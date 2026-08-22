@@ -2,9 +2,9 @@
 
 ## 목표
 
-기존 Python 코드를 옮기지 않고, V2에서 다시 구현할 기능·도메인 규칙·데이터 계약·실패
-사례만 선별한다. 이 단계는 문서와 검증 fixture 설계 단계이며 애플리케이션 코드를 만들지
-않는다.
+V2 범위를 선별한다. service 레이어는 Kotlin에서 다시 구현할 기능·도메인 규칙·데이터
+계약·실패 사례만 고르고, ML 레이어는 재활용 가능한 코드 범위와 잘라낼 결합을 식별한다.
+이 단계는 문서와 검증 fixture 설계 단계이며 애플리케이션 코드를 만들지 않는다.
 
 ## 선행 조건
 
@@ -63,7 +63,7 @@
 
 최소 다음 결정을 기록한다.
 
-1. Kotlin modular application + Python ML engine
+1. Kotlin modular application + Python ML engine, 그리고 service 재작성 / ML 재활용 경계
 2. Gradle module과 의존 방향
 3. 금액/rate/basis 표현
 4. gRPC/Protobuf 내부 계약
@@ -71,6 +71,15 @@
 6. domain event/outbox/notification 방식
 7. 테스트 pyramid와 mutation 대상
 8. React UI 재사용/재작성/후속 여부
+9. ML 재활용 출처 기록 위치 — `docs/discovery/legacy-reference-map.md` 통합 vs slice별
+   `reports/evidence/` 기록. 사용자 확인을 받아 결정한다(2026-08-22 지시).
+
+### 추가 조사 항목 — ML 재활용 대상 래칫 사전 조사
+
+legacy-scout 조사 범위에 다음을 포함한다: `app/ai/predictors/`,
+`app/services/ml_training/`, `app/services/ml_release/`의 파일·함수 크기와 결합 지점.
+기존 ML 코드가 V2 래칫(함수 50줄, 파일 500줄)을 만족하는지 확인하고, 미달 모듈은
+M5에서 "이식 시 분해"할지 allowlist 사유를 쓸지 판단할 근거를 남긴다.
 
 ## 산출물
 
@@ -89,7 +98,9 @@ fixtures/manifest.yaml              # schema와 후보 목록만
 ## 완료 조건
 
 - V2 필수 capability마다 사용자 가치와 acceptance scenario가 있다.
-- Python 파일/endpoint를 그대로 옮기는 작업 항목이 없다.
+- Kotlin service 범위에 Python 파일/endpoint를 그대로 옮기는 작업 항목이 없다.
+- ML 재활용 대상은 모듈 단위로 식별되고, 잘라낼 결합(ORM, DB, 설정, 업무 판정)이 명시돼
+  있다. 재활용은 기대값 판정 근거가 아니라 구현 전략으로만 기록한다.
 - 모든 도메인 숫자의 unit/basis/provenance가 정의되거나 `OPEN`이다.
 - 기존 회귀마다 V2의 타입·계약·테스트 중 최소 하나의 예방책이 있다.
 - Python 결과가 정답이 아니라 참고임을 모든 관련 문서가 일관되게 명시한다.

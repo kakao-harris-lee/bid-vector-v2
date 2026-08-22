@@ -112,9 +112,15 @@ rollback: 이번 slice의 신규 V2 wiring을 비활성화하는 방법
     }
   ],
   "commands_run": ["..."],
-  "residual_risks": ["..."]
+  "residual_risks": ["..."],
+  "reviewer": { "cli_version": "codex-cli x.y.z", "model": "<리뷰에 사용한 모델>" }
 }
 ```
+
+`reviewer` 필드는 리뷰 재현성을 위한 메타데이터다. Codex 출력에 없으면 리뷰 레인이
+저장 전에 실측값(`codex --version`, 설정된 모델)으로 채워 넣는다. 이 주입은 verdict와
+findings를 변경하지 않는 메타데이터 추가로, 판정 수정 금지 규칙의 예외가 아니라
+계약이 위임한 기록 행위다.
 
 다음 중 하나면 `request_changes`다.
 
@@ -137,7 +143,10 @@ rollback: 이번 slice의 신규 V2 wiring을 비활성화하는 방법
 - Codex에는 요구사항, base/head, diff, repository만 제공한다.
 - 리뷰 산출물은 append-only 경로에 저장하고 덮어쓰지 않는다.
 - 재리뷰는 이전 finding과 새 diff를 모두 확인하되, 새 HEAD 전체를 다시 검증한다.
-- 자동 수정과 자동 merge는 금지한다.
+- 자동 수정과 자동 merge는 금지한다. 여기서 자동 수정 금지란 리뷰 레인(Codex)이
+  finding을 스스로 고치는 것을 뜻한다. Claude가 finding을 받아 별도 커밋으로 수정하고
+  재검증·재리뷰를 거치는 수정 라운드는 이 금지에 해당하지 않으며, 아래 상한(두 번의
+  수정 라운드)을 따른다. merge는 어떤 경우에도 사용자 결정이다.
 - 두 번의 수정 라운드 후에도 blocker가 남으면 자동 반복을 중단하고 사용자에게 판단을
   요청한다.
 
