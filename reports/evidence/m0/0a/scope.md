@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a-capability-map
 base_sha: 3dc7d26333e9f3699c3fd1149651fe54500b6f27
-head_sha: df78c77c11b3270abc12ed2a174c6bc247f03466  # 재리뷰 전 최종 산출물 커밋. 아래 갱신 이력 참조
+head_sha: 0b48eaa647fe2e0cc095d1602b7167bdf8f5a584  # 수정 라운드 2 최종 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a/
@@ -75,3 +75,23 @@ blocker 0 / high 2 / medium 2)의 finding을 finding별 커밋으로 반영했�
   분류 줄 형식 위반 0, `V2 필수` 63건의 사용자 가치·acceptance 결측 0. `checklist.md`와
   `commands.md`는 수치가 그대로여서 갱신하지 않았다.
 - verifier L-3~L-6은 미처리다(재검증 판정이 `ready-for-review`이고 지시 범위 밖).
+
+### 2026-08-22 — 수정 라운드 2 (Codex 재리뷰 `request_changes` 대응, spec-writer)
+
+재리뷰(`codex-review-20260822T065525Z.json`, verdict `request_changes`,
+blocker 0 / high 4 / medium 1)의 신규 finding을 finding별 커밋으로 반영했다. 라운드 1의
+finding 4건은 재리뷰에서 해소로 확인됐다.
+
+| 커밋 | 대응 | 요지 |
+| --- | --- | --- |
+| `adf584e` | high #1 · #2 | OPS-09 acceptance를 §0.5 조건부 형식으로 전환. OPS-04에서 측정 불가의 초록 변환을 제거하고 정상/임계 초과/측정 불가 3-상태로 분리 |
+| `8f3a0b8` | high #3 | NOTI-04 사용자 가치와 acceptance 정렬. 금액-선도착 경로의 가치 공백을 명시하고 재통지 여부를 `OPEN-NOTI-08`로 신설·조건부화 |
+| `0b48eaa` | high #4 + evidence | OPS-13 acceptance에 크기 외 결합도 축 6종 추가. 라운드 2 evidence(`commands.md` D1~D5, checklist §8, 리뷰 JSON) |
+
+- `head_sha`를 `df78c77` → `0b48eaa`로 갱신했다.
+- **재리뷰 range는 `3dc7d26...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+  이전 라운드와 같은 이유로 `head_sha`는 그 직전 커밋을 가리킨다.
+- finding #5(strict/정본 verdict 스키마의 `line` 계약 불일치)는 `.claude/skills/` 하위
+  하네스 소관이며 이 slice의 in_scope 밖이다. 팀 리드가 별도로 해소했다.
+- 산출물 변화: capability 94(불변), 활성 `OPEN` 65 → 66(`OPEN-NOTI-08` 신설),
+  `capability-map.md` 2,518 → 2,591줄. 분류 집계 63/14/6/11 불변.
