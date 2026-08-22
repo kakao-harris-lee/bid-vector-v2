@@ -1,9 +1,9 @@
 # M0 / 0A — 완료 조건 대조 checklist
 
-- 작성: 라운드 0(2026-08-22) → **수정 라운드 1(2026-08-22, Codex `request_changes` 대응)**
-- 산출물: `docs/discovery/capability-map.md` (2,518줄)
+- 작성: 라운드 0 → 수정 라운드 1 → **수정 라운드 2(2026-08-22, Codex 재리뷰 `request_changes` 대응)**
+- 산출물: `docs/discovery/capability-map.md` (2,591줄)
 - 함께 볼 것: `commands.md`(리뷰 메타데이터·라운드별 검증 명령),
-  `codex-review-20260822T061532Z.json`(finding 원문)
+  `codex-review-20260822T061532Z.json`·`codex-review-20260822T065525Z.json`(finding 원문)
 - 기준: `reports/evidence/m0/0a/scope.md`의 `acceptance_commands` 4항목
   (= `milestone-0.md` 완료 조건 중 0A 담당 항목)
 - 규격: `.claude/skills/evidence-pack/SKILL.md` §"문서 slice(M0)의 evidence"
@@ -148,19 +148,20 @@
 
 ## 2. OPEN 결정 잔여 수
 
-- **잔여 `OPEN` 65건** (`capability-map.md` §12).
+- **잔여 `OPEN` 66건** (`capability-map.md` §12).
   - G1 도메인 의미론(외부 공식 정의 확인 필요): 7
   - G2 정책 값·임계 근거: 10
-  - G3 V2 범위 결정: 15
+  - G3 V2 범위 결정: 16
   - G4 legacy 동작이 의도인가 결함인가: 17
   - G5 미검증 수치 재측정: 9
   - G6 외부 확인 / ADR 연계: 7
-- 수정 라운드 1에서 **`OPEN-SET-10` 1건을 신설**했다(64 → 65). SET-06의 시간축 대체
-  규칙을 승인된 정책으로 채택할지는 임의로 정할 수 없고 legacy 근거가 단일 실측뿐이다.
+- 수정 라운드 1에서 **`OPEN-SET-10`**(64 → 65), 라운드 2에서 **`OPEN-NOTI-08`**(65 → 66)을
+  신설했다. 둘 다 legacy 동작을 확정하는 대신 근거 부재를 사용자 결정으로 올린 것이다 —
+  전자는 성숙도 시간축 대체 정책, 후자는 늦게 확정된 낙찰/패찰 판정의 재통지 여부다.
 - 이 slice에서 통합·해소된 항목 3건(`OPEN-OPS-06` 해소, `OPEN-NOTI-03`·`OPEN-SET-07` 통합)은
   §12.1에 결번 사유와 함께 기록했다.
 - 검증: `grep -oE 'OPEN-(COL|STR|QUAL|ML|DEC|NOTI|SET|OPS|NUM)-[0-9]+' … | sort -u | wc -l`
-  → 68 (활성 65 + 결번 3).
+  → 69 (활성 66 + 결번 3).
 - **acceptance가 OPEN을 암묵적으로 해소하지 않는지**를 수정 라운드 1에서 전수 확인했다
   (`commands.md` C2). Codex 지목 4곳 + 자체 발견 2곳을 조건부 시나리오로 재서술했고,
   규약을 `capability-map.md` §0.5에 명문화했다.
@@ -258,3 +259,24 @@ verifier low 6건 중 함께 처리한 것:
 | F-4 | ML-04에 측정일 `2026-08-11` 보완(원본 `assessment_shrinkage.py:6`). §11.2를 "측정일이 확인된 항목"과 "`(측정일 미기재)`"로 분리하고 미기재 4건을 표시. 라벨만 "측정일 병기"이고 날짜가 없던 COL-07·STR-09도 정정 |
 | F-6 | secret 스캔을 evidence-pack 규격 전체 패턴(`BEGIN (RSA\|EC\|OPENSSH)` 포함)으로 재실행·기록. 추가 매치 0건 |
 | F-5 | **미처리.** 디렉터리 없는 파일명 154건의 다중 해석 가능성. 인용 표기 규약 변경이라 문서 전반 재작성이 필요하고, verifier 표본 검증에서 오해석 0건·미해석 0건이었다. 후속 라운드 또는 0B 작성 시 표기 규약을 함께 정하는 것을 권고한다 |
+
+## 8. 수정 라운드 2 — finding별 처리
+
+Codex 재리뷰 `request_changes` (blocker 0 / high 4 / medium 1). 라운드 1의 finding 4건은
+해소로 확인됐고 이번 4건은 신규다. 원문은 `codex-review-20260822T065525Z.json`, 검증
+명령·출력은 `commands.md` D1~D5에 있다.
+
+| # | severity | 처리 | 산출물 변화 |
+| --- | --- | --- | --- |
+| 1 | high | OPS-09 acceptance를 §0.5 조건부 형식으로 전환. 무조건 5항목(구조화 신호 분류, `Unclassified`의 별도 값 관측, 재시도 가능성의 **선언 여부** 검증)과 조건부 1항목(`OPEN-OPS-01` 정책 질문)으로 분리. V2 제약의 단정도 제거 | §0.5 조건부 보유 목록 6 → 7 |
+| 2 | high | OPS-04에서 측정 불가의 초록 변환을 제거. 정상 / 임계 초과 / **측정 불가(중립)** 3-상태로 분리하고, 표시 계층에서도 성공 색상으로 렌더링되지 않음을 acceptance로 고정 | `legacy 형태 처리` 신설, V2 제약에 상태→표시 매핑 추가 |
+| 3 | high | NOTI-04의 사용자 가치를 실제 배달되는 것으로 재서술하고, 금액-선도착 경로의 **가치 공백을 명시**. 재통지 여부는 근거가 없어 `OPEN-NOTI-08`로 신설하고 acceptance를 조건부화 | OPEN 65 → 66, §0.5에 복수 조건부 묶음 표기 규칙 추가 |
+| 4 | high | OPS-13 acceptance에 v2-지침서 §5의 크기 외 축 전부 추가 — fan-in/fan-out, public API 예산, 순환 의존, duplicate helper, 복잡도, `domain <- application <- adapters/app` 의존 방향. **크기를 한도 안에 유지한 채로도** 실패해야 함을 명시 | 크기 외 축의 근거(legacy mixin god-class 사례) 추가 |
+| 5 | medium | **범위 밖.** `.claude/skills/` 하위 스키마 계약 문제로 하네스 소관이며 팀 리드가 별도 해소했다 | — |
+
+라운드 2 불변 확인: capability 94건(추가·분리 없음), 분류 63/14/6/11, 분류 줄 형식 위반
+0, `V2 필수` 사용자 가치·acceptance 결측 0, 중복 ID 0, secret 스캔 신규 매치 0.
+
+전수 스윕(`commands.md` D1)에서 신규 OPEN 2건을 포함해 다시 대조한 결과 finding 1의
+OPS-09 외에 추가 위반은 없었다. SET-06(`OPEN-SET-10`)은 "승인된 대체 출처"라는 중립
+표현이라 어느 결정에도 성립하고, STR-15(`OPEN-STR-04`)는 이미 조건부 형식이다.

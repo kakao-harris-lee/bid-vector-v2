@@ -1,0 +1,67 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "3dc7d26333e9f3699c3fd1149651fe54500b6f27",
+  "reviewed_head": "707b683b6c9f597be00f32fed43ad03976e1c590",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/discovery/capability-map.md",
+      "line": 2085,
+      "evidence": "OPS-09의 acceptance는 분류 불가 실패를 자동 재시도하지 않는다고 확정하지만, 같은 블록과 OPEN-OPS-01(2479행)은 retryable 여부를 사용자 결정이 남은 정책 OPEN으로 명시한다. 작성자 임시 판단이라는 설명만으로는 §0.5의 조건부 acceptance 규칙을 충족하지 않으며, 사용자가 선택지 (a)를 택하면 현재 acceptance가 즉시 모순된다.",
+      "required_fix": "OPEN-OPS-01이 해소될 때까지 해당 acceptance를 retryable/non-retryable 두 선택지에 따른 조건부 시나리오로 작성하거나, 사용자 결정으로 정책을 확정한 뒤 OPEN 목록과 acceptance를 함께 갱신하라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/capability-map.md",
+      "line": 1956,
+      "evidence": "V2 필수인 OPS-04가 측정 불가를 명시적 타입으로 보존하면서도 운영 상태를 '초록 + 사유'로 정의한다. 이는 Unmeasurable을 정상/성공 색상으로 변환하여 브로커 관측 실패를 정상 큐와 같은 최상위 상태로 보이게 하며, 필수 위험인 Unmeasurable의 성공 변환을 남긴다.",
+      "required_fix": "측정 불가는 정상/초록과 구별되는 중립 또는 unknown 상태로 표시하고, 정상·임계 초과·측정 불가가 서로 다른 관측 결과임을 acceptance scenario로 고정하라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/capability-map.md",
+      "line": 1462,
+      "evidence": "NOTI-04의 사용자 가치는 운영자가 낙찰/패찰 여부를 자동 통지받는 것이지만, 무조건 acceptance는 판정이 비어 있는 알림을 먼저 보낸 뒤 실제 판정이 도착해도 재통지하지 않도록 고정한다. 이 시나리오에서는 기록만 사후 정정되고 사용자는 낙찰/패찰 결과를 자동 통지받지 못하므로 capability의 관찰 가능한 가치가 충족되지 않는다.",
+      "required_fix": "outcome이 확정되는 전이에 멱등한 결과 통지 또는 기존 메시지 갱신을 요구하라. 재통지를 의도적으로 하지 않는다면 capability를 단순 개찰 알림과 기록 대사로 분리하고 '낙찰/패찰 결과 자동 통지'를 V2 필수로 주장하지 마라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/capability-map.md",
+      "line": 2168,
+      "evidence": "OPS-13의 acceptance는 함수·파일 크기, allowlist, 환경 스니핑만 검증한다. 그러나 승인된 v2-지침서.md 278-285행은 크기와 함께 모듈 fan-in/fan-out, public API 수, 순환 의존, duplicate helper를 측정하도록 요구한다. 현재 시나리오로는 파일 크기만 맞춘 순환 의존이나 과도한 public API가 모두 통과한다.",
+      "required_fix": "fan-in/fan-out, public API 예산, 순환 의존, 중복 helper 및 domain 의존 방향을 위반하는 변이가 CI에서 실패하는 관찰 가능한 acceptance scenario를 OPS-13에 추가하라."
+    },
+    {
+      "severity": "medium",
+      "file": ".claude/skills/codex-review-gate/references/codex-output.strict.schema.json",
+      "line": 20,
+      "evidence": "strict 출력 스키마는 findings[].line을 required이면서 integer|null로 허용하지만 정본 codex-verdict.schema.json은 line을 선택적 integer(minimum 1)로만 허용한다. 따라서 strict 스키마가 허용한 null 결과는 SKILL.md 71-74행이 주장하는 정본 검증을 통과할 수 없고, 판정 JSON 보정 금지 때문에 저장 레인이 복구할 수도 없다.",
+      "required_fix": "두 스키마의 line 계약을 동일하게 맞춰라. 현재 리뷰 계약처럼 대표 행을 요구한다면 양쪽 모두 required integer(minimum 1)로 만들고, 파일 전체 finding에 null을 허용하려면 정본도 required nullable로 바꾼 뒤 실제 structured-output 및 정본 검증 회귀를 추가하라."
+    }
+  ],
+  "commands_run": [
+    "git status --short --branch; git rev-parse HEAD; git cat-file -t 3dc7d26333e9f3699c3fd1149651fe54500b6f27; git cat-file -t 707b683b6c9f597be00f32fed43ad03976e1c590; git merge-base 3dc7d26333e9f3699c3fd1149651fe54500b6f27 707b683b6c9f597be00f32fed43ad03976e1c590; git ls-files --others --exclude-standard",
+    "git log --oneline --decorate --graph 3dc7d26333e9f3699c3fd1149651fe54500b6f27..707b683b6c9f597be00f32fed43ad03976e1c590; git diff --stat 3dc7d26333e9f3699c3fd1149651fe54500b6f27...707b683b6c9f597be00f32fed43ad03976e1c590; git diff --name-status 3dc7d26333e9f3699c3fd1149651fe54500b6f27...707b683b6c9f597be00f32fed43ad03976e1c590",
+    "sed -n '1,260p' milestone-0.md; sed -n '1,280p' agent-workflow.md; sed -n '1,360p' v2-지침서.md",
+    "nl -ba reports/evidence/m0/0a/scope.md; nl -ba reports/evidence/m0/0a/commands.md; nl -ba reports/evidence/m0/0a/checklist.md; nl -ba reports/evidence/m0/0a/codex-review-20260822T061532Z.json",
+    "git diff --unified=80 3dc7d26333e9f3699c3fd1149651fe54500b6f27...707b683b6c9f597be00f32fed43ad03976e1c590 -- .claude/skills/codex-review-gate/SKILL.md .claude/skills/codex-review-gate/references/codex-output.strict.schema.json CLAUDE.md",
+    "python3 capability-map block parser: classification counts, duplicate IDs, V2 필수 사용자 가치/acceptance, OPEN ID 집계를 독립 재검증",
+    "rg -n -C 3 'Uncertain|Unmeasurable|측정 불가|판정 불가|0\\.0|초록|성공|fallback|폴백|default|기본값' docs/discovery/capability-map.md",
+    "rg -n -C 2 '재시도|retry|멱등|idempot|outbox|dry-run|write|발송|송신|부작용' docs/discovery/capability-map.md",
+    "rg -n -C 3 'public API|순환 의존|fan-in|fan-out|import boundary|의존 방향|architecture test' docs/discovery/capability-map.md",
+    "python3 strict/canonical verdict schema comparison probe for findings[].line required/type compatibility",
+    "wc -l docs/discovery/capability-map.md; rg -n 'api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)' docs/discovery/ reports/evidence/m0/0a/",
+    "git diff --check 3dc7d26333e9f3699c3fd1149651fe54500b6f27...707b683b6c9f597be00f32fed43ad03976e1c590",
+    "codex --version; codex exec --help"
+  ],
+  "residual_risks": [
+    "이 worktree에는 원본 bid-vector 저장소와 _workspace scout 노트가 없어 capability map의 legacy 파일·라인·commit 인용을 원본과 대조하지 못했다.",
+    "활성 OPEN 65건이 남아 있다. 이번 판정은 OPEN 자체를 결함으로 보지 않았지만, 다음 단계 진행에는 milestone-0.md가 요구하는 사용자 결정 또는 명시적 진행 승인이 필요하다.",
+    "문서 slice이므로 acceptance scenario의 실제 production wiring, DB·알림 side effect, retry/멱등 동작은 실행 검증할 수 없었다.",
+    "새 strict 스키마를 실제 외부 structured-output 요청으로 재실행하지 않았으며 정적 계약 정합성만 검증했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.148.0",
+    "model": "gpt-5.6-sol (model_reasoning_effort=high)"
+  }
+}

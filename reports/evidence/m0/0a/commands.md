@@ -163,3 +163,101 @@ $ git status --porcelain
 ```
 
 - exit: 0. in_scope 밖 변경 없음. `_workspace/`, `bid-vector/`는 미변경.
+
+---
+
+## 2026-08-22 — Codex 재리뷰 라운드 2 (수신)
+
+| 항목 | 값 |
+| --- | --- |
+| 산출물 | `reports/evidence/m0/0a/codex-review-20260822T065525Z.json` |
+| CLI | codex-cli 0.148.0 |
+| 모델 | gpt-5.6-sol (`model_reasoning_effort=high`) |
+| reviewed_base | `3dc7d26333e9f3699c3fd1149651fe54500b6f27` |
+| reviewed_head | `707b683b6c9f597be00f32fed43ad03976e1c590` |
+| verdict | `request_changes` |
+| findings | blocker 0 / high 4 / medium 1 |
+
+라운드 1의 finding 4건은 해소로 확인됐고, 이번 4건은 **신규**다.
+
+| # | severity | 위치 | 요지 |
+| --- | --- | --- | --- |
+| 1 | high | capability-map.md:2085 | OPS-09 acceptance가 `OPEN-OPS-01`의 정책 질문을 확정 — 라운드 1 #1 계열 잔존 |
+| 2 | high | capability-map.md:1956 | OPS-04가 측정 불가를 초록(정상)으로 변환 |
+| 3 | high | capability-map.md:1462 | NOTI-04 사용자 가치와 acceptance 불일치 |
+| 4 | high | capability-map.md:2168 | OPS-13 acceptance가 크기 축만 검증 |
+| 5 | medium | `.claude/skills/codex-review-gate/references/codex-output.strict.schema.json` | strict/정본 스키마의 `line` 계약 불일치 — **하네스 소관, spec-writer 범위 밖** |
+
+---
+
+## 2026-08-22 — 수정 라운드 2 검증
+
+### D1. OPEN / acceptance 모순 전수 재확인 (finding 1 대응 + 신규 OPEN 반영)
+
+라운드 1 이후 `OPEN-SET-10`·`OPEN-NOTI-08`이 신설됐으므로 전수 스윕을 다시 돌렸다.
+OPEN을 언급하면서 acceptance를 가진 블록 26개의 조건부 표기 유무를 대조했다.
+
+```
+$ python3 - <<'PY'   # 블록별 OPEN ID와 조건부 묶음 유무
+...
+PY
+COL-08 / STR-03 / STR-11 / STR-15 / QUAL-02 / QUAL-04 / DEC-03 / DEC-04 / DEC-06 /
+DEC-08 / DEC-10 / NOTI-01 / NOTI-05 / NOTI-08 / NOTI-10 / SET-01 / SET-06 / OPS-04 /
+OPS-12  → 조건부 없음 (acceptance가 해당 OPEN의 쟁점 축을 건드리지 않음)
+STR-08 / QUAL-03 / ML-03 / DEC-02 / NOTI-04 / OPS-03 / OPS-09 → 조건부 보유
+```
+
+- exit: 0
+- 신규 OPEN 2건 재확인 결과: **SET-06**(`OPEN-SET-10`)의 acceptance는 "승인된 대체 출처"
+  라는 중립 표현을 써서 대체 채택 여부 어느 쪽으로 결정돼도 성립한다(미채택이면 대체 행이
+  0건이고 나머지 항목은 그대로 유지). **STR-15**(`OPEN-STR-04`)는 `근거 부족`이며
+  `채택 시 요구되는 관찰 가능 동작` 제목을 쓰므로 이미 조건부 형식이다.
+- 추가 위반 0건. finding 1의 OPS-09만 조건부로 전환했다.
+
+### D2. 분류·acceptance·ID 불변 재검증
+
+```
+$ python3 - <<'PY'   # 분류 백틱 전수 검사 + 중복 ID + OPEN 참조/등록 대조
+...
+PY
+분류: {'V2 필수': 63, '근거 부족': 11, '폐기': 6, '후속': 14} = 94
+형식 위반: none | V2 필수 결측: none
+중복 ID: none
+본문 참조 - 표 등록: ['OPEN-NOTI-03', 'OPEN-OPS-06', 'OPEN-SET-07']
+```
+
+- exit: 0
+- 표에 없는 참조 3건은 §12.1에 결번 사유가 기록된 통합·해소 항목이다(신규 누락 아님).
+- capability 94건, 분류 집계 불변. 이번 라운드는 capability를 추가·분리하지 않았다.
+
+### D3. OPEN 집계
+
+```
+$ python3 - <<'PY'   # G1~G6 표 행 수와 선언 대조
+G1 7 / G2 10 / G3 16 / G4 17 / G5 9 / G6 7
+table total 66 | **총 66건** (G1 7 / G2 10 / G3 16 / G4 17 / G5 9 / G6 7)
+```
+
+- exit: 0. `OPEN-NOTI-08` 신설로 65 → 66 (G3 15 → 16).
+
+### D4. 규모·secret 스캔
+
+```
+$ wc -l docs/discovery/capability-map.md
+2591
+
+$ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" docs/discovery/ | wc -l
+3
+```
+
+- exit: 0. 매치 3건은 라운드 0부터 동일한 일반 명사(외부 API 오류 문구 인용 1건, webhook
+  인증 메커니즘 설명 2건)이며 새 매치가 없다.
+
+### D5. clean tree
+
+```
+$ git status --porcelain
+(출력 없음)
+```
+
+- exit: 0.
