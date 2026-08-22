@@ -1,0 +1,13 @@
+# 로컬 작업 산출물 — 리뷰 대상 아님 (B2: clean-tree 게이트)
+_workspace/
+.omc/
+
+# 기존 프로젝트 참조용 symlink — V2 저장소의 일부가 아님
+bid-vector
+
+# codex 리뷰 레인의 로컬 실행 산출물
+*.raw-output.txt
+
+# 전역 gitignore(~/.gitignore_global)가 CLAUDE.md를 제외하지만,
+# 이 프로젝트에서는 역할별 진입점 문서라 커밋 대상이다 (README '문서 읽는 순서')
+!CLAUDE.md

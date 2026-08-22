@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex slice review verdict (agent-workflow.md §4)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "reviewed_base", "reviewed_head", "findings", "commands_run", "residual_risks"],
+  "properties": {
+    "verdict": { "enum": ["approve", "request_changes"] },
+    "reviewed_base": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "reviewed_head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "file", "evidence", "required_fix"],
+        "properties": {
+          "severity": { "enum": ["blocker", "high", "medium", "low"] },
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "evidence": { "type": "string", "minLength": 1 },
+          "required_fix": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "commands_run": { "type": "array", "items": { "type": "string" } },
+    "residual_risks": { "type": "array", "items": { "type": "string" } },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cli_version", "model"],
+      "properties": {
+        "cli_version": { "type": "string" },
+        "model": { "type": "string" }
+      }
+    }
+  }
+}
