@@ -17,7 +17,7 @@
         "properties": {
           "severity": { "enum": ["blocker", "high", "medium", "low"] },
           "file": { "type": "string" },
-          "line": { "type": "integer", "minimum": 1 },
+          "line": { "type": ["integer", "null"], "minimum": 1 },
           "evidence": { "type": "string", "minLength": 1 },
           "required_fix": { "type": "string", "minLength": 1 }
         }
