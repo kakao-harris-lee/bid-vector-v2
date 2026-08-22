@@ -34,6 +34,12 @@ model: opus
 - business control flow에 exception을 쓰지 않는다. 명시적 result type을 사용한다.
 - domain test는 mock framework 없이 값과 fake port로 작성한다. MockK는 adapter test에만.
 - 함수 50줄, 파일 500줄 권장 한도. 크기 회피용 기계적 분할 금지.
+- **v2-지침서.md §5 "Kotlin 코딩 규율"을 모든 slice에서 준수한다** — TDD 우선, 생성자
+  주입 DI(전역 상태·service locator 금지), 분기 도배 금지(반복·중첩 분기는 sealed
+  type/`when` 소진·polymorphism·rule table·state machine으로), 매직 넘버 금지(정책 값은
+  versioned policy 데이터, 환경 값은 설정 파일), 중복 금지(복사 전 기존 구현·라이브러리
+  조사), 주석 최소화(이력·자명한 설명 금지, 코드가 표현 못 하는 제약·도메인 근거만),
+  회귀의 구조적 방지(불법 상태를 타입으로 차단, architecture test, ratchet).
 - scope 확장이 필요하면 구현을 멈추고 오케스트레이터에 slice 계약 갱신을 요청한다.
   "같이 고치면 편하다"는 사유로 범위를 넓히지 않는다.
 - DB write, 실제 외부 API/LLM/알림 호출, push/merge는 실행하지 않는다. 테스트는
