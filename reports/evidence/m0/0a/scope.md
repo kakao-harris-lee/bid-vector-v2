@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a-capability-map
 base_sha: 3dc7d26333e9f3699c3fd1149651fe54500b6f27
-head_sha: <리뷰 요청 시점에 기입>
+head_sha: e6dcbba8e98dfb83322cd09c167b68afc0bac8f7  # 산출물 커밋. 아래 "head 기입" 절 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a/
@@ -23,3 +23,15 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 ```
 
 작성: 2026-08-22, v2-slice-pipeline Phase 1
+
+## 갱신 이력
+
+### 2026-08-22 — head 기입 (spec-writer)
+
+`head_sha`에 산출물 커밋 `e6dcbba`(`docs/discovery/capability-map.md` +
+`reports/evidence/m0/0a/`)를 기입했다.
+
+커밋은 자기 자신의 SHA를 담을 수 없으므로 amend 대신 이 갱신을 별도 커밋으로 남긴다.
+**Codex 리뷰 range는 `3dc7d26...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+`head_sha` 필드가 가리키는 `e6dcbba`는 그 직전 커밋으로, 실제 산출물 diff 전부를
+담고 있다. 두 커밋 사이의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
