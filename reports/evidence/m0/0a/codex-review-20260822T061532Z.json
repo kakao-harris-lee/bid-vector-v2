@@ -1,0 +1,59 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "3dc7d26333e9f3699c3fd1149651fe54500b6f27",
+  "reviewed_head": "ff754c224beb55273dca30d75d0603dd6280e27e",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/discovery/capability-map.md",
+      "line": 570,
+      "evidence": "QUAL-03은 공식 정의를 확인하지 않은 legacy의 그룹 간 OR/그룹 내 AND 해석을 최상위 미해결 항목 OPEN-QUAL-01로 남기면서도(560, 565-568, 2283행), acceptance에서는 그 해석과 결측 그룹의 AND fold를 확정한다(569-573행). 같은 모순이 STR-08(416행 대 OPEN-STR-08 2335행), ML-03(761-766행 대 OPEN-ML-03 2344행), NOTI-04(1383행 대 OPEN-NOTI-01 2329행)에도 있다. 이는 '어떤 OPEN도 임의로 해소하지 않았다'는 2270-2273행의 선언과 모순되고, 미승인 legacy 동작을 V2 기대값으로 고정한다.",
+      "required_fix": "각 OPEN과 충돌하는 acceptance를 결정 전 조건부 시나리오로 바꾸거나 제거하라. 해당 동작을 확정하려면 사용자 결정과 근거·시점을 기록하고 OPEN을 해소한 뒤 acceptance를 고정하라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/capability-map.md",
+      "line": 1641,
+      "evidence": "SET-06 acceptance는 개찰 시각이 없으면 마감 시각으로 대체하고 둘 다 없으면 행을 분모에서 조용히 제외하도록 요구한다. 대체 출처를 결과에 보존하거나 제외 사유를 관측시키는 조건이 없으므로 시간 provenance가 소실되고, 주 경계가 바뀌거나 분모가 축소되어 성숙도가 부풀 수 있다. 이는 침묵 fallback 금지와 Unmeasurable/사유 보존 규율에 어긋난다.",
+      "required_fix": "개찰 시각 결측을 사유와 provenance가 있는 측정 불가로 모델링하라. 마감 시각 대체가 승인된 정책이라면 원본 시각 종류와 정책 version을 보존하고, 주 경계 이동 및 성숙도 분모 왜곡이 없음을 관찰 가능한 acceptance로 명시하라. 어떤 경우에도 행을 사유 없이 분모에서 제외하지 마라."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/discovery/capability-map.md",
+      "line": 487,
+      "evidence": "STR-13 하나가 `후속`과 `근거 부족` 두 분류를 동시에 가진다. 요구사항은 capability마다 네 어휘 중 하나를 요구하지만 checklist의 검증기는 첫 backtick 값만 잘라 `후속`으로 집계하므로 이 위반을 놓치고 A3를 충족으로 보고한다.",
+      "required_fix": "튜닝 추천과 무승인 자동 반영을 별도 capability로 분리해 각각 하나의 분류를 부여하거나 STR-13 전체에 단일 분류를 부여하라. 검증기는 분류 줄 전체가 허용된 단일 값과 부가 설명 형식에 맞는지 검사해 두 번째 분류가 있으면 실패하게 하라."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/discovery/capability-map.md",
+      "line": 842,
+      "evidence": "ML-07의 '정책 상수를 관측 데이터에서 역산해 굳히지 않는다'는 작성 의도/절차 규율이지 입력과 기대 결과로 재현할 수 있는 acceptance scenario가 아니다. checklist 51-52행의 '모든 scenario가 관측 가능하다'는 판정과 맞지 않는다.",
+      "required_fix": "이를 승인 근거·effective date·policy version을 가진 관측 가능한 정책 산출물 계약과, CLI·환경변수·런타임 입력으로 임계를 완화할 수 없음을 검증하는 시나리오로 바꾸거나 acceptance 밖의 작업 규율로 이동하라."
+    }
+  ],
+  "commands_run": [
+    "pwd; git status --short --branch; git rev-parse --verify 3dc7d26333e9f3699c3fd1149651fe54500b6f27^{commit}; git rev-parse --verify ff754c224beb55273dca30d75d0603dd6280e27e^{commit}; git rev-parse HEAD; rg --files -g 'AGENTS.md' -g '!**/.git/**'",
+    "git log --oneline --decorate --no-merges 3dc7d26333e9f3699c3fd1149651fe54500b6f27..ff754c224beb55273dca30d75d0603dd6280e27e; git diff --stat 3dc7d26333e9f3699c3fd1149651fe54500b6f27...ff754c224beb55273dca30d75d0603dd6280e27e; git diff --name-status 3dc7d26333e9f3699c3fd1149651fe54500b6f27...ff754c224beb55273dca30d75d0603dd6280e27e; git ls-files --others --exclude-standard",
+    "rg -n '^#|^##|^###|Codex 독립 리뷰|capability|0A|관찰|acceptance|금지|완료 조건|판정|verdict|findings|residual_risks' agent-workflow.md milestone-0.md v2-지침서.md; find docs/adr -maxdepth 2 -type f -print; find reports/evidence/m0/0a -maxdepth 2 -type f -print | sort",
+    "nl -ba agent-workflow.md | sed -n '42,165p'; nl -ba milestone-0.md | sed -n '1,135p'; nl -ba v2-지침서.md | sed -n '1,225p'; nl -ba v2-지침서.md | sed -n '291,360p'",
+    "nl -ba reports/evidence/m0/0a/scope.md; nl -ba reports/evidence/m0/0a/checklist.md | sed -n '1,260p'; nl -ba docs/discovery/capability-map.md | sed -n '1,260p'",
+    "python3 - <<'PY' (reports/evidence/m0/0a/checklist.md의 A1 검증 스크립트를 그대로 재실행)",
+    "grep -c '분류 근거' docs/discovery/capability-map.md; grep -c '^- \\*\\*분류\\*\\*:' docs/discovery/capability-map.md; grep -coE 'commit `[0-9a-f]{7}`' docs/discovery/capability-map.md | wc -l; grep -oE 'OPEN-(COL|STR|QUAL|ML|DEC|NOTI|SET|OPS|NUM)-[0-9]+' docs/discovery/capability-map.md | sort -u | wc -l",
+    "python3 -c 'capability 블록의 분류 수, V2 필수 사용자 가치/acceptance 누락, 복수 분류를 검사'",
+    "python3 - <<'PY' (세 변경 문서의 상대 Markdown 링크 존재 여부 검사)",
+    "rg -n 'OPEN-STR-08|OPEN-QUAL-01|OPEN-ML-03|OPEN-NOTI-01|개찰 시각이 없으면|정책 상수를 관측 데이터에서 역산' docs/discovery/capability-map.md",
+    "git diff --check 3dc7d26333e9f3699c3fd1149651fe54500b6f27...ff754c224beb55273dca30d75d0603dd6280e27e; git diff --name-only 3dc7d26333e9f3699c3fd1149651fe54500b6f27...ff754c224beb55273dca30d75d0603dd6280e27e | rg '\\.(kt|kts|java|py|js|ts|tsx|sql|proto)$' || true; rg -n 'api[_-]?key|secret|token|password|Bearer ' docs/discovery/ reports/evidence/m0/0a/",
+    "git merge-base 3dc7d26333e9f3699c3fd1149651fe54500b6f27 ff754c224beb55273dca30d75d0603dd6280e27e; git rev-list --count 3dc7d26333e9f3699c3fd1149651fe54500b6f27..ff754c224beb55273dca30d75d0603dd6280e27e; git show --stat --oneline --decorate e6dcbba8e98dfb83322cd09c167b68afc0bac8f7; git show --stat --oneline --decorate ff754c224beb55273dca30d75d0603dd6280e27e",
+    "test ! -e bid-vector && echo 'bid-vector: absent'; test ! -d _workspace/m0-0a && echo '_workspace/m0-0a: absent'; test ! -d docs/adr && echo 'docs/adr: absent' || find docs/adr -maxdepth 1 -type f -print"
+  ],
+  "residual_risks": [
+    "원본 `bid-vector`와 인용의 중간 근거인 `_workspace/m0-0a/01_scout_*.md`가 모두 없어 legacy 파일:라인, commit, 실측 수치 및 `ed4b06c`/`ddee938` 기준 배정을 원본 대조하지 못했다.",
+    "활성 OPEN 64건이 남아 있다. 이 자체는 0A 문서 작성의 결함으로 판정하지 않았지만, `milestone-0.md` 완료 조건에 따라 다음 단계 진행에는 사용자 명시 승인이 필요하다.",
+    "문서 slice라 애플리케이션 wiring이나 authoritative fixture 실행 검증은 불가능했으며 acceptance의 텍스트상 관찰 가능성과 내부 정합성까지만 판정했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.148.0",
+    "model": "gpt-5.6-sol (model_reasoning_effort=high)"
+  }
+}
