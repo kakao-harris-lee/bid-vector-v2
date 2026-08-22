@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a-capability-map
 base_sha: 3dc7d26333e9f3699c3fd1149651fe54500b6f27
-head_sha: 0dbef957a2dee8f6d476eb3546213731a7a800b8  # 수정 라운드 1 최종 산출물 커밋. 아래 갱신 이력 참조
+head_sha: df78c77c11b3270abc12ed2a174c6bc247f03466  # 재리뷰 전 최종 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a/
@@ -57,3 +57,21 @@ blocker 0 / high 2 / medium 2)의 finding을 finding별 커밋으로 반영했�
   활성 `OPEN` 64 → 65(`OPEN-SET-10` 신설), `capability-map.md` 2,403 → 2,518줄.
 - 미처리 1건: verifier F-5(디렉터리 없는 파일명의 다중 해석 가능성). 사유와 권고는
   `checklist.md` §7에 있다.
+
+### 2026-08-22 — 재리뷰 전 잔존 2건 정리 (verifier L-1·L-2, spec-writer)
+
+재검증 판정은 `ready-for-review`였으나, Codex finding #1과 같은 계열의 잔존 사례 2건이
+재리뷰에서 다시 걸릴 위험이 있어 재리뷰 전에 정리했다
+(`_workspace/m0-0a/03_verifier_report_round1.md` L-1·L-2).
+
+| 커밋 | 대응 | 요지 |
+| --- | --- | --- |
+| `df78c77` | L-1 · L-2 | DEC-03 acceptance의 주어를 기관 유형 → 하한 모델 적용 가능성으로 교체(결정 무관화). OPS-09의 `unknown` 비재시도 기본값이 작성자 판단임을 근거와 함께 명시하고, `OPEN-OPS-01` 행에 정책 질문을 추가해 §12.1 통합 기록과 일치시킴 |
+
+- `head_sha`를 `0dbef95` → `df78c77`로 갱신했다.
+- **재리뷰 range는 `3dc7d26...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+  이전 라운드와 같은 이유로 `head_sha`는 그 직전 커밋을 가리킨다.
+- 지시 범위대로 위 두 곳만 수정했다. 집계는 불변이다 — capability 94, 활성 `OPEN` 65,
+  분류 줄 형식 위반 0, `V2 필수` 63건의 사용자 가치·acceptance 결측 0. `checklist.md`와
+  `commands.md`는 수치가 그대로여서 갱신하지 않았다.
+- verifier L-3~L-6은 미처리다(재검증 판정이 `ready-for-review`이고 지시 범위 밖).
