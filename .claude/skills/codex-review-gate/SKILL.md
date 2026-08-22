@@ -62,11 +62,16 @@ worktree를 작업 루트로, 명령 재실행(테스트 등)을 위해 workspac
 ```bash
 codex --version   # 기록용 — 실행 결과를 리뷰 메타데이터로 남긴다
 codex exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
-  --output-schema .claude/skills/codex-review-gate/references/codex-verdict.schema.json \
+  --output-schema .claude/skills/codex-review-gate/references/codex-output.strict.schema.json \
   -o _workspace/{slice}/codex-verdict.json \
   - < _workspace/{slice}/codex-prompt.md \
   > _workspace/{slice}/codex.raw-output.txt 2>&1
 ```
+
+`--output-schema`에는 **strict 변형**(`codex-output.strict.schema.json`)을 쓴다 — OpenAI
+strict structured output은 모든 property가 required여야 하므로, `line`은 null 허용으로
+바꾸고 레인이 주입하는 `reviewer`는 제외한 스키마다. 저장물의 정본 스키마는
+`codex-verdict.schema.json`이며(reviewer 포함), 6단계 검증과 저장은 정본 기준이다.
 
 - prompt는 stdin(`-`)으로 전달한다 (ARG_MAX 회피).
 - Bash `timeout` 최대치는 10분(600000ms)이다. 리뷰는 보통 이를 초과하므로 **처음부터

@@ -50,3 +50,4 @@ Codex가 `request_changes`를 반환하면 같은 scope에서 Claude가 수정�
 | 2026-08-22 | 두 갈래 전략 확정 — service만 Kotlin 재작성, ML은 재활용+튜닝 (지침서 greenfield 서술 개정과 동기화) | ml-implementer, v2-slice-pipeline | 운영자 지시로 지침서 개정 |
 | 2026-08-22 | 독립 감사 반영 — Codex 리뷰를 저장소 밖 clean worktree로 격리, .gitignore 추가, clean-tree 게이트 단일 정의(in_scope 한정), 커밋 단계·안전 규칙·재작업 상한(총 4회)·OPEN 에스컬레이션·secret 스캔 추가, M0 문서 slice N/A 규칙, verdict JSON schema 번들 | 전 에이전트, 전 스킬, .gitignore | 하네스 독립 감사 blocker 3건·high 9건 수정 |
 | 2026-08-22 | Kotlin 코딩 규율 성문화 — TDD 우선, DI 적극, 분기 도배 금지(패턴 대체), 매직넘버 금지(정책 데이터/설정 외부화), 중복·주석 최소화, 회귀 구조적 방지 | v2-지침서 §5, kotlin-implementer | 운영자 지시 |
+| 2026-08-22 | codex --output-schema용 strict 변형 스키마 추가 (모든 키 required, line null 허용, reviewer 제외) | codex-review-gate | 첫 리뷰 실행에서 OpenAI strict 제약 위반으로 400 실패 발견 |

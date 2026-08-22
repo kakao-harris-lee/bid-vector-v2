@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex --output-schema용 strict 변형 — 모든 키 required(OpenAI strict 제약), line은 null 허용, reviewer는 레인이 저장 전 주입하므로 제외",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "reviewed_base", "reviewed_head", "findings", "commands_run", "residual_risks"],
+  "properties": {
+    "verdict": { "enum": ["approve", "request_changes"] },
+    "reviewed_base": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "reviewed_head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "file", "line", "evidence", "required_fix"],
+        "properties": {
+          "severity": { "enum": ["blocker", "high", "medium", "low"] },
+          "file": { "type": "string" },
+          "line": { "type": ["integer", "null"] },
+          "evidence": { "type": "string", "minLength": 1 },
+          "required_fix": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "commands_run": { "type": "array", "items": { "type": "string" } },
+    "residual_risks": { "type": "array", "items": { "type": "string" } }
+  }
+}
