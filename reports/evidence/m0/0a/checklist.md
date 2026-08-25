@@ -1,7 +1,7 @@
 # M0 / 0A — 완료 조건 대조 checklist
 
-- 작성: 라운드 0 → 수정 라운드 1 → **수정 라운드 2(2026-08-22, Codex 재리뷰 `request_changes` 대응)**
-- 산출물: `docs/discovery/capability-map.md` (2,591줄)
+- 작성: 라운드 0 → 수정 라운드 1 → 수정 라운드 2(2026-08-22, Codex 재리뷰 `request_changes` 대응) → **수정 라운드 3(2026-08-26, verifier `not-ready` M-1 + low 3건 대응)**
+- 산출물: `docs/discovery/capability-map.md` (2,608줄 — 라운드 3 기준)
 - 함께 볼 것: `commands.md`(리뷰 메타데이터·라운드별 검증 명령),
   `codex-review-20260822T061532Z.json`·`codex-review-20260822T065525Z.json`(finding 원문)
 - 기준: `reports/evidence/m0/0a/scope.md`의 `acceptance_commands` 4항목
@@ -189,7 +189,7 @@
 | `differential.json` | N/A | Python/V2 실행 결과 비교가 없는 문서 slice다. 이 slice는 legacy 동작을 **관찰로만** 기록하며 V2 산출물이 없어 비교 대상이 성립하지 않는다 |
 | `golden-manifest.json` | N/A | fixture를 사용하지 않는다. fixture 후보 인계만 했다(§11.4) |
 | `rollback.md` | N/A — 문서 산출물은 `git revert`로 복구 | 신규 wiring이 없다 |
-| `codex-review-*.json` | **존재** | `codex-review-20260822T061532Z.json` (라운드 1, `request_changes`). codex-reviewer 레인이 작성했고 spec-writer는 읽기만 한다(append-only) |
+| `codex-review-*.json` | **존재** | `codex-review-20260822T061532Z.json` (라운드 1, `request_changes`) · `codex-review-20260822T065525Z.json` (라운드 2 재리뷰, `request_changes`). codex-reviewer 레인이 작성했고 spec-writer는 읽기만 한다(append-only). 라운드 3은 verifier finding 대응이라 Codex 리뷰 JSON이 없다 |
 
 ## 5. secret 스캔
 
@@ -312,3 +312,20 @@ OPEN을 해소하지도 신설하지도 않았다 — L-1은 근거 부재의 *�
 처리했고, 나머지 — QUAL-03의 항목 배치, SET-06 신규 근거의 파일:라인 부재, checklist A1의
 실패 이력 누락 — 와 라운드 0의 F-5(디렉터리 없는 파일명 표기 규약)는 그대로 이월한다.
 사유와 권고는 §7에 있다. 0B 또는 후속 라운드에서 처리한다.
+
+### 9.1 라운드 3 evidence 정정 (verifier N-1~N-4)
+
+라운드 3 재검증 판정은 **`ready-for-review`**이고 신규 발견 4건은 전부 low이며 산출물이
+아니라 **evidence 기록의 정확도**에 한정된다(`_workspace/m0-0a/05_verifier_report_round3.md`
+§6). 리뷰 요청 전에 4건 전부를 반영했다. `docs/discovery/capability-map.md`는 건드리지
+않았다 — 산출물이 바뀌면 재검증이 다시 필요해진다.
+
+| # | 처리 |
+| --- | --- |
+| N-1 | `commands.md` E4의 grep 출력을 `head_sha`(`fb832dd`) 기준으로 **재실행해 교체**하고(1900→1915 등 +15), 행 번호를 head 기준으로 통일한다는 주석을 달았다. E1의 OPS-00 acceptance 위치 `:1907` → **`:1908`** 정정 |
+| N-2 | `checklist.md` 머리말 — 작성 이력에 라운드 3 추가, 산출물 줄 수 2,591 → **2,608**(§9와 일치), §4 `codex-review-*.json` 행에 라운드 2 JSON 추가(라운드 3은 verifier 대응이라 리뷰 JSON 없음을 명시) |
+| N-3 | 라운드 3 절 제목의 날짜를 실제 커밋 날짜 **2026-08-26**으로 정정(`scope.md`·`commands.md`). 라운드 0~2는 실제 08-22이므로 그대로 둔다 |
+| N-4 | `scope.md` 라운드 3 절에 리뷰 range의 in_scope 밖 변경을 **재확인해 명시** — 무관 커밋 **2건**(`1f8e57c`, `0c7eeff`), 파일 **4개**, `CLAUDE.md`는 `.claude/` 하위가 아니라 저장소 루트. 라운드 1 절의 낡은 선언은 감사 추적을 위해 남기고 라운드 3 절이 대체한다 |
+
+산출물 불변: `capability-map.md`는 이 정정으로 **한 줄도 바뀌지 않았다**(2,608줄 유지,
+capability 94, 분류 63/14/6/11, 활성 OPEN 66).

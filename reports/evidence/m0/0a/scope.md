@@ -96,7 +96,7 @@ finding 4건은 재리뷰에서 해소로 확인됐다.
 - 산출물 변화: capability 94(불변), 활성 `OPEN` 65 → 66(`OPEN-NOTI-08` 신설),
   `capability-map.md` 2,518 → 2,591줄. 분류 집계 63/14/6/11 불변.
 
-### 2026-08-22 — 수정 라운드 3 (verifier not-ready M-1 대응, spec-writer)
+### 2026-08-26 — 수정 라운드 3 (verifier not-ready M-1 대응, spec-writer)
 
 verifier 재검증(`_workspace/m0-0a/04_verifier_report_round2.md`) 판정 `not-ready`.
 Codex 라운드 2 finding 4건은 verifier가 전부 충족으로 확인했고, `not-ready` 사유는 M-1
@@ -112,6 +112,28 @@ Codex 라운드 2 finding 4건은 verifier가 전부 충족으로 확인했고, 
 - **재리뷰 range는 `3dc7d26...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
   이전 라운드와 같은 이유로(커밋이 자기 SHA를 담을 수 없다) `head_sha`는 그 직전 커밋을
   가리키며, 두 커밋의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
+- **리뷰 range의 in_scope 밖 변경 — 라운드 1 절의 선언을 여기서 갱신한다**(verifier N-4).
+  라운드 1 절은 "무관 커밋 `1f8e57c` **하나**, `.claude/` 하위"라고 적었으나 지금은 두
+  군데가 부정확하다. 낡은 서술은 감사 추적을 위해 지우지 않고 이 절이 대체한다.
+
+  ```
+  $ git diff --name-only 3dc7d26 HEAD | grep -v '^docs/discovery/\|^reports/evidence/'
+  .claude/skills/codex-review-gate/SKILL.md
+  .claude/skills/codex-review-gate/references/codex-output.strict.schema.json
+  .claude/skills/codex-review-gate/references/codex-verdict.schema.json
+  CLAUDE.md
+  ```
+
+  실제로는 **무관 커밋 2건**(`1f8e57c` harness strict 스키마 추가, `0c7eeff` 정본 verdict
+  스키마의 `line` null 허용)이고 **파일 4개**이며, `CLAUDE.md`는 `.claude/` 하위가 아니라
+  **저장소 루트**다. 넷 다 이 slice의 `in_scope` 밖이고 **이 slice가 만든 커밋이 아니다** —
+  하네스 소관으로 팀 리드가 따로 넣었다. 리뷰는 `docs/discovery/capability-map.md`와
+  `reports/evidence/m0/0a/`만 대상으로 한다.
+
+  이 선언이 필요한 이유: 라운드 2 Codex finding #5가 정확히 이 조건에서 나왔다 — range에
+  섞인 `codex-output.strict.schema.json`을 읽고 스키마 계약 문제를 지적했고 사후에 "범위
+  밖"으로 처리됐다. 이번 range에는 그 finding의 **수정 커밋**(`0c7eeff`)까지 들어 있어
+  같은 일이 반복될 조건이 갖춰져 있다.
 - 산출물 변화: capability **94 불변**, 분류 **63/14/6/11 불변**, 활성 `OPEN` **66 불변**
   (id 집합 대조 결과 소멸 0 · 신규 0), `capability-map.md` 2,591 → **2,608줄**.
 - L-1은 근거 부재의 *서술*만 정밀화했고 `OPEN-NOTI-08`의 판단은 유지했다. 이번 라운드에
