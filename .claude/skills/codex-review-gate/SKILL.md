@@ -62,6 +62,7 @@ worktree를 작업 루트로, 명령 재실행(테스트 등)을 위해 workspac
 ```bash
 codex --version   # 기록용 — 실행 결과를 리뷰 메타데이터로 남긴다
 codex exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
+  -c model_reasoning_effort="high" \
   --output-schema .claude/skills/codex-review-gate/references/codex-output.strict.schema.json \
   -o _workspace/{slice}/codex-verdict.json \
   - < _workspace/{slice}/codex-prompt.md \
@@ -72,6 +73,14 @@ codex exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
 strict structured output은 모든 property가 required여야 하므로, `line`은 null 허용으로
 바꾸고 레인이 주입하는 `reviewer`는 제외한 스키마다. 저장물의 정본 스키마는
 `codex-verdict.schema.json`이며(reviewer 포함), 6단계 검증과 저장은 정본 기준이다.
+
+**`model_reasoning_effort`는 반드시 `high`로 고정한다.** 생략하면 CLI 기본값에 의존해
+같은 base...head가 라운드마다 다른 effort로 리뷰되고, 판정이 갈릴 수 있다. M0/0A 3차
+리뷰에서 실제로 같은 range가 medium `approve` / high `request_changes`로 갈렸다
+(`reports/evidence/m0/0a/codex-review-20260825T235414Z.json` vs `...235415Z.json`).
+리뷰 재현성은 심판 레인의 전제이므로 effort는 메타데이터로만 기록할 값이 아니라
+호출 시 고정할 값이다. effort를 바꿔야 할 사유가 생기면 이 스킬을 고쳐서 바꾸고,
+호출부에서 즉흥적으로 덮어쓰지 않는다.
 
 - prompt는 stdin(`-`)으로 전달한다 (ARG_MAX 회피).
 - Bash `timeout` 최대치는 10분(600000ms)이다. 리뷰는 보통 이를 초과하므로 **처음부터
