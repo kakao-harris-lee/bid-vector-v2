@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a-capability-map
 base_sha: 3dc7d26333e9f3699c3fd1149651fe54500b6f27
-head_sha: fb832dd4251597ed064f0e7e776cda5f2aa2a95a  # 수정 라운드 3 최종 산출물 커밋. 아래 갱신 이력 참조
+head_sha: bd43fb735e033b18d48da07f615207ed7be67d02  # 수정 라운드 3 evidence 정정 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a/
@@ -143,3 +143,23 @@ Codex 라운드 2 finding 4건은 verifier가 전부 충족으로 확인했고, 
 - 미처리 이월: 라운드 1 verifier L-4~L-6(QUAL-03 항목 배치, SET-06 신규 근거의 파일:라인
   부재, checklist A1의 실패 이력 누락)과 라운드 0의 F-5(디렉터리 없는 파일명 표기 규약).
   이번 지시 범위 밖으로 명시됐다. 사유와 권고는 `checklist.md` §7·§9에 있다.
+
+### 2026-08-26 — 라운드 3 evidence 정정 (verifier N-1~N-4, spec-writer)
+
+라운드 3 재검증 판정은 **`ready-for-review`**이고 신규 발견 4건은 전부 low이며 산출물이
+아니라 **evidence 기록의 정확도**에 한정된다(`_workspace/m0-0a/05_verifier_report_round3.md`
+§6). 리뷰 요청 전에 4건 전부를 한 커밋으로 반영했다.
+
+| 커밋 | 대응 | 요지 |
+| --- | --- | --- |
+| `bd43fb7` | N-1 · N-2 · N-3 · N-4 | 위 라운드 3 절의 range 선언 갱신(N-4), 라운드 3 절 제목 날짜 2026-08-22 → **2026-08-26**(N-3, `scope.md`·`commands.md`), `checklist.md` 머리말의 작성 이력·줄 수 2,591 → 2,608·라운드 2 리뷰 JSON 열거(N-2), `commands.md` E4 grep 출력을 `head_sha` 기준으로 재실행 교체와 E1의 `:1907` → `:1908`(N-1). `checklist.md` §9.1에 finding별 처리 기록 |
+
+- `head_sha`를 `fb832dd` → `bd43fb7`로 갱신했다.
+- **재리뷰 range는 `3dc7d26...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+  이전 라운드와 같은 이유로(커밋이 자기 SHA를 담을 수 없다) `head_sha`는 그 직전 커밋을
+  가리키며, 두 커밋의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
+- **`docs/discovery/capability-map.md`는 한 줄도 바뀌지 않았다** — 2,608줄, capability 94,
+  분류 63/14/6/11, 활성 OPEN 66 전부 라운드 3 산출물 그대로다. 이 정정은 evidence 3파일에
+  한정된다.
+- range의 in_scope 밖 변경은 위 라운드 3 절의 선언 그대로다(무관 커밋 2건, 파일 4개).
+  이 정정 커밋과 이 scope 갱신 커밋은 `reports/evidence/m0/0a/` 안에만 있다.
