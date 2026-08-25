@@ -261,3 +261,220 @@ $ git status --porcelain
 ```
 
 - exit: 0.
+
+## 2026-08-22 — 수정 라운드 3 검증 (verifier `not-ready` M-1 + low 3건)
+
+입력: `_workspace/m0-0a/04_verifier_report_round2.md` §3 (M-1, L-1, L-2, L-3).
+Codex 리뷰 요청 없이 verifier finding에 대응한 라운드다.
+
+### E1. 전수 스윕 — **재정의된 정의**로 재실행 (L-2 대응)
+
+**구 정의(라운드 1·2)**: `분류` 줄을 가지면서 `- **Acceptance scenario**` bullet을 가진
+블록. → (a) 분류 줄이 없는 **설계 입력 절**과 (b) **비-bullet** acceptance 제목이 구조적
+사각지대였고, M-1이 정확히 그 교집합(OPS-00)에서 나왔다.
+
+**신 정의(라운드 3부터)**: **acceptance 절을 가진 모든 `###` 블록**. 분류 줄 보유 여부와
+bullet 형식을 묻지 않는다. 대상 제목은 §0.5가 규약으로 고정한 3형식 전부다 —
+`- **Acceptance scenario**`(범위 괄호 변형 포함), `- **채택 시 요구되는 관찰 가능 동작**`,
+비-bullet `**Acceptance scenario**`.
+
+```
+$ python3 - <<'PY'   # 제목 형식 열거 + 누락 탐색
+ACC = r'^\s*-?\s*\*\*(Acceptance scenario|채택 시 요구되는 관찰 가능 동작)'
+PY
+- **Acceptance scenario**                (정확 일치)   : 63
+- **Acceptance scenario (승계 계약 부분)**              : 1   (NOTI-08)
+- **채택 시 요구되는 관찰 가능 동작**                     : 2   (STR-11, STR-15)
+**Acceptance scenario**  (비-bullet, 설계 입력 절)      : 1   (OPS-00, :1907)
+그 밖의 acceptance 유사 제목                            : 0
+
+$ python3 - <<'PY'   # 블록 스윕 (신 정의)
+PY
+전체 ### 블록 수: 122
+분류 줄 보유 블록(= capability) 수: 94
+acceptance 절 보유 블록 수 (신 정의): 67
+  그중 분류 줄 없음   (구 정의 사각지대 a): ['OPS-00 · 참조 사례: 큐 폭주 회귀 :1874']
+  그중 비-bullet 제목 (구 정의 사각지대 b): ['OPS-00 · 참조 사례: 큐 폭주 회귀 :1874']
+
+$ python3 - <<'PY'   # acceptance 절의 OPEN 인용과 조건부 표기 대조
+PY
+acceptance 절에서 OPEN을 인용하는 블록: 7
+    STR-08 ['OPEN-STR-08']                 조건부 O
+    QUAL-03 ['OPEN-QUAL-01']               조건부 O
+    ML-03  ['OPEN-ML-03']                  조건부 O
+    DEC-02 ['OPEN-DEC-03']                 조건부 O
+    NOTI-04 ['OPEN-NOTI-01','OPEN-NOTI-08'] 조건부 O
+    OPS-03 ['OPEN-NOTI-02']                조건부 O
+    OPS-09 ['OPEN-OPS-01']                 조건부 O
+   조건부 표시 없이 OPEN 인용: []
+조건부 묶음 수: 8 | 무조건 acceptance 항목 수: 225
+```
+
+- exit: 0
+- 스윕 대상이 **63 → 67 블록**으로 늘었다(+OPS-00, +STR-11, +STR-15, +NOTI-08). 새로
+  편입된 4블록 중 M-1 계열이 남아 있던 것은 **OPS-00 하나뿐**이며 이번 라운드에 고쳤다.
+  나머지 3블록은 위반 없음.
+- 조건부 보유 7 capability가 §0.5의 목록과 정확히 일치한다(NOTI-04가 OPEN 2건이라 묶음은
+  8개). 조건부 표시 없이 OPEN을 인용하는 블록 0건.
+- "무조건 항목 225"는 라운드 2 verifier의 203과 다르다. **집계 변화가 아니라 정의 변화**다
+  — 대상 블록이 4개 늘었고, 줄바꿈된 bullet을 하나의 항목으로 접합하도록 추출기를 고쳤다.
+
+### E2. 어휘 중첩 스캔 — OPEN을 인용하지 **않으면서** 쟁점을 확정하는 유형 (L-2 대응)
+
+E1의 블록 스윕은 acceptance가 OPEN id를 **명시할 때만** 걸린다. id를 쓰지 않으면서 그
+OPEN의 쟁점을 확정하는 유형은 §12 활성 OPEN 66건의 결정문과 무조건 acceptance 225항목의
+토큰 교집합으로 잡는다(불용어 제거, 2자 이상).
+
+```
+$ python3 - <<'PY'
+PY
+§12 활성 OPEN 행 수: 66 | 무조건 acceptance 항목 수: 225
+중첩 4개 이상 쌍: 4
+  (7) OPEN-SET-10 ↔ SET-06  "시간축 provenance — … 어느 시각 종류에서 왔는지(개찰 시각 /
+      승인된 대체 출처)와 적용된 정책 version이 함께 남는다"
+  (5) OPEN-SET-10 ↔ SET-06  "결측의 명시적 처리 — … `Unmeasurable(사유)`로 분류되며 …"
+  (4) OPEN-OPS-01 ↔ OPS-13  "프로덕션 엔진에서만 유효한 코드 경로는 프로덕션 엔진 테스트
+      없이 통과하지 못한다"
+  (4) OPEN-ML-01  ↔ OPS-13  "`domain <- application <- adapters/app` 의존 방향을 뒤집는
+      변이 …"
+```
+
+- exit: 0
+- 4쌍 전부 **무해**로 판정했다.
+  - SET-06 2건: `OPEN-SET-10`은 마감 시각 대체를 **승인된 정책으로 채택할지**를 묻는다.
+    두 acceptance는 "승인된 대체 출처"라는 중립 표현을 써서 (a) 채택이면 그 행에
+    provenance가 남고, (b) 미채택이면 대체 행이 0건이고 결측 행이 `Unmeasurable`로
+    분류될 뿐 항목 자체는 그대로 성립한다. 어느 결정에도 깨지지 않으므로 무조건이 맞다.
+  - OPS-13 ↔ `OPEN-OPS-01`: OPEN의 쟁점은 `Unclassified` 실패의 **재시도 정책**이고,
+    적출된 항목은 아키텍처 게이트다. 축이 겹치지 않는다(공유 토큰은 "코드 경로").
+  - OPS-13 ↔ `OPEN-ML-01`: OPEN의 쟁점은 ML 수학 커널을 **어느 런타임에 둘지**의 경계이고,
+    적출된 항목은 Kotlin 모듈 내부의 의존 방향이다. 커널의 소속을 확정하지 않는다.
+- 중첩 3개 쌍까지 낮추면 8쌍이 나오며 추가 4쌍(OPEN-NOTI-08↔NOTI-04, OPEN-NOTI-02↔NOTI-10,
+  OPEN-DEC-04↔SET-01, OPEN-DEC-04↔DEC-05)도 검토했다. NOTI-04는 이미 조건부를 가진
+  capability이고 적출된 항목은 "판정할 수 있으면 통지에 담긴다"는 결정 무관 항목이다.
+  나머지 3건은 어휘만 겹친다.
+
+### E3. 정책 기본값 단정 스캔
+
+```
+$ python3 - <<'PY'   # 무조건 acceptance에서 기본값|기본 ON|기본 OFF|항상
+PY
+COL-06 | 수집 1회 결과에서 `received = normalized + duplicate + dropped` 항등식이 항상
+         성립하고, 위반 시 산출이 실패한다.
+ML-08  | 새 metric을 추가할 때 가드 누락이 기본값이 되는 구조가 아니다(제외는 한 곳의
+         데이터 변환으로).
+```
+
+- exit: 0. 라운드 2와 동일한 2건이며 둘 다 OPEN과 무관하다(수집 회계 항등식 / 구조 제약).
+
+### E4. M-1 계열 잔존 재확인 (측정 불가 → 성공 변환)
+
+```
+$ grep -n '초록' docs/discovery/capability-map.md
+1900:  경우**는 정상과 구별되는 **측정 불가(중립)**로 기록된다. 측정 불가를 성공(초록)으로
+1980:  있음"이 아니다**. (2) legacy는 측정 불가를 **초록(정상)으로 표시하고 사유를 덧붙인다**:
+1984:- **legacy 형태 처리 — 측정 불가의 초록 변환**: legacy의 문제의식(측정 실패를 빨강으로
+1988:  ML-02 미학습 가드, ML-07 `not_evaluable`, SET-06 시간축 측정 불가). V2는 **초록이냐
+1998:  - **측정 불가가 성공(초록) 표시로 렌더링되지 않는다** — 표시 계층에서 정상과 다른
+2216:  못한다 — OPS-00의 모든 결함은 **래칫 초록 상태에서** 발생했다. property / contract /
+2290:  않으므로 이 KPI들은 전부 초록으로 남는다** — OPS-00이 정확히 이 상태였다.
+
+$ python3 - <<'PY'   # 무조건 acceptance 항목 중 초록/정상 변환 어휘
+PY
+OPS-00 | … 정상과 구별되는 **측정 불가(중립)**로 기록된다. 측정 불가를 성공(초록)으로
+         변환하지 않는다 — … OPS-04가 소유 …
+OPS-04 | **측정 불가가 성공(초록) 표시로 렌더링되지 않는다** …
+```
+
+- exit: 0
+- acceptance에 남은 `초록` 2건은 **금지 방향**이다. 1980·1984·1988은 legacy 관찰과 그
+  형태의 배격 서술이고, 2216·2290은 래칫 KPI 문맥(측정 불가와 무관)이다. V2 요구로 읽히는
+  "측정 불가 → 초록" 형태는 0건이다.
+
+### E5. 분류·acceptance·ID·OPEN 불변 재검증
+
+```
+$ python3 - <<'PY'   # 분류 백틱 전수 + V2 필수 결측 + 중복 ID + OPEN 참조/등록 대조
+PY
+분류: {'V2 필수': 63, '근거 부족': 11, '폐기': 6, '후속': 14} = 94
+형식 위반: none
+V2 필수 사용자 가치/acceptance 결측: none
+중복 ID: none
+§12 등록 OPEN: 66 | 본문 참조 - 표 등록: ['OPEN-NOTI-03', 'OPEN-OPS-06', 'OPEN-SET-07']
+총 OPEN id(등록+결번): 69
+
+$ python3 - <<'PY'   # OPEN id 집합을 0b48eaa와 대조
+PY
+0b48eaa 등록 OPEN: 66 | worktree: 66
+소멸: 없음 | 신규: 없음
+
+$ grep -n '총 66건' docs/discovery/capability-map.md
+2473:**총 66건** (G1 7 / G2 10 / G3 16 / G4 17 / G5 9 / G6 7). …
+```
+
+- exit: 0
+- **집계 전부 불변.** capability 94, 63/14/6/11, 형식 위반 0, `V2 필수` 결측 0, 중복 ID 0,
+  활성 OPEN 66(헤더 선언과 일치), 결번 3건(§12.1 기록된 통합·해소 항목).
+- **OPEN 소멸 0건** — 이번 라운드는 OPEN을 해소하지도 신설하지도 않았다.
+
+### E6. 규모·secret 스캔·clean tree
+
+```
+$ wc -l docs/discovery/capability-map.md
+2608
+
+$ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" docs/discovery/ | wc -l
+3
+
+$ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m0/0a/ | cut -d: -f1 | sort | uniq -c
+   9 reports/evidence/m0/0a/checklist.md
+   1 reports/evidence/m0/0a/codex-review-20260822T061532Z.json
+   1 reports/evidence/m0/0a/codex-review-20260822T065525Z.json
+  12 reports/evidence/m0/0a/commands.md
+  (합계 23)
+
+$ git diff --stat 0b48eaa -- docs/discovery/capability-map.md
+ docs/discovery/capability-map.md | 25 ++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
+
+$ git status --porcelain -- docs/discovery/capability-map.md reports/evidence/m0/0a/
+(출력 없음 — 커밋 후)
+```
+
+- exit: 0
+- 2,591 → **2,608줄**. hunk별 순증 +17 — §0.5 +11(L-3 규약 문단), NOTI-04 +4(L-1 인용),
+  OPS-00 +2(M-1), §12 행 ±0(행 내 교체).
+- `docs/discovery/` 매치 **3건**은 라운드 0부터 동일한 일반 명사(외부 API 오류 문구 인용
+  1건, webhook 인증 메커니즘 설명 2건)이며 신규 0건.
+- evidence 디렉터리 매치 **23건은 전부 자기참조**다 — 스캔 명령 문자열 자체, 그 명령이
+  뱉은 3줄을 인용한 기록, secret 스캔 절 제목, Codex 리뷰 JSON의 `commands_run`. 실제
+  자격증명은 0건이다(라운드 0 C3에서 확인한 것과 같은 성격이며, 이번 라운드가 늘린 것은
+  E6 자신의 명령 문자열 3줄뿐).
+- Telegram id·사업자 정보는 패턴으로 잡히지 않으므로 육안 재확인했다. 이번 라운드 추가분
+  (capability-map 4개 hunk, checklist §9, commands E1~E7)에 실데이터·식별자가 없다.
+
+### E7. legacy 원본 인용 대조 (L-1)
+
+verifier 권고의 라인 번호를 그대로 옮기지 않고 원본에서 직접 확인했다.
+
+```
+$ cd bid-vector && git show ed4b06c:app/services/award_notifications.py | grep -n "_recover_outcomes"
+68:        recovered = self._recover_outcomes(
+201:    def _recover_outcomes(
+
+$ git show ed4b06c:app/services/award_notifications.py | sed -n '201,221p'
+201:    def _recover_outcomes(
+...
+210:        """Backfill award_outcome for already-notified bids without re-notifying.
+...
+216:        public-award gate + :meth:`_record_outcomes`, but never sends a message
+217:        nor stamps ``award_notified_at`` (재통지 금지). Returns the count recorded.
+...
+221:        """
+```
+
+- exit: 0
+- `def`는 `:201`, **docstring은 `:210-221`**, "재통지 금지" 문장은 `:216-217`이다. verifier
+  권고문의 `:201-217`은 `def` 줄부터 센 범위여서 문서에는 docstring 범위 `:210-221`을
+  기입하고 해당 문장 위치 `:216-217`을 병기했다.
+- 조사는 전부 `git show ed4b06c:`로 수행했다(legacy working tree가 dirty하며 읽기 전용).

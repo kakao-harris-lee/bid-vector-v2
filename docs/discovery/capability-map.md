@@ -74,6 +74,17 @@ capability의 acceptance는 두 묶음으로 나눠 쓴다.
 한 capability가 서로 다른 OPEN에 걸린 조건부 묶음을 둘 이상 가질 수 있다. 그때는 묶음
 마다 어느 OPEN에 종속되는지 각각 표시한다(NOTI-04가 그 사례다).
 
+**acceptance 절의 제목 형식은 세 가지이며, 어느 형식이든 acceptance 절이다.** (1) 일반
+capability는 `- **Acceptance scenario**` — 절이 capability의 일부만 덮으면 괄호로 범위를
+덧붙일 수 있다(NOTI-08의 `(승계 계약 부분)`). (2) capability **자체의 채택 여부**가 미해결인
+`근거 부족` 항목은 `- **채택 시 요구되는 관찰 가능 동작**`을 쓴다 — 블록 전체가 "채택
+되면"이라는 하나의 조건에 걸리므로 항목마다 조건부 표시를 반복하지 않으며, 위 조건부
+목록에도 넣지 않는다(조건 대상이 개별 동작이 아니라 capability 채택 자체다). 채택과
+무관하게 성립하는 제약은 `**legacy 형태 처리(결정과 무관하게 확정)**` 또는 `**결정 전에
+확정되는 제약**`으로 분리해 적는다. 현재 이 형식을 쓰는 항목은 STR-11·STR-15 둘이다.
+(3) capability가 아닌 **설계 입력 절**(OPS-00)은 bullet이 아닌 `**Acceptance scenario**`
+문단 제목을 쓴다. 형식 위반·모순 전수 스윕은 이 세 형식을 **모두** 대상으로 한다.
+
 현재 조건부 항목을 가진 capability는 7개다 — QUAL-03(`OPEN-QUAL-01`),
 STR-08(`OPEN-STR-08`), ML-03(`OPEN-ML-03`), NOTI-04(`OPEN-NOTI-01` · `OPEN-NOTI-08`),
 DEC-02(`OPEN-DEC-03`), OPS-03(`OPEN-NOTI-02`), OPS-09(`OPEN-OPS-01`). 이 목록은 §12의
@@ -1447,8 +1458,12 @@ policy 엔트리이며, 같은 축의 밴드가 둘 이상이면 그 사실 자�
 - **가치의 공백(측정된 것)**: 외부 피드가 낙찰자 이름과 금액을 **독립적으로 병합**하므로
   금액만 먼저 도착하는 경로가 있다. 그때 legacy는 판정이 빈 통지를 먼저 보내고, 이름이
   나중에 도착하면 **재통지 없이 기록만 정정**한다. 이 경로에서는 운영자가 낙찰/패찰 결과를
-  통지로 받지 못한다. **legacy가 재통지하지 않는 것이 의도인지, 운영자가 그때 push를
-  원하는지에 대한 근거를 조사에서 찾지 못했다** → `OPEN-NOTI-08`. 이 공백은 아래 조건부
+  통지로 받지 못한다. 재통지하지 않는 것은 **구현 의도로는 명시돼 있다** —
+  `_recover_outcomes` docstring이 "never sends a message nor stamps
+  ``award_notified_at`` (재통지 금지)"라고 적는다(`award_notifications.py:210-221`,
+  해당 문장은 `:216-217`). **없는 것은 그 선택이 운영자 요구와 합의됐다는 근거이며,
+  운영자가 이 경로에서 push를 원하는지도 조사에서 찾지 못했다** → `OPEN-NOTI-08`.
+  이 공백은 아래 조건부
   acceptance로 표시하며, 확정 전까지 "늦게 확정된 판정의 자동 통지"를 V2 필수로 주장하지
   않는다.
 - **분류**: `V2 필수` (아래 legacy 동작의 처리는 `OPEN-NOTI-01` 결정에 종속)
@@ -2505,7 +2520,7 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | OPEN-STR-11 | 대화형 채널 전략 편집을 V2 capability로 유지하는가 | 두 scout 노트의 분류가 상충 | strategy C-08 vs notification C8 |
 | OPEN-NOTI-04 | 라이브 메일 송신이 V2 필수인가 | legacy 미검증 경로 | notification OPEN-4 |
 | OPEN-NOTI-07 | 채널 우선순위·fallback이 V2 요구사항인가 | legacy 구현 없음 | notification OPEN-7 |
-| OPEN-NOTI-08 | 낙찰/패찰 판정이 **통지 이후에** 확정되는 전이에서 운영자에게 다시 알릴 것인가 | (a) 멱등 재통지 또는 기존 메시지 갱신 (b) legacy처럼 기록만 정정. legacy는 (b)이고 그것이 의도인지에 대한 근거가 없다. (b)를 유지하면 그 경로의 운영자는 결과를 통지로 받지 못한다 | Codex 재리뷰에서 신규 식별(NOTI-04). legacy 동작은 notification C4-3 |
+| OPEN-NOTI-08 | 낙찰/패찰 판정이 **통지 이후에** 확정되는 전이에서 운영자에게 다시 알릴 것인가 | (a) 멱등 재통지 또는 기존 메시지 갱신 (b) legacy처럼 기록만 정정. legacy는 (b)이고 그 **구현 의도**는 `award_notifications.py:210-221` docstring에 "재통지 금지"로 명시돼 있으나, 그 선택이 운영자 요구와 합의됐다는 근거는 없다. (b)를 유지하면 그 경로의 운영자는 결과를 통지로 받지 못한다 | Codex 재리뷰에서 신규 식별(NOTI-04). legacy 동작은 notification C4-3 |
 | OPEN-ML-06 | win-proxy 커널을 M5 이식 대상에 넣는가 | (a) 보존 이식 (b) M0 범위 밖으로 완전히 미룸. 코드 품질은 최상급이나 사용자 도달 경로가 없다 | ml OPEN-6 |
 | OPEN-ML-02 | Platt 캘리브레이션이 실제로 사용자 응답에 도달하는가, 도달한다면 자격 라벨 계약을 M2에 넣는가 | 경계 위반 후보 | ml OPEN-2, ML-09 |
 | OPEN-ML-04 | "결과를 언제 알았는가"(정산 관측 시각)를 canonical fact로 데이터 사전에 넣는가 | 없으면 성숙도 편향 방향을 **측정할 수 없다** | ml OPEN-4 |
