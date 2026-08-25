@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a-capability-map
 base_sha: 3dc7d26333e9f3699c3fd1149651fe54500b6f27
-head_sha: 0b48eaa647fe2e0cc095d1602b7167bdf8f5a584  # 수정 라운드 2 최종 산출물 커밋. 아래 갱신 이력 참조
+head_sha: fb832dd4251597ed064f0e7e776cda5f2aa2a95a  # 수정 라운드 3 최종 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a/
@@ -95,3 +95,29 @@ finding 4건은 재리뷰에서 해소로 확인됐다.
   하네스 소관이며 이 slice의 in_scope 밖이다. 팀 리드가 별도로 해소했다.
 - 산출물 변화: capability 94(불변), 활성 `OPEN` 65 → 66(`OPEN-NOTI-08` 신설),
   `capability-map.md` 2,518 → 2,591줄. 분류 집계 63/14/6/11 불변.
+
+### 2026-08-22 — 수정 라운드 3 (verifier not-ready M-1 대응, spec-writer)
+
+verifier 재검증(`_workspace/m0-0a/04_verifier_report_round2.md`) 판정 `not-ready`.
+Codex 라운드 2 finding 4건은 verifier가 전부 충족으로 확인했고, `not-ready` 사유는 M-1
+한 건이었다. 사용자가 M-1 + low 3건 전부 수정을 승인해 finding별 커밋으로 반영했다.
+이번 라운드에 Codex 리뷰 요청은 없었다.
+
+| 커밋 | 대응 | 요지 |
+| --- | --- | --- |
+| `f29fa53` | M-1 (medium) | OPS-00 acceptance의 "측정 불가 → 초록 + 사유"를 "정상과 구별되는 측정 불가(중립)"로 교체. 3-상태 정의와 표시 계층 제약의 소유가 OPS-04임을 참조로 명시 — 라운드 2에 Codex high #2로 고친 OPS-04, OPS-21 B-13과 정렬 |
+| `fb832dd` | L-1 · L-2 · L-3 + evidence | `OPEN-NOTI-08` 근거 서술을 원본 대조로 정밀화(구현 의도는 docstring에 명시, 없는 것은 운영자 합의 근거). 전수 스윕 정의를 "acceptance 절을 가진 모든 블록"으로 재정의하고 재실행(63 → 67 블록). §0.5에 acceptance 절 제목 형식 3종 규약 추가. checklist §9 · commands E1~E7 |
+
+- `head_sha`를 `0b48eaa` → `fb832dd`로 갱신했다.
+- **재리뷰 range는 `3dc7d26...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+  이전 라운드와 같은 이유로(커밋이 자기 SHA를 담을 수 없다) `head_sha`는 그 직전 커밋을
+  가리키며, 두 커밋의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
+- 산출물 변화: capability **94 불변**, 분류 **63/14/6/11 불변**, 활성 `OPEN` **66 불변**
+  (id 집합 대조 결과 소멸 0 · 신규 0), `capability-map.md` 2,591 → **2,608줄**.
+- L-1은 근거 부재의 *서술*만 정밀화했고 `OPEN-NOTI-08`의 판단은 유지했다. 이번 라운드에
+  임의로 해소한 `OPEN`은 없다.
+- 재정의한 스윕이 새로 편입한 4블록(OPS-00 · STR-11 · STR-15 · NOTI-08) 중 M-1 계열
+  잔존은 OPS-00 하나뿐이었고 `f29fa53`에서 처리했다. 신규 발견 0건.
+- 미처리 이월: 라운드 1 verifier L-4~L-6(QUAL-03 항목 배치, SET-06 신규 근거의 파일:라인
+  부재, checklist A1의 실패 이력 누락)과 라운드 0의 F-5(디렉터리 없는 파일명 표기 규약).
+  이번 지시 범위 밖으로 명시됐다. 사유와 권고는 `checklist.md` §7·§9에 있다.
