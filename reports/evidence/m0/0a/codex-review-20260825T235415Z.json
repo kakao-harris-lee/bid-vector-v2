@@ -1,0 +1,46 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "3dc7d26333e9f3699c3fd1149651fe54500b6f27",
+  "reviewed_head": "6c6b3a2ae658894ab105cec931f796a954e9230a",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/discovery/capability-map.md",
+      "line": 452,
+      "evidence": "STR-08은 run-payload 기반 중복 억제를 폐기하고 공고별 통지 이력을 사용한다고 확정하며(447-449행), 무조건 acceptance도 같은 공고가 연속 두 run의 후보이면 두 번째 알림은 없다고 요구한다(451-454행). 그러나 바로 다음 조건부 항목과 OPEN-STR-08은 직전 run이 실패·취소된 경우 재통지 여부가 미정이고 legacy는 재발송한다고 명시한다(455-458, 2540행). 무조건 시나리오가 실패·취소 run을 제외하지 않으므로 미해결 OPEN에서 '재통지하지 않음'을 이미 선택했고, 본문의 확정된 입력 경계도 같은 선택을 강제한다.",
+      "required_fix": "직전 run이 실패·취소된 경우를 무조건 acceptance와 확정된 중복 억제 경계에서 제외해 OPEN-STR-08의 두 선택지가 모두 가능하게 하거나, 사용자 결정의 근거와 시점을 기록해 OPEN-STR-08을 해소한 뒤 하나의 동작으로 일관되게 확정하라."
+    }
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse --verify 3dc7d26333e9f3699c3fd1149651fe54500b6f27^{commit}",
+    "git rev-parse --verify 6c6b3a2ae658894ab105cec931f796a954e9230a^{commit}",
+    "git rev-parse HEAD",
+    "git merge-base 3dc7d26333e9f3699c3fd1149651fe54500b6f27 6c6b3a2ae658894ab105cec931f796a954e9230a",
+    "git log --oneline --decorate 3dc7d26333e9f3699c3fd1149651fe54500b6f27..6c6b3a2ae658894ab105cec931f796a954e9230a",
+    "git diff --name-status 3dc7d26333e9f3699c3fd1149651fe54500b6f27...6c6b3a2ae658894ab105cec931f796a954e9230a",
+    "git ls-files --others --exclude-standard",
+    "sed -n '1,140p' milestone-0.md",
+    "sed -n '1,170p' agent-workflow.md",
+    "sed -n '1,225p' v2-지침서.md",
+    "sed -n '225,360p' v2-지침서.md",
+    "sed -n '1,2608p' docs/discovery/capability-map.md (구간별 실행)",
+    "sed -n '1,380p' reports/evidence/m0/0a/checklist.md",
+    "jq . reports/evidence/m0/0a/codex-review-20260822T061532Z.json reports/evidence/m0/0a/codex-review-20260822T065525Z.json",
+    "python3 capability-map 구조 검증: capability·분류 집계, 중복 ID, V2 필수 사용자 가치/acceptance 결측, 활성 OPEN과 조건부 블록 대조",
+    "rg -n '폴백|fallback|fallback_mock|조용히|침묵' docs/discovery/capability-map.md",
+    "rg -n -C 3 'OPEN-STR-08|직전 run이 실패|연속 두 run|run-payload 기반 중복' docs/discovery/capability-map.md reports/evidence/m0/0a/",
+    "git diff --check 3dc7d26333e9f3699c3fd1149651fe54500b6f27...6c6b3a2ae658894ab105cec931f796a954e9230a",
+    "test ! -e bid-vector && echo 'bid-vector: absent'; test ! -d _workspace/m0-0a && echo '_workspace/m0-0a: absent'"
+  ],
+  "residual_risks": [
+    "원본 bid-vector와 인용의 중간 근거인 _workspace/m0-0a/01_scout_*.md가 없어 legacy 파일·행·commit 및 실측 수치를 원본 대조하지 못했다.",
+    "활성 OPEN 66건이 남아 있다. OPEN 자체는 이 slice의 결함이 아니지만 milestone-0.md 완료 조건에 따라 M1 진행에는 사용자 명시 승인이 필요하다.",
+    "문서 slice이므로 acceptance의 실제 production wiring, DB·알림 side effect, retry·멱등 동작은 실행 검증하지 못했고 문서의 관찰 가능성과 내부 정합성까지만 판정했다.",
+    "리뷰 range에 포함된 하네스 소관 파일 4개는 명시된 in_scope 밖이므로 판정에서 제외했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (model_reasoning_effort=high)"
+  }
+}

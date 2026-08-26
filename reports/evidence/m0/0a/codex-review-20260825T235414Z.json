@@ -1,0 +1,32 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "3dc7d26333e9f3699c3fd1149651fe54500b6f27",
+  "reviewed_head": "6c6b3a2ae658894ab105cec931f796a954e9230a",
+  "findings": [],
+  "commands_run": [
+    "git status --short --branch && git rev-parse HEAD && git cat-file -t <base> && git cat-file -t <head>",
+    "git log --oneline --decorate 3dc7d26333e9f3699c3fd1149651fe54500b6f27..6c6b3a2ae658894ab105cec931f796a954e9230a",
+    "git diff --stat 3dc7d26333e9f3699c3fd1149651fe54500b6f27...6c6b3a2ae658894ab105cec931f796a954e9230a",
+    "git diff --name-status 3dc7d26333e9f3699c3fd1149651fe54500b6f27...6c6b3a2ae658894ab105cec931f796a954e9230a",
+    "sed/rg로 milestone-0.md, agent-workflow.md, v2-지침서.md의 0A acceptance 및 판정 계약 직접 확인",
+    "sed/rg로 이전 Codex 판정 2건, scope.md, checklist.md, commands.md 확인",
+    "git diff --unified=40 707b683..6c6b3a2ae658894ab105cec931f796a954e9230a -- docs/discovery/capability-map.md reports/evidence/m0/0a",
+    "Python 파서로 capability 94건의 단일 분류, V2 필수 사용자 가치/acceptance, 분류 근거, 중복 ID, OPEN 등록 정합성 재검증",
+    "rg -n -i 'fallback|폴백|대체|추측|unknown|unclassified|uncertain|unmeasurable|측정 불가|dry-run|재시도|retry|idempot|멱등|schema|contract|호환|framework|Spring|JPA|DB|SQL|Kotlin|Python' docs/discovery/capability-map.md",
+    "git diff --check 3dc7d26333e9f3699c3fd1149651fe54500b6f27...6c6b3a2ae658894ab105cec931f796a954e9230a",
+    "git merge-base 3dc7d26333e9f3699c3fd1149651fe54500b6f27 6c6b3a2ae658894ab105cec931f796a954e9230a",
+    "git status --porcelain=v1 --untracked-files=all",
+    "git diff --numstat 3dc7d26333e9f3699c3fd1149651fe54500b6f27...6c6b3a2ae658894ab105cec931f796a954e9230a -- docs/discovery/capability-map.md reports/evidence/m0/0a/",
+    "wc -l docs/discovery/capability-map.md 및 capability/OPEN 집계 재확인"
+  ],
+  "residual_risks": [
+    "기존 bid-vector 저장소와 해당 commit object가 이 worktree에 없어 Python 파일·라인·commit 인용은 원본과 대조하지 못했다. 문서 내부의 인용 형식·주장 연결·상호 모순만 검토했다.",
+    "디렉터리 없는 legacy 파일명 인용은 동일 파일명이 여러 경로에 존재할 경우 원본 대조 시 모호할 수 있다.",
+    "활성 OPEN 66건은 규격에 따라 유지되어 있으며 M1 진행 전 사용자 명시 승인이 필요하다.",
+    "리뷰 range에 포함된 하네스 소관 4개 파일은 지시대로 finding 범위에서 제외했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (model_reasoning_effort=medium)"
+  }
+}

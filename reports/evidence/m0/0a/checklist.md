@@ -1,7 +1,7 @@
 # M0 / 0A — 완료 조건 대조 checklist
 
-- 작성: 라운드 0 → 수정 라운드 1 → 수정 라운드 2(2026-08-22, Codex 재리뷰 `request_changes` 대응) → **수정 라운드 3(2026-08-26, verifier `not-ready` M-1 + low 3건 대응)**
-- 산출물: `docs/discovery/capability-map.md` (2,608줄 — 라운드 3 기준)
+- 작성: 라운드 0 → 수정 라운드 1 → 수정 라운드 2(2026-08-22, Codex 재리뷰 `request_changes` 대응) → 수정 라운드 3(2026-08-26, verifier `not-ready` M-1 + low 3건 대응) → **수정 라운드 4(2026-08-26, Codex 3차 `request_changes` high 1건 대응)**
+- 산출물: `docs/discovery/capability-map.md` (2,621줄 — 라운드 4 기준)
 - 함께 볼 것: `commands.md`(리뷰 메타데이터·라운드별 검증 명령),
   `codex-review-20260822T061532Z.json`·`codex-review-20260822T065525Z.json`(finding 원문)
 - 기준: `reports/evidence/m0/0a/scope.md`의 `acceptance_commands` 4항목
@@ -189,7 +189,7 @@
 | `differential.json` | N/A | Python/V2 실행 결과 비교가 없는 문서 slice다. 이 slice는 legacy 동작을 **관찰로만** 기록하며 V2 산출물이 없어 비교 대상이 성립하지 않는다 |
 | `golden-manifest.json` | N/A | fixture를 사용하지 않는다. fixture 후보 인계만 했다(§11.4) |
 | `rollback.md` | N/A — 문서 산출물은 `git revert`로 복구 | 신규 wiring이 없다 |
-| `codex-review-*.json` | **존재** | `codex-review-20260822T061532Z.json` (라운드 1, `request_changes`) · `codex-review-20260822T065525Z.json` (라운드 2 재리뷰, `request_changes`). codex-reviewer 레인이 작성했고 spec-writer는 읽기만 한다(append-only). 라운드 3은 verifier finding 대응이라 Codex 리뷰 JSON이 없다 |
+| `codex-review-*.json` | **존재** | `codex-review-20260822T061532Z.json` (라운드 1, `request_changes`) · `codex-review-20260822T065525Z.json` (라운드 2 재리뷰, `request_changes`) · `codex-review-20260825T235415Z.json` (**3차 정본**, effort=high, `request_changes`) · `codex-review-20260825T235414Z.json` (3차 부수 실행, effort=medium, `approve`) — 판정이 갈린 경위는 §10.1. codex-reviewer 레인이 작성했고 spec-writer는 읽기만 한다(append-only). 라운드 3은 verifier finding 대응이라 리뷰 JSON이 없다 |
 
 ## 5. secret 스캔
 
@@ -329,3 +329,61 @@ OPEN을 해소하지도 신설하지도 않았다 — L-1은 근거 부재의 *�
 
 산출물 불변: `capability-map.md`는 이 정정으로 **한 줄도 바뀌지 않았다**(2,608줄 유지,
 capability 94, 분류 63/14/6/11, 활성 OPEN 66).
+
+## 10. 수정 라운드 4 — Codex 3차 `request_changes` (high 1건)
+
+정본 `codex-review-20260825T235415Z.json` (verdict `request_changes`, blocker 0 / high 1).
+검증 명령·출력은 `commands.md` F1~F5에 있다.
+
+| # | severity | 처리 | 산출물 변화 |
+| --- | --- | --- | --- |
+| 1 | high | STR-08. 무조건 항목의 전제를 **"직전 run이 정상 완료된 경우"**로 좁히고 실패·취소 경로가 조건부 소관임을 명시. 입력 관측 항목에 세 후보(직전 run payload / 공고별 통지 이력 / run 상태)를 모두 열거하고 목록의 **선언 여부**만 요구하도록 전환. `legacy 형태 처리`는 관찰과 판정(억제가 payload 존재라는 **부작용**으로 정해지는 형태는 `폐기`)을 유지하되, 실패·취소 run에서 run 상태를 억제 입력에 넣을지는 조건부로 이관. 조건부 묶음에 §0.5 형식대로 임시 시나리오와 **대체 시나리오**를 함께 기입 | STR-08 17 → 28행. `OPEN-STR-08` **유지** |
+
+**`required_fix`의 선택지**: "(1) 실패·취소 run을 제외해 두 선택지가 모두 가능하게 하라"와
+"(2) 사용자 결정을 기록해 `OPEN-STR-08`을 해소하고 하나로 확정하라" 중 **사용자가 (1)을
+택했다**. `OPEN-STR-08`은 해소하지 않았다.
+
+### 10.1 리뷰 재현성 — 같은 range에서 effort에 따라 판정이 갈렸다
+
+같은 base/head(`3dc7d26...6c6b3a2`), 같은 CLI(`codex-cli 0.149.0`), 같은 모델
+(`gpt-5.6-sol`)로 두 실행이 있었고 `model_reasoning_effort`만 다르다 — **high는
+`request_changes`(high 1), medium은 `approve`(finding 0)**.
+
+**두 파일 모두 커밋한다.** 유리한 쪽을 지우거나 감추지 않는다. **정본은 high 실행**이며
+채택 근거는 셋이다. (1) 1·2차 리뷰가 같은 high 레인에서 나왔으므로 라운드 간 판정을
+비교하려면 레인이 같아야 한다. (2) 판정이 갈릴 때 **finding을 낸 쪽이 검증 가능**하다 —
+high가 지목한 STR-08의 모순은 F1·F2에서 독립 재현됐고, `approve`는 부재의 주장이라 반증만
+가능하다. (3) 유리한 판정을 고르면 심판 레인이 무의미해진다. 하네스는 이 발견으로
+`codex-review-gate`에 `effort=high`를 고정했다(`CLAUDE.md` 변경 이력 2026-08-26, 이 slice의
+in_scope 밖이며 이 slice가 만들지 않았다).
+
+### 10.2 전수 스윕 신규 축과 그 발견
+
+이 계열이 4라운드 연속 재발한 구조적 원인은 스윕 축에 있었다. 기존 축은 "acceptance가
+OPEN을 인용하는데 조건부 표시가 없는 블록"을 찾는데, **STR-08은 조건부 표시를 이미
+갖고 있어서** 통과했다. 같은 블록의 무조건 항목·확정 서술이 그 조건부가 미정으로 둔
+쟁점을 확정하는 형태는 어느 축에도 걸리지 않았다.
+
+| 축 | 정의 | 결과 |
+| --- | --- | --- |
+| **F1** (신규) | 조건부 보유 블록마다 (조건부 묶음 본문 + 인용 OPEN의 §12 결정문) = 쟁점 어휘를 만들고, **같은 블록의 무조건 항목**과 토큰 중첩 3개 이상을 전수 적출 | 7블록에서 7건 적출. 수정 전 STR-08 항목이 중첩 5로 걸려 **Codex 정본 finding을 독립 재현**. 수정 후 7건 전부 결정 무관 |
+| **F2** (신규) | 조건부 보유 블록의 **확정 서술 절**(`legacy 형태 처리`·`V2 제약`·`결정 전에 확정되는 제약`·`경계`·`legacy 한계`) 중 같은 절에서 그 OPEN을 언급하면서 단정 술어를 쓰는 경우 | 3건 적출. 수정 전 **2건이 위반** — STR-08(Codex 지목)과 **ML-03(신규 발견)** |
+
+**신규 축이 찾은 추가 위반 1건 — ML-03** (`legacy 형태 처리`):
+"가격 적합도와 낙찰 확률을 서로 대입 불가능한 **별개 타입으로 만든다**(`OPEN-ML-03`은
+이를 타입으로 할지 문서 규율로 할지의 결정)" — **한 문장 안에서** 주절이 타입 분리를
+확정하고 괄호가 그것을 미정이라고 말한다. STR-08과 정확히 같은 형태다. 이번 라운드에 함께
+고쳤다: 확정되는 부분(같은 정직 명세를 4개 파일에 **복제하는** 형태는 `폐기`, 혼동을 막는
+메커니즘이 **선언된 형태로 하나 존재해야 한다**)과 미정인 부분(그 메커니즘을 타입 분리로
+할지 문서 규율로 할지 → `OPEN-ML-03`)을 절 안에서 분리했다. `OPEN-ML-03`은 해소하지 않았다.
+
+F2에서 적출된 나머지 1건(OPS-09 `V2 제약`)은 **위반이 아니다** — 같은 절이 "이는 작성자
+판단이지 확정이 아니다"를 명시하고 조건부로 이관했다(라운드 1.5 `df78c77`에서 처리).
+
+라운드 4 불변 확인(재실행): capability **94**, 분류 **63/14/6/11**, 분류 줄 형식 위반 **0**,
+`V2 필수` 사용자 가치·acceptance 결측 **0**, 중복 ID **0**, §12 등록 OPEN **66**(전체 id
+69 = 활성 66 + 결번 3), **OPEN id 소멸 0 · 신규 0**(`6c6b3a2` 대조), secret 스캔 매치
+**3**(불변, 신규 Codex JSON 2건은 0건). 기존 4축(블록 스윕·어휘 중첩·기본값 단정·측정 불가
+계열)도 재실행해 전부 라운드 3과 동일하다. `capability-map.md` 2,608 → **2,621줄**.
+
+**이월(변동 없음)**: 라운드 1 verifier L-4~L-6과 라운드 0 F-5. §7·§9 참조.
