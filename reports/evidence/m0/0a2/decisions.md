@@ -171,7 +171,7 @@
 | --- | --- | --- |
 | OPEN-QUAL-01 | **(a)** 그룹 간 OR / 그룹 내 AND | 조달청 OpenAPI 문서 근거. **`OPEN-QUAL-03`이 따라 닫힌다**(M2 차단) |
 | OPEN-QUAL-02 | **(b)** `permsnIndstrytyList`를 자격 경로로 포함 | 제한을 넓히는 축이라 제외하면 과차단 방향 |
-| OPEN-QUAL-08 | **분할 확정** — 시공능력평가액은 **자격 축**, 도급한도·연매출·capacity_score는 **적합도 축** | 공고가 게시하는 요건이면 자격, 운영자 사정이면 적합도 |
+| OPEN-QUAL-08 | **분할 확정** — 시공능력평가액은 **자격 축**, 도급한도·연매출·capacity_score는 **적합도 축** | 공고가 게시하는 요건이면 자격, 운영자 사정이면 적합도. **capability QUAL-11의 분류 상향 근거는 아래 절에 축어로 옮겼다** |
 | OPEN-COL-02 | 문서의 **17개 resultCode를 versioned policy data로 등재** | `OPEN-OPS-01`의 `Unclassified` 모수가 줄어든다 |
 | OPEN-DEC-05 | **(a)** 하나의 `Skip` verdict + **필수** reason code | **M-4(DEC-12 A9 표 셀)가 이 결정으로 해소된다** — 아래 참조 |
 | OPEN-DEC-06 | **(a)** 구조화된 `biasDirection` 필드로 노출 | 측정 가능한 편향을 숨기지 않는다 |
@@ -262,7 +262,9 @@
 
 - **M2 계약**: 투찰가 산출이 request/response가 된다 — 운영자의 gRPC + callback 방향과 일치.
 - **M5 serving**: 배치 선산출 부하가 사라지고 요청 단위 지연이 설계 기준이 된다.
-- **큐 폭주 문제의 뿌리가 사라진다.** legacy OPS-00의 21,321건은 배치 산출 작업이 쌓인 것이다.
+- ~~**큐 폭주 문제의 뿌리가 사라진다.** legacy OPS-00의 21,321건은 배치 산출 작업이 쌓인
+  것이다.~~ → **철회. 원본의 사실 오류다**(0A2 라운드 2, verifier H-2 — 아래 정정 절 참조).
+  21,321건은 **유사공고 임베딩 백필** 적체이며 투찰가 배치 산출과 무관하다.
   `OPEN-OPS-03`(큐 깊이 SLO)의 모수가 근본적으로 달라진다.
 - **capability 재분류 후보**(통합 패스에서 처리, 임의 변경 금지):
   | capability | 현재 | 후보 | 사유 |
@@ -293,3 +295,91 @@
 
 **M0 차단 8건 전부 확정. M1 차단은 17건 중 14건 확정, 3건 미결**
 (`OPEN-DEC-01` · `OPEN-DEC-04` · `OPEN-STR-06`).
+
+---
+
+## 0A2 라운드 2 추가 — `OPEN-QUAL-08` 승인 권고의 축어 인용 (verifier M-2)
+
+**왜 추가하는가**: `capability-map.md`의 QUAL-11 블록이 **분류 상향**(`근거 부족` →
+`V2 필수`)의 근거로 승인된 권고의 한 문장을 인용하면서 출처를 이 파일로 적었는데,
+**그 문장이 이 파일에 없었다.** 실물은 gitignore 대상인
+`_workspace/m0-open-decisions/g1-g3.md`에만 있어 리뷰어가 인용을 따라가면 근거를 찾지
+못한다. A7(결정 기록을 커밋하는 이유)이 정확히 이 상황을 막으려던 것이므로 여기 옮긴다.
+
+QUAL-11은 **이 slice에서 결정 기록에 결정 내용이 명시되지 않은 유일한 분류 변경**이다.
+나머지 재분류 5건은 "capability 재분류 후보" 표에 직접 적혀 있다.
+
+### 원본 위치
+
+`_workspace/m0-open-decisions/g1-g3.md` → `### OPEN-QUAL-08 · 금액 capacity 게이트가
+자격인가 적합도인가` → `**영향**` 절의 첫 항목.
+
+### 축어 인용
+
+> - capability **QUAL-11**(현재 `근거 부족`). 결정으로 `V2 필수`(자격 부분) + `폐기`
+>   (`capacity_score` 추측 정규화)로 갈린다.
+> - **COL 축에 신규 수집 필드**가 생긴다 — `cnstrtnAbltyEvlAmtList`는 legacy가 수집하지
+>   않는다. 0C 데이터 사전과 M1 수집 어댑터에 영향.
+> - verifier 라운드 5가 지적한 QUAL-11 `사용자 가치`("회사 규모를 넘는 공고를 거른다")의
+>   어감 문제도 이 결정으로 닫힌다.
+
+운영자는 이 권고를 **일괄 승인**했다(위 "M1 차단 묶음: 11건 권고 승인" 절 — "운영자가
+아래 11건의 권고를 일괄 승인했다(2026-08-26). 권고 근거는 결정표 원본에 있다"). 승인
+대상에 `영향` 절이 포함되므로 **분류 상향은 승인된 권고의 일부**이며 0A2가 새로 판단한
+것이 아니다.
+
+### 함께 정정한 것
+
+`capability-map.md`가 QUAL-11의 이전 분류를 "`근거 부족`(**§0.4 규칙 4**)"으로 귀속했으나
+**base 블록은 규칙 번호를 인용하지 않았다.** §9.1 상충 표에 올라 있으므로 성격은 규칙 3
+계열이다. 규칙 번호 귀속을 빼고 "`OPEN-QUAL-08` 미해결"이라는 실제 근거만 남겼다.
+
+---
+
+## 0A2 라운드 2 정정 — 21,321건 귀속 오류 (verifier H-2)
+
+**경위를 그대로 적는다. 은폐하지 않는다.**
+
+이 결정 기록의 "상호작용 모델 — pull 확정" 절 하류 파급 항목에 **"큐 폭주 문제의 뿌리가
+사라진다 — legacy OPS-00의 21,321건은 배치 산출 작업이 쌓인 것이다"**가 있었다.
+**사실이 아니다.** 이 문장은 운영자 결정이 아니라 **팀 리드 레인의 분석 단계 서술**이며,
+0A2 통합 패스가 그것을 `capability-map.md` §0.7로 승격시켜 **정본 산출물의 확정 서술**로
+만들었다. verifier가 legacy 실측으로 반증했다.
+
+### 실측
+
+| 근거 | 내용 |
+| --- | --- |
+| commit `19f2c94` | "fix(similarity): **백필 폭주 수습** — 큐 21,321건 적체의 코드 원인 제거 (P1~P4) (#368)" |
+| `app/services/task_queue_depth.py:6` | "On 2026-08-13 the **similarity projection backfill** pinned the one inference worker for four hours and ``bid_vector_ml_inference`` accumulated 21,321 messages." |
+| `tests/test_similarity_backfill_overlap_guard.py:5` | "...pinned the inference worker for four hours and 21,321 events piled up behind them." |
+| `tests/test_pipeline_sweep_expiry.py:4` | "...beat 는 계속 밀어 넣었고 ``bid_vector_ml_inference`` 에 21,321건이 쌓였다." |
+| `app/tasks/pipeline_schedules.py:30`, `app/core/inference_config.py:84,96,105,114` | 같은 사고를 가리킨다 |
+| `capability-map.md` OPS-00 표 | P1~P4가 상관 서브쿼리·워터마크 신선도·**유사 공고 패널 빈 화면**을 다루지 투찰가 산출을 다루지 않는다 |
+
+### 무엇이 문제였나 — 계열 A
+
+틀린 사실 위에 **"그 뿌리가 사라진다"는 완화**가 얹혔고, 그 완화가 가리키는
+`OPEN-OPS-03`(큐 깊이 SLO)과 `OPEN-OPS-04`(legacy 임계값 — 큐 깊이 임계 포함)는
+**둘 다 활성 잔존**이다. 미해결 쟁점의 근거 기반을 확정 서술이 잠식하는 형태이며,
+이 저장소가 0A에서 여섯 라운드에 걸쳐 추적한 계열 A와 같다.
+
+### 정정 결과
+
+- `capability-map.md` §0.7 하류 파급의 해당 문장을 **철회 블록으로 교체**했다(반증 근거 포함).
+- 이 파일의 원본 문장은 **지우지 않고 취소선 + 철회 표시**했다 — 감사 추적이 목적인
+  파일이므로 무엇이 잘못됐는지가 남아야 한다.
+- `OPEN-OPS-03`·`OPEN-OPS-04`의 근거 기반은 **완화 이전 상태 그대로**다. `OPEN-OPS-03`을
+  좁힌 것은 "1인 운영"이라는 입력뿐이며 큐 폭주 사례와 무관하다.
+
+### 같은 라운드의 다른 승격 오류 — `M-1`
+
+**"legacy는 파이프라인 run에서 배치로 산출한다 → V2는 요청 시 산출한다(의도적 재설계)"**도
+같은 경위다. legacy에 `POST /predictions/price`(`app/api/predictions.py:20`,
+`routes.py:40` wiring, `prediction_workflow`가 `build_bid_target_menu`로 DEC-05 투찰가
+3안까지 요청 시 첨부)라는 **on-demand 경로가 이미 있다.** V2가 바꾸는 것은 on-demand
+도입이 아니라 **배치 선산출의 제거**다. `capability-map.md` §0.7 #2와 재분류 표를
+그 범위로 좁혔다.
+
+**두 건 다 0A2가 만든 오류는 아니지만 0A2가 정본으로 승격시켰다.** 승격 전에 legacy
+원본을 대조하지 않은 것이 원인이며, 라운드 2에서 `git show ed4b06c:`로 실측해 정정했다.
