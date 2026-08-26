@@ -564,7 +564,7 @@ $ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))
        3
 
 $ wc -l docs/discovery/capability-map.md
-    3076 docs/discovery/capability-map.md
+    3078 docs/discovery/capability-map.md
 
 $ grep -n "조건부 — .OPEN-|잠정 — .OPEN-" docs/discovery/capability-map.md
 72:- **조건부 — `OPEN-*` 결정에 따라 확정** …            ← §0.5 규약 정의(묶음 아님)
@@ -587,4 +587,4 @@ $ grep -n "조건부 — .OPEN-|잠정 — .OPEN-" docs/discovery/capability-map
 - 조건부 묶음 **7개 / capability 5개** + 잠정 1. §0.5 목록(5개)과 일치한다.
   grep 9행 중 `:72`는 §0.5 **규약 정의문**이고 `:1404`는 **잠정** 묶음이므로 조건부에서
   제외한다 — 라운드 2의 같은 확인도 정의문을 제외해 셌다(verifier F-6).
-- secret 매치 3건 불변. `capability-map.md` 2,958 → 3,064(라운드 5) → **3,076줄**(라운드 6 전파 +12).
+- secret 매치 3건 불변. `capability-map.md` 2,958 → 3,064(라운드 5) → **3,078줄**(라운드 6 전파 +14).
