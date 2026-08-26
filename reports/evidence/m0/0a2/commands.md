@@ -486,3 +486,102 @@ $ git show ed4b06c:app/services/opportunity_monitoring/filters.py | sed -n '62,6
   맞춘 것이며, 좁힌 자리마다 정정 경위를 남겼다.
 - **M-4r가 §10.1 3번의 반대 형태다** — M-2r가 "출력을 손으로 썼다"면 이것은
   **"재실행 범위를 손으로 넓혔다"**이다. 같은 표에 이 사실을 기록했다.
+
+---
+
+## 2026-08-26 — 수정 라운드 5 검증 (Codex 4차 `request_changes`)
+
+Codex 4차 판정 `request_changes`(blocker 0 / high 4 / medium 2). verdict 원문은
+`codex-review-20260826T102642Z.json`. **6건 중 4건이 "결정의 파급이 문서 곳곳에 덜 반영된"
+유형**이었다.
+
+### R5-0. **`inv2.py` 본문 — Codex residual risk 대응**
+
+Codex가 residual risk로 적었다:
+
+> clean worktree에서 evidence가 기록한 `python3 inv2.py`는 **파일 부재로 exit 2**였다.
+> 동일 불변식은 독립 parser로 재현했지만 evidence 명령 자체는 재실행할 수 없다.
+
+**정확한 지적이다.** `inv2.py`는 커밋되지 않은 스크래치 스크립트였고, 이 파일이 그것을
+이름으로만 불러 **리뷰어가 재실행할 수 없었다.** `checklist.md` §10.1이 세는 계열의
+사촌이다 — 실행은 했지만 **남이 재실행할 수 없다.** 0A 라운드 5가 F1·F2'·X 스크립트에
+한 것과 같은 방식으로 본문을 인라인한다.
+
+```python
+import re, collections, sys
+p=sys.argv[1] if len(sys.argv)>1 else "docs/discovery/capability-map.md"
+lines=open(p,encoding="utf-8").read().split("\n")
+starts=[i for i,l in enumerate(lines) if l.startswith("### ")]
+CLS=re.compile(r'^\s*- \*\*분류\*\*:\s*\*?\*?`([^`]+)`')
+ACC=re.compile(r'^\s*-?\s*\*\*(Acceptance scenario|채택 시 요구되는 관찰 가능 동작)')
+VAL=re.compile(r'^\s*- \*\*사용자 가치')
+VALID={"V2 필수","후속","폐기","근거 부족"}
+cnt=collections.Counter(); bad=[]; miss=[]; ids=[]
+for n,st in enumerate(starts):
+    e=starts[n+1] if n+1<len(starts) else len(lines)
+    body=lines[st:e]; t=lines[st][4:].strip()
+    m=[CLS.match(l) for l in body]; m=[x for x in m if x]
+    if not m: continue
+    cid=t.split(" ")[0]; ids.append(cid); v=m[0].group(1)
+    if v not in VALID: bad.append((cid,v))
+    cnt[v]+=1
+    if v=="V2 필수" and (not any(VAL.match(l) for l in body) or not any(ACC.match(l) for l in body)):
+        miss.append(cid)
+print("분류:",dict(cnt),"=",sum(cnt.values()))
+print("형식 위반:",bad or "none")
+print("V2 필수 사용자 가치/acceptance 결측:",miss or "none")
+dup=[k for k,v in collections.Counter(ids).items() if v>1]
+print("중복 id:",dup or "none")
+txt="\n".join(lines)
+reg=set(re.findall(r'^\|\s*(OPEN-[A-Z]+-\d+)\s*\|',txt,re.M))
+ref=set(re.findall(r'OPEN-[A-Z]+-\d+',txt))
+print("§12 활성 OPEN:",len(reg))
+print("본문 참조 - 활성 등록:",len(sorted(ref-reg)),"건 (해소·결번 포함)")
+```
+
+- 위 스크립트를 임의 경로에 저장하고 `python3 <경로> [문서경로]`로 실행하면 이 파일의
+  모든 `$ python3 inv2.py` 블록을 재현할 수 있다. 인자를 생략하면
+  `docs/discovery/capability-map.md`를 읽는다.
+- **주의**: 라운드 1 절의 출력은 그 시점 문서 기준이므로 현재 HEAD에서 재실행하면 다른
+  값이 나온다(각 절 제목의 기준 시점 선언 참조). 재현 가능한 것은 **스크립트이지 값이
+  아니다** — 값은 리비전에 종속된다.
+
+### R5-1. 불변 재확인 — **라운드 5 HEAD에서 실행**
+
+```
+$ python3 inv2.py
+분류: {'V2 필수': 62, '근거 부족': 10, '폐기': 6, '후속': 17} = 95
+형식 위반: none
+V2 필수 사용자 가치/acceptance 결측: none
+중복 id: none
+§12 활성 OPEN: 43
+본문 참조 - 활성 등록: 31 건 (해소·결번 포함)
+
+$ grep -c "^| OPEN-" docs/discovery/capability-map.md
+43
+
+$ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" docs/discovery/ | wc -l
+       3
+
+$ wc -l docs/discovery/capability-map.md
+    3064 docs/discovery/capability-map.md
+
+$ grep -n "조건부 — .OPEN-|잠정 — .OPEN-" docs/discovery/capability-map.md
+72:- **조건부 — `OPEN-*` 결정에 따라 확정** …            ← §0.5 규약 정의
+836:  - **조건부 — `OPEN-QUAL-11` 결정에 따라 확정.** …   ← 신규
+1002:  - **조건부 — `OPEN-QUAL-10` 결정에 따라 확정.** …  ← 신규
+1007:  - **조건부 — `OPEN-QUAL-09` 결정에 따라 확정.** …  ← 신규(high #1)
+1097:  - **조건부 — `OPEN-ML-03` 결정에 따라 확정.** …
+1393:  - **잠정 — `OPEN-DEC-03` 재결정 대상.** …
+1783:  - **조건부 — `OPEN-NOTI-08` 결정에 따라 확정.** …
+1790:  - **조건부 — `OPEN-NOTI-01` 결정에 따라 확정.** …
+2471:  - **조건부 — `OPEN-OPS-01`의 정책 질문 결정에 따라 확정.** …
+```
+
+- exit: 0. **이 블록의 5개 명령은 라운드 5 HEAD 실행분이다.** 라운드 1 절 5개는
+  재실행하지 않았고 각 제목에 기준 시점을 선언했다(라운드 4 M-4r).
+- **capability 95 · 분류 62/17/6/10 불변** — 라운드 5는 capability를 추가·재분류하지 않았다.
+- **활성 OPEN 39 → 43.** 신설 3(`OPEN-QUAL-10` · `OPEN-QUAL-11` · `OPEN-OPS-10`) +
+  복원 1(`OPEN-OPS-07`). `^| OPEN-` 행 수와 `inv2.py` 등록 수가 **양쪽 43으로 일치**한다.
+- 조건부 묶음 **8개 / capability 5개** + 잠정 1. §0.5 목록(5개)과 일치한다.
+- secret 매치 3건 불변. `capability-map.md` 2,958 → **3,064줄**(+106).
