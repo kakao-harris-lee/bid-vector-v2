@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a-capability-map
 base_sha: 3dc7d26333e9f3699c3fd1149651fe54500b6f27
-head_sha: 6dee91a24d70865efb8881ec1e13c3f98c6fa666  # 수정 라운드 5 최종 산출물 커밋. 아래 갱신 이력 참조
+head_sha: cd5a456470c8cec35c2dafaa9ca8fac4164f4da9  # 수정 라운드 6 최종 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a/
@@ -226,3 +226,35 @@ blocker 0 / **high 1**)의 finding을 반영했다. 같은 scope를 유지했다
   저장소 루트 `CLAUDE.md`)로 불변이다. 셋 다 하네스 소관이며 **이 slice가 만든 커밋이
   아니다.** 재확인 명령과 출력은 `commands.md` G7.
 - 미처리 이월(변동 없음): 라운드 1 verifier L-4~L-6, 라운드 0 F-5. `checklist.md` §7·§9.
+
+### 2026-08-26 — 수정 라운드 6 (verifier `not-ready` M-3 대응, spec-writer) · **최종 수정 라운드**
+
+라운드 5 재검증 판정 `not-ready`, 사유는 **M-3 한 건**(medium, 문장 1개)이다. 라운드 4
+발견 5건(H-1·M-1·M-2·L-1·L-2 주요부)은 **전부 닫혔다**고 판정됐고 불변 9종·secret·범위·
+clean tree·스크립트 재현성도 전부 독립 재현됐다. **H-1 정정은 "완화·은폐 없음"으로
+통과**했다. 사용자가 이번을 **마지막 수정 라운드**로 잡았다.
+
+| 커밋 | 대응 | 요지 |
+| --- | --- | --- |
+| `d140f92` | M-3 | NOTI-05 `사용자 가치`에 **"at-most-once를 유지하면"** 한정어와 `OPEN-NOTI-02` 참조 추가. `OPEN-NOTI-02`의 (b) at-least-once를 배제하던 무조건 서술을 조건화. 어법은 라운드 5의 M-2 수정과 대칭 |
+| `cd5a456` | L-4~L-9 + evidence | 라운드 4 F2 절 정정 대칭성(L-5, verifier 자기 정정 포함), F2'도 M-1을 못 본다는 실측(L-6), G4 임계 표의 기준 리비전 명시(L-7), §2 낡은 부재 주장 한정(L-8), 죽은 `§10.3` 참조 제거(L-9), L-4 미이행 명시. checklist §12, commands H1~H5 |
+
+- `head_sha`를 `6dee91a` → `cd5a456`로 갱신했다.
+- **재리뷰 range는 `3dc7d26...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+  이전 라운드와 같은 이유로(커밋이 자기 SHA를 담을 수 없다) `head_sha`는 그 직전 커밋을
+  가리키며, 두 커밋의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
+- 산출물 변화: capability **94 불변**, 분류 **63/14/6/11 불변**, 활성 `OPEN` **66 불변**
+  (`a72e247` 대조 결과 소멸 0 · 신규 0), `capability-map.md` 2,624 → **2,625줄**
+  (NOTI-05 `사용자 가치` +1). `OPEN-NOTI-02`·`OPEN-STR-08`·`OPEN-ML-03` 전부 유지.
+- **축을 늘리지 않았다.** M-3의 `NOTI-05 사용자 가치 × OPEN-NOTI-02` 어휘 중첩은 실측
+  **0**(수정 후 3)이다 — 완전한 환언이라 토큰 기반 축이 원리적으로 볼 수 없고, 이는
+  `checklist.md` §11.3 한계 3이 예고한 사각지대의 **실물 사례**다. 새 축을 만드는 대신
+  그 한계 서술의 사례로 기록했다(§12.1). 기존 축(F1·F2'·X)은 불변 확인용으로만 재실행했고
+  **F1 7 / F2' 5 / X 15 — 라운드 5와 전부 동일, 새 적출 0건**이다.
+- **리뷰 range의 in_scope 밖 변경**: 라운드 5 절의 선언 그대로다 — 무관 커밋 **3건**
+  (`1f8e57c`, `0c7eeff`, `d7b1c10`), 파일 **4개**(`.claude/skills/codex-review-gate/` 3개 +
+  저장소 루트 `CLAUDE.md`). 라운드 6의 세 커밋은 `docs/discovery/capability-map.md`와
+  `reports/evidence/m0/0a/` 안에만 있다. 재확인 명령·출력은 `commands.md` G7.
+- 미처리 이월(변동 없음): 라운드 1 verifier L-4~L-6, 라운드 0 F-5. `checklist.md` §7·§9.
+  라운드 5 verifier L-4(라운드 3 E1~E4·라운드 4 F2 스크립트 미기입)도 **의도적 미이행**
+  으로 `checklist.md` §11 표 L-2 행에 기록했다.
