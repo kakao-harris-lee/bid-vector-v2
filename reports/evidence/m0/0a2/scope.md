@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a2-decision-integration
 base_sha: 6af7019996ec26903c7b531ed7ede12c22cf176e
-head_sha: 6a4e49b77f53137db0e8719e4b6e8bf55c1e842f  # 0A2 최종 산출물 커밋. 아래 갱신 이력 참조
+head_sha: 0ce2e4c6de9a862eed2dcccaf77c0093b811aab4  # 0A2 수정 라운드 2 최종 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a2/
@@ -104,3 +104,33 @@ rollback: "N/A — 문서 산출물은 git revert로 복구. 0A head 6af7019로 
   **해소하지 않았다.**
 - **미처리(알려진 제한)**: `OPS-06` 재정의(DB 큐 설계 부재에 종속) · STR-11 분류
   (결정 기록에 판단 없음). 상세는 `checklist.md` §9.
+
+### 2026-08-26 — 수정 라운드 2 (verifier `not-ready` 대응, spec-writer)
+
+verifier 판정 `not-ready`, 발견 9건(high 2 / medium 5 / low 2).
+**A2는 통과**(소멸 29 / 신규 0 / 임의 해소 0, 독립 재현)이고 A1·A4·A5·A6·A7도 충족이었다.
+9건 전부를 처리했다.
+
+| 커밋 | 대응 |
+| --- | --- |
+| `5192213` | **H-1 · H-2 · M-1** — legacy 실측으로 사실 정정. STR-16 부재 주장 반증(`projects.py`의 라이브 검색 경로), 21,321건 귀속 정정(유사공고 임베딩 백필), legacy on-demand 경로 존재(`predictions.py:20`). §13 0B 인계를 **세 경로**로 재작성 |
+| `4c29cce` | **M-2 · M-3 · M-4 · L-1 · L-2** + evidence — OPEN 2건 신설, `잠정` 묶음 분리, QUAL-11 인용 이관, 절 순서, `OPEN-OPS-03` 행 갱신 |
+| `0ce2e4c` | **M-5** — 0A `commands.md` 틀린 원문 지점에 정정 절 포인터 append |
+
+- `head_sha`를 `6a4e49b` → `0ce2e4c`로 갱신했다.
+- **리뷰 range는 `6af7019...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+  라운드 1과 같은 이유로 `head_sha`는 그 직전 커밋을 가리킨다.
+- **range의 in_scope 밖 변경은 없다.**
+- **산출물 변화(라운드 2)**: capability **95 불변**, 분류 **62/17/6/10 불변** —
+  라운드 2는 분류를 하나도 바꾸지 않았다. 활성 `OPEN` **37 → 39**(`OPEN-QUAL-09` ·
+  `OPEN-STR-12` 신설). `capability-map.md` 2,872 → **2,951줄**.
+- **A2 재확인**: base 대비 소멸 **29건 불변**, 임의 해소 **0건**. 신규 2건은 **정당한
+  신설**이며 A2가 금지하는 임의 해소의 **반대 방향**이다 — 결정이 상위 축만 정하고 하위
+  질문을 남겼는데 그 질문을 받던 OPEN이 같은 라운드에 닫혀 **수신처가 사라진** 미결이다.
+  등록하지 않으면 `milestone-0.md` 게이트가 쓰는 OPEN 수가 실제 미결을 과소 계상한다.
+- **H-2·M-1의 경위를 기록했다**: 두 건 다 팀 리드 분석 단계 서술이 `decisions-log.md`를
+  거쳐 0A2에서 **정본으로 승격**된 것이다. `decisions.md`에 정정 절을 신설하고 원본
+  문장은 취소선으로 보존했다. 승격 전 legacy 대조를 하지 않은 것이 원인이며, 그 교훈을
+  `checklist.md` §10.1에 0B 이후 적용 규칙으로 적었다.
+- **미처리(라운드 1에서 이월, 변동 없음)**: `OPS-06` 재정의(DB 큐 설계 부재에 종속).
+  STR-11 분류는 **`OPEN-STR-12` 신설로 짝 구조가 복원**됐다.
