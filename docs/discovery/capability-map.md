@@ -107,9 +107,18 @@ pull로 확정됐다.** 운영자 진술(2026-08-26):
 확정되는 것 셋:
 
 1. **주기 감시는 후보를 제안까지만 한다.** 수집 → 조건 매칭 → 제안 목록(STR-09·STR-08 유지).
-2. **투찰가 산출은 on-demand다.** legacy는 파이프라인 run에서 배치로 산출한다(lineage
-   stage `selected → workload → decision → notification → completed`). **V2는 요청 시
-   산출한다** — legacy 복제 금지 원칙에 따른 **의도적 재설계**다.
+2. **투찰가 산출은 on-demand이며, 배치 선산출을 하지 않는다.**
+   **legacy에는 두 경로가 다 있다** — 파이프라인 run의 **배치 산출**(lineage stage
+   `selected → workload → decision → notification → completed`)과 **요청 시 산출**
+   (`app/api/predictions.py:20` `@router.post("/price")`, `routes.py:40`에 wiring,
+   `prediction_workflow.py`의 `predict_project_price` → `build_bid_target_menu`가
+   DEC-05의 투찰가 3안까지 요청 시 붙인다).
+   **따라서 V2가 바꾸는 것은 on-demand 도입이 아니라 배치 선산출의 제거다.** 요청 경로는
+   legacy에 이미 있으므로 "의도적 재설계"는 **배치 선산출을 승계하지 않는다**는 범위에만
+   적용된다.
+   > **라운드 2 정정(verifier M-1)**: 이 항목은 원래 "legacy는 배치로 산출한다 → V2는
+   > 요청 시 산출한다(의도적 재설계)"로 적혀 legacy의 요청 경로를 없는 것처럼 서술했다.
+   > 실측으로 정정했다.
 3. **운영자에게 강제되는 작업 큐가 없다.** 워크플로 상태 기계가 "운영자가 처리해야 할
    항목"을 추적할 필요가 없다.
 
@@ -122,12 +131,36 @@ pull로 확정됐다.** 운영자 진술(2026-08-26):
 | NOTI-02 알림 피로도 게이트 | `V2 필수` → **`후속`** | 알림을 다 소비하지 않아도 되므로 피로도 억제의 가치가 크게 낮다 |
 | NOTI-05 배달 outbox | `V2 필수` → **`후속`** | at-most-once 확정 + best-effort면 "커밋 후에만 보낸다"로 충분 |
 | NOTI-10 앱 알림 중복 억제 | `V2 필수` **유지·강화** | 앱 알림함이 **기록이자 회수 경로**로 확정됐다 |
-| DEC-02 추천 투찰가 산정 | `V2 필수` 유지, **산출 시점 배치 → on-demand** | 위 2번 |
+| DEC-02 추천 투찰가 산정 | `V2 필수` 유지, **배치 선산출 제거**(요청 경로만 남긴다) | 위 2번. legacy에도 요청 경로가 있으므로 없애는 쪽이 변경분이다 |
 
 **하류 파급**: M2 계약에서 투찰가 산출이 request/response가 된다. M5 serving은 배치
-선산출 부하가 사라지고 요청 단위 지연이 설계 기준이 된다. **legacy OPS-00의 큐 폭주
-(21,321건)는 배치 산출 작업이 쌓인 것이므로 그 뿌리가 사라지고**, `OPEN-OPS-03`(큐 깊이
-SLO)의 모수가 근본적으로 달라진다.
+선산출 부하가 사라지고 요청 단위 지연이 설계 기준이 된다.
+
+> **⚠ 라운드 2 정정 (verifier H-2) — 여기에 있던 완화를 철회한다.**
+> 원래 이 자리에 "**legacy OPS-00의 큐 폭주(21,321건)는 배치 산출 작업이 쌓인 것이므로
+> 그 뿌리가 사라지고**, `OPEN-OPS-03`(큐 깊이 SLO)의 모수가 근본적으로 달라진다"가
+> 적혀 있었다. **사실이 아니다.** 21,321건은 투찰가 배치 산출이 아니라 **유사공고 임베딩
+> 백필**이 단일 inference worker를 4시간 점유하는 동안 쌓인 것이다.
+>
+> - commit `19f2c94` "fix(similarity): 백필 폭주 수습 — 큐 21,321건 적체의 코드 원인
+>   제거 (P1~P4) (#368)"
+> - `app/services/task_queue_depth.py:6` "On 2026-08-13 the **similarity projection
+>   backfill** pinned the one inference worker for four hours and
+>   ``bid_vector_ml_inference`` accumulated 21,321 messages."
+> - `tests/test_similarity_backfill_overlap_guard.py:5`, `tests/test_pipeline_sweep_expiry.py:4`,
+>   `app/tasks/pipeline_schedules.py:30`, `app/core/inference_config.py:84,96,105,114`가
+>   모두 같은 사고를 가리킨다.
+> - 이 문서 자신의 OPS-00 표(P1~P4)도 상관 서브쿼리·워터마크 신선도·**유사 공고 패널
+>   빈 화면**을 다루지 투찰가 산출을 다루지 않는다.
+>
+> **따라서 pull 모델이 큐 폭주의 뿌리를 없애지 않는다.** `OPEN-OPS-03`(큐 깊이 SLO)과
+> `OPEN-OPS-04`(legacy 임계값 — 큐 깊이 임계 포함)는 **둘 다 활성 잔존**이며, 그 근거
+> 기반은 완화 이전 상태 그대로다. 이 완화는 팀 리드 분석 단계의 사실 오류가
+> `decisions-log.md`를 거쳐 산출물로 승격된 것이며, 0A2 라운드 2에서 실측으로 철회했다.
+
+pull 모델이 실제로 줄이는 큐 부하는 **투찰가 배치 산출분**이며, 그것이 21,321건 사고의
+원인이었다는 근거는 없다. `OPEN-OPS-03`의 모수는 **1인 운영**이라는 입력(§12.2)으로만
+좁혀졌고 큐 폭주 사례와는 무관하다.
 
 ### 0.6 축과 ID 접두사
 
@@ -643,16 +676,33 @@ SLO)의 모수가 근본적으로 달라진다.
 
   §0.7의 pull 상호작용 모델에서 **이것이 운영자의 주 경로**다. 조사가 legacy(push·batch
   모델) 기반이라 구조적으로 빠진 영역이며, 이 문서의 다른 94개 항목과 달리 **legacy
-  관찰이 근거가 아니다.** legacy 측 전수 확인 결과 검색·목록 관련 항목은 COL-01(수집)과
-  QUAL-10(무관)뿐으로, **대응 구현이 없다.** `milestone-0.md` 완료 조건("`V2 필수`
-  capability마다 사용자 가치와 acceptance scenario")에 직접 걸리므로 신규로 추가한다.
+  관찰이 근거가 아니다** — 이 capability는 **운영자 진술로 식별됐다.**
+  `milestone-0.md` 완료 조건("`V2 필수` capability마다 사용자 가치와 acceptance
+  scenario")에 직접 걸리므로 신규로 추가한다.
+- **legacy 대응 형태 — 부분 대응이 실재한다**:
+  > **⚠ 라운드 2 정정 (verifier H-1)**: 이 자리에 원래 "검색·목록 관련 항목은 COL-01과
+  > QUAL-10뿐으로 **대응 구현이 없다**"가 적혀 있었다. **부재 주장이 반증됐다.**
+
+  `app/api/projects.py`의 `list_projects`(`GET /projects/`, `routes.py:38`에 wiring된
+  라이브 경로)가 이 capability의 **검색 절반을 이미 구현한다** — `q`(제목·공고번호
+  `ILIKE` 부분 일치), `agency`(발주·수요기관 `ILIKE`), `budget_min`/`budget_max`,
+  그리고 `X-Total-Count` 헤더 페이지네이션(`projects.py:56-119`). 즉 "제목·관심사로
+  검색"은 legacy에 있다. **없는 것은 검색 결과에서 투찰가를 요청하는 결합**이며,
+  투찰가 요청 자체도 `POST /predictions/price`로 따로 존재한다(§0.7 #2).
+  조사가 이 경로를 놓친 이유는 capability map이 legacy의 **파이프라인**을 축으로 훑었고
+  이 엔드포인트가 어느 파이프라인 stage에도 속하지 않기 때문이다.
 - **축 배정 사유**: §0.6의 STR 축 소유 주제는 "감시 조건, 임계치, **후보 산출 트리거**"다.
   이 항목은 운영자가 직접 거는 후보 산출 트리거이므로 STR에 속한다. 새 축을 만들지 않는
   이유는 이것이 **전략 축의 수동 경로**이지 별개 주제가 아니기 때문이다(§0.3). id는
   STR 축의 다음 번호 `STR-16`이다.
-- **legacy 형태 처리**: legacy의 배치 산출(lineage `selected → workload → decision →
-  notification → completed`)은 채택하지 않는다 — 요청 시 산출한다(§0.7). 검색 경로에
-  대응하는 legacy 구현이 없으므로 이식할 형태 자체가 없다.
+- **legacy 형태 처리**: legacy의 **배치 선산출**(lineage `selected → workload →
+  decision → notification → completed`)은 채택하지 않는다 — 요청 시 산출한다(§0.7).
+  검색 경로(`projects.py:56-119`)는 형태가 실재하며 아래 둘로 갈린다.
+  - **채택 가능**: `ILIKE` 부분 일치 검색과 `X-Total-Count` 페이지네이션의 **계약 형태**.
+    STR-05(텍스트 매칭 부분문자열 유지) 결정과 방향이 같다.
+  - **`폐기`**: 금액 필터가 `Project.budget_estimate`(**추정가격**)와 비교하는 형태
+    (`projects.py:112-116`). **`OPEN-STR-01` 결정으로 `legacy-defect`가 된 것과 같은
+    결함**이며, 감시 경로(`filters.py`)와 **같은 뿌리**다. §13 0B 인계 참조.
 - **Acceptance scenario**
   - 운영자가 제목·관심사(키워드)로 입찰 목록을 검색하면, **감시 조건 통과 여부와 무관하게**
     수집된 공고가 조회된다. 제안 목록에 없던 공고도 찾을 수 있다.
@@ -662,6 +712,10 @@ SLO)의 모수가 근본적으로 달라진다.
     답해지며 빈 값이나 0으로 답하지 않는다(DEC-04·B-13의 측정 불가 어휘를 따른다).
   - 같은 공고에 대해 투찰가를 두 번 요청하면 **입력이 같은 한 같은 답**이 나오고, 입력이
     달라졌으면 무엇이 달라져서 답이 바뀌었는지 결과에서 구분된다.
+  - **금액 범위로 검색할 때 그 값이 어느 basis인지가 선언돼 있고, 비교 대상 금액과 basis가
+    같다.** 운영자가 적은 금액이 기초금액이면 기초금액과 비교된다(`OPEN-STR-01` 결정).
+    legacy 검색(`projects.py:112-116`)이 추정가격과 비교하던 형태는 **재현하지 않는다** —
+    감시 경로(STR-02 계열)와 **같은 basis**를 쓰는지가 이 항목으로 고정된다.
   - 검색이 운영자 전략을 **변경하지 않는다** — 조회 경로는 read-only다.
   - 검색 결과가 비어 있을 때 "조건에 맞는 것이 없다"와 "아직 수집되지 않았다"가 서로 다른
     답으로 구분된다.
@@ -2856,7 +2910,7 @@ G2(정책 값 재유도)·G4(legacy 의도 판정)·G5(수치 재측정)에 몰�
 | 수신 | 인계 내용 |
 | --- | --- |
 | 0B regression ledger | DEC(basis·rate·하한 계열), QUAL B-1~B-5, COL-02/COL-04, ML-11.4 F1~F7, SET-09, OPS-00·OPS-09·OPS-16. 각 항목에 `관찰 / 사용자 영향 / V2 예방 제약 / 검증 방법 / 근거 파일·commit`을 채운다. **신규 (운영자 결정 2026-08-26)**: ① **예산 필터 basis 불일치**(`OPEN-STR-01` 해소로 **`legacy-defect` 판정**) ② **지방계약 하한의 선언·실행 불일치**(`OPEN-DEC-09` 해소) — 아래 두 행 참조 |
-| 0B — 예산 필터 basis (`legacy-defect`) | **관찰**: 운영자 예산 필터 값을 `Project.budget_estimate`(**추정가격**)와 비교한다(`opportunity_monitoring/filters.py`, `strategy.min\|max_budget_estimate`). **운영자 의도는 기초금액**이다(운영자 답 2026-08-26). **사용자 영향**: 기초금액과 추정가격은 VAT·사정률만큼 체계적으로 다르므로 임의 오차가 아니라 경계 근처 공고를 **한 방향으로 일관되게** 누락/포함시킨다. **V2 예방 제약**: basis는 타입이다 — 값과 basis 태그를 함께 저장·비교하고 교차 대입을 타입으로 차단한다(`BaseAmount` 뉴타입 상당물). **검증 방법**: 과세/비과세 공고 경계 쌍으로 필터 결과가 basis에 따라 갈리는지 고정. **근거**: 같은 부류가 **capture 경로에서만** 이미 고쳐졌다 — R-07(#162 계열)이 분모를 `resolve_notice_bid_base`(기초금액)로 바꾸고 `BaseAmount` 뉴타입으로 교차 대입을 정적 차단했다(commit `0755695`). **예산 필터 경로는 고치지 않았다.** **마이그레이션**: 기존 전략 값은 이 결정을 근거로 `기초금액`으로 일괄 태깅한다 |
+| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_estimate`(**추정가격**)와 비교하는 형태가 legacy에 **두 곳 남아 있다.** ① **감시 경로** — `opportunity_monitoring/filters.py`의 `project_budget = float(project.budget_estimate or 0.0)` ↔ `strategy.min\|max_budget_estimate`. ② **검색 경로(라운드 2 추가, verifier H-1)** — `app/api/projects.py:112-116`의 `list_projects`가 `budget_min`/`budget_max`를 `Project.budget_estimate >= / <=`로 필터한다(`routes.py:38`에 wiring된 라이브 경로). ③ **capture 경로는 이미 고쳐졌다** — R-07(#162 계열)이 분모를 `resolve_notice_bid_base`(기초금액)로 바꾸고 `BaseAmount` 뉴타입으로 교차 대입을 정적 차단했다(commit `0755695`). **즉 같은 결함이 세 경로에 있었고 하나만 고쳐졌다.** **운영자 의도는 기초금액**이다(운영자 답 2026-08-26). **사용자 영향**: 기초금액과 추정가격은 VAT·사정률만큼 체계적으로 다르므로 임의 오차가 아니라 경계 근처 공고를 **한 방향으로 일관되게** 누락/포함시킨다. **V2 예방 제약**: basis는 타입이다 — 값과 basis 태그를 함께 저장·비교하고 교차 대입을 타입으로 차단한다(`BaseAmount` 뉴타입 상당물). **검증 방법**: 과세/비과세 공고 경계 쌍으로 필터 결과가 basis에 따라 갈리는지 고정하고, **같은 쌍이 감시·검색 양쪽에서 같은 결과**를 내는지도 함께 고정한다 — 두 경로가 서로 다른 basis를 쓰면 "제안에는 뜨는데 검색에는 안 나온다"가 된다. **근거**: R-07이 capture 경로만 고쳤다는 사실 자체가 이 결함이 **경로별로 산발 수정된 이력**을 보여준다. **마이그레이션**: 기존 전략 값은 이 결정을 근거로 `기초금액`으로 일괄 태깅한다. **STR-16 주의**: 검색 경로는 신규 capability STR-16이 소유하므로 그 acceptance가 basis를 고정해야 한다 |
 | 0B — 지방계약 하한의 선언·실행 불일치 | **관찰**: "지방계약 제외"가 `legal_floor_spec.py:30-31` docstring 한 줄뿐이고 **실행되는 분기가 없다**. `floor_applicability.py:125-126`이 지자체를 기본값 `applicable`에 남기고 `tests/test_floor_applicability.py:70`이 "울산광역시 울주군"→`FLOOR_APPLICABLE`을 고정한다. **사용자 영향**: 지자체 공고가 국가계약 tier로 판정돼 얕은 하회(0.9~2.7%p) 오탐이 발생하며, legacy 자신의 백테스트 문서가 이를 한계로 공시한다. **V2 예방 제약**: 범위 밖 결정은 **실행되는 미적용 상태**로 구현한다 — 선언과 실행이 일치해야 하고, 미지원이 관측 가능한 상태로 산출돼야 한다. **검증 방법**: 지자체 발주기관 공고에 하한 판정이 **생략**되고 사유가 남는지 고정. **근거**: `OPEN-DEC-09` 해소(§12.2) |
 | 0C 데이터 사전 | DEC-11(Rate 밴드 인벤토리), SET-07("정산됨" 4정의 — **통합 여부를 0C가 결정한다**), COL-07(필드 계약 선언 데이터), B-13(측정 불가 어휘 통합), ML-11.4 F3(결측 사유 3분), `OPEN-ML-04`(정산 관측 시각 컬럼 — **결정 완료**, 채움 경로 정의 필요). **신규 (운영자 결정 2026-08-26)**: 예산 필터 필드의 **basis 태그**(값은 `기초금액`) · 시공능력평가금액 요건 필드(`cnstrtnAbltyEvlAmtList`, legacy 미수집) · `resultCode` 17개 정책 데이터 · **"미정산"을 `0`으로 적재하지 않는 규칙** · SET-06 acceptance가 "성숙도 **계산**"과 "성숙도 기반 **판정**"을 분리해 서술하는지 확인 |
 | 0D ADR | `OPEN-ML-01`(ML 경계 — **결정 완료**: 8개 커널 전부 ml-engine, "수학 커널 = ml-engine / 업무 판정 = Kotlin"), `OPEN-OPS-05`(**결정 완료: 브로커 없음** — DB 기반 스케줄·outbox·재시도. **ML 호출 경로의 gRPC 전송은 별개 축이며 ADR 0003 소관**), ML-11.4 F3의 "피처 철회 판단 기준을 ADR로 명문화" 제안, OPS-21 라이브러리 후보(**`OPEN-OPS-07` 조사 완료, ADR 대안 절 기입 대기**) |
