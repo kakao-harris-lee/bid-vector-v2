@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a-capability-map
 base_sha: 3dc7d26333e9f3699c3fd1149651fe54500b6f27
-head_sha: 23b9c2a3d5486e5b2ec970ed23f2b3619b85fe83  # 수정 라운드 4 최종 산출물 커밋. 아래 갱신 이력 참조
+head_sha: 6dee91a24d70865efb8881ec1e13c3f98c6fa666  # 수정 라운드 5 최종 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a/
@@ -192,3 +192,37 @@ blocker 0 / **high 1**)의 finding을 반영했다. 같은 scope를 유지했다
   `git diff --name-only 3dc7d26 HEAD`로 재확인해야 한다. 넷 다 이 slice의 in_scope 밖이고
   **이 slice가 만든 커밋이 아니다.**
 - 미처리 이월(변동 없음): 라운드 1 verifier L-4~L-6, 라운드 0 F-5. `checklist.md` §7·§9 참조.
+
+### 2026-08-26 — 수정 라운드 5 (verifier `not-ready` H-1·M-1·M-2 대응, spec-writer)
+
+라운드 4 재검증 판정 `not-ready`. Codex high #1(STR-08)에 대한 **수정 이행 자체는 충족**
+으로 확인됐고 불변 8종·secret·범위·JSON 무결성도 전부 통과했다. 발견 5건 전부를 처리했다.
+
+| 커밋 | 대응 | 요지 |
+| --- | --- | --- |
+| `0581e97` | M-1 · M-2 | `OPEN-STR-08`의 쟁점을 선점하는 잔존 2건. NOTI-02 `경계`(교차 블록)를 STR-08 본문과 같은 어법으로 교체, STR-08 `사용자 가치`(절 화이트리스트 밖)에 "직전 run이 정상 완료된 흐름에서" 한정어와 OPEN 참조 추가 |
+| `6dee91a` | H-1 · L-2 + 축 보강 + evidence | F1의 "수정 전 적출" 주장을 **실측으로 교체하고 철회**. 스윕 스크립트 전문 기입. F2' 화이트리스트 확장 + **구조적 버그 수정**, X(교차 블록) 축 신설. checklist §11, commands G1~G7 |
+
+- `head_sha`를 `23b9c2a` → `6dee91a`로 갱신했다.
+- **재리뷰 range는 `3dc7d26...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+  이전 라운드와 같은 이유로(커밋이 자기 SHA를 담을 수 없다) `head_sha`는 그 직전 커밋을
+  가리키며, 두 커밋의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
+- **H-1은 은폐하지 않고 정정했다.** 라운드 4에 적은 "F1이 Codex 정본 finding을 독립
+  재현했다"는 **실행된 적 없는 측정**이었다. 같은 스크립트를 수정 전 문서에 실제로 돌린
+  결과 **2 / 2**(임계 3 미만, 적출 안 됨)였고 기록된 5는 수정 **후** 값이었다. 주장을
+  철회하고 F1의 성격을 triage 필터로 정정했으며, 이 주장에 의존하던 `checklist.md`
+  §10.1의 정본 채택 근거 (2)도 철회해 (1)·(3)만으로 재작성했다. **정본이 high라는 결론은
+  유지된다.** 상세는 `checklist.md` §11.1, `commands.md` G1.
+- **축의 한계를 evidence에 명시했다**(`commands.md` G4, `checklist.md` §11.3). F1·F2'·X는
+  전부 대리 지표 기반 **triage 필터**이며 계열 A의 부재를 증명하지 않는다. 적출 0건은
+  "임계 위에서 읽을 후보가 없었다"는 뜻이지 "위반이 없다"는 뜻이 아니다.
+- 산출물 변화: capability **94 불변**, 분류 **63/14/6/11 불변**, 활성 `OPEN` **66 불변**
+  (`744fbfd` 대조 결과 소멸 0 · 신규 0), `capability-map.md` 2,621 → **2,624줄**
+  (STR-08 `사용자 가치` +1, NOTI-02 `경계` +2). `OPEN-STR-08`·`OPEN-ML-03` 유지.
+- **리뷰 range의 in_scope 밖 변경 — 라운드 3·4 절의 "무관 커밋 2건"을 여기서 갱신한다**
+  (verifier L-1). 실제는 **3건**이다 — `1f8e57c`, `0c7eeff`, 그리고 라운드 4 이후 추가된
+  `d7b1c10`(codex 호출에 `model_reasoning_effort=high` 고정; `SKILL.md` +9행,
+  `CLAUDE.md` +1행). 파일은 여전히 **4개**(`.claude/skills/codex-review-gate/` 3개 +
+  저장소 루트 `CLAUDE.md`)로 불변이다. 셋 다 하네스 소관이며 **이 slice가 만든 커밋이
+  아니다.** 재확인 명령과 출력은 `commands.md` G7.
+- 미처리 이월(변동 없음): 라운드 1 verifier L-4~L-6, 라운드 0 F-5. `checklist.md` §7·§9.
