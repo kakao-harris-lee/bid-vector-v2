@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a-capability-map
 base_sha: 3dc7d26333e9f3699c3fd1149651fe54500b6f27
-head_sha: bd43fb735e033b18d48da07f615207ed7be67d02  # 수정 라운드 3 evidence 정정 커밋. 아래 갱신 이력 참조
+head_sha: 23b9c2a3d5486e5b2ec970ed23f2b3619b85fe83  # 수정 라운드 4 최종 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a/
@@ -163,3 +163,32 @@ Codex 라운드 2 finding 4건은 verifier가 전부 충족으로 확인했고, 
   한정된다.
 - range의 in_scope 밖 변경은 위 라운드 3 절의 선언 그대로다(무관 커밋 2건, 파일 4개).
   이 정정 커밋과 이 scope 갱신 커밋은 `reports/evidence/m0/0a/` 안에만 있다.
+
+### 2026-08-26 — 수정 라운드 4 (Codex 3차 `request_changes` 대응, spec-writer)
+
+3차 리뷰 정본(`codex-review-20260825T235415Z.json`, verdict `request_changes`,
+blocker 0 / **high 1**)의 finding을 반영했다. 같은 scope를 유지했다.
+
+| 커밋 | 대응 | 요지 |
+| --- | --- | --- |
+| `0b0c8aa` | high #1 | STR-08 무조건 acceptance의 전제를 "직전 run이 정상 완료된 경우"로 좁히고, 실패·취소 경로를 조건부 소관으로 이관. `legacy 형태 처리`의 확정 범위를 "억제가 payload 존재라는 부작용으로 정해지는 형태는 `폐기`"까지로 한정하고 run 상태 포함 여부는 조건부로 이관. §0.5 형식대로 대체 시나리오 기입 |
+| `23b9c2a` | 신규 스윕 축 + 동일 계열 + evidence | 전수 스윕에 축 **F1**(조건부 보유 블록의 무조건 항목이 같은 OPEN의 쟁점을 확정하는가)·**F2**(같은 블록의 확정 서술 절이 그러한가)를 추가·실행. F2가 **ML-03**에서 동일 계열 위반 1건을 신규 적출해 함께 수정. Codex JSON 2건 append-only 커밋, checklist §10·commands F1~F5 |
+
+- `head_sha`를 `bd43fb7` → `23b9c2a`로 갱신했다.
+- **재리뷰 range는 `3dc7d26...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+  이전 라운드와 같은 이유로(커밋이 자기 SHA를 담을 수 없다) `head_sha`는 그 직전 커밋을
+  가리키며, 두 커밋의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
+- **`required_fix`는 두 선택지를 줬고 사용자가 첫 번째(제외)를 택했다.** `OPEN-STR-08`은
+  해소하지 않았다. `OPEN-ML-03`도 마찬가지다.
+- 산출물 변화: capability **94 불변**, 분류 **63/14/6/11 불변**, 활성 `OPEN` **66 불변**
+  (`6c6b3a2` 대조 결과 소멸 0 · 신규 0), `capability-map.md` 2,608 → **2,621줄**
+  (STR-08 +11, ML-03 +2).
+- **리뷰 재현성**: 같은 range·CLI·모델에서 `model_reasoning_effort`만 달라 판정이 갈렸다
+  (high `request_changes` / medium `approve`). **두 실행 JSON을 모두 커밋했고 high를 정본으로
+  채택했다.** 근거는 `checklist.md` §10.1에 있다. 하네스는 이 발견으로
+  `codex-review-gate`에 `effort=high`를 고정했다(`CLAUDE.md` 변경 이력 2026-08-26).
+- **리뷰 range의 in_scope 밖 변경**: 라운드 3 절의 선언에 더해, 하네스가 이번에
+  `CLAUDE.md` 변경 이력 1행을 추가했다. 무관 커밋과 파일 목록은 리뷰 직전에
+  `git diff --name-only 3dc7d26 HEAD`로 재확인해야 한다. 넷 다 이 slice의 in_scope 밖이고
+  **이 slice가 만든 커밋이 아니다.**
+- 미처리 이월(변동 없음): 라운드 1 verifier L-4~L-6, 라운드 0 F-5. `checklist.md` §7·§9 참조.
