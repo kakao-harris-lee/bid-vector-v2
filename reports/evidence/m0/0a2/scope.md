@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a2-decision-integration
 base_sha: 6af7019996ec26903c7b531ed7ede12c22cf176e
-head_sha: a2ff86b47f18c94ea7d25a0ddd091b1a697c7b34  # 0A2 최종 산출물 커밋(Codex 5차 송부 대상). 아래 갱신 이력 참조
+head_sha: f77f85de568e64cb2be204e6774fd55e4a60ec8f  # 0A2 수정 라운드 7 최종 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a2/
@@ -343,3 +343,48 @@ verdict 원문: `codex-review-20260826T102642Z.json`. 사용자가 재작업 상
   셋 다 35%로 고쳤다. 각 지점이 기록하는 대상(L-5r이 44%로 되돌린 사실)은 그대로다.
 - **F6-5 실측**: 조건부·잠정 grep의 실제 행 수는 **9**다. `checklist.md`를 9로 통일했다.
 - `decisions.md:26`은 지시대로 **손대지 않았다**.
+
+### 2026-08-27 — 수정 라운드 7 (Codex 5차 `request_changes` 대응, spec-writer)
+
+Codex 5차 판정 `request_changes`(blocker 0 / **high 3** / medium 2).
+**4차 finding 6건은 residual에 해소로 명시**됐다. high #1·#2가 **같은 부류**여서
+인스턴스가 아니라 **부류를 전수 재판정**했다.
+
+| 커밋 | 대응 |
+| --- | --- |
+| `c46ddb4` | **high #1 · #2 + 추가 발견 · medium #4** — OPS-06 조건부화, DEC-03·DEC-07 활성 복원, NOTI-02 재분류, 집계 정합 |
+| `f77f85d` | **high #3 · medium #5 + residual** — 계약 `주의` 절 정정, `decisions.md` provenance 표, evidence 정합, whitespace |
+
+- `head_sha`를 `a2ff86b` → `f77f85d`로 갱신했다.
+- **리뷰 range는 `6af7019...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+- **range의 in_scope 밖 변경은 없다.** ADR 작성(0D)은 이 slice 범위가 아니다.
+
+#### 전수 재판정 — 이 라운드의 방식
+
+Codex #1(`OPS-06`)과 #2(`OPEN-DEC-03`)는 **활성 OPEN에 종속된 것을 확정으로 계상한다**는
+같은 부류다. **인벤토리 규모**: 활성 OPEN 43건, anchorless 5건, 활성 OPEN을 인용하는 블록
+37개(capability 30 + 설계 입력 절 7). 기계적 스윕과 읽기를 병행했고 판정은 읽기로 했다.
+
+**하나의 기준** — *종료 조건이 충족되지 않았으면 활성 registry에 있어야 한다.*
+
+| 항목 | 재판정 |
+| --- | --- |
+| `OPEN-OPS-07` | 미충족 → 라운드 5에 이미 복원 |
+| `OPEN-DEC-03` | 미충족 → **복원**(Codex #2) |
+| `OPEN-DEC-07` | 미충족 → **복원**(전수 재판정의 **추가 발견**. `OPS-07`과 같은 `실행 대기` 라벨인데 복원되지 않아 기준이 일관되지 않았다) |
+| `OPEN-DEC-08`·`OPEN-ML-01`·`OPEN-STR-07`·`OPEN-QUAL-06`의 "잔여" | **유지** — 종료 조건이 아니라 **하류 작업 지시**이며 결정 자체는 완결이다 |
+| `OPS-06` | 분류·acceptance가 확정돼 있었다 → **조건부화**(Codex #1) |
+
+어휘 스윕 8건 중 실제 위반은 **`OPS-06` 1건**이었다.
+
+- **산출물 변화**: capability **95 불변**, 분류 **62/17/6/10 → 61/16/6/12**
+  (OPS-06 `V2 필수`→`근거 부족`, NOTI-02 `후속`→`근거 부족` — 둘 다 활성 OPEN 종속).
+  활성 `OPEN` **43 → 46**(복원 `OPEN-DEC-03`·`OPEN-DEC-07`, 신설 `OPEN-NOTI-09`).
+  `capability-map.md` 3,078 → **3,133줄**.
+- **차단 집계**: M0 차단 8건 중 **7건 해소**(`OPEN-OPS-07` 활성), M1 차단 17건 중
+  **15건 해소**(`OPEN-DEC-03`·`OPEN-DEC-07` 활성).
+- **`주의` 절을 정정했다**(high #3) — 이 절은 팀 리드가 쓴 계약 지시였고 라운드 5·7의
+  복원 결정과 어긋난 채 남아 **계약과 산출물이 반대를 말하는 상태**였다. 지시를 철회하고
+  세 항목을 분리해 각각의 종료 조건과 활성·미해소 사유를 적었다.
+- **미처리(이월)**: `OPS-06` 재정의·폐기 판정 — 이제 **`OPEN-OPS-10`의 종료 조건에
+  포함**되므로 별도 이월이 아니라 등록된 OPEN이다.
