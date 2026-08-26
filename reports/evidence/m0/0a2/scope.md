@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a2-decision-integration
 base_sha: 6af7019996ec26903c7b531ed7ede12c22cf176e
-head_sha: TBD  # 산출물 커밋 후 후속 커밋으로 기입 (0A와 같은 방식)
+head_sha: 6a4e49b77f53137db0e8719e4b6e8bf55c1e842f  # 0A2 최종 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a2/
@@ -76,3 +76,31 @@ rollback: "N/A — 문서 산출물은 git revert로 복구. 0A head 6af7019로 
 - `OPEN-OPS-03`은 **입력만 부분 확정**(1인 운영)이며 임계는 미결이다. 해소하지 마라.
 - capability `OPS-06`(queue topology 배포 게이트)은 브로커 존재를 전제한다. 브로커 없음
   결정으로 **재정의 또는 폐기 대상**이며, 이 slice에서 그 사실을 기록한다.
+
+## 갱신 이력
+
+### 2026-08-26 — head 기입 (spec-writer)
+
+| 커밋 | 대응 |
+| --- | --- |
+| `e06e62a` | 결정 29건 반영 — OPEN 66 → 37 해소(§12.2 신설, §12.1 결번 29행), 조건부 7 → 3 전환, pull 모델 §0.7 신설, capability 재분류 5건, 신규 **STR-16**, §10 재계산, §13 인계(STR-01 `legacy-defect` · DEC-09 선언·실행 불일치 · OPS-06 재정의) |
+| `66850e0` | verifier 라운드 6 발견 3건 — **M-4**(DEC-12 A9 한정어 복원) · **M-5**(SET-07 `V2 제약` 조건화) · **H-2**(0A `commands.md` G4 기준 리비전 정정, append) |
+| `6a4e49b` | evidence — `decisions.md`(A7, 커밋된 결정 기록) · `checklist.md`(A1~A7) · `commands.md`(검증 명령·출력) |
+
+- `head_sha`를 `6a4e49b`로 기입했다.
+- **리뷰 range는 `6af7019...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
+  0A와 같은 이유로(커밋이 자기 SHA를 담을 수 없다) `head_sha`는 그 직전 커밋을 가리키며,
+  두 커밋의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
+- **range의 in_scope 밖 변경은 없다.** 이 slice의 커밋 4개는 전부
+  `docs/discovery/capability-map.md` · `reports/evidence/m0/0a2/` ·
+  `reports/evidence/m0/0a/commands.md`(H-2 append 한정) 안에 있다.
+  0A의 base(`3dc7d26`)부터 세던 하네스 무관 커밋 3건은 이 slice의 base(`6af7019`)
+  **이전**이므로 이번 range에 들어오지 않는다.
+- **산출물 변화**: capability **94 → 95**(STR-16 신규), 분류 **63/14/6/11 → 62/17/6/10**,
+  활성 `OPEN` **66 → 37**(소멸 29 · 신규 0 · 임의 해소 0), `capability-map.md`
+  2,625 → **2,872줄**.
+- **A2 증명**: id 집합을 양방향 대조했다 — 결정 기록에 없는데 소멸한 항목 **0건**,
+  결정 기록에 있는데 잔존한 항목 **0건**. `OPEN-OPS-03`은 입력만 부분 확정이므로
+  **해소하지 않았다.**
+- **미처리(알려진 제한)**: `OPS-06` 재정의(DB 큐 설계 부재에 종속) · STR-11 분류
+  (결정 기록에 판단 없음). 상세는 `checklist.md` §9.
