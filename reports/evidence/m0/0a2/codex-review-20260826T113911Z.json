@@ -1,0 +1,76 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6af7019996ec26903c7b531ed7ede12c22cf176e",
+  "reviewed_head": "01676ad40864bd836cf3d286d16fe57238e8eaf7",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/discovery/capability-map.md",
+      "line": 2382,
+      "evidence": "`OPEN-OPS-05`의 authoritative 결정은 V2 내부 workflow를 DB 기반으로 구현하고 broker를 두지 않는 것이다. `OPEN-OPS-10`도 DB 큐 설계가 아직 없다고 명시한다. 그런데 OPS-06은 여전히 `V2 필수`로 확정하고 워커별 큐 이름, 노드별 활성 큐 집합, 라우팅 큐 소비자, 노드 응답을 acceptance로 요구한다. §13은 OPS-06을 재정의하거나 폐기해야 한다고 인정하면서 동시에 실행 불가능한 전제를 제거했다고 주장한다. 활성 OPEN에 종속된 동작을 확정 acceptance가 선점해 §0.5 규약과 broker 없음 결정에 모순된다.",
+      "required_fix": "OPS-06의 broker 전용 서술을 legacy 관찰로 한정하고, DB 큐 설계가 정해질 때까지 분류·V2 acceptance를 `OPEN-OPS-10`에 명시적으로 조건화한다. `OPEN-OPS-10`의 종료 조건에 OPS-06의 재정의 또는 폐기 판정을 포함하고 §13·evidence를 같은 상태로 맞춘다."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/capability-map.md",
+      "line": 2974,
+      "evidence": "`OPEN-DEC-03`은 활성 registry에서 해소 처리됐고 문서는 M1 차단 17건이 전부 해소됐다고 선언한다. 그러나 DEC-02 본문과 §12.2는 이 결정이 `잠정`이며 예규 원문 확인 후 재결정되고 결과에 따라 다시 열린다고 명시한다. 독립 집계에서도 `OPEN-DEC-03`은 head의 활성 43건에 포함되지 않는다. 최종 결정이 없는 쟁점을 별도 `잠정` 어휘로만 보존해 OPEN 완료 게이트와 M1 차단 집계에서 제외한 형식적 폐쇄다.",
+      "required_fix": "예규 확인과 최종 재결정이 끝날 때까지 `OPEN-DEC-03`을 활성 registry와 M1 차단 집계에 복원한다. 잠정 결정을 비차단으로 취급하려면 그 권한을 부여한 운영자의 명시적 결정을 authoritative 기록에 추가하고 완료 조건·본문·집계를 일관되게 갱신한다."
+    },
+    {
+      "severity": "high",
+      "file": "reports/evidence/m0/0a2/scope.md",
+      "line": 74,
+      "evidence": "현재 slice 계약의 `주의` 절은 `OPEN-OPS-07`을 해소로 기록하라고 여전히 지시한다. 같은 파일의 후반부와 capability map은 ADR 대안 절 미기입 때문에 이 항목을 활성 M0 차단 게이트로 복원했고, scope는 `M0 차단` 전수 훑기 잔재가 0건이라고 주장한다. 복원된 게이트와 정면으로 모순되는 지시가 계약 본문에 남아 있어 직전 medium finding이 실질적으로 완결되지 않았다.",
+      "required_fix": "scope의 `주의` 절에서 `OPEN-OPS-07`을 DEC-07·DEC-03과 분리하고, ADR 대안 절이 커밋될 때까지 활성·미해소라고 명시한다. `M0 차단` 전수 확인 및 관련 evidence 주장도 이 지점을 포함해 다시 대조한다."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/discovery/capability-map.md",
+      "line": 1707,
+      "evidence": "NOTI-02의 정확한 분류를 `후속`으로 확정하면서 운영자 결정이라고 귀속했지만 authoritative `decisions.md`는 후보를 `후속 또는 축소`로만 기록한다. `checklist.md:106`도 구현자가 두 선택지 중 `후속`을 택했다고 인정한다. 따라서 정확한 범위 결정은 운영자 기록에 없는 slice 자체 판단인데 운영자 결정으로 표시돼 A4와 결정 추적성이 어긋난다.",
+      "required_fix": "NOTI-02를 정확히 `후속`으로 둘지 `축소`할지 authoritative 운영자 결정을 기록하거나, 결정 전까지 확정 분류와 운영자 귀속을 제거하고 미결 상태 및 집계를 정합화한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a2/checklist.md",
+      "line": 151,
+      "evidence": "A7 대조는 `decisions.md`에 통합 패스 주석만 추가됐고 나머지는 원본 그대로라고 주장한다. 실제 파일에는 `0A2 라운드 2 추가`와 `0A2 라운드 2 정정` 절도 추가돼 있으며, legacy 사실 정정과 slice 분석이 authoritative 운영자 기록과 같은 파일에 섞여 있다. 같은 checklist의 §8은 이미 커밋된 직전 `codex-review-*.json`도 없다고 적는다. evidence가 자신의 최종 구성과 출처를 정확히 설명하지 못한다.",
+      "required_fix": "`decisions.md`에서 원본 운영자 기록과 slice가 추가한 주석·인용·정정 절의 provenance를 정확히 구분하고, checklist의 A7 및 현재 evidence 목록을 최종 HEAD와 일치시킨다."
+    }
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse --verify 6af7019996ec26903c7b531ed7ede12c22cf176e^{commit}",
+    "git rev-parse --verify 01676ad40864bd836cf3d286d16fe57238e8eaf7^{commit}",
+    "git rev-parse HEAD",
+    "git log --oneline --decorate --no-merges 6af7019996ec26903c7b531ed7ede12c22cf176e..01676ad40864bd836cf3d286d16fe57238e8eaf7",
+    "git diff --name-status 6af7019996ec26903c7b531ed7ede12c22cf176e...01676ad40864bd836cf3d286d16fe57238e8eaf7",
+    "git diff --stat 6af7019996ec26903c7b531ed7ede12c22cf176e...01676ad40864bd836cf3d286d16fe57238e8eaf7",
+    "git ls-files --others --exclude-standard",
+    "git merge-base 6af7019996ec26903c7b531ed7ede12c22cf176e 01676ad40864bd836cf3d286d16fe57238e8eaf7",
+    "git rev-list --count 6af7019996ec26903c7b531ed7ede12c22cf176e..01676ad40864bd836cf3d286d16fe57238e8eaf7",
+    "git diff --check 6af7019996ec26903c7b531ed7ede12c22cf176e...01676ad40864bd836cf3d286d16fe57238e8eaf7",
+    "git diff --unified=5 16d690b2de8d91b1da5f267b03fb57f1981b27c8...01676ad40864bd836cf3d286d16fe57238e8eaf7 -- docs/discovery/capability-map.md reports/evidence/m0/0a2/",
+    "python3 inline independent parser for base/head classification counts, required acceptance sections, duplicate capability IDs, active OPEN sets, removed/added IDs, and §12.2 decision rows",
+    "wc -l docs/discovery/capability-map.md",
+    "grep -c '^| OPEN-' docs/discovery/capability-map.md",
+    "grep -rniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))' docs/discovery/",
+    "rg -n '조건부 — .*OPEN-|잠정 — .*OPEN-' docs/discovery/capability-map.md",
+    "rg -n -i -C 3 'OPS-06|queue topology|worker topology|브로커|broker|RabbitMQ|AMQP|passive declare' docs/discovery/capability-map.md reports/evidence/m0/0a2/",
+    "rg -n -C 3 'OPEN-DEC-03|잠정|예규 확인 후 재결정|M1 차단 17건 전부' docs/discovery/capability-map.md reports/evidence/m0/0a2/",
+    "rg -n -C 5 'NOTI-02|후속 또는 축소|capability 재분류 후보|후속을 택했다' docs/discovery/capability-map.md reports/evidence/m0/0a2/",
+    "rg -n 'M0 차단|전부 해소|OPS-07.*해소|그 외 내용은 원본 그대로|아직 리뷰 요청 전' docs/discovery/capability-map.md reports/evidence/m0/0a2/"
+  ],
+  "residual_risks": [
+    "독립 집계로 capability 95개, 분류 62/17/6/10, 필수 capability 결측 0, 활성 OPEN 43개를 재현했다. Base 대비 순소멸 28개·신설 5개이며 `OPEN-OPS-07`은 활성으로 복원돼 있다.",
+    "직전 판정의 QUAL-09/10/11, OPS-02·OPS-04·OPS-21, A3 finding은 본문 수준에서 해소된 것을 확인했다.",
+    "legacy `bid-vector`와 인용된 legacy commit 객체가 이 worktree에 없어 저장소 밖 파일·수치 주장은 재현하지 않았으며 그 사실만으로 결함 판정하지 않았다.",
+    "활성 OPEN 43건과 `OPEN-OPS-07` M0 게이트가 남아 있으므로 이 판정은 M1 진행, merge, 외부 호출, DB write, release 또는 배포 승인이 아니다.",
+    "`git diff --check`는 Markdown 제목 6곳의 trailing whitespace를 보고했다. 의미상 acceptance를 막지 않는 형식 개선 사항이다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}

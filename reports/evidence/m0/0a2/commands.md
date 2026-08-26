@@ -8,7 +8,8 @@
 
 ---
 
-## 2026-08-26 — A2 검증 (미결 OPEN 임의 해소 0건)  
+## 2026-08-26 — A2 검증 (미결 OPEN 임의 해소 0건)
+
 **(라운드 1 시점 기준 — 활성 OPEN 37 · `capability-map.md` 2,872줄. 그 뒤 라운드 2가 OPEN 2건을 신설했고 라운드 2~4가 문서를 늘렸으므로 아래 출력은 현재 HEAD에서 재실행해도 그대로 나오지 않는다. 재실행으로 덮지 않고 그 시점의 기록으로 보존한다 — 현재 값은 이 파일의 라운드 2·3 절과 `checklist.md` §11.2에 있다.)**
 
 **A2가 이 slice의 실패 조건**이므로 수치가 아니라 **id 집합**을 대조한다.
@@ -64,7 +65,8 @@ G6: 7 -> 3  (해소 4)  ML-01, OPS-05, OPS-07, STR-01
 
 ---
 
-## 2026-08-26 — A6 불변 + A4 집계 재검증  
+## 2026-08-26 — A6 불변 + A4 집계 재검증
+
 **(라운드 1 시점 기준 — 활성 OPEN 37 · `capability-map.md` 2,872줄. 그 뒤 라운드 2가 OPEN 2건을 신설했고 라운드 2~4가 문서를 늘렸으므로 아래 출력은 현재 HEAD에서 재실행해도 그대로 나오지 않는다. 재실행으로 덮지 않고 그 시점의 기록으로 보존한다 — 현재 값은 이 파일의 라운드 2·3 절과 `checklist.md` §11.2에 있다.)**
 
 **이번 라운드는 집계가 의도적으로 바뀐다.** "불변"과 "의도된 변경"을 구분해 적는다.
@@ -109,7 +111,8 @@ V2 필수 사용자 가치/acceptance 결측: none
 
 ---
 
-## 2026-08-26 — 조건부 묶음 전수 확인 (§0.5 목록 정합)  
+## 2026-08-26 — 조건부 묶음 전수 확인 (§0.5 목록 정합)
+
 **(라운드 1 시점 기준 — 활성 OPEN 37 · `capability-map.md` 2,872줄. 그 뒤 라운드 2가 OPEN 2건을 신설했고 라운드 2~4가 문서를 늘렸으므로 아래 출력은 현재 HEAD에서 재실행해도 그대로 나오지 않는다. 재실행으로 덮지 않고 그 시점의 기록으로 보존한다 — 현재 값은 이 파일의 라운드 2·3 절과 `checklist.md` §11.2에 있다.)**
 
 조건부의 근거였던 OPEN이 닫혔으면 조건부를 유지할 이유가 없다. 전수로 확인했다.
@@ -133,7 +136,8 @@ $ grep -n '조건부 — `OPEN-' docs/discovery/capability-map.md
 
 ---
 
-## 2026-08-26 — 스윕 축 재실행 (0A 라운드 5·6의 F1 · F2' · X)  
+## 2026-08-26 — 스윕 축 재실행 (0A 라운드 5·6의 F1 · F2' · X)
+
 **(라운드 1 시점 기준 — 활성 OPEN 37 · `capability-map.md` 2,872줄. 그 뒤 라운드 2가 OPEN 2건을 신설했고 라운드 2~4가 문서를 늘렸으므로 아래 출력은 현재 HEAD에서 재실행해도 그대로 나오지 않는다. 재실행으로 덮지 않고 그 시점의 기록으로 보존한다 — 현재 값은 이 파일의 라운드 2·3 절과 `checklist.md` §11.2에 있다.)**
 
 0A가 만든 축을 그대로 재실행한다. **모집단이 바뀌었으므로(활성 OPEN 66 → 37, 조건부 보유
@@ -167,7 +171,8 @@ $ python3 sweep_r5.py docs/discovery/capability-map.md x
 
 ---
 
-## 2026-08-26 — 규모·secret·clean tree  
+## 2026-08-26 — 규모·secret·clean tree
+
 **(라운드 1 시점 기준 — 활성 OPEN 37 · `capability-map.md` 2,872줄. 그 뒤 라운드 2가 OPEN 2건을 신설했고 라운드 2~4가 문서를 늘렸으므로 아래 출력은 현재 HEAD에서 재실행해도 그대로 나오지 않는다. 재실행으로 덮지 않고 그 시점의 기록으로 보존한다 — 현재 값은 이 파일의 라운드 2·3 절과 `checklist.md` §11.2에 있다.)**
 
 ```
@@ -588,3 +593,106 @@ $ grep -n "조건부 — .OPEN-|잠정 — .OPEN-" docs/discovery/capability-map
   grep 9행 중 `:72`는 §0.5 **규약 정의문**이고 `:1404`는 **잠정** 묶음이므로 조건부에서
   제외한다 — 라운드 2의 같은 확인도 정의문을 제외해 셌다(verifier F-6).
 - secret 매치 3건 불변. `capability-map.md` 2,958 → 3,064(라운드 5) → **3,078줄**(라운드 6 전파 +14).
+
+---
+
+## 2026-08-27 — 수정 라운드 7 검증 (Codex 5차 `request_changes` + 전수 재판정)
+
+Codex 5차 판정 `request_changes`(blocker 0 / high 3 / medium 2). verdict 원문은
+`codex-review-20260826T113911Z.json`. **4차 finding 6건은 residual에 해소로 명시**됐다.
+
+### R7-0. 전수 재판정 — 인벤토리와 기준
+
+Codex high #1(`OPS-06`)과 #2(`OPEN-DEC-03`)가 **같은 부류**다: **활성 OPEN에 종속된 것을
+확정으로 계상한다.** 인스턴스가 아니라 부류를 쳤다.
+
+**1단계 인벤토리 — 규모**
+
+```
+$ python3 inventory.py    # 활성 OPEN × 종속 지점
+활성 OPEN: 43건
+본문(§12 이전) 참조 없는 활성 OPEN (= anchorless): 5
+  ['OPEN-COL-01','OPEN-COL-05','OPEN-NUM-03','OPEN-QUAL-05','OPEN-SET-08']
+활성 OPEN을 인용하는 블록: 37 (capability 30 + 설계 입력 절 7)
+  그중 조건부 보유: QUAL-03 · QUAL-11 · ML-03 · NOTI-04 · OPS-09 (5)
+
+$ python3 - <<'PY'   # V2 필수 블록의 acceptance에서 큐/브로커/워커 어휘 검색
+STR-16 · QUAL-05 · OPS-02 · OPS-03 · OPS-04 · OPS-06 · OPS-12 · OPS-13
+PY
+```
+
+- **기계적 스윕과 읽기를 병행**했다. 스윕은 후보를 좁혔고 판정은 읽기로 했다.
+- 어휘 스윕 8건 중 **OPS-06만 실제 위반**이다 — OPS-02·OPS-04의 broker 어휘는 라운드 5의
+  **정정 블록 안**(전제를 제거했다는 서술)이고 acceptance 항목 자체는 구현 중립이다.
+  OPS-03의 outbox·워커는 DB 기반에서도 성립하고, OPS-12의 "큐"는 스케줄 파라미터 이름이며
+  STR-16·QUAL-05·OPS-13은 축이 다르다.
+
+**2단계 재판정 — 하나의 기준**
+
+> 종료 조건이 충족되지 않았으면 활성 registry에 있어야 한다. 그에 종속된 서술은 조건부여야
+> 하고, 그 쟁점에 종속된 capability 분류·acceptance는 확정될 수 없다.
+
+`잠정`·`실행 대기`·`이월` 라벨을 전수로 훑었다.
+
+```
+$ grep -n '잠정\|실행 대기\|이월\|종료 조건' docs/discovery/capability-map.md
+```
+
+| 항목 | 라벨 | 종료 조건 | 재판정 |
+| --- | --- | --- | --- |
+| `OPEN-OPS-07` | 실행 대기 | ADR 대안 절 기입 | **미충족 → 이미 라운드 5에 복원** |
+| `OPEN-DEC-03` | 잠정 | 예규 확인 후 재결정 | **미충족 → 복원**(Codex #2) |
+| `OPEN-DEC-07` | 실행 대기 | 마진 값 산출 | **미충족 → 복원**(전수 재판정의 추가 발견) |
+| `OPEN-DEC-08` "후속 확인" | — | 없음 — 결정 (b)는 그 자체로 완결이고 (a)는 근거가 생기면 **좁히는 선택지** | 유지 |
+| `OPEN-ML-01` "잔여: 0C 확인" · `OPEN-STR-07` "하류 주의" · `OPEN-QUAL-06` "사유 enum" | — | 없음 — 결정 완결, 하류 작업 지시 | 유지 |
+| `OPS-06` 이월(§13) | 이월 | DB 큐 설계 | **분류·acceptance가 확정돼 있었다 → 조건부화**(Codex #1) |
+
+- **추가 발견은 `OPEN-DEC-07` 1건**이다. `OPEN-OPS-07`과 **같은 라벨**인데 복원되지 않아
+  기준이 일관되지 않았다.
+- **유지 판정 4건의 근거**: 그 항목들의 "잔여"는 **종료 조건이 아니라 하류 작업 지시**다 —
+  결정 자체는 완결이고 미충족 조건이 없다.
+
+### R7-1. 불변 재확인 — **라운드 7 HEAD에서 실행**
+
+```
+$ python3 inv2.py
+분류: {'V2 필수': 61, '근거 부족': 12, '폐기': 6, '후속': 16} = 95
+형식 위반: none
+V2 필수 사용자 가치/acceptance 결측: none
+중복 id: none
+§12 활성 OPEN: 46
+본문 참조 - 활성 등록: 29 건 (해소·결번 포함)
+
+$ grep -c "^| OPEN-" docs/discovery/capability-map.md
+46
+
+$ grep -n "조건부 — .OPEN-|잠정 — .OPEN-" docs/discovery/capability-map.md
+72:   ← §0.5 규약 정의(묶음 아님)
+847:  QUAL-03(`OPEN-QUAL-11`)
+1013: QUAL-11(`OPEN-QUAL-10`)
+1018: QUAL-11(`OPEN-QUAL-09`)
+1108: ML-03(`OPEN-ML-03`)
+1404: DEC-02(`OPEN-DEC-03`)   ← 잠정 묶음
+1803: NOTI-04(`OPEN-NOTI-08`)
+1810: NOTI-04(`OPEN-NOTI-01`)
+2411: OPS-06(`OPEN-OPS-10`)   ← 라운드 7 신규
+2504: OPS-09(`OPEN-OPS-01`)
+
+$ wc -l docs/discovery/capability-map.md
+    3133 docs/discovery/capability-map.md
+
+$ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" docs/discovery/ | wc -l
+       3
+
+$ git diff --check 6af7019 -- docs reports | wc -l
+       0
+```
+
+- exit: 0. **이 블록의 6개 명령은 라운드 7 HEAD 실행분이다.** 라운드 1 절 5개는
+  재실행하지 않았고 각 제목에 기준 시점을 선언했다(라운드 4 M-4r).
+- **capability 95 불변**, 분류 **62/17/6/10 → 61/16/6/12**(OPS-06·NOTI-02 재분류).
+- **활성 OPEN 43 → 46** — 복원 2(`OPEN-DEC-03` · `OPEN-DEC-07`) + 신설 1(`OPEN-NOTI-09`).
+  `^| OPEN-` 행 수와 `inv2.py` 등록 수가 **양쪽 46으로 일치**한다.
+- 조건부 묶음 **8개 / capability 6개**(§0.5 목록과 일치) + 잠정 1. `:72`는 규약 정의문이다.
+- **`git diff --check` 0** — Codex residual이 보고한 Markdown 제목 6곳의 trailing
+  whitespace를 제거했다(제목 뒤 두 칸 → 빈 줄로 문단 분리).
