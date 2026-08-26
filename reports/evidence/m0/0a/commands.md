@@ -539,9 +539,14 @@ PY
 ```
 
 - exit: 0 (수정 **후** 재실행 결과)
-- **수정 전** 같은 축에서 STR-08의 무조건 항목 "같은 공고가 연속 두 run에 걸쳐 후보면 두
-  번째 run은 알림을 만들지 않는다"가 중첩 5로 적출됐고, 이것이 Codex high finding과
-  **동일한 항목**이다 — 신규 축이 정본 finding을 독립 재현했다.
+- > **⚠ 라운드 5 정정 (verifier H-1) — 아래 취소선 주장은 철회한다.**
+  > 여기에는 원래 "**수정 전** 같은 축에서 STR-08의 무조건 항목이 중첩 **5**로 적출됐고,
+  > 신규 축이 정본 finding을 **독립 재현**했다"고 적혀 있었다. **그 측정은 실제로 실행된
+  > 적이 없다.** F1 스크립트는 STR-08 수정 커밋(`0b0c8aa`) **이후에** 작성·실행됐고,
+  > 수정 전 문서에는 한 번도 돌리지 않았다. 기록된 5는 수정 **후** 값을 수정 **전**
+  > 항목에 귀속시킨 것이다. `evidence-pack`의 "기억으로 재구성한 증적은 증적이 아니다"에
+  > 저촉된다. 라운드 5에서 실측으로 교체했다 — 아래 G1 참조. 실측 결과 **F1은 이 사례를
+  > 적출하지 못한다.**
 - 7건 전부 수정 후 판정: **결정 무관**.
   - STR-08 2건: 전제를 "직전 run이 정상 완료된 경우"로 좁혔고, 입력 관측 항목은 세 후보
     (payload / 통지 이력 / run 상태)를 **모두 열거**한 뒤 목록의 **선언 여부**만 요구한다.
@@ -639,3 +644,400 @@ $ git status --porcelain -- docs/discovery/capability-map.md reports/evidence/m0
 - exit: 0. 2,608 → **2,621줄**. hunk별 순증 +13 — STR-08 **+11**(17→28행), ML-03 **+2**
   (9→11행). secret 매치 3건 불변(일반 명사). 이번 라운드가 추가한 Codex JSON 2건에 대한
   같은 패턴 스캔은 **0건**이며, 내용은 verdict·finding·legacy 파일 경로·행 번호뿐이다.
+
+
+## 2026-08-26 — 수정 라운드 5 검증 (verifier `not-ready` H-1 · M-1 · M-2 · L-1 · L-2)
+
+### G1. **H-1 정정 — F1의 "수정 전 적출" 주장 실측 (처리 방식 (a))**
+
+**무엇이 잘못됐나.** 라운드 4의 F1 절에 "수정 전 STR-08 무조건 항목이 중첩 **5**로
+적출됐고 신규 축이 Codex 정본 finding을 **독립 재현**했다"고 적었다. **그 측정은 실행된
+적이 없다.** 작업 순서를 보면 명백하다 — STR-08 수정 커밋 `0b0c8aa`를 **먼저** 만들고,
+그 **뒤에** F1 스크립트를 작성해 수정된 문서에만 돌렸다. 수정 전 문서(`6c6b3a2`)에는 한
+번도 실행하지 않았다. 기록된 5는 수정 **후** 값을 수정 **전** 항목에 귀속시킨 것이다.
+`evidence-pack`의 "기억으로 재구성한 증적은 증적이 아니다"에 정면으로 저촉된다.
+
+**정정 방식은 (a) — 실제로 재실행했다.** 라운드 4에서 실행한 것과 **같은 스크립트**를
+수정 전 문서에 돌렸다.
+
+```
+$ git show 6c6b3a2:docs/discovery/capability-map.md > /tmp/pre.md
+$ python3 f1.py /tmp/pre.md          # 수정 전
+조건부 보유 블록: 7
+중첩 3개 이상: 5건 — OPS-09(6), OPS-09(5), ML-03(4), NOTI-04(3), NOTI-04(3)
+   ** STR-08은 한 건도 적출되지 않는다 **
+
+$ python3 f1.py /tmp/pre.md          # 임계를 0으로 낮춰 STR-08만 강제 출력
+   2 | STR-08 OPEN-STR-08 | 중복 억제 판정이 무엇을 입력으로 삼는지가 관측 가능하다(…)
+       겹침: ['중복', '직전']
+   2 | STR-08 OPEN-STR-08 | 같은 공고가 연속 두 run에 걸쳐 후보면 두 번째 run은 알림을
+                            만들지 않는다.
+       겹침: ['공고가', '않는다']
+
+$ python3 f1.py docs/discovery/capability-map.md   # 수정 후 같은 두 항목
+   7 | STR-08 | … run 상태를 함께 보는지 …
+   5 | STR-08 | **직전 run이 정상 완료된 경우**, … 실패·취소인 경우는 … 범위 밖 …
+```
+
+- exit: 0
+- **실측: 수정 전 2 / 2. 임계 3 미만이라 F1은 이 사례를 적출하지 못한다.** verifier가
+  어절 토큰화로 재구현해 얻은 값(2 / 2)과 **정확히 일치**한다.
+- 기록됐던 **5는 수정 후 두 번째 항목의 값**이다. 귀속 오류가 맞다.
+- **따라서 "F1이 Codex 정본 finding을 독립 재현했다"를 철회한다.** 라운드 4의 F1 절과
+  `checklist.md` §10.2 표에 정정 주석을 달았고, 이 주장에 의존하던 §10.1 채택 근거 (2)도
+  철회해 근거 (1)·(3)만으로 재작성했다(정본이 high라는 **결론은 유지**된다).
+
+**더 중요한 사실 — 이 축들의 점수는 수정에 의해 올라간다.** 2 → 5, 2 → 7이다. 결함이 있는
+문장보다 **고쳐진 문장의 점수가 높다.** 이유는 구조적이다: 올바른 수정은 OPEN id를 인용하고
+"실패·취소인 경우는 범위 밖"처럼 **쟁점 어휘를 명시적으로 끌어오기 때문**이다. 즉 이 축은
+"쟁점을 **언급하는**" 항목을 고르지 "쟁점을 **선점하는**" 항목을 고르지 않는다.
+**결함 탐지기가 아니라 사람이 읽을 후보를 좁히는 triage 필터다.** 실제 판정은 전부 사람이
+한다. G4의 한계 서술을 함께 볼 것.
+
+### G2. **L-2 — 스윕 스크립트 본문 기입**
+
+라운드 3~4 evidence의 `python3 - <<'PY'` heredoc 본문이 전부 비어 있어 축이 evidence만으로
+재현 불가였다. H-1이 정확히 그래서 생겼다(임계값 기반 축은 본문 없이 재현 불가). 아래가
+**실제로 실행한 스크립트 전문**이다. 두 파일 모두 인자로 문서 경로를 받으므로
+`git show <rev>:docs/discovery/capability-map.md > /tmp/x.md` 후 임의 리비전에 재실행할 수
+있다.
+
+**`f1.py` — F1 축 (라운드 4·5 공통)**
+
+```python
+import re
+import sys
+p=sys.argv[1] if len(sys.argv)>1 else "docs/discovery/capability-map.md"
+lines=open(p,encoding="utf-8").read().split("\n")
+starts=[i for i,l in enumerate(lines) if l.startswith("### ")]
+blocks=[]
+for n,s in enumerate(starts):
+    e=starts[n+1] if n+1<len(starts) else len(lines)
+    blocks.append((lines[s][4:].strip(), s+1, lines[s:e]))
+ACC=re.compile(r'^\s*-?\s*\*\*(Acceptance scenario|채택 시 요구되는 관찰 가능 동작)')
+COND=re.compile(r'조건부')
+
+def acc_span(body):
+    for i,l in enumerate(body):
+        if ACC.match(l):
+            ind=len(l)-len(l.lstrip()); out=[l]
+            for j in range(i+1,len(body)):
+                m=body[j]
+                if not m.strip(): out.append(m); continue
+                cur=len(m)-len(m.lstrip())
+                if m.lstrip().startswith("- **") and cur<=ind and not ACC.match(m): break
+                if m.startswith("**") and not ACC.match(m): break
+                out.append(m)
+            return out
+    return None
+
+def items(span):
+    out,cur,curind=[],None,0
+    for l in span[1:]:
+        if not l.strip(): continue
+        ind=len(l)-len(l.lstrip())
+        if l.lstrip().startswith("- "):
+            if cur is not None: out.append((curind,cur))
+            cur,curind=l.strip()[2:],ind
+        elif cur is not None and ind>curind: cur+=" "+l.strip()
+    if cur is not None: out.append((curind,cur))
+    return out
+
+txt="\n".join(lines)
+opens={}
+for m in re.finditer(r'^\|\s*(OPEN-[A-Z]+-\d+)\s*\|(.*)$', txt, re.M):
+    opens[m.group(1)]=m.group(2)
+
+STOP=set("있다 없다 된다 한다 그 이 되는 하는 것이 것을 수 안 더 두 세 각 같은 다른 모든 전부 위 아래 때 및 또는 그리고 판정 결과 값 상태 기록 경우 대상 기준 이상 이하 사실 여부 하나 사용 표시 확인 결정 조건부 확정 미정 시나리오 임시 대체 결정에 따라 무관 무조건 legacy OPEN".split())
+def toks(s):
+    s=re.sub(r'[`*\[\]()|]',' ',s)
+    return {w for w in re.findall(r'[가-힣A-Za-z_][가-힣A-Za-z0-9_]{1,}',s) if len(w)>=2 and w not in STOP}
+
+print("=== F1. 조건부 보유 블록의 무조건 항목이 같은 OPEN의 쟁점을 확정하는가 ===")
+n_blocks=0; hits=[]
+for t,ln,body in blocks:
+    span=acc_span(body)
+    if not span: continue
+    its=items(span)
+    # 조건부 묶음과 그 하위 항목을 분리
+    bundles=[]; uncond=[]
+    in_cond=False; cond_ind=None; buf=None
+    for ind,it in its:
+        is_bundle = COND.search(it) and ("결정에 따라 확정" in it or it.startswith("조건부"))
+        if is_bundle:
+            if buf: bundles.append(buf)
+            buf=it; in_cond=True; cond_ind=ind; continue
+        if in_cond and ind<=cond_ind:
+            in_cond=False
+            if buf: bundles.append(buf); buf=None
+        if in_cond: buf+=" "+it; continue
+        if "결정 무관" in it and len(it)<30: continue
+        uncond.append(it)
+    if buf: bundles.append(buf)
+    if not bundles: continue
+    n_blocks+=1
+    cap=t.split(" ·")[0]
+    for b in bundles:
+        oids=sorted(set(re.findall(r'OPEN-[A-Z]+-\d+',b)))
+        # 쟁점 어휘 = 조건부 묶음 본문 + 해당 OPEN의 §12 결정문
+        axis=toks(b) | set().union(*[toks(opens.get(o,"")) for o in oids]) if oids else toks(b)
+        for u in uncond:
+            ov=axis & toks(u)
+            if len(ov)>=3:
+                hits.append((len(ov), cap, ",".join(oids), u[:110], sorted(ov)[:8]))
+hits.sort(reverse=True)
+print("조건부 보유 블록:", n_blocks)
+print("중첩 3개 이상 (무조건 항목 × 같은 블록의 쟁점 어휘):", len(hits))
+for h in hits: print("  ", h[0], "|", h[1], h[2], "|", h[3], "|", h[4])
+```
+
+**`sweep_r5.py` — F2'(확장 화이트리스트) + X(교차 블록) 축 (라운드 5)**
+
+```python
+import re, sys
+p = sys.argv[1] if len(sys.argv) > 1 else "docs/discovery/capability-map.md"
+lines = open(p, encoding="utf-8").read().split("\n")
+starts = [i for i, l in enumerate(lines) if l.startswith("### ")]
+blocks = []
+for n, s in enumerate(starts):
+    e = starts[n+1] if n+1 < len(starts) else len(lines)
+    blocks.append((lines[s][4:].strip(), s+1, lines[s:e]))
+
+ACC = re.compile(r'^\s*-?\s*\*\*(Acceptance scenario|채택 시 요구되는 관찰 가능 동작)')
+COND = re.compile(r'조건부')
+# F2 확장: 사용자 가치·분류 근거 추가 (verifier M-2 대응)
+NARR = re.compile(r'^\s*- \*\*(legacy 형태 처리|V2 제약|결정 전에 확정되는 제약|경계|legacy 한계|사용자 가치|분류 근거|재사용 후보|모집단 제약|분리 사유)')
+ASSERT = re.compile(r'(만든다|한다\b|않는다|둔다|쓴다|채택한다|채택하지 않는다|해야 한다|로 한다|분리한다|고정한다|사용한다|금지한다|대체한다|포함한다)')
+
+
+def strip_acc(body):
+    """acceptance 절의 span만 제거하고 블록의 나머지 전부를 돌려준다.
+    (구 구현은 acceptance '앞'만 봐서 그 뒤의 `경계` 같은 절을 통째로 놓쳤다)"""
+    out=[]; skip=False; ind0=None
+    for l in body:
+        if ACC.match(l):
+            skip=True; ind0=len(l)-len(l.lstrip()); continue
+        if skip:
+            if not l.strip(): continue
+            cur=len(l)-len(l.lstrip())
+            if l.lstrip().startswith("- **") and cur<=ind0: skip=False
+            elif l.startswith("**"): skip=False
+            else: continue
+        out.append(l)
+    return out
+
+def top_items(body, matcher):
+    out, cur, curind, grab = [], None, 0, False
+    for l in body:
+        if not l.strip(): continue
+        ind = len(l) - len(l.lstrip())
+        if l.lstrip().startswith("- **") and ind == 0:
+            if grab and cur: out.append(cur)
+            grab = bool(matcher.match(l)); cur = l.strip()[2:] if grab else None; curind = ind
+        elif grab and cur is not None and ind > curind:
+            cur += " " + l.strip()
+    if grab and cur: out.append(cur)
+    return out
+
+txt = "\n".join(lines)
+opens = {}
+for m in re.finditer(r'^\|\s*(OPEN-[A-Z]+-\d+)\s*\|(.*)$', txt, re.M):
+    opens[m.group(1)] = m.group(2)
+
+STOP = set("있다 없다 된다 한다 그 이 되는 하는 것이 것을 수 안 더 두 세 각 같은 다른 모든 전부 위 아래 때 및 또는 그리고 판정 결과 값 상태 기록 경우 대상 기준 이상 이하 사실 여부 하나 사용 표시 확인 결정 조건부 확정 미정 시나리오 임시 대체 무관 무조건 legacy OPEN".split())
+def toks(s):
+    s = re.sub(r'[`*\[\]()|]', ' ', s)
+    return {w for w in re.findall(r'[가-힣A-Za-z_][가-힣A-Za-z0-9_]{1,}', s) if len(w) >= 2 and w not in STOP}
+
+mode = sys.argv[2] if len(sys.argv) > 2 else "all"
+
+if mode in ("all", "f2"):
+    print("=== F2' (확장 화이트리스트: +사용자 가치 +분류 근거 +재사용 후보 +모집단 제약 +분리 사유) ===")
+    n = 0
+    for t, ln, body in blocks:
+        acc_i = [i for i, l in enumerate(body) if ACC.match(l)]
+        if not acc_i: continue
+        accblock = "\n".join(body[acc_i[0]:])
+        if not COND.search(accblock): continue
+        oids = sorted(set(re.findall(r'OPEN-[A-Z]+-\d+', accblock)))
+        cap = t.split(" ·")[0]
+        for narr in top_items(strip_acc(body), NARR):
+            mention = [o for o in oids if o in narr]
+            if mention and ASSERT.search(narr):
+                n += 1
+                print(f"\n  [{cap}] {mention}")
+                print("    ", narr[:340])
+    print("\n  적출:", n, "건")
+
+if mode in ("all", "x"):
+    # 교차 블록 축 (verifier §2.4 a+c): 모든 확정 서술 절 x 모든 활성 OPEN 결정문.
+    # 소유 블록·OPEN id 인용 여부를 묻지 않는다.
+    print("\n=== X. 교차 블록 축 — 모든 확정 서술 절 × 모든 활성 OPEN 결정문 (임계 5) ===")
+    narrs = []
+    for t, ln, body in blocks:
+        cap = t.split(" ·")[0]
+        for narr in top_items(strip_acc(body), NARR):
+            if ASSERT.search(narr):
+                narrs.append((cap, narr))
+    print("  확정 서술 절 수:", len(narrs), "| 활성 OPEN:", len(opens))
+    hits = []
+    for oid, od in opens.items():
+        ot = toks(od)
+        for cap, narr in narrs:
+            ov = ot & toks(narr)
+            if len(ov) >= 5:
+                own = oid in narr
+                hits.append((len(ov), oid, cap, own, narr[:150], sorted(ov)[:10]))
+    hits.sort(reverse=True)
+    print("  중첩 5 이상 적출:", len(hits))
+    for h in hits:
+        print(f"   {h[0]} | {h[1]} | {h[2]} | id인용={h[3]} | {h[4]}")
+        print(f"       겹침: {h[5]}")
+```
+
+- 라운드 3의 E1·E2·E3·E4 스크립트는 `sweep_r5.py`의 `top_items`/`toks`/`opens` 추출부와
+  같은 구조이며, E1의 블록·acceptance 추출은 위 `f1.py`의 `acc_span`/`items`와 동일하다.
+  라운드 3 절에 소급 기입하는 대신 여기서 한 벌로 제공한다.
+
+### G3. 축 보강 — F2' (절 화이트리스트 확장) 과 X (교차 블록)
+
+verifier §2.4가 지적한 세 사각지대에 대응한다. (a) 교차 블록, (b) 절 화이트리스트 밖,
+(c) OPEN id 미언급.
+
+**F2' 변경 2가지.** ① 화이트리스트에 `사용자 가치`·`분류 근거`(및 `재사용 후보`·
+`모집단 제약`·`분리 사유`)를 추가했다 — M-2가 정확히 `사용자 가치`에 있었고, 라운드 2
+Codex high #3도 같은 절이었다. ② **구조적 버그를 고쳤다**: 구 구현은 `body[:acc_i[0]]`,
+즉 acceptance 절 **앞**만 훑어서 **그 뒤에 오는 절을 통째로 놓쳤다.** NOTI-02의 `경계`가
+바로 거기 있어 라운드 4 F2는 M-1을 **볼 수조차 없었다.** 이제 acceptance span만 제외하고
+블록 전체를 본다(`strip_acc`).
+
+**X (신규, 교차 블록)**: **모든** 확정 서술 절 × **모든** 활성 OPEN 결정문. 소유 블록인지,
+그 절이 OPEN id를 인용하는지 **묻지 않는다** — (a)와 (c)를 함께 덮는다.
+
+```
+$ python3 sweep_r5.py docs/discovery/capability-map.md f2
+  [STR-08] ['OPEN-STR-08']  **사용자 가치**: **직전 run이 정상 완료된 흐름에서** … (M-2 수정 후)
+  [STR-08] ['OPEN-STR-08']  **legacy 형태 처리 — 관찰과, 결정과 무관하게 확정되는 부분** …
+  [ML-03]  ['OPEN-ML-03']   **legacy 형태 처리 — 결정과 무관하게 확정되는 부분** …
+  [OPS-03] ['OPEN-NOTI-02'] **경계**: 알림 채널의 전달 의미 선택은 NOTI-05가 소유한다 …
+  [OPS-09] ['OPEN-OPS-01']  **V2 제약** … 이는 작성자 판단이지 확정이 아니다 …
+  적출: 5 건
+
+$ python3 sweep_r5.py docs/discovery/capability-map.md x
+확정 서술 절 수: 170 | 활성 OPEN: 66   (전수 모집단 11,220쌍)
+중첩 5 이상 적출: 15
+  14 OPEN-OPS-01×OPS-09(V2 제약)      11 OPEN-SET-10×SET-06(시간축 대체)
+  10 OPEN-NOTI-08×NOTI-04(분류 근거)   8 OPEN-QUAL-01×QUAL-03   8 OPEN-ML-02×ML-09
+   7 OPEN-QUAL-07×QUAL-04              7 OPEN-QUAL-04×QUAL-10   7 OPEN-OPS-01×OPS-09
+   6 OPEN-STR-08×STR-08                6 OPEN-NOTI-08×SET-01    5 OPEN-SET-10×SET-06
+   5 OPEN-QUAL-05×QUAL-10              5 OPEN-OPS-02×OPS-09     5 OPEN-OPS-01×OPS-04
+   5 OPEN-DEC-04×DEC-10
+```
+
+- exit: 0
+- **추가 위반 0건.** 적출 20건(F2' 5 + X 15)을 전수로 읽었다.
+  - F2' 5건: STR-08 2건·ML-03 1건은 이번·지난 라운드에 고친 것이고 전부 "결정과 무관하게
+    확정되는 부분"과 "여기서 확정하지 않는다 → `OPEN-*`"을 절 안에서 분리한다.
+    OPS-03 `경계`는 소유를 NOTI-05로 넘기는 서술이고, OPS-09 `V2 제약`은 "작성자 판단이지
+    확정이 아니다"를 명시한다.
+  - X 15건: **전부 legacy 관찰 서술(`분류 근거`)이거나 이미 조건부화된 절이다.** 개별
+    판정 — OPS-09·OPS-04의 `V2 제약`/`legacy 형태 처리`는 조건부 이관이 명시돼 있고,
+    SET-06 `시간축 대체`는 "V2는 대체를 **승인된 정책으로만** 허용한다"는 메타 제약이라
+    `OPEN-SET-10`의 (a)·(b) 어느 쪽에도 성립한다((b)면 승인이 없어 대체가 없다).
+    QUAL-04는 어휘 테이블의 **저장 형태**를 폐기할 뿐 `OPEN-QUAL-07`이 묻는 **세그먼트
+    범위**를 정하지 않는다. QUAL-10 `결정 전에 확정되는 제약` 2건은 §12 행 자신이
+    "넣는다면 … 선행한다"로 같은 조건부를 적고 있다. NOTI-04·SET-01·QUAL-03·ML-09·
+    DEC-10은 파일:라인이 붙은 legacy 관찰이다. OPS-02×OPS-09는 어휘 잡음.
+
+### G4. **축의 한계 — 이 축들은 결함 부재를 증명하지 않는다**
+
+**이 절은 evidence의 필수 부분이다.** 라운드 3의 오진은 "형식 규약 준수(조건부 마커의
+존재)"를 내용 정합의 **대리 지표**로 쓴 데서 나왔다. F1·F2는 그 배제를 되돌렸지만
+**같은 오류를 한 단계 아래에서 반복했다** — 이번엔 "절 이름"과 "같은 블록"이 대리 지표였고,
+그래서 M-1(다른 블록)과 M-2(목록 밖 절)가 보이지 않았다. 라운드 5의 F2'·X도 **여전히
+대리 지표 기반이다.** 구체적으로:
+
+1. **점수가 결함과 역상관한다.** G1에서 실측했다 — 수정 전 2, 수정 후 5·7. 올바른 수정이
+   OPEN id와 쟁점 어휘를 끌어오기 때문이다. **높은 점수는 위험 신호가 아니라 "이 절이 그
+   쟁점을 다룬다"는 신호일 뿐이다.**
+2. **X는 M-1을 적출하지 못한다.** 버그를 고친 뒤에도 NOTI-02 `경계` × `OPEN-STR-08`의
+   실측 점수는 **2**(수정 후 3)다. 임계를 2로 내리면 적출이 **437건**(모집단 11,220의 3.9%)
+   이 되어 사람이 읽을 수 있는 양을 벗어난다. **verifier는 축이 아니라 읽어서 M-1을 찾았고,
+   축은 읽을 곳을 좁히는 보조였다.**
+
+   | 임계 | 수정 전 적출 | 수정 후 적출 | M-1 포함? |
+   | --- | --- | --- | --- |
+   | 5 | 16 | 15 | 아니오 |
+   | 4 | 37 | 37 | 아니오 |
+   | 3 | 109 | 110 | 아니오 |
+   | 2 | 437 | 440 | 예(순위 최하위, 잡음과 구별 불가) |
+3. **새 사각지대가 남는다.** 어휘가 겹치지 않게 같은 쟁점을 확정하는 서술(동의어·환언),
+   확정 서술 절이 아닌 곳(표 셀, §0.x 규약, acceptance 하위 항목의 괄호), 그리고 여러
+   절에 나뉘어 합쳐질 때만 확정이 되는 형태는 어느 축도 보지 못한다.
+
+**따라서 이 축들을 "계열 A의 부재 증명"으로 읽지 마라.** 적출 0건은 **"임계 위에서 사람이
+읽을 후보가 없었다"**는 뜻이지 **"위반이 없다"**는 뜻이 아니다. 계열 A의 실질 방어는
+(i) 사람이 OPEN 66건 각각에 대해 "이 결정의 두 선택지가 문서 전체에서 모두 성립하는가"를
+읽는 것과 (ii) Codex 독립 리뷰뿐이며, 축은 그 읽기의 **순서를 정하는 도구**다.
+
+### G5. 분류·acceptance·ID·OPEN 불변 재검증
+
+```
+$ python3 invariants.py
+분류: {'V2 필수': 63, '근거 부족': 11, '폐기': 6, '후속': 14} = 94
+형식 위반: none
+V2 필수 사용자 가치/acceptance 결측: none
+중복 ID: none
+§12 등록 OPEN: 66 | 본문 참조 - 표 등록: ['OPEN-NOTI-03', 'OPEN-OPS-06', 'OPEN-SET-07']
+총 OPEN id(등록+결번): 69
+
+$ python3 - <<'PY'   # OPEN id 집합을 744fbfd와 대조
+PY
+744fbfd: 66 | worktree: 66 | 소멸: 없음 | 신규: 없음
+```
+
+- exit: 0. **전부 불변.** `OPEN-STR-08`·`OPEN-ML-03` 유지.
+- M-2 수정으로 STR-08 `사용자 가치`가 바뀌었으나 `V2 필수` 결측 검사는 여전히 0이다
+  (절이 사라진 것이 아니라 한정어가 붙었다).
+
+### G6. 규모·secret 스캔·clean tree
+
+```
+$ wc -l docs/discovery/capability-map.md
+2624
+
+$ git diff --stat 744fbfd -- docs/discovery/capability-map.md
+ 1 file changed, 6 insertions(+), 3 deletions(-)      # hunk: :437 +1, :1443 +2
+
+$ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" docs/discovery/ | wc -l
+3
+
+$ git status --porcelain -- docs/discovery/capability-map.md reports/evidence/m0/0a/
+(출력 없음 — 커밋 후)
+```
+
+- exit: 0. 2,621 → **2,624줄**(STR-08 `사용자 가치` +1, NOTI-02 `경계` +2). secret 매치
+  3건 불변(일반 명사).
+
+### G7. L-1 — 리뷰 range의 in_scope 밖 커밋 재확인
+
+```
+$ git log --oneline 3dc7d26..HEAD -- .claude/ CLAUDE.md
+d7b1c10 chore(harness): codex 리뷰 호출에 model_reasoning_effort=high 고정
+0c7eeff chore(harness): 정본 verdict 스키마의 line을 null 허용으로 — strict 변형과 계약 일치
+1f8e57c chore(harness): codex --output-schema용 strict 변형 스키마 추가
+
+$ git show d7b1c10 --stat
+ .claude/skills/codex-review-gate/SKILL.md | 9 +++++++++
+ CLAUDE.md                                 | 1 +
+
+$ git diff --name-only 3dc7d26 HEAD | grep -v '^docs/discovery/\|^reports/evidence/'
+.claude/skills/codex-review-gate/SKILL.md
+.claude/skills/codex-review-gate/references/codex-output.strict.schema.json
+.claude/skills/codex-review-gate/references/codex-verdict.schema.json
+CLAUDE.md
+```
+
+- exit: 0. 무관 커밋은 **3건**(라운드 3·4 절의 "2건"은 `d7b1c10` 이전 기준이라 낡았다),
+  파일은 **4개**로 불변이다. `scope.md` 라운드 5 절에서 갱신했다. 셋 다 하네스 소관이며
+  **이 slice가 만든 커밋이 아니다.**
