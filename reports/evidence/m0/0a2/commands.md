@@ -156,7 +156,7 @@ $ python3 sweep_r5.py docs/discovery/capability-map.md x
   않는다. 적출 0건은 "임계 위에서 읽을 후보가 없었다"는 뜻이지 "위반이 없다"는 뜻이
   아니다. **0A2가 이 한계를 뒤집지 않는다.**
 - 다만 이 slice는 계열 A의 **뿌리**를 줄였다 — 활성 OPEN이 66 → 37이므로 "미해결 쟁점을
-  확정 서술이 선점할" 표면 자체가 44% 줄었다. 축이 아니라 **결정**이 그 일을 했다.
+  확정 서술이 선점할" 표면 자체가 41% 줄었다. 축이 아니라 **결정**이 그 일을 했다.
 
 ---
 
@@ -208,67 +208,85 @@ verifier 판정 `not-ready`. **A2는 통과**(독립 재현됨)이고 A1·A4·A5
 
 **세 건 다 부재 주장 또는 귀속 오류였다. 완화 없이 실측으로 교체했다.**
 
+> **라운드 3 재실행 (verifier M-2r)**: 아래 블록은 **라운드 3 시점 HEAD에서 실제로
+> 재실행한 출력**이다. 라운드 2 기록은 내용은 정확했으나 `$` 프롬프트 아래 붙은 것이
+> 실행 출력이 아니라 **손으로 압축한 요약**이었다. 접어서 보여주는 곳은 그렇다고
+> 아래에 명시한다.
+
 ```
 $ cd bid-vector
 
 # H-1 — STR-16의 "legacy에 대응 구현이 없다" 반증
-$ git show ed4b06c:app/api/projects.py | grep -n 'q:\|agency:\|budget_min\|budget_max\|ilike\|X-Total-Count'
-63:    q: Optional[str] = Query(                       # 제목/공고번호 부분 일치(LIKE)
-67:    agency: Optional[str] = Query(                  # 발주/수요 기관명 부분 일치
+$ git show ed4b06c:app/api/projects.py | grep -nE "q: |agency: |budget_min|budget_max|ilike|X-Total-Count"
+63:    q: Optional[str] = Query(
+67:    agency: Optional[str] = Query(
 71:    budget_min: Optional[float] = Query(
-74:        description="budget_estimate >= 값으로 필터",
 76:    budget_max: Optional[float] = Query(
-79:        description="budget_estimate <= 값으로 필터",
 86:    count is exposed via the `X-Total-Count` response header so the frontend
 100:            or_(Project.title.ilike(like), Project.notice_number.ilike(like))
 107:                Project.issuing_agency.ilike(agency_like),
 108:                Project.demand_agency.ilike(agency_like),
+112:    if budget_min is not None:
 113:        query = query.filter(Project.budget_estimate >= budget_min)
+115:    if budget_max is not None:
 116:        query = query.filter(Project.budget_estimate <= budget_max)
+119:    response.headers["X-Total-Count"] = str(total)
 
-$ git show ed4b06c:app/api/routes.py | grep -n 'projects.router'
+$ git show ed4b06c:app/api/routes.py | grep -n "projects.router\|predictions.router"
 38:router.include_router(projects.router, prefix="/projects", tags=["Projects"])
+40:router.include_router(predictions.router, prefix="/predictions", tags=["AI Predictions"])
 
 # H-2 — 21,321건 귀속
 $ git grep -n "21,321\|21321" ed4b06c
-app/core/inference_config.py:84,96,105,114
-app/services/task_queue_depth.py:6      "the similarity projection backfill pinned the one
-                                         inference worker for four hours and
-                                         bid_vector_ml_inference accumulated 21,321 messages"
-app/tasks/pipeline_schedules.py:30
-tests/test_pipeline_sweep_expiry.py:4
-tests/test_similarity_backfill_overlap_guard.py:5
-tests/test_task_queue_depth.py:3,129
-$ git log -1 --format='%h %s' 19f2c94
+ed4b06c:app/core/inference_config.py:84:    # 소진을 넘으면 큐가 무한히 자란다(실제로 21,321건). 60초 유지 시 투입이 6,000건/시로
+ed4b06c:app/core/inference_config.py:96:    # 21,321건이 며칠 쌓이는 동안 아무 신호도 없었다(2026-08-13). 기존 점검은 전부
+ed4b06c:app/core/inference_config.py:105:    #   사고 실측(21,321건) 대비 2.3% 지점이므로 같은 사고가 재발하면 훨씬 얕은 깊이에서
+ed4b06c:app/core/inference_config.py:114:    # 주기 sweep 태스크 메시지의 수명 = 주기 × 이 배수. 21,321건은 소비자가 막힌
+ed4b06c:app/services/task_queue_depth.py:6:for four hours and ``bid_vector_ml_inference`` accumulated 21,321 messages. The
+ed4b06c:app/tasks/pipeline_schedules.py:30:    proportion to its downtime — that is literally how 21,321 messages reached
+ed4b06c:tests/test_pipeline_sweep_expiry.py:4:동안 beat 는 계속 밀어 넣었고 ``bid_vector_ml_inference`` 에 21,321건이 쌓였다.
+ed4b06c:tests/test_similarity_backfill_overlap_guard.py:5:inference worker for four hours and 21,321 events piled up behind them.
+ed4b06c:tests/test_task_queue_depth.py:3:21,321 messages accumulated over days behind a blocked consumer and no check
+ed4b06c:tests/test_task_queue_depth.py:129:    """21,321 — the depth the 2026-08-13 runaway reached with nothing reporting it."""
+
+$ git log -1 --format="%h %s" 19f2c94
 19f2c94 fix(similarity): 백필 폭주 수습 — 큐 21,321건 적체의 코드 원인 제거 (P1~P4) (#368)
 
 # M-1 — legacy on-demand 경로
-$ git show ed4b06c:app/api/predictions.py | sed -n '20,26p'
+$ git show ed4b06c:app/api/predictions.py | sed -n "20,26p"
 @router.post("/price", response_model=PricePredictionResponse)
-def predict_project_price(request, db, workflow): return workflow.predict_project_price(db, request)
-$ git show ed4b06c:app/api/routes.py | grep -n 'predictions.router'
-40:router.include_router(predictions.router, prefix="/predictions", tags=["AI Predictions"])
-$ git show ed4b06c:app/services/prediction_workflow.py | grep -n 'build_bid_target_menu'
+def predict_project_price(
+    request: PricePredictionRequest,
+    db: Session = Depends(get_db),
+    workflow: PredictionWorkflowService = Depends(get_prediction_workflow),
+):
+    return workflow.predict_project_price(db, request)
+
+$ git show ed4b06c:app/services/prediction_workflow.py | grep -n "build_bid_target_menu"
 18:from app.ai.bid_target import build_bid_target_menu
 109:            menu = build_bid_target_menu(
 ```
 
-- exit: 0
+- exit: 0. 위 6개 명령 전부 **라운드 3 HEAD에서 실행한 그대로**이며 접거나 압축한 곳이
+  없다. `task_queue_depth.py:6`의 문장이 grep 한 줄로 잘려 나오므로 문맥을 덧붙인다 —
+  전문은 "On 2026-08-13 the **similarity projection backfill** pinned the one inference
+  worker for four hours and ``bid_vector_ml_inference`` accumulated 21,321 messages."
+  (`git show ed4b06c:app/services/task_queue_depth.py | sed -n '1,12p'`로 확인 가능).
 - **H-1**: `list_projects`가 STR-16의 검색 절반을 이미 구현한다. 부재 주장 2곳을 실제
   형태 관찰로 교체하고, 조사가 놓친 이유(파이프라인 축으로 훑었고 이 엔드포인트가 어느
   stage에도 속하지 않는다)를 적었다. `V2 필수` 분류와 STR 축 배정은 유지했다.
-- **H-1 파생 — 닫혔던 조사 표면을 열었다.** 검색 API의 금액 필터가
+- **H-1 파생 — 닫혔던 조사 표면을 열었다.** 검색 API의 금액 필터가 `:113`·`:116`에서
   `Project.budget_estimate`(추정가격)와 비교한다. 이번에 `legacy-defect`로 판정한
-  `filters.py`와 **같은 결함**이다. §13 0B 인계 행을 **세 경로**로 다시 썼다 —
-  capture(R-07 `0755695`, **수정됨**) / 감시(`filters.py`, 미수정) /
-  검색(`projects.py:112-116`, 미수정). STR-16 acceptance에도 basis 고정 항목을 넣었다.
-- **H-2**: 21,321건은 **유사공고 임베딩 백필** 적체다. "그 뿌리가 사라진다"는 완화를
-  철회했다. `OPEN-OPS-03`·`OPEN-OPS-04`의 근거 기반은 완화 이전 상태 그대로다.
+  `filters.py`와 **같은 결함**이다. §13 0B 인계 행을 **세 경로**로 다시 썼다.
+  STR-16 acceptance에도 basis 고정 항목을 넣었다.
+- **H-2**: 10곳 전부 같은 2026-08-13 사고를 가리키며, 원인은 **유사공고 임베딩 백필**이다.
+  "그 뿌리가 사라진다"는 완화를 철회했다(라운드 3에서 문장 후반부까지 철회 범위 확대 —
+  R2-5 참조). `OPEN-OPS-03`·`OPEN-OPS-04`의 근거 기반은 완화 이전 상태 그대로다.
 - **M-1**: legacy에 on-demand 경로가 이미 있다. 바뀌는 것은 **배치 선산출의 제거**이므로
   "의도적 재설계" 프레이밍을 그 범위로 좁혔다.
 - **경위**: H-2와 M-1은 팀 리드 분석 단계의 사실 오류가 `decisions-log.md`를 거쳐 0A2에서
-  **정본 산출물로 승격**된 것이다. 승격 전에 legacy 원본을 대조하지 않은 것이 원인이며,
-  `decisions.md`에 경위를 절로 남기고 원본 문장은 취소선으로 보존했다(감사 추적).
+  **정본 산출물로 승격**된 것이다. `decisions.md`에 경위를 절로 남기고 원본 문장은
+  취소선으로 보존했다(감사 추적).
 
 ### R2-2. M-3 — OPEN registry 밖으로 이탈한 미결 2건 신설
 
@@ -301,26 +319,86 @@ registry 밖에 있으면 활성 수가 실제 미결을 과소 계상하고, �
 | **L-1** | 절 번호 순서 정정 — §0.7이 §0.6 앞에 삽입돼 있었다. 블록을 §0.6 뒤로 옮겼다 |
 | **L-2** | `OPEN-OPS-03` registry 행을 갱신했다(**해소하지 않았다**) — "실시간 경보 필요 여부는 운영 형태에 달렸다"는 입력이 **1인 운영으로 확정**됐고 §12.2 인접 표가 그 사실을 적는다. 남은 것이 **구체 임계**임을 행에 명시했다 |
 
-### R2-4. 불변 재확인
+### R2-4. 불변 재확인 — **라운드 3 HEAD에서 재실행**
+
+> **라운드 3 정정 (verifier M-2r)**: 라운드 2 기록의 절 번호 grep 출력이 `63 / 98 / 111`
+> 이었는데 **range 내 어느 커밋에서도 그 값이 나오지 않는다.** 실행하지 않고 기재한
+> 것이다. 아래는 라운드 3 HEAD에서 실제로 실행한 출력이다.
 
 ```
+$ grep -n "^### 0\.[567] " docs/discovery/capability-map.md
+63:### 0.5 OPEN과 acceptance scenario의 관계
+107:### 0.6 축과 ID 접두사
+120:### 0.7 상호작용 모델 — **pull** (운영자 결정 2026-08-26)
+
 $ python3 inv2.py
 분류: {'V2 필수': 62, '근거 부족': 10, '폐기': 6, '후속': 17} = 95
 형식 위반: none
 V2 필수 사용자 가치/acceptance 결측: none
 중복 id: none
 §12 활성 OPEN: 39
+본문 참조 - 활성 등록: 32 건 (해소·결번 포함)
 
-$ grep -n '^### 0\.[567] ' docs/discovery/capability-map.md
-63:### 0.5 OPEN과 acceptance scenario의 관계
-98:### 0.6 축과 ID 접두사
-111:### 0.7 상호작용 모델 — **pull** (운영자 결정 2026-08-26)
+$ grep -c "^| OPEN-" docs/discovery/capability-map.md
+39
+
+$ grep -n "조건부 — .OPEN-\|잠정 — .OPEN-" docs/discovery/capability-map.md
+72:- **조건부 — `OPEN-*` 결정에 따라 확정** — 결정 전 **임시 시나리오**임을 명시하고,
+1045:  - **조건부 — `OPEN-ML-03` 결정에 따라 확정.** 결정 전 임시 시나리오: 가격 적합도 값이
+1341:  - **잠정 — `OPEN-DEC-03` 재결정 대상.** 아래 항목은 확정이 아니라 **잠정**이므로 위
+1731:  - **조건부 — `OPEN-NOTI-08` 결정에 따라 확정.** 판정이 통지 이후에 확정되는 전이에서
+1738:  - **조건부 — `OPEN-NOTI-01` 결정에 따라 확정.** 미전달을 통지 완료로 스탬프하는 legacy
+2399:  - **조건부 — `OPEN-OPS-01`의 정책 질문 결정에 따라 확정.** `Unclassified`를 재시도
 
 $ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" docs/discovery/ | wc -l
-3
+       3
+
+$ wc -l docs/discovery/capability-map.md
+    2956 docs/discovery/capability-map.md
 ```
 
 - exit: 0
-- **capability 95 · 분류 62/17/6/10 불변** — 라운드 2는 분류를 하나도 바꾸지 않았다.
-- **활성 OPEN 37 → 39**(M-3 신설 2건). 이것이 라운드 2의 유일한 의도된 집계 변경이다.
-- 절 번호 순서 정상. secret 매치 3건 불변.
+- **capability 95 · 분류 62/17/6/10 불변** — 라운드 2·3 모두 분류를 바꾸지 않았다.
+- **활성 OPEN 39.** `^| OPEN-` 행 수와 `inv2.py`의 §12 등록 수가 **양쪽 39로 일치**한다.
+- 절 번호 순서 정상(0.5 → 0.6 → 0.7). secret 매치 3건 불변.
+- 묶음: 조건부 3 + **잠정 1**. `:72`는 §0.5의 규약 정의문이지 묶음이 아니다.
+- `capability-map.md` 2,951 → **2,956줄**(라운드 3 +5).
+
+### R2-5. 라운드 3 — H-2r · L-4r 정정
+
+```
+$ sed -n "263,269p" reports/evidence/m0/0a2/decisions.md   # H-2r 수정 전
+- ~~**큐 폭주 문제의 뿌리가 사라진다.** …배치 산출 작업이 쌓인 것이다.~~
+  → **철회. 원본의 사실 오류다**…
+  `OPEN-OPS-03`(큐 깊이 SLO)의 모수가 근본적으로 달라진다.      ← 철회 표시 **밖**
+
+$ cd bid-vector && git grep -rn "R-07" ed4b06c
+(출력 없음 — 매치 0)
+
+$ git log -1 --format="%h %s" 0755695
+0755695 fix(basis): budget_estimate capture 축 basis 정합 3종 세트 (#354)
+
+$ git log -1 --format="%h %s" 4645ce4
+4645ce4 fix(predictor): 투찰가를 사업금액(기초금액) 기준으로 산정 (#162)
+
+$ git log --oneline --all --grep="BaseAmount" | head -3
+0755695 fix(basis): budget_estimate capture 축 basis 정합 3종 세트 (#354)
+2db542c fix(allocation): 투찰 결정 capture 분모를 기초금액으로 정렬
+c4ec93b refactor(domain): money 타입(BaseAmount)을 bid_base 경계 시그니처에 강제 — mypy strict 아일랜드 승격 (#262)
+
+$ git show 0755695 | grep -c "resolve_notice_bid_base"
+12
+```
+
+- exit: 0
+- **H-2r**: 라운드 2가 앞문장만 취소선에 넣고 **뒷문장을 철회 표시 밖에 남겼다.** 그 결과
+  정정문이 오히려 완화의 결론을 재확인하는 형태가 됐고, 같은 파일의 정정 절
+  (`OPEN-OPS-03`·`OPEN-OPS-04`의 근거 기반은 완화 이전 그대로)과 `capability-map.md`
+  §0.7이 **정반대를 적고 있었다.** 철회 범위를 문장 전체로 넓혔다.
+- **L-4r**: `R-07`은 legacy 저장소에 **매치 0**이며 scout 노트 `01_scout_strategy.md`의
+  내부 번호다. `#162`와 `0755695`는 **같은 계열의 서로 다른 두 건**이다 —
+  `0755695`=**#354**(capture 축, `resolve_notice_bid_base` 12회),
+  `4645ce4`=**#162**(투찰가를 기초금액 기준으로, `bid_base.py` 신설),
+  `c4ec93b`=**#262**(`BaseAmount` 뉴타입 강제). §13과 §12.2를 검증 가능한 형태로 고쳤다.
+  **"같은 계열"이라는 판단 자체는 성립하므로 유지했다** — 입증된 오류는 "R-07이 저장소
+  식별자"와 "#162 = 0755695" 두 전제뿐이며, 없는 주장을 만들지 않았다.
