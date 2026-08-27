@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a3-decision-basis-correction
 base_sha: 48151b9   # 0B Codex 4차 approve verdict 등재 직후의 HEAD
-head_sha: 03d7240   # 이 scope 커밋의 직전 커밋. 「이 커밋에 대해서는 주장하지 않는다」 참조
+head_sha: 90dde40   # 이 scope 커밋의 직전 커밋. 「이 커밋에 대해서는 주장하지 않는다」 참조
 in_scope:
   - reports/evidence/m0/0a2/decisions.md      # X-1 정정 한정 + provenance 등재
   - reports/evidence/m0/0a2/checklist.md      # §10.1 형태 7 등재 한정
@@ -128,12 +128,15 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 | --- | --- |
 | `b3276cb` | X-1 정정 — `decisions.md` `OPEN-STR-01` + provenance 등재 · `capability-map.md` §13 |
 | `03d7240` | §10.1 형태 7 등재 |
-| 이 커밋 | evidence — `scope.md` · `checklist.md` · `commands.md` |
+| `cb1be88` | evidence 최초 — `scope.md` · `checklist.md` · `commands.md`. **Codex 1차가 리뷰한 head** |
+| `6857ae8` | **수정 라운드 1** — F-1(high). 반대 방향 단정을 선언/관측으로 좁힌다 |
+| `90dde40` | **수정 라운드 1** — F-3(medium). C-4를 재현 가능한 명령으로 |
+| 이 커밋 | **수정 라운드 1** — F-2(medium) + evidence 동기화 |
 
 **파일 목록도 셈도 여기에 옮기지 않는다** — `git show --stat --format='' <SHA>`가 낸다.
 
-두 커밋으로 나눈 이유는 **각 커밋에서 문서가 자체 정합**하기 때문이다. X-1 정정과 형태 7
-등재는 서로 독립이며, 리뷰가 둘을 따로 볼 수 있다.
+**커밋을 나눈 이유는 각 커밋에서 문서가 자체 정합**하기 때문이다. X-1 정정과 형태 7 등재는
+서로 독립이고, 수정 라운드는 **finding별로 갈라** 리뷰가 하나씩 볼 수 있게 했다.
 
 ## 발견했으나 고치지 않은 것 — 계약이 금지한 자리
 
@@ -142,7 +145,7 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 
 | # | 무엇 | 왜 문제인가 | 판단 |
 | --- | --- | --- | --- |
-| **O-1** | §13 같은 행의 **`검증 방법`**이 *"과세/비과세 공고 경계 쌍"*을 **무조건**으로 요구한다 | 0B ledger의 대응 항목(`R-BASIS-01`)은 같은 요구를 **`OPEN-REG-05` 조건부**로 돌리고 *"지금 만들면 legacy의 미결 과세 의미로 corpus 경계가 굳는다"*고 적는다. 조건 표시 없이 두면 **형태 7(계열 A) 그 자체**이며, 정정된 `사용자 영향`과 **같은 행 안에서 어긋난다** | **고치지 않았다.** 팀 리드가 X-1을 *"ex-VAT 단정과 «VAT만큼» 정량 서술"*로 한정했고 이 문장은 그 둘 어느 쪽도 아니다. **행 안 불일치는 이 slice가 만든 것이 아니라 드러낸 것**이며, 후속 결정 대상으로 올린다 |
+| **O-1** | §13 같은 행의 **`검증 방법`**이 *"과세/비과세 공고 경계 쌍"*을 **무조건**으로 요구한다. **Codex 1차가 같은 진단을 medium으로 냈다**(verdict의 `capability-map.md:3171` finding) | 0B ledger의 대응 항목(`R-BASIS-01`)은 같은 요구를 **`OPEN-REG-05` 조건부**로 돌리고 *"지금 만들면 legacy의 미결 과세 의미로 corpus 경계가 굳는다"*고 적는다. 조건 표시 없이 두면 **형태 7(계열 A) 그 자체**이며, 정정된 `사용자 영향`과 **같은 행 안에서 어긋난다** | **고치지 않았다.** 팀 리드가 X-1을 *"ex-VAT 단정과 «VAT만큼» 정량 서술"*로 한정했고 이 문장은 그 둘 어느 쪽도 아니다. **행 안 불일치는 이 slice가 만든 것이 아니라 드러낸 것**이며 **운영자 판단 대기**다 — 수정 라운드 1에서도 지시에 따라 손대지 않았다 |
 | **O-2** | **§5 DEC-01 분류 근거**(*"투찰율이 곱해지는 base는 추정가격(**ex-VAT**)이 아니라 기초금액/사업금액(**과세 공고면 VAT 포함**)"*)와 **§6 NOTI 보고서 계약**(*"기초금액(사업금액)과 추정가격(**부가세 별도**)"*)에 **살아 있는 X-1 프레이밍**이 남아 있다 | 팀 리드 지시는 X-1이 *"두 파일에 남아 있다 — `decisions.md` `OPEN-STR-01` 절과 `capability-map.md` §13"*이라 적었으나 **그 완결 주장이 참이 아니다.** 두 자리 다 legacy 실측과 어긋나는 같은 단정이다 | **고치지 않았다.** in_scope가 *"§13 X-1 서술 한정"*이라 §5·§6을 건드리면 **A4의 구조적 불변(§13 밖 무변경)이 깨진다.** 위치는 `commands.md` **C-3.4**의 스윕 출력이 낸다 |
 | **O-3** | `decisions.md` 전수 표의 **훅 번호가 편집마다 낡는다** | 이 slice가 훅 하나를 더하자 뒤따르는 값이 전부 밀렸다. **값을 고치는 「인스턴스 고치기」**이며 다음 편집에 다시 낡는다(0B `F-4`·`N-1`과 같은 뿌리) | **셈만 지우고 번호는 유지**했다. 번호를 없애려면 표의 설계(훅↔행 1:1)를 바꿔야 하고 그것은 이 slice의 위임 범위 밖이다. **그 자리에 「정본은 명령의 출력」임을 명시**했다 |
 
@@ -153,7 +156,7 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 **이 slice의 evidence 셋은 한 커밋이고 이 절이 그 커밋에 실린다.** 그래서 **SHA를 적지
 않고 이 커밋에 대해 아무것도 주장하지 않는다** — 0B가 세운 「이력 절 규약」이 그렇게 정한다.
 
-- `head_sha` → `03d7240`. 커밋이 자기 SHA를 담을 수 없어 **직전 커밋**을 가리킨다.
+- `head_sha` → `90dde40`. 커밋이 자기 SHA를 담을 수 없어 **직전 커밋**을 가리킨다.
 - **리뷰 range는 `48151b9...HEAD`**. in_scope 준수는 `git diff --name-only 48151b9...HEAD`로
   확인한다.
 
@@ -164,13 +167,13 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 
 | 확인할 것 | 명령 |
 | --- | --- |
-| in_scope 준수 | `git diff --name-only 48151b9...HEAD` |
+| in_scope 준수 | `git diff --name-only 48151b9...HEAD` — **목록을 옮겨 적지 않는다.** 나오는 경로가 전부 위 `in_scope` 아래에 있는가만 본다(Codex 1차 F-2) |
 | `capability-map.md` 변경이 §13 한 행인가 | `git diff -U0 48151b9...HEAD -- docs/discovery/capability-map.md \| grep -E '^@@'` · `grep -n '^## 13\. ' docs/discovery/capability-map.md` |
-| capability 총수 · 분류 4종 · 활성 OPEN 총수 | `commands.md` **C-4** — 인라인 본문을 marker로 뽑아 stdin으로 실행한다. base와 HEAD 양쪽 |
+| capability 총수 · 분류 4종 · 활성 OPEN 총수 | `commands.md` **C-4** — 인라인 본문을 marker로 뽑아 stdin으로 실행한다. base와 HEAD 양쪽. **커밋되지 않은 스크립트 파일에 의존하지 않는다**(Codex 1차 F-3) |
 | 새 `OPEN` 신설 0 | `git diff 48151b9...HEAD -- docs/discovery/capability-map.md \| grep -cE '^\+.*\\\| OPEN-[A-Z]+-[0-9]+ \\\|'` |
 | `decisions.md` 전수 표가 훅과 1:1인가 | `git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md \| grep -E '^@@'` |
 | X-1 프레이밍이 in_scope에 살아 있는가 | `commands.md` **C-3**의 스윕 |
-| 공백 오류 | `git diff --check 48151b9...HEAD` |
+| 공백 오류 | `git diff --check 48151b9...HEAD` — **결과를 옮겨 적지 않는다**(Codex 1차 F-2) |
 | legacy 인용의 블록 경계 | `commands.md` **C-1** |
 | 형태 7이 인용하는 0B 자리가 실재하는가 | `commands.md` **C-5** |
 
@@ -184,4 +187,70 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 | `differential.json` | N/A — Python/V2 실행 비교가 없다 |
 | `golden-manifest.json` | N/A — fixture를 사용하지 않는다 |
 | `rollback.md` | N/A — 문서 산출물은 `git revert`로 복구. base `48151b9`로 되돌릴 수 있다 |
-| `codex-review-*.json` | **없음 — 아직 리뷰 요청 전이다.** 요청 후 codex-reviewer 레인이 append-only로 등재한다 |
+| `codex-review-*.json` | **존재** — 목록은 `git ls-files 'reports/evidence/m0/0a3/codex-review-*.json'`로 재현된다. codex-reviewer 레인이 작성했고 spec-writer는 읽기만 한다(append-only) |
+
+---
+
+## 갱신 이력 — 수정 라운드 1 (Codex 1차 `request_changes`)
+
+verdict 정본: `reports/evidence/m0/0a3/codex-review-20260827T132148Z.json`(등재, append-only).
+`reviewed_base` **`48151b9`** → `reviewed_head` **`cb1be88`**. **severity별 건수는 옮겨
+적지 않는다** — 그 JSON의 `findings`가 정본이다.
+
+**건별 처리는 `checklist.md` §8**에 있다. 여기에는 이 slice의 계약에 걸리는 것만 적는다.
+
+### F-1이 뒤집은 것 — 등재하는 형태를 그 라운드에 저질렀다
+
+`decisions.md`의 정정 블록이 **`budget_estimate`는 ex-VAT가 「아니다」**라고 **반대 방향으로
+새로 단정**했다. 근거가 지지하는 것은 `money.py`의 **선언**뿐이고 바로 다음 근거가
+**저장 값의 일관성 부재를 공시**한다. **실제 의미는 활성 `OPEN-REG-05` 소유**이며
+`commands.md` C-1이 스스로 그렇게 적어 **자기 evidence와도 어긋났다.**
+
+**이 slice는 §10.1에 형태 7 「미결을 확정으로 쓰기」를 등재하는 그 라운드에 같은 형태를
+저질렀다.** 0A2 §10.1이 형태 3에 대해 적은 것과 같은 구조다 — *"규칙을 적는 것과 그
+라운드의 자기 evidence에 적용하는 것은 다른 일"*. **지우지 않고 2차 정정 주석에 남겼다.**
+
+이 계약의 「0A2·0B에서 가져오는 규율」 표는 **형태 7의 적용을 A3의 소유 `OPEN` 귀속으로만
+좁혀 적고 있었다.** 그 좁힘이 이 실패를 덮지 못했다 — **같은 블록의 legacy 사실 서술에도
+같은 축이 걸린다.** 표를 고쳐 적지 않는다(그 시점의 판단이다). **드러난 것을 여기 적는다.**
+
+### F-2 · F-3이 가리키는 공통 뿌리
+
+둘 다 **evidence가 자기 실행 환경을 정확히 말하지 못한 것**이다.
+F-2는 **range가 커밋과 함께 움직이는데 그 전에 뜬 목록을 산문에 박았고**,
+F-3은 **커밋되지 않은 스크립트에 기댔다.** 처방도 하나다 —
+**낡을 수 있는 값을 옮겨 적지 않고, 대상을 가리키거나 정본에서 다시 계산한다.**
+
+- **F-2**: 목록·셈을 지우고 **명령만 남겼다.** 출력을 기록하는 검사는
+  **`capability-map.md`로 경로를 한정**해 뒤 커밋에 낡지 않는 형태로 바꿨다.
+- **F-3**: 인라인 본문을 **marker로 집어**(줄 번호가 아니다) `assert`로 유일성을 확인한 뒤
+  stdin으로 실행한다. **base와 HEAD 양쪽에서 실제로 돌렸다.**
+
+**출력 블록의 머리에 한 HEAD를 박던 것도 함께 걷어냈다** — 수정 라운드마다 낡는다.
+**블록이 각자 자기 실행 시점을 선언**한다.
+
+### 넷째 finding은 건드리지 않았다
+
+`docs/discovery/capability-map.md:3171` — 이 계약의 **O-1**이다. **운영자 판단 대기**이며
+지금 손대면 **A4의 구조적 불변(§13 한 줄 교체)이 깨진다.** 판단이 오면 별도로 처리한다.
+
+### 이 커밋에 대해서는 주장하지 않는다
+
+**이 라운드의 마지막 커밋이고 이 절이 그 커밋에 실린다.** 그래서 **SHA를 적지 않고 이
+커밋에 대해 아무것도 주장하지 않는다** — 0B가 세운 「이력 절 규약」이 그렇게 정한다.
+무엇이 들어갔는지는 `git show --stat --format='' HEAD`가 낸다.
+
+- `head_sha` → `90dde40`(직전 커밋). **range `48151b9...HEAD`**.
+
+### 불변 — 이 절은 수를 옮겨 적지 않는다
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| `capability-map.md` 이번 라운드 무변경 | `git diff --stat cb1be88..HEAD -- docs/discovery/capability-map.md` |
+| `regression-ledger.md` 무변경 | `git diff --stat 48151b9...HEAD -- docs/discovery/regression-ledger.md` |
+| 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** |
+| in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
+| `decisions.md` 전수 표 ↔ 훅 1:1 | `commands.md` **C-3.5** |
+| 하네스 두 파일이 range 밖인가 | `git diff --name-only 48151b9...HEAD` — `.claude/`·`CLAUDE.md`가 나오지 않아야 한다 |
+
+**이 커밋에 대해서는 아무것도 주장하지 않는다.**

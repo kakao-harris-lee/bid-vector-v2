@@ -1,0 +1,59 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "48151b9c47e4f09286c4ee869977383fa4b23396",
+  "reviewed_head": "cb1be885051850314680f7f6b47a8953b1fed252",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "reports/evidence/m0/0a2/decisions.md",
+      "line": 152,
+      "evidence": "정정 블록은 `budget_estimate는 ex-VAT가 아니다`라고 새로 단정한다. 그러나 인용된 근거가 지지하는 것은 `money.py`의 enum 주석이 VAT 포함으로 선언한다는 사실뿐이며, 바로 다음 근거인 `bid_summary.py`는 저장 값의 VAT 포함 여부가 이력상 일관되지 않다고 명시한다. `commands.md:69-73`도 어느 의미가 맞는지는 `OPEN-REG-05` 소유라 이 slice가 정하지 않는다고 기록한다. 따라서 기존 ex-VAT 단정을 제거하면서 반대 방향의 과잉 단정을 만들었고 A1의 사실 정확성 및 A3의 미결 보존을 충족하지 못한다. 운영자 선택값 `기초금액`과 `legacy-defect` 라벨 자체는 diff에서 변경되지 않았다.",
+      "required_fix": "문장을 `legacy money.py는 VAT 포함으로 선언하지만 저장 값은 일관되지 않아 실제 VAT 처리는 OPEN-REG-05 소유`처럼 선언과 관측을 구분하는 범위로 좁힌다. 결정값과 판정 라벨은 그대로 보존한다."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/discovery/capability-map.md",
+      "line": 3171,
+      "evidence": "정정된 같은 행은 과세 처리와 차이의 크기·방향이 `OPEN-REG-05` 소유라고 명시하면서, 뒤의 검증 방법은 `과세/비과세 공고 경계 쌍`을 조건 없이 고정하라고 요구한다. authoritative 0B ledger의 `R-BASIS-01`은 해당 fixture를 OPEN 종료 뒤에만 만들라고 명시한다(`regression-ledger.md:99-102`). `scope.md` O-1은 이 모순을 범위 밖으로 선언했지만, 변경한 동일 인계 행 안에서 미결 의미를 fixture로 확정하므로 범위 분할이 X-1 정정과 새 형태 7의 목적을 형해화한다.",
+      "required_fix": "같은 행의 과세/비과세 fixture를 `OPEN-REG-05` 종료에 조건화하고, scope/A4도 이 최소 동일 행 정합성 수정을 허용하도록 맞춘다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a3/commands.md",
+      "line": 83,
+      "evidence": "기록된 `git diff --name-only 48151b9...HEAD` 출력은 03d7240에서 실행돼 기존 세 파일만 열거한다. 리뷰 head cb1be885에서 같은 명령을 재실행하면 그 세 파일과 `reports/evidence/m0/0a3/{scope,checklist,commands}.md`까지 총 여섯 경로가 나온다. 따라서 C-2.1과 line 110의 `in_scope 세 파일만` 판정은 현재 고정 range의 실측이 아니며, checklist가 C-2를 근거로 A4 pass라고 한 자기 기록도 현재 HEAD와 맞지 않는다. 이는 허용된 `scope.md.head_sha` 직전 커밋 표기와 별개인 명령 출력 불일치다.",
+      "required_fix": "새 리뷰 head에서 범위 명령을 다시 실행해 여섯 in-scope 경로를 기록하고 C-2 판정과 checklist의 A4 근거를 동기화한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a3/commands.md",
+      "line": 270,
+      "evidence": "C-4.2에 기록된 명령은 새 임시 디렉터리에 `docs/discovery/capability-map.md`만 archive한 뒤 그 안에서 `python3 inv0a3.py`를 실행한다. 저장소와 archive에 `inv0a3.py`가 없으므로 그대로 재실행하면 `can't open file .../inv0a3.py`와 exit 2가 발생하며, 뒤에 기록된 수치 출력은 이 명령에서 나올 수 없다. 인라인 스크립트를 직접 추출해 base/head에서 실행한 실제 수치는 양쪽 모두 95, 61/17/6/11, 45, 3184로 A4 불변 자체와 일치하지만 evidence의 실행 기록은 재현 불가다.",
+      "required_fix": "인라인 본문을 실제로 stdin으로 실행하거나 스크립트를 커밋된 경로에 두는 재현 가능한 명령으로 base/head 양쪽을 다시 실행하고, 실제 명령과 출력을 C-4에 기록한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse 48151b9c47e4f09286c4ee869977383fa4b23396^{commit} && git rev-parse cb1be885051850314680f7f6b47a8953b1fed252^{commit} && git rev-parse HEAD",
+    "git log --oneline 48151b9c47e4f09286c4ee869977383fa4b23396..cb1be885051850314680f7f6b47a8953b1fed252 && git diff --stat 48151b9c47e4f09286c4ee869977383fa4b23396...cb1be885051850314680f7f6b47a8953b1fed252 && git diff --name-status 48151b9c47e4f09286c4ee869977383fa4b23396...cb1be885051850314680f7f6b47a8953b1fed252 && git ls-files --others --exclude-standard",
+    "git merge-base 48151b9c47e4f09286c4ee869977383fa4b23396 cb1be885051850314680f7f6b47a8953b1fed252 && git merge-base --is-ancestor 48151b9c47e4f09286c4ee869977383fa4b23396 cb1be885051850314680f7f6b47a8953b1fed252",
+    "git diff --unified=8 48151b9c47e4f09286c4ee869977383fa4b23396...cb1be885051850314680f7f6b47a8953b1fed252 -- docs/discovery/capability-map.md reports/evidence/m0/0a2/checklist.md reports/evidence/m0/0a2/decisions.md",
+    "git diff --check 48151b9c47e4f09286c4ee869977383fa4b23396...cb1be885051850314680f7f6b47a8953b1fed252",
+    "git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md | rg '^@@'",
+    "sed -n '229,253p' reports/evidence/m0/0a3/commands.md | python3 -",
+    "git archive 48151b9 docs/discovery/capability-map.md | tar -x -C \"$task_base\"; sed -n '229,253p' reports/evidence/m0/0a3/commands.md | (cd \"$task_base\" && python3 -)",
+    "git archive 48151b9 docs/discovery/capability-map.md | tar -x -C \"$task_tmp\"; (cd \"$task_tmp\" && python3 inv0a3.py)",
+    "git diff --name-only 48151b9...cb1be885 && git diff --numstat 48151b9...cb1be885 -- docs/discovery/capability-map.md && git diff -U0 48151b9...cb1be885 -- docs/discovery/capability-map.md | rg '^@@'",
+    "rg -n '^### C-8\\.1 |^### C-8\\.2 |^### C-8\\.5 |^### C-9\\.9 ' reports/evidence/m0/0b/commands.md && rg -n '^### F-1 \\(high\\)|^- \\*\\*F-2\\*\\*: `R-BASIS-01`' reports/evidence/m0/0b/scope.md",
+    "for f in reports/evidence/m0/0b/codex-review-*.json; do jq -r '.verdict, (.findings[]? | [.severity,.file,(.line|tostring),.evidence,.required_fix] | @tsv)' \"$f\"; done",
+    "rg -n 'OPEN-REG-05|OPEN-QUAL-10.*소유자가 아니다' docs/discovery/regression-ledger.md docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md"
+  ],
+  "residual_risks": [
+    "이 worktree에는 legacy `bid-vector` 저장소가 없어 `ed4b06c`의 실제 파일·행 범위와 인용 내용을 독립 재현하지 못했다. 요청에 명시된 환경 한계이므로 finding으로 계상하지 않았다.",
+    "`scope.md` O-2가 범위 밖으로 명시한 `capability-map.md:1373`과 `:1929`의 ex-VAT/부가세 별도 프레이밍은 그대로 남아 있다. 이번 finding에는 섞지 않았지만 후속 정본화 전까지 문서 독자는 §13 정정과 상충하는 표현을 만나게 된다.",
+    "애플리케이션 코드가 없는 M0 문서 slice이므로 production wiring의 side effect, retry/idempotency, contract unknown-schema 처리, Kotlin/Python 업무 규칙 단일 소유 및 domain 의존 방향은 이번 range에서 검증 대상이 아니며 후속 구현 리뷰에 남는다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol"
+  }
+}

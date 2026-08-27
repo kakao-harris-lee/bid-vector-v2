@@ -1,7 +1,11 @@
 # M0 / 0A3 — 검증 명령과 실행 출력
 
-**range**: `48151b9...HEAD`. **아래 출력은 전부 HEAD `03d7240`에서 실제로 실행한 것**이며
-접거나 손으로 압축한 블록은 없다(§10.1 **형태 3**). 셈은 이 절의 출력이 내고 **산문으로
+**range**: `48151b9...<head>`. **출력 블록은 각자 자기 실행 시점 HEAD를 첫 줄에 선언한다** —
+한 값을 머리에 박으면 수정 라운드마다 낡는다(0B `N-1`). 접거나 손으로 압축한 블록은 없다
+(§10.1 **형태 3**). **기록된 블록은 전부 뒤 커밋에 낡지 않는 형태**다 — legacy 고정 commit
+읽기(C-1) · `capability-map.md`로 경로 한정(C-2) · 이 라운드 이후 바뀌지 않는 파일의
+grep(C-3·C-5) · 산출물에서 정본을 계산하는 스크립트(C-4). **range 전체를 보는 검사는
+출력을 적지 않고 명령만 남긴다**(C-2의 첫 표). 셈은 이 절의 출력이 내고 **산문으로
 옮겨 적지 않는다**(**형태 6**).
 
 **0B의 축을 새로 만들지 않았다.** 이 slice에 필요한 것만 두었다 — legacy 인용 확인(C-1),
@@ -23,7 +27,8 @@
 `:70-77`로 한 줄 늦게 적었다가 고친 그 자리다.
 
 ```
-### 실행 시점 HEAD = 03d7240
+### 실행 시점 HEAD = 90dde40
+### 이 블록의 출력은 저장소 HEAD와 무관하다 — legacy 저장소의 고정 commit 을 읽는다.
 
 $ cd bid-vector && git show ed4b06c:app/domain/money.py | sed -n "20,31p"
 class Basis(str, Enum):
@@ -77,66 +82,77 @@ $ cd bid-vector && git show ed4b06c:app/schemas/bid_summary.py | sed -n "68,79p"
 
 ## C-2. 범위 — in_scope 준수와 `capability-map.md` 변경의 위치
 
+### 목록을 옮겨 적지 않는 것 두 가지 — 명령만 남긴다
+
+**range 전체를 보는 검사는 evidence 커밋이 자기 파일을 range에 더하므로, 커밋 전에 뜬
+출력은 언제나 불완전하다.** 앞 라운드가 그 자리에서 걸렸다(Codex 1차 medium) — 기록된
+목록이 세 경로였고 리뷰 head에서는 여섯이었다. **인스턴스를 고치면 다음 커밋에 다시
+낡는다.** 그래서 **목록도 셈도 옮겨 적지 않고 명령만 남긴다** — 0B가 같은 부류에 네 번
+걸린 뒤 세운 처방이다.
+
+| 확인할 것 | 명령 | 판정 문면 |
+| --- | --- | --- |
+| in_scope 밖 경로가 없다 | `git diff --name-only 48151b9...<head>` | **목록 없이** — 나오는 경로가 전부 `scope.md`의 `in_scope` 아래에 있는가 |
+| 공백 오류가 없다 | `git diff --check 48151b9...<head>` | 출력이 없다 |
+
+**결과를 여기 적지 않는다.** 두 명령은 **리뷰 head에서 리뷰어가 직접 돌린다** — 그것이
+정본이고, 이 파일이 옮겨 적은 값은 정본이 될 수 없다.
+
+### 경로를 한정해 안정한 검사 — 출력을 기록한다
+
 ```
-### 실행 시점 HEAD = 03d7240
+### 실행 시점 HEAD = 90dde40
+### 아래 셋은 전부 `-- docs/discovery/capability-map.md` 로 경로를 한정한다 —
+### 그래서 이 파일을 건드리지 않는 뒤 커밋이 붙어도 출력이 바뀌지 않는다.
 
 --- C-2.1 ---
-$ git diff --name-only 48151b9...HEAD
-docs/discovery/capability-map.md
-reports/evidence/m0/0a2/checklist.md
-reports/evidence/m0/0a2/decisions.md
-
---- C-2.2 ---
 $ git diff --numstat 48151b9...HEAD -- docs/discovery/capability-map.md
 1	1	docs/discovery/capability-map.md
 
---- C-2.3 ---
+--- C-2.2 ---
 $ git diff -U0 48151b9...HEAD -- docs/discovery/capability-map.md | grep -E '^@@'
 @@ -3171 +3171 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 $ grep -n '^## 1[23]\. ' docs/discovery/capability-map.md
 2910:## 12. OPEN 결정 목록
 3166:## 13. 하류 인계
 
---- C-2.4 ---
-$ git diff --check 48151b9...HEAD ; echo "exit=$?"
-exit=0
-
---- C-2.5 ---
+--- C-2.3 ---
 $ git diff 48151b9...HEAD -- docs/discovery/capability-map.md | grep -cE '^\+.*\| OPEN-[A-Z]+-[0-9]+ \|'
 0
 ```
 
 **판정**:
 
-- `git diff --name-only`가 in_scope 세 파일만 낸다(`reports/evidence/m0/0a3/`는 이 커밋에
-  들어간다).
 - `capability-map.md`는 **한 줄 교체**이고 hunk가 **`3171` 하나**다. §13이 `3166`에서
   시작하고 §12가 `2910`에서 시작하므로 **그 한 줄은 §13 안**이다 — **A4의 「X-1 외 서술
   무변경」이 구조로 성립한다.** §10 집계표·§12 registry는 diff에 없다.
-- `git diff --check` **exit 0**.
 - **registry에 추가된 `OPEN` 행 0** — 새 `OPEN`을 만들지 않았다(A3).
+- **이 셋은 뒤 커밋에 낡지 않는다** — 경로가 `capability-map.md`로 한정돼 있고
+  **그 파일은 이번 수정 라운드에 건드리지 않는다**(위 hunk 하나가 그 사실을 낸다).
 
 ---
 
 ## C-3. X-1 프레이밍 스윕 — 정정이 어디까지 갔고 어디서 멈췄나
 
 ```
-### 실행 시점 HEAD = 03d7240
+### 실행 시점 HEAD = 90dde40
 
 --- C-3.1 X-1 프레이밍 스윕 (in_scope 두 파일) ---
-$ grep -nE 'ex-VAT|VAT·사정률만큼' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-140
-reports/evidence/m0/0a2/decisions.md:40:| 「OPEN-STR-01」 절 안의 2026-08-27 정정 블록(**slice 0A3 · X-1**) | **slice 산물** — legacy **사실 서술 정정**(`bud
-reports/evidence/m0/0a2/decisions.md:59:| `144` · `147` | 「OPEN-STR-01」 | **정정** — **X-1**: `budget_estimate`의 ex-VAT 단정과 차이의 크기·방향 서술(취소선 +
+$ grep -nE 'ex-VAT|VAT·사정률만큼' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-130 | sed 's/[[:space:]]*$//'
+reports/evidence/m0/0a2/decisions.md:40:| 「OPEN-STR-01」 절 안의 2026-08-27 정정 블록(**slice 0A3 · X-1**) | **slice 산물** — legacy **사실 서술
+reports/evidence/m0/0a2/decisions.md:59:| `144` · `147` | 「OPEN-STR-01」 | **정정** — **X-1**: `budget_estimate`의 ex-VAT 단정과 차이의 크기·방
 reports/evidence/m0/0a2/decisions.md:144:    `strategy.min|max_budget_estimate`. `Project.budget_estimate`는 ~~추정가격(ex-VAT)이다~~
 reports/evidence/m0/0a2/decisions.md:147:    ~~기초금액과 추정가격은 VAT·사정률만큼 체계적으로 다르므로 임의 오차가 아니라
-reports/evidence/m0/0a2/decisions.md:152:    > - **`budget_estimate`는 ex-VAT가 아니다.** legacy는 그 반대로 선언한다 —
-reports/evidence/m0/0a2/decisions.md:155:    > - **차이가 "VAT·사정률만큼"이라고 말할 근거가 없다.** legacy 자신이 저장된 값의
-reports/evidence/m0/0a2/decisions.md:173:    >   "fix(m0-0b): budget_estimate의 ex-VAT 단정을 제거 (0C 선행 조사 X-1)"에서 정정했고,
+reports/evidence/m0/0a2/decisions.md:152:    > - ~~**`budget_estimate`는 ex-VAT가 아니다.** legacy는 그 반대로 선언한다 —~~
+reports/evidence/m0/0a2/decisions.md:157:    >   ex-VAT라고도 VAT 포함이라고도 단정하지 않으며**, 그 판정은 활성 **`OPEN-REG-05`**가
+reports/evidence/m0/0a2/decisions.md:158:    >   소유한다. 원본에 대해 남는 것은 **「ex-VAT」라는 단정에 근거가 없다**는 것까지다.
+reports/evidence/m0/0a2/decisions.md:168:    > - **차이가 "VAT·사정률만큼"이라고 말할 근거가 없다.** legacy 자신이 저장된 값의
+reports/evidence/m0/0a2/decisions.md:186:    >   "fix(m0-0b): budget_estimate의 ex-VAT 단정을 제거 (0C 선행 조사 X-1)"에서 정정했고,
 docs/discovery/capability-map.md:1373:- **분류 근거**: 투찰율이 곱해지는 base는 추정가격(ex-VAT)이 아니라 기초금액/사업금액
-docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_estimate`(**
+docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_es
 
---- C-3.2 취소선 안인가 (원본 보존 확인) ---
-$ sed -n '141,149p' reports/evidence/m0/0a2/decisions.md
+--- C-3.2 원본 보존 확인 (줄 번호가 아니라 내용으로 집는다) ---
+$ awk '/^  - legacy는 운영자 값을 \*\*추정가격\*\*과 비교한다:/,/^    >   > \*\*2차 정정 /' reports/evidence/m0/0a2/decisions.md
   - legacy는 운영자 값을 **추정가격**과 비교한다:
     `app/services/opportunity_monitoring/filters.py`
     `project_budget = float(project.budget_estimate or 0.0)` ↔
@@ -146,15 +162,25 @@ $ sed -n '141,149p' reports/evidence/m0/0a2/decisions.md
     ~~기초금액과 추정가격은 VAT·사정률만큼 체계적으로 다르므로 임의 오차가 아니라
     경계 근처 공고를 **한 방향으로 일관되게** 누락/포함시킨다.~~
     > **2026-08-27 정정 (slice 0A3 — 0C 선행 조사 X-1) — legacy 사실 서술을 실측으로 교체.**
+    > 위 취소선 두 곳은 **slice가 고친 legacy 사실 서술**이며 원본 문장은 감사 추적을 위해
+    > 남긴다. 확인은 `git show ed4b06c:`로 두 파일을 직접 열어서 했다.
+    > - ~~**`budget_estimate`는 ex-VAT가 아니다.** legacy는 그 반대로 선언한다 —~~
+    >   `app/domain/money.py:30`의 `Basis` enum 주석이
+    >   `BUDGET_ESTIMATE = "budget_estimate"  # 추정가격: 부가세 포함 추정 총액(법정 하한 구간 기준)`이다.
+    >   **legacy가 그렇게 「선언」한다는 것이 이 인용이 지지하는 전부다** — 저장된 값의 실제
+    >   과세 처리가 그 선언과 같은지는 **다음 항목이 반대로 적는다.** 따라서 **이 문서는
+    >   ex-VAT라고도 VAT 포함이라고도 단정하지 않으며**, 그 판정은 활성 **`OPEN-REG-05`**가
+    >   소유한다. 원본에 대해 남는 것은 **「ex-VAT」라는 단정에 근거가 없다**는 것까지다.
+    >   > **2차 정정 (Codex 1차 high · 2026-08-27) — 이 slice가 만든 반대 방향 단정을 좁혔다.**
 
 --- C-3.3 OPEN-REG-05 귀속 ---
 $ grep -c 'OPEN-REG-05' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md
-reports/evidence/m0/0a2/decisions.md:3
+reports/evidence/m0/0a2/decisions.md:4
 docs/discovery/capability-map.md:1
-$ grep -n 'OPEN-QUAL-10.*소유자가 아니' docs/discovery/regression-ledger.md docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-120
-docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project
+$ grep -n 'OPEN-QUAL-10.*소유자가 아니' docs/discovery/regression-ledger.md docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-110 | sed 's/[[:space:]]*$//'
+docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값
 docs/discovery/regression-ledger.md:82:    `OPEN-QUAL-10`은 **시공능력평가금액 축**이라 이 질문의 소유자가 아니다.
-docs/discovery/regression-ledger.md:1345:| **OPEN-REG-05** | **기초금액과 추정가격의 과세 처리 — 두 금액의 차이가 무엇으로 이루어지는가** | legacy는 `bu
+docs/discovery/regression-ledger.md:1345:| **OPEN-REG-05** | **기초금액과 추정가격의 과세 처리 — 두 금액의 차이가 무엇으로 이루어지는가** | l
 
 --- C-3.4 §13 밖에 남은 X-1 프레이밍 (O-2, 고치지 않음) ---
 $ grep -nE '추정가격.{0,12}(ex-VAT|부가세 별도)' docs/discovery/capability-map.md
@@ -171,24 +197,24 @@ $ git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md | grep -E '^@@'
 @@ -12,2 +21,4 @@
 @@ -15,0 +27,50 @@
 @@ -83 +144 @@
-@@ -86,2 +147,30 @@
-@@ -91,0 +181,9 @@
-@@ -174 +272 @@
-@@ -189 +287 @@
-@@ -191 +289,15 @@
-@@ -265,2 +377,9 @@
-@@ -295,0 +415,113 @@
-$ sed -n '55,64p' reports/evidence/m0/0a2/decisions.md | cut -c1-46
+@@ -86,2 +147,43 @@
+@@ -91,0 +194,9 @@
+@@ -174 +285 @@
+@@ -189 +300 @@
+@@ -191 +302,15 @@
+@@ -265,2 +390,9 @@
+@@ -295,0 +428,113 @@
+$ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut -c1-44 | sed 's/[[:space:]]*$//'
 | 훅(신규 줄) | 위치 | 성격 |
 | --- | --- | --- |
-| `4` · `6` · `21` | **파일 머리** | slice가 쓴 메타(원
-| `27` | **「이 파일의 구성 — provenance」 신설** | slic
-| `144` · `147` | 「OPEN-STR-01」 | **정정** — **X
-| `181` | 「OPEN-STR-01」 | **정정** — `R-07` 식별자(
-| `272` | 「M1 차단 묶음」의 `OPEN-QUAL-08` 표 행 | **포
-| `287` · `289` | 「OPEN-DEC-09」 | **정정** — leg
-| `377` | 「상호작용 모델」 절의 하류 파급 | **철회** — 21,321
-| `415` | **말미 새 절 전부** | slice 절 추가(2026-08-2
+| `4` · `6` · `21` | **파일 머리** | slice가 쓴 메타
+| `27` | **「이 파일의 구성 — provenance」 신설** | sl
+| `144` · `147` | 「OPEN-STR-01」 | **정정** — *
+| `194` | 「OPEN-STR-01」 | **정정** — `R-07` 식별
+| `285` | 「M1 차단 묶음」의 `OPEN-QUAL-08` 표 행 | *
+| `300` · `302` | 「OPEN-DEC-09」 | **정정** — l
+| `390` | 「상호작용 모델」 절의 하류 파급 | **철회** — 21,3
+| `428` | **말미 새 절 전부** | slice 절 추가(2026-08
 ```
 
 **판정**:
@@ -333,7 +359,7 @@ $ sed -n '1519,1521p' reports/evidence/m0/0b/commands.md
   명령이었다.**
 - **C-4.2 ↔ C-4.3** — base `48151b9`와 HEAD에서 **같은 본문을 실제로 실행**했고 네 값이
   **모두 같다**(**A4**). 줄 수까지 같은 것은 §13 변경이 **한 줄 교체**였기 때문이며
-  C-2.2의 `1 1`이 그것을 낸다.
+  C-2.1의 `1	1`이 그것을 낸다.
 - **C-5.1** — §10.1 형태 표에 **`7` 행이 들어갔고** 기존 행(`1`~`6`, `3′`)은 그대로다.
   `399`~`401`은 형태 1·2·3의 **결론/근거/처리 3열 표**로 다른 표다.
 - **C-5.2** — 형태 7 절과 그 근거 절(*"왜 새 형태인가 — 기존 여섯을 다 지켜도 난다"*),
@@ -352,7 +378,7 @@ $ sed -n '1519,1521p' reports/evidence/m0/0b/commands.md
 | 안 만든 것 | 이유 |
 | --- | --- |
 | 새 스윕 축·스크립트 | 이 slice에서 그 부류의 결함이 **관측되지 않았다.** 0B가 세운 순서(결함이 먼저, 도구가 나중)를 지킨다 |
-| 새 `OPEN` | 소유자가 **이미 등록돼 있다**(`OPEN-REG-05`). C-2.5가 신설 0을 낸다 |
+| 새 `OPEN` | 소유자가 **이미 등록돼 있다**(`OPEN-REG-05`). C-2.3이 신설 0을 낸다 |
 | `OPEN` 해소 | 활성 45건 전부 out_of_scope. C-4가 총수 불변을 낸다 |
 | `capability-map.md` §13 밖 편집 | in_scope 선언이 §13 한정. 발견한 것은 `scope.md` O-1·O-2로 등재 |
 | 0B evidence 편집 | 0B는 Codex `approve`로 닫혔다. **인용만 하고 읽기 전용으로 다뤘다** |
