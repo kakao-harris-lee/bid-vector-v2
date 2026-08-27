@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0b-regression-ledger
 base_sha: ec115a7   # 0A2 Codex approve verdict 등재 직후
-head_sha: 65a8f90   # 0B 산출물·evidence 최종 커밋. 아래 「완료 기록」 참조
+head_sha: 6d37634   # 0B 산출물·evidence 최종 커밋. 아래 「완료 기록」 참조
 in_scope:
   - docs/discovery/regression-ledger.md
   - reports/evidence/m0/0b/
