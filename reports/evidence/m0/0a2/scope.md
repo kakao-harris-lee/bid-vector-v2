@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a2-decision-integration
 base_sha: 6af7019996ec26903c7b531ed7ede12c22cf176e
-head_sha: 3ed76e9af0a6dae044a5abf7077e5f1cdf1ee318  # 0A2 수정 라운드 7 완결 산출물 커밋. 아래 갱신 이력 참조
+head_sha: c58d8f81d1b7f57c158e427d45174877d0145b68  # 0A2 수정 라운드 7 완결 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a2/
@@ -474,7 +474,7 @@ verifier 재검증 판정 `not-ready`. 차단 사유는 **라운드 7이 복원�
 패스·결정 반영은 독립 재현으로 확인됐다. 차단 사유는 **2026-08-27 결정을 반영하면서 §10
 축별 표 자체를 안 고친 것**이다.
 
-- `head_sha`를 `3ed76e9` → `__HEADSHA__`로 갱신했다.
+- `head_sha`를 `3ed76e9` → `c58d8f8`로 갱신했다.
 - 이전 라운드와 같은 이유로 `head_sha`는 그 직전 커밋을 가리키며, 두 커밋의 차이는
   이 파일의 `head_sha` 한 줄과 이 절뿐이다.
 - **리뷰 range는 `6af7019...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
