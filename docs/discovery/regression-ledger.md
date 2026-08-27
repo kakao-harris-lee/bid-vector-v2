@@ -132,7 +132,13 @@ legacy가 그렇게 한다는 사실은 **관찰**이다. 제약은 승인된 �
 - **관찰**: `budget_capture_score = recommended_amount / budget_estimate`에서 분자는 모든
   경로가 기초금액 basis로 산출하는데 **분모는 경로마다 달랐다.** 추정가격을 넣던 **세
   경로**(`allocation.save_decision` 폴백 · `opportunity_monitoring` 스캔→영속 결정 ·
-  `paper_bidding_backtest`)에서 과세 공고의 capture가 `rate × 1.1 → 1.0` clamp로 부풀었다.
+  `paper_bidding_backtest`)에서 **commit이 이렇게 적는다** — *"과세 공고의 capture가
+  rate x 1.1 -> 1.0 clamp로 부풀어, 같은 공고가 어느 경로로 평가됐는지에 따라
+  opportunity/priority 점수와 근거 문구가 갈렸다."*
+  ※ **이 문서는 그 방향·크기를 확정하지 않는다.** `과세 공고`라는 범주와 `× 1.1`이라는
+  기제는 **legacy의 서술**이며, 두 금액의 과세 처리는 활성 **`OPEN-REG-05`**가 소유한다
+  (R-BASIS-04 · R-BASIS-06과 같은 처리). **경로마다 분모가 달랐다는 사실은 그 미결과
+  무관하게 성립한다** — 이 항목의 논지는 그것이다.
 - **사용자 영향**: 같은 공고가 **어느 경로로 평가됐는지에 따라** opportunity/priority 점수와
   근거 문구가 갈렸다.
 - **V2 예방 제약** — **타입 + 테스트**: 판정 커널을 하나만 두고 경로는 입력 조립만 한다.
