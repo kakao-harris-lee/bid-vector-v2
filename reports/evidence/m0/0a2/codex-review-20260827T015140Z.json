@@ -1,0 +1,68 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6af7019996ec26903c7b531ed7ede12c22cf176e",
+  "reviewed_head": "ab690129d86e93c5e1f17237394e99f348c98009",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a2/decisions.md",
+      "line": 8,
+      "evidence": "파일 머리는 2026-08-26 사본이 `0A2 통합 패스 주석` 외에는 원본 그대로라고 주장하고, provenance 표도 원본 절은 라운드 3 취소선 1건 외에 바뀌지 않았다고 적는다. 그러나 `git blame`과 `git diff 6a4e49b...HEAD`에서 `1fc5968`이 원본 절인 `OPEN-DEC-09`의 legacy 경로·행·수치 출처 서술을 lines 221-226에서 직접 교체한 사실이 재현된다. checklist A7의 slice 추가 목록에도 이 in-place C-1/C-2 정정은 없다. 따라서 slice가 작성한 사실 정정이 authoritative 운영자 원본의 일부처럼 보이며, 직전 medium #5가 요구한 원본과 slice 산물의 provenance 구분이 새 head에서 다시 깨졌다.",
+      "required_fix": "`OPEN-DEC-09`의 원본 문구와 C-1/C-2 정정을 구분 가능한 형태로 보존하고, decisions.md 머리·provenance 표와 checklist A7에 이 in-place 정정을 slice 산물로 명시한다. `통합 패스 주석 외 원본 그대로` 및 `취소선 1건 외 불변`이라는 현재의 전칭 주장도 실제 구성에 맞춘다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a2/commands.md",
+      "line": 1375,
+      "evidence": "최신 R11-6은 수치 축 결과를 `200건 / 128건`으로 기록하고 scope.md:605도 이를 반복하지만 실행 기준 SHA를 선언하지 않는다. 인라인된 numsweep을 요청된 head에서 그대로 재실행하면 `203건 / 128건`이다. 커밋별 archive에서 재실행한 결과 200은 `1fc5968`에서만 맞고, scope 이력이 추가된 `2adadb8`부터 `520f928` 및 현재 `ab69012`까지는 203이다. 이전 절들이 자기참조 수치의 재현 커밋을 명시한 것과 달리 최신 절은 과거 실행값을 현재 head evidence처럼 남겨, 요청된 최신-head 대조와 evidence 사실 정확성을 충족하지 못한다.",
+      "required_fix": "R11-6과 scope 요약에 `200/128`의 재현 지점이 `1fc5968a32091004902bf0c9d067d1251c8ce566`임을 명시하거나, 현재 head에서 재실행한 `203/128`로 갱신하고 후속 evidence 추가에 따른 자기참조 증가를 설명한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "git cat-file -t 6af7019996ec26903c7b531ed7ede12c22cf176e",
+    "git cat-file -t ab690129d86e93c5e1f17237394e99f348c98009",
+    "git log --oneline --decorate 6af7019996ec26903c7b531ed7ede12c22cf176e..ab690129d86e93c5e1f17237394e99f348c98009",
+    "git diff --name-status 6af7019996ec26903c7b531ed7ede12c22cf176e...ab690129d86e93c5e1f17237394e99f348c98009",
+    "git diff --stat 6af7019996ec26903c7b531ed7ede12c22cf176e...ab690129d86e93c5e1f17237394e99f348c98009",
+    "git ls-files --others --exclude-standard",
+    "git merge-base 6af7019996ec26903c7b531ed7ede12c22cf176e ab690129d86e93c5e1f17237394e99f348c98009",
+    "git rev-list --count 6af7019996ec26903c7b531ed7ede12c22cf176e..ab690129d86e93c5e1f17237394e99f348c98009",
+    "git diff --check 6af7019996ec26903c7b531ed7ede12c22cf176e...ab690129d86e93c5e1f17237394e99f348c98009",
+    "cat reports/evidence/m0/0a2/codex-review-20260826T113911Z.json",
+    "nl -ba agent-workflow.md",
+    "nl -ba milestone-0.md",
+    "nl -ba reports/evidence/m0/0a2/{scope,decisions,checklist,commands}.md",
+    "nl -ba docs/discovery/capability-map.md",
+    "sed -n '521,549p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "sed -n '719,739p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "sed -n '924,1081p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "python3 independent base/head active-OPEN set comparison",
+    "git archive 1fc5968a32091004902bf0c9d067d1251c8ce566 | tar -x -C <temporary-directory>; run inline numsweep",
+    "git archive 2adadb8 | tar -x -C <temporary-directory>; run inline numsweep",
+    "git archive 520f928 | tar -x -C <temporary-directory>; run inline numsweep",
+    "git archive ab690129d86e93c5e1f17237394e99f348c98009 | tar -x -C <temporary-directory>; run inline numsweep",
+    "git diff --unified=8 6af7019996ec26903c7b531ed7ede12c22cf176e...ab690129d86e93c5e1f17237394e99f348c98009 -- reports/evidence/m0/0a/commands.md",
+    "git diff --unified=5 6a4e49b...ab690129d86e93c5e1f17237394e99f348c98009 -- reports/evidence/m0/0a2/decisions.md",
+    "git blame -L 6,12 reports/evidence/m0/0a2/decisions.md",
+    "git blame -L 22,38 reports/evidence/m0/0a2/decisions.md",
+    "git blame -L 216,230 reports/evidence/m0/0a2/decisions.md",
+    "wc -l docs/discovery/capability-map.md",
+    "grep -c '^| OPEN-' docs/discovery/capability-map.md",
+    "grep -rniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))' docs/discovery/"
+  ],
+  "residual_risks": [
+    "직전 high #1은 OPS-06을 `근거 부족` 및 `OPEN-OPS-10` 조건부로 전환하고 종료 조건에 재정의·폐기를 포함해 해소됐다.",
+    "직전 high #2·#3과 medium #4는 각각 `OPEN-DEC-03` 활성 복원, scope의 잘못된 해소 지시 철회, 2026-08-27 운영자 결정에 따른 NOTI-02 `후속` 확정으로 해소됐다. medium #5는 provenance 표 자체는 추가됐지만 finding 1의 후속 in-place 변경 때문에 완결되지 않았다.",
+    "독립 집계는 capability 95개, 분류 61/17/6/11, 필수 capability 결측 0, 활성 OPEN 45개를 재현했다. Base 대비 활성 OPEN은 순소멸 26개·신규 5개이며, 신설·복원 후 활성인 8개는 registry에 판정 가능한 질문 또는 종료 조건을 갖는다.",
+    "checklist.md:27은 `OPEN-DEC-03`을 내용상 `잠정`이라고 쓰면서 제목상 `실행 대기 2건`에 포함한다. 활성 상태와 차단 집계는 정확하므로 현재 acceptance blocker로 올리지는 않았지만 상태 4종을 구분했다는 자기 설명과 어휘가 맞지 않는다.",
+    "legacy `bid-vector` symlink와 인용된 legacy commit 객체가 이 worktree에 없어 저장소 밖 파일·commit·수치 주장은 재현하지 못했다. 요청 지침에 따라 재현 불가 자체를 finding으로 판정하지 않았다.",
+    "`docs/adr/`는 현재 존재하지 않으며 `OPEN-OPS-07`은 ADR 대안 절 기입을 종료 조건으로 활성 상태다. 이는 0D 소관의 명시된 미결이므로 이 slice 결함으로 판정하지 않았다.",
+    "활성 OPEN 45건과 M0 차단 1건·M1 차단 2건이 남아 있다. 이 판정은 M1 진행, merge, 외부 호출, DB write, release 또는 배포 승인이 아니다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
