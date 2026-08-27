@@ -4,17 +4,22 @@
 한 값을 머리에 박으면 수정 라운드마다 낡는다(0B `N-1`). 접거나 손으로 압축한 블록은 없다
 (§10.1 **형태 3**). **기록된 블록은 전부 뒤 커밋에 낡지 않는 형태**다 — legacy 고정 commit
 읽기(C-1) · `capability-map.md`로 경로 한정(C-2) · 이 라운드 이후 바뀌지 않는 파일의
-grep(C-3·C-5) · 산출물에서 정본을 계산하는 스크립트(C-4). **range 전체를 보는 검사는
+grep(C-3·C-5) · 산출물에서 정본을 계산하는 스크립트(C-3.4·C-4). **range 전체를 보는 검사는
 출력을 적지 않고 명령만 남긴다**(C-2의 첫 표). 셈은 이 절의 출력이 내고 **산문으로
 옮겨 적지 않는다**(**형태 6**).
 
-**0B의 축을 새로 만들지 않았다.** 이 slice에 필요한 것만 두었다 — legacy 인용 확인(C-1),
-범위·불변(C-2·C-4), X-1 프레이밍 스윕(C-3), 형태 7 등재 확인(C-5). 스윕 스크립트를 새로
-만들지 않은 이유는 **결함이 아직 한 번도 이 slice에서 관측되지 않았기 때문**이다
-(0B가 세운 순서 — *"필요가 관측되기 전에 도구를 늘리지 마라"*). 유일한 스크립트는 새 도구가
-아니라 **0A2 수치 축의 「정본 산출」 절을 그대로 떼어낸 것**이고 **본문을 C-4에 인라인한 뒤
-그 본문을 파일에서 뽑아 실행**한다 — **커밋되지 않은 스크립트 파일에 의존하지 않는다**
-(**형태 4**).
+### 이 패키지가 쓰는 스크립트 — 둘이고, 각각 왜 있는지
+
+**둘 다 본문을 이 파일에 인라인해 두고, 실행할 때 그 본문을 marker로 뽑아 stdin 으로
+흘려 넣는다** — **커밋되지 않은 스크립트 파일에 의존하지 않는다**(**형태 4**).
+
+| 스크립트 | 어디 | 무엇을 하나 | 왜 있나 (도입 근거) |
+| --- | --- | --- | --- |
+| **불변 계산기** | **C-4** | `capability-map.md`에서 capability 총수·분류 4종·활성 OPEN 총수·줄 수를 **직접 계산**한다 | **새 도구가 아니다** — 0A2 수치 축의 「정본 산출」 절을 그대로 떼어낸 것이고 **A4의 불변을 base와 HEAD 양쪽에서 재는 데** 쓴다 |
+| **X-1 프레이밍 후보 스윕** | **C-3.4** | `capability-map.md` 전체에서 X-1 프레이밍 후보를 **블록 단위**로 찍는다(어휘 5종) | **결함이 관측된 뒤에 넓혔다** — verifier **`P-1`**이 *"살아 있는 단정이 하나"*를 반증했고, 그 전 축이 **어휘 하나·줄 단위**라 `부가세 별도`와 **여러 줄에 걸친 자리**를 못 봤다. 0B가 세운 순서(**결함이 먼저, 도구가 나중**)를 지킨 것이다 |
+
+**0B의 축을 그대로 가져오지 않았다.** 이 slice에 필요한 것만 두었다 — legacy 인용
+확인(C-1), 범위·불변(C-2·C-4), X-1 프레이밍 스윕(C-3), 형태 7 등재 확인(C-5).
 
 ---
 
@@ -138,24 +143,34 @@ $ git diff 48151b9...HEAD -- docs/discovery/capability-map.md | grep -cE '^\+.*\
 
 ---
 
-## C-3. X-1 프레이밍 스윕 — 정정이 어디까지 갔고 어디서 멈췄나
+## C-3. X-1 프레이밍 — 두 축이 범위를 나눠 본다
+
+**C-3.1은 A1의 범위**(`decisions.md` + `capability-map.md` **§13**)**만 본다.**
+**C-3.4는 `capability-map.md` 전체**를 본다(out_of_scope · `scope.md` **O-2**).
+**두 축의 범위가 겹치지 않는다** — 겹쳐 두면 같은 사실을 두 자리가 다르게 말하게 되고,
+이 slice가 `H-1`·`P-1`·Codex 2차로 세 번 그것으로 걸렸다.
 
 ```
-### 실행 시점 HEAD = 491684f
+### 실행 시점 HEAD = fbdedb6
 
---- C-3.1 in_scope 두 파일의 X-1 단정 스윕 (패턴 한정) ---
-$ grep -nE 'ex-VAT|VAT·사정률만큼' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-130 | sed 's/[[:space:]]*$//'
-reports/evidence/m0/0a2/decisions.md:40:| 「OPEN-STR-01」 절 안의 2026-08-27 정정 블록(**slice 0A3 · X-1**) | **slice 산물** — legacy **사실 서술
-reports/evidence/m0/0a2/decisions.md:59:| `144` · `147` | 「OPEN-STR-01」 | **정정** — **X-1**: `budget_estimate`의 ex-VAT 단정과 차이의 크기·방
-reports/evidence/m0/0a2/decisions.md:144:    `strategy.min|max_budget_estimate`. `Project.budget_estimate`는 ~~추정가격(ex-VAT)이다~~
-reports/evidence/m0/0a2/decisions.md:147:    ~~기초금액과 추정가격은 VAT·사정률만큼 체계적으로 다르므로 임의 오차가 아니라
-reports/evidence/m0/0a2/decisions.md:152:    > - ~~**`budget_estimate`는 ex-VAT가 아니다.** legacy는 그 반대로 선언한다 —~~
-reports/evidence/m0/0a2/decisions.md:157:    >   ex-VAT라고도 VAT 포함이라고도 단정하지 않으며**, 그 판정은 활성 **`OPEN-REG-05`**가
-reports/evidence/m0/0a2/decisions.md:158:    >   소유한다. 원본에 대해 남는 것은 **「ex-VAT」라는 단정에 근거가 없다**는 것까지다.
-reports/evidence/m0/0a2/decisions.md:168:    > - **차이가 "VAT·사정률만큼"이라고 말할 근거가 없다.** legacy 자신이 저장된 값의
-reports/evidence/m0/0a2/decisions.md:186:    >   "fix(m0-0b): budget_estimate의 ex-VAT 단정을 제거 (0C 선행 조사 X-1)"에서 정정했고,
-docs/discovery/capability-map.md:1373:- **분류 근거**: 투찰율이 곱해지는 base는 추정가격(ex-VAT)이 아니라 기초금액/사업금액
-docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_es
+--- C-3.1 A1 범위의 X-1 단정 스윕 ---
+### A1 이 주장하는 범위 그대로다 — decisions.md 와 capability-map.md §13.
+### §13 은 절 머리로 잘라낸다(줄 번호가 아니라 내용으로 집는다).
+$ grep -nE 'ex-VAT|VAT·사정률만큼' reports/evidence/m0/0a2/decisions.md | cut -c1-125 | sed 's/[[:space:]]*$//'
+40:| 「OPEN-STR-01」 절 안의 2026-08-27 정정 블록(**slice 0A3 · X-1**) | **slice 산물** — legacy **사실 서술 정정**(`budget_estimate`의 ex-VAT
+59:| `144` · `147` | 「OPEN-STR-01」 | **정정** — **X-1**: `budget_estimate`의 ex-VAT 단정과 차이의 크기·방향 서술(취소선 + 인용 블록, 원본 문장 보존). sli
+144:    `strategy.min|max_budget_estimate`. `Project.budget_estimate`는 ~~추정가격(ex-VAT)이다~~
+147:    ~~기초금액과 추정가격은 VAT·사정률만큼 체계적으로 다르므로 임의 오차가 아니라
+152:    > - ~~**`budget_estimate`는 ex-VAT가 아니다.** legacy는 그 반대로 선언한다 —~~
+157:    >   ex-VAT라고도 VAT 포함이라고도 단정하지 않으며**, 그 판정은 활성 **`OPEN-REG-05`**가
+158:    >   소유한다. 원본에 대해 남는 것은 **「ex-VAT」라는 단정에 근거가 없다**는 것까지다.
+168:    > - **차이가 "VAT·사정률만큼"이라고 말할 근거가 없다.** legacy 자신이 저장된 값의
+186:    >   "fix(m0-0b): budget_estimate의 ex-VAT 단정을 제거 (0C 선행 조사 X-1)"에서 정정했고,
+$ awk '/^## 13\. /,0' docs/discovery/capability-map.md | grep -E 'ex-VAT|VAT·사정률만큼' | cut -c1-125 | sed 's/[[:space:]]*$//'
+| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_estimate`(**추정가격**)와 비교하는 형태가 legac
+$ grep -n '^## 1[23]\. ' docs/discovery/capability-map.md   # §13 이 파일 끝까지임을 보인다
+2910:## 12. OPEN 결정 목록
+3166:## 13. 하류 인계
 
 --- C-3.2 원본 보존 확인 (줄 번호가 아니라 내용으로 집는다) ---
 $ awk '/^  - legacy는 운영자 값을 \*\*추정가격\*\*과 비교한다:/,/^    >   > \*\*2차 정정 /' reports/evidence/m0/0a2/decisions.md
@@ -181,8 +196,8 @@ $ awk '/^  - legacy는 운영자 값을 \*\*추정가격\*\*과 비교한다:/,/
 
 --- C-3.3 OPEN-REG-05 귀속 ---
 $ grep -c 'OPEN-REG-05' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md
-reports/evidence/m0/0a2/decisions.md:4
 docs/discovery/capability-map.md:1
+reports/evidence/m0/0a2/decisions.md:4
 $ grep -n 'OPEN-QUAL-10.*소유자가 아니' docs/discovery/regression-ledger.md docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-110 | sed 's/[[:space:]]*$//'
 docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값
 docs/discovery/regression-ledger.md:82:    `OPEN-QUAL-10`은 **시공능력평가금액 축**이라 이 질문의 소유자가 아니다.
@@ -239,16 +254,21 @@ $ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut 
 
 **판정**:
 
-- **C-3.1** — **이 출력의 매치에 한정한 판정이다**(패턴은 `ex-VAT|VAT·사정률만큼`이고
-  in_scope 두 파일만 본다 — **문서 전체에 대한 주장이 아니다**). **그 매치는 전부**
-  ① **취소선 안**(원본 보존) ② **정정 블록이 무엇을 고쳤는지 설명하는 산문**
-  ③ **provenance 표가 이 정정을 등재한 행** ④ **§13 정정문이 원문을 인용한 자리** 중
-  하나이며 **그 넷 중 어느 것도 살아 있는 단정이 아니다.**
-- **C-3.1의 사각지대** — **이 패턴은 X-1 프레이밍을 다 잡지 못한다.** `부가세 별도`처럼
-  **어휘가 다른 자리**를 놓치고 **`capability-map.md` 전체를 보지도 않는다.**
-  **문서 전체의 정본은 C-3.4**이며, 거기 **살아 있는 X-1 프레이밍이 남아 있다**
+- **C-3.1 — 검사 범위가 A1의 범위와 같다.** A1이 주장하는 것은
+  **`decisions.md`의 `OPEN-STR-01` 절**과 **`capability-map.md` §13**에서 X-1 단정이
+  제거됐다는 것이고, **이 명령이 정확히 그 둘을 본다** — `capability-map.md`는
+  **§13만** 잘라서 본다(`awk`가 절 머리로 자른다. **줄 번호가 아니라 내용으로 집는다**).
+  **그래서 §5·§6·§7의 out_of_scope 매치가 이 출력에 섞이지 않는다.**
+- **판정** — **그 범위의 매치는 전부** ① **취소선 안**(원본 보존) ② **정정 블록이 무엇을
+  고쳤는지 설명하는 산문** ③ **provenance 표가 이 정정을 등재한 행** ④ **§13 정정문이
+  원문을 인용한 자리** 중 하나이며 **그 넷 중 어느 것도 살아 있는 단정이 아니다.**
+  **A1이 요구하는 것은 여기까지다.**
+- **이 축이 하지 않는 일** — **문서 전체를 보지 않는다**(§13 밖은 범위 밖이다) **그리고
+  어휘도 이 패턴 둘로 한정된다**(`부가세 별도` 같은 자리를 잡지 않는다).
+  **문서 전체의 정본은 C-3.4**이며 거기 **살아 있는 X-1 프레이밍이 남아 있다**
   (out_of_scope · `scope.md` **O-2**). **자리도 수도 여기 옮겨 적지 않는다** — C-3.4의
-  출력과 그 아래 판정 표가 낸다.
+  출력과 그 아래 판정 표가 낸다. **두 축의 범위가 겹치지 않게 갈랐다** — 겹쳐 두면
+  같은 사실을 두 자리가 다르게 말하게 되고, `H-1`·`P-1`이 그것으로 났다.
 - **C-3.2** — 원본 두 문장이 **지워지지 않고 취소선으로 보존**됐고 바로 아래 정정 인용
   블록이 붙었다. `decisions.md`의 provenance 원칙(*"원본 문장은 지우지 않는다"*)을
   지킨다(**A2**).
@@ -279,7 +299,8 @@ $ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut 
 - **C-3.4 판정 요약** — **살아 있는 X-1 프레이밍은 §5 · §6 · §7에 걸쳐 남아 있다.**
   **부가세 제외 단정**과 **과세로 차이를 설명·정량화하는 서술** 두 갈래이며,
   **자리와 수는 위 출력과 판정 표가 내고 산문에 옮겨 적지 않는다.**
-  **전부 out_of_scope다** — in_scope가 *"§13 X-1 서술 한정"*이고 건드리면 C-2가 낸 구조적
+  **전부 out_of_scope다** — in_scope 가 승인한 것은 **§13 인계 행의 `사용자 영향`과
+  `검증 방법` 두 자리뿐**이고 여기 찍힌 자리는 **§13 밖**이다. 건드리면 C-2가 낸 구조적
   불변이 깨진다. `scope.md` **O-2**로 등재했고 **0C 데이터 사전이 정본**이 된다.
 - **C-3.5** — 위 두 출력이 **1:1로 대응**한다 — `git diff -U0 6a4e49b`가 낸 훅 하나하나가
   전수 표의 행으로 설명된다. **표에는 인접 훅을 한 행으로 묶는 자리가 있다** — 파일 머리 ·
@@ -518,8 +539,8 @@ $ wc -l < docs/discovery/regression-ledger.md
 
 | 안 만든 것 | 이유 |
 | --- | --- |
-| 새 스윕 축·스크립트 | 이 slice에서 그 부류의 결함이 **관측되지 않았다.** 0B가 세운 순서(결함이 먼저, 도구가 나중)를 지킨다 |
+| **근거 없이 늘린 축·스크립트** | **결함이 관측되기 전에는 도구를 만들지 않았다**(0B가 세운 순서 — 결함이 먼저, 도구가 나중). **이 패키지에는 스크립트가 둘 있고 둘 다 근거가 있다** — 불변 계산기는 **0A2 수치 축에서 떼어온 것**, X-1 스윕은 **verifier `P-1`이 앞 축의 미탐을 반증한 뒤에 넓힌 것**이다. 목적과 도입 근거는 이 파일 머리의 표에 있다 |
 | 새 `OPEN` | 소유자가 **이미 등록돼 있다**(`OPEN-REG-05`). C-2.3이 신설 0을 낸다 |
 | `OPEN` 해소 | 활성 45건 전부 out_of_scope. C-4가 총수 불변을 낸다 |
-| `capability-map.md` §13 밖 편집 | in_scope 선언이 §13 한정. 발견한 것은 `scope.md` **O-2**로 등재했고 **0C가 정본**이 된다 |
+| `capability-map.md` §13 밖 편집 | in_scope 가 승인한 것은 **§13 인계 행의 두 자리**(`사용자 영향`·`검증 방법`)뿐이다. 발견한 것은 `scope.md` **O-2**로 등재했고 **0C가 정본**이 된다 |
 | 0B evidence 편집 | 0B는 Codex `approve`로 닫혔다. **인용만 하고 읽기 전용으로 다뤘다** |
