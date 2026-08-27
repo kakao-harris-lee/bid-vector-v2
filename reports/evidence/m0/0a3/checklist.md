@@ -9,7 +9,7 @@
 | **A1** | **pass** | `commands.md` C-1 · C-3.1 · C-3.2 |
 | **A2** | **pass** | `commands.md` C-3.2 · C-3.5 |
 | **A3** | **pass, 단 소유 `OPEN` id가 지시와 다르다** | `commands.md` C-2.5 · C-3.3 |
-| **A4** | **pass** | `commands.md` C-2 · C-4.1 · C-4.2 |
+| **A4** | **pass** | `commands.md` C-2 · C-4.2 · C-4.3 |
 | **A5** | **pass** | `commands.md` C-5.1 ~ C-5.4 |
 
 ---
@@ -109,9 +109,9 @@ slice가 덧붙이는 것은 별도 절이거나 인용 블록(`>`)·취소선�
 | 확인할 것 | 어떻게 성립하는가 | 출력 |
 | --- | --- | --- |
 | `capability-map.md`의 **X-1 외 서술 무변경** | diff hunk가 **하나**이고 §13 시작 줄보다 뒤다. §10 집계표·§12 registry는 diff에 없다 | C-2.2 · C-2.3 |
-| 활성 OPEN 총수 | base와 HEAD에서 **같은 스크립트**를 돌려 값을 비교했다 | C-4.1 ↔ C-4.2 |
-| capability 총수 | 〃 | C-4.1 ↔ C-4.2 |
-| 분류 4종 | 〃 | C-4.1 ↔ C-4.2 |
+| 활성 OPEN 총수 | base와 HEAD에서 **같은 본문**을 실제로 실행해 값을 비교했다. 본문은 C-4.1이 marker로 뽑는다 | C-4.2 ↔ C-4.3 |
+| capability 총수 | 〃 | C-4.2 ↔ C-4.3 |
+| 분류 4종 | 〃 | C-4.2 ↔ C-4.3 |
 | `git diff --check` | — | C-2.4 |
 | 새 `OPEN` 신설 0 | registry 행 추가를 diff에서 직접 센다 | C-2.5 |
 

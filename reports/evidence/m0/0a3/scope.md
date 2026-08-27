@@ -166,7 +166,7 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 | --- | --- |
 | in_scope 준수 | `git diff --name-only 48151b9...HEAD` |
 | `capability-map.md` 변경이 §13 한 행인가 | `git diff -U0 48151b9...HEAD -- docs/discovery/capability-map.md \| grep -E '^@@'` · `grep -n '^## 13\. ' docs/discovery/capability-map.md` |
-| capability 총수 · 분류 4종 · 활성 OPEN 총수 | `commands.md` **C-4**의 `inv0a3.py`(본문 인라인). base와 HEAD 양쪽에서 돌린다 |
+| capability 총수 · 분류 4종 · 활성 OPEN 총수 | `commands.md` **C-4** — 인라인 본문을 marker로 뽑아 stdin으로 실행한다. base와 HEAD 양쪽 |
 | 새 `OPEN` 신설 0 | `git diff 48151b9...HEAD -- docs/discovery/capability-map.md \| grep -cE '^\+.*\\\| OPEN-[A-Z]+-[0-9]+ \\\|'` |
 | `decisions.md` 전수 표가 훅과 1:1인가 | `git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md \| grep -E '^@@'` |
 | X-1 프레이밍이 in_scope에 살아 있는가 | `commands.md` **C-3**의 스윕 |
