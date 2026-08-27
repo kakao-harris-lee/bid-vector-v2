@@ -1167,18 +1167,70 @@ $ python3 openstance.py
 > 열어 확인한다` — **내가 앞 라운드에 세운 규칙이다.**
 >
 > **원인은 resync 루프가 「출력」만 갱신하고 「본문」은 갱신하지 않은 것**이다. 이번에
-> **본문 동기화를 그 루프에 넣었고**(`resync.sh`), **인라인된 여섯 스크립트를 실물과
-> 전수 대조**했다 — **어긋난 것은 `citecheck` 하나뿐**이고 나머지 다섯
-> (`ledgercheck`·`numsrc`·`prosecheck`·`statusdiff`·`openstance`)은 **바이트 동일**이었다.
->
-> **변이 검사로 고침을 실증했다** — `eligibility.py:53-97`을 `:53-98`(파일 끝 +1)로 바꾸면
-> **현행 본문은 `초과 1`로 적출**하고 **옛 본문은 `초과 0`으로 통과**시킨다:
->
-> ```
-> 현행(splitlines): 행 범위: 파일 길이 내 103 / 초과 1
->   [초과] app/services/classification/eligibility.py:53-98 (파일 97줄)  ← [('R-QUAL-07', 754)]
-> 옛 버전(split)  : 행 범위: 파일 길이 내 104 / 초과 0
-> ```
+> **본문 동기화를 그 루프에 넣었고**(`resync.sh`), **인라인된 스크립트를 실물과 전수
+> 대조**했다 — **어긋난 것은 `citecheck` 하나뿐**이고 나머지는 **바이트 동일**이었다.
+> (이 자리에 적었던 **"여섯"**은 같은 라운드에 `slack.py`가 인라인되며 낡았다 —
+> **셈은 C-9.8의 `resync.sh`가 매 실행에 찍는다**. C-9.7과 같은 처리다.)
+
+**변이 검사로 고침을 실증했다** — `eligibility.py:53-97`을 `:53-98`(파일 끝 +1)로 바꾸면
+**현행 본문은 `초과 1`로 적출**하고 **옛 본문은 `초과 0`으로 통과**시킨다.
+
+> **정정 (verifier M-C2)** — 이 자리는 원래 **손으로 옮겨 적은 출력**이었고 그 안의 ledger
+> 행 번호가 **두 라운드 연속 낡았다**(편집으로 밀릴 때마다). 실행 키가 없어 `resync`가
+> 덮지 않았고 펜스 안이라 `claimcheck`도 보지 않는 **두 축 모두의 사각지대**였다.
+> **실행 키를 갖는 블록으로 바꿨다** — 이제 L-1의 유도 루프가 자동으로 덮고
+> **행 번호는 아래 블록이 매 실행에 다시 찍는다.**
+
+스크립트 본문(형태 4: 인라인):
+
+```python
+# 변이 검사 — `citecheck` 의 경계 수정(splitlines)이 실제로 잡는가.
+# 손으로 옮겨 적은 수가 두 라운드 연속 낡았으므로(754 → 760 → 765) **실행 키를 갖는
+# 블록**으로 바꾼다. 이제 resync 가 매 실행에 이 출력을 다시 뜬다.
+import sys, os
+# 스크래치패드에 `grp.py` 같은 이름이 있으면 sys.path[0] 이 표준 모듈을 가린다
+# (`tempfile` → `shutil` → `grp`). 자기 디렉터리를 경로에서 빼고 시작한다.
+SP = os.path.dirname(os.path.abspath(__file__))
+sys.path[:] = [q for q in sys.path if os.path.abspath(q or ".") != SP]
+import pathlib, re, subprocess, tempfile
+LEDGER = "docs/discovery/regression-ledger.md"
+CITE = pathlib.Path(f"{SP}/citecheck.py").read_text(encoding="utf-8")
+MUT = ("app/services/classification/eligibility.py:53-97",
+       "app/services/classification/eligibility.py:53-98")   # 파일 끝 +1
+
+src = pathlib.Path(LEDGER).read_text(encoding="utf-8")
+n = src.count(MUT[0])
+print(f"변이 대상: {MUT[0]} → {MUT[1]}  (ledger 안 출현 {n}회)")
+if n != 1:
+    print("  대상이 유일하지 않다 — 검사를 중단한다."); sys.exit(1)
+
+d = tempfile.mkdtemp()
+mut = os.path.join(d, "mutant.md")
+pathlib.Path(mut).write_text(src.replace(*MUT), encoding="utf-8")
+
+def run(body, tag):
+    p = os.path.join(d, tag + ".py")
+    pathlib.Path(p).write_text(body, encoding="utf-8")
+    out = subprocess.run(["python3", p, mut], capture_output=True, text=True).stdout
+    for ln in out.split("\n"):
+        if "행 범위" in ln or "[초과]" in ln:
+            print(f"  {tag:22s} {ln.strip()}")
+
+old = CITE.replace('.splitlines()', '.split("\\n")')
+assert old != CITE, "옛 판을 만들 수 없다 — splitlines() 가 본문에 없다"
+run(CITE, "현행(splitlines)")
+run(old,  "옛 판(split)")
+print("  → 현행은 초과 1로 적출하고 옛 판은 초과 0으로 통과시킨다.")
+```
+
+```
+$ python3 mutcheck.py
+변이 대상: app/services/classification/eligibility.py:53-97 → app/services/classification/eligibility.py:53-98  (ledger 안 출현 1회)
+  현행(splitlines)         --- 행 범위: 파일 길이 내 103 / 초과 1 ---
+  현행(splitlines)         [초과] app/services/classification/eligibility.py:53-98 (파일 97줄)  ← [('R-QUAL-07', 765)]
+  옛 판(split)             --- 행 범위: 파일 길이 내 104 / 초과 0 ---
+  → 현행은 초과 1로 적출하고 옛 판은 초과 0으로 통과시킨다.
+```
 
 **그 틈을 실제로 쓴 인용이 있었는지 재 봤다** — 인용 끝과 파일 끝의 여유를 전수로
 계산한다. **스크립트 본문**(형태 4 — verifier F-3이 지적해 인라인했다):
@@ -1331,7 +1383,9 @@ $ python3 slack.py
 ② **부정형은 강등이 아니라 표시**다. 처음엔 블록에 부정 어휘가 있으면 지목을 내렸는데,
 그러면 한 문장의 "…하지 않았다"가 **블록의 모든 주장을 가린다**(checklist A4가 정확히
 그렇게 숨었다). ③ **펜스 블록은 주장이 아니다** — 스크립트 본문과 명령 출력을 건너뛴다.
-넣지 않으면 **이 축이 자기 출력을 주장으로 읽어** 지목이 8 → 54로 폭주한다(실측).
+넣지 않으면 **이 축이 자기 출력을 주장으로 읽어 자기 출력에 폭주한다.**
+**수를 적지 않는다** — 폭주하던 판은 폐기된 중간판이라 **그 수를 내는 명령이 남아 있지
+않다**(verifier L-C7). **재현할 수 없는 수는 적지 않는다**(형태 4·6).
 
 **셋 다 "고쳤다"이므로 대상은 인라인 본문이고, 그 본문은 C-9.8의 `resync.sh`가 매 실행에
 실물과 대조한다**(`불일치 0`). **이 축의 주장은 이 축이 아니라 그 루프가 닫는다.**
@@ -1638,7 +1692,7 @@ $ python3 claimcheck.py ec115a7 WT
 
 === 참고 — 대상은 있으나 이 range 가 넣은 것이 아니다 (0건) ===
 
-=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (77건: scope.md 44 · checklist.md 1 · commands.md 32) ===
+=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (81건: scope.md 45 · checklist.md 1 · commands.md 35) ===
 [scope.md] | **5. 정정을 인용 지점에 전파하지 않기** | 수치를 바꿨으면 인용 지점을 전수 확인. **자기 편집이 만든 오프셋도 대상이다** |
 [scope.md] | **6. 셈으로 전칭을 주장하기** | 전칭은 셈이 아니라 **재현 명령**으로 쓴다. `뿐`·`전부`처럼 **수를 쓰지 않는 전칭도 포함**한다. **"고쳤다"는 진술도 전칭이다 —
 [scope.md] 계열별로 나눈 이유는 **각 커밋에서 문서가 자체 정합**하기 위해서다 — 진행 중인 커밋은 "계열 N~8은 후속 커밋"을 문서 말미에 명시했고, 마지막 계열 커밋이 그 문구를 걷어냈다.
@@ -1679,6 +1733,7 @@ $ python3 claimcheck.py ec115a7 WT
 [scope.md] **축이 두 겹 다 못 본 이유**: 1차는 그 두 줄이 `OPEN-DEC-07`을 적지 않아서, 2차는 그 OPEN의 `결정 필요 사항`이 **전부 숫자**("기준 금액 신뢰 비율 1.
 [scope.md] **전칭 둘을 현재 상태로 고쳤다** — C-8.2의 "추가 발견 0건"과 checklist A4의 "활성 OPEN을 선점하지 않았다". **둘 다 참이 아니었다.**
 [scope.md] - **F-3**: 여유 검사에 **스크립트 본문이 없었다**(형태 4). `slack.py`로 인라인했다.
+[scope.md] - `head_sha`를 갱신했다 — 이 라운드는 커밋이 넷이라 **`65a8f90`으로 한 번, 복원 커밋 `6d37634`으로 다시** 옮겼다(frontmatter가 최종값이다). *
 [scope.md] **축을 만들며 축 자신의 결함 셋을 고쳤다** — 마크다운 강조가 한국어 동사를 가르는 것 (**F-2가 그것 때문에 안 잡혔다**), 부정형을 강등으로 쓴 것(**A4가 그렇게 숨었다
 [scope.md] **인라인 스크립트 셈이 `scope.md`의 "7종"과 `commands.md`·`checklist.md`의 "6종"으로 어긋나 있었다.** **7이 맞다** — F-3이 같은 라운드에
 [scope.md] **인라인한 직후 같은 구멍이 도구 자신에게 열려 있는 것을 찾았다** — 루프가 `.py`만 덮어 **`resync.sh` 자신의 본문이 낡았고** 대조가 그것을 잡았다. **자기 본문
@@ -1701,6 +1756,7 @@ $ python3 claimcheck.py ec115a7 WT
 [commands.md] **0A2가 `OPS-09`에 쓴 기법을 그대로 따랐다** — 결정과 무관하게 성립하는 것과 정책에 달린 것을 **갈랐다**:
 [commands.md] `citecheck`가 파일 길이를 `len(stdout.split("\n"))`으로 계산해 **trailing newline 때문에 실제보다 1 컸다.** `splitlines()`로
 [commands.md] > **정정 (verifier F-0, blocker) — 앞 라운드는 고치지 않고 고쳤다고 적었다.** > `splitlines()` 치환이 **산문에만** 들어갔고 **인라인된 스크립
+[commands.md] > **정정 (verifier M-C2)** — 이 자리는 원래 **손으로 옮겨 적은 출력**이었고 그 안의 ledger > 행 번호가 **두 라운드 연속 낡았다**(편집으로 밀릴 때마다
 [commands.md] **그 틈을 실제로 쓴 인용이 있었는지 재 봤다** — 인용 끝과 파일 끝의 여유를 전수로 계산한다. **스크립트 본문**(형태 4 — verifier F-3이 지적해 인라인했다):
 [commands.md] `checklist.md`와 `scope.md`가 선행 조사 표 불일치의 원인을 **"전부 두 축의 혼동"**으로 요약했는데, `commands.md` C-5.2는 라운드 3에 그것을 *
 [commands.md] **축을 늘리지 않았다.** 계산할 정본이 없으면 도구를 만들 수 없고, 이 부류의 처방은 이미 표에 있다 — **형태 5(정정을 인용 지점에 전파하지 않기)**다. 판정을 좁혔으면 **
@@ -1714,6 +1770,8 @@ $ python3 claimcheck.py ec115a7 WT
 [commands.md] **셋 다 "고쳤다"이므로 대상은 인라인 본문이고, 그 본문은 C-9.8의 `resync.sh`가 매 실행에 실물과 대조한다**(`불일치 0`). **이 축의 주장은 이 축이 아니라 그
 [commands.md] - **대상 토큰의 어휘가 id와 산출물 필드명으로 한정된다** — "들여쓰기를 맞췄다"처럼 **대상이 이름을 갖지 않는 주장**은 짝지을 것이 없다.
 [commands.md] - **"바뀌었는가"는 range 전체 기준이다** — 어느 라운드가 바꿨는지는 가르지 않는다.
+[commands.md] - **펜스 블록은 보지 않는다** — 스크립트 본문과 명령 출력은 주장이 아니라고 정의했다. 그 자리는 C-9.8의 `resync.sh`가 닫되 **실행 키를 가진 블록만** 닫는다.
+[commands.md] **위치 특정 불가 목록은 전수를 읽었다**(verifier L-C6). **결론**: 산출물 편집을 주장하면서 대상이 산출물에 없는 것은 **위 하나뿐**이고, 나머지는 세 부류다 —
 [commands.md] `resync.sh` 본문(형태 4 — verifier L-1이 지적해 인라인했다):
 [commands.md] **§10.1 형태 6의 네 번째 재발이며 새 형태가 아니다.** 규칙은 **"'고쳤다'는 진술도 전칭이다 — 적기 전에 그 지점을 열어 확인한다"**이고 **내가 앞 라운드에 세운 것*
 ```
@@ -1743,7 +1801,10 @@ $ python3 claimcheck.py ec115a7 WT
   evidence 파일 자신에 대한 편집 주장은 위치 색인이 없다.
 - **"바뀌었는가"는 range 전체 기준이다** — 어느 라운드가 바꿨는지는 가르지 않는다.
 - **펜스 블록은 보지 않는다** — 스크립트 본문과 명령 출력은 주장이 아니라고 정의했다.
-  그 자리는 C-9.8의 `resync.sh`가 **실물 대조**로 닫는다.
+  그 자리는 C-9.8의 `resync.sh`가 닫되 **실행 키를 가진 블록만** 닫는다.
+  **키 없는 붙여넣기 블록은 어느 축도 보지 않으며**, C-8.3의 변이 검사가 그 반례로
+  두 라운드 살아 있었다(verifier M-C2). 그 자리는 **실행 키를 갖게 바꿨고**, 남은
+  키 없는 블록은 C-2.2의 **발췌 한 개**뿐이다 — `resync.sh`가 매 실행에 그 수를 찍는다.
 
 ### C-9.6a 이 절이 한 번 통째로 사라졌다 — 동기화 루프의 빈 블록 경계 (자기 발견)
 
@@ -1771,6 +1832,14 @@ $ python3 claimcheck.py ec115a7 WT
 **셈을 고쳐 적지 않고 세는 도구가 세게 했다.** 아래 `resync.sh`가 매 실행에서
 **전체 블록 수 · 실행 목록이 차지한 수 · 발췌 수 · 불일치 수**를 찍는다.
 
+**위치 특정 불가 목록은 전수를 읽었다**(verifier L-C6). **결론**: 산출물 편집을 주장하면서
+대상이 산출물에 없는 것은 **위 하나뿐**이고, 나머지는 세 부류다 — ① `§10.1` 형태 표와
+계약을 **인용**하는 문장(주장이 아니다), ② **evidence 자신·스크립트·`_workspace` 노트**를
+대상으로 하는 수정(이 축의 위치 색인 밖이며 스크립트 쪽은 `resync.sh`의 본문 대조가 닫는다),
+③ **대상이 이름을 갖지 않는 수정**("들여쓰기를 맞췄다" 부류). **전수 표는 만들지 않는다** —
+`openstance`의 7건과 달리 이 목록은 **판정이 필요한 미결이 아니라 축의 적용 범위 밖**이고,
+그 사실은 항목마다가 아니라 **부류로** 닫힌다.
+
 ### C-9.8 L-1 — resync의 대상 목록이 **손으로 유지되는 배열이라** 새 스크립트를 놓쳤다
 
 verifier가 든 셋 전부 같은 뿌리다: `slack`이 본문·출력 **어느 동기화 목록에도 없었고**,
@@ -1783,8 +1852,8 @@ verifier가 든 셋 전부 같은 뿌리다: `slack`이 본문·출력 **어느 
 
 ```
 $ bash resync.sh
-evidence 가 선언한 실행 9건 · 스크립트 8종: citecheck · claimcheck · ledgercheck · numsrc · openstance · prosecheck · slack · statusdiff
-  [본문] 전체 블록 9 · 실행 목록이 차지한 것 8 · 발췌(실행 키 없음) 1 · 불일치 0
+evidence 가 선언한 실행 10건 · 스크립트 9종: citecheck · claimcheck · ledgercheck · mutcheck · numsrc · openstance · prosecheck · slack · statusdiff
+  [본문] 전체 블록 10 · 실행 목록이 차지한 것 9 · 발췌(실행 키 없음) 1 · 불일치 0
   [불변] ledger 1362줄 · secret 11
   [안전] 절 머리 43 → 43
 ```
