@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a2-decision-integration
 base_sha: 6af7019996ec26903c7b531ed7ede12c22cf176e
-head_sha: 3198d3c5d24548c11aae1554b648ac0a77a0163f  # 0A2 수정 라운드 7 완결 산출물 커밋. 아래 갱신 이력 참조
+head_sha: 3d3f982cb0d2a4a21ccf94d60aadb2b4ec964965  # 0A2 수정 라운드 7 완결 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a2/
@@ -397,7 +397,7 @@ verifier 재검증 판정 `not-ready`. 차단 사유는 **라운드 7이 복원�
 안 고친 것**(F7-1·F7-2)이며, 라운드 6 F-2와 글자 그대로 같은 형태다 —
 `checklist.md` §10.1 **형태 5의 세 번째 재발**이다.
 
-- `head_sha`를 `f77f85d` → `3198d3c`로 갱신했다.
+- `head_sha`를 `f77f85d` → `3d3f982`로 갱신했다.
 - 이전 라운드와 같은 이유로(커밋이 자기 SHA를 담을 수 없다) `head_sha`는 그 직전
   커밋을 가리키며, 두 커밋의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
 - **리뷰 range는 `6af7019...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
@@ -409,6 +409,7 @@ verifier 재검증 판정 `not-ready`. 차단 사유는 **라운드 7이 복원�
 | --- | --- |
 | `db793db` | F7-1~F7-4 — 산출물 상태 정합. §12.1 결번 표의 `DEC-07`·`DEC-03` 행을 같은 표 `OPS-07` 행 형식으로, DEC-02 본문의 "해소" 서술을 활성 복원 상태로, §12 머리 8건 → **9건**(신설 6 + 복원 3), `NOTI-02` acceptance를 `OPEN-NOTI-09` 조건부로 |
 | `3198d3c` | F7-5~F7-9 + **활성 OPEN 46건 전수 인용 스윕 기록** + §10.1 형태 5 절차화 |
+| `3d3f982` | 전수 스윕 수치를 재현 커밋에 고정(378/51 → **379/52**, 불일치 0 불변) + `scope.md` EOF 공백 |
 | 이 커밋 | scope 완결 이력과 `head_sha` |
 
 **형태 5를 절차로 만들었다.** 규칙을 문장("grep으로 전수 확인한다")으로 둔 것이 세 번을
