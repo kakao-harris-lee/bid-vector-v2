@@ -27,7 +27,7 @@ grep(C-3·C-5) · 산출물에서 정본을 계산하는 스크립트(C-4). **ra
 `:70-77`로 한 줄 늦게 적었다가 고친 그 자리다.
 
 ```
-### 실행 시점 HEAD = 90dde40
+### 실행 시점 HEAD = 74132ea
 ### 이 블록의 출력은 저장소 HEAD와 무관하다 — legacy 저장소의 고정 commit 을 읽는다.
 
 $ cd bid-vector && git show ed4b06c:app/domain/money.py | sed -n "20,31p"
@@ -101,7 +101,7 @@ $ cd bid-vector && git show ed4b06c:app/schemas/bid_summary.py | sed -n "68,79p"
 ### 경로를 한정해 안정한 검사 — 출력을 기록한다
 
 ```
-### 실행 시점 HEAD = 90dde40
+### 실행 시점 HEAD = 74132ea
 ### 아래 셋은 전부 `-- docs/discovery/capability-map.md` 로 경로를 한정한다 —
 ### 그래서 이 파일을 건드리지 않는 뒤 커밋이 붙어도 출력이 바뀌지 않는다.
 
@@ -115,6 +115,8 @@ $ git diff -U0 48151b9...HEAD -- docs/discovery/capability-map.md | grep -E '^@@
 $ grep -n '^## 1[23]\. ' docs/discovery/capability-map.md
 2910:## 12. OPEN 결정 목록
 3166:## 13. 하류 인계
+$ grep -n '^| 0B — 예산 basis 불일치' docs/discovery/capability-map.md | cut -c1-46
+3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — *
 
 --- C-2.3 ---
 $ git diff 48151b9...HEAD -- docs/discovery/capability-map.md | grep -cE '^\+.*\| OPEN-[A-Z]+-[0-9]+ \|'
@@ -123,22 +125,27 @@ $ git diff 48151b9...HEAD -- docs/discovery/capability-map.md | grep -cE '^\+.*\
 
 **판정**:
 
-- `capability-map.md`는 **한 줄 교체**이고 hunk가 **`3171` 하나**다. §13이 `3166`에서
-  시작하고 §12가 `2910`에서 시작하므로 **그 한 줄은 §13 안**이다 — **A4의 「X-1 외 서술
-  무변경」이 구조로 성립한다.** §10 집계표·§12 registry는 diff에 없다.
+- **변경 위치가 §13 안이다** — 위 hunk 지목이 §13 시작 줄보다 뒤이고 §12 시작 줄보다도
+  뒤다. **§10 집계표·§12 registry는 diff에 없고**, §13 안에서도 **「0B — 예산 basis
+  불일치」 인계 행 하나**가 대상이다(그 행은 마크다운 표의 한 줄이라 hunk가 그 줄을
+  지목한다). **A4의 「그 인계 행 밖 무변경」이 구조로 성립한다.**
+  **셈을 여기 옮겨 적지 않는다** — 지목도 위치도 위 블록이 낸다.
 - **registry에 추가된 `OPEN` 행 0** — 새 `OPEN`을 만들지 않았다(A3).
 - **이 셋은 뒤 커밋에 낡지 않는다** — 경로가 `capability-map.md`로 한정돼 있고
-  **그 파일은 이번 수정 라운드에 건드리지 않는다**(위 hunk 하나가 그 사실을 낸다).
+  **그 파일을 바꾸는 커밋은 이 블록과 같은 커밋에 실린다**(수정 라운드 2의 F-4가
+  마지막이다). 뒤에 붙는 evidence 전용 커밋은 이 경로를 건드리지 않는다.
 
 ---
 
 ## C-3. X-1 프레이밍 스윕 — 정정이 어디까지 갔고 어디서 멈췄나
 
 ```
-### 실행 시점 HEAD = 90dde40
+### 실행 시점 HEAD = 74132ea
 
 --- C-3.1 X-1 프레이밍 스윕 (in_scope 두 파일) ---
 $ grep -nE 'ex-VAT|VAT·사정률만큼' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-130 | sed 's/[[:space:]]*$//'
+docs/discovery/capability-map.md:1373:- **분류 근거**: 투찰율이 곱해지는 base는 추정가격(ex-VAT)이 아니라 기초금액/사업금액
+docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_es
 reports/evidence/m0/0a2/decisions.md:40:| 「OPEN-STR-01」 절 안의 2026-08-27 정정 블록(**slice 0A3 · X-1**) | **slice 산물** — legacy **사실 서술
 reports/evidence/m0/0a2/decisions.md:59:| `144` · `147` | 「OPEN-STR-01」 | **정정** — **X-1**: `budget_estimate`의 ex-VAT 단정과 차이의 크기·방
 reports/evidence/m0/0a2/decisions.md:144:    `strategy.min|max_budget_estimate`. `Project.budget_estimate`는 ~~추정가격(ex-VAT)이다~~
@@ -148,8 +155,6 @@ reports/evidence/m0/0a2/decisions.md:157:    >   ex-VAT라고도 VAT 포함이�
 reports/evidence/m0/0a2/decisions.md:158:    >   소유한다. 원본에 대해 남는 것은 **「ex-VAT」라는 단정에 근거가 없다**는 것까지다.
 reports/evidence/m0/0a2/decisions.md:168:    > - **차이가 "VAT·사정률만큼"이라고 말할 근거가 없다.** legacy 자신이 저장된 값의
 reports/evidence/m0/0a2/decisions.md:186:    >   "fix(m0-0b): budget_estimate의 ex-VAT 단정을 제거 (0C 선행 조사 X-1)"에서 정정했고,
-docs/discovery/capability-map.md:1373:- **분류 근거**: 투찰율이 곱해지는 base는 추정가격(ex-VAT)이 아니라 기초금액/사업금액
-docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_es
 
 --- C-3.2 원본 보존 확인 (줄 번호가 아니라 내용으로 집는다) ---
 $ awk '/^  - legacy는 운영자 값을 \*\*추정가격\*\*과 비교한다:/,/^    >   > \*\*2차 정정 /' reports/evidence/m0/0a2/decisions.md
@@ -182,13 +187,15 @@ docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-d
 docs/discovery/regression-ledger.md:82:    `OPEN-QUAL-10`은 **시공능력평가금액 축**이라 이 질문의 소유자가 아니다.
 docs/discovery/regression-ledger.md:1345:| **OPEN-REG-05** | **기초금액과 추정가격의 과세 처리 — 두 금액의 차이가 무엇으로 이루어지는가** | l
 
---- C-3.4 §13 밖에 남은 X-1 프레이밍 (O-2, 고치지 않음) ---
+--- C-3.4 §13 밖에 남은 X-1 프레이밍 (O-2, 여전히 out_of_scope) ---
 $ grep -nE '추정가격.{0,12}(ex-VAT|부가세 별도)' docs/discovery/capability-map.md
 1373:- **분류 근거**: 투찰율이 곱해지는 base는 추정가격(ex-VAT)이 아니라 기초금액/사업금액
 1929:  - 기초금액(사업금액)과 추정가격(부가세 별도)을 **다른 행**으로 싣는다. 한 라벨로 묶지
 $ for L in 1373 1929; do awk -v L=$L 'NR<=L && /^## /{h=$0} NR==L{print L" → "h}' docs/discovery/capability-map.md; done
 1373 → ## 5. 축 5 — 투찰 판단과 근거 (DEC)
 1929 → ## 6. 축 6 — 알림 / 보고서 (NOTI)
+$ git diff --numstat 48151b9...HEAD -- docs/discovery/capability-map.md   # 위 두 줄이 diff 밖임은 C-2.2 의 지목이 낸다
+1	1	docs/discovery/capability-map.md
 
 --- C-3.5 decisions.md 전수 표 ↔ 훅 1:1 ---
 $ git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md | grep -E '^@@'
@@ -247,7 +254,11 @@ $ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut 
 
 ---
 
-## C-4. A4 불변 — 정본을 산출물에서 직접 계산한다
+## C-4. A4 불변 — 정본을 산출물에서 직접 계산한다 (**C-5** 형태 7 확인을 같은 실행에 포함)
+
+**아래 출력 블록은 한 번의 실행이라 `C-4.x`와 `C-5.x`가 같은 블록에 들어 있다** —
+서로 다른 실행의 출력을 섞지 않기 위해서다(§10.1 **형태 3**). 그래서 `C-5`에는 별도
+절 머리가 없다.
 
 **스크립트 본문(형태 4 — 이름으로만 부르지 않는다).** 산출 정의는 0A2 `commands.md`
 R9-1 수치 축 스윕의 「정본 산출」 절과 **같다** — 새 정의를 만들지 않았다.
@@ -285,7 +296,7 @@ print("capability-map 줄 수 :", len(lines) - (1 if lines and lines[-1] == "" e
 `assert`로 유일성을 확인한다(줄 번호를 쓰면 이 파일이 편집될 때마다 낡는다).
 
 ```
-### 실행 시점 HEAD = 6857ae8
+### 실행 시점 HEAD = 74132ea
 
 --- C-4.1 인라인 본문을 파일에서 뽑는다 (줄 번호가 아니라 marker로 집는다) ---
 $ BLK=$(python3 - <<'EOF'
@@ -358,8 +369,8 @@ $ sed -n '1519,1521p' reports/evidence/m0/0b/commands.md
   그대로 돌리면 exit 2였다**(Codex 1차 medium · 형태 4). 수치는 맞았고 **틀린 것은
   명령이었다.**
 - **C-4.2 ↔ C-4.3** — base `48151b9`와 HEAD에서 **같은 본문을 실제로 실행**했고 네 값이
-  **모두 같다**(**A4**). 줄 수까지 같은 것은 §13 변경이 **한 줄 교체**였기 때문이며
-  C-2.1의 `1	1`이 그것을 낸다.
+  **모두 같다**(**A4**). 줄 수까지 같은 것은 §13 변경이 **표의 한 줄 안에서 일어났기**
+  때문이며 **그 규모는 C-2.1이 낸다** — 여기 옮겨 적지 않는다.
 - **C-5.1** — §10.1 형태 표에 **`7` 행이 들어갔고** 기존 행(`1`~`6`, `3′`)은 그대로다.
   `399`~`401`은 형태 1·2·3의 **결론/근거/처리 3열 표**로 다른 표다.
 - **C-5.2** — 형태 7 절과 그 근거 절(*"왜 새 형태인가 — 기존 여섯을 다 지켜도 난다"*),
@@ -373,7 +384,48 @@ $ sed -n '1519,1521p' reports/evidence/m0/0b/commands.md
 
 ---
 
-## C-6. 이 slice가 만들지 않은 것
+## C-6. F-4 — ledger 정본을 직접 열어 그 조건부 서술을 따랐다
+
+**`capability-map.md` §13의 `검증 방법`을 새로 쓰지 않았다.** 0B ledger `R-BASIS-01`이
+authoritative이고(0B Codex `approve`로 확정) **그 문면을 옮겼다.** 아래가 그 정본이다 —
+**줄 번호가 아니라 항목 이름으로 집는다.**
+
+```
+### 실행 시점 HEAD = 74132ea
+### ledger 는 0B Codex approve 로 확정된 authoritative 정본이며 읽기만 한다.
+
+$ awk '/^### R-BASIS-01 /,/^- \*\*근거\*\*/' docs/discovery/regression-ledger.md | awk '/^- \*\*검증 방법\*\*/,/^- \*\*동반 OPEN\*\*/'
+- **검증 방법**
+  - **결정 무관(무조건)**: **basis 태그가 다른 값 쌍**을 fixture로 고정한다 — **어느 쪽이
+    크다는 전제를 넣지 않고**, 같은 운영자 값에 대해 **필터 결과가 basis에 따라 갈리는지**만
+    고정한다. **같은 쌍이 감시 경로와 검색 경로(R-BASIS-02)에서 같은 답을 내는지도 함께
+    고정한다** — 두 경로가 다른 basis를 쓰면 "제안에는 뜨는데 검색에는 안 나온다"가 된다.
+  - **조건부 — `OPEN-REG-05` 결정에 따라 확정.** **과세/비과세로 정의된 경계 쌍은 그 OPEN이
+    닫힌 뒤에 만든다.** 지금 만들면 **legacy의 미결 과세 의미로 corpus 경계가 굳는다** —
+    저장된 추정가격의 과세 처리가 legacy 안에서 일관되지 않기 때문이다.
+- **동반 OPEN**: **`OPEN-REG-05`**(활성)가 두 금액의 **과세 처리**, 따라서 **차이의 크기와
+
+$ git diff --stat 48151b9...HEAD -- docs/discovery/regression-ledger.md ; echo "(빈 출력 = 무변경)"
+(빈 출력 = 무변경)
+$ wc -l < docs/discovery/regression-ledger.md
+    1402
+```
+
+**판정**:
+
+- **§13이 이제 ledger와 같은 두 갈래를 갖는다** — **결정 무관(무조건)** = basis 태그가
+  다른 값 쌍, 어느 쪽이 크다는 전제 없이 + 감시·검색 두 경로의 일치.
+  **조건부(`OPEN-REG-05` 결정에 따라 확정)** = 과세/비과세로 정의된 경계 쌍은 그 `OPEN`이
+  닫힌 뒤에. 사유(*"legacy의 미결 과세 의미로 corpus 경계가 굳는다"*)까지 같다.
+- **ledger는 읽기만 했다** — `git diff --stat`이 무변경을 내고 줄 수도 그대로다.
+  **0B는 Codex `approve`로 닫혔고 이 slice의 out_of_scope다.**
+- **`검증 방법` 외의 필드는 건드리지 않았다** — C-2.2의 hunk 지목이 대상이 그 인계 행
+  하나임을 내고, 그 행 안에서 무엇이 바뀌었는지는 `git diff 48151b9...HEAD --
+  docs/discovery/capability-map.md`가 낸다. **셈을 여기 옮겨 적지 않는다.**
+
+---
+
+## C-7. 이 slice가 만들지 않은 것
 
 | 안 만든 것 | 이유 |
 | --- | --- |
