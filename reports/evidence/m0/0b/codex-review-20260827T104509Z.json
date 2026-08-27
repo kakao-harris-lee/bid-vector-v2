@@ -1,0 +1,61 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "ec115a79c75e51770ecd58d3c19a3d2adb70120e",
+  "reviewed_head": "105259a8a02f61be6f09b806dd891e02159238a7",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0b/scope.md",
+      "line": 1048,
+      "evidence": "최종 evidence는 이 커밋이 `scope.md`와 `commands.md` 출력 블록을 변경했다고 주장한다. 그러나 `git diff-tree --no-commit-id --name-status -r 105259a8a02f61be6f09b806dd891e02159238a7`은 `M reports/evidence/m0/0b/scope.md`만 출력하고, `git diff cc30af53e0eaf2b4ab7986780c299ebc42494993..105259a8a02f61be6f09b806dd891e02159238a7 -- reports/evidence/m0/0b/commands.md`는 빈 출력이다. 해당 커밋 본문도 '이 파일뿐'이라고 명시한다. 따라서 마지막 검증 라운드의 변경 provenance 서술이 실제 diff와 다르며, 같은 절이 선언한 '틀린 서술이 없다' 게이트를 충족하지 않는다.",
+      "required_fix": "1048-1049행을 실제 커밋 diff에 맞게 `scope.md`의 head_sha 한 줄과 마지막 이력 절만 변경됐다고 정정한다. `commands.md` 출력 갱신이 일어난 과거 커밋을 설명하려는 의도였다면 그 커밋 SHA와 이력을 별도로 정확히 지목한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0b/commands.md",
+      "line": 2400,
+      "evidence": "현재 HEAD의 인라인 `prosecheck`를 그대로 실행하면 `WIN=12`는 5건, `WIN=25`는 9건, `WIN=40`은 12건을 지목한다. 구체적으로 `sed -n '324,418p' ... | sed 's/^WIN = 12/WIN = 25/' | python3 -`의 결과는 9건이다. 하지만 이 행은 `25줄 15건`이라고 기록하고, `scope.md:1067-1068`도 `12줄 5건 → 25줄 15건 → 40줄 12건`이라고 반복한다. 현재 실행 결과와 다른 실측 수치가 도구 확장을 거부한 근거로 남아 있어 evidence의 정량 주장이 재현되지 않는다.",
+      "required_fix": "현재 HEAD에서 WIN 12·25·40 변형을 다시 실행해 출력과 명령을 evidence에 기록하고, `commands.md`와 `scope.md`의 수치를 실제 결과에 맞춰 동기화한다. 역사적 커밋의 수치라면 해당 SHA를 명시하고 현재 결과와 구분한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short --untracked-files=all",
+    "git rev-parse HEAD",
+    "git cat-file -t ec115a79c75e51770ecd58d3c19a3d2adb70120e",
+    "git cat-file -t 105259a8a02f61be6f09b806dd891e02159238a7",
+    "git merge-base ec115a79c75e51770ecd58d3c19a3d2adb70120e 105259a8a02f61be6f09b806dd891e02159238a7",
+    "git log --oneline --decorate --reverse ec115a79c75e51770ecd58d3c19a3d2adb70120e..105259a8a02f61be6f09b806dd891e02159238a7",
+    "git diff --stat ec115a79c75e51770ecd58d3c19a3d2adb70120e...105259a8a02f61be6f09b806dd891e02159238a7",
+    "git diff --name-status ec115a79c75e51770ecd58d3c19a3d2adb70120e...105259a8a02f61be6f09b806dd891e02159238a7",
+    "git diff --check ec115a79c75e51770ecd58d3c19a3d2adb70120e...105259a8a02f61be6f09b806dd891e02159238a7",
+    "sed -n '1,180p' agent-workflow.md; sed -n '1,140p' milestone-0.md; sed -n '1,120p' v2-지침서.md; sed -n '140,280p' v2-지침서.md; sed -n '300,360p' v2-지침서.md",
+    "cat reports/evidence/m0/0b/codex-review-20260827T064055Z.json; cat reports/evidence/m0/0b/codex-review-20260827T085200Z.json",
+    "sed -n '523,603p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '324,418p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '1084,1228p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '2440,2487p' reports/evidence/m0/0b/commands.md | python3 - 105259a8a02f61be6f09b806dd891e02159238a7",
+    "sed -n '1567,1719p' reports/evidence/m0/0b/commands.md | python3 - ec115a79c75e51770ecd58d3c19a3d2adb70120e 105259a8a02f61be6f09b806dd891e02159238a7",
+    "sed -n '917,984p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '1410,1437p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '64,159p' reports/evidence/m0/0b/commands.md | python3 - docs/discovery/regression-ledger.md",
+    "grep -rniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))' docs/discovery/regression-ledger.md reports/evidence/m0/0b/",
+    "wc -l docs/discovery/regression-ledger.md reports/evidence/m0/0b/*.md",
+    "jq -e '.verdict and .reviewed_base and .reviewed_head and (.findings|type==\"array\") and (.commands_run|type==\"array\") and (.residual_risks|type==\"array\")' reports/evidence/m0/0b/codex-review-20260827T064055Z.json reports/evidence/m0/0b/codex-review-20260827T085200Z.json",
+    "sed -n '324,418p' reports/evidence/m0/0b/commands.md | sed 's/^WIN = 12/WIN = 12/' | python3 -",
+    "sed -n '324,418p' reports/evidence/m0/0b/commands.md | sed 's/^WIN = 12/WIN = 25/' | python3 -",
+    "sed -n '324,418p' reports/evidence/m0/0b/commands.md | sed 's/^WIN = 12/WIN = 40/' | python3 -",
+    "git diff-tree --no-commit-id --name-status -r 105259a8a02f61be6f09b806dd891e02159238a7",
+    "git diff cc30af53e0eaf2b4ab7986780c299ebc42494993..105259a8a02f61be6f09b806dd891e02159238a7 -- reports/evidence/m0/0b/commands.md",
+    "git show -s --format='%H%n%P%n%B' 105259a8a02f61be6f09b806dd891e02159238a7"
+  ],
+  "residual_risks": [
+    "이 worktree에는 legacy `bid-vector` 저장소가 없어 `ed4b06c`의 파일 내용·행 범위·commit 및 실측 수치·방향 주장을 독립 재현하지 못했다. 현재 `citecheck` 재실행도 이 때문에 legacy 경로 109종과 commit 25종을 부재로 출력했으며, 이는 finding으로 계상하지 않았다.",
+    "`_workspace/m0-0b/01_scout_regression_preflight.md`가 없어 `statusdiff.py`의 선행 조사 대조를 재실행하지 못했다.",
+    "`mutcheck.py`는 저장소에 존재하지 않는 추출본 `citecheck.py`를 요구해 인라인 그대로는 재실행되지 않았다. `resync.sh`는 evidence 파일을 쓰는 도구이므로 read-only 리뷰 조건상 실행하지 않았다.",
+    "이 slice는 문서 산출물 단계이므로 예방 제약의 production wiring, 실제 side effect 차단, 계약 unknown-schema 처리 및 Kotlin/Python 업무 규칙 단일 소유는 후속 구현 리뷰에서 검증해야 한다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
