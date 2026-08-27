@@ -1,0 +1,60 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6af7019996ec26903c7b531ed7ede12c22cf176e",
+  "reviewed_head": "ed73b55998a340cd5f26ac2ced6681354a6921d4",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a2/decisions.md",
+      "line": 33,
+      "evidence": "직전 medium #1의 `OPEN-DEC-09` 원문 복원·정정 표시는 실질적으로 해소됐지만, 현재 provenance의 전칭 주장은 여전히 반례가 있다. 이 행은 원본 절이 원본 문장을 바꾸지 않았고 예외는 표시된 legacy 사실 정정 3건뿐이라고 선언한다. 그러나 이 파일의 최초 커밋 `6a4e49b7` blob과 HEAD를 직접 diff하면 원본 표의 `OPEN-QUAL-08` 비고가 `공고가 게시하는 요건이면 자격, 운영자 사정이면 적합도`에서 line 211의 `...적합도. capability QUAL-11의 분류 상향 근거는 아래 절에 축어로 옮겼다`로 in-place 변경됐다. `git blame -L 203,212`도 해당 행을 후속 slice 커밋 `4c29cce4`에 귀속한다. 이 추가분은 취소선·인용 블록으로 구분되지 않고 provenance 표에도 예외로 없으며, checklist.md:178-189의 slice 추가 6종 목록에도 없다. 따라서 authoritative 원본과 slice 산물을 전수 구분한다는 A7 evidence가 실제 구성과 일치하지 않는다.",
+      "required_fix": "`OPEN-QUAL-08` 원본 행을 보존한 채 후속 cross-reference를 명시적인 slice 주석/인용으로 분리하거나, 해당 in-place 추가를 slice 산물로 명확히 표시하고 decisions.md provenance 표와 checklist.md A7 목록·건수를 실제 구성에 맞게 갱신한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "git cat-file -t 6af7019996ec26903c7b531ed7ede12c22cf176e",
+    "git cat-file -t ed73b55998a340cd5f26ac2ced6681354a6921d4",
+    "git merge-base 6af7019996ec26903c7b531ed7ede12c22cf176e ed73b55998a340cd5f26ac2ced6681354a6921d4",
+    "git log --oneline --decorate --graph 6af7019996ec26903c7b531ed7ede12c22cf176e..ed73b55998a340cd5f26ac2ced6681354a6921d4",
+    "git diff --name-status 6af7019996ec26903c7b531ed7ede12c22cf176e...ed73b55998a340cd5f26ac2ced6681354a6921d4",
+    "git diff --stat 6af7019996ec26903c7b531ed7ede12c22cf176e...ed73b55998a340cd5f26ac2ced6681354a6921d4",
+    "git diff --check 6af7019996ec26903c7b531ed7ede12c22cf176e...ed73b55998a340cd5f26ac2ced6681354a6921d4",
+    "git ls-files --others --exclude-standard",
+    "git rev-list --count 6af7019996ec26903c7b531ed7ede12c22cf176e..ed73b55998a340cd5f26ac2ced6681354a6921d4",
+    "nl -ba agent-workflow.md | sed -n '55,145p'",
+    "nl -ba milestone-0.md | sed -n '1,280p'",
+    "nl -ba reports/evidence/m0/0a2/codex-review-20260827T015140Z.json",
+    "nl -ba reports/evidence/m0/0a2/{scope,decisions,checklist,commands}.md",
+    "nl -ba docs/discovery/capability-map.md",
+    "git diff --unified=20 ab690129d86e93c5e1f17237394e99f348c98009..ed73b55998a340cd5f26ac2ced6681354a6921d4",
+    "git diff --unified=8 6af7019996ec26903c7b531ed7ede12c22cf176e...ed73b55998a340cd5f26ac2ced6681354a6921d4 -- reports/evidence/m0/0a/commands.md",
+    "git diff --unified=3 6a4e49b7:reports/evidence/m0/0a2/decisions.md ed73b55998a340cd5f26ac2ced6681354a6921d4:reports/evidence/m0/0a2/decisions.md",
+    "git blame -L 1,45 reports/evidence/m0/0a2/decisions.md",
+    "git blame -L 203,212 reports/evidence/m0/0a2/decisions.md",
+    "git blame -L 220,245 reports/evidence/m0/0a2/decisions.md",
+    "sed -n '521,549p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "sed -n '719,739p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "sed -n '924,1081p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "python3 independent base/head active-OPEN set and capability classification comparison",
+    "git archive 7fe93cc754055dfed7ea31faa93a8d118377eeee | tar -x -C <temporary-directory>; sed -n '924,1081p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "git archive ab690129d86e93c5e1f17237394e99f348c98009 | tar -x -C <temporary-directory>; sed -n '924,1081p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "grep -c '^| OPEN-' docs/discovery/capability-map.md",
+    "wc -l docs/discovery/capability-map.md",
+    "grep -rniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))' docs/discovery/ | wc -l"
+  ],
+  "residual_risks": [
+    "직전 medium #1의 직접 대상인 `OPEN-DEC-09`는 원본 문구 복원, 틀린 조각의 취소선, slice 정정 블록, provenance/A7 등재까지 확인돼 해소됐다. 이번 finding은 전체 provenance 전수 대조에서 별도로 확인된 `OPEN-QUAL-08` 반례다.",
+    "직전 medium #2는 해소됐다. 인라인 numsweep 재실행 결과 `ab69012`에서 203/128, `7fe93cc`에서 204/128, 현재 head에서 207/128이 재현돼 R11-6·R11-7과 scope의 기준 커밋별 설명에 일치했다.",
+    "독립 집계는 capability 95개, 분류 61/17/6/11, 필수 capability의 사용자 가치·acceptance 결측 0, 활성 OPEN 45개와 G1~G6 분포 3/7/15/8/7/5를 재현했다. Base 대비 순소멸 26개는 기록된 결정 중 복원 3건과 신규 후 해소된 `OPEN-NOTI-09`를 제외한 해소 집합과 정확히 일치했고, 신규 활성 5개도 문서 기록과 일치했다.",
+    "활성 OPEN 45건 자체는 결함이 아니다. 다만 M0 차단 `OPEN-OPS-07` 1건과 M1 차단 `OPEN-DEC-03`·`OPEN-DEC-07` 2건이 남아 있어 M1 진행에는 milestone 계약에 따른 사용자 명시 승인이 별도로 필요하다.",
+    "legacy `bid-vector` 경로와 `ed4b06c` commit 객체가 이 worktree에 없어 저장소 밖 파일·commit·수치 주장은 재현하지 못했다. 요청 지침에 따라 재현 불가 자체를 finding으로 판정하지 않았다.",
+    "`docs/adr/`는 아직 없고 `OPEN-OPS-07`은 ADR 대안 절 기입을 종료 조건으로 활성 상태다. 이는 0D 소관으로 명시된 정상 미결이며 이번 slice 결함으로 판정하지 않았다.",
+    "이 판정은 merge, 외부 호출, DB write, release 또는 배포 승인이 아니다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol"
+  }
+}
