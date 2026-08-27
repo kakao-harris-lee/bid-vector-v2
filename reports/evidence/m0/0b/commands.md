@@ -530,3 +530,179 @@ $ wc -l docs/discovery/regression-ledger.md
   걸린 적이 있어 실측으로 고쳤다.)
 - 공고번호·기관명 등 식별자는 **근거 추적에 필요한 곳(commit 참조)에만** 남기고 본문에
   옮기지 않았다 — 패턴 스캔으로 잡히지 않으므로 **육안 확인 병기**.
+
+---
+
+## C-7. 수정 라운드 1 — H1·H2 재확인 실측 (2026-08-27)
+
+검증 판정 `not-ready`. **A2 하나가 미충족**이었고 **H1·H2가 형태 2의 실물**이다 — 둘 다
+선행 조사 노트의 문장이 축어로 이월된 것이며, 계약 A2가 "상류 노트에서 옮겨 온 인용도
+**그 파일을 직접 열어** 확인한다"고 요구한 바로 그 지점이다.
+
+### C-7.1 H1 — `필요 951/시`가 인용한 범위에 없다
+
+```
+$ git -C bid-vector show ed4b06c:app/core/inference_config.py | sed -n '77,89p'
+    # 이걸 상한으로 만드는 것이 **산술적으로 불가능하지는 않다** — 필요량은 창에 따라
+    # 3,800~5,600건/시이고 소진 6,000건/시 아래다. 하지 않는 이유는 다른 데 있다:
+    # 5,600건/시는 **소진 용량의 94%** 이고, 그러면 투입 ≈ 소진이 되어 아래 부등식의
+    # 3배 여유가 정확히 사라진다. 그 여유가 이 PR 의 핵심 재발 방지선이므로, drift
+    # 상한을 사려고 재발 방지선을 파는 거래는 하지 않는다. 여기서 보장하는 것은 수명뿐이다.
+    #
+    # 위쪽 부등식(투입 2,000 ≤ 소진 6,000, 3배)이 이번 사고의 재발 방지선이다. 투입이
+    # 소진을 넘으면 큐가 무한히 자란다(실제로 21,321건). 60초 유지 시 투입이 6,000건/시로
+    # 소진과 정확히 같아져 여유가 0 이 된다.
+    #
+    # 한계점: 수명 보장은 활성 대상이 투입×6h = **12,000건**을 넘으면 깨진다(현재
+    # 5,822건, 2.1배 여유). 그 선을 넘으면 배치 크기를 올려야 하고, 그때도 투입이
+    # 소진을 넘지 않도록 outbox 처리량을 함께 올려야 한다.
+```
+
+- **필요량은 `3,800~5,600건/시`**다. **`951`은 이 범위에 없다.**
+- **「투입 2,000 ≤ 소진 6,000(3배)」과 「60초 유지 시 여유 0」은 주석과 일치**하므로
+  건드리지 않았다. 틀린 것은 `951` 하나다.
+
+**951의 출처를 추적했다** — 이전 판에 있었고 legacy가 스스로 지웠다:
+
+```
+$ git -C bid-vector show 93ecf9e -- app/core/inference_config.py | grep -E '^[-+].*(951|필요)'
+-    #   필요 처리량 = 활성 대상 / 스냅샷 최대 수명 = 5,708 / 6h ≈ 951건/시
+-    #   필요(951) ≤ 투입(2,000) ≤ 소진(6,000)
++    # 그렇다고 필요 처리량이 무효화 횟수에 비례하지는 **않는다**. 한 대상은 한 회전에
++    # 작업량의 단위는 "무효화 이벤트"가 아니라 **서로 다른 대상**이고, 필요 처리량은
+$ git -C bid-vector log -1 --format='%h %ad %s' --date=short 93ecf9e
+93ecf9e 2026-08-13 docs(similarity): 처리량 산술 정정 — 임베딩 모델이 두 벌이었다 (M1·m3·n1)
+```
+
+**`93ecf9e`가 그 두 줄을 지웠다.** legacy가 오류로 판정해 제거한 값을 이 문서가 되살린
+셈이다. **그 정정 사실을 R-ASYNC-02의 근거에 넣었다** — 관계가 주석에만 있으면 산술이
+틀려도 아무것도 깨지지 않고 사람이 읽을 때까지 남는다는 **그 항목의 논거를 강화**한다.
+
+**`951건/시`는 `ed4b06c`에 여전히 있다** — 다만 **다른 파일에서 다른 양**을 가리킨다:
+
+```
+$ git -C bid-vector grep -n '951건/시' ed4b06c -- '*.py'
+ed4b06c:app/core/constants.py:445:# 신선도면 판단이 달라지지 않는다. 부하는 활성 대상 수 / 수명 = 5,708/6h ≈ 951건/시,
+```
+
+여기서는 **스냅샷 6h 수명이 만드는 부하**이지 **재발 방지선의 필요량이 아니다.**
+ledger에 그 구분을 명시했다. **verifier가 "951이 트리 전체에 없다(테스트의 0.951뿐)"고
+적었는데 그 부분은 정확하지 않다** — `constants.py:445`에 `951건/시`가 있다. **H1의 실질
+(인용한 범위에 없고 그 값이 재발 방지선의 필요량이 아니다)은 그대로 성립**하며, 이 구분을
+적어 두는 이유는 **다음 사람이 `951`을 다시 만났을 때 어느 쪽인지 알게 하기 위해서**다.
+
+### C-7.2 H2 — R-FLOOR-08 관찰이 코드와 반대였다
+
+```
+$ git -C bid-vector show ed4b06c:app/domain/floor_shortfall.py | sed -n '48,57p'
+# 사정률(예정가/기초금액)의 물리적 개연 범위. KONEPS 복수예비가격은 기초금액을
+# 대략 ±2~3% 로 둘러싸도록 생성되므로 실제 추첨 결과가 이 범위를 벗어날 수 없다.
+# 범위 밖 값은 추첨 결과가 아니라 수집/파싱 오류이므로 표본에서 제외한다.
+# ⚠ app/core/constants.ASSESSMENT_RATE_PLAUSIBLE_*(0.8~1.2)와 이름이 비슷하지만
+# **다른 밴드·다른 목적**(그쪽=관측 필터)이다 — §4.5-8 근거 통합 금지(리뷰 N4):
+# 합치면 빈도가 왜곡된다 — 하단 꼬리(0.8~0.90)는 분모만 늘려 낙관, 상단 꼬리
+# ((1.10,1.20])는 임계(≈1.00125)도 넘어 분자에 들어가 비관, 순방향은 꼬리 분포에
+# 달린다(2026-08-12 실측 하단 76·상단 0 → 현재는 낙관 방향, 리뷰 O2).
+ASSESSMENT_RATE_MIN: Final[float] = 0.90
+ASSESSMENT_RATE_MAX: Final[float] = 1.10
+```
+
+`is_plausible_assessment_rate`(`:89-97`)가 **범위 안만** 담는 순수 술어이고 `:162`가 그것을
+표본 필터로 쓴다.
+
+- 밴드는 **`[0.90, 1.10]`** — **버리는 것은 1에서 먼 꼬리**(하단 `0.8~0.90` · 상단
+  `(1.10, 1.20]`)이고 **1 근방은 유지된다.** 관찰이 정반대였다.
+- **관찰과 제목을 코드에 맞게 뒤집었고**, 소스가 적은 **메커니즘**으로 대체했다 —
+  하단 꼬리는 낙관, 상단 꼬리는 비관, **순방향은 꼬리 분포에 달린다**(실측 **2026-08-12**
+  하단 76 · 상단 0 → 그 시점 **낙관 방향**).
+- **사용자 영향은 임계 사정률 `≈1.00125` 축이라 성립하므로 유지**하되, 위 실측을 붙여
+  **"틀릴 수 있었고 실제로 그 방향이었다"**로 정확히 했다.
+- **선행 조사의 제목이 이미 뒤집혀 있었고 본문은 정확했다.** ledger가 **그 제목 표현을
+  관찰 본문으로 승격**한 것이 이 결함의 경로다 — 상류의 **제목도 인용 대상**이다.
+
+### C-7.3 같은 형태가 더 없는지 — 기계로 훑고 전수 판정했다
+
+**형태 2에도 기계 검증 가능한 절반이 있다** — 항목이 인용한 legacy 범위에 그 항목이
+적은 **수치가 실제로 있는가**. H1이 정확히 그 축이었으므로 축을 만들었다(**결함이 먼저
+관측된 뒤에 도구를 만든다**).
+
+**방향·의미의 정합은 이 축이 못 본다**(H2가 그 부류다). 그 절반은 사람이 읽는 것으로
+남으며 C-1의 두 축 구분에 그대로 해당한다.
+
+```python
+# 형태 2의 기계 검증 가능한 절반 —
+# ledger 항목이 인용한 legacy 행 범위에 그 항목이 적은 수치가 실제로 있는가.
+# (방향·의미의 정합은 기계가 못 본다. 그 절반은 사람이 읽는다.)
+import re, subprocess, collections
+REPO, REF = "bid-vector", "ed4b06c"
+lines = open("docs/discovery/regression-ledger.md", encoding="utf-8").read().split("\n")
+PATH = re.compile(r'`([A-Za-z0-9_./-]+\.(?:py|md))(?::([\d,\-]+))?`')
+NUM  = re.compile(r'(?<![\w.:/-])(\d{1,3}(?:,\d{3})+|\d{2,6}(?:\.\d+)?)(?![\d,]*[%\w])')
+starts = [i for i, l in enumerate(lines) if re.match(r'^### [RP]-', l)]
+cache = {}
+def body(p):
+    if p not in cache:
+        cache[p] = subprocess.run(["git","-C",REPO,"show",f"{REF}:{p}"],
+                                  capture_output=True, text=True).stdout.split("\n")
+    return cache[p]
+def norm(x): return x.replace(",", "")
+flag = []
+for n, st in enumerate(starts):
+    e = starts[n+1] if n+1 < len(starts) else len(lines)
+    eid = re.match(r'^### ([RP]-[A-Z]+-\d+)', lines[st]).group(1)
+    blk = lines[st:e]; txt = "\n".join(blk)
+    # 인용된 (경로, 범위)들의 원문을 모은다
+    src = []
+    for m in PATH.finditer(txt):
+        p, rng = m.group(1), m.group(2)
+        b = body(p)
+        if len(b) <= 1: continue
+        if rng:
+            for part in rng.split(","):
+                a = part.split("-"); lo = int(a[0]); hi = int(a[-1]) if len(a) > 1 else lo
+                src += b[lo-1:hi]
+        else:
+            src += b
+    # 커밋 본문도 근거로 인용된다 — 그 본문의 수치도 pool에 넣는다(H1이 이 축이었다).
+    for h in set(re.findall(r'`([0-9a-f]{7,40})`', txt)):
+        r = subprocess.run(["git","-C",REPO,"log","-1","--format=%B",h],
+                           capture_output=True, text=True)
+        if r.returncode == 0: src += r.stdout.split("\n")
+    if not src: continue
+    pool = set()
+    for l in src:
+        for mm in NUM.finditer(l): pool.add(norm(mm.group(1)))
+        for mm in re.finditer(r'\d[\d,\.]*', l): pool.add(norm(mm.group(0)))
+    # 관찰/사용자 영향에 적힌 수치가 원문 pool에 있는가
+    for l in blk:
+        if not re.match(r'^\s*(- \*\*(관찰|사용자 영향)\*\*|  )', l): continue
+        for mm in NUM.finditer(l):
+            v = norm(mm.group(1))
+            if v in pool: continue
+            if v in {norm(x) for x in re.findall(r'\d[\d,\.]*', " ".join(
+                    re.findall(r'`[^`]*`', l)))}: continue   # 인용부호 안 식별자
+            if re.match(r'^20\d\d$', v): continue           # 연도
+            if re.search(r'#%s\b' % re.escape(v), l): continue  # PR 번호
+            if re.search(r'§\s*%s\b' % re.escape(v), l): continue  # 이 문서 절 번호
+            flag.append((eid, v, l.strip()[:95]))
+print(f"=== 인용 범위에서 찾지 못한 수치: {len(flag)}건 (전부 사람 판정 대상) ===")
+seen = collections.Counter()
+for eid, v, l in flag:
+    seen[eid] += 1
+    if seen[eid] <= 4: print(f"[{eid}] {v}\n    {l}")
+```
+
+```
+$ python3 numsrc.py
+=== 인용 범위에서 찾지 못한 수치: 1건 (전부 사람 판정 대상) ===
+[R-BASIS-04] 19
+    그 상태였다 — 측정 시점 **2026-08-07**(`2610826` 커밋 본문). *(78/400 = 19.5%는 이
+```
+
+- **남은 지목 1건은 `R-BASIS-04`**였고, 확인 결과 **legacy 인용이 아니라 이 문서가
+  `78/400`을 계산한 파생값**이었다. 커밋 본문은 "운영 DB 홀드아웃 400건 중 78건"만 적는다
+  — **그 사실을 ledger에 표시**했다.
+- **추가 발견 0건.** H1·H2 외에 인용 범위에 없는 수치는 없다.
+- **초기 실행은 17건을 지목**했고 전수로 읽어 판정했다 — 대부분 PR 번호(`#262`)·연도·
+  이 문서 절 번호(`§10`)·백분율 소수부 분리였고, **커밋 본문을 pool에 넣지 않은 것**이
+  진짜 구멍이었다(H1이 커밋 본문 축이다). 그 둘을 반영한 것이 위 출력이다.
