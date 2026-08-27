@@ -157,10 +157,10 @@ $ python3 citecheck.py docs/discovery/regression-ledger.md
   [부재] reports/evidence/m0/0a2/decisions.md:None  ← [(None, 45)]
   [부재] reports/evidence/m0/0b/commands.md:None  ← [(None, 59)]
   [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 88), ('R-RATE-03', 259), ('R-RATE-05', 305)]
-  [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 439)]
-  [부재] commands.md:None  ← [('R-FLOOR-06', 584), ('R-QUAL-07', 745)]
-  [부재] data-extract.md:None  ← [('R-COL-06', 879), ('R-ML-07', 1243)]
-  [부재] capability-map.md:None  ← [('R-ML-09', 1289), ('R-ML-09', 1325), ('R-ML-09', 1336)]
+  [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 445)]
+  [부재] commands.md:None  ← [('R-FLOOR-06', 590), ('R-QUAL-07', 751)]
+  [부재] data-extract.md:None  ← [('R-COL-06', 885), ('R-ML-07', 1249)]
+  [부재] capability-map.md:None  ← [('R-ML-09', 1295), ('R-ML-09', 1305), ('R-ML-09', 1336)]
 --- 행 범위: 파일 길이 내 104 / 초과 0 ---
 
 --- commit: legacy 25종 / 이 저장소(v2) 1종 ---
@@ -693,7 +693,7 @@ $ git diff --check ec115a7...HEAD | wc -l
 $ git status --porcelain -- docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
 0
 $ wc -l docs/discovery/regression-ledger.md
-1346 docs/discovery/regression-ledger.md
+1357 docs/discovery/regression-ledger.md
 ```
 
 - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 ·
@@ -1031,7 +1031,9 @@ rows = re.findall(r'^\|\s*(OPEN-[A-Z]+-\d+)\s*\|([^|]*)\|', cm, re.M)
 STOP = set("결정 필요 사항 여부 것인가 무엇 어떤 할 를 을 이 가 의 와 과 에 로 는 은 수 그 이번 V2 legacy".split())
 topics = {}
 for oid, q in rows:
-    terms = {t for t in re.findall(r'[A-Za-z_][A-Za-z0-9_]{4,}|[가-힣]{3,}', q)
+    # **숫자 리터럴도 특징어다** — `OPEN-DEC-07`(마진 `0.05`, 비율 `1.15`)이 어휘만으로는
+    # 하나도 안 걸려 F-1이 두 겹을 다 빠져나갔다.
+    terms = {t for t in re.findall(r'[A-Za-z_][A-Za-z0-9_]{4,}|[가-힣]{3,}|\d+\.\d+', q)
              if t not in STOP}
     if terms: topics[oid] = terms
 
@@ -1050,31 +1052,76 @@ for n, st in enumerate(starts):
             hit = terms & set(re.findall(r'[A-Za-z_][A-Za-z0-9_]{4,}|[가-힣]{3,}', l))
             if len(hit) >= 2 and (eid, oid) not in named:
                 cands[(eid, oid)] |= hit
+# 숫자 리터럴은 **하나만 겹쳐도** 지목한다(어휘와 달리 우연 일치가 드물다).
+for n, st in enumerate(starts):
+    e = starts[n+1] if n+1 < len(starts) else len(lines)
+    eid = re.match(r'^### ([RP]-[A-Z]+-\d+)', lines[st]).group(1)
+    field = None
+    for k in range(st, e):
+        l = lines[k]
+        m = re.match(r'^- \*\*([^*]+)\*\*', l)
+        if m: field = m.group(1).split("(")[0].split(" —")[0].strip()
+        if field not in DECIDE: continue
+        nums = set(re.findall(r'\d+\.\d+', l))
+        for oid, terms in topics.items():
+            hit = {t for t in terms if re.match(r'\d+\.\d+$', t)} & nums
+            if hit and (eid, oid) not in named: cands[(eid, oid)] |= hit
 print(f"\n=== id 없이 주제가 겹치는 후보: {len(cands)}건 (오탐 다수 — 사람 판정) ===")
 for (eid, oid), terms in sorted(cands.items()):
     print(f"  [{eid}] ~ {oid}  공통어: {sorted(terms)[:5]}")
+
+# ── 사각지대 명시: 특징어를 뽑을 수 없어 **2차가 볼 수 없는** 활성 OPEN ──
+weak = sorted(o for o in active if o.startswith("OPEN-") and not o.startswith("OPEN-REG")
+              and len(topics.get(o, set())) < 2)
+print(f"\n=== 2차가 매칭할 수 없는 활성 OPEN: {len(weak)}건 (특징어 2개 미만) ===")
+for o in weak:
+    q = next((qq.strip() for oo, qq in rows if oo == o), "")
+    print(f"  {o}: 특징어 {sorted(topics.get(o, set()))} | 질문 {q[:60]}")
+print("  → 이 항목들은 **사람이 읽어 판정**한다. 기록은 evidence C-8.2.")
 ```
 
 ```
 $ python3 openstance.py
-활성 OPEN 정본: capability-map §12 45건 + OPEN-REG 4건
+활성 OPEN 정본: capability-map §12 45건 + OPEN-REG 5건
 
-=== 결정 필드가 활성 OPEN을 언급하는 자리: 4건 ===
-  [R-COL-02] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :801
+=== 결정 필드가 활성 OPEN을 언급하는 자리: 5건 ===
+  [R-PROV-02] 검증 방법 → OPEN-DEC-07  조건부 표시 있음  :354
+      - **조건부 — `OPEN-DEC-07` 결정에 따라 확정.** legacy의 임계 **1.15**(부가세 1.10 +
+  [R-COL-02] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :807
       - **조건부 — `OPEN-OPS-01`의 정책 질문 결정에 따라 확정.** **분류 불가(`unknown`)를
-  [R-COL-02] 검증 방법 → OPEN-OPS-01  조건부 표시 있음  :810
+  [R-COL-02] 검증 방법 → OPEN-OPS-01  조건부 표시 있음  :816
       - **조건부 — `OPEN-OPS-01` 결정에 따라 확정.** (b) fail-safe면 "`unknown`이 재시도
-  [R-COL-03] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :831
+  [R-COL-03] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :837
       ※ 재시도 정책 자체(`unknown → retryable` 여부)는 **활성 `OPEN-OPS-01`이 소유**하며
-  [R-ASYNC-01] V2 예방 제약 → OPEN-OPS-10  조건부 표시 있음  :946
+  [R-ASYNC-01] V2 예방 제약 → OPEN-OPS-10  조건부 표시 있음  :952
       ※ DB 기반 큐의 backlog 관측·가시성 timeout 계약은 **활성 `OPEN-OPS-10`이 소유**하며
 
 === id 없이 주제가 겹치는 후보: 2건 (오탐 다수 — 사람 판정) ===
   [R-BASIS-01] ~ OPEN-QUAL-10  공통어: ['basis', '운영자']
   [R-COL-01] ~ OPEN-ML-05  공통어: ['policy', 'versioned']
+
+=== 2차가 매칭할 수 없는 활성 OPEN: 7건 (특징어 2개 미만) ===
+  OPEN-COL-03: 특징어 ['업무구분'] | 질문 업무구분 코드 전체 체계(현재 4개만 매핑)
+  OPEN-COL-05: 특징어 ['limit'] | 질문 외부 API rate limit의 실제 수치
+  OPEN-NOTI-06: 특징어 ['초기값'] | 질문 알림 임계 4종의 초기값
+  OPEN-NUM-02: 특징어 ['unknown'] | 질문 자격 관련 수치 5종(92% unknown 포함)
+  OPEN-OPS-03: 특징어 [] | 질문 큐 깊이 검출 SLO (**임계 미결**)
+  OPEN-SET-01: 특징어 ['페이퍼'] | 질문 페이퍼 정산 근접 임계 3종의 도출 근거
+  OPEN-SET-05: 특징어 ['재공고'] | 질문 재공고(차수 다수) 대사 대상 선택 규칙
+  → 이 항목들은 **사람이 읽어 판정**한다. 기록은 evidence C-8.2.
 ```
 
-**판정 — 추가 발견 0건.** 2차가 남긴 후보 둘은 **어휘만 겹치는 오탐**이다:
+> **정정 (verifier F-1) — 이 절의 "추가 발견 0건"은 참이 아니었다.**
+> **계열 A 실물이 하나 더 있었다** — `OPEN-DEC-07`(마진 `0.05` 재유도 대기, **활성 ·
+> M1 차단**)의 값을 `R-PROV-02`의 `검증 방법`과 **§10 fixture-curator 인계**가 조건 표시
+> 없이 고정했다. **둘 다 고쳤다**(결정 무관 = 판정 **순서** / 조건부 = 경계 **값**).
+>
+> **축이 두 겹 다 못 봤다** — 1차는 그 두 줄이 `OPEN-DEC-07`을 적지 않아서, 2차는 그
+> OPEN의 `결정 필요 사항`("기준 금액 신뢰 비율 **1.15**의 마진 **0.05** 값")에 **어휘
+> 토큰이 하나도 없어서**다(전부 숫자다). **2차에 숫자 리터럴 대조를 넣었다** — 숫자는
+> 어휘와 달리 우연 일치가 드물어 **하나만 겹쳐도 지목**한다.
+
+**판정 — 아래는 축을 고친 뒤의 결과다.** 2차가 남긴 후보 둘은 **어휘만 겹치는 오탐**이다:
 
 | 후보 | 판정 |
 | --- | --- |
@@ -1083,6 +1130,29 @@ $ python3 openstance.py
 
 1차가 지목한 `R-COL-03`·`R-ASYNC-01`은 **이미 "활성 OPEN이 소유한다"고 적고 있어** 선점이
 아니다(축이 그렇게 표시한다).
+
+#### 축의 사각지대 — 특징어를 뽑을 수 없는 활성 OPEN 7건 (verifier F-1)
+
+숫자 대조를 넣어도 **`결정 필요 사항`이 짧아 특징어가 2개 미만인 활성 OPEN**은 2차가
+매칭하지 못한다. **그 목록을 축이 직접 찍게 했고**(위 출력 마지막 절) **일곱 건은 사람이
+읽어 판정했다.**
+
+| OPEN | 질문 | 판정 |
+| --- | --- | --- |
+| `OPEN-COL-03` | 업무구분 코드 전체 체계 | ledger 결정 필드에 **업무구분 코드가 없다** |
+| `OPEN-COL-05` | 외부 API rate limit의 **실제 수치** | `R-COL-02`가 "rate limit/quota는 1급 카테고리, 처리는 backoff"라고만 적는다 — **수치를 고정하지 않는다** |
+| `OPEN-NOTI-06` | 알림 임계 4종의 초기값 | ledger에 **알림 임계가 없다** |
+| `OPEN-NUM-02` | 자격 관련 수치 5종 | `R-QUAL-03`의 "3건 중 1건"은 **legacy 관찰**이고 V2 요구가 아니다 |
+| `OPEN-OPS-03` | 큐 깊이 검출 SLO **임계** | `R-ASYNC-01`·`R-ASYNC-08`은 **무엇을 재는가**(큐 깊이·마지막 진행 시각)를 요구할 뿐 **임계값을 고정하지 않는다.** `R-ASYNC-01`은 DB 큐 계약을 `OPEN-OPS-10` 소유로 이미 넘긴다 |
+| `OPEN-SET-01` | 페이퍼 정산 근접 임계 3종 | ledger에 **정산 근접 임계가 없다** |
+| `OPEN-SET-05` | 재공고 대사 대상 선택 규칙 | ledger에 **재공고 대사가 없다** |
+
+**일곱 건 다 선점 없음.** 판정은 각 OPEN의 핵심어로 결정 필드를 훑어(`임계`·`rate limit`·
+`업무구분` 등) 걸린 줄을 읽는 방식으로 했고, **`임계`처럼 흔한 낱말은 오탐이 많아 전부 열어
+읽었다.**
+
+**이 목록은 축의 출력에 남는다** — 다음 라운드가 같은 판정을 다시 하지 않아도 되고,
+활성 OPEN이 바뀌면 목록도 바뀐다.
 
 ### C-8.3 medium #1 — 축이 1줄 느슨했다
 
@@ -1110,10 +1180,42 @@ $ python3 openstance.py
 > 옛 버전(split)  : 행 범위: 파일 길이 내 104 / 초과 0
 > ```
 
-**그 틈을 실제로 쓴 인용이 있었는지 재 봤다** — 인용 끝과 파일 끝의 여유를 전수로 계산:
+**그 틈을 실제로 쓴 인용이 있었는지 재 봤다** — 인용 끝과 파일 끝의 여유를 전수로
+계산한다. **스크립트 본문**(형태 4 — verifier F-3이 지적해 인라인했다):
+
+```python
+# 인용 행 범위 끝과 파일 끝의 여유 — 축이 1줄 느슨했던 동안 그 틈을 쓴 인용이 있었는가.
+import re, subprocess
+REPO, REF = "bid-vector", "ed4b06c"
+src = open("docs/discovery/regression-ledger.md", encoding="utf-8").read()
+PATH = re.compile(r'`([A-Za-z0-9_./-]+\.(?:py|md|toml|cfg|yaml|yml|json|txt))'
+                  r'(?::([\d,\-]+))?(?:::[A-Za-z_][A-Za-z0-9_]*)?`')
+tree = set(subprocess.run(["git","-C",REPO,"ls-tree","-r","--name-only",REF],
+                          capture_output=True, text=True).stdout.split())
+cache = {}
+def body(p):
+    if p not in cache:
+        cache[p] = subprocess.run(["git","-C",REPO,"show",f"{REF}:{p}"],
+                                  capture_output=True, text=True).stdout.splitlines()
+    return cache[p]
+worst = []
+for m in PATH.finditer(src):
+    p, rng = m.group(1), m.group(2)
+    if p not in tree or not rng: continue
+    n = len(body(p))
+    for part in rng.split(","):
+        hi = int(part.split("-")[-1])
+        worst.append((n - hi, p, part, n))
+worst.sort()
+print("행 범위 끝과 파일 끝의 여유(작을수록 경계에 가깝다) — 하위 6건:")
+for slack, p, part, n in worst[:6]:
+    print(f"  여유 {slack:>5}  {p}:{part}  (파일 {n}줄)")
+print(f"\n음수(=초과) 건수: {sum(1 for s,_,_,_ in worst if s < 0)}")
+print(f"여유 0(=마지막 줄까지 인용) 건수: {sum(1 for s,_,_,_ in worst if s == 0)}")
+```
 
 ```
-$ python3 - <<'PY'   # 여유 = 파일 줄 수 − 인용 범위 끝
+$ python3 slack.py
 행 범위 끝과 파일 끝의 여유(작을수록 경계에 가깝다) — 하위 6건:
   여유     0  app/services/classification/eligibility.py:53-97  (파일 97줄)
   여유     0  app/services/classification/text.py:108-117  (파일 117줄)
@@ -1124,7 +1226,6 @@ $ python3 - <<'PY'   # 여유 = 파일 줄 수 − 인용 범위 끝
 
 음수(=초과) 건수: 0
 여유 0(=마지막 줄까지 인용) 건수: 3
-PY
 ```
 
 - **초과 0.** 느슨한 동안에도 **그 틈을 쓴 인용은 없었다.**
@@ -1151,6 +1252,25 @@ PY
 표에 있다 — **형태 5(정정을 인용 지점에 전파하지 않기)**다. 판정을 좁혔으면 **그 판정을
 요약한 자리를 전수로 찾는 것**이 규칙이고, 라운드 3이 그것을 하지 않았다. **한계로 적고
 규칙을 다시 가리킨다.**
+
+### C-8.6 형태 6 재발 — 산문을 고치고 대상을 안 고쳤다 (verifier F-0, blocker)
+
+**§10.1 형태 6의 재발이며 새 형태가 아니다.** 그 형태의 규칙은
+**"'고쳤다'는 진술도 전칭이다 — 적기 전에 그 지점을 열어 확인한다"**이고,
+**내가 앞 라운드에 세운 규칙**이다.
+
+**이번 모양은 "산문을 고치고 대상을 안 고쳤다"**다. 앞선 재발들이 *대상을 고치고
+인용 지점을 놓친* 형태(형태 5 계열)였다면, 이번은 **반대 방향**이다 — 세 파일이
+"고쳤다"고 적는 동안 **고쳐야 할 스크립트 본문은 손대지 않았다.**
+
+**원인은 도구다.** resync 루프가 **「출력」만 갱신하고 「본문」은 갱신하지 않았다** —
+스크래치패드의 실물은 고쳐져 있었고 **그것으로 실행한 출력도 맞았지만**, evidence에
+인라인된 본문만 옛 상태로 남았다. 그래서 **누가 evidence의 본문을 그대로 돌리면 느슨한
+검사가 나온다.**
+
+**처방**: **본문 동기화를 resync에 넣었다.** 그리고 인라인된 스크립트 **6종을 실물과
+전수 대조**해 어긋난 것이 `citecheck` 하나뿐임을 확인했다 — 나머지 다섯은 바이트 동일.
+**"고쳤다"고 적을 때 그 대상이 파일이면 그 파일의 diff를 본다.**
 
 ### C-8.5 §10.1 판단 — 계열 A는 **일곱 번째 형태로 추가할 만하다**(단 그 파일은 범위 밖)
 
