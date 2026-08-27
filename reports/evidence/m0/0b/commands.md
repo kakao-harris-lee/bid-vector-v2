@@ -157,8 +157,8 @@ $ python3 citecheck.py docs/discovery/regression-ledger.md
   [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 88), ('R-RATE-03', 259), ('R-RATE-05', 305)]
   [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 439)]
   [부재] commands.md:None  ← [('R-FLOOR-06', 584), ('R-QUAL-07', 745)]
-  [부재] data-extract.md:None  ← [('R-COL-06', 864), ('R-ML-07', 1228)]
-  [부재] capability-map.md:None  ← [('R-ML-09', 1274), ('R-ML-09', 1310), ('R-ML-09', 1321)]
+  [부재] data-extract.md:None  ← [('R-COL-06', 879), ('R-ML-07', 1243)]
+  [부재] capability-map.md:None  ← [('R-ML-09', 1289), ('R-ML-09', 1325), ('R-ML-09', 1336)]
 --- 행 범위: 파일 길이 내 104 / 초과 0 ---
 
 --- commit: legacy 25종 / 이 저장소(v2) 1종 ---
@@ -685,13 +685,13 @@ R-ASYNC-02 · R-ML-07 · R-ML-08.
 ```
 $ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
     docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
-5
+6
 $ git diff --check ec115a7...HEAD | wc -l
 0
 $ git status --porcelain -- docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
 0
 $ wc -l docs/discovery/regression-ledger.md
-1331 docs/discovery/regression-ledger.md
+1346 docs/discovery/regression-ledger.md
 ```
 
 - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 ·
@@ -950,3 +950,201 @@ $ python3 numsrc.py
   실제로 `사용자 영향`에 있는 값으로 교체했다. 자기 문서의 필드 배치라 **확인 비용이 0인
   자리에서 형태 1을 냈다.**
 - **단일 숫자와 백분율 표기**는 잡되, 그 값이 원문의 다른 문맥에 우연히 있으면 통과한다.
+
+---
+
+## C-8. Codex 1차 대응 (2026-08-27) — 계열 A와 축의 경계
+
+Codex 1차 판정 `request_changes` — blocker 0 / high 1 / medium 2. verdict는
+`codex-review-20260827T064055Z.json`(등재, append-only).
+
+### C-8.1 high — 계열 A. 계약이 건 여섯 형태에 없던 축이다
+
+`R-COL-02`가 **"분류 불가(`unknown`)는 재시도 가능이 될 수 없다"**를 확정하고 `검증 방법`
+에서 고정했다. 그런데 **같은 문서 `R-COL-03`과 `capability-map.md` §12가 그 정책은 활성
+`OPEN-OPS-01` 소유**라고 적는다.
+
+**0A2가 `OPS-09`에 쓴 기법을 그대로 따랐다** — 결정과 무관하게 성립하는 것과 정책에 달린
+것을 **갈랐다**:
+
+| 갈래 | 내용 |
+| --- | --- |
+| **결정 무관** | 실패 분류가 **응답 신호**에서 나온다 · rate limit/quota는 **1급 카테고리**이고 처리는 **backoff**다 · **재시도 가능 여부가 분류마다 선언되고 관측된다** — **값이 아니라 선언의 존재**를 고정한다(지침서의 침묵 fallback 금지에서 나오므로 **정책 결정과 무관**) |
+| **조건부** | `unknown`을 재시도 가능으로 둘지는 **미결**. `OPS-09`가 fail-safe를 **결정 전 기본값**으로 쓰되 **"작성자 판단이지 확정이 아니다"**라고 명시했고 **이 문서도 그 지위를 그대로 따른다.** (a)/(b) 각각에서 `검증 방법`이 무엇으로 대체되는지도 적었다 |
+
+`동반 OPEN` 항목을 새로 달아 `OPEN-OPS-01`의 **두 질문(측정·정책)**을 밝히고 **둘 다 이
+문서가 결정하지 않음**을 명시했다. **`OPEN-OPS-01`을 해소하지 않았다.**
+
+### C-8.2 계열 A 전수 훑기 — 축을 하나 더 만들었다
+
+**기존 축 다섯은 이 부류를 보지 않는다.** 전부 **근거의 지위**(확인했는가 · 실행했는가 ·
+전파했는가 · 셌는가)를 보고, 계열 A는 **미결을 확정으로 쓰는가**라는 다른 축이다.
+
+**두 겹으로 짰다.** 1차는 결정 필드가 **활성 OPEN id를 언급**하는 자리를 보고, 2차는
+**id를 언급하지 않는 선점**을 활성 OPEN의 `결정 필요 사항` 특징어로 찾는다 —
+**`R-COL-02`가 정확히 1차를 빠져나갔기 때문**이다(그 항목은 `OPEN-OPS-01`을 아예 적지
+않았다).
+
+```python
+# 계열 A 스윕 — 활성 OPEN이 소유한 쟁점을 `V2 예방 제약`·`검증 방법`이 확정하는가.
+# 정본: capability-map.md §12의 활성 registry + ledger §9의 OPEN-REG.
+# 기계가 판정할 수 없는 것: "그 문장이 그 OPEN의 분기를 선점하는가". 지목만 하고 사람이 읽는다.
+import re, collections
+CM = "docs/discovery/capability-map.md"
+LG = "docs/discovery/regression-ledger.md"
+
+cm = open(CM, encoding="utf-8").read()
+active = set(re.findall(r'^\|\s*(OPEN-[A-Z]+-\d+)\s*\|', cm, re.M))
+lg = open(LG, encoding="utf-8").read()
+active |= set(re.findall(r'\*\*(OPEN-REG-\d+)\*\*', lg))
+print(f"활성 OPEN 정본: capability-map §12 {len(active - set(re.findall(r'OPEN-REG-\d+', lg)))}건"
+      f" + OPEN-REG {len(set(re.findall(r'OPEN-REG-\d+', lg)))}건")
+
+lines = lg.split("\n")
+starts = [i for i, l in enumerate(lines) if re.match(r'^### [RP]-', l)]
+DECIDE = ("V2 예방 제약", "검증 방법")
+hits = []
+for n, st in enumerate(starts):
+    e = starts[n+1] if n+1 < len(starts) else len(lines)
+    eid = re.match(r'^### ([RP]-[A-Z]+-\d+)', lines[st]).group(1)
+    field = None
+    for k in range(st, e):
+        l = lines[k]
+        m = re.match(r'^- \*\*([^*]+)\*\*', l)
+        if m: field = m.group(1).split("(")[0].split(" —")[0].strip()
+        if field not in DECIDE: continue
+        for o in set(re.findall(r'OPEN-[A-Z]+-\d+', l)):
+            if o in active:
+                cond = bool(re.search(r'조건부|미정|소유|결정하지 않는다|판단이지|결정에 따라', l))
+                hits.append((eid, field, o, k+1, cond, l.strip()[:95]))
+print(f"\n=== 결정 필드가 활성 OPEN을 언급하는 자리: {len(hits)}건 ===")
+for eid, f, o, ln, cond, l in hits:
+    print(f"  [{eid}] {f} → {o}  {'조건부 표시 있음' if cond else '★ 확정 서술 의심'}  :{ln}\n      {l}")
+
+
+# ── 2차: **id를 언급하지 않는** 선점 후보 (R-COL-02가 그렇게 새어 나갔다) ──
+# 활성 OPEN의 `결정 필요 사항`에서 특징어를 뽑아 결정 필드와 대조한다.
+# 어휘 매칭이라 오탐이 많다 — **지목만 하고 사람이 읽는다.**
+rows = re.findall(r'^\|\s*(OPEN-[A-Z]+-\d+)\s*\|([^|]*)\|', cm, re.M)
+STOP = set("결정 필요 사항 여부 것인가 무엇 어떤 할 를 을 이 가 의 와 과 에 로 는 은 수 그 이번 V2 legacy".split())
+topics = {}
+for oid, q in rows:
+    terms = {t for t in re.findall(r'[A-Za-z_][A-Za-z0-9_]{4,}|[가-힣]{3,}', q)
+             if t not in STOP}
+    if terms: topics[oid] = terms
+
+named = {(eid, o) for eid, _, o, _, _, _ in hits}
+cands = collections.defaultdict(set)
+for n, st in enumerate(starts):
+    e = starts[n+1] if n+1 < len(starts) else len(lines)
+    eid = re.match(r'^### ([RP]-[A-Z]+-\d+)', lines[st]).group(1)
+    field = None
+    for k in range(st, e):
+        l = lines[k]
+        m = re.match(r'^- \*\*([^*]+)\*\*', l)
+        if m: field = m.group(1).split("(")[0].split(" —")[0].strip()
+        if field not in DECIDE: continue
+        for oid, terms in topics.items():
+            hit = terms & set(re.findall(r'[A-Za-z_][A-Za-z0-9_]{4,}|[가-힣]{3,}', l))
+            if len(hit) >= 2 and (eid, oid) not in named:
+                cands[(eid, oid)] |= hit
+print(f"\n=== id 없이 주제가 겹치는 후보: {len(cands)}건 (오탐 다수 — 사람 판정) ===")
+for (eid, oid), terms in sorted(cands.items()):
+    print(f"  [{eid}] ~ {oid}  공통어: {sorted(terms)[:5]}")
+```
+
+```
+$ python3 openstance.py
+활성 OPEN 정본: capability-map §12 45건 + OPEN-REG 4건
+
+=== 결정 필드가 활성 OPEN을 언급하는 자리: 4건 ===
+  [R-COL-02] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :801
+      - **조건부 — `OPEN-OPS-01`의 정책 질문 결정에 따라 확정.** **분류 불가(`unknown`)를
+  [R-COL-02] 검증 방법 → OPEN-OPS-01  조건부 표시 있음  :810
+      - **조건부 — `OPEN-OPS-01` 결정에 따라 확정.** (b) fail-safe면 "`unknown`이 재시도
+  [R-COL-03] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :831
+      ※ 재시도 정책 자체(`unknown → retryable` 여부)는 **활성 `OPEN-OPS-01`이 소유**하며
+  [R-ASYNC-01] V2 예방 제약 → OPEN-OPS-10  조건부 표시 있음  :946
+      ※ DB 기반 큐의 backlog 관측·가시성 timeout 계약은 **활성 `OPEN-OPS-10`이 소유**하며
+
+=== id 없이 주제가 겹치는 후보: 2건 (오탐 다수 — 사람 판정) ===
+  [R-BASIS-01] ~ OPEN-QUAL-10  공통어: ['basis', '운영자']
+  [R-COL-01] ~ OPEN-ML-05  공통어: ['policy', 'versioned']
+```
+
+**판정 — 추가 발견 0건.** 2차가 남긴 후보 둘은 **어휘만 겹치는 오탐**이다:
+
+| 후보 | 판정 |
+| --- | --- |
+| `R-BASIS-01` ~ `OPEN-QUAL-10` | **오탐 — 다른 금액 축.** `OPEN-QUAL-10`은 **시공능력평가금액**(QUAL 축)의 unit·과세이고, R-BASIS-01의 제약은 **예산 필터 basis**로 운영자 결정 `OPEN-STR-01`(확정)에 선다. 라운드 4에 두 금액의 **차이 크기**를 `OPEN-QUAL-10` 소유로 넘긴 것은 **참조이지 선점이 아니다** |
+| `R-COL-01` ~ `OPEN-ML-05` | **오탐 — 다른 정책 영역.** `OPEN-ML-05`는 **predictor 정책 값 33개**의 versioned policy 경계이고, R-COL-01은 **KONEPS `resultCode`**의 versioned policy로 운영자 결정 `OPEN-COL-02`(확정)에 선다. `versioned`·`policy` 두 낱말만 겹친다 |
+
+1차가 지목한 `R-COL-03`·`R-ASYNC-01`은 **이미 "활성 OPEN이 소유한다"고 적고 있어** 선점이
+아니다(축이 그렇게 표시한다).
+
+### C-8.3 medium #1 — 축이 1줄 느슨했다
+
+`citecheck`가 파일 길이를 `len(stdout.split("\n"))`으로 계산해 **trailing newline 때문에
+실제보다 1 컸다.** `splitlines()`로 고쳤다.
+
+**그 틈을 실제로 쓴 인용이 있었는지 재 봤다** — 인용 끝과 파일 끝의 여유를 전수로 계산:
+
+```
+$ python3 - <<'PY'   # 여유 = 파일 줄 수 − 인용 범위 끝
+행 범위 끝과 파일 끝의 여유(작을수록 경계에 가깝다) — 하위 6건:
+  여유     0  app/services/classification/eligibility.py:53-97  (파일 97줄)
+  여유     0  app/services/classification/text.py:108-117  (파일 117줄)
+  여유     0  app/services/license_eligibility.py:447-511  (파일 511줄)
+  여유     2  app/services/allocation_core.py:133-179  (파일 181줄)
+  여유     4  app/core/constants.py:445  (파일 449줄)
+  여유     4  app/core/inference_config.py:114-124  (파일 128줄)
+
+음수(=초과) 건수: 0
+여유 0(=마지막 줄까지 인용) 건수: 3
+PY
+```
+
+- **초과 0.** 느슨한 동안에도 **그 틈을 쓴 인용은 없었다.**
+- **다만 세 인용이 정확히 마지막 줄에서 끝난다.** 셋 다 파일이 실제로 거기서 끝나는 것을
+  `tail -2`로 확인했다 — **고친 축은 이 경계를 이제 정확히 잡는다.**
+
+**다른 세 축의 같은 부류 점검**: `ledgercheck`·`numsrc`·`prosecheck`도 `split("\n")`을
+쓰지만 **모두 줄을 순회하는 용도**이고 **길이를 경계로 쓰지 않는다** — 끝에 붙는 빈 원소는
+어떤 패턴에도 걸리지 않는다. `numsrc`가 legacy 본문을 `b[lo-1:hi]`로 자르는 곳은
+**슬라이스라 범위를 넘어도 잘려 나갈 뿐** 잘못된 결과를 만들지 않는다. **경계 오차 없음.**
+
+### C-8.4 medium #2 — `prosecheck`가 이 부류를 보지 못하는 이유
+
+`checklist.md`와 `scope.md`가 선행 조사 표 불일치의 원인을 **"전부 두 축의 혼동"**으로
+요약했는데, `commands.md` C-5.2는 라운드 3에 그것을 **"계열 6 한 칸만 그렇고 3·4·8은 단순
+오계수"**로 좁혔다. **두 곳에 전파되지 않았다**(형태 5). 둘 다 고쳤다.
+
+**`prosecheck`는 이 부류를 설계상 보지 않는다.** 그 축의 정본은 **출력 블록에서 뽑은 명명된
+수치**이고 대조 대상은 **산문이 옮겨 적은 그 수**다. 이번 것은 **수가 아니라 판정 요약**이며
+**출력 블록에 정본이 없다** — 어느 명령도 "이 요약이 저 절의 판정과 맞는가"를 계산하지
+못한다.
+
+**축을 늘리지 않았다.** 계산할 정본이 없으면 도구를 만들 수 없고, 이 부류의 처방은 이미
+표에 있다 — **형태 5(정정을 인용 지점에 전파하지 않기)**다. 판정을 좁혔으면 **그 판정을
+요약한 자리를 전수로 찾는 것**이 규칙이고, 라운드 3이 그것을 하지 않았다. **한계로 적고
+규칙을 다시 가리킨다.**
+
+### C-8.5 §10.1 판단 — 계열 A는 **일곱 번째 형태로 추가할 만하다**(단 그 파일은 범위 밖)
+
+**추가하는 쪽이 맞다고 판단한다.** 근거 넷:
+
+1. **기존 여섯은 전부 "근거의 지위" 축**이다 — 확인했는가(1·2) · 실행했는가(3·4) ·
+   전파했는가(5) · 셌는가(6). 계열 A는 **"미결을 확정으로 쓰는가"**로 **다른 축**이다.
+2. **여섯을 다 지켜도 발생한다.** legacy를 직접 열고, 명령을 실행하고, 전파하고, 재현
+   명령으로 셈을 대신해도 **활성 OPEN의 분기를 선점할 수 있다.** `R-COL-02`가 그 실물이다.
+3. **0B 계약이 여섯 형태를 처음부터 걸었는데도 났다.** 표가 이 부류를 덮지 못한다는
+   **직접 증거**다.
+4. **고유한 적출 방법과 처방이 있다** — 축은 C-8.2, 처방은 **결정 무관/조건부 분리**
+   (`OPS-09` 기법)다. 기존 여섯 중 어느 것도 이 처방을 주지 않는다.
+
+**앞서 두 번은 새 형태를 만들지 않는 쪽이 옳았다**(형태 2로 흡수, 형태 5의 절반 복원).
+그때는 **뿌리가 기존 형태와 같았고** 지금은 다르다.
+
+**다만 §10.1은 `reports/evidence/m0/0a2/checklist.md`에 있고 0B의 out_of_scope다.**
+이 slice는 **판단만 기록하고 그 파일을 편집하지 않는다** — 표를 고치려면 별도 slice 계약이
+필요하다. **0B는 그 사이 계열 A 축(C-8.2)을 자기 evidence에 두고 돌린다.**

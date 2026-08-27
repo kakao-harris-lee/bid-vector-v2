@@ -1,0 +1,55 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "ec115a79c75e51770ecd58d3c19a3d2adb70120e",
+  "reviewed_head": "26199744f187cb626121f1fb6ae7944b644d4b89",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/discovery/regression-ledger.md",
+      "line": 795,
+      "evidence": "R-COL-02는 `분류 불가(unknown)는 재시도 가능이 될 수 없다`고 확정하고 line 799에서 이를 검증 대상으로 고정한다. 그러나 같은 문서 line 816-817은 `unknown → retryable` 정책이 활성 `OPEN-OPS-01` 소유라고 명시하며, `docs/discovery/capability-map.md:3023`과 `:3158`도 재시도 여부가 미결이라고 확인한다. 따라서 이 slice가 활성 OPEN을 선점했으며 A4·A7 및 checklist line 73의 `활성 OPEN을 선점하지 않았다` 주장과 충돌한다.",
+      "required_fix": "R-COL-02의 확정 제약은 구조화된 실패 분류, 별도 `Unclassified`, 관측 가능성까지만 남기고 `Unclassified`의 재시도 여부는 `OPEN-OPS-01` 결정에 조건화한다. line 799의 검증 방법과 checklist의 A4 판정도 같은 범위로 정정한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0b/commands.md",
+      "line": 108,
+      "evidence": "C-2 인용 검사기는 파일 길이를 `len(stdout.split(\"\\n\"))`로 계산한다. `git show` 결과가 일반적인 trailing newline으로 끝나면 실제 줄 수보다 1 크게 계산된다. 재현 명령 `python3 -c 'print(len(\"one\\n\".split(\"\\n\")), len(\"one\\n\".splitlines()))'`은 `2 1`을 출력하므로 실제 마지막 줄 다음 행을 인용해도 `파일 길이 내`로 통과할 수 있다. 따라서 C-2.1의 `행 범위 초과 0` 출력은 A2의 정확한 행 범위 불변을 온전히 검사하지 않는다.",
+      "required_fix": "파일 길이를 `splitlines()` 등으로 정확히 계산하고, 마지막 행과 마지막 행+1 인용에 대한 변이 검사를 추가한 뒤 legacy 저장소가 있는 환경에서 C-2를 재실행하여 기록된 출력을 갱신한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0b/checklist.md",
+      "line": 26,
+      "evidence": "현재 acceptance checklist는 선행 조사 표의 불일치 원인을 전부 `상태 축과 사용자 영향 축을 한 칸에 섞었다`고 요약한다. 그러나 같은 evidence의 `commands.md:647-659`는 재계산 결과 이 설명이 계열 6 한 칸에만 성립하고 계열 3·4·8은 단순 오계수라고 명시한다. 자기 정정 결과가 현재 checklist와 `scope.md:150-153`의 완료 요약에 전파되지 않아 evidence가 내부적으로 모순된다.",
+      "required_fix": "checklist의 현재 요약을 계열 6의 축 혼동과 계열 3·4·8의 단순 오계수로 구분한다. scope의 기존 완료 요약도 정정하거나 명시적으로 후속 정정에 의해 대체됐다고 표시한다."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse --show-toplevel && git rev-parse HEAD",
+    "git cat-file -t ec115a79c75e51770ecd58d3c19a3d2adb70120e && git cat-file -t 26199744f187cb626121f1fb6ae7944b644d4b89",
+    "git merge-base ec115a79c75e51770ecd58d3c19a3d2adb70120e 26199744f187cb626121f1fb6ae7944b644d4b89 && git merge-base --is-ancestor ec115a79c75e51770ecd58d3c19a3d2adb70120e 26199744f187cb626121f1fb6ae7944b644d4b89",
+    "git status --short --untracked-files=all",
+    "git diff --stat ec115a79c75e51770ecd58d3c19a3d2adb70120e...26199744f187cb626121f1fb6ae7944b644d4b89",
+    "git diff --name-status ec115a79c75e51770ecd58d3c19a3d2adb70120e...26199744f187cb626121f1fb6ae7944b644d4b89",
+    "git diff --check ec115a79c75e51770ecd58d3c19a3d2adb70120e...26199744f187cb626121f1fb6ae7944b644d4b89",
+    "git log --oneline --reverse ec115a79c75e51770ecd58d3c19a3d2adb70120e..26199744f187cb626121f1fb6ae7944b644d4b89",
+    "sed -n '439,517p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '294,347p' reports/evidence/m0/0b/commands.md | python3 -",
+    "grep -rniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))' docs/discovery/regression-ledger.md reports/evidence/m0/0b/",
+    "wc -l docs/discovery/regression-ledger.md reports/evidence/m0/0b/*.md",
+    "rg -n 'OPEN-OPS-01|OPEN-OPS-10|unknown.*retry|retryable' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md reports/evidence/m0/0b docs/discovery/regression-ledger.md",
+    "python3 custom audit: 61개 항목의 필드, 구조적 제약 표지, 검증 방법 및 운영자 결정 참조 대조",
+    "python3 -c 'print(len(\"one\\n\".split(\"\\n\")), len(\"one\\n\".splitlines()))'"
+  ],
+  "residual_risks": [
+    "이 worktree에는 legacy `bid-vector` 저장소가 없어 `ed4b06c`의 파일 내용·행 범위·commit·수치 주장을 독립 재실행하지 못했다. 이는 요청에 따라 finding이 아니라 잔존 위험으로 남긴다.",
+    "C-5.2 `statusdiff.py`의 입력 `_workspace/m0-0b/01_scout_regression_preflight.md`가 이 worktree에 없어 기록된 scout 대조 출력은 재실행하지 못했다.",
+    "bare 연속 행 범위와 legacy 서술의 방향·의미 정합은 evidence 자체도 사람 판독 축으로 남긴다. legacy 저장소 부재로 이번 리뷰에서는 검증되지 않았다.",
+    "예방 제약은 아직 문서 요구사항이다. 실제 production wiring과 테스트가 이를 우회하지 않는지는 M1 이후 구현 리뷰에서 별도로 검증해야 한다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
