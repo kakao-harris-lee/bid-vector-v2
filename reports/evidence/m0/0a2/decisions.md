@@ -218,9 +218,12 @@
 - **운영자 답**: 지자체 공고에 투찰하지 않는다(2026-08-26).
 - **필수 단서(단서 없는 (b)는 현재 결함을 이식한다)**: legacy의 "명시 제외"는 docstring
   한 줄뿐이고 **런타임에는 지자체가 국가계약 tier로 판정된다**
-  (`floor_applicability.py:125-126`; `tests/test_floor_applicability.py:70`이
-  "울산광역시 울주군"→`FLOOR_APPLICABLE`을 고정). 그 결과 얕은 하회 0.9~2.7%p가 legacy
-  자신의 백테스트 문서에 한계로 공시돼 있다.
+  (`app/ai/floor_applicability.py:126-127`; `tests/test_floor_applicability.py:70`이
+  "울산광역시 울주군"→`FLOOR_APPLICABLE`을 고정). 그 결과 얕은 하회 0.9~2.7%p를 legacy
+  자신이 한계로 적어 둔다 — **출처는 백테스트 문서가 아니라 리포트 생성 스크립트의
+  caveat 문자열**이다(`scripts/backtest_latest_award_holdouts.py:1203-1204`).
+  백테스트 문서(`docs/operations/latest-award-holdout-backtest.md:277`)의 같은 한계
+  서술에는 숫자가 없고, 그 문서 `:240`의 `0.9~1.7%p`는 **다른 축**의 수치다.
 - **따라서 V2는 "실행되는 미적용 상태"로 구현한다** — 지자체 공고를 국가계약 하한으로
   조용히 판정하지 않고, 하한 체계 미지원을 **관측 가능한 상태**로 산출한다.
 - **0B 인계**: 이 항목은 regression ledger 대상이다(선언과 실행의 불일치).

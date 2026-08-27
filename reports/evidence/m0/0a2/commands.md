@@ -472,9 +472,14 @@ $ git show ed4b06c:app/services/opportunity_monitoring/filters.py | sed -n '62,6
 
 - exit: 0
 - **`0755695`는 감시 모듈에 손을 댔다**(`base.py` · `candidates.py`). 건드리지 않은 것은
-  **`filters.py`**이며 그 안의 `:62-67`이 바로 예산 basis 비교 지점이다.
+  **`filters.py`**이며 그 안의 예산 basis 비교 지점이 위 출력이다.
 - 따라서 "감시·검색 경로는 세 commit에서 빠졌다"는 **과했다.** 빠진 것은 정확히
-  **전략 예산 필터(`filters.py:62-67`)와 검색 경로(`projects.py:112-116`) 두 지점**이다.
+  **전략 예산 필터(`filters.py:62-70`)와 검색 경로(`projects.py:112-116`) 두 지점**이다.
+
+> **범위 정정 (2026-08-27, 0B 선행 조사 C-3)** — 위 실행은 `sed -n '62,67p'`로 **블록을
+> 6줄만 떴다.** 비교 블록은 실제로 **`:62-70`**이다. 위 출력은 그 시점 실행 그대로
+> 두고(형태 3), 재실측을 아래 「C-3 재실측」에 적었다. **어느 지점인가라는 실질 주장은
+> 바뀌지 않는다** — 범위 끝이 3줄 늘었다.
   §13 인계 행의 `근거` 문장을 그 범위로 좁혔다. **실질 주장(두 지점이 미수정)은 참이며
   바꾸지 않았다.**
 
@@ -1204,7 +1209,15 @@ $ python3 numsweep.py
   **그 커밋에서는 199/125**다(실측) — R9-2와 달리 이번엔 두 커밋의 값이 같지 않다.
 - R9-2의 **173/103은 확장 전 축의 값**이며 그 시점 기록으로 남는다.
 
-### R10-3. 판정 — 넓힌 축이 새로 지목한 것
+### R10-3. 판정 — F2-1 3지점과 넓힌 축의 적출
+
+**표 제목의 범위를 좁힌다**(verifier F3-1) — 아래 4행 중 **축이 기계로 지목한 것은
+`checklist.md:20`·`:21`과 `scope.md:103`**이고, **`:173`은 축이 지목하지 않았다.**
+수정 전 그 줄은 "이 파일의 **29건**이…"이고 `§12` arm은 `N행`을 요구하므로 어휘가
+어긋난다(`8540239`에서 `:173`에 대한 매치는 전 항목 통틀어 0건). `:173`은 **F2-1이
+부수 지점으로 지목한 것을 사람이 판정해 고친 것**이다. 그 행의 「추출 → 정본」 열이
+수치쌍이 아니라 `29건 / 한 날짜`로 적혀 있어 형식으로는 이미 구분됐으나, 제목이
+범위를 넓게 말했다.
 
 | 지점 | 추출 → 정본 | 판정 |
 | --- | --- | --- |
@@ -1252,3 +1265,128 @@ $ wc -l docs/discovery/capability-map.md
 
 - id 축 **불일치 0**. 이번 라운드는 **산출물을 바꾸지 않았다** — `capability-map.md`는
   `098bf03` 이후 그대로이고 이번 수정은 전부 evidence다.
+
+---
+
+## 2026-08-27 — Codex 송부 전 legacy 인용 정정 (0B 선행 조사 C-1~C-4 + verifier F3-1)
+
+**이건 저장소 안 정합 검증이 못 잡는 부류다.** Codex worktree에 `bid-vector`가 없어 매
+라운드 residual risk에 "저장소 밖 파일·commit 주장은 재현하지 않았다"가 적혔고, 여덟
+라운드가 문서 내부 정합만 훑었다. **전부 `git show ed4b06c:`로 직접 열어 재확인**하고
+고쳤다 — 상류 조사의 실측을 그대로 믿지 않았다.
+
+### R11-1. C-1 — 출처가 문서가 아니라 스크립트다 (가장 무겁다)
+
+```
+$ git show ed4b06c:scripts/backtest_latest_award_holdouts.py | grep -n '0.9~2.7%p'
+1203:            "Known limit: shallow undercuts (0.9~2.7%p, 지방계약/공공기관/수의견적 등 "
+$ git show ed4b06c:scripts/backtest_latest_award_holdouts.py | sed -n '1203,1204p'
+            "Known limit: shallow undercuts (0.9~2.7%p, 지방계약/공공기관/수의견적 등 "
+            "다른 하한 체계 가능성) outside those gates are NOT resolved and still surface as below_legal_floor — the data alone cannot tell which tier applied.",
+
+$ git show ed4b06c:docs/operations/latest-award-holdout-backtest.md | grep -n '0\.9~2\.7\|0\.9~1\.7'
+240:낮게 읽힌다(관측된 0.9~1.7%p 하회와 정합).
+```
+
+- **`0.9~2.7%p`는 백테스트 문서에 없다.** 리포트 caveat **문자열**로
+  `scripts/backtest_latest_award_holdouts.py:1203-1204`에 있다.
+- 문서 `:277`의 같은 한계 서술("**남는 한계(정직 표기):** 위 두 게이트 밖의 얕은
+  하회…")에는 **숫자가 없다.**
+- 문서 `:240`의 `0.9~1.7%p`는 **보고 낙찰률 basis 독립성** 축의 수치다. 다른 축이므로
+  섞지 않는다.
+- 고친 곳 3: `capability-map.md` DEC-09 블록 · §13 인계 행, `decisions.md` `OPEN-DEC-09` 절.
+- **이 오류는 팀 리드 분석 단계 서술의 승격**이다 — §10.1 **형태 2의 다섯 번째 사례**로
+  기록했다.
+
+### R11-2. C-2 — 경로와 행
+
+```
+$ git ls-tree -r --name-only ed4b06c | grep floor_applicability
+app/ai/floor_applicability.py
+tests/test_floor_applicability.py
+$ git show ed4b06c:app/ai/floor_applicability.py | sed -n '126,127p'
+# 보수적으로 **명백한 것만** 넣는다. 조직 종류 어미(공사/공단/청/시/군)는 국가·지자체
+# 기관을 뜻하므로 여기 없고 기본값 ``applicable`` 로 남는다.
+```
+
+- 경로는 `app/ai/floor_applicability.py`다(`app/ai/predictors/` 아래가 아니다 — 같은
+  디렉터리에 있는 것은 `legal_floor_spec.py`이고 그 인용은 맞다).
+- 지자체가 기본값 `applicable`에 남는다는 근거 줄은 **`:126-127`**이다.
+- 고친 곳 4: `capability-map.md` DEC-09 · §12.2 DEC-09 행 · §13 인계 행, `decisions.md`.
+- **함께 재확인한 인접 인용 2건은 맞다** — `tests/test_floor_applicability.py:70`이
+  `("울산광역시 울주군", FLOOR_APPLICABLE)`, `app/ai/predictors/legal_floor_spec.py:30-31`이
+  "지방계약(지자체)은 별도 율 체계로 / 2025-07-01 기시행됐고 이번 스코프에서 제외한다".
+
+### R11-3. C-3 재실측 — 블록 끝이 3줄 더 있다
+
+```
+$ git show ed4b06c:app/services/opportunity_monitoring/filters.py | sed -n '62,70p'
+        project_budget = float(project.budget_estimate or 0.0)
+        min_budget = float(strategy.min_budget_estimate or 0.0)
+        max_budget = float(strategy.max_budget_estimate or 0.0)
+        if min_budget > 0 and project_budget < min_budget:
+            return StrategyFilterResult(matched=False, reasons=[])
+        if max_budget > 0 and project_budget > max_budget:
+            return StrategyFilterResult(matched=False, reasons=[])
+        if min_budget > 0 or max_budget > 0:
+            reasons.append("예산 범위 일치")
+```
+
+- 비교 블록은 **`:62-70`** — `:65-66`·`:67-68`이 두 guard, `:69-70`이 사유 append다.
+- 라운드 2의 실행(`sed -n '62,67p'`)은 **6줄만 떴다.** 그 출력은 실행 그대로 두고(형태 3)
+  범위 정정 주석을 그 자리에 달았다. **어느 지점인가라는 실질 주장은 바뀌지 않는다.**
+- 고친 곳 3: `capability-map.md` §13 인계 행, `commands.md` 라운드 2 절, `checklist.md` L-7r.
+
+### R11-4. C-4 — in_scope에 없다
+
+```
+$ git ls-tree -r --name-only ed4b06c | grep collection_jobs
+app/tasks/collection_jobs.py
+$ grep -rn 'services/collection_jobs' docs/discovery/capability-map.md reports/evidence/m0/0a2/
+(매치 없음)
+```
+
+- 실제 경로는 `app/tasks/collection_jobs.py`이나 **`app/services/collection_jobs.py`
+  인용은 in_scope 산출물·evidence에 들어와 있지 않다.** 0A 노트(`_workspace/`)는 이 slice
+  범위 밖이므로 **손대지 않았다.**
+
+### R11-5. F3-1 · §10.1 형태 판단
+
+- **F3-1**: R10-3 표 제목이 축의 적출 범위를 넓게 말했다 → 제목을 좁히고, `:173`이
+  **축이 아니라 사람 판정으로 고쳐진 것**임을 표 위에 적었다.
+- **§10.1 형태 판단**: **새 형태를 만들지 않고 형태 2를 넓혔다.** 근거 셋은 `checklist.md`
+  §10.1 「형태 2의 판단」에 적었다 — ① 이 표는 원인으로 형태를 나누는데 C-1~C-3의 원인은
+  하나("legacy를 열지 않고 legacy를 인용했다")이고 형태 2의 규칙 문장이 이미 그것을
+  요구한다(빠진 것은 규칙이 아니라 **적용 범위**), ② 한 원인을 두 형태로 쪼개면 각 형태가
+  자기 절반만 방어한다 — **형태 5가 절차화에서 수치 축을 잃고 네 번째 재발을 낸 전례**,
+  ③ Codex 레인의 사각지대는 **레인의 속성**이지 실패 형태가 아니다.
+- **절차화는 하지 않았다** — legacy 인용은 정본을 계산할 수 있는 집계가 아니라 사람이
+  파일을 열어야 하는 종류다. 근거 없이 스크립트를 만들면 형태 5가 밟은 길을 되풀이한다.
+  **0B가 legacy를 본격적으로 훑으므로 그 라운드가 절차의 필요를 판단할 자리**다.
+
+### R11-6. 넓힌 수치 축 · id 축 · 불변 재실행
+
+```
+$ python3 numsweep.py
+추출된 수치 인용: 200건 | 정본 불일치: 128건 (이력 서술 포함 — 판정 대상)
+$ python3 sweep46.py
+활성 OPEN: 45건 | 전체 매치: 367건
+'해소/결번/취소선' 어휘와 같은 줄에 있는 매치: 52건 (판정 대상)
+$ python3 inv2.py
+분류: {'V2 필수': 61, '근거 부족': 11, '폐기': 6, '후속': 17} = 95
+형식 위반: none
+V2 필수 사용자 가치/acceptance 결측: none
+중복 id: none
+§12 활성 OPEN: 45
+본문 참조 - 활성 등록: 30 건 (해소·결번 포함)
+$ wc -l docs/discovery/capability-map.md
+    3176 docs/discovery/capability-map.md
+```
+
+- **이번 정정은 분류·OPEN 집계를 바꾸지 않는다** — 경로·행 범위·출처 종류만 고쳤다.
+  **바뀐 수치는 산출물 줄 수 하나**(3,171 → **3,176**)이며 C-1의 출처 설명이 5줄
+  늘어난 결과다. **그 파급을 넓힌 수치 축이 스스로 적출했다** — `checklist.md:7`(head
+  기준 줄 수)·`:582`(§14.3 후속)를 지목해 함께 고쳤다. `scope.md:509`는 라운드 7 완결
+  3차 블록 안의 그 시점 값이라 유지했다.
+- 그 외 살아 있는 현재 값 주장의 불일치 **신규 0건**.
+- id 축 **불일치 0**(OPEN을 신설·복원·해소하지 않았다).
