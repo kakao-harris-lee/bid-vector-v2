@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0b-regression-ledger
 base_sha: ec115a7   # 0A2 Codex approve verdict 등재 직후
-head_sha: TBD       # 산출물 커밋 후 후속 커밋으로 기입 (0A2와 같은 방식)
+head_sha: 36a66f65282a0cf003ffb505b1384359229cfb95   # 0B 산출물·evidence 최종 커밋. 아래 「완료 기록」 참조
 in_scope:
   - docs/discovery/regression-ledger.md
   - reports/evidence/m0/0b/
@@ -102,3 +102,65 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 - 예방책 1건(P-ML-01, training-serving skew 방지 구조)은 **회귀가 아니라 이미 있는 장치**다.
   ledger에 넣되 그렇게 표시하고 회귀 수에 계상하지 않는다.
 - **`_workspace/`는 gitignore 대상**이다. 판정의 근거가 되는 것은 evidence로 커밋한다.
+
+---
+
+## 완료 기록 (2026-08-27)
+
+- `head_sha`를 `36a66f6`로 기입했다. 0A2와 같은 이유로(커밋이 자기 SHA를 담을 수 없다)
+  `head_sha`는 **그 직전 커밋**을 가리키며, 두 커밋의 차이는 이 파일의 `head_sha` 한 줄과
+  이 절뿐이다.
+- **리뷰 range는 `ec115a7...<현재 HEAD>`**이며 현재 HEAD는 이 scope 갱신 커밋이다.
+- **range의 in_scope 밖 변경은 없다** — `git diff --name-only ec115a7...HEAD`가
+  `docs/discovery/regression-ledger.md`와 `reports/evidence/m0/0b/`만 낸다.
+  **`docs/discovery/capability-map.md`는 건드리지 않았다**(out_of_scope,
+  `git diff --stat ec115a7...HEAD -- docs/discovery/capability-map.md` 출력 0줄).
+
+### 커밋 구성
+
+| 커밋 | 내용 |
+| --- | --- |
+| `81a2ce3` | §0 규약 + 계열 1(금액 basis 7건) · 2(rate scale 5건) |
+| `29a55be` | 계열 3(provenance 8건) · 4(법정 하한 8건) |
+| `34684f9` | 계열 5(면허 7건) · 6(KONEPS 8건) |
+| `b9b97c9` | 계열 7(비동기 8건) · 8(ML 9건 + 예방책 1) + `OPEN` 절 + 인계 |
+| `36a66f6` | evidence — `commands.md` · `checklist.md` |
+| 이 커밋 | `scope.md` 완료 기록과 `head_sha` |
+
+계열별로 나눈 이유는 **각 커밋에서 문서가 자체 정합**하기 위해서다 — 진행 중인 커밋은
+"계열 N~8은 후속 커밋"을 문서 말미에 명시했고, 마지막 계열 커밋이 그 문구를 걷어냈다.
+
+### 산출물
+
+- `docs/discovery/regression-ledger.md` — **8계열 전부**, 회귀 **60건** + 예방책 1건.
+  계열별 사례 수·5필드 충족·상태 분포는 **`commands.md` C-5의 스크립트가 산출**한다
+  (셈을 문서에 적지 않는다 — 0A2 §10.1 형태 6).
+- `OPEN-REG-01`~`04` 등록. **중앙 registry(§12) 통합은 별도 slice**이며 이 slice는
+  통합하지 않고 필요 사실만 인계에 적었다.
+
+### A2 방법 판단 — 계약이 이 slice에 위임한 것
+
+`commands.md` **C-1**에 근거와 함께 적었다. 요지: **정본이 있는 축(경로·행 범위·commit)은
+기계로 전수, 정본을 계산할 수 없는 축(행 범위의 내용)은 사람이 전수.** 0A2가 "사람이 파일을
+열어야 하는 종류"라며 절차화를 0B로 미룬 판단은 **절반만 맞았다** — 인용의 **일부는 정본이
+있고 그 부분에서 실제 오류가 나왔다**(선행 조사가 찾은 4건 중 셋이 경로·행 오류다).
+
+### 0B가 발견한 것 — 선행 조사 노트의 자기 불일치
+
+`commands.md` **C-5.2**. 선행 조사 §0.1 요약 표가 **자기 항목과 4계열에서 어긋난다**
+(항목 기준 31/27/2, 표는 29/28/3). 원인은 **상태 축과 사용자 영향 축을 한 칸에 섞은 것**이다.
+**항목별 상태는 61건 전부 동일**하므로 0B가 바꾼 판정은 **0건**이며, 표를 고치는 대신
+**두 축을 ledger 규약에서 분리**했다. `_workspace/`는 gitignore 대상이라 편집하지 않았다.
+
+### `capability-map.md`가 틀렸음이 드러난 지점
+
+**없다.** 선행 조사가 정정한 C-1·C-2(백테스트 문서 출처 · `floor_applicability` 경로·행)는
+**0A2가 이미 산출물에 반영해 고쳤고**, 0B가 `ed4b06c`에서 재확인한 결과 **현재
+`capability-map.md`의 서술이 맞다.** ledger는 그 정정된 형태를 그대로 쓴다.
+
+### 미처리(이월)
+
+- **`OPEN-REG-01`~`04`의 판정** — 운영 로그·legacy DB·코퍼스 재계산이 필요하며 이 slice의
+  범위 밖이다.
+- **중앙 registry 통합** — 별도 slice(ledger §10.3).
+- **예방 제약의 실제 구현** — M1 이후. 이 문서의 `검증 방법`은 그때 테스트가 된다.
