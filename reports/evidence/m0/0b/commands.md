@@ -136,15 +136,19 @@ print(f"  → legacy commit {len(leg)}종 중 존재 {len(leg)-missing} · 부�
 
 ### C-2.1 실행 결과 — ledger 대상 (전문)
 
-**아래는 잘라내지 않은 전체 출력이다**(verifier M1 — 이전 판은 `[부재]` 줄 직전에서
-잘려 있었다). 커밋 기준은 이 절을 담은 커밋이다.
+**아래는 잘라내지 않은 전체 출력이며 HEAD에서 재실행한 것이다.**
+
+> **정정 (verifier H-N1)** — 이전 판은 같은 선언을 달고 **`f24bf6d` 시점 ledger의
+> 출력**을 실었다. **같은 커밋(`4db8830`) 안에서 L3 경로 수정을 하기 전**에 뜬 실행분이라
+> 경로 존재/부재가 `97 / 12`였고 줄 번호도 어긋났다. **한 커밋 안에서도 편집 순서 때문에
+> 출력이 낡는다** — §10.1 **형태 3**의 재발이며 그 사실을 아래 C-2.4에 기록했다.
 
 ```
 $ python3 citecheck.py docs/discovery/regression-ledger.md
 === 인용 추출 ===
 경로 인용 109종 · commit 인용 26종
 
---- 경로: 존재 97 / 부재 12 ---
+--- 경로: 존재 99 / 부재 10 ---
   [부재] reports/evidence/m0/0b/scope.md:None  ← [(None, 3)]
   [부재] milestone-0.md:None  ← [(None, 5), ('R-PROV-01', 310)]
   [부재] summary.py:None  ← [(None, 33)]
@@ -152,12 +156,10 @@ $ python3 citecheck.py docs/discovery/regression-ledger.md
   [부재] reports/evidence/m0/0b/commands.md:None  ← [(None, 59)]
   [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 82), ('R-RATE-03', 252), ('R-RATE-05', 298)]
   [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 422)]
-  [부재] commands.md:None  ← [('R-FLOOR-06', 567), ('R-QUAL-07', 727)]
-  [부재] classification/eligibility.py:None  ← [('R-QUAL-07', 724)]
-  [부재] license_eligibility.py:None  ← [('R-QUAL-07', 725)]
-  [부재] data-extract.md:None  ← [('R-COL-06', 846), ('R-ML-07', 1196)]
-  [부재] capability-map.md:None  ← [('R-ML-09', 1242), ('R-ML-09', 1278), ('R-ML-09', 1284)]
---- 행 범위: 파일 길이 내 97 / 초과 0 ---
+  [부재] commands.md:None  ← [('R-FLOOR-06', 567), ('R-QUAL-07', 728)]
+  [부재] data-extract.md:None  ← [('R-COL-06', 847), ('R-ML-07', 1208)]
+  [부재] capability-map.md:None  ← [('R-ML-09', 1254), ('R-ML-09', 1290), ('R-ML-09', 1301)]
+--- 행 범위: 파일 길이 내 99 / 초과 0 ---
 
 --- commit: legacy 25종 / 이 저장소(v2) 1종 ---
   [v2 — legacy 검사 대상 아님] ec115a7
@@ -189,11 +191,9 @@ $ python3 citecheck.py docs/discovery/regression-ledger.md
   → legacy commit 25종 중 존재 25 · 부재 0
 ```
 
-- **legacy 경로 인용 97종이 전부 `ed4b06c`에 존재하고 인용 행 범위는 전부 파일 길이
-  안이다(초과 0).** 부재 12종은 **legacy 트리에 있을 수 없는 것**들이다 — 이 저장소 자신의
-  문서(`scope.md` · `milestone-0.md` · `0a2/decisions.md` · `commands.md` ·
-  `capability-map.md` · `data-extract.md` · `fixtures/manifest.yaml`), §0.3이 모호성의
-  **예시로 언급**하는 `summary.py`, 그리고 부분 경로 인용 2종(L3 — 아래 C-2.3).
+- **legacy 경로 인용 99종이 전부 `ed4b06c`에 존재하고 인용 행 범위는 전부 파일 길이
+  안이다(초과 0).** 부재 10종은 **legacy 트리에 있을 수 없는 것**들이다 — 이 저장소 자신의
+  문서와, §0.3이 모호성의 **예시로 언급**하는 `summary.py`.
 - **legacy commit 25종이 전부 존재**한다. `ec115a7`은 **이 저장소의 base SHA**라 legacy
   검사 대상이 아니며 스크립트가 그렇게 분리해 찍는다.
 
@@ -237,6 +237,18 @@ ledger가 R-QUAL-07에서 `classification/eligibility.py::assess_license` ·
 "파일명만 쓰지 않는다"에 저촉되고, **검사기가 `::함수` 접미 때문에 그 인용을 보지도
 못했다.** 둘 다 고쳤다 — ledger는 전체 경로를 쓰고, 검사기 `PATH` 정규식에
 `(?:::[A-Za-z_][A-Za-z0-9_]*)?`를 더해 **그 형태도 추출 대상**이 되게 했다.
+
+### C-2.4 형태 3의 재발 — 한 커밋 안에서도 출력이 낡는다 (verifier H-N1)
+
+라운드 1이 **M1(잘린 출력)을 고치겠다고 선언한 바로 그 블록에서 형태 3이 재발**했다.
+원인은 잘라낸 것이 아니라 **뜬 시점**이다 — `4db8830` 한 커밋이 ① L3 경로 수정과
+② 출력 붙여넣기를 함께 했는데, **출력을 ① 이전에 떴다.** 커밋 단위로는 "그 커밋의
+출력"이 맞지만 **그 커밋 최종 상태의 출력이 아니었다.**
+
+그리고 그 값이 `checklist.md` A2에 **"97종"으로 전파**됐다(형태 5) — 현재는 99다.
+
+**규칙**: 출력을 붙일 때 **그 커밋의 최종 상태에서 다시 뜬다.** "이 커밋 기준"이라는
+선언만으로는 부족하다 — 같은 커밋 안에서도 편집 순서가 출력을 낡게 만든다.
 
 ## C-3. 선행 산출물 인용 오류 4건 — 0B가 그대로 옮기지 않았다
 
@@ -415,9 +427,18 @@ $ python3 ledgercheck.py
   들어간다 — 스크립트가 그 분해를 직접 찍는다.
 - **상태 분포 합 61**. `판정 불가` 2건은 **상태 축**(R-BASIS-07 · R-PROV-01)이며
   **사용자 영향 축**은 그보다 많다(C-5.3).
-- **자기참조 줄 번호 검사의 예외 판정을 고쳤다**(이번 라운드) — `- **근거**:` 한 항목이
+- **자기참조 줄 번호 검사의 예외 판정을 고쳤다**(라운드 1) — `- **근거**:` 한 항목이
   여러 줄에 걸치면 legacy 행 범위 연속 표기(`:162`)를 놓쳤다. **항목 시작까지 거슬러
   보게** 바꿨다.
+  **한계(verifier L-N1)**: 이 완화는 **트레이드오프**다. lookback 범위 안에 legacy 경로
+  인용이 하나라도 있으면 그 뒤의 `` `:NNN` ``을 전부 예외로 본다 — **같은 항목 안에서
+  이 문서 자신을 줄 번호로 가리키면 놓친다.** 지금은 그런 자기참조가 없고(§0.3이 금지),
+  **없다는 것을 이 검사가 증명하지는 않는다.**
+- **bare 연속 범위의 사각지대(verifier L-N2)**: `path.py:1-2` 뒤에 오는 `` `:3-4` `` 형태는
+  **어느 기계 축도 행 범위를 검사하지 않는다** — `citecheck`의 `PATH`가 경로를 요구하기
+  때문이다. 현재 **28종**이 그 형태이며 **사람이 읽은 것으로만 확인**됐다(계열별 커밋
+  메시지가 그 기록이다). **축을 늘릴지는 근거가 관측된 뒤에 판단한다** — 지금 이 부류에서
+  적발된 오류는 없다.
 - **선행 조사 §0.1 요약 표와 다르다. 그러나 0B가 판정을 바꾼 것은 아니다** — C-5.2.
 
 ### C-5.2 선행 조사 §0.1 요약 표가 자기 항목과 어긋난다 (0B 발견)
@@ -519,7 +540,7 @@ $ git diff --check ec115a7...HEAD | wc -l
 $ git status --porcelain -- docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
 0
 $ wc -l docs/discovery/regression-ledger.md
-1300 docs/discovery/regression-ledger.md
+1311 docs/discovery/regression-ledger.md
 ```
 
 - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 ·
@@ -570,6 +591,7 @@ $ git -C bid-vector show 93ecf9e -- app/core/inference_config.py | grep -E '^[-+
 -    #   필요(951) ≤ 투입(2,000) ≤ 소진(6,000)
 +    # 그렇다고 필요 처리량이 무효화 횟수에 비례하지는 **않는다**. 한 대상은 한 회전에
 +    # 작업량의 단위는 "무효화 이벤트"가 아니라 **서로 다른 대상**이고, 필요 처리량은
++    # 실시간 경보가 아니다. 더 빠른 검출이 필요해지면 임계를 낮출 것이 아니라 이 점검을
 $ git -C bid-vector log -1 --format='%h %ad %s' --date=short 93ecf9e
 93ecf9e 2026-08-13 docs(similarity): 처리량 산술 정정 — 임베딩 모델이 두 벌이었다 (M1·m3·n1)
 ```
@@ -626,8 +648,24 @@ ASSESSMENT_RATE_MAX: Final[float] = 1.10
 적은 **수치가 실제로 있는가**. H1이 정확히 그 축이었으므로 축을 만들었다(**결함이 먼저
 관측된 뒤에 도구를 만든다**).
 
-**방향·의미의 정합은 이 축이 못 본다**(H2가 그 부류다). 그 절반은 사람이 읽는 것으로
-남으며 C-1의 두 축 구분에 그대로 해당한다.
+#### 커버리지 — 이 축이 무엇을 보고 무엇을 못 보는가 (verifier M-N2)
+
+이전 판의 전칭("H1·H2 외에 인용 범위에 없는 수치는 없다")이 **자기 재현 명령의 범위를
+넘었다.** 정규식이 뒤에 오는 `\w`를 전부 배제해 **한글 단위가 붙은 수를 통째로 놓쳤다** —
+`78건` · `5,822건` · `1,046행` · `1.15배`가 전부 검사 밖이었다. **좁히는 대신 패턴을
+넓혔다**(라틴 문자·추가 숫자가 이어붙는 경우만 배제).
+
+**그리고 스캔 대상 필드를 `관찰`로 한정했다.** 이전 판은 이어지는 줄을 전부 훑어
+`V2 예방 제약`·`검증 방법`의 수치까지 지목했는데, **그것들은 이 문서가 V2에 요구하는
+것이라 legacy 원문에 있을 이유가 없다.** 넓힌 패턴 그대로 필드만 좁히니 31건 → 6건이 됐고
+**그 6건은 전부 실제 `관찰`의 수치**다.
+
+**이 축이 못 보는 것**(한계로 기록):
+
+- **방향·의미의 정합** — H2가 그 부류다. 수치가 맞아도 서술이 반대일 수 있다.
+- **원문에 리터럴로 없는 파생·집계 수치** — 아래 6건이 전부 그 부류이며 **사람이 원문을
+  세어 확인**했다.
+- **단일 숫자와 백분율 표기**는 잡되, 그 값이 원문의 다른 문맥에 우연히 있으면 통과한다.
 
 ```python
 # 형태 2의 기계 검증 가능한 절반 —
@@ -637,7 +675,10 @@ import re, subprocess, collections
 REPO, REF = "bid-vector", "ed4b06c"
 lines = open("docs/discovery/regression-ledger.md", encoding="utf-8").read().split("\n")
 PATH = re.compile(r'`([A-Za-z0-9_./-]+\.(?:py|md))(?::([\d,\-]+))?`')
-NUM  = re.compile(r'(?<![\w.:/-])(\d{1,3}(?:,\d{3})+|\d{2,6}(?:\.\d+)?)(?![\d,]*[%\w])')
+# 이전 판은 뒤에 오는 `\w` 를 전부 배제해 **한글 단위가 붙은 수를 놓쳤다**
+# (`78건`·`5,822건`·`1,046행`·`1.15배`가 전부 검사 밖이었다 — verifier M-N2).
+# 지금은 **라틴 문자·추가 숫자가 이어붙는 경우만** 배제한다(식별자·버전 문자열 방지).
+NUM  = re.compile(r'(?<![\w.:/-])(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?![\d,]*[A-Za-z_])')
 starts = [i for i, l in enumerate(lines) if re.match(r'^### [RP]-', l)]
 cache = {}
 def body(p):
@@ -673,9 +714,14 @@ for n, st in enumerate(starts):
     for l in src:
         for mm in NUM.finditer(l): pool.add(norm(mm.group(1)))
         for mm in re.finditer(r'\d[\d,\.]*', l): pool.add(norm(mm.group(0)))
-    # 관찰/사용자 영향에 적힌 수치가 원문 pool에 있는가
+    # **`관찰` 필드만** 본다. 그 필드가 legacy 사실을 주장하는 자리이고,
+    # `V2 예방 제약`·`검증 방법`은 이 문서가 **V2에 요구하는 것**이라 legacy 원문에
+    # 있을 이유가 없다(이전 판은 이어지는 줄을 전부 훑어 그것들까지 지목했다 — M-N2).
+    field = None
     for l in blk:
-        if not re.match(r'^\s*(- \*\*(관찰|사용자 영향)\*\*|  )', l): continue
+        m = re.match(r'^- \*\*([^*]+)\*\*', l)
+        if m: field = m.group(1).split("(")[0].strip()
+        if field != "관찰": continue
         for mm in NUM.finditer(l):
             v = norm(mm.group(1))
             if v in pool: continue
@@ -694,15 +740,34 @@ for eid, v, l in flag:
 
 ```
 $ python3 numsrc.py
-=== 인용 범위에서 찾지 못한 수치: 1건 (전부 사람 판정 대상) ===
-[R-BASIS-04] 19
-    그 상태였다 — 측정 시점 **2026-08-07**(`2610826` 커밋 본문). *(78/400 = 19.5%는 이
+=== 인용 범위에서 찾지 못한 수치: 6건 (전부 사람 판정 대상) ===
+[R-PROV-01] 5
+    - **관찰**: `base_amount`의 66%가 실제 기초금액이 아니라는 문자열이 **5곳에 복제**돼 있다.
+[R-FLOOR-05] 4
+    적는다. 서비스 층은 사유 4종을 나누고 각 사유에 "위험이 없다는 뜻이 아닙니다"를 명시한다.
+[R-COL-01] 0
+    `resultCode`로 신호한다(4xx가 아니다).** 이게 통과하면 payload가 0건으로 파싱되어
+[R-COL-02] 7
+    `selector_drift` / `timeout` / `unknown` **7종이고 `429`·`rate limit`·`quota`에 대응하는
+[R-COL-03] 30
+    - **관찰**: 30여 개 리터럴 substring 매칭(`"captcha"` · `"403"` · `"net::"` ·
+[R-COL-06] 2
+    - **관찰**: 라이브 수집이 실패하면 `build_mock_items`가 **하드코딩 공고 2건**을 만들어 정상
 ```
 
-- **남은 지목 1건은 `R-BASIS-04`**였고, 확인 결과 **legacy 인용이 아니라 이 문서가
-  `78/400`을 계산한 파생값**이었다. 커밋 본문은 "운영 DB 홀드아웃 400건 중 78건"만 적는다
-  — **그 사실을 ledger에 표시**했다.
-- **추가 발견 0건.** H1·H2 외에 인용 범위에 없는 수치는 없다.
-- **초기 실행은 17건을 지목**했고 전수로 읽어 판정했다 — 대부분 PR 번호(`#262`)·연도·
-  이 문서 절 번호(`§10`)·백분율 소수부 분리였고, **커밋 본문을 pool에 넣지 않은 것**이
-  진짜 구멍이었다(H1이 커밋 본문 축이다). 그 둘을 반영한 것이 위 출력이다.
+#### 6건 전수 판정 — legacy에서 직접 세어 확인했다
+
+전부 **원문을 읽고 센 결과**이지 legacy가 적은 리터럴이 아니라 이 축이 지목한다.
+
+| 항목 | 주장 | 실측 |
+| --- | --- | --- |
+| R-PROV-01 | "5곳에 복제" | **5** — 근거에 다섯 경로가 열거돼 있고 C-2.1이 전부 존재를 확인한다 |
+| R-FLOOR-05 | "사유 4종" | **4** — `notice_floor_shortfall.py:51-75`의 `_SCOPE_*` 상수 4개 |
+| R-COL-02 | "7종" | **7** — `access_denied`·`browser_runtime`·`network`·`no_data`·`selector_drift`·`timeout`·`unknown` |
+| R-COL-03 | "30여 개" | **정확히 30** — `live_failure.py:115-159`의 리터럴 |
+| R-COL-06 | "하드코딩 공고 2건" | **2** — `collection.py`의 `build_mock_items`가 `-001`·`-002` 둘을 만든다 |
+| R-COL-01 | "0건으로 파싱" | 수치 주장이 아니라 **서술**이다(빈 payload) |
+
+- **추가 발견 0건.** H1·H2 외에 **`관찰`이 적은 수치 중 원문과 어긋나는 것은 없다.**
+- **`R-BASIS-04`의 `19.5%`**는 이 라운드에 `관찰`이 아니라 `사용자 영향`으로 옮겨져
+  이 축의 대상이 아니다. **이 문서가 `78/400`을 계산한 파생값**임은 그 자리에 표시돼 있다.
