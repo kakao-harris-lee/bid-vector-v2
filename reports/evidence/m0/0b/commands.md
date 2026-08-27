@@ -152,15 +152,15 @@ $ python3 citecheck.py docs/discovery/regression-ledger.md
 
 --- 경로: 존재 104 / 부재 10 ---
   [부재] reports/evidence/m0/0b/scope.md:None  ← [(None, 3)]
-  [부재] milestone-0.md:None  ← [(None, 5), ('R-PROV-01', 322)]
-  [부재] summary.py:None  ← [(None, 33)]
-  [부재] reports/evidence/m0/0a2/decisions.md:None  ← [(None, 45)]
-  [부재] reports/evidence/m0/0b/commands.md:None  ← [(None, 59)]
-  [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 88), ('R-RATE-03', 259), ('R-RATE-05', 305)]
-  [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 445)]
-  [부재] commands.md:None  ← [('R-FLOOR-06', 590), ('R-QUAL-07', 751)]
-  [부재] data-extract.md:None  ← [('R-COL-06', 885), ('R-ML-07', 1249)]
-  [부재] capability-map.md:None  ← [('R-ML-09', 1295), ('R-ML-09', 1305), ('R-ML-09', 1336)]
+  [부재] milestone-0.md:None  ← [(None, 5), ('R-PROV-01', 324)]
+  [부재] summary.py:None  ← [(None, 34)]
+  [부재] reports/evidence/m0/0a2/decisions.md:None  ← [(None, 46)]
+  [부재] reports/evidence/m0/0b/commands.md:None  ← [(None, 60)]
+  [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 90), ('R-RATE-03', 261), ('R-RATE-05', 307)]
+  [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 450)]
+  [부재] commands.md:None  ← [('R-FLOOR-06', 595), ('R-QUAL-07', 756)]
+  [부재] data-extract.md:None  ← [('R-COL-06', 890), ('R-ML-07', 1254)]
+  [부재] capability-map.md:None  ← [('R-ML-09', 1300), ('R-ML-09', 1310), ('R-ML-09', 1341)]
 --- 행 범위: 파일 길이 내 104 / 초과 0 ---
 
 --- commit: legacy 25종 / 이 저장소(v2) 1종 ---
@@ -693,7 +693,7 @@ $ git diff --check ec115a7...HEAD | wc -l
 $ git status --porcelain -- docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
 0
 $ wc -l docs/discovery/regression-ledger.md
-1357 docs/discovery/regression-ledger.md
+1362 docs/discovery/regression-ledger.md
 ```
 
 - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 ·
@@ -1085,15 +1085,15 @@ $ python3 openstance.py
 활성 OPEN 정본: capability-map §12 45건 + OPEN-REG 5건
 
 === 결정 필드가 활성 OPEN을 언급하는 자리: 5건 ===
-  [R-PROV-02] 검증 방법 → OPEN-DEC-07  조건부 표시 있음  :354
+  [R-PROV-02] 검증 방법 → OPEN-DEC-07  조건부 표시 있음  :356
       - **조건부 — `OPEN-DEC-07` 결정에 따라 확정.** legacy의 임계 **1.15**(부가세 1.10 +
-  [R-COL-02] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :807
+  [R-COL-02] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :812
       - **조건부 — `OPEN-OPS-01`의 정책 질문 결정에 따라 확정.** **분류 불가(`unknown`)를
-  [R-COL-02] 검증 방법 → OPEN-OPS-01  조건부 표시 있음  :816
+  [R-COL-02] 검증 방법 → OPEN-OPS-01  조건부 표시 있음  :821
       - **조건부 — `OPEN-OPS-01` 결정에 따라 확정.** (b) fail-safe면 "`unknown`이 재시도
-  [R-COL-03] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :837
+  [R-COL-03] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :842
       ※ 재시도 정책 자체(`unknown → retryable` 여부)는 **활성 `OPEN-OPS-01`이 소유**하며
-  [R-ASYNC-01] V2 예방 제약 → OPEN-OPS-10  조건부 표시 있음  :952
+  [R-ASYNC-01] V2 예방 제약 → OPEN-OPS-10  조건부 표시 있음  :957
       ※ DB 기반 큐의 backlog 관측·가시성 timeout 계약은 **활성 `OPEN-OPS-10`이 소유**하며
 
 === id 없이 주제가 겹치는 후보: 2건 (오탐 다수 — 사람 판정) ===
