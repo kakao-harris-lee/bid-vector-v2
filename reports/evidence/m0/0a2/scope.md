@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a2-decision-integration
 base_sha: 6af7019996ec26903c7b531ed7ede12c22cf176e
-head_sha: 1fc5968a32091004902bf0c9d067d1251c8ce566  # 0A2 수정 라운드 7 완결 산출물 커밋. 아래 갱신 이력 참조
+head_sha: 520f92809c92d2f809ccd065a812f0c8347b597e  # 0A2 수정 라운드 7 완결 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a2/
@@ -569,7 +569,7 @@ F2-1(`checklist.md` A1 「결정 근거」 행이 §12.2를 "29행"으로 적음
 없어 매 라운드 residual risk에 "저장소 밖 파일·commit 주장은 재현하지 않았다"가 적혔다.
 여덟 라운드가 문서 내부 정합을 샅샅이 훑는 동안 **legacy 인용의 정확성은 검증 사각지대**였다.
 
-- `head_sha`를 `0d33111` → `1fc5968`로 갱신했다.
+- `head_sha`를 `0d33111` → `520f928`로 갱신했다.
 - 이전 라운드와 같은 이유로 `head_sha`는 그 직전 커밋을 가리키며, 두 커밋의 차이는
   이 파일의 `head_sha` 한 줄과 이 절뿐이다.
 - **리뷰 range는 `6af7019...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
