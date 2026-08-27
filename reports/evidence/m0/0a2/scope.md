@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a2-decision-integration
 base_sha: 6af7019996ec26903c7b531ed7ede12c22cf176e
-head_sha: 304de901c49bf716156e3b1c280bf2fc9297446b  # 0A2 수정 라운드 7 완결 산출물 커밋. 아래 갱신 이력 참조
+head_sha: 3ed76e9af0a6dae044a5abf7077e5f1cdf1ee318  # 0A2 수정 라운드 7 완결 산출물 커밋. 아래 갱신 이력 참조
 in_scope:
   - docs/discovery/capability-map.md
   - reports/evidence/m0/0a2/
@@ -435,7 +435,7 @@ verifier 재검증 판정 `not-ready`. 차단 사유는 **라운드 7이 복원�
 **`후속`으로 확정**한다. **`축소`가 아니다.** 이 slice가 라운드 7에 신설한
 `OPEN-NOTI-09`가 **같은 slice 안에서 해소**됐다.
 
-- `head_sha`를 `304de90` → `__HEADSHA__`로 갱신했다.
+- `head_sha`를 `304de90` → `3ed76e9`로 갱신했다.
 - 이전 라운드와 같은 이유로 `head_sha`는 그 직전 커밋을 가리키며, 두 커밋의 차이는
   이 파일의 `head_sha` 한 줄과 이 절뿐이다.
 - **리뷰 range는 `6af7019...<현재 HEAD>`이며**, 현재 HEAD는 이 scope 갱신 커밋이다.
