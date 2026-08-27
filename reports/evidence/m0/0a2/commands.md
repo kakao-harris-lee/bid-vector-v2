@@ -765,7 +765,15 @@ $ python3 sweep46.py
 
 ```
 $ git show HEAD:docs/discovery/capability-map.md > /tmp/pre.md   # 수정 전
-$ python3 - <<'PY'   # 같은 판정 규칙, '복원' 없는 줄만
+$ python3 - <<'EOS'
+import re
+pre=open("/tmp/pre.md",encoding="utf-8").read().split("\n")
+# 복원 2건은 그 시점에도 활성 registry에 있었다 — 같은 판정 규칙으로 인용 지점을 훑는다.
+for oid in ("OPEN-DEC-03","OPEN-DEC-07"):
+    for i,l in enumerate(pre,1):
+        if oid in l and re.search(r'해소|결번|~~', l) and '복원' not in l:
+            print(f"[{oid}] :{i}  {l.strip()[:70]} …")
+EOS
 [OPEN-DEC-03] :3017  | ~~OPEN-DEC-03~~ | **운영자 결정 2026-08-26로 해소** — …
 [OPEN-DEC-07] :1410  신뢰 비율 1.15의 마진 0.05는 V2 코퍼스에서 **재유도**한다(`OPEN-DEC-07` 해소,
 [OPEN-DEC-07] :3016  | ~~OPEN-DEC-07~~ | **운영자 결정 2026-08-26로 해소** — …
@@ -841,13 +849,14 @@ $ python3 sweep46.py
 
 ```
 $ grep -c 'OPEN-NOTI-09' <capability-map.md + evidence 5개 파일>
-   수정 전 HEAD(304de90) 합계 16 → 반영 후 합계 41
+   수정 전 `304de90` 합계 16 → 반영 후 `3ed76e9` 합계 41
 $ grep -c 'NOTI-02'      <같은 파일들>
-   수정 전 HEAD(304de90) 합계 45 → 반영 후 합계 63
+   수정 전 `304de90` 합계 45 → 반영 후 `3ed76e9` 합계 64
 ```
 
 **수정 전 HEAD의 16곳·45줄을 전수로 읽어 판정**했고, 그 판정에 따라 **현재 상태 주장만**
-고쳤다. 늘어난 25곳·18줄은 **전부 이번 반영이 쓴 기록**이다 — `capability-map.md`
+고쳤다(반영 후 수치는 **`3ed76e9` 기준 고정**이다 — 이 파일 자신이 스캔 대상이라 뒤
+라운드가 쓰면 늘어난다). 늘어난 25곳·19줄은 **전부 이번 반영이 쓴 기록**이다 — `capability-map.md`
 §0.5 보완 문단 · NOTI-02 블록 · §10 되돌림 표 · §12 머리 · §12.1 두 곳 · §12.2 행,
 `checklist.md` §4 · §9 · §10.1 보완 · §14.3 · §14.5, 이 절, `decisions.md` 새 절,
 `scope.md` 이 라운드 이력.
@@ -883,3 +892,253 @@ $ wc -l docs/discovery/capability-map.md
 - capability **95 불변**. 분류 **61/16/6/12 → 61/17/6/11**. 활성 OPEN **46 → 45**.
 - 조건부 묶음 **9 → 8개 / capability 7 → 6개** + 잠정 1(불변).
 - M0 차단 8건 중 7건 해소 · M1 차단 17건 중 15건 해소 — **불변**.
+
+---
+
+## 2026-08-27 — 라운드 7 완결 2차: **수치 축 스윕** (verifier V-1~V-10)
+
+**진단이 핵심이다.** §10.1 형태 5의 원래 정의는 "정정을 인용 지점에 전파하지 않기"이고
+라운드 6 F-1이 바로 "활성 OPEN 43 **수치** 미전파"였다. 라운드 7 완결이 그 규칙을
+절차로 만들면서 **OPEN id grep으로 좁혔고**, 그 결과 **id 축 불일치 0인 상태에서 수치 축
+5건**(V-1~V-5)이 남았다. 좁힌 것을 되돌린다 — 새 형태가 아니라 원래 정의의 복원이다.
+
+### R9-1. 스크립트 본문 (형태 4 — 인라인)
+
+**id 축 스윕(R7C-1)과 설계가 다르다.** id 축은 문자열을 grep해 사람이 판정하지만, 수치
+축은 **정본을 산출물에서 직접 계산한 뒤 인용 지점을 패턴으로 추출해 자동 대조**한다.
+그래서 수치 축은 사람 판정 없이도 불일치를 지목한다 — 판정이 필요한 것은 "그 불일치가
+살아 있는 현재 값 주장인가, 라운드별 이력의 그 시점 값인가" 하나뿐이다.
+
+```python
+# 수치 축 스윕 — §10.1 형태 5의 수치 arm.
+# 1) 정본을 산출물에서 직접 계산하고 2) 문서·evidence의 수치 인용을 패턴으로 추출해
+# 정본과 자동 대조한다. MISMATCH는 "이력의 그 시점 값"일 수 있으므로 사람이 판정한다.
+import re, collections, glob, sys, os
+CM="docs/discovery/capability-map.md"
+FILES=[CM]+sorted(glob.glob("reports/evidence/m0/0a2/*.md"))
+lines=open(CM,encoding="utf-8").read().split("\n"); txt="\n".join(lines)
+
+# ---------- 정본 산출 ----------
+starts=[i for i,l in enumerate(lines) if l.startswith("### ")]
+CLS=re.compile(r'^\s*- \*\*분류\*\*:\s*\*?\*?`([^`]+)`')
+cnt=collections.Counter(); axis=collections.defaultdict(collections.Counter); ids=[]
+for n,st in enumerate(starts):
+    e=starts[n+1] if n+1<len(starts) else len(lines)
+    body=lines[st:e]; t=lines[st][4:].strip()
+    m=[CLS.match(l) for l in body]; m=[x for x in m if x]
+    if not m: continue
+    cid=t.split(" ")[0]; ids.append(cid); v=m[0].group(1)
+    cnt[v]+=1; axis[cid.split("-")[0]][v]+=1
+ORDER=["V2 필수","후속","폐기","근거 부족"]
+CLS4=tuple(cnt[k] for k in ORDER); CAP=sum(cnt.values())
+reg=sorted(set(re.findall(r'^\|\s*(OPEN-[A-Z]+-\d+)\s*\|',txt,re.M)))
+OPENTOT=len(reg)
+# 그룹별: '### G<n>.' 헤딩 아래의 registry 행
+grp=collections.Counter(); cur=None
+for l in lines:
+    g=re.match(r'^### (G\d)\.',l)
+    if g: cur=g.group(1)
+    elif re.match(r'^\|\s*OPEN-[A-Z]+-\d+\s*\|',l) and cur: grp[cur]+=1
+COND=len(re.findall(r'^\s+- \*\*조건부 — `OPEN-',txt,re.M))
+PROV=len(re.findall(r'^\s+- \*\*잠정 — `OPEN-',txt,re.M))
+CONDCAP=len(set(re.findall(r'^### ([A-Z]+-\d+)',txt,re.M)) & set())  # 아래에서 별도 산출
+condcaps=set()
+for n,st in enumerate(starts):
+    e=starts[n+1] if n+1<len(starts) else len(lines)
+    if any(re.match(r'^\s+- \*\*조건부 — `OPEN-',l) for l in lines[st:e]):
+        condcaps.add(lines[st][4:].strip().split(" ")[0])
+CONDCAP=len(condcaps)
+LINES=len(lines)-(1 if lines and lines[-1]=="" else 0)
+
+GT={
+ "분류4종": CLS4, "capability 총수": CAP, "활성 OPEN 총수": OPENTOT,
+ "G 분포": {k:grp[k] for k in sorted(grp)},
+ "축별 분포": {a:tuple(axis[a][k] for k in ORDER) for a in sorted(axis)},
+ "조건부 묶음": COND, "조건부 capability": CONDCAP, "잠정 묶음": PROV,
+ "capability-map 줄 수": LINES,
+}
+print("=== 정본 (산출물에서 직접 계산) ===")
+for k,v in GT.items(): print(f"  {k}: {v}")
+print("  차단 집계: 문서 선언값 — 기계 산출 불가(§12.2 라벨이 없다). 인용 지점 간 일치만 본다")
+print()
+
+# ---------- 인용 지점 추출·대조 ----------
+# 각 항목: (이름, 줄 필터, 값 정규식, 추출 함수, 정본)
+# 줄 필터 = 그 수치가 "이 문서의 집계"를 가리킬 때만 참이 되는 문맥 조건.
+# 필터 없이 숫자만 긁으면 legacy 줄 수·건수 같은 무관한 수치가 섞인다.
+def has(*ws): return lambda l: any(w in l for w in ws)
+ALWAYS=lambda l: True
+CHK=[
+ ("분류4종", has("분류","집계","/ 6 /","/6/"),
+   re.compile(r'(\d{1,3})\s*/\s*(\d{1,3})\s*/\s*(\d{1,3})\s*/\s*(\d{1,3})'),
+   lambda m: tuple(int(x) for x in m.groups()), CLS4),
+ ("분류4종(§10 표 계 행)", ALWAYS,
+   re.compile(r'^\|\s*\*\*계\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*'),
+   lambda m: tuple(int(x) for x in m.groups()), CLS4),
+ ("§10 축별 행", ALWAYS,
+   re.compile(r'^\|\s*(COL|STR|QUAL|ML|DEC|NOTI|SET|OPS)\s[^|]*\|\s*\*{0,2}(\d+)\*{0,2}\s*\|\s*\*{0,2}(\d+)\*{0,2}\s*\|\s*\*{0,2}(\d+)\*{0,2}\s*\|\s*\*{0,2}(\d+)\*{0,2}\s*\|'),
+   None, None),
+ ("활성 OPEN 총수", has("활성","잔여"),
+   re.compile(r'활성\s*`?OPEN`?\s*(?:결정\s*)?\*{0,2}(\d{1,3})\*{0,2}\s*건'),
+   lambda m: int(m.group(1)), OPENTOT),
+ ("활성 OPEN 총수(잔여 N건)", has("활성 OPEN","잔여 활성","OPEN**"),
+   re.compile(r'잔여\s*\*{0,2}(\d{1,3})\s*건\*{0,2}'),
+   lambda m: int(m.group(1)), OPENTOT),
+ ("G3 분포", has("G4","분포"),
+   re.compile(r'G3\s*\*{0,2}(\d{1,2})\*{0,2}'), lambda m: int(m.group(1)), grp["G3"]),
+ ("capability 총수", has("capability","분류"),
+   re.compile(r'capability\s*(?:수\s*)?\*{0,2}(\d{2,3})\*{0,2}\s*(?:불변|개다|개|다)'),
+   lambda m: int(m.group(1)), CAP),
+ ("조건부 capability 수", ALWAYS,
+   re.compile(r'조건부[^\n]{0,30}?capability\s*(?:는)?\s*\*{0,2}(\d{1,2})\*{0,2}\s*개'),
+   lambda m: int(m.group(1)), CONDCAP),
+ ("조건부 묶음 수", ALWAYS,
+   re.compile(r'조건부 묶음\s*\*{0,2}(\d{1,2})\*{0,2}\s*개'),
+   lambda m: int(m.group(1)), COND),
+ ("capability-map 줄 수", has("capability-map","산출물"),
+   re.compile(r'\*{0,2}([\d,]{3,6})\s*줄\*{0,2}'),
+   lambda m: int(m.group(1).replace(",","")), LINES),
+ ("M0 차단", ALWAYS,
+   re.compile(r'M0[^\n]{0,4}차단\s*\*{0,2}(\d+)\*{0,2}건 중\s*\*{0,2}(\d+)\*{0,2}'),
+   lambda m: (int(m.group(1)),int(m.group(2))), (8,7)),
+ ("M1 차단", ALWAYS,
+   re.compile(r'M1[^\n]{0,4}차단(?:은)?\s*\*{0,2}(\d+)\*{0,2}건 중\s*\*{0,2}(\d+)\*{0,2}'),
+   lambda m: (int(m.group(1)),int(m.group(2))), (17,15)),
+]
+AXORD=["COL","STR","QUAL","ML","DEC","NOTI","SET","OPS"]
+
+# 파생 수치: 문서가 계산해 인용하는 값도 정본에서 다시 계산한다.
+import subprocess
+def gcount(pat):
+    n=0
+    for f in FILES:
+        n+=sum(1 for l in open(f,encoding="utf-8") if pat in l)
+    return n
+N09=gcount("OPEN-NOTI-09"); N02=gcount("NOTI-02")
+REDUCE=round((66-OPENTOT)/66*100)
+GT["역방향 OPEN-NOTI-09 총수"]=N09
+GT["역방향 NOTI-02 총수"]=N02
+GT["활성 OPEN 감축률(66 기준)"]=f"{REDUCE}%"
+
+CHK += [
+ ("시계열 마지막 값", has("활성 OPEN","활성 `OPEN`","OPEN 수","잔여"),
+   re.compile(r'(?:\d{1,3}\s*→\s*\*{0,2}){1,6}\*{0,2}(\d{1,3})\*{0,2}'),
+   lambda m: int(m.group(1)), OPENTOT),
+ ("감축률", has("줄여","줄였","감축"),
+   re.compile(r'(\d{1,3})\s*%'), lambda m: f"{m.group(1)}%", f"{REDUCE}%"),
+ ("역방향 패스 합계", has("합계"),
+   re.compile(r'합계\s*(\d{1,3})'), None, None),
+]
+tot=0; bad=[]
+for f in FILES:
+    for i,l in enumerate(open(f,encoding="utf-8").read().split("\n"),1):
+        for name,filt,rx,ex,exp in CHK:
+            if not filt(l): continue
+            for m in rx.finditer(l):
+                tot+=1
+                if name=="역방향 패스 합계":
+                    v=int(m.group(1))
+                    if v not in (N09,N02,16,45):   # 16·45는 수정 전 HEAD 실측(고정 이력)
+                        bad.append((name,f,i,v,f"{N09}(N09) 또는 {N02}(N02)",l.strip()[:160]))
+                    continue
+                if name=="§10 축별 행":
+                    a=m.group(1); got=tuple(int(x) for x in m.groups()[1:])
+                    e=GT["축별 분포"].get(a)
+                    if e and got!=e: bad.append((name,f,i,got,e,l.strip()[:150]))
+                    continue
+                got=ex(m)
+                if got!=exp: bad.append((name,f,i,got,exp,l.strip()[:160]))
+print(f"=== 대조 ===\n추출된 수치 인용: {tot}건 | 정본 불일치: {len(bad)}건 (이력 서술 포함 — 판정 대상)\n")
+for n,f,i,g,e,l in bad:
+    print(f"[{n}] {f}:{i}  추출={g} 정본={e}\n   {l}\n")
+```
+
+### R9-2. 실행 결과
+
+```
+$ python3 numsweep.py
+=== 정본 (산출물에서 직접 계산) ===
+  분류4종: (61, 17, 6, 11)
+  capability 총수: 95
+  활성 OPEN 총수: 45
+  G 분포: {'G1': 3, 'G2': 7, 'G3': 15, 'G4': 8, 'G5': 7, 'G6': 5}
+  축별 분포: {'COL': (8, 0, 1, 1), 'DEC': (9, 1, 0, 0), 'ML': (7, 2, 0, 1),
+             'NOTI': (5, 5, 0, 1), 'OPS': (12, 1, 4, 3), 'QUAL': (7, 3, 1, 1),
+             'SET': (3, 1, 0, 2), 'STR': (10, 4, 0, 2)}
+  조건부 묶음: 8 / 조건부 capability: 6 / 잠정 묶음: 1
+  capability-map 줄 수: 3171
+  차단 집계: 문서 선언값 — 기계 산출 불가(§12.2 라벨이 없다). 인용 지점 간 일치만 본다
+
+=== 대조 ===
+추출된 수치 인용: 173건 | 정본 불일치: 103건 (이력 서술 포함 — 판정 대상)
+```
+
+- **재현 지점은 이 절을 담은 커밋**이다. 스윕이 evidence 자신을 훑으므로 기록을 쓰면
+  추출 건수가 늘어난다. 뒤따르는 `scope.md` 커밋은 **`head_sha` 한 줄만** 바꾸므로
+  그 커밋에서도 같은 값이 나온다(실측으로 확인했다).
+- **정본은 산출물에서 직접 계산한다.** §10 축별 표를 읽어 대조하는 것이 아니라
+  capability 블록의 `- **분류**:` 줄을 세서 표를 검증한다 — 그래서 V-1이 잡혔다.
+
+### R9-3. 판정 — 살아 있는 현재 값 주장 vs 이력의 그 시점 값
+
+103건을 전수로 읽었다. **살아 있는 현재 값 주장의 불일치는 아래가 전부이며 모두
+고쳤다.** 나머지는 라운드별 이력 절의 그 시점 값(정확한 기록)과 무관한 수치의 오탐이다.
+
+| # | 지점 | 추출 → 정본 | 처리 |
+| --- | --- | --- | --- |
+| **V-1** | `capability-map.md:2777` §10 NOTI 행 | `(5,4,0,2)` → `(5,5,0,1)` | 고침(`098bf03`) |
+| **V-1** | `capability-map.md:2780` §10 계 행 | `(61,16,6,12)` → `(61,17,6,11)` | 고침(`098bf03`) |
+| **V-2** | `checklist.md` A1 §12 집계 일치 행 | 46 / G3 16 → 45 / G3 15 | 고침 + 시계열에 `→ 45(2026-08-27)` |
+| **V-3** | `checklist.md` §9 제한 4 | `66 → 46`, 30% → `66 → 45`, **32%** | 고침(감축률도 정본에서 재계산) |
+| **V-5** | `commands.md` R8-2 `NOTI-02` 합계 | 63 → **64**, 파생 "18줄" → **19줄** | 고침 + 측정 커밋(`3ed76e9`) 명시 |
+| **V-7** | `checklist.md:7` 산출물 줄 수 | 3,144 → **3,171** | 고침. §14.3 후속 줄에도 3,171 추가 |
+| **V-9** | `checklist.md` §10.1 활성 OPEN 시계열 | `라운드 7 후 46`에서 끝남 | `2026-08-27 결정 후 45` 추가 |
+| **추가 발견** | `checklist.md` §4 「§10 재계산」 | `62/17/6/10 = 95`가 **2026-08-27 블록 뒤에 놓여 현재 값처럼 읽혔다** | 「라운드 1 시점」 한정을 달고 현재 값 `61/17/6/11` 병기 |
+| **추가 발견** | `checklist.md` A1 본문 인용 일치 행 | 조건부 시계열이 `→ 8(라운드 7)`에서 끝남 | `→ 9(라운드 7 완결) → 8(2026-08-27)` 추가 |
+
+**이 표 자신이 수정 전 값을 인용하므로 다음 실행부터는 스윕이 이 절의 행들도 지목한다**
+(`R9-3` 표 안의 `30%` · `(62,17,6,10)` 등). 기록의 성질상 정상이며 산출물의 상태와
+무관하다 — 다음 라운드가 다시 판정하지 않도록 여기 적는다.
+
+**추가 발견 2건은 verifier 목록에 없던 것**이며 수치 축 스윕이 잡았다. 첫 번째가 특히
+이 축의 값을 보여준다 — 문장은 참(라운드 1 시점 값)인데 **위치가 바뀌어** 현재 값 주장이
+된 경우이고, id 축으로는 영원히 안 보인다.
+
+**오탐 3건**(스윕의 한계로 기록한다 — 다음 라운드가 다시 판정하지 않도록):
+
+| 지점 | 왜 오탐인가 |
+| --- | --- |
+| `capability-map.md:998` "잔여 2건" | QUAL-11 블록의 **미결 항목 2건**이지 활성 OPEN 총수가 아니다 |
+| `capability-map.md:1260` "합계 2,166줄" | legacy `app/domain/` 줄 수다 |
+| `commands.md:200` "(합계 6)" | 라운드 1 절 번호 grep 출력의 행 수다 |
+
+### R9-4. id 축 스윕 재실행 (R7C-1 스크립트)
+
+```
+$ python3 sweep46.py
+활성 OPEN: 45건 | 전체 매치: 367건
+'해소/결번/취소선' 어휘와 같은 줄에 있는 매치: 52건 (판정 대상)
+```
+
+- **불일치 0건.** 이번 라운드는 OPEN을 신설·복원·해소하지 않았으므로 R8-1의 판정이
+  그대로 유효하고, 재실행은 그 사실의 확인이다.
+
+### R9-5. 불변 재실행
+
+```
+$ python3 inv2.py
+분류: {'V2 필수': 61, '근거 부족': 11, '폐기': 6, '후속': 17} = 95
+형식 위반: none
+V2 필수 사용자 가치/acceptance 결측: none
+중복 id: none
+§12 활성 OPEN: 45
+$ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" docs/discovery/ | wc -l
+       3
+$ git diff --check 6af7019...HEAD | wc -l
+       0
+$ wc -l docs/discovery/capability-map.md
+    3171 docs/discovery/capability-map.md
+```
+
+- capability **95** · 분류 **61/17/6/11** · 활성 OPEN **45** — 전부 불변.
+  V-1은 표를 실측에 맞춘 것이지 분류를 바꾼 것이 아니다.
