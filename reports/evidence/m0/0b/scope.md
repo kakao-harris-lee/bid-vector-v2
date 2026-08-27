@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0b-regression-ledger
 base_sha: ec115a7   # 0A2 Codex approve verdict 등재 직후
-head_sha: 1bf0312   # 기입 시점의 최신 커밋(N-1 대응). 「이력 절 규약」 참조
+head_sha: 7701556   # 기입 시점의 최신 커밋 = Codex 4차가 리뷰한 head. 「이력 절 규약」 참조
 in_scope:
   - docs/discovery/regression-ledger.md
   - reports/evidence/m0/0b/
@@ -1124,6 +1124,8 @@ F-2 하나**다. **한계로 적고 넓히지 않는다** — 도구를 한 사�
 | **I-6** | **「이 라운드의 커밋」 표가 자기 커밋을 싣지 않는다**(verifier O-1) — 「이력 절 규약」이 그렇게 정했고 표 아래 그 사실이 명시돼 있어 **거짓 서술은 아니다.** 다만 표 제목이 「이 라운드의 커밋」이라 **단독 인용 시 전수로 읽힌다.** 제목 어휘는 다음 slice에서 정한다 |
 | **I-7** | **`commands.md` C-12.1이 *"한 라운드 동안 **이 자리에** 적혀 있던 수"*라 적는다**(verifier O-2) — 그 하위 절은 그 라운드에 **신설**됐으므로 수가 있던 자리는 여기가 아니라 **`C-10.2`와 `scope.md`**다. **이력 서술의 거칢**이며 판정을 막지 않는다 |
 | **I-8** | **`O-3`과 같은 부류의 문장이 두 자리 더 있다** — 이 파일의 「형태 기록 — 새 형태를 만들지 않았다」 절(`22d173e`)과 `commands.md`의 「C-12.4 형태 기록」 절(`d659765`)이 *"이 slice에서 재발이 끊긴 처방은 … **하나뿐**"*이라 적는다. **`O-3`과 같은 주장이고 재현 명령이 없다.** **이번 라운드에 고치지 않았다** — 둘 다 **앞선 라운드의 산문**이고 앞의 것은 **이력 절 안**이라 「소급 편집하지 않는다」에 걸린다. 검증자도 `O-3`으로 지목하지 않았다. **판정은 다음 slice** |
+| **I-9** | **legacy `bid-vector` 저장소가 리뷰 worktree에 없어 `ed4b06c`의 파일 내용·행 범위·commit을 독립 재현하지 못한다**(Codex 4차 `residual_risks`) — `citecheck` 재실행에서 legacy 경로·commit이 부재로 뜨는 것은 **환경 한계**이고 Codex도 finding으로 계상하지 않았다. **legacy 인용의 독립 검증은 저장소가 있는 환경에서 다시 한다** |
+| **I-10** | **`statusdiff`·`mutcheck`를 리뷰 환경에서 재실행하지 못한다**(Codex 4차 `residual_risks`) — 앞의 것은 `_workspace`의 선행 조사 노트를, 뒤의 것은 이 worktree에 없는 추출본 스크립트를 요구한다. **둘 다 evidence 밖 입력에 걸린 재현성 한계**다. 인라인 본문과 출력 자체는 C-9.8의 `resync`가 매 실행에 맞춘다 |
 
 **기존 이월도 그대로다** — 최초 완료 기록의 셋(`OPEN-REG-01`~`05` 판정 · 중앙 registry 통합 ·
 예방 제약의 실제 구현) + ex-VAT 프레이밍(별도 slice) + §10.1 계열 A 형태 추가(별도 slice) +
@@ -1355,5 +1357,70 @@ Codex verdict는 그 블록을 `sed -n '324,418p' reports/evidence/m0/0b/command
 | 활성 OPEN 해소 · `OPEN-REG` 목록 | `grep -oE 'OPEN-REG-[0-9]+' docs/discovery/regression-ledger.md \| sort -u` |
 | 공백 오류 | `git diff --check ec115a7...HEAD` |
 | 절 머리 · 인라인 본문 · 출력 블록 | `bash resync.sh` — 그 출력의 자리는 C-9.8이다 |
+
+**이 커밋에 대해서는 아무것도 주장하지 않는다.**
+
+---
+
+## 갱신 이력 — Codex 4차 `approve` 등재 + low 1건 (0B 종료)
+
+### Codex 4차 verdict — `approve`
+
+정본: `reports/evidence/m0/0b/codex-review-20260827T121954Z.json`.
+`reviewed_base` **`ec115a7`** → `reviewed_head` **`7701556`**.
+**severity별 건수는 옮겨 적지 않는다** — 그 JSON의 `findings`가 정본이다. 셈을 산문에
+옮기면 다시 낡고, `N-1`이 정확히 그것으로 났다.
+
+**3차 medium 두 건 다 해소 판정을 받았다.** 네 라운드가 **값 교체가 아니라 발생원 제거**로
+간 것이 통했다.
+
+### `approve`는 `7701556`에 대한 것이고 이 커밋은 그 뒤에 온다
+
+**리뷰된 head는 `7701556`이다.** 이 커밋은 그 **뒤**에 오며 **verdict 등재**와 **Codex가
+직접 처방한 low 수정**만 담는다. 무엇이 들어갔는지는 `git diff --name-only 7701556..HEAD`와
+`git show --stat --format='' HEAD`가 낸다 — **목록도 셈도 여기에 옮기지 않는다.**
+
+### low 1건 — 수를 지우는 쪽으로 닫았다 (`checklist.md` A4)
+
+| 지운 문면 | 왜 낡았나 | 남긴 문면 |
+| --- | --- | --- |
+| *"특징어가 부족해 축이 매칭할 수 없는 활성 OPEN **7건**은 사람이 읽어 판정했고"* | `openstance` 인라인 본문을 그대로 돌리면 그 수가 다르고, `commands.md`의 **사람 판정 표**에는 `OPEN-REG-04`를 포함해 더 등재돼 있다. **수만 낡았고 판정은 전부 존재한다** | *"…활성 OPEN**은** 사람이 읽어 판정했고"* — **수를 지웠다.** 목록과 판정은 그대로 **C-8.2가 낸다** |
+
+**Codex가 제시한 두 처방 중 두 번째를 택했다** — *"다시 낡지 않도록 수를 옮겨 적지 않고
+C-8.2 출력과 판정 표만 가리킨다."* 이것이 **이 slice가 채택한 처방과 같다.**
+**판정 결론(선점 없음)은 그대로 두었다** — 낡은 것은 수이고 결론이 아니다.
+
+### `residual_risks` — 닫을 수 없는 것을 이월로 등재했다
+
+verdict의 `residual_risks` 중 **이 slice가 닫을 수 없는 것**을 위 이월 표에 등재했다
+(`I-9` · `I-10`). 나머지는 등재하지 않았고 그 이유를 적는다:
+
+- **예방 제약의 실제 구현은 M1 이후** — **이미 기존 이월에 있다.** 중복 등재하지 않는다.
+- **`resync.sh`를 리뷰에서 실행하지 않았다** — **리뷰 레인의 read-only 조건**이지 slice의
+  부채가 아니다. 구현 레인은 매 라운드 실행하고 그 출력의 자리는 C-9.8이다.
+
+### 이 라운드의 커밋 — 이 절이 그 커밋 안에 있다
+
+**이 라운드는 한 커밋이고 이 절이 그 커밋에 실린다.** 그래서 **SHA를 적지 않고 이 커밋에
+대해 아무것도 주장하지 않는다** — 위 「이력 절 규약」이 그렇게 정한다.
+
+- `head_sha` → `7701556`. 커밋이 자기 SHA를 담을 수 없어 **직전 커밋**을 가리킨다.
+  **그 SHA가 Codex 4차가 리뷰한 head와 같다.**
+- **range `ec115a7...HEAD`**. in_scope 준수는 `git diff --name-only ec115a7...HEAD`로
+  확인한다.
+
+### 불변 — 이 절은 수를 옮겨 적지 않는다
+
+**셈을 산문에 옮기지 않는다.** 아래는 **확인할 것과 그것을 내는 명령**이고, **결과를
+여기 적지 않는다.**
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| `regression-ledger.md`가 이 라운드에 바뀌었는지 | `git diff --stat 7701556..HEAD -- docs/discovery/regression-ledger.md` |
+| `capability-map.md` 미편집 · in_scope 준수 | `git diff --name-only ec115a7...HEAD` |
+| 활성 OPEN 해소 · `OPEN-REG` 목록 | `grep -oE 'OPEN-REG-[0-9]+' docs/discovery/regression-ledger.md \| sort -u` |
+| 공백 오류 | `git diff --check ec115a7...HEAD` |
+| 절 머리 · 인라인 본문 · 출력 블록 | `bash resync.sh` — 그 출력의 자리는 C-9.8이다 |
+| Codex 4차 verdict와 `findings` | 위 verdict JSON |
 
 **이 커밋에 대해서는 아무것도 주장하지 않는다.**

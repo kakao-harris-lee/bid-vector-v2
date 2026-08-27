@@ -1,0 +1,47 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "ec115a79c75e51770ecd58d3c19a3d2adb70120e",
+  "reviewed_head": "7701556c130c44251063335ff920dc8e029acae4",
+  "findings": [
+    {
+      "severity": "low",
+      "file": "reports/evidence/m0/0b/checklist.md",
+      "line": 96,
+      "evidence": "A4 대조는 `openstance`가 특징어 부족으로 매칭하지 못한 활성 OPEN을 7건이라고 서술한다. 그러나 현재 HEAD의 인라인 본문을 그대로 실행한 `sed -n '1084,1228p' reports/evidence/m0/0b/commands.md | python3 -`은 8건을 출력하며, `commands.md:1308-1317`의 사람 판정 표에도 `OPEN-REG-04`를 포함한 8건이 실제로 등재돼 있다. 따라서 수치만 낡았다. 모든 8건의 판정은 존재하고 선점 없음 결론도 본문과 맞으므로 산출물 acceptance를 막지는 않는다.",
+      "required_fix": "`7건`을 현재 출력과 같은 `8건`으로 고치거나, 다시 낡지 않도록 수를 옮겨 적지 않고 C-8.2 출력과 판정 표만 가리킨다."
+    }
+  ],
+  "commands_run": [
+    "rg -n \"bid-vector-v2|regression-ledger|0b-regression|G-2|G-3\" /Users/harris/.codex/memories/MEMORY.md",
+    "git status --short --branch && git rev-parse HEAD && git cat-file -t ec115a79c75e51770ecd58d3c19a3d2adb70120e && git cat-file -t 7701556c130c44251063335ff920dc8e029acae4 && git merge-base ec115a79c75e51770ecd58d3c19a3d2adb70120e 7701556c130c44251063335ff920dc8e029acae4",
+    "git diff --stat ec115a79c75e51770ecd58d3c19a3d2adb70120e...7701556c130c44251063335ff920dc8e029acae4 && git diff --name-status ec115a79c75e51770ecd58d3c19a3d2adb70120e...7701556c130c44251063335ff920dc8e029acae4 && git log --oneline --decorate --no-merges ec115a79c75e51770ecd58d3c19a3d2adb70120e..7701556c130c44251063335ff920dc8e029acae4",
+    "git diff --check ec115a79c75e51770ecd58d3c19a3d2adb70120e...7701556c130c44251063335ff920dc8e029acae4",
+    "sed -n '523,603p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '324,418p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '1084,1228p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '1567,1719p' reports/evidence/m0/0b/commands.md | python3 - ec115a79c75e51770ecd58d3c19a3d2adb70120e 7701556c130c44251063335ff920dc8e029acae4",
+    "sed -n '2456,2503p' reports/evidence/m0/0b/commands.md | python3 -",
+    "sed -n '64,159p' reports/evidence/m0/0b/commands.md | python3 - docs/discovery/regression-ledger.md",
+    "for W in 12 25 40; do printf '창 %s줄 → ' \"$W\"; python3 - \"$W\" <<'PY' | python3 - | tail -1\nimport re, sys\nt = open(\"reports/evidence/m0/0b/commands.md\", encoding=\"utf-8\").read()\nb = [x for x in re.findall(r\"```python\\n(.*?)\\n```\", t, re.S) if re.search(r\"^WIN = 12\\b\", x, re.M)]\nassert len(b) == 1, f\"prosecheck 본문 자리 특정 실패: {len(b)}\"\nprint(re.sub(r\"^WIN = 12\\b\", \"WIN = \" + sys.argv[1], b[0], count=1, flags=re.M))\nPY\ndone",
+    "grep -rniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))' docs/discovery/regression-ledger.md reports/evidence/m0/0b/",
+    "git diff 105259a8a02f61be6f09b806dd891e02159238a7..7701556c130c44251063335ff920dc8e029acae4 -- docs/discovery/regression-ledger.md reports/evidence/m0/0b/checklist.md",
+    "git diff-tree --no-commit-id --name-status -r 105259a8a02f61be6f09b806dd891e02159238a7",
+    "git show -s --format='%H%n%P%n%B' 105259a8a02f61be6f09b806dd891e02159238a7",
+    "git diff 4f4fd7ffb3b8b0e5d2de22908877e12ac99341ce..7701556c130c44251063335ff920dc8e029acae4 -- docs/discovery/regression-ledger.md",
+    "git diff 26199744f187cb626121f1fb6ae7944b644d4b89..7701556c130c44251063335ff920dc8e029acae4 -- docs/discovery/regression-ledger.md",
+    "git blame -L 87,98 -- reports/evidence/m0/0b/checklist.md",
+    "git merge-base --is-ancestor ec115a79c75e51770ecd58d3c19a3d2adb70120e 7701556c130c44251063335ff920dc8e029acae4; git status --short --untracked-files=all; git diff --name-only ec115a79c75e51770ecd58d3c19a3d2adb70120e...7701556c130c44251063335ff920dc8e029acae4 -- docs/discovery/capability-map.md",
+    "jq -e '.verdict and .reviewed_base and .reviewed_head and (.findings|type==\"array\") and (.commands_run|type==\"array\") and (.residual_risks|type==\"array\")' reports/evidence/m0/0b/codex-review-20260827T064055Z.json reports/evidence/m0/0b/codex-review-20260827T085200Z.json reports/evidence/m0/0b/codex-review-20260827T104509Z.json"
+  ],
+  "residual_risks": [
+    "이 worktree에는 legacy `bid-vector` 저장소가 없어 `ed4b06c`의 파일 내용·행 범위·commit과 실측 수치·방향을 독립 재현하지 못했다. `citecheck` 재실행에서 legacy 경로와 commit이 부재로 나온 것은 요청에 명시된 환경 한계이며 finding으로 계상하지 않았다.",
+    "`_workspace/m0-0b/01_scout_regression_preflight.md` 및 후속 verifier 노트가 없어 `statusdiff` 계열의 선행 조사 대조를 재실행하지 못했다.",
+    "`mutcheck`는 이 worktree에 없는 추출본 스크립트를 요구해 인라인 그대로 재실행하지 못했다.",
+    "`resync.sh`는 evidence 파일을 쓰므로 read-only 리뷰 조건에 따라 실행하지 않았다.",
+    "예방 제약은 문서 요구사항이다. production wiring의 실제 side-effect 차단, Kotlin/Python 업무 규칙 단일 소유, unknown-schema/contract compatibility, domain 의존 방향과 크기·순환 API 래칫은 해당 구현이 생기는 M1 이후 및 M2 계약 리뷰에서 검증해야 한다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
