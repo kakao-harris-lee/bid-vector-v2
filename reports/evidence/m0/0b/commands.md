@@ -687,7 +687,7 @@ R-ASYNC-02 · R-ML-07 · R-ML-08.
 ```
 $ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
     docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
-6
+11
 $ git diff --check ec115a7...HEAD | wc -l
 0
 $ git status --porcelain -- docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
@@ -1268,9 +1268,13 @@ $ python3 slack.py
 인라인된 본문만 옛 상태로 남았다. 그래서 **누가 evidence의 본문을 그대로 돌리면 느슨한
 검사가 나온다.**
 
-**처방**: **본문 동기화를 resync에 넣었다.** 그리고 인라인된 스크립트 **6종을 실물과
-전수 대조**해 어긋난 것이 `citecheck` 하나뿐임을 확인했다 — 나머지 다섯은 바이트 동일.
+**처방**: **본문 동기화를 resync에 넣었다.** 그리고 인라인된 스크립트를 실물과
+**전수 대조**해 어긋난 것이 `citecheck` 하나뿐임을 확인했다 — 나머지는 바이트 동일.
 **"고쳤다"고 적을 때 그 대상이 파일이면 그 파일의 diff를 본다.**
+
+> **정정 (C-9.7)** — 이 자리에 적었던 **"6종"**은 같은 라운드에 `slack.py`가 인라인되며
+> 낡았다(형태 5). **셈을 고쳐 적지 않고 세는 도구가 세게 했다** — C-9.8의 `resync.sh`가
+> 매 실행에서 블록 수·차지한 수·발췌 수·불일치 수를 찍는다.
 
 ### C-8.5 §10.1 판단 — 계열 A는 **일곱 번째 형태로 추가할 만하다**(단 그 파일은 범위 밖)
 
@@ -1291,3 +1295,541 @@ $ python3 slack.py
 **다만 §10.1은 `reports/evidence/m0/0a2/checklist.md`에 있고 0B의 out_of_scope다.**
 이 slice는 **판단만 기록하고 그 파일을 편집하지 않는다** — 표를 고치려면 별도 slice 계약이
 필요하다. **0B는 그 사이 계열 A 축(C-8.2)을 자기 evidence에 두고 돌린다.**
+
+---
+
+## C-9. 주장 대조 축 — "했다"가 산출물에 있는가 (verifier F-2 · F-4 · checklist A4)
+
+### C-9.1 왜 이 축을 만들었는가 — 같은 결함이 **네 번** 관측됐다
+
+| # | 라운드 | evidence가 서술한 수정 | 산출물의 실제 상태 |
+| --- | --- | --- | --- |
+| 1 | Codex 1차 | `citecheck`의 `splitlines()` 치환 | **인라인 본문 미수정**(verifier F-0, blocker) |
+| 2 | F-0 대응 | `R-BASIS-01`의 귀속을 `OPEN-REG-05`로 | **`:80`은 `OPEN-QUAL-10` 그대로** — ledger가 `:1305`와 **자기 모순** |
+| 3 | F-0 대응 | `동반 OPEN`을 §0.1 필드 표에 등재 | **표에 행이 없음** |
+| 4 | F-0 대응 | checklist A4 "둘 다 `동반 OPEN`을 달았다" | **`R-PROV-02`에 그 필드가 없음** |
+
+**F-0의 처방은 이 부류의 일부만 덮었다.** 본문 동기화를 resync에 넣은 것은
+**「인라인 스크립트 본문」**을 대조하게 했을 뿐이고, **산출물 편집을 주장하는 산문은
+여전히 아무것도 대조하지 않았다.** 결함이 네 번 관측됐으므로
+**"필요가 관측되기 전에 도구를 늘리지 마라"**의 조건은 충족됐다.
+
+### C-9.2 정의 — 무엇을 정본으로 삼는가
+
+| | |
+| --- | --- |
+| **정본 (변경)** | `git diff ec115a7 <head> -- docs/discovery/regression-ledger.md`의 **추가 줄** |
+| **정본 (상태)** | `<head>`의 산출물 본문 |
+| **주장** | evidence 3파일에서 **완료 동사**(`고쳤`·`등재했`·`달았`·`교체했`·`추가했`·`제거했`·`걷어냈`·`넣었`·`갈랐`·`등록했`·`인라인했`·`옮겼`·`없앴`·`맞췄`·`좁혔`·`넓혔`·`정정했`·`반영했`·`삭제했`·`바꿨`·`붙였`·`보강했`)를 담은 단위 |
+| **주장의 단위** | **문장이 아니라 블록**(bullet·문단). F-2가 그 이유다 — 대상(`R-BASIS-01`)이 앞 문장에 있고 완료 동사(`등록했다`)가 뒤 문장에 있었다 |
+| **위치** | `§N`·`§N.N`(**포함 관계** — "§10 인계"는 §10.1의 내용으로 충족된다) 또는 항목 id(`R-BASIS-01`) |
+| **대상 토큰** | `OPEN-*` id + **산출물이 스스로 쓰는 필드명**. 필드 어휘는 손으로 적지 않고 ledger의 `- **X**:` 라벨을 훑어 만든다 — **정본은 산출물이다** |
+| **판정** | 대상 토큰이 그 위치에 **없으면 지목**. 있는데 range의 추가 줄이 아니면 참고 |
+
+**축을 만들며 축 자신의 결함 셋을 고쳤다.** ① 마크다운 강조가 한국어 동사를 가른다
+(`등록**했다`)라 정규식 전에 `*`·`` ` ``·`>`를 걷어낸다 — **F-2가 그것 때문에 안 잡혔다.**
+② **부정형은 강등이 아니라 표시**다. 처음엔 블록에 부정 어휘가 있으면 지목을 내렸는데,
+그러면 한 문장의 "…하지 않았다"가 **블록의 모든 주장을 가린다**(checklist A4가 정확히
+그렇게 숨었다). ③ **펜스 블록은 주장이 아니다** — 스크립트 본문과 명령 출력을 건너뛴다.
+넣지 않으면 **이 축이 자기 출력을 주장으로 읽어** 지목이 8 → 54로 폭주한다(실측).
+
+**셋 다 "고쳤다"이므로 대상은 인라인 본문이고, 그 본문은 C-9.8의 `resync.sh`가 매 실행에
+실물과 대조한다**(`불일치 0`). **이 축의 주장은 이 축이 아니라 그 루프가 닫는다.**
+
+### C-9.3 스크립트 본문 (형태 4: 인라인)
+
+```python
+#!/usr/bin/env python3
+# claimcheck — evidence 의 "완료 주장" 을 산출물 실물과 대조한다.
+#
+# 정본:
+#   (변경) git diff <BASE> <HEAD> -- <산출물> 의 추가 줄
+#   (상태) <HEAD> 의 산출물 본문
+# 판정: 주장이 지목한 「대상 토큰」이 주장이 지목한 「위치」에 실제로 있는가.
+#
+# 못 하는 것 — 아래 두 부류는 기계가 닫지 않고 사람에게 넘긴다.
+#   (1) 위치를 특정할 수 없는 주장 (절 번호도 항목 id 도 없는 것)
+#   (2) 부정형 주장 (".. 가 소유자가 아니다") — 부재가 정답인 경우
+import re, subprocess, sys, collections
+
+BASE = sys.argv[1] if len(sys.argv) > 1 else "ec115a7"
+HEAD = sys.argv[2] if len(sys.argv) > 2 else "HEAD"
+LEDGER = "docs/discovery/regression-ledger.md"
+EV = ["reports/evidence/m0/0b/scope.md",
+      "reports/evidence/m0/0b/checklist.md",
+      "reports/evidence/m0/0b/commands.md"]
+
+def git(*a):
+    return subprocess.run(["git"] + list(a), capture_output=True, text=True, check=True).stdout
+
+# HEAD 에 "WT" 를 주면 **작업 트리**를 본다 — 커밋 전에 돌려야 의미가 있는 축이다.
+WT = (HEAD == "WT")
+def read(path):
+    return open(path, encoding="utf-8").read() if WT else git("show", f"{HEAD}:{path}")
+def diff(path):
+    a = ["diff", "-U0", BASE] + ([] if WT else [HEAD]) + ["--", path]
+    return git(*a)
+
+# ---- 1. 산출물의 절 색인: 줄 -> 위치 키 -------------------------------------
+body = read(LEDGER).splitlines()
+sec_of = [None] * (len(body) + 1)      # 1-based
+cur = None
+for i, ln in enumerate(body, 1):
+    m = re.match(r'^#{2,4}\s+(\d+(?:\.\d+)?)[.\s]', ln)          # "## 0. .."  "### 0.1 .."
+    if m: cur = "§" + m.group(1)
+    m = re.match(r'^#{3,4}\s+((?:R|P)-[A-Z]+-\d+)\b', ln)        # "### R-BASIS-01 · .."
+    if m: cur = m.group(1)
+    sec_of[i] = cur
+
+# ---- 2. range 가 추가한 줄 (새 파일 줄번호) ---------------------------------
+added = set()
+d = diff(LEDGER).splitlines()
+newline = 0
+for ln in d:
+    h = re.match(r'^@@ -\S+ \+(\d+)(?:,(\d+))? @@', ln)
+    if h:
+        newline = int(h.group(1)); continue
+    if ln.startswith("+") and not ln.startswith("+++"):
+        added.add(newline); newline += 1
+    elif ln.startswith(" "):
+        newline += 1
+
+# ---- 3. 대상 토큰 어휘: 산출물이 스스로 쓰는 필드명 (정본은 산출물) ----------
+fields = sorted({m.group(1) for ln in body
+                 for m in [re.match(r'^\s*[-*]\s+\*\*([^*]+?)\*\*\s*(?:—|:)', ln)] if m},
+                key=len, reverse=True)
+
+ID = re.compile(r'\b((?:R|P)-[A-Z]+-\d+|OPEN-[A-Z]+-\d+)\b')
+SEC = re.compile(r'§(\d+(?:\.\d+)?)')
+CLAIM = re.compile(r'(고쳤|등재했|달았|교체했|추가했|제거했|걷어냈|넣었|갈랐|등록했'
+                   r'|인라인했|옮겼|없앴|맞췄|좁혔|넓혔|정정했|반영했|삭제했|바꿨|붙였|보강했)')
+NEG = re.compile(r'(아니다|아니라|않는다|않았다|없다|없음|없었|못 |못했|빠져|틀렸|저촉)')
+
+def units(text):
+    blocks, cur, fence = [], [], None
+    for ln in text.split("\n"):
+        s = ln.strip()
+        # 펜스 블록(스크립트 본문·명령 출력)은 **주장이 아니다.** 건너뛴다 —
+        # 넣지 않으면 이 축이 자기 출력을 주장으로 읽어 자기참조로 폭주한다.
+        if s.startswith("```"):
+            m = re.match(r'^(`{3,})', s)
+            if fence is None: fence = m.group(1)
+            elif s.startswith(fence): fence = None
+            if cur: blocks.append(" ".join(cur)); cur = []
+            continue
+        if fence is not None: continue
+        if not s or s.startswith(("#", "|")) or re.match(r'^[-*]\s|^\d+\.\s', s):
+            if cur: blocks.append(" ".join(cur)); cur = []
+            if s.startswith(("|", "#")): blocks.append(s); continue
+            if re.match(r'^[-*]\s|^\d+\.\s', s): cur = [s]
+            continue
+        cur.append(s)
+    if cur: blocks.append(" ".join(cur))
+    # 단위는 **문장이 아니라 블록**(bullet/문단)이다 — 주장의 대상이 앞 문장에
+    # 있고 완료 동사가 뒤 문장에 있는 경우가 실제로 있다(F-2 가 그것이다).
+    return [b.strip() for b in blocks if b.strip()]
+
+def lines_in(loc):
+    # 절은 포함 관계다 — "§10 인계" 라는 주장은 §10.1 의 내용으로 충족된다.
+    return [i for i in range(1, len(body) + 1)
+            if sec_of[i] and (sec_of[i] == loc or sec_of[i].startswith(loc + "."))]
+
+def flat(x):                      # 마크다운 강조가 한국어 동사를 가른다 (`등록**했다`)
+    return re.sub(r'[*`~>]', '', x)
+
+def sents(b):
+    return [x for x in re.split(r'(?<=다\.)\s+|(?<=다\.\*\*)\s+', b) if x.strip()]
+
+flag, note, unloc = [], [], []
+for f in EV:
+    for u in units(read(f)):
+        fu = flat(u)
+        if not CLAIM.search(fu): continue
+        ids  = ID.findall(u)
+        locs = ["§" + s for s in SEC.findall(u)] + [i for i in ids if not i.startswith("OPEN-")]
+        locs = [l for l in dict.fromkeys(locs) if lines_in(l)]
+        toks = [i for i in dict.fromkeys(ids) if i.startswith("OPEN-")] \
+             + [t for t in fields if "`" + t + "`" in u or "**" + t + "**" in u]
+        if not locs or not toks:
+            unloc.append((f, u, ids)); continue
+        ss = sents(u)
+        for loc in locs:
+            ns = lines_in(loc)
+            for t in toks:
+                if t in loc: continue
+                # 그 토큰을 실제로 말하는 문장만 본다 — 부정형 판정을 블록 전체로 넓히면
+                # 한 문장의 "..하지 않았다" 가 블록의 모든 주장을 가린다.
+                mine = [x for x in ss if t in x] or [u]
+                if not any(CLAIM.search(flat(x)) for x in mine): continue
+                neg = any(NEG.search(flat(x)) for x in mine)
+                hd  = [i for i in ns if t in body[i - 1]]
+                say = max(mine, key=len)
+                # 부정형은 **강등이 아니라 표시**다 — 부정이 토큰에 걸리는지 절 단위로
+                # 가르는 것은 기계가 못 한다. 지목은 남기고 사람이 판정한다.
+                if not hd:
+                    flag.append((f, loc, t, say, "부정형 어휘 포함" if neg else ""))
+                elif not any(i in added for i in hd):
+                    note.append((f, loc, t, say, "HEAD 에는 있으나 이 range 가 넣은 것이 아니다"))
+
+def dump(title, rows):
+    seen, keep = set(), []
+    for r in rows:
+        k = r[:3]
+        if k in seen: continue
+        seen.add(k); keep.append(r)
+    print(f"\n=== {title} ({len(keep)}건) ===")
+    for f, loc, t, u, tag in keep:
+        print(f"[{f.split('/')[-1]} → {loc}] 대상 `{t}` 가 그 위치에 없다" + (f"   ※ {tag}" if tag else ""))
+        print(f"    주장: {' '.join(u.split())[:180]}".rstrip())
+
+print(f"정본: git diff {BASE} {'' if WT else HEAD} -- {LEDGER}  (추가 줄 {len(added)})")
+print(f"산출물 절 {len({s for s in sec_of if s})}종 · 필드 어휘 {len(fields)}종 · evidence {len(EV)}파일")
+dump("지목 — 주장이 가리키는 대상이 그 위치에 없다 (전부 사람이 판정한다)", flag)
+dump("참고 — 대상은 있으나 이 range 가 넣은 것이 아니다", note)
+# 위치를 특정할 수 없는 주장 — 축이 닫지 않는다. 파일별로 세어 찍고 사람이 읽는다.
+c = collections.Counter(f.split("/")[-1] for f, _, _ in unloc)
+print(f"\n=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 ({len(unloc)}건: "
+      + " · ".join(f"{k} {v}" for k, v in c.items()) + ") ===")
+for f, u, ids in unloc:
+    print(f"[{f.split('/')[-1]}] {' '.join(u.split())[:104]}".rstrip())
+```
+
+### C-9.4 유효성 실증 — **수정 전 트리에서 셋을 지목한다**
+
+`8e6b78a`는 세 건을 고치기 **전** 커밋이다. 축이 그 트리에서 셋을 전부 찍지 못하면
+축이 작동하지 않는 것이다.
+
+```
+$ python3 claimcheck.py ec115a7 8e6b78a
+정본: git diff ec115a7 8e6b78a -- docs/discovery/regression-ledger.md  (추가 줄 1357)
+산출물 절 81종 · 필드 어휘 15종 · evidence 3파일
+
+=== 지목 — 주장이 가리키는 대상이 그 위치에 없다 (전부 사람이 판정한다) (8건) ===
+[scope.md → R-BASIS-01] 대상 `OPEN-DEC-10` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: 등록된 소유자가 없음을 확인하고(`OPEN-DEC-10`은 예규 구간 차등으로 다른 축) **A7대로 `OPEN-REG-05`로 등록**했다.
+[scope.md → R-BASIS-01] 대상 `OPEN-REG-05` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: 등록된 소유자가 없음을 확인하고(`OPEN-DEC-10`은 예규 구간 차등으로 다른 축) **A7대로 `OPEN-REG-05`로 등록**했다.
+[scope.md → §0.1] 대상 `동반 OPEN` 가 그 위치에 없다
+    주장: - **F-4**: **`동반 OPEN`**을 §0.1 필드 표에 **선택 필드**로 등재했다.
+[checklist.md → §10] 대상 `동반 OPEN` 가 그 위치에 없다
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`·§10 인계(`OPEN-DEC-07`, verifier F-1). 둘 다 **결정 무관/조건부를 가르고** `동반 OPEN`을 달았다.
+[checklist.md → R-COL-02] 대상 `OPEN-DEC-07` 가 그 위치에 없다
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`·§10 인계(`OPEN-DEC-07`, verifier F-1). 둘 다 **결정 무관/조건부를 가르고** `동반 OPEN`을 달았다.
+[checklist.md → R-PROV-02] 대상 `OPEN-OPS-01` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`·§10 인계(`OPEN-DEC-07`, verifier F-1). 둘 다 **결정 무관/조건부를 가르고** `동반 OPEN`을 달았다.
+[checklist.md → R-PROV-02] 대상 `동반 OPEN` 가 그 위치에 없다
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`·§10 인계(`OPEN-DEC-07`, verifier F-1). 둘 다 **결정 무관/조건부를 가르고** `동반 OPEN`을 달았다.
+[commands.md → §0.3] 대상 `근거` 가 그 위치에 없다
+    주장: - **자기참조 줄 번호 검사의 예외 판정을 고쳤다**(라운드 1) — `- **근거**:` 한 항목이 여러 줄에 걸치면 legacy 행 범위 연속 표기(`:162`)를 놓쳤다.
+
+=== 참고 — 대상은 있으나 이 range 가 넣은 것이 아니다 (0건) ===
+
+=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (65건: scope.md 40 · checklist.md 1 · commands.md 24) ===
+[scope.md] | **5. 정정을 인용 지점에 전파하지 않기** | 수치를 바꿨으면 인용 지점을 전수 확인. **자기 편집이 만든 오프셋도 대상이다** |
+[scope.md] | **6. 셈으로 전칭을 주장하기** | 전칭은 셈이 아니라 **재현 명령**으로 쓴다. `뿐`·`전부`처럼 **수를 쓰지 않는 전칭도 포함**한다. **"고쳤다"는 진술도 전칭이다 —
+[scope.md] 계열별로 나눈 이유는 **각 커밋에서 문서가 자체 정합**하기 위해서다 — 진행 중인 커밋은 "계열 N~8은 후속 커밋"을 문서 말미에 명시했고, 마지막 계열 커밋이 그 문구를 걷어냈다.
+[scope.md] **없다.** 선행 조사가 정정한 C-1·C-2(백테스트 문서 출처 · `floor_applicability` 경로·행)는 **0A2가 이미 산출물에 반영해 고쳤고**, 0B가 `ed4b
+[scope.md] **둘 다 선행 조사 노트의 문장이 축어로 이월된 것**이고, 계약 A2가 "상류 노트에서 옮겨 온 인용도 그 파일을 직접 열어 확인한다"고 요구한 바로 그 지점이다. **둘 다 lega
+[scope.md] | **H1** | R-ASYNC-02가 `필요 951/시`를 부등식에 넣었다 | `inference_config.py:77-89`의 필요량은 **3,800~5,600건/시**다. `95
+[scope.md] | **H2** | R-FLOOR-08이 "필터가 사정률 1 근방을 버린다"고 적었다 | **반대다.** 밴드 `[0.90, 1.10]` **안만** 담고 버리는 것은 **1에서 먼 꼬리
+[scope.md] **H1에서 `93ecf9e`의 정정 사실을 근거에 넣었다** — 관계가 주석에만 있으면 그 산술이 틀려도 아무것도 깨지지 않고 사람이 읽을 때까지 남는다는 **이 항목의 논거를 강화**
+[scope.md] `commands.md`의 출력 블록에서 **실행되지 않은 줄을 걷어냈다**(형태 3) — 손으로 고른 발췌 블록을 통째로 제거하고 **전문으로 교체**했다. **기계 축이 전수가 아니었
+[scope.md] **자기참조 줄 번호 검사가 H2 수정으로 들어간 legacy 행 범위 연속 표기를 오탐으로 지목**했다. 검사기의 lookback이 직전 한 줄만 봐서 여러 줄에 걸친 `근거` 항목을
+[scope.md] 라운드 1이 H1을 고치며 `93ecf9e`의 정정 사실을 근거에 넣은 것은 옳았으나 **그 정정의 *내용*을 커밋 본문과 다르게 적었다.** `git show 93ecf9e`로 본문과
+[scope.md] **관찰도 함께 정확히 했다** — `3,800~5,600건/시`는 운영 필요량이 아니라 **0.5% drift 임계를 상한으로 만들려 할 때** 필요한 양이다. 주석이 **"보장되는 것
+[scope.md] **규칙으로 남겼다**(`commands.md` C-2.4): **출력은 그 커밋의 최종 상태에서 다시 뜬다.** "이 커밋 기준"이라는 선언만으로는 부족하다. **이번 커밋은 그 규칙대
+[scope.md] ### M-N2 — 축의 전칭을 실제 커버리지에 맞췄다
+[scope.md] `numsrc`의 정규식이 뒤에 오는 `\w`를 전부 배제해 **한글 단위가 붙은 수를 통째로 놓쳤다**(`78건`·`5,822건`·`1,046행`·`1.15배`). **좁히는 대신 패턴
+[scope.md] - **bare 연속 범위는 어느 기계 축도 행 범위를 검사하지 않는다** — 사람이 읽은 것으로만 확인됐다. **축을 늘릴지는 근거가 관측된 뒤에 판단한다.** (이 자리에 적었던 **
+[scope.md] **verifier가 준 두 선택지 중 ①(실측값으로 교체 + 두 경로 추가)을 택했다.** ②(복제의 범위를 좁혀 정의)는 **증거가 가장 강한 자리에서 주장을 축소**하게 된다 — 이
+[scope.md] **C-7.3의 판정 근거를 전부 재현 명령으로 교체**했고, **나머지 5건도 파일 전체 기준으로 재점검**했다. 넷은 성립하고 **하나(R-COL-03의 "정확히 30")는 철회**했
+[scope.md] - **L-R2-2**: "`19.5%`가 이 라운드에 `관찰`에서 `사용자 영향`으로 옮겨졌다"가 **사실과 반대**였다. 텍스트는 **최초 커밋 `81a2ce3`부터 줄곧 `사용자 영
+[scope.md] - **참고 2**: ledger의 깨진 들여쓰기 한 줄을 맞췄다.
+[scope.md] **C-2.4 규칙대로** 커밋 직전에 세 스크립트를 재실행해 붙여넣기가 **최종 상태와 일치**함을 확인했다. 그 재실행에서 **자체 검사기가 이번 라운드 수정의 §0.3 위반을 잡았다
+[scope.md] - **세 곳을 고쳤다** — `checklist.md` A2 · `commands.md` C-2.1 bullet · **C-2.4의 "현재는 99다"**(verifier가 든 둘 외에
+[scope.md] - **C-2.4의 적용 대상을 「블록」에서 「블록 + 그 블록을 인용하는 산문」으로 넓혔다.**
+[scope.md] - **인스턴스를 넘어서**: 두 곳은 아예 **수를 옮겨 적지 않고 블록을 가리키기만** 하게 바꿨다. **옮겨 적지 않으면 낡을 수 없다** — 형태 6의 "셈이 아니라 재현 명령으로
+[scope.md] - **L-1**: `22~27`을 걷어내고 **셈 정의를 밝힌 실행 가능한 명령 둘**로 교체했다 — 리터럴 전체 **30**, 반환 카테고리명 7종을 뺀 **마커 24**(고유값도 2
+[scope.md] - **L-2**: `R-COL-02` 셀의 생략 경로를 전체 경로로 고쳐 **복사 실행이 되게** 했고, `R-COL-06` 셀의 파일명 인용과 **범위 오기**(`:255-330` →
+[scope.md] ### 0C 선행 조사 X-1 — ledger에서 함께 정정했다
+[scope.md] **ledger가 그 프레이밍을 쓰고 있었고 네 자리를 고쳤다** — `R-BASIS-01`의 관찰 ("추정가격(ex-VAT)")과 사용자 영향("VAT·사정률만큼"), `R-BASIS-
+[scope.md] **형태 5이고 H-R3와 같은 부류**이며, **그 절이 스스로 적은 사각지대 ③(정본이 블록에 없는 파생값)의 실물**이다. `checklist.md` A2·C-2.1 bullet과
+[scope.md] **문서에서 그대로 떼어 실행해 35가 나오는 것을 확인**했다. 처음엔 인라인 코드로 넣었더니 **이스케이프된 백틱 때문에 복사 실행이 안 돼** fenced 블록으로 옮겼다 — 재현
+[scope.md] - **L-1**: X-1 정정이 단 `bid_summary.py:70-77`이 **블록 경계보다 한 줄 늦다.** `Field(` 호출은 **`:69`에서 시작해 `:77`에서 닫힌다*
+[scope.md] - **L-2**: **`prosecheck` 자신의 결함을 고쳤다.** `CHK` 두 패턴이 같은 문자열에 함께 걸려 한 줄을 **두 번 계상**했다. **한계로 기록하지 않고 고친 이
+[scope.md] `citecheck`가 파일 길이를 `len(split("\n"))`으로 세어 **trailing newline 때문에 1 컸다.** `splitlines()`로 **산문에만** 적었고
+[scope.md] 라운드 3의 M5 정정(**"두 축의 혼동"은 계열 6 한 칸뿐, 3·4·8은 단순 오계수**)이 `checklist.md`와 이 파일의 완료 요약에 **전파되지 않았다**(형태 5).
+[scope.md] ### F-0 (blocker) — 고치지 않고 고쳤다고 적었다
+[scope.md] **처방**: **본문 동기화를 resync에 넣고**(`resync.sh`) **인라인 7종을 실물과 전수 대조** 했다 — 어긋난 것은 **`citecheck` 하나뿐**이고 나머지는
+[scope.md] `R-COL-02`와 **같은 처방**을 썼다 — **결정 무관(판정 순서는 임계값이 무엇이든 성립)**과 **조건부(경계 값 1.15의 마진 0.05는 재유도 대상이라 구체 수치를 고정
+[scope.md] **축이 두 겹 다 못 본 이유**: 1차는 그 두 줄이 `OPEN-DEC-07`을 적지 않아서, 2차는 그 OPEN의 `결정 필요 사항`이 **전부 숫자**("기준 금액 신뢰 비율 1.
+[scope.md] **전칭 둘을 현재 상태로 고쳤다** — C-8.2의 "추가 발견 0건"과 checklist A4의 "활성 OPEN을 선점하지 않았다". **둘 다 참이 아니었다.**
+[scope.md] - **F-3**: 여유 검사에 **스크립트 본문이 없었다**(형태 4). `slack.py`로 인라인했다.
+[checklist.md] | 축의 경계 | **C-8.3** — `citecheck`가 파일 길이를 **1 크게** 세고 있었다(trailing newline). **앞 라운드는 산문만 고치고 인라인 본문을 안
+[commands.md] **필터를 길이 7 이상의 16진수로 바꿨고**(존재 여부는 `git`이 판정한다) 재실행 결과가 C-2.1이다. **커버리지 22/26 → 26/26**이며 그중 legacy 25종은
+[commands.md] ledger가 R-QUAL-07에서 `classification/eligibility.py::assess_license` · `license_eligibility.py::assess_li
+[commands.md] C-7.3의 판정 근거를 **전부 재현 명령으로 교체**했고, 그 결과 **추가 발견은 0이 아니라 1건**(R-PROV-01)이었다.
+[commands.md] **"0건"은 축의 범위 안에서의 0이지 evidence 전체에 낡은 수가 없다는 뜻이 아니다.** 실제로 **사각지대 ③에 같은 부류의 실물이 살아 있었다** — C-5.1의 "현재 2
+[commands.md] - **정본이 블록에 없는 수** — 산문이 계산해 적은 파생값은 대조 대상이 없다. **C-5.1의 "현재 28종"이 그 실물이었다**(verifier M-1) — 이 라운드에 재현 명
+[commands.md] **축 자신의 결함 하나를 고쳤다**(verifier L-2): `CHK`의 두 패턴이 **같은 문자열에 함께 걸려** `checklist.md`의 한 줄을 **두 번 계상**했다. 자리
+[commands.md] - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 · 위 스캔 명령 자신 · 이 설명이 `secret`이라는
+[commands.md] **`93ecf9e`가 그 두 줄을 지웠다.** legacy가 오류로 판정해 제거한 값을 이 문서가 되살린 셈이다. **그 정정 사실을 R-ASYNC-02의 근거에 넣었다** — 관계가
+[commands.md] 이전 판의 전칭("H1·H2 외에 인용 범위에 없는 수치는 없다")이 **자기 재현 명령의 범위를 넘었다.** 정규식이 뒤에 오는 `\w`를 전부 배제해 **한글 단위가 붙은 수를 통째로
+[commands.md] > **정정 (verifier H-R2)** — 이전 판의 `R-PROV-01` 행은 **"근거에 다섯 경로가 열거돼 > 있다"**로 닫았다. **그건 legacy를 센 것이 아니라 le
+[commands.md] | **R-PROV-01** | ~~"5곳에 복제"~~ → **앱 코드 6곳 · 테스트 포함 7곳** | `git grep -n -E '66(\.2)?%' ed4b06c -- '*.py'
+[commands.md] | R-COL-03 | "30여 개" | **세는 대상 정의에 달렸다.** `F=app/services/koneps/live_failure.py`로 두고 — 리터럴 전체 `git -C b
+[commands.md] - **`19.5%`의 이력을 잘못 적었던 것도 고쳤다**(verifier L-R2-2) — 이전 판은 "이 라운드에 `관찰`에서 `사용자 영향`으로 **옮겨져**"라고 적었으나 **텍스
+[commands.md] - **`사용자 영향` 필드**(verifier L-R2-1) — 필드를 `관찰`로 한정하면서 **`사용자 영향`도 함께 빠졌고 그 사실이 기록되지 않았다.** 그 필드에도 **legac
+[commands.md] **0A2가 `OPS-09`에 쓴 기법을 그대로 따랐다** — 결정과 무관하게 성립하는 것과 정책에 달린 것을 **갈랐다**:
+[commands.md] `citecheck`가 파일 길이를 `len(stdout.split("\n"))`으로 계산해 **trailing newline 때문에 실제보다 1 컸다.** `splitlines()`로
+[commands.md] > **정정 (verifier F-0, blocker) — 앞 라운드는 고치지 않고 고쳤다고 적었다.** > `splitlines()` 치환이 **산문에만** 들어갔고 **인라인된 스크립
+[commands.md] **그 틈을 실제로 쓴 인용이 있었는지 재 봤다** — 인용 끝과 파일 끝의 여유를 전수로 계산한다. **스크립트 본문**(형태 4 — verifier F-3이 지적해 인라인했다):
+[commands.md] `checklist.md`와 `scope.md`가 선행 조사 표 불일치의 원인을 **"전부 두 축의 혼동"**으로 요약했는데, `commands.md` C-5.2는 라운드 3에 그것을 *
+[commands.md] **축을 늘리지 않았다.** 계산할 정본이 없으면 도구를 만들 수 없고, 이 부류의 처방은 이미 표에 있다 — **형태 5(정정을 인용 지점에 전파하지 않기)**다. 판정을 좁혔으면 **
+[commands.md] ### C-8.6 형태 6 재발 — 산문을 고치고 대상을 안 고쳤다 (verifier F-0, blocker)
+[commands.md] **§10.1 형태 6의 재발이며 새 형태가 아니다.** 그 형태의 규칙은 **"'고쳤다'는 진술도 전칭이다 — 적기 전에 그 지점을 열어 확인한다"**이고, **내가 앞 라운드에 세운
+[commands.md] **이번 모양은 "산문을 고치고 대상을 안 고쳤다"**다. 앞선 재발들이 *대상을 고치고 인용 지점을 놓친* 형태(형태 5 계열)였다면, 이번은 **반대 방향**이다 — 세 파일이 "고쳤
+[commands.md] **처방**: **본문 동기화를 resync에 넣었다.** 그리고 인라인된 스크립트 **6종을 실물과 전수 대조**해 어긋난 것이 `citecheck` 하나뿐임을 확인했다 — 나머지 다섯
+```
+
+**지목 8건 중 셋이 실물이고 다섯이 오탐이다.** 전부 사람이 판정한다.
+
+| # | 지목 | 판정 | 근거 |
+| --- | --- | --- | --- |
+| 1 | `scope.md → §0.1` / `동반 OPEN` | **실물 (F-4)** | §0.1 필드 표에 그 행이 없었다 |
+| 2 | `scope.md → R-BASIS-01` / `OPEN-REG-05` | **실물 (F-2)** | 귀속이 `OPEN-QUAL-10` 그대로였다 |
+| 3 | `checklist.md → R-PROV-02` / `동반 OPEN` | **실물 (A4)** | `R-PROV-02`에 그 필드가 없었다 |
+| 4 | `scope.md → R-BASIS-01` / `OPEN-DEC-10` | 오탐 | 주장이 **부정**이다("예규 구간 차등으로 **다른 축**") — 없는 것이 정답 |
+| 5 | `checklist.md → §10` / `동반 OPEN` | 오탐 | §10 인계는 5필드 항목이 아니라 그 필드를 갖지 않는다 |
+| 6 | `checklist.md → R-COL-02` / `OPEN-DEC-07` | 오탐 | 교차 짝짓기. `OPEN-DEC-07`은 `R-PROV-02` 몫이다 |
+| 7 | `checklist.md → R-PROV-02` / `OPEN-OPS-01` | 오탐 | 교차 짝짓기(반대 방향) |
+| 8 | `commands.md → §0.3` / `근거` | 오탐 | 주장은 **검사기**의 `- **근거**:` 처리에 관한 것이고 §0.3은 인용 규약 절이다 |
+
+### C-9.5 수정 뒤 재실행 — 실물 셋이 사라졌다
+
+`WT`를 주면 **작업 트리**를 본다. 커밋 전에 돌아야 의미가 있는 축이라 그 모드를 뒀다.
+깨끗한 트리에서 `ec115a7 WT`와 `ec115a7 HEAD`는 같은 것을 본다.
+
+```
+$ python3 claimcheck.py ec115a7 WT
+정본: git diff ec115a7  -- docs/discovery/regression-ledger.md  (추가 줄 1362)
+산출물 절 81종 · 필드 어휘 15종 · evidence 3파일
+
+=== 지목 — 주장이 가리키는 대상이 그 위치에 없다 (전부 사람이 판정한다) (8건) ===
+[scope.md → R-BASIS-01] 대상 `OPEN-DEC-10` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: 등록된 소유자가 없음을 확인하고(`OPEN-DEC-10`은 예규 구간 차등으로 다른 축) **A7대로 `OPEN-REG-05`로 등록**했다.
+[checklist.md → §0.1] 대상 `OPEN-OPS-01` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`(`OPEN-DEC-07`, verifier F-1). **두 항목 다 결정 무관/조건부를 가르고 `동반 OPEN`을 달았다**(ledger §0.1이 그 필드를 **선택 필드**로 규약
+[checklist.md → §0.1] 대상 `OPEN-DEC-07` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`(`OPEN-DEC-07`, verifier F-1). **두 항목 다 결정 무관/조건부를 가르고 `동반 OPEN`을 달았다**(ledger §0.1이 그 필드를 **선택 필드**로 규약
+[checklist.md → §10.1] 대상 `OPEN-OPS-01` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`(`OPEN-DEC-07`, verifier F-1). **두 항목 다 결정 무관/조건부를 가르고 `동반 OPEN`을 달았다**(ledger §0.1이 그 필드를 **선택 필드**로 규약
+[checklist.md → §10.1] 대상 `동반 OPEN` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`(`OPEN-DEC-07`, verifier F-1). **두 항목 다 결정 무관/조건부를 가르고 `동반 OPEN`을 달았다**(ledger §0.1이 그 필드를 **선택 필드**로 규약
+[checklist.md → R-COL-02] 대상 `OPEN-DEC-07` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`(`OPEN-DEC-07`, verifier F-1). **두 항목 다 결정 무관/조건부를 가르고 `동반 OPEN`을 달았다**(ledger §0.1이 그 필드를 **선택 필드**로 규약
+[checklist.md → R-PROV-02] 대상 `OPEN-OPS-01` 가 그 위치에 없다   ※ 부정형 어휘 포함
+    주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`(`OPEN-DEC-07`, verifier F-1). **두 항목 다 결정 무관/조건부를 가르고 `동반 OPEN`을 달았다**(ledger §0.1이 그 필드를 **선택 필드**로 규약
+[commands.md → §0.3] 대상 `근거` 가 그 위치에 없다
+    주장: - **자기참조 줄 번호 검사의 예외 판정을 고쳤다**(라운드 1) — `- **근거**:` 한 항목이 여러 줄에 걸치면 legacy 행 범위 연속 표기(`:162`)를 놓쳤다.
+
+=== 참고 — 대상은 있으나 이 range 가 넣은 것이 아니다 (0건) ===
+
+=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (69건: scope.md 40 · checklist.md 1 · commands.md 28) ===
+[scope.md] | **5. 정정을 인용 지점에 전파하지 않기** | 수치를 바꿨으면 인용 지점을 전수 확인. **자기 편집이 만든 오프셋도 대상이다** |
+[scope.md] | **6. 셈으로 전칭을 주장하기** | 전칭은 셈이 아니라 **재현 명령**으로 쓴다. `뿐`·`전부`처럼 **수를 쓰지 않는 전칭도 포함**한다. **"고쳤다"는 진술도 전칭이다 —
+[scope.md] 계열별로 나눈 이유는 **각 커밋에서 문서가 자체 정합**하기 위해서다 — 진행 중인 커밋은 "계열 N~8은 후속 커밋"을 문서 말미에 명시했고, 마지막 계열 커밋이 그 문구를 걷어냈다.
+[scope.md] **없다.** 선행 조사가 정정한 C-1·C-2(백테스트 문서 출처 · `floor_applicability` 경로·행)는 **0A2가 이미 산출물에 반영해 고쳤고**, 0B가 `ed4b
+[scope.md] **둘 다 선행 조사 노트의 문장이 축어로 이월된 것**이고, 계약 A2가 "상류 노트에서 옮겨 온 인용도 그 파일을 직접 열어 확인한다"고 요구한 바로 그 지점이다. **둘 다 lega
+[scope.md] | **H1** | R-ASYNC-02가 `필요 951/시`를 부등식에 넣었다 | `inference_config.py:77-89`의 필요량은 **3,800~5,600건/시**다. `95
+[scope.md] | **H2** | R-FLOOR-08이 "필터가 사정률 1 근방을 버린다"고 적었다 | **반대다.** 밴드 `[0.90, 1.10]` **안만** 담고 버리는 것은 **1에서 먼 꼬리
+[scope.md] **H1에서 `93ecf9e`의 정정 사실을 근거에 넣었다** — 관계가 주석에만 있으면 그 산술이 틀려도 아무것도 깨지지 않고 사람이 읽을 때까지 남는다는 **이 항목의 논거를 강화**
+[scope.md] `commands.md`의 출력 블록에서 **실행되지 않은 줄을 걷어냈다**(형태 3) — 손으로 고른 발췌 블록을 통째로 제거하고 **전문으로 교체**했다. **기계 축이 전수가 아니었
+[scope.md] **자기참조 줄 번호 검사가 H2 수정으로 들어간 legacy 행 범위 연속 표기를 오탐으로 지목**했다. 검사기의 lookback이 직전 한 줄만 봐서 여러 줄에 걸친 `근거` 항목을
+[scope.md] 라운드 1이 H1을 고치며 `93ecf9e`의 정정 사실을 근거에 넣은 것은 옳았으나 **그 정정의 *내용*을 커밋 본문과 다르게 적었다.** `git show 93ecf9e`로 본문과
+[scope.md] **관찰도 함께 정확히 했다** — `3,800~5,600건/시`는 운영 필요량이 아니라 **0.5% drift 임계를 상한으로 만들려 할 때** 필요한 양이다. 주석이 **"보장되는 것
+[scope.md] **규칙으로 남겼다**(`commands.md` C-2.4): **출력은 그 커밋의 최종 상태에서 다시 뜬다.** "이 커밋 기준"이라는 선언만으로는 부족하다. **이번 커밋은 그 규칙대
+[scope.md] ### M-N2 — 축의 전칭을 실제 커버리지에 맞췄다
+[scope.md] `numsrc`의 정규식이 뒤에 오는 `\w`를 전부 배제해 **한글 단위가 붙은 수를 통째로 놓쳤다**(`78건`·`5,822건`·`1,046행`·`1.15배`). **좁히는 대신 패턴
+[scope.md] - **bare 연속 범위는 어느 기계 축도 행 범위를 검사하지 않는다** — 사람이 읽은 것으로만 확인됐다. **축을 늘릴지는 근거가 관측된 뒤에 판단한다.** (이 자리에 적었던 **
+[scope.md] **verifier가 준 두 선택지 중 ①(실측값으로 교체 + 두 경로 추가)을 택했다.** ②(복제의 범위를 좁혀 정의)는 **증거가 가장 강한 자리에서 주장을 축소**하게 된다 — 이
+[scope.md] **C-7.3의 판정 근거를 전부 재현 명령으로 교체**했고, **나머지 5건도 파일 전체 기준으로 재점검**했다. 넷은 성립하고 **하나(R-COL-03의 "정확히 30")는 철회**했
+[scope.md] - **L-R2-2**: "`19.5%`가 이 라운드에 `관찰`에서 `사용자 영향`으로 옮겨졌다"가 **사실과 반대**였다. 텍스트는 **최초 커밋 `81a2ce3`부터 줄곧 `사용자 영
+[scope.md] - **참고 2**: ledger의 깨진 들여쓰기 한 줄을 맞췄다.
+[scope.md] **C-2.4 규칙대로** 커밋 직전에 세 스크립트를 재실행해 붙여넣기가 **최종 상태와 일치**함을 확인했다. 그 재실행에서 **자체 검사기가 이번 라운드 수정의 §0.3 위반을 잡았다
+[scope.md] - **세 곳을 고쳤다** — `checklist.md` A2 · `commands.md` C-2.1 bullet · **C-2.4의 "현재는 99다"**(verifier가 든 둘 외에
+[scope.md] - **C-2.4의 적용 대상을 「블록」에서 「블록 + 그 블록을 인용하는 산문」으로 넓혔다.**
+[scope.md] - **인스턴스를 넘어서**: 두 곳은 아예 **수를 옮겨 적지 않고 블록을 가리키기만** 하게 바꿨다. **옮겨 적지 않으면 낡을 수 없다** — 형태 6의 "셈이 아니라 재현 명령으로
+[scope.md] - **L-1**: `22~27`을 걷어내고 **셈 정의를 밝힌 실행 가능한 명령 둘**로 교체했다 — 리터럴 전체 **30**, 반환 카테고리명 7종을 뺀 **마커 24**(고유값도 2
+[scope.md] - **L-2**: `R-COL-02` 셀의 생략 경로를 전체 경로로 고쳐 **복사 실행이 되게** 했고, `R-COL-06` 셀의 파일명 인용과 **범위 오기**(`:255-330` →
+[scope.md] ### 0C 선행 조사 X-1 — ledger에서 함께 정정했다
+[scope.md] **ledger가 그 프레이밍을 쓰고 있었고 네 자리를 고쳤다** — `R-BASIS-01`의 관찰 ("추정가격(ex-VAT)")과 사용자 영향("VAT·사정률만큼"), `R-BASIS-
+[scope.md] **형태 5이고 H-R3와 같은 부류**이며, **그 절이 스스로 적은 사각지대 ③(정본이 블록에 없는 파생값)의 실물**이다. `checklist.md` A2·C-2.1 bullet과
+[scope.md] **문서에서 그대로 떼어 실행해 35가 나오는 것을 확인**했다. 처음엔 인라인 코드로 넣었더니 **이스케이프된 백틱 때문에 복사 실행이 안 돼** fenced 블록으로 옮겼다 — 재현
+[scope.md] - **L-1**: X-1 정정이 단 `bid_summary.py:70-77`이 **블록 경계보다 한 줄 늦다.** `Field(` 호출은 **`:69`에서 시작해 `:77`에서 닫힌다*
+[scope.md] - **L-2**: **`prosecheck` 자신의 결함을 고쳤다.** `CHK` 두 패턴이 같은 문자열에 함께 걸려 한 줄을 **두 번 계상**했다. **한계로 기록하지 않고 고친 이
+[scope.md] `citecheck`가 파일 길이를 `len(split("\n"))`으로 세어 **trailing newline 때문에 1 컸다.** `splitlines()`로 **산문에만** 적었고
+[scope.md] 라운드 3의 M5 정정(**"두 축의 혼동"은 계열 6 한 칸뿐, 3·4·8은 단순 오계수**)이 `checklist.md`와 이 파일의 완료 요약에 **전파되지 않았다**(형태 5).
+[scope.md] ### F-0 (blocker) — 고치지 않고 고쳤다고 적었다
+[scope.md] **처방**: **본문 동기화를 resync에 넣고**(`resync.sh`) **인라인 7종을 실물과 전수 대조** 했다 — 어긋난 것은 **`citecheck` 하나뿐**이고 나머지는
+[scope.md] `R-COL-02`와 **같은 처방**을 썼다 — **결정 무관(판정 순서는 임계값이 무엇이든 성립)**과 **조건부(경계 값 1.15의 마진 0.05는 재유도 대상이라 구체 수치를 고정
+[scope.md] **축이 두 겹 다 못 본 이유**: 1차는 그 두 줄이 `OPEN-DEC-07`을 적지 않아서, 2차는 그 OPEN의 `결정 필요 사항`이 **전부 숫자**("기준 금액 신뢰 비율 1.
+[scope.md] **전칭 둘을 현재 상태로 고쳤다** — C-8.2의 "추가 발견 0건"과 checklist A4의 "활성 OPEN을 선점하지 않았다". **둘 다 참이 아니었다.**
+[scope.md] - **F-3**: 여유 검사에 **스크립트 본문이 없었다**(형태 4). `slack.py`로 인라인했다.
+[checklist.md] | 축의 경계 | **C-8.3** — `citecheck`가 파일 길이를 **1 크게** 세고 있었다(trailing newline). **앞 라운드는 산문만 고치고 인라인 본문을 안
+[commands.md] **필터를 길이 7 이상의 16진수로 바꿨고**(존재 여부는 `git`이 판정한다) 재실행 결과가 C-2.1이다. **커버리지 22/26 → 26/26**이며 그중 legacy 25종은
+[commands.md] ledger가 R-QUAL-07에서 `classification/eligibility.py::assess_license` · `license_eligibility.py::assess_li
+[commands.md] C-7.3의 판정 근거를 **전부 재현 명령으로 교체**했고, 그 결과 **추가 발견은 0이 아니라 1건**(R-PROV-01)이었다.
+[commands.md] **"0건"은 축의 범위 안에서의 0이지 evidence 전체에 낡은 수가 없다는 뜻이 아니다.** 실제로 **사각지대 ③에 같은 부류의 실물이 살아 있었다** — C-5.1의 "현재 2
+[commands.md] - **정본이 블록에 없는 수** — 산문이 계산해 적은 파생값은 대조 대상이 없다. **C-5.1의 "현재 28종"이 그 실물이었다**(verifier M-1) — 이 라운드에 재현 명
+[commands.md] **축 자신의 결함 하나를 고쳤다**(verifier L-2): `CHK`의 두 패턴이 **같은 문자열에 함께 걸려** `checklist.md`의 한 줄을 **두 번 계상**했다. 자리
+[commands.md] - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 · 위 스캔 명령 자신 · 이 설명이 `secret`이라는
+[commands.md] **`93ecf9e`가 그 두 줄을 지웠다.** legacy가 오류로 판정해 제거한 값을 이 문서가 되살린 셈이다. **그 정정 사실을 R-ASYNC-02의 근거에 넣었다** — 관계가
+[commands.md] 이전 판의 전칭("H1·H2 외에 인용 범위에 없는 수치는 없다")이 **자기 재현 명령의 범위를 넘었다.** 정규식이 뒤에 오는 `\w`를 전부 배제해 **한글 단위가 붙은 수를 통째로
+[commands.md] > **정정 (verifier H-R2)** — 이전 판의 `R-PROV-01` 행은 **"근거에 다섯 경로가 열거돼 > 있다"**로 닫았다. **그건 legacy를 센 것이 아니라 le
+[commands.md] | **R-PROV-01** | ~~"5곳에 복제"~~ → **앱 코드 6곳 · 테스트 포함 7곳** | `git grep -n -E '66(\.2)?%' ed4b06c -- '*.py'
+[commands.md] | R-COL-03 | "30여 개" | **세는 대상 정의에 달렸다.** `F=app/services/koneps/live_failure.py`로 두고 — 리터럴 전체 `git -C b
+[commands.md] - **`19.5%`의 이력을 잘못 적었던 것도 고쳤다**(verifier L-R2-2) — 이전 판은 "이 라운드에 `관찰`에서 `사용자 영향`으로 **옮겨져**"라고 적었으나 **텍스
+[commands.md] - **`사용자 영향` 필드**(verifier L-R2-1) — 필드를 `관찰`로 한정하면서 **`사용자 영향`도 함께 빠졌고 그 사실이 기록되지 않았다.** 그 필드에도 **legac
+[commands.md] **0A2가 `OPS-09`에 쓴 기법을 그대로 따랐다** — 결정과 무관하게 성립하는 것과 정책에 달린 것을 **갈랐다**:
+[commands.md] `citecheck`가 파일 길이를 `len(stdout.split("\n"))`으로 계산해 **trailing newline 때문에 실제보다 1 컸다.** `splitlines()`로
+[commands.md] > **정정 (verifier F-0, blocker) — 앞 라운드는 고치지 않고 고쳤다고 적었다.** > `splitlines()` 치환이 **산문에만** 들어갔고 **인라인된 스크립
+[commands.md] **그 틈을 실제로 쓴 인용이 있었는지 재 봤다** — 인용 끝과 파일 끝의 여유를 전수로 계산한다. **스크립트 본문**(형태 4 — verifier F-3이 지적해 인라인했다):
+[commands.md] `checklist.md`와 `scope.md`가 선행 조사 표 불일치의 원인을 **"전부 두 축의 혼동"**으로 요약했는데, `commands.md` C-5.2는 라운드 3에 그것을 *
+[commands.md] **축을 늘리지 않았다.** 계산할 정본이 없으면 도구를 만들 수 없고, 이 부류의 처방은 이미 표에 있다 — **형태 5(정정을 인용 지점에 전파하지 않기)**다. 판정을 좁혔으면 **
+[commands.md] ### C-8.6 형태 6 재발 — 산문을 고치고 대상을 안 고쳤다 (verifier F-0, blocker)
+[commands.md] **§10.1 형태 6의 재발이며 새 형태가 아니다.** 그 형태의 규칙은 **"'고쳤다'는 진술도 전칭이다 — 적기 전에 그 지점을 열어 확인한다"**이고, **내가 앞 라운드에 세운
+[commands.md] **이번 모양은 "산문을 고치고 대상을 안 고쳤다"**다. 앞선 재발들이 *대상을 고치고 인용 지점을 놓친* 형태(형태 5 계열)였다면, 이번은 **반대 방향**이다 — 세 파일이 "고쳤
+[commands.md] **처방**: **본문 동기화를 resync에 넣었다.** 그리고 인라인된 스크립트를 실물과 **전수 대조**해 어긋난 것이 `citecheck` 하나뿐임을 확인했다 — 나머지는 바이트
+[commands.md] | **주장** | evidence 3파일에서 **완료 동사**(`고쳤`·`등재했`·`달았`·`교체했`·`추가했`·`제거했`·`걷어냈`·`넣었`·`갈랐`·`등록했`·`인라인했`·`옮겼`·
+[commands.md] | **주장의 단위** | **문장이 아니라 블록**(bullet·문단). F-2가 그 이유다 — 대상(`R-BASIS-01`)이 앞 문장에 있고 완료 동사(`등록했다`)가 뒤 문장에 있
+[commands.md] **축을 만들며 축 자신의 결함 셋을 고쳤다.** ① 마크다운 강조가 한국어 동사를 가른다 (`등록**했다`)라 정규식 전에 `*`·`` ` ``·`>`를 걷어낸다 — **F-2가 그것
+[commands.md] **셋 다 "고쳤다"이므로 대상은 인라인 본문이고, 그 본문은 C-9.8의 `resync.sh`가 매 실행에 실물과 대조한다**(`불일치 0`). **이 축의 주장은 이 축이 아니라 그
+```
+$ bash resync.sh
+evidence 가 선언한 실행 9건 · 스크립트 8종: citecheck · claimcheck · ledgercheck · numsrc · openstance · prosecheck · slack · statusdiff
+  [본문] 전체 블록 9 · 실행 목록이 차지한 것 8 · 발췌(실행 키 없음) 1 · 불일치 0
+  [불변] ledger 1362줄 · secret 11
+```
+
+출력의 `발췌(실행 키 없음) 1`은 C-2.2의 필터 조각이다 — 실행 키를 갖지 않는 **발췌**이고
+전체 스크립트가 아니다. 루프가 그것을 **셈에서 갈라 찍는다.**
+
+**인라인한 직후 같은 구멍이 도구 자신에게 열려 있는 것을 찾았다** — 루프가 `.py`만 덮어
+**`resync.sh` 자신의 인라인 본문이 낡았다.** 대조가 `X`를 내서 알았다. **1b) 블록을 더해
+자기 본문도 동기화**하게 했다. 도구를 만든 자리에서 그 도구가 자기를 빠뜨리는 것이
+이 slice에서 **세 번째**다(F-0의 `citecheck` · L-1의 `slack` · 이번의 `resync` 자신).
+
+`resync.sh` 본문(형태 4 — verifier L-1이 지적해 인라인했다):
+
+````bash
+#!/bin/bash
+# 확장 C-2.4 규칙의 실행본 — evidence 의 **스크립트 본문**·**출력**·**불변 수치**를
+# 최종 상태에 맞춘다. F-0 은 이 루프가 **본문을 갱신하지 않아서** 났고, L-1 은 대상
+# 목록이 **손으로 유지되는 배열이라 새 스크립트를 놓쳐서** 났다.
+#
+# L-1 의 처방: **두 루프의 대상 목록을 evidence 에서 유도한다.**
+#   정본 = commands.md 안의 `$ python3 <name>.py <args>` 출력 키.
+#   손으로 고칠 배열이 없으므로 **새 스크립트를 추가하면 자동으로 루프에 든다.**
+set -e
+cd /Users/harris/Development/private/bid-vector-v2
+python3 - <<'PY'
+import pathlib, subprocess, re, shlex
+SP = "/private/tmp/claude-503/-Users-harris-Development-private-bid-vector-v2/2071e10c-f36a-4720-b677-b29c3a80734f/scratchpad"
+P  = pathlib.Path("reports/evidence/m0/0b/commands.md")
+
+def keys():
+    """evidence 가 스스로 선언하는 실행 목록. 여러 줄 `\\` 이음을 붙인다."""
+    s, out = P.read_text(encoding="utf-8"), []
+    for m in re.finditer(r'^\$ python3 ((?:[^\n]*\\\n)*[^\n]*)$', s, re.M):
+        cmd = m.group(1).replace("\\\n", " ")
+        name = cmd.split()[0]
+        if name.endswith(".py"):
+            out.append((m.group(0)[len("$ python3 "):], name[:-3], shlex.split(cmd)[1:]))
+    return out
+
+RUNS = keys()
+names = sorted({n for _, n, _ in RUNS})
+print(f"evidence 가 선언한 실행 {len(RUNS)}건 · 스크립트 {len(names)}종: " + " · ".join(names))
+
+# 1) 스크립트 **본문** 동기화 (F-0). 자리는 실물의 첫 줄로 찾는다.
+claimed, mism = set(), []
+for _, name, _ in RUNS:
+    real = pathlib.Path(f"{SP}/{name}.py").read_text(encoding="utf-8").rstrip("\n")
+    s = P.read_text(encoding="utf-8")
+    head = real.split("\n")[0]
+    tgt = [m for m in re.finditer(r'```python\n(.*?)\n```', s, re.S)
+           if m.group(1).split("\n")[0] == head]
+    if len(tgt) != 1:
+        print(f"  [본문] {name}: 자리 특정 실패({len(tgt)})"); continue
+    m = tgt[0]; claimed.add(m.start())
+    if m.group(1).rstrip("\n") == real:
+        continue
+    mism.append(name)
+    P.write_text(s[:m.start(1)] + real + s[m.end(1):], encoding="utf-8")
+    print(f"  [본문] {name}: 갱신")
+s = P.read_text(encoding="utf-8")
+allb = [m.start() for m in re.finditer(r'```python\n(.*?)\n```', s, re.S)]
+print(f"  [본문] 전체 블록 {len(allb)} · 실행 목록이 차지한 것 {len(claimed)} · "
+      f"발췌(실행 키 없음) {len(allb)-len(claimed)} · 불일치 {len(mism)}"
+      + (": " + ", ".join(mism) if mism else ""))
+
+# 1b) **자기 본문**도 동기화한다. 이 루프가 `.py` 만 덮던 동안 `resync.sh` 자신의
+#     인라인 본문이 낡아 있었다 — F-0 과 같은 구멍이 도구 자신에게 열려 있었다.
+me = pathlib.Path(f"{SP}/resync.sh").read_text(encoding="utf-8").rstrip("\n")
+s = P.read_text(encoding="utf-8")
+tgt = [m for m in re.finditer(r'````bash\n(.*?)\n````', s, re.S)
+       if m.group(1).split("\n")[0] == me.split("\n")[0]]
+if len(tgt) != 1:
+    print(f"  [본문] resync.sh: 자리 특정 실패({len(tgt)})")
+elif tgt[0].group(1).rstrip("\n") != me:
+    P.write_text(s[:tgt[0].start(1)] + me + s[tgt[0].end(1):], encoding="utf-8")
+    print("  [본문] resync.sh: 갱신")
+
+# 2) 출력 동기화 — 같은 목록에서 돈다. 손으로 빠뜨릴 자리가 없다.
+for label, name, args in RUNS:
+    out = subprocess.run(["python3", f"{SP}/{name}.py"] + args,
+                         capture_output=True, text=True).stdout.rstrip("\n")
+    s = P.read_text(encoding="utf-8"); key = f"```\n$ python3 {label}\n"
+    if key not in s:
+        print(f"  [출력] {name}: 키 미발견"); continue
+    a = s.index(key); b = s.index("\n```\n", a + len(key))
+    if s[a+len(key):b] != out:
+        print(f"  [출력] {name}: 갱신")
+    P.write_text(s[:a] + key + out + s[b:], encoding="utf-8")
+
+# 3) 불변 수치
+wc  = subprocess.run(["wc","-l","docs/discovery/regression-ledger.md"],capture_output=True,text=True).stdout.split()[0]
+sec = subprocess.run("grep -rniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))' docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l",shell=True,capture_output=True,text=True).stdout.strip()
+s = P.read_text(encoding="utf-8")
+s = re.sub(r"(\$ wc -l docs/discovery/regression-ledger\.md\n)\d+", r"\g<1>"+wc, s, count=1)
+s = re.sub(r"(reports/evidence/m0/0b/ \| wc -l\n)\d+", r"\g<1>"+sec, s, count=1)
+P.write_text(s, encoding="utf-8")
+print(f"  [불변] ledger {wc}줄 · secret {sec}")
+PY
+````
+
+### C-9.9 M-1 — §10 인계 자리는 계열 A 축의 **구조적 사각지대**다 (미기록이었다)
+
+F-1이 조건부화한 자리는 **둘**(`R-PROV-02`의 `검증 방법` · **§10.1 fixture-curator 인계**)
+인데 **계열 A 축(C-8.2)이 지목한 것은 앞의 하나뿐**이다. 축이 `^### [RP]-` 블록의
+`V2 예방 제약`·`검증 방법` 필드만 훑고 **§10의 `- **경계값 corpus**:`는 스캔 대상이
+아니기 때문**이다. C-8.2의 사각지대 절은 **"특징어 2개 미만인 활성 OPEN 7건"**만 적었고
+**필드 범위 사각지대는 적지 않았다.**
+
+**내가 스스로 "하류로 나가는 자리라 이쪽이 더 중요하다"고 적은 자리가 축 밖에 있다.**
+**축을 넓히지 않고 사각지대로 기록한다** — 근거가 한 번 관측됐고(F-1) 그 한 건은
+사람이 읽어 닫았다. **§10 인계를 스캔에 넣을지는 이 부류가 다시 관측된 뒤에 판단한다.**
+
+`R-PROV-02`에 단 `동반 OPEN`이 **§10.1을 함께 가리키게** 적은 것이 지금의 완화책이다 —
+항목 쪽은 축이 보므로 **축이 보는 자리에서 사각지대를 가리킨다.**
+
+### C-9.10 형태 6 재발 — 이번 모양은 "산문이 앞서 가고 대상이 따라오지 않았다"
+
+**§10.1 형태 6의 네 번째 재발이며 새 형태가 아니다.** 규칙은
+**"'고쳤다'는 진술도 전칭이다 — 적기 전에 그 지점을 열어 확인한다"**이고
+**내가 앞 라운드에 세운 것**이다. C-8.6이 같은 진단을 적었는데 **그 진단을 적은 라운드가
+같은 실패를 세 번 더 냈다.**
+
+**문장으로 적은 규칙은 지켜지지 않고, 실행되는 절차로 만든 규칙만 남는다.** 이 slice가
+축을 여섯 번 만들며 매번 배운 것이 그것이다. C-9는 그 규칙의 **실행본**이다.
