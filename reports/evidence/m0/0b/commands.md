@@ -133,7 +133,10 @@ for (p, rng), where in cites.items():
     else: ok += 1
 print(f"--- v2 저장소 파일(legacy 검사 대상 아님): {len(v2_ok)+len(v2_bad)}종 · 행 범위 초과 {len(v2_bad)} ---")
 for p, rng, n, w in v2_ok + v2_bad:
-    print(f"  [{'초과' if (p,rng,n,w) in v2_bad else 'ok'}] {p}:{rng} (파일 {n}줄)  ← {w[:2]}")
+    # 행 범위가 없는 인용에는 **파일 길이를 찍지 않는다.** 이 evidence 자신이 그 목록에
+    # 들어 있어, 길이를 찍으면 출력이 자기 길이를 바꿔 **고정점에 닿지 못한다.**
+    tag = "초과" if (p, rng, n, w) in v2_bad else "ok"
+    print(f"  [{tag}] {p}:{rng} (파일 {n}줄)  ← {w[:2]}" if rng else f"  [{tag}] {p}  ← {w[:2]}")
 print(f"--- 경로: 존재 {len(cites)-len(bad_path)-len(v2_ok)-len(v2_bad)} / 부재 {len(bad_path)} ---")
 for p, rng, w in bad_path: print(f"  [부재] {p}:{rng}  ← {w[:3]}")
 print(f"--- 행 범위: 파일 길이 내 {ok} / 초과 {len(bad_range)} ---")
@@ -171,12 +174,12 @@ $ python3 citecheck.py docs/discovery/regression-ledger.md
 경로 인용 116종 · commit 인용 26종
 
 --- v2 저장소 파일(legacy 검사 대상 아님): 7종 · 행 범위 초과 0 ---
-  [ok] reports/evidence/m0/0b/scope.md:None (파일 867줄)  ← [(None, 3)]
-  [ok] milestone-0.md:None (파일 126줄)  ← [(None, 5), ('R-PROV-01', 342)]
-  [ok] v2-지침서.md:None (파일 355줄)  ← [(None, 45), ('R-BASIS-03', 141)]
-  [ok] reports/evidence/m0/0a2/decisions.md:None (파일 490줄)  ← [(None, 46)]
-  [ok] reports/evidence/m0/0b/commands.md:None (파일 2555줄)  ← [(None, 60)]
-  [ok] data-extract.md:None (파일 165줄)  ← [('R-COL-06', 908), ('R-ML-07', 1283)]
+  [ok] reports/evidence/m0/0b/scope.md  ← [(None, 3)]
+  [ok] milestone-0.md  ← [(None, 5), ('R-PROV-01', 342)]
+  [ok] v2-지침서.md  ← [(None, 45), ('R-BASIS-03', 141)]
+  [ok] reports/evidence/m0/0a2/decisions.md  ← [(None, 46)]
+  [ok] reports/evidence/m0/0b/commands.md  ← [(None, 60)]
+  [ok] data-extract.md  ← [('R-COL-06', 908), ('R-ML-07', 1283)]
   [ok] v2-지침서.md:215-223 (파일 355줄)  ← [('R-ASYNC-06', 1096)]
 --- 경로: 존재 104 / 부재 5 ---
   [부재] summary.py:None  ← [(None, 34)]
@@ -1795,7 +1798,7 @@ $ python3 claimcheck.py ec115a7 WT
 
 === 참고 — 대상은 있으나 이 range 가 넣은 것이 아니다 (0건) ===
 
-=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (98건: scope.md 54 · checklist.md 2 · commands.md 42) ===
+=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (100건: scope.md 55 · checklist.md 2 · commands.md 43) ===
 [scope.md] | **5. 정정을 인용 지점에 전파하지 않기** | 수치를 바꿨으면 인용 지점을 전수 확인. **자기 편집이 만든 오프셋도 대상이다** |
 [scope.md] | **6. 셈으로 전칭을 주장하기** | 전칭은 셈이 아니라 **재현 명령**으로 쓴다. `뿐`·`전부`처럼 **수를 쓰지 않는 전칭도 포함**한다. **"고쳤다"는 진술도 전칭이다 —
 [scope.md] 계열별로 나눈 이유는 **각 커밋에서 문서가 자체 정합**하기 위해서다 — 진행 중인 커밋은 "계열 N~8은 후속 커밋"을 문서 말미에 명시했고, 마지막 계열 커밋이 그 문구를 걷어냈다.
@@ -1850,6 +1853,7 @@ $ python3 claimcheck.py ec115a7 WT
 [scope.md] **Codex의 판정이 맞다.** A3의 판정 기준은 **머리표가 아니라 "무엇이 실제로 막히는가"**다 — 검사가 통과해도 막으려는 사건이 그대로 일어나면 형태만 갖춘 것이다. `a3c
 [scope.md] **세 자리를 맞췄다** — C-5.1의 오탐 판정 bullet · 같은 절의 한계 서술 · `checklist.md` A6 셀에 **그 칸이 `d205d31` 시점에 근거와 어긋나 있었
 [scope.md] **F-1·F-4는 형태 5**(정정·확장을 그것에 기대던 자리에 전파하지 않기)이고, **F-2는 형태 4**에 인접하며 처방은 도구 쪽에 넣었다. **F-3은 medium #1과 같은
+[scope.md] **`citecheck`의 새 v2 경로 절이 행 범위 없는 인용에도 파일 길이를 찍었는데, 그 목록에 이 evidence 자신이 들어 있다.** 출력을 쓰면 자기 길이가 바뀌어 **동기
 [checklist.md] | 축의 경계 | **C-8.3** — `citecheck`가 파일 길이를 **1 크게** 세고 있었다(trailing newline). **앞 라운드는 산문만 고치고 인라인 본문을 안
 [checklist.md] **`R-ASYNC-06`을 지침서 요구에 맞춰 고쳤다** — `v2-지침서.md:222-223`(§4.5)이 side effect를 port 뒤에 두고 **재시도를 멱등성 key와 함께
 [commands.md] **필터를 길이 7 이상의 16진수로 바꿨고**(존재 여부는 `git`이 판정한다) 재실행 결과가 C-2.1이다. **커버리지 22/26 → 26/26**이며 그중 legacy 25종은
@@ -1893,6 +1897,7 @@ $ python3 claimcheck.py ec115a7 WT
 [commands.md] **처리** — 확정 가능한 것과 미결을 갈랐다.
 [commands.md] **처리**: `V2 예방 제약`을 **계약 + 테스트**로 바꾸고 **논리 작업을 식별하는 안정적인 멱등성 key**(대상 식별자 + 작업 종류 + 처리 대상 시점/버전)와 **그 ke
 [commands.md] **판단: ③ 둘 다 — 정규식을 넓히고 세 자리를 맞췄다.**
+[commands.md] > **이 확장이 곧바로 자기 결함을 냈다.** v2 경로 절이 **행 범위 없는 인용에도 파일 길이를 > 찍었는데**, 그 목록에 **이 evidence 자신이 들어 있다** — 출력을
 [commands.md] - **F-2는 형태 4**(재현 불가능한 참조)에 인접하다 — 블록이 비어 근거가 그 자리에 없다. **처방은 도구 쪽이고 넣었다.**
 ```
 
@@ -2502,6 +2507,12 @@ $ python3 a3check.py
 
 **남는 한계**: 이 확장은 **한글**을 넣은 것이지 임의의 유니코드가 아니다. 다른 문자셋의
 파일명은 여전히 같은 구멍이다 — **관측되면 그때 넓힌다.**
+
+> **이 확장이 곧바로 자기 결함을 냈다.** v2 경로 절이 **행 범위 없는 인용에도 파일 길이를
+> 찍었는데**, 그 목록에 **이 evidence 자신이 들어 있다** — 출력을 쓰면 자기 길이가 바뀌어
+> **동기화가 고정점에 닿지 못했다**(커밋 직후 resync가 트리를 다시 더럽혔다).
+> **행 범위가 없으면 길이를 찍지 않게** 고쳤다. 검사할 범위가 없는 자리에 수를 찍은 것이고,
+> **필요 없는 수를 출력에 넣으면 그것이 곧 낡을 수**라는 이 slice의 반복 교훈과 같다.
 
 ### C-11.2 F-2 — 같은 실행 키가 두 곳인데 **첫 곳만 채웠다**
 
