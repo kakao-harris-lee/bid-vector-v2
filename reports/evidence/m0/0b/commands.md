@@ -74,8 +74,10 @@ def git(*a):
 
 # ── 인용 추출 ─────────────────────────────────────────────
 # 경로:행  (행은 12-34 / 12 / 12-34,56-78 형태)
+# `path.py:12-34` · `path.py` · `path.py::func` 세 형태를 전부 본다.
+# ::func 접미를 못 보면 부분 경로 인용이 검사를 빠져나간다(verifier L3).
 PATH = re.compile(r'`([A-Za-z0-9_./-]+\.(?:py|md|toml|cfg|yaml|yml|json|txt))'
-                  r'(?::([\d,\-]+))?`')
+                  r'(?::([\d,\-]+))?(?:::[A-Za-z_][A-Za-z0-9_]*)?`')
 COMMIT = re.compile(r'`([0-9a-f]{7,40})`')
 lines = src.split("\n")
 cites = collections.OrderedDict()   # (path, ranges) -> [줄번호]
@@ -88,7 +90,10 @@ for i, l in enumerate(lines, 1):
         cites.setdefault((mm.group(1), mm.group(2)), []).append((cur, i))
     for mm in COMMIT.finditer(l):
         h = mm.group(1)
-        if re.fullmatch(r'[0-9a-f]+', h) and not re.fullmatch(r'\d+', h):
+        # 십진 숫자로만 된 해시도 해시다(`0755695`·`2610826`·`3447952`·`7553873`).
+        # 이전 판이 `not re.fullmatch(r'\d+', h)` 로 그 넷을 배제해 커버리지가 20/24였다.
+        # 대신 **길이 7 이상의 16진수**만 받고, 실제 존재 여부는 아래 git 이 판정한다.
+        if re.fullmatch(r'[0-9a-f]{7,40}', h):
             commits.setdefault(h, []).append((cur, i))
 
 # ── 파일 목록 (정본) ──────────────────────────────────────
@@ -112,61 +117,126 @@ for p, rng, w in bad_path: print(f"  [부재] {p}:{rng}  ← {w[:3]}")
 print(f"--- 행 범위: 파일 길이 내 {ok} / 초과 {len(bad_range)} ---")
 for p, part, n, w in bad_range: print(f"  [초과] {p}:{part} (파일 {n}줄)  ← {w[:3]}")
 
-print(f"\n--- commit: 존재 여부와 subject ---")
+# 이 저장소(v2)의 SHA는 legacy 트리에 없는 것이 정상이다 — legacy 검사와 분리한다.
+def in_v2(h):
+    return subprocess.run(["git","cat-file","-e",h+"^{commit}"],
+                          capture_output=True).returncode == 0
+v2, leg = [], []
 for h, w in commits.items():
+    (v2 if in_v2(h) else leg).append((h, w))
+print(f"\n--- commit: legacy {len(leg)}종 / 이 저장소(v2) {len(v2)}종 ---")
+if v2: print("  [v2 — legacy 검사 대상 아님] " + ", ".join(h for h, _ in v2))
+missing = 0
+for h, w in leg:
     r = git("log","-1","--format=%h %ad %s","--date=short",h)
-    if r.returncode: print(f"  [부재] {h}  ← {w[:2]}")
+    if r.returncode: missing += 1; print(f"  [부재] {h}  ← {w[:2]}")
     else: print(f"  {r.stdout.strip()[:110]}")
+print(f"  → legacy commit {len(leg)}종 중 존재 {len(leg)-missing} · 부재 {missing}")
 ```
 
-### C-2.1 실행 결과 — ledger 대상
+### C-2.1 실행 결과 — ledger 대상 (전문)
+
+**아래는 잘라내지 않은 전체 출력이다**(verifier M1 — 이전 판은 `[부재]` 줄 직전에서
+잘려 있었다). 커밋 기준은 이 절을 담은 커밋이다.
 
 ```
 $ python3 citecheck.py docs/discovery/regression-ledger.md
 === 인용 추출 ===
-경로 인용 105종 · commit 인용 21종
+경로 인용 109종 · commit 인용 26종
 
---- 경로: 존재 95 / 부재 10 ---
---- 행 범위: 파일 길이 내 95 / 초과 0 ---
+--- 경로: 존재 97 / 부재 12 ---
+  [부재] reports/evidence/m0/0b/scope.md:None  ← [(None, 3)]
+  [부재] milestone-0.md:None  ← [(None, 5), ('R-PROV-01', 310)]
+  [부재] summary.py:None  ← [(None, 33)]
+  [부재] reports/evidence/m0/0a2/decisions.md:None  ← [(None, 45)]
+  [부재] reports/evidence/m0/0b/commands.md:None  ← [(None, 59)]
+  [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 82), ('R-RATE-03', 252), ('R-RATE-05', 298)]
+  [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 422)]
+  [부재] commands.md:None  ← [('R-FLOOR-06', 567), ('R-QUAL-07', 727)]
+  [부재] classification/eligibility.py:None  ← [('R-QUAL-07', 724)]
+  [부재] license_eligibility.py:None  ← [('R-QUAL-07', 725)]
+  [부재] data-extract.md:None  ← [('R-COL-06', 846), ('R-ML-07', 1196)]
+  [부재] capability-map.md:None  ← [('R-ML-09', 1242), ('R-ML-09', 1278), ('R-ML-09', 1284)]
+--- 행 범위: 파일 길이 내 97 / 초과 0 ---
+
+--- commit: legacy 25종 / 이 저장소(v2) 1종 ---
+  [v2 — legacy 검사 대상 아님] ec115a7
+  ed4b06c 2026-08-14 feat(ml): Phase 3 PR2 — win-proxy 백테스트·캘리브레이션 리포트 (읽기 전용 측정) (#371)
+  881ce27 2026-08-06 fix(scoring): expected_margin 축 basis 정합 — floor_headroom 과대 표시 해소 (#355)
+  0755695 2026-08-06 fix(basis): budget_estimate capture 축 basis 정합 3종 세트 (#354)
+  c4ec93b 2026-07-25 refactor(domain): money 타입(BaseAmount)을 bid_base 경계 시그니처에 강제 — mypy strict 아일랜드 승격 (#262)
+  4645ce4 2026-07-15 fix(predictor): 투찰가를 사업금액(기초금액) 기준으로 산정 (#162)
+  6b7f185 2026-05-10 feat: expand bid intelligence and crawl linkage
+  2610826 2026-08-07 fix(market): budget_cap 하한 정책 — published 법정하한+신뢰 비율 게이트(V3)로 실격측 추천 제거 (#356)
+  a1ca0b6 2026-08-11 fix(predictor): summary 예비가 패턴 블록의 None bid_rate 크래시 — #360 회귀 핫픽스 (#361)
+  2f9bad7 2026-07-17 chore(data): HistoricalData base_amount 출처 분류(basis)+기초금액 추정 backfill + 홀드아웃 오염 가드 (#199)
+  4a8e064 2026-08-08 fix(basis): base÷추정가격 비율로 clean 버킷 오염 분리 — suspect-ratio 재태깅 (#358)
+  ddee938 2026-08-08 fix(basis): 추정가격 출처 인지 write 가드 — 파생 예정가·폴백이 분모·budget_cap을 덮지 못하게 (#359)
+  3447952 2026-08-07 fix(floor): award_floor_rate 신뢰 게이트 — 성립 불가 게시 하한을 수집·가격·검증 3층에서 차단 (#357)
+  c704fff 2026-07-25 fix(classifier): tech_field 축을 면허 게이트와 동일한 lmtGrpNo 그룹-OR로 정렬 (false-exclusion) (#254)
+  187cea9 2026-07-25 refactor(eligibility): 그룹-OR 평가 커널 추출 — 면허 게이트·tech_field 공유 (동작 동일, golden diff 0) (#257)
+  cc4bc9f 2026-07-25 fix(eligibility): association 축을 그룹-OR 커널 세 번째 소비자로 이관 — 평면-AND 잠재 과차단 선제 제거 (#258)
+  aa772f0 2026-07-21 fix(eligibility): ENG001 포괄 별칭을 면허 대조에서 배제 — 엔지니어링 전문분야 collapse 오탐 제거(실측) (#216)
+  f3a3027 2026-07-19 fix(collector): eligibility_raw 원천을 license-limit 서브 오퍼레이션으로 교정 — 목록 응답에 자격 상세 부재(실측) (#209
+  d85711d 2026-07-19 fix(data): license-limit 서브콜 차수를 제로패딩 문자열로 전달 — int 변환이 "000"을 0으로 파괴 (#210)
+  7553873 2026-07-21 feat(eligibility): 면허 자격 게이트를 후보 스크리닝에 wiring(기본 OFF)+영향 계측 (#219)
+  19f2c94 2026-08-13 fix(similarity): 백필 폭주 수습 — 큐 21,321건 적체의 코드 원인 제거 (P1~P4) (#368)
+  93ecf9e 2026-08-13 docs(similarity): 처리량 산술 정정 — 임베딩 모델이 두 벌이었다 (M1·m3·n1)
+  f70df07 2026-08-06 fix(pipeline): 수집 리스 기아 해소 — busy 시 bounded retry + consumer_timeout 선언 (#353)
+  fe24c15 2026-07-19 fix(opening): 후보 쿼리 SELECT DISTINCT 제거 — Postgres json 컬럼 비호환 (라이브 실증) (#212)
+  75254c1 2026-08-13 feat(ml): 서빙 분포 정합 학습 필터 + 미학습 공종 가드 (Phase 2b) — 용역 편향 +5.91%p → +0.90%p (#366)
+  5d38ac1 2026-08-13 feat(ml): 승격 게이트 재설계 — 성숙도 embargo + 겹치지 않는 날짜 창 (Phase 2c) (#367)
+  → legacy commit 25종 중 존재 25 · 부재 0
 ```
 
-- **legacy 경로 인용 95종이 전부 `ed4b06c`에 존재하고, 인용한 행 범위가 전부 파일 길이
-  안이다. 초과 0.**
-- **부재 10종은 전부 이 저장소 자신의 문서**다 — `reports/evidence/m0/0b/scope.md` ·
-  `milestone-0.md` · `reports/evidence/m0/0a2/decisions.md` ·
-  `reports/evidence/m0/0b/commands.md` · `fixtures/manifest.yaml` · `data-extract.md` ·
-  `docs/discovery/capability-map.md`, 그리고 §0.3이 **모호성의 예시로 언급**하는
-  `summary.py`. legacy 트리에 없는 것이 정상이다.
-- **commit 21종이 전부 존재**하고 subject·날짜가 아래 C-3과 같다.
+- **legacy 경로 인용 97종이 전부 `ed4b06c`에 존재하고 인용 행 범위는 전부 파일 길이
+  안이다(초과 0).** 부재 12종은 **legacy 트리에 있을 수 없는 것**들이다 — 이 저장소 자신의
+  문서(`scope.md` · `milestone-0.md` · `0a2/decisions.md` · `commands.md` ·
+  `capability-map.md` · `data-extract.md` · `fixtures/manifest.yaml`), §0.3이 모호성의
+  **예시로 언급**하는 `summary.py`, 그리고 부분 경로 인용 2종(L3 — 아래 C-2.3).
+- **legacy commit 25종이 전부 존재**한다. `ec115a7`은 **이 저장소의 base SHA**라 legacy
+  검사 대상이 아니며 스크립트가 그렇게 분리해 찍는다.
 
-### C-2.2 commit 존재와 subject (발췌 — 전수는 위 명령이 낸다)
+### C-2.2 커버리지 정정 — 이전 판의 기계 축은 전수가 아니었다 (verifier M2)
 
-```
-ed4b06c 2026-08-14 feat(ml): Phase 3 PR2 — win-proxy 백테스트·캘리브레이션 리포트 (읽기 전용 측정) (#371)
-19f2c94 2026-08-13 fix(similarity): 백필 폭주 수습 — 큐 21,321건 적체의 코드 원인 제거 (P1~P4) (#368)
-5d38ac1 2026-08-13 feat(ml): 승격 게이트 재설계 — 성숙도 embargo + 겹치지 않는 날짜 창 (Phase 2c) (#367)
-75254c1 2026-08-13 feat(ml): 서빙 분포 정합 학습 필터 + 미학습 공종 가드 (Phase 2b) — 용역 편향 +5.91%p → +0.90%p (#366)
-a1ca0b6 2026-08-11 fix(predictor): summary 예비가 패턴 블록의 None bid_rate 크래시 — #360 회귀 핫픽스 (#361)
-ddee938 2026-08-08 fix(basis): 추정가격 출처 인지 write 가드 — 파생 예정가·폴백이 분모·budget_cap을 덮지 못하게 (#359)
-4a8e064 2026-08-08 fix(basis): base÷추정가격 비율로 clean 버킷 오염 분리 — suspect-ratio 재태깅 (#358)
-3447952 2026-08-07 fix(floor): award_floor_rate 신뢰 게이트 — 성립 불가 게시 하한을 수집·가격·검증 3층에서 차단 (#357)
-881ce27 2026-08-06 fix(scoring): expected_margin 축 basis 정합 — floor_headroom 과대 표시 해소 (#355)
-f70df07 2026-08-06 fix(pipeline): 수집 리스 기아 해소 — busy 시 bounded retry + consumer_timeout 선언 (#353)
-c4ec93b 2026-07-25 refactor(domain): money 타입(BaseAmount)을 bid_base 경계 시그니처에 강제 — mypy strict 아일랜드 승격 (#262)
-cc4bc9f 2026-07-25 fix(eligibility): association 축을 그룹-OR 커널 세 번째 소비자로 이관 — 평면-AND 잠재 과차단 선제 제거 (#258)
-187cea9 2026-07-25 refactor(eligibility): 그룹-OR 평가 커널 추출 — 면허 게이트·tech_field 공유 (동작 동일, golden diff 0) (#257)
-c704fff 2026-07-25 fix(classifier): tech_field 축을 면허 게이트와 동일한 lmtGrpNo 그룹-OR로 정렬 (false-exclusion) (#254)
-aa772f0 2026-07-21 fix(eligibility): ENG001 포괄 별칭을 면허 대조에서 배제 — 엔지니어링 전문분야 collapse 오탐 제거(실측) (#216)
-7553873 2026-07-21 feat(eligibility): 면허 자격 게이트를 후보 스크리닝에 wiring(기본 OFF)+영향 계측 (#219)
-d85711d 2026-07-19 fix(data): license-limit 서브콜 차수를 제로패딩 문자열로 전달 — int 변환이 "000"을 0으로 파괴 (#210)
-f3a3027 2026-07-19 fix(collector): eligibility_raw 원천을 license-limit 서브 오퍼레이션으로 교정 — 목록 응답에 자격 상세 부재(실측) (#209)
-fe24c15 2026-07-19 (R-ASYNC-04의 전례 — 엔티티 DISTINCT가 Postgres json 컬럼에서만 죽었다) (#212)
-2f9bad7 2026-07-17 chore(data): HistoricalData base_amount 출처 분류(basis)+기초금액 추정 backfill + 홀드아웃 오염 가드 (#199)
-4645ce4 2026-07-15 fix(predictor): 투찰가를 사업금액(기초금액) 기준으로 산정 (#162)
-6b7f185 2026-05-10 feat: expand bid intelligence and crawl linkage
+이전 판의 필터가 **십진 숫자로만 된 해시를 배제**했다:
+
+```python
+if re.fullmatch(r'[0-9a-f]+', h) and not re.fullmatch(r'\d+', h):
 ```
 
----
+`0755695` · `2610826` · `3447952` · `7553873` **네 종이 그렇게 빠졌다.** 실측:
+
+```
+$ python3 - <<'PY'
+import re
+txt = open("docs/discovery/regression-ledger.md", encoding="utf-8").read()
+hs  = set(re.findall(r'`([0-9a-f]{7,40})`', txt))
+old = {h for h in hs if re.fullmatch(r'[0-9a-f]+', h) and not re.fullmatch(r'\d+', h)}
+new = {h for h in hs if re.fullmatch(r'[0-9a-f]{7,40}', h)}
+print("추출 대상 해시 총:", len(new))
+print("이전 필터가 검사한 것:", len(old))
+print("이전 필터가 빠뜨린 것:", sorted(new - old))
+PY
+추출 대상 해시 총: 26
+이전 필터가 검사한 것: 22
+이전 필터가 빠뜨린 것: ['0755695', '2610826', '3447952', '7553873']
+```
+
+**필터를 길이 7 이상의 16진수로 바꿨고**(존재 여부는 `git`이 판정한다) 재실행 결과가
+C-2.1이다. **커버리지 22/26 → 26/26**이며 그중 legacy 25종은 전부 존재, 나머지 1종은
+v2 SHA로 분리됐다.
+
+**이전 판의 "commit 21종이 전부 존재" 주장은 문장과 붙여넣기가 둘 다 부정확했다** —
+수를 잘못 셌고 출력도 잘려 있었다. 위 전문이 그 자리를 대신한다.
+
+### C-2.3 부분 경로 인용 2종 (verifier L3)
+
+ledger가 R-QUAL-07에서 `classification/eligibility.py::assess_license` ·
+`license_eligibility.py::assess_license_eligibility`로 **부분 경로**를 썼다. §0.3의
+"파일명만 쓰지 않는다"에 저촉되고, **검사기가 `::함수` 접미 때문에 그 인용을 보지도
+못했다.** 둘 다 고쳤다 — ledger는 전체 경로를 쓰고, 검사기 `PATH` 정규식에
+`(?:::[A-Za-z_][A-Za-z0-9_]*)?`를 더해 **그 형태도 추출 대상**이 되게 했다.
 
 ## C-3. 선행 산출물 인용 오류 4건 — 0B가 그대로 옮기지 않았다
 
@@ -366,8 +436,8 @@ $ python3 statusdiff.py _workspace/m0-0b/01_scout_regression_preflight.md \
     docs/discovery/regression-ledger.md
 scout 61 ledger 61
 변경 건수: 0
-scout 분포: {'legacy에서 수정됨': 31, 'legacy에 잔존': 27, '판정 불가': 2, '예방책': 1}
-ledger 분포: {'legacy에서 수정됨': 31, 'legacy에 잔존': 27, '판정 불가': 2, '예방책': 1}
+scout 분포: {'legacy에 잔존': 27, 'legacy에서 수정됨': 31, '판정 불가': 2, 'legacy에 이미 있는 예방책': 1}
+ledger 분포: {'legacy에 잔존': 27, 'legacy에서 수정됨': 31, '판정 불가': 2, 'legacy에 이미 있는 예방책': 1}
 ```
 
 **항목별 상태는 61건 전부 동일하다.** 그런데 선행 조사 §0.1 표는 다른 수를 적는다:
@@ -384,9 +454,19 @@ ledger 분포: {'legacy에서 수정됨': 31, 'legacy에 잔존': 27, '판정 �
 | 8 | **6 / 3 / 0** | 4 / 5 / 0 | **✗** |
 | **계** | **31 / 27 / 2** | 29 / 28 / 3 | **✗** |
 
-**원인은 두 축의 혼동**이다. 계열 6의 표가 `판정 불가` 1을 세는데 해당 항목(R-COL-02)의
-**상태는 `잔존`이고 `판정 불가`인 것은 사용자 영향**이다. 표가 **상태 축과 사용자 영향
-축을 한 칸에 섞었다.**
+**원인은 하나가 아니다**(verifier M5 — 이전 판은 전부를 "두 축의 혼동"으로 적었으나
+재계산하니 그 설명이 성립하는 것은 **한 칸뿐**이다).
+
+```
+계열3: 항목=(4, 3, 1) 표=(3, 4, 1)  → 수정/잔존 배분만 다름(합은 같다)
+계열4: 항목=(3, 5, 0) 표=(4, 4, 0)  → 수정/잔존 배분만 다름(합은 같다)
+계열6: 항목=(3, 5, 0) 표=(3, 4, 1)  → 판정불가 축 다름, 수정+잔존 합 다름
+계열8: 항목=(6, 3, 0) 표=(4, 5, 0)  → 수정/잔존 배분만 다름(합은 같다)
+```
+
+- **계열 6 한 칸만 두 축의 혼동**이다 — 표가 `판정 불가` 1을 세는데 해당 항목(R-COL-02)의
+  **상태는 `잔존`이고 `판정 불가`인 것은 사용자 영향**이다.
+- **계열 3·4·8은 단순 오계수**다 — `수정 / 잔존` 배분만 어긋나고 **합은 같다.**
 
 **0B의 처리**: 항목별 상태를 그대로 두고(바꿀 근거가 없다) **두 축을 문서 규약에서
 분리**했다 — ledger §0.1이 `사용자 영향`과 `상태`를 **다른 필드**로 정의하고, 위 스크립트가
@@ -396,9 +476,17 @@ ledger 분포: {'legacy에서 수정됨': 31, 'legacy에 잔존': 27, '판정 �
 ### C-5.3 두 축의 `판정 불가`를 구분한다
 
 **상태 축**(그 결함이 legacy에 있는가)과 **사용자 영향 축**(피해가 관측됐는가)은 다른
-질문이다. 스크립트가 후자를 따로 찍는다 — R-RATE-01 · 02 · 03 · 05 · R-PROV-05 ·
-R-QUAL-02 · R-COL-02 · R-ASYNC-02 · R-ML-07 · R-ML-08. **계열 2는 5건 중 4건**이 여기
-들어간다(계약이 예고한 얇은 계열이다).
+질문이다. 스크립트가 후자를 따로 찍고 **11행**을 낸다:
+
+R-RATE-01 · 02 · 03 · 05 · R-PROV-05 · **R-FLOOR-07** · R-QUAL-02 · R-COL-02 ·
+R-ASYNC-02 · R-ML-07 · R-ML-08.
+
+- **실제 `판정 불가`는 10건**이다. **`R-FLOOR-07`은 문자열 오탐**이다(verifier L1) —
+  그 항목의 사용자 영향은 "표본이 **149건이면 판정 불가**, 150건이면 판정된다"로
+  **legacy 동작을 설명하며 그 낱말을 쓴 것**이고, 사용자 영향 축이 `판정 불가`로
+  표시된 것이 아니다. **스크립트는 낱말을 보고 사람이 판정한다** — 출력을 줄이지 않고
+  오탐임을 여기 적는다.
+- **계열 2는 5건 중 4건**이 여기 들어간다(계약이 예고한 얇은 계열이다).
 
 ---
 
@@ -420,10 +508,7 @@ $ wc -l docs/discovery/regression-ledger.md
   위 스캔 명령 자신 · 이 설명이 `secret`이라는 낱말을 포함한다. **실제 비밀은 없다.**
   **수치는 이 절을 담은 커밋 기준**이며, evidence를 더 쓰면 늘어난다 — 그래서
   `checklist.md` A6은 수를 적지 않고 **"자기참조만"**으로 적는다(형태 6).
-  (처음에 "매치 없음"이라고 적었으나 **그 문장 자신이 매치를 만든다.** 0A2가 같은 형태로
-  걸린 적이 있어 실측으로 고쳤다.)
   (처음에 "매치 없음"이라고 적었으나 **그 문장 자신이 매치를 만든다** — 0A2가 같은 형태로
   걸린 적이 있어 실측으로 고쳤다.)
 - 공고번호·기관명 등 식별자는 **근거 추적에 필요한 곳(commit 참조)에만** 남기고 본문에
   옮기지 않았다 — 패턴 스캔으로 잡히지 않으므로 **육안 확인 병기**.
-- 위 수치는 **이 절을 담은 커밋 기준**이다.
