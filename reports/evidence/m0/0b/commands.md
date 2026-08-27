@@ -146,20 +146,20 @@ print(f"  → legacy commit {len(leg)}종 중 존재 {len(leg)-missing} · 부�
 ```
 $ python3 citecheck.py docs/discovery/regression-ledger.md
 === 인용 추출 ===
-경로 인용 112종 · commit 인용 26종
+경로 인용 114종 · commit 인용 26종
 
---- 경로: 존재 102 / 부재 10 ---
+--- 경로: 존재 104 / 부재 10 ---
   [부재] reports/evidence/m0/0b/scope.md:None  ← [(None, 3)]
-  [부재] milestone-0.md:None  ← [(None, 5), ('R-PROV-01', 315)]
+  [부재] milestone-0.md:None  ← [(None, 5), ('R-PROV-01', 322)]
   [부재] summary.py:None  ← [(None, 33)]
   [부재] reports/evidence/m0/0a2/decisions.md:None  ← [(None, 45)]
   [부재] reports/evidence/m0/0b/commands.md:None  ← [(None, 59)]
-  [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 82), ('R-RATE-03', 252), ('R-RATE-05', 298)]
-  [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 432)]
-  [부재] commands.md:None  ← [('R-FLOOR-06', 577), ('R-QUAL-07', 738)]
-  [부재] data-extract.md:None  ← [('R-COL-06', 857), ('R-ML-07', 1221)]
-  [부재] capability-map.md:None  ← [('R-ML-09', 1267), ('R-ML-09', 1303), ('R-ML-09', 1314)]
---- 행 범위: 파일 길이 내 102 / 초과 0 ---
+  [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 88), ('R-RATE-03', 259), ('R-RATE-05', 305)]
+  [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 439)]
+  [부재] commands.md:None  ← [('R-FLOOR-06', 584), ('R-QUAL-07', 745)]
+  [부재] data-extract.md:None  ← [('R-COL-06', 864), ('R-ML-07', 1228)]
+  [부재] capability-map.md:None  ← [('R-ML-09', 1274), ('R-ML-09', 1310), ('R-ML-09', 1321)]
+--- 행 범위: 파일 길이 내 104 / 초과 0 ---
 
 --- commit: legacy 25종 / 이 저장소(v2) 1종 ---
   [v2 — legacy 검사 대상 아님] ec115a7
@@ -191,9 +191,10 @@ $ python3 citecheck.py docs/discovery/regression-ledger.md
   → legacy commit 25종 중 존재 25 · 부재 0
 ```
 
-- **legacy 경로 인용 99종이 전부 `ed4b06c`에 존재하고 인용 행 범위는 전부 파일 길이
-  안이다(초과 0).** 부재 10종은 **legacy 트리에 있을 수 없는 것**들이다 — 이 저장소 자신의
-  문서와, §0.3이 모호성의 **예시로 언급**하는 `summary.py`.
+- **legacy 경로 인용이 전부 `ed4b06c`에 존재하고 인용 행 범위는 전부 파일 길이 안이다
+  (초과 0).** 수는 **위 블록이 정본**이며 이 줄은 옮겨 적지 않는다(H-R3). 부재로 찍히는
+  것은 **legacy 트리에 있을 수 없는 것**들이다 — 이 저장소 자신의 문서와, §0.3이 모호성의
+  **예시로 언급**하는 `summary.py`.
 - **legacy commit 25종이 전부 존재**한다. `ec115a7`은 **이 저장소의 base SHA**라 legacy
   검사 대상이 아니며 스크립트가 그렇게 분리해 찍는다.
 
@@ -245,10 +246,21 @@ ledger가 R-QUAL-07에서 `classification/eligibility.py::assess_license` ·
 ② 출력 붙여넣기를 함께 했는데, **출력을 ① 이전에 떴다.** 커밋 단위로는 "그 커밋의
 출력"이 맞지만 **그 커밋 최종 상태의 출력이 아니었다.**
 
-그리고 그 값이 `checklist.md` A2에 **"97종"으로 전파**됐다(형태 5) — 현재는 99다.
+그리고 그 값이 `checklist.md` A2에 **"97종"으로 전파**됐다(형태 5).
 
 **규칙**: 출력을 붙일 때 **그 커밋의 최종 상태에서 다시 뜬다.** "이 커밋 기준"이라는
 선언만으로는 부족하다 — 같은 커밋 안에서도 편집 순서가 출력을 낡게 만든다.
+
+**범위 확장 (verifier H-R3, 형태 5의 재발)** — 위 규칙을 지켰는데도 같은 자리가 또 낡았다.
+`eeaa8e1`이 **출력 블록을 102/10으로 정확히 갱신**했으나 **그 출력을 인용하는 산문 두 곳이
+`99종`으로 남았다.** `97 → 99`가 났던 **그 자리**다.
+
+> **규칙이 지켜진 대상은 "붙여넣기 블록"이었고, 그 블록을 인용하는 산문은 규칙 밖에 있었다.**
+
+**규칙의 적용 대상을 「블록」에서 「블록 + 그 블록을 인용하는 산문」으로 넓힌다.** 그리고
+**가능하면 산문이 수를 옮겨 적지 않게 한다** — `checklist.md` A2와 위 C-2.1 bullet은 이제
+**블록을 가리키기만** 한다(형태 6의 "셈이 아니라 재현 명령으로"와 같은 취지다).
+전수 훑기와 그 사각지대를 보는 축은 **C-2.6**에 있다.
 
 ### C-2.5 형태 6의 재발 — 축이 지목한 것을 순환 논증으로 닫았다 (verifier H-R2)
 
@@ -267,6 +279,93 @@ ledger가 R-QUAL-07에서 `classification/eligibility.py::assess_license` ·
 
 C-7.3의 판정 근거를 **전부 재현 명령으로 교체**했고, 그 결과 **추가 발견은 0이 아니라
 1건**(R-PROV-01)이었다.
+
+### C-2.6 산문 인용 전수 훑기 — 이 자리가 축의 사각지대였다 (verifier H-R3)
+
+**기존 축 넷은 이 부류를 보지 않는다.** `citecheck`·`numsrc`는 **(ledger ↔ legacy)**를,
+`ledgercheck`는 **ledger 내부 구조**를, `statusdiff`는 **두 문서의 상태**를 본다.
+**evidence 안에서 산문이 출력 블록의 수를 옮겨 적는 자리**는 **어느 축의 대상도 아니었다** —
+`97 → 99`와 `99 → 102`가 **같은 칸에서 두 번** 난 이유다.
+
+**축을 하나 더 만들었다**(결함이 두 번 관측된 뒤에 만든다는 순서를 따른다). 정본은
+`commands.md`의 **출력 블록**이고 대조 대상은 **같은 파일들의 산문**이다.
+
+```python
+# H-R3의 사각지대 —— **스크립트 출력 블록**과 **그 출력을 인용하는 산문**의 대조.
+# 기존 축들은 (ledger↔legacy)만 본다. evidence 안에서 산문이 블록의 수를 옮겨 적을 때
+# 블록만 갱신되고 산문이 남는 형태를 아무 축도 보지 않았다(형태 5의 변종).
+#
+# 정본 = commands.md 안의 ``` 출력 블록. 대조 대상 = 같은 파일들의 산문.
+import re, glob, sys
+
+EV = sorted(glob.glob("reports/evidence/m0/0b/*.md"))
+blocks = "\n".join(
+    re.findall(r'```[a-z]*\n(.*?)\n```', open("reports/evidence/m0/0b/commands.md",
+               encoding="utf-8").read(), re.S))
+
+# 블록에서 뽑는 정본 수치: "이름: N" / "존재 N / 부재 M" 같은 명명된 집계
+GT = {}
+for pat, key in [
+    (r'경로: 존재 (\d+) / 부재 (\d+)',              ("경로 존재", "경로 부재")),
+    (r'행 범위: 파일 길이 내 (\d+) / 초과 (\d+)',    ("행 범위 내", "행 범위 초과")),
+    (r'legacy commit (\d+)종 중 존재 (\d+)',        ("legacy commit", "legacy commit 존재")),
+    (r'경로 인용 (\d+)종 · commit 인용 (\d+)종',     ("경로 인용", "commit 인용")),
+]:
+    m = re.search(pat, blocks)
+    if m:
+        for name, val in zip(key, m.groups()): GT[name] = int(val)
+
+print("=== 정본 (commands.md 출력 블록에서 추출) ===")
+for k, v in GT.items(): print(f"  {k}: {v}")
+
+# 산문에서 같은 양을 가리키는 표현
+CHK = [
+    ("경로 존재", re.compile(r'legacy 경로 인용 \*{0,2}(\d+)종')),
+    ("경로 존재", re.compile(r'경로 인용 \*{0,2}(\d+)종 전부 존재')),
+    ("legacy commit", re.compile(r'legacy commit \*{0,2}(\d+)종')),
+]
+print("\n=== 산문 대조 ===")
+bad = 0
+for f in EV:
+    for i, l in enumerate(open(f, encoding="utf-8").read().split("\n"), 1):
+        if l.lstrip().startswith(("$", "---", "===")): continue
+        for name, rx in CHK:
+            for m in rx.finditer(l):
+                got, exp = int(m.group(1)), GT.get(name)
+                if exp is None or got == exp: continue
+                # 이력 서술(과거 값을 그 시점 기록으로 적는 것)은 사람이 판정한다
+                bad += 1
+                print(f"  [{name}] {f}:{i}  산문={got} 정본={exp}\n      {l.strip()[:110]}")
+print(f"  불일치 {bad}건 (이력 서술 포함 — 사람 판정 대상)")
+```
+
+```
+$ python3 prosecheck.py
+=== 정본 (commands.md 출력 블록에서 추출) ===
+  경로 존재: 104
+  경로 부재: 10
+  행 범위 내: 104
+  행 범위 초과: 0
+  legacy commit: 25
+  legacy commit 존재: 25
+  경로 인용: 114
+  commit 인용: 26
+
+=== 산문 대조 ===
+  불일치 0건 (이력 서술 포함 — 사람 판정 대상)
+```
+
+**전수 훑기 결과 — 이번에 고친 것 외 추가 발견 0건.** 지목된 자리는 전부 이 라운드가
+고친 두 곳(`checklist.md` A2 · C-2.1 bullet)이며, **고친 뒤에는 산문이 수를 옮겨 적지
+않으므로 그 칸이 다시 낡을 수 없다.**
+
+**이 축이 못 보는 것**(한계):
+
+- **표현이 다른 인용** — `C-2.4`의 "현재는 99다" 같은 문장은 명명된 집계 패턴에 걸리지
+  않아 **사람이 찾았다.** 그 자리는 아예 **살아 있는 수를 빼서** 닫았다.
+- **이력 서술과 현재 값 주장의 구분** — 축은 낡음을 지목만 하고 **그 수가 그 시점 기록인지
+  현재 주장인지는 사람이 판정**한다(다른 축들과 같다).
+- **정본이 블록에 없는 수** — 산문이 계산해 적은 파생값은 대조 대상이 없다.
 
 ## C-3. 선행 산출물 인용 오류 4건 — 0B가 그대로 옮기지 않았다
 
@@ -558,7 +657,7 @@ $ git diff --check ec115a7...HEAD | wc -l
 $ git status --porcelain -- docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
 0
 $ wc -l docs/discovery/regression-ledger.md
-1324 docs/discovery/regression-ledger.md
+1331 docs/discovery/regression-ledger.md
 ```
 
 - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 ·
@@ -787,9 +886,9 @@ $ python3 numsrc.py
 | --- | --- | --- |
 | **R-PROV-01** | ~~"5곳에 복제"~~ → **앱 코드 6곳 · 테스트 포함 7곳** | `git grep -n -E '66(\.2)?%' ed4b06c -- '*.py'` → 앱 6 · 테스트 1. **미계상이던 두 곳**은 `app/services/prediction_dataset.py:436`(학습·데이터셋 조립 경로가 근거로 삼는다)과 `tests/test_holdout_agency_quality.py:451`(회귀 가드 사유로 복제). **산출물을 실측값으로 고쳤다** |
 | R-FLOOR-05 | "사유 4종" | `git grep -c '^_SCOPE_' ed4b06c -- app/services/notice_floor_shortfall.py` → **4**(`:55-58`). 파일 전체 기준이며 인용 범위가 그 넷을 덮는다 |
-| R-COL-02 | "7종" | `git show ed4b06c:…/live_failure.py \| grep -oE 'return "[a-z_]+"' \| sort -u` → **정확히 7**(파일 전체) |
-| R-COL-03 | "30여 개" | **세는 대상 정의에 달렸다.** `:115-159`의 문자열 리터럴은 **30**이지만 그중 **5개는 반환 카테고리명**이고, **매칭 마커만 세면 20여 개**(구분 정규식에 따라 22~27). **"30여 개"라는 어림은 성립하나 "정확히 30"이라고 판정할 수는 없다** — 이전 판의 그 표현을 철회한다(verifier 참고 1) |
-| R-COL-06 | "하드코딩 공고 2건" | `build_mock_items` 본문이 `KONEPS-{target_stamp}-001`·`-002` **둘**을 만든다(`collection.py:255-330` 판독) |
+| R-COL-02 | "7종" | `git -C bid-vector show ed4b06c:app/services/koneps/live_failure.py \| grep -oE 'return "[a-z_]+"' \| sort -u \| wc -l` → **정확히 7**(파일 전체). 이전 판은 경로를 `…`로 줄여 **복사 실행이 안 됐다**(verifier L-2, 형태 4) |
+| R-COL-03 | "30여 개" | **세는 대상 정의에 달렸다.** `F=app/services/koneps/live_failure.py`로 두고 — 리터럴 전체 `git -C bid-vector show ed4b06c:$F \| sed -n '115,159p' \| grep -oE '"[^"]*"' \| wc -l` → **30**, 그중 **반환 카테고리명 7종을 뺀 매칭 마커** `… \| grep -vE '"(access_denied\|browser_runtime\|network\|no_data\|selector_drift\|timeout\|unknown)"' \| wc -l` → **24**(고유값도 24). **"30여 개"라는 어림은 성립하나 "정확히 30"이라고 판정할 수는 없다** — 이전 판의 그 표현을 철회한다(verifier 참고 1). 이전 판이 적은 `22~27`은 **셈 정의를 밝히지 않은 밴드**여서 함께 걷어냈다(verifier L-1) |
+| R-COL-06 | "하드코딩 공고 2건" | `git -C bid-vector show ed4b06c:app/services/koneps/collection.py \| sed -n '255,315p' \| grep -c 'notice_number=f"KONEPS-'` → **2**(`-001`·`-002`). 이전 판은 파일명만 쓰고 범위를 `:255-330`으로 적었는데 **`build_mock_items`는 `:255-315`**이고 `:318`이 다음 `def`다 — ledger 본문 인용(`:255-315`)이 정확하다(verifier L-2) |
 | R-COL-01 | "0건으로 파싱" | **수치 주장이 아니라 서술**이다(빈 payload). 셈의 대상이 없다 |
 | R-BASIS-04 | "19.5%" | **이 문서가 `78/400`을 계산한 파생값**이며 legacy는 "400건 중 78건"만 적는다(`2610826` 본문). 그 사실이 산출물에 표시돼 있다 |
 
@@ -808,7 +907,12 @@ $ python3 numsrc.py
 - **원문에 리터럴로 없는 파생·집계 수치** — 위 표의 대부분이 그 부류이며 **사람이 원문을
   세어** 확인했다. **그 셈의 대상 정의가 흔들리면 판정도 흔들린다**(R-COL-03이 그 예다).
 - **`사용자 영향` 필드**(verifier L-R2-1) — 필드를 `관찰`로 한정하면서 **`사용자 영향`도
-  함께 빠졌고 그 사실이 기록되지 않았다.** 그 필드에도 **legacy 실측이 들어 있다**
-  (예: R-BASIS-04의 400/78, R-QUAL-03의 3건 중 1건). 지금은 **사람 판독으로만** 확인된다.
-  **축을 넓힐지는 근거가 관측된 뒤에 판단한다.**
+  함께 빠졌고 그 사실이 기록되지 않았다.** 그 필드에도 **legacy 실측이 들어 있다** —
+  R-BASIS-04의 **400건 중 78건**, R-FLOOR-03의 **라이브 400건 중 1건 실측 · 최대 +10%
+  과추천**. 지금은 **사람 판독으로만** 확인된다. **축을 넓힐지는 근거가 관측된 뒤에
+  판단한다.**
+  ※ 이전 판은 두 번째 예시로 **R-QUAL-03의 "3건 중 1건"**을 들었으나 **그 값은 `관찰`에
+  있어** 스캐너가 이미 보는 자리다(verifier M-1) — **가려진 것의 예시가 될 수 없어**
+  실제로 `사용자 영향`에 있는 값으로 교체했다. 자기 문서의 필드 배치라 **확인 비용이 0인
+  자리에서 형태 1을 냈다.**
 - **단일 숫자와 백분율 표기**는 잡되, 그 값이 원문의 다른 문맥에 우연히 있으면 통과한다.
