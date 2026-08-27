@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a3-decision-basis-correction
 base_sha: 48151b9   # 0B Codex 4차 approve verdict 등재 직후의 HEAD
-head_sha: 491684f   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
+head_sha: f6bcf18   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
 in_scope:
   - reports/evidence/m0/0a2/decisions.md      # X-1 정정 한정 + provenance 등재
   - reports/evidence/m0/0a2/checklist.md      # §10.1 형태 7 등재 한정
@@ -148,7 +148,8 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 | `7f25aa4` | **수정 라운드 2** — evidence 동기화 + **A4 갱신** |
 | `4aa4e3c` | **수정 라운드 3** — verifier `G-1`~`G-5`. evidence 자기서술 정정 |
 | `491684f` | **수정 라운드 4** — verifier `H-1`~`H-4`. `H-1`은 앞 라운드가 지운 참인 절을 되돌린다 |
-| 이 커밋 | **수정 라운드 5** — verifier `P-1`. X-1 스윕 축을 넓히고 O-2 서술을 실측에 맞춘다 |
+| `f6bcf18` | **수정 라운드 5** — verifier `P-1`. X-1 스윕 축을 넓히고 O-2 서술을 실측에 맞춘다 |
+| 이 커밋 | **수정 라운드 6** — 정의되지 않은 이름 하나를 지운다(운영자 승인). **Codex 2차 송부 대상** |
 
 **파일 목록도 셈도 여기에 옮기지 않는다** — `git show --stat --format='' <SHA>`가 낸다.
 
@@ -549,6 +550,60 @@ corpus 경계가 굳는다"*)까지 같다.
 | 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
 | **`O-2` 자리가 살아 있는가** | `commands.md` **C-3.4** — **없어지면 안 된다** |
 | C-3.4 스윕이 고정점인가 | 그 절의 명령을 다시 돌려 출력이 같은지 본다 |
+| in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
+| 하네스 두 파일이 range 밖인가 | `git diff --name-only 48151b9...HEAD` — `.claude/`·`CLAUDE.md`가 나오지 않아야 한다 |
+
+**결과를 여기 적지 않는다.**
+
+---
+
+## 갱신 이력 — 수정 라운드 6 (마지막 1건 · 운영자 승인 2026-08-27)
+
+`P-1`이 닫히고 **게이트 안 0건**으로 `ready-for-review` 판정을 받았다.
+**재작업 상한에 도달해 운영자가 이 한 건만 더 고치고 리뷰로 가라고 결정했다.**
+건별 처리는 `checklist.md` **§13**에 있다.
+
+### 정의되지 않은 이름을 불렀다
+
+C-3.4 스윕 본문 절이 **`EXTRACT`라는 이름으로 추출 방식을 불렀는데 그 이름이 패키지
+어디에도 정의돼 있지 않다.** **실물을 열어 확인했다** — C-3.4는 `BLK4`, C-4.1은 `BLK`를
+쓰고 **`EXTRACT`는 그 한 줄에만 나온다.**
+
+**재실행이 막히지는 않는다.** 그러나 **그 절의 제목이 「형태 4 — 이름으로만 부르지
+않는다」**이고, **Codex 1차가 이미 같은 계열을 medium으로 냈다**(`inv0a3.py` 미존재).
+**규칙을 적은 절이 그 규칙을 어긴 것**이라 고친다.
+
+**이름을 지우고 자리를 가리키게 했다.** 실제 변수명으로 바꾸는 쪽도 가능했으나
+**그 절의 논지가 「이름으로만 부르지 않는다」**이고 이름을 적으면 **그것이 또 낡을 수 있는
+자리**가 된다. **명령은 바로 위 출력 블록에 그대로 있다.**
+
+**뒤따르는 명제 셋은 참이라 건드리지 않았다** — 줄 번호가 아니라 marker로 집고 ·
+`assert`로 유일성 확인 · stdin 으로 흘려 넣어 커밋되지 않은 스크립트 파일에 의존하지
+않는다. **두 절의 실물에 대조해 확인했다.**
+
+### 게이트 밖 나머지는 고치지 않았다
+
+**범위를 넓히지 않았다** — 검증자가 *"어느 것도 현재 상태 선언을 거짓으로 만들지 않는다"*고
+판정했고 **다음 slice 소관**이다.
+
+### `head_sha`와 range
+
+**이 커밋이 무엇을 바꿨는지는 `git show --stat --format='' HEAD`가 낸다** — 파일 목록도
+셈도 여기 옮겨 적지 않는다. 사실 주장은 아래 표의 재현 명령과 함께 남긴다.
+
+- **`head_sha`의 정본은 이 파일 머리의 yaml 하나다.** 커밋이 자기 SHA를 담을 수 없어
+  **직전 커밋**을 가리킨다.
+- **리뷰 range는 `48151b9...HEAD`**. **이 커밋 뒤 Codex 2차로 간다.**
+
+### 불변 — 이 절은 수도 좌표도 옮겨 적지 않는다
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| 산출물 셋이 이 라운드에 무변경 | `git diff --stat f6bcf18..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
+| C-3.4 스윕이 여전히 고정점인가 | 그 절의 명령을 다시 돌려 출력이 기록과 같은지 본다 |
+| 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
+| `regression-ledger.md` 무변경 | `commands.md` **C-6** |
+| **`O-2` 자리가 살아 있는가** | `commands.md` **C-3.4** — **없어지면 안 된다** |
 | in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
 | 하네스 두 파일이 range 밖인가 | `git diff --name-only 48151b9...HEAD` — `.claude/`·`CLAUDE.md`가 나오지 않아야 한다 |
 
