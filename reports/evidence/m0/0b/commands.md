@@ -76,7 +76,9 @@ def git(*a):
 # 경로:행  (행은 12-34 / 12 / 12-34,56-78 형태)
 # `path.py:12-34` · `path.py` · `path.py::func` 세 형태를 전부 본다.
 # ::func 접미를 못 보면 부분 경로 인용이 검사를 빠져나간다(verifier L3).
-PATH = re.compile(r'`([A-Za-z0-9_./-]+\.(?:py|md|toml|cfg|yaml|yml|json|txt))'
+# 문자 클래스가 ASCII 전용이라 **한글이 든 파일명을 경로로 보지 못했다**(`v2-지침서.md`).
+# 그 결과 그 인용은 **어느 축도 검사하지 않았다.** 한글을 넣어 검사 대상으로 들인다.
+PATH = re.compile(r'`([A-Za-z0-9_./가-힣-]+\.(?:py|md|toml|cfg|yaml|yml|json|txt))'
                   r'(?::([\d,\-]+))?(?:::[A-Za-z_][A-Za-z0-9_]*)?`')
 COMMIT = re.compile(r'`([0-9a-f]{7,40})`')
 lines = src.split("\n")
@@ -100,11 +102,26 @@ for i, l in enumerate(lines, 1):
 tree = set(git("ls-tree","-r","--name-only",REF).stdout.split())
 print(f"=== 인용 추출 ===\n경로 인용 {len(cites)}종 · commit 인용 {len(commits)}종\n")
 
+# 이 저장소(v2)의 문서도 인용된다(`v2-지침서.md`). legacy 트리에 없는 것이 정상이므로
+# **commit 축과 같은 방식으로 갈라** v2 파일로 검사한다 — 빠뜨리면 아무도 안 본다.
+def v2_body(p):
+    r = subprocess.run(["git","show",f"HEAD:{p}"], capture_output=True, text=True)
+    return None if r.returncode else r.stdout.splitlines()
+
 bad_path, bad_range, ok = [], [], 0
+v2_ok, v2_bad = [], []
 for (p, rng), where in cites.items():
     if p not in tree:
-        # 저장소 밖 파일(이 저장소 자신의 문서 등)은 제외 후보로 표시
-        bad_path.append((p, rng, where)); continue
+        b = v2_body(p)
+        if b is None:
+            bad_path.append((p, rng, where)); continue
+        n = len(b)
+        bad = False
+        for part in (rng or "").split(",") if rng else []:
+            a = part.split("-"); hi = int(a[-1])
+            if hi > n: bad = True
+        (v2_bad if bad else v2_ok).append((p, rng, n, where))
+        continue
     # `split("\n")` 은 trailing newline 때문에 실제 줄 수보다 **1 크다**
     # (`"one\n".split("\n")` → 2). 그만큼 이 축이 마지막 줄 +1 까지 통과시켰다.
     n = len(git("show", f"{REF}:{p}").stdout.splitlines())
@@ -114,7 +131,10 @@ for (p, rng), where in cites.items():
             if hi > n: bad_range.append((p, part, n, where)); break
         else: ok += 1
     else: ok += 1
-print(f"--- 경로: 존재 {len(cites)-len(bad_path)} / 부재 {len(bad_path)} ---")
+print(f"--- v2 저장소 파일(legacy 검사 대상 아님): {len(v2_ok)+len(v2_bad)}종 · 행 범위 초과 {len(v2_bad)} ---")
+for p, rng, n, w in v2_ok + v2_bad:
+    print(f"  [{'초과' if (p,rng,n,w) in v2_bad else 'ok'}] {p}:{rng} (파일 {n}줄)  ← {w[:2]}")
+print(f"--- 경로: 존재 {len(cites)-len(bad_path)-len(v2_ok)-len(v2_bad)} / 부재 {len(bad_path)} ---")
 for p, rng, w in bad_path: print(f"  [부재] {p}:{rng}  ← {w[:3]}")
 print(f"--- 행 범위: 파일 길이 내 {ok} / 초과 {len(bad_range)} ---")
 for p, part, n, w in bad_range: print(f"  [초과] {p}:{part} (파일 {n}줄)  ← {w[:3]}")
@@ -148,19 +168,22 @@ print(f"  → legacy commit {len(leg)}종 중 존재 {len(leg)-missing} · 부�
 ```
 $ python3 citecheck.py docs/discovery/regression-ledger.md
 === 인용 추출 ===
-경로 인용 114종 · commit 인용 26종
+경로 인용 116종 · commit 인용 26종
 
---- 경로: 존재 104 / 부재 10 ---
-  [부재] reports/evidence/m0/0b/scope.md:None  ← [(None, 3)]
-  [부재] milestone-0.md:None  ← [(None, 5), ('R-PROV-01', 339)]
+--- v2 저장소 파일(legacy 검사 대상 아님): 7종 · 행 범위 초과 0 ---
+  [ok] reports/evidence/m0/0b/scope.md:None (파일 867줄)  ← [(None, 3)]
+  [ok] milestone-0.md:None (파일 126줄)  ← [(None, 5), ('R-PROV-01', 342)]
+  [ok] v2-지침서.md:None (파일 355줄)  ← [(None, 45), ('R-BASIS-03', 141)]
+  [ok] reports/evidence/m0/0a2/decisions.md:None (파일 490줄)  ← [(None, 46)]
+  [ok] reports/evidence/m0/0b/commands.md:None (파일 2353줄)  ← [(None, 60)]
+  [ok] data-extract.md:None (파일 165줄)  ← [('R-COL-06', 908), ('R-ML-07', 1283)]
+  [ok] v2-지침서.md:215-223 (파일 355줄)  ← [('R-ASYNC-06', 1096)]
+--- 경로: 존재 104 / 부재 5 ---
   [부재] summary.py:None  ← [(None, 34)]
-  [부재] reports/evidence/m0/0a2/decisions.md:None  ← [(None, 46)]
-  [부재] reports/evidence/m0/0b/commands.md:None  ← [(None, 60)]
-  [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 94), ('R-RATE-03', 276), ('R-RATE-05', 322)]
-  [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 465)]
-  [부재] commands.md:None  ← [('R-FLOOR-06', 610), ('R-QUAL-07', 771)]
-  [부재] data-extract.md:None  ← [('R-COL-06', 905), ('R-ML-07', 1280)]
-  [부재] capability-map.md:None  ← [('R-ML-09', 1326), ('R-ML-09', 1336), ('R-ML-09', 1372)]
+  [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 94), ('R-RATE-03', 279), ('R-RATE-05', 325)]
+  [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 468)]
+  [부재] commands.md:None  ← [('R-FLOOR-06', 613), ('R-QUAL-07', 774)]
+  [부재] capability-map.md:None  ← [('R-ML-09', 1329), ('R-ML-09', 1339), ('R-ML-09', 1375)]
 --- 행 범위: 파일 길이 내 104 / 초과 0 ---
 
 --- commit: legacy 25종 / 이 저장소(v2) 1종 ---
@@ -353,12 +376,12 @@ print(f"  불일치 {len(hits)}건 (이력 서술 포함 — 사람 판정 대�
 $ python3 prosecheck.py
 === 정본 (commands.md 출력 블록에서 추출) ===
   경로 존재: 104
-  경로 부재: 10
+  경로 부재: 5
   행 범위 내: 104
   행 범위 초과: 0
   legacy commit: 25
   legacy commit 존재: 25
-  경로 인용: 114
+  경로 인용: 116
   commit 인용: 26
 
 === 산문 대조 ===
@@ -513,7 +536,9 @@ for i, l in enumerate(lines[body_start:], body_start + 1):
         for k in range(i - 2, max(-1, i - 8), -1):
             ctx.append(lines[k])
             if re.match(r'^- \*\*', lines[k]): break
-        if any(re.search(r'`[A-Za-z0-9_./-]+\.(py|md):[\d,\-]+`', c) for c in ctx):
+        # 문자 클래스가 ASCII 전용이라 `v2-지침서.md:215-223` 같은 **한글 파일명 인용**을
+        # 경로로 보지 못해 뒤따르는 `:222`·`:223` 을 자기참조로 오탐했다(verifier F-1).
+        if any(re.search(r'`[A-Za-z0-9_./가-힣-]+\.(py|md):[\d,\-]+`', c) for c in ctx):
             continue
         self_ref.append((i, m.group(0)))
 print("  없음" if not self_ref else f"  {self_ref}")
@@ -563,7 +588,7 @@ $ python3 ledgercheck.py
   없음
 
 === 이 문서 자기참조 줄 번호 (legacy 행 범위 연속 표기 제외) ===
-  [(1093, '`:222`'), (1093, '`:223`')]
+  없음
 ```
 
 - **계열 8이 10인 것은 P-ML-01을 포함**하기 때문이다. **회귀는 9건**이고 합계 60에
@@ -575,8 +600,17 @@ $ python3 ledgercheck.py
   보게** 바꿨다.
   **한계(verifier L-N1)**: 이 완화는 **트레이드오프**다. lookback 범위 안에 legacy 경로
   인용이 하나라도 있으면 그 뒤의 `` `:NNN` ``을 전부 예외로 본다 — **같은 항목 안에서
-  이 문서 자신을 줄 번호로 가리키면 놓친다.** 지금은 그런 자기참조가 없고(§0.3이 금지),
+  이 문서 자신을 줄 번호로 가리키면 놓친다.** 이 검사가 지금 `없음`을 내지만
   **없다는 것을 이 검사가 증명하지는 않는다.**
+- **한글 파일명이 두 축의 사각지대였다**(verifier F-1). `d205d31`이 넣은
+  `` `v2-지침서.md:215-223` `` 인용에 대해 이 검사가 뒤따르는 `` `:222` ``·`` `:223` ``을
+  **자기참조 2건으로 오탐**했다 — 예외 판정 정규식의 문자 클래스가 **ASCII 전용**이라
+  한글이 든 파일명을 **경로로 인식하지 못했다.** 실질은 자기참조가 아니고 §0.3 위반도
+  아니다. **정규식에 한글을 넣어 고쳤고 지금은 `없음`이다.** 판단 근거는 C-11.1에 있다.
+- **`citecheck`도 같은 문자 클래스였다** — 그래서 **`v2-지침서.md:215-223`은 경로 존재도
+  행 범위도 어느 축이 검사하지 않았다.** 같이 넓혔고, **legacy 트레에 없는 것이 정상인 v2
+  저장소 파일**은 commit 축과 같은 방식으로 갈라 **v2 HEAD에서 행 범위를 검사**한다.
+  C-2.1 출력의 `v2 저장소 파일` 절이 그것이다 — **검사가 늘었다.**
 - **bare 연속 범위의 사각지대(verifier L-N2)**: `path.py:1-2` 뒤에 오는 `` `:3-4` `` 형태는
   **어느 기계 축도 행 범위를 검사하지 않는다** — `citecheck`의 `PATH`가 경로를 요구하기
   때문이다. **수를 여기 적지 않는다**(아래 ※). 세는 명령:
@@ -693,7 +727,7 @@ $ git diff --check ec115a7...HEAD | wc -l
 $ git status --porcelain -- docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
 0
 $ wc -l docs/discovery/regression-ledger.md
-1393 docs/discovery/regression-ledger.md
+1396 docs/discovery/regression-ledger.md
 ```
 
 - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 ·
@@ -1096,7 +1130,10 @@ print("  → 이 항목들은 **사람이 읽어 판정**한다. 기록은 evide
 # 관측된 형태를 그대로 겨눈다: **방향·대소를 말하는 문장은 대소 관계를 전제한다.**
 # 그 항목이 활성 OPEN과 엮여 있으면 그 전제가 미결일 수 있다 — **지목만 하고 사람이 읽는다.**
 FACT  = ("관찰", "사용자 영향")
-DIR   = re.compile(r'한 방향|일관되게|더 크|더 작|보다 크|보다 작|상회|하회|넘는|초과하|미만')
+# `~10% 낮은` 이 어휘에 없어 `R-BASIS-06` 이 새어 나갔다(verifier F-3). **관측된 뒤에** 넓힌다 —
+# 넓히면 지목이 늘고 검사가 늘어난다(줄이는 방향이 아니다).
+DIR   = re.compile(r'한 방향|일관되게|더 크|더 작|보다 크|보다 작|상회|하회|넘는|초과하|미만'
+                   r'|낮은|높은|낮아|높아|적은|많은')
 HEDGE = re.compile(r'조건부|미정|소유한다|확정하지 않는다|판정할 수 없다|정하지 않는다'
                    r'|결정에 따라|단정할 수 없다|전제를 넣지 않는다')
 f3 = []
@@ -1132,15 +1169,15 @@ $ python3 openstance.py
       - **조건부 — `OPEN-REG-05` 결정에 따라 확정.** **과세/비과세로 정의된 경계 쌍은 그 OPEN이
   [R-BASIS-04] 검증 방법 → OPEN-REG-05  조건부 표시 있음  :169
       공시하며, 과세 의미의 확정은 활성 `OPEN-REG-05`가 소유한다. **값 조건으로 고르면 그
-  [R-PROV-02] 검증 방법 → OPEN-DEC-07  조건부 표시 있음  :371
+  [R-PROV-02] 검증 방법 → OPEN-DEC-07  조건부 표시 있음  :374
       - **조건부 — `OPEN-DEC-07` 결정에 따라 확정.** legacy의 임계 **1.15**(부가세 1.10 +
-  [R-COL-02] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :827
+  [R-COL-02] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :830
       - **조건부 — `OPEN-OPS-01`의 정책 질문 결정에 따라 확정.** **분류 불가(`unknown`)를
-  [R-COL-02] 검증 방법 → OPEN-OPS-01  조건부 표시 있음  :836
+  [R-COL-02] 검증 방법 → OPEN-OPS-01  조건부 표시 있음  :839
       - **조건부 — `OPEN-OPS-01` 결정에 따라 확정.** (b) fail-safe면 "`unknown`이 재시도
-  [R-COL-03] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :857
+  [R-COL-03] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :860
       ※ 재시도 정책 자체(`unknown → retryable` 여부)는 **활성 `OPEN-OPS-01`이 소유**하며
-  [R-ASYNC-01] V2 예방 제약 → OPEN-OPS-10  조건부 표시 있음  :972
+  [R-ASYNC-01] V2 예방 제약 → OPEN-OPS-10  조건부 표시 있음  :975
       ※ DB 기반 큐의 backlog 관측·가시성 timeout 계약은 **활성 `OPEN-OPS-10`이 소유**하며
 
 === id 없이 주제가 겹치는 후보: 2건 (오탐 다수 — 사람 판정) ===
@@ -1158,10 +1195,14 @@ $ python3 openstance.py
   OPEN-SET-05: 특징어 ['재공고'] | 질문 재공고(차수 다수) 대사 대상 선택 규칙
   → 이 항목들은 **사람이 읽어 판정**한다. 기록은 evidence C-8.2.
 
-=== 3차: 사실 주장 필드의 방향·대소 주장: 2건 ===
-  [R-RATE-01] 관찰 :239  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-REG-03']
+=== 3차: 사실 주장 필드의 방향·대소 주장: 4건 ===
+  [R-BASIS-06] 관찰 :197  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-ML-02', 'OPEN-QUAL-10', 'OPEN-REG-05']
+      ~10% 낮은 투찰가가 나온다 — 이 저장소 실투찰 실격 이력과 같은 계열의 실패다."*
+  [R-RATE-01] 관찰 :242  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-REG-03']
       - **관찰**: "값이 임계치보다 크면 백분율로 보고 `/100`" 규칙과 그 임계치가 **7곳에 독립
-  [R-ML-04] 관찰 :1225  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-SET-06']
+  [R-QUAL-06] 관찰 :756  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-ML-02']
+      기반으로 교체하고 다중 그룹에서는 **누락이 가장 적은 그룹**을 대표로 쓴 것이다.
+  [R-ML-04] 관찰 :1228  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-SET-06']
       **"측정할 수 없는 편향은 없다고 주장할 수 없으므로 회피한다"** — 성숙도 임계 미만 구간
   → 방향을 말하려면 대소 관계가 정해져 있어야 한다. **사람이 읽어 판정**한다.
 ```
@@ -1186,11 +1227,11 @@ $ python3 openstance.py
 1차가 지목한 `R-COL-03`·`R-ASYNC-01`은 **이미 "활성 OPEN이 소유한다"고 적고 있어** 선점이
 아니다(축이 그렇게 표시한다).
 
-#### 축의 사각지대 — 특징어를 뽑을 수 없는 활성 OPEN 7건 (verifier F-1)
+#### 축의 사각지대 — 특징어를 뽑을 수 없는 활성 OPEN (verifier F-1 · F-4)
 
 숫자 대조를 넣어도 **`결정 필요 사항`이 짧아 특징어가 2개 미만인 활성 OPEN**은 2차가
-매칭하지 못한다. **그 목록을 축이 직접 찍게 했고**(위 출력 마지막 절) **일곱 건은 사람이
-읽어 판정했다.**
+매칭하지 못한다. **그 목록을 축이 직접 찍게 했고**(위 출력 마지막 절) **전부 사람이 읽어
+판정했다.** **셈은 여기 옮겨 적지 않는다 — 그 출력이 찍는다**(형태 6).
 
 | OPEN | 질문 | 판정 |
 | --- | --- | --- |
@@ -1198,11 +1239,12 @@ $ python3 openstance.py
 | `OPEN-COL-05` | 외부 API rate limit의 **실제 수치** | `R-COL-02`가 "rate limit/quota는 1급 카테고리, 처리는 backoff"라고만 적는다 — **수치를 고정하지 않는다** |
 | `OPEN-NOTI-06` | 알림 임계 4종의 초기값 | ledger에 **알림 임계가 없다** |
 | `OPEN-NUM-02` | 자격 관련 수치 5종 | `R-QUAL-03`의 "3건 중 1건"은 **legacy 관찰**이고 V2 요구가 아니다 |
+| `OPEN-REG-04` | **"66% 오염"의 측정 방법·모수·측정일** | ledger는 그 수치를 **사실로 승격하지 않는다** — §10.3이 `OPEN-NUM-01`과 같은 쟁점임을 적고 **승격 금지**를 유지하며, §10.4가 출처 포인터의 진전이 **해소 근거가 아님**을 명시한다. **선점 없음** (verifier F-4 — 이번 라운드의 `OPEN-REG` 제외 제거로 **새로 드러난 자리**다) |
 | `OPEN-OPS-03` | 큐 깊이 검출 SLO **임계** | `R-ASYNC-01`·`R-ASYNC-08`은 **무엇을 재는가**(큐 깊이·마지막 진행 시각)를 요구할 뿐 **임계값을 고정하지 않는다.** `R-ASYNC-01`은 DB 큐 계약을 `OPEN-OPS-10` 소유로 이미 넘긴다 |
 | `OPEN-SET-01` | 페이퍼 정산 근접 임계 3종 | ledger에 **정산 근접 임계가 없다** |
 | `OPEN-SET-05` | 재공고 대사 대상 선택 규칙 | ledger에 **재공고 대사가 없다** |
 
-**일곱 건 다 선점 없음.** 판정은 각 OPEN의 핵심어로 결정 필드를 훑어(`임계`·`rate limit`·
+**전부 선점 없음.** 판정은 각 OPEN의 핵심어로 결정 필드를 훑어(`임계`·`rate limit`·
 `업무구분` 등) 걸린 줄을 읽는 방식으로 했고, **`임계`처럼 흔한 낱말은 오탐이 많아 전부 열어
 읽었다.**
 
@@ -1281,8 +1323,10 @@ print("  → 현행은 초과 1로 적출하고 옛 판은 초과 0으로 통과
 ```
 $ python3 mutcheck.py
 변이 대상: app/services/classification/eligibility.py:53-97 → app/services/classification/eligibility.py:53-98  (ledger 안 출현 1회)
+  현행(splitlines)         --- v2 저장소 파일(legacy 검사 대상 아님): 7종 · 행 범위 초과 0 ---
   현행(splitlines)         --- 행 범위: 파일 길이 내 103 / 초과 1 ---
-  현행(splitlines)         [초과] app/services/classification/eligibility.py:53-98 (파일 97줄)  ← [('R-QUAL-07', 780)]
+  현행(splitlines)         [초과] app/services/classification/eligibility.py:53-98 (파일 97줄)  ← [('R-QUAL-07', 783)]
+  옛 판(split)             --- v2 저장소 파일(legacy 검사 대상 아님): 7종 · 행 범위 초과 0 ---
   옛 판(split)             --- 행 범위: 파일 길이 내 104 / 초과 0 ---
   → 현행은 초과 1로 적출하고 옛 판은 초과 0으로 통과시킨다.
 ```
@@ -1722,10 +1766,10 @@ $ python3 claimcheck.py ec115a7 8e6b78a
 
 ```
 $ python3 claimcheck.py ec115a7 WT
-정본: git diff ec115a7  -- docs/discovery/regression-ledger.md  (추가 줄 1393)
+정본: git diff ec115a7  -- docs/discovery/regression-ledger.md  (추가 줄 1396)
 산출물 절 81종 · 필드 어휘 15종 · evidence 3파일
 
-=== 지목 — 주장이 가리키는 대상이 그 위치에 없다 (전부 사람이 판정한다) (11건) ===
+=== 지목 — 주장이 가리키는 대상이 그 위치에 없다 (전부 사람이 판정한다) (10건) ===
 [scope.md → R-BASIS-01] 대상 `OPEN-DEC-10` 가 그 위치에 없다   ※ 부정형 어휘 포함
     주장: 등록된 소유자가 없음을 확인하고(`OPEN-DEC-10`은 예규 구간 차등으로 다른 축) **A7대로 `OPEN-REG-05`로 등록**했다.
 [scope.md → §10.1] 대상 `동반 OPEN` 가 그 위치에 없다   ※ 부정형 어휘 포함
@@ -1746,12 +1790,10 @@ $ python3 claimcheck.py ec115a7 WT
     주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`(`OPEN-DEC-07`, verifier F-1). **두 항목 다 결정 무관/조건부를 가르고 `동반 OPEN`을 달았다**(ledger §0.1이 그 필드를 **선택 필드**로 규약
 [checklist.md → R-PROV-02] 대상 `OPEN-OPS-01` 가 그 위치에 없다   ※ 부정형 어휘 포함
     주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`(`OPEN-DEC-07`, verifier F-1). **두 항목 다 결정 무관/조건부를 가르고 `동반 OPEN`을 달았다**(ledger §0.1이 그 필드를 **선택 필드**로 규약
-[commands.md → §0.3] 대상 `근거` 가 그 위치에 없다
-    주장: - **자기참조 줄 번호 검사의 예외 판정을 고쳤다**(라운드 1) — `- **근거**:` 한 항목이 여러 줄에 걸치면 legacy 행 범위 연속 표기(`:162`)를 놓쳤다.
 
 === 참고 — 대상은 있으나 이 range 가 넣은 것이 아니다 (0건) ===
 
-=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (91건: scope.md 52 · checklist.md 2 · commands.md 37) ===
+=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (94건: scope.md 52 · checklist.md 2 · commands.md 40) ===
 [scope.md] | **5. 정정을 인용 지점에 전파하지 않기** | 수치를 바꿨으면 인용 지점을 전수 확인. **자기 편집이 만든 오프셋도 대상이다** |
 [scope.md] | **6. 셈으로 전칭을 주장하기** | 전칭은 셈이 아니라 **재현 명령**으로 쓴다. `뿐`·`전부`처럼 **수를 쓰지 않는 전칭도 포함**한다. **"고쳤다"는 진술도 전칭이다 —
 [scope.md] 계열별로 나눈 이유는 **각 커밋에서 문서가 자체 정합**하기 위해서다 — 진행 중인 커밋은 "계열 N~8은 후속 커밋"을 문서 말미에 명시했고, 마지막 계열 커밋이 그 문구를 걷어냈다.
@@ -1812,6 +1854,9 @@ $ python3 claimcheck.py ec115a7 WT
 [commands.md] **"0건"은 축의 범위 안에서의 0이지 evidence 전체에 낡은 수가 없다는 뜻이 아니다.** 실제로 **사각지대 ③에 같은 부류의 실물이 살아 있었다** — C-5.1의 "현재 2
 [commands.md] - **정본이 블록에 없는 수** — 산문이 계산해 적은 파생값은 대조 대상이 없다. **C-5.1의 "현재 28종"이 그 실물이었다**(verifier M-1) — 이 라운드에 재현 명
 [commands.md] **축 자신의 결함 하나를 고쳤다**(verifier L-2): `CHK`의 두 패턴이 **같은 문자열에 함께 걸려** `checklist.md`의 한 줄을 **두 번 계상**했다. 자리
+[commands.md] - **자기참조 줄 번호 검사의 예외 판정을 고쳤다**(라운드 1) — `- **근거**:` 한 항목이 여러 줄에 걸치면 legacy 행 범위 연속 표기(`:162`)를 놓쳤다. **항목
+[commands.md] - **한글 파일명이 두 축의 사각지대였다**(verifier F-1). `d205d31`이 넣은 `` `v2-지침서.md:215-223` `` 인용에 대해 이 검사가 뒤따르는 `` `:
+[commands.md] - **`citecheck`도 같은 문자 클래스였다** — 그래서 **`v2-지침서.md:215-223`은 경로 존재도 행 범위도 어느 축이 검사하지 않았다.** 같이 넓혔고, **leg
 [commands.md] - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 · 위 스캔 명령 자신 · 이 설명이 `secret`이라는
 [commands.md] **`93ecf9e`가 그 두 줄을 지웠다.** legacy가 오류로 판정해 제거한 값을 이 문서가 되살린 셈이다. **그 정정 사실을 R-ASYNC-02의 근거에 넣었다** — 관계가
 [commands.md] 이전 판의 전칭("H1·H2 외에 인용 범위에 없는 수치는 없다")이 **자기 재현 명령의 범위를 넘었다.** 정규식이 뒤에 오는 `\w`를 전부 배제해 **한글 단위가 붙은 수를 통째로
@@ -1908,7 +1953,8 @@ $ python3 claimcheck.py ec115a7 WT
 계약을 **인용**하는 문장(주장이 아니다), ② **evidence 자신·스크립트·`_workspace` 노트**를
 대상으로 하는 수정(이 축의 위치 색인 밖이며 스크립트 쪽은 `resync.sh`의 본문 대조가 닫는다),
 ③ **대상이 이름을 갖지 않는 수정**("들여쓰기를 맞췄다" 부류). **전수 표는 만들지 않는다** —
-`openstance`의 7건과 달리 이 목록은 **판정이 필요한 미결이 아니라 축의 적용 범위 밖**이고,
+`openstance`의 사각지대 목록과 달리 이 목록은 **판정이 필요한 미결이 아니라 축의 적용
+범위 밖**이고,
 그 사실은 항목마다가 아니라 **부류로** 닫힌다.
 
 ### C-9.8 L-1 — resync의 대상 목록이 **손으로 유지되는 배열이라** 새 스크립트를 놓쳤다
@@ -1925,7 +1971,9 @@ verifier가 든 셋 전부 같은 뿌리다: `slack`이 본문·출력 **어느 
 $ bash resync.sh
 evidence 가 선언한 실행 14건 · 스크립트 10종: a3check · citecheck · claimcheck · ledgercheck · mutcheck · numsrc · openstance · prosecheck · slack · statusdiff
   [본문] 전체 블록 11 · 실행 목록이 차지한 것 10 · 발췌(실행 키 없음) 1 · 불일치 0
-  [불변] ledger 1393줄 · secret 12
+  [출력] openstance: 같은 키 2곳 — 전부 갱신
+  [출력] openstance: 같은 키 2곳 — 전부 갱신
+  [불변] ledger 1396줄 · secret 12
   [안전] 절 머리 49 → 49
 ```
 
@@ -2012,12 +2060,17 @@ for label, name, args in RUNS:
     # **빈 블록을 인덱스로 자르면 다음 블록의 여는 펜스까지 먹는다.** 그렇게 evidence
     # 세 절이 조용히 지워졌다. 비탐욕 정규식으로 **그 블록의 닫는 펜스**를 잡는다.
     pat = re.compile(r'(```\n\$ python3 ' + re.escape(label) + r'\n)(.*?)(```\n)', re.S)
-    m = pat.search(s)
-    if not m:
+    ms = list(pat.finditer(s))
+    if not ms:
         print(f"  [출력] {name}: 키 미발견"); continue
-    if m.group(2).rstrip("\n") != out:
+    # **같은 실행 키가 여러 곳에 있으면 전부 갱신한다.** 첫 매치만 채우던 동안
+    # 둘째 블록이 **영구히 빈 채로** 남았다(verifier F-2). 뒤에서부터 치환한다.
+    if len(ms) > 1: print(f"  [출력] {name}: 같은 키 {len(ms)}곳 — 전부 갱신")
+    if any(m.group(2).rstrip("\n") != out for m in ms):
         print(f"  [출력] {name}: 갱신")
-    P.write_text(s[:m.start(2)] + out + "\n" + s[m.end(2):], encoding="utf-8")
+    for m in reversed(ms):
+        s = s[:m.start(2)] + out + "\n" + s[m.end(2):]
+    P.write_text(s, encoding="utf-8")
 
 # 3) 불변 수치
 wc  = subprocess.run(["wc","-l","docs/discovery/regression-ledger.md"],capture_output=True,text=True).stdout.split()[0]
@@ -2041,7 +2094,7 @@ PY
 F-1이 조건부화한 자리는 **둘**(`R-PROV-02`의 `검증 방법` · **§10.1 fixture-curator 인계**)
 인데 **계열 A 축(C-8.2)이 지목한 것은 앞의 하나뿐**이다. 축이 `^### [RP]-` 블록의
 `V2 예방 제약`·`검증 방법` 필드만 훑고 **§10의 `- **경계값 corpus**:`는 스캔 대상이
-아니기 때문**이다. C-8.2의 사각지대 절은 **"특징어 2개 미만인 활성 OPEN 7건"**만 적었고
+아니기 때문**이다. C-8.2의 사각지대 절은 **"특징어 2개 미만인 활성 OPEN"**만 적었고
 **필드 범위 사각지대는 적지 않았다.**
 
 **내가 스스로 "하류로 나가는 자리라 이쪽이 더 중요하다"고 적은 자리가 축 밖에 있다.**
@@ -2147,11 +2200,15 @@ $ python3 openstance.py 4f4fd7f
   OPEN-SET-05: 특징어 ['재공고'] | 질문 재공고(차수 다수) 대사 대상 선택 규칙
   → 이 항목들은 **사람이 읽어 판정**한다. 기록은 evidence C-8.2.
 
-=== 3차: 사실 주장 필드의 방향·대소 주장: 3건 ===
+=== 3차: 사실 주장 필드의 방향·대소 주장: 5건 ===
   [R-BASIS-01] 사용자 영향 :84  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-QUAL-10', 'OPEN-REG-05']
       경계 근처 공고가 **한 방향으로 일관되게** 누락되거나 포함된다. 운영자에게는 "그 공고가
+  [R-BASIS-06] 관찰 :181  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-ML-02']
+      되고, 과세 공고에서는 그대로 ~10% 낮은 투찰가가 나온다. commit이 "이 저장소 실투찰 실격
   [R-RATE-01] 관찰 :224  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-REG-03']
       - **관찰**: "값이 임계치보다 크면 백분율로 보고 `/100`" 규칙과 그 임계치가 **7곳에 독립
+  [R-QUAL-06] 관찰 :738  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-ML-02']
+      기반으로 교체하고 다중 그룹에서는 **누락이 가장 적은 그룹**을 대표로 쓴 것이다.
   [R-ML-04] 관찰 :1199  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-SET-06']
       **"측정할 수 없는 편향은 없다고 주장할 수 없으므로 회피한다"** — 성숙도 임계 미만 구간
   → 방향을 말하려면 대소 관계가 정해져 있어야 한다. **사람이 읽어 판정**한다.
@@ -2164,6 +2221,49 @@ $ python3 openstance.py 4f4fd7f
 
 ```
 $ python3 openstance.py
+활성 OPEN 정본: capability-map §12 45건 + OPEN-REG 5건
+
+=== 결정 필드가 활성 OPEN을 언급하는 자리: 7건 ===
+  [R-BASIS-01] 검증 방법 → OPEN-REG-05  조건부 표시 있음  :100
+      - **조건부 — `OPEN-REG-05` 결정에 따라 확정.** **과세/비과세로 정의된 경계 쌍은 그 OPEN이
+  [R-BASIS-04] 검증 방법 → OPEN-REG-05  조건부 표시 있음  :169
+      공시하며, 과세 의미의 확정은 활성 `OPEN-REG-05`가 소유한다. **값 조건으로 고르면 그
+  [R-PROV-02] 검증 방법 → OPEN-DEC-07  조건부 표시 있음  :374
+      - **조건부 — `OPEN-DEC-07` 결정에 따라 확정.** legacy의 임계 **1.15**(부가세 1.10 +
+  [R-COL-02] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :830
+      - **조건부 — `OPEN-OPS-01`의 정책 질문 결정에 따라 확정.** **분류 불가(`unknown`)를
+  [R-COL-02] 검증 방법 → OPEN-OPS-01  조건부 표시 있음  :839
+      - **조건부 — `OPEN-OPS-01` 결정에 따라 확정.** (b) fail-safe면 "`unknown`이 재시도
+  [R-COL-03] V2 예방 제약 → OPEN-OPS-01  조건부 표시 있음  :860
+      ※ 재시도 정책 자체(`unknown → retryable` 여부)는 **활성 `OPEN-OPS-01`이 소유**하며
+  [R-ASYNC-01] V2 예방 제약 → OPEN-OPS-10  조건부 표시 있음  :975
+      ※ DB 기반 큐의 backlog 관측·가시성 timeout 계약은 **활성 `OPEN-OPS-10`이 소유**하며
+
+=== id 없이 주제가 겹치는 후보: 2건 (오탐 다수 — 사람 판정) ===
+  [R-BASIS-01] ~ OPEN-QUAL-10  공통어: ['basis', '운영자']
+  [R-COL-01] ~ OPEN-ML-05  공통어: ['policy', 'versioned']
+
+=== 2차가 매칭할 수 없는 활성 OPEN: 8건 (특징어 2개 미만) ===
+  OPEN-COL-03: 특징어 ['업무구분'] | 질문 업무구분 코드 전체 체계(현재 4개만 매핑)
+  OPEN-COL-05: 특징어 ['limit'] | 질문 외부 API rate limit의 실제 수치
+  OPEN-NOTI-06: 특징어 ['초기값'] | 질문 알림 임계 4종의 초기값
+  OPEN-NUM-02: 특징어 ['unknown'] | 질문 자격 관련 수치 5종(92% unknown 포함)
+  OPEN-OPS-03: 특징어 [] | 질문 큐 깊이 검출 SLO (**임계 미결**)
+  OPEN-REG-04: 특징어 ['측정일'] | 질문 **"66% 오염"의 측정 방법·모수·측정일**
+  OPEN-SET-01: 특징어 ['페이퍼'] | 질문 페이퍼 정산 근접 임계 3종의 도출 근거
+  OPEN-SET-05: 특징어 ['재공고'] | 질문 재공고(차수 다수) 대사 대상 선택 규칙
+  → 이 항목들은 **사람이 읽어 판정**한다. 기록은 evidence C-8.2.
+
+=== 3차: 사실 주장 필드의 방향·대소 주장: 4건 ===
+  [R-BASIS-06] 관찰 :197  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-ML-02', 'OPEN-QUAL-10', 'OPEN-REG-05']
+      ~10% 낮은 투찰가가 나온다 — 이 저장소 실투찰 실격 이력과 같은 계열의 실패다."*
+  [R-RATE-01] 관찰 :242  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-REG-03']
+      - **관찰**: "값이 임계치보다 크면 백분율로 보고 `/100`" 규칙과 그 임계치가 **7곳에 독립
+  [R-QUAL-06] 관찰 :756  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-ML-02']
+      기반으로 교체하고 다중 그룹에서는 **누락이 가장 적은 그룹**을 대표로 쓴 것이다.
+  [R-ML-04] 관찰 :1228  ★ 전제 확인 필요  엮인 활성 OPEN: ['OPEN-SET-06']
+      **"측정할 수 없는 편향은 없다고 주장할 수 없으므로 회피한다"** — 성숙도 임계 미만 구간
+  → 방향을 말하려면 대소 관계가 정해져 있어야 한다. **사람이 읽어 판정**한다.
 ```
 
 **남은 둘은 오탐이며 근거는 이렇다.**
