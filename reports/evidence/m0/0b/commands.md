@@ -148,19 +148,18 @@ $ python3 citecheck.py docs/discovery/regression-ledger.md
 === 인용 추출 ===
 경로 인용 112종 · commit 인용 26종
 
---- 경로: 존재 101 / 부재 11 ---
+--- 경로: 존재 102 / 부재 10 ---
   [부재] reports/evidence/m0/0b/scope.md:None  ← [(None, 3)]
   [부재] milestone-0.md:None  ← [(None, 5), ('R-PROV-01', 315)]
   [부재] summary.py:None  ← [(None, 33)]
   [부재] reports/evidence/m0/0a2/decisions.md:None  ← [(None, 45)]
   [부재] reports/evidence/m0/0b/commands.md:None  ← [(None, 59)]
   [부재] 0a2/decisions.md:None  ← [('R-BASIS-01', 82), ('R-RATE-03', 252), ('R-RATE-05', 298)]
-  [부재] prediction_dataset.py:None  ← [('R-PROV-01', 306)]
   [부재] fixtures/manifest.yaml:None  ← [('R-PROV-07', 432)]
   [부재] commands.md:None  ← [('R-FLOOR-06', 577), ('R-QUAL-07', 738)]
   [부재] data-extract.md:None  ← [('R-COL-06', 857), ('R-ML-07', 1221)]
   [부재] capability-map.md:None  ← [('R-ML-09', 1267), ('R-ML-09', 1303), ('R-ML-09', 1314)]
---- 행 범위: 파일 길이 내 101 / 초과 0 ---
+--- 행 범위: 파일 길이 내 102 / 초과 0 ---
 
 --- commit: legacy 25종 / 이 저장소(v2) 1종 ---
   [v2 — legacy 검사 대상 아님] ec115a7
@@ -436,7 +435,7 @@ $ python3 ledgercheck.py
   없음
 
 === 인용 형식: 파일명만 쓴 것(전체 경로 아님) — 계열 본문 한정 ===
-  {'prediction_dataset.py': [306]}
+  없음
 
 === 이 문서 자기참조 줄 번호 (legacy 행 범위 연속 표기 제외) ===
   없음
@@ -759,9 +758,7 @@ for eid, v, l in flag:
 
 ```
 $ python3 numsrc.py
-=== 인용 범위에서 찾지 못한 수치: 7건 (전부 사람 판정 대상) ===
-[R-PROV-01] 6
-    - **관찰**: `base_amount`의 66%가 실제 기초금액이 아니라는 수치가 **앱 코드 6곳**에
+=== 인용 범위에서 찾지 못한 수치: 6건 (전부 사람 판정 대상) ===
 [R-PROV-01] 7
     복제돼 있고 **테스트까지 넣으면 7곳**이다(재현: `git grep -n -E '66(\.2)?%' ed4b06c -- '*.py'`).
 [R-FLOOR-05] 4
