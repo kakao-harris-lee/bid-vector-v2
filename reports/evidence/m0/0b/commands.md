@@ -175,7 +175,7 @@ $ python3 citecheck.py docs/discovery/regression-ledger.md
   [ok] milestone-0.md:None (파일 126줄)  ← [(None, 5), ('R-PROV-01', 342)]
   [ok] v2-지침서.md:None (파일 355줄)  ← [(None, 45), ('R-BASIS-03', 141)]
   [ok] reports/evidence/m0/0a2/decisions.md:None (파일 490줄)  ← [(None, 46)]
-  [ok] reports/evidence/m0/0b/commands.md:None (파일 2453줄)  ← [(None, 60)]
+  [ok] reports/evidence/m0/0b/commands.md:None (파일 2555줄)  ← [(None, 60)]
   [ok] data-extract.md:None (파일 165줄)  ← [('R-COL-06', 908), ('R-ML-07', 1283)]
   [ok] v2-지침서.md:215-223 (파일 355줄)  ← [('R-ASYNC-06', 1096)]
 --- 경로: 존재 104 / 부재 5 ---
@@ -1769,7 +1769,7 @@ $ python3 claimcheck.py ec115a7 WT
 정본: git diff ec115a7  -- docs/discovery/regression-ledger.md  (추가 줄 1396)
 산출물 절 81종 · 필드 어휘 15종 · evidence 3파일
 
-=== 지목 — 주장이 가리키는 대상이 그 위치에 없다 (전부 사람이 판정한다) (10건) ===
+=== 지목 — 주장이 가리키는 대상이 그 위치에 없다 (전부 사람이 판정한다) (11건) ===
 [scope.md → R-BASIS-01] 대상 `OPEN-DEC-10` 가 그 위치에 없다   ※ 부정형 어휘 포함
     주장: 등록된 소유자가 없음을 확인하고(`OPEN-DEC-10`은 예규 구간 차등으로 다른 축) **A7대로 `OPEN-REG-05`로 등록**했다.
 [scope.md → §10.1] 대상 `동반 OPEN` 가 그 위치에 없다   ※ 부정형 어휘 포함
@@ -1778,6 +1778,8 @@ $ python3 claimcheck.py ec115a7 WT
     주장: `R-BASIS-04`의 같은 잔재 두 자리(`검증 방법`·`관찰`)도 **값 조건**(`낙찰하한율 × 기초금액 > 추정가격`)으로 바꿨다 — **값 조건으로 고르면 그 OPEN에 의존하지 않는다.**
 [scope.md → R-BASIS-04] 대상 `동반 OPEN` 가 그 위치에 없다   ※ 부정형 어휘 포함
     주장: `검증 방법`은 **결정 무관**(basis 태그가 다른 값 쌍, **어느 쪽이 크다는 전제 없음**)과 **조건부**(과세/비과세 경계 쌍은 그 OPEN이 닫힌 뒤)로 나누고 **`동반 OPEN`**을 달았다.
+[scope.md → R-QUAL-06] 대상 `OPEN-REG-05` 가 그 위치에 없다
+    주장: **둘 다 고쳤다** — `DIR`을 넓히고(**관측된 뒤의 확장이며 지목을 늘리는 방향**), 그 자리에 **legacy commit 본문의 인용임을 문면에 드러내고** 과세 의미·차이 크기가 `OPEN-REG-05` 소유임을 명시했다.
 [checklist.md → §0.1] 대상 `OPEN-OPS-01` 가 그 위치에 없다   ※ 부정형 어휘 포함
     주장: **계열 A로 두 건이 적출돼 조건부화했다** — `R-COL-02`(`OPEN-OPS-01`, Codex 1차)와 `R-PROV-02`(`OPEN-DEC-07`, verifier F-1). **두 항목 다 결정 무관/조건부를 가르고 `동반 OPEN`을 달았다**(ledger §0.1이 그 필드를 **선택 필드**로 규약
 [checklist.md → §0.1] 대상 `OPEN-DEC-07` 가 그 위치에 없다   ※ 부정형 어휘 포함
@@ -1793,7 +1795,7 @@ $ python3 claimcheck.py ec115a7 WT
 
 === 참고 — 대상은 있으나 이 range 가 넣은 것이 아니다 (0건) ===
 
-=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (96건: scope.md 52 · checklist.md 2 · commands.md 42) ===
+=== 위치 특정 불가 — 축이 닫지 않는다. 사람이 읽는다 (98건: scope.md 54 · checklist.md 2 · commands.md 42) ===
 [scope.md] | **5. 정정을 인용 지점에 전파하지 않기** | 수치를 바꿨으면 인용 지점을 전수 확인. **자기 편집이 만든 오프셋도 대상이다** |
 [scope.md] | **6. 셈으로 전칭을 주장하기** | 전칭은 셈이 아니라 **재현 명령**으로 쓴다. `뿐`·`전부`처럼 **수를 쓰지 않는 전칭도 포함**한다. **"고쳤다"는 진술도 전칭이다 —
 [scope.md] 계열별로 나눈 이유는 **각 커밋에서 문서가 자체 정합**하기 위해서다 — 진행 중인 커밋은 "계열 N~8은 후속 커밋"을 문서 말미에 명시했고, 마지막 계열 커밋이 그 문구를 걷어냈다.
@@ -1846,6 +1848,8 @@ $ python3 claimcheck.py ec115a7 WT
 [scope.md] - **L-C4**: `head_sha` 서술이 한 절 안에서 frontmatter와 어긋났다 — 이 라운드가 커밋을 넷 냈고 값을 두 번 옮겼기 때문이다. 그 사실을 적었다.
 [scope.md] **승인된 지침서를 직접 열었다** — `v2-지침서.md:222-223`(§4.5, `:215-223`)이 side effect를 port 뒤에 두고 **재시도를 멱등성 key와 함께
 [scope.md] **Codex의 판정이 맞다.** A3의 판정 기준은 **머리표가 아니라 "무엇이 실제로 막히는가"**다 — 검사가 통과해도 막으려는 사건이 그대로 일어나면 형태만 갖춘 것이다. `a3c
+[scope.md] **세 자리를 맞췄다** — C-5.1의 오탐 판정 bullet · 같은 절의 한계 서술 · `checklist.md` A6 셀에 **그 칸이 `d205d31` 시점에 근거와 어긋나 있었
+[scope.md] **F-1·F-4는 형태 5**(정정·확장을 그것에 기대던 자리에 전파하지 않기)이고, **F-2는 형태 4**에 인접하며 처방은 도구 쪽에 넣었다. **F-3은 medium #1과 같은
 [checklist.md] | 축의 경계 | **C-8.3** — `citecheck`가 파일 길이를 **1 크게** 세고 있었다(trailing newline). **앞 라운드는 산문만 고치고 인라인 본문을 안
 [checklist.md] **`R-ASYNC-06`을 지침서 요구에 맞춰 고쳤다** — `v2-지침서.md:222-223`(§4.5)이 side effect를 port 뒤에 두고 **재시도를 멱등성 key와 함께
 [commands.md] **필터를 길이 7 이상의 16진수로 바꿨고**(존재 여부는 `git`이 판정한다) 재실행 결과가 C-2.1이다. **커버리지 22/26 → 26/26**이며 그중 legacy 25종은
