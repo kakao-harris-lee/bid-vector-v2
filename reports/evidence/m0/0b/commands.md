@@ -105,7 +105,9 @@ for (p, rng), where in cites.items():
     if p not in tree:
         # 저장소 밖 파일(이 저장소 자신의 문서 등)은 제외 후보로 표시
         bad_path.append((p, rng, where)); continue
-    n = len(git("show", f"{REF}:{p}").stdout.split("\n"))
+    # `split("\n")` 은 trailing newline 때문에 실제 줄 수보다 **1 크다**
+    # (`"one\n".split("\n")` → 2). 그만큼 이 축이 마지막 줄 +1 까지 통과시켰다.
+    n = len(git("show", f"{REF}:{p}").stdout.splitlines())
     if rng:
         for part in rng.split(","):
             a = part.split("-"); lo = int(a[0]); hi = int(a[-1]) if len(a)>1 else lo
@@ -1086,6 +1088,27 @@ $ python3 openstance.py
 
 `citecheck`가 파일 길이를 `len(stdout.split("\n"))`으로 계산해 **trailing newline 때문에
 실제보다 1 컸다.** `splitlines()`로 고쳤다.
+
+> **정정 (verifier F-0, blocker) — 앞 라운드는 고치지 않고 고쳤다고 적었다.**
+> `splitlines()` 치환이 **산문에만** 들어갔고 **인라인된 스크립트 본문은 그대로**였다
+> (`2619974`의 같은 줄과 바이트 동일). **evidence가 도구의 상태를 사실과 다르게
+> 말한 것**이라 그 위에 쌓인 "행 범위 초과 0"의 근거가 흔들렸다.
+> **§10.1 형태 6의 정면 위반**이며 — `"고쳤다"는 진술도 전칭이다. 적기 전에 그 지점을
+> 열어 확인한다` — **내가 앞 라운드에 세운 규칙이다.**
+>
+> **원인은 resync 루프가 「출력」만 갱신하고 「본문」은 갱신하지 않은 것**이다. 이번에
+> **본문 동기화를 그 루프에 넣었고**(`resync.sh`), **인라인된 여섯 스크립트를 실물과
+> 전수 대조**했다 — **어긋난 것은 `citecheck` 하나뿐**이고 나머지 다섯
+> (`ledgercheck`·`numsrc`·`prosecheck`·`statusdiff`·`openstance`)은 **바이트 동일**이었다.
+>
+> **변이 검사로 고침을 실증했다** — `eligibility.py:53-97`을 `:53-98`(파일 끝 +1)로 바꾸면
+> **현행 본문은 `초과 1`로 적출**하고 **옛 본문은 `초과 0`으로 통과**시킨다:
+>
+> ```
+> 현행(splitlines): 행 범위: 파일 길이 내 103 / 초과 1
+>   [초과] app/services/classification/eligibility.py:53-98 (파일 97줄)  ← [('R-QUAL-07', 754)]
+> 옛 버전(split)  : 행 범위: 파일 길이 내 104 / 초과 0
+> ```
 
 **그 틈을 실제로 쓴 인용이 있었는지 재 봤다** — 인용 끝과 파일 끝의 여유를 전수로 계산:
 
