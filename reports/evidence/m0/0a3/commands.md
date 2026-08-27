@@ -141,12 +141,10 @@ $ git diff 48151b9...HEAD -- docs/discovery/capability-map.md | grep -cE '^\+.*\
 ## C-3. X-1 프레이밍 스윕 — 정정이 어디까지 갔고 어디서 멈췄나
 
 ```
-### 실행 시점 HEAD = 74132ea
+### 실행 시점 HEAD = 491684f
 
---- C-3.1 X-1 프레이밍 스윕 (in_scope 두 파일) ---
+--- C-3.1 in_scope 두 파일의 X-1 단정 스윕 (패턴 한정) ---
 $ grep -nE 'ex-VAT|VAT·사정률만큼' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-130 | sed 's/[[:space:]]*$//'
-docs/discovery/capability-map.md:1373:- **분류 근거**: 투찰율이 곱해지는 base는 추정가격(ex-VAT)이 아니라 기초금액/사업금액
-docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_es
 reports/evidence/m0/0a2/decisions.md:40:| 「OPEN-STR-01」 절 안의 2026-08-27 정정 블록(**slice 0A3 · X-1**) | **slice 산물** — legacy **사실 서술
 reports/evidence/m0/0a2/decisions.md:59:| `144` · `147` | 「OPEN-STR-01」 | **정정** — **X-1**: `budget_estimate`의 ex-VAT 단정과 차이의 크기·방
 reports/evidence/m0/0a2/decisions.md:144:    `strategy.min|max_budget_estimate`. `Project.budget_estimate`는 ~~추정가격(ex-VAT)이다~~
@@ -156,6 +154,8 @@ reports/evidence/m0/0a2/decisions.md:157:    >   ex-VAT라고도 VAT 포함이�
 reports/evidence/m0/0a2/decisions.md:158:    >   소유한다. 원본에 대해 남는 것은 **「ex-VAT」라는 단정에 근거가 없다**는 것까지다.
 reports/evidence/m0/0a2/decisions.md:168:    > - **차이가 "VAT·사정률만큼"이라고 말할 근거가 없다.** legacy 자신이 저장된 값의
 reports/evidence/m0/0a2/decisions.md:186:    >   "fix(m0-0b): budget_estimate의 ex-VAT 단정을 제거 (0C 선행 조사 X-1)"에서 정정했고,
+docs/discovery/capability-map.md:1373:- **분류 근거**: 투찰율이 곱해지는 base는 추정가격(ex-VAT)이 아니라 기초금액/사업금액
+docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_es
 
 --- C-3.2 원본 보존 확인 (줄 번호가 아니라 내용으로 집는다) ---
 $ awk '/^  - legacy는 운영자 값을 \*\*추정가격\*\*과 비교한다:/,/^    >   > \*\*2차 정정 /' reports/evidence/m0/0a2/decisions.md
@@ -188,15 +188,27 @@ docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-d
 docs/discovery/regression-ledger.md:82:    `OPEN-QUAL-10`은 **시공능력평가금액 축**이라 이 질문의 소유자가 아니다.
 docs/discovery/regression-ledger.md:1345:| **OPEN-REG-05** | **기초금액과 추정가격의 과세 처리 — 두 금액의 차이가 무엇으로 이루어지는가** | l
 
---- C-3.4 §13 밖에 남은 X-1 프레이밍 (O-2, 여전히 out_of_scope) ---
-$ grep -nE '추정가격.{0,12}(ex-VAT|부가세 별도)' docs/discovery/capability-map.md
-1373:- **분류 근거**: 투찰율이 곱해지는 base는 추정가격(ex-VAT)이 아니라 기초금액/사업금액
-1929:  - 기초금액(사업금액)과 추정가격(부가세 별도)을 **다른 행**으로 싣는다. 한 라벨로 묶지
-$ for L in 1373 1929; do awk -v L=$L 'NR<=L && /^## /{h=$0} NR==L{print L" → "h}' docs/discovery/capability-map.md; done
-1373 → ## 5. 축 5 — 투찰 판단과 근거 (DEC)
-1929 → ## 6. 축 6 — 알림 / 보고서 (NOTI)
-$ git diff --numstat 48151b9...HEAD -- docs/discovery/capability-map.md   # 위 두 줄이 diff 밖임은 C-2.2 의 지목이 낸다
-1	1	docs/discovery/capability-map.md
+--- C-3.4 X-1 프레이밍 후보 스윕 (capability-map.md 전체 · O-2, out_of_scope) ---
+$ BLK4=$(python3 - <<'EOF'
+import re
+F = chr(96) * 3                     # 리터럴 백틱 세 개를 이 파일에 넣지 않는다
+s = open("reports/evidence/m0/0a3/commands.md", encoding="utf-8").read()
+b = [m.group(1) for m in re.finditer(F + r"python\n(.*?)" + F, s, re.S)
+     if "X-1 프레이밍 후보 스윕" in m.group(1)]
+assert len(b) == 1, "marker 블록이 유일하지 않다: %d" % len(b)
+print(b[0], end="")
+EOF
+)
+$ printf %s "$BLK4" | python3 -
+[ 3.] :978  - **분류**: `V2 필수` — **분할 확정** (운영자 결정 2026-08-26), `OPEN-QUAL-08` 해소. **시공능력평가액은 자격 축**(공고가 게시하는 요건), **
+[ 5.] :1373  - **분류 근거**: 투찰율이 곱해지는 base는 추정가격(ex-VAT)이 아니라 기초금액/사업금액 (과세 공고면 VAT 포함)이며, 해석 결과가 금액만이 아니라 **출처 라벨과 비교
+[ 6.] :1929  - 기초금액(사업금액)과 추정가격(부가세 별도)을 **다른 행**으로 싣는다. 한 라벨로 묶지 않는다.
+[ 6.] :1931  - 투찰률은 **낙찰하한율과 basis가 같은 기초금액 기준 율만** 싣는다. 추정가격 기준 율을 하한 옆에 두면 **과세 공고에서 하한 여유가 부풀어 보인다**(관찰된 회귀).
+[ 6.] :1938  - 과세 공고 보고서에서 기초금액과 추정가격이 서로 다른 행으로 표시된다.
+[ 7.] :2187  | F-4 | 율 결측 시 폴백 분모를 추정가격으로 잡으면 과세 공고에서 약 10% 어긋난다 | 금액에 basis를 타입으로 붙인다(DEC-01) |
+[12.] :2998  | OPEN-QUAL-10 | **시공능력평가금액 비교에 쓰는 두 금액의 unit·basis·과세 처리·기준 시점** — 공고 게시 요건(`cnstrtnAbltyEvlAmtList`)과
+[12.] :3088  | `OPEN-QUAL-10` (신설) | 라운드 1이 시공능력평가금액 요건과 운영자 보유액의 **직접 비교를 확정**했는데 그 두 금액의 **unit·basis·과세 처리·기준 시점**
+[13.] :3171  | 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_estimate`(**추정
 
 --- C-3.5 decisions.md 전수 표 ↔ 훅 1:1 ---
 $ git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md | grep -E '^@@'
@@ -227,12 +239,16 @@ $ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut 
 
 **판정**:
 
-- **C-3.1** — **위 출력이 낸 매치는 in_scope 안에서 전부** ① **취소선 안**(원본 보존)
-  ② **정정 블록이 무엇을 고쳤는지 설명하는 산문** ③ **provenance 표가 이 정정을 등재한
-  행** ④ **§13 정정문이 원문을 인용한 자리** 중 하나다 — **그 넷 중 어느 것도 살아 있는
-  단정이 아니다.** **§13 밖에 살아 있는 단정이 하나 남아 있고**(§5 DEC-01), 그것은
-  **out_of_scope**라 이 slice가 고치지 않았다 — **어느 줄인지는 C-3.4가 찍는다**
-  (`scope.md` **O-2**). **좌표를 여기 옮겨 적지 않는다** — 편집마다 밀린다.
+- **C-3.1** — **이 출력의 매치에 한정한 판정이다**(패턴은 `ex-VAT|VAT·사정률만큼`이고
+  in_scope 두 파일만 본다 — **문서 전체에 대한 주장이 아니다**). **그 매치는 전부**
+  ① **취소선 안**(원본 보존) ② **정정 블록이 무엇을 고쳤는지 설명하는 산문**
+  ③ **provenance 표가 이 정정을 등재한 행** ④ **§13 정정문이 원문을 인용한 자리** 중
+  하나이며 **그 넷 중 어느 것도 살아 있는 단정이 아니다.**
+- **C-3.1의 사각지대** — **이 패턴은 X-1 프레이밍을 다 잡지 못한다.** `부가세 별도`처럼
+  **어휘가 다른 자리**를 놓치고 **`capability-map.md` 전체를 보지도 않는다.**
+  **문서 전체의 정본은 C-3.4**이며, 거기 **살아 있는 X-1 프레이밍이 남아 있다**
+  (out_of_scope · `scope.md` **O-2**). **자리도 수도 여기 옮겨 적지 않는다** — C-3.4의
+  출력과 그 아래 판정 표가 낸다.
 - **C-3.2** — 원본 두 문장이 **지워지지 않고 취소선으로 보존**됐고 바로 아래 정정 인용
   블록이 붙었다. `decisions.md`의 provenance 원칙(*"원본 문장은 지우지 않는다"*)을
   지킨다(**A2**).
@@ -240,10 +256,31 @@ $ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut 
   서술이 **ledger와 §13 양쪽에** 있다. **두 문서가 같은 말을 한다** — 0B verifier F-2가
   적출한 자기모순(*"한 자리에서 소유한다, 다른 자리에서 소유자가 아니다"*)이 재발하지
   않는다.
-- **C-3.4** — **§5 DEC-01과 §6 NOTI 보고서 계약에 살아 있는 X-1 프레이밍이 남아 있다.**
-  팀 리드 지시의 *"두 파일에 남아 있다"*가 **완결 주장으로는 참이 아니다.**
-  **고치지 않았다** — in_scope가 *"§13 X-1 서술 한정"*이라 건드리면 C-2가 낸 구조적
-  불변이 깨진다. `scope.md` **O-2**로 등재했다.
+- **C-3.4** — **이 축이 `capability-map.md` 전체에 대한 정본이다.** 어휘를 가리지 않고
+  (`ex-VAT` · `부가가치세` · `부가세` · `VAT` · `과세`) **줄이 아니라 블록**으로 본다 —
+  한 문장이 여러 줄에 걸치면 줄 grep 이 놓치기 때문이다(0B 가 "창 밖" 미탐으로 두 번 태운
+  자리다). **후보와 자리는 위 출력이 내고 여기 옮겨 적지 않는다.**
+  **판정은 기계가 못 한다** — *"이 블록이 이 문서의 단정인가, 귀속된 인용인가"*는 정본을
+  계산할 수 없다. **후보 전건을 사람이 읽고 아래 표에 근거와 함께 남긴다**(0B C-1 의 두 축
+  구분). **판정 축**: *"`capability-map.md`가 **자기 목소리로** ① `추정가격`을 부가세
+  제외로 **단정**하거나 ② 두 금액의 차이를 **과세로 설명하거나 크기를 정량화**하는가."*
+
+| 후보(절) | 판정 | 근거 |
+| --- | --- | --- |
+| §3 QUAL | **제외** | `추정가격` 언급이 **조달청 문서 정의의 귀속 인용**이다(*"같은 문서가 다른 금액 필드에는 단위·과세를 명시하므로(예: …)"*). 이 문서의 단정이 아니라 **다른 필드의 무주석이 규약 누락임을 보이는 근거**다 |
+| §5 DEC | **포함 — 부가세 제외 단정** | *"투찰율이 곱해지는 base는 추정가격(**ex-VAT**)이 아니라 기초금액/사업금액(**과세 공고면 VAT 포함**)"* — 자기 목소리다 |
+| §6 NOTI(승계 계약, 금액 라벨) | **포함 — 부가세 제외 단정** | *"기초금액(사업금액)과 추정가격(**부가세 별도**)"* |
+| §6 NOTI(승계 계약, 투찰률) | **포함 — 과세로 차이의 방향을 설명** | *"추정가격 기준 율을 하한 옆에 두면 **과세 공고에서 하한 여유가 부풀어 보인다**"* — 방향까지 말한다 |
+| §6 NOTI(acceptance) | **포함 — 과세를 전제** | *"**과세 공고** 보고서에서 기초금액과 추정가격이 서로 다른 행으로 표시된다"* — 무엇이 두 금액을 가르는지를 과세로 잡는다 |
+| §7 SET(SET-09 F-4) | **포함 — 과세 + 정량** | *"폴백 분모를 추정가격으로 잡으면 **과세 공고에서 약 10% 어긋난다**"*. **0B ledger `R-BASIS-06`이 같은 주장에 ※를 달아 `OPEN-REG-05` 소유로 돌린 그 문장**인데 여기엔 그 귀속이 없다 |
+| §12(두 자리) | **제외** | `OPEN-QUAL-10` registry 행의 **조달청 문서 귀속 인용** |
+| §13 | **제외** | **이 slice의 정정문이 원문을 인용**한 자리다. 그 행은 고쳐졌다 |
+
+- **C-3.4 판정 요약** — **살아 있는 X-1 프레이밍은 §5 · §6 · §7에 걸쳐 남아 있다.**
+  **부가세 제외 단정**과 **과세로 차이를 설명·정량화하는 서술** 두 갈래이며,
+  **자리와 수는 위 출력과 판정 표가 내고 산문에 옮겨 적지 않는다.**
+  **전부 out_of_scope다** — in_scope가 *"§13 X-1 서술 한정"*이고 건드리면 C-2가 낸 구조적
+  불변이 깨진다. `scope.md` **O-2**로 등재했고 **0C 데이터 사전이 정본**이 된다.
 - **C-3.5** — 위 두 출력이 **1:1로 대응**한다 — `git diff -U0 6a4e49b`가 낸 훅 하나하나가
   전수 표의 행으로 설명된다. **표에는 인접 훅을 한 행으로 묶는 자리가 있다** — 파일 머리 ·
   `OPEN-DEC-09` · 이 slice가 더한 X-1 정정. **어느 훅인지는 위 awk 출력이 낸다.**
@@ -254,6 +291,54 @@ $ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut 
 > 다음 편집에 다시 낡는다. 표의 설계(훅 번호 ↔ 행)를 바꾸는 것은 이 slice의 위임 범위
 > 밖이라 **번호는 유지하고 「정본은 명령의 출력」임을 표 아래에 명시**했으며,
 > **셈(*"네 자리뿐"*)만 지웠다**(0B verifier `N-1` 처방). `scope.md` **O-3**.
+
+---
+
+### C-3.4의 스윕 본문 (형태 4 — 이름으로만 부르지 않는다)
+
+**`EXTRACT`는 C-4.1이 쓰는 것과 같은 방식이다** — 줄 번호가 아니라 **marker로 블록을
+집고** `assert`로 유일성을 확인한 뒤 stdin 으로 흘려 넣는다. **커밋되지 않은 스크립트
+파일에 의존하지 않는다.**
+
+```python
+# X-1 프레이밍 후보 스윕 — capability-map.md 전체 (0A3 C-3.4).
+#
+# 기계가 하는 일: 후보를 좁혀 「절 · 시작 줄 · 블록 본문」으로 찍는다.
+#   - 어휘 하나에 기대지 않는다(ex-VAT · 부가가치세 · 부가세 · VAT · 과세).
+#   - 줄이 아니라 **블록**을 본다 — 한 문장이 여러 줄에 걸치면 줄 grep 은 놓친다
+#     (0B 가 "창 밖" 미탐으로 두 번 태운 자리다).
+# 기계가 못 하는 일: "이 블록이 이 문서의 단정인가, 귀속된 인용인가"의 판정.
+#   → 후보 전건을 사람이 읽고 아래 판정 표에 근거와 함께 남긴다
+#     (0B C-1 의 두 축 구분: 정본이 있는 축은 기계, 없는 축은 사람).
+import re
+
+CM = "docs/discovery/capability-map.md"
+lines = open(CM, encoding="utf-8").read().split("\n")
+
+AMT = re.compile(r'추정가격|budget_estimate')
+TAX = re.compile(r'ex-VAT|부가가치세|부가세|VAT|과세')
+NEW = re.compile(r'^(#{1,6} |\s*[-*] |\s*\d+\. |\|)')      # 새 블록이 시작되는 형태
+
+blocks, cur, start, sec, sec_at = [], [], 1, "", ""
+for i, l in enumerate(lines, 1):
+    if l.startswith("## "):
+        sec = l[3:].strip()
+    if NEW.match(l) or not l.strip():
+        if cur:
+            blocks.append((sec_at, start, cur))
+        cur, start, sec_at = ([l], i, sec) if l.strip() else ([], i, sec)
+    else:
+        if not cur:
+            start, sec_at = i, sec
+        cur.append(l)
+if cur:
+    blocks.append((sec_at, start, cur))
+
+for sec_at, start, body in blocks:
+    t = " ".join(x.strip() for x in body)
+    if AMT.search(t) and TAX.search(t):
+        print(f"[{sec_at.split(' ')[0]:>3}] :{start}  {t[:104].rstrip()}")
+```
 
 ---
 
