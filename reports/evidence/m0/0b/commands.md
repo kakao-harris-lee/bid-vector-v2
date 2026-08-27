@@ -351,11 +351,14 @@ print("\n=== 이 문서 자기참조 줄 번호 (legacy 행 범위 연속 표기
 self_ref = []
 for i, l in enumerate(lines[body_start:], body_start + 1):
     for m in re.finditer(r'(?<![\w/.])`:(\d+)(?:-\d+)?`', l):
-        head = l[:m.start()]
-        prev = lines[i - 2] if i >= 2 else ""
-        if re.search(r'`[A-Za-z0-9_./-]+\.(py|md):[\d,\-]+`[^`]*$', head) or \
-           re.search(r'`[A-Za-z0-9_./-]+\.(py|md):[\d,\-]+`', head) or \
-           re.search(r'`[A-Za-z0-9_./-]+\.(py|md):[\d,\-]+`', prev):
+        # legacy 파일의 두 번째 이후 행 범위(`path.py:1-2`, `:3-4`, `:5`)는 §0.3의 예외다.
+        # 한 `- **근거**:` 항목이 여러 줄에 걸치므로 **그 항목 시작까지 거슬러** 본다 —
+        # 직전 한 줄만 보면 줄바꿈이 끼었을 때 놓친다(이전 판이 그랬다).
+        ctx = [l[:m.start()]]
+        for k in range(i - 2, max(-1, i - 8), -1):
+            ctx.append(lines[k])
+            if re.match(r'^- \*\*', lines[k]): break
+        if any(re.search(r'`[A-Za-z0-9_./-]+\.(py|md):[\d,\-]+`', c) for c in ctx):
             continue
         self_ref.append((i, m.group(0)))
 print("  없음" if not self_ref else f"  {self_ref}")
@@ -385,6 +388,19 @@ $ python3 ledgercheck.py
   판정 불가: 2
   legacy에 이미 있는 예방책: 1
 
+=== 사용자 영향 '판정 불가' ===
+  R-RATE-01: **`판정 불가`.** `(1.5, 2.0]` 구간의 오해석이 정산 백테스트에서 몇 건을
+  R-RATE-02: **`판정 불가`** — 남은 콜사이트가 실제로 잘못된 답을 냈다는 관측이 없다.
+  R-RATE-03: **`판정 불가`.** 이 경로로 잘못된 점수가 운영자에게 갔다는 관측이 없다.
+  R-RATE-05: **`판정 불가`** — 실제로 한쪽만 바뀌어 사고가 났다는 기록이 없다.
+  R-PROV-05: **관측된 직접 영향 없음.** 두 축의 provenance가 같은 문자열로 저장돼
+  R-FLOOR-07: 표본이 **149건이면 판정 불가, 150건이면 판정된다.** 그 경계에 도메인
+  R-QUAL-02: **관측된 피해 없음(잠재).** 데이터가 아직 그 형태를 만들지 않았을 뿐이며
+  R-COL-02: **`판정 불가`.** 코드 경로는 확정적으로 읽히지만 **실제로 이 경로가 429를
+  R-ASYNC-02: **관측된 피해 없음(잠재).** 상수 하나를 바꾸면 재발 방지선이 조용히
+  R-ML-07: **관측된 피해 없음.** 다만 이 golden들은 **회귀 검출 장치이지 정답 판정
+  R-ML-08: **관측된 피해 없음.** 그러나 계약의 근거가 "현재 구현들의 교집합"이면
+
 === id 중복 ===
   없음
 
@@ -397,10 +413,12 @@ $ python3 ledgercheck.py
 
 - **계열 8이 10인 것은 P-ML-01을 포함**하기 때문이다. **회귀는 9건**이고 합계 60에
   들어간다 — 스크립트가 그 분해를 직접 찍는다.
-- **상태 분포 합 61** = 27 + 31 + 2 + 1. `판정 불가` 2건은 **상태 축**의 판정 불가
-  (R-BASIS-07 · R-PROV-01)이며, **사용자 영향 축**의 판정 불가는 그보다 많다(아래).
-- **선행 조사의 §0.1 요약 표(수정됨 29 · 잔존 28 · 판정 불가 3)와 다르다. 그러나 0B가
-  판정을 바꾼 것은 아니다** — 아래 C-5.3이 그 경위다.
+- **상태 분포 합 61**. `판정 불가` 2건은 **상태 축**(R-BASIS-07 · R-PROV-01)이며
+  **사용자 영향 축**은 그보다 많다(C-5.3).
+- **자기참조 줄 번호 검사의 예외 판정을 고쳤다**(이번 라운드) — `- **근거**:` 한 항목이
+  여러 줄에 걸치면 legacy 행 범위 연속 표기(`:162`)를 놓쳤다. **항목 시작까지 거슬러
+  보게** 바꿨다.
+- **선행 조사 §0.1 요약 표와 다르다. 그러나 0B가 판정을 바꾼 것은 아니다** — C-5.2.
 
 ### C-5.2 선행 조사 §0.1 요약 표가 자기 항목과 어긋난다 (0B 발견)
 
@@ -501,7 +519,7 @@ $ git diff --check ec115a7...HEAD | wc -l
 $ git status --porcelain -- docs/discovery/regression-ledger.md reports/evidence/m0/0b/ | wc -l
 0
 $ wc -l docs/discovery/regression-ledger.md
-1263 docs/discovery/regression-ledger.md
+1300 docs/discovery/regression-ledger.md
 ```
 
 - secret 스캔 매치는 **전부 자기참조**다 — `scope.md`의 A6 문장 · `checklist.md`의 A6 행 ·
