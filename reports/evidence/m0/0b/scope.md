@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0b-regression-ledger
 base_sha: ec115a7   # 0A2 Codex approve verdict 등재 직후
-head_sha: 23b811bd0a6588ef446d398f62b6b954ad5f5e8e   # 0B 산출물·evidence 최종 커밋. 아래 「완료 기록」 참조
+head_sha: d952f9fa2fa4ad7f6f22dbc7e72eb6504a30536c   # 0B 산출물·evidence 최종 커밋. 아래 「완료 기록」 참조
 in_scope:
   - docs/discovery/regression-ledger.md
   - reports/evidence/m0/0b/
@@ -172,7 +172,7 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 검증 판정 `not-ready`. **A1·A3·A4·A5·A6·A7은 pass**이고 **미충족은 A2 하나** —
 이 slice의 핵심 축이다.
 
-- `head_sha`를 `36a66f6` → `23b811b`로 갱신했다. 이전과 같은 이유로 그 직전 커밋을
+- `head_sha`를 `36a66f6` → `d952f9f`로 갱신했다. 이전과 같은 이유로 그 직전 커밋을
   가리키며, 두 커밋의 차이는 이 파일의 `head_sha` 한 줄과 이 절뿐이다.
 - **리뷰 range는 `ec115a7...<현재 HEAD>`**. **in_scope 밖 변경 없음**이며
   `capability-map.md`는 여전히 건드리지 않았다.
