@@ -1349,6 +1349,10 @@ $ grep -rn 'services/collection_jobs' docs/discovery/capability-map.md reports/e
 - 실제 경로는 `app/tasks/collection_jobs.py`이나 **`app/services/collection_jobs.py`
   인용은 in_scope 산출물·evidence에 들어와 있지 않다.** 0A 노트(`_workspace/`)는 이 slice
   범위 밖이므로 **손대지 않았다.**
+- **재실행 주의**: 위 grep은 `reports/evidence/m0/0a2/`를 훑으므로 **이 절이 커밋된 뒤로는
+  이 기록 자신이 매치된다**(R11-4 본문 2줄과 `scope.md` C-4 행). "매치 없음"은 **정정 전
+  상태**의 결과다. 산출물·evidence에 실제 인용이 없음을 다시 보려면 이 절과 `scope.md`
+  「Codex 송부 전」 절을 제외하고 읽으면 된다 — 스윕 기록들과 같은 자기참조다.
 
 ### R11-5. F3-1 · §10.1 형태 판단
 
