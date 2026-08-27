@@ -1,0 +1,35 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "6af7019996ec26903c7b531ed7ede12c22cf176e",
+  "reviewed_head": "f790e193efbcc8b62e81f73a0622b5c956310928",
+  "findings": [],
+  "commands_run": [
+    "git status --porcelain=v2 --untracked-files=all",
+    "git rev-parse HEAD && git cat-file -t 6af7019996ec26903c7b531ed7ede12c22cf176e && git cat-file -t f790e193efbcc8b62e81f73a0622b5c956310928",
+    "git log --oneline --decorate --graph 6af7019996ec26903c7b531ed7ede12c22cf176e..f790e193efbcc8b62e81f73a0622b5c956310928",
+    "git diff --name-status 6af7019996ec26903c7b531ed7ede12c22cf176e...f790e193efbcc8b62e81f73a0622b5c956310928",
+    "git diff --stat 6af7019996ec26903c7b531ed7ede12c22cf176e...f790e193efbcc8b62e81f73a0622b5c956310928",
+    "git diff --check 6af7019996ec26903c7b531ed7ede12c22cf176e...f790e193efbcc8b62e81f73a0622b5c956310928",
+    "git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md",
+    "git ls-files 'reports/evidence/m0/0a2/codex-review-*.json'",
+    "sed -n '521,549p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "sed -n '924,1081p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "sed -n '719,739p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "sed -n '1565,1670p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "git archive 4f8c247953603aefe8916bcb829af3acc230cea6 | tar -x -C <temporary-directory>; 해당 스냅샷에서 numsweep/enumsweep/sweep46/inv2 재실행",
+    "python3 - <<'PY' ... base/head 활성 OPEN id 집합 양방향 대조 ... PY",
+    "grep -rniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))' docs/discovery/",
+    "wc -l docs/discovery/capability-map.md reports/evidence/m0/0a2/{checklist,commands,decisions,scope}.md"
+  ],
+  "residual_risks": [
+    "worktree에 legacy bid-vector 저장소가 없어 legacy 파일·commit·운영 수치 인용은 이번 환경에서 독립 재현하지 못했다.",
+    "gitignore된 _workspace 원본 결정표가 없어 2026-08-26 운영자 기록과 최초 커밋 사본의 축어 동일성은 검증하지 못했다. 저장소 안에서는 6a4e49b 이후 provenance 훅 10개가 선언 목록과 일치했다.",
+    "활성 OPEN 45건은 정상적으로 남아 있다. M1 진행에는 milestone-0.md에 따라 사용자의 명시적 승인이 별도로 필요하다.",
+    "evidence의 수치·열거 스윕은 역사 서술과 자기참조를 다수 후보로 내는 휴리스틱이다. 현재 정본 집계와 고정 커밋 출력은 재현됐지만 스윕 자체가 결함 부재를 증명하지는 않는다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high"
+  }
+}
