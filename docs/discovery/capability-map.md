@@ -87,14 +87,17 @@ capability는 `- **Acceptance scenario**` — 절이 capability의 일부만 덮
 (3) capability가 아닌 **설계 입력 절**(OPS-00)은 bullet이 아닌 `**Acceptance scenario**`
 문단 제목을 쓴다. 형식 위반·모순 전수 스윕은 이 세 형식을 **모두** 대상으로 한다.
 
-현재 조건부 항목을 가진 capability는 **6개**다 — QUAL-03(`OPEN-QUAL-11`),
+현재 조건부 항목을 가진 capability는 **7개**다 — QUAL-03(`OPEN-QUAL-11`),
 QUAL-11(`OPEN-QUAL-09` · `OPEN-QUAL-10`), ML-03(`OPEN-ML-03`),
-NOTI-04(`OPEN-NOTI-01` · `OPEN-NOTI-08`), **OPS-06(`OPEN-OPS-10`)**, OPS-09(`OPEN-OPS-01`). 이 목록은 §12의
+**NOTI-02(`OPEN-NOTI-09`)**, NOTI-04(`OPEN-NOTI-01` · `OPEN-NOTI-08`),
+**OPS-06(`OPEN-OPS-10`)**, OPS-09(`OPEN-OPS-01`). 이 목록은 §12의
 OPEN이 해소될 때 함께 갱신한다.
 
-**0A2 라운드 5에 2개가 늘었다**(3 → 5) — Codex 4차 리뷰가 QUAL-11의 확정 서술이 활성
-`OPEN-QUAL-09`의 한 분기를 선점한다고 지적했고(high #1), 같은 라운드에 신설한
-`OPEN-QUAL-10`·`OPEN-QUAL-11`도 조건부로 분리했다. **결정되지 않은 것을 확정 서술로
+**0A2 라운드 5에 2개가 늘었고**(3 → 5) **라운드 7에 1개가 더 늘었다**(5 → 6). 라운드 5는
+Codex 4차 리뷰가 QUAL-11의 확정 서술이 활성 `OPEN-QUAL-09`의 한 분기를 선점한다고
+지적해(high #1) 신설 `OPEN-QUAL-10`·`OPEN-QUAL-11`과 함께 조건부로 분리했고, 라운드 7은
+Codex 5차 high #1로 **OPS-06**(`OPEN-OPS-10`)을, 그 완결에서 verifier F7-4로
+**NOTI-02**(`OPEN-NOTI-09`)를 추가해 **7개**가 됐다. **결정되지 않은 것을 확정 서술로
 채우는 대신 조건부로 남기는 것이 이 규약의 목적이다.**
 
 **2026-08-26 운영자 결정으로 3개가 조건부에서 확정으로 전환됐다**(§12.2) —
@@ -3083,7 +3086,7 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-ML-04` | **넣는다** — 정산 관측 시각을 canonical fact로. 함께 확정: "미정산"을 `0`으로 적재하지 않는다 | `#367`에서 게이트 홀드아웃이 가장 미성숙한 구간(정산 41.5%)에 앉았을 때 편향 방향을 타임스탬프 부재로 **측정 불가**였고 그래서 회피(embargo)를 택했다(commit `5d38ac1`). 사후 회고가 아니라 사건 시점의 판정 근거 | 확정. 0C 데이터 사전이 컬럼과 채움 경로를 정의. SET-06의 "현재 스키마로 측정 불가" 전제가 풀린다 |
 | `OPEN-NUM-04` | **(a)** ML 출력 수치는 전부 `legacy-behavior`, 입력 형태·경계 조건만 `observed`로 승격. **승격되는 것은 형태이지 건수가 아니다** — "69행"·"91.9%"·"n=1,405" 같은 모수는 fixture에 인용하지 않는다 | `data-extract.md` §1의 계층 정의와 일치. 사용자 판단이 아니라 문서가 이미 정한 분류였다 | 확정 |
 | `OPEN-QUAL-06` | **(a)** 분포 재측정 없이 `Uncertain`을 sealed subtype으로 분해한다. 비율은 V2 운영 관측으로 산출 | `v2-지침서.md` §4.2가 `Uncertain(reasons)` 구조화를 이미 요구한다. 분포는 분해 **여부**를 바꾸지 않고 우선순위만 바꾼다 | 확정. **사유 enum은 legacy evidence 문자열 이식이 아니라 도메인 명세가 먼저 정한다**(ML-11.4 F7). scout 노트의 4분류는 후보이지 확정 목록이 아니다 |
-| `OPEN-DEC-08` | **(b)** legacy `clean` 라벨을 V2 corpus에 승계하지 않는다. write provenance를 갖고 새로 수집·판정한 행만 clean으로 인정하고, legacy 유래 행은 provenance 미상으로 격리 | 런북 자신이 "legacy 데이터만으로는 오염 행과 정상 clean 행을 구분할 수 없다"고 적는다 — 표식이 값이 아니라 **write 경로**인데 legacy엔 provenance가 없다 | 확정. 후속 확인: 런북의 3,982건 코호트 쿼리가 legacy DB 접근 없이 재현되면 (a)로 좁힌다 |
+| `OPEN-DEC-08` | **(b)** legacy `clean` 라벨을 V2 corpus에 승계하지 않는다. write provenance를 갖고 새로 수집·판정한 행만 clean으로 인정하고, legacy 유래 행은 provenance 미상으로 격리 | 런북 자신이 "legacy 데이터만으로는 오염 행과 정상 clean 행을 구분할 수 없다"고 적는다 — 표식이 값이 아니라 **write 경로**인데 legacy엔 provenance가 없다 | 확정. 후속 확인: 런북의 3,982건 코호트 쿼리가 legacy DB 접근 없이 재현되면 (a)로 **좁힌다** — 결정 (b)는 그 자체로 완결이고 (a)는 근거가 생기면 범위를 줄이는 선택지다. **`OPEN-DEC-03`처럼 다시 열리는 잠정이 아니므로 활성 복원 대상이 아니다** |
 | ~~`OPEN-OPS-07`~~ **← 라운드 5에 활성으로 복원(§12.1)** | **(a) 조회 착수.** 판정 기준은 "최신 버전"이 아니라 M1에서 고정할 **Kotlin 2.x + Spring Boot 3.x 조합과의 호환** | `v2-지침서.md` §5 | ~~실행 대기~~ → **활성 복원.** 조사는 완료(`ops07-library-survey.md`)이나 **종료 조건인 ADR 대안 절 기입이 미완**이므로 해소로 계상할 수 없다(Codex 4차 medium #5). **이 행은 결정 내용의 기록으로만 남고, OPEN 상태는 G6의 활성 항목이다** |
 | `OPEN-STR-07` | **단일 회사.** 다중 operator를 V2 범위에 두지 않는다 | 운영자 답(운영 인원 1인과는 별개 축으로 확인). 정합 근거: 스키마 16개 테이블이 per-operator인데 주기 스케줄러가 operator를 순회하지 않고(`strategy_scheduler.py:63-81`→`orchestration.py:174-184`), 현존하는 "다른 operator"는 고객사가 아니라 백테스트용 가상 회사다(`synthetic_custom_operator.py:1-22`) | 확정. **하류 주의**: per-operator 스키마를 단일 회사 전제로 단순화할지는 별개 설계 결정이며 0C·M1 소관이다. 조용한 소유권 재할당이 실제 오염을 낸 이력이 있다(commit `fc291c7`) |
 | `OPEN-STR-11` | **닫힘 — `OPEN-STR-07` 결정에 따라.** 대화형 채널 전략 편집은 단일 회사 결정과 함께 정리된다 | 결정표가 STR-07 → STR-11 **순서 의존**으로 묶은 항목이다 | 확정(연쇄). STR-11 블록의 `채택 시 요구되는 관찰 가능 동작` 형식은 유지 — 채택 여부가 아니라 **범위**가 정해졌다 |

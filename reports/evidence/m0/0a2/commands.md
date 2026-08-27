@@ -609,7 +609,7 @@ Codex high #1(`OPS-06`)과 #2(`OPEN-DEC-03`)가 **같은 부류**다: **활성 O
 **1단계 인벤토리 — 규모**
 
 ```
-$ python3 inventory.py    # 활성 OPEN × 종속 지점
+$ python3 inventory.py    # 활성 OPEN × 종속 지점  (재판정 **착수 시점** — 복원·신설 전)
 활성 OPEN: 43건
 본문(§12 이전) 참조 없는 활성 OPEN (= anchorless): 5
   ['OPEN-COL-01','OPEN-COL-05','OPEN-NUM-03','OPEN-QUAL-05','OPEN-SET-08']
@@ -696,3 +696,102 @@ $ git diff --check 6af7019 -- docs reports | wc -l
 - 조건부 묶음 **8개 / capability 6개**(§0.5 목록과 일치) + 잠정 1. `:72`는 규약 정의문이다.
 - **`git diff --check` 0** — Codex residual이 보고한 Markdown 제목 6곳의 trailing
   whitespace를 제거했다(제목 뒤 두 칸 → 빈 줄로 문단 분리).
+
+---
+
+## 2026-08-27 — 라운드 7 완결: 활성 OPEN 46건 전수 인용 스윕 (verifier F7-1~F7-9)
+
+라운드 7 재검증에서 **복원한 항목의 인용 지점을 안 고친 것**이 차단 사유였다
+(F7-1 · F7-2). **라운드 6 F-2와 글자 그대로 같은 형태이며 세 번째 재발**이다 —
+`checklist.md` §10.1 **형태 5**를 자기 복원 항목에 적용하지 않았다.
+
+### R7C-1. 절차 — 형태 5를 문장이 아니라 실행으로
+
+문장으로 둔 규칙이 세 번을 못 막았으므로 **스크립트로 만들었다.** 아래를 임의 경로에
+저장하고 저장소 루트에서 `python3 <경로>`로 실행하면 재현된다.
+
+```python
+"""활성 OPEN 46건 전수 인용 스윕.
+각 id의 모든 매치를 훑어 '해소' 계열 어휘와 같은 줄에 있는 것을 적출한다.
+라운드별 이력 절의 그 시점 값은 제외 대상이 아니라 '판정 대상'이며,
+살아 있는 현재 상태 주장인지는 사람이 읽고 정한다."""
+import re, subprocess, sys, glob
+FILES=["docs/discovery/capability-map.md"]+sorted(glob.glob("reports/evidence/m0/0a2/*.md"))
+cm=open(FILES[0],encoding="utf-8").read()
+active=sorted(set(re.findall(r'^\|\s*(OPEN-[A-Z]+-\d+)\s*\|', cm, re.M)))
+RESOLVED=re.compile(r'해소|해소됐|결번|~~')
+total=0; flagged=[]
+for oid in active:
+    for f in FILES:
+        for i,l in enumerate(open(f,encoding="utf-8").read().split("\n"),1):
+            if oid not in l: continue
+            total+=1
+            if RESOLVED.search(l):
+                flagged.append((oid,f,i,l.strip()[:150]))
+print(f"활성 OPEN: {len(active)}건 | 전체 매치: {total}건")
+print(f"'해소/결번/취소선' 어휘와 같은 줄에 있는 매치: {len(flagged)}건 (판정 대상)")
+for oid,f,i,l in flagged:
+    print(f"\n[{oid}] {f}:{i}\n   {l}")
+```
+
+**판정 기준**: 매치가 그 항목의 **현재 상태(활성/해소)와 정합하는가**. 라운드별 이력 절의
+그 시점 값은 **정확한 기록이므로 제외 대상이 아니라 판정 대상**이고, 판정 축은
+**"살아 있는 현재 상태 주장인가"**다.
+
+### R7C-2. 실행 결과
+
+```
+$ python3 sweep46.py
+활성 OPEN: 46건 | 전체 매치: 378건
+'해소/결번/취소선' 어휘와 같은 줄에 있는 매치: 51건 (판정 대상)
+```
+
+- **51건 전수를 읽고 판정했다. 불일치 0건.**
+- 스윕이 evidence 파일도 훑으므로 **이 기록 자체가 매치에 포함된다.** 위 수치는 라운드 7
+  완결 최종 상태 기준이다(기록을 쓰기 전 중간 측정은 363/47이었다 — 늘어난 15/4건은
+  이 절과 §10.1 절차 본문이다).
+- 내역: `DEC-03`·`DEC-07` 13건(전부 활성 복원 서술 또는 라운드 이력) · `OPS-03` 8건
+  (전부 "해소하지 않았다") · `OPS-07` 11건(복원·활성·이력) · `STR-12` 5건(§9.1이
+  "미해소"로 적음) · `QUAL-09` 3건(신설 사유) · `NUM-03` 1건(`SET-07`이 여기로 통합된
+  것이지 `NUM-03`이 해소된 것이 아니다) · 나머지 6건은 처리 기록.
+
+### R7C-3. 절차 유효성 — 수정 **전** 상태에서 F7-1·F7-2가 잡히는가
+
+```
+$ git show HEAD:docs/discovery/capability-map.md > /tmp/pre.md   # 수정 전
+$ python3 - <<'PY'   # 같은 판정 규칙, '복원' 없는 줄만
+[OPEN-DEC-03] :3017  | ~~OPEN-DEC-03~~ | **운영자 결정 2026-08-26로 해소** — …
+[OPEN-DEC-07] :1410  신뢰 비율 1.15의 마진 0.05는 V2 코퍼스에서 **재유도**한다(`OPEN-DEC-07` 해소,
+[OPEN-DEC-07] :3016  | ~~OPEN-DEC-07~~ | **운영자 결정 2026-08-26로 해소** — …
+```
+
+- exit: 0. **F7-1(§12.1 결번 표 2행)과 F7-2(DEC-02 본문 1행)가 정확히 적출된다.**
+  절차가 이 부류를 잡는다는 것이 실증됐다.
+- **F7-1·F7-2 외 추가 불일치는 0건**이다.
+
+### R7C-4. 불변 재확인 — 라운드 7 완결 HEAD
+
+```
+$ python3 inv2.py
+분류: {'V2 필수': 61, '근거 부족': 12, '폐기': 6, '후속': 16} = 95
+형식 위반: none
+V2 필수 사용자 가치/acceptance 결측: none
+중복 id: none
+§12 활성 OPEN: 46
+
+$ grep -c "^| OPEN-" docs/discovery/capability-map.md
+46
+
+$ grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" docs/discovery/ | wc -l
+       3
+
+$ git diff --check 6af7019 HEAD | wc -l
+       0
+
+$ wc -l docs/discovery/capability-map.md
+    3144 docs/discovery/capability-map.md
+```
+
+- exit: 0. **집계는 하나도 바뀌지 않았다** — 이 완결은 상태 정합과 절차 기록만 했다.
+- 조건부 묶음 **9개 / capability 7개**(F7-4로 NOTI-02 추가) + 잠정 1. §0.5 목록과 일치한다.
+- `capability-map.md` 3,133 → **3,144줄**.
