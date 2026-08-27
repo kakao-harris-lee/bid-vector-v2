@@ -1,0 +1,56 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6af7019996ec26903c7b531ed7ede12c22cf176e",
+  "reviewed_head": "210ec5ad41bab5e06e2680cca4094362ce80f0fe",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a2/checklist.md",
+      "line": 70,
+      "evidence": "A3 증명은 STR-16 acceptance를 6항목이라고 단정하고 6개만 열거하지만, 현재 authoritative 본문 `docs/discovery/capability-map.md:729-744`에는 금액 범위 검색의 basis 일치 항목(`:738-741`)을 포함한 7항목이 있다. 본문의 basis 항목은 raw numeric의 unit/basis 손실을 막는 핵심 계약인데 evidence가 이를 누락하므로, A3 및 evidence 사실성 대조가 현재 head와 일치하지 않는다.",
+      "required_fix": "A3의 acceptance 개수와 목록을 현재 STR-16 본문과 맞춰 7항목으로 고치고, 금액 범위 검색의 선언된 basis 및 비교 대상 basis 일치 조건을 명시하라."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a2/checklist.md",
+      "line": 213,
+      "evidence": "규격 산출물 목록은 `codex-review-*.json`이 2건이라고 기록하고 두 파일만 열거한다. 그러나 `git ls-files 'reports/evidence/m0/0a2/codex-review-*.json'`의 현재 head 결과는 4건이며, 누락된 파일은 `codex-review-20260827T015140Z.json`과 `codex-review-20260827T021632Z.json`이다. 최신 head의 append-only 리뷰 이력을 포괄한다고 주장하는 evidence inventory가 실제 커밋 범위와 불일치한다.",
+      "required_fix": "현재 head에 커밋된 리뷰 JSON 4건을 모두 정확한 파일명과 라운드/판정으로 열거하고 건수를 4건으로 갱신하라."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/discovery/capability-map.md",
+      "line": 1855,
+      "evidence": "NOTI-05 본문은 바로 앞에서 at-most-once가 2026-08-26 운영자 결정으로 확정되고 `OPEN-NOTI-02`가 해소됐다고 적지만(`:1842-1847`), 같은 capability에서 다시 `정책 미확정`이라며 사용자 합의 근거가 없다고 단정한다(`:1855-1857`). 이는 authoritative `decisions.md:312-319` 및 §12.2의 확정 기록(`capability-map.md:3141`)과 정면으로 모순된다. 결정 통합 후에도 과거 미결 서술이 남아 retry/멱등성 정책의 확정 상태를 한 문서 안에서 양립 불가능하게 만든다.",
+      "required_fix": "NOTI-05의 과거 미결 서술을 제거하거나 역사적 조사 상태와 현재 확정 상태를 명확히 구분하고, `OPEN-NOTI-02` 운영자 결정 및 §12.2와 모순 없이 정렬하라."
+    }
+  ],
+  "commands_run": [
+    "git status --porcelain=v2 --untracked-files=all",
+    "git rev-parse HEAD && git cat-file -e 6af7019996ec26903c7b531ed7ede12c22cf176e^{commit} && git cat-file -e 210ec5ad41bab5e06e2680cca4094362ce80f0fe^{commit}",
+    "git log --oneline --decorate --graph 6af7019996ec26903c7b531ed7ede12c22cf176e..210ec5ad41bab5e06e2680cca4094362ce80f0fe",
+    "git diff --name-status 6af7019996ec26903c7b531ed7ede12c22cf176e...210ec5ad41bab5e06e2680cca4094362ce80f0fe && git diff --stat 6af7019996ec26903c7b531ed7ede12c22cf176e...210ec5ad41bab5e06e2680cca4094362ce80f0fe",
+    "git diff --check 6af7019996ec26903c7b531ed7ede12c22cf176e...210ec5ad41bab5e06e2680cca4094362ce80f0fe",
+    "git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md | grep -E '^@@'",
+    "git log --oneline -S'capability QUAL-11의 `OPEN-QUAL-08` 포인터' -- reports/evidence/m0/0a2/decisions.md",
+    "sed -n '521,549p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "sed -n '719,739p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "sed -n '924,1081p' reports/evidence/m0/0a2/commands.md | python3 -",
+    "git ls-files 'reports/evidence/m0/0a2/codex-review-*.json' | wc -l",
+    "grep -c '^| OPEN-' docs/discovery/capability-map.md && wc -l docs/discovery/capability-map.md",
+    "rg -n -C 3 '정책 미확정|OPEN-NOTI-02|at-most-once' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md",
+    "rg -n -i '(api[_-]?key|secret|token|password|private[_-]?key)' docs/discovery/capability-map.md reports/evidence/m0/0a2 reports/evidence/m0/0a/commands.md"
+  ],
+  "residual_risks": [
+    "직전 4차 finding은 해소됐다. `decisions.md`의 선언된 10개 provenance hunk와 실제 `git diff -U0 6a4e49b`의 10개 hunk가 일치하고, OPEN-QUAL-08 포인터는 slice 추가분으로 표시됐다.",
+    "현재 재실행 결과는 capability 95개, 분류 61/17/6/11, 활성 OPEN 45개이며 G1~G6 분포는 3/7/15/8/7/5다. base 대비 활성 OPEN은 26개 소멸·5개 신설로 재현됐다. 활성 OPEN의 존속 자체는 finding으로 판정하지 않았다.",
+    "`commands.md`가 기준으로 선언한 `3ec50fbe14abd9233aa64f979582dbd5f6bae82e`에서 numsweep 209/128, OPEN sweep 45/369/52, 문서 3176행이 재현됐다. 최신 head의 numsweep 213/129 증가는 G분포 튜플 등 후속 기록을 숫자 인용으로 포착하는 보수적 false positive를 포함한다.",
+    "이 worktree에는 저장소 밖 legacy `bid-vector`가 없어 legacy 파일·커밋·수치 인용은 독립 재현하지 못했다. 이를 그 자체로 결함 판정하지 않았다.",
+    "활성 OPEN 중 M0 blocker로 표시된 OPEN-OPS-07과 M1 blocker로 표시된 OPEN-DEC-03/OPEN-DEC-07은 후속 사용자 명시 승인 또는 규정된 해소 절차가 필요하다. `docs/adr/` 부재는 현재 slice 범위에서 결함으로 판정하지 않았다.",
+    "이번 판정은 merge, 외부 호출, DB write, release 또는 배포 승인이 아니다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol"
+  }
+}

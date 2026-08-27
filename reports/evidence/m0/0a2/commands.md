@@ -1536,3 +1536,224 @@ $ wc -l docs/discovery/capability-map.md
   값이 달라지며 그 값은 그 절에 적는다(medium #2가 지적한 형태를 되풀이하지 않는다).
 - **산출물 `capability-map.md`는 건드리지 않았다** — `1fc5968` 이후 무변경, **3,176줄**.
 - 살아 있는 현재 값 주장의 신규 불일치 **0건**. id 축 **불일치 0**.
+
+---
+
+## 2026-08-27 — Codex 8차 대응: **형태 6 전수 적용** (medium 3건)
+
+Codex 5차 리뷰 판정 `request_changes` — **blocker 0 / high 0 / medium 3**. 직전 1건은
+해소 판정됐고(provenance 훅 10개 일치·`OPEN-QUAL-08` 표시 확인, 기준 `3ec50fb`에서
+numsweep 209/128 · OPEN sweep 45/369/52 · 3,176행 재현). verdict는
+`codex-review-20260827T024238Z.json`(등재, append-only).
+
+**#1·#2는 형태 6의 인스턴스다.** 직전 라운드가 형태 6을 신설하면서 `decisions.md`
+provenance **한 곳에만** 적용하고 evidence 전수를 돌리지 않았다 — **축을 만들면 그 축으로
+전수를 훑는다**는, 이 slice가 형태 5로 네 번 배운 것을 되풀이했다. §10.1 형태 6에
+**재발 1회**로 기록했다.
+
+### R13-1. 형태 6 스윕 — 정의와 스크립트 (형태 4 — 인라인)
+
+**수치 축(`numsweep`)과 대상이 다르다.** 수치 축은 **집계**(활성 OPEN 수, 분류 4종 …)를
+보고, 이것은 **열거**를 본다 — `N항목`·`N건`·`N종`처럼 **목록을 동반하는 셈**이 실제 열거
+대상 수와 맞는가다. 정본은 산출물·저장소에서 직접 계산한다.
+
+**정본을 만들 수 없으면 주장하지 않는다** — acceptance 블록에 `결정 무관`/`조건부`/`잠정`
+묶음이 있으면 2-space bullet 셈이 **항목 수가 아니라 묶음 수**이므로 그 capability는
+대조 대상에서 뺀다(현재 평면 블록 60개만 정본이 있다).
+
+```python
+# 형태 6 스윕 — "셈으로 전칭을 주장하기"의 전수 적용.
+# 수치 축(numsweep)은 *집계*를 본다. 이것은 *열거*를 본다 — "N항목/N건/N종…"이
+# 목록·열거를 동반하는 자리에서, 그 N이 실제 열거 대상 수와 맞는지 본다.
+# 정본은 산출물·저장소에서 직접 계산한다.
+import re, glob, subprocess, collections
+CM = "docs/discovery/capability-map.md"
+EV = sorted(glob.glob("reports/evidence/m0/0a2/*.md"))
+cm = open(CM, encoding="utf-8").read().split("\n")
+
+# ---------- 정본 ----------
+# 1) capability별 acceptance 항목 수
+ACC_HEAD = re.compile(r'^\s*-?\s*\*\*(Acceptance scenario|채택 시 요구되는 관찰 가능 동작)')
+acc = {}
+starts = [i for i, l in enumerate(cm) if l.startswith("### ")]
+for n, st in enumerate(starts):
+    e = starts[n+1] if n+1 < len(starts) else len(cm)
+    cid = cm[st][4:].strip().split(" ")[0]
+    body = cm[st:e]
+    idx = [k for k, l in enumerate(body) if ACC_HEAD.match(l)]
+    if not idx: continue
+    k = idx[0] + 1; cnt = 0; grouped = False
+    while k < len(body):
+        l = body[k]
+        if re.match(r'^- ', l): break          # 다음 최상위 bullet에서 종료
+        if re.search(r'\*\*(결정 무관|조건부 —|잠정 —)', l): grouped = True
+        if re.match(r'^  - ', l): cnt += 1     # acceptance 항목은 2-space bullet
+        k += 1
+    # 묶음(결정 무관 / 조건부 / 잠정)이 있는 블록은 2-space 셈이 '묶음 수'라
+    # 항목 수의 정본이 되지 못한다. 정본을 만들 수 없으면 주장하지 않는다.
+    acc[cid] = None if grouped else cnt
+# 2) verdict JSON
+vj = subprocess.run(["git","ls-files","reports/evidence/m0/0a2/codex-review-*.json"],
+                    capture_output=True, text=True).stdout.split()
+# 3) decisions.md provenance 훅
+hunks = [l for l in subprocess.run(
+    ["git","diff","-U0","6a4e49b","--","reports/evidence/m0/0a2/decisions.md"],
+    capture_output=True, text=True).stdout.split("\n") if l.startswith("@@")]
+# 4) decisions.md 최상위 절 수
+dsec = [l for l in open("reports/evidence/m0/0a2/decisions.md",encoding="utf-8") if l.startswith("## ")]
+# 5) evidence 파일 수
+GT = {"verdict JSON": len(vj), "provenance 훅": len(hunks),
+      "decisions.md ## 절": len(dsec), "evidence .md 파일": len(EV)}
+print("=== 정본 (저장물에서 직접 계산) ===")
+for k, v in GT.items(): print(f"  {k}: {v}")
+print(f"  acceptance 항목 수: 평면 블록 {sum(1 for v in acc.values() if v is not None)}개 산출 (예: STR-16={acc.get('STR-16')})")
+print()
+
+# ---------- 대조 ----------
+CHK = [
+ # acceptance 항목 수: 줄에 등장하는 capability id의 정본과 대조(일반화)
+ ("acceptance 항목 수", None, None, None, None),
+ ("verdict JSON 건수", lambda l: "codex-review-*.json" in l or ("codex-review" in l and "존재" in l),
+  re.compile(r'\*{0,2}(\d{1,2})\s*건'), lambda m: int(m.group(1)), len(vj)),
+ ("provenance 훅 수", lambda l: "훅" in l and "provenance" not in l.lower(),
+  re.compile(r'훅\s*\*{0,2}(\d{1,2})\s*개'), lambda m: int(m.group(1)), len(hunks)),
+]
+bad = []; tot = 0
+# capability id. `OPEN-NOTI-02` 같은 OPEN id의 꼬리를 capability로 읽지 않는다.
+CAPID = re.compile(r'(?<!OPEN-)\b([A-Z]{2,4}-\d{2})\b')
+ITEM  = re.compile(r'\*{0,2}(\d{1,2})\s*항목')
+for f in EV:
+    cur = None                                # 절 안에서 마지막으로 언급된 capability
+    for i, l in enumerate(open(f, encoding="utf-8").read().split("\n"), 1):
+        if l.startswith("## "): cur = None     # 절이 바뀌면 초기화
+        found = [c for c in CAPID.findall(l) if c in acc]
+        if found: cur = found[-1]
+        # acceptance 항목 수 — 줄이 capability id를 명시할 때만
+        for m in ITEM.finditer(l):
+            ids = [c for c in CAPID.findall(l) if c in acc]
+            if not ids and cur:              # 줄에 없으면 절 안의 직전 capability
+                ids = [cur]
+            if len(ids) == 1 and acc.get(ids[0]) is not None:
+                tot += 1
+                if int(m.group(1)) != acc[ids[0]]:
+                    bad.append(("acceptance 항목 수(%s)" % ids[0], f, i,
+                                int(m.group(1)), acc[ids[0]], l.strip()[:150]))
+        for name, filt, rx, ex, exp in CHK:
+            if exp is None or filt is None or not filt(l): continue
+            for m in rx.finditer(l):
+                tot += 1
+                if ex(m) != exp: bad.append((name, f, i, ex(m), exp, l.strip()[:150]))
+print(f"=== 계산 가능한 열거 주장 대조 ===\n추출 {tot}건 | 불일치 {len(bad)}건\n")
+for n, f, i, g, e, l in bad:
+    print(f"[{n}] {f}:{i}  추출={g} 정본={e}\n   {l}\n")
+
+# ---------- 광역 후보 스캔 ----------
+UNIT = re.compile(r'(?<![.\d])(\d{1,3})\s*(항목|종|곳|건|개|행|줄)')
+ENUM = ("—", "·", ":", "다음", "아래", "열거", "전부", "뿐")
+cand = collections.Counter(); rows = []
+for f in EV:
+    for i, l in enumerate(open(f, encoding="utf-8").read().split("\n"), 1):
+        if not any(t in l for t in ENUM): continue
+        for m in UNIT.finditer(l):
+            cand[m.group(2)] += 1
+            rows.append((f, i, m.group(0), l.strip()[:120]))
+print(f"=== 광역 후보(열거 동반 셈) : {sum(cand.values())}건 ===")
+print("  단위별:", dict(cand))
+```
+
+### R13-2. 실행 결과
+
+```
+$ python3 enumsweep.py
+=== 정본 (저장물에서 직접 계산) ===
+  verdict JSON: 5
+  provenance 훅: 10
+  decisions.md ## 절: 10
+  evidence .md 파일: 4
+  acceptance 항목 수: 평면 블록 60개 산출 (예: STR-16=7)
+
+=== 계산 가능한 열거 주장 대조 ===
+추출 13건 | 불일치 5건
+
+=== 광역 후보(열거 동반 셈) : 448건 ===
+  단위별: {'줄': 32, '행': 32, '종': 19, '건': 295, '항목': 8, '곳': 18, '개': 35}
+```
+
+**광역 후보 수는 이 절을 담은 커밋 기준**이다 — 스윕이 evidence 자신을 훑으므로 기록을
+쓰면 늘어난다(형태 6의 규칙대로 기준을 못박는다). **계산 가능한 대조의 13/5는 정본과의
+대조라 그 성질이 없다.**
+
+**두 겹으로 돌렸다.** ① **계산 가능한 열거**는 정본과 자동 대조하고, ② **광역 후보**는
+`N항목|N건|N종|N개|N행|N곳|N줄`이 열거 어휘(`—`·`·`·`아래`·`전부`·`뿐` 등)를 동반하는
+자리를 전부 뽑아 사람이 판정했다.
+
+### R13-3. 판정 — 살아 있는 열거 주장의 불일치
+
+| 지점 | 추출 → 정본 | 처리 |
+| --- | --- | --- |
+| **#1** `checklist.md:70` A3 증명 | STR-16 acceptance **6항목** → **7** | 빠진 것은 **금액 범위 검색의 basis 일치**(`OPEN-STR-01` 결정 · `OPEN-QUAL-10` 축). 7항목으로 고치고 **재현 명령을 셀에 넣었다** |
+| **#2** `checklist.md:213` 규격 산출물 | `codex-review-*.json` **2건** → **5** | **셈을 지우고** `git ls-files 'reports/evidence/m0/0a2/codex-review-*.json'`로 바꿨다(형태 6 규칙). 목록은 참고로 병기 |
+
+**추가 발견은 없다.** 광역 후보 중 `항목`·`종`·`곳` 단위 **35건을 전수로 읽었고**, #1 외에
+살아 있는 열거 주장의 불일치가 없었다. 나머지는 라운드별 이력의 그 시점 값(`불변 8종`·
+`부재 주장 2곳`·`Markdown 제목 6곳` 등)이거나 도메인 수치(`운영 라이브러리 6종`)다.
+`건`·`개`·`행`·`줄` 단위는 대부분 라운드별 finding 수·집계이며 **집계 축은 `numsweep`이
+이미 덮는다**(§12.1/§12.2 행 수, 조건부 개수, 줄 수).
+
+**판정 보류 1건 — 정본을 만들지 않았다**: `commands.md:106`의 QUAL-11 "이번에 **6항목**을
+신설했다"는 **라운드 1 시점 기록**이며, 그 뒤 라운드 5가 그 블록을 조건부 묶음으로
+쪼갰다. 지금 구조에서는 "항목 수"의 정본이 성립하지 않으므로(위 규칙) **대조 대상에서
+빼고 이력으로 둔다.** 셈을 지어내 맞추지 않는다.
+
+**오탐 5건**(한계로 기록) — **전부 이 라운드의 기록 자신**이 적발된 틀린 값을 인용해서다:
+`checklist.md:287` 형태 6 표 행(`3건뿐`·`2건`·`6항목`)과 위 R13-3 표 두 행(`6항목`·`2건`).
+기록의 성질상 정상이며 `R9-3`·`R10-3`에 적은 자기참조와 같은 부류다.
+
+**스윕 자체의 결함 1건을 고쳤다**: `OPEN-NOTI-02` 같은 **OPEN id의 꼬리를 capability
+`NOTI-02`로 읽어** NOTI-05 판독 표의 "Acceptance 3항목"을 오탐으로 지목했다.
+`(?<!OPEN-)` 전방부정으로 막았다 — 위 스크립트 본문에 반영돼 있다.
+
+### R13-4. #3 산출물 정합화 — NOTI-05 블록 전문 판독
+
+블록 전문을 읽었다. **미갱신 서술은 「분류 근거(정책 미확정)」 한 bullet뿐**이었다.
+
+| bullet | 판독 |
+| --- | --- |
+| 사용자 가치 | **정합** — 이미 "at-most-once 확정 (운영자 결정 2026-08-26), `OPEN-NOTI-02` 해소"라 적고 회수 경로가 앱 알림함임을 밝힌다(라운드 5 M-3 처리분) |
+| 분류 `후속` | **정합** — 전달 의미 확정 + pull 확정을 근거로 든다 |
+| 분류 근거 | **정합** — legacy 설계 관찰(커밋 경계·`running` 격리)이며 V2 요구 주장이 아니다 |
+| **분류 근거(정책 미확정)** | **모순** — "사용자와 합의된 것인지 근거가 없다"가 확정 결정과 정면 충돌. **교체했다** |
+| Acceptance 3항목 | **정합** — outbox 메커니즘 시나리오이며 조건부 표시가 필요 없다(`OPEN-NOTI-02`는 닫혔다) |
+| 경계 | **정합** — 소유 범위 서술 |
+
+교체 내용: legacy가 택한 at-most-once를 **V2도 채택**하며, legacy는 채널 멱등 키가 없어
+**선택의 여지가 없었던 것으로 보이나** V2에서는 운영자가 그 절충(놓침 감수)을 **명시적으로
+승인**했다는 구분을 남겼다. **라운드 5 M-3과의 관계**를 인용 블록 한 줄로 적었다 —
+그때는 활성 `OPEN-NOTI-02`의 한 분기를 선점해 조건을 걷어냈고, 지금은 그 OPEN이 닫혔으므로
+확정 서술이 옳다. **`NOTI-02`가 밟은 경로(조건화 → 운영자 결정으로 확정 복귀)와 같은
+형태**다.
+
+### R13-5. 스윕·불변 재실행
+
+```
+$ python3 numsweep.py
+추출된 수치 인용: 213건 | 정본 불일치: 134건 (이력 서술 포함 — 판정 대상)
+$ python3 sweep46.py
+활성 OPEN: 45건 | 전체 매치: 371건
+'해소/결번/취소선' 어휘와 같은 줄에 있는 매치: 52건 (판정 대상)
+$ python3 inv2.py
+분류: {'V2 필수': 61, '근거 부족': 11, '폐기': 6, '후속': 17} = 95
+형식 위반: none
+V2 필수 사용자 가치/acceptance 결측: none
+중복 id: none
+§12 활성 OPEN: 45
+본문 참조 - 활성 등록: 30 건 (해소·결번 포함)
+$ wc -l docs/discovery/capability-map.md
+    3182 docs/discovery/capability-map.md
+```
+
+- **기준 SHA는 이 절을 담은 커밋**이다(뒤따르는 `scope.md` 커밋은 값이 다르며 그 절에 적는다).
+- **줄 수 전파**: NOTI-05 정합화로 3,176 → **3,182**. 수치 축이 6지점을 지목했고
+  살아 있는 head 주장인 `checklist.md:7`을 고쳤다(**나머지 5곳은 각 라운드의 그 시점 값**
+  — "`1fc5968` 이후 무변경" 같은 커밋 고정 서술이라 유지). §14.3 후속 줄에 3,182를 더했다.
+- 분류·활성 OPEN 집계 **불변**. id 축 **불일치 0**.

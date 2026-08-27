@@ -4,7 +4,7 @@
 - 작성: 라운드 1 → 라운드 2·3·4(verifier `not-ready` 대응) → 라운드 5(Codex 4차 대응) →
   라운드 6(verifier F-1 blocker — 수치·인용 전파) → **수정 라운드 7(2026-08-27, Codex 5차
   `request_changes` — 활성 OPEN 종속의 전수 재판정)**
-- 산출물: `docs/discovery/capability-map.md` (**3,176줄** — head 기준),
+- 산출물: `docs/discovery/capability-map.md` (**3,182줄** — head 기준),
   `reports/evidence/m0/0a2/`,
   `reports/evidence/m0/0a/commands.md`(H-2 정정 append 한정)
 - 함께 볼 것: `decisions.md`(결정 기록·근거), `commands.md`(검증 명령·출력)
@@ -67,7 +67,7 @@ OPEN-OPS-03 잔존: True
 | --- | --- |
 | `V2 필수` 분류 | 있음 |
 | 사용자 가치 | 있음 — "언제든 목록을 검색하고 고른 공고의 투찰가를 요청해 즉시 받는다" |
-| acceptance scenario | **6항목** — 검색 범위(감시 조건과 무관), on-demand 산출, 판정 불가의 사유 있는 답, 같은 입력 같은 답, read-only, 빈 결과의 2분 |
+| acceptance scenario | **7항목** — 검색 범위(감시 조건과 무관), on-demand 산출, 판정 불가의 사유 있는 답, 같은 입력 같은 답, **금액 범위 검색의 basis 일치**(`OPEN-STR-01` 결정 · `OPEN-QUAL-10` 축), read-only, 빈 결과의 2분. 재현: `sed -n '/^### STR-16/,/^### /p' docs/discovery/capability-map.md`의 `Acceptance scenario` 아래 2-space bullet |
 | 분류 근거 | 있음 — **legacy 관찰이 아니라 운영자 진술**임을 명시했다 |
 
 **분류 근거를 지어내지 않았다.** 근거를 **운영자 진술 2026-08-26**으로 적고, 이 항목이
@@ -210,7 +210,7 @@ Codex 5차 medium #5), 바로 뒤 **「원본 절에 대한 slice 변경 — 전
 | `differential.json` | N/A — Python/V2 실행 비교가 없다 |
 | `golden-manifest.json` | N/A — fixture를 사용하지 않는다 |
 | `rollback.md` | N/A — 문서 산출물은 `git revert`로 복구. 0A head `6af7019`로 되돌릴 수 있다 |
-| `codex-review-*.json` | **존재(2건)** — `codex-review-20260826T102642Z.json`(4차, `request_changes`) · `codex-review-20260826T113911Z.json`(**5차**, `request_changes`). codex-reviewer 레인이 작성했고 spec-writer는 읽기만 한다(append-only) |
+| `codex-review-*.json` | **존재** — 목록은 `git ls-files 'reports/evidence/m0/0a2/codex-review-*.json'`로 재현된다(`20260826T102642Z` 4차 · `20260826T113911Z` 5차 · `20260827T015140Z` 6차 · `20260827T021632Z` 7차 · `20260827T024238Z` 8차, 전부 `request_changes`). codex-reviewer 레인이 작성했고 spec-writer는 읽기만 한다(append-only) |
 
 > **⚠ 라운드 7 정정**: 이 행이 "없음 — 아직 리뷰 요청 전이다"로 남아 있었다. 4차 리뷰
 > JSON은 라운드 5에 이미 커밋됐고 5차는 이 라운드의 입력이다(Codex 5차 medium #5).
@@ -284,7 +284,7 @@ Codex 5차 medium #5), 바로 뒤 **「원본 절에 대한 slice 변경 — 전
 
 | # | 형태 | 어디서 나왔나 | 규칙 |
 | --- | --- | --- | --- |
-| **6** | **셈으로 전칭을 주장하기** | 0A2 라운드 7 완결 — `decisions.md` provenance가 "원본 절 안의 slice 정정은 **3건뿐**"이라 선언했으나 라운드 2의 `OPEN-QUAL-08` 포인터 추가가 빠진 **4번째**였다. Codex가 최초 커밋 blob과 head를 통째로 diff해 찾았다 | **전칭 주장은 셈이 아니라 재현 명령으로 쓴다.** "예외는 N건뿐"을 금지하고 **"전부는 아래 목록이며 `<명령>`으로 재현된다"**로 적는다. 목록은 위치와 성격을 담고, 새 변경이 생기면 **목록에 항목을 추가**한다 |
+| **6** | **셈으로 전칭을 주장하기** | 0A2 라운드 7 완결 — `decisions.md` provenance가 "원본 절 안의 slice 정정은 **3건뿐**"이라 선언했으나 라운드 2의 `OPEN-QUAL-08` 포인터 추가가 빠진 **4번째**였다. Codex가 최초 커밋 blob과 head를 통째로 diff해 찾았다. **재발 1회**: 다음 라운드에 Codex 8차 #1·#2 — **형태를 신설한 라운드가 `decisions.md` provenance 한 곳에만 적용하고 evidence 전수를 돌리지 않았다.** A3 증명의 STR-16 acceptance "6항목"(실제 7)과 규격 목록의 `codex-review-*.json` "2건"(실제 4)이 남아 있었다. **축을 만들면 그 축으로 전수를 훑는다** — 형태 5가 같은 이유로 네 번 재발했다 | **전칭 주장은 셈이 아니라 재현 명령으로 쓴다.** "예외는 N건뿐"을 금지하고 **"전부는 아래 목록이며 `<명령>`으로 재현된다"**로 적는다. 목록은 위치와 성격을 담고, 새 변경이 생기면 **목록에 항목을 추가**한다 |
 
 **왜 새 형태인가 — 기존 형태로는 못 막는다.** 지금까지 두 번은 새 형태를 만들지 않는
 쪽이 옳았고(형태 2로 흡수), 이번은 다르다고 판단했다. 근거 셋:
@@ -606,7 +606,8 @@ capability **95 불변**, 분류 **62/17/6/10 → 61/16/6/12**(OPS-06·NOTI-02 �
 **2026-08-27 운영자 결정 반영 후**(§14.5): 분류 **61/17/6/11**, 활성 OPEN **45**,
 조건부 묶음 **8개 / capability 6개** + 잠정 1. capability 수는 **95 불변**이고
 `capability-map.md`는 **3,171줄**이다(V-1 수정 포함). **legacy 인용 정정 후(C-1)
-**3,176줄**이며, 그 정정은 출처 종류를 바로잡은 서술이라 집계는 그대로다.
+**3,176줄**, **NOTI-05 정합화 후(Codex 8차 #3) 3,182줄**이며, 둘 다 서술 정정이라
+분류·OPEN 집계는 그대로다.
 
 ### 14.4 라운드 7 완결 — 복원 항목의 인용 전파 (verifier F7-1~F7-9)
 
