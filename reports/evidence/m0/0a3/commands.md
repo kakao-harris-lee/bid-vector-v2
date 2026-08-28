@@ -874,8 +874,9 @@ DECL  = re.compile(r'^### 실행 시점 HEAD = [0-9a-f]{7,40}')
 for path in FILES:
     lines = io.open(path, encoding="utf-8").read().split("\n")
     inblk, start, body = False, 0, []
-    for i, l in enumerate(lines, 1):
-        if l.startswith("```"):
+    FENCE = chr(96) * 3            # 리터럴 백틱 세 개를 이 파일에 넣지 않는다 —
+    for i, l in enumerate(lines, 1):  # 넣으면 이 절의 펜스가 일찍 닫혀 추출이 깨진다
+        if l.startswith(FENCE):
             if not inblk:
                 inblk, start, body = True, i, []
             else:
