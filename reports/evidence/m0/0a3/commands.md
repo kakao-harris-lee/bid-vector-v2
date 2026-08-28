@@ -700,19 +700,20 @@ print(f"-- 지목 {len(bad)}건 · 번호를 넘겨준 절: {' '.join(sorted(mov
 **두 커밋에서 돌려 능력을 측정했다** — **넓혔다고 적기 전에 재는 것이 이번 라운드의 요구**다.
 
 ```
-### 실행 시점 HEAD = 32f7a63 (이 라운드의 편집이 든 작업 트리)
+### 실행 시점 HEAD = d8fcef8 (이 라운드의 편집이 든 작업 트리)
 ### 마커는 셸 변수로 쪼갠다 — 이 절 자신의 서술이 검사에 걸리지 않게.
+### 파일 간 출력 순서는 구현에 따라 다르므로 sort 로 고정한다(R-2 와 같은 부류).
 
 ## (a) 표시가 이력 절 안에 실제로 들어갔는가 (V-1)
-$ MARK='재판정으로 이 절의'; grep -rn "⚠ 수정 라운드 10의 출처 층 $MARK" reports/evidence/m0/0a3/ | cut -c1-64 | sed 's/[[:space:]]*$//'
-reports/evidence/m0/0a3/scope.md:447:> **⚠ 수정 라운드 10의 출처 층 재판정으로
-reports/evidence/m0/0a3/scope.md:531:> **⚠ 수정 라운드 10의 출처 층 재판정으로
+$ MARK='재판정으로 이 절의'; grep -rn "⚠ 수정 라운드 10의 출처 층 $MARK" reports/evidence/m0/0a3/ | sort | cut -c1-64 | sed 's/[[:space:]]*$//'
 reports/evidence/m0/0a3/checklist.md:421:> **⚠ 수정 라운드 10의 출처 층 재
-$ MARK2='재판정으로 이 귀속은'; grep -rn "⚠ 수정 라운드 10의 출처 층 $MARK2" reports/evidence/m0/0a3/ | cut -c1-64 | sed 's/[[:space:]]*$//'
+reports/evidence/m0/0a3/scope.md:450:> **⚠ 수정 라운드 10의 출처 층 재판정으로
+reports/evidence/m0/0a3/scope.md:534:> **⚠ 수정 라운드 10의 출처 층 재판정으로
+$ MARK2='재판정으로 이 귀속은'; grep -rn "⚠ 수정 라운드 10의 출처 층 $MARK2" reports/evidence/m0/0a3/ | sort | cut -c1-64 | sed 's/[[:space:]]*$//'
 reports/evidence/m0/0a3/checklist.md:365:| **H-1** (high) | C-3.
 $ grep -n '^## 갱신 이력 — 수정 라운드 [45] ' reports/evidence/m0/0a3/scope.md | cut -c1-56 | sed 's/[[:space:]]*$//'
-440:## 갱신 이력 — 수정 라운드 4 (verifier `H-1`~`H-4`)
-511:## 갱신 이력 — 수정 라운드 5 (verifier `P-1` · 게이트 안 1건)
+443:## 갱신 이력 — 수정 라운드 4 (verifier `H-1`~`H-4`)
+514:## 갱신 이력 — 수정 라운드 5 (verifier `P-1` · 게이트 안 1건)
 $ grep -n '^## 1[12]\. 수정 라운드' reports/evidence/m0/0a3/checklist.md | cut -c1-56 | sed 's/[[:space:]]*$//'
 358:## 11. 수정 라운드 4 — verifier `H-1`~`H-4`
 397:## 12. 수정 라운드 5 — verifier `P-1` (게이트 안 1건)
@@ -780,3 +781,58 @@ $ printf %s "$BLKP" | python3 - HEAD
 | `OPEN` 해소 | 활성 45건 전부 out_of_scope. C-4가 총수 불변을 낸다 |
 | `capability-map.md` §13 밖 편집 | in_scope 가 승인한 것은 **§13 인계 행의 두 자리**(`사용자 영향`·`검증 방법`)뿐이다. 발견한 것은 `scope.md` **O-2**로 등재했고 **0C가 정본**이 된다 |
 | 0B evidence 편집 | 0B는 Codex `approve`로 닫혔다. **인용만 하고 읽기 전용으로 다뤘다** |
+
+---
+
+## C-9. 이 라운드의 편집이 무엇을 낡게 했는지 훑는다 (Codex 4차 `B`·`C`)
+
+**`B`와 `C`가 같은 것을 말한다 — 앞 라운드의 참인 기록이 뒤 라운드에 거짓이 된다.**
+`B`는 대상이 늘어서, `C`는 지시 문구를 기록에 그대로 옮겨 범위가 사라져서.
+**그래서 고친 뒤 그 수정이 무효화한 자리가 없는지 훑는다.**
+
+```
+### 실행 시점 HEAD = d8fcef8 (이 라운드의 편집이 든 작업 트리)
+### 인벤토리·셈·「~하지 않았다」류가 이 라운드의 편집으로 낡는지 본다.
+### (b) 는 commands.md 를 대상에서 뺀다 — 이 절의 출력이 자기 검사에 걸리기 때문이다.
+### 파일 간 출력 순서는 구현에 따라 다르므로 sort 로 고정한다(R-2 와 같은 부류).
+
+## (a) 인벤토리 표 ↔ 실물 python 블록
+$ grep -c '^```python' reports/evidence/m0/0a3/commands.md
+3
+$ awk '/^### 이 패키지가 쓰는 스크립트/,/^## /' reports/evidence/m0/0a3/commands.md | grep -c '^| \*\*'
+3
+
+## (b) 산문에 살아 있는 셈이 남았는가 (scope.md · checklist.md)
+$ grep -nE '스크립트가 (둘|셋|하나)|스크립트 — (둘|셋)|블록이 (둘|셋)' reports/evidence/m0/0a3/scope.md reports/evidence/m0/0a3/checklist.md | sort | cut -c1-88
+reports/evidence/m0/0a3/checklist.md:1008:| **지운 문면** | 머리글의 *"이 패키지가 쓰는 스크립트 — **둘**이고"
+reports/evidence/m0/0a3/scope.md:1218:늘면서 `python` 블록이 셋이 됐는데 인벤토리는 **둘**이라 적고 있었다.
+
+## (c) 라운드 15 실측 — 「~하지 않았다」류가 이것과 맞아야 한다
+$ git diff --numstat 32f7a63..6b99420 -- reports/evidence/m0/0a3/
+69	1	reports/evidence/m0/0a3/checklist.md
+5	33	reports/evidence/m0/0a3/commands.md
+57	2	reports/evidence/m0/0a3/scope.md
+$ for f in scope checklist commands; do a=$(git show 32f7a63:…/$f.md | grep -c '^#\{2,4\} '); b=$(git show 6b99420:…/$f.md | grep -c '^#\{2,4\} '); echo "  $f: $a → $b"; done
+  scope: 94 → 100
+  checklist: 64 → 69
+  commands: 31 → 30
+
+## (d) 이 라운드가 산출물을 건드렸는가
+$ git diff --stat 6b99420..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/
+(빈 출력 = 무변경)
+```
+
+**판정**:
+
+- **(a)** **인벤토리 표의 행 수와 실물 `python` 블록 수가 같다.** 표는 **셈을 적지 않고
+  이 대조로 유지**된다 — 스크립트가 늘면 **행을 더하고 이 명령이 그것을 낸다.**
+- **(b)** **살아 있는 셈은 없다.** 남은 매치는 둘 다 **이번 라운드가 그 셈을 고쳤다고
+  적은 기록**이다 — `checklist.md` §24의 **「지운 문면」 인용**과 `scope.md` 라운드 17
+  이력의 **경위 서술**. **기록이지 주장이 아니다.**
+  **`commands.md`를 대상에서 뺐다** — 이 절의 **출력이 그 패턴에 걸려** 넣어 두면
+  **쓸 때마다 매치가 늘어난다.** C-7이 마커를 셸 변수로 쪼갠 것과 같은 이유다.
+- **(c)** 라운드 15는 **`commands.md`에서 지우고 `scope.md`·`checklist.md`에는 더했다.**
+  그래서 **「새 서술을 쓰지 않았다」를 라운드 전체에 걸면 거짓**이고, 주장을
+  **`commands.md`의 교체 대상 구간**으로 한정했다(Codex 4차 `C`).
+  **절 머리도 두 파일은 늘고 `commands.md`만 줄었다** — 줄어든 것은 **중복이 빠진 것**이다.
+- **(d)** **이 라운드는 산출물을 건드리지 않았다.**
