@@ -717,3 +717,137 @@ tests/test_bid_target_workflow.py
 exit=0
 ```
 
+---
+
+## C-10 · 출력 블록의 **축어 재현** — 두 환경에서 잰다
+
+**대상 파일** `9d8d206`의 `commands.md` · **실행 트리** `ba23629`(그 블록들이 선언한 SHA).
+
+**두 SHA를 고정해도 그것만으로 결과가 정해지지 않는다.** `bid-vector`와 `_workspace`는
+**git이 추적하지 않아 SHA에서 복원할 수 없고**, C-10은 그 둘을 **실행 CWD에서** 가져다
+연결한다. 그래서 **CWD에 그 둘이 있는지가 결과를 가른다.**
+
+그 사실을 주장으로 적지 않고 **실행으로 잰다** — 아래 두 블록이 같은 명령을 두 환경에서
+돌린 것이다.
+
+- **명령문에 `bid-vector`·`_workspace`가 나오는 블록**을 그 경로가 필요한 블록으로 본다.
+  없으면 **`환경 부족`으로 표시하고 재지 않는다** — 잴 수 없는 것을 `불일치`로 세면
+  결과가 오독된다.
+- 판정은 셋이다: **`PASS`**(전부 재고 불일치 0) · **`INCOMPLETE`**(재지 못한 블록이 있고
+  잰 것은 전부 일치) · **`FAIL`**(불일치가 있다).
+- **이 검사는 자기 자신을 포함하지 않는다** — 대상 파일 `9d8d206`에 이 절이 없다.
+  **그것은 우연이 아니라 `ba23629`가 C-10 절을 들어낸 결과**이며, 이 커밋이 다시 넣는다.
+
+### C-10.1 두 경로가 **있는** 작업 트리에서
+
+```
+# 대상 파일 = 9d8d206 의 commands.md · 실행 트리 = ba23629 (그 블록들이 선언한 SHA)
+# 두 경로(bid-vector · _workspace)는 git 이 추적하지 않아 SHA 에서 복원할 수 없다.
+# 실행 CWD 에 있으면 연결하고, 없으면 그 사실을 출력에 낸다.
+WT="$(mktemp -d)/wt"
+git worktree add --detach "$WT" ba23629 >/dev/null 2>&1
+[ -d bid-vector ] && ln -sfn "$(cd bid-vector && pwd -P)" "$WT/bid-vector"
+[ -d _workspace ] && ln -sfn "$(cd _workspace && pwd -P)" "$WT/_workspace"
+git show 9d8d206:reports/evidence/m0/0c/commands.md > "$WT/.blocks.md"
+python3 - "$WT" <<'PY'
+import os, subprocess, sys, pathlib
+WT = sys.argv[1]
+FENCE = chr(96) * 3   # 리터럴 백틱 세 개를 쓰면 이 블록의 펜스가 끊긴다
+NEEDS = ("bid-vector", "_workspace")   # git 미추적 — 명령문에 이 문자열이 있으면 그 경로가 필요하다
+have = {n: os.path.isdir(os.path.join(WT, n)) for n in NEEDS}
+print("환경 전제 — " + " · ".join(f"{n}: {'있음' if have[n] else '없음'}" for n in NEEDS))
+lines = pathlib.Path(WT + "/.blocks.md").read_text().split("\n")
+fences, open_at = [], None
+for i, l in enumerate(lines):
+    if l.strip() == FENCE:
+        if open_at is None: open_at = i
+        else: fences.append((open_at, i)); open_at = None
+assert open_at is None and len(fences) % 2 == 0
+env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
+       "LC_ALL": "en_US.UTF-8", "HOME": os.environ.get("HOME", "/tmp")}
+same = diff = skip = 0
+for k in range(0, len(fences), 2):
+    (cs, ce), (os_, oe) = fences[k], fences[k+1]
+    cmd = "\n".join(lines[cs+1:ce])
+    head = cmd.splitlines()[0][:58].rstrip()   # 자른 끝의 공백은 뗀다 — 후행 공백은 A8 이 지적한다
+    missing = [n for n in NEEDS if n in cmd and not have[n]]
+    if missing:
+        skip += 1
+        print(f"  환경 부족({','.join(missing)})  {head}")
+        continue
+    r = subprocess.run(["bash", "-c", cmd], cwd=WT, capture_output=True,
+                       text=True, errors="replace", env=env)
+    ok = r.stdout.rstrip("\n") == "\n".join(lines[os_+1:oe]).rstrip("\n")
+    same, diff = same + ok, diff + (not ok)
+    print(("  축어 일치            " if ok else "  불일치              ") + head)
+print(f"명령/출력 쌍: {len(fences)//2} · 잰 것: {same+diff}"
+      f" (축어 일치 {same} · 불일치 {diff}) · 환경 부족으로 못 잰 것: {skip}")
+print("PASS" if diff == 0 and skip == 0 else ("INCOMPLETE" if diff == 0 else "FAIL"))
+PY
+git worktree remove --force "$WT" >/dev/null 2>&1
+echo "exit=$?"
+```
+
+```
+환경 전제 — bid-vector: 있음 · _workspace: 있음
+  축어 일치            diff <(sed -n '281,564p' _workspace/m0-open-decisions/deci
+  축어 일치            for c in $(git log --format='%H' 2b05684..ba23629 \
+  축어 일치            # 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
+  축어 일치            git diff --check 2b05684..5a9a5f5 | sed 's/[[:space:]]\{1,
+  축어 일치            python3 - <<'PY'
+  축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
+  축어 일치            python3 - <<'PY'
+  축어 일치            for c in $(git log --format='%H' 2b05684..ba23629 \
+  축어 일치            grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary
+  축어 일치            python3 - <<'PY'
+  축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
+  축어 일치            git -C bid-vector grep -l 'cnstrtnAbltyEvlAmt' ed4b06c --
+  축어 일치            git -C bid-vector grep -n 'default=0\.0\|server_default="0
+  축어 일치            git -C bid-vector grep -n 'status = Column' ed4b06c \
+  축어 일치            git -C bid-vector show ed4b06c:app/services/koneps/field_c
+  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+  축어 일치            git -C bid-vector ls-tree -r --name-only ed4b06c | grep bi
+명령/출력 쌍: 17 · 잰 것: 17 (축어 일치 17 · 불일치 0) · 환경 부족으로 못 잰 것: 0
+PASS
+exit=0
+```
+
+### C-10.2 두 경로가 **없는** clean worktree에서 — Codex 리뷰어 환경과 같은 형태
+
+**위 블록의 명령을 한 글자도 바꾸지 않고** 두 경로가 없는 worktree 안에서 돌린다.
+
+```
+CT="$(mktemp -d)/cleanwt"
+git worktree add --detach "$CT" ba23629 >/dev/null 2>&1
+# 위 블록의 본문을 그대로 담은 파일을 넣고 그 안에서 돌린다.
+cp <위 블록 그대로> "$CT/.c10.sh"
+cd "$CT" && bash .c10.sh
+```
+
+```
+환경 전제 — bid-vector: 없음 · _workspace: 없음
+  환경 부족(_workspace)  diff <(sed -n '281,564p' _workspace/m0-open-decisions/deci
+  축어 일치            for c in $(git log --format='%H' 2b05684..ba23629 \
+  축어 일치            # 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
+  축어 일치            git diff --check 2b05684..5a9a5f5 | sed 's/[[:space:]]\{1,
+  축어 일치            python3 - <<'PY'
+  축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
+  축어 일치            python3 - <<'PY'
+  축어 일치            for c in $(git log --format='%H' 2b05684..ba23629 \
+  축어 일치            grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary
+  축어 일치            python3 - <<'PY'
+  환경 부족(bid-vector)  python3 - docs/discovery/data-dictionary.md <<'PY'
+  환경 부족(bid-vector)  git -C bid-vector grep -l 'cnstrtnAbltyEvlAmt' ed4b06c --
+  환경 부족(bid-vector)  git -C bid-vector grep -n 'default=0\.0\|server_default="0
+  환경 부족(bid-vector)  git -C bid-vector grep -n 'status = Column' ed4b06c \
+  환경 부족(bid-vector)  git -C bid-vector show ed4b06c:app/services/koneps/field_c
+  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+  환경 부족(bid-vector)  git -C bid-vector ls-tree -r --name-only ed4b06c | grep bi
+명령/출력 쌍: 17 · 잰 것: 10 (축어 일치 10 · 불일치 0) · 환경 부족으로 못 잰 것: 7
+INCOMPLETE
+exit=0
+```
+
+> **이 절이 재는 범위는 위 두 SHA와 위 두 환경뿐이다.** 다른 트리·다른 환경에서
+> 재현된다고 주장하지 않는다. **C-10.2가 보여주듯 그 환경에서는 재지 못하는 블록이 있고,
+> 그것들은 `checklist.md` A6이 「이 slice가 유일한 확인 지점」이라 적은 자리와 같다.**
