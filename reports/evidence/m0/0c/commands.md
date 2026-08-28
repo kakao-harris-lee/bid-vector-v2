@@ -228,8 +228,9 @@ pat = re.compile(r"정책 version|policy version|policyVersion|versioned policy"
 for line in pathlib.Path("docs/discovery/capability-map.md").read_text().split("\n"):
     if line.startswith("### "): cap = line
     if pat.search(line):
-        # 문자 단위로 자른다 — 바이트 절단은 한글을 깨뜨린다
-        print(cap); print("    ↳ " + line.strip()[:90])
+        # 문자 단위로 자른다 — 바이트 절단은 한글을 깨뜨린다.
+        # 자른 끝의 공백은 떤다 — 후행 공백은 git diff --check 가 지적한다(A8).
+        print(cap); print(("    ↳ " + line.strip()[:90]).rstrip())
 PY
 echo "exit=$?"
 ```
