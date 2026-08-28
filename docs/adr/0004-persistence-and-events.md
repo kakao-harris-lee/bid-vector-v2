@@ -32,11 +32,11 @@
 
 ### 1.2 legacy의 형태
 
-```
-git -C bid-vector show ed4b06c:app/core/config.py | grep -n 'DATABASE_URL'
-→ 10: DEFAULT_DATABASE_URL = f"{POSTGRES_DRIVERNAME}://postgres:password@localhost:5432/bid_vector_db"
-→ 40-42: DATABASE_URL: str = ("postgresql+psycopg://postgres:password@localhost:5432/bid_vector_db")
-```
+`app/core/config.py:10`이 `DEFAULT_DATABASE_URL`을 `POSTGRES_DRIVERNAME` 기반으로 만들고,
+`app/core/config.py:40-42`의 `DATABASE_URL` 기본값이 `postgresql+psycopg` 드라이버를
+지목한다. **두 줄의 원문은 이 문서에 옮기지 않는다** — 자격증명 형태의 문자열이 들어 있고
+`agent-workflow.md` §6이 그런 문자열을 생성물에 남기지 않도록 규정한다. 확인하는 명령은
+`reports/evidence/m0/0d/commands.md` **C-5.4**에 있다.
 
 legacy도 PostgreSQL이고 migration은 **Alembic**이다(`alembic.ini`, `alembic/`).
 `requirements/runtime.txt`에 `sqlalchemy` · `psycopg[binary]` · `pgvector` · `sqlmodel` ·
