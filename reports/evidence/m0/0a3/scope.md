@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a3-decision-basis-correction
 base_sha: 48151b9   # 0B Codex 4차 approve verdict 등재 직후의 HEAD
-head_sha: 77c5b98   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
+head_sha: 20f09ba   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
 in_scope:
   - reports/evidence/m0/0a2/decisions.md      # X-1 정정 한정 + provenance 등재
   - reports/evidence/m0/0a2/checklist.md      # §10.1 형태 7 등재 한정
@@ -181,12 +181,16 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 | `9910c96` | **수정 라운드 23b** — C-10 스캐너의 리터럴 백틱을 없앤다(추출이 깨졌다) |
 | `4cccf21` | **수정 라운드 24** — 두 블록을 선언 SHA의 트리에서 다시 뜬다 |
 | `77c5b98` | **수정 라운드 25** — verifier `GI-1`·`GI-2`. 스캐너가 명령을 논리 단위로 집게 하고, 인벤토리에 C-10 행을 더한다 |
-| 이 커밋 | **수정 라운드 26** — C-9·C-10을 그 수정의 트리에서 다시 뜬다 |
+| `20f09ba` | **수정 라운드 26** — C-9·C-10을 그 수정의 트리에서 다시 뜬다. **Codex 7차가 리뷰한 head** |
+| 이 커밋 | **마무리** — Codex 7차 `approve`. low 1건을 닫고 verdict·이월·알려진 제한을 등재한다 |
 
 **파일 목록도 셈도 여기에 옮기지 않는다** — `git show --stat --format='' <SHA>`가 낸다.
 
 **커밋을 나눈 이유는 각 커밋에서 문서가 자체 정합**하기 때문이다. X-1 정정과 형태 7 등재는
-서로 독립이고, 수정 라운드는 **finding별로 갈라** 리뷰가 하나씩 볼 수 있게 했다.
+서로 독립이라 갈랐다. **수정 라운드는 finding 묶음 또는 라운드 단위로 갈랐다** —
+**한 커밋이 한 finding인 것도 있고 여러 건을 한 커밋에 담은 것도 있다.**
+어느 쪽인지는 **위 커밋 표와 `git log --format='%h %s' 48151b9..HEAD`가 낸다**
+(Codex 7차 low). **여기에 셈을 적지 않는다.**
 
 ## 발견했으나 고치지 않은 것 — 계약이 금지한 자리
 
@@ -1513,6 +1517,80 @@ Codex 4차 `B`, 그리고 이번). **앞의 둘은 산문에 박은 셈이 거�
 | --- | --- |
 | 산출물 셋이 이 두 라운드에 무변경 | `git diff --stat 4cccf21..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
 | **절 머리가 줄지 않았는가** | `for f in scope checklist commands; do git show 4cccf21:reports/evidence/m0/0a3/$f.md \| grep -c '^#\{2,4\} '; grep -c '^#\{2,4\} ' reports/evidence/m0/0a3/$f.md; done` |
+| **산문이 출력 자리에 선 줄 · 선언 SHA 없는 블록** | `commands.md` **C-10** |
+| **각 블록이 자기 선언 SHA에서 재현되는가** | 그 SHA를 체크아웃한 worktree에서 그 절의 명령을 돌린다 |
+| **인벤토리 표 ↔ 실물 `python` 블록** | `commands.md` **C-9 (a)** |
+| **층 판정 · `O-2` 무변경** | `commands.md` **C-3.4** |
+| 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
+| `regression-ledger.md` 무변경 | `commands.md` **C-6** |
+| in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
+
+**결과를 여기 적지 않는다.**
+
+---
+
+## 갱신 이력 — 마무리 (Codex 7차 `approve`)
+
+verdict 정본: `reports/evidence/m0/0a3/codex-review-20260828T062714Z.json`(등재, append-only).
+`reviewed_base` **`48151b9`** → `reviewed_head` **`20f09ba`**. 판정 **`approve`**.
+**severity별 건수를 여기 옮겨 적지 않는다** — **JSON이 정본이고 append-only라 낡지 않는다.**
+
+**approve는 `20f09ba`에 대한 것이고 이 커밋은 그 뒤에 온다.** 그러므로
+**이 커밋의 내용은 그 approve가 본 것이 아니다** — 무엇이 들어갔는지는
+`git show --stat --format='' HEAD`가 낸다.
+
+### low 1건 — 이력 서술의 전칭을 실측에 맞게 좁힌다
+
+**evidence가 현재형으로 *"수정 라운드는 finding별로 갈라 리뷰가 하나씩 볼 수 있게
+했다"*고 주장했는데, 바로 위 커밋 표와 `git log`가 반증한다** — **여러 건을 한 커밋에
+담은 라운드가 있다.** **전칭을 지우고 「묶음 또는 라운드 단위」로 좁혔으며, 어느 쪽인지는
+커밋 표와 `git log --format='%h %s' 48151b9..HEAD`가 내게 했다.** **새 셈을 박지 않았다.**
+
+**같은 주장을 하는 자리를 세 파일에서 전수로 훑었다** — `commands.md`·`checklist.md`에는
+없었다. 다른 파일의 「갈랐다」는 **판정 축·출처 층·절을 가른 것**이라 이 주장이 아니다.
+훑은 명령은 이 절의 불변 표에 있다.
+
+**그 명령을 지금 돌리면 매치가 남는다** — **이 절이 인용한 원문**과 **명령 자신**이다.
+**기록이지 살아 있는 주장이 아니다.** C-9 (b)가 같은 부류를 다루는 방식과 같다.
+**verdict JSON은 정본이라 대상에서 뺀다**(`--include='*.md'`).
+
+### 이월 — 이 slice가 닫을 수 없는 것
+
+verdict의 `residual_risks`가 정본이다. **그중 이 slice가 닫을 수 없는 것**:
+
+- **legacy 저장소 재현 환경** — 리뷰 worktree에 `bid-vector` 저장소가 없어
+  **C-1의 `ed4b06c` 파일·행 인용을 리뷰어가 직접 재현하지 못했다.** 저장소 안에 기록된
+  전문과 상호참조로만 검증됐다. **저장소 접근은 slice 밖의 환경 조건**이라 이 계약으로
+  닫히지 않는다. **후속 slice가 legacy를 여는 자리에서 함께 확인한다.**
+
+**나머지 `residual_risks`는 이 파일과 `commands.md`가 이미 담고 있다** —
+`capability-map.md` §6·§7의 `legacy-behavior` 서술은 **`O-2`**, `decisions.md`
+provenance 훅 번호의 구조적 부채는 **`O-3`**, C-10 스캐너가 일반적으로 증명하지 않는
+것은 **`commands.md` C-10의 판정**이다. **여기서 다시 번호를 매기지 않는다.**
+
+### 운영자 정지 규칙을 적용했다
+
+**운영자가 정한 규칙(2026-08-28)**: **7차가 산출물 무지적이면 남은 evidence 자기서술
+finding을 「알려진 제한」으로 기록하고 slice를 닫는다.**
+**7차의 low 1건은 이 커밋에서 실제로 고쳤으므로 제한으로 남기지 않는다.**
+**이 slice의 성격은 `checklist.md`의 「알려진 제한」 절에 한 항목으로 남겼다** —
+**0C·0D에 넘기는 관찰이지 이 slice의 미해결 결함이 아니다.**
+
+### 이 커밋에 대해서는 주장하지 않는다
+
+**이 절이 그 커밋에 실린다.** 그래서 **SHA를 적지 않고 이 커밋에 대해 아무것도 주장하지
+않는다** — 「이력 절 규약」이 그렇게 정한다. 무엇이 들어갔는지는
+`git show --stat --format='' HEAD`가 낸다.
+
+- `head_sha` → **`20f09ba`**(직전 커밋). **range `48151b9...HEAD`**.
+
+### 불변 — 이 절은 수도 좌표도 옮겨 적지 않는다
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| 산출물 셋이 이 커밋에 무변경 | `git diff --stat 20f09ba..HEAD -- docs/discovery/ reports/evidence/m0/0a2/` |
+| **커밋 단위 주장이 실측과 맞는가** | `git log --format='%h %s' 48151b9..HEAD` ↔ 위 커밋 표 |
+| **같은 주장이 다른 자리에 남았는가** | `grep -rn 'finding별\|리뷰가 하나씩' reports/evidence/m0/0a3/ --include='*.md'` |
 | **산문이 출력 자리에 선 줄 · 선언 SHA 없는 블록** | `commands.md` **C-10** |
 | **각 블록이 자기 선언 SHA에서 재현되는가** | 그 SHA를 체크아웃한 worktree에서 그 절의 명령을 돌린다 |
 | **인벤토리 표 ↔ 실물 `python` 블록** | `commands.md` **C-9 (a)** |

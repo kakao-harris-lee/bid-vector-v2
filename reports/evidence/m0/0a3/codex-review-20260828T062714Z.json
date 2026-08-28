@@ -1,0 +1,49 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "48151b9c47e4f09286c4ee869977383fa4b23396",
+  "reviewed_head": "20f09baf8053c65b05ac1d82edf3b57a2226f4ca",
+  "findings": [
+    {
+      "severity": "low",
+      "file": "reports/evidence/m0/0a3/scope.md",
+      "line": 188,
+      "evidence": "evidence 자기 기록은 현재형으로 수정 라운드 커밋을 `finding별로 갈라` 리뷰가 하나씩 볼 수 있게 했다고 주장한다. 그러나 바로 위 커밋 표와 `git log --format='%h %s' 48151b9..20f09ba`는 `4aa4e3c`가 G-1~G-5, `491684f`가 H-1~H-4, `2f8b65a`가 M-1~M-3, `5d2ca03`가 V-1~V-3, `d2cced5`가 W-1~W-3, `f18b990`가 H-1·H-2, `77c5b98`가 GI-1·GI-2를 각각 한 커밋에서 함께 처리했음을 보인다. 산출물 A1~A5나 명령 재현성에는 영향이 없는 이력 서술의 거칢이므로 acceptance를 막지 않는다.",
+      "required_fix": "후속 문서 정리 시 해당 문장을 실제 이력에 맞게 `finding 묶음 또는 수정 라운드별로 분리했다` 정도로 좁히거나 삭제한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse HEAD && git cat-file -t 48151b9c47e4f09286c4ee869977383fa4b23396 && git cat-file -t 20f09baf8053c65b05ac1d82edf3b57a2226f4ca",
+    "git diff --stat 48151b9c47e4f09286c4ee869977383fa4b23396...20f09baf8053c65b05ac1d82edf3b57a2226f4ca",
+    "git diff --name-status 48151b9c47e4f09286c4ee869977383fa4b23396...20f09baf8053c65b05ac1d82edf3b57a2226f4ca",
+    "git log --oneline 48151b9c47e4f09286c4ee869977383fa4b23396..20f09baf8053c65b05ac1d82edf3b57a2226f4ca",
+    "for f in reports/evidence/m0/0a3/codex-review-*.json; do jq -c '{file:input_filename,verdict,reviewed_head,findings}' \"$f\"; done",
+    "git diff --unified=20 48151b9c47e4f09286c4ee869977383fa4b23396...20f09baf8053c65b05ac1d82edf3b57a2226f4ca -- docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md reports/evidence/m0/0a2/checklist.md",
+    "git diff --check 48151b9c47e4f09286c4ee869977383fa4b23396...20f09baf8053c65b05ac1d82edf3b57a2226f4ca",
+    "git diff --word-diff=porcelain 48151b9c47e4f09286c4ee869977383fa4b23396...20f09baf8053c65b05ac1d82edf3b57a2226f4ca -- docs/discovery/capability-map.md",
+    "C-2 명령 블록을 선언 SHA 74132ea의 임시 clone에서 재실행",
+    "C-3 명령 블록과 인라인 X-1 스윕을 선언 SHA a264d6f의 임시 clone에서 재실행",
+    "C-4 인라인 불변 계산기를 선언 SHA 74132ea와 base 48151b9 양쪽에서 재실행",
+    "C-5.1~C-5.4를 선언 SHA 74132ea의 임시 clone에서 재실행하고 0B verdict·C-8.1·C-8.2·C-8.5·F-1·F-2 실물을 직접 대조",
+    "C-6 명령 블록을 선언 SHA 74132ea의 임시 clone에서 재실행",
+    "C-7 명령 블록과 포인터 스크립트를 선언 SHA 7bcf2e7에서 재실행",
+    "C-9 명령 블록을 선언 SHA 77c5b98에서 재실행",
+    "C-10의 구·신 스캐너를 fea90f2, 4cccf21, 77c5b98 트리에서 재실행",
+    "checklist.md의 동결 출력 블록을 각각 선언된 6b99420 및 d8fcef8 트리에서 재실행",
+    "checklist.md의 축약·자리표시자 스윕을 선언 SHA 9910c96에서 재실행",
+    "rg -n '^\\$ ' reports/evidence/m0/0a3/commands.md reports/evidence/m0/0a3/checklist.md reports/evidence/m0/0a3/scope.md",
+    "for f in scope checklist commands; do git show 4cccf21:reports/evidence/m0/0a3/$f.md | grep -c '^#\\{2,4\\} '; grep -c '^#\\{2,4\\} ' reports/evidence/m0/0a3/$f.md; done",
+    "git diff --stat 4cccf21..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/",
+    "git diff --stat 48151b9...HEAD -- docs/discovery/regression-ledger.md",
+    "git ls-files 'reports/evidence/m0/0a3/codex-review-*.json'"
+  ],
+  "residual_risks": [
+    "이 worktree에는 legacy `bid-vector` 저장소가 없어 C-1의 `ed4b06c` 파일·행 인용은 직접 재현하지 못했다. 저장소 내부에 기록된 전문과 상호참조만 검증했다.",
+    "out_of_scope로 명시된 `capability-map.md` §6 NOTI 투찰률 및 §7 SET-09 F-4의 legacy-behavior 서술은 `OPEN-REG-05` 귀속 없이 남아 있다. 위치·성격·출처 층은 C-3.4 실측 및 O-2 기록과 일치한다.",
+    "`decisions.md` provenance 표의 훅 번호는 후속 편집 때 다시 낡을 수 있는 O-3 구조적 부채로 남아 있으나 이번 slice의 전수 목록은 현재 실측과 일치한다.",
+    "C-10은 산문 출력 후보 세 형태와 선언 SHA 누락을 지목하는 제한된 스캐너이며 모든 명령의 의미·출력 진위를 일반적으로 증명하지 않는다. 이번 리뷰에서는 각 기록 블록을 별도로 재실행해 보완했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
