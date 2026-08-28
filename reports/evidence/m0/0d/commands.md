@@ -1126,7 +1126,7 @@ for n, (c, o) in enumerate(sel):
     want = chr(10).join(lines[o[0]:o[1]]).strip(chr(10))
     ok = got == want
     diff += 0 if ok else 1
-    print("pair %2d L%-5d %s  %s" % (n, o[0] + 1, "OK  " if ok else "DIFF", lines[c[0]][:56]))
+    print("pair %2d L%-5d %s  %s" % (n, o[0] + 1, "OK  " if ok else "DIFF", lines[c[0]][:56].rstrip()))
 print("pairs=%d skipped_harness=%d diff=%d" % (len(sel), len(pairs) - len(sel), diff))
 PY
 git worktree remove --force "$WT"
@@ -1137,7 +1137,7 @@ pair  0 L44    OK    git rev-parse HEAD
 pair  1 L65    OK    T0=$(mktemp -d)
 pair  2 L121   OK    T=$(mktemp -d)
 pair  3 L148   OK    # adrscan.py 는 C-3 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않는
-pair  4 L171   OK    git log --format='%H %s' 998dc21..HEAD | grep 'm0-0d' | 
+pair  4 L171   OK    git log --format='%H %s' 998dc21..HEAD | grep 'm0-0d' |
 pair  5 L205   OK    cd bid-vector
 pair  6 L274   OK    cd bid-vector
 pair  7 L291   OK    awk -F'\t' '$4>50 {printf "%s:%d-%d\t%d\t%s\n", $1,$2,$3
@@ -1152,9 +1152,9 @@ pair 15 L773   OK    # citescan.py 는 C-6 블록이 만든 "$T" 의 것을 그�
 pair 16 L844   OK    T=$(mktemp -d)
 pair 17 L871   OK    python3 "$T/ops07scan.py" docs/adr 'Kafka@0005' 'RabbitM
 pair 18 L888   OK    xargs grep -nEi 'api[_-]?key|secret|token|password|passw
-pair 19 L912   OK    grep -ci 'react' docs/discovery/capability-map.md | sed 
+pair 19 L912   OK    grep -ci 'react' docs/discovery/capability-map.md | sed
 pair 20 L924   OK    grep -h '^### Slice' milestone-*.md | wc -l | sed 's/^ *
-pair 21 L939   OK    grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | 
+pair 21 L939   OK    grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md |
 pair 22 L976   OK    grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u |
 pair 23 L1001  OK    grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | g
 pair 24 L1036  OK    T=$(mktemp -d)
