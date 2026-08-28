@@ -600,12 +600,13 @@ $ wc -l < docs/discovery/regression-ledger.md
 
 ---
 
-## C-7. 「적은 대로 했는지」를 실행으로 확인한다 (verifier `V-1`)
+## C-7. 「적은 대로 했는지」를 실행으로 확인한다 (verifier `V-1` · `W-1` · `Y-1`)
 
 **`V-1`은 evidence가 *"라운드별 이력 절에 표시를 달았다"*고 적고 **그 행위를 하지 않은
-것**이다. **한 줄로 잡혔다.** **그래서 이번에는 적기 전에 실행으로 확인했다.**
+것**이고, **`W-1`은 절을 개명하고 그 이름을 부르던 자리를 안 고친 것**이다. **둘 다 실행
+한 줄로 잡혔다.** **그래서 적기 전에 실행으로 확인한다.**
 
-**마커로 집는다** — 이 절의 서술이 **자기 검사에 걸리지 않게** 마커 문자열을 셸 변수로
+**(a) 마커로 집는다** — 이 절의 서술이 **자기 검사에 걸리지 않게** 마커 문자열을 셸 변수로
 쪼개 기록한다. 그러지 않으면 **이 절을 쓰는 것만으로 결과가 늘어난다.**
 
 > **이 블록은 고정점이 아니다.** 쪼갠 것은 **자기참조 하나**이고, **검사 대상은 라운드마다
@@ -613,33 +614,146 @@ $ wc -l < docs/discovery/regression-ledger.md
 > **그때 다시 뜬다.** 이 절은 *"지금 이 상태에서 적은 대로 했는가"*를 보이는 것이지
 > **어느 상태에서도 같은 출력을 낸다는 주장이 아니다**(verifier `W-2`).
 
+**(b) 포인터를 두 축으로 본다.** 앞 라운드의 검사는 **`commands.md` 접두가 붙은 인용만**
+봤고 **`W-1`의 자리는 전부 접두가 없어 구조적으로 못 봤다**(verifier `Y-1`).
+**넓혔다** — 접두를 가리지 않고, **번호가 절을 넘겨준 뒤에 낡은 인용**까지 본다.
+**본문은 아래에 인라인**한다(형태 4).
+
+```python
+# 포인터 대조 — scope.md·checklist.md 가 commands.md 의 절을 부르는 이름을 검사한다.
+#
+# 앞 라운드의 검사는 `commands.md` 접두가 붙은 인용만 봤다. W-1 의 자리는 전부 접두가
+# 없어 구조적으로 못 봤다(verifier Y-1). 두 축으로 넓힌다.
+#
+#   (1) 존재   — 부르는 이름이 실재하는 절 머리인가. **접두 유무를 가리지 않는다.**
+#   (2) 번호이동 — 그 번호가 쓰던 제목이 지금은 **다른 번호**의 제목인가(= 절이 번호를
+#                옮겼다). 옮겼다면 그 이동 **전에 쓰인 줄**은 옛 절을 뜻하는 채로 남아
+#                있다. **W-1 이 정확히 그 형태다.**
+#
+# 제목만 다듬은 것(번호는 그대로, 내용도 그대로)은 지목하지 않는다 — 그것으로 지목하면
+# 이 파일의 정상 인용 다수가 걸려 축이 무의미해진다. 좁힌 근거는 evidence 에 적었다.
+#
+# 기계가 못 하는 것: "이 문장이 뜻한 절이 어느 것인가". 축은 지목하고 판정은 사람이 한다.
+import re, subprocess, sys
+
+CM  = "reports/evidence/m0/0a3/commands.md"
+SRC = ["reports/evidence/m0/0a3/scope.md", "reports/evidence/m0/0a3/checklist.md"]
+EXEMPT = {"C-5"}   # 절 머리가 없다 — C-4 의 출력 블록에 같은 실행으로 들어 있고 C-4 제목이 그렇게 적는다
+rev = sys.argv[1] if len(sys.argv) > 1 else "HEAD"
+
+def sh(*a): return subprocess.run(a, capture_output=True, text=True).stdout
+HEAD_RE = re.compile(r'^## (C-\d)\. (.*)$', re.M)
+now = dict(HEAD_RE.findall(sh("git","show",f"{rev}:{CM}")))
+now_title_owner = {t: n for n, t in now.items()}
+
+# 번호별 제목 이력 + 각 변경 커밋
+shas = sh("git","log","--format=%H","--reverse",rev,"--",CM).split()
+seen, moved_at = {}, {}
+for sha in shas:
+    for n, t in HEAD_RE.findall(sh("git","show",f"{sha}:{CM}")):
+        t = t.strip()
+        if seen.get(n) != t:
+            prev = seen.get(n)
+            seen[n] = t
+            # 이전 제목이 지금 다른 번호의 것이면 = 그 번호가 절을 넘겨줬다
+            if prev and now_title_owner.get(prev) not in (None, n):
+                moved_at[n] = sha
+def when(s): return int(sh("git","show","-s","--format=%ct",s).strip() or 0)
+
+MENTION = re.compile(r'(?<![0-9A-Za-z-])(C-\d)(?![0-9.\-])')
+bad = []
+for path in SRC:
+    cur, line_sha, lines = None, [], []
+    for ln in sh("git","blame","--line-porcelain",rev,"--",path).split("\n"):
+        if re.match(r'^[0-9a-f]{40} ', ln): cur = ln.split()[0]
+        elif ln.startswith("\t"): line_sha.append(cur); lines.append(ln[1:])
+    for i, (sha, line) in enumerate(zip(line_sha, lines), 1):
+        for m in sorted(set(MENTION.findall(line))):
+            if m in EXEMPT: continue
+            if m not in now:
+                bad.append(("존재", path, i, m, "그런 절이 없다"))
+            elif m in moved_at and when(moved_at[m]) > when(sha):
+                bad.append(("번호이동", path, i, m,
+                            f"그 줄({sha[:7]})은 {m} 이 절을 넘겨준 커밋({moved_at[m][:7]})보다 앞선다"))
+for k, p, i, m, w in bad: print(f"[{k}] {p}:{i}  {m} — {w}")
+print(f"-- 지목 {len(bad)}건 · 번호를 넘겨준 절: {' '.join(sorted(moved_at)) or '없음'}")
 ```
-### 실행 시점 HEAD = 5d2ca03 (이 라운드의 편집이 든 작업 트리)
+
+**두 커밋에서 돌려 능력을 측정했다** — **넓혔다고 적기 전에 재는 것이 이번 라운드의 요구**다.
+
+```
+### 실행 시점 HEAD = d2cced5 (이 라운드의 편집이 든 작업 트리)
 ### 마커는 셸 변수로 쪼갠다 — 이 절 자신의 서술이 검사에 걸리지 않게.
 
 ## (a) 표시가 이력 절 안에 실제로 들어갔는가 (V-1)
 $ MARK='재판정으로 이 절의'; grep -rn "⚠ 수정 라운드 10의 출처 층 $MARK" reports/evidence/m0/0a3/ | cut -c1-64 | sed 's/[[:space:]]*$//'
-reports/evidence/m0/0a3/scope.md:445:> **⚠ 수정 라운드 10의 출처 층 재판정으로
-reports/evidence/m0/0a3/scope.md:529:> **⚠ 수정 라운드 10의 출처 층 재판정으로
+reports/evidence/m0/0a3/scope.md:446:> **⚠ 수정 라운드 10의 출처 층 재판정으로
+reports/evidence/m0/0a3/scope.md:530:> **⚠ 수정 라운드 10의 출처 층 재판정으로
 reports/evidence/m0/0a3/checklist.md:421:> **⚠ 수정 라운드 10의 출처 층 재
 $ MARK2='재판정으로 이 귀속은'; grep -rn "⚠ 수정 라운드 10의 출처 층 $MARK2" reports/evidence/m0/0a3/ | cut -c1-64 | sed 's/[[:space:]]*$//'
 reports/evidence/m0/0a3/checklist.md:365:| **H-1** (high) | C-3.
 $ grep -n '^## 갱신 이력 — 수정 라운드 [45] ' reports/evidence/m0/0a3/scope.md | cut -c1-56 | sed 's/[[:space:]]*$//'
-438:## 갱신 이력 — 수정 라운드 4 (verifier `H-1`~`H-4`)
-509:## 갱신 이력 — 수정 라운드 5 (verifier `P-1` · 게이트 안 1건)
+439:## 갱신 이력 — 수정 라운드 4 (verifier `H-1`~`H-4`)
+510:## 갱신 이력 — 수정 라운드 5 (verifier `P-1` · 게이트 안 1건)
 $ grep -n '^## 1[12]\. 수정 라운드' reports/evidence/m0/0a3/checklist.md | cut -c1-56 | sed 's/[[:space:]]*$//'
 358:## 11. 수정 라운드 4 — verifier `H-1`~`H-4`
 397:## 12. 수정 라운드 5 — verifier `P-1` (게이트 안 1건)
 
-## (b) 포인터가 실재하는 절을 가리키는가 (W-1)
-$ grep -n '^## C-' reports/evidence/m0/0a3/commands.md | cut -c1-46 | sed 's/[[:space:]]*$//'
-29:## C-1. legacy 인용 재확인 — 직접 열었다 (§10.1 형태 2)
-91:## C-2. 범위 — in_scope 준수와 `capability-map.m
-149:## C-3. X-1 프레이밍 — 두 축이 보는 범위
-432:## C-4. A4 불변 — 정본을 산출물에서 직접 계산한다 (**C-5**
-562:## C-6. F-4 — ledger 정본을 직접 열어 그 조건부 서술을 따
-603:## C-7. 「적은 대로 했는지」를 실행으로 확인한다 (verifier `
-669:## C-8. 이 slice가 만들지 않은 것
+## (b) 포인터가 실재하고 낡지 않았는가 (W-1 · Y-1)
+$ BLKP=$(python3 - <<'EOF'
+import re
+F = chr(96) * 3
+s = open("reports/evidence/m0/0a3/commands.md", encoding="utf-8").read()
+b = [m.group(1) for m in re.finditer(F + r"python\n(.*?)" + F, s, re.S)
+     if "포인터 대조 — scope.md" in m.group(1)]
+assert len(b) == 1, "marker 블록이 유일하지 않다: %d" % len(b)
+print(b[0], end="")
+EOF
+)
+
+### (b-1) W-1 이 살아 있던 커밋에서 — 넓힌 검사가 그 자리를 실제로 잡는가
+$ printf %s "$BLKP" | python3 - 5d2ca03
+[번호이동] reports/evidence/m0/0a3/scope.md:662  C-7 — 그 줄(2f8b65a)은 C-7 이 절을 넘겨준 커밋(5d2ca03)보다 앞선다
+[번호이동] reports/evidence/m0/0a3/scope.md:690  C-7 — 그 줄(2f8b65a)은 C-7 이 절을 넘겨준 커밋(5d2ca03)보다 앞선다
+[번호이동] reports/evidence/m0/0a3/scope.md:695  C-7 — 그 줄(2f8b65a)은 C-7 이 절을 넘겨준 커밋(5d2ca03)보다 앞선다
+[번호이동] reports/evidence/m0/0a3/checklist.md:526  C-7 — 그 줄(2f8b65a)은 C-7 이 절을 넘겨준 커밋(5d2ca03)보다 앞선다
+-- 지목 4건 · 번호를 넘겨준 절: C-6 C-7
+
+### (b-2) 현재 HEAD 에서
+$ printf %s "$BLKP" | python3 - HEAD
+-- 지목 0건 · 번호를 넘겨준 절: C-6 C-7
+```
+
+**판정 (a)** — **네 자리 전부 라운드별 이력 절 안에 있다.** 앞 두 grep 이 낸 줄 번호가
+뒤 두 grep 이 낸 절 머리보다 **뒤**다: `scope.md`는 **라운드 4 이력**과 **라운드 5 이력**,
+`checklist.md`는 **§11(라운드 4)**과 **§12(라운드 5)**. **이력 본문은 고쳐 쓰지 않았고
+표시만 달았다.** **앞 라운드들이 달아 둔 다른 표시**는 **다른 마커를 써서** 여기 걸리지 않는다.
+
+**판정 (b)** — **측정한 것을 적는다.**
+
+- **`5d2ca03`(= `W-1`이 살아 있던 커밋)에서 그 자리를 잡는다.** 지목이 `scope.md`의
+  세 줄과 `checklist.md`의 한 줄이고 **그 넷이 `W-1`이 지적한 자리 전부**다
+  (`checklist.md` 쪽 한 줄에 인용이 **둘** 있었다). **다른 지목은 없다.**
+- **현재 HEAD 에서 지목 0.**
+- **앞 축은 이것을 못 잡았다** — 접두가 붙은 인용만 봤기 때문이고, **`W-1`의 자리는
+  전부 접두가 없다.**
+
+**이 축이 좁혀 둔 것과 못 보는 것**:
+
+| 좁힌 것 / 못 보는 것 | 왜 |
+| --- | --- |
+| **제목만 다듬은 번호는 지목하지 않는다** | 번호가 그대로이고 절도 그대로면 인용은 여전히 옳다. **지목 대상으로 넣으면 정상 인용 다수가 걸린다** — 실제로 그 형태로 먼저 짜서 돌려 보고 좁혔다(그때 HEAD 지목이 0이 아니었다) |
+| **`C-5`는 면제다** | **절 머리가 없다** — C-4 의 출력 블록에 같은 실행으로 들어 있고 **C-4 제목이 그렇게 적는다.** 면제를 스크립트에 명시했다 |
+| **줄이 옮겨지기만 해도 blame 이 갱신된다** | 내용을 안 고치고 위치만 바뀐 줄은 **새 커밋으로 찍혀 낡음 판정을 빠져나간다** |
+| **코드 블록·인용 안의 이름도 같이 본다** | 오탐이 될 수 있다. **오탐이 는다는 이유로 좁히지 않았다** — 지금은 0건이다 |
+| **다른 파일의 절 이름** | 0B 의 `C-8.2`·`C-9.9` 같은 것은 **점이 붙어** 이 패턴에 걸리지 않는다 |
+
+**「전부 막는다」고 적지 않는다** — 위 표가 못 보는 것이고, **이 축이 막는 것은 측정된
+한 형태(번호 이동 뒤 낡은 인용)**다.
+
+---
+
+## C-8. 이 slice가 만들지 않은 것
 $ grep -rhoE 'commands.md` \*{0,2}C-[0-9]' reports/evidence/m0/0a3/scope.md reports/evidence/m0/0a3/checklist.md | grep -oE 'C-[0-9]' | sort -u
 C-1
 C-2
@@ -661,8 +775,9 @@ C-8
 실재한다.** 두 번째 grep 이 낸 이름 집합이 첫 번째 grep 이 낸 절 머리에 다 있다.
 **`C-5`만 절 머리가 없다** — **C-4 의 출력 블록에 같은 실행으로 들어 있고** 그 사실을
 **C-4 제목이 적는다.**
-**이 검사가 `W-1`을 막는다** — 앞 커밋이 절 하나를 개명하고 **그 이름을 부르던 네 문장을
-안 고쳤다.** **절 이름·번호를 바꾸면 이 대조를 돌린다.**
+**이 검사는 `W-1`이 난 자리를 잡는다 — 그것을 실행으로 쟀다**(위 (b-1)).
+**「막는다」고는 적지 않는다** — 이 축이 보는 것은 **번호 이동 뒤에 낡은 인용** 하나이고
+**못 보는 것은 바로 위 표에 있다.** **절 이름·번호를 바꾸면 이 대조를 돌린다.**
 
 ---
 
