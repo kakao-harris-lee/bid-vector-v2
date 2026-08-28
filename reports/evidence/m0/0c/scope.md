@@ -5,7 +5,7 @@ milestone: m0
 slice: 0c-data-dictionary
 base_sha: 2b05684d0e2ed8bac391d0eea4429e05f582a47b   # 착수 시점의 HEAD
 review_base: aff62abfca85ca873932fedcad1e65c29ab35730   # 이 slice 첫 커밋의 부모. 아래 「head_sha와 range」
-head_sha: 6af4179   # 이 파일을 쓴 가장 최근 커밋의 직전 커밋. 「head_sha와 range」 절 참조
+head_sha: c3020e8   # 이 파일을 쓴 가장 최근 커밋의 직전 커밋. 「head_sha와 range」 절 참조
 in_scope:
   - docs/discovery/data-dictionary.md   # 신설
   - reports/evidence/m0/0c/             # 이 패키지 (decisions-2026-08-28.md 포함)
@@ -75,6 +75,8 @@ A3("결정을 재조사하지 않고 인용한다")이 확인 불가능해지므
 
 - 이 파일은 **자기 커밋의 diff를 서술하지 않는다.** 커밋이 자기 SHA를 담을 수 없으므로
   yaml의 `head_sha`는 **이 파일을 쓴 가장 최근 커밋의 직전 커밋**을 가리킨다.
+  **그 뒤에 오는 커밋은 이 값을 갱신하지 않는다** — 뒤 커밋의 경로가 전부 `in_scope`
+  안이라 "`in_scope` 밖 경로가 없다"는 판정이 낡지 않기 때문이다.
 - **0D가 이 slice와 같은 시각에 작업했고 실제로 섞였다.** `base_sha`는 착수 시점
   HEAD이지만 착수 후 이 slice가 첫 커밋을 올리기 전에 **0D가 세 커밋을 올렸다.**
   그래서 `base_sha..HEAD`에는 0D의 커밋이 들어 있다.
@@ -220,7 +222,9 @@ ledger §10.3이 그렇게 인계했다.
 | --- | --- |
 | `8b938d6` | 계약 확정, 2026-08-28 결정 사본, 사전 6축 작성 |
 | `6af4179` | 검증 명령·출력(`commands.md`)과 acceptance 대조(`checklist.md`) |
-| 이 커밋 | `head_sha` 기입과 이 이력 절. **이 커밋에 대해서는 아무것도 주장하지 않는다** |
+| `f852716` | `head_sha` 기입과 이 이력 절 |
+| `c3020e8` | **A8이 잡은 것을 고쳤다** — `C-6.2`의 기록된 출력에 후행 공백이 있어 `git diff --check`가 지적했다. **산문으로 예외를 두지 않고 명령 자체를 바꿔** 옳은 문자열을 내게 했다 |
+| 이 커밋 | 위 두 줄의 등재와 `head_sha` 갱신. **이 커밋에 대해서는 아무것도 주장하지 않는다** |
 
 **커밋을 나눈 이유는 각 커밋에서 산출물이 자체 정합하기 때문이다** — 첫 커밋의 사전은
 자기 안에서 정합하고, 둘째 커밋의 evidence는 첫 커밋의 트리를 선언해 그 트리에서
