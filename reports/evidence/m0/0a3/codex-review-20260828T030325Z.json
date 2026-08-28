@@ -1,0 +1,56 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "48151b9c47e4f09286c4ee869977383fa4b23396",
+  "reviewed_head": "6b9942022ec429c1ddf4df987ddfa11cc42cb69e",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a3/commands.md",
+      "line": 339,
+      "evidence": "Codex 3차 R-1 대응은 §5 DEC와 §6 금액 라벨·acceptance를 O-2에서 뺀 점, §6 투찰률과 §7 SET F-4를 OPEN-REG-05 미귀속 부채로 남긴 점은 타당하다. 그러나 남은 두 항목을 `observed`로 분류한 것은 출처 층 정의와 어긋난다. `data-extract.md:10-12`는 `observed`를 운영 데이터/로그의 실제 형태, `legacy-behavior`를 기존 Python 결과로 구분하고, `capability-map.md:27-28`도 기존 Python 출력·수치를 `legacy-behavior`라고 명시한다. 특히 0B `R-BASIS-06`은 약 10% 방향·크기를 명시적으로 `legacy의 서술`이라고 판정한다. 그런데 C-3.4는 단지 `(관찰된 회귀)` 문구와 표 제목을 근거로 두 항목을 `observed`로 승격하고 scope.md:191 및 checklist.md:174에도 같은 분류를 전파했다. 이는 legacy 결과를 운영 데이터 관측과 같은 층으로 기록해 0C 인계의 provenance를 왜곡한다.",
+      "required_fix": "§6 투찰률과 §7 SET F-4를 `legacy-behavior` 층으로 바로잡되 두 항목이 O-2에 남는다는 판정과 OPEN-REG-05 유보 필요성은 유지한다. commands.md C-3.4, scope.md O-2, checklist의 현재 상태·인계 서술을 같은 분류로 동기화하고 동결 이력에는 필요하면 명시적 후속 정정 표시를 단다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a3/commands.md",
+      "line": 14,
+      "evidence": "현재형 인벤토리는 이 패키지의 인라인 스크립트가 둘이라고 선언하고 C-3.4와 C-4만 열거하며 line 760도 같은 주장을 반복한다. 실제 `commands.md`에는 `python` 코드펜스가 세 개다: C-3.4 X-1 스윕(line 390), C-4 불변 계산기(line 441), C-7 포인터 대조(line 622). 세 번째 스크립트는 32f7a63에서 추가됐고 실제로 `5d2ca03`과 현재 HEAD에 실행된다. 따라서 Codex 2차 M-3에서 고친 스크립트 자기 인벤토리가 후속 변경으로 다시 거짓이 됐다.",
+      "required_fix": "현재형 인벤토리를 세 스크립트로 갱신하고 C-7 포인터 대조의 위치·목적·도입 근거(Y-1)를 등재한다. line 16의 `둘 다`와 C-8의 `스크립트가 둘` 주장도 함께 동기화한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a3/checklist.md",
+      "line": 890,
+      "evidence": "수정 라운드 15 기록은 `새 서술을 쓰지 않았다`고 무조건적으로 주장하고 line 935는 `scope.md·checklist.md는 그대로`라고 적는다. 그러나 `git diff --numstat 32f7a63..6b99420`은 checklist.md +69/-1, scope.md +57/-2이며, 같은 range의 `^#{2,4} ` 절 머리 수는 checklist 64→69, scope 94→100이다. 실제 diff에는 checklist §22와 scope 수정 라운드 15 이력 등 새 판단·표·명령 기록이 대량 추가됐다. commands.md에서 옛 구간을 삭제했다는 대응 자체는 맞지만, 라운드 전체의 자기 기록은 실제 변경과 정면으로 어긋난다.",
+      "required_fix": "`새 서술을 쓰지 않았다`는 주장을 commands.md의 교체 대상 구간에 한정하고, scope/checklist에 이력·판정 서술을 추가했다는 사실을 명시한다. line 935의 무변경 주장과 절 머리 비교도 32f7a63..6b99420 실측에 맞게 고치거나 제거한다."
+    }
+  ],
+  "commands_run": [
+    "pwd && git status --short && git rev-parse 48151b9c47e4f09286c4ee869977383fa4b23396^{commit} && git rev-parse 6b9942022ec429c1ddf4df987ddfa11cc42cb69e^{commit} && git rev-parse HEAD",
+    "git log --oneline 48151b9c47e4f09286c4ee869977383fa4b23396..6b9942022ec429c1ddf4df987ddfa11cc42cb69e && git diff --stat 48151b9c47e4f09286c4ee869977383fa4b23396...6b9942022ec429c1ddf4df987ddfa11cc42cb69e && git diff --name-status 48151b9c47e4f09286c4ee869977383fa4b23396...6b9942022ec429c1ddf4df987ddfa11cc42cb69e",
+    "git merge-base 48151b9c47e4f09286c4ee869977383fa4b23396 6b9942022ec429c1ddf4df987ddfa11cc42cb69e && git merge-base --is-ancestor 48151b9c47e4f09286c4ee869977383fa4b23396 6b9942022ec429c1ddf4df987ddfa11cc42cb69e",
+    "git ls-files --others --exclude-standard && git diff --check 48151b9c47e4f09286c4ee869977383fa4b23396...6b9942022ec429c1ddf4df987ddfa11cc42cb69e",
+    "jq로 reports/evidence/m0/0a3/codex-review-20260827T132148Z.json, codex-review-20260827T204954Z.json, codex-review-20260828T005833Z.json의 이전 findings 전건 확인",
+    "git diff --unified=12 48151b9...6b99420 -- reports/evidence/m0/0a2/decisions.md reports/evidence/m0/0a2/checklist.md && git diff --unified=5 48151b9...6b99420 -- docs/discovery/capability-map.md",
+    "git diff --numstat 48151b9...6b99420 -- docs/discovery/capability-map.md && git diff -U0 48151b9...6b99420 -- docs/discovery/capability-map.md | rg '^@@'",
+    "git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md | rg '^@@'",
+    "commands.md C-4의 `0A3 A4 불변` Python 블록을 marker로 추출해 현재 HEAD와 `git archive 48151b9` 양쪽에서 stdin 실행",
+    "commands.md C-3.4의 `X-1 프레이밍 후보 스윕` Python 블록을 marker로 추출해 현재 HEAD에서 stdin 실행",
+    "commands.md C-7의 포인터 대조 Python 블록을 marker로 추출해 5d2ca03과 현재 HEAD에서 stdin 실행",
+    "grep -c 'OPEN-REG-05' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | sort",
+    "0B Codex 판정 JSON과 commands.md C-8.1·C-8.2·C-8.5·C-9.9, scope.md F-1·F-2, regression-ledger.md R-BASIS-01·R-BASIS-03·R-BASIS-06 직접 대조",
+    "rg -n '^```python|^# (0A3 A4 불변|X-1 프레이밍 후보 스윕|포인터 대조)' reports/evidence/m0/0a3/commands.md",
+    "git diff --numstat 32f7a63..6b99420 -- reports/evidence/m0/0a3/commands.md reports/evidence/m0/0a3/scope.md reports/evidence/m0/0a3/checklist.md",
+    "32f7a63과 6b99420에서 reports/evidence/m0/0a3/{commands,scope,checklist}.md의 `^#{2,4} ` 절 머리 수 비교",
+    "grep -c '^```' reports/evidence/m0/0a3/commands.md && grep -n '^## C-' reports/evidence/m0/0a3/commands.md"
+  ],
+  "residual_risks": [
+    "이 worktree에는 legacy `bid-vector` 저장소가 없어 `ed4b06c`의 파일·행 범위와 인용 원문을 독립 재현하지 못했다. 요청에 명시된 환경 한계이므로 finding으로 계상하지 않았다.",
+    "scope가 out_of_scope로 둔 capability-map.md §6 투찰률과 §7 SET F-4의 OPEN-REG-05 미귀속 서술은 현재도 그대로다. 이번 finding은 그 부채의 출처 층을 잘못 기록한 문제이며, 원문 자체의 수정은 후속 범위로 남는다.",
+    "문서 slice이므로 production wiring의 side effect, retry/idempotency, unknown-schema 계약, Kotlin/Python 업무 규칙 소유와 domain 의존 방향은 이번 range에서 검증할 구현이 없다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}

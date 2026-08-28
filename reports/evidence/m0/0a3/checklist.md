@@ -171,7 +171,7 @@ checklist.md`에 있고 0B의 out_of_scope다. 표를 고치려면 별도 slice 
 **`O-1`은 여기 없다 — 수정 라운드 2에서 닫혔다**(§9 · `scope.md`의 그 행).
 아래는 **지금도 열려 있는 것**이다.
 
-- **O-2** — **`capability-map.md` §13 밖에, 두 금액의 차이를 `observed` 층에서
+- **O-2** — **`capability-map.md` §13 밖에, 두 금액의 차이를 `legacy-behavior` 층에서
   정량화·방향화하면서 `OPEN-REG-05`를 지목하지 않은 서술이 남아 있다** —
   **§6 NOTI(투찰률)**과 **§7 SET(SET-09 F-4)**. **자리와 수는 `commands.md` C-3.4**의
   스윕 출력과 판정 표가 낸다 — **여기 옮겨 적지 않는다.** 지시가 적은
@@ -680,7 +680,7 @@ verdict 정본: `reports/evidence/m0/0a3/codex-review-20260828T005833Z.json`(등
 이 문서의 확정 서술로 읽힌다"*로 **판정**했다. **유보를 실제로 단 것은 다른 라운드다** —
 같은 `F-c` 블록이 그렇게 적는다: **`R-BASIS-06`은 `F-3`이, `R-BASIS-03`은 `F-b`가**
 각각 **인용 귀속 + `OPEN-REG-05` 유보**를 달았다.
-**기준은 `observed`로 귀속하는 것만으로는 부족하고 그 `OPEN`을 지목해야 한다**는 것이고,
+**기준은 legacy 서술로 귀속하는 것만으로는 부족하고 그 `OPEN`을 지목해야 한다**는 것이고,
 **남는 두 항목 다 그 지목이 없다.**
 
 ### `O-2`가 줄었다 — 0C 인계 내용이 달라진다
@@ -944,6 +944,48 @@ $ grep -n '^## C-' reports/evidence/m0/0a3/commands.md
 | **출력 블록이 여전히 전수 재현되는가** | `commands.md` C-3.4 · C-4 · C-7 의 명령을 다시 돌린다 |
 | 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** |
 | **`O-2` 자리가 살아 있는가** | `commands.md` **C-3.4** |
+| in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
+
+**결과를 여기 적지 않는다.**
+
+---
+
+## 23. 수정 라운드 16 — Codex 4차 `A` (층 한 겹 아래)
+
+verdict 정본: `reports/evidence/m0/0a3/codex-review-20260828T030325Z.json`(등재, append-only).
+`reviewed_base` **`48151b9`** → `reviewed_head` **`6b99420`**.
+**3차 두 건은 해소 판정을 받았고 `O-2` 재판정 자체도 타당하다고 인정됐다.**
+
+| | |
+| --- | --- |
+| **지운 문면** | 남는 두 항목의 층 라벨 **`observed`**와 그 근거 — *"`(관찰된 회귀)`로 귀속"* · *"표 제목이 「관찰된 실패·회귀」"* |
+| **왜 거짓인가** | **`data-extract.md` §1이 `observed`를 「기존 운영 데이터/로그에서 비식별화해 관찰한 실제 형태」, `legacy-behavior`를 「기존 Python이 낸 결과」로 가른다.** `capability-map.md` §0도 **기존 Python의 출력·docstring 수치를 `legacy-behavior`**라 명시한다. **0B `R-BASIS-06`은 그 `~10%`를 「legacy의 서술」로 명시 판정**하고 **그 값이 legacy commit 본문의 인용**임을 적는다. **문구(`(관찰된 회귀)`·표 제목)를 층 판정 근거로 쓴 것**이 오류다 — **층은 「그 값이 어디서 왔는가」로 정해진다.** legacy 결과를 운영 관측과 같은 층으로 기록하면 **0C 인계의 provenance가 왜곡된다** |
+| **남긴 문면** | **두 항목을 `legacy-behavior`로 바로잡았다.** §6 투찰률 — *"값의 출처가 **legacy 자신의 서술**이다. `(관찰된 회귀)`는 **legacy 저장소가 자기 회귀를 그렇게 부른 것**이고 운영 데이터·로그 관측이 아니다"*. §7 SET F-4 — *"**0B ledger `R-BASIS-06`이 같은 `~10%`를 「legacy의 서술」로 명시 판정**한다 … 표 제목의 「관찰된」은 **legacy 저장소가 자기 실패를 부른 말**이지 층이 아니다"*. **판정 축 서술에 층 판정 기준을 명시**했다 — *"층은 「그 값이 어디서 왔는가」로 정한다 — 문구가 아니다"* |
+
+**바뀐 것은 층 라벨과 그 근거 서술뿐이다** — **두 항목이 `O-2`에 남는다는 판정과
+`OPEN-REG-05` 유보 필요성은 그대로**다. 요약에 **`legacy-behavior`는 정답 지위가 없어
+그 값으로 V2 계약을 세우려면 그 `OPEN`의 지목이 더 필요하다**는 것을 덧붙였다.
+
+**0B `F-c` 기준의 문면도 맞췄다** — *"`observed`로 귀속하는 것만으로는"* →
+*"**legacy 서술로 귀속하는 것만으로는**"*. 세 자리 전수(`commands.md`·이 파일·`scope.md`).
+
+**이것은 3차 finding의 한 겹 아래다** — 3차는 **`authoritative` 대 나머지**를 갈랐고,
+이번은 **`observed` 대 `legacy-behavior`**다.
+
+### 동기화한 자리
+
+`commands.md` **C-3.4 판정 축·판정 표 두 행·요약·`F-c` 기준** · `scope.md` **`O-2` 행과
+`F-c` 기준** · `checklist.md` **§6 `O-2` bullet과 `F-c` 기준**.
+**동결 이력은 본문을 고치지 않았다** — 남은 `` `observed` `` 인용 셋은 **층의 정의**이거나
+**세 층 구분을 가리키는 말**이라 그대로다.
+
+### 이 라운드의 불변
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| 산출물 셋이 이 라운드에 무변경 | `git diff --stat 6b99420..<head> -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
+| **`O-2`에 남는 두 항목이 그대로인가** | `commands.md` **C-3.4 판정 표** — 층 라벨만 바뀐다 |
+| 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** |
 | in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
 
 **결과를 여기 적지 않는다.**
