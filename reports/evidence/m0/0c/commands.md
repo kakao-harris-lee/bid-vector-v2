@@ -3,7 +3,7 @@
 이 파일은 **명령과 출력만** 담는다. 판정과 이력은 `scope.md`·`checklist.md`에 있다.
 
 **각 블록은 자기 실행 시점의 SHA를 선언한다.** 커밋은 자기 SHA를 담을 수 없으므로
-이 파일의 블록은 **`8b938d6`**(산출물 커밋)의 트리를 선언한다 — 그 SHA를 체크아웃한
+이 파일의 블록은 **`cd1fbce`**(수정 라운드 1 커밋)의 트리를 선언한다 — 그 SHA를 체크아웃한
 worktree에서 재현된다. 이 파일 자신은 그 다음 커밋에 실린다.
 
 **`ed4b06c`를 여는 블록(C-7·C-9)은 `bid-vector` symlink가 있어야 재현된다.**
@@ -13,7 +13,7 @@ worktree에서 재현된다. 이 파일 자신은 그 다음 커밋에 실린다
 
 ## C-1 · 운영자 결정 사본이 원본과 같은가
 
-선언 SHA `8b938d6`. 원본은 `_workspace/`(gitignore 대상)라 이 블록은 그 디렉터리가
+선언 SHA `cd1fbce`. 원본은 `_workspace/`(gitignore 대상)라 이 블록은 그 디렉터리가
 있는 작업 트리에서만 재현된다.
 
 ```
@@ -38,16 +38,16 @@ exit=0
 
 ### C-2.1 이 slice의 커밋과 그 커밋이 건드린 경로
 
-선언 SHA `8b938d6`.
+선언 SHA `cd1fbce`.
 
 ```
-for c in $(git log --format='%H' 2b05684..8b938d6 \
+for c in $(git log --format='%H' 2b05684..cd1fbce \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   echo "-- $(git log --format='%h %s' -1 $c)"
   git show --name-only --format='' $c | sed '/^$/d' | sed 's/^/   /'
 done
 echo "### in_scope 밖 경로 (아래 줄이 '(없음)'이면 통과)"
-for c in $(git log --format='%H' 2b05684..8b938d6 \
+for c in $(git log --format='%H' 2b05684..cd1fbce \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   git show --name-only --format='' $c
 done | sed '/^$/d' | sort -u \
@@ -56,6 +56,20 @@ done | sed '/^$/d' | sort -u \
 ```
 
 ```
+-- cd1fbce fix(m0-0c): 정본 목록의 범위·귀속과 셈·인용을 실측에 맞춘다 (F-2·F-4~F-8)
+   docs/discovery/data-dictionary.md
+   reports/evidence/m0/0c/checklist.md
+   reports/evidence/m0/0c/commands.md
+   reports/evidence/m0/0c/scope.md
+-- b833fee docs(m0-0c): scope.md 이력에 f852716·c3020e8 등재, head_sha → c3020e8
+   reports/evidence/m0/0c/scope.md
+-- c3020e8 fix(m0-0c): C-6.2 가 후행 공백을 내지 않게 한다 (A8 git diff --check)
+   reports/evidence/m0/0c/commands.md
+-- f852716 docs(m0-0c): scope.md 에 head_sha(6af4179)와 커밋 이력 기입
+   reports/evidence/m0/0c/scope.md
+-- 6af4179 docs(m0-0c): 검증 명령·출력(C-1~C-9)과 acceptance 대조(A1~A8)
+   reports/evidence/m0/0c/checklist.md
+   reports/evidence/m0/0c/commands.md
 -- 8b938d6 docs(m0-0c): 도메인 명세·데이터 사전 6축 작성 + slice 계약
    docs/discovery/data-dictionary.md
    reports/evidence/m0/0c/decisions-2026-08-28.md
@@ -66,15 +80,15 @@ done | sed '/^$/d' | sort -u \
 
 **이 판정은 뒤 커밋에 낡지 않는다** — 뒤 커밋(`commands.md`·`checklist.md`·`scope.md`
 갱신)의 경로가 전부 `reports/evidence/m0/0c/` 안이기 때문이다. 리뷰 시점의 HEAD로
-다시 돌리려면 위 두 자리의 `8b938d6`을 HEAD로 바꾼다.
+다시 돌리려면 위 두 자리의 `cd1fbce`를 HEAD로 바꾼다.
 
 ### C-2.2 공백 오류
 
-선언 SHA `8b938d6`.
+선언 SHA `cd1fbce`.
 
 ```
-git diff --check 2b05684..8b938d6
-echo "git diff --check 지적: $(git diff --check 2b05684..8b938d6 | wc -l | tr -d ' ')"
+git diff --check 2b05684..cd1fbce
+echo "git diff --check 지적: $(git diff --check 2b05684..cd1fbce | wc -l | tr -d ' ')"
 ```
 
 ```
@@ -85,7 +99,7 @@ git diff --check 지적: 0
 
 ## C-3 · 6축 커버 (A1)
 
-선언 SHA `8b938d6`. 스크립트 본문은 인라인이다.
+선언 SHA `cd1fbce`. 스크립트 본문은 인라인이다.
 
 ```
 python3 - <<'PY'
@@ -121,7 +135,7 @@ exit=0
 
 사전 §12 「숫자 인덱스」의 **값 칸**을 정본으로 삼고, §12 밖 본문에서 그 목록에 없는
 숫자 토큰을 찾는다. **셈·좌표·식별자는 마스크로 뺀다** — 무엇을 뺐는지는 `MASKS`가
-한 줄씩 밝힌다. 선언 SHA `8b938d6`.
+한 줄씩 밝힌다. 선언 SHA `cd1fbce`.
 
 ```
 python3 - docs/discovery/data-dictionary.md <<'PY'
@@ -191,52 +205,57 @@ exit=0
 
 ## C-5 · `capability-map.md`에서 정책 version을 말하는 자리 전수 (A3 · §4.2)
 
-선언 SHA `8b938d6`.
+선언 SHA `cd1fbce`.
 
 ```
-awk '
-/^### /{cap=$0}
-/정책 version|policy version|policyVersion|versioned policy/ {
-  printf "%s\n    ↳ %s\n", cap, substr($0,1,110)
-}' docs/discovery/capability-map.md
+python3 - <<'PY'
+import pathlib, re
+cap = ""
+pat = re.compile(r"정책 version|policy version|policyVersion|versioned policy")
+for line in pathlib.Path("docs/discovery/capability-map.md").read_text().split("\n"):
+    if line.startswith("### "): cap = line
+    if pat.search(line):
+        # 문자 단위로 자른다 — 바이트 절단은 한글을 깨뜨린다
+        print(cap); print("    ↳ " + line.strip()[:90])
+PY
 echo "exit=$?"
 ```
 
 ```
 ### QUAL-01 · 이 공고에 우리가 참가할 수 있는가, 없다면 무엇이 없어서인가
-    ↳   과거 판정의 의미가 조용히 달라진다 — 정책 version 식별자로 참조한다.
+    ↳ 과거 판정의 의미가 조용히 달라진다 — 정책 version 식별자로 참조한다.
 ### QUAL-03 · 그룹 AND/OR 자격 경로 판정
-    ↳     - 판정 결과에 어떤 policy version으로 판정했는지가 함께 남는다.
+    ↳ - 판정 결과에 어떤 policy version으로 판정했는지가 함께 남는다.
 ### QUAL-03 · 그룹 AND/OR 자격 경로 판정
-    ↳     - **판정에 쓰인 요건 소스 집합과 결합 규칙의 policy version이 결과에 함께 남는다** —
+    ↳ - **판정에 쓰인 요건 소스 집합과 결합 규칙의 policy version이 결과에 함께 남는다** —
 ### ML-07 · 모델 승격 게이트 (사전 선언 판정식 + 검정력 공시)
-    ↳   - 게이트 리포트가 자신이 사용한 정책 version을 싣고, 정책 version이 바뀌면 그 이전
+    ↳ - 게이트 리포트가 자신이 사용한 정책 version을 싣고, 정책 version이 바뀌면 그 이전
 ### ML-11 · ML 재활용 대상 요약 (v2-지침서 §3.2 이식 판단 입력)
-    ↳ | 전역 `settings` 싱글턴 | 14파일. predictor 동작에 영향 주는 설정 33개 | 생성자 주입으
+    ↳ | 전역 `settings` 싱글턴 | 14파일. predictor 동작에 영향 주는 설정 33개 | 생성자 주입으로. 33개 중 다수는 환경 값이 아니라 **도
 ### DEC-03 · 법정 낙찰하한율 해석 (우선순위 + 적용 범위)
-    ↳ - **재사용 후보(설계 규율)**: 시행일 표를 versioned policy + effective date로 두고 기준
+    ↳ - **재사용 후보(설계 규율)**: 시행일 표를 versioned policy + effective date로 두고 기준일을
 ### DEC-03 · 법정 낙찰하한율 해석 (우선순위 + 적용 범위)
-    ↳     유형이 어느 모델에 해당하는지는 versioned policy가 정하며, 이 시나리오는 그 매핑과
+    ↳ 유형이 어느 모델에 해당하는지는 versioned policy가 정하며, 이 시나리오는 그 매핑과
 ### DEC-04 · 하한 미달 빈도 표시와 판정 불가 사유 (정직 명세)
-    ↳   - 빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version)
+    ↳ - 빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version)
 ### DEC-05 · 투찰가 메뉴 3안 (recommended / aggressive / safe)
-    ↳   `_MAX_ADJUSTMENT`)가 코드 상수인 형태는 `폐기` — versioned policy 데이터로.
+    ↳ `_MAX_ADJUSTMENT`)가 코드 상수인 형태는 `폐기` — versioned policy 데이터로.
 ### DEC-08 · 기초금액 provenance 분류
-    ↳   - 분류에 사용된 정책 version이 결과와 함께 저장된다.
+    ↳ - 분류에 사용된 정책 version이 결과와 함께 저장된다.
 ### SET-06 · 정산 성숙도(관측 가능성) → 평가 창 embargo
-    ↳     (개찰 시각 / 승인된 대체 출처)와 적용된 정책 version이 함께 남는다. 시각 종류를
+    ↳ (개찰 시각 / 승인된 대체 출처)와 적용된 정책 version이 함께 남는다. 시각 종류를
 ### SET-06 · 정산 성숙도(관측 가능성) → 평가 창 embargo
-    ↳   (`OPEN-SET-10`), 대체 출처와 정책 version을 결과에 보존하며, 대체 불가 행을 사유 있는
+    ↳ (`OPEN-SET-10`), 대체 출처와 정책 version을 결과에 보존하며, 대체 불가 행을 사유 있는
 ### G2. 정책 값·임계의 근거 — 재유도 또는 승인 필요
-    ↳ | OPEN-SET-10 | 성숙도 시간축에서 개찰 시각 결측 시 마감 시각 대체를 **승인된 정책**으로
+    ↳ | OPEN-SET-10 | 성숙도 시간축에서 개찰 시각 결측 시 마감 시각 대체를 **승인된 정책**으로 채택할 것인가 | (a) 채택 + 대체 출처·polic
 ### G2. 정책 값·임계의 근거 — 재유도 또는 승인 필요
-    ↳ | OPEN-ML-05 | predictor 정책 값 33개 중 어디까지가 versioned policy이고 어디까지가 환경
+    ↳ | OPEN-ML-05 | predictor 정책 값 33개 중 어디까지가 versioned policy이고 어디까지가 환경 설정인가 | 특히 발주기관별 값들은 
 ### 12.1 통합·해소된 항목 (ID 결번 사유)
-    ↳ | `OPEN-QUAL-11` (신설) | `OPEN-QUAL-02`가 `permsnIndstrytyList`의 **판정 소스 포함**을
+    ↳ | `OPEN-QUAL-11` (신설) | `OPEN-QUAL-02`가 `permsnIndstrytyList`의 **판정 소스 포함**을 확정했으나 **결합 규칙
 ### 12.2 결정 완료 항목 (운영자 결정 2026-08-26 · 2026-08-27)
-    ↳ | `OPEN-QUAL-02` | **(b)** `permsnIndstrytyList`를 자격 경로로 포함한다 | 문서 정의가 "공
+    ↳ | `OPEN-QUAL-02` | **(b)** `permsnIndstrytyList`를 자격 경로로 포함한다 | 문서 정의가 "공고의 제한되는 면허에서 **허용
 ### 12.2 결정 완료 항목 (운영자 결정 2026-08-26 · 2026-08-27)
-    ↳ | `OPEN-COL-02` | 문서의 **17개 `resultCode`를 versioned policy data로 등재**한다 | 조달
+    ↳ | `OPEN-COL-02` | 문서의 **17개 `resultCode`를 versioned policy data로 등재**한다 | 조달청 OpenAPI 참고자료
 exit=0
 ```
 
@@ -246,10 +265,10 @@ exit=0
 
 ### C-6.1 상류 산출물과 0D 산출물이 이 slice의 커밋에서 변하지 않았다
 
-선언 SHA `8b938d6`.
+선언 SHA `cd1fbce`.
 
 ```
-for c in $(git log --format='%H' 2b05684..8b938d6 \
+for c in $(git log --format='%H' 2b05684..cd1fbce \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   git show --name-only --format='' $c
 done | sed '/^$/d' | sort -u \
@@ -263,7 +282,7 @@ done | sed '/^$/d' | sort -u \
 
 ### C-6.2 신설 `OPEN-DIC` id와 중복
 
-선언 SHA `8b938d6`.
+선언 SHA `cd1fbce`.
 
 ```
 grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary.md \
@@ -285,7 +304,7 @@ OPEN-DIC-01 OPEN-DIC-02 OPEN-DIC-03 OPEN-DIC-04
 
 `capability-map.md` §12의 **표 첫 칸**과 `regression-ledger.md` §9의 첫 칸을 정본으로
 삼는다. **한 id가 활성과 결정 완료 양쪽에 나오면 활성이 이긴다** — §12.2가 "라운드 7에
-활성으로 복원", "임계 자체는 미결"이라 적는 행들이 그렇다. 선언 SHA `8b938d6`.
+활성으로 복원", "임계 자체는 미결"이라 적는 행들이 그렇다. 선언 SHA `cd1fbce`.
 
 ```
 python3 - <<'PY'
@@ -362,6 +381,7 @@ echo "exit=$?"
   OPEN-STR-07   결정 완료 — 사전이 등재한다
 
 신설: 4 · 활성: 15 · 결정 완료: 17 · 미분류: 0
+exit=0
 ```
 
 > **이 분류의 읽는 법과 항목별 처리는 `checklist.md` **A5**가 적는다** — 이 파일은
@@ -373,7 +393,7 @@ echo "exit=$?"
 
 ## C-7 · legacy 인용 (A6)
 
-`bid-vector` symlink가 있어야 재현된다. 선언 SHA `8b938d6`.
+`bid-vector` symlink가 있어야 재현된다. 선언 SHA `cd1fbce`.
 
 ### C-7.1 경로 존재 · 행 범위 유효 · 파일명만 쓴 인용
 
@@ -416,9 +436,9 @@ echo "exit=$?"
 
 ```
 문서: docs/discovery/data-dictionary.md
-legacy 인용(고유 (경로,범위)): 78
-고유 경로: 33
-경로 존재 + 행 범위 유효: 78
+legacy 인용(고유 (경로,범위)): 81
+고유 경로: 35
+경로 존재 + 행 범위 유효: 81
 경로 부재: 0
 행 범위 초과/역전: 0
 파일명만 쓴 인용(디렉터리 없음): 0
@@ -443,6 +463,10 @@ git -C bid-vector grep -l 'cnstrtnAbltyEvlAmt' ed4b06c -- app/ tests/ \
 
 ### C-7.3 `0`을 부재로 쓰는 legacy 컬럼 (§1.3)
 
+이 명령이 내는 것은 **두 모델 파일에서 `0` 기본값을 선언한 컬럼 전부**다. 부재 금지 규칙이
+걸리는 것은 그중 **도메인 값을 나르는 컬럼**이며, 불리언 플래그처럼 `0`이 진짜 값인 자리는
+그 규칙의 대상이 아니다.
+
 ```
 git -C bid-vector grep -n 'default=0\.0\|server_default="0"' ed4b06c \
   -- app/models/models.py app/models/pipeline.py | sed 's/^ed4b06c://'
@@ -450,15 +474,44 @@ echo "exit=$?"
 ```
 
 ```
+app/models/models.py:150:    predicted_bid_rate = Column(Float, default=0.0)
+app/models/models.py:170:    annual_revenue = Column(Float, default=0.0)
 app/models/models.py:171:    capacity_score = Column(Float, default=0.0)
-app/models/models.py:172:    annual_revenue = Column(Float, default=0.0)
-app/models/models.py:175:        Float, default=0.0, nullable=False, server_default="0"
+app/models/models.py:176:        Float, default=0.0, nullable=False, server_default="0"
 app/models/models.py:181:        Float, default=0.0, nullable=False, server_default="0"
+app/models/models.py:222:    min_budget_estimate = Column(Float, default=0.0)
+app/models/models.py:223:    max_budget_estimate = Column(Float, default=0.0)
+app/models/models.py:255:    is_active = Column(Boolean, default=False, nullable=False, server_default="0")
 app/models/models.py:273:    base_amount = Column(Float, default=0.0)
 app/models/models.py:274:    predicted_price = Column(Float, default=0.0)
 app/models/models.py:275:    bid_rate = Column(Float, default=0.0)
+app/models/models.py:330:    probability_score = Column(Float, default=0.0)
+app/models/models.py:331:    matched_score = Column(Float, default=0.0)
+app/models/models.py:332:    priority_score = Column(Float, default=0.0)
+app/models/models.py:333:    urgency_score = Column(Float, default=0.0)
+app/models/models.py:334:    competitiveness_score = Column(Float, default=0.0)
+app/models/models.py:335:    budget_capture_score = Column(Float, default=0.0)
+app/models/models.py:336:    expected_margin_score = Column(Float, default=0.0)
+app/models/models.py:337:    execution_complexity_score = Column(Float, default=0.0)
+app/models/models.py:341:    current_workload_score = Column(Float, default=0.0)
+app/models/models.py:408:    recommended_amount = Column(Float, default=0.0)
+app/models/models.py:409:    probability_score = Column(Float, default=0.0)
 app/models/models.py:461:    paper_bid_amount = Column(Float, default=0.0)
 app/models/models.py:462:    paper_bid_rate = Column(Float, default=0.0)
+app/models/models.py:464:    priority_score = Column(Float, default=0.0)
+app/models/models.py:465:    probability_score = Column(Float, default=0.0)
+app/models/models.py:466:    matched_score = Column(Float, default=0.0)
+app/models/models.py:467:    predicted_price = Column(Float, default=0.0)
+app/models/models.py:468:    predicted_bid_rate = Column(Float, default=0.0)
+app/models/models.py:469:    price_range_min = Column(Float, default=0.0)
+app/models/models.py:470:    price_range_max = Column(Float, default=0.0)
+app/models/models.py:471:    confidence_score = Column(Float, default=0.0)
+app/models/models.py:494:    winning_amount = Column(Float, default=0.0)
+app/models/models.py:495:    winning_rate = Column(Float, default=0.0)
+app/models/models.py:496:    amount_delta = Column(Float, default=0.0)
+app/models/models.py:497:    absolute_error_rate = Column(Float, default=0.0)
+app/models/models.py:498:    bid_rate_delta = Column(Float, default=0.0)
+app/models/models.py:499:    absolute_bid_rate_error = Column(Float, default=0.0)
 app/models/pipeline.py:156:    winning_amount = Column(Float, default=0.0)
 app/models/pipeline.py:157:    winning_rate = Column(Float, default=0.0)
 exit=0
@@ -476,17 +529,24 @@ git -C bid-vector grep -rn 'TRANSITION\|transition_table\|state_machine' ed4b06c
 
 ```
 app/models/models.py:86:    status = Column(String(50), default="open")  # open, re_notice, closed, awarded, failed, cancelled
-app/models/models.py:117:    status = Column(String(50), default="pending")
-app/models/models.py:198:    status = Column(String(20), default="active")
-app/models/models.py:375:    status = Column(String(20), default="pending")
-app/models/models.py:411:    status = Column(String(20), default="pending", index=True)
-app/models/models.py:427:    status = Column(String(20), default="pending")
-app/models/models.py:492:    status = Column(String(20), default="pending")
-app/models/models.py:699:    status = Column(String(20), default="active", index=True)
-app/models/models.py:731:    status = Column(String(30), default="queued", index=True)
-app/models/pipeline.py:118:    status = Column(String(20), default="pending", index=True)
+app/models/models.py:117:    status = Column(String(50), default="submitted")  # submitted, reviewed, accepted, rejected
+app/models/models.py:198:    business_verification_status = Column(
+app/models/models.py:321:    decision_status = Column(String(50), default="planned")
+app/models/models.py:323:    initial_decision_status = Column(String(50), default="planned")
+app/models/models.py:375:    status = Column(String(50), default="planned", index=True)
+app/models/models.py:411:    status = Column(String(50), default="proposed")
+app/models/models.py:427:    status = Column(String(50), default="running", index=True)
+app/models/models.py:459:    decision_status = Column(String(50), default="skipped", index=True)
+app/models/models.py:492:    result_status = Column(String(50), default="pending")
+app/models/models.py:535:    telegram_status = Column(String(50), nullable=True)
+app/models/models.py:597:    status = Column(String(50), default="queued", index=True)  # queued/running/completed/failed
+app/models/models.py:699:    status = Column(String(20), nullable=False)
+app/models/models.py:731:    status = Column(String(50), default="idle", nullable=False, index=True)  # idle / running / failed
+app/models/pipeline.py:31:    status = Column(String(50), default="queued", index=True)
+app/models/pipeline.py:74:    status = Column(String(30), nullable=False, default="processing", index=True)
+app/models/pipeline.py:118:    status = Column(String(20), nullable=False, default="pending", index=True)
 app/models/pipeline.py:158:    result_status = Column(String(50), default="pending")
-app/models/pipeline.py:192:    status = Column(String(20), default="running")
+app/models/pipeline.py:192:    status = Column(String(50), default="queued")
 ---
 (전이표 선언 매치 0)
 ```
@@ -523,7 +583,7 @@ KNOWN_FIELDS 고유 키: 60
 
 ## C-8 · secret 스캔
 
-선언 SHA `8b938d6`.
+선언 SHA `cd1fbce`.
 
 ```
 grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
@@ -536,15 +596,22 @@ grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}
 ```
 
 ```
-reports/evidence/m0/0c/scope.md:98:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:524:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:529:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:539:reports/evidence/m0/0c/scope.md:98:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:546:> 있는 `secret 스캔 통과`가 자기 패턴에 걸린 것이다. **이 파일이 커밋되면 위 정규식
+reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
 exit=0
 --- 사업자/채널 식별자 패턴 ---
-(매치 0)
+reports/evidence/m0/0c/commands.md:533:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
 ```
 
-> **매치는 그 단어를 말하는 산문 한 줄이고 값이 아니다** — `scope.md`의 acceptance 표에
-> 있는 `secret 스캔 통과`가 자기 패턴에 걸린 것이다. **이 파일이 커밋되면 위 정규식
-> 자체와 이 문단도 같은 이유로 매치에 추가된다** — 값이 아니다.
+> **매치는 전부 그 단어를 말하는 산문이거나 위 정규식 자체이고 값이 아니다** —
+> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+> 판정 문단, 그리고 두 grep의 패턴 문자열이다. 둘째 스캔이 내는 한 줄도 자기 정규식이다.
+> **좌표는 선언 SHA 트리의 것이고 이 커밋의 편집으로 이동한다** — 자기 커밋의 내용을
+> 좌표로 주장하지 않으므로 갱신하지 않는다.
 
 ---
 
