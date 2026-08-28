@@ -3,8 +3,9 @@
 ```yaml
 milestone: m0
 slice: 0c-data-dictionary
-base_sha: 2b05684d0e2ed8bac391d0eea4429e05f582a47b   # 착수 시점의 HEAD (0D의 직전 커밋)
-head_sha: TBD   # 리뷰 요청 시점에 기입. 「head_sha와 range」 절 참조
+base_sha: 2b05684d0e2ed8bac391d0eea4429e05f582a47b   # 착수 시점의 HEAD
+review_base: aff62abfca85ca873932fedcad1e65c29ab35730   # 이 slice 첫 커밋의 부모. 아래 「head_sha와 range」
+head_sha: 6af4179   # 이 파일을 쓴 가장 최근 커밋의 직전 커밋. 「head_sha와 range」 절 참조
 in_scope:
   - docs/discovery/data-dictionary.md   # 신설
   - reports/evidence/m0/0c/             # 이 패키지 (decisions-2026-08-28.md 포함)
@@ -74,12 +75,19 @@ A3("결정을 재조사하지 않고 인용한다")이 확인 불가능해지므
 
 - 이 파일은 **자기 커밋의 diff를 서술하지 않는다.** 커밋이 자기 SHA를 담을 수 없으므로
   yaml의 `head_sha`는 **이 파일을 쓴 가장 최근 커밋의 직전 커밋**을 가리킨다.
-- **0D가 이 slice와 같은 시각에 작업 중이다.** `base_sha`는 착수 시점 HEAD이므로
-  `base_sha..HEAD` 범위에 **0D의 커밋이 섞여 들어올 수 있다.** 이 slice의 커밋만 보려면
-  경로를 한정한다:
-  `git log --format='%h %s' <base_sha>..HEAD -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/`
+- **0D가 이 slice와 같은 시각에 작업했고 실제로 섞였다.** `base_sha`는 착수 시점
+  HEAD이지만 착수 후 이 slice가 첫 커밋을 올리기 전에 **0D가 세 커밋을 올렸다.**
+  그래서 `base_sha..HEAD`에는 0D의 커밋이 들어 있다.
+  - **`review_base`는 이 slice 첫 커밋의 부모**이며 **리뷰 range는 `review_base...HEAD`**다.
+    그 range에는 이 slice의 커밋만 있다.
+  - `base_sha`는 **계약이 고정된 시점**의 기록으로 남긴다 — 두 값이 다르다는 사실 자체가
+    병행 작업의 증적이다.
+  - 이 slice의 커밋 목록은
+    `git log --format='%h %s' <base_sha>..HEAD -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/`
+    가 낸다.
 - `in_scope` 밖 경로를 이 slice가 건드리지 않았음은 `commands.md` **C-2**가 낸다.
-  그 검사는 **이 slice의 커밋 집합에 대해서만** 성립하며 0D의 커밋을 판정하지 않는다.
+  그 검사는 **이 slice의 커밋 집합을 먼저 고르고 그 커밋이 건드린 경로 전부**를 보므로
+  0D의 커밋을 판정하지 않으면서도 혼합 커밋을 놓치지 않는다.
 - Codex 리뷰의 `reviewed_head`는 리뷰 요청 시점의 HEAD이며 이 값과 다를 수 있다.
 
 ---
@@ -208,8 +216,35 @@ ledger §10.3이 그렇게 인계했다.
 **이 절만이 이 slice의 라운드 이력이다.** `checklist.md`·`commands.md`에는 이력·자기평가
 산문을 적지 않는다(0A3의 교훈).
 
-| 라운드 | 무엇을 했는가 |
+| 커밋 | 무엇을 했는가 |
 | --- | --- |
-| 초판 | 계약 확정(`base_sha` = 착수 시점 HEAD), 2026-08-28 결정 사본 커밋, 사전 6축 작성, evidence 3종 작성 |
+| `8b938d6` | 계약 확정, 2026-08-28 결정 사본, 사전 6축 작성 |
+| `6af4179` | 검증 명령·출력(`commands.md`)과 acceptance 대조(`checklist.md`) |
+| 이 커밋 | `head_sha` 기입과 이 이력 절. **이 커밋에 대해서는 아무것도 주장하지 않는다** |
 
-**파일 목록도 셈도 이 절에 옮기지 않는다** — `git show --stat --format='' <SHA>`가 낸다.
+**커밋을 나눈 이유는 각 커밋에서 산출물이 자체 정합하기 때문이다** — 첫 커밋의 사전은
+자기 안에서 정합하고, 둘째 커밋의 evidence는 첫 커밋의 트리를 선언해 그 트리에서
+재현된다.
+
+**파일 목록도 셈도 이 절에 옮기지 않는다** — `git show --stat --format='' <SHA>`와
+`git log --format='%h %s' <review_base>..HEAD`가 낸다.
+
+### 이 slice에서 실행이 한 번 끊겼다
+
+플랫폼 오류로 `8b938d6` 직후에 실행이 중단됐고 작업 트리에 미완(`scope.md` 수정분,
+untracked `commands.md`)이 남았다. **재개 시 `git status`·`git log`로 실측을 떠서 확인한
+뒤 이어 썼다.** 산출물의 내용에 그 중단이 남긴 흔적은 없다 — `commands.md`의 모든 블록을
+재개 후 다시 돌려 출력을 맞췄다.
+
+### 불변 — 이 절은 수도 좌표도 옮겨 적지 않는다
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| 이 slice의 커밋 목록 | `git log --format='%h %s' aff62ab..HEAD -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/` |
+| `in_scope` 밖 경로 · 공백 오류 | `commands.md` **C-2** |
+| 상류 산출물·0D 산출물 무변경 | `commands.md` **C-6.1** |
+| 6축 커버 · 도메인 숫자 전수 | `commands.md` **C-3** · **C-4** |
+| legacy 인용 | `commands.md` **C-7** |
+| 각 블록이 자기 선언 SHA에서 재현되는가 | 그 SHA를 체크아웃한 worktree에서 그 절의 명령을 돌린다 |
+
+**결과를 여기 적지 않는다.**
