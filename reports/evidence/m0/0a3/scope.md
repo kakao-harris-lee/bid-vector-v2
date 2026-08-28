@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a3-decision-basis-correction
 base_sha: 48151b9   # 0B Codex 4차 approve verdict 등재 직후의 HEAD
-head_sha: b940074   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
+head_sha: 9910c96   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
 in_scope:
   - reports/evidence/m0/0a2/decisions.md      # X-1 정정 한정 + provenance 등재
   - reports/evidence/m0/0a2/checklist.md      # §10.1 형태 7 등재 한정
@@ -176,7 +176,10 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 | `7bcf2e7` | **수정 라운드 19** — verifier `F-1`. 동결 이력 본문을 원문으로 되돌리고 표시를 단다 |
 | `c69c04c` | **수정 라운드 20** — verifier `F-2`. 출력 블록을 선언 SHA의 트리에서 다시 뜬다 |
 | `b940074` | **수정 라운드 21** — Codex 5차 `G-1`. C-9 명령의 축약 경로를 전체 경로로 |
-| 이 커밋 | **수정 라운드 22** — Codex 5차 `G-1`. C-9를 새 선언 SHA의 트리에서 다시 뜬다 |
+| `fea90f2` | **수정 라운드 22** — Codex 5차 `G-1`. C-9를 새 선언 SHA의 트리에서 다시 뜬다 |
+| `f18b990` | **수정 라운드 23** — Codex 6차 `H-1`·`H-2`. 산문을 출력 자리에서 걷어낸다 |
+| `9910c96` | **수정 라운드 23b** — C-10 스캐너의 리터럴 백틱을 없앤다(추출이 깨졌다) |
+| 이 커밋 | **수정 라운드 24** — 두 블록을 선언 SHA의 트리에서 다시 뜬다 |
 
 **파일 목록도 셈도 여기에 옮기지 않는다** — `git show --stat --format='' <SHA>`가 낸다.
 
@@ -1365,6 +1368,68 @@ C-9 (c)의 `for` 명령이 `git show <sha>:…/$f.md`로 적혀 **그대로 돌�
 | 산출물 셋이 두 라운드에 무변경 | `git diff --stat c69c04c..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
 | **두 블록이 각자 선언 SHA에서 재현되는가** | 그 SHA를 체크아웃한 worktree에서 C-7·C-9의 명령을 돌린다 |
 | **축약·자리표시자가 남은 명령** | `checklist.md` §28의 스윕 |
+| **층 판정 · `O-2` · 인벤토리 무변경** | `commands.md` **C-3.4** · **C-9 (a)** |
+| 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
+| `regression-ledger.md` 무변경 | `commands.md` **C-6** |
+| in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
+
+**결과를 여기 적지 않는다.**
+
+---
+
+## 갱신 이력 — 수정 라운드 23·23b·24 (Codex 6차 `H-1`·`H-2`)
+
+verdict 정본: `reports/evidence/m0/0a3/codex-review-20260828T043354Z.json`(등재, append-only).
+`reviewed_base` **`48151b9`** → `reviewed_head` **`fea90f2`**.
+**5차 한 건은 해소 판정**을 받았고 **산출물 지적은 다섯 라운드째 0건**이다.
+건별 처리는 `checklist.md` **§29**에 있다.
+
+**운영자가 정지 규칙을 정했다(2026-08-28)** — **이번 두 건을 고치고 Codex 7차를 돌린다.
+7차가 산출물 무지적이면 남은 evidence 자기서술 finding을 「알려진 제한」으로 기록하고
+slice를 닫는다.** 그래서 **범위를 넓히지 않고 이 둘만 닫았다.**
+
+### 두 건은 한 형태다 — 산문이 출력 자리에 서 있다
+
+- **`H-1`** — C-9 (d)의 `(빈 출력 = 무변경)`이 **명령이 낸 문자열이 아니었다.**
+  **같은 파일 `C-6`이 이미 옳은 형태를 갖고 있었고**(명령에 `echo` 포함) **그 패턴을
+  적용**했다. **구조적 불변 자체는 실제 빈 출력으로 성립하고 바뀐 것은 기록 방식**이다.
+- **`H-2`** — `checklist.md`의 명령 블록 **셋에 선언 SHA가 없었다.**
+  **살아 있는 블록**은 **선언 SHA를 달고 명령이 문자열을 직접 내게** 했고,
+  **동결 이력 안의 둘**은 **본문을 고치지 않고 ⚠ 후속 표시로 선언 SHA를 밝혔다** —
+  **`F-1`이 동결 본문을 고쳐 걸린 전례를 반복하지 않는다.**
+
+### 전수는 한 스캐너로 훑었다 — `commands.md` C-10
+
+**두 축을 한 번에 본다** — ① **산문이 출력 자리에 선 줄**(바로 위 `$` 명령에 `echo`가
+없는 경우) ② **`$` 명령을 담고도 선언 SHA가 없는 블록**. **세 파일 전부**가 대상이다.
+**수정 전(`fea90f2`)과 수정 후(`9910c96`) 두 실행을 나란히 실었다.**
+**수정 전 스캔이 낸 것은 Codex가 지목한 것과 정확히 같다.**
+
+**「모든 블록이 선언 SHA를 갖는다」고 적지 않았다** — **적은 것은 이 스캔의 범위**이고,
+**동결 이력 안의 둘은 계속 지목된다**(본문을 고치지 않으므로).
+
+### 라운드 23b — 스캐너가 자기 펜스를 깼다
+
+인라인한 스캐너 본문에 **리터럴 백틱 세 개**가 있어 **marker 추출 정규식이 그 자리에서
+끊겼고** 추출한 본문이 **`SyntaxError`로 죽었다** — **즉 그 블록은 재현되지 않았다.**
+**C-4·C-7이 같은 이유로 `chr(96)*3`을 쓰고 있었는데 이 스캐너에만 빠졌다.**
+**고치고 그 이유를 주석에 적었다.**
+
+### `head_sha`와 range
+
+**이 커밋이 무엇을 바꿨는지는 `git show --stat --format='' HEAD`가 낸다.**
+
+- **`head_sha`의 정본은 이 파일 머리의 yaml 하나다.** 커밋이 자기 SHA를 담을 수 없어
+  **직전 커밋**을 가리킨다.
+- **리뷰 range는 `48151b9...HEAD`**.
+
+### 불변 — 이 절은 수도 좌표도 옮겨 적지 않는다
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| 산출물 셋이 세 라운드에 무변경 | `git diff --stat fea90f2..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
+| **산문이 출력 자리에 선 줄 · 선언 SHA 없는 블록** | `commands.md` **C-10** |
+| **각 블록이 자기 선언 SHA에서 재현되는가** | 그 SHA를 체크아웃한 worktree에서 그 절의 명령을 돌린다 |
 | **층 판정 · `O-2` · 인벤토리 무변경** | `commands.md` **C-3.4** · **C-9 (a)** |
 | 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
 | `regression-ledger.md` 무변경 | `commands.md` **C-6** |
