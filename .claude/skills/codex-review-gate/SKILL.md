@@ -63,6 +63,7 @@ worktree를 작업 루트로, 명령 재실행(테스트 등)을 위해 workspac
 codex --version   # 기록용 — 실행 결과를 리뷰 메타데이터로 남긴다
 codex exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
   -c model_reasoning_effort="high" \
+  --disable memories --ignore-rules \
   --output-schema .claude/skills/codex-review-gate/references/codex-output.strict.schema.json \
   -o _workspace/{slice}/codex-verdict.json \
   - < _workspace/{slice}/codex-prompt.md \
@@ -81,6 +82,77 @@ strict structured output은 모든 property가 required여야 하므로, `line`�
 리뷰 재현성은 심판 레인의 전제이므로 effort는 메타데이터로만 기록할 값이 아니라
 호출 시 고정할 값이다. effort를 바꿔야 할 사유가 생기면 이 스킬을 고쳐서 바꾸고,
 호출부에서 즉흥적으로 덮어쓰지 않는다.
+
+**`--disable memories --ignore-rules`는 반드시 붙인다.** worktree 격리는 **프롬프트 주입을
+막지 못한다.** 두 표면이 있고 **둘은 서로 다른 플래그로 닫힌다.**
+
+- **memory 주입** — codex는 매 세션 developer 메시지로 memory 지침과 `memory_summary.md`
+  **전문**을 주입하고, 그 지침이 `MEMORY.md` 질의를 시킨다. **모델이 스스로 찾아 읽은 것이
+  아니라 무조건 주입이다.** 주입되는 요약이 이 저장소를 이름으로 지목하고
+  *"Uses Claude for implementation and Codex for independent … review"*까지 적는다 —
+  **심판이 프롬프트를 읽기도 전에 분업 구조와 운영자 선호를 알고 시작한다.**
+- **rules 주입** — `~/.codex/rules/default.rules`(execpolicy allowlist)가 프롬프트에 통째로
+  들어가고 거기에 `bid_vector_db`·`kis_unified_sts` 등 **다른 저장소의 실제 경로·명령**이
+  들어 있다. **`--disable memories`로는 사라지지 않는다.**
+
+**효과는 실측으로 확인됐다**(2026-08-27, 스모크 2회의 세션 rollout 대조):
+
+| 주입 패턴 | 기본 | `--disable memories` | `+ --ignore-rules` |
+| --- | --- | --- | --- |
+| `MEMORY_SUMMARY` | 1 | **0** | 0 |
+| `memories/MEMORY.md` | 8 | **0** | 0 |
+| `bid_vector_db` | 1 | – | **0** |
+| `kis_unified_sts` | 4 | – | **0** |
+
+**막지 못하는 것**: 두 플래그는 **주입과 포인터**를 없앨 뿐 `~/.codex` **읽기 자체는 여전히
+가능**하다. exec에 읽기 루트를 좁히는 수단은 찾지 못했다(`--sandbox-state-readable-root`는
+`codex sandbox` 전용). 읽히는 표면은 `MEMORY.md` 하나가 아니라 최소 12개이며
+`rollout_summaries/`·`sessions/`의 **원본 transcript**와 `memories/skills/`(legacy 저장소의
+리뷰 절차서가 이미 skill로 굳어 있다)가 포함된다.
+
+**`CODEX_HOME` 이전은 쓰지 않는다** — `--ignore-user-config` help가 *"auth still uses
+`CODEX_HOME`"*라고 명시하고, `auth.json`은 API key가 아니라 **ChatGPT 로그인 토큰**
+(`last_refresh` 포함)이라 사본이 만료로 갈라질 수 있다. 호출 단위 플래그가 같은 목적을
+인증 위험 없이 달성한다.
+
+**`config.toml`의 `[features] memories=false`도 쓰지 않는다** — 운영자의 대화형 codex까지
+끈다. 리뷰 레인의 권한 밖이다.
+
+**preflight**: 리뷰 실행 전 아래를 돌려 이 저장소 흔적의 양을 기록한다. `sessions/`는
+용량이 커서 훑지 않는다.
+
+```bash
+grep -rniE 'bid-vector-v2|regression-ledger|capability-map|OPEN-REG|0a2|0b-regression' \
+  ~/.codex/memories/memory_summary.md ~/.codex/memories/MEMORY.md \
+  ~/.codex/memories/rollout_summaries/ ~/.codex/memories/skills/ \
+  ~/.codex/rules/default.rules 2>/dev/null | wc -l
+```
+
+**리뷰는 memory에 직접 쓰지 않는다 — 비동기 배치가 transcript를 집어 올린다.** 경로는
+`세션 transcript → memory_stage1 → memory_consolidate_global → MEMORY.md`이며
+`~/.codex/memories_1.sqlite`가 그 실물이다(`memory_stage1` done 632건).
+**리뷰 라운드 세션 16개는 아직 한 건도 올라오지 않았다**(2026-08-27 실측). 그러나
+**선택되지 않을 구조적 이유는 없다.** 그래서 아래 두 번째 검사가 첫 번째보다 먼저 움직인다.
+
+```bash
+sqlite3 "file:$HOME/.codex/memories_1.sqlite?mode=ro" \
+  "select thread_id, rollout_slug, datetime(generated_at,'unixepoch','localtime')
+     from stage1_outputs
+    where raw_memory like '%bid-vector-v2-review%'
+       or rollout_summary like '%bid-vector-v2-review%';"
+```
+
+**0행이 아닌 날이 오면 그 라운드부터 심판은 자기 과거 판정을 물려받는다.** 위 grep은
+consolidate **이후**를 보고 이 질의는 stage1을 보므로, 이 질의가 먼저 걸린다.
+0행이 아니면 **리뷰를 중단하고 사용자에게 보고한다** — 심판 독립성의 전제가 깨진 것이다.
+
+**이 출력을 verdict JSON에 넣지 마라.** `residual_risks`는 Codex가 쓰는 필드이고 이 스킬의
+금지 조항이 **리뷰 JSON 수정**을 막는다(정본 스키마도 `additionalProperties: false`다).
+preflight 결과는 **레인 산출물**이다 — codex-reviewer의 반환 보고와 그 slice의
+`commands.md`에 남긴다.
+
+**`codex debug prompt-input`을 preflight 도구로 쓰지 마라** — memory 주입을 렌더하지 않아
+항상 「없음」이라고 답한다.
 
 - prompt는 stdin(`-`)으로 전달한다 (ARG_MAX 회피).
 - Bash `timeout` 최대치는 10분(600000ms)이다. 리뷰는 보통 이를 초과하므로 **처음부터
@@ -124,10 +196,23 @@ git worktree remove ../bid-vector-v2-review-{slice}
 기존 리뷰 파일은 절대 덮어쓰지 않는다. 재리뷰는 새 timestamp 파일로 저장한다 —
 리뷰 이력 자체가 감사 증적이다.
 
-저장 전에 판정 JSON에 `reviewer: {cli_version, model}` 필드가 없으면 실측값
-(`codex --version` 출력, 설정된 모델)으로 채워 넣는다. 이 주입은 agent-workflow.md
-4절 계약이 리뷰 레인에 위임한 메타데이터 기록이며, verdict·findings에는 손대지 않는다.
-같은 값을 `commands.md`에도 기록한다.
+저장 전에 판정 JSON에 `reviewer: {cli_version, model}` 필드가 없으면 실측값으로 채워
+넣는다. 이 주입은 agent-workflow.md 4절 계약이 리뷰 레인에 위임한 메타데이터 기록이며,
+verdict·findings에는 손대지 않는다. 같은 값을 `commands.md`에도 기록한다.
+
+**두 값의 출처는 `codex.raw-output.txt`의 머리글이지 기억이 아니다.** 그 파일 첫 10줄에
+`model:`과 `reasoning effort:` 줄이 실측으로 찍힌다. **`model`에는 effort를 함께 적는다** —
+`gpt-5.6-sol (reasoning effort: high)` 형태다. M0/0A3 1차에서 effort 표기가 빠져
+**고정이 실제로 풀린 것인지 표기만 빠진 것인지 판정 불가**가 됐고, raw output을 열어서야
+`reasoning effort: high`가 확인됐다. **effort는 이 하네스가 재현성 때문에 못박은 값이라
+그 표기가 빠지면 verdict의 비교 가능성을 확인할 수 없다.**
+
+```bash
+sed -n '1,10p' _workspace/{slice}/codex.raw-output.txt | grep -E '^(model|reasoning effort):'
+```
+
+머리글에 `reasoning effort: high`가 없으면 **그 라운드는 무효다** — 고정이 적용되지 않은
+것이므로 verdict를 저장하지 말고 재실행한다.
 
 ### 8. 반환
 
