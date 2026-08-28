@@ -143,19 +143,25 @@ $ git diff 48151b9...HEAD -- docs/discovery/capability-map.md | grep -cE '^\+.*\
 
 ---
 
-## C-3. X-1 프레이밍 — 두 축이 범위를 나눠 본다
+## C-3. X-1 프레이밍 — 두 축이 보는 범위
 
-**C-3.1은 A1의 범위**(`decisions.md` + `capability-map.md` **§13**)**만 본다.**
-**C-3.4는 `capability-map.md` 전체**를 본다(out_of_scope · `scope.md` **O-2**).
-**두 축의 범위가 겹치지 않는다** — 겹쳐 두면 같은 사실을 두 자리가 다르게 말하게 되고,
-이 slice가 `H-1`·`P-1`·Codex 2차로 세 번 그것으로 걸렸다.
+- **C-3.1**은 **`decisions.md` 전체**와 **`capability-map.md` §13**을 본다.
+- **C-3.4**는 **`capability-map.md` 전체**를 본다(out_of_scope · `scope.md` **O-2**).
+
+**두 범위는 포개져 있다** — **§13 ⊂ `capability-map.md` 전체**이므로 **§13은 두 축이 모두
+출력하고 각자 판정한다**(C-3.1의 분류 **④**와 C-3.4 판정 표의 **§13 행**이 그 자리다).
+**오늘 두 판정이 어긋나지 않지만 그것이 구성으로 보장되지는 않는다.**
+
+**이 라운드가 한 것은 C-3.1의 범위를 A1 쪽으로 좁힌 것**이다 — 앞서 C-3.1이
+`capability-map.md` **전체**를 grep해 **§5·§6·§7의 out_of_scope 매치가 그 출력에 섞였고**,
+그것이 Codex 2차 `M-2`였다. **지금은 섞이지 않는다.**
 
 ```
-### 실행 시점 HEAD = fbdedb6
+### 실행 시점 HEAD = 2f8b65a
 
---- C-3.1 A1 범위의 X-1 단정 스윕 ---
-### A1 이 주장하는 범위 그대로다 — decisions.md 와 capability-map.md §13.
-### §13 은 절 머리로 잘라낸다(줄 번호가 아니라 내용으로 집는다).
+--- C-3.1 X-1 단정 스윕 — decisions.md 전체 + capability-map.md §13 ---
+### A1 의 범위(OPEN-STR-01 절 + §13)를 포함하는 상위집합이다 —
+### decisions.md 는 절로 자르지 않는다. §13 은 절 머리로 잘라낸다(내용으로 집는다).
 $ grep -nE 'ex-VAT|VAT·사정률만큼' reports/evidence/m0/0a2/decisions.md | cut -c1-125 | sed 's/[[:space:]]*$//'
 40:| 「OPEN-STR-01」 절 안의 2026-08-27 정정 블록(**slice 0A3 · X-1**) | **slice 산물** — legacy **사실 서술 정정**(`budget_estimate`의 ex-VAT
 59:| `144` · `147` | 「OPEN-STR-01」 | **정정** — **X-1**: `budget_estimate`의 ex-VAT 단정과 차이의 크기·방향 서술(취소선 + 인용 블록, 원본 문장 보존). sli
@@ -166,6 +172,9 @@ $ grep -nE 'ex-VAT|VAT·사정률만큼' reports/evidence/m0/0a2/decisions.md | 
 158:    >   소유한다. 원본에 대해 남는 것은 **「ex-VAT」라는 단정에 근거가 없다**는 것까지다.
 168:    > - **차이가 "VAT·사정률만큼"이라고 말할 근거가 없다.** legacy 자신이 저장된 값의
 186:    >   "fix(m0-0b): budget_estimate의 ex-VAT 단정을 제거 (0C 선행 조사 X-1)"에서 정정했고,
+$ grep -n '^### OPEN-STR-01\|^### OPEN-OPS-03' reports/evidence/m0/0a2/decisions.md | cut -c1-58 | sed 's/[[:space:]]*$//'   # 절 경계 — 위 매치 일부가 이 밖이다
+135:### OPEN-STR-01 · 운영자 예산 필터가 비교하는 금액의 basis — **결정: (c
+211:### OPEN-OPS-03 · 큐 깊이 SLO — **부분 확정**
 $ awk '/^## 13\. /,0' docs/discovery/capability-map.md | grep -E 'ex-VAT|VAT·사정률만큼' | cut -c1-125 | sed 's/[[:space:]]*$//'
 | 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값을 `Project.budget_estimate`(**추정가격**)와 비교하는 형태가 legac
 $ grep -n '^## 1[23]\. ' docs/discovery/capability-map.md   # §13 이 파일 끝까지임을 보인다
@@ -196,8 +205,8 @@ $ awk '/^  - legacy는 운영자 값을 \*\*추정가격\*\*과 비교한다:/,/
 
 --- C-3.3 OPEN-REG-05 귀속 ---
 $ grep -c 'OPEN-REG-05' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md
-docs/discovery/capability-map.md:1
 reports/evidence/m0/0a2/decisions.md:4
+docs/discovery/capability-map.md:1
 $ grep -n 'OPEN-QUAL-10.*소유자가 아니' docs/discovery/regression-ledger.md docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-110 | sed 's/[[:space:]]*$//'
 docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값
 docs/discovery/regression-ledger.md:82:    `OPEN-QUAL-10`은 **시공능력평가금액 축**이라 이 질문의 소유자가 아니다.
@@ -254,11 +263,15 @@ $ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut 
 
 **판정**:
 
-- **C-3.1 — 검사 범위가 A1의 범위와 같다.** A1이 주장하는 것은
+- **C-3.1 — 검사 범위가 A1의 범위를 포함하는 상위집합이다.** A1이 주장하는 것은
   **`decisions.md`의 `OPEN-STR-01` 절**과 **`capability-map.md` §13**에서 X-1 단정이
-  제거됐다는 것이고, **이 명령이 정확히 그 둘을 본다** — `capability-map.md`는
-  **§13만** 잘라서 본다(`awk`가 절 머리로 자른다. **줄 번호가 아니라 내용으로 집는다**).
-  **그래서 §5·§6·§7의 out_of_scope 매치가 이 출력에 섞이지 않는다.**
+  제거됐다는 것이다. **이 명령은 그보다 넓다** — `capability-map.md`는 **§13만** 잘라
+  보지만(`awk`가 절 머리로 자른다. **줄 번호가 아니라 내용으로 집는다**),
+  **`decisions.md`는 절로 자르지 않고 파일 전체를 본다.**
+  **자기 출력이 그것을 보인다** — provenance 절의 매치가 `OPEN-STR-01` 절 **밖**이고,
+  **분류 ③이 바로 그 절 밖 매치를 받는다.**
+  **방향은 보수적이다** — 상위집합이라 **A1이 요구하는 것을 놓치지 않는다.**
+  **§5·§6·§7의 out_of_scope 매치는 섞이지 않는다.**
 - **판정** — **그 범위의 매치는 전부** ① **취소선 안**(원본 보존) ② **정정 블록이 무엇을
   고쳤는지 설명하는 산문** ③ **provenance 표가 이 정정을 등재한 행** ④ **§13 정정문이
   원문을 인용한 자리** 중 하나이며 **그 넷 중 어느 것도 살아 있는 단정이 아니다.**
@@ -267,8 +280,8 @@ $ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut 
   어휘도 이 패턴 둘로 한정된다**(`부가세 별도` 같은 자리를 잡지 않는다).
   **문서 전체의 정본은 C-3.4**이며 거기 **살아 있는 X-1 프레이밍이 남아 있다**
   (out_of_scope · `scope.md` **O-2**). **자리도 수도 여기 옮겨 적지 않는다** — C-3.4의
-  출력과 그 아래 판정 표가 낸다. **두 축의 범위가 겹치지 않게 갈랐다** — 겹쳐 두면
-  같은 사실을 두 자리가 다르게 말하게 되고, `H-1`·`P-1`이 그것으로 났다.
+  출력과 그 아래 판정 표가 낸다. **§13은 이 축과 C-3.1이 모두 판정한다** — 두 범위가
+  포개져 있기 때문이고, **여기서는 「제외」**(정정문이 원문을 인용한 자리)**로 판정한다.**
 - **C-3.2** — 원본 두 문장이 **지워지지 않고 취소선으로 보존**됐고 바로 아래 정정 인용
   블록이 붙었다. `decisions.md`의 provenance 원칙(*"원본 문장은 지우지 않는다"*)을
   지킨다(**A2**).
