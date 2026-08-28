@@ -269,7 +269,7 @@ done | sed '/^$/d' | sort -u \
 grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary.md \
   | xargs printf '§9 표의 OPEN-DIC 행 수: %s\n'
 grep -o '^| \*\*`OPEN-DIC-[0-9][0-9]' docs/discovery/data-dictionary.md \
-  | grep -o 'OPEN-DIC-[0-9][0-9]' | sort | tr '\n' ' '; echo
+  | grep -o 'OPEN-DIC-[0-9][0-9]' | sort | xargs echo
 grep -o '^| \*\*`OPEN-DIC-[0-9][0-9]' docs/discovery/data-dictionary.md \
   | grep -o 'OPEN-DIC-[0-9][0-9]' | sort | uniq -d | wc -l \
   | xargs printf '§9 표 안의 중복 id: %s\n'
@@ -277,7 +277,7 @@ grep -o '^| \*\*`OPEN-DIC-[0-9][0-9]' docs/discovery/data-dictionary.md \
 
 ```
 §9 표의 OPEN-DIC 행 수: 4
-OPEN-DIC-01 OPEN-DIC-02 OPEN-DIC-03 OPEN-DIC-04 
+OPEN-DIC-01 OPEN-DIC-02 OPEN-DIC-03 OPEN-DIC-04
 §9 표 안의 중복 id: 0
 ```
 
