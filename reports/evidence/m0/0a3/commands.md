@@ -682,19 +682,19 @@ print(f"-- 지목 {len(bad)}건 · 번호를 넘겨준 절: {' '.join(sorted(mov
 **두 커밋에서 돌려 능력을 측정했다** — **넓혔다고 적기 전에 재는 것이 이번 라운드의 요구**다.
 
 ```
-### 실행 시점 HEAD = d2cced5 (이 라운드의 편집이 든 작업 트리)
+### 실행 시점 HEAD = 32f7a63 (이 라운드의 편집이 든 작업 트리)
 ### 마커는 셸 변수로 쪼갠다 — 이 절 자신의 서술이 검사에 걸리지 않게.
 
 ## (a) 표시가 이력 절 안에 실제로 들어갔는가 (V-1)
 $ MARK='재판정으로 이 절의'; grep -rn "⚠ 수정 라운드 10의 출처 층 $MARK" reports/evidence/m0/0a3/ | cut -c1-64 | sed 's/[[:space:]]*$//'
-reports/evidence/m0/0a3/scope.md:446:> **⚠ 수정 라운드 10의 출처 층 재판정으로
-reports/evidence/m0/0a3/scope.md:530:> **⚠ 수정 라운드 10의 출처 층 재판정으로
+reports/evidence/m0/0a3/scope.md:447:> **⚠ 수정 라운드 10의 출처 층 재판정으로
+reports/evidence/m0/0a3/scope.md:531:> **⚠ 수정 라운드 10의 출처 층 재판정으로
 reports/evidence/m0/0a3/checklist.md:421:> **⚠ 수정 라운드 10의 출처 층 재
 $ MARK2='재판정으로 이 귀속은'; grep -rn "⚠ 수정 라운드 10의 출처 층 $MARK2" reports/evidence/m0/0a3/ | cut -c1-64 | sed 's/[[:space:]]*$//'
 reports/evidence/m0/0a3/checklist.md:365:| **H-1** (high) | C-3.
 $ grep -n '^## 갱신 이력 — 수정 라운드 [45] ' reports/evidence/m0/0a3/scope.md | cut -c1-56 | sed 's/[[:space:]]*$//'
-439:## 갱신 이력 — 수정 라운드 4 (verifier `H-1`~`H-4`)
-510:## 갱신 이력 — 수정 라운드 5 (verifier `P-1` · 게이트 안 1건)
+440:## 갱신 이력 — 수정 라운드 4 (verifier `H-1`~`H-4`)
+511:## 갱신 이력 — 수정 라운드 5 (verifier `P-1` · 게이트 안 1건)
 $ grep -n '^## 1[12]\. 수정 라운드' reports/evidence/m0/0a3/checklist.md | cut -c1-56 | sed 's/[[:space:]]*$//'
 358:## 11. 수정 라운드 4 — verifier `H-1`~`H-4`
 397:## 12. 수정 라운드 5 — verifier `P-1` (게이트 안 1건)
@@ -750,34 +750,6 @@ $ printf %s "$BLKP" | python3 - HEAD
 
 **「전부 막는다」고 적지 않는다** — 위 표가 못 보는 것이고, **이 축이 막는 것은 측정된
 한 형태(번호 이동 뒤 낡은 인용)**다.
-
----
-
-## C-8. 이 slice가 만들지 않은 것
-$ grep -rhoE 'commands.md` \*{0,2}C-[0-9]' reports/evidence/m0/0a3/scope.md reports/evidence/m0/0a3/checklist.md | grep -oE 'C-[0-9]' | sort -u
-C-1
-C-2
-C-3
-C-4
-C-5
-C-6
-C-7
-C-8
-```
-
-**판정 (a)** — **네 자리 전부 라운드별 이력 절 안에 있다.** 앞 두 grep 이 낸 줄 번호가
-뒤 두 grep 이 낸 절 머리보다 **뒤**다: `scope.md`는 **라운드 4 이력**과 **라운드 5 이력**,
-`checklist.md`는 **§11(라운드 4)**과 **§12(라운드 5)**. **이력 본문은 고쳐 쓰지 않았고
-표시만 달았다.** **앞 라운드들이 달아 둔 다른 표시**(`scope.md` 라운드 7 ·
-`checklist.md` §10 `G-2` · §14 `M-2` · `O-2` 행)는 **다른 마커를 써서** 여기 걸리지 않는다.
-
-**판정 (b)** — **`scope.md`·`checklist.md`가 `commands.md`의 절을 부르는 이름이 전부
-실재한다.** 두 번째 grep 이 낸 이름 집합이 첫 번째 grep 이 낸 절 머리에 다 있다.
-**`C-5`만 절 머리가 없다** — **C-4 의 출력 블록에 같은 실행으로 들어 있고** 그 사실을
-**C-4 제목이 적는다.**
-**이 검사는 `W-1`이 난 자리를 잡는다 — 그것을 실행으로 쟀다**(위 (b-1)).
-**「막는다」고는 적지 않는다** — 이 축이 보는 것은 **번호 이동 뒤에 낡은 인용** 하나이고
-**못 보는 것은 바로 위 표에 있다.** **절 이름·번호를 바꾸면 이 대조를 돌린다.**
 
 ---
 
