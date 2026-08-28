@@ -20,6 +20,8 @@ grep(C-3·C-5) · 산출물에서 정본을 계산하는 스크립트(C-3.4·C-4
 **그 출력과 1:1로 대조되는 것**이고, 스크립트가 늘면 **행을 더한다.**
 **앞서 이 자리에 「둘」이라고 셈을 박아 두었다가 셋이 되면서 거짓이 됐다**(Codex 2차
 `M-3`에서 한 번, Codex 4차 `B`에서 다시). **셈을 지우고 대상이 내게 한다.**
+**세 번째는 셈이 아니라 행이 빠진 것이었다**(verifier `GI-2`) — **스크립트를 늘리고
+표에 더하지 않아** 대조 명령의 출력과 표가 어긋났다. **대조 명령은 이미 옆에 있었다.**
 
 ```
 grep -n '^```python' reports/evidence/m0/0a3/commands.md
@@ -30,6 +32,7 @@ grep -n '^```python' reports/evidence/m0/0a3/commands.md
 | **불변 계산기** | **C-4** | `capability-map.md`에서 capability 총수·분류 4종·활성 OPEN 총수·줄 수를 **직접 계산**한다 | **새 도구가 아니다** — 0A2 수치 축의 「정본 산출」 절을 그대로 떼어낸 것이고 **A4의 불변을 base와 HEAD 양쪽에서 재는 데** 쓴다 |
 | **X-1 프레이밍 후보 스윕** | **C-3.4** | `capability-map.md` 전체에서 X-1 프레이밍 후보를 **블록 단위**로 찍는다(어휘 5종) | **결함이 관측된 뒤에 넓혔다** — verifier **`P-1`**이 *"살아 있는 단정이 하나"*를 반증했고, 그 전 축이 **어휘 하나·줄 단위**라 `부가세 별도`와 **여러 줄에 걸친 자리**를 못 봤다. 0B가 세운 순서(**결함이 먼저, 도구가 나중**)를 지킨 것이다 |
 | **포인터 대조** | **C-7 (b)** | `scope.md`·`checklist.md`가 이 파일의 절을 부르는 이름이 **실재하는지**, **번호가 절을 넘겨준 뒤에 낡지 않았는지**(`git blame`) 본다 | **결함이 관측된 뒤에 넓혔다** — verifier **`W-1`**이 개명으로 끊긴 포인터를 냈고, **`Y-1`**이 그때 만든 좁은 검사가 **그 자리를 구조적으로 못 본다**는 것을 지적했다. **넓힌 뒤 두 커밋에서 능력을 실행으로 쟀다**(C-7 (b)) |
+| **출력 블록 스캔** | **C-10** | 세 파일의 fenced 블록에서 **산문이 출력 자리에 선 줄**과 **`$` 명령을 담고도 선언 SHA가 없는 블록**을 찍는다 | **결함이 관측된 뒤에 넓혔다** — Codex 6차 **`H-1`**·**`H-2`**가 그 두 자리를 냈고, **건별로 고치기 전에 전수로 훑으려고** 인라인했다. 이후 verifier **`GI-1`**이 **`\` 연속줄을 못 보는 거짓 지목**을 냈고 **명령을 논리 단위로 집도록 고쳤다** |
 
 **0B의 축을 그대로 가져오지 않았다.** 이 slice에 필요한 것만 두었다 — legacy 인용
 확인(C-1), 범위·불변(C-2·C-4), X-1 프레이밍 스윕(C-3), 형태 7 등재 확인(C-5).
@@ -862,6 +865,9 @@ $ git diff --stat 6b99420..7bcf2e7 -- docs/discovery/capability-map.md reports/e
 #   (2) 선언 SHA 가 없는 블록 — 이 패키지는 commands.md 머리에서 출력 블록마다
 #       「실행 시점 HEAD」를 선언하기로 규정한다.
 #
+# 명령은 줄이 아니라 **논리 단위**로 집는다 — `\` 로 이어진 줄을 앞 명령에 잇는다.
+# 줄 단위로 보면 `... \` 다음 줄에 있는 `; echo` 를 못 보고 거짓 지목이 난다(verifier `GI-1`).
+#
 # 기계가 못 하는 것: 그 블록이 「출력 블록」인가 「예시·인용」인가. 지목하고 사람이 읽는다.
 import re, sys, io
 
@@ -870,6 +876,18 @@ FILES = ["reports/evidence/m0/0a3/commands.md",
          "reports/evidence/m0/0a3/scope.md"]
 PROSE = re.compile(r'^\((빈 출력|출력 없음|무변경)')
 DECL  = re.compile(r'^### 실행 시점 HEAD = [0-9a-f]{7,40}')
+
+def cmd_before(body, k):
+    """body[k] 앞의 가장 가까운 논리 명령. `\\` 로 이어진 줄을 하나로 잇는다."""
+    cur, done = None, ""
+    for x in body[:k]:
+        if cur is not None:
+            cur += "\n" + x
+        elif x.startswith("$ "):
+            cur = x
+        if cur is not None and not cur.rstrip().endswith("\\"):
+            done, cur = cur, None
+    return cur if cur is not None else done
 
 for path in FILES:
     lines = io.open(path, encoding="utf-8").read().split("\n")
@@ -887,48 +905,22 @@ for path in FILES:
                         print(f"[선언없음] {path}:{start}")
                     for k, x in enumerate(body):
                         if PROSE.match(x):
-                            prev = next((body[j] for j in range(k-1, -1, -1)
-                                         if body[j].startswith("$ ")), "")
-                            if "echo" not in prev:
+                            if "echo" not in cmd_before(body, k):
                                 print(f"[산문출력] {path}:{start+1+k}  {x[:40]}")
                 continue
         if inblk:
             body.append(l)
 ```
 
-**두 커밋에서 돌렸다** — **수정 전**(무엇이 걸렸는지)과 **수정 후**(남았는지).
+**앞 라운드의 두 실행 기록은 이 커밋에서 걷어냈다** — **스캐너 본문이 바뀌었으므로
+기록도 이 수정의 트리에서 다시 떠야 한다**(verifier `GI-1`의 처방 순서, `F-2`·`G-1`과
+같다). **판정도 그때 적는다** — 재지 않은 결과를 먼저 쓰지 않는다.
 
 ```
-### 실행 시점 HEAD = 9910c96
-### 이 블록은 그 커밋의 트리에서 떴다 — 선언한 SHA 에서 재현된다.
-### 본문 추출은 C-4.1 · C-7 (b) 와 같은 방식이다(marker + assert + stdin).
-
-## 수정 전 — fea90f2 (Codex 6차가 리뷰한 head)
-$ W=$(mktemp -d); git worktree add -q --detach "$W" fea90f2
-$ printf %s "$BLKS" | (cd "$W" && python3 -)
-[산문출력] reports/evidence/m0/0a3/commands.md:833  (빈 출력 = 무변경)
-[선언없음] reports/evidence/m0/0a3/checklist.md:923
-[선언없음] reports/evidence/m0/0a3/checklist.md:1029
-[선언없음] reports/evidence/m0/0a3/checklist.md:1183
-[산문출력] reports/evidence/m0/0a3/checklist.md:1187  (출력 없음)
-$ git worktree remove --force "$W"
-
-## 수정 후 — 9910c96 (이 블록의 선언 SHA)
-$ printf %s "$BLKS" | python3 -
-[선언없음] reports/evidence/m0/0a3/checklist.md:927
-[선언없음] reports/evidence/m0/0a3/checklist.md:1037
+### 실행 시점 HEAD = (아직 커밋되지 않은 작업 트리 — 다음 커밋에서 선언 SHA로 다시 뜬다)
 ```
 
-**판정**:
-
-- **수정 전 스캔이 낸 넷은 Codex가 지목한 것과 정확히 같다** — 더도 덜도 없다.
-- **수정 후 스캔에 남은 것은 동결 이력 안의 두 블록뿐**이다 — **본문을 고치지 않았기
-  때문**이고, 그 자리는 **⚠ 후속 표시로 선언 SHA를 밝혔다**(각각 **`6b99420`**·
-  **`d8fcef8`**). **그 트리에서 재현되는 것을 확인**했다.
-  **`F-1`의 전례대로 동결 본문은 고치지 않는다** — 그래서 이 축은 **그 둘을 계속 지목한다.**
-- **`H-1`의 자리와 살아 있던 블록은 사라졌다** — 수정 전 스캔과 수정 후 스캔을 나란히
-  놓으면 보인다.
-- **이 스캐너가 못 보는 것**: 그 블록이 **출력 블록인가 예시·인용인가**는 판정하지
-  못한다 — **지목하고 사람이 읽는다.** 그리고 **`echo` 가 있으면 그 명령이 낸 것으로
-  본다** — `echo` 로 거짓 문자열을 낼 수도 있으나 그것은 이 축이 아니다.
-- **「모든 블록이 선언 SHA를 갖는다」고 적지 않는다** — **측정한 것은 이 스캔의 범위**다.
+**이 스캐너가 못 보는 것**: 그 블록이 **출력 블록인가 예시·인용인가**는 판정하지
+못한다 — **지목하고 사람이 읽는다.** 그리고 **`echo` 가 있으면 그 명령이 낸 것으로
+본다** — `echo` 로 거짓 문자열을 낼 수도 있으나 그것은 이 축이 아니다.
+**「모든 블록이 선언 SHA를 갖는다」고 적지 않는다** — **적는 것은 이 스캔의 범위**다.
