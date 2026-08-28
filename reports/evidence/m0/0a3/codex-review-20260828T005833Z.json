@@ -1,0 +1,47 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "48151b9c47e4f09286c4ee869977383fa4b23396",
+  "reviewed_head": "f49155d9c05870b30f4809bdfa87aeac49122b6f",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a3/scope.md",
+      "line": 185,
+      "evidence": "O-2는 capability-map.md §5·§6·§7을 모두 「살아 있는 X-1 프레이밍」으로 판정하지만, X-1의 근거는 legacy `Project.budget_estimate`의 선언과 저장 관측이 불일치한다는 것이다. 반면 commands.md:80-84는 공식 조달청 정의의 `추정가격`이 부가세 제외라고 명시적으로 구분한다. C-3.4는 이 출처 층을 구분하지 않고 문서의 자기 목소리라는 이유만으로 §5의 `추정가격(ex-VAT)`과 §6의 `추정가격(부가세 별도)`을 오류에 포함하며, §6 acceptance의 단순 표시 요구인 `과세 공고 보고서에서 ... 서로 다른 행`까지 과세가 두 금액을 가른다는 단정으로 분류한다. 이는 data-extract.md:8-14의 authoritative/observed/legacy-behavior 구분과 이 slice의 핵심인 선언/관측 구분을 다시 섞으며, out-of-scope 부채의 위치·성격을 정확히 기록했다는 scope.md·checklist.md·commands.md의 자기 기록을 성립하지 않게 한다.",
+      "required_fix": "C-3.4 후보를 공식·승인된 정의, legacy 선언, 저장값 관측으로 구분해 다시 판정하고, 실제로 저장값의 과세 처리를 근거 없이 단정하거나 차이를 정량화하는 항목만 O-2에 남긴다. capability-map.md 자체는 out_of_scope로 유지하면서 scope.md O-2, commands.md C-3.4 판정표·요약, checklist.md의 O-2/알려진 제한을 같은 판정으로 동기화한다."
+    },
+    {
+      "severity": "low",
+      "file": "reports/evidence/m0/0a3/commands.md",
+      "line": 211,
+      "evidence": "C-3.3의 기록 출력은 적힌 명령에서 그대로 나올 수 없다. 현재 head에서 line 211 명령을 재실행하면 인자 순서대로 `docs/discovery/capability-map.md:1` 다음 `reports/evidence/m0/0a2/decisions.md:4`가 나오지만 기록은 역순이다. line 214 명령도 실제로는 `regression-ledger.md:82`, `regression-ledger.md:1345`, `capability-map.md:3171` 순서인데 기록은 capability-map을 먼저 놓았다. 매치 내용과 A3 결론은 같지만, commands.md:4-5의 출력 블록을 접거나 손으로 압축하지 않았다는 자기 기록과 어긋난다.",
+      "required_fix": "C-3.3 명령을 현재 head에서 다시 실행해 출력을 그대로 기록하거나, 의도한 순서가 필요하면 그 순서를 만드는 명시적 정렬 명령을 기록한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse 48151b9c47e4f09286c4ee869977383fa4b23396^{commit} && git rev-parse f49155d9c05870b30f4809bdfa87aeac49122b6f^{commit} && git rev-parse HEAD",
+    "git log --oneline 48151b9c47e4f09286c4ee869977383fa4b23396..f49155d9c05870b30f4809bdfa87aeac49122b6f && git diff --stat 48151b9c47e4f09286c4ee869977383fa4b23396...f49155d9c05870b30f4809bdfa87aeac49122b6f && git diff --name-status 48151b9c47e4f09286c4ee869977383fa4b23396...f49155d9c05870b30f4809bdfa87aeac49122b6f && git ls-files --others --exclude-standard",
+    "git merge-base 48151b9c47e4f09286c4ee869977383fa4b23396 f49155d9c05870b30f4809bdfa87aeac49122b6f && git merge-base --is-ancestor 48151b9c47e4f09286c4ee869977383fa4b23396 f49155d9c05870b30f4809bdfa87aeac49122b6f",
+    "git diff --unified=35 48151b9c47e4f09286c4ee869977383fa4b23396...f49155d9c05870b30f4809bdfa87aeac49122b6f -- docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md reports/evidence/m0/0a2/checklist.md",
+    "git diff --unified=20 cb1be885051850314680f7f6b47a8953b1fed252..f49155d9c05870b30f4809bdfa87aeac49122b6f -- reports/evidence/m0/0a3/scope.md",
+    "git diff --check 48151b9c47e4f09286c4ee869977383fa4b23396...f49155d9c05870b30f4809bdfa87aeac49122b6f",
+    "jq 'del(.reviewer)' reports/evidence/m0/0a3/codex-review-20260827T132148Z.json && jq 'del(.reviewer)' reports/evidence/m0/0a3/codex-review-20260827T204954Z.json",
+    "commands.md C-3.4의 `X-1 프레이밍 후보 스윕` Python 블록을 marker로 추출해 현재 head에서 stdin 실행",
+    "commands.md C-4의 `0A3 A4 불변` Python 블록을 marker로 추출해 현재 head와 `git archive 48151b9` 양쪽에서 stdin 실행",
+    "grep -nE 'ex-VAT|VAT·사정률만큼' reports/evidence/m0/0a2/decisions.md; awk로 capability-map.md §13만 추출해 같은 패턴 재검사; git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md의 훅과 provenance 표 대조",
+    "grep -c 'OPEN-REG-05' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md && grep -n 'OPEN-QUAL-10.*소유자가 아니' docs/discovery/regression-ledger.md docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md",
+    "grep로 reports/evidence/m0/0b/commands.md C-8.1·C-8.2·C-8.5·C-9.9 및 scope.md F-1·F-2를 확인하고 codex-review-20260827T064055Z.json findings를 jq로 대조",
+    "awk로 docs/discovery/regression-ledger.md R-BASIS-01의 검증 방법·동반 OPEN을 추출하고 capability-map.md §13 F-4 문면과 대조",
+    "rg -n '추정가격|budget_estimate' docs/discovery/capability-map.md && rg -n '세전|세후|세액|공급가액|면세|세금|tax|VAT|부가가치세|부가세|과세' docs/discovery/capability-map.md",
+    "git diff 0775a71..f49155d9 -- reports/evidence/m0/0a3/commands.md | rg '^[-+]\\$' || true && git diff --stat 0775a71..f49155d9 -- docs/discovery/capability-map.md reports/evidence/m0/0a2/"
+  ],
+  "residual_risks": [
+    "이 worktree에는 legacy `bid-vector` 저장소가 없어 `ed4b06c`의 파일·행 범위와 인용 원문을 독립 재현하지 못했다. 요청에 명시된 환경 한계이므로 finding으로 계상하지 않았다.",
+    "scope.md가 out_of_scope로 둔 capability-map.md §13 밖의 VAT/basis 서술은 이번 판정에서 수정 대상으로 삼지 않았다. finding은 그 서술 자체가 아니라 evidence가 선언·관측·공식 정의를 구분하지 않고 전부 같은 오류로 분류한 점에 한정한다.",
+    "문서 slice이므로 production wiring의 side effect, retry/idempotency, unknown-schema 계약, Kotlin/Python 업무 규칙 소유와 domain 의존 방향은 이번 range에서 검증할 구현이 없다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
