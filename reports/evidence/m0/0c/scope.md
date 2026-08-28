@@ -5,7 +5,7 @@ milestone: m0
 slice: 0c-data-dictionary
 base_sha: 2b05684d0e2ed8bac391d0eea4429e05f582a47b   # 착수 시점의 HEAD
 review_base: aff62abfca85ca873932fedcad1e65c29ab35730   # 이 slice 첫 커밋의 부모. 아래 「head_sha와 range」
-head_sha: c3020e8   # 이 파일을 쓴 가장 최근 커밋의 직전 커밋. 「head_sha와 range」 절 참조
+head_sha: c81c8a1   # 이 파일을 쓴 가장 최근 커밋의 직전 커밋. 「head_sha와 range」 절 참조
 in_scope:
   - docs/discovery/data-dictionary.md   # 신설
   - reports/evidence/m0/0c/             # 이 패키지 (decisions-2026-08-28.md 포함)
@@ -231,7 +231,20 @@ ledger §10.3이 그렇게 인계했다.
 | `6af4179` | 검증 명령·출력(`commands.md`)과 acceptance 대조(`checklist.md`) |
 | `f852716` | `head_sha` 기입과 이 이력 절 |
 | `c3020e8` | **A8이 잡은 것을 고쳤다** — `C-6.2`의 기록된 출력에 후행 공백이 있어 `git diff --check`가 지적했다. **산문으로 예외를 두지 않고 명령 자체를 바꿔** 옳은 문자열을 내게 했다 |
-| 이 커밋 | 위 두 줄의 등재와 `head_sha` 갱신. **이 커밋에 대해서는 아무것도 주장하지 않는다** |
+| `b833fee` | 위 두 줄의 등재와 `head_sha` 갱신 |
+
+### 수정 라운드 1 — 독립 검증 finding (blocker 1 · high 2 · medium 2 · low 3)
+
+| 커밋 | 무엇을 고쳤는가 |
+| --- | --- |
+| `cd1fbce` | **문면·셈·귀속** — `F-2`(정본 목록의 범위: 승인은 `X-2`~`X-6` 다섯, `O-2`는 out_of_scope 부채, **`O-1`은 0A3에서 닫혔으므로 표에서 뺐다**) · `F-5`(`X-3`의 귀속을 DEC-11 문면에 맞춤) · `F-4`(§4.3의 셈을 지우고 표를 정본으로) · `F-6`(인용 귀속) · `F-7`(§12 provenance 두 자리) · `F-8`(`commands.md`에서 셈 제거). 게이트 밖 셋도 함께 |
+| `1e9e670` | **`F-3`의 뿌리와 `F-1`의 파급** — C-5의 `awk substr`가 **바이트 절단**이라 한글을 깨뜨려 stdout을 그대로 옮길 수 없었다. 문자 단위로 자르는 python으로 바꿨다. 사전의 두 전칭을 **명령이 실제로 내는 범위**에 맞췄다 |
+| `c81c8a1` | **`F-1`·`F-3` 본체** — 열여섯 블록 **전부**를 `1e9e670` 트리(worktree + `bid-vector`·`_workspace` symlink)에서 `bash -c`로 다시 돌려 **stdout만** 받아 실었다. 선언 SHA도 전부 갱신했다 |
+| 이 커밋 | **C-10 신설** — 그 축어 재현을 재는 검사와 이 이력 절, `head_sha` 갱신. **이 커밋에 대해서는 아무것도 주장하지 않는다** |
+
+**어디까지 쟀는지만 적는다** — C-10은 **대상 파일 `c81c8a1` · 실행 트리 `1e9e670`** 두
+SHA에 대해 잰 것이고, **이후 커밋이 바꾼 트리에서 재현된다고 주장하지 않는다.**
+그 검사는 **자기 자신을 포함하지 않는다**(대상 파일에 C-10이 없다).
 
 **커밋을 나눈 이유는 각 커밋에서 산출물이 자체 정합하기 때문이다** — 첫 커밋의 사전은
 자기 안에서 정합하고, 둘째 커밋의 evidence는 첫 커밋의 트리를 선언해 그 트리에서
@@ -252,6 +265,7 @@ untracked `commands.md`)이 남았다. **재개 시 `git status`·`git log`로 �
 | 확인할 것 | 명령 |
 | --- | --- |
 | 이 slice의 커밋 목록 | `git log --format='%h %s' aff62ab..HEAD -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/` |
+| **기록된 출력이 실제 stdout인가** | `commands.md` **C-10** |
 | `in_scope` 밖 경로 · 공백 오류 | `commands.md` **C-2** |
 | 상류 산출물·0D 산출물 무변경 | `commands.md` **C-6.1** |
 | 6축 커버 · 도메인 숫자 전수 | `commands.md` **C-3** · **C-4** |

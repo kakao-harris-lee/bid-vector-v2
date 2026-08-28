@@ -3,11 +3,19 @@
 이 파일은 **명령과 출력만** 담는다. 판정과 이력은 `scope.md`·`checklist.md`에 있다.
 
 **각 블록은 자기 실행 시점의 SHA를 선언한다.** 커밋은 자기 SHA를 담을 수 없으므로
-이 파일의 블록은 **`1e9e670`**(수정 라운드 1의 마지막 커밋)의 트리를 선언한다 — 그 SHA를 체크아웃한
-worktree에서 재현된다. 이 파일 자신은 그 다음 커밋에 실린다.
+**C-1 ~ C-9의 블록은 `1e9e670`**(수정 라운드 1의 마지막 커밋)의 트리를 선언한다 —
+그 SHA를 체크아웃한 worktree에서 재현된다.
 
-**`ed4b06c`를 여는 블록(C-7·C-9)은 `bid-vector` symlink가 있어야 재현된다.**
-그 저장소는 이 저장소 밖이라 **Codex 리뷰어 worktree에서 재현되지 않는다.**
+**C-10만 예외다** — 그것은 다른 블록들이 실제로 그 트리에서 축어 재현되는지를 재는
+검사이므로 **대상 파일과 실행 트리 두 SHA를 모두 명시**한다.
+
+**출력은 명령의 stdout만 싣는다.** 로그인 프로파일 잡음이 stdout에 섞이면 재현이
+깨지므로 `bash -c`로 돌린다.
+
+**`ed4b06c`를 여는 블록(C-7·C-9)은 `bid-vector` symlink가 있어야 재현되고,
+`_workspace`를 여는 블록(C-1)은 그 디렉터리가 있어야 재현된다.** 둘 다 git이 추적하지
+않으므로 **Codex 리뷰어 worktree에서는 재현되지 않는다** — C-10은 그래서 두 경로를
+symlink로 연결한 worktree를 만든다.
 
 ---
 
@@ -643,3 +651,80 @@ tests/test_bid_target_signals.py
 tests/test_bid_target_workflow.py
 exit=0
 ```
+
+---
+
+## C-10 · 출력 블록의 **축어 재현** 전수 확인
+
+**두 입력이 모두 SHA로 고정돼 있어 어느 트리에서 돌려도 같은 답이 나온다.**
+
+- **대상 파일** — `c81c8a1`의 `commands.md`(출력을 다시 뜬 커밋).
+- **실행 트리** — `1e9e670`(그 블록들이 선언한 SHA)을 체크아웃한 임시 worktree.
+  `bid-vector`·`_workspace`는 git이 추적하지 않으므로 **symlink로 연결**한다.
+- **비교** — 각 명령의 **stdout만** 받아 기록된 출력과 **문자열 동등**인지 본다.
+  로그인 프로파일을 태우지 않는다(`bash -c`) — 프로파일 잡음이 stdout에 섞이면 재현이
+  깨진다.
+
+**이 검사는 자기 자신을 포함하지 않는다** — 대상 파일 `c81c8a1`에는 이 절이 없다.
+그래서 아래 셈은 **이 절을 뺀 나머지**에 대한 것이다.
+
+```
+# 대상 파일 = c81c8a1 의 commands.md · 실행 트리 = 1e9e670 (블록이 선언한 SHA)
+WT="$(mktemp -d)/wt"
+git worktree add --detach "$WT" 1e9e670 >/dev/null 2>&1
+ln -sfn "$(cd bid-vector && pwd -P)" "$WT/bid-vector"
+ln -sfn "$(pwd -P)/_workspace" "$WT/_workspace"
+git show c81c8a1:reports/evidence/m0/0c/commands.md > "$WT/.blocks.md"
+python3 - "$WT" <<'PY'
+import subprocess, sys, pathlib
+WT = sys.argv[1]
+FENCE = chr(96) * 3   # 리터럴 백틱 세 개를 쓰면 이 블록의 펜스가 끊긴다
+lines = pathlib.Path(WT + "/.blocks.md").read_text().split("\n")
+fences, open_at = [], None
+for i, l in enumerate(lines):
+    if l.strip() == FENCE:
+        if open_at is None: open_at = i
+        else: fences.append((open_at, i)); open_at = None
+assert open_at is None and len(fences) % 2 == 0
+env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
+       "LC_ALL": "en_US.UTF-8", "HOME": "/Users/harris"}
+same = diff = 0
+for k in range(0, len(fences), 2):
+    (cs, ce), (os_, oe) = fences[k], fences[k+1]
+    cmd = "\n".join(lines[cs+1:ce])
+    r = subprocess.run(["bash", "-c", cmd], cwd=WT, capture_output=True,
+                       text=True, errors="replace", env=env)
+    ok = r.stdout.rstrip("\n") == "\n".join(lines[os_+1:oe]).rstrip("\n")
+    same, diff = same + ok, diff + (not ok)
+    print(("  축어 일치  " if ok else "  불일치    ") + cmd.splitlines()[0][:64])
+print(f"명령/출력 쌍: {len(fences)//2} · 축어 일치: {same} · 불일치: {diff}")
+print("PASS" if diff == 0 else "FAIL")
+PY
+git worktree remove --force "$WT" >/dev/null 2>&1
+echo "exit=$?"
+```
+
+```
+  축어 일치  diff <(sed -n '281,564p' _workspace/m0-open-decisions/decisions-
+  축어 일치  for c in $(git log --format='%H' 2b05684..1e9e670 \
+  축어 일치  git diff --check 2b05684..1e9e670
+  축어 일치  python3 - <<'PY'
+  축어 일치  python3 - docs/discovery/data-dictionary.md <<'PY'
+  축어 일치  python3 - <<'PY'
+  축어 일치  for c in $(git log --format='%H' 2b05684..1e9e670 \
+  축어 일치  grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary.md \
+  축어 일치  python3 - <<'PY'
+  축어 일치  python3 - docs/discovery/data-dictionary.md <<'PY'
+  축어 일치  git -C bid-vector grep -l 'cnstrtnAbltyEvlAmt' ed4b06c -- app/ t
+  축어 일치  git -C bid-vector grep -n 'default=0\.0\|server_default="0"' ed4
+  축어 일치  git -C bid-vector grep -n 'status = Column' ed4b06c \
+  축어 일치  git -C bid-vector show ed4b06c:app/services/koneps/field_contrac
+  축어 일치  grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RS
+  축어 일치  git -C bid-vector ls-tree -r --name-only ed4b06c | grep bid_targ
+명령/출력 쌍: 16 · 축어 일치: 16 · 불일치: 0
+PASS
+exit=0
+```
+
+> **측정한 범위만 적는다** — 위 두 SHA에 대해 잰 것이고, 이후 커밋이 바꾼 트리에서
+> 재현된다고 주장하지 않는다.

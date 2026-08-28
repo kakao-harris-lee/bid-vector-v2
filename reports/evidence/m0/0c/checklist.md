@@ -182,6 +182,7 @@ slice의 몫이다(`regression-ledger.md` §10.3).
 | secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
 | `git diff --check` 0 | `commands.md` **C-2.2** |
 | `in_scope` 밖 경로 변경 0 | `commands.md` **C-2.1** — 이 slice의 커밋을 고른 뒤 **그 커밋이 건드린 경로 전부**를 본다 |
+| **기록된 출력이 실제 stdout인가** | `commands.md` **C-10** — 대상 파일과 실행 트리를 SHA로 고정하고 각 블록의 stdout을 기록과 **문자열 동등** 비교한다. **그 검사는 자기 자신을 포함하지 않는다** |
 
 ---
 
