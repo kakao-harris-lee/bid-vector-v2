@@ -212,7 +212,8 @@ docstring 포함, `end_lineno - lineno + 1`)도 같은 자리에 있다.
 | 최대 파일 줄 수 | 491 | 460 |
 
 **따라서 파일 축 위반이 없고, 판단이 필요한 것은 함수 축 29건뿐이다.** 그 29건의 전수와
-파일별 결합 지점, M5의 「이식 시 분해 / allowlist」 양쪽 재료는 **C-5.2**에 있다.
+파일별 결합 지점은 **C-5.2**에 있다. **이 ADR은 파일별 「분해 / allowlist」 판정을
+하지 않는다** — 그것은 M5의 결정이고, 여기 남기는 것은 그 판정이 딛을 측정이다.
 
 **M5에 넘기는 판단 순서**(이 ADR의 권고이며 결정이 아니다): ① 이식 대상 목록 확정 →
 ② 결합 제거 → ③ 그래도 남은 함수에 대해서만 분해/allowlist 판정. 근거는 29건 중 상당수가
@@ -239,7 +240,7 @@ legacy가 **mixin 합성으로 파일 한도를 우회한 형태**를 스스로 
 > verification are byte-identical and behaviour is unchanged."""
 > ```
 
-합성된 클래스의 실제 크기는 파일 한도를 크게 넘는다(C-5.2). **이 관찰은 ADR 0007로
+합성된 클래스의 실제 크기는 파일 한도를 크게 넘는다(C-5.2d). **이 관찰은 ADR 0007로
 넘긴다** — `OPEN-ADR-06`(래칫 축에 클래스/타입 크기를 넣는가).
 
 ### 4.4 서비스 계약과 검증
@@ -306,7 +307,8 @@ Kotlin 1.7.x"*를 규정하고 Gradle에서 *"the Spring Boot plugin automatical
 
 - **대상**: `app/ai/predictors/legal_floor_spec.py` · `procurement_band_rules.py` ·
   `rate_band_spec.py` · `blend_tables.py`.
-- **관찰**: 넷 다 외부 import가 사실상 없는 **순수 규칙표/spec**이다(C-5.2). 수학이 아니라
+- **관찰**: 넷 중 `app.*` import를 가진 것은 `legal_floor_spec.py` 하나이고 그것도
+  `app.utils.numeric` 한 줄이다(C-5.2c). 나머지 셋은 0이다 — **순수 규칙표/spec**이며 수학이 아니라
   **정책 데이터**로 보인다.
 - **파급**: 정책 데이터면 `v2-지침서.md` §5(*"도메인 정책 값은 versioned policy
   데이터로"*)에 따라 **Kotlin `decision` 모듈의 정책 테이블**로 가고 ml-engine에 남지
@@ -318,7 +320,7 @@ Kotlin 1.7.x"*를 규정하고 Gradle에서 *"the Spring Boot plugin automatical
 - **대상**: `app/services/ml_training/award_landing_ladder.py`.
 - **관찰**: 이 파일이 `is_floor_judgeable`·`resolve_floor_applicability`·
   `is_plausible_assessment_rate`·`plausible_published_floor_rate`·`get_reliable_base` 등
-  **업무 술어를 직접 부른다**(import와 호출 지점은 C-5.2). 파일 docstring은 그것이
+  **업무 술어를 직접 부른다**(import와 호출 지점은 C-5.2c). 파일 docstring은 그것이
   의도라고 적는다 — *"사다리는 신설하지 않고 재사용한다 … 각 단계는 이미 이 저장소가
   소유한 단일 출처 술어를 그대로 부른다"*.
 - **왜 판정이 갈리는가**: `v2-지침서.md` §3.2는 *"Kotlin이 이미 판정한 자격·법정 하한을
@@ -338,7 +340,8 @@ Kotlin 1.7.x"*를 규정하고 Gradle에서 *"the Spring Boot plugin automatical
   조사 노트의 주장이며 이 slice가 재확인하지 않았다.
 - **`tests/design_ratchet_baseline.json`과 교차 검증하지 않았다.** §4.2의 수치는 AST
   재측정 단독 근거다.
-- **분해 후 예상 줄 수는 전부 추정이다** — 실제 분해를 수행해 잰 값이 아니다(C-5.2).
+- **분해 후 크기를 추정하지 않았다.** 이 ADR은 「이 함수를 쪼개면 몇 줄이 된다」를
+  주장하지 않는다 — 실제 분해를 수행해 잰 값이 없기 때문이다.
 - **결합도 축을 재지 않았다.** `v2-지침서.md` §5는 fan-in/fan-out, public API 수, 순환
   의존, duplicate mechanical helper를 함께 재라 요구한다. 이번에 잰 것은 줄 수와 import
   결합뿐이다.

@@ -38,7 +38,7 @@ legacy에는 `scripts/design_ratchet.py`와 `tests/design_ratchet_baseline.json`
 
 legacy가 mixin 합성으로 파일 한도를 우회한 형태를 스스로 문서화한다(ADR 0001 §4.3 인용).
 파일 줄 수는 한도 안이지만 **합성된 클래스의 실제 크기는 한도를 크게 넘는다**
-(`commands.md` **C-5.2**). 크기 축을 파일 하나로만 두면 분할이 우회로가 된다.
+(`commands.md` **C-5.2d**). 크기 축을 파일 하나로만 두면 분할이 우회로가 된다.
 
 ---
 
