@@ -139,9 +139,10 @@ legacy는 **한 basis 태그가 두 개념을 덮고**(추정가격 ↔ 배정�
 
 - **정의상 기본값**은 위 표다 — 추정가격 `Exclusive`, 기초금액 `Inclusive`.
 - **저장된 legacy 값의 실제 과세 처리는 여전히 행마다 다르다.** legacy 자신이 그렇게
-  공시한다: *"저장된 추정가격의 부가세 포함 여부가 이력상 일관되지 않다(수집 키가 공고마다
-  다름)"*(`app/schemas/bid_summary.py:69-77`), 그리고 같은 이유로 *"이 비율에서 과세 여부를
-  단정하면 틀릴 수 있다"*(`app/services/bid_base.py:69-81`).
+  공시한다: *"저장된 추정가격의 부가세 포함 여부가 이력상 일관되지 않다"*
+  (`app/schemas/bid_summary.py:69-77`). 그 원인과 결론은 다른 자리에 있다 —
+  *"부가세 포함 여부가 이력상 일관되지 않아**(수집 키가 공고마다 다름)** 이 비율에서 과세
+  여부를 단정하면 틀릴 수 있다"*(`app/services/bid_base.py:69-81`).
   **이것은 `observed` 층의 참인 관찰이지 `legacy-defect`가 아니다.**
 - **`legacy-defect`인 것은 선언이다** — `app/domain/money.py:20-37`의
   `# 추정가격: 부가세 포함 추정 총액`과 같은 방향의 주석
@@ -557,7 +558,7 @@ legacy의 출력은 `verdict: str` + 표시용 튜플들이라 사유가 구조�
 **대안 해석(`lmtGrpNo`가 공동수급체 구성원 슬롯)**까지 적어 둔다(`app/services/license_eligibility.py:33-40`).
 결측 행의 AND 폴딩 근거도 코드에 있다(`app/services/license_eligibility.py:128-130`).
 
-**한계(반드시 적는다)**: 이 모듈은 legacy에서 **소비자가 0개**라고 스스로 적는다
+**한계(반드시 적는다)**: 이 모듈은 legacy에서 **소비자가 없다**고 스스로 적는다
 (`app/services/license_eligibility.py:44-45`). **확정된 의미론이 운영에서 검증된 적이
 없다.**
 
@@ -833,19 +834,21 @@ legacy는 게이트 사다리 first-match로 `action`을 정하고, **두 보류
 **0C에 확인을 위임했다** — *"주석에 근거가 있다 — 0C가 그 근거를 직접 열어 확인하고
 옮긴다."*
 
-**확인 결과: 「정책(근거 있음)」으로 분류된 다섯 중 실제로 값의 근거를 가진 것은 둘이다.**
-나머지 셋의 주석은 **값이 무엇을 하는지의 서술이지 값이 왜 그 값인지의 근거가 아니다.**
+**확인 결과는 아래 표의 「값의 근거인가」 칸이 낸다** — 셈을 여기 옮겨 적지 않는다.
+가른 기준 하나는 적어 둔다: **값이 무엇을 하는지의 서술은 근거가 아니다.** 근거는
+**왜 그 값인지**를 말해야 한다.
 
-| 값 | 주석이 말하는 것 | 값의 근거인가 | 근거 위치 |
-| --- | --- | --- | --- |
-| `MIN_ASSESSMENT_SAMPLES` = `150` | 이항 비율 표준오차 유도 | **예** | `app/domain/floor_shortfall.py:42-57` |
-| `BID_BASE_TRUST_RATIO_MAX` = `1.15` | 부가세 배수 + 측정 마진의 합으로 분해 | **예** | `app/core/constants.py:158-177` |
-| `clamp_bid_rate` `0.7` ~ `1.4` | *"Keep scenario bid rates inside a realistic bidding band."* | **아니다** — 용도 서술 | `app/ai/predictors/historical/statistics.py:65-67` |
-| `_BASE_ADJUSTMENT` = `0.15` | *"recommended anchor: 15% up from the floor"* | **아니다** — 무엇을 하는지 | `app/ai/bid_target.py:20-25` |
-| `_DISPERSION_REFERENCE` = `0.02` | *"winning-rate std at which dispersion fully lifts…"* | **아니다** — 무엇을 하는지 | `app/ai/bid_target.py:20-25` |
-| `_MAX_ADJUSTMENT` = `0.85` | *"never let the signal alone push the recommended past…"* | **아니다** — 무엇을 하는지 | `app/ai/bid_target.py:20-25` |
+| 값 | U-10 표에서의 자리 | 주석이 말하는 것 | 값의 근거인가 | 근거 위치 |
+| --- | --- | --- | --- | --- |
+| `MIN_ASSESSMENT_SAMPLES` = `150` | 자체 근거를 단 행 — **확인 위임 대상이 아니다** | 이항 비율 표준오차 유도 | **예** | `app/domain/floor_shortfall.py:42-57` |
+| `BID_BASE_TRUST_RATIO_MAX` = `1.15` | **확인 위임 행** | 부가세 배수 + 측정 마진의 합으로 분해 | **예** | `app/core/constants.py:158-177` |
+| `clamp_bid_rate` `0.7` ~ `1.4` | **확인 위임 행** | *"Keep scenario bid rates inside a realistic bidding band."* | **아니다** — 용도 서술 | `app/ai/predictors/historical/statistics.py:65-67` |
+| `_BASE_ADJUSTMENT` = `0.15` | **확인 위임 행** | *"recommended anchor: 15% up from the floor"* | **아니다** — 무엇을 하는지 | `app/ai/bid_target.py:20-25` |
+| `_DISPERSION_REFERENCE` = `0.02` | **확인 위임 행** | *"winning-rate std at which dispersion fully lifts…"* | **아니다** — 무엇을 하는지 | `app/ai/bid_target.py:20-25` |
+| `_MAX_ADJUSTMENT` = `0.85` | **확인 위임 행** | *"never let the signal alone push the recommended past…"* | **아니다** — 무엇을 하는지 | `app/ai/bid_target.py:20-25` |
 
-**U-10의 기준을 확인된 문면에 적용하면 아래 넷은 「미분류」다.** U-10 자신이 그 방향을
+**U-10의 기준을 확인된 문면에 적용하면 위 표에서 「아니다」로 찍힌 것들이 「미분류」로
+간다.** U-10 자신이 그 방향을
 보호한다 — *"「근거 없는 계수」를 정책으로 승격하면 「정책이니 바꿀 수 있다」로 읽히므로,
 미분류는 미분류로 남긴다."*
 
@@ -1091,7 +1094,8 @@ ADR 명문화는 0D 소관이다.
 > `Maturity = sealed { Observed(settledCount, openedCount, ratio), NoObservation }`
 > **`0/0`을 비율로 표현할 수 있는 경로를 만들지 않는다.**
 
-**embargo 임계는 손잡이가 아니다.** legacy가 그 규율을 적고 CLI 플래그를 두지 않는다 —
+**embargo 임계는 손잡이가 아니다.** legacy가 그 규율을 적고 CLI 플래그를 두지 않는다
+(`app/services/ml_training/award_rate_windows.py:16-20`) —
 임계의 의미는 **감수하는 무지의 상한 선언**이다. **V2 승계 여부는 활성 `OPEN-SET-06`이
 소유하므로 이 문서는 값을 쓰지 않는다.**
 
@@ -1169,7 +1173,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 ## 8. 알려진 제한
 
 1. **면허 그룹 의미론이 운영에서 검증된 적이 없다.** U-8이 확정한 의미론의 legacy 모듈은
-   **소비자가 0개**라고 스스로 적는다(§3.2.2).
+   **소비자가 없다**고 스스로 적는다(§3.2.2).
 2. **면허 유효기간을 다루지 않는다**(U-7). 만료 면허로 자격을 오판정할 수 있고, 그 위험은
    판정 결과의 "유효기간 미검증" 표시로만 가려진다(§3.2.4).
 3. **정책 version의 날짜 식별은 같은 날 두 번 바뀌는 정책을 구별하지 못한다**(§4.1).
@@ -1197,29 +1201,42 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 **활성 `OPEN`은 해소하지 않았다.** 이 문서가 문면에서 마주친 것 — `OPEN-QUAL-05` ·
 `OPEN-QUAL-09` · `OPEN-ML-05` · `OPEN-SET-04` · `OPEN-SET-05` · `OPEN-SET-06` ·
 `OPEN-SET-10` · `OPEN-DEC-07` · `OPEN-DEC-10` · `OPEN-OPS-10` · `OPEN-NUM-01` ·
-`OPEN-REG-04` — 은 전부 각 자리에서 **소유자만 밝히고 정의를 붙이지 않았다.**
+`OPEN-REG-04` — 에 **정의를 붙이지 않았다.** 그중 `OPEN-SET-05`(재공고 대사 대상 선택
+규칙)만은 **본문에 자리가 없다** — 이 문서가 다루는 축이 아니라 여기 이름만 남긴다.
+나머지는 각 자리에서 **소유자를 밝힌다.**
 재현은 `commands.md` **C-6**이다.
 
 ---
 
 ## 10. `capability-map.md`와 다른 자리 — **이 문서가 정본이다**
 
-운영자 승인 2026-08-27(`reports/evidence/m0/0a3/scope.md` 「알려진 제한」).
-**`capability-map.md`를 고치지 않는다.**
+**`capability-map.md`를 고치지 않는다.** 아래 항목은 **성격이 둘로 갈린다.**
 
-| # | `capability-map.md`의 서술 | 이 문서의 정본 | 근거 |
-| --- | --- | --- | --- |
-| **X-2** | DEC-11 밴드 표의 「사정률 관측 가능 판정」 행이 별도 밴드다 | **§1.4.3** — 별도 밴드가 아니라 B2의 상수를 쓰는 **술어 한 벌**이다 | `app/ai/predictors/distribution_extraction.py:51-58` · `app/core/constants.py:406-415` |
-| **X-3** | DEC-11 표가 밴드를 전수 담는다 | **§1.4.3** — 표에 없는 밴드가 둘(**B3**·**B5**) 있다 | `app/services/floor_shortfall.py:94-98` · `app/ai/predictors/distribution_extraction.py:40-48` |
-| **X-4** | 투찰율 클램프 출처가 `app/domain/basis_conversion.py:110-120`의 한 줄이다 | **§1.4.3 B7** — 그 줄은 **docstring 언급**이고 리터럴은 다른 파일에 있다 | `app/domain/basis_conversion.py:110-120` ↔ `app/ai/predictors/historical/statistics.py:65-67` |
-| **X-5** | SET-07 S4가 "예비가 존재 또는 낙찰가 > 0" 두 논리합이다 | **§2.3.1 S4** — **세 논리합**이며 `total_count`가 독립 축이다 | `app/services/award_verification.py:283-291` |
-| **X-6** | DEC-05가 `bid_target.py`를 디렉터리 없이 인용한다 | **§0.3** — 전체 경로는 `app/ai/bid_target.py`이며 저장소에 `app/services/bid_target_signals.py`가 따로 있어 모호하다 | `commands.md` **C-9** |
-| **O-1** | §13 `R-BASIS-01` 대응 행의 `검증 방법`이 과세/비과세 경계 쌍 fixture를 **무조건**으로 요구한다 | **`regression-ledger.md`가 정본이다.** ledger가 같은 요구를 **`OPEN-REG-05` 조건부**로 돌렸고, 이 문서는 fixture 요구를 **조건부로** 서술한다 — §11의 유보 사유 교체 참조 | `regression-ledger.md` §10.1 |
-| **O-2** | §6 **NOTI-08**의 투찰률 항목과 §7 **SET-09 F-4**가 두 금액의 차이를 정량화한다 | **§1.2가 정본이다.** 층은 **`legacy-behavior`**이고 귀속은 **`OPEN-REG-05`**(§11에서 해소). **U-1·U-1b가 그 관찰을 설명한다** — 부가세 혼용이 성분 하나다. **차이의 나머지는 이 문서가 정량화하지 않는다** | `reports/evidence/m0/0c/decisions-2026-08-28.md` |
+- **`X-2`~`X-6` — 운영자가 승인한 정본 교체 다섯 건**(2026-08-27).
+  0A3이 그 목록을 **다섯 행 표**로 고정했다
+  (`reports/evidence/m0/0a3/scope.md`의 「(A) 결정 — X-2~X-6은 0C가 정본이 된다」 절).
+- **`O-2` — 승인 목록이 아니다.** 0A3의 in_scope 밖이라 **고치지 않고 out_of_scope로
+  남긴 부채**이며, 같은 문서가 *"**X-2~X-6과 O-2는 여전히 out_of_scope**이고
+  **0C 데이터 사전이 정본**이 된다"*고 인계했다.
 
-### 10.1 이 slice가 새로 발견한 것 — 승인된 일곱 건 밖이다
+**`O-1`은 여기에 없다 — 0A3에서 닫혔다.** 운영자 결정(2026-08-27, 0A3 수정 라운드 2 / F-4)으로
+`capability-map.md` §13의 해당 행이 **`결정 무관(무조건)`과 `조건부 — `OPEN-REG-05` 결정에
+따라 확정`으로 이미 갈라졌다.** 그 파일은 지금 무조건을 요구하지 않는다. 이 문서가
+fixture 요구를 **조건부**로 서술하는 것(§1.2 · §11)은 정본 교체가 아니라 **이미 정정된
+문면·ledger §10.1과 일치하는 서술**이다.
 
-**아래는 0A3이 넘긴 일곱 건에 없다.** 이 slice가 `commands.md` **C-7.5**를 돌리다 발견했다.
+| # | 성격 | `capability-map.md`의 서술 | 이 문서의 정본 | 근거 |
+| --- | --- | --- | --- | --- |
+| **X-2** | 승인(2026-08-27) | DEC-11 밴드 표의 「사정률 관측 가능 판정」 행이 별도 밴드다 | **§1.4.3** — 별도 밴드가 아니라 B2의 상수를 쓰는 **술어 한 벌**이다 | `app/ai/predictors/distribution_extraction.py:51-58` · `app/core/constants.py:406-415` |
+| **X-3** | 승인(2026-08-27) | DEC-11이 밴드를 여섯 행으로 열거한다(전수를 주장하지는 않는다 — *"최소 6종"*) | **§1.4.3** — 그 여섯에 **없는 밴드가 둘**(**B3**·**B5**) 있다 | `app/services/floor_shortfall.py:94-98` · `app/ai/predictors/distribution_extraction.py:40-48` |
+| **X-4** | 승인(2026-08-27) | 투찰율 클램프 출처가 `app/domain/basis_conversion.py:110-120`의 한 줄이다 | **§1.4.3 B7** — 그 줄은 **docstring 언급**이고 리터럴은 다른 파일에 있다 | `app/domain/basis_conversion.py:110-120` ↔ `app/ai/predictors/historical/statistics.py:65-67` |
+| **X-5** | 승인(2026-08-27) | SET-07 S4가 "예비가 존재 또는 낙찰가 > 0" 두 논리합이다 | **§2.3.1 S4** — **세 논리합**이며 `total_count`가 독립 축이다 | `app/services/award_verification.py:283-291` |
+| **X-6** | 승인(2026-08-27) | DEC-05가 `bid_target.py`를 디렉터리 없이 인용한다 | **§0.3** — 전체 경로는 `app/ai/bid_target.py`이며 저장소에 `app/services/bid_target_signals.py`가 따로 있어 모호하다 | `commands.md` **C-9** |
+| **O-2** | out_of_scope 부채 | §6 **NOTI-08**의 투찰률 항목과 §7 **SET-09 F-4**가 두 금액의 차이를 정량화한다 | **§1.2가 정본이다.** 층은 **`legacy-behavior`**이고 귀속은 **`OPEN-REG-05`**(§11에서 해소). **U-1·U-1b가 그 관찰을 설명한다** — 부가세 혼용이 성분 하나다. **차이의 나머지는 이 문서가 정량화하지 않는다** | `reports/evidence/m0/0c/decisions-2026-08-28.md` |
+
+### 10.1 이 slice가 새로 발견한 것 — 승인된 다섯 건 밖이다
+
+**아래는 0A3이 넘긴 `X-2`~`X-6`에 없다.** 이 slice가 `commands.md` **C-7.5**를 돌리다 발견했다.
 같은 처리를 적용하되(고치지 않고 정본을 여기 적는다) **승인된 목록과 구별해 표시한다.**
 
 | # | `capability-map.md`의 서술 | 실측 | 근거 |
@@ -1263,12 +1280,12 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 | --- | --- | --- | --- | --- | --- |
 | `0.90` · `1.10` | fraction | 사정률(예정가/기초금액) 분모 필터 밴드 | `app/domain/floor_shortfall.py:42-57` | `legacy-behavior` | — (`OPEN-DEC-02` 확정: 두 벌 유지) |
 | `0.8` · `1.2` | fraction | 사정률 관측 편입 필터 밴드 | `app/core/constants.py:406-415` | `legacy-behavior` | — |
-| `1` ± `1e-3` | fraction | 사정률 제외 밴드의 중심과 반폭. 중심 `1`은 예정가 = 기초금액인 중립 사정률이다 | `app/services/floor_shortfall.py:94-98` | `legacy-behavior` | — |
+| `1` ± `1e-3` | fraction | 사정률 제외 밴드의 중심과 반폭. 중심 `1`은 예정가 = 기초금액인 중립 사정률이다 | 리터럴은 `app/ai/holdout_quality.py:87-91`, 밴드 별칭은 `app/services/floor_shortfall.py:94-98` | `legacy-behavior` | — |
 | `0.5` · `1.5` | fraction | 율 라벨 유효 창(낙찰가/금액) | `app/domain/rate_normalization.py:96-102` | `legacy-behavior` | — |
 | `0.5` · `1.5` | fraction | **투찰비 개연 밴드**(투찰가/기초금액) — 별도 사본 | `app/ai/predictors/distribution_extraction.py:40-48` | `legacy-behavior` | — |
 | `0.30` · `0.995` | fraction | 게시 낙찰하한율 신뢰 밴드 | `app/domain/published_floor_rate.py:34-43` | `legacy-behavior` | — |
 | `0.7` · `1.4` | fraction | 투찰율 guardrail 클램프 | `app/ai/predictors/historical/statistics.py:65-67` | `legacy-behavior` | **`OPEN-ML-05`** (근거 없음 — §4.3) |
-| `1.5` | fraction | percent/fraction 판별 임계 | `app/domain/rate_normalization.py:96-113` | `legacy-behavior` | — (V2 미채택 — §1.4.1) |
+| `1.5` | fraction | percent/fraction 판별 임계(`PERCENT_SCALE_THRESHOLD`) | `app/domain/rate_normalization.py:70-73` | `legacy-behavior` | — (V2 미채택 — §1.4.1) |
 | `100` | 무차원 | percent → fraction 변환 제수(정의상 `1` percent = `1` ÷ `100`) | `app/domain/rate_normalization.py:96-113` | **`authoritative`** — 단위 정의 | — |
 | `150` | 건수 | 하한 미달 빈도의 최소 표본 수 | `app/domain/floor_shortfall.py:42-57` + 운영자 승인 2026-08-26 | **`authoritative`** | — (`OPEN-DEC-01` 해소) |
 | `1.15` | fraction | 기초금액 ÷ 추정가격 신뢰 상한 | `app/core/constants.py:158-177` | `legacy-behavior` | **`OPEN-DEC-07`** (마진 재유도) |
