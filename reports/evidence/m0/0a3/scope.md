@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a3-decision-basis-correction
 base_sha: 48151b9   # 0B Codex 4차 approve verdict 등재 직후의 HEAD
-head_sha: d8fcef8   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
+head_sha: 7bcf2e7   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
 in_scope:
   - reports/evidence/m0/0a2/decisions.md      # X-1 정정 한정 + provenance 등재
   - reports/evidence/m0/0a2/checklist.md      # §10.1 형태 7 등재 한정
@@ -172,7 +172,9 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 | `6b99420` | **수정 라운드 15** — verifier `Z-1`(blocker)·`Z-2`. 편집 잔해를 지운다 |
 | `aabde68` | **수정 라운드 16** — Codex 4차 `A`. 남은 두 항목의 층을 `legacy-behavior`로 |
 | `d8fcef8` | **수정 라운드 17** — Codex 4차 `B`. 스크립트 인벤토리를 셋으로, 셈을 지운다 |
-| 이 커밋 | **수정 라운드 18** — Codex 4차 `C`. 라운드 15 자기 기록을 실측에 맞춘다 |
+| `47e1716` | **수정 라운드 18** — Codex 4차 `C`. 라운드 15 자기 기록을 실측에 맞춘다 |
+| `7bcf2e7` | **수정 라운드 19** — verifier `F-1`. 동결 이력 본문을 원문으로 되돌리고 표시를 단다 |
+| 이 커밋 | **수정 라운드 20** — verifier `F-2`. 출력 블록을 선언 SHA의 트리에서 다시 뜬다 |
 
 **파일 목록도 셈도 여기에 옮기지 않는다** — `git show --stat --format='' <SHA>`가 낸다.
 
@@ -1249,6 +1251,62 @@ C-3.4가 **`(관찰된 회귀)` 문구와 표 제목**을 근거로 두 항목�
 | 산출물 셋이 이 세 라운드에 무변경 | `commands.md` **C-9 (d)** · `git diff --stat 6b99420..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
 | **인벤토리 ↔ `python` 블록** · **산문에 살아 있는 셈** | `commands.md` **C-9 (a)·(b)** |
 | **`O-2`에 남는 두 항목이 그대로인가** | `commands.md` **C-3.4 판정 표** — 층 라벨만 바뀐다 |
+| 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
+| `regression-ledger.md` 무변경 | `commands.md` **C-6** |
+| in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
+| 하네스 두 파일이 range 밖인가 | `git diff --name-only 48151b9...HEAD` |
+
+**결과를 여기 적지 않는다.**
+
+---
+
+## 갱신 이력 — 수정 라운드 19·20 (verifier `F-1`·`F-2`)
+
+**층 판정은 옳다** — 검증자가 값의 출처를 직접 따라가 **두 항목 다 `legacy-behavior`로
+독립 판정**했고 **일치**했다. **`B`·`C`도 처방까지 이행됐고 불변은 안 깨졌다.**
+건별 처리는 `checklist.md` **§26·§27**에 있고 **커밋도 둘로 나눴다**(처방의 순서 때문이다).
+
+### `F-1` — 동결 이력 본문을 고쳐 놓고 「안 고쳤다」고 적었다
+
+라운드 16이 0B `F-c` 기준 문면을 *"세 자리 전수"*로 고쳤는데 **그 중 둘이 동결 이력
+본문**이었다 — 이 파일의 **「갱신 이력 — 수정 라운드 10」**과 `checklist.md` **§17**.
+**⚠도 안 달았고**, 그 위에 *"동결 이력은 본문을 고치지 않았다"*를 적었다.
+
+**이 패키지 자신의 관례를 어긴다** — `G-5`와 `W-1`이 세운 **본문/포인터 구분**이다.
+**`observed` → `legacy 서술`은 이름이 아니라 기준 문장 자체다.**
+**두 자리를 원문으로 되돌리고 ⚠ 후속 정정을 달았다.**
+
+**형태가 아프다** — **Codex 4차 `C`(「한 것과 적은 것이 다름」)를 고치는 라운드가 같은
+형태를 새로 만들었다.** **전수 스윕이 「기준 문면」으로 돌면서 그 자리가 동결 이력인지
+보지 않았다.**
+
+### `F-2` — 커밋 안의 블록은 자기 커밋의 트리에서 뜰 수 없다
+
+C-7·C-9의 선언 HEAD가 **기록된 출력이 나온 트리와 달랐다.** **뿌리는 `head_sha`와 같다.**
+
+**커밋된 뒤에 다시 떴다** — `F-1`을 먼저 커밋하고 **그 커밋을 체크아웃한 worktree에서
+두 블록을 실행**해 **그 SHA로 선언**했다. **선언된 SHA의 트리에서 재현되는지 확인**했고
+**어긋나는 줄 0**이다.
+
+**「이제 항상 맞는다」고 적지 않았다** — **한계를 적었다**: *"이후 편집이 들어오면 다시
+떠야 한다"*. **둘 다 고쳤다** — 한쪽만 고치면 **같은 파일 안에서 계약을 지키는 블록과
+어기는 블록이 공존한다.**
+
+### `head_sha`와 range
+
+**이 커밋이 무엇을 바꿨는지는 `git show --stat --format='' HEAD`가 낸다.**
+
+- **`head_sha`의 정본은 이 파일 머리의 yaml 하나다.** 커밋이 자기 SHA를 담을 수 없어
+  **직전 커밋**을 가리킨다.
+- **리뷰 range는 `48151b9...HEAD`**.
+
+### 불변 — 이 절은 수도 좌표도 옮겨 적지 않는다
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| 산출물 셋이 두 라운드에 무변경 | `git diff --stat 47e1716..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
+| **두 블록이 선언 SHA에서 재현되는가** | 그 SHA를 체크아웃한 worktree에서 C-7·C-9의 명령을 돌린다 |
+| **층 판정 · `O-2` · 인벤토리 무변경** | `commands.md` **C-3.4** · **C-9 (a)** |
 | 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
 | `regression-ledger.md` 무변경 | `commands.md` **C-6** |
 | in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |

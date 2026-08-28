@@ -699,10 +699,14 @@ print(f"-- 지목 {len(bad)}건 · 번호를 넘겨준 절: {' '.join(sorted(mov
 
 **두 커밋에서 돌려 능력을 측정했다** — **넓혔다고 적기 전에 재는 것이 이번 라운드의 요구**다.
 
+> **이 블록은 선언된 SHA의 트리에서 떴다.** 커밋 안의 블록은 **자기 커밋의 트리에서 뜰 수
+> 없으므로**(`head_sha`와 같은 뿌리), **직전 커밋을 체크아웃한 worktree에서 실행**했다.
+> **선언된 SHA에서 재현된다** — **이후 편집이 들어오면 다시 떠야 한다**(verifier `F-2`).
+
 ```
-### 실행 시점 HEAD = d8fcef8 (이 라운드의 편집이 든 작업 트리)
-### 마커는 셸 변수로 쪼갠다 — 이 절 자신의 서술이 검사에 걸리지 않게.
-### 파일 간 출력 순서는 구현에 따라 다르므로 sort 로 고정한다(R-2 와 같은 부류).
+### 실행 시점 HEAD = 7bcf2e7
+### 이 블록은 그 커밋의 트리에서 떴다 — 선언한 SHA 에서 재현된다.
+### 마커는 셸 변수로 쪼갠다 · 파일 간 순서는 sort 로 고정한다.
 
 ## (a) 표시가 이력 절 안에 실제로 들어갔는가 (V-1)
 $ MARK='재판정으로 이 절의'; grep -rn "⚠ 수정 라운드 10의 출처 층 $MARK" reports/evidence/m0/0a3/ | sort | cut -c1-64 | sed 's/[[:space:]]*$//'
@@ -738,8 +742,8 @@ $ printf %s "$BLKP" | python3 - 5d2ca03
 [번호이동] reports/evidence/m0/0a3/checklist.md:526  C-7 — 그 줄(2f8b65a)은 C-7 이 절을 넘겨준 커밋(5d2ca03)보다 앞선다
 -- 지목 4건 · 번호를 넘겨준 절: C-6 C-7
 
-### (b-2) 현재 HEAD 에서
-$ printf %s "$BLKP" | python3 - HEAD
+### (b-2) 선언된 HEAD 7bcf2e7 에서
+$ printf %s "$BLKP" | python3 - 7bcf2e7
 -- 지목 0건 · 번호를 넘겨준 절: C-6 C-7
 ```
 
@@ -753,7 +757,7 @@ $ printf %s "$BLKP" | python3 - HEAD
 - **`5d2ca03`(= `W-1`이 살아 있던 커밋)에서 그 자리를 잡는다.** 지목이 `scope.md`의
   세 줄과 `checklist.md`의 한 줄이고 **그 넷이 `W-1`이 지적한 자리 전부**다
   (`checklist.md` 쪽 한 줄에 인용이 **둘** 있었다). **다른 지목은 없다.**
-- **현재 HEAD 에서 지목 0.**
+- **선언된 HEAD(`7bcf2e7`)에서 지목 0.**
 - **앞 축은 이것을 못 잡았다** — 접두가 붙은 인용만 봤기 때문이고, **`W-1`의 자리는
   전부 접두가 없다.**
 
@@ -791,8 +795,8 @@ $ printf %s "$BLKP" | python3 - HEAD
 **그래서 고친 뒤 그 수정이 무효화한 자리가 없는지 훑는다.**
 
 ```
-### 실행 시점 HEAD = d8fcef8 (이 라운드의 편집이 든 작업 트리)
-### 인벤토리·셈·「~하지 않았다」류가 이 라운드의 편집으로 낡는지 본다.
+### 실행 시점 HEAD = 7bcf2e7
+### 이 블록은 그 커밋의 트리에서 떴다 — 선언한 SHA 에서 재현된다.
 ### (b) 는 commands.md 를 대상에서 뺀다 — 이 절의 출력이 자기 검사에 걸리기 때문이다.
 ### 파일 간 출력 순서는 구현에 따라 다르므로 sort 로 고정한다(R-2 와 같은 부류).
 
@@ -804,8 +808,8 @@ $ awk '/^### 이 패키지가 쓰는 스크립트/,/^## /' reports/evidence/m0/0
 
 ## (b) 산문에 살아 있는 셈이 남았는가 (scope.md · checklist.md)
 $ grep -nE '스크립트가 (둘|셋|하나)|스크립트 — (둘|셋)|블록이 (둘|셋)' reports/evidence/m0/0a3/scope.md reports/evidence/m0/0a3/checklist.md | sort | cut -c1-88
-reports/evidence/m0/0a3/checklist.md:1008:| **지운 문면** | 머리글의 *"이 패키지가 쓰는 스크립트 — **둘**이고"
-reports/evidence/m0/0a3/scope.md:1218:늘면서 `python` 블록이 셋이 됐는데 인벤토리는 **둘**이라 적고 있었다.
+reports/evidence/m0/0a3/checklist.md:1017:| **지운 문면** | 머리글의 *"이 패키지가 쓰는 스크립트 — **둘**이고"
+reports/evidence/m0/0a3/scope.md:1221:늘면서 `python` 블록이 셋이 됐는데 인벤토리는 **둘**이라 적고 있었다.
 
 ## (c) 라운드 15 실측 — 「~하지 않았다」류가 이것과 맞아야 한다
 $ git diff --numstat 32f7a63..6b99420 -- reports/evidence/m0/0a3/
@@ -817,8 +821,8 @@ $ for f in scope checklist commands; do a=$(git show 32f7a63:…/$f.md | grep -c
   checklist: 64 → 69
   commands: 31 → 30
 
-## (d) 이 라운드가 산출물을 건드렸는가
-$ git diff --stat 6b99420..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/
+## (d) 라운드 16~18 이 산출물을 건드렸는가
+$ git diff --stat 6b99420..7bcf2e7 -- docs/discovery/capability-map.md reports/evidence/m0/0a2/
 (빈 출력 = 무변경)
 ```
 
