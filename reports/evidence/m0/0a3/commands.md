@@ -794,8 +794,14 @@ $ printf %s "$BLKP" | python3 - 7bcf2e7
 `B`는 대상이 늘어서, `C`는 지시 문구를 기록에 그대로 옮겨 범위가 사라져서.
 **그래서 고친 뒤 그 수정이 무효화한 자리가 없는지 훑는다.**
 
+> **이 블록은 선언된 SHA의 트리에서 떴다.** 커밋 안의 블록은 **자기 커밋의 트리에서 뜰 수
+> 없으므로**(`head_sha`와 같은 뿌리) **직전 커밋을 체크아웃한 worktree에서 실행**했다.
+> **선언된 SHA에서 재현된다** — **이후 편집이 들어오면 다시 떠야 한다**(verifier `F-2`).
+> **명령에 축약·자리표시자를 쓰지 않는다** — 앞 라운드가 `git show <sha>:…/$f.md`로 적어
+> **그대로 돌면 실패했다**(Codex 5차 `G-1`). **전체 경로로 적는다.**
+
 ```
-### 실행 시점 HEAD = 7bcf2e7
+### 실행 시점 HEAD = b940074
 ### 이 블록은 그 커밋의 트리에서 떴다 — 선언한 SHA 에서 재현된다.
 ### (b) 는 commands.md 를 대상에서 뺀다 — 이 절의 출력이 자기 검사에 걸리기 때문이다.
 ### 파일 간 출력 순서는 구현에 따라 다르므로 sort 로 고정한다(R-2 와 같은 부류).
@@ -809,7 +815,7 @@ $ awk '/^### 이 패키지가 쓰는 스크립트/,/^## /' reports/evidence/m0/0
 ## (b) 산문에 살아 있는 셈이 남았는가 (scope.md · checklist.md)
 $ grep -nE '스크립트가 (둘|셋|하나)|스크립트 — (둘|셋)|블록이 (둘|셋)' reports/evidence/m0/0a3/scope.md reports/evidence/m0/0a3/checklist.md | sort | cut -c1-88
 reports/evidence/m0/0a3/checklist.md:1017:| **지운 문면** | 머리글의 *"이 패키지가 쓰는 스크립트 — **둘**이고"
-reports/evidence/m0/0a3/scope.md:1221:늘면서 `python` 블록이 셋이 됐는데 인벤토리는 **둘**이라 적고 있었다.
+reports/evidence/m0/0a3/scope.md:1223:늘면서 `python` 블록이 셋이 됐는데 인벤토리는 **둘**이라 적고 있었다.
 
 ## (c) 라운드 15 실측 — 「~하지 않았다」류가 이것과 맞아야 한다
 $ git diff --numstat 32f7a63..6b99420 -- reports/evidence/m0/0a3/

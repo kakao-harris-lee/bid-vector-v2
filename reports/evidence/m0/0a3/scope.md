@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a3-decision-basis-correction
 base_sha: 48151b9   # 0B Codex 4차 approve verdict 등재 직후의 HEAD
-head_sha: 7bcf2e7   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
+head_sha: b940074   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
 in_scope:
   - reports/evidence/m0/0a2/decisions.md      # X-1 정정 한정 + provenance 등재
   - reports/evidence/m0/0a2/checklist.md      # §10.1 형태 7 등재 한정
@@ -174,7 +174,9 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 | `d8fcef8` | **수정 라운드 17** — Codex 4차 `B`. 스크립트 인벤토리를 셋으로, 셈을 지운다 |
 | `47e1716` | **수정 라운드 18** — Codex 4차 `C`. 라운드 15 자기 기록을 실측에 맞춘다 |
 | `7bcf2e7` | **수정 라운드 19** — verifier `F-1`. 동결 이력 본문을 원문으로 되돌리고 표시를 단다 |
-| 이 커밋 | **수정 라운드 20** — verifier `F-2`. 출력 블록을 선언 SHA의 트리에서 다시 뜬다 |
+| `c69c04c` | **수정 라운드 20** — verifier `F-2`. 출력 블록을 선언 SHA의 트리에서 다시 뜬다 |
+| `b940074` | **수정 라운드 21** — Codex 5차 `G-1`. C-9 명령의 축약 경로를 전체 경로로 |
+| 이 커밋 | **수정 라운드 22** — Codex 5차 `G-1`. C-9를 새 선언 SHA의 트리에서 다시 뜬다 |
 
 **파일 목록도 셈도 여기에 옮기지 않는다** — `git show --stat --format='' <SHA>`가 낸다.
 
@@ -1311,5 +1313,61 @@ C-7·C-9의 선언 HEAD가 **기록된 출력이 나온 트리와 달랐다.** *
 | `regression-ledger.md` 무변경 | `commands.md` **C-6** |
 | in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
 | 하네스 두 파일이 range 밖인가 | `git diff --name-only 48151b9...HEAD` |
+
+**결과를 여기 적지 않는다.**
+
+---
+
+## 갱신 이력 — 수정 라운드 21·22 (Codex 5차 `G-1`)
+
+verdict 정본: `reports/evidence/m0/0a3/codex-review-20260828T040618Z.json`(등재, append-only).
+`reviewed_base` **`48151b9`** → `reviewed_head` **`c69c04c`**.
+**4차 세 건은 전부 해소 판정**을 받았고 **residual risk가 `O-2`의 위치·성격·출처 층이
+evidence와 실물에서 일치한다고 명시**한다. 건별 처리는 `checklist.md` **§28**에 있다.
+
+### 명령이 축약 경로를 썼다
+
+C-9 (c)의 `for` 명령이 `git show <sha>:…/$f.md`로 적혀 **그대로 돌면 실패**하고
+**`0 → 0`**을 낸다. **기록된 값은 그 명령에서 나올 수 없다.** **결론과 수치는 맞고 명령이
+안 돈다** — `F-3`·`W-1`과 같은 계열이며 **머리글의 재현 계약과 어긋난다.**
+
+**전체 경로로 바꿨고 직접 확인했다** — 축약 경로는 실패하고 전체 경로는 기록된 값을 낸다.
+**C-9 머리에 한계를 더했다**: *"명령에 축약·자리표시자를 쓰지 않는다."*
+
+### 처방의 순서를 지켰다 — `F-2`와 같다
+
+**고쳐 커밋한 뒤**(`b940074`) **그 커밋의 트리에서 C-9를 다시 떠 그 SHA로 선언**했다.
+**커밋 안의 블록은 자기 커밋의 트리에서 뜰 수 없다.**
+
+### 전수 훑기 — 측정한 범위만 적는다
+
+**`commands.md`의 `$`로 시작하는 명령**에서 **축약·자리표시자를 훑었고 남은 것은 없다.**
+**첫 스윕이 지목한 넷은 git range 문법**(`48151b9...HEAD`)이라 **오탐이었고 넷 다 실제로
+도는 것을 확인**했다. **「모든 명령이 재현된다」고는 적지 않는다** — 본 것은 **축약 표기
+하나의 축**이다.
+
+### 이 편집이 다른 블록을 깨지 않았다
+
+**두 블록을 각자 선언한 SHA의 worktree에서 다시 돌려 기록과 대조**했다 — **둘 다 어긋남 0.**
+
+### `head_sha`와 range
+
+**이 커밋이 무엇을 바꿨는지는 `git show --stat --format='' HEAD`가 낸다.**
+
+- **`head_sha`의 정본은 이 파일 머리의 yaml 하나다.** 커밋이 자기 SHA를 담을 수 없어
+  **직전 커밋**을 가리킨다.
+- **리뷰 range는 `48151b9...HEAD`**.
+
+### 불변 — 이 절은 수도 좌표도 옮겨 적지 않는다
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| 산출물 셋이 두 라운드에 무변경 | `git diff --stat c69c04c..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
+| **두 블록이 각자 선언 SHA에서 재현되는가** | 그 SHA를 체크아웃한 worktree에서 C-7·C-9의 명령을 돌린다 |
+| **축약·자리표시자가 남은 명령** | `checklist.md` §28의 스윕 |
+| **층 판정 · `O-2` · 인벤토리 무변경** | `commands.md` **C-3.4** · **C-9 (a)** |
+| 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
+| `regression-ledger.md` 무변경 | `commands.md` **C-6** |
+| in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
 
 **결과를 여기 적지 않는다.**

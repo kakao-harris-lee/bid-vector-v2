@@ -1,0 +1,42 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "48151b9c47e4f09286c4ee869977383fa4b23396",
+  "reviewed_head": "c69c04c00d5bedeb0408ded9a425fa3e6ec6d323",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a3/commands.md",
+      "line": 819,
+      "evidence": "C-9 출력 블록은 선언 SHA `7bcf2e7`에서 재현된 명령이라고 기록하지만, 명령의 `git show 32f7a63:…/$f.md`와 `git show 6b99420:…/$f.md`는 실제 경로 대신 문자 `…`를 사용한다. 그대로 재실행하면 각 파일마다 `fatal: path '…/<file>.md' does not exist`가 발생하고 `scope/checklist/commands: 0 → 0`을 출력한다. 기록된 `94→100`, `64→69`, `31→30`은 이 명령에서 나올 수 없다. 전체 경로를 사용하면 기록된 수치가 나오므로 결론과 수치 자체는 맞지만, 현재형 머리글의 “접거나 손으로 압축한 블록은 없다”는 주장과 evidence 명령 재현 계약이 어긋난다.",
+      "required_fix": "C-9 명령의 축약 경로를 실제 저장소 경로 `reports/evidence/m0/0a3/$f.md`로 바꾸고, 그 명령이 포함된 선언 SHA의 트리에서 다시 실행한 출력과 실행 시점 SHA를 기록한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse 48151b9c47e4f09286c4ee869977383fa4b23396^{commit} && git rev-parse c69c04c00d5bedeb0408ded9a425fa3e6ec6d323^{commit} && git rev-parse HEAD",
+    "git merge-base 48151b9c47e4f09286c4ee869977383fa4b23396 c69c04c00d5bedeb0408ded9a425fa3e6ec6d323 && git merge-base --is-ancestor 48151b9c47e4f09286c4ee869977383fa4b23396 c69c04c00d5bedeb0408ded9a425fa3e6ec6d323",
+    "git log --oneline 48151b9c47e4f09286c4ee869977383fa4b23396..c69c04c00d5bedeb0408ded9a425fa3e6ec6d323 && git diff --stat 48151b9c47e4f09286c4ee869977383fa4b23396...c69c04c00d5bedeb0408ded9a425fa3e6ec6d323 && git diff --name-status 48151b9c47e4f09286c4ee869977383fa4b23396...c69c04c00d5bedeb0408ded9a425fa3e6ec6d323 && git ls-files --others --exclude-standard",
+    "git diff --check 48151b9c47e4f09286c4ee869977383fa4b23396...c69c04c00d5bedeb0408ded9a425fa3e6ec6d323",
+    "jq로 reports/evidence/m0/0a3/codex-review-20260827T132148Z.json, codex-review-20260827T204954Z.json, codex-review-20260828T005833Z.json, codex-review-20260828T030325Z.json의 findings 전건 확인",
+    "git diff --unified=15 48151b9c47e4f09286c4ee869977383fa4b23396...c69c04c00d5bedeb0408ded9a425fa3e6ec6d323 -- reports/evidence/m0/0a2/decisions.md && git diff --unified=12 48151b9c47e4f09286c4ee869977383fa4b23396...c69c04c00d5bedeb0408ded9a425fa3e6ec6d323 -- docs/discovery/capability-map.md && git diff --unified=5 48151b9c47e4f09286c4ee869977383fa4b23396...c69c04c00d5bedeb0408ded9a425fa3e6ec6d323 -- reports/evidence/m0/0a2/checklist.md",
+    "git diff --unified=8 cb1be885051850314680f7f6b47a8953b1fed252..c69c04c00d5bedeb0408ded9a425fa3e6ec6d323 -- reports/evidence/m0/0a3/scope.md",
+    "git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md | rg '^@@'",
+    "commands.md C-3.4의 `X-1 프레이밍 후보 스윕` Python 블록을 marker로 추출해 현재 head에서 stdin 실행",
+    "commands.md C-4의 `0A3 A4 불변` Python 블록을 marker로 추출해 현재 head와 `git archive 48151b9` 트리에서 stdin 실행",
+    "commands.md C-7의 포인터 대조 Python 블록을 marker로 추출해 `5d2ca03`, `7bcf2e7`, 현재 head에서 실행",
+    "git archive 7bcf2e7 reports/evidence/m0/0a3 트리에서 C-7 (a)와 C-9 (a)·(b)의 grep/awk 명령 재실행",
+    "for f in scope checklist commands; do a=$(git show 32f7a63:…/$f.md | grep -c '^#\\{2,4\\} '); b=$(git show 6b99420:…/$f.md | grep -c '^#\\{2,4\\} '); echo \"  $f: $a → $b\"; done",
+    "for f in scope checklist commands; do a=$(git show 32f7a63:reports/evidence/m0/0a3/$f.md | grep -c '^#\\{2,4\\} '); b=$(git show 6b99420:reports/evidence/m0/0a3/$f.md | grep -c '^#\\{2,4\\} '); echo \"  $f: $a → $b\"; done",
+    "0B Codex 판정 JSON과 commands.md C-8.1·C-8.2·C-8.5·C-9.9, scope.md F-1·F-2, regression-ledger.md R-BASIS-01·R-BASIS-03·R-BASIS-06·OPEN-REG-05를 직접 대조",
+    "grep -n '^```python' reports/evidence/m0/0a3/commands.md 및 인벤토리 표 행 수, 코드펜스 짝, C 절 머리 중복을 대조",
+    "git status --short && git rev-parse HEAD && git show -s --format='%P' c69c04c00d5bedeb0408ded9a425fa3e6ec6d323"
+  ],
+  "residual_risks": [
+    "이 worktree에는 legacy `bid-vector` 저장소가 없어 `ed4b06c`의 파일·행 범위와 인용 원문을 독립 재현하지 못했다. 요청에 명시된 환경 한계이므로 finding으로 계상하지 않았다.",
+    "scope.md가 out_of_scope로 둔 capability-map.md §6 NOTI 투찰률과 §7 SET-09 F-4의 `OPEN-REG-05` 미귀속 서술은 현재도 남아 있다. 위치·성격·출처 층은 evidence와 실물에서 일치하므로 이번 finding에 섞지 않았다.",
+    "문서 slice이므로 production wiring의 side effect, retry/idempotency, unknown-schema 계약, Kotlin/Python 업무 규칙 소유 및 domain 의존 방향은 이번 range에서 검증할 구현이 없다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
