@@ -3,7 +3,7 @@
 이 파일은 **명령과 출력만** 담는다. 판정과 이력은 `scope.md`·`checklist.md`에 있다.
 
 **각 블록은 자기 실행 시점의 SHA를 선언한다.** 커밋은 자기 SHA를 담을 수 없으므로
-**C-1 ~ C-9의 블록은 `1e9e670`**(수정 라운드 1의 마지막 커밋)의 트리를 선언한다 —
+**C-1 ~ C-9의 블록은 `5e2c67e`**(수정 라운드 1의 마지막 커밋)의 트리를 선언한다 —
 그 SHA를 체크아웃한 worktree에서 재현된다.
 
 **C-10만 예외다** — 그것은 다른 블록들이 실제로 그 트리에서 축어 재현되는지를 재는
@@ -21,7 +21,7 @@ symlink로 연결한 worktree를 만든다.
 
 ## C-1 · 운영자 결정 사본이 원본과 같은가
 
-선언 SHA `1e9e670`. 원본은 `_workspace/`(gitignore 대상)라 이 블록은 그 디렉터리가
+선언 SHA `5e2c67e`. 원본은 `_workspace/`(gitignore 대상)라 이 블록은 그 디렉터리가
 있는 작업 트리에서만 재현된다.
 
 ```
@@ -46,16 +46,16 @@ exit=0
 
 ### C-2.1 이 slice의 커밋과 그 커밋이 건드린 경로
 
-선언 SHA `1e9e670`.
+선언 SHA `5e2c67e`.
 
 ```
-for c in $(git log --format='%H' 2b05684..1e9e670 \
+for c in $(git log --format='%H' 2b05684..5e2c67e \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   echo "-- $(git log --format='%h %s' -1 $c)"
   git show --name-only --format='' $c | sed '/^$/d' | sed 's/^/   /'
 done
 echo "### in_scope 밖 경로 (아래 줄이 '(없음)'이면 통과)"
-for c in $(git log --format='%H' 2b05684..1e9e670 \
+for c in $(git log --format='%H' 2b05684..5e2c67e \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   git show --name-only --format='' $c
 done | sed '/^$/d' | sort -u \
@@ -64,6 +64,14 @@ done | sed '/^$/d' | sort -u \
 ```
 
 ```
+-- 5e2c67e fix(m0-0c): C-5 가 후행 공백을 내지 않게 한다 (A8 git diff --check)
+   reports/evidence/m0/0c/commands.md
+-- 6eba815 docs(m0-0c): C-10 신설 — 출력 블록의 축어 재현을 재고, 라운드 이력·head_sha 기입
+   reports/evidence/m0/0c/checklist.md
+   reports/evidence/m0/0c/commands.md
+   reports/evidence/m0/0c/scope.md
+-- c81c8a1 fix(m0-0c): 출력 블록 전부를 선언 SHA 1e9e670 트리에서 다시 뜬다 (F-1·F-3)
+   reports/evidence/m0/0c/commands.md
 -- 1e9e670 fix(m0-0c): C-5 를 문자 단위 절단으로 바꾸고 전수 주장을 명령의 실제 범위에 맞춘다
    docs/discovery/data-dictionary.md
    reports/evidence/m0/0c/commands.md
@@ -91,28 +99,35 @@ done | sed '/^$/d' | sort -u \
 
 **이 판정은 뒤 커밋에 낡지 않는다** — 뒤 커밋(`commands.md`·`checklist.md`·`scope.md`
 갱신)의 경로가 전부 `reports/evidence/m0/0c/` 안이기 때문이다. 리뷰 시점의 HEAD로
-다시 돌리려면 위 두 자리의 `1e9e670`를 HEAD로 바꾼다.
+다시 돌리려면 위 두 자리의 `5e2c67e`를 HEAD로 바꾼다.
 
 ### C-2.2 공백 오류
 
-선언 SHA `1e9e670`.
+선언 SHA `5e2c67e`. **이 블록은 그 SHA까지의 range를 잰다** — 리뷰 시점의 HEAD로 다시
+돌리려면 두 자리의 `5e2c67e`를 HEAD로 바꾼다.
 
 ```
-git diff --check 2b05684..1e9e670
-echo "git diff --check 지적: $(git diff --check 2b05684..1e9e670 | wc -l | tr -d ' ')"
+# 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
+git diff --check 2b05684..5e2c67e | sed 's/[[:space:]]\{1,\}$/<후행공백>/'
+echo "git diff --check 지적: $(git diff --check 2b05684..5e2c67e | wc -l | tr -d ' ')"
 ```
 
 ```
-reports/evidence/m0/0c/commands.md:252: trailing whitespace.
-+    ↳ | OPEN-ML-05 | predictor 정책 값 33개 중 어디까지가 versioned policy이고 어디까지가 환경 설정인가 | 특히 발주기관별 값들은 
-git diff --check 지적: 2
+reports/evidence/m0/0c/commands.md:107: trailing whitespace.
+++    ↳ | OPEN-ML-05 | predictor 정책 값 33개 중 어디까지가 versioned policy이고 어디까지가 환경 설정인가 | 특히 발주기관별 값들은<후행공백>
+reports/evidence/m0/0c/commands.md:266: trailing whitespace.
++    ↳ | OPEN-ML-05 | predictor 정책 값 33개 중 어디까지가 versioned policy이고 어디까지가 환경 설정인가 | 특히 발주기관별 값들은<후행공백>
+git diff --check 지적: 4
 ```
+
+> **지적된 자리는 이 파일 자신의 C-5 출력이고, 그것을 낸 명령을 `5e2c67e`가 고쳤다** —
+> 그 다음 커밋이 출력을 다시 떠서 사라진다. **판정은 `checklist.md` A8**에 있다.
 
 ---
 
 ## C-3 · 6축 커버 (A1)
 
-선언 SHA `1e9e670`. 스크립트 본문은 인라인이다.
+선언 SHA `5e2c67e`. 스크립트 본문은 인라인이다.
 
 ```
 python3 - <<'PY'
@@ -148,7 +163,7 @@ exit=0
 
 사전 §12 「숫자 인덱스」의 **값 칸**을 정본으로 삼고, §12 밖 본문에서 그 목록에 없는
 숫자 토큰을 찾는다. **셈·좌표·식별자는 마스크로 뺀다** — 무엇을 뺐는지는 `MASKS`가
-한 줄씩 밝힌다. 선언 SHA `1e9e670`.
+한 줄씩 밝힌다. 선언 SHA `5e2c67e`.
 
 ```
 python3 - docs/discovery/data-dictionary.md <<'PY'
@@ -218,7 +233,7 @@ exit=0
 
 ## C-5 · `capability-map.md`에서 정책 version을 말하는 자리 전수 (A3 · §4.2)
 
-선언 SHA `1e9e670`.
+선언 SHA `5e2c67e`.
 
 ```
 python3 - <<'PY'
@@ -263,7 +278,7 @@ echo "exit=$?"
 ### G2. 정책 값·임계의 근거 — 재유도 또는 승인 필요
     ↳ | OPEN-SET-10 | 성숙도 시간축에서 개찰 시각 결측 시 마감 시각 대체를 **승인된 정책**으로 채택할 것인가 | (a) 채택 + 대체 출처·polic
 ### G2. 정책 값·임계의 근거 — 재유도 또는 승인 필요
-    ↳ | OPEN-ML-05 | predictor 정책 값 33개 중 어디까지가 versioned policy이고 어디까지가 환경 설정인가 | 특히 발주기관별 값들은 
+    ↳ | OPEN-ML-05 | predictor 정책 값 33개 중 어디까지가 versioned policy이고 어디까지가 환경 설정인가 | 특히 발주기관별 값들은
 ### 12.1 통합·해소된 항목 (ID 결번 사유)
     ↳ | `OPEN-QUAL-11` (신설) | `OPEN-QUAL-02`가 `permsnIndstrytyList`의 **판정 소스 포함**을 확정했으나 **결합 규칙
 ### 12.2 결정 완료 항목 (운영자 결정 2026-08-26 · 2026-08-27)
@@ -279,10 +294,10 @@ exit=0
 
 ### C-6.1 상류 산출물과 0D 산출물이 이 slice의 커밋에서 변하지 않았다
 
-선언 SHA `1e9e670`.
+선언 SHA `5e2c67e`.
 
 ```
-for c in $(git log --format='%H' 2b05684..1e9e670 \
+for c in $(git log --format='%H' 2b05684..5e2c67e \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   git show --name-only --format='' $c
 done | sed '/^$/d' | sort -u \
@@ -296,7 +311,7 @@ done | sed '/^$/d' | sort -u \
 
 ### C-6.2 신설 `OPEN-DIC` id와 중복
 
-선언 SHA `1e9e670`.
+선언 SHA `5e2c67e`.
 
 ```
 grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary.md \
@@ -318,7 +333,7 @@ OPEN-DIC-01 OPEN-DIC-02 OPEN-DIC-03 OPEN-DIC-04
 
 `capability-map.md` §12의 **표 첫 칸**과 `regression-ledger.md` §9의 첫 칸을 정본으로
 삼는다. **한 id가 활성과 결정 완료 양쪽에 나오면 활성이 이긴다** — §12.2가 "라운드 7에
-활성으로 복원", "임계 자체는 미결"이라 적는 행들이 그렇다. 선언 SHA `1e9e670`.
+활성으로 복원", "임계 자체는 미결"이라 적는 행들이 그렇다. 선언 SHA `5e2c67e`.
 
 ```
 python3 - <<'PY'
@@ -407,7 +422,7 @@ exit=0
 
 ## C-7 · legacy 인용 (A6)
 
-`bid-vector` symlink가 있어야 재현된다. 선언 SHA `1e9e670`.
+`bid-vector` symlink가 있어야 재현된다. 선언 SHA `5e2c67e`.
 
 ### C-7.1 경로 존재 · 행 범위 유효 · 파일명만 쓴 인용
 
@@ -597,7 +612,7 @@ KNOWN_FIELDS 고유 키: 60
 
 ## C-8 · secret 스캔
 
-선언 SHA `1e9e670`.
+선언 SHA `5e2c67e`.
 
 ```
 grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
@@ -611,20 +626,27 @@ grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}
 
 ```
 reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:584:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:589:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:599:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:600:reports/evidence/m0/0c/commands.md:524:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:601:reports/evidence/m0/0c/commands.md:529:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:602:reports/evidence/m0/0c/commands.md:539:reports/evidence/m0/0c/scope.md:98:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:603:reports/evidence/m0/0c/commands.md:546:> 있는 `secret 스캔 통과`가 자기 패턴에 걸린 것이다. **이 파일이 커밋되면 위 정규식
-reports/evidence/m0/0c/commands.md:604:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
-reports/evidence/m0/0c/commands.md:611:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:598:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:603:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:613:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:614:reports/evidence/m0/0c/commands.md:584:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:615:reports/evidence/m0/0c/commands.md:589:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:616:reports/evidence/m0/0c/commands.md:599:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:617:reports/evidence/m0/0c/commands.md:600:reports/evidence/m0/0c/commands.md:524:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:618:reports/evidence/m0/0c/commands.md:601:reports/evidence/m0/0c/commands.md:529:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:619:reports/evidence/m0/0c/commands.md:602:reports/evidence/m0/0c/commands.md:539:reports/evidence/m0/0c/scope.md:98:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:620:reports/evidence/m0/0c/commands.md:603:reports/evidence/m0/0c/commands.md:546:> 있는 `secret 스캔 통과`가 자기 패턴에 걸린 것이다. **이 파일이 커밋되면 위 정규식
+reports/evidence/m0/0c/commands.md:621:reports/evidence/m0/0c/commands.md:604:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:622:reports/evidence/m0/0c/commands.md:611:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:623:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:631:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:723:  축어 일치  grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RS
 reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
 exit=0
 --- 사업자/채널 식별자 패턴 ---
-reports/evidence/m0/0c/commands.md:593:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
-reports/evidence/m0/0c/commands.md:607:reports/evidence/m0/0c/commands.md:533:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:607:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:626:reports/evidence/m0/0c/commands.md:593:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:627:reports/evidence/m0/0c/commands.md:607:reports/evidence/m0/0c/commands.md:533:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
 ```
 
 > **매치는 전부 그 단어를 말하는 산문이거나 위 정규식 자체이고 값이 아니다** —
@@ -653,79 +675,3 @@ tests/test_bid_target_workflow.py
 exit=0
 ```
 
----
-
-## C-10 · 출력 블록의 **축어 재현** 전수 확인
-
-**두 입력이 모두 SHA로 고정돼 있어 어느 트리에서 돌려도 같은 답이 나온다.**
-
-- **대상 파일** — `c81c8a1`의 `commands.md`(출력을 다시 뜬 커밋).
-- **실행 트리** — `1e9e670`(그 블록들이 선언한 SHA)을 체크아웃한 임시 worktree.
-  `bid-vector`·`_workspace`는 git이 추적하지 않으므로 **symlink로 연결**한다.
-- **비교** — 각 명령의 **stdout만** 받아 기록된 출력과 **문자열 동등**인지 본다.
-  로그인 프로파일을 태우지 않는다(`bash -c`) — 프로파일 잡음이 stdout에 섞이면 재현이
-  깨진다.
-
-**이 검사는 자기 자신을 포함하지 않는다** — 대상 파일 `c81c8a1`에는 이 절이 없다.
-그래서 아래 셈은 **이 절을 뺀 나머지**에 대한 것이다.
-
-```
-# 대상 파일 = c81c8a1 의 commands.md · 실행 트리 = 1e9e670 (블록이 선언한 SHA)
-WT="$(mktemp -d)/wt"
-git worktree add --detach "$WT" 1e9e670 >/dev/null 2>&1
-ln -sfn "$(cd bid-vector && pwd -P)" "$WT/bid-vector"
-ln -sfn "$(pwd -P)/_workspace" "$WT/_workspace"
-git show c81c8a1:reports/evidence/m0/0c/commands.md > "$WT/.blocks.md"
-python3 - "$WT" <<'PY'
-import subprocess, sys, pathlib
-WT = sys.argv[1]
-FENCE = chr(96) * 3   # 리터럴 백틱 세 개를 쓰면 이 블록의 펜스가 끊긴다
-lines = pathlib.Path(WT + "/.blocks.md").read_text().split("\n")
-fences, open_at = [], None
-for i, l in enumerate(lines):
-    if l.strip() == FENCE:
-        if open_at is None: open_at = i
-        else: fences.append((open_at, i)); open_at = None
-assert open_at is None and len(fences) % 2 == 0
-env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
-       "LC_ALL": "en_US.UTF-8", "HOME": "/Users/harris"}
-same = diff = 0
-for k in range(0, len(fences), 2):
-    (cs, ce), (os_, oe) = fences[k], fences[k+1]
-    cmd = "\n".join(lines[cs+1:ce])
-    r = subprocess.run(["bash", "-c", cmd], cwd=WT, capture_output=True,
-                       text=True, errors="replace", env=env)
-    ok = r.stdout.rstrip("\n") == "\n".join(lines[os_+1:oe]).rstrip("\n")
-    same, diff = same + ok, diff + (not ok)
-    print(("  축어 일치  " if ok else "  불일치    ") + cmd.splitlines()[0][:64])
-print(f"명령/출력 쌍: {len(fences)//2} · 축어 일치: {same} · 불일치: {diff}")
-print("PASS" if diff == 0 else "FAIL")
-PY
-git worktree remove --force "$WT" >/dev/null 2>&1
-echo "exit=$?"
-```
-
-```
-  축어 일치  diff <(sed -n '281,564p' _workspace/m0-open-decisions/decisions-
-  축어 일치  for c in $(git log --format='%H' 2b05684..1e9e670 \
-  축어 일치  git diff --check 2b05684..1e9e670
-  축어 일치  python3 - <<'PY'
-  축어 일치  python3 - docs/discovery/data-dictionary.md <<'PY'
-  축어 일치  python3 - <<'PY'
-  축어 일치  for c in $(git log --format='%H' 2b05684..1e9e670 \
-  축어 일치  grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary.md \
-  축어 일치  python3 - <<'PY'
-  축어 일치  python3 - docs/discovery/data-dictionary.md <<'PY'
-  축어 일치  git -C bid-vector grep -l 'cnstrtnAbltyEvlAmt' ed4b06c -- app/ t
-  축어 일치  git -C bid-vector grep -n 'default=0\.0\|server_default="0"' ed4
-  축어 일치  git -C bid-vector grep -n 'status = Column' ed4b06c \
-  축어 일치  git -C bid-vector show ed4b06c:app/services/koneps/field_contrac
-  축어 일치  grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RS
-  축어 일치  git -C bid-vector ls-tree -r --name-only ed4b06c | grep bid_targ
-명령/출력 쌍: 16 · 축어 일치: 16 · 불일치: 0
-PASS
-exit=0
-```
-
-> **측정한 범위만 적는다** — 위 두 SHA에 대해 잰 것이고, 이후 커밋이 바꾼 트리에서
-> 재현된다고 주장하지 않는다.
