@@ -828,7 +828,7 @@ $ for f in scope checklist commands; do a=$(git show 32f7a63:reports/evidence/m0
   commands: 31 → 30
 
 ## (d) 라운드 16~18 이 산출물을 건드렸는가
-$ git diff --stat 6b99420..7bcf2e7 -- docs/discovery/capability-map.md reports/evidence/m0/0a2/
+$ git diff --stat 6b99420..7bcf2e7 -- docs/discovery/capability-map.md reports/evidence/m0/0a2/ ; echo "(빈 출력 = 무변경)"
 (빈 출력 = 무변경)
 ```
 
@@ -846,3 +846,68 @@ $ git diff --stat 6b99420..7bcf2e7 -- docs/discovery/capability-map.md reports/e
   **`commands.md`의 교체 대상 구간**으로 한정했다(Codex 4차 `C`).
   **절 머리도 두 파일은 늘고 `commands.md`만 줄었다** — 줄어든 것은 **중복이 빠진 것**이다.
 - **(d)** **이 라운드는 산출물을 건드리지 않았다.**
+
+---
+
+## C-10. 출력 블록 스캔 — 산문이 출력 자리에 서 있는가 (Codex 6차 `H-1`·`H-2`)
+
+**두 건은 한 형태다** — **산문이 출력 자리에 서 있다.** 하나는 명령이 내지 않은 문자열을
+출력으로 적었고, 하나는 **선언 SHA 없이** 블록을 두었다. **한 스캐너로 두 축을 훑는다.**
+
+```python
+# 출력 블록 스캔 — 세 파일의 fenced 블록을 두 축으로 본다.
+#
+#   (1) 산문이 출력 자리에 서 있는가 — `(빈 출력` · `(출력 없음` · `(무변경` 같은 줄이
+#       **바로 위 `$` 명령이 낸 것이 아닌** 자리. 명령에 `echo` 가 있으면 그 명령이 낸 것이다.
+#   (2) 선언 SHA 가 없는 블록 — 이 패키지는 commands.md 머리에서 출력 블록마다
+#       「실행 시점 HEAD」를 선언하기로 규정한다.
+#
+# 기계가 못 하는 것: 그 블록이 「출력 블록」인가 「예시·인용」인가. 지목하고 사람이 읽는다.
+import re, sys, io
+
+FILES = ["reports/evidence/m0/0a3/commands.md",
+         "reports/evidence/m0/0a3/checklist.md",
+         "reports/evidence/m0/0a3/scope.md"]
+PROSE = re.compile(r'^\((빈 출력|출력 없음|무변경)')
+DECL  = re.compile(r'^### 실행 시점 HEAD = [0-9a-f]{7,40}')
+
+for path in FILES:
+    lines = io.open(path, encoding="utf-8").read().split("\n")
+    inblk, start, body = False, 0, []
+    for i, l in enumerate(lines, 1):
+        if l.startswith("```"):
+            if not inblk:
+                inblk, start, body = True, i, []
+            else:
+                inblk = False
+                has_cmd = any(x.startswith("$ ") for x in body)
+                if has_cmd:
+                    if not any(DECL.match(x) for x in body):
+                        print(f"[선언없음] {path}:{start}")
+                    for k, x in enumerate(body):
+                        if PROSE.match(x):
+                            prev = next((body[j] for j in range(k-1, -1, -1)
+                                         if body[j].startswith("$ ")), "")
+                            if "echo" not in prev:
+                                print(f"[산문출력] {path}:{start+1+k}  {x[:40]}")
+                continue
+        if inblk:
+            body.append(l)
+```
+
+**두 커밋에서 돌렸다** — **수정 전**(무엇이 걸렸는지)과 **수정 후**(남았는지).
+
+```
+### 실행 시점 HEAD = (아직 커밋되지 않은 작업 트리 — 다음 커밋에서 선언 SHA로 다시 뜬다)
+```
+
+**판정**:
+
+- **수정 전 스캔이 낸 넷은 Codex가 지목한 것과 정확히 같다** — 더도 덜도 없다.
+- **수정 후 스캔은 살아 있는 블록에서 0**이다. **동결 이력 안의 둘은 본문을 고치지
+  않았으므로 여전히 지목된다** — 그 자리는 **⚠ 후속 표시로 선언 SHA를 밝혔고**
+  **각각 그 트리에서 재현되는 것을 확인**했다(`F-1`의 전례대로 동결 본문은 고치지 않는다).
+- **이 스캐너가 못 보는 것**: 그 블록이 **출력 블록인가 예시·인용인가**는 판정하지
+  못한다 — **지목하고 사람이 읽는다.** 그리고 **`echo` 가 있으면 그 명령이 낸 것으로
+  본다** — `echo` 로 거짓 문자열을 낼 수도 있으나 그것은 이 축이 아니다.
+- **「모든 블록이 선언 SHA를 갖는다」고 적지 않는다** — **측정한 것은 이 스캔의 범위**다.

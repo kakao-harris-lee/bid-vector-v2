@@ -1,0 +1,50 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "48151b9c47e4f09286c4ee869977383fa4b23396",
+  "reviewed_head": "fea90f2581b2b2b2c89612a9e5d3d375abbb1ee6",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a3/commands.md",
+      "line": 832,
+      "evidence": "C-9는 선언 SHA `b940074`의 트리에서 재현된 출력 블록이라고 주장하지만, (d)의 `git diff --stat 6b99420..7bcf2e7 -- docs/discovery/capability-map.md reports/evidence/m0/0a2/`를 그 트리에서 그대로 실행하면 exit 0과 함께 stdout 0바이트다. 블록에 기록된 `(빈 출력 = 무변경)`은 명령이 출력한 문자열이 아니다. 같은 파일 C-6은 동일한 표시를 실제 출력으로 만들기 위해 명령에 `echo`를 포함하므로, C-9의 기록 및 checklist/scope의 `C-9 어긋남 0` 주장은 자체 재현 계약과 맞지 않는다. 구조적 불변 자체는 실제 빈 출력으로 성립한다.",
+      "required_fix": "C-9 (d)에서 빈 출력 설명을 기록 출력과 구분해 제거하거나 명령에 명시적 `echo`를 포함하고, 수정된 명령을 선언 SHA의 트리에서 다시 실행해 C-9 출력·선언 SHA와 `어긋남 0` 자기 기록을 동기화한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0a3/checklist.md",
+      "line": 1183,
+      "evidence": "이 패키지는 `commands.md:3`과 `scope.md` 수정 이력에서 명령 출력 블록마다 자기 실행 시점 HEAD를 선언한다고 규정한다. 그러나 이번 head에서 새로 추가된 축약·자리표시자 스윕 블록(lines 1183-1187)은 명령과 `(출력 없음)` 결과를 기록하면서 선언 SHA가 없다. 같은 파일의 동결 이력 출력 블록 lines 923-935와 1029-1034도 선언 SHA가 없다. 명령 결과는 각각 `6b99420`, `d8fcef8`, 그리고 `b940074`/현재 head에서 독립 재현됐지만, 블록 자체만으로 어느 트리의 기록인지 판정할 수 없어 요청된 선언-SHA 규약과 `각 블록이 자기 실행 시점을 선언한다`는 자기 기록이 성립하지 않는다.",
+      "required_fix": "세 checklist 명령 출력 블록에 실제 실행 트리를 명시적으로 연결하고 그 SHA에서 명령과 기록 출력을 다시 대조한다. 동결 이력은 원문을 모호하게 재작성하지 말고 후속 정정 표시 등 이력 규약과 양립하는 방식으로 선언 SHA를 명시한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short --branch && git rev-parse HEAD && git cat-file -t <base/head>",
+    "git diff --stat --name-status 48151b9...fea90f2 && git log --oneline 48151b9..fea90f2 && git ls-files --others --exclude-standard",
+    "git merge-base 48151b9 fea90f2 && git merge-base --is-ancestor 48151b9 fea90f2",
+    "sed/rg로 v2-지침서.md, agent-workflow.md, data-extract.md, milestone-0.md의 요구사항·출처 층·판정 계약 추출",
+    "jq로 reports/evidence/m0/0a3/codex-review-*.json 5건의 findings와 residual_risks 전수 확인",
+    "git diff --unified=8 48151b9...fea90f2 -- docs/discovery/capability-map.md reports/evidence/m0/0a2/checklist.md reports/evidence/m0/0a2/decisions.md",
+    "git diff b940074..fea90f2 -- reports/evidence/m0/0a3/{scope,checklist,commands}.md",
+    "git diff --check 48151b9...fea90f2",
+    "git diff --name-only 48151b9...fea90f2",
+    "선언 SHA a264d6f의 독립 clone에서 commands.md C-3.1~C-3.5 명령 및 인라인 X-1 스윕 재실행",
+    "선언 SHA 74132ea의 독립 clone에서 C-2, C-4, C-5, C-6 명령과 base/head 불변 계산기 재실행",
+    "선언 SHA 7bcf2e7의 독립 clone에서 C-7 명령과 포인터 대조 스크립트를 5d2ca03/7bcf2e7 대상으로 재실행",
+    "선언 SHA b940074의 독립 clone에서 C-9 (a)~(d) 명령 재실행",
+    "git diff --stat 6b99420..7bcf2e7 -- docs/discovery/capability-map.md reports/evidence/m0/0a2/ | od -An -tx1",
+    "6b99420과 d8fcef8 트리에서 checklist.md의 동결 이력 명령 출력 블록 재실행·대조",
+    "grep -nE '^\\$ ' reports/evidence/m0/0a3/commands.md | grep -E '…|<[a-z_]+>|(^|[^0-9a-f])\\.\\.\\.([^A-Za-z0-9]|$)'",
+    "rg/awk로 0B C-8.1·C-8.2·C-8.5·C-9.9 및 scope F-1·F-2, regression-ledger R-BASIS-01·OPEN-REG-05 대조",
+    "git diff -U0 6a4e49b -- reports/evidence/m0/0a2/decisions.md와 provenance 훅 표 1:1 대조"
+  ],
+  "residual_risks": [
+    "이 worktree에는 legacy `bid-vector` 저장소가 없어 `ed4b06c`의 파일·행 범위와 인용 원문을 독립 재현하지 못했다. 요청에 명시된 환경 한계이므로 finding으로 계상하지 않았다.",
+    "scope가 out_of_scope로 둔 capability-map.md §6 NOTI 투찰률과 §7 SET-09 F-4의 `OPEN-REG-05` 미귀속 legacy-behavior 서술은 현재도 남아 있다. evidence의 위치·성격·출처 층 기록은 실물과 일치하므로 이번 finding에 섞지 않았다.",
+    "문서 slice이므로 production wiring의 side effect, retry/idempotency, unknown-schema 계약, Kotlin/Python 업무 규칙 소유 및 domain 의존 방향은 이번 range에서 검증할 구현이 없다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
