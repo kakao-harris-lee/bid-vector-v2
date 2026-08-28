@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0a3-decision-basis-correction
 base_sha: 48151b9   # 0B Codex 4차 approve verdict 등재 직후의 HEAD
-head_sha: f49155d   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
+head_sha: 2f74829   # 이 scope 커밋의 직전 커밋. 「`head_sha`와 range」 절 참조
 in_scope:
   - reports/evidence/m0/0a2/decisions.md      # X-1 정정 한정 + provenance 등재
   - reports/evidence/m0/0a2/checklist.md      # §10.1 형태 7 등재 한정
@@ -164,7 +164,8 @@ rollback: "N/A — 문서 산출물은 git revert로 복구"
 | `2f8b65a` | **수정 라운드 7** — Codex 2차 `M-1`~`M-3`. 계약 범위를 실제 승인에 맞추고 C-3.1의 범위를 좁힌다 |
 | `0775a71` | **수정 라운드 8** — verifier `N-1`·`N-2`. 그 라운드가 만든 구조 주장 둘을 사실로 되돌린다 |
 | `f49155d` | **수정 라운드 9** — verifier `Q-1`. 두 축의 발견을 합친 자리를 갈라 적는다 |
-| 이 커밋 | **수정 라운드 10** — Codex 3차 `R-1`. `O-2`를 출처 층으로 다시 판정한다 |
+| `2f74829` | **수정 라운드 10** — Codex 3차 `R-1`. `O-2`를 출처 층으로 다시 판정한다 |
+| 이 커밋 | **수정 라운드 11** — Codex 3차 `R-2`. C-3.3의 출력 순서를 `sort`로 고정한다 |
 
 **파일 목록도 셈도 여기에 옮기지 않는다** — `git show --stat --format='' <SHA>`가 낸다.
 
@@ -878,6 +879,45 @@ C-3.4가 **「문서의 자기 목소리인가」만 보고 출처 층을 가르
 | 확인할 것 | 명령 |
 | --- | --- |
 | 산출물 셋이 이 라운드에 무변경 | `git diff --stat f49155d..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
+| 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
+| `regression-ledger.md` 무변경 | `commands.md` **C-6** |
+| **`O-2` 자리가 살아 있는가** | `commands.md` **C-3.4** — **없어지면 안 된다** |
+| in_scope 밖 경로 · 공백 오류 | `commands.md` **C-2**의 첫 표 |
+| 하네스 두 파일이 range 밖인가 | `git diff --name-only 48151b9...HEAD` |
+
+**결과를 여기 적지 않는다.**
+
+---
+
+## 갱신 이력 — 수정 라운드 11 (Codex 3차 `R-2` · 출력 순서)
+
+건별 처리는 `checklist.md` **§18**에 있다.
+
+### 환경에 따라 순서가 달랐다
+
+**여러 파일을 인자로 주는 `grep`은 구현에 따라 출력 순서가 다르다.**
+**이 저장소의 `grep`은 `ugrep`**이라 **병렬 완료 순**으로 내고, **인자 순서로 내는
+구현**에서는 다른 순서가 나온다. **기록은 이 환경에서는 재현됐으나 리뷰어 환경에서는
+아니었다.** 매치 내용과 A3 결론은 같고, 어긋난 것은 **`commands.md` 머리의 자기 기록**
+(*"접거나 손으로 압축한 블록은 없다"*)이다.
+
+**두 명령에 `| sort`를 붙이고 출력을 그 상태에서 다시 떴다.** 블록 머리와 판정에
+**원인**을 적었다. **환경 의존을 지운 것이지 값을 고친 것이 아니다.**
+
+### `head_sha`와 range
+
+**이 커밋이 무엇을 바꿨는지는 `git show --stat --format='' HEAD`가 낸다.**
+
+- **`head_sha`의 정본은 이 파일 머리의 yaml 하나다.** 커밋이 자기 SHA를 담을 수 없어
+  **직전 커밋**을 가리킨다.
+- **리뷰 range는 `48151b9...HEAD`**.
+
+### 불변 — 이 절은 수도 좌표도 옮겨 적지 않는다
+
+| 확인할 것 | 명령 |
+| --- | --- |
+| 산출물 셋이 이 라운드에 무변경 | `git diff --stat 2f74829..HEAD -- docs/discovery/capability-map.md reports/evidence/m0/0a2/` |
+| C-3.3이 고정점인가 | 그 절의 두 명령을 다시 돌려 출력이 기록과 같은지 본다 |
 | 활성 OPEN · capability · 분류 4종 | `commands.md` **C-4** (base ↔ HEAD 두 실행) |
 | `regression-ledger.md` 무변경 | `commands.md` **C-6** |
 | **`O-2` 자리가 살아 있는가** | `commands.md` **C-3.4** — **없어지면 안 된다** |

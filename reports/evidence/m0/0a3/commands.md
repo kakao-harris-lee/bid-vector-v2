@@ -161,7 +161,7 @@ $ git diff 48151b9...HEAD -- docs/discovery/capability-map.md | grep -cE '^\+.*\
 스윕이 냈고 그것은 `P-1` 라운드의 발견**이다. **두 축의 발견을 합치지 않는다.**
 
 ```
-### 실행 시점 HEAD = 2f8b65a
+### 실행 시점 HEAD = 2f74829
 
 --- C-3.1 X-1 단정 스윕 — decisions.md 전체 + capability-map.md §13 ---
 ### A1 의 범위(OPEN-STR-01 절 + §13)를 포함하는 상위집합이다 —
@@ -208,13 +208,15 @@ $ awk '/^  - legacy는 운영자 값을 \*\*추정가격\*\*과 비교한다:/,/
     >   > **2차 정정 (Codex 1차 high · 2026-08-27) — 이 slice가 만든 반대 방향 단정을 좁혔다.**
 
 --- C-3.3 OPEN-REG-05 귀속 ---
-$ grep -c 'OPEN-REG-05' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md
-reports/evidence/m0/0a2/decisions.md:4
+### 여러 파일을 인자로 주는 grep 은 구현에 따라 출력 순서가 다르다(이 저장소의
+### grep 은 ugrep 이라 병렬 완료 순으로 낸다). 그래서 sort 로 순서를 고정한다.
+$ grep -c 'OPEN-REG-05' docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | sort
 docs/discovery/capability-map.md:1
-$ grep -n 'OPEN-QUAL-10.*소유자가 아니' docs/discovery/regression-ledger.md docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | cut -c1-110 | sed 's/[[:space:]]*$//'
+reports/evidence/m0/0a2/decisions.md:4
+$ grep -n 'OPEN-QUAL-10.*소유자가 아니' docs/discovery/regression-ledger.md docs/discovery/capability-map.md reports/evidence/m0/0a2/decisions.md | sort | cut -c1-110 | sed 's/[[:space:]]*$//'
 docs/discovery/capability-map.md:3171:| 0B — 예산 basis 불일치 (`legacy-defect`) — **세 경로** | **관찰**: 운영자가 지정한 예산 값
-docs/discovery/regression-ledger.md:82:    `OPEN-QUAL-10`은 **시공능력평가금액 축**이라 이 질문의 소유자가 아니다.
 docs/discovery/regression-ledger.md:1345:| **OPEN-REG-05** | **기초금액과 추정가격의 과세 처리 — 두 금액의 차이가 무엇으로 이루어지는가** | l
+docs/discovery/regression-ledger.md:82:    `OPEN-QUAL-10`은 **시공능력평가금액 축**이라 이 질문의 소유자가 아니다.
 
 --- C-3.4 X-1 프레이밍 후보 스윕 (capability-map.md 전체 · O-2, out_of_scope) ---
 $ BLK4=$(python3 - <<'EOF'
@@ -291,7 +293,12 @@ $ awk '/^\| 훅\(신규 줄\)/,/^$/' reports/evidence/m0/0a2/decisions.md | cut 
 - **C-3.2** — 원본 두 문장이 **지워지지 않고 취소선으로 보존**됐고 바로 아래 정정 인용
   블록이 붙었다. `decisions.md`의 provenance 원칙(*"원본 문장은 지우지 않는다"*)을
   지킨다(**A2**).
-- **C-3.3** — `OPEN-REG-05` 귀속이 두 파일에 적혔고, `OPEN-QUAL-10`이 소유자가 아니라는
+- **C-3.3** — **출력 순서를 `sort`로 고정했다.** 여러 파일을 인자로 주는 `grep`은
+  **구현에 따라 순서가 다르다** — 이 저장소의 `grep`은 **ugrep**이라 **병렬 완료 순**으로
+  내고, 인자 순서로 내는 구현에서는 다른 순서가 나온다. **앞 라운드의 기록은 이 환경에서는
+  재현됐으나 다른 환경에서는 아니었다**(Codex 3차 low). **정렬을 명시해 어디서 돌려도 같은
+  출력이 나오게 했다.** 매치 내용과 아래 판정은 바뀌지 않는다.
+- **C-3.3(판정)** — `OPEN-REG-05` 귀속이 두 파일에 적혔고, `OPEN-QUAL-10`이 소유자가 아니라는
   서술이 **ledger와 §13 양쪽에** 있다. **두 문서가 같은 말을 한다** — 0B verifier F-2가
   적출한 자기모순(*"한 자리에서 소유한다, 다른 자리에서 소유자가 아니다"*)이 재발하지
   않는다.
