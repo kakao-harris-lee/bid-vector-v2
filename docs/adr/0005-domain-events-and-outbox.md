@@ -102,7 +102,10 @@ PostgreSQL(ADR 0004) 위에 둔다. **이 ADR은 그 결정을 재확정하지 �
 - 한 라이브러리가 이 축 전부를 덮고 Apache-2.0이다. `resilience4j-spring-boot3` 모듈이
   있고 2.4.0에 Boot 4 지원이 들어가 `OPEN-ADR-01`과 분리된다.
 - 정책을 `application.yml`로 외부화하는 것이 기본 사용법이다(`v2-지침서.md` §5).
-- 대응 capability: OPS-13(재시도·서킷브레이커), OPS-08 (a)(c)·COL-03(rate limiter).
+- 대응 capability: **OPS-08 (a)(c)** · **COL-03**. `capability-map.md` OPS-21 표의
+  「재시도·backoff·circuit breaker·rate limiter」 행이 그 둘을 대응 항목으로 적는다.
+  **`OPS-13`은 이 행이 아니라 「아키텍처 규칙 강제」 행의 것**이며 그 항목의 정의는
+  **「설계 래칫(비대화 방지)」**다 — §3.5와 ADR 0007이 소유한다.
 - **채택과 함께 기록해야 할 위험**:
   - 릴리스 간격이 후보 중 가장 길다(2.3.0 → 2.4.0이 약 14개월). 보안 수정 대기가 길 수 있다.
   - **AOP 애스펙트 순서가 문서화된 실패 모드다** — 2.4.0에 *"Clarify Aspect Order defaults
@@ -169,7 +172,7 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 | **ShedLock** | **불채택 (현 시점)** | **db-scheduler가 heartbeat 기반 단일 실행을 자체 보장**하므로 기능이 상당 부분 겹친다. ShedLock은 스케줄러가 아니라 `@Scheduled` 위에 락만 얹는 도구다. 겹치는 도구를 둘 다 두면 `v2-지침서.md` §5의 *"같은 규칙·변환·판정이 두 곳에 존재하면 한 곳은 회귀 지점이다"*에 해당한다. **호환·유지보수는 후보 중 최상위권이다** — 7.x가 **Boot 4.x·3.5·3.4를 함께 테스트**하고(공식 호환 매트릭스, 최소 JVM 17) 7.7.0에서 Micrometer 지표가 추가됐으며 커밋이 상시 돈다. **재검토 조건**: db-scheduler가 덮지 못하는 `@Scheduled` 기반 경로나 스케줄 외 상호배제가 필요해질 때. 그때는 **AOP 프록시 무효화가 조용한 실패 모드**이므로 `LockAssert` 테스트를 함께 둔다 |
 | **Spring Integration JDBC lock registry** | **판정 보류 — 조사되지 않음** | OPS-21 표의 후보인데 `OPEN-OPS-07` 조사 노트의 대상 9종에 **없다.** 버전·유지보수·호환 어느 것도 확인되지 않았다. **불채택이 아니라 미조사다** — 위 두 후보로 이 축이 덮이면 조사할 이유가 생기지 않고, 덮이지 않으면 조사가 선행돼야 한다 |
 
-### 3.3 재시도 · backoff · circuit breaker · rate limiter (OPS-13 · OPS-08(a)(c) · COL-03)
+### 3.3 재시도 · backoff · circuit breaker · rate limiter (OPS-08 (a)(c) · COL-03)
 
 | 후보 | 판정 | 사유 |
 | --- | --- | --- |
@@ -214,6 +217,16 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 §3.2의 **Spring Integration JDBC lock registry 미조사**는 새 `OPEN`으로 등록하지 않는다 —
 그것은 결정이 필요한 쟁점이 아니라 **아직 필요가 생기지 않은 조사**다. 필요가 생기면
 그 slice가 조사한다.
+
+### 이 ADR이 선점하지 않는 활성 `OPEN` — 인접 축
+
+**언급하지 않은 활성 `OPEN` 중 이 ADR의 서술과 인접한 것**을 적는다. 관계만 적고
+**해소하지 않는다.**
+
+| 활성 `OPEN` | 이 ADR이 하지 않는 것 |
+| --- | --- |
+| **`OPEN-OPS-02`** (스케줄 기본값 정책 — (a) 코드 선언 + 환경별 override (b) legacy 관례 유지) | D-5가 db-scheduler의 설정 표면이 **외부화된다는 성질**만 적는다. **기본값을 무엇으로 둘지, 스케줄이 기본 OFF인지는 정하지 않는다** |
+| **`OPEN-OPS-08`** (realtime 이벤트 fanout이 V2 범위인가) | D-1이 정하는 것은 **내부 workflow 큐의 기반**이다. **realtime fanout의 범위 편입 여부는 다루지 않는다** |
 
 ---
 

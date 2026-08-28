@@ -196,6 +196,14 @@ allowlist 절차는 **ADR 0007**이 소유한다.
 | 정산 성숙도 커널 | `app/domain/settlement_maturity.py` |
 | 곡선 빌더 | `app/domain/award_landing_curve_builders.py` |
 
+> **이 표는 `OPEN-ML-01` 결정의 하류 서술을 옮긴 것이지 새 판정이 아니다.**
+> `decisions.md`의 그 절이 *"M5 이식 대상 목록이 8개로 확정된다"*를 하류로 적었다.
+> **그리고 활성 `OPEN-ML-06`이 win-proxy 커널(`award_landing_curve.py` ·
+> `award_landing_distribution.py`)의 M5 포함 여부를 여전히 들고 있다** —
+> *"(a) 보존 이식 (b) M0 범위 밖으로 완전히 미룸"*. **이 ADR은 그 둘을 닫지 않는다.**
+> 두 서술이 부딪히면 **활성 registry가 이긴다** — 이 표는 경계(어느 runtime이 소유하는가)를
+> 적고, `OPEN-ML-06`은 범위(M5에 넣는가)를 소유한다. §5의 표가 그 관계를 다시 적는다.
+
 ### 4.2 래칫 사전 조사 — 결정을 막는 것은 없다
 
 `milestone-0.md` §"추가 조사 항목"이 요구한 조사를 수행했다. 대상은 `app/ai/predictors/`,
@@ -330,6 +338,19 @@ Kotlin 1.7.x"*를 규정하고 Gradle에서 *"the Spring Boot plugin automatical
   출처가 Kotlin이면 학습 시점에 그 값을 **데이터로 받아야** 한다 (b) 위반이므로 이식
   대상에서 제외하고 학습 코퍼스 구성을 Kotlin이 소유한다.
 - **소유**: M2 계약(학습 데이터셋 계약) 또는 M5.
+
+### 이 ADR이 선점하지 않는 활성 `OPEN` — 인접 축
+
+**언급하지 않은 활성 `OPEN` 중 이 ADR의 서술과 인접한 것**을 적는다. 관계만 적고
+**해소하지 않는다.**
+
+| 활성 `OPEN` | 이 ADR이 하지 않는 것 |
+| --- | --- |
+| **`OPEN-ML-06`** (win-proxy 커널을 M5 이식 대상에 넣는가 — (a) 보존 이식 (b) 완전히 미룸) | §4.1의 표는 **어느 runtime이 소유하는가**(경계)를 적는다. **M5 범위에 넣을지는 정하지 않는다.** 두 서술이 부딪히면 활성 registry가 이긴다 |
+| **`OPEN-SET-06`** (성숙도 embargo 임계를 승계할 것인가) | D-2가 `OPEN-ML-01` 결정을 인용해 **성숙도 계산은 ml-engine, embargo 판정은 Kotlin**이라는 **소유**를 적는다. **임계값의 승계 여부는 정하지 않는다** |
+
+**나머지 활성 `OPEN`과의 관계는 `commands.md` C-9.6이 자리를 낸다** — 그 명령이 ADR이
+언급하지 않은 활성 `OPEN` 전수를 내고, 인접 여부는 사람이 읽는다.
 
 ---
 
