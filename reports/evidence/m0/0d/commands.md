@@ -8,10 +8,10 @@
 
 | 블록 | 대상 | 선언 SHA | 그 SHA에서 재현되는가 |
 | --- | --- | --- | --- |
-| C-1 · C-2 · C-3 · C-4 · C-7 · C-8 · C-9 | 이 저장소 | **`c731399`** | 예. 그 트리에 `docs/adr/`와 `scope.md`가 있다 |
+| C-1 · C-2 · C-3 · C-4 · C-7 · C-8 · C-9 · C-10 | 이 저장소 | **`fb79029`** | 예. 그 트리에 `docs/adr/`와 `scope.md`가 있다 |
 | C-5 · C-6 | legacy `bid-vector` | **`ed4b06c`** | 예. legacy commit은 이 저장소의 커밋과 무관하게 고정이다 |
 
-**`c731399`는 이 커밋의 직전 커밋이다.** 커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다.
+**`fb79029`는 이 커밋의 직전 커밋이다.** 커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다.
 C-5·C-6은 legacy를 읽으므로 이 저장소의 어느 HEAD에서도 같은 답을 낸다.
 
 명령은 저장소 루트(`/Users/harris/Development/private/bid-vector-v2`)에서 실행한다.
@@ -35,30 +35,37 @@ git status --porcelain | grep -v '^?? reports/evidence/m0/0d/' | wc -l | sed 's/
 tracked_dirty=0
 ```
 
-> 위 출력은 `20fc15e` 시점에 뜬 것이다. 그 뒤 `446aba5`(secret 정정) · `420316c`
-> (scope 갱신) · `c731399`(ADR 포인터 정정)가 이어졌고, `scope.md`의 「갱신 이력」이
-> secret 정정을 등재한다. **base는 `998dc21`로 불변**이며, 뒤 커밋들이 `in_scope` 안에
-> 있다는 것은 C-2가 낸다.
+> 위 출력은 `20fc15e` 시점의 작업 트리에서 뜬 것이다. **작업 트리에는 SHA 주소가 없어
+> 이 블록만은 선언 SHA에서 재현되지 않는다.** 그 뒤 이어진 커밋들의 이력은
+> **`scope.md`의 「갱신 이력」이 소유한다** — 이 파일에 옮기지 않는다.
+> **base는 `998dc21`로 불변**이고, 뒤 커밋이 `in_scope` 안에 있다는 것은 C-2가 낸다.
 
 ---
 
 ## C-2 · in_scope 밖 경로 · 공백 오류
 
 ```
-git diff --name-only 998dc21...c731399 | grep -cvE '^(docs/adr/|reports/evidence/m0/0d/)' | sed 's/^/out_of_scope_paths=/'
-git diff --name-only 998dc21...c731399 | wc -l | sed 's/^ *//;s/^/changed_paths=/'
-git diff --check 998dc21...c731399 | wc -l | sed 's/^ *//;s/^/whitespace_problems=/'
+git diff --name-only 998dc21...fb79029 | grep -cvE '^(docs/adr/|reports/evidence/m0/0d/)' | sed 's/^/out_of_scope_paths=/'
+git diff --name-only 998dc21...fb79029 | wc -l | sed 's/^ *//;s/^/changed_paths=/'
+git diff --check 998dc21...fb79029 | wc -l | sed 's/^ *//;s/^/whitespace_problems=/'
 ```
 
 ```
 out_of_scope_paths=0
-changed_paths=10
-whitespace_problems=0
+changed_paths=12
+whitespace_problems=2
 ```
 
 **판정**: `in_scope` 밖 경로가 없다. **목록도 셈도 여기 옮겨 적지 않는다** — 뒤 커밋이
 `in_scope` 안에만 있는 한 이 판정은 낡지 않고, 변경 경로가 궁금하면 위 첫 명령에서
 `-cv`를 `-v`로 바꾸면 그 명령이 목록을 낸다.
+
+> **`whitespace_problems=2`는 이 파일 자신의 것이고 이 커밋이 지운다.**
+> `git diff --check`는 한 문제를 두 줄(위치 + 내용)로 내므로 **문제는 하나**다 —
+> C-9.4의 `tr '\n' ' '`가 만든 후행 공백이며, 검증자 `F-5`가 적출했다.
+> **이 커밋이 그 명령을 `paste -sd' ' -`로 바꿔 원인을 없앤다.** 선언 SHA는 정정 **전**
+> 상태이므로 이 블록은 `2`를 기록한다 — **자기 커밋의 결과를 미리 적지 않는다.**
+> 확인은 HEAD에서 `git diff --check 998dc21...HEAD | wc -l`로 한다.
 
 ---
 
@@ -108,6 +115,9 @@ python3 "$T/adrscan.py" docs/adr
 0007	0007-test-pyramid-and-ratchet.md	STATUS=OK	CONTEXT=OK	DECISION=OK	ALT=OK	CONSEQ=OK
 0008	0008-frontend-disposition.md	STATUS=OK	CONTEXT=OK	DECISION=OK	ALT=OK	CONSEQ=OK
 0009	0009-ml-reuse-provenance.md	STATUS=OK	CONTEXT=OK	DECISION=OK	ALT=OK	CONSEQ=OK
+files=9
+numbers_unique=yes
+numbers_contiguous_from_1=yes
 ```
 
 ### C-3n · 이 스캐너가 무엇을 잡는지 — 실행으로 잰다
@@ -139,9 +149,9 @@ numbers_contiguous_from_1=no
 ## C-4 · 확정 산출물 무변경
 
 ```
-git diff --name-only 998dc21...c731399 -- docs/discovery/ | wc -l | sed 's/^ *//;s/^/discovery_changed=/'
-git diff --name-only 998dc21...c731399 -- reports/evidence/m0/0a reports/evidence/m0/0a2 reports/evidence/m0/0a3 reports/evidence/m0/0b | wc -l | sed 's/^ *//;s/^/prior_evidence_changed=/'
-git diff --name-only 998dc21...c731399 -- .claude | wc -l | sed 's/^ *//;s/^/harness_changed=/'
+git diff --name-only 998dc21...fb79029 -- docs/discovery/ | wc -l | sed 's/^ *//;s/^/discovery_changed=/'
+git diff --name-only 998dc21...fb79029 -- reports/evidence/m0/0a reports/evidence/m0/0a2 reports/evidence/m0/0a3 reports/evidence/m0/0b | wc -l | sed 's/^ *//;s/^/prior_evidence_changed=/'
+git diff --name-only 998dc21...fb79029 -- .claude | wc -l | sed 's/^ *//;s/^/harness_changed=/'
 ```
 
 ```
@@ -547,6 +557,9 @@ frontend_ts_files=292
 10:DEFAULT_DATABASE_URL = <redacted — 자격증명 형태>
 40:    DATABASE_URL: str = <redacted — 자격증명 형태>
 817:        """Allow split DATABASE_* env vars to compose DATABASE_URL deterministically."""
+828:            self.DATABASE_URL = <redacted — 자격증명 형태>
+832:        elif self.DATABASE_URL and self.DATABASE_URL != <redacted — 자격증명 형태>
+840:                self.DATABASE_URL
 alembic.ini=present
 alembic_files=30
 3:sqlalchemy==2.0.23
@@ -560,8 +573,10 @@ alembic_files=30
 48:    "openapi-typescript": "^7.13.0",
 ```
 
-> `DATABASE_URL` 두 줄의 **값은 `sed`가 지운다** — 자격증명 형태의 문자열이라
-> `agent-workflow.md` §6이 생성물에 남기지 못하게 한다. **행 번호와 존재는 그대로 뜬다.**
+> **`sed`가 `=` 뒤를 지운다** — 자격증명 형태의 문자열이라 `agent-workflow.md` §6이
+> 생성물에 남기지 못하게 한다. **행 번호와 존재는 그대로 뜬다.**
+> `817` · `840`은 `=`가 없어 원문이 그대로 남는다 — 그 두 줄에는 값이 없다.
+> `828` · `832`는 **env 조합 로직**이며 자격증명 리터럴이 아니다.
 > 41행이 이 출력에 없는 것은 그 줄에 `DATABASE_URL` 문자열이 없기 때문이며,
 > ADR 0004가 인용한 `:40-42`는 `(`…`)`로 닫히는 대입 **한 덩어리**다 — 그 세 줄은
 > `git show ed4b06c:app/core/config.py | sed -n '40,42p'`가 낸다.
@@ -849,24 +864,32 @@ candidates=12 found=10 missing=2
 ## C-8 · secret 스캔
 
 ```
-git diff --name-only 998dc21...c731399 | xargs grep -nEi 'api[_-]?key|secret|token|password|passwd|BEGIN [A-Z ]*PRIVATE KEY|xox[baprs]-|ghp_|AKIA[0-9A-Z]{16}' 2>/dev/null
+git diff --name-only 998dc21...fb79029 | xargs grep -nEi 'api[_-]?key|secret|token|password|passwd|BEGIN [A-Z ]*PRIVATE KEY|xox[baprs]-|ghp_|AKIA[0-9A-Z]{16}' 2>/dev/null
 echo "exit=$?"
 ```
 
 ```
+reports/evidence/m0/0d/checklist.md:16:| **A8** | `in_scope` 밖 경로 변경 없음, 공백 오류·secret 없음 | **C-2** · **C-8** | **충족** |
+reports/evidence/m0/0d/commands.md:777:TOKENS = ["불채택", "채택", "판정 보류", "대상 아님", "조건부"]
+reports/evidence/m0/0d/commands.md:805:    judged = sorted({t for ln in rows for t in TOKENS if t in ln})
+reports/evidence/m0/0d/commands.md:857:## C-8 · secret 스캔
+reports/evidence/m0/0d/commands.md:860:git diff --name-only 998dc21...fb79029 | xargs grep -nEi 'api[_-]?key|secret|token|password|passwd|BEGIN [A-Z ]*PRIVATE KEY|xox[baprs]-|ghp_|AKIA[0-9A-Z]{16}' 2>/dev/null
+reports/evidence/m0/0d/commands.md:865:reports/evidence/m0/0d/scope.md:86:| **A8** | `in_scope` 밖 경로 변경이 없고, 공백 오류·secret이 없다 | agent-workflow §6 | `commands.md` C-2 · C-8 |
+reports/evidence/m0/0d/commands.md:866:reports/evidence/m0/0d/scope.md:174:| `446aba5` | **secret 스캔(C-8)이 잡은 것을 고쳤다** — ADR 0004가 legacy 기본 `DATABASE_URL` 원문을 인용했고 그 문자열이 자격증명 형태(`user:password@host`)다. `agent-workflow.md` §6이 생성물에 남기지 못하게 하는 부류라 **값을 지우고 경로·행과 확인 명령을 가리키게** 바꿨다. 주장은 그대로다 |
+reports/evidence/m0/0d/commands.md:876:> 패턴 문자열(`secret`·`password` 등을 말하는 산문과 위 정규식 자체)이 매치로 추가된다.**
 reports/evidence/m0/0d/scope.md:86:| **A8** | `in_scope` 밖 경로 변경이 없고, 공백 오류·secret이 없다 | agent-workflow §6 | `commands.md` C-2 · C-8 |
 reports/evidence/m0/0d/scope.md:174:| `446aba5` | **secret 스캔(C-8)이 잡은 것을 고쳤다** — ADR 0004가 legacy 기본 `DATABASE_URL` 원문을 인용했고 그 문자열이 자격증명 형태(`user:password@host`)다. `agent-workflow.md` §6이 생성물에 남기지 못하게 하는 부류라 **값을 지우고 경로·행과 확인 명령을 가리키게** 바꿨다. 주장은 그대로다 |
 exit=0
 ```
 
-**판정**: 매치는 전부 **그 단어를 말하는 산문**이고 값이 아니다.
+**판정**: 매치는 전부 **그 단어를 말하는 산문 또는 위 정규식 자체**이고 값이 아니다.
 값 형태의 문자열 하나(legacy 기본 `DATABASE_URL`)는 `446aba5`에서 걷어냈다 —
 `scope.md`의 「갱신 이력」이 그 커밋을 등재한다.
 
-> **위 출력은 `c731399` 트리의 것이며 이 파일 자신의 행은 없다** — `commands.md`가
-> 그 트리에 없기 때문이다. **이 파일이 커밋된 뒤 같은 명령을 다시 돌리면 이 파일의
-> 패턴 문자열(`secret`·`password` 등을 말하는 산문과 위 정규식 자체)이 매치로 추가된다.**
-> 그 좌표를 여기 적지 않는다 — 자기 커밋의 내용을 좌표로 주장하지 않는다.
+> **위 출력에는 `commands.md` 자신의 행이 있다** — 이 파일이 선언 SHA(`fb79029`)의
+> 트리에 이미 있기 때문이다. 그 행들은 **패턴 문자열을 말하는 산문과 위 정규식 자체**이며
+> 값이 아니다. **좌표는 그 SHA 시점의 것이고 이 커밋의 편집으로 이동한다** — 자기 커밋의
+> 내용을 좌표로 주장하지 않으므로 갱신하지 않는다.
 
 ---
 
@@ -934,12 +957,12 @@ OPEN-DEC-01	count=1
 ### C-9.4 · 신설 `OPEN-ADR-NN`의 등록 자리
 
 ```
-grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u | tr '\n' ' '; echo
-for f in docs/adr/*.md; do ids=$(grep -ho 'OPEN-ADR-[0-9]\{2\}' "$f" | sort -u | tr '\n' ',' | sed 's/,$//'); [ -n "$ids" ] && printf '%s\t%s\n' "$(basename $f)" "$ids"; done
+grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u | paste -sd' ' -
+for f in docs/adr/*.md; do ids=$(grep -ho 'OPEN-ADR-[0-9]\{2\}' "$f" | sort -u | paste -sd',' -); [ -n "$ids" ] && printf '%s\t%s\n' "$(basename $f)" "$ids"; done
 ```
 
 ```
-OPEN-ADR-01 OPEN-ADR-02 OPEN-ADR-03 OPEN-ADR-04 OPEN-ADR-05 OPEN-ADR-06 OPEN-ADR-07 OPEN-ADR-08 OPEN-ADR-09 OPEN-ADR-10 OPEN-ADR-11 
+OPEN-ADR-01 OPEN-ADR-02 OPEN-ADR-03 OPEN-ADR-04 OPEN-ADR-05 OPEN-ADR-06 OPEN-ADR-07 OPEN-ADR-08 OPEN-ADR-09 OPEN-ADR-10 OPEN-ADR-11
 0001-target-architecture.md	OPEN-ADR-01,OPEN-ADR-02,OPEN-ADR-03,OPEN-ADR-04,OPEN-ADR-05,OPEN-ADR-06,OPEN-ADR-10
 0003-contract-transport.md	OPEN-ADR-01,OPEN-ADR-11
 0004-persistence-and-events.md	OPEN-ADR-01
@@ -960,16 +983,16 @@ OPEN-ADR-01 OPEN-ADR-02 OPEN-ADR-03 OPEN-ADR-04 OPEN-ADR-05 OPEN-ADR-06 OPEN-ADR
 
 ```
 grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | grep -v 'OPEN-ADR-' | grep -E '해소|확정' | wc -l | sed 's/^ *//;s/^/lines_to_read=/'
-grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | grep -v 'OPEN-ADR-' | grep -E '해소|확정' | cut -c1-120
+grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | grep -v 'OPEN-ADR-' | grep -E '해소|확정' | cut -c1-120 | sort
 ```
 
 ```
 lines_to_read=6
+docs/adr/0001-target-architecture.md:175:| **A-3** | **업무별 배포 서비스로 분해(MSA)** | **불채택** | `v2-지침서.md` §3이 *"과도한 MSA가 아닌 두
+docs/adr/0001-target-architecture.md:177:| **A-5** | **커널 일부만 Kotlin으로** (혼합 경계) | **불채택** | `OPEN-ML-01`이 (a)로 확정됐다 — 8
 docs/adr/0002-money-rate-basis.md:139:| **A-7** | **"모름"을 `null`로, 하한 미달 빈도를 `0`으로** | **불채택 (D-5)** | `R-PROV-08` · `R-
 docs/adr/0002-money-rate-basis.md:187:| **`OPEN-DEC-07`** | 기준 금액 신뢰 비율 1.15의 **마진 0.05 값**. 결정은 "V2 코퍼스에서 재유도"로 확정됐고 **
 docs/adr/0002-money-rate-basis.md:189:| **`OPEN-DEC-01`** (해소됨, 참고) | 하한 미달 빈도의 최소 표본 수 150은 **유지로 확정**됐고 **통계적 편의임을 명시*
-docs/adr/0001-target-architecture.md:175:| **A-3** | **업무별 배포 서비스로 분해(MSA)** | **불채택** | `v2-지침서.md` §3이 *"과도한 MSA가 아닌 두
-docs/adr/0001-target-architecture.md:177:| **A-5** | **커널 일부만 Kotlin으로** (혼합 경계) | **불채택** | `OPEN-ML-01`이 (a)로 확정됐다 — 8
 docs/adr/0006-gradle-modules.md:59:확정됐다**(운영자 결정 `OPEN-OPS-05`, 2026-08-26). 위 표에서 그 항목을 뺐고, 그 자리를
 ```
 
@@ -977,6 +1000,69 @@ docs/adr/0006-gradle-modules.md:59:확정됐다**(운영자 결정 `OPEN-OPS-05`
 **해소하지 않았다는 선언**이다. 이 slice가 활성 `OPEN`을 닫은 자리가 없다.
 **`OPEN-OPS-07`은 예외이며 종료 조건이 「ADR 대안 절 기입」이므로 C-7이 그것을 낸다.**
 
-> 좌표는 `c731399` 시점의 것이고 **파일 순서는 셸의 glob 순서**다. **줄 번호를 판정의
-> 근거로 쓰지 않는다** — 근거는 위 명령이고 이 열은 그 시점의 좌표다. 값이 어긋나면
-> 명령을 다시 돌린다.
+> 좌표는 `fb79029` 시점의 것이다. **순서는 `sort`가 준다** — 이 환경의 `grep`은 인자
+> glob 순서로 내지 않아 정렬 없이는 순서가 재현되지 않았다(검증자 `F-7`).
+> **줄 번호를 판정의 근거로 쓰지 않는다** — 근거는 위 명령이고 이 열은 그 시점의
+> 좌표다. 값이 어긋나면 명령을 다시 돌린다.
+
+### C-9.6 · ADR이 언급하지 않은 활성 `OPEN` — 전수
+
+**계열 A는 「ADR이 언급한 활성 `OPEN`」이 아니라 「언급하지 않은 채 그 쟁점을 확정 서술로
+쓴 것」에서 난다**(검증자 `F-4`). 그래서 이 블록은 **언급되지 않은 활성 `OPEN`을 전수로
+낸다** — 인접 여부는 사람이 그 목록을 읽고 판정한다. 기계는 목록만 낸다.
+
+```
+T=$(mktemp -d)
+awk '/^### G1\./{f=1} /^## 12\.1/{f=0} f && /^\| OPEN-/ {print $2}' docs/discovery/capability-map.md | sort -u > "$T/active.txt"
+wc -l < "$T/active.txt" | sed 's/^ *//;s/^/active_open_ids=/'
+grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | grep -v '^OPEN-ADR-' | sort -u > "$T/mentioned.txt"
+comm -12 "$T/active.txt" "$T/mentioned.txt" | wc -l | sed 's/^ *//;s/^/mentioned=/'
+comm -12 "$T/active.txt" "$T/mentioned.txt" | paste -sd' ' -
+comm -23 "$T/active.txt" "$T/mentioned.txt" | wc -l | sed 's/^ *//;s/^/unmentioned=/'
+comm -23 "$T/active.txt" "$T/mentioned.txt" | paste -sd' ' -
+```
+
+```
+active_open_ids=45
+mentioned=14
+OPEN-DEC-03 OPEN-DEC-07 OPEN-ML-05 OPEN-ML-06 OPEN-NUM-01 OPEN-OPS-01 OPEN-OPS-02 OPEN-OPS-03 OPEN-OPS-04 OPEN-OPS-07 OPEN-OPS-08 OPEN-OPS-10 OPEN-QUAL-10 OPEN-SET-06
+unmentioned=31
+OPEN-COL-01 OPEN-COL-03 OPEN-COL-04 OPEN-COL-05 OPEN-DEC-10 OPEN-ML-02 OPEN-ML-03 OPEN-NOTI-01 OPEN-NOTI-04 OPEN-NOTI-05 OPEN-NOTI-06 OPEN-NOTI-07 OPEN-NOTI-08 OPEN-NUM-02 OPEN-NUM-03 OPEN-OPS-09 OPEN-QUAL-04 OPEN-QUAL-05 OPEN-QUAL-07 OPEN-QUAL-09 OPEN-QUAL-11 OPEN-SET-01 OPEN-SET-03 OPEN-SET-04 OPEN-SET-05 OPEN-SET-08 OPEN-SET-09 OPEN-SET-10 OPEN-STR-02 OPEN-STR-04 OPEN-STR-12
+```
+
+**판정(사람이 읽은 것)**: **`unmentioned` 목록 전수를 읽었고 ADR의 확정 서술과 인접한
+것은 없다.** 인접한 것으로 판정된 다섯은 이번 라운드에 **관계 서술을 얻어 `mentioned`
+쪽으로 옮겨졌다** — `OPEN-ML-06`(ADR 0001 §4.1·§5, 검증자 `F-4`) · `OPEN-SET-06`(0001 §5) ·
+`OPEN-OPS-02` · `OPEN-OPS-08`(0005 §5) · `OPEN-ML-05`(0006 D-7).
+**다섯 중 어느 것도 해소하지 않았다 — 관계만 적었다.**
+
+**이 명령이 잡지 못하는 것**: **쟁점의 인접성.** ID 문자열의 등장 여부만 센다.
+`mentioned`에 있다고 선점하지 않은 것도, `unmentioned`에 있다고 선점한 것도 아니다.
+
+---
+
+## C-10 · capability ID 용법 — `OPS-13`
+
+검증자 `F-1`이 적출한 오지목의 정정을 확인한다.
+
+```
+grep -n 'OPS-13' docs/adr/*.md
+grep -n '^### OPS-13' docs/discovery/capability-map.md
+grep -n '^| 재시도·backoff\|^| 아키텍처 규칙 강제' docs/discovery/capability-map.md
+```
+
+```
+-- ADR 안의 OPS-13 전수
+docs/adr/0005-domain-events-and-outbox.md:107:  **`OPS-13`은 이 행이 아니라 「아키텍처 규칙 강제」 행의 것**이며 그 항목의 정의는
+docs/adr/0005-domain-events-and-outbox.md:188:### 3.5 아키텍처 규칙 강제 (OPS-13)
+-- capability-map 의 OPS-13 정의
+2596:### OPS-13 · 설계 래칫 (비대화 방지)
+-- OPS-21 표에서 그 두 행
+2724:| 재시도·backoff·circuit breaker·rate limiter | Resilience4j | OPS-08 (a)(c), COL-03 |
+2725:| 아키텍처 규칙 강제 | ArchUnit(의존 방향), Konsist, Detekt(크기 임계) | OPS-13 |
+```
+
+**판정**: ADR 안의 `OPS-13`은 **두 자리**이고 둘 다 「아키텍처 규칙 강제」 맥락이다 —
+하나는 그 정정을 적는 자리, 하나는 §3.5 제목이다. `capability-map.md`가 `OPS-13`을
+**「설계 래칫(비대화 방지)」**로 정의하고 OPS-21 표가 그것을 **아키텍처 규칙 강제 행**에
+둔다. 재시도 행의 대응 항목은 **`OPS-08 (a)(c)` · `COL-03`**뿐이다.
