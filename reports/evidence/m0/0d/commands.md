@@ -6,8 +6,10 @@
 
 ## 선언 SHA와 실행 계약
 
-**이 파일의 출력 블록은 전부 `b925b91` 트리에서 뜬 것이다** — 일부가 아니라 전부다.
-`b925b91`은 이 커밋의 직전 커밋이며, 커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다.
+**출력 블록은 `b925b91` 트리에서 뜬 것이다** — **예외는 C-11 하나이고 그것은 HEAD에서
+뜬다.** 어느 블록이 무엇을 선언하는지는 아래 표가 적고, 그 예외의 사유는 C-11 절이 적는다.
+커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`b925b91`로 그대로
+지목한다.** 다른 커밋과의 관계로 부르지 않는다: 관계는 뒤 편집이 들어올 때마다 낡는다.
 
 | 블록 | 읽는 것 | 선언 SHA |
 | --- | --- | --- |
@@ -1133,32 +1135,32 @@ git worktree remove --force "$WT"
 ```
 
 ```
-pair  0 L44    OK    git rev-parse HEAD
-pair  1 L65    OK    T0=$(mktemp -d)
-pair  2 L121   OK    T=$(mktemp -d)
-pair  3 L148   OK    # adrscan.py 는 C-3 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않는
-pair  4 L171   OK    git log --format='%H %s' 998dc21..HEAD | grep 'm0-0d' |
-pair  5 L205   OK    cd bid-vector
-pair  6 L274   OK    cd bid-vector
-pair  7 L291   OK    awk -F'\t' '$4>50 {printf "%s:%d-%d\t%d\t%s\n", $1,$2,$3
-pair  8 L345   OK    cd bid-vector
-pair  9 L416   OK    cd bid-vector
-pair 10 L487   OK    cd bid-vector
-pair 11 L537   OK    cd bid-vector
-pair 12 L570   OK    cd bid-vector
-pair 13 L609   OK    cd bid-vector
-pair 14 L718   OK    T=$(mktemp -d)
-pair 15 L773   OK    # citescan.py 는 C-6 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않
-pair 16 L844   OK    T=$(mktemp -d)
-pair 17 L871   OK    python3 "$T/ops07scan.py" docs/adr 'Kafka@0005' 'RabbitM
-pair 18 L888   OK    xargs grep -nEi 'api[_-]?key|secret|token|password|passw
-pair 19 L912   OK    grep -ci 'react' docs/discovery/capability-map.md | sed
-pair 20 L924   OK    grep -h '^### Slice' milestone-*.md | wc -l | sed 's/^ *
-pair 21 L939   OK    grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md |
-pair 22 L976   OK    grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u |
-pair 23 L1001  OK    grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | g
-pair 24 L1036  OK    T=$(mktemp -d)
-pair 25 L1068  OK    echo "-- ADR 안의 OPS-13 전수"
+pair  0 L46    OK    git rev-parse HEAD
+pair  1 L67    OK    T0=$(mktemp -d)
+pair  2 L123   OK    T=$(mktemp -d)
+pair  3 L150   OK    # adrscan.py 는 C-3 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않는
+pair  4 L173   OK    git log --format='%H %s' 998dc21..HEAD | grep 'm0-0d' |
+pair  5 L207   OK    cd bid-vector
+pair  6 L276   OK    cd bid-vector
+pair  7 L293   OK    awk -F'\t' '$4>50 {printf "%s:%d-%d\t%d\t%s\n", $1,$2,$3
+pair  8 L347   OK    cd bid-vector
+pair  9 L418   OK    cd bid-vector
+pair 10 L489   OK    cd bid-vector
+pair 11 L539   OK    cd bid-vector
+pair 12 L572   OK    cd bid-vector
+pair 13 L611   OK    cd bid-vector
+pair 14 L720   OK    T=$(mktemp -d)
+pair 15 L775   OK    # citescan.py 는 C-6 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않
+pair 16 L846   OK    T=$(mktemp -d)
+pair 17 L873   OK    python3 "$T/ops07scan.py" docs/adr 'Kafka@0005' 'RabbitM
+pair 18 L890   OK    xargs grep -nEi 'api[_-]?key|secret|token|password|passw
+pair 19 L914   OK    grep -ci 'react' docs/discovery/capability-map.md | sed
+pair 20 L926   OK    grep -h '^### Slice' milestone-*.md | wc -l | sed 's/^ *
+pair 21 L941   OK    grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md |
+pair 22 L978   OK    grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u |
+pair 23 L1003  OK    grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | g
+pair 24 L1038  OK    T=$(mktemp -d)
+pair 25 L1070  OK    echo "-- ADR 안의 OPS-13 전수"
 pairs=26 skipped_harness=1 diff=0
 ```
 
