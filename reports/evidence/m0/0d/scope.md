@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0d-adr
 base_sha: 998dc21754e39efa425c3cfad9d5b7d5540ad1ba   # 0A3 종료 + 하네스 커밋 직후의 HEAD
-head_sha: 446aba5   # 이 갱신 커밋의 직전 커밋. 「head_sha와 range」 절 참조
+head_sha: 99855e7   # 이 갱신 커밋의 직전 커밋. 「head_sha와 range」 절 참조
 in_scope:
   - docs/adr/                       # 신설. ADR 0001~0009
   - reports/evidence/m0/0d/         # 이 패키지
@@ -172,6 +172,7 @@ C-7이 이 대응을 스캐너로 확인한다 — 후보 이름이 그 ADR의 �
 | --- | --- |
 | 최초 | ADR 0001~0009 신설, `OPEN-ADR-01`~`11` 등록, evidence 패키지 작성 |
 | `446aba5` | **secret 스캔(C-8)이 잡은 것을 고쳤다** — ADR 0004가 legacy 기본 `DATABASE_URL` 원문을 인용했고 그 문자열이 자격증명 형태(`user:password@host`)다. `agent-workflow.md` §6이 생성물에 남기지 못하게 하는 부류라 **값을 지우고 경로·행과 확인 명령을 가리키게** 바꿨다. 주장은 그대로다 |
+| `c731399` | **ADR의 근거 포인터를 그 수를 실제로 내는 블록으로 맞췄다.** 세 자리가 존재하지 않는 출력을 가리켰다 — 0001 §4.2가 C-5.2에 「분해/allowlist 양쪽 재료」가 있다고 적었으나 그 블록은 함수 전수와 결합 축만 낸다. 그 주장을 지우고 이 ADR이 파일별 판정을 하지 않는다는 것을 적었다. mixin 크기와 `OPEN` 후보 실측은 `commands.md` **C-5.2d**·**C-5.2c**를 신설해 그리로 보냈다 |
 
 **이력 절은 자기가 속한 커밋의 diff나 파일 목록을 주장하지 않는다.** 이미 커밋된 SHA만
 지목하고, 그 커밋이 무엇을 바꿨는지는 `git show --stat --format='' <SHA>`에 맡긴다.
