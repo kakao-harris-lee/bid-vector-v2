@@ -4,7 +4,7 @@
 milestone: m0
 slice: 0d-adr
 base_sha: 998dc21754e39efa425c3cfad9d5b7d5540ad1ba   # 0A3 종료 + 하네스 커밋 직후의 HEAD
-head_sha: a093488   # 이 scope 커밋의 직전 커밋. 「head_sha와 range」 절 참조
+head_sha: 446aba5   # 이 갱신 커밋의 직전 커밋. 「head_sha와 range」 절 참조
 in_scope:
   - docs/adr/                       # 신설. ADR 0001~0009
   - reports/evidence/m0/0d/         # 이 패키지
@@ -63,12 +63,12 @@ rollback: "N/A — 문서 산출물은 git revert로 복구. 애플리케이션 
 
 `head_sha`의 정본은 이 파일 머리의 yaml 하나다 — 값을 두 곳에 두지 않는다.
 
-이 파일은 **자기 커밋의 diff를 서술하지 않는다.** yaml의 `head_sha`는 **이 scope 커밋의
-직전 커밋**이며, 그 뒤에 오는 evidence 커밋(`commands.md`·`checklist.md`)은 이 값을
-갱신하지 않는다 — 그 커밋들의 경로가 전부 `in_scope`의 `reports/evidence/m0/0d/` 안이라
-**"in_scope 밖 경로가 없다"는 판정이 뒤 커밋에 낡지 않기 때문**이다. 확인하는 명령은
-`commands.md` **C-2**다. Codex 리뷰의 `reviewed_head`는 리뷰 요청 시점의 HEAD이며 이
-값과 다를 수 있다.
+이 파일은 **자기 커밋의 diff를 서술하지 않는다.** yaml의 `head_sha`는 **이 파일을 쓴
+가장 최근 커밋의 직전 커밋**이며, 그 뒤에 오는 커밋(`commands.md`·`checklist.md`)은 이
+값을 갱신하지 않는다 — 뒤 커밋의 경로가 전부 `in_scope`(`docs/adr/` 또는
+`reports/evidence/m0/0d/`) 안이라 **"in_scope 밖 경로가 없다"는 판정이 뒤 커밋에 낡지
+않기 때문**이다. 확인하는 명령은 `commands.md` **C-2**다. Codex 리뷰의 `reviewed_head`는
+리뷰 요청 시점의 HEAD이며 이 값과 다를 수 있다.
 
 ---
 
@@ -171,6 +171,7 @@ C-7이 이 대응을 스캐너로 확인한다 — 후보 이름이 그 ADR의 �
 | 라운드 | 내용 |
 | --- | --- |
 | 최초 | ADR 0001~0009 신설, `OPEN-ADR-01`~`11` 등록, evidence 패키지 작성 |
+| `446aba5` | **secret 스캔(C-8)이 잡은 것을 고쳤다** — ADR 0004가 legacy 기본 `DATABASE_URL` 원문을 인용했고 그 문자열이 자격증명 형태(`user:password@host`)다. `agent-workflow.md` §6이 생성물에 남기지 못하게 하는 부류라 **값을 지우고 경로·행과 확인 명령을 가리키게** 바꿨다. 주장은 그대로다 |
 
 **이력 절은 자기가 속한 커밋의 diff나 파일 목록을 주장하지 않는다.** 이미 커밋된 SHA만
 지목하고, 그 커밋이 무엇을 바꿨는지는 `git show --stat --format='' <SHA>`에 맡긴다.
