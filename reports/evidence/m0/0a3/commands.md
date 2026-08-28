@@ -816,7 +816,7 @@ $ git diff --numstat 32f7a63..6b99420 -- reports/evidence/m0/0a3/
 69	1	reports/evidence/m0/0a3/checklist.md
 5	33	reports/evidence/m0/0a3/commands.md
 57	2	reports/evidence/m0/0a3/scope.md
-$ for f in scope checklist commands; do a=$(git show 32f7a63:…/$f.md | grep -c '^#\{2,4\} '); b=$(git show 6b99420:…/$f.md | grep -c '^#\{2,4\} '); echo "  $f: $a → $b"; done
+$ for f in scope checklist commands; do a=$(git show 32f7a63:reports/evidence/m0/0a3/$f.md | grep -c '^#\{2,4\} '); b=$(git show 6b99420:reports/evidence/m0/0a3/$f.md | grep -c '^#\{2,4\} '); echo "  $f: $a → $b"; done
   scope: 94 → 100
   checklist: 64 → 69
   commands: 31 → 30
