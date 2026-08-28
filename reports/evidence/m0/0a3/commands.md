@@ -804,21 +804,21 @@ $ printf %s "$BLKP" | python3 - 7bcf2e7
 > **그대로 돌면 실패했다**(Codex 5차 `G-1`). **전체 경로로 적는다.**
 
 ```
-### 실행 시점 HEAD = b940074
+### 실행 시점 HEAD = 77c5b98
 ### 이 블록은 그 커밋의 트리에서 떴다 — 선언한 SHA 에서 재현된다.
 ### (b) 는 commands.md 를 대상에서 뺀다 — 이 절의 출력이 자기 검사에 걸리기 때문이다.
 ### 파일 간 출력 순서는 구현에 따라 다르므로 sort 로 고정한다(R-2 와 같은 부류).
 
 ## (a) 인벤토리 표 ↔ 실물 python 블록
 $ grep -c '^```python' reports/evidence/m0/0a3/commands.md
-3
+4
 $ awk '/^### 이 패키지가 쓰는 스크립트/,/^## /' reports/evidence/m0/0a3/commands.md | grep -c '^| \*\*'
-3
+4
 
 ## (b) 산문에 살아 있는 셈이 남았는가 (scope.md · checklist.md)
 $ grep -nE '스크립트가 (둘|셋|하나)|스크립트 — (둘|셋)|블록이 (둘|셋)' reports/evidence/m0/0a3/scope.md reports/evidence/m0/0a3/checklist.md | sort | cut -c1-88
-reports/evidence/m0/0a3/checklist.md:1017:| **지운 문면** | 머리글의 *"이 패키지가 쓰는 스크립트 — **둘**이고"
-reports/evidence/m0/0a3/scope.md:1223:늘면서 `python` 블록이 셋이 됐는데 인벤토리는 **둘**이라 적고 있었다.
+reports/evidence/m0/0a3/checklist.md:1021:| **지운 문면** | 머리글의 *"이 패키지가 쓰는 스크립트 — **둘**이고"
+reports/evidence/m0/0a3/scope.md:1228:늘면서 `python` 블록이 셋이 됐는데 인벤토리는 **둘**이라 적고 있었다.
 
 ## (c) 라운드 15 실측 — 「~하지 않았다」류가 이것과 맞아야 한다
 $ git diff --numstat 32f7a63..6b99420 -- reports/evidence/m0/0a3/
@@ -839,6 +839,8 @@ $ git diff --stat 6b99420..7bcf2e7 -- docs/discovery/capability-map.md reports/e
 
 - **(a)** **인벤토리 표의 행 수와 실물 `python` 블록 수가 같다.** 표는 **셈을 적지 않고
   이 대조로 유지**된다 — 스크립트가 늘면 **행을 더하고 이 명령이 그것을 낸다.**
+  **verifier `GI-2`가 바로 그 자리였다** — C-10 스캐너를 늘리고 **표에 행을 더하지 않아**
+  이 대조가 어긋났다. **행을 더했고 이 실행이 그것을 낸다.**
 - **(b)** **살아 있는 셈은 없다.** 남은 매치는 둘 다 **이번 라운드가 그 셈을 고쳤다고
   적은 기록**이다 — `checklist.md` §24의 **「지운 문면」 인용**과 `scope.md` 라운드 17
   이력의 **경위 서술**. **기록이지 주장이 아니다.**
@@ -912,15 +914,84 @@ for path in FILES:
             body.append(l)
 ```
 
-**앞 라운드의 두 실행 기록은 이 커밋에서 걷어냈다** — **스캐너 본문이 바뀌었으므로
-기록도 이 수정의 트리에서 다시 떠야 한다**(verifier `GI-1`의 처방 순서, `F-2`·`G-1`과
-같다). **판정도 그때 적는다** — 재지 않은 결과를 먼저 쓰지 않는다.
+**세 트리에서 돌렸다** — **수정 전**(`fea90f2`, Codex 6차가 리뷰한 head) ·
+**`GI-1`이 난 트리**(`4cccf21`) · **수정 후**(이 블록의 선언 SHA).
+**고치기 전 스캐너(`9910c96`)와 나란히 돌려** 이 수정이 **앞 측정을 바꾸는지**도 본다.
 
 ```
-### 실행 시점 HEAD = (아직 커밋되지 않은 작업 트리 — 다음 커밋에서 선언 SHA로 다시 뜬다)
+### 실행 시점 HEAD = 77c5b98
+### 이 블록은 그 커밋의 트리에서 떴다 — 선언한 SHA 에서 재현된다.
+### $BLKS 는 이 트리의 스캐너 본문, $OLD 는 고치기 전(9910c96)의 스캐너 본문이다.
+
+## 스캐너 본문 둘을 marker 로 뽑는다 (C-4.1 · C-7 (b) 와 같은 방식)
+$ BLKS=$(python3 - <<'EOF'
+import re
+F = chr(96) * 3                     # 리터럴 백틱 세 개를 이 파일에 넣지 않는다
+s = open("reports/evidence/m0/0a3/commands.md", encoding="utf-8").read()
+b = [m.group(1) for m in re.finditer(F + r"python\n(.*?)" + F, s, re.S)
+     if "출력 블록 스캔 — 세 파일의 fenced 블록을" in m.group(1)]
+assert len(b) == 1, "marker 블록이 유일하지 않다: %d" % len(b)
+print(b[0], end="")
+EOF
+)
+$ OLDMD=$(mktemp); git show 9910c96:reports/evidence/m0/0a3/commands.md > "$OLDMD"
+$ OLD=$(OLDMD="$OLDMD" python3 - <<'EOF'
+import re, os
+F = chr(96) * 3
+s = open(os.environ["OLDMD"], encoding="utf-8").read()
+b = [m.group(1) for m in re.finditer(F + r"python\n(.*?)" + F, s, re.S)
+     if "출력 블록 스캔 — 세 파일의 fenced 블록을" in m.group(1)]
+assert len(b) == 1, "marker 블록이 유일하지 않다: %d" % len(b)
+print(b[0], end="")
+EOF
+)
+
+## (1) 수정 전 — fea90f2
+$ W=$(mktemp -d); git worktree add -q --detach "$W" fea90f2
+$ printf %s "$BLKS" | (cd "$W" && python3 -)
+[산문출력] reports/evidence/m0/0a3/commands.md:833  (빈 출력 = 무변경)
+[선언없음] reports/evidence/m0/0a3/checklist.md:923
+[선언없음] reports/evidence/m0/0a3/checklist.md:1029
+[선언없음] reports/evidence/m0/0a3/checklist.md:1183
+[산문출력] reports/evidence/m0/0a3/checklist.md:1187  (출력 없음)
+
+## (2) 이 수정이 그 측정을 바꾸는가 — 같은 트리에서 옛 스캐너와 나란히
+$ diff <(printf %s "$OLD" | (cd "$W" && python3 -)) <(printf %s "$BLKS" | (cd "$W" && python3 -)) ; echo "(차이 없음 = 옛 스캐너와 지목이 같다)"
+(차이 없음 = 옛 스캐너와 지목이 같다)
+$ git worktree remove --force "$W"
+
+## (3) GI-1 이 난 자리 — 4cccf21 (앞 라운드가 「사라졌다」고 적은 트리)
+$ W2=$(mktemp -d); git worktree add -q --detach "$W2" 4cccf21
+$ printf %s "$OLD" | (cd "$W2" && python3 -)
+[선언없음] reports/evidence/m0/0a3/checklist.md:927
+[선언없음] reports/evidence/m0/0a3/checklist.md:1037
+[산문출력] reports/evidence/m0/0a3/checklist.md:1196  (출력 없음)
+$ printf %s "$BLKS" | (cd "$W2" && python3 -)
+[선언없음] reports/evidence/m0/0a3/checklist.md:927
+[선언없음] reports/evidence/m0/0a3/checklist.md:1037
+$ git worktree remove --force "$W2"; rm -f "$OLDMD"
+
+## (4) 수정 후 — 77c5b98 (이 블록의 선언 SHA)
+$ printf %s "$BLKS" | python3 -
+[선언없음] reports/evidence/m0/0a3/checklist.md:927
+[선언없음] reports/evidence/m0/0a3/checklist.md:1037
 ```
 
-**이 스캐너가 못 보는 것**: 그 블록이 **출력 블록인가 예시·인용인가**는 판정하지
-못한다 — **지목하고 사람이 읽는다.** 그리고 **`echo` 가 있으면 그 명령이 낸 것으로
-본다** — `echo` 로 거짓 문자열을 낼 수도 있으나 그것은 이 축이 아니다.
-**「모든 블록이 선언 SHA를 갖는다」고 적지 않는다** — **적는 것은 이 스캔의 범위**다.
+**판정**:
+
+- **(1)이 낸 것은 Codex 6차가 지목한 자리와 같다** — 그리고 **(2)가 그것을 옛 스캐너와
+  대조**한다. **이 수정은 수정 전 측정을 바꾸지 않았다.**
+- **`GI-1`이 난 자리는 (3)이다.** 앞 라운드는 **`9910c96`에서 재고 「사라졌다」**고
+  적었는데, **그 블록은 다음 커밋(`4cccf21`)에서 채워졌다.** 채워진 명령의 `; echo`가
+  **`\` 연속줄 다음**에 있어 **줄 단위로 위를 훑던 `prev`가 그것을 못 보고 거짓 지목**을
+  냈다. **명령을 논리 단위로 집도록 고쳤다**(처방 **(가)**) — **(3)의 두 실행이 같은
+  트리에서 옛 스캐너와 새 스캐너를 나란히 돌린 것**이다.
+- **(4)에 남은 것은 동결 이력 안의 두 블록**이다 — **본문을 고치지 않았기 때문**이고,
+  그 자리는 **⚠ 후속 표시로 선언 SHA를 밝혔다**(각각 **`6b99420`**·**`d8fcef8`**).
+  **`F-1`의 전례대로 동결 본문은 고치지 않는다** — 그래서 이 축은 **그 둘을 계속 지목한다.**
+- **「이제 전부 잡는다」고 적지 않는다**(verifier `Y-1`이 그 형태였다) — **잰 트리는
+  `fea90f2` · `4cccf21` · `77c5b98`**이고 **판정은 그 범위**다.
+- **이 스캐너가 못 보는 것**: 그 블록이 **출력 블록인가 예시·인용인가**는 판정하지
+  못한다 — **지목하고 사람이 읽는다.** 그리고 **`echo` 가 있으면 그 명령이 낸 것으로
+  본다** — `echo` 로 거짓 문자열을 낼 수도 있으나 그것은 이 축이 아니다.
+- **「모든 블록이 선언 SHA를 갖는다」고 적지 않는다** — **적는 것은 이 스캔의 범위**다.
