@@ -1,0 +1,218 @@
+# ADR 0007 — 테스트 pyramid, mutation 대상, 크기·경계 래칫
+
+- **상태**: 제안됨 (M0 slice 0D) — 사용자 승인과 Codex `approve` 대기
+- **작성일**: 2026-08-28
+- **대응**: `milestone-0.md` §"Slice 0D" 결정 **7** (테스트 pyramid와 mutation 대상)
+- **legacy 기준 commit**: `ed4b06c`
+- **이 ADR이 닫는 것**: **`OPEN-OPS-07`** — OPS-21의 **아키텍처 규칙 강제** 행
+  (ArchUnit · Konsist · Detekt). 나머지 네 행은 **ADR 0005**가 닫는다.
+- **관련 ADR**: 0006(경계) · 0002(mutation 대상의 출처) · 0004(프로덕션 엔진 테스트)
+
+---
+
+## 1. 맥락
+
+### 1.1 승인된 우선순위
+
+`v2-지침서.md` §6이 순서를 규정했다 — ① 승인된 예제 기반 unit test ② 경계·결측·단위
+혼입을 생성하는 property test ③ 계약 consumer/provider test ④ **mutation test로 중요
+rule이 실제로 보호되는지 확인** ⑤ DB/broker/gRPC adapter integration test ⑥ mock KONEPS와
+fake notification을 사용한 E2E ⑦ 승인된 환경에서만 live read probe.
+
+§5가 도구와 규율을 규정했다 — JUnit 5 + Kotest/AssertJ, property test, Testcontainers.
+**domain test에서는 mock framework를 쓰지 않고 값과 fake port를 쓴다. adapter test에서만
+MockK 또는 test server/container를 쓴다.**
+
+### 1.2 래칫만으로는 막히지 않았다는 관찰
+
+`v2-지침서.md` §2:
+
+> | Ruff/mypy/pytest/design ratchet가 있어도 회귀 발생 | green suite 외에 property, mutation,
+> contract, E2E 증거 필요 |
+
+legacy에는 `scripts/design_ratchet.py`와 `tests/design_ratchet_baseline.json`이 있고
+(§2.1 조사 앵커의 「비대화 방지」 행) **그럼에도** `regression-ledger.md`가 등재한 회귀가
+났다. **이 ADR은 래칫을 채택하되 그것이 충분하지 않다는 관찰을 결정에 반영한다.**
+
+### 1.3 파일 래칫이 우회된 실물
+
+legacy가 mixin 합성으로 파일 한도를 우회한 형태를 스스로 문서화한다(ADR 0001 §4.3 인용).
+파일 줄 수는 한도 안이지만 **합성된 클래스의 실제 크기는 한도를 크게 넘는다**
+(`commands.md` **C-5.2**). 크기 축을 파일 하나로만 두면 분할이 우회로가 된다.
+
+---
+
+## 2. 결정
+
+### D-1. `v2-지침서.md` §6의 우선순위를 그대로 채택한다
+
+이 ADR은 순서를 바꾸지 않는다. 더하는 것은 **각 층이 무엇을 소유하는지**다.
+
+| 층 | 이 프로젝트에서의 소유 |
+| --- | --- |
+| unit (예제 기반) | 승인된 명세와 authoritative fixture의 기대값. **legacy 출력이 아니다**(`v2-지침서.md` §1) |
+| property | 경계·결측·**단위 혼입**을 생성한다 — ADR 0002가 타입으로 막는 것을 값으로도 흔든다 |
+| contract | ADR 0003의 `.proto` consumer/provider. `milestone-2.md`가 **breaking mutation을 실제로 잡는지**를 완료 조건으로 둔다 |
+| **mutation** | D-3의 대상 목록 |
+| adapter integration | ADR 0004 D-1 — **프로덕션 엔진(Testcontainers PostgreSQL)** |
+| E2E | mock KONEPS와 fake notification |
+| live read probe | 승인된 환경에서만. `v2-지침서.md` §8의 안전 규칙 |
+
+### D-2. differential test는 보조 도구이고 판정 근거가 아니다
+
+`v2-지침서.md` §6: 일치는 합격을 자동 보장하지 않고, 불일치는 `Python defect` /
+`V2 defect` / `intentional redesign` / `insufficient evidence` 중 하나로 **판정하고 근거를
+남긴다**. **승인되지 않은 Python 출력으로 V2 golden을 자동 생성하지 않는다.**
+
+`regression-ledger.md` `R-ML-07`이 legacy에서 그 반대 형태를 등재했다 — *"golden 기대값
+일괄 재생성 명령이 존재하고 테스트가 스스로 성격을 자인한다."*
+
+### D-3. mutation 대상은 회귀 ledger가 정한다
+
+**선정 기준**: `docs/discovery/regression-ledger.md`가 등재한 계열 중, 예방 제약이
+**타입·계약·정책 데이터**로 표현되는 규칙. 그 규칙을 훼손하는 mutation이 테스트에서
+생존하면 예방 제약이 실제로는 작동하지 않는다는 뜻이다.
+
+| # | mutation 대상 | 근거 계열 | 훼손했을 때 살아나면 안 되는 것 |
+| --- | --- | --- | --- |
+| **M-1** | 금액 basis의 자리 바꿔치기 | `R-BASIS-01`·`02`·`03`·`04` | 기초금액 자리에 추정가격이 들어가는 것이 컴파일·테스트를 통과하지 못한다 |
+| **M-2** | rate scale 변환 지점 이동·중복 | `R-RATE-01`·`03`·`05` | 도메인 안에서 크기로 단위를 추측하는 경로가 생기면 실패한다 |
+| **M-3** | 측정 불가/부재를 숫자로 접기 | `R-RATE-04`·`R-FLOOR-05`·`R-PROV-08` | `Unmeasurable`·`Uncertain`·미정산이 `0`이나 `null`로 합쳐지지 않는다 |
+| **M-4** | provenance first-match 순서 뒤집기 | `R-PROV-02`·`03`, capability DEC-08 | 순서가 바뀌면 분류가 달라지고 테스트가 그것을 잡는다 |
+| **M-5** | 파생값이 원본을 덮게 하기 | `R-PROV-04`, `milestone-3.md` 완료 조건 | *"derived fact가 authoritative fact를 덮는 mutation이 실패"* |
+| **M-6** | 법정 하한 적용 tier·범위 바꾸기 | `R-FLOOR-01`·`02` | 선언과 실행이 어긋나면 실패한다 |
+| **M-7** | 자격 group AND/OR와 별칭 fold 뒤집기 | `R-QUAL-01`·`02`·`03` | 과차단·과허용 어느 방향도 살아남지 않는다 |
+| **M-8** | outbox 전달 의미 훼손 | capability OPS-03 acceptance | 트랜잭션 밖 등록, dedupe 미수렴, 무한 재시도가 실패한다 |
+| **M-9** | 계약 breaking change | `milestone-2.md` 완료 조건 | compatibility gate가 실제로 잡는다 |
+| **M-10** | 금지 import·순환 의존 주입 | ADR 0006, `milestone-1.md`·`milestone-5.md` 완료 조건 | 경계 게이트가 실제로 잡는다 |
+
+**M-1~M-9는 mutation test**(도구가 코드를 변형)이고, **M-10은 의도적 결함 fixture**
+(사람이 위반을 심고 게이트가 잡는지 본다)다. `milestone-1.md`가 후자를 명시적으로 요구한다
+— *"금지 import와 순환 의존을 **일부러 넣은 test fixture가 실제로 실패**"*.
+**두 형태를 같은 이름으로 부르지 않는다.**
+
+**생존 기준**: `milestone-6.md`의 완료 조건 — *"중요 mutation 생존 0 또는 **사용자 승인된
+명시적 예외**"*. 예외는 사용자 승인 사항이며 구현자가 스스로 선언하지 않는다.
+
+### D-4. 래칫 임계는 함수 50줄 · 파일 500줄이다
+
+`v2-지침서.md` §5의 권고 한도를 채택한다. **이식한 ML 코드에도 같은 한도를 적용한다**
+(ADR 0001 D-7). 초과는 **자동 실패 또는 명시적 allowlist 사유**를 요구하고,
+**baseline을 느슨하게 갱신해서 우회하지 않는다**(§5).
+
+**allowlist의 형식**: 사유와 **해소 계획**을 함께 적는다(`v2-지침서.md` §5 Python ML —
+*"예외가 필요하면 allowlist 사유와 해소 계획을 남긴다"*). 사유만 있고 계획이 없는
+allowlist는 영구 면제가 된다.
+
+### D-5. 크기 축만으로 판정하지 않는다
+
+`v2-지침서.md` §5가 함께 재라고 한 것 — 함수/메서드 크기와 복잡도, 파일 크기, 모듈
+fan-in/fan-out, public API 수, 순환 의존, duplicate mechanical helper. **줄 수만 맞추기
+위한 파일 분할을 금지한다.**
+
+§1.3이 그 규칙이 필요한 이유의 실물이다. **클래스/타입 크기 축을 추가할지는
+`OPEN-ADR-06`**이며 이 ADR이 정하지 않는다.
+
+### D-6. 아키텍처 규칙 강제는 **ArchUnit**을 채택한다
+
+- **후보 3종 중 유일하게 활발한 안정 라인을 가진다** — 1.5.0(2026-08-04), 직전
+  1.4.2(2026-04-18), 마지막 push 2026-08-24. Apache-2.0.
+- **바이트코드를 분석하므로 Kotlin 소스 버전 축의 영향을 받지 않는다.** 관련 축은 class
+  file 버전이고 1.5.0이 그것을 직접 다룬다 — *"Support Java 27 / class file major
+  version 71"*. 지원 Java 범위는 1.8~25(**ArchUnit 저장소의** `build.gradle:48-49` —
+  이 인용은 legacy `bid-vector`가 아니라 조사 노트가 취득한 외부 저장소 파일이다).
+- 1.5.0이 **sealed 정보를 노출한다** — `JavaClass.isSealed()` / `getPermittedSubclasses()`.
+  `v2-지침서.md` §5가 sealed type을 회귀 방지 수단으로 규정하므로 이 API는 직접 관련이 있다.
+- JUnit 5/6 양쪽 러너를 제공한다(1.5.0에 `archunit-junit6` 추가).
+- **확인하지 않은 것**: *"Kotlin 2.x 지원"이라는 공식 서술은 없다.* 위 두 사실만 기록하고
+  추론을 사실로 쓰지 않는다. 또한 **소스 레벨 규칙**(파일 크기, Kotlin 고유 형태의 배치·
+  네이밍)은 표현하지 못하며, `internal`·확장 함수·top-level 함수처럼 바이트코드에서 형태가
+  바뀌는 요소의 규칙 표현은 조사하지 않았다. **그래서 ADR 0006 D-3이 빌드 의존 선언을
+  1차 강제로 둔다.**
+
+### D-7. 크기·복잡도 래칫 도구는 미결이며 그동안 게이트는 자체 검사로 선다
+
+`v2-지침서.md` §5의 크기·복잡도 임계를 자동화하는 후보는 **Detekt**이지만 버전 경로가
+미결이다(`OPEN-ADR-08`). **래칫이 CI 게이트인데 게이트 도구 자체가 alpha면 게이트의
+안정성이 도구에 종속된다.**
+
+따라서 **M1이 Kotlin 버전을 고정할 때까지 크기·복잡도 래칫은 도구에 의존하지 않는
+자체 검사로 세운다.** 이는 legacy가 `scripts/design_ratchet.py`로 한 것과 같은 형태이며,
+§1.2의 관찰대로 **그것만으로 회귀가 막히지 않는다**는 것을 알고 채택한다 — 래칫은
+D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
+
+---
+
+## 3. 대안 — 아키텍처·정적 규율 3종
+
+**판정 기준은 M1에서 고정할 Kotlin 2.x + Spring Boot 3.x 조합과의 호환**이다
+(`v2-지침서.md` §5, `decisions.md` `OPEN-OPS-07`). 조사 원본은
+`_workspace/m0-open-decisions/ops07-library-survey.md`(2026-08-26)다.
+
+| 후보 | 판정 | 사유 |
+| --- | --- | --- |
+| **ArchUnit** | **채택** | D-6 |
+| **Konsist** | **불채택** | **유지보수 정체가 이 축에서 확인된 가장 명확한 리스크다.** 마지막 릴리스가 **0.17.3 / 2024-12-08**로 조사 시점(2026-08-26) 기준 약 20개월 전이고, 그 이후 main 커밋이 **1건**(문서 도구 제거)뿐이다. 소스를 `kotlin-compiler-embeddable`로 파싱하는데 그 버전이 **2.0.21에 고정**돼 있고 2024-11에 *"Disable Kotlin updates"* 커밋이 있다 — **내장 컴파일러 버전이 분석 가능한 Kotlin 문법의 상한을 좌우한다.** `OPEN-OPS-07`이 예방하려 한 상황(*"확인 없이 채택한 라이브러리가 유지보수 중단 상태로 드러나면 M4에서 통째로 재작업"*)에 가장 가까운 후보다. 더해서 **ArchUnit이 덮는 축과 상당 부분 겹치므로, 겹치지 않는 규칙이 실제로 필요하다는 것이 먼저 확인돼야 도입 논의가 성립한다.** Kotlin 2.2+ 소스 분석 가능 여부는 **공식 호환표가 없어 확인 불가**이며, 근거 없이 "호환된다/안 된다" 어느 쪽도 쓰지 않는다 |
+| **Detekt** | **조건부 — 버전 경로가 `OPEN-ADR-08`** | **채택할 이유는 분명하다**: §5의 크기·복잡도 규율에 직접 대응하는 유일한 후보이고, 1.23.8 기준으로도 `LongMethod` · `LongParameterList` · `ComplexCondition` · `CognitiveComplexMethod` · `ReturnCount`/`ThrowsCount` 같은 규칙과 **baseline 파일**이 있어 래칫 운용이 가능하다. Apache-2.0. **막는 것은 버전이다**: 안정판 **1.23.8(2025-02-21)이 Kotlin 2.0.21 기준**이고 **Kotlin 2.2 이상 기준의 안정판이 존재하지 않는다.** 대응하는 2.0.0은 alpha.0(2025-10-21)부터 alpha.6(2026-08-04)까지 **10개월째 alpha**다(2.0.0-alpha.6은 Kotlin 2.4.10 기준). **1.23.8이 상위 Kotlin 소스를 어떻게 처리하는지는 문서화돼 있지 않다 — 확인 불가.** 프로젝트 자체는 살아 있고(마지막 push 2026-08-26) 안정판만 오래됐다 |
+
+---
+
+## 4. 결과
+
+- **CI가 프로덕션 엔진을 요구한다**(ADR 0004 D-1) — 동시성·격리에 의존하는 경로는
+  Testcontainers PostgreSQL 없이 머지되지 않는다. 테스트 시간이 이 결정의 비용이다.
+- **mutation 실행 비용이 든다.** D-3의 대상은 **전체 코드가 아니라 열거된 규칙**이며,
+  그 범위를 좁게 유지하는 것이 이 결정의 일부다.
+- **도구가 정해지지 않은 축이 둘 있다** — mutation 도구(`OPEN-ADR-07`)와 Detekt 버전 경로
+  (`OPEN-ADR-08`). D-7이 그동안의 게이트를 자체 검사로 세운다.
+- **`milestone-1.md`의 완료 조건이 이 ADR의 1차 acceptance**다 — *"`./gradlew check`
+  통과"*, *"금지 import와 순환 의존을 일부러 넣은 test fixture가 실제로 실패"*,
+  *"중요 rule mutation이 생존하지 않음"*, *"신규 파일/함수 예산 위반 없음"*.
+
+---
+
+## 5. 이 ADR이 등록하는 `OPEN`
+
+### `OPEN-ADR-06` · 래칫 축에 클래스/타입 크기를 추가하는가
+
+- **결정 필요 사항**: 파일·함수 크기 외에 **클래스/타입 단위 크기**(또는 상속 깊이·mixin
+  수) 축을 래칫에 넣는가.
+- **근거**: §1.3 — legacy가 mixin 합성으로 파일 한도를 우회했고 그 사실을 스스로
+  문서화했다. 축을 파일 줄 수로만 두면 **분할이 공식 우회로가 된다.**
+- **선택지**: (a) 클래스/타입 크기 축 추가 (b) `v2-지침서.md` §5의 결합도 축(fan-in/out,
+  public API 수)으로 대신 잡는다 (c) 추가하지 않고 리뷰에 맡긴다 — **(c)는 §5의 "회귀
+  방어를 사람의 주의력에 맡기지 않는다"와 충돌한다.**
+- **소유**: M1 래칫 구현.
+
+### `OPEN-ADR-07` · mutation 도구
+
+- **결정 필요 사항**: Kotlin에서 D-3의 M-1~M-9를 무엇으로 실행하는가.
+- **왜 미결인가**: `OPEN-OPS-07`의 조사 대상 9종에 mutation 도구가 없다. **조사되지
+  않았다.** 도구 없이도 대상 목록(D-3)은 확정되므로 이 항목이 D-3을 막지 않는다.
+- **소유**: M1.
+
+### `OPEN-ADR-08` · Detekt 버전 경로
+
+- **결정 필요 사항**: (i) alpha(2.0.0-alpha.x)를 쓴다 (ii) 안정판 1.23.8을 상위 Kotlin
+  소스에 쓴다 — **동작 미확인** (iii) 2.0 정식 출시를 기다린다 — **출시 시점 확인 불가**
+  (iv) M1이 Kotlin 2.0.x를 고정하면 1.23.8이 정확히 맞는다.
+- **종속**: **M1이 고정할 Kotlin 버전이 정해져야 판정된다.** 그것은 `OPEN-ADR-01`(Boot
+  세대)과 함께 움직인다.
+- **소유**: M1 버전 고정.
+
+---
+
+## 6. 확인하지 않은 것
+
+- **Detekt 1.23.8이 Kotlin 2.2+ 소스를 분석할 때의 실제 동작**(정상/부분 실패/타입 해석
+  저하). 공식 호환표는 *"1.23.8 → Kotlin 2.0.21"*만 적는다.
+- **Detekt 2.0.0의 정식 출시 시점.** 로드맵 날짜를 확인하지 못했다.
+- **Konsist의 Kotlin 2.2+ 소스 분석 가능 여부.** 공식 호환표가 존재하지 않는다. 확인된
+  것은 Konsist 자신의 빌드가 `kotlin-compiler-embeddable` 2.0.21에 고정돼 있다는 사실뿐이다.
+- **ArchUnit의 Kotlin 버전 지원 공식 서술은 없다**(D-6). Kotlin 고유 형태의 규칙 표현
+  범위도 조사하지 않았다.
+- **mutation 도구를 조사하지 않았다**(`OPEN-ADR-07`).
+- **property test·mutation의 실행 시간 예산을 재지 않았다.** CI 시간이 결정의 비용이라고
+  §4에 적었으나 **그 비용을 측정하지 않았다.**
+- **legacy `scripts/design_ratchet.py`의 측정 정의를 이식하지 않았다.** D-7이 자체 검사를
+  세운다고 정했을 뿐 그 검사의 형태를 정하지 않았다 — M1 소관.
