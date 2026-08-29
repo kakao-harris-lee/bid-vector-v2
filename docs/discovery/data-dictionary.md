@@ -1412,7 +1412,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 | `sampleSize` (`Measured<T>` · §6.5) | 건수 | 그 측정에 쓰인 표본 수 | 표본 집합 | — |
 | `value` (`Measured<T>`) | **`T`가 정한다** | `T`의 축 | `T`를 낸 계산 | — |
 | `dispersion` (§6.5) | fraction | **투찰율 축** 표본의 표준편차 | 과거 투찰율 표본 | — |
-| `estimateMargin` (§6.5) | fraction | 같은 축. 평균 투찰율 **신뢰구간 반폭** | 같음 | — |
+| `estimateMargin` (§6.5) | fraction | 같은 축. 평균 투찰율 **신뢰구간 반폭** — **단, 표본이 하나면 legacy에서 이 값이 `dispersion`과 같아져 반폭이 아니다**(§6.5) | 같음. **V2가 그 분기를 승계할지 이 문서는 정하지 않는다**(§6.5) | — |
 | `settledCount` · `openedCount` (`Maturity.Observed`) | 건수 | 그 KST 주에 개찰된 공고 수와 그중 낙찰가를 아는 수(§2.3) | 성숙도 계산 입력 | — |
 | `ratio` (`Maturity.Observed`) | fraction | `settledCount` ÷ `openedCount` | 파생값. **`0/0`은 `NoObservation`이며 비율이 아니다**(§6.4) | — |
 | `evaluationYear` (`ConstructionCapacityAmount`) | **연도** | 시공능력평가액 공시 연도 = `year(공고일) − 1`(§1.2.4) | 그 규칙 | **`OPEN-DIC-02`** |
