@@ -460,7 +460,7 @@ for span in (flat(sp) for sp in re.findall(r"`([^`]+)`", body)):
             n = a.split(":")[0].strip()
             if tname in LEGACY_DECLS: legacy_args.append(f"{tname}({n})")
             elif NAME.fullmatch(n): found.setdefault(n, set()).add(tname)
-            elif re.fullmatch(r"[A-Z][A-Za-z0-9]*", n): type_only.append((n, tname))
+            elif re.fullmatch(r"[A-Z][A-Za-z0-9]*", n): type_only.append(f"{tname}({n})")
             else: off_name.append(f"{tname}({n})")
     m2 = re.match(r"^([a-z][A-Za-z0-9]*)\s*:\s*[A-Z]", span)
     if m2: found.setdefault(m2.group(1), set()).add("(단독 선언)")
@@ -494,7 +494,8 @@ print(f"legacy 선언 축어 인용의 인자(V2 필드가 아니다): {len(lega
 print(wrap("    ", sorted(legacy_args)))
 print(f"이름 규칙 밖 인자(legacy 선언 밖): {len(off_name)}자리")
 print(wrap("    ", sorted(off_name)))
-print(f"이름 없이 타입만 적힌 인자: {len(type_only)} — {sorted({t[1] for t in type_only})}")
+print(f"이름 없이 타입만 적힌 인자: {len(type_only)}자리")
+print(wrap("    ", sorted(type_only)))
 print(f"덮개에만 있는 이름(①②③이 못 내는 자리 — 손 등재): {sorted(covered - set(found) - set(loose))}")
 print("PASS" if not missing and not unclassified and not unread and not off_name and not leaked else "FAIL")
 PY
