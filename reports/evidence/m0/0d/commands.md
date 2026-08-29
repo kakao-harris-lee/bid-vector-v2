@@ -6,18 +6,18 @@
 
 ## 선언 SHA와 실행 계약
 
-**출력 블록은 `a7f3835` 트리에서 뜬 것이다** — **예외는 C-11 하나이고 그것은 HEAD에서
+**출력 블록은 `f207412` 트리에서 뜬 것이다** — **예외는 C-11 하나이고 그것은 HEAD에서
 뜬다.** 어느 블록이 무엇을 선언하는지는 아래 표가 적고, 그 예외의 사유는 C-11 절이 적는다.
-커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`a7f3835`로 그대로
+커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`f207412`로 그대로
 지목한다.** 다른 커밋과의 관계로 부르지 않는다: 관계는 뒤 편집이 들어올 때마다 낡는다.
 
 | 블록 | 읽는 것 | 선언 SHA |
 | --- | --- | --- |
-| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`a7f3835`** |
+| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`f207412`** |
 | C-5.1 ~ C-5.5 | legacy `bid-vector`만 | **`ed4b06c`** (이 저장소의 어느 HEAD에서도 같다) |
-| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`a7f3835` + `ed4b06c`** |
+| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`f207412` + `ed4b06c`** |
+| C-12 | **양쪽** — 리뷰 레인 산출물(`_workspace/`)·`~/.codex` 실물과 **등재된 verdict JSON**(이 저장소) | **`f207412`** + 저장소 밖 실물 |
 | C-11 | 이 파일 자신 ↔ 선언 SHA 트리 | **HEAD** (그 블록이 사유를 적는다) |
-| C-12 | **양쪽** — 리뷰 레인 산출물(`_workspace/`)·`~/.codex` 실물과 **등재된 verdict JSON**(이 저장소) | **`a7f3835`** + 저장소 밖 실물 |
 
 ### 실행 계약
 
@@ -45,7 +45,7 @@ git status --porcelain | grep -vc '^??' | sed 's/^/tracked_dirty=/'
 ```
 
 ```
-a7f38358595c2b89989e4ee2b6e15c6434a262c6
+f2074125fca0edeac3ab4a29cb080a01c37fd63d
 tracked_dirty=0
 ```
 
@@ -66,8 +66,8 @@ git diff --check 998dc21...HEAD -- docs/adr reports/evidence/m0/0d | wc -l | sed
 ```
 
 ```
-slice_commits=25
-slice_paths=13
+slice_commits=30
+slice_paths=14
 out_of_scope_paths=0
 whitespace_problems=0
 ```
@@ -873,19 +873,19 @@ REJECTED	Spring Modulith	0005-domain-events-and-outbox.md	불채택 (현 시점)
 REJECTED	JobRunr	0005-domain-events-and-outbox.md	불채택
 ADOPTED	db-scheduler	0005-domain-events-and-outbox.md	채택
 DEFERRED	Spring Integration JDBC lock registry	0005-domain-events-and-outbox.md	판정 보류 — 조사되지 않음
-DEFERRED	ShedLock	0005-domain-events-and-outbox.md	판정 보류 — OPS-01 요구에 대한 확인 미완
+REJECTED	ShedLock	0005-domain-events-and-outbox.md	불채택 (OPS-01의 lease 어댑터로) — 요구 ② 불충족
 ADOPTED	Resilience4j	0005-domain-events-and-outbox.md	채택
 ADOPTED	Micrometer	0005-domain-events-and-outbox.md	채택 (선택의 여지가 사실상 없다)
 ADOPTED	ArchUnit	0007-test-pyramid-and-ratchet.md	채택
 REJECTED	Konsist	0007-test-pyramid-and-ratchet.md	불채택
 CONDITIONAL	Detekt	0007-test-pyramid-and-ratchet.md	조건부 — 버전 경로가 OPEN-ADR-08
-candidates=10 ADOPTED=4 CONDITIONAL=1 DEFERRED=2 REJECTED=3
+candidates=10 ADOPTED=4 CONDITIONAL=1 DEFERRED=1 REJECTED=4
 ```
 
 **판정**: 후보 전부가 지정 ADR의 「대안」 절 표에 있고 **각자 하나의 판정**을 갖는다.
-`DEFERRED` 둘은 **advisory lock 행**이며 ADR 0005 §3.2·§5가 그 사유와 `OPEN-ADR-12`를
-적는다. **「후보 전건 채택/불채택 완료」는 이 출력이 지지하지 않는다** — `DEFERRED`가
-있는 한 그 주장은 성립하지 않는다.
+남은 `DEFERRED` 행은 **advisory lock 축**이며 ADR 0005 §3.2·§5가 그 사유와
+`OPEN-ADR-12`를 적는다. **「후보 전건 채택/불채택 완료」는 이 출력이 지지하지 않는다** —
+`DEFERRED`가 있는 한 그 주장은 성립하지 않는다.
 
 **이 스캐너가 재는 것**: 표의 **판정 열 한 칸**을 분류한다.
 **재지 않는 것**: 그 판정이 **옳은지**, 사유가 판정을 **떠받치는지**. 그것은 사람이 읽는다.
@@ -930,7 +930,7 @@ xargs grep -nEi '[a-z+]+://[A-Za-z0-9_.-]+:[^@/[:space:]]+@|AKIA[0-9A-Z]{16}|ghp
 ```
 
 ```
-matches=6
+matches=7
 credential_literals=0
 ```
 
@@ -1113,7 +1113,7 @@ grep -n '^| 재시도·backoff\|^| 아키텍처 규칙 강제' docs/discovery/ca
 ```
 -- ADR 안의 OPS-13 전수
 docs/adr/0005-domain-events-and-outbox.md:110:  **`OPS-13`은 이 행이 아니라 「아키텍처 규칙 강제」 행의 것**이며 그 항목의 정의는
-docs/adr/0005-domain-events-and-outbox.md:247:### 3.5 아키텍처 규칙 강제 (OPS-13)
+docs/adr/0005-domain-events-and-outbox.md:286:### 3.5 아키텍처 규칙 강제 (OPS-13)
 -- capability-map 의 OPS-13 정의
 2596:### OPS-13 · 설계 래칫 (비대화 방지)
 -- OPS-21 표에서 그 두 행
@@ -1125,102 +1125,6 @@ docs/adr/0005-domain-events-and-outbox.md:247:### 3.5 아키텍처 규칙 강제
 하나는 그 정정을 적는 자리, 하나는 §3.5 제목이다. `capability-map.md`가 `OPS-13`을
 **「설계 래칫(비대화 방지)」**로 정의하고 OPS-21 표가 그것을 **아키텍처 규칙 강제 행**에
 둔다. 재시도 행의 대응 항목은 **`OPS-08 (a)(c)` · `COL-03`**뿐이다.
-
----
-
-## C-11 · 출력 블록 전수 재현 — 선언 SHA 트리에서 축어 대조
-
-**이 블록만 선언 SHA가 HEAD다.** 이 검사는 *"HEAD의 `commands.md`를 선언 SHA의 트리에
-대고 맞춰 본다"*이므로 **HEAD의 파일 내용이 입력**이다. 선언 SHA 트리에는 이 블록이
-없으니 거기서는 돌 수 없다. **자기 자신은 대조 대상에서 뺀다** — 아래 스크립트가
-`==0D-BLOCK-HARNESS==` 마커가 든 쌍을 건너뛰고 그 수를 `skipped_harness`로 낸다.
-
-블록 쌍은 fenced 블록의 **교대**(짝수=명령, 홀수=출력)로 집는다. 각 쌍 앞에서 루트로
-돌아가고 셸은 하나라 `$T`·`$T0`가 이어진다 — 「실행 계약」 그대로다.
-
-```
-# ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다
-DECL=a7f3835
-WT=$(mktemp -d)/wt
-git worktree add --detach "$WT" "$DECL" >/dev/null 2>&1
-ln -sfn "$PWD/bid-vector" "$WT/bid-vector"
-ln -sfn "$PWD/_workspace" "$WT/_workspace"
-python3 - reports/evidence/m0/0d/commands.md "$WT" <<'PY'
-import pathlib, subprocess, sys
-md, wt = pathlib.Path(sys.argv[1]), sys.argv[2]
-lines = md.read_text(encoding="utf-8").splitlines()
-fence = [i for i, l in enumerate(lines) if l.startswith("`" * 3)]
-assert len(fence) % 2 == 0
-blocks = [(fence[k] + 1, fence[k + 1]) for k in range(0, len(fence), 2)]
-assert len(blocks) % 2 == 0
-pairs = [(blocks[k], blocks[k + 1]) for k in range(0, len(blocks), 2)]
-MARK = "==0D-BLOCK-HARNESS=="
-sel = [(c, o) for c, o in pairs if MARK not in chr(10).join(lines[c[0]:c[1]])]
-SEP = "@@@0D-BLOCK-%d@@@"
-script = ["set +e", 'ROOT="%s"' % wt, 'cd "$ROOT"']
-for n, (c, _) in enumerate(sel):
-    script.append('cd "$ROOT"')
-    script.append('echo "%s"' % (SEP % n))
-    script.extend(lines[c[0]:c[1]])
-script.append('echo "%s"' % (SEP % len(sel)))
-out = subprocess.run(["bash", "-c", chr(10).join(script)],
-                     capture_output=True, text=True, cwd=wt).stdout
-diff = 0
-for n, (c, o) in enumerate(sel):
-    a = out.index(SEP % n) + len(SEP % n)
-    b = out.index(SEP % (n + 1))
-    got = out[a:b].strip(chr(10))
-    want = chr(10).join(lines[o[0]:o[1]]).strip(chr(10))
-    ok = got == want
-    diff += 0 if ok else 1
-    print("pair %2d L%-5d %s  %s" % (n, o[0] + 1, "OK  " if ok else "DIFF", lines[c[0]][:56].rstrip()))
-print("pairs=%d skipped_harness=%d diff=%d" % (len(sel), len(pairs) - len(sel), diff))
-PY
-git worktree remove --force "$WT"
-```
-
-```
-pair  0 L47    OK    git rev-parse HEAD
-pair  1 L68    OK    T0=$(mktemp -d)
-pair  2 L124   OK    T=$(mktemp -d)
-pair  3 L151   OK    # adrscan.py 는 C-3 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않는
-pair  4 L174   OK    git log --format='%H %s' 998dc21..HEAD | grep 'm0-0d' |
-pair  5 L208   OK    cd bid-vector
-pair  6 L277   OK    cd bid-vector
-pair  7 L294   OK    awk -F'\t' '$4>50 {printf "%s:%d-%d\t%d\t%s\n", $1,$2,$3
-pair  8 L348   OK    cd bid-vector
-pair  9 L419   OK    cd bid-vector
-pair 10 L490   OK    cd bid-vector
-pair 11 L540   OK    cd bid-vector
-pair 12 L573   OK    cd bid-vector
-pair 13 L612   OK    cd bid-vector
-pair 14 L721   OK    T=$(mktemp -d)
-pair 15 L776   OK    # citescan.py 는 C-6 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않
-pair 16 L871   OK    T=$(mktemp -d)
-pair 17 L913   OK    # ops07scan.py 는 C-7 블록이 만든 "$T" 의 것을 그대로 쓴다
-pair 18 L932   OK    xargs grep -nEi 'api[_-]?key|secret|token|password|passw
-pair 19 L956   OK    grep -ci 'react' docs/discovery/capability-map.md | sed
-pair 20 L968   OK    grep -h '^### Slice' milestone-*.md | wc -l | sed 's/^ *
-pair 21 L983   OK    grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md |
-pair 22 L1021  OK    grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u |
-pair 23 L1046  OK    grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | g
-pair 24 L1081  OK    T=$(mktemp -d)
-pair 25 L1113  OK    echo "-- ADR 안의 OPS-13 전수"
-pairs=26 skipped_harness=1 diff=0
-```
-
-**판정**: `diff=0`이면 **위 출력이 `pairs=`로 센 쌍이 선언 SHA `a7f3835`의 트리에서
-축어로 다시 뜬다.**
-
-**이 검사가 재는 범위**: `commands.md`의 명령/출력 쌍이다 — 그 수는 `pairs=`가 낸다.
-**재지 않는 것** —
-`checklist.md`·`scope.md`의 인라인 블록, 각 블록 아래 **판정 산문의 참·거짓**,
-그리고 **이 블록 자신**. `diff=0`은 *"기록이 그 트리에서 다시 뜬다"*이지
-*"기록이 옳다"*가 아니다.
-
-> 이 검사는 `git worktree`를 하나 만들고 지운다. legacy 인용 블록을 위해 그 worktree
-> 안에 `bid-vector` symlink를, **리뷰 레인 산출물을 읽는 C-12를 위해 `_workspace`
-> symlink를** 건다 — 둘 다 `.gitignore` 대상이라 `tracked_dirty`에 잡히지 않는다.
 
 ---
 
@@ -1315,3 +1219,101 @@ mode_ro: Error: in prepare, unable to open database file (14)
 위 출력의 `mode_ro:` 줄이 그 실패다. `?immutable=1`로 바꿔 읽었고, 그 대가는 **파일이
 동시에 쓰이면 찢긴 페이지를 읽을 수 있다**는 것이다. **이 차이를 스킬에 반영할지는
 하네스 소유자의 판정이며 이 slice는 `.claude/`를 고치지 않는다.**
+
+---
+
+## C-11 · 출력 블록 전수 재현 — 선언 SHA 트리에서 축어 대조
+
+**이 블록만 선언 SHA가 HEAD다.** 이 검사는 *"HEAD의 `commands.md`를 선언 SHA의 트리에
+대고 맞춰 본다"*이므로 **HEAD의 파일 내용이 입력**이다. 선언 SHA 트리에는 이 블록이
+없으니 거기서는 돌 수 없다. **자기 자신은 대조 대상에서 뺀다** — 아래 스크립트가
+`==0D-BLOCK-HARNESS==` 마커가 든 쌍을 건너뛰고 그 수를 `skipped_harness`로 낸다.
+
+블록 쌍은 fenced 블록의 **교대**(짝수=명령, 홀수=출력)로 집는다. 각 쌍 앞에서 루트로
+돌아가고 셸은 하나라 `$T`·`$T0`가 이어진다 — 「실행 계약」 그대로다.
+
+```
+# ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다
+DECL=f207412
+WT=$(mktemp -d)/wt
+git worktree add --detach "$WT" "$DECL" >/dev/null 2>&1
+ln -sfn "$PWD/bid-vector" "$WT/bid-vector"
+ln -sfn "$PWD/_workspace" "$WT/_workspace"
+python3 - reports/evidence/m0/0d/commands.md "$WT" <<'PY'
+import pathlib, subprocess, sys
+md, wt = pathlib.Path(sys.argv[1]), sys.argv[2]
+lines = md.read_text(encoding="utf-8").splitlines()
+fence = [i for i, l in enumerate(lines) if l.startswith("`" * 3)]
+assert len(fence) % 2 == 0
+blocks = [(fence[k] + 1, fence[k + 1]) for k in range(0, len(fence), 2)]
+assert len(blocks) % 2 == 0
+pairs = [(blocks[k], blocks[k + 1]) for k in range(0, len(blocks), 2)]
+MARK = "==0D-BLOCK-HARNESS=="
+sel = [(c, o) for c, o in pairs if MARK not in chr(10).join(lines[c[0]:c[1]])]
+SEP = "@@@0D-BLOCK-%d@@@"
+script = ["set +e", 'ROOT="%s"' % wt, 'cd "$ROOT"']
+for n, (c, _) in enumerate(sel):
+    script.append('cd "$ROOT"')
+    script.append('echo "%s"' % (SEP % n))
+    script.extend(lines[c[0]:c[1]])
+script.append('echo "%s"' % (SEP % len(sel)))
+out = subprocess.run(["bash", "-c", chr(10).join(script)],
+                     capture_output=True, text=True, cwd=wt).stdout
+diff = 0
+for n, (c, o) in enumerate(sel):
+    a = out.index(SEP % n) + len(SEP % n)
+    b = out.index(SEP % (n + 1))
+    got = out[a:b].strip(chr(10))
+    want = chr(10).join(lines[o[0]:o[1]]).strip(chr(10))
+    ok = got == want
+    diff += 0 if ok else 1
+    print("pair %2d L%-5d %s  %s" % (n, o[0] + 1, "OK  " if ok else "DIFF", lines[c[0]][:56].rstrip()))
+print("pairs=%d skipped_harness=%d diff=%d" % (len(sel), len(pairs) - len(sel), diff))
+PY
+git worktree remove --force "$WT"
+```
+
+```
+pair  0 L48    OK    git rev-parse HEAD
+pair  1 L69    OK    T0=$(mktemp -d)
+pair  2 L125   OK    T=$(mktemp -d)
+pair  3 L152   OK    # adrscan.py 는 C-3 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않는
+pair  4 L175   OK    git log --format='%H %s' 998dc21..HEAD | grep 'm0-0d' |
+pair  5 L209   OK    cd bid-vector
+pair  6 L278   OK    cd bid-vector
+pair  7 L295   OK    awk -F'\t' '$4>50 {printf "%s:%d-%d\t%d\t%s\n", $1,$2,$3
+pair  8 L349   OK    cd bid-vector
+pair  9 L420   OK    cd bid-vector
+pair 10 L491   OK    cd bid-vector
+pair 11 L541   OK    cd bid-vector
+pair 12 L574   OK    cd bid-vector
+pair 13 L613   OK    cd bid-vector
+pair 14 L722   OK    T=$(mktemp -d)
+pair 15 L777   OK    # citescan.py 는 C-6 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않
+pair 16 L872   OK    T=$(mktemp -d)
+pair 17 L914   OK    # ops07scan.py 는 C-7 블록이 만든 "$T" 의 것을 그대로 쓴다
+pair 18 L933   OK    xargs grep -nEi 'api[_-]?key|secret|token|password|passw
+pair 19 L957   OK    grep -ci 'react' docs/discovery/capability-map.md | sed
+pair 20 L969   OK    grep -h '^### Slice' milestone-*.md | wc -l | sed 's/^ *
+pair 21 L984   OK    grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md |
+pair 22 L1022  OK    grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u |
+pair 23 L1047  OK    grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | g
+pair 24 L1082  OK    T=$(mktemp -d)
+pair 25 L1114  OK    echo "-- ADR 안의 OPS-13 전수"
+pair 26 L1164  OK    echo "-- 실행 메타 · 출처: _workspace/m0-0d/codex.raw-output.t
+pair 27 L1203  OK    echo "-- preflight ① consolidate 이후 이 저장소 흔적"
+pairs=28 skipped_harness=1 diff=0
+```
+
+**판정**: `diff=0`이면 **위 출력이 `pairs=`로 센 쌍이 선언 SHA `f207412`의 트리에서
+축어로 다시 뜬다.**
+
+**이 검사가 재는 범위**: `commands.md`의 명령/출력 쌍이다 — 그 수는 `pairs=`가 낸다.
+**재지 않는 것** —
+`checklist.md`·`scope.md`의 인라인 블록, 각 블록 아래 **판정 산문의 참·거짓**,
+그리고 **이 블록 자신**. `diff=0`은 *"기록이 그 트리에서 다시 뜬다"*이지
+*"기록이 옳다"*가 아니다.
+
+> 이 검사는 `git worktree`를 하나 만들고 지운다. legacy 인용 블록을 위해 그 worktree
+> 안에 `bid-vector` symlink를, **리뷰 레인 산출물을 읽는 C-12를 위해 `_workspace`
+> symlink를** 건다 — 둘 다 `.gitignore` 대상이라 `tracked_dirty`에 잡히지 않는다.
