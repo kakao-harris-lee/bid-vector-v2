@@ -393,8 +393,10 @@ exit=0
 **사각지대가 무엇인지도 이 블록이 낸다.**
 
 **빼는 것은 되도록 규칙이 아니라 이름 목록으로 한다** — 규칙은 조용히 넓어지지만 목록은
-밖의 새 이름을 `FAIL`로 낸다. **어떤 갈래로 몇 개를 뺐는지, 규칙으로 뺀 것이 무엇인지는
-블록이 낸다** — 갈래를 산문이 세면 새 갈래가 늘 때 이 자리가 낡는다.
+밖의 새 이름을 `FAIL`로 낸다. **목록 자신이 조용히 넓어지는 것도 같은 실행이 막는다** —
+이번 실행이 실제로 쓰지 않은 항목이 있으면 `FAIL`이다. **어떤 갈래로 몇 개를 뺐는지,
+규칙으로 뺀 것이 무엇인지, 목록의 크기와 실사용이 얼마인지는 블록이 낸다** — 갈래를
+산문이 세면 새 갈래가 늘 때 이 자리가 낡는다.
 
 **덮개는 §12.2의 「표 칸」만 센다** — 그 절의 산문에 나오는 이름은 분류가 아니므로 덮개가
 아니다.
@@ -414,8 +416,11 @@ body = "\n".join(lines[:s] + lines[e:])
 DECL  = re.compile(r"\b(_*[A-Z][A-Za-z0-9_]*)")                    # ① 선언 앵커. 밑줄 선두를 포함한다
 SITE  = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\s*(?:<[^<>]*>)?\(")  # 사각지대 앵커 — 대문자를 전제하지 않는다
 NAME  = re.compile(r"[a-z][A-Za-z0-9]*")                           # 인자 이름 규칙
+THEAD = re.compile(r"^\|\s*(필드|성분)\s*\|")                      # ② 표 머리 칸 규칙
+TROW  = re.compile(r"^\| `([a-z][A-Za-z0-9]*)`(?: \(|\s*\|)")      # ② 표 행 규칙
 LOOSE = re.compile(r"`([a-z][A-Za-z0-9]*)`")                       # ③ 단독 백틱 이름 규칙
 WIDER = re.compile(r"`([a-z][A-Za-z0-9_]*)`")                      # ③ 규칙 밖을 재는 더 넓은 규칙
+QUAL  = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+)`")  # ④ WIDER 도 못 보는 한정 이름
 HASH  = re.compile(r"[0-9a-f]{7,40}\Z")                            # commit 해시는 규칙으로 뺀다
 # 고정 표본 — **검사의 능력을 문서의 현재 내용이 아니라 이 상수로 잰다.** 내용이 우연히
 # 깨끗하면 내용에 기대는 술어는 침묵한다. 각 표본은 「넓은 쪽만 보고 좁은 쪽은 못 보는」
@@ -425,6 +430,8 @@ PROBES = [
    lambda p: {m.start() for m in SITE.finditer(p)}, lambda p: {d[1] for d in decls(p)}),
   ("세는 앵커가 읽는 앵커 밖을 본다 — 밑줄+소문자 선두", "_floorSchedule(effective_from)",
    lambda p: {m.start() for m in SITE.finditer(p)}, lambda p: {d[1] for d in decls(p)}),
+  ("④ 가 ③ 규칙 밖 규칙의 밖을 본다 — 점이 든 이름", "`Legacy.some_field`",
+   lambda p: {m.group(1) for m in QUAL.finditer(p)}, lambda p: {m.group(1) for m in WIDER.finditer(p)}),
 ]
 # legacy 파이썬 선언의 축어 인용(§4.1 · §5.3). V2 타입이 아니므로 그 인자는 §12.2 등재 대상이 아니다.
 LEGACY_DECLS = {"FieldContract", "_FloorSchedule"}
@@ -492,6 +499,7 @@ def wrap(head, names, width=96):    # 셈과 열거가 같은 것을 세도록 �
     out.append(cur.rstrip())
     return "\n".join(out)
 found, type_only, off_name, legacy_args, unread = {}, [], [], [], []
+used = {"NOT_A_DECL": set(), "LEGACY_DECLS": set()}   # 목록이 조용히 커지지 않게 실사용을 센다
 n_site = n_decl = leaked = ruled_out = 0
 for span in (flat(sp) for sp in re.findall(r"`([^`]+)`", body)):
     ds = decls(span); taken = {d[1] for d in ds}
@@ -501,12 +509,12 @@ for span in (flat(sp) for sp in re.findall(r"`([^`]+)`", body)):
     n_site += len(sites); n_decl += len(taken); leaked += len(taken - sites)
     for p in sorted(sites - taken):
         nm = re.match(r"[A-Za-z_][A-Za-z0-9_]*", span[p:]).group(0)
-        if nm in NOT_A_DECL: ruled_out += 1
+        if nm in NOT_A_DECL: ruled_out += 1; used["NOT_A_DECL"].add(nm)
         else: unread.append(span[p:p+50])
     for tname, _, args in ds:
         for a in top_split(args):
             n = a.split(":")[0].strip()
-            if tname in LEGACY_DECLS: legacy_args.append(f"{tname}({n})")
+            if tname in LEGACY_DECLS: legacy_args.append(f"{tname}({n})"); used["LEGACY_DECLS"].add(tname)
             elif NAME.fullmatch(n): found.setdefault(n, set()).add(tname)
             elif re.fullmatch(r"[A-Z][A-Za-z0-9]*", n): type_only.append(f"{tname}({n})")
             else: off_name.append(f"{tname}({n})")
@@ -514,15 +522,16 @@ for span in (flat(sp) for sp in re.findall(r"`([^`]+)`", body)):
     if m2: found.setdefault(m2.group(1), set()).add("(단독 선언)")
 hdr = False
 for l in body.split("\n"):
-    if l.startswith("|") and re.match(r"^\|\s*(필드|성분)\s*\|", l): hdr = True; continue
+    if l.startswith("|") and THEAD.match(l): hdr = True; continue
     if not l.startswith("|"): hdr = False; continue
     if not hdr: continue
-    m = re.match(r"^\| `([a-z][A-Za-z0-9]*)`(?: \(|\s*\|)", l)
+    m = TROW.match(l)
     if m: found.setdefault(m.group(1), set()).add("(표 선언)")
-loose, wider = {}, {}
+loose, wider, qual = {}, {}, {}
 for i, l in enumerate(body.split("\n")):
     for m in LOOSE.finditer(l): loose.setdefault(m.group(1), []).append(i + 1)
     for m in WIDER.finditer(l): wider.setdefault(m.group(1), []).append(i + 1)
+    for m in QUAL.finditer(l): qual.setdefault(m.group(1), []).append(i + 1)
 missing = sorted(n for n in found if n not in covered)
 # ③이 낸 이름을 빼는 갈래를 **명령이 세어 낸다** — 산문이 「둘 다 아니면 FAIL」이라
 # 적어 세 번째 갈래(commit 해시 규칙)를 빠뜨렸던 자리다.
@@ -532,9 +541,16 @@ for n in sorted(loose):
            else "NOT_A_FIELD 목록" if n in NOT_A_FIELD
            else "commit 해시 규칙" if HASH.match(n) else "남은 것")].append(n)
 unclassified = route["남은 것"]
+used["NOT_A_FIELD"] = set(route["NOT_A_FIELD 목록"])
+# 목록의 크기와 내용은 출력에 드러나지 않으면 조용히 커진다 — 이번 실행이 실제로 쓰지
+# 않은 항목을 FAIL 로 낸다. 그래야 미리 넣어 둔 이름이 나중에 조용히 흡수되지 않는다.
+LISTS = [("NOT_A_DECL", NOT_A_DECL), ("NOT_A_FIELD", NOT_A_FIELD), ("LEGACY_DECLS", LEGACY_DECLS)]
+unused = [f"{k}:{n}" for k, v in LISTS for n in sorted(v - used[k])]
 # ③의 이름 규칙 자체가 못 보는 갈래도 **더 넓은 규칙으로 재어** 낸다.
 off_rule = sorted(n for n in wider if n not in loose)
 blind = [n for n in off_rule if n not in covered and n not in found]
+# ③ 규칙 밖을 재는 규칙 자신이 못 보는 갈래(점이 든 한정 이름)도 재어 이름째 낸다.
+qual_off = sorted(n for n in qual if n not in loose and n not in wider)
 # 고정 표본이 살아 있는지 — 문서와 무관한 상수로 잰다(㉡).
 probe = [(("산 표본" if wide(p) - narrow(p) else "죽은 표본"), why, p) for why, p, wide, narrow in PROBES]
 probe_dead = [t for t in probe if t[0] == "죽은 표본"]
@@ -545,12 +561,21 @@ for n in missing: print(f"    {n!r} ← {' · '.join(sorted(found[n]))}")
 print(f"③ 본문의 단독 백틱 이름: {len(loose)}  덮개·①②·목록·해시 밖: {len(unclassified)}")
 for n in unclassified: print(f"    {n!r} @ 본문 행 {loose[n][:6]}")
 print("--- 이 블록이 자기 범위와 예외를 스스로 낸다 ---")
-print(f"① 선언 앵커 {DECL.pattern}  ·  인자 이름 규칙 {NAME.pattern}  ·  ③ 단독 이름 규칙 {LOOSE.pattern}")
+print(f"① 선언 앵커 {DECL.pattern}  ·  인자 이름 규칙 {NAME.pattern}")
+print(f"② 표 머리 칸 {THEAD.pattern}  ·  표 행 {TROW.pattern}")
+print(f"③ 단독 이름 규칙 {LOOSE.pattern}")
 print("③이 낸 이름을 빼는 갈래 — " + " · ".join(f"{k} {len(v)}" for k, v in route.items()))
 print(f"    규칙으로 빼는 갈래는 commit 해시({HASH.pattern}) 하나뿐이고 그것이 뺀 이름: {route['commit 해시 규칙']}")
+print("목록의 크기와 이번 실행이 실제로 쓴 항목 — "
+      + " · ".join(f"{k} {len(v)}/{len(used[k])}" for k, v in LISTS)
+      + f"  쓰이지 않은 항목: {len(unused)}")
+print(wrap("    ", unused))
 print(f"③ 규칙 밖 — {WIDER.pattern} 는 맞고 {LOOSE.pattern} 는 아닌 백틱 이름: {len(off_rule)}"
       f" (덮개·①② 안 {len(off_rule) - len(blind)} · 이 검사 어디에도 없음 {len(blind)})")
 print(wrap("    어디에도 없는 것: ", blind))
+print(f"④ ③ 규칙 밖 규칙도 못 보는 한정 이름 — {QUAL.pattern}: {len(qual_off)}"
+      " (판정에 넣지 않고 이름째 낸다 — 각주)")
+print(wrap("    ", qual_off))
 print("--- 두 앵커의 관계를 잰다 — ㉠ 문서에 대해 포함 · ㉡ 고정 표본에 대해 「세는 앵커만 보는 자리가 있다」 ---")
 print(f"㉡ 고정 표본 {len(probe)} · 죽은 표본 {len(probe_dead)}")
 for st, why, p in probe: print(f"    [{st}] {why} :: {p!r}")
@@ -565,7 +590,7 @@ print(wrap("    ", sorted(off_name)))
 print(f"이름 없이 타입만 적힌 인자: {len(type_only)}자리")
 print(wrap("    ", sorted(type_only)))
 print(f"덮개에만 있는 이름(①②③이 못 내는 자리 — 손 등재): {sorted(covered - set(found) - set(loose))}")
-print("PASS" if not (missing or unclassified or unread or off_name or leaked or probe_dead) else "FAIL")
+print("PASS" if not (missing or unclassified or unread or off_name or leaked or probe_dead or unused) else "FAIL")
 PY
 echo "exit=$?"
 ```
@@ -621,6 +646,12 @@ exit=0
 > 바뀌므로 diff로 드러나고, 기록된 출력과 달라지면 `C-10`이 불일치로 낸다.
 > **오늘 그 줄이 낸 이름이 전부 legacy 참조라는 확인은 사람이 전수로 연 것이고 매
 > 실행이 되풀이하지 않는다 — 그것이 이 검사의 한계다.**
+>
+> **④는 `③ 규칙 밖`을 재는 규칙(`WIDER`) 자신이 못 보던 갈래다** — 점이 든 한정 이름
+> (`Type.field`·파일명)은 그 규칙도 보지 못했다. **계측기의 계측기가 좁았던 자리**이고 이
+> 줄이 그것을 이름째 낸다. **④도 판정에 넣지 않는다** — 위와 같은 이유이고, **파일명이
+> 같은 형태로 섞이므로** 무엇인지는 사람이 열어야 한다. ④ 자신이 다시 좁아지는 것은
+> ㉡의 셋째 고정 표본이 막는다.
 >
 > `checklist.md` A2의 *"어느 갈래에도 들지 않은 이름이 남으면 `FAIL`"*에서 **「갈래」는
 > ③의 이름 규칙 안에서 나눈 갈래**를 뜻한다 — 위 `③이 낸 이름을 빼는 갈래` 줄이 그
