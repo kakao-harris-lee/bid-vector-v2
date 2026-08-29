@@ -45,7 +45,7 @@ echo "exit=$?"
 ---
 > | **U-3** | **`TenderOutcome` aggregate — current는 event stream의 fold 결과** | ~~`OPEN-SET-05`~~ → **`OPEN-SET-04`** ⚠ 아래 정정 |
 113a114,120
-> 
+>
 > > **⚠ 정정 (2026-08-29, Codex 리뷰 finding E)** — 위 표의 U-3 행이 소유 `OPEN`을
 > > `OPEN-SET-05`로 적었으나 **`capability-map.md` §12에서 그 id는 「재공고(차수 다수) 대사
 > > 대상 선택 규칙」**이고 U-3와 무관하다. U-3가 걸리는 것은 **`OPEN-SET-04`(이벤트 재관측
