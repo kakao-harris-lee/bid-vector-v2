@@ -405,6 +405,11 @@ exit=0
   본 자리`.
 - **㉡ 고정 표본에 대해 — 「세는 앵커만 보는 자리가 있다」.** 문서와 무관한 상수 셋을 두고,
   각 표본에서 **넓은 쪽만 보고 좁은 쪽은 못 보는지**를 같은 실행이 확인한다.
+  **두 쪽의 크기를 함께 내고, 표본마다 두 쪽이 다 무엇인가를 보게 짠다** — 「살았다」는
+  표시만 내거나 좁은 쪽이 늘 비어 있으면 **좁은 쪽을 통째로 없애도 출력이 축어 동일**이라,
+  표본이 계속 `[산 표본]`이라 인쇄하면서 한쪽을 재지 않는 상태가 드러나지 않는다.
+  같은 이유로 **판정에 드는 술어의 목록도 그 목록 자신이 인쇄하고 판정도 그 목록에서 낸다** —
+  판정에서 술어를 빼면 인쇄가 함께 바뀌므로 둘이 갈라질 수 없고, 그 변조를 `C-10`이 받는다.
 
 **㉠만으로는 부족하다** — 두 앵커가 **같은 폭**이 되어도 포함은 깨지지 않으므로, `F-1`이
 고친 결함이 그대로 되돌아와도 ㉠은 침묵한다. 그때 **㉡의 표본이 죽는다.**
@@ -448,12 +453,14 @@ HASH  = re.compile(r"[0-9a-f]{7,40}\Z")                            # commit 해�
 # 고정 표본 — **검사의 능력을 문서의 현재 내용이 아니라 이 상수로 잰다.** 내용이 우연히
 # 깨끗하면 내용에 기대는 술어는 침묵한다. 각 표본은 「넓은 쪽만 보고 좁은 쪽은 못 보는」
 # 자리이고, 두 쪽이 같은 폭이 되는 순간 표본이 죽으며 그것이 FAIL 이다.
+# **표본마다 두 쪽이 다 무엇인가를 보게 짠다** — 좁은 쪽이 언제나 빈 집합이면 좁은 쪽을
+# 통째로 없애도 셈이 바뀌지 않아, 표본이 「산 표본」으로 인쇄되면서 한쪽을 재지 않게 된다.
 PROBES = [
-  ("세는 앵커가 읽는 앵커 밖을 본다 — 소문자 선두", "to_bid_rate_fraction(numeric)",
+  ("세는 앵커가 읽는 앵커 밖을 본다 — 소문자 선두", "Decl(a) to_bid_rate_fraction(numeric)",
    lambda p: {m.start() for m in SITE.finditer(p)}, lambda p: {d[1] for d in decls(p)}),
-  ("세는 앵커가 읽는 앵커 밖을 본다 — 밑줄+소문자 선두", "_floorSchedule(effective_from)",
+  ("세는 앵커가 읽는 앵커 밖을 본다 — 밑줄+소문자 선두", "_Decl(a) _floorSchedule(effective_from)",
    lambda p: {m.start() for m in SITE.finditer(p)}, lambda p: {d[1] for d in decls(p)}),
-  ("④ 가 ③ 규칙 밖 규칙의 밖을 본다 — 점이 든 이름", "`Legacy.some_field`",
+  ("④ 가 ③ 규칙 밖 규칙의 밖을 본다 — 점이 든 이름", "`plainName` `Legacy.some_field`",
    lambda p: {m.group(1) for m in QUAL.finditer(p)}, lambda p: {m.group(1) for m in WIDER.finditer(p)}),
 ]
 # legacy 파이썬 선언의 축어 인용(§4.1 · §5.3). V2 타입이 아니므로 그 인자는 §12.2 등재 대상이 아니다.
@@ -575,9 +582,18 @@ off_rule = sorted(n for n in wider if n not in loose)
 blind = [n for n in off_rule if n not in covered and n not in found]
 # ③ 규칙 밖을 재는 규칙 자신이 못 보는 갈래(점이 든 한정 이름)도 재어 이름째 낸다.
 qual_off = sorted(n for n in qual if n not in loose and n not in wider)
-# 고정 표본이 살아 있는지 — 문서와 무관한 상수로 잰다(㉡).
-probe = [(("산 표본" if wide(p) - narrow(p) else "죽은 표본"), why, p) for why, p, wide, narrow in PROBES]
+# 고정 표본이 살아 있는지 — 문서와 무관한 상수로 잰다(㉡). **두 쪽의 크기를 함께 낸다** —
+# 살았다는 표시만 내면 좁은 쪽을 빈 집합으로 만들어도 출력이 축어 동일이라, 표본이 계속
+# 「산 표본」이라 인쇄하면서 아무것도 재지 않는 상태를 라운드 간 래칫이 못 잡는다.
+probe = [(("산 표본" if wide(p) - narrow(p) else "죽은 표본"), why, p, len(wide(p)), len(narrow(p)))
+         for why, p, wide, narrow in PROBES]
 probe_dead = [t for t in probe if t[0] == "죽은 표본"]
+# 판정에 드는 술어를 한 자리에 세우고 **그 목록 자신을 인쇄한다** — 인쇄와 판정이 같은
+# 목록을 읽으므로 판정에서 술어를 빼면 출력이 함께 바뀐다. 산문이 술어를 옮겨 적지 않는다.
+size = lambda v: v if isinstance(v, int) else len(v)
+VERDICT = [("미덮개", missing), ("③ 덮개·①②·목록·해시 밖", unclassified),
+           ("통째로 못 읽은 선언 자리", unread), ("이름 규칙 밖 인자", off_name),
+           ("샌 자리", leaked), ("죽은 표본", probe_dead), ("쓰이지 않은 항목", unused)]
 print(f"문서: {DOC}")
 print(f"§12.2 표 칸이 덮는 이름: {len(covered)}")
 print(f"① 타입 선언 인자 + ② 필드·성분 표에서 뽑은 이름: {len(found)}  미덮개: {len(missing)}")
@@ -602,7 +618,7 @@ print(f"④ ③ 규칙 밖 규칙도 못 보는 한정 이름 — {QUAL.pattern}
 print(wrap("    ", qual_off))
 print("--- 두 앵커의 관계를 잰다 — ㉠ 문서에 대해 포함 · ㉡ 고정 표본에 대해 「세는 앵커만 보는 자리가 있다」 ---")
 print(f"㉡ 고정 표본 {len(probe)} · 죽은 표본 {len(probe_dead)}")
-for st, why, p in probe: print(f"    [{st}] {why} :: {p!r}")
+for st, why, p, nw, nn in probe: print(f"    [{st}] {why} :: {p!r} (넓 {nw} · 좁 {nn})")
 print(f"㉠ 사각지대 앵커 {SITE.pattern}")
 print(f"선언 앵커가 읽은 자리 {n_decl} ⊆ 사각지대 앵커가 본 자리 {n_site} — 그 밖으로 샌 자리: {leaked}")
 print(f"통째로 못 읽은 선언 자리: {len(unread)} (NOT_A_DECL 로 가른 함수·술어 호출 {ruled_out})"
@@ -614,7 +630,8 @@ print(wrap("    ", sorted(off_name)))
 print(f"이름 없이 타입만 적힌 인자: {len(type_only)}자리")
 print(wrap("    ", sorted(type_only)))
 print(f"덮개에만 있는 이름(①②③이 못 내는 자리 — 손 등재): {sorted(covered - set(found) - set(loose))}")
-print("PASS" if not (missing or unclassified or unread or off_name or leaked or probe_dead or unused) else "FAIL")
+print("판정에 드는 술어와 그 셈 — " + " · ".join(f"{k} {size(v)}" for k, v in VERDICT))
+print("PASS" if not any(size(v) for _, v in VERDICT) else "FAIL")
 PY
 echo "exit=$?"
 ```
