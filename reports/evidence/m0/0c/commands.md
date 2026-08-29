@@ -315,56 +315,125 @@ exit=0
 > **MASKS 각 줄에 무엇을 빼는지 적는다.**
 
 
-### C-4.2 타입이 나르는 필드 — §12.2가 전부 덮는가
+### C-4.2 타입이 나르는 필드 — §12.2가 뽑힌 이름을 전부 덮는가
 
-**타입 선언의 인자 목록**과 **머리 칸이 「필드」·「성분」인 표**에서 필드 이름을 뽑아,
-사전 **§12.2**가 그 이름을 덮는지 본다. **덮개는 「수인지 아닌지」를 묻지 않는다** —
-§12.2가 각 필드를 **수** 또는 **수가 아님**으로 분류하므로, 덮이지 않은 이름이 있으면
-그것이 곧 미분류다.
+**이름을 뽑는 자리는 셋이다.** ① **타입 선언의 인자 목록** — 인자 목록을 **균형 괄호**로
+잘라 **중첩 괄호·제네릭**을 견디고, 백틱 span의 **블록인용 줄바꿈을 편다.** ② **머리 칸이
+「필드」·「성분」인 표.** ③ **본문의 단독 백틱 이름.** **덮개는 「수인지 아닌지」를 묻지
+않는다** — §12.2가 각 필드를 **수** 또는 **수가 아님**으로 분류하므로, 덮이지 않은 이름이
+있으면 그것이 곧 미분류다.
+
+**이 검사는 자기가 못 본 자리를 같은 실행에서 센다.** ①이 **통째로 못 읽은 선언 자리** ·
+**이름 규칙 밖 인자** · **이름 없이 타입만 적힌 인자** · **①②③이 못 내는 덮개 이름**을
+**이름째** 낸다. **사각지대를 산문으로 적지 않고 이 블록이 낸다** — 산문으로 적은 사각지대
+목록이 실제보다 좁았던 것이 이 검사가 고쳐진 이유다.
+
+**③이 내는 이름 가운데 필드가 아닌 것은 이름째 뺀다**(`NOT_A_FIELD`). 규칙으로 빼는 것은
+commit 해시 하나뿐이다. **목록 밖의 새 이름은 `FAIL`이 된다** — 분류되지 않은 이름이
+조용히 통과하지 않게 하는 것이 그 목록의 목적이다.
+
+**덮개는 §12.2의 「표 칸」만 센다** — 그 절의 산문에 나오는 이름은 분류가 아니므로 덮개가
+아니다.
 
 ```
 python3 - docs/discovery/data-dictionary.md <<'PY'
 import re, sys, pathlib
 DOC = sys.argv[1]
-text = pathlib.Path(DOC).read_text()
-lines = text.split("\n")
-# §12.2 구간 = 정본. 그 구간의 백틱 식별자가 덮개다.
+lines = pathlib.Path(DOC).read_text().split("\n")
 s = next(i for i,l in enumerate(lines) if l.startswith("### 12.2"))
 e = next(i for i,l in enumerate(lines) if l.startswith("## 13."))
-covered = set()
-for l in lines[s:e]:
-    for m in re.finditer(r"`([a-z][A-Za-z0-9]*)`", l):
-        covered.add(m.group(1))
+# 덮개 = §12.2 의 **표 칸**에 적힌 백틱 이름. 그 절의 산문은 덮개로 세지 않는다.
+covered = {m.group(1) for l in lines[s:e] if l.startswith("|")
+           for m in re.finditer(r"`([a-z][A-Za-z0-9_]*)`", l)}
 body = "\n".join(lines[:s] + lines[e:])
-# 타입 선언의 인자 목록과 단독 선언에서 필드 이름을 뽑는다
-found = {}
-for span in re.findall(r"`([^`]+)`", body):
-    for m in re.finditer(r"\b([A-Z][A-Za-z0-9]*)(?:<[^>]*>)?\(([^()]*)\)", span):
-        for a in m.group(2).split(","):
-            a = a.strip()
-            if not a: continue
+NAME = re.compile(r"[a-z][A-Za-z0-9]*")
+HASH = re.compile(r"[0-9a-f]{7,40}\Z")          # commit 해시는 규칙으로 뺀다
+LEGACY_DECLS = {"FieldContract"}                # legacy 파이썬 선언의 축어 인용(§5.3). V2 타입이 아니다
+NOT_A_FIELD = {
+  # legacy KONEPS 응답 키 — V2 대응 필드는 §12.2 가 따로 등재한다
+  "asignBdgtAmt","bdgtAmt","bidNtceOrd","bssAmt","cnstrtnAbltyEvlAmt",
+  "cnstrtnAbltyEvlAmtList","lcnsLmtNm","lmtGrpNo","lmtSno","permsnIndstrytyList",
+  "presmptPrce","resultCode",
+  # legacy 저장 값·열거 문자열·컬럼 이름
+  "action","applicable","clean","derived","digits","notice","observed","status",
+  "submit","uncertain",
+  # legacy 지역 변수와 이 문서가 폐기한 이름
+  "margin","marginToFloor",
+  # 필드가 아님 — 리터럴·타입·보통 명사
+  "false","int","legacy",
+  # 필드가 아님 — 정책·모델 식별 「축」의 이름(§4.1). 어떤 타입도 필드로 나르지 않는다
+  "corpusScope","ruleVersion",
+}
+def flat(sp):                       # 블록인용 줄바꿈을 편다 — '> ' 가 인자 이름에 붙지 않게
+    return re.sub(r"\s*\n\s*>?\s*", " ", sp)
+def decls(span):                    # `Name(...)` 를 균형 괄호로 자른다 — 중첩 괄호·제네릭을 견딘다
+    out = []
+    for m in re.finditer(r"\b([A-Z][A-Za-z0-9]*)", span):
+        j = m.end()
+        if j < len(span) and span[j] == "<":
+            d = 0
+            while j < len(span):
+                d += (span[j] == "<") - (span[j] == ">"); j += 1
+                if d == 0: break
+        if j >= len(span) or span[j] != "(": continue
+        d, k = 0, j
+        while k < len(span):
+            d += (span[k] == "(") - (span[k] == ")")
+            if d == 0: break
+            k += 1
+        if k >= len(span): continue
+        out.append((m.group(1), m.start(), span[j+1:k]))
+    return out
+def top_split(a):                   # 최상위 콤마로만 자른다
+    parts, d, cur = [], 0, ""
+    for ch in a:
+        if ch in "(<[": d += 1
+        elif ch in ")>]": d = max(0, d - 1)
+        if ch == "," and d == 0: parts.append(cur); cur = ""
+        else: cur += ch
+    parts.append(cur)
+    return [p.strip() for p in parts if p.strip()]
+found, type_only, off_name, unread = {}, [], [], []
+for span in (flat(sp) for sp in re.findall(r"`([^`]+)`", body)):
+    ds = decls(span); taken = {d[1] for d in ds}
+    for m in re.finditer(r"\b[A-Z][A-Za-z0-9]*\s*(?:<[^<>]*>)?\(", span):
+        if m.start() not in taken: unread.append(span[m.start():m.start()+50])
+    for tname, _, args in ds:
+        for a in top_split(args):
             n = a.split(":")[0].strip()
-            if re.fullmatch(r"[a-z][A-Za-z0-9]*", n):
-                found.setdefault(n, set()).add(m.group(1))
+            if NAME.fullmatch(n): found.setdefault(n, set()).add(tname)
+            elif re.fullmatch(r"[A-Z][A-Za-z0-9]*", n): type_only.append((n, tname))
+            else: off_name.append((n, tname))
     m2 = re.match(r"^([a-z][A-Za-z0-9]*)\s*:\s*[A-Z]", span)
     if m2: found.setdefault(m2.group(1), set()).add("(단독 선언)")
-# 표로만 선언된 필드·성분(§6.5 등)도 뽑는다 — 머리 칸이 「필드」나 「성분」인 표만 본다
-header_is_field = False
+hdr = False
 for l in body.split("\n"):
-    if l.startswith("|") and re.match(r"^\|\s*(필드|성분)\s*\|", l):
-        header_is_field = True; continue
-    if not l.startswith("|"): header_is_field = False; continue
-    if not header_is_field: continue
+    if l.startswith("|") and re.match(r"^\|\s*(필드|성분)\s*\|", l): hdr = True; continue
+    if not l.startswith("|"): hdr = False; continue
+    if not hdr: continue
     m = re.match(r"^\| `([a-z][A-Za-z0-9]*)`(?: \(|\s*\|)", l)
     if m: found.setdefault(m.group(1), set()).add("(표 선언)")
+loose = {}
+for i, l in enumerate(body.split("\n")):
+    for m in re.finditer(r"`([a-z][A-Za-z0-9]*)`", l):
+        loose.setdefault(m.group(1), []).append(i + 1)
 missing = sorted(n for n in found if n not in covered)
+unclassified = sorted(n for n in loose if n not in covered and n not in found
+                      and n not in NOT_A_FIELD and not HASH.match(n))
+stray = sorted({t for t in off_name if t[1] not in LEGACY_DECLS})
 print(f"문서: {DOC}")
-print(f"§12.2가 덮는 필드 이름: {len(covered)}")
-print(f"타입·표 선언에서 뽑은 필드 이름: {len(found)}")
-print(f"§12.2에 없는 것: {len(missing)}")
-for n in missing:
-    print(f"  {n!r} ← {' · '.join(sorted(found[n]))}")
-print("PASS" if not missing else "FAIL")
+print(f"§12.2 표 칸이 덮는 이름: {len(covered)}")
+print(f"① 타입 선언 인자 + ② 필드·성분 표에서 뽑은 이름: {len(found)}  미덮개: {len(missing)}")
+for n in missing: print(f"    {n!r} ← {' · '.join(sorted(found[n]))}")
+print(f"③ 본문의 단독 백틱 이름: {len(loose)}  덮개·①②·목록·해시 밖: {len(unclassified)}")
+for n in unclassified: print(f"    {n!r} @ 본문 행 {loose[n][:6]}")
+print("--- 이 추출기가 못 본 자리를 같은 실행에서 센다 ---")
+print(f"통째로 못 읽은 선언 자리: {len(unread)}" + ("" if not unread else " -> " + repr(unread)))
+print(f"이름 규칙 밖 인자: {len(off_name)} — legacy 선언({' · '.join(sorted(LEGACY_DECLS))}) 밖: {len(stray)}"
+      + ("" if not stray else " -> " + repr(stray)))
+print(f"이름 없이 타입만 적힌 인자: {len(type_only)} — {sorted({t[1] for t in type_only})}")
+print(f"덮개에만 있는 이름(①②③이 못 내는 자리 — 손 등재): {sorted(covered - set(found) - set(loose))}")
+print("PASS" if not missing and not unclassified and not unread and not stray else "FAIL")
 PY
 echo "exit=$?"
 ```
@@ -378,9 +447,12 @@ PASS
 exit=0
 ```
 
-> **이 검사가 못 보는 것**: **`snake_case` 이름**과 **한 칸에 여러 이름을 적은 표 행**.
-> §12.2가 그 자리를 손으로 등재하고 **같은 사실을 사각지대로 적는다.**
-> **덮개 수가 뽑은 이름 수보다 큰 것은 그 손 등재 때문이다.**
+> **`snake_case` 인자와 「한 칸에 여러 이름을 적은 표 행」은 ①②가 뽑지 못한다.**
+> 그 두 자리를 **산문에 목록으로 두지 않는다** — 위 출력의 **`이름 규칙 밖 인자`**와
+> **`덮개에만 있는 이름`**이 각각을 **이름째** 낸다.
+>
+> **③은 백틱으로 적힌 lowerCamel 이름만 본다.** `review_required`처럼 밑줄이 든 이름은
+> ③이 못 보고 **덮개에서만 나온다** — 그것이 위 출력의 마지막 줄이 세는 자리다.
 
 ---
 
