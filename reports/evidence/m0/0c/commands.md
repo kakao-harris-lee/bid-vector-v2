@@ -440,8 +440,11 @@ NOT_A_FIELD = {
   "cnstrtnAbltyEvlAmtList","lcnsLmtNm","lmtGrpNo","lmtSno","permsnIndstrytyList",
   "presmptPrce","resultCode",
   # legacy 저장 값·열거 문자열·컬럼 이름
-  "action","applicable","clean","derived","digits","notice","observed","status",
-  "submit","uncertain",
+  "action","applicable","clean","derived","notice","status","submit","uncertain",
+  # 이 문서 자신의 출처 분류 어휘(사전 §0.2 표) — 어떤 타입도 필드로 나르지 않는다
+  "observed",
+  # legacy 함수가 필수 키워드로 받는 인자(사전 §1.3, `app/domain/aggregates.py:20-26`)
+  "digits",
   # legacy 지역 변수와 이 문서가 폐기한 이름
   "margin","marginToFloor",
   # 필드가 아님 — 리터럴·타입·보통 명사
