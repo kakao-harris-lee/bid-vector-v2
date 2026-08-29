@@ -6,16 +6,16 @@
 
 ## 선언 SHA와 실행 계약
 
-**출력 블록은 `b925b91` 트리에서 뜬 것이다** — **예외는 C-11 하나이고 그것은 HEAD에서
+**출력 블록은 `ba2e4f9` 트리에서 뜬 것이다** — **예외는 C-11 하나이고 그것은 HEAD에서
 뜬다.** 어느 블록이 무엇을 선언하는지는 아래 표가 적고, 그 예외의 사유는 C-11 절이 적는다.
-커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`b925b91`로 그대로
+커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`ba2e4f9`로 그대로
 지목한다.** 다른 커밋과의 관계로 부르지 않는다: 관계는 뒤 편집이 들어올 때마다 낡는다.
 
 | 블록 | 읽는 것 | 선언 SHA |
 | --- | --- | --- |
-| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`b925b91`** |
+| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`ba2e4f9`** |
 | C-5.1 ~ C-5.5 | legacy `bid-vector`만 | **`ed4b06c`** (이 저장소의 어느 HEAD에서도 같다) |
-| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`b925b91` + `ed4b06c`** |
+| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`ba2e4f9` + `ed4b06c`** |
 | C-11 | 이 파일 자신 ↔ 선언 SHA 트리 | **HEAD** (그 블록이 사유를 적는다) |
 
 ### 실행 계약
@@ -43,7 +43,7 @@ git status --porcelain | grep -vc '^??' | sed 's/^/tracked_dirty=/'
 ```
 
 ```
-b925b918f54b6b40c5f777a92fe445ac76f672e6
+ba2e4f93d50d892e5d1a53c08433e05c78757e7f
 tracked_dirty=0
 ```
 
@@ -64,7 +64,7 @@ git diff --check 998dc21...HEAD -- docs/adr reports/evidence/m0/0d | wc -l | sed
 ```
 
 ```
-slice_commits=11
+slice_commits=19
 slice_paths=12
 out_of_scope_paths=0
 whitespace_problems=0
@@ -867,7 +867,17 @@ python3 "$T/ops07scan.py" docs/adr
 ```
 
 ```
-__C7_OUT__
+REJECTED	Spring Modulith	0005-domain-events-and-outbox.md	불채택 (현 시점) · 재검토 예약
+REJECTED	JobRunr	0005-domain-events-and-outbox.md	불채택
+ADOPTED	db-scheduler	0005-domain-events-and-outbox.md	채택
+DEFERRED	Spring Integration JDBC lock registry	0005-domain-events-and-outbox.md	판정 보류 — 조사되지 않음
+DEFERRED	ShedLock	0005-domain-events-and-outbox.md	판정 보류 — OPS-01 요구에 대한 확인 미완
+ADOPTED	Resilience4j	0005-domain-events-and-outbox.md	채택
+ADOPTED	Micrometer	0005-domain-events-and-outbox.md	채택 (선택의 여지가 사실상 없다)
+ADOPTED	ArchUnit	0007-test-pyramid-and-ratchet.md	채택
+REJECTED	Konsist	0007-test-pyramid-and-ratchet.md	불채택
+CONDITIONAL	Detekt	0007-test-pyramid-and-ratchet.md	조건부 — 버전 경로가 OPEN-ADR-08
+candidates=10 ADOPTED=4 CONDITIONAL=1 DEFERRED=2 REJECTED=3
 ```
 
 **판정**: 후보 전부가 지정 ADR의 「대안」 절 표에 있고 **각자 하나의 판정**을 갖는다.
@@ -899,7 +909,9 @@ python3 "$T/ops07scan.py" "$NV" | grep -vE '^MISSING'
 ```
 
 ```
-__C7N_OUT__
+REJECTED	db-scheduler	0005-neg.md	불채택
+DEFERRED	ShedLock	0005-neg.md	판정 보류 — 조사되지 않음
+candidates=10 DEFERRED=1 MISSING=8 REJECTED=1
 ```
 
 **판정**: **사유 열의 낱말에 끌려가지 않는다** — `ShedLock` 행은 사유에 `불채택`이
@@ -916,7 +928,7 @@ xargs grep -nEi '[a-z+]+://[A-Za-z0-9_.-]+:[^@/[:space:]]+@|AKIA[0-9A-Z]{16}|ghp
 ```
 
 ```
-matches=17
+matches=6
 credential_literals=0
 ```
 
@@ -967,7 +979,7 @@ grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | grep -v '^OPEN-ADR-' | s
 ```
 
 ```
-OPEN-OPS-07	count=12
+OPEN-OPS-07	count=13
 OPEN-ML-01	count=9
 OPEN-OPS-05	count=8
 OPEN-OPS-10	count=5
@@ -978,6 +990,7 @@ OPEN-ML-06	count=3
 OPEN-SET-02	count=2
 OPEN-REG-05	count=2
 OPEN-REG-01	count=2
+OPEN-NOTI-02	count=2
 OPEN-ML-04	count=2
 OPEN-DEC-08	count=2
 OPEN-STR-01	count=1
@@ -989,7 +1002,7 @@ OPEN-OPS-08	count=1
 OPEN-OPS-02	count=1
 OPEN-OPS-01	count=1
 OPEN-NUM-01	count=1
-OPEN-NOTI-02	count=1
+OPEN-NOTI-09	count=1
 OPEN-ML-05	count=1
 OPEN-DEC-07	count=1
 OPEN-DEC-03	count=1
@@ -1004,11 +1017,11 @@ for f in docs/adr/*.md; do ids=$(grep -ho 'OPEN-ADR-[0-9]\{2\}' "$f" | sort -u |
 ```
 
 ```
-OPEN-ADR-01 OPEN-ADR-02 OPEN-ADR-03 OPEN-ADR-04 OPEN-ADR-05 OPEN-ADR-06 OPEN-ADR-07 OPEN-ADR-08 OPEN-ADR-09 OPEN-ADR-10 OPEN-ADR-11
-0001-target-architecture.md	OPEN-ADR-01,OPEN-ADR-02,OPEN-ADR-03,OPEN-ADR-04,OPEN-ADR-05,OPEN-ADR-06,OPEN-ADR-10
+OPEN-ADR-01 OPEN-ADR-02 OPEN-ADR-03 OPEN-ADR-04 OPEN-ADR-05 OPEN-ADR-06 OPEN-ADR-07 OPEN-ADR-08 OPEN-ADR-09 OPEN-ADR-10 OPEN-ADR-11 OPEN-ADR-12 OPEN-ADR-13
+0001-target-architecture.md	OPEN-ADR-01,OPEN-ADR-02,OPEN-ADR-03,OPEN-ADR-04,OPEN-ADR-05,OPEN-ADR-06
 0003-contract-transport.md	OPEN-ADR-01,OPEN-ADR-11
 0004-persistence-and-events.md	OPEN-ADR-01
-0005-domain-events-and-outbox.md	OPEN-ADR-01
+0005-domain-events-and-outbox.md	OPEN-ADR-01,OPEN-ADR-12,OPEN-ADR-13
 0007-test-pyramid-and-ratchet.md	OPEN-ADR-01,OPEN-ADR-06,OPEN-ADR-07,OPEN-ADR-08
 0008-frontend-disposition.md	OPEN-ADR-09
 0009-ml-reuse-provenance.md	OPEN-ADR-10
@@ -1030,8 +1043,8 @@ grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | grep -v 'OPEN-ADR-' | gre
 
 ```
 lines_to_read=6
-docs/adr/0001-target-architecture.md:175:| **A-3** | **업무별 배포 서비스로 분해(MSA)** | **불채택** | `v2-지침서.md` §3이 *"과도한 MSA가 아닌 두
-docs/adr/0001-target-architecture.md:177:| **A-5** | **커널 일부만 Kotlin으로** (혼합 경계) | **불채택** | `OPEN-ML-01`이 (a)로 확정됐다 — 8
+docs/adr/0001-target-architecture.md:176:| **A-3** | **업무별 배포 서비스로 분해(MSA)** | **불채택** | `v2-지침서.md` §3이 *"과도한 MSA가 아닌 두
+docs/adr/0001-target-architecture.md:178:| **A-5** | **커널 일부만 Kotlin으로** (혼합 경계) | **불채택** | `OPEN-ML-01`이 (a)로 확정됐다 — 8
 docs/adr/0002-money-rate-basis.md:139:| **A-7** | **"모름"을 `null`로, 하한 미달 빈도를 `0`으로** | **불채택 (D-5)** | `R-PROV-08` · `R-
 docs/adr/0002-money-rate-basis.md:187:| **`OPEN-DEC-07`** | 기준 금액 신뢰 비율 1.15의 **마진 0.05 값**. 결정은 "V2 코퍼스에서 재유도"로 확정됐고 **
 docs/adr/0002-money-rate-basis.md:189:| **`OPEN-DEC-01`** (해소됨, 참고) | 하한 미달 빈도의 최소 표본 수 150은 **유지로 확정**됐고 **통계적 편의임을 명시*
@@ -1097,8 +1110,8 @@ grep -n '^| 재시도·backoff\|^| 아키텍처 규칙 강제' docs/discovery/ca
 
 ```
 -- ADR 안의 OPS-13 전수
-docs/adr/0005-domain-events-and-outbox.md:107:  **`OPS-13`은 이 행이 아니라 「아키텍처 규칙 강제」 행의 것**이며 그 항목의 정의는
-docs/adr/0005-domain-events-and-outbox.md:188:### 3.5 아키텍처 규칙 강제 (OPS-13)
+docs/adr/0005-domain-events-and-outbox.md:110:  **`OPS-13`은 이 행이 아니라 「아키텍처 규칙 강제」 행의 것**이며 그 항목의 정의는
+docs/adr/0005-domain-events-and-outbox.md:247:### 3.5 아키텍처 규칙 강제 (OPS-13)
 -- capability-map 의 OPS-13 정의
 2596:### OPS-13 · 설계 래칫 (비대화 방지)
 -- OPS-21 표에서 그 두 행
@@ -1125,7 +1138,7 @@ docs/adr/0005-domain-events-and-outbox.md:188:### 3.5 아키텍처 규칙 강제
 
 ```
 # ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다
-DECL=b925b91
+DECL=ba2e4f9
 WT=$(mktemp -d)/wt
 git worktree add --detach "$WT" "$DECL" >/dev/null 2>&1
 ln -sfn "$PWD/bid-vector" "$WT/bid-vector"
@@ -1180,20 +1193,20 @@ pair 12 L572   OK    cd bid-vector
 pair 13 L611   OK    cd bid-vector
 pair 14 L720   OK    T=$(mktemp -d)
 pair 15 L775   OK    # citescan.py 는 C-6 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않
-pair 16 L846   OK    T=$(mktemp -d)
-pair 17 L873   OK    python3 "$T/ops07scan.py" docs/adr 'Kafka@0005' 'RabbitM
-pair 18 L890   OK    xargs grep -nEi 'api[_-]?key|secret|token|password|passw
-pair 19 L914   OK    grep -ci 'react' docs/discovery/capability-map.md | sed
-pair 20 L926   OK    grep -h '^### Slice' milestone-*.md | wc -l | sed 's/^ *
-pair 21 L941   OK    grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md |
-pair 22 L978   OK    grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u |
-pair 23 L1003  OK    grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | g
-pair 24 L1038  OK    T=$(mktemp -d)
-pair 25 L1070  OK    echo "-- ADR 안의 OPS-13 전수"
+pair 16 L870   OK    T=$(mktemp -d)
+pair 17 L912   OK    # ops07scan.py 는 C-7 블록이 만든 "$T" 의 것을 그대로 쓴다
+pair 18 L931   OK    xargs grep -nEi 'api[_-]?key|secret|token|password|passw
+pair 19 L955   OK    grep -ci 'react' docs/discovery/capability-map.md | sed
+pair 20 L967   OK    grep -h '^### Slice' milestone-*.md | wc -l | sed 's/^ *
+pair 21 L982   OK    grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md |
+pair 22 L1020  OK    grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u |
+pair 23 L1045  OK    grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | g
+pair 24 L1080  OK    T=$(mktemp -d)
+pair 25 L1112  OK    echo "-- ADR 안의 OPS-13 전수"
 pairs=26 skipped_harness=1 diff=0
 ```
 
-**판정**: `diff=0`이면 **그 26쌍이 선언 SHA `b925b91`의 트리에서 축어로 다시 뜬다.**
+**판정**: `diff=0`이면 **그 26쌍이 선언 SHA `ba2e4f9`의 트리에서 축어로 다시 뜬다.**
 
 **이 검사가 재는 범위**: `commands.md`의 명령/출력 쌍 26개다. **재지 않는 것** —
 `checklist.md`·`scope.md`의 인라인 블록, 각 블록 아래 **판정 산문의 참·거짓**,

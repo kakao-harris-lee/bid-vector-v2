@@ -1,0 +1,59 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "998dc21754e39efa425c3cfad9d5b7d5540ad1ba",
+  "reviewed_head": "f1cd72b4f61ad902fe6763c81a5396acf2acbf22",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/adr/0009-ml-reuse-provenance.md",
+      "line": 3,
+      "evidence": "[산출물 결함] `milestone-0.md:64-75`는 최소 9개 결정을 기록하고 9번 기록 위치는 사용자 확인을 받아 결정하도록 요구한다. 그러나 ADR 0009는 상태를 `미결`로 두고 결론이 없다고 명시한다. `checklist.md:37-42`도 9번이 미결임을 확인하므로, 파일 9개가 존재한다는 A1 구조 검사는 요구된 아홉 번째 결정을 대신하지 못한다.",
+      "required_fix": "사용자에게 (a)~(d) 중 기록 위치와 형식을 확인받아 ADR 0009를 결정 상태로 마무리하고, 선택에 따라 `milestone-0.md` 산출물 목록을 정합화하라. 사용자 결정 전에는 0D의 9개 결정 완료를 주장하지 말라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/adr/0005-domain-events-and-outbox.md",
+      "line": 172,
+      "evidence": "[산출물 결함] 필수 capability OPS-01은 lease를 도메인 use-case 경계에 두어 in-process 우회를 막고, 홀더 프로세스 종료 시 즉시 해제되도록 요구한다(`capability-map.md:2270-2287`). ADR은 ShedLock을 db-scheduler와 중복이라며 불채택하지만 db-scheduler는 예약 작업 실행을 단일화할 뿐 모든 use-case 진입 경계의 lease를 정의하지 않는다. 나머지 후보인 Spring Integration JDBC lock registry는 `판정 보류 — 조사되지 않음`이며, §5는 새 OPEN도 없다고 선언한다. 따라서 OPS-01 구현 수단이 없고 `OPEN-OPS-07` 후보 전건 판정도 완료되지 않았다.",
+      "required_fix": "OPS-01의 use-case 경계, 억제 감사 결과, 프로세스 종료 시 즉시 해제 acceptance를 만족하는 lock port/adapter를 명시적으로 선택하라. Spring Integration JDBC lock registry를 Kotlin 2.x·Spring Boot 3.x 기준으로 조사해 채택/불채택하거나 다른 선택이 OPS-01 전 경로를 충족한다는 근거를 남긴 뒤에만 `OPEN-OPS-07`을 종료하라."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/adr/0005-domain-events-and-outbox.md",
+      "line": 82,
+      "evidence": "[산출물 결함] D-3은 채널 배달의 모호한 실패를 재시도하지 않는 at-most-once를 요구하지만, 채택한 db-scheduler의 공식 Task configuration 기본값은 one-time 실패를 5분 뒤 재시도하고 dead execution을 `ReviveDeadExecution`으로 즉시 재예약한다. 또한 D-6은 Resilience4j retry를 별도로 채택하면서 두 재시도 계층의 소유·합산 예산·멱등성 경계를 정하지 않는다. 이 상태로는 워커 종료 후 채널 작업 재실행 또는 중첩 retry를 막는 실행 가능한 규칙이 없다. 근거: [db-scheduler 공식 README](https://github.com/kagkarlsson/db-scheduler).",
+      "required_fix": "부작용 유형별 db-scheduler `onFailure`/`onDeadExecution` 동작을 결정하라. 채널 배달은 모호한 `running` 종료를 격리하고 재실행하지 않게 하며, retry-safe 작업만 안정적 idempotency/dedupe key와 단일 bounded retry 예산 아래 재시도하도록 db-scheduler와 Resilience4j의 책임 경계를 명시하라."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0d/commands.md",
+      "line": 830,
+      "evidence": "[evidence 자기서술 결함] C-7은 후보가 포함된 행 어디에서든 `채택`, `불채택`, `판정 보류` 등의 부분문자열 하나만 찾으면 통과시킨다. 실제 출력도 Spring Integration 행을 `불채택|채택|판정 보류`로 표시하며, ADR 원문은 `불채택이 아니라 미조사`라고 적는다. 그런데 C-7과 `checklist.md:10`은 이를 후보 전부의 판정 완료 및 `OPEN-OPS-07` 종료로 선언한다. 스캐너가 자기 출력에서 드러난 미조사를 성공으로 변환했다.",
+      "required_fix": "표의 판정 셀을 구조적으로 파싱해 후보별 정확한 단일 verdict를 검사하고, A2가 요구하는 채택/불채택이 아닌 `판정 보류`·`조사되지 않음`은 미충족으로 처리하라. `불채택이 아니라 미조사` 음성 fixture를 추가하고 checklist 판정을 실제 결과에 맞춰 갱신하라."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse HEAD && git cat-file -e 998dc21754e39efa425c3cfad9d5b7d5540ad1ba^{commit} && git cat-file -e f1cd72b4f61ad902fe6763c81a5396acf2acbf22^{commit}",
+    "git status --short",
+    "git diff --name-status 998dc21754e39efa425c3cfad9d5b7d5540ad1ba...f1cd72b4f61ad902fe6763c81a5396acf2acbf22",
+    "git log --oneline 998dc21754e39efa425c3cfad9d5b7d5540ad1ba..f1cd72b4f61ad902fe6763c81a5396acf2acbf22",
+    "git diff --check 998dc21754e39efa425c3cfad9d5b7d5540ad1ba...f1cd72b4f61ad902fe6763c81a5396acf2acbf22 -- docs/adr reports/evidence/m0/0d",
+    "git log --format='%H %s' 998dc21754e39efa425c3cfad9d5b7d5540ad1ba..f1cd72b4f61ad902fe6763c81a5396acf2acbf22 | rg 'm0-0d' | cut -d' ' -f1 | git show --stdin --name-only --format= | sort -u",
+    "python3 - <<'PY' ... ADR 파일 수·필수 절·번호 유일성/연속성 독립 검사 ... PY",
+    "rg -n '^\\| \\*\\*(Spring Modulith|JobRunr|db-scheduler|Spring Integration JDBC lock registry|ShedLock|Resilience4j|Micrometer|ArchUnit|Konsist|Detekt)' docs/adr/0005-domain-events-and-outbox.md docs/adr/0007-test-pyramid-and-ratchet.md",
+    "awk '/^### G1\\./{f=1} /^## 12\\.1/{f=0} f && /^\\| OPEN-/ {print}' docs/discovery/capability-map.md",
+    "git diff --unified=3 b925b918f54b6b40c5f777a92fe445ac76f672e6...f1cd72b4f61ad902fe6763c81a5396acf2acbf22 -- docs/adr reports/evidence/m0/0d",
+    "credential literal 패턴을 0D slice 경로에 대해 rg로 재검사: credential_literals=0",
+    "공식 웹 문서 확인: db-scheduler README/Task configuration 및 Spring Integration JDBC Lock Registry",
+    "git status --porcelain && git rev-parse HEAD"
+  ],
+  "residual_risks": [
+    "격리 worktree에 `bid-vector` symlink가 없어 C-5·C-6의 legacy `ed4b06c` 계측·인용 범위와 C-11 전체 하네스를 독립 재실행하지 못했다. 해당 기록의 정확성은 잔여 위험으로 남는다.",
+    "`_workspace/m0-open-decisions/ops07-library-survey.md`가 없어 원 조사 노트와 ADR 전사를 직접 대조하지 못했다.",
+    "병렬 slice 0C의 `docs/discovery/data-dictionary.md`와 `reports/evidence/m0/0c/`는 선언된 0D 범위 밖으로 제외했으며, 그 산출물 자체에는 판정을 내리지 않았다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
