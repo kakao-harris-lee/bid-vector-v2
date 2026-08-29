@@ -13,7 +13,7 @@ out_of_scope:
   - docs/discovery/regression-ledger.md   # 0B Codex approve로 확정 — 읽기 전용
   - reports/evidence/m0/0a/ · 0a2/ · 0a3/ · 0b/   # 확정된 evidence — 읽기 전용
   - docs/discovery/data-dictionary.md     # 0C 소관. 이 slice는 만들지 않는다
-  - docs/discovery/legacy-reference-map.md # 존재하지 않는다. 생성 여부가 ADR 0009의 OPEN 자체다
+  - docs/discovery/legacy-reference-map.md # 만들지 않는다 — 운영자 결정 (d)가 이 파일을 쓰지 않는다
   - fixtures/                              # fixture-curator 소유
   - 활성 OPEN 50건 전부 — 해소하지 않는다
       # capability-map.md §12 활성 45건 + regression-ledger.md §9 OPEN-REG 5건.
@@ -77,7 +77,7 @@ rollback: "N/A — 문서 산출물은 git revert로 복구. 애플리케이션 
 | # | 요구 | 출처 | 대조 |
 | --- | --- | --- | --- |
 | **A1** | ADR 9건이 `docs/adr/`에 있고, 각 파일이 `상태`·`맥락`·`결정`·`대안`·`결과` 절을 갖는다. 번호는 유일하고 연속이다 | `milestone-0.md` §"Slice 0D", agent-workflow §7 | `commands.md` C-3 |
-| **A2** | `OPEN-OPS-07`의 종료 조건이 충족된다 — **OPS-21 표의 후보 전부**가 어느 ADR의 「대안」 절에 채택/불채택 판정과 사유를 갖고 등장한다 | `capability-map.md` §12 G6 `OPEN-OPS-07` 행 | `commands.md` C-7 |
+| **A2** | **OPS-21 표의 후보 전부**가 어느 ADR의 「대안」 절 표에 **판정 한 칸과 사유**를 갖고 등장한다. 판정에는 `채택`·`불채택`·`조건부`뿐 아니라 **`보류`(미조사·확인 미완)도 있으며 그 사실이 드러나야 한다** | `capability-map.md` §12 G6 `OPEN-OPS-07` 행 | `commands.md` C-7 · C-7n |
 | **A3** | 판정 기준이 "최신 버전"이 아니라 **M1에서 고정할 Kotlin 2.x + Spring Boot 3.x 조합과의 호환**이다 | `v2-지침서.md` §5, `decisions.md` `OPEN-OPS-07` | `checklist.md` §2 |
 | **A4** | **활성 OPEN을 해소하지 않았다.** `capability-map.md`·`regression-ledger.md`가 무변경이고, ADR이 활성 OPEN이 소유한 쟁점을 확정 서술로 선점하지 않는다 | 팀 리드 지시, `0a2/checklist.md` §10.1 형태 7 | `commands.md` C-4 · `checklist.md` §3 |
 | **A5** | 이미 확정된 운영자 결정(`OPEN-ML-01` · `OPEN-OPS-05` · 두 갈래 전략)을 **재확정하지 않고 인용**한다 | `reports/evidence/m0/0a2/decisions.md` | `commands.md` C-6 · `checklist.md` §4 |
@@ -87,7 +87,7 @@ rollback: "N/A — 문서 산출물은 git revert로 복구. 애플리케이션 
 
 ---
 
-## 이 slice가 닫는 것 — `OPEN-OPS-07`
+## `OPEN-OPS-07`과 이 slice — 「기입」은 했고 「전건 판정」은 아니다
 
 `capability-map.md` §12 G6가 이 항목의 성격을 적는다 — *"이 항목은 결정이 아니라
 **실행으로 닫힌다**"*, 종료 조건은 **ADR 대안 절 기입**이며 *"ADR 작성은 **0D 소관**"*이다.
@@ -107,8 +107,22 @@ ADR에는 **그 ADR의 판정을 떠받치는 사실만** 출처와 함께 옮�
 | 아키텍처 규칙 강제 | ArchUnit · Konsist · Detekt | **0007** |
 | 관측 | Micrometer | **0005** |
 
-C-7이 이 대응을 스캐너로 확인한다 — 후보 이름이 그 ADR의 「대안」 절 안에 있고
-채택/불채택 표시를 갖는지.
+C-7이 이 대응을 스캐너로 확인한다 — 후보마다 그 ADR의 「대안」 절 **표의 판정 열**을
+읽는다.
+
+### 종료 조건에 대한 이 slice의 판정
+
+**종료 조건의 문면은 「ADR 대안 절 기입」이다**(`capability-map.md` §12 G6). 조사 노트의
+결과가 전부 ADR에 기입됐고 **조사 범위 밖이었던 후보는 「미조사」로 기입**됐다.
+
+**그러나 「후보 전건 채택/불채택 판정 완료」는 성립하지 않는다** — C-7이 `DEFERRED` 둘을
+낸다. Codex 1차 리뷰(high #2)가 그 둘 중 하나(`Spring Integration JDBC lock registry`)를
+지목하며 **`OPS-01`을 덮는 수단이 정해지지 않았다**고 적었고, 이 slice는 그 지적을 받아
+**ShedLock을 판정 보류로 되돌리고** `OPEN-ADR-12`를 신설했다(ADR 0005 §3.2 · §5).
+
+**따라서 이 slice는 `OPEN-OPS-07`의 종료를 스스로 선언하지 않는다.** 기입은 됐고,
+**「전건 판정」이 종료 조건에 포함되는지는 운영자와 Codex의 판정에 남긴다.** 앞 라운드가
+A2에 적었던 *"채택/불채택 판정"*은 **실제보다 강한 주장**이었고 위에서 고쳤다.
 
 ---
 
@@ -136,11 +150,15 @@ C-7이 이 대응을 스캐너로 확인한다 — 후보 이름이 그 ADR의 �
 | `OPEN-ADR-07` | mutation 도구 — Kotlin에서 무엇을 쓰는가 | 0007 | `OPEN-OPS-07` 조사 범위 밖. 미조사 |
 | `OPEN-ADR-08` | Detekt 버전 경로 — 안정판 / alpha / 정식 대기 중 무엇인가 | 0007 | M1이 고정할 Kotlin 버전에 종속. 조사가 `판정 보류` |
 | `OPEN-ADR-09` | V2 기간 중 운영자는 **어느 화면**으로 시스템을 쓰는가 | 0008 | `capability-map.md`에 UI 축이 없다 |
-| `OPEN-ADR-10` | **ML 재활용 출처 기록 위치** — `legacy-reference-map.md` 통합 vs slice별 `reports/evidence/` | 0009 | **운영자 결정 사항**(2026-08-22 지시) |
+| ~~`OPEN-ADR-10`~~ | **ML 재활용 출처 기록 위치** — **해소**(운영자 결정 2026-08-29: **(d) 조합**). ADR 0009 §5가 결정 근거를 적는다 | 0009 | 운영자 결정 완료 |
+| `OPEN-ADR-12` | **OPS-01의 lease 어댑터** — 홀더 강제 종료 시 즉시 해제를 무엇이 만족하는가 | 0005 | Codex 1차 high #2로 신설. `Spring Integration JDBC lock registry` 조사가 선행 |
+| `OPEN-ADR-13` | **db-scheduler 실패 처리 기본값** — 부작용 유형별 `onFailure`/`onDeadExecution` | 0005 | Codex 1차 medium으로 신설. 기본값을 이 slice가 확인하지 않았다 |
 | `OPEN-ADR-11` | ML 호출의 **동기 RPC 예산** — deadline·재시도·fail-open 금지의 구체값 | 0003 | M2가 소유. 값의 근거가 아직 없다 |
 
-**`OPEN-ADR-09`·`OPEN-ADR-10`은 운영자 결정을 직접 요청하는 항목**이고 나머지 9건은
-후속 마일스톤이 실행·측정으로 닫는다.
+**등록 13건 중 `OPEN-ADR-10`은 해소됐고 활성은 12건이다.**
+**`OPEN-ADR-09`가 운영자 결정을 직접 요청하는 유일한 항목**으로 남았고 나머지는 후속
+마일스톤이 실행·측정으로 닫는다. **`OPEN-ADR-12`는 M1/M4를, `OPEN-ADR-13`은 M4를**
+차단한다.
 
 ---
 
@@ -169,8 +187,22 @@ C-7이 이 대응을 스캐너로 확인한다 — 후보 이름이 그 ADR의 �
 7. **선언 SHA를 올리면 그 SHA에서 전부 다시 떠야 한다.** 라운드 2의 두 medium이 그
    규칙을 어긴 자리에서 났다 — 일부만 다시 뜨면 **같은 파일 안의 두 블록이 서로
    어긋난다**(C-9.3 ↔ C-9.6). C-11이 이제 그 어긋남을 한 번에 낸다.
-8. **`legacy-reference-map.md`를 만들지 않았다.** 그 파일의 존재 여부 자체가
-   `OPEN-ADR-10`의 선택지 한쪽이므로, 만들면 그 `OPEN`을 임의 해소하는 것이 된다.
+8. **`legacy-reference-map.md`를 만들지 않는다** — **운영자 결정 (d)가 그 파일을 쓰지
+   않는다**(ADR 0009 D-4·D-5). **`milestone-0.md` 「산출물」이 그 경로를 적고 있어 개정이
+   필요하며**, 그 문서는 `out_of_scope`라 이 slice가 고치지 않고 **사실만 적었다.**
+9. **`OPS-01`을 덮는 lease 어댑터가 정해지지 않았다**(`OPEN-ADR-12`). Codex 1차 high #2가
+   적출했고, 앞 라운드의 ShedLock 불채택 사유는 **예약 작업의 단일 실행**만 보고
+   **use case 경계의 lease**를 보지 않았다. **후보 넷 중 어느 것도 OPS-01의 요구 셋을
+   덮는다고 확인되지 않았다** — `Spring Integration JDBC lock registry`는 조사 자체가
+   없고, 나머지 셋은 요구 ②(홀더 종료 시 즉시 해제)가 미확인이다.
+10. **채택 도구의 실패 처리 기본값을 확인하지 않았다**(`OPEN-ADR-13`). Codex가 지목한
+   db-scheduler 기본값을 이 slice가 공식 문서로 열어 보지 않았다. **결정(D-11)은
+   기본값과 무관하게 성립하나, 그 기본값이 결정과 충돌하는지는 M4가 확인한다.**
+11. **커밋 스테이징이 다른 slice와 공유된다.** 이 라운드에 0C 레인이 스테이징해 둔 파일
+   셋이 `git add docs/adr` 뒤의 `git commit`에 딸려 들어갔고, `git reset --soft` +
+   **`git commit -- <경로>`**로 갈라 다시 커밋했다(그 커밋 SHA는 「갱신 이력」이 적는다).
+   **이후 이 slice의 커밋은 전부 경로 pathspec으로 한다** — `git add` 뒤의 무인자
+   `git commit`은 **인덱스 전체**를 담으므로 공유 트리에서 안전하지 않다.
 
 ---
 

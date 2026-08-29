@@ -784,98 +784,127 @@ legacy=3 ok=0 missing=2 range=1 skipped=0
 
 ---
 
-## C-7 · `OPEN-OPS-07` 종료 조건 — OPS-21 후보 전부가 「대안」 절에 판정과 함께 있는가
+## C-7 · `OPEN-OPS-07` — OPS-21 후보의 판정
 
-후보는 `docs/discovery/capability-map.md` OPS-21 표의 것이다.
+후보는 `docs/discovery/capability-map.md` OPS-21 표의 것이다. **이 검사는 후보마다
+「대안」 절 표의 판정 열을 읽는다** — 행 어디에나 있는 낱말을 판정으로 세지 않는다.
 
 ```
 T=$(mktemp -d)
 cat > "$T/ops07scan.py" <<'PY'
 #!/usr/bin/env python3
-"""OPS-21 후보가 지정 ADR 의 「대안」 절에서 판정 토큰과 같은 줄에 나오는지.
-argv[1]=ADR 디렉터리. argv[2:] 는 `이름@ADR번호` 형식의 추가 후보(음성 대조용)."""
-import pathlib, sys
+"""OPS-21 후보가 지정 ADR 의 「대안」 절 표에서 어떤 판정을 받았는지.
+
+argv[1]=ADR 디렉터리. argv[2:] 는 `이름@ADR번호` 형식의 추가 후보(음성 대조용).
+표 행을 `|` 로 갈라 **1열(후보)에서만 이름을 찾고 2열(판정)을 읽는다** — 행 어디에나
+있는 부분문자열을 판정으로 세지 않는다.
+판정 분류: ADOPTED(채택) · REJECTED(불채택) · CONDITIONAL(조건부) · DEFERRED(보류·미조사) ·
+NOT-APPLICABLE(대상 아님) · NO-VERDICT(2열에 판정 어휘 없음) · MISSING(1열에 후보 없음)
+"""
+import pathlib, re, sys
+
 PAIRS = [("Spring Modulith", "0005"), ("JobRunr", "0005"), ("db-scheduler", "0005"),
          ("Spring Integration JDBC lock registry", "0005"), ("ShedLock", "0005"),
          ("Resilience4j", "0005"), ("Micrometer", "0005"),
          ("ArchUnit", "0007"), ("Konsist", "0007"), ("Detekt", "0007")]
-TOKENS = ["불채택", "채택", "판정 보류", "대상 아님", "조건부"]
 adr_dir = pathlib.Path(sys.argv[1])
 for extra in sys.argv[2:]:
     name, _, num = extra.partition("@")
     PAIRS.append((name, num or "0005"))
 
-def alt_section(num):
+
+def classify(cell):
+    c = re.sub(r"[*`]", "", cell)
+    if "보류" in c or "미조사" in c or "조사되지 않음" in c:
+        return "DEFERRED"
+    if "대상 아님" in c:
+        return "NOT-APPLICABLE"
+    if "조건부" in c:
+        return "CONDITIONAL"
+    if "불채택" in c:
+        return "REJECTED"
+    if "채택" in c:
+        return "ADOPTED"
+    return "NO-VERDICT"
+
+
+def alt_rows(num):
     hits = list(adr_dir.glob(f"{num}-*.md"))
     if not hits:
         return None
-    out, on = [], False
+    rows, on = [], False
     for ln in hits[0].read_text(encoding="utf-8").splitlines():
         if ln.startswith("## "):
             on = "대안" in ln
             continue
-        if on:
-            out.append(ln)
-    return (hits[0].name, out)
+        if on and ln.startswith("|"):
+            cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+            if len(cells) >= 2:
+                rows.append((cells[0], cells[1]))
+    return (hits[0].name, rows)
 
-found = missing = 0
+
+counts = {}
 for cand, num in PAIRS:
-    sec = alt_section(num)
+    sec = alt_rows(num)
     if sec is None:
-        missing += 1
         print(f"MISSING\t{cand}\t(no ADR {num})\t-")
+        counts["MISSING"] = counts.get("MISSING", 0) + 1
         continue
-    fname, body = sec
-    rows = [ln for ln in body if cand in ln]
-    judged = sorted({t for ln in rows for t in TOKENS if t in ln})
-    if rows and judged:
-        found += 1
-        print(f"FOUND\t{cand}\t{fname}\t{'|'.join(judged)}")
-    elif rows:
-        missing += 1
-        print(f"NO-VERDICT\t{cand}\t{fname}\t(대안 절에 있으나 판정 토큰 없음)")
-    else:
-        missing += 1
-        print(f"MISSING\t{cand}\t{fname}\t(대안 절에 없음)")
-print(f"candidates={len(PAIRS)} found={found} missing={missing}")
+    fname, rows = sec
+    hit = [v for name, v in rows if cand in re.sub(r"[*`]", "", name)]
+    if not hit:
+        print(f"MISSING\t{cand}\t{fname}\t(대안 절 표의 후보 열에 없음)")
+        counts["MISSING"] = counts.get("MISSING", 0) + 1
+        continue
+    verdict = classify(hit[0])
+    counts[verdict] = counts.get(verdict, 0) + 1
+    print(f"{verdict}\t{cand}\t{fname}\t{re.sub(r'[*`]', '', hit[0])[:52]}")
+print("candidates=%d " % len(PAIRS) + " ".join(
+    "%s=%d" % (k, counts[k]) for k in sorted(counts)))
 PY
 python3 "$T/ops07scan.py" docs/adr
 ```
 
 ```
-FOUND	Spring Modulith	0005-domain-events-and-outbox.md	불채택|채택
-FOUND	JobRunr	0005-domain-events-and-outbox.md	불채택|채택
-FOUND	db-scheduler	0005-domain-events-and-outbox.md	불채택|채택
-FOUND	Spring Integration JDBC lock registry	0005-domain-events-and-outbox.md	불채택|채택|판정 보류
-FOUND	ShedLock	0005-domain-events-and-outbox.md	불채택|채택
-FOUND	Resilience4j	0005-domain-events-and-outbox.md	채택
-FOUND	Micrometer	0005-domain-events-and-outbox.md	불채택|채택
-FOUND	ArchUnit	0007-test-pyramid-and-ratchet.md	불채택|채택
-FOUND	Konsist	0007-test-pyramid-and-ratchet.md	불채택|채택
-FOUND	Detekt	0007-test-pyramid-and-ratchet.md	조건부|채택
-candidates=10 found=10 missing=0
+__C7_OUT__
 ```
 
-**판정**: 후보 전부가 지정 ADR의 「대안」 절에 판정 토큰과 함께 있다 —
-`OPEN-OPS-07`의 종료 조건(**ADR 대안 절 기입**)이 충족된다.
+**판정**: 후보 전부가 지정 ADR의 「대안」 절 표에 있고 **각자 하나의 판정**을 갖는다.
+`DEFERRED` 둘은 **advisory lock 행**이며 ADR 0005 §3.2·§5가 그 사유와 `OPEN-ADR-12`를
+적는다. **「후보 전건 채택/불채택 완료」는 이 출력이 지지하지 않는다** — `DEFERRED`가
+있는 한 그 주장은 성립하지 않는다.
 
-**이 스캐너가 잡지 못하는 것**: **어느 판정인지.** 표의 한 행이 다른 후보를 언급하면
-토큰이 여러 개 뜬다(위 출력이 그렇다). **기계가 세우는 것은 「기입됐다」이고, 어느 쪽으로
-판정됐는지는 사람이 ADR을 읽는다** — `regression-ledger.md` §0.5의 두 축 구분과 같다.
+**이 스캐너가 재는 것**: 표의 **판정 열 한 칸**을 분류한다.
+**재지 않는 것**: 그 판정이 **옳은지**, 사유가 판정을 **떠받치는지**. 그것은 사람이 읽는다.
 
-### C-7n · 음성 대조
+### C-7n · 이 스캐너가 무엇을 잡는지 — 실행으로 잰다
+
+**앞선 형태는 행 어디에서든 판정 낱말 하나를 찾으면 통과시켰고**, 그래서
+`판정 보류 — 조사되지 않음`인 행을 `불채택|채택|판정 보류`로 표시하면서 통과로 셌다.
+아래 fixture는 **판정 열과 사유 열에 서로 반대되는 낱말**을 넣어 어느 쪽을 읽는지 가른다.
 
 ```
-python3 "$T/ops07scan.py" docs/adr 'Kafka@0005' 'RabbitMQ@0007' | tail -3
+# ops07scan.py 는 C-7 블록이 만든 "$T" 의 것을 그대로 쓴다
+NV=$(mktemp -d)
+cat > "$NV/0005-neg.md" <<'MD'
+# neg
+## 3. 대안
+| 후보 | 판정 | 사유 |
+| --- | --- | --- |
+| **ShedLock** | **판정 보류 — 조사되지 않음** | 앞 라운드는 **불채택**이라 적었으나 그것은 판정이 아니다 |
+| **db-scheduler** | **불채택** | **채택**이라는 낱말이 사유에 들어 있어도 판정은 2열이다 |
+MD
+python3 "$T/ops07scan.py" "$NV" | grep -vE '^MISSING'
 ```
 
 ```
-MISSING	Kafka	0005-domain-events-and-outbox.md	(대안 절에 없음)
-MISSING	RabbitMQ	0007-test-pyramid-and-ratchet.md	(대안 절에 없음)
-candidates=12 found=10 missing=2
+__C7N_OUT__
 ```
 
-**판정**: 「대안 절에 없음」을 실제로 낸다.
+**판정**: **사유 열의 낱말에 끌려가지 않는다** — `ShedLock` 행은 사유에 `불채택`이
+있어도 `DEFERRED`, `db-scheduler` 행은 사유에 `채택`이 있어도 `REJECTED`다.
+그리고 **표에 없는 후보는 `MISSING`**으로 나온다(그 여덟이 위 출력에서 걸러진 것들이다).
 
 ---
 
