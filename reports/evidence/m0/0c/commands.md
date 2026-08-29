@@ -5,7 +5,7 @@
 있다 — 이 파일은 그 둘을 담지 않는다. **명령이 내는 셈을 산문에 옮겨 적지 않는다.**
 
 **각 블록은 자기 실행 시점의 SHA를 선언한다.** 커밋은 자기 SHA를 담을 수 없으므로
-**C-1 ~ C-9의 블록은 `aa05167`**(Codex 수정 라운드 1의 수정 커밋)의 트리를 선언한다 —
+**C-1 ~ C-9의 블록은 `446a39f`**(독립 검증 finding V-1~V-7 수정의 마지막 커밋)의 트리를 선언한다 —
 그 SHA를 체크아웃한 worktree에서 재현된다.
 
 **C-10만 예외다** — 그것은 다른 블록들이 실제로 그 트리에서 축어 재현되는지를 재는
@@ -26,7 +26,7 @@
 
 ## C-1 · 운영자 결정 사본과 원본의 차이
 
-선언 SHA `aa05167`. 원본은 `_workspace/`(gitignore 대상)라 이 블록은 그 디렉터리가
+선언 SHA `446a39f`. 원본은 `_workspace/`(gitignore 대상)라 이 블록은 그 디렉터리가
 있는 작업 트리에서만 재현된다.
 
 **사본은 이제 원본과 한 자리에서 다르다** — Codex 리뷰 finding **E**가 U-3의 소유 `OPEN`
@@ -67,16 +67,16 @@ exit=1
 
 ### C-2.1 이 slice의 커밋과 그 커밋이 건드린 경로
 
-선언 SHA `aa05167`.
+선언 SHA `446a39f`.
 
 ```
-for c in $(git log --format='%H' 2b05684..aa05167 \
+for c in $(git log --format='%H' 2b05684..446a39f \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   echo "-- $(git log --format='%h %s' -1 $c)"
   git show --name-only --format='' $c | sed '/^$/d' | sed 's/^/   /'
 done
 echo "### in_scope 밖 경로 (아래 줄이 '(없음)'이면 통과)"
-for c in $(git log --format='%H' 2b05684..aa05167 \
+for c in $(git log --format='%H' 2b05684..446a39f \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   git show --name-only --format='' $c
 done | sed '/^$/d' | sort -u \
@@ -85,6 +85,30 @@ done | sed '/^$/d' | sort -u \
 ```
 
 ```
+-- 446a39f fix(m0-0c): 라운드 이력의 「이 커밋」 행을 커밋된 SHA 두 행으로 가른다 (V-3)
+   reports/evidence/m0/0c/scope.md
+-- 384c780 fix(m0-0c): §12 서술의 사본을 사전 §0.4 의 현재 문장에 맞춘다 (V-6)
+   reports/evidence/m0/0c/checklist.md
+-- 3e9feb2 fix(m0-0c): C-4.1 자기서술을 구현에 맞춘다 (V-5)
+   reports/evidence/m0/0c/checklist.md
+   reports/evidence/m0/0c/commands.md
+-- d75f406 fix(m0-0c): §12.2 의 「모든 필드」 전칭을 걷고 빠진 둘을 등재한다 (V-1)
+   docs/discovery/data-dictionary.md
+   reports/evidence/m0/0c/checklist.md
+   reports/evidence/m0/0c/scope.md
+-- 685fe08 fix(m0-0c): C-4.2 가 자기 사각지대를 실행으로 재게 한다 (V-2)
+   docs/discovery/data-dictionary.md
+   reports/evidence/m0/0c/checklist.md
+   reports/evidence/m0/0c/commands.md
+-- 494b5b7 fix(m0-0c): margin 산식의 sample_size 분기를 적는다 (V-7)
+   docs/discovery/data-dictionary.md
+-- 33f05f5 fix(m0-0c): estimateMargin 정정의 legacy 좌표를 산식이 있는 파일로 옮긴다 (V-4)
+   docs/discovery/data-dictionary.md
+   reports/evidence/m0/0c/checklist.md
+-- 03072ce docs(m0-0c): scope.md 에 Codex 수정 라운드 1 을 등재하고 head_sha 를 갱신한다
+   reports/evidence/m0/0c/scope.md
+-- 295a6cf docs(m0-0c): 출력 블록 전부를 선언 SHA aa05167 트리에서 다시 뜬다
+   reports/evidence/m0/0c/commands.md
 -- aa05167 fix(m0-0c): C-1 이 후행 공백을 되싣지 않게 명령을 고친다 (A8)
    reports/evidence/m0/0c/commands.md
 -- 87ad2d9 fix(m0-0c): 인용 블록 빈 줄의 후행 공백을 뗀다 (A8 git diff --check)
@@ -177,17 +201,17 @@ done | sed '/^$/d' | sort -u \
 
 **이 판정은 뒤 커밋에 낡지 않는다** — 뒤 커밋(`commands.md`·`checklist.md`·`scope.md`
 갱신)의 경로가 전부 `reports/evidence/m0/0c/` 안이기 때문이다. 리뷰 시점의 HEAD로
-다시 돌리려면 위 두 자리의 `aa05167`를 HEAD로 바꾼다.
+다시 돌리려면 위 두 자리의 `446a39f`를 HEAD로 바꾼다.
 
 ### C-2.2 공백 오류
 
-선언 SHA `aa05167`.
+선언 SHA `446a39f`.
 
 ```
 # 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
-git diff --check 2b05684..aa05167 | sed 's/[[:space:]]\{1,\}$/<후행공백>/'
-echo "base_sha 기준 지적: $(git diff --check 2b05684..aa05167 | wc -l | tr -d ' ')"
-echo "review_base 기준 지적: $(git diff --check aff62ab..aa05167 | wc -l | tr -d ' ')"
+git diff --check 2b05684..446a39f | sed 's/[[:space:]]\{1,\}$/<후행공백>/'
+echo "base_sha 기준 지적: $(git diff --check 2b05684..446a39f | wc -l | tr -d ' ')"
+echo "review_base 기준 지적: $(git diff --check aff62ab..446a39f | wc -l | tr -d ' ')"
 ```
 
 ```
@@ -207,7 +231,7 @@ review_base 기준 지적: 0
 
 ## C-3 · 6축 커버 (A1)
 
-선언 SHA `aa05167`. 스크립트 본문은 인라인이다.
+선언 SHA `446a39f`. 스크립트 본문은 인라인이다.
 
 ```
 python3 - <<'PY'
@@ -249,7 +273,7 @@ exit=0
 사전 **§12 전 구간**(`## 12.`부터 `## 13.` 앞까지)의 **표 첫 칸**을 정본으로 삼고,
 §12 밖 본문에서 그 목록에 없는 숫자 토큰을 찾는다 — **§12.1의 값 칸이 그 대부분이고
 §12.2의 첫 칸도 들어온다.** **셈·좌표·식별자는 마스크로 뺀다** — 무엇을 뺐는지는
-`MASKS`가 한 줄씩 밝힌다. 선언 SHA `aa05167`.
+`MASKS`가 한 줄씩 밝힌다. 선언 SHA `446a39f`.
 
 ```
 python3 - docs/discovery/data-dictionary.md <<'PY'
@@ -305,7 +329,7 @@ echo "exit=$?"
 
 ```
 문서: docs/discovery/data-dictionary.md
-§12 값 칸이 허용하는 숫자 토큰: 55
+§12 표 첫 칸이 허용하는 숫자 토큰: 55
 §12 밖 본문에서 §12에 없는 숫자 토큰: 0
 PASS
 exit=0
@@ -441,9 +465,14 @@ echo "exit=$?"
 
 ```
 문서: docs/discovery/data-dictionary.md
-§12.2가 덮는 필드 이름: 62
-타입·표 선언에서 뽑은 필드 이름: 58
-§12.2에 없는 것: 0
+§12.2 표 칸이 덮는 이름: 65
+① 타입 선언 인자 + ② 필드·성분 표에서 뽑은 이름: 60  미덮개: 0
+③ 본문의 단독 백틱 이름: 56  덮개·①②·목록·해시 밖: 0
+--- 이 추출기가 못 본 자리를 같은 실행에서 센다 ---
+통째로 못 읽은 선언 자리: 0
+이름 규칙 밖 인자: 5 — legacy 선언(FieldContract) 밖: 0
+이름 없이 타입만 적힌 인자: 13 — ['Actual', 'Column', 'Known', 'OperatorAction', 'Resolved', 'Scheduled', 'Substituted', 'Uncertain']
+덮개에만 있는 이름(①②③이 못 내는 자리 — 손 등재): ['review_required']
 PASS
 exit=0
 ```
@@ -459,7 +488,7 @@ exit=0
 
 ## C-5 · `capability-map.md`에서 정책 version을 말하는 자리 전수 (A3 · §4.2)
 
-선언 SHA `aa05167`.
+선언 SHA `446a39f`.
 
 ```
 python3 - <<'PY'
@@ -520,10 +549,10 @@ exit=0
 
 ### C-6.1 상류 산출물과 0D 산출물이 이 slice의 커밋에서 변하지 않았다
 
-선언 SHA `aa05167`.
+선언 SHA `446a39f`.
 
 ```
-for c in $(git log --format='%H' 2b05684..aa05167 \
+for c in $(git log --format='%H' 2b05684..446a39f \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   git show --name-only --format='' $c
 done | sed '/^$/d' | sort -u \
@@ -537,7 +566,7 @@ done | sed '/^$/d' | sort -u \
 
 ### C-6.2 신설 `OPEN-DIC` id와 중복
 
-선언 SHA `aa05167`.
+선언 SHA `446a39f`.
 
 ```
 grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary.md \
@@ -559,7 +588,7 @@ OPEN-DIC-01 OPEN-DIC-02 OPEN-DIC-03 OPEN-DIC-04 OPEN-DIC-05
 
 `capability-map.md` §12의 **표 첫 칸**과 `regression-ledger.md` §9의 첫 칸을 정본으로
 삼는다. **한 id가 활성과 결정 완료 양쪽에 나오면 활성이 이긴다** — §12.2가 "라운드 7에
-활성으로 복원", "임계 자체는 미결"이라 적는 행들이 그렇다. 선언 SHA `aa05167`.
+활성으로 복원", "임계 자체는 미결"이라 적는 행들이 그렇다. 선언 SHA `446a39f`.
 
 ```
 python3 - <<'PY'
@@ -649,7 +678,7 @@ exit=0
 
 ## C-7 · legacy 인용 (A6)
 
-`bid-vector` symlink가 있어야 재현된다. 선언 SHA `aa05167`.
+`bid-vector` symlink가 있어야 재현된다. 선언 SHA `446a39f`.
 
 ### C-7.1 경로 존재 · 행 범위 유효 · 파일명만 쓴 인용
 
@@ -692,9 +721,9 @@ echo "exit=$?"
 
 ```
 문서: docs/discovery/data-dictionary.md
-legacy 인용(고유 (경로,범위)): 81
-고유 경로: 35
-경로 존재 + 행 범위 유효: 81
+legacy 인용(고유 (경로,범위)): 84
+고유 경로: 36
+경로 존재 + 행 범위 유효: 84
 경로 부재: 0
 행 범위 초과/역전: 0
 파일명만 쓴 인용(디렉터리 없음): 0
@@ -839,7 +868,7 @@ KNOWN_FIELDS 고유 키: 60
 
 ## C-8 · secret 스캔
 
-선언 SHA `aa05167`.
+선언 SHA `446a39f`.
 
 ```
 grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
@@ -853,71 +882,87 @@ grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}
 
 ```
 reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
-reports/evidence/m0/0c/scope.md:113:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:761:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:766:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:776:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
-reports/evidence/m0/0c/commands.md:777:reports/evidence/m0/0c/scope.md:113:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:778:reports/evidence/m0/0c/commands.md:732:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:779:reports/evidence/m0/0c/commands.md:737:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:780:reports/evidence/m0/0c/commands.md:747:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:781:reports/evidence/m0/0c/commands.md:748:reports/evidence/m0/0c/commands.md:640:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:782:reports/evidence/m0/0c/commands.md:749:reports/evidence/m0/0c/commands.md:645:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:783:reports/evidence/m0/0c/commands.md:750:reports/evidence/m0/0c/commands.md:655:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:784:reports/evidence/m0/0c/commands.md:751:reports/evidence/m0/0c/commands.md:656:reports/evidence/m0/0c/commands.md:630:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:785:reports/evidence/m0/0c/commands.md:752:reports/evidence/m0/0c/commands.md:657:reports/evidence/m0/0c/commands.md:635:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:786:reports/evidence/m0/0c/commands.md:753:reports/evidence/m0/0c/commands.md:658:reports/evidence/m0/0c/commands.md:645:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:787:reports/evidence/m0/0c/commands.md:754:reports/evidence/m0/0c/commands.md:659:reports/evidence/m0/0c/commands.md:646:reports/evidence/m0/0c/commands.md:637:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:788:reports/evidence/m0/0c/commands.md:755:reports/evidence/m0/0c/commands.md:660:reports/evidence/m0/0c/commands.md:647:reports/evidence/m0/0c/commands.md:642:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:789:reports/evidence/m0/0c/commands.md:756:reports/evidence/m0/0c/commands.md:661:reports/evidence/m0/0c/commands.md:648:reports/evidence/m0/0c/commands.md:652:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:790:reports/evidence/m0/0c/commands.md:757:reports/evidence/m0/0c/commands.md:662:reports/evidence/m0/0c/commands.md:649:reports/evidence/m0/0c/commands.md:653:reports/evidence/m0/0c/commands.md:598:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:791:reports/evidence/m0/0c/commands.md:758:reports/evidence/m0/0c/commands.md:663:reports/evidence/m0/0c/commands.md:650:reports/evidence/m0/0c/commands.md:654:reports/evidence/m0/0c/commands.md:603:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:792:reports/evidence/m0/0c/commands.md:759:reports/evidence/m0/0c/commands.md:664:reports/evidence/m0/0c/commands.md:651:reports/evidence/m0/0c/commands.md:655:reports/evidence/m0/0c/commands.md:613:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:793:reports/evidence/m0/0c/commands.md:760:reports/evidence/m0/0c/commands.md:665:reports/evidence/m0/0c/commands.md:652:reports/evidence/m0/0c/commands.md:656:reports/evidence/m0/0c/commands.md:614:reports/evidence/m0/0c/commands.md:584:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:794:reports/evidence/m0/0c/commands.md:761:reports/evidence/m0/0c/commands.md:666:reports/evidence/m0/0c/commands.md:653:reports/evidence/m0/0c/commands.md:657:reports/evidence/m0/0c/commands.md:615:reports/evidence/m0/0c/commands.md:589:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:795:reports/evidence/m0/0c/commands.md:762:reports/evidence/m0/0c/commands.md:667:reports/evidence/m0/0c/commands.md:654:reports/evidence/m0/0c/commands.md:658:reports/evidence/m0/0c/commands.md:616:reports/evidence/m0/0c/commands.md:599:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:796:reports/evidence/m0/0c/commands.md:763:reports/evidence/m0/0c/commands.md:668:reports/evidence/m0/0c/commands.md:655:reports/evidence/m0/0c/commands.md:659:reports/evidence/m0/0c/commands.md:617:reports/evidence/m0/0c/commands.md:600:reports/evidence/m0/0c/commands.md:524:## C-8 · secret 스캔
-reports/evidence/m0/0c/commands.md:797:reports/evidence/m0/0c/commands.md:764:reports/evidence/m0/0c/commands.md:669:reports/evidence/m0/0c/commands.md:656:reports/evidence/m0/0c/commands.md:660:reports/evidence/m0/0c/commands.md:618:reports/evidence/m0/0c/commands.md:601:reports/evidence/m0/0c/commands.md:529:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
-reports/evidence/m0/0c/commands.md:798:reports/evidence/m0/0c/commands.md:765:reports/evidence/m0/0c/commands.md:670:reports/evidence/m0/0c/commands.md:657:reports/evidence/m0/0c/commands.md:661:reports/evidence/m0/0c/commands.md:619:reports/evidence/m0/0c/commands.md:602:reports/evidence/m0/0c/commands.md:539:reports/evidence/m0/0c/scope.md:98:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
-reports/evidence/m0/0c/commands.md:799:reports/evidence/m0/0c/commands.md:766:reports/evidence/m0/0c/commands.md:671:reports/evidence/m0/0c/commands.md:658:reports/evidence/m0/0c/commands.md:662:reports/evidence/m0/0c/commands.md:620:reports/evidence/m0/0c/commands.md:603:reports/evidence/m0/0c/commands.md:546:> 있는 `secret 스캔 통과`가 자기 패턴에 걸린 것이다. **이 파일이 커밋되면 위 정규식
-reports/evidence/m0/0c/commands.md:800:reports/evidence/m0/0c/commands.md:767:reports/evidence/m0/0c/commands.md:672:reports/evidence/m0/0c/commands.md:659:reports/evidence/m0/0c/commands.md:663:reports/evidence/m0/0c/commands.md:621:reports/evidence/m0/0c/commands.md:604:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
-reports/evidence/m0/0c/commands.md:801:reports/evidence/m0/0c/commands.md:768:reports/evidence/m0/0c/commands.md:673:reports/evidence/m0/0c/commands.md:660:reports/evidence/m0/0c/commands.md:664:reports/evidence/m0/0c/commands.md:622:reports/evidence/m0/0c/commands.md:611:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
-reports/evidence/m0/0c/commands.md:802:reports/evidence/m0/0c/commands.md:769:reports/evidence/m0/0c/commands.md:674:reports/evidence/m0/0c/commands.md:661:reports/evidence/m0/0c/commands.md:665:reports/evidence/m0/0c/commands.md:623:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
-reports/evidence/m0/0c/commands.md:803:reports/evidence/m0/0c/commands.md:770:reports/evidence/m0/0c/commands.md:675:reports/evidence/m0/0c/commands.md:662:reports/evidence/m0/0c/commands.md:666:reports/evidence/m0/0c/commands.md:631:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
-reports/evidence/m0/0c/commands.md:804:reports/evidence/m0/0c/commands.md:771:reports/evidence/m0/0c/commands.md:676:reports/evidence/m0/0c/commands.md:663:reports/evidence/m0/0c/commands.md:667:reports/evidence/m0/0c/commands.md:723:  축어 일치  grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RS
-reports/evidence/m0/0c/commands.md:805:reports/evidence/m0/0c/commands.md:772:reports/evidence/m0/0c/commands.md:677:reports/evidence/m0/0c/commands.md:664:reports/evidence/m0/0c/commands.md:668:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
-reports/evidence/m0/0c/commands.md:806:reports/evidence/m0/0c/commands.md:773:reports/evidence/m0/0c/commands.md:678:reports/evidence/m0/0c/commands.md:665:reports/evidence/m0/0c/commands.md:677:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
-reports/evidence/m0/0c/commands.md:807:reports/evidence/m0/0c/commands.md:774:reports/evidence/m0/0c/commands.md:679:reports/evidence/m0/0c/commands.md:666:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
-reports/evidence/m0/0c/commands.md:808:reports/evidence/m0/0c/commands.md:775:reports/evidence/m0/0c/commands.md:680:reports/evidence/m0/0c/commands.md:676:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
-reports/evidence/m0/0c/commands.md:809:reports/evidence/m0/0c/commands.md:776:reports/evidence/m0/0c/commands.md:681:reports/evidence/m0/0c/commands.md:789:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
-reports/evidence/m0/0c/commands.md:810:reports/evidence/m0/0c/commands.md:777:reports/evidence/m0/0c/commands.md:682:reports/evidence/m0/0c/commands.md:825:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
-reports/evidence/m0/0c/commands.md:811:reports/evidence/m0/0c/commands.md:778:reports/evidence/m0/0c/commands.md:683:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
-reports/evidence/m0/0c/commands.md:812:reports/evidence/m0/0c/commands.md:779:reports/evidence/m0/0c/commands.md:694:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
-reports/evidence/m0/0c/commands.md:813:reports/evidence/m0/0c/commands.md:780:reports/evidence/m0/0c/commands.md:819:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
-reports/evidence/m0/0c/commands.md:814:reports/evidence/m0/0c/commands.md:781:reports/evidence/m0/0c/commands.md:868:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
-reports/evidence/m0/0c/commands.md:815:reports/evidence/m0/0c/commands.md:782:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
-reports/evidence/m0/0c/commands.md:816:reports/evidence/m0/0c/commands.md:794:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
-reports/evidence/m0/0c/commands.md:817:reports/evidence/m0/0c/commands.md:920:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
-reports/evidence/m0/0c/commands.md:818:reports/evidence/m0/0c/commands.md:971:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
-reports/evidence/m0/0c/commands.md:819:reports/evidence/m0/0c/checklist.md:185:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
-reports/evidence/m0/0c/commands.md:822:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
-reports/evidence/m0/0c/commands.md:833:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
-reports/evidence/m0/0c/commands.md:960:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
-reports/evidence/m0/0c/commands.md:1014:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
-reports/evidence/m0/0c/checklist.md:185:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/scope.md:117:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:840:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:845:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:855:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:856:reports/evidence/m0/0c/scope.md:113:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:857:reports/evidence/m0/0c/commands.md:761:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:858:reports/evidence/m0/0c/commands.md:766:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:859:reports/evidence/m0/0c/commands.md:776:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:860:reports/evidence/m0/0c/commands.md:777:reports/evidence/m0/0c/scope.md:113:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:861:reports/evidence/m0/0c/commands.md:778:reports/evidence/m0/0c/commands.md:732:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:862:reports/evidence/m0/0c/commands.md:779:reports/evidence/m0/0c/commands.md:737:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:863:reports/evidence/m0/0c/commands.md:780:reports/evidence/m0/0c/commands.md:747:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:864:reports/evidence/m0/0c/commands.md:781:reports/evidence/m0/0c/commands.md:748:reports/evidence/m0/0c/commands.md:640:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:865:reports/evidence/m0/0c/commands.md:782:reports/evidence/m0/0c/commands.md:749:reports/evidence/m0/0c/commands.md:645:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:866:reports/evidence/m0/0c/commands.md:783:reports/evidence/m0/0c/commands.md:750:reports/evidence/m0/0c/commands.md:655:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:867:reports/evidence/m0/0c/commands.md:784:reports/evidence/m0/0c/commands.md:751:reports/evidence/m0/0c/commands.md:656:reports/evidence/m0/0c/commands.md:630:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:868:reports/evidence/m0/0c/commands.md:785:reports/evidence/m0/0c/commands.md:752:reports/evidence/m0/0c/commands.md:657:reports/evidence/m0/0c/commands.md:635:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:869:reports/evidence/m0/0c/commands.md:786:reports/evidence/m0/0c/commands.md:753:reports/evidence/m0/0c/commands.md:658:reports/evidence/m0/0c/commands.md:645:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:870:reports/evidence/m0/0c/commands.md:787:reports/evidence/m0/0c/commands.md:754:reports/evidence/m0/0c/commands.md:659:reports/evidence/m0/0c/commands.md:646:reports/evidence/m0/0c/commands.md:637:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:871:reports/evidence/m0/0c/commands.md:788:reports/evidence/m0/0c/commands.md:755:reports/evidence/m0/0c/commands.md:660:reports/evidence/m0/0c/commands.md:647:reports/evidence/m0/0c/commands.md:642:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:872:reports/evidence/m0/0c/commands.md:789:reports/evidence/m0/0c/commands.md:756:reports/evidence/m0/0c/commands.md:661:reports/evidence/m0/0c/commands.md:648:reports/evidence/m0/0c/commands.md:652:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:873:reports/evidence/m0/0c/commands.md:790:reports/evidence/m0/0c/commands.md:757:reports/evidence/m0/0c/commands.md:662:reports/evidence/m0/0c/commands.md:649:reports/evidence/m0/0c/commands.md:653:reports/evidence/m0/0c/commands.md:598:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:874:reports/evidence/m0/0c/commands.md:791:reports/evidence/m0/0c/commands.md:758:reports/evidence/m0/0c/commands.md:663:reports/evidence/m0/0c/commands.md:650:reports/evidence/m0/0c/commands.md:654:reports/evidence/m0/0c/commands.md:603:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:875:reports/evidence/m0/0c/commands.md:792:reports/evidence/m0/0c/commands.md:759:reports/evidence/m0/0c/commands.md:664:reports/evidence/m0/0c/commands.md:651:reports/evidence/m0/0c/commands.md:655:reports/evidence/m0/0c/commands.md:613:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:876:reports/evidence/m0/0c/commands.md:793:reports/evidence/m0/0c/commands.md:760:reports/evidence/m0/0c/commands.md:665:reports/evidence/m0/0c/commands.md:652:reports/evidence/m0/0c/commands.md:656:reports/evidence/m0/0c/commands.md:614:reports/evidence/m0/0c/commands.md:584:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:877:reports/evidence/m0/0c/commands.md:794:reports/evidence/m0/0c/commands.md:761:reports/evidence/m0/0c/commands.md:666:reports/evidence/m0/0c/commands.md:653:reports/evidence/m0/0c/commands.md:657:reports/evidence/m0/0c/commands.md:615:reports/evidence/m0/0c/commands.md:589:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:878:reports/evidence/m0/0c/commands.md:795:reports/evidence/m0/0c/commands.md:762:reports/evidence/m0/0c/commands.md:667:reports/evidence/m0/0c/commands.md:654:reports/evidence/m0/0c/commands.md:658:reports/evidence/m0/0c/commands.md:616:reports/evidence/m0/0c/commands.md:599:reports/evidence/m0/0c/scope.md:108:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:879:reports/evidence/m0/0c/commands.md:796:reports/evidence/m0/0c/commands.md:763:reports/evidence/m0/0c/commands.md:668:reports/evidence/m0/0c/commands.md:655:reports/evidence/m0/0c/commands.md:659:reports/evidence/m0/0c/commands.md:617:reports/evidence/m0/0c/commands.md:600:reports/evidence/m0/0c/commands.md:524:## C-8 · secret 스캔
+reports/evidence/m0/0c/commands.md:880:reports/evidence/m0/0c/commands.md:797:reports/evidence/m0/0c/commands.md:764:reports/evidence/m0/0c/commands.md:669:reports/evidence/m0/0c/commands.md:656:reports/evidence/m0/0c/commands.md:660:reports/evidence/m0/0c/commands.md:618:reports/evidence/m0/0c/commands.md:601:reports/evidence/m0/0c/commands.md:529:grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" \
+reports/evidence/m0/0c/commands.md:881:reports/evidence/m0/0c/commands.md:798:reports/evidence/m0/0c/commands.md:765:reports/evidence/m0/0c/commands.md:670:reports/evidence/m0/0c/commands.md:657:reports/evidence/m0/0c/commands.md:661:reports/evidence/m0/0c/commands.md:619:reports/evidence/m0/0c/commands.md:602:reports/evidence/m0/0c/commands.md:539:reports/evidence/m0/0c/scope.md:98:| **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · secret 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack 스킬 | `commands.md` **C-2** · **C-7** · **C-8** |
+reports/evidence/m0/0c/commands.md:882:reports/evidence/m0/0c/commands.md:799:reports/evidence/m0/0c/commands.md:766:reports/evidence/m0/0c/commands.md:671:reports/evidence/m0/0c/commands.md:658:reports/evidence/m0/0c/commands.md:662:reports/evidence/m0/0c/commands.md:620:reports/evidence/m0/0c/commands.md:603:reports/evidence/m0/0c/commands.md:546:> 있는 `secret 스캔 통과`가 자기 패턴에 걸린 것이다. **이 파일이 커밋되면 위 정규식
+reports/evidence/m0/0c/commands.md:883:reports/evidence/m0/0c/commands.md:800:reports/evidence/m0/0c/commands.md:767:reports/evidence/m0/0c/commands.md:672:reports/evidence/m0/0c/commands.md:659:reports/evidence/m0/0c/commands.md:663:reports/evidence/m0/0c/commands.md:621:reports/evidence/m0/0c/commands.md:604:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:884:reports/evidence/m0/0c/commands.md:801:reports/evidence/m0/0c/commands.md:768:reports/evidence/m0/0c/commands.md:673:reports/evidence/m0/0c/commands.md:660:reports/evidence/m0/0c/commands.md:664:reports/evidence/m0/0c/commands.md:622:reports/evidence/m0/0c/commands.md:611:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:885:reports/evidence/m0/0c/commands.md:802:reports/evidence/m0/0c/commands.md:769:reports/evidence/m0/0c/commands.md:674:reports/evidence/m0/0c/commands.md:661:reports/evidence/m0/0c/commands.md:665:reports/evidence/m0/0c/commands.md:623:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:886:reports/evidence/m0/0c/commands.md:803:reports/evidence/m0/0c/commands.md:770:reports/evidence/m0/0c/commands.md:675:reports/evidence/m0/0c/commands.md:662:reports/evidence/m0/0c/commands.md:666:reports/evidence/m0/0c/commands.md:631:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:887:reports/evidence/m0/0c/commands.md:804:reports/evidence/m0/0c/commands.md:771:reports/evidence/m0/0c/commands.md:676:reports/evidence/m0/0c/commands.md:663:reports/evidence/m0/0c/commands.md:667:reports/evidence/m0/0c/commands.md:723:  축어 일치  grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RS
+reports/evidence/m0/0c/commands.md:888:reports/evidence/m0/0c/commands.md:805:reports/evidence/m0/0c/commands.md:772:reports/evidence/m0/0c/commands.md:677:reports/evidence/m0/0c/commands.md:664:reports/evidence/m0/0c/commands.md:668:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:889:reports/evidence/m0/0c/commands.md:806:reports/evidence/m0/0c/commands.md:773:reports/evidence/m0/0c/commands.md:678:reports/evidence/m0/0c/commands.md:665:reports/evidence/m0/0c/commands.md:677:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:890:reports/evidence/m0/0c/commands.md:807:reports/evidence/m0/0c/commands.md:774:reports/evidence/m0/0c/commands.md:679:reports/evidence/m0/0c/commands.md:666:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:891:reports/evidence/m0/0c/commands.md:808:reports/evidence/m0/0c/commands.md:775:reports/evidence/m0/0c/commands.md:680:reports/evidence/m0/0c/commands.md:676:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:892:reports/evidence/m0/0c/commands.md:809:reports/evidence/m0/0c/commands.md:776:reports/evidence/m0/0c/commands.md:681:reports/evidence/m0/0c/commands.md:789:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/commands.md:893:reports/evidence/m0/0c/commands.md:810:reports/evidence/m0/0c/commands.md:777:reports/evidence/m0/0c/commands.md:682:reports/evidence/m0/0c/commands.md:825:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/commands.md:894:reports/evidence/m0/0c/commands.md:811:reports/evidence/m0/0c/commands.md:778:reports/evidence/m0/0c/commands.md:683:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:895:reports/evidence/m0/0c/commands.md:812:reports/evidence/m0/0c/commands.md:779:reports/evidence/m0/0c/commands.md:694:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:896:reports/evidence/m0/0c/commands.md:813:reports/evidence/m0/0c/commands.md:780:reports/evidence/m0/0c/commands.md:819:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/commands.md:897:reports/evidence/m0/0c/commands.md:814:reports/evidence/m0/0c/commands.md:781:reports/evidence/m0/0c/commands.md:868:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/commands.md:898:reports/evidence/m0/0c/commands.md:815:reports/evidence/m0/0c/commands.md:782:reports/evidence/m0/0c/checklist.md:182:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:899:reports/evidence/m0/0c/commands.md:816:reports/evidence/m0/0c/commands.md:794:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:900:reports/evidence/m0/0c/commands.md:817:reports/evidence/m0/0c/commands.md:920:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/commands.md:901:reports/evidence/m0/0c/commands.md:818:reports/evidence/m0/0c/commands.md:971:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/commands.md:902:reports/evidence/m0/0c/commands.md:819:reports/evidence/m0/0c/checklist.md:185:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:903:reports/evidence/m0/0c/commands.md:822:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:904:reports/evidence/m0/0c/commands.md:833:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:905:reports/evidence/m0/0c/commands.md:960:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/commands.md:906:reports/evidence/m0/0c/commands.md:1014:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/commands.md:907:reports/evidence/m0/0c/checklist.md:185:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+reports/evidence/m0/0c/commands.md:910:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:912:reports/evidence/m0/0c/commands.md:776:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:913:reports/evidence/m0/0c/commands.md:822:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:924:> `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
+reports/evidence/m0/0c/commands.md:1051:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/commands.md:1105:  축어 일치            grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEG
+reports/evidence/m0/0c/checklist.md:188:| secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
 exit=0
 --- 사업자/채널 식별자 패턴 ---
 reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
-reports/evidence/m0/0c/commands.md:770:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
-reports/evidence/m0/0c/commands.md:776:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
-reports/evidence/m0/0c/commands.md:822:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
-reports/evidence/m0/0c/commands.md:823:reports/evidence/m0/0c/commands.md:741:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
-reports/evidence/m0/0c/commands.md:824:reports/evidence/m0/0c/commands.md:785:reports/evidence/m0/0c/commands.md:649:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
-reports/evidence/m0/0c/commands.md:825:reports/evidence/m0/0c/commands.md:786:reports/evidence/m0/0c/commands.md:686:reports/evidence/m0/0c/commands.md:639:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
-reports/evidence/m0/0c/commands.md:826:reports/evidence/m0/0c/commands.md:787:reports/evidence/m0/0c/commands.md:687:reports/evidence/m0/0c/commands.md:669:reports/evidence/m0/0c/commands.md:646:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
-reports/evidence/m0/0c/commands.md:827:reports/evidence/m0/0c/commands.md:788:reports/evidence/m0/0c/commands.md:688:reports/evidence/m0/0c/commands.md:670:reports/evidence/m0/0c/commands.md:671:reports/evidence/m0/0c/commands.md:607:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
-reports/evidence/m0/0c/commands.md:828:reports/evidence/m0/0c/commands.md:789:reports/evidence/m0/0c/commands.md:689:reports/evidence/m0/0c/commands.md:671:reports/evidence/m0/0c/commands.md:672:reports/evidence/m0/0c/commands.md:626:reports/evidence/m0/0c/commands.md:593:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
-reports/evidence/m0/0c/commands.md:829:reports/evidence/m0/0c/commands.md:790:reports/evidence/m0/0c/commands.md:690:reports/evidence/m0/0c/commands.md:672:reports/evidence/m0/0c/commands.md:673:reports/evidence/m0/0c/commands.md:627:reports/evidence/m0/0c/commands.md:607:reports/evidence/m0/0c/commands.md:533:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:849:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:855:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:859:reports/evidence/m0/0c/commands.md:776:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:903:reports/evidence/m0/0c/commands.md:822:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:910:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:911:reports/evidence/m0/0c/commands.md:770:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:912:reports/evidence/m0/0c/commands.md:776:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:913:reports/evidence/m0/0c/commands.md:822:reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+reports/evidence/m0/0c/commands.md:914:reports/evidence/m0/0c/commands.md:823:reports/evidence/m0/0c/commands.md:741:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:915:reports/evidence/m0/0c/commands.md:824:reports/evidence/m0/0c/commands.md:785:reports/evidence/m0/0c/commands.md:649:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:916:reports/evidence/m0/0c/commands.md:825:reports/evidence/m0/0c/commands.md:786:reports/evidence/m0/0c/commands.md:686:reports/evidence/m0/0c/commands.md:639:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:917:reports/evidence/m0/0c/commands.md:826:reports/evidence/m0/0c/commands.md:787:reports/evidence/m0/0c/commands.md:687:reports/evidence/m0/0c/commands.md:669:reports/evidence/m0/0c/commands.md:646:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:918:reports/evidence/m0/0c/commands.md:827:reports/evidence/m0/0c/commands.md:788:reports/evidence/m0/0c/commands.md:688:reports/evidence/m0/0c/commands.md:670:reports/evidence/m0/0c/commands.md:671:reports/evidence/m0/0c/commands.md:607:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:919:reports/evidence/m0/0c/commands.md:828:reports/evidence/m0/0c/commands.md:789:reports/evidence/m0/0c/commands.md:689:reports/evidence/m0/0c/commands.md:671:reports/evidence/m0/0c/commands.md:672:reports/evidence/m0/0c/commands.md:626:reports/evidence/m0/0c/commands.md:593:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
+reports/evidence/m0/0c/commands.md:920:reports/evidence/m0/0c/commands.md:829:reports/evidence/m0/0c/commands.md:790:reports/evidence/m0/0c/commands.md:690:reports/evidence/m0/0c/commands.md:672:reports/evidence/m0/0c/commands.md:673:reports/evidence/m0/0c/commands.md:627:reports/evidence/m0/0c/commands.md:607:reports/evidence/m0/0c/commands.md:533:grep -rnE "([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)" \
 ```
 
 > **매치는 전부 그 단어를 말하는 산문이거나 위 정규식 자체이고 값이 아니다** —
@@ -950,7 +995,7 @@ exit=0
 
 ## C-10 · 출력 블록의 **축어 재현** — 두 환경에서 잰다
 
-**대상 파일** — **이 파일 자신**(읽는 체크아웃의 내용). **실행 트리** — `aa05167`
+**대상 파일** — **이 파일 자신**(읽는 체크아웃의 내용). **실행 트리** — `446a39f`
 (C-1 ~ C-9가 선언한 SHA).
 
 **그래서 이 검사는 「리뷰 대상 `commands.md`가 있는 체크아웃」에서 돌려야 한다.**
@@ -977,13 +1022,13 @@ exit=0
 
 ```
 # SELF-EXCLUDE-C10 — 이 표지가 있는 블록은 검사에서 뺀다(자기 자신).
-# 대상 파일 = 이 파일 자신(읽는 체크아웃의 내용) · 실행 트리 = aa05167 (블록들이 선언한 SHA)
+# 대상 파일 = 이 파일 자신(읽는 체크아웃의 내용) · 실행 트리 = 446a39f (블록들이 선언한 SHA)
 # bid-vector · _workspace 는 git 이 추적하지 않아 SHA 에서 복원할 수 없다.
 # 실행 CWD 에 있으면 연결하고, 없으면 그 사실을 출력에 낸다.
 WT="$(mktemp -d)/wt"
 # 실패해도 worktree 를 남기지 않는다 — 검사가 영속 git metadata 를 남기면 안 된다.
 trap 'git worktree remove --force "$WT" >/dev/null 2>&1; git worktree prune' EXIT
-git worktree add --detach "$WT" aa05167 >/dev/null 2>&1
+git worktree add --detach "$WT" 446a39f >/dev/null 2>&1
 [ -d bid-vector ] && ln -sfn "$(cd bid-vector && pwd -P)" "$WT/bid-vector"
 [ -d _workspace ] && ln -sfn "$(cd _workspace && pwd -P)" "$WT/_workspace"
 cp reports/evidence/m0/0c/commands.md "$WT/.blocks.md"
@@ -1034,13 +1079,13 @@ echo "exit=$?"
 ```
 환경 전제 — bid-vector: 있음 · _workspace: 있음
   축어 일치            # diff 가 낸 줄을 그대로 실으면 이 파일이 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
-  축어 일치            for c in $(git log --format='%H' 2b05684..aa05167 \
+  축어 일치            for c in $(git log --format='%H' 2b05684..446a39f \
   축어 일치            # 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
   축어 일치            python3 - <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
   축어 일치            python3 - <<'PY'
-  축어 일치            for c in $(git log --format='%H' 2b05684..aa05167 \
+  축어 일치            for c in $(git log --format='%H' 2b05684..446a39f \
   축어 일치            grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary
   축어 일치            python3 - <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
@@ -1070,7 +1115,7 @@ CT="$(mktemp -d)/cleanwt"
 # 실패해도 worktree 를 남기지 않는다 — 검사가 영속 git metadata 를 남기면 안 된다.
 # 지우기 전에 CWD 를 돌려놓는다 — 안에 선 채로 지우면 이후 git 이 CWD 를 못 읽는다.
 trap 'cd "$ROOT"; git worktree remove --force "$CT" >/dev/null 2>&1; git worktree prune' EXIT
-git worktree add --detach "$CT" aa05167 >/dev/null 2>&1
+git worktree add --detach "$CT" 446a39f >/dev/null 2>&1
 cp reports/evidence/m0/0c/commands.md "$CT/reports/evidence/m0/0c/commands.md"
 python3 - "$CT" <<'PY'
 import pathlib, sys
@@ -1088,13 +1133,13 @@ cd "$CT" && bash .c10.sh
 ```
 환경 전제 — bid-vector: 없음 · _workspace: 없음
   환경 부족(_workspace)  # diff 가 낸 줄을 그대로 실으면 이 파일이 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
-  축어 일치            for c in $(git log --format='%H' 2b05684..aa05167 \
+  축어 일치            for c in $(git log --format='%H' 2b05684..446a39f \
   축어 일치            # 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
   축어 일치            python3 - <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
   축어 일치            python3 - <<'PY'
-  축어 일치            for c in $(git log --format='%H' 2b05684..aa05167 \
+  축어 일치            for c in $(git log --format='%H' 2b05684..446a39f \
   축어 일치            grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary
   축어 일치            python3 - <<'PY'
   환경 부족(bid-vector)  python3 - docs/discovery/data-dictionary.md <<'PY'
