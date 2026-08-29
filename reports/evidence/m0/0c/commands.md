@@ -356,10 +356,9 @@ exit=0
 **그 포함 관계도 산문의 주장이 아니라 블록이 실행으로 잰다** — `선언 앵커가 읽은 자리 ⊆
 사각지대 앵커가 본 자리`가 깨지면 `FAIL`이다. **사각지대가 무엇인지도 이 블록이 낸다.**
 
-**빼는 것은 규칙이 아니라 이름 목록으로 한다** — ③이 내는 이름 가운데 필드가 아닌 것은
-`NOT_A_FIELD`가, 「이름(」 이지만 타입 선언이 아닌 자리(함수·술어 호출)는 `NOT_A_DECL`이
-이름째 뺀다. 규칙으로 빼는 것은 commit 해시 하나뿐이다. **목록 밖의 새 이름은 `FAIL`이
-된다** — 분류되지 않은 이름이 조용히 통과하지 않게 하는 것이 두 목록의 목적이다.
+**빼는 것은 되도록 규칙이 아니라 이름 목록으로 한다** — 규칙은 조용히 넓어지지만 목록은
+밖의 새 이름을 `FAIL`로 낸다. **어떤 갈래로 몇 개를 뺐는지, 규칙으로 뺀 것이 무엇인지는
+블록이 낸다** — 갈래를 산문이 세면 새 갈래가 늘 때 이 자리가 낡는다.
 
 **덮개는 §12.2의 「표 칸」만 센다** — 그 절의 산문에 나오는 이름은 분류가 아니므로 덮개가
 아니다.
@@ -475,8 +474,14 @@ loose = {}
 for i, l in enumerate(body.split("\n")):
     for m in LOOSE.finditer(l): loose.setdefault(m.group(1), []).append(i + 1)
 missing = sorted(n for n in found if n not in covered)
-unclassified = sorted(n for n in loose if n not in covered and n not in found
-                      and n not in NOT_A_FIELD and not HASH.match(n))
+# ③이 낸 이름을 빼는 갈래를 **명령이 세어 낸다** — 산문이 「둘 다 아니면 FAIL」이라
+# 적어 세 번째 갈래(commit 해시 규칙)를 빠뜨렸던 자리다.
+route = {"덮개": [], "①② 추출": [], "NOT_A_FIELD 목록": [], "commit 해시 규칙": [], "남은 것": []}
+for n in sorted(loose):
+    route[("덮개" if n in covered else "①② 추출" if n in found
+           else "NOT_A_FIELD 목록" if n in NOT_A_FIELD
+           else "commit 해시 규칙" if HASH.match(n) else "남은 것")].append(n)
+unclassified = route["남은 것"]
 print(f"문서: {DOC}")
 print(f"§12.2 표 칸이 덮는 이름: {len(covered)}")
 print(f"① 타입 선언 인자 + ② 필드·성분 표에서 뽑은 이름: {len(found)}  미덮개: {len(missing)}")
@@ -485,6 +490,8 @@ print(f"③ 본문의 단독 백틱 이름: {len(loose)}  덮개·①②·목록
 for n in unclassified: print(f"    {n!r} @ 본문 행 {loose[n][:6]}")
 print("--- 이 블록이 자기 범위와 예외를 스스로 낸다 ---")
 print(f"① 선언 앵커 {DECL.pattern}  ·  인자 이름 규칙 {NAME.pattern}  ·  ③ 단독 이름 규칙 {LOOSE.pattern}")
+print("③이 낸 이름을 빼는 갈래 — " + " · ".join(f"{k} {len(v)}" for k, v in route.items()))
+print(f"    규칙으로 빼는 갈래는 commit 해시({HASH.pattern}) 하나뿐이고 그것이 뺀 이름: {route['commit 해시 규칙']}")
 print("--- 못 본 것을 세는 앵커는 보는 앵커보다 넓다 — 그 관계도 실행이 잰다 ---")
 print(f"사각지대 앵커 {SITE.pattern}")
 print(f"선언 앵커가 읽은 자리 {n_decl} ⊆ 사각지대 앵커가 본 자리 {n_site} — 그 밖으로 샌 자리: {leaked}")
