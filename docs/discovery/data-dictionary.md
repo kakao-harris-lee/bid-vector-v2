@@ -1380,10 +1380,22 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 
 ### 12.2 타입이 나르는 필드 — 수인 것과 수가 아닌 것
 
-**§12.1은 숫자 *리터럴*만 덮는다.** 필드도 수를 나르므로 **이 문서가 선언한 모든 타입의
-모든 필드**를 여기 등재하고, **수인 것에는 단위·basis·provenance를, 수가 아닌 것에는
-그 사실을** 적는다. 검사는 `commands.md` **C-4.2**다 — **필드 이름을 기계로 뽑아 이 표의
-덮개를 대조**한다.
+**§12.1은 숫자 *리터럴*만 덮는다.** 필드도 수를 나르므로 이 표가 **필드**를 받아
+**수인 것에는 단위·basis·provenance를, 수가 아닌 것에는 그 사실을** 적는다.
+
+**「모든 필드」라고 쓰지 않는다.** 덮는 범위를 정하는 것은 이 문장이 아니라
+`commands.md` **C-4.2**이며, 그 블록은 **① 타입 선언의 인자 목록** · **② 머리 칸이
+「필드」·「성분」인 표** · **③ 본문의 단독 백틱 이름** 세 자리에서 이름을 뽑는다.
+**그 셋이 낸 이름은 이 표가 덮거나 그 블록이 「필드가 아님」으로 이름째 분류한다** —
+둘 다 아니면 `FAIL`이다.
+
+> **⚠ 정정** — 앞서 이 자리는 *"이 문서가 선언한 **모든** 타입의 **모든** 필드를 여기
+> 등재하고"*라 적었고 **그것은 거짓이었다**: `entries`(§4.1)와 `isAuthoritative`(§5.1)가
+> 등재돼 있지 않았다. **원인은 셈이 아니라 순서다** — 그때의 `C-4.2`는 중첩 괄호와
+> 블록인용 줄바꿈을 못 읽어 그 둘을 **보지 못한 채 `PASS`를 냈고**, 이 문장이 그 `PASS`
+> 위에 전칭을 얹었다. **덮개가 못 보는 것을 재기 전에 전칭을 쓰지 않는다.** 그래서
+> 전칭을 지우고 **범위를 그 블록에 넘겼으며**, 그 블록이 **자기가 못 본 자리를 같은
+> 실행에서 이름째 낸다.** 빠져 있던 두 필드는 아래 표에 등재했다.
 
 #### 수를 나르는 필드
 
@@ -1414,16 +1426,17 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 | 갈래 | 필드 |
 | --- | --- |
 | **열거·sealed 값** | `basis` · `biasDirection` · `nullability` · `provenance` · `reason` · `reasons` · `regime` · `scale` · `vatTreatment` · `currency` |
-| **불리언** | `authoritative` (`KonepsFieldContract`) — **술어가 아니라 데이터로 선언한다**(§5.1) |
+| **불리언** | `authoritative` (`KonepsFieldContract`) · `isAuthoritative` (`FactProvenance` — §5.1) — 둘 다 **술어가 아니라 데이터로 선언한다** |
 | **식별자** — 수처럼 보여도 셈이 아니다. **정수 변환 금지**(§5.3의 공고 차수와 같은 부류) | `limitGroupNo` · `licenseRegionCode` · `noticeRevision` · `observationKey` · `key` · `sourceKey` · `modelArtifactId` · `inputSnapshotHash` · `policyVersion` |
 | **시각·날짜** | `decidedAt` · `measuredAt` · `observedAt` · `settlementObservedAt` · `effectiveFrom` |
 | **텍스트·이름** | `concept` · `definition` · `detail` · `licenseRegionName` · `method` · `population` · `rawName` · `source` · `unit` |
-| **집합·구조** | `missingByGroup` · `satisfiedGroup` · `payload` · `presentIn` · `row` |
+| **집합·구조** | `entries` (`EffectiveDatedPolicy` — 유효일자와 값의 쌍 목록, §4.1) · `missingByGroup` · `satisfiedGroup` · `payload` · `presentIn` · `row` |
 | **경계 표의 비수치 필드**(§6.2) | `review_required`(불리언 — **업무 판정이므로 Kotlin 소유**) · `regimeLabel` · `signals` |
 
-> **이 표가 덮는 범위**: **이 문서가 선언한 타입의 필드**와 **머리 칸이 「필드」·「성분」인
-> 표가 선언한 필드**다. 필드가 늘면 **C-4.2가 그 사실을 낸다** — 표에 없는 이름이 나오면
-> 미덮개로 찍힌다.
+> **이 표가 덮는 범위는 `C-4.2`의 세 자리가 정한다** — ① 타입 선언의 인자 목록 ·
+> ② 머리 칸이 「필드」·「성분」인 표 · ③ 본문의 단독 백틱 이름. 필드가 늘면 **그 블록이
+> 그 사실을 낸다** — 이 표에 없고 「필드가 아님」으로도 분류되지 않은 이름은 미덮개로
+> 찍힌다.
 >
 > **`C-4.2`가 못 보는 자리는 산문이 적지 않고 그 실행이 낸다.** 그 블록은 자기가
 > **통째로 못 읽은 선언 자리** · **이름 규칙 밖 인자** · **이름 없이 타입만 적힌 인자** ·
