@@ -6,10 +6,10 @@
 
 ## 선언 SHA와 실행 계약
 
-**출력 블록은 `f207412` 트리에서 뜬 것이다** — **예외는 아래 표의 「재현 래칫」 열이
+**출력 블록은 `0767525` 트리에서 뜬 것이다** — **예외는 아래 표의 「재현 래칫」 열이
 `제외`인 블록들이고, 그 열의 값을 사람이 정하지 않는다.** C-11의 스크립트가 명령 블록의
 문면에서 정하며, **무엇이 어느 사유로 빠졌는지는 C-11 출력이 쌍마다 낸다.**
-커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`f207412`로 그대로
+커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`0767525`로 그대로
 지목한다.** 다른 커밋과의 관계로 부르지 않는다: 관계는 뒤 편집이 들어올 때마다 낡는다.
 
 **제외의 축은 「트리를 고정하면 답도 고정되는가」다.** 선언 SHA 트리 밖의 상태를 읽는
@@ -21,10 +21,10 @@
 
 | 블록 | 읽는 것 | 선언 SHA | 재현 래칫 |
 | --- | --- | --- | --- |
-| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`f207412`** | 대조 |
+| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`0767525`** | 대조 |
 | C-5.1 ~ C-5.5 | legacy `bid-vector`만 | **`ed4b06c`** (이 저장소의 어느 HEAD에서도 같다) | 대조 |
-| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`f207412` + `ed4b06c`** | 대조 |
-| C-12.1 · C-12.2 | **양쪽** — 리뷰 레인 산출물(`_workspace/`)·`~/.codex` 실물과 **등재된 verdict JSON**(이 저장소) | **`f207412`** + 저장소 밖 실물 | **제외 `EXT`** — 트리의 함수가 아니다 |
+| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`0767525` + `ed4b06c`** | 대조 |
+| C-12.1 · C-12.2 | **양쪽** — 리뷰 레인 산출물(`_workspace/`)·`~/.codex` 실물과 **등재된 verdict JSON**(이 저장소) | **`0767525`** + 저장소 밖 실물 | **제외 `EXT`** — 트리의 함수가 아니다 |
 | C-11 | 이 파일 자신 ↔ 선언 SHA 트리 | **HEAD** (그 블록이 사유를 적는다) | **제외 `SELF`** |
 
 ### 실행 계약
@@ -55,7 +55,7 @@ git status --porcelain | grep -vc '^??' | sed 's/^/tracked_dirty=/'
 ```
 
 ```
-f2074125fca0edeac3ab4a29cb080a01c37fd63d
+07675259c124baddb540713a34df45f055e6d579
 tracked_dirty=0
 ```
 
@@ -76,7 +76,7 @@ git diff --check 998dc21...HEAD -- docs/adr reports/evidence/m0/0d | wc -l | sed
 ```
 
 ```
-slice_commits=30
+slice_commits=39
 slice_paths=14
 out_of_scope_paths=0
 whitespace_problems=0
@@ -1277,7 +1277,7 @@ taken_at=2026-08-29T11:32:32Z
 
 ```
 # ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다 (SELF)
-DECL=f207412
+DECL=0767525
 WT=$(mktemp -d)/wt
 git worktree add --detach "$WT" "$DECL" >/dev/null 2>&1
 ln -sfn "$PWD/bid-vector" "$WT/bid-vector"
@@ -1331,38 +1331,39 @@ git worktree remove --force "$WT"
 ```
 
 ```
-pair  0 L48    OK    git rev-parse HEAD
-pair  1 L69    OK    T0=$(mktemp -d)
-pair  2 L125   OK    T=$(mktemp -d)
-pair  3 L152   OK    # adrscan.py 는 C-3 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않는
-pair  4 L175   OK    git log --format='%H %s' 998dc21..HEAD | grep 'm0-0d' |
-pair  5 L209   OK    cd bid-vector
-pair  6 L278   OK    cd bid-vector
-pair  7 L295   OK    awk -F'\t' '$4>50 {printf "%s:%d-%d\t%d\t%s\n", $1,$2,$3
-pair  8 L349   OK    cd bid-vector
-pair  9 L420   OK    cd bid-vector
-pair 10 L491   OK    cd bid-vector
-pair 11 L541   OK    cd bid-vector
-pair 12 L574   OK    cd bid-vector
-pair 13 L613   OK    cd bid-vector
-pair 14 L722   OK    T=$(mktemp -d)
-pair 15 L777   OK    # citescan.py 는 C-6 블록이 만든 "$T" 의 것을 그대로 쓴다 — T 를 덮어쓰지 않
-pair 16 L872   OK    T=$(mktemp -d)
-pair 17 L914   OK    # ops07scan.py 는 C-7 블록이 만든 "$T" 의 것을 그대로 쓴다
-pair 18 L933   OK    xargs grep -nEi 'api[_-]?key|secret|token|password|passw
-pair 19 L957   OK    grep -ci 'react' docs/discovery/capability-map.md | sed
-pair 20 L969   OK    grep -h '^### Slice' milestone-*.md | wc -l | sed 's/^ *
-pair 21 L984   OK    grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md |
-pair 22 L1022  OK    grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md | sort -u |
-pair 23 L1047  OK    grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/adr/*.md | g
-pair 24 L1082  OK    T=$(mktemp -d)
-pair 25 L1114  OK    echo "-- ADR 안의 OPS-13 전수"
-pair 26 L1164  OK    echo "-- 실행 메타 · 출처: _workspace/m0-0d/codex.raw-output.t
-pair 27 L1203  OK    echo "-- preflight ① consolidate 이후 이 저장소 흔적"
-pairs=28 skipped_harness=1 diff=0
+pair  0 L58    OK                                 git rev-parse HEAD
+pair  1 L79    OK                                 T0=$(mktemp -d)
+pair  2 L135   OK                                 T=$(mktemp -d)
+pair  3 L162   OK                                 # adrscan.py 는 C-3 블록이 만든 "$T" 의 것을 그대로 쓴다 —
+pair  4 L185   OK                                 git log --format='%H %s' 998dc21..HEAD | gre
+pair  5 L219   OK                                 cd bid-vector
+pair  6 L288   OK                                 cd bid-vector
+pair  7 L305   OK                                 awk -F'\t' '$4>50 {printf "%s:%d-%d\t%d\t%s\
+pair  8 L359   OK                                 cd bid-vector
+pair  9 L430   OK                                 cd bid-vector
+pair 10 L501   OK                                 cd bid-vector
+pair 11 L551   OK                                 cd bid-vector
+pair 12 L584   OK                                 cd bid-vector
+pair 13 L623   OK                                 cd bid-vector
+pair 14 L732   OK                                 T=$(mktemp -d)
+pair 15 L787   OK                                 # citescan.py 는 C-6 블록이 만든 "$T" 의 것을 그대로 쓴다
+pair 16 L882   OK                                 T=$(mktemp -d)
+pair 17 L924   OK                                 # ops07scan.py 는 C-7 블록이 만든 "$T" 의 것을 그대로 쓴다
+pair 18 L943   OK                                 xargs grep -nEi 'api[_-]?key|secret|token|pa
+pair 19 L967   OK                                 grep -ci 'react' docs/discovery/capability-m
+pair 20 L979   OK                                 grep -h '^### Slice' milestone-*.md | wc -l
+pair 21 L994   OK                                 grep -ho 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs
+pair 22 L1032  OK                                 grep -ho 'OPEN-ADR-[0-9]\{2\}' docs/adr/*.md
+pair 23 L1057  OK                                 grep -n 'OPEN-[A-Z]\{2,4\}-[0-9]\{2\}' docs/
+pair 24 L1092  OK                                 T=$(mktemp -d)
+pair 25 L1124  OK                                 echo "-- ADR 안의 OPS-13 전수"
+pair 26 L1184  SKIP EXT <_workspace/>             echo "-- 실행 메타 · 출처: _workspace/m0-0d/codex.
+pair 27 L1225  SKIP EXT <~/>                      echo "-- preflight ① consolidate 이후 이 저장소 흔적
+pair 28 L1334  SKIP SELF <==0D-BLOCK-HARNESS==>   # ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다 (S
+pairs_total=29 replayed=26 skipped_SELF=1 skipped_EXT=2 diff=0
 ```
 
-**판정**: `diff=0`이면 **위 출력이 `replayed=`로 센 쌍이 선언 SHA `f207412`의 트리에서
+**판정**: `diff=0`이면 **위 출력이 `replayed=`로 센 쌍이 선언 SHA `0767525`의 트리에서
 축어로 다시 뜬다.** 빠진 쌍은 `SKIP` 행이 사유 코드와 **그 사유의 근거 토큰**까지 함께
 내고, 사유별 수는 마지막 줄의 `skipped_SELF=`·`skipped_EXT=`가 낸다.
 
