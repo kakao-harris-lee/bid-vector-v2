@@ -182,7 +182,7 @@ slice의 몫이다(`regression-ledger.md` §10.3).
 | secret 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
 | `git diff --check` 0 | `commands.md` **C-2.2** — **`base_sha` 기준과 `review_base` 기준을 함께 낸다.** 그 블록은 **선언 SHA 하나만** 재고 커밋 이력만 읽으므로 `bid-vector`·`_workspace` 없이도 재현된다. 리뷰 시점의 HEAD로 확인하려면 그 블록의 SHA 자리를 HEAD로 바꾼다. **이 검사가 지적을 낸 적이 있고 그때마다 명령을 고쳤다** — 이력은 `scope.md`의 커밋 표에 있다. **C-10은 이 축을 재지 않는다** |
 | `in_scope` 밖 경로 변경 0 | `commands.md` **C-2.1** — 이 slice의 커밋을 고른 뒤 **그 커밋이 건드린 경로 전부**를 본다 |
-| **기록된 출력이 실제 stdout인가** | `commands.md` **C-10** — 대상 파일과 실행 트리를 SHA로 고정하고 각 블록의 stdout을 기록과 **문자열 동등** 비교한다. **두 SHA만으로는 결과가 정해지지 않는다** — `bid-vector`·`_workspace`가 git 미추적이라 **CWD에 그 둘이 있는지가 결과를 가른다.** 그래서 **C-10.1(있는 트리) · C-10.2(없는 clean worktree) 두 환경에서 각각 잰다.** 그 검사는 **자기 자신을 포함하지 않는다** |
+| **기록된 출력이 실제 stdout인가** | `commands.md` **C-10** — **이 파일 자신**을 대상으로 삼고 **실행 트리를 SHA로 고정**해 각 블록의 stdout을 기록과 **문자열 동등** 비교한다. **실행 트리 고정만으로는 결과가 정해지지 않는다** — `bid-vector`·`_workspace`가 git 미추적이라 **CWD에 그 둘이 있는지가 결과를 가른다.** 그래서 **C-10.1(있는 트리) · C-10.2(없는 clean worktree) 두 환경에서 각각 잰다.** **이 절 자신은 표지로 걸러 뺀다** |
 
 ---
 
