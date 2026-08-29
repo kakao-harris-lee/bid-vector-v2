@@ -461,7 +461,7 @@ for span in (flat(sp) for sp in re.findall(r"`([^`]+)`", body)):
             if tname in LEGACY_DECLS: legacy_args.append(f"{tname}({n})")
             elif NAME.fullmatch(n): found.setdefault(n, set()).add(tname)
             elif re.fullmatch(r"[A-Z][A-Za-z0-9]*", n): type_only.append((n, tname))
-            else: off_name.append((n, tname))
+            else: off_name.append(f"{tname}({n})")
     m2 = re.match(r"^([a-z][A-Za-z0-9]*)\s*:\s*[A-Z]", span)
     if m2: found.setdefault(m2.group(1), set()).add("(단독 선언)")
 hdr = False
@@ -492,7 +492,8 @@ print(f"통째로 못 읽은 선언 자리: {len(unread)} (NOT_A_DECL 로 가른
       + ("" if not unread else " -> " + repr(unread)))
 print(f"legacy 선언 축어 인용의 인자(V2 필드가 아니다): {len(legacy_args)}자리")
 print(wrap("    ", sorted(legacy_args)))
-print(f"이름 규칙 밖 인자: {len(off_name)}" + ("" if not off_name else " -> " + repr(sorted(off_name))))
+print(f"이름 규칙 밖 인자(legacy 선언 밖): {len(off_name)}자리")
+print(wrap("    ", sorted(off_name)))
 print(f"이름 없이 타입만 적힌 인자: {len(type_only)} — {sorted({t[1] for t in type_only})}")
 print(f"덮개에만 있는 이름(①②③이 못 내는 자리 — 손 등재): {sorted(covered - set(found) - set(loose))}")
 print("PASS" if not missing and not unclassified and not unread and not off_name and not leaked else "FAIL")
@@ -514,9 +515,9 @@ PASS
 exit=0
 ```
 
-> **`snake_case` 인자와 「한 칸에 여러 이름을 적은 표 행」은 ①②가 뽑지 못한다.**
-> 그 두 자리를 **산문에 목록으로 두지 않는다** — 위 출력의 **`이름 규칙 밖 인자`**와
-> **`덮개에만 있는 이름`**이 각각을 **이름째** 낸다.
+> **이 검사가 무엇을 보고 무엇을 빼고 무엇을 못 보는지는 위 출력이 낸다** — 셈만 내고
+> 이름을 삼키는 줄을 두지 않으므로, **새 이름이 셈에만 얹혀 조용히 빠지지 않는다.**
+> 여기 옮겨 적지 않는다.
 >
 > **③은 백틱으로 적힌 lowerCamel 이름만 본다.** `review_required`처럼 밑줄이 든 이름은
 > ③이 못 보고 **덮개에서만 나온다** — 그것이 위 출력의 마지막 줄이 세는 자리다.
