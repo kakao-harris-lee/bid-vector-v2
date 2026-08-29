@@ -46,7 +46,7 @@ rollback: "N/A — 문서 산출물은 git revert로 복구. 애플리케이션 
 | 0006 | `docs/adr/0006-gradle-modules.md` | 2 — Gradle module과 의존 방향 |
 | 0007 | `docs/adr/0007-test-pyramid-and-ratchet.md` | 7 — 테스트 pyramid와 mutation 대상 |
 | 0008 | `docs/adr/0008-frontend-disposition.md` | 8 — React UI 재사용/재작성/후속 여부 |
-| 0009 | `docs/adr/0009-ml-reuse-provenance.md` | 9 — ML 재활용 출처 기록 위치 (**OPEN**) |
+| 0009 | `docs/adr/0009-ml-reuse-provenance.md` | 9 — ML 재활용 출처 기록 위치 (**결정** — 운영자 2026-08-29) |
 
 **ADR 번호가 결정 번호와 어긋난다.** ADR 번호는 부여 순서이고 결정 번호는
 `milestone-0.md`의 열거 순서다. 위 표가 둘의 대응이며, 각 ADR 머리에도 같은 대응이 있다.
@@ -139,10 +139,13 @@ A2에 적었던 *"채택/불채택 판정"*은 **실제보다 강한 주장**이
 
 ## 이 slice가 새로 등록하는 `OPEN`
 
-**11건을 신설했다.** 근거가 없는 자리를 확정 서술로 채우는 대신 등록한다 —
-`milestone-0.md`가 *"모호한 항목은 기존 Python 구현을 정답으로 채우지 말고 `OPEN`으로
-남겨 사용자 결정을 요청한다"*고 요구하고, `0a2` §12.1이 *"신설은 임의 해소의 반대
-방향이며 A2 위반이 아니다"*를 세웠다.
+**근거가 없는 자리를 확정 서술로 채우는 대신 등록한다** — `milestone-0.md`가
+*"모호한 항목은 기존 Python 구현을 정답으로 채우지 말고 `OPEN`으로 남겨 사용자 결정을
+요청한다"*고 요구하고, `0a2` §12.1이 *"신설은 임의 해소의 반대 방향이며 A2 위반이
+아니다"*를 세웠다.
+
+**아래 표가 전수다. 수를 이 자리에 옮겨 적지 않는다** — 표가 세고, 등록된 ID는
+`commands.md` **C-9.4**가 낸다. 셈이 필요한 자리는 `checklist.md` §6 하나다.
 
 **등록 위치는 ADR 파일 안이며 `capability-map.md` §12가 아니다** — 그 파일은
 `out_of_scope`(Codex approve로 확정)라 이 slice가 쓰지 못한다.
@@ -166,7 +169,8 @@ A2에 적었던 *"채택/불채택 판정"*은 **실제보다 강한 주장**이
 | `OPEN-ADR-13` | **db-scheduler 실패 처리 기본값** — 부작용 유형별 `onFailure`/`onDeadExecution` | 0005 | Codex 1차 medium으로 신설. 기본값을 이 slice가 확인하지 않았다 |
 | `OPEN-ADR-11` | ML 호출의 **동기 RPC 예산** — deadline·재시도·fail-open 금지의 구체값 | 0003 | M2가 소유. 값의 근거가 아직 없다 |
 
-**등록 13건 중 `OPEN-ADR-10`은 해소됐고 활성은 12건이다.**
+**`OPEN-ADR-10`은 해소됐고**(운영자 결정 2026-08-29) 나머지가 활성이다 —
+셈은 `checklist.md` §6이 낸다.
 **`OPEN-ADR-09`가 운영자 결정을 직접 요청하는 유일한 항목**으로 남았고 나머지는 후속
 마일스톤이 실행·측정으로 닫는다. **`OPEN-ADR-12`는 M1/M4를, `OPEN-ADR-13`은 M4를**
 차단한다.
