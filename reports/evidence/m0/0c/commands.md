@@ -379,6 +379,7 @@ DECL  = re.compile(r"\b(_*[A-Z][A-Za-z0-9_]*)")                    # ① 선언 
 SITE  = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\s*(?:<[^<>]*>)?\(")  # 사각지대 앵커 — 대문자를 전제하지 않는다
 NAME  = re.compile(r"[a-z][A-Za-z0-9]*")                           # 인자 이름 규칙
 LOOSE = re.compile(r"`([a-z][A-Za-z0-9]*)`")                       # ③ 단독 백틱 이름 규칙
+WIDER = re.compile(r"`([a-z][A-Za-z0-9_]*)`")                      # ③ 규칙 밖을 재는 더 넓은 규칙
 HASH  = re.compile(r"[0-9a-f]{7,40}\Z")                            # commit 해시는 규칙으로 뺀다
 # legacy 파이썬 선언의 축어 인용(§4.1 · §5.3). V2 타입이 아니므로 그 인자는 §12.2 등재 대상이 아니다.
 LEGACY_DECLS = {"FieldContract", "_FloorSchedule"}
@@ -470,9 +471,10 @@ for l in body.split("\n"):
     if not hdr: continue
     m = re.match(r"^\| `([a-z][A-Za-z0-9]*)`(?: \(|\s*\|)", l)
     if m: found.setdefault(m.group(1), set()).add("(표 선언)")
-loose = {}
+loose, wider = {}, {}
 for i, l in enumerate(body.split("\n")):
     for m in LOOSE.finditer(l): loose.setdefault(m.group(1), []).append(i + 1)
+    for m in WIDER.finditer(l): wider.setdefault(m.group(1), []).append(i + 1)
 missing = sorted(n for n in found if n not in covered)
 # ③이 낸 이름을 빼는 갈래를 **명령이 세어 낸다** — 산문이 「둘 다 아니면 FAIL」이라
 # 적어 세 번째 갈래(commit 해시 규칙)를 빠뜨렸던 자리다.
@@ -482,6 +484,9 @@ for n in sorted(loose):
            else "NOT_A_FIELD 목록" if n in NOT_A_FIELD
            else "commit 해시 규칙" if HASH.match(n) else "남은 것")].append(n)
 unclassified = route["남은 것"]
+# ③의 이름 규칙 자체가 못 보는 갈래도 **더 넓은 규칙으로 재어** 낸다.
+off_rule = sorted(n for n in wider if n not in loose)
+blind = [n for n in off_rule if n not in covered and n not in found]
 print(f"문서: {DOC}")
 print(f"§12.2 표 칸이 덮는 이름: {len(covered)}")
 print(f"① 타입 선언 인자 + ② 필드·성분 표에서 뽑은 이름: {len(found)}  미덮개: {len(missing)}")
@@ -492,6 +497,9 @@ print("--- 이 블록이 자기 범위와 예외를 스스로 낸다 ---")
 print(f"① 선언 앵커 {DECL.pattern}  ·  인자 이름 규칙 {NAME.pattern}  ·  ③ 단독 이름 규칙 {LOOSE.pattern}")
 print("③이 낸 이름을 빼는 갈래 — " + " · ".join(f"{k} {len(v)}" for k, v in route.items()))
 print(f"    규칙으로 빼는 갈래는 commit 해시({HASH.pattern}) 하나뿐이고 그것이 뺀 이름: {route['commit 해시 규칙']}")
+print(f"③ 규칙 밖 — {WIDER.pattern} 는 맞고 {LOOSE.pattern} 는 아닌 백틱 이름: {len(off_rule)}"
+      f" (덮개·①② 안 {len(off_rule) - len(blind)} · 이 검사 어디에도 없음 {len(blind)})")
+print(wrap("    어디에도 없는 것: ", blind))
 print("--- 못 본 것을 세는 앵커는 보는 앵커보다 넓다 — 그 관계도 실행이 잰다 ---")
 print(f"사각지대 앵커 {SITE.pattern}")
 print(f"선언 앵커가 읽은 자리 {n_decl} ⊆ 사각지대 앵커가 본 자리 {n_site} — 그 밖으로 샌 자리: {leaked}")
@@ -527,8 +535,8 @@ exit=0
 > 이름을 삼키는 줄을 두지 않으므로, **새 이름이 셈에만 얹혀 조용히 빠지지 않는다.**
 > 여기 옮겨 적지 않는다.
 >
-> **③은 백틱으로 적힌 lowerCamel 이름만 본다.** `review_required`처럼 밑줄이 든 이름은
-> ③이 못 보고 **덮개에서만 나온다** — 그것이 위 출력의 마지막 줄이 세는 자리다.
+> **③의 이름 규칙이 무엇을 못 보는지도 규칙을 넓혀 재고 위 출력이 낸다** — 산문이
+> 「필드가 늘면 이 검사가 낸다」고 적으면 그 규칙 밖의 이름에 거짓이 된다.
 
 ---
 
