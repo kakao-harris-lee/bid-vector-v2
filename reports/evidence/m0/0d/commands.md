@@ -17,6 +17,7 @@
 | C-5.1 ~ C-5.5 | legacy `bid-vector`만 | **`ed4b06c`** (이 저장소의 어느 HEAD에서도 같다) |
 | C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`a7f3835` + `ed4b06c`** |
 | C-11 | 이 파일 자신 ↔ 선언 SHA 트리 | **HEAD** (그 블록이 사유를 적는다) |
+| C-12 | **양쪽** — 리뷰 레인 산출물(`_workspace/`)·`~/.codex` 실물과 **등재된 verdict JSON**(이 저장소) | **`a7f3835`** + 저장소 밖 실물 |
 
 ### 실행 계약
 
@@ -1143,6 +1144,7 @@ DECL=a7f3835
 WT=$(mktemp -d)/wt
 git worktree add --detach "$WT" "$DECL" >/dev/null 2>&1
 ln -sfn "$PWD/bid-vector" "$WT/bid-vector"
+ln -sfn "$PWD/_workspace" "$WT/_workspace"
 python3 - reports/evidence/m0/0d/commands.md "$WT" <<'PY'
 import pathlib, subprocess, sys
 md, wt = pathlib.Path(sys.argv[1]), sys.argv[2]
@@ -1217,4 +1219,99 @@ pairs=26 skipped_harness=1 diff=0
 *"기록이 옳다"*가 아니다.
 
 > 이 검사는 `git worktree`를 하나 만들고 지운다. legacy 인용 블록을 위해 그 worktree
-> 안에 `bid-vector` symlink를 건다 — `.gitignore` 대상이라 `tracked_dirty`에 잡히지 않는다.
+> 안에 `bid-vector` symlink를, **리뷰 레인 산출물을 읽는 C-12를 위해 `_workspace`
+> symlink를** 건다 — 둘 다 `.gitignore` 대상이라 `tracked_dirty`에 잡히지 않는다.
+
+---
+
+## C-12 · Codex 2차 리뷰의 실행 메타와 preflight
+
+`codex-review-gate`가 리뷰 레인에 지운 기록 의무다 — **reviewer 메타**(`cli_version` ·
+`model`+effort)와 **memory 오염 preflight**. **2차 리뷰 레인은 이 파일이 자기 리뷰
+대상이라 쓰지 않았고, 이 수정 라운드가 쓴다.**
+
+**C-12.2의 두 값은 리뷰 시점이 아니라 이 수정 라운드에 뜬 것이다.** 리뷰 시점 값은
+레인이 남기지 않았고 **되살릴 수 없다** — 그래서 여기 적는 것은 *"리뷰 당시 오염이
+없었다"*가 아니라 *"지금 이 저장소 흔적이 얼마이고 stage1에 리뷰 세션이 올라와 있지
+않다"*이다. **C-12.1은 다르다** — 리뷰 실행이 남긴 파일의 머리글을 읽으므로 **리뷰
+시점의 실측**이다.
+
+### C-12.1 · reviewer 메타
+
+```
+echo "-- 실행 메타 · 출처: _workspace/m0-0d/codex.raw-output.txt 머리글"
+sed -n '1,10p' _workspace/m0-0d/codex.raw-output.txt |
+  grep -E '^OpenAI Codex|^model:|^reasoning effort:'
+echo "-- 등재된 verdict JSON"
+python3 - <<'PY'
+import json
+d = json.load(open("reports/evidence/m0/0d/codex-review-20260829T063806Z.json"))
+print("cli_version=%s" % d["reviewer"]["cli_version"])
+print("model=%s" % d["reviewer"]["model"])
+print("verdict=%s" % d["verdict"])
+print("reviewed_base=%s" % d["reviewed_base"][:7])
+print("reviewed_head=%s" % d["reviewed_head"][:7])
+print("findings=%d" % len(d["findings"]))
+print("severities=%s" % ",".join(sorted(f["severity"] for f in d["findings"])))
+PY
+```
+
+```
+-- 실행 메타 · 출처: _workspace/m0-0d/codex.raw-output.txt 머리글
+OpenAI Codex v0.149.0
+model: gpt-5.6-sol
+reasoning effort: high
+-- 등재된 verdict JSON
+cli_version=codex-cli 0.149.0
+model=gpt-5.6-sol (reasoning effort: high)
+verdict=request_changes
+reviewed_base=998dc21
+reviewed_head=584305b
+findings=3
+severities=medium,medium,medium
+```
+
+**판정**: raw output 머리글과 등재된 verdict JSON의 `reviewer`가 같은 값을 말하고,
+`model_reasoning_effort`가 **`high`로 고정된 채 돌았다** — 하네스가 재현성 때문에
+못박은 값이다. **그 JSON이 evidence 패키지에 등재됐다는 사실은 C-2 출력이 낸다**
+(이 slice의 커밋이 건드린 `in_scope` 경로 목록에 그 파일이 있다).
+
+### C-12.2 · memory 오염 preflight
+
+```
+echo "-- preflight ① consolidate 이후 이 저장소 흔적"
+grep -rniE 'bid-vector-v2|regression-ledger|capability-map|OPEN-REG|0a2|0b-regression' \
+  ~/.codex/memories/memory_summary.md ~/.codex/memories/MEMORY.md \
+  ~/.codex/memories/rollout_summaries/ ~/.codex/memories/skills/ \
+  ~/.codex/rules/default.rules 2>/dev/null | wc -l | tr -d ' ' | sed 's/^/traces=/'
+echo "-- preflight ② stage1 에 리뷰 세션이 올라왔는가 (0 이 아니면 리뷰 중단)"
+sqlite3 "file:$HOME/.codex/memories_1.sqlite?immutable=1" \
+  "select count(*) from stage1_outputs;" | sed 's/^/stage1_rows_total=/'
+sqlite3 "file:$HOME/.codex/memories_1.sqlite?immutable=1" \
+  "select count(*) from stage1_outputs
+    where raw_memory like '%bid-vector-v2-review%'
+       or rollout_summary like '%bid-vector-v2-review%';" | sed 's/^/stage1_review_rows=/'
+echo "-- 스킬 문면의 mode=ro 는 이 환경에서 열리지 않는다"
+sqlite3 "file:$HOME/.codex/memories_1.sqlite?mode=ro" "select 1;" 2>&1 | sed 's/^/mode_ro: /'
+```
+
+```
+-- preflight ① consolidate 이후 이 저장소 흔적
+traces=17
+-- preflight ② stage1 에 리뷰 세션이 올라왔는가 (0 이 아니면 리뷰 중단)
+stage1_rows_total=535
+stage1_review_rows=0
+-- 스킬 문면의 mode=ro 는 이 환경에서 열리지 않는다
+mode_ro: Error: in prepare, unable to open database file (14)
+```
+
+**판정**: `stage1_review_rows=0` — 리뷰 세션 transcript가 stage1에 올라와 있지 않다.
+**`stage1_rows_total`이 0이 아니므로 「테이블이 비어서 0」이 아니다.**
+`traces`는 **consolidate 이후 이 저장소 흔적의 양**이고 0이 아니다 — 그래서 호출이
+`--disable memories --ignore-rules`를 붙인다. **이 값은 그 플래그의 효과를 재지 않는다**
+(흔적의 양일 뿐이다).
+
+**스킬 문면과 다른 점**: 스킬은 `?mode=ro`를 적는데 **이 환경에서 열리지 않는다** —
+위 출력의 `mode_ro:` 줄이 그 실패다. `?immutable=1`로 바꿔 읽었고, 그 대가는 **파일이
+동시에 쓰이면 찢긴 페이지를 읽을 수 있다**는 것이다. **이 차이를 스킬에 반영할지는
+하네스 소유자의 판정이며 이 slice는 `.claude/`를 고치지 않는다.**

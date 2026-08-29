@@ -1,0 +1,54 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "998dc21754e39efa425c3cfad9d5b7d5540ad1ba",
+  "reviewed_head": "584305bb5aeea797933a836095cc9e00496ecbda",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "docs/adr/0009-ml-reuse-provenance.md",
+      "line": 89,
+      "evidence": "D-5는 slice evidence가 `수행한 튜닝·수정 내역`만 담는다고 결정하지만, D-6(105~106행)은 CI가 모듈 메타와 slice evidence의 `원본 경로·기준 commit` 일치를 비교하도록 요구한다. 결정된 evidence 형식에는 비교할 두 값이나 안정적인 연결 키가 없으므로 D-6 검사는 구현할 수 없다. 이는 운영자가 (d)의 불일치 위험을 수용하면서 요구한 완화책과 재활용 provenance 계약을 실행 불가능하게 만든다.",
+      "required_fix": "두 자리를 연결하는 기계 판독 가능한 계약을 확정하라. 예를 들어 slice evidence에도 모듈 ID·원본 경로·기준 commit과 튜닝 내역을 함께 기록하거나, 양쪽이 공유하는 안정적인 provenance ID를 정의하고 CI가 실제로 대조할 필드를 명시하라."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/adr/0005-domain-events-and-outbox.md",
+      "line": 168,
+      "evidence": "D-10은 lease port를 application 계층인 `workflow`가 소유한다고 한 직후 `도메인은 그 port만 본다`고 규정한다. 그러나 ADR 0006 D-2~D-3은 `workflow`를 application 모듈로 분류하고 의존 방향을 `domain <- application`으로 고정한다. 도메인이 workflow 소유 타입을 보면 domain → application 역방향 의존이 생겨 확정한 Gradle 경계와 모순된다.",
+      "required_fix": "lease 획득과 억제 기록은 workflow use-case 진입점이 workflow 소유 port를 호출하도록 규정하고, domain 모듈은 그 port를 전혀 보지 않는다고 정정하라. 필요하면 port의 소비자·구현자·호출 순서를 ADR 0006의 의존 방향과 함께 명시하라."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/adr/0005-domain-events-and-outbox.md",
+      "line": 230,
+      "evidence": "ShedLock의 요구 ① 판정은 경계가 `@Scheduled` 메서드라 use-case 진입점에 둘 수 없다고 읽지만, 공식 README는 기본 proxy-method 모드에서 직접 메서드 호출에도 lock이 적용되고, 프레임워크 없이 `DefaultLockingTaskExecutor.executeWithLock(...)`로 임의 호출 경계를 잠그는 API도 제공한다. 따라서 `workflow` port 어댑터로 use-case 경계에 적용할 수 없다는 사유는 사실과 다르다. 다만 JVM crash 시 `lockAtMostFor` 뒤에 해제되므로 요구 ②의 즉시 해제를 충족하지 않는 별도 문제는 남는다. 근거: [ShedLock 공식 README](https://github.com/lukas-krecan/ShedLock).",
+      "required_fix": "ShedLock 비교표에서 요구 ①을 programmatic API로 구현 가능한 성질로 재평가하고, 호출 경계 우회 방지 방법을 구분해 적어라. 채택 여부는 요구 ②의 TTL 기반 crash 해제와 OPS-01의 즉시 해제 조건을 근거로 판정하라."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse --verify 998dc21754e39efa425c3cfad9d5b7d5540ad1ba^{commit} && git rev-parse --verify 584305bb5aeea797933a836095cc9e00496ecbda^{commit} && git rev-parse HEAD",
+    "git log --oneline --decorate --no-merges 998dc21754e39efa425c3cfad9d5b7d5540ad1ba..584305bb5aeea797933a836095cc9e00496ecbda",
+    "git diff --stat 998dc21754e39efa425c3cfad9d5b7d5540ad1ba...584305bb5aeea797933a836095cc9e00496ecbda && git diff --name-status 998dc21754e39efa425c3cfad9d5b7d5540ad1ba...584305bb5aeea797933a836095cc9e00496ecbda",
+    "wc -l v2-지침서.md agent-workflow.md milestone-0.md reports/evidence/m0/0a2/decisions.md reports/evidence/m0/0d/{scope,checklist,commands}.md docs/adr/000*.md docs/discovery/{capability-map,regression-ledger}.md",
+    "rg -n '^(#|##|###|####) ' v2-지침서.md agent-workflow.md milestone-0.md reports/evidence/m0/0a2/decisions.md reports/evidence/m0/0d/*.md docs/adr/000*.md",
+    "git diff --unified=5 f1cd72b4f61ad902fe6763c81a5396acf2acbf22...584305bb5aeea797933a836095cc9e00496ecbda -- docs/adr reports/evidence/m0/0d",
+    "git diff --check 998dc21754e39efa425c3cfad9d5b7d5540ad1ba...584305bb5aeea797933a836095cc9e00496ecbda -- docs/adr reports/evidence/m0/0d",
+    "git log --format='%H %s' 998dc21754e39efa425c3cfad9d5b7d5540ad1ba..584305bb5aeea797933a836095cc9e00496ecbda | awk '/m0-0d/{print $1}' | git show --stdin --name-only --format= | sort -u",
+    "python3 독립 검사: ADR 9파일의 상태·맥락·결정·대안·결과 절 및 번호 유일성·연속성 검증",
+    "python3 독립 검사: OPS-21 후보 10건의 지정 ADR 대안표 후보 열·판정 열·사유 열 파싱",
+    "rg -n -i '[a-z+]+://[A-Za-z0-9_.-]+:[^@/[:space:]]+@|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|xox[baprs]-|BEGIN [A-Z ]*PRIVATE KEY|sk-[A-Za-z0-9]{20,}' docs/adr reports/evidence/m0/0d",
+    "awk/rg/comm 독립 검사: capability-map 활성 OPEN 45건과 ADR 언급·미언급 집합 대조",
+    "rg -n 'ml-engine 모듈 안|slice별 `reports/evidence|같은 모듈에 대해 같은 원본 경로|도메인은 그 port만 본다|workflow.*port' docs/adr/0005-domain-events-and-outbox.md docs/adr/0009-ml-reuse-provenance.md",
+    "공식 문서 검색·확인: db-scheduler README/Task configuration, Spring Integration JDBC Lock Registry, ShedLock README/compatibility/programmatic locking",
+    "git status --porcelain"
+  ],
+  "residual_risks": [
+    "worktree에 `bid-vector` symlink와 `_workspace/`가 없어 commands.md C-5·C-6·C-11을 그대로 재실행하지 못했다. legacy `ed4b06c` 계측·인용 범위와 전체 출력 블록의 축어 재현 정확성은 잔여 위험이다.",
+    "`_workspace/m0-open-decisions/ops07-library-survey.md`가 없어 원 조사 노트와 ADR 전사를 직접 대조하지 못했다.",
+    "공유 range의 0C 산출물(`docs/discovery/data-dictionary.md`, `reports/evidence/m0/0c/`)은 scope 규약에 따라 판정에서 제외했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
