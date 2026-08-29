@@ -151,7 +151,7 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 들어가지 않는다. 강제 수단은 **ADR 0006**(의존 방향)과 **ADR 0007**(architecture test)이
 소유한다.
 
-### D-10. OPS-01의 lease는 **`workflow` 계층의 port**이고 스케줄러가 아니다
+### D-10. OPS-01의 lease는 **`workflow`(application)가 소유하는 port**이고 스케줄러가 아니다
 
 `capability-map.md` **OPS-01**(`V2 필수`)이 요구하는 것은 셋이다.
 
@@ -165,9 +165,40 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 
 - **①·③은 애플리케이션 설계 사항이다.** lease를 **use case 진입 경계**에 두는 것과
   억제를 **reason code + detail로 기록**하는 것은 어느 라이브러리도 대신하지 않는다.
-  따라서 **lease는 `workflow` 모듈의 port**이고, 도메인은 그 port만 본다(ADR 0006 D-3).
+  따라서 **lease port는 `workflow`(application)가 소유**하고 **`adapters`가 구현**하며,
+  **`domain` 모듈은 그 port를 보지 않는다.**
 - **②는 어댑터의 성질이며 후보마다 다르다.** **이 ADR은 그 어댑터를 고르지 않는다** —
   §5 `OPEN-ADR-12`.
+
+#### D-10.1 · 「도메인 use case 경계」가 가리키는 자리
+
+요구 ①의 문면은 *"lease는 **도메인 use case 경계**에 둔다"*이고, **그 요구가 배격하는
+실물**은 *"소비자마다 다른 레이어"*와 *"in-process 실행 경로에서 수집만 lease를
+우회"*다(OPS-14). **그 배격이 요구하는 것은 lease가 `domain` 모듈 안에 서는 것이 아니라,
+모든 소비자가 반드시 지나는 한 자리에 서는 것이다.** ADR 0006 D-2가 **use case를
+`workflow`의 책임**으로 두었으므로 그 한 자리는 **`workflow`의 use case 진입점**이다.
+**「도메인 use case」는 「도메인 연산의 use case」를 뜻하고 `domain` 모듈을 뜻하지 않는다.**
+
+**방향 점검**: ADR 0006 D-3의 방향은 `domain <- application <- adapters/app`이고,
+**domain이 의존하는 port는 domain 안에 선다**(*"domain은 프레임워크 독립적인 port
+인터페이스에만 의존"*). 그러므로 **`domain`이 `workflow` 소유의 port를 보면 방향이
+뒤집힌다.** 그리고 lease를 `domain`으로 옮기는 대안도 서지 않는다 — lease는
+**실행 제어**라는 운영 관심사이고, D-9(*"도메인은 전달 메커니즘을 모른다"*)가 같은
+계열을 이미 도메인 밖에 두었다. **port를 `workflow`에 두고 `domain`이 보지 않는 배치가
+두 조항 모두와 정합한다.**
+
+| 역할 | 자리 |
+| --- | --- |
+| **소유(선언)** | `workflow` (application) |
+| **구현** | `adapters` — 어느 기제인지는 `OPEN-ADR-12`가 고른다 |
+| **호출** | `workflow`의 use case 진입점. **도메인 연산을 부르기 전에** lease를 잡고, 잡지 못하면 **도메인을 부르지 않고** 억제를 기록한다(요구 ③) |
+| **보지 않는 곳** | `domain` 전 모듈 (`shared-kernel` 포함) |
+
+**요구 ①이 실제로 서려면 함께 서야 하는 제약**: 스케줄러 어댑터·HTTP 어댑터·in-process
+호출 **어느 경로도 도메인 연산을 직접 부르지 않고 같은 use case 진입점을 지난다.**
+이 제약이 없으면 lease를 한 자리에 선언해도 legacy가 겪은 우회(OPS-14)가 형태만 바꿔
+돌아온다. **강제 수단은 ADR 0006(빌드 의존 선언)과 ADR 0007(architecture test)이
+소유하며, 그 규칙을 도구가 표현할 수 있는지는 이 slice가 확인하지 않았다**(§6).
 
 **따라서 D-5의 db-scheduler 채택은 OPS-01을 덮지 않는다.** db-scheduler가 덮는 것은
 **예약 작업의 단일 실행**이고, OPS-01이 요구하는 것은 **use case 경계의 lease**다.
@@ -279,7 +310,8 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
   ADR 0004 D-1의 단일 엔진 결정과 정합하나 전용 커넥션 운용 비용이 미조사다
   (b) **Spring Integration JDBC lock registry** — OPS-21 후보인데 **조사 자체가 없다**
   (c) **ShedLock** — 경계가 `@Scheduled`라 요구 ①과 어긋나 보이고 해제 기제가 미확인
-  (d) 위를 어댑터로 감싸 **`workflow` port 뒤에 두고** 요구 ①·③은 애플리케이션이 소유.
+  (d) 위를 어댑터로 감싸 **`workflow`가 소유하는 port 뒤에 두고**(`domain`은 그 port를
+  보지 않는다 — D-10.1) 요구 ①·③은 애플리케이션이 소유.
   **(d)는 (a)~(c)와 배타가 아니다** — D-10이 이미 port를 확정했고 남은 것은 그 어댑터다.
 - **선행 조사**: (b)의 **버전·유지보수·Kotlin 2.x + Spring Boot 3.x 호환**이
   `OPEN-OPS-07` 조사 범위 밖이었다. **판정하려면 그 조사가 선행한다.**
@@ -338,6 +370,10 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
   있다**는 것까지이고, 그것이 「즉시 해제」를 배제하는지는 **읽은 것이 아니라 추론**이다.
 - **db-scheduler의 실패·dead execution 기본값을 확인하지 않았다**(D-11) — `OPEN-ADR-13`.
   이 ADR이 인용한 값은 **Codex 리뷰가 지목한 것**이며 이 slice가 원문을 열지 않았다.
+- **D-10.1의 제약(「모든 진입 경로가 같은 use case 진입점을 지난다」)을 architecture
+  test로 표현할 수 있는지 확인하지 않았다.** ADR 0006 §4가 ArchUnit의 Kotlin 고유 형태
+  표현 범위를 확인하지 않았다고 적은 것과 같은 자리이며, **소유는 ADR 0007이다.**
+  이 ADR은 그 규칙을 **선언만 하고 강제 수단을 재지 않았다.**
 - **PostgreSQL 세션 advisory lock의 V2 운용 비용을 조사하지 않았다** — 전용 커넥션,
   커넥션 풀과의 관계, Spring 트랜잭션 경계와의 상호작용.
 - **알림 채널의 구체 선택(Telegram/email/앱)을 이 ADR이 정하지 않는다** —
