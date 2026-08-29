@@ -1151,6 +1151,15 @@ legacy의 `confidence`는 근거 없는 계수 아홉의 아핀 결합이고 클
 `app/ai/predictors/historical/statistics.py:49-55`는 **`confidence` 산식**이고 그 자리에서
 `margin`은 **입력 인자**다 — **세 성분의 산식이 아니다.**
 
+> **분기를 뭉개 적지 않는다.** legacy의 `margin`이 `t값 × (표준편차 ÷ √표본수)`인 것은
+> **`sample_size > 1` 분기뿐**이다. **`sample_size == 1`이면 `margin`은 `std_rate` 그 자체**이고,
+> 그 `std_rate`도 같은 자리에서 **다시 잡힌다** — 표본에서 온 표준편차와 **휴리스틱
+> 예측율과의 거리의 절반**, 그리고 **바닥값** 가운데 **큰 것**을 쓴다
+> (`app/ai/predictors/historical/__init__.py:304-308`). 그래서 **표본이 하나면 legacy에서
+> `dispersion`과 `estimateMargin`이 같은 값이 되고, 그 값은 신뢰구간 반폭이 아니다.**
+> **V2가 이 분기를 승계할지 이 문서는 정하지 않는다** — 승계하려면 그 분기가 쓰는 계수가
+> §12.1에 등재돼야 하고 **지금은 등재돼 있지 않다.**
+
 > **⚠ 정정** — 이 절은 앞서 셋째 성분을 **`marginToFloor`**로 적었다. **legacy의 `margin`은
 > 하한까지의 거리가 아니라 신뢰구간 반폭**이라 이름이 축을 잘못 가리켰다.
 > **하한 여유 축은 §3.3이 이미 소유한다**(`criticalAssessmentRate` · `frequency`) —
