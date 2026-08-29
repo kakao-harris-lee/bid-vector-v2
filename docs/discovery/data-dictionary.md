@@ -1142,16 +1142,23 @@ legacy의 `confidence`는 근거 없는 계수 아홉의 아핀 결합이고 클
 | --- | --- | --- | --- |
 | `sampleSize` | 건수 | 그 추정에 쓰인 과거 표본 수 | `sample_size` |
 | `dispersion` | fraction | **투찰율 축**(투찰가 ÷ 기초금액) 표본의 **표준편차** | `std_rate` — `std_bid_rate`에서 온다 |
-| `estimateMargin` | fraction | 같은 축. **평균 투찰율 신뢰구간의 반폭** | `margin` = `t값 × (표준편차 ÷ √표본수)` |
+| `estimateMargin` | fraction | 같은 축. **평균 투찰율 신뢰구간의 반폭** | `margin` |
 
 **세 성분의 provenance는 같다** — 과거 투찰율 표본 집합에서 계산한 파생값이다.
-근거는 `app/ai/predictors/historical/statistics.py:49-55`(산식)와 그 호출부가 세 값을
-만드는 자리다.
+**세 값을 만드는 산식은 `app/ai/predictors/historical/__init__.py:294-308`**이고, 셋이 함께
+`estimate_historical_confidence`로 들어가는 자리는 같은 파일
+`app/ai/predictors/historical/__init__.py:371-375`다.
+`app/ai/predictors/historical/statistics.py:49-55`는 **`confidence` 산식**이고 그 자리에서
+`margin`은 **입력 인자**다 — **세 성분의 산식이 아니다.**
 
 > **⚠ 정정** — 이 절은 앞서 셋째 성분을 **`marginToFloor`**로 적었다. **legacy의 `margin`은
 > 하한까지의 거리가 아니라 신뢰구간 반폭**이라 이름이 축을 잘못 가리켰다.
 > **하한 여유 축은 §3.3이 이미 소유한다**(`criticalAssessmentRate` · `frequency`) —
 > 여기서 다시 정의하지 않는다.
+>
+> **이 정정의 근거 좌표도 함께 고쳤다.** 앞서 이 절은 세 성분의 산식을
+> `app/ai/predictors/historical/statistics.py:49-55`로 귀속했으나 **그 자리는 `confidence`
+> 산식이고 `margin`은 거기서 입력 인자**다. 산식은 위 좌표에 있다.
 
 계수의 분류는 `OPEN-ML-05`가 소유한다(§4.3).
 

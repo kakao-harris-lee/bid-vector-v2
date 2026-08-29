@@ -128,7 +128,8 @@
 `app/domain/money.py` · `app/services/bid_base.py` · `app/schemas/bid_summary.py` ·
 `app/services/award_verification.py` · `app/services/query_predicates.py` ·
 `app/models/models.py` · `app/models/pipeline.py` ·
-`app/ai/predictors/historical/statistics.py` · `app/domain/settlement_maturity.py` ·
+`app/ai/predictors/historical/statistics.py` ·
+`app/ai/predictors/historical/__init__.py` · `app/domain/settlement_maturity.py` ·
 `app/services/settlement_maturity.py` · `app/services/license_eligibility.py` ·
 `app/ai/predictors/legal_floor_spec.py` · `app/domain/floor_shortfall.py` ·
 `app/services/floor_shortfall.py` · `app/core/constants.py` ·
