@@ -245,20 +245,28 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 ### 3.2 advisory lock 추상화 (OPS-01)
 
 **이 행은 판정이 끝나지 않았다.** D-10이 OPS-01의 요구 셋을 세웠고 **어느 후보도 셋을
-덮는다고 확인되지 않았다.** 아래 표는 **무엇이 확인됐고 무엇이 확인되지 않았는지**를
-적으며, 채택은 **`OPEN-ADR-12`**가 닫힐 때 정해진다.
+덮는다고 확인되지 않았다.** **ShedLock에 대해서는 이번 라운드에 「덮지 않는다」가 공식
+문서로 확인**됐고(요구 ② 불충족), 나머지 둘은 여전히 **미조사·미확인**이다. 아래 표는
+**무엇이 확인됐고 무엇이 확인되지 않았는지**를 적으며, 채택은 **`OPEN-ADR-12`**가 닫힐
+때 정해진다.
 
 | OPS-01 요구 | db-scheduler | ShedLock | Spring Integration JDBC lock registry | PostgreSQL 세션 advisory lock |
 | --- | --- | --- | --- | --- |
-| **① use case 경계** | **아니다** — 예약 작업 실행 단위다 | **아니다로 읽힌다** — `@Scheduled` 위에 락을 얹는다(조사 노트) | **미조사** | **경계는 호출자가 정한다** — 기제 자체는 경계를 강제하지 않는다 |
-| **② 홀더 종료 시 즉시 해제** | **미확인** — 설정 표면에 `heartbeat-interval`·`missed-heartbeats-limit`가 있다(조사 노트). **heartbeat 종속으로 읽히나 공식 문서로 확인하지 않았다** | **미확인** — 조사 노트에 해제 기제 서술이 없다 | **미조사** | **legacy가 이 성질로 얻었다** — TTL 없는 세션 락이라 커넥션이 끊기면 해제(OPS-01 분류 근거). **V2에서의 운용은 미조사** |
+| **① use case 경계** | **아니다** — 예약 작업 실행 단위다 | **경계는 호출자가 정한다 — `@Scheduled`에 매이지 않는다**(공식 README). 기본 `PROXY_METHOD`에서 *"the lock is applied even if you call the method directly"*이고, *"It is possible to use ShedLock without a framework"* 아래 `DefaultLockingTaskExecutor` + `executeWithLock(...)`로 **임의 코드 블록**을 잠근다 | **미조사** | **경계는 호출자가 정한다** — 기제 자체는 경계를 강제하지 않는다 |
+| **② 홀더 종료 시 즉시 해제** | **미확인** — 설정 표면에 `heartbeat-interval`·`missed-heartbeats-limit`가 있다(조사 노트). **heartbeat 종속으로 읽히나 공식 문서로 확인하지 않았다** | **불충족**(공식 README 확인) — *"If the JVM crashes before the task finishes, `lockAtMostFor` attribute comes to play. The lock is always released after `lockAtMostFor`."* **해제가 TTL 만료 기반이고 즉시가 아니다** | **미조사** | **legacy가 이 성질로 얻었다** — TTL 없는 세션 락이라 커넥션이 끊기면 해제(OPS-01 분류 근거). **V2에서의 운용은 미조사** |
 | **③ 억제의 감사 기록 · reason code + detail** | **아니다** — 라이브러리 관심사가 아니다 | **아니다** | **미조사** | **아니다** |
 
 **③은 어느 후보도 주지 않는다** — D-10대로 **애플리케이션이 소유한다.**
 
+**ShedLock 칸 두 개의 출처**: 공식 README(`https://github.com/lukas-krecan/ShedLock`,
+2026-08-29 열람). 같은 문서가 *"ShedLock is not and will never be full-fledged
+scheduler, it's just a lock."*라고 적어 **조사 노트의 서술 자체는 참임이 확인**됐다 —
+**틀린 것은 거기서 끌어낸 「그러므로 경계가 `@Scheduled` 메서드다」라는 추론**이다.
+**이 slice가 앞 라운드에 그 추론을 확인 없이 판정 사유로 승격했다**(Codex 2차 medium).
+
 | 후보 | 판정 | 사유 |
 | --- | --- | --- |
-| **ShedLock** | **판정 보류 — OPS-01 요구에 대한 확인 미완** | **앞 라운드는 「db-scheduler와 기능 중복」을 사유로 불채택했으나 그것은 OPS-01을 덮지 못하는 판단이었다**(Codex 1차 high). db-scheduler가 덮는 것은 **예약 작업의 단일 실행**이고 OPS-01이 요구하는 것은 **use case 경계의 lease**다(D-10). ShedLock에 대해 **확인된 것**: 조사 노트가 *"**스케줄러가 아니다.** 스케줄 실행 자체는 Spring `@Scheduled` 등이 하고 ShedLock은 그 위에 락만 얹는다"*고 적는다 → **경계가 `@Scheduled` 메서드이지 use case 진입점이 아니다**(요구 ① 불충족으로 읽힌다). 호환·유지보수는 최상위권이다(7.x가 Boot 4.x·3.5·3.4를 함께 테스트, 최소 JVM 17, 7.7.0에 Micrometer 지표). **확인되지 않은 것**: 락 해제 기제(요구 ②) — 조사 노트에 서술이 없다. **AOP 프록시 무효화가 조용한 실패 모드**라는 것은 확인됐고, 채택한다면 `LockAssert` 테스트를 함께 둔다 |
+| **ShedLock** | **불채택 (OPS-01의 lease 어댑터로) — 요구 ② 불충족** | **판정 사유가 두 라운드 연속 틀렸고 둘 다 확인 없이 쓴 것이다.** ① 「db-scheduler와 기능 중복」 — OPS-01을 덮지 못하는 판단이었다(Codex 1차 high). db-scheduler가 덮는 것은 **예약 작업의 단일 실행**이고 OPS-01이 요구하는 것은 **use case 경계의 lease**다(D-10). ② 「경계가 `@Scheduled` 메서드이지 use case 진입점이 아니다」 — **사실과 다르다**(Codex 2차 medium, 위 표). **공식 문서로 확인한 요구별 사실**: **요구 ①은 충족 가능하다** — programmatic API로 `workflow` use case 진입점을 잠글 수 있다. **요구 ②는 불충족이다** — 해제가 `lockAtMostFor` TTL 만료 기반이다. **요구 ③은 어느 후보도 주지 않는다** — 애플리케이션이 소유(D-10). **판정 근거는 요구 ② 하나다**: OPS-01 acceptance가 *"홀더 프로세스를 강제 종료하면 lease가 **즉시 해제**된다"*를 문면으로 요구하고 ShedLock의 **문서화된 해제 의미가 그것과 정면으로 어긋난다.** **이 불채택은 OPS-01 축에 한정된다** — 다른 용도(예약 작업 단일 실행 등)에 대한 판정이 아니다. **조사 노트에서 온 것(이 라운드에 재확인하지 않았다)**: 호환·유지보수 최상위권(7.x가 Boot 4.x·3.5·3.4를 함께 테스트, 최소 JVM 17, 7.7.0에 Micrometer 지표), **AOP 프록시 무효화가 조용한 실패 모드**이며 채택한다면 `LockAssert` 테스트를 함께 둔다 |
 | **Spring Integration JDBC lock registry** | **판정 보류 — 조사되지 않음** | OPS-21 표의 후보인데 `OPEN-OPS-07` 조사 노트의 대상 9종에 **없다**(그 노트에 문자열 매치 0). 버전·유지보수·호환 어느 것도 확인되지 않았다. **불채택이 아니라 미조사다.** **앞 라운드는 *"위 두 후보로 이 축이 덮이면 조사할 이유가 생기지 않고, 덮이지 않으면 조사가 선행돼야 한다"*고 적었으나 그 앞머리의 전제가 틀렸다** — D-10이 보인 대로 **두 후보 어느 것도 OPS-01의 세 요구를 덮는다고 확인되지 않았다.** 따라서 **조사가 선행돼야 한다**(§5 `OPEN-ADR-12`) |
 | **PostgreSQL 세션 advisory lock 직접 사용** | **후보로 등재 — 미조사** | **legacy가 요구 ②를 이 기제로 얻었다** — *"TTL이 없는 것이 **의도된 설계**"*이고 *"홀더가 죽으면 커넥션이 끊기며 즉시 해제"*(OPS-01 분류 근거). ADR 0004 D-1이 **PostgreSQL 단일 엔진**을 확정했으므로 이 기제가 가용하다. **OPS-21 표에 없는 후보이며 이 ADR이 등재만 한다** — 전용 커넥션 운용 비용과 Spring 트랜잭션 경계와의 관계를 **확인하지 않았다**(§5 `OPEN-ADR-12`) |
 
@@ -309,7 +317,9 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 - **선택지**: (a) **PostgreSQL 세션 advisory lock 직접 사용** — legacy가 이 성질로 얻었고
   ADR 0004 D-1의 단일 엔진 결정과 정합하나 전용 커넥션 운용 비용이 미조사다
   (b) **Spring Integration JDBC lock registry** — OPS-21 후보인데 **조사 자체가 없다**
-  (c) **ShedLock** — 경계가 `@Scheduled`라 요구 ①과 어긋나 보이고 해제 기제가 미확인
+  (c) ~~**ShedLock**~~ — **탈락**(§3.2). 요구 ①은 programmatic API로 충족 가능하나
+  **요구 ②가 `lockAtMostFor` TTL 만료 기반이라 불충족**임이 공식 README로 확인됐다.
+  **남은 선택지는 (a)·(b)이고 (d)는 그 둘 위에 얹힌다**
   (d) 위를 어댑터로 감싸 **`workflow`가 소유하는 port 뒤에 두고**(`domain`은 그 port를
   보지 않는다 — D-10.1) 요구 ①·③은 애플리케이션이 소유.
   **(d)는 (a)~(c)와 배타가 아니다** — D-10이 이미 port를 확정했고 남은 것은 그 어댑터다.
@@ -365,9 +375,15 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
   "2.0 snapshot"). 이 ADR의 버전 대응은 **릴리스 노트**를 인용했고 문서 매트릭스를
   인용하지 않았다.
 - **Spring Integration JDBC lock registry를 조사하지 않았다**(§3.2) — `OPEN-ADR-12`.
-- **db-scheduler·ShedLock의 락 해제 기제를 공식 문서로 확인하지 않았다**(§3.2 요구 ②).
-  db-scheduler에 대해 확인된 것은 **설정 표면에 `heartbeat-interval`·`missed-heartbeats-limit`가
+- **db-scheduler의 락 해제 기제를 공식 문서로 확인하지 않았다**(§3.2 요구 ②).
+  확인된 것은 **설정 표면에 `heartbeat-interval`·`missed-heartbeats-limit`가
   있다**는 것까지이고, 그것이 「즉시 해제」를 배제하는지는 **읽은 것이 아니라 추론**이다.
+  **ShedLock 쪽은 이 라운드에 공식 README로 확인했다** — 더 이상 이 목록에 있지 않다.
+- **ShedLock의 LockProvider 구현들을 열어 보지 않았다.** README의 provider 목록에
+  **PostgreSQL 세션 advisory lock 기반 provider가 없고**, 커넥션·세션 종료 시 즉시
+  해제되는 provider도 **README가 서술하지 않는다** — **거기까지가 확인된 것**이고
+  각 provider의 구현을 읽어 확인한 것이 아니다. 요구 ② 불충족 판정은 **README가 적은
+  해제 의미**(`lockAtMostFor` 만료)에 근거한다.
 - **db-scheduler의 실패·dead execution 기본값을 확인하지 않았다**(D-11) — `OPEN-ADR-13`.
   이 ADR이 인용한 값은 **Codex 리뷰가 지목한 것**이며 이 slice가 원문을 열지 않았다.
 - **D-10.1의 제약(「모든 진입 경로가 같은 use case 진입점을 지난다」)을 architecture

@@ -61,7 +61,7 @@ Kotlin 2.x + Spring Boot 3.x 조합과의 호환**이다(`v2-지침서.md` §5).
 | --- | --- | --- |
 | JobRunr | **OSS/Pro 경계**(트랜잭션 연동이 Pro)와 **라이선스** | 아니다 — 버전은 최신이고 Kotlin 2.4를 특정해 지원 선언한 유일한 후보다 |
 | Spring Modulith | **프레임워크 결합도**와 **모듈 개념 이중화** | 아니다 — 세 라인 병행 유지로 유지보수가 최상위권이다 |
-| ShedLock | **판정 보류** — `OPS-01` 요구에 대한 확인 미완(ADR 0005 §3.2) | 아니다 — Boot 3.5·4.x를 함께 테스트한다. **앞 라운드의 「db-scheduler와의 기능 중복」은 철회됐다** |
+| ShedLock | **`OPS-01` 요구 ② 불충족** — 해제가 `lockAtMostFor` TTL 만료 기반이다(ADR 0005 §3.2, 공식 README 확인) | 아니다 — Boot 3.5·4.x를 함께 테스트한다. **앞선 두 사유(「db-scheduler와의 기능 중복」·「경계가 `@Scheduled`」)는 모두 철회됐다** |
 | Konsist | **유지보수 정체**(릴리스 부재 + 내장 컴파일러 고정) | **버전이 근거이나 「최신이 아님」이 아니라 「고정된 내장 컴파일러가 M1 Kotlin보다 낮을 위험」이다** |
 | Detekt | **안정판의 기준 Kotlin이 M1 고정 후보보다 낮다** | 같은 축 — 조합 호환이지 최신성이 아니다 |
 
@@ -187,10 +187,13 @@ docs/adr/0009-ml-reuse-provenance.md:2
 
 ---
 
-## 9. A2의 판정 둘이 `보류`다
+## 9. A2의 판정에 `보류`가 남는다
 
-**C-7이 `DEFERRED` 둘을 낸다** — `Spring Integration JDBC lock registry`(조사 자체가 없다)와
-`ShedLock`(OPS-01 요구에 대한 확인 미완). 둘 다 **advisory lock 행**이다.
+**C-7 출력의 `DEFERRED` 행이 그것이다** — `Spring Integration JDBC lock registry`
+(조사 자체가 없다). **수는 그 블록의 `candidates=` 줄이 낸다.**
+**앞 라운드에 함께 `DEFERRED`였던 `ShedLock`은 이 라운드에 판정이 바뀌었다** — 요구 ②
+불충족이 공식 README로 확인돼 **`불채택`**이다(ADR 0005 §3.2). **둘 다 advisory lock
+행이며**, 그 축이 닫히지 않았다는 사실은 `OPEN-ADR-12`가 든다.
 
 **A2가 요구하는 것은 「판정 한 칸과 사유」이고 그것은 충족된다.** `보류`도 판정이며
 사유가 붙어 있다. **그러나 「후보 전건 채택/불채택 완료」는 성립하지 않는다** —

@@ -126,10 +126,13 @@ C-7이 이 대응을 스캐너로 확인한다 — 후보마다 그 ADR의 「�
 **종료 조건의 문면은 「ADR 대안 절 기입」이다**(`capability-map.md` §12 G6). 조사 노트의
 결과가 전부 ADR에 기입됐고 **조사 범위 밖이었던 후보는 「미조사」로 기입**됐다.
 
-**그러나 「후보 전건 채택/불채택 판정 완료」는 성립하지 않는다** — C-7이 `DEFERRED` 둘을
-낸다. Codex 1차 리뷰(high #2)가 그 둘 중 하나(`Spring Integration JDBC lock registry`)를
-지목하며 **`OPS-01`을 덮는 수단이 정해지지 않았다**고 적었고, 이 slice는 그 지적을 받아
-**ShedLock을 판정 보류로 되돌리고** `OPEN-ADR-12`를 신설했다(ADR 0005 §3.2 · §5).
+**그러나 「후보 전건 채택/불채택 판정 완료」는 성립하지 않는다** — C-7이 `DEFERRED`를
+낸다(수는 그 블록의 `candidates=` 줄이 낸다). Codex 1차 리뷰(high #2)가
+`Spring Integration JDBC lock registry`를 지목하며 **`OPS-01`을 덮는 수단이 정해지지
+않았다**고 적었고, 이 slice는 그 지적을 받아 **ShedLock을 판정 보류로 되돌리고**
+`OPEN-ADR-12`를 신설했다. **Codex 2차 리뷰(medium #3)로 ShedLock은 다시 판정됐다** —
+요구 ② 불충족(공식 README 확인)으로 **OPS-01 축에서 탈락**이며, 남는 `DEFERRED`는
+**조사 자체가 없는** `Spring Integration JDBC lock registry`다(ADR 0005 §3.2 · §5).
 
 **따라서 이 slice는 `OPEN-OPS-07`의 종료를 스스로 선언하지 않는다.** 기입은 됐고,
 **「전건 판정」이 종료 조건에 포함되는지는 운영자와 Codex의 판정에 남긴다.** 앞 라운드가
@@ -207,10 +210,12 @@ A2에 적었던 *"채택/불채택 판정"*은 **실제보다 강한 주장**이
    않는다**(ADR 0009 D-4·D-5). **`milestone-0.md` 「산출물」이 그 경로를 적고 있어 개정이
    필요하며**, 그 문서는 `out_of_scope`라 이 slice가 고치지 않고 **사실만 적었다.**
 9. **`OPS-01`을 덮는 lease 어댑터가 정해지지 않았다**(`OPEN-ADR-12`). Codex 1차 high #2가
-   적출했고, 앞 라운드의 ShedLock 불채택 사유는 **예약 작업의 단일 실행**만 보고
-   **use case 경계의 lease**를 보지 않았다. **후보 넷 중 어느 것도 OPS-01의 요구 셋을
+   적출했고, 그때의 ShedLock 불채택 사유는 **예약 작업의 단일 실행**만 보고
+   **use case 경계의 lease**를 보지 않았다. **후보 어느 것도 OPS-01의 요구 셋을
    덮는다고 확인되지 않았다** — `Spring Integration JDBC lock registry`는 조사 자체가
-   없고, 나머지 셋은 요구 ②(홀더 종료 시 즉시 해제)가 미확인이다.
+   없고, `db-scheduler`·`PostgreSQL 세션 advisory lock`은 요구 ②(홀더 종료 시 즉시
+   해제)가 각각 미확인·미조사이며, **`ShedLock`은 요구 ② 불충족이 공식 README로
+   확인돼 이 축에서 탈락했다**(Codex 2차 medium #3, ADR 0005 §3.2).
 10. **채택 도구의 실패 처리 기본값을 확인하지 않았다**(`OPEN-ADR-13`). Codex가 지목한
    db-scheduler 기본값을 이 slice가 공식 문서로 열어 보지 않았다. **결정(D-11)은
    기본값과 무관하게 성립하나, 그 기본값이 결정과 충돌하는지는 M4가 확인한다.**
