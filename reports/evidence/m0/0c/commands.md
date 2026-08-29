@@ -721,6 +721,11 @@ exit=0
 **대상 파일** — **이 파일 자신**(읽는 체크아웃의 내용). **실행 트리** — `19c7e57`
 (C-1 ~ C-9가 선언한 SHA).
 
+**그래서 이 검사는 「리뷰 대상 `commands.md`가 있는 체크아웃」에서 돌려야 한다.**
+실행 트리(`19c7e57`)를 체크아웃한 곳에서 돌리면 **그 트리의 `commands.md`에는 이 절이
+없으므로 다른 블록 집합을 재게 된다.** `C-10.2`가 clean worktree에 이 파일을 넣어
+돌리는 이유가 그것이다.
+
 **실행 트리를 SHA로 고정해도 그것만으로 결과가 정해지지 않는다.** `bid-vector`와
 `_workspace`는 **git이 추적하지 않아 SHA에서 복원할 수 없고**, 이 검사는 그 둘을
 **실행 CWD에서** 가져다 연결한다. 그래서 **CWD에 그 둘이 있는지가 결과를 가른다.**
@@ -819,16 +824,25 @@ exit=0
 
 ### C-10.2 두 경로가 **없는** clean worktree에서 — Codex 리뷰어 환경과 같은 형태
 
-**위 블록의 명령을 한 글자도 바꾸지 않고** 두 경로가 없는 worktree 안에서 돌린다.
-이 파일 자신을 읽으므로 그 worktree에 이 파일도 넣는다.
+**위 블록의 명령 본문을 이 파일에서 그대로 뽑아** 두 경로가 없는 worktree 안에서 돌린다.
+검사가 이 파일 자신을 읽으므로 그 worktree에 이 파일도 넣는다.
 
 ```
 # SELF-EXCLUDE-C10 — 이 절의 실행 절차이므로 검사 대상에서 뺀다.
+# C-10.1 의 명령 본문을 이 파일에서 그대로 뽑아 clean worktree 안에서 돌린다.
 CT="$(mktemp -d)/cleanwt"
 git worktree add --detach "$CT" 19c7e57 >/dev/null 2>&1
-# 위 블록의 본문을 그대로 담은 파일과 이 파일을 그 worktree 에 넣고 그 안에서 돌린다.
-cp <위 블록 그대로> "$CT/.c10.sh"
 cp reports/evidence/m0/0c/commands.md "$CT/reports/evidence/m0/0c/commands.md"
+python3 - "$CT" <<'PY'
+import pathlib, sys
+F = chr(96) * 3
+t = pathlib.Path("reports/evidence/m0/0c/commands.md").read_text().split("\n")
+i = next(k for k, l in enumerate(t) if l.startswith("### C-10.1"))
+j = next(k for k, l in enumerate(t) if l.startswith("### C-10.2"))
+seg = t[i:j]
+fz = [k for k, l in enumerate(seg) if l.strip() == F]
+pathlib.Path(sys.argv[1] + "/.c10.sh").write_text("\n".join(seg[fz[0]+1:fz[1]]) + "\n")
+PY
 cd "$CT" && bash .c10.sh
 ```
 
