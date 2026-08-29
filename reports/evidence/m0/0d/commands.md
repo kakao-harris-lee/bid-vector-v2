@@ -6,10 +6,10 @@
 
 ## 선언 SHA와 실행 계약
 
-**출력 블록은 `f2a6e02` 트리에서 뜬 것이다** — **예외는 아래 표의 「재현 래칫」 열이
+**출력 블록은 `96c1ec7` 트리에서 뜬 것이다** — **예외는 아래 표의 「재현 래칫」 열이
 `제외`인 블록들이고, 그 열의 값을 사람이 정하지 않는다.** C-11의 스크립트가 명령 블록의
 문면에서 정하며, **무엇이 어느 사유로 빠졌는지는 C-11 출력이 쌍마다 낸다.**
-커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`f2a6e02`로 그대로
+커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`96c1ec7`로 그대로
 지목한다.** 다른 커밋과의 관계로 부르지 않는다: 관계는 뒤 편집이 들어올 때마다 낡는다.
 
 **제외의 축은 「트리를 고정하면 답도 고정되는가」다.** 선언 SHA 트리 밖의 상태를 읽는
@@ -21,10 +21,10 @@
 
 | 블록 | 읽는 것 | 선언 SHA | 재현 래칫 |
 | --- | --- | --- | --- |
-| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`f2a6e02`** | 대조 |
+| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`96c1ec7`** | 대조 |
 | C-5.1 ~ C-5.5 | legacy `bid-vector`만 | **`ed4b06c`** (이 저장소의 어느 HEAD에서도 같다) | 대조 |
-| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`f2a6e02` + `ed4b06c`** | 대조 |
-| C-12.1 · C-12.2 | **양쪽** — 리뷰 레인 산출물(`_workspace/`)·`~/.codex` 실물과 **등재된 verdict JSON**(이 저장소) | **`f2a6e02`** + 저장소 밖 실물 | **제외 `EXT`** — 트리의 함수가 아니다 |
+| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`96c1ec7` + `ed4b06c`** | 대조 |
+| C-12.1 · C-12.2 | **양쪽** — 리뷰 레인 산출물(`_workspace/`)·`~/.codex` 실물과 **등재된 verdict JSON**(이 저장소) | **`96c1ec7`** + 저장소 밖 실물 | **제외 `EXT`** — 트리의 함수가 아니다 |
 | C-11 | 이 파일 자신 ↔ 선언 SHA 트리 | **HEAD** (그 블록이 사유를 적는다) | **제외 `SELF`** |
 
 ### 실행 계약
@@ -59,7 +59,7 @@ git status --porcelain | grep -vc '^??' | sed 's/^/tracked_dirty=/'
 ```
 
 ```
-f2a6e02d2ee5aa02c2694bd588ada115fe0cdc9b
+96c1ec7396354e191b897e157c81279d87ed4913
 tracked_dirty=0
 ```
 
@@ -80,7 +80,7 @@ git diff --check 998dc21...HEAD -- docs/adr reports/evidence/m0/0d | wc -l | sed
 ```
 
 ```
-slice_commits=63
+slice_commits=65
 slice_paths=14
 out_of_scope_paths=0
 whitespace_problems=0
@@ -1316,7 +1316,7 @@ taken_at=2026-08-29T11:32:32Z
 
 ```
 # ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다 (SELF)
-DECL=f2a6e02
+DECL=96c1ec7
 WT=$(mktemp -d)/wt
 git worktree add --detach "$WT" "$DECL" >/dev/null 2>&1
 ln -sfn "$PWD/bid-vector" "$WT/bid-vector"
@@ -1402,7 +1402,7 @@ pair 28 L1373  SKIP SELF <==0D-BLOCK-HARNESS==>   # ==0D-BLOCK-HARNESS== — 이
 pairs_total=29 replayed=26 skipped_SELF=1 skipped_EXT=2 diff=0
 ```
 
-**판정**: `diff=0`이면 **위 출력이 `replayed=`로 센 쌍이 선언 SHA `f2a6e02`의 트리에서
+**판정**: `diff=0`이면 **위 출력이 `replayed=`로 센 쌍이 선언 SHA `96c1ec7`의 트리에서
 축어로 다시 뜬다.** 빠진 쌍은 `SKIP` 행이 사유 코드와 **그 사유의 근거 토큰**까지 함께
 내고, 사유별 수는 마지막 줄의 `skipped_SELF=`·`skipped_EXT=`가 낸다.
 
