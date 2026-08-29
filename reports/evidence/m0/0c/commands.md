@@ -34,9 +34,11 @@
 **그 차이가 무엇인지는 아래 diff가 그대로 낸다** — 산문으로 옮겨 적지 않는다.
 
 ```
+# diff 가 낸 줄을 그대로 실으면 이 파일이 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
 diff <(sed -n '281,564p' _workspace/m0-open-decisions/decisions-log.md) \
-     <(sed -n '17,$p' reports/evidence/m0/0c/decisions-2026-08-28.md)
-echo "exit=$?"
+     <(sed -n '17,$p' reports/evidence/m0/0c/decisions-2026-08-28.md) \
+  | sed 's/[[:space:]]\{1,\}$/<후행공백>/'
+echo "exit=${PIPESTATUS[0]}"
 ```
 
 ```
@@ -45,7 +47,7 @@ echo "exit=$?"
 ---
 > | **U-3** | **`TenderOutcome` aggregate — current는 event stream의 fold 결과** | ~~`OPEN-SET-05`~~ → **`OPEN-SET-04`** ⚠ 아래 정정 |
 113a114,120
->
+><후행공백>
 > > **⚠ 정정 (2026-08-29, Codex 리뷰 finding E)** — 위 표의 U-3 행이 소유 `OPEN`을
 > > `OPEN-SET-05`로 적었으나 **`capability-map.md` §12에서 그 id는 「재공고(차수 다수) 대사
 > > 대상 선택 규칙」**이고 U-3와 무관하다. U-3가 걸리는 것은 **`OPEN-SET-04`(이벤트 재관측
