@@ -1208,6 +1208,13 @@ exit=0
 그 사실을 주장으로 적지 않고 **실행으로 잰다** — 아래 두 블록이 같은 명령을 두 환경에서
 돌린 것이다.
 
+**이 검사는 공유 git 상태를 건드리지 않는다** — `trap`은 자기 worktree만
+`git worktree remove --force`로 걷고 **`git worktree prune`을 부르지 않는다.** prune은
+**다른 레인이 같은 저장소에서 쓰는 worktree 등록까지 훑으므로** 검사가 부를 side effect가
+아니다. 실제로 독립 검증자가 그 한 줄 때문에 이 두 블록을 **축어 그대로 돌리지 못하고
+같은 알고리즘의 자기 하네스로 대신 쟀다.** 그 줄이 없으면 두 블록은 다른 레인이 worktree를
+쓰는 중에도 그대로 돌릴 수 있다.
+
 - **명령문에 `bid-vector`·`_workspace`가 나오는 블록**을 그 경로가 필요한 블록으로 본다.
   없으면 **`환경 부족`으로 표시하고 재지 않는다** — 잴 수 없는 것을 `불일치`로 세면
   결과가 오독된다.
@@ -1225,7 +1232,7 @@ exit=0
 # 실행 CWD 에 있으면 연결하고, 없으면 그 사실을 출력에 낸다.
 WT="$(mktemp -d)/wt"
 # 실패해도 worktree 를 남기지 않는다 — 검사가 영속 git metadata 를 남기면 안 된다.
-trap 'git worktree remove --force "$WT" >/dev/null 2>&1; git worktree prune' EXIT
+trap 'git worktree remove --force "$WT" >/dev/null 2>&1' EXIT
 git worktree add --detach "$WT" d7851ad >/dev/null 2>&1
 [ -d bid-vector ] && ln -sfn "$(cd bid-vector && pwd -P)" "$WT/bid-vector"
 [ -d _workspace ] && ln -sfn "$(cd _workspace && pwd -P)" "$WT/_workspace"
@@ -1312,7 +1319,7 @@ ROOT="$(pwd -P)"
 CT="$(mktemp -d)/cleanwt"
 # 실패해도 worktree 를 남기지 않는다 — 검사가 영속 git metadata 를 남기면 안 된다.
 # 지우기 전에 CWD 를 돌려놓는다 — 안에 선 채로 지우면 이후 git 이 CWD 를 못 읽는다.
-trap 'cd "$ROOT"; git worktree remove --force "$CT" >/dev/null 2>&1; git worktree prune' EXIT
+trap 'cd "$ROOT"; git worktree remove --force "$CT" >/dev/null 2>&1' EXIT
 git worktree add --detach "$CT" d7851ad >/dev/null 2>&1
 cp reports/evidence/m0/0c/commands.md "$CT/reports/evidence/m0/0c/commands.md"
 python3 - "$CT" <<'PY'
