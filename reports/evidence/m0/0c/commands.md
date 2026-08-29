@@ -1121,13 +1121,22 @@ KNOWN_FIELDS 고유 키: 60
 (66 → 82 → 82 → 106 → 146줄, 깊이 11, 87%가 자기 인용). 그러면 진짜 값 한 줄이 잡음
 수백 줄에 묻혀 **판정이 사람의 육안에만 의존**한다. **어휘는 그대로 두고 두 자리를 바꿨다.**
 
-- **매치한 자리를 가려서 낸다.** ① 진짜 값이 걸렸을 때 그것을 이 파일에 붙여 넣지 않고
-  ② **이 출력 자신이 다음 라운드의 매치가 되지 않는다** — 재귀가 여기서 끊긴다.
-- **능력을 이 디렉터리의 현재 내용이 아니라 심어 둔 가짜 값 셋으로 잰다.** 내용이 깨끗하면
-  스캔은 잡을 것이 없어도 침묵하므로, 침묵이 능력을 뜻하지 않는다.
+- **낱말만이 아니라 그 옆의 값 자리까지 가려서 낸다.** 어휘 갈래가 매치하는 것은 **낱말**이라
+  매치한 span만 가리면 낱말이 가려지고 **값은 그대로 인쇄된다.** 그래서 가리는 폭을
+  `낱말 [:=] 값`과 `낱말 바로 뒤에 붙는 값`까지 늘렸다 — 구분자는 남기고 두 자리를 따로
+  가리므로 꼴은 읽을 수 있다. ① 그 꼴로 걸린 값은 **이 파일에 실리지 않고** ② **이 출력
+  자신이 다음 라운드의 매치가 되지 않는다** — 재귀가 여기서 끊긴다.
+  **판정 어휘(`PATS`)는 그대로다 — 고친 것은 인쇄지 판정이 아니다.**
+- **능력을 이 디렉터리의 현재 내용이 아니라 심어 둔 가짜 값 여섯으로 잰다.** 내용이 깨끗하면
+  스캔은 잡을 것이 없어도 침묵하므로, 침묵이 능력을 뜻하지 않는다. 표본 여섯은 **어휘가
+  값을 데리고 오는 네 꼴**과 **값 형태 둘**을 각각 하나씩 든다.
+- **값이 실제로 가려졌는지도 블록이 잰다.** 표본에서 값 조각을 뽑아 **그것이 출력에 남으면
+  `FAIL`**이다. 남았다는 사실은 표본 이름으로만 내고 조각 자체는 인쇄하지 않는다 — 그
+  인쇄가 곧 유출이다.
 
-**끊겼다는 것과 잡는다는 것을 산문이 주장하지 않고 블록이 잰다** — 자기 출력을 자기 패턴으로
-되재어 내고(`0`이라야 쌓이지 않는다), 심은 표본을 놓치면 `FAIL`이다.
+**끊겼다는 것과 잡는다는 것과 가려졌다는 것을 산문이 주장하지 않고 블록이 잰다** — 자기 출력을
+자기 패턴으로 되재어 내고(`0`이라야 쌓이지 않는다), 심은 표본을 놓치거나 그 값 조각이 출력에
+남으면 `FAIL`이다.
 
 ```
 python3 - <<'PY'
@@ -1136,29 +1145,52 @@ import re, pathlib
 PATS = [("비밀 어휘", re.compile(r"(?i)(api[_-]?key|secret|token|password|bearer |begin (rsa|ec|openssh))")),
         ("식별자",   re.compile(r"([0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)"))]
 VALUE = re.compile(r"(?i)([0-9]{3}-[0-9]{2}-[0-9]{5}|begin (rsa|ec|openssh))")   # 어휘가 아니라 값 형태인 갈래
-# 심어 둔 가짜 값(planted probe) — **진짜 비밀값이 아니다.** 셋 다 이 자리에서 지어낸
+# 가리는 폭 — 낱말만이 아니라 그 옆의 값 자리다. 어휘 갈래가 매치하는 것은 낱말이므로
+# 매치한 span 만 가리면 낱말이 가려지고 값은 그대로 인쇄된다. 판정 어휘(PATS)는 그대로 두고
+# 인쇄에서만 값 자리를 함께 덮는다 — 판정이 아니라 인쇄를 고치는 것이다.
+SEP  = re.compile(r"\s*[:=]\s*('[^']*'|\"[^\"]*\"|[^\s'\",]+)")   # 낱말 뒤 구분자와 그 값
+NEXT = re.compile(r"[A-Za-z0-9][^\s'\",]{7,}")                    # 구분자 없이 낱말 바로 뒤에 붙는 값
+# 심어 둔 가짜 값(planted probe) — **진짜 비밀값이 아니다.** 여섯 다 이 자리에서 지어낸
 # 형태이고 어떤 계정·채널·사업자에도 대응하지 않는다. 검사의 능력을 이 디렉터리의 현재
 # 내용이 아니라 이 상수로 잰다 — 내용이 깨끗하면 스캔은 잡을 것이 없어도 침묵한다.
-PROBES = ['api_key = "0000-not-a-real-key-0000"', "999-88-77777", "-----BEGIN RSA PRIVATE KEY-----"]
+PROBES = [("어휘 + 따옴표 값", 'api_key = "Zz00-not-a-real-key-0000"'),
+          ("어휘 뒤 바로 값",  'Authorization: Bearer Zz00.not-a-real-head.0000'),
+          ("어휘 + 등호 값",   'db_password=Zz00-not-a-real-pw-0000'),
+          ("어휘 + 콜론 값",   'slack_token: xoxb-0000-not-a-real-0000'),
+          ("값 형태 — 번호",   '999-88-77777'),
+          ("값 형태 — 개인키", '-----BEGIN RSA PRIVATE KEY-----')]
+# 표본의 「값 조각」은 표본에서 뽑아 얻는다 — 상수로 한 번 더 적으면 그 리터럴이 낱말 옆에
+# 있지 않아 가려지지 않고, 검사가 자기가 적은 값에 걸린다.
+def val(p):
+    m = re.search(r"(?i)bearer\s+([^\s'\",]+)", p) or re.search(r"[:=]\s*('[^']*'|\"[^\"]*\"|[^\s'\",]+)", p)
+    return m.group(1).strip("\"'") if m else p
 TARGETS = sorted(p for p in pathlib.Path("reports/evidence/m0/0c").rglob("*") if p.is_file())
 TARGETS.append(pathlib.Path("docs/discovery/data-dictionary.md"))
 def hits(s): return sorted({(m.start(), m.end()) for _, r in PATS for m in r.finditer(s)})
+def valspan(s, b):   # 낱말이 b 에서 끝났을 때 그 옆의 값 자리
+    m = SEP.match(s, b)
+    if m: return (m.start(1), m.end())            # 구분자는 남기고 값만 가린다
+    m = NEXT.match(s, b) if s[b-1:b] == " " else None
+    return m.span() if m else None
+def spans(s):   # 낱말 자리와 값 자리를 따로 세고 겹치는 것만 합친다
+    raw = []
+    for a, b in hits(s):
+        raw.append([a, b]); v = valspan(s, b)
+        if v: raw.append(list(v))
+    out = []
+    for a, b in sorted(raw):
+        if out and a < out[-1][1]: out[-1][1] = max(out[-1][1], b)
+        else: out.append([a, b])
+    return out
 def mask(s):
-    # 매치한 자리를 가려서 낸다 — ① 진짜 값이면 그것을 이 파일에 붙여 넣지 않고
-    # ② 이 출력 자신이 다음 라운드의 매치가 되어 자기 인용이 쌓이던 재귀를 끊는다.
-    for _ in range(8):
-        h = hits(s)
-        if not h: return s
-        out, prev = [], 0
-        for a, b in h:
-            if a < prev: continue
-            out += [s[prev:a], f"<가림 {b-a}자>"]; prev = b
-        s = "".join(out + [s[prev:]])
-    return s
+    out, prev = [], 0
+    for a, b in spans(s):
+        out += [s[prev:a], f"<가림 {b-a}자>"]; prev = b
+    return "".join(out + [s[prev:]])
 L = ["--- 심어 둔 가짜 값을 이 패턴이 잡는가 (planted probe — 진짜 비밀값이 아니다) ---",
-     f"심은 표본 {len(PROBES)} · 놓친 표본 {sum(1 for p in PROBES if not hits(p))}"]
-L += [f"    [{'잡힘' if hits(p) else '놓침'}] {mask(p)}" for p in PROBES]
-L.append("--- 스캔 매치 — 매치한 자리를 가려서 낸다 ---")
+     f"심은 표본 {len(PROBES)} · 놓친 표본 {sum(1 for _, p in PROBES if not hits(p))}"]
+L += [f"    [{'잡힘' if hits(p) else '놓침'}] {k} :: {mask(p)}" for k, p in PROBES]
+L.append("--- 스캔 매치 — 낱말과 그 옆의 값 자리를 가려서 낸다 ---")
 rows, planted, stray = [], 0, []
 for t in TARGETS:
     n = 0
@@ -1167,14 +1199,19 @@ for t in TARGETS:
         # 자른 끝의 공백은 뗀다 — 후행 공백은 A8 이 지적한다
         n += 1; rows.append(f"    {t}:{i}: {mask(l)[:110].rstrip()}")
         if VALUE.search(l):
-            if any(pr in l for pr in PROBES): planted += 1
+            if any(pr in l for _, pr in PROBES): planted += 1
             else: stray.append(f"{t}:{i}")
     L.append(f"{t} — 매치 {n}줄")
 L += rows
 L.append(f"값 형태 갈래({VALUE.pattern})에서 난 매치: {planted + len(stray)}"
          f" — 심어 둔 표본의 정의 줄 {planted} · 그 밖 {len(stray)}")
 L += [f"    {s}" for s in stray]
-ok = lambda n: not stray and n == 0 and all(hits(p) for p in PROBES)
+# 남았는지는 표본 이름으로만 낸다 — 남은 조각 자체를 여기 인쇄하면 그 인쇄가 곧 유출이다.
+leak = [k for k, p in PROBES if any(val(p) in l for l in L)]
+L.append(f"심은 표본의 값 조각이 위 줄들에 가려지지 않고 남은 것: {len(leak)}"
+         " (0 이라야 값이 이 파일에 실리지 않는다)")
+L += [f"    [{k}] 의 값 조각이 가려지지 않았다" for k in leak]
+ok = lambda n: not stray and not leak and n == 0 and all(hits(p) for _, p in PROBES)
 tail = lambda n: [f"이 블록의 출력 중 자기 패턴에 걸리는 줄: {n} (0 이라야 자기 인용이 쌓이지 않는다)",
                   "PASS" if ok(n) else "FAIL"]
 n = sum(1 for l in L if hits(l))
@@ -1218,8 +1255,11 @@ exit=0
 > 확인은 사람이 전수로 연 것이고 매 실행이 되풀이하지 않는다.** 기계가 매 실행 되풀이하는
 > 것은 **값 형태 갈래**(사업자번호 형태 · 개인키 머리)뿐이며, 그 갈래에서 **심어 둔 표본 밖의
 > 매치가 나면 `FAIL`**이다.
-> **심어 둔 표본 셋은 진짜 비밀값이 아니다** — 이 자리에서 지어낸 형태이고 어떤 계정·채널·
-> 사업자에도 대응하지 않는다.
+> **가림이 덮는 것은 `낱말 [:=] 값`과 낱말 바로 뒤에 붙는 값이다.** 그 꼴을 벗어난 자리
+> (예로 값이 낱말보다 앞에 오는 줄)까지 덮는다고 주장하지 않는다. **덮는다고 적은 꼴에
+> 대해서는 산문이 아니라 블록이 잰다** — 표본 여섯의 값 조각이 출력에 남으면 `FAIL`이다.
+> **심어 둔 표본 여섯은 진짜 비밀값이 아니다** — 이 자리에서 지어낸 형태이고 어떤 계정·
+> 채널·사업자에도 대응하지 않는다.
 > **좌표는 선언 SHA 트리의 것이고 이 커밋의 편집으로 이동한다** — 자기 커밋의 내용을
 > 좌표로 주장하지 않으므로 갱신하지 않는다.
 
