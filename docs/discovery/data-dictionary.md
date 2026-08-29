@@ -178,15 +178,37 @@ legacy의 회귀 원인이 **화면의 "예산"이라는 한 단어**였다고 �
 
 #### 1.2.4 시공능력평가금액 — 기준 시점 규칙 (0C가 도출)
 
-`ConstructionCapacityAmount(money, evaluationYear, provenance)`.
+`ConstructionCapacityAmount(money, evaluationYear)`. **이 타입이 나르는 것은 운영자
+보유액 하나다** — 공고가 게시하는 요건은 §5.5의 `ConstructionCapacityRequirement`가 나른다.
 
 - 과세 처리 **`Inclusive`**(U-2), `evaluationYear` = **직전 연도 공시값**(U-2b).
 - 미입력은 **`Absent`**이며 `0`이 아니다. legacy는 `0`을 "not provided"로 쓰고
   `nullable=False`로 못박아 "미입력"과 "미달"을 구분하지 않는다
   (`app/models/models.py:161-182`).
-- **운영자 보유액의 provenance는 `OperatorDeclared`**, 공고 요건의 provenance는
-  `NoticePublished`. 두 값은 같은 타입이되 provenance가 다르고, 비교 결과에 **무엇과
-  무엇을 비교했는지가 남는다**(`capability-map.md` QUAL-11의 무조건 acceptance).
+- **출처는 `money.provenance`가 나른다** — 운영자 보유액은 **`OperatorDeclared`**(§5.1).
+  공고 요건 값의 출처는 그 다른 타입의 `requiredAmount`에 실리며 **`Published`**다.
+  비교 결과에는 **무엇과 무엇을 비교했는지가 남는다**
+  (`capability-map.md` QUAL-11의 무조건 acceptance).
+
+> **⚠ 정정** — 앞서 이 자리는 서명을
+> `ConstructionCapacityAmount(money, evaluationYear, provenance)`로 적고, 그 바깥
+> `provenance`의 **타입을 선언하지 않은 채** 값으로 `OperatorDeclared`·`NoticePublished`를
+> 지정했다. **셋이 함께 틀렸다.**
+>
+> - **`NoticePublished`는 `FactProvenance`에 없는 이름이고, 있는 이름의 둘째 이름이다** —
+>   `Published(noticeRevision)`가 이미 "공고가 게시했다"의 자리다. §5.1의 **셋째 규율**
+>   (어휘가 이웃 축과 겹치지 않게 한다)이 정확히 이 형태를 막는다. **도입하지 않는다.**
+> - **"두 값은 같은 타입"이 거짓이다** — §5.5가 공고 요건에 **별도 타입**을 준다.
+>   그 타입은 `limitGroupNo`·`licenseRegionCode`를 나르는 **제한그룹별 요구 금액**이고
+>   운영자 보유액은 회사 하나의 값이다. **한 타입이 둘을 겸할 수 없다.**
+> - **바깥 `provenance`는 새 축이 아니라 `money.provenance`의 재선언이다.** §5.3의 **둘째
+>   규율**이 같은 형태를 막는다 — *"계약이 밴드를 재선언하지 않고 단일 출처를 참조한다"*.
+>   두 자리를 두면 갈린다. **그래서 바깥 필드를 걷고 `money.provenance` 하나로 나른다** —
+>   §12.2는 이미 이 값을 `money` 행에 귀속하고 있었다.
+>
+> **U-2b 기록이 이 서명을 세 항으로 인용한다**(`decisions-2026-08-28.md`의 U-2b 절).
+> 그 인용은 **0C가 제출한 서명**이고 운영자가 정한 것은 **`evaluationYear` = 직전 연도**다.
+> **결정 내용은 바뀌지 않는다** — 0C가 자기 서명의 중복을 걷는다.
 
 **"직전"의 기준일 — 규칙: 공고일이다.** 운영자 결정이 아니라 규칙 도출이므로 0C가 정한다.
 
@@ -938,10 +960,27 @@ legacy의 가장 성숙한 장치가 이 축에 있다. `EstimatedAmountSource` 
 하나뿐**임을 데이터로 선언한다(`app/core/constants.py:179-222`).
 
 > `FactProvenance = sealed { Published(noticeRevision), DerivedFromOpening,
-> FilledFromBudgetKey(key), CopiedFromBaseAmount, Undeclared }`
+> FilledFromBudgetKey(key), CopiedFromBaseAmount, OperatorDeclared, Undeclared }`
 >
 > `isAuthoritative`는 **술어가 아니라 데이터로 선언한다** — 어휘가 늘 때 "덮을 수 있는가"를
 > 한 자리에서 정하고, 빠뜨리면 기본이 **보수(fill-only)**다.
+
+**`OperatorDeclared`가 왜 여기 있는가 — 다섯으로는 덮이지 않는 자리가 실재한다.**
+legacy에서 도출한 나머지는 **전부 KONEPS 수집 경로 안의 해석 경로**다(게시 · 개찰 역산 ·
+예산 키 폴백 · 기초금액 사본 · 미신고). 그런데 `v2-지침서.md` §4.1이 **모든 `Money`에
+`provenance`를 필수**로 두고, **KONEPS를 거치지 않는 금액이 실제로 있다** — 운영자가
+직접 넣는 시공능력평가액이며 legacy가 그것을 **수기 입력** 컬럼으로 갖는다
+(`app/models/models.py:161-182`). 그 값을 나를 자리가 다섯 안에 없다.
+**§5.1이 어휘가 느는 경우를 설계에 넣어 둔 것이 이 자리다.**
+
+- **`isAuthoritative`는 이 값에 대해 참이다.** 근거 둘 — ① legacy 실물이 **연 1회 갱신**이라
+  (같은 자리) 덮지 못하면 갱신 자체가 불가능하다. ② 점유 가드가 막으려는 것은 **권위 없는
+  자동 유입**이 이미 있는 값을 조용히 바꾸는 것이고(`app/services/koneps/budget_fields.py:24-34`),
+  사람의 명시 신고는 그 대상이 아니다.
+- **`OperatorDeclared`는 KONEPS fact의 자리에 들어갈 수 없다.** §5.2의 경계 규칙이 그대로
+  적용된다 — 자리가 같아야 한다면 타입이 달라야 한다.
+- **`NoticePublished`라는 이름은 두지 않는다** — `Published(noticeRevision)`와 같은 것을
+  가리키는 둘째 이름이고, **셋째 규율**이 그것을 막는다(§1.2.4의 ⚠ 정정).
 
 **계승할 규율 셋.**
 
@@ -955,7 +994,8 @@ legacy의 가장 성숙한 장치가 이 축에 있다. `EstimatedAmountSource` 
 
 **⚠ legacy의 판정 함수는 세 값만 낸다** — `notice` / 예산 폴백 / 기초금액 사본. `derived`는
 개찰 경로가 따로 넣는다(`app/domain/estimate_provenance.py:40-53`). **어휘 넷과 판정 셋이
-어긋난다.** V2는 **모든 variant를 같은 판정 지점이 낸다.**
+어긋난다.** V2는 **KONEPS 수집 경로의 variant 전부를 같은 판정 지점이 낸다** —
+`OperatorDeclared`는 그 경로 밖에서 들어오므로 이 문장의 대상이 아니다.
 
 ### 5.2 canonical fact와 derived fact의 경계
 
@@ -1195,8 +1235,18 @@ legacy의 `confidence`는 근거 없는 계수 아홉의 아핀 결합이고 클
 **셋을 합쳐 하나의 비율로만 발표하지 않는다.** 각 성분의 분자를 따로 낸다 — legacy가 남긴
 단일 수 하나가 **무엇의 비율인지 복원되지 않는 것**이 그 수를 못 쓰게 만든 원인이다.
 
-**V2 write 경로에서 C2는 타입으로 `0`이다**(provenance가 필수 필드다). 따라서 C2의 분자가
-`0`이 아니면 그것은 오염이 아니라 **적재 결함**이며 그렇게 분류한다.
+> **⚠ 정정** — 앞서 이 자리는 *"V2 write 경로에서 C2는 타입으로 `0`이다(provenance가 필수
+> 필드다)"*라 적었고 **거짓이었다.** `Undeclared`가 `FactProvenance`의 **멤버**이므로(§5.1)
+> **필수 필드는 값이 있게 할 뿐 `Undeclared`를 배제하지 않는다** — 필수로 두어도 그 값을
+> 실으면 그만이다. 그 위에 얹혀 있던 *"C2의 분자가 `0`이 아니면 오염이 아니라 적재
+> 결함이며 그렇게 분류한다"*도 함께 걷는다. **그 분류는 성립하지 않는 전제 위에 있었다.**
+
+**C2는 V2 write 경로에서도 `0`이 아닐 수 있고, 그 분자는 다른 성분과 같은 방식으로 잰다.**
+타입만으로 `0`이 되게 하려면 **write 계약의 입력 타입이 `Undeclared`를 갖지 않아야**
+한다 — `FactProvenance`의 진부분집합을 그 경계에 두는 것이다. **그 부분집합을 둘지는 이
+문서가 정하지 않는다** → **`OPEN-DIC-06`**. 근거가 한쪽으로 서지 않는다 — §5.1의 **둘째
+규율**은 `Undeclared`를 **권위로 취급하지 않을** 뿐 **금지하지 않고**, 같은 축의
+`vatTreatment`에서 §1.2.1은 *"선언을 만들 수 없으면 `Unknown`"*을 **허용**한다.
 
 **legacy 유래 행은 별도 모집단이다.** 운영자 결정 `OPEN-DEC-08`이 legacy `clean` 라벨의
 승계를 금지했다 — 표식이 값이 아니라 **write 경로**인데 legacy에 provenance가 없다.
@@ -1257,6 +1307,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 | **`OPEN-DIC-03`** | **`SkipReason` 어휘의 전수성.** 최소 두 값은 legacy 게이트 사다리에서 확인되나 목록이 닫혔는지는 미확인 | legacy 사다리를 M1에서 옮길 때 확정된다. 지금 닫으면 옮기는 과정에서 발견될 사유가 갈 곳을 잃는다 | §3.6 |
 | **`OPEN-DIC-04`** | **`AllocatedBudget`·`YegaAmount`·`AwardAmount`의 과세 처리** | U-1·U-1b는 추정가격과 기초금액 둘만 정했다. 나머지 셋은 결정도 문서 근거도 없다 | §1.2 |
 | **`OPEN-DIC-05`** | **`BaseAmountProvenance`의 승인 라벨 다섯이 legacy 실측을 덮는가** — ① `suspect-fractional`에 대응하는 이름이 승인 명세에 없다 ② **미판정(`NULL`)과 「출처를 모름」(`Unknown`)이 같은 값인가** | **승인 명세(`v2-지침서.md` §4.3)의 집합을 이 문서가 바꿀 수 없다.** `OPEN-DEC-08`은 **legacy `clean` 승계 금지**만 확정했고 라벨 집합 변경을 승인하지 않았다. **바꾸려면 별도 결정이 필요하다** | §3.4 |
+| **`OPEN-DIC-06`** | **V2 canonical write 경로가 `Undeclared` provenance를 거부하는가** — 거부한다면 그 경계의 입력 타입은 `FactProvenance`의 진부분집합이다 | **근거가 한쪽으로 서지 않는다.** §5.1의 **둘째 규율**은 `Undeclared`를 **권위로 취급하지 않을** 뿐 **금지하지 않고**, 같은 축의 `vatTreatment`에서 §1.2.1은 *"선언을 만들 수 없으면 `Unknown`"*을 **허용**한다. **어댑터의 의무를 정하는 결정**이므로 이 문서가 정할 자리가 아니다 | §7.1 · §5.1 |
 
 **활성 `OPEN`은 해소하지 않았다.** 이 문서가 문면에서 마주친 것 — `OPEN-QUAL-05` ·
 `OPEN-QUAL-09` · `OPEN-ML-05` · `OPEN-SET-04` · `OPEN-SET-05` · `OPEN-SET-06` ·
@@ -1401,8 +1452,8 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 | 필드 | 단위 | basis / 축 | provenance | 소유 `OPEN` |
 | --- | --- | --- | --- | --- |
 | `amount` (`Money`) | **원(KRW), 정수** | 같은 값의 `basis` 필드가 정하는 금액 축(§1.2) | 수집 어댑터가 `provenance`·`vatTreatment`와 함께 싣는다 | — |
-| `money` (`ConstructionCapacityAmount`) | `Money` 한 벌 — 위와 같다 | 시공능력평가액 | `OperatorDeclared` 또는 `NoticePublished`(§1.2.4) | — |
-| `requiredAmount` (`ConstructionCapacityRequirement`) | 원 | 시공능력평가액 **요건** | 공고 게시값. **legacy가 수집하지 않으며 `vatTreatment`는 `Unknown`**(§5.5) | 수집 신설은 §13.4 인계 |
+| `money` (`ConstructionCapacityAmount`) | `Money` 한 벌 — 위와 같다 | 시공능력평가액 **보유액** | 그 `Money`의 `provenance`가 나른다 — 운영자 보유액이므로 `OperatorDeclared`(§1.2.4 · §5.1) | — |
+| `requiredAmount` (`ConstructionCapacityRequirement`) | 원 | 시공능력평가액 **요건** | 공고 게시값이므로 그 `Money`의 `provenance`는 `Published`. **legacy가 수집하지 않으며 `vatTreatment`는 `Unknown`**(§5.5) | 수집 신설은 §13.4 인계 |
 | `frequency` | fraction | `numerator` ÷ `denominator`. **확률이 아니다**(§3.3) | 표본 집합에서 계산한 파생값 | — |
 | `criticalAssessmentRate` | fraction | **사정률 축**(예정가 ÷ 기초금액) | 추천 투찰율 ÷ 낙찰하한율의 파생값 | — |
 | `numerator` | 건수 | 하한 미달로 판정된 표본 수 | 표본 집합 | — |
