@@ -370,13 +370,27 @@ exit=0
 않는다** — §12.2가 각 필드를 **수** 또는 **수가 아님**으로 분류하므로, 덮이지 않은 이름이
 있으면 그것이 곧 미분류다.
 
-**못 본 것을 세는 앵커는 보는 앵커보다 넓다.** 사각지대를 재는 앵커가 선언을 읽는 앵커와
-같으면 **못 읽는 자리와 못 읽었다고 세는 자리가 같아 구조적으로 자기를 볼 수 없다** — 이
-검사가 그렇게 지어져 `_FloorSchedule(effective_from, brackets)` 한 자리를 네 사각지대 줄
-어디에도 내지 못했다. 그래서 사각지대 앵커를 **대문자를 전제하지 않는 형태**로 따로 세웠다.
+**두 앵커의 관계에 대한 정본은 이 자리 하나다** — `checklist.md`·`scope.md`는 여기를
+가리키기만 한다. 사각지대를 재는 앵커가 선언을 읽는 앵커와 같으면 **못 읽는 자리와 못
+읽었다고 세는 자리가 같아 구조적으로 자기를 볼 수 없다** — 이 검사가 그렇게 지어져
+`_FloorSchedule(effective_from, brackets)` 한 자리를 네 사각지대 줄 어디에도 내지 못했다.
+그래서 사각지대 앵커를 **대문자를 전제하지 않는 형태**로 따로 세웠다.
 
-**그 포함 관계도 산문의 주장이 아니라 블록이 실행으로 잰다** — `선언 앵커가 읽은 자리 ⊆
-사각지대 앵커가 본 자리`가 깨지면 `FAIL`이다. **사각지대가 무엇인지도 이 블록이 낸다.**
+**그 관계를 산문이 주장하지 않고 블록이 잰다. 재는 것은 둘이고 둘 다 깨지면 `FAIL`이다.**
+
+- **㉠ 문서에 대해 — 포함.** 모든 백틱 span에서 `선언 앵커가 읽은 자리 ⊆ 사각지대 앵커가
+  본 자리`.
+- **㉡ 고정 표본에 대해 — 「세는 앵커만 보는 자리가 있다」.** 문서와 무관한 상수 셋을 두고,
+  각 표본에서 **넓은 쪽만 보고 좁은 쪽은 못 보는지**를 같은 실행이 확인한다.
+
+**㉠만으로는 부족하다** — 두 앵커가 **같은 폭**이 되어도 포함은 깨지지 않으므로, `F-1`이
+고친 결함이 그대로 되돌아와도 ㉠은 침묵한다. 그때 **㉡의 표본이 죽는다.**
+**이것이 능력을 문서의 현재 내용으로 재지 않는 이유다** — 내용이 우연히 깨끗하면 내용에
+기대는 술어는 침묵하지만, 표본은 상수이므로 내용과 무관하게 죽는다.
+**㉠·㉡이 재지 않는 것**: 두 앵커의 관계를 **모든 입력에 대해** 재지는 않는다. 재는 것은
+**오늘 이 문서**(㉠)와 **적어 둔 표본 셋**(㉡)뿐이다.
+
+**사각지대가 무엇인지도 이 블록이 낸다.**
 
 **빼는 것은 되도록 규칙이 아니라 이름 목록으로 한다** — 규칙은 조용히 넓어지지만 목록은
 밖의 새 이름을 `FAIL`로 낸다. **어떤 갈래로 몇 개를 뺐는지, 규칙으로 뺀 것이 무엇인지는
@@ -403,6 +417,15 @@ NAME  = re.compile(r"[a-z][A-Za-z0-9]*")                           # 인자 이�
 LOOSE = re.compile(r"`([a-z][A-Za-z0-9]*)`")                       # ③ 단독 백틱 이름 규칙
 WIDER = re.compile(r"`([a-z][A-Za-z0-9_]*)`")                      # ③ 규칙 밖을 재는 더 넓은 규칙
 HASH  = re.compile(r"[0-9a-f]{7,40}\Z")                            # commit 해시는 규칙으로 뺀다
+# 고정 표본 — **검사의 능력을 문서의 현재 내용이 아니라 이 상수로 잰다.** 내용이 우연히
+# 깨끗하면 내용에 기대는 술어는 침묵한다. 각 표본은 「넓은 쪽만 보고 좁은 쪽은 못 보는」
+# 자리이고, 두 쪽이 같은 폭이 되는 순간 표본이 죽으며 그것이 FAIL 이다.
+PROBES = [
+  ("세는 앵커가 읽는 앵커 밖을 본다 — 소문자 선두", "to_bid_rate_fraction(numeric)",
+   lambda p: {m.start() for m in SITE.finditer(p)}, lambda p: {d[1] for d in decls(p)}),
+  ("세는 앵커가 읽는 앵커 밖을 본다 — 밑줄+소문자 선두", "_floorSchedule(effective_from)",
+   lambda p: {m.start() for m in SITE.finditer(p)}, lambda p: {d[1] for d in decls(p)}),
+]
 # legacy 파이썬 선언의 축어 인용(§4.1 · §5.3). V2 타입이 아니므로 그 인자는 §12.2 등재 대상이 아니다.
 LEGACY_DECLS = {"FieldContract", "_FloorSchedule"}
 NOT_A_DECL = {   # 「이름(」 이지만 타입 선언이 아닌 자리. 목록 밖의 새 이름은 못 읽은 선언 자리로 센다
@@ -509,6 +532,9 @@ unclassified = route["남은 것"]
 # ③의 이름 규칙 자체가 못 보는 갈래도 **더 넓은 규칙으로 재어** 낸다.
 off_rule = sorted(n for n in wider if n not in loose)
 blind = [n for n in off_rule if n not in covered and n not in found]
+# 고정 표본이 살아 있는지 — 문서와 무관한 상수로 잰다(㉡).
+probe = [(("산 표본" if wide(p) - narrow(p) else "죽은 표본"), why, p) for why, p, wide, narrow in PROBES]
+probe_dead = [t for t in probe if t[0] == "죽은 표본"]
 print(f"문서: {DOC}")
 print(f"§12.2 표 칸이 덮는 이름: {len(covered)}")
 print(f"① 타입 선언 인자 + ② 필드·성분 표에서 뽑은 이름: {len(found)}  미덮개: {len(missing)}")
@@ -522,8 +548,10 @@ print(f"    규칙으로 빼는 갈래는 commit 해시({HASH.pattern}) 하나�
 print(f"③ 규칙 밖 — {WIDER.pattern} 는 맞고 {LOOSE.pattern} 는 아닌 백틱 이름: {len(off_rule)}"
       f" (덮개·①② 안 {len(off_rule) - len(blind)} · 이 검사 어디에도 없음 {len(blind)})")
 print(wrap("    어디에도 없는 것: ", blind))
-print("--- 못 본 것을 세는 앵커는 보는 앵커보다 넓다 — 그 관계도 실행이 잰다 ---")
-print(f"사각지대 앵커 {SITE.pattern}")
+print("--- 두 앵커의 관계를 잰다 — ㉠ 문서에 대해 포함 · ㉡ 고정 표본에 대해 「세는 앵커만 보는 자리가 있다」 ---")
+print(f"㉡ 고정 표본 {len(probe)} · 죽은 표본 {len(probe_dead)}")
+for st, why, p in probe: print(f"    [{st}] {why} :: {p!r}")
+print(f"㉠ 사각지대 앵커 {SITE.pattern}")
 print(f"선언 앵커가 읽은 자리 {n_decl} ⊆ 사각지대 앵커가 본 자리 {n_site} — 그 밖으로 샌 자리: {leaked}")
 print(f"통째로 못 읽은 선언 자리: {len(unread)} (NOT_A_DECL 로 가른 함수·술어 호출 {ruled_out})"
       + ("" if not unread else " -> " + repr(unread)))
@@ -534,7 +562,7 @@ print(wrap("    ", sorted(off_name)))
 print(f"이름 없이 타입만 적힌 인자: {len(type_only)}자리")
 print(wrap("    ", sorted(type_only)))
 print(f"덮개에만 있는 이름(①②③이 못 내는 자리 — 손 등재): {sorted(covered - set(found) - set(loose))}")
-print("PASS" if not missing and not unclassified and not unread and not off_name and not leaked else "FAIL")
+print("PASS" if not (missing or unclassified or unread or off_name or leaked or probe_dead) else "FAIL")
 PY
 echo "exit=$?"
 ```
