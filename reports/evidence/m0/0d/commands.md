@@ -6,18 +6,26 @@
 
 ## 선언 SHA와 실행 계약
 
-**출력 블록은 `f207412` 트리에서 뜬 것이다** — **예외는 C-11 하나이고 그것은 HEAD에서
-뜬다.** 어느 블록이 무엇을 선언하는지는 아래 표가 적고, 그 예외의 사유는 C-11 절이 적는다.
+**출력 블록은 `f207412` 트리에서 뜬 것이다** — **예외는 아래 표의 「재현 래칫」 열이
+`제외`인 블록들이고, 그 열의 값을 사람이 정하지 않는다.** C-11의 스크립트가 명령 블록의
+문면에서 정하며, **무엇이 어느 사유로 빠졌는지는 C-11 출력이 쌍마다 낸다.**
 커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`f207412`로 그대로
 지목한다.** 다른 커밋과의 관계로 부르지 않는다: 관계는 뒤 편집이 들어올 때마다 낡는다.
 
-| 블록 | 읽는 것 | 선언 SHA |
-| --- | --- | --- |
-| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`f207412`** |
-| C-5.1 ~ C-5.5 | legacy `bid-vector`만 | **`ed4b06c`** (이 저장소의 어느 HEAD에서도 같다) |
-| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`f207412` + `ed4b06c`** |
-| C-12 | **양쪽** — 리뷰 레인 산출물(`_workspace/`)·`~/.codex` 실물과 **등재된 verdict JSON**(이 저장소) | **`f207412`** + 저장소 밖 실물 |
-| C-11 | 이 파일 자신 ↔ 선언 SHA 트리 | **HEAD** (그 블록이 사유를 적는다) |
+**제외의 축은 「트리를 고정하면 답도 고정되는가」다.** 선언 SHA 트리 밖의 상태를 읽는
+블록은 그 트리의 함수가 아니므로 **트리 재현 래칫이 잴 수 있는 대상이 아니다** — 같은
+트리에서 오늘 뜬 값이 내일 다르게 뜬다. 그런 블록의 기록을 지우지는 않는다.
+`codex-review-gate`가 preflight 결과와 reviewer 메타를 **그 slice의 `commands.md`에**
+남기라고 요구하기 때문이다. **재현되는 기록으로 적지 않고 시점 기록으로 적을 뿐이며**,
+그 블록들은 자기 출력에 뜬 시각(`taken_at`)을 함께 낸다.
+
+| 블록 | 읽는 것 | 선언 SHA | 재현 래칫 |
+| --- | --- | --- | --- |
+| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`f207412`** | 대조 |
+| C-5.1 ~ C-5.5 | legacy `bid-vector`만 | **`ed4b06c`** (이 저장소의 어느 HEAD에서도 같다) | 대조 |
+| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`f207412` + `ed4b06c`** | 대조 |
+| C-12.1 · C-12.2 | **양쪽** — 리뷰 레인 산출물(`_workspace/`)·`~/.codex` 실물과 **등재된 verdict JSON**(이 저장소) | **`f207412`** + 저장소 밖 실물 | **제외 `EXT`** — 트리의 함수가 아니다 |
+| C-11 | 이 파일 자신 ↔ 선언 SHA 트리 | **HEAD** (그 블록이 사유를 적는다) | **제외 `SELF`** |
 
 ### 실행 계약
 
@@ -33,7 +41,9 @@
    블록 실행에 쓴 셸은 `bash`다(C-11).
 
 **C-11이 이 선언을 실행으로 확인한다** — 명령/출력 쌍을 선언 SHA의 트리에 대고 축어
-대조하며, 쌍의 수는 그 출력의 `pairs=`가 낸다.
+대조하고, **위 표의 「재현 래칫」 열을 자기가 다시 계산한다.** 전체 쌍 수·대조한 수·사유별로
+빠진 수는 그 출력의 마지막 줄이 내고, 어느 쌍이 어느 토큰 때문에 빠졌는지는 그 위의 `SKIP`
+행이 낸다. **표와 출력이 갈라지면 출력이 이긴다.**
 
 ---
 
@@ -1134,6 +1144,15 @@ docs/adr/0005-domain-events-and-outbox.md:286:### 3.5 아키텍처 규칙 강제
 `model`+effort)와 **memory 오염 preflight**. **2차 리뷰 레인은 이 파일이 자기 리뷰
 대상이라 쓰지 않았고, 이 수정 라운드가 쓴다.**
 
+**이 절의 두 블록은 재현 래칫에서 빠진다.** 둘 다 선언 SHA 트리 밖의 상태를 읽으므로
+(`_workspace/`의 리뷰 레인 산출물 · `~/.codex` 실물) **트리를 고정해도 값이 고정되지
+않는다.** 빼는 일은 C-11의 스크립트가 명령 문면에서 그 경로 토큰을 찾아 하고, 뺀 사실과
+근거 토큰을 그 출력이 낸다 — **사람이 기억해서 빼는 것이 아니다.** 기록은 그대로 남는다:
+스킬이 preflight 결과와 reviewer 메타를 이 파일에 남기기를 요구한다. 그래서 두 블록은
+**재현되는 기록이 아니라 시점 기록**이고, 각 블록이 마지막 줄에 `taken_at`을 낸다 —
+그 값이 있는 한 이 블록들은 어느 트리에서도 축어로 다시 뜨지 않으며, **빠져야 한다는
+사실이 출력 자신에 남는다.**
+
 **C-12.2의 두 값은 리뷰 시점이 아니라 이 수정 라운드에 뜬 것이다.** 리뷰 시점 값은
 레인이 남기지 않았고 **되살릴 수 없다** — 그래서 여기 적는 것은 *"리뷰 당시 오염이
 없었다"*가 아니라 *"지금 이 저장소 흔적이 얼마이고 stage1에 리뷰 세션이 올라와 있지
@@ -1158,6 +1177,7 @@ print("reviewed_head=%s" % d["reviewed_head"][:7])
 print("findings=%d" % len(d["findings"]))
 print("severities=%s" % ",".join(sorted(f["severity"] for f in d["findings"])))
 PY
+date -u +%Y-%m-%dT%H:%M:%SZ | sed 's/^/taken_at=/'
 ```
 
 ```
@@ -1173,6 +1193,7 @@ reviewed_base=998dc21
 reviewed_head=584305b
 findings=3
 severities=medium,medium,medium
+taken_at=2026-08-29T11:32:33Z
 ```
 
 **판정**: raw output 머리글과 등재된 verdict JSON의 `reviewer`가 같은 값을 말하고,
@@ -1195,18 +1216,20 @@ sqlite3 "file:$HOME/.codex/memories_1.sqlite?immutable=1" \
   "select count(*) from stage1_outputs
     where raw_memory like '%bid-vector-v2-review%'
        or rollout_summary like '%bid-vector-v2-review%';" | sed 's/^/stage1_review_rows=/'
-echo "-- 스킬 문면의 mode=ro 는 이 환경에서 열리지 않는다"
+echo "-- 스킬 문면의 mode=ro 를 그대로 실행 (시점 값 — 아래 산문)"
 sqlite3 "file:$HOME/.codex/memories_1.sqlite?mode=ro" "select 1;" 2>&1 | sed 's/^/mode_ro: /'
+date -u +%Y-%m-%dT%H:%M:%SZ | sed 's/^/taken_at=/'
 ```
 
 ```
 -- preflight ① consolidate 이후 이 저장소 흔적
 traces=17
 -- preflight ② stage1 에 리뷰 세션이 올라왔는가 (0 이 아니면 리뷰 중단)
-stage1_rows_total=535
+stage1_rows_total=548
 stage1_review_rows=0
--- 스킬 문면의 mode=ro 는 이 환경에서 열리지 않는다
-mode_ro: Error: in prepare, unable to open database file (14)
+-- 스킬 문면의 mode=ro 를 그대로 실행 (시점 값 — 아래 산문)
+mode_ro: 1
+taken_at=2026-08-29T11:32:32Z
 ```
 
 **판정**: `stage1_review_rows=0` — 리뷰 세션 transcript가 stage1에 올라와 있지 않다.
@@ -1215,10 +1238,19 @@ mode_ro: Error: in prepare, unable to open database file (14)
 `--disable memories --ignore-rules`를 붙인다. **이 값은 그 플래그의 효과를 재지 않는다**
 (흔적의 양일 뿐이다).
 
-**스킬 문면과 다른 점**: 스킬은 `?mode=ro`를 적는데 **이 환경에서 열리지 않는다** —
-위 출력의 `mode_ro:` 줄이 그 실패다. `?immutable=1`로 바꿔 읽었고, 그 대가는 **파일이
-동시에 쓰이면 찢긴 페이지를 읽을 수 있다**는 것이다. **이 차이를 스킬에 반영할지는
-하네스 소유자의 판정이며 이 slice는 `.claude/`를 고치지 않는다.**
+**스킬 문면과 갈라진 자리**: 스킬은 `?mode=ro`를 적고 이 블록은 그 명령을 그대로 돌린다.
+**그 결과가 시점에 따라 갈렸다.** 이 수정 라운드의 첫 실행에서는
+`Error: in prepare, unable to open database file (14)`가 떴고 그 값이 `f207412`에
+기록됐다. 같은 날 늦게 독립 검증 레인이 같은 명령을 연속 두 번 돌렸을 때는 **둘 다 `1`**이
+떴다(`_workspace/m0-0d/18_verifier_report_codex2fix.md`). 그 사이 `memories_1.sqlite`의
+`-wal`·`-shm`이 갱신됐고 **그때의 상태는 되돌릴 수 없어 원인을 확정하지 못했다.**
+그래서 이 slice는 `?mode=ro`를 **「열린다」로도 「열리지 않는다」로도 적지 않는다** —
+실측된 것은 **같은 환경에서 같은 명령이 시점에 따라 갈린다**는 것뿐이고, 위 `mode_ro:`
+줄은 그 자체가 **`taken_at` 시점의 값**이다. **이것이 이 두 블록을 재현 래칫에서 빼는
+이유의 실물**이다 — 같은 블록의 `stage1_rows_total`도 `f207412`에 기록됐던 값과 다르게
+떴다. 두 기록을 나란히 놓으면 그 줄들이 트리의 함수가 아님이 보인다. preflight는 `?immutable=1`로 읽었고 그 대가는 **파일이 동시에 쓰이면
+찢긴 페이지를 읽을 수 있다**는 것이다. **이 갈라짐을 스킬에 반영할지는 하네스 소유자의
+판정이며 이 slice는 `.claude/`를 고치지 않는다.**
 
 ---
 
@@ -1226,21 +1258,31 @@ mode_ro: Error: in prepare, unable to open database file (14)
 
 **이 블록만 선언 SHA가 HEAD다.** 이 검사는 *"HEAD의 `commands.md`를 선언 SHA의 트리에
 대고 맞춰 본다"*이므로 **HEAD의 파일 내용이 입력**이다. 선언 SHA 트리에는 이 블록이
-없으니 거기서는 돌 수 없다. **자기 자신은 대조 대상에서 뺀다** — 아래 스크립트가
-`==0D-BLOCK-HARNESS==` 마커가 든 쌍을 건너뛰고 그 수를 `skipped_harness`로 낸다.
+없으니 거기서는 돌 수 없다.
+
+**무엇을 대조 대상에서 뺄지는 아래 스크립트가 정한다 — 사람이 표시해 두는 것이 아니다.**
+두 사유가 있다.
+
+| 사유 코드 | 판정 방법 | 왜 빼는가 |
+| --- | --- | --- |
+| `SELF` | 명령 블록에 `==0D-BLOCK-HARNESS==`가 있다 | 이 블록 자신. 선언 SHA 트리에 없어 거기서 돌 수 없다 |
+| `EXT` | 명령 블록의 문면에 `$HOME` · `~/` · `_workspace/` 중 하나가 있다 | 선언 SHA 트리 **밖**의 상태를 읽는다 — 그 출력은 트리의 함수가 아니라 **시점 값**이라 트리 재현 래칫이 잴 수 있는 대상이 아니다 |
+
+**`EXT`는 명령 문면에서 나오므로, 새 블록이 저장소 밖을 읽기 시작하면 그것만으로 빠지고
+읽지 않게 되면 그것만으로 대조로 돌아온다.** 빠진 쌍은 `SKIP <코드> <근거 토큰>` 행으로
+남고 사유별 수는 마지막 줄이 낸다 — **출력 자신이 무엇을 왜 뺐는지 말한다.**
 
 블록 쌍은 fenced 블록의 **교대**(짝수=명령, 홀수=출력)로 집는다. 각 쌍 앞에서 루트로
 돌아가고 셸은 하나라 `$T`·`$T0`가 이어진다 — 「실행 계약」 그대로다.
 
 ```
-# ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다
+# ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다 (SELF)
 DECL=f207412
 WT=$(mktemp -d)/wt
 git worktree add --detach "$WT" "$DECL" >/dev/null 2>&1
 ln -sfn "$PWD/bid-vector" "$WT/bid-vector"
-ln -sfn "$PWD/_workspace" "$WT/_workspace"
 python3 - reports/evidence/m0/0d/commands.md "$WT" <<'PY'
-import pathlib, subprocess, sys
+import pathlib, re, subprocess, sys
 md, wt = pathlib.Path(sys.argv[1]), sys.argv[2]
 lines = md.read_text(encoding="utf-8").splitlines()
 fence = [i for i, l in enumerate(lines) if l.startswith("`" * 3)]
@@ -1248,27 +1290,42 @@ assert len(fence) % 2 == 0
 blocks = [(fence[k] + 1, fence[k + 1]) for k in range(0, len(fence), 2)]
 assert len(blocks) % 2 == 0
 pairs = [(blocks[k], blocks[k + 1]) for k in range(0, len(blocks), 2)]
-MARK = "==0D-BLOCK-HARNESS=="
-sel = [(c, o) for c, o in pairs if MARK not in chr(10).join(lines[c[0]:c[1]])]
+SELF = "==0D-BLOCK-HARNESS=="                  # 이 하네스 자신
+EXT = re.compile(r"[$]HOME|~/|_workspace/")    # 선언 SHA 트리 밖의 상태
+skip = {}
+for n, (c, _) in enumerate(pairs):
+    body = chr(10).join(lines[c[0]:c[1]])
+    m = EXT.search(body)
+    if SELF in body:
+        skip[n] = ("SELF", SELF)
+    elif m:
+        skip[n] = ("EXT", m.group(0))
+sel = [n for n in range(len(pairs)) if n not in skip]
 SEP = "@@@0D-BLOCK-%d@@@"
 script = ["set +e", 'ROOT="%s"' % wt, 'cd "$ROOT"']
-for n, (c, _) in enumerate(sel):
+for i, n in enumerate(sel):
     script.append('cd "$ROOT"')
-    script.append('echo "%s"' % (SEP % n))
-    script.extend(lines[c[0]:c[1]])
+    script.append('echo "%s"' % (SEP % i))
+    script.extend(lines[pairs[n][0][0]:pairs[n][0][1]])
 script.append('echo "%s"' % (SEP % len(sel)))
 out = subprocess.run(["bash", "-c", chr(10).join(script)],
                      capture_output=True, text=True, cwd=wt).stdout
-diff = 0
-for n, (c, o) in enumerate(sel):
-    a = out.index(SEP % n) + len(SEP % n)
-    b = out.index(SEP % (n + 1))
+res, diff = {}, 0
+for i, n in enumerate(sel):
+    o = pairs[n][1]
+    a = out.index(SEP % i) + len(SEP % i)
+    b = out.index(SEP % (i + 1))
     got = out[a:b].strip(chr(10))
     want = chr(10).join(lines[o[0]:o[1]]).strip(chr(10))
-    ok = got == want
-    diff += 0 if ok else 1
-    print("pair %2d L%-5d %s  %s" % (n, o[0] + 1, "OK  " if ok else "DIFF", lines[c[0]][:56].rstrip()))
-print("pairs=%d skipped_harness=%d diff=%d" % (len(sel), len(pairs) - len(sel), diff))
+    diff += 0 if got == want else 1
+    res[n] = "OK  " if got == want else "DIFF"
+for n, (c, o) in enumerate(pairs):
+    tag = res[n] if n in res else "SKIP %s <%s>" % skip[n]
+    print("pair %2d L%-5d %-34s %s" % (n, o[0] + 1, tag, lines[c[0]][:44].rstrip()))
+print("pairs_total=%d replayed=%d skipped_SELF=%d skipped_EXT=%d diff=%d" % (
+    len(pairs), len(sel),
+    sum(1 for v in skip.values() if v[0] == "SELF"),
+    sum(1 for v in skip.values() if v[0] == "EXT"), diff))
 PY
 git worktree remove --force "$WT"
 ```
@@ -1305,15 +1362,20 @@ pair 27 L1203  OK    echo "-- preflight ① consolidate 이후 이 저장소 흔
 pairs=28 skipped_harness=1 diff=0
 ```
 
-**판정**: `diff=0`이면 **위 출력이 `pairs=`로 센 쌍이 선언 SHA `f207412`의 트리에서
-축어로 다시 뜬다.**
+**판정**: `diff=0`이면 **위 출력이 `replayed=`로 센 쌍이 선언 SHA `f207412`의 트리에서
+축어로 다시 뜬다.** 빠진 쌍은 `SKIP` 행이 사유 코드와 **그 사유의 근거 토큰**까지 함께
+내고, 사유별 수는 마지막 줄의 `skipped_SELF=`·`skipped_EXT=`가 낸다.
 
-**이 검사가 재는 범위**: `commands.md`의 명령/출력 쌍이다 — 그 수는 `pairs=`가 낸다.
-**재지 않는 것** —
+**이 검사가 재는 범위**: `commands.md`의 명령/출력 쌍 중 **래칫 대상인 것**이다 —
+전체 수와 대조한 수는 `pairs_total=`·`replayed=`가 낸다. **재지 않는 것** —
 `checklist.md`·`scope.md`의 인라인 블록, 각 블록 아래 **판정 산문의 참·거짓**,
-그리고 **이 블록 자신**. `diff=0`은 *"기록이 그 트리에서 다시 뜬다"*이지
-*"기록이 옳다"*가 아니다.
+**이 블록 자신**(`SELF`), 그리고 **선언 SHA 트리 밖의 상태를 읽는 블록**(`EXT`).
+`diff=0`은 *"래칫 대상 기록이 그 트리에서 다시 뜬다"*이지 *"기록이 옳다"*가 아니며,
+`EXT`로 빠진 기록에 대해서는 **아무 말도 하지 않는다** — 그 기록은 시점 기록이고
+그 사실은 C-12 절이 적는다.
 
 > 이 검사는 `git worktree`를 하나 만들고 지운다. legacy 인용 블록을 위해 그 worktree
-> 안에 `bid-vector` symlink를, **리뷰 레인 산출물을 읽는 C-12를 위해 `_workspace`
-> symlink를** 건다 — 둘 다 `.gitignore` 대상이라 `tracked_dirty`에 잡히지 않는다.
+> 안에 `bid-vector` symlink를 건다 — `.gitignore` 대상이라 `tracked_dirty`에 잡히지
+> 않는다. **`_workspace` symlink는 걸지 않는다.** 그 경로를 읽는 블록은 `EXT`로 빠져
+> 재생되지 않으므로 필요가 없고, **걸지 않는 것이 그 규칙을 실행으로 강제한다** —
+> 대조 대상 블록이 `_workspace/`를 읽기 시작하면 그 자리에서 깨진다.
