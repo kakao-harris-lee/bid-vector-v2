@@ -4,8 +4,9 @@
 - **작성일**: 2026-08-28
 - **대응**: `milestone-0.md` §"Slice 0D" 결정 **7** (테스트 pyramid와 mutation 대상)
 - **legacy 기준 commit**: `ed4b06c`
-- **이 ADR이 닫는 것**: **`OPEN-OPS-07`** — OPS-21의 **아키텍처 규칙 강제** 행
-  (ArchUnit · Konsist · Detekt). 나머지 네 행은 **ADR 0005**가 닫는다.
+- **`OPEN-OPS-07`과의 관계**: 이 ADR이 OPS-21의 **아키텍처 규칙 강제** 행
+  (ArchUnit · Konsist · Detekt)의 조사 결과를 기입한다. 나머지 네 행은 **ADR 0005**가
+  기입하며, 그중 **advisory lock 행은 판정이 끝나지 않았다**(ADR 0005 §3.2).
 - **관련 ADR**: 0006(경계) · 0002(mutation 대상의 출처) · 0004(프로덕션 엔진 테스트)
 
 ---

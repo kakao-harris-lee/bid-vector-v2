@@ -4,8 +4,11 @@
 - **작성일**: 2026-08-28
 - **대응**: `milestone-0.md` §"Slice 0D" 결정 **6** (domain event / outbox / notification 방식)
 - **legacy 기준 commit**: `ed4b06c`
-- **이 ADR이 닫는 것**: **`OPEN-OPS-07`** — OPS-21 후보 중 outbox/스케줄러 · advisory lock ·
-  resilience · 관측 네 행. 아키텍처 규칙 강제 행은 **ADR 0007**이 닫는다.
+- **`OPEN-OPS-07`과의 관계**: 이 ADR이 OPS-21 후보 중 **outbox/스케줄러 · advisory lock ·
+  resilience · 관측** 네 행의 **조사 결과를 기입**한다(그 항목의 종료 조건). **아키텍처
+  규칙 강제 행은 ADR 0007**이 기입한다. **단 advisory lock 행은 판정이 끝나지 않았다** —
+  후보 하나가 조사 범위 밖이었고 어느 후보도 OPS-01의 요구 셋을 덮는다고 확인되지
+  않았다(§3.2 · §5 `OPEN-ADR-12`). **「후보 전건 판정 완료」를 이 ADR은 주장하지 않는다.**
 - **관련 ADR**: 0004(데이터베이스 — 이 메커니즘의 기반) · 0003(ML 호출 축 — **다른 축**) · 0006
 
 ---
@@ -148,9 +151,52 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 들어가지 않는다. 강제 수단은 **ADR 0006**(의존 방향)과 **ADR 0007**(architecture test)이
 소유한다.
 
----
+### D-10. OPS-01의 lease는 **`workflow` 계층의 port**이고 스케줄러가 아니다
 
-## 3. 대안 — `OPEN-OPS-07` 후보의 채택/불채택
+`capability-map.md` **OPS-01**(`V2 필수`)이 요구하는 것은 셋이다.
+
+| # | OPS-01 요구 | 원문 |
+| --- | --- | --- |
+| **①** | lease가 **도메인 use case 경계**에 있다 | *"lease가 소비자마다 다른 레이어에 있는 형태는 채택하지 않는다 — 수집은 태스크 레이어, 모니터는 서비스 레이어라 **in-process 실행 경로에서 수집만 lease를 우회**한다(OPS-14). lease는 **도메인 use case 경계**에 둔다"* |
+| **②** | 홀더 프로세스를 강제 종료하면 **즉시 해제** | acceptance: *"홀더 프로세스를 강제 종료하면 lease가 **즉시 해제**된다."* legacy는 **TTL이 없는 세션 advisory lock**으로 그 성질을 얻었다 — *"홀더가 죽으면 커넥션이 끊기며 즉시 해제되므로 … **죽은 홀더가 스케줄을 영구 점유할 수 없다**"* |
+| **③** | 억제가 **감사 가능한 결과**를 남기고 사유가 **reason code(enum) + detail**로 분리된다 | acceptance: *"lease를 잡지 못한 실행이 조용히 사라지지 않고 관찰 가능한 결과를 남긴다"*, *"억제 사유 값이 재시도 횟수와 무관하게 동일하다"* |
+
+**결정**: 이 셋은 **스케줄러 라이브러리가 주는 성질이 아니다.**
+
+- **①·③은 애플리케이션 설계 사항이다.** lease를 **use case 진입 경계**에 두는 것과
+  억제를 **reason code + detail로 기록**하는 것은 어느 라이브러리도 대신하지 않는다.
+  따라서 **lease는 `workflow` 모듈의 port**이고, 도메인은 그 port만 본다(ADR 0006 D-3).
+- **②는 어댑터의 성질이며 후보마다 다르다.** **이 ADR은 그 어댑터를 고르지 않는다** —
+  §5 `OPEN-ADR-12`.
+
+**따라서 D-5의 db-scheduler 채택은 OPS-01을 덮지 않는다.** db-scheduler가 덮는 것은
+**예약 작업의 단일 실행**이고, OPS-01이 요구하는 것은 **use case 경계의 lease**다.
+**두 축을 같은 결정으로 접지 않는다.**
+
+### D-11. 재시도의 소유를 부작용 유형이 정한다
+
+**D-3이 전달 의미를 부작용마다 선언하게 했으므로, 재시도도 그 선언을 따른다.**
+채택한 도구가 둘(db-scheduler · Resilience4j)이므로 **어느 계층이 무엇을 재시도하는지**를
+정하지 않으면 두 재시도가 곱해진다.
+
+| 부작용 유형 | 재시도 | 소유 |
+| --- | --- | --- |
+| **채널 배달**(at-most-once, `OPEN-NOTI-02`) | **하지 않는다.** `running`에서 워커가 죽은 행은 **재실행하지 않고 격리**한다(OPS-03 acceptance) | 스케줄러도 Resilience4j도 이 작업에 재시도를 걸지 않는다 |
+| **외부 호출**(KONEPS 등, 재시도 안전이 선언된 것) | **한 곳에서만** — **Resilience4j**의 bounded retry | 호출 지점. 스케줄러는 그 작업을 재실행하지 않는다 |
+| **멱등 작업**(dedupe key가 있고 재시도 안전이 선언된 것) | 스케줄러의 재시도 예산 **하나만** | 스케줄러 |
+
+**규칙**: **한 부작용에 재시도 계층은 하나다.** 두 계층이 같은 부작용을 재시도하면
+예산이 곱해지고, `regression-ledger.md` §7의 백로그 폭주 계열이 그 형태다.
+
+**채택한 도구의 기본값이 이 결정과 충돌할 수 있다.** Codex 리뷰(2026-08-28)가 db-scheduler
+공식 문서를 근거로 지목했다 — *"one-time 실패를 5분 뒤 재시도하고 dead execution을
+`ReviveDeadExecution`으로 즉시 재예약한다"*. **이 slice는 그 기본값을 공식 문서로
+확인하지 않았다**(§6). 확인 여부와 무관하게 **결정은 위 표이며**, 구현은
+**부작용 유형마다 `onFailure`/`onDeadExecution`을 명시적으로 지정**해야 한다 —
+**기본값에 맡기지 않는다.** 실제 기본값의 확인과 그 지정은 **M4가 한다**(§5 `OPEN-ADR-13`).
+
+
+## 3. 대안 — `OPEN-OPS-07` 후보의 판정
 
 **판정 기준은 "최신 버전"이 아니라 M1에서 고정할 Kotlin 2.x + Spring Boot 3.x 조합과의
 호환**이다(`v2-지침서.md` §5, `decisions.md` `OPEN-OPS-07`). 조사 원본은
@@ -167,10 +213,23 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 
 ### 3.2 advisory lock 추상화 (OPS-01)
 
+**이 행은 판정이 끝나지 않았다.** D-10이 OPS-01의 요구 셋을 세웠고 **어느 후보도 셋을
+덮는다고 확인되지 않았다.** 아래 표는 **무엇이 확인됐고 무엇이 확인되지 않았는지**를
+적으며, 채택은 **`OPEN-ADR-12`**가 닫힐 때 정해진다.
+
+| OPS-01 요구 | db-scheduler | ShedLock | Spring Integration JDBC lock registry | PostgreSQL 세션 advisory lock |
+| --- | --- | --- | --- | --- |
+| **① use case 경계** | **아니다** — 예약 작업 실행 단위다 | **아니다로 읽힌다** — `@Scheduled` 위에 락을 얹는다(조사 노트) | **미조사** | **경계는 호출자가 정한다** — 기제 자체는 경계를 강제하지 않는다 |
+| **② 홀더 종료 시 즉시 해제** | **미확인** — 설정 표면에 `heartbeat-interval`·`missed-heartbeats-limit`가 있다(조사 노트). **heartbeat 종속으로 읽히나 공식 문서로 확인하지 않았다** | **미확인** — 조사 노트에 해제 기제 서술이 없다 | **미조사** | **legacy가 이 성질로 얻었다** — TTL 없는 세션 락이라 커넥션이 끊기면 해제(OPS-01 분류 근거). **V2에서의 운용은 미조사** |
+| **③ 억제의 감사 기록 · reason code + detail** | **아니다** — 라이브러리 관심사가 아니다 | **아니다** | **미조사** | **아니다** |
+
+**③은 어느 후보도 주지 않는다** — D-10대로 **애플리케이션이 소유한다.**
+
 | 후보 | 판정 | 사유 |
 | --- | --- | --- |
-| **ShedLock** | **불채택 (현 시점)** | **db-scheduler가 heartbeat 기반 단일 실행을 자체 보장**하므로 기능이 상당 부분 겹친다. ShedLock은 스케줄러가 아니라 `@Scheduled` 위에 락만 얹는 도구다. 겹치는 도구를 둘 다 두면 `v2-지침서.md` §5의 *"같은 규칙·변환·판정이 두 곳에 존재하면 한 곳은 회귀 지점이다"*에 해당한다. **호환·유지보수는 후보 중 최상위권이다** — 7.x가 **Boot 4.x·3.5·3.4를 함께 테스트**하고(공식 호환 매트릭스, 최소 JVM 17) 7.7.0에서 Micrometer 지표가 추가됐으며 커밋이 상시 돈다. **재검토 조건**: db-scheduler가 덮지 못하는 `@Scheduled` 기반 경로나 스케줄 외 상호배제가 필요해질 때. 그때는 **AOP 프록시 무효화가 조용한 실패 모드**이므로 `LockAssert` 테스트를 함께 둔다 |
-| **Spring Integration JDBC lock registry** | **판정 보류 — 조사되지 않음** | OPS-21 표의 후보인데 `OPEN-OPS-07` 조사 노트의 대상 9종에 **없다.** 버전·유지보수·호환 어느 것도 확인되지 않았다. **불채택이 아니라 미조사다** — 위 두 후보로 이 축이 덮이면 조사할 이유가 생기지 않고, 덮이지 않으면 조사가 선행돼야 한다 |
+| **ShedLock** | **판정 보류 — OPS-01 요구에 대한 확인 미완** | **앞 라운드는 「db-scheduler와 기능 중복」을 사유로 불채택했으나 그것은 OPS-01을 덮지 못하는 판단이었다**(Codex 1차 high). db-scheduler가 덮는 것은 **예약 작업의 단일 실행**이고 OPS-01이 요구하는 것은 **use case 경계의 lease**다(D-10). ShedLock에 대해 **확인된 것**: 조사 노트가 *"스케줄러가 아니라 `@Scheduled` 위에 **락만 얹는다**"*고 적는다 → **경계가 `@Scheduled` 메서드이지 use case 진입점이 아니다**(요구 ① 불충족으로 읽힌다). 호환·유지보수는 최상위권이다(7.x가 Boot 4.x·3.5·3.4를 함께 테스트, 최소 JVM 17, 7.7.0에 Micrometer 지표). **확인되지 않은 것**: 락 해제 기제(요구 ②) — 조사 노트에 서술이 없다. **AOP 프록시 무효화가 조용한 실패 모드**라는 것은 확인됐고, 채택한다면 `LockAssert` 테스트를 함께 둔다 |
+| **Spring Integration JDBC lock registry** | **판정 보류 — 조사되지 않음** | OPS-21 표의 후보인데 `OPEN-OPS-07` 조사 노트의 대상 9종에 **없다**(그 노트에 문자열 매치 0). 버전·유지보수·호환 어느 것도 확인되지 않았다. **불채택이 아니라 미조사다.** **앞 라운드는 *"위 두 후보로 이 축이 덮이면 조사할 이유가 생기지 않는다"*고 적었으나 그 전제가 틀렸다** — D-10이 보인 대로 **두 후보 어느 것도 OPS-01의 세 요구를 덮는다고 확인되지 않았다.** 따라서 **조사가 선행돼야 한다**(§5 `OPEN-ADR-12`) |
+| **PostgreSQL 세션 advisory lock 직접 사용** | **후보로 등재 — 미조사** | **legacy가 요구 ②를 이 기제로 얻었다** — *"TTL이 없는 것이 **의도된 설계**"*이고 *"홀더가 죽으면 커넥션이 끊기며 즉시 해제"*(OPS-01 분류 근거). ADR 0004 D-1이 **PostgreSQL 단일 엔진**을 확정했으므로 이 기제가 가용하다. **OPS-21 표에 없는 후보이며 이 ADR이 등재만 한다** — 전용 커넥션 운용 비용과 Spring 트랜잭션 경계와의 관계를 **확인하지 않았다**(§5 `OPEN-ADR-12`) |
 
 ### 3.3 재시도 · backoff · circuit breaker · rate limiter (OPS-08 (a)(c) · COL-03)
 
@@ -209,14 +268,42 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 
 ## 5. 이 ADR이 등록하는 `OPEN`
 
-**없다.** 이 축의 미결은 이미 활성 registry에 있다 — `OPEN-OPS-10`(DB 큐 계약과 OPS-06
-재정의/폐기), `OPEN-OPS-03`(큐 깊이 SLO 임계), `OPEN-OPS-04`(legacy 임계값 재유도),
-`OPEN-OPS-01`·`OPEN-REG-01`(라이브 크롤 rate-limit 오분류의 실제 영향).
-**이 ADR은 그중 어느 것도 해소하지 않는다.**
+**2건.** 앞 라운드는 *"없다"*고 적으면서 §3.2의 미조사를 *"아직 필요가 생기지 않은 조사"*로
+넘겼는데, **그 전제가 틀렸다** — D-10이 보인 대로 **OPS-01(`V2 필수`)을 덮는 수단이
+정해지지 않았고, 그것은 필요가 이미 생긴 자리다**(Codex 1차 high).
 
-§3.2의 **Spring Integration JDBC lock registry 미조사**는 새 `OPEN`으로 등록하지 않는다 —
-그것은 결정이 필요한 쟁점이 아니라 **아직 필요가 생기지 않은 조사**다. 필요가 생기면
-그 slice가 조사한다.
+### `OPEN-ADR-12` · OPS-01의 lease 어댑터
+
+- **결정 필요 사항**: D-10의 요구 **②**(홀더 강제 종료 시 즉시 해제)를 무엇이 만족하는가.
+- **선택지**: (a) **PostgreSQL 세션 advisory lock 직접 사용** — legacy가 이 성질로 얻었고
+  ADR 0004 D-1의 단일 엔진 결정과 정합하나 전용 커넥션 운용 비용이 미조사다
+  (b) **Spring Integration JDBC lock registry** — OPS-21 후보인데 **조사 자체가 없다**
+  (c) **ShedLock** — 경계가 `@Scheduled`라 요구 ①과 어긋나 보이고 해제 기제가 미확인
+  (d) 위를 어댑터로 감싸 **`workflow` port 뒤에 두고** 요구 ①·③은 애플리케이션이 소유.
+  **(d)는 (a)~(c)와 배타가 아니다** — D-10이 이미 port를 확정했고 남은 것은 그 어댑터다.
+- **선행 조사**: (b)의 **버전·유지보수·Kotlin 2.x + Spring Boot 3.x 호환**이
+  `OPEN-OPS-07` 조사 범위 밖이었다. **판정하려면 그 조사가 선행한다.**
+- **판정 방법**: OPS-01 acceptance *"홀더 프로세스를 강제 종료하면 lease가 즉시
+  해제된다"*를 **Testcontainers PostgreSQL 통합 테스트**로 후보별로 재는 것
+  (ADR 0004 D-1 · ADR 0007 D-1).
+- **소유**: M1(port) · M4(어댑터 선택과 그 테스트).
+
+### `OPEN-ADR-13` · db-scheduler 실패 처리 기본값
+
+- **결정 필요 사항**: 부작용 유형별 `onFailure`/`onDeadExecution`을 무엇으로 지정하는가.
+- **왜 미결인가**: **결정(D-11의 표)은 확정**이나 **채택 도구의 실제 기본값을 이 slice가
+  공식 문서로 확인하지 않았다.** Codex 리뷰(2026-08-28)가 *"one-time 실패를 5분 뒤 재시도,
+  dead execution을 `ReviveDeadExecution`으로 즉시 재예약"*이라고 지목했고, 그것이 사실이면
+  **기본값이 D-3의 at-most-once와 정면으로 충돌한다.**
+- **종료 조건**: 기본값을 공식 문서로 확인하고, **채널 배달 작업에 대해 재시도·재예약이
+  일어나지 않도록 명시 지정**한 뒤 그것을 테스트로 고정하는 것.
+- **소유**: M4. **M1이 버전을 고정할 때 함께 확인하면 더 이르다.**
+
+### 이 ADR이 해소하지 않는 활성 `OPEN`
+
+`OPEN-OPS-10`(DB 큐 계약과 OPS-06 재정의/폐기) · `OPEN-OPS-03`(큐 깊이 SLO 임계) ·
+`OPEN-OPS-04`(legacy 임계값 재유도) · `OPEN-OPS-01`·`OPEN-REG-01`(라이브 크롤 rate-limit
+오분류의 실제 영향). **어느 것도 해소하지 않는다.**
 
 ### 이 ADR이 선점하지 않는 활성 `OPEN` — 인접 축
 
@@ -245,7 +332,14 @@ db-scheduler·Resilience4j·Micrometer 타입은 `adapters`/`app` 모듈에만 �
 - **Spring Modulith 공식 레퍼런스의 호환 매트릭스는 최신 상태가 아니다**(최고 행이
   "2.0 snapshot"). 이 ADR의 버전 대응은 **릴리스 노트**를 인용했고 문서 매트릭스를
   인용하지 않았다.
-- **Spring Integration JDBC lock registry를 조사하지 않았다**(§3.2).
+- **Spring Integration JDBC lock registry를 조사하지 않았다**(§3.2) — `OPEN-ADR-12`.
+- **db-scheduler·ShedLock의 락 해제 기제를 공식 문서로 확인하지 않았다**(§3.2 요구 ②).
+  db-scheduler에 대해 확인된 것은 **설정 표면에 `heartbeat-interval`·`missed-heartbeats-limit`가
+  있다**는 것까지이고, 그것이 「즉시 해제」를 배제하는지는 **읽은 것이 아니라 추론**이다.
+- **db-scheduler의 실패·dead execution 기본값을 확인하지 않았다**(D-11) — `OPEN-ADR-13`.
+  이 ADR이 인용한 값은 **Codex 리뷰가 지목한 것**이며 이 slice가 원문을 열지 않았다.
+- **PostgreSQL 세션 advisory lock의 V2 운용 비용을 조사하지 않았다** — 전용 커넥션,
+  커넥션 풀과의 관계, Spring 트랜잭션 경계와의 상호작용.
 - **알림 채널의 구체 선택(Telegram/email/앱)을 이 ADR이 정하지 않는다** —
   `capability-map.md` NOTI 축과 `milestone-4.md`가 소유한다. 여기서 정한 것은 **전달
   메커니즘과 그 의미**다.
