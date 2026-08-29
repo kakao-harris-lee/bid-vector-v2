@@ -246,9 +246,10 @@ exit=0
 
 ### C-4.1 숫자 리터럴 — §12.1 밖에 정의 없는 리터럴이 없는가
 
-사전 **§12.1**의 **값 칸**을 정본으로 삼고, §12 밖 본문에서 그 목록에 없는
-숫자 토큰을 찾는다. **셈·좌표·식별자는 마스크로 뺀다** — 무엇을 뺐는지는 `MASKS`가
-한 줄씩 밝힌다. 선언 SHA `aa05167`.
+사전 **§12 전 구간**(`## 12.`부터 `## 13.` 앞까지)의 **표 첫 칸**을 정본으로 삼고,
+§12 밖 본문에서 그 목록에 없는 숫자 토큰을 찾는다 — **§12.1의 값 칸이 그 대부분이고
+§12.2의 첫 칸도 들어온다.** **셈·좌표·식별자는 마스크로 뺀다** — 무엇을 뺐는지는
+`MASKS`가 한 줄씩 밝힌다. 선언 SHA `aa05167`.
 
 ```
 python3 - docs/discovery/data-dictionary.md <<'PY'
@@ -256,7 +257,7 @@ import re, sys, pathlib
 DOC = sys.argv[1]
 text = pathlib.Path(DOC).read_text()
 lines = text.split("\n")
-# §12 「숫자 인덱스」 구간 = 정본. 그 구간의 첫 칸(값 칸)에서 허용 숫자를 모은다.
+# §12 「숫자 인덱스」 구간 = 정본. 그 구간의 **표 첫 칸** 전부에서 허용 숫자를 모은다.
 s = next(i for i,l in enumerate(lines) if l.startswith("## 12."))
 e = next(i for i,l in enumerate(lines) if l.startswith("## 13."))
 allowed = set()
@@ -293,7 +294,7 @@ for i, l in enumerate(masked.split("\n")):
         if tok in allowed: continue
         found.setdefault(tok, []).append(i+1)
 print(f"문서: {DOC}")
-print(f"§12 값 칸이 허용하는 숫자 토큰: {len(allowed)}")
+print(f"§12 표 첫 칸이 허용하는 숫자 토큰: {len(allowed)}")
 print(f"§12 밖 본문에서 §12에 없는 숫자 토큰: {len(found)}")
 for tok in sorted(found):
     print(f"  {tok!r} @ 본문 행 {found[tok][:6]}")
