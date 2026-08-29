@@ -503,8 +503,9 @@ used = {"NOT_A_DECL": set(), "LEGACY_DECLS": set()}   # 목록이 조용히 커�
 n_site = n_decl = leaked = ruled_out = 0
 for span in (flat(sp) for sp in re.findall(r"`([^`]+)`", body)):
     ds = decls(span); taken = {d[1] for d in ds}
-    # 사각지대는 **다른(더 넓은) 앵커**로 잰다 — 못 읽는 자리와 못 읽었다고 세는 자리가
-    # 같으면 구조적으로 자기를 못 본다.
+    # 사각지대는 **선언을 읽는 앵커와 다른 앵커**로 잰다 — 못 읽는 자리와 못 읽었다고 세는
+    # 자리가 같으면 구조적으로 자기를 못 본다. 두 앵커의 관계는 ㉠(아래 leaked)과
+    # ㉡(고정 표본)이 잰다.
     sites = {m.start() for m in SITE.finditer(span)}
     n_site += len(sites); n_decl += len(taken); leaked += len(taken - sites)
     for p in sorted(sites - taken):
