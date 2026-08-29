@@ -118,46 +118,27 @@ done | sed '/^$/d' | sort -u \
 
 ### C-2.2 공백 오류
 
-선언 SHA `ba23629`. **이 블록은 그 SHA까지의 range를 잰다** — 리뷰 시점의 HEAD로 다시
-돌리려면 두 자리의 `ba23629`를 HEAD로 바꾼다.
+선언 SHA `ba23629`.
 
 ```
 # 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
 git diff --check 2b05684..ba23629 | sed 's/[[:space:]]\{1,\}$/<후행공백>/'
-echo "git diff --check 지적: $(git diff --check 2b05684..ba23629 | wc -l | tr -d ' ')"
+echo "base_sha 기준 지적: $(git diff --check 2b05684..ba23629 | wc -l | tr -d ' ')"
+echo "review_base 기준 지적: $(git diff --check aff62ab..ba23629 | wc -l | tr -d ' ')"
 ```
 
 ```
 reports/evidence/m0/0c/commands.md:701: new blank line at EOF.
-git diff --check 지적: 1
-```
-
-> **지적된 자리는 이 파일 자신이다** — `ba23629`가 C-10 절을 들어내면서 파일 끝에 빈 줄이
-> 남았고, **C-10을 다시 넣는 다음 커밋에서 사라진다.** 그 시점의 초록 출력이 **C-2.3**이다.
-> **판정은 `checklist.md` A8**에 있다.
->
-> **이 블록이 선언 SHA에서 잡은 것은 이 파일의 상태이지 산출물의 결함이 아니다** —
-> 같은 range를 `5a9a5f5`로 끊으면 **0**이고 그것이 C-2.3이다.
-
-### C-2.3 공백 오류 — 초록 출력
-
-**C-2.2가 선언한 SHA에는 지적이 있다.** 그 지적이 사라진 시점의 출력이 이것이다.
-선언 SHA `5a9a5f5`.
-
-```
-git diff --check 2b05684..5a9a5f5 | sed 's/[[:space:]]\{1,\}$/<후행공백>/'
-echo "git diff --check 지적: $(git diff --check 2b05684..5a9a5f5 | wc -l | tr -d ' ')"
-echo "review_base 기준: $(git diff --check aff62ab..5a9a5f5 | wc -l | tr -d ' ')"
-```
-
-```
-git diff --check 지적: 0
-review_base 기준: 0
+base_sha 기준 지적: 1
+review_base 기준 지적: 1
 ```
 
 > **이 블록은 커밋 이력만 읽는다** — 작업 트리의 상태에 의존하지 않으므로 `bid-vector`나
-> `_workspace`가 없어도 재현된다. 리뷰 시점의 HEAD로 다시 재려면 세 자리의 `5a9a5f5`를
+> `_workspace`가 없어도 재현된다. 리뷰 시점의 HEAD로 다시 재려면 세 자리의 선언 SHA를
 > HEAD로 바꾼다.
+>
+> **이 검사가 지적을 낸 적이 있고 그때마다 명령을 고쳤다** — 어느 커밋에서 무엇을
+> 고쳤는지는 `scope.md`의 커밋 표에 있다. **이 블록은 선언 SHA 하나만 잰다.**
 
 ---
 
@@ -450,7 +431,7 @@ exit=0
 ```
 
 > **이 분류의 읽는 법과 항목별 처리는 `checklist.md` **A5**가 적는다** — 이 파일은
-> 명령과 출력만 담는다. `OPEN-REG-05`·`OPEN-QUAL-10`·`OPEN-QUAL-11`이 「활성」으로 찍히는
+> 이 파일은 그 판정을 싣지 않는다. `OPEN-REG-05`·`OPEN-QUAL-10`·`OPEN-QUAL-11`이 「활성」으로 찍히는
 > 것은 두 상류 파일의 행을 **고치지 않았기 때문**이며(out_of_scope), 사전 §11이 그것들을
 > 결정 근거와 함께 등재해 닫는다. 상류 registry 갱신은 별도 slice의 몫이다.
 
@@ -693,7 +674,7 @@ reports/evidence/m0/0c/commands.md:673:reports/evidence/m0/0c/commands.md:627:re
 
 > **매치는 전부 그 단어를 말하는 산문이거나 위 정규식 자체이고 값이 아니다** —
 > `scope.md`·`checklist.md`의 acceptance 표에 있는 `secret 스캔 통과`, 이 절의 제목과
-> 판정 문단, 그리고 두 grep의 패턴 문자열이다. 둘째 스캔이 내는 한 줄도 자기 정규식이다.
+> 판정 문단, 그리고 두 grep의 패턴 문자열이다. **둘째 스캔의 출력도 자기 정규식이다.**
 > **좌표는 선언 SHA 트리의 것이고 이 커밋의 편집으로 이동한다** — 자기 커밋의 내용을
 > 좌표로 주장하지 않으므로 갱신하지 않는다.
 
@@ -849,5 +830,12 @@ exit=0
 ```
 
 > **이 절이 재는 범위는 위 두 SHA와 위 두 환경뿐이다.** 다른 트리·다른 환경에서
-> 재현된다고 주장하지 않는다. **C-10.2가 보여주듯 그 환경에서는 재지 못하는 블록이 있고,
-> 그것들은 `checklist.md` A6이 「이 slice가 유일한 확인 지점」이라 적은 자리와 같다.**
+> 재현된다고 주장하지 않는다.
+>
+> **C-10.2가 재지 못한 블록은 한 갈래가 아니라 셋이다** — 합쳐 적지 않는다.
+>
+> - **`C-7.1`~`C-7.5`** — legacy 인용 축. `checklist.md` **A6**이 이 축을 두고
+>   「이 slice가 유일한 확인 지점」이라 적는다.
+> - **`C-1`** — 운영자 결정 사본 대조. `checklist.md` **A3**이 가리키는 자리이며 A6과 다른 축이다.
+> - **`C-9`** — `bid_target` 경로 모호성의 재현. **`checklist.md`는 이 블록을 참조하지 않는다** —
+>   가리키는 곳은 `data-dictionary.md` §10의 `X-6` 행이다.
