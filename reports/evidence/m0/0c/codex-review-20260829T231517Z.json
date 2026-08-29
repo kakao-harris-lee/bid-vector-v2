@@ -1,0 +1,72 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "aff62abfca85ca873932fedcad1e65c29ab35730",
+  "reviewed_head": "197bea396f80a86566ae99f5e9dd5f7fde477265",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 187,
+      "evidence": "`Money.provenance`의 타입은 `FactProvenance`인데 시공능력평가액에는 그 타입에 없는 `OperatorDeclared`·`NoticePublished`를 지정한다. 반대로 `FactProvenance`에는 `Undeclared`가 존재하므로 provenance 필수화만으로 C2가 타입상 0이라는 §7.1의 주장도 성립하지 않는다. A2의 provenance 완전성과 V2 write 경로의 출처 보존을 동시에 깨는 데이터 사전 자체의 모순이다.",
+      "required_fix": "단일 provenance 타입과 variant를 일관되게 정의하고 시공능력평가액의 두 출처를 그 타입으로 표현하라. V2 canonical write에서 `Undeclared`를 금지하려면 별도 입력 타입이나 검증 불변식을 명시하고, §7.1과 §12.2를 같은 규칙으로 정정하라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 1218,
+      "evidence": "§7.1은 오염 성분별 분자를 따로 산출한다고 하고 §7.2는 오염률을 정의하지만 `ContaminationMeasurement(definition, population, measuredAt, method, policyVersion)`에는 분자·분모·비율 등 측정 결과가 하나도 없다. 따라서 결과의 unit/basis/provenance를 표현할 수 없는데도 C-4.2는 선언된 필드만 검사하여 PASS한다. A2의 전수성 주장과 데이터 사전 자체가 불완전하다.",
+      "required_fix": "성분별 numerator, 공통 denominator, 산출 rate 또는 동등한 구조를 측정 타입에 명시하고 각각의 unit, basis, provenance, 부재 의미를 §12.2에 등재하라. C-4 검증도 오염률 산출 요구와 결과 필드의 대응을 확인하게 하라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 1419,
+      "evidence": "§2.2.3은 `observationKey`를 멱등 단위로 정의하면서 같은 값의 재관측은 기록해야 한다고 한다. 그런데 §12.2는 `reobservationCount`를 같은 `observationKey`의 재관측 횟수로 정의한다. 같은 키를 중복 제거하면 횟수를 셀 수 없고, 세면 retry가 상태를 바꾸므로 멱등성이 깨진다. 재시도와 업무상 재관측을 구분할 키가 없다.",
+      "required_fix": "delivery/idempotency key와 동일 사실의 재관측을 묶는 semantic key를 분리하고, retry는 무효과이며 새 관측만 카운트를 증가시키도록 fold 규칙과 `reobservationCount` basis를 일치시켜라."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0c/scope.md",
+      "line": 89,
+      "evidence": "현재 문서는 `head_sha` `c941828` 이후 0C 커밋이 둘뿐이라고 단정하지만, 경로 필터로 재실행한 결과 `f388a69`, `aea96c7`, `bf03494`, `78b097b`, `197bea3`의 5개가 나온다. `head_sha`와 commands 선언 SHA는 일치하지만 그 이후 범위에 대한 현재형 자기서술은 실행하면 거짓이다.",
+      "required_fix": "현재 리뷰 HEAD까지의 후속 0C 커밋을 실제 개수와 역할로 기술하거나, 쉽게 낡는 정확한 개수 주장을 제거하고 허용되는 후속 커밋의 성격과 재검증 명령만 남겨라."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0c/decisions-2026-08-28.md",
+      "line": 5,
+      "evidence": "머리는 원본을 그대로 옮겼고 문장을 더하거나 지우지 않았다고 주장하지만, C-1의 기록과 `227ba0c..c0fe44f` diff는 U-3 행 변경 및 2026-08-29 정정 7줄 추가를 보여준다. `scope.md` 68행도 여전히 축어 사본이라고 설명한다. 정정 내용은 투명하지만 evidence의 출처 보존 자기서술은 사실과 다르다.",
+      "required_fix": "이 파일을 원본의 불변 사본과 별도 정정 부록으로 분리하거나, 머리와 scope를 '원본 사본에 명시적 정정을 추가한 문서'라는 실제 형태로 고쳐 C-1의 diff와 일치시켜라."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse --verify aff62abfca85ca873932fedcad1e65c29ab35730^{commit} && git rev-parse --verify 197bea396f80a86566ae99f5e9dd5f7fde477265^{commit} && git rev-parse HEAD && git diff --name-status aff62abfca85ca873932fedcad1e65c29ab35730 197bea396f80a86566ae99f5e9dd5f7fde477265 && git ls-files --others --exclude-standard",
+    "git log --reverse --format='%H %s' aff62abfca85ca873932fedcad1e65c29ab35730..197bea396f80a86566ae99f5e9dd5f7fde477265 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "git diff --stat aff62abfca85ca873932fedcad1e65c29ab35730 197bea396f80a86566ae99f5e9dd5f7fde477265 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "git diff --check aff62abfca85ca873932fedcad1e65c29ab35730 197bea396f80a86566ae99f5e9dd5f7fde477265",
+    "for c in $(git log --format='%H' aff62abfca85ca873932fedcad1e65c29ab35730..197bea396f80a86566ae99f5e9dd5f7fde477265 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do git show --name-only --format='' \"$c\"; done | sed '/^$/d' | sort -u",
+    "git log --format='%H %s' c94182810b175e01930d62caeee55eecd003693d..197bea396f80a86566ae99f5e9dd5f7fde477265 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "sed -n '332,344p' reports/evidence/m0/0c/commands.md | bash",
+    "sed -n '374,422p' reports/evidence/m0/0c/commands.md | bash",
+    "sed -n '483,686p' reports/evidence/m0/0c/commands.md | bash",
+    "sed -n '850,856p' reports/evidence/m0/0c/commands.md | bash",
+    "sed -n '872,904p' reports/evidence/m0/0c/commands.md | bash",
+    "sed -n '1178,1263p' reports/evidence/m0/0c/commands.md | bash",
+    "sed -n '964,997p' reports/evidence/m0/0c/commands.md | bash",
+    "sed -n '772,783p' reports/evidence/m0/0c/commands.md | bash",
+    "rg -n 'OperatorDeclared|NoticePublished|FactProvenance|Undeclared|Contaminated\\(|C2 출처|타입으로 `0`' docs/discovery/data-dictionary.md",
+    "git diff 227ba0ca5825cab6981c13260dc228463d788061 c0fe44fe4129546f9d0c9071089bf6fc167bdabd -- reports/evidence/m0/0c/decisions-2026-08-28.md",
+    "sed -n '1471,1490p' reports/evidence/m0/0c/commands.md | bash",
+    "git worktree list --porcelain && git status --short && git ls-files --others --exclude-standard",
+    "git status --short && git ls-files --others --exclude-standard && git rev-parse HEAD && git rev-list --count c94182810b175e01930d62caeee55eecd003693d..197bea396f80a86566ae99f5e9dd5f7fde477265 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/"
+  ],
+  "residual_risks": [
+    "`bid-vector`와 `_workspace`가 없어 C-1·C-7·C-9의 원본/legacy 내용 검증은 독립 재실행하지 못했다. C-7.1은 형식상 고유 인용 84건과 bare filename 0건을 확인했지만 경로 84건 모두 환경 부재로 열지 못했다.",
+    "C-10.2는 이 샌드박스가 `.git` metadata 쓰기를 허용하지 않아 `git worktree add` 단계에서 완료되지 않았다. 잔존 worktree는 없었고 최종 worktree 상태는 clean이다.",
+    "C-8은 현재 패키지에서 PASS했지만 문서가 밝힌 대로 접미사가 붙은 `secret_key`·`client_secret_id`·`tokens` 형태의 값 가림은 보장하지 않는다. 현재 매치는 가짜 표본·패턴·이력 서술뿐인 것으로 확인했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}

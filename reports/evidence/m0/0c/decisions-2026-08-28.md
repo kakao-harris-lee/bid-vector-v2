@@ -1,14 +1,21 @@
 # 운영자 결정 — 2026-08-28 (U-1 ~ U-10) · 0C evidence 사본
 
 원본은 `_workspace/m0-open-decisions/decisions-log.md`이고 `_workspace/`는 gitignore
-대상이라(`.gitignore` 2행) 저장소에 감사 추적이 남지 않는다. 아래는 그 원본의
-**2026-08-28 절 전부를 문장 단위로 그대로 옮긴 사본**이며 이 slice가 문장을 더하거나
-지우지 않았다. `data-dictionary.md`와 `checklist.md`의 결정 인용은 이 파일을 가리킨다.
+대상이라(`.gitignore` 2행) 저장소에 감사 추적이 남지 않는다. 아래는 **그 원본의
+2026-08-28 절을 문장 단위로 옮긴 사본에, 이 slice가 표식을 붙여 더한 정정을 얹은
+문서**다. `data-dictionary.md`와 `checklist.md`의 결정 인용은 이 파일을 가리킨다.
 
+**「그대로 옮겼고 더하거나 지우지 않았다」는 앞 문장은 거짓이었다** — 이 파일은 지금
+원본과 **두 자리에서 다르다**(U-3 행의 취소선 표기와 그 아래 `⚠ 정정` 부록).
+**차이가 무엇인지는 산문이 아니라 `C-1`의 diff가 낸다.**
+
+- **원본 문장은 지우지 않는다** — 이 파일은 결정 기록이므로 정정은 **덧대는 방식**으로만
+  한다(취소선 + `⚠ 정정`). 그래서 사본은 **원본의 부분집합이 아니라 확대**다.
 - 원본 파일: `_workspace/m0-open-decisions/decisions-log.md`
 - 옮긴 범위: 그 파일의 `## 2026-08-28 · U-1 결정 — 추정가격의 과세 처리` 절부터 파일 끝까지
 - 옮긴 slice: `0c-data-dictionary`
-- 대조 명령: `reports/evidence/m0/0c/commands.md` **C-1**
+- 대조 명령: `reports/evidence/m0/0c/commands.md` **C-1** — **그 블록의 출력이 이 파일과
+  원본의 차이 전부다.** 차이가 늘거나 줄면 그 출력이 바뀐다.
 - 2026-08-26 묶음(`OPEN-ML-01` 등)의 커밋된 사본은 `reports/evidence/m0/0a2/decisions.md`다.
   이 파일은 그 뒤에 이어지는 2026-08-28 묶음만 담는다.
 
