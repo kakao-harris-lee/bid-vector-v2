@@ -6,16 +6,16 @@
 
 ## 선언 SHA와 실행 계약
 
-**출력 블록은 `ba2e4f9` 트리에서 뜬 것이다** — **예외는 C-11 하나이고 그것은 HEAD에서
+**출력 블록은 `d0a882e` 트리에서 뜬 것이다** — **예외는 C-11 하나이고 그것은 HEAD에서
 뜬다.** 어느 블록이 무엇을 선언하는지는 아래 표가 적고, 그 예외의 사유는 C-11 절이 적는다.
-커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`ba2e4f9`로 그대로
+커밋 안의 블록은 자기 커밋 트리에서 뜰 수 없다 — 그래서 선언 SHA를 **`d0a882e`로 그대로
 지목한다.** 다른 커밋과의 관계로 부르지 않는다: 관계는 뒤 편집이 들어올 때마다 낡는다.
 
 | 블록 | 읽는 것 | 선언 SHA |
 | --- | --- | --- |
-| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`ba2e4f9`** |
+| C-1 · C-2 · C-3 · C-3n · C-4 · C-7 · C-7n · C-8 · C-9 · C-10 | 이 저장소 | **`d0a882e`** |
 | C-5.1 ~ C-5.5 | legacy `bid-vector`만 | **`ed4b06c`** (이 저장소의 어느 HEAD에서도 같다) |
-| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`ba2e4f9` + `ed4b06c`** |
+| C-6 · C-6n | **양쪽** — `citescan.py`가 `docs/adr`(저장소)와 legacy를 함께 읽는다 | **`d0a882e` + `ed4b06c`** |
 | C-11 | 이 파일 자신 ↔ 선언 SHA 트리 | **HEAD** (그 블록이 사유를 적는다) |
 
 ### 실행 계약
@@ -43,7 +43,7 @@ git status --porcelain | grep -vc '^??' | sed 's/^/tracked_dirty=/'
 ```
 
 ```
-ba2e4f93d50d892e5d1a53c08433e05c78757e7f
+d0a882e60593728797716216de4b39ad90a6b544
 tracked_dirty=0
 ```
 
@@ -64,8 +64,8 @@ git diff --check 998dc21...HEAD -- docs/adr reports/evidence/m0/0d | wc -l | sed
 ```
 
 ```
-slice_commits=19
-slice_paths=12
+slice_commits=23
+slice_paths=13
 out_of_scope_paths=0
 whitespace_problems=0
 ```
@@ -1138,7 +1138,7 @@ docs/adr/0005-domain-events-and-outbox.md:247:### 3.5 아키텍처 규칙 강제
 
 ```
 # ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다
-DECL=ba2e4f9
+DECL=d0a882e
 WT=$(mktemp -d)/wt
 git worktree add --detach "$WT" "$DECL" >/dev/null 2>&1
 ln -sfn "$PWD/bid-vector" "$WT/bid-vector"
@@ -1206,7 +1206,7 @@ pair 25 L1112  OK    echo "-- ADR 안의 OPS-13 전수"
 pairs=26 skipped_harness=1 diff=0
 ```
 
-**판정**: `diff=0`이면 **그 26쌍이 선언 SHA `ba2e4f9`의 트리에서 축어로 다시 뜬다.**
+**판정**: `diff=0`이면 **그 26쌍이 선언 SHA `d0a882e`의 트리에서 축어로 다시 뜬다.**
 
 **이 검사가 재는 범위**: `commands.md`의 명령/출력 쌍 26개다. **재지 않는 것** —
 `checklist.md`·`scope.md`의 인라인 블록, 각 블록 아래 **판정 산문의 참·거짓**,
