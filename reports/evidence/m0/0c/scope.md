@@ -26,6 +26,8 @@ out_of_scope:
 acceptance_commands:
   - "N/A — 문서 slice. 아래 A1~A8을 checklist.md로 대조"
 rollback: "N/A — 문서 산출물은 git revert로 복구. 애플리케이션 코드·설정·스키마 변경이 없다"
+differential_json: "N/A — 실행 산출물을 Python과 대조하는 slice가 아니다. 이 slice가 내는 것은 문서 하나이고 대조 대상 실행이 없다"
+golden_manifest_json: "N/A — fixture를 쓰지 않는다. fixtures/는 out_of_scope이고 소유자가 fixture-curator다"
 ```
 
 작성: 2026-08-28, spec-writer (v2-slice-pipeline).
