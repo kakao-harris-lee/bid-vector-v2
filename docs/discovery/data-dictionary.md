@@ -59,9 +59,13 @@ canonical KONEPS fact와 derived fact / ML feature와 업무 판단의 경계.
 | **부재 표현** | 값이 없을 때 무엇이 되는가. **`0`·빈 문자열·`false`를 부재로 쓰지 않는다** |
 | **provenance / 층** | 그 값이 어디서 왔는가, 그리고 §0.2의 어느 층인가 |
 
-**모든 도메인 숫자는 §12 「숫자 인덱스」에 단위·basis·provenance·층·소유 `OPEN`과 함께
-등재된다.** 본문에서 셈(항목 수)은 한글 수사로 쓰고 아라비아 숫자를 쓰지 않는다 —
-그래야 §12가 도메인 숫자만 담고 전수 검사가 성립한다. 검사는 **C-4**다.
+**모든 도메인 숫자는 §12에 등재된다** — **리터럴은 §12.1**에 단위·basis·provenance·층·
+소유 `OPEN`과 함께, **타입이 나르는 필드는 §12.2**에 단위·basis·provenance와 함께.
+**수가 아닌 필드는 §12.2가 그 사실을 적는다.**
+
+본문에서 셈(항목 수)은 한글 수사로 쓰고 아라비아 숫자를 쓰지 않는다 —
+그래야 §12.1이 도메인 숫자 리터럴만 담고 전수 검사가 성립한다. **필드가 나르는 수는
+§12.2가 따로 덮는다.** 검사는 **C-4.1**(리터럴)과 **C-4.2**(필드)다.
 
 ### 0.5 `OPEN` 규약
 
@@ -613,6 +617,18 @@ legacy의 출력은 `verdict: str` + 표시용 튜플들이라 사유가 구조�
 | **입력** | 추천 투찰율(`BidRate`) · 낙찰하한율(`FloorRate`) · 표본 집합 · 기준일 |
 | **출력** | `FloorShortfall = sealed { Measured(frequency, criticalAssessmentRate, numerator, denominator, band, biasDirection, policyVersion), Unmeasurable(reason: FloorUnmeasurableReason) }` |
 
+**`Measured`가 나르는 수 넷의 단위와 basis** — 전수는 §12.2에 있다.
+
+| 필드 | 단위 | basis / 축 |
+| --- | --- | --- |
+| `frequency` | fraction | **`numerator` ÷ `denominator`**. **확률이 아니라 표본 비율**이다 |
+| `criticalAssessmentRate` | fraction | **사정률 축**(예정가 ÷ 기초금액). `= 추천 투찰율 ÷ 낙찰하한율` |
+| `numerator` | 건수 | 하한 미달로 판정된 표본 수 |
+| `denominator` | 건수 | 밴드 필터를 통과해 분모에 남은 표본 수 |
+
+**분자·분모를 비율과 함께 나르는 이유**는 성숙도와 같다(§6.4) — 비율 하나만 남기면
+표본 규모가 사라진다.
+
 **핵심 관계**: `임계 사정률 = 추천 투찰율 ÷ 낙찰하한율`이고 **하한 미달 ⟺ 실현 사정률 >
 임계 사정률**. 이 basis 관계를 타입과 설명으로 보존한다(`v2-지침서.md` §4.4).
 
@@ -646,19 +662,28 @@ legacy가 스스로 공시한 편향이 있다 — 표본 필터가 사정률 `1
 
 ### 3.4 기초금액 provenance rule
 
-`v2-지침서.md` §4.3이 라벨 집합을 정한다: `Clean` · `DerivedYega` · `DerivedVat` ·
-`SuspectRatio` · `Unknown`.
+`v2-지침서.md` §4.3이 라벨 집합을 **승인 명세로** 정한다.
 
-> `BaseAmountProvenance = sealed { Clean, DerivedYega, DerivedVat, SuspectFractional,
-> SuspectRatio, **Unclassified** }`
+> `BaseAmountProvenance = sealed { Clean, DerivedYega, DerivedVat, SuspectRatio, Unknown }`
+>
+> **승인 명세의 다섯 값 그대로다.** 이 문서는 그 집합을 바꾸지 않는다 —
+> 바꿔야 할 근거가 있으면 아래처럼 **`OPEN`으로 등록**하고 결정을 기다린다.
 
-**`Unclassified`를 명시 variant로 넣는다 — 이것이 0C가 더하는 것이다.** legacy의 라벨은
-다섯이고(`app/services/base_amount_basis.py:26-41`) 컬럼은 nullable이라 **`NULL`이 여섯째
-상태**인데, **소비자가 `NULL`을 `clean`과 같게 취급한다**:
-*"A `clean` row (or an unclassified `NULL` basis — the common case for open notices)
-returns its `base_amount` unchanged"*(`app/services/bid_base.py:84-104`).
-**라벨 다섯만 옮기면 실제 동작의 절반이 빠진다.** "아직 판정하지 않음"이 "신뢰함"으로
-접히지 않게 한다.
+**legacy 실측이 그 다섯에 정확히 겹치지 않는다.** 두 가지가 남는다.
+
+1. **여섯째 라벨 `suspect-fractional`** — legacy가 선언한 라벨은 `clean` · `derived-yega` ·
+   `derived-vat` · **`suspect-fractional`** · `suspect-ratio` 다섯이고
+   (`app/services/base_amount_basis.py:26-41`), 그중 `suspect-fractional`은 승인 명세에
+   대응하는 이름이 없다.
+2. **미판정 상태** — 컬럼이 nullable이라 **`NULL`이 별도 상태**이고,
+   **소비자가 `NULL`을 `clean`과 같게 취급한다**:
+   *"A `clean` row (or an unclassified `NULL` basis — the common case for open notices)
+   returns its `base_amount` unchanged"*(`app/services/bid_base.py:84-104`).
+   멱등 마커는 별도 컬럼이다(`app/models/models.py:264-306`의 `basis_checked_at`).
+
+> **바뀌지 않는 요구**: **"아직 판정하지 않음"이 "신뢰함"으로 접히면 안 된다.**
+> 그 요구를 **승인 명세의 어느 variant가 나르는가**(`Unknown`에 접는가, 별도 variant를
+> 더하는가)는 이 문서가 정하지 않는다 → **`OPEN-DIC-05`**.
 
 **first-match 순서가 load-bearing이다.** 비율 의심이 정수 판정 앞, 정수 판정이 VAT 파생
 앞이며 그 이유가 코드에 선언돼 있다. **순서를 정책 데이터로 선언하고 테스트와 정책
@@ -1110,9 +1135,23 @@ legacy의 `confidence`는 근거 없는 계수 아홉의 아핀 결합이고 클
 임의 계수의 합성이라 **이름이 주장하는 의미를 산식이 뒷받침하지 않는다.**
 `v2-지침서.md` §4.4의 *"빈도는 실제 확률이라고 표시하지 않는다"*와 같은 계열의 위험이다.
 
-> **이 산식을 사전에 올리지 않는다.** 대신 **관측 가능한 구성 요소**를 그대로 노출한다 —
-> `sampleSize` · `dispersion` · `marginToFloor`. 합성 점수가 필요하면 **별도 이름과
-> 명시 policy version**으로 둔다.
+> **이 산식을 사전에 올리지 않는다.** 대신 **그 산식이 먹는 관측 가능한 구성 요소**를
+> 그대로 노출한다. 합성 점수가 필요하면 **별도 이름과 명시 policy version**으로 둔다.
+
+| 성분 | 단위 | basis / 축 | legacy 대응 |
+| --- | --- | --- | --- |
+| `sampleSize` | 건수 | 그 추정에 쓰인 과거 표본 수 | `sample_size` |
+| `dispersion` | fraction | **투찰율 축**(투찰가 ÷ 기초금액) 표본의 **표준편차** | `std_rate` — `std_bid_rate`에서 온다 |
+| `estimateMargin` | fraction | 같은 축. **평균 투찰율 신뢰구간의 반폭** | `margin` = `t값 × (표준편차 ÷ √표본수)` |
+
+**세 성분의 provenance는 같다** — 과거 투찰율 표본 집합에서 계산한 파생값이다.
+근거는 `app/ai/predictors/historical/statistics.py:49-55`(산식)와 그 호출부가 세 값을
+만드는 자리다.
+
+> **⚠ 정정** — 이 절은 앞서 셋째 성분을 **`marginToFloor`**로 적었다. **legacy의 `margin`은
+> 하한까지의 거리가 아니라 신뢰구간 반폭**이라 이름이 축을 잘못 가리켰다.
+> **하한 여유 축은 §3.3이 이미 소유한다**(`criticalAssessmentRate` · `frequency`) —
+> 여기서 다시 정의하지 않는다.
 
 계수의 분류는 `OPEN-ML-05`가 소유한다(§4.3).
 
@@ -1201,6 +1240,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 | **`OPEN-DIC-02`** | **시공능력평가액 공시의 갱신 주기와 시행 구간.** "직전 연도"와 "공고일 기준 직전 해"가 같으려면 갱신이 역년 경계여야 한다 | 이 저장소에 근거가 없다. 조달청·협회 문서 확인이 필요하다 | §1.2.4 |
 | **`OPEN-DIC-03`** | **`SkipReason` 어휘의 전수성.** 최소 두 값은 legacy 게이트 사다리에서 확인되나 목록이 닫혔는지는 미확인 | legacy 사다리를 M1에서 옮길 때 확정된다. 지금 닫으면 옮기는 과정에서 발견될 사유가 갈 곳을 잃는다 | §3.6 |
 | **`OPEN-DIC-04`** | **`AllocatedBudget`·`YegaAmount`·`AwardAmount`의 과세 처리** | U-1·U-1b는 추정가격과 기초금액 둘만 정했다. 나머지 셋은 결정도 문서 근거도 없다 | §1.2 |
+| **`OPEN-DIC-05`** | **`BaseAmountProvenance`의 승인 라벨 다섯이 legacy 실측을 덮는가** — ① `suspect-fractional`에 대응하는 이름이 승인 명세에 없다 ② **미판정(`NULL`)과 「출처를 모름」(`Unknown`)이 같은 값인가** | **승인 명세(`v2-지침서.md` §4.3)의 집합을 이 문서가 바꿀 수 없다.** `OPEN-DEC-08`은 **legacy `clean` 승계 금지**만 확정했고 라벨 집합 변경을 승인하지 않았다. **바꾸려면 별도 결정이 필요하다** | §3.4 |
 
 **활성 `OPEN`은 해소하지 않았다.** 이 문서가 문면에서 마주친 것 — `OPEN-QUAL-05` ·
 `OPEN-QUAL-09` · `OPEN-ML-05` · `OPEN-SET-04` · `OPEN-SET-05` · `OPEN-SET-06` ·
@@ -1278,8 +1318,13 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 ## 12. 숫자 인덱스 — 모든 도메인 숫자의 unit / basis / provenance
 
 `milestone-0.md` 완료 조건: *"모든 도메인 숫자의 unit/basis/provenance가 정의되거나
-`OPEN`이다."* **이 표가 그 전수다.** 본문에 등장하는 도메인 숫자는 전부 여기 있고, 검사는
-`commands.md` **C-4**다. 셈(항목 수)은 본문에서 한글 수사로 쓰므로 이 표에 들어오지 않는다.
+`OPEN`이다."* **숫자는 두 자리에 있다 — 리터럴과 필드.** §12.1이 리터럴을, **§12.2가
+필드**를 덮는다.
+
+### 12.1 숫자 리터럴
+
+**본문에 등장하는 도메인 숫자 리터럴은 전부 여기 있고, 검사는 `commands.md` C-4.1**이다.
+셈(항목 수)은 본문에서 한글 수사로 쓰므로 이 표에 들어오지 않는다.
 
 | 값 | 단위 | basis / 축 | provenance (근거 위치) | 층 | 소유 `OPEN` |
 | --- | --- | --- | --- | --- | --- |
@@ -1313,8 +1358,61 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 | `4` · `6` | 자리수 | legacy 집계 반올림 자리수(콜사이트별) | `app/domain/aggregates.py:20-26` | `legacy-behavior` | — (V2는 `RoundingPolicy`로 중앙화) |
 
 **이 표에 없는 수를 본문에 쓰지 않는다.** 예외는 **legacy 파일의 행 범위** · **날짜** ·
-**절 번호** · **식별자**(`OPEN-…` · `DEC-…` · `#…` · commit 해시)뿐이며 C-4가 그 예외를
+**절 번호** · **식별자**(`OPEN-…` · `DEC-…` · `#…` · commit 해시)뿐이며 C-4.1이 그 예외를
 명시적으로 뺀다.
+
+
+### 12.2 타입이 나르는 필드 — 수인 것과 수가 아닌 것
+
+**§12.1은 숫자 *리터럴*만 덮는다.** 필드도 수를 나르므로 **이 문서가 선언한 모든 타입의
+모든 필드**를 여기 등재하고, **수인 것에는 단위·basis·provenance를, 수가 아닌 것에는
+그 사실을** 적는다. 검사는 `commands.md` **C-4.2**다 — **필드 이름을 기계로 뽑아 이 표의
+덮개를 대조**한다.
+
+#### 수를 나르는 필드
+
+| 필드 | 단위 | basis / 축 | provenance | 소유 `OPEN` |
+| --- | --- | --- | --- | --- |
+| `amount` (`Money`) | **원(KRW), 정수** | 같은 값의 `basis` 필드가 정하는 금액 축(§1.2) | 수집 어댑터가 `provenance`·`vatTreatment`와 함께 싣는다 | — |
+| `money` (`ConstructionCapacityAmount`) | `Money` 한 벌 — 위와 같다 | 시공능력평가액 | `OperatorDeclared` 또는 `NoticePublished`(§1.2.4) | — |
+| `requiredAmount` (`ConstructionCapacityRequirement`) | 원 | 시공능력평가액 **요건** | 공고 게시값. **legacy가 수집하지 않으며 `vatTreatment`는 `Unknown`**(§5.5) | 수집 신설은 §13.4 인계 |
+| `frequency` | fraction | `numerator` ÷ `denominator`. **확률이 아니다**(§3.3) | 표본 집합에서 계산한 파생값 | — |
+| `criticalAssessmentRate` | fraction | **사정률 축**(예정가 ÷ 기초금액) | 추천 투찰율 ÷ 낙찰하한율의 파생값 | — |
+| `numerator` | 건수 | 하한 미달로 판정된 표본 수 | 표본 집합 | — |
+| `denominator` | 건수 | 밴드 필터를 통과한 표본 수 | 표본 집합 | — |
+| `band` (`Measured`) | fraction | §1.4.3 밴드 인벤토리의 한 엔트리(축은 그 엔트리가 정한다) | 정책 데이터 | — |
+| `required` · `actual` (`SampleInsufficient`) | 건수 | 최소 표본 수 **정책값**과 **실제** 표본 수 | 정책 데이터 / 표본 집합 | — |
+| `sampleSize` (`Measured<T>` · §6.5) | 건수 | 그 측정에 쓰인 표본 수 | 표본 집합 | — |
+| `value` (`Measured<T>`) | **`T`가 정한다** | `T`의 축 | `T`를 낸 계산 | — |
+| `dispersion` (§6.5) | fraction | **투찰율 축** 표본의 표준편차 | 과거 투찰율 표본 | — |
+| `estimateMargin` (§6.5) | fraction | 같은 축. 평균 투찰율 **신뢰구간 반폭** | 같음 | — |
+| `settledCount` · `openedCount` (`Maturity.Observed`) | 건수 | 그 KST 주에 개찰된 공고 수와 그중 낙찰가를 아는 수(§2.3) | 성숙도 계산 입력 | — |
+| `ratio` (`Maturity.Observed`) | fraction | `settledCount` ÷ `openedCount` | 파생값. **`0/0`은 `NoObservation`이며 비율이 아니다**(§6.4) | — |
+| `evaluationYear` (`ConstructionCapacityAmount`) | **연도** | 시공능력평가액 공시 연도 = `year(공고일) − 1`(§1.2.4) | 그 규칙 | **`OPEN-DIC-02`** |
+| `reobservationCount` (`TenderOutcome` fold) | 건수 | 같은 `observationKey`의 재관측 횟수(§2.2.3) | event stream fold | **`OPEN-SET-04`**(노출 여부) |
+| `expectedRange` (`KonepsFieldContract`) | 같은 계약의 `unit`이 정한다 | 같은 계약의 `scale`·`basis`가 정하는 축 | 필드 계약 선언(§5.3) | — |
+| `confidence` (§6.2 경계 표) | 무차원 | **없다** — 이름이 주장하는 의미를 산식이 뒷받침하지 않는다(§6.5). legacy는 클램프된 아핀 결합을 낸다 | legacy 산식. **V2는 이 필드를 내지 않고 §6.5의 세 성분을 노출한다** | **`OPEN-ML-05`**(계수 분류) |
+
+#### 수를 나르지 않는 필드
+
+| 갈래 | 필드 |
+| --- | --- |
+| **열거·sealed 값** | `basis` · `biasDirection` · `nullability` · `provenance` · `reason` · `reasons` · `regime` · `scale` · `vatTreatment` · `currency` |
+| **불리언** | `authoritative` (`KonepsFieldContract`) — **술어가 아니라 데이터로 선언한다**(§5.1) |
+| **식별자** — 수처럼 보여도 셈이 아니다. **정수 변환 금지**(§5.3의 공고 차수와 같은 부류) | `limitGroupNo` · `licenseRegionCode` · `noticeRevision` · `observationKey` · `key` · `sourceKey` · `modelArtifactId` · `inputSnapshotHash` · `policyVersion` |
+| **시각·날짜** | `decidedAt` · `measuredAt` · `observedAt` · `settlementObservedAt` · `effectiveFrom` |
+| **텍스트·이름** | `concept` · `definition` · `detail` · `licenseRegionName` · `method` · `population` · `rawName` · `source` · `unit` |
+| **집합·구조** | `missingByGroup` · `satisfiedGroup` · `payload` · `presentIn` · `row` |
+| **경계 표의 비수치 필드**(§6.2) | `review_required`(불리언 — **업무 판정이므로 Kotlin 소유**) · `regimeLabel` · `signals` |
+
+> **이 표가 덮는 범위**: **이 문서가 선언한 타입의 필드**와 **머리 칸이 「필드」·「성분」인
+> 표가 선언한 필드**다. 필드가 늘면 **C-4.2가 그 사실을 낸다** — 표에 없는 이름이 나오면
+> 미덮개로 찍힌다.
+>
+> **C-4.2가 못 보는 것**(그 절이 같은 문장으로 적는다): **`snake_case` 이름**과
+> **한 칸에 여러 이름을 적은 행**. 위 마지막 행의 `review_required` · `regimeLabel` ·
+> `signals`가 그런 자리이며 **손으로 등재했다.** 검사가 그것들을 잡지 못한다는 사실이
+> 이 표의 사각지대다.
 
 ---
 

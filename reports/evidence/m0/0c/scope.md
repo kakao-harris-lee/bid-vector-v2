@@ -81,7 +81,12 @@ A3("결정을 재조사하지 않고 인용한다")이 확인 불가능해지므
   HEAD이지만 착수 후 이 slice가 첫 커밋을 올리기 전에 **0D가 세 커밋을 올렸다.**
   그래서 `base_sha..HEAD`에는 0D의 커밋이 들어 있다.
   - **`review_base`는 이 slice 첫 커밋의 부모**이며 **리뷰 range는 `review_base...HEAD`**다.
-    그 range에는 이 slice의 커밋만 있다.
+  - **그 range에도 0D의 커밋이 들어 있다.** 두 레인이 **같은 브랜치를 공유**하므로 이
+    slice가 커밋한 뒤에도 0D가 계속 올린다. **`review_base` 이후로 0C 커밋만 남는다는
+    뜻이 아니다** — `review_base`가 하는 일은 **이 slice의 첫 커밋 앞을 잘라내는 것**뿐이다.
+  - **그래서 `in_scope` 확인은 range가 아니라 경로 필터로 한다:**
+    `git diff --name-only <base>...<0C head> -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/`
+    또는 `commands.md` **C-2.1**(이 slice의 커밋을 고른 뒤 그 커밋이 건드린 경로 전부를 본다).
   - `base_sha`는 **계약이 고정된 시점**의 기록으로 남긴다 — 두 값이 다르다는 사실 자체가
     병행 작업의 증적이다.
   - 이 slice의 커밋 목록은

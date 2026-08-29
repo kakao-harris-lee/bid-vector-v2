@@ -1,0 +1,76 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "aff62abfca85ca873932fedcad1e65c29ab35730",
+  "reviewed_head": "227ba0ca5825cab6981c13260dc228463d788061",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 614,
+      "evidence": "A2의 숫자 인덱스는 숫자 리터럴만 검사한다. 따라서 `FloorShortfall`의 `frequency`, `criticalAssessmentRate`, `numerator`, `denominator`와 §6.5의 `sampleSize`, `dispersion`, `marginToFloor` 같은 numeric field가 unit/basis/provenance 또는 소유 OPEN 없이 남아 있는데도 C-4가 PASS를 출력한다. 이는 데이터 사전 자체의 누락이자 evidence의 거짓 완전성 주장이다.",
+      "required_fix": "모든 numeric field를 전수 목록화해 unit, basis, provenance, 층, 소유 OPEN을 정의하고, C-4가 숫자 리터럴이 아니라 numeric field 인벤토리의 완전성을 검증하도록 수정한다."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 652,
+      "evidence": "직전 문장은 승인 명세 `v2-지침서.md` §4.3의 라벨 집합에 `Unknown`이 있음을 인정하지만 실제 `BaseAmountProvenance` 타입에서는 `Unknown`을 누락하고 `SuspectFractional`과 `Unclassified`를 채택한다. `OPEN-DEC-08`은 legacy `clean` 승계 금지만 확정하며 이 계약 변경을 승인하지 않는다.",
+      "required_fix": "승인된 `Unknown` 의미를 타입에 보존한다. 추가 또는 분할 라벨은 authoritative 근거를 제시하거나 명시적 OPEN으로 남긴다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0c/scope.md",
+      "line": 84,
+      "evidence": "`review_base...HEAD`에 0C 커밋만 있다고 단정하지만 실제 log에는 여러 0D 커밋이 있고 diff에는 `docs/adr/`와 `reports/evidence/m0/0d/` 변경이 포함된다. 실행하면 거짓으로 드러나는 현재 범위 자기서술이다.",
+      "required_fix": "range 자체에는 병행 0D가 섞였으며 path/commit 필터로 0C 집합을 격리한다는 실제 구조로 수정한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0c/commands.md",
+      "line": 859,
+      "evidence": "C-10.2는 outer clean worktree를 추가한 뒤 제거하지 않는다. `git worktree list --porcelain`에서 HEAD `37c9905`의 `cleanwt` 잔존 항목 9개가 확인되어 검증 명령이 실제로 영속적인 Git metadata와 임시 worktree side effect를 남겼음이 재현된다.",
+      "required_fix": "trap 또는 명시적 cleanup으로 성공·실패 모두에서 outer worktree와 임시 디렉터리를 제거하고, 기존 잔존 항목의 안전한 정리 및 재실행 결과를 evidence에 남긴다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0c/decisions-2026-08-28.md",
+      "line": 116,
+      "evidence": "U-3의 소유 OPEN을 `OPEN-SET-05`로 적지만 authoritative `capability-map.md`에서 이 ID는 재공고 대사 대상 선택 규칙이다. 같은 evidence의 U-3 본문은 재관측 노출인 `OPEN-SET-04`만 관련 쟁점으로 설명하며, scope와 checklist도 `OPEN-SET-05`를 활성 상태로 유지한다.",
+      "required_fix": "원문 사본을 보존해야 한다면 별도 editorial correction으로 오귀속을 명시하고, U-3과 `OPEN-SET-05`의 현재 상태 서술을 일관되게 만든다."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse --verify aff62abfca85ca873932fedcad1e65c29ab35730^{commit}",
+    "git rev-parse --verify 227ba0ca5825cab6981c13260dc228463d788061^{commit}",
+    "git status --short",
+    "git log --format='%H %s' aff62abfca85ca873932fedcad1e65c29ab35730..227ba0ca5825cab6981c13260dc228463d788061 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "git diff --name-status aff62abfca85ca873932fedcad1e65c29ab35730 227ba0ca5825cab6981c13260dc228463d788061 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "git diff --stat aff62abfca85ca873932fedcad1e65c29ab35730...227ba0ca5825cab6981c13260dc228463d788061",
+    "git log --reverse --format='%H %s' aff62abfca85ca873932fedcad1e65c29ab35730..227ba0ca5825cab6981c13260dc228463d788061",
+    "git diff --name-only aff62abfca85ca873932fedcad1e65c29ab35730 227ba0ca5825cab6981c13260dc228463d788061",
+    "git diff --check aff62abfca85ca873932fedcad1e65c29ab35730 227ba0ca5825cab6981c13260dc228463d788061",
+    "for c in $(git log --format='%H' aff62abfca85ca873932fedcad1e65c29ab35730..227ba0ca5825cab6981c13260dc228463d788061 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do git show --name-only --format='' \"$c\"; done | sed '/^$/d' | sort -u",
+    "python3 - <<'PY'  # commands.md C-3의 6축 검사 스크립트를 현재 head에서 실행",
+    "python3 - docs/discovery/data-dictionary.md <<'PY'  # commands.md C-4의 숫자 토큰 검사 스크립트를 현재 head에서 실행",
+    "grep -c '^| \\*\\*`OPEN-DIC-' docs/discovery/data-dictionary.md",
+    "grep -o '^| \\*\\*`OPEN-DIC-[0-9][0-9]' docs/discovery/data-dictionary.md | grep -o 'OPEN-DIC-[0-9][0-9]' | sort | uniq -d | wc -l",
+    "test -e bid-vector; echo \"bid-vector_exists=$?\"",
+    "test -e _workspace; echo \"workspace_exists=$?\"",
+    "bash -c 'diff <(sed -n '\\''281,564p'\\'' _workspace/m0-open-decisions/decisions-log.md) <(sed -n '\\''17,$p'\\'' reports/evidence/m0/0c/decisions-2026-08-28.md)'",
+    "git -C bid-vector ls-tree -r --name-only ed4b06c",
+    "python3 - docs/discovery/data-dictionary.md <<'PY'  # commands.md C-7.1 인용 검사 스크립트를 현재 환경에서 실행",
+    "git worktree list --porcelain",
+    "python3 - docs/discovery/data-dictionary.md <<'PY'  # legacy 인용 및 bare filename 형식 검사",
+    "rg -n --glob '!commands.md' '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)|[0-9]{3}-[0-9]{2}-[0-9]{5}|chat_id|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)' reports/evidence/m0/0c docs/discovery/data-dictionary.md",
+    "git rev-parse HEAD"
+  ],
+  "residual_risks": [
+    "`bid-vector`가 없어 C-7과 C-9는 성공 재현할 수 없었다. C-7.1 실행은 81개 인용 모두를 경로 부재로 보고했으며, 형식 검사에서는 bare filename 인용 0건을 확인했다.",
+    "`_workspace/`가 없어 C-1의 운영자 결정 원본 대조는 실패했다. 커밋된 사본과 원본의 축어 일치는 이 환경에서 독립 검증되지 않았다.",
+    "최종 `git status --short`는 출력이 없어 리뷰 중 worktree 파일을 수정하지 않았음을 확인했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}

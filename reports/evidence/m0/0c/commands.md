@@ -24,15 +24,18 @@
 
 ---
 
-## C-1 · 운영자 결정 사본이 원본과 같은가
+## C-1 · 운영자 결정 사본과 원본의 차이
 
 선언 SHA `37c9905`. 원본은 `_workspace/`(gitignore 대상)라 이 블록은 그 디렉터리가
 있는 작업 트리에서만 재현된다.
 
+**사본은 이제 원본과 한 자리에서 다르다** — Codex 리뷰 finding **E**가 U-3의 소유 `OPEN`
+오기를 지적했고, **결정 기록이므로 원 표기를 지우지 않고 취소선과 ⚠ 정정으로** 남겼다.
+**그 차이가 무엇인지는 아래 diff가 그대로 낸다** — 산문으로 옮겨 적지 않는다.
+
 ```
 diff <(sed -n '281,564p' _workspace/m0-open-decisions/decisions-log.md) \
-     <(sed -n '17,$p' reports/evidence/m0/0c/decisions-2026-08-28.md) \
-  && echo "차이 0줄 — 사본이 원본과 일치"
+     <(sed -n '17,$p' reports/evidence/m0/0c/decisions-2026-08-28.md)
 echo "exit=$?"
 ```
 
@@ -202,9 +205,14 @@ exit=0
 
 ---
 
-## C-4 · 도메인 숫자 전수 — §12 밖에 정의 없는 숫자가 없는가 (A2)
+## C-4 · 도메인 숫자 전수 (A2)
 
-사전 §12 「숫자 인덱스」의 **값 칸**을 정본으로 삼고, §12 밖 본문에서 그 목록에 없는
+**숫자는 두 자리에 있다 — 리터럴과 필드.** `C-4.1`이 리터럴을, **`C-4.2`가 필드**를 본다.
+**`C-4.1`만으로는 필드가 나르는 수를 볼 수 없다** — Codex 리뷰 finding **A**가 그것으로 났다.
+
+### C-4.1 숫자 리터럴 — §12.1 밖에 정의 없는 리터럴이 없는가
+
+사전 **§12.1**의 **값 칸**을 정본으로 삼고, §12 밖 본문에서 그 목록에 없는
 숫자 토큰을 찾는다. **셈·좌표·식별자는 마스크로 뺀다** — 무엇을 뺐는지는 `MASKS`가
 한 줄씩 밝힌다. 선언 SHA `37c9905`.
 
@@ -271,6 +279,74 @@ exit=0
 > **이 검사의 한계**: 마스크는 **한 자리 수(`0`~`9`)를 빼지 않는다** — `0`·`1`은 §12에
 > 등재해 통과시킨다. 마스크가 잘못 넓으면 진짜 도메인 숫자를 놓칠 수 있으므로
 > **MASKS 각 줄에 무엇을 빼는지 적는다.**
+
+
+### C-4.2 타입이 나르는 필드 — §12.2가 전부 덮는가
+
+**타입 선언의 인자 목록**과 **머리 칸이 「필드」·「성분」인 표**에서 필드 이름을 뽑아,
+사전 **§12.2**가 그 이름을 덮는지 본다. **덮개는 「수인지 아닌지」를 묻지 않는다** —
+§12.2가 각 필드를 **수** 또는 **수가 아님**으로 분류하므로, 덮이지 않은 이름이 있으면
+그것이 곧 미분류다.
+
+```
+python3 - docs/discovery/data-dictionary.md <<'PY'
+import re, sys, pathlib
+DOC = sys.argv[1]
+text = pathlib.Path(DOC).read_text()
+lines = text.split("\n")
+# §12.2 구간 = 정본. 그 구간의 백틱 식별자가 덮개다.
+s = next(i for i,l in enumerate(lines) if l.startswith("### 12.2"))
+e = next(i for i,l in enumerate(lines) if l.startswith("## 13."))
+covered = set()
+for l in lines[s:e]:
+    for m in re.finditer(r"`([a-z][A-Za-z0-9]*)`", l):
+        covered.add(m.group(1))
+body = "\n".join(lines[:s] + lines[e:])
+# 타입 선언의 인자 목록과 단독 선언에서 필드 이름을 뽑는다
+found = {}
+for span in re.findall(r"`([^`]+)`", body):
+    for m in re.finditer(r"\b([A-Z][A-Za-z0-9]*)(?:<[^>]*>)?\(([^()]*)\)", span):
+        for a in m.group(2).split(","):
+            a = a.strip()
+            if not a: continue
+            n = a.split(":")[0].strip()
+            if re.fullmatch(r"[a-z][A-Za-z0-9]*", n):
+                found.setdefault(n, set()).add(m.group(1))
+    m2 = re.match(r"^([a-z][A-Za-z0-9]*)\s*:\s*[A-Z]", span)
+    if m2: found.setdefault(m2.group(1), set()).add("(단독 선언)")
+# 표로만 선언된 필드·성분(§6.5 등)도 뽑는다 — 머리 칸이 「필드」나 「성분」인 표만 본다
+header_is_field = False
+for l in body.split("\n"):
+    if l.startswith("|") and re.match(r"^\|\s*(필드|성분)\s*\|", l):
+        header_is_field = True; continue
+    if not l.startswith("|"): header_is_field = False; continue
+    if not header_is_field: continue
+    m = re.match(r"^\| `([a-z][A-Za-z0-9]*)`(?: \(|\s*\|)", l)
+    if m: found.setdefault(m.group(1), set()).add("(표 선언)")
+missing = sorted(n for n in found if n not in covered)
+print(f"문서: {DOC}")
+print(f"§12.2가 덮는 필드 이름: {len(covered)}")
+print(f"타입·표 선언에서 뽑은 필드 이름: {len(found)}")
+print(f"§12.2에 없는 것: {len(missing)}")
+for n in missing:
+    print(f"  {n!r} ← {' · '.join(sorted(found[n]))}")
+print("PASS" if not missing else "FAIL")
+PY
+echo "exit=$?"
+```
+
+```
+문서: docs/discovery/data-dictionary.md
+§12.2가 덮는 필드 이름: 62
+타입·표 선언에서 뽑은 필드 이름: 58
+§12.2에 없는 것: 0
+PASS
+exit=0
+```
+
+> **이 검사가 못 보는 것**: **`snake_case` 이름**과 **한 칸에 여러 이름을 적은 표 행**.
+> §12.2가 그 자리를 손으로 등재하고 **같은 사실을 사각지대로 적는다.**
+> **덮개 수가 뽑은 이름 수보다 큰 것은 그 손 등재 때문이다.**
 
 ---
 
@@ -775,6 +851,8 @@ exit=0
 # bid-vector · _workspace 는 git 이 추적하지 않아 SHA 에서 복원할 수 없다.
 # 실행 CWD 에 있으면 연결하고, 없으면 그 사실을 출력에 낸다.
 WT="$(mktemp -d)/wt"
+# 실패해도 worktree 를 남기지 않는다 — 검사가 영속 git metadata 를 남기면 안 된다.
+trap 'git worktree remove --force "$WT" >/dev/null 2>&1; git worktree prune' EXIT
 git worktree add --detach "$WT" 37c9905 >/dev/null 2>&1
 [ -d bid-vector ] && ln -sfn "$(cd bid-vector && pwd -P)" "$WT/bid-vector"
 [ -d _workspace ] && ln -sfn "$(cd _workspace && pwd -P)" "$WT/_workspace"
@@ -857,6 +935,8 @@ exit=0
 # SELF-EXCLUDE-C10 — 이 절의 실행 절차이므로 검사 대상에서 뺀다.
 # C-10.1 의 명령 본문을 이 파일에서 그대로 뽑아 clean worktree 안에서 돌린다.
 CT="$(mktemp -d)/cleanwt"
+# 실패해도 worktree 를 남기지 않는다 — 검사가 영속 git metadata 를 남기면 안 된다.
+trap 'git worktree remove --force "$CT" >/dev/null 2>&1; git worktree prune' EXIT
 git worktree add --detach "$CT" 37c9905 >/dev/null 2>&1
 cp reports/evidence/m0/0c/commands.md "$CT/reports/evidence/m0/0c/commands.md"
 python3 - "$CT" <<'PY'

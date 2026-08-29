@@ -113,7 +113,7 @@ U-1과 합쳐 **`OPEN-REG-05`("기초금액과 추정가격의 과세 처리 —
 | # | 결정 | 소유 OPEN |
 | --- | --- | --- |
 | **U-2** | **시공능력평가금액은 부가세 포함** | `OPEN-QUAL-10` |
-| **U-3** | **`TenderOutcome` aggregate — current는 event stream의 fold 결과** | `OPEN-SET-05` |
+| **U-3** | **`TenderOutcome` aggregate — current는 event stream의 fold 결과** | ~~`OPEN-SET-05`~~ → **`OPEN-SET-04`** ⚠ 아래 정정 |
 | **U-4** | **정산 관측 시각은 수집 어댑터가 write 시점에 기록. V2 가동 이전 데이터는 `Absent`** | `OPEN-ML-04` 실행 정의 |
 | **U-8** | **`lmtGrpNo` = 요건 묶음** (그룹 간 OR / 그룹 내 AND) | `OPEN-QUAL-11` |
 
@@ -127,6 +127,13 @@ legacy는 `models.py:172-177`에서 **"원"이라는 주석만** 달고 과세 �
 
 **미입력 표현은 이 결정과 별개로 이미 확정** — `0`이 아니라 `Absent`
 (`OPEN-ML-04`의 "'미정산'을 `0`으로 적재하지 않는다"와 같은 규율).
+
+> **⚠ 정정 (2026-08-29, Codex 리뷰 finding E)** — 위 표의 U-3 행이 소유 `OPEN`을
+> `OPEN-SET-05`로 적었으나 **`capability-map.md` §12에서 그 id는 「재공고(차수 다수) 대사
+> 대상 선택 규칙」**이고 U-3와 무관하다. U-3가 걸리는 것은 **`OPEN-SET-04`(이벤트 재관측
+> 횟수를 운영자에게 노출할지)**이며 **아래 U-3 본문도 `OPEN-SET-04`만 관련 쟁점으로
+> 설명한다.** 원 표기는 지우지 않고 취소선으로 남긴다 — **이 파일은 결정 기록이다.**
+> **`OPEN-SET-05`는 활성으로 유지된다.**
 
 ### U-3 — event fold로 재정의
 
