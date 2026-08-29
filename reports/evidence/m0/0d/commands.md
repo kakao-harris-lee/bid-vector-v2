@@ -1259,6 +1259,7 @@ taken_at=2026-08-29T11:32:32Z
 | `_workspace/m0-0d/18_verifier_report_codex2fix.md` — 독립 검증 레인, 연속 2회 | 둘 다 `1` |
 | 위 출력 블록 — `8af7a30`이 넣었고 뜬 시각은 그 블록의 `taken_at`이 낸다 | `1` |
 | `_workspace/m0-0d/20_verifier_report_h1fix.md` — 독립 검증 레인, 연속 2회 | 둘 다 `(14)` |
+| **이 행** — Codex 3차 리뷰 레인의 preflight ②, `taken_at=2026-08-29T22:13:20Z`. 레인이 `?immutable=1`로 대체 실행해 preflight를 마쳤고 그 시점 `-wal`·`-shm` 부재를 함께 보고했다. **리뷰 레인은 이 파일이 자기 리뷰 대상이라 여기 쓰지 못하므로 명령 출력이 파일로 남지 않았고, 이 행이 그 기록 자리다** | `Error: in prepare, unable to open database file (14)` |
 
 그 사이 `memories_1.sqlite`의 `-wal`·`-shm`이 갱신됐고 **그때의 상태는 되돌릴 수 없어
 원인을 확정하지 못했다.**
@@ -1275,11 +1276,19 @@ taken_at=2026-08-29T11:32:32Z
 **WAL sidecar의 유무**. WAL 모드 DB를 `?mode=ro`로 열면 **읽기 전용 연결은 `-shm`을
 만들 수 없어** `-wal`·`-shm`이 없는 시점(checkpoint 직후)에는 `SQLITE_CANTOPEN(14)`가
 나고, 있는 시점에는 열린다는 것이다. 그 레인은 자기 관측 시점에 **`-wal`·`-shm`이
-없었음**을 실물로 적었고(`ls -la ~/.codex/`), 위 표의 관측 넷이 전부 이 규칙에 맞는다고
-보고했다. **이 slice는 그것을 실험으로 확정하지 않았다** — sidecar를 만들고 없애며
+없었음**을 실물로 적었고(`ls -la ~/.codex/`), **그때까지 위 표에 있던 관측이**
+전부 이 규칙에 맞는다고 보고했다. **이 slice는 그것을 실험으로 확정하지 않았다** — sidecar를 만들고 없애며
 `mode_ro`를 가르는 실험을 돌리지 않았고, `f207412` 시점의 sidecar 상태는 되돌릴 수
 없다. 그래서 위 *"원인을 확정하지 못했다"*는 그대로 서고, 이 문단은 **후속이 그 실마리를
 잃지 않도록 후보와 출처만 남긴다.**
+
+**Codex 3차 리뷰 라운드에 관측이 하나 더 얹혔다** — 위 표의 마지막 행이고, `(14)`와
+**`-wal`·`-shm` 부재**를 **같은 시점에** 들었다. 후보가 예측하는 짝이다.
+**그래도 후보는 후보로 남는다.** 관측이 하나 늘어난 것은 **아직 반례가 없다**는 뜻일 뿐이고
+이 slice는 여전히 그 실험을 돌리지 않았다 — **관측만으로는 sidecar 유무가 원인인지, 아니면
+sidecar와 `mode_ro`가 제3의 상태를 따라 함께 움직인 것인지 가르지 못한다.**
+후보를 확정으로 올리는 것은 그 실험을 돌리는 쪽의 몫이고, **이 slice의 판정은
+위 *"원인을 확정하지 못했다"* 그대로다.**
 
 ---
 
@@ -1398,7 +1407,7 @@ pair 24 L1102  OK                                 T=$(mktemp -d)
 pair 25 L1134  OK                                 echo "-- ADR 안의 OPS-13 전수"
 pair 26 L1195  SKIP EXT <_workspace/>             echo "-- 실행 메타 · 출처: _workspace/m0-0d/codex.
 pair 27 L1236  SKIP EXT <~/>                      echo "-- preflight ① consolidate 이후 이 저장소 흔적
-pair 28 L1373  SKIP SELF <==0D-BLOCK-HARNESS==>   # ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다 (S
+pair 28 L1382  SKIP SELF <==0D-BLOCK-HARNESS==>   # ==0D-BLOCK-HARNESS== — 이 쌍은 대조 대상에서 빠진다 (S
 pairs_total=29 replayed=26 skipped_SELF=1 skipped_EXT=2 diff=0
 ```
 

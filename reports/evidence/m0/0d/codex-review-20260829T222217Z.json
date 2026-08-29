@@ -1,0 +1,30 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "998dc21754e39efa425c3cfad9d5b7d5540ad1ba",
+  "reviewed_head": "df0562593d875849304d6284cb251fd0663273ad",
+  "findings": [],
+  "commands_run": [
+    "git status --short && git rev-parse HEAD && git cat-file -t <base/head> && git merge-base <base> <head>",
+    "git log --oneline 998dc21754e39efa425c3cfad9d5b7d5540ad1ba..df0562593d875849304d6284cb251fd0663273ad",
+    "git diff --stat/--name-status 998dc21754e39efa425c3cfad9d5b7d5540ad1ba..df0562593d875849304d6284cb251fd0663273ad && git ls-files --others --exclude-standard",
+    "git log --format='%H %s' <base>..<head> | grep 'm0-0d' | cut -d' ' -f1 | git show --stdin --name-only --format= | sort -u",
+    "git diff --check 998dc21754e39efa425c3cfad9d5b7d5540ad1ba...df0562593d875849304d6284cb251fd0663273ad -- docs/adr reports/evidence/m0/0d",
+    "sed/nl/rg로 v2-지침서.md, agent-workflow.md, milestone-0.md, 선행 evidence, scope.md, checklist.md, commands.md, ADR 0001~0009 전수 대조",
+    "git diff --unified=3 2a46bd41ed5157388f03468507ad198c2d106d06..df0562593d875849304d6284cb251fd0663273ad -- docs/adr reports/evidence/m0/0d",
+    "임시 detached clone을 2a46bd41ed5157388f03468507ad198c2d106d06에 체크아웃하고 commands.md의 C-1~C-4·C-7~C-10 재실행",
+    "임시 detached clone에서 C-7·C-7n을 별도 재실행하여 후보 판정 열과 음성 fixture 출력 대조",
+    "test ! -e docs/discovery/legacy-reference-map.md 및 milestone-0.md/ADR 0009/scope.md/checklist.md 관련 문면 대조",
+    "공식 문서 교차 확인: [ShedLock README](https://github.com/lukas-krecan/ShedLock), [db-scheduler README](https://github.com/kagkarlsson/db-scheduler), [ArchUnit releases](https://github.com/TNG/ArchUnit/releases)",
+    "git status --porcelain && git rev-parse HEAD && git rev-parse <base> && git diff --check <base>...<head> -- docs/adr reports/evidence/m0/0d"
+  ],
+  "residual_risks": [
+    "격리 worktree에 bid-vector symlink와 _workspace가 없어 규약대로 C-5·C-6·C-11·C-12는 재실행하지 않았다. legacy 계측·인용 범위와 전체 출력 블록 래칫은 커밋된 evidence에 의존한다.",
+    "OPEN-ADR-12의 lease adapter와 OPEN-ADR-13의 db-scheduler 실패 처리 설정은 의도적으로 미결이며 각각 M1/M4와 M4를 차단한다.",
+    "운영자 결정 (d)에 따라 legacy-reference-map.md를 만들지 않으므로 milestone-0.md의 전체 산출물 목록은 M0 전체 완료 전에 별도 권한으로 정합화해야 한다.",
+    "gRPC unknown-schema 처리와 deadline/retry/error-mapping의 구체 의미는 승인된 분업에 따라 M2 ADR로 남아 있다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
