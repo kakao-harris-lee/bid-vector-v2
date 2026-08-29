@@ -1228,12 +1228,20 @@ legacy의 `confidence`는 근거 없는 계수 아홉의 아핀 결합이고 클
 
 > `Contaminated(row) ⟺ C1 ∨ C2 ∨ C3`
 >
-> - **C1 출처 부적격** — 그 값의 `FactProvenance`가 `Published`가 아니다(파생·폴백·사본).
+> - **C1 출처 부적격** — 그 값의 `FactProvenance`가 `Published`도 `Undeclared`도 아니다
+>   (파생 · 폴백 · 사본). **`OperatorDeclared`는 이 자리에 들어올 수 없다**(§5.1 · §5.2) —
+>   들어와 있으면 오염이 아니라 경계 위반이다.
 > - **C2 출처 미신고** — `FactProvenance`가 `Undeclared`다.
 > - **C3 모순 관측** — 같은 공고의 다른 금액과의 관계가 **선언된 개연 밴드 밖**이다.
 
 **셋을 합쳐 하나의 비율로만 발표하지 않는다.** 각 성분의 분자를 따로 낸다 — legacy가 남긴
 단일 수 하나가 **무엇의 비율인지 복원되지 않는 것**이 그 수를 못 쓰게 만든 원인이다.
+**그 요구가 성분의 경계도 정한다** — 앞서 C1을 *"`Published`가 아니다"*로 적어 **C2를
+통째로 품고 있었고**, 그러면 성분별 분자를 따로 내도 **두 분자가 겹쳐 복원되지 않는다.**
+그래서 C1에서 `Undeclared`를 뺐다 — 한 값의 `FactProvenance`는 하나이므로 **C1과 C2는
+이제 겹치지 않는다.** **C3는 여전히 둘 중 어느 쪽과도 겹칠 수 있다** — 출처와 모순은
+다른 축이다. 그래서 **합집합의 분자를 성분 분자의 합으로 얻을 수 없다.**
+**그리고 이 요구를 담는 것은 산문이 아니라 §7.3의 측정 타입이다.**
 
 > **⚠ 정정** — 앞서 이 자리는 *"V2 write 경로에서 C2는 타입으로 `0`이다(provenance가 필수
 > 필드다)"*라 적었고 **거짓이었다.** `Undeclared`가 `FactProvenance`의 **멤버**이므로(§5.1)
@@ -1263,13 +1271,39 @@ legacy의 `confidence`는 근거 없는 계수 아홉의 아핀 결합이고 클
 
 같은 정의라도 모수가 다르면 다른 수가 나온다. **발표는 `(정의, 모수)` 쌍으로만 한다.**
 
-### 7.3 측정 규격 — 다섯 필드
+### 7.3 측정 규격 — 맥락 다섯과 결과 셋
 
-> `ContaminationMeasurement(definition, population, measuredAt, method, policyVersion)`
+> `ContaminationMeasurement(definition, population, measuredAt, method, policyVersion,
+> populationSize, componentNumerators, unionNumerator)`
 >
-> **다섯 필드를 갖지 않는 오염률은 V2 문서·화면·리포트에 인용할 수 없다.**
+> **맥락 다섯**(`definition` · `population` · `measuredAt` · `method` · `policyVersion`)을
+> 갖지 않는 오염률은 V2 문서·화면·리포트에 인용할 수 없다.
+> **결과 셋**이 §7.1·§7.2가 요구한 것을 담는다.
 
-legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·모수·측정일)의 부재다.
+legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법·모수·측정일)의 부재다.
+
+**결과를 담는 자리가 없으면 요구가 성립하지 않는다.** §7.1은 *"각 성분의 분자를 따로
+낸다"*를, §7.2는 *"발표는 `(정의, 모수)` 쌍으로만"*을 요구하는데 **앞서 이 타입에는
+분자도 분모도 없었다** — 요구를 산문에만 두고 타입이 담지 않으면 그 요구는 구현에
+전달되지 않는다. **아래 셋이 그 자리다.**
+
+| 필드 | 무엇을 나르는가 |
+| --- | --- |
+| `populationSize` | 건수 — `population`이 지목한 모수(§7.2의 `P1` · `P2` · `P3`)의 행 수. **공통 분모다** |
+| `componentNumerators` | 건수 — **성분마다 하나씩.** 성분 어휘는 `ContaminationComponent`가 정한다 |
+| `unionNumerator` | 건수 — `Contaminated`가 참인 행 수. **성분 분자의 합이 아니다**(§7.1 — C3가 다른 둘과 겹칠 수 있다) |
+
+> `ContaminationComponent = sealed { SourceIneligible, SourceUndeclared,
+> ContradictoryObservation }` — 차례로 §7.1의 C1 · C2 · C3다.
+
+**비율은 필드가 아니다.** `분자 ÷ populationSize`의 파생이며 **저장하지 않는다** —
+저장하면 그 수가 자기 맥락에서 떨어져 나가 홀로 인용될 수 있고, **그것이 legacy의 수를
+못 쓰게 만든 바로 그 형태다**(U-9 · §7 머리). 발표는 §7.2가 정한 대로 **`(정의, 모수)`
+쌍과 함께만** 한다.
+
+**`populationSize`가 `0`이면 비율이 없다** — `Unmeasurable`이며 `0`이 아니다.
+`v2-지침서.md` §4.4가 같은 규율을 다른 축에 적는다(*"표본 부족은 0%가 아니라
+`Unmeasurable`"*). §6.4의 `NoObservation`과 같은 형태다.
 
 ### 7.4 이 정의가 답하지 않는 것
 
@@ -1295,6 +1329,10 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
    확인은 `commands.md` **C-7**이 유일한 지점이다.
 7. **`v2-지침서.md` §4.2가 요구하는 「유효기간을 versioned policy data로」와 U-7이
    어긋난다**(§3.2.4). 지침서 개정은 이 slice의 범위 밖이다 → §13.
+8. **`C-4.2`는 한 방향만 잰다** — **선언된 필드가 §12.2에 등재됐는지**는 재지만
+   **산문이 요구한 필드가 타입에 선언됐는지는 재지 않는다.** 선언되지 않은 이름은
+   뽑히지 않으므로 그 자리에서 덮개는 침묵한다(§12.2). **이 문서의 요구와 타입의 대응은
+   사람이 읽어야 한다** — 이 라운드는 그 방향을 재는 검사를 만들지 않았다.
 
 ---
 
@@ -1468,6 +1506,9 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 | `ratio` (`Maturity.Observed`) | fraction | `settledCount` ÷ `openedCount` | 파생값. **`0/0`은 `NoObservation`이며 비율이 아니다**(§6.4) | — |
 | `evaluationYear` (`ConstructionCapacityAmount`) | **연도** | 시공능력평가액 공시 연도 = `year(공고일) − 1`(§1.2.4) | 그 규칙 | **`OPEN-DIC-02`** |
 | `reobservationCount` (`TenderOutcome` fold) | 건수 | 같은 `observationKey`의 재관측 횟수(§2.2.3) | event stream fold | **`OPEN-SET-04`**(노출 여부) |
+| `populationSize` (`ContaminationMeasurement`) | 건수 | 오염률의 **공통 분모** — `population`이 지목한 모수(§7.2)의 행 수 | 그 모수를 센 측정(§7.3) | — |
+| `componentNumerators` (`ContaminationMeasurement`) | 건수 | 성분(`ContaminationComponent`)마다 하나 — §7.1 세 술어의 분자 | 같은 측정 | — |
+| `unionNumerator` (`ContaminationMeasurement`) | 건수 | `Contaminated`가 참인 행 수. **성분 분자의 합이 아니다**(§7.1) | 같은 측정 | — |
 | `expectedRange` (`KonepsFieldContract`) | 같은 계약의 `unit`이 정한다 | 같은 계약의 `scale`·`basis`가 정하는 축 | 필드 계약 선언(§5.3) | — |
 | `confidence` (§6.2 경계 표) | 무차원 | **없다** — 이름이 주장하는 의미를 산식이 뒷받침하지 않는다(§6.5). legacy는 클램프된 아핀 결합을 낸다 | legacy 산식. **V2는 이 필드를 내지 않고 §6.5의 세 성분을 노출한다** | **`OPEN-ML-05`**(계수 분류) |
 
@@ -1483,6 +1524,15 @@ legacy의 수가 인용 금지가 된 이유가 정확히 이 중 셋(방법·�
 | **집합·구조** | `entries` (`EffectiveDatedPolicy` — 유효일자와 값의 쌍 목록, §4.1) · `missingByGroup` · `satisfiedGroup` · `payload` · `presentIn` · `row` |
 | **경계 표의 비수치 필드**(§6.2) | `review_required`(불리언 — **업무 판정이므로 Kotlin 소유**) · `regimeLabel` · `signals` |
 
+> **`C-4.2`가 재는 방향은 하나다 — 그 반대 방향은 재지 않는다.**
+> 그 블록은 **「선언된 필드가 §12.2에 등재됐는가」**를 재고
+> **「요구된 필드가 선언됐는가」는 재지 않는다.** 요구는 산문에 있고(§7.1의
+> *"각 성분의 분자를 따로 낸다"*가 그렇다) **선언되지 않은 이름은 뽑히지도 않으므로**
+> 타입이 그 요구를 빠뜨려도 덮개는 침묵한다. 실제로 그렇게 났다 — 오염 측정 타입이
+> §7.1·§7.2가 요구한 분자·분모를 **하나도 갖지 않은 채** `C-4.2`가 `PASS`를 냈다
+> (Codex 2차 high). **Codex 1차 finding `A`와 같은 계열이 도메인 층위에서 되풀이된 것이다.**
+> **이 방향을 재는 검사는 이 라운드가 만들지 않는다** — 한계로 적고 §8에 등재한다.
+>
 > **이 표가 덮는 범위와 `C-4.2`가 못 보는 자리는 산문이 적지 않고 그 블록의 실행이 낸다.**
 > 「필드가 늘면 이 검사가 낸다」처럼 **덮개 범위를 산문이 주장하지 않는다** — 그 주장은
 > 검사의 이름 규칙 밖(예: 밑줄 든 이름)에서 곧 거짓이 되고, 여기 옮겨 적은 목록과 셈은
