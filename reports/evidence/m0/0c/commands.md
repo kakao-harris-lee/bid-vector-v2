@@ -348,14 +348,18 @@ exit=0
 않는다** — §12.2가 각 필드를 **수** 또는 **수가 아님**으로 분류하므로, 덮이지 않은 이름이
 있으면 그것이 곧 미분류다.
 
-**이 검사는 자기가 못 본 자리를 같은 실행에서 센다.** ①이 **통째로 못 읽은 선언 자리** ·
-**이름 규칙 밖 인자** · **이름 없이 타입만 적힌 인자** · **①②③이 못 내는 덮개 이름**을
-**이름째** 낸다. **사각지대를 산문으로 적지 않고 이 블록이 낸다** — 산문으로 적은 사각지대
-목록이 실제보다 좁았던 것이 이 검사가 고쳐진 이유다.
+**못 본 것을 세는 앵커는 보는 앵커보다 넓다.** 사각지대를 재는 앵커가 선언을 읽는 앵커와
+같으면 **못 읽는 자리와 못 읽었다고 세는 자리가 같아 구조적으로 자기를 볼 수 없다** — 이
+검사가 그렇게 지어져 `_FloorSchedule(effective_from, brackets)` 한 자리를 네 사각지대 줄
+어디에도 내지 못했다. 그래서 사각지대 앵커를 **대문자를 전제하지 않는 형태**로 따로 세웠다.
 
-**③이 내는 이름 가운데 필드가 아닌 것은 이름째 뺀다**(`NOT_A_FIELD`). 규칙으로 빼는 것은
-commit 해시 하나뿐이다. **목록 밖의 새 이름은 `FAIL`이 된다** — 분류되지 않은 이름이
-조용히 통과하지 않게 하는 것이 그 목록의 목적이다.
+**그 포함 관계도 산문의 주장이 아니라 블록이 실행으로 잰다** — `선언 앵커가 읽은 자리 ⊆
+사각지대 앵커가 본 자리`가 깨지면 `FAIL`이다. **사각지대가 무엇인지도 이 블록이 낸다.**
+
+**빼는 것은 규칙이 아니라 이름 목록으로 한다** — ③이 내는 이름 가운데 필드가 아닌 것은
+`NOT_A_FIELD`가, 「이름(」 이지만 타입 선언이 아닌 자리(함수·술어 호출)는 `NOT_A_DECL`이
+이름째 뺀다. 규칙으로 빼는 것은 commit 해시 하나뿐이다. **목록 밖의 새 이름은 `FAIL`이
+된다** — 분류되지 않은 이름이 조용히 통과하지 않게 하는 것이 두 목록의 목적이다.
 
 **덮개는 §12.2의 「표 칸」만 센다** — 그 절의 산문에 나오는 이름은 분류가 아니므로 덮개가
 아니다.
@@ -371,9 +375,20 @@ e = next(i for i,l in enumerate(lines) if l.startswith("## 13."))
 covered = {m.group(1) for l in lines[s:e] if l.startswith("|")
            for m in re.finditer(r"`([a-z][A-Za-z0-9_]*)`", l)}
 body = "\n".join(lines[:s] + lines[e:])
-NAME = re.compile(r"[a-z][A-Za-z0-9]*")
-HASH = re.compile(r"[0-9a-f]{7,40}\Z")          # commit 해시는 규칙으로 뺀다
-LEGACY_DECLS = {"FieldContract"}                # legacy 파이썬 선언의 축어 인용(§5.3). V2 타입이 아니다
+# 앵커·규칙에 이름을 붙여 두고 **출력이 자기 패턴을 그대로 낸다** — 산문이 옮겨 적지 않는다.
+DECL  = re.compile(r"\b(_*[A-Z][A-Za-z0-9_]*)")                    # ① 선언 앵커. 밑줄 선두를 포함한다
+SITE  = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\s*(?:<[^<>]*>)?\(")  # 사각지대 앵커 — 대문자를 전제하지 않는다
+NAME  = re.compile(r"[a-z][A-Za-z0-9]*")                           # 인자 이름 규칙
+LOOSE = re.compile(r"`([a-z][A-Za-z0-9]*)`")                       # ③ 단독 백틱 이름 규칙
+HASH  = re.compile(r"[0-9a-f]{7,40}\Z")                            # commit 해시는 규칙으로 뺀다
+# legacy 파이썬 선언의 축어 인용(§4.1 · §5.3). V2 타입이 아니므로 그 인자는 §12.2 등재 대상이 아니다.
+LEGACY_DECLS = {"FieldContract", "_FloorSchedule"}
+NOT_A_DECL = {   # 「이름(」 이지만 타입 선언이 아닌 자리. 목록 밖의 새 이름은 못 읽은 선언 자리로 센다
+  # 문서가 산식·술어를 적을 때 쓰는 호출 표기
+  "bool","float","round","year","fold","resolve","isBiddable","to_bid_rate_fraction",
+  # legacy 파이썬 메서드 호출의 축어 인용(§2.2)
+  "settled_any_signal","settled_with_amount",
+}
 NOT_A_FIELD = {
   # legacy KONEPS 응답 키 — V2 대응 필드는 §12.2 가 따로 등재한다
   "asignBdgtAmt","bdgtAmt","bidNtceOrd","bssAmt","cnstrtnAbltyEvlAmt",
@@ -393,7 +408,7 @@ def flat(sp):                       # 블록인용 줄바꿈을 편다 — '> ' 
     return re.sub(r"\s*\n\s*>?\s*", " ", sp)
 def decls(span):                    # `Name(...)` 를 균형 괄호로 자른다 — 중첩 괄호·제네릭을 견딘다
     out = []
-    for m in re.finditer(r"\b([A-Z][A-Za-z0-9]*)", span):
+    for m in DECL.finditer(span):
         j = m.end()
         if j < len(span) and span[j] == "<":
             d = 0
@@ -418,15 +433,33 @@ def top_split(a):                   # 최상위 콤마로만 자른다
         else: cur += ch
     parts.append(cur)
     return [p.strip() for p in parts if p.strip()]
-found, type_only, off_name, unread = {}, [], [], []
+def wrap(head, names, width=96):    # 셈과 열거가 같은 것을 세도록 전수를 접어 싣는다
+    if not names: return head + "(없음)"
+    out, cur = [], head
+    for i, n in enumerate(names):
+        tok = n + ("" if i == len(names) - 1 else " ·")
+        if cur.strip() and len(cur) + len(tok) > width:
+            out.append(cur.rstrip()); cur = "    "
+        cur += tok + " "
+    out.append(cur.rstrip())
+    return "\n".join(out)
+found, type_only, off_name, legacy_args, unread = {}, [], [], [], []
+n_site = n_decl = leaked = ruled_out = 0
 for span in (flat(sp) for sp in re.findall(r"`([^`]+)`", body)):
     ds = decls(span); taken = {d[1] for d in ds}
-    for m in re.finditer(r"\b[A-Z][A-Za-z0-9]*\s*(?:<[^<>]*>)?\(", span):
-        if m.start() not in taken: unread.append(span[m.start():m.start()+50])
+    # 사각지대는 **다른(더 넓은) 앵커**로 잰다 — 못 읽는 자리와 못 읽었다고 세는 자리가
+    # 같으면 구조적으로 자기를 못 본다.
+    sites = {m.start() for m in SITE.finditer(span)}
+    n_site += len(sites); n_decl += len(taken); leaked += len(taken - sites)
+    for p in sorted(sites - taken):
+        nm = re.match(r"[A-Za-z_][A-Za-z0-9_]*", span[p:]).group(0)
+        if nm in NOT_A_DECL: ruled_out += 1
+        else: unread.append(span[p:p+50])
     for tname, _, args in ds:
         for a in top_split(args):
             n = a.split(":")[0].strip()
-            if NAME.fullmatch(n): found.setdefault(n, set()).add(tname)
+            if tname in LEGACY_DECLS: legacy_args.append(f"{tname}({n})")
+            elif NAME.fullmatch(n): found.setdefault(n, set()).add(tname)
             elif re.fullmatch(r"[A-Z][A-Za-z0-9]*", n): type_only.append((n, tname))
             else: off_name.append((n, tname))
     m2 = re.match(r"^([a-z][A-Za-z0-9]*)\s*:\s*[A-Z]", span)
@@ -440,25 +473,29 @@ for l in body.split("\n"):
     if m: found.setdefault(m.group(1), set()).add("(표 선언)")
 loose = {}
 for i, l in enumerate(body.split("\n")):
-    for m in re.finditer(r"`([a-z][A-Za-z0-9]*)`", l):
-        loose.setdefault(m.group(1), []).append(i + 1)
+    for m in LOOSE.finditer(l): loose.setdefault(m.group(1), []).append(i + 1)
 missing = sorted(n for n in found if n not in covered)
 unclassified = sorted(n for n in loose if n not in covered and n not in found
                       and n not in NOT_A_FIELD and not HASH.match(n))
-stray = sorted({t for t in off_name if t[1] not in LEGACY_DECLS})
 print(f"문서: {DOC}")
 print(f"§12.2 표 칸이 덮는 이름: {len(covered)}")
 print(f"① 타입 선언 인자 + ② 필드·성분 표에서 뽑은 이름: {len(found)}  미덮개: {len(missing)}")
 for n in missing: print(f"    {n!r} ← {' · '.join(sorted(found[n]))}")
 print(f"③ 본문의 단독 백틱 이름: {len(loose)}  덮개·①②·목록·해시 밖: {len(unclassified)}")
 for n in unclassified: print(f"    {n!r} @ 본문 행 {loose[n][:6]}")
-print("--- 이 추출기가 못 본 자리를 같은 실행에서 센다 ---")
-print(f"통째로 못 읽은 선언 자리: {len(unread)}" + ("" if not unread else " -> " + repr(unread)))
-print(f"이름 규칙 밖 인자: {len(off_name)} — legacy 선언({' · '.join(sorted(LEGACY_DECLS))}) 밖: {len(stray)}"
-      + ("" if not stray else " -> " + repr(stray)))
+print("--- 이 블록이 자기 범위와 예외를 스스로 낸다 ---")
+print(f"① 선언 앵커 {DECL.pattern}  ·  인자 이름 규칙 {NAME.pattern}  ·  ③ 단독 이름 규칙 {LOOSE.pattern}")
+print("--- 못 본 것을 세는 앵커는 보는 앵커보다 넓다 — 그 관계도 실행이 잰다 ---")
+print(f"사각지대 앵커 {SITE.pattern}")
+print(f"선언 앵커가 읽은 자리 {n_decl} ⊆ 사각지대 앵커가 본 자리 {n_site} — 그 밖으로 샌 자리: {leaked}")
+print(f"통째로 못 읽은 선언 자리: {len(unread)} (NOT_A_DECL 로 가른 함수·술어 호출 {ruled_out})"
+      + ("" if not unread else " -> " + repr(unread)))
+print(f"legacy 선언 축어 인용의 인자(V2 필드가 아니다): {len(legacy_args)}자리")
+print(wrap("    ", sorted(legacy_args)))
+print(f"이름 규칙 밖 인자: {len(off_name)}" + ("" if not off_name else " -> " + repr(sorted(off_name))))
 print(f"이름 없이 타입만 적힌 인자: {len(type_only)} — {sorted({t[1] for t in type_only})}")
 print(f"덮개에만 있는 이름(①②③이 못 내는 자리 — 손 등재): {sorted(covered - set(found) - set(loose))}")
-print("PASS" if not missing and not unclassified and not unread and not stray else "FAIL")
+print("PASS" if not missing and not unclassified and not unread and not off_name and not leaked else "FAIL")
 PY
 echo "exit=$?"
 ```
