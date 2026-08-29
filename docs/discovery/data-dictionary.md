@@ -466,12 +466,28 @@ legacy는 event가 append-only인데 snapshot은 in-place mutate라
 
 | fold 규칙 | 정의 |
 | --- | --- |
-| **입력** | `TenderObservation(observationKey, observedAt, payload, source)` 의 append-only 스트림 |
-| **멱등 단위** | `observationKey`. **payload 전체 해시가 아니다** — 같은 값 재관측이 기록되어야 한다 |
-| **재관측** | `reobservationCount`를 별도 필드로 센다 |
+| **입력** | `TenderObservation(deliveryKey, observationKey, observedAt, payload, source)` 의 append-only 스트림 |
+| **멱등 단위(전송)** | `deliveryKey`. 같은 `deliveryKey`를 나르는 **재전송은 상태를 바꾸지 않는다** |
+| **재관측 단위(의미)** | `observationKey`. **같은 사실의 관측을 묶는다.** **payload 전체 해시가 아니다** — 같은 값 재관측이 기록되어야 한다 |
+| **재관측** | `reobservationCount`를 별도 필드로 센다 — **같은 `observationKey`를 가진 관측**을 세고 **첫 관측은 세지 않는다** |
 | **정정 방향** | **상향·하향 모두 허용**한다. 단조 ratchet을 만들지 않는다 |
 | **current** | `fold(observations)` — 각 필드는 그 필드를 마지막으로 관측한 event에서 온다 |
 | **저장** | current를 물리적으로 저장할 수 있으나 **그 값은 fold의 캐시**이며 event stream이 진실이다 |
+
+> **⚠ 정정 — 키가 둘인 이유: 하나로는 셀 수 없다.** 앞서 이 표는 **멱등 단위와 재관측
+> 단위를 한 키(`observationKey`)에 겹쳐** 두었다. 그러면 **중복을 제거하면 재관측을 셀 수
+> 없고, 세면 재전송이 상태를 바꾼다** — 멱등성과 `reobservationCount`가 **동시에 성립할 수
+> 없다.** 두 역할을 **한 키가 겸할 수 없다는 것**이 여기서 확정되는 전부이고, 그것은 새
+> 결정이 아니라 **모순의 제거**다. `capability-map.md` SET-09 `F-8`이 이미 같은 방향을
+> 적는다 — *"멱등 단위와 재관측 횟수를 분리해 표현한다"*.
+
+**각 키가 무엇으로 이루어지는지는 이 문서가 정하지 않는다** → **`OPEN-DIC-07`**.
+무엇이 **한 전송**을 식별하고 무엇이 **같은 사실**을 식별하는지가 그 미결이다.
+
+- **U-3을 넘지 않는다.** U-3이 정한 것은 **fold로의 재정의**이고, 그 결정은 **멱등 키의
+  구성을 정하지 않았다**(`decisions-2026-08-28.md`의 U-3 절).
+- **`OPEN-SET-04`가 소유한 것도 아니다.** 그 `OPEN`은 **재관측을 운영자에게 노출할지**를
+  묻는다 — 키의 구성이 아니다. 그래서 신설 `OPEN`으로 올린다.
 
 **`OPEN-SET-04`(재관측을 운영자에게 노출할지)는 이 결정에 종속되나 별개다.** fold로
 정의하면 재관측이 **표현 가능**해지지만 **보일지**는 그 `OPEN`이 소유한다. 이 문서는
@@ -1346,6 +1362,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | **`OPEN-DIC-04`** | **`AllocatedBudget`·`YegaAmount`·`AwardAmount`의 과세 처리** | U-1·U-1b는 추정가격과 기초금액 둘만 정했다. 나머지 셋은 결정도 문서 근거도 없다 | §1.2 |
 | **`OPEN-DIC-05`** | **`BaseAmountProvenance`의 승인 라벨 다섯이 legacy 실측을 덮는가** — ① `suspect-fractional`에 대응하는 이름이 승인 명세에 없다 ② **미판정(`NULL`)과 「출처를 모름」(`Unknown`)이 같은 값인가** | **승인 명세(`v2-지침서.md` §4.3)의 집합을 이 문서가 바꿀 수 없다.** `OPEN-DEC-08`은 **legacy `clean` 승계 금지**만 확정했고 라벨 집합 변경을 승인하지 않았다. **바꾸려면 별도 결정이 필요하다** | §3.4 |
 | **`OPEN-DIC-06`** | **V2 canonical write 경로가 `Undeclared` provenance를 거부하는가** — 거부한다면 그 경계의 입력 타입은 `FactProvenance`의 진부분집합이다 | **근거가 한쪽으로 서지 않는다.** §5.1의 **둘째 규율**은 `Undeclared`를 **권위로 취급하지 않을** 뿐 **금지하지 않고**, 같은 축의 `vatTreatment`에서 §1.2.1은 *"선언을 만들 수 없으면 `Unknown`"*을 **허용**한다. **어댑터의 의무를 정하는 결정**이므로 이 문서가 정할 자리가 아니다 | §7.1 · §5.1 |
+| **`OPEN-DIC-07`** | **전송 멱등 키와 재관측 키가 각각 무엇으로 이루어지는가** — 무엇이 **한 전송**을 식별하고 무엇이 **같은 사실**을 식별하는가 | **두 역할을 한 키가 겸할 수 없다는 것**은 모순 제거로 확정되나(§2.2.3) **키의 구성**은 아니다. **U-3은 fold로의 재정의를 정했고 멱등 키의 구성을 정하지 않았다.** `OPEN-SET-04`가 소유한 것은 **재관측의 노출 여부**이지 키의 구성이 아니다 | §2.2.3 |
 
 **활성 `OPEN`은 해소하지 않았다.** 이 문서가 문면에서 마주친 것 — `OPEN-QUAL-05` ·
 `OPEN-QUAL-09` · `OPEN-ML-05` · `OPEN-SET-04` · `OPEN-SET-05` · `OPEN-SET-06` ·
@@ -1505,7 +1522,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | `settledCount` · `openedCount` (`Maturity.Observed`) | 건수 | 그 KST 주에 개찰된 공고 수와 그중 낙찰가를 아는 수(§2.3) | 성숙도 계산 입력 | — |
 | `ratio` (`Maturity.Observed`) | fraction | `settledCount` ÷ `openedCount` | 파생값. **`0/0`은 `NoObservation`이며 비율이 아니다**(§6.4) | — |
 | `evaluationYear` (`ConstructionCapacityAmount`) | **연도** | 시공능력평가액 공시 연도 = `year(공고일) − 1`(§1.2.4) | 그 규칙 | **`OPEN-DIC-02`** |
-| `reobservationCount` (`TenderOutcome` fold) | 건수 | 같은 `observationKey`의 재관측 횟수(§2.2.3) | event stream fold | **`OPEN-SET-04`**(노출 여부) |
+| `reobservationCount` (`TenderOutcome` fold) | 건수 | 같은 `observationKey`를 가진 관측을 센다. **첫 관측은 세지 않고, `deliveryKey`가 같은 재전송도 세지 않는다**(§2.2.3) | event stream fold | **`OPEN-SET-04`**(노출 여부) · **`OPEN-DIC-07`**(두 키의 구성) |
 | `populationSize` (`ContaminationMeasurement`) | 건수 | 오염률의 **공통 분모** — `population`이 지목한 모수(§7.2)의 행 수 | 그 모수를 센 측정(§7.3) | — |
 | `componentNumerators` (`ContaminationMeasurement`) | 건수 | 성분(`ContaminationComponent`)마다 하나 — §7.1 세 술어의 분자 | 같은 측정 | — |
 | `unionNumerator` (`ContaminationMeasurement`) | 건수 | `Contaminated`가 참인 행 수. **성분 분자의 합이 아니다**(§7.1) | 같은 측정 | — |
@@ -1518,7 +1535,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | --- | --- |
 | **열거·sealed 값** | `basis` · `biasDirection` · `nullability` · `provenance` · `reason` · `reasons` · `regime` · `scale` · `vatTreatment` · `currency` |
 | **불리언** | `authoritative` (`KonepsFieldContract`) · `isAuthoritative` (`FactProvenance` — §5.1) — 둘 다 **술어가 아니라 데이터로 선언한다** |
-| **식별자** — 수처럼 보여도 셈이 아니다. **정수 변환 금지**(§5.3의 공고 차수와 같은 부류) | `limitGroupNo` · `licenseRegionCode` · `noticeRevision` · `observationKey` · `key` · `sourceKey` · `modelArtifactId` · `inputSnapshotHash` · `policyVersion` |
+| **식별자** — 수처럼 보여도 셈이 아니다. **정수 변환 금지**(§5.3의 공고 차수와 같은 부류) | `limitGroupNo` · `licenseRegionCode` · `noticeRevision` · `deliveryKey`(전송 멱등 단위, §2.2.3) · `observationKey`(재관측 단위, 같은 자리) · `key` · `sourceKey` · `modelArtifactId` · `inputSnapshotHash` · `policyVersion` |
 | **시각·날짜** | `decidedAt` · `measuredAt` · `observedAt` · `settlementObservedAt` · `effectiveFrom` |
 | **텍스트·이름** | `concept` · `definition` · `detail` · `licenseRegionName` · `method` · `population` · `rawName` · `source` · `unit` |
 | **집합·구조** | `entries` (`EffectiveDatedPolicy` — 유효일자와 값의 쌍 목록, §4.1) · `missingByGroup` · `satisfiedGroup` · `payload` · `presentIn` · `row` |
