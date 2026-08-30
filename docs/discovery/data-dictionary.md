@@ -628,11 +628,18 @@ legacy는 event가 append-only인데 snapshot은 in-place mutate라
 > 순서에 대한 불변**이기 때문이다. **키가 정해지면 그 키가 지목한 값이 current인지까지 재는
 > 시나리오가 그 위에 붙고, 그것은 지금 쓸 수 없다.**
 
-**늦은 관측의 보존은 이미 정해져 있다** — 입력이 append-only이고 같은 `deliveryKey`의
-재전송만 상태를 바꾸지 않으므로 늦게 도착한 과거 관측도 스트림에 남는다.
-**정해지지 않은 것은 그것이 current에 적용되는가**다.
+**늦은 관측은 보존되고, 그것이 current에 실리는지도 따로 고를 것이 아니다.** 보존은 입력이
+append-only이고 같은 `deliveryKey`의 재전송만 상태를 바꾸지 않는 데서 나온다 — 늦게 도착한
+과거 관측도 스트림에 남는다. **적용은 위 fold 규칙이 낸다** — fold가 **필드별**이므로 각
+필드는 **그 필드를 관측한 event 가운데 순서 술어가 마지막에 세우는 것**에서 오고, 늦은
+관측이 나르는 필드를 더 뒤가 관측하지 않았으면 그 필드는 늦은 관측에서 온다.
+**「늦게 왔으니 current를 바꾸지 않는다」를 갈래로 세울 수 없는 것도 여기서 나온다** —
+**필드별로 읽으면 위 규칙과 같은 말이 되고**, **레코드 단위로 읽으면** 늦은 관측만 나르는
+필드가 전달 순서에 따라 남거나 사라져 **위 acceptance scenario를 깬다.** 전달 순서와
+무관하게 레코드 단위로 버리도록 고쳐 읽으면 이번에는 **필드별 fold를 부정한다.**
+**그래서 미결로 남는 것은 순서 술어 자체이고 그 적용이 아니다.**
 
-**순서 술어의 구성과 tie-break, 늦은 관측의 적용은 이 문서가 정하지 않는다** →
+**순서 술어의 구성과 tie-break는 이 문서가 정하지 않는다** →
 **`OPEN-DIC-09`**. **legacy에 답이 없다** — snapshot을 **전달 순서대로 in-place mutate**하고
 순서 키를 읽지 않으며(`app/services/tender_result_persistence.py:25-49`), `observed_at`은
 **nullable**이고(`app/models/pipeline.py:130-144`) 생산자마다 다른 시각을 넣는다 — 개찰 공고
@@ -1620,7 +1627,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | **`OPEN-DIC-06`** | **V2 canonical write 경로가 `Undeclared` provenance를 거부하는가** — 거부한다면 그 경계의 입력 타입은 `FactProvenance`의 진부분집합이다 | — (0C 자체 발견) | **근거가 한쪽으로 서지 않는다.** §5.1의 **둘째 규율**은 `Undeclared`를 **권위로 취급하지 않을** 뿐 **금지하지 않고**, 같은 축의 `vatTreatment`에서 §1.2.1은 *"선언을 만들 수 없으면 `Unknown`"*을 **허용**한다. **어댑터의 의무를 정하는 결정**이므로 이 문서가 정할 자리가 아니다 | §7.1 · §5.1 |
 | **`OPEN-DIC-07`** | **전송 멱등 키와 재관측 키가 각각 무엇으로 이루어지는가** — 무엇이 **한 전송**을 식별하고 무엇이 **같은 사실**을 식별하는가 | **U-3이 fold 재정의만 정했다** | **두 역할을 한 키가 겸할 수 없다는 것**은 모순 제거로 확정되나(§2.2.3) **키의 구성**은 아니다. **U-3은 fold로의 재정의를 정했고 멱등 키의 구성을 정하지 않았다.** `OPEN-SET-04`가 소유한 것은 **재관측의 노출 여부**이지 키의 구성이 아니다 | §2.2.3 |
 | **`OPEN-DIC-08`** | **파생 `Money`와 파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가.** 걸리는 값은 `BidAmount`(기초금액 × 투찰율)와 `AssessmentRate`·`AwardRate`다. **선택지 셋** — ① **아무것도 싣지 않는다.** 되짚기는 그 값을 낸 판정의 `DecisionProvenance`(§4.1: `policyVersion`·`inputSnapshotHash`)로만 하고, 값과 판정이 떨어지면 되짚지 않는 것을 받아들인다 ② **값이 입력 fact의 안정적 참조와 계산 정책 version을 나른다**(참조는 §12.2의 식별자 갈래) ③ **`FactProvenance`에 파생 산출 variant를 더해** 그 안에 ②를 넣는다 | — (Codex 리뷰 라운드 5가 드러냈다) | **운반 범위를 정하는 결정**이다. 저장·전송되는 값에 무엇을 얹을지는 이 문서가 근거로 고를 수 없다 — `v2-지침서.md` §4.1은 `provenance`를 **필수**로만 두고 **파생값이 무엇을 실을지 정하지 않으며**, legacy에는 파생 금액의 provenance 자리 자체가 없다 | §1.2 · §1.4.2 · §5.1 · §12.2 |
-| **`OPEN-DIC-09`** | **fold의 순서 술어 — ① 총순서 키가 무엇으로 이루어지는가 ② 그 키가 같을 때 무엇으로 가르는가 ③ 늦게 도착한 과거 관측이 current에 적용되는가**(보존은 이미 정해졌다 — §2.2.3). **선택지** — 키: ⓐ `observedAt` 단독 ⓑ `observedAt` + 생산자를 가르는 보조 축 ⓒ 관측이 나르는 별도 순번. tie-break: ⓐ 두지 않는다(같은 키의 두 관측은 같은 값이어야 한다) ⓑ 명시 우선순위를 둔다. 늦은 관측: ⓐ 키가 최대면 적용한다 ⓑ 보존만 하고 current를 바꾸지 않는다 | **U-3이 fold 재정의만 정했다** | **정책 결정**이다. **legacy에 답이 없다** — 전달 순서대로 in-place mutate하고 순서 키를 읽지 않으며(`app/services/tender_result_persistence.py:25-49`), `observed_at`이 **nullable**이고(`app/models/pipeline.py:130-144`) 생산자마다 다른 시각을 넣는다(`app/services/tender_result_persistence.py:72-84` · `app/services/opening_result_collection.py:373-380`) | §2.2.3 |
+| **`OPEN-DIC-09`** | **fold의 순서 술어 — ① 총순서 키가 무엇으로 이루어지는가 ② 그 키가 같을 때 무엇으로 가르는가**(늦은 관측의 보존과 적용은 미결이 아니다 — §2.2.3의 **필드별 fold**가 ①이 정해지면 함께 낸다). **선택지** — 키: ⓐ `observedAt` 단독 ⓑ `observedAt` + 생산자를 가르는 보조 축 ⓒ 관측이 나르는 별도 순번. tie-break: ⓐ 두지 않는다(같은 키의 두 관측은 같은 값이어야 한다) ⓑ 명시 우선순위를 둔다 | **U-3이 fold 재정의만 정했다** | **정책 결정**이다. **legacy에 답이 없다** — 전달 순서대로 in-place mutate하고 순서 키를 읽지 않으며(`app/services/tender_result_persistence.py:25-49`), `observed_at`이 **nullable**이고(`app/models/pipeline.py:130-144`) 생산자마다 다른 시각을 넣는다(`app/services/tender_result_persistence.py:72-84` · `app/services/opening_result_collection.py:373-380`) | §2.2.3 |
 | **`OPEN-DIC-10`** | **`RoundingPolicy`의 `mode` 값, 금액 축 밖(집계·리포팅)의 `scaleDigits`, 첫 `effectiveFrom`.** **선택지** — `mode`: ⓐ 사사오입 ⓑ 짝수 자리 반올림 ⓒ 하한 쪽으로는 올림 고정. 금액 축 밖 `scaleDigits`: ⓐ legacy의 자리수를 축별로 승계 ⓑ 축 하나로 통일. | — (Codex 리뷰 라운드 5가 드러냈다) | **값의 결정**이다. 승인 명세가 요구하는 것은 **형태**(`RoundingPolicy`와 version)뿐이고 값을 고를 근거가 이 저장소에 없다. §12.1의 legacy 자리수 가운데 **금액 축의 것은 §1.1 정의 ①이 닫아 V2 미채택**이고, **금액 축 밖의 것은 승계할지 여부부터 이 미결 안에 있다.** **정해진 둘(금액 축의 자리수 · 하한 이상 보장)은 §1.1이 갖는다** | §1.1 · §12.1 · §12.2 |
 
 **활성 `OPEN`은 해소하지 않았다.** 이 문서가 문면에서 마주친 것 — `OPEN-QUAL-05` ·
