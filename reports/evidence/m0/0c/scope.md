@@ -214,7 +214,13 @@ F-4**. 층은 **`legacy-behavior`**이고 `OPEN-REG-05` 귀속이 필요했다. 
 | `OPEN-REG-05` (ledger §9) | 사전 §1.2 | U-1 · U-1b |
 | `OPEN-QUAL-10` (capability-map §12) | 사전 §1.2 | U-2 · U-2b |
 | `OPEN-QUAL-06` (capability-map §12) | 사전 §3.2 | U-5 |
-| `OPEN-QUAL-11` (capability-map §12) | 사전 §3.2 | U-8 |
+
+> **⚠ 정정 (2026-08-30, Codex 3차 high #1)** — 이 표에 **`OPEN-QUAL-11` 행이 있었고 닫는
+> 결정을 U-8로 적었다. 그 귀속이 틀렸다** — `OPEN-QUAL-11`이 묻는 것은 `permsnIndstrytyList`
+> (허용업종)의 **단독 충족인가 결합 충족인가**이고 U-8은 **`lmtGrpNo` 그룹 간 OR / 그룹 내
+> AND**를 정했다. **다른 질문이다.** **그 `OPEN`은 활성으로 되돌아가며 이 slice가 닫지
+> 않는다** — 아래 「이 slice가 닫지 않는 것」이 그것을 든다. 정정의 전문은 **사전 §11**이
+> 갖는다. **U-8 자체는 유효하고 사전 §3.2.2가 소유한다.**
 
 **등재는 사전 안에서만 한다.** `capability-map.md` §12와 `regression-ledger.md` §9의
 **행 자체는 고치지 않는다**(out_of_scope) — 중앙 registry 통합은 별도 slice의 몫이고
@@ -224,6 +230,8 @@ ledger §10.3이 그렇게 인계했다.
 
 - **활성 `OPEN` 전부.** 특히 사전이 문면에서 마주치는 것들 — `OPEN-QUAL-05`(면허 유효기간,
   U-7이 **알려진 제한**으로 돌렸다) · `OPEN-QUAL-09`(시공능력 미달 처리) ·
+  `OPEN-QUAL-11`(허용업종의 단독/결합 충족 — **위 ⚠ 정정으로 되돌아온 것**이며 운영자
+  판정 2026-08-30이 **M1 1C의 관측**으로 넘겼다) ·
   `OPEN-ML-05`(정책 값 경계) · `OPEN-SET-04`(재관측 노출) · `OPEN-SET-05`(재공고 대사 대상
   선택 규칙) · `OPEN-SET-06`(embargo 임계) · `OPEN-SET-10`(시간축 대체 출처) ·
   `OPEN-DEC-07`(마진 재유도) · `OPEN-DEC-10`(예규 구간별 차등) · `OPEN-NUM-01`/`OPEN-REG-04`
