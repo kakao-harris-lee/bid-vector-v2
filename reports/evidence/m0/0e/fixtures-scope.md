@@ -37,19 +37,33 @@ acceptance** 뿐이라 `data-extract.md` §1의 세 층(`authoritative`·`observ
 실패"*). **case 는 지우지 않았다** — 되돌림 경로는 `manifest.yaml` 의
 `classification_policy.insufficient_evidence` 와 `next_steps` 가 적는다.
 
+**같은 날 `source.kind` 자신을 전수 재판정했다.** 그 결정의 첫 적용은 이미 `m0-derived-rule`
+이던 자리만 내렸고 **`source.kind` 를 하나도 바꾸지 않았다** — 근거가 실제로는 M0 자체 도출인데
+`kind` 가 `operator-decision`·`official-doc`·`approved-spec` 으로 적힌 자리가 남았다.
+**`operator-decision` 전건의 결정 문면을 원문으로 열어 대조**하고 `approved-spec`·`official-doc`
+도 같은 눈으로 훑었다. 판정 축 셋(**한정어를 지웠는가 · 결정이 축만 정하는가 · 인용한 결정이
+실재·해소됐는가**)과 적용 기준(case 가 선언한 `verifies` 를 대상으로 한다)은
+`classification_policy.insufficient_evidence` 가 적는다. **활성 `OPEN` 을 결정처럼 인용한 자리는
+없었다** — 인용된 결정 id 열넷을 활성 목록(`commands.md` **C-3** 이 세는 그 집합)과 대조해 전부
+해소 상태임을 확인했다.
+
 **셈을 여기 옮겨 적지 않는다** — case 수 · **분류별 분포** · `source.kind` 분포와 그 교차 ·
 `uncovered_axes`/`insufficient_evidence`/`access_approval_required` 수는 전부 **F-7** 이 낸다.
 도메인별 건수도 같은 명령이 낸다(분류를 섞지 않으려면 `kind x class` 줄을 함께 본다).
 
 ## `milestone-1.md:12`("검증 fixture 중 `authoritative` case 준비")를 어디까지 만족하는가
 
-**부분 만족이고, 2026-08-31 결정으로 만족도가 내려갔다.** `authoritative` 로 서는 case 수가
-줄었고(F-7 의 `classification` 줄), 그만큼 `data-extract.md` §4의 도메인별 최소 corpus 를 덮는
-몫이 작아졌다. **내려간 12건이 덮던 축은 사라진 것이 아니라 `uncovered_axes` 로 옮겨졌다** —
-`floor-applicability`(하한 적용 범위·시행일) · `koneps-collection`(필드 계약 강제, 코드·라벨 분리) ·
-`ml-boundary`(결측 provenance, 누수 차단 시그니처) · `license`(허용업종 단독 보유의 임시 처리)
-넷이 그 자리를 받는다. 원래 막혀 있던 축은 그대로 남는다. 그 목록을 비우지 않고 그럴듯하게
-채우지도 않았다.
+**부분 만족이고, 2026-08-31 결정과 그날의 전수 재판정으로 만족도가 두 번 내려갔다.**
+`authoritative` 로 서는 case 수가 줄었고(F-7 의 `classification` 줄), 그만큼 `data-extract.md`
+§4의 도메인별 최소 corpus 를 덮는 몫이 작아졌다. **내려간 case 가 덮던 축은 사라진 것이 아니라
+`uncovered_axes` 로 옮겨졌다** — 첫 적용이 만든 넷은 `floor-applicability`(하한 적용 범위·시행일) ·
+`koneps-collection`(필드 계약 강제, 코드·라벨 분리) · `ml-boundary`(결측 provenance, 누수 차단
+시그니처) · `license`(허용업종 단독 보유의 임시 처리)이고, **전수 재판정이 셋을 더했다** —
+`capacity-gate`(금액 capacity 게이트의 무조건 acceptance) · `license`(판정의 「동반 산출」과 요건
+provenance) · `money-basis`(`Unknown` 과세 금액의 산술 비교 차단). **재판정은 앞선 넷 중 둘의
+「덮개」 서술도 뒤집었다** — `floor-applicability` 와 `koneps-collection` 은 그 축에 `authoritative`
+로 남는 case 가 있다고 적었으나 **둘 다 전건 내려갔다.** 원래 막혀 있던 축은 그대로 남는다.
+그 목록을 비우지 않고 그럴듯하게 채우지도 않았다. **수는 여기 박지 않는다 — F-7 이 낸다.**
 
 **§6 이 이 상태에 완료 gate 실패를 건다.** 그러므로 `milestone-1.md:12` 는 **이 결정이 되돌려지기
 전에는 이 corpus 만으로 충족되지 않는다** — 되돌림은 운영자가 그 acceptance 들을 업무 규칙으로
@@ -85,6 +99,10 @@ case 의 `review.approved_by_user`가 `false`, `review.codex_verdict`가 `pendin
    `source.kind: m0-derived-rule`이 그 자리를 표시하고 근거·되돌림 경로는 `manifest.yaml`의
    `classification_policy.insufficient_evidence`가 적는다. 어느 case 가 드는지와 그 대응이
    전건인지는 **F-7**의 `kind x class` 줄이 낸다.
+   **같은 날의 전수 재판정이 이 목록을 늘렸다** — 결정 문면을 원문으로 열어 보니 `kind` 가
+   `operator-decision`·`official-doc`·`approved-spec` 이면서 실제 근거는 M0 자체 도출인 자리가
+   있었고, 그 case 들의 `source.kind` 를 내리고 `classification` 을 따라 내렸다. 각 case 의
+   `change_history` 가 어느 축(한정어 삭제 / 결정이 축만 정함)에 걸렸는지와 실제 근거를 적는다.
 8. **`insufficient-evidence` 라는 이름이 `manifest.yaml` 안에서 두 자리에 쓰인다.** case 의
    `classification` 값과, **fixture 가 아예 없는 후보** 목록(`insufficient_evidence`)이다.
    둘 다 §6의 어휘를 빌리지만 앞은 `cases` 의 셈에 들고 뒤는 들지 않는다 — manifest 의 그

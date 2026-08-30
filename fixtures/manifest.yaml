@@ -31,8 +31,8 @@
 #      **운영자는 2026-08-30 「M0 승인」을 냈으나**(`milestone-0.md`의 「사용자 명시 승인」)
 #      그 기록이 덮는 것은 활성 `OPEN`의 이월 · **그날의** fixture 미덮개 축 · 부분 만족인 채로 M1
 #      진입이고, **개별 case 의 기대값 비준은 그 안에 없다.** 같은 기록이 0E의 Codex `approve`도 승인
-#      밖으로 둔다. **2026-08-31 결정이 더한 미덮개 축 넷은 그 기록보다 뒤라 그 안에 들지 않는다** —
-#      수는 여기 박지 않고 **F-7** 이 낸다.
+#      밖으로 둔다. **2026-08-31 결정과 그날의 전수 재판정이 더한 미덮개 축은 그 기록보다 뒤라 그 안에
+#      들지 않는다** — 수는 여기 박지 않고 **F-7** 이 낸다.
 #
 # 덮지 못한 축은 숨기지 않는다 — `uncovered_axes`가 전부 적고 소유 `OPEN`을 단다.
 
@@ -131,6 +131,23 @@ classification_policy:
 
     **legacy 를 정답으로 올린 것과는 다른 축이다** — 이 근거들은 legacy 가 낸 **출력**이 아니라
     M0 조사가 legacy 형태를 읽고 세운 **V2 설계 요구**다. `legacy-behavior` 층은 여전히 0건이다.
+
+    **2026-08-31 전수 재판정 — `source.kind` 자신이 재판정 대상이었다.** 앞선 라운드는 이미
+    `m0-derived-rule` 이던 자리만 내렸고 **`source.kind` 를 하나도 바꾸지 않았다.** 그래서 근거가
+    실제로는 M0 산출 문서의 자체 도출인데 `kind` 가 `operator-decision`·`official-doc`·`approved-spec`
+    으로 적힌 자리가 남았다. 이 라운드가 **`operator-decision` 전건의 결정 문면을 원문으로 열어
+    대조**하고 `approved-spec`·`official-doc` 도 같은 눈으로 훑었다. 판정 축 셋 —
+    **① 한정어를 지웠는가**(결정이 좁게 말한 것을 case 가 넓게 인용) **② 결정이 축만 정하는가**
+    (결정은 「무엇을 어느 축에 넣는다」까지이고 기대값은 다른 데서 온다) **③ 인용한 결정이
+    실재·해소됐는가**(활성 `OPEN` 을 결정처럼 인용하지 않았는가).
+
+    **적용 기준을 명시한다** — 판정은 case 가 선언한 **`verifies`(§7 「한 case 는 한 의미만
+    검증한다」의 그 의미)** 를 대상으로 한다. `verifies` 가 주장하는 것 중 하나라도 ①②③ 어느
+    문면으로도 나오지 않으면 내린다. 반대로 expected JSON 이 스키마로 나르기만 하고 `verifies` 가
+    주장하지 않는 필드(예: 면허 축의 `unparsableRowCount`·`requirementSourceFields`, 공통
+    `policyVersion`)는 그 자체로 내리는 사유가 아니다 — **그 필드들의 근거는 `data-dictionary.md`
+    §3.2.1 「동반 산출」과 `capability-map.md` QUAL-03 acceptance 이며 M0 자체 도출이다. 이 corpus 는
+    그것을 case 의 주 규칙으로 세우지 않는다.** 세운 자리는 내렸다.
 
     **어느 case 가 여기 드는지는 이 산문이 세지 않는다** — `source.kind`가 표시하고
     `reports/evidence/m0/0e/fixtures-commands.md` **F-7**이 센다.
@@ -522,11 +539,11 @@ cases:
       approved_by_user: false
   - id: money-basis-005
     domain: money-basis
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         과세 처리가 `Unknown`인 금액은 다른 과세 처리의 금액과 산술 비교에 들어갈 수 없다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           U-1b (reports/evidence/m0/0c/decisions-2026-08-28.md) · data-dictionary.md §1.2.1
     expected_reasoning: |-
@@ -548,7 +565,29 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 77a4079b0b832116df68dd9e552b015fe499a110204755f883c48ae022a98a29
     expected_sha256: 3c8516bd2261103c32916fb66dc0987a284ad493efd9ffdb5698f07214c6ec71
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다)**.
+
+          `U-1b` 문면은 **기초금액의 과세 처리**(부가세 포함)라는 **정의**만 확정하고, 그 하류 인계도
+          *"0C 사전은 `vatTreatment` sealed 를 두되 정의상 기본값과 저장 값의 실측을 구별하라"*까지다.
+          이 case 가 재는 **「`Unknown` 금액은 다른 과세 처리의 금액과 산술 비교에 들어갈 수 없다」**는
+          `data-dictionary.md` §1.2.1 이 스스로 세운 타입 차단 규칙이다. `v2-지침서.md` §4.1 의 거부 규칙은
+          `unit/basis/provenance` 를 열거하고 `vatTreatment` 를 들지 않는다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -591,11 +630,11 @@ cases:
       approved_by_user: false
   - id: license-001
     domain: license
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         그룹 내 모든 면허를 보유하면 `Eligible`. 판정 결과에 policy version과 요건 소스 집합이 함께 남는다.
     source:
-      kind: official-doc
+      kind: m0-derived-rule
       reference: |-
           조달청 OpenAPI 참고자료(나라장터 입찰공고정보서비스 1.2) — 형제 필드 `indstrytyMfrcFldList`의 결합 표기 명문 규칙 + 운영자 결정
           2026-08-26 (`OPEN-QUAL-01` 해소, capability-map.md §12.2 · QUAL-03)
@@ -628,7 +667,29 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 2b9e2628bcdd301b1d8d6e2f9d7a58519a6f595e6aa0a493d141b3d49afdff70
     expected_sha256: be9f21c1be15a814502d53c229e286e5649077df888d8f0b08f72ef46d2b494c
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `official-doc` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다) — `official-doc` 자리에서 발견**.
+
+          조달청 OpenAPI 참고자료의 형제 필드 결합 규칙과 `OPEN-QUAL-01` 이 **그룹 내 AND → `Eligible`**
+          까지는 떠받친다. 그러나 이 case 는 **「판정 결과에 policy version 과 요건 소스 집합이 함께
+          남는다」**를 함께 재고, 그 두 문장은 `capability-map.md` QUAL-03 의 **「결정 무관(무조건)」
+          acceptance** — 그 문서가 스스로 쓴 문장 — 에만 있다. `v2-지침서.md` §4.2 는 versioned policy
+          data 로 **관리**하라고만 하고 「결과에 남는다」를 말하지 않는다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -771,14 +832,20 @@ cases:
     verifies: |-
         `lmtGrpNo` 결측 행 2개는 단일 그룹 AND로 폴딩된다 — OR로 흩지 않는다. 하나만 보유하므로 `Ineligible`.
     source:
-      kind: official-doc
+      kind: operator-decision
       reference: |-
-          조달청 OpenAPI 참고자료(나라장터 입찰공고정보서비스 1.2) — 형제 필드 `indstrytyMfrcFldList`의 결합 표기 명문 규칙 + 운영자 결정
+          **U-8** — 운영자 결정 2026-08-28 (`reports/evidence/m0/0c/decisions-2026-08-28.md` §U-8):
+          *"`lmtGrpNo` 결측 행을 하나의 그룹으로 묶어 AND로 해석하는 legacy의 보수적 처리도 함께 확정한다"*.
+          **조달청 문서는 이 축을 말하지 않는다** — `capability-map.md` QUAL-03 이 *"그 문서가 `lmtGrpNo`
+          **자신의** 결합 규칙을 축어적으로 서술하지는 않는다"*로 그 간극을 적는다. 그래서 001~004 와 달리 이
+          case 의 `kind` 는 `official-doc` 이 아니다. 그룹 의미론 자체의 근거는 조달청 OpenAPI 참고자료(나라장터
+          입찰공고정보서비스 1.2)의 형제 필드 `indstrytyMfrcFldList` 결합 표기 명문 규칙 + 운영자 결정
           2026-08-26 (`OPEN-QUAL-01` 해소, capability-map.md §12.2 · QUAL-03)
     expected_reasoning: |-
       data-dictionary.md §3.2.2 *"그룹 간 OR · 그룹 내 AND. `lmtGrpNo` 결측 행은 하나의 그룹으로 묶어 AND로 해석한다"* — 층
-      `authoritative`(운영자 결정 + 조달청 문서). capability-map.md QUAL-03 결정 무관(무조건) acceptance가 같은 판정을 관측 가능한
-      형태로 적는다.
+      `authoritative`(운영자 결정 + 조달청 문서). **결측 행 폴딩을 떠받치는 것은 운영자 결정 U-8 이다** — 같은 절이
+      *"운영자 결정으로 그 가정이 확정되므로 0C는 이것을 명세로 올린다 — `legacy-behavior`가 아니라 `authoritative`다"*라
+      적는다. capability-map.md QUAL-03 결정 무관(무조건) acceptance가 같은 판정을 관측 가능한 형태로 적는다.
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -897,11 +964,11 @@ cases:
       approved_by_user: false
   - id: license-008
     domain: license
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         요건 행 파싱 실패는 `Uncertain(RequirementUnparsable)`이며 파싱 실패 행 수가 동반 산출된다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           U-5 · data-dictionary.md §3.2.1·§3.2.3
     expected_reasoning: |-
@@ -934,7 +1001,27 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: c633f0554b952c9160cf6d2b4d4f64a68786380b7d08ff10a582050e2eec4553
     expected_sha256: 1038490f1bf125916f94f48ab10fef0d95e0da96d156da3f2932271dd4203e54
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다)**.
+
+          `U-5` 는 `UncertainReason` **네 값**만 확정한다 — `RequirementUnparsable` 판정까지는 그것이
+          떠받친다. 그러나 이 case 는 **「파싱 실패 행 수가 동반 산출된다」**를 함께 재고, 그 요구는
+          `data-dictionary.md` §3.2.1 의 **「동반 산출」 자체 I/O 계약**에만 있다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -984,11 +1071,11 @@ cases:
       approved_by_user: false
   - id: license-010
     domain: license
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         `permsnIndstrytyList`에만 표현된 요건이 판정에서 누락되지 않고, 어느 필드에서 온 요건인지가 결과에 남는다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           OPEN-QUAL-02 해소 (운영자 결정 2026-08-26, capability-map.md QUAL-03)
     expected_reasoning: |-
@@ -1013,7 +1100,27 @@ cases:
     expected_sha256: 953cc9957354a69b43ecfc7dbb73133e30f2c3bf3c5be88665b8a74c5022f920
     not_covered: |-
       허용업종 단독 보유의 결합 규칙 — `OPEN-QUAL-11`. 011이 그 자리의 임시 처리다.
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다)**.
+
+          `OPEN-QUAL-02` 문면은 *"(b) `permsnIndstrytyList` 를 자격 경로로 **포함**한다"* **뿐**이고
+          「누락되지 않는다」까지는 그것이 떠받친다. 그러나 이 case 는 **「어느 필드에서 온 요건인지가
+          판정 결과에 남는다」**를 함께 재고, 그 문장은 `capability-map.md` QUAL-03 의 **자체 acceptance** 다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -1111,11 +1218,11 @@ cases:
       approved_by_user: false
   - id: capacity-gate-001
     domain: capacity-gate
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         운영자 보유액 미입력은 `0`이나 「미달」로 접히지 않고 사유 있는 `Uncertain`이다 — `Absent`가 1급 상태다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           OPEN-QUAL-08 분할 확정 (운영자 결정 2026-08-26) · capability-map.md QUAL-11 결정 무관(무조건) acceptance
     expected_reasoning: |-
@@ -1146,18 +1253,38 @@ cases:
     expected_sha256: 55af7bcccc3301504b2ec9e645b7186264b585f640c7f2febee11908ca050662
     not_covered: |-
       요건 값과의 실제 비교 — `OPEN-QUAL-10`(게시 요건의 unit·과세·기준 시점) 및 `cnstrtnAbltyEvlAmtList` 수집 신설(M1 이후)
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다)**.
+
+          `OPEN-QUAL-08` 문면은 **분할 확정**(시공능력평가액 = 자격 축 / 도급한도·연매출·`capacity_score`
+          = 적합도 축)**뿐**이다. 기대값은 `capability-map.md` QUAL-11 의 「결정 무관(무조건)」 acceptance —
+          그 문서가 스스로 쓴 acceptance — 에서 온다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: capacity-gate-002
     domain: capacity-gate
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         명시 신고된 `0`원 보유액은 `Known(0원)`이며 미입력(001)과 다른 상태다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           OPEN-QUAL-08 분할 확정 (운영자 결정 2026-08-26) · capability-map.md QUAL-11 결정 무관(무조건) acceptance
     expected_reasoning: |-
@@ -1179,18 +1306,37 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 1e2adef296008a675f39b4cc6aaca3198ad0c0845497955532f4b0da3f936e17
     expected_sha256: 6d1d9687bfb4c0a6b2ea941b07ca048e108e9dc957bf8a913df0ac43a469d6f8
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다)**.
+
+          `OPEN-QUAL-08` 문면은 **분할 확정뿐**이다. 「명시 `0` = `Known(0원)` ≠ 미입력」은
+          `capability-map.md` QUAL-11 acceptance 와 `data-dictionary.md` §1.3 이 스스로 세운 규칙이다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: capacity-gate-003
     domain: capacity-gate
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         도급한도·연매출로 인한 판정은 자격 어휘로 산출되지 않는다 — 도급한도가 낮다는 이유로 공고가 `Ineligible`이 되지 않는다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           OPEN-QUAL-08 분할 확정 (운영자 결정 2026-08-26) · capability-map.md QUAL-11 결정 무관(무조건) acceptance
     expected_reasoning: |-
@@ -1214,18 +1360,37 @@ cases:
     expected_sha256: 8eaad4f0c1d1605e9151e5ec9cb9834c87414b30acb6511e35053320003edd9e
     not_covered: |-
       적합도 점수의 값 — `capacity_score` 추측 정규화는 `폐기`이고 대체 산식이 없다
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다)**.
+
+          `OPEN-QUAL-08` 문면은 **분할 확정뿐**이다. 「도급한도가 낮다는 이유로 `Ineligible` 이 되지 않는다」는
+          `capability-map.md` QUAL-11 의 자체 acceptance 문면이다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: capacity-gate-004
     domain: capacity-gate
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         공고에 시공능력평가금액 요건이 없으면 이 축은 중립이며 다른 자격 축의 판정을 바꾸지 않는다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           OPEN-QUAL-08 분할 확정 (운영자 결정 2026-08-26) · capability-map.md QUAL-11 결정 무관(무조건) acceptance
     expected_reasoning: |-
@@ -1247,7 +1412,26 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 638bb63d30a0b99cb361ae86ddf4c6b759aa4a964f7c69c72a9be0ac25549718
     expected_sha256: 33266a106b4941021c237f4a075f2bba4c0e9e31c2216e272e3577312f038493
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다)**.
+
+          `OPEN-QUAL-08` 문면은 **분할 확정뿐**이다. 「요건이 없으면 이 축은 중립」은 `capability-map.md`
+          QUAL-11 의 자체 acceptance 문면이다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -1440,7 +1624,9 @@ cases:
     source:
       kind: operator-decision
       reference: |-
-          OPEN-DEC-01 해소 (운영자 결정 2026-08-26) · capability-map.md DEC-04 · v2-지침서.md §4.4
+          OPEN-DEC-01 해소 (운영자 결정 2026-08-26) · **OPEN-DEC-06 해소 (운영자 결정 2026-08-26 — `biasDirection`
+          을 구조화 필드로 노출한다. expected 의 `biasDirection` 자리가 이 결정에서 온다)** ·
+          capability-map.md DEC-04 · v2-지침서.md §4.4
     expected_reasoning: |-
       capability-map.md DEC-04 확정 (운영자 결정 2026-08-26, `OPEN-DEC-01` 해소) — 최소 표본 수 **150**을 유지하고 근거를
       「통계적 편의」로 명시 승인하며 **정책 데이터로 외부화**한다. data-dictionary.md §12.1이 `150`을 **`authoritative`** 층으로
@@ -1665,11 +1851,11 @@ cases:
       approved_by_user: false
   - id: floor-applicability-001
     domain: floor-applicability
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         지자체 공고는 국가계약 하한으로 조용히 판정되지 않고 **관측 가능한 미적용 상태**(`OutOfScope`)로 산출된다 — 선언과 실행이 일치한다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           OPEN-DEC-09 해소 (운영자 결정 2026-08-26) · capability-map.md DEC-03 · data-dictionary.md §3.5
     expected_reasoning: |-
@@ -1700,7 +1886,28 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 2bf838d86682a0689bf4812f3f1adda1a939e3ae8f3bfd9c2f0d806936694973
     expected_sha256: e938d8e5982c013a8d5b60782d0214b02a38b0a3549613e854c7f1a10a495a3b
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다)**.
+
+          `OPEN-DEC-09` 의 **운영자 답은 *"지자체 공고에 투찰하지 않는다"*(2026-08-26) 한 줄**이고 그것이
+          정하는 것은 **범위 밖**까지다. 이 case 가 재는 **「조용히 판정하지 않고 관측 가능한 미적용 상태로
+          산출한다」**는 같은 결정 기록의 **「필수 단서」** 항목이며 **운영자 발화가 아니라 M0 분석의 도출**이다
+          (`reports/evidence/m0/0a2/decisions.md` 의 `OPEN-DEC-09` 절이 운영자 답과 단서를 따로 적는다).
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -2036,13 +2243,15 @@ cases:
       approved_by_user: false
   - id: koneps-collection-003
     domain: koneps-collection
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         optional 필드의 **명시적 null**은 `Absent`이며 `0`이 아니다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          OPEN-ML-04 (부재를 `0`으로 적재하지 않는다) · data-dictionary.md §1.3
+          OPEN-ML-04 (문면은 **「미정산」을 `0`으로 적재하지 않는다** — 정산 축 한정이며 이 case 의 금액 축을
+          덮지 않는다) · **실제 근거는 data-dictionary.md §1.3 의 광의 「부재 금지 규칙」이고 그것은 그 문서의
+          자체 도출이다**(*"0C가 도출하는 것은 그 금지가 적용되는 컬럼 집합"* · *"정산 축만으로 좁히지 않는다"*)
     expected_reasoning: |-
       data-dictionary.md §1.3 부재 금지 규칙 — *"도메인 값을 나르는 필드는 부재를 값으로 표현할 수 없다 … 부재는 `Absent(reason)` 또는
       `Unmeasurable(reason)`으로만 표현한다"* + §1.1 *"`0`은 '0원'이지 '모름'이 아니다"*. 004가 이 case의 쌍이다.
@@ -2070,21 +2279,44 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 1eee2e90c676377ea3bdcb8261693824c69b09372e7ac5b140049d6e2f7ca7a1
     expected_sha256: 96403e77df23cee01254e961b0651c3ebe9a33065faa2d95f53296c3c8f5dd6d
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 1 (한정어를 지웠다)**.
+
+          `OPEN-ML-04` 문면은 *"**「미정산」**을 `0` 으로 적재하지 않는다"* 로 **정산 축에 한정**된다.
+          이 case 가 재는 것은 `presmptPrce`(추정가격, **금액 축**)의 명시적 null → `Absent` 이고,
+          그것을 떠받치는 넓은 **부재 금지 규칙**은 `data-dictionary.md` §1.3 이 *"0C가 도출하는 것은 그
+          금지가 적용되는 컬럼 집합"* · *"정산 축만으로 좁히지 않는다"* 로 **스스로 넓혔음을 밝히는** 규칙이다.
+          `source.reference` 에서 지워졌던 **「미정산」 한정어를 원문대로 복원**했다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: koneps-collection-004
     domain: koneps-collection
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         optional 필드의 **키 부재**도 `Absent`이며 `0`이 아니다. 003과 함께 `Absent` ≠ `0`을 고정하고, 두 부재가 payload 등장 여부로
         구별된다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          OPEN-ML-04 · data-dictionary.md §1.3 · §5.3
+          OPEN-ML-04 (문면은 **「미정산」** 한정이다 — 003 과 같다) · **실제 근거는 data-dictionary.md §1.3 의
+          광의 「부재 금지 규칙」(자체 도출) 과 §5.3 의 `KonepsFieldContract.presentIn` 이다**
     expected_reasoning: |-
       003과 같다. 등장 여부는 data-dictionary.md §5.3의 `KonepsFieldContract.presentIn`이 나른다.
     legacy_reference:
@@ -2111,7 +2343,26 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 266c62e4b998b864b62a629c587abb25a23520e425235c37a95cece865052a00
     expected_sha256: 8353cc69dd9a7599af86bacadc16f85b52fa9542c0c1fbf1c3e1607dc8a491d6
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 1 (한정어를 지웠다)**.
+
+          003 과 같다 — `OPEN-ML-04` 의 「미정산」 한정어를 지운 채 인용했고, 실제 근거는
+          `data-dictionary.md` §1.3 의 자체 도출 규칙과 §5.3 의 `presentIn` 이다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -2268,12 +2519,12 @@ cases:
       approved_by_user: false
   - id: koneps-collection-008
     domain: koneps-collection
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         점유 가드 — 권위 없는 유입이 이미 있는 값을 덮지 않고 빈 자리만 채운다. **유입값은 대상 자리의 basis 로
         다시 표기되지 않는다** — 예산 키 유입은 자기 basis(`ALLOCATED_BUDGET`)와 과세(`UNKNOWN`)를 그대로 지고 기록된다.
     source:
-      kind: approved-spec
+      kind: m0-derived-rule
       reference: |-
           data-dictionary.md §5.1 계승 규율 1 · §1.2(배정예산 = `AllocatedBudget`, basis 배정예산, 과세 `Unknown`) ·
           §1.2.1(정의상 기본값 자동 태깅 금지) · v2-지침서.md §4.1(provenance 필수 · 원시 숫자 상호 대입 금지)
@@ -2331,18 +2582,40 @@ cases:
           (병행 레인 소유이므로 이 slice 가 손대지 않는다).
         previous_sha256: f7a7fe706a4ffff414c56d31172f177dc46e43462fdd982ae77d203d5867ee1c
         previous_expected_sha256: b60454b4e929a8f76322804dec6d7b328973eb7eefea83c399d7f65000ff1913
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `approved-spec` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다) — `approved-spec` 자리에서 발견**.
+
+          `v2-지침서.md` §4.1 이 떠받치는 것은 **`provenance` 필수**와 **원시 숫자 상호 대입 금지**까지이고,
+          그 절반(유입값이 대상 자리의 basis 로 다시 표기되지 않는다)은 승인 명세가 준다. 그러나 이 case 의
+          **주 규칙인 「점유 가드」**(*"권위값만 저장값을 덮는다 … 나머지와 미신고는 빈 자리만 채운다"* ·
+          `isAuthoritative` 를 술어가 아니라 데이터로 선언)는 `data-dictionary.md` §5.1 이 legacy 코드에서
+          도출해 **「계승할 규율」**로 세운 자체 규칙이다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: koneps-collection-009
     domain: koneps-collection
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         derived fact가 canonical fact의 자리를 차지하지 않는다 — 기초금액 자리를 예산 키로 채운 결과는 직접 게시값과
         **타입이 다르고**, 그 값은 **자기 basis(`ALLOCATED_BUDGET`)와 과세(`UNKNOWN`)를 그대로 진다**.
     source:
-      kind: approved-spec
+      kind: m0-derived-rule
       reference: |-
           data-dictionary.md §5.2 규칙 · §1.2(배정예산 = `AllocatedBudget`, basis 배정예산, 과세 `Unknown`) ·
           §1.2.1(정의상 기본값 자동 태깅 금지 · `Unknown` 금액의 산술 비교 차단) · §5.1(`FilledFromBudgetKey`) ·
@@ -2409,6 +2682,26 @@ cases:
           않았다(병행 레인 소유이므로 이 slice 가 손대지 않는다).
         previous_sha256: 5b2a1d3edf412d203974461ed6d858e387706a80bf35b42794a6a67aecd90afa
         previous_expected_sha256: 35b69bbdec59a8199d35478d291ad37d3f68bffa4a995e92957d202fc16f0b2a
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `approved-spec` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
+          동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
+          이 case 가 걸린 축: **축 2 (결정이 축만 정한다) — `approved-spec` 자리에서 발견**.
+
+          008 과 같은 자리다. `v2-지침서.md` §4.1 이 떠받치는 것은 폴백된 값이 자기 basis·과세를 그대로
+          진다는 데까지다. 이 case 의 **주 규칙인 「derived fact 가 canonical fact 의 자리를 차지할 수 없다 —
+          자리가 같아야 한다면 타입이 달라야 한다」**는 `data-dictionary.md` §5.2 의 자체 규칙이다.
+
+          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
+          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
+          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
+          `classification_policy.insufficient_evidence` 가 적는다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -3066,7 +3359,12 @@ uncovered_axes:
       - "OPEN-QUAL-10 (활성) — 게시 요건 축의 unit·과세·기준 시점"
       - "OPEN-QUAL-09 (활성) — 미달의 처리"
       - "OPEN-DIC-02 (활성) — 시공능력평가액 공시의 갱신 주기가 역년 경계인가"
-    what_is_covered_instead: "`capacity-gate-001`~`004`가 무조건 acceptance 넷(미입력 ≠ 0, 요건 없음 중립, 도급한도는 자격 어휘 아님)을 고정한다."
+    what_is_covered_instead: |-
+      `capacity-gate-001`~`004`가 무조건 acceptance 넷(미입력 ≠ 0, 요건 없음 중립, 도급한도는 자격
+      어휘 아님)을 고정한다. **⚠ 넷 다 2026-08-31 전수 재판정으로 `insufficient-evidence` 다** —
+      `OPEN-QUAL-08` 문면이 **분할 확정뿐**이고 그 acceptance 넷은 `capability-map.md` QUAL-11 의
+      자체 도출이다. 이 「덮개」는 `authoritative` corpus 의 덮개가 아니며, 그 축은 아래
+      「승인 부재로 authoritative 덮개를 잃은 축 — capacity-gate」가 받는다.
     unblocks_when: M1 이후 수집 신설 + OPEN-QUAL-09/10 결정.
 
   - axis: KONEPS — rate limit · timeout · partial page · out-of-order · 중복/수정 이벤트
@@ -3110,7 +3408,10 @@ uncovered_axes:
       참조하는 도메인 개념만 정의한다"*로 소유를 M2에 둔다. **그 계약이 아직 없다.**
     owning_open:
       - "(소유 OPEN 없음) — M2 계약 slice 의 산출물 대기"
-    what_is_covered_instead: "`ml-boundary-001`~`004`가 **경계**(업무 판정은 Kotlin, 결측 사유, 누수 차단 시그니처)만 고정한다."
+    what_is_covered_instead: |-
+      `ml-boundary-001`~`004`가 **경계**(업무 판정은 Kotlin, 결측 사유, 누수 차단 시그니처)만
+      고정한다. **⚠ `-003`·`-004`는 `insufficient-evidence` 다** — `authoritative` 로 남는 것은
+      `v2-지침서.md` §3.2 가 직접 떠받치는 `-001`·`-002`의 판정 경계뿐이다.
     unblocks_when: M2 gRPC 피처 계약이 작성된다.
 
   - axis: "`SkipReason` 어휘의 전수성"
@@ -3151,8 +3452,9 @@ uncovered_axes:
     unblocks_when: 정산 축 slice.
 
   # ---------------------------------------------------------------------------
-  # 아래 넷은 2026-08-31 결정(`m0-derived-rule` → `insufficient-evidence`)이 만든 자리다.
-  # **case 는 지우지 않았다** — `authoritative` corpus 의 덮개에서만 빠진다.
+  # 아래는 2026-08-31 결정(`m0-derived-rule` → `insufficient-evidence`)과 **같은 날의 전수
+  # 재판정**(`operator-decision` 28건의 결정 문면 원문 대조 + `approved-spec`·`official-doc` 훑기)이
+  # 만든 자리다. **case 는 지우지 않았다** — `authoritative` corpus 의 덮개에서만 빠진다.
   # 어느 case 가 어느 축에 걸리는지는 `source.kind`가 표시하고 **F-7**이 센다.
   # ---------------------------------------------------------------------------
 
@@ -3166,11 +3468,17 @@ uncovered_axes:
     owning_open:
       - "소유 `OPEN` 없음 — 막는 것은 미결이 아니라 **운영자 승인 부재**다"
     what_is_covered_instead: |-
-      `floor-applicability-001`만 `authoritative` 로 남는다 — 「지자체 공고가 국가계약 하한으로 조용히
-      판정되지 않고 관측 가능한 `OutOfScope` 로 산출된다」. **그 case 의 근거는 DEC-03 의 운영자 결정
-      그 자체**(지방계약 범위)라 이 축에 들지 않는다. 나머지 셋(`-002`·`-003`/`-004`·`-005`)은
+      **없다 — 2026-08-31 전수 재판정으로 `floor-applicability-001`도 내려갔다.** 앞선 라운드는 그
+      case 의 근거를 *"DEC-03 의 운영자 결정 그 자체"*로 적었으나 **결정 문면을 원문으로 열어 보니
+      운영자 답은 *"지자체 공고에 투찰하지 않는다"*(2026-08-26) 한 줄**이고 그것이 정하는 것은
+      **범위 밖**까지다. 그 case 가 재는 **「조용히 판정하지 않고 관측 가능한 미적용 상태로 산출한다」**는
+      같은 결정 기록의 **「필수 단서」** 항목이며 **운영자 발화가 아니라 M0 분석의 도출**이다
+      (`reports/evidence/m0/0a2/decisions.md` 의 `OPEN-DEC-09` 절이 운영자 답과 단서를 따로 적는다).
+      **이 도메인은 `authoritative` corpus 에서 전건 덮이지 않는다.** 다섯 case 전부
       `insufficient-evidence` 로 남아 있고 지워지지 않았다.
-    unblocks_when: 운영자가 DEC-03 acceptance 와 §1.4.2 를 업무 규칙으로 명시 승인한다.
+    unblocks_when: |-
+      운영자가 DEC-03 acceptance · §1.4.2 · **`OPEN-DEC-09` 의 「필수 단서」**(실행되는 미적용 상태)를
+      업무 규칙으로 명시 승인한다.
 
   - axis: 승인 부재로 authoritative 덮개를 잃은 축 — KONEPS 필드 계약 강제와 코드·라벨 분리
     domain: koneps-collection
@@ -3184,10 +3492,20 @@ uncovered_axes:
       - "(코드 체계 내용) OPEN-COL-03 (활성)"
       - "(acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**"
     what_is_covered_instead: |-
-      `koneps-collection-003`·`004`(`Absent` ≠ `0`, 두 부재의 구별)와 `-008`·`-009`(점유 가드,
-      canonical ↔ derived 경계와 basis·과세 보존)가 `authoritative` 로 남는다. **필드 계약의 경계
-      거부와 코드·라벨 분리는 `authoritative` corpus 에서 덮이지 않는다.**
-    unblocks_when: 운영자가 COL-07·COL-08 acceptance 를 업무 규칙으로 명시 승인한다.
+      **없다 — 2026-08-31 전수 재판정으로 `-003`·`-004`·`-008`·`-009`도 내려갔다.**
+      **`-003`·`-004`(축 1)**: `OPEN-ML-04` 문면은 *"**「미정산」**을 `0` 으로 적재하지 않는다"* 로
+      **정산 축 한정**인데 두 case 는 「부재를 `0` 으로 적재하지 않는다」로 **한정어를 지운 채**
+      인용했고, 실제로 재는 것은 `presmptPrce`(금액 축)다. 넓은 부재 금지 규칙은
+      `data-dictionary.md` §1.3 이 *"0C가 도출하는 것"* · *"정산 축만으로 좁히지 않는다"* 로
+      **스스로 넓혔음을 밝히는** 자체 규칙이다.
+      **`-008`·`-009`(축 2, `approved-spec` 자리)**: `v2-지침서.md` §4.1 이 떠받치는 것은
+      `provenance` 필수와 원시 숫자 상호 대입 금지(= basis·과세 보존)까지이고, 두 case 의 **주
+      규칙인 「점유 가드」(§5.1 계승 규율 1)와 「derived fact 가 canonical fact 의 자리를 차지할 수
+      없다」(§5.2)** 는 `data-dictionary.md` 가 legacy 코드에서 도출해 세운 자체 규칙이다.
+      **이 도메인은 `authoritative` corpus 에서 전건 덮이지 않는다.**
+    unblocks_when: |-
+      운영자가 COL-07·COL-08 acceptance 와 **§1.3 광의 부재 금지 규칙 · §5.1 계승 규율 · §5.2 경계
+      규칙**을 업무 규칙으로 명시 승인한다.
 
   - axis: 승인 부재로 authoritative 덮개를 잃은 축 — ML 피처 결측 provenance 와 누수 차단 시그니처
     domain: ml-boundary
@@ -3219,6 +3537,61 @@ uncovered_axes:
       그 임시성을 계속 나른다. 되돌림은 **`OPEN-QUAL-11`이 닫혀 기대값이 교체된 뒤**이며
       **승인만으로는 올라가지 않는다** — `classification_policy.insufficient_evidence` 가 그 예외를 적는다.
     unblocks_when: M1 slice 1C 의 관측으로 `OPEN-QUAL-11`이 닫히고 기대값이 교체된다.
+
+  - axis: 승인 부재로 authoritative 덮개를 잃은 축 — capacity-gate (금액 capacity 게이트의 무조건 acceptance)
+    domain: capacity-gate
+    why_blocked: |-
+      「운영자 보유액 미입력은 `0`·미달로 접히지 않고 사유 있는 `Uncertain`」 · 「명시 `0` 은
+      `Known(0원)` 이며 미입력과 다른 상태」 · 「도급한도·연매출은 자격 어휘로 산출되지 않는다」 ·
+      「요건이 없으면 이 축은 중립」 넷의 근거가 `capability-map.md` **QUAL-11 의 「결정 무관(무조건)」
+      acceptance 자체 도출**뿐이다. 인용된 운영자 결정 `OPEN-QUAL-08` 의 문면은 **분할 확정** —
+      *"시공능력평가액은 **자격 축**, 도급한도·연매출·`capacity_score` 는 **적합도 축**"* — **뿐이고
+      「무엇을 어느 축에 넣는가」까지만 정한다.** 기대값은 그 결정에서 나오지 않는다.
+    owning_open:
+      - "소유 `OPEN` 없음 — 막는 것은 미결이 아니라 **운영자 승인 부재**다"
+      - "(요건 값과의 실제 비교) OPEN-QUAL-09 · OPEN-QUAL-10 (둘 다 활성) — 위 「시공능력평가금액 요건과 보유액의 실제 비교」 축이 받는다"
+    what_is_covered_instead: |-
+      없다. `capacity-gate-001`~`004`는 `insufficient-evidence` 로 **남아 있고**(지우지 않았다)
+      **이 도메인은 `authoritative` corpus 에서 전건 덮이지 않는다.**
+    unblocks_when: 운영자가 `capability-map.md` QUAL-11 의 무조건 acceptance 를 업무 규칙으로 명시 승인한다.
+
+  - axis: 승인 부재로 authoritative 덮개를 잃은 축 — 면허 판정의 「동반 산출」과 요건 provenance
+    domain: license
+    why_blocked: |-
+      「파싱 실패 행 수가 동반 산출된다」(`license-008`) · 「어느 필드에서 온 요건인지가 판정 결과에
+      남는다」(`license-010`) · 「판정 결과에 policy version 과 요건 소스 집합이 함께 남는다」
+      (`license-001`) 셋의 근거가 `data-dictionary.md` §3.2.1 의 **「동반 산출」 자체 I/O 계약**과
+      `capability-map.md` **QUAL-03 의 자체 acceptance** 뿐이다. 세 case 가 인용한 근거는 각각
+      **판정 자체까지만** 떠받친다 — `U-5` 는 `UncertainReason` **네 값**, `OPEN-QUAL-02` 는
+      *"`permsnIndstrytyList` 를 자격 경로로 **포함**한다"*, 조달청 문서 + `OPEN-QUAL-01` 은
+      **그룹 간 OR / 그룹 내 AND**. `v2-지침서.md` §4.2 는 versioned policy data 로 **관리**하라고만
+      하고 「결과에 남는다」를 말하지 않는다.
+    owning_open:
+      - "소유 `OPEN` 없음 — **운영자 승인 부재**"
+    what_is_covered_instead: |-
+      **판정 자체는 덮인다.** `license-002`~`005`(그룹 결합 의미론) · `license-006`·`007`·`009`
+      (`UncertainReason` 세 값) · `license-012`(유효기간 미검증 노출)가 `authoritative` 로 남는다.
+      **덮이지 않는 것은 그 판정에 동반되는 관측 요구**다 — 세 case 는 `insufficient-evidence` 로
+      남아 있고 지워지지 않았다.
+    unblocks_when: 운영자가 §3.2.1 「동반 산출」과 QUAL-03 acceptance 를 업무 규칙으로 명시 승인한다.
+
+  - axis: 승인 부재로 authoritative 덮개를 잃은 축 — `Unknown` 과세 금액의 산술 비교 차단
+    domain: money-basis
+    why_blocked: |-
+      「과세 처리가 `Unknown` 인 금액은 다른 과세 처리의 금액과 산술 비교에 들어갈 수 없다(타입
+      차단)」의 근거가 `data-dictionary.md` **§1.2.1 자체 도출**뿐이다. 인용된 운영자 결정 `U-1b` 는
+      **기초금액의 과세 처리**(부가세 포함)라는 **정의**를 확정하고 하류 인계도 *"0C 사전은
+      `vatTreatment` sealed 를 두되 정의상 기본값과 저장 값의 실측을 구별하라"*까지다 — **차단
+      규칙을 세우지 않는다.** `v2-지침서.md` §4.1 의 거부 규칙은 `unit`/`basis`/`provenance` 를
+      열거하고 `vatTreatment` 를 들지 않는다.
+    owning_open:
+      - "소유 `OPEN` 없음 — **운영자 승인 부재**"
+    what_is_covered_instead: |-
+      **basis 축은 덮인다** — `money-basis-001`·`004`가 「basis 가 다르면 비교·min/max 가 수행되지
+      않는다」를 `v2-지침서.md` §4.1 로 고정하고, `-006`이 legacy 유래 행의 자동 태깅 금지를
+      `U-1b`·`OPEN-DEC-08` 로 고정한다. **과세(`vatTreatment`) 축의 차단만 덮이지 않는다** —
+      `money-basis-005`는 `insufficient-evidence` 로 남아 있고 지워지지 않았다.
+    unblocks_when: 운영자가 `data-dictionary.md` §1.2.1 의 타입 차단 규칙을 업무 규칙으로 명시 승인한다.
 
 # =============================================================================
 # 출처를 확정할 수 없어 fixture 로 만들지 않은 후보 (`data-extract.md` 에러 핸들링)
@@ -3309,7 +3682,11 @@ next_steps:
     acceptance 를 **업무 규칙으로 명시 승인**하면 `classification` 을 `authoritative` 로 되돌리고
     `change_history` 에 그 승인 기록의 좌표를 적는다. **`license-011`은 예외** — 승인에 더해 활성
     `OPEN-QUAL-11`이 닫혀 `provisional` 기대값이 교체돼야 올라간다.
-    승인이 없는 동안 그 12건은 **M1 golden 이 되지 않는다**(`data-extract.md` §6 완료 gate 실패).
+    **2026-08-31 전수 재판정이 이 목록을 늘렸다** — 그 case 들은 승인 대상이 acceptance 하나가
+    아니라 **결정 문면이 덮지 못한 자리**이므로, 되돌리려면 `uncovered_axes` 의 「승인 부재로
+    authoritative 덮개를 잃은 축」 각 항목의 `unblocks_when` 이 지목하는 문면을 승인해야 한다.
+    승인이 없는 동안 그 case 들은 **M1 golden 이 되지 않는다**(`data-extract.md` §6 완료 gate 실패).
+    **수는 여기 박지 않는다 — F-7 이 낸다.**
   - "`data-extract.md` §5 7단계 — Claude 가 이 corpus 를 소비하는 test 를 만들고(M1 slice), Codex 가 source·privacy·expected reasoning 을 독립 검토한다."
   - "사용자 승인 시 각 case 의 `review.approved_by_user`를 `true`로 올리고 `review.claude_commit`을 채운다."
   - "기대값을 바꿀 때 case 를 덮어쓰지 않고 `change_history`에 변경 이유와 policy version 을 적는다(`data-extract.md` §3)."
