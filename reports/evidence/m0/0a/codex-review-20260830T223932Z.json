@@ -1,0 +1,34 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "6c6b3a2ae658894ab105cec931f796a954e9230a",
+  "reviewed_head": "6af7019996ec26903c7b531ed7ede12c22cf176e",
+  "findings": [],
+  "commands_run": [
+    "pwd && git status --short --branch && git rev-parse HEAD && git cat-file -t <base> && git cat-file -t <head>",
+    "git diff --stat --name-status 6c6b3a2ae658894ab105cec931f796a954e9230a...6af7019996ec26903c7b531ed7ede12c22cf176e && git ls-files --others --exclude-standard",
+    "git log --oneline --decorate --graph 6c6b3a2ae658894ab105cec931f796a954e9230a..6af7019996ec26903c7b531ed7ede12c22cf176e",
+    "sed로 v2-지침서.md, agent-workflow.md, milestone-0.md, scope.md, checklist.md, commands.md 전체 관련 절 확인",
+    "cat reports/evidence/m0/0a/codex-review-20260825T235415Z.json reports/evidence/m0/0a/codex-review-20260825T235414Z.json",
+    "cat reports/evidence/m0/0a/codex-review-20260822T061532Z.json reports/evidence/m0/0a/codex-review-20260822T065525Z.json",
+    "git diff --unified=25 6c6b3a2ae658894ab105cec931f796a954e9230a...6af7019996ec26903c7b531ed7ede12c22cf176e -- docs/discovery/capability-map.md",
+    "sed/rg로 docs/discovery/capability-map.md 2625행 전체와 raw numeric, Uncertain/Unmeasurable, fallback, retry/멱등, dry-run, contract, 의존 방향, 래칫 위험을 점검",
+    "Python 파서로 capability 94건의 분류 집계 63/14/6/11, 중복 ID 0, V2 필수 사용자 가치·acceptance 결측 0을 재검증",
+    "Python 파서로 활성 OPEN 66건과 중복 0을 재검증하고 조건부 acceptance 및 교차 블록 서술을 대조",
+    "Python 파서로 capability-map.md와 evidence 문서의 상대 Markdown 링크 존재 여부를 검증",
+    "git diff --check 6c6b3a2ae658894ab105cec931f796a954e9230a...6af7019996ec26903c7b531ed7ede12c22cf176e",
+    "rg -n -i \"api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH)\" docs/discovery reports/evidence/m0/0a",
+    "git diff --name-only 6c6b3a2ae658894ab105cec931f796a954e9230a...6af7019996ec26903c7b531ed7ede12c22cf176e | rg '\\.(kt|kts|java|py|js|ts|tsx|sql|proto)$' || true",
+    "git merge-base <base> <head> && git rev-list --count <base>..<head> && git status --porcelain=v1 --untracked-files=all",
+    "test -e bid-vector; test -d _workspace/m0-0a; find docs/adr -maxdepth 2 -type f"
+  ],
+  "residual_risks": [
+    "원본 bid-vector와 _workspace/m0-0a/01_scout_*.md가 없어 legacy 파일·행·commit 인용과 실측 수치를 원본 대조하지 못했다.",
+    "활성 OPEN 66건이 남아 있다. OPEN 자체는 이 slice의 결함이 아니지만 milestone-0.md 완료 조건에 따라 M1 진행에는 사용자 명시 승인이 필요하다.",
+    "문서 slice이므로 production wiring, DB·알림 side effect, retry·멱등 동작과 계약 호환성은 실행 검증하지 못했고 문서의 관찰 가능성과 내부 정합성까지만 판정했다.",
+    "리뷰 range에 포함된 .claude/ 및 CLAUDE.md 하네스 변경은 명시된 in_scope 밖이므로 판정에서 제외했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
