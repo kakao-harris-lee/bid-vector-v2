@@ -20,9 +20,12 @@
 #      의존하게 설계했다. §12.1이 `authoritative`로 등재한 수는 셋뿐이고(`100` 변환 제수 ·
 #      `150` 최소 표본 수 · `0.10` 부가세율) 이 corpus는 그중 둘을 쓴다.
 #      검사 범위와 **검사가 못 보는 자리**는 `numeric_discipline.check`가 적는다.
-#   4. **아직 아무것도 승인되지 않았다.** 모든 case의 `review.approved_by_user`가 `false`이고
-#      `review.codex_verdict`가 `pending`이다. `review.claude_commit`은 이 파일을 담은 커밋이
-#      자기 SHA를 담을 수 없으므로 `pending`이며 리뷰 라운드에서 채운다.
+#   4. **case 단위로는 아직 아무것도 승인되지 않았다.** 모든 case의 `review.approved_by_user`가
+#      `false`이고 `review.codex_verdict`가 `pending`이다. `review.claude_commit`은 이 파일을 담은
+#      커밋이 자기 SHA를 담을 수 없으므로 `pending`이며 리뷰 라운드에서 채운다.
+#      **운영자는 2026-08-30 「M0 승인」을 냈으나**(`milestone-0.md`의 「사용자 명시 승인」)
+#      그 기록이 덮는 것은 활성 `OPEN`의 이월 · fixture 미덮개 18축 · 부분 만족인 채로 M1 진입이고,
+#      **개별 case 의 기대값 비준은 그 안에 없다.** 같은 기록이 0E의 Codex `approve`도 승인 밖으로 둔다.
 #
 # 덮지 못한 축은 숨기지 않는다 — `uncovered_axes`가 전부 적고 소유 `OPEN`을 단다.
 
@@ -73,11 +76,16 @@ classification_policy:
     `source.kind: m0-derived-rule`이 그 자리를 표시한다.
 
     **이 경로는 `data-extract.md` §1을 넓히지 않는다.** §1의 `authoritative`는 「공식 규정/API
-    문서 또는 **사용자가 승인한** 업무 규칙」이고, **이 근거는 아직 승인 전이다** — 그 승인이
-    바로 0E가 준비하는 M0 완료 게이트(`milestone-0.md`의 「사용자 명시 승인」, 현재 비어 있다)다.
-    따라서 이 case 들의 `authoritative` 분류는 **그 게이트가 열린다는 조건 아래에서만 성립한다.**
-    사용자가 해당 acceptance 를 승인하지 않거나 승인 범위가 갈리면 **그 case 는 재분류 대상**이고,
-    `change_history`에 사유와 policy version 을 적어 교체한다.
+    문서 또는 **사용자가 승인한** 업무 규칙」인데, **이 근거들이 그 「승인」에 드는지가 정해져
+    있지 않다.** 운영자는 2026-08-30 「M0 승인」을 냈고(`milestone-0.md`의 「사용자 명시 승인」),
+    그 기록이 덮는 것으로 열거한 셋은 **활성 `OPEN`의 M1 이후 이월 · fixture 가 덮지 못한 18축 ·
+    `milestone-1.md:12`의 부분 만족인 채로 M1 진입**이다 — **M0 산출 문서의 acceptance 를 업무
+    규칙으로 비준한다는 문면은 그 기록에 없다.** 같은 기록이 0E의 Codex `approve`도 승인 밖으로
+    두고, `milestone-1.md:12`는 그 둘을 묶어 요구한다.
+
+    따라서 이 case 들의 `authoritative` 분류는 **조건부**다 — 그 acceptance 들이 승인 범위에
+    든다는 판정이 서면 성립하고, 서지 않거나 범위가 갈리면 **그 case 는 재분류 대상**이며
+    `change_history`에 사유와 policy version 을 적어 교체한다. **미결을 확정으로 쓰지 않는다.**
 
     **legacy 를 정답으로 올린 것과는 다른 축이다** — 이 근거들은 legacy 가 낸 **출력**이 아니라
     M0 조사가 legacy 형태를 읽고 세운 **V2 설계 요구**다. `legacy-behavior` 층은 여전히 0건이다.
@@ -87,8 +95,10 @@ classification_policy:
   observed: 0건. 운영 데이터 접근 승인이 선행한다.
   legacy_behavior: 0건. 이 slice 는 legacy Python 을 실행하지 않았고 golden 기대값을 옮기지 않았다.
   pending_user_approval: |-
-    **분류가 `authoritative`인 것과 승인된 것은 다르다.** M0 완료 게이트(사용자 승인)가 아직
-    열리지 않았으므로 모든 case 의 `review.approved_by_user`는 `false`다.
+    **분류가 `authoritative`인 것과 승인된 것은 다르다.** 운영자의 2026-08-30 「M0 승인」은
+    **M1 진입**을 덮고 **개별 case 의 기대값을 비준하지 않는다**(`milestone-0.md`의 「사용자 명시
+    승인」이 덮는 것과 덮지 않는 것을 열거한다). 그러므로 모든 case 의 `review.approved_by_user`는
+    여전히 `false`이며, case 단위 승인은 `next_steps`가 적는 경로로 올린다.
 
 numeric_discipline:
   rule: |-
