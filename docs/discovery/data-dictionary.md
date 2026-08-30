@@ -113,6 +113,21 @@ canonical KONEPS fact와 derived fact / ML feature와 업무 판단의 경계.
 `app/domain/aggregates.py:20-26`이 그 사실을 적고 `digits`를 필수 키워드로 받는다.
 V2는 `RoundingPolicy`를 정책 데이터로 두고 version을 붙인다(§4).
 
+> `RoundingPolicy(scaleDigits, mode)` — `EffectiveDatedPolicy`로 선언하고 `PolicyVersion`
+> 으로 푼다(§4.1). **version 없는 반올림 규칙을 두지 않는다** — `v2-지침서.md` §4.1이
+> *"반올림은 `RoundingPolicy`와 version으로 중앙화한다"*를 요구한다.
+
+**정해진 것 둘.** ① **`Money`의 반올림 결과는 원 단위 정수다** — 위 「단위」 행과
+`v2-지침서.md` §4.1(*"확정 원화 금액은 `Long` 원 단위"*)이 그것을 정하므로 금액 축에서는
+소수 자리가 남는 `scaleDigits`가 선택지가 아니다. ② **투찰가 산출은 반올림 뒤에도 적용
+하한 이상이어야 한다** — `capability-map.md` DEC-02의 **결정 무관(무조건)** acceptance가
+*"반올림 내림이 하한을 미세하게 밑도는 잔차가 발생하지 않는다"*를 요구한다. **이 제약은
+`mode`가 무엇이든 판정할 수 있다** — 재는 것이 결과와 하한의 비교이기 때문이다.
+
+**정해지지 않은 것** — `mode`의 값, **금액 축 밖**(집계·리포팅)의 `scaleDigits`, 첫
+`effectiveFrom` → **`OPEN-DIC-10`**. §12.1의 legacy 자리수 셋은 **V2 미채택**이고 그
+미결을 이 `OPEN`이 소유한다.
+
 **basis 교차 대입은 타입으로 막는다.** legacy는 `NewType` 두 개(`BaseAmount`·`YegaAmount`)만
 두고 나머지 둘에는 타입이 없으며, `NewType`은 런타임에 소멸한다고 코드가 명시한다
 (`app/domain/money.py:20-37`). 같은 모듈 docstring이 이 축의 교차 대입을 반복 회귀의 근본
@@ -1602,6 +1617,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | **`OPEN-DIC-07`** | **전송 멱등 키와 재관측 키가 각각 무엇으로 이루어지는가** — 무엇이 **한 전송**을 식별하고 무엇이 **같은 사실**을 식별하는가 | **U-3이 fold 재정의만 정했다** | **두 역할을 한 키가 겸할 수 없다는 것**은 모순 제거로 확정되나(§2.2.3) **키의 구성**은 아니다. **U-3은 fold로의 재정의를 정했고 멱등 키의 구성을 정하지 않았다.** `OPEN-SET-04`가 소유한 것은 **재관측의 노출 여부**이지 키의 구성이 아니다 | §2.2.3 |
 | **`OPEN-DIC-08`** | **파생 `Money`와 파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가.** 걸리는 값은 `BidAmount`(기초금액 × 투찰율)와 `AssessmentRate`·`AwardRate`다. **선택지 셋** — ① **아무것도 싣지 않는다.** 되짚기는 그 값을 낸 판정의 `DecisionProvenance`(§4.1: `policyVersion`·`inputSnapshotHash`)로만 하고, 값과 판정이 떨어지면 되짚지 않는 것을 받아들인다 ② **값이 입력 fact의 안정적 참조와 계산 정책 version을 나른다**(참조는 §12.2의 식별자 갈래) ③ **`FactProvenance`에 파생 산출 variant를 더해** 그 안에 ②를 넣는다 | — (Codex 5차 리뷰가 드러냈다) | **운반 범위를 정하는 결정**이다. 저장·전송되는 값에 무엇을 얹을지는 이 문서가 근거로 고를 수 없다 — `v2-지침서.md` §4.1은 `provenance`를 **필수**로만 두고 **파생값이 무엇을 실을지 정하지 않으며**, legacy에는 파생 금액의 provenance 자리 자체가 없다 | §1.2 · §1.4.2 · §5.1 · §12.2 |
 | **`OPEN-DIC-09`** | **fold의 순서 술어 — ① 총순서 키가 무엇으로 이루어지는가 ② 그 키가 같을 때 무엇으로 가르는가 ③ 늦게 도착한 과거 관측이 current에 적용되는가**(보존은 이미 정해졌다 — §2.2.3). **선택지** — 키: ⓐ `observedAt` 단독 ⓑ `observedAt` + 생산자를 가르는 보조 축 ⓒ 관측이 나르는 별도 순번. tie-break: ⓐ 두지 않는다(같은 키의 두 관측은 같은 값이어야 한다) ⓑ 명시 우선순위를 둔다. 늦은 관측: ⓐ 키가 최대면 적용한다 ⓑ 보존만 하고 current를 바꾸지 않는다 | **U-3이 fold 재정의만 정했다** | **정책 결정**이다. **legacy에 답이 없다** — 전달 순서대로 in-place mutate하고 순서 키를 읽지 않으며(`app/services/tender_result_persistence.py:25-49`), `observed_at`이 **nullable**이고(`app/models/pipeline.py:130-144`) 생산자마다 다른 시각을 넣는다(`app/services/tender_result_persistence.py:72-84` · `app/services/opening_result_collection.py:373-380`) | §2.2.3 |
+| **`OPEN-DIC-10`** | **`RoundingPolicy`의 `mode` 값, 금액 축 밖(집계·리포팅)의 `scaleDigits`, 첫 `effectiveFrom`.** **선택지** — `mode`: ⓐ 사사오입 ⓑ 짝수 자리 반올림 ⓒ 하한 쪽으로는 올림 고정. 금액 축 밖 `scaleDigits`: ⓐ legacy의 자리수를 축별로 승계 ⓑ 축 하나로 통일. | — (Codex 5차 리뷰가 드러냈다) | **값의 결정**이다. legacy 자리수 셋은 **V2 미채택**으로 이미 판정돼 있고(§12.1) 승인 명세가 요구하는 것은 **형태**(`RoundingPolicy`와 version)뿐이다 — 값을 고를 근거가 이 저장소에 없다. **정해진 둘(금액 축의 자리수 · 하한 이상 보장)은 §1.1이 갖는다** | §1.1 · §12.1 · §12.2 |
 
 **활성 `OPEN`은 해소하지 않았다.** 이 문서가 문면에서 마주친 것 — `OPEN-QUAL-05` ·
 `OPEN-QUAL-09` · `OPEN-QUAL-10`(게시 요건 축 · 보유액의 `unit`) · `OPEN-QUAL-11` ·
@@ -1817,8 +1833,8 @@ U-5로 **새로 닫는다**고 적었으나 **2026-08-26에 이미 닫혀 있었
 | `0.58` · `0.86` · `0.84` · `0.82` · `0.45` | 무차원 | price regime 규칙표의 confidence·fallback | `app/ai/price_prediction/price_regime.py:45-69` | `legacy-behavior` | **`OPEN-ML-05`** |
 | `-1.0` | 범주 코드 | 미지 범주 피처 코드 | `app/domain/award_rate_features.py:60-90` | `legacy-behavior` | — |
 | `0` · `0.0` | 해당 없음 | **부재를 표현하는 데 쓰인 legacy sentinel** — 금액·율·건수·정산 여부 축에 걸쳐 있다 | `app/models/models.py:264-306` · `app/models/pipeline.py:147-167` · `app/domain/settlement_maturity.py:81-86` · `app/domain/aggregates.py:59-68` | `legacy-behavior` | — (`OPEN-ML-04` 확정: 부재를 `0`으로 적재하지 않는다 — §1.3) |
-| `2` | 자리수 | legacy 투찰가 반올림 자리수 | `app/ai/bid_target.py:56-59` | `legacy-behavior` | — (V2 미채택 — §1.1) |
-| `4` · `6` | 자리수 | legacy 집계 반올림 자리수(콜사이트별) | `app/domain/aggregates.py:20-26` | `legacy-behavior` | — (V2는 `RoundingPolicy`로 중앙화) |
+| `2` | 자리수 | legacy 투찰가 반올림 자리수 | `app/ai/bid_target.py:56-59` | `legacy-behavior` | **`OPEN-DIC-10`** (V2 미채택 — §1.1) |
+| `4` · `6` | 자리수 | legacy 집계 반올림 자리수(콜사이트별) | `app/domain/aggregates.py:20-26` | `legacy-behavior` | **`OPEN-DIC-10`** (V2는 `RoundingPolicy`로 중앙화 — §1.1) |
 
 **이 표에 없는 수를 본문에 쓰지 않는다.** 예외는 **legacy 파일의 행 범위** · **날짜** ·
 **절 번호** · **식별자**(`OPEN-…` · `DEC-…` · `#…` · commit 해시)뿐이며 C-4.1이 그 예외를
@@ -1852,6 +1868,7 @@ U-5로 **새로 닫는다**고 적었으나 **2026-08-26에 이미 닫혀 있었
 | `requiredAmount` (`ConstructionCapacityRequirement`) | **미정 — 게시값의 원문 단위가 확인되지 않았다.** 조달청 문서가 이 필드에 단위·과세를 적지 않는다(§5.5). **타입이 `Money`가 아니라 `UnnormalizedFigure`이고 서명이 그 미정을 나른다** — 단위는 같은 값의 `fieldContract`가 선언해야 정해진다 | 시공능력평가액 **요건** | 공고 게시값이므로 그 `fieldContract`의 `provenance`가 `Published`. **legacy가 수집하지 않으며 `vatTreatment`도 그 계약이 나르고 `Unknown`이다**(§5.5) | **`OPEN-QUAL-10`의 게시 요건 축**(§11의 ⚠ 정정). 수집 신설은 §13.4 인계 |
 | `figure` (`UnnormalizedFigure`) | **미정 — 같은 값의 `fieldContract`가 선언하는 `unit`·`scale`이 정한다.** 그 선언이 없으면 판정에 넣지 않는다(§5.5). **값 자신은 단위를 주장하지 않는다** | 그 계약의 `basis`가 정하는 축. 이 타입을 쓰는 자리는 지금 `requiredAmount` 하나다 | 그 계약의 `provenance`가 나른다 | **`OPEN-QUAL-10`의 게시 요건 축** |
 | `fraction` (`Rate` — `AssessmentRate` · `AwardRate` · `FloorRate` · `BidRate`) | fraction | **그 뉴타입이 정하는 율 축**(§1.4.2). 넷을 섞는 것은 타입이 막고, **값 크기로 단위를 추측하는 경로를 두지 않는다**(§1.4.1) | **이 값 자신은 provenance를 나르지 않는다.** 출처가 갈리는 두 축은 **같은 타입의 `origin` 필드**가 나른다 — `FloorRate`는 `NoticeValue(noticeRevision)`(공고 게시값, §1.4.3 **B6** 신뢰 게이트가 이 variant에만 걸린다)와 `StatutoryTable(effectiveFrom)`(§4.4 정책 데이터)을, `BidRate`는 `ObservedFromSamples`(§6.5 표본 축)와 `Recommended`(§3.3의 입력)를 가른다(아래 「수를 나르지 않는 필드」). 파생 율의 **입력** provenance는 그 입력 `Money`의 `provenance`가 갖는다(§5.1 · 이 표의 `amount` 행) — **다만 그것이 서는 것은 그 `Money`를 함께 들고 있을 때뿐이고, 율이 입력과 떨어져 저장·전송되면 되짚을 수 없다**(§1.4.2의 ⚠ 정정). **원문 unit도 나르지 않는다** — 그것은 §5.3 필드 계약의 `unit`·`scale`에 있다 | **`OPEN-DIC-08`**(되짚기 축) |
+| `scaleDigits` (`RoundingPolicy`) | 자리수 | 반올림 자리수 축(§1.1). **금액 축에서는 원 단위 정수로 고정**이고 그 밖의 축은 미정 | 정책 데이터 — `EffectiveDatedPolicy`가 `PolicyVersion`과 함께 푼다(§4.1) | **`OPEN-DIC-10`** |
 | `frequency` | fraction | `numerator` ÷ `denominator`. **확률이 아니다**(§3.3) | 표본 집합에서 계산한 파생값 | — |
 | `criticalAssessmentRate` | fraction | **사정률 축**(예정가 ÷ 기초금액) | 추천 투찰율 ÷ 낙찰하한율의 파생값 | — |
 | `numerator` | 건수 | 하한 미달로 판정된 표본 수 | 표본 집합 | — |
@@ -1876,7 +1893,7 @@ U-5로 **새로 닫는다**고 적었으나 **2026-08-26에 이미 닫혀 있었
 
 | 갈래 | 필드 |
 | --- | --- |
-| **열거·sealed 값** | `basis` · `biasDirection` · `nullability` · `origin` (`FloorRateOrigin` · `BidRateOrigin` — §1.4.2. **율 값의 출처 축이며 수가 아니다**) · `provenance` · `reason` · `reasons` · `regime` · `scale` · `vatTreatment` · `currency` |
+| **열거·sealed 값** | `basis` · `biasDirection` · `mode` (`RoundingPolicy` — §1.1. **반올림 방식이며 자리수가 아니다**) · `nullability` · `origin` (`FloorRateOrigin` · `BidRateOrigin` — §1.4.2. **율 값의 출처 축이며 수가 아니다**) · `provenance` · `reason` · `reasons` · `regime` · `scale` · `vatTreatment` · `currency` |
 | **불리언** | `authoritative` (`KonepsFieldContract`) · `isAuthoritative` (`FactProvenance` — §5.1) — 둘 다 **술어가 아니라 데이터로 선언한다** |
 | **식별자** — 수처럼 보여도 셈이 아니다. **정수 변환 금지**(§5.3의 공고 차수와 같은 부류) | `limitGroupNo` · `licenseRegionCode` · `noticeRevision` · `deliveryKey`(전송 멱등 단위, §2.2.3) · `observationKey`(재관측 단위, 같은 자리) · `key` · `sourceKey` · `modelArtifactId` · `inputSnapshotHash` · `policyVersion` |
 | **시각·날짜** | `decidedAt` · `measuredAt` · `observedAt` · `settlementObservedAt` · `effectiveFrom` |
