@@ -1,6 +1,13 @@
 # ADR 0002 — 금액 · 비율 · basis의 표현
 
-- **상태**: 제안됨 (M0 slice 0D) — 사용자 승인과 Codex `approve` 대기
+- **상태**: **결정** — M0 slice 0D가 Codex `approve`로 닫혔다
+  (`reports/evidence/m0/0d/codex-review-20260829T222217Z.json`, `reviewed_base` `998dc217` …
+  `reviewed_head` `df056259`, 2026-08-29, `model_reasoning_effort=high`). 갱신 시점은
+  **2026-08-30 · M0 종료 slice 0E**다 — 0D 종료 뒤에도 이 줄이 *"제안됨 … 대기"*로 남아
+  **문면이 사실을 따라가지 않았다.**
+  **`milestone-0.md` 완료 조건의 「사용자 명시 승인」은 아직 받지 않았다** — 그 승인의
+  대상은 0E가 만든 이월 목록(`docs/discovery/capability-map.md` §14)이다.
+  **`milestone-1.md:11`의 M1 선행 조건 「금액/rate/basis ADR 승인」이 이 ADR을 가리킨다.**
 - **작성일**: 2026-08-28
 - **대응**: `milestone-0.md` §"Slice 0D" 결정 **3** (금액/rate/basis 표현)
 - **legacy 기준 commit**: `ed4b06c`

@@ -1,7 +1,11 @@
 # ADR 0009 — ML 재활용 출처를 어디에 기록하는가
 
-- **상태**: **결정** — **운영자 결정 2026-08-29**로 위치가 확정됐다(§2 D-5).
-  사용자 승인과 Codex `approve` 대기
+- **상태**: **결정** — **운영자 결정 2026-08-29**로 위치가 확정됐다(§2 D-5). M0 slice 0D가
+  Codex `approve`로 닫혔다(`reports/evidence/m0/0d/codex-review-20260829T222217Z.json`,
+  `reviewed_head` `df056259`). **`milestone-0.md` 완료 조건의 「사용자 명시 승인」은 아직
+  받지 않았다** — 그 승인의 대상은 M0 종료 slice 0E가 만든 이월 목록
+  (`docs/discovery/capability-map.md` §14)이다. **이 줄의 뒷부분(`approve` 대기)만
+  2026-08-30 · 0E가 갱신했고 「결정」 판정과 §2 D-5 귀속은 0D가 쓴 그대로다.**
 - **작성일**: 2026-08-28
 - **대응**: `milestone-0.md` §"Slice 0D" 결정 **9** (ML 재활용 출처 기록 위치 —
   `docs/discovery/legacy-reference-map.md` 통합 vs slice별 `reports/evidence/` 기록.
