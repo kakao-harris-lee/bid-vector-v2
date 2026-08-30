@@ -285,21 +285,31 @@ legacy는 `0.0`을 부재 표현으로 쓴다 — `HistoricalData.base_amount`·
 
 #### 1.4.2 축별 타입
 
-한 축의 율을 다른 축에 대입할 수 없게 타입을 나눈다. **넷 다 `Rate`의 뉴타입이고, 수를
+한 축의 율을 다른 축에 대입할 수 없게 타입을 나눈다. **넷 다 `Rate`를 감싸고, 수를
 나르는 자리는 `Rate`의 `fraction` 하나다** — 축은 타입이 나르고 수는 한 자리에 둔다.
-그래서 §12.2에 등재되는 **필드**는 `fraction` 하나이며, **넷의 축·provenance·층·부재
-표현은 이 표가 정본이다.**
+**넷 중 둘은 그 옆에 출처 축을 하나 더 나른다** — 아래 선언이 그 자리를 적고,
+**넷의 축·provenance·층·부재 표현은 이 표가 정본이다.**
 
-> `Rate(fraction)`. **부재는 값이 아니다** — 율이 아직 없으면 `Absent(reason)`, 재려
-> 했으나 재지 못했으면 `Unmeasurable(reason)`이다(§1.3 · §1.6). **`0`은 "0"이지 "모름"이
-> 아니고, 어떤 계산도 그 둘을 `0`으로 접을 수 없다**(타입 차단).
+> `Rate(fraction)` — 수를 나르는 자리는 여기 하나다. **부재는 값이 아니다** — 율이
+> 아직 없으면 `Absent(reason)`, 재려 했으나 재지 못했으면 `Unmeasurable(reason)`이다
+> (§1.3 · §1.6). **`0`은 "0"이지 "모름"이 아니고, 어떤 계산도 그 둘을 `0`으로 접을 수
+> 없다**(타입 차단).
+>
+> `AssessmentRate(Rate)` · `AwardRate(Rate)` — **축만 더하는 뉴타입이다.**
+>
+> `FloorRate(Rate, origin: FloorRateOrigin)` ·
+> `BidRate(Rate, origin: BidRateOrigin)` — 축에 더해 **출처 축 하나**를 나른다.
+>
+> `FloorRateOrigin = sealed { NoticeValue(noticeRevision), StatutoryTable(effectiveFrom) }`
+>
+> `BidRateOrigin = sealed { ObservedFromSamples, Recommended }`
 
 | 타입 | 분자 / 분모 | 단위 | 값의 provenance · 층 | 부재 표현 |
 | --- | --- | --- | --- | --- |
-| `AssessmentRate` (사정률) | 예정가 / 기초금액 | fraction | **파생값**(§5.2 derived fact) — 두 금액의 몫이다. **분자·분모 두 `Money`의 `provenance`가 결과의 성질을 정하므로 값과 함께 남는다.** 축 정의의 층은 `legacy-behavior` — §1.4.3 **B1**·**B2**의 축 칸이 **「예정가/기초금액」**으로 분자·분모를 그대로 적는다 | `Absent(reason)` / `Unmeasurable(reason)` |
+| `AssessmentRate` (사정률) | 예정가 / 기초금액 | fraction | **파생값**(§5.2 derived fact) — 두 금액의 몫이다. **입력 두 `Money`의 `provenance`는 이 값에 실리지 않는다** — 그 축을 나르는 자리는 **입력 `Money` 자신**(§5.1 · §12.2 `amount` 행)과 **행 단위 오염 측정**(§7.1 C1·C2 · §7.2 `P3`)이다. 축 정의의 층은 `legacy-behavior` — §1.4.3 **B1**·**B2**의 축 칸이 **「예정가/기초금액」**으로 분자·분모를 그대로 적는다 | `Absent(reason)` / `Unmeasurable(reason)` |
 | `AwardRate` (낙찰률) | 낙찰가 / 기초금액 | fraction | **파생값** — 같은 형태이고 분자가 개찰 결과에서 온다. 축 정의의 층은 `legacy-behavior` — 다만 **§1.4.3 B4의 축 칸(「낙찰가/금액」)은 분모를 못 박지 않는다.** 분모가 기초금액이라는 것은 legacy가 따로 적는다(`app/services/paper_bidding_backtest/settlement.py:49-58`의 *"winning_rate 는 winning_amount / base_amount (기초금액 …)"*) | 같음 |
-| `FloorRate` (낙찰하한율) | **예정가격 기준** 율 | fraction | **출처가 둘이고 섞지 않는다** — ① **공고 게시값**(canonical fact, §5.2)에는 §1.4.3 **B6**의 신뢰 게이트가 걸린다 ② **§4.4 법정 하한율 표**(정책 데이터)는 `effectiveFrom`으로 고른다. **어느 쪽에서 왔는지가 값과 함께 남는다.** 표 값의 층은 `legacy-behavior`이고 V2 값의 확정은 활성 `OPEN-DEC-10`이 소유한다 | 같음. 해석 실패의 사유는 §3.3의 `FloorRateUnresolved` |
-| `BidRate` (투찰율) | 투찰가 / 기초금액 | fraction | **자리가 둘이고 한 값으로 합치지 않는다** — ① 과거 실적에서 잰 **관측 파생값**(표본 축, §6.5) ② 우리가 산출한 **추천 투찰율**(파생). 축 정의(분모가 기초금액)의 층은 **`legacy-behavior`** — 그 관계를 적는 자리가 legacy뿐이다(`app/services/bid_base.py:50-58` · `app/ai/predictors/legal_floor_spec.py:20-33`의 *"우리 투찰가는 기초금액(사업금액) 기준"*, commit `4645ce4`) | 같음. 산출 불가의 사유는 §3.3의 `BidRateUnavailable` |
+| `FloorRate` (낙찰하한율) | **예정가격 기준** 율 | fraction | **출처가 둘이고 섞지 않는다 — 그 구분을 `origin`이 나른다.** ① **공고 게시값**(canonical fact, §5.2) = `NoticeValue(noticeRevision)`이고 §1.4.3 **B6**의 신뢰 게이트가 **이 variant에만** 걸린다 ② **§4.4 법정 하한율 표**(정책 데이터) = `StatutoryTable(effectiveFrom)`이고 그 `effectiveFrom`으로 고른다. 표 값의 층은 `legacy-behavior`이고 V2 값의 확정은 활성 `OPEN-DEC-10`이 소유한다 | 같음. 해석 실패의 사유는 §3.3의 `FloorRateUnresolved` |
+| `BidRate` (투찰율) | 투찰가 / 기초금액 | fraction | **자리가 둘이고 한 값으로 합치지 않는다 — 그 구분을 `origin`이 나른다.** ① 과거 실적에서 잰 **관측 파생값**(표본 축, §6.5) = `ObservedFromSamples` ② 우리가 산출한 **추천 투찰율**(파생) = `Recommended`. **§3.3이 입력으로 받는 것은 `Recommended` 쪽이다.** 축 정의(분모가 기초금액)의 층은 **`legacy-behavior`** — 그 관계를 적는 자리가 legacy뿐이다(`app/services/bid_base.py:50-58` · `app/ai/predictors/legal_floor_spec.py:20-33`의 *"우리 투찰가는 기초금액(사업금액) 기준"*, commit `4645ce4`) | 같음. 산출 불가의 사유는 §3.3의 `BidRateUnavailable` |
 
 **넷의 축 정의는 모두 `legacy-behavior`다.** `data-extract.md`의 층 정의로 재면
 `authoritative`는 **공식 규정/API 문서 또는 승인된 업무 규칙**을 요구하는데, 네 축의
@@ -313,6 +323,32 @@ legacy는 `0.0`을 부재 표현으로 쓴다 — `HistoricalData.base_amount`·
 > 기초금액이다"*)도 **전략 예산 필터 축**이고 곱셈 base 축이 아니다 —
 > `capability-map.md` §13(하류 인계)이 그 축 구분을 이미 한 번 못 박았다.
 > **결정을 인용하기 전에 그 결정의 원문을 연다** — §3.2.2·§11의 재정정과 같은 뿌리다.
+
+> **⚠ 정정 (2026-08-30, Codex 리뷰 라운드 4 high #1)** — 앞서 이 표는 **산문으로 세 축을
+> 요구하면서 그것을 나를 자리를 두지 않았다.** 실제 carrier가 `Rate`의 `fraction`
+> 하나였으므로 **서로 다른 `FloorRate` 출처와 `BidRate` 기원을 런타임 값에서 구별할 수
+> 없었다.** 요구와 carrier가 어긋나면 **둘 중 하나가 틀린 것**이고, 어느 쪽을 고칠지는
+> **그 축이 런타임에 필요한가**로 갈린다. **축마다 갈라 판정했다.**
+>
+> - **`FloorRate` 출처 — carrier를 넓혔다.** 런타임에 필요하다: **B6 신뢰 게이트가 게시값
+>   에만 걸리고** 정책표 값은 `effectiveFrom`으로 고른다. 구별하지 못하면 게이트를 표 값에
+>   걸거나 게시값에서 빠뜨리며, 그 둘은 **다른 오답**이다. §5.2의 규칙이 이 형태를 이미
+>   못 박는다 — *"자리가 같아야 한다면 **타입이 달라야 한다**"*(`ResolvedBaseAmount.Direct`
+>   vs `.FallbackFromBudget(sourceKey)`). **같은 형태이므로 같은 처방을 쓴다.**
+> - **`BidRate` 기원 — carrier를 넓혔다.** 런타임에 필요하다: §3.3이 입력으로 받는 것은
+>   **추천 투찰율**이고 §6.5가 재는 것은 **관측 표본**이다. 관측값이 추천 자리에 들어가면
+>   `임계 사정률 = 추천 투찰율 ÷ 낙찰하한율`이 **조용히 다른 수**가 된다. 둘 다 `fraction`
+>   이므로 값으로는 걸리지 않는다 — **타입이 막아야 하는 자리다.**
+> - **`AssessmentRate`의 분자·분모 provenance — 요구를 좁혔다.** 런타임 값에 남을 필요가
+>   없다. 근거 둘. ① **그 축을 나르는 자리가 이미 있다** — 입력 두 `Money`의 `provenance`
+>   (§5.1 · §12.2 `amount` 행)이고, **오염 여부를 판정하는 단위는 율이 아니라 행**이다
+>   (§7.1의 C1·C2가 `FactProvenance`를 **행**에 대해 읽고, §7.2의 `P3`가 *"판정에 실제로
+>   소비된 행"*을 모수로 이름 붙인다). ② **무엇을 실을지가 정해지지 않는다** — 기초금액은
+>   `FactProvenance`(§5.1)와 `BaseAmountProvenance`(§3.4) **두 축**을 갖고 앞 문면은 어느
+>   쪽인지 적지 않았다. **나를 수 없는 요구가 아니라 자리를 잘못 지목한 요구였다.**
+>
+> **`AwardRate`는 그런 요구를 적은 적이 없다** — 훑어 확인했고 이 라운드가 그 행에 더한
+> 것은 없다.
 
 **원문 unit이 보존되는 자리는 값이 아니라 필드 계약이다.** §1.4.1은 *"원문 unit을 수집
 시점에 붙잡는다"*고만 적고 **어느 자리가 그것을 나르는지는 §5.3이 갖는다** —
@@ -1465,8 +1501,11 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
    **㉡ 타입이 인자 이름을 하나도 내지 않아(값 하나를 감싸는 뉴타입) §12.2에 통째로
    없어도 걸리지 않는 경우.** **둘 다 이 문서에서 실제로 났고** 전문과 실례는 **§12.2의
    각주**가 갖는다. **이 문서의 요구·타입 목록과 §12.2의 대응은 사람이 읽어야 한다** —
-   이 라운드도 그 형태를 재는 검사를 만들지 않았고, ㉡에 대해 한 것은 **§1.4.2의 율 타입
-   넷이 `Rate`의 `fraction`으로 이름을 내게 한 것**뿐이다.
+   이 라운드도 그 형태를 재는 검사를 만들지 않았다. ㉡에 대해 한 것은 **§1.4.2의 율 타입
+   넷이 `Rate`의 `fraction`으로 이름을 내게 한 것**이고, **그것이 ㉠까지 닫지는
+   않았다** — 같은 §1.4.2에서 **산문이 요구한 출처 축을 나를 필드가 없는 채 `PASS`가
+   났다**(Codex 4차 high #1). 이 라운드는 `FloorRate`·`BidRate`에 `origin`을 두어 그
+   요구를 carrier로 옮겼으나 **검사는 여전히 요구와 carrier의 일치를 재지 않는다.**
 
 ---
 
@@ -1694,7 +1733,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | `money` (`ConstructionCapacityAmount`) | `Money` 한 벌 — 위와 같다 | 시공능력평가액 **보유액** | 그 `Money`의 `provenance`가 나른다 — 운영자 보유액이므로 `OperatorDeclared`(§1.2.4 · §5.1) | — |
 | `requiredAmount` (`ConstructionCapacityRequirement`) | **미정 — 게시값의 원문 단위가 확인되지 않았다.** 조달청 문서가 이 필드에 단위·과세를 적지 않는다(§5.5). **타입이 `Money`가 아니라 `UnnormalizedFigure`이고 서명이 그 미정을 나른다** — 단위는 같은 값의 `fieldContract`가 선언해야 정해진다 | 시공능력평가액 **요건** | 공고 게시값이므로 그 `fieldContract`의 `provenance`가 `Published`. **legacy가 수집하지 않으며 `vatTreatment`도 그 계약이 나르고 `Unknown`이다**(§5.5) | **`OPEN-QUAL-10`의 게시 요건 축**(§11의 ⚠ 정정). 수집 신설은 §13.4 인계 |
 | `figure` (`UnnormalizedFigure`) | **미정 — 같은 값의 `fieldContract`가 선언하는 `unit`·`scale`이 정한다.** 그 선언이 없으면 판정에 넣지 않는다(§5.5). **값 자신은 단위를 주장하지 않는다** | 그 계약의 `basis`가 정하는 축. 이 타입을 쓰는 자리는 지금 `requiredAmount` 하나다 | 그 계약의 `provenance`가 나른다 | **`OPEN-QUAL-10`의 게시 요건 축** |
-| `fraction` (`Rate` — `AssessmentRate` · `AwardRate` · `FloorRate` · `BidRate`) | fraction | **그 뉴타입이 정하는 율 축**(§1.4.2). 넷을 섞는 것은 타입이 막고, **값 크기로 단위를 추측하는 경로를 두지 않는다**(§1.4.1) | **§1.4.2의 「값의 provenance · 층」 열이 타입마다 정한다.** 이 값 자신은 **원문 unit을 나르지 않는다** — 그것은 §5.3 필드 계약의 `unit`·`scale`에 있다 | — |
+| `fraction` (`Rate` — `AssessmentRate` · `AwardRate` · `FloorRate` · `BidRate`) | fraction | **그 뉴타입이 정하는 율 축**(§1.4.2). 넷을 섞는 것은 타입이 막고, **값 크기로 단위를 추측하는 경로를 두지 않는다**(§1.4.1) | **이 값 자신은 provenance를 나르지 않는다.** 출처가 갈리는 두 축은 **같은 타입의 `origin` 필드**가 나른다 — `FloorRate`는 `NoticeValue(noticeRevision)`(공고 게시값, §1.4.3 **B6** 신뢰 게이트가 이 variant에만 걸린다)와 `StatutoryTable(effectiveFrom)`(§4.4 정책 데이터)을, `BidRate`는 `ObservedFromSamples`(§6.5 표본 축)와 `Recommended`(§3.3의 입력)를 가른다(아래 「수를 나르지 않는 필드」). 파생 율의 **입력** provenance는 그 입력 `Money`의 `provenance`가 갖는다(§5.1 · 이 표의 `amount` 행). **원문 unit도 나르지 않는다** — 그것은 §5.3 필드 계약의 `unit`·`scale`에 있다 | — |
 | `frequency` | fraction | `numerator` ÷ `denominator`. **확률이 아니다**(§3.3) | 표본 집합에서 계산한 파생값 | — |
 | `criticalAssessmentRate` | fraction | **사정률 축**(예정가 ÷ 기초금액) | 추천 투찰율 ÷ 낙찰하한율의 파생값 | — |
 | `numerator` | 건수 | 하한 미달로 판정된 표본 수 | 표본 집합 | — |
@@ -1719,7 +1758,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 
 | 갈래 | 필드 |
 | --- | --- |
-| **열거·sealed 값** | `basis` · `biasDirection` · `nullability` · `provenance` · `reason` · `reasons` · `regime` · `scale` · `vatTreatment` · `currency` |
+| **열거·sealed 값** | `basis` · `biasDirection` · `nullability` · `origin` (`FloorRateOrigin` · `BidRateOrigin` — §1.4.2. **율 값의 출처 축이며 수가 아니다**) · `provenance` · `reason` · `reasons` · `regime` · `scale` · `vatTreatment` · `currency` |
 | **불리언** | `authoritative` (`KonepsFieldContract`) · `isAuthoritative` (`FactProvenance` — §5.1) — 둘 다 **술어가 아니라 데이터로 선언한다** |
 | **식별자** — 수처럼 보여도 셈이 아니다. **정수 변환 금지**(§5.3의 공고 차수와 같은 부류) | `limitGroupNo` · `licenseRegionCode` · `noticeRevision` · `deliveryKey`(전송 멱등 단위, §2.2.3) · `observationKey`(재관측 단위, 같은 자리) · `key` · `sourceKey` · `modelArtifactId` · `inputSnapshotHash` · `policyVersion` |
 | **시각·날짜** | `decidedAt` · `measuredAt` · `observedAt` · `settlementObservedAt` · `effectiveFrom` |
@@ -1735,11 +1774,17 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 >   *"각 성분의 분자를 따로 낸다"*가 그렇다) **선언되지 않은 이름은 뽑히지도 않으므로**
 >   타입이 그 요구를 빠뜨려도 덮개는 침묵한다. 오염 측정 타입이 **§7.1이 요구한 분자도
 >   그 분자가 딛는 분모도 갖지 않은 채** `PASS`가 났다(Codex 2차 high).
+>   **같은 형태가 §1.4.2에서 한 번 더 났다** — §1.4.2 산문이 `FloorRate`의 출처와
+>   `BidRate`의 기원이 *"값과 함께 남는다"*를 요구했는데 **그것을 나를 필드가 없었고**,
+>   등재된 이름(`fraction`)은 있었으므로 `C-4.2`는 `PASS`했다(Codex 4차 high #1).
+>   **㉡을 고쳐 이름이 나오게 한 것이 ㉠까지 닫지는 않는다** — 이름 등재는
+>   **요구와 carrier가 맞는지**를 재지 않는다. 이번에 고친 것은 문서이고 **덮개의 이
+>   성질은 그대로 남는다.**
 > - **㉡ 타입이 인자 이름을 하나도 내지 않는 경우.** 값 하나를 감싸는 뉴타입이 그렇다 —
 >   **타입 이름은 대문자라 ③의 이름 규칙 밖이고, ①은 인자에서 이름을 뽑으므로 인자가
 >   없으면 뽑히는 것이 없다.** 그래서 그런 타입이 §12.2에 **통째로 없어도** 판정에 걸리지
 >   않는다. §1.4.2의 율 타입 넷이 그 자리였고 `PASS`가 났다(Codex 3차 high).
->   **이 라운드가 고친 것은 검사가 아니라 문서다** — 넷의 carrier를 `Rate`의 `fraction`
+>   **앞 라운드가 고친 것은 검사가 아니라 문서다** — 넷의 carrier를 `Rate`의 `fraction`
 >   으로 명시해 **이름이 나오게** 했다. **덮개의 이 성질은 그대로 남는다.**
 >
 > **Codex 1차 finding `A`와 같은 계열이 도메인 층위에서 되풀이된 것이고 ㉡이 세 번째다.**
