@@ -205,7 +205,7 @@ Codex `approve`와 사용자 승인이 있어야 M1로 진행한다.
   legacy 순수 함수 실행(`A-3`) · 게시값 관측(`A-4`). 실제 DB·API 접근은 **별도 승인
   사항**이라 자동 포함하지 않는다. 필요해지는 시점(대체로 1B·1C)에 따로 묻는다.
 - **push · merge · 배포** — 전부 로컬 커밋 상태로 둔다.
-- **0E의 Codex `approve`** — `milestone-1.md:12`의 선행 조건은 *"M0 Codex `approve`**와** 사용자
+- **0E의 Codex `approve`** — `milestone-1.md:10`의 선행 조건은 *"M0 Codex `approve`**와** 사용자
   승인"*으로 **둘을 묶어** 요구한다. 이 승인은 **둘째만** 충족시킨다 — 첫째는 0E 리뷰가
   남았고, 그 리뷰 range가 0A의 미리뷰 구간까지 덮는다.
 
