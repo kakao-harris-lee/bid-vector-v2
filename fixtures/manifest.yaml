@@ -60,7 +60,11 @@ schema:
     provisional: 이 기대값이 어느 활성 `OPEN`의 결정 전 **임시 처리**인가. 그 `OPEN`이 닫히면 교체된다.
     owning_open: 이 case 가 **건드리지 않는** 인접 축의 소유 `OPEN`. 원칙은 활성 id 이나, 이미 해소된 id 를 드는 자리는 **해소 시점을 함께 적는다** — 이 필드가 든 id 가 활성임을 함의하지 않는다.
     not_covered: 이 case 가 덮지 **못하는** 것.
-    change_history: 기대값 변경 이력(§3 「기대값 변경 시 case 를 덮어쓰지 말고 변경 이유와 policy version 기록」). 최초 등재에는 비어 있다.
+    change_history: |-
+      기대값 변경 이력(§3 「기대값 변경 시 case 를 덮어쓰지 말고 변경 이유와 policy version 기록」). 최초 등재에는 비어 있다.
+      항목 하나의 자리는 여섯이다 — `date` · `change`(무엇을 바꿨는가) · `reason`(왜) · `policy_version`(§3 요구.
+      effective-dated 정책에 의존하지 않는 case 는 「해당 없음」과 근거 문면을 적는다) · `previous_sha256` ·
+      `previous_expected_sha256`. **앞선 해시를 남기는 것이 「덮어쓰지 않는다」를 기계로 확인 가능하게 만든다.**
 
 classification_policy:
   authoritative: |-
@@ -2116,15 +2120,24 @@ cases:
     domain: koneps-collection
     classification: authoritative
     verifies: |-
-        점유 가드 — 권위 없는 유입이 이미 있는 값을 덮지 않고 빈 자리만 채운다.
+        점유 가드 — 권위 없는 유입이 이미 있는 값을 덮지 않고 빈 자리만 채운다. **유입값은 대상 자리의 basis 로
+        다시 표기되지 않는다** — 예산 키 유입은 자기 basis(`ALLOCATED_BUDGET`)와 과세(`UNKNOWN`)를 그대로 지고 기록된다.
     source:
       kind: approved-spec
       reference: |-
-          data-dictionary.md §5.1 계승 규율 1 · v2-지침서.md §4.1(provenance 필수)
+          data-dictionary.md §5.1 계승 규율 1 · §1.2(배정예산 = `AllocatedBudget`, basis 배정예산, 과세 `Unknown`) ·
+          §1.2.1(정의상 기본값 자동 태깅 금지) · v2-지침서.md §4.1(provenance 필수 · 원시 숫자 상호 대입 금지)
     expected_reasoning: |-
       data-dictionary.md §5.1 계승 규율 1 *"권위값만 저장값을 덮는다(점유 가드). 나머지와 미신고는 **빈 자리만** 채운다"* + 규율 2
       *"미신고(`Undeclared`)를 권위로 취급하지 않는다"*. `isAuthoritative`는 술어가 아니라 **데이터로 선언**되며 빠뜨리면 기본이
       보수(fill-only)다.
+
+      **유입값의 basis·과세는 §1.2가 정한다.** 그 표의 배정예산 행이 *"`asignBdgtAmt`·`bdgtAmt` | `AllocatedBudget` |
+      원 / 배정예산 | `Unknown` — 정해진 바 없다"*이므로 `asignBdgtAmt`에서 온 값은 `ALLOCATED_BUDGET` · `UNKNOWN`으로
+      기록된다. **대상 자리(`ESTIMATED_PRICE`)의 basis 로 다시 표기하지 않는다** — 그것이 §1.2 머리가 legacy 결함으로 든
+      *"한 basis 태그가 두 개념을 덮고"*이고, §1.2.1의 *"legacy 유래 행은 정의상 기본값으로 **자동 태깅하지 않는다**"*가
+      같은 방향을 금지한다. 유입이 **어느 자리를 채우려 했는가**는 입력의 `targetSlot`이 별도 필드로 나른다 —
+      해석 대상 역할이 원천 표기를 덮지 않는다.
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -2147,9 +2160,27 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: f7a7fe706a4ffff414c56d31172f177dc46e43462fdd982ae77d203d5867ee1c
-    expected_sha256: b60454b4e929a8f76322804dec6d7b328973eb7eefea83c399d7f65000ff1913
-    change_history: []
+    sha256: 89d61f17ad40846153e088465433a067c4a85324a2566bce22219a993a690117
+    expected_sha256: 99fac1176eca4f1f4c285b5838f2cffc8c48e3f416fa9e5669b1464f189281fd
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          input 의 `incomingValue`가 `basis: ESTIMATED_PRICE` · `vatTreatment: EXCLUSIVE`였다. 그 값은
+          `sourceKey: asignBdgtAmt`에서 왔으므로 원천 basis 는 `ALLOCATED_BUDGET`, 과세는 `UNKNOWN`이다 —
+          둘로 바꾸고 대상 자리를 `targetSlot: ESTIMATED_PRICE`라는 **별도 필드**로 분리했다.
+          expected 에는 `incomingReBasedToTargetSlotBasis: false`와 `incomingRecordedBasis`·
+          `incomingRecordedVatTreatment`를 더해 그 보존을 기대값이 직접 재게 했고, 저장값 쪽에도
+          `resultBasis`·`resultVatTreatment`를 실어 결과가 어느 basis 인지 남게 했다.
+        reason: |-
+          basis laundering. `data-dictionary.md` §1.2가 예산 키를 `AllocatedBudget`(basis 배정예산, 과세
+          `Unknown`)로 정의하는데 이 fixture 가 그 값을 추정가격 basis 로 재표기했고, `authoritative` 분류가
+          그 재표기를 정답으로 고정하고 있었다. Codex 리뷰 B `findings[3]`(high).
+        policy_version: |-
+          해당 없음 — 이 case 의 기대값은 effective-dated 정책 데이터에 의존하지 않는다. 근거 문면은
+          `docs/discovery/data-dictionary.md` §1.2 · §1.2.1 · §5.1 이며 이 라운드에서 그 문면은 바뀌지 않았다
+          (병행 레인 소유이므로 이 slice 가 손대지 않는다).
+        previous_sha256: f7a7fe706a4ffff414c56d31172f177dc46e43462fdd982ae77d203d5867ee1c
+        previous_expected_sha256: b60454b4e929a8f76322804dec6d7b328973eb7eefea83c399d7f65000ff1913
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -2158,14 +2189,29 @@ cases:
     domain: koneps-collection
     classification: authoritative
     verifies: |-
-        derived fact가 canonical fact의 자리를 차지하지 않는다 — 예산 키 폴백으로 복원한 기초금액은 직접 게시값과 **타입이 다르다**.
+        derived fact가 canonical fact의 자리를 차지하지 않는다 — 기초금액 자리를 예산 키로 채운 결과는 직접 게시값과
+        **타입이 다르고**, 그 값은 **자기 basis(`ALLOCATED_BUDGET`)와 과세(`UNKNOWN`)를 그대로 진다**.
     source:
       kind: approved-spec
       reference: |-
-          data-dictionary.md §5.2 규칙 · v2-지침서.md §4.1
+          data-dictionary.md §5.2 규칙 · §1.2(배정예산 = `AllocatedBudget`, basis 배정예산, 과세 `Unknown`) ·
+          §1.2.1(정의상 기본값 자동 태깅 금지 · `Unknown` 금액의 산술 비교 차단) · §5.1(`FilledFromBudgetKey`) ·
+          v2-지침서.md §4.1
     expected_reasoning: |-
       data-dictionary.md §5.2 *"derived fact가 canonical fact의 자리를 차지할 수 없다. 자리가 같아야 한다면 **타입이 달라야 한다**
-      — `ResolvedBaseAmount.Direct` vs `.FallbackFromBudget(sourceKey)`"*.
+      — `ResolvedBaseAmount.Direct` vs `.FallbackFromBudget(sourceKey)`"*. `variant`·`targetSlot`이 그 **해석 결과와 대상
+      역할**을 나른다.
+
+      **그 역할이 값의 원천 표기를 덮지 않는다.** §1.2의 배정예산 행이 *"`asignBdgtAmt`·`bdgtAmt` | `AllocatedBudget` |
+      원 / 배정예산 | `Unknown` — 정해진 바 없다"*이므로 폴백된 값의 basis 는 `ALLOCATED_BUDGET`, 과세는 `UNKNOWN`이다.
+      **`BASE_AMOUNT`로 다시 표기하면 §1.2 머리가 legacy 결함으로 든 *"한 basis 태그가 두 개념을 덮고"*를 그대로 재현하고,**
+      §1.2.1의 *"legacy 유래 행은 정의상 기본값으로 **자동 태깅하지 않는다**"*를 어긴다. 값이 딛는 provenance 는 §5.1의
+      `FilledFromBudgetKey(key)`이며 §5.1 계승 규율 1이 그것을 **권위가 아닌 것**으로 둔다.
+
+      `arithmeticComparisonWithBaseAmountBasisAllowed: false`의 근거는 둘이다 — §1.2.1 *"**`Unknown` 금액은 다른 과세
+      처리의 금액과 산술 비교에 들어갈 수 없다**(타입 차단)"* + `v2-지침서.md` §4.1 *"`BaseAmount`, `EstimatedAmount`,
+      `YegaAmount`, `BidAmount`를 원시 숫자로 상호 대입하지 못하게 한다"*. **이 항이 basis·과세 보존의 실제 결과다** —
+      보존이 표기에만 남고 결과가 없으면 laundering 을 막지 못한다.
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -2188,11 +2234,31 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 5b2a1d3edf412d203974461ed6d858e387706a80bf35b42794a6a67aecd90afa
-    expected_sha256: 35b69bbdec59a8199d35478d291ad37d3f68bffa4a995e92957d202fc16f0b2a
+    sha256: a2d0ce19015e07e5304169cc558f63a3beaaf65b9b1d2b94e85054bcbd1c38d6
+    expected_sha256: 0f419c65482e741829257dd38d3db80ac14c06bc3a612e620d0a2a45071bce60
     not_covered: |-
-      폴백된 값의 `vatTreatment` — 배정예산의 과세 처리는 `OPEN-DIC-04`가 소유한다
-    change_history: []
+      배정예산의 **실제** 과세 처리 — `OPEN-DIC-04`가 소유한다. 이 case 가 싣는 `UNKNOWN`은 그 미결의 회피가 아니라
+      §1.2가 정한 **선언값 자체**이며(*"`Unknown` — 정해진 바 없다"*), `OPEN-DIC-04`가 닫히면 이 값도 함께 교체된다.
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          expected 의 `resolvedBaseAmount`가 `basis: BASE_AMOUNT`를 싣고 `vatTreatment`를 아예 갖지 않았다.
+          그 값은 `sourceKey: asignBdgtAmt`에서 왔으므로 `basis: ALLOCATED_BUDGET` · `vatTreatment: UNKNOWN`으로
+          바로잡고, 대상 자리는 `targetSlot: BASE_AMOUNT`라는 **별도 필드**로 분리했다.
+          `reBasedToBaseAmount: false`와 `arithmeticComparisonWithBaseAmountBasisAllowed: false`를 더해 보존이
+          기대값에서 실제로 재지도록 했다. input 에는 `bssAmt`·`asignBdgtAmt`의 `fieldContract`를 실어
+          **원천 basis·과세·provenance 가 입력에 선언돼 있게** 했다 — 그 선언이 없어 expected 가 basis 를 지어낼 수
+          있었다.
+        reason: |-
+          basis laundering. `data-dictionary.md` §1.2가 예산 키를 `AllocatedBudget`(basis 배정예산, 과세
+          `Unknown`)로 정의하는데 이 fixture 가 그 값을 기초금액 basis 로 재표기하고 과세를 누락했으며,
+          `authoritative` 분류가 그 재표기를 정답으로 고정하고 있었다. Codex 리뷰 B `findings[3]`(high).
+        policy_version: |-
+          해당 없음 — 이 case 의 기대값은 effective-dated 정책 데이터에 의존하지 않는다. 근거 문면은
+          `docs/discovery/data-dictionary.md` §1.2 · §1.2.1 · §5.1 · §5.2 이며 이 라운드에서 그 문면은 바뀌지
+          않았다(병행 레인 소유이므로 이 slice 가 손대지 않는다).
+        previous_sha256: 5b2a1d3edf412d203974461ed6d858e387706a80bf35b42794a6a67aecd90afa
+        previous_expected_sha256: 35b69bbdec59a8199d35478d291ad37d3f68bffa4a995e92957d202fc16f0b2a
     review:
       claude_commit: pending
       codex_verdict: pending

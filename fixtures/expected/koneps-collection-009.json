@@ -2,11 +2,15 @@
   "resolvedBaseAmount": {
     "variant": "FallbackFromBudget",
     "sourceKey": "asignBdgtAmt",
+    "targetSlot": "BASE_AMOUNT",
     "amount": 820000000,
     "currency": "KRW",
-    "basis": "BASE_AMOUNT",
+    "basis": "ALLOCATED_BUDGET",
+    "vatTreatment": "UNKNOWN",
     "provenance": "FilledFromBudgetKey"
   },
   "storedInCanonicalDirectSlot": false,
-  "typeDistinctFromDirect": true
+  "typeDistinctFromDirect": true,
+  "reBasedToBaseAmount": false,
+  "arithmeticComparisonWithBaseAmountBasisAllowed": false
 }

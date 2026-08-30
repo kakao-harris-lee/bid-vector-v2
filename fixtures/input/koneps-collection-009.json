@@ -1,4 +1,33 @@
 {
+  "fieldContract": {
+    "registeredKeys": [
+      {
+        "rawName": "bssAmt",
+        "concept": "기초금액",
+        "type": "money",
+        "unit": "KRW",
+        "scale": "integer",
+        "basis": "BASE_AMOUNT",
+        "vatTreatment": "INCLUSIVE",
+        "nullability": "nullable",
+        "provenance": "Published",
+        "authoritative": true
+      },
+      {
+        "rawName": "asignBdgtAmt",
+        "concept": "배정예산",
+        "type": "money",
+        "unit": "KRW",
+        "scale": "integer",
+        "basis": "ALLOCATED_BUDGET",
+        "vatTreatment": "UNKNOWN",
+        "nullability": "nullable",
+        "provenance": "Published",
+        "authoritative": true,
+        "note": "이 계약은 **이 키 자신의 개념 자리(배정예산)**를 적는다 — basis·과세는 data-dictionary.md §1.2, 과세 `UNKNOWN`의 확정은 `OPEN-DIC-04`가 소유한다. 이 키로 **다른 개념 자리(기초금액)**를 채우면 그 자리의 provenance 는 `FilledFromBudgetKey`이며 권위가 아니다(§5.1)."
+      }
+    ]
+  },
   "payload": {
     "bidNtceNo": "SYN-NTC-0009",
     "bidNtceOrd": "000",

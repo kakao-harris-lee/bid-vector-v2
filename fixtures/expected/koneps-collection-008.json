@@ -1,7 +1,12 @@
 {
   "storedValueOverwritten": false,
   "resultAmount": 900000000,
+  "resultBasis": "ESTIMATED_PRICE",
+  "resultVatTreatment": "EXCLUSIVE",
   "resultProvenance": "Published",
   "incomingRecordedAs": "NonAuthoritativeFillOnly",
+  "incomingReBasedToTargetSlotBasis": false,
+  "incomingRecordedBasis": "ALLOCATED_BUDGET",
+  "incomingRecordedVatTreatment": "UNKNOWN",
   "reasonCode": "OccupancyGuard"
 }
