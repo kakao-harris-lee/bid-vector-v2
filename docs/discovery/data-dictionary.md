@@ -137,6 +137,12 @@ legacy는 **한 basis 태그가 두 개념을 덮고**(추정가격 ↔ 배정�
 | **시공능력평가금액 — 운영자 보유액** | `ConstructionCapacityAmount` | 원 / 시공능력평가액 | **`Inclusive`** | **과세 처리**가 `authoritative` — 운영자 결정 (**U-2**). **단위는 그 결정이 아니라 입력 계약이 정한다** — 운영자가 직접 넣는 값이라 `Money`로 받는 자리이고 그 단위는 `v2-지침서.md` §4.1이 못 박는다(§11). **공고가 게시하는 요건 값은 이 행이 아니다** — §5.5의 별도 타입이고 **`Money`가 아니며** 단위·과세가 미결이다 |
 | **도급한도** | `AwardedContractLimit` | 원 / 도급한도 | `Unknown` | 적합도 축(`OPEN-QUAL-08` 분할 확정) |
 
+**파생 금액의 provenance를 지금 어휘가 표현하지 못한다.** `BidAmount`는 위 표가 적듯
+**기초금액에 투찰율을 곱해 얻는 파생값**인데, §5.1의 `FactProvenance`에 **그 산출과 그
+입력 조합을 표현하는 값이 없어** `Undeclared`로 떨어진다. 그러면 `v2-지침서.md` §4.1이
+**모든 `Money`에 필수**로 둔 `provenance`가 이 자리에서 **형식적 필드**가 되고, §5.1의
+둘째 규율이 그 값을 권위로 취급하지 않는다 → **`OPEN-DIC-08`**.
+
 #### 1.2.1 과세 처리 — **정의와 저장 값을 구별한다**
 
 `VatTreatment = sealed { Inclusive, Exclusive, Unknown }`이며 **금액의 필수 필드**다.
@@ -372,6 +378,14 @@ legacy는 `0.0`을 부재 표현으로 쓴다 — `HistoricalData.base_amount`·
 >
 > **`AwardRate`는 그런 요구를 적은 적이 없다** — 훑어 확인했고 이 라운드가 그 행에 더한
 > 것은 없다.
+
+> **⚠ 정정 (2026-08-30, Codex 리뷰 라운드 5 high #1)** — 위 셋째 항목의 **「좁혔다」는 다른
+> 축의 판정이었다.** 그것이 답한 것은 **런타임에 두 자리를 구별해야 하는가**이고, 리뷰어가
+> 든 것은 **파생값이 입력과 떨어져 저장·전송된 뒤 그 입력 fact를 되짚을 수 있는가**다.
+> **두 축은 같지 않다** — 입력 두 `Money`가 그 축을 나르는 것은 **그 `Money`를 함께 들고
+> 있을 때뿐**이고, 율 값만 남으면 그 연결이 끊긴다. **앞 판정은 지우지 않는다** — 그것이
+> 답한 축(런타임 구별)에 대해서는 그대로 선다. **되짚기 축은 이 문서가 닫지 못한다** →
+> **`OPEN-DIC-08`**(§1.2 · §5.1 · §12.2). **같은 축이 `BidAmount`에도 걸린다**(§1.2).
 
 **원문 unit이 보존되는 자리는 값이 아니라 필드 계약이다.** §1.4.1은 *"원문 unit을 수집
 시점에 붙잡는다"*고만 적고 **어느 자리가 그것을 나르는지는 §5.3이 갖는다** —
@@ -1120,6 +1134,11 @@ legacy의 가장 성숙한 장치가 이 축에 있다. `EstimatedAmountSource` 
 > `isAuthoritative`는 **술어가 아니라 데이터로 선언한다** — 어휘가 늘 때 "덮을 수 있는가"를
 > 한 자리에서 정하고, 빠뜨리면 기본이 **보수(fill-only)**다.
 
+**이 어휘에 파생 산출을 표현하는 값이 없다.** `DerivedFromOpening`이 가리키는 것은
+**개찰 역산** 하나이고, 기초금액에 투찰율을 곱해 얻는 산출처럼 **다른 계산과 그 입력
+조합**을 나르는 variant가 없다. 그런 값은 `Undeclared`로 떨어져 **아래 둘째 규율에 걸리고
+권위가 되지 않는다** → **`OPEN-DIC-08`**(§1.2 · §12.2).
+
 **`OperatorDeclared`가 왜 여기 있는가 — 다섯으로는 덮이지 않는 자리가 실재한다.**
 legacy에서 도출한 나머지는 **전부 KONEPS 수집 경로 안의 해석 경로**다(게시 · 개찰 역산 ·
 예산 키 폴백 · 기초금액 사본 · 미신고). 그런데 `v2-지침서.md` §4.1이 **모든 `Money`에
@@ -1553,6 +1572,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | **`OPEN-DIC-05`** | **`BaseAmountProvenance`의 승인 라벨 다섯이 legacy 실측을 덮는가** — ① `suspect-fractional`에 대응하는 이름이 승인 명세에 없다 ② **미판정(`NULL`)과 「출처를 모름」(`Unknown`)이 같은 값인가** | — (0C 자체 발견) | **승인 명세(`v2-지침서.md` §4.3)의 집합을 이 문서가 바꿀 수 없다.** `OPEN-DEC-08`은 **legacy `clean` 승계 금지**만 확정했고 라벨 집합 변경을 승인하지 않았다. **바꾸려면 별도 결정이 필요하다** | §3.4 |
 | **`OPEN-DIC-06`** | **V2 canonical write 경로가 `Undeclared` provenance를 거부하는가** — 거부한다면 그 경계의 입력 타입은 `FactProvenance`의 진부분집합이다 | — (0C 자체 발견) | **근거가 한쪽으로 서지 않는다.** §5.1의 **둘째 규율**은 `Undeclared`를 **권위로 취급하지 않을** 뿐 **금지하지 않고**, 같은 축의 `vatTreatment`에서 §1.2.1은 *"선언을 만들 수 없으면 `Unknown`"*을 **허용**한다. **어댑터의 의무를 정하는 결정**이므로 이 문서가 정할 자리가 아니다 | §7.1 · §5.1 |
 | **`OPEN-DIC-07`** | **전송 멱등 키와 재관측 키가 각각 무엇으로 이루어지는가** — 무엇이 **한 전송**을 식별하고 무엇이 **같은 사실**을 식별하는가 | **U-3이 fold 재정의만 정했다** | **두 역할을 한 키가 겸할 수 없다는 것**은 모순 제거로 확정되나(§2.2.3) **키의 구성**은 아니다. **U-3은 fold로의 재정의를 정했고 멱등 키의 구성을 정하지 않았다.** `OPEN-SET-04`가 소유한 것은 **재관측의 노출 여부**이지 키의 구성이 아니다 | §2.2.3 |
+| **`OPEN-DIC-08`** | **파생 `Money`와 파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가.** 걸리는 값은 `BidAmount`(기초금액 × 투찰율)와 `AssessmentRate`·`AwardRate`다. **선택지 셋** — ① **아무것도 싣지 않는다.** 되짚기는 그 값을 낸 판정의 `DecisionProvenance`(§4.1: `policyVersion`·`inputSnapshotHash`)로만 하고, 값과 판정이 떨어지면 되짚지 않는 것을 받아들인다 ② **값이 입력 fact의 안정적 참조와 계산 정책 version을 나른다**(참조는 §12.2의 식별자 갈래) ③ **`FactProvenance`에 파생 산출 variant를 더해** 그 안에 ②를 넣는다 | — (Codex 5차 리뷰가 드러냈다) | **운반 범위를 정하는 결정**이다. 저장·전송되는 값에 무엇을 얹을지는 이 문서가 근거로 고를 수 없다 — `v2-지침서.md` §4.1은 `provenance`를 **필수**로만 두고 **파생값이 무엇을 실을지 정하지 않으며**, legacy에는 파생 금액의 provenance 자리 자체가 없다 | §1.2 · §1.4.2 · §5.1 · §12.2 |
 
 **활성 `OPEN`은 해소하지 않았다.** 이 문서가 문면에서 마주친 것 — `OPEN-QUAL-05` ·
 `OPEN-QUAL-09` · `OPEN-QUAL-10`(게시 요건 축 · 보유액의 `unit`) · `OPEN-QUAL-11` ·
@@ -1798,11 +1818,11 @@ U-5로 **새로 닫는다**고 적었으나 **2026-08-26에 이미 닫혀 있었
 
 | 필드 | 단위 | basis / 축 | provenance | 소유 `OPEN` |
 | --- | --- | --- | --- | --- |
-| `amount` (`Money`) | **원(KRW), 정수** | 같은 값의 `basis` 필드가 정하는 금액 축(§1.2) | 수집 어댑터가 `provenance`·`vatTreatment`와 함께 싣는다 | — |
+| `amount` (`Money`) | **원(KRW), 정수** | 같은 값의 `basis` 필드가 정하는 금액 축(§1.2) | 수집 어댑터가 `provenance`·`vatTreatment`와 함께 싣는다. **파생 금액(`BidAmount`)은 그 경로가 아니라 계산에서 나오고, 그 산출을 표현하는 `FactProvenance` variant가 없다**(§1.2 · §5.1) | **`OPEN-DIC-08`**(파생 금액 축) |
 | `money` (`ConstructionCapacityAmount`) | `Money` 한 벌 — 위와 같다 | 시공능력평가액 **보유액** | 그 `Money`의 `provenance`가 나른다 — 운영자 보유액이므로 `OperatorDeclared`(§1.2.4 · §5.1) | — |
 | `requiredAmount` (`ConstructionCapacityRequirement`) | **미정 — 게시값의 원문 단위가 확인되지 않았다.** 조달청 문서가 이 필드에 단위·과세를 적지 않는다(§5.5). **타입이 `Money`가 아니라 `UnnormalizedFigure`이고 서명이 그 미정을 나른다** — 단위는 같은 값의 `fieldContract`가 선언해야 정해진다 | 시공능력평가액 **요건** | 공고 게시값이므로 그 `fieldContract`의 `provenance`가 `Published`. **legacy가 수집하지 않으며 `vatTreatment`도 그 계약이 나르고 `Unknown`이다**(§5.5) | **`OPEN-QUAL-10`의 게시 요건 축**(§11의 ⚠ 정정). 수집 신설은 §13.4 인계 |
 | `figure` (`UnnormalizedFigure`) | **미정 — 같은 값의 `fieldContract`가 선언하는 `unit`·`scale`이 정한다.** 그 선언이 없으면 판정에 넣지 않는다(§5.5). **값 자신은 단위를 주장하지 않는다** | 그 계약의 `basis`가 정하는 축. 이 타입을 쓰는 자리는 지금 `requiredAmount` 하나다 | 그 계약의 `provenance`가 나른다 | **`OPEN-QUAL-10`의 게시 요건 축** |
-| `fraction` (`Rate` — `AssessmentRate` · `AwardRate` · `FloorRate` · `BidRate`) | fraction | **그 뉴타입이 정하는 율 축**(§1.4.2). 넷을 섞는 것은 타입이 막고, **값 크기로 단위를 추측하는 경로를 두지 않는다**(§1.4.1) | **이 값 자신은 provenance를 나르지 않는다.** 출처가 갈리는 두 축은 **같은 타입의 `origin` 필드**가 나른다 — `FloorRate`는 `NoticeValue(noticeRevision)`(공고 게시값, §1.4.3 **B6** 신뢰 게이트가 이 variant에만 걸린다)와 `StatutoryTable(effectiveFrom)`(§4.4 정책 데이터)을, `BidRate`는 `ObservedFromSamples`(§6.5 표본 축)와 `Recommended`(§3.3의 입력)를 가른다(아래 「수를 나르지 않는 필드」). 파생 율의 **입력** provenance는 그 입력 `Money`의 `provenance`가 갖는다(§5.1 · 이 표의 `amount` 행). **원문 unit도 나르지 않는다** — 그것은 §5.3 필드 계약의 `unit`·`scale`에 있다 | — |
+| `fraction` (`Rate` — `AssessmentRate` · `AwardRate` · `FloorRate` · `BidRate`) | fraction | **그 뉴타입이 정하는 율 축**(§1.4.2). 넷을 섞는 것은 타입이 막고, **값 크기로 단위를 추측하는 경로를 두지 않는다**(§1.4.1) | **이 값 자신은 provenance를 나르지 않는다.** 출처가 갈리는 두 축은 **같은 타입의 `origin` 필드**가 나른다 — `FloorRate`는 `NoticeValue(noticeRevision)`(공고 게시값, §1.4.3 **B6** 신뢰 게이트가 이 variant에만 걸린다)와 `StatutoryTable(effectiveFrom)`(§4.4 정책 데이터)을, `BidRate`는 `ObservedFromSamples`(§6.5 표본 축)와 `Recommended`(§3.3의 입력)를 가른다(아래 「수를 나르지 않는 필드」). 파생 율의 **입력** provenance는 그 입력 `Money`의 `provenance`가 갖는다(§5.1 · 이 표의 `amount` 행) — **다만 그것이 서는 것은 그 `Money`를 함께 들고 있을 때뿐이고, 율이 입력과 떨어져 저장·전송되면 되짚을 수 없다**(§1.4.2의 ⚠ 정정). **원문 unit도 나르지 않는다** — 그것은 §5.3 필드 계약의 `unit`·`scale`에 있다 | **`OPEN-DIC-08`**(되짚기 축) |
 | `frequency` | fraction | `numerator` ÷ `denominator`. **확률이 아니다**(§3.3) | 표본 집합에서 계산한 파생값 | — |
 | `criticalAssessmentRate` | fraction | **사정률 축**(예정가 ÷ 기초금액) | 추천 투찰율 ÷ 낙찰하한율의 파생값 | — |
 | `numerator` | 건수 | 하한 미달로 판정된 표본 수 | 표본 집합 | — |

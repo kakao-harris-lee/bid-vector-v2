@@ -207,6 +207,7 @@
 | `OPEN-DIC-05` | `BaseAmountProvenance`의 승인 라벨 다섯이 legacy 실측을 덮는가 | **승인 명세(`v2-지침서.md` §4.3)의 집합을 이 문서가 바꿀 수 없다.** Codex finding **B**가 그 변경을 적출했고, 이 문서는 **승인 집합으로 되돌린 뒤 차이를 미결로 등록**했다 |
 | `OPEN-DIC-06` | V2 canonical write 경로가 `Undeclared` provenance를 거부하는가 | Codex 2차 high 1이 「provenance 필수 필드이므로 C2가 타입으로 `0`」을 적출했다. `Undeclared`가 집합의 멤버라 그 주장이 서지 않고, **거부할지는 어댑터의 의무를 정하는 결정**이라 이 문서가 정할 자리가 아니다 |
 | `OPEN-DIC-07` | 전송 멱등 키와 재관측 키가 각각 무엇으로 이루어지는가 | Codex 2차 high 3이 멱등 단위와 재관측 계수의 충돌을 적출했다. **두 역할을 한 키가 겸할 수 없다는 것**은 모순 제거로 확정되나 **키의 구성**은 U-3도 `OPEN-SET-04`도 정하지 않았다 |
+| `OPEN-DIC-08` | 파생 `Money`·파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가 | Codex 5차 high #1이 **파생값이 입력과 떨어져 저장·전송되면 되짚을 자리가 없다**는 것을 적출했다. **운반 범위를 정하는 결정**이라 이 문서가 고를 자리가 아니다 |
 
 **등록 자리는 사전 §9 하나다.** `capability-map.md` §12와 ledger `OPEN-REG`는
 **out_of_scope**이며 무변경이다(`commands.md` **C-6.1**). 중앙 registry 통합은 별도
