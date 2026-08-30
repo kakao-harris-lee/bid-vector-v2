@@ -39,7 +39,9 @@ property test로 변환 왕복, 반올림 경계, 잘못된 단위 거부를 검
 - 단일 면허 조건
 - 그룹 내 AND, 그룹 간 OR
 - `Eligible`, `Ineligible(reasons)`, `Uncertain(reasons)`
-- 별칭/포괄 코드/유효기간/지역 조건을 versioned policy data로 분리
+- 별칭/포괄 코드/지역 조건을 versioned policy data로 분리
+- **유효기간은 다루지 않는다** — `v2-지침서.md` §4.2(운영자 결정 2026-08-28 U-7, 문면
+  집행 2026-08-29 Q2). **대신 자격 판정 결과에 「유효기간 미검증」이 드러나야 한다**
 
 ### Slice 1D — Provenance와 Floor Shortfall
 
