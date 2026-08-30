@@ -1,0 +1,56 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "aff62abfca85ca873932fedcad1e65c29ab35730",
+  "reviewed_head": "cf1b6a31cfda132ce43bb606f9852753ce36dbae",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 331,
+      "evidence": "`AssessmentRate`와 `AwardRate`는 입력 `Money`의 provenance를 값에 싣지 않고 별도 입력 객체에만 남긴다. 따라서 파생 율이 저장·전송되면 어느 입력 fact에서 계산됐는지 복원할 연결이 없다. 같은 결함이 금액에도 있다. 99행은 모든 `Money`가 `FactProvenance`를 필수로 갖는다고 정의하고 136행은 `BidAmount`를 기초금액과 투찰율의 파생값으로 정의하지만, 1117행의 `FactProvenance` variant에는 추천 산출 또는 해당 입력 조합을 표현할 값이 없다. `Undeclared`를 쓰면 provenance 필수화가 형식적 필드로 축소된다. 이는 A2와 `v2-지침서.md` §4.1의 값-출처 동반 요구를 충족하지 못하며 C-4.2는 선언된 이름의 등재만 검사하므로 이 누락에도 PASS한다.",
+      "required_fix": "파생 율과 `BidAmount`에 입력 fact의 안정적 참조/provenance 및 계산 정책 version을 나르는 타입·필드·sealed variant를 정의하고 §12.2에 등재하라. 아직 운반 범위를 결정할 수 없다면 정확한 미결 질문을 활성 `OPEN-DIC`으로 등록하라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 571,
+      "evidence": "`TenderOutcome.current`는 각 필드의 '마지막' 관측을 사용한다고만 정의한다. 입력에는 `observedAt`이 있지만 마지막을 append/delivery 순서로 정하는지, `observedAt`으로 정하는지, 동률의 tie-break가 무엇인지와 늦게 도착한 과거 관측의 처리가 없다. 따라서 동일한 논리 관측 집합을 A→B와 B→A로 전달하면 서로 다른 current가 가능하다. `deliveryKey` 중복 제거는 retry만 막을 뿐 out-of-order 병합을 결정하지 않으므로 `v2-지침서.md` §4.5의 out-of-order event 요구와 재현 가능한 fold 명세를 충족하지 못한다.",
+      "required_fix": "fold의 총순서 키와 deterministic tie-break, 늦은 관측의 적용/보존 규칙을 정의하고 동일 event 집합의 전달 순서를 바꿔도 의도한 current가 나오는 acceptance scenario를 명시하라. 정책 결정이 필요하면 별도 활성 `OPEN-DIC`으로 등록하라."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 112,
+      "evidence": "확정 금액은 `Long`이고 `BidAmount`는 fraction 율을 곱해 만들기 때문에 정수화 규칙이 필수지만, 문서는 `RoundingPolicy`를 중앙화한다고만 하고 자리수·rounding mode·policy version을 나르는 타입이나 채택값을 정의하지 않는다. §12.1의 `2`, `4`, `6`은 모두 legacy 값이며 V2 미채택으로 명시돼 있고 이 미결을 소유하는 `OPEN`도 없다. 같은 입력에서 어떤 `BidAmount`가 나오는지 재현할 수 없고 capability-map DEC-02의 하한 아래 반올림 방지 acceptance도 판정할 수 없다.",
+      "required_fix": "`RoundingPolicy`의 최소 계약(자리수/scale, rounding mode, version/effective date)을 정의하고 투찰가 산출이 사용하는 정책을 지정하라. 값 또는 방식이 미정이면 그 질문을 활성 `OPEN-DIC`으로 등록하라."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse --verify aff62abfca85ca873932fedcad1e65c29ab35730^{commit}; git rev-parse --verify cf1b6a31cfda132ce43bb606f9852753ce36dbae^{commit}; git rev-parse HEAD; git status --short --untracked-files=all",
+    "git diff --stat --name-status aff62abfca85ca873932fedcad1e65c29ab35730...cf1b6a31cfda132ce43bb606f9852753ce36dbae -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "git rev-list --count aff62abfca85ca873932fedcad1e65c29ab35730...cf1b6a31cfda132ce43bb606f9852753ce36dbae",
+    "git diff --check aff62abfca85ca873932fedcad1e65c29ab35730...cf1b6a31cfda132ce43bb606f9852753ce36dbae -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "commands.md C-3 재실행 — 6축 전부 존재, exit=0",
+    "commands.md C-4.1 재실행 — 정의 없는 숫자 토큰 0, PASS",
+    "commands.md C-4.2 재실행 — 기록된 술어 기준 미덮개 0, PASS",
+    "commands.md C-5 재실행 — policy version 언급 자리 출력, exit=0",
+    "commands.md C-6.1 재실행 — 상류·0D 산출물 변경 0건",
+    "commands.md C-6.2 재실행 — OPEN-DIC 7행, 중복 0",
+    "commands.md C-6.3 재실행 — 신설 7·활성 15·결정 완료 19·미분류 0",
+    "commands.md C-8 재실행 — planted probe 7/7 탐지, 실제 값 형태 추가 매치 0, PASS",
+    "scope.md 라운드 이력 footer 명령 재실행 — 행 없는 0C 커밋 목록 확인",
+    "commands.md C-10.2 재실행 시도 — 격리 환경의 read-only `.git` 때문에 임시 worktree 생성이 거부되어 exit=1",
+    "rg/nl로 `Money`, `BidAmount`, `Rate`, `FactProvenance`, `TenderOutcome` 및 `RoundingPolicy` 정의와 관련 ADR/지침 대조",
+    "git status --porcelain=v1 --untracked-files=all — 최종 clean 확인"
+  ],
+  "residual_risks": [
+    "격리 worktree에 `bid-vector`와 `_workspace/`가 없어 C-1, C-7, C-9의 원본·legacy 인용 검증은 재실행하지 못했고 커밋된 출력에 의존했다.",
+    "C-10.2는 Git metadata 쓰기 권한이 없어 독립 재현하지 못했다. C-3, C-4, C-5, C-6, C-8 등 비파괴 핵심 블록은 개별 재실행했다.",
+    "경로 필터 밖의 0D ADR/evidence 변경은 이번 finding에 포함하지 않았다.",
+    "C-4.2가 요구와 실제 carrier의 대응을 검사하지 못한다는 문서화된 사각지대는 남아 있어, 위 provenance·정책 누락 외에도 신규 타입 변경 시 수동 감사가 계속 필요하다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
