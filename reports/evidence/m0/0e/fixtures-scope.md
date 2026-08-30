@@ -66,6 +66,15 @@
 5. **`license-011`의 기대값은 잠정이다** — `OPEN-QUAL-11` 결정 전 임시 처리이고 `provisional`
    필드가 그 사실을 나른다.
 
+## evidence 패키지에서 성립하지 않는 항목 (`N/A + 사유`)
+
+- `differential.json`: **N/A** — Python/V2 차이 판정은 두 항이 있어야 성립하는데 V2 구현이
+  아직 없고 `legacy-behavior` case 도 0건이다. legacy 순수 함수 실행은 승인 대상이며 요청하지
+  않았다(`access_approval_required` **A-3**). 그 판정은 fixture 를 소비하는 첫 구현 slice 의 몫이다.
+- `golden-manifest.json`: **N/A** — 이 slice 는 fixture 를 **소비**하지 않고 **등재**한다. 그 파일이
+  담을 것(사용 fixture id · 출처 분류 · SHA-256)을 `fixtures/manifest.yaml` 이 case 마다 이미 갖고
+  **F-1** 이 SHA-256 대조를 돌린다. 별도 파일로 복제하면 두 벌이 갈린다.
+
 ## rollback
 
 `fixtures/` 디렉터리 전체와 `reports/evidence/m0/0e/fixtures-*.md`를 지우면 base 상태다.
