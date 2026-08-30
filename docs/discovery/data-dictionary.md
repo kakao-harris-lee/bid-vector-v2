@@ -128,8 +128,9 @@ V2는 `RoundingPolicy`를 정책 데이터로 두고 version을 붙인다(§4).
 `mode`가 무엇이든 판정할 수 있다** — 재는 것이 결과와 하한의 비교이기 때문이다.
 
 **정해지지 않은 것** — `mode`의 값, **금액 축 밖**(집계·리포팅)의 `scaleDigits`, 첫
-`effectiveFrom` → **`OPEN-DIC-10`**. §12.1의 legacy 자리수 셋은 **V2 미채택**이고 그
-미결을 이 `OPEN`이 소유한다.
+`effectiveFrom` → **`OPEN-DIC-10`**. §12.1이 적는 legacy 반올림 자리수 가운데 **금액 축의
+것은 위 정의 ①이 닫았고**(그래서 V2가 그 자리수를 쓰지 않는다), **금액 축 밖의 것은 값이
+미결이라 이 `OPEN`이 소유한다** — 승계할지 여부가 그 미결 안에 있다.
 
 **basis 교차 대입은 타입으로 막는다.** legacy는 `NewType` 두 개(`BaseAmount`·`YegaAmount`)만
 두고 나머지 둘에는 타입이 없으며, `NewType`은 런타임에 소멸한다고 코드가 명시한다
@@ -1620,7 +1621,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | **`OPEN-DIC-07`** | **전송 멱등 키와 재관측 키가 각각 무엇으로 이루어지는가** — 무엇이 **한 전송**을 식별하고 무엇이 **같은 사실**을 식별하는가 | **U-3이 fold 재정의만 정했다** | **두 역할을 한 키가 겸할 수 없다는 것**은 모순 제거로 확정되나(§2.2.3) **키의 구성**은 아니다. **U-3은 fold로의 재정의를 정했고 멱등 키의 구성을 정하지 않았다.** `OPEN-SET-04`가 소유한 것은 **재관측의 노출 여부**이지 키의 구성이 아니다 | §2.2.3 |
 | **`OPEN-DIC-08`** | **파생 `Money`와 파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가.** 걸리는 값은 `BidAmount`(기초금액 × 투찰율)와 `AssessmentRate`·`AwardRate`다. **선택지 셋** — ① **아무것도 싣지 않는다.** 되짚기는 그 값을 낸 판정의 `DecisionProvenance`(§4.1: `policyVersion`·`inputSnapshotHash`)로만 하고, 값과 판정이 떨어지면 되짚지 않는 것을 받아들인다 ② **값이 입력 fact의 안정적 참조와 계산 정책 version을 나른다**(참조는 §12.2의 식별자 갈래) ③ **`FactProvenance`에 파생 산출 variant를 더해** 그 안에 ②를 넣는다 | — (Codex 리뷰 라운드 5가 드러냈다) | **운반 범위를 정하는 결정**이다. 저장·전송되는 값에 무엇을 얹을지는 이 문서가 근거로 고를 수 없다 — `v2-지침서.md` §4.1은 `provenance`를 **필수**로만 두고 **파생값이 무엇을 실을지 정하지 않으며**, legacy에는 파생 금액의 provenance 자리 자체가 없다 | §1.2 · §1.4.2 · §5.1 · §12.2 |
 | **`OPEN-DIC-09`** | **fold의 순서 술어 — ① 총순서 키가 무엇으로 이루어지는가 ② 그 키가 같을 때 무엇으로 가르는가 ③ 늦게 도착한 과거 관측이 current에 적용되는가**(보존은 이미 정해졌다 — §2.2.3). **선택지** — 키: ⓐ `observedAt` 단독 ⓑ `observedAt` + 생산자를 가르는 보조 축 ⓒ 관측이 나르는 별도 순번. tie-break: ⓐ 두지 않는다(같은 키의 두 관측은 같은 값이어야 한다) ⓑ 명시 우선순위를 둔다. 늦은 관측: ⓐ 키가 최대면 적용한다 ⓑ 보존만 하고 current를 바꾸지 않는다 | **U-3이 fold 재정의만 정했다** | **정책 결정**이다. **legacy에 답이 없다** — 전달 순서대로 in-place mutate하고 순서 키를 읽지 않으며(`app/services/tender_result_persistence.py:25-49`), `observed_at`이 **nullable**이고(`app/models/pipeline.py:130-144`) 생산자마다 다른 시각을 넣는다(`app/services/tender_result_persistence.py:72-84` · `app/services/opening_result_collection.py:373-380`) | §2.2.3 |
-| **`OPEN-DIC-10`** | **`RoundingPolicy`의 `mode` 값, 금액 축 밖(집계·리포팅)의 `scaleDigits`, 첫 `effectiveFrom`.** **선택지** — `mode`: ⓐ 사사오입 ⓑ 짝수 자리 반올림 ⓒ 하한 쪽으로는 올림 고정. 금액 축 밖 `scaleDigits`: ⓐ legacy의 자리수를 축별로 승계 ⓑ 축 하나로 통일. | — (Codex 리뷰 라운드 5가 드러냈다) | **값의 결정**이다. legacy 자리수 셋은 **V2 미채택**으로 이미 판정돼 있고(§12.1) 승인 명세가 요구하는 것은 **형태**(`RoundingPolicy`와 version)뿐이다 — 값을 고를 근거가 이 저장소에 없다. **정해진 둘(금액 축의 자리수 · 하한 이상 보장)은 §1.1이 갖는다** | §1.1 · §12.1 · §12.2 |
+| **`OPEN-DIC-10`** | **`RoundingPolicy`의 `mode` 값, 금액 축 밖(집계·리포팅)의 `scaleDigits`, 첫 `effectiveFrom`.** **선택지** — `mode`: ⓐ 사사오입 ⓑ 짝수 자리 반올림 ⓒ 하한 쪽으로는 올림 고정. 금액 축 밖 `scaleDigits`: ⓐ legacy의 자리수를 축별로 승계 ⓑ 축 하나로 통일. | — (Codex 리뷰 라운드 5가 드러냈다) | **값의 결정**이다. 승인 명세가 요구하는 것은 **형태**(`RoundingPolicy`와 version)뿐이고 값을 고를 근거가 이 저장소에 없다. §12.1의 legacy 자리수 가운데 **금액 축의 것은 §1.1 정의 ①이 닫아 V2 미채택**이고, **금액 축 밖의 것은 승계할지 여부부터 이 미결 안에 있다.** **정해진 둘(금액 축의 자리수 · 하한 이상 보장)은 §1.1이 갖는다** | §1.1 · §12.1 · §12.2 |
 
 **활성 `OPEN`은 해소하지 않았다.** 이 문서가 문면에서 마주친 것 — `OPEN-QUAL-05` ·
 `OPEN-QUAL-09` · `OPEN-QUAL-10`(게시 요건 축 · 보유액의 `unit`) · `OPEN-QUAL-11` ·
@@ -1836,8 +1837,8 @@ U-5로 **새로 닫는다**고 적었으나 **2026-08-26에 이미 닫혀 있었
 | `0.58` · `0.86` · `0.84` · `0.82` · `0.45` | 무차원 | price regime 규칙표의 confidence·fallback | `app/ai/price_prediction/price_regime.py:45-69` | `legacy-behavior` | **`OPEN-ML-05`** |
 | `-1.0` | 범주 코드 | 미지 범주 피처 코드 | `app/domain/award_rate_features.py:60-90` | `legacy-behavior` | — |
 | `0` · `0.0` | 해당 없음 | **부재를 표현하는 데 쓰인 legacy sentinel** — 금액·율·건수·정산 여부 축에 걸쳐 있다 | `app/models/models.py:264-306` · `app/models/pipeline.py:147-167` · `app/domain/settlement_maturity.py:81-86` · `app/domain/aggregates.py:59-68` | `legacy-behavior` | — (`OPEN-ML-04` 확정: 부재를 `0`으로 적재하지 않는다 — §1.3) |
-| `2` | 자리수 | legacy 투찰가 반올림 자리수 | `app/ai/bid_target.py:56-59` | `legacy-behavior` | **`OPEN-DIC-10`** (V2 미채택 — §1.1) |
-| `4` · `6` | 자리수 | legacy 집계 반올림 자리수(콜사이트별) | `app/domain/aggregates.py:20-26` | `legacy-behavior` | **`OPEN-DIC-10`** (V2는 `RoundingPolicy`로 중앙화 — §1.1) |
+| `2` | 자리수 | legacy 투찰가 반올림 자리수 — **금액 축** | `app/ai/bid_target.py:56-59` | `legacy-behavior` | — (§1.1 정의 ① 확정: 금액 축은 원 단위 정수 — V2 미채택) |
+| `4` · `6` | 자리수 | legacy 집계 반올림 자리수(콜사이트별) — **금액 축 밖** | `app/domain/aggregates.py:20-26` | `legacy-behavior` | **`OPEN-DIC-10`** (V2는 `RoundingPolicy`로 중앙화 — §1.1) |
 
 **이 표에 없는 수를 본문에 쓰지 않는다.** 예외는 **legacy 파일의 행 범위** · **날짜** ·
 **절 번호** · **식별자**(`OPEN-…` · `DEC-…` · `#…` · commit 해시)뿐이며 C-4.1이 그 예외를
