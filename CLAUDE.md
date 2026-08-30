@@ -53,3 +53,4 @@ Codex가 `request_changes`를 반환하면 같은 scope에서 Claude가 수정�
 | 2026-08-22 | codex --output-schema용 strict 변형 스키마 추가 (모든 키 required, line null 허용, reviewer 제외) | codex-review-gate | 첫 리뷰 실행에서 OpenAI strict 제약 위반으로 400 실패 발견 |
 | 2026-08-26 | codex 호출에 `model_reasoning_effort=high` 고정 | codex-review-gate | M0/0A 3차 리뷰에서 같은 range가 effort에 따라 medium `approve` / high `request_changes`로 갈려 리뷰 재현성 결여 발견 |
 | 2026-08-27 | codex 호출에 `features.memories=false` 추가 + memory 흔적 preflight | codex-review-gate | M0/0B 4차 리뷰에서 codex의 첫 명령이 worktree 밖 `~/.codex/memories/MEMORY.md`를 읽어, worktree 격리가 읽기를 막지 못함이 드러남. **override의 효과는 다음 라운드에서 실증 확인 대기** |
+| 2026-08-30 | preflight ②의 `?mode=ro` → `?immutable=1` 교체 + 총 행 수 동반 확인 | codex-review-gate | `mode=ro`가 이 환경에서 반복 실패(`unable to open database file (14)`). 0D가 진동을 관측 다섯으로, 0C 6차 리뷰어가 기제를 진술. **기제는 미확정이고 교체는 「`immutable=1`이 열린다」는 실측에만 기댄다.** `immutable=1`이 동시 writer 부재를 가정하므로 「0행」이 「못 열어서 0」이 아님을 총 행 수로 확인한다 |

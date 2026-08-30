@@ -135,12 +135,30 @@ grep -rniE 'bid-vector-v2|regression-ledger|capability-map|OPEN-REG|0a2|0b-regre
 **선택되지 않을 구조적 이유는 없다.** 그래서 아래 두 번째 검사가 첫 번째보다 먼저 움직인다.
 
 ```bash
-sqlite3 "file:$HOME/.codex/memories_1.sqlite?mode=ro" \
+sqlite3 "file:$HOME/.codex/memories_1.sqlite?immutable=1" \
   "select thread_id, rollout_slug, datetime(generated_at,'unixepoch','localtime')
      from stage1_outputs
     where raw_memory like '%bid-vector-v2-review%'
        or rollout_summary like '%bid-vector-v2-review%';"
 ```
+
+**`?mode=ro`가 아니라 `?immutable=1`이다.** 앞서 `mode=ro`를 썼고 이 환경에서 반복 실패했다
+— `Error: in prepare, unable to open database file (14)`. M0/0D가 그 진동을 관측 다섯으로
+기록했고(sidecar `-wal`/`-shm`이 있으면 열리고 checkpoint된 뒤 없으면 실패), M0/0C 6차
+리뷰어가 기제를 진술했다 — **`mode=ro`도 WAL `-shm` sidecar를 만들어야 하는데 샌드박스가
+그것을 막고, `immutable=1`은 잠금을 아예 건너뛴다.** **그 기제는 실험으로 확정되지 않았다**
+— 진술이지 증거가 아니다. 확정된 것은 **`immutable=1`이 이 환경에서 열린다**는 실측뿐이고,
+이 교체는 그 실측에만 기댄다.
+
+**`immutable=1`은 동시 writer가 없음을 가정한다.** 그래서 **0행을 받았을 때 그것이
+「못 열어서 0」이 아님을 같은 핸들로 확인한다** — 아래처럼 총 행 수를 함께 받아라.
+
+```bash
+sqlite3 "file:$HOME/.codex/memories_1.sqlite?immutable=1" \
+  "select count(*) from stage1_outputs;"
+```
+
+**총 행 수가 0이면 DB를 못 연 것이고 그 라운드는 preflight 미충족이다.**
 
 **0행이 아닌 날이 오면 그 라운드부터 심판은 자기 과거 판정을 물려받는다.** 위 grep은
 consolidate **이후**를 보고 이 질의는 stage1을 보므로, 이 질의가 먼저 걸린다.
