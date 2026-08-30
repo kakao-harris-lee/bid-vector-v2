@@ -5,7 +5,7 @@
 | 자리 | 값 |
 | --- | --- |
 | base_sha | `14686dbf3bff4085203ffdcd931564fd1e36edf0` |
-| head_sha | 이 slice 의 커밋 |
+| head_sha | `9e1223ac2a64f3328b8ea2bdadca9b69c933d264` |
 | 기준 문서 | `data-extract.md` (단일 기준) |
 | legacy 기준 SHA | `ed4b06c` — read-only. **이 slice 는 legacy Python 을 실행하지 않았다** |
 | 착수 근거 | `milestone-1.md:12` M1 선행 조건 · `milestone-0.md:94` 산출물 · `m1-blocking-analysis-v2.md` `N-1`/`T-1` |
