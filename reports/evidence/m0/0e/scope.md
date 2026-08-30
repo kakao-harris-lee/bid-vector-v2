@@ -14,13 +14,15 @@ in_scope:
   - v2-지침서.md                          # §5(Q1) · §4.2(Q2) 문면 개정
   - milestone-1.md                         # 1C 유효기간 요구(Q2 동기화)
   - milestone-0.md                         # 산출물 목록(Q3) + M0 완료 기록
-  - docs/adr/*.md                          # 「상태」 줄만 (3행)
+  - docs/adr/*.md                          # ① 「상태」 줄 아홉 (각 3행)
+                                           # ② ADR 0001 §5 의 OPEN-ADR-01 행 — 해소로 갱신
   - docs/discovery/capability-map.md       # OPEN-OPS-07·OPEN-QUAL-05 registry + §14 이월 목록
   - reports/evidence/m0/0e/                # 이 패키지
 out_of_scope:
   - docs/discovery/data-dictionary.md      # 0C Codex approve 로 확정 — 읽기 전용
   - docs/discovery/regression-ledger.md    # 0B Codex approve 로 확정 — 읽기 전용
-  - docs/adr/** 의 「상태」 줄 이외 전부    # 결정 내용·대안·§5 OPEN registry 무접촉
+  - docs/adr/** 의 위 둘 이외 전부          # 결정 내용·§1~§4·§6 무접촉.
+                                           # §5 도 OPEN-ADR-01 행 하나만이고 나머지 열둘은 무접촉
   - reports/evidence/m0/0a · 0a2 · 0a3 · 0b · 0c · 0d   # 확정된 evidence — 읽기 전용
   - fixtures/                              # fixture-curator 소유. 이 slice 가 만들지 않는다
   - _workspace/**                          # .gitignore 대상. 조사 노트는 읽기만 한다
@@ -63,7 +65,7 @@ rollback: |
 
 | id | 왜 닫히는가 | 남는 것 |
 | --- | --- | --- |
-| `OPEN-ADR-01` | Q1 이 **선택지 (b) Boot 4.x** 로 답했다 | **`ADR 0001` §5 행의 기록 갱신** — `docs/adr/**` 편집이 「상태」 줄로 한정돼 이 slice 가 하지 않았다. 담당 **M1 1A**(그 ADR §5 의 「소유: M1 버전 고정」). `capability-map.md` §14.1·§14.5-1 이 그 사실을 적는다 |
+| `OPEN-ADR-01` | Q1 이 **선택지 (b) Boot 4.x** 로 답했고, 종료 조건인 **`v2-지침서.md` §5 문면 개정**을 이 slice 가 집행했다. **`ADR 0001` §5 행도 해소로 갱신**했다 — 취소선 + 결정·결정자·종료 조건·남는 축 | **나머지 라이브러리의 4.x 호환 실측 재확인** → **M1 1A**(`v2-지침서.md` §5 의 신설 항목이 소유). **새 `OPEN` 을 만들지 않았다** — 고를 것이 없는 **측정**이고, 같은 형태의 선례가 `ADR 0004`(Flyway → 1A 스모크 빌드)이며, 그 축에 남은 **결정**은 `OPEN-ADR-08` 이 이미 들고 있다. 근거 전문은 `ADR 0001` §5 해소 블록 |
 | `OPEN-OPS-07` | 종료 조건 = ADR 대안 절 기입. **`ADR 0005` §3 이 그 기입**이며 0D 가 `approve` 를 받았다. **결정 부재가 아니라 기록 미갱신이었다** | advisory lock 행 → `OPEN-ADR-12` · 3.x→4.x 전제 재확인 → **M1 1A** · 대상 모수(6종 ↔ 9종) → registry 통합 slice |
 | `OPEN-QUAL-05` | 종료 조건 = `v2-지침서.md` §4.2 문면 개정. Q2 가 집행했다 | **없다.** U-7 의 「유효기간 미검증 노출」 요구는 `OPEN` 이 아니라 **명세**로 두 문서에 남겼다 |
 
@@ -98,8 +100,10 @@ rollback: |
 - **새 조사·새 결정을 하지 않았다.** 모든 개정이 이미 내려진 운영자 결정의 집행이다.
 - **`OPEN` 을 임의로 해소하지 않았다** — 닫은 셋은 전부 **종료 조건 충족을 확인**해서 닫았고,
   그 확인의 명령은 `commands.md` C-6 에 있다.
-- **`docs/adr/**` 의 결정 내용을 건드리지 않았다** — diff 가 각 파일 3행뿐임을
-  `commands.md` C-5 가 낸다.
+- **`docs/adr/**` 의 결정 내용을 건드리지 않았다.** 편집은 **「상태」 줄 아홉**과
+  **`ADR 0001` §5 의 `OPEN-ADR-01` 행 하나**뿐이며, 그 행에서도 **미결 당시의 기록
+  (결정 필요 사항·선택지·근거·부수 사실)을 지우지 않고 그대로 보존**한 채 해소 블록을
+  앞에 얹었다. §1~§4·§6 과 §5 의 나머지 `OPEN` 열둘은 무접촉이다 — `commands.md` C-5.
 - **`data-dictionary.md`·`regression-ledger.md`·앞 여섯 slice 의 evidence·`fixtures/` 무접촉** —
   `commands.md` C-7.
 - **네 registry 를 통합하지도, 「활성 총계」를 확정하지도 않았다** — §14.0 이 그 사실을 적고

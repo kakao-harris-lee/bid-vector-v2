@@ -8,9 +8,11 @@
 ## C-0 — 트리 좌표
 ```
 $ git rev-parse HEAD
-da2e53883e8f29d3b26bd71d9477c455e538e89e
+e9bcaabbe20b1adadd07cd7ecb4a7c1fde59407b
 
 $ git log --oneline 14686db..HEAD
+e9bcaab chore(harness): evidence 규격을 금지로 명시하고 검증을 slice 끝 한 번으로 묶는다
+129c1ce docs(m0-0e): scope 의 head_sha·rollback 을 SHA 열거에서 range 로
 da2e538 docs(m0-0e): fixtures 무접촉의 근거를 시점 관측에서 커밋 range 로 바꾼다
 77af80c docs(m0-0e): evidence 패키지 — scope · commands · checklist
 6f7918d docs(m0-0e): Q3 집행(산출물 목록) + M0 완료 기록
@@ -19,11 +21,14 @@ fbbd320 docs(m0-0e): OPEN-OPS-07·OPEN-QUAL-05 registry 갱신 + §14 M0 이월 
 1fe87eb docs(m0-0e): Q1·Q2 문서 개정 집행 — Boot 4.x 이동, 면허 유효기간 축 제거
 
 $ git status --porcelain
- M .claude/skills/v2-slice-pipeline/SKILL.md
- M CLAUDE.md
+ M docs/adr/0001-target-architecture.md
+ M docs/discovery/capability-map.md
+ M reports/evidence/m0/0e/checklist.md
  M reports/evidence/m0/0e/commands.md
  M reports/evidence/m0/0e/scope.md
 ?? fixtures/
+?? reports/evidence/m0/0e/fixtures-commands.md
+?? reports/evidence/m0/0e/fixtures-scope.md
 
 ```
 
@@ -56,9 +61,10 @@ $ sed -n '/^## 9\. `OPEN`/,/^## 10\./p' docs/discovery/data-dictionary.md | grep
 OPEN-DIC-01 OPEN-DIC-02 OPEN-DIC-03 OPEN-DIC-04 OPEN-DIC-05 OPEN-DIC-06 OPEN-DIC-07 OPEN-DIC-08 OPEN-DIC-09 OPEN-DIC-10 
 
 $ grep -hE '^### `OPEN-ADR-[0-9]+`' docs/adr/*.md | grep -oE 'OPEN-ADR-[0-9]+' | sort -u | tr '\n' ' '; echo
-OPEN-ADR-01 OPEN-ADR-02 OPEN-ADR-03 OPEN-ADR-04 OPEN-ADR-05 OPEN-ADR-06 OPEN-ADR-07 OPEN-ADR-08 OPEN-ADR-09 OPEN-ADR-11 OPEN-ADR-12 OPEN-ADR-13 
+OPEN-ADR-02 OPEN-ADR-03 OPEN-ADR-04 OPEN-ADR-05 OPEN-ADR-06 OPEN-ADR-07 OPEN-ADR-08 OPEN-ADR-09 OPEN-ADR-11 OPEN-ADR-12 OPEN-ADR-13 
 
 $ grep -nE '^### ~~`OPEN-ADR-[0-9]+`~~' docs/adr/*.md
+docs/adr/0001-target-architecture.md:277:### ~~`OPEN-ADR-01`~~ · Spring Boot 세대 — **해소**
 docs/adr/0009-ml-reuse-provenance.md:230:### ~~`OPEN-ADR-10`~~ · ML 재활용 출처의 기록 위치 — **해소**
 
 ```
@@ -119,19 +125,19 @@ print('(B) 교 (C)     :', sorted(B & C))
 print('활성인데 미분류:', sorted(a - (B|C)))
 print('분류인데 비활성:', sorted((B|C) - a))
 PY
-활성 전수      : 70
+활성 전수      : 69
 14.1 (A) 표    : 4 ['OPEN-ADR-01', 'OPEN-ADR-06', 'OPEN-ADR-08', 'OPEN-OPS-07']
 14.2 (B)       : 14
 14.3 (C)       : 55
 (B) 교 (C)     : []
-활성인데 미분류: ['OPEN-ADR-01']
+활성인데 미분류: []
 분류인데 비활성: []
 
 ```
 
-**`OPEN-ADR-01` 하나가 활성 전수에 남고 (B)∪(C)에 없다.** 결정은 났고(Q1) 남은 것은
-`ADR 0001` §5 행의 기록 갱신뿐인데 그것이 이 slice의 편집 범위 밖이다 — §14.1과
-§14.5-1이 그 사실과 담당(M1 1A)을 적는다.
+**양방향 대조가 둘 다 빈 출력이다** — 활성 전수가 §14의 (B)∪(C)에 정확히 덮이고, 분류에만
+있고 활성이 아닌 것도 없다. §14.1의 넷은 **0E가 닫았거나 (B)로 내린 것**이라 (B)∪(C)의
+분모가 아니다(`OPEN-ADR-06`·`OPEN-ADR-08`은 §14.2에도 행이 있다).
 
 ---
 
@@ -272,11 +278,17 @@ $ git diff -U0 14686db..HEAD -- docs/adr/ | grep -E '^@@'
 
 ---
 
-## C-6 — `OPEN-OPS-07` 종료 조건의 실재
+## C-6 — 닫은 `OPEN` 셋의 종료 조건이 산출물에 실재하는가
 
 ```
 $ grep -n '^## 3\.' docs/adr/0005-domain-events-and-outbox.md
 236:## 3. 대안 — `OPEN-OPS-07` 후보의 판정
+
+$ grep -cE '^### `OPEN-ADR-01`' docs/adr/0001-target-architecture.md   # 취소선 없는 활성 제목
+0
+
+$ grep -nE '^### ~~`OPEN-ADR-01`~~' docs/adr/0001-target-architecture.md
+277:### ~~`OPEN-ADR-01`~~ · Spring Boot 세대 — **해소**
 
 $ sed -n '/^## 12\. OPEN 결정 목록/,/^### 12\.1/p' docs/discovery/capability-map.md | grep -c 'OPEN-OPS-07'
 7
@@ -301,6 +313,9 @@ $ git log --oneline 14686db..HEAD -- fixtures
 $ git diff --name-only 14686db..HEAD -- fixtures
 
 $ git diff --name-only 14686db..HEAD
+.claude/skills/evidence-pack/SKILL.md
+.claude/skills/v2-slice-pipeline/SKILL.md
+CLAUDE.md
 docs/adr/0001-target-architecture.md
 docs/adr/0002-money-rate-basis.md
 docs/adr/0003-contract-transport.md
