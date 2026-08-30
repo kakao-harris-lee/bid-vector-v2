@@ -13,7 +13,8 @@
 ## in_scope
 
 - `fixtures/manifest.yaml`
-- `fixtures/input/*.json` · `fixtures/expected/*.json` (63 case)
+- `fixtures/input/*.json` · `fixtures/expected/*.json` (`cases` 전건 — **분류와 무관하게** 전부 이
+  레인이 쓴다. 수는 **F-7** 이 낸다)
 - `fixtures/tools/check_legacy_numbers.py` (**F-3**) · `fixtures/legacy-reference-index.json` (**F-5**)
   — `manifest.yaml`의 `layout.other_files`가 둘을 선언한다
 - `reports/evidence/m0/0e/fixtures-*.md`
@@ -27,32 +28,35 @@
 
 ## 이 slice 가 등재하는 것
 
-**`authoritative` 63 case.** `observed` 0건, `legacy-behavior` 0건.
+**층은 둘이다** — `authoritative` 와 `insufficient-evidence`. `observed` 0건, `legacy-behavior` 0건.
 
-| 도메인 | 건수 |
-| --- | --- |
-| license | 12 |
-| koneps-collection | 9 |
-| floor-shortfall | 6 |
-| money-basis | 6 |
-| base-amount-provenance | 5 |
-| floor-applicability | 5 |
-| rate-unit | 5 |
-| capacity-gate | 4 |
-| ml-boundary | 4 |
-| verdict | 4 |
-| floor-threshold | 3 |
+**`insufficient-evidence` 는 운영자 결정 2026-08-31 이 만든 자리다** — `source.kind:
+m0-derived-rule` case 를 `authoritative` corpus 에서 **제외**했다. 근거가 M0 산출 문서의 **자체 도출
+acceptance** 뿐이라 `data-extract.md` §1의 세 층(`authoritative`·`observed`·`legacy-behavior`)
+어디에도 들지 않고, 그 자리의 어휘를 §6이 준다(*"명세가 모호 | `insufficient-evidence`, 완료 gate
+실패"*). **case 는 지우지 않았다** — 되돌림 경로는 `manifest.yaml` 의
+`classification_policy.insufficient_evidence` 와 `next_steps` 가 적는다.
 
-`uncovered_axes` 18 · `insufficient_evidence` 4 · `access_approval_required` 4.
+**셈을 여기 옮겨 적지 않는다** — case 수 · **분류별 분포** · `source.kind` 분포와 그 교차 ·
+`uncovered_axes`/`insufficient_evidence`/`access_approval_required` 수는 전부 **F-7** 이 낸다.
+도메인별 건수도 같은 명령이 낸다(분류를 섞지 않으려면 `kind x class` 줄을 함께 본다).
 
 ## `milestone-1.md:12`("검증 fixture 중 `authoritative` case 준비")를 어디까지 만족하는가
 
-**부분 만족이다.** 63 case 가 `authoritative`로 서지만 `data-extract.md` §4가 요구하는 도메인별
-최소 corpus 가 **전부 차지는 않는다** — 막힌 축은 `fixtures/manifest.yaml`의 `uncovered_axes`가
-소유 `OPEN`과 함께 전수로 적는다. 그 목록을 비우지 않고 그럴듯하게 채우지도 않았다.
+**부분 만족이고, 2026-08-31 결정으로 만족도가 내려갔다.** `authoritative` 로 서는 case 수가
+줄었고(F-7 의 `classification` 줄), 그만큼 `data-extract.md` §4의 도메인별 최소 corpus 를 덮는
+몫이 작아졌다. **내려간 12건이 덮던 축은 사라진 것이 아니라 `uncovered_axes` 로 옮겨졌다** —
+`floor-applicability`(하한 적용 범위·시행일) · `koneps-collection`(필드 계약 강제, 코드·라벨 분리) ·
+`ml-boundary`(결측 provenance, 누수 차단 시그니처) · `license`(허용업종 단독 보유의 임시 처리)
+넷이 그 자리를 받는다. 원래 막혀 있던 축은 그대로 남는다. 그 목록을 비우지 않고 그럴듯하게
+채우지도 않았다.
 
-**분류가 `authoritative`인 것과 승인된 것은 다르다.** 모든 case 의
-`review.approved_by_user`가 `false`, `review.codex_verdict`가 `pending`이다.
+**§6 이 이 상태에 완료 gate 실패를 건다.** 그러므로 `milestone-1.md:12` 는 **이 결정이 되돌려지기
+전에는 이 corpus 만으로 충족되지 않는다** — 되돌림은 운영자가 그 acceptance 들을 업무 규칙으로
+명시 승인하는 것이고, `license-011` 은 그에 더해 활성 `OPEN-QUAL-11` 이 닫혀야 한다.
+
+**분류가 `authoritative`인 것과 승인된 것은 다르다.** `authoritative` 로 남은 것을 포함해 모든
+case 의 `review.approved_by_user`가 `false`, `review.codex_verdict`가 `pending`이다.
 
 ## 알려진 제한
 
@@ -66,18 +70,25 @@
 4. **`fixtures/expected/`의 위치가 `data-extract.md` §3 예시와 다르다.** 이 slice 의 쓰기 범위가
    `fixtures/`로 한정된 결과이며 `manifest.yaml`의 `layout.note`가 선언한다.
 5. **`license-011`의 기대값은 잠정이다** — `OPEN-QUAL-11` 결정 전 임시 처리이고 `provisional`
-   필드가 그 사실을 나른다.
+   필드가 그 사실을 나른다. **그래서 `authoritative` 가 아니다** — 활성 `OPEN` 의 임시 처리를
+   authoritative golden 으로 고정하지 않는다.
 6. **legacy 좌표의 재검증이 두 갈래다.** `fixtures/legacy-reference-index.json`이 pinned commit 과
    39개 좌표(§2 목록 15 + `legacy_reference` 24)의 **git object id** 를 저장소 안에 고정한다.
    legacy 체크아웃이 있으면 object id 까지 다시 잰다(**F-5.3**). 없으면 잴 수 있는 것은 **그때
    무엇을 봤는지의 고정과 manifest 와의 일치**뿐이다(**F-5.1**·**F-5.2**) — 그 index 자체가
    legacy 저장소에 대해 옳다는 것은 체크아웃 없이 확인되지 않는다.
-7. **일부 case 의 `authoritative` 분류가 조건부다.** 근거가 M0 산출 문서의 **자체 도출
-   acceptance** 뿐이고 그것을 세운 운영자 결정·조달청 문서·`v2-지침서.md` 문면이 없는 case 다.
-   `source.kind: m0-derived-rule`이 그 자리를 표시하고 조건은 `manifest.yaml`의
-   `classification_policy.m0_derived_rule`이 적는다 — 운영자의 2026-08-30 「M0 승인」이
-   **그 acceptance 들까지 비준하는지가 승인 기록에 적혀 있지 않고**, 들지 않는 것으로
-   판정되면 **재분류 대상**이다. 어느 case 가 드는지는 **F-7**이 센다.
+7. **`insufficient-evidence` case 는 M1 golden 이 되지 않는다.** 근거가 M0 산출 문서의 **자체
+   도출 acceptance** 뿐이고 그것을 세운 운영자 결정·조달청 문서·`v2-지침서.md` 문면이 없는
+   case 다. 앞선 라운드는 이것을 **「조건부 `authoritative`」**로 두었고 — 운영자 결정
+   2026-08-31 이 그 자리를 닫았다: **`authoritative` 에서 제외한다.** 되돌리기 쉬운 쪽을
+   택한 것이며(미승인 규칙이 golden 이 되는 것을 먼저 막는다) case 는 지우지 않았다.
+   `source.kind: m0-derived-rule`이 그 자리를 표시하고 근거·되돌림 경로는 `manifest.yaml`의
+   `classification_policy.insufficient_evidence`가 적는다. 어느 case 가 드는지와 그 대응이
+   전건인지는 **F-7**의 `kind x class` 줄이 낸다.
+8. **`insufficient-evidence` 라는 이름이 `manifest.yaml` 안에서 두 자리에 쓰인다.** case 의
+   `classification` 값과, **fixture 가 아예 없는 후보** 목록(`insufficient_evidence`)이다.
+   둘 다 §6의 어휘를 빌리지만 앞은 `cases` 의 셈에 들고 뒤는 들지 않는다 — manifest 의 그
+   목록 머리 주석이 그 구별을 적는다.
 
 ## evidence 패키지에서 성립하지 않는 항목 (`N/A + 사유`)
 

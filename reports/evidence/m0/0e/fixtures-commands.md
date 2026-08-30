@@ -15,7 +15,9 @@
     | shasum -a 256 -c -
   ```
 - exit: 0
-- 핵심 결과: 63 case × (input + expected) 전부 OK, FAILED 0
+- 핵심 결과: 모든 case 의 (input + expected) 가 OK, **FAILED 0**. 검사 분모는 **분류와 무관하게 `cases`
+  전건**이다 — `insufficient-evidence` 로 내린 case 도 파일이 그대로 남아 해시 대조를 받는다.
+  **셈은 이 명령의 출력이 낸다**(`shasum -c` 의 OK 줄 수 = case 수 × 2)
 
 ## F-2 · 모든 fixture JSON 파싱
 
@@ -188,18 +190,23 @@ legacy 좌표를 저장소 안에 고정한 것이 `fixtures/legacy-reference-in
   print('uncovered', len(m['uncovered_axes']),
         '| insufficient', len(m['insufficient_evidence']),
         '| access', len(m['access_approval_required']))
-  print('classification', set(c['classification'] for c in m['cases']))
+  print('classification', dict(collections.Counter(c['classification'] for c in m['cases'])))
   print('source kinds', dict(collections.Counter(c['source']['kind'] for c in m['cases'])))
+  print('kind x class', dict(collections.Counter(
+        (c['source']['kind'], c['classification']) for c in m['cases'])))
   print('approved_by_user', set(c['review']['approved_by_user'] for c in m['cases']))
   print('provisional', [c['id'] for c in m['cases'] if 'provisional' in c])
   print('with not_covered', sum(1 for c in m['cases'] if 'not_covered' in c))
+  print('with change_history', sum(1 for c in m['cases'] if c['change_history']))
   print('with legacy_reference', sum(1 for c in m['cases'] if 'legacy_reference' in c))
   "
   ```
 - exit: 0
 - 핵심 결과: YAML 파싱 성공. `data-extract.md` §3 필수 키 + 선언 확장 키의 누락 0건.
-  **셈(case 수 · 층 · `source.kind` 분포 · `uncovered_axes` 수)은 이 명령이 낸다 — 여기 옮겨
-  적지 않는다**
+  **셈(case 수 · 분류별 분포 · `source.kind` 분포와 그 교차 · `uncovered_axes` 수)은 이 명령이
+  낸다 — 여기 옮겨 적지 않는다.** `kind x class` 가 **`m0-derived-rule` ↔ `insufficient-evidence`
+  대응이 전건인지**를 한 줄로 보인다(운영자 결정 2026-08-31,
+  `manifest.yaml`의 `classification_policy.insufficient_evidence`)
 
 ---
 
