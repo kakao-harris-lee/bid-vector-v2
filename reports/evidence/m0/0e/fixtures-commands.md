@@ -59,10 +59,99 @@
 
 ## F-5 · legacy 기준 SHA 확인 (read-only)
 
-- cmd: `git -C bid-vector log --oneline -1 ed4b06c`
+**앞서 이 자리는 `git -C bid-vector log --oneline -1 ed4b06c`를 exit 0으로 적었고 그것은 주
+작업 디렉터리에서만 참이다.** `bid-vector`는 `.gitignore` 된 symlink 라 커밋되지 않으므로
+**clean review worktree 에는 그 경로가 없다** — 감사자가 같은 명령을 돌리면 exit 128 이고
+pinned SHA 와 `legacy_reference`를 독립 재검증할 수 없었다. 아래 **F-5.0** 이 그 실측이고,
+**F-5.1~F-5.3** 이 체크아웃 없이 도는 재검증 경로다.
+
+### F-5.0 · clean worktree 실측 (재현: 종전 명령이 왜 성립하지 않는가)
+
+- cmd:
+  ```bash
+  git worktree add -q --detach /tmp/wt-f5 HEAD
+  cd /tmp/wt-f5 && test -e bid-vector; echo "test -e: $?"
+  git -C bid-vector log --oneline -1 ed4b06c; echo "git: $?"
+  cd - >/dev/null && git worktree remove /tmp/wt-f5
+  ```
+- exit: `test -e bid-vector` **1** · `git -C bid-vector log ...` **128**
+- 핵심 결과: `fatal: cannot change to 'bid-vector': No such file or directory`.
+  **clean worktree 에 legacy 체크아웃이 없다는 것이 실측으로 확인됐다**
+
+### F-5.1 · 저장소 안 불변 산출물 — 파싱과 선언 해시 대조
+
+legacy 좌표를 저장소 안에 고정한 것이 `fixtures/legacy-reference-index.json` 이다. legacy
+파일 **내용은 옮기지 않고** pinned commit 과 각 경로의 **git object id** 만 싣는다.
+
+- cmd:
+  ```bash
+  python3 -c "import json; json.load(open('fixtures/legacy-reference-index.json')); print('parsed')"
+  printf '%s  fixtures/legacy-reference-index.json\n' \
+    "$(awk '/^  index_file_sha256: /{print $2}' fixtures/manifest.yaml)" | shasum -a 256 -c -
+  ```
 - exit: 0
-- 핵심 결과: `ed4b06c` 실재. `data-extract.md` §2가 든 12개 테스트 파일이 전부 그 트리에
-  있음을 `git cat-file -e`로 확인했다. **읽기만 했고 실행하지 않았다**
+- 핵심 결과: 파싱 성공, manifest `legacy_repo.index_file_sha256` 과 파일 해시 일치(OK)
+
+### F-5.2 · index ↔ manifest `legacy_reference` 집합 대조 (legacy 체크아웃 불필요)
+
+- cmd:
+  ```bash
+  /tmp/fxvenv/bin/python -c "
+  import json, yaml
+  ix = json.load(open('fixtures/legacy-reference-index.json'))
+  m  = yaml.safe_load(open('fixtures/manifest.yaml'))
+  sha = ix['legacy_repo']['pinned_sha_short']
+  idx = {e['path'] for e in ix['manifest_legacy_reference_paths']['entries']}
+  ref, bad = set(), []
+  for c in m['cases']:
+      lr = c.get('legacy_reference')
+      if not lr: continue
+      if lr['repo_sha'] != sha: bad.append(c['id'])
+      ref |= set(lr.get('files', []))
+  assert sha == m['legacy_repo']['pinned_sha'] and \
+         ix['legacy_repo']['pinned_sha_full'] == m['legacy_repo']['pinned_sha_full']
+  assert not bad, bad
+  assert idx == ref, (idx ^ ref)
+  assert all('object_id' in e for e in ix['manifest_legacy_reference_paths']['entries'] +
+                                       ix['data_extract_section_2_paths']['entries'])
+  print('paths', len(idx), '| de-section-2', len(ix['data_extract_section_2_paths']['entries']))
+  "
+  ```
+- exit: 0
+- 핵심 결과: 경로 집합 일치(대칭차 0), 모든 case 의 `repo_sha` 가 pinned SHA 와 같음,
+  두 목록의 모든 항목이 `object_id` 를 가짐. **이 검사는 legacy 체크아웃 없이 돈다**
+
+### F-5.3 · legacy 체크아웃이 있을 때의 좌표 재검증 (준비 절차 포함)
+
+**준비 절차** — 이 저장소는 legacy 체크아웃을 담지 않는다. 감사자는 운영자에게서 legacy
+체크아웃을 받아 임의 경로 `$LEGACY` 에 두고 **읽기만** 한다(원격 URL 은 운영자·회사 식별자를
+담아 저장소에 적지 않는다). 고정 SHA 는 `ed4b06cbb8862c7cf121bb27d7cb962afe42270e` 이고,
+아래 명령이 그 SHA 와 각 경로의 object id 를 index 와 대조한다.
+
+- cmd:
+  ```bash
+  LEGACY=bid-vector   # 감사자는 자기 체크아웃 경로로 바꾼다
+  python3 -c "
+  import json, subprocess, os
+  L = os.environ['LEGACY']
+  ix = json.load(open('fixtures/legacy-reference-index.json'))
+  full = ix['legacy_repo']['pinned_sha_full']; sha = ix['legacy_repo']['pinned_sha_short']
+  got = subprocess.run(['git','-C',L,'rev-parse',sha+'^{commit}'],capture_output=True,text=True)
+  assert got.returncode == 0 and got.stdout.strip() == full, got
+  n = 0
+  for k in ('data_extract_section_2_paths','manifest_legacy_reference_paths'):
+      for e in ix[k]['entries']:
+          r = subprocess.run(['git','-C',L,'rev-parse',f\"{sha}:{e['path']}\"],
+                             capture_output=True,text=True)
+          assert r.returncode == 0 and r.stdout.strip() == e['object_id'], (e['path'], r)
+          n += 1
+  print('verified', n)
+  "
+  ```
+- exit: 0 (**주 작업 디렉터리의 read-only symlink 로 실행**. clean worktree 에서는 `$LEGACY`
+  가 없어 이 검사가 성립하지 않고, 그때 서는 것이 **F-5.1·F-5.2** 다)
+- 핵심 결과: pinned commit 일치, 39개 좌표(§2 목록 15 + `legacy_reference` 24) 전부 object id
+  일치. **읽기만 했고 legacy Python 을 실행하지 않았다**
 
 ## F-6 · 기대값 인용의 대조 — 커밋된 HEAD 기준
 

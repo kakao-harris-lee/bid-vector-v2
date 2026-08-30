@@ -36,7 +36,16 @@ authored_at: 2026-08-30
 legacy_repo:
   path: ./bid-vector (symlink, read-only)
   pinned_sha: ed4b06c
+  pinned_sha_full: ed4b06cbb8862c7cf121bb27d7cb962afe42270e
   accessed: read-only. 이 slice 는 legacy Python 을 실행하지 않았다.
+  index_file: fixtures/legacy-reference-index.json
+  index_file_sha256: dc85fcdab445b0c29c537e03091e8b4bd842786053cbddaa3890d1dbbca60a95
+  index_note: |-
+    **`./bid-vector`는 이 저장소의 일부가 아니다** — `.gitignore` 된 symlink 이고 커밋되지 않는다.
+    그래서 **clean review worktree 에는 그 경로가 없고** `git -C bid-vector ...` 는 거기서 **exit 128**
+    이다(실측: `reports/evidence/m0/0e/fixtures-commands.md` **F-5**). 그 자리를 메우려고 pinned SHA 와
+    `legacy_reference`가 가리키는 **legacy 좌표 전수**를 `index_file` 이 저장소 안의 불변 산출물로
+    고정한다 — legacy 파일 **내용**은 옮기지 않고 git object id 만 싣는다. 재검증 절차는 F-5 가 적는다.
 
 layout:
   note: |-
@@ -45,6 +54,11 @@ layout:
     경로 외에 schema 를 바꾸지 않는다.**
   input_dir: fixtures/input/
   expected_dir: fixtures/expected/
+  other_files:
+    - path: fixtures/tools/check_legacy_numbers.py
+      role: "`numeric_discipline.check` 를 돌리는 스크립트. **F-3**이 호출한다."
+    - path: fixtures/legacy-reference-index.json
+      role: "legacy 좌표 고정 산출물. `legacy_repo.index_file` 이 해시와 함께 선언한다. **F-5**가 검사한다."
 
 schema:
   base: data-extract.md §3

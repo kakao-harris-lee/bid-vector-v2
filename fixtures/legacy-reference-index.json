@@ -1,0 +1,391 @@
+{
+  "purpose": "`fixtures/manifest.yaml`의 `legacy_repo.pinned_sha`와 각 case 의 `legacy_reference`가 가리키는 legacy 좌표를 저장소 안의 불변 산출물로 고정한다. clean review worktree 에는 `bid-vector` symlink 가 없어(.gitignore) legacy 저장소를 직접 열 수 없다 — 이 파일이 그 자리를 대신한다.",
+  "authored_at": "2026-08-31",
+  "legacy_repo": {
+    "pinned_sha_short": "ed4b06c",
+    "pinned_sha_full": "ed4b06cbb8862c7cf121bb27d7cb962afe42270e",
+    "access": "read-only. 이 slice 는 legacy Python 을 실행하지 않았고 git 읽기 명령만 썼다.",
+    "checkout_note": "이 저장소는 legacy 체크아웃을 담지 않는다. 주 작업 디렉터리의 `bid-vector`는 .gitignore 된 symlink 이며 커밋되지 않는다. 준비 절차는 `reports/evidence/m0/0e/fixtures-commands.md` F-5 가 적는다. 원격 URL 은 운영자·회사 식별자를 담아 여기 적지 않는다(비식별화 규율) — 체크아웃은 운영자에게서 받는다."
+  },
+  "verification": {
+    "with_legacy_checkout": "git -C <legacy-checkout> rev-parse <pinned_sha_short>:<path> 가 각 항목의 object_id 와 같아야 한다. commit 은 git -C <legacy-checkout> rev-parse <pinned_sha_short>^{commit} 이 pinned_sha_full 과 같아야 한다.",
+    "without_legacy_checkout": "legacy 좌표를 새로 확인할 수는 없다. 이 파일이 **그때 무엇을 봤는지**를 고정하고, `fixtures/manifest.yaml`의 legacy_reference 집합과 이 파일의 항목 집합이 일치하는지는 체크아웃 없이 확인된다 — 재현 명령은 F-5 가 적는다.",
+    "object_id_note": "object_id 는 git object id(SHA-1)다. 파일 내용의 SHA-256 이 아니다 — legacy 파일 내용을 이 저장소로 옮기지 않으려고 git 좌표만 싣는다."
+  },
+  "data_extract_section_2_paths": {
+    "note": "`data-extract.md` §2가 「우선 조사할 자료」로 든 목록 전부. 테스트 파일 12개와 golden 디렉터리 3개다. **이 파일들의 기대값을 옮겨 적지 않았다** — manifest 머리 규율 2.",
+    "entries": [
+      {
+        "path": "tests/test_koneps_collection_characterization.py",
+        "object_type": "blob",
+        "object_id": "7f0db30603f0d0ff18ac0d3c2a3ba565daa4a7e4"
+      },
+      {
+        "path": "tests/goldens/koneps",
+        "object_type": "tree",
+        "object_id": "d327065759e3772b625ceacd75852eef38bc71f8"
+      },
+      {
+        "path": "tests/test_basis_conversion.py",
+        "object_type": "blob",
+        "object_id": "aef2574950c08dd07b7670827c80410bbe75442d"
+      },
+      {
+        "path": "tests/test_base_amount_basis.py",
+        "object_type": "blob",
+        "object_id": "fe27a6500ed19599c4d541cacd7f41ff532842d5"
+      },
+      {
+        "path": "tests/test_bid_decision_basis_alignment.py",
+        "object_type": "blob",
+        "object_id": "581299c0029687ee0d307890c9449bcbceaf0910"
+      },
+      {
+        "path": "tests/test_floor_shortfall.py",
+        "object_type": "blob",
+        "object_id": "23d645ea2ed1a4bba0184465d42f16de594bd38a"
+      },
+      {
+        "path": "tests/test_published_floor_rate.py",
+        "object_type": "blob",
+        "object_id": "35379624da1bfc6546b89a91df2ef6511d6f1ec5"
+      },
+      {
+        "path": "tests/test_budget_cap_basis.py",
+        "object_type": "blob",
+        "object_id": "5ea883397462f690c34b827612a50dc52f4b9c8b"
+      },
+      {
+        "path": "tests/test_license_eligibility.py",
+        "object_type": "blob",
+        "object_id": "b402e54766dc3bc51c3355eb74a824945c053ce8"
+      },
+      {
+        "path": "tests/test_license_matching.py",
+        "object_type": "blob",
+        "object_id": "65971e2df41c82bab9bbae184306b528929c0099"
+      },
+      {
+        "path": "tests/test_license_gate_wiring.py",
+        "object_type": "blob",
+        "object_id": "58fc0a716f38b602d33eff43170e1c46527edfca"
+      },
+      {
+        "path": "tests/test_predictor_output_equivalence.py",
+        "object_type": "blob",
+        "object_id": "798b943307cce93b749b155538e7023d1e5998c5"
+      },
+      {
+        "path": "tests/goldens/predictor",
+        "object_type": "tree",
+        "object_id": "c3d0b4c570fc1e9a9bc4cd1790aa795b728dc13e"
+      },
+      {
+        "path": "tests/test_paper_bidding_run_payload_characterization.py",
+        "object_type": "blob",
+        "object_id": "5918c2d38f0585406b670e0263bc603b39a86b83"
+      },
+      {
+        "path": "tests/goldens/paper_bidding",
+        "object_type": "tree",
+        "object_id": "33107c6e84386a7a0040441b10aae76fd709baf6"
+      }
+    ]
+  },
+  "manifest_legacy_reference_paths": {
+    "note": "각 case 의 `legacy_reference.files`에 실제로 오른 경로 전수. 모든 case 의 `legacy_reference.repo_sha`가 pinned_sha_short 와 같음을 확인했다.",
+    "entries": [
+      {
+        "path": "app/ai/floor_applicability.py",
+        "object_type": "blob",
+        "object_id": "2f5c12d4e8b69b3eb98614fe3a76754b91ede498",
+        "cited_by_cases": [
+          "floor-applicability-001",
+          "floor-applicability-002",
+          "floor-applicability-003",
+          "floor-applicability-004",
+          "floor-applicability-005"
+        ]
+      },
+      {
+        "path": "app/ai/predictors/legal_floor_spec.py",
+        "object_type": "blob",
+        "object_id": "d84907fb73540c039b0d23d14f1aace7308dba67",
+        "cited_by_cases": [
+          "floor-applicability-001",
+          "floor-applicability-002",
+          "floor-applicability-003",
+          "floor-applicability-004",
+          "floor-applicability-005"
+        ]
+      },
+      {
+        "path": "app/api/projects.py",
+        "object_type": "blob",
+        "object_id": "844c941c618438b624dced1c0817212b22a8ad9f",
+        "cited_by_cases": [
+          "money-basis-001"
+        ]
+      },
+      {
+        "path": "app/domain/floor_shortfall.py",
+        "object_type": "blob",
+        "object_id": "d837209938af5d30562dbea94b1cee16cdb9bb2d",
+        "cited_by_cases": [
+          "floor-shortfall-001",
+          "floor-shortfall-002",
+          "floor-shortfall-003",
+          "floor-shortfall-004",
+          "floor-shortfall-005",
+          "floor-shortfall-006",
+          "floor-threshold-001",
+          "floor-threshold-002",
+          "floor-threshold-003"
+        ]
+      },
+      {
+        "path": "app/models/models.py",
+        "object_type": "blob",
+        "object_id": "5b6f455c84fcef7fb3315c01e89a47556916d4ae",
+        "cited_by_cases": [
+          "capacity-gate-001"
+        ]
+      },
+      {
+        "path": "app/services/allocation_core.py",
+        "object_type": "blob",
+        "object_id": "e187dd11994846408bf996c4f672d44fcf838fc0",
+        "cited_by_cases": [
+          "verdict-001",
+          "verdict-002",
+          "verdict-003"
+        ]
+      },
+      {
+        "path": "app/services/base_amount_basis.py",
+        "object_type": "blob",
+        "object_id": "329af11c28a2923faa23c14dfa3dd0a87d6a5153",
+        "cited_by_cases": [
+          "base-amount-provenance-001",
+          "base-amount-provenance-002",
+          "base-amount-provenance-003"
+        ]
+      },
+      {
+        "path": "app/services/koneps/budget_fields.py",
+        "object_type": "blob",
+        "object_id": "088e5fdfedb696b97c4692df448cadd843e41006",
+        "cited_by_cases": [
+          "koneps-collection-001",
+          "koneps-collection-002",
+          "koneps-collection-003",
+          "koneps-collection-004",
+          "koneps-collection-008",
+          "koneps-collection-009"
+        ]
+      },
+      {
+        "path": "app/services/koneps/field_contract_spec.py",
+        "object_type": "blob",
+        "object_id": "cacb49d117ecc735942bab3f56bfe9d62bd11d52",
+        "cited_by_cases": [
+          "koneps-collection-001",
+          "koneps-collection-002",
+          "koneps-collection-003",
+          "koneps-collection-004",
+          "koneps-collection-008",
+          "koneps-collection-009"
+        ]
+      },
+      {
+        "path": "app/services/koneps/html_parsing.py",
+        "object_type": "blob",
+        "object_id": "cad68cc0d1bffe3e8b3896c4bbe960ce82d88d31",
+        "cited_by_cases": [
+          "koneps-collection-006"
+        ]
+      },
+      {
+        "path": "app/services/koneps/openapi.py",
+        "object_type": "blob",
+        "object_id": "91698f69c5d10e92a0cb5cce86e5e834e3c394b1",
+        "cited_by_cases": [
+          "koneps-collection-005"
+        ]
+      },
+      {
+        "path": "app/services/license_eligibility.py",
+        "object_type": "blob",
+        "object_id": "35ab8a624347b4b6bdb77e91c9df610f5cc3f392",
+        "cited_by_cases": [
+          "license-001",
+          "license-002",
+          "license-003",
+          "license-004",
+          "license-005",
+          "license-006",
+          "license-007",
+          "license-008",
+          "license-009"
+        ]
+      },
+      {
+        "path": "app/services/notice_floor_shortfall.py",
+        "object_type": "blob",
+        "object_id": "a5401982f78bb06580f3098f8d4b1a31c0f05f2f",
+        "cited_by_cases": [
+          "floor-shortfall-001",
+          "floor-shortfall-002",
+          "floor-shortfall-003",
+          "floor-shortfall-004",
+          "floor-shortfall-005",
+          "floor-shortfall-006",
+          "floor-threshold-001",
+          "floor-threshold-002",
+          "floor-threshold-003"
+        ]
+      },
+      {
+        "path": "app/services/opportunity_monitoring/filters.py",
+        "object_type": "blob",
+        "object_id": "2c3d214b303f6230d02a26c7710ca48be069e0c0",
+        "cited_by_cases": [
+          "money-basis-001"
+        ]
+      },
+      {
+        "path": "tests/test_base_amount_basis.py",
+        "object_type": "blob",
+        "object_id": "fe27a6500ed19599c4d541cacd7f41ff532842d5",
+        "cited_by_cases": [
+          "base-amount-provenance-001",
+          "base-amount-provenance-002",
+          "base-amount-provenance-003"
+        ]
+      },
+      {
+        "path": "tests/test_basis_conversion.py",
+        "object_type": "blob",
+        "object_id": "aef2574950c08dd07b7670827c80410bbe75442d",
+        "cited_by_cases": [
+          "base-amount-provenance-001",
+          "base-amount-provenance-002",
+          "base-amount-provenance-003"
+        ]
+      },
+      {
+        "path": "tests/test_budget_cap_basis.py",
+        "object_type": "blob",
+        "object_id": "5ea883397462f690c34b827612a50dc52f4b9c8b",
+        "cited_by_cases": [
+          "money-basis-004"
+        ]
+      },
+      {
+        "path": "tests/test_floor_applicability.py",
+        "object_type": "blob",
+        "object_id": "9b9b9798036fd8fcbad1221676b1ca05f42e7b21",
+        "cited_by_cases": [
+          "floor-applicability-001",
+          "floor-applicability-002",
+          "floor-applicability-003",
+          "floor-applicability-004",
+          "floor-applicability-005"
+        ]
+      },
+      {
+        "path": "tests/test_floor_shortfall.py",
+        "object_type": "blob",
+        "object_id": "23d645ea2ed1a4bba0184465d42f16de594bd38a",
+        "cited_by_cases": [
+          "floor-shortfall-001",
+          "floor-shortfall-002",
+          "floor-shortfall-003",
+          "floor-shortfall-004",
+          "floor-shortfall-005",
+          "floor-shortfall-006",
+          "floor-threshold-001",
+          "floor-threshold-002",
+          "floor-threshold-003"
+        ]
+      },
+      {
+        "path": "tests/test_koneps_collection_characterization.py",
+        "object_type": "blob",
+        "object_id": "7f0db30603f0d0ff18ac0d3c2a3ba565daa4a7e4",
+        "cited_by_cases": [
+          "koneps-collection-001",
+          "koneps-collection-002",
+          "koneps-collection-003",
+          "koneps-collection-004",
+          "koneps-collection-008",
+          "koneps-collection-009"
+        ]
+      },
+      {
+        "path": "tests/test_license_eligibility.py",
+        "object_type": "blob",
+        "object_id": "b402e54766dc3bc51c3355eb74a824945c053ce8",
+        "cited_by_cases": [
+          "license-001",
+          "license-002",
+          "license-003",
+          "license-004",
+          "license-005",
+          "license-006",
+          "license-007",
+          "license-008",
+          "license-009"
+        ]
+      },
+      {
+        "path": "tests/test_license_gate_wiring.py",
+        "object_type": "blob",
+        "object_id": "58fc0a716f38b602d33eff43170e1c46527edfca",
+        "cited_by_cases": [
+          "license-001",
+          "license-002",
+          "license-003",
+          "license-004",
+          "license-005",
+          "license-006",
+          "license-007",
+          "license-008",
+          "license-009"
+        ]
+      },
+      {
+        "path": "tests/test_license_matching.py",
+        "object_type": "blob",
+        "object_id": "65971e2df41c82bab9bbae184306b528929c0099",
+        "cited_by_cases": [
+          "license-001",
+          "license-002",
+          "license-003",
+          "license-004",
+          "license-005",
+          "license-006",
+          "license-007",
+          "license-008",
+          "license-009"
+        ]
+      },
+      {
+        "path": "tests/test_published_floor_rate.py",
+        "object_type": "blob",
+        "object_id": "35379624da1bfc6546b89a91df2ef6511d6f1ec5",
+        "cited_by_cases": [
+          "floor-shortfall-001",
+          "floor-shortfall-002",
+          "floor-shortfall-003",
+          "floor-shortfall-004",
+          "floor-shortfall-005",
+          "floor-shortfall-006",
+          "floor-threshold-001",
+          "floor-threshold-002",
+          "floor-threshold-003"
+        ]
+      }
+    ]
+  }
+}

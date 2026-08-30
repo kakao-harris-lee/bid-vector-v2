@@ -7,13 +7,15 @@
 | base_sha | `14686dbf3bff4085203ffdcd931564fd1e36edf0` |
 | head_sha | **리뷰 시점의 HEAD.** SHA 를 여기 박으면 커밋이 늘 때마다 낡으므로 range 로 적는다 — 커밋마다 이 값을 옮겨 적는 장치(선언 SHA 래칫)를 두지 않는다. 이 레인의 커밋 집합은 `git log --oneline 14686db..HEAD -- fixtures/ 'reports/evidence/m0/0e/fixtures-*.md'` 가 낸다 |
 | 기준 문서 | `data-extract.md` (단일 기준) |
-| legacy 기준 SHA | `ed4b06c` — read-only. **이 slice 는 legacy Python 을 실행하지 않았다** |
+| legacy 기준 SHA | `ed4b06cbb8862c7cf121bb27d7cb962afe42270e`(`ed4b06c`) — read-only. **이 slice 는 legacy Python 을 실행하지 않았다.** `./bid-vector`는 `.gitignore` 된 symlink 라 **clean worktree 에 없다** — pinned SHA 와 `legacy_reference`의 재검증은 `fixtures/legacy-reference-index.json`(저장소 안 불변 산출물)과 **F-5**가 받는다 |
 | 착수 근거 | `milestone-1.md:12` M1 선행 조건 · `milestone-0.md:94` 산출물 · `m1-blocking-analysis-v2.md` `N-1`/`T-1` |
 
 ## in_scope
 
 - `fixtures/manifest.yaml`
 - `fixtures/input/*.json` · `fixtures/expected/*.json` (63 case)
+- `fixtures/tools/check_legacy_numbers.py` (**F-3**) · `fixtures/legacy-reference-index.json` (**F-5**)
+  — `manifest.yaml`의 `layout.other_files`가 둘을 선언한다
 - `reports/evidence/m0/0e/fixtures-*.md`
 
 ## out_of_scope
@@ -65,7 +67,12 @@
    `fixtures/`로 한정된 결과이며 `manifest.yaml`의 `layout.note`가 선언한다.
 5. **`license-011`의 기대값은 잠정이다** — `OPEN-QUAL-11` 결정 전 임시 처리이고 `provisional`
    필드가 그 사실을 나른다.
-6. **일부 case 의 `authoritative` 분류가 조건부다.** 근거가 M0 산출 문서의 **자체 도출
+6. **legacy 좌표의 재검증이 두 갈래다.** `fixtures/legacy-reference-index.json`이 pinned commit 과
+   39개 좌표(§2 목록 15 + `legacy_reference` 24)의 **git object id** 를 저장소 안에 고정한다.
+   legacy 체크아웃이 있으면 object id 까지 다시 잰다(**F-5.3**). 없으면 잴 수 있는 것은 **그때
+   무엇을 봤는지의 고정과 manifest 와의 일치**뿐이다(**F-5.1**·**F-5.2**) — 그 index 자체가
+   legacy 저장소에 대해 옳다는 것은 체크아웃 없이 확인되지 않는다.
+7. **일부 case 의 `authoritative` 분류가 조건부다.** 근거가 M0 산출 문서의 **자체 도출
    acceptance** 뿐이고 그것을 세운 운영자 결정·조달청 문서·`v2-지침서.md` 문면이 없는 case 다.
    `source.kind: m0-derived-rule`이 그 자리를 표시하고 조건은 `manifest.yaml`의
    `classification_policy.m0_derived_rule`이 적는다 — 운영자의 2026-08-30 「M0 승인」이
