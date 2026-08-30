@@ -1252,9 +1252,11 @@ legacy의 `confidence`는 근거 없는 계수 아홉의 아핀 결합이고 클
 
 > `Contaminated(row) ⟺ C1 ∨ C2 ∨ C3`
 >
-> - **C1 출처 부적격** — 그 값의 `FactProvenance`가 `Published`도 `Undeclared`도 아니다
->   (파생 · 폴백 · 사본). **`OperatorDeclared`는 이 자리에 들어올 수 없다**(§5.1 · §5.2) —
->   들어와 있으면 오염이 아니라 경계 위반이다.
+> - **C1 출처 부적격** — 그 값의 `FactProvenance`가 **`DerivedFromOpening` ·
+>   `FilledFromBudgetKey` · `CopiedFromBaseAmount` 중 하나다**(파생 · 폴백 · 사본).
+>   **열거가 술어다** — 「`Published`도 `Undeclared`도 아니다」로 적으면 `OperatorDeclared`가
+>   술어 안으로 들어와 오염으로 세어진다. 그 값은 이 자리에 **들어올 수 없고**(§5.1 · §5.2)
+>   들어와 있으면 오염이 아니라 **경계 위반**이다 — 다른 판정이므로 이 분자가 받지 않는다.
 > - **C2 출처 미신고** — `FactProvenance`가 `Undeclared`다.
 > - **C3 모순 관측** — 같은 공고의 다른 금액과의 관계가 **선언된 개연 밴드 밖**이다.
 
