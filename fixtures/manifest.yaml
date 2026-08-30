@@ -55,7 +55,7 @@ schema:
     extracted_at / extraction_method: 추출 시점과 방법. 합성 입력은 `authored-from-approved-spec`.
     normalization.source_form: 정규화 **전** 원본의 형태(§3 「정규화 전 원본과 정규화 후 fixture 구분」).
     provisional: 이 기대값이 어느 활성 `OPEN`의 결정 전 **임시 처리**인가. 그 `OPEN`이 닫히면 교체된다.
-    owning_open: 이 case 가 **건드리지 않는** 인접 축을 소유한 활성 `OPEN`.
+    owning_open: 이 case 가 **건드리지 않는** 인접 축의 소유 `OPEN`. 원칙은 활성 id 이나, 이미 해소된 id 를 드는 자리는 **해소 시점을 함께 적는다** — 이 필드가 든 id 가 활성임을 함의하지 않는다.
     not_covered: 이 case 가 덮지 **못하는** 것.
     change_history: 기대값 변경 이력(§3 「기대값 변경 시 case 를 덮어쓰지 말고 변경 이유와 policy version 기록」). 최초 등재에는 비어 있다.
 
@@ -1013,7 +1013,8 @@ cases:
     sha256: 339802642440528fed8412a87f1e89d8ba398da8a2c87a53d516942f6a49de72
     expected_sha256: f7b4d94e66e883d71dde14ca77228ac3a8260d8f4042f5eea482955b12963c3f
     not_covered: |-
-      유효기간 판정 자체 — `OPEN-QUAL-05`(알려진 제한으로 후속 이월) · `OPEN-DIC-01`(면허 축이 정책 version을 싣는가)
+      유효기간 판정 자체 — `OPEN-QUAL-05`(**0E 가 해소**, 2026-08-30. 축은 남되 알려진 제한으로만 남는다: `data-dictionary.md` §8 제한 2) ·
+      `OPEN-DIC-01`(활성 — 면허 축이 정책 version을 싣는가)
     change_history: []
     review:
       claude_commit: pending
@@ -2757,7 +2758,7 @@ uncovered_axes:
     domain: license
     why_blocked: "U-7이 **V2는 보지 않는다**로 확정했다. 판정 자체를 만들 수 없다."
     owning_open:
-      - "OPEN-QUAL-05 (알려진 제한으로 후속 이월)"
+      - "OPEN-QUAL-05 — **활성 아님. 0E 가 해소했다**(2026-08-30). 이 축을 소유한 활성 `OPEN`은 없다: U-7이 「V2는 다루지 않는다」로 닫았고 남는 것은 알려진 제한(`data-dictionary.md` §8 제한 2)이다"
     what_is_covered_instead: "`license-012`가 「유효기간을 보지 않으며 결과에 「유효기간 미검증」이 드러난다」를 고정한다."
     known_conflict: |-
       **지침서 쪽 어긋남은 해소됐다.** `v2-지침서.md` §4.2 의 원 문면이 유효기간을 versioned policy
@@ -2809,7 +2810,7 @@ uncovered_axes:
       `resultCode` 분류표는 운영자 결정 `OPEN-COL-02`가 소유한다고 §4.3.2가 적으나 **표의 내용이
       이 저장소의 문서에 실려 있지 않다.** 인코딩·구분자 정규화 규칙은 승인된 명세가 없다.
     owning_open:
-      - "OPEN-COL-02 (분류표의 내용) · (인코딩·구분자) 소유 OPEN 없음 — 명세 부재"
+      - "OPEN-COL-02 — **활성 아님. 2026-08-26 해소**(분류표 등재 결정은 내려졌다). 그럼에도 **표의 내용이 이 저장소 문서에 없어** 이 축은 막혀 있고, 그 자리를 소유한 활성 `OPEN`도 없다 · (인코딩·구분자) 소유 `OPEN` 없음 — 명세 부재"
     unblocks_when: 분류표 본문이 명세에 등재되고 정규화 규칙이 정해진다.
 
   - axis: ML — 피처 스키마 version · artifact checksum · LightGBM 오류 · KDE singular · deterministic seed
