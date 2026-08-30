@@ -1,0 +1,34 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "aff62abfca85ca873932fedcad1e65c29ab35730",
+  "reviewed_head": "7cbdc9bbd06fc953aad8c04c5a24d5f48f93ef5f",
+  "findings": [],
+  "commands_run": [
+    "git status --short --branch; git rev-parse --verify <base/head>^{commit}; git rev-parse HEAD; git merge-base <base> <head>; git ls-files --others --exclude-standard",
+    "git diff --name-status <base>...<head> -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "git log --reverse --format='%H %s' <base>..<head> -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "git diff --check <base>...<head> -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "agent-workflow.md, milestone-0.md, v2-지침서.md, data-extract.md, docs/adr/*.md와 0C evidence 및 선행 판정 5건 대조",
+    "commands.md C-3 재실행 — 6축 전부 존재, exit=0",
+    "commands.md C-4.1 재실행 — 정의 없는 숫자 토큰 0, PASS",
+    "commands.md C-4.2 재실행 — 기록된 검출 범위에서 미덮개·미분류·누락 선언 0, PASS",
+    "commands.md C-5 재실행 — policy-version 언급 지점 출력, exit=0",
+    "commands.md C-6.1 재실행 — 상류·0D 산출물 변경 0건",
+    "commands.md C-6.2 재실행 — OPEN-DIC-01~10, 중복 0",
+    "commands.md C-6.3 재실행 — 신설 10·활성 15·결정 완료 19·미분류 0",
+    "commands.md C-8 재실행 — planted probe 7/7 탐지, 비표본 값 형태 0, 값 조각 유출 0, PASS",
+    "jq -e로 커밋된 codex-review JSON 5건 구문 검증",
+    "라운드 이력 footer 명령 재실행 — 표에 행이 없는 후속 0C 커밋을 명령이 출력함",
+    "최종 git status --short --untracked-files=all 및 git rev-parse HEAD 확인 — clean, HEAD 일치"
+  ],
+  "residual_risks": [
+    "격리 worktree에 `bid-vector`와 `_workspace/`가 없어 C-1·C-7·C-9의 원본 및 legacy 인용 내용은 독립 재검증하지 못했고 커밋된 evidence에 의존했다.",
+    "C-10.2는 이 환경에서 임시 worktree를 만들 수 없어 독립 재현하지 못했다.",
+    "`OPEN-DIC-08`·`OPEN-DIC-09`·`OPEN-DIC-10`은 의도대로 활성 미결이다. 파생값 lineage, fold 총순서/tie-break, 반올림 정책 값과 경계가 결정되기 전에는 관련 구현 계약을 확정할 수 없다.",
+    "C-4.2는 문서가 명시한 대로 요구와 실제 carrier의 대응을 완전하게 증명하지 못하므로 이후 타입 변경에도 수동 의미 검토가 필요하다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
