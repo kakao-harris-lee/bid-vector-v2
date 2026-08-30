@@ -8,9 +8,10 @@
 ## C-0 — 트리 좌표
 ```
 $ git rev-parse HEAD
-77af80c52594b5837669638cdcb336b42ec113c6
+da2e53883e8f29d3b26bd71d9477c455e538e89e
 
 $ git log --oneline 14686db..HEAD
+da2e538 docs(m0-0e): fixtures 무접촉의 근거를 시점 관측에서 커밋 range 로 바꾼다
 77af80c docs(m0-0e): evidence 패키지 — scope · commands · checklist
 6f7918d docs(m0-0e): Q3 집행(산출물 목록) + M0 완료 기록
 fbbd320 docs(m0-0e): OPEN-OPS-07·OPEN-QUAL-05 registry 갱신 + §14 M0 이월 목록 신설
@@ -20,9 +21,8 @@ fbbd320 docs(m0-0e): OPEN-OPS-07·OPEN-QUAL-05 registry 갱신 + §14 M0 이월 
 $ git status --porcelain
  M .claude/skills/v2-slice-pipeline/SKILL.md
  M CLAUDE.md
- M docs/discovery/capability-map.md
- M reports/evidence/m0/0e/checklist.md
  M reports/evidence/m0/0e/commands.md
+ M reports/evidence/m0/0e/scope.md
 ?? fixtures/
 
 ```

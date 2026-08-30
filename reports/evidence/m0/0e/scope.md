@@ -7,9 +7,9 @@ base_sha: 6c6b3a2ae658894ab105cec931f796a954e9230a
   # 0A 가 마지막으로 Codex 리뷰를 받은 head. 0E 착수 커밋(14686db)이 아니다 — 사유는 아래
   # 「리뷰 range 를 왜 여기서 잡는가」.
 head_sha: 리뷰 시점의 HEAD (= 0E 의 마지막 커밋)
-  # 산출물이 고정된 커밋 넷: 1fe87eb · 353912b · fbbd320 · 6f7918d.
-  # 이 evidence 커밋은 산출물이 아니라 기록이다.
-  # 커밋마다 이 값을 옮겨 적는 장치를 두지 않는다.
+  # 0E 의 커밋 집합은 `git log --oneline 14686db..HEAD` 가 낸다(commands.md C-0).
+  # SHA 를 여기 박아 두면 커밋이 늘 때마다 낡으므로 range 로 적는다 —
+  # 커밋마다 이 값을 옮겨 적는 장치(선언 SHA 래칫)를 두지 않는다.
 in_scope:
   - v2-지침서.md                          # §5(Q1) · §4.2(Q2) 문면 개정
   - milestone-1.md                         # 1C 유효기간 요구(Q2 동기화)
@@ -30,7 +30,12 @@ out_of_scope:
   - 활성 OPEN 의 임의 해소                 # 아래 「이 slice 가 닫는 OPEN」 셋 외에는 손대지 않는다
 acceptance_commands:
   - "N/A — 문서 slice. 아래 A1~A7 을 checklist.md 로 대조하고 근거 명령은 commands.md 가 갖는다"
-rollback: "git revert 1fe87eb 353912b fbbd320 6f7918d. 애플리케이션 코드·설정·스키마·fixture 변경이 없어 되돌림의 부작용이 없다. 부분 되돌림도 가능하다 — 네 커밋이 서로 독립인 개정 단위다(단 fbbd320 의 §14 이월 목록은 1fe87eb·353912b·6f7918d 이 만든 사실을 참조하므로 fbbd320 만 남기고 나머지를 되돌리면 §14 가 낡는다)."
+rollback: |
+    git revert 로 0E 의 커밋 전부를 되돌린다. 그 집합은 `git log --oneline 14686db..HEAD`
+    가 낸다(commands.md C-0) — SHA 를 여기 열거해 두면 커밋이 늘 때마다 낡으므로 range 로
+    적는다. 애플리케이션 코드·설정·스키마·fixture 변경이 없어 되돌림의 부작용이 없다.
+    부분 되돌림도 가능하다(커밋이 개정 단위로 나뉘어 있다). 단 §14 이월 목록은 개정 셋과
+    ADR 상태 줄이 만든 사실을 참조하므로, 그것만 남기고 나머지를 되돌리면 §14 가 낡는다.
 ```
 
 작성: 2026-08-30, spec-writer (v2-slice-pipeline).
