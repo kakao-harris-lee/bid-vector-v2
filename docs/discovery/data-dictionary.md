@@ -999,8 +999,11 @@ legacy에서 도출한 나머지는 **전부 KONEPS 수집 경로 안의 해석 
   (같은 자리) 덮지 못하면 갱신 자체가 불가능하다. ② 점유 가드가 막으려는 것은 **권위 없는
   자동 유입**이 이미 있는 값을 조용히 바꾸는 것이고(`app/services/koneps/budget_fields.py:24-34`),
   사람의 명시 신고는 그 대상이 아니다.
-- **`OperatorDeclared`는 KONEPS fact의 자리에 들어갈 수 없다.** §5.2의 경계 규칙이 그대로
-  적용된다 — 자리가 같아야 한다면 타입이 달라야 한다.
+- **`OperatorDeclared`는 KONEPS fact의 자리에 들어갈 수 없다.** §5.2의 경계 규칙이
+  **그대로 적용되지는 않는다** — 그 규칙의 원문은 *"derived fact가 canonical fact의 자리를
+  차지할 수 없다"*이고 `OperatorDeclared`는 **derived도 canonical KONEPS fact도 아니다.**
+  받는 것은 그 규칙의 **둘째 문장이 세운 같은 형태**다 — *"자리가 같아야 한다면 타입이
+  달라야 한다"*.
 - **`NoticePublished`라는 이름은 두지 않는다** — `Published(noticeRevision)`와 같은 것을
   가리키는 둘째 이름이다. **셋째 규율이 막는 것은 이것이 아니다** — 그 규율은 어휘
   **문자열**의 겹침을 막고 여기에는 겹치는 문자열이 없다. 받는 자리는 **§1.2 머리**이고
