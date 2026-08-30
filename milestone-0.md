@@ -87,13 +87,27 @@ M5에서 "이식 시 분해"할지 allowlist 사유를 쓸지 판단할 근거�
 docs/discovery/capability-map.md
 docs/discovery/regression-ledger.md
 docs/discovery/data-dictionary.md
-docs/discovery/legacy-reference-map.md
 docs/adr/0001-target-architecture.md
 docs/adr/0002-money-rate-basis.md
 docs/adr/0003-contract-transport.md
 docs/adr/0004-persistence-and-events.md
 fixtures/manifest.yaml              # schema와 후보 목록만
 ```
+
+**`docs/discovery/legacy-reference-map.md`를 이 목록에서 뺐다** (**운영자 결정 2026-08-29 ·
+Q3**, 집행 2026-08-30 slice 0E). 대체된 이유는 `ADR 0009`의 **(d) 결정**이다 — ML 재활용
+출처의 기록을 **통합 단일 문서 하나가 아니라 두 자리로 나눠 갖도록** 확정했다
+(`docs/adr/0009-ml-reuse-provenance.md` §2 D-5 · §5).
+
+| 자리 | 담는 것 |
+| --- | --- |
+| **ml-engine 모듈 안** | 모듈 식별자 · **원본 파일 경로 · 기준 commit** — 현재 상태의 선언 |
+| **slice별 `reports/evidence/<milestone>/<slice>/`** | 수행한 튜닝·수정 **내역** + 그 이식이 딛은 모듈 식별자 · 원본 파일 경로 · 기준 commit |
+
+통합 문서는 이 분할이 대체한 대상이며, `ADR 0009` §5가 스스로
+*"`milestone-0.md` 「산출물」의 `legacy-reference-map.md` 항목이 이 결정과 어긋난다 …
+개정은 운영자 결정이다"*로 개정 필요를 사실로 남겼다. 두 자리가 어긋나는 것을 잡는 검사는
+같은 ADR의 D-6·D-6.1이 계약을 적고 **M5가 구현**한다.
 
 ## 완료 조건
 
@@ -117,6 +131,60 @@ Codex는 구현을 제안하는 대신 다음만 판정한다.
 - acceptance scenario가 관찰 가능한가
 
 Codex `approve`와 사용자 승인이 있어야 M1로 진행한다.
+
+## M0 완료 기록
+
+- **기록 시점**: 2026-08-30 · M0 종료 slice **0E**
+- **verdict 원본**: `reports/evidence/m0/<slice>/codex-review-*.json` (append-only)
+
+### 여섯 slice와 각각의 마지막 Codex verdict
+
+| slice | 산출물 | 마지막 verdict | `reviewed_base` … `reviewed_head` | verdict 파일 |
+| --- | --- | --- | --- | --- |
+| **0A** | `docs/discovery/capability-map.md` (초판) | **`request_changes`** (effort=high, **3차 정본**) — 아래 단서 참조 | `3dc7d263` … `6c6b3a2a` | `0a/codex-review-20260825T235415Z.json` |
+| **0A2** | 같은 파일 — 운영자 결정 반영 | **`approve`** | `6af70199` … `f790e193` | `0a2/codex-review-20260827T034348Z.json` |
+| **0A3** | 같은 파일 — 정정 | **`approve`** | `48151b9c` … `20f09baf` | `0a3/codex-review-20260828T062714Z.json` |
+| **0B** | `docs/discovery/regression-ledger.md` | **`approve`** | `ec115a79` … `7701556c` | `0b/codex-review-20260827T121954Z.json` |
+| **0C** | `docs/discovery/data-dictionary.md` | **`approve`** | `aff62abf` … `7cbdc9bb` | `0c/codex-review-20260830T124011Z.json` |
+| **0D** | `docs/adr/0001`~`0009` | **`approve`** | `998dc217` … `df056259` | `0d/codex-review-20260829T222217Z.json` |
+
+**0E(이 종료 slice)의 리뷰는 별도이며 그 계약은 `reports/evidence/m0/0e/scope.md`가 갖는다.**
+
+### 단서 — 0A는 이 slice의 리뷰에 포함된다
+
+**0A의 최종 head는 어느 Codex 리뷰 range에도 들지 않았다.**
+
+- 0A의 유일한 `approve`는 head `6c6b3a2a`의 **effort=medium 부수 실행**
+  (`0a/codex-review-20260825T235414Z.json`)이고, **같은 head의 effort=high 실행은
+  `request_changes`**다. **0A 자신의 evidence가 high 쪽을 「3차 정본」으로 지정**한다
+  (`reports/evidence/m0/0a/checklist.md:197`). `CLAUDE.md` 변경 이력의 2026-08-26 행이 같은
+  사건을 *"리뷰 재현성 결여"*로 적고 그 뒤로 `model_reasoning_effort=high`를 고정했다.
+- 그 `request_changes`에 대응해 **라운드 4·5·6이 돌았고** `capability-map.md`를 다시 고쳤다.
+  그 라운드들의 head **`cd5a456`**(`0a/scope.md`의 선언 `head_sha`)는 **0A에 4차 리뷰가 없고**
+  0A2 리뷰의 `reviewed_base`가 그 **바로 다음 커밋**(`6af7019`)이라 **어느 range에도 들지
+  않는다.**
+
+**그러므로 0E의 Codex 리뷰 range를 `cd5a456` 이전부터 잡아 그 구간을 함께 덮는다.**
+계약과 실제 range는 `reports/evidence/m0/0e/scope.md`에 있다.
+
+### 이월 목록 — 「사용자 명시 승인」의 대상
+
+완료 조건은 *"`OPEN` 결정이 0개이거나 사용자가 명시적으로 다음 단계 진행을 승인했다"*이고,
+**활성 `OPEN`이 0이 될 수 없다**(다수가 V2 코퍼스나 운영 관측을 선행 조건으로 가져 사용자가
+지금 답해도 닫히지 않는다). **그러므로 명시 승인만이 유일한 경로이며, 무엇을 승인하는지는
+아래 목록으로 읽는다.**
+
+**→ `docs/discovery/capability-map.md` §14 「M0 이월 목록 — 활성 `OPEN`의 담당」**
+
+그 절이 활성 `OPEN` 전부를 **(A) M1 착수 차단 / (B) M1 진행 중 필요 / (C) M1 이후**로 나누고
+각각의 **담당 slice**와 **결정 주체**를 적으며, 지목이 **정본**인지 이 절의 **유도**인지,
+근거 둘이 **갈리는지**를 표시한다. **(A)에 남는 활성 `OPEN`은 없다** — 0E가 닫았다.
+비-`OPEN` 이월(`fixtures/manifest.yaml` 부재 등)은 같은 절 §14.4가 갖는다.
+
+### 사용자 명시 승인
+
+> **(비어 있음)** — 이 자리는 **사용자가 채운다.** 0E는 승인의 **대상**(§14 이월 목록)과
+> **경로**(위 완료 조건)를 갖추기만 했고, 승인 자체를 대신 적지 않는다.
 
 ## 금지 사항
 
