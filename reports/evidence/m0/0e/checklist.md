@@ -78,8 +78,8 @@
 | `docs/adr/**` 는 「상태」 줄만 | `commands.md` **C-5** — `git diff -U0` 의 `@@` 헤더 아홉이 전부 3행 하나다 |
 | `data-dictionary.md`·`regression-ledger.md` 무접촉 | `commands.md` **C-7** — 빈 diff |
 | 앞 여섯 slice 의 evidence 무접촉 | 같은 명령 — 빈 diff |
-| `fixtures/` 무접촉 | `ls fixtures` → `No such file or directory` |
-| 다른 레인의 `CLAUDE.md`·`.claude/` 변경을 커밋에 넣지 않았다 | `commands.md` **C-0** — `git status --porcelain` 에 남아 있고 `git diff --name-only 14686db..HEAD` 에 없다 |
+| `fixtures/` 무접촉 | `commands.md` **C-7** — `git log --oneline 14686db..HEAD -- fixtures` 와 `git diff --name-only … -- fixtures` 가 둘 다 빈 출력. **`ls` 로 재지 않는다** — fixture-curator 레인이 0E 와 병행하므로 시점 의존 관측은 근거가 되지 않는다 |
+| 다른 레인의 변경(`CLAUDE.md`·`.claude/`·`fixtures/`)을 커밋에 넣지 않았다 | `commands.md` **C-0** — `git status --porcelain` 에 남아 있고 **C-7** 의 `git diff --name-only 14686db..HEAD` 에 없다 |
 
 ---
 

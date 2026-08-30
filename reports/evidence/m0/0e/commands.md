@@ -8,9 +8,10 @@
 ## C-0 — 트리 좌표
 ```
 $ git rev-parse HEAD
-6f7918d0341c7245b6320a834439379bad0ab6af
+77af80c52594b5837669638cdcb336b42ec113c6
 
 $ git log --oneline 14686db..HEAD
+77af80c docs(m0-0e): evidence 패키지 — scope · commands · checklist
 6f7918d docs(m0-0e): Q3 집행(산출물 목록) + M0 완료 기록
 fbbd320 docs(m0-0e): OPEN-OPS-07·OPEN-QUAL-05 registry 갱신 + §14 M0 이월 목록 신설
 353912b docs(m0-0e): ADR 0001~0009 「상태」 줄을 0D 의 Codex approve 에 맞춘다
@@ -19,13 +20,23 @@ fbbd320 docs(m0-0e): OPEN-OPS-07·OPEN-QUAL-05 registry 갱신 + §14 M0 이월 
 $ git status --porcelain
  M .claude/skills/v2-slice-pipeline/SKILL.md
  M CLAUDE.md
-?? reports/evidence/m0/0e/
+ M docs/discovery/capability-map.md
+ M reports/evidence/m0/0e/checklist.md
+ M reports/evidence/m0/0e/commands.md
+?? fixtures/
 
 ```
 
-**`.claude/skills/v2-slice-pipeline/SKILL.md`와 `CLAUDE.md`의 수정은 이 slice가 한 것이
-아니다** — 0E 착수 시점(`14686db`)의 working tree에 이미 있었고, 다른 레인이 재작업 상한
-5회를 성문화한 변경이다. 이 slice는 스테이징하지 않았고 커밋에 넣지 않았다.
+**`git status`는 이 명령을 돌린 시점의 working tree이며 세 레인이 섞인다.** 0E의 커밋
+집합은 `git status`가 아니라 **C-7 마지막의 `git diff --name-only 14686db..HEAD`** 가 낸다.
+
+- `.claude/skills/v2-slice-pipeline/SKILL.md` · `CLAUDE.md` — **0E 착수 시점(`14686db`)의
+  working tree에 이미 있던 다른 레인의 수정**이다(재작업 상한 5회 성문화).
+- `fixtures/` — **fixture-curator 레인이 0E와 병행해 만들고 있다.**
+- 0E 자신의 미커밋 편집이 이 목록에 보일 수 있다 — 이 파일(`commands.md`)이 자기를 다시
+  생성하기 때문이다. **그 편집은 이 evidence 커밋에 들어간다.**
+
+**앞의 둘은 스테이징하지 않았고 커밋에 넣지 않았다.**
 
 ---
 
@@ -285,8 +296,9 @@ $ git diff --stat 14686db..HEAD -- docs/discovery/data-dictionary.md docs/discov
 
 $ git diff --stat 14686db..HEAD -- reports/evidence/m0/0a reports/evidence/m0/0a2 reports/evidence/m0/0a3 reports/evidence/m0/0b reports/evidence/m0/0c reports/evidence/m0/0d
 
-$ ls fixtures
-ls: fixtures: No such file or directory
+$ git log --oneline 14686db..HEAD -- fixtures
+
+$ git diff --name-only 14686db..HEAD -- fixtures
 
 $ git diff --name-only 14686db..HEAD
 docs/adr/0001-target-architecture.md
@@ -301,13 +313,18 @@ docs/adr/0009-ml-reuse-provenance.md
 docs/discovery/capability-map.md
 milestone-0.md
 milestone-1.md
+reports/evidence/m0/0e/checklist.md
+reports/evidence/m0/0e/commands.md
+reports/evidence/m0/0e/scope.md
 "v2-\354\247\200\354\271\250\354\204\234.md"
 
 ```
 
-**세 명령이 빈 출력이다** — `data-dictionary.md`·`regression-ledger.md` 무접촉, 앞 여섯
-slice의 evidence 무접촉, `fixtures/`는 여전히 없다(그 디렉터리는 fixture-curator 소유이며
-이 slice가 만들지 않는다).
+**네 명령이 빈 출력이다** — `data-dictionary.md`·`regression-ledger.md` 무접촉, 앞 여섯
+slice의 evidence 무접촉, `fixtures/` 무접촉. **`fixtures/`는 fixture-curator 레인이 0E와
+병행해 만들고 있다** — 그래서 무접촉의 근거를 `ls`(시점 의존)가 아니라 **`git log`/`git diff`의
+range**(0E가 만든 커밋 집합)로 잡는다. 마지막 `git diff --name-only`의 전체 목록이 그 범위를
+다시 낸다.
 
 ---
 
