@@ -26,7 +26,15 @@ out_of_scope:
   - docs/discovery/regression-ledger.md    # 0B Codex approve 로 확정 — 읽기 전용
   - docs/adr/** 의 위 둘 이외 전부          # 결정 내용·§1~§4·§6 무접촉.
                                            # §5 도 OPEN-ADR-01 행 하나만이고 나머지 열둘은 무접촉
-  - reports/evidence/m0/0a · 0a2 · 0a3 · 0b · 0c · 0d   # 확정된 evidence — 읽기 전용
+  - reports/evidence/m0/0a · 0a2 · 0a3 · 0b · 0c · 0d   # 확정된 evidence — 읽기 전용.
+                                           # 예외 하나: 리뷰 A(6c6b3a2..6af7019)의 verdict JSON
+                                           # 한 건이 m0/0a 아래에 신설된다(b2b3860). Codex #1 의
+                                           # required_fix 가 「A 의 독립 verdict 를 받아 기록한 뒤에만
+                                           # N-3 을 닫는다」를 요구했고, verdict 는 그 range 를 받은
+                                           # slice 의 디렉터리에 append-only 로 쌓인다. 기존 파일은
+                                           # 하나도 고치지 않는다 — 이 slice 의 range 에서
+                                           # 앞선 slice evidence 를 수정한 커밋은 0 이고 신설이 1 이다
+                                           # (`git log --diff-filter=M 14686db..HEAD -- reports/evidence/m0/0{a,a2,a3,b,c,d}/`).
   - fixtures/                              # fixture-curator 소유. 이 slice 가 만들지 않는다
   - _workspace/**                          # .gitignore 대상. 조사 노트는 읽기만 한다
   - fixtures/** · reports/evidence/m0/0e/fixtures-*.md   # fixture-curator 레인 소유
