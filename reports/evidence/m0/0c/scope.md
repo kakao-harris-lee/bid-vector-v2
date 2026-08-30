@@ -18,8 +18,10 @@ out_of_scope:
   - fixtures/                             # fixture-curator 소유
   - 활성 OPEN — 해소하지 않는다
       # capability-map.md §12 활성분 + regression-ledger.md §9 OPEN-REG.
-      # 예외는 운영자 결정 2026-08-28이 이미 닫은 네 건이며, 그것도 「새로 결정」이
-      # 아니라 「결정을 근거와 함께 등재」로만 닫는다 — 아래 「이 slice가 닫는 것」.
+      # 이 slice가 하는 것은 「새로 결정」이 아니라 「운영자 결정 2026-08-28을 근거와
+      # 함께 등재」다. 등재가 곧 닫힘인 것은 그 결정이 그 OPEN의 질문 전부에 답할
+      # 때뿐이며, 이 slice에 그런 「전건 해소」는 없다 —
+      # 아래 「이 slice가 등재하는 것 — 그리고 그것이 무엇을 닫는가」.
   - Kotlin/Spring/Python 애플리케이션 코드   # M0은 문서 slice다
   - .claude/ 하네스
   - bid-vector/ symlink 아래 기존 저장소 수정 (읽기 전용)
@@ -50,7 +52,10 @@ golden_manifest_json: "N/A — fixture를 쓰지 않는다. fixtures/는 out_of_
 
 **같은 문서의 금지 사항도 계약이다** — *"모호한 항목은 기존 Python 구현을 정답으로 채우지
 말고 `OPEN`으로 남겨 사용자 결정을 요청한다"*. 이 slice의 `OPEN`은 사전 §9에
-`OPEN-DIC-NN`으로 등록한다.
+`OPEN-DIC-NN`으로 등록한다. **일곱을 등록했고 일곱 다 활성이다** — 그중 **셋은 운영자
+결정 2026-08-28 묶음이 남긴 미완이 직접 만든 것**이다(`OPEN-DIC-01` ← U-6 ·
+`OPEN-DIC-04` ← U-1·U-1b · `OPEN-DIC-07` ← U-3). **결정 사본의 「전건 완료」는 「물을 것을
+다 물었다」이지 「잔여 미결이 없다」가 아니다.**
 
 ### 입력
 
