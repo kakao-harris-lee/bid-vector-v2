@@ -1,0 +1,9 @@
+{
+  "outcome": "Comparable",
+  "comparisonPerformed": true,
+  "result": true,
+  "comparedBases": [
+    "BASE_AMOUNT",
+    "BASE_AMOUNT"
+  ]
+}

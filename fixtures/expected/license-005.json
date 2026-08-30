@@ -1,0 +1,19 @@
+{
+  "verdict": "Ineligible",
+  "satisfiedGroups": [],
+  "requiredLicenses": [
+    "건축공사업",
+    "토목공사업"
+  ],
+  "missingByGroup": {
+    "__ungrouped__": [
+      "건축공사업"
+    ]
+  },
+  "foldedUngroupedRowsIntoSingleAndGroup": true,
+  "unparsableRowCount": 0,
+  "requirementSourceFields": [
+    "lcnsLmtNm"
+  ],
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

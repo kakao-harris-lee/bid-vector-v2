@@ -1,0 +1,11 @@
+{
+  "unknownFields": [
+    "synNewKey"
+  ],
+  "unknownFieldCount": 1,
+  "consumedAsDomainValue": {
+    "synNewKey": false
+  },
+  "silentlySwallowed": false,
+  "requiresHumanReviewBeforeConsumption": true
+}

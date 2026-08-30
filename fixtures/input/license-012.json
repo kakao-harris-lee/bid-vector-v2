@@ -1,0 +1,23 @@
+{
+  "notice": {
+    "noticeId": "SYN-NOTICE-0001",
+    "bidNtceOrd": "000",
+    "licenseLimitRows": [
+      {
+        "lmtGrpNo": "1",
+        "lmtSno": "1",
+        "lcnsLmtNm": "토목공사업"
+      }
+    ]
+  },
+  "operatorLicenses": [
+    {
+      "name": "토목공사업",
+      "validUntil": "2020-01-01"
+    }
+  ],
+  "evaluatedAt": "2026-08-30T00:00:00Z",
+  "policy": {
+    "licenseGroupingPolicyVersion": "SYN-POLICY-2026-08-30"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "operation": "GREATER_OR_EQUAL",
+  "operands": [
+    {
+      "amount": 500000000,
+      "currency": "KRW",
+      "basis": "BASE_AMOUNT",
+      "vatTreatment": "INCLUSIVE",
+      "provenance": "Published"
+    },
+    {
+      "amount": 500000000,
+      "currency": "KRW",
+      "basis": "BASE_AMOUNT",
+      "vatTreatment": "UNKNOWN",
+      "provenance": "Undeclared"
+    }
+  ]
+}

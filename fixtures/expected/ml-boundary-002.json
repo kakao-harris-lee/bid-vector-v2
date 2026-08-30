@@ -1,0 +1,12 @@
+{
+  "contractViolations": [
+    {
+      "field": "review_required",
+      "reasonCode": "BusinessVerdictFieldInModelResponse"
+    }
+  ],
+  "forbiddenFieldsPresent": [
+    "review_required"
+  ],
+  "accepted": false
+}

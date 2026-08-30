@@ -1,0 +1,13 @@
+{
+  "mlEngineResponse": {
+    "regimeLabel": "SYN-REGIME-A",
+    "signals": {
+      "synSignal": 0.42
+    },
+    "confidence": 0.61,
+    "candidatePriceRange": {
+      "lowerFraction": 0.873,
+      "upperFraction": 0.941
+    }
+  }
+}

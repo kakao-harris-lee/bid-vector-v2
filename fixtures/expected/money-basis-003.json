@@ -1,0 +1,15 @@
+{
+  "perPath": {
+    "MONITORING_FILTER": {
+      "outcome": "Comparable",
+      "result": true,
+      "basisUsed": "BASE_AMOUNT"
+    },
+    "SEARCH_QUERY": {
+      "outcome": "Comparable",
+      "result": true,
+      "basisUsed": "BASE_AMOUNT"
+    }
+  },
+  "pathsAgree": true
+}

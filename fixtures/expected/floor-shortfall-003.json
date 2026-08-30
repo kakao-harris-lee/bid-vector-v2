@@ -1,0 +1,16 @@
+{
+  "result": "Measured",
+  "criticalAssessmentRate": {
+    "fraction": 1.05
+  },
+  "frequency": {
+    "numerator": 18,
+    "denominator": 151,
+    "exactDecimal": null,
+    "decimalAsserted": false
+  },
+  "numerator": 18,
+  "denominator": 151,
+  "sampleSize": 151,
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

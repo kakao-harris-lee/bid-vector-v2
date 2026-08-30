@@ -1,0 +1,22 @@
+{
+  "notice": {
+    "noticeId": "SYN-NOTICE-0014",
+    "noticeDate": "2026-08-01",
+    "agency": {
+      "name": "SYN-AGENCY-0004",
+      "orgType": "CENTRAL_GOVERNMENT"
+    },
+    "publishedFloorRate": {
+      "numeric": 87.5,
+      "declaredUnit": "percent",
+      "noticeRevision": "000"
+    }
+  },
+  "trustBand": {
+    "id": "SYN-BAND-published-floor-rate",
+    "min": 0.25,
+    "max": 0.999,
+    "inclusivity": "min-inclusive-max-inclusive",
+    "note": "SYNTHETIC — legacy B6 값이 아니다."
+  }
+}

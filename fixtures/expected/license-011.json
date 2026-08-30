@@ -1,0 +1,10 @@
+{
+  "verdict": "Uncertain",
+  "uncertainReason": "PermittedIndustryCombinationRuleUndecided",
+  "requirementSourceFields": [
+    "lcnsLmtNm",
+    "permsnIndstrytyList"
+  ],
+  "unparsableRowCount": 0,
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

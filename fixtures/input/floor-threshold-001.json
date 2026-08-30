@@ -1,0 +1,24 @@
+{
+  "recommendedBidRate": {
+    "fraction": 0.91875,
+    "unit": "fraction",
+    "origin": "Recommended",
+    "axisNumerator": "투찰가",
+    "axisDenominator": "기초금액"
+  },
+  "floorRate": {
+    "fraction": 0.875,
+    "unit": "fraction",
+    "origin": "NoticeValue",
+    "noticeRevision": "000",
+    "axisDenominator": "예정가격"
+  },
+  "sample": {
+    "sampleId": "SYN-SAMPLE-0001",
+    "realizedAssessmentRate": {
+      "fraction": 1.0499,
+      "axisNumerator": "예정가",
+      "axisDenominator": "기초금액"
+    }
+  }
+}

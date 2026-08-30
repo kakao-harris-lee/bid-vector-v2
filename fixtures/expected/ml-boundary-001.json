@@ -1,0 +1,12 @@
+{
+  "contractViolations": [],
+  "forbiddenFieldsPresent": [],
+  "reviewRequiredOwnedBy": "kotlin",
+  "verdictOwnedBy": "kotlin",
+  "pythonMayReturn": [
+    "regimeLabel",
+    "signals",
+    "confidence",
+    "candidatePriceRange"
+  ]
+}

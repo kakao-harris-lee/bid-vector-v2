@@ -1,0 +1,7 @@
+{
+  "gateOutcome": "SKIP",
+  "gateId": "SYN-GATE-capacity",
+  "structuredPayload": {
+    "heldByCapacity": true
+  }
+}

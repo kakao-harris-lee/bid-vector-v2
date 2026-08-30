@@ -1,0 +1,9 @@
+{
+  "appliedTierId": "A",
+  "floorRate": {
+    "fraction": 0.815,
+    "origin": "StatutoryTable",
+    "effectiveFrom": "2020-01-01"
+  },
+  "retroactiveApplication": false
+}

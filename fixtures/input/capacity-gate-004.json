@@ -1,0 +1,17 @@
+{
+  "operatorConstructionCapacity": {
+    "state": "Known",
+    "amount": 7412000000,
+    "currency": "KRW",
+    "basis": "CONSTRUCTION_CAPACITY",
+    "vatTreatment": "INCLUSIVE",
+    "provenance": "OperatorDeclared",
+    "evaluationYear": 2025
+  },
+  "noticeRequirement": {
+    "state": "NotRequired"
+  },
+  "otherAxisVerdict": {
+    "license": "Eligible"
+  }
+}

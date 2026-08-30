@@ -1,0 +1,17 @@
+{
+  "outcome": "Accepted",
+  "normalizedFloorRate": {
+    "fraction": 0.875
+  },
+  "normalizedBidRate": {
+    "fraction": 0.91875
+  },
+  "preservedSourceUnits": {
+    "floorRate": "percent",
+    "recommendedBidRate": "fraction"
+  },
+  "criticalAssessmentRate": {
+    "fraction": 1.05
+  },
+  "sampleIsShortfall": true
+}

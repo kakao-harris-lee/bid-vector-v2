@@ -1,0 +1,17 @@
+{
+  "notice": {
+    "noticeId": "SYN-NOTICE-0003",
+    "bidNtceOrd": "000",
+    "licenseLimitRows": null,
+    "collection": {
+      "status": "FAILED",
+      "reasonCode": "UpstreamTimeout"
+    }
+  },
+  "operatorLicenses": [
+    "토목공사업"
+  ],
+  "policy": {
+    "licenseGroupingPolicyVersion": "SYN-POLICY-2026-08-30"
+  }
+}

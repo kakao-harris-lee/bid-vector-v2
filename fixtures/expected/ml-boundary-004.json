@@ -1,0 +1,25 @@
+{
+  "acceptedInputs": [
+    "syn_agency_band",
+    "syn_base_amount"
+  ],
+  "rejectedInputs": [
+    {
+      "name": "reserve_prices",
+      "reasonCode": "PostOpeningFactNotAccepted"
+    },
+    {
+      "name": "drawn_numbers",
+      "reasonCode": "PostOpeningFactNotAccepted"
+    },
+    {
+      "name": "realized_assessment_rate",
+      "reasonCode": "PostOpeningFactNotAccepted"
+    },
+    {
+      "name": "winning_amount",
+      "reasonCode": "PostOpeningFactNotAccepted"
+    }
+  ],
+  "enforcedBy": "signature"
+}

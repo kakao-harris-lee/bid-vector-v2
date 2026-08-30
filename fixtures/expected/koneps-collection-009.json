@@ -1,0 +1,12 @@
+{
+  "resolvedBaseAmount": {
+    "variant": "FallbackFromBudget",
+    "sourceKey": "asignBdgtAmt",
+    "amount": 820000000,
+    "currency": "KRW",
+    "basis": "BASE_AMOUNT",
+    "provenance": "FilledFromBudgetKey"
+  },
+  "storedInCanonicalDirectSlot": false,
+  "typeDistinctFromDirect": true
+}

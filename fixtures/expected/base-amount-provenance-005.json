@@ -1,0 +1,6 @@
+{
+  "outcome": "Rejected",
+  "reasonCode": "AmountNotRepresentable",
+  "moneyConstructed": false,
+  "coercedToZero": false
+}

@@ -1,0 +1,19 @@
+{
+  "operation": "MIN",
+  "operands": [
+    {
+      "amount": 900000000,
+      "currency": "KRW",
+      "basis": "BASE_AMOUNT",
+      "vatTreatment": "INCLUSIVE",
+      "provenance": "Published"
+    },
+    {
+      "amount": 900000000,
+      "currency": "KRW",
+      "basis": "ESTIMATED_PRICE",
+      "vatTreatment": "EXCLUSIVE",
+      "provenance": "Published"
+    }
+  ]
+}

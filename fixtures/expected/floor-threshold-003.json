@@ -1,0 +1,9 @@
+{
+  "criticalAssessmentRate": {
+    "fraction": 1.05,
+    "axisNumerator": "예정가",
+    "axisDenominator": "기초금액"
+  },
+  "sampleIsShortfall": true,
+  "comparison": "realizedAssessmentRate > criticalAssessmentRate"
+}

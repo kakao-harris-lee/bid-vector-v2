@@ -1,0 +1,19 @@
+{
+  "row": {
+    "rowId": "SYN-ROW-0002",
+    "rawBaseAmount": 900000000,
+    "currency": "KRW"
+  },
+  "ruleHits": [
+    "suspect-ratio",
+    "clean-integer"
+  ],
+  "policy": {
+    "ruleOrder": [
+      "clean-integer",
+      "suspect-ratio",
+      "derived-vat"
+    ],
+    "policyVersion": "SYN-POLICY-B-2026-08-30"
+  }
+}

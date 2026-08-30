@@ -1,0 +1,29 @@
+{
+  "recommendedBidRate": {
+    "fraction": 0.91875,
+    "unit": "fraction",
+    "origin": "Recommended"
+  },
+  "floorRate": {
+    "fraction": 0.875,
+    "unit": "fraction",
+    "origin": "NoticeValue",
+    "noticeRevision": "000"
+  },
+  "rawSampleCount": 152,
+  "samplesOutsideBand": 3,
+  "shortfallSampleCountAmongQualified": 10,
+  "band": {
+    "id": "SYN-BAND-assessment-denominator",
+    "min": 0.935,
+    "max": 1.125,
+    "inclusivity": "min-inclusive-max-inclusive",
+    "purpose": "표본 개연 범위 (분모 필터)",
+    "note": "SYNTHETIC — legacy 값이 아니다. 이 case의 기대값은 밴드의 구체 값에 의존하지 않고 밴드 밖 표본이 분모에서 빠진다는 규칙에만 의존한다."
+  },
+  "policy": {
+    "minAssessmentSamples": 150,
+    "minAssessmentSamplesRationale": "통계적 편의(운영자 승인 2026-08-26)",
+    "policyVersion": "SYN-POLICY-2026-08-30"
+  }
+}

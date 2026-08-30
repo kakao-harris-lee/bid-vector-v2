@@ -1,0 +1,17 @@
+{
+  "operatorAwardedContractLimit": {
+    "amount": 500000000,
+    "currency": "KRW",
+    "basis": "AWARDED_CONTRACT_LIMIT",
+    "vatTreatment": "UNKNOWN",
+    "provenance": "OperatorDeclared"
+  },
+  "noticeAmount": {
+    "amount": 3000000000,
+    "currency": "KRW",
+    "basis": "BASE_AMOUNT",
+    "vatTreatment": "INCLUSIVE",
+    "provenance": "Published"
+  },
+  "licenseVerdict": "Eligible"
+}

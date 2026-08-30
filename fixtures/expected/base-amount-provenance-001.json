@@ -1,0 +1,14 @@
+{
+  "originalBaseAmount": 912345678,
+  "originalFieldMutated": false,
+  "classification": "SuspectRatio",
+  "evidence": {
+    "firstMatchedRule": "suspect-ratio"
+  },
+  "recoveryEstimate": {
+    "field": "recoveredBaseAmount",
+    "amount": 900000000
+  },
+  "recoveryWrittenToOriginalField": false,
+  "policyVersion": "SYN-POLICY-A-2026-08-30"
+}

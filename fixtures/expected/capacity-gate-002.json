@@ -1,0 +1,7 @@
+{
+  "verdict": "Uncertain",
+  "uncertainReason": "RequirementDataAbsent",
+  "operatorHoldingState": "Known",
+  "operatorHoldingAmount": 0,
+  "distinctFromAbsent": true
+}

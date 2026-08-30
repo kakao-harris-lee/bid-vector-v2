@@ -1,0 +1,9 @@
+{
+  "verdict": "Uncertain",
+  "uncertainReason": "RequirementUnparsable",
+  "unparsableRowCount": 1,
+  "requirementSourceFields": [
+    "lcnsLmtNm"
+  ],
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

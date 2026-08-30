@@ -1,0 +1,6 @@
+{
+  "classification": "Clean",
+  "firstMatchedRule": "clean-integer",
+  "policyVersion": "SYN-POLICY-B-2026-08-30",
+  "orderIsLoadBearing": true
+}

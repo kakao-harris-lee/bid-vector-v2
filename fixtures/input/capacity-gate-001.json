@@ -1,0 +1,10 @@
+{
+  "operatorConstructionCapacity": {
+    "state": "Absent",
+    "reason": "NotDeclared"
+  },
+  "noticeRequirement": {
+    "state": "Absent",
+    "reason": "NotCollectedYet"
+  }
+}

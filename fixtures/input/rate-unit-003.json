@@ -1,0 +1,8 @@
+{
+  "rawRate": {
+    "numeric": 87.5,
+    "declaredUnit": null,
+    "sourceField": "SYN-FIELD-bidRate",
+    "axis": "bidRate"
+  }
+}

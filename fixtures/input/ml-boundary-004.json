@@ -1,0 +1,10 @@
+{
+  "attemptedKernelInputs": [
+    "syn_base_amount",
+    "syn_agency_band",
+    "reserve_prices",
+    "drawn_numbers",
+    "realized_assessment_rate",
+    "winning_amount"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "payload": {
+    "bidNtceNo": "SYN-NTC-0009",
+    "bidNtceOrd": "000",
+    "bssAmt": null,
+    "asignBdgtAmt": "820000000"
+  },
+  "resolutionOrder": [
+    "bssAmt",
+    "asignBdgtAmt"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "result": "Measured",
+  "criticalAssessmentRate": {
+    "fraction": 1.05
+  },
+  "frequency": {
+    "numerator": 18,
+    "denominator": 150,
+    "exactDecimal": 0.12
+  },
+  "numerator": 18,
+  "denominator": 150,
+  "band": {
+    "ref": "SYN-BAND-assessment-denominator"
+  },
+  "biasDirection": {
+    "present": true
+  },
+  "sampleSize": 150,
+  "policyVersion": "SYN-POLICY-2026-08-30",
+  "calledProbability": false
+}

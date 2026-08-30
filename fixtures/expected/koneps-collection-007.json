@@ -1,0 +1,9 @@
+{
+  "code": "9999",
+  "codeKnown": false,
+  "label": {
+    "state": "Absent",
+    "reason": "CodeNotInMapping"
+  },
+  "labelInvented": false
+}

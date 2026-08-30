@@ -1,0 +1,8 @@
+{
+  "verdict": "Uncertain",
+  "uncertainReason": "RequirementDataAbsent",
+  "requiredLicenses": null,
+  "unparsableRowCount": 0,
+  "requirementSourceFields": [],
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

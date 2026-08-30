@@ -1,0 +1,13 @@
+{
+  "notice": {
+    "noticeId": "SYN-NOTICE-0002",
+    "bidNtceOrd": "000",
+    "licenseLimitRows": null
+  },
+  "operatorLicenses": [
+    "토목공사업"
+  ],
+  "policy": {
+    "licenseGroupingPolicyVersion": "SYN-POLICY-2026-08-30"
+  }
+}

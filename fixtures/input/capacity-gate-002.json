@@ -1,0 +1,15 @@
+{
+  "operatorConstructionCapacity": {
+    "state": "Known",
+    "amount": 0,
+    "currency": "KRW",
+    "basis": "CONSTRUCTION_CAPACITY",
+    "vatTreatment": "INCLUSIVE",
+    "provenance": "OperatorDeclared",
+    "evaluationYear": 2025
+  },
+  "noticeRequirement": {
+    "state": "Absent",
+    "reason": "NotCollectedYet"
+  }
+}

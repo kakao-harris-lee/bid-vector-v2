@@ -1,0 +1,10 @@
+{
+  "outcome": "Uncertain",
+  "reasonCode": "BasisMismatch",
+  "comparisonPerformed": false,
+  "comparedBases": [
+    "BASE_AMOUNT",
+    "ESTIMATED_PRICE"
+  ],
+  "directionAsserted": false
+}

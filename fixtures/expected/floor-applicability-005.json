@@ -1,0 +1,17 @@
+{
+  "floorRate": {
+    "fraction": 0.875
+  },
+  "origin": {
+    "kind": "NoticeValue",
+    "noticeRevision": "000"
+  },
+  "applicability": "Applicable",
+  "plausibilityFlag": "WithinTrustBand",
+  "bundleFields": [
+    "floorRate",
+    "origin",
+    "applicability",
+    "plausibilityFlag"
+  ]
+}

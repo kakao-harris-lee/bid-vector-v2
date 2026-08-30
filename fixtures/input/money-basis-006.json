@@ -1,0 +1,14 @@
+{
+  "row": {
+    "origin": "LEGACY_IMPORT",
+    "conceptSlot": "BASE_AMOUNT",
+    "amount": 800000000,
+    "currency": "KRW",
+    "declaredVatTreatment": null,
+    "declaredProvenance": null
+  },
+  "definitionDefaultForSlot": {
+    "basis": "BASE_AMOUNT",
+    "vatTreatment": "INCLUSIVE"
+  }
+}

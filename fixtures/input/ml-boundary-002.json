@@ -1,0 +1,9 @@
+{
+  "mlEngineResponse": {
+    "regimeLabel": "SYN-REGIME-A",
+    "signals": {
+      "synSignal": 0.42
+    },
+    "review_required": true
+  }
+}

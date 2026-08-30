@@ -1,0 +1,19 @@
+{
+  "notice": {
+    "noticeId": "SYN-NOTICE-0011",
+    "noticeDate": null,
+    "agency": {
+      "name": "SYN-AGENCY-0002",
+      "orgType": "CENTRAL_GOVERNMENT"
+    }
+  },
+  "statutoryTable": {
+    "id": "SYN-TABLE-floor-rate",
+    "tiers": [
+      {
+        "effectiveFrom": "2026-07-01",
+        "rate": 0.865
+      }
+    ]
+  }
+}

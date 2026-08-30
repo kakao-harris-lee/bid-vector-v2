@@ -1,0 +1,2939 @@
+# V2 검증 corpus — case manifest
+#
+# 기준 문서: `data-extract.md` (단일 기준). 이 파일의 구조는 그 문서 §3의 manifest schema를
+# 따르고, 확장 키는 아래 `schema.extensions`가 전부 선언한다.
+#
+# 이 파일을 읽기 전에 알아야 할 것 넷.
+#
+#   1. **여기 든 입력은 전부 synthetic이다.** 운영 DB·KONEPS API·로그에서 가져온 행이 하나도
+#      없다. `data-extract.md` §7이 금지한 「가상의 fixture를 실운영 샘플이라 표기」를 피하려고
+#      모든 식별자를 `SYN-` 접두로 두고 `privacy.synthetic: true`를 case마다 적는다.
+#      따라서 **`observed` 층 case는 0건이다** — 그 층은 운영 데이터 접근 승인이 선행한다
+#      (`access_approval_required` 참조).
+#   2. **legacy 출력을 정답으로 복사한 case가 하나도 없다.** 이 slice는 기존 Python을 실행하지
+#      않았고 `tests/goldens/**`의 기대값을 읽어 옮기지 않았다. `legacy_reference`는 **입력 형태와
+#      회귀 사례의 출처**로만 달려 있으며 각 항목이 그 사실을 `role`에 적는다.
+#   3. **기대값이 legacy 숫자에 의존하지 않는다.** 규율 하나로 강제하고 기계로 확인한다 —
+#      *`data-dictionary.md` §12.1이 `legacy-behavior`로 등재한 수를 fixture가 input·expected
+#      어느 쪽에도 쓰지 않는다.* 그런 수가 필요한 자리(밴드 경계, 법정 하한율, 신뢰 상한,
+#      허용 오차)는 **synthetic 정책 입력**으로 받고, 기대값은 그 값이 아니라 **규칙**에만
+#      의존하게 설계했다. §12.1이 `authoritative`로 등재한 수는 셋뿐이고(`100` 변환 제수 ·
+#      `150` 최소 표본 수 · `0.10` 부가세율) 이 corpus는 그중 둘을 쓴다.
+#      검사 범위와 **검사가 못 보는 자리**는 `numeric_discipline.check`가 적는다.
+#   4. **아직 아무것도 승인되지 않았다.** 모든 case의 `review.approved_by_user`가 `false`이고
+#      `review.codex_verdict`가 `pending`이다. `review.claude_commit`은 이 파일을 담은 커밋이
+#      자기 SHA를 담을 수 없으므로 `pending`이며 리뷰 라운드에서 채운다.
+#
+# 덮지 못한 축은 숨기지 않는다 — `uncovered_axes`가 전부 적고 소유 `OPEN`을 단다.
+
+manifest_version: 1
+base_document: data-extract.md
+slice: m0/0e (fixture-curator)
+authored_at: 2026-08-30
+legacy_repo:
+  path: ./bid-vector (symlink, read-only)
+  pinned_sha: ed4b06c
+  accessed: read-only. 이 slice 는 legacy Python 을 실행하지 않았다.
+
+layout:
+  note: |-
+    `data-extract.md` §3의 예시는 `expected/<id>.json`을 저장소 루트 형제로 둔다. 이 slice 의
+    쓰기 범위가 `fixtures/`로 한정돼 있어 두 디렉터리를 그 아래 두었다. **선언된 이탈이며
+    경로 외에 schema 를 바꾸지 않는다.**
+  input_dir: fixtures/input/
+  expected_dir: fixtures/expected/
+
+schema:
+  base: data-extract.md §3
+  extensions:
+    verifies: 이 fixture 가 **무엇을 검증하는가**. 한 case 는 한 의미만 검증한다(§7 「한 case 의 기대값을 여러 의미에 재사용」 금지).
+    expected_reasoning: 기대값이 **어느 문서의 어느 문장**에서 나왔는가. Codex 독립 검토(§5 7단계)의 대상.
+    source.kind 어휘: official-doc | operator-decision | approved-spec | legacy-observation. 앞 셋만 `authoritative` 분류를 낼 수 있다.
+    expected_sha256: 기대값 파일의 SHA-256. §3은 fixture 해시만 요구하나 기대값도 사후 변경 탐지 대상이다.
+    privacy.synthetic: 입력이 합성인지. 운영 데이터 유래가 아님을 case 마다 명시한다.
+    privacy.method: 비식별화 방식. 합성 입력은 `not-applicable-synthetic`.
+    extracted_at / extraction_method: 추출 시점과 방법. 합성 입력은 `authored-from-approved-spec`.
+    normalization.source_form: 정규화 **전** 원본의 형태(§3 「정규화 전 원본과 정규화 후 fixture 구분」).
+    provisional: 이 기대값이 어느 활성 `OPEN`의 결정 전 **임시 처리**인가. 그 `OPEN`이 닫히면 교체된다.
+    owning_open: 이 case 가 **건드리지 않는** 인접 축을 소유한 활성 `OPEN`.
+    not_covered: 이 case 가 덮지 **못하는** 것.
+    change_history: 기대값 변경 이력(§3 「기대값 변경 시 case 를 덮어쓰지 말고 변경 이유와 policy version 기록」). 최초 등재에는 비어 있다.
+
+classification_policy:
+  authoritative: |-
+    출처가 ① 조달청 공식 문서 인용 ② 커밋된 운영자 결정 기록 ③ `v2-지침서.md`(M0 선행 조건으로
+    승인된 기준 문서) 중 하나인 case. M0 산출 문서(`capability-map.md`·`regression-ledger.md`·
+    `data-dictionary.md`)는 **그 안에 인용된 결정·공식 문서를 가리키는 포인터로만** 쓰고,
+    그 문서가 스스로 도출한 규칙은 이 분류를 내지 않는다.
+  observed: 0건. 운영 데이터 접근 승인이 선행한다.
+  legacy_behavior: 0건. 이 slice 는 legacy Python 을 실행하지 않았고 golden 기대값을 옮기지 않았다.
+  pending_user_approval: |-
+    **분류가 `authoritative`인 것과 승인된 것은 다르다.** M0 완료 게이트(사용자 승인)가 아직
+    열리지 않았으므로 모든 case 의 `review.approved_by_user`는 `false`다.
+
+numeric_discipline:
+  rule: |-
+    **`docs/discovery/data-dictionary.md` §12.1이 `legacy-behavior`로 등재한 수를 fixture 가 쓰지
+    않는다.** input·expected 양쪽에 걸린다 — 입력에 넣어도 그 값이 곧 정책 경계가 되기 때문이다.
+    그런 수가 필요한 자리(밴드 경계, 법정 하한율, 신뢰 상한, 허용 오차)는 **synthetic 정책
+    입력**으로 받고, 기대값은 그 값이 아니라 **규칙**에만 의존하게 설계했다.
+  check:
+    what: "§12.1의 `legacy-behavior` 수 가운데 **비정수 율·배수·오차**와 **금액 구간 경계 셋**과 `-1.0`을 모든 fixture JSON에서 문자열·수치 양쪽으로 찾는다."
+    exempt: |-
+      정수 counts 와 sentinel — `15`(복수예비가격 개수) · `12`(confidence 계수) · `2`·`4`·`6`
+      (반올림 자리수) · `0`·`0.0`. 그 수들은 자기 축 밖에서 흔한 셈이라 **문자열 일치가 채택을
+      뜻하지 않는다.** 그 축에서의 채택 여부는 사람이 읽는다. (검사가 못 보는 자리를 적어 둔다.)
+    result: "0건 (2026-08-30). 재현 명령은 `reports/evidence/m0/0e/fixtures-commands.md` **F-3**."
+  authoritative_numbers_used:
+    note: "§12.1이 `authoritative`로 등재한 수는 셋뿐이고(`100` · `150` · `0.10`) 이 corpus 는 그중 둘을 쓴다."
+    entries:
+      - value: 100
+        unit: 무차원
+        role: percent → fraction 변환 제수 (정의상 `1` percent = `1` ÷ `100`)
+        source: "data-dictionary.md §12.1 — 층 `authoritative`(단위 정의)"
+        used_in: [rate-unit-001, rate-unit-005]
+        note: "`rate-unit-002`는 fraction 입력이라 제수가 `1`이고, `floor-shortfall-006`은 같은 변환을 쓰되 제수를 기대값에 싣지 않는다."
+      - value: 150
+        unit: 건수
+        role: 하한 미달 빈도의 최소 표본 수
+        source: "운영자 결정 2026-08-26 (`OPEN-DEC-01` 해소) · data-dictionary.md §12.1 — 층 `authoritative`"
+        used_in: [floor-shortfall-001, floor-shortfall-002, floor-shortfall-003, floor-shortfall-004, floor-shortfall-005]
+      - value: 0.10
+        unit: fraction
+        role: 부가세율
+        source: "운영자 결정 2026-08-28 (U-1b)의 근거 서술 · data-dictionary.md §12.1 — 층 `authoritative`"
+        used_in: []
+        note: "쓰지 않았다. 과세 성분을 계산하는 case 가 이 corpus 에 없다 — 그 축은 `OPEN-REG-05`가 막는다."
+  synthetic_policy_inputs:
+    note: |-
+      아래는 fixture 가 **정책 데이터를 입력으로 받는** 자리다. 값은 전부 synthetic 이며 legacy
+      값을 옮긴 것이 아니다(위 검사가 그것을 기계로 확인한다). 각 case 의 기대값은 이 값이 아니라
+      규칙에만 의존한다.
+    entries:
+      - "SYN-BAND-assessment-denominator (사정률 분모 필터 밴드) — 실물은 §1.4.3 B1~B3, 전부 `legacy-behavior`"
+      - "SYN-BAND-published-floor-rate (게시 하한율 신뢰 밴드) — 실물은 §1.4.3 B6, `legacy-behavior`"
+      - "SYN-TABLE-floor-rate (법정 하한율 시행일 표) — 실물 값은 `OPEN-DEC-10` 소유"
+      - "SYN-POLICY-agency-regime (기관 유형 → 하한 모델 매핑) — 순서·매핑 모두 정책 데이터"
+      - "SYN-POLICY-A/B-2026-08-30 (기초금액 provenance rule order) — 두 순서의 **대조**가 목적이고 어느 쪽도 정답으로 두지 않는다"
+      - "SYN-POLICY-2026-08-30 (면허 결합 규칙 · 최소 표본 정책의 version 문자열)"
+  band_axis_separation:
+    rule: |-
+      `data-dictionary.md` §13.1 — 「값이 같고 축이 다른 **B4·B5를 한 case 에 섞지 않는다**」.
+    how: "이 corpus 는 B4(율 라벨 유효 창)도 B5(투찰비 개연 밴드)도 **값으로 쓰지 않는다.** 축을 섞을 자리 자체를 만들지 않았다. 밴드 값이 승격되면 그때 축별로 나눠 만든다."
+
+
+cases:
+  - id: rate-unit-001
+    domain: rate-unit
+    classification: authoritative
+    verifies: |-
+        선언된 percent 입력이 fraction으로 명시 변환된다. 원문 unit이 보존된다.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.1
+    expected_reasoning: |-
+      v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
+      기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
+      data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+    input_file: fixtures/input/rate-unit-001.json
+    expected_file: fixtures/expected/rate-unit-001.json
+    normalization:
+      rate_unit: "fraction (원문 percent)"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "raw-with-declared-unit"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 7289b53dde1ef728688cfb54a8c4e883fcf2ec6d4441db22246b1d868901fffc
+    expected_sha256: 1937c3ba8fec01bcd8cdf354457fa758ca13a1ecdf500d6116b886fe23e5b5f6
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: rate-unit-002
+    domain: rate-unit
+    classification: authoritative
+    verifies: |-
+        선언된 fraction 입력은 배율 없이 그대로 통과한다.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.1
+    expected_reasoning: |-
+      v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
+      기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
+      data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+    input_file: fixtures/input/rate-unit-002.json
+    expected_file: fixtures/expected/rate-unit-002.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "raw-with-declared-unit"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 30459cc29f32c6313b6c72e8eed645de6df0659a8b5488f07bbda5c4431f3b39
+    expected_sha256: 771fc9af17a9445ec688ab5ff44bdc61088cd2b555974a4de13fd823abbfbd68
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: rate-unit-003
+    domain: rate-unit
+    classification: authoritative
+    verifies: |-
+        unit 미선언 입력은 크기와 무관하게 거부된다 (percent 모양). 004와 쌍이다.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.1
+    expected_reasoning: |-
+      v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
+      기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
+      data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+    input_file: fixtures/input/rate-unit-003.json
+    expected_file: fixtures/expected/rate-unit-003.json
+    normalization:
+      rate_unit: "미선언 — 정규화하지 않는다"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "raw-unit-absent"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 5b6933acb516fe36b08a4fa5ff308dbb47e122dca16ed4c2e07792ff51719b03
+    expected_sha256: 7b4f00d137ffaa6ba731bcdeaae8c0fac6fb34336f712ebedf168ece4592c7bd
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: rate-unit-004
+    domain: rate-unit
+    classification: authoritative
+    verifies: |-
+        unit 미선언 입력은 크기와 무관하게 거부된다 (fraction 모양). 003과 같은 결과여야 한다 — 값 크기로 단위를 추측하는 경로가 없음을 이 쌍이 고정한다.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.1
+    expected_reasoning: |-
+      v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
+      기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
+      data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+    input_file: fixtures/input/rate-unit-004.json
+    expected_file: fixtures/expected/rate-unit-004.json
+    normalization:
+      rate_unit: "미선언 — 정규화하지 않는다"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "raw-unit-absent"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 12eb4ac8ae9230c0d999a89b7d5d7b85ff91e99e83d4cb27e1b3e7a0ab139e04
+    expected_sha256: 7b4f00d137ffaa6ba731bcdeaae8c0fac6fb34336f712ebedf168ece4592c7bd
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: rate-unit-005
+    domain: rate-unit
+    classification: authoritative
+    verifies: |-
+        선언이 개연성을 이긴다 — percent로 선언된 0.875는 0.00875이지 0.875가 아니다.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.1
+    expected_reasoning: |-
+      v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
+      기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
+      data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+    input_file: fixtures/input/rate-unit-005.json
+    expected_file: fixtures/expected/rate-unit-005.json
+    normalization:
+      rate_unit: "fraction (원문 percent)"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "raw-with-declared-unit"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 4b2f770c22b93947b5b24292f193614016a11d260a37f25d3ae63cebae84588e
+    expected_sha256: a1a0e827c3af46a6b274e9fde8c9fcb90f4fc31217ec84983ff19a74e6722b96
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: money-basis-001
+    domain: money-basis
+    classification: authoritative
+    verifies: |-
+        basis 태그가 다른 두 금액의 비교가 수행되지 않고 사유와 함께 거부된다. 두 값의 수치가 같으므로 대소 전제가 들어가지 않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-STR-01 (reports/evidence/m0/0a2/decisions.md) · capability-map.md STR-16 · DEC-02
+    expected_reasoning: |-
+      v2-지침서.md §4.1 *"`BaseAmount`, `EstimatedAmount`, `YegaAmount`, `BidAmount`를 원시 숫자로 상호 대입하지 못하게
+      한다"* + capability-map.md DEC-02 결정 무관(무조건) acceptance *"서로 다른 basis의 금액이 하나의 min/max 연산에 함께 들어갈
+      수 없다"* + STR-16 acceptance *"금액 범위로 검색할 때 그 값이 어느 basis인지가 선언돼 있고, 비교 대상 금액과 basis가 같다"*. 두 값의
+      수치를 같게 두어 **어느 쪽이 크다는 전제를 넣지 않는다** — regression-ledger.md §10.1 fixture-curator 인계의 요구다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/opportunity_monitoring/filters.py
+        - app/api/projects.py
+      role: |-
+        회귀 형태(R-BASIS-01·R-BASIS-02)의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/money-basis-001.json
+    expected_file: fixtures/expected/money-basis-001.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 3d6dbe0b54213bb662cc420885199bcecb4fe248ff59d49eb3a1a293d7b2c141
+    expected_sha256: 6ace534b600427c387784d5316b10951ce206632db5f3ccaef7b54bd30b970e0
+    owning_open: |-
+      OPEN-REG-05 (두 금액 차이의 잔차·행별 실제 과세) — 이 case는 그 축을 건드리지 않는다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: money-basis-002
+    domain: money-basis
+    classification: authoritative
+    verifies: |-
+        basis가 같으면 비교가 수행된다 — 001의 대조군.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-STR-01 · capability-map.md STR-16
+    expected_reasoning: |-
+      v2-지침서.md §4.1 *"`BaseAmount`, `EstimatedAmount`, `YegaAmount`, `BidAmount`를 원시 숫자로 상호 대입하지 못하게
+      한다"* + capability-map.md DEC-02 결정 무관(무조건) acceptance *"서로 다른 basis의 금액이 하나의 min/max 연산에 함께 들어갈
+      수 없다"* + STR-16 acceptance *"금액 범위로 검색할 때 그 값이 어느 basis인지가 선언돼 있고, 비교 대상 금액과 basis가 같다"*. 두 값의
+      수치를 같게 두어 **어느 쪽이 크다는 전제를 넣지 않는다** — regression-ledger.md §10.1 fixture-curator 인계의 요구다.
+    input_file: fixtures/input/money-basis-002.json
+    expected_file: fixtures/expected/money-basis-002.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 4e19b0d22d5f9f532aff33d4c5da840e9d16a9e1fbe16cd67736a233f649a185
+    expected_sha256: 99f56b4282cb9ab2d3c1840f32fef247075c5df13c60c4cca4ee4d5d297563af
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: money-basis-003
+    domain: money-basis
+    classification: authoritative
+    verifies: |-
+        같은 입력 쌍이 감시 경로와 검색 경로에서 같은 답을 낸다 — 두 경로가 다른 basis를 쓰면 "제안에는 뜨는데 검색에는 안 나온다"가 된다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-STR-01 · capability-map.md STR-16 · regression-ledger.md R-BASIS-01·R-BASIS-02
+    expected_reasoning: |-
+      regression-ledger.md R-BASIS-01 검증 방법 결정 무관(무조건) — *"같은 쌍이 감시 경로와 검색 경로(R-BASIS-02)에서 같은 답을 내는지도
+      함께 고정한다"*.
+    input_file: fixtures/input/money-basis-003.json
+    expected_file: fixtures/expected/money-basis-003.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 472dcedf7a35b51772140ef471051905e6eb96b74be18b4a5459d587c8daffbd
+    expected_sha256: 810b6e95be545d9be5b41fc792f088af490e718c536f89ba8648ef39b5053c9d
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: money-basis-004
+    domain: money-basis
+    classification: authoritative
+    verifies: |-
+        서로 다른 basis의 금액이 하나의 min/max 연산에 들어갈 수 없다 — R-BASIS-04가 남긴 형태.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md DEC-02 결정 무관(무조건)
+    expected_reasoning: |-
+      capability-map.md DEC-02 acceptance *"서로 다른 basis의 금액이 하나의 min/max 연산에 함께 들어갈 수 없다"*. 두 인자의 수치를
+      같게 두어 대소 전제를 넣지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_budget_cap_basis.py
+      role: |-
+        회귀 형태(R-BASIS-04)의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/money-basis-004.json
+    expected_file: fixtures/expected/money-basis-004.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 4d8c3dddf8f166d059576059abaa383ea390f3bd6087a6c153ce9be7b6c5722d
+    expected_sha256: de3923d8969df8d51462ebfdf69679bb6164970bf2c28d5de4f8ca65cad2f1ba
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: money-basis-005
+    domain: money-basis
+    classification: authoritative
+    verifies: |-
+        과세 처리가 `Unknown`인 금액은 다른 과세 처리의 금액과 산술 비교에 들어갈 수 없다.
+    source:
+      kind: operator-decision
+      reference: |-
+          U-1b (reports/evidence/m0/0c/decisions-2026-08-28.md) · data-dictionary.md §1.2.1
+    expected_reasoning: |-
+      data-dictionary.md §1.2.1 *"선언을 만들 수 없으면 `Unknown`이고, `Unknown` 금액은 다른 과세 처리의 금액과 산술 비교에 들어갈 수
+      없다(타입 차단)"*.
+    input_file: fixtures/input/money-basis-005.json
+    expected_file: fixtures/expected/money-basis-005.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 77a4079b0b832116df68dd9e552b015fe499a110204755f883c48ae022a98a29
+    expected_sha256: 3c8516bd2261103c32916fb66dc0987a284ad493efd9ffdb5698f07214c6ec71
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: money-basis-006
+    domain: money-basis
+    classification: authoritative
+    verifies: |-
+        legacy 유래 행을 정의상 기본값 과세로 자동 태깅하지 않는다 — 저장 값이 정의를 따른다는 근거가 없다. 값은 기초금액 자리에 있으나 `Inclusive`로 승격되지
+        않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          U-1b · OPEN-DEC-08 (capability-map.md §12.2) · data-dictionary.md §1.2.1
+    expected_reasoning: |-
+      data-dictionary.md §1.2.1 *"legacy 유래 행은 정의상 기본값으로 자동 태깅하지 않는다 — 저장 값이 정의를 따른다는 근거가 없다"* + 운영자
+      결정 `OPEN-DEC-08` *"legacy `clean` 라벨을 V2 corpus에 승계하지 않는다 … legacy 유래 행은 provenance 미상으로 격리"*.
+    input_file: fixtures/input/money-basis-006.json
+    expected_file: fixtures/expected/money-basis-006.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 2bd60764160fe33ef894b8b48491b6a6df1cac0d0f8bf42c5ed5641088635197
+    expected_sha256: d155ce45da58dfdb04eafff4a22baac9c709a7849e72b1e184387ff1987e48f0
+    owning_open: |-
+      OPEN-REG-05 (저장 값의 행별 실제 과세) — 이 case는 그 판정을 하지 않고 판정하지 않음을 고정한다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-001
+    domain: license
+    classification: authoritative
+    verifies: |-
+        그룹 내 모든 면허를 보유하면 `Eligible`. 판정 결과에 policy version과 요건 소스 집합이 함께 남는다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 OpenAPI 참고자료(나라장터 입찰공고정보서비스 1.2) — 형제 필드 `indstrytyMfrcFldList`의 결합 표기 명문 규칙 + 운영자 결정
+          2026-08-26 (`OPEN-QUAL-01` 해소, capability-map.md §12.2 · QUAL-03)
+    expected_reasoning: |-
+      data-dictionary.md §3.2.2 *"그룹 간 OR · 그룹 내 AND. `lmtGrpNo` 결측 행은 하나의 그룹으로 묶어 AND로 해석한다"* — 층
+      `authoritative`(운영자 결정 + 조달청 문서). capability-map.md QUAL-03 결정 무관(무조건) acceptance가 같은 판정을 관측 가능한
+      형태로 적는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_license_eligibility.py
+        - tests/test_license_matching.py
+        - tests/test_license_gate_wiring.py
+        - app/services/license_eligibility.py
+      role: |-
+        입력 형태(요건 행 4필드)와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/license-001.json
+    expected_file: fixtures/expected/license-001.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 2b9e2628bcdd301b1d8d6e2f9d7a58519a6f595e6aa0a493d141b3d49afdff70
+    expected_sha256: be9f21c1be15a814502d53c229e286e5649077df888d8f0b08f72ef46d2b494c
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-002
+    domain: license
+    classification: authoritative
+    verifies: |-
+        그룹 내 일부만 보유하면 `Ineligible` (그룹 내 AND). 미충족 면허가 그룹별로 남는다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 OpenAPI 참고자료(나라장터 입찰공고정보서비스 1.2) — 형제 필드 `indstrytyMfrcFldList`의 결합 표기 명문 규칙 + 운영자 결정
+          2026-08-26 (`OPEN-QUAL-01` 해소, capability-map.md §12.2 · QUAL-03)
+    expected_reasoning: |-
+      data-dictionary.md §3.2.2 *"그룹 간 OR · 그룹 내 AND. `lmtGrpNo` 결측 행은 하나의 그룹으로 묶어 AND로 해석한다"* — 층
+      `authoritative`(운영자 결정 + 조달청 문서). capability-map.md QUAL-03 결정 무관(무조건) acceptance가 같은 판정을 관측 가능한
+      형태로 적는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_license_eligibility.py
+        - tests/test_license_matching.py
+        - tests/test_license_gate_wiring.py
+        - app/services/license_eligibility.py
+      role: |-
+        입력 형태(요건 행 4필드)와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/license-002.json
+    expected_file: fixtures/expected/license-002.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 9999569f0d5b3cc50f1b75e33130e193eee21f1511bfbed73b28d71a11b895a7
+    expected_sha256: ba64424851fe62d9a6dfc30c013b030d8c062dc2e9d188cc62124118cd80cdcd
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-003
+    domain: license
+    classification: authoritative
+    verifies: |-
+        여러 그룹 중 하나만 충족하면 `Eligible` (그룹 간 OR). 다른 그룹의 미충족은 사유가 되지 않는다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 OpenAPI 참고자료(나라장터 입찰공고정보서비스 1.2) — 형제 필드 `indstrytyMfrcFldList`의 결합 표기 명문 규칙 + 운영자 결정
+          2026-08-26 (`OPEN-QUAL-01` 해소, capability-map.md §12.2 · QUAL-03)
+    expected_reasoning: |-
+      data-dictionary.md §3.2.2 *"그룹 간 OR · 그룹 내 AND. `lmtGrpNo` 결측 행은 하나의 그룹으로 묶어 AND로 해석한다"* — 층
+      `authoritative`(운영자 결정 + 조달청 문서). capability-map.md QUAL-03 결정 무관(무조건) acceptance가 같은 판정을 관측 가능한
+      형태로 적는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_license_eligibility.py
+        - tests/test_license_matching.py
+        - tests/test_license_gate_wiring.py
+        - app/services/license_eligibility.py
+      role: |-
+        입력 형태(요건 행 4필드)와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/license-003.json
+    expected_file: fixtures/expected/license-003.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: ce13cd74e98ec86152cfcbe80555328dbb5446d45ac08d3f0d48bc7aef93a2f0
+    expected_sha256: be2f1c4cdbde71d28cd037101078a0161dfe89d59004d22e086ea8e8483c365e
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-004
+    domain: license
+    classification: authoritative
+    verifies: |-
+        그룹1 ⊂ 그룹2 형태에서 그룹1만 충족해도 `Eligible` — 논리적 잉여 그룹이 판정을 뒤집지 않는다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 OpenAPI 참고자료(나라장터 입찰공고정보서비스 1.2) — 형제 필드 `indstrytyMfrcFldList`의 결합 표기 명문 규칙 + 운영자 결정
+          2026-08-26 (`OPEN-QUAL-01` 해소, capability-map.md §12.2 · QUAL-03)
+    expected_reasoning: |-
+      data-dictionary.md §3.2.2 *"그룹 간 OR · 그룹 내 AND. `lmtGrpNo` 결측 행은 하나의 그룹으로 묶어 AND로 해석한다"* — 층
+      `authoritative`(운영자 결정 + 조달청 문서). capability-map.md QUAL-03 결정 무관(무조건) acceptance가 같은 판정을 관측 가능한
+      형태로 적는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_license_eligibility.py
+        - tests/test_license_matching.py
+        - tests/test_license_gate_wiring.py
+        - app/services/license_eligibility.py
+      role: |-
+        입력 형태(요건 행 4필드)와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/license-004.json
+    expected_file: fixtures/expected/license-004.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: dbae12e248fbac8d234a37203e2368dcd07a4d74cd15521f9081d79b3097dbd2
+    expected_sha256: be9f21c1be15a814502d53c229e286e5649077df888d8f0b08f72ef46d2b494c
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-005
+    domain: license
+    classification: authoritative
+    verifies: |-
+        `lmtGrpNo` 결측 행 2개는 단일 그룹 AND로 폴딩된다 — OR로 흩지 않는다. 하나만 보유하므로 `Ineligible`.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 OpenAPI 참고자료(나라장터 입찰공고정보서비스 1.2) — 형제 필드 `indstrytyMfrcFldList`의 결합 표기 명문 규칙 + 운영자 결정
+          2026-08-26 (`OPEN-QUAL-01` 해소, capability-map.md §12.2 · QUAL-03)
+    expected_reasoning: |-
+      data-dictionary.md §3.2.2 *"그룹 간 OR · 그룹 내 AND. `lmtGrpNo` 결측 행은 하나의 그룹으로 묶어 AND로 해석한다"* — 층
+      `authoritative`(운영자 결정 + 조달청 문서). capability-map.md QUAL-03 결정 무관(무조건) acceptance가 같은 판정을 관측 가능한
+      형태로 적는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_license_eligibility.py
+        - tests/test_license_matching.py
+        - tests/test_license_gate_wiring.py
+        - app/services/license_eligibility.py
+      role: |-
+        입력 형태(요건 행 4필드)와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/license-005.json
+    expected_file: fixtures/expected/license-005.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 68f830f017a5a6d117faa43349f104f73051e5f4392225932074353fd47dd9bb
+    expected_sha256: 7467e3b7638d8e72941ec3511dd0e52dcbdfe42f6206e123409155c9ba60abb4
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-006
+    domain: license
+    classification: authoritative
+    verifies: |-
+        운영자 보유 면허 미신고는 `Uncertain`이지 `Ineligible`이 아니다.
+    source:
+      kind: operator-decision
+      reference: |-
+          U-5 (reports/evidence/m0/0c/decisions-2026-08-28.md) · data-dictionary.md §3.2.3
+    expected_reasoning: |-
+      data-dictionary.md §3.2.3 (**U-5**) `UncertainReason = sealed { RequirementDataAbsent,
+      RequirementUnparsable, OperatorLicensesNotDeclared, CollectionFailed }` + *"`Uncertain` ≠
+      `Ineligible`. 보유 면허 미기재는 '미보유'가 아니다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_license_eligibility.py
+        - tests/test_license_matching.py
+        - tests/test_license_gate_wiring.py
+        - app/services/license_eligibility.py
+      role: |-
+        입력 형태(요건 행 4필드)와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/license-006.json
+    expected_file: fixtures/expected/license-006.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: c6813f1968098092e8d81d5f900d63fc27b39c8ed7d355c0990bbeb0376121e5
+    expected_sha256: bbcdcf5b9edf6dfc8419c0c888b401c3ba5128662e877b7f1bbaa112bf0d1fe9
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-007
+    domain: license
+    classification: authoritative
+    verifies: |-
+        요건 원문이 없으면 `Uncertain(RequirementDataAbsent)` — 요건 없음으로 접히지 않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          U-5 · data-dictionary.md §3.2.3
+    expected_reasoning: |-
+      data-dictionary.md §3.2.3 (**U-5**) `UncertainReason = sealed { RequirementDataAbsent,
+      RequirementUnparsable, OperatorLicensesNotDeclared, CollectionFailed }` + *"`Uncertain` ≠
+      `Ineligible`. 보유 면허 미기재는 '미보유'가 아니다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_license_eligibility.py
+        - tests/test_license_matching.py
+        - tests/test_license_gate_wiring.py
+        - app/services/license_eligibility.py
+      role: |-
+        입력 형태(요건 행 4필드)와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/license-007.json
+    expected_file: fixtures/expected/license-007.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 59c8b390bb76921d519bb9fc5e04b7c1c4d38e8fd5b14278959892c54ff043ab
+    expected_sha256: 25de9aa5eb7c61f7810e032f0bf7c132f43fc5b88251d656b26ea97b4e57561c
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-008
+    domain: license
+    classification: authoritative
+    verifies: |-
+        요건 행 파싱 실패는 `Uncertain(RequirementUnparsable)`이며 파싱 실패 행 수가 동반 산출된다.
+    source:
+      kind: operator-decision
+      reference: |-
+          U-5 · data-dictionary.md §3.2.1·§3.2.3
+    expected_reasoning: |-
+      data-dictionary.md §3.2.3 (**U-5**) `UncertainReason = sealed { RequirementDataAbsent,
+      RequirementUnparsable, OperatorLicensesNotDeclared, CollectionFailed }` + *"`Uncertain` ≠
+      `Ineligible`. 보유 면허 미기재는 '미보유'가 아니다"*. 동반 산출의 **파싱 실패 행 수**는 data-dictionary.md §3.2.1 「동반 산출」
+      행이 필수로 둔다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_license_eligibility.py
+        - tests/test_license_matching.py
+        - tests/test_license_gate_wiring.py
+        - app/services/license_eligibility.py
+      role: |-
+        입력 형태(요건 행 4필드)와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/license-008.json
+    expected_file: fixtures/expected/license-008.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: c633f0554b952c9160cf6d2b4d4f64a68786380b7d08ff10a582050e2eec4553
+    expected_sha256: 1038490f1bf125916f94f48ab10fef0d95e0da96d156da3f2932271dd4203e54
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-009
+    domain: license
+    classification: authoritative
+    verifies: |-
+        수집 실패는 도메인 사유가 아닌 별도 `Uncertain(CollectionFailed)`이다 — legacy evidence 문자열에 대응물이 없는 값.
+    source:
+      kind: operator-decision
+      reference: |-
+          U-5 · data-dictionary.md §3.2.3
+    expected_reasoning: |-
+      data-dictionary.md §3.2.3 (**U-5**) `UncertainReason = sealed { RequirementDataAbsent,
+      RequirementUnparsable, OperatorLicensesNotDeclared, CollectionFailed }` + *"`Uncertain` ≠
+      `Ineligible`. 보유 면허 미기재는 '미보유'가 아니다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_license_eligibility.py
+        - tests/test_license_matching.py
+        - tests/test_license_gate_wiring.py
+        - app/services/license_eligibility.py
+      role: |-
+        입력 형태(요건 행 4필드)와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/license-009.json
+    expected_file: fixtures/expected/license-009.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 3be7f59aaaf9fb149d4ed28059a1c052bdcbc1a7cca3b0f6d65cb2a06b8ca20d
+    expected_sha256: 9434a1ea8d158d02d0282e5baa1a0ad98b9e2cc49a936002c04824380163cab5
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-010
+    domain: license
+    classification: authoritative
+    verifies: |-
+        `permsnIndstrytyList`에만 표현된 요건이 판정에서 누락되지 않고, 어느 필드에서 온 요건인지가 결과에 남는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-QUAL-02 해소 (운영자 결정 2026-08-26, capability-map.md QUAL-03)
+    expected_reasoning: |-
+      capability-map.md QUAL-03 결정 무조건 acceptance *"요건 소스에 `permsnIndstrytyList`가 포함된다 — 그 필드에만 표현된
+      요건이 판정에서 누락되지 않는다. 어느 필드에서 온 요건인지가 판정 결과에 남는다"*. **이 case는 결합 규칙을 판정하지 않는다** — 운영자가 두 소스를 모두
+      보유하므로 `OPEN-QUAL-11`의 어느 선택지에서도 답이 같다.
+    input_file: fixtures/input/license-010.json
+    expected_file: fixtures/expected/license-010.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: ba2e4b94f1108ec5379ceffa75a28f85137a465f50ca3060d559299557889a55
+    expected_sha256: 953cc9957354a69b43ecfc7dbb73133e30f2c3bf3c5be88665b8a74c5022f920
+    not_covered: |-
+      허용업종 단독 보유의 결합 규칙 — `OPEN-QUAL-11`. 011이 그 자리의 임시 처리다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-011
+    domain: license
+    classification: authoritative
+    verifies: |-
+        허용업종만 보유한 경우는 `Eligible`로도 `Ineligible`로도 확정하지 않고 사유 있는 `Uncertain`으로 산출된다 — 과차단·과추천 어느 쪽으로도 틀리지
+        않는 쪽.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md QUAL-03 조건부 acceptance (결정 전 임시 시나리오) · data-dictionary.md §3.2.5
+    expected_reasoning: |-
+      capability-map.md QUAL-03 *"조건부 — `OPEN-QUAL-11` 결정에 따라 확정 … 결정 전 임시 시나리오: 허용업종만 보유한 경우를
+      `Eligible`로도 `Ineligible`로도 확정하지 않고 사유 있는 `Uncertain`으로 산출한다"*. **이 기대값은 잠정이며 `OPEN-QUAL-11`이
+      닫히면 교체된다.**
+    input_file: fixtures/input/license-011.json
+    expected_file: fixtures/expected/license-011.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: f75b2b562d6110553554d7fd498e368ef083f38c3fb2e3e4cf0b2f6437cd924f
+    expected_sha256: f58ce646a6a293579313c9dd9bb82375d05e6f130526ad85dfd7c2c009ba1559
+    provisional: "이 기대값은 활성 `OPEN-QUAL-11` 결정 전의 **임시 처리**다. 그 OPEN 이 닫히면 교체한다."
+    owning_open: |-
+      OPEN-QUAL-11
+    not_covered: |-
+      (a) 허용업종 단독 충족 / (b) 제한 면허 동반 시에만 대체 경로 — 둘 중 어느 쪽인지. M1 자격 slice(1C)가 실제 공고 관측으로 닫는다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: license-012
+    domain: license
+    classification: authoritative
+    verifies: |-
+        V2는 면허 유효기간을 보지 않는다. 만료된 면허도 판정에 그대로 쓰이되 결과에 「유효기간 미검증」이 드러난다 — 침묵하면 검증된 판정과 구별되지 않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          U-7 (reports/evidence/m0/0c/decisions-2026-08-28.md) · data-dictionary.md §3.2.4 · §8 알려진 제한 2
+    expected_reasoning: |-
+      data-dictionary.md §3.2.4 (**U-7**) *"V2는 면허 유효기간을 보지 않는다"* + *"자격 판정 결과에 '유효기간 미검증'이 드러나야 한다"*.
+      **`v2-지침서.md` §4.2가 유효기간을 versioned policy data로 요구하는 것과 이 결정이 어긋나며, 그 개정은 미처리다**(§8 제한 7 ·
+      §13.5).
+    input_file: fixtures/input/license-012.json
+    expected_file: fixtures/expected/license-012.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 339802642440528fed8412a87f1e89d8ba398da8a2c87a53d516942f6a49de72
+    expected_sha256: f7b4d94e66e883d71dde14ca77228ac3a8260d8f4042f5eea482955b12963c3f
+    not_covered: |-
+      유효기간 판정 자체 — `OPEN-QUAL-05`(알려진 제한으로 후속 이월) · `OPEN-DIC-01`(면허 축이 정책 version을 싣는가)
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: capacity-gate-001
+    domain: capacity-gate
+    classification: authoritative
+    verifies: |-
+        운영자 보유액 미입력은 `0`이나 「미달」로 접히지 않고 사유 있는 `Uncertain`이다 — `Absent`가 1급 상태다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-QUAL-08 분할 확정 (운영자 결정 2026-08-26) · capability-map.md QUAL-11 결정 무관(무조건) acceptance
+    expected_reasoning: |-
+      capability-map.md QUAL-11 무조건 acceptance *"운영자 보유액이 **미입력**이면 `0`이나 '미달'로 접히지 않고 사유 있는
+      `Uncertain`으로 산출된다"* + data-dictionary.md §1.3 부재 금지 규칙(운영자 결정 `OPEN-ML-04`) + §1.2.4 *"미입력은
+      `Absent`이며 `0`이 아니다"*. 002가 이 case의 대조군이다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/models/models.py
+      role: |-
+        `0`을 not-provided 로 쓰고 `nullable=False`로 못박은 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/capacity-gate-001.json
+    expected_file: fixtures/expected/capacity-gate-001.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 346e57418b9996959364b407fb94a6a4c1cb03912142d74b668848a66dc7e640
+    expected_sha256: 55af7bcccc3301504b2ec9e645b7186264b585f640c7f2febee11908ca050662
+    not_covered: |-
+      요건 값과의 실제 비교 — `OPEN-QUAL-10`(게시 요건의 unit·과세·기준 시점) 및 `cnstrtnAbltyEvlAmtList` 수집 신설(M1 이후)
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: capacity-gate-002
+    domain: capacity-gate
+    classification: authoritative
+    verifies: |-
+        명시 신고된 `0`원 보유액은 `Known(0원)`이며 미입력(001)과 다른 상태다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-QUAL-08 분할 확정 (운영자 결정 2026-08-26) · capability-map.md QUAL-11 결정 무관(무조건) acceptance
+    expected_reasoning: |-
+      data-dictionary.md §1.3 *"`0`은 '0원'이지 '모름'이 아니다"* — 001과 이 case의 쌍이 `Absent` ≠ `0`을 고정한다. **비교
+      결과는 두 case 모두 `Uncertain`이지만 사유가 다르다** — 요건 값 부재는 별개 축이다(`OPEN-QUAL-10` · §5.5).
+    input_file: fixtures/input/capacity-gate-002.json
+    expected_file: fixtures/expected/capacity-gate-002.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 1e2adef296008a675f39b4cc6aaca3198ad0c0845497955532f4b0da3f936e17
+    expected_sha256: 6d1d9687bfb4c0a6b2ea941b07ca048e108e9dc957bf8a913df0ac43a469d6f8
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: capacity-gate-003
+    domain: capacity-gate
+    classification: authoritative
+    verifies: |-
+        도급한도·연매출로 인한 판정은 자격 어휘로 산출되지 않는다 — 도급한도가 낮다는 이유로 공고가 `Ineligible`이 되지 않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-QUAL-08 분할 확정 (운영자 결정 2026-08-26) · capability-map.md QUAL-11 결정 무관(무조건) acceptance
+    expected_reasoning: |-
+      capability-map.md QUAL-11 무조건 acceptance *"도급한도·연매출로 인한 판정은 **자격 어휘로 산출되지 않는다** — 적합도 점수에만 반영된다.
+      도급한도가 낮다는 이유로 공고가 `Ineligible`이 되지 않는다"* (`OPEN-QUAL-08` 분할 확정).
+    input_file: fixtures/input/capacity-gate-003.json
+    expected_file: fixtures/expected/capacity-gate-003.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 599f85760716ef342a266676fe32a80b85668800ad84732caf876fab7b8a8ec5
+    expected_sha256: 8eaad4f0c1d1605e9151e5ec9cb9834c87414b30acb6511e35053320003edd9e
+    not_covered: |-
+      적합도 점수의 값 — `capacity_score` 추측 정규화는 `폐기`이고 대체 산식이 없다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: capacity-gate-004
+    domain: capacity-gate
+    classification: authoritative
+    verifies: |-
+        공고에 시공능력평가금액 요건이 없으면 이 축은 중립이며 다른 자격 축의 판정을 바꾸지 않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-QUAL-08 분할 확정 (운영자 결정 2026-08-26) · capability-map.md QUAL-11 결정 무관(무조건) acceptance
+    expected_reasoning: |-
+      capability-map.md QUAL-11 무조건 acceptance *"공고에 시공능력평가금액 요건이 **없으면** 이 축은 중립이며 다른 자격 축의 판정을 바꾸지
+      않는다"*.
+    input_file: fixtures/input/capacity-gate-004.json
+    expected_file: fixtures/expected/capacity-gate-004.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 638bb63d30a0b99cb361ae86ddf4c6b759aa4a964f7c69c72a9be0ac25549718
+    expected_sha256: 33266a106b4941021c237f4a075f2bba4c0e9e31c2216e272e3577312f038493
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-threshold-001
+    domain: floor-threshold
+    classification: authoritative
+    verifies: |-
+        임계 사정률 경계 — 실현 사정률이 임계 **미만**이면 미달이 아니다. 이 case는 **표본 하나의 미달 여부**만 고정한다 — 밴드 필터·최소 표본 수·집계 빈도는
+        덮지 않는다(`floor-shortfall-001`~`006`이 그 축이다).
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.4
+    expected_reasoning: |-
+      v2-지침서.md §4.4 *"`추천 투찰률 / 낙찰하한율`이 임계 사정률이라는 basis 관계를 타입과 설명으로 보존한다"* + capability-map.md
+      DEC-04 결정 무관 acceptance *"임계 사정률이 정확히 경계값인 표본은 미달로 세지 않는다(초과가 아니므로 적격)"* — 즉 **하한 미달 ⟺ 실현 사정률 >
+      임계 사정률**의 **엄격 부등호**다. `0.91875 ÷ 0.875 = 1.05`는 십진에서 정확히 떨어지므로 이 case의 기대값은 반올림
+      정책(`OPEN-DIC-10`)에 의존하지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_floor_shortfall.py
+        - tests/test_published_floor_rate.py
+        - app/domain/floor_shortfall.py
+        - app/services/notice_floor_shortfall.py
+      role: |-
+        입력 형태와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-threshold-001.json
+    expected_file: fixtures/expected/floor-threshold-001.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 23b492f2aff8d2a617b5c873749d68151aad305b58d21a947bed78d178721749
+    expected_sha256: d03e94b7b9b3ad309b8994ca6326f42eb9c0f65a6446554ff5adebbf7067d6e7
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-threshold-002
+    domain: floor-threshold
+    classification: authoritative
+    verifies: |-
+        임계 사정률 경계 — 실현 사정률이 임계 **와 같으면** 미달이 아니다 (초과가 아니므로 적격). 이 case는 **표본 하나의 미달 여부**만 고정한다 — 밴드
+        필터·최소 표본 수·집계 빈도는 덮지 않는다(`floor-shortfall-001`~`006`이 그 축이다).
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.4
+    expected_reasoning: |-
+      v2-지침서.md §4.4 *"`추천 투찰률 / 낙찰하한율`이 임계 사정률이라는 basis 관계를 타입과 설명으로 보존한다"* + capability-map.md
+      DEC-04 결정 무관 acceptance *"임계 사정률이 정확히 경계값인 표본은 미달로 세지 않는다(초과가 아니므로 적격)"* — 즉 **하한 미달 ⟺ 실현 사정률 >
+      임계 사정률**의 **엄격 부등호**다. `0.91875 ÷ 0.875 = 1.05`는 십진에서 정확히 떨어지므로 이 case의 기대값은 반올림
+      정책(`OPEN-DIC-10`)에 의존하지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_floor_shortfall.py
+        - tests/test_published_floor_rate.py
+        - app/domain/floor_shortfall.py
+        - app/services/notice_floor_shortfall.py
+      role: |-
+        입력 형태와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-threshold-002.json
+    expected_file: fixtures/expected/floor-threshold-002.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: d6aa107d20eb06103efa9a3bdf89ad56a4a984129f98c6ddafff4a8ffe4ea97b
+    expected_sha256: d03e94b7b9b3ad309b8994ca6326f42eb9c0f65a6446554ff5adebbf7067d6e7
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-threshold-003
+    domain: floor-threshold
+    classification: authoritative
+    verifies: |-
+        임계 사정률 경계 — 실현 사정률이 임계 **초과**면 미달이다. 이 case는 **표본 하나의 미달 여부**만 고정한다 — 밴드 필터·최소 표본 수·집계 빈도는 덮지
+        않는다(`floor-shortfall-001`~`006`이 그 축이다).
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.4
+    expected_reasoning: |-
+      v2-지침서.md §4.4 *"`추천 투찰률 / 낙찰하한율`이 임계 사정률이라는 basis 관계를 타입과 설명으로 보존한다"* + capability-map.md
+      DEC-04 결정 무관 acceptance *"임계 사정률이 정확히 경계값인 표본은 미달로 세지 않는다(초과가 아니므로 적격)"* — 즉 **하한 미달 ⟺ 실현 사정률 >
+      임계 사정률**의 **엄격 부등호**다. `0.91875 ÷ 0.875 = 1.05`는 십진에서 정확히 떨어지므로 이 case의 기대값은 반올림
+      정책(`OPEN-DIC-10`)에 의존하지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_floor_shortfall.py
+        - tests/test_published_floor_rate.py
+        - app/domain/floor_shortfall.py
+        - app/services/notice_floor_shortfall.py
+      role: |-
+        입력 형태와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-threshold-003.json
+    expected_file: fixtures/expected/floor-threshold-003.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: f7e5bbc2b7d75797f2893355967e9ca6e8c919ce2c09b7603b5d99ff18bfd11c
+    expected_sha256: 6942d065010d2d5d8a654efc7459412939289b72485e79dfe366bbc688131f26
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-shortfall-001
+    domain: floor-shortfall
+    classification: authoritative
+    verifies: |-
+        최소 표본 수 `N-1`(149) — 값이 아니라 사유 있는 측정 불가를 반환한다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-DEC-01 해소 (운영자 결정 2026-08-26) · capability-map.md DEC-04 · v2-지침서.md §4.4
+    expected_reasoning: |-
+      capability-map.md DEC-04 확정 (운영자 결정 2026-08-26, `OPEN-DEC-01` 해소) — 최소 표본 수 **150**을 유지하고 근거를
+      「통계적 편의」로 명시 승인하며 **정책 데이터로 외부화**한다. data-dictionary.md §12.1이 `150`을 **`authoritative`** 층으로
+      등재한다. 경계 포함성은 같은 acceptance 문면이 정한다 — *"최소 표본 수 **미만**이면 값이 아니라 사유가 있는 측정 불가를 반환한다"* →
+      `denominator >= 150`이면 측정한다. 반환 형태는 *"빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로
+      반환된다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_floor_shortfall.py
+        - tests/test_published_floor_rate.py
+        - app/domain/floor_shortfall.py
+        - app/services/notice_floor_shortfall.py
+      role: |-
+        입력 형태와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-shortfall-001.json
+    expected_file: fixtures/expected/floor-shortfall-001.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 55d192295d7af9a175fdcfcf39e070c14664774d76492ee82cc2ff6b735e3fec
+    expected_sha256: 7becfb517d789355b6cca6478aecdb1520f0b7ad3dc97c3f9a4239c264a15cd5
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-shortfall-002
+    domain: floor-shortfall
+    classification: authoritative
+    verifies: |-
+        최소 표본 수 `N`(150) — 경계 포함. 측정되며 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로 반환된다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-DEC-01 해소 (운영자 결정 2026-08-26) · capability-map.md DEC-04 · v2-지침서.md §4.4
+    expected_reasoning: |-
+      capability-map.md DEC-04 확정 (운영자 결정 2026-08-26, `OPEN-DEC-01` 해소) — 최소 표본 수 **150**을 유지하고 근거를
+      「통계적 편의」로 명시 승인하며 **정책 데이터로 외부화**한다. data-dictionary.md §12.1이 `150`을 **`authoritative`** 층으로
+      등재한다. 경계 포함성은 같은 acceptance 문면이 정한다 — *"최소 표본 수 **미만**이면 값이 아니라 사유가 있는 측정 불가를 반환한다"* →
+      `denominator >= 150`이면 측정한다. 반환 형태는 *"빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로
+      반환된다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_floor_shortfall.py
+        - tests/test_published_floor_rate.py
+        - app/domain/floor_shortfall.py
+        - app/services/notice_floor_shortfall.py
+      role: |-
+        입력 형태와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-shortfall-002.json
+    expected_file: fixtures/expected/floor-shortfall-002.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 7675b693151fb2c0e47ae739394652c2186048f89f95f2d2b39ccef517e844e4
+    expected_sha256: 802bf29631f9b9f353b485d453a4973ca194911e1813095e663b7b45f396a125
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-shortfall-003
+    domain: floor-shortfall
+    classification: authoritative
+    verifies: |-
+        최소 표본 수 `N+1`(151) — 측정된다. 빈도는 유리수(분자/분모)로 고정하고 십진 표현은 주장하지 않는다 (반올림은 `OPEN-DIC-10`).
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-DEC-01 해소 (운영자 결정 2026-08-26) · capability-map.md DEC-04 · v2-지침서.md §4.4
+    expected_reasoning: |-
+      capability-map.md DEC-04 확정 (운영자 결정 2026-08-26, `OPEN-DEC-01` 해소) — 최소 표본 수 **150**을 유지하고 근거를
+      「통계적 편의」로 명시 승인하며 **정책 데이터로 외부화**한다. data-dictionary.md §12.1이 `150`을 **`authoritative`** 층으로
+      등재한다. 경계 포함성은 같은 acceptance 문면이 정한다 — *"최소 표본 수 **미만**이면 값이 아니라 사유가 있는 측정 불가를 반환한다"* →
+      `denominator >= 150`이면 측정한다. 반환 형태는 *"빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로
+      반환된다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_floor_shortfall.py
+        - tests/test_published_floor_rate.py
+        - app/domain/floor_shortfall.py
+        - app/services/notice_floor_shortfall.py
+      role: |-
+        입력 형태와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-shortfall-003.json
+    expected_file: fixtures/expected/floor-shortfall-003.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: cfcf24d020eecf314161955ef140e46fa2d32c8b4609e318533e451cade68f6f
+    expected_sha256: 01d5bd0dba110e16934301a03ece086620abc5af0f3deddb53fd64d800680cba
+    not_covered: |-
+      빈도의 십진 표현·반올림 자리수 — `OPEN-DIC-10`(`RoundingPolicy`의 `mode`와 금액 축 밖 `scaleDigits`)
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-shortfall-004
+    domain: floor-shortfall
+    classification: authoritative
+    verifies: |-
+        여유가 충분해 빈도가 `0.0`인 경우와 판정 불가(001)가 서로 다른 표시로 구분된다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-DEC-01 해소 (운영자 결정 2026-08-26) · capability-map.md DEC-04 · v2-지침서.md §4.4
+    expected_reasoning: |-
+      capability-map.md DEC-04 확정 (운영자 결정 2026-08-26, `OPEN-DEC-01` 해소) — 최소 표본 수 **150**을 유지하고 근거를
+      「통계적 편의」로 명시 승인하며 **정책 데이터로 외부화**한다. data-dictionary.md §12.1이 `150`을 **`authoritative`** 층으로
+      등재한다. 경계 포함성은 같은 acceptance 문면이 정한다 — *"최소 표본 수 **미만**이면 값이 아니라 사유가 있는 측정 불가를 반환한다"* →
+      `denominator >= 150`이면 측정한다. 반환 형태는 *"빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로
+      반환된다"*. 대조는 capability-map.md DEC-04 acceptance *"여유가 충분해 빈도가 0.0인 경우와 판정 불가가 서로 다른 표시로 구분된다"* +
+      v2-지침서.md §4.4 *"표본 부족은 0%가 아니라 `Unmeasurable`이다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_floor_shortfall.py
+        - tests/test_published_floor_rate.py
+        - app/domain/floor_shortfall.py
+        - app/services/notice_floor_shortfall.py
+      role: |-
+        입력 형태와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-shortfall-004.json
+    expected_file: fixtures/expected/floor-shortfall-004.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 1e891e5d288768a5f1beff796a0fa137ec3e45849737398db5677534462f188c
+    expected_sha256: ba19a7cc6e7cf543861f6f62fa00579c5689b141ef9fbbd514f48b6fa374bae9
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-shortfall-005
+    domain: floor-shortfall
+    classification: authoritative
+    verifies: |-
+        개연 범위 밖 표본이 분모에서 빠지고, 그 결과 표본 부족이 되면 판정 불가로 전이된다. 밴드 값은 **synthetic 정책 입력**이며 기대값은 그 구체 값에 의존하지
+        않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md DEC-04 결정 무관 acceptance
+    expected_reasoning: |-
+      capability-map.md DEC-04 acceptance *"개연 범위 밖 표본이 분모에서 빠지고, 그 결과 표본 부족이 되면 판정 불가로 전이된다"* +
+      data-dictionary.md §3.3 *"`SampleInsufficient`를 명시 variant로 두는 이유 … 전이의 도착점에 이름이 있어야 한다"*. **밴드
+      값은 legacy 값이 아니라 synthetic이다** — data-dictionary.md §12.1이 legacy 밴드를 `legacy-behavior`로 등재하므로 그
+      값을 corpus 경계로 굳히지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_floor_shortfall.py
+        - tests/test_published_floor_rate.py
+        - app/domain/floor_shortfall.py
+        - app/services/notice_floor_shortfall.py
+      role: |-
+        입력 형태와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-shortfall-005.json
+    expected_file: fixtures/expected/floor-shortfall-005.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: dacc5ca6c22e1be5babf730e8b0629c82cc23e7a1d5e759e9088d6feef66b9aa
+    expected_sha256: 65c7565d6a71b02990a0131711757f653c6262e97916f59017142ea25d6ab0b0
+    not_covered: |-
+      밴드의 **값**과 경계 포함성 — data-dictionary.md §1.4.3 B1~B7은 전부 `legacy-behavior`이며 승격 결정이 없다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-shortfall-006
+    domain: floor-shortfall
+    classification: authoritative
+    verifies: |-
+        선언된 단위가 서로 다른 두 율(percent·fraction)은 명시 변환되어 정상 처리된다 — 거부되는 것은 **미선언**이지 **선언된 혼합**이 아니다.
+        rate-unit-003·004의 대조군.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.1 · §4.4
+    expected_reasoning: |-
+      v2-지침서.md §4.1 *"percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을 기록한다"*. `87.5 percent → 0.875
+      fraction`, `0.91875 fraction`, `0.91875 ÷ 0.875 = 1.05`.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_floor_shortfall.py
+        - tests/test_published_floor_rate.py
+        - app/domain/floor_shortfall.py
+        - app/services/notice_floor_shortfall.py
+      role: |-
+        입력 형태와 회귀 사례의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-shortfall-006.json
+    expected_file: fixtures/expected/floor-shortfall-006.json
+    normalization:
+      rate_unit: "fraction (원문 percent·fraction 혼재, 각각 선언됨)"
+      money_unit: "해당 없음"
+      timezone: "Asia/Seoul"
+      source_form: "raw-with-declared-unit"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 422d1bdbf44f6e4f5194c292a98fd51c3f7f257967d11099a8672e8067ea2bae
+    expected_sha256: b9d7473d9c19ec56b2f07da3b1bf8c080fa8b4aafde6bf1d9cf8a5c7570ecb40
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-applicability-001
+    domain: floor-applicability
+    classification: authoritative
+    verifies: |-
+        지자체 공고는 국가계약 하한으로 조용히 판정되지 않고 **관측 가능한 미적용 상태**(`OutOfScope`)로 산출된다 — 선언과 실행이 일치한다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-DEC-09 해소 (운영자 결정 2026-08-26) · capability-map.md DEC-03 · data-dictionary.md §3.5
+    expected_reasoning: |-
+      capability-map.md DEC-03 확정 *"지방계약(지자체) 하한 체계는 V2 범위 밖이다 … **필수 단서**: legacy의 '명시 제외'는 docstring
+      한 줄뿐이고 런타임에는 지자체가 국가계약 tier로 판정된다 … V2는 '실행되는 미적용 상태'로 구현한다"*. 기관 → regime 매핑은 **synthetic 정책
+      입력**이며 기대값은 매핑 값이 아니라 그 결과가 관측 가능한 상태라는 규칙에 의존한다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/ai/floor_applicability.py
+        - app/ai/predictors/legal_floor_spec.py
+        - tests/test_floor_applicability.py
+      role: |-
+        어휘 넷과 「런타임에 지자체가 기본값 applicable 로 남는다」 관찰의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-applicability-001.json
+    expected_file: fixtures/expected/floor-applicability-001.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 2bf838d86682a0689bf4812f3f1adda1a939e3ae8f3bfd9c2f0d806936694973
+    expected_sha256: e938d8e5982c013a8d5b60782d0214b02a38b0a3549613e854c7f1a10a495a3b
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-applicability-002
+    domain: floor-applicability
+    classification: authoritative
+    verifies: |-
+        기준일(공고일)이 미상이면 시행일 표를 적용하지 않는다 — 소급 방지.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md DEC-03 acceptance
+    expected_reasoning: |-
+      capability-map.md DEC-03 acceptance *"기준일이 미상이면 시행일 표를 적용하지 않는다(소급 방지)"*. data-dictionary.md
+      §1.2.4 근거 2가 같은 leakage-safe 규율을 인용한다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/ai/floor_applicability.py
+        - app/ai/predictors/legal_floor_spec.py
+        - tests/test_floor_applicability.py
+      role: |-
+        어휘 넷과 「런타임에 지자체가 기본값 applicable 로 남는다」 관찰의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-applicability-002.json
+    expected_file: fixtures/expected/floor-applicability-002.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: cf562fef45066a792a7ae0009d0792f5f2b09dd9503cac7fff3cc659e66f5196
+    expected_sha256: c8238f086bb1477c88d1639712224a20780da42f8f27000cbb45305d1f6b0361
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-applicability-003
+    domain: floor-applicability
+    classification: authoritative
+    verifies: |-
+        시행일 경계 전후 하루 차이로 다른 tier가 적용된다 (경계 **전날**). 시행일 표는 **synthetic 정책 입력**이며 기대값은 그 값이 아니라 경계 규칙에
+        의존한다.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md DEC-03 acceptance
+    expected_reasoning: |-
+      capability-map.md DEC-03 acceptance *"시행일 경계 전후 하루 차이로 다른 tier가 적용된다(소급 적용 없음)"* +
+      data-dictionary.md §4.4. **율 값은 synthetic이다** — §12.1이 legacy 법정 하한율을 `legacy-behavior`로 등재하고
+      `OPEN-DEC-10`이 V2 값을 소유한다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/ai/floor_applicability.py
+        - app/ai/predictors/legal_floor_spec.py
+        - tests/test_floor_applicability.py
+      role: |-
+        어휘 넷과 「런타임에 지자체가 기본값 applicable 로 남는다」 관찰의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-applicability-003.json
+    expected_file: fixtures/expected/floor-applicability-003.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: efad89738120467b29ab00f3eaa4f784169cbe5300a2e99762b106622612a532
+    expected_sha256: d8c3beff0612284c8af6e521c0a4b28a5d66112e1d3107eac72958a20793fc2f
+    not_covered: |-
+      법정 하한율의 **값**과 추정가격 구간 경계 — `OPEN-DEC-10`
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-applicability-004
+    domain: floor-applicability
+    classification: authoritative
+    verifies: |-
+        시행일 경계 전후 하루 차이로 다른 tier가 적용된다 (경계 **당일**). 003과 쌍이다.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md DEC-03 acceptance
+    expected_reasoning: |-
+      003과 같다. 경계 포함성은 `effectiveFrom` 이 **당일 포함**임을 이 쌍이 고정한다 — data-dictionary.md §4.1이 정책 version을
+      날짜로 식별하고 §1.5가 구간 경계를 **시작 포함·끝 제외**로 둔다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/ai/floor_applicability.py
+        - app/ai/predictors/legal_floor_spec.py
+        - tests/test_floor_applicability.py
+      role: |-
+        어휘 넷과 「런타임에 지자체가 기본값 applicable 로 남는다」 관찰의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-applicability-004.json
+    expected_file: fixtures/expected/floor-applicability-004.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: f07b6b9da0bd2fb50a4d56e35b7ee58029032bebb77c5e09682e8e3c49633de6
+    expected_sha256: fb8e6214ab464dffae068068d319115290f880994ce484b2cf6b59d12f59259d
+    not_covered: |-
+      법정 하한율의 **값**과 추정가격 구간 경계 — `OPEN-DEC-10`
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: floor-applicability-005
+    domain: floor-applicability
+    classification: authoritative
+    verifies: |-
+        하한 해석 결과가 `Rate` 하나가 아니라 (율, 출처, 적용 범위, 개연성 플래그) 묶음이다. 게시값과 표 값의 출처가 `origin`으로 구별된다.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md DEC-03 acceptance · data-dictionary.md §1.4.2
+    expected_reasoning: |-
+      capability-map.md DEC-03 acceptance *"하한 해석 결과가 `Rate` 하나가 아니라 (율, 출처, 적용 범위, 개연성 플래그) 묶음이다"* +
+      data-dictionary.md §1.4.2 `FloorRateOrigin = sealed { NoticeValue(noticeRevision),
+      StatutoryTable(effectiveFrom) }` — *"출처가 둘이고 섞지 않는다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/ai/floor_applicability.py
+        - app/ai/predictors/legal_floor_spec.py
+        - tests/test_floor_applicability.py
+      role: |-
+        어휘 넷과 「런타임에 지자체가 기본값 applicable 로 남는다」 관찰의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/floor-applicability-005.json
+    expected_file: fixtures/expected/floor-applicability-005.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 511e13dde53d0401eda2e308cac2c4f37fb5e6421237804f3c08995f73356719
+    expected_sha256: 0f0fc8e2ebd34b68c1da4178ca082057913177ab8b56effd8fb8043e6d64ad53
+    not_covered: |-
+      신뢰 밴드의 **값** — data-dictionary.md §1.4.3 B6은 `legacy-behavior`
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-001
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        선언에 없는 raw 키가 응답에 나오면 미지 필드로 계수되고 그 값이 도메인 값으로 소비되지 않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md COL-07 acceptance + 승격 결정 (data-dictionary.md §5.3 — *"계약 테스트 승격 여부는 0C에서
+          결정한다"* → **결정: 승격한다**)
+    expected_reasoning: |-
+      capability-map.md COL-07 acceptance *"선언에 없는 raw 키가 응답에 나오면 그 사실이 run 산출에 미지 필드로 계수되고, 해당 값이 도메인
+      값으로 소비되지 않는다"* + data-dictionary.md §5.3 규율 1 *"선언에 없는 키는 '미지 필드'로 리포트되어 조용히 삼켜지지 않는다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_koneps_collection_characterization.py
+        - app/services/koneps/field_contract_spec.py
+        - app/services/koneps/budget_fields.py
+      role: |-
+        필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/koneps-collection-001.json
+    expected_file: fixtures/expected/koneps-collection-001.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: ab0885dacd851bd2c112aee9a34985229c850c2d4cf0009cb5fe07518abab819
+    expected_sha256: 993b5b9d4ceb1ee41f0ff09256fe089e9c9890c70de77a53492783a8428fb875
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-002
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        선언된 `scale`/`expectedRange`와 어긋나는 값(fraction 자리에 백분율)이 오면 그 항목이 거부되고 사유가 회계에 남는다. **선언된 범위와의
+        대조**이지 값 크기로 단위를 추측하는 경로가 아니다.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md COL-07 acceptance + 승격 결정 (data-dictionary.md §5.3 — *"계약 테스트 승격 여부는 0C에서
+          결정한다"* → **결정: 승격한다**)
+    expected_reasoning: |-
+      capability-map.md COL-07 acceptance *"선언된 `scale`/`basis`와 어긋나는 값(예: fraction 자리에 백분율)이 오면 그 항목이
+      거부되고 사유가 회계에 남는다"*. 판정 근거는 **계약이 선언한 `expectedRange`**이며, data-dictionary.md §1.4.1이 금지한 「값 크기로
+      단위를 되짚는 경로」와 구별된다 — 여기서는 단위를 **추론하지 않고** 선언된 단위에 대해 범위 위반만 낸다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_koneps_collection_characterization.py
+        - app/services/koneps/field_contract_spec.py
+        - app/services/koneps/budget_fields.py
+      role: |-
+        필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/koneps-collection-002.json
+    expected_file: fixtures/expected/koneps-collection-002.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 27cb306a50eca9cb8227aeee4213604037444bea75217960300ee4395e91c544
+    expected_sha256: 8686077f2e848967b896bd6d3110e2daf5c73ef6c9c64ba4b0bbe5f8da10b3ae
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-003
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        optional 필드의 **명시적 null**은 `Absent`이며 `0`이 아니다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-ML-04 (부재를 `0`으로 적재하지 않는다) · data-dictionary.md §1.3
+    expected_reasoning: |-
+      data-dictionary.md §1.3 부재 금지 규칙 — *"도메인 값을 나르는 필드는 부재를 값으로 표현할 수 없다 … 부재는 `Absent(reason)` 또는
+      `Unmeasurable(reason)`으로만 표현한다"* + §1.1 *"`0`은 '0원'이지 '모름'이 아니다"*. 004가 이 case의 쌍이다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_koneps_collection_characterization.py
+        - app/services/koneps/field_contract_spec.py
+        - app/services/koneps/budget_fields.py
+      role: |-
+        필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/koneps-collection-003.json
+    expected_file: fixtures/expected/koneps-collection-003.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 1eee2e90c676377ea3bdcb8261693824c69b09372e7ac5b140049d6e2f7ca7a1
+    expected_sha256: 96403e77df23cee01254e961b0651c3ebe9a33065faa2d95f53296c3c8f5dd6d
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-004
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        optional 필드의 **키 부재**도 `Absent`이며 `0`이 아니다. 003과 함께 `Absent` ≠ `0`을 고정하고, 두 부재가 payload 등장 여부로
+        구별된다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-ML-04 · data-dictionary.md §1.3 · §5.3
+    expected_reasoning: |-
+      003과 같다. 등장 여부는 data-dictionary.md §5.3의 `KonepsFieldContract.presentIn`이 나른다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_koneps_collection_characterization.py
+        - app/services/koneps/field_contract_spec.py
+        - app/services/koneps/budget_fields.py
+      role: |-
+        필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/koneps-collection-004.json
+    expected_file: fixtures/expected/koneps-collection-004.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 266c62e4b998b864b62a629c587abb25a23520e425235c37a95cece865052a00
+    expected_sha256: 8353cc69dd9a7599af86bacadc16f85b52fa9542c0c1fbf1c3e1607dc8a491d6
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-005
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        제로패딩 식별자(`bidNtceOrd` = `"000"`)가 정수 변환 없이 그대로 전달된다. 식별자 타입에 산술 연산이 정의되지 않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md COL-07 acceptance + 승격 결정 (data-dictionary.md §5.3 — *"계약 테스트 승격 여부는 0C에서
+          결정한다"* → **결정: 승격한다**)
+    expected_reasoning: |-
+      data-dictionary.md §5.3 *"식별자는 숫자가 아니다. 공고 차수(`bidNtceOrd`)는 제로패딩 식별자이며 `int` 변환 금지가 계약에 선언돼
+      있다"* + regression-ledger.md `R-QUAL-05` V2 예방 제약 *"외부 식별자는 문자열 도메인 타입이고 숫자 변환이 허용되지 않는다"* 및 검증
+      방법 *"차수 `"000"` fixture가 정수 변환 없이 그대로 전달되는지 고정"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/openapi.py
+      role: |-
+        라이브 실측(2026-07-19, commit `d85711d` #210)의 출처 — `bidNtceOrd=0`에 `totalCount=0`, `"000"`에 실데이터.
+        기대값의 근거가 아니다.
+    input_file: fixtures/input/koneps-collection-005.json
+    expected_file: fixtures/expected/koneps-collection-005.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: a3ef8104ce07ab670b0b04c40b2896b86cc06ea3b4e030fa2e27ae3fc5e5b42f
+    expected_sha256: b28ddecd57ea96db662a7bec403f4990170a7c8d77ab9034deb4d01758c4cd96
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-006
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        코드와 라벨이 한 문자열로 오는 외부 형태가 파싱 경계 밖으로 흐르지 않는다 — 두 값으로 저장된다.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md COL-08 acceptance
+    expected_reasoning: |-
+      capability-map.md COL-08 acceptance *"업무구분은 코드 열거값과 표시 라벨 두 값으로 저장되며, '코드와 라벨이 한 문자열'인 외부 형태는 파싱
+      경계 밖으로 흐르지 않는다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/html_parsing.py
+      role: |-
+        셀 형태와 휴리스틱 분리 규칙의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/koneps-collection-006.json
+    expected_file: fixtures/expected/koneps-collection-006.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 6e15bb2edeb0e64a5587b7d4e9389d5132e33cc676008d4506505a21133ce9f7
+    expected_sha256: d89c5fabd09e9b53667098bcb965f7f27c965874c2e15c8ff6d76bf41e4472c1
+    not_covered: |-
+      전체 업무구분 코드 체계 — `OPEN-COL-03`
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-007
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        매핑에 없는 코드가 오면 미지 코드로 표시되고 임의 라벨이 붙지 않는다.
+    source:
+      kind: operator-decision
+      reference: |-
+          capability-map.md COL-08 acceptance
+    expected_reasoning: |-
+      capability-map.md COL-08 acceptance *"매핑에 없는 코드가 오면 미지 코드로 표시되고 임의 라벨이 붙지 않는다"*.
+    input_file: fixtures/input/koneps-collection-007.json
+    expected_file: fixtures/expected/koneps-collection-007.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 5dd3775f0833947a81568fdf16936751a86aca5c016ae00a7d32fb29c5b7f37c
+    expected_sha256: 132dccb9841f9025e0b54bd7deaf644d4185a1a4cab3543a70dac281c15db8f1
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-008
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        점유 가드 — 권위 없는 유입이 이미 있는 값을 덮지 않고 빈 자리만 채운다.
+    source:
+      kind: approved-spec
+      reference: |-
+          data-dictionary.md §5.1 계승 규율 1 · v2-지침서.md §4.1(provenance 필수)
+    expected_reasoning: |-
+      data-dictionary.md §5.1 계승 규율 1 *"권위값만 저장값을 덮는다(점유 가드). 나머지와 미신고는 **빈 자리만** 채운다"* + 규율 2
+      *"미신고(`Undeclared`)를 권위로 취급하지 않는다"*. `isAuthoritative`는 술어가 아니라 **데이터로 선언**되며 빠뜨리면 기본이
+      보수(fill-only)다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_koneps_collection_characterization.py
+        - app/services/koneps/field_contract_spec.py
+        - app/services/koneps/budget_fields.py
+      role: |-
+        필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/koneps-collection-008.json
+    expected_file: fixtures/expected/koneps-collection-008.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: f7a7fe706a4ffff414c56d31172f177dc46e43462fdd982ae77d203d5867ee1c
+    expected_sha256: b60454b4e929a8f76322804dec6d7b328973eb7eefea83c399d7f65000ff1913
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-009
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        derived fact가 canonical fact의 자리를 차지하지 않는다 — 예산 키 폴백으로 복원한 기초금액은 직접 게시값과 **타입이 다르다**.
+    source:
+      kind: approved-spec
+      reference: |-
+          data-dictionary.md §5.2 규칙 · v2-지침서.md §4.1
+    expected_reasoning: |-
+      data-dictionary.md §5.2 *"derived fact가 canonical fact의 자리를 차지할 수 없다. 자리가 같아야 한다면 **타입이 달라야 한다**
+      — `ResolvedBaseAmount.Direct` vs `.FallbackFromBudget(sourceKey)`"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_koneps_collection_characterization.py
+        - app/services/koneps/field_contract_spec.py
+        - app/services/koneps/budget_fields.py
+      role: |-
+        필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/koneps-collection-009.json
+    expected_file: fixtures/expected/koneps-collection-009.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 5b2a1d3edf412d203974461ed6d858e387706a80bf35b42794a6a67aecd90afa
+    expected_sha256: 35b69bbdec59a8199d35478d291ad37d3f68bffa4a995e92957d202fc16f0b2a
+    not_covered: |-
+      폴백된 값의 `vatTreatment` — 배정예산의 과세 처리는 `OPEN-DIC-04`가 소유한다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: base-amount-provenance-001
+    domain: base-amount-provenance
+    classification: authoritative
+    verifies: |-
+        원본 값을 조용히 교정하지 않는다 — 원본·판정·근거·정책 version이 함께 보존되고 복구 추정치는 **별도 필드**에 들어간다.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.3
+    expected_reasoning: |-
+      v2-지침서.md §4.3 *"원본 값을 조용히 교정하지 않는다. 원본, 판정, 근거, 정책 version을 함께 보존한다"* + data-dictionary.md §3.4
+      *"복구 추정치는 별도 필드이며 원본 필드에 기록되지 않는다"*. 입력은 **어느 rule이 걸렸는지**를 추상으로 선언한다 — 임계·허용 오차 값을 fixture에 넣지
+      않기 위해서다. `기초금액 ÷ 추정가격` 신뢰 상한의 마진은 활성 `OPEN-DEC-07`의 재유도 대상이고, 정수·VAT 허용 오차는 data-dictionary.md
+      §12.1이 `legacy-behavior`로 등재한다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_base_amount_basis.py
+        - tests/test_basis_conversion.py
+        - app/services/base_amount_basis.py
+      role: |-
+        라벨 다섯·여섯째 라벨·허용 오차 상수의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/base-amount-provenance-001.json
+    expected_file: fixtures/expected/base-amount-provenance-001.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: c37617a5ff3e7dc75b1d40eee6aadf94d06a4d12b63dbba9bda1cfe0799f2c2c
+    expected_sha256: 4d79bbae77e3d1adc69c36e79038cf1e8702ab6e380023d4e3611827bdd771d0
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: base-amount-provenance-002
+    domain: base-amount-provenance
+    classification: authoritative
+    verifies: |-
+        first-match rule 순서가 결과를 바꾼다 (순서 A: `suspect-ratio` 먼저). 003과 쌍을 이뤄 **순서가 load-bearing이고 정책 데이터로
+        외부화된다**는 것만 고정한다 — 어느 순서가 옳은지는 고정하지 않는다.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.3
+    expected_reasoning: |-
+      v2-지침서.md §4.3 *"first-match rule의 순서는 도메인 의미가 있으므로 테스트와 정책 version으로 고정한다"* +
+      data-dictionary.md §3.4 *"순서를 정책 데이터로 선언하고 테스트와 정책 version으로 고정한다"* + §13.1 인계 *"그때까지는 **판정
+      순서**만 fixture로 고정한다"*. **legacy의 구체 순서를 정답으로 승격하지 않는다** — 002·003의 쌍이 재는 것은 「순서를 바꾸면 결과가 바뀐다」이지
+      「A가 맞다」가 아니다. 입력은 **어느 rule이 걸렸는지**를 추상으로 선언한다 — 임계·허용 오차 값을 fixture에 넣지 않기 위해서다. `기초금액 ÷ 추정가격`
+      신뢰 상한의 마진은 활성 `OPEN-DEC-07`의 재유도 대상이고, 정수·VAT 허용 오차는 data-dictionary.md §12.1이
+      `legacy-behavior`로 등재한다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_base_amount_basis.py
+        - tests/test_basis_conversion.py
+        - app/services/base_amount_basis.py
+      role: |-
+        라벨 다섯·여섯째 라벨·허용 오차 상수의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/base-amount-provenance-002.json
+    expected_file: fixtures/expected/base-amount-provenance-002.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: b91361ed6807fbbfa3ddc28a5539325b922e014bb9d4688c4e5bec4b6c0ef777
+    expected_sha256: 2026484fb93ca725436401b727ccc9ef358c4e5372cdb66f2666a8efa688d522
+    not_covered: |-
+      **어느 순서가 V2의 정답인가** — legacy 선언 순서(비율 의심 → 정수 → VAT 파생)는 `legacy-behavior`이고 승격 결정이 없다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: base-amount-provenance-003
+    domain: base-amount-provenance
+    classification: authoritative
+    verifies: |-
+        같은 행·같은 rule hit에 순서 B(`clean-integer` 먼저)를 적용하면 결과가 달라진다. 002와 쌍.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.3
+    expected_reasoning: |-
+      002와 같다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - tests/test_base_amount_basis.py
+        - tests/test_basis_conversion.py
+        - app/services/base_amount_basis.py
+      role: |-
+        라벨 다섯·여섯째 라벨·허용 오차 상수의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/base-amount-provenance-003.json
+    expected_file: fixtures/expected/base-amount-provenance-003.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 1d04a1c8be3a955425d90f9b66133662f8361fd0dd3cd6999a29f3b7bf939c1f
+    expected_sha256: 8641cd9ca09d9d911247f6e510978b86578dcb762b799fe3bff1c49d811a2f85
+    not_covered: |-
+      **어느 순서가 V2의 정답인가** — 002와 같다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: base-amount-provenance-004
+    domain: base-amount-provenance
+    classification: authoritative
+    verifies: |-
+        NaN은 `Money`로 구성되지 않고 경계에서 거부된다 — 원화 확정 금액은 정수다.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.1
+    expected_reasoning: |-
+      v2-지침서.md §4.1 *"확정 원화 금액은 `Long` 원 단위 또는 명시적 `BigDecimal`로 표현한다"* + *"unit/basis/provenance가
+      없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"* + data-dictionary.md §1.1 *"원(KRW), 정수. 소수 자리를
+      만들지 않는다"*. NaN·Infinity는 그 표현에 존재하지 않는 값이므로 `Money` 구성 자체가 실패한다.
+    input_file: fixtures/input/base-amount-provenance-004.json
+    expected_file: fixtures/expected/base-amount-provenance-004.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: e812d96b7c2a2a203865e0d1aa313d7b23de36051e194ca132c2407ce05a10c6
+    expected_sha256: 17ff1f8abbadbad327567f8c60e876be3f85c46204a19f304e21735d97540450
+    not_covered: |-
+      음수 금액·`Long` overflow의 처리 — 승인된 규칙이 없다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: base-amount-provenance-005
+    domain: base-amount-provenance
+    classification: authoritative
+    verifies: |-
+        Infinity도 같다 — 004와 쌍.
+    source:
+      kind: approved-spec
+      reference: |-
+          v2-지침서.md §4.1
+    expected_reasoning: |-
+      004와 같다.
+    input_file: fixtures/input/base-amount-provenance-005.json
+    expected_file: fixtures/expected/base-amount-provenance-005.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: f0481190693b4c4dd7a201737e79ef0d97af0b070ec93faecece1cb35042718b
+    expected_sha256: 17ff1f8abbadbad327567f8c60e876be3f85c46204a19f304e21735d97540450
+    not_covered: |-
+      음수 금액·`Long` overflow의 처리 — 승인된 규칙이 없다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: ml-boundary-001
+    domain: ml-boundary
+    classification: authoritative
+    verifies: |-
+        Python 예측 응답은 `review_required`를 반환하지 않는다 — 업무 판정은 Kotlin이 소유한다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-ML-01 (수학 커널 = Python / 업무 판정 = Kotlin) · v2-지침서.md §3.2 · data-dictionary.md §6.2
+    expected_reasoning: |-
+      data-dictionary.md §6.2 표 — `review_required`: 현재 legacy는 *"Python이 낸다"*, V2 소유는 **Kotlin**,
+      *"Python이 반환하지 않는다"* + v2-지침서.md §3.2 *"Python 응답은 후보·점수·불확실성·모델 근거만 반환한다. 최종 `bid/review/skip`은
+      Kotlin이 결정한다"*.
+    input_file: fixtures/input/ml-boundary-001.json
+    expected_file: fixtures/expected/ml-boundary-001.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: c199283033faa81cc5cfda1485880034ea39d2e6856cbeee0be3219860fa05e9
+    expected_sha256: 5393781e1182d0f7fb707ac25625e7e71c05f6f04455380633102cd877fe118a
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: ml-boundary-002
+    domain: ml-boundary
+    classification: authoritative
+    verifies: |-
+        Python 응답에 `review_required`가 실리면 계약 위반으로 거부된다 — 001의 반례.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-ML-01 (수학 커널 = Python / 업무 판정 = Kotlin) · v2-지침서.md §3.2 · data-dictionary.md §6.2
+    expected_reasoning: |-
+      001과 같다.
+    input_file: fixtures/input/ml-boundary-002.json
+    expected_file: fixtures/expected/ml-boundary-002.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 303ef0a849aebdd81b4b0c17e9c491d8e4d2771adae41a2b58d1f561e07b8def
+    expected_sha256: 17ea1ead4d4aa5e7ecdba599befe9602e2a0bb8a5e4da7cc655c832c44fab654
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: ml-boundary-003
+    domain: ml-boundary
+    classification: authoritative
+    verifies: |-
+        피처 결측이 `0`이나 미지 코드로 접히지 않고 `MissingReason`을 provenance로 나른다.
+    source:
+      kind: approved-spec
+      reference: |-
+          data-dictionary.md §6.3 · capability-map.md ML-11.4 F3
+    expected_reasoning: |-
+      data-dictionary.md §6.3 `MissingReason = sealed { Unknown, NotApplicable, NotCollectedYet }` —
+      *"모든 피처가 결측 사유를 provenance로 갖는다"* + *"결측이 미지 코드나 `0`으로 접힌다"*가 legacy의 대가였다는 기록(ML-11.4 F3: 피처
+      커버리지가 도메인이 아니라 **백필 진행 상태**였다).
+    input_file: fixtures/input/ml-boundary-003.json
+    expected_file: fixtures/expected/ml-boundary-003.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: f797cf6d3105d6f68e53c7dd2525c7e9f8360ce0c049aa484336469221fac913
+    expected_sha256: a74e1e17cfa71193ea7a0ab8005efe9268397772ea97a6220d0f1d08c6dae4d5
+    not_covered: |-
+      피처 스키마 version·artifact checksum·LightGBM 오류·KDE singular·deterministic seed — M2 gRPC 피처 계약이
+      소유하며 그 계약이 아직 없다
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: ml-boundary-004
+    domain: ml-boundary
+    classification: authoritative
+    verifies: |-
+        누수 차단이 규율이 아니라 시그니처다 — 피처 커널은 예비가격·추첨번호·실현 사정률·낙찰가를 아예 받지 않는다.
+    source:
+      kind: approved-spec
+      reference: |-
+          data-dictionary.md §6.3
+    expected_reasoning: |-
+      data-dictionary.md §6.3 — legacy 설계를 **계승한다**고 명시한다: *"이 커널의 입력 시그니처가 곧 피처 계약이고 … 예비가격·추첨번호·실현
+      사정률·낙찰가는 아예 받지 않는다. '쓰지 말자'는 규율보다 '받을 수 없다'는 시그니처가 강하다"* — **이 형태를 계승한다**.
+    input_file: fixtures/input/ml-boundary-004.json
+    expected_file: fixtures/expected/ml-boundary-004.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 6b4d3ca6c10ec7a5c1908f0a67b10d5c9b919adedee009a86e43761159909209
+    expected_sha256: 643e29f19d600dd2285238db6e072c7663bcd263ea0fd69fb75a1708d0770726
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: verdict-001
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        두 보류가 문장이 아니라 `SkipReason`으로 구분된다 (`CapacityHold`). 002와 쌍.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-DEC-05 (운영자 결정) · data-dictionary.md §3.6 · §3.1
+    expected_reasoning: |-
+      data-dictionary.md §3.6 `Verdict = sealed { BidNow, Review, Skip(reason: SkipReason) }`,
+      *"`SkipReason` **필수**. 최소 두 값: `CapacityHold` · `LowPriority`"* + 운영자 결정 `OPEN-DEC-05` — *"금지되는
+      것은 한-verdict가 아니라 **문장으로만 구분되는 형태**"* + §3.1 *"사람이 읽는 문장은 렌더링 시점에 생성하고 영속하지 않는다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+      role: |-
+        두 보류가 같은 `"skip"`이며 한국어 문장으로만 구분되던 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/verdict-001.json
+    expected_file: fixtures/expected/verdict-001.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: abdae836b88d395282804842547619460ed707f3a0b169d2f90a71d6c0f43550
+    expected_sha256: 3c65444020710f62c670d9d6c133a36b66adab2bf81894087de3063b2e543e49
+    not_covered: |-
+      `SkipReason` 어휘의 **전수성** — `OPEN-DIC-03`(M1에서 게이트 사다리를 옮길 때 확정)
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: verdict-002
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        두 보류가 문장이 아니라 `SkipReason`으로 구분된다 (`LowPriority`). 001과 쌍 — verdict는 같고 reason code가 다르다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-DEC-05 · data-dictionary.md §3.6 · §3.1
+    expected_reasoning: |-
+      001과 같다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+      role: |-
+        두 보류가 같은 `"skip"`이며 한국어 문장으로만 구분되던 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/verdict-002.json
+    expected_file: fixtures/expected/verdict-002.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: 2a4fc1bcd2bb6caf0178ec2a06e4f009ce00cb27832fb2a97ab9f292a14a1e78
+    expected_sha256: c1a30beac648f399b26934b05fbc7102e5fff4d12af99a338ee3dfc33ecb9a42
+    not_covered: |-
+      `SkipReason` 어휘의 **전수성** — `OPEN-DIC-03`
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: verdict-003
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        force-bid 우회는 유지하되 출처가 판정 결과에 노출된다 — 우회의 존재를 감춘 것이 결함이었지 우회 자체가 아니다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-STR-03 (운영자 결정) · data-dictionary.md §3.6
+    expected_reasoning: |-
+      data-dictionary.md §3.6 *"force-bid 우회는 유지하되 출처를 판정 결과에 노출한다(운영자 결정 `OPEN-STR-03`) — 우회의 존재를 감춘
+      것이 결함이었지 우회 자체가 아니다"*.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+      role: |-
+        두 보류가 같은 `"skip"`이며 한국어 문장으로만 구분되던 형태의 출처. 기대값의 근거가 아니다.
+    input_file: fixtures/input/verdict-003.json
+    expected_file: fixtures/expected/verdict-003.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: a7ed33985f34360f1c6a21c89183d85877aeaafce8f4b9a0b723feb8ac7fe57c
+    expected_sha256: 501a04622e9e450f69fb958d1b4d5efda6ae55a0918ca9e64286cd8dbe603667
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: verdict-004
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        개연 밴드 밖 운영자 하한 override는 버리지도 통과시키지도 않고 사유와 함께 거부되며, 그 거부가 관측 가능하다. 밴드는 **synthetic 정책 입력**이다.
+    source:
+      kind: operator-decision
+      reference: |-
+          OPEN-DEC-04 (운영자 결정) · data-dictionary.md §3.6
+    expected_reasoning: |-
+      data-dictionary.md §3.6 *"개연 밴드 밖 override는 **버리지도 통과시키지도 않고 사유와 함께 거부**한다(운영자 결정
+      `OPEN-DEC-04`). 거부가 **관측 가능한 결과**여야 한다"*. 밴드 값은 synthetic이며 기대값은 그 값이 아니라 「밖이면 사유와 함께 거부」 규칙에
+      의존한다.
+    input_file: fixtures/input/verdict-004.json
+    expected_file: fixtures/expected/verdict-004.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-08-30
+    extraction_method: authored-from-approved-spec
+    sha256: c2403d85701a9911037ddc868b4dc750c263b8b834f93062471bea4f25a261ef
+    expected_sha256: 85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9
+    not_covered: |-
+      개연 밴드의 **값** — data-dictionary.md §1.4.3 B6은 `legacy-behavior`
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+# =============================================================================
+# 덮지 못한 축 — 비워 두지 않고 소유 `OPEN`과 함께 적는다
+# =============================================================================
+uncovered_axes:
+
+  - axis: 과세/비과세 경계 쌍 (기초금액 ↔ 추정가격)
+    domain: money-basis
+    why_blocked: |-
+      **유보 사유가 「정의 미결」에서 「저장 값 비일관」으로 바뀌었다.** 정의는 운영자 결정
+      U-1(추정가격 `Exclusive`)·U-1b(기초금액 `Inclusive`)로 정해졌다. 그러나
+      `data-dictionary.md` §1.2.1이 *"저장된 legacy 값의 실제 과세 처리는 여전히 행마다 다르다"*를
+      legacy 자신의 공시로 적는다 — 수집 키가 공고마다 달라 legacy 데이터로는 **행별 라벨을 붙일
+      수 없다.** 지금 만들면 미결 과세 의미로 corpus 경계가 굳는다.
+    owning_open:
+      - "OPEN-REG-05 (활성) — ① 두 금액 차이의 **잔차 성분**(사정률 등) ② **저장 값의 행별 실제 과세 처리**"
+    what_is_covered_instead: |-
+      `money-basis-001`·`004`가 **basis 태그가 다른 값 쌍**을 고정하되 **두 값의 수치를 같게 두어
+      어느 쪽이 크다는 전제를 넣지 않는다**(`regression-ledger.md` §10.1 인계의 요구).
+      `money-basis-006`이 legacy 유래 행을 정의상 기본값으로 자동 태깅하지 않음을 고정한다.
+    unblocks_when: OPEN-REG-05 가 닫히고 행별 과세 판정 근거가 생긴다.
+
+  - axis: "`기초금액 ÷ 추정가격` 신뢰 상한의 경계값"
+    domain: base-amount-provenance
+    why_blocked: |-
+      legacy 임계 `1.15`의 구성은 부가세 배수 `1.1` + 마진 `0.05`이고 **그 마진이 활성
+      `OPEN-DEC-07`의 재유도 대상이며 값이 아직 산출되지 않았다**(capability-map.md DEC-02 결정).
+      legacy 값으로 경계를 굳히면 재유도 뒤에 틀린 값이 남는다.
+    owning_open:
+      - "OPEN-DEC-07 (활성) — 신뢰 비율 마진의 재유도. **값 미산출**"
+    what_is_covered_instead: |-
+      `base-amount-provenance-002`·`003`이 **판정 순서**만 고정한다 — 같은 rule hit 에 두 정책
+      순서를 넣어 결과가 갈리는 것으로 「순서가 load-bearing 이고 정책 데이터로 외부화된다」만
+      재고, **어느 순서가 옳은지는 재지 않는다.**
+    unblocks_when: OPEN-DEC-07 이 마진 값을 낸다.
+
+  - axis: provenance 판정의 허용 오차와 배수 (정수 `1e-6` · 예정가 역산 `1.0`원 · VAT `0.01` · 배수 `1.1`)
+    domain: base-amount-provenance
+    why_blocked: |-
+      `data-dictionary.md` §12.1이 넷 모두 `legacy-behavior`로 등재한다. 승격 결정이 없으므로
+      **정수 원화 후보 / 예정가 역산형 소수 / VAT 파생형 / 추정가격과 모순되는 비율**의 실제
+      경계 case(`data-extract.md` §4 최소 corpus 넷)를 만들 수 없다.
+    owning_open:
+      - "(소유 OPEN 없음) — 승격에는 운영자 결정이 필요하다. `OPEN-DIC-05`가 인접 축(라벨 다섯의 덮개)을 소유한다"
+    unblocks_when: 허용 오차·배수를 정책 데이터로 승격하는 운영자 결정이 나온다.
+
+  - axis: "`BaseAmountProvenance`의 미판정(`NULL`) 상태와 여섯째 라벨 `suspect-fractional`"
+    domain: base-amount-provenance
+    why_blocked: |-
+      *"아직 판정하지 않음"이 "신뢰함"으로 접히면 안 된다*는 요구는 확정이나, 그것을 승인 명세의
+      어느 variant 가 나르는지(`Unknown`에 접는가, 별도 variant 를 더하는가)가 미결이다.
+      `suspect-fractional`도 승인 명세에 대응 이름이 없다.
+    owning_open:
+      - "OPEN-DIC-05 (활성)"
+    unblocks_when: 라벨 집합 변경을 승인하는 별도 결정이 나온다.
+
+  - axis: 밴드 경계 corpus (§1.4.3 B1~B7의 실제 값과 경계 포함성)
+    domain: floor-shortfall / rate
+    why_blocked: |-
+      일곱 밴드 전부 `legacy-behavior`다(§12.1). `data-dictionary.md` §13.1이 *"밴드 경계 fixture 는
+      §1.4.3의 일곱 밴드를 **축별로 나눠** 만든다. 값이 같고 축이 다른 **B4·B5를 한 case 에 섞지
+      않는다**"*를 지시하나, **축을 나누는 것과 값을 정답으로 고정하는 것은 다르다** — 값을 쓰려면
+      승격 결정이 필요하다.
+    owning_open:
+      - "(B7만) OPEN-ML-05 (활성) — 근거 없는 미분류 상수"
+      - "(B1~B6) 소유 OPEN 없음 — 승격에 운영자 결정이 필요하다"
+    what_is_covered_instead: |-
+      `floor-shortfall-005`가 **synthetic 밴드**로 「밴드 밖 표본이 분모에서 빠지고 표본 부족으로
+      전이된다」는 규칙만 고정한다. B4·B5는 축이 다른 별도 사본이므로 **같은 case 에 넣지 않았고**,
+      이 corpus 는 둘 중 어느 것도 값으로 쓰지 않는다.
+    unblocks_when: 밴드 값·경계 포함성을 정책 데이터로 승격하는 결정이 나온다.
+
+  - axis: 법정 하한율 표의 값과 추정가격 구간 경계
+    domain: floor-applicability
+    why_blocked: 신율·구율 여섯과 구간 경계 셋이 전부 `legacy-behavior`이고 V2 값의 확정을 활성 OPEN 이 소유한다.
+    owning_open:
+      - "OPEN-DEC-10 (활성)"
+    what_is_covered_instead: |-
+      `floor-applicability-003`·`004`가 **synthetic 시행일 표**로 「경계 전후 하루 차이로 다른 tier,
+      소급 없음」만 고정하고, `-002`가 「기준일 미상이면 표를 적용하지 않는다」를 고정한다.
+      **표 대상 범위를 벗어난 추정가격 구간의 판정 생략**은 구간 경계 값이 필요해 덮지 못했다.
+    unblocks_when: OPEN-DEC-10 이 V2 값을 확정한다.
+
+  - axis: 면허 — 별칭 · 포괄 코드 · 지역 · 협회 조건
+    domain: license
+    why_blocked: |-
+      `v2-지침서.md` §4.2가 넷을 versioned policy data 로 요구하나 **그 정책 데이터가 아직 없고**,
+      면허 축이 정책 version 을 싣는지 자체가 미결이다. 협회·기술부문 어휘 테이블은 legacy 실물이
+      세그먼트 편향(`TECH_FIELD_TERMS` 넷이 전부 해양 계열)이라 그대로 쓸 수 없다.
+    owning_open:
+      - "OPEN-DIC-01 (활성) — 면허·지역 축이 정책 version 을 싣는가"
+      - "OPEN-QUAL-07 (활성) — 어휘 테이블의 세그먼트 편향"
+    unblocks_when: 면허 정책 데이터의 소유와 version 축이 정해진다.
+
+  - axis: "면허 — 허용업종(`permsnIndstrytyList`) 단독 보유의 결합 규칙"
+    domain: license
+    why_blocked: |-
+      조달청 문서가 결합 규칙을 말하지 않는다(0A2 라운드 5 재확인). **운영자 판정 2026-08-30 —
+      지금 답하지 않고 다시 열어 둔다. M1 자격 slice(1C)가 실제 공고로 관측해 닫는다.**
+    owning_open:
+      - "OPEN-QUAL-11 (활성)"
+    what_is_covered_instead: "`license-011`이 결정 전 임시 처리(사유 있는 `Uncertain`)를 `provisional`로 고정한다."
+    unblocks_when: M1 slice 1C 의 관측.
+
+  - axis: 면허 유효기간
+    domain: license
+    why_blocked: "U-7이 **V2는 보지 않는다**로 확정했다. 판정 자체를 만들 수 없다."
+    owning_open:
+      - "OPEN-QUAL-05 (알려진 제한으로 후속 이월)"
+    what_is_covered_instead: "`license-012`가 「유효기간을 보지 않으며 결과에 「유효기간 미검증」이 드러난다」를 고정한다."
+    known_conflict: |-
+      `v2-지침서.md` §4.2가 유효기간을 versioned policy data 로 요구하는 것과 U-7이 어긋난다
+      (`data-dictionary.md` §8 제한 7 · §13.5). 지침서 개정은 이 slice 의 범위 밖이다.
+
+  - axis: 시공능력평가금액 요건과 보유액의 실제 비교
+    domain: capacity-gate
+    why_blocked: |-
+      ① 공고 게시 요건 필드(`cnstrtnAbltyEvlAmtList` 계열)를 legacy 가 **수집하지 않는다**
+      (`ed4b06c`에 키가 없다) — 비교 대상이 없다. ② 게시값의 **단위·과세**가 조달청 문서에 없어
+      관측으로만 알 수 있다. ③ 요건 미달의 처리(즉시 실격 vs 적격심사 감점)가 미결이다.
+    owning_open:
+      - "OPEN-QUAL-10 (활성) — 게시 요건 축의 unit·과세·기준 시점"
+      - "OPEN-QUAL-09 (활성) — 미달의 처리"
+      - "OPEN-DIC-02 (활성) — 시공능력평가액 공시의 갱신 주기가 역년 경계인가"
+    what_is_covered_instead: "`capacity-gate-001`~`004`가 무조건 acceptance 넷(미입력 ≠ 0, 요건 없음 중립, 도급한도는 자격 어휘 아님)을 고정한다."
+    unblocks_when: M1 이후 수집 신설 + OPEN-QUAL-09/10 결정.
+
+  - axis: KONEPS — rate limit · timeout · partial page · out-of-order · 중복/수정 이벤트
+    domain: koneps-collection
+    why_blocked: |-
+      늦은 관측의 **적용**은 필드별 fold 가 내는데 그 fold 의 순서 술어(총순서 키·tie-break)가
+      미결이고, 전송 멱등 키와 재관측 키의 **구성**도 미결이다. legacy 에 답이 없다 — 전달 순서대로
+      in-place mutate 하고 순서 키를 읽지 않으며 `observed_at`이 nullable 이다.
+    owning_open:
+      - "OPEN-DIC-09 (활성) — fold 의 순서 술어"
+      - "OPEN-DIC-07 (활성) — 전송 멱등 키와 재관측 키의 구성"
+      - "OPEN-OPS-01 / OPEN-REG-01 (활성) — 재시도 정책과 그 측정"
+    unblocks_when: 위 셋이 닫힌다.
+
+  - axis: KONEPS — HTML fallback 경로
+    domain: koneps-collection
+    why_blocked: |-
+      브라우저 경로의 존치 자체가 `근거 부족`으로 분류돼 있다(COL-09). *"브라우저 경로로만 얻을 수
+      있는 필드 목록"*을 조사가 특정하지 못했다.
+    owning_open:
+      - "OPEN-COL-04 (활성)"
+    note: |-
+      **결정 전이라도 확정된 제약은 있다** — 값 크기·위치 휴리스틱으로 basis 를 추측하는 경로는
+      V2에 도입하지 않는다. 그 제약은 `rate-unit-003`·`004`와 `koneps-collection-002`가 이미
+      다른 축에서 고정한다.
+
+  - axis: KONEPS — `resultCode` 분류표 · 잘못된 인코딩 · 천 단위 구분자
+    domain: koneps-collection
+    why_blocked: |-
+      `resultCode` 분류표는 운영자 결정 `OPEN-COL-02`가 소유한다고 §4.3.2가 적으나 **표의 내용이
+      이 저장소의 문서에 실려 있지 않다.** 인코딩·구분자 정규화 규칙은 승인된 명세가 없다.
+    owning_open:
+      - "OPEN-COL-02 (분류표의 내용) · (인코딩·구분자) 소유 OPEN 없음 — 명세 부재"
+    unblocks_when: 분류표 본문이 명세에 등재되고 정규화 규칙이 정해진다.
+
+  - axis: ML — 피처 스키마 version · artifact checksum · LightGBM 오류 · KDE singular · deterministic seed
+    domain: ml-boundary
+    why_blocked: |-
+      `data-dictionary.md` §6.3이 *"피처 계약은 M2 gRPC 스키마가 소유하고, 이 문서는 피처 이름이
+      참조하는 도메인 개념만 정의한다"*로 소유를 M2에 둔다. **그 계약이 아직 없다.**
+    owning_open:
+      - "(소유 OPEN 없음) — M2 계약 slice 의 산출물 대기"
+    what_is_covered_instead: "`ml-boundary-001`~`004`가 **경계**(업무 판정은 Kotlin, 결측 사유, 누수 차단 시그니처)만 고정한다."
+    unblocks_when: M2 gRPC 피처 계약이 작성된다.
+
+  - axis: "`SkipReason` 어휘의 전수성"
+    domain: verdict
+    why_blocked: "최소 두 값은 확인되나 목록이 닫혔는지는 미확인. 지금 닫으면 게이트 사다리를 옮기며 발견될 사유가 갈 곳을 잃는다."
+    owning_open:
+      - "OPEN-DIC-03 (활성)"
+    what_is_covered_instead: "`verdict-001`·`002`가 확인된 두 값으로 「문장이 아니라 reason code 로 구분된다」를 고정한다."
+    unblocks_when: M1 에서 게이트 사다리를 옮길 때.
+
+  - axis: 반올림 — `RoundingPolicy`의 `mode` · 금액 축 밖 `scaleDigits` · 첫 `effectiveFrom`
+    domain: money-basis / floor-shortfall
+    why_blocked: "승인 명세가 요구하는 것은 **형태**(`RoundingPolicy`와 version)뿐이고 값을 고를 근거가 없다."
+    owning_open:
+      - "OPEN-DIC-10 (활성)"
+    what_is_covered_instead: |-
+      기대값이 반올림에 의존하지 않게 설계했다 — `floor-threshold-*`는 `0.945 ÷ 0.900 = 1.05`처럼
+      십진에서 정확히 떨어지는 수만 쓰고, `floor-shortfall-003`은 빈도를 **유리수(15/151)**로 두고
+      십진 표현을 주장하지 않는다.
+    unblocks_when: OPEN-DIC-10 이 값을 정한다.
+
+  - axis: 파생값의 되짚기 (`BidAmount` · `AssessmentRate` · `AwardRate`)
+    domain: money-basis
+    why_blocked: "파생값이 입력과 떨어져 저장·전송된 뒤 그 입력 fact 를 되짚을 수 있는가 — 운반 범위를 정하는 결정이며 근거로 고를 수 없다."
+    owning_open:
+      - "OPEN-DIC-08 (활성)"
+    unblocks_when: 운반 범위 결정.
+
+  - axis: 상태 전이표 · 정산 관측 시각 · 성숙도
+    domain: (미착수)
+    why_blocked: |-
+      `settlementObservedAt`은 **V2 가동 이전 데이터가 `Absent`이며 백필하지 않는다**(U-4).
+      그래서 지금 만들 수 있는 것은 「부재 구간을 구별해 노출한다」뿐인데, 그 구별의 표시 규격이
+      성숙도 지표 정의에 달려 있고 `OPEN-SET-04`·`OPEN-SET-05`·`OPEN-SET-06`·`OPEN-SET-10`이
+      인접 축을 열어 두고 있다. 이 slice 는 이 축에 손대지 않았다.
+    owning_open:
+      - "OPEN-SET-04 · OPEN-SET-05 · OPEN-SET-06 · OPEN-SET-10 (전부 활성)"
+    unblocks_when: 정산 축 slice.
+
+# =============================================================================
+# 출처를 확정할 수 없어 fixture 로 만들지 않은 후보 (`data-extract.md` 에러 핸들링)
+# =============================================================================
+insufficient_evidence:
+  - candidate: 같은 면허 코드를 percent·공백·문장 위치 차이로 표현한 입력의 정규화
+    why: |-
+      `data-extract.md` §4가 면허 최소 corpus 로 요구하나 **정규화 규칙을 정한 승인 명세가 없다.**
+      legacy 의 문자열 매칭 형태를 옮기면 그것이 곧 기대값이 되고 `legacy-behavior`를 정답으로
+      승격하는 일이 된다.
+    needed: 면허명 정규화 규칙의 도메인 명세 또는 운영자 결정.
+  - candidate: 음수 금액 · `Long` overflow 의 처리
+    why: |-
+      `v2-지침서.md` §4.1이 표현(`Long` 원 단위)만 정하고 **범위 위반의 처리**를 정하지 않는다.
+      `base-amount-provenance-004`·`005`가 덮는 NaN·Infinity 는 「그 표현에 존재하지 않는 값」이라
+      구성 실패가 따라 나오지만, 음수와 overflow 는 그렇지 않다.
+    needed: 금액 범위 계약(음수 허용 여부·overflow 시 거부/포화)의 결정.
+  - candidate: 적합도 점수(`capacity_score`)의 산식
+    why: "legacy 의 추측 정규화가 `폐기`로 확정됐고 **대체 산식이 없다.**"
+    needed: 적합도 산식의 도메인 명세.
+  - candidate: "`FloorApplicability`의 기관 패턴 테이블 내용"
+    why: |-
+      첫 매칭 우선 순서가 도메인 의미를 갖는다는 **규율**은 확정이나 **패턴 목록 자체**는 legacy
+      코드뿐이고 세그먼트 편향이 확인되지 않았다. `floor-applicability-001`은 그래서 패턴이 아니라
+      `orgType` 열거값을 입력으로 받는다.
+    needed: 기관 유형 분류의 정책 데이터.
+
+# =============================================================================
+# 접근 승인이 필요한 것 — 이 slice 는 하나도 실행하지 않았다
+# =============================================================================
+access_approval_required:
+
+  - id: A-1
+    what: 운영 DB read — `observed` 층 corpus 의 신설
+    why: |-
+      이 manifest 의 `observed` 층이 **0건**이다. `data-extract.md` §1이 그 층을 *"기존 운영
+      데이터/로그에서 비식별화해 관찰한 실제 형태"*로 정의하므로 **접근 없이는 만들 수 없다.**
+      지금 corpus 는 전부 synthetic 이라 **실제 payload 형태의 함정**(누락 필드 조합, 인코딩,
+      천 단위 구분자, 실제 키 이름의 변형)을 재현하지 못한다.
+    would_need:
+      query_scope: "`Project` · `HistoricalData` · `TenderResult`의 컬럼 부분집합"
+      columns: 금액·율·차수·기관 유형·수집 시각. **회사/운영자 식별자, Telegram id, 연락처, 원문 개인정보는 제외**
+      row_limit: 축별 200행 이하 (경계 근방 표본 우선)
+      masking: 식별자는 안정적 합성 id 로 치환하고 **masking 전 값을 로그·리뷰 산출물에 남기지 않는다**
+    status: 미요청. **`data-extract.md` §5 말미 — 이 문서만으로 DB 접근 권한이 생기지 않는다.**
+
+  - id: A-2
+    what: "`OPEN-REG-05` 해소를 위한 행별 과세 판정 표본"
+    why: |-
+      과세/비과세 경계 쌍 fixture 를 막는 것이 **저장 값의 행별 실제 과세 처리**다. 그것은 문서로
+      풀리지 않고 **행을 봐야** 판정된다. A-1의 부분집합이나 목적이 달라 따로 적는다.
+    would_need: A-1과 같은 masking 계획 + 두 금액이 함께 있는 행만, 축별 100행 이하
+    status: 미요청
+
+  - id: A-3
+    what: legacy Python 의 순수 함수 실행 (`legacy-observation` 수집)
+    why: |-
+      `data-extract.md` §5 5단계가 허용하는 경로다. 지금 `legacy-behavior` 층 case 가 **0건**이라
+      differential 판정(§6)의 한쪽 항이 비어 있다. 다만 이 slice 는 **실행하지 않는 쪽**을
+      택했다 — 후보 모듈(`app/services/base_amount_basis.py` 등)이 ORM·설정과 같은 패키지에 있어
+      import 부작용 없이 순수 호출만 하는지 확인하지 않았기 때문이다.
+    would_need:
+      commands: 대상 함수 목록과 정확한 호출 명령
+      env: "`ENVIRONMENT=test`, 네트워크·DB 비활성"
+      side_effects: import 시점 부작용 조사 결과를 먼저 제출
+    status: 미요청. **승인 없이는 실행하지 않는다.**
+    note: |-
+      실행하더라도 그 출력은 `legacy-behavior`이며 **정답 지위가 없다**(`data-extract.md` §1).
+      `authoritative` 승격에는 수작업 판정과 사용자 승인 근거가 별도로 필요하다.
+
+  - id: A-4
+    what: "`cnstrtnAbltyEvlAmtList` 계열의 실제 게시값 관측 (KONEPS API)"
+    why: "게시 요건 값의 **단위·과세**가 조달청 문서에 없어 **관측으로만** 알 수 있다(`OPEN-QUAL-10`)."
+    would_need: KONEPS OpenAPI 호출 승인 + 대상 오퍼레이션·건수·저장 계획
+    status: 미요청. M1 이후 수집 신설로 인계돼 있다.
+
+# =============================================================================
+# 다음 단계
+# =============================================================================
+next_steps:
+  - "`data-extract.md` §5 7단계 — Claude 가 이 corpus 를 소비하는 test 를 만들고(M1 slice), Codex 가 source·privacy·expected reasoning 을 독립 검토한다."
+  - "사용자 승인 시 각 case 의 `review.approved_by_user`를 `true`로 올리고 `review.claude_commit`을 채운다."
+  - "기대값을 바꿀 때 case 를 덮어쓰지 않고 `change_history`에 변경 이유와 policy version 을 적는다(`data-extract.md` §3)."

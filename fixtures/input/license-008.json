@@ -1,0 +1,25 @@
+{
+  "notice": {
+    "noticeId": "SYN-NOTICE-0001",
+    "bidNtceOrd": "000",
+    "licenseLimitRows": [
+      {
+        "lmtGrpNo": "1",
+        "lmtSno": "1",
+        "lcnsLmtNm": "토목공사업"
+      },
+      {
+        "lmtGrpNo": "1",
+        "lmtSno": "2",
+        "lcnsLmtNm": "SYN-UNPARSABLE-ROW",
+        "parseNote": "SYNTHETIC — 요건명이 어떤 면허 어휘로도 해석되지 않는 행"
+      }
+    ]
+  },
+  "operatorLicenses": [
+    "토목공사업"
+  ],
+  "policy": {
+    "licenseGroupingPolicyVersion": "SYN-POLICY-2026-08-30"
+  }
+}

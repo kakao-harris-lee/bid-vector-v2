@@ -1,0 +1,23 @@
+{
+  "notice": {
+    "noticeId": "SYN-NOTICE-0001",
+    "bidNtceOrd": "000",
+    "licenseLimitRows": [
+      {
+        "lmtGrpNo": "1",
+        "lmtSno": "1",
+        "lcnsLmtNm": "토목공사업",
+        "permsnIndstrytyList": [
+          "토목시설물축조업"
+        ]
+      }
+    ]
+  },
+  "operatorLicenses": [
+    "토목공사업",
+    "토목시설물축조업"
+  ],
+  "policy": {
+    "licenseGroupingPolicyVersion": "SYN-POLICY-2026-08-30"
+  }
+}

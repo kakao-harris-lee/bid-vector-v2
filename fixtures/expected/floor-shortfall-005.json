@@ -1,0 +1,12 @@
+{
+  "qualifiedDenominator": 149,
+  "result": "Unmeasurable",
+  "reason": {
+    "code": "SampleInsufficient",
+    "required": 150,
+    "actual": 149
+  },
+  "transitionedFrom": "Measured-candidate",
+  "frequency": null,
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

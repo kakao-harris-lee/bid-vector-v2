@@ -1,0 +1,20 @@
+{
+  "verdict": "Eligible",
+  "satisfiedGroups": [
+    "1"
+  ],
+  "requirementSourceFields": [
+    "lcnsLmtNm",
+    "permsnIndstrytyList"
+  ],
+  "requirementsBySourceField": {
+    "lcnsLmtNm": [
+      "토목공사업"
+    ],
+    "permsnIndstrytyList": [
+      "토목시설물축조업"
+    ]
+  },
+  "unparsableRowCount": 0,
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

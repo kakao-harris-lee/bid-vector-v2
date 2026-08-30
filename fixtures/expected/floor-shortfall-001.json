@@ -1,0 +1,11 @@
+{
+  "result": "Unmeasurable",
+  "reason": {
+    "code": "SampleInsufficient",
+    "required": 150,
+    "actual": 149
+  },
+  "frequency": null,
+  "renderedAsZeroPercent": false,
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

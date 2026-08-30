@@ -1,0 +1,17 @@
+{
+  "features": [
+    {
+      "name": "syn_denominator_source",
+      "state": "Missing",
+      "missingReason": "NotCollectedYet",
+      "foldedToZero": false,
+      "foldedToUnknownCategoryCode": false
+    },
+    {
+      "name": "syn_award_rate_mean",
+      "state": "Present",
+      "value": 0.912
+    }
+  ],
+  "everyFeatureCarriesMissingProvenance": true
+}

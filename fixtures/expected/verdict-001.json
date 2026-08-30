@@ -1,0 +1,7 @@
+{
+  "verdict": "Skip",
+  "skipReason": "CapacityHold",
+  "reasonCodeRequired": true,
+  "renderedSentencePersisted": false,
+  "distinguishableWithoutSentence": true
+}

@@ -1,0 +1,12 @@
+{
+  "verdict": "Uncertain",
+  "uncertainReason": "OperatorLicensesNotDeclared",
+  "requiredLicenses": [
+    "토목공사업"
+  ],
+  "unparsableRowCount": 0,
+  "requirementSourceFields": [
+    "lcnsLmtNm"
+  ],
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

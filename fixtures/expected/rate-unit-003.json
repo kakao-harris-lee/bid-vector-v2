@@ -1,0 +1,6 @@
+{
+  "outcome": "Rejected",
+  "reasonCode": "RateUnitUndeclared",
+  "rate": null,
+  "guessAttempted": false
+}

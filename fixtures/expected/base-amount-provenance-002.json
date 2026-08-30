@@ -1,0 +1,6 @@
+{
+  "classification": "SuspectRatio",
+  "firstMatchedRule": "suspect-ratio",
+  "policyVersion": "SYN-POLICY-A-2026-08-30",
+  "orderIsLoadBearing": true
+}

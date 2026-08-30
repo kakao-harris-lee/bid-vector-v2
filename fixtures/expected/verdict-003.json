@@ -1,0 +1,10 @@
+{
+  "verdict": "BidNow",
+  "override": {
+    "applied": true,
+    "source": "OPERATOR_STRATEGY_FLAG",
+    "supersededVerdict": "Skip",
+    "supersededReason": "LowPriority"
+  },
+  "overrideHidden": false
+}

@@ -1,0 +1,8 @@
+{
+  "estimatedPrice": {
+    "state": "Absent",
+    "reason": "KeyMissing"
+  },
+  "foldedToZero": false,
+  "presentInPayload": false
+}

@@ -1,0 +1,7 @@
+{
+  "verdict": "Skip",
+  "skipReason": "LowPriority",
+  "reasonCodeRequired": true,
+  "renderedSentencePersisted": false,
+  "distinguishableWithoutSentence": true
+}

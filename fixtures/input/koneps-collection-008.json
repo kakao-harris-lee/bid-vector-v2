@@ -1,0 +1,26 @@
+{
+  "storedValue": {
+    "amount": 900000000,
+    "currency": "KRW",
+    "basis": "ESTIMATED_PRICE",
+    "vatTreatment": "EXCLUSIVE",
+    "provenance": "Published",
+    "noticeRevision": "000"
+  },
+  "incomingValue": {
+    "amount": 750000000,
+    "currency": "KRW",
+    "basis": "ESTIMATED_PRICE",
+    "vatTreatment": "EXCLUSIVE",
+    "provenance": "FilledFromBudgetKey",
+    "sourceKey": "asignBdgtAmt"
+  },
+  "provenanceAuthorityTable": {
+    "Published": true,
+    "DerivedFromOpening": false,
+    "FilledFromBudgetKey": false,
+    "CopiedFromBaseAmount": false,
+    "OperatorDeclared": true,
+    "Undeclared": false
+  }
+}

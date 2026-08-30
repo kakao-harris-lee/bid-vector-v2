@@ -1,0 +1,22 @@
+{
+  "operatorFilter": {
+    "field": "minBudget",
+    "amount": 1234000000,
+    "currency": "KRW",
+    "basis": "BASE_AMOUNT",
+    "vatTreatment": "INCLUSIVE",
+    "provenance": "OperatorDeclared"
+  },
+  "noticeAmount": {
+    "amount": 1456000000,
+    "currency": "KRW",
+    "basis": "BASE_AMOUNT",
+    "vatTreatment": "INCLUSIVE",
+    "provenance": "Published",
+    "noticeRevision": "000"
+  },
+  "evaluatedVia": [
+    "MONITORING_FILTER",
+    "SEARCH_QUERY"
+  ]
+}

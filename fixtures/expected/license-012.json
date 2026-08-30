@@ -1,0 +1,13 @@
+{
+  "verdict": "Eligible",
+  "satisfiedGroups": [
+    "1"
+  ],
+  "licenseValidityUnverified": true,
+  "expiryEvaluated": false,
+  "unparsableRowCount": 0,
+  "requirementSourceFields": [
+    "lcnsLmtNm"
+  ],
+  "policyVersion": "SYN-POLICY-2026-08-30"
+}

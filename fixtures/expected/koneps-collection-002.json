@@ -1,0 +1,19 @@
+{
+  "rejectedItems": [
+    {
+      "rawName": "synFloorRt",
+      "value": "87.5",
+      "reasonCode": "ValueOutsideDeclaredRange",
+      "declaredUnit": "fraction",
+      "declaredRange": [
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "unitInferred": false,
+  "accountedInRunReport": true,
+  "consumedAsDomainValue": {
+    "synFloorRt": false
+  }
+}

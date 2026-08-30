@@ -1,0 +1,26 @@
+{
+  "notice": {
+    "noticeId": "SYN-NOTICE-0012",
+    "noticeDate": "2026-06-30",
+    "agency": {
+      "name": "SYN-AGENCY-0003",
+      "orgType": "CENTRAL_GOVERNMENT"
+    }
+  },
+  "statutoryTable": {
+    "id": "SYN-TABLE-floor-rate",
+    "note": "SYNTHETIC — legacy 율 값이 아니다.",
+    "tiers": [
+      {
+        "tierId": "A",
+        "effectiveFrom": "2020-01-01",
+        "rate": 0.815
+      },
+      {
+        "tierId": "B",
+        "effectiveFrom": "2026-07-01",
+        "rate": 0.865
+      }
+    ]
+  }
+}

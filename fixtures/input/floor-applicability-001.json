@@ -1,0 +1,27 @@
+{
+  "notice": {
+    "noticeId": "SYN-NOTICE-0010",
+    "noticeDate": "2026-08-01",
+    "agency": {
+      "name": "SYN-AGENCY-0001",
+      "orgType": "LOCAL_GOVERNMENT"
+    }
+  },
+  "policy": {
+    "id": "SYN-POLICY-agency-regime",
+    "mapping": [
+      {
+        "orgType": "LOCAL_GOVERNMENT",
+        "regime": "LOCAL_CONTRACT_ACT"
+      },
+      {
+        "orgType": "CENTRAL_GOVERNMENT",
+        "regime": "NATIONAL_CONTRACT_ACT"
+      }
+    ],
+    "outOfScopeRegimes": [
+      "LOCAL_CONTRACT_ACT"
+    ],
+    "policyVersion": "SYN-POLICY-2026-08-30"
+  }
+}

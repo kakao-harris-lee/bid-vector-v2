@@ -1,0 +1,15 @@
+{
+  "features": [
+    {
+      "name": "syn_denominator_source",
+      "value": null,
+      "missing": true,
+      "missingReason": "NotCollectedYet"
+    },
+    {
+      "name": "syn_award_rate_mean",
+      "value": 0.912,
+      "missing": false
+    }
+  ]
+}

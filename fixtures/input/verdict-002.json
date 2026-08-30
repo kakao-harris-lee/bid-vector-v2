@@ -1,0 +1,7 @@
+{
+  "gateOutcome": "SKIP",
+  "gateId": "SYN-GATE-priority",
+  "structuredPayload": {
+    "priorityScoreBelowThreshold": true
+  }
+}

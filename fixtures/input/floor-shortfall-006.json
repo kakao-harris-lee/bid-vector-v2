@@ -1,0 +1,20 @@
+{
+  "recommendedBidRate": {
+    "numeric": 0.91875,
+    "declaredUnit": "fraction",
+    "origin": "Recommended"
+  },
+  "floorRate": {
+    "numeric": 87.5,
+    "declaredUnit": "percent",
+    "origin": "NoticeValue",
+    "noticeRevision": "000"
+  },
+  "sample": {
+    "sampleId": "SYN-SAMPLE-0002",
+    "realizedAssessmentRate": {
+      "numeric": 1.0501,
+      "declaredUnit": "fraction"
+    }
+  }
+}

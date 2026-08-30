@@ -1,0 +1,9 @@
+{
+  "baseVerdict": "Skip",
+  "baseSkipReason": "LowPriority",
+  "forceBid": {
+    "applied": true,
+    "source": "OPERATOR_STRATEGY_FLAG",
+    "declaredBy": "SYN-OPERATOR-0001"
+  }
+}

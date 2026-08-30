@@ -1,0 +1,20 @@
+{
+  "recommendedBidRate": {
+    "fraction": 0.91875,
+    "unit": "fraction",
+    "origin": "Recommended"
+  },
+  "floorRate": {
+    "fraction": 0.875,
+    "unit": "fraction",
+    "origin": "NoticeValue",
+    "noticeRevision": "000"
+  },
+  "qualifiedSampleCount": 150,
+  "shortfallSampleCount": 0,
+  "policy": {
+    "minAssessmentSamples": 150,
+    "minAssessmentSamplesRationale": "통계적 편의(운영자 승인 2026-08-26)",
+    "policyVersion": "SYN-POLICY-2026-08-30"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "outcome": "Accepted",
+  "rate": {
+    "fraction": 0.875,
+    "axis": "bidRate"
+  },
+  "preservedSourceUnit": "percent",
+  "conversionDivisor": 100
+}

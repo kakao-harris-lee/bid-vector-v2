@@ -1,0 +1,51 @@
+{
+  "fieldContract": {
+    "registeredKeys": [
+      {
+        "rawName": "bidNtceNo",
+        "concept": "공고번호",
+        "type": "identifier",
+        "zeroPadded": false,
+        "intConversionAllowed": false
+      },
+      {
+        "rawName": "bidNtceOrd",
+        "concept": "공고차수",
+        "type": "identifier",
+        "zeroPadded": true,
+        "intConversionAllowed": false
+      },
+      {
+        "rawName": "presmptPrce",
+        "concept": "추정가격",
+        "type": "money",
+        "unit": "KRW",
+        "scale": "integer",
+        "basis": "ESTIMATED_PRICE",
+        "vatTreatment": "EXCLUSIVE",
+        "nullability": "nullable",
+        "provenance": "Published",
+        "authoritative": true
+      },
+      {
+        "rawName": "synFloorRt",
+        "concept": "게시 낙찰하한율",
+        "type": "rate",
+        "unit": "fraction",
+        "expectedRange": [
+          0.0,
+          1.0
+        ],
+        "nullability": "nullable",
+        "provenance": "Published",
+        "authoritative": true,
+        "note": "SYNTHETIC 키 이름 — 실제 KONEPS 키가 아니다."
+      }
+    ]
+  },
+  "payload": {
+    "bidNtceNo": "SYN-NTC-0002",
+    "bidNtceOrd": "000",
+    "synFloorRt": "87.5"
+  }
+}
