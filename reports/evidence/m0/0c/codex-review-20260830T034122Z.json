@@ -1,0 +1,67 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "aff62abfca85ca873932fedcad1e65c29ab35730",
+  "reviewed_head": "f0bdfbb83d16ac3d03be5f50bf3860df221f7c07",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 617,
+      "evidence": "상류 정본 `capability-map.md:827-859,2999`에서 `OPEN-QUAL-11`의 질문은 `permsnIndstrytyList`가 단독 충족인지 제한 면허와의 결합 충족인지다. U-8은 `lmtGrpNo`의 그룹 간 OR/그룹 내 AND만 확정한다. 사전 §3.2.5도 전자의 결합 규칙이 여전히 미결이라고 인정하지만, 이 행과 §11·checklist는 U-8로 `OPEN-QUAL-11`이 해소됐다고 기록한다. 활성 OPEN을 다른 결정으로 닫은 데이터 사전 결함이다.",
+      "required_fix": "`OPEN-QUAL-11`을 활성 상태로 복원하고 §3.2.5의 단독/결합 충족 질문에 귀속하라. §11, checklist, 결정 사본 요약의 해소 서술도 정정하되, 실제 질문에 대한 별도 운영자 결정이 있다면 그 근거를 인용하라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 1531,
+      "evidence": "§5.5는 공고 측 `ConstructionCapacityRequirement.requiredAmount`에 관한 조달청 문서가 단위와 과세를 명시하지 않는다고 밝힌다. 그런데 §12.2는 근거나 소유 OPEN 없이 단위를 `원`으로 확정한다. 상류 `OPEN-QUAL-10`은 공고 게시 요건과 운영자 보유액 양쪽의 unit/basis/VAT/기준 시점을 질문하지만 §11은 U-2·U-2b로 전체가 닫혔다고 기록한다. U-2가 정한 보유액의 성질을 게시 요건에 전이하지 않는다는 §5.5 자체 규율과도 맞지 않으며, 원시 숫자의 unit을 추측하게 만든다.",
+      "required_fix": "공고 게시 요건의 단위에 authoritative 근거를 제시하거나 명시적 OPEN으로 남겨라. 단위가 확정되기 전에는 원 단위 `Money`로 정규화할 수 있다고 단정하지 말고, `OPEN-QUAL-10` 또는 정확히 좁힌 신규 OPEN의 상태와 §11/checklist를 일치시켜라."
+    },
+    {
+      "severity": "high",
+      "file": "docs/discovery/data-dictionary.md",
+      "line": 284,
+      "evidence": "§1.4.2의 네 numeric value type(`AssessmentRate`, `AwardRate`, `FloorRate`, `BidRate`)은 분자/분모와 fraction 단위만 정의하고 provenance·층·부재 표현을 정의하지 않는다. §1.4.1은 원문 unit을 수집 시점에 붙잡는다고만 하며 어느 값/필드가 이를 보존하는지 계약이 없다. §12.2 검색 결과 네 타입 모두 인덱스에 없지만 C-4.2는 필드 이름만 추출하므로 PASS한다. 이는 §0.4의 다섯 자리 규약과 A2의 모든 도메인 숫자 unit/basis/provenance 게이트를 충족하지 못한다.",
+      "required_fix": "각 Rate 값의 실제 numeric carrier, provenance/층, nullable·측정불가 표현과 원문 unit 보존 위치를 정의하거나 OPEN으로 등록하고 §12.2에 등재하라. C-4 검증도 필드가 없는 numeric value wrapper를 놓치지 않게 보강하라."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0c/decisions-2026-08-28.md",
+      "line": 249,
+      "evidence": "U-9 표는 `OPEN-NUM-01`을 '인용 금지로 닫음'이라고 기록하지만 같은 파일 312-314행은 `OPEN-NUM-01`/`OPEN-REG-04`를 유지되는 OPEN으로 분류한다. 사전 §7.4와 상류 registry도 측정 방법·모수·측정일 질문을 활성으로 유지한다. 실행 결과가 아니라 evidence 내부에서 직접 모순되는 상태 서술이다.",
+      "required_fix": "원 기록을 보존해야 한다면 U-3과 같은 명시적 정정을 덧대어, 인용 금지 결정과 측정 질문의 활성 상태가 별개임을 일관되게 기록하라."
+    },
+    {
+      "severity": "low",
+      "file": "reports/evidence/m0/0c/scope.md",
+      "line": 98,
+      "evidence": "`head_sha` 이후 커밋의 성격을 출력 재취득·라운드 이력·Codex finding 수정 세 종류로 기술하지만 실제 로그에는 독립 검증 finding 수정과 운영자 판정 커밋도 있다. 같은 파일 703-705행이 이미 이 열거가 검증자 finding 수정을 덮지 못한다고 인정한다. 경로 판정은 C-2.1이 담당해 범위 결론에는 영향이 없지만 현재 이력 서술은 불완전하다.",
+      "required_fix": "세 항목을 비전수 예시라고 명시하거나 실제 허용되는 후속 커밋 성격을 포괄하도록 문면을 좁혀라."
+    }
+  ],
+  "commands_run": [
+    "pwd; git status --short; git rev-parse --verify aff62abfca85ca873932fedcad1e65c29ab35730^{commit}; git rev-parse --verify f0bdfbb83d16ac3d03be5f50bf3860df221f7c07^{commit}; git merge-base aff62abfca85ca873932fedcad1e65c29ab35730 f0bdfbb83d16ac3d03be5f50bf3860df221f7c07; git ls-files --others --exclude-standard",
+    "git log --format='%H %s' aff62abfca85ca873932fedcad1e65c29ab35730..f0bdfbb83d16ac3d03be5f50bf3860df221f7c07 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "git diff --stat aff62abfca85ca873932fedcad1e65c29ab35730 f0bdfbb83d16ac3d03be5f50bf3860df221f7c07 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/; git diff --name-status aff62abfca85ca873932fedcad1e65c29ab35730 f0bdfbb83d16ac3d03be5f50bf3860df221f7c07 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "git diff --check aff62abfca85ca873932fedcad1e65c29ab35730 f0bdfbb83d16ac3d03be5f50bf3860df221f7c07 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/",
+    "run_first_fence '^## C-3 '; run_first_fence '^### C-4\\.1 '; run_first_fence '^### C-4\\.2 '; run_first_fence '^## C-8 '",
+    "run_first_fence '^### C-2\\.2 '",
+    "for c in $(git log --format='%H' aff62abfca85ca873932fedcad1e65c29ab35730..f0bdfbb83d16ac3d03be5f50bf3860df221f7c07 -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do git show --name-only --format='' \"$c\"; done | sed '/^$/d' | sort -u",
+    "CELLS=$(awk -F'|' '/^\\|/ {print $2}' reports/evidence/m0/0c/scope.md); for c in $(git log --format='%h' 2b05684..HEAD -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do printf '%s\\n' \"$CELLS\" | grep -qF \"\\`$c\\`\" || git log --format='%h %s' -1 $c; done",
+    "git show f0bdfbb83d16ac3d03be5f50bf3860df221f7c07 --stat; wc -l reports/evidence/m0/0c/scope.md; rg -n '768' reports/evidence/m0/0c/ || true",
+    "sed -n '827,859p' docs/discovery/capability-map.md; sed -n '601,655p;1445,1451p' docs/discovery/data-dictionary.md",
+    "sed -n '2994,3001p' docs/discovery/capability-map.md; sed -n '1095,1107p;1527,1533p' docs/discovery/data-dictionary.md",
+    "for n in AssessmentRate AwardRate FloorRate BidRate; do sed -n '/### 12\\.2/,/## 13\\./p' docs/discovery/data-dictionary.md | rg -n \"\\`$n\\`|\\($n\\)\" || echo '(§12.2에 없음)'; done",
+    "git rev-parse HEAD; git status --short; git ls-files --others --exclude-standard; git worktree list --porcelain"
+  ],
+  "residual_risks": [
+    "`bid-vector` symlink와 `_workspace/`가 없어 C-1·C-5·C-6·C-7·C-9 및 C-10의 두 환경 검증을 독립 재실행하지 못했다. 문서가 밝힌 환경 제한과 일치하며 실행 불가 자체는 finding으로 세지 않았다.",
+    "C-3·C-4.1·C-4.2·C-8과 C-2.2는 기록과 동일하게 통과했지만, C-4.2가 선언된 필드만 보는 한계 때문에 위 Rate 타입 누락을 잡지 못한다.",
+    "커밋 `f0bdfbb` 메시지의 768행 주장은 실측 767행과 다르지만 산출물에는 768이 없고 커밋 메시지 amend 금지 전제가 명시돼 있어 acceptance finding으로 세지 않았다.",
+    "최종 worktree는 수정·신규 파일 없이 clean이며 새 worktree나 커밋을 만들지 않았다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
