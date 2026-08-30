@@ -18,7 +18,7 @@ LANE=(docs/adr docs/discovery/capability-map.md milestone-0.md milestone-1.md \
 
 | # | 명령 | exit | 핵심 결과 |
 | --- | --- | --- | --- |
-| **C-0** | `git log --format=%h 14686db..HEAD -- "${LANE[@]}"` | 0 | 이 레인의 커밋 **8개** (`1fe87eb` … `c490b5a`) |
+| **C-0** | `git log --format=%h 14686db..HEAD -- "${LANE[@]}"` | 0 | 이 레인의 커밋 집합 (`1fe87eb` 이후). **수를 여기 적지 않는다** — 이 명령이 낸다. `C-7a`·`C-7b` 의 분모다 |
 | **C-1a** | `sed -n '/^## 12\. OPEN/,/^### 12\.1/p' docs/discovery/capability-map.md \| grep -cE '^\| *OPEN-[A-Z]+-[0-9]+ *\|'` | 0 | **43** (45 → 43. `OPEN-OPS-07`·`OPEN-QUAL-05` 해소) |
 | **C-1b** | `sed -n '/^## 9\. \`OPEN\`/,/^## 10\./p' docs/discovery/regression-ledger.md \| grep -oE 'OPEN-REG-[0-9]+' \| sort -u \| wc -l` | 0 | **5** (무변경) |
 | **C-1c** | `sed -n '/^## 9\. \`OPEN\`/,/^## 10\./p' docs/discovery/data-dictionary.md \| grep -coE '^\| \*\*\`OPEN-DIC-[0-9]+\`\*\*'` | 0 | **10** (무변경) |
