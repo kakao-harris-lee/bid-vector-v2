@@ -15,7 +15,7 @@ in_scope:
   - v2-지침서.md                          # §5(Q1) · §4.2(Q2) 문면 개정
   - milestone-1.md                         # 1C 유효기간 요구(Q2 동기화)
   - milestone-0.md                         # 산출물 목록(Q3) + M0 완료 기록
-  - docs/adr/*.md                          # ① 「상태」 줄 아홉 (각 3행)
+  - docs/adr/*.md                          # ① 「상태」 줄 아홉
                                            # ② ADR 0001 §5 의 OPEN-ADR-01 행 — 해소로 갱신
   - docs/discovery/capability-map.md       # OPEN-OPS-07·OPEN-QUAL-05 registry + §14 이월 목록
   - reports/evidence/m0/0e/scope.md         # 이 패키지 셋뿐이다.
@@ -61,7 +61,7 @@ rollback: |
 | 2 | **Q2** — 면허 **유효기간 축만** versioned policy data 요구에서 제거 | 운영자 결정 2026-08-28 **U-7** + 문면 집행 2026-08-29 (`A-56`) | `v2-지침서.md` §4.2 · `milestone-1.md` 1C |
 | 3 | **Q3** — `milestone-0.md` 산출물 목록에서 `legacy-reference-map.md` 제거 | 운영자 결정 2026-08-29 (`A-57`) · 대체 근거는 `ADR 0009` **(d)** | `milestone-0.md` 「산출물」 |
 | 4 | **`OPEN-OPS-07` registry 갱신** | 종료 조건(ADR 대안 절 기입)이 `ADR 0005` §3 으로 **이미 충족**(`A-59`) | `capability-map.md` §12 · §12.1 · §12.2 |
-| 5 | **ADR 0001~0009 「상태」 줄** | 0D 가 Codex `approve` 로 닫혔다(`df056259`) | `docs/adr/*.md:3` |
+| 5 | **ADR 0001~0009 「상태」 줄** | 0D 가 Codex `approve` 로 닫혔다(`df056259`). **채택의 「사용자 명시 승인」은 운영자 2026-08-31** — 정본은 `milestone-0.md` 「승인에 드는 것」의 ADR 행 | `docs/adr/*.md:3` |
 | 6 | **이월 목록** — 활성 `OPEN` 마다 담당 slice | `A-58` 이 M0 완료 게이트 항목으로 든다 | `capability-map.md` **§14** |
 | 7 | **M0 완료 기록** | `milestone-0.md` 완료 조건 | `milestone-0.md` 「M0 완료 기록」 |
 
@@ -152,7 +152,10 @@ range 에 다시 들어온다"* 를 **비용으로 감수**한다고 적었다. 
 
 ## 이 slice 가 하지 않은 것
 
-- **새 조사·새 결정을 하지 않았다.** 모든 개정이 이미 내려진 운영자 결정의 집행이다.
+- **새 조사를 하지 않았고, 이 slice 가 결정을 내리지도 않았다.** 개정은 전부 운영자 결정의
+  집행이다 — 대부분 착수 전에 내려진 것이고, **`ADR 0001`~`0009` 채택 승인 하나만 이 slice
+  진행 중(2026-08-31)에 운영자에게 물어 받았다.** 물음과 답은 `milestone-0.md` 「승인에
+  드는 것」의 ADR 행이 그대로 싣는다.
 - **`OPEN` 을 임의로 해소하지 않았다** — 닫은 셋은 전부 **종료 조건 충족을 확인**해서 닫았고,
   그 확인의 명령은 `commands.md` C-6 에 있다.
 - **`docs/adr/**` 의 결정 내용을 건드리지 않았다.** 편집은 **「상태」 줄 아홉**과

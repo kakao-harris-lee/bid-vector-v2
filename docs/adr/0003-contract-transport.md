@@ -5,8 +5,11 @@
   `reviewed_head` `df056259`, 2026-08-29, `model_reasoning_effort=high`). 갱신 시점은
   **2026-08-30 · M0 종료 slice 0E**다 — 0D 종료 뒤에도 이 줄이 *"제안됨 … 대기"*로 남아
   **문면이 사실을 따라가지 않았다.**
-  **`milestone-0.md` 완료 조건의 「사용자 명시 승인」은 아직 받지 않았다** — 그 승인의
-  대상은 0E가 만든 이월 목록(`docs/discovery/capability-map.md` §14)이다.
+  **`milestone-0.md` 완료 조건의 「사용자 명시 승인」을 받았다** — **운영자, 2026-08-31**.
+  물음 *"「M0 승인」이 ADR 0001~0009 채택까지 덮는가"*에 **「덮는다 — ADR 채택 포함」**.
+  **이 승인은 Codex `approve`가 만든 것이 아니다** — 위 0D `approve`와 별개로 운영자에게
+  직접 물어 받았다. 기록의 **정본**은 `milestone-0.md` 「승인에 드는 것」의 ADR 행이며,
+  같은 승인의 다른 대상(활성 `OPEN` 이월)은 `docs/discovery/capability-map.md` §14다.
 - **작성일**: 2026-08-28
 - **대응**: `milestone-0.md` §"Slice 0D" 결정 **4** (gRPC/Protobuf 내부 계약)
 - **legacy 기준 commit**: `ed4b06c`
