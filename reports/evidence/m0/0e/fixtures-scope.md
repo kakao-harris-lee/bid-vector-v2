@@ -65,6 +65,11 @@
    `fixtures/`로 한정된 결과이며 `manifest.yaml`의 `layout.note`가 선언한다.
 5. **`license-011`의 기대값은 잠정이다** — `OPEN-QUAL-11` 결정 전 임시 처리이고 `provisional`
    필드가 그 사실을 나른다.
+6. **일부 case 의 `authoritative` 분류가 M0 완료 게이트에 걸려 있다.** 근거가 M0 산출 문서의
+   **자체 도출 acceptance** 뿐이고 그것을 세운 운영자 결정·조달청 문서·`v2-지침서.md` 문면이
+   없는 case 다. `source.kind: m0-derived-rule`이 그 자리를 표시하고 조건은
+   `manifest.yaml`의 `classification_policy.m0_derived_rule`이 적는다 — 사용자가 그
+   acceptance 를 승인하지 않으면 **재분류 대상**이다. 어느 case 가 드는지는 **F-7**이 센다.
 
 ## evidence 패키지에서 성립하지 않는 항목 (`N/A + 사유`)
 

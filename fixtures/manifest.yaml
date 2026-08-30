@@ -48,7 +48,7 @@ schema:
   extensions:
     verifies: 이 fixture 가 **무엇을 검증하는가**. 한 case 는 한 의미만 검증한다(§7 「한 case 의 기대값을 여러 의미에 재사용」 금지).
     expected_reasoning: 기대값이 **어느 문서의 어느 문장**에서 나왔는가. Codex 독립 검토(§5 7단계)의 대상.
-    source.kind 어휘: official-doc | operator-decision | approved-spec | legacy-observation. 앞 셋만 `authoritative` 분류를 낼 수 있다.
+    source.kind 어휘: official-doc | operator-decision | approved-spec | m0-derived-rule | legacy-observation. 앞 셋은 `authoritative` 분류를 **무조건** 낸다. `m0-derived-rule`은 **조건부**이며 그 조건은 `classification_policy.m0_derived_rule`이 적는다. `legacy-observation`은 낼 수 없다.
     expected_sha256: 기대값 파일의 SHA-256. §3은 fixture 해시만 요구하나 기대값도 사후 변경 탐지 대상이다.
     privacy.synthetic: 입력이 합성인지. 운영 데이터 유래가 아님을 case 마다 명시한다.
     privacy.method: 비식별화 방식. 합성 입력은 `not-applicable-synthetic`.
@@ -64,7 +64,26 @@ classification_policy:
     출처가 ① 조달청 공식 문서 인용 ② 커밋된 운영자 결정 기록 ③ `v2-지침서.md`(M0 선행 조건으로
     승인된 기준 문서) 중 하나인 case. M0 산출 문서(`capability-map.md`·`regression-ledger.md`·
     `data-dictionary.md`)는 **그 안에 인용된 결정·공식 문서를 가리키는 포인터로만** 쓰고,
-    그 문서가 스스로 도출한 규칙은 이 분류를 내지 않는다.
+    그 문서가 스스로 도출한 규칙은 이 셋 어디에도 들지 않는다.
+    **그렇게 도출된 규칙에만 기댄 case 가 실제로 있다** — 아래 `m0_derived_rule`이 그 자리를
+    **조건부로** 다룬다. 지우거나 셋 중 하나로 우겨 넣지 않는다.
+  m0_derived_rule: |-
+    위 셋 어디에도 기대지 못하는 case 다. 근거가 **M0 산출 문서가 스스로 도출한 acceptance·정의**
+    뿐이고, 그것을 세운 운영자 결정·조달청 문서·`v2-지침서.md` 문면이 그 자리에 없다.
+    `source.kind: m0-derived-rule`이 그 자리를 표시한다.
+
+    **이 경로는 `data-extract.md` §1을 넓히지 않는다.** §1의 `authoritative`는 「공식 규정/API
+    문서 또는 **사용자가 승인한** 업무 규칙」이고, **이 근거는 아직 승인 전이다** — 그 승인이
+    바로 0E가 준비하는 M0 완료 게이트(`milestone-0.md`의 「사용자 명시 승인」, 현재 비어 있다)다.
+    따라서 이 case 들의 `authoritative` 분류는 **그 게이트가 열린다는 조건 아래에서만 성립한다.**
+    사용자가 해당 acceptance 를 승인하지 않거나 승인 범위가 갈리면 **그 case 는 재분류 대상**이고,
+    `change_history`에 사유와 policy version 을 적어 교체한다.
+
+    **legacy 를 정답으로 올린 것과는 다른 축이다** — 이 근거들은 legacy 가 낸 **출력**이 아니라
+    M0 조사가 legacy 형태를 읽고 세운 **V2 설계 요구**다. `legacy-behavior` 층은 여전히 0건이다.
+
+    **어느 case 가 여기 드는지는 이 산문이 세지 않는다** — `source.kind`가 표시하고
+    `reports/evidence/m0/0e/fixtures-commands.md` **F-7**이 센다.
   observed: 0건. 운영 데이터 접근 승인이 선행한다.
   legacy_behavior: 0건. 이 slice 는 legacy Python 을 실행하지 않았고 golden 기대값을 옮기지 않았다.
   pending_user_approval: |-
@@ -411,12 +430,15 @@ cases:
     verifies: |-
         서로 다른 basis의 금액이 하나의 min/max 연산에 들어갈 수 없다 — R-BASIS-04가 남긴 형태.
     source:
-      kind: operator-decision
+      kind: approved-spec
       reference: |-
-          capability-map.md DEC-02 결정 무관(무조건)
+          v2-지침서.md §4.1 (원시 숫자 상호 대입 금지) — `capability-map.md` DEC-02 「결정 무관(무조건)」 acceptance 는
+          그 요구를 min/max 형태로 적은 포인터다.
     expected_reasoning: |-
-      capability-map.md DEC-02 acceptance *"서로 다른 basis의 금액이 하나의 min/max 연산에 함께 들어갈 수 없다"*. 두 인자의 수치를
-      같게 두어 대소 전제를 넣지 않는다.
+      **근거는 승인 명세다** — `v2-지침서.md` §4.1 *"`BaseAmount`, `EstimatedAmount`, `YegaAmount`, `BidAmount`를 원시 숫자로
+      상호 대입하지 못하게 한다"*. 서로 다른 basis 의 두 금액을 하나의 min/max 에 넣는 것이 곧 그 상호 대입이다.
+      capability-map.md DEC-02 acceptance *"서로 다른 basis의 금액이 하나의 min/max 연산에 함께 들어갈 수 없다"* 가 같은 요구를
+      이 형태로 적는다. 두 인자의 수치를 같게 두어 대소 전제를 넣지 않는다.
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -949,9 +971,11 @@ cases:
         허용업종만 보유한 경우는 `Eligible`로도 `Ineligible`로도 확정하지 않고 사유 있는 `Uncertain`으로 산출된다 — 과차단·과추천 어느 쪽으로도 틀리지
         않는 쪽.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md QUAL-03 조건부 acceptance (결정 전 임시 시나리오) · data-dictionary.md §3.2.5
+          capability-map.md QUAL-03 **조건부** acceptance (결정 전 임시 시나리오) · data-dictionary.md §3.2.5 —
+          **M0 산출 문서의 자체 도출이며, `OPEN-QUAL-11`(활성) 결정 전의 임시 처리다.** QUAL-03 의 운영자 결정 둘
+          (`OPEN-QUAL-01`·`OPEN-QUAL-02` 해소)은 그룹 의미론과 요건 소스를 정했고 이 조건부 시나리오를 세우지 않는다.
     expected_reasoning: |-
       capability-map.md QUAL-03 *"조건부 — `OPEN-QUAL-11` 결정에 따라 확정 … 결정 전 임시 시나리오: 허용업종만 보유한 경우를
       `Eligible`로도 `Ineligible`로도 확정하지 않고 사유 있는 `Uncertain`으로 산출한다"*. **이 기대값은 잠정이며 `OPEN-QUAL-11`이
@@ -1488,10 +1512,13 @@ cases:
         개연 범위 밖 표본이 분모에서 빠지고, 그 결과 표본 부족이 되면 판정 불가로 전이된다. 밴드 값은 **synthetic 정책 입력**이며 기대값은 그 구체 값에 의존하지
         않는다.
     source:
-      kind: operator-decision
+      kind: approved-spec
       reference: |-
-          capability-map.md DEC-04 결정 무관 acceptance
+          v2-지침서.md §4.4 (표본 부족 = `Unmeasurable` · 표본 필터 범위는 versioned 정책) — `capability-map.md` DEC-04
+          acceptance 는 그 둘을 이 전이 형태로 적은 포인터다.
     expected_reasoning: |-
+      **근거는 승인 명세다** — `v2-지침서.md` §4.4 *"표본 부족은 0%가 아니라 `Unmeasurable`이다"* + *"표본 필터 범위, 최소 표본
+      수, 경계의 포함/제외는 versioned 정책이다"*. 이 case 는 그 둘의 합성(범위 필터가 분모를 줄여 표본 부족에 이르는 전이)을 고정한다.
       capability-map.md DEC-04 acceptance *"개연 범위 밖 표본이 분모에서 빠지고, 그 결과 표본 부족이 되면 판정 불가로 전이된다"* +
       data-dictionary.md §3.3 *"`SampleInsufficient`를 명시 variant로 두는 이유 … 전이의 도착점에 이름이 있어야 한다"*. **밴드
       값은 legacy 값이 아니라 synthetic이다** — data-dictionary.md §12.1이 legacy 밴드를 `legacy-behavior`로 등재하므로 그
@@ -1619,9 +1646,10 @@ cases:
     verifies: |-
         기준일(공고일)이 미상이면 시행일 표를 적용하지 않는다 — 소급 방지.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md DEC-03 acceptance
+          capability-map.md DEC-03 acceptance — **M0 산출 문서의 자체 도출**. DEC-03 의 운영자 결정 2026-08-26
+          (`OPEN-DEC-09` 해소)은 지방계약 범위 축만 정했고 이 acceptance 를 세우지 않는다.
     expected_reasoning: |-
       capability-map.md DEC-03 acceptance *"기준일이 미상이면 시행일 표를 적용하지 않는다(소급 방지)"*. data-dictionary.md
       §1.2.4 근거 2가 같은 leakage-safe 규율을 인용한다.
@@ -1661,9 +1689,10 @@ cases:
         시행일 경계 전후 하루 차이로 다른 tier가 적용된다 (경계 **전날**). 시행일 표는 **synthetic 정책 입력**이며 기대값은 그 값이 아니라 경계 규칙에
         의존한다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md DEC-03 acceptance
+          capability-map.md DEC-03 acceptance — **M0 산출 문서의 자체 도출**. DEC-03 의 운영자 결정 2026-08-26
+          (`OPEN-DEC-09` 해소)은 지방계약 범위 축만 정했고 이 acceptance 를 세우지 않는다.
     expected_reasoning: |-
       capability-map.md DEC-03 acceptance *"시행일 경계 전후 하루 차이로 다른 tier가 적용된다(소급 적용 없음)"* +
       data-dictionary.md §4.4. **율 값은 synthetic이다** — §12.1이 legacy 법정 하한율을 `legacy-behavior`로 등재하고
@@ -1705,9 +1734,10 @@ cases:
     verifies: |-
         시행일 경계 전후 하루 차이로 다른 tier가 적용된다 (경계 **당일**). 003과 쌍이다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md DEC-03 acceptance
+          capability-map.md DEC-03 acceptance — **M0 산출 문서의 자체 도출**. DEC-03 의 운영자 결정 2026-08-26
+          (`OPEN-DEC-09` 해소)은 지방계약 범위 축만 정했고 이 acceptance 를 세우지 않는다.
     expected_reasoning: |-
       003과 같다. 경계 포함성은 `effectiveFrom` 이 **당일 포함**임을 이 쌍이 고정한다 — data-dictionary.md §4.1이 정책 version을
       날짜로 식별하고 §1.5가 구간 경계를 **시작 포함·끝 제외**로 둔다.
@@ -1748,9 +1778,10 @@ cases:
     verifies: |-
         하한 해석 결과가 `Rate` 하나가 아니라 (율, 출처, 적용 범위, 개연성 플래그) 묶음이다. 게시값과 표 값의 출처가 `origin`으로 구별된다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md DEC-03 acceptance · data-dictionary.md §1.4.2
+          capability-map.md DEC-03 acceptance · data-dictionary.md §1.4.2 — **둘 다 M0 산출 문서의 자체 도출**.
+          DEC-03 의 운영자 결정 2026-08-26 은 지방계약 범위 축만 정했고 이 acceptance 를 세우지 않는다.
     expected_reasoning: |-
       capability-map.md DEC-03 acceptance *"하한 해석 결과가 `Rate` 하나가 아니라 (율, 출처, 적용 범위, 개연성 플래그) 묶음이다"* +
       data-dictionary.md §1.4.2 `FloorRateOrigin = sealed { NoticeValue(noticeRevision),
@@ -1792,10 +1823,10 @@ cases:
     verifies: |-
         선언에 없는 raw 키가 응답에 나오면 미지 필드로 계수되고 그 값이 도메인 값으로 소비되지 않는다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md COL-07 acceptance + 승격 결정 (data-dictionary.md §5.3 — *"계약 테스트 승격 여부는 0C에서
-          결정한다"* → **결정: 승격한다**)
+          capability-map.md COL-07 acceptance — **M0 산출 문서의 자체 도출**. 「계약 테스트로 승격한다」는 판단은
+          `data-dictionary.md` §5.3 이 0C 에 넘긴 것을 **0C slice 가** 내린 것이며 운영자 결정이 아니다.
     expected_reasoning: |-
       capability-map.md COL-07 acceptance *"선언에 없는 raw 키가 응답에 나오면 그 사실이 run 산출에 미지 필드로 계수되고, 해당 값이 도메인
       값으로 소비되지 않는다"* + data-dictionary.md §5.3 규율 1 *"선언에 없는 키는 '미지 필드'로 리포트되어 조용히 삼켜지지 않는다"*.
@@ -1835,10 +1866,10 @@ cases:
         선언된 `scale`/`expectedRange`와 어긋나는 값(fraction 자리에 백분율)이 오면 그 항목이 거부되고 사유가 회계에 남는다. **선언된 범위와의
         대조**이지 값 크기로 단위를 추측하는 경로가 아니다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md COL-07 acceptance + 승격 결정 (data-dictionary.md §5.3 — *"계약 테스트 승격 여부는 0C에서
-          결정한다"* → **결정: 승격한다**)
+          capability-map.md COL-07 acceptance — **M0 산출 문서의 자체 도출**. 「계약 테스트로 승격한다」는 판단은
+          `data-dictionary.md` §5.3 이 0C 에 넘긴 것을 **0C slice 가** 내린 것이며 운영자 결정이 아니다.
     expected_reasoning: |-
       capability-map.md COL-07 acceptance *"선언된 `scale`/`basis`와 어긋나는 값(예: fraction 자리에 백분율)이 오면 그 항목이
       거부되고 사유가 회계에 남는다"*. 판정 근거는 **계약이 선언한 `expectedRange`**이며, data-dictionary.md §1.4.1이 금지한 「값 크기로
@@ -1960,10 +1991,10 @@ cases:
     verifies: |-
         제로패딩 식별자(`bidNtceOrd` = `"000"`)가 정수 변환 없이 그대로 전달된다. 식별자 타입에 산술 연산이 정의되지 않는다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md COL-07 acceptance + 승격 결정 (data-dictionary.md §5.3 — *"계약 테스트 승격 여부는 0C에서
-          결정한다"* → **결정: 승격한다**)
+          capability-map.md COL-07 acceptance — **M0 산출 문서의 자체 도출**. 「계약 테스트로 승격한다」는 판단은
+          `data-dictionary.md` §5.3 이 0C 에 넘긴 것을 **0C slice 가** 내린 것이며 운영자 결정이 아니다.
     expected_reasoning: |-
       data-dictionary.md §5.3 *"식별자는 숫자가 아니다. 공고 차수(`bidNtceOrd`)는 제로패딩 식별자이며 `int` 변환 금지가 계약에 선언돼
       있다"* + regression-ledger.md `R-QUAL-05` V2 예방 제약 *"외부 식별자는 문자열 도메인 타입이고 숫자 변환이 허용되지 않는다"* 및 검증
@@ -2002,9 +2033,10 @@ cases:
     verifies: |-
         코드와 라벨이 한 문자열로 오는 외부 형태가 파싱 경계 밖으로 흐르지 않는다 — 두 값으로 저장된다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md COL-08 acceptance
+          capability-map.md COL-08 acceptance — **M0 산출 문서의 자체 도출**. COL-08 자신이 「코드 체계 출처는
+          `OPEN-COL-03`」(활성)이라 적는다.
     expected_reasoning: |-
       capability-map.md COL-08 acceptance *"업무구분은 코드 열거값과 표시 라벨 두 값으로 저장되며, '코드와 라벨이 한 문자열'인 외부 형태는 파싱
       경계 밖으로 흐르지 않는다"*.
@@ -2043,9 +2075,10 @@ cases:
     verifies: |-
         매핑에 없는 코드가 오면 미지 코드로 표시되고 임의 라벨이 붙지 않는다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
-          capability-map.md COL-08 acceptance
+          capability-map.md COL-08 acceptance — **M0 산출 문서의 자체 도출**. COL-08 자신이 「코드 체계 출처는
+          `OPEN-COL-03`」(활성)이라 적는다.
     expected_reasoning: |-
       capability-map.md COL-08 acceptance *"매핑에 없는 코드가 오면 미지 코드로 표시되고 임의 라벨이 붙지 않는다"*.
     input_file: fixtures/input/koneps-collection-007.json
@@ -2429,9 +2462,10 @@ cases:
     verifies: |-
         피처 결측이 `0`이나 미지 코드로 접히지 않고 `MissingReason`을 provenance로 나른다.
     source:
-      kind: approved-spec
+      kind: m0-derived-rule
       reference: |-
-          data-dictionary.md §6.3 · capability-map.md ML-11.4 F3
+          data-dictionary.md §6.3 · capability-map.md ML-11.4 F3 — **둘 다 M0 산출 문서의 자체 도출**.
+          `v2-지침서.md` 에 결측 사유 provenance 를 요구하는 문면이 없다(§3.2 의 경계 규칙은 다른 축이다).
     expected_reasoning: |-
       data-dictionary.md §6.3 `MissingReason = sealed { Unknown, NotApplicable, NotCollectedYet }` —
       *"모든 피처가 결측 사유를 provenance로 갖는다"* + *"결측이 미지 코드나 `0`으로 접힌다"*가 legacy의 대가였다는 기록(ML-11.4 F3: 피처
@@ -2466,9 +2500,10 @@ cases:
     verifies: |-
         누수 차단이 규율이 아니라 시그니처다 — 피처 커널은 예비가격·추첨번호·실현 사정률·낙찰가를 아예 받지 않는다.
     source:
-      kind: approved-spec
+      kind: m0-derived-rule
       reference: |-
-          data-dictionary.md §6.3
+          data-dictionary.md §6.3 — **M0 산출 문서의 자체 도출**. `v2-지침서.md` §3.2 는 Kotlin·Python 의 판정 경계를
+          정하고 **피처 커널의 누수 차단 시그니처를 요구하지 않는다.**
     expected_reasoning: |-
       data-dictionary.md §6.3 — legacy 설계를 **계승한다**고 명시한다: *"이 커널의 입력 시그니처가 곧 피처 계약이고 … 예비가격·추첨번호·실현
       사정률·낙찰가는 아예 받지 않는다. '쓰지 말자'는 규율보다 '받을 수 없다'는 시그니처가 강하다"* — **이 형태를 계승한다**.
