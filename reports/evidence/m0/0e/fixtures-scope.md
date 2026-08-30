@@ -5,7 +5,7 @@
 | 자리 | 값 |
 | --- | --- |
 | base_sha | `14686dbf3bff4085203ffdcd931564fd1e36edf0` |
-| head_sha | `9e1223ac2a64f3328b8ea2bdadca9b69c933d264` |
+| head_sha | **리뷰 시점의 HEAD.** SHA 를 여기 박으면 커밋이 늘 때마다 낡으므로 range 로 적는다 — 커밋마다 이 값을 옮겨 적는 장치(선언 SHA 래칫)를 두지 않는다. 이 레인의 커밋 집합은 `git log --oneline 14686db..HEAD -- fixtures/ 'reports/evidence/m0/0e/fixtures-*.md'` 가 낸다 |
 | 기준 문서 | `data-extract.md` (단일 기준) |
 | legacy 기준 SHA | `ed4b06c` — read-only. **이 slice 는 legacy Python 을 실행하지 않았다** |
 | 착수 근거 | `milestone-1.md:12` M1 선행 조건 · `milestone-0.md:94` 산출물 · `m1-blocking-analysis-v2.md` `N-1`/`T-1` |
