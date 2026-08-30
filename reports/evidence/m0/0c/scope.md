@@ -5,7 +5,7 @@ milestone: m0
 slice: 0c-data-dictionary
 base_sha: 2b05684d0e2ed8bac391d0eea4429e05f582a47b   # 착수 시점의 HEAD
 review_base: aff62abfca85ca873932fedcad1e65c29ab35730   # 이 slice 첫 커밋의 부모. 아래 「head_sha와 range」
-head_sha: e9c321f   # 이 evidence가 좌표로 고정한 커밋 = commands.md의 선언 SHA. head가 아니다 — 「head_sha와 range」 절
+head_sha: e67d177   # 이 evidence가 좌표로 고정한 커밋 = commands.md의 선언 SHA. head가 아니다 — 「head_sha와 range」 절
 in_scope:
   - docs/discovery/data-dictionary.md   # 신설
   - reports/evidence/m0/0c/             # 이 패키지 (decisions-2026-08-28.md 포함)
