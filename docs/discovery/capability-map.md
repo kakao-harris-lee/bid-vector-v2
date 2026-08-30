@@ -3413,7 +3413,7 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | # | 무엇이 | 판정 | 담당 |
 | --- | --- | --- | --- |
 | **N-1** | **`fixtures/manifest.yaml`** — 0E의 base 트리(`14686db`)에 `fixtures/` 자체가 없었고, **fixture-curator 레인이 0E와 병행해 `authoritative` 63 case로 착수했다**(`reports/evidence/m0/0e/fixtures-scope.md`). **이 절은 그 corpus가 `milestone-1.md:12`를 어디까지 만족시키는지 판정하지 않는다** — 그 레인이 잰다 | **(A)급 — M1 착수 차단.** `milestone-1.md:12` `- 검증 fixture 중 \`authoritative\` case 준비`가 **문면으로** 요구한다 | **fixture-curator slice**(0E와 병행). **제약**: `data-dictionary.md` §13이 **과세/비과세 경계 쌍**(`OPEN-REG-05` 활성)과 **`기초금액 ÷ 추정가격` 경계값**(`OPEN-DEC-07` 활성)을 지금 고정하지 말라고 인계한다 — `milestone-1.md:12`를 **부분적으로만** 만족시킬 수 있다 |
-| **N-3** | **0A의 최종 head(`cd5a456`)가 어느 Codex 리뷰 range에도 들지 않았다.** 0A의 유일한 `approve`는 조상 `6c6b3a2`의 **effort=medium 부수 실행**이고 **같은 head의 effort=high 실행은 `request_changes`**이며 0A 자신의 evidence가 high 쪽을 「3차 정본」으로 지정한다(`reports/evidence/m0/0a/checklist.md:197`) | **(A)급 — `milestone-1.md:10` `- M0 Codex \`approve\`와 사용자 승인`에 직접 걸린다** | **0E의 Codex 리뷰가 그 구간을 함께 덮는다** — 리뷰 range를 **`cd5a456` 이전부터** 잡는다. 계약은 `reports/evidence/m0/0e/scope.md` |
+| **N-3** | **0A의 최종 head(`cd5a456`)가 어느 Codex 리뷰 range에도 들지 않았다.** 0A의 유일한 `approve`는 조상 `6c6b3a2`의 **effort=medium 부수 실행**이고 **같은 head의 effort=high 실행은 `request_changes`**이며 0A 자신의 evidence가 high 쪽을 「3차 정본」으로 지정한다(`reports/evidence/m0/0a/checklist.md:197`) | **(A)급 — `milestone-1.md:10` `- M0 Codex \`approve\`와 사용자 승인`에 직접 걸린다** | **닫혔다 — 별도 리뷰 A가 `approve`.** A의 range `6c6b3a2..6af7019`가 `cd5a456`를 안에 담는다. verdict는 `reports/evidence/m0/0a/codex-review-20260830T223932Z.json` — `reviewed_base` `6c6b3a2a` … `reviewed_head` `6af70199`, `findings` 0. **0E(B)와 묶지 않았다**: 리뷰 계약이 A/B로 나뉘며 정본은 `reports/evidence/m0/0e/scope.md` 「리뷰 range 를 왜 둘로 나누는가」 |
 | **N-4** | **ADR 0001~0008의 「상태」 줄이 *"제안됨 … `approve` 대기"*로 남아 있었다** | **(A)급 — `milestone-1.md:11` `- 금액/rate/basis ADR 승인`(대상 = `ADR 0002`)** | **0E가 집행했다.** 아홉 전부 「결정」 + 0D의 `approve` 좌표를 싣는다. **「사용자 명시 승인」은 비워 두었다** — 그것은 사용자가 할 일이다 |
 | **N-5** | **집행 유예된 문서 개정 셋** — ① `v2-지침서.md` §5(Q1) ② `v2-지침서.md` §4.2(Q2) ③ `milestone-0.md` 산출물 목록(Q3) | **M0 완료 조건 차단** | **0E가 셋 다 집행했다.** ②는 `milestone-1.md:42`도 함께 고쳤다 |
 | **N-6** | **M0 완료 게이트** — `milestone-0.md` 완료 조건의 *"`OPEN` 결정이 0개이거나 사용자가 명시적으로 … 승인"* | **정의상 차단.** 활성이 0이 아니므로 **명시 승인만이 유일한 경로**다 | **사용자.** **이 §14가 그 승인의 대상이다** |
@@ -3442,6 +3442,7 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
    않았다** — 두 축의 fixture가 막힌다는 사실까지만 확인했고 남은 fixture로
    `authoritative` corpus가 성립하는지는 **fixture-curator가 잰다.**
 5. **네 registry의 통합도, 「활성 총계」의 확정도 하지 않았다**(§14.0).
-6. **0A 라운드 4~6의 변경이 실제로 결함을 담았는지 판정하지 않았다** — 확인한 것은 그
-   변경이 어느 Codex 리뷰 range에도 들지 않았다는 사실뿐이다. **내용 판정은 리뷰 레인의
-   몫**이며 0E의 리뷰 range가 그것을 덮는다.
+6. **0A 라운드 4~6의 변경이 실제로 결함을 담았는지 이 절이 판정하지 않았다** — 이 절이
+   확인한 것은 그 변경이 어느 Codex 리뷰 range에도 들지 않았다는 사실뿐이다. **내용 판정은
+   리뷰 레인의 몫**이고, **0E(B)가 아니라 별도 리뷰 A**(`6c6b3a2..6af7019`)가 그것을 덮어
+   `approve`했다 — 좌표는 위 `N-3` 행이 싣는다.

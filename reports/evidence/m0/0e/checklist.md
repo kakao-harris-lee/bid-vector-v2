@@ -54,7 +54,7 @@
 | 요구 | 대조 |
 | --- | --- |
 | 여섯 slice 와 각각의 Codex verdict | 표 6행. `reviewed_base … reviewed_head` 와 verdict 파일 경로를 싣는다. 원본 전수는 `commands.md` **C-8** |
-| **0A 가 이 slice 리뷰에 포함된다는 사실** | 「단서」 절. 근거 명령은 `commands.md` **C-9**, 계약은 `scope.md` 의 `base_sha: 6c6b3a2…` |
+| **0A 미리뷰 창이 별도 리뷰 A로 덮였다는 사실** | 「단서」 절이 A 의 좌표(`0a/codex-review-20260830T223932Z.json` · `6c6b3a2a` … `6af70199` · `approve`)를 싣는다. 근거 명령은 `commands.md` **C-9**, 리뷰 계약의 정본은 `scope.md` 의 A/B 표다 — **이 slice(B) 의 `base_sha` 는 `14686db`** 이고 0A 미리뷰 창은 그 range 밖이다 |
 | 이월 목록 지목 | 「이월 목록」 절이 `capability-map.md` §14 를 가리킨다 |
 | **「사용자 명시 승인」 자리를 비워 두었는가** | 「사용자 명시 승인」 절 — **(비어 있음)** 으로 남기고 *"이 자리는 사용자가 채운다"* 를 적었다. **0E 가 대신 적지 않았다** |
 

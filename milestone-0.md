@@ -141,7 +141,7 @@ Codex `approve`와 사용자 승인이 있어야 M1로 진행한다.
 
 | slice | 산출물 | 마지막 verdict | `reviewed_base` … `reviewed_head` | verdict 파일 |
 | --- | --- | --- | --- | --- |
-| **0A** | `docs/discovery/capability-map.md` (초판) | **`request_changes`** (effort=high, **3차 정본**) — 아래 단서 참조 | `3dc7d263` … `6c6b3a2a` | `0a/codex-review-20260825T235415Z.json` |
+| **0A** | `docs/discovery/capability-map.md` (초판) | **`request_changes`** (effort=high, **3차 정본**). 그 뒤 라운드 4~6은 **별도 리뷰 A**가 `approve` — 아래 단서 참조 | `3dc7d263` … `6c6b3a2a` | `0a/codex-review-20260825T235415Z.json` |
 | **0A2** | 같은 파일 — 운영자 결정 반영 | **`approve`** | `6af70199` … `f790e193` | `0a2/codex-review-20260827T034348Z.json` |
 | **0A3** | 같은 파일 — 정정 | **`approve`** | `48151b9c` … `20f09baf` | `0a3/codex-review-20260828T062714Z.json` |
 | **0B** | `docs/discovery/regression-ledger.md` | **`approve`** | `ec115a79` … `7701556c` | `0b/codex-review-20260827T121954Z.json` |
@@ -149,10 +149,12 @@ Codex `approve`와 사용자 승인이 있어야 M1로 진행한다.
 | **0D** | `docs/adr/0001`~`0009` | **`approve`** | `998dc217` … `df056259` | `0d/codex-review-20260829T222217Z.json` |
 
 **0E(이 종료 slice)의 리뷰는 별도이며 그 계약은 `reports/evidence/m0/0e/scope.md`가 갖는다.**
+**그 계약은 둘로 나뉜다** — **A**(0A 미리뷰 창) · **B**(0E). 두 range와 나눈 사유·실측은
+같은 파일의 「리뷰 range 를 왜 둘로 나누는가」가 **정본**이며 여기 옮겨 적지 않는다.
 
-### 단서 — 0A는 이 slice의 리뷰에 포함된다
+### 단서 — 0A의 미리뷰 창은 **별도 리뷰 A**가 덮었다
 
-**0A의 최종 head는 어느 Codex 리뷰 range에도 들지 않았다.**
+**0A의 최종 head는 0E 착수 시점까지 어느 Codex 리뷰 range에도 들지 않았다.**
 
 - 0A의 유일한 `approve`는 head `6c6b3a2a`의 **effort=medium 부수 실행**
   (`0a/codex-review-20260825T235414Z.json`)이고, **같은 head의 effort=high 실행은
@@ -162,10 +164,15 @@ Codex `approve`와 사용자 승인이 있어야 M1로 진행한다.
 - 그 `request_changes`에 대응해 **라운드 4·5·6이 돌았고** `capability-map.md`를 다시 고쳤다.
   그 라운드들의 head **`cd5a456`**(`0a/scope.md`의 선언 `head_sha`)는 **0A에 4차 리뷰가 없고**
   0A2 리뷰의 `reviewed_base`가 그 **바로 다음 커밋**(`6af7019`)이라 **어느 range에도 들지
-  않는다.**
+  않았다.**
 
-**그러므로 0E의 Codex 리뷰 range를 `cd5a456` 이전부터 잡아 그 구간을 함께 덮는다.**
-계약과 실제 range는 `reports/evidence/m0/0e/scope.md`에 있다.
+**그러므로 그 창을 0E와 묶지 않고 별도 리뷰 A로 받았다.** 계약은 위가 가리킨
+`reports/evidence/m0/0e/scope.md`의 A/B 표가 **정본**이다.
+
+**A는 `approve`다** — `reports/evidence/m0/0a/codex-review-20260830T223932Z.json`,
+`reviewed_base` `6c6b3a2a` … `reviewed_head` `6af70199`, `findings` 0.
+**`cd5a456`는 그 range 안에 든다**(`6c6b3a2`의 자손이자 `6af7019`의 조상). 위 미리뷰 창은
+이것으로 닫혔다. **B(0E)의 리뷰는 별개이며 이 기록 시점에 남아 있다.**
 
 ### 이월 목록 — 「사용자 명시 승인」의 대상
 
@@ -206,8 +213,9 @@ Codex `approve`와 사용자 승인이 있어야 M1로 진행한다.
   사항**이라 자동 포함하지 않는다. 필요해지는 시점(대체로 1B·1C)에 따로 묻는다.
 - **push · merge · 배포** — 전부 로컬 커밋 상태로 둔다.
 - **0E의 Codex `approve`** — `milestone-1.md:10`의 선행 조건은 *"M0 Codex `approve`**와** 사용자
-  승인"*으로 **둘을 묶어** 요구한다. 이 승인은 **둘째만** 충족시킨다 — 첫째는 0E 리뷰가
-  남았고, 그 리뷰 range가 0A의 미리뷰 구간까지 덮는다.
+  승인"*으로 **둘을 묶어** 요구한다. 이 승인은 **둘째만** 충족시킨다 — 첫째는 **B(0E) 리뷰가
+  남았다.** 0A 미리뷰 창은 B의 range에 들지 않으며 **별도 리뷰 A가 `approve`로 이미 닫았다**
+  (위 「단서」).
 
 ## 금지 사항
 
