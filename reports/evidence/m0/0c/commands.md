@@ -5,7 +5,7 @@
 있다 — 이 파일은 그 둘을 담지 않는다. **명령이 내는 셈을 산문에 옮겨 적지 않는다.**
 
 **각 블록은 자기 실행 시점의 SHA를 선언한다.** 커밋은 자기 SHA를 담을 수 없으므로
-**C-1 ~ C-9의 블록은 `ca8a13b`**(**이 evidence가 좌표로 고정한 커밋**이며 `scope.md` yaml의
+**C-1 ~ C-9의 블록은 `9c55ede`**(**이 evidence가 좌표로 고정한 커밋**이며 `scope.md` yaml의
 `head_sha`와 같은 값이다)의 트리를 선언한다 — 그 SHA를 체크아웃한 worktree에서 재현된다.
 **이 자리는 순서를 말하지 않는다** — 「브랜치의 head」도 「마지막 커밋」도 아니다. 그렇게
 적으면 **그 뒤에 커밋이 하나 붙는 순간 낡는다**(실제로 그랬다). 규약의 문면은 `scope.md`의
@@ -29,7 +29,7 @@
 
 ## C-1 · 운영자 결정 사본과 원본의 차이
 
-선언 SHA `ca8a13b`. 원본은 `_workspace/`(gitignore 대상)라 이 블록은 그 디렉터리가
+선언 SHA `9c55ede`. 원본은 `_workspace/`(gitignore 대상)라 이 블록은 그 디렉터리가
 있는 작업 트리에서만 재현된다.
 
 **사본은 원본의 축어 복제가 아니다** — Codex 리뷰 finding **E**가 U-3의 소유 `OPEN`
@@ -74,7 +74,12 @@ echo "exit=${PIPESTATUS[0]}"
 > > 설명한다.** 원 표기는 지우지 않고 취소선으로 남긴다 — **이 파일은 결정 기록이다.**
 > > **`OPEN-SET-05`는 활성으로 유지된다.**
 ><후행공백>
-157a165,177
+152c159,160
+< **`OPEN-QUAL-11`은 해소**된다. **`OPEN-QUAL-09`(시공능력 미달 처리)는 별개로 유지**한다 —
+---
+> **`OPEN-QUAL-11`은 해소**된다.(⚠ 아래 정정 — **해소되지 않는다.** U-8은 그 질문에 답하지
+> 않는다.) **`OPEN-QUAL-09`(시공능력 미달 처리)는 별개로 유지**한다 —
+157a166,191
 > > **⚠ 정정 (2026-08-30, Codex 리뷰 라운드 3 high #1 · 운영자 정정)** — 위 표의 U-8 행과 이 절이
 > > 소유 `OPEN`을 `OPEN-QUAL-11`로 적고 *"해소된다"*로 닫았으나 **그 귀속이 틀렸다.**
 > > `capability-map.md` §12에서 그 id가 묻는 것은 **`permsnIndstrytyList`(허용업종)의 결합
@@ -83,24 +88,37 @@ echo "exit=${PIPESTATUS[0]}"
 > > `lmtGrpNo` 그룹 간 OR / 그룹 내 AND이며 (a)/(b) 어느 쪽도 고르지 않는다 — 다른
 > > 질문이다.**
 > > **U-8의 결정 내용은 바뀌지 않는다** — 바뀌는 것은 그것이 어느 `OPEN`을 닫는가뿐이고,
-> > **U-8이 닫는 `OPEN`은 없다**(그 결합 축을 소유한 `OPEN`이 따로 없었다).
+> > **U-8이 닫는 활성 `OPEN`은 없다**~~(그 결합 축을 소유한 `OPEN`이 따로 없었다)~~
+> > (⚠ 아래 재정정 — 그 괄호가 거짓이다).
 > > **`OPEN-QUAL-11`은 활성으로 되돌린다.** **운영자 판정(2026-08-30)**: 조달청 문서에
 > > 근거가 없어 지금 답하지 않고 **M1 자격 slice(1C)가 실제 공고로 관측해 닫는다.**
 > > 원 표기는 지우지 않고 취소선으로 남긴다 — **이 파일은 결정 기록이다.**
+> >
+> > **⚠ 재정정 (2026-08-30, 같은 날 · 운영자 정정)** — 위 괄호의 부재 주장
+> > *"그 결합 축을 소유한 `OPEN`이 따로 없었다"*가 **거짓이다.**
+> > **`OPEN-QUAL-01`이 그 축을 소유했고 운영자 결정 2026-08-26으로 이미 해소됐다** —
+> > `capability-map.md` §12.2의 그 행이 결정을 U-8과 **같은 문장**(**(a)** 그룹 간 OR /
+> > 그룹 내 AND)으로 적고 근거로 **조달청 OpenAPI 참고자료**를 들며, §12.1이 그것을
+> > 해소로 등재한다. **결론은 그대로 선다 — 소유자가 없어서가 아니라 소유자가 이미
+> > 닫혀 있어서다.** **U-8은 `OPEN-QUAL-01`의 확정을 2026-08-28에 재확인한 것**으로 읽는
+> > 것이 실물에 맞고, 사전 §3.2.2가 그것을 사전의 언어로 적는다.
+> > **같은 형태의 세 번째다** — ① U-3 → `OPEN-SET-05`(실제 `OPEN-SET-04`) ② U-8 →
+> > `OPEN-QUAL-11` · U-2/U-2b → `OPEN-QUAL-10` 전체 ③ **이번 — 「소유자가 없다」를 확인
+> > 없이 단정.** **부재 주장도 그 자리를 열어 재고 나서 적는다.**
 ><후행공백>
-215c235
+215c249
 < | **U-2b** | **시공능력평가금액은 직전 연도 공시값** | `OPEN-QUAL-10` → **해소** |
 ---
 > | **U-2b** | **시공능력평가금액은 직전 연도 공시값** | ~~`OPEN-QUAL-10` → **해소**~~ → **운영자 보유액 축만 해소** ⚠ 아래 정정 |
-217c237
+217c251
 < | **U-9** | **"66% 오염" 인용 금지 유지. V2가 재정의·재측정** | `OPEN-NUM-01` → 인용 금지로 닫음 |
 ---
 > | **U-9** | **"66% 오염" 인용 금지 유지. V2가 재정의·재측정** | ~~`OPEN-NUM-01` → 인용 금지로 닫음~~ → **`OPEN-NUM-01` 유지** ⚠ 아래 정정 |
-223c243
+223c257
 < **`OPEN-QUAL-10`이 닫힌다.**
 ---
 > **`OPEN-QUAL-10`이 닫힌다.**(⚠ 아래 정정 — **운영자 보유액 축만** 닫힌다.)
-231a252,262
+231a266,276
 > > **⚠ 정정 (2026-08-30, Codex 리뷰 라운드 3 high #2 · 운영자 정정)** — 위 표의 U-2b 행과 이 절이
 > > **`OPEN-QUAL-10`이 닫힌다**고 적었으나 **절반만 닫힌다.**
 > > `capability-map.md` §12의 그 행은 **공고 게시 요건(`cnstrtnAbltyEvlAmtList`)과 운영자
@@ -112,7 +130,7 @@ echo "exit=${PIPESTATUS[0]}"
 > > **U-2·U-2b의 결정 내용은 바뀌지 않는다.** 원 표기는 지우지 않고 취소선으로 남긴다 —
 > > **이 파일은 결정 기록이다.**
 ><후행공백>
-256a288,302
+256a302,316
 > > **⚠ 정정 (2026-08-30, Codex 리뷰 라운드 3 medium)** — 위 표의 U-9 행이 소유 `OPEN`을
 > > *"`OPEN-NUM-01` → **인용 금지로 닫음**"*이라 적었고, **같은 파일의 「유지되는 OPEN」
 > > 절은 그것을 유지되는 `OPEN`으로 분류한다. 한 파일 안에서 서로 모순이었다.**
@@ -128,20 +146,20 @@ echo "exit=${PIPESTATUS[0]}"
 > > 맞고 이 행이 틀렸다. `OPEN-REG-04`(ledger §9)도 같다.
 > > 원 표기는 지우지 않고 취소선으로 남긴다 — **이 파일은 결정 기록이다.**
 ><후행공백>
-266c312
+266c326
 < | U-2b | **직전 연도 공시값** → **`OPEN-QUAL-10` 해소** |
 ---
 > | U-2b | **직전 연도 공시값** → ~~**`OPEN-QUAL-10` 해소**~~ **운영자 보유액 축만 해소** ⚠ U-2b 절의 정정 |
-273c319
+273c333
 < | U-8 | `lmtGrpNo` = **요건 묶음** → **`OPEN-QUAL-11` 해소** |
 ---
 > | U-8 | `lmtGrpNo` = **요건 묶음** → ~~**`OPEN-QUAL-11` 해소**~~ **닫는 `OPEN` 없음** ⚠ U-8 절의 정정 |
-277c323,324
+277c337,338
 < **해소되는 OPEN**: `OPEN-REG-05` · `OPEN-QUAL-10` · `OPEN-QUAL-06` · `OPEN-QUAL-11`
 ---
 > **해소되는 OPEN**: `OPEN-REG-05` · `OPEN-QUAL-10`(**운영자 보유액 축만** — ⚠ U-2b 절의
 > 정정) · `OPEN-QUAL-06` · ~~`OPEN-QUAL-11`~~
-280a328,329
+280a342,343
 > **`OPEN-QUAL-10`의 게시 요건 축**(⚠ U-2b 절의 정정) ·
 > **`OPEN-QUAL-11`**(허용업종 결합 규칙 — ⚠ U-8 절의 정정) ·
 exit=1
@@ -157,16 +175,16 @@ exit=1
 
 ### C-2.1 이 slice의 커밋과 그 커밋이 건드린 경로
 
-선언 SHA `ca8a13b`.
+선언 SHA `9c55ede`.
 
 ```
-for c in $(git log --format='%H' 2b05684..ca8a13b \
+for c in $(git log --format='%H' 2b05684..9c55ede \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   echo "-- $(git log --format='%h %s' -1 $c)"
   git show --name-only --format='' $c | sed '/^$/d' | sed 's/^/   /'
 done
 echo "### in_scope 밖 경로 (아래 줄이 '(없음)'이면 통과)"
-for c in $(git log --format='%H' 2b05684..ca8a13b \
+for c in $(git log --format='%H' 2b05684..9c55ede \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   git show --name-only --format='' $c
 done | sed '/^$/d' | sort -u \
@@ -175,6 +193,25 @@ done | sed '/^$/d' | sort -u \
 ```
 
 ```
+-- 9c55ede fix(m0-0c): 보유액 축의 unit 을 정한 결정이 없다 — 근거를 대고 귀속을 쪼갠다 (F-4)
+   docs/discovery/data-dictionary.md
+   reports/evidence/m0/0c/checklist.md
+   reports/evidence/m0/0c/scope.md
+-- 0faf79b fix(m0-0c): 율 타입 넷의 층을 실물에 맞춰 재배정한다 — BidRate 는 legacy-behavior (F-3)
+   docs/discovery/data-dictionary.md
+-- 9811fb7 fix(m0-0c): 시공능력 요건 금액의 서명을 Money 에서 UnnormalizedFigure 로 바꾼다 (F-2)
+   docs/discovery/data-dictionary.md
+   reports/evidence/m0/0c/checklist.md
+-- 2f7cb05 fix(m0-0c): 결정 사본 U-8 산문에 인라인 정정 표시를 단다 (F-5)
+   reports/evidence/m0/0c/decisions-2026-08-28.md
+-- 0c1b7ab fix(m0-0c): U-8 의 축을 소유한 OPEN 은 OPEN-QUAL-01 이고 이미 닫혀 있었다 (F-1)
+   docs/discovery/data-dictionary.md
+   reports/evidence/m0/0c/checklist.md
+   reports/evidence/m0/0c/decisions-2026-08-28.md
+   reports/evidence/m0/0c/scope.md
+-- 8c34179 docs(m0-0c): 출력 블록 전부를 선언 SHA ca8a13b 트리에서 다시 뜨고 head_sha 를 함께 옮긴다
+   reports/evidence/m0/0c/commands.md
+   reports/evidence/m0/0c/scope.md
 -- ca8a13b fix(m0-0c): C-6.3 각주가 세 OPEN 을 한 갈래로 묶은 것을 가른다 (전수 훑기 잔여)
    reports/evidence/m0/0c/commands.md
 -- 0124dd4 fix(m0-0c): head_sha 뒤 후속 커밋 성격의 열거를 닫지 않는다 (codex 3차 low)
@@ -484,17 +521,17 @@ done | sed '/^$/d' | sort -u \
 
 **이 판정은 뒤 커밋에 낡지 않는다** — 뒤 커밋(`commands.md`·`checklist.md`·`scope.md`
 갱신)의 경로가 전부 `reports/evidence/m0/0c/` 안이기 때문이다. 리뷰 시점의 HEAD로
-다시 돌리려면 위 두 자리의 `ca8a13b`를 HEAD로 바꾼다.
+다시 돌리려면 위 두 자리의 `9c55ede`를 HEAD로 바꾼다.
 
 ### C-2.2 공백 오류
 
-선언 SHA `ca8a13b`.
+선언 SHA `9c55ede`.
 
 ```
 # 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
-git diff --check 2b05684..ca8a13b | sed 's/[[:space:]]\{1,\}$/<후행공백>/'
-echo "base_sha 기준 지적: $(git diff --check 2b05684..ca8a13b | wc -l | tr -d ' ')"
-echo "review_base 기준 지적: $(git diff --check aff62ab..ca8a13b | wc -l | tr -d ' ')"
+git diff --check 2b05684..9c55ede | sed 's/[[:space:]]\{1,\}$/<후행공백>/'
+echo "base_sha 기준 지적: $(git diff --check 2b05684..9c55ede | wc -l | tr -d ' ')"
+echo "review_base 기준 지적: $(git diff --check aff62ab..9c55ede | wc -l | tr -d ' ')"
 ```
 
 ```
@@ -514,7 +551,7 @@ review_base 기준 지적: 0
 
 ## C-3 · 6축 커버 (A1)
 
-선언 SHA `ca8a13b`. 스크립트 본문은 인라인이다.
+선언 SHA `9c55ede`. 스크립트 본문은 인라인이다.
 
 ```
 python3 - <<'PY'
@@ -556,7 +593,7 @@ exit=0
 사전 **§12 전 구간**(`## 12.`부터 `## 13.` 앞까지)의 **표 첫 칸**을 정본으로 삼고,
 §12 밖 본문에서 그 목록에 없는 숫자 토큰을 찾는다 — **§12.1의 값 칸이 그 대부분이고
 §12.2의 첫 칸도 들어온다.** **셈·좌표·식별자는 마스크로 뺀다** — 무엇을 뺐는지는
-`MASKS`가 한 줄씩 밝힌다. 선언 SHA `ca8a13b`.
+`MASKS`가 한 줄씩 밝힌다. 선언 SHA `9c55ede`.
 
 ```
 python3 - docs/discovery/data-dictionary.md <<'PY'
@@ -876,14 +913,14 @@ echo "exit=$?"
 
 ```
 문서: docs/discovery/data-dictionary.md
-§12.2 표 칸이 덮는 이름: 70
-① 타입 선언 인자 + ② 필드·성분 표에서 뽑은 이름: 65  미덮개: 0
-③ 본문의 단독 백틱 이름: 71  덮개·①②·목록·해시 밖: 0
+§12.2 표 칸이 덮는 이름: 72
+① 타입 선언 인자 + ② 필드·성분 표에서 뽑은 이름: 67  미덮개: 0
+③ 본문의 단독 백틱 이름: 72  덮개·①②·목록·해시 밖: 0
 --- 이 블록이 자기 범위와 예외를 스스로 낸다 ---
 ① 선언 앵커 \b(_*[A-Z][A-Za-z0-9_]*)  ·  인자 이름 규칙 [a-z][A-Za-z0-9]*
 ② 표 머리 칸 ^\|\s*(필드|성분)\s*\|  ·  표 행 ^\| `([a-z][A-Za-z0-9]*)`(?: \(|\s*\|)
 ③ 단독 이름 규칙 `([a-z][A-Za-z0-9]*)`
-③이 낸 이름을 빼는 갈래 — 덮개 39 · ①② 추출 0 · NOT_A_FIELD 목록 29 · commit 해시 규칙 3 · 남은 것 0
+③이 낸 이름을 빼는 갈래 — 덮개 40 · ①② 추출 0 · NOT_A_FIELD 목록 29 · commit 해시 규칙 3 · 남은 것 0
     규칙으로 빼는 갈래는 commit 해시([0-9a-f]{7,40}\Z) 하나뿐이고 그것이 뺀 이름: ['a05deb3', 'ed4b06c', 'fc291c7']
 목록의 크기와 이번 실행이 실제로 쓴 항목 — NOT_A_DECL 10/10 · NOT_A_FIELD 29/29 · LEGACY_DECLS 2/2  쓰이지 않은 항목: 0
     (없음)
@@ -905,7 +942,7 @@ echo "exit=$?"
     [산 표본] 세는 앵커가 읽는 앵커 밖을 본다 — 밑줄+소문자 선두 :: '_Decl(a) _floorSchedule(effective_from)' (넓 2 · 좁 1)
     [산 표본] ④ 가 ③ 규칙 밖 규칙의 밖을 본다 — 점이 든 이름 :: '`plainName` `Legacy.some_field`' (넓 1 · 좁 1)
 ㉠ 사각지대 앵커 \b[A-Za-z_][A-Za-z0-9_]*\s*(?:<[^<>]*>)?\(
-선언 앵커가 읽은 자리 59 ⊆ 사각지대 앵커가 본 자리 69 — 그 밖으로 샌 자리: 0
+선언 앵커가 읽은 자리 61 ⊆ 사각지대 앵커가 본 자리 71 — 그 밖으로 샌 자리: 0
 통째로 못 읽은 선언 자리: 0 (NOT_A_DECL 로 가른 함수·술어 호출 10)
 legacy 선언 축어 인용의 인자(V2 필드가 아니다): 11자리
     FieldContract(basis) · FieldContract(concept) · FieldContract(expected_max) ·
@@ -954,7 +991,7 @@ exit=0
 
 ## C-5 · `capability-map.md`에서 정책 version을 말하는 자리 전수 (A3 · §4.2)
 
-선언 SHA `ca8a13b`.
+선언 SHA `9c55ede`.
 
 ```
 python3 - <<'PY'
@@ -1015,10 +1052,10 @@ exit=0
 
 ### C-6.1 상류 산출물과 0D 산출물이 이 slice의 커밋에서 변하지 않았다
 
-선언 SHA `ca8a13b`.
+선언 SHA `9c55ede`.
 
 ```
-for c in $(git log --format='%H' 2b05684..ca8a13b \
+for c in $(git log --format='%H' 2b05684..9c55ede \
              -- docs/discovery/data-dictionary.md reports/evidence/m0/0c/); do
   git show --name-only --format='' $c
 done | sed '/^$/d' | sort -u \
@@ -1032,7 +1069,7 @@ done | sed '/^$/d' | sort -u \
 
 ### C-6.2 신설 `OPEN-DIC` id와 중복
 
-선언 SHA `ca8a13b`.
+선언 SHA `9c55ede`.
 
 ```
 grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary.md \
@@ -1054,7 +1091,7 @@ OPEN-DIC-01 OPEN-DIC-02 OPEN-DIC-03 OPEN-DIC-04 OPEN-DIC-05 OPEN-DIC-06 OPEN-DIC
 
 `capability-map.md` §12의 **표 첫 칸**과 `regression-ledger.md` §9의 첫 칸을 정본으로
 삼는다. **한 id가 활성과 결정 완료 양쪽에 나오면 활성이 이긴다** — §12.2가 "라운드 7에
-활성으로 복원", "임계 자체는 미결"이라 적는 행들이 그렇다. 선언 SHA `ca8a13b`.
+활성으로 복원", "임계 자체는 미결"이라 적는 행들이 그렇다. 선언 SHA `9c55ede`.
 
 ```
 python3 - <<'PY'
@@ -1116,6 +1153,7 @@ echo "exit=$?"
   OPEN-NUM-01   활성 — 사전은 소유자만 밝힌다
   OPEN-OPS-05   결정 완료 — 사전이 등재한다
   OPEN-OPS-10   활성 — 사전은 소유자만 밝힌다
+  OPEN-QUAL-01  결정 완료 — 사전이 등재한다
   OPEN-QUAL-02  결정 완료 — 사전이 등재한다
   OPEN-QUAL-05  활성 — 사전은 소유자만 밝힌다
   OPEN-QUAL-06  결정 완료 — 사전이 등재한다
@@ -1130,10 +1168,11 @@ echo "exit=$?"
   OPEN-SET-05   활성 — 사전은 소유자만 밝힌다
   OPEN-SET-06   활성 — 사전은 소유자만 밝힌다
   OPEN-SET-10   활성 — 사전은 소유자만 밝힌다
+  OPEN-STR-01   결정 완료 — 사전이 등재한다
   OPEN-STR-03   결정 완료 — 사전이 등재한다
   OPEN-STR-07   결정 완료 — 사전이 등재한다
 
-신설: 7 · 활성: 15 · 결정 완료: 17 · 미분류: 0
+신설: 7 · 활성: 15 · 결정 완료: 19 · 미분류: 0
 exit=0
 ```
 
@@ -1151,7 +1190,7 @@ exit=0
 
 ## C-7 · legacy 인용 (A6)
 
-`bid-vector` symlink가 있어야 재현된다. 선언 SHA `ca8a13b`.
+`bid-vector` symlink가 있어야 재현된다. 선언 SHA `9c55ede`.
 
 ### C-7.1 경로 존재 · 행 범위 유효 · 파일명만 쓴 인용
 
@@ -1194,9 +1233,9 @@ echo "exit=$?"
 
 ```
 문서: docs/discovery/data-dictionary.md
-legacy 인용(고유 (경로,범위)): 84
-고유 경로: 36
-경로 존재 + 행 범위 유효: 84
+legacy 인용(고유 (경로,범위)): 85
+고유 경로: 37
+경로 존재 + 행 범위 유효: 85
 경로 부재: 0
 행 범위 초과/역전: 0
 파일명만 쓴 인용(디렉터리 없음): 0
@@ -1341,7 +1380,7 @@ KNOWN_FIELDS 고유 키: 60
 
 ## C-8 · secret 스캔
 
-선언 SHA `ca8a13b`.
+선언 SHA `9c55ede`.
 
 **이 검사는 자기 기록을 스캔 대상에 담고 있다** — `commands.md`가 앞 라운드의 기록된 출력을
 싣고, 그 출력이 매치한 줄을 통째로 나르므로 **자기 인용이 라운드마다 한 겹씩 쌓였다**
@@ -1477,28 +1516,28 @@ reports/evidence/m0/0c/commands.md — 매치 13줄
 reports/evidence/m0/0c/decisions-2026-08-28.md — 매치 0줄
 reports/evidence/m0/0c/scope.md — 매치 6줄
 docs/discovery/data-dictionary.md — 매치 0줄
-    reports/evidence/m0/0c/checklist.md:196: | <가림 6자> 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
+    reports/evidence/m0/0c/checklist.md:208: | <가림 6자> 스캔 | `commands.md` **C-8** — 매치와 그 판정이 그 절에 있다 |
     reports/evidence/m0/0c/codex-review-20260829T061613Z.json:64:     "rg -n --glob '!commands.md' '(api[_-]?key|<가림 6자>|<가림 5자>|<가림 8자>|<가림 7자>|BEGIN (RSA|EC|OPENSSH)|[0-9]{3}
     reports/evidence/m0/0c/codex-review-20260829T231517Z.json:66:     "C-8은 현재 패키지에서 PASS했지만 문서가 밝힌 대로 접미사가 붙은 `<가림 6자>_key`·`client_<가림 6자>_id`·`<가림 5자>s` 형태의 값 가림은 보장하지 않는다.
-    reports/evidence/m0/0c/commands.md:1227: ## C-8 · <가림 6자> 스캔
-    reports/evidence/m0/0c/commands.md:1261: PATS = [("비밀 어휘", re.compile(r"(?i)(api[_-]?key|<가림 6자>|<가림 5자>|<가림 8자>|<가림 7자>|begin (rsa|ec|openssh))")),
-    reports/evidence/m0/0c/commands.md:1262:         ("식별자",   re.compile(r"([0-9]{3}-[0-9]{2}-[0-9]{5}|<가림 7자>|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)"))]
-    reports/evidence/m0/0c/commands.md:1273: PROBES = [("어휘 + 따옴표 값",  '<가림 7자> = <가림 19자>'),
-    reports/evidence/m0/0c/commands.md:1274:           ("어휘 뒤 바로 값",   'Authorization: <가림 7자><가림 15자>'),
-    reports/evidence/m0/0c/commands.md:1275:           ("쉼표 든 값",       'db_<가림 8자>=<가림 16자>'),
-    reports/evidence/m0/0c/commands.md:1276:           ("어휘 + 콜론 값",    'slack_<가림 5자>: <가림 16자>'),
-    reports/evidence/m0/0c/commands.md:1277:           ("따옴표 든 낱말",    '"<가림 7자>": <가림 17자>'),
-    reports/evidence/m0/0c/commands.md:1278:           ("값 형태 — 번호",    '<가림 12자>'),
-    reports/evidence/m0/0c/commands.md:1279:           ("값 형태 — 개인키",  '-----<가림 9자> PRIVATE KEY-----')]
-    reports/evidence/m0/0c/commands.md:1401: > **공백으로 끝나는 어휘**(`PATS`에서는 `<가림 7자>` 하나뿐이다)일 때만 재고, 값이 **영숫자로
-    reports/evidence/m0/0c/commands.md:1403: > 한 조각이어서 낱말 뒤에 구분자가 바로 오지 않는 줄**(`<가림 6자>_key = …` ·
-    reports/evidence/m0/0c/commands.md:1404: > `client_<가림 6자>_id=…` · `<가림 5자>s = […]`)이나 값이 낱말보다 앞에 오는 줄 — 까지 덮는다고
+    reports/evidence/m0/0c/commands.md:1342: ## C-8 · <가림 6자> 스캔
+    reports/evidence/m0/0c/commands.md:1376: PATS = [("비밀 어휘", re.compile(r"(?i)(api[_-]?key|<가림 6자>|<가림 5자>|<가림 8자>|<가림 7자>|begin (rsa|ec|openssh))")),
+    reports/evidence/m0/0c/commands.md:1377:         ("식별자",   re.compile(r"([0-9]{3}-[0-9]{2}-[0-9]{5}|<가림 7자>|telegram[_-]?id|@[A-Za-z0-9_]{5,}bot)"))]
+    reports/evidence/m0/0c/commands.md:1388: PROBES = [("어휘 + 따옴표 값",  '<가림 7자> = <가림 19자>'),
+    reports/evidence/m0/0c/commands.md:1389:           ("어휘 뒤 바로 값",   'Authorization: <가림 7자><가림 15자>'),
+    reports/evidence/m0/0c/commands.md:1390:           ("쉼표 든 값",       'db_<가림 8자>=<가림 16자>'),
+    reports/evidence/m0/0c/commands.md:1391:           ("어휘 + 콜론 값",    'slack_<가림 5자>: <가림 16자>'),
+    reports/evidence/m0/0c/commands.md:1392:           ("따옴표 든 낱말",    '"<가림 7자>": <가림 17자>'),
+    reports/evidence/m0/0c/commands.md:1393:           ("값 형태 — 번호",    '<가림 12자>'),
+    reports/evidence/m0/0c/commands.md:1394:           ("값 형태 — 개인키",  '-----<가림 9자> PRIVATE KEY-----')]
+    reports/evidence/m0/0c/commands.md:1519: > **공백으로 끝나는 어휘**(`PATS`에서는 `<가림 7자>` 하나뿐이다)일 때만 재고, 값이 **영숫자로
+    reports/evidence/m0/0c/commands.md:1521: > 한 조각이어서 낱말 뒤에 구분자가 바로 오지 않는 줄**(`<가림 6자>_key = …` ·
+    reports/evidence/m0/0c/commands.md:1522: > `client_<가림 6자>_id=…` · `<가림 5자>s = […]`)이나 값이 낱말보다 앞에 오는 줄 — 까지 덮는다고
     reports/evidence/m0/0c/scope.md:147: | **A8** | 불변: 인용 형식 위반 0 · 중복 id 0 · <가림 6자> 스캔 통과 · `git diff --check` 0 | agent-workflow §6, evidence-pack
-    reports/evidence/m0/0c/scope.md:612: 재취득 고정점, `C-10` 두 환경, 불변·경계·이력, 진짜 <가림 6자> 0. 막은 것은 **그 라운드가
-    reports/evidence/m0/0c/scope.md:619: | `6925f53` | **`W-2`(low)** — **「덮는다」고 적은 꼴 안에서도 값이 남았다.** `NEXT`가 요구하는 **영숫자 시작·여덟 자 이상**도, `SEP`가 요구하는 **따옴
-    reports/evidence/m0/0c/scope.md:620: | `c941828` | 한계의 **유일한 예시**(*"값이 낱말보다 앞에 오는 줄"*)가 **실무에서 가장 흔한 계열을 대표하지 못했다** — 어휘가 더 긴 식별자의 한 조각이라 낱말 뒤에 구분자
-    reports/evidence/m0/0c/scope.md:701: `in_scope` 밖 0 · 진짜 <가림 6자> 0 — **전부 재현으로 섰다.** 막은 것은 **직전 라운드가 새로 쓴
-    reports/evidence/m0/0c/scope.md:736: 번씩** · 「분모 둘이 섞였다」 진단 · 불변 · 경계 · `in_scope` 밖 0 · 진짜 <가림 6자> 0 · 이력 표
+    reports/evidence/m0/0c/scope.md:621: 재취득 고정점, `C-10` 두 환경, 불변·경계·이력, 진짜 <가림 6자> 0. 막은 것은 **그 라운드가
+    reports/evidence/m0/0c/scope.md:628: | `6925f53` | **`W-2`(low)** — **「덮는다」고 적은 꼴 안에서도 값이 남았다.** `NEXT`가 요구하는 **영숫자 시작·여덟 자 이상**도, `SEP`가 요구하는 **따옴
+    reports/evidence/m0/0c/scope.md:629: | `c941828` | 한계의 **유일한 예시**(*"값이 낱말보다 앞에 오는 줄"*)가 **실무에서 가장 흔한 계열을 대표하지 못했다** — 어휘가 더 긴 식별자의 한 조각이라 낱말 뒤에 구분자
+    reports/evidence/m0/0c/scope.md:710: `in_scope` 밖 0 · 진짜 <가림 6자> 0 — **전부 재현으로 섰다.** 막은 것은 **직전 라운드가 새로 쓴
+    reports/evidence/m0/0c/scope.md:745: 번씩** · 「분모 둘이 섞였다」 진단 · 불변 · 경계 · `in_scope` 밖 0 · 진짜 <가림 6자> 0 · 이력 표
 값 형태 갈래((?i)([0-9]{3}-[0-9]{2}-[0-9]{5}|begin (rsa|ec|openssh)))에서 난 매치: 2 — 심어 둔 표본의 정의 줄 2 · 그 밖 0
 심은 표본의 값 조각이 위 줄들에 가려지지 않고 남은 것: 0 (0 이라야 값이 이 파일에 실리지 않는다)
 이 블록의 출력 중 자기 패턴에 걸리는 줄: 0 (0 이라야 자기 인용이 쌓이지 않는다)
@@ -1551,7 +1590,7 @@ exit=0
 
 ## C-10 · 출력 블록의 **축어 재현** — 두 환경에서 잰다
 
-**대상 파일** — **이 파일 자신**(읽는 체크아웃의 내용). **실행 트리** — `ca8a13b`
+**대상 파일** — **이 파일 자신**(읽는 체크아웃의 내용). **실행 트리** — `9c55ede`
 (C-1 ~ C-9가 선언한 SHA).
 
 **그래서 이 검사는 「리뷰 대상 `commands.md`가 있는 체크아웃」에서 돌려야 한다.**
@@ -1592,13 +1631,13 @@ SHA를 나르는지는 산문이 세지 않는다 — 아래 두 출력이 그�
 
 ```
 # SELF-EXCLUDE-C10 — 이 표지가 있는 블록은 검사에서 뺀다(자기 자신).
-# 대상 파일 = 이 파일 자신(읽는 체크아웃의 내용) · 실행 트리 = ca8a13b (블록들이 선언한 SHA)
+# 대상 파일 = 이 파일 자신(읽는 체크아웃의 내용) · 실행 트리 = 9c55ede (블록들이 선언한 SHA)
 # bid-vector · _workspace 는 git 이 추적하지 않아 SHA 에서 복원할 수 없다.
 # 실행 CWD 에 있으면 연결하고, 없으면 그 사실을 출력에 낸다.
 WT="$(mktemp -d)/wt"
 # 실패해도 worktree 를 남기지 않는다 — 검사가 영속 git metadata 를 남기면 안 된다.
 trap 'git worktree remove --force "$WT" >/dev/null 2>&1' EXIT
-git worktree add --detach "$WT" ca8a13b >/dev/null 2>&1
+git worktree add --detach "$WT" 9c55ede >/dev/null 2>&1
 [ -d bid-vector ] && ln -sfn "$(cd bid-vector && pwd -P)" "$WT/bid-vector"
 [ -d _workspace ] && ln -sfn "$(cd _workspace && pwd -P)" "$WT/_workspace"
 cp reports/evidence/m0/0c/commands.md "$WT/.blocks.md"
@@ -1649,13 +1688,13 @@ echo "exit=$?"
 ```
 환경 전제 — bid-vector: 있음 · _workspace: 있음
   축어 일치            # 경계를 **행 번호가 아니라 날짜 머리로** 잡는다 — 어느 쪽 파일이 자라도 낡지 않는다.
-  축어 일치            for c in $(git log --format='%H' 2b05684..ca8a13b \
+  축어 일치            for c in $(git log --format='%H' 2b05684..9c55ede \
   축어 일치            # 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
   축어 일치            python3 - <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
   축어 일치            python3 - <<'PY'
-  축어 일치            for c in $(git log --format='%H' 2b05684..ca8a13b \
+  축어 일치            for c in $(git log --format='%H' 2b05684..9c55ede \
   축어 일치            grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary
   축어 일치            python3 - <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
@@ -1685,7 +1724,7 @@ CT="$(mktemp -d)/cleanwt"
 # 실패해도 worktree 를 남기지 않는다 — 검사가 영속 git metadata 를 남기면 안 된다.
 # 지우기 전에 CWD 를 돌려놓는다 — 안에 선 채로 지우면 이후 git 이 CWD 를 못 읽는다.
 trap 'cd "$ROOT"; git worktree remove --force "$CT" >/dev/null 2>&1' EXIT
-git worktree add --detach "$CT" ca8a13b >/dev/null 2>&1
+git worktree add --detach "$CT" 9c55ede >/dev/null 2>&1
 cp reports/evidence/m0/0c/commands.md "$CT/reports/evidence/m0/0c/commands.md"
 python3 - "$CT" <<'PY'
 import pathlib, sys
@@ -1703,13 +1742,13 @@ cd "$CT" && bash .c10.sh
 ```
 환경 전제 — bid-vector: 없음 · _workspace: 없음
   환경 부족(_workspace)  # 경계를 **행 번호가 아니라 날짜 머리로** 잡는다 — 어느 쪽 파일이 자라도 낡지 않는다.
-  축어 일치            for c in $(git log --format='%H' 2b05684..ca8a13b \
+  축어 일치            for c in $(git log --format='%H' 2b05684..9c55ede \
   축어 일치            # 지적 줄을 그대로 실으면 이 파일이 다시 후행 공백을 갖는다 — 표지로 바꿔 싣는다.
   축어 일치            python3 - <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
   축어 일치            python3 - docs/discovery/data-dictionary.md <<'PY'
   축어 일치            python3 - <<'PY'
-  축어 일치            for c in $(git log --format='%H' 2b05684..ca8a13b \
+  축어 일치            for c in $(git log --format='%H' 2b05684..9c55ede \
   축어 일치            grep -c '^| \*\*`OPEN-DIC-' docs/discovery/data-dictionary
   축어 일치            python3 - <<'PY'
   환경 부족(bid-vector)  python3 - docs/discovery/data-dictionary.md <<'PY'
