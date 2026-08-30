@@ -133,7 +133,7 @@ legacy는 **한 basis 태그가 두 개념을 덮고**(추정가격 ↔ 배정�
 | **배정예산** (`asignBdgtAmt`·`bdgtAmt`) | `AllocatedBudget` | 원 / 배정예산 | `Unknown` — 정해진 바 없다 | 개념 분리는 legacy 선언(`app/services/koneps/field_contract_spec.py:137-161`), 과세는 미정 |
 | **예정가** (`planned_price`) | `YegaAmount` | 원 / 예정가 | `Unknown` — 정해진 바 없다 | 개념은 `legacy-behavior` |
 | **낙찰가** | `AwardAmount` | 원 / 낙찰가 | `Unknown` | 개념은 `legacy-behavior` |
-| **투찰가** | `BidAmount` | 원 / 투찰가. **기초금액에 투찰율을 곱해 얻는다** | 곱셈 base를 따른다 → `Inclusive` | 관계는 `authoritative`(U-1b가 base를 확정) |
+| **투찰가** | `BidAmount` | 원 / 투찰가. **기초금액에 투찰율을 곱해 얻는다** | 곱셈 base를 따른다 → `Inclusive` | **곱셈 base가 기초금액이라는 관계**는 `legacy-behavior`(§1.4.2 · `app/services/bid_base.py:50-58`). **U-1b가 정한 것은 그 base의 과세 처리**이므로 `Inclusive` 전이만 `authoritative`다 |
 | **시공능력평가금액 — 운영자 보유액** | `ConstructionCapacityAmount` | 원 / 시공능력평가액 | **`Inclusive`** | `authoritative` — 운영자 결정 (**U-2**). **공고가 게시하는 요건 값은 이 행이 아니다** — §5.5의 별도 타입이고 단위·과세가 미결이다 |
 | **도급한도** | `AwardedContractLimit` | 원 / 도급한도 | `Unknown` | 적합도 축(`OPEN-QUAL-08` 분할 확정) |
 
@@ -296,10 +296,23 @@ legacy는 `0.0`을 부재 표현으로 쓴다 — `HistoricalData.base_amount`·
 
 | 타입 | 분자 / 분모 | 단위 | 값의 provenance · 층 | 부재 표현 |
 | --- | --- | --- | --- | --- |
-| `AssessmentRate` (사정률) | 예정가 / 기초금액 | fraction | **파생값**(§5.2 derived fact) — 두 금액의 몫이다. **분자·분모 두 `Money`의 `provenance`가 결과의 성질을 정하므로 값과 함께 남는다.** 축 정의의 층은 `legacy-behavior`(§1.4.3 **B1**·**B2**) | `Absent(reason)` / `Unmeasurable(reason)` |
-| `AwardRate` (낙찰률) | 낙찰가 / 기초금액 | fraction | **파생값** — 같은 형태이고 분자가 개찰 결과에서 온다. 축 정의의 층은 `legacy-behavior`(§1.4.3 **B4**) | 같음 |
+| `AssessmentRate` (사정률) | 예정가 / 기초금액 | fraction | **파생값**(§5.2 derived fact) — 두 금액의 몫이다. **분자·분모 두 `Money`의 `provenance`가 결과의 성질을 정하므로 값과 함께 남는다.** 축 정의의 층은 `legacy-behavior` — §1.4.3 **B1**·**B2**의 축 칸이 **「예정가/기초금액」**으로 분자·분모를 그대로 적는다 | `Absent(reason)` / `Unmeasurable(reason)` |
+| `AwardRate` (낙찰률) | 낙찰가 / 기초금액 | fraction | **파생값** — 같은 형태이고 분자가 개찰 결과에서 온다. 축 정의의 층은 `legacy-behavior` — 다만 **§1.4.3 B4의 축 칸(「낙찰가/금액」)은 분모를 못 박지 않는다.** 분모가 기초금액이라는 것은 legacy가 따로 적는다(`app/services/paper_bidding_backtest/settlement.py:49-58`의 *"winning_rate 는 winning_amount / base_amount (기초금액 …)"*) | 같음 |
 | `FloorRate` (낙찰하한율) | **예정가격 기준** 율 | fraction | **출처가 둘이고 섞지 않는다** — ① **공고 게시값**(canonical fact, §5.2)에는 §1.4.3 **B6**의 신뢰 게이트가 걸린다 ② **§4.4 법정 하한율 표**(정책 데이터)는 `effectiveFrom`으로 고른다. **어느 쪽에서 왔는지가 값과 함께 남는다.** 표 값의 층은 `legacy-behavior`이고 V2 값의 확정은 활성 `OPEN-DEC-10`이 소유한다 | 같음. 해석 실패의 사유는 §3.3의 `FloorRateUnresolved` |
-| `BidRate` (투찰율) | 투찰가 / 기초금액 | fraction | **자리가 둘이고 한 값으로 합치지 않는다** — ① 과거 실적에서 잰 **관측 파생값**(표본 축, §6.5) ② 우리가 산출한 **추천 투찰율**(파생). 축 정의의 층은 **`authoritative`** — 곱셈 base가 기초금액이라는 것을 U-1b가 확정했다(§1.2) | 같음. 산출 불가의 사유는 §3.3의 `BidRateUnavailable` |
+| `BidRate` (투찰율) | 투찰가 / 기초금액 | fraction | **자리가 둘이고 한 값으로 합치지 않는다** — ① 과거 실적에서 잰 **관측 파생값**(표본 축, §6.5) ② 우리가 산출한 **추천 투찰율**(파생). 축 정의(분모가 기초금액)의 층은 **`legacy-behavior`** — 그 관계를 적는 자리가 legacy뿐이다(`app/services/bid_base.py:50-58` · `app/ai/predictors/legal_floor_spec.py:20-33`의 *"우리 투찰가는 기초금액(사업금액) 기준"*, commit `4645ce4`) | 같음. 산출 불가의 사유는 §3.3의 `BidRateUnavailable` |
+
+**넷의 축 정의는 모두 `legacy-behavior`다.** `data-extract.md`의 층 정의로 재면
+`authoritative`는 **공식 규정/API 문서 또는 승인된 업무 규칙**을 요구하는데, 네 축의
+분자·분모를 정하는 근거는 이 저장소에서 **legacy 코드뿐**이다.
+
+> **⚠ 정정 (2026-08-30)** — 앞서 이 표는 `BidRate`만 **`authoritative`**로 올리고 그 유일한
+> 근거를 *"곱셈 base가 기초금액이라는 것을 U-1b가 확정했다"*로 적었다. **U-1b의 결정
+> 원문에 그런 확정이 없다** — U-1b가 정한 것은 **기초금액의 과세 처리**(부가세 포함)이고
+> 그것으로 닫힌 것은 `OPEN-REG-05`다(§11). 곱셈 base가 무엇인가는 **다른 축**이며 그
+> 축을 정하는 운영자 결정은 없다. `OPEN-STR-01`의 운영자 답(*"예산 필터에 적은 값은
+> 기초금액이다"*)도 **전략 예산 필터 축**이고 곱셈 base 축이 아니다 —
+> `capability-map.md` §13(하류 인계)이 그 축 구분을 이미 한 번 못 박았다.
+> **결정을 인용하기 전에 그 결정의 원문을 연다** — §3.2.2·§11의 재정정과 같은 뿌리다.
 
 **원문 unit이 보존되는 자리는 값이 아니라 필드 계약이다.** §1.4.1은 *"원문 unit을 수집
 시점에 붙잡는다"*고만 적고 **어느 자리가 그것을 나르는지는 §5.3이 갖는다** —
