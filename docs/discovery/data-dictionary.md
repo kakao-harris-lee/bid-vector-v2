@@ -186,7 +186,8 @@ legacy의 회귀 원인이 **화면의 "예산"이라는 한 단어**였다고 �
   `nullable=False`로 못박아 "미입력"과 "미달"을 구분하지 않는다
   (`app/models/models.py:161-182`).
 - **출처는 `money.provenance`가 나른다** — 운영자 보유액은 **`OperatorDeclared`**(§5.1).
-  공고 요건 값의 출처는 그 다른 타입의 `requiredAmount`에 실리며 **`Published`**다.
+  공고 요건 값의 출처는 **그 다른 타입의 `requiredAmount`가 딛는 §5.3 필드 계약의
+  `provenance`**가 나르며 **`Published`**다 — **그 값은 `Money`가 아니다**(§5.5).
   비교 결과에는 **무엇과 무엇을 비교했는지가 남는다**
   (`capability-map.md` QUAL-11의 무조건 acceptance).
 
@@ -1151,8 +1152,25 @@ basis, scale, zero_padded, present_in, provenance, expected_min, expected_max)`�
 ### 5.5 신설 수집 필드 — 시공능력 요건
 
 `ConstructionCapacityRequirement(limitGroupNo, licenseRegionCode, licenseRegionName,
-requiredAmount: Money)`.
+requiredAmount: UnnormalizedFigure)`.
 
+> **`Money`가 아니다.** `Money`는 `unit`·`scale`을 **필드로 갖지 않고**(§1.1) 그 단위를
+> **원(KRW) 정수**로 못 박는다 — `v2-지침서.md` §4.1이 정한 형태다. 그러므로 **어떤 값을
+> `Money`로 선언하는 것은 그 값의 단위를 원으로 확정하는 것**이고, **서명이 곧 그 주장이다.**
+> 이 필드의 원문 단위는 확정되지 않았다(아래) — **그래서 이 자리를 `Money`로 선언할 수
+> 없다.** 앞서 이 절은 서명을 `requiredAmount: Money`로 둔 채 세 줄 아래에 *"정해지기
+> 전에는 `Money`로 정규화하지 않는다"*를 적어 **한 절 안에서 두 말을 했다**(2026-08-30 정정).
+
+> `UnnormalizedFigure(figure, fieldContract)` — **정규화되지 않은 원문 수치 하나**와
+> **그 값을 낸 §5.3의 필드 계약** 한 벌. 단위·`scale`·`vatTreatment`·`provenance`는 전부
+> **그 계약이 나르고 값 자신은 아무것도 주장하지 않는다.** 부재는 `Absent(reason)`이며
+> `0`이 아니다(§1.3).
+
+- **이 타입을 고른 이유는 비교를 타입으로 막기 위해서다.** 보유액
+  (`ConstructionCapacityAmount`, `Money` 한 벌)과 이 요건 값을 견주려면 **정규화가
+  선행해야 하고 정규화 규칙은 그 축이 닫혀야 나온다.** `Money`로 선언해 두면 그 비교가
+  **컴파일을 통과해 버리고**, §1.4.1이 금지한 「값 크기로 단위를 되짚는 경로」가 그 자리에
+  생긴다. **다른 타입을 두면 그 경로가 애초에 만들어지지 않는다.**
 - **legacy가 이 필드를 수집하지 않는다**(§1.2.4). 조달청 문서의 서술만이 근거이고
   **그 문서가 단위·과세를 명시하지 않는다**(0A2 라운드 5 확인).
 - 따라서 `requiredAmount`의 **`vatTreatment`는 `Unknown`으로 선언한다.** 운영자 보유액의
@@ -1162,10 +1180,9 @@ requiredAmount: Money)`.
   자리의 누락이고, **전이 금지는 두 성질에 똑같이 걸린다.** 그래서 이 문서는 게시값의
   단위를 **원으로 확정하지 않는다** — 그 축은 **활성 `OPEN-QUAL-10`의 게시 요건 절반**이
   소유한다(§11의 ⚠ 정정 · §12.2).
-- **정해지기 전에는 `Money`로 정규화하지 않는다.** §1.4.1이 금지한 것과 같은 형태이기
-  때문이다 — 단위를 모르는 값을 원으로 받으면 **값 크기로 단위를 되짚는 경로**가 생긴다.
-  수집 어댑터는 **원문 단위를 §5.3의 필드 계약(`unit`·`scale`)에 붙잡아** 두고,
-  그 선언이 없으면 판정에 넣지 않는다.
+- **정해지기 전에는 `Money`로 정규화하지 않는다 — 서명이 그것을 강제한다.** 수집
+  어댑터는 **원문 단위를 §5.3의 필드 계약(`unit`·`scale`)에 붙잡아** 두고, 그 선언이
+  없으면 판정에 넣지 않는다. **그 계약을 나르는 자리가 `fieldContract`다.**
 - **답은 관측으로만 나온다** — 조달청 문서에 없으므로 **M1이 게시값을 실제로 수집한
   뒤에** 닫힌다. **수집 신설은 M1 이후로 인계**하고(§13.4), 그때까지 금액 capacity 판정은
   비교 대상 부재로 `Uncertain(RequirementDataAbsent)`다.
@@ -1645,7 +1662,8 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | --- | --- | --- | --- | --- |
 | `amount` (`Money`) | **원(KRW), 정수** | 같은 값의 `basis` 필드가 정하는 금액 축(§1.2) | 수집 어댑터가 `provenance`·`vatTreatment`와 함께 싣는다 | — |
 | `money` (`ConstructionCapacityAmount`) | `Money` 한 벌 — 위와 같다 | 시공능력평가액 **보유액** | 그 `Money`의 `provenance`가 나른다 — 운영자 보유액이므로 `OperatorDeclared`(§1.2.4 · §5.1) | — |
-| `requiredAmount` (`ConstructionCapacityRequirement`) | **미정 — 게시값의 원문 단위가 확인되지 않았다.** 조달청 문서가 이 필드에 단위·과세를 적지 않는다(§5.5). **`Money`로 정규화할 수 있다고 단정하지 않는다** — 무엇을 곱해야 원이 되는지가 그 축의 답에 달렸다 | 시공능력평가액 **요건** | 공고 게시값이므로 그 `Money`의 `provenance`는 `Published`. **legacy가 수집하지 않으며 `vatTreatment`는 `Unknown`**(§5.5) | **`OPEN-QUAL-10`의 게시 요건 축**(§11의 ⚠ 정정). 수집 신설은 §13.4 인계 |
+| `requiredAmount` (`ConstructionCapacityRequirement`) | **미정 — 게시값의 원문 단위가 확인되지 않았다.** 조달청 문서가 이 필드에 단위·과세를 적지 않는다(§5.5). **타입이 `Money`가 아니라 `UnnormalizedFigure`이고 서명이 그 미정을 나른다** — 단위는 같은 값의 `fieldContract`가 선언해야 정해진다 | 시공능력평가액 **요건** | 공고 게시값이므로 그 `fieldContract`의 `provenance`가 `Published`. **legacy가 수집하지 않으며 `vatTreatment`도 그 계약이 나르고 `Unknown`이다**(§5.5) | **`OPEN-QUAL-10`의 게시 요건 축**(§11의 ⚠ 정정). 수집 신설은 §13.4 인계 |
+| `figure` (`UnnormalizedFigure`) | **미정 — 같은 값의 `fieldContract`가 선언하는 `unit`·`scale`이 정한다.** 그 선언이 없으면 판정에 넣지 않는다(§5.5). **값 자신은 단위를 주장하지 않는다** | 그 계약의 `basis`가 정하는 축. 이 타입을 쓰는 자리는 지금 `requiredAmount` 하나다 | 그 계약의 `provenance`가 나른다 | **`OPEN-QUAL-10`의 게시 요건 축** |
 | `fraction` (`Rate` — `AssessmentRate` · `AwardRate` · `FloorRate` · `BidRate`) | fraction | **그 뉴타입이 정하는 율 축**(§1.4.2). 넷을 섞는 것은 타입이 막고, **값 크기로 단위를 추측하는 경로를 두지 않는다**(§1.4.1) | **§1.4.2의 「값의 provenance · 층」 열이 타입마다 정한다.** 이 값 자신은 **원문 unit을 나르지 않는다** — 그것은 §5.3 필드 계약의 `unit`·`scale`에 있다 | — |
 | `frequency` | fraction | `numerator` ÷ `denominator`. **확률이 아니다**(§3.3) | 표본 집합에서 계산한 파생값 | — |
 | `criticalAssessmentRate` | fraction | **사정률 축**(예정가 ÷ 기초금액) | 추천 투찰율 ÷ 낙찰하한율의 파생값 | — |
@@ -1676,7 +1694,7 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | **식별자** — 수처럼 보여도 셈이 아니다. **정수 변환 금지**(§5.3의 공고 차수와 같은 부류) | `limitGroupNo` · `licenseRegionCode` · `noticeRevision` · `deliveryKey`(전송 멱등 단위, §2.2.3) · `observationKey`(재관측 단위, 같은 자리) · `key` · `sourceKey` · `modelArtifactId` · `inputSnapshotHash` · `policyVersion` |
 | **시각·날짜** | `decidedAt` · `measuredAt` · `observedAt` · `settlementObservedAt` · `effectiveFrom` |
 | **텍스트·이름** | `concept` · `definition` · `detail` · `licenseRegionName` · `method` · `population` · `rawName` · `source` · `unit` |
-| **집합·구조** | `entries` (`EffectiveDatedPolicy` — 유효일자와 값의 쌍 목록, §4.1) · `missingByGroup` · `satisfiedGroup` · `payload` · `presentIn` · `row` |
+| **집합·구조** | `entries` (`EffectiveDatedPolicy` — 유효일자와 값의 쌍 목록, §4.1) · `fieldContract` (`UnnormalizedFigure` — 그 값을 낸 §5.3 `KonepsFieldContract` 한 벌. **단위·`scale`·`vatTreatment`·`provenance`를 나르는 자리가 여기다**) · `missingByGroup` · `satisfiedGroup` · `payload` · `presentIn` · `row` |
 | **경계 표의 비수치 필드**(§6.2) | `review_required`(불리언 — **업무 판정이므로 Kotlin 소유**) · `regimeLabel` · `signals` |
 
 > **`C-4.2`는 이름을 통해서만 잰다 — 이름이 나오지 않는 자리에서는 침묵한다.**
