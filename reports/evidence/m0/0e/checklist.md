@@ -64,9 +64,9 @@
 
 | id | 종료 조건 | 충족의 산출물 좌표 | 명령 |
 | --- | --- | --- | --- |
-| `OPEN-OPS-07` | ADR 대안 절 기입 | `docs/adr/0005-domain-events-and-outbox.md` **§3** (제목이 `## 3. 대안 — \`OPEN-OPS-07\` 후보의 판정`) | `commands.md` **C-6** — `grep -n '^## 3\.'` 이 그 제목을 낸다 |
+| `OPEN-OPS-07` | ADR 대안 절 기입 | `docs/adr/0005-domain-events-and-outbox.md` **§3** (제목이 `## 3. 대안 — \`OPEN-OPS-07\` 후보의 판정`) | `commands.md` **C-6a** |
 | `OPEN-QUAL-05` | `v2-지침서.md` §4.2 문면 개정 | `v2-지침서.md` §4.2 (+ `milestone-1.md` 1C) | `commands.md` **C-4** 의 `git diff` |
-| `OPEN-ADR-01` | Boot 라인 결정 + `v2-지침서.md` §5 문면 개정 | `v2-지침서.md` §5 · **`docs/adr/0001-target-architecture.md` §5 의 `~~OPEN-ADR-01~~ … 해소` 블록** | 같은 diff + `commands.md` **C-6** 의 `grep -cE "^### \`OPEN-ADR-01\`"` → 0 (취소선 없는 활성 제목이 없다) |
+| `OPEN-ADR-01` | Boot 라인 결정 + `v2-지침서.md` §5 문면 개정 | `v2-지침서.md` §5 · **`docs/adr/0001-target-architecture.md` §5 의 `~~OPEN-ADR-01~~ … 해소` 블록** | `commands.md` **C-4**(개정 diff) + **C-6b** → **0** (취소선 없는 활성 제목이 없다) |
 
 **해소 사유는 registry 자신에도 적혀 있다** — `capability-map.md` §12.1 「M0 종료 slice 0E
 해소 2건」과 §12.2 의 두 행. 그 표가 **닫힌 축과 남는 축을 분리**한다.
@@ -75,11 +75,11 @@
 
 | 경계 | 대조 |
 | --- | --- |
-| `docs/adr/**` 편집이 「상태」 줄 아홉 + `ADR 0001` §5 한 행에 그치는가 | `commands.md` **C-5** — `git diff -U0` 의 `@@` 헤더가 아홉 파일의 3행과 `0001` 의 §5 블록 하나뿐이다. 미결 당시의 기록은 지우지 않고 보존했다 |
+| `docs/adr/**` 편집이 「상태」 줄 아홉 + `ADR 0001` §5 한 행에 그치는가 | `commands.md` **C-5a** — `@@` 헤더 **11개** = 아홉 파일의 3행 + `ADR 0001` §5 의 두 hunk. 미결 당시의 기록은 지우지 않고 보존했다 |
 | `data-dictionary.md`·`regression-ledger.md` 무접촉 | `commands.md` **C-7** — 빈 diff |
 | 앞 여섯 slice 의 evidence 무접촉 | 같은 명령 — 빈 diff |
-| `fixtures/` 무접촉 | `commands.md` **C-7** — `git log --oneline 14686db..HEAD -- fixtures` 와 `git diff --name-only … -- fixtures` 가 둘 다 빈 출력. **`ls` 로 재지 않는다** — fixture-curator 레인이 0E 와 병행하므로 시점 의존 관측은 근거가 되지 않는다 |
-| 다른 레인의 변경(`CLAUDE.md`·`.claude/`·`fixtures/`)을 커밋에 넣지 않았다 | `commands.md` **C-0** — `git status --porcelain` 에 남아 있고 **C-7** 의 `git diff --name-only 14686db..HEAD` 에 없다 |
+| `fixtures/` 무접촉 | `commands.md` **C-7b** — **이 레인의 커밋 집합**(C-0 의 pathspec)이 건드린 파일 전수에 `fixtures/` 매치가 **0**이다. **`ls` 로도 `14686db..HEAD` 전체로도 재지 않는다** — fixture-curator 레인이 병행해 실제로 `fixtures/` 를 만들었으므로 그 둘은 이 레인의 무접촉을 재지 못한다 |
+| 다른 레인의 변경(`CLAUDE.md`·`.claude/`·`fixtures/`·`fixtures-*.md`)을 커밋에 넣지 않았다 | `commands.md` **C-7a** — 이 레인의 커밋이 건드린 파일 **16개**가 `in_scope` 와 정확히 같다 |
 
 ---
 

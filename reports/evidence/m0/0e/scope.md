@@ -17,7 +17,9 @@ in_scope:
   - docs/adr/*.md                          # ① 「상태」 줄 아홉 (각 3행)
                                            # ② ADR 0001 §5 의 OPEN-ADR-01 행 — 해소로 갱신
   - docs/discovery/capability-map.md       # OPEN-OPS-07·OPEN-QUAL-05 registry + §14 이월 목록
-  - reports/evidence/m0/0e/                # 이 패키지
+  - reports/evidence/m0/0e/scope.md         # 이 패키지 셋뿐이다.
+  - reports/evidence/m0/0e/commands.md      #   같은 디렉터리의 fixtures-*.md 는
+  - reports/evidence/m0/0e/checklist.md     #   fixture-curator 레인 소유다
 out_of_scope:
   - docs/discovery/data-dictionary.md      # 0C Codex approve 로 확정 — 읽기 전용
   - docs/discovery/regression-ledger.md    # 0B Codex approve 로 확정 — 읽기 전용
@@ -26,6 +28,7 @@ out_of_scope:
   - reports/evidence/m0/0a · 0a2 · 0a3 · 0b · 0c · 0d   # 확정된 evidence — 읽기 전용
   - fixtures/                              # fixture-curator 소유. 이 slice 가 만들지 않는다
   - _workspace/**                          # .gitignore 대상. 조사 노트는 읽기만 한다
+  - fixtures/** · reports/evidence/m0/0e/fixtures-*.md   # fixture-curator 레인 소유
   - .claude/ 하네스 · CLAUDE.md            # 다른 레인 소유
   - Kotlin/Spring/Python 애플리케이션 코드  # M0 은 문서 slice다
   - bid-vector/ symlink 아래 기존 저장소    # 읽기 전용
@@ -74,6 +77,21 @@ rollback: |
 
 ---
 
+## 이 range 에는 세 레인이 있다
+
+`14686db..HEAD` 는 **spec-writer(이 계약) · fixture-curator(`fixtures/**` ·
+`reports/evidence/m0/0e/fixtures-*.md`) · 하네스(`.claude/**` · `CLAUDE.md`)** 셋의 커밋을
+함께 담는다. 셋이 같은 브랜치에 병행해 커밋했다. **이 evidence 는 spec-writer 레인만
+다루며, 그 커밋 집합은 위 `in_scope` 경로로 pathspec 을 걸어 뽑는다**(`commands.md` C-0).
+**불변 확인도 그 집합만으로 한다**(C-7) — `14686db..HEAD` 전체로 재면 다른 레인의 변경이
+섞여 이 레인이 `fixtures/` 를 건드린 것처럼 읽힌다.
+
+**하네스 커밋 `e9bcaab` 이 evidence 규격을 이 slice 진행 중에 바꿨다** — 출력 전문 금지,
+`핵심 결과` 한 줄, 크기 게이트(evidence 합계 ≤ 그 slice 산출물). **이 패키지는 그 규격을
+따른다**(`commands.md` C-10 이 크기를 잰다).
+
+---
+
 ## 리뷰 range 를 왜 `6c6b3a2` 부터 잡는가
 
 **0A 의 최종 head 는 어느 Codex 리뷰 range 에도 들지 않았다.**
@@ -103,9 +121,9 @@ rollback: |
 - **`docs/adr/**` 의 결정 내용을 건드리지 않았다.** 편집은 **「상태」 줄 아홉**과
   **`ADR 0001` §5 의 `OPEN-ADR-01` 행 하나**뿐이며, 그 행에서도 **미결 당시의 기록
   (결정 필요 사항·선택지·근거·부수 사실)을 지우지 않고 그대로 보존**한 채 해소 블록을
-  앞에 얹었다. §1~§4·§6 과 §5 의 나머지 `OPEN` 열둘은 무접촉이다 — `commands.md` C-5.
+  앞에 얹었다. §1~§4·§6 과 §5 의 나머지 `OPEN` 열둘은 무접촉이다 — `commands.md` C-5a.
 - **`data-dictionary.md`·`regression-ledger.md`·앞 여섯 slice 의 evidence·`fixtures/` 무접촉** —
-  `commands.md` C-7.
+  `commands.md` C-7b 가 이 레인의 커밋 집합만으로 확인한다(매치 0).
 - **네 registry 를 통합하지도, 「활성 총계」를 확정하지도 않았다** — §14.0 이 그 사실을 적고
   담당을 **registry 통합 slice** 로 지목한다.
 - **자기 검사 하네스를 만들지 않았다.** 필요한 대조는 `commands.md` 의 명령으로만 남겼다.
