@@ -99,6 +99,15 @@ classification_policy:
     승인된 기준 문서) 중 하나인 case. M0 산출 문서(`capability-map.md`·`regression-ledger.md`·
     `data-dictionary.md`)는 **그 안에 인용된 결정·공식 문서를 가리키는 포인터로만** 쓰고,
     그 문서가 스스로 도출한 규칙은 이 셋 어디에도 들지 않는다.
+
+    **②의 적용 기준 — 운영자 결정 2026-08-31. 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).**
+    물음: *"결정 기록의 「기록자 bullet」이 `classification_policy.authoritative` ②의 「커밋된 운영자
+    결정 기록」에 드는가?"* — 답: ***"든다"***.
+    그러므로 **②는 「운영자 발화」로 좁혀지지 않는다** — 커밋된 결정 기록 절 안의 **기록자 bullet
+    문면도 ②의 근거로 선다**(`reports/evidence/m0/0a2/decisions.md` 의 `OPEN-DEC-09` 절 본문 bullet ·
+    `OPEN-DEC-04` 절의 기록자 bullet 이 그런 자리다). 다만 그 문면은 **커밋된 결정 기록 안**에
+    있어야 한다 — M0 산출 문서가 **스스로 쓴 acceptance·검증 방법**은 결정 기록이 아니므로 이
+    기준으로 서지 않는다. 그 구별이 `insufficient_evidence` 의 판정 축과 같은 잣대다.
     **그렇게 도출된 규칙에만 기댄 case 가 실제로 있다** — 그것들은 이 층에 **들지 않는다**.
     `source.kind: m0-derived-rule`이 그 자리를 표시하고 바로 아래
     `classification_policy.insufficient_evidence`가 받는다(**최상위 `insufficient_evidence` 목록과는
@@ -1851,11 +1860,11 @@ cases:
       approved_by_user: false
   - id: floor-applicability-001
     domain: floor-applicability
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         지자체 공고는 국가계약 하한으로 조용히 판정되지 않고 **관측 가능한 미적용 상태**(`OutOfScope`)로 산출된다 — 선언과 실행이 일치한다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
           OPEN-DEC-09 해소 (운영자 결정 2026-08-26) · capability-map.md DEC-03 · data-dictionary.md §3.5
     expected_reasoning: |-
@@ -1894,17 +1903,35 @@ cases:
         reason: |-
           **0E 수정 라운드 3 — `operator-decision` 28건 전수 재판정**(`approved-spec` 18 · `official-doc` 5
           동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
-          이 case 가 걸린 축: **축 2 (결정이 축만 정한다)**.
+          이 case 에 든 축: **축 2 (결정이 축만 정한다)**.
 
-          `OPEN-DEC-09` 의 **운영자 답은 *"지자체 공고에 투찰하지 않는다"*(2026-08-26) 한 줄**이고 그것이
-          정하는 것은 **범위 밖**까지다. 이 case 가 재는 **「조용히 판정하지 않고 관측 가능한 미적용 상태로
-          산출한다」**는 같은 결정 기록의 **「필수 단서」** 항목이며 **운영자 발화가 아니라 M0 분석의 도출**이다
-          (`reports/evidence/m0/0a2/decisions.md` 의 `OPEN-DEC-09` 절이 운영자 답과 단서를 따로 적는다).
+          그 라운드가 든 근거 — `OPEN-DEC-09` 의 **운영자 답은 *"지자체 공고에 투찰하지 않는다"*
+          (2026-08-26) 한 줄**이고 그것이 정하는 것은 **범위 밖**까지인데, 이 case 가 재는
+          **「조용히 판정하지 않고 관측 가능한 미적용 상태로 산출한다」**는 운영자 발화가 아니라
+          같은 결정 절의 **기록자 bullet**(`reports/evidence/m0/0a2/decisions.md:317`)이라는 것.
 
-          따라서 `classification_policy.authoritative` 의 ①②③ 어디에도 들지 않는다 —
-          `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
-          정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 되돌림 경로는
-          `classification_policy.insufficient_evidence` 가 적는다.
+          **이 항목은 같은 날 아래 복원 항목으로 되돌려졌다** — 운영자가 기록자 bullet 도 ②에
+          든다고 정했기 때문이다. 지우지 않고 이력으로 남긴다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-08-31
+        change: |-
+          **위 강등을 되돌렸다** — `source.kind` 를 `operator-decision` 으로, `classification` 을
+          `authoritative` 로 복원했다. **기대값·입력·해시는 이번에도 바꾸지 않았다.**
+        reason: |-
+          **운영자 결정 2026-08-31. 물음과 답을 그대로 옮긴다.** 물음: *"결정 기록의 「기록자 bullet」이
+          `classification_policy.authoritative` ②의 「커밋된 운영자 결정 기록」에 드는가?"* — 답: ***"든다"***.
+
+          이 case 가 재는 문면은 `reports/evidence/m0/0a2/decisions.md:317` 의 `OPEN-DEC-09` **결정 절
+          본문 bullet** — *"따라서 V2는 「실행되는 미적용 상태」로 구현한다 — 지자체 공고를 국가계약
+          하한으로 조용히 판정하지 않고, 하한 체계 미지원을 관측 가능한 상태로 산출한다"* — 이다.
+          같은 파일의 provenance 표(「이 파일의 구성 — provenance」)가 그 절에 slice 가 넣은 것을
+          훅 `300`·`302`(legacy 인용 정정) **뿐**으로 전수 열거하므로 `317` 은 **원본**이고,
+          `capability-map.md:1448` 도 그 문장을 「확정 (운영자 결정 2026-08-26), `OPEN-DEC-09` 해소」
+          블록 안에 싣는다. 곧 **커밋된 운영자 결정 기록 안의 기록자 bullet** 이므로 위 결정에 따라
+          `classification_policy.authoritative` ②에 든다. 같은 파일·같은 형태인 `OPEN-DEC-04` 의
+          기록자 bullet 에 기댄 `verdict-004` 와 잣대가 같아졌다.
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
@@ -3468,17 +3495,15 @@ uncovered_axes:
     owning_open:
       - "소유 `OPEN` 없음 — 막는 것은 미결이 아니라 **운영자 승인 부재**다"
     what_is_covered_instead: |-
-      **없다 — 2026-08-31 전수 재판정으로 `floor-applicability-001`도 내려갔다.** 앞선 라운드는 그
-      case 의 근거를 *"DEC-03 의 운영자 결정 그 자체"*로 적었으나 **결정 문면을 원문으로 열어 보니
-      운영자 답은 *"지자체 공고에 투찰하지 않는다"*(2026-08-26) 한 줄**이고 그것이 정하는 것은
-      **범위 밖**까지다. 그 case 가 재는 **「조용히 판정하지 않고 관측 가능한 미적용 상태로 산출한다」**는
-      같은 결정 기록의 **「필수 단서」** 항목이며 **운영자 발화가 아니라 M0 분석의 도출**이다
-      (`reports/evidence/m0/0a2/decisions.md` 의 `OPEN-DEC-09` 절이 운영자 답과 단서를 따로 적는다).
-      **이 도메인은 `authoritative` corpus 에서 전건 덮이지 않는다.** 다섯 case 전부
-      `insufficient-evidence` 로 남아 있고 지워지지 않았다.
-    unblocks_when: |-
-      운영자가 DEC-03 acceptance · §1.4.2 · **`OPEN-DEC-09` 의 「필수 단서」**(실행되는 미적용 상태)를
-      업무 규칙으로 명시 승인한다.
+      `floor-applicability-001`만 `authoritative` 로 남는다 — 「지자체 공고가 국가계약 하한으로 조용히
+      판정되지 않고 관측 가능한 `OutOfScope` 로 산출된다」. **그 case 의 근거는 커밋된 결정 기록
+      안의 문면**(`reports/evidence/m0/0a2/decisions.md:317` 의 `OPEN-DEC-09` 결정 절 본문 bullet)이고,
+      **운영자 결정 2026-08-31**(*"결정 기록의 「기록자 bullet」이 ②의 「커밋된 운영자 결정 기록」에
+      드는가?"* → ***"든다"***)이 그 자리를 `classification_policy.authoritative` ②로 세운다.
+      그래서 이 축에 들지 않는다. 나머지(`-002`~`-005`)는 `insufficient-evidence` 로 남아 있고
+      지워지지 않았다 — 그 넷의 근거는 결정 기록이 아니라 `capability-map.md` DEC-03 acceptance 와
+      `data-dictionary.md` §1.4.2 의 자체 도출이다.
+    unblocks_when: 운영자가 DEC-03 acceptance 와 §1.4.2 를 업무 규칙으로 명시 승인한다.
 
   - axis: 승인 부재로 authoritative 덮개를 잃은 축 — KONEPS 필드 계약 강제와 코드·라벨 분리
     domain: koneps-collection

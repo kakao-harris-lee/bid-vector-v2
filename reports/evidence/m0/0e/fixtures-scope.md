@@ -47,6 +47,16 @@ acceptance** 뿐이라 `data-extract.md` §1의 세 층(`authoritative`·`observ
 없었다** — 인용된 결정 id 열넷을 활성 목록(`commands.md` **C-3** 이 세는 그 집합)과 대조해 전부
 해소 상태임을 확인했다.
 
+**같은 날 운영자가 판정 기준 하나를 더 정했다 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).**
+물음: *"결정 기록의 「기록자 bullet」이 `classification_policy.authoritative` ②의 「커밋된 운영자 결정
+기록」에 드는가?"* — 답: ***"든다"***.
+그러므로 **②는 「운영자 발화」로 좁혀지지 않는다** — 커밋된 결정 기록 절 안의 **기록자 bullet 문면도
+②의 근거로 선다.** 이 결정으로 전수 재판정이 내렸던 `floor-applicability-001` 이 `authoritative` 로
+복원됐고(그 case 가 재는 문면은 `0a2/decisions.md:317` 의 `OPEN-DEC-09` 결정 절 본문 bullet 이다),
+기록자 bullet 에 기댄 다른 case 들의 유지도 같은 잣대로 정당화된다. **다만 그 문면은 커밋된 결정
+기록 안에 있어야 한다** — M0 산출 문서가 스스로 쓴 acceptance·검증 방법은 결정 기록이 아니므로 이
+기준으로 서지 않는다. 정본은 `manifest.yaml` 의 `classification_policy.authoritative` 가 갖는다.
+
 **셈을 여기 옮겨 적지 않는다** — case 수 · **분류별 분포** · `source.kind` 분포와 그 교차 ·
 `uncovered_axes`/`insufficient_evidence`/`access_approval_required` 수는 전부 **F-7** 이 낸다.
 도메인별 건수도 같은 명령이 낸다(분류를 섞지 않으려면 `kind x class` 줄을 함께 본다).
@@ -60,9 +70,10 @@ acceptance** 뿐이라 `data-extract.md` §1의 세 층(`authoritative`·`observ
 `koneps-collection`(필드 계약 강제, 코드·라벨 분리) · `ml-boundary`(결측 provenance, 누수 차단
 시그니처) · `license`(허용업종 단독 보유의 임시 처리)이고, **전수 재판정이 셋을 더했다** —
 `capacity-gate`(금액 capacity 게이트의 무조건 acceptance) · `license`(판정의 「동반 산출」과 요건
-provenance) · `money-basis`(`Unknown` 과세 금액의 산술 비교 차단). **재판정은 앞선 넷 중 둘의
-「덮개」 서술도 뒤집었다** — `floor-applicability` 와 `koneps-collection` 은 그 축에 `authoritative`
-로 남는 case 가 있다고 적었으나 **둘 다 전건 내려갔다.** 원래 막혀 있던 축은 그대로 남는다.
+provenance) · `money-basis`(`Unknown` 과세 금액의 산술 비교 차단). **재판정은 앞선 넷 중 하나의
+「덮개」 서술도 뒤집었다** — `koneps-collection` 은 그 축에 `authoritative` 로 남는 case 가 있다고
+적었으나 **전건 내려갔다.** `floor-applicability` 는 `-001` 이 `authoritative` 로 남아 그 덮개
+서술이 선다(위 기록자 bullet 결정). 원래 막혀 있던 축은 그대로 남는다.
 그 목록을 비우지 않고 그럴듯하게 채우지도 않았다. **수는 여기 박지 않는다 — F-7 이 낸다.**
 
 **§6 이 이 상태에 완료 gate 실패를 건다.** 그러므로 `milestone-1.md:12` 는 **이 결정이 되돌려지기
