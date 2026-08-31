@@ -47,15 +47,20 @@ acceptance** 뿐이라 `data-extract.md` §1의 세 층(`authoritative`·`observ
 없었다** — 인용된 결정 id 열넷을 활성 목록(`commands.md` **C-3** 이 세는 그 집합)과 대조해 전부
 해소 상태임을 확인했다.
 
-**같은 날 운영자가 판정 기준 하나를 더 정했다 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).**
+**같은 날 운영자가 판정 기준 하나를 더 정했다.**
+
+*결정 축어 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).*
 물음: *"결정 기록의 「기록자 bullet」이 `classification_policy.authoritative` ②의 「커밋된 운영자 결정
 기록」에 드는가?"* — 답: ***"든다"***.
-그러므로 **②는 「운영자 발화」로 좁혀지지 않는다** — 커밋된 결정 기록 절 안의 **기록자 bullet 문면도
-②의 근거로 선다.** 이 결정으로 전수 재판정이 내렸던 `floor-applicability-001` 이 `authoritative` 로
-복원됐고(그 case 가 재는 문면은 `0a2/decisions.md:317` 의 `OPEN-DEC-09` 결정 절 본문 bullet 이다),
-기록자 bullet 에 기댄 다른 case 들의 유지도 같은 잣대로 정당화된다. **다만 그 문면은 커밋된 결정
-기록 안에 있어야 한다** — M0 산출 문서가 스스로 쓴 acceptance·검증 방법은 결정 기록이 아니므로 이
-기준으로 서지 않는다. 정본은 `manifest.yaml` 의 `classification_policy.authoritative` 가 갖는다.
+
+*이 레인이 그 답을 적용한 범위는 이 레인의 판단이다*(운영자 발화가 아니다). **②는 「운영자 발화」로
+좁혀지지 않는다** — 커밋된 결정 기록 절 안의 **기록자 bullet 문면도 ②의 근거로 선다.** 이 결정으로
+전수 재판정이 내렸던 `floor-applicability-001` 이 `authoritative` 로 복원됐고(그 case 가 재는 문면은
+`0a2/decisions.md:317` 의 `OPEN-DEC-09` 결정 절 본문 bullet 이다), 기록자 bullet 에 기댄 다른
+case 들의 유지도 같은 잣대로 정당화된다. **그 문면이 커밋된 결정 기록 안에 있어야 한다는 한계는 이
+답이 새로 건 것이 아니라 ② 자신의 문면이 이미 갖는 것이다** — 그래서 M0 산출 문서가 스스로 쓴
+acceptance·검증 방법은 이 기준으로 서지 않는다. 정본은 `manifest.yaml` 의
+`classification_policy.authoritative` 가 갖는다.
 
 **같은 날 운영자가 판정 대상을 하나 더 넓혔다 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).**
 물음: *"verdict-001·002가 SkipReason 구체 어휘 `CapacityHold`·`LowPriority`를 authoritative golden으로

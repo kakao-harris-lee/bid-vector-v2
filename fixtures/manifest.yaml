@@ -100,14 +100,19 @@ classification_policy:
     `data-dictionary.md`)는 **그 안에 인용된 결정·공식 문서를 가리키는 포인터로만** 쓰고,
     그 문서가 스스로 도출한 규칙은 이 셋 어디에도 들지 않는다.
 
-    **②의 적용 기준 — 운영자 결정 2026-08-31. 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).**
+    **②의 적용 기준 — 운영자 결정 2026-08-31.**
+
+    *결정 축어 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).*
     물음: *"결정 기록의 「기록자 bullet」이 `classification_policy.authoritative` ②의 「커밋된 운영자
     결정 기록」에 드는가?"* — 답: ***"든다"***.
-    그러므로 **②는 「운영자 발화」로 좁혀지지 않는다** — 커밋된 결정 기록 절 안의 **기록자 bullet
-    문면도 ②의 근거로 선다**(`reports/evidence/m0/0a2/decisions.md` 의 `OPEN-DEC-09` 절 본문 bullet ·
-    `OPEN-DEC-04` 절의 기록자 bullet 이 그런 자리다). 다만 그 문면은 **커밋된 결정 기록 안**에
-    있어야 한다 — M0 산출 문서가 **스스로 쓴 acceptance·검증 방법**은 결정 기록이 아니므로 이
-    기준으로 서지 않는다. 그 구별이 `insufficient_evidence` 의 판정 축과 같은 잣대다.
+
+    *이 레인이 그 답을 적용한 범위*(운영자 발화가 아니라 적용이다). **②는 「운영자 발화」로
+    좁혀지지 않는다** — 커밋된 결정 기록 절 안의 **기록자 bullet 문면도 ②의 근거로 선다**
+    (`reports/evidence/m0/0a2/decisions.md` 의 `OPEN-DEC-09` 절 본문 bullet · `OPEN-DEC-04` 절의
+    기록자 bullet 이 그런 자리다). 그 문면이 **커밋된 결정 기록 안**에 있어야 한다는 한계는 이
+    답이 새로 건 것이 아니라 **② 자신의 문면**(「커밋된 운영자 결정 **기록**」)이 이미 갖는
+    것이다 — 그래서 M0 산출 문서가 **스스로 쓴 acceptance·검증 방법**은 이 기준으로 서지 않는다.
+    그 구별이 `insufficient_evidence` 의 판정 축과 같은 잣대다.
     **그렇게 도출된 규칙에만 기댄 case 가 실제로 있다** — 그것들은 이 층에 **들지 않는다**.
     `source.kind: m0-derived-rule`이 그 자리를 표시하고 바로 아래
     `classification_policy.insufficient_evidence`가 받는다(**최상위 `insufficient_evidence` 목록과는
@@ -1391,10 +1396,17 @@ cases:
     source:
       kind: operator-decision
       reference: |-
-          OPEN-QUAL-08 분할 확정 (운영자 결정 2026-08-26) · capability-map.md QUAL-11 결정 무관(무조건) acceptance
+          OPEN-QUAL-08 분할 확정 축어 (운영자 결정 2026-08-26) — `reports/evidence/m0/0a2/decisions.md:285`
     expected_reasoning: |-
-      capability-map.md QUAL-11 무조건 acceptance *"도급한도·연매출로 인한 판정은 **자격 어휘로 산출되지 않는다** — 적합도 점수에만 반영된다.
-      도급한도가 낮다는 이유로 공고가 `Ineligible`이 되지 않는다"* (`OPEN-QUAL-08` 분할 확정).
+      **결정 문면이 이 case 를 직접 떠받친다.** `OPEN-QUAL-08` 분할 확정 축어
+      (`reports/evidence/m0/0a2/decisions.md:285`) — *"**분할 확정** — 시공능력평가액은 **자격 축**,
+      도급한도·연매출·capacity_score는 **적합도 축**"*, 비고 *"공고가 게시하는 요건이면 자격, 운영자 사정이면
+      적합도"*. 도급한도·연매출이 **적합도 축**이라는 것이 곧 그것들이 **자격 어휘를 내지 않는다**는 뜻이므로
+      이 case 의 `verifies` 는 그 문면의 재진술이다.
+      `capability-map.md` QUAL-11 의 「결정 무관(무조건)」 acceptance(*"도급한도가 낮다는 이유로 공고가
+      `Ineligible`이 되지 않는다"*)는 같은 말을 M0 산출 문서가 다시 적은 **포인터**이고 이 case 의 1차 근거가
+      아니다 — 그 acceptance **만** 붙들었던 같은 축의 `-001`·`-002`·`-004` 는 `insufficient-evidence` 로
+      내려가 있다. 그 갈림은 `change_history` 와 `uncovered_axes` 의 capacity-gate 축이 적는다.
     input_file: fixtures/input/capacity-gate-003.json
     expected_file: fixtures/expected/capacity-gate-003.json
     normalization:
@@ -1969,13 +1981,20 @@ cases:
           동반 훑기). 판정 축: ① 한정어를 지웠는가 ② 결정이 축만 정하는가 ③ 인용한 결정이 실재·해소됐는가.
           이 case 에 든 축: **축 2 (결정이 축만 정한다)**.
 
-          그 라운드가 든 근거 — `OPEN-DEC-09` 의 **운영자 답은 *"지자체 공고에 투찰하지 않는다"*
-          (2026-08-26) 한 줄**이고 그것이 정하는 것은 **범위 밖**까지인데, 이 case 가 재는
-          **「조용히 판정하지 않고 관측 가능한 미적용 상태로 산출한다」**는 운영자 발화가 아니라
-          같은 결정 절의 **기록자 bullet**(`reports/evidence/m0/0a2/decisions.md:317`)이라는 것.
+          **그 라운드가 실제로 편 논거를 그대로 보존한다** — 원문 좌표는
+          `git show 288bb38:fixtures/manifest.yaml` 의 이 case `change_history[0].reason` 이다.
+          그 라운드는 이렇게 적었다: *"`OPEN-DEC-09` 의 **운영자 답은 「지자체 공고에 투찰하지
+          않는다」(2026-08-26) 한 줄**이고 그것이 정하는 것은 **범위 밖**까지다. 이 case 가 재는
+          **「조용히 판정하지 않고 관측 가능한 미적용 상태로 산출한다」**는 같은 결정 기록의
+          **「필수 단서」** 항목이며 **운영자 발화가 아니라 M0 분석의 도출**이다."*
 
-          **이 항목은 같은 날 아래 복원 항목으로 되돌려졌다** — 운영자가 기록자 bullet 도 ②에
-          든다고 정했기 때문이다. 지우지 않고 이력으로 남긴다.
+          **그 논거의 뒷문장은 사실이 아니었다.** 아래 복원 항목이 확인하듯 그 문면은
+          `reports/evidence/m0/0a2/decisions.md:317` 의 **커밋된 결정 절 본문 bullet** 이고 이
+          slice 가 도출한 것이 아니다. 앞문장(운영자 답 한 줄이 정하는 것은 범위 밖까지)은 그대로
+          참이며, 그 위에서 **기록자 bullet 이 ②에 드는가**가 갈림길로 남았다.
+
+          **이 항목은 같은 날 아래 복원 항목으로 되돌려졌다** — 운영자가 그 물음에 「든다」로
+          답했기 때문이다. 지우지 않고 이력으로 남긴다.
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
