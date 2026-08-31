@@ -1168,7 +1168,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -1955,7 +1955,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -2012,7 +2012,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -2067,7 +2067,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -2123,7 +2123,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -2176,7 +2176,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -2231,7 +2231,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -2410,7 +2410,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -2463,7 +2463,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -2507,7 +2507,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -3014,7 +3014,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
@@ -3059,7 +3059,7 @@ cases:
           `classification` 을 `authoritative` 에서 `insufficient-evidence` 로 내렸다. 기대값·입력·해시는
           바꾸지 않았다 — **분류만** 내렸고 case 는 그대로 남는다.
         reason: |-
-          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` 12건을 `authoritative` corpus 에서
+          운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
           제외한다. 근거와 되돌림 경로는 `classification_policy.insufficient_evidence` 가 적는다.
           Codex 리뷰 B `findings[2]`(high).
         policy_version: |-
