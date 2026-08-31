@@ -70,7 +70,10 @@ acceptance** 뿐이라 `data-extract.md` §1의 세 층(`authoritative`·`observ
 `koneps-collection`(필드 계약 강제, 코드·라벨 분리) · `ml-boundary`(결측 provenance, 누수 차단
 시그니처) · `license`(허용업종 단독 보유의 임시 처리)이고, **전수 재판정이 셋을 더했다** —
 `capacity-gate`(금액 capacity 게이트의 무조건 acceptance) · `license`(판정의 「동반 산출」과 요건
-provenance) · `money-basis`(`Unknown` 과세 금액의 산술 비교 차단). **재판정은 앞선 넷 중 하나의
+provenance) · `money-basis`(`Unknown` 과세 금액의 산술 비교 차단). **이어진 라운드가 `money-basis`
+(감시 경로와 검색 경로의 basis 일치) 축을 하나 더 세웠다** — `money-basis-003` 의 유일한 근거가
+`regression-ledger.md` R-BASIS-01 의 자체 acceptance 였고, 그것은 커밋된 결정 기록이 아니라 M0
+산출 문서라 기록자 bullet 기준으로도 서지 않는다. **재판정은 앞선 넷 중 하나의
 「덮개」 서술도 뒤집었다** — `koneps-collection` 은 그 축에 `authoritative` 로 남는 case 가 있다고
 적었으나 **전건 내려갔다.** `floor-applicability` 는 `-001` 이 `authoritative` 로 남아 그 덮개
 서술이 선다(위 기록자 bullet 결정). 원래 막혀 있던 축은 그대로 남는다.
