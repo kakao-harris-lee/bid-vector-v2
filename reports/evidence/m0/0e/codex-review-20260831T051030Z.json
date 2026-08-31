@@ -1,0 +1,47 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "b9dbb174c70630f06bd30396e250943b9a1a6f95",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 1846,
+      "evidence": "floor-shortfall-002·003은 `verifies`만 N/N+1 경계로 좁혔지만 `expected_file`은 그대로다. 실제 expected JSON에는 승인되지 않았다고 스스로 밝힌 임계 사정률·frequency의 분자/분모·band·policyVersion 등 출력 표현이 계속 정확한 기대값으로 들어 있다. `data-extract.md` §3은 expected 결과를 version/hash로 고정하고 M1은 authoritative corpus 통과를 요구하는데, manifest에는 어느 JSON 경로만 assertion인지 표현하는 계약이 없다. 따라서 산문상의 “나르기만 한다”는 선언으로는 M1 테스트가 미승인 출력 계약을 golden으로 강제하는 것을 막을 수 없으며, 이전 B3 finding의 expected assertion 축이 해소되지 않았다.",
+      "required_fix": "두 case의 authoritative assertion을 기계적으로 식별할 수 있도록 expected를 승인된 N/N+1 의미의 최소 projection으로 좁히거나 assertion path/schema를 명시하고 M1 소비 테스트가 그것만 비교하도록 계약화한다. 미승인 출력 표현은 별도 insufficient-evidence 후보로 분리하거나 명시 승인 전까지 두 case를 강등하고, 해시와 change_history를 함께 갱신한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0e/checklist.md",
+      "line": 81,
+      "evidence": "checklist는 spec-writer 레인의 `fixtures/` 매치가 0이고 in-scope 16개와 정확히 같다고 판정하지만, C-7 명령 재실행 결과는 17개 경로이며 `fixtures/manifest.yaml`이 매치된다. `commands.md` C-7b는 이 사실을 한 건의 예외이자 “운영자 사후 승인 대상”으로 정정했지만 checklist와 `scope.md:38,50,173-174`는 여전히 fixtures 무접촉 및 fixture 변경 없는 rollback을 주장한다. 즉 필수 acceptance checklist가 자신의 근거 명령 및 slice 계약과 모순되고, 아직 승인되지 않은 범위 예외를 포함한 채 완료를 선언한다.",
+      "required_fix": "scope·rollback·checklist를 C-7 실측과 일치시키고, 8701882의 교차 레인 변경을 허용하는 운영자 결정을 기록하거나 승인되지 않은 범위 예외가 남아 있음을 완료 판정에 반영한다. C-7a 경로 수와 C-7b 매치 결과도 한 정본으로 통일한다."
+    }
+  ],
+  "commands_run": [
+    "pwd && git status --short && git rev-parse 14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit} && git rev-parse b9dbb174c70630f06bd30396e250943b9a1a6f95^{commit} && git rev-parse HEAD && rg --files -g 'AGENTS.md' -g '!build' -g '!node_modules'",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..b9dbb174c70630f06bd30396e250943b9a1a6f95 && git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..b9dbb174c70630f06bd30396e250943b9a1a6f95 && git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..b9dbb174c70630f06bd30396e250943b9a1a6f95 && git log --oneline --decorate 14686dbf3bff4085203ffdcd931564fd1e36edf0..b9dbb174c70630f06bd30396e250943b9a1a6f95",
+    "git merge-base --is-ancestor 14686dbf3bff4085203ffdcd931564fd1e36edf0 b9dbb174c70630f06bd30396e250943b9a1a6f95 && git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..b9dbb174c70630f06bd30396e250943b9a1a6f95 && git ls-files --others --exclude-standard && git status --porcelain=v1",
+    "sed -n over agent-workflow.md, milestone-0.md, milestone-1.md, v2-지침서.md, data-extract.md, ADRs, and reports/evidence/m0/0e/*.md",
+    "git diff --unified=80 14686dbf3bff4085203ffdcd931564fd1e36edf0..b9dbb174c70630f06bd30396e250943b9a1a6f95 -- v2-지침서.md milestone-0.md milestone-1.md docs/adr/*.md",
+    "awk manifest input/expected SHA-256 pairs | shasum -a 256 -c -",
+    "python3 -c JSON parse of fixtures/input/*.json and fixtures/expected/*.json (126 files)",
+    "python3 fixtures/tools/check_legacy_numbers.py",
+    "/tmp/fxvenv/bin/python inline manifest audit: duplicate keys, required fields, hashes, classifications, review state, and legacy-reference-index consistency",
+    "python3 inline OPEN registry/§14 coverage audit: active 69, B 14, C 55, missing/extra/overlap empty",
+    "for f in docs/adr/*.md; do sed -n '3p' \"$f\"; done | grep -c '^- \\*\\*상태\\*\\*: \\*\\*결정\\*\\*'; git diff -U0 14686db b9dbb17 -- docs/adr/ | grep -cE '^@@'",
+    "git diff --numstat 14686db b9dbb17 -- v2-지침서.md milestone-0.md milestone-1.md docs/adr docs/discovery/capability-map.md | awk '{a+=$1;d+=$2} END{print a-d}'; wc -l reports/evidence/m0/0e/{scope,commands,checklist}.md",
+    "grep -rniE '(api[_-]?key|secret|token|passwd|password|bearer|authorization|telegram|chat_id|@[a-z0-9.-]+\\.(com|net|kr|org)|010-[0-9]{4}|[0-9]{6}-[0-9]{7})' fixtures/",
+    "LANE=(docs/adr docs/discovery/capability-map.md milestone-0.md milestone-1.md 'v2-지침서.md' reports/evidence/m0/0e/scope.md reports/evidence/m0/0e/commands.md reports/evidence/m0/0e/checklist.md); for c in $(git log --format=%h 14686db..b9dbb17 -- \"${LANE[@]}\"); do git diff --name-only \"$c^\" \"$c\"; done | sort -u; same output filtered by out-of-scope path regex",
+    "git status --porcelain=v1 && git rev-parse HEAD && git rev-parse 14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit} && git rev-parse b9dbb174c70630f06bd30396e250943b9a1a6f95^{commit} && git merge-base --is-ancestor 14686dbf3bff4085203ffdcd931564fd1e36edf0 b9dbb174c70630f06bd30396e250943b9a1a6f95"
+  ],
+  "residual_risks": [
+    "63개 case 중 28개는 insufficient-evidence이고 uncovered axis도 28개이며 observed/legacy-behavior case는 0개다. 이월 결정에 따라 M1 진입은 가능하더라도 해당 case들은 승인 전 golden으로 사용할 수 없다.",
+    "clean worktree에는 legacy checkout이 없어 legacy-reference-index의 object ID를 실제 ed4b06c 저장소와 대조하지 못했다. 저장소 내부 index 해시와 manifest 경로 집합만 검증했다.",
+    "이 range에는 production 애플리케이션 wiring이 없어 retry·멱등성·DB write·외부 side effect·contract runtime 동작은 실행 검증 대상이 아니었다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
