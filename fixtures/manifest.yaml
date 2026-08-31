@@ -123,6 +123,13 @@ classification_policy:
     기대값이 **나르기만 하면** 이 층에 남는다. 그 강등선과 가족별 근거는
     `classification_policy.insufficient_evidence` 가 축어로 갖는다. **남은 것이 그 이름을 승인받은
     뜻은 아니다** — 그 이름들은 **어휘 승인 대상**이며 그 축은 같은 자리가 적는다.
+
+    **같은 강등선이 이름만이 아니라 표현에도 걸린다 — 운영자 결정 2026-08-31
+    (`floor-shortfall` 출력 표현).** `verifies` 가 미승인 **출력 표현**(결과 항목의 묶음 · 수의
+    표현 형태)을 검증 대상으로 잠그는 것도 이름을 잠그는 것과 같은 자리에 선다. 그 결정이
+    택한 처리는 강등이 아니라 **`verifies` 를 승인된 의미로 좁혀 유지**이고, 잠금에서 빠진
+    표현은 가족 A 와 같이 **어휘·표현 승인 대상**으로 기록된다. 물음·답 축어와 이 레인이 그
+    답을 적용한 범위는 `classification_policy.insufficient_evidence` 가 갖는다.
   insufficient_evidence: |-
     **운영자 결정 2026-08-31 — `source.kind: m0-derived-rule` case 를 `authoritative` corpus 에서
     제외한다.** 근거가 **M0 산출 문서가 스스로 도출한 acceptance·정의** 뿐이고, 그것을 세운 운영자
@@ -225,6 +232,32 @@ classification_policy:
     **이 레인은 그 자리를** `pending_user_approval` **이 적는 case 단위 비준과 다른 축으로 둔다** —
     앞은 **이름**의 층이고 뒤는 case 의 비준 여부다.
 
+    **강등선이 이름만이 아니라 표현에도 걸린다 — 운영자 결정 2026-08-31(`floor-shortfall`
+    출력 표현).**
+
+    *결정 축어 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).*
+    물음: *"`floor-shortfall-002`·`003`의 `verifies`가 승인된 의미(N/N+1 경계·최소 표본 150·
+    Unmeasurable·versioned 정책)를 넘어 『임계 사정률·빈도·분자·분모·범위·정책 version』 출력
+    표현 묶음 전체와 유리수 표현을 authoritative로 잠그고 있다 — 그 묶음을 승인한 결정이 없다.
+    어떻게 처리할까?"*
+    답: ***"verifies 좁혀 유지"*** — 「insufficient-evidence 강등」과 「출력 묶음을 명시 승인」
+    두 선택지를 물리치고 택한 답이다.
+
+    *이 레인이 그 답을 적용한 범위*(운영자 발화가 아니라 적용이다). 두 case 의 `classification`
+    은 `authoritative` 그대로 두고, **`verifies` 와 그 case 가 검증을 주장하는 범위 서술만**
+    승인된 의미로 좁혔다 — `OPEN-DEC-01`(최소 표본 수 `150` · 정책 데이터 외부화) ·
+    `OPEN-DEC-06`(`biasDirection` 을 구조화 필드로 노출) · `v2-지침서.md` §4.4(표본 부족은
+    `Unmeasurable` · 비확률 표시 · versioned 정책) · **`N`/`N+1` 경계 의미**. 잠금에서 뺀
+    **출력 표현 묶음 여섯 항목**(임계 사정률 · 빈도 · 분자 · 분모 · 범위 · 정책 version)과
+    **유리수(분자/분모) 표현**은 가족 A 와 같은 자리로 간다 — **기대값이 나르는 미승인 표현**
+    이며 **어휘·표현 승인 대상**으로 기록된다. 그 표현이 나오는 자리는 `capability-map.md`
+    DEC-04 acceptance *"빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위,
+    정책 version) 묶음으로 반환된다"* 하나이고 그것은 **M0 산출 문서의 자체 도출**이라 ①②③
+    어느 문면으로도 서지 않는다. **기대값·입력 파일과 해시는 바꾸지 않았다** — 기대값이 나르는
+    것을 지운 것이 아니라 case 가 **주장하는 범위**를 좁혔다. 잠금이 풀린 축은 `uncovered_axes`
+    의 「승인 부재로 검증 주장에서 내린 축 — `floor-shortfall` 빈도 결과의 출력 표현」이 받고,
+    되돌림은 그 축의 `unblocks_when` 이 지목한다.
+
     **어느 case 가 여기 드는지는 이 산문이 세지 않는다** — `source.kind`가 표시하고
     `reports/evidence/m0/0e/fixtures-commands.md` **F-7**이 센다.
   observed: 0건. 운영 데이터 접근 승인이 선행한다.
@@ -238,7 +271,9 @@ classification_policy:
     앞은 근거의 층이고 뒤는 비준 여부다. **운영자 결정 2026-08-31(4문 4답)이 어휘 승인 대상을
     정했고 — `authoritative` 로 남은 case 의 기대값이 나르기만 하는 미승인 이름 — 이 레인은 그것을
     셋째 축으로 둔다.** case 의 층도 비준 여부도 아니며 근거는
-    `classification_policy.insufficient_evidence` 가 적는다.
+    `classification_policy.insufficient_evidence` 가 적는다. **같은 날의 `floor-shortfall` 출력
+    표현 결정이 그 셋째 축에 이름만이 아니라 표현을 넣었다** — `verifies` 를 좁히면서 잠금에서
+    뺀 출력 묶음과 유리수 표현이 그 자리이며, 이 레인은 그것을 **이름과 같은 축**으로 둔다.
 
 numeric_discipline:
   rule: |-
@@ -1753,7 +1788,8 @@ cases:
     domain: floor-shortfall
     classification: authoritative
     verifies: |-
-        최소 표본 수 `N`(150) — 경계 포함. 측정되며 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로 반환된다.
+        최소 표본 수 `N`(150) — **경계 포함**. 표본이 최소 수와 같으면 표본 부족이 아니라 측정된다(`N-1`인 001과 쌍). **결과의 출력 표현은 이 case가
+        검증 대상으로 잠그지 않는다** — 기대값이 나를 뿐이고 그 자리는 `not_covered`가 적는다.
     source:
       kind: operator-decision
       reference: |-
@@ -1764,8 +1800,13 @@ cases:
       capability-map.md DEC-04 확정 (운영자 결정 2026-08-26, `OPEN-DEC-01` 해소) — 최소 표본 수 **150**을 유지하고 근거를
       「통계적 편의」로 명시 승인하며 **정책 데이터로 외부화**한다. data-dictionary.md §12.1이 `150`을 **`authoritative`** 층으로
       등재한다. 경계 포함성은 같은 acceptance 문면이 정한다 — *"최소 표본 수 **미만**이면 값이 아니라 사유가 있는 측정 불가를 반환한다"* →
-      `denominator >= 150`이면 측정한다. 반환 형태는 *"빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로
-      반환된다"*.
+      `denominator >= 150`이면 측정한다.
+
+      **기대값이 담는 출력 표현의 출처는 여기 적되 이 case 가 그것을 주장하지는 않는다.** 여섯 항목의 형태는 같은 acceptance 의
+      *"빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로 반환된다"* 에서 오고 그것은 **M0 산출 문서의
+      자체 도출**이다 — `verifies` 는 그 묶음을 검증 대상으로 잠그지 않고 `not_covered` 가 그 자리를 적는다(운영자 결정 2026-08-31,
+      `classification_policy.insufficient_evidence` 가 축어로 갖는다). `biasDirection` **필드를 구조화해 노출한다**까지는
+      `OPEN-DEC-06`(커밋된 결정 기록 `reports/evidence/m0/0a2/decisions.md:288`)이 떠받친다.
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -1791,7 +1832,33 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 7675b693151fb2c0e47ae739394652c2186048f89f95f2d2b39ccef517e844e4
     expected_sha256: 802bf29631f9b9f353b485d453a4973ca194911e1813095e663b7b45f396a125
-    change_history: []
+    not_covered: |-
+      **빈도 결과의 출력 표현 묶음** — 여섯 항목(임계 사정률 · 빈도 · 분자 · 분모 · 범위 · 정책 version)이 함께 반환된다는 형태.
+      기대값은 그 형태를 나르지만 이 case 는 그것을 검증 대상으로 잠그지 않는다. 출처가 `capability-map.md` DEC-04 acceptance 의
+      **M0 자체 도출**뿐이라 `classification_policy.authoritative` ①②③ 어디에도 서지 않기 때문이다. 승인 경로는 `uncovered_axes`
+      의 「승인 부재로 검증 주장에서 내린 축 — `floor-shortfall` 빈도 결과의 출력 표현」이 지목한다.
+      (`biasDirection` 을 **구조화 필드로 노출한다**는 이 자리가 아니다 — `OPEN-DEC-06` 이 떠받친다.)
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `verifies` 를 승인된 의미로 **좁혔다** — 「(임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로 반환된다」를
+          검증 주장에서 빼고 `not_covered` 로 옮겼다. `expected_reasoning` 에 그 표현이 나르는 것일 뿐임을 적었다.
+          **`classification` 은 `authoritative` 그대로이고 기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 7 — Codex 재리뷰 B3 `findings[0]`(high).** 이 case 의 `verifies` 가 승인된 의미를 넘어
+          **출력 표현 묶음 전체**를 authoritative golden 으로 잠그고 있었다. 인용된 `OPEN-DEC-01` 이 승인한 것은
+          최소 표본 수 `150` 의 유지·근거·정책 데이터 외부화까지이고(`reports/evidence/m0/0a2/decisions.md:342`),
+          `OPEN-DEC-06` 은 `biasDirection` 노출까지다(`:288`). `v2-지침서.md` §4.4 도 표본 부족의 `Unmeasurable` ·
+          비확률 표시 · versioned 정책만 요구한다. **여섯 항목이 함께 반환된다는 형태를 정하는 문면은 그 셋 어디에도
+          없고** `capability-map.md` DEC-04 acceptance 하나이며 그것은 M0 산출 문서의 자체 도출이다.
+
+          운영자는 「`insufficient-evidence` 강등」과 「출력 묶음을 명시 승인」을 물리치고 **「verifies 좁혀 유지」**
+          를 택했다 — 물음·답 축어는 `classification_policy.insufficient_evidence` 가 갖는다. 그래서 분류는 그대로
+          두고 **주장하는 범위만** 좁혔고, 빠진 표현은 가족 A 와 같이 **어휘·표현 승인 대상**이 된다.
+          **case 를 덮어쓰지 않았다** — 앞선 문면은 이 항목이 인용으로 보존한다.
+        policy_version: |-
+          해당 없음 — `verifies` 의 범위 서술 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -1800,7 +1867,8 @@ cases:
     domain: floor-shortfall
     classification: authoritative
     verifies: |-
-        최소 표본 수 `N+1`(151) — 측정된다. 빈도는 유리수(분자/분모)로 고정하고 십진 표현은 주장하지 않는다 (반올림은 `OPEN-DIC-10`).
+        최소 표본 수 `N+1`(151) — **경계 위쪽**에서도 측정된다(`N`인 002와 쌍). **빈도의 표현 형태는 이 case가 검증 대상으로 잠그지 않는다** —
+        기대값이 나를 뿐이고 그 자리는 `not_covered`가 적는다.
     source:
       kind: operator-decision
       reference: |-
@@ -1809,8 +1877,12 @@ cases:
       capability-map.md DEC-04 확정 (운영자 결정 2026-08-26, `OPEN-DEC-01` 해소) — 최소 표본 수 **150**을 유지하고 근거를
       「통계적 편의」로 명시 승인하며 **정책 데이터로 외부화**한다. data-dictionary.md §12.1이 `150`을 **`authoritative`** 층으로
       등재한다. 경계 포함성은 같은 acceptance 문면이 정한다 — *"최소 표본 수 **미만**이면 값이 아니라 사유가 있는 측정 불가를 반환한다"* →
-      `denominator >= 150`이면 측정한다. 반환 형태는 *"빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로
-      반환된다"*.
+      `denominator >= 150`이면 측정한다.
+
+      **기대값이 담는 출력 표현의 출처는 여기 적되 이 case 가 그것을 주장하지는 않는다.** 여섯 항목의 형태와 빈도를 **유리수(분자/분모)로**
+      싣는 표현은 같은 acceptance 의 *"빈도 결과가 값 단독이 아니라 (임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로 반환된다"*
+      에서 오고 그것은 **M0 산출 문서의 자체 도출**이다 — `verifies` 는 그 표현을 검증 대상으로 잠그지 않고 `not_covered` 가 그 자리를
+      적는다(운영자 결정 2026-08-31, `classification_policy.insufficient_evidence` 가 축어로 갖는다).
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -1837,8 +1909,32 @@ cases:
     sha256: cfcf24d020eecf314161955ef140e46fa2d32c8b4609e318533e451cade68f6f
     expected_sha256: 01d5bd0dba110e16934301a03ece086620abc5af0f3deddb53fd64d800680cba
     not_covered: |-
-      빈도의 십진 표현·반올림 자리수 — `OPEN-DIC-10`(`RoundingPolicy`의 `mode`와 금액 축 밖 `scaleDigits`)
-    change_history: []
+      ① 빈도의 십진 표현·반올림 자리수 — `OPEN-DIC-10`(`RoundingPolicy`의 `mode`와 금액 축 밖 `scaleDigits`).
+      ② **빈도를 유리수(분자/분모)로 싣는 표현과 출력 표현 묶음** — 기대값은 그 형태를 나르지만 이 case 는 그것을 검증 대상으로
+      잠그지 않는다. 출처가 `capability-map.md` DEC-04 acceptance 의 **M0 자체 도출**뿐이라 `classification_policy.authoritative`
+      ①②③ 어디에도 서지 않기 때문이다. 승인 경로는 `uncovered_axes` 의 「승인 부재로 검증 주장에서 내린 축 —
+      `floor-shortfall` 빈도 결과의 출력 표현」이 지목한다. **①과 ②는 다른 축이다** — ①은 활성 `OPEN` 이 막는 자리이고
+      ②는 운영자 승인이 없는 자리다.
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `verifies` 를 승인된 의미로 **좁혔다** — 「빈도는 유리수(분자/분모)로 고정하고 십진 표현은 주장하지 않는다」를
+          검증 주장에서 빼고 `not_covered` ②로 옮겼다. `expected_reasoning` 에 그 표현이 나르는 것일 뿐임을 적었다.
+          **`classification` 은 `authoritative` 그대로이고 기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 7 — Codex 재리뷰 B3 `findings[0]`(high).** 근거는 `floor-shortfall-002` 의 같은 날 항목과
+          같다 — 인용된 `OPEN-DEC-01` 이 승인한 것은 최소 표본 수 `150` 의 유지·근거·정책 데이터 외부화까지이고
+          (`reports/evidence/m0/0a2/decisions.md:342`), `v2-지침서.md` §4.4 도 표본 부족의 `Unmeasurable` · 비확률 표시 ·
+          versioned 정책만 요구한다. **빈도를 분자/분모로 싣는 표현을 정하는 문면은 그 셋 어디에도 없고**
+          `capability-map.md` DEC-04 acceptance 하나이며 그것은 M0 산출 문서의 자체 도출이다.
+
+          운영자 답은 **「verifies 좁혀 유지」**(「강등」·「출력 묶음 명시 승인」을 물리쳤다). 축어는
+          `classification_policy.insufficient_evidence` 가 갖는다. **남는 의미는 `N+1` 경계**다 — 002 의 `N` 과 쌍으로
+          경계 포함성을 고정하는 자리이고 그것은 승인된 의미에 든다. **십진 미주장은 `not_covered` ①이 이미 갖던
+          자리라 잃은 덮개가 아니다.**
+        policy_version: |-
+          해당 없음 — `verifies` 의 범위 서술 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -3902,6 +3998,41 @@ uncovered_axes:
       운영자가 대신 **다른 어휘를 지정**하면 그때는 기대값 파일이 바뀌므로 `change_history` 에
       `previous_expected_sha256` 를 함께 싣는다.
 
+  - axis: "승인 부재로 **검증 주장에서 내린** 축 — `floor-shortfall` 빈도 결과의 출력 표현 (여섯 항목 묶음 · 유리수 분자/분모)"
+    domain: floor-shortfall
+    why_blocked: |-
+      **이 항목은 위의 「덮개를 잃은 축」들과 형태가 다르다** — case 가 `insufficient-evidence` 로
+      내려가서 비는 자리가 아니라, `authoritative` 로 **남은** case 가 자기 `verifies` 에서
+      내려놓아 비는 자리다. `floor-shortfall-002`·`003`은 그대로 `authoritative` 이고 `N`/`N+1`
+      경계를 계속 고정한다.
+      **비는 것은 출력 표현이다.** 「빈도 결과가 여섯 항목(임계 사정률 · 빈도 · 분자 · 분모 ·
+      범위 · 정책 version)의 묶음으로 반환된다」와 「빈도를 유리수(분자/분모)로 싣는다」를 정하는
+      문면은 `capability-map.md` DEC-04 acceptance *"빈도 결과가 값 단독이 아니라 (임계 사정률,
+      빈도, 분자, 분모, 범위, 정책 version) 묶음으로 반환된다"* 하나이고, 그것은 **M0 산출 문서의
+      자체 도출**이다. 인용된 운영자 결정이 정하는 것은 다른 데까지다 — `OPEN-DEC-01` 은 최소
+      표본 수 `150` 의 유지·근거·정책 데이터 외부화(`reports/evidence/m0/0a2/decisions.md:342`),
+      `OPEN-DEC-06` 은 `biasDirection` 을 구조화 필드로 노출(`:288`). `v2-지침서.md` §4.4 도
+      표본 부족의 `Unmeasurable` · 비확률 표시 · versioned 정책까지다.
+      **처리를 정한 것이 운영자 결정 2026-08-31 이다** — 강등이 아니라 **`verifies` 좁혀 유지**이며
+      물음·답 축어는 `classification_policy.insufficient_evidence` 가 갖는다.
+    owning_open:
+      - "소유 `OPEN` 없음 — 막는 것은 미결이 아니라 **운영자 승인 부재**다"
+      - "인접: `OPEN-DIC-10` (활성) — 빈도의 **십진 표현·반올림 자리수**를 소유한다. 이 축은 반올림이 아니라 **표현 묶음 자체의 근거**다"
+    what_is_covered_instead: |-
+      **경계 의미는 덮인다** — `floor-shortfall-001`(`N-1`) · `002`(`N`) · `003`(`N+1`) 이
+      `authoritative` 로 남아 「최소 표본 수 미만이면 값이 아니라 사유 있는 측정 불가」와 그
+      경계 포함성을 고정한다. `004` 는 빈도 `0.0` 과 판정 불가의 구별을 고정한다.
+      **덮이지 않는 것은 「측정될 때 결과가 어떤 항목 묶음으로, 빈도가 어떤 수 표현으로
+      나오는가」** 다. 기대값 파일은 그 형태를 **그대로 나른다** — 지우지 않았고 해시도 그대로다.
+    unblocks_when: |-
+      운영자가 `capability-map.md` DEC-04 acceptance 의 *"빈도 결과가 값 단독이 아니라 (임계
+      사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로 반환된다"* 를 **업무 규칙으로 명시
+      승인**한다. 승인되면 `floor-shortfall-002`·`003`의 `verifies` 를 그 표현까지 넓히고
+      `change_history` 에 승인 기록의 좌표를 적는다. **승인 대상은 규칙이 아니라 출력 표현**이다 —
+      규칙(최소 표본 수와 그 경계)은 이미 `OPEN-DEC-01` 이 갖는다. 운영자가 대신 **다른 표현을
+      지정**하면 그때는 기대값 파일이 바뀌므로 `change_history` 에 `previous_expected_sha256` 를
+      함께 싣는다.
+
 # =============================================================================
 # 출처를 확정할 수 없어 fixture 로 만들지 않은 후보 (`data-extract.md` 에러 핸들링)
 #
@@ -3997,11 +4128,15 @@ next_steps:
     승인이 없는 동안 그 case 들은 **M1 golden 이 되지 않는다**(`data-extract.md` §6 완료 gate 실패).
     **수는 여기 박지 않는다 — F-7 이 낸다.**
   - |-
-    **어휘 승인** — `authoritative` 로 남은 case 의 기대값이 **나르기만 하는 미승인 이름**
+    **어휘·표현 승인** — `authoritative` 로 남은 case 의 기대값이 **나르기만 하는 미승인 이름**
     (`classification_policy.insufficient_evidence` 가 가족 A 로 드는 넷이 대표다)은 M1 이 그
     이름을 골든으로 굳히기 전에 승인이 필요하다. **case 를 내리는 축이 아니다** — 운영자 결정
     2026-08-31(4문 4답)이 그 자리를 「유지 + 어휘 승인 대상」으로 정했다. 반면 corpus 가 스스로
     지은 그릇과 표기 변형(가족 B·C)은 승인 대상이 아니라 **M1/M2 계약 설계가 정할 몫**이다.
+    **같은 축에 이름만이 아니라 표현이 든다** — 운영자 결정 2026-08-31(`floor-shortfall` 출력
+    표현)이 `floor-shortfall-002`·`003` 의 `verifies` 를 좁히면서 잠금에서 뺀 **출력 표현 묶음과
+    유리수(분자/분모) 표현**이 그 자리다. 승인 문면과 되돌림은 `uncovered_axes` 의 「승인 부재로
+    **검증 주장에서 내린** 축」이 지목한다.
   - "`data-extract.md` §5 7단계 — Claude 가 이 corpus 를 소비하는 test 를 만들고(M1 slice), Codex 가 source·privacy·expected reasoning 을 독립 검토한다."
   - "사용자 승인 시 각 case 의 `review.approved_by_user`를 `true`로 올리고 `review.claude_commit`을 채운다."
   - "기대값을 바꿀 때 case 를 덮어쓰지 않고 `change_history`에 변경 이유와 policy version 을 적는다(`data-extract.md` §3)."

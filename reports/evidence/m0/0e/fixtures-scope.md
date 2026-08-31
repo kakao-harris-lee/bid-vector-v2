@@ -96,6 +96,24 @@ case 에 대어 보면 **내려간 넷과 남은 가족들이 한 잣대의 양�
 대상이라는 것은 위 답이 정했고, 그 자리를 case 단위 비준과 **다른 축**으로 두는 것은 이 레인이다.
 가족별 근거와 강등선 문면은 위 정본이 갖는다.
 
+**같은 날 운영자가 그 강등선을 이름에서 표현으로 넓혔다 — `floor-shortfall` 출력 표현.**
+
+*결정 축어 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).*
+물음: *"`floor-shortfall-002`·`003`의 `verifies`가 승인된 의미(N/N+1 경계·최소 표본 150·
+Unmeasurable·versioned 정책)를 넘어 『임계 사정률·빈도·분자·분모·범위·정책 version』 출력 표현
+묶음 전체와 유리수 표현을 authoritative로 잠그고 있다 — 그 묶음을 승인한 결정이 없다. 어떻게
+처리할까?"* — 답: ***"verifies 좁혀 유지"*** (「insufficient-evidence 강등」·「출력 묶음을 명시
+승인」 두 선택지를 물리치고 택함).
+
+*이 레인이 그 답을 적용한 범위는 이 레인의 판단이다*(운영자 발화가 아니다). 두 case 의
+`classification` 은 `authoritative` 그대로 두고 **`verifies` 와 그 case 가 검증을 주장하는 범위
+서술만** 좁혔다. 잠금에서 뺀 **출력 표현 묶음 여섯 항목**과 **유리수(분자/분모) 표현**은 가족 A 와
+같은 자리로 보내 **어휘·표현 승인 대상**으로 기록했다 — 강등선이 「이름을 잠그는가」에서 「이름·
+표현을 잠그는가」로 넓어진 것이고, **나르기만 하면 남는다**는 반대편은 그대로다. **기대값·입력
+파일과 해시는 바꾸지 않았다.** 정본은 `manifest.yaml` 의 `classification_policy.insufficient_evidence`
+가 갖고, 잠금이 풀린 축은 같은 파일 `uncovered_axes` 의 「승인 부재로 **검증 주장에서 내린** 축」이
+받는다.
+
 **셈을 여기 옮겨 적지 않는다** — case 수 · **분류별 분포** · `source.kind` 분포와 그 교차 ·
 `uncovered_axes`/`insufficient_evidence`/`access_approval_required` 수는 전부 **F-7** 이 낸다.
 도메인별 건수도 같은 명령이 낸다(분류를 섞지 않으려면 `kind x class` 줄을 함께 본다).
@@ -119,6 +137,11 @@ provenance) · `money-basis`(`Unknown` 과세 금액의 산술 비교 차단). *
 **이어진 어휘 전수 스캔이 같은 축에 둘을 더 붙였다** — `verdict-003`(기대값이 그 `LowPriority`
 와 `BidNow` 를 잠근다)과 `floor-applicability-001`(`OutOfScope`). 규칙의 근거는 둘 다 성한데
 기대값이 미승인 어휘를 잠그는 자리다.
+**출력 표현 결정이 축을 하나 더 세웠다 — 이번에는 case 가 내려가서가 아니다.**
+`floor-shortfall-002`·`003`은 `authoritative` 로 **남았고** 만족도를 더 내리지 않는다. 대신 두 case 가
+자기 `verifies` 에서 **출력 표현 묶음과 유리수 표현**을 내려놓았고, 그 자리를 `uncovered_axes` 의
+「승인 부재로 **검증 주장에서 내린** 축」이 받는다. **덮개를 잃은 것과 처음부터 주장하지 말았어야 할
+것을 내려놓은 것은 다르다** — 이 축은 뒤쪽이며 그 구별을 그 항목의 `why_blocked` 가 적는다.
 **재판정은 앞선 넷 중 하나의
 「덮개」 서술도 뒤집었다** — `koneps-collection` 은 그 축에 `authoritative` 로 남는 case 가 있다고
 적었으나 **전건 내려갔다.** `floor-applicability` 도 **어휘 판정으로 전건이 됐다** — `-001` 의
