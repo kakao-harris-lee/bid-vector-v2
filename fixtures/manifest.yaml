@@ -71,6 +71,31 @@ schema:
   base: data-extract.md §3
   extensions:
     verifies: 이 fixture 가 **무엇을 검증하는가**. 한 case 는 한 의미만 검증한다(§7 「한 case 의 기대값을 여러 의미에 재사용」 금지).
+    verified_paths: |-
+      **`verifies` 의 기계적 표현이다.** case 의 `verifies` 가 주장하는 축에 대응하는 **기대값 JSON 경로 집합**이며,
+      **M1 소비 테스트는 이 경로만 정확 비교해야 한다.** 목록 밖의 값은 기대값이 **나르는 참고**이지 계약이 아니다.
+
+      **왜 이 필드가 필요한가 — 운영자 결정 2026-08-31(assertion path 계약화).** 앞선 라운드는 `verifies` 를 산문으로
+      좁혔으나 `expected_file` 은 그대로여서, 「나르기만 한다」가 **선언에만 있고 기계에는 없었다.** 그 상태로는 M1
+      테스트가 기대값 파일 **전체**를 비교해 미승인 출력 표현까지 golden 으로 굳힐 수 있다. 이 필드가 그 선언을
+      기계가 읽는 계약으로 옮긴다.
+
+      **강등선과 같은 잣대다.** `classification_policy` 가 세운 선 — *"case 가 그 이름·표현을 **검증 대상으로 잠그는가**"* —
+      에서 **잠그는 쪽이 이 목록**이고 **나르기만 하는 쪽이 목록 밖**이다. 그래서 가족 A 가 나르는 미승인 이름
+      (`Measured` · `SampleInsufficient` · `Undeclared` · `UNKNOWN`)과 가족 B 의 자작 그릇은 **경로 밖에 놓이는 것이
+      기본**이고, `verifies` 가 그 값을 직접 주장하는 자리에서만 목록에 든다 — 그때 그 자리는 **어휘·표현 승인 대상**이다.
+
+      **도출 규칙 셋.** ① `verifies` 가 그 경로의 **값**을 주장하면 **든다**. ② `verifies` 가 **존재·형태만** 주장하고
+      어느 값인지는 주장하지 않으면(예: *"사유와 함께 거부된다"*) **들지 않는다** — 실제 어휘는 가족 B 답대로 **M1/M2
+      계약 설계**가 정한다. ③ `verifies` 가 아예 언급하지 않는 **동반 산출**(면허 축의 `unparsableRowCount` ·
+      `requirementSourceFields`, 공통 `policyVersion`)과 **입력 되울림**은 들지 않는다.
+
+      **`insufficient-evidence` case 에는 이 필드를 두지 않는다.** 그 case 들은 M1 golden 이 아니므로(§6 완료 gate 실패)
+      계약할 assertion 이 없다. **필드 생략은 「계약 없음」이지 「전체 비교」가 아니다** — 승인으로 `authoritative` 에
+      올라올 때 그 case 의 `verifies` 에서 목록을 도출해 함께 단다.
+
+      **목록이 `verifies` 와 어긋나면 그 자체가 finding 이다.** 전건을 `verifies` 문면에서 도출했고, 도출이 갈릴 수
+      있는 자리는 바꾸지 않고 레인 보고에 표로 올렸다.
     expected_reasoning: 기대값이 **어느 문서의 어느 문장**에서 나왔는가. Codex 독립 검토(§5 7단계)의 대상.
     source.kind 어휘: official-doc | operator-decision | approved-spec | m0-derived-rule | legacy-observation. 앞 셋은 `authoritative` 분류를 낸다. **`m0-derived-rule`은 `authoritative` 를 내지 않는다** — 운영자 결정 2026-08-31 로 `insufficient-evidence` 이며 근거와 되돌림 경로는 `classification_policy.insufficient_evidence`가 적는다. `legacy-observation`은 낼 수 없다.
     classification 어휘: |-
@@ -258,6 +283,28 @@ classification_policy:
     의 「승인 부재로 검증 주장에서 내린 축 — `floor-shortfall` 빈도 결과의 출력 표현」이 받고,
     되돌림은 그 축의 `unblocks_when` 이 지목한다.
 
+    **선언을 기계가 읽는 계약으로 옮긴다 — 운영자 결정 2026-08-31(assertion path 계약화).**
+
+    *결정 축어 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).*
+    물음: *"B3 때 택한 『verifies 좁혀 유지』가 불충분하다는 판정이다 — 기대값 JSON 자체에 미승인 출력
+    표현(임계 사정률·분자/분모·band·policyVersion)이 정확한 golden으로 남아 있고, manifest에 『어느 JSON
+    경로가 assertion인가』 계약이 없어 산문 선언만으로는 M1 테스트가 전체 파일을 비교하는 것을 못 막는다는
+    논지다. 어떻게 할까?"*
+    답: ***"assertion path 계약화"*** — 「expected를 최소 projection으로」와 「두 case 강등」 두 선택지를
+    물리치고 택한 답이다. 답이 든 선택지 문면: *"manifest에 M1 소비 테스트가 비교해야 하는 JSON 경로를
+    case 필드로 명시해 승인된 projection만 계약이 되게 함. 기대값 파일 무변경. 스키마 차원의 변경이라
+    전 case 적용 설계가 따라옴."*
+
+    *이 레인이 그 답을 적용한 범위*(운영자 발화가 아니라 적용이다). 필드 이름을 `verified_paths` 로 두고
+    정의를 `schema.extensions` 에 실었다. **`authoritative` 전건**에 그 case 의 `verifies` 에서 도출한 경로
+    목록을 달았고, **`insufficient-evidence` 전건은 필드를 두지 않았다**(생략 = 계약 없음, 전체 비교가
+    아니다). 도출 규칙 셋과 그 근거는 `schema.extensions.verified_paths` 가 갖는다.
+    **이 필드는 강등선의 기계적 표현이다** — 위 4문 4답이 세운 *"검증 대상으로 잠그는가"* 에서 **잠그는 쪽이
+    목록**이고 **나르기만 하는 쪽이 목록 밖**이다. 그래서 **가족 A 의 네 이름과 가족 B 의 자작 그릇은 경로
+    밖에 놓이는 것이 기본**이 됐고, `floor-shortfall-002`·`003` 은 승인된 `N`/`N+1` 경계 의미의 경로만
+    남아 **B3 이 지적한 출력 표현 묶음이 계약에서 빠졌다**. **기대값·입력 파일과 해시는 바꾸지 않았다** —
+    답이 고른 선택지 자신이 *"기대값 파일 무변경"* 을 명시한다.
+
     **어느 case 가 여기 드는지는 이 산문이 세지 않는다** — `source.kind`가 표시하고
     `reports/evidence/m0/0e/fixtures-commands.md` **F-7**이 센다.
   observed: 0건. 운영 데이터 접근 승인이 선행한다.
@@ -332,6 +379,10 @@ cases:
     classification: authoritative
     verifies: |-
         선언된 percent 입력이 fraction으로 명시 변환된다. 원문 unit이 보존된다.
+    verified_paths:
+      - "$.rate.fraction"
+      - "$.conversionDivisor"
+      - "$.preservedSourceUnit"
     source:
       kind: approved-spec
       reference: |-
@@ -366,6 +417,9 @@ cases:
     classification: authoritative
     verifies: |-
         선언된 fraction 입력은 배율 없이 그대로 통과한다.
+    verified_paths:
+      - "$.rate.fraction"
+      - "$.conversionDivisor"
     source:
       kind: approved-spec
       reference: |-
@@ -400,6 +454,9 @@ cases:
     classification: authoritative
     verifies: |-
         unit 미선언 입력은 크기와 무관하게 거부된다 (percent 모양). 004와 쌍이다.
+    verified_paths:
+      - "$.rate"
+      - "$.guessAttempted"
     source:
       kind: approved-spec
       reference: |-
@@ -434,6 +491,9 @@ cases:
     classification: authoritative
     verifies: |-
         unit 미선언 입력은 크기와 무관하게 거부된다 (fraction 모양). 003과 같은 결과여야 한다 — 값 크기로 단위를 추측하는 경로가 없음을 이 쌍이 고정한다.
+    verified_paths:
+      - "$.rate"
+      - "$.guessAttempted"
     source:
       kind: approved-spec
       reference: |-
@@ -468,6 +528,10 @@ cases:
     classification: authoritative
     verifies: |-
         선언이 개연성을 이긴다 — percent로 선언된 0.875는 0.00875이지 0.875가 아니다.
+    verified_paths:
+      - "$.rate.fraction"
+      - "$.conversionDivisor"
+      - "$.preservedSourceUnit"
     source:
       kind: approved-spec
       reference: |-
@@ -502,6 +566,9 @@ cases:
     classification: authoritative
     verifies: |-
         basis 태그가 다른 두 금액의 비교가 수행되지 않고 사유와 함께 거부된다. 두 값의 수치가 같으므로 대소 전제가 들어가지 않는다.
+    verified_paths:
+      - "$.comparisonPerformed"
+      - "$.directionAsserted"
     source:
       kind: operator-decision
       reference: |-
@@ -546,6 +613,9 @@ cases:
     classification: authoritative
     verifies: |-
         basis가 같으면 비교가 수행된다 — 001의 대조군.
+    verified_paths:
+      - "$.comparisonPerformed"
+      - "$.result"
     source:
       kind: operator-decision
       reference: |-
@@ -641,6 +711,9 @@ cases:
     classification: authoritative
     verifies: |-
         서로 다른 basis의 금액이 하나의 min/max 연산에 들어갈 수 없다 — R-BASIS-04가 남긴 형태.
+    verified_paths:
+      - "$.operationPerformed"
+      - "$.directionAsserted"
     source:
       kind: approved-spec
       reference: |-
@@ -739,6 +812,8 @@ cases:
     verifies: |-
         legacy 유래 행을 정의상 기본값 과세로 자동 태깅하지 않는다 — 저장 값이 정의를 따른다는 근거가 없다. 값은 기초금액 자리에 있으나 `Inclusive`로 승격되지
         않는다.
+    verified_paths:
+      - "$.autoTaggedFromDefinitionDefault"
     source:
       kind: operator-decision
       reference: |-
@@ -840,6 +915,9 @@ cases:
     classification: authoritative
     verifies: |-
         그룹 내 일부만 보유하면 `Ineligible` (그룹 내 AND). 미충족 면허가 그룹별로 남는다.
+    verified_paths:
+      - "$.verdict"
+      - "$.missingByGroup"
     source:
       kind: official-doc
       reference: |-
@@ -884,6 +962,10 @@ cases:
     classification: authoritative
     verifies: |-
         여러 그룹 중 하나만 충족하면 `Eligible` (그룹 간 OR). 다른 그룹의 미충족은 사유가 되지 않는다.
+    verified_paths:
+      - "$.verdict"
+      - "$.satisfiedGroups"
+      - "$.missingByGroup"
     source:
       kind: official-doc
       reference: |-
@@ -928,6 +1010,9 @@ cases:
     classification: authoritative
     verifies: |-
         그룹1 ⊂ 그룹2 형태에서 그룹1만 충족해도 `Eligible` — 논리적 잉여 그룹이 판정을 뒤집지 않는다.
+    verified_paths:
+      - "$.verdict"
+      - "$.satisfiedGroups"
     source:
       kind: official-doc
       reference: |-
@@ -972,6 +1057,9 @@ cases:
     classification: authoritative
     verifies: |-
         `lmtGrpNo` 결측 행 2개는 단일 그룹 AND로 폴딩된다 — OR로 흩지 않는다. 하나만 보유하므로 `Ineligible`.
+    verified_paths:
+      - "$.verdict"
+      - "$.foldedUngroupedRowsIntoSingleAndGroup"
     source:
       kind: operator-decision
       reference: |-
@@ -1022,6 +1110,8 @@ cases:
     classification: authoritative
     verifies: |-
         운영자 보유 면허 미신고는 `Uncertain`이지 `Ineligible`이 아니다.
+    verified_paths:
+      - "$.verdict"
     source:
       kind: operator-decision
       reference: |-
@@ -1065,6 +1155,10 @@ cases:
     classification: authoritative
     verifies: |-
         요건 원문이 없으면 `Uncertain(RequirementDataAbsent)` — 요건 없음으로 접히지 않는다.
+    verified_paths:
+      - "$.verdict"
+      - "$.uncertainReason"
+      - "$.requiredLicenses"
     source:
       kind: operator-decision
       reference: |-
@@ -1172,6 +1266,9 @@ cases:
     classification: authoritative
     verifies: |-
         수집 실패는 도메인 사유가 아닌 별도 `Uncertain(CollectionFailed)`이다 — legacy evidence 문자열에 대응물이 없는 값.
+    verified_paths:
+      - "$.verdict"
+      - "$.uncertainReason"
     source:
       kind: operator-decision
       reference: |-
@@ -1324,6 +1421,10 @@ cases:
     classification: authoritative
     verifies: |-
         V2는 면허 유효기간을 보지 않는다. 만료된 면허도 판정에 그대로 쓰이되 결과에 「유효기간 미검증」이 드러난다 — 침묵하면 검증된 판정과 구별되지 않는다.
+    verified_paths:
+      - "$.verdict"
+      - "$.licenseValidityUnverified"
+      - "$.expiryEvaluated"
     source:
       kind: operator-decision
       reference: |-
@@ -1476,6 +1577,9 @@ cases:
     classification: authoritative
     verifies: |-
         도급한도·연매출로 인한 판정은 자격 어휘로 산출되지 않는다 — 도급한도가 낮다는 이유로 공고가 `Ineligible`이 되지 않는다.
+    verified_paths:
+      - "$.qualificationVerdict"
+      - "$.awardedContractLimitEmittedAsQualification"
     source:
       kind: operator-decision
       reference: |-
@@ -1610,6 +1714,8 @@ cases:
     verifies: |-
         임계 사정률 경계 — 실현 사정률이 임계 **미만**이면 미달이 아니다. 이 case는 **표본 하나의 미달 여부**만 고정한다 — 밴드 필터·최소 표본 수·집계 빈도는
         덮지 않는다(`floor-shortfall-001`~`006`이 그 축이다).
+    verified_paths:
+      - "$.sampleIsShortfall"
     source:
       kind: approved-spec
       reference: |-
@@ -1655,6 +1761,8 @@ cases:
     verifies: |-
         임계 사정률 경계 — 실현 사정률이 임계 **와 같으면** 미달이 아니다 (초과가 아니므로 적격). 이 case는 **표본 하나의 미달 여부**만 고정한다 — 밴드
         필터·최소 표본 수·집계 빈도는 덮지 않는다(`floor-shortfall-001`~`006`이 그 축이다).
+    verified_paths:
+      - "$.sampleIsShortfall"
     source:
       kind: approved-spec
       reference: |-
@@ -1700,6 +1808,8 @@ cases:
     verifies: |-
         임계 사정률 경계 — 실현 사정률이 임계 **초과**면 미달이다. 이 case는 **표본 하나의 미달 여부**만 고정한다 — 밴드 필터·최소 표본 수·집계 빈도는 덮지
         않는다(`floor-shortfall-001`~`006`이 그 축이다).
+    verified_paths:
+      - "$.sampleIsShortfall"
     source:
       kind: approved-spec
       reference: |-
@@ -1744,6 +1854,11 @@ cases:
     classification: authoritative
     verifies: |-
         최소 표본 수 `N-1`(149) — 값이 아니라 사유 있는 측정 불가를 반환한다.
+    verified_paths:
+      - "$.result"
+      - "$.frequency"
+      - "$.reason.required"
+      - "$.reason.actual"
     source:
       kind: operator-decision
       reference: |-
@@ -1790,6 +1905,9 @@ cases:
     verifies: |-
         최소 표본 수 `N`(150) — **경계 포함**. 표본이 최소 수와 같으면 표본 부족이 아니라 측정된다(`N-1`인 001과 쌍). **결과의 출력 표현은 이 case가
         검증 대상으로 잠그지 않는다** — 기대값이 나를 뿐이고 그 자리는 `not_covered`가 적는다.
+    verified_paths:
+      - "$.result"
+      - "$.sampleSize"
     source:
       kind: operator-decision
       reference: |-
@@ -1859,6 +1977,29 @@ cases:
         policy_version: |-
           해당 없음 — `verifies` 의 범위 서술 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
+      - date: 2026-08-31
+        change: |-
+          `verified_paths` 를 달았다 — `["$.result", "$.sampleSize"]`. **`classification` 은 `authoritative` 그대로이고
+          기대값·입력·해시는 이번에도 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 8 — Codex 재리뷰 B4 `findings[0]`(high).** 위 항목이 `verifies` 를 좁혔으나
+          `expected_file` 은 그대로여서 **「나르기만 한다」가 선언에만 있고 기계에는 없었다.** 그 상태로는 M1
+          테스트가 기대값 파일 전체를 비교해 `criticalAssessmentRate` · `frequency` 의 분자/분모 · `band` ·
+          `policyVersion` 같은 **미승인 출력 표현까지 golden 으로 굳힐 수 있다** — B3 이 지적한 축이 닫히지 않은
+          채였다.
+
+          운영자는 「expected 를 최소 projection 으로」와 「두 case 강등」을 물리치고 **「assertion path 계약화」**
+          를 택했다 — 물음·답 축어는 `classification_policy.insufficient_evidence` 가 갖는다. 그 답에 따라 이
+          case 가 **주장하는 경로만** 계약으로 명시했다: `$.result`(표본 부족이 아니라 측정된다) ·
+          `$.sampleSize`(표본이 최소 수와 같다). **B3 이 든 출력 표현 묶음은 전부 목록 밖**이며 그 자리는 위
+          항목이 만든 `not_covered` 와 `uncovered_axes` 항목이 계속 받는다.
+
+          **`$.result` 의 값 `Measured` 는 가족 A 가 나르는 미승인 이름이다** — `verifies` 가 「측정된다」로 그
+          값을 직접 주장하므로 도출 규칙 ①에 따라 목록에 들었고, 그래서 **어휘·표현 승인 대상**이다.
+          규칙 셋은 `schema.extensions.verified_paths` 가 적는다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 명시이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -1869,6 +2010,9 @@ cases:
     verifies: |-
         최소 표본 수 `N+1`(151) — **경계 위쪽**에서도 측정된다(`N`인 002와 쌍). **빈도의 표현 형태는 이 case가 검증 대상으로 잠그지 않는다** —
         기대값이 나를 뿐이고 그 자리는 `not_covered`가 적는다.
+    verified_paths:
+      - "$.result"
+      - "$.sampleSize"
     source:
       kind: operator-decision
       reference: |-
@@ -1935,6 +2079,26 @@ cases:
         policy_version: |-
           해당 없음 — `verifies` 의 범위 서술 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
+      - date: 2026-08-31
+        change: |-
+          `verified_paths` 를 달았다 — `["$.result", "$.sampleSize"]`. **`classification` 은 `authoritative` 그대로이고
+          기대값·입력·해시는 이번에도 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 8 — Codex 재리뷰 B4 `findings[0]`(high).** 근거는 `floor-shortfall-002` 의 같은 날
+          항목과 같다 — `verifies` 를 좁혀도 `expected_file` 이 그대로라 **선언이 기계에 닿지 않았다.**
+          이 case 에서 특히 문제였던 것은 `frequency.numerator`·`frequency.denominator` 다: B3 이 유리수 표현을
+          지적해 `verifies` 에서 뺐는데 **기대값에는 정확한 값으로 남아 전체 비교의 대상이었다.**
+
+          운영자 답 **「assertion path 계약화」**(「최소 projection」·「강등」을 물리쳤다)에 따라 이 case 가
+          주장하는 경로만 명시했다: `$.result`(경계 위쪽에서도 측정된다) · `$.sampleSize`(`N+1`). **`frequency`
+          하위 경로는 하나도 들지 않는다** — 유리수 표현도 십진 미주장도 계약이 아니고, 그 자리는 위 항목이
+          만든 `not_covered` ①②가 계속 받는다.
+
+          **002 와 목록이 같은 것이 옳다** — 두 case 는 같은 축(경계)의 `N` 과 `N+1` 이고 다른 것은 **입력**이다.
+          같은 계약에 입력만 달리 넣어 결과가 같다는 것이 곧 「경계 위쪽에서도 측정된다」의 검증이다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 명시이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -1944,6 +2108,11 @@ cases:
     classification: authoritative
     verifies: |-
         여유가 충분해 빈도가 `0.0`인 경우와 판정 불가(001)가 서로 다른 표시로 구분된다.
+    verified_paths:
+      - "$.result"
+      - "$.frequency.numerator"
+      - "$.frequency.exactDecimal"
+      - "$.distinctFromUnmeasurable"
     source:
       kind: operator-decision
       reference: |-
@@ -1991,6 +2160,12 @@ cases:
     verifies: |-
         개연 범위 밖 표본이 분모에서 빠지고, 그 결과 표본 부족이 되면 판정 불가로 전이된다. 밴드 값은 **synthetic 정책 입력**이며 기대값은 그 구체 값에 의존하지
         않는다.
+    verified_paths:
+      - "$.qualifiedDenominator"
+      - "$.result"
+      - "$.transitionedFrom"
+      - "$.reason.required"
+      - "$.reason.actual"
     source:
       kind: approved-spec
       reference: |-
@@ -2041,6 +2216,10 @@ cases:
     verifies: |-
         선언된 단위가 서로 다른 두 율(percent·fraction)은 명시 변환되어 정상 처리된다 — 거부되는 것은 **미선언**이지 **선언된 혼합**이 아니다.
         rate-unit-003·004의 대조군.
+    verified_paths:
+      - "$.normalizedFloorRate.fraction"
+      - "$.normalizedBidRate.fraction"
+      - "$.preservedSourceUnits"
     source:
       kind: approved-spec
       reference: |-
@@ -2996,6 +3175,15 @@ cases:
     classification: authoritative
     verifies: |-
         원본 값을 조용히 교정하지 않는다 — 원본·판정·근거·정책 version이 함께 보존되고 복구 추정치는 **별도 필드**에 들어간다.
+    verified_paths:
+      - "$.originalBaseAmount"
+      - "$.originalFieldMutated"
+      - "$.classification"
+      - "$.evidence.firstMatchedRule"
+      - "$.recoveryEstimate.field"
+      - "$.recoveryEstimate.amount"
+      - "$.recoveryWrittenToOriginalField"
+      - "$.policyVersion"
     source:
       kind: approved-spec
       reference: |-
@@ -3040,6 +3228,11 @@ cases:
     verifies: |-
         first-match rule 순서가 결과를 바꾼다 (순서 A: `suspect-ratio` 먼저). 003과 쌍을 이뤄 **순서가 load-bearing이고 정책 데이터로
         외부화된다**는 것만 고정한다 — 어느 순서가 옳은지는 고정하지 않는다.
+    verified_paths:
+      - "$.classification"
+      - "$.firstMatchedRule"
+      - "$.orderIsLoadBearing"
+      - "$.policyVersion"
     source:
       kind: approved-spec
       reference: |-
@@ -3087,6 +3280,11 @@ cases:
     classification: authoritative
     verifies: |-
         같은 행·같은 rule hit에 순서 B(`clean-integer` 먼저)를 적용하면 결과가 달라진다. 002와 쌍.
+    verified_paths:
+      - "$.classification"
+      - "$.firstMatchedRule"
+      - "$.orderIsLoadBearing"
+      - "$.policyVersion"
     source:
       kind: approved-spec
       reference: |-
@@ -3129,6 +3327,9 @@ cases:
     classification: authoritative
     verifies: |-
         NaN은 `Money`로 구성되지 않고 경계에서 거부된다 — 원화 확정 금액은 정수다.
+    verified_paths:
+      - "$.moneyConstructed"
+      - "$.coercedToZero"
     source:
       kind: approved-spec
       reference: |-
@@ -3165,6 +3366,9 @@ cases:
     classification: authoritative
     verifies: |-
         Infinity도 같다 — 004와 쌍.
+    verified_paths:
+      - "$.moneyConstructed"
+      - "$.coercedToZero"
     source:
       kind: approved-spec
       reference: |-
@@ -3199,6 +3403,11 @@ cases:
     classification: authoritative
     verifies: |-
         Python 예측 응답은 `review_required`를 반환하지 않는다 — 업무 판정은 Kotlin이 소유한다.
+    verified_paths:
+      - "$.contractViolations"
+      - "$.forbiddenFieldsPresent"
+      - "$.reviewRequiredOwnedBy"
+      - "$.verdictOwnedBy"
     source:
       kind: operator-decision
       reference: |-
@@ -3233,6 +3442,10 @@ cases:
     classification: authoritative
     verifies: |-
         Python 응답에 `review_required`가 실리면 계약 위반으로 거부된다 — 001의 반례.
+    verified_paths:
+      - "$.contractViolations[0].field"
+      - "$.forbiddenFieldsPresent"
+      - "$.accepted"
     source:
       kind: operator-decision
       reference: |-
@@ -3544,6 +3757,10 @@ cases:
     classification: authoritative
     verifies: |-
         개연 밴드 밖 운영자 하한 override는 버리지도 통과시키지도 않고 사유와 함께 거부되며, 그 거부가 관측 가능하다. 밴드는 **synthetic 정책 입력**이다.
+    verified_paths:
+      - "$.silentlyDropped"
+      - "$.silentlyAccepted"
+      - "$.observableInResult"
     source:
       kind: operator-decision
       reference: |-
@@ -4039,6 +4256,10 @@ uncovered_axes:
       판정 불가의 구별을 고정한다.
       **덮이지 않는 것은 「측정될 때 결과가 어떤 항목 묶음으로, 빈도가 어떤 수 표현으로
       나오는가」** 다. 기대값 파일은 그 형태를 **그대로 나른다** — 지우지 않았고 해시도 그대로다.
+      **그 「나르기만 한다」가 이제 기계에도 있다** — 운영자 결정 2026-08-31(assertion path 계약화)로
+      두 case 의 `verified_paths` 가 `$.result`·`$.sampleSize` 뿐이라 `criticalAssessmentRate` ·
+      `frequency` 하위 · `band` · `biasDirection` · `numerator`/`denominator` · `policyVersion` 이
+      **계약 밖**이다. 앞서 이 자리는 산문 선언뿐이었고 M1 이 전체 파일을 비교하는 것을 막지 못했다.
     unblocks_when: |-
       운영자가 `capability-map.md` DEC-04 acceptance 의 *"빈도 결과가 값 단독이 아니라 (임계
       사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로 반환된다"* 를 **업무 규칙으로 명시
@@ -4152,6 +4373,12 @@ next_steps:
     표현)이 `floor-shortfall-002`·`003` 의 `verifies` 를 좁히면서 잠금에서 뺀 **출력 표현 묶음과
     유리수(분자/분모) 표현**이 그 자리다. 승인 문면과 되돌림은 `uncovered_axes` 의 「승인 부재로
     **검증 주장에서 내린** 축」이 지목한다.
+  - |-
+    **M1 소비 테스트는 `verified_paths` 만 정확 비교한다.** 기대값 파일 전체를 비교하면 목록 밖의
+    미승인 출력 표현까지 golden 으로 굳는다 — 그것을 막으려고 운영자 결정 2026-08-31(assertion path
+    계약화)이 이 필드를 세웠다. `insufficient-evidence` case 는 필드가 없고 **그것은 「계약 없음」이지
+    「전체 비교」가 아니다**. 목록 밖 값이 실제 계약이 되어야 한다고 판단되면 **먼저 그 표현을 승인받고**
+    해당 case 의 `verified_paths` 와 `change_history` 를 함께 갱신한다.
   - "`data-extract.md` §5 7단계 — Claude 가 이 corpus 를 소비하는 test 를 만들고(M1 slice), Codex 가 source·privacy·expected reasoning 을 독립 검토한다."
   - "사용자 승인 시 각 case 의 `review.approved_by_user`를 `true`로 올리고 `review.claude_commit`을 채운다."
   - "기대값을 바꿀 때 case 를 덮어쓰지 않고 `change_history`에 변경 이유와 policy version 을 적는다(`data-extract.md` §3)."

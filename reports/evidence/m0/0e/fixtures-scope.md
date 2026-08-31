@@ -114,6 +114,26 @@ Unmeasurable·versioned 정책)를 넘어 『임계 사정률·빈도·분자·�
 가 갖고, 잠금이 풀린 축은 같은 파일 `uncovered_axes` 의 「승인 부재로 **검증 주장에서 내린** 축」이
 받는다.
 
+**같은 날 운영자가 그 선언을 기계가 읽는 계약으로 옮기게 했다 — assertion path 계약화.**
+
+*결정 축어 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).*
+물음: *"B3 때 택한 『verifies 좁혀 유지』가 불충분하다는 판정이다 — 기대값 JSON 자체에 미승인 출력
+표현(임계 사정률·분자/분모·band·policyVersion)이 정확한 golden으로 남아 있고, manifest에 『어느 JSON
+경로가 assertion인가』 계약이 없어 산문 선언만으로는 M1 테스트가 전체 파일을 비교하는 것을 못 막는다는
+논지다. 어떻게 할까?"* — 답: ***"assertion path 계약화"*** (「expected를 최소 projection으로」·「두 case
+강등」을 물리치고 택함). 답이 든 선택지 문면: *"manifest에 M1 소비 테스트가 비교해야 하는 JSON 경로를
+case 필드로 명시해 승인된 projection만 계약이 되게 함. 기대값 파일 무변경. 스키마 차원의 변경이라 전
+case 적용 설계가 따라옴."*
+
+*이 레인이 그 답을 적용한 범위는 이 레인의 판단이다*(운영자 발화가 아니다). 필드를 `verified_paths` 로
+두고 `authoritative` **전건**에 `verifies` 에서 도출한 경로 목록을 달았다. `insufficient-evidence` 전건은
+필드를 두지 않았고 **생략은 「계약 없음」이지 「전체 비교」가 아니다** — 그 case 들은 §6 완료 gate 실패라
+계약할 assertion 이 없다. 도출 규칙 셋(**값을 주장하면 든다 / 존재·형태만 주장하면 들지 않는다 / 동반
+산출·입력 되울림은 들지 않는다**)은 `manifest.yaml` 의 `schema.extensions.verified_paths` 가 갖는다.
+**이 필드는 앞선 강등선의 기계적 표현이다** — 「잠그는가」에서 잠그는 쪽이 목록이고 나르는 쪽이 목록
+밖이라, 가족 A 의 네 이름과 가족 B 의 자작 그릇이 **경로 밖에 놓이는 것이 기본**이 됐다. 정본은
+`manifest.yaml` 의 `classification_policy.insufficient_evidence` 가 갖는다.
+
 **셈을 여기 옮겨 적지 않는다** — case 수 · **분류별 분포** · `source.kind` 분포와 그 교차 ·
 `uncovered_axes`/`insufficient_evidence`/`access_approval_required` 수는 전부 **F-7** 이 낸다.
 도메인별 건수도 같은 명령이 낸다(분류를 섞지 않으려면 `kind x class` 줄을 함께 본다).

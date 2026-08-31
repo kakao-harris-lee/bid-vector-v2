@@ -211,6 +211,52 @@ legacy 좌표를 저장소 안에 고정한 것이 `fixtures/legacy-reference-in
   대응이 전건인지**를 한 줄로 보인다(운영자 결정 2026-08-31,
   `manifest.yaml`의 `classification_policy.insufficient_evidence`)
 
+### F-7b · `verified_paths` 계약의 구조 검사
+
+운영자 결정 2026-08-31(assertion path 계약화)이 세운 필드를 기계로 본다. **세 가지** —
+`authoritative` 전건에 있고 `insufficient-evidence` 전건에 없는가 · 목록이 비었거나 중복인가 ·
+**목록의 모든 경로가 그 case 의 기대값 JSON 에 실재하는가**. 셋째가 핵심이다: 경로가 오타이거나
+기대값에 없으면 그 계약은 아무것도 비교하지 못한다.
+
+- cmd:
+  ```bash
+  /tmp/fxvenv/bin/python -c "
+  import yaml, json, re
+  m = yaml.safe_load(open('fixtures/manifest.yaml'))
+  def resolve(o, p):
+      cur = o
+      for key, idx in re.findall(r'\.([A-Za-z_][A-Za-z0-9_]*)|\[(\d+)\]', p):
+          if key:
+              if not isinstance(cur, dict) or key not in cur: return False
+              cur = cur[key]
+          else:
+              i = int(idx)
+              if not isinstance(cur, list) or i >= len(cur): return False
+              cur = cur[i]
+      return True
+  bad = []
+  for c in m['cases']:
+      vp = c.get('verified_paths')
+      if c['classification'] == 'authoritative':
+          if not vp: bad.append((c['id'], 'authoritative 인데 목록이 없거나 비었다')); continue
+          if len(vp) != len(set(vp)): bad.append((c['id'], '중복 경로'))
+          exp = json.load(open(c['expected_file']))
+          for p in vp:
+              if not p.startswith('\$.'): bad.append((c['id'], 'prefix: ' + p))
+              elif not resolve(exp, p): bad.append((c['id'], '기대값에 부재: ' + p))
+      elif vp is not None:
+          bad.append((c['id'], 'insufficient-evidence 인데 목록이 있다'))
+  print('with verified_paths', sum(1 for c in m['cases'] if 'verified_paths' in c))
+  print('violations', bad)
+  "
+  ```
+- exit: 0
+- 핵심 결과: `violations` **빈 목록**. 필드 보유 수는 이 명령이 낸다 — **`authoritative` 전건과
+  같아야 하고 그 대조는 F-7 의 `classification` 줄과 함께 읽는다.**
+  **이 검사가 보지 못하는 것을 적어 둔다** — 경로가 **실재하는가**는 재지만 그 목록이 그 case 의
+  `verifies` 를 **옳게 도출했는가**는 기계가 재지 못한다. 그것은 사람이 읽는 자리이고
+  도출 규칙은 `manifest.yaml` 의 `schema.extensions.verified_paths` 가 적는다
+
 ---
 
 ## 실행하지 않은 것 (승인 대상)
