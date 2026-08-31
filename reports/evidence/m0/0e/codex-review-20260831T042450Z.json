@@ -1,0 +1,45 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "71e3e3a12f494dd5bd97f0edc3e1e7761ce67a5e",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 1752,
+      "evidence": "`classification_policy.authoritative`(98~101행)는 M0 산출 문서가 자체 도출한 규칙을 authoritative 근거로 인정하지 않는다. 그러나 `floor-shortfall-002`의 `verifies`는 임계 사정률·빈도·분자·분모·범위·policy version 묶음을 고정하고, `floor-shortfall-003`은 빈도를 유리수(분자/분모)로 고정한다. 인용된 운영자 결정 `OPEN-DEC-01`은 최소 표본 수 150과 정책 외부화만 승인했고(`reports/evidence/m0/0a2/decisions.md:342`), `OPEN-DEC-06`은 `biasDirection` 노출만 승인했다. `v2-지침서.md` §4.4도 표본 부족의 `Unmeasurable`, 비확률 표시, versioned 정책만 요구한다. 따라서 두 case는 `capability-map.md`/`data-dictionary.md`가 자체 도출한 출력 표현을 authoritative golden으로 고정한다. 실제 expected도 002에서 전체 묶음을, 003에서 numerator/denominator와 decimal 미주장을 강제한다.",
+      "required_fix": "`floor-shortfall-002`·`003`을 승인된 N/N+1 경계 의미만 검증하도록 `verifies`와 expected assertion 범위를 좁히거나 `insufficient-evidence`로 강등하고 uncovered axis를 기록한다. 현재 출력 묶음·유리수 표현을 유지하려면 해당 계약을 사용자에게 명시 승인받아 근거와 change history를 기록한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse HEAD && git cat-file -t 14686dbf3bff4085203ffdcd931564fd1e36edf0 && git cat-file -t 71e3e3a12f494dd5bd97f0edc3e1e7761ce67a5e && git merge-base --is-ancestor 14686dbf3bff4085203ffdcd931564fd1e36edf0 71e3e3a12f494dd5bd97f0edc3e1e7761ce67a5e",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..71e3e3a12f494dd5bd97f0edc3e1e7761ce67a5e && git log --oneline 14686dbf3bff4085203ffdcd931564fd1e36edf0..71e3e3a12f494dd5bd97f0edc3e1e7761ce67a5e",
+    "git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..71e3e3a12f494dd5bd97f0edc3e1e7761ce67a5e; git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..71e3e3a12f494dd5bd97f0edc3e1e7761ce67a5e; git ls-files --others --exclude-standard; git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..71e3e3a12f494dd5bd97f0edc3e1e7761ce67a5e",
+    "sed -n over agent-workflow.md, milestone-0.md, milestone-1.md, v2-지침서.md, data-extract.md, and reports/evidence/m0/0e/*.md",
+    "git diff --unified=5 14686dbf3bff4085203ffdcd931564fd1e36edf0..71e3e3a12f494dd5bd97f0edc3e1e7761ce67a5e -- v2-지침서.md milestone-0.md milestone-1.md docs/adr docs/discovery/capability-map.md .claude CLAUDE.md",
+    "awk manifest input/expected SHA-256 pairs | shasum -a 256 -c -",
+    "python3 JSON parse of fixtures/input/*.json and fixtures/expected/*.json; jq -e over all fixture JSON and fixtures/legacy-reference-index.json",
+    "python3 fixtures/tools/check_legacy_numbers.py",
+    "ruby YAML audit of fixtures/manifest.yaml: 63 unique cases, 35 authoritative, 28 insufficient-evidence, required keys/files/hashes present, review state audit",
+    "ruby Psych AST duplicate-key audit of fixtures/manifest.yaml",
+    "SHA-256 and path-set audit of fixtures/legacy-reference-index.json against fixtures/manifest.yaml",
+    "python3 inline OPEN registry/§14 coverage audit: active 69, B 14, C 55, missing/extra/overlap empty",
+    "ADR status/open checks and evidence-size rerun: 9 decided ADRs, 11 diff hunks, deliverable net 501, evidence 350 lines",
+    "ruby semantic inspection of every authoritative fixture input/expected pair and manifest source/verifies text",
+    "rg/nl source-decision audit for OPEN-DEC-01, OPEN-DEC-06, floor-shortfall-002, and floor-shortfall-003",
+    "grep secret/privacy patterns under fixtures/",
+    "rg -n '총 4회|총 5회|상한.*[45]회|4회 초과|5회 도달' .claude CLAUDE.md agent-workflow.md",
+    "find reports/evidence/m0 -path '*/codex-review-*.json' | wc -l and verdict summary audit",
+    "git status --porcelain=v1; git rev-parse HEAD; git rev-parse base/head commits; final ancestor check"
+  ],
+  "residual_risks": [
+    "28개 case는 `insufficient-evidence`, uncovered axis는 27개이며 observed/legacy-behavior case는 0개다. 모든 case의 `approved_by_user`는 false이고 `codex_verdict`는 pending이어서 M1 fixture 선행 조건은 evidence가 선언한 대로 부분 만족 상태다.",
+    "clean worktree에 legacy checkout이 없어 `legacy-reference-index.json`의 object ID를 실제 `ed4b06c` 저장소와 대조하지 못했다. 저장소 내부 해시와 manifest 경로 집합만 검증했다.",
+    "`reports/evidence/m0/0e/commands.md`의 C-8/C-10 핵심 결과는 현재 HEAD에서 재실행한 값과 다르다(기록은 verdict 32건·493/342행, 실측은 33건·501/350행). 명령 자체와 주요 게이트 결과는 재실행으로 확인했다.",
+    "이 range에는 production application/wiring이 없어 retry·멱등성·DB write·외부 side effect·contract runtime 동작은 실행 검증 대상이 아니었다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.149.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
