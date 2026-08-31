@@ -55,9 +55,10 @@ acceptance** 뿐이라 `data-extract.md` §1의 세 층(`authoritative`·`observ
 
 *이 레인이 그 답을 적용한 범위는 이 레인의 판단이다*(운영자 발화가 아니다). **②는 「운영자 발화」로
 좁혀지지 않는다** — 커밋된 결정 기록 절 안의 **기록자 bullet 문면도 ②의 근거로 선다.** 이 결정으로
-전수 재판정이 내렸던 `floor-applicability-001` 이 `authoritative` 로 복원됐고(그 case 가 재는 문면은
+전수 재판정이 `floor-applicability-001` 에 걸었던 **규칙 축의 강등이 풀렸고**(그 case 가 재는 문면은
 `0a2/decisions.md:317` 의 `OPEN-DEC-09` 결정 절 본문 bullet 이다), 기록자 bullet 에 기댄 다른
-case 들의 유지도 같은 잣대로 정당화된다. **그 문면이 커밋된 결정 기록 안에 있어야 한다는 한계는 이
+case 들의 유지도 같은 잣대로 정당화된다. **그 case 자신은 지금 `authoritative` 가 아니다** — 뒤이은
+어휘 판정이 다른 축에서 다시 내렸다(아래). **그 문면이 커밋된 결정 기록 안에 있어야 한다는 한계는 이
 답이 새로 건 것이 아니라 ② 자신의 문면이 이미 갖는 것이다** — 그래서 M0 산출 문서가 스스로 쓴
 acceptance·검증 방법은 이 기준으로 서지 않는다. 정본은 `manifest.yaml` 의
 `classification_policy.authoritative` 가 갖는다.
@@ -95,10 +96,15 @@ provenance) · `money-basis`(`Unknown` 과세 금액의 산술 비교 차단). *
 `verdict`(`SkipReason` 구체 어휘). `verdict-001`·`002` 가 `OPEN-DEC-05` 로 떠받쳐지는 것은
 「문장이 아니라 사유 코드로 구분된다」는 **규칙**까지이고, 기대값이 함께 고정하는 두 **어휘**
 (`CapacityHold`·`LowPriority`)는 `data-dictionary.md` §3.6의 자체 정의에서만 나온다.
+**이어진 어휘 전수 스캔이 같은 축에 둘을 더 붙였다** — `verdict-003`(기대값이 그 `LowPriority`
+와 `BidNow` 를 잠근다)과 `floor-applicability-001`(`OutOfScope`). 규칙의 근거는 둘 다 성한데
+기대값이 미승인 어휘를 잠그는 자리다.
 **재판정은 앞선 넷 중 하나의
 「덮개」 서술도 뒤집었다** — `koneps-collection` 은 그 축에 `authoritative` 로 남는 case 가 있다고
-적었으나 **전건 내려갔다.** `floor-applicability` 는 `-001` 이 `authoritative` 로 남아 그 덮개
-서술이 선다(위 기록자 bullet 결정). 원래 막혀 있던 축은 그대로 남는다.
+적었으나 **전건 내려갔다.** `floor-applicability` 도 **어휘 판정으로 전건이 됐다** — `-001` 의
+**규칙**은 기록자 bullet 결정으로 서지만 그 case 의 `verifies` 가 상태의 이름(`OutOfScope`)까지
+함께 고정하고 그 어휘는 `data-dictionary.md` 가 스스로 더한 variant 다. 원래 막혀 있던 축은
+그대로 남는다.
 그 목록을 비우지 않고 그럴듯하게 채우지도 않았다. **수는 여기 박지 않는다 — F-7 이 낸다.**
 
 **§6 이 이 상태에 완료 gate 실패를 건다.** 그러므로 `milestone-1.md:12` 는 **이 결정이 되돌려지기
