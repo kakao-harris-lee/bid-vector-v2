@@ -158,6 +158,23 @@ classification_policy:
     §3.2.1 「동반 산출」과 `capability-map.md` QUAL-03 acceptance 이며 M0 자체 도출이다. 이 corpus 는
     그것을 case 의 주 규칙으로 세우지 않는다.** 세운 자리는 내렸다.
 
+    **판정 대상에 어휘가 든다 — 운영자 결정 2026-08-31. 물음과 답을 그대로 옮긴다(대신 판단하지
+    않는다).**
+    물음: *"verdict-001·002가 SkipReason 구체 어휘 `CapacityHold`·`LowPriority`를 authoritative
+    golden으로 고정하고 있다. OPEN-DEC-05는 『Skip 판정 + 사유 코드 의무』라는 축만 정했고 이 두
+    리터럴 값의 출처는 data-dictionary 자체 도출뿐이다. 어떻게 처리할까?"*
+    답: ***"insufficient-evidence 강등"*** — 어휘 명시 승인과 합성 어휘 재작성 두 선택지를
+    물리치고 택한 답이다.
+
+    **이 레인이 그 답을 적용한 범위**(운영자 발화가 아니라 적용이다). 판정 대상은 case 의
+    `verifies` 가 주장하는 규칙만이 아니라 **기대값이 도메인 어휘로 고정하는 리터럴 토큰** —
+    enum 값 · 상태/사유 코드 · 판정 어휘 · 고정 문자열 · 도메인 키 이름 — 도 포함한다. 그 토큰이
+    위 세 출처(①②③) 어느 문면에도 없고 출처가 M0 산출 문서의 자체 도출뿐이면 그 case 는
+    내려간다. **fixture 파일의 형식·schema 자체**(`data-extract.md` §3가 정하는 것)는 대상이
+    아니다 — 어휘를 재는 것이지 그릇을 재는 것이 아니다. `authoritative` 로 남은 case 전수에
+    이 잣대를 한 번 돌렸고, 판정이 갈릴 수 있는 자리는 **바꾸지 않고 운영자 에스컬레이션 후보로
+    레인 보고에 남겼다.**
+
     **어느 case 가 여기 드는지는 이 산문이 세지 않는다** — `source.kind`가 표시하고
     `reports/evidence/m0/0e/fixtures-commands.md` **F-7**이 센다.
   observed: 0건. 운영 데이터 접근 승인이 선행한다.
@@ -3145,11 +3162,11 @@ cases:
       approved_by_user: false
   - id: verdict-001
     domain: verdict
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         두 보류가 문장이 아니라 `SkipReason`으로 구분된다 (`CapacityHold`). 002와 쌍.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           OPEN-DEC-05 (운영자 결정) · data-dictionary.md §3.6 · §3.1
     expected_reasoning: |-
@@ -3180,18 +3197,43 @@ cases:
     expected_sha256: 3c65444020710f62c670d9d6c133a36b66adab2bf81894087de3063b2e543e49
     not_covered: |-
       `SkipReason` 어휘의 **전수성** — `OPEN-DIC-03`(M1에서 게이트 사다리를 옮길 때 확정)
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **0E 수정 라운드 5 — 판정 대상에 어휘가 든다(운영자 결정 2026-08-31).** 앞선 재판정들은
+          case 가 선언한 `verifies` 의 **규칙**만 문면 대조했고 기대값이 **고정하는 어휘**는 보지 않았다.
+          이 case 의 기대값은 `skipReason` 값으로 리터럴 `CapacityHold` 를 고정한다.
+
+          인용된 운영자 결정 `OPEN-DEC-05` 가 정하는 것은 **축뿐**이다 — *"금지되는 것은 한-verdict 가
+          아니라 **문장으로만 구분되는 형태**"*, 곧 「하나의 Skip 판정 + 사유 코드 의무」다. 그 문면은
+          **어느 사유 코드가 있는지를 정하지 않는다.** 두 리터럴이 실제로 나오는 자리는
+          `data-dictionary.md` §3.6의 *"`SkipReason` **필수**. 최소 두 값: `CapacityHold` · `LowPriority`"*
+          하나이고, 그것은 **M0 산출 문서가 스스로 쓴 정의**다. `classification_policy.authoritative` ②의
+          기록자 bullet 기준으로도 서지 않는다 — `data-dictionary.md` 는 커밋된 결정 기록이 아니다.
+          조달청 공식 문서(①)·`v2-지침서.md`(③) 어느 쪽에도 이 어휘가 없다.
+
+          그대로 두면 **미승인 enum 값이 M1 golden 으로 고정된다.** 운영자는 세 선택지 가운데
+          「어휘 명시 승인」과 「합성 어휘 재작성」을 물리치고 **강등**을 택했다 — 물음·답 축어는
+          `classification_policy.insufficient_evidence` 가 갖는다. 덮이지 않게 된 축은
+          `uncovered_axes` 의 「승인 부재로 authoritative 덮개를 잃은 축 — verdict (`SkipReason` 구체
+          어휘)」가 받고, 되돌림 경로는 그 축의 `unblocks_when` 이 지목한다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: verdict-002
     domain: verdict
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         두 보류가 문장이 아니라 `SkipReason`으로 구분된다 (`LowPriority`). 001과 쌍 — verdict는 같고 reason code가 다르다.
     source:
-      kind: operator-decision
+      kind: m0-derived-rule
       reference: |-
           OPEN-DEC-05 · data-dictionary.md §3.6 · §3.1
     expected_reasoning: |-
@@ -3220,7 +3262,21 @@ cases:
     expected_sha256: c1a30beac648f399b26934b05fbc7102e5fff4d12af99a338ee3dfc33ecb9a42
     not_covered: |-
       `SkipReason` 어휘의 **전수성** — `OPEN-DIC-03`
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
+          `insufficient-evidence` 로 내렸다. **기대값·입력·해시는 바꾸지 않았다** — case 는 그대로 남는다.
+        reason: |-
+          **`verdict-001` 과 같다 — 같은 라운드, 같은 잣대, 같은 결정.** 이 case 의 기대값이 고정하는
+          리터럴은 `LowPriority` 이고, 그 어휘 역시 `OPEN-DEC-05` 문면이 아니라 `data-dictionary.md`
+          §3.6의 *"최소 두 값: `CapacityHold` · `LowPriority`"* 라는 **M0 자체 정의**에서만 나온다.
+          `-001` 의 `change_history` 가 근거 전부를 적고, 물음·답 축어는
+          `classification_policy.insufficient_evidence` 가 갖는다. 둘은 쌍이라 한쪽만 내리면
+          「문장이 아니라 reason code 로 구분된다」는 대조가 성립하지 않으므로 함께 내렸다.
+        policy_version: |-
+          해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -3494,8 +3550,14 @@ uncovered_axes:
     why_blocked: "최소 두 값은 확인되나 목록이 닫혔는지는 미확인. 지금 닫으면 게이트 사다리를 옮기며 발견될 사유가 갈 곳을 잃는다."
     owning_open:
       - "OPEN-DIC-03 (활성)"
-    what_is_covered_instead: "`verdict-001`·`002`가 확인된 두 값으로 「문장이 아니라 reason code 로 구분된다」를 고정한다."
-    unblocks_when: M1 에서 게이트 사다리를 옮길 때.
+    what_is_covered_instead: |-
+      **덮이지 않는다.** 이 자리를 덮던 `verdict-001`·`002`(확인된 두 값으로 「문장이 아니라 reason
+      code 로 구분된다」를 고정)가 **둘 다 `insufficient-evidence` 로 내려갔다** — 그 두 값 자체가
+      승인된 어휘가 아니라는 것이 강등 사유다(아래 「승인 부재로 authoritative 덮개를 잃은 축 —
+      verdict」). 그래서 **전수성 이전에 어휘 자체가 미승인**이고, 두 축은 이제 겹쳐 있다.
+    unblocks_when: |-
+      전수성은 M1 에서 게이트 사다리를 옮길 때 `OPEN-DIC-03` 이 닫는다. 다만 그 전에 어휘 축의
+      승인이 필요하다 — 아래 verdict 축의 `unblocks_when` 이 지목하는 문면.
 
   - axis: 반올림 — `RoundingPolicy`의 `mode` · 금액 축 밖 `scaleDigits` · 첫 `effectiveFrom`
     domain: money-basis / floor-shortfall
@@ -3528,8 +3590,9 @@ uncovered_axes:
 
   # ---------------------------------------------------------------------------
   # 아래는 2026-08-31 결정(`m0-derived-rule` → `insufficient-evidence`)과 **같은 날의 전수
-  # 재판정**(`operator-decision` 28건의 결정 문면 원문 대조 + `approved-spec`·`official-doc` 훑기)이
-  # 만든 자리다. **case 는 지우지 않았다** — `authoritative` corpus 의 덮개에서만 빠진다.
+  # 재판정**(`operator-decision` 28건의 결정 문면 원문 대조 + `approved-spec`·`official-doc` 훑기),
+  # 그리고 그 뒤 **판정 대상에 어휘가 든다**는 같은 날의 결정이 만든 자리다.
+  # **case 는 지우지 않았다** — `authoritative` corpus 의 덮개에서만 빠진다.
   # 어느 case 가 어느 축에 걸리는지는 `source.kind`가 표시하고 **F-7**이 센다.
   # ---------------------------------------------------------------------------
 
@@ -3690,6 +3753,35 @@ uncovered_axes:
       운영자가 `regression-ledger.md` R-BASIS-01 의 「결정 무관(무조건)」 검증 방법 가운데
       **「같은 쌍이 감시 경로와 검색 경로(R-BASIS-02)에서 같은 답을 내는지도 함께 고정한다」**를
       업무 규칙으로 명시 승인한다(그 축을 소유한 `STR-16` 의 신설 승인을 겸한다).
+
+  - axis: "승인 부재로 authoritative 덮개를 잃은 축 — verdict (`SkipReason` 구체 어휘)"
+    domain: verdict
+    why_blocked: |-
+      「두 보류가 문장이 아니라 사유 코드로 구분된다」는 **규칙**은 운영자 결정 `OPEN-DEC-05` 가
+      떠받친다 — *"금지되는 것은 한-verdict 가 아니라 **문장으로만 구분되는 형태**"*. 그러나
+      `verdict-001`·`002` 의 기대값은 그 규칙만이 아니라 **구체 어휘 두 개**(`CapacityHold` ·
+      `LowPriority`)를 `skipReason` 리터럴로 고정한다. **결정은 축만 정하고 어휘를 정하지 않는다** —
+      두 값이 나오는 자리는 `data-dictionary.md` §3.6의 *"`SkipReason` **필수**. 최소 두 값:
+      `CapacityHold` · `LowPriority`"* 하나이고 그것은 **M0 산출 문서의 자체 정의**다. 조달청 공식
+      문서·`v2-지침서.md` 에도 없고, `classification_policy.authoritative` ②의 기록자 bullet
+      기준으로도 서지 않는다(`data-dictionary.md` 는 커밋된 결정 기록이 아니다).
+      **어휘가 판정 대상이라는 것 자체가 운영자 결정 2026-08-31 이며** 그 물음·답은
+      `classification_policy.insufficient_evidence` 가 축어로 갖는다.
+    owning_open:
+      - "소유 `OPEN` 없음 — 막는 것은 미결이 아니라 **운영자 승인 부재**다"
+      - "인접: `OPEN-DIC-03` (활성) — 어휘의 **전수성**을 소유한다. 이 축은 전수성이 아니라 **든 두 값의 근거**다"
+    what_is_covered_instead: |-
+      **verdict 축이 통째로 비지는 않는다** — `verdict-003`(force-bid 우회의 출처 노출)은
+      `OPEN-STR-03`, `verdict-004`(개연 밴드 밖 override 의 사유 있는 거부)는 `OPEN-DEC-04` 라는
+      **커밋된 결정 문면**이 직접 떠받쳐 `authoritative` 로 남는다. **덮이지 않는 것은 「두 보류를
+      가르는 사유 코드가 무엇인가」** 다 — `verdict-001`·`002` 는 `insufficient-evidence` 로 남아
+      있고 지워지지 않았다. 위 「`SkipReason` 어휘의 전수성」 축도 이제 이 축에 막혀 있다.
+    unblocks_when: |-
+      운영자가 `data-dictionary.md` §3.6의 *"`SkipReason` **필수**. 최소 두 값: `CapacityHold` ·
+      `LowPriority`"* 에서 **그 두 어휘를 업무 규칙으로 명시 승인**한다. 승인 대상은 규칙이 아니라
+      **어휘 리터럴**이다 — 규칙(`Skip` 하나 + 사유 코드 의무)은 이미 `OPEN-DEC-05` 가 갖는다.
+      운영자가 대신 **다른 어휘를 지정**하면 그때는 기대값 파일이 바뀌므로 `change_history` 에
+      `previous_expected_sha256` 를 함께 싣는다.
 
 # =============================================================================
 # 출처를 확정할 수 없어 fixture 로 만들지 않은 후보 (`data-extract.md` 에러 핸들링)

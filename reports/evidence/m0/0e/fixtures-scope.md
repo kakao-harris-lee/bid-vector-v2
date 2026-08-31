@@ -57,6 +57,19 @@ acceptance** 뿐이라 `data-extract.md` §1의 세 층(`authoritative`·`observ
 기록 안에 있어야 한다** — M0 산출 문서가 스스로 쓴 acceptance·검증 방법은 결정 기록이 아니므로 이
 기준으로 서지 않는다. 정본은 `manifest.yaml` 의 `classification_policy.authoritative` 가 갖는다.
 
+**같은 날 운영자가 판정 대상을 하나 더 넓혔다 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).**
+물음: *"verdict-001·002가 SkipReason 구체 어휘 `CapacityHold`·`LowPriority`를 authoritative golden으로
+고정하고 있다. OPEN-DEC-05는 『Skip 판정 + 사유 코드 의무』라는 축만 정했고 이 두 리터럴 값의 출처는
+data-dictionary 자체 도출뿐이다. 어떻게 처리할까?"* — 답: ***"insufficient-evidence 강등"***
+(어휘 명시 승인·합성 어휘 재작성 두 선택지를 물리치고 택함).
+
+**이 레인이 그 답을 적용한 범위는 이 레인의 판단이다**(운영자 발화가 아니다). 판정 대상에
+**기대값이 도메인 어휘로 고정하는 리터럴 토큰**(enum 값 · 상태/사유 코드 · 판정 어휘 · 고정 문자열 ·
+도메인 키 이름)을 넣고, `authoritative` 로 남는 case 전수에 세 출처 문면 대조를 한 번 돌렸다.
+fixture 파일의 형식·schema 자체(`data-extract.md` §3가 정하는 것)는 대상에서 뺐다 — 어휘를 재는
+것이지 그릇을 재는 것이 아니다. **판정이 갈릴 수 있는 자리는 바꾸지 않고 운영자 에스컬레이션
+후보로 남겼다.** 정본은 `manifest.yaml` 의 `classification_policy.insufficient_evidence` 가 갖는다.
+
 **셈을 여기 옮겨 적지 않는다** — case 수 · **분류별 분포** · `source.kind` 분포와 그 교차 ·
 `uncovered_axes`/`insufficient_evidence`/`access_approval_required` 수는 전부 **F-7** 이 낸다.
 도메인별 건수도 같은 명령이 낸다(분류를 섞지 않으려면 `kind x class` 줄을 함께 본다).
@@ -73,7 +86,11 @@ acceptance** 뿐이라 `data-extract.md` §1의 세 층(`authoritative`·`observ
 provenance) · `money-basis`(`Unknown` 과세 금액의 산술 비교 차단). **이어진 라운드가 `money-basis`
 (감시 경로와 검색 경로의 basis 일치) 축을 하나 더 세웠다** — `money-basis-003` 의 유일한 근거가
 `regression-ledger.md` R-BASIS-01 의 자체 acceptance 였고, 그것은 커밋된 결정 기록이 아니라 M0
-산출 문서라 기록자 bullet 기준으로도 서지 않는다. **재판정은 앞선 넷 중 하나의
+산출 문서라 기록자 bullet 기준으로도 서지 않는다. **어휘 판정이 다시 하나를 세웠다** —
+`verdict`(`SkipReason` 구체 어휘). `verdict-001`·`002` 가 `OPEN-DEC-05` 로 떠받쳐지는 것은
+「문장이 아니라 사유 코드로 구분된다」는 **규칙**까지이고, 기대값이 함께 고정하는 두 **어휘**
+(`CapacityHold`·`LowPriority`)는 `data-dictionary.md` §3.6의 자체 정의에서만 나온다.
+**재판정은 앞선 넷 중 하나의
 「덮개」 서술도 뒤집었다** — `koneps-collection` 은 그 축에 `authoritative` 로 남는 case 가 있다고
 적었으나 **전건 내려갔다.** `floor-applicability` 는 `-001` 이 `authoritative` 로 남아 그 덮개
 서술이 선다(위 기록자 bullet 결정). 원래 막혀 있던 축은 그대로 남는다.
@@ -117,6 +134,9 @@ case 의 `review.approved_by_user`가 `false`, `review.codex_verdict`가 `pendin
    `operator-decision`·`official-doc`·`approved-spec` 이면서 실제 근거는 M0 자체 도출인 자리가
    있었고, 그 case 들의 `source.kind` 를 내리고 `classification` 을 따라 내렸다. 각 case 의
    `change_history` 가 어느 축(한정어 삭제 / 결정이 축만 정함)에 걸렸는지와 실제 근거를 적는다.
+   **어휘 판정이 이 목록을 또 늘렸다** — 규칙은 결정이 떠받치는데 기대값이 함께 고정하는
+   **리터럴 어휘**의 출처가 M0 자체 도출뿐인 자리다. 그 case 들의 `change_history` 는 어느
+   토큰이 어느 문면에 없는지를 적는다.
 8. **`insufficient-evidence` 라는 이름이 `manifest.yaml` 안에서 두 자리에 쓰인다.** case 의
    `classification` 값과, **fixture 가 아예 없는 후보** 목록(`insufficient_evidence`)이다.
    둘 다 §6의 어휘를 빌리지만 앞은 `cases` 의 셈에 들고 뒤는 들지 않는다 — manifest 의 그
