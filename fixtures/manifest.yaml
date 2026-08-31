@@ -521,7 +521,8 @@ cases:
 
           따라서 `source.kind` 를 실제 근거에 맞게 `m0-derived-rule` 로 내리고 운영자 결정 2026-08-31 의
           정책에 따라 `classification` 을 `insufficient-evidence` 로 함께 내렸다. 덮이지 않게 된 축은
-          `uncovered_axes` 의 「money-basis — 감시 경로와 검색 경로의 basis 일치」가 받고, 되돌림 경로는
+          `uncovered_axes` 의 「승인 부재로 authoritative 덮개를 잃은 축 — money-basis (감시 경로와
+          검색 경로의 basis 일치)」가 받고, 되돌림 경로는
           `classification_policy.insufficient_evidence` 가 적는다.
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
@@ -1429,8 +1430,9 @@ cases:
 
           같은 축의 `-001`(미입력 ≠ `0`) · `-002`(명시 `0` = `Known(0원)`) · `-004`(요건 없음 중립)는
           다르다 — 그 셋이 재는 것은 **부재·중립 상태의 산출 형태**이고 분할 확정은 그것을 정하지
-          않는다. 그 셋은 `insufficient-evidence` 로 남는다. `uncovered_axes` 의
-          「승인 부재로 authoritative 덮개를 잃은 축 — capacity-gate」가 그 셋만 받도록 고쳤다.
+          않는다. 그 셋은 `insufficient-evidence` 로 남는다. `uncovered_axes` 의 「승인 부재로
+          authoritative 덮개를 잃은 축 — capacity-gate (금액 capacity 게이트의 무조건 acceptance)」가
+          그 셋만 받도록 고쳤다.
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
@@ -3544,8 +3546,8 @@ uncovered_axes:
       `floor-applicability-001`만 `authoritative` 로 남는다 — 「지자체 공고가 국가계약 하한으로 조용히
       판정되지 않고 관측 가능한 `OutOfScope` 로 산출된다」. **그 case 의 근거는 커밋된 결정 기록
       안의 문면**(`reports/evidence/m0/0a2/decisions.md:317` 의 `OPEN-DEC-09` 결정 절 본문 bullet)이고,
-      **운영자 결정 2026-08-31**(*"결정 기록의 「기록자 bullet」이 ②의 「커밋된 운영자 결정 기록」에
-      드는가?"* → ***"든다"***)이 그 자리를 `classification_policy.authoritative` ②로 세운다.
+      **운영자 결정 2026-08-31**(기록자 bullet 도 ②에 든다 — 물음과 답의 정본은
+      `classification_policy.authoritative`)이 그 자리를 ②로 세운다.
       그래서 이 축에 들지 않는다. 나머지(`-002`~`-005`)는 `insufficient-evidence` 로 남아 있고
       지워지지 않았다 — 그 넷의 근거는 결정 기록이 아니라 `capability-map.md` DEC-03 acceptance 와
       `data-dictionary.md` §1.4.2 의 자체 도출이다.
