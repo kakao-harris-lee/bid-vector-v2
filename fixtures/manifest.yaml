@@ -249,6 +249,13 @@ classification_policy:
     **나르기만 한다 → 남는다.** 가족 A 는 case 가 규칙을 재고 이름은 기대값이 나른다. B~E 는
     그에 더해 **출처의 성격 자체가 다르다**(자작 그릇 · 표기 변형 · legacy·조달청 유래 ·
     입력 되울림).
+    **다만 「나르기만 한다」가 가족 전체에 걸리지는 않는다 — assertion path 계약화(2026-08-31)
+    이후의 정정.** `verifies` 가 그 이름의 값을 **직접 주장하는** 자리에서는 그 경로가
+    `verified_paths` 에 들어 **계약이 이름을 잠근다** — `floor-shortfall-001`~`005` 의 `$.result`
+    (`Measured`·`Unmeasurable`)와 `floor-shortfall-005` 의 `$.transitionedFrom`
+    (`Measured-candidate`)이 그런 자리다. **그 자리들은 case 를 내리는 사유가 아니라 어휘·표현
+    승인 대상**이며(위 4문 4답이 정한 처리 그대로다), 도출 규칙은
+    `schema.extensions.verified_paths` 가 적는다.
 
     **남는 것이 승인된 것은 아니다.** 위 답이 *"어휘 승인 대상으로 정책에 기록한다"* 로 정한
     자리다 — **기대값이 나르는 미승인 이름**(가족 A 의 넷이 대표다)은 M1 이 그 이름을 골든으로
@@ -615,7 +622,6 @@ cases:
         basis가 같으면 비교가 수행된다 — 001의 대조군.
     verified_paths:
       - "$.comparisonPerformed"
-      - "$.result"
     source:
       kind: operator-decision
       reference: |-
@@ -641,7 +647,33 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 4e19b0d22d5f9f532aff33d4c5da840e9d16a9e1fbe16cd67736a233f649a185
     expected_sha256: 99f56b4282cb9ab2d3c1840f32fef247075c5df13c60c4cca4ee4d5d297563af
-    change_history: []
+    not_covered: |-
+      **비교의 결과값과 그 경계 포함성** — 기대값은 `result: true` 를 나르지만 이 case 는 그것을 검증 대상으로
+      잠그지 않는다. 이 corpus 는 두 금액의 **수치를 같게** 두어 어느 쪽이 크다는 전제를 넣지 않으므로
+      (`expected_reasoning`), `result: true` 를 계약에 넣으면 **같은 값에서 비교가 참**이라는 경계 포함성을
+      잠근다 — 이 case 가 재는 것은 그것이 아니다. **경계 포함성을 실제로 재려면 별도 case 와 별도 근거가
+      필요하다** — 그 축은 이 corpus 에 없다.
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `verified_paths` 에서 `$.result` 를 **뺐다**(`$.comparisonPerformed` 만 남는다). `not_covered` 를
+          신설했다. **`classification` 은 `authoritative` 그대로이고 기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 9 — verifier r7 F-2(medium).** 이 case 의 `verifies` 는 *"basis가 같으면 비교가
+          **수행된다**"* 로 **수행 여부만** 주장한다 — 도출 규칙 ②(존재·형태만 주장하면 들지 않는다)의 자리다.
+          그런데 기대값 `result: true` 는 입력의 두 금액이 **같을 때** 비교가 참이라는 **경계 포함성**을
+          잠근다.
+
+          **계약이 자기 근거와 반대로 서 있었다** — 같은 case 의 `expected_reasoning` 이 *"두 값의 수치를
+          같게 두어 **어느 쪽이 크다는 전제를 넣지 않는다**"* 라고 적는다(`regression-ledger.md` §10.1
+          인계의 요구). 쌍인 `money-basis-001` 은 같은 자리를 `$.directionAsserted: false` 로 「전제 없음」
+          쪽에 둔다.
+
+          **001 과의 대조는 `$.comparisonPerformed` 로 성립한다** — 001 은 `false`, 002 는 `true` 이고
+          그것이 이 쌍이 재는 축 전부다. 새 운영자 결정 없이 **이미 선 도출 규칙의 적용**으로 닫았다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 범위 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -1162,7 +1194,7 @@ cases:
     source:
       kind: operator-decision
       reference: |-
-          U-5 · data-dictionary.md §3.2.3
+          U-5 (reports/evidence/m0/0c/decisions-2026-08-28.md) · data-dictionary.md §3.2.3
     expected_reasoning: |-
       data-dictionary.md §3.2.3 (**U-5**) `UncertainReason = sealed { RequirementDataAbsent,
       RequirementUnparsable, OperatorLicensesNotDeclared, CollectionFailed }` + *"`Uncertain` ≠
@@ -1192,7 +1224,29 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 59c8b390bb76921d519bb9fc5e04b7c1c4d38e8fd5b14278959892c54ff043ab
     expected_sha256: 25de9aa5eb7c61f7810e032f0bf7c132f43fc5b88251d656b26ea97b4e57561c
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.reference` 의 `U-5` 에 **②급 원천의 파일 좌표**를 달았다 —
+          `reports/evidence/m0/0c/decisions-2026-08-28.md`. `license-006`·`license-012` 와 같은 형태다.
+          **분류·기대값·입력·해시·`verified_paths` 는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 9 — verifier r7 F-4(low).** 좌표가 id 뿐이라 `expected_reasoning` 이 인용하는
+          `data-dictionary.md` §3.2.3 만 가리키는 것처럼 읽혔고, **②급 원천으로 가는 감사 경로가 끊겨
+          있었다.**
+
+          그 끊긴 경로가 실제로 오판을 불렀다 — r8 레인 보고가 이 case 를 **D-1「강등 후보로 보인다」**
+          로 올렸다. `verifies` 가 `` `Uncertain(RequirementDataAbsent)` `` 로 미승인처럼 보이는 어휘를 잠근다고 읽었기
+          때문이다. **verifier r7 이 그 판정을 뒤집었다** — `RequirementDataAbsent` 는
+          `reports/evidence/m0/0c/decisions-2026-08-28.md` 「U-5 — 네 값으로 확정」 절에 네 리터럴이
+          축어로 있고 그 절이 *"운영자가 도메인 판단으로 확정했다"* 라 적는다. 곧 **커밋된 운영자 결정
+          기록**이므로 `classification_policy.authoritative` **②**에 선다.
+          **강등선은 「잠그는가」와 「①②③에 서는가」의 곱이다** — 이 case 는 잠그지만 ②에 서므로
+          내려가지 않는다. 강등된 셋(`CapacityHold`·`LowPriority`·`OutOfScope`)은 결정 기록에 한 건도
+          없다는 점에서 다르다. 좌표가 있었으면 이 갈림 자체가 없었다.
+        policy_version: |-
+          해당 없음 — 출처 좌표의 보완이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -1272,7 +1326,7 @@ cases:
     source:
       kind: operator-decision
       reference: |-
-          U-5 · data-dictionary.md §3.2.3
+          U-5 (reports/evidence/m0/0c/decisions-2026-08-28.md) · data-dictionary.md §3.2.3
     expected_reasoning: |-
       data-dictionary.md §3.2.3 (**U-5**) `UncertainReason = sealed { RequirementDataAbsent,
       RequirementUnparsable, OperatorLicensesNotDeclared, CollectionFailed }` + *"`Uncertain` ≠
@@ -1302,7 +1356,29 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 3be7f59aaaf9fb149d4ed28059a1c052bdcbc1a7cca3b0f6d65cb2a06b8ca20d
     expected_sha256: 9434a1ea8d158d02d0282e5baa1a0ad98b9e2cc49a936002c04824380163cab5
-    change_history: []
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `source.reference` 의 `U-5` 에 **②급 원천의 파일 좌표**를 달았다 —
+          `reports/evidence/m0/0c/decisions-2026-08-28.md`. `license-006`·`license-012` 와 같은 형태다.
+          **분류·기대값·입력·해시·`verified_paths` 는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 9 — verifier r7 F-4(low).** 좌표가 id 뿐이라 `expected_reasoning` 이 인용하는
+          `data-dictionary.md` §3.2.3 만 가리키는 것처럼 읽혔고, **②급 원천으로 가는 감사 경로가 끊겨
+          있었다.**
+
+          그 끊긴 경로가 실제로 오판을 불렀다 — r8 레인 보고가 이 case 를 **D-1「강등 후보로 보인다」**
+          로 올렸다. `verifies` 가 `` `Uncertain(CollectionFailed)` `` 로 미승인처럼 보이는 어휘를 잠근다고 읽었기
+          때문이다. **verifier r7 이 그 판정을 뒤집었다** — `CollectionFailed` 는
+          `reports/evidence/m0/0c/decisions-2026-08-28.md` 「U-5 — 네 값으로 확정」 절에 네 리터럴이
+          축어로 있고 그 절이 *"운영자가 도메인 판단으로 확정했다"* 라 적는다. 곧 **커밋된 운영자 결정
+          기록**이므로 `classification_policy.authoritative` **②**에 선다.
+          **강등선은 「잠그는가」와 「①②③에 서는가」의 곱이다** — 이 case 는 잠그지만 ②에 서므로
+          내려가지 않는다. 강등된 셋(`CapacityHold`·`LowPriority`·`OutOfScope`)은 결정 기록에 한 건도
+          없다는 점에서 다르다. 좌표가 있었으면 이 갈림 자체가 없었다.
+        policy_version: |-
+          해당 없음 — 출처 좌표의 보완이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -2107,11 +2183,10 @@ cases:
     domain: floor-shortfall
     classification: authoritative
     verifies: |-
-        여유가 충분해 빈도가 `0.0`인 경우와 판정 불가(001)가 서로 다른 표시로 구분된다.
+        여유가 충분해 **미달 표본이 없는** 경우(입력 `shortfallSampleCount: 0`)와 판정 불가(001)가 **서로 다른 표시로 구분된다** — 표본 부족은 0%가 아니다.
+        **빈도의 수 표현은 이 case가 검증 대상으로 잠그지 않는다** — 기대값이 나를 뿐이고 그 자리는 `not_covered`가 적는다.
     verified_paths:
       - "$.result"
-      - "$.frequency.numerator"
-      - "$.frequency.exactDecimal"
       - "$.distinctFromUnmeasurable"
     source:
       kind: operator-decision
@@ -2149,7 +2224,41 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 1e891e5d288768a5f1beff796a0fa137ec3e45849737398db5677534462f188c
     expected_sha256: ba19a7cc6e7cf543861f6f62fa00579c5689b141ef9fbbd514f48b6fa374bae9
-    change_history: []
+    not_covered: |-
+      **빈도의 수 표현** — 분자/분모의 유리수 표현과 십진 표현. 기대값은 `frequency.numerator: 0` 과
+      `frequency.exactDecimal: 0.0` 을 나르지만 이 case 는 그것을 검증 대상으로 잠그지 않는다.
+      **두 축의 사유가 다르다** — 유리수 표현은 출처가 `capability-map.md` DEC-04 acceptance 의 **M0 자체
+      도출**뿐이라 `classification_policy.authoritative` ①②③ 어디에도 서지 않고(형제 `floor-shortfall-003`
+      의 `not_covered` ②와 같은 자리, 승인 경로는 `uncovered_axes` 의 「승인 부재로 검증 주장에서 내린
+      축 — `floor-shortfall` 빈도 결과의 출력 표현」), 십진 표현은 **활성 `OPEN-DIC-10`** 이 막는다
+      (같은 형제의 `not_covered` ①).
+    change_history:
+      - date: 2026-08-31
+        change: |-
+          `verified_paths` 에서 `$.frequency.numerator` 와 `$.frequency.exactDecimal` 을 **뺐다**
+          (`$.result`·`$.distinctFromUnmeasurable` 만 남는다). `verifies` 에서 빈도의 수 표현 주장을 걷고
+          `not_covered` 를 신설했다. **`classification` 은 `authoritative` 그대로이고 기대값·입력·해시는
+          바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 9 — verifier r7 F-1(high).** 앞 라운드가 `verified_paths` 를 세우면서 이 case 에
+          **B4 가 든 미승인 표현군의 두 축을 새로 잠갔다.** B4 high 의 실질은 「미승인 출력 표현이 M1 golden
+          이 되는 것을 산문이 못 막는다」였는데, 새 계약이 여기서 그것을 **기계로 강제**하고 있었다 —
+          `002`·`003` 에서 뺀 것을 `004` 가 넣은 꼴이다.
+
+          **`$.frequency.numerator` 는 이 case 의 `verifies` 가 언급조차 하지 않았다** — 이 레인 자신의
+          도출 규칙 ③(언급 없는 동반 산출은 들지 않는다) 위반이고, 형제 `floor-shortfall-003` 의
+          `not_covered` ②가 이미 명시로 배제한 축이다.
+          **`$.frequency.exactDecimal` 은 규칙 ①로는 설명됐다** — 옛 `verifies` 가 `0.0` 을 명명했기
+          때문이다. **그렇다면 `verifies` 자체가 B3 결정이 `002`·`003` 에서 걷어낸 축을 잠그고 있었다**
+          (그 축은 활성 `OPEN-DIC-10` 소관이라고 같은 형제가 적는다). 그래서 경로만이 아니라 `verifies`
+          를 함께 좁혔다 — B3 처리와 형태가 같아진다.
+
+          **case 는 비지 않는다.** 구분 주장은 `$.result`(`v2-지침서.md` §4.4 *"표본 부족은 0%가 아니라
+          `Unmeasurable`이다"*)와 `$.distinctFromUnmeasurable` 이 떠받친다. 이 라운드는 새 운영자 결정
+          없이 **이미 선 규칙의 적용**으로 닫았다.
+        policy_version: |-
+          해당 없음 — assertion 계약과 그 범위 서술의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
