@@ -35,7 +35,11 @@ out_of_scope:
                                            # 하나도 고치지 않는다 — 이 slice 의 range 에서
                                            # 앞선 slice evidence 를 수정한 커밋은 0 이고 신설이 1 이다
                                            # (`git log --diff-filter=M 14686db..HEAD -- reports/evidence/m0/0{a,a2,a3,b,c,d}/`).
-  - fixtures/                              # fixture-curator 소유. 이 slice 가 만들지 않는다
+  - fixtures/                              # fixture-curator 소유. 이 slice 가 만들지 않는다.
+                                           # 단 `8701882` 이 한 인용 좌표를 두 레인 파일에 일관
+                                           # 정정하며 fixtures/manifest.yaml 한 줄을 건드렸다 —
+                                           # 운영자 승인 2026-08-31 을 받은 **선언된 예외**이고
+                                           # 정본은 commands.md 의 「`C-7b` 매치의 처리」다
   - _workspace/**                          # .gitignore 대상. 조사 노트는 읽기만 한다
   - fixtures/** · reports/evidence/m0/0e/fixtures-*.md   # fixture-curator 레인 소유
   - .claude/ 하네스 · CLAUDE.md            # 다른 레인 소유
@@ -47,9 +51,15 @@ acceptance_commands:
 rollback: |
     git revert 로 0E 의 커밋 전부를 되돌린다. 그 집합은 `git log --oneline 14686db..HEAD`
     가 낸다(commands.md C-0) — SHA 를 여기 열거해 두면 커밋이 늘 때마다 낡으므로 range 로
-    적는다. 애플리케이션 코드·설정·스키마·fixture 변경이 없어 되돌림의 부작용이 없다.
+    적는다. 애플리케이션 코드·설정·스키마 변경이 없어 되돌림의 부작용이 없다.
+    **fixture 변경은 한 자리 있다** — `8701882` 이 `fixtures/manifest.yaml` 의 인용 좌표 한
+    줄을 함께 고쳤다(운영자 승인 2026-08-31 을 받은 선언된 예외. 정본은 commands.md 의
+    「`C-7b` 매치의 처리」). **그 커밋도 이 range 안이라 range 전체를 되돌리면 그 한 줄도
+    함께 돌아가고 절차는 그대로 성립한다.**
     부분 되돌림도 가능하다(커밋이 개정 단위로 나뉘어 있다). 단 §14 이월 목록은 개정 셋과
     ADR 상태 줄이 만든 사실을 참조하므로, 그것만 남기고 나머지를 되돌리면 §14 가 낡는다.
+    같은 이유로 `8701882` 만 빼고 되돌리면 저장소가 **같은 문장에 다른 좌표**를 갖게 되므로,
+    그 커밋은 `milestone-0.md` 쪽 정정과 **함께** 다룬다.
 ```
 
 작성: 2026-08-30, spec-writer (v2-slice-pipeline).
@@ -170,8 +180,11 @@ range 에 다시 들어온다"* 를 **비용으로 감수**한다고 적었다. 
   **`ADR 0001` §5 의 `OPEN-ADR-01` 행 하나**뿐이며, 그 행에서도 **미결 당시의 기록
   (결정 필요 사항·선택지·근거·부수 사실)을 지우지 않고 그대로 보존**한 채 해소 블록을
   앞에 얹었다. §1~§4·§6 과 §5 의 나머지 `OPEN` 열둘은 무접촉이다 — `commands.md` C-5a.
-- **`data-dictionary.md`·`regression-ledger.md`·앞 여섯 slice 의 evidence·`fixtures/` 무접촉** —
-  `commands.md` C-7b 가 이 레인의 커밋 집합만으로 확인한다(매치 0).
+- **`data-dictionary.md`·`regression-ledger.md`·앞 여섯 slice 의 evidence 무접촉** —
+  `commands.md` C-7b 가 이 레인의 커밋 집합만으로 확인한다. **`fixtures/` 는 무접촉이 아니다** —
+  `8701882` 이 한 인용 좌표를 두 레인 파일에 일관 정정하며 `fixtures/manifest.yaml` 한 줄을
+  건드렸고, 운영자 승인 2026-08-31 을 받은 **선언된 예외**다. 매치의 정본과 그 판정은
+  `commands.md` 의 **「`C-7b` 매치의 처리」**가 갖는다 — 여기서 되풀이하지 않는다.
 - **네 registry 를 통합하지도, 「활성 총계」를 확정하지도 않았다** — §14.0 이 그 사실을 적고
   담당을 **registry 통합 slice** 로 지목한다.
 - **자기 검사 하네스를 만들지 않았다.** 필요한 대조는 `commands.md` 의 명령으로만 남겼다.

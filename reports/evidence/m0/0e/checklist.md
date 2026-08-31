@@ -78,8 +78,8 @@
 | `docs/adr/**` 편집이 「상태」 줄 아홉 + `ADR 0001` §5 한 행에 그치는가 | `commands.md` **C-5a** — `@@` 헤더 **11개** = 아홉 파일의 3행 + `ADR 0001` §5 의 두 hunk. 미결 당시의 기록은 지우지 않고 보존했다 |
 | `data-dictionary.md`·`regression-ledger.md` 무접촉 | `commands.md` **C-7** — 빈 diff |
 | 앞 여섯 slice 의 evidence 무접촉 | 같은 명령 — 빈 diff |
-| `fixtures/` 무접촉 | `commands.md` **C-7b** — **이 레인의 커밋 집합**(C-0 의 pathspec)이 건드린 파일 전수에 `fixtures/` 매치가 **0**이다. **`ls` 로도 `14686db..HEAD` 전체로도 재지 않는다** — fixture-curator 레인이 병행해 실제로 `fixtures/` 를 만들었으므로 그 둘은 이 레인의 무접촉을 재지 못한다 |
-| 다른 레인의 변경(`CLAUDE.md`·`.claude/`·`fixtures/`·`fixtures-*.md`)을 커밋에 넣지 않았다 | `commands.md` **C-7a** — 이 레인의 커밋이 건드린 파일 **16개**가 `in_scope` 와 정확히 같다 |
+| `fixtures/` 접촉이 **승인된 예외 하나뿐**인가 | `commands.md` **C-7b 와 그 아래 「`C-7b` 매치의 처리」가 정본이다** — **이 레인의 커밋 집합**(C-0 의 pathspec)이 건드린 파일 전수에서 `fixtures/manifest.yaml` **하나**가 잡히고, 그것은 `8701882`(한 인용 좌표를 두 레인 파일에 일관 정정)이며 **운영자 승인 2026-08-31** 을 받은 선언된 예외다. **여기서 「무접촉」을 주장하지 않는다** — 그 주장은 실측과 어긋났다(Codex B4 medium). **`ls` 로도 `14686db..HEAD` 전체로도 재지 않는다** — fixture-curator 레인이 병행해 실제로 `fixtures/` 를 만들었으므로 그 둘은 이 레인의 접촉 범위를 재지 못한다 |
+| 다른 레인의 변경(`CLAUDE.md`·`.claude/`·`fixtures-*.md`)을 커밋에 넣지 않았다 | `commands.md` **C-7a** — 이 레인의 커밋이 건드린 파일 집합이 `in_scope` 에 위 예외 하나를 더한 것과 같다. **수는 여기 적지 않는다 — C-7a 가 낸다** |
 
 ---
 
