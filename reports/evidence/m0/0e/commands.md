@@ -31,12 +31,30 @@ LANE=(docs/adr docs/discovery/capability-map.md milestone-0.md milestone-1.md \
 | **C-6a** | `grep -n '^## 3\.' docs/adr/0005-domain-events-and-outbox.md` | 0 | `236:## 3. 대안 — \`OPEN-OPS-07\` 후보의 판정` — 종료 조건이 산출물에 실재 |
 | **C-6b** | `grep -c '^### \`OPEN-ADR-01\`' docs/adr/0001-target-architecture.md` | 1 | **0** — 취소선 없는 활성 제목 없음 (`^### ~~\`OPEN-ADR-01\`~~` 은 1) |
 | **C-7a** | `for c in $(git log --format=%h 14686db..HEAD -- "${LANE[@]}"); do git diff --name-only $c^ $c; done \| sort -u` | 0 | 이 레인의 커밋들이 건드린 파일 집합. **수를 여기 적지 않는다** — 커밋이 늘면 바뀌므로 **이 명령이 낸다**. `in_scope` 밖 경로가 섞였는지는 `C-7b` 가 본다 |
-| **C-7b** | 같은 목록 \| `grep -E '^(fixtures/\|docs/discovery/(data-dictionary\|regression-ledger)\|reports/evidence/m0/0[a-d])'` | **0** | **매치 하나 — `fixtures/manifest.yaml`.** `8701882`(「`milestone-1.md` 인용 좌표를 `:12` 에서 `:10` 으로 — 두 자리」)이 `milestone-0.md` 와 `fixtures/manifest.yaml` 의 **같은 인용 좌표를 한 커밋에** 담아 pathspec 이 두 레인에 걸쳤다. **선언된 예외이며 두 레인의 산출물을 갈라 쓴 것이 아니라 한 오류를 두 자리에서 함께 고친 자리다.** `data-dictionary.md` · `regression-ledger.md` · 앞 여섯 slice evidence 는 여전히 **무접촉** |
+| **C-7b** | 같은 목록 \| `grep -E '^(fixtures/\|docs/discovery/(data-dictionary\|regression-ledger)\|reports/evidence/m0/0[a-d])'` | **0** | **매치 하나 — `fixtures/manifest.yaml`.** `8701882` 이 `milestone-0.md` 와 `fixtures/manifest.yaml` 의 **같은 인용 좌표를 한 커밋에** 담아 pathspec 이 두 레인에 걸쳤다. **선언된 예외**이고 판정·근거·범위는 표 아래 **「`C-7b` 매치의 처리」**가 갖는다. `data-dictionary.md` · `regression-ledger.md` · 앞 여섯 slice evidence 는 여전히 **무접촉** |
 | **C-8** | `for f in reports/evidence/m0/*/codex-review-*.json; do python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(d['verdict'],d['reviewed_base'][:8],d['reviewed_head'][:8])" "$f"; done` | 0 | 각 리뷰 JSON 의 `verdict`·base·head 를 낸다. **건수도 head SHA 도 여기 옮겨 적지 않는다** — verdict 가 등재될 때마다 바뀌므로 **이 명령이 낸다**. 읽는 법: slice 별 마지막 줄이 그 slice 의 현재 상태이고, 0A 의 `approve` 는 `6c6b3a2a..6af70199` 의 **별도 리뷰 A** 다(`C-9b`·`C-9c` 가 그 range 를 다룬다) |
 | **C-9a** | `git log --oneline 6c6b3a2..6af7019 -- docs/discovery/capability-map.md` | 0 | 커밋 **4개** (`0b0c8aa`·`23b9c2a`·`0581e97`·`d140f92`) — 0A 라운드 4~6 |
 | **C-9b** | `git diff --stat 6c6b3a2 6af7019 -- docs/discovery/capability-map.md` | 0 | **31 삽입 / 14 삭제** — 실행 시점에 어느 리뷰 range 에도 들지 않았던 delta. **그 뒤 별도 리뷰 A(`6c6b3a2..6af7019`) 가 덮어 `approve`** |
 | **C-9c** | `python3 -c "import json;print(json.load(open('reports/evidence/m0/0a2/codex-review-20260827T034348Z.json'))['reviewed_base'])"` | 0 | `6af7019…` — 0A2 리뷰의 base 가 그 넷 **뒤**다 |
 | **C-10** | `git diff --numstat 14686db HEAD -- 'v2-지침서.md' milestone-0.md milestone-1.md docs/adr docs/discovery/capability-map.md \| awk '{a+=$1;d+=$2} END{print a-d}'` · `wc -l reports/evidence/m0/0e/{scope,commands,checklist}.md` | 0 | **게이트 통과** — 판정은 `evidence ≤ 산출물`. **두 수를 여기 옮겨 적지 않는다** — 커밋이 늘 때마다 바뀌므로 **이 명령이 낸다** |
+
+**`C-7b` 매치의 처리 — `8701882` 을 선언된 예외로 둔다.**
+
+*이것은 **오케스트레이터 판정**이다 — 운영자 결정이 아니며 **운영자 사후 승인 대상**이다.*
+(이 evidence 의 다른 자리가 「결정 축어」로 싣는 것은 운영자 발화이고, 이 항목은 그 층이 아니다.)
+
+- **무엇이 잡히는가.** `8701882`(「`milestone-1.md` 인용 좌표를 `:12` 에서 `:10` 으로 — 두 자리」)이
+  `milestone-0.md` 와 `fixtures/manifest.yaml` 을 한 커밋에 담았다. 두 레인의 pathspec 에 동시에
+  걸리므로 `C-7b` 가 매치를 낸다.
+- **왜 예외로 두는가.** ① 내용이 **한 인용 좌표 정정을 두 레인 파일에 일관 적용**한 것이라 레인별
+  산출물을 갈라 쓴 자리가 아니다 — 두 자리 중 하나만 고치면 저장소가 같은 문장에 다른 좌표를
+  갖는다. ② **소급 분리가 이 slice 의 게이트와 양립하지 않는다** — 부모 사슬 직선·amend/rebase
+  금지가 걸려 있어 역사를 다시 쓸 수 없다. 그 커밋은 base `14686db` **뒤**이지만 **0E Codex 리뷰
+  세 라운드의 head(`857e7767`·`74ef4415`·`71e3e3a1`) 전부의 조상**이라 이미 리뷰된 range 안에
+  있다(`git merge-base --is-ancestor 8701882 <head>` 가 낸다). 분리하려면 리뷰된 역사를 다시
+  써야 한다.
+- **예외의 범위는 `8701882` 하나다.** `C-7b` 의 나머지 판정은 그대로 선다. **다음 커밋에 같은
+  형태가 또 나오면 새 판정 대상**이며 이 항목이 그것을 덮지 않는다.
 
 **`C-2`·`C-3` 의 python3 블록** (긴 명령이라 표 밖에 둔다. **quoted heredoc 이라 셸 확장이
 없다** — 이대로 붙여 돌리면 재현된다).
