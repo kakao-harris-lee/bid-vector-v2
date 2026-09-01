@@ -39,7 +39,7 @@ LANE=(docs/adr docs/discovery/capability-map.md milestone-0.md milestone-1.md \
 | **C-10** | `git diff --numstat 14686db HEAD -- 'v2-지침서.md' milestone-0.md milestone-1.md docs/adr docs/discovery/capability-map.md \| awk '{a+=$1;d+=$2} END{print a-d}'` · `wc -l reports/evidence/m0/0e/{scope,commands,checklist}.md` | 0 | **게이트 통과** — 판정은 `evidence ≤ 산출물`. **두 수를 여기 옮겨 적지 않는다** — 커밋이 늘 때마다 바뀌므로 **이 명령이 낸다** |
 | **C-11** | B5-high 수정의 계약 불변 (전문은 이 표 아래) | 0 | `violations` **빈 목록**. ① `verified_paths` 의 어느 값도 **가족 A 의 네 이름이 아니다** ② `verified_projections` 는 다섯 필수 키 · 술어 `not-equals` · 피연산자가 가족 A 밖 ③ 같은 경로가 두 필드에 겹치지 않고 술어가 기대값에서 **참** ④ `insufficient-evidence` 에는 두 필드가 없다 ⑤ `change_history` 네 필수 키. **함께 fixture-curator 레인 `F-7b` 를 문면 그대로 재실행해** `violations` 빈 목록을 확인했다(신설 필드가 그 레인의 검사를 깨지 않는다). **이 검사가 못 보는 것**: `[i]` 첨자 경로는 값을 풀지 않고 건너뛴다 — 이 라운드가 바꾼 세 자리는 전부 최상위다 |
 | **C-12** | 해소된 `OPEN` 의 **현재형 활성/대기 서술** (전문은 이 표 아래) | 0 | **B5 medium 이 든 둘(`OPS-21` 본문 · §13 하류 인계 표)은 사라졌다.** 남는 매치는 **하나**이고 `OPEN-OPS-07` 의 주장이 아니다 — `capability-map.md` §12 의 **`OPEN-DEC-07` 행**(활성)이 자기 종료 조건 미충족을 적으며 **판정 기준으로** `OPEN-OPS-07` 을 인용하는 자리다. **이 검사가 못 보는 것**: 같은 줄 안의 근접만 재므로 「누구에 대한 주장인가」는 사람이 읽는다 |
-| **C-13** | `codex-review-gate` **preflight** — 리뷰 B5 (전문은 이 표 아래) | 0 | ① repo 흔적(`memory_summary`·`MEMORY.md`·`rollout_summaries/`·`skills/`·`rules`) **5건** ② `stage1_outputs` 중 `bid-vector-v2-review` 언급 **0** / **총 647행** — 총 행이 0이 아니므로 **DB 가 실제로 열렸고** 「0행」이 「못 열어서 0」이 아니다(독립성 전건 성립) ③ `codex-cli` **0.148.0** = 스킬의 `CODEX_PIN`. **B1~B4 는 0.149.0 이었다**(각 verdict JSON 의 `reviewer.cli_version`, `C-8` 이 낸다) — **사실만 적고 이 라운드가 판단하지 않는다** |
+| **C-13** | `codex-review-gate` **preflight** — 리뷰 B5 (전문은 이 표 아래) | 0 | ① repo 흔적(`memory_summary`·`MEMORY.md`·`rollout_summaries/`·`skills/`·`rules`) **5건** ② `stage1_outputs` 중 `bid-vector-v2-review` 언급 **0** / **총 647행** — 총 행이 0이 아니므로 **DB 가 실제로 열렸고** 「0행」이 「못 열어서 0」이 아니다(독립성 전건 성립) ③ **B5 가 실제로 돈 CLI 는 `0.148.0`** 이고 스킬의 `CODEX_PIN` 과 같다. 정본은 실행 산출물 `_workspace/m0-0e/codex.raw-output-B5.txt` 의 머리글 `OpenAI Codex v0.148.0` 이며, 그 경로는 `.gitignore` 대상이라 clean worktree 에 없으므로 **저장소 안의 대응물은 verdict JSON 의 `reviewer.cli_version`** 이다 — 둘이 일치한다. **B~B4 는 0.149.0**(같은 디렉터리의 앞선 머리글 넷, verdict 쪽은 `C-8`). **알려진 제한 — 심판 CLI 버전을 라운드마다 정해 온 것은 PATH 가 고른 바이너리다.** 이 evidence 를 쓰는 **도중에도 갈렸다**: `codex --version` 이 **0.148.0 → 0.151.0** 으로 바뀌었고 그 사이 스킬이 `CODEX_BIN` 으로 고정한 **`/opt/homebrew/bin/codex`(먼저 잡히던 자리)가 사라졌다** — 지금 `type -a codex` 는 `~/.nvm/versions/node/v22.21.1/bin/codex`(**0.151.0**) 하나만 낸다. 0.149.0 은 **현재 어느 바이너리와도 일치하지 않는다.** **기제는 미확정이고 이 라운드는 사실만 적는다** — `CODEX_BIN` 경로 부재의 처리는 **하네스 판단이며 이 slice 범위 밖**이다 |
 
 **`C-7b` 매치의 처리 — 이 레인의 `fixtures/manifest.yaml` 접촉 둘을 선언된 예외로 둔다.**
 
@@ -87,15 +87,13 @@ git show --stat --format='%h %s' 16d7a48
 
 **② B5-high 수정 — 다른 사유의 예외다.**
 
-- **무엇이 잡히는가 — 아무것도 잡히지 않는다.** Codex 재리뷰 **B5 `findings[0]`(high)** 가 지목한
-  파일이 `fixtures/manifest.yaml` 이고 그 수정 커밋이 이 레인에서 났으나, **그 커밋은 그 파일
-  하나만 건드려 `C-0` 의 `in_scope` pathspec 밖에 있다.** 그래서 `C-7b` 의 매치가 하나인 것은
-  ①만 세었기 때문이고 **②는 그 검사가 구조적으로 보지 못한다.** 검사 밖의 접촉을 검사 결과로
-  숨기지 않으려고 이 절이 명시한다 — 검출은 위 블록의 `git show --stat` 이 한다.
+- **무엇이 잡히는가 — 아무것도 잡히지 않는다.** **B5 `findings[0]`(high)** 가 지목한 파일이
+  `fixtures/manifest.yaml` 이고 그 수정 커밋이 이 레인에서 났으나, **그 커밋은 그 파일 하나만
+  건드려 `C-0` 의 pathspec 밖에 있다.** `C-7b` 의 매치가 하나인 것은 ①만 세었기 때문이고
+  **②는 그 검사가 구조적으로 보지 못한다** — 검출은 위 블록의 `git show --stat` 이 한다.
 - **왜 이 레인이 고치는가.** finding 이 든 축은 **B4-high 가 세운 `verified_paths` 계약**이고 그
-  계약을 세운 것도 이 레인이다. **위 ①과 사유가 다르다** — ①은 두 레인 파일에 걸친 인용 좌표
-  정정이고, ②는 **이 레인이 만든 계약 위의 정정**이다. 오케스트레이터가 이 라운드의 작업 범위로
-  지정했고 **운영자 결정 2026-09-01**(「projection 으로 좁힘」)이 그 처리를 정했다.
+  계약을 세운 것도 이 레인이다. ①이 두 레인 파일에 걸친 인용 좌표 정정이라면 ②는 **이 레인이
+  만든 계약 위의 정정**이다. 처리는 **운영자 결정 2026-09-01**(「projection 으로 좁힘」)이 정했다.
 - **범위는 그 finding 이 든 자리에 그친다** — 세 case 의 `verified_paths`, 그 계약을 정의하는
   `schema.extensions`, 계약의 현재 형태를 서술하던 자리들(분류 정책·`uncovered_axes`·`next_steps`).
   **기대값·입력 파일과 해시는 무접촉**이고 `fixtures/` 의 다른 파일도 무접촉이다.
@@ -205,6 +203,7 @@ PY
 **`C-13` 의 preflight 명령 셋.** 절차의 정본은 `.claude/skills/codex-review-gate/SKILL.md` 이고
 여기 있는 것은 **이 라운드의 실행 기록**이다 — 리뷰 레인은 verdict JSON 만 쓰므로 구현 레인이 갖는다.
 ②는 매치와 총 행 수를 **같은 핸들로** 받는다(총 행이 0이면 못 연 것이고 preflight 미충족이다).
+③은 **실행된 버전이 아니라 지금 PATH 가 고르는 버전**을 낸다 — 실행된 버전의 정본은 raw-output 머리글이다.
 
 ```sh
 grep -rniE 'bid-vector-v2|regression-ledger|capability-map|OPEN-REG|0a2|0b-regression' \
@@ -216,5 +215,6 @@ sqlite3 "file:$HOME/.codex/memories_1.sqlite?immutable=1" \
     where raw_memory like '%bid-vector-v2-review%'
        or rollout_summary like '%bid-vector-v2-review%';"    # ②
 sqlite3 "file:$HOME/.codex/memories_1.sqlite?immutable=1" "select count(*) from stage1_outputs;"
-codex --version                                              # ③
+type -a codex && codex --version                             # ③ 어느 바이너리인지까지 낸다
+head -1 _workspace/m0-0e/codex.raw-output-B5.txt             # ③ 실행된 버전의 정본
 ```
