@@ -123,6 +123,11 @@ schema:
       개념을 다른 대소문자로 승격하는 산출이 빠져나갔다(`Inclusive` ↔ `INCLUSIVE` 실증). **계약의 대상은
       직렬화 표기가 아니라 개념**이라, 표기 변형(가족 C)이 술어를 우회하지 못하게 비교를 정규화한다.
       **표기 통일 자체는 여전히 M1/M2 몫이다** — 이 키는 통일을 대신하지 않고 **계약을 표기에 둔감하게** 만든다.
+
+      **어느 projection 에 다는가 — `means` 문면이 정한다.** `means` 가 **상태·개념**을 계약하면(「승격되지
+      않는다」 · 「측정 불가로 떨어지지 않는다」) **단다.** **표기 자체가 계약인 자리에는 달지 않는다** — 그런
+      자리는 정확 비교가 의도이기 때문이다. **현재 다섯 projection 은 전부 앞쪽이라 전건에 달렸다**(verifier
+      r16 F-8 로 형제 넷을 뒤따라 달았다) — 뒤쪽에 해당하는 자리는 **아직 없고**, 생기면 이 규칙으로 가른다.
       **`operand` 는 승인 문면이 있는 어휘여야 한다.** 없으면 projection 이 잠금을 옮길 뿐이고, 그래서
       `operand_source` 가 필수다.
 
@@ -936,6 +941,7 @@ cases:
       - path: "$.provenance"
         projection: not-equals
         operand: "Clean"
+        normalize: case-fold
         operand_source: "`v2-지침서.md` §4.3 — 「`Clean`, `DerivedYega`, `DerivedVat`, `SuspectRatio`, `Unknown`을 명시한다」"
         means: |-
           legacy 유래 행의 provenance 가 **승격되지 않는다** — `verifies` 의 「provenance 미상으로 격리」 가운데
@@ -1027,6 +1033,18 @@ cases:
           required_fix 가 든 것은 *"직렬화 대소문자가 아니라 `VatTreatment` 개념을 기준으로"* 다. 그래서
           **비교를 정규화**했다 — 표기 통일(M1/M2 몫)을 대신하지 않고 **계약을 표기에 둔감하게** 만드는 쪽이다.
           `normalize` 는 **선택 키이고 없으면 정확 비교**라 다른 세 projection 의 의미는 바뀌지 않는다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 비교 방식 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
+      - date: 2026-09-02
+        change: |-
+          `$.provenance` projection 에 **`normalize: case-fold`** 를 달았다. **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 15 — verifier r16 F-8(high).** B8 `findings[0]` 이 든 자리(`money-basis-006` 의
+          `$.vatTreatment`)에만 정규화를 달아, **같은 우회가 형제 projection 에 남아 있었다** — `cLEAN` 로 바꾼
+          변이체가 통과했다. 이 projection 의 `means` 는 **표기가 아니라 상태**(「provenance 가 승격되지 않는다」)를 계약하므로
+          `schema.extensions` 가 세운 「계약의 대상은 직렬화 표기가 아니라 개념」이 그대로 적용된다.
+          **새 결정이 아니라 B8 #1 명령의 완결**이고, 피연산자와 그 승인 문면은 바뀌지 않았다.
         policy_version: |-
           해당 없음 — assertion 계약의 비교 방식 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
@@ -2190,6 +2208,7 @@ cases:
       - path: "$.result"
         projection: not-equals
         operand: "Unmeasurable"
+        normalize: case-fold
         operand_source: "`v2-지침서.md` §4.4 — 「표본 부족은 0%가 아니라 `Unmeasurable`이다」"
         means: |-
           표본이 최소 수와 **같으면 측정 불가로 떨어지지 않는다** — `verifies` 의 「표본 부족이 아니라 측정된다」 가운데
@@ -2312,6 +2331,18 @@ cases:
         policy_version: |-
           해당 없음 — assertion 계약의 형태 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
+      - date: 2026-09-02
+        change: |-
+          `$.result` projection 에 **`normalize: case-fold`** 를 달았다. **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 15 — verifier r16 F-8(high).** B8 `findings[0]` 이 든 자리(`money-basis-006` 의
+          `$.vatTreatment`)에만 정규화를 달아, **같은 우회가 형제 projection 에 남아 있었다** — `uNMEASURABLE` 로 바꾼
+          변이체가 통과했다. 이 projection 의 `means` 는 **표기가 아니라 상태**(「측정 불가로 떨어지지 않는다」)를 계약하므로
+          `schema.extensions` 가 세운 「계약의 대상은 직렬화 표기가 아니라 개념」이 그대로 적용된다.
+          **새 결정이 아니라 B8 #1 명령의 완결**이고, 피연산자와 그 승인 문면은 바뀌지 않았다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 비교 방식 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -2328,6 +2359,7 @@ cases:
       - path: "$.result"
         projection: not-equals
         operand: "Unmeasurable"
+        normalize: case-fold
         operand_source: "`v2-지침서.md` §4.4 — 「표본 부족은 0%가 아니라 `Unmeasurable`이다」"
         means: |-
           **경계 위쪽에서도 측정 불가로 떨어지지 않는다** — `verifies` 의 「`N+1` 에서도 측정된다」 가운데 승인 문면이
@@ -2441,6 +2473,18 @@ cases:
         policy_version: |-
           해당 없음 — assertion 계약의 형태 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
+      - date: 2026-09-02
+        change: |-
+          `$.result` projection 에 **`normalize: case-fold`** 를 달았다. **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 15 — verifier r16 F-8(high).** B8 `findings[0]` 이 든 자리(`money-basis-006` 의
+          `$.vatTreatment`)에만 정규화를 달아, **같은 우회가 형제 projection 에 남아 있었다** — `uNMEASURABLE` 로 바꾼
+          변이체가 통과했다. 이 projection 의 `means` 는 **표기가 아니라 상태**(「경계 위쪽에서도 측정 불가로 떨어지지 않는다」)를 계약하므로
+          `schema.extensions` 가 세운 「계약의 대상은 직렬화 표기가 아니라 개념」이 그대로 적용된다.
+          **새 결정이 아니라 B8 #1 명령의 완결**이고, 피연산자와 그 승인 문면은 바뀌지 않았다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 비교 방식 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -2457,6 +2501,7 @@ cases:
       - path: "$.result"
         projection: not-equals
         operand: "Unmeasurable"
+        normalize: case-fold
         operand_source: "`v2-지침서.md` §4.4 — 「표본 부족은 0%가 아니라 `Unmeasurable`이다」"
         means: |-
           미달 표본이 없는 경우의 결과가 **판정 불가(001)의 상태와 같지 않다** — `verifies` 의 「서로 다른 표시로
@@ -2558,6 +2603,18 @@ cases:
           계약한다. 위 라운드 9 가 적은 *"case 는 비지 않는다"* 가 이번에도 성립한다.
         policy_version: |-
           해당 없음 — assertion 계약의 형태 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
+      - date: 2026-09-02
+        change: |-
+          `$.result` projection 에 **`normalize: case-fold`** 를 달았다. **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 15 — verifier r16 F-8(high).** B8 `findings[0]` 이 든 자리(`money-basis-006` 의
+          `$.vatTreatment`)에만 정규화를 달아, **같은 우회가 형제 projection 에 남아 있었다** — `uNMEASURABLE` 로 바꾼
+          변이체가 통과했다. 이 projection 의 `means` 는 **표기가 아니라 상태**(「판정 불가의 상태와 같지 않다」)를 계약하므로
+          `schema.extensions` 가 세운 「계약의 대상은 직렬화 표기가 아니라 개념」이 그대로 적용된다.
+          **새 결정이 아니라 B8 #1 명령의 완결**이고, 피연산자와 그 승인 문면은 바뀌지 않았다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 비교 방식 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
