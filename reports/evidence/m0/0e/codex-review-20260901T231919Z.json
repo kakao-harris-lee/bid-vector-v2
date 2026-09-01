@@ -1,0 +1,53 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "055a9daa5b9125c063f06c4ad8ece2e051beef24",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 916,
+      "evidence": "`money-basis-006`은 legacy 값을 정의상 기본값인 `Inclusive`로 승격하지 않는다고 명시하지만, VAT projection은 문자열 `INCLUSIVE` 하나만 배제한다. 기대 결과의 `vatTreatment`만 `Inclusive`로 바꿔 계약을 재평가하자 exact path 둘과 projection 둘이 모두 통과해 `mutant_passes=true`였다. 919~927행도 승인 근거의 어휘가 `Inclusive`이며 이 표기는 현재 검사가 잡지 못한다고 스스로 인정한다. 따라서 의미상 동일한 과세 승격이 authoritative corpus를 통과해 VAT 의미를 세탁할 수 있다.",
+      "required_fix": "직렬화 대소문자가 아니라 `VatTreatment` 개념을 기준으로 projection을 평가하도록 정규화/타입 기반 술어를 계약하거나, 최소한 허용 가능한 `Inclusive`와 `INCLUSIVE` 승격을 모두 배제한다. 두 표기 각각의 단독 변이가 실패하는지 재검증한다."
+    },
+    {
+      "severity": "high",
+      "file": ".claude/skills/v2-slice-pipeline/SKILL.md",
+      "line": 159,
+      "evidence": "159~168행의 「장부층 종결선」은 Codex `request_changes`에 든 finding을 구현 레인이 `non-blocker`로 재분류해 사용자 승인만으로 slice를 닫도록 허용한다. 이는 `agent-workflow.md:15`의 finding 임의 축소 금지, 90~94행의 `request_changes` 재검증 절차, `milestone-0.md:133` 및 `milestone-1.md:10`의 M0 Codex `approve` 선행 조건과 충돌한다. 이 경로를 따르면 독립 리뷰가 한 번도 `approve`하지 않은 slice가 완료/M1-ready로 처리될 수 있다.",
+      "required_fix": "`request_changes`는 slice를 닫지 못하게 하고, 수정 상한 도달 시에는 미승인 상태로 중단·보고만 한다. 개선 의견뿐이라면 독립 리뷰가 `approve`와 residual risk로 판정하도록 하며 구현 레인이 verdict나 finding의 차단성을 재분류하지 않게 한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0e/rollback.md",
+      "line": null,
+      "evidence": "`agent-workflow.md:155-162`는 각 slice에 별도 `rollback.md`와 예상 복구 시간을 필수로 요구하고, 135행은 rollback 절차 부재를 `request_changes` 사유로 둔다. 실제 `reports/evidence/m0/0e/`에는 해당 파일이 없다. `scope.md`의 인라인 rollback과 `fixtures-scope.md:228-231`의 삭제 설명에도 예상 복구 시간이 없어 계약을 충족하지 않는다.",
+      "required_fix": "전체 0E range와 세 레인의 산출물을 안전하게 되돌리는 명령, 부분 revert 시 결합 관계, 검증 방법, 예상 복구 시간을 `reports/evidence/m0/0e/rollback.md`에 기록한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse HEAD && git cat-file -t 14686dbf3bff4085203ffdcd931564fd1e36edf0 && git cat-file -t 055a9daa5b9125c063f06c4ad8ece2e051beef24 && git merge-base 14686dbf3bff4085203ffdcd931564fd1e36edf0 055a9daa5b9125c063f06c4ad8ece2e051beef24",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..055a9daa5b9125c063f06c4ad8ece2e051beef24 && git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..055a9daa5b9125c063f06c4ad8ece2e051beef24",
+    "git log --oneline --decorate 14686dbf3bff4085203ffdcd931564fd1e36edf0..055a9daa5b9125c063f06c4ad8ece2e051beef24",
+    "sed -n '1,260p' agent-workflow.md; sed -n '1,245p' milestone-0.md; sed -n '1,100p' milestone-1.md; sed -n '1,360p' v2-지침서.md; sed -n '1,260p' data-extract.md",
+    "git diff --unified=20 14686db..055a9da -- .claude/skills/codex-review-gate/SKILL.md .claude/skills/evidence-pack/SKILL.md .claude/skills/v2-slice-pipeline/SKILL.md CLAUDE.md",
+    "awk '/^    input_file: /{f=$2} /^    expected_file: /{g=$2} /^    sha256: [0-9a-f]{64}$/{print $2\"  \"f} /^    expected_sha256: [0-9a-f]{64}$/{print $2\"  \"g}' fixtures/manifest.yaml | shasum -a 256 -c -",
+    "python3 -c \"import json,glob; fs=sorted(glob.glob('fixtures/input/*.json')+glob.glob('fixtures/expected/*.json')); [json.load(open(f)) for f in fs]; print('parsed OK:',len(fs))\" && python3 fixtures/tools/check_legacy_numbers.py",
+    "python3 -c \"import json;json.load(open('fixtures/legacy-reference-index.json'));print('parsed')\" && awk '/^  index_file_sha256: /{print $2\"  fixtures/legacy-reference-index.json\"}' fixtures/manifest.yaml | shasum -a 256 -c -",
+    "/tmp/fxvenv/bin/python으로 manifest 필수 키·해시·중복 id·orphan 파일·classification 분포·legacy_reference 집합·verified_paths/verified_projections 경로를 전수 검사",
+    "reports/evidence/m0/0e/commands.md의 C-2, C-3, C-11, C-12 명령 재실행",
+    "git diff --numstat 14686db HEAD -- 'v2-지침서.md' milestone-0.md milestone-1.md docs/adr docs/discovery/capability-map.md; wc -l reports/evidence/m0/0e/{scope,commands,checklist}.md; git diff --check 14686db..055a9da",
+    "money-basis-006의 vatTreatment만 `Inclusive`로 바꾼 인메모리 변이에 verified_paths와 verified_projections를 재평가",
+    "ls reports/evidence/m0/0e/rollback.md reports/evidence/m0/0e/golden-manifest.json reports/evidence/m0/0e/differential.json",
+    "git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..055a9daa5b9125c063f06c4ad8ece2e051beef24; git diff --shortstat 14686dbf3bff4085203ffdcd931564fd1e36edf0..055a9daa5b9125c063f06c4ad8ece2e051beef24; git status --porcelain=v1 --untracked-files=all"
+  ],
+  "residual_risks": [
+    "legacy checkout이 clean worktree에 없어 F-5.3의 git object 대조는 재실행하지 못했으며, 커밋된 legacy-reference-index의 해시와 manifest 경로 집합만 독립 검증했다.",
+    "29개 case가 `insufficient-evidence`, 30개 축이 `uncovered_axes`로 남아 authoritative corpus가 부분 준비 상태지만, 이는 기록된 사용자 승인 범위에 포함된 이월 위험이다.",
+    "M0 문서·fixture slice이므로 production Kotlin/Python wiring, DB write, retry/idempotency 및 실제 side effect는 이번 range에 존재하지 않아 실행 검증 대상이 아니었다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
