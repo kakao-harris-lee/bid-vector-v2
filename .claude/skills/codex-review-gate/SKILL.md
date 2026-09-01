@@ -148,6 +148,13 @@ developer 구간 0 — 주입 아님.
 **`config.toml`의 `[features] memories=false`도 쓰지 않는다** — 운영자의 대화형 codex까지
 끈다. 리뷰 레인의 권한 밖이다.
 
+**세 번째 주입 표면 — hooks (`~/.codex/hooks.json`).** codex 세션은 hook 을 실행하며
+(B8 실측: 한 라운드에 262 이벤트) **두 플래그로 닫히지 않는다.** hook 이 stdout 에 쓰면
+컨텍스트로 **조용히 주입**된다. 현재 등록된 orca hook 은 stdout 에 아무것도 쓰지 않고
+`ORCA_*` 환경변수 미설정 시 no-op 이라 침해가 없음을 실측했으나, 표면은 실재한다 —
+**preflight 에서 `~/.codex/hooks.json` 의 hook 목록과 각 스크립트가 stdout 에 쓰는지를
+라운드마다 확인**하고, stdout 에 쓰는 hook 이 발견되면 그 라운드는 preflight 미충족이다.
+
 **preflight**: 리뷰 실행 전 아래를 돌려 이 저장소 흔적의 양을 기록한다. `sessions/`는
 용량이 커서 훑지 않는다.
 
@@ -229,6 +236,12 @@ worktree 격리로 인해 영향받지 않는다.
 - `verdict`가 `approve` 또는 `request_changes`
 - `reviewed_base`/`reviewed_head`가 요청한 SHA와 일치
 - `request_changes`면 `findings[]`에 severity/file/evidence/required_fix 존재
+- **저장된 verdict 가 raw output 의 종말 메시지와 일치하고 `commands_run` 이 실질적**
+  (2개 이상, 실제 검토 명령 포함)**인지.** codex 는 작업 전에 schema-valid 한 조기
+  verdict 를 내뱉을 수 있다 — B8 실측: raw 136행에서 명령 실행 전의 `approve` 가 나왔고
+  최종(10027행) `request_changes` 가 `-o` 로 저장돼 사고를 면했다. 캡처 의미가 바뀌거나
+  타임아웃이 나면 조기 verdict 가 저장될 수 있으므로, **`commands_run` 이 빈약한
+  `approve` 는 판정이 아니라 미완 실행으로 취급**하고 재실행한다.
 
 검증 실패 시 1회 재실행. 재실패 시 raw 출력을 보존하고 실패로 보고한다. JSON을 임의로
 보정·생성하지 않는다.
