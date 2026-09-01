@@ -87,7 +87,7 @@
 | 앞 여섯 slice 의 evidence 무접촉 | 같은 명령 — 빈 diff |
 | `fixtures/` 접촉이 **선언된 예외뿐**인가 | `commands.md` **C-7b 와 그 아래 「`C-7b` 매치의 처리」가 정본이다** — 접촉은 `fixtures/manifest.yaml` **한 파일**이고, **자리를 여기 열거하지 않는다**(열거하면 접촉이 늘 때마다 낡는다 — `scope.md` 와 같은 처방이다). 그 절이 **두 부류(A 혼합 커밋 · B manifest 단독)와 각 부류의 검출 명령**을 갖고, **각 커밋의 개별 판정은 그 커밋 메시지**가 싣는다. **여기서 「무접촉」을 주장하지 않는다** — 그 주장은 실측과 어긋났다(Codex B4 medium). **B 부류는 `C-7b` 가 구조적으로 보지 못한다** — `C-0` 이 `in_scope` 경로로 레인을 뽑으므로 manifest 만 건드린 커밋이 그 입력에 들지 않는다. **`ls` 로도 `14686db..HEAD` 전체로도 재지 않는다** — fixture-curator 레인이 병행해 실제로 `fixtures/` 를 만들었으므로 그 둘은 이 레인의 접촉 범위를 재지 못한다 |
 | 다른 레인의 변경(`CLAUDE.md`·`.claude/`·`fixtures-*.md`)을 커밋에 넣지 않았다 | `commands.md` **C-7a** — 이 레인의 커밋이 건드린 파일 집합이 `in_scope` 에 `fixtures/manifest.yaml` 을 더한 것과 같다(**B 부류는 위 칸이 적는 대로 이 명령의 입력 밖**이고, 그 커밋들이 건드린 파일은 정본 절의 B 검출 명령이 낸 목록을 `git show --stat` 으로 읽는다). **수는 여기 적지 않는다 — C-7a 가 낸다** |
-| B5-high 수정이 **계약 축에 그쳤는가** | `commands.md` **C-11** — 기대값·입력 파일과 해시 무접촉, `verified_paths` 의 어느 값도 가족 A 의 미승인 이름이 아니고, `verified_projections` 가 다섯 필수 키·승인된 피연산자·기대값에서 참인 술어를 갖는다. **fixture-curator 레인의 `F-7b` 를 문면 그대로 재실행해 그 레인의 검사가 깨지지 않았음도 함께 낸다** |
+| manifest 수정이 **계약·분류 축에 그쳤는가** | `commands.md` **C-11** — 기대값·입력 파일과 해시 무접촉, `verified_paths` 의 어느 값도 가족 A 의 미승인 이름이 아니고, `verified_projections` 가 다섯 필수 키·승인된 피연산자·기대값에서 참인 술어를 가지며, **`insufficient-evidence` 로 내린 case 에는 두 계약 필드가 없다**. **fixture-curator 레인의 `F-7b` 를 문면 그대로 재실행해 그 레인의 검사가 깨지지 않았음도 함께 낸다** |
 
 ---
 
