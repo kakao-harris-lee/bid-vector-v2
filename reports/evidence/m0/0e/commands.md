@@ -31,7 +31,7 @@ LANE=(docs/adr docs/discovery/capability-map.md milestone-0.md milestone-1.md \
 | **C-6a** | `grep -c '^## 3\. 대안 — .OPEN-OPS-07. 후보의 판정' docs/adr/0005-domain-events-and-outbox.md` | 0 | **1** — 종료 조건(ADR 대안 절)이 그 제목으로 산출물에 실재한다. **줄 번호를 여기 적지 않는다** — 문서가 자라면 낡으므로(실제로 230 → 236 → 239 로 표류했다) 자리를 재려면 같은 패턴에 `-n` 을 준다 |
 | **C-6b** | `grep -c '^### \`OPEN-ADR-01\`' docs/adr/0001-target-architecture.md` | 1 | **0** — 취소선 없는 활성 제목 없음 (`^### ~~\`OPEN-ADR-01\`~~` 은 1) |
 | **C-7a** | `for c in $(git log --format=%h 14686db..HEAD -- "${LANE[@]}"); do git diff --name-only $c^ $c; done \| sort -u` | 0 | 이 레인의 커밋들이 건드린 파일 집합. **수를 여기 적지 않는다** — 커밋이 늘면 바뀌므로 **이 명령이 낸다**. `in_scope` 밖 경로가 섞였는지는 `C-7b` 가 본다 |
-| **C-7b** | 같은 목록 \| `grep -E '^(fixtures/\|docs/discovery/(data-dictionary\|regression-ledger)\|reports/evidence/m0/0[a-d])'` | **0** | **매치 하나 — `fixtures/manifest.yaml`.** `8701882` 이 `milestone-0.md` 와 `fixtures/manifest.yaml` 의 **같은 인용 좌표를 한 커밋에** 담아 pathspec 이 두 레인에 걸쳤다. **선언된 예외**이고 판정·근거·범위는 표 아래 **「`C-7b` 매치의 처리」**가 갖는다. **⚠ 이 검사는 이 레인의 `fixtures/` 접촉을 전수로 재지 못한다** — `C-0` 이 `in_scope` 경로로 레인을 뽑으므로 **`fixtures/manifest.yaml` 만 건드린 커밋은 입력에 들지 않는다.** 이 라운드에 그런 커밋이 났고 같은 절이 그것을 적는다. `data-dictionary.md` · `regression-ledger.md` · 앞 여섯 slice evidence 는 여전히 **무접촉** |
+| **C-7b** | 같은 목록 \| `grep -E '^(fixtures/\|docs/discovery/(data-dictionary\|regression-ledger)\|reports/evidence/m0/0[a-d])'` | **0** | **매치 하나 — `fixtures/manifest.yaml`.** `in_scope` 파일과 그 파일을 한 커밋에 담은 **혼합 커밋**(부류 A)이 있어 pathspec 이 두 레인에 걸친다. **선언된 예외**이고 부류·검출 명령·판정 규칙은 표 아래 **「`C-7b` 매치의 처리」**가 갖는다 — **커밋을 여기 열거하지 않는다**(열거하면 접촉이 늘 때마다 낡는다). **⚠ 이 검사는 이 레인의 `fixtures/` 접촉을 전수로 재지 못한다** — `C-0` 이 `in_scope` 경로로 레인을 뽑으므로 **`fixtures/manifest.yaml` 만 건드린 커밋(부류 B)은 입력에 들지 않는다.** 같은 절이 그 부류의 검출을 갖는다. `data-dictionary.md` · `regression-ledger.md` · 앞 여섯 slice evidence 는 여전히 **무접촉** |
 | **C-8** | `for f in reports/evidence/m0/*/codex-review-*.json; do python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(d['verdict'],d['reviewed_base'][:8],d['reviewed_head'][:8])" "$f"; done` | 0 | 각 리뷰 JSON 의 `verdict`·base·head 를 낸다. **건수도 head SHA 도 여기 옮겨 적지 않는다** — verdict 가 등재될 때마다 바뀌므로 **이 명령이 낸다**. 읽는 법: slice 별 마지막 줄이 그 slice 의 현재 상태이고, 0A 의 `approve` 는 `6c6b3a2a..6af70199` 의 **별도 리뷰 A** 다(`C-9b`·`C-9c` 가 그 range 를 다룬다) |
 | **C-9a** | `git log --oneline 6c6b3a2..6af7019 -- docs/discovery/capability-map.md` | 0 | 커밋 **4개** (`0b0c8aa`·`23b9c2a`·`0581e97`·`d140f92`) — 0A 라운드 4~6 |
 | **C-9b** | `git diff --stat 6c6b3a2 6af7019 -- docs/discovery/capability-map.md` | 0 | **31 삽입 / 14 삭제** — 실행 시점에 어느 리뷰 range 에도 들지 않았던 delta. **그 뒤 별도 리뷰 A(`6c6b3a2..6af7019`) 가 덮어 `approve`** |
@@ -41,24 +41,24 @@ LANE=(docs/adr docs/discovery/capability-map.md milestone-0.md milestone-1.md \
 | **C-12** | 해소된 `OPEN` 의 **현재형 활성/대기 서술** (전문은 이 표 아래) | 0 | **B5 medium 이 든 둘(`OPS-21` 본문 · §13 하류 인계 표)은 사라졌다.** 남는 매치는 **하나**이고 `OPEN-OPS-07` 의 주장이 아니다 — `capability-map.md` §12 의 **`OPEN-DEC-07` 행**(활성)이 자기 종료 조건 미충족을 적으며 **판정 기준으로** `OPEN-OPS-07` 을 인용하는 자리다. **이 검사가 못 보는 것**: 같은 줄 안의 근접만 재므로 「누구에 대한 주장인가」는 사람이 읽는다 |
 | **C-13** | `codex-review-gate` **preflight** — 리뷰 B5 (전문은 이 표 아래) | 0 | ① repo 흔적(`memory_summary`·`MEMORY.md`·`rollout_summaries/`·`skills/`·`rules`) **5건** ② `stage1_outputs` 중 `bid-vector-v2-review` 언급 **0** / **총 647행** — 총 행이 0이 아니므로 **DB 가 실제로 열렸고** 「0행」이 「못 열어서 0」이 아니다(독립성 전건 성립) ③ **B5 가 실제로 돈 CLI 는 `0.148.0`** — **당시 PATH 가 고른 바이너리**이고, 정본은 실행 산출물 `_workspace/m0-0e/codex.raw-output-B5.txt` 의 머리글 `OpenAI Codex v0.148.0` 이며, 그 경로는 `.gitignore` 대상이라 clean worktree 에 없으므로 **저장소 안의 대응물은 verdict JSON 의 `reviewer.cli_version`** 이다 — 둘이 일치한다. **B~B4 는 0.149.0**(같은 디렉터리의 앞선 머리글 넷, verdict 쪽은 `C-8`). **알려진 제한 — B5 시점의 스킬은 심판 버전을 고정하지 않았다**: `git show dc27007^:.claude/skills/codex-review-gate/SKILL.md` 의 §4 가 맨 `codex` 를 부르므로 **어느 바이너리가 도는지를 PATH 가 정했고** 그래서 라운드마다 갈렸다(0.149.0 → 0.148.0). 이 evidence 를 쓰는 **도중에도 갈렸다** — `codex --version` 이 **0.148.0 → 0.151.0** 으로 바뀌었고 지금 `type -a codex` 는 `~/.nvm/versions/node/v22.21.1/bin/codex`(**0.151.0**) 하나만 낸다. **이 축은 다른 레인이 같은 range 에서 닫았다** — 하네스 커밋 `dc27007`(**운영자 지정 2026-09-01**)이 `CODEX_BIN` 을 절대 경로로, `CODEX_PIN` 을 **0.151.0** 으로 고정했다. **그 핀은 B6 부터 적용된다** — 그래서 **B5 와 B6 는 엔진 버전이 다르고**, 스킬 자신이 그것을 *"조용한 PATH 결과가 아니라 여기 기록된 명시적 결정"* 이라 적는다. 판단은 그 커밋이 갖는다(**이 slice 범위 밖**) |
 
-**`C-7b` 매치의 처리 — 이 레인의 `fixtures/manifest.yaml` 접촉 둘을 선언된 예외로 둔다.**
+**`C-7b` 매치의 처리 — 이 레인의 `fixtures/manifest.yaml` 접촉을 선언된 예외로 둔다.**
 
 **이 자리가 `C-7a` 의 경로 집합과 `C-7b` 매치의 정본이다** — `checklist.md`·`scope.md` 는 여기를
 가리키고 같은 사실을 따로 적지 않는다. 수는 어느 쪽에도 적지 않는다(`C-7a`·`C-7b` 가 낸다).
 
-**이 레인이 `fixtures/manifest.yaml` 을 건드린 자리는 둘이고 성격이 다르다** — **① 인용 좌표
-정정**(`8701882`) · **② B5-high 수정**(`16d7a48`). **둘은 검출 방식도 다르다.**
+**이 절은 커밋을 열거하지 않는다 — 두 부류와 각 부류의 검출·판정 규칙만 세운다.** **A 혼합
+커밋**(`in_scope` 와 한 커밋에 담긴 것) · **B manifest 단독 커밋**. 무엇이 났는지는 명령이 낸다.
 
 ```sh
-# ① — 두 레인 pathspec 에 동시에 걸리는 혼합 커밋. C-7b 가 낸다
+# A — 두 레인 pathspec 에 동시에 걸리는 혼합 커밋 전수. C-7b 가 잡는 자리다
 comm -12 <(git log --format=%h 14686db..HEAD -- "${LANE[@]}" | sort) \
          <(git log --format=%h 14686db..HEAD -- fixtures/manifest.yaml | sort)
-# ② — `fixtures/manifest.yaml` **만** 건드린 커밋이라 `C-0` 의 pathspec 밖이고 위 교집합에
-#     들지 않는다. 파일 목록으로 그 사실을 낸다
-git show --stat --format='%h %s' 16d7a48
+# B — manifest 단독이라 C-0 의 pathspec 밖이고 위 교집합에 들지 않는다. 아래가 후보 전수이며
+#     어느 줄이 이 레인의 것인지는 **pathspec 으로 갈리지 않는다** — 커밋 메시지를 읽어 가른다
+git log --format='%h %s' 14686db..HEAD -- fixtures/manifest.yaml
 ```
 
-*판정은 오케스트레이터가 냈고 **운영자가 승인했다**(2026-08-31).* 사후 승인 대상이던 자리가 닫혔다.
+**부류 A — 혼합 커밋.** *판정은 오케스트레이터가 냈고 **운영자가 승인했다**(2026-08-31).* 사후 승인 대상이던 자리가 닫혔다.
 
 *결정 축어 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).*
 물음: *"오케스트레이터가 『8701882의 두 레인 교차 커밋은 선언된 예외』로 판정했고 운영자 사후 승인
@@ -82,23 +82,22 @@ git show --stat --format='%h %s' 16d7a48
   세 라운드의 head(`857e7767`·`74ef4415`·`71e3e3a1`) 전부의 조상**이라 이미 리뷰된 range 안에
   있다(`git merge-base --is-ancestor 8701882 <head>` 가 낸다). 분리하려면 리뷰된 역사를 다시
   써야 한다.
-- **①의 범위는 `8701882` 하나다.** `C-7b` 의 나머지 판정은 그대로 선다. **다음 커밋에 같은
-  형태가 또 나오면 새 판정 대상**이며 이 항목이 그것을 덮지 않는다.
+- **승인은 커밋마다 따로 선다.** 위 2026-08-31 승인은 그 물음이 든 접촉에만 걸리고 **다른
+  접촉으로 번지지 않는다.** 그래서 이 절은 근거를 열거하는 대신 **분류 규칙과 이 요구**를
+  갖는다 — **명령이 내는 각 커밋의 개별 판정은 그 커밋 메시지**가 싣는다(어느 finding 이 그
+  접촉을 요구했는지와 범위). 새 접촉이 나도 이 절은 낡지 않는다.
 
-**② B5-high 수정 — 다른 사유의 예외다.**
+**부류 B — manifest 단독 커밋.**
 
-- **무엇이 잡히는가 — 아무것도 잡히지 않는다.** **B5 `findings[0]`(high)** 가 지목한 파일이
-  `fixtures/manifest.yaml` 이고 그 수정 커밋이 이 레인에서 났으나, **그 커밋은 그 파일 하나만
-  건드려 `C-0` 의 pathspec 밖에 있다.** `C-7b` 의 매치가 하나인 것은 ①만 세었기 때문이고
-  **②는 그 검사가 구조적으로 보지 못한다** — 검출은 위 블록의 `git show --stat` 이 한다.
-- **왜 이 레인이 고치는가.** finding 이 든 축은 **B4-high 가 세운 `verified_paths` 계약**이고 그
-  계약을 세운 것도 이 레인이다. ①이 두 레인 파일에 걸친 인용 좌표 정정이라면 ②는 **이 레인이
-  만든 계약 위의 정정**이다. 처리는 **운영자 결정 2026-09-01**(「projection 으로 좁힘」)이 정했다.
-- **범위는 그 finding 이 든 자리에 그친다** — 세 case 의 `verified_paths`, 그 계약을 정의하는
-  `schema.extensions`, 계약의 현재 형태를 서술하던 자리들(분류 정책·`uncovered_axes`·`next_steps`).
-  **기대값·입력 파일과 해시는 무접촉**이고 `fixtures/` 의 다른 파일도 무접촉이다.
-- **fixture-curator 레인의 파일을 고치지 않았다** — 신설 필드 `verified_projections` 는 그 레인의
-  `F-7b` 가 읽는 필드의 **모양을 바꾸지 않고 형제로 선다**. 재실행 결과는 `C-11` 이 낸다.
+- **`C-7b` 가 구조적으로 보지 못한다.** `C-0` 이 `in_scope` 경로로 레인을 뽑으므로 manifest 만
+  건드린 커밋은 그 입력에 아예 없다 — **`C-7b` 가 내는 매치는 A 부류가 건드린 경로뿐**이다.
+  B 부류의 검출은 위 블록의 마지막 명령이 한다 — 검사 밖의 접촉을 검사 결과로 숨기지 않는다.
+- **왜 이 레인이 manifest 를 고치는가.** 접촉의 축은 **B4-high 가 세운 `verified_paths` 계약**이고
+  그 계약을 세운 것도 이 레인이라, 그 계약 위의 정정은 이 레인이 맡는다. **어느 finding 이 어떤
+  범위를 요구했는지는 커밋마다 다르고 그 커밋 메시지가 갖는다.**
+- **부류를 가리지 않는 공통 제약 둘.** ① **기대값·입력 파일과 해시 무접촉** ② **fixture-curator
+  레인의 파일 무접촉** — 신설 필드 `verified_projections` 는 그 레인의 `F-7b` 가 읽는 필드의
+  **모양을 바꾸지 않고 형제로 선다**. 둘 다 `C-11` 이 낸다.
 
 **`C-2`·`C-3` 의 python3 블록** (긴 명령이라 표 밖에 둔다. **quoted heredoc 이라 셸 확장이
 없다** — 이대로 붙여 돌리면 재현된다).
