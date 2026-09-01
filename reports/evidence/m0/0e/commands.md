@@ -5,15 +5,13 @@
 
 ## 이 range 에는 세 레인이 있다
 
-`14686db..HEAD` 는 **spec-writer(이 evidence) · fixture-curator(`fixtures/**` ·
-`reports/evidence/m0/0e/fixtures-*.md`) · 하네스(`.claude/**` · `CLAUDE.md`)** 셋의 커밋을
-함께 담는다. **아래 `C-0` 이 이 레인의 커밋 집합을 pathspec 으로 뽑고, `C-7` 이 그 집합만으로
-불변을 확인한다** — `14686db..HEAD` 전체로 재면 다른 레인의 변경이 섞인다.
+`14686db..HEAD` 는 **spec-writer(이 evidence) · fixture-curator(`fixtures/**` · `fixtures-*.md`) ·
+하네스(`.claude/**` · `CLAUDE.md`)** 셋의 커밋을 함께 담는다. **`C-0` 이 이 레인의 커밋 집합을 pathspec
+으로 뽑고 `C-7` 이 그 집합만으로 불변을 확인한다** — 전체로 재면 다른 레인의 변경이 섞인다.
 
 ```sh
 LANE=(docs/adr docs/discovery/capability-map.md milestone-0.md milestone-1.md \
-      'v2-지침서.md' reports/evidence/m0/0e/scope.md \
-      reports/evidence/m0/0e/commands.md reports/evidence/m0/0e/checklist.md)
+      'v2-지침서.md' $(ls reports/evidence/m0/0e/*.md | grep -v fixtures-))   # 파일이 늘면 따라간다
 ```
 
 | # | 명령 | exit | 핵심 결과 |
@@ -36,7 +34,7 @@ LANE=(docs/adr docs/discovery/capability-map.md milestone-0.md milestone-1.md \
 | **C-9a** | `git log --oneline 6c6b3a2..6af7019 -- docs/discovery/capability-map.md` | 0 | 커밋 **4개** (`0b0c8aa`·`23b9c2a`·`0581e97`·`d140f92`) — 0A 라운드 4~6 |
 | **C-9b** | `git diff --stat 6c6b3a2 6af7019 -- docs/discovery/capability-map.md` | 0 | **31 삽입 / 14 삭제** — 실행 시점에 어느 리뷰 range 에도 들지 않았던 delta. **그 뒤 별도 리뷰 A(`6c6b3a2..6af7019`) 가 덮어 `approve`** |
 | **C-9c** | `python3 -c "import json;print(json.load(open('reports/evidence/m0/0a2/codex-review-20260827T034348Z.json'))['reviewed_base'])"` | 0 | `6af7019…` — 0A2 리뷰의 base 가 그 넷 **뒤**다 |
-| **C-10** | `git diff --numstat 14686db HEAD -- 'v2-지침서.md' milestone-0.md milestone-1.md docs/adr docs/discovery/capability-map.md \| awk '{a+=$1;d+=$2} END{print a-d}'` · `wc -l reports/evidence/m0/0e/{scope,commands,checklist}.md` | 0 | **게이트 통과** — 판정은 `evidence ≤ 산출물`. **두 수를 여기 옮겨 적지 않는다** — 커밋이 늘 때마다 바뀌므로 **이 명령이 낸다** |
+| **C-10** | `git diff --numstat 14686db HEAD -- 'v2-지침서.md' milestone-0.md milestone-1.md docs/adr docs/discovery/capability-map.md \| awk '{a+=$1;d+=$2} END{print a-d}'` · `ls reports/evidence/m0/0e/*.md \| grep -v fixtures- \| xargs wc -l \| tail -1` | 0 | **게이트 통과** — 판정은 `evidence ≤ 산출물`. **분자는 이 레인 evidence 전수**다(`fixtures-*.md` 는 다른 레인) — 파일이 늘면 `glob` 이 따라가므로 **이름을 열거하지 않는다**(`rollback.md` 신설이 그 실례다). **두 수를 여기 옮겨 적지 않는다** — 커밋이 늘 때마다 바뀌므로 **이 명령이 낸다** |
 | **C-11** | B5-high 수정의 계약 불변 (전문은 이 표 아래) | 0 | `violations` **빈 목록**. ① `verified_paths` 의 어느 값도 **가족 A 의 네 이름이 아니다** ② `verified_projections` 는 다섯 필수 키 · 술어 `not-equals` · 피연산자가 가족 A 밖 ③ 같은 경로가 두 필드에 겹치지 않고 술어가 기대값에서 **참** ④ `insufficient-evidence` 에는 두 필드가 없다 ⑤ `change_history` 네 필수 키. **함께 fixture-curator 레인 `F-7b` 를 문면 그대로 재실행해** `violations` 빈 목록을 확인했다(신설 필드가 그 레인의 검사를 깨지 않는다). **이 검사가 못 보는 것**: `[i]` 첨자 경로는 값을 풀지 않고 건너뛴다 — 이 라운드가 바꾼 세 자리는 전부 최상위다 |
 | **C-12** | 해소된 `OPEN` 의 **현재형 활성/대기 서술** (전문은 이 표 아래) | 0 | **B5 medium 이 든 둘(`OPS-21` 본문 · §13 하류 인계 표)은 사라졌다.** 남는 매치는 **하나**이고 `OPEN-OPS-07` 의 주장이 아니다 — `capability-map.md` §12 의 **`OPEN-DEC-07` 행**(활성)이 자기 종료 조건 미충족을 적으며 **판정 기준으로** `OPEN-OPS-07` 을 인용하는 자리다. **이 검사가 못 보는 것**: 같은 줄 안의 근접만 재므로 「누구에 대한 주장인가」는 사람이 읽는다 |
 | **C-13** | `codex-review-gate` **preflight** — 리뷰 B5 (전문은 이 표 아래) | 0 | ① repo 흔적(`memory_summary`·`MEMORY.md`·`rollout_summaries/`·`skills/`·`rules`) **5건** ② `stage1_outputs` 중 `bid-vector-v2-review` 언급 **0** / **총 647행** — 총 행이 0이 아니므로 **DB 가 실제로 열렸고** 「0행」이 「못 열어서 0」이 아니다(독립성 전건 성립) ③ **B5 가 실제로 돈 CLI 는 `0.148.0`** — **당시 PATH 가 고른 바이너리**이고, 정본은 실행 산출물 `_workspace/m0-0e/codex.raw-output-B5.txt` 의 머리글 `OpenAI Codex v0.148.0` 이며, 그 경로는 `.gitignore` 대상이라 clean worktree 에 없으므로 **저장소 안의 대응물은 verdict JSON 의 `reviewer.cli_version`** 이다 — 둘이 일치한다. **B~B4 는 0.149.0**(같은 디렉터리의 앞선 머리글 넷, verdict 쪽은 `C-8`). **알려진 제한 — B5 시점의 스킬은 심판 버전을 고정하지 않았다**: `git show dc27007^:.claude/skills/codex-review-gate/SKILL.md` 의 §4 가 맨 `codex` 를 부르므로 **어느 바이너리가 도는지를 PATH 가 정했고** 그래서 라운드마다 갈렸다(0.149.0 → 0.148.0). 이 evidence 를 쓰는 **도중에도 갈렸다** — `codex --version` 이 **0.148.0 → 0.151.0** 으로 바뀌었고 지금 `type -a codex` 는 `~/.nvm/versions/node/v22.21.1/bin/codex`(**0.151.0**) 하나만 낸다. **이 축은 다른 레인이 같은 range 에서 닫았다** — 하네스 커밋 `dc27007`(**운영자 지정 2026-09-01**)이 `CODEX_BIN` 을 절대 경로로, `CODEX_PIN` 을 **0.151.0** 으로 고정했다. **그 핀은 B6 부터 적용된다** — 그래서 **B5 와 B6 는 엔진 버전이 다르고**, 스킬 자신이 그것을 *"조용한 PATH 결과가 아니라 여기 기록된 명시적 결정"* 이라 적는다. 판단은 그 커밋이 갖는다(**이 slice 범위 밖**) |
@@ -161,8 +159,10 @@ for c in m['cases']:
         return cur
     bad += [(c['id'], '가족 A 잠금: ' + p) for p in vp if str(at(p)) in A]
     for e in vj:
-        if (set(e) != REQ or e['projection'] != 'not-equals' or e['operand'] in A
-                or e['path'] in vp or at(e['path']) == e['operand']):
+        a, b = at(e['path']), e['operand']
+        if e.get('normalize') == 'case-fold' and isinstance(a, str): a, b = a.casefold(), b.casefold()
+        if (not REQ <= set(e) <= REQ | {'normalize'} or e['projection'] != 'not-equals'
+                or e['operand'] in A or e['path'] in vp or a == b):
             bad.append((c['id'], 'projection: ' + str(e.get('path'))))
     if c['classification'] != 'authoritative' and (vp or vj):
         bad.append((c['id'], 'ie 인데 계약 필드가 있다'))

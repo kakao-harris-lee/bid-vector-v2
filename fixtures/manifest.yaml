@@ -116,6 +116,13 @@ schema:
       *"`verifies` 를 승인된 의미로 좁혀 유지"* 를 그대로 쓰되, 그때 산문에서 한 좁힘을 이번에는 기계 계약에서 한다.
 
       **술어 어휘는 하나뿐이다** — `not-equals`. 늘릴 일이 있으면 이 자리에 정의하고 늘린다.
+
+      **`normalize` — 여섯째 키이고 선택이다.** 어휘 `case-fold` 하나뿐이며, 있으면 **값과 피연산자를 둘 다
+      case-fold 한 뒤** 비교한다. **없으면 정확 비교**이므로 이 키를 달지 않은 항목의 의미는 바뀌지 않는다.
+      **왜 필요한가 — Codex 재리뷰 B8 `findings[0]`(high).** `not-equals` 는 **한 표기만** 배제하므로 같은
+      개념을 다른 대소문자로 승격하는 산출이 빠져나갔다(`Inclusive` ↔ `INCLUSIVE` 실증). **계약의 대상은
+      직렬화 표기가 아니라 개념**이라, 표기 변형(가족 C)이 술어를 우회하지 못하게 비교를 정규화한다.
+      **표기 통일 자체는 여전히 M1/M2 몫이다** — 이 키는 통일을 대신하지 않고 **계약을 표기에 둔감하게** 만든다.
       **`operand` 는 승인 문면이 있는 어휘여야 한다.** 없으면 projection 이 잠금을 옮길 뿐이고, 그래서
       `operand_source` 가 필수다.
 
@@ -914,17 +921,18 @@ cases:
     verified_projections:
       - path: "$.vatTreatment"
         projection: not-equals
-        operand: "INCLUSIVE"
+        operand: "Inclusive"
+        normalize: case-fold
         operand_source: |-
           **커밋된 운영자 결정 기록** `reports/evidence/m0/0c/decisions-2026-08-28.md` — `:68` 「운영자 결정: 기초금액
           (사업금액)은 부가세 포함이다」이고 `:109` 의 기록자 bullet 이 그 정의상 기본값을 **`Inclusive`** 로 적는다
-          (같은 파일을 이 manifest 의 다른 case 들도 ② 근거로 쓴다). **대소문자 차이는 가족 C 다** — 개념이 승인
-          문면에 있고 표기만 다른 자리이며 4문 4답이 *"개념 기준 통과 … 표기 통일은 M1/M2 계약 설계로 이월"* 로 정했다.
+          (같은 파일을 이 manifest 의 다른 case 들도 ② 근거로 쓴다). **피연산자를 승인 문면의 표기 그대로 둔다** —
+          기대값의 표기(`INCLUSIVE`)는 `normalize: case-fold` 가 흡수하므로 계약이 **승인된 이름**에 선다.
         means: |-
           legacy 유래 행이 **정의상 기본값 과세로 자동 태깅되지 않는다** — `verifies` 의 「`Inclusive` 로 승격되지
           않는다」 그 자리다. **미상 쪽의 이름(`UNKNOWN`)은 계약하지 않는다**(가족 A).
-          **이 술어의 한계를 적어 둔다** — 배제하는 것은 이 표기뿐이라 다른 표기(`Inclusive`)로 승격하는 산출은
-          걸리지 않는다. 표기 통일이 M1/M2 로 이월된 축이라 지금 좁힐 수단이 없고, `not_covered` 가 그 자리를 받는다.
+          **표기가 아니라 개념에 건다** — `normalize: case-fold` 로 `Inclusive`·`INCLUSIVE` 어느 표기의 승격도
+          같은 술어에 걸린다. 대소문자 밖의 표기 변형(공백·구분자)은 여전히 밖이며 그 통일은 M1/M2 몫이다.
       - path: "$.provenance"
         projection: not-equals
         operand: "Clean"
@@ -959,9 +967,9 @@ cases:
     owning_open: |-
       OPEN-REG-05 (저장 값의 행별 실제 과세) — 이 case는 그 판정을 하지 않고 판정하지 않음을 고정한다
     not_covered: |-
-      **과세 라벨의 다른 표기** — 위 projection 이 배제하는 것은 `INCLUSIVE` **이 표기뿐**이고, 같은 개념을
-      다른 표기(`Inclusive`)로 승격하는 산출은 걸리지 않는다. **표기 통일이 M1/M2 계약 설계로 이월된 축**이라
-      (4문 4답 가족 C) 지금 좁힐 수단이 없다. 미상 쪽의 이름(`UNKNOWN`)도 계약하지 않는다 — 가족 A 다.
+      **대소문자 밖의 표기 변형** — 과세 승격은 `normalize: case-fold` 로 표기와 무관하게 걸리지만, 공백·구분자
+      까지 다른 변형(`INCLUSIVE_VAT` 류)은 여전히 밖이다. 그 통일은 **M1/M2 계약 설계 몫**이다(4문 4답 가족 C).
+      미상 쪽의 이름(`UNKNOWN`)도 계약하지 않는다 — 가족 A 다.
       **세 축의 실질은 덮인다** — 과세 승격(위 projection) · provenance 승격(같은 자리) · corpus 적격
       (`$.eligibleForAuthoritativeCorpus`).
     change_history:
@@ -1004,6 +1012,23 @@ cases:
           **이제 `vatTreatment` 단독 변이도 잡힌다** — 스윕 재실행이 낸다(`C-15`).
         policy_version: |-
           해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
+      - date: 2026-09-02
+        change: |-
+          VAT projection 을 **표기가 아니라 개념에 걸도록** 바꿨다 — 피연산자를 승인 문면의 표기 `Inclusive` 로
+          두고 `normalize: case-fold` 를 달았다(신설 선택 키). `not_covered` 를 「다른 표기」에서 **「대소문자 밖의
+          표기 변형」**으로 좁혔다. **분류·기대값·입력·해시는 이번에도 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 14 — Codex 재리뷰 B8 `findings[0]`(high).** 바로 위 항목이 **스스로 적어 둔 한계를
+          Codex 가 실증했다** — `not-equals` 가 `INCLUSIVE` 한 표기만 배제하므로 `vatTreatment` 를 `Inclusive`
+          로만 바꾼 변이체가 통과했다(`mutant_passes=true`). **의미가 같은 과세 승격이 표기만 바꿔 corpus 를
+          빠져나갔다.**
+
+          required_fix 가 든 것은 *"직렬화 대소문자가 아니라 `VatTreatment` 개념을 기준으로"* 다. 그래서
+          **비교를 정규화**했다 — 표기 통일(M1/M2 몫)을 대신하지 않고 **계약을 표기에 둔감하게** 만드는 쪽이다.
+          `normalize` 는 **선택 키이고 없으면 정확 비교**라 다른 세 projection 의 의미는 바뀌지 않는다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 비교 방식 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending

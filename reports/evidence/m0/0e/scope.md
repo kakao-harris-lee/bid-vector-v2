@@ -18,9 +18,10 @@ in_scope:
   - docs/adr/*.md                          # ① 「상태」 줄 아홉
                                            # ② ADR 0001 §5 의 OPEN-ADR-01 행 — 해소로 갱신
   - docs/discovery/capability-map.md       # OPEN-OPS-07·OPEN-QUAL-05 registry + §14 이월 목록
-  - reports/evidence/m0/0e/scope.md         # 이 패키지 셋뿐이다.
-  - reports/evidence/m0/0e/commands.md      #   같은 디렉터리의 fixtures-*.md 는
-  - reports/evidence/m0/0e/checklist.md     #   fixture-curator 레인 소유다
+  - reports/evidence/m0/0e/scope.md         # 이 레인의 evidence 는 `fixtures-*.md` 를
+  - reports/evidence/m0/0e/commands.md      #   뺀 나머지다 — 그쪽은 fixture-curator
+  - reports/evidence/m0/0e/checklist.md     #   레인 소유다. 개수를 적지 않는다:
+  - reports/evidence/m0/0e/rollback.md      #   agent-workflow.md §6 이 요구하면 는다
 out_of_scope:
   - docs/discovery/data-dictionary.md      # 0C Codex approve 로 확정 — 읽기 전용
   - docs/discovery/regression-ledger.md    # 0B Codex approve 로 확정 — 읽기 전용
@@ -36,10 +37,9 @@ out_of_scope:
                                            # 앞선 slice evidence 를 수정한 커밋은 0 이고 신설이 1 이다
                                            # (`git log --diff-filter=M 14686db..HEAD -- reports/evidence/m0/0{a,a2,a3,b,c,d}/`).
   - fixtures/                              # fixture-curator 소유. 이 slice 가 만들지 않는다.
-                                           # 단 이 레인이 fixtures/manifest.yaml 을 건드린
-                                           # **선언된 예외**가 있다 — 자리·근거·검출 방법을 여기
-                                           # 열거하지 않고 정본인 commands.md 「`C-7b` 매치의
-                                           # 처리」가 갖는다. 열거하면 접촉이 늘 때마다 낡는다
+                                           # 단 이 레인이 manifest.yaml 을 건드린 **선언된 예외**가
+                                           # 있다 — 자리·근거·검출은 열거하지 않고 정본인
+                                           # commands.md 「`C-7b` 매치의 처리」가 갖는다
   - _workspace/**                          # .gitignore 대상. 조사 노트는 읽기만 한다
   - fixtures/** · reports/evidence/m0/0e/fixtures-*.md   # fixture-curator 레인 소유
   - .claude/ 하네스 · CLAUDE.md            # 다른 레인 소유
@@ -49,17 +49,8 @@ out_of_scope:
 acceptance_commands:
   - "N/A — 문서 slice. 아래 A1~A7 을 checklist.md 로 대조하고 근거 명령은 commands.md 가 갖는다"
 rollback: |
-    git revert 로 0E 의 커밋 전부를 되돌린다. 그 집합은 `git log --oneline 14686db..HEAD`
-    가 낸다(commands.md C-0) — SHA 를 여기 열거해 두면 커밋이 늘 때마다 낡으므로 range 로
-    적는다. 애플리케이션 코드·설정·스키마 변경이 없어 되돌림의 부작용이 없다.
-    **`fixtures/manifest.yaml` 변경이 있다** — 선언된 예외이고, 자리와 근거는 commands.md 의
-    「`C-7b` 매치의 처리」가 갖는다. **여기 열거하지 않는다** — 접촉이 늘 때마다 낡으므로 위
-    `head_sha` 와 같은 원리로 정본을 가리킨다. **그 커밋들도 이 range 안이라 range 전체를
-    되돌리면 함께 돌아가고 절차는 그대로 성립한다.**
-    부분 되돌림도 가능하다(커밋이 개정 단위로 나뉘어 있다). 단 §14 이월 목록은 개정 셋과
-    ADR 상태 줄이 만든 사실을 참조하므로, 그것만 남기고 나머지를 되돌리면 §14 가 낡는다.
-    **fixture 접촉 커밋만 따로 빼는 부분 되돌림도 그 정본 절을 읽고 판단한다** — 자리마다
-    함께 다뤄야 할 짝이 다르고, 그 짝도 열거가 아니라 그 절이 갖는다.
+    **정본은 `reports/evidence/m0/0e/rollback.md`**(`agent-workflow.md` §6 이 요구하는 파일).
+    되풀이하지 않는다 — 같은 사실을 두 자리에 적으면 한쪽이 낡는다.
 ```
 
 작성: 2026-08-30, spec-writer (v2-slice-pipeline).
@@ -98,16 +89,11 @@ rollback: |
 
 ## 이 range 에는 세 레인이 있다
 
-`14686db..HEAD` 는 **spec-writer(이 계약) · fixture-curator(`fixtures/**` ·
-`reports/evidence/m0/0e/fixtures-*.md`) · 하네스(`.claude/**` · `CLAUDE.md`)** 셋의 커밋을
-함께 담는다. 셋이 같은 브랜치에 병행해 커밋했다. **이 evidence 는 spec-writer 레인만
-다루며, 그 커밋 집합은 위 `in_scope` 경로로 pathspec 을 걸어 뽑는다**(`commands.md` C-0).
-**불변 확인도 그 집합만으로 한다**(C-7) — `14686db..HEAD` 전체로 재면 다른 레인의 변경이
-섞여 이 레인이 `fixtures/` 를 건드린 것처럼 읽힌다.
+셋이 같은 브랜치에 병행해 커밋했고 **이 evidence 는 spec-writer 레인만 다룬다.** 레인 구분과
+커밋 집합을 뽑는 법의 정본은 `commands.md` 의 같은 절이다 — **여기서 되풀이하지 않는다.**
 
-**하네스 커밋 `e9bcaab` 이 evidence 규격을 이 slice 진행 중에 바꿨다** — 출력 전문 금지,
-`핵심 결과` 한 줄, 크기 게이트(evidence 합계 ≤ 그 slice 산출물). **이 패키지는 그 규격을
-따른다**(`commands.md` C-10 이 크기를 잰다).
+**하네스 커밋 `e9bcaab` 이 evidence 규격을 이 slice 진행 중에 바꿨다** — 출력 전문 금지, `핵심 결과`
+한 줄, 크기 게이트(evidence 합계 ≤ 산출물). **이 패키지는 그 규격을 따른다**(`commands.md` C-10 이 잰다).
 
 ---
 
