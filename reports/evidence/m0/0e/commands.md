@@ -40,6 +40,7 @@ LANE=(docs/adr docs/discovery/capability-map.md milestone-0.md milestone-1.md \
 | **C-11** | B5-high 수정의 계약 불변 (전문은 이 표 아래) | 0 | `violations` **빈 목록**. ① `verified_paths` 의 어느 값도 **가족 A 의 네 이름이 아니다** ② `verified_projections` 는 다섯 필수 키 · 술어 `not-equals` · 피연산자가 가족 A 밖 ③ 같은 경로가 두 필드에 겹치지 않고 술어가 기대값에서 **참** ④ `insufficient-evidence` 에는 두 필드가 없다 ⑤ `change_history` 네 필수 키. **함께 fixture-curator 레인 `F-7b` 를 문면 그대로 재실행해** `violations` 빈 목록을 확인했다(신설 필드가 그 레인의 검사를 깨지 않는다). **이 검사가 못 보는 것**: `[i]` 첨자 경로는 값을 풀지 않고 건너뛴다 — 이 라운드가 바꾼 세 자리는 전부 최상위다 |
 | **C-12** | 해소된 `OPEN` 의 **현재형 활성/대기 서술** (전문은 이 표 아래) | 0 | **B5 medium 이 든 둘(`OPS-21` 본문 · §13 하류 인계 표)은 사라졌다.** 남는 매치는 **하나**이고 `OPEN-OPS-07` 의 주장이 아니다 — `capability-map.md` §12 의 **`OPEN-DEC-07` 행**(활성)이 자기 종료 조건 미충족을 적으며 **판정 기준으로** `OPEN-OPS-07` 을 인용하는 자리다. **이 검사가 못 보는 것**: 같은 줄 안의 근접만 재므로 「누구에 대한 주장인가」는 사람이 읽는다 |
 | **C-13** | `codex-review-gate` **preflight** — 리뷰 B5 (전문은 이 표 아래) | 0 | ① repo 흔적(`memory_summary`·`MEMORY.md`·`rollout_summaries/`·`skills/`·`rules`) **5건** ② `stage1_outputs` 중 `bid-vector-v2-review` 언급 **0** / **총 647행** — 총 행이 0이 아니므로 **DB 가 실제로 열렸고** 「0행」이 「못 열어서 0」이 아니다(독립성 전건 성립) ③ **B5 가 실제로 돈 CLI 는 `0.148.0`** — **당시 PATH 가 고른 바이너리**이고, 정본은 실행 산출물 `_workspace/m0-0e/codex.raw-output-B5.txt` 의 머리글 `OpenAI Codex v0.148.0` 이며, 그 경로는 `.gitignore` 대상이라 clean worktree 에 없으므로 **저장소 안의 대응물은 verdict JSON 의 `reviewer.cli_version`** 이다 — 둘이 일치한다. **B~B4 는 0.149.0**(같은 디렉터리의 앞선 머리글 넷, verdict 쪽은 `C-8`). **알려진 제한 — B5 시점의 스킬은 심판 버전을 고정하지 않았다**: `git show dc27007^:.claude/skills/codex-review-gate/SKILL.md` 의 §4 가 맨 `codex` 를 부르므로 **어느 바이너리가 도는지를 PATH 가 정했고** 그래서 라운드마다 갈렸다(0.149.0 → 0.148.0). 이 evidence 를 쓰는 **도중에도 갈렸다** — `codex --version` 이 **0.148.0 → 0.151.0** 으로 바뀌었고 지금 `type -a codex` 는 `~/.nvm/versions/node/v22.21.1/bin/codex`(**0.151.0**) 하나만 낸다. **이 축은 다른 레인이 같은 range 에서 닫았다** — 하네스 커밋 `dc27007`(**운영자 지정 2026-09-01**)이 `CODEX_BIN` 을 절대 경로로, `CODEX_PIN` 을 **0.151.0** 으로 고정했다. **그 핀은 B6 부터 적용된다** — 그래서 **B5 와 B6 는 엔진 버전이 다르고**, 스킬 자신이 그것을 *"조용한 PATH 결과가 아니라 여기 기록된 명시적 결정"* 이라 적는다. 판단은 그 커밋이 갖는다(**이 slice 범위 밖**) |
+| **C-14** | `codex-review-gate` **preflight** — 리뷰 B6 (명령은 `C-13` 과 같고 **④ 누출 검사**가 붙는다) | 0 | **①②는 스냅숏이고 값이 아니라 조건이 판정이다** — `~/.codex` 는 배치와 운영자의 대화형 codex 가 계속 고치므로 다시 재면 다른 수가 나온다. 이 evidence 를 쓰며 재실행해 실제로 갈렸다. ① repo 흔적 **5건**(재측 **4**) — 조건은 *"그 양을 기록한다"* 이고 값의 고정이 아니다 ② `bid-vector-v2-review` 매치 **0** / 총 **647행**(재측 **655**) — **조건은 「매치 0」과 「총계가 0 이 아니다」 둘**이고 **두 측정 모두에서 성립한다**(총계가 0 이면 DB 를 못 연 것이라 preflight 미충족이다) ③ **`0.151.0`** — raw-output 머리글과 verdict 의 `reviewer.cli_version` 이 일치한다. **스킬이 `CODEX_BIN`·`CODEX_PIN` 을 도입한 뒤 첫 라운드이고 그 assertion 을 통과**했다(B5 는 0.148.0 이었다 — `C-13`) ④ **누출 검사 — 주입이 아니다.** 주입 패턴 넷의 발생 **9**(줄 기준 **8**, 한 줄이 두 패턴에 걸린다)가 **전부 codex 가 뜬 diff hunk 안**이다: `.claude/skills/codex-review-gate/SKILL.md`(**주입 패턴 표 자신**) 여섯 · `CLAUDE.md` 변경 이력 둘. **developer 메시지 구간(diff 시작 전) 매치 0.** 하네스 커밋이 그 표를 이 range 의 diff 에 넣어 생긴 **false-positive 바닥**이며, 판독 규칙의 **정본은 스킬**이고 여기는 이 라운드의 실행 기록이다 |
 
 **`C-7b` 매치의 처리 — 이 레인의 `fixtures/manifest.yaml` 접촉을 선언된 예외로 둔다.**
 
@@ -199,10 +200,9 @@ print('matches', hit)
 PY
 ```
 
-**`C-13` 의 preflight 명령 셋.** 절차의 정본은 `.claude/skills/codex-review-gate/SKILL.md` 이고
-여기 있는 것은 **이 라운드의 실행 기록**이다 — 리뷰 레인은 verdict JSON 만 쓰므로 구현 레인이 갖는다.
-②는 매치와 총 행 수를 **같은 핸들로** 받는다(총 행이 0이면 못 연 것이고 preflight 미충족이다).
-③은 **실행된 버전이 아니라 지금 PATH 가 고르는 버전**을 낸다 — 실행된 버전의 정본은 raw-output 머리글이다.
+**`C-13`·`C-14` 의 preflight 명령.** 절차의 정본은 `.claude/skills/codex-review-gate/SKILL.md` 이고 여기 있는 것은
+**각 라운드의 실행 기록**이다(리뷰 레인은 verdict JSON 만 쓴다). ②는 매치와 총 행 수를 **같은 핸들로** 받고(총 행 0 이면
+못 연 것이다), ③의 `codex --version` 은 **지금 PATH 가 고르는** 버전이라 **실행된 버전의 정본은 머리글**이다. ④는 `C-14` 만 쓴다.
 
 ```sh
 grep -rniE 'bid-vector-v2|regression-ledger|capability-map|OPEN-REG|0a2|0b-regression' \
@@ -215,5 +215,6 @@ sqlite3 "file:$HOME/.codex/memories_1.sqlite?immutable=1" \
        or rollout_summary like '%bid-vector-v2-review%';"    # ②
 sqlite3 "file:$HOME/.codex/memories_1.sqlite?immutable=1" "select count(*) from stage1_outputs;"
 type -a codex && codex --version                             # ③ 어느 바이너리인지까지 낸다
-head -1 _workspace/m0-0e/codex.raw-output-B5.txt             # ③ 실행된 버전의 정본
+head -1 _workspace/m0-0e/codex.raw-output-B5.txt             # ③ 실행된 버전의 정본 (B6 은 -B6)
+P='MEMORY_SUMMARY|memories/MEMORY\.md|bid_vector_db|kis_unified_sts'; R=_workspace/m0-0e/codex.raw-output-B6.txt; grep -cE "$P" "$R"; sed -n '1,300p' "$R" | grep -cE "$P"; grep -nE "$P" "$R" | cut -d: -f1   # ④ 줄 수 · developer 구간 · 위치
 ```
