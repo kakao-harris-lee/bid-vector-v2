@@ -910,6 +910,16 @@ cases:
         않는다.
     verified_paths:
       - "$.autoTaggedFromDefinitionDefault"
+      - "$.eligibleForAuthoritativeCorpus"
+    verified_projections:
+      - path: "$.provenance"
+        projection: not-equals
+        operand: "Clean"
+        operand_source: "`v2-지침서.md` §4.3 — 「`Clean`, `DerivedYega`, `DerivedVat`, `SuspectRatio`, `Unknown`을 명시한다」"
+        means: |-
+          legacy 유래 행의 provenance 가 **승격되지 않는다** — `verifies` 의 「provenance 미상으로 격리」 가운데
+          승인 문면이 있는 절반이다. **격리된 쪽의 이름(`Undeclared`)은 계약하지 않는다**(가족 A). 피연산자
+          `Clean` 은 §4.3 이 sealed 로 명시하는 **승인된 이름**이라 이 술어가 잠금을 옮기지 않는다.
     source:
       kind: operator-decision
       reference: |-
@@ -935,7 +945,35 @@ cases:
     expected_sha256: d155ce45da58dfdb04eafff4a22baac9c709a7849e72b1e184387ff1987e48f0
     owning_open: |-
       OPEN-REG-05 (저장 값의 행별 실제 과세) — 이 case는 그 판정을 하지 않고 판정하지 않음을 고정한다
-    change_history: []
+    not_covered: |-
+      **과세 라벨의 세탁 방지** — `verifies` 는 「`Inclusive` 로 승격되지 않는다」까지 주장하지만 그 축은
+      **계약에 들어가지 못했다.** `$.vatTreatment` 를 정확 비교하면 미승인 이름(`UNKNOWN`, 가족 A)을 잠그고,
+      `!= INCLUSIVE` projection 은 **피연산자에 승인 문면이 없다** — `Inclusive` 를 정한 운영자 결정 **U-1b 의
+      기록이 `_workspace/`(`.gitignore`) 에만 있어** `classification_policy.authoritative` ②의 「**커밋된**
+      운영자 결정 기록」에 서지 못하고, `data-dictionary.md` 는 M0 산출 문서라 근거가 되지 못한다.
+      **그래서 이 축은 승인 대기다** — `uncovered_axes` 의 「계약이 덮지 못한 축 — 승인된 피연산자 부재」가 받는다.
+      **provenance 승격과 corpus 적격은 덮인다**(위 projection 과 `$.eligibleForAuthoritativeCorpus`).
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `verified_paths` 에 `$.eligibleForAuthoritativeCorpus` 를 더하고, `verified_projections` 에
+          `$.provenance != "Clean"` 을 신설했다. 계약이 덮지 못한 과세 라벨 축을 `not_covered` 로 등재했다.
+          **분류·기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 12 — Codex 재리뷰 B7 `findings[0]`(high), mutation 실증.** 계약이
+          `$.autoTaggedFromDefinitionDefault` 하나뿐이라, `vatTreatment` 를 `INCLUSIVE` 로 `provenance` 를
+          `Clean` 으로 바꾸고 `eligibleForAuthoritativeCorpus` 를 `true` 로 뒤집은 **변이체가 계약을 통과했다**
+          (`mutant_passes=true`). 즉 **VAT·provenance 를 실제로 세탁하는 산출이 authoritative corpus 를
+          통과할 수 있었다.**
+
+          운영자 승인 2026-09-02(전수 mutation 스윕)에 따라 **승인된 피연산자로 표현되는 만큼**을 계약에
+          넣었다 — `$.eligibleForAuthoritativeCorpus` 는 **불리언이라 어휘를 잠그지 않고**, `Clean` 은
+          `v2-지침서.md` §4.3 이 sealed 로 명시하는 승인된 이름이다. **`vatTreatment` 축은 넣지 못했다** —
+          사유는 `not_covered` 가 적는다. **그래서 B7 이 든 변이체는 잡히고**(두 축이 걸린다) **`vatTreatment`
+          만 바꾸는 더 좁은 변이체는 아직 통과한다.** 그 잔여는 숨기지 않고 등재했다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -2031,6 +2069,7 @@ cases:
       - "$.frequency"
       - "$.reason.required"
       - "$.reason.actual"
+      - "$.renderedAsZeroPercent"
     source:
       kind: operator-decision
       reference: |-
@@ -2066,7 +2105,19 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 55d192295d7af9a175fdcfcf39e070c14664774d76492ee82cc2ff6b735e3fec
     expected_sha256: 7becfb517d789355b6cca6478aecdb1520f0b7ad3dc97c3f9a4239c264a15cd5
-    change_history: []
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `verified_paths` 에 `$.renderedAsZeroPercent` 를 더했다. **분류·기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 12 — Codex 재리뷰 B7(high)이 연 전수 mutation 스윕.** 이 case 의 `verifies` 는
+          「**값이 아니라** 사유 있는 측정 불가를 반환한다」인데, `$.renderedAsZeroPercent` 를 `true` 로
+          뒤집은 변이체가 계약을 통과했다 — **측정 불가가 0% 라는 값으로 렌더되는 산출이 통과**하므로
+          `v2-지침서.md` §4.4 *"표본 부족은 0%가 아니라 `Unmeasurable`이다"* 의 절반이 비어 있었다.
+          **불리언이라 어휘를 잠그지 않는다** — 승인 대기가 따라오지 않는 자리다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4561,6 +4612,34 @@ uncovered_axes:
       아니라 **어휘 리터럴**이다 — 규칙(`Skip` 하나 + 사유 코드 의무)은 이미 `OPEN-DEC-05` 가 갖는다.
       운영자가 대신 **다른 어휘를 지정**하면 그때는 기대값 파일이 바뀌므로 `change_history` 에
       `previous_expected_sha256` 를 함께 싣는다.
+
+  - axis: "계약이 덮지 못한 축 — **승인된 피연산자 부재**로 잠글 수 없는 결과 토큰"
+    domain: 여러 축에 걸친다
+    why_blocked: |-
+      **이 항목은 앞의 「덮개를 잃은 축」들과 형태가 다르다** — case 가 내려가서 비는 자리가 아니라,
+      `authoritative` 로 **남은** case 의 `verifies` 가 주장하는데 **계약에 넣을 수단이 없어** 비는 자리다.
+      **B7(2026-09-01, high)의 mutation 실증이 연 축**이고 운영자 승인 2026-09-02(전수 스윕)로 재판정했다.
+      **막는 것은 셋 중 하나다** — ① 그 값이 **가족 B 자작 토큰**이라 정확 비교도 projection 도 미승인
+      어휘를 잠근다(결과 상태 토큰이 대표다) ② 필요한 술어가 **경로 간 동등**인데
+      `schema.extensions.verified_projections` 의 어휘가 `not-equals` 하나다 ③ 개념은 승인 문면에 있으나
+      그 **결정 기록이 커밋돼 있지 않다**(`money-basis-006` 의 `Inclusive` — **U-1b 의 기록이
+      `_workspace/`(`.gitignore`) 에만 있어** ②의 「**커밋된** 운영자 결정 기록」에 서지 못한다).
+      **어느 case 가 여기 드는지는 이 산문이 세지 않는다** — 스윕이 낸다(`reports/evidence/m0/0e/commands.md`
+      **C-15**). 열거하면 계약이 바뀔 때마다 낡는다.
+    owning_open:
+      - "소유 `OPEN` 없음 — 막는 것은 미결이 아니라 **어휘 승인 부재**이거나 **술어 어휘의 좁음**이다"
+      - "인접: `pending_user_approval` — 그쪽은 case 단위 비준이고 이쪽은 **계약 가능성**이다"
+    what_is_covered_instead: |-
+      **각 case 의 나머지 주장은 계약에 있다** — 스윕이 잡은 자리마다 승인된 피연산자나 **불리언**으로
+      표현되는 만큼은 이 라운드가 넣었다(`money-basis-006` 의 provenance·corpus 적격,
+      `floor-shortfall-001` 의 0% 렌더 여부). **비는 것은 결과 토큰 자체**다.
+      **case 를 내리지 않았다** — 근거의 층이 문제가 아니라 **표현 수단**이 없는 것이라 강등의 사유가 다르다.
+    unblocks_when: |-
+      셋 중 하나가 풀린다 — ① 운영자가 그 **결과 토큰 어휘를 명시 승인**한다(그러면 `floor-shortfall-005`
+      의 `$.transitionedFrom` 과 같은 자리가 된다) ② **`equals-path` 술어를 `verified_projections` 에
+      신설**한다(스키마 확장이라 전 case 적용 설계가 따라온다) ③ **U-1b 를 커밋된 결정 기록으로 등재**한다
+      (그러면 `Inclusive` 가 ②에 서고 `money-basis-006` 의 과세 축이 projection 으로 닫힌다).
+      셋 다 **M1 계약 설계와 함께 판단할 일**이고 이 slice 는 결정하지 않았다.
 
   - axis: "승인 부재로 authoritative 덮개를 잃은 축 — floor-threshold (경계 등가의 미달 판정)"
     domain: floor-threshold
