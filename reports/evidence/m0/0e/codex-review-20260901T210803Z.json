@@ -1,0 +1,40 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "08325002009af8ce981ad9b9b5201b74766a08f5",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 911,
+      "evidence": "`money-basis-006`은 legacy 값이 `Inclusive`로 승격되지 않고 provenance 미상으로 격리됨을 검증한다고 선언하지만, M1이 정확 비교할 경로는 `$.autoTaggedFromDefinitionDefault` 하나뿐이다. expected의 `vatTreatment`, `provenance`, `eligibleForAuthoritativeCorpus`는 계약 밖이다. 독립 mutation 재현에서 이 세 값을 각각 `INCLUSIVE`, `Clean`, `true`로 바꾸고 `reasonCode`를 제거해도 유일한 verified path가 그대로 `false`여서 `mutant_passes=true`였다. 따라서 VAT/provenance를 실제로 세탁하는 production 결과가 authoritative corpus를 통과할 수 있으며, 이는 manifest가 선언한 assertion-path 계약과 승인 규칙을 우회한다.",
+      "required_fix": "미승인 출력 리터럴을 정확 비교하지 않으면서도 핵심 의미를 고정하도록 `money-basis-006`에 승인된 피연산자를 사용하는 projection을 추가한다. 최소한 `vatTreatment != INCLUSIVE`, `provenance != Clean`을 기계적으로 검사하고 `eligibleForAuthoritativeCorpus == false`도 assertion에 포함한 뒤 구조 검사와 mutation 재현을 다시 실행한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short; git rev-parse --verify '14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit}'; git rev-parse --verify '08325002009af8ce981ad9b9b5201b74766a08f5^{commit}'; git rev-parse HEAD",
+    "git cat-file -t 14686dbf3bff4085203ffdcd931564fd1e36edf0; git cat-file -t 08325002009af8ce981ad9b9b5201b74766a08f5; git merge-base 14686dbf3bff4085203ffdcd931564fd1e36edf0 08325002009af8ce981ad9b9b5201b74766a08f5; git merge-base --is-ancestor 14686dbf3bff4085203ffdcd931564fd1e36edf0 08325002009af8ce981ad9b9b5201b74766a08f5",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..08325002009af8ce981ad9b9b5201b74766a08f5; git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..08325002009af8ce981ad9b9b5201b74766a08f5; git log --oneline 14686dbf3bff4085203ffdcd931564fd1e36edf0..08325002009af8ce981ad9b9b5201b74766a08f5",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..08325002009af8ce981ad9b9b5201b74766a08f5",
+    "sed -n '1,190p' agent-workflow.md; sed -n '1,260p' milestone-0.md; sed -n '1,125p' milestone-1.md; sed -n '1,230p' 'v2-지침서.md'; sed -n '1,210p' data-extract.md",
+    "for f in reports/evidence/m0/0e/codex-review-*.json; do jq -c '{file:input_filename,verdict,reviewed_head,findings}' \"$f\"; done",
+    "awk '/^    input_file: /{f=$2} /^    expected_file: /{g=$2} /^    sha256: [0-9a-f]{64}$/{print $2\"  \"f} /^    expected_sha256: [0-9a-f]{64}$/{print $2\"  \"g}' fixtures/manifest.yaml | shasum -a 256 -c -",
+    "python3 -c \"import json,glob; fs=sorted(glob.glob('fixtures/input/*.json')+glob.glob('fixtures/expected/*.json')); [json.load(open(f)) for f in fs]; print('parsed OK:',len(fs))\"",
+    "python3 fixtures/tools/check_legacy_numbers.py",
+    "python3 -c \"import json; json.load(open('fixtures/legacy-reference-index.json')); print('parsed')\"; printf '%s  fixtures/legacy-reference-index.json\\n' \"$(awk '/^  index_file_sha256: /{print $2}' fixtures/manifest.yaml)\" | shasum -a 256 -c -",
+    "grep -rniE '(api[_-]?key|secret|token|passwd|password|bearer|authorization|telegram|chat_id|@[a-z0-9.-]+\\.(com|net|kr|org)|010-[0-9]{4}|[0-9]{6}-[0-9]{7})' fixtures/",
+    "Ruby/Psych/JSON 독립 검사로 manifest 필수 필드, 63개 case와 126개 파일의 정확한 집합, SHA-256, 분류-source 대응, assertion 경로 실재성, projection 진리값, review/change-history 구조 및 YAML/JSON 중복 키를 검사",
+    "reports/evidence/m0/0e/commands.md의 C-2·C-3·C-11·C-12 검사를 독립 재실행해 활성 OPEN 69건의 §14 양방향 coverage, projection 계약 및 해소 OPEN 현재형 서술을 대조",
+    "Ruby 인메모리 mutation으로 money-basis-006의 vatTreatment=INCLUSIVE, provenance=Clean, eligibleForAuthoritativeCorpus=true, reasonCode=nil 변경 후 verified_paths 비교를 재실행",
+    "git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..08325002009af8ce981ad9b9b5201b74766a08f5; git diff --name-only 14686dbf3bff4085203ffdcd931564fd1e36edf0..08325002009af8ce981ad9b9b5201b74766a08f5 | wc -l; git status --porcelain=v1 --untracked-files=all"
+  ],
+  "residual_risks": [
+    "clean worktree에 legacy `bid-vector` checkout이 없어 `legacy-reference-index.json`의 object ID를 실제 `ed4b06c` 저장소와 대조하는 F-5.3은 재실행하지 못했다. 저장소 내부 index 해시와 manifest 경로 집합만 검증했다.",
+    "63개 case 중 29개는 `insufficient-evidence`이며 uncovered axis도 29개다. observed 및 legacy-behavior case는 0개이고 모든 case의 `approved_by_user`는 false, `codex_verdict`는 pending이다.",
+    "이 range에는 production 애플리케이션이나 wiring이 없어 retry·멱등성, DB write, 외부 side effect 및 runtime contract compatibility는 실행 검증 대상이 아니었다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
