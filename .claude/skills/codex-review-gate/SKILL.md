@@ -129,9 +129,10 @@ node 버전을 품고 있어 node 업그레이드 시 경로가 사라진다 —
 **판독 규칙 — 숫자만 읽지 마라.** 리뷰 range 의 diff 가 이 스킬 파일이나 `CLAUDE.md`
 변경 이력을 담는 라운드에서는 위 패턴 표 자신이 diff 로 codex 앞에 놓이므로, raw-output
 grep 에 **상시 false-positive 바닥**이 생긴다. 매치의 위치를 갈라 읽는다 — **developer
-메시지 구간(머리글 부근)의 매치만 주입**이고, codex 가 뜬 `git diff` hunk·변경 이력 안의
-매치는 리뷰 대상 텍스트다. 실측(B6, 2026-09-01): 매치 9 전부 diff hunk 안, developer
-구간 0 — 주입 아님.
+메시지 구간(머리글 부근)의 매치만 주입**이고, codex 가 뜬 텍스트(diff hunk·파일 읽기
+출력·변경 이력)의 매치는 리뷰 대상이다. **「diff 시작 전 = developer 구간」이 아니다** —
+파일 읽기 출력도 diff 앞에 온다(B7 실측). 실측(B6, 2026-09-01): 매치 9 전부 diff hunk 안,
+developer 구간 0 — 주입 아님.
 
 **막지 못하는 것**: 두 플래그는 **주입과 포인터**를 없앨 뿐 `~/.codex` **읽기 자체는 여전히
 가능**하다. exec에 읽기 루트를 좁히는 수단은 찾지 못했다(`--sandbox-state-readable-root`는
