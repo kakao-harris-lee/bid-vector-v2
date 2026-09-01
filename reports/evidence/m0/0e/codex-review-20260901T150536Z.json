@@ -1,0 +1,44 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "177b800d6b02b5d48934374e835f566cdd90713e",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 1893,
+      "evidence": "`floor-threshold-002`는 authoritative case로서 임계 사정률과 실현 사정률이 같을 때 `$.sampleIsShortfall == false`를 정확 비교하도록 고정한다. 그러나 세 floor-threshold 입력에는 경계 정책이나 policy version이 없고, 승인 명세 `v2-지침서.md:220`은 경계의 포함/제외를 versioned 정책으로 둔다. 엄격 부등호의 유일한 직접 근거는 `capability-map.md` DEC-04의 M0 자체 도출 acceptance이며, manifest의 `classification_policy.authoritative`는 이런 자체 도출 규칙을 authoritative 근거로 인정하지 않는다. 따라서 미승인 경계 선택이 정책 version 없이 M1 golden으로 고정된다.",
+      "required_fix": "`floor-threshold-002`의 경계 포함성을 명시적인 versioned policy 입력으로 만들고 해당 정책에서 기대값을 도출하도록 하거나, 그 경계 규칙을 명시 승인받기 전까지 case를 `insufficient-evidence`로 강등하고 uncovered axis에 기록한다."
+    },
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 2427,
+      "evidence": "`schema.extensions.verified_paths`는 지정 경로의 값을 M1 소비 테스트가 정확 비교하도록 요구한다. `floor-shortfall-005`는 `$.transitionedFrom`을 그 목록에 넣어 기대값 `Measured-candidate`를 고정하지만, manifest 자체가 291~293행에서 이 토큰은 어느 M0 근거에도 없는 corpus 자작 그릇이며 실제 어휘는 M1/M2 계약 설계가 정한다고 인정한다. 정확 비교는 그 후속 선택을 선점하므로 ‘그릇일 뿐 어휘 비준이 아니다’라는 분류 정책과 기계 계약이 모순된다.",
+      "required_fix": "`$.transitionedFrom`을 `verified_paths`에서 제거하고 이미 승인된 의미인 분모 감소와 `Unmeasurable` 전이만 계약하거나, 승인된 의미만 표현하는 projection으로 바꾼다. 정확한 `Measured-candidate` 토큰을 유지하려면 그 어휘를 명시 승인받아 근거를 기록한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse HEAD && git cat-file -t 14686dbf3bff4085203ffdcd931564fd1e36edf0 && git cat-file -t 177b800d6b02b5d48934374e835f566cdd90713e && git merge-base 14686dbf3bff4085203ffdcd931564fd1e36edf0 177b800d6b02b5d48934374e835f566cdd90713e && git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..177b800d6b02b5d48934374e835f566cdd90713e && git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..177b800d6b02b5d48934374e835f566cdd90713e && git log --oneline 14686dbf3bff4085203ffdcd931564fd1e36edf0..177b800d6b02b5d48934374e835f566cdd90713e",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..177b800d6b02b5d48934374e835f566cdd90713e",
+    "awk '/^    input_file: /{f=$2} /^    expected_file: /{g=$2} /^    sha256: [0-9a-f]{64}$/{print $2\"  \"f} /^    expected_sha256: [0-9a-f]{64}$/{print $2\"  \"g}' fixtures/manifest.yaml | shasum -a 256 -c -",
+    "python3 -c \"import json,glob; fs=sorted(glob.glob('fixtures/input/*.json')+glob.glob('fixtures/expected/*.json')); [json.load(open(f)) for f in fs]; print('parsed OK:',len(fs))\"",
+    "python3 fixtures/tools/check_legacy_numbers.py",
+    "grep -rniE '(api[_-]?key|secret|token|passwd|password|bearer|authorization|telegram|chat_id|@[a-z0-9.-]+\\.(com|net|kr|org)|010-[0-9]{4}|[0-9]{6}-[0-9]{7})' fixtures/",
+    "Ruby Psych/JSON 검사로 manifest·JSON 중복 키, 63 case 필수 필드, 126개 파일 집합, input/expected SHA-256, authoritative 35건의 verified_paths, legacy-reference-index 경로 집합을 대조",
+    "reports/evidence/m0/0e/commands.md의 C-1~C-7, C-10, C-12를 재실행해 활성 OPEN 69건의 §14 양방향 coverage, ADR 상태·해소 조건, 레인 접촉, evidence 크기 게이트를 대조",
+    "Ruby로 authoritative 35건의 모든 verified_paths 실제 값과 verified_projections 3건을 expected JSON에서 해석하고 중복·부재·겹침·거짓 술어를 검사",
+    "test -x /Users/harris/.nvm/versions/node/v22.21.1/bin/codex && /Users/harris/.nvm/versions/node/v22.21.1/bin/codex --version && command -v codex && codex --version",
+    "for f in fixtures/input/floor-threshold-00{1,2,3}.json; do jq -e 'has(\"policy\") or has(\"policyVersion\") or (.policy? != null)' \"$f\" >/dev/null || printf '%s: no boundary policy/version\\n' \"$f\"; done; rg -n '경계의 포함/제외는 versioned 정책|임계 사정률이 정확히 경계값인 표본은 미달로 세지 않는다|transitionedFrom|Measured-candidate' v2-지침서.md docs/discovery/capability-map.md fixtures/manifest.yaml fixtures/expected/floor-shortfall-005.json",
+    "test -e bid-vector; git rev-parse HEAD; git status --porcelain=v1 --untracked-files=all; git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..177b800d6b02b5d48934374e835f566cdd90713e; git diff --name-only 14686dbf3bff4085203ffdcd931564fd1e36edf0..177b800d6b02b5d48934374e835f566cdd90713e | wc -l"
+  ],
+  "residual_risks": [
+    "clean worktree에 legacy `bid-vector` checkout이 없어 `legacy-reference-index.json`의 object ID를 실제 `ed4b06c` 저장소와 대조하지 못했다. 저장소 내부 해시와 manifest 경로 집합만 검증했다.",
+    "63개 case 중 28개는 `insufficient-evidence`이고 uncovered axis도 28개이며 observed/legacy-behavior case는 0개다. 모든 case의 `approved_by_user`는 false이고 `codex_verdict`는 pending이다.",
+    "이 range에는 production 애플리케이션이나 wiring이 없어 retry·멱등성, DB write, 외부 side effect, contract runtime compatibility는 실행 검증 대상이 아니었다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
