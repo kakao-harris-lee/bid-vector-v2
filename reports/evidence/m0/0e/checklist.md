@@ -12,7 +12,7 @@
 
 | # | 완료 조건 (`milestone-0.md`) | 소유 slice · 판정 근거 | 0E 가 깨뜨리지 않았는가 |
 | --- | --- | --- | --- |
-| **A1** | V2 필수 capability마다 사용자 가치와 acceptance scenario가 있다 | **0A · 0A2 · 0A3** — `docs/discovery/capability-map.md` §1~§10. 마지막 verdict `approve`(0A3 `20f09baf`) | **깨뜨리지 않았다.** 0E 의 `capability-map.md` 변경은 **§12(OPEN registry)와 §14(신설)** 뿐이며 capability 절(§1~§10)에 닿지 않는다. `commands.md` C-4·C-7 의 `git diff` 가 범위를 낸다 |
+| **A1** | V2 필수 capability마다 사용자 가치와 acceptance scenario가 있다 | **0A · 0A2 · 0A3** — `docs/discovery/capability-map.md` §1~§10. 마지막 verdict `approve`(0A3 `20f09baf`) | **깨뜨리지 않았다.** 0E 의 `capability-map.md` 변경은 **§12(OPEN registry) · §14(신설)** 와, **Codex B5 medium 이 든 두 자리** — §8 의 **OPS-21 본문**과 §13 하류 인계 표 — 다. **OPS-21 은 `분류`·사용자 가치·acceptance 를 갖는 capability 항목이 아니라 「설계 입력」 절**이고, 고친 것은 그 안의 **`OPEN-OPS-07` 상태 서술과 버전 전제의 시제**뿐이다 — **후보 표와 권고 문면은 무접촉**이다. A1 이 재는 **V2 필수 capability 의 사용자 가치·acceptance 에는 하나도 닿지 않았다.** 범위는 `commands.md` C-4·C-7 의 `git diff` 가 낸다 |
 | **A2** | Kotlin service 범위에 Python 파일/endpoint를 그대로 옮기는 작업 항목이 없다 | **0A 계열** — 같은 verdict | **깨뜨리지 않았다.** 0E 는 작업 항목을 신설하지 않았다. 신설한 §14 는 **`OPEN` 의 담당 지목**이며 구현 항목이 아니다 |
 | **A3** | ML 재활용 대상이 모듈 단위로 식별되고 잘라낼 결합이 명시돼 있다. 재활용은 구현 전략으로만 기록한다 | **0A 계열**(ML-11) + **0D** `ADR 0001`·`ADR 0009` — `approve` `df056259` | **깨뜨리지 않았다.** 오히려 **Q3 이 그 기록 위치를 정합시켰다** — `milestone-0.md` 산출물 목록의 `legacy-reference-map.md` 가 `ADR 0009` (d) 와 어긋난 채 남아 있던 것을 제거하고 대체 사유를 기록했다 |
 | **A4** | 모든 도메인 숫자의 unit/basis/provenance가 정의되거나 `OPEN`이다 | **0C** — `docs/discovery/data-dictionary.md`. `approve` `7cbdc9bb` | **깨뜨리지 않았다.** `data-dictionary.md` **무접촉**(`commands.md` C-7 이 빈 diff 를 낸다). 0E 가 닫은 셋 중 어느 것도 도메인 숫자의 unit/basis/provenance 축이 아니다 — Boot 라인 · 라이브러리 조사 기입 · 면허 유효기간 범위다 |
@@ -71,6 +71,13 @@
 **해소 사유는 registry 자신에도 적혀 있다** — `capability-map.md` §12.1 「M0 종료 slice 0E
 해소 2건」과 §12.2 의 두 행. 그 표가 **닫힌 축과 남는 축을 분리**한다.
 
+**registry 밖의 본문 서술도 해소 상태에 맞췄다.** `OPEN-OPS-07` 은 §12·§14 가 해소로 적는
+동안에도 **OPS-21 본문**과 **§13 하류 인계 표**에 현재형 「활성이다」·「기입 대기」로 남아
+있었다(Codex B5 medium). 두 자리를 고치되 **3.x 전제의 조사 결과는 역사적 전제로 보존**했고,
+남은 **4.x 호환 실측 재확인의 담당이 `OPEN-OPS-07` 의 미해소분이 아니라 M1 1A** 임을
+명시했다. **§12 registry 만 파싱하는 `C-3` 은 이 모순을 보지 못한다** — 현재형 서술까지
+훑는 검사는 `commands.md` **C-12** 이고, 그 결과가 「이 검사가 못 보는 것」도 함께 적는다.
+
 ### A7-5. 편집 경계
 
 | 경계 | 대조 |
@@ -78,8 +85,9 @@
 | `docs/adr/**` 편집이 「상태」 줄 아홉 + `ADR 0001` §5 한 행에 그치는가 | `commands.md` **C-5a** — `@@` 헤더 **11개** = 아홉 파일의 3행 + `ADR 0001` §5 의 두 hunk. 미결 당시의 기록은 지우지 않고 보존했다 |
 | `data-dictionary.md`·`regression-ledger.md` 무접촉 | `commands.md` **C-7** — 빈 diff |
 | 앞 여섯 slice 의 evidence 무접촉 | 같은 명령 — 빈 diff |
-| `fixtures/` 접촉이 **승인된 예외 하나뿐**인가 | `commands.md` **C-7b 와 그 아래 「`C-7b` 매치의 처리」가 정본이다** — **이 레인의 커밋 집합**(C-0 의 pathspec)이 건드린 파일 전수에서 `fixtures/manifest.yaml` **하나**가 잡히고, 그것은 `8701882`(한 인용 좌표를 두 레인 파일에 일관 정정)이며 **운영자 승인 2026-08-31** 을 받은 선언된 예외다. **여기서 「무접촉」을 주장하지 않는다** — 그 주장은 실측과 어긋났다(Codex B4 medium). **`ls` 로도 `14686db..HEAD` 전체로도 재지 않는다** — fixture-curator 레인이 병행해 실제로 `fixtures/` 를 만들었으므로 그 둘은 이 레인의 접촉 범위를 재지 못한다 |
-| 다른 레인의 변경(`CLAUDE.md`·`.claude/`·`fixtures-*.md`)을 커밋에 넣지 않았다 | `commands.md` **C-7a** — 이 레인의 커밋이 건드린 파일 집합이 `in_scope` 에 위 예외 하나를 더한 것과 같다. **수는 여기 적지 않는다 — C-7a 가 낸다** |
+| `fixtures/` 접촉이 **선언된 예외뿐**인가 | `commands.md` **C-7b 와 그 아래 「`C-7b` 매치의 처리」가 정본이다** — 접촉은 `fixtures/manifest.yaml` **한 파일**이고 자리는 **둘**이다: ① `8701882`(한 인용 좌표를 두 레인 파일에 일관 정정 · **운영자 승인 2026-08-31**) ② `16d7a48`(**Codex B5 high** 수정 — 이 레인이 세운 `verified_paths` 계약 위의 정정 · **운영자 결정 2026-09-01**). **여기서 「무접촉」을 주장하지 않는다** — 그 주장은 실측과 어긋났다(Codex B4 medium). **②는 `C-7b` 가 구조적으로 보지 못한다** — `C-0` 이 `in_scope` 경로로 레인을 뽑는데 그 커밋은 `fixtures/manifest.yaml` 만 건드렸다. 정본 절이 그 사실과 검출 명령을 갖는다. **`ls` 로도 `14686db..HEAD` 전체로도 재지 않는다** — fixture-curator 레인이 병행해 실제로 `fixtures/` 를 만들었으므로 그 둘은 이 레인의 접촉 범위를 재지 못한다 |
+| 다른 레인의 변경(`CLAUDE.md`·`.claude/`·`fixtures-*.md`)을 커밋에 넣지 않았다 | `commands.md` **C-7a** — 이 레인의 커밋이 건드린 파일 집합이 `in_scope` 에 위 ①을 더한 것과 같다(②는 위 칸이 적는 대로 이 명령의 입력 밖이며, 그 커밋이 건드린 파일 전수는 정본 절의 `git show --stat` 이 낸다). **수는 여기 적지 않는다 — C-7a 가 낸다** |
+| B5-high 수정이 **계약 축에 그쳤는가** | `commands.md` **C-11** — 기대값·입력 파일과 해시 무접촉, `verified_paths` 의 어느 값도 가족 A 의 미승인 이름이 아니고, `verified_projections` 가 다섯 필수 키·승인된 피연산자·기대값에서 참인 술어를 갖는다. **fixture-curator 레인의 `F-7b` 를 문면 그대로 재실행해 그 레인의 검사가 깨지지 않았음도 함께 낸다** |
 
 ---
 
