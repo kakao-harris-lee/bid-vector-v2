@@ -912,6 +912,19 @@ cases:
       - "$.autoTaggedFromDefinitionDefault"
       - "$.eligibleForAuthoritativeCorpus"
     verified_projections:
+      - path: "$.vatTreatment"
+        projection: not-equals
+        operand: "INCLUSIVE"
+        operand_source: |-
+          **커밋된 운영자 결정 기록** `reports/evidence/m0/0c/decisions-2026-08-28.md` — `:68` 「운영자 결정: 기초금액
+          (사업금액)은 부가세 포함이다」이고 `:109` 의 기록자 bullet 이 그 정의상 기본값을 **`Inclusive`** 로 적는다
+          (같은 파일을 이 manifest 의 다른 case 들도 ② 근거로 쓴다). **대소문자 차이는 가족 C 다** — 개념이 승인
+          문면에 있고 표기만 다른 자리이며 4문 4답이 *"개념 기준 통과 … 표기 통일은 M1/M2 계약 설계로 이월"* 로 정했다.
+        means: |-
+          legacy 유래 행이 **정의상 기본값 과세로 자동 태깅되지 않는다** — `verifies` 의 「`Inclusive` 로 승격되지
+          않는다」 그 자리다. **미상 쪽의 이름(`UNKNOWN`)은 계약하지 않는다**(가족 A).
+          **이 술어의 한계를 적어 둔다** — 배제하는 것은 이 표기뿐이라 다른 표기(`Inclusive`)로 승격하는 산출은
+          걸리지 않는다. 표기 통일이 M1/M2 로 이월된 축이라 지금 좁힐 수단이 없고, `not_covered` 가 그 자리를 받는다.
       - path: "$.provenance"
         projection: not-equals
         operand: "Clean"
@@ -946,13 +959,11 @@ cases:
     owning_open: |-
       OPEN-REG-05 (저장 값의 행별 실제 과세) — 이 case는 그 판정을 하지 않고 판정하지 않음을 고정한다
     not_covered: |-
-      **과세 라벨의 세탁 방지** — `verifies` 는 「`Inclusive` 로 승격되지 않는다」까지 주장하지만 그 축은
-      **계약에 들어가지 못했다.** `$.vatTreatment` 를 정확 비교하면 미승인 이름(`UNKNOWN`, 가족 A)을 잠그고,
-      `!= INCLUSIVE` projection 은 **피연산자에 승인 문면이 없다** — `Inclusive` 를 정한 운영자 결정 **U-1b 의
-      기록이 `_workspace/`(`.gitignore`) 에만 있어** `classification_policy.authoritative` ②의 「**커밋된**
-      운영자 결정 기록」에 서지 못하고, `data-dictionary.md` 는 M0 산출 문서라 근거가 되지 못한다.
-      **그래서 이 축은 승인 대기다** — `uncovered_axes` 의 「계약이 덮지 못한 축 — 승인된 피연산자 부재」가 받는다.
-      **provenance 승격과 corpus 적격은 덮인다**(위 projection 과 `$.eligibleForAuthoritativeCorpus`).
+      **과세 라벨의 다른 표기** — 위 projection 이 배제하는 것은 `INCLUSIVE` **이 표기뿐**이고, 같은 개념을
+      다른 표기(`Inclusive`)로 승격하는 산출은 걸리지 않는다. **표기 통일이 M1/M2 계약 설계로 이월된 축**이라
+      (4문 4답 가족 C) 지금 좁힐 수단이 없다. 미상 쪽의 이름(`UNKNOWN`)도 계약하지 않는다 — 가족 A 다.
+      **세 축의 실질은 덮인다** — 과세 승격(위 projection) · provenance 승격(같은 자리) · corpus 적격
+      (`$.eligibleForAuthoritativeCorpus`).
     change_history:
       - date: 2026-09-02
         change: |-
@@ -968,9 +979,29 @@ cases:
 
           운영자 승인 2026-09-02(전수 mutation 스윕)에 따라 **승인된 피연산자로 표현되는 만큼**을 계약에
           넣었다 — `$.eligibleForAuthoritativeCorpus` 는 **불리언이라 어휘를 잠그지 않고**, `Clean` 은
-          `v2-지침서.md` §4.3 이 sealed 로 명시하는 승인된 이름이다. **`vatTreatment` 축은 넣지 못했다** —
-          사유는 `not_covered` 가 적는다. **그래서 B7 이 든 변이체는 잡히고**(두 축이 걸린다) **`vatTreatment`
-          만 바꾸는 더 좁은 변이체는 아직 통과한다.** 그 잔여는 숨기지 않고 등재했다.
+          `v2-지침서.md` §4.3 이 sealed 로 명시하는 승인된 이름이다. **`vatTreatment` 축은 이 라운드에 넣지
+          못했다** — 그 판단의 근거가 틀렸음이 다음 항목에서 드러난다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
+      - date: 2026-09-02
+        change: |-
+          `verified_projections` 에 `$.vatTreatment != "INCLUSIVE"` 를 더했다 — **B7 required_fix 의 남은
+          절반**이다. `not_covered` 를 「승인 대기」에서 **「다른 표기」**로 고쳤다.
+          **분류·기대값·입력·해시는 이번에도 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 13 — verifier r14 F-1(high).** 바로 위 항목이 이 축을 넣지 않은 근거로
+          *"U-1b 의 기록이 `_workspace/`(`.gitignore`) 에만 있다"* 를 들었는데 **그것이 사실이 아니었다.**
+          그 결정은 **커밋된 파일에 있다** — `reports/evidence/m0/0c/decisions-2026-08-28.md:66-68`
+          (「운영자 결정: 기초금액(사업금액)은 부가세 포함이다」)이고 `:109` 의 기록자 bullet 이 `Inclusive`
+          를 적는다. **이 manifest 자신이 다른 자리에서 그 경로를 U-1b 좌표로 쓰고 있었다**(`money-basis-005`
+          의 `source.reference`). 즉 같은 파일 안에서 서로 모순됐고, **거짓 전제 위에 세운 거절**이었다.
+
+          대소문자 차이(`INCLUSIVE` ↔ `Inclusive`)는 **가족 C** 이고 4문 4답이 *"개념 기준 통과"* 로 정했으므로
+          **막지 않는다.** 이 레인이 새로 판정한 것이 아니라 **이미 선 답의 적용**이다. 다만 그 답이 표기 통일을
+          M1/M2 로 이월했으므로 **술어가 이 표기만 배제한다는 한계**를 `means` 와 `not_covered` 에 적었다.
+
+          **이제 `vatTreatment` 단독 변이도 잡힌다** — 스윕 재실행이 낸다(`C-15`).
         policy_version: |-
           해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
@@ -4619,11 +4650,12 @@ uncovered_axes:
       **이 항목은 앞의 「덮개를 잃은 축」들과 형태가 다르다** — case 가 내려가서 비는 자리가 아니라,
       `authoritative` 로 **남은** case 의 `verifies` 가 주장하는데 **계약에 넣을 수단이 없어** 비는 자리다.
       **B7(2026-09-01, high)의 mutation 실증이 연 축**이고 운영자 승인 2026-09-02(전수 스윕)로 재판정했다.
-      **막는 것은 셋 중 하나다** — ① 그 값이 **가족 B 자작 토큰**이라 정확 비교도 projection 도 미승인
+      **막는 것은 둘 중 하나다** — ① 그 값이 **가족 B 자작 토큰**이라 정확 비교도 projection 도 미승인
       어휘를 잠근다(결과 상태 토큰이 대표다) ② 필요한 술어가 **경로 간 동등**인데
-      `schema.extensions.verified_projections` 의 어휘가 `not-equals` 하나다 ③ 개념은 승인 문면에 있으나
-      그 **결정 기록이 커밋돼 있지 않다**(`money-basis-006` 의 `Inclusive` — **U-1b 의 기록이
-      `_workspace/`(`.gitignore`) 에만 있어** ②의 「**커밋된** 운영자 결정 기록」에 서지 못한다).
+      `schema.extensions.verified_projections` 의 어휘가 `not-equals` 하나다.
+      **셋째가 있었으나 전제가 거짓이라 걷혔다** — 「개념은 승인 문면에 있으나 결정 기록이 커밋돼 있지
+      않다」로 `money-basis-006` 의 `Inclusive` 를 들었는데, 그 결정은 **커밋된 파일에 있다**
+      (`reports/evidence/m0/0c/decisions-2026-08-28.md`). 그 축은 projection 으로 닫혔다(verifier r14 F-1).
       **어느 case 가 여기 드는지는 이 산문이 세지 않는다** — 스윕이 낸다(`reports/evidence/m0/0e/commands.md`
       **C-15**). 열거하면 계약이 바뀔 때마다 낡는다.
     owning_open:
@@ -4635,11 +4667,12 @@ uncovered_axes:
       `floor-shortfall-001` 의 0% 렌더 여부). **비는 것은 결과 토큰 자체**다.
       **case 를 내리지 않았다** — 근거의 층이 문제가 아니라 **표현 수단**이 없는 것이라 강등의 사유가 다르다.
     unblocks_when: |-
-      셋 중 하나가 풀린다 — ① 운영자가 그 **결과 토큰 어휘를 명시 승인**한다(그러면 `floor-shortfall-005`
+      둘 중 하나가 풀린다 — ① 운영자가 그 **결과 토큰 어휘를 명시 승인**한다(그러면 `floor-shortfall-005`
       의 `$.transitionedFrom` 과 같은 자리가 된다) ② **`equals-path` 술어를 `verified_projections` 에
-      신설**한다(스키마 확장이라 전 case 적용 설계가 따라온다) ③ **U-1b 를 커밋된 결정 기록으로 등재**한다
-      (그러면 `Inclusive` 가 ②에 서고 `money-basis-006` 의 과세 축이 projection 으로 닫힌다).
-      셋 다 **M1 계약 설계와 함께 판단할 일**이고 이 slice 는 결정하지 않았다.
+      신설**한다(스키마 확장이라 전 case 적용 설계가 따라온다).
+      둘 다 **M1 계약 설계와 함께 판단할 일**이고 이 slice 는 결정하지 않았다.
+      **표기 통일도 그 자리에서 함께 본다** — `not-equals` 는 한 표기만 배제하므로, 같은 개념의 다른 표기로
+      우회하는 산출은 **표기가 통일돼야** 걸린다(4문 4답이 그 통일을 M1/M2 로 이월했다).
 
   - axis: "승인 부재로 authoritative 덮개를 잃은 축 — floor-threshold (경계 등가의 미달 판정)"
     domain: floor-threshold
