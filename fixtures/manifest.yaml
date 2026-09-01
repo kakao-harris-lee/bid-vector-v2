@@ -2284,8 +2284,9 @@ cases:
           M1 golden 에 기계적으로 넣었고, 그것은 같은 파일이 그 이름을 **어휘·표현 승인 대상**이라 적는 것과
           어긋난다.
 
-          운영자 답은 **「projection 으로 좁힘」**(「리터럴 명시 승인」·「강등」을 물리쳤다)이고 축어와 적용 범위는
-          `classification_policy.insufficient_evidence` 가 갖는다. **B3 의 「좁혀 유지」를 기계 계약에 적용한 것**이다.
+          운영자 답은 **「projection 으로 좁힘」**(「리터럴 명시 승인」·「강등」을 물리쳤다)이다. **축어 인용은 없다** —
+          그 결정의 물음·답 원문을 이 레인이 받지 않았고, `classification_policy.insufficient_evidence` 가 **그 사실과 함께**
+          요지·적용 범위를 적는다. **B3 의 「좁혀 유지」를 기계 계약에 적용한 것**이다.
 
           **002 와 목록이 같은 것은 이번에도 옳다** — 두 case 는 같은 축의 `N` 과 `N+1` 이고 다른 것은 입력이다.
           `N+1` 주장은 `$.sampleSize` 와 위 projection 이 함께 떠받치므로 **case 는 비지 않는다.**
@@ -2400,8 +2401,9 @@ cases:
           **위 라운드 9 가 이 case 에서 좁힌 것과 같은 형태의 자리가 하나 더 남아 있었다**: 그때는 언급 없는 동반
           산출(`$.frequency.*`)을 걷었고, 이번에는 **주장은 있으나 그 값이 미승인 리터럴인 자리**를 걷는다.
 
-          운영자 답은 **「projection 으로 좁힘」**(「리터럴 명시 승인」·「강등」을 물리쳤다)이고 축어와 적용 범위는
-          `classification_policy.insufficient_evidence` 가 갖는다.
+          운영자 답은 **「projection 으로 좁힘」**(「리터럴 명시 승인」·「강등」을 물리쳤다)이다. **축어 인용은 없다** —
+          그 결정의 물음·답 원문을 이 레인이 받지 않았고, `classification_policy.insufficient_evidence` 가 **그 사실과 함께**
+          요지·적용 범위를 적는다.
 
           **구분 주장은 그대로 선다** — projection 이 「001 의 상태와 같지 않다」를 승인된 이름
           `Unmeasurable` 하나로 계약하고, `$.distinctFromUnmeasurable` 이 그 구분이 관측 가능한 산출임을
