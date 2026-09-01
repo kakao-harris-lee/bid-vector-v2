@@ -4753,8 +4753,9 @@ uncovered_axes:
       의 `$.transitionedFrom` 과 같은 자리가 된다) ② **`equals-path` 술어를 `verified_projections` 에
       신설**한다(스키마 확장이라 전 case 적용 설계가 따라온다).
       둘 다 **M1 계약 설계와 함께 판단할 일**이고 이 slice 는 결정하지 않았다.
-      **표기 통일도 그 자리에서 함께 본다** — `not-equals` 는 한 표기만 배제하므로, 같은 개념의 다른 표기로
-      우회하는 산출은 **표기가 통일돼야** 걸린다(4문 4답이 그 통일을 M1/M2 로 이월했다).
+      **표기 통일도 그 자리에서 함께 본다** — **대소문자는 `normalize: case-fold` 가 덮지만**
+      **대소문자 밖의 표기 변형**(공백·구분자)은 여전히 밖이라 **통일이 필요하다**(4문 4답이 그 통일을
+      M1/M2 로 이월했다).
 
   - axis: "승인 부재로 authoritative 덮개를 잃은 축 — floor-threshold (경계 등가의 미달 판정)"
     domain: floor-threshold
