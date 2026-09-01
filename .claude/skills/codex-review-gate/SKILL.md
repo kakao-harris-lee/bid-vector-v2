@@ -5,7 +5,7 @@ description: "Codex CLI로 base...head diff의 독립 리뷰를 clean worktree�
 
 # Codex Review Gate — 독립 리뷰 실행 절차
 
-codex CLI(로컬 `codex`, v0.148 기준)로 slice diff의 독립 리뷰를 실행하고 판정 JSON을
+codex CLI(로컬 `codex`, v0.151 기준)로 slice diff의 독립 리뷰를 실행하고 판정 JSON을
 보존한다. 판정 계약과 리뷰 기준은 `CODEX-REVIEW.md`와 `agent-workflow.md` 4~5절이
 정의하며, 이 스킬은 실행 mechanics만 다룬다.
 
@@ -60,8 +60,14 @@ worktree를 작업 루트로, 명령 재실행(테스트 등)을 위해 workspac
 쓰기 가능 범위가 폐기 예정인 worktree로 한정되므로 메인 저장소는 보호된다.
 
 ```bash
-codex --version   # 기록용 — 실행 결과를 리뷰 메타데이터로 남긴다
-codex exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
+CODEX_BIN=/Users/harris/.nvm/versions/node/v22.21.1/bin/codex   # 심판 바이너리 고정 — PATH 에 맡기지 않는다
+CODEX_PIN="0.151.0"                   # 심판 버전 고정 — 바꾸려면 이 스킬을 고친다
+"$CODEX_BIN" --version | grep -qF "$CODEX_PIN" || {
+  echo "codex 버전 불일치: $("$CODEX_BIN" --version) ≠ $CODEX_PIN — preflight 미충족, 리뷰 중단"
+  exit 1
+}
+"$CODEX_BIN" --version   # 기록용 — 리뷰 메타데이터의 값은 여전히 raw-output 머리글이 정본
+"$CODEX_BIN" exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
   -c model_reasoning_effort="high" \
   --disable memories --ignore-rules \
   --output-schema .claude/skills/codex-review-gate/references/codex-output.strict.schema.json \
@@ -82,6 +88,22 @@ strict structured output은 모든 property가 required여야 하므로, `line`�
 리뷰 재현성은 심판 레인의 전제이므로 effort는 메타데이터로만 기록할 값이 아니라
 호출 시 고정할 값이다. effort를 바꿔야 할 사유가 생기면 이 스킬을 고쳐서 바꾸고,
 호출부에서 즉흥적으로 덮어쓰지 않는다.
+
+**바이너리 경로와 버전도 같은 이유로 고정한다.** 이 머신에는 codex 바이너리가 둘 공존하고
+(`/opt/homebrew/bin/codex` 0.148.0 · `~/.nvm/versions/node/*/bin/codex` 0.151.0, 2026-09-01
+실측) PATH 순서가 라운드마다 심판 엔진 버전을 조용히 결정해 왔다 — M0/0E 의 B3·B4 는
+0.149.0, B5 는 0.148.0 으로 돌았고 그 사이 업그레이드도 기록 없이 지나갔다. 버전이 다르면
+판정 차이가 finding 때문인지 엔진 때문인지 가를 수 없다. 그래서 경로는 `CODEX_BIN` 으로
+박고 버전은 실행 전 assertion 으로 대조하며, **불일치는 그 라운드의 preflight 미충족이다**
+(다른 바이너리로 대체 실행하지 않는다). 업그레이드는 이 스킬의 핀 값을 고치는 명시적
+결정으로만 하고 `CLAUDE.md` 변경 이력에 남긴다. 기록용 버전 값의 출처는 여전히
+`codex.raw-output.txt` 머리글이지 기억이 아니다.
+
+핀은 **0.151.0**(nvm 쪽, 운영자가 사용 중인 최신)이다 — 운영자 지정 2026-09-01. 그래서
+**M0/0E 의 B6 부터는 B5(0.148.0)와 엔진 버전이 다르다** — 이 전환은 조용한 PATH 결과가
+아니라 여기 기록된 명시적 결정이며, B6 판정을 읽을 때 이 사실을 함께 읽는다. nvm 경로는
+node 버전을 품고 있어 node 업그레이드 시 경로가 사라진다 — 그때는 실행이 시끄럽게
+실패하므로 핀 갱신 결정을 새로 받으면 된다.
 
 **`--disable memories --ignore-rules`는 반드시 붙인다.** worktree 격리는 **프롬프트 주입을
 막지 못한다.** 두 표면이 있고 **둘은 서로 다른 플래그로 닫힌다.**
