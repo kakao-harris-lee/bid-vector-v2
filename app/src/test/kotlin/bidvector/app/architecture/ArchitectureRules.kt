@@ -1,6 +1,7 @@
 package bidvector.app.architecture
 
 import com.tngtech.archunit.base.DescribedPredicate
+import com.tngtech.archunit.core.domain.JavaAccess
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.lang.ArchCondition
 import com.tngtech.archunit.lang.ArchRule
@@ -57,10 +58,17 @@ class ArchitectureRules(
         }
     }
 
-    /** `owner#member` 로 적은 것만 잡는다. T-D 는 열려 있는 열거이고 그 사실을 숨기지 않는다. */
+    /**
+     * **호출 지점의 owner 가 아니라 선언 클래스로 잰다.** `IllegalStateException("x").printStackTrace()`
+     * 의 owner 는 구체 예외 타입이고 그 멤버는 `java.lang.Throwable` 이 선언한다 — owner 로 재면
+     * 잡히지 않고(Codex 6차 #1), `Throwable` 을 허용 목록에서 빼도 `require`/`check`/`toInt()` 가
+     * 컴파일러 산출로 내는 구체 예외 타입들이 같은 멤버를 상속으로 갖는다.
+     *
+     * 목록은 손 열거가 아니라 `memberEffectGate` 가 도출한 후보의 분류다.
+     */
     private fun accessForbiddenMember(): ArchCondition<JavaClass> {
         val forbidden = policy.forbiddenMembers.toSet()
-        return object : ArchCondition<JavaClass>("금지 멤버에 접근한다 ($forbidden)") {
+        return object : ArchCondition<JavaClass>("금지 멤버에 접근한다 (${forbidden.size} 종)") {
             override fun check(
                 item: JavaClass,
                 events: ConditionEvents,
@@ -68,10 +76,29 @@ class ArchitectureRules(
                 // `noClasses().should(...)` 는 조건을 뒤집는다 — **만족**이 곧 위반이다.
                 // `violated` 로 내면 뒤집혀 사라진다(실측으로 그 상태를 만났다).
                 item.accessesFromSelf
-                    .filter { "${it.targetOwner.name}#${it.target.name}" in forbidden }
+                    .filter { access -> access.declaringKeys().any { it in forbidden } }
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, it.description)) }
             }
         }
+    }
+
+    /**
+     * 접근이 가리키는 멤버의 **선언 클래스 후보**. 해석되면 한 자리로 확정되고, classpath 에 없어
+     * 해석이 안 되면(ArchUnit 이 `(미해결)` 을 준다) owner 의 상위 타입을 훑어 **닫히는 쪽으로**
+     * 넓게 본다 — 놓치는 것보다 넓게 잡는 편이 게이트의 실패 방향에 맞는다.
+     */
+    private fun JavaAccess<*>.declaringKeys(): List<String> {
+        val declared =
+            target
+                .resolveMember()
+                .orElse(null)
+                ?.owner
+                ?.name
+        val owners =
+            declared?.let(::listOf)
+                ?: (listOf(targetOwner) + targetOwner.allRawSuperclasses + targetOwner.allRawInterfaces)
+                    .map(JavaClass::getName)
+        return owners.map { "$it#${target.name}" }
     }
 
     private fun String.isUnder(roots: List<String>): Boolean = roots.any { this == it || startsWith("$it.") }

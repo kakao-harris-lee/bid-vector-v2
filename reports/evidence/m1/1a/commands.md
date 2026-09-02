@@ -187,7 +187,7 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | # | 우회 | 막는 층 | 실측 |
 | --- | --- | --- | --- |
 | `U-1` | `ResourceBundle` — classpath 자원 I/O, 추가 의존 0 | **T-C** 목록 밖 | fixture |
-| `U-2` | `Boolean.getBoolean` 등 시스템 프로퍼티 | **T-D** 멤버 단위 | fixture |
+| `U-2` | `Boolean.getBoolean` 등 시스템 프로퍼티 | **T-D** — 효과 표면 도출이 스스로 냈다 | fixture · `E-38` |
 | `U-3` | 모듈이 convention plugin 을 안 씀 → 게이트 소멸 | `conventionCoverageGate` | `E-21` |
 | `U-4` | `runtimeOnly` 등 다른 configuration | 혈통으로 고른 configuration 전건 + main 좌표 allow-list | `E-22` |
 | `U-5` | `srcDir("gen")` — 크기 래칫만 빠짐 | sizeGate 입력을 실제 srcDirs 로 | `E-23` |
@@ -222,6 +222,32 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `E-30` | `jar { from("prebuilt") }` 로 `evil/Sneak.class` | 1 | `아카이브에 소유 밖 클래스` |
 | `E-31` | 다중 행 `@Suppress` · `@file:Suppress` · `@kotlin.Suppress` + 54줄 함수 | 1 (셋 전부) | detekt 은 exit 0 — **그 축을 더는 detekt 이 들지 않는다** |
 | `E-32` | 50줄 넘는 람다 | 1 | 함수를 쪼개도 닫힌다 |
+
+### 효과 표면 도출 — T-D 를 열거에서 래칫으로
+
+**허용된 클래스 안에도 효과를 내는 멤버가 있다**(`Throwable#printStackTrace` 는 `System.err` 로
+쓴다). 그 자리를 손으로 열거하면 라운드마다 목록이 늘고 생각해 내지 못한 멤버는 조용히 열린다.
+그래서 **금지 표면을 효과 어휘로 고정**하고(`architecture-policy.properties` 의
+`effect.surface.*`) 허용 클래스의 public/protected 멤버 중 그 표면에 닿는 것을 도출한다.
+**분류하지 않은 후보가 남으면 빌드가 실패**하는 것이 이 층을 래칫으로 만든다.
+
+**여집합(허용 목록 밖에 닿으면 불순)은 쓰지 못한다** — 설계 검토가 `ArrayList#add` ·
+`String#substring` · `Integer#valueOf` · `HashMap#put` · `StringBuilder#append` 가 전부 불순이
+되는 것을 실측했다. `Throwable` 계열을 허용에서 빼는 길도 닫혀 있다 — owner 가 구체 예외
+타입이고 그 셋(`IllegalArgumentException`·`IllegalStateException`·`NumberFormatException`)은
+`require`/`check`/`toInt()` 가 컴파일러 산출로 낸다.
+
+| # | 심은 것 | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| `E-38` | `RuntimeException(...).printStackTrace()` · `Math.random()` · `Collections.shuffle` · `IllegalStateException(...).stackTrace` | `:app:test --tests '*ArchitectureGate*'` | 0 | 넷 다 음성 단언으로 잡힌다. **손 열거 셋(`getBoolean`·`getInteger`·`getLong`)은 도출이 스스로 재도출했다** |
+| `E-39` | 판정을 **owner 기준**으로 되돌림(직전 판) | 같은 명령 | **1** | 음성 셋이 죽는다 — 구체 예외 타입 경유가 그때 통과했다는 실물 |
+| `E-40` | 분류를 `forbidden` → `reviewed` 로 뒤집음 | 같은 명령 | **1** | 음성 단언이 **분류에 묶여 있다** — tautology 가 아니다 |
+| `E-41` | 분류 한 줄 삭제 | `./gradlew memberEffectGate` | **1** | `분류되지 않은 후보 — java.lang.Math#random` |
+| `E-42` | 후보에 없는 분류 추가 | 같은 명령 | **1** | `후보에 없는 분류(낡았다)` — 낡은 금지도 거짓말이다 |
+| `E-43` | 효과 표면에서 `java.io` 제거 | 같은 명령 | **1** | `도출 결과가 커밋본과 다르다` — JDK·정책 변경이 조용히 지나가지 않는다 |
+| `E-44` | 양성: `require`/`check`/`toInt()`·`toString`·`String.format` | `:app:test --tests '*ArchitectureGate*'` | 0 | 오탐 없음. 양성 corpus 가 이 통과를 고정한다 |
+
+분류의 셈은 `./gradlew memberEffectGate` 가 한 줄로 낸다 — 여기 적지 않는다(후보가 바뀌면 낡는다).
 
 ### 본문을 갖는 선언 — 표기별 실측
 

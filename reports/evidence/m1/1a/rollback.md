@@ -40,6 +40,7 @@ ls settings.gradle.kts build.gradle.kts gradlew    # 셋 다 없어야 한다
 | --- | --- |
 | detekt | `bidvector.kotlin-conventions.gradle.kts` 와 `build-logic/build.gradle.kts` 양쪽에서 `dev.detekt` 제거. **승인된 두 임계(함수 50줄·파일 500줄)는 `sizeGate` 가 계속 든다**(ADR 0007 D-7 이 노린 성질). detekt 과 함께 사라지는 것은 **승인 문서가 수치를 정하지 않은 축**(복잡도·중첩·파라미터 수)뿐이다 |
 | ktlint | 같은 두 자리에서 `org.jlleitschuh.gradle.ktlint` 제거 |
+| 효과 멤버 금지 | `member-effects.properties` 의 그 줄을 `forbidden` 에서 `reviewed:<사유>` 로 바꾸면 **그 좌표만** 열린다 — 배선은 그대로 서고 사유가 리뷰 대상으로 남는다. 도출 자체를 끄려면 루트 `check` 에서 `memberEffectGate` 를 뗀다 |
 | architecture test | `app/src/test/kotlin/bidvector/app/architecture/` 와 `app/src/test/kotlin/bidvector/archfixture/` 제거. **1 차 강제인 `moduleDependencyGate` 는 남는다** |
 | build-logic 게이트만 | 루트 `bidvector.quality-baseline.gradle.kts` 의 `check` task 제거. 아홉 모듈의 게이트는 그대로 |
 | Boot 4.x 스모크 | `app/build.gradle.kts` 의 Boot 플러그인·스모크 의존·`compatibilitySmoke` 제거. 다른 모듈은 Spring 을 모른다 |

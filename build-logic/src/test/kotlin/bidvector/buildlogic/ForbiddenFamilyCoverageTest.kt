@@ -67,11 +67,26 @@ class ForbiddenFamilyCoverageTest {
         assertTrue(orphan.isEmpty(), "클래스 단위 패키지 밖의 클래스를 허용했다: $orphan")
     }
 
-    /** T-D 의 owner 는 T-C 가 이미 연 클래스여야 한다 — 닫힌 클래스의 멤버를 또 막을 이유가 없다. */
+    /**
+     * **두 정책이 서로를 부정하지 않는다.** T-C 가 연 클래스를 효과 표면에 올리면 같은 좌표를
+     * 한쪽은 허용하고 한쪽은 금지 표면으로 삼는다 — 어느 게이트도 그 모순을 보지 못하므로
+     * 여기서 잰다. (T-D 의 owner 검사는 이 자리를 떠났다: 이제 판정이 **선언 클래스**라
+     * `Throwable#printStackTrace` 처럼 owner 가 허용 목록 밖일 수 있다.)
+     */
     @Test
-    fun `금지 멤버의 owner 는 허용된 클래스다`() {
-        val orphan = policy.forbiddenMembers.map { it.substringBefore('#') }.filterNot { it in policy.allowedClasses }
-        assertTrue(orphan.isEmpty(), "허용되지 않은 클래스의 멤버를 금지했다: $orphan")
+    fun `효과 표면과 클래스 허용이 겹치지 않는다`() {
+        val both = policy.effectSurfaceClasses.filter { it in policy.allowedClasses }
+        assertTrue(both.isEmpty(), "같은 클래스를 허용하면서 효과 표면으로도 뒀다: $both")
+    }
+
+    /** 같은 모순의 패키지 판. `java.io` 가 정확 패키지로 열리면 표면 줄이 죽는다. */
+    @Test
+    fun `효과 표면 패키지가 정확 패키지로 열려 있지 않다`() {
+        val both =
+            policy.effectSurfacePackages.filter { surface ->
+                policy.allowedExactPackages.any { it == surface || it.startsWith("$surface.") }
+            }
+        assertTrue(both.isEmpty(), "효과 표면 아래가 정확 패키지로 열려 있다: $both")
     }
 
     /**

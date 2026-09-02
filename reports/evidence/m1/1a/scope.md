@@ -283,6 +283,37 @@ ktlint 1.8.0 을 구동. 스타일 규칙은 `.editorconfig` 그대로다.
 형태가 통과하는지 함께 잰다 — 게이트가 「도메인이 비어 있는 동안만」 초록인 상태를 구조로
 막는다. 그래도 막히는 자리는 `ADR 0007` D-4 의 allowlist 형식(사유 + 해소 계획)으로 연다.
 
+### 2026-09-03 — T-D 를 손 열거에서 **효과 표면 도출**로 바꾼다 (Codex 6차 · 설계 addendum2)
+
+**바뀐 것**: 허용된 클래스 **안**의 금지 멤버를 정책 파일에 손으로 적지 않는다. 대신
+`effect.surface.packages`·`effect.surface.classes` 가 **금지 표면**을 효과 어휘로 고정하고,
+`memberEffectGate` 가 허용 클래스의 public/protected 멤버 중 **서명 ∪ depth-1 본문**이 그 표면에
+닿는 것을 도출한다. 도출 결과는 `member-effects.generated.properties` 로 커밋되고 분류는
+`member-effects.properties` 가 갖는다. **미분류 후보가 남거나 재생성 결과가 커밋본과 다르면
+빌드가 실패한다.** ArchUnit 규칙은 접근의 owner 가 아니라 **선언 클래스**로 판정한다.
+
+**사유 — 손 열거 셋으로는 닫히지 않는 자리가 있었다.** `RuntimeException("x").printStackTrace()`
+가 `System.err` 로 쓰는데 어느 층도 잡지 못했다(Codex 6차). `Throwable` 계열을 허용 목록에서
+빼는 것으로는 못 닫는다 — 바이트코드의 owner 가 구체 예외 타입이고, 그 타입들
+(`IllegalArgumentException`·`IllegalStateException`·`NumberFormatException`)은 `require`/`check`/
+`toInt()` 가 컴파일러 산출로 내므로 뺄 수 없다. **여집합**(허용 목록 밖에 닿으면 불순)도 쓰지
+못한다 — 설계 검토가 `ArrayList#add`·`String#substring`·`Integer#valueOf`·`HashMap#put`·
+`StringBuilder#append` 가 전부 불순이 되는 것을 실측했다.
+
+**그래서 열거의 대상을 옮긴다 — 「어떤 멤버가 위험한가」에서 「어떤 효과가 금지인가」로.**
+이 이동이 이득인 근거 둘: ① 효과 어휘는 승인 문면이 이미 고정했고(`milestone-1.md` 「구현 규칙」의
+*"domain은 I/O가 없는 입력→출력 함수/객체다"* · `v2-지침서.md` §3.1) 라운드마다 늘지 않는다 —
+반면 멤버 목록은 여섯 라운드 연속 늘었다. ② 미분류 후보가 빌드 실패이므로 **생각해 내지 못한
+멤버가 조용히 열리지 않는다.** 손 열거 셋(`getBoolean`·`getInteger`·`getLong`)은 도출이 스스로
+재도출했다 — 사람이 넣은 것이 아니다.
+
+**폐쇄성은 부분이다. 숨기지 않는다.** 효과 표면 자체의 누락은 막지 못하고, depth-1 을 넘는
+위임 중 이름이 겹치지 않는 것도 놓치며, T-B 정확 패키지의 멤버(`LocalDate.now()`)는 이 도출의
+대상이 아니다(1B). 셋 다 알려진 제한에 등재했다.
+
+**대가**: 도출이 JDK 판에 매여 있어 JDK 가 바뀌면 재생성 대조가 실패한다. **조용히 지나가는
+것보다 낫다**는 판단이고, 실패 메시지가 고치는 방법을 적는다.
+
 ### 2026-09-02 — 모듈이 자기 패키지만 소유하도록 강제한다 (Codex 3차 · 운영자 승인)
 
 **바뀐 것**: 각 Gradle 프로젝트의 class output 전건이 그 모듈이 소유한 `bidvector.<module>` 아래에

@@ -24,7 +24,8 @@ internal class ModuleDependencyPolicy(
     val allowedExactPackages: List<String> get() = list("package.allowed.exact")
     val byClassPackages: List<String> get() = list("package.allowed.byclass")
     val allowedClasses: List<String> get() = list("class.allowed.api") + list("class.allowed.runtime")
-    val forbiddenMembers: List<String> get() = list("member.forbidden")
+    val effectSurfacePackages: List<String> get() = list("effect.surface.packages")
+    val effectSurfaceClasses: List<String> get() = list("effect.surface.classes")
     val domainAllowedExternals: List<String> get() = list("external.allowed.domain")
 
     fun layerOf(module: String): String? = modulesByLayer.entries.firstOrNull { (_, modules) -> module in modules }?.key

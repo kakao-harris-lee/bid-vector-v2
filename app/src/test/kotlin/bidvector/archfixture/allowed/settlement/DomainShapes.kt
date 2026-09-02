@@ -119,6 +119,23 @@ class DomainShapes {
 
     fun formatted(value: Long): String = String.format("%,d", value)
 
+    /**
+     * **T-D 의 오탐 자리.** 이 셋은 컴파일러가 `IllegalArgumentException`·`IllegalStateException`·
+     * `NumberFormatException` 을 산출로 낸다 — 그 예외들이 `Throwable#printStackTrace` 를
+     * 상속으로 갖기 때문에 「`Throwable` 계열을 허용 목록에서 뺀다」로는 그 멤버를 닫지 못한다.
+     * 여기서 통과가 고정되므로, 멤버 규칙이 클래스 단위로 번지면 이 corpus 가 먼저 깨진다.
+     */
+    fun guarded(
+        value: Long,
+        raw: String,
+    ): Long {
+        require(value >= 0) { "음수" }
+        check(cache.isNotEmpty()) { "빈 정책" }
+        return value + raw.trim().toInt()
+    }
+
+    fun described(row: Row): String = row.toString()
+
     fun span(count: Int): List<Int> = (1..count).toList()
 
     fun labels(rows: List<Row>): Array<String> = rows.map { it.kind.name }.toTypedArray()

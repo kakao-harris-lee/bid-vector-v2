@@ -38,6 +38,10 @@ tasks.test {
     val architecturePolicy = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
     inputs.file(architecturePolicy).withPropertyName("architecturePolicy")
     systemProperty("bidvector.architecture.policy", architecturePolicy.asFile.absolutePath)
+    // T-D 의 정본은 도출된 후보의 **분류**다 — 같은 목록을 여기 두 벌로 두지 않는다.
+    val memberEffects = layout.settingsDirectory.file("config/quality/member-effects.properties")
+    inputs.file(memberEffects).withPropertyName("memberEffects")
+    systemProperty("bidvector.member.effects", memberEffects.asFile.absolutePath)
 }
 
 // 해석만 재면 「호환」을 주장할 수 없다 — 그 버전의 API 로 컴파일되고 JVM 에서 로드되는지는

@@ -59,10 +59,35 @@ class ArchitectureGateCatchesViolationsTest {
         rules.domainMayOnlyDependOnAllowedPackages(fixtureRoot).mustReport(fixture, forbiddenTarget)
     }
 
-    /** T-D 는 클래스가 아니라 **멤버**로 잡으므로 사유 문자열이 다르다 — 따로 단언한다. */
+    /**
+     * T-D 는 클래스가 아니라 **멤버**로 잡으므로 사유 문자열이 다르다 — 따로 단언한다.
+     * 목록은 손 열거가 아니라 `memberEffectGate` 가 도출한 후보의 분류이며, 아래 넷은 그
+     * 도출이 스스로 낸 좌표다(시스템 프로퍼티 · 예외의 I/O · 비결정성 · 실행 스택).
+     */
+    @ParameterizedTest(name = "{0} ← {1}")
+    @CsvSource(
+        "SystemPropertyLeak,getBoolean",
+        "ExceptionIoLeak,printStackTrace",
+        "NondeterminismLeak,random",
+        "NondeterminismLeak,shuffle",
+        "StackTraceLeak,getStackTrace",
+    )
+    fun `허용된 클래스 안의 금지 멤버를 잡는다`(
+        fixture: String,
+        forbiddenMember: String,
+    ) {
+        rules.domainMayOnlyDependOnAllowedPackages(fixtureRoot).mustReport(fixture, forbiddenMember)
+    }
+
+    /**
+     * **구체 예외 타입을 거쳐도 잡힌다.** 바이트코드의 owner 가 `IllegalStateException` 이라
+     * owner 로 재던 앞선 판은 이 접근을 통과시켰다 — Codex 6차 #1 의 실물이다.
+     */
     @Test
-    fun `허용된 클래스 안의 금지 멤버를 잡는다`() {
-        rules.domainMayOnlyDependOnAllowedPackages(fixtureRoot).mustReport("SystemPropertyLeak", "getBoolean")
+    fun `상속으로 물려받은 금지 멤버도 선언 클래스로 잡는다`() {
+        rules
+            .domainMayOnlyDependOnAllowedPackages(fixtureRoot)
+            .mustReport("ExceptionIoLeak.reportConcrete", "printStackTrace")
     }
 
     /**

@@ -1,4 +1,5 @@
 import bidvector.buildlogic.ConventionCoverageGateTask
+import bidvector.buildlogic.MemberEffectGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 
@@ -20,6 +21,19 @@ val buildLogicSizeGate =
         policyFile = layout.settingsDirectory.file("config/quality/size-policy.properties")
         sources.from(layout.settingsDirectory.dir("build-logic/src"))
         report = layout.buildDirectory.file("reports/size-gate/build-logic.txt")
+    }
+
+// 허용 클래스 **안**의 효과 멤버는 손으로 열거하지 않고 도출한다. 루트에 두는 이유는 모듈과
+// 무관한 전역 사실(JDK 바이트코드 + 허용 목록)이기 때문이다 — 모듈마다 돌릴 이유가 없다.
+val memberEffectGate =
+    tasks.register<MemberEffectGateTask>("memberEffectGate") {
+        group = "verification"
+        description = "허용 클래스의 효과 멤버를 도출하고 전부 분류돼 있는지 잰다 — T-D 의 래칫"
+        policyFile = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
+        derivedFile = layout.settingsDirectory.file("config/quality/member-effects.generated.properties")
+        classificationFile = layout.settingsDirectory.file("config/quality/member-effects.properties")
+        expectedJdk = providers.gradleProperty("bidvector.jvmToolchain")
+        report = layout.buildDirectory.file("reports/member-effects/derived.properties")
     }
 
 // 루트와 included build 의 `*.gradle.kts` — 모듈에도 source set 에도 속하지 않아 다른 어느
@@ -58,6 +72,6 @@ val conventionCoverageGate =
 tasks.register("check") {
     group = "verification"
     description = "included build 의 검증까지 루트 check 에 포함한다"
-    dependsOn(buildLogicSizeGate, scriptSizeGate, conventionCoverageGate)
+    dependsOn(buildLogicSizeGate, scriptSizeGate, conventionCoverageGate, memberEffectGate)
     dependsOn(gradle.includedBuild("build-logic").task(":check"))
 }
