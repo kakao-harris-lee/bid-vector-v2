@@ -8,7 +8,7 @@
 | 좌표 | 조건 | 1A 판정 | 근거 |
 | --- | --- | --- | --- |
 | `:79` | `./gradlew check` 통과 | **충족** | `commands.md` `A-1` |
-| `:80` | 금지 import·순환 의존을 일부러 넣은 fixture 가 **실제로 실패** | **충족** | `commands.md` RED → GREEN. 다섯 위반을 심었고(금지 import · 역방향 의존 · 업무 모듈 직접 참조 · 패키지 순환 · 기술 계층 패키지명) fixture 가 없던 시점에 같은 단언이 **전부 실패**했다 |
+| `:80` | 금지 import·순환 의존을 일부러 넣은 fixture 가 **실제로 실패** | **충족** | `commands.md` RED → GREEN. 위반 다섯 형태(금지 import · 역방향 의존 · 업무 모듈 직접 참조 · 패키지 순환 · 기술 계층 패키지명)에 **금지 가족 일곱**(Spring·JPA·JSON·HTTP·broker·SQL·I/O)을 더해 심었고, fixture 가 없던 시점에 같은 단언이 **전부 실패**했다 |
 | `:81` | 승인된 authoritative corpus 전체 통과 | **pending — 1B~1E** | 1A 는 corpus 를 소비하지 않는다. `golden-manifest.json` 이 없는 이유이기도 하다 |
 | `:82` | 중요 rule mutation 이 생존하지 않음 | **pending — 1B~1E** | 도구가 `OPEN-ADR-07` 로 미결. 카탈로그에 pitest 좌표만 등재하고 적용하지 않았다 |
 | `:83` | raw `Double` 금액/rate 가 public domain API 에 없음 | **pending — 1B**. 1A 는 **게이트가 표현 가능한지**까지 | ArchUnit 이 시그니처 타입을 볼 수 있으므로 1B 가 값 타입을 넣는 시점에 규칙으로 표현 가능하다. **1A 는 그 규칙을 쓰지 않았다** — 지킬 대상이 없는 규칙은 빈 집합 위에서 통과하고, 그것이 이 slice 가 피한 형태다 |
@@ -40,7 +40,7 @@
 | --- | --- |
 | 구현 diff 가 커밋되어 base/head 고정 | `git status --porcelain -- <in_scope 경로>` 가 비어 있어야 한다 — 판정은 verifier 레인이 재실행한다. **이 명령만으로는 부족하고** 그 틈은 `A-0`·`A-0b` 가 맡는다 — 근거는 `commands.md` 의 `A-0b` 절 |
 | `acceptance_commands` 전부 exit 0 | 전건. 목록은 `scope.md` 의 `acceptance_commands` 가 내고 결과는 `commands.md` 의 acceptance 절이 낸다 — 여기서 다시 열거하면 목록이 늘 때마다 낡는다 |
-| test/lint/type/architecture 통과 | `A-1` 이 전부를 든다 |
+| test/lint/type/architecture 통과 | `A-1` 이 전부를 든다 — **`build-logic` 의 lint·detekt·크기 게이트와 판정 테스트까지 포함한다**(Codex #5) |
 | 변경된 fixture 와 정책 version 의 근거 | 정책 데이터 둘 다 `policy.version=1` 이고 값의 출처를 파일 주석이 든다. **1A 가 값을 고른 것은 없다** — `v2-지침서.md` §5:305 의 둘을 옮겼을 뿐이다 |
 | 알려진 제한과 rollback | 아래 「알려진 제한」 · `rollback.md` |
 | 비밀값 스캔 | `commands.md` 의 비밀값 스캔 절 |
@@ -51,10 +51,13 @@
    수치가 부재하고(`milestone-1.md:22` 가 `coverage` 를 이름으로만 든다) **도메인 코드가 없는
    상태에서 정한 수치는 근거가 없다.** `check` 는 coverage 로 실패하지 않는다 — **1B 가 첫
    도메인 코드와 함께 정한다.**
-2. **`bidding` 모듈이 없다.** `ADR 0006` D-2 목록과 어긋나며 `OPEN-ADR-14` 가 그 갈림을 든다.
-3. **ArchUnit 은 바이트코드를 본다.** Kotlin `internal`·확장 함수·top-level 함수의 형태 규칙을
-   표현하지 못한다. 그래서 1 차 강제를 **빌드 의존 선언**에 뒀고(`E-4` 가 그 층이 단독으로
-   잡는 것을 보인다) `qualityBaseline` 의 public API 수도 같은 이유로 `internal` 을 public 으로 센다.
+2. **`bidding` 모듈이 없다.** 승인 문서(`ADR 0006` D-2.1 · `milestone-1.md` 1A)가 이 보류를
+   담고 있고 `OPEN-ADR-14` 가 되살리는 조건을 든다 — **더는 evidence 만의 주장이 아니다**(Codex #1).
+3. **두 게이트의 사각이 서로 반대다.** ArchUnit 은 바이트코드를 보므로 **선언만 되고 참조가
+   없는 의존**을 못 보고(`E-9b`), 의존 그래프 게이트는 **Maven group 이 없는 JDK 타입**을 못 본다
+   (`java.net`·`java.sql`·`java.io`). 그래서 둘 다 둔다 — 어느 쪽도 혼자로는 충분하지 않다.
+   `commands.md` 의 가족별 표가 그 분담의 실측이다. Kotlin `internal` 이 바이트코드에서
+   public 으로 보이는 것도 같은 성질이고, `qualityBaseline` 의 public API 수가 그 영향을 받는다.
 4. **detekt 2.0 은 alpha 다.** 규칙과 설정 키가 정식 출시 전에 바뀔 수 있다. 승인된 두 임계 중
    파일 축은 detekt 밖(`sizeGate`)에 있어 detekt 이 죽어도 남는다.
 5. **모듈 안의 패키지 순환은 아직 시험되지 않았다.** 규칙(`bidvector.(**)` slice)은 걸려 있으나
