@@ -1,0 +1,53 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "7405714511a7027eb491c6a33bd33387152e98ee",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 1451,
+      "evidence": "`license-006`은 U-5의 `OperatorLicensesNotDeclared` 사유와 `Uncertain(reasons)` 계약을 authoritative 근거로 들지만 `verified_paths`는 `$.verdict`만 비교한다. 기대값에서 `uncertainReason`만 삭제한 독립 mutation을 재평가해도 `contract_passes=True`였다. 따라서 보유 면허 미신고를 사유 없는 일반 `Uncertain`으로 반환하는 production shortcut이 authoritative corpus를 통과한다.",
+      "required_fix": "U-5로 승인된 `$.uncertainReason == OperatorLicensesNotDeclared`를 기계 계약에 포함하고, 해당 필드 삭제 mutation이 실패하도록 재검증한다. 현재 동결된 계약으로 표현하지 않을 경우에는 `license-006`을 `insufficient-evidence`로 강등한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0e/fixtures-scope.md",
+      "line": 161,
+      "evidence": "현재 manifest 재파싱 결과는 authoritative 21건, insufficient-evidence 42건이며 `floor-shortfall-002`·`003`도 후자다. 그러나 이 evidence는 두 case가 authoritative로 남았다고 명시하고 2026-09-02 B9 후속 강등 13건과 새 uncovered 축을 반영하지 않는다. M1 fixture 준비 상태를 설명하는 필수 evidence가 HEAD의 실제 분류와 불일치한다.",
+      "required_fix": "이 절을 현재 manifest와 2026-09-02 동결·강등 결정에 맞춰 갱신한다. 변동 가능한 건수는 F-7에 맡기되, `floor-shortfall-002`·`003`의 현재 상태와 새 계약-술어 미덮개 축을 정확히 기술한다."
+    },
+    {
+      "severity": "medium",
+      "file": "reports/evidence/m0/0e/commands.md",
+      "line": 44,
+      "evidence": "C-15는 authoritative 분류를 결정한 핵심 mutation 스윕이지만 실행 명령이나 코드가 없고, 스크립트는 커밋하지 않은 `_workspace/m0-0e/mutation/`에 있다고만 기록한다. clean HEAD에서 해당 경로 존재 검사는 exit 1이었고 저장소 검색에서도 스윕 구현을 찾지 못했다. `rollback.md`도 C-15 재실행을 요구하므로 현재 evidence로는 13건 강등과 잔존 authoritative 전건 판정을 재현할 수 없다.",
+      "required_fix": "clean worktree에서 실행 가능한 read-only 스윕을 저장소에 커밋하거나 완전한 인라인 명령을 evidence에 제공하고, 적대 변이 목록·case별 주장 매핑·실패 조건을 포함해 전수 결과를 다시 기록한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short; git rev-parse '14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit}'; git rev-parse '7405714511a7027eb491c6a33bd33387152e98ee^{commit}'; git rev-parse HEAD",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..7405714511a7027eb491c6a33bd33387152e98ee; git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..7405714511a7027eb491c6a33bd33387152e98ee",
+    "git log --oneline 14686dbf3bff4085203ffdcd931564fd1e36edf0..7405714511a7027eb491c6a33bd33387152e98ee; git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..7405714511a7027eb491c6a33bd33387152e98ee",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..7405714511a7027eb491c6a33bd33387152e98ee",
+    "for f in reports/evidence/m0/0e/codex-review-*.json; do jq -c '{file:input_filename,verdict,reviewed_head,findings}' \"$f\"; done",
+    "awk manifest 해시 목록 생성 | shasum -a 256 -c -",
+    "python3 fixture JSON 126개 파싱; python3 fixtures/tools/check_legacy_numbers.py",
+    "grep secret/개인정보 패턴 fixtures/; grep 한글 문자열 fixtures/input fixtures/expected",
+    "python3 legacy-reference-index.json 파싱; manifest 선언 SHA-256 대조",
+    "/tmp/fxvenv/bin/python으로 manifest F-7/F-7b 구조·분류·source-kind·verified_paths 전수 검사",
+    "python3으로 C-2 OPEN 그룹 집계, C-3 활성 OPEN↔§14 양방향 대조, C-11 계약 불변, C-12 해소 OPEN 현재형 서술 검사",
+    "/tmp/fxvenv/bin/python으로 license-006의 uncertainReason 삭제 mutation 후 verified_paths 계약 재평가",
+    "test -e _workspace/m0-0e/mutation; rg -n 'C-15|mutation' reports/evidence/m0/0e/commands.md reports/evidence/m0/0e/rollback.md; rg --files | rg 'mutation|sweep'",
+    "python3으로 reports/evidence/m0/**/*.json 전수 파싱 및 ADR 0001~0009 상태 검사; git merge-base --is-ancestor로 B range와 별도 리뷰 A 계보 확인",
+    "git status --porcelain=v1 --untracked-files=all"
+  ],
+  "residual_risks": [
+    "clean worktree에는 legacy `bid-vector` checkout이 없어 F-5.3의 pinned commit/object-id 대조는 재실행하지 못했다. F-5.1·F-5.2로 저장소 내 index의 파싱·해시·manifest 정합성만 확인했다.",
+    "운영 DB, KONEPS API, legacy Python 및 외부 호출은 승인 범위 밖이어서 실행하지 않았다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
