@@ -85,6 +85,12 @@ Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramS
 만들고 거기서 `SocketException: Operation not permitted` 로 죽는다. 플래그로 우회할 수 없다.
 **그래서 2차의 두 finding 도 정적 판독이다** — verdict 의 `residual_risks` 가 같은 말을 한다.
 
+## preflight 등재 규칙의 전환
+
+**이 절(3차)까지가 evidence 에 preflight 를 옮겨 적는 마지막 라운드다.** 이후 코드 slice 의
+preflight 정본은 **verdict JSON** 이고 여기 `C-` 행을 새로 만들지 않는다 — 같은 사실을 두 자리에
+두면 한쪽이 낡는다는 규칙이 이 자리에도 적용된다(하네스 규칙 C, 2026-09-02).
+
 ## 2026-09-02T13:25Z — Codex 3차 라운드의 preflight
 
 | # | 축 | 값 |
@@ -120,6 +126,8 @@ Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramS
 | `E-17` | domain 모듈에 `data class Won(val amount: Long)` | `./gradlew :app:test --tests '*ArchitectureGateTest*'` | **0** | 컴파일러 삽입 `@NotNull` 을 허용하기 전에는 **exit 1** 이었다 — 게이트가 도메인이 비어 있는 동안만 초록이었다 |
 | `E-18` | domain 모듈에 `ProcessBuilder`·`java.util.logging`·`Thread`·`System.getenv`·리플렉션 (각각) | 같은 명령 | **1** (다섯 전부) | 허용을 뿌리로 두었을 때는 다섯 전부 exit 0 이었다 |
 | `E-19` | 허용 목록에 `kotlin.io` 를 넣음 | `./gradlew :app:test --tests '*ArchitectureGateCatchesViolationsTest*'` · `:build-logic:test` | 1 · 1 | 음성 단언과 출처 대조가 **둘 다** 죽는다. 이름만 보던 단언은 이때 죽지 않았다(masking) |
+
+| `E-20` | domain 모듈에 `ServiceLoader`·`Timer`(별칭 import)·`StackWalker`·`TimerTask` (각각) | `./gradlew :app:test --tests '*ArchitectureGateTest*'` | **1** (넷 전부) | 정확 패키지가 닫지 못하는 자리 — 한 패키지에 순수 타입과 위험 타입이 섞여 있어 멤버 단위로 가른다. 별칭 import 도 잡힌다(판정 기준이 패키지·클래스 이름이지 import 철자가 아니다) |
 
 `E-12b`·`E-13b`·`E-17`·`E-18` 이 이 라운드의 요점이다 — **같은 위반을 새 게이트만 잡는다.** 세 라운드 연속
 같은 가족이 샌 이유가 「목록이 짧아서」가 아니라 **판정 방향과 판정 근거**에 있었다는 뜻이다.
