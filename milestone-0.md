@@ -147,8 +147,9 @@ Codex `approve`와 사용자 승인이 있어야 M1로 진행한다.
 | **0B** | `docs/discovery/regression-ledger.md` | **`approve`** | `ec115a79` … `7701556c` | `0b/codex-review-20260827T121954Z.json` |
 | **0C** | `docs/discovery/data-dictionary.md` | **`approve`** | `aff62abf` … `7cbdc9bb` | `0c/codex-review-20260830T124011Z.json` |
 | **0D** | `docs/adr/0001`~`0009` | **`approve`** | `998dc217` … `df056259` | `0d/codex-review-20260829T222217Z.json` |
+| **0E** | 개정 셋 · ADR 「상태」 줄 · `capability-map.md` §12·§14 · `fixtures/manifest.yaml` 계약·분류 | **`approve`** (리뷰 **B**. `request_changes` **14회** 뒤 15번째 라운드) | `14686dbf` … `dc5771d2` | `0e/codex-review-20260902T044741Z.json` |
 
-**0E(이 종료 slice)의 리뷰는 별도이며 그 계약은 `reports/evidence/m0/0e/scope.md`가 갖는다.**
+**0E(이 종료 slice)의 리뷰 계약은 `reports/evidence/m0/0e/scope.md`가 갖는다.**
 **그 계약은 둘로 나뉜다** — **A**(0A 미리뷰 창) · **B**(0E). 두 range와 나눈 사유·실측은
 같은 파일의 「리뷰 range 를 왜 둘로 나누는가」가 **정본**이며 여기 옮겨 적지 않는다.
 
@@ -172,7 +173,32 @@ Codex `approve`와 사용자 승인이 있어야 M1로 진행한다.
 **A는 `approve`다** — `reports/evidence/m0/0a/codex-review-20260830T223932Z.json`,
 `reviewed_base` `6c6b3a2a` … `reviewed_head` `6af70199`, `findings` 0.
 **`cd5a456`는 그 range 안에 든다**(`6c6b3a2`의 자손이자 `6af7019`의 조상). 위 미리뷰 창은
-이것으로 닫혔다. **B(0E)의 리뷰는 별개이며 이 기록 시점에 남아 있다.**
+이것으로 닫혔다. **B(0E)도 `approve`로 닫혔다** — 위 표의 0E 행이 그 좌표를 싣는다.
+
+### 승인 상태 — Codex `approve`는 충족, **사용자 승인은 대기**
+
+완료 조건은 **Codex `approve`와 사용자 명시 승인 둘**을 요구한다. **앞의 것은 갖춰졌고**
+(A·B 두 range 모두 `approve`) **뒤의 것은 이 기록 시점에 대기**다. 2026-08-30 「M0 승인」과
+2026-08-31 ADR 채택 확인이 덮는 범위는 위 「사용자 명시 승인」 절이 열거하며, **그 안에
+0E의 `approve` 이후 상태에 대한 승인은 들어 있지 않다.**
+
+### 알려진 제한 — 고치지 않고 넘긴다
+
+- **B15 `low`(비차단)** — `fixtures/tools/mutation_sweep_adversarial.py`의 docstring이 갈래를
+  「세 갈래」로 적고 사람 판단을 `(a)`뿐이라 한다. **실제는 `(a)`~`(d)`이고 `(d)`도 사람
+  판단**이다. **실행에는 영향이 없다**(스윕 결과 불변). **고치지 않는다** — `approve`된 head
+  뒤에 실질 변경을 넣지 않는 것이 이 slice의 규율이고, **M1이 그 도구를 손댈 때 함께 고친다.**
+- **fixture corpus의 계층** — 63 case 중 `authoritative`와 `insufficient-evidence`의 분포,
+  `observed`·`legacy-behavior` 층이 **비어 있다**는 사실, 그리고 후자가 **추가 승인 또는
+  M1/M2 계약 설계 전에는 M1 golden이 되지 못한다**는 것. **수와 목록은 여기 적지 않는다** —
+  `fixtures/manifest.yaml`의 각 case `classification`이 정본이고 셈은
+  `reports/evidence/m0/0e/fixtures-commands.md` **F-7**과 `.../commands.md` **C-15**가 낸다.
+- **case 단위 비준은 하나도 없다** — 전 case의 `review.codex_verdict`·`claude_commit`이
+  `pending`이고 `approved_by_user`가 `false`다. **이번 `approve`는 range의 acceptance 판정일
+  뿐** case별 사용자 승인이 아니다.
+- **legacy object-id 교차 확인 미실행** — clean worktree에 `bid-vector` checkout이 없어
+  `fixtures/legacy-reference-index.json`의 object id를 실제 legacy git object와 재대조하지
+  못했다. 저장소 안의 해시·경로 집합만 검증됐다(같은 evidence의 **F-5**가 절차를 적는다).
 
 ### 이월 목록 — 「사용자 명시 승인」의 대상
 
