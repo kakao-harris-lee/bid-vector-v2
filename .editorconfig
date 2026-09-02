@@ -14,3 +14,9 @@ max_line_length = 120
 
 [*.{yml,yaml,json,toml}]
 indent_size = 2
+
+# Gradle `kotlin-dsl` 이 build/generated-sources 에 만드는 plugin spec builder 는 우리 코드가
+# 아니고 ktlint_official 규칙을 만족할 수도 없다(밑줄 패키지명 등 자동 교정 불가 항목 포함).
+# ktlint 자신의 경로별 비활성화로 뺀다 — 게이트 쪽에 예외 배선을 만들지 않는다.
+[**/build/generated-sources/**]
+ktlint = disabled

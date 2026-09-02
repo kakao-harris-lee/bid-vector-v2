@@ -25,5 +25,4 @@ internal fun Map<String, String>.requireList(key: String): List<String> =
         .map(String::trim)
         .filter(String::isNotEmpty)
 
-internal fun Map<String, String>.requireValue(key: String): String =
-    this[key] ?: error("정책 키 '$key' 가 없다")
+internal fun Map<String, String>.requireValue(key: String): String = this[key] ?: error("정책 키 '$key' 가 없다")

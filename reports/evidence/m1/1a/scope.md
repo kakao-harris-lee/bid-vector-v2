@@ -134,12 +134,19 @@ detekt 이슈 #8865 가 **closed as not planned** 로 닫혔다 — 1.23.8 을 K
 
 ### D-5. 임계는 코드가 아니라 **versioned policy 데이터**다
 
-`config/quality/size-policy.properties` 하나가 정본이고 policy version 을 갖는다. 값은
-`v2-지침서.md` §5:305 의 **함수 50줄 · 파일 500줄** 둘뿐이다 — 승인 문서가 정한 임계는 이 둘이
-전부이므로 나머지 축의 수치를 1A 가 지어내지 않는다.
+승인 문서가 수치로 정한 임계는 `v2-지침서.md` §5:305 의 **함수 50줄 · 파일 500줄** 둘뿐이므로
+나머지 축의 수치를 1A 가 지어내지 않는다. **각 임계는 강제하는 주체 쪽에 한 번만 산다.**
 
-detekt 이 같은 함수 임계를 알아야 하지만 **수를 두 자리에 적지 않는다** — 정책 파일에서 detekt
-설정 overlay 를 생성해 얹는다(`detektThresholdOverlay`). 정책 파일이 유일한 자리다.
+| 축 | 정본 | 강제 |
+| --- | --- | --- |
+| 함수 50줄 | `config/detekt/detekt.yml` 의 `LongMethod.allowedLines` | detekt (도구 기본값은 60) |
+| 파일 500줄 | `config/quality/size-policy.properties` | `sizeGate` task — detekt 에 파일 길이 규칙이 없다 |
+
+**처음에는 두 수를 정책 파일 하나에 두고 detekt 설정 overlay 를 생성해 얹었다.** 그 배선을
+걷었다 — `build-logic` 도 게이트 대상이 되자(Codex #5) 그 included build 가 overlay 생성
+task 를 쓸 수 없기 때문이다. 그 task 클래스가 바로 그 빌드의 산출물이라 자기 자신을 쓰는
+순환이 된다. 축마다 자리를 하나씩 두면 **생성 단계 없이** 애플리케이션 아홉 모듈과
+`build-logic` 이 같은 설정 파일을 읽는다. 중복은 여전히 없다 — 각 수는 한 자리에만 있다.
 
 **baseline 파일을 만들지 않는다.** 그린필드에서 detekt baseline 을 생성하면 *"지금 상태는 정상"*
 을 박제하게 되고, 이것이 `ADR 0007` D-4 가 금지한 **「baseline 을 느슨하게 갱신해 우회」** 의

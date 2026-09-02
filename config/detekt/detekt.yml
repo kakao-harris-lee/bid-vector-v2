@@ -1,14 +1,22 @@
 # detekt 2.0 설정. **2.0 키만 쓴다** — 1.x 의 `threshold` 계열은 2.0 에서 조용히 무시된다.
 # `buildUponDefaultConfig = true` 이므로 여기 없는 규칙은 도구 기본값으로 돈다.
 #
-# 임계 수치를 여기 적지 않는다. 승인 문서가 수치로 정한 것은 함수 50줄·파일 500줄 둘뿐이고
-# (v2-지침서.md §5:305) 그 둘의 자리는 config/quality/size-policy.properties 다 —
-# 함수 임계는 detektThresholdOverlay 가 생성해 이 파일 위에 얹는다.
+# **승인된 임계는 축마다 한 자리에만 산다.** 승인 문서가 수치로 정한 것은 둘이고
+# (v2-지침서.md §5:305) 강제하는 주체가 다르므로 자리도 다르다:
+#   - 함수 50줄 → 아래 `LongMethod.allowedLines`. detekt 이 이 축을 제공하므로 여기가 정본이다.
+#   - 파일 500줄 → config/quality/size-policy.properties. detekt 에 파일 길이 규칙이 없어
+#     도구 없이 서는 sizeGate task 가 든다(ADR 0007 D-7 이 요구한 자체 검사).
+# 같은 수를 두 자리에 적지 않으므로 옮겨 쓰는 생성 단계가 필요 없고, 이 파일 하나로
+# 애플리케이션 아홉 모듈과 build-logic 이 같은 임계를 받는다.
 #
-# 아래는 v2-지침서.md §5 「크기와 결합도」가 요구하는 축 가운데 **도구 기본값이 꺼져 있는 것**만
-# 켠다. 켜는 것은 축의 채택이고 수치는 도구 기본값이다.
+# 나머지 축은 **켜기만 하고 수치는 도구 기본값**을 쓴다 — 승인 문서가 정하지 않은 수를
+# 1A 가 지어내지 않는다.
 
 complexity:
+  # v2-지침서.md §5:305 — "Kotlin/Python 함수 50줄". 도구 기본값은 60 이다.
+  LongMethod:
+    active: true
+    allowedLines: 50
   CognitiveComplexMethod:
     active: true
   ComplexInterface:

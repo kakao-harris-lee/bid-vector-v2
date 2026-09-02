@@ -51,12 +51,19 @@ abstract class QualityBaselineTask : DefaultTask() {
     fun measure() {
         val rows = modules.map(::measureModule)
         val fanIn = rows.associate { row -> row.module to rows.count { row.module in it.projectDependencies } }
-        report.get().asFile.apply { parentFile.mkdirs() }.writeText(render(rows, fanIn))
+        report
+            .get()
+            .asFile
+            .apply { parentFile.mkdirs() }
+            .writeText(render(rows, fanIn))
         logger.lifecycle("quality baseline → {}", report.get().asFile)
     }
 
     private fun measureModule(spec: ModuleBaselineSpec): BaselineRow {
-        val sourceFiles = spec.sources.asFileTree.matching { include("**/*.kt") }.files
+        val sourceFiles =
+            spec.sources.asFileTree
+                .matching { include("**/*.kt") }
+                .files
         val lineCounts = sourceFiles.map { it.readLines().size }
         val types = importTypes(spec)
         return BaselineRow(
@@ -74,7 +81,10 @@ abstract class QualityBaselineTask : DefaultTask() {
     }
 
     private fun importTypes(spec: ModuleBaselineSpec): List<JavaClass> {
-        val roots = spec.classes.files.filter { it.isDirectory }.map { it.toPath() }
+        val roots =
+            spec.classes.files
+                .filter { it.isDirectory }
+                .map { it.toPath() }
         if (roots.isEmpty()) return emptyList()
         return ClassFileImporter().importPaths(roots).filterNot { it.isAnonymousClass }
     }
@@ -94,24 +104,31 @@ abstract class QualityBaselineTask : DefaultTask() {
         rows: List<BaselineRow>,
         fanIn: Map<String, Int>,
     ): String {
-        val header =
+        val preamble =
             listOf(
                 "# quality baseline (OPEN-ADR-06 입력)",
                 "",
                 "게이트가 아니라 측정이다. 타입 축은 바이트코드 기준이라 Kotlin `internal` 이 public 으로 보인다.",
                 "duplicate mechanical helper 축은 기계적 판정 기준이 없어 재지 않는다.",
                 "",
-                "| module | files | lines | max file | types | max type members | max depth | max interfaces | public api | fan-out | fan-in |",
-                "| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |",
+                markdownRow(COLUMNS.map { it.header }),
+                markdownRow(COLUMNS.mapIndexed { index, _ -> if (index == 0) "---" else "--:" }),
             )
         val body =
             rows.map { row ->
-                "| ${row.module} | ${row.files} | ${row.lines} | ${row.maxFileLines} | ${row.types} " +
-                    "| ${row.maxTypeMembers} | ${row.maxInheritanceDepth} | ${row.maxInterfaces} " +
-                    "| ${row.publicApi} | ${row.projectDependencies.size} | ${fanIn[row.module] ?: 0} |"
+                markdownRow(COLUMNS.map { column -> column.read(row, fanIn[row.module] ?: 0).toString() })
             }
-        return (header + body).joinToString(separator = "\n", postfix = "\n")
+        return (preamble + body).joinToString(separator = "\n", postfix = "\n")
     }
+
+    private fun markdownRow(cells: List<String>): String =
+        cells.joinToString(separator = " | ", prefix = "| ", postfix = " |")
+
+    /** 표의 열은 한 번만 선언한다 — 머리글·정렬행·본문이 같은 목록에서 나오므로 어긋날 수 없다. */
+    private class Column(
+        val header: String,
+        val read: (BaselineRow, Int) -> Any,
+    )
 
     private data class BaselineRow(
         val module: String,
@@ -125,4 +142,21 @@ abstract class QualityBaselineTask : DefaultTask() {
         val maxInterfaces: Int,
         val publicApi: Int,
     )
+
+    private companion object {
+        val COLUMNS =
+            listOf(
+                Column("module") { row, _ -> row.module },
+                Column("files") { row, _ -> row.files },
+                Column("lines") { row, _ -> row.lines },
+                Column("max file") { row, _ -> row.maxFileLines },
+                Column("types") { row, _ -> row.types },
+                Column("max type members") { row, _ -> row.maxTypeMembers },
+                Column("max depth") { row, _ -> row.maxInheritanceDepth },
+                Column("max interfaces") { row, _ -> row.maxInterfaces },
+                Column("public api") { row, _ -> row.publicApi },
+                Column("fan-out") { row, _ -> row.projectDependencies.size },
+                Column("fan-in") { _, fanIn -> fanIn },
+            )
+    }
 }

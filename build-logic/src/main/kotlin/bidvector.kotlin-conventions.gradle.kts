@@ -1,4 +1,3 @@
-import bidvector.buildlogic.DetektThresholdOverlayTask
 import bidvector.buildlogic.ModuleBaselineSpec
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
@@ -47,16 +46,9 @@ ktlint {
     // 규칙 집합과 스타일은 .editorconfig 가 갖는다 — 같은 설정을 두 자리에 두지 않는다.
 }
 
-val detektThresholdOverlay =
-    tasks.register<DetektThresholdOverlayTask>("detektThresholdOverlay") {
-        description = "승인된 함수 크기 임계를 정책 파일에서 detekt 설정으로 옮긴다"
-        policyFile = sizePolicy
-        overlayFile = layout.buildDirectory.file("detekt/threshold-overlay.yml")
-    }
-
 detekt {
     buildUponDefaultConfig = true
-    config.from(configDir.file("detekt/detekt.yml"), detektThresholdOverlay.flatMap { it.overlayFile })
+    config.from(configDir.file("detekt/detekt.yml"))
 }
 
 val sizeGate =
@@ -77,7 +69,8 @@ rootProject.tasks.named<QualityBaselineTask>("qualityBaseline").configure {
         objects.newInstance(ModuleBaselineSpec::class.java).apply {
             moduleName = this@Project.name
             projectDependencies =
-                this@Project.configurations
+                this@Project
+                    .configurations
                     .getByName("compileClasspath")
                     .allDependencies
                     .withType(ProjectDependency::class.java)
