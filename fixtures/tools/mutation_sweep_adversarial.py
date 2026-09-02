@@ -13,6 +13,7 @@
   (a) `verifies` 가 **주장하는 필드의 삭제** — 아래 `ASSERTED` 가 case 별로 든다.
   (b) projection 경로의 **null 치환** — projection 전건에서 기계로 생성한다.
   (c) projection 피연산자와 다른 **확정 토큰 치환** — 같음.
+  (d) 기대값이 **`null` 인 필드의 non-null 치환** — `NULL_ASSERTED` 가 case 별로 든다.
 
 **(a) 만 사람의 판단이다.** 어느 필드가 `verifies` 의 주장에 드는지는 기계가 읽지
 못한다. 그래서 `ASSERTED` 의 각 줄이 **근거를 오른쪽 주석에 싣는다** — 이 파일에서
@@ -76,6 +77,18 @@ OTHER_TOKEN = {"Inclusive": "Exclusive", "Clean": "DerivedVat", "Unmeasurable": 
 ADVERSARIAL_VALUE = {"Accepted": "Rejected", "Rejected": "Accepted",
                      "Comparable": "Rejected", "Uncertain": "Eligible"}
 
+# (d) 기대값이 **`null`** 인데 `verifies` 가 그 **부재**를 주장하는 경로 — 사람의 판단이다.
+#     Codex B14 high 의 진단: 적대 집합이 null 기대값을 한 번도 변이하지 않아 「강등 대상 0」이
+#     건전성의 증거가 아니었다. 아래 다섯이 심판이 쓴 최소 집합이다.
+NULL_ASSERTED = {
+    "floor-shortfall-005": ["$.frequency"],   # "판정 불가로 전이" — 값이 나오면 전이가 아니다
+    "floor-shortfall-001": ["$.frequency"],   # "값이 아니라 사유 있는 측정 불가"
+    "license-009":         ["$.requiredLicenses"],  # "수집 실패" — 요건이 있으면 수집된 것이다
+    "license-007":         ["$.requiredLicenses"],  # "요건 원문이 없으면" — 없음이 주장이다
+}
+NULL_REPLACEMENTS = [0.0, {"numerator": 0, "denominator": 149}, 0,
+                     {"numerator": 0, "denominator": 0}, "0%"]
+
 
 def build_mutants(cases):
     mutants = []
@@ -94,6 +107,15 @@ def build_mutants(cases):
             else:
                 continue      # 수·객체·null 은 이 갈래의 대상이 아니다
             mutants.append((cid, path, flipped, "(a') verifies 주장 필드 값 변이"))
+    for cid, paths in NULL_ASSERTED.items():
+        if cid not in cases:
+            continue
+        for path in paths:
+            ok, cur = mc.get(json.load(open(cases[cid]["expected_file"])), path)
+            if not ok or cur is not None:
+                continue      # 기대값이 null 인 자리만 이 갈래의 대상이다
+            for rep in NULL_REPLACEMENTS:
+                mutants.append((cid, path, rep, "(d) null 기대값의 non-null 치환"))
     for cid, case in cases.items():
         for entry in case.get("verified_projections") or []:
             mutants.append((cid, entry["path"], None, "(b) projection 경로 null"))

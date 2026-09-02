@@ -1744,6 +1744,7 @@ cases:
     verified_paths:
       - "$.verdict"
       - "$.uncertainReason"
+      - "$.requiredLicenses"
     source:
       kind: operator-decision
       reference: |-
@@ -1778,6 +1779,20 @@ cases:
     sha256: 3be7f59aaaf9fb149d4ed28059a1c052bdcbc1a7cca3b0f6d65cb2a06b8ca20d
     expected_sha256: 9434a1ea8d158d02d0282e5baa1a0ad98b9e2cc49a936002c04824380163cab5
     change_history:
+      - date: 2026-09-02
+        change: |-
+          `verified_paths` 에 **`$.requiredLicenses`** 를 더했다(기대값이 `null` 인 자리의 **부재 자체**를 계약한다).
+          **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 19 — Codex 재리뷰 B14(high)가 연 (d) 갈래.** 이 case 의 `verifies` 가 「수집 실패」를 주장하는데(요건이 실려 있으면 수집된 것이다)
+          그 부재가 계약 밖이라 **non-null 치환 다섯(`0.0` · `{0/N}` · `0` · `{0/0}` · `"0%"`)이 전부
+          통과**했다. **스윕이 놓친 이유가 진단의 핵심이다** — 적대 집합이 **`null` 기대값 경로를 한 번도
+          변이하지 않아** 「강등 대상 0」이 건전성의 증거가 아니었다.
+          **동결 어휘로 닫힌다** — 정확 경로 비교이고 **`null` 은 어휘를 잠그지 않으므로** 승인이 따라오지
+          않는다. 그래서 강등이 아니라 계약 추가다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
       - date: 2026-08-31
         change: |-
           `source.reference` 의 `U-5` 에 **②급 원천의 파일 좌표**를 달았다 —
@@ -2954,6 +2969,7 @@ cases:
       - "$.transitionedFrom"
       - "$.reason.required"
       - "$.reason.actual"
+      - "$.frequency"
     source:
       kind: approved-spec
       reference: |-
@@ -2994,6 +3010,20 @@ cases:
     not_covered: |-
       밴드의 **값**과 경계 포함성 — data-dictionary.md §1.4.3 B1~B7은 전부 `legacy-behavior`이며 승격 결정이 없다
     change_history:
+      - date: 2026-09-02
+        change: |-
+          `verified_paths` 에 **`$.frequency`** 를 더했다(기대값이 `null` 인 자리의 **부재 자체**를 계약한다).
+          **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 19 — Codex 재리뷰 B14(high)가 연 (d) 갈래.** 이 case 의 `verifies` 가 「표본 부족이 되면 판정 불가로 전이된다」를 주장하는데(값이 나오면 전이가 아니다)
+          그 부재가 계약 밖이라 **non-null 치환 다섯(`0.0` · `{0/N}` · `0` · `{0/0}` · `"0%"`)이 전부
+          통과**했다. **스윕이 놓친 이유가 진단의 핵심이다** — 적대 집합이 **`null` 기대값 경로를 한 번도
+          변이하지 않아** 「강등 대상 0」이 건전성의 증거가 아니었다.
+          **동결 어휘로 닫힌다** — 정확 경로 비교이고 **`null` 은 어휘를 잠그지 않으므로** 승인이 따라오지
+          않는다. 그래서 강등이 아니라 계약 추가다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
       - date: 2026-09-02
         change: |-
           `$.transitionedFrom` 을 `verified_paths` 에 **그대로 둔다** — 그 값 `Measured-candidate` 의 잠금이
