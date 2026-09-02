@@ -124,7 +124,11 @@ Codex 리뷰를 요청하기 전에 전부 충족해야 한다 (프로젝트 CLA
 - [ ] 구현 diff가 커밋되어 base/head 고정 —
       `git status --porcelain -- <scope.md의 in_scope 경로>` 결과 없음.
       scope 밖 로컬 파일은 판정에 넣지 않는다 (clean-tree 게이트 정의는 이 한 곳이
-      기준이다)
+      기준이다). **경로는 개별 인자로 넘긴다 — 목록을 변수 하나에 담지 마라.** zsh 는
+      변수를 단어 분리하지 않아 목록 전체가 pathspec 하나가 되고, 아무것도 매치하지 않아
+      「결과 없음·exit 0」이 된다 — 더러운 트리와 구별이 안 된다(M1/1A 구현 레인 실측,
+      2026-09-03; codex-review-gate §4b 스모크의 변수 확장 함정과 같은 클래스). 판정을
+      남길 때 **양성 대조 한 번**(in_scope 파일 하나를 일부러 건드려 잡히는지)을 같이 남긴다
 - [ ] scope.md의 acceptance_commands가 전부 exit 0으로 commands.md에 기록됨
 - [ ] test/lint/type/architecture/contract 관련 명령 통과
 - [ ] 변경된 fixture와 정책 version의 근거가 기록됨
