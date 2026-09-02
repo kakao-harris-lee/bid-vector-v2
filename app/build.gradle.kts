@@ -38,11 +38,23 @@ tasks.test {
     systemProperty("bidvector.architecture.policy", architecturePolicy.asFile.absolutePath)
 }
 
+// 해석만 재면 「호환」을 주장할 수 없다 — 그 버전의 API 로 컴파일되고 JVM 에서 로드되는지는
+// 테스트가 잰다(Codex #4). 두 층을 한 명령으로 묶는다.
+val compatibilitySmokeTest =
+    tasks.register<Test>("compatibilitySmokeTest") {
+        group = "verification"
+        description = "채택 라이브러리의 대표 API 를 컴파일하고 JVM 에서 로드한다"
+        val testSourceSet = sourceSets.getByName("test")
+        testClassesDirs = testSourceSet.output.classesDirs
+        classpath = testSourceSet.runtimeClasspath
+        filter { includeTestsMatching("*BootCompatibilitySmokeTest") }
+    }
+
 val compatibilitySmoke =
     tasks.register<CompatibilitySmokeTask>("compatibilitySmoke") {
         group = "verification"
-        description = "채택 라이브러리가 Boot 4.x BOM 아래에서 해석·컴파일되는지 잰다"
-        dependsOn(tasks.named("compileTestKotlin"))
+        description = "채택 라이브러리가 Boot 4.x BOM 아래에서 해석·컴파일·로드되는지 잰다"
+        dependsOn(compatibilitySmokeTest)
         graphs.add(configurations.named("testRuntimeClasspath").flatMap { it.incoming.resolutionResult.rootComponent })
         expectedModules =
             setOf(
