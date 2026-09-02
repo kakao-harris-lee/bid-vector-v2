@@ -207,7 +207,7 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `java.srcDir` 재등록 | `allSource`(살아 있는 뷰) + `src/` 병행 | `E-27` |
 | `sourceSets.create("extra")` | source set 집합 고정 | `E-28` |
 | 수제 `JavaCompile`·출력 리다이렉트 | **class 원산지**(`kotlin.Metadata` 부재) | `E-29` |
-| `jar { from("prebuilt") }` | **jar 엔트리 검사** | `E-30` |
+| `jar { from("prebuilt") }` | **포함 관계** — 아카이브 class 는 게이트를 통과한 산출물의 부분집합이어야 한다 | `E-30` · `E-47` |
 | `@Suppress` 다중 행·`@file:`·`@kotlin.` | **무의미해진다** — PSI 로 직접 잰다 | `E-31` |
 | 45줄 함수 + 20줄 람다 | 람다도 잰다 | `E-32` |
 | 45줄 함수 여럿으로 쪼개 응집도만 저하 | **막지 못한다. 막으려 해서도 안 된다** | 알려진 제한 |
@@ -222,6 +222,32 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `E-30` | `jar { from("prebuilt") }` 로 `evil/Sneak.class` | 1 | `아카이브에 소유 밖 클래스` |
 | `E-31` | 다중 행 `@Suppress` · `@file:Suppress` · `@kotlin.Suppress` + 54줄 함수 | 1 (셋 전부) | detekt 은 exit 0 — **그 축을 더는 detekt 이 들지 않는다** |
 | `E-32` | 50줄 넘는 람다 | 1 | 함수를 쪼개도 닫힌다 |
+
+### 아카이브 = 게이트를 통과한 산출물 (Codex 7차)
+
+**패키지 접두 검사는 넣는 쪽이 이름을 맞추면 통과한다.** `E-30` 은 소유 **밖**(`evil/Sneak.class`)만
+심어 그 사각을 드러내지 못했다. 소유 패키지에 이름을 맞춘 prebuilt Java class 는 jar 게이트를
+통과하면서 원산지·ktlint·detekt·크기 게이트를 전부 비껴간다.
+
+그래서 판정을 열거가 아니라 **포함 관계**로 바꾼다 — 아카이브의 class 엔트리는 **경로와 내용
+해시가 모두** 게이트를 통과한 class output 과 일치해야 한다. 엔트리마다 원산지
+(`kotlin.Metadata`)도 함께 본다. 대상은 **class 엔트리뿐**이고 resource 는 컴파일 산출물이
+아니라 이 판정의 대상이 아니다.
+
+| # | 심은 것 | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| `E-47` | 소유 패키지에 이름을 맞춘 prebuilt Java class(`bidvector/settlement/Sneak.class`)를 `jar { from(...) }` 로 | `./gradlew :settlement:jarContentGate` | 1 | `게이트를 거치지 않은 클래스가 아카이브에 있다` — **접두만 보던 판에서는 통과하던 형태** |
+| `E-48` | 같은 이름·다른 내용(javac 로 만든 `ModuleBoundaryAnchor.class`) | 같은 명령 | 1 | `게이트를 통과한 산출물과 내용이 다르다` — 해시가 이름 위장을 막는다 |
+| `E-49` | `from(zipTree(...))` 로 주입 | 같은 명령 | 1 | 주입 **경로**를 열거하지 않아도 닫힌다 |
+| `E-50` | `src/main/resources` 에 `.class` 를 두어 `processResources` 로 | 같은 명령 | 1 | resource 경로도 같은 판정을 받는다 |
+| `E-51` | `src/main/resources` 에 `.properties` | 같은 명령 | **0** | **의도된 결과** — resource 는 이 판정의 대상이 아니다 |
+| `E-52` | `classes/kotlin/main` 에 심어 **포함 관계를 통과**시킴 | 같은 명령 | 1 | `kotlin.Metadata 가 없다` — **두 번째 층이 서는 자리가 이것**이다 |
+
+**원산지 검사를 ArchUnit 으로 재지 않는 이유도 실측이다.** `ClassFileImporter().importJar` 은 이
+데몬 안에서 위 Java 클래스를 **조용히 건너뛰었다**(두 엔트리 중 Kotlin 것만 임포트). 같은 jar 를
+독립 JVM 에서 읽으면 둘 다 나온다. 잡아야 할 바로 그 클래스를 빠뜨리는 검사는 없는 것만 못하므로
+상수 풀에서 `kotlin/Metadata` 를 바이트로 찾는다. **`importPaths` 는 영향이 없다** —
+`packageOwnershipGate` 의 원산지 검사에 같은 클래스를 심어 재확인했다(exit 1).
 
 ### 효과 표면 도출 — T-D 를 열거에서 래칫으로
 

@@ -139,10 +139,14 @@ val sourceLanguageGate =
 
 val jarContentGate =
     tasks.register<JarContentGateTask>("jarContentGate") {
-        description = "배포되는 아카이브에 소유 밖 클래스가 들어 있는지 잰다"
+        description = "배포되는 아카이브의 class 가 게이트를 통과한 산출물 그 바이트인지 잰다"
         policyFile = configDir.file("quality/architecture-policy.properties")
         moduleName = project.name
         archives.from(tasks.named("jar").map { (it as Jar).archiveFile })
+        // 대조 대상 = 소유 게이트가 이미 본 class output. 판정이 「이름이 맞는가」가 아니라
+        // **「게이트를 거친 바이트인가」**가 되려면 이 집합이 필요하다(Codex 7차).
+        classDirectories.from(provider { sourceSets.filter { it.name != "test" }.flatMap { it.output.classesDirs } })
+        dependsOn(provider { sourceSets.filter { it.name != "test" }.map { it.classesTaskName } })
         report = layout.buildDirectory.file("reports/jar-content-gate/entries.txt")
     }
 
