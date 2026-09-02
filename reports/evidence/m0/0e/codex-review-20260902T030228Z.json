@@ -1,0 +1,50 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "baf00559e80f0f2b4273e746e88429bd2d03287b",
+  "findings": [
+    {
+      "severity": "high",
+      "file": ".claude/skills/v2-slice-pipeline/SKILL.md",
+      "line": 165,
+      "evidence": "장부층 finding만 남은 `request_changes`에 대해 163~164행은 slice를 닫지 못한다고 규정하지만, 바로 다음 165~166행은 운영자 결정만 기록하면 「Codex approve 없는 종결」로 닫을 수 있게 한다. 이는 같은 문단 170~171행이 정본으로 인정하는 `milestone-0.md:133`의 “Codex approve와 사용자 승인” 및 `milestone-1.md:10`의 M1 선행 조건과 직접 충돌한다. 이 경로를 따르면 독립 리뷰가 끝까지 `request_changes`인 slice도 상위 계약을 개정하지 않은 채 완료 처리할 수 있다.",
+      "required_fix": "165~166행의 `request_changes` 종결 예외를 제거하고, 장부층-only나 상한 도달 시에는 미승인 상태로 정지·보고만 하도록 한다. Codex approve 없는 종결을 허용하려면 먼저 `agent-workflow.md`와 해당 milestone의 승인 계약을 명시적으로 개정하는 별도 결정이 필요하다."
+    },
+    {
+      "severity": "medium",
+      "file": "fixtures/manifest.yaml",
+      "line": 4909,
+      "evidence": "반올림 미의존 근거가 실제 fixture와 다르다. 4909행은 `floor-threshold-*`가 `0.945 ÷ 0.900 = 1.05`를 쓴다고 하지만 실제 입력은 `0.91875 ÷ 0.875 = 1.05`이고, 4910행은 `floor-shortfall-003` 빈도를 `15/151`이라고 하지만 실제 expected는 numerator 18, denominator 151이다. 따라서 M1 준비 상태를 설명하는 manifest 산문이 authoritative fixture 두 계열의 실제 값과 불일치한다.",
+      "required_fix": "4909~4911행을 실제 fixture 값인 `0.91875 ÷ 0.875`와 `18/151`에 맞추거나, 변동 가능한 숫자를 제거하고 파일 포인터로 대체한 뒤 산문-fixture 정합 검사를 재실행한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse --verify 14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit} && git rev-parse --verify baf00559e80f0f2b4273e746e88429bd2d03287b^{commit} && git rev-parse HEAD",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..baf00559e80f0f2b4273e746e88429bd2d03287b && git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..baf00559e80f0f2b4273e746e88429bd2d03287b",
+    "git log --oneline 14686dbf3bff4085203ffdcd931564fd1e36edf0..baf00559e80f0f2b4273e746e88429bd2d03287b",
+    "sed -n '1,260p' agent-workflow.md; sed -n '1,320p' milestone-0.md; sed -n '1,300p' 'v2-지침서.md'; sed -n '1,220p' milestone-1.md",
+    "for f in reports/evidence/m0/0e/codex-review-*.json; do jq '{reviewed_head,verdict,findings}' \"$f\"; done",
+    "git diff --unified=80 78b98eee3010957b353f5ea839880c3304891ca6..baf00559e80f0f2b4273e746e88429bd2d03287b -- fixtures/manifest.yaml fixtures/tools reports/evidence/m0/0e",
+    "python3 fixtures/tools/check_legacy_numbers.py",
+    "python3 fixtures/tools/mutation_sweep_adversarial.py",
+    "python3 fixtures/tools/mutation_sweep_targeted.py",
+    "python3 fixtures/tools/manifest_prose_consistency.py",
+    "awk '/^    input_file: /{f=$2} /^    expected_file: /{g=$2} /^    sha256: [0-9a-f]{64}$/{print $2\"  \"f} /^    expected_sha256: [0-9a-f]{64}$/{print $2\"  \"g}' fixtures/manifest.yaml | shasum -a 256 -c -",
+    "python3 -B -c \"import json,glob; fs=sorted(glob.glob('fixtures/input/*.json')+glob.glob('fixtures/expected/*.json')); [json.load(open(f)) for f in fs]; print('parsed OK:',len(fs))\"",
+    "ruby -rdigest -rjson -ryaml -e '<manifest required-key, classification, file, SHA-256, contract and synthetic-data invariant checks>'",
+    "ruby -rjson -ryaml -e '<legacy-reference-index and manifest path/pinned-SHA set comparison>'",
+    "python3 -B - <<'PY'\n# capability-map §14의 B/C 분류와 네 registry의 활성 OPEN 합집합 양방향 대조\nPY",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..baf00559e80f0f2b4273e746e88429bd2d03287b",
+    "rg -n 'open\\([^\\n]*(\"w\"|\"a\"|write)|\\.write\\(|subprocess|requests|urllib|socket|psycopg|sqlalchemy|httpx|boto|telegram|sendmail|curl|wget' fixtures/tools || true",
+    "jq . fixtures/expected/floor-shortfall-003.json; jq '{recommendedBidRate,floorRate}' fixtures/input/floor-threshold-001.json",
+    "test -e bid-vector; git status --short; git rev-parse HEAD; git merge-base --is-ancestor 14686dbf3bff4085203ffdcd931564fd1e36edf0 baf00559e80f0f2b4273e746e88429bd2d03287b; git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..baf00559e80f0f2b4273e746e88429bd2d03287b"
+  ],
+  "residual_risks": [
+    "clean worktree에 legacy `bid-vector` checkout이 없어 `fixtures/legacy-reference-index.json`의 object id가 실제 legacy 저장소와 일치하는지는 독립 재검증하지 못했다. 저장소 내부 index 해시, pinned SHA 선언, manifest 경로 집합의 상호 일치까지만 확인했다.",
+    "M0는 문서·fixture 설계 단계이므로 Kotlin/Python production wiring, DB·외부 호출 side effect, retry/idempotency의 실행 검증은 이번 range에서 적용 대상이 아니다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
