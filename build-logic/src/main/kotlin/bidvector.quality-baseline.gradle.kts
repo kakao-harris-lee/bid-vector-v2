@@ -22,6 +22,26 @@ val buildLogicSizeGate =
         report = layout.buildDirectory.file("reports/size-gate/build-logic.txt")
     }
 
+// 루트와 included build 의 `*.gradle.kts` — 모듈에도 source set 에도 속하지 않아 다른 어느
+// 게이트의 입력에도 없다. 이름을 열거하면 새 스크립트가 조용히 빠지므로 두 디렉터리를
+// **훑어서**(재귀 아님) 낸다.
+val looseBuildScripts =
+    providers.provider {
+        listOf(layout.settingsDirectory.asFile, layout.settingsDirectory.dir("build-logic").asFile)
+            .flatMap { directory -> directory.listFiles().orEmpty().toList() }
+            .filter { it.isFile && it.name.endsWith(".gradle.kts") }
+            .sortedBy { it.path }
+    }
+
+val scriptSizeGate =
+    tasks.register<SizeGateTask>("scriptSizeGate") {
+        group = "verification"
+        description = "모듈 밖 빌드 스크립트에도 크기 래칫을 건다"
+        policyFile = layout.settingsDirectory.file("config/quality/size-policy.properties")
+        sources.from(looseBuildScripts)
+        report = layout.buildDirectory.file("reports/size-gate/build-scripts.txt")
+    }
+
 // 루트 프로젝트에는 `check` 가 없어 `./gradlew check` 가 included build 를 지나친다.
 // 여기서 만들어 그 빌드의 `check`(ktlint·detekt)와 위 크기 게이트를 함께 건다.
 val baseline = tasks.named<QualityBaselineTask>("qualityBaseline")
@@ -38,6 +58,6 @@ val conventionCoverageGate =
 tasks.register("check") {
     group = "verification"
     description = "included build 의 검증까지 루트 check 에 포함한다"
-    dependsOn(buildLogicSizeGate, conventionCoverageGate)
+    dependsOn(buildLogicSizeGate, scriptSizeGate, conventionCoverageGate)
     dependsOn(gradle.includedBuild("build-logic").task(":check"))
 }

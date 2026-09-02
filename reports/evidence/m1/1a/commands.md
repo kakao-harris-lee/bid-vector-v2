@@ -226,14 +226,19 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 ### 본문을 갖는 선언 — 표기별 실측
 
 **정의의 정본은 `config/quality/size-policy.properties` 의 `limit.function.lines` 주석**이다.
-그 정의가 표기마다 실제로 서는지 `settlement` 에 심어 재고 되돌렸다. 방문자를 골라 구현하면
-구현하지 않은 표기가 곧 우회로가 되므로, 재는 대상을 노드 **타입**(`KtDeclarationWithBody` ·
-`KtAnonymousInitializer`)으로 판정한다.
+그 정의가 표기마다 실제로 서는지 `settlement` 과 빌드 스크립트에 심어 재고 되돌렸다. 방문자를
+골라 구현하면 구현하지 않은 표기가 곧 우회로가 되므로, 재는 대상을 노드
+**타입**(`KtDeclarationWithBody` · `KtAnonymousInitializer`)으로 판정한다. **파일 축과 함수 축의
+입력이 같은 집합이 아니었다** — 빌드 스크립트는 어느 source set 에도 속하지 않아 두 축 모두에서
+빠져 있었고(`scriptSizeGate` 가 그 자리를 든다), 모듈 스크립트는 그 모듈 `sizeGate` 가 든다.
 
 | # | 심은 것 | cmd | exit | 핵심 결과 |
 | --- | --- | --- | --- | --- |
 | `E-33` | `get() { }` · `init { }` · 보조 생성자를 각 54 줄로 한 파일에 | `./gradlew :settlement:sizeGate` | 1 | **셋 다 보고**(`v.get` · `init` · `constructor`). 같은 파일의 **본문 없는 주 생성자는 보고되지 않는다** — 정의대로다 |
 | `E-34` | 위 파일 제거 | 같은 명령 | 0 | 되돌림 확인 |
+| `E-35` | 모듈 `build.gradle.kts` 에 55 줄 람다 | 같은 명령 | 1 | **`.kts` 도 같은 임계** |
+| `E-36` | 루트 `build.gradle.kts` 에 55 줄 람다 | `./gradlew scriptSizeGate` | 1 | 모듈에도 source set 에도 속하지 않는 스크립트를 이 게이트가 든다 |
+| `E-37` | 같은 파일에 60 행짜리 top-level 문장 | 같은 명령 | **0** | **의도된 결과** — 함수 본문이 아니므로 함수 축이 아니고 파일 축(500 줄)이 든다 |
 
 ### addendum 이 미확인으로 남긴 것 — 실측으로 답한다
 

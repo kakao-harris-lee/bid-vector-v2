@@ -13,9 +13,12 @@ import org.jetbrains.kotlin.psi.KtFunctionLiteral
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtPropertyAccessor
 import org.jetbrains.kotlin.psi.KtPsiFactory
+import org.jetbrains.kotlin.psi.KtScriptInitializer
 import org.jetbrains.kotlin.psi.KtSecondaryConstructor
 import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
 import java.io.File
+
+private val KOTLIN_EXTENSIONS = setOf("kt", "kts")
 
 internal class MeasuredFunction(
     val file: File,
@@ -45,7 +48,10 @@ internal class MeasuredFunction(
  * 함수에서 곧바로 틀리는 것**을 실측했다. PSI 는 문자열·주석·`"""`·식 본문을 이미 갈라 준다.
  */
 internal fun measureFunctions(files: List<File>): List<MeasuredFunction> {
-    val kotlinFiles = files.filter { it.extension == "kt" }
+    // `.kts` 도 잰다 — 빌드 로직은 이 저장소에서 실제 코드이고, 빼 두면 긴 함수가 스크립트로
+    // 옮겨 가는 것이 우회가 된다(Codex 6차). `KtPsiFactory.createFile` 이 확장자로 스크립트를
+    // 판별하므로 파서를 따로 두지 않는다.
+    val kotlinFiles = files.filter { it.extension in KOTLIN_EXTENSIONS }
     if (kotlinFiles.isEmpty()) return emptyList()
 
     // 전역 application environment 를 잡으므로 task action 안에서 만들고 반드시 dispose 한다 —
@@ -104,8 +110,15 @@ private fun measureFile(
  */
 private fun KtElement.hasDeclarationBody(): Boolean =
     when (this) {
+        // 스크립트의 top-level 문장은 함수 본문이 아니다 — `KtScriptInitializer` 가
+        // `KtAnonymousInitializer` 를 구현하므로 명시적으로 뺀다. **그 안의 람다는 이미 재므로
+        // 새는 것이 없고**, 빼지 않으면 문장과 그 안의 람다가 같은 범위를 두 번 보고한다.
+        is KtScriptInitializer -> false
+
         is KtAnonymousInitializer -> body != null
+
         is KtDeclarationWithBody -> hasBody()
+
         else -> false
     }
 

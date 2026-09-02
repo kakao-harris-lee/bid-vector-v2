@@ -150,7 +150,9 @@ val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
         policyFile = sizePolicy
-        sources.from(handWrittenSourceDirectories)
+        // 모듈의 빌드 스크립트도 잰다. 어느 source set 에도 속하지 않아 `allSource` 에 보이지
+        // 않지만 실제 코드이고, 빼 두면 긴 함수가 그리로 옮겨 가는 것이 우회가 된다(Codex 6차).
+        sources.from(handWrittenSourceDirectories, layout.projectDirectory.file("build.gradle.kts"))
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
     }
 

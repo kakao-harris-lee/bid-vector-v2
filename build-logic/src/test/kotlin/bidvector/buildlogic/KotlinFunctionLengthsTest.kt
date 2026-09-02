@@ -14,8 +14,13 @@ class KotlinFunctionLengthsTest {
     @TempDir
     lateinit var dir: File
 
-    private fun measure(source: String): List<MeasuredFunction> {
-        val file = File(dir, "Probe.kt").apply { writeText(source) }
+    private fun measure(source: String): List<MeasuredFunction> = measure("Probe.kt", source)
+
+    private fun measure(
+        fileName: String,
+        source: String,
+    ): List<MeasuredFunction> {
+        val file = File(dir, fileName).apply { writeText(source) }
         return measureFunctions(listOf(file))
     }
 
@@ -106,6 +111,28 @@ class KotlinFunctionLengthsTest {
                     "${body(50)}\n        check(total > 0)\n    }\n}\n",
             )
         assertTrue(f.single { it.name == "init" }.lines > 50, "init ${f.single { it.name == "init" }.lines} 줄")
+    }
+
+    @Test
+    fun `빌드 스크립트의 람다도 잰다`() {
+        val f =
+            measure(
+                "probe.gradle.kts",
+                "tasks.register(\"probe\") {\n    doLast {\n        var total = 0\n" +
+                    "${body(50)}\n        println(total)\n    }\n}\n",
+            )
+        val lambda = f.filter { it.name == "<람다>" }.maxBy { it.lines }
+        assertTrue(lambda.lines > 50, "스크립트 람다 ${lambda.lines} 줄")
+    }
+
+    @Test
+    fun `스크립트 top-level 문장은 재지 않는다`() {
+        val f =
+            measure(
+                "probe.gradle.kts",
+                "val total =\n    0 +\n${(1..60).joinToString(" +\n") { "        $it" }}\n",
+            )
+        assertEquals(emptyList(), f.map { it.name }, "top-level 문장은 함수 본문이 아니다")
     }
 
     @Test
