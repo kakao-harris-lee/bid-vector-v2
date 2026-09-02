@@ -1,0 +1,52 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "58e3331cd62cb6644c23966da059d36d38887295",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 89,
+      "evidence": "`verified_paths` 도출 규칙 ②가 `verifies`의 존재·형태 요구를 계약에서 제외한다. 그 결과 `money-basis-001`·`money-basis-004`·`verdict-004`는 각각 “사유와 함께 거부”를 검증한다고 선언하지만 `reasonCode`는 assertion 경로가 아니다. 독립 계약 재평가에서 각 expected의 `reasonCode`만 삭제해도 모두 `reason_removed_passes=true`였다. 승인된 실패 계약에서 사유가 사라진 production 결과가 authoritative corpus를 통과하는 fake shortcut이다.",
+      "required_fix": "값의 정확한 어휘를 고정하지 않더라도 필드 존재·non-null·형태를 검증할 수 있는 projection을 계약에 추가하고, 각 authoritative case의 `verifies` 전부가 `verified_paths` 또는 projection으로 기계적으로 보호되게 한다. 최소한 위 세 case에서 `reasonCode` 제거 변이가 실패해야 한다."
+    },
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 118,
+      "evidence": "`verified_projections`의 유일한 술어 `not-equals`는 특정 토큰 하나만 배제할 뿐 선언된 의미를 보장하지 않는다. 독립 재평가에서 `money-basis-006`의 `vatTreatment`를 `EXCLUSIVE`, `provenance`를 `DerivedVat`로 바꿔 미상 provenance/VAT를 확정 의미로 세탁해도 두 projection과 exact paths가 모두 통과했다. 또한 `floor-shortfall-002`의 `result`를 null로 바꿔 N 경계에서 측정 결과 자체를 없애도 `null != Unmeasurable`이므로 통과했다. 이는 각각 raw VAT/provenance 보존과 `Unmeasurable` 분리라는 핵심 acceptance를 보호하지 못한다.",
+      "required_fix": "경로 존재·타입과 승인된 의미 범주를 함께 검사하는 의미 projection(예: unknown/non-definitive, measurable)을 정의하거나, 그런 projection으로 표현할 수 없는 case는 계약이 준비될 때까지 authoritative에서 내린다. null·임의의 비피연산자·다른 확정 VAT/provenance 값 변이를 포함한 전수 mutation을 다시 실행해 모두 실패시킨다."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/discovery/capability-map.md",
+      "line": 3429,
+      "evidence": "M0 이월 목록 N-1은 fixture-curator가 “`authoritative` 63 case”로 착수했다고 현재형으로 기록한다. HEAD의 manifest 독립 파싱 결과는 전체 63건 중 authoritative 34건, insufficient-evidence 29건이다. 같은 완료 기록은 수를 산문에 박지 말고 F-7이 내도록 규정하므로, 이 문장은 사용자 승인 대상인 §14와 M1 fixture 준비 상태를 실제보다 크게 표시한다.",
+      "required_fix": "N-1을 분류 중립적인 전체 case 수와 F-7 포인터로 고치거나 현재 분류를 명확히 구분한다. 변동 가능한 authoritative 건수는 산문에 고정하지 않는다."
+    }
+  ],
+  "commands_run": [
+    "git status --short; git rev-parse 14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit}; git rev-parse 58e3331cd62cb6644c23966da059d36d38887295^{commit}; git rev-parse HEAD",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..58e3331cd62cb6644c23966da059d36d38887295; git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..58e3331cd62cb6644c23966da059d36d38887295; git log --oneline 14686dbf3bff4085203ffdcd931564fd1e36edf0..58e3331cd62cb6644c23966da059d36d38887295",
+    "git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..58e3331cd62cb6644c23966da059d36d38887295; git diff --name-only 14686dbf3bff4085203ffdcd931564fd1e36edf0..58e3331cd62cb6644c23966da059d36d38887295 | wc -l; git diff --numstat 14686dbf3bff4085203ffdcd931564fd1e36edf0..58e3331cd62cb6644c23966da059d36d38887295",
+    "sed로 agent-workflow.md, v2-지침서.md, milestone-0.md, milestone-1.md, data-extract.md, ADR, scope/checklist/commands/rollback 및 fixture evidence를 직접 검토",
+    "jq로 reports/evidence/m0/0e/codex-review-*.json의 이전 verdict와 findings 전수 확인",
+    "awk로 manifest의 input/expected SHA-256 목록을 생성한 뒤 shasum -a 256 -c - 실행; python3로 fixture JSON 126개 파싱; python3 fixtures/tools/check_legacy_numbers.py",
+    "python3 인라인 검사로 §12 registry 그룹 수와 §14의 활성 OPEN 양방향 coverage 재검증",
+    "Ruby Psych/JSON 독립 검사로 manifest 63건의 필수 필드, 분류-source 대응, 파일 집합, SHA-256, assertion 경로, projection 구조, review/change-history를 검증",
+    "Python object_pairs_hook 및 Ruby Psych AST로 fixture JSON과 manifest YAML의 중복 키 검사",
+    "Ruby 독립 계약 evaluator로 reasonCode 삭제, VAT/provenance 의미 세탁, null result 변이를 재평가",
+    "rg -n 'authoritative.*63|63 case|63개' docs/discovery/capability-map.md milestone-0.md reports/evidence/m0/0e fixtures/manifest.yaml",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..58e3331cd62cb6644c23966da059d36d38887295; git fsck --no-dangling --no-reflogs --connectivity-only",
+    "test -e bid-vector; git -C bid-vector rev-parse ed4b06c^{commit}"
+  ],
+  "residual_risks": [
+    "전체 63건 중 29건은 insufficient-evidence이고 uncovered_axes는 30건이다. observed 및 legacy-behavior case는 0건이며 case 단위 사용자 승인은 모두 false다. 부분 만족 상태의 M1 진입은 기록된 사용자 결정이므로 그 자체를 finding으로 올리지 않았다.",
+    "clean worktree에는 bid-vector checkout이 없어 pinned legacy SHA와 object id를 원 저장소에 대조하는 F-5.3은 재실행할 수 없었다. 커밋된 legacy-reference-index의 내부 해시·manifest 집합 일치까지만 확인했다.",
+    "이 range에는 Kotlin/Python 애플리케이션 구현이 없어 framework 의존, retry/idempotency, side effect, production wiring 위험은 이번 문서·fixture slice에서 실행 검증할 대상이 아니다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
