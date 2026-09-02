@@ -1,0 +1,40 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "6974756eb8ceb5989f3c2fa105be9ab33b411c33",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts",
+      "line": 148,
+      "evidence": "jarContentGate와 packageOwnershipGate는 모든 main source-set class directory를 이미 검증된 산출물로 신뢰하지만, sourceLanguageGate와 sizeGate는 lines 123-132, 159의 src/allSource 입력만 검사한다. 따라서 모듈 루트의 추적된 Java 파일을 수제 JavaCompile로 build/classes/kotlin/main에 출력하고 classes가 그 task에 의존하게 하면 소스는 언어·ktlint·detekt·크기 검사에서 빠지지만 산출물은 신뢰 집합과 jar에 들어간다. Java 클래스에 @kotlin.Metadata를 붙인 production-policy 직접 probe에서도 ArchUnit의 metadata 판정과 hasKotlinMetadata가 true였고 package/JarContent 정책 위반은 각각 0이었다. 기존 E-29/E-52는 metadata 없는 Java만 심으므로 이 경로를 검증하지 않는다. 결과적으로 ./gradlew check가 Kotlin 전용 및 1A의 formatting/lint/size acceptance 위반을 놓칠 수 있다.",
+      "required_fix": "검증된 class 집합을 실제로 sourceLanguage/ktlint/detekt/size 검사를 받은 compiler source와 연결하고, 표준 Kotlin compilation 밖의 compile task 또는 main output 주입을 거부하거나 그 입력 전부에 동일한 게이트를 적용한다. kotlin.Metadata를 원산지 보증으로 사용하지 말고, 외부 소스를 기존 main class directory로 출력하는 수제 Kotlin compile과 @kotlin.Metadata JavaCompile 음성 fixture를 추가해 check가 구체적인 위반 사유로 실패함을 고정한다."
+    }
+  ],
+  "commands_run": [
+    "git cat-file -e 6b03c75016a1d5437ca7ff932282fc477be974e6^{commit} && git cat-file -e 6974756eb8ceb5989f3c2fa105be9ab33b411c33^{commit}",
+    "git rev-parse HEAD && git merge-base 6b03c75016a1d5437ca7ff932282fc477be974e6 6974756eb8ceb5989f3c2fa105be9ab33b411c33",
+    "git diff --stat --shortstat --name-status --check 6b03c75016a1d5437ca7ff932282fc477be974e6..6974756eb8ceb5989f3c2fa105be9ab33b411c33",
+    "git log --oneline 6b03c75016a1d5437ca7ff932282fc477be974e6..6974756eb8ceb5989f3c2fa105be9ab33b411c33",
+    "git status --short --untracked-files=all -- ':!.gradle-home/**'",
+    "sed/nl/rg로 v2-지침서.md, agent-workflow.md, milestone-1.md, 관련 ADR, capability-map 및 reports/evidence/m1/1a 전체 검토",
+    "python3로 **/build/test-results/**/*.xml 집계: 10 suites, 85 tests, failures/errors/skipped 0",
+    "python3로 detekt XML 및 Kover 산출물 검사: detekt XML 10개·error 0, Kover XML 9개",
+    "cmp -s config/quality/member-effects.generated.properties build/reports/member-effects/derived.properties",
+    "unzip -tq gradle/wrapper/gradle-wrapper.jar; sh -n gradlew; bash -n gradlew; ruby YAML.safe_load로 .github/workflows/ci.yml 파싱",
+    "jar tf 및 javap로 모듈 jar/class와 음성 fixture bytecode 검사",
+    "kotlin -Xskip-metadata-version-check -classpath <build-logic worker classpath> -e <JavaCompiler로 @kotlin.Metadata Java class를 생성하고 production PackageOwnershipPolicy/JarContentPolicy/ArchUnit 판정을 reflection으로 실행>",
+    "Temurin 21.0.4, Corretto 21.0.3, Oracle/OpenJDK 21.0.2에서 production deriveMemberEffects reflection 실행 후 SHA-256/diff 비교",
+    "git fsck --no-dangling --no-reflogs --connectivity-only",
+    "codex --version"
+  ],
+  "residual_risks": [
+    "명시된 sandbox 제한에 따라 Gradle 자체는 재실행하지 않았으며, 현재 HEAD에서 생성된 build 산출물과 비-Gradle production-policy probe로 검증했다.",
+    "GitHub Actions 원격 실행은 확인할 수 없어 CI workflow는 정적 배선과 로컬 산출물만 검토했다.",
+    "금액·unit/basis/VAT/provenance, uncertainty, 계약, retry/멱등성 및 side-effect 위험은 이 slice에 해당 구현이 없어 후속 1B~1E에서 검증해야 한다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
