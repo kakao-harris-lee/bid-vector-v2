@@ -463,8 +463,16 @@ grep -rhoF -f <(grep -oE '「[^」]{10,}」|\*"[^"]{10,}"\*' \
 | 비밀값(evidence) | `evidence-pack` SKILL 의 패턴 | 매치 없음(exit 1) |
 | 비밀값(diff) | 같은 패턴을 `git diff acb89eb..HEAD` 에 | 매치 없음(exit 1) |
 
-**acceptance 는 재실행하지 않는다** — 이 라운드의 변경은 승인 문서와 evidence 뿐이고
-빌드 입력이 아니다. 직전 코드 라운드의 `A-0`~`A-5` 가 그대로 선다.
+**acceptance 를 어느 커밋에서 돌렸는지는 커밋마다 다르다 — 「문서만이라 불요」로 뭉치지
+않는다.** 승인 문서 개정 라운드에도 **빌드 입력 변경이 있었다**: 좌표를 인용문으로 바꾸면서
+`BootCompatibilitySmokeTest.kt` 의 KDoc 과 `config/detekt/detekt.yml` 의 주석을 건드렸다.
+그 변경은 **그 SHA 에서 검증됐다** — 커밋 전 `clean check` 와 **verifier r12 의 `A-0`~`A-5`** 가
+같은 SHA 를 돈다. 뒤이은 두 커밋(문면 정정·`clean-tree` 정정)만이 빌드 입력 **무변경**이고,
+그 뒤 장부층 일괄 커밋은 다시 `build-logic` 주석을 건드려 `check` 를 재실행했다.
+
+**어느 커밋이 어느 쪽인지는 `git show --name-only` 가 낸다** — 여기 파일 목록을 옮겨 적지
+않는다. 요지는 「주석만 고쳤다」가 **빌드 입력 무변경과 같은 말이 아니라는 것**이다.
+`.kt`·`.yml`·`.properties` 는 주석 한 줄이라도 게이트의 입력이다.
 
 > **clean-tree 검사가 조용히 아무것도 검사하지 않을 수 있다 — 이 라운드에서 실제로 그랬다.**
 > in_scope 목록을 셸 변수 하나에 담아 `-- $IN` 으로 넘기면 zsh 는 그것을 **단어로 쪼개지 않고**
