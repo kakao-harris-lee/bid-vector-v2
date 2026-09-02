@@ -70,31 +70,43 @@ class ForbiddenFamilyCoverageTest {
         val FAMILIES =
             listOf(
                 Family(
-                    "Spring", "지침서 §3.1 · ADR 0006 D-3",
-                    listOf("org.springframework"), listOf("org.springframework"),
+                    "Spring",
+                    "지침서 §3.1 · ADR 0006 D-3",
+                    listOf("org.springframework"),
+                    listOf("org.springframework"),
                 ),
                 Family(
-                    "JPA", "지침서 §3.1 · ADR 0006 D-3",
+                    "JPA",
+                    "지침서 §3.1 · ADR 0006 D-3",
                     listOf("jakarta.persistence", "javax.persistence", "org.hibernate"),
                     listOf("jakarta.persistence", "org.hibernate"),
                 ),
                 Family(
-                    "JSON", "지침서 §3.1 · ADR 0006 D-3",
+                    "JSON",
+                    "지침서 §3.1 · ADR 0006 D-3",
                     listOf("com.fasterxml.jackson", "tools.jackson", "kotlinx.serialization"),
                     listOf("com.fasterxml.jackson", "tools.jackson"),
                 ),
                 Family(
-                    "HTTP", "지침서 §3.1 · ADR 0006 D-3",
-                    listOf("java.net", "okhttp3", "io.ktor"), listOf("com.squareup.okhttp3", "io.ktor"),
+                    "HTTP",
+                    "지침서 §3.1 · ADR 0006 D-3",
+                    listOf("java.net", "okhttp3", "io.ktor"),
+                    listOf("com.squareup.okhttp3", "io.ktor"),
                 ),
                 Family(
-                    "broker", "지침서 §3.1",
+                    "broker",
+                    "지침서 §3.1",
                     listOf("jakarta.jms", "org.apache.kafka", "com.rabbitmq"),
                     listOf("jakarta.jms", "org.apache.kafka", "com.rabbitmq"),
                 ),
                 Family("gRPC", "ADR 0006 D-3 · D-6", listOf("io.grpc"), listOf("io.grpc")),
                 Family("Protobuf", "ADR 0006 D-6", listOf("com.google.protobuf"), listOf("com.google.protobuf")),
-                Family("SQL", "지침서 §3.1 · milestone-1.md:62", listOf("java.sql", "org.postgresql"), listOf("org.postgresql")),
+                Family(
+                    "SQL",
+                    "지침서 §3.1 · milestone-1.md:62",
+                    listOf("java.sql", "org.postgresql"),
+                    listOf("org.postgresql"),
+                ),
                 Family("I/O", "milestone-1.md:62", listOf("java.io", "java.nio")),
             )
     }
