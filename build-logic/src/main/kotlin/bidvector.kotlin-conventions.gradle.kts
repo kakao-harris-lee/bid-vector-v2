@@ -72,8 +72,16 @@ val sizeGate =
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
     }
 
+// coverage 는 **측정만** 한다. 승인 문서에 임계 수치가 없어 검증 규칙을 두지 않지만
+// (그 결정은 1B 로 이월), 리포트를 내지 않으면 CI 가 올릴 산출물도 사람이 볼 수치도 없다 —
+// 「배선했다」와 「측정한다」는 다르다. XML 은 기계가, HTML 은 사람이 읽는다.
 tasks.named("check") {
-    dependsOn(sizeGate, moduleDependencyGate)
+    dependsOn(
+        sizeGate,
+        moduleDependencyGate,
+        tasks.named("koverXmlReport"),
+        tasks.named("koverHtmlReport"),
+    )
 }
 
 rootProject.tasks.named<QualityBaselineTask>("qualityBaseline").configure {
