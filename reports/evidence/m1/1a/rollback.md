@@ -38,9 +38,10 @@ ls settings.gradle.kts build.gradle.kts gradlew    # 셋 다 없어야 한다
 
 | 대상 | 방법 |
 | --- | --- |
-| detekt | `build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts` 의 `id("dev.detekt")` 제거. **승인된 파일 500 줄 임계는 `sizeGate` 가 계속 든다**(ADR 0007 D-7 이 노린 성질) |
-| ktlint | 같은 파일의 `id("org.jlleitschuh.gradle.ktlint")` 제거 |
-| architecture test | `app/src/test/kotlin/bidvector/app/architecture/` 와 `app/src/test/kotlin/bidvector/archfixture/` 제거. **1 차 강제인 `domainDependencyGate` 는 남는다** |
+| detekt | `bidvector.kotlin-conventions.gradle.kts` 와 `build-logic/build.gradle.kts` 양쪽에서 `dev.detekt` 제거. **승인된 파일 500 줄 임계는 `sizeGate` 가 계속 든다**(ADR 0007 D-7 이 노린 성질). 함수 50줄 임계는 detekt 과 함께 사라진다 |
+| ktlint | 같은 두 자리에서 `org.jlleitschuh.gradle.ktlint` 제거 |
+| architecture test | `app/src/test/kotlin/bidvector/app/architecture/` 와 `app/src/test/kotlin/bidvector/archfixture/` 제거. **1 차 강제인 `moduleDependencyGate` 는 남는다** |
+| build-logic 게이트만 | 루트 `bidvector.quality-baseline.gradle.kts` 의 `check` task 제거. 아홉 모듈의 게이트는 그대로 |
 | Boot 4.x 스모크 | `app/build.gradle.kts` 의 Boot 플러그인·스모크 의존·`compatibilitySmoke` 제거. 다른 모듈은 Spring 을 모른다 |
 
 **게이트를 끄는 것은 되돌림이 아니라 회귀다.** 위 표는 급한 우회로이며 쓰는 경우 사유와
