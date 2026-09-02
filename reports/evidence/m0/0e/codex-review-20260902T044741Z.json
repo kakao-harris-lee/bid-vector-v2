@@ -1,0 +1,38 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "dc5771d2dbdecda2ef4f35d884b9435bb85a6ba5",
+  "findings": [
+    {
+      "severity": "low",
+      "file": "fixtures/tools/mutation_sweep_adversarial.py",
+      "line": 11,
+      "evidence": "비차단 문서 정합성 결함이다. docstring은 곧바로 (a)~(d) 네 갈래를 열거하면서도 “세 갈래”라고 하고, 18행은 사람 판단이 (a)뿐이라고 하지만 `NULL_ASSERTED`를 구성하는 (d)도 사람 판단이다. `reports/evidence/m0/0e/commands.md` C-15는 (a)와 (d)가 판단이라고 정확히 설명하므로 실행 결과에는 영향이 없고, 독립 전수 확인에서도 authoritative 기대값의 null 경로 4개가 모두 `NULL_ASSERTED`에 포함돼 각 non-null 변이가 잡혔다.",
+      "required_fix": "후속 문서 정리 시 갈래 개수 리터럴을 제거하고 (a)와 (d)가 모두 수작업 판정 표임을 docstring에 맞춰 적는다. 현재 acceptance를 막지는 않는다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse --verify 14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit} && git rev-parse --verify dc5771d2dbdecda2ef4f35d884b9435bb85a6ba5^{commit} && git rev-parse HEAD && git merge-base 14686dbf3bff4085203ffdcd931564fd1e36edf0 dc5771d2dbdecda2ef4f35d884b9435bb85a6ba5",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..dc5771d2dbdecda2ef4f35d884b9435bb85a6ba5 && git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..dc5771d2dbdecda2ef4f35d884b9435bb85a6ba5 && git log --oneline --decorate 14686dbf3bff4085203ffdcd931564fd1e36edf0..dc5771d2dbdecda2ef4f35d884b9435bb85a6ba5",
+    "sed -n '1,260p' agent-workflow.md; sed -n '1,280p' milestone-0.md; sed -n '1,220p' milestone-1.md; sed -n '1,280p' v2-지침서.md; sed -n '1,260p' data-extract.md",
+    "sed -n '1,260p' reports/evidence/m0/0e/scope.md; sed -n '1,260p' reports/evidence/m0/0e/checklist.md; sed -n '1,380p' reports/evidence/m0/0e/fixtures-scope.md; sed -n '1,280p' reports/evidence/m0/0e/commands.md; sed -n '1,380p' reports/evidence/m0/0e/fixtures-commands.md",
+    "for f in reports/evidence/m0/0e/codex-review-*.json; do jq -r 'input_filename as $f | \"FILE \\($f) HEAD \\(.reviewed_head) \\(.verdict)\", (.findings[]? | \"  [\\(.severity)] \\(.file):\\(.line // 0) — \\(.evidence | gsub(\"\\n\";\" \"))\")' \"$f\"; done",
+    "git diff --unified=100 7b290ac6bc26c0490666672bfa323a3c2ae61db5..dc5771d2dbdecda2ef4f35d884b9435bb85a6ba5 -- fixtures/manifest.yaml fixtures/tools/mutation_sweep_adversarial.py fixtures/tools/mutation_sweep_targeted.py fixtures/tools/manifest_contract.py reports/evidence/m0/0e/commands.md reports/evidence/m0/0e/fixtures-commands.md reports/evidence/m0/0e/fixtures-scope.md reports/evidence/m0/0e/checklist.md",
+    "python3 fixtures/tools/mutation_sweep_adversarial.py && python3 fixtures/tools/mutation_sweep_targeted.py && python3 fixtures/tools/manifest_prose_consistency.py && python3 fixtures/tools/check_legacy_numbers.py",
+    "ruby -e 'require \"yaml\"; m=YAML.unsafe_load_file(\"fixtures/manifest.yaml\"); puts \"cases=#{m[\"cases\"].size}\"; p m[\"cases\"].group_by{|c| c[\"classification\"]}.transform_values(&:size)'",
+    "while IFS= read -r f; do python3 -m json.tool \"$f\" >/dev/null || exit 1; done < <(find fixtures/input fixtures/expected -type f -name '*.json' | sort)",
+    "ruby -e 'require \"yaml\"; require \"digest\"; m=YAML.unsafe_load_file(\"fixtures/manifest.yaml\"); bad=[]; m[\"cases\"].each{|c| [[\"input_file\",\"sha256\"],[\"expected_file\",\"expected_sha256\"]].each{|fp,hp| actual=Digest::SHA256.file(c[fp]).hexdigest; bad << [c[\"id\"],fp,c[hp],actual] unless actual==c[hp]}}; p bad; exit(bad.empty? ? 0:1)'",
+    "python3 - <<'PY'\nimport sys, json, copy\nsys.path.insert(0,'fixtures/tools'); import manifest_contract as mc\nbad=[]\ndef alt(v):\n if v is None: return 0\n if isinstance(v,bool): return not v\n if isinstance(v,str): return v+'__mut'\n if isinstance(v,(int,float)): return v+1\n if isinstance(v,list): return v+['__mut']\n if isinstance(v,dict): z=copy.deepcopy(v); z['__mut']=1; return z\nfor cid,c in mc.authoritative_cases().items():\n e=mc.load_expected(c)\n for p in c.get('verified_paths') or []:\n  _,v=mc.get(e,p); m=copy.deepcopy(e); mc.set_path(m,p,alt(v))\n  if mc.holds(c,m): bad.append((cid,p,'value mutation passed'))\n  m=copy.deepcopy(e); mc.set_path(m,p,mc.DELETE)\n  if mc.holds(c,m): bad.append((cid,p,'deletion passed'))\nprint('all verified exact-path mutants caught:', not bad, bad)\nPY",
+    "python3 - <<'PY'\nimport re, io, glob\nrd=lambda f:io.open(f,encoding='utf-8').read(); cap=rd('docs/discovery/capability-map.md')\na=set(re.findall(r'^\\| *(OPEN-[A-Z]+-\\d+) *\\|',cap.split('## 12. OPEN 결정 목록')[1].split('### 12.1')[0],re.M))\ndef sec9(t): return re.search(r'^## 9\\. `OPEN`.*?^## 10\\.',t,re.M|re.S).group(0)\na |= set(re.findall(r'OPEN-REG-\\d+',sec9(rd('docs/discovery/regression-ledger.md')))); a |= set(re.findall(r'^\\| \\*\\*`(OPEN-DIC-\\d+)`\\*\\*',sec9(rd('docs/discovery/data-dictionary.md')),re.M))\nfor f in glob.glob('docs/adr/*.md'): a |= set(re.findall(r'^### `(OPEN-ADR-\\d+)`',rd(f),re.M))\ns=cap.split('## 14. M0 이월 목록')[1]; row=lambda t:set(re.findall(r'^\\| `(OPEN-[A-Z]+-\\d+)`',t,re.M)); B=row(s.split('### 14.2')[1].split('### 14.3')[0]); C=row(s.split('### 14.3')[1].split('### 14.4')[0]); print('active',len(a),'B',len(B),'C',len(C),'missing',sorted(a-(B|C)),'inactive',sorted((B|C)-a),'intersection',sorted(B&C))\nPY",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..dc5771d2dbdecda2ef4f35d884b9435bb85a6ba5 && git status --porcelain=v1 && git rev-parse HEAD"
+  ],
+  "residual_risks": [
+    "clean worktree에 legacy `bid-vector` checkout이 없어 `fixtures/legacy-reference-index.json`의 object id를 실제 legacy git object와 재대조하지 못했다. 저장소 내부 index 해시, manifest 참조 집합, pinned SHA 선언은 서로 일치했다.",
+    "63개 case 중 authoritative는 18개이고 45개는 `insufficient-evidence`이며 observed/legacy-behavior 층은 비어 있다. 이 제한과 해제 조건은 manifest에 공개돼 있으며, 45개 case는 추가 승인 또는 M1/M2 계약 설계 전 authoritative golden으로 사용할 수 없다.",
+    "모든 case의 `review.codex_verdict`와 `review.claude_commit`은 `pending`, `approved_by_user`는 `false`다. 이번 Codex 승인은 range의 acceptance 판정일 뿐 case별 사용자 승인이나 merge·외부 호출·DB write·release·배포 승인이 아니다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
