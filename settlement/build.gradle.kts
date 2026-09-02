@@ -1,3 +1,3 @@
 plugins {
-    id("bidvector.kotlin-domain-conventions")
+    id("bidvector.kotlin-conventions")
 }

@@ -1,4 +1,5 @@
 import bidvector.buildlogic.ModuleBaselineSpec
+import bidvector.buildlogic.ModuleDependencyGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.lib
@@ -51,6 +52,18 @@ detekt {
     config.from(configDir.file("detekt/detekt.yml"))
 }
 
+// 경계의 1차 강제는 **모든 모듈**에 건다. domain 만 걸면 workflow 가 adapters 를 참조하는
+// 역방향 선언이 1차에서 통과한다 — 층 규칙은 domain 전용이 아니다(ADR 0006 D-3).
+val moduleDependencyGate =
+    tasks.register<ModuleDependencyGateTask>("moduleDependencyGate") {
+        description = "허용된 project 의존과 금지 group 을 의존 그래프에서 잰다"
+        policyFile = configDir.file("quality/architecture-policy.properties")
+        moduleName = project.name
+        graphs.add(configurations.named("compileClasspath").flatMap { it.incoming.resolutionResult.rootComponent })
+        graphs.add(configurations.named("testCompileClasspath").flatMap { it.incoming.resolutionResult.rootComponent })
+        report = layout.buildDirectory.file("reports/module-dependency-gate/resolved.txt")
+    }
+
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
@@ -60,7 +73,7 @@ val sizeGate =
     }
 
 tasks.named("check") {
-    dependsOn(sizeGate)
+    dependsOn(sizeGate, moduleDependencyGate)
 }
 
 rootProject.tasks.named<QualityBaselineTask>("qualityBaseline").configure {

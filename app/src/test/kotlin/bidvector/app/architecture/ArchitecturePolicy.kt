@@ -11,11 +11,14 @@ class ArchitecturePolicy private constructor(
     private val values: Map<String, String>,
 ) {
     val packageRoot: String get() = value("package.root")
-    val domainModules: List<String> get() = list("layer.domain")
-    val applicationModules: List<String> get() = list("layer.application")
-    val adapterModules: List<String> get() = list("layer.adapters")
-    val appModules: List<String> get() = list("layer.app")
-    val shareableDomainModules: List<String> get() = list("layer.domain.shareable")
+
+    // 아래 넷은 **패키지 세그먼트**다. 정책 파일은 Gradle project 이름으로 적고
+    // (`shared-kernel`) 변환 규칙은 하이픈 제거 하나다 — 그 파일의 `package.root` 주석이 정본.
+    val domainModules: List<String> get() = packageSegments("layer.domain")
+    val applicationModules: List<String> get() = packageSegments("layer.application")
+    val adapterModules: List<String> get() = packageSegments("layer.adapters")
+    val appModules: List<String> get() = packageSegments("layer.app")
+    val shareableDomainModules: List<String> get() = packageSegments("layer.domain.shareable")
     val forbiddenPackages: List<String> get() = list("package.forbidden")
     val forbiddenPackageSegments: List<String> get() = list("package.segment.forbidden")
 
@@ -26,6 +29,8 @@ class ArchitecturePolicy private constructor(
         get() = domainModules - shareableDomainModules.toSet()
 
     private fun value(key: String): String = values[key] ?: error("아키텍처 정책에 '$key' 가 없다")
+
+    private fun packageSegments(key: String): List<String> = list(key).map { it.replace("-", "") }
 
     private fun list(key: String): List<String> = value(key).split(',').map(String::trim).filter(String::isNotEmpty)
 

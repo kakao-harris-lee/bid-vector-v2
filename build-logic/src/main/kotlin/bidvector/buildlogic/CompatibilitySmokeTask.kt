@@ -32,7 +32,7 @@ abstract class CompatibilitySmokeTask : DefaultTask() {
 
     @TaskAction
     fun smoke() {
-        val resolved = resolvedModules(graphs.get())
+        val resolved = resolveDependencies(graphs.get()).externalModules
         val expected = expectedModules.get().toSortedSet()
         val missing = expected.filterNot(resolved::containsKey)
 

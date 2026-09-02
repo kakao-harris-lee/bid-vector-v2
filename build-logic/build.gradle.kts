@@ -51,4 +51,13 @@ dependencies {
     implementation(libs.ktlint.gradlePlugin)
     implementation(libs.kover.gradlePlugin)
     implementation(libs.archunit.core)
+
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testImplementation(kotlin("test"))
+    testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }
