@@ -88,8 +88,10 @@ Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramS
 ## preflight 등재 규칙의 전환
 
 **이 절(3차)까지가 evidence 에 preflight 를 옮겨 적는 마지막 라운드다.** 이후 코드 slice 의
-preflight 정본은 **verdict JSON** 이고 여기 `C-` 행을 새로 만들지 않는다 — 같은 사실을 두 자리에
-두면 한쪽이 낡는다는 규칙이 이 자리에도 적용된다(하네스 규칙 C, 2026-09-02).
+preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflight.json`** 이고 여기 `C-` 행을
+새로 만들지 않는다(하네스 규칙 C, 2026-09-02). 같은 사실을 두 자리에 두면 한쪽이 낡는다는 규칙이
+이 자리에도 적용된다 — **이 문단 자신이 그 실물이다**: 처음 쓸 때 정본을 verdict JSON 이라
+적었는데 규칙이 곧바로 형제 파일로 정정됐다(`residual_risks` 는 Codex 소유라 레인이 쓰지 않는다).
 
 ## 2026-09-02T13:25Z — Codex 3차 라운드의 preflight
 
