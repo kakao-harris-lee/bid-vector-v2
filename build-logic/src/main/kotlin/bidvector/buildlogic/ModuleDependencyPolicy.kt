@@ -45,6 +45,22 @@ internal class ModuleDependencyPolicy(
         dependencies: ResolvedDependencies,
     ): List<String> = projectViolations(module, dependencies.projectPaths) + groupViolations(module, dependencies)
 
+    /**
+     * domain 모듈의 **main** 이 볼 수 있는 외부 좌표는 **allow-list** 다. group deny 는 생각해 낸
+     * 것만 막지만 여기 없는 좌표는 전부 막힌다 — 어느 configuration 으로 들어와도 같다.
+     * test 는 kotest·junit 등이 필요하므로 기존 deny 를 그대로 쓴다(위 `groupViolations`).
+     */
+    fun mainExternalViolations(
+        module: String,
+        dependencies: ResolvedDependencies,
+    ): List<String> {
+        if (!isDomain(module)) return emptyList()
+        val allowed = domainAllowedExternals
+        return dependencies.externalModules.keys
+            .filterNot { id -> allowed.any { id == it || id.startsWith("$it:") } }
+            .map { "domain main 이 허용 목록 밖 좌표를 본다: '$it' — 허용은 $allowed" }
+    }
+
     private fun projectViolations(
         module: String,
         projectPaths: Set<String>,

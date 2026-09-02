@@ -17,6 +17,10 @@ plugins {
 }
 
 val libs = versionCatalog
+
+/** 사용자가 의존을 **선언하는** 버킷. 도구 자신의 classpath 는 이 혈통을 갖지 않는다. */
+val declarableBuckets =
+    listOf("implementation", "api", "compileOnly", "compileOnlyApi", "runtimeOnly", "annotationProcessor")
 val configDir = layout.settingsDirectory.dir("config")
 val sizePolicy = configDir.file("quality/size-policy.properties")
 
@@ -68,8 +72,30 @@ val moduleDependencyGate =
         description = "허용된 project 의존과 금지 group 을 의존 그래프에서 잰다"
         policyFile = configDir.file("quality/architecture-policy.properties")
         moduleName = project.name
-        graphs.add(configurations.named("compileClasspath").flatMap { it.incoming.resolutionResult.rootComponent })
-        graphs.add(configurations.named("testCompileClasspath").flatMap { it.incoming.resolutionResult.rootComponent })
+        // `compileClasspath` 둘만 보면 `runtimeOnly`·`annotationProcessor`·`ksp` 로 들어오는
+        // 프레임워크가 빠져나간다(U-4). 그렇다고 해석 가능한 전건을 넣으면 **컴파일러·도구 자신의
+        // classpath**(kotlinCompilerPluginClasspath·detekt·ktlint·kover)까지 들어와 오탐이 난다 —
+        // 실제로 kotlinx-serialization 이 그 경로로 잡혔다.
+        // 기준은 이름 열거가 아니라 **혈통**이다: 모듈이 *선언한* 의존이 흘러드는 configuration 만 본다.
+        configurations.configureEach {
+            val declared =
+                hierarchy.any { parent ->
+                    declarableBuckets.any { bucket ->
+                        parent.name == bucket || parent.name == "test${bucket.replaceFirstChar(Char::uppercase)}"
+                    }
+                }
+            // **두 판정의 범위가 다르다.** main 은 *무엇이든 닿는 것*을 본다 — 닿으면 배포되는
+            // 코드에 들어갈 수 있다. test 는 *test 코드가 이름 붙일 수 있는 것*(compile classpath)만
+            // 본다 — 테스트 도구의 runtime 전이(kotest → xmlutil → kotlinx-serialization)는
+            // 도메인의 선택이 아니고, 그것까지 재면 정당한 도구가 위반으로 잡힌다(실측).
+            if (isCanBeResolved && declared) {
+                val root = incoming.resolutionResult.rootComponent
+                when {
+                    !name.startsWith("test") -> graphs.add(root)
+                    name == "testCompileClasspath" -> testGraphs.add(root)
+                }
+            }
+        }
         report = layout.buildDirectory.file("reports/module-dependency-gate/resolved.txt")
     }
 

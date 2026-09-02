@@ -23,8 +23,13 @@ abstract class ModuleDependencyGateTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val policyFile: RegularFileProperty
 
+    /** main 쪽 해석 가능한 configuration 전건. `runtimeOnly`·`annotationProcessor` 도 포함된다. */
     @get:Input
     abstract val graphs: ListProperty<ResolvedComponentResult>
+
+    /** test 쪽. 판정 기준이 다르다 — 도구 의존이 정상이므로 deny 를 쓴다. */
+    @get:Input
+    abstract val testGraphs: ListProperty<ResolvedComponentResult>
 
     @get:Input
     abstract val moduleName: Property<String>
@@ -36,8 +41,15 @@ abstract class ModuleDependencyGateTask : DefaultTask() {
     fun gate() {
         val policy = ModuleDependencyPolicy.load(policyFile.get().asFile)
         val module = moduleName.get()
-        val resolved = resolveDependencies(graphs.get())
-        val violations = policy.violations(module, resolved)
+        val mainResolved = resolveDependencies(graphs.get())
+        val testResolved = resolveDependencies(testGraphs.get())
+        val resolved =
+            ResolvedDependencies(
+                mainResolved.externalModules + testResolved.externalModules,
+                mainResolved.projectPaths + testResolved.projectPaths,
+            )
+        val violations =
+            policy.violations(module, resolved) + policy.mainExternalViolations(module, mainResolved)
 
         writeReport(module, policy, resolved)
 

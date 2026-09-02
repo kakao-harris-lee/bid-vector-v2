@@ -1,3 +1,4 @@
+import bidvector.buildlogic.ConventionCoverageGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 
@@ -23,9 +24,20 @@ val buildLogicSizeGate =
 
 // 루트 프로젝트에는 `check` 가 없어 `./gradlew check` 가 included build 를 지나친다.
 // 여기서 만들어 그 빌드의 `check`(ktlint·detekt)와 위 크기 게이트를 함께 건다.
+val baseline = tasks.named<QualityBaselineTask>("qualityBaseline")
+
+val conventionCoverageGate =
+    tasks.register<ConventionCoverageGateTask>("conventionCoverageGate") {
+        group = "verification"
+        description = "convention plugin 이 모든 모듈에 적용됐는지 — 게이트의 부재는 조용하다"
+        expectedModules = provider { subprojects.map { it.name }.toSet() }
+        registeredModules = baseline.map { task -> task.modules.map { it.moduleName.get() }.toSet() }
+        report = layout.buildDirectory.file("reports/convention-coverage/modules.txt")
+    }
+
 tasks.register("check") {
     group = "verification"
     description = "included build 의 검증까지 루트 check 에 포함한다"
-    dependsOn(buildLogicSizeGate)
+    dependsOn(buildLogicSizeGate, conventionCoverageGate)
     dependsOn(gradle.includedBuild("build-logic").task(":check"))
 }
