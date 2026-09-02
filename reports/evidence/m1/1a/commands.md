@@ -52,8 +52,8 @@ detekt 였으나(`T-2`) **실제로 깨진 것은 Spotless 다.** 처리는 아�
 ## 2026-09-02T09:20Z — acceptance (scope.md `acceptance_commands`)
 
 **`A-0` 이 나머지의 전제다.** 앞선 실행은 전부 구현자 working tree 에서 돌았고, 그 트리에만
-있던 파일 여덟에 의존했다(verifier B-1). 아래는 `90e46ff` 이후 **커밋된 것만 있는 detached
-worktree** 에서 다시 잰 값이다.
+있던 파일 여덟에 의존했다(verifier B-1). 아래 `A-0`·`A-2`~`A-4` 는 **커밋된 것만 있는 detached
+worktree** 에서 잰 값이고, `A-1` 만 working tree 에서 잰다(둘의 차이가 B-1 이 드러낸 것이다).
 
 | # | cmd | exit | 핵심 결과 |
 | --- | --- | --- | --- |

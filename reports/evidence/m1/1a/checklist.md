@@ -38,7 +38,7 @@
 
 | 항목 | 상태 |
 | --- | --- |
-| 구현 diff 가 커밋되어 base/head 고정 | `git status --porcelain -- <in_scope 경로>` 가 비어 있어야 한다 — 판정은 verifier 레인이 재실행한다 |
+| 구현 diff 가 커밋되어 base/head 고정 | `git status --porcelain -- <in_scope 경로>` 가 비어 있어야 한다 — 판정은 verifier 레인이 재실행한다. **이 명령만으로는 부족하다**: ignored 파일은 여기서 비어 보이고 그것이 B-1 의 실물이었다. `commands.md` 의 `A-0`(커밋만 있는 worktree 에서 빌드)과 `A-0b`(ignore 에 걸린 소스·디스크와 커밋의 집합 차이)가 그 틈을 맡는다 |
 | `acceptance_commands` 전부 exit 0 | `commands.md` `A-1`~`A-4` |
 | test/lint/type/architecture 통과 | `A-1` 이 전부를 든다 |
 | 변경된 fixture 와 정책 version 의 근거 | 정책 데이터 둘 다 `policy.version=1` 이고 값의 출처를 파일 주석이 든다. **1A 가 값을 고른 것은 없다** — `v2-지침서.md` §5:305 의 둘을 옮겼을 뿐이다 |
