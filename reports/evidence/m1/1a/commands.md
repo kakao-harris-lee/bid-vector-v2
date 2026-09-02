@@ -431,14 +431,29 @@ grep -rhoF -f <(grep -oE '「[^」]{10,}」|\*"[^"]{10,}"\*' \
 | 가리켜지는 파일 | 매치 | 처리 |
 | --- | --- | --- |
 | `v2-지침서.md` | 있음 — **전부 `:215`~`:223`(§4.5)** | 삽입 지점(§5 테스트 플랫폼 문면)보다 **위**라 밀린 것이 없다. 고칠 대상 0, 등재 대상 0 |
-| `docs/adr/0007-test-pyramid-and-ratchet.md` | 있음 — `:2`(머리) | 편집은 §1.1 이하라 **밀리지 않는다** |
+| `docs/adr/0007-test-pyramid-and-ratchet.md` | **전체 파일명 1(`:2`) · 축약형 `docs/adr/0007:<줄>` 있음** | **밀렸다.** 앞 행의 판단(「편집이 아래쪽이라 안 밀린다」)이 **둘 다 틀렸다** — 삽입(§1.1.1)은 문서 **머리 쪽**이고, 전체 파일명 grep 이 `docs/adr/0007:186` 같은 축약형을 놓쳤다. 목록·개수는 `grep -rnoE 'docs/adr/0007:[0-9]+' docs/discovery/capability-map.md` 가 낸다. 범위 밖이라 **알려진 제한 16 에 등재**(`:2` 만 머리라 무영향) |
 | `reports/evidence/m1/1a/scope.md` | **0** | 이 파일을 줄 번호로 가리키는 곳이 없다(같은 이름의 매치는 전부 M0 slice 가 자기 `scope.md` 를 가리킨 것) |
 
-**밀린 것은 0 이지만 좌표의 형태는 바꿨다** — `v2-지침서.md` 가 이 slice 의 편집 대상이 되면서
+**`v2-지침서.md` 쪽은 밀린 것이 0 이지만 좌표의 형태는 바꿨다** — 그 파일이 이 slice 의 편집 대상이 되면서
 그 파일로의 줄 번호가 「같은 slice 안에서 움직일 수 있는 좌표」가 됐기 때문이다(`evidence-pack`
 「낡는 좌표」). 대상은 `git diff` 가 낸다. **같은 훑기가 이미 밀어 놓은 좌표 하나를 찾아 고쳤다** —
 `scope.md` D-3 이 `ADR 0006` 을 가리키던 줄 번호가 이 slice 의 `D-2.1` 신설로 어긋나 있었다
 (알려진 제한 16).
+
+## 2026-09-03 — `importJar` 누락 관측의 재현 시도
+
+**재현되지 않는다.** 처음 관측한 그 조건(`JarContentGateTask` 의 task action 안에서
+`ClassFileImporter().importJar(JarFile(archive))`, 소유 패키지에 javac 산출 class 를 심은
+`settlement.jar`)을 그대로 만들어 다시 쟀다.
+
+- cmd: 그 조건을 복원한 worktree 에서 `./gradlew --no-daemon :settlement:jarContentGate`
+  (이어서 데몬 재사용으로 2회 더)
+- 결과: **3 회 전부 `jarEntries=2 importJar=2`** — Java class 가 `kotlin.Metadata=false` 로
+  정상 임포트된다. **한 번 관측했고 재현에 실패했다.** 원인은 규명하지 못했다.
+
+**그래서 바이트 스캔의 근거를 바꾼다.** 「`importJar` 를 믿을 수 없다」가 아니라 **「`E-52` 가
+바이트 스캔이 실제로 잡는 것을 실측했고, 그 층에 라이브러리 의존이 없다」**가 근거다. 층의
+선택은 그대로이고 그것을 정당화하는 문장만 사실에 맞춘다.
 
 ## 2026-09-03 — 승인 문서 개정 라운드의 clean-tree · 비밀값
 

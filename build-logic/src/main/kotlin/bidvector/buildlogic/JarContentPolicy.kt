@@ -38,10 +38,11 @@ internal class JarContentPolicy(
  * 상수 풀의 `Lkotlin/Metadata;` 를 바이트로 찾는다 — Kotlin 컴파일러는 모든 산출 클래스에
  * 그 애노테이션을 단다.
  *
- * **ArchUnit 으로 재지 않는 이유**: 이 데몬 안에서 `importJar` 이 Java 산출 클래스를 **조용히
- * 건너뛰는 것**을 실측했다(같은 jar 를 독립 JVM 에서 읽으면 둘 다 나온다). 잡아야 할 바로 그
- * 클래스를 빠뜨리는 검사는 없는 것만 못하다. 바이트 탐색은 그 침묵이 없고 틀리는 방향도
+ * **클래스 파서를 들이지 않는 이유**: 이 층은 바이트 탐색만으로 서고 그것이 실제로 잡는 것이
+ * 실측돼 있다(검증 집합에 심어 포함 관계를 통과시킨 class 를 이 층이 잡는다). 틀리는 방향도
  * 닫히는 쪽이다 — 그 문자열을 참조만 하는 Java 클래스는 통과하지만 포함 관계가 이미 잡는다.
+ * (`importJar` 이 Java 산출 클래스를 빠뜨리는 것을 한 번 보았으나 **재현되지 않았다** — 그
+ * 관측은 이 선택의 근거가 아니다. 알려진 제한 26.)
  */
 internal fun ByteArray.hasKotlinMetadata(): Boolean {
     val marker = "kotlin/Metadata".toByteArray(Charsets.US_ASCII)
