@@ -66,6 +66,17 @@ layout:
       role: "`numeric_discipline.check` 를 돌리는 스크립트. **F-3**이 호출한다."
     - path: fixtures/legacy-reference-index.json
       role: "legacy 좌표 고정 산출물. `legacy_repo.index_file` 이 해시와 함께 선언한다. **F-5**가 검사한다."
+    - path: fixtures/tools/manifest_contract.py
+      role: |-
+        이 파일의 **계약 부분만** 읽어 평가하는 공용 모듈 — `verified_paths` 정확 비교와
+        `verified_projections` 의 술어(`not-equals` + `normalize`)를 **동결된 어휘 그대로** 구현한다.
+        아래 두 스윕이 공유한다. **계약의 정의는 여전히 `schema.extensions` 가 갖고 이 모듈은 그 실행이다.**
+    - path: fixtures/tools/mutation_sweep_adversarial.py
+      role: |-
+        **확장 적대 집합**의 전수 스윕 — 「`authoritative` = 위반 변이체 통과 0」을 재는 자리다.
+        `reports/evidence/m0/0e/commands.md` **C-15** 가 호출하고, **분류를 정한 근거가 이 스크립트의 출력**이다.
+    - path: fixtures/tools/mutation_sweep_targeted.py
+      role: "표기 변형 등 지목 갈래의 스윕. 같은 **C-15** 가 함께 호출한다."
 
 schema:
   base: data-extract.md §3
