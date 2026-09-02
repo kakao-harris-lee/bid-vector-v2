@@ -1,0 +1,36 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "7b290ac6bc26c0490666672bfa323a3c2ae61db5",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 2951,
+      "evidence": "`floor-shortfall-005`는 범위 필터 후 표본 부족으로 `Unmeasurable` 전이됨을 authoritative로 검증하지만 `verified_paths`가 expected의 `$.frequency`를 보호하지 않는다. 독립 계약 재평가에서 `frequency: null`을 `0.0` 또는 `{numerator: 0, denominator: 149}`로 바꿔도 두 변이 모두 `contract_passes=True`였다. 따라서 표본 부족 결과와 0 빈도를 동시에 반환하는 production fallback이 authoritative corpus를 통과한다. 이는 `v2-지침서.md` §4.4의 “표본 부족은 0%가 아니라 Unmeasurable” 및 M1 완료 조건의 “Unmeasurable가 성공 또는 0으로 합쳐지지 않음”을 위반하며, 전수 adversarial 스윕도 이 경로를 변이하지 않아 `강등 대상 0`으로 잘못 놓친다.",
+      "required_fix": "`floor-shortfall-005`의 승인된 의미에 `$.frequency == null`을 기계적으로 포함하고, 최소한 `0.0` 및 0 유리수 변이가 계약에서 실패하도록 adversarial 스윕의 주장 경로에도 추가해 재실행한다. 동결된 계약으로 보호하지 않을 경우 이 case를 `insufficient-evidence`로 강등한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse --verify 14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit} && git rev-parse --verify 7b290ac6bc26c0490666672bfa323a3c2ae61db5^{commit} && git rev-parse HEAD",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..7b290ac6bc26c0490666672bfa323a3c2ae61db5 && git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..7b290ac6bc26c0490666672bfa323a3c2ae61db5",
+    "git log --oneline baf00559e80f0f2b4273e746e88429bd2d03287b..7b290ac6bc26c0490666672bfa323a3c2ae61db5 && git diff --unified=80 baf00559e80f0f2b4273e746e88429bd2d03287b..7b290ac6bc26c0490666672bfa323a3c2ae61db5",
+    "sed -n '1,260p' agent-workflow.md; sed -n '1,280p' milestone-0.md; sed -n '1,120p' milestone-1.md; sed -n '1,260p' v2-지침서.md",
+    "for f in reports/evidence/m0/0e/codex-review-*.json; do jq -c '{file:input_filename,verdict,reviewed_head,findings}' \"$f\"; done",
+    "python3 fixtures/tools/mutation_sweep_adversarial.py; python3 fixtures/tools/mutation_sweep_targeted.py; python3 fixtures/tools/manifest_prose_consistency.py; python3 fixtures/tools/check_legacy_numbers.py",
+    "ruby -e 'require \"yaml\"; m=YAML.unsafe_load_file(\"fixtures/manifest.yaml\"); puts \"cases=#{m[\"cases\"].size}\"; p m[\"cases\"].group_by{|c| c[\"classification\"]}.transform_values(&:size)'",
+    "while IFS= read -r f; do python3 -m json.tool \"$f\" >/dev/null || exit 1; done < <(find fixtures/input fixtures/expected -type f -name '*.json' | sort)",
+    "ruby -e 'require \"yaml\"; require \"digest\"; m=YAML.unsafe_load_file(\"fixtures/manifest.yaml\"); bad=[]; m[\"cases\"].each{|c| [[\"input_file\",\"sha256\"],[\"expected_file\",\"expected_sha256\"]].each{|fp,hp| actual=Digest::SHA256.file(c[fp]).hexdigest; bad << [c[\"id\"],fp,c[hp],actual] unless actual==c[hp]}}; p bad; exit(bad.empty? ? 0:1)'",
+    "python3 - <<'PY'\nimport copy, sys\nsys.path.insert(0, 'fixtures/tools')\nimport manifest_contract as mc\nc=mc.authoritative_cases()['floor-shortfall-005']\nfor value in (0.0, {'numerator': 0, 'denominator': 149}):\n    mutated=copy.deepcopy(mc.load_expected(c)); mc.set_path(mutated, '$.frequency', value)\n    print(value, 'contract_passes=', mc.holds(c, mutated))\nPY",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..7b290ac6bc26c0490666672bfa323a3c2ae61db5",
+    "git status --short && git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..7b290ac6bc26c0490666672bfa323a3c2ae61db5 && git diff --numstat 14686dbf3bff4085203ffdcd931564fd1e36edf0..7b290ac6bc26c0490666672bfa323a3c2ae61db5 | awk '{a+=$1;d+=$2} END{print a,d}'"
+  ],
+  "residual_risks": [
+    "clean worktree에는 legacy `bid-vector` checkout이 없어 `fixtures/legacy-reference-index.json`을 실제 legacy git object와 재대조하지 못했다. 저장소 내부 index 해시와 manifest/fixture 정합성만 검증했다.",
+    "63개 case 중 45개가 `insufficient-evidence`이며 observed/legacy-behavior 층은 비어 있다. 이는 문서에 공개된 제한이지만, 해당 축들은 추가 승인·계약 설계 전 M1 authoritative golden으로 사용할 수 없다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
