@@ -3,9 +3,11 @@ import bidvector.buildlogic.ModuleDependencyGateTask
 import bidvector.buildlogic.PackageOwnershipGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
+import bidvector.buildlogic.SourceLanguageGateTask
 import bidvector.buildlogic.lib
 import bidvector.buildlogic.version
 import bidvector.buildlogic.versionCatalog
+import org.gradle.api.file.SourceDirectorySet
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -17,6 +19,12 @@ plugins {
 val libs = versionCatalog
 val configDir = layout.settingsDirectory.dir("config")
 val sizePolicy = configDir.file("quality/size-policy.properties")
+
+// Java 소스를 구조적으로 봉쇄한다 — 산출물이 `classes/java/main` 으로 새면 소유·크기·경계
+// 게이트가 통째로 비껴간다(Codex 4차 b). 봉쇄가 1차이고 sourceLanguageGate 가 2차 그물이다.
+sourceSets.configureEach {
+    java.setSrcDirs(emptyList<String>())
+}
 
 kotlin {
     jvmToolchain(providers.gradleProperty("bidvector.jvmToolchain").get().toInt())
@@ -72,16 +80,34 @@ val packageOwnershipGate =
         description = "모듈의 class output 이 그 모듈이 소유한 패키지 아래에만 있는지 잰다"
         policyFile = configDir.file("quality/architecture-policy.properties")
         moduleName = project.name
-        classDirectories.from(layout.buildDirectory.dir("classes/kotlin/main"))
+        classDirectories.from(sourceSets.named("main").map { it.output.classesDirs })
         dependsOn(tasks.named("classes"))
         report = layout.buildDirectory.file("reports/package-ownership-gate/packages.txt")
+    }
+
+// 손으로 쓴 소스의 실제 위치. `src/` 를 하드코딩하면 `srcDir("gen")` 으로 더한 트리가
+// 크기 래칫만 빠져나간다.
+val kotlinSourceDirectories =
+    provider {
+        sourceSets.flatMap { set -> (set.extensions.getByName("kotlin") as SourceDirectorySet).srcDirs }
+    }
+
+val sourceLanguageGate =
+    tasks.register<SourceLanguageGateTask>("sourceLanguageGate") {
+        description = "소스 트리에 Kotlin 아닌 소스가 있으면 실패한다 — java.setSrcDirs 봉쇄의 2차 그물"
+        sourceDirectories.from(layout.projectDirectory.dir("src"), kotlinSourceDirectories)
+        excludedDirectories.from(provider { sourceSets.flatMap { it.resources.srcDirs } })
+        // `md` 는 소스가 아니라 그 트리를 설명하는 문서다 — 컴파일되지 않으므로 class output 을
+        // 만들 수 없고, 이 게이트가 막으려는 것(게이트를 비껴가는 산출물)에 해당하지 않는다.
+        allowedExtensions = setOf("kt", "kts", "md")
+        report = layout.buildDirectory.file("reports/source-language-gate/offenders.txt")
     }
 
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
         policyFile = sizePolicy
-        sources.from(layout.projectDirectory.dir("src"))
+        sources.from(kotlinSourceDirectories)
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
     }
 
@@ -93,6 +119,7 @@ tasks.named("check") {
         sizeGate,
         moduleDependencyGate,
         packageOwnershipGate,
+        sourceLanguageGate,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )

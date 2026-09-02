@@ -13,7 +13,9 @@ import org.gradle.api.tasks.TaskAction
 import java.io.File
 
 /**
- * 파일 크기 래칫. ADR 0007 D-7 이 요구한 **도구에 의존하지 않는 자체 검사**다 —
+ * 파일 크기 래칫. **확장자를 가리지 않는다** — 손으로 쓴 소스가 무엇이든 승인된 한도를 받는다.
+ * 어떤 언어가 허용되는지는 `sourceLanguageGate` 가 따로 판정한다.
+ * ADR 0007 D-7 이 요구한 **도구에 의존하지 않는 자체 검사**다 —
  * detekt 2.0 이 alpha 인 동안 승인된 임계가 alpha 도구와 함께 죽지 않게 한다.
  * 함수 크기는 같은 정책 파일에서 생성한 overlay 로 detekt 이 맡는다.
  */
@@ -34,9 +36,7 @@ abstract class SizeGateTask : DefaultTask() {
         val policy = readPolicy(policyFile.get().asFile)
         val limit = policy.requireInt("limit.file.lines")
         val measured =
-            sources.asFileTree
-                .matching { include("**/*.kt", "**/*.kts") }
-                .files
+            sources.asFileTree.files
                 .map { it to it.readLines().size }
                 .sortedByDescending { (_, lines) -> lines }
 
