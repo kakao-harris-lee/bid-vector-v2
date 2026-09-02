@@ -18,7 +18,8 @@ in_scope:
   - config/detekt/**                  # detekt 2.0 키 규칙 집합
   - .github/workflows/ci.yml
   - .gitignore                        # Gradle 산출물 규칙. 앵커 없는 `build/` 가 B-1 을 냈다
-  - docs/adr/0007-test-pyramid-and-ratchet.md      # §5 의 OPEN-ADR-08 행 하나
+  - v2-지침서.md                                   # §5 「Kotlin」의 테스트 플랫폼 문면 한 줄
+  - docs/adr/0007-test-pyramid-and-ratchet.md      # OPEN-ADR-08 행 + §1.1 테스트 플랫폼 문면
   - docs/adr/0006-gradle-modules.md                # D-2 표 + 신설 D-2.1 — 계약 갱신으로 넓힘
   - milestone-1.md                                 # 1A 모듈 목록 — 같은 갱신
   - docs/discovery/capability-map.md               # §12 registry 의 해당 행 + bidding 보류 OPEN 신설
@@ -29,7 +30,7 @@ out_of_scope:
   - Spring controller · DB schema · Flyway migration 실행 · 실제 외부 호출
   - Python ML · 기존 Python 과의 byte-for-byte 동등성
   - mutation testing 적용              # OPEN-ADR-07 — 카탈로그 좌표 등재만
-  - 위 네 줄 외의 docs/adr · capability-map · milestone-1.md 편집
+  - 위에 열거한 자리 외의 v2-지침서 · docs/adr · capability-map · milestone-1.md 편집
   - bid-vector/ symlink 아래 기존 저장소   # 읽기 전용
   - _workspace/**                     # .gitignore 대상
 acceptance_commands:
@@ -77,8 +78,8 @@ rollback: |
 | Gradle wrapper | **9.6.1** | detekt 2.0.0-alpha.6 이 **검증한 조합**과 정확히 일치(같은 노트 §8.4). KGP 문서 상한 9.5.0 을 한 마이너 초과 — **실측으로 닫는다**. 실패 시 **9.5.1 + detekt 2.0.0-alpha.5** 로 후퇴 |
 | JDK toolchain | **21** | **승인 문서에 지침 0건**(scout 노트 X-10). 근거 둘: 로컬 실측(Temurin 21.0.4) · Boot 4.1.1 하한 17 · Kotest 6 하한 11 · pitest 플러그인 하한 17 — 아홉 도구 전부의 하한을 만족하는 가장 낮은 LTS |
 | Spring Boot | **4.1.1** | GA 최신. **`app` 에만 플러그인 적용**(D-7), 도메인 모듈은 Spring 무의존 |
-| 테스트 플랫폼 | **JUnit 6.1.3** | Boot 4.1.1 이 이미 jupiter 6 을 관리하고 ArchUnit 1.5.0 이 `archunit-junit6` 을 냈다 |
-| property/assertion | **Kotest 6.2.4 의 `kotest-property` + `kotest-assertions-core`만** | runner 를 붙이지 않는다 — `kotest-property` 는 junit-platform 에 의존하지 않아 평범한 Jupiter 테스트에서 호출된다. **jqwik 탈락**: 1.10.1 이 junit-platform 1.14.4 에 묶여 있고 2.x 라인이 없다 |
+| 테스트 플랫폼 | **JUnit 6.1.3** | 라인 자체는 **승인 문서가 정한다** — `v2-지침서.md` §5 「Kotlin」의 테스트 플랫폼 문면과 `ADR 0007` §1.1.1(운영자 결정 2026-09-02). 1A 가 고른 것은 그 라인 안의 **패치 값**뿐이다 |
+| property/assertion | **Kotest 6.2.4 의 `kotest-property` + `kotest-assertions-core`만** | runner 를 붙이지 않는다 — `kotest-property` 는 junit-platform 에 의존하지 않아 평범한 Jupiter 테스트에서 호출된다. **jqwik 탈락의 근거는 `ADR 0007` §1.1.1 이 갖는다** — 플랫폼 이동의 대가라 그 결정과 같은 자리에 있어야 한다 |
 | 아키텍처 테스트 | **ArchUnit 1.5.0** (`archunit-junit6`) | `ADR 0007` D-6 채택. **Konsist 불채택 유지** — 21 개월 정체 + 번들 Kotlin 컴파일러 2.0.20 이 우리 소스 2.4.10 을 파싱한다는 근거가 없다 |
 
 **`kotlin.version` 충돌**: Boot 4.1.1 BOM 이 `kotlin-stdlib` 을 2.3.21 로 관리한다. `app` 에서
@@ -101,7 +102,7 @@ capability 가 등재돼 있지 않다.
 근거로 두었는데 그러면 discovery 문서가 승인된 ADR 을 대체하는 상태가 된다(Codex #1). 아래
 「계약 갱신」이 그 시정을 적는다 — 승인 문서 두 자리를 고쳤고 이 절은 그것을 가리킨다.
 
-### D-3. 패키지 규약 — `ADR 0006` §6:172 가 1A 로 넘긴 결정
+### D-3. 패키지 규약 — `ADR 0006` §6 이 1A 로 넘긴 결정
 
 - **루트**: `bidvector`. 모듈 X 의 코드는 `bidvector.<x>..` 에 산다(`shared-kernel` → `bidvector.sharedkernel`).
 - **모듈 안은 개념으로 나눈다.** 기술 계층 이름(`util`·`helper`·`impl`·`common`·`base`·`misc`·
@@ -149,7 +150,7 @@ detekt 이슈 #8865 가 **closed as not planned** 로 닫혔다 — 1.23.8 을 K
 
 ### D-5. 임계는 코드가 아니라 **versioned policy 데이터**다
 
-승인 문서가 수치로 정한 임계는 `v2-지침서.md` §5:305 의 **함수 50줄 · 파일 500줄** 둘뿐이므로
+승인 문서가 수치로 정한 임계는 `v2-지침서.md` §5 「크기와 결합도」 의 **함수 50줄 · 파일 500줄** 둘뿐이므로
 나머지 축의 수치를 1A 가 지어내지 않는다. **각 임계는 강제하는 주체 쪽에 한 번만 산다.**
 
 | 축 | 정본 | 강제 |
@@ -173,8 +174,8 @@ task 를 쓸 수 없기 때문이다. 그 task 클래스가 바로 그 빌드의
 정의가 승인 문서에 없다**(scout 노트 X-3 — 인접 문면 둘이 서로 다른 축을 가리킨다). 1A 는
 **정의를 자기 승인하지 않는다.** 대신 둘을 한다.
 
-1. `v2-지침서.md` §5:305 가 **실제로 정한** 두 한도(함수 50 · 파일 500)를 게이트로 건다.
-2. §5:296~303 의 여섯 축과 `OPEN-ADR-06` 이 묻는 세 축(클래스/타입 크기 · 상속 깊이 · mixin 수)을
+1. `v2-지침서.md` §5 「크기와 결합도」 가 **실제로 정한** 두 한도(함수 50 · 파일 500)를 게이트로 건다.
+2. 같은 절이 「함께 측정한다」로 든 여섯 축과 `OPEN-ADR-06` 이 묻는 세 축(클래스/타입 크기 · 상속 깊이 · mixin 수)을
    **재는 task** 를 만들고 그 실측을 `capability-map.md` §12 에 등재한다. **결정은 운영자**다
    (`capability-map.md` §14.2 의 `OPEN-ADR-06` 행 — 결정 주체가 운영자, 시점이 1A 실측 뒤).
 
@@ -183,19 +184,19 @@ task 를 쓸 수 없기 때문이다. 그 task 클래스가 바로 그 빌드의
 
 ### D-7. 4.x 스모크는 **의존 해석 + 컴파일 + 클래스 로드**까지다
 
-`v2-지침서.md` §5:241~247 과 `ADR 0004` §5:176 이 1A 에 지운 실측이다. 범위를 계약이 정한다
+`v2-지침서.md` §5 「Kotlin」의 `OPEN-OPS-07` 항목과 `ADR 0004` §5:176 이 1A 에 지운 실측이다. 범위를 계약이 정한다
 (scout 노트 X-4 가 지목한 구분): **Flyway 는 좌표를 세워 해석·컴파일되는지만 재고 migration 을
 쓰지 않는다.** 마찬가지로 db-scheduler 는 스케줄을 돌리지 않고, Testcontainers 는 컨테이너를
 띄우지 않는다. **runtime 사용은 해당 slice 의 일이다.**
 
 `app` 이 스모크 자리다 — Boot 플러그인을 **`app` 에만** 적용한다(scout 노트 X-5 의 갈림에 대한 답).
 `milestone-1.md` 「범위 밖」의 *"Spring controller, DB schema, Flyway"* 는 **controller** 이지 플러그인이 아니며, 플러그인을 세우지 않으면
-§5:244 가 지운 측정 자체가 성립하지 않는다. `app` 에 controller·`main`·`@SpringBootApplication`
+같은 항목이 지운 측정 자체가 성립하지 않는다. `app` 에 controller·`main`·`@SpringBootApplication`
 은 없고 `bootJar` 는 비활성이다.
 
 ### D-8. `broker` 의존을 세우지 않는다
 
-`v2-지침서.md` §3.1:125 가 아직 `adapters` 에 `broker` 를 적지만 `ADR 0006` D-2 가 그 항목을
+`v2-지침서.md` §3.1 의 `adapters` 행이 아직 `broker` 를 적지만 `ADR 0006` D-2 가 그 항목을
 뺐다(`OPEN-OPS-05`, 운영자 2026-08-26). **ADR 이 이긴다** — 지침서 문면만 낡았다.
 
 ---
@@ -282,6 +283,29 @@ ktlint 1.8.0 을 구동. 스타일 규칙은 `.editorconfig` 그대로다.
 **대가**: 허용이 좁으면 정당한 도메인 코드가 막힌다. 그래서 **양성 fixture** 로 실제 도메인
 형태가 통과하는지 함께 잰다 — 게이트가 「도메인이 비어 있는 동안만」 초록인 상태를 구조로
 막는다. 그래도 막히는 자리는 `ADR 0007` D-4 의 allowlist 형식(사유 + 해소 계획)으로 연다.
+
+### 2026-09-03 — `in_scope` 를 승인 문서 두 자리로 더 넓힌다 (Codex 7차 medium · 운영자 결정)
+
+**넓힌 범위**: `v2-지침서.md`(§5 「Kotlin」의 테스트 플랫폼 문면 한 줄) ·
+`docs/adr/0007-test-pyramid-and-ratchet.md`(§1.1 의 같은 문면 + 신설 §1.1.1).
+**그 두 자리에 한정**하고 두 문서의 다른 절은 손대지 않는다.
+
+**사유**: Codex 7차가 **승인 명세를 slice 계약이 갈아치운 상태**를 지적했다 — 승인 문서 둘이
+테스트 플랫폼을 JUnit 5 로 규정하는데 구현은 JUnit 6 을 고정했고, 그 결정은 **구현자가 쓴
+`scope.md` 에만** 있었다. 운영자가 JUnit 6 을 승인하면서(2026-09-02) **결정은 승인 문서
+개정으로 남긴다**는 원칙을 함께 확인했다. 그래서 이 라운드는 코드를 바꾸지 않고 **정본을
+옮긴다** — 승인 문서가 라인을 정하고, `scope.md` 는 그 라인 안에서 1A 가 고른 패치 값만 든다.
+
+**함께 걷은 것 — `v2-지침서.md` 로의 `file:line`.** 이 slice 가 그 파일을 편집하게 되면서
+그것을 가리키던 좌표가 「같은 slice 안에서 움직일 수 있는 파일의 줄 번호」가 됐다
+(`evidence-pack` 「낡는 좌표」). 실제로 삽입 지점 아래의 좌표 둘이 밀린다.
+**수를 밀어 맞추지 않고 인용문·절 제목으로 바꿨다** — 그래야 다음 개정에서 다시 밀리지 않는다.
+대상은 `git diff` 가 낸다(여기 열거하지 않는다). 삽입 지점 **위**의 좌표는 이번에 밀리지
+않았지만 같은 이유로 함께 걷었다.
+
+**같은 훑기가 이미 밀어 놓은 좌표 하나를 찾았다** — `ADR 0006` 을 가리키던 D-3 의 줄 번호가
+이 slice 의 `D-2.1` 신설로 밀려 있었고(그 문서를 편집한 것이 이 slice 다) 아무도 보지 못했다.
+같은 방식으로 걷었다. **역방향 훑기가 가정이 아니라 실제 파손을 낸 사례다.**
 
 ### 2026-09-03 — 아카이브 판정을 접두에서 **포함 관계**로 바꾼다 (Codex 7차)
 

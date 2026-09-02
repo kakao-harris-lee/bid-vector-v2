@@ -29,9 +29,31 @@
 rule이 실제로 보호되는지 확인** ⑤ DB/broker/gRPC adapter integration test ⑥ mock KONEPS와
 fake notification을 사용한 E2E ⑦ 승인된 환경에서만 live read probe.
 
-§5가 도구와 규율을 규정했다 — JUnit 5 + Kotest/AssertJ, property test, Testcontainers.
+§5가 도구와 규율을 규정했다 — ~~JUnit 5~~ **JUnit 6**(아래 1.1.1) + Kotest/AssertJ,
+property test, Testcontainers.
 **domain test에서는 mock framework를 쓰지 않고 값과 fake port를 쓴다. adapter test에서만
 MockK 또는 test server/container를 쓴다.**
+
+#### 1.1.1 테스트 플랫폼은 JUnit 6이다 — 운영자 결정 2026-09-02
+
+- **결정**: 테스트 플랫폼 라인을 **JUnit 6**으로 옮긴다. `v2-지침서.md` §5의 문면도 함께
+  개정됐고 **그쪽이 정본**이다 — 이 절은 채택 판정과 그 대가를 적는다.
+- **결정자·시점**: **운영자, 2026-09-02.** Codex 리뷰 7차가 *"승인된 `v2-지침서.md` §5와
+  ADR 0007은 테스트 플랫폼을 JUnit 5로 규정하지만 구현은 JUnit 6.1.3을 고정했다"*를
+  medium 으로 지적했고, **구현자가 쓴 slice 계약이 승인 명세를 갈아치운 상태**였다.
+  결정은 구현 문서가 아니라 **승인 문서 개정으로** 남긴다.
+- **근거 — 이 이동은 이 ADR이 고른 것이 아니라 `Q1`의 귀결이다.** 운영자 결정 2026-08-29
+  `Q1`이 Spring Boot 라인을 **4.x**로 옮겼고, Boot 4.x BOM이 관리하는 jupiter가 이미 6이다.
+  플랫폼 하한이 그 결정과 함께 올라간 것이지 테스트 도구를 새로 고른 것이 아니다.
+- **정합 실측**(조사 노트 `_workspace/m1-1a/02_survey_toolchain.md` §9 · §3.5):
+  `archunit-junit6`이 1.5.0에서 신설됐고(그 이전 `archunit-junit5`는 JUnit Platform 1.x에
+  묶여 JUnit 6에서 쓸 수 없다), Kotest 6.2.4는 runner를 `kotest-runner-junit5`/`-junit6`로
+  나눠 배포하며, `kotest-property`는 junit-platform에 의존하지 않아 러너 결합 없이 쓴다.
+- **대가 — `jqwik`이 탈락한다.** 1.10.1이 junit-platform **1.14.4**에 묶여 있고 2.x 라인이
+  없다. §5가 요구하는 property test는 `kotest-property`가 든다. **§1.1의 「property test」
+  요구 자체는 바뀌지 않는다** — 그것을 드는 라이브러리만 바뀐다.
+- **M1이 고정한 값**은 slice 계약(`reports/evidence/m1/1a/scope.md` D-1)이 갖는다. 이 절은
+  버전 숫자를 옮겨 적지 않는다 — 같은 사실을 두 자리에 두면 한쪽이 낡는다.
 
 ### 1.2 래칫만으로는 막히지 않았다는 관찰
 
