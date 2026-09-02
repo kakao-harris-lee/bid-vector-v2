@@ -27,8 +27,7 @@ class ArchitecturePolicy private constructor(
 
     private fun value(key: String): String = values[key] ?: error("아키텍처 정책에 '$key' 가 없다")
 
-    private fun list(key: String): List<String> =
-        value(key).split(',').map(String::trim).filter(String::isNotEmpty)
+    private fun list(key: String): List<String> = value(key).split(',').map(String::trim).filter(String::isNotEmpty)
 
     companion object {
         private const val LOCATION_PROPERTY = "bidvector.architecture.policy"

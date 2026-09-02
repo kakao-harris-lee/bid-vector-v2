@@ -54,7 +54,10 @@ class ArchitectureGateCatchesViolationsTest {
     private infix fun List<ArchRule>.mustReport(mentioned: String) {
         val details =
             flatMap { rule ->
-                rule.allowEmptyShould(true).evaluate(violating).failureReport.details
+                rule
+                    .allowEmptyShould(true)
+                    .evaluate(violating)
+                    .failureReport.details
             }
         details.filter { it.contains(mentioned) }.shouldNotBeEmpty()
     }

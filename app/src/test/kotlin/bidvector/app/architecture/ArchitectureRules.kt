@@ -16,19 +16,24 @@ class ArchitectureRules(
     fun domainMustNotDependOnFrameworks(root: String): List<ArchRule> =
         listOf(
             noClasses()
-                .that().resideInAnyPackage(*packagesOf(root, policy.domainModules))
-                .should().dependOnClassesThat().resideInAnyPackage(
+                .that()
+                .resideInAnyPackage(*packagesOf(root, policy.domainModules))
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(
                     *policy.forbiddenPackages.map { "$it.." }.toTypedArray(),
-                )
-                .because("v2-지침서.md §3.1 — domain 은 Spring·JPA·JSON·HTTP 를 import 하지 않는다"),
+                ).because("v2-지침서.md §3.1 — domain 은 Spring·JPA·JSON·HTTP 를 import 하지 않는다"),
         )
 
     fun businessDomainModulesMustNotReferenceEachOther(root: String): List<ArchRule> =
         policy.businessDomainModules.map { module ->
             val others = policy.businessDomainModules - module
             noClasses()
-                .that().resideInAPackage("$root.$module..")
-                .should().dependOnClassesThat().resideInAnyPackage(*packagesOf(root, others))
+                .that()
+                .resideInAPackage("$root.$module..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(*packagesOf(root, others))
                 .because("ADR 0006 D-4 — 업무 모듈 교차는 workflow 가 조합하고 공유는 shared-kernel 로만 한다")
         }
 
@@ -36,14 +41,22 @@ class ArchitectureRules(
         listOf(
             layeredArchitecture()
                 .consideringOnlyDependenciesInAnyPackage("$root..")
-                .layer(DOMAIN).definedBy(*packagesOf(root, policy.domainModules))
-                .layer(APPLICATION).definedBy(*packagesOf(root, policy.applicationModules))
-                .layer(ADAPTERS).definedBy(*packagesOf(root, policy.adapterModules))
-                .layer(APP).definedBy(*packagesOf(root, policy.appModules))
-                .whereLayer(APP).mayNotBeAccessedByAnyLayer()
-                .whereLayer(ADAPTERS).mayOnlyBeAccessedByLayers(APP)
-                .whereLayer(APPLICATION).mayOnlyBeAccessedByLayers(ADAPTERS, APP)
-                .whereLayer(DOMAIN).mayOnlyBeAccessedByLayers(APPLICATION, ADAPTERS, APP)
+                .layer(DOMAIN)
+                .definedBy(*packagesOf(root, policy.domainModules))
+                .layer(APPLICATION)
+                .definedBy(*packagesOf(root, policy.applicationModules))
+                .layer(ADAPTERS)
+                .definedBy(*packagesOf(root, policy.adapterModules))
+                .layer(APP)
+                .definedBy(*packagesOf(root, policy.appModules))
+                .whereLayer(APP)
+                .mayNotBeAccessedByAnyLayer()
+                .whereLayer(ADAPTERS)
+                .mayOnlyBeAccessedByLayers(APP)
+                .whereLayer(APPLICATION)
+                .mayOnlyBeAccessedByLayers(ADAPTERS, APP)
+                .whereLayer(DOMAIN)
+                .mayOnlyBeAccessedByLayers(APPLICATION, ADAPTERS, APP)
                 .because("v2-지침서.md §3.1 — 의존 방향은 domain <- application <- adapters/app 이다"),
         )
 
@@ -51,15 +64,18 @@ class ArchitectureRules(
         listOf(
             slices()
                 .matching("$root.(**)")
-                .should().beFreeOfCycles()
+                .should()
+                .beFreeOfCycles()
                 .because("v2-지침서.md §5 — 순환 의존을 래칫 축으로 잰다"),
         )
 
     fun packageNamesMustNotBeTechnicalLayers(root: String): List<ArchRule> =
         policy.forbiddenPackageSegments.map { segment ->
             noClasses()
-                .that().resideInAPackage("$root..")
-                .should().resideInAPackage("..$segment..")
+                .that()
+                .resideInAPackage("$root..")
+                .should()
+                .resideInAPackage("..$segment..")
                 .because("모듈 경계가 이미 계층을 표현한다 — 모듈 안에 기술 계층을 또 만들지 않는다")
         }
 
