@@ -111,6 +111,12 @@ verdict는 `legacy-defect | v2-defect | intentional-redesign | insufficient-evid
 codex-reviewer 에이전트만 작성한다 (`codex-review-gate` 스킬). 다른 에이전트는 이
 파일을 생성·수정하지 않는다.
 
+**코드 slice 에서 리뷰 라운드의 reviewer 메타데이터 정본은 이 JSON**(`reviewer`·`commands_run`),
+**preflight 정본은 레인이 쓰는 형제 파일 `codex-review-<UTC>.preflight.json`** 이다
+(`residual_risks` 는 Codex 소유 필드라 레인이 쓰지 않는다). `commands.md` 에 라운드마다 preflight 행을
+등재하지 않는다 — M0/0E·M1/1A 에서 그 등재 커밋이 라운드마다 하나씩 붙었고 값은 JSON 과
+중복이었다(운영자 결정 2026-09-02). `commands.md` 는 acceptance 와 게이트 실측만 갖는다.
+
 ## 리뷰 요청 조건 점검 (verifier용)
 
 Codex 리뷰를 요청하기 전에 전부 충족해야 한다 (프로젝트 CLAUDE.md 기준):

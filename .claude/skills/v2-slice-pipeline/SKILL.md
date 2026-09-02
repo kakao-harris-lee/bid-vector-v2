@@ -51,8 +51,11 @@ bid-vector V2의 slice 단위 작업(`Claude 구현 → 검증 → Codex 독립 
 | verifier | acceptance 재실행·evidence 점검 | 전 단계 | `_workspace/{slice}/NN_verifier_report.md` |
 | codex-reviewer | Codex CLI 독립 리뷰 실행 | 전 단계 | `reports/evidence/**/codex-review-*.json` |
 
-모델은 각 에이전트 frontmatter의 `model: opus`가 단일 출처다(호출부에서 덮어쓰지
-않는다). 관련 스킬: `evidence-pack`(구현자·verifier), `codex-review-gate`(codex-reviewer).
+모델은 각 에이전트 frontmatter 의 `model:` 이 단일 출처다(호출부에서 덮어쓰지 않는다).
+구현 레인(`kotlin-implementer`·`ml-implementer`)은 **sonnet**, 판정·검증·설계 레인
+(`verifier`·`codex-reviewer`·`deep-reasoner`)은 **opus** — 운영자 결정 2026-09-02(진짜
+결함은 검증 레인이 잡았고 구현의 기계적 수정에 opus 단가가 필요 없었다).
+관련 스킬: `evidence-pack`(구현자·verifier), `codex-review-gate`(codex-reviewer).
 
 ## 워크플로우
 
@@ -97,6 +100,19 @@ preflight 조사 1건. 각 scout에 앵커 파일 목록과 출력 경로를 프
 라이브러리, (b) 기존 bid-vector의 재활용 가능한 성숙 코드(특히 Python ML), (c) 이미
 구현된 V2 코드와의 중복 여부. 조사 없이 새로 만드는 것을 허용하지 않는다.
 
+### Phase 2.5: 설계 검토 — 게이트·계약형 slice 는 필수 (운영자 채택 2026-09-02)
+
+**실행 모드:** 서브 에이전트 1명 (`deep-reasoner`, 읽기 전용)
+
+산출물의 수용 기준이 「우회할 수 없는가」·「구성상 닫히는가」인 slice(아키텍처 게이트·래칫·
+fixture 계약·정책 데이터 분리·타입 불변식)는 **구현 전에** 설계 검토를 받는다. 검토자는
+조사 노트와 slice 계약을 읽고 (1) 제안 설계가 열거(deny-list)에 기대는지 구성상 닫히는지,
+(2) 우회 경로를 최소 다섯 고안해 설계가 각각을 어떻게 막는지, (3) 승인 문서가 요구하지 않는
+과잉·미달을 판정해 `_workspace/{slice}/NN_design-review.md` 에 남긴다. 구현 레인은 그
+노트를 입력으로 받는다. **왜 필수인가:** M1/1A 에서 deny-list 게이트 설계를 Codex 3라운드·
+verifier 7라운드로 발견했다 — 같은 판정을 구현 전 검토 1회가 낸다. 도메인 코드 slice 는
+계약(1B 의 타입 불변식 등)이 있으면 받고, 순수 구현 slice 는 생략 가능하다.
+
 ### Phase 3: 구현
 
 **실행 모드:** 서브 에이전트, 순차 (slice당 구현자 1명)
@@ -125,11 +141,20 @@ finding별 별도 커밋을 지시한다.
 **slice 끝에 한 번 돌린다.** 한 파일 고칠 때마다 부르지 않는다 — 구현자가 자기 acceptance를
 통과시킨 뒤, 그 수정이 만든 것까지 스스로 훑은 뒤에 부른다.
 **게이트는 산출물이다** — evidence가 자기에 대해 하는 말은 게이트 항목이 아니다.
+
+**차단 문턱 (운영자 채택 2026-09-02):** `not-ready` 는 **산출물(코드·게이트·계약)의 blocker/high**
+에만 낸다. 장부층(evidence 수치·좌표·문면·상호 포인터) finding 과 산출물 low 는 리포트에
+등재하되 라운드를 막지 않는다 — 구현 레인이 다음 Codex 전 **한 커밋**으로 일괄 처리하고,
+verifier 는 그 커밋을 재검증하지 않는다(Codex 가 본다). M1/1A 실측: verifier 8라운드 중
+not-ready 5 가운데 셋이 장부층이었다.
+
 **`evidence-pack`의 크기 게이트를 여기서 확인한다.**
 
 verifier에 slice 계약, base/head, evidence 경로를 전달한다.
 - `ready-for-review` → Phase 5로 진행
 - `not-ready` → 보고서를 첨부해 Phase 3 구현자에 수정 지시
+
+verifier 의 최고 가치 활동은 **우회 고안·실행 재현**이다 — 축어·좌표 대조는 명령이 내게 하고 verifier 의 시간을 거기에 쓰지 않는다.
 
 **재작업 상한(절대값): 5회.** verifier not-ready와 Codex request_changes를 합산해
 slice 전체에서 구현 재작업이 **5회에 이르면 멈춘다.** 카운터는 라운드마다 리셋되지 않는다.
@@ -149,6 +174,9 @@ Codex 라운드는 비싸고 느리며, 잦은 호출은 심판을 「다음 할
 **한 finding을 고치고 바로 다시 거는 것을 금지한다.** finding을 전부 닫고, 자체 검증으로
 게이트를 통과시키고, 그 수정이 만든 것까지 훑은 뒤에 한 번에 건다.
 **같은 이유로 자체 검증(Phase 4)도 한 줄 고칠 때마다 돌리지 않는다** — 묶어서 돌린다.
+
+**Codex 는 Phase 2.5 설계 검토와 Phase 4 를 통과한 뒤에만 건다.** 게이트형 slice 에서 설계
+검토 없이 Codex 를 걸면 열거 누락 finding 이 라운드마다 하나씩 온다(M1/1A 3라운드 실측).
 
 1. 구현 diff가 커밋되어 base/head가 고정되었는지 확인 — 판정 기준은
    `git status --porcelain -- <scope.md의 in_scope 경로>` (evidence-pack 스킬과 동일

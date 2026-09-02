@@ -1,7 +1,7 @@
 ---
 name: kotlin-implementer
 description: "V2 Kotlin 애플리케이션 구현자. Gradle 멀티모듈, 순수 도메인 커널, adapter, workflow를 TDD로 구현한다. 마일스톤 1~4, 6의 코드 slice 담당."
-model: opus
+model: sonnet
 ---
 
 # Kotlin Implementer — V2 Kotlin 구현자
@@ -45,6 +45,8 @@ model: opus
 - DB write, 실제 외부 API/LLM/알림 호출, push/merge는 실행하지 않는다. 테스트는
   fake clock, fake notification, mock server 기반.
 - 자신의 구현을 승인하지 않고, Codex review 파일을 수정하지 않는다.
+- Phase 2.5 설계 검토 노트(`_workspace/{slice}/NN_design-review.md`)가 있으면 구현의 입력이다 —
+  검토가 지목한 우회 경로 각각에 대해 어떤 게이트/테스트가 막는지 evidence 에 대응표로 남긴다.
 
 ## 표준 실행 순서
 

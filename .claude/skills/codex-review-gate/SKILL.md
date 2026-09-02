@@ -207,8 +207,12 @@ consolidate **이후**를 보고 이 질의는 stage1을 보므로, 이 질의�
 
 **이 출력을 verdict JSON에 넣지 마라.** `residual_risks`는 Codex가 쓰는 필드이고 이 스킬의
 금지 조항이 **리뷰 JSON 수정**을 막는다(정본 스키마도 `additionalProperties: false`다).
-preflight 결과는 **레인 산출물**이다 — codex-reviewer의 반환 보고와 그 slice의
-`commands.md`에 남긴다.
+preflight 결과는 **레인 산출물**이다 — codex-reviewer 의 반환 보고와, 레인이 쓰는 **형제
+파일 `codex-review-<UTC>.preflight.json`**(같은 evidence 디렉터리, append-only, verdict 와
+같은 등재 커밋에 실린다)에 남긴다. 키: `traces`·`stage1_matches`·`stage1_total`·`cli_version`
+·`hooks_events`·`hooks_stdout_bytes`·`leak_matches`·`leak_developer_region`·`emissions`
+·`premature_approves`·`gradle_executed`(코드 slice). 문서 slice 의 기존 C-행 관행은 그대로
+두고, 코드 slice 는 `commands.md` 에 라운드별 행을 등재하지 않는다(운영자 결정 2026-09-02).
 
 **`codex debug prompt-input`을 preflight 도구로 쓰지 마라** — memory 주입을 렌더하지 않아
 항상 「없음」이라고 답한다.
@@ -327,7 +331,9 @@ git worktree remove ../bid-vector-v2-review-{slice}
 
 저장 전에 판정 JSON에 `reviewer: {cli_version, model}` 필드가 없으면 실측값으로 채워
 넣는다. 이 주입은 agent-workflow.md 4절 계약이 리뷰 레인에 위임한 메타데이터 기록이며,
-verdict·findings에는 손대지 않는다. 같은 값을 `commands.md`에도 기록한다.
+verdict·findings에는 손대지 않는다. 코드 slice 에서는 `commands.md` 에 중복 기록하지
+않는다 — verdict JSON 이 정본이다(evidence-pack 참조, 운영자 결정 2026-09-02). 문서
+slice 의 기존 C-행 관행은 그대로 둔다.
 
 **두 값의 출처는 `codex.raw-output.txt`의 머리글이지 기억이 아니다.** 그 파일 첫 10줄에
 `model:`과 `reasoning effort:` 줄이 실측으로 찍힌다. **`model`에는 effort를 함께 적는다** —
