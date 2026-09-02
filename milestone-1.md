@@ -16,13 +16,18 @@ broker 없이도 핵심 판정이 실행되는 순수 도메인부터 만든다.
 ### Slice 1A — 프로젝트와 CI 골격
 
 - Gradle Kotlin DSL, wrapper, version catalog
-- `shared-kernel`, `procurement`, `qualification`, `strategy`, `bidding`, `decision`,
+- `shared-kernel`, `procurement`, `qualification`, `strategy`, `decision`,
   `settlement`, `workflow`, `adapters`, `app`
 - module dependency/순환 의존 architecture test
 - formatting, lint, unit test, coverage, size/complexity ratchet
 - domain 모듈의 Spring/JPA/JSON/HTTP import 금지 test
 
 빈 모듈을 많이 만드는 것이 목적이 아니다. M0 필수 capability에 없는 모듈은 만들지 않는다.
+
+**`bidding`을 위 목록에서 뺐다 — 운영자 결정 2026-09-02.** 「투찰 계획과 상태」를 소유하는
+capability가 `capability-map.md`에 없어 바로 위 문장이 그대로 적용된다. 소유 capability가
+서면 추가하며 추적은 **`OPEN-ADR-14`**다. 근거 전문은 **`docs/adr/0006` D-2.1**이 갖는다 —
+여기서 되풀이하지 않는다.
 
 ### Slice 1B — Money/Rate/Basis
 

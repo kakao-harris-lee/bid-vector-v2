@@ -220,6 +220,37 @@ preflight 결과는 **레인 산출물**이다 — codex-reviewer의 반환 보�
 - 첫 운영 실행 전에 `codex exec -s read-only "echo ok"` 수준의 스모크 테스트로 비대화
   모드 동작(trust 프롬프트 여부)을 1회 검증한다.
 
+### 4b. 코드 slice — 오프라인 Gradle 실행 능력 (운영자 채택 2026-09-02)
+
+M1/1A 1차 리뷰에서 Codex 는 gradle 을 한 번도 실행하지 못했다 — sandbox 가 `~/.gradle`
+잠금 파일 쓰기와 네트워크(DNS)를 막아 wrapper 다운로드·의존 해석이 전부 실패했고, 다섯
+finding 이 전부 정적 판독이었다. 코드 slice 의 리뷰가 실행 없이 도는 것은 구조적 약점이므로,
+**격리(네트워크 차단·쓰기는 worktree 안)를 유지한 채** 실행 능력을 준다:
+
+```bash
+RO=$HOME/.codex-review/gradle-ro                       # read-only 의존 캐시 사본 (증분)
+mkdir -p "$RO" && rsync -a --delete "$HOME/.gradle/caches/modules-2/" "$RO/modules-2/"
+W=../bid-vector-v2-review-{slice}                      # clean worktree
+mkdir -p "$W/.gradle-home/wrapper/dists"
+DIST=$(grep -o 'gradle-[0-9.]*-bin' "$W/gradle/wrapper/gradle-wrapper.properties" | head -1)
+cp -R "$HOME/.gradle/wrapper/dists/$DIST" "$W/.gradle-home/wrapper/dists/"
+export GRADLE_USER_HOME="$W/.gradle-home" GRADLE_RO_DEP_CACHE="$RO"
+( cd "$W" && ./gradlew --offline -q help )             # 레인이 먼저 스모크 — 실패하면 codex 에 넘기지 않는다
+```
+
+- 이 env 를 export 한 채 §4 의 `codex exec` 를 부른다(sandbox 는 env 를 상속한다). 프롬프트에
+  「gradle 은 `--offline` 으로, `GRADLE_USER_HOME`·`GRADLE_RO_DEP_CACHE` 는 이미 설정됨」을 한 줄
+  적는다. 네트워크는 열지 않는다 — 심판이 저장소 내용을 밖으로 보낼 표면이 생긴다.
+- `GRADLE_RO_DEP_CACHE` 는 **live `~/.gradle/caches` 를 직접 가리키지 않는다** — Gradle 이 RO
+  캐시의 동시 쓰기 부재를 전제하므로 사본을 쓴다. rsync 는 증분이라 2회차부터 빠르다.
+- `.gradle-home/` 은 worktree 안의 untracked 디렉터리다 — §5·§7 의 `git status --porcelain`
+  대조에서 **그 경로 하나만 허용된 예외**이고, 그 밖의 변경은 여전히 오염이다.
+- `git worktree add` 는 codex 가 할 수 없다(메인 `.git` 쓰기 거부 — 격리가 맞게 동작한 것).
+  A-0 류 「clean checkout 빌드」 재현은 codex 의 worktree 자체가 clean checkout 이므로 그 자리에서
+  `./gradlew --offline clean check` 로 대신한다고 프롬프트에 적는다.
+- 의존이 로컬 캐시에 없으면(새 라이브러리) `--offline` 이 실패한다 — 그때는 구현 레인이 먼저
+  로컬에서 한 번 빌드해 캐시를 채운 뒤 rsync 한다. 캐시 채우기는 심판이 아니라 구현 레인의 일이다.
+
 ### 5. 무효 라운드 검사
 
 실행 후 worktree의 오염을 확인한다:

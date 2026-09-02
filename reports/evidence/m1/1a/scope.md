@@ -19,15 +19,17 @@ in_scope:
   - .github/workflows/ci.yml
   - .gitignore                        # Gradle 산출물 규칙. 앵커 없는 `build/` 가 B-1 을 냈다
   - docs/adr/0007-test-pyramid-and-ratchet.md      # §5 의 OPEN-ADR-08 행 하나
+  - docs/adr/0006-gradle-modules.md                # D-2 표 + 신설 D-2.1 — 계약 갱신으로 넓힘
+  - milestone-1.md                                 # 1A 모듈 목록 — 같은 갱신
   - docs/discovery/capability-map.md               # §12 registry 의 해당 행 + bidding 보류 OPEN 신설
   - reports/evidence/m1/1a/{scope,commands,checklist,rollback}.md
 out_of_scope:
   - 도메인 코드 일체                   # 1B~1E. 1A 가 넣는 것은 모듈 경계 앵커 아홉뿐
-  - bidding 모듈                       # 운영자 결정 2026-09-02 보류 — 아래 「결정」 D-2
+  - bidding 모듈                       # 운영자 결정 2026-09-02 보류 — D-2 · ADR 0006 D-2.1
   - Spring controller · DB schema · Flyway migration 실행 · 실제 외부 호출
   - Python ML · 기존 Python 과의 byte-for-byte 동등성
   - mutation testing 적용              # OPEN-ADR-07 — 카탈로그 좌표 등재만
-  - 위 두 줄 외의 docs/adr · capability-map 편집
+  - 위 네 줄 외의 docs/adr · capability-map · milestone-1.md 편집
   - bid-vector/ symlink 아래 기존 저장소   # 읽기 전용
   - _workspace/**                     # .gitignore 대상
 acceptance_commands:
@@ -91,8 +93,12 @@ capability 가 등재돼 있지 않다.
 
 `ADR 0006` D-2 가 목록에 넣었으므로 이것은 **ADR 과 capability map 사이의 갈림**이고, 구현자가
 혼자 닫을 것이 아니다 — **운영자 결정 2026-09-02 로 보류**하고 `capability-map.md` §12 에
-`OPEN` 을 신설해 소유 capability 가 설 때 재개하도록 등재한다. 아홉 모듈은 `ADR 0006` D-5 의
-「목록 밖 신설」에 해당하지 않는다(빼는 것이지 더하는 것이 아니다).
+`OPEN-ADR-14` 를 신설해 소유 capability 가 설 때 재개하도록 등재한다. 아홉 모듈은
+`ADR 0006` D-5 의 「목록 밖 신설」에 해당하지 않는다(빼는 것이지 더하는 것이 아니다).
+
+**결정의 정본은 evidence 가 아니라 `ADR 0006` D-2.1 이다.** 처음에는 이 절과 `OPEN-ADR-14` 만
+근거로 두었는데 그러면 discovery 문서가 승인된 ADR 을 대체하는 상태가 된다(Codex #1). 아래
+「계약 갱신」이 그 시정을 적는다 — 승인 문서 두 자리를 고쳤고 이 절은 그것을 가리킨다.
 
 ### D-3. 패키지 규약 — `ADR 0006` §6:172 가 1A 로 넘긴 결정
 
@@ -214,6 +220,22 @@ ktlint 1.8.0 을 구동. 스타일 규칙은 `.editorconfig` 그대로다.
 래퍼를 걷고 도구를 직접 쓴다.
 
 **부수 효과**: `check` 가 configuration cache 를 온전히 쓴다(`A-1`).
+
+### 2026-09-02 — `in_scope` 를 승인 문서 두 자리로 넓힌다 (Codex #1 · 운영자 결정)
+
+**넓힌 범위**: `docs/adr/0006-gradle-modules.md`(D-2 표와 신설 D-2.1) · `milestone-1.md`(1A 모듈
+목록). **그 두 자리에 한정**하고 두 문서의 다른 절은 손대지 않는다.
+
+**사유**: Codex 1차 리뷰 #1 — *"구현 evidence 가 새 `OPEN-ADR-14` 와 운영자 보류를 주장하더라도
+승인된 ADR·마일스톤은 변경되지 않아 discovery 문서가 authoritative 요구사항을 대체한 상태다."*
+**맞는 지적이다.** 원래 계약은 `bidding` 을 `out_of_scope` 에 두고 근거를 evidence 와
+`capability-map.md` 에만 적었는데, `ADR 0006` D-2 와 `milestone-1.md` 1A 가 열 모듈을 요구하는
+한 구현·정책·테스트가 승인 문서와 어긋난 채로 남는다.
+
+**처리**: 운영자 결정(2026-09-02)으로 **정본을 고친다.** `ADR 0006` 에 D-2.1 을 신설해 보류
+결정·결정자·시점·근거·되살리는 조건을 적고 D-2 표의 행에 취소선을 얹었다 — **결정 내용을
+지우지 않는다**(M0 0E 의 `OPEN-ADR-01` 해소 블록과 같은 관례). `milestone-1.md` 1A 목록에서
+`bidding` 을 빼고 근거는 ADR 을 가리킨다. 추적은 그대로 `OPEN-ADR-14`.
 
 ### 2026-09-02 — `in_scope` 의 두 어긋남을 정정한다 (verifier M-2)
 
