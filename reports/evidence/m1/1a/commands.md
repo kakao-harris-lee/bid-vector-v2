@@ -68,6 +68,23 @@ detekt 였으나(`T-2`) **실제로 깨진 것은 Spotless 다.** 처리는 아�
 타당성을 낮추지 않는다 — 다섯 중 넷은 실행 없이 서는 지적이고 이 라운드가 실측으로 닫았다.
 하네스가 오프라인 캐시 탑재를 성문화 중이라 재리뷰부터는 실행 가능해질 예정이다.
 
+## 2026-09-02T11:55Z — Codex 2차 라운드의 preflight
+
+| # | 축 | 값 |
+| --- | --- | --- |
+| `C-8` | 이 저장소 흔적 | 3 |
+| `C-9` | stage1 배치 | 0 / 722 (709 → 722 증가) |
+| `C-10` | 심판 바이너리 핀 | 1차와 같다 (`C-3`) |
+| `C-11` | 주입 누출 · developer 구간 매치 | 0 · 0 |
+| `C-12` | hooks | 8 개 / stdout 0 바이트 |
+| `C-13` | 방출(앵커 ∩ 형태) · 조기 종료 | 4 · **3 — 사상 최다.** 그중 9,742 행짜리 approve 가 **첫 gradle 시도 직전**이라 종말 캡처가 사고를 면했다 |
+
+**`C-14` — 2차도 gradle 을 돌리지 못했다. 원인이 1차와 다르다.** 1차의 캐시·쓰기 문제는
+하네스 §4b(오프라인 캐시 사본)가 해소했고, 이번에 막은 것은 **seatbelt 의 소켓 생성 금지**다 —
+Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramSocket` 을 **무조건**
+만들고 거기서 `SocketException: Operation not permitted` 로 죽는다. 플래그로 우회할 수 없다.
+**그래서 2차의 두 finding 도 정적 판독이다** — verdict 의 `residual_risks` 가 같은 말을 한다.
+
 ## 2026-09-02T10:10Z — 레인 경계 (선언)
 
 **`e733cfa` 에 하네스 레인의 변경이 섞여 있다.** 공유 working tree 에서 두 레인이 병행하는
@@ -113,7 +130,9 @@ detekt 였으나(`T-2`) **실제로 깨진 것은 Spotless 다.** 처리는 아�
 
 ### 금지 가족을 어느 층이 잡는가
 
-fixture 일곱이 이 표를 실측으로 만든다. **어느 한 층도 혼자로는 충분하지 않다.**
+가족마다 심은 fixture 가 이 표를 실측으로 만든다. **어느 한 층도 혼자로는 충분하지 않다.**
+가족 목록의 출처는 승인 문서이고 그 대조는 `build-logic` 의 `ForbiddenFamilyCoverageTest` 가
+든다 — 표를 손으로 맞추지 않는다.
 
 | 가족 | fixture | 1차(의존 그래프) | 2차(ArchUnit) |
 | --- | --- | --- | --- |
@@ -124,6 +143,9 @@ fixture 일곱이 이 표를 실측으로 만든다. **어느 한 층도 혼자�
 | HTTP | `HttpLeak` | **못 잡는다** — JDK 타입이라 Maven group 이 없다 | 잡는다 |
 | SQL | `SqlLeak` | **못 잡는다** — 같은 이유 | 잡는다 |
 | file I/O | `FileIoLeak` | **못 잡는다** — 같은 이유 | 잡는다 |
+| nio channels | `ChannelLeak` | **못 잡는다** — 같은 이유 | 잡는다 |
+| gRPC | `GrpcLeak` | 잡는다 | 잡는다 |
+| Protobuf | `ProtobufLeak` | 잡는다 | 잡는다 |
 
 반대로 `E-9`·`E-9b` 가 보이듯 **선언만 되고 참조가 없는 의존은 2 차가 못 본다.** 두 층의
 사각이 서로 반대라 둘 다 필요하다.
@@ -137,10 +159,10 @@ working tree 에서 잰다. **`A-0` 이 나머지의 전제인 이유는 `A-0b` 
 | --- | --- | --- | --- |
 | `A-0` | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 | 커밋만으로 빌드된다. `build-logic/src/main/kotlin/bidvector/buildlogic/` 에 8 파일 |
 | `A-1` | `./gradlew --no-build-cache clean check` | 0 | 게이트 전부 통과. 3 회 연속 재현 |
-| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 | 17 tests, 0 failed (양성 6 · 음성 11 — 금지 가족 일곱 포함) |
+| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 | 0 failed. 양성 6 + 음성(위반 형태 넷 + 금지 가족 전건) — **수는 가족이 늘면 함께 는다.** 명령이 낸다 |
 | `A-3` | `./gradlew qualityBaseline` | 0 | 값은 `build/reports/quality-baseline/quality-baseline.md` |
-| `A-4` | `./gradlew :app:compatibilitySmoke` | 0 | 해석 아홉 + **로드 테스트 7 tests, 0 failed**. 값은 `app/build/reports/compatibility-smoke/resolved-modules.txt` |
-| `A-5` | `./gradlew :build-logic:test` | 0 | 7 tests, 0 failed — 경계 판정의 순수 함수 테스트 |
+| `A-4` | `./gradlew :app:compatibilitySmoke` | 0 | 해석 + **채택 라이브러리마다 로드 테스트 하나**, 0 failed. 값은 `app/build/reports/compatibility-smoke/resolved-modules.txt` |
+| `A-5` | `./gradlew :build-logic:test` | 0 | 0 failed — 경계 판정의 순수 함수 테스트 + 금지 가족의 **출처 대조** |
 
 ### `A-0b` — 커밋된 파일 집합과 디스크 실물의 대조
 
