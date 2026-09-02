@@ -1,5 +1,6 @@
 package bidvector.app.architecture
 
+import com.tngtech.archunit.ArchConfiguration
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
@@ -23,6 +24,19 @@ class ArchitectureGateTest {
         ClassFileImporter()
             .withImportOption(ImportOption.DoNotIncludeTests())
             .importPackages(policy.packageRoot)
+
+    /**
+     * **멤버 규칙은 ArchUnit 의 classpath 해석에 기대고 있다.** 그 설정을 끄고 재 보면 이
+     * corpus 의 접근이 전부 미해결이 되고, 그때는 owner 의 상위 타입도 함께 알 수 없어
+     * 상위 타입 훑기 fallback 이 **아무것도 잡지 못한다** — `printStackTrace` 보고가 0 이 된다.
+     *
+     * 기본값이 켜짐이라 지금은 참이지만, `archunit.properties` 한 줄로 꺼질 수 있고 그러면
+     * 게이트가 **조용히** 눈을 감는다. 그 부재를 시끄럽게 만드는 것이 이 단언이다.
+     */
+    @Test
+    fun `멤버 판정이 기대는 classpath 해석이 켜져 있다`() {
+        ArchConfiguration.get().resolveMissingDependenciesFromClassPath() shouldBe true
+    }
 
     @Test
     fun `루트 아래 1급 패키지는 승인된 모듈 집합과 정확히 같다`() {

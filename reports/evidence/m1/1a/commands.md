@@ -246,8 +246,18 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `E-42` | 후보에 없는 분류 추가 | 같은 명령 | **1** | `후보에 없는 분류(낡았다)` — 낡은 금지도 거짓말이다 |
 | `E-43` | 효과 표면에서 `java.io` 제거 | 같은 명령 | **1** | `도출 결과가 커밋본과 다르다` — JDK·정책 변경이 조용히 지나가지 않는다 |
 | `E-44` | 양성: `require`/`check`/`toInt()`·`toString`·`String.format` | `:app:test --tests '*ArchitectureGate*'` | 0 | 오탐 없음. 양성 corpus 가 이 통과를 고정한다 |
+| `E-45` | ArchUnit 의 classpath 해석을 끄고 같은 접근을 잼 | 임시 probe | — | **해석 5/5 → 0/5 미해결**이 되고 상위 타입 훑기 fallback 이 **0 건** 잡는다(`printStackTrace` 보고 2 → 0) — 그때는 owner 의 계보도 함께 알 수 없다 |
 
 분류의 셈은 `./gradlew memberEffectGate` 가 한 줄로 낸다 — 여기 적지 않는다(후보가 바뀌면 낡는다).
+
+**설계 검토가 미확인으로 남긴 셋을 실측으로 답한다.** ① 효과 표면 초안 — 그대로 채택하되
+`java.lang.StackTraceElement` 을 더했다(실행 스택은 환경·리플렉션 축이고 `StackWalker` 와 같은
+이유다. 그것이 없으면 `Throwable#getStackTrace` 가 후보에 오르지 않아 음성 fixture 하나가 서지
+못한다). ② 후보 분류 — 전건 분류했고 셈은 위 명령이 낸다. ③ **`resolveMember()` fallback 은
+검토자의 기대만큼 넓지 않다**(`E-45`) — 상위 타입 훑기는 「owner 의 계보는 알지만 그 멤버만 못
+찾는」 좁은 경우만 덮고, 해석 자체가 꺼지면 계보도 모르므로 아무것도 잡지 못한다. 판정을
+실제로 떠받치는 것은 ArchUnit 의 classpath 해석이며, **그 의존을 조용히 두지 않으려고 해석
+설정을 단언하는 테스트를 넣었다.**
 
 ### 본문을 갖는 선언 — 표기별 실측
 
