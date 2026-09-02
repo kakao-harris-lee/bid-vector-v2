@@ -1,0 +1,73 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "e3091b71bb35027b9257bb1333bca5c7ae317aa6",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "settings.gradle.kts",
+      "line": 25,
+      "evidence": "`milestone-1.md` Slice 1A와 결정 상태인 ADR 0006 D-2는 `bidding`을 포함한 10개 모듈을 직접 요구하지만 실제 include 목록과 아키텍처 정책에는 9개만 있다. 구현 evidence가 새 `OPEN-ADR-14`와 운영자 보류를 주장하더라도 승인된 ADR·마일스톤은 변경되지 않아 discovery 문서가 authoritative 요구사항을 대체한 상태다.",
+      "required_fix": "`bidding` 모듈과 경계 앵커를 추가하거나, 별도 사용자 승인으로 ADR 0006과 `milestone-1.md`의 모듈 계약을 먼저 개정한 뒤 정책·테스트·evidence를 일치시킨다."
+    },
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector/buildlogic/ResolutionGraph.kt",
+      "line": 16,
+      "evidence": "의존 게이트가 `moduleVersion`이 있는 외부 모듈만 수집하므로 Gradle project dependency는 모두 누락된다. 예를 들어 `qualification`에 사용하지 않는 `implementation(project(\":decision\"))`을 선언하면 순환은 생기지 않고, `domainDependencyGate`는 그 project component를 보지 못하며 ArchUnit도 바이트코드 참조가 없어 통과한다. ADR 0006 D-3의 '의존 선언이 1차 강제'와 D-4의 업무 모듈 직접 참조 금지를 우회한다.",
+      "required_fix": "`ProjectComponentIdentifier` 또는 선언된 `ProjectDependency`까지 검사해 층별 허용 project dependency 그래프를 강제하고, 사용되지 않은 업무 모듈 간 의존 선언을 넣었을 때 `check`가 실패하는 음성 테스트를 추가한다."
+    },
+    {
+      "severity": "high",
+      "file": "config/quality/architecture-policy.properties",
+      "line": 24,
+      "evidence": "금지 import 정책이 HTTP 전체가 아니라 `java.net.http`만 열거한다. domain 소스가 `java.net.HttpURLConnection`을 참조하는 위반은 외부 Maven group이 없어 1차 게이트를 피하고, 패키지도 `java.net.http..`가 아니어서 ArchUnit을 피한다. 현재 음성 fixture도 Spring 한 종류만 검사하므로 JPA·JSON·HTTP·broker 금지 전부의 구속력을 증명하지 않는다.",
+      "required_fix": "domain의 I/O/transport 의존을 불완전한 좌표 열거로 우회할 수 없게 정책을 보강하고, Spring·JPA·JSON·HTTP·broker 각 범주에 실제 위반 fixture를 넣어 동일한 production 게이트가 모두 실패하는지 검증한다."
+    },
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector/buildlogic/CompatibilitySmokeTask.kt",
+      "line": 35,
+      "evidence": "acceptance 문서 D-7은 Boot 4.x 스모크를 '의존 해석 + 컴파일 + 클래스 로드'로 고정했지만 이 task는 resolution graph만 편다. `compileTestKotlin`이 선행되어도 소스 검색 결과 db-scheduler, resilience4j, Micrometer, Flyway, Testcontainers 타입 참조가 전혀 없어 이 라이브러리들은 컴파일되거나 로드되지 않는다. 따라서 A-4는 단순 해석 성공을 호환 스모크 성공으로 보고한다.",
+      "required_fix": "채택 라이브러리 각각의 대표 public API를 실제로 컴파일하고 JVM에서 로드하는 스모크 테스트를 추가하고 `compatibilitySmoke`가 그 테스트 결과에 의존하게 한다."
+    },
+    {
+      "severity": "high",
+      "file": "build-logic/build.gradle.kts",
+      "line": 1,
+      "evidence": "실제 게이트 구현이 들어 있는 included build에는 `kotlin-dsl`만 적용되고 ktlint·detekt·sizeGate가 적용되지 않는다. 루트 convention plugin의 게이트는 애플리케이션 9개 모듈에만 붙는다. 따라서 `build-logic/src/main/kotlin`에 501줄 파일이나 50줄 초과 함수를 추가해도 루트 `check`의 크기·복잡도·포맷 게이트 대상이 아니며, 게이트 자체가 자신이 강제하는 V2 코드 규율을 우회한다.",
+      "required_fix": "순환 없이 build-logic 소스에도 ktlint, detekt, 함수/파일 크기 검사를 배선하고, 루트 CI의 `check`가 included build 검증까지 명시적으로 실행하도록 한 뒤 build-logic 위반 주입으로 실패를 증명한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse --verify 6b03c75016a1d5437ca7ff932282fc477be974e6^{commit} && git rev-parse --verify e3091b71bb35027b9257bb1333bca5c7ae317aa6^{commit} && git rev-parse HEAD",
+    "git diff --stat 6b03c75016a1d5437ca7ff932282fc477be974e6..e3091b71bb35027b9257bb1333bca5c7ae317aa6",
+    "git log --oneline 6b03c75016a1d5437ca7ff932282fc477be974e6..e3091b71bb35027b9257bb1333bca5c7ae317aa6",
+    "git merge-base 6b03c75016a1d5437ca7ff932282fc477be974e6 e3091b71bb35027b9257bb1333bca5c7ae317aa6",
+    "git diff --stat 6b03c75016a1d5437ca7ff932282fc477be974e6...e3091b71bb35027b9257bb1333bca5c7ae317aa6",
+    "git diff --check 6b03c75016a1d5437ca7ff932282fc477be974e6..e3091b71bb35027b9257bb1333bca5c7ae317aa6",
+    "git diff --name-status 6b03c75016a1d5437ca7ff932282fc477be974e6..e3091b71bb35027b9257bb1333bca5c7ae317aa6",
+    "git status --porcelain=v1 --untracked-files=all",
+    "git ls-files --others --ignored --exclude-standard -- '*/src/*'",
+    "diff <(find . \\( -name '*.kt' -o -name '*.kts' \\) | rg -v '/(build|\\.gradle|_workspace)/|^\\./bid-vector/' | sed 's|^\\./||' | sort) <(git ls-files '*.kt' '*.kts' | sort)",
+    "./gradlew --no-build-cache clean check",
+    "git worktree add --detach /tmp/bid-vector-review-a0-e3091b7 e3091b71bb35027b9257bb1333bca5c7ae317aa6 && (cd /tmp/bid-vector-review-a0-e3091b7 && ./gradlew --no-build-cache clean check)",
+    "./gradlew :app:test --tests '*ArchitectureGate*'",
+    "./gradlew qualityBaseline",
+    "./gradlew :app:compatibilitySmoke",
+    "GRADLE_USER_HOME=/tmp/bid-vector-v2-review-gradle ./gradlew --no-build-cache clean check",
+    "GRADLE_USER_HOME=/tmp/bid-vector-v2-review-gradle GRADLE_RO_DEP_CACHE=/Users/harris/.gradle/caches/modules-2 /Users/harris/.gradle/wrapper/dists/gradle-9.6.1-bin/4ticwg1pgcbps2hj28r8so764/gradle-9.6.1/bin/gradle --offline --no-build-cache clean check",
+    "git show e3091b71bb35027b9257bb1333bca5c7ae317aa6:.github/workflows/ci.yml | ruby -e 'require \"yaml\"; YAML.safe_load(STDIN.read, aliases: true); puts \"yaml-ok\"'",
+    "rg -n \"db-scheduler|resilience4j|micrometer|flyway|testcontainers|DbScheduler|Retry|MeterRegistry|Flyway|PostgreSQLContainer|Class\\.forName\" --glob '*.kt' --glob '*.kts'"
+  ],
+  "residual_risks": [
+    "Gradle acceptance 명령은 현재 실행 환경이 `/Users/harris/.gradle`의 wrapper lock 쓰기를 거부해 모두 시작 전에 실패했다. 임시 `GRADLE_USER_HOME` 경로는 네트워크 DNS가 차단됐고, 설치된 Gradle 직접 실행도 소켓 생성이 금지되어 실패했으므로 GREEN 결과를 독립 재확인하지 못했다.",
+    "detached worktree acceptance도 공용 Git 디렉터리 `/Users/harris/Development/private/bid-vector-v2/.git/worktrees` 쓰기가 금지되어 worktree 생성 단계에서 실패했다.",
+    "GitHub Actions 워크플로는 YAML 파싱과 정적 배선만 확인했으며 실제 GitHub runner 실행 이력은 evidence에도 없다.",
+    "coverage 임계와 public API/fan-in/fan-out의 강제 래칫은 아직 없고 `qualityBaseline`은 측정 전용이다. 이 라운드의 별도 finding으로 확대하지 않았지만 후속 도메인 코드 증가 전에 승인된 기준으로 닫아야 한다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
