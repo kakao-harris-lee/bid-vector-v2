@@ -117,7 +117,11 @@ Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramS
 | `E-15` | 허용 목록에서 `kotlin.io` 제외를 걷음 | `./gradlew :build-logic:test` | 1 | 금지 가족이 허용으로 들어오는 것을 출처 대조가 잡는다 |
 | `E-16` | 허용된 적 없는 것을 제외 목록에 | `./gradlew :build-logic:test` | 1 | 제외 항목의 뜻이 서는지 본다 |
 
-`E-12b`·`E-13b` 가 이 라운드의 요점이다 — **같은 위반을 새 게이트만 잡는다.** 세 라운드 연속
+| `E-17` | domain 모듈에 `data class Won(val amount: Long)` | `./gradlew :app:test --tests '*ArchitectureGateTest*'` | **0** | 컴파일러 삽입 `@NotNull` 을 허용하기 전에는 **exit 1** 이었다 — 게이트가 도메인이 비어 있는 동안만 초록이었다 |
+| `E-18` | domain 모듈에 `ProcessBuilder`·`java.util.logging`·`Thread`·`System.getenv`·리플렉션 (각각) | 같은 명령 | **1** (다섯 전부) | 허용을 뿌리로 두었을 때는 다섯 전부 exit 0 이었다 |
+| `E-19` | 허용 목록에 `kotlin.io` 를 넣음 | `./gradlew :app:test --tests '*ArchitectureGateCatchesViolationsTest*'` · `:build-logic:test` | 1 · 1 | 음성 단언과 출처 대조가 **둘 다** 죽는다. 이름만 보던 단언은 이때 죽지 않았다(masking) |
+
+`E-12b`·`E-13b`·`E-17`·`E-18` 이 이 라운드의 요점이다 — **같은 위반을 새 게이트만 잡는다.** 세 라운드 연속
 같은 가족이 샌 이유가 「목록이 짧아서」가 아니라 **판정 방향과 판정 근거**에 있었다는 뜻이다.
 
 ## 2026-09-02T10:10Z — 레인 경계 (선언)
@@ -165,9 +169,10 @@ Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramS
 
 ### 금지 가족을 어느 층이 잡는가
 
-**2차 열의 뜻이 바뀌었다** — 이제 domain 게이트는 금지 열거가 아니라 **allow-list** 다. 아래
-가족은 전부 허용 목록 밖이라 잡히고, **목록에 이름이 없는 좌표도 함께 잡힌다**(그것이 전환의
+**2차 열의 뜻이 바뀌었다** — 이제 domain 게이트는 금지 열거가 아니라 **allow-list(정확 패키지)** 다.
+아래 가족은 전부 허용 밖이라 잡히고, **목록에 이름이 없는 좌표도 함께 잡힌다**(그것이 전환의
 이유다). 표는 여전히 fixture 로 실측하지만 **완전성을 표가 지지 않는다** — allow-list 자신이 진다.
+`E-18` 이 그 차이의 실물이다: 허용을 뿌리로 두었을 때 다섯이 새고 정확 패키지로 좁히자 닫혔다.
 
 가족 목록의 출처는 승인 문서이고 대조는 `build-logic` 의 `ForbiddenFamilyCoverageTest` 가
 **방향을 뒤집어** 든다(금지 가족이 허용 목록에 들어오지 않는가). 표를 손으로 맞추지 않는다.
