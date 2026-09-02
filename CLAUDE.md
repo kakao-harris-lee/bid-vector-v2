@@ -81,3 +81,4 @@ Codex가 `request_changes`를 반환하면 같은 scope에서 Claude가 수정�
 | 2026-09-02 | 코드 slice 의 리뷰 preflight 정본을 **레인이 쓰는 형제 `codex-review-<UTC>.preflight.json`** 으로(reviewer 메타는 verdict JSON) — commands.md 라운드별 C-행 등재 폐지. `residual_risks` 는 Codex 소유라 레인이 쓰지 않음 | evidence-pack, codex-review-gate | 운영자 지시 — 라운드마다 등재 커밋 1 이 붙고 값은 JSON 과 중복 |
 | 2026-09-02 | 구현 레인 모델 **sonnet** (`kotlin-implementer`·`ml-implementer`), 판정·검증 레인 opus 유지 | agents, v2-slice-pipeline | 운영자 지시 — 진짜 결함은 검증 레인이 잡았고 기계적 수정에 opus 단가 불필요 |
 | 2026-09-02 | Codex 는 설계 검토·Phase 4 통과 뒤에만 — 게이트 강화의 실검증은 첫 도메인 코드 slice 에서 | v2-slice-pipeline | 운영자 지시 — 1A 의 결정적 결함(빈 도메인에서만 초록)은 실제 도메인 코드가 있어야 드러남 |
+| 2026-09-02 | §4b 프롬프트에 `.gradle-home/` 비대상 명시 · 사전 스모크 명령 변수 확장 금지 | codex-review-gate | 1A 4차 — codex 가 세 라운드째 「clean worktree 와 다르다」 residual · zsh 단어 분리로 스모크 전건 실패가 exit 0 으로 가려질 뻔함 |

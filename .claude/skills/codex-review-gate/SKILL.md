@@ -243,8 +243,13 @@ export GRADLE_USER_HOME="$W/.gradle-home" GRADLE_RO_DEP_CACHE="$RO"
 ```
 
 - 이 env 를 export 한 채 §4 의 `codex exec` 를 부른다(sandbox 는 env 를 상속한다). 프롬프트에
-  「gradle 은 `--offline` 으로, `GRADLE_USER_HOME`·`GRADLE_RO_DEP_CACHE` 는 이미 설정됨」을 한 줄
-  적는다. 네트워크는 열지 않는다 — 심판이 저장소 내용을 밖으로 보낼 표면이 생긴다.
+  「gradle 은 `--offline` 으로, `GRADLE_USER_HOME`·`GRADLE_RO_DEP_CACHE` 는 이미 설정됨」과
+  **「`.gradle-home/` 은 리뷰 레인이 둔 gradle 캐시이며 리뷰 대상이 아니다」**를 한 줄씩 적는다
+  (없으면 codex 가 세 라운드째 「clean worktree 와 다르다」를 residual risk 로 적는다).
+  네트워크는 열지 않는다 — 심판이 저장소 내용을 밖으로 보낼 표면이 생긴다.
+- 사전 스모크 명령은 **변수에 담아 확장하지 않는다** — zsh 는 단어 분리를 하지 않아
+  `G="./gradlew --offline …"; $G check` 가 `no such file` 로 전건 실패하면서 래퍼는 exit 0 을
+  보고한다(1A 4차에서 「전건 통과」로 넘길 뻔했다). 명령마다 풀어서 쓰고 exit code 를 각각 본다.
 - `GRADLE_RO_DEP_CACHE` 는 **live `~/.gradle/caches` 를 직접 가리키지 않는다** — Gradle 이 RO
   캐시의 동시 쓰기 부재를 전제하므로 사본을 쓴다. rsync 는 증분이라 2회차부터 빠르다.
 - `.gradle-home/` 은 worktree 안의 untracked 디렉터리다 — §5·§7 의 `git status --porcelain`
