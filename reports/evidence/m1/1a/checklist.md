@@ -1,21 +1,24 @@
 # checklist — M1 / 1A
 
-## M1 완료 조건 대조 (`milestone-1.md:77`~`:85`)
+## M1 완료 조건 대조 (`milestone-1.md` 「완료 조건」)
 
 `milestone-1.md` 의 완료 조건은 **M1 전체**의 것이다. 1A 가 담당하는 것과 1B~1E 로 넘어가는
 것을 나눈다 — 1A 가 남의 조건까지 「충족」이라 적으면 그 서술이 곧 거짓이 된다.
 
-| 좌표 | 조건 | 1A 판정 | 근거 |
-| --- | --- | --- | --- |
-| `:79` | `./gradlew check` 통과 | **충족** | `commands.md` `A-1` |
-| `:80` | 금지 import·순환 의존을 일부러 넣은 fixture 가 **실제로 실패** | **충족** | `commands.md` RED → GREEN. 위반 다섯 형태(금지 import · 역방향 의존 · 업무 모듈 직접 참조 · 패키지 순환 · 기술 계층 패키지명)에 **금지 가족 일곱**(Spring·JPA·JSON·HTTP·broker·SQL·I/O)을 더해 심었고, fixture 가 없던 시점에 같은 단언이 **전부 실패**했다 |
-| `:81` | 승인된 authoritative corpus 전체 통과 | **pending — 1B~1E** | 1A 는 corpus 를 소비하지 않는다. `golden-manifest.json` 이 없는 이유이기도 하다 |
-| `:82` | 중요 rule mutation 이 생존하지 않음 | **pending — 1B~1E** | 도구가 `OPEN-ADR-07` 로 미결. 카탈로그에 pitest 좌표만 등재하고 적용하지 않았다 |
-| `:83` | raw `Double` 금액/rate 가 public domain API 에 없음 | **pending — 1B**. 1A 는 **게이트가 표현 가능한지**까지 | ArchUnit 이 시그니처 타입을 볼 수 있으므로 1B 가 값 타입을 넣는 시점에 규칙으로 표현 가능하다. **1A 는 그 규칙을 쓰지 않았다** — 지킬 대상이 없는 규칙은 빈 집합 위에서 통과하고, 그것이 이 slice 가 피한 형태다 |
-| `:84` | `Uncertain`/`Unmeasurable` 이 성공이나 0 으로 합쳐지지 않음 | **pending — 1C·1D** | 도메인 타입이 없다 |
-| `:85` | 신규 파일/함수 예산 위반 없음 | **부분 — 정의가 부재하다** | 아래 「예산」 |
+**조건은 문면으로 가리킨다** — 줄 번호를 쓰지 않는다. 이 slice 가 `milestone-1.md` 를 편집했고
+그 아래 좌표가 전부 밀렸다(verifier r5 M-1). 아래 「조건」 열은 그 문서의 **축어**라 그대로 grep 키다(공백까지 원문이다).
 
-### `:85` 「예산」 — 1A 가 수치를 정하지 않은 이유
+| 조건 | 1A 판정 | 근거 |
+| --- | --- | --- |
+| `./gradlew check` 통과 | **충족** | `commands.md` `A-1` |
+| 금지 import와 순환 의존을 일부러 넣은 test fixture가 실제로 실패 | **충족** | `commands.md` RED → GREEN. 위반 다섯 형태(금지 import · 역방향 의존 · 업무 모듈 직접 참조 · 패키지 순환 · 기술 계층 패키지명)에 **금지 가족 일곱**(Spring·JPA·JSON·HTTP·broker·SQL·I/O)을 더해 심었고, fixture 가 없던 시점에 같은 단언이 **전부 실패**했다 |
+| 승인된 authoritative corpus 전체 통과 | **pending — 1B~1E** | 1A 는 corpus 를 소비하지 않는다. `golden-manifest.json` 이 없는 이유이기도 하다 |
+| 중요 rule mutation이 생존하지 않음 | **pending — 1B~1E** | 도구가 `OPEN-ADR-07` 로 미결. 카탈로그에 pitest 좌표만 등재하고 적용하지 않았다 |
+| raw `Double` 금액/rate가 public domain API에 없음 | **pending — 1B**. 1A 는 **게이트가 표현 가능한지**까지 | ArchUnit 이 시그니처 타입을 볼 수 있으므로 1B 가 값 타입을 넣는 시점에 규칙으로 표현 가능하다. **1A 는 그 규칙을 쓰지 않았다** — 지킬 대상이 없는 규칙은 빈 집합 위에서 통과하고, 그것이 이 slice 가 피한 형태다 |
+| `Uncertain`/`Unmeasurable`가 성공 또는 0으로 합쳐지지 않음 | **pending — 1C·1D** | 도메인 타입이 없다 |
+| 신규 파일/함수 예산 위반 없음 | **부분 — 정의가 부재하다** | 아래 「예산」 |
+
+### 「신규 파일/함수 예산」 — 1A 가 수치를 정하지 않은 이유
 
 **그 「예산」의 정의를 승인 문서에서 찾지 못했다.** 인접 문면 둘이 서로 다른 축을 가리킨다 —
 `v2-지침서.md` §5:305 는 **크기 한도**(함수 50 · 파일 500)를, §2:55 는 **책임·의존성 예산**을
@@ -49,8 +52,8 @@
 
 1. **coverage 는 측정하고 임계는 없다.** `check` 가 모듈마다 Kover XML·HTML 리포트를 내고
    그 경로(`*/build/reports/kover/`)를 CI 가 아티팩트로 올린다 — **수치는 나온다.** 없는 것은
-   **검증 규칙**이다: 승인 문서에 임계가 부재하고(`milestone-1.md:22` 가 `coverage` 를 이름으로만
-   든다) **도메인 코드가 없는 상태에서 정한 수치는 근거가 없다.** 그래서 `check` 는 coverage 로
+   **검증 규칙**이다: 승인 문서에 임계가 부재하고(`milestone-1.md` 1A 항목이 *"formatting, lint, unit test, coverage,
+   size/complexity ratchet"* 으로 `coverage` 를 이름으로만 든다) **도메인 코드가 없는 상태에서 정한 수치는 근거가 없다.** 그래서 `check` 는 coverage 로
    실패하지 않는다 — **1B 가 첫 도메인 코드와 함께 정한다.**
 2. **`bidding` 모듈이 없다.** 승인 문서(`ADR 0006` D-2.1 · `milestone-1.md` 1A)가 이 보류를
    담고 있고 `OPEN-ADR-14` 가 되살리는 조건을 든다 — **더는 evidence 만의 주장이 아니다**(Codex #1).
@@ -73,7 +76,14 @@
    모듈 사이다. 1B 가 패키지를 늘리면 그때 안쪽에서도 구속력이 생긴다.
 6. **CI 워크플로가 실행된 적 없다.** 원격에 push 하지 않았으므로 `.github/workflows/ci.yml` 은
    **문법만 갖춘 골격**이고 GitHub 러너에서 도는 것을 확인하지 못했다.
-7. **RED/GREEN 커밋을 checkout 해서는 재현할 수 없다.** 빌드에 필요한 여덟 파일이 `90e46ff`
+7. **뿌리 패키지 금지의 과잉 도달 — `java.net` 이 `java.net.URI` 도 막는다.** 금지 좌표를
+   뿌리로 올린 대가다(잎을 적으면 형제가 새는 쪽이 더 나쁘다). 도메인이 URI 를 값으로
+   모델링하려 하면 2 차 게이트가 실패한다. **1A 는 이것을 고치지 않는다** — 1A 의 값 타입
+   규율에 비추면 오히려 맞는 제약일 수 있고, 판단은 실제로 필요해지는 slice 의 몫이다.
+   필요해지면 `ADR 0007` D-4 의 allowlist 형식(사유 + 해소 계획)으로 연다.
+   **함께 잰 것**: `java.math.BigDecimal` 과 `Charsets` 는 막히지 않는다 — 1B 의 금액 타입과
+   인코딩은 안전하다.
+8. **RED/GREEN 커밋을 checkout 해서는 재현할 수 없다.** 빌드에 필요한 여덟 파일이 `90e46ff`
    에서 처음 등장하므로 그 앞 구간(RED·GREEN 커밋 포함)은 clean checkout 에서
    `:build-logic:compileKotlin` 이 깨진다. **이력은 되쓰지 않는다.** head 는 영향받지 않고
    주장 자체는 확인됐다 — verifier 가 그 구간에 파일을 복원해 **RED = 음성 단언 전부 실패 ·

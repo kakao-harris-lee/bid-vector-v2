@@ -66,6 +66,12 @@ class ForbiddenFamilyCoverageTest {
             System.getProperty("bidvector.architecture.policy")
                 ?: error("시스템 속성 'bidvector.architecture.policy' 가 없다 — 빌드가 넘긴다")
 
+        /**
+         * 승인 문서를 **줄 번호가 아니라 인용문·절 제목으로** 가리킨다. 이 slice 가
+         * `milestone-1.md` 를 편집했고 그 아래 줄 번호가 전부 밀렸다 — 인용문은 밀리지 않는다.
+         */
+        const val IO_RULE = "milestone-1.md 「구현 규칙」 — \"domain은 I/O가 없는 입력→출력 함수/객체다\""
+
         /** 각 행의 `source` 가 그 가족을 요구하는 승인 문서의 문면이다. */
         val FAMILIES =
             listOf(
@@ -103,11 +109,11 @@ class ForbiddenFamilyCoverageTest {
                 Family("Protobuf", "ADR 0006 D-6", listOf("com.google.protobuf"), listOf("com.google.protobuf")),
                 Family(
                     "SQL",
-                    "지침서 §3.1 · milestone-1.md:62",
+                    "지침서 §3.1 · $IO_RULE",
                     listOf("java.sql", "org.postgresql"),
                     listOf("org.postgresql"),
                 ),
-                Family("I/O", "milestone-1.md:62", listOf("java.io", "java.nio")),
+                Family("I/O", IO_RULE, listOf("java.io", "java.nio")),
             )
     }
 }

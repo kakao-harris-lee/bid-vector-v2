@@ -188,6 +188,23 @@ diff <(find . -name '*.kt' -o -name '*.kts' | grep -vE '/(build|\.gradle|_worksp
   것**이라 신호가 아니라 잡음이다. 손으로 쓴 소스는 언제나 `src/` 아래에 있고 빌드 산출물은
   거기에 없다 — 그 비대칭이 이 명령을 판별자로 만든다
 
+## 2026-09-02T12:40Z — 인용 축어 대조
+
+이 slice 는 `milestone-1.md` 를 편집했고 그 아래 줄 번호가 전부 밀렸다. 그래서 **그 파일을
+가리킬 때 `file:line` 을 쓰지 않고 인용 축어·절 제목으로 가리킨다**(`evidence-pack` 「낡는
+좌표」). 인용이 축어인지는 대조로만 안다 — **첫 시도의 표는 축어가 아니라 조사 띄어쓰기를
+고친 의역이었고 이 명령이 그것을 잡았다.**
+
+```
+sed -n '/^## M1 완료 조건 대조/,/^### /p' reports/evidence/m1/1a/checklist.md \
+ | awk -F'|' '/^\| / && NF>3 {gsub(/^ +| +$/,"",$2); if ($2 !~ /^-+$/ && $2 != "조건") print $2}' \
+ | while IFS= read -r q; do printf '%s\t%s\n' "$(grep -cF "$q" milestone-1.md)" "$q"; done
+```
+
+- exit: 0
+- 핵심 결과: **매치 0 인 줄이 없다.** 표 밖의 인용 넷(I/O 규정 · 범위 밖 · 1A 모듈 문장 ·
+  ratchet 열거)과 fixture 쪽 인용 하나도 같은 방식으로 확인했다
+
 ## 2026-09-02T08:55Z — 비밀값 스캔
 
 **패턴을 여기 옮겨 적지 않고 이 절의 이름도 한국어로 쓴다.** 정본은 `evidence-pack` SKILL 의

@@ -10,7 +10,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 /**
- * 경계 게이트의 **음성** 쪽 — `milestone-1.md:80` 이 요구하는 *"일부러 넣은 fixture 가 실제로
+ * 경계 게이트의 **음성** 쪽 — `milestone-1.md` 「완료 조건」이 요구하는 *"일부러 넣은 test fixture가 실제로
  * 실패"* 다. `ADR 0006` §4 — *"게이트가 있다는 주장이 아니라 게이트가 잡는다는 증거가 기준"*.
  *
  * 규칙을 fixture 전용으로 새로 쓰지 않는다. production 을 지키는 **같은 규칙 값**에 fixture
