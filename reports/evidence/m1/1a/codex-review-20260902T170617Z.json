@@ -1,0 +1,44 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "161d94d86f93d3712de238f4216fe289771c5bc3",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "config/quality/architecture-policy.properties",
+      "line": 65,
+      "evidence": "domain allow-list가 Throwable·Exception·RuntimeException을 허용하지만 member.forbidden은 시스템 프로퍼티 메서드 3개만 막는다. 동일한 production ArchitectureRules로 `RuntimeException(\"domain side effect\").printStackTrace()`를 포함한 domain fixture를 평가한 결과 `violations=0`이었다. 생성 바이트코드는 `RuntimeException.printStackTrace()`만 참조하므로 허용 클래스 검사도 통과한다. `javap -c java.lang.Throwable`은 이 메서드가 `System.err`로 출력함을 확인한다. 따라서 milestone-1.md의 「domain은 I/O가 없는 입력→출력 함수/객체다」 규칙을 추가 의존 없이 우회한다.",
+      "required_fix": "허용된 예외 계층의 `printStackTrace` 같은 I/O 멤버를 상속 관계까지 포함해 차단하거나 허용 API를 더 좁혀라. 같은 production 규칙을 사용하는 음성 fixture를 추가하고 구체적인 출력 멤버 때문에 실패함을 단언하라."
+    },
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector/buildlogic/MeasuredFunction.kt",
+      "line": 48,
+      "evidence": "함수 50줄 게이트는 입력 파일 중 확장자가 정확히 `kt`인 파일만 PSI로 측정한다. 그러나 이 slice의 Gradle Kotlin DSL 구현에는 `bidvector.kotlin-conventions.gradle.kts` 같은 실제 `.kts` 코드가 있고, build-logic size report도 이 파일을 파일 크기 입력으로 열거한다. 55행 본문을 가진 임시 `.kts` 함수로 `measureFunctions`를 직접 호출하자 `kts_measured_count=0`이 반환됐다. 기존 KotlinFunctionLengthsTest 9건도 모두 `Probe.kt`만 사용한다. 따라서 `.kts` 함수는 파일이 500줄 이하인 한 승인된 Kotlin 함수 50줄 한도를 우회한다.",
+      "required_fix": "함수 측정이 `.kt`와 `.kts`를 모두 파싱하도록 수정하고, 루트·모듈 Gradle Kotlin DSL 파일도 크기 게이트 입력에 포함하거나 승인된 명시적 제외 근거를 남겨라. 50줄 초과 `.gradle.kts` 함수가 production sizeGate에서 실패하는 음성 테스트를 추가하라."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse --verify <base>^{commit}; git rev-parse --verify <head>^{commit}; git rev-parse HEAD; git status --short --untracked-files=all",
+    "git diff --stat <base>..<head>; git diff --name-status <base>..<head>; git log --oneline <base>..<head>; git merge-base <base> <head>; git diff --check <base>..<head>",
+    "sed/nl로 agent-workflow.md, v2-지침서.md, milestone-1.md, ADR 0001·0003·0004·0006·0007, capability-map 및 m1/1a evidence 전체를 확인",
+    "nl/sed로 settings.gradle.kts, 루트·모듈 build script, build-logic task/policy, ArchitecturePolicy/Rules/Test, compatibility smoke와 모든 음성·양성 fixture를 확인",
+    "Python ElementTree로 build/test-results XML 7개를 집계 — 60 tests, failures/errors/skipped 0",
+    "Python ElementTree로 Kover XML 9개와 detekt XML 10개를 파싱 — 전건 파싱 성공, detekt error 0",
+    "build/reports/convention-coverage, quality-baseline, build-logic size report, 모듈별 dependency/package/source-language/jar-content/size gate 및 compatibility-smoke 산출물을 대조",
+    "git status --porcelain -- ':!.gradle-home'; git ls-files와 디스크의 Kotlin/KTS 파일 집합 대조 — 각각 69개, 차이 없음",
+    "unzip -tq gradle/wrapper/gradle-wrapper.jar; sh -n gradlew; bash -n gradlew; Ruby YAML.safe_load로 .github/workflows/ci.yml 파싱",
+    "javap -c java.lang.String; javap -c java.util.Formatter; javap -c java.lang.Throwable; javap -c bidvector.buildlogic.MeasuredFunctionKt",
+    "임시 Kotlin fixture `RuntimeException(...).printStackTrace()`를 컴파일하고 production ArchitectureRules로 평가 — violations=0; javap로 호출 바이트코드 확인",
+    "임시 55행 `.kts` 함수를 Java reflection으로 `measureFunctions`에 전달 — kts_measured_count=0"
+  ],
+  "residual_risks": [
+    "지시된 sandbox 제한에 따라 Gradle은 실행하지 않았다. 제공된 HEAD build 산출물에서 테스트 60건, Kover 9개, detekt 10개와 각 게이트 보고서를 대조했다.",
+    "GitHub Actions는 YAML 문법과 정적 배선만 확인했으며 실제 GitHub runner 실행 증거는 없다.",
+    "coverage는 XML·HTML 측정만 배선됐고 실패 임계는 승인된 수치가 없어 1B로 이월돼 있다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
