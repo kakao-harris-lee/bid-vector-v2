@@ -1,5 +1,6 @@
 import bidvector.buildlogic.ModuleBaselineSpec
 import bidvector.buildlogic.ModuleDependencyGateTask
+import bidvector.buildlogic.PackageOwnershipGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.lib
@@ -64,6 +65,18 @@ val moduleDependencyGate =
         report = layout.buildDirectory.file("reports/module-dependency-gate/resolved.txt")
     }
 
+// 경계 규칙 전체가 클래스의 **자기 신고**에 기대지 않게 한다 — 선언 없는 패키지와 남의
+// 세그먼트 참칭을 산출물 위치로 잡는다.
+val packageOwnershipGate =
+    tasks.register<PackageOwnershipGateTask>("packageOwnershipGate") {
+        description = "모듈의 class output 이 그 모듈이 소유한 패키지 아래에만 있는지 잰다"
+        policyFile = configDir.file("quality/architecture-policy.properties")
+        moduleName = project.name
+        classDirectories.from(layout.buildDirectory.dir("classes/kotlin/main"))
+        dependsOn(tasks.named("classes"))
+        report = layout.buildDirectory.file("reports/package-ownership-gate/packages.txt")
+    }
+
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
@@ -79,6 +92,7 @@ tasks.named("check") {
     dependsOn(
         sizeGate,
         moduleDependencyGate,
+        packageOwnershipGate,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )
