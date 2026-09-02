@@ -34,11 +34,10 @@ class ForbiddenFamilyCoverageTest {
         )
     }
 
-    private fun isAllowed(candidate: String): Boolean {
-        val excluded = policy.excludedFromAllowed.any { candidate == it || candidate.startsWith("$it.") }
-        if (excluded) return false
-        return policy.allowedPackages.any { candidate == it || candidate.startsWith("$it.") }
-    }
+    /** 정확 패키지 허용 + `bidvector` 만 하위까지. 게이트의 판정과 같은 모양이다. */
+    private fun isAllowed(candidate: String): Boolean =
+        candidate in policy.allowedExactPackages ||
+            policy.allowedSubtrees.any { candidate == it || candidate.startsWith("$it.") }
 
     @Test
     fun `Maven 좌표가 있는 가족은 group 좌표계에도 전부 있다`() {
@@ -53,16 +52,17 @@ class ForbiddenFamilyCoverageTest {
     }
 
     /**
-     * 제외 항목은 **허용 뿌리 안에 있어야** 뜻이 선다. 허용된 적 없는 것을 제외 목록에 적는 것은
-     * 모델을 잘못 읽은 것이고, 그 항목은 아무것도 막지 않으면서 막는 것처럼 보인다.
+     * 클래스 단위 금지는 **허용된 정확 패키지 안**에 있어야 뜻이 선다. 허용된 적 없는 패키지의
+     * 클래스를 적는 것은 아무것도 막지 않으면서 막는 것처럼 보인다. 이 잔여 deny 가 「무한 열거」가
+     * 아닌 근거이기도 하다 — 대상이 유한한 JDK 패키지 안으로 한정된다.
      */
     @Test
-    fun `제외 항목은 허용 뿌리 안에 있다`() {
+    fun `클래스 금지는 허용된 정확 패키지 안에 있다`() {
         val orphan =
-            policy.excludedFromAllowed.filterNot { excluded ->
-                policy.allowedPackages.any { excluded.startsWith("$it.") }
+            policy.forbiddenClasses.filterNot { fqcn ->
+                fqcn.substringBeforeLast('.') in policy.allowedExactPackages
             }
-        assertTrue(orphan.isEmpty(), "허용된 적 없는 것을 제외했다: $orphan")
+        assertTrue(orphan.isEmpty(), "허용된 적 없는 패키지의 클래스를 금지했다: $orphan")
     }
 
     private class Family(

@@ -31,15 +31,16 @@ class ArchitectureRules(
         )
 
     private fun outsideAllowList(root: String): DescribedPredicate<JavaClass> {
-        val allowed = policy.allowedPackages.map { if (it == ROOT_PLACEHOLDER) root else it }
-        val excluded = policy.excludedFromAllowed
+        val subtrees = policy.allowedSubtrees.map { if (it == ROOT_PLACEHOLDER) root else it }
+        val exact = policy.allowedExactPackages.toSet()
+        val forbiddenClasses = policy.forbiddenClasses.toSet()
         return object : DescribedPredicate<JavaClass>(
-            "허용 목록 밖 (허용=$allowed, 그중 제외=$excluded)",
+            "허용 목록 밖 (하위까지=$subtrees, 정확 패키지=$exact, 그중 금지 클래스=$forbiddenClasses)",
         ) {
             override fun test(target: JavaClass): Boolean {
                 if (target.isPrimitive || target.isArray) return false
-                val name = target.packageName
-                return name.isUnder(excluded) || !name.isUnder(allowed)
+                val admittedPackage = target.packageName in exact || target.packageName.isUnder(subtrees)
+                return target.name in forbiddenClasses || !admittedPackage
             }
         }
     }
