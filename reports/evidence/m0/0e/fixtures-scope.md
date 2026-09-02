@@ -15,8 +15,13 @@
 - `fixtures/manifest.yaml`
 - `fixtures/input/*.json` · `fixtures/expected/*.json` (`cases` 전건 — **분류와 무관하게** 전부 이
   레인이 쓴다. 수는 **F-7** 이 낸다)
-- `fixtures/tools/check_legacy_numbers.py` (**F-3**) · `fixtures/legacy-reference-index.json` (**F-5**)
-  — `manifest.yaml`의 `layout.other_files`가 둘을 선언한다
+- `fixtures/tools/**` · `fixtures/legacy-reference-index.json` — 이 레인이 쓴 검사·스윕 도구와
+  legacy 좌표 고정 산출물. **어느 파일이 있고 무엇을 하는지는 디렉터리와 각 파일의 docstring 이
+  낸다** — 여기 열거하지 않는다. 호출 자리는 `fixtures-commands.md` 의 **F-3**(numeric
+  discipline) · **F-5**(legacy 좌표) · **F-8**(mutation 스윕)이다.
+  **`manifest.yaml` 의 `layout.other_files` 는 앞의 둘만 선언한다** — 2026-09-02 에 들어온
+  스윕 셋은 아직 그 목록에 없다. manifest 무접촉 경계 아래서 옮긴 것이라 그 정합은 이
+  레인의 다음 manifest 라운드 몫이고, 그때까지 이 문장이 그 자리를 표시한다
 - `reports/evidence/m0/0e/fixtures-*.md`
 
 ## out_of_scope
@@ -134,15 +139,38 @@ case 적용 설계가 따라옴."*
 밖이라, 가족 A 의 네 이름과 가족 B 의 자작 그릇이 **경로 밖에 놓이는 것이 기본**이 됐다. 정본은
 `manifest.yaml` 의 `classification_policy.insufficient_evidence` 가 갖는다.
 
+**그 뒤 운영자가 분류의 기준 자체를 기계로 옮겼다 — 2026-09-02 「동결+강등」.**
+
+*결정 축어 — 물음과 답을 그대로 옮긴다(대신 판단하지 않는다).* Codex 재리뷰 B9 가, 동결된 술어로는
+막히지 않는 변이 셋(**주장 필드 삭제 · null 치환 · 다른 확정 토큰**)을 실증하고 스스로 fallback 을
+제시했다 — *"그런 projection 으로 표현할 수 없는 case 는 계약이 준비될 때까지 authoritative 에서
+내린다."* 운영자가 그것을 택했다: **술어 어휘를 동결하고**(`verified_paths` 정확 비교 ·
+`verified_projections` 의 `not-equals` + 선택 `normalize: case-fold` 가 전부),
+**리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+
+**이 결정으로 분류가 산문의 판단에서 기계의 판정으로 바뀌었다** —
+**「`authoritative` = 확장 적대 집합에서 위반 변이체 통과 0」**. 통과가 하나라도 있으면 그 case 는
+**기계적으로** `insufficient-evidence` 로 내려간다. **어느 case 가 내려갔고 몇인지는 여기 적지
+않는다** — 판정의 정본이 스윕이고(`commands.md` **C-15** · 재실행은 **F-8**), 각 case 의
+`change_history` 와 `not_covered` 가 자기를 통과시킨 갈래를 싣는다.
+
+**이 강등의 사유는 근거의 층이 아니다.** 내려간 case 들의 `source.kind` 는 그대로 두었다 — 근거가
+약해서가 아니라 **그 주장을 동결된 술어로 표현할 수 없어서** 내려간다. 그래서
+`insufficient-evidence` 로 가는 길이 이제 둘이고, 그 구별은 아래 「알려진 제한」 7 이 적는다.
+되돌림은 `uncovered_axes` 의 「계약 술어 부재로 **authoritative 를 유지하지 못한** 축」이 지목한다.
+
 **셈을 여기 옮겨 적지 않는다** — case 수 · **분류별 분포** · `source.kind` 분포와 그 교차 ·
 `uncovered_axes`/`insufficient_evidence`/`access_approval_required` 수는 전부 **F-7** 이 낸다.
 도메인별 건수도 같은 명령이 낸다(분류를 섞지 않으려면 `kind x class` 줄을 함께 본다).
 
 ## `milestone-1.md:12`("검증 fixture 중 `authoritative` case 준비")를 어디까지 만족하는가
 
-**부분 만족이고, 2026-08-31 결정과 그날의 전수 재판정으로 만족도가 두 번 내려갔다.**
-`authoritative` 로 서는 case 수가 줄었고(F-7 의 `classification` 줄), 그만큼 `data-extract.md`
-§4의 도메인별 최소 corpus 를 덮는 몫이 작아졌다. **내려간 case 가 덮던 축은 사라진 것이 아니라
+**부분 만족이고, 2026-08-31 결정 이후 라운드가 거듭될수록 만족도가 내려갔다.**
+아래 문단들이 그 내림을 **일어난 순서대로** 적는다 — **라운드 수도 case 수도 여기 세지 않는다**:
+현재 분류의 정본은 `manifest.yaml` 이고 셈은 **F-7** 이, 어느 case 가 어느 라운드에 내려갔는지는
+각 case 의 `change_history` 가 낸다. `authoritative` 로 서는 case 수가 줄었고(F-7 의
+`classification` 줄), 그만큼 `data-extract.md` §4의 도메인별 최소 corpus 를 덮는 몫이
+작아졌다. **내려간 case 가 덮던 축은 사라진 것이 아니라
 `uncovered_axes` 로 옮겨졌다** — 첫 적용이 만든 넷은 `floor-applicability`(하한 적용 범위·시행일) ·
 `koneps-collection`(필드 계약 강제, 코드·라벨 분리) · `ml-boundary`(결측 provenance, 누수 차단
 시그니처) · `license`(허용업종 단독 보유의 임시 처리)이고, **전수 재판정이 셋을 더했다** —
@@ -157,22 +185,33 @@ provenance) · `money-basis`(`Unknown` 과세 금액의 산술 비교 차단). *
 **이어진 어휘 전수 스캔이 같은 축에 둘을 더 붙였다** — `verdict-003`(기대값이 그 `LowPriority`
 와 `BidNow` 를 잠근다)과 `floor-applicability-001`(`OutOfScope`). 규칙의 근거는 둘 다 성한데
 기대값이 미승인 어휘를 잠그는 자리다.
-**출력 표현 결정이 축을 하나 더 세웠다 — 이번에는 case 가 내려가서가 아니다.**
-`floor-shortfall-002`·`003`은 `authoritative` 로 **남았고** 만족도를 더 내리지 않는다. 대신 두 case 가
-자기 `verifies` 에서 **출력 표현 묶음과 유리수 표현**을 내려놓았고, 그 자리를 `uncovered_axes` 의
-「승인 부재로 **검증 주장에서 내린** 축」이 받는다. **덮개를 잃은 것과 처음부터 주장하지 말았어야 할
-것을 내려놓은 것은 다르다** — 이 축은 뒤쪽이며 그 구별을 그 항목의 `why_blocked` 가 적는다.
+**출력 표현 결정이 축을 하나 더 세웠다 — 그때는 case 가 내려가서가 아니었다.**
+`floor-shortfall-002`·`003`은 그 라운드에 `authoritative` 로 **남았고** 만족도를 더 내리지 않았다.
+대신 두 case 가 자기 `verifies` 에서 **출력 표현 묶음과 유리수 표현**을 내려놓았고, 그 자리를
+`uncovered_axes` 의 「승인 부재로 **검증 주장에서 내린** 축」이 받는다. **덮개를 잃은 것과 처음부터
+주장하지 말았어야 할 것을 내려놓은 것은 다르다** — 이 축은 뒤쪽이며 그 구별을 그 항목의
+`why_blocked` 가 적는다.
 **재판정은 앞선 넷 중 하나의
 「덮개」 서술도 뒤집었다** — `koneps-collection` 은 그 축에 `authoritative` 로 남는 case 가 있다고
 적었으나 **전건 내려갔다.** `floor-applicability` 도 **어휘 판정으로 전건이 됐다** — `-001` 의
 **규칙**은 기록자 bullet 결정으로 서지만 그 case 의 `verifies` 가 상태의 이름(`OutOfScope`)까지
 함께 고정하고 그 어휘는 `data-dictionary.md` 가 스스로 더한 variant 다. 원래 막혀 있던 축은
 그대로 남는다.
+
+**마지막으로 2026-09-02 「동결+강등」이 만족도를 또 내렸다 — 이번 사유는 앞의 것들과 다르다.**
+근거의 층이 아니라 **계약 술어의 부재**로 내려간 것이라, 그 case 들이 덮던 축은 위 목록이 아니라
+`uncovered_axes` 의 「계약 술어 부재로 authoritative 를 유지하지 못한 축」으로 간다. 바로 위
+문단들이 이름을 든 case 중에도 이 라운드에 내려간 것이 있다 — **그러니 이 절의 어느 문단도 현재
+분류로 읽지 않는다.** 각 문단은 자기 라운드의 판정을 기록할 뿐이고, **현재 분류는
+`manifest.yaml` 과 F-7 이, 이 라운드의 판정은 스윕이 낸다**(**C-15** · **F-8**).
+
 그 목록을 비우지 않고 그럴듯하게 채우지도 않았다. **수는 여기 박지 않는다 — F-7 이 낸다.**
 
-**§6 이 이 상태에 완료 gate 실패를 건다.** 그러므로 `milestone-1.md:12` 는 **이 결정이 되돌려지기
-전에는 이 corpus 만으로 충족되지 않는다** — 되돌림은 운영자가 그 acceptance 들을 업무 규칙으로
-명시 승인하는 것이고, `license-011` 은 그에 더해 활성 `OPEN-QUAL-11` 이 닫혀야 한다.
+**§6 이 이 상태에 완료 gate 실패를 건다.** 그러므로 `milestone-1.md:12` 는 **이 결정들이 되돌려지기
+전에는 이 corpus 만으로 충족되지 않는다** — 되돌림은 **내려간 사유마다 다르다**: 근거의 층으로
+내려간 case 는 운영자가 그 acceptance 들을 업무 규칙으로 명시 승인해야 하고, 계약 술어 부재로
+내려간 case 는 **M1/M2 계약 설계가 그 주장을 표현할 술어를 세워야** 한다(동결은 이 slice 의
+것이지 영구가 아니다). `license-011` 은 그에 더해 활성 `OPEN-QUAL-11` 이 닫혀야 한다.
 
 **분류가 `authoritative`인 것과 승인된 것은 다르다.** `authoritative` 로 남은 것을 포함해 모든
 case 의 `review.approved_by_user`가 `false`, `review.codex_verdict`가 `pending`이다.
@@ -202,8 +241,13 @@ case 의 `review.approved_by_user`가 `false`, `review.codex_verdict`가 `pendin
    2026-08-31 이 그 자리를 닫았다: **`authoritative` 에서 제외한다.** 되돌리기 쉬운 쪽을
    택한 것이며(미승인 규칙이 golden 이 되는 것을 먼저 막는다) case 는 지우지 않았다.
    `source.kind: m0-derived-rule`이 그 자리를 표시하고 근거·되돌림 경로는 `manifest.yaml`의
-   `classification_policy.insufficient_evidence`가 적는다. 어느 case 가 드는지와 그 대응이
-   전건인지는 **F-7**의 `kind x class` 줄이 낸다.
+   `classification_policy.insufficient_evidence`가 적는다. 어느 case 가 드는지는 **F-7**의
+   `kind x class` 줄이 낸다.
+   **`insufficient-evidence` 로 가는 길이 이제 둘이라 그 줄을 「전건 대응」으로 읽으면 안 된다.**
+   ① **근거의 층** — 위가 적는 자리이고 `source.kind` 가 함께 내려간다. ② **계약 술어의 부재**
+   (2026-09-02 동결+강등) — `source.kind` 는 **그대로 두었다**. 그래서 `m0-derived-rule` 과
+   `insufficient-evidence` 는 더 이상 같은 집합이 아니며, 그 차가 ②로 내려간 자리다.
+   어느 쪽인지는 각 case 의 `change_history` 가 적고, ②의 판정은 스윕이 낸다(**C-15** · **F-8**).
    **같은 날의 전수 재판정이 이 목록을 늘렸다** — 결정 문면을 원문으로 열어 보니 `kind` 가
    `operator-decision`·`official-doc`·`approved-spec` 이면서 실제 근거는 M0 자체 도출인 자리가
    있었고, 그 case 들의 `source.kind` 를 내리고 `classification` 을 따라 내렸다. 각 case 의
@@ -227,5 +271,11 @@ case 의 `review.approved_by_user`가 `false`, `review.codex_verdict`가 `pendin
 
 ## rollback
 
-`fixtures/` 디렉터리 전체와 `reports/evidence/m0/0e/fixtures-*.md`를 지우면 base 상태다.
-다른 경로에 쓴 것이 없고, 이 slice 는 어떤 실행 코드도 만들지 않았다.
+`fixtures/` 디렉터리 전체와 `reports/evidence/m0/0e/fixtures-*.md`를 지우면 base 상태다
+(`.gitignore` 의 `__pycache__/` 한 줄만 남고, 그 줄은 지워도 무해하다).
+
+**이 slice 가 만든 실행 코드는 `fixtures/tools/` 아래에만 있고, 하는 일은 검사다.** 어느 것도
+V2 런타임에 들어가지 않고, 읽는 것은 이 저장소 안의 `fixtures/` 뿐이며, 파일을 쓰지 않는다
+(스윕의 변이는 기대값 JSON 의 **메모리 사본**에서만 일어난다). 네트워크·DB·외부 API 호출은
+없다. 그러므로 이 도구들에는 「비활성화」가 따로 없다 — 부르지 않으면 아무 일도 일어나지 않고,
+지우면 남는 것은 **판정을 다시 낼 수 없는 상태**(2026-09-02 이전)다.
