@@ -41,7 +41,7 @@
 | 구현 diff 가 커밋되어 base/head 고정 | `git status --porcelain -- <in_scope 경로>` 가 비어 있어야 한다 — 판정은 verifier 레인이 재실행한다. **이 명령만으로는 부족하고** 그 틈은 `A-0`·`A-0b` 가 맡는다 — 근거는 `commands.md` 의 `A-0b` 절 |
 | `acceptance_commands` 전부 exit 0 | 전건. 목록은 `scope.md` 의 `acceptance_commands` 가 내고 결과는 `commands.md` 의 acceptance 절이 낸다 — 여기서 다시 열거하면 목록이 늘 때마다 낡는다 |
 | test/lint/type/architecture 통과 | `A-1` 이 전부를 든다 — **`build-logic` 의 lint·detekt·크기 게이트와 판정 테스트까지 포함한다**(Codex #5) |
-| 변경된 fixture 와 정책 version 의 근거 | 정책 데이터 둘 다 `policy.version=1` 이고 값의 출처를 파일 주석이 든다. **1A 가 값을 고른 것은 없다** — `v2-지침서.md` §5:305 의 둘을 옮겼을 뿐이다 |
+| 변경된 fixture 와 정책 version 의 근거 | 정책 데이터 둘 다 `policy.version` 을 갖고 값의 출처를 파일 주석이 든다 — **현재 값은 `grep '^policy.version' config/quality/*.properties` 가 낸다**(수를 여기 박으면 정책이 바뀔 때마다 낡는다). **임계 수치는 1A 가 고르지 않았다** — `v2-지침서.md` §5:305 의 둘을 옮겼을 뿐이다. 반면 **금지 가족의 좌표 열거는 1A 가 고른 정책**이고(Codex #3 대응) 그 근거는 가족마다 심은 fixture 다 |
 | 알려진 제한과 rollback | 아래 「알려진 제한」 · `rollback.md` |
 | 비밀값 스캔 | `commands.md` 의 비밀값 스캔 절 |
 
@@ -58,6 +58,13 @@
    (`java.net`·`java.sql`·`java.io`). 그래서 둘 다 둔다 — 어느 쪽도 혼자로는 충분하지 않다.
    `commands.md` 의 가족별 표가 그 분담의 실측이다. Kotlin `internal` 이 바이트코드에서
    public 으로 보이는 것도 같은 성질이고, `qualityBaseline` 의 public API 수가 그 영향을 받는다.
+
+   **두 사각이 겹치는 자리가 하나 있다 — 컴파일 시 인라인되는 상수.** domain 이
+   `java.net.HttpURLConnection.HTTP_OK` 만 쓰면 바이트코드에 그 타입 참조가 한 건도 남지
+   않아(`javap` 로 확인) 2 차가 못 보고, JDK 타입이라 Maven group 이 없어 1 차도 못 본다 —
+   **어느 층도 잡지 못한다.** 실질 위험은 낮다: 넘어오는 것이 `int` 값 하나라 프레임워크
+   결합이 실제로 들어오지는 않는다. 그러나 「두 사각이 서로 반대라 둘이면 덮인다」는 말은
+   **이 자리에서 참이 아니다.**
 4. **detekt 2.0 은 alpha 다.** 규칙과 설정 키가 정식 출시 전에 바뀔 수 있다. 승인된 두 임계 중
    파일 축은 detekt 밖(`sizeGate`)에 있어 detekt 이 죽어도 남는다.
 5. **모듈 안의 패키지 순환은 아직 시험되지 않았다.** 규칙(`bidvector.(**)` slice)은 걸려 있으나
@@ -68,17 +75,18 @@
 7. **RED/GREEN 커밋을 checkout 해서는 재현할 수 없다.** 빌드에 필요한 여덟 파일이 `90e46ff`
    에서 처음 등장하므로 그 앞 구간(RED·GREEN 커밋 포함)은 clean checkout 에서
    `:build-logic:compileKotlin` 이 깨진다. **이력은 되쓰지 않는다.** head 는 영향받지 않고
-   주장 자체는 확인됐다 — verifier 가 그 구간에 파일을 복원해 **RED = 11 tests 5 failed(음성
-   단언 다섯 전부, 양성 여섯 통과) · GREEN = exit 0** 을 실측했다.
+   주장 자체는 확인됐다 — verifier 가 그 구간에 파일을 복원해 **RED = 음성 단언 전부 실패 ·
+   양성 전부 통과, GREEN = exit 0** 을 실측했다(그 시점의 수는 verifier r1 리포트가 갖는다).
 
    **현재 head 에서 RED 를 재현하는 방법** — 위반 fixture 를 지우면 음성 단언이 되살아난다.
 
    ```
    rm -r app/src/test/kotlin/bidvector/archfixture/violating
-   ./gradlew :app:test --tests '*ArchitectureGate*'      # 11 tests, 5 failed
+   ./gradlew :app:test --tests '*ArchitectureGate*'      # 음성 단언 전부 실패 · 양성 전부 통과
    git checkout -- app/src/test/kotlin/bidvector/archfixture
    ```
 
    테스트는 fixture 를 **패키지 이름 문자열로만** 참조하므로 fixture 가 없어도 컴파일된다 —
    그래서 결과가 컴파일 오류가 아니라 「위반을 못 찾았다」가 되고, 그것이 음성 단언의
-   RED 다.
+   RED 다. **수는 적지 않는다** — 음성 단언은 금지 가족이 늘면 함께 늘고(실제로 5 → 11 로
+   늘었다) 그때마다 이 문단이 낡는다. 명령이 내는 수를 읽으면 된다.
