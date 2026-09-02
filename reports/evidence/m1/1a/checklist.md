@@ -179,6 +179,8 @@
    **다만 이제 「눈치채지 못한 구멍」이 아니라 기록된 판단이다.** 도출이 `String#format` 을
    기본 로케일에 닿는 후보로 냈고, 분류가 `reviewed` 이며 그 줄이 사유를 적는다. 양성 corpus
    (`DomainShapes.formatted`)가 이 통과를 고정하므로 판단이 바뀌면 그 자리가 함께 움직인다.
+   **막히는 쪽의 짝은 제한 25 다** — 같은 형식화·로케일 축에서 `lowercase()` 는 차단된다.
+   두 쪽 다 기록된 판단이어야 비대칭이 생기지 않는다.
 19. **RED/GREEN 커밋을 checkout 해서는 재현할 수 없다.** 빌드에 필요한 여덟 파일이 `90e46ff`
    에서 처음 등장하므로 그 앞 구간(RED·GREEN 커밋 포함)은 clean checkout 에서
    `:build-logic:compileKotlin` 이 깨진다. **이력은 되쓰지 않는다.** head 는 영향받지 않고
@@ -230,6 +232,29 @@
     `archunit.properties` 한 줄로 꺼질 수 있으므로, **그 설정을 단언하는 테스트**를 두어 부재가
     조용하지 않게 했다. 훑기가 실제로 덮는 것은 「owner 의 계보는 알지만 그 멤버만 못 찾는」
     좁은 경우이고, 그 경우를 이 corpus 에서 만들지는 못했다.
+
+25. **대소문자 정규화는 현재 허용 경로가 없다 — 차단되는 쪽의 기록된 판단이다.**
+    Kotlin 의 `lowercase()`/`uppercase()`(인자 없는 형)는 **의도적으로 로케일 비의존**이고
+    로케일 의존적인 `toLowerCase()` 의 권장 대체인데, 도메인에서 쓰면 exit 1 이다.
+    `String.toLowerCase(Locale.ROOT)` 로 컴파일되므로 **두 층이 동시에 문다**(실측: 두 규칙이
+    각각 보고한다) — 효과 분류의 `java.lang.String#toLowerCase`(로케일 의존 오버로드 때문에
+    `forbidden`)와, `java.util.Locale` 이 T-C 허용 목록에 없는 것. **그래서 멤버를 재분류하는
+    것만으로는 열리지 않는다** — `Locale.ROOT` 필드 접근이 남는다.
+
+    **부분 대안만 있다**: `equals(ignoreCase = true)` 는 통과하므로 *비교*는 되지만
+    **정규화 키**(map key · 중복 제거 · canonical form)를 만드는 경로가 없다. 이 프로젝트에서
+    닿을 자리가 실재한다 — `capability-map.md` 의 `settlement` 「상호 정규화 토큰」과 1C 의
+    별칭·포괄 코드가 같은 성질이다.
+
+    **1A 가 고치지 않는다.** 방향이 안전한 차단이고(새는 쪽이 아니다) 도메인 코드가 없는
+    상태에서 정할 판단이 아니다. 필요해지면 `ADR 0007` D-4 의 allowlist 형식으로 **둘을 함께**
+    연다 — `class.allowed` 에 `java.util.Locale` 을 더하고 `String#toLowerCase` 를 사유와 함께
+    재분류한다. 「허용 목록의 과잉 도달」(`java.net.URI`)과 같은 가족이되, 그쪽과 달리 **효과
+    분류 층이 함께 관여**한다는 점이 다르다.
+
+    **이 항목이 있는 이유**: 제한 18 이 `String.format` 이 **통과**하는 쪽을 기록된 판단으로
+    등재했는데 **차단**되는 쪽에는 등재가 없었다. 그 비대칭이 있으면 1B 가 `lowercase()` 에
+    막혔을 때 게이트 결함으로 오해할 근거가 문서에 없다.
 
 ## 1B 인계 목록
 

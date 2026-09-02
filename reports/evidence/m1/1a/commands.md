@@ -247,6 +247,7 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `E-43` | 효과 표면에서 `java.io` 제거 | 같은 명령 | **1** | `도출 결과가 커밋본과 다르다` — JDK·정책 변경이 조용히 지나가지 않는다 |
 | `E-44` | 양성: `require`/`check`/`toInt()`·`toString`·`String.format` | `:app:test --tests '*ArchitectureGate*'` | 0 | 오탐 없음. 양성 corpus 가 이 통과를 고정한다 |
 | `E-45` | ArchUnit 의 classpath 해석을 끄고 같은 접근을 잼 | 임시 probe | — | **해석 5/5 → 0/5 미해결**이 되고 상위 타입 훑기 fallback 이 **0 건** 잡는다(`printStackTrace` 보고 2 → 0) — 그때는 owner 의 계보도 함께 알 수 없다 |
+| `E-46` | domain 모듈에 `raw.lowercase()` · `raw.uppercase()` · `a.equals(b, ignoreCase = true)` | `:app:test --tests '*ArchitectureGateTest*'` | 1 · 1 · **0** | **앞의 둘은 두 규칙이 각각 보고한다**(규칙을 따로 평가해 확인) — 멤버 층의 `String#toLowerCase` 와 클래스 층의 `java.util.Locale`. 멤버만 재분류해도 `Locale.ROOT` 필드 접근이 남는다. 비교는 되고 **정규화 키 경로가 없다**(알려진 제한 25) |
 
 분류의 셈은 `./gradlew memberEffectGate` 가 한 줄로 낸다 — 여기 적지 않는다(후보가 바뀌면 낡는다).
 
