@@ -197,7 +197,40 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | Codex a | `Formatter(String)` — 허용 패키지 안의 파일 I/O | **T-C** 목록 밖 | fixture |
 | Codex b | Java source set — 소유·크기·경계 셋 다 비껴감 | `java.setSrcDirs` 봉쇄 + `sourceLanguageGate` | `E-25` |
 
+### Codex 5차 대응표 (addendum)
+
+**두 finding 은 같은 결함이다** — 입력을 **관례**에서 뽑았다(디렉터리 관례·텍스트 관례).
+해법도 같다: Gradle/Kotlin 이 이미 갖고 있는 resolved fact 를 입력으로 삼는다.
+
+| 경로 | 막는 층 | 실측 |
+| --- | --- | --- |
+| `java.srcDir` 재등록 | `allSource`(살아 있는 뷰) + `src/` 병행 | `E-27` |
+| `sourceSets.create("extra")` | source set 집합 고정 | `E-28` |
+| 수제 `JavaCompile`·출력 리다이렉트 | **class 원산지**(`kotlin.Metadata` 부재) | `E-29` |
+| `jar { from("prebuilt") }` | **jar 엔트리 검사** | `E-30` |
+| `@Suppress` 다중 행·`@file:`·`@kotlin.` | **무의미해진다** — PSI 로 직접 잰다 | `E-31` |
+| 45줄 함수 + 20줄 람다 | 람다도 잰다 | `E-32` |
+| 45줄 함수 여럿으로 쪼개 응집도만 저하 | **막지 못한다. 막으려 해서도 안 된다** | 알려진 제한 |
+
 ### 이 라운드의 게이트 실측
+
+| # | 심은 것 | exit | 핵심 결과 |
+| --- | --- | --- | --- |
+| `E-27` | `java.srcDir("domain-java")` + `.java` | 1 | **Codex 시나리오는 현행 head 에서도 이미 잡혔다** — KGP 2.4.10 이 `java.srcDir` 를 kotlin srcDirs 에 넣기 때문(실측). 그 우연에 기대지 않으려 `allSource` 로 옮겼다 |
+| `E-28` | `sourceSets.create("extra")` | 1 | `예상 밖 source set 'extra'` |
+| `E-29` | 수제 `JavaCompile` → `classes/kotlin/main` | 1 | `kotlin.Metadata 가 없다` |
+| `E-30` | `jar { from("prebuilt") }` 로 `evil/Sneak.class` | 1 | `아카이브에 소유 밖 클래스` |
+| `E-31` | 다중 행 `@Suppress` · `@file:Suppress` · `@kotlin.Suppress` + 54줄 함수 | 1 (셋 전부) | detekt 은 exit 0 — **그 축을 더는 detekt 이 들지 않는다** |
+| `E-32` | 50줄 넘는 람다 | 1 | 함수를 쪼개도 닫힌다 |
+
+### addendum 이 미확인으로 남긴 것 — 실측으로 답한다
+
+| 물음 | 답 |
+| --- | --- |
+| KGP 아래 `kotlin.srcDirs` 가 `java.srcDirs` 를 추적하는가 | **추적한다**(`KOTLIN [kotlin, domain-java, kotlin]`). 그래서 Codex 시나리오가 현행 배선에도 걸렸다 — 다만 KGP 내부 동작이라 계약으로 삼지 않는다 |
+| `kotlin.Metadata` 를 전 Kotlin 산출물이 갖는가 | **이 저장소의 전 모듈 산출물에서 위반 0**(게이트가 `check` 마다 전수로 잰다). 「Kotlin 이 만든 모든 클래스」에 대한 일반 보증은 아니다 — 반례가 나오면 그 클래스가 게이트에 걸려 **시끄럽게** 드러난다 |
+| jar 엔트리 검사 | **넣었다**(`E-30`) |
+| TestKit | **넣지 않았다.** 알려진 제한 |
 
 | # | 심은 것 | cmd | exit | 핵심 결과 |
 | --- | --- | --- | --- | --- |

@@ -134,18 +134,18 @@ detekt 이슈 #8865 가 **closed as not planned** 로 닫혔다 — 1.23.8 을 K
 | 축 | 정본 | detekt 이 죽으면 |
 | --- | --- | --- |
 | 파일 500줄 | `sizeGate`(도구 비의존) | **남는다** |
-| 함수 50줄 | `config/detekt/detekt.yml` | **사라진다** |
+| 함수 50줄 | `sizeGate` — Kotlin PSI 로 직접 잰다 | **남는다** |
 | 복잡도·중첩·파라미터 수 등 | detekt 기본값 | 사라진다 |
 
 **앞선 판에서 이 절은 「두 임계 다 sizeGate 가 들고 detekt 이 죽어도 걸린다」고 적었다. 사실이
 아니었다** — 같은 문서 D-5 의 표와 정책 파일 주석이 처음부터 「함수 축은 detekt 정본」이라 적었고
 구현도 그랬다(설계 검토 §3.2 가 그 어긋남을 지목했다).
 
-**대신 함수 축이 인라인으로 꺼지는 것은 막는다.** `@Suppress("LongMethod")` 한 줄이면 detekt 이
-그 함수를 건너뛴다(실측: 54 줄 함수가 exit 0). 그 억제 자체를 `sizeGate` 가 잡으므로 승인된
-임계를 조용히 없앨 수는 없다 — 예외는 `ADR 0007` D-4 의 allowlist 형식(사유 + 해소 계획)으로만
-연다. **detekt 이 죽는 경우까지 덮지는 못한다**: 그때 함수 축은 사라지고, 그 사실을 알려진
-제한에 적는다.
+**그 뒤 함수 축도 도구 비의존이 됐다.** 처음에는 `@Suppress("LongMethod")` 텍스트를 막았는데
+그 방식은 표기의 열거 게임이 된다(다중 행·`@file:`·`@kotlin.`). 억제를 막는 대신 **무의미하게**
+만들었다 — `sizeGate` 가 Kotlin PSI 로 함수 길이를 직접 재므로 detekt 을 경유하지 않는다.
+`detekt.yml` 의 `LongMethod` 는 껐다(같은 수가 두 자리에 있으면 안 된다). 파서 버전은
+`version.ref = "kotlin"` 으로 컴파일러 버전에 묶여 있다.
 
 ### D-5. 임계는 코드가 아니라 **versioned policy 데이터**다
 
@@ -154,8 +154,8 @@ detekt 이슈 #8865 가 **closed as not planned** 로 닫혔다 — 1.23.8 을 K
 
 | 축 | 정본 | 강제 |
 | --- | --- | --- |
-| 함수 50줄 | `config/detekt/detekt.yml` 의 `LongMethod.allowedLines` | detekt (도구 기본값은 60) |
-| 파일 500줄 | `config/quality/size-policy.properties` | `sizeGate` task — detekt 에 파일 길이 규칙이 없다 |
+| 함수 50줄 | `config/quality/size-policy.properties` | `sizeGate` — Kotlin PSI 로 직접 잰다 |
+| 파일 500줄 | `config/quality/size-policy.properties` | `sizeGate` — detekt 에 파일 길이 규칙이 없다 |
 
 **처음에는 두 수를 정책 파일 하나에 두고 detekt 설정 overlay 를 생성해 얹었다.** 그 배선을
 걷었다 — `build-logic` 도 게이트 대상이 되자(Codex #5) 그 included build 가 overlay 생성
