@@ -54,6 +54,8 @@ testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgr
 jakarta-persistence = { module = "jakarta.persistence:jakarta.persistence-api" }
 jakarta-jms = { module = "jakarta.jms:jakarta.jms-api" }
 jackson-databind = { module = "tools.jackson.core:jackson-databind" }
+grpc-api = { module = "io.grpc:grpc-api" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java" }
 
 db-scheduler = { module = "com.github.kagkarlsson:db-scheduler", version.ref = "db-scheduler" }
 resilience4j-retry = { module = "io.github.resilience4j:resilience4j-retry", version.ref = "resilience4j" }

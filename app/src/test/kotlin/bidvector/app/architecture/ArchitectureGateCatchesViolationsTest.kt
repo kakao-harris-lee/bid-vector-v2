@@ -43,6 +43,9 @@ class ArchitectureGateCatchesViolationsTest {
             "BrokerLeak",
             "SqlLeak",
             "FileIoLeak",
+            "GrpcLeak",
+            "ProtobufLeak",
+            "ChannelLeak",
         ],
     )
     fun `금지 가족마다 심은 위반을 잡는다`(fixture: String) {

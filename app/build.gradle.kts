@@ -29,6 +29,8 @@ dependencies {
     testImplementation(libs.jakarta.persistence)
     testImplementation(libs.jakarta.jms)
     testImplementation(libs.jackson.databind)
+    testImplementation(libs.grpc.api)
+    testImplementation(libs.protobuf.java)
 }
 
 // 아키텍처 게이트는 조합 지점에서 돈다 — app 의 test runtime classpath 에 아홉 모듈이 모두 있다.
