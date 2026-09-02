@@ -1,0 +1,44 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "0717d2fde48994727d960cfb3bc0cea2faf5e3a9",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector/buildlogic/JarContentGateTask.kt",
+      "line": 44,
+      "evidence": "아카이브 게이트는 class entry가 모듈 소유 패키지로 시작하는지만 검사한다. `packageOwnershipGate`의 Kotlin 원산지 검사는 source-set classDirectories에만 적용되고 `sourceLanguageGate`도 등록된 소스 디렉터리만 검사한다. 따라서 `jar { from(\"prebuilt\") }`로 `bidvector.decision.Sneak.class`처럼 소유 패키지에 맞춘 사전 컴파일 Java class를 넣으면 jar gate를 통과하면서 Kotlin 원산지 검사와 ktlint/detekt/함수·파일 크기 게이트를 모두 우회한다. 해당 class가 허용 타입만 참조하면 ArchUnit도 실패하지 않는다. 커밋된 E-30 증거는 `evil/Sneak.class`만 주입해 소유 패키지 밖인 경우만 검증한다.",
+      "required_fix": "jar의 모든 class entry가 검증된 main source-set output에서 온 동일한 산출물인지 대조하거나, archive 전체에 동등한 원산지 검사를 적용해 임의의 prebuilt class를 거부한다. 소유 패키지 안의 prebuilt Java class를 넣었을 때 production `check`가 실패하는 음성 테스트도 추가한다."
+    },
+    {
+      "severity": "medium",
+      "file": "gradle/libs.versions.toml",
+      "line": 10,
+      "evidence": "승인된 `v2-지침서.md` §5와 ADR 0007은 테스트 플랫폼을 JUnit 5로 규정하지만 구현은 JUnit 6.1.3과 `archunit-junit6`을 고정했다. 현재 compatibility report도 `org.junit.jupiter:junit-jupiter 6.1.3`을 확인한다. JUnit 6 선택은 구현자가 작성한 `scope.md`에만 있고 승인된 요구사항을 개정한 운영자 결정은 저장소에서 확인되지 않는다.",
+      "required_fix": "JUnit 5 및 대응 ArchUnit runner로 구현을 정렬해 acceptance를 재실행하거나, JUnit 6 전환을 운영자에게 명시적으로 승인받아 authoritative 지침과 ADR을 먼저 개정한 뒤 카탈로그·테스트·evidence를 일치시킨다."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse --verify <base>^{commit}; git rev-parse --verify <head>^{commit}; git rev-parse HEAD",
+    "git status --short --untracked-files=all; git diff --stat --name-status <base>..<head>; git log --oneline <base>..<head>",
+    "sed/rg로 agent-workflow.md, v2-지침서.md, milestone-1.md, ADR 0001/0003/0004/0006/0007, capability-map.md와 slice evidence를 대조",
+    "sed/nl로 Gradle 설정, convention plugin, custom gate, architecture test·fixture 및 quality policy 전건을 판독",
+    "git diff --unified=80 161d94d..<head> -- build-logic app config/quality reports/evidence/m1/1a",
+    "find로 app/build 및 build-logic/build의 test XML, Kover, detekt, architecture, size, dependency, ownership, compatibility 산출물을 열람",
+    "ruby -r rexml/document로 test XML 9개를 집계: tests=79, failures=0, errors=0, skipped=0",
+    "ruby -r rexml/document로 detekt XML 10개를 집계하고 cmp로 생성된 member-effects와 커밋본을 대조",
+    "rg로 authoritative JUnit 5 요구와 JUnit 6.1.3/archunit-junit6 구현 및 compatibility report를 대조",
+    "jar tf 및 javap -v로 모듈 jar 내용과 kotlin.Metadata를 확인",
+    "git diff --check <base>..<head>; git fsck --no-dangling --no-reflogs --connectivity-only",
+    "git merge-base --is-ancestor <base> <head>; git rev-list --count <base>..<head>; git diff --name-only <base>..<head> | wc -l"
+  ],
+  "residual_risks": [
+    "명시된 sandbox 제약에 따라 Gradle은 직접 실행하지 않았다. 대신 HEAD 커밋 직후 생성된 build 산출물과 테스트 XML·게이트 보고서를 재검증했다.",
+    "GitHub Actions 워크플로는 저장소 evidence상 실제 GitHub runner에서 실행된 적이 없다.",
+    "도메인 코드가 없는 1A이므로 raw numeric 의미 보존, Uncertain/Unmeasurable, 계약 unknown-schema 및 retry/idempotency 위험은 후속 slice에서 검증해야 한다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
