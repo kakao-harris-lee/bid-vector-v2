@@ -242,10 +242,13 @@ worktree 격리로 인해 영향받지 않는다.
 - `request_changes`면 `findings[]`에 severity/file/evidence/required_fix 존재
 - **저장된 verdict 가 raw output 의 종말 메시지와 일치하고 `commands_run` 이 실질적**
   (2개 이상, 실제 검토 명령 포함)**인지.** codex 는 schema-valid 한 조기 verdict 를
-  **실행 중 어느 지점에서든** 내뱉을 수 있다 — B8(raw 136행)·B9(138행)·B10(한 라운드에
-  verdict 메시지 **6회**, 그중 명령 0건짜리 `approve` 가 실행 **끝자락** 7684행) 연속
-  실측으로 **`--output-schema` 하의 체계적 거동**이고 앞부분에 국한되지 않는다. 매번
-  종말 `request_changes` 가 `-o` 로 저장돼 사고를 면했다. 캡처 의미가 바뀌거나
+  내뱉을 수 있다 — B8(raw 136행)·B9(138행) 각 1회, B10 은 **한 라운드에 2회**(140행
+  첫 출력 직후 · 3150행 중반)로 연속 실측된 **`--output-schema` 하의 체계적 거동**이다.
+  매번 종말 `request_changes` 가 `-o` 로 저장돼 사고를 면했다. **방출을 셀 때는 codex
+  표지가 앞선 줄만 센다** — raw 의 `"verdict"` 문자열에는 프롬프트의 스키마 템플릿과
+  codex 가 읽은 파일의 출력이 섞인다(B10 에서 커밋된 0A verdict JSON 을 jq 로 읽은
+  stdout 7684행을 「끝자락 방출」로 오독할 뻔했다). 누출 검사와 같은 판독 규칙이다 —
+  **codex 가 뜬 텍스트는 방출이 아니다.** 캡처 의미가 바뀌거나
   타임아웃이 나면 조기 verdict 가 저장될 수 있으므로, **`commands_run` 이 빈약한
   `approve` 는 판정이 아니라 미완 실행으로 취급**하고 재실행한다.
 
