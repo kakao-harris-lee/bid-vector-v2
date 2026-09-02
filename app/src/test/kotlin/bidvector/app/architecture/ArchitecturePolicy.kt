@@ -19,7 +19,8 @@ class ArchitecturePolicy private constructor(
     val adapterModules: List<String> get() = packageSegments("layer.adapters")
     val appModules: List<String> get() = packageSegments("layer.app")
     val shareableDomainModules: List<String> get() = packageSegments("layer.domain.shareable")
-    val forbiddenPackages: List<String> get() = list("package.forbidden")
+    val allowedPackages: List<String> get() = list("package.allowed")
+    val excludedFromAllowed: List<String> get() = list("package.allowed.excluded")
     val forbiddenPackageSegments: List<String> get() = list("package.segment.forbidden")
 
     val allModules: List<String>

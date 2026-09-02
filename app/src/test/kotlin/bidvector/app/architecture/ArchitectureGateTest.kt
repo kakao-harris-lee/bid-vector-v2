@@ -38,8 +38,8 @@ class ArchitectureGateTest {
     }
 
     @Test
-    fun `도메인 모듈이 프레임워크에 의존하지 않는다`() {
-        rules.domainMustNotDependOnFrameworks(policy.packageRoot).checkAll()
+    fun `도메인 모듈이 허용 목록 밖을 보지 않는다`() {
+        rules.domainMayOnlyDependOnAllowedPackages(policy.packageRoot).checkAll()
     }
 
     @Test

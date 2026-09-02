@@ -1,5 +1,7 @@
 package bidvector.app.architecture
 
+import com.tngtech.archunit.base.DescribedPredicate
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.lang.ArchRule
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.library.Architectures.layeredArchitecture
@@ -13,17 +15,36 @@ import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 class ArchitectureRules(
     private val policy: ArchitecturePolicy,
 ) {
-    fun domainMustNotDependOnFrameworks(root: String): List<ArchRule> =
+    /**
+     * domain 이 볼 수 있는 것을 **열거하고 나머지를 전부 막는다.** 금지 열거는 세 라운드 연속
+     * 새는 좌표를 냈고 마지막 것(`kotlin.io`)은 승인 문서가 이름으로 든 적이 없어 출처 대조로도
+     * 잡히지 않았다 — 「생각해 낸 것만 막는」 방향의 한계다. allow-list 는 그 비대칭을 뒤집는다.
+     */
+    fun domainMayOnlyDependOnAllowedPackages(root: String): List<ArchRule> =
         listOf(
             noClasses()
                 .that()
                 .resideInAnyPackage(*packagesOf(root, policy.domainModules))
                 .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                    *policy.forbiddenPackages.map { "$it.." }.toTypedArray(),
-                ).because("v2-지침서.md §3.1 — domain 은 Spring·JPA·JSON·HTTP 를 import 하지 않는다"),
+                .dependOnClassesThat(outsideAllowList(root))
+                .because("v2-지침서.md §3.1 · milestone-1.md 「구현 규칙」 — domain 은 허용 목록 밖을 보지 못한다"),
         )
+
+    private fun outsideAllowList(root: String): DescribedPredicate<JavaClass> {
+        val allowed = policy.allowedPackages.map { if (it == ROOT_PLACEHOLDER) root else it }
+        val excluded = policy.excludedFromAllowed
+        return object : DescribedPredicate<JavaClass>(
+            "허용 목록 밖 (허용=$allowed, 그중 제외=$excluded)",
+        ) {
+            override fun test(target: JavaClass): Boolean {
+                if (target.isPrimitive || target.isArray) return false
+                val name = target.packageName
+                return name.isUnder(excluded) || !name.isUnder(allowed)
+            }
+        }
+    }
+
+    private fun String.isUnder(roots: List<String>): Boolean = roots.any { this == it || startsWith("$it.") }
 
     fun businessDomainModulesMustNotReferenceEachOther(root: String): List<ArchRule> =
         policy.businessDomainModules.map { module ->
@@ -85,6 +106,8 @@ class ArchitectureRules(
     ): Array<String> = modules.map { "$root.$it.." }.toTypedArray()
 
     private companion object {
+        /** 정책의 `bidvector` 항목은 평가 루트로 바뀐다 — fixture 루트에서도 같은 규칙이 서게. */
+        const val ROOT_PLACEHOLDER = "bidvector"
         const val DOMAIN = "domain"
         const val APPLICATION = "application"
         const val ADAPTERS = "adapters"

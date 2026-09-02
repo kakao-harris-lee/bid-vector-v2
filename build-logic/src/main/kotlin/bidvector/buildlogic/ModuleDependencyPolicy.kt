@@ -20,7 +20,8 @@ internal class ModuleDependencyPolicy(
     private val shareable: Set<String> = list("layer.domain.shareable").toSet()
 
     val forbiddenGroups: List<String> get() = list("group.forbidden")
-    val forbiddenPackages: List<String> get() = list("package.forbidden")
+    val allowedPackages: List<String> get() = list("package.allowed")
+    val excludedFromAllowed: List<String> get() = list("package.allowed.excluded")
 
     fun layerOf(module: String): String? = modulesByLayer.entries.firstOrNull { (_, modules) -> module in modules }?.key
 

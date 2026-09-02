@@ -46,10 +46,11 @@ class ArchitectureGateCatchesViolationsTest {
             "GrpcLeak",
             "ProtobufLeak",
             "ChannelLeak",
+            "ConsoleIoLeak",
         ],
     )
     fun `금지 가족마다 심은 위반을 잡는다`(fixture: String) {
-        rules.domainMustNotDependOnFrameworks(fixtureRoot) mustReport fixture
+        rules.domainMayOnlyDependOnAllowedPackages(fixtureRoot) mustReport fixture
     }
 
     @Test

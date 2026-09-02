@@ -17,16 +17,27 @@ import kotlin.test.assertTrue
 class ForbiddenFamilyCoverageTest {
     private val policy = ModuleDependencyPolicy.load(File(REAL_POLICY))
 
+    /**
+     * **방향이 뒤집혔다.** 예전에는 「가족이 금지 목록에 있는가」를 봤는데, 그 물음은 목록에 없는
+     * 좌표(`kotlin.io`)를 정의상 잡지 못했다. 이제 domain 게이트가 allow-list 라 물음도 바뀐다 —
+     * **승인 문서가 금지한 가족이 허용 목록으로 도로 들어오지 않는가.**
+     */
     @Test
-    fun `승인 문서가 든 가족이 package 좌표계에 전부 있다`() {
+    fun `승인 문서가 금지한 가족이 허용 목록에 들어오지 않는다`() {
         assertAll(
             FAMILIES.map { family ->
                 {
-                    val missing = family.packages.filterNot { it in policy.forbiddenPackages }
-                    assertTrue(missing.isEmpty(), "${family.name}(${family.source}) 의 누락: $missing")
+                    val admitted = family.packages.filter(::isAllowed)
+                    assertTrue(admitted.isEmpty(), "${family.name}(${family.source}) 가 허용된다: $admitted")
                 }
             },
         )
+    }
+
+    private fun isAllowed(candidate: String): Boolean {
+        val excluded = policy.excludedFromAllowed.any { candidate == it || candidate.startsWith("$it.") }
+        if (excluded) return false
+        return policy.allowedPackages.any { candidate == it || candidate.startsWith("$it.") }
     }
 
     @Test
@@ -42,16 +53,16 @@ class ForbiddenFamilyCoverageTest {
     }
 
     /**
-     * 뿌리 패키지로 적었는지 본다. `a.b.c` 를 적었는데 `a.b` 도 목록에 있으면 잎을 적은 것이고,
-     * 그 형제는 여전히 새어 나간다 — 이 slice 가 두 번 겪은 그 형태다.
+     * 제외 항목은 **허용 뿌리 안에 있어야** 뜻이 선다. 허용된 적 없는 것을 제외 목록에 적는 것은
+     * 모델을 잘못 읽은 것이고, 그 항목은 아무것도 막지 않으면서 막는 것처럼 보인다.
      */
     @Test
-    fun `잎 좌표로 적힌 것이 없다`() {
-        val redundant =
-            policy.forbiddenPackages.filter { candidate ->
-                policy.forbiddenPackages.any { other -> other != candidate && candidate.startsWith("$other.") }
+    fun `제외 항목은 허용 뿌리 안에 있다`() {
+        val orphan =
+            policy.excludedFromAllowed.filterNot { excluded ->
+                policy.allowedPackages.any { excluded.startsWith("$it.") }
             }
-        assertTrue(redundant.isEmpty(), "뿌리가 이미 있는데 잎을 또 적었다: $redundant")
+        assertTrue(orphan.isEmpty(), "허용된 적 없는 것을 제외했다: $orphan")
     }
 
     private class Family(
@@ -113,7 +124,12 @@ class ForbiddenFamilyCoverageTest {
                     listOf("java.sql", "org.postgresql"),
                     listOf("org.postgresql"),
                 ),
-                Family("I/O", IO_RULE, listOf("java.io", "java.nio")),
+                Family("I/O (JDK)", IO_RULE, listOf("java.io", "java.nio")),
+                // Codex 3차 #2 의 실물. 승인 문서는 **I/O 를 금지**하지 그 언어의 좌표를 열거하지
+                // 않는다 — 같은 문면이 Kotlin 표준 I/O 도 덮는다. deny-list 시절에는 이 줄을 쓸
+                // 근거가 없어 보였고 그래서 `readln()` 이 새어 나갔다.
+                Family("I/O (Kotlin stdlib)", IO_RULE, listOf("kotlin.io")),
+                Family("동시성", IO_RULE, listOf("java.util.concurrent", "kotlin.concurrent")),
             )
     }
 }
