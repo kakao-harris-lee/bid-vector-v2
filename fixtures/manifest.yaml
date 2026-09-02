@@ -124,6 +124,18 @@ schema:
       직렬화 표기가 아니라 개념**이라, 표기 변형(가족 C)이 술어를 우회하지 못하게 비교를 정규화한다.
       **표기 통일 자체는 여전히 M1/M2 몫이다** — 이 키는 통일을 대신하지 않고 **계약을 표기에 둔감하게** 만든다.
 
+      **술어 어휘를 여기서 동결한다 — 운영자 결정 2026-09-02.** 이 slice 의 계약 기계는 **`verified_paths` 의
+      정확 비교**와 **`verified_projections` 의 `not-equals`(+ 선택 `normalize: case-fold`)** 가 **전부**다.
+      **presence/shape · 의미 범주 · `equals-path` 같은 새 술어를 이 slice 는 만들지 않는다.**
+      **왜 — Codex 재리뷰 B9.** 동결된 술어로 막지 못하는 변이(주장 필드 삭제 · null 치환 · 다른 확정 토큰)가
+      실증됐고, Codex 자신이 fallback 으로 *"그런 projection 으로 표현할 수 없는 case 는 계약이 준비될 때까지
+      authoritative 에서 내린다"* 를 들었다. 운영자가 그것을 택했다 — **리뷰 압력 아래서 계약 기계를 더
+      발명하지 않는다.** 표현하지 못하는 case 는 **내린다**(`classification_policy.insufficient_evidence`).
+      **술어의 확장 소유권은 M1 계약 설계에 있다** — 거기서 소비 테스트의 형태와 함께 정한다.
+      **동결의 결과로 이 필드의 현재 사용처는 0 이다** — projection 을 달았던 case 넷이 같은 결정으로
+      전부 내려갔기 때문이다(스윕이 낸다). **필드를 지우지 않는다** — 정의와 도출 규칙이 되돌림의 계약이고,
+      M1 이 술어를 갖추거나 case 가 올라올 때 그대로 쓴다.
+
       **어느 projection 에 다는가 — `means` 문면이 정한다.** `means` 가 **상태·개념**을 계약하면(「승격되지
       않는다」 · 「측정 불가로 떨어지지 않는다」) **단다.** **표기 자체가 계약인 자리에는 달지 않는다** — 그런
       자리는 정확 비교가 의도이기 때문이다. **현재 다섯 projection 은 전부 앞쪽이라 전건에 달렸다**(verifier
@@ -388,8 +400,19 @@ classification_policy:
     전부이기 때문이다. **분류·기대값·입력 파일과 해시는 이번에도 바꾸지 않았다** — 세 case 는
     `authoritative` 그대로다. 필드의 형태와 도출 규칙은 `schema.extensions.verified_projections` 가 갖는다.
 
+    **둘째 모집단이 생겼다 — 운영자 결정 2026-09-02(동결+강등).** 위까지가 **근거의 층** 때문에 내려간
+    자리라면, 이쪽은 **근거는 서는데 계약이 그 주장을 기계로 지키지 못해** 내려간 자리다. Codex 재리뷰
+    B9 가 동결된 술어로 막지 못하는 변이 셋을 실증했고, 그 fallback 을 운영자가 택했다.
+    **판정은 기계가 낸다** — 「`authoritative` = 확장 적대 집합에서 위반 변이체 통과 **0**」이고
+    스윕이 목록을 낸다(`reports/evidence/m0/0e/commands.md` **C-15**).
+    **그래서 `source.kind` 를 바꾸지 않았다** — 내려가는 사유가 근거의 층이 아니기 때문이다.
+    **`m0-derived-rule` ↔ `insufficient-evidence` 대응은 이제 전건이 아니다**: 앞은 여전히 뒤를
+    함의하나 **역은 성립하지 않는다.** 되돌림은 `uncovered_axes` 의 「계약 술어 부재로 authoritative 를
+    유지하지 못한 축」이 지목한다 — **M1 이 술어를 갖추면 계약을 달고 되돌린다.**
+
     **어느 case 가 여기 드는지는 이 산문이 세지 않는다** — `source.kind`가 표시하고
-    `reports/evidence/m0/0e/fixtures-commands.md` **F-7**이 센다.
+    `reports/evidence/m0/0e/fixtures-commands.md` **F-7**이 센다. **둘째 모집단은 `source.kind` 로
+    구별되지 않으므로 스윕이 낸다.**
   observed: 0건. 운영 데이터 접근 승인이 선행한다.
   legacy_behavior: 0건. 이 slice 는 legacy Python 을 실행하지 않았고 golden 기대값을 옮기지 않았다.
   pending_user_approval: |-
@@ -534,12 +557,9 @@ cases:
       approved_by_user: false
   - id: rate-unit-003
     domain: rate-unit
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         unit 미선언 입력은 크기와 무관하게 거부된다 (percent 모양). 004와 쌍이다.
-    verified_paths:
-      - "$.rate"
-      - "$.guessAttempted"
     source:
       kind: approved-spec
       reference: |-
@@ -564,19 +584,41 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 5b6933acb516fe36b08a4fa5ff308dbb47e122dca16ed4c2e07792ff51719b03
     expected_sha256: 7b4f00d137ffaa6ba731bcdeaae8c0fac6fb34336f712ebedf168ece4592c7bd
-    change_history: []
+    not_covered: |-
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.outcome (a) verifies 주장 필드 삭제.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: rate-unit-004
     domain: rate-unit
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         unit 미선언 입력은 크기와 무관하게 거부된다 (fraction 모양). 003과 같은 결과여야 한다 — 값 크기로 단위를 추측하는 경로가 없음을 이 쌍이 고정한다.
-    verified_paths:
-      - "$.rate"
-      - "$.guessAttempted"
     source:
       kind: approved-spec
       reference: |-
@@ -601,7 +643,32 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 12eb4ac8ae9230c0d999a89b7d5d7b85ff91e99e83d4cb27e1b3e7a0ab139e04
     expected_sha256: 7b4f00d137ffaa6ba731bcdeaae8c0fac6fb34336f712ebedf168ece4592c7bd
-    change_history: []
+    not_covered: |-
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.outcome (a) verifies 주장 필드 삭제.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -646,12 +713,9 @@ cases:
       approved_by_user: false
   - id: money-basis-001
     domain: money-basis
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         basis 태그가 다른 두 금액의 비교가 수행되지 않고 사유와 함께 거부된다. 두 값의 수치가 같으므로 대소 전제가 들어가지 않는다.
-    verified_paths:
-      - "$.comparisonPerformed"
-      - "$.directionAsserted"
     source:
       kind: operator-decision
       reference: |-
@@ -686,18 +750,41 @@ cases:
     expected_sha256: 6ace534b600427c387784d5316b10951ce206632db5f3ccaef7b54bd30b970e0
     owning_open: |-
       OPEN-REG-05 (두 금액 차이의 잔차·행별 실제 과세) — 이 case는 그 축을 건드리지 않는다
-    change_history: []
+    not_covered: |-
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제 · $.reasonCode (a) verifies 주장 필드 삭제. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.outcome (a) verifies 주장 필드 삭제 · $.reasonCode (a) verifies 주장 필드 삭제.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: money-basis-002
     domain: money-basis
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         basis가 같으면 비교가 수행된다 — 001의 대조군.
-    verified_paths:
-      - "$.comparisonPerformed"
     source:
       kind: operator-decision
       reference: |-
@@ -729,7 +816,31 @@ cases:
       (`expected_reasoning`), `result: true` 를 계약에 넣으면 **같은 값에서 비교가 참**이라는 경계 포함성을
       잠근다 — 이 case 가 재는 것은 그것이 아니다. **경계 포함성을 실제로 재려면 별도 case 와 별도 근거가
       필요하다** — 그 축은 이 corpus 에 없다.
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.comparedBases (a) verifies 주장 필드 삭제. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
     change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.comparedBases (a) verifies 주장 필드 삭제.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
       - date: 2026-08-31
         change: |-
           `verified_paths` 에서 `$.result` 를 **뺐다**(`$.comparisonPerformed` 만 남는다). `not_covered` 를
@@ -816,12 +927,9 @@ cases:
       approved_by_user: false
   - id: money-basis-004
     domain: money-basis
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         서로 다른 basis의 금액이 하나의 min/max 연산에 들어갈 수 없다 — R-BASIS-04가 남긴 형태.
-    verified_paths:
-      - "$.operationPerformed"
-      - "$.directionAsserted"
     source:
       kind: approved-spec
       reference: |-
@@ -854,7 +962,32 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 4d8c3dddf8f166d059576059abaa383ea390f3bd6087a6c153ce9be7b6c5722d
     expected_sha256: de3923d8969df8d51462ebfdf69679bb6164970bf2c28d5de4f8ca65cad2f1ba
-    change_history: []
+    not_covered: |-
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.outcome (a) verifies 주장 필드 삭제.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -916,37 +1049,10 @@ cases:
       approved_by_user: false
   - id: money-basis-006
     domain: money-basis
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         legacy 유래 행을 정의상 기본값 과세로 자동 태깅하지 않는다 — 저장 값이 정의를 따른다는 근거가 없다. 값은 기초금액 자리에 있으나 `Inclusive`로 승격되지
         않는다.
-    verified_paths:
-      - "$.autoTaggedFromDefinitionDefault"
-      - "$.eligibleForAuthoritativeCorpus"
-    verified_projections:
-      - path: "$.vatTreatment"
-        projection: not-equals
-        operand: "Inclusive"
-        normalize: case-fold
-        operand_source: |-
-          **커밋된 운영자 결정 기록** `reports/evidence/m0/0c/decisions-2026-08-28.md` — `:68` 「운영자 결정: 기초금액
-          (사업금액)은 부가세 포함이다」이고 `:109` 의 기록자 bullet 이 그 정의상 기본값을 **`Inclusive`** 로 적는다
-          (같은 파일을 이 manifest 의 다른 case 들도 ② 근거로 쓴다). **피연산자를 승인 문면의 표기 그대로 둔다** —
-          기대값의 표기(`INCLUSIVE`)는 `normalize: case-fold` 가 흡수하므로 계약이 **승인된 이름**에 선다.
-        means: |-
-          legacy 유래 행이 **정의상 기본값 과세로 자동 태깅되지 않는다** — `verifies` 의 「`Inclusive` 로 승격되지
-          않는다」 그 자리다. **미상 쪽의 이름(`UNKNOWN`)은 계약하지 않는다**(가족 A).
-          **표기가 아니라 개념에 건다** — `normalize: case-fold` 로 `Inclusive`·`INCLUSIVE` 어느 표기의 승격도
-          같은 술어에 걸린다. 대소문자 밖의 표기 변형(공백·구분자)은 여전히 밖이며 그 통일은 M1/M2 몫이다.
-      - path: "$.provenance"
-        projection: not-equals
-        operand: "Clean"
-        normalize: case-fold
-        operand_source: "`v2-지침서.md` §4.3 — 「`Clean`, `DerivedYega`, `DerivedVat`, `SuspectRatio`, `Unknown`을 명시한다」"
-        means: |-
-          legacy 유래 행의 provenance 가 **승격되지 않는다** — `verifies` 의 「provenance 미상으로 격리」 가운데
-          승인 문면이 있는 절반이다. **격리된 쪽의 이름(`Undeclared`)은 계약하지 않는다**(가족 A). 피연산자
-          `Clean` 은 §4.3 이 sealed 로 명시하는 **승인된 이름**이라 이 술어가 잠금을 옮기지 않는다.
     source:
       kind: operator-decision
       reference: |-
@@ -978,7 +1084,31 @@ cases:
       미상 쪽의 이름(`UNKNOWN`)도 계약하지 않는다 — 가족 A 다.
       **세 축의 실질은 덮인다** — 과세 승격(위 projection) · provenance 승격(같은 자리) · corpus 적격
       (`$.eligibleForAuthoritativeCorpus`).
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.provenance (b) projection 경로 null · $.provenance (c) 다른 확정 토큰 · $.reasonCode (a) verifies 주장 필드 삭제 · $.vatTreatment (b) projection 경로 null · $.vatTreatment (c) 다른 확정 토큰. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
     change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`·`verified_projections`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.provenance (b) projection 경로 null · $.provenance (c) 다른 확정 토큰 · $.reasonCode (a) verifies 주장 필드 삭제 · $.vatTreatment (b) projection 경로 null · $.vatTreatment (c) 다른 확정 토큰.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
       - date: 2026-09-02
         change: |-
           `verified_paths` 에 `$.eligibleForAuthoritativeCorpus` 를 더하고, `verified_projections` 에
@@ -2198,22 +2328,10 @@ cases:
       approved_by_user: false
   - id: floor-shortfall-002
     domain: floor-shortfall
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         최소 표본 수 `N`(150) — **경계 포함**. 표본이 최소 수와 같으면 표본 부족이 아니라 측정된다(`N-1`인 001과 쌍). **결과의 출력 표현은 이 case가
         검증 대상으로 잠그지 않는다** — 기대값이 나를 뿐이고 그 자리는 `not_covered`가 적는다.
-    verified_paths:
-      - "$.sampleSize"
-    verified_projections:
-      - path: "$.result"
-        projection: not-equals
-        operand: "Unmeasurable"
-        normalize: case-fold
-        operand_source: "`v2-지침서.md` §4.4 — 「표본 부족은 0%가 아니라 `Unmeasurable`이다」"
-        means: |-
-          표본이 최소 수와 **같으면 측정 불가로 떨어지지 않는다** — `verifies` 의 「표본 부족이 아니라 측정된다」 가운데
-          승인 문면이 있는 절반이다. **측정될 때의 이름(`Measured`)은 계약하지 않는다** — 가족 A 의 미승인 어휘이고
-          그 승인 경로는 `next_steps` 의 「어휘·표현 승인」이 지목한다.
     source:
       kind: operator-decision
       reference: |-
@@ -2265,7 +2383,31 @@ cases:
 
       **결과 상태의 이름** — 기대값은 `result: "Measured"` 를 나르지만 이 case 는 그 **이름**을 계약하지 않는다.
       `$.result` 는 `verified_projections` 의 술어로만 계약되며 그 자리가 이유를 적는다.
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.result (b) projection 경로 null · $.result (c) 다른 확정 토큰. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
     change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`·`verified_projections`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.result (b) projection 경로 null · $.result (c) 다른 확정 토큰.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
       - date: 2026-08-31
         change: |-
           `verifies` 를 승인된 의미로 **좁혔다** — 「(임계 사정률, 빈도, 분자, 분모, 범위, 정책 version) 묶음으로 반환된다」를
@@ -2349,22 +2491,10 @@ cases:
       approved_by_user: false
   - id: floor-shortfall-003
     domain: floor-shortfall
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         최소 표본 수 `N+1`(151) — **경계 위쪽**에서도 측정된다(`N`인 002와 쌍). **빈도의 표현 형태는 이 case가 검증 대상으로 잠그지 않는다** —
         기대값이 나를 뿐이고 그 자리는 `not_covered`가 적는다.
-    verified_paths:
-      - "$.sampleSize"
-    verified_projections:
-      - path: "$.result"
-        projection: not-equals
-        operand: "Unmeasurable"
-        normalize: case-fold
-        operand_source: "`v2-지침서.md` §4.4 — 「표본 부족은 0%가 아니라 `Unmeasurable`이다」"
-        means: |-
-          **경계 위쪽에서도 측정 불가로 떨어지지 않는다** — `verifies` 의 「`N+1` 에서도 측정된다」 가운데 승인 문면이
-          있는 절반이다. **측정될 때의 이름(`Measured`)은 계약하지 않는다** — 002 와 같은 자리이고 그 승인 경로는
-          `next_steps` 의 「어휘·표현 승인」이 지목한다.
     source:
       kind: operator-decision
       reference: |-
@@ -2413,7 +2543,31 @@ cases:
       ②는 운영자 승인이 없는 자리다.
       ③ **결과 상태의 이름** — 기대값은 `result: "Measured"` 를 나르지만 이 case 는 그 **이름**을 계약하지 않는다.
       `$.result` 는 `verified_projections` 의 술어로만 계약되며 그 자리가 이유를 적는다.
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.result (b) projection 경로 null · $.result (c) 다른 확정 토큰. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
     change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`·`verified_projections`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.result (b) projection 경로 null · $.result (c) 다른 확정 토큰.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
       - date: 2026-08-31
         change: |-
           `verifies` 를 승인된 의미로 **좁혔다** — 「빈도는 유리수(분자/분모)로 고정하고 십진 표현은 주장하지 않는다」를
@@ -2491,23 +2645,10 @@ cases:
       approved_by_user: false
   - id: floor-shortfall-004
     domain: floor-shortfall
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         여유가 충분해 **미달 표본이 없는** 경우(입력 `shortfallSampleCount: 0`)와 판정 불가(001)가 **서로 다른 표시로 구분된다** — 표본 부족은 0%가 아니다.
         **빈도의 수 표현은 이 case가 검증 대상으로 잠그지 않는다** — 기대값이 나를 뿐이고 그 자리는 `not_covered`가 적는다.
-    verified_paths:
-      - "$.distinctFromUnmeasurable"
-    verified_projections:
-      - path: "$.result"
-        projection: not-equals
-        operand: "Unmeasurable"
-        normalize: case-fold
-        operand_source: "`v2-지침서.md` §4.4 — 「표본 부족은 0%가 아니라 `Unmeasurable`이다」"
-        means: |-
-          미달 표본이 없는 경우의 결과가 **판정 불가(001)의 상태와 같지 않다** — `verifies` 의 「서로 다른 표시로
-          구분된다」를 승인된 이름 하나로만 쓴 형태다(001 의 `$.result` 가 그 `Unmeasurable` 이다). **구분된 쪽의
-          이름(`Measured`)은 계약하지 않는다** — 가족 A 의 미승인 어휘이고 승인 경로는 `next_steps` 의
-          「어휘·표현 승인」이 지목한다.
     source:
       kind: operator-decision
       reference: |-
@@ -2555,7 +2696,31 @@ cases:
 
       **결과 상태의 이름** — 기대값은 `result: "Measured"` 를 나르지만 이 case 는 그 **이름**을 계약하지 않는다.
       `$.result` 는 `verified_projections` 의 술어로만 계약되며 그 자리가 이유를 적는다.
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.result (b) projection 경로 null · $.result (c) 다른 확정 토큰. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
     change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`·`verified_projections`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.result (b) projection 경로 null · $.result (c) 다른 확정 토큰.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
       - date: 2026-08-31
         change: |-
           `verified_paths` 에서 `$.frequency.numerator` 와 `$.frequency.exactDecimal` 을 **뺐다**
@@ -2709,14 +2874,10 @@ cases:
       approved_by_user: false
   - id: floor-shortfall-006
     domain: floor-shortfall
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         선언된 단위가 서로 다른 두 율(percent·fraction)은 명시 변환되어 정상 처리된다 — 거부되는 것은 **미선언**이지 **선언된 혼합**이 아니다.
         rate-unit-003·004의 대조군.
-    verified_paths:
-      - "$.normalizedFloorRate.fraction"
-      - "$.normalizedBidRate.fraction"
-      - "$.preservedSourceUnits"
     source:
       kind: approved-spec
       reference: |-
@@ -2749,7 +2910,32 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 422d1bdbf44f6e4f5194c292a98fd51c3f7f257967d11099a8672e8067ea2bae
     expected_sha256: b9d7473d9c19ec56b2f07da3b1bf8c080fa8b4aafde6bf1d9cf8a5c7570ecb40
-    change_history: []
+    not_covered: |-
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.outcome (a) verifies 주장 필드 삭제.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -3821,12 +4007,9 @@ cases:
       approved_by_user: false
   - id: base-amount-provenance-004
     domain: base-amount-provenance
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         NaN은 `Money`로 구성되지 않고 경계에서 거부된다 — 원화 확정 금액은 정수다.
-    verified_paths:
-      - "$.moneyConstructed"
-      - "$.coercedToZero"
     source:
       kind: approved-spec
       reference: |-
@@ -3853,19 +4036,40 @@ cases:
     expected_sha256: 17ff1f8abbadbad327567f8c60e876be3f85c46204a19f304e21735d97540450
     not_covered: |-
       음수 금액·`Long` overflow의 처리 — 승인된 규칙이 없다
-    change_history: []
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.outcome (a) verifies 주장 필드 삭제.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: base-amount-provenance-005
     domain: base-amount-provenance
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         Infinity도 같다 — 004와 쌍.
-    verified_paths:
-      - "$.moneyConstructed"
-      - "$.coercedToZero"
     source:
       kind: approved-spec
       reference: |-
@@ -3890,7 +4094,31 @@ cases:
     expected_sha256: 17ff1f8abbadbad327567f8c60e876be3f85c46204a19f304e21735d97540450
     not_covered: |-
       음수 금액·`Long` overflow의 처리 — 승인된 규칙이 없다
-    change_history: []
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.outcome (a) verifies 주장 필드 삭제.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4251,13 +4479,9 @@ cases:
       approved_by_user: false
   - id: verdict-004
     domain: verdict
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         개연 밴드 밖 운영자 하한 override는 버리지도 통과시키지도 않고 사유와 함께 거부되며, 그 거부가 관측 가능하다. 밴드는 **synthetic 정책 입력**이다.
-    verified_paths:
-      - "$.silentlyDropped"
-      - "$.silentlyAccepted"
-      - "$.observableInResult"
     source:
       kind: operator-decision
       reference: |-
@@ -4284,7 +4508,31 @@ cases:
     expected_sha256: 85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9
     not_covered: |-
       개연 밴드의 **값** — data-dictionary.md §1.4.3 B6은 `legacy-behavior`
-    change_history: []
+      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
+      위반 변이체가 통과했다: $.overrideOutcome (a) verifies 주장 필드 삭제 · $.reasonCode (a) verifies 주장 필드 삭제. 동결된 술어 어휘
+      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
+      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
+      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
+      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 계약 필드
+          (`verified_paths`)를 걷었다. `not_covered` 를 신설했다.
+          **`source.kind` 는 그대로 두었다** — 내려가는 사유가 근거의 층이 아니다.
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 16 — Codex 재리뷰 B9(high 2)와 운영자 결정 2026-09-02(동결+강등).**
+          B9 는 동결된 술어로는 막을 수 없는 변이 셋(주장 필드 삭제 · null 치환 · 다른 확정 토큰)을
+          실증했고, **Codex 자신이 제시한 fallback** 이 *"그런 projection 으로 표현할 수 없는 case 는
+          계약이 준비될 때까지 authoritative 에서 내린다"* 였다. 운영자가 그것을 택했다 —
+          **리뷰 압력 아래서 계약 기계를 더 발명하지 않는다.**
+          이 case 에서 통과한 변이체: $.overrideOutcome (a) verifies 주장 필드 삭제 · $.reasonCode (a) verifies 주장 필드 삭제.
+          **판정은 기계가 냈다** — 「authoritative = 확장 적대 집합에서 위반 변이체 통과 0」이고
+          목록의 정본은 스윕이다(`commands.md` **C-15**).
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4726,12 +4974,37 @@ uncovered_axes:
       운영자가 대신 **다른 어휘를 지정**하면 그때는 기대값 파일이 바뀌므로 `change_history` 에
       `previous_expected_sha256` 를 함께 싣는다.
 
+  - axis: "계약 술어 부재로 **authoritative 를 유지하지 못한** 축 — 동결된 어휘로 표현되지 않는 주장"
+    domain: 여러 축에 걸친다
+    why_blocked: |-
+      **근거의 층이 아니라 계약 가능성으로 내려간 자리다.** 각 case 의 `verifies` 는 승인 문면 위에 서는데,
+      **동결된 술어**(`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는
+      그 주장을 기계로 지킬 수 없다. Codex 재리뷰 **B9(high 2)** 가 막지 못하는 변이 셋을 실증했다 —
+      **① `verifies` 가 주장하는 필드의 삭제**(사유 없는 거부가 통과) **② projection 경로의 null 치환**
+      (`null != 피연산자` 라 통과) **③ 다른 확정 토큰 치환**(배제 대상이 아닌 확정 값으로 세탁).
+      **운영자 결정 2026-09-02** 이 Codex 자신의 fallback 을 택했다 — **술어를 더 발명하지 않고 내린다.**
+      **어느 case 가 여기 드는지는 이 산문이 세지 않는다** — 스윕이 낸다(`commands.md` **C-15**).
+    owning_open:
+      - "소유 `OPEN` 없음 — 막는 것은 미결도 승인 부재도 아니라 **계약 술어의 부재**다"
+      - "인접: 바로 아래 「승인된 피연산자 부재」 축 — 그쪽은 **피연산자**가 없고 이쪽은 **술어**가 없다"
+    what_is_covered_instead: |-
+      **case 를 지우지 않았고 기대값·입력·해시도 그대로다** — 계약 필드만 걷혔다(그 층에는 두지 않는다).
+      **`source.kind` 도 그대로**라 근거의 층은 보존된다. 남은 `authoritative` 는 **확장 적대 집합에서
+      위반 변이체 통과 0** 을 만족하는 case 뿐이고, 그 수와 목록은 스윕이 낸다.
+    unblocks_when: |-
+      **M1 계약 설계가 필요한 술어를 갖추면** 그 case 에 계약을 달고 `authoritative` 로 되돌린다.
+      B9 가 이름 든 것은 **presence/non-null·형태**(①②)와 **의미 범주**(③ — unknown/non-definitive ·
+      measurable 류)이고, 앞선 축이 든 **`equals-path`** 도 같은 자리다. **술어의 확장 소유권이 M1 에
+      있다는 것이 동결의 내용**이다(`schema.extensions`). 되돌릴 때 `change_history` 에 그 술어의 좌표를 적는다.
+
   - axis: "계약이 덮지 못한 축 — **승인된 피연산자 부재**로 잠글 수 없는 결과 토큰"
     domain: 여러 축에 걸친다
     why_blocked: |-
-      **이 항목은 앞의 「덮개를 잃은 축」들과 형태가 다르다** — case 가 내려가서 비는 자리가 아니라,
-      `authoritative` 로 **남은** case 의 `verifies` 가 주장하는데 **계약에 넣을 수단이 없어** 비는 자리다.
-      **B7(2026-09-01, high)의 mutation 실증이 연 축**이고 운영자 승인 2026-09-02(전수 스윕)로 재판정했다.
+      **B7(2026-09-01, high)의 mutation 실증이 연 축**이다. 열릴 때는 *"`authoritative` 로 **남은** case 의
+      `verifies` 가 주장하는데 계약에 넣을 수단이 없어 비는 자리"* 였으나, **2026-09-02 의 동결+강등으로
+      그 case 들이 내려갔다** — 이제 이 축은 **바로 위 축과 같은 모집단을 다른 각도에서 적는다**:
+      위가 **술어**가 없어 내려간 자리라면 여기는 **피연산자**가 없어 잠글 수 없던 자리다.
+      **되돌림 조건이 서로 다르므로 합치지 않는다.**
       **막는 것은 둘 중 하나다** — ① 그 값이 **가족 B 자작 토큰**이라 정확 비교도 projection 도 미승인
       어휘를 잠근다(결과 상태 토큰이 대표다) ② 필요한 술어가 **경로 간 동등**인데
       `schema.extensions.verified_projections` 의 어휘가 `not-equals` 하나다.
