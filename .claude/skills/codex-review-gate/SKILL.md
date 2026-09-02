@@ -154,6 +154,10 @@ developer 구간 0 — 주입 아님.
 `ORCA_*` 환경변수 미설정 시 no-op 이라 침해가 없음을 실측했으나, 표면은 실재한다 —
 **preflight 에서 `~/.codex/hooks.json` 의 hook 목록과 각 스크립트가 stdout 에 쓰는지를
 라운드마다 확인**하고, stdout 에 쓰는 hook 이 발견되면 그 라운드는 preflight 미충족이다.
+**이 검사는 grep 이 아니라 실행으로 잰다** — `echo`/`printf` 정적 스캔은 curl 로 파이프되거나
+`/dev/null` 로 버려지는 출력을 오탐한다(B9 에서 정상 라운드를 떨어뜨릴 뻔했다). codex 가
+부르는 방식 그대로 실행해(리뷰 환경 그대로 · 변수 설정+닫힌 포트 · 빈 payload) stdout
+바이트를 실측한다.
 
 **preflight**: 리뷰 실행 전 아래를 돌려 이 저장소 흔적의 양을 기록한다. `sessions/`는
 용량이 커서 훑지 않는다.
@@ -238,8 +242,9 @@ worktree 격리로 인해 영향받지 않는다.
 - `request_changes`면 `findings[]`에 severity/file/evidence/required_fix 존재
 - **저장된 verdict 가 raw output 의 종말 메시지와 일치하고 `commands_run` 이 실질적**
   (2개 이상, 실제 검토 명령 포함)**인지.** codex 는 작업 전에 schema-valid 한 조기
-  verdict 를 내뱉을 수 있다 — B8 실측: raw 136행에서 명령 실행 전의 `approve` 가 나왔고
-  최종(10027행) `request_changes` 가 `-o` 로 저장돼 사고를 면했다. 캡처 의미가 바뀌거나
+  verdict 를 내뱉을 수 있다 — B8(raw 136행)·B9(raw 138행) 연속 실측으로
+  **`--output-schema` 하의 체계적 거동**이다. 매번 명령 실행 전의 `approve` 가 나왔고
+  최종 `request_changes` 가 `-o` 로 저장돼 사고를 면했다. 캡처 의미가 바뀌거나
   타임아웃이 나면 조기 verdict 가 저장될 수 있으므로, **`commands_run` 이 빈약한
   `approve` 는 판정이 아니라 미완 실행으로 취급**하고 재실행한다.
 
