@@ -145,7 +145,26 @@
    *"domain은 I/O가 없는 입력→출력 함수/객체다"* 는 I/O 규정이지 결정성 규정이 아니다.
    **다만 1B 가 시계를 port 로 주입할 근거는 이미 있다** — `v2-지침서.md` 의 테스트 관행이
    fake clock 을 기본으로 둔다. 게이트로 막을 일이 아니라 **설계로 정할 일**이라는 뜻이다.
-16. **RED/GREEN 커밋을 checkout 해서는 재현할 수 없다.** 빌드에 필요한 여덟 파일이 `90e46ff`
+
+   **실제로 무엇이 열려 있는지는 실측이 다르게 답한다.** `UUID`·`Random`·`Date` 는 T-C 목록에
+   없어 **이미 막힌다**(exit 1) — 1A 가 금지 정책을 세운 것이 아니라 목록에 넣지 않았을 뿐인데
+   결과가 차단이다. 정작 **통과하는 것은 허용 62 종 안에 있는 둘**이다:
+
+   | 좌표 | 왜 통과하는가 | 실측 |
+   | --- | --- | --- |
+   | `java.lang.Math#random` | `Math` 는 계산에 필수라 T-C 가 열었고 T-D 에 없다 | exit 0 |
+   | `java.util.Collections#shuffle` | `Collections` 도 같은 이유 | exit 0 |
+   | `java.time.Clock`·`Instant#now`·`LocalDate#now` | `java.time` 이 T-B(정확 패키지)라 통째로 열려 있다 | — |
+
+   **그러므로 1B 가 결정성을 정책으로 정하면 실제 조치는 `member.forbidden` 에 그 둘을 더하고
+   시계 셋을 더하는 것**이다 — T-D 기제가 이미 서 있어 정책 파일 몇 줄이면 된다. 1A 는 기제만
+   세우고 정책은 세우지 않았다.
+16. **`String.format` 은 통과한다 — 형식화의 정책 경계가 게이트에 없다.** `java.lang.String` 이
+   T-C 목록에 있으므로 도메인이 문자열 형식화를 할 수 있다. 설계 검토는 **「형식화는 표현
+   관심사라 adapters 의 일」**이라 보고 `java.text` 를 허용에서 뺐는데, `String.format` 은 그
+   경계의 반대편에 남는다. 승인 문서가 이것을 금지하지 않으므로 1A 가 막지 않았다 —
+   1B 가 도메인의 표현 책임을 정할 때 함께 볼 자리다.
+17. **RED/GREEN 커밋을 checkout 해서는 재현할 수 없다.** 빌드에 필요한 여덟 파일이 `90e46ff`
    에서 처음 등장하므로 그 앞 구간(RED·GREEN 커밋 포함)은 clean checkout 에서
    `:build-logic:compileKotlin` 이 깨진다. **이력은 되쓰지 않는다.** head 는 영향받지 않고
    주장 자체는 확인됐다 — verifier 가 그 구간에 파일을 복원해 **RED = 음성 단언 전부 실패 ·
@@ -171,7 +190,7 @@
 
 | 항목 | 왜 1B 인가 |
 | --- | --- |
-| 비결정성 정책(시계·난수 port 주입) | 게이트가 아니라 설계 결정. 1A 는 T-D 기제만 남긴다 — 정하면 `member.forbidden` 에 세 줄이다 |
+| 비결정성 정책(시계·난수 port 주입) | 게이트가 아니라 설계 결정. 1A 는 T-D 기제만 남긴다 — 실제로 열려 있는 것은 `Math#random`·`Collections#shuffle` 과 `java.time` 이고, 정하면 `member.forbidden` 에 그 줄들을 더한다(알려진 제한의 표가 정본) |
 | coverage 임계 | 도메인 코드 없이 정한 수치는 근거가 없다 |
 | `java.net.URI` 등 허용 확장 | 실제로 필요해지는 slice 의 판단. `ADR 0007` D-4 형식으로 연다 |
 | mutation 도구 | `OPEN-ADR-07` |

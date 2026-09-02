@@ -148,8 +148,11 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 커밋 직전 `git diff --cached --name-status` 로 in_scope 를 대조했다.
 
 - 검출: `git log --oneline 6b03c75..HEAD -- .claude/ CLAUDE.md`
-- 판별: 그 목록에서 **`chore(harness)` 가 아닌 커밋이 혼입**이다. 나머지는 하네스 레인이
+- 판별: 그 목록에서 **scope 가 `(harness)` 가 아닌 커밋이 혼입**이다. 나머지는 하네스 레인이
   자기 몫으로 낸 커밋이라 레인 경계 위반이 아니다
+- **type 이 아니라 scope 로 가른다.** 처음에는 `chore(harness)` 로 적었는데 하네스 레인이
+  `docs(harness)` 도 쓰기 시작하자 그 커밋이 혼입으로 오탐됐다 — 레인을 가르는 것은 scope 이고
+  type 은 그 커밋이 무엇을 했는지일 뿐이다
 
 ## 2026-09-02T10:30Z — Codex 수정 라운드의 게이트 실측
 
