@@ -13,7 +13,8 @@ in_scope:
   - build-logic/**                    # convention plugin 과 커스텀 task 의 included build
   - shared-kernel · procurement · qualification · strategy · decision
   - settlement · workflow · adapters · app          # 모듈 아홉. `bidding` 은 out_of_scope
-  - config/quality/**                 # 크기 정책 데이터(versioned)
+  - config/quality/**                 # 크기·경계 정책 데이터(versioned)
+  - .editorconfig                     # ktlint 스타일. 규칙 집합의 유일한 자리
   - config/detekt/**                  # detekt 2.0 키 규칙 집합
   - .github/workflows/ci.yml
   - docs/adr/0007-architecture-and-test-gates.md   # §5 의 OPEN-ADR-08 행 하나
@@ -187,3 +188,25 @@ detekt 이 같은 함수 임계를 알아야 하지만 **수를 두 자리에 �
 - **`OPEN` 을 임의로 해소하지 않는다.** 닫는 것은 `OPEN-ADR-08` 하나이며 종료 조건(1A 가 경로를
   정한다)을 충족해서 닫는다. `OPEN-ADR-06` 은 **실측만 등재**하고 열어 둔다.
 - **evidence 가 자기를 검사하는 장치를 만들지 않는다.** 대조는 `commands.md` 의 명령이 낸다.
+
+---
+
+## 계약 갱신
+
+### 2026-09-02 — 포맷 도구를 Spotless 에서 ktlint Gradle 플러그인으로 바꾼다
+
+**바뀐 것**: `Spotless 8.10.1 + ktlint 1.8.0` → `org.jlleitschuh.gradle.ktlint 14.2.0` 이 같은
+ktlint 1.8.0 을 구동. 스타일 규칙은 `.editorconfig` 그대로다.
+
+**사유**: 실측이다 — `commands.md` **T-6**. Spotless 가 configuration cache 아래에서 무작위
+모듈 하나를 `InvocationTargetException` 으로 떨어뜨렸고 ktlint 세 버전과 `--no-parallel` 에서
+동일했다. **게이트가 무작위로 죽으면 게이트가 아니다.**
+
+대안 둘을 재고 골랐다. (a) Spotless 를 `notCompatibleWithConfigurationCache` 로 선언 — 동작은
+하지만 `check` 가 매번 configuration cache 를 버리고 **45 줄짜리 경고를 출력**한다. 게이트의
+신호를 매 빌드 노이즈로 덮는다. (b) 교체 — 조사 노트가 Spotless 를 권고한 근거는
+`ratchetFrom` 과 다포맷 커버리지인데 **1A 는 둘 다 쓰지 않기로 이미 정했다**(그린필드라 래칫할
+과거가 없고, 손으로 쓴 한국어 문서를 재포맷하지 않는다). 남은 용도가 ktlint 래핑 하나뿐이므로
+래퍼를 걷고 도구를 직접 쓴다.
+
+**부수 효과**: `check` 가 configuration cache 를 온전히 쓴다(`A-1`).

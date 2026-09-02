@@ -9,7 +9,7 @@ kotlin {
 dependencies {
     implementation(libs.kotlin.gradlePlugin)
     implementation(libs.detekt.gradlePlugin)
-    implementation(libs.spotless.gradlePlugin)
+    implementation(libs.ktlint.gradlePlugin)
     implementation(libs.kover.gradlePlugin)
     implementation(libs.archunit.core)
 }

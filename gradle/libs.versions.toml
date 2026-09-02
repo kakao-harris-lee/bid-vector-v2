@@ -3,8 +3,8 @@
 kotlin = "2.4.10"
 spring-boot = "4.1.1"
 detekt = "2.0.0-alpha.6"
-spotless = "8.10.1"
 ktlint = "1.8.0"
+ktlint-gradle = "14.2.0"
 kover = "0.9.9"
 archunit = "1.5.0"
 junit = "6.1.3"
@@ -22,7 +22,7 @@ pitest = "1.30.0"
 # build-logic 이 convention plugin 안에서 plugin id 로 적용하려면 marker 아티팩트가 필요하다.
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 detekt-gradlePlugin = { module = "dev.detekt:detekt-gradle-plugin", version.ref = "detekt" }
-spotless-gradlePlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
+ktlint-gradlePlugin = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint-gradle" }
 kover-gradlePlugin = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", version.ref = "kover" }
 
 # quality baseline task 가 컴파일된 바이트코드에서 타입 축을 잰다(OPEN-ADR-06 입력).
@@ -60,6 +60,6 @@ pitest-engine = { module = "org.pitest:pitest", version.ref = "pitest" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
-spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint-gradle" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 pitest = { id = "info.solidsoft.pitest", version.ref = "pitest-plugin" }

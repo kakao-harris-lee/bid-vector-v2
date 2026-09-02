@@ -9,7 +9,7 @@ import bidvector.build.versionCatalog
 plugins {
     id("org.jetbrains.kotlin.jvm")
     id("dev.detekt")
-    id("com.diffplug.spotless")
+    id("org.jlleitschuh.gradle.ktlint")
     id("org.jetbrains.kotlinx.kover")
 }
 
@@ -42,15 +42,9 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-spotless {
-    kotlin {
-        target("src/**/*.kt")
-        ktlint(libs.version("ktlint"))
-    }
-    kotlinGradle {
-        target("*.gradle.kts")
-        ktlint(libs.version("ktlint"))
-    }
+ktlint {
+    version = libs.version("ktlint")
+    // 규칙 집합과 스타일은 .editorconfig 가 갖는다 — 같은 설정을 두 자리에 두지 않는다.
 }
 
 val detektThresholdOverlay =
