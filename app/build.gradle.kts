@@ -24,6 +24,11 @@ dependencies {
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.archunit.junit6)
+
+    // 위반 fixture 전용 — 금지 가족을 실제로 컴파일해야 게이트가 그것을 잡는지 잴 수 있다.
+    testImplementation(libs.jakarta.persistence)
+    testImplementation(libs.jakarta.jms)
+    testImplementation(libs.jackson.databind)
 }
 
 // 아키텍처 게이트는 조합 지점에서 돈다 — app 의 test runtime classpath 에 아홉 모듈이 모두 있다.

@@ -6,6 +6,8 @@ import com.tngtech.archunit.lang.ArchRule
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 /**
  * 경계 게이트의 **음성** 쪽 — `milestone-1.md:80` 이 요구하는 *"일부러 넣은 fixture 가 실제로
@@ -26,9 +28,25 @@ class ArchitectureGateCatchesViolationsTest {
     private val fixtureRoot = "${policy.packageRoot}.archfixture.violating"
     private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
 
-    @Test
-    fun `도메인에 심은 프레임워크 의존을 잡는다`() {
-        rules.domainMustNotDependOnFrameworks(fixtureRoot) mustReport "FrameworkLeak"
+    /**
+     * **가족마다 하나씩 심는다.** 한 가족(Spring)만 확인하면 나머지 금지 목록이 실제로 구속하는지
+     * 알 수 없고, 목록에 좌표 하나를 빠뜨린 것도 드러나지 않는다 — Codex #3 이 지적한 형태다
+     * (`java.net.http` 만 적어 `java.net.HttpURLConnection` 이 통과했다).
+     */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = [
+            "FrameworkLeak",
+            "PersistenceLeak",
+            "SerializationLeak",
+            "HttpLeak",
+            "BrokerLeak",
+            "SqlLeak",
+            "FileIoLeak",
+        ],
+    )
+    fun `금지 가족마다 심은 위반을 잡는다`(fixture: String) {
+        rules.domainMustNotDependOnFrameworks(fixtureRoot) mustReport fixture
     }
 
     @Test

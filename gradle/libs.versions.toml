@@ -49,6 +49,12 @@ micrometer-core = { module = "io.micrometer:micrometer-core" }
 # Boot 4.1.1 BOM 이 끌어오는 testcontainers-bom 2.0.5 는 `testcontainers-postgresql` 을 관리한다.
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
 
+# 금지 가족마다 위반 fixture 를 컴파일하기 위한 좌표. app 의 **test** 에만 오르며 어떤 모듈도
+# production 에서 쓰지 않는다 — 게이트가 그 가족을 실제로 잡는지 재는 것이 유일한 용도다.
+jakarta-persistence = { module = "jakarta.persistence:jakarta.persistence-api" }
+jakarta-jms = { module = "jakarta.jms:jakarta.jms-api" }
+jackson-databind = { module = "tools.jackson.core:jackson-databind" }
+
 db-scheduler = { module = "com.github.kagkarlsson:db-scheduler", version.ref = "db-scheduler" }
 resilience4j-retry = { module = "io.github.resilience4j:resilience4j-retry", version.ref = "resilience4j" }
 
