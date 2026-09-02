@@ -83,3 +83,4 @@ Codex가 `request_changes`를 반환하면 같은 scope에서 Claude가 수정�
 | 2026-09-02 | Codex 는 설계 검토·Phase 4 통과 뒤에만 — 게이트 강화의 실검증은 첫 도메인 코드 slice 에서 | v2-slice-pipeline | 운영자 지시 — 1A 의 결정적 결함(빈 도메인에서만 초록)은 실제 도메인 코드가 있어야 드러남 |
 | 2026-09-02 | §4b 프롬프트에 `.gradle-home/` 비대상 명시 · 사전 스모크 명령 변수 확장 금지 | codex-review-gate | 1A 4차 — codex 가 세 라운드째 「clean worktree 와 다르다」 residual · zsh 단어 분리로 스모크 전건 실패가 exit 0 으로 가려질 뻔함 |
 | 2026-09-03 | clean-tree 게이트 정의에 **경로 개별 인자 · 양성 대조 1회** 명시 | evidence-pack | 1A 구현 레인 실측 — in_scope 목록을 변수 하나로 넘겨 pathspec 하나가 되어 매치 0·exit 0 = 거짓 통과. 직전 행의 변수 확장 함정이 검증 쪽에서 재발 |
+| 2026-09-03 | 역방향 파급 grep 을 **축약형 포함(stem 기준)** 으로 · 「아래쪽 편집이라 안 밀림」 판단은 두 줄 번호를 명령으로 낸 뒤에만 | evidence-pack | 1A verifier r12 L-1 — ADR 0007 을 `docs/adr/0007:186` 으로 인용한 5건을 전체 파일명 grep 이 0건으로 놓쳤고, 문서 머리 +22줄 삽입에 「밀리지 않는다」로 적힘 |
