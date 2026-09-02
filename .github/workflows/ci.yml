@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 러너의 launcher JVM. 컴파일에 쓰이는 toolchain 은 gradle.properties 의
+      # `bidvector.jvmToolchain` 이 정하고, 없으면 foojay resolver 가 내려받는다.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # check 가 게이트 전부를 든다 — 컴파일 · ktlint · detekt · sizeGate ·
+      # domainDependencyGate · architecture test · compatibilitySmoke.
+      - run: ./gradlew --no-daemon check
+
+      # OPEN-ADR-06 의 입력. 게이트가 아니라 측정이라 실패시키지 않는다.
+      - run: ./gradlew --no-daemon qualityBaseline
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: |
+            build/reports/quality-baseline/
+            */build/reports/
+          retention-days: 14
