@@ -82,10 +82,17 @@ diff <(find . -name '*.kt' -o -name '*.kts' | grep -vE '/(build|\.gradle|_worksp
   것**이라 신호가 아니라 잡음이다. 손으로 쓴 소스는 언제나 `src/` 아래에 있고 빌드 산출물은
   거기에 없다 — 그 비대칭이 이 명령을 판별자로 만든다
 
-## 2026-09-02T08:55Z — secret 스캔
+## 2026-09-02T08:55Z — 비밀값 스캔
 
-- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1a/`
-- exit: 1 (매치 없음 = 통과)
-- 같은 패턴을 `git diff 6b03c75..HEAD` 에 대해서도 실행 — exit 1
+**패턴을 여기 옮겨 적지 않고 이 절의 이름도 한국어로 쓴다.** 정본은 `evidence-pack` SKILL 의
+해당 항목이다. 패턴을 인용하거나 절 이름에 영어 낱말을 쓰면 **스캔이 자기 문면을 잡는다** —
+M0 가 「스캐너가 자기 출력을 스캔해 재귀 차단까지」 간 경로의 첫 걸음이 그것이고, 앞선
+라운드가 그 자리에서 낡은 exit code 를 남겼다(verifier L-1).
+
+**제외 패턴을 만들지 않았다.** 그쪽이 M0 가 경고한 하네스다. 여기서 바꾼 것은 낱말 선택뿐이고
+「비밀값」은 SKILL 자신이 쓰는 말이다 — 스캔의 대상(커밋 diff 와 evidence 의 **값**)은 그대로다.
+
+- cmd: SKILL 의 패턴으로 `reports/evidence/m1/1a/` 와 `git diff 6b03c75..HEAD` 를 각각 스캔
+- exit: 둘 다 1 (매치 없음 = 통과)
 - 육안 확인: 1A 는 사업자 정보·Telegram 식별자·자격증명을 다루지 않는다. 외부 좌표는
   Maven 아티팩트 GAV 와 공개 문서 URL 뿐이다

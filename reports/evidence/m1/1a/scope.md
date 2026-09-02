@@ -38,7 +38,7 @@ acceptance_commands:
   - "./gradlew --no-build-cache clean check"       # A-1
   - "./gradlew :app:test --tests '*ArchitectureGate*'"   # A-2 — 위반 fixture 음성 테스트 포함
   - "./gradlew qualityBaseline"                    # A-3 — OPEN-ADR-06 입력 실측
-  - "./gradlew compatibilitySmoke"                 # A-4 — 채택 라이브러리 일곱 × Boot 4.1.1
+  - "./gradlew :app:compatibilitySmoke"            # A-4 — 채택 라이브러리 일곱 × Boot 4.1.1
 rollback: |
     **정본은 `reports/evidence/m1/1a/rollback.md`**(`agent-workflow.md` §6 이 요구하는 파일).
     되풀이하지 않는다 — 같은 사실을 두 자리에 적으면 한쪽이 낡는다.

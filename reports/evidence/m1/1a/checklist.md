@@ -43,7 +43,7 @@
 | test/lint/type/architecture 통과 | `A-1` 이 전부를 든다 |
 | 변경된 fixture 와 정책 version 의 근거 | 정책 데이터 둘 다 `policy.version=1` 이고 값의 출처를 파일 주석이 든다. **1A 가 값을 고른 것은 없다** — `v2-지침서.md` §5:305 의 둘을 옮겼을 뿐이다 |
 | 알려진 제한과 rollback | 아래 「알려진 제한」 · `rollback.md` |
-| secret 스캔 | `commands.md` 의 secret 스캔 절 |
+| 비밀값 스캔 | `commands.md` 의 비밀값 스캔 절 |
 
 ## 알려진 제한
 
