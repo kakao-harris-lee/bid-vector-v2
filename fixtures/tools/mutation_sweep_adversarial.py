@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""확장 적대 집합 스윕 — **분류를 결정하는 스윕이다.**
+
+판정: **`authoritative` = 확장 적대 집합에서 위반 변이체 통과 0**
+(운영자 결정 2026-09-02 「동결+강등」, Codex 재리뷰 B9 가 쓴 수).
+통과가 하나라도 있으면 그 case 는 기계적으로 `insufficient-evidence` 로 내려간다 —
+술어를 새로 만들지 않는다(`manifest.yaml` `schema.extensions` 의 동결).
+
+방법·갈래 정의의 정본은 `reports/evidence/m0/0e/commands.md` **C-15** 다.
+여기서 도는 세 갈래는 그 항목의 확장 셋이다.
+
+  (a) `verifies` 가 **주장하는 필드의 삭제** — 아래 `ASSERTED` 가 case 별로 든다.
+  (b) projection 경로의 **null 치환** — projection 전건에서 기계로 생성한다.
+  (c) projection 피연산자와 다른 **확정 토큰 치환** — 같음.
+
+**(a) 만 사람의 판단이다.** 어느 필드가 `verifies` 의 주장에 드는지는 기계가 읽지
+못한다. 그래서 `ASSERTED` 의 각 줄이 **근거를 오른쪽 주석에 싣는다** — 이 파일에서
+사람 판단이 개입한 자리는 그 열이 전부다.
+
+**(a) 의 기준은 Codex 재리뷰 B10(high)이 조였다** — `verifies` **문면만이 아니라
+그것이 근거로 인용한 결정이 정하는 것**(사유 토큰 · 계약 형태 · 관계 주장의 축)**도
+주장에 든다.** 이 레인의 앞선 해석선(「사유를 괄호에 적은 case 만」)은 기각됐다.
+
+**실제 fixture 는 건드리지 않는다** — 변이는 기대값 JSON 의 격리된 메모리 사본에서만
+일어나고 이 스크립트는 아무 파일도 쓰지 않는다.
+
+실행:
+
+    python3 fixtures/tools/mutation_sweep_adversarial.py
+    python3 fixtures/tools/mutation_sweep_adversarial.py --crosscheck-pyyaml
+    python3 fixtures/tools/mutation_sweep_adversarial.py --manifest <경로>
+
+`--manifest` 는 강등 **이전** manifest 를 물려 그날의 판정을 재현할 때 쓴다
+(기대값·입력 파일은 강등에서 바뀌지 않았으므로 옛 manifest + 현재 fixture 로 성립한다).
+"""
+import argparse
+import copy
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import manifest_contract as mc  # noqa: E402
+
+
+# (a) `verifies` 가 존재·값을 주장하는데 계약 밖인 경로 — 각 case 의 `verifies` 문면과
+#     그것이 인용한 근거에서 도출한 **사람의 판단**이다. 근거는 오른쪽 주석.
+ASSERTED = {
+    "license-006":                 ["$.uncertainReason"],                  # U-5 sealed enum 의 사유 토큰
+    "capacity-gate-003":           ["$.suitabilityAxisAffected"],          # OPEN-QUAL-08 분할의 양(陽)의 절반
+    "floor-threshold-001":         ["$.criticalAssessmentRate.fraction"],  # 관계 주장의 축(임계값)
+    "floor-threshold-003":         ["$.criticalAssessmentRate.fraction"],
+    "rate-unit-003":               ["$.outcome"],                          # "거부된다"
+    "rate-unit-004":               ["$.outcome"],                          # "거부된다"
+    "money-basis-001":             ["$.outcome", "$.reasonCode"],          # "사유와 함께 거부된다"
+    "money-basis-002":             ["$.comparedBases"],                    # "basis 가 같으면"
+    "money-basis-004":             ["$.outcome"],                          # "들어갈 수 없다"
+    "money-basis-006":             ["$.reasonCode"],                       # "승격되지 않는다" 의 사유
+    "floor-shortfall-006":         ["$.outcome"],                          # "정상 처리된다"
+    "base-amount-provenance-004":  ["$.outcome"],                          # "거부된다"
+    "base-amount-provenance-005":  ["$.outcome"],                          # "거부된다"
+    "verdict-004":                 ["$.overrideOutcome", "$.reasonCode"],  # "사유와 함께 거부되며"
+}
+
+# (c) 갈래가 쓰는 대체 토큰. 목록에 없는 피연산자는 `Other` 로 친다.
+OTHER_TOKEN = {"Inclusive": "Exclusive", "Clean": "DerivedVat", "Unmeasurable": "Computed"}
+
+
+def build_mutants(cases):
+    mutants = []
+    for cid, paths in ASSERTED.items():
+        if cid not in cases:
+            continue  # 강등된 case 는 대상이 아니다
+        for path in paths:
+            mutants.append((cid, path, mc.DELETE, "(a) verifies 주장 필드 삭제"))
+    for cid, case in cases.items():
+        for entry in case.get("verified_projections") or []:
+            mutants.append((cid, entry["path"], None, "(b) projection 경로 null"))
+            mutants.append((cid, entry["path"],
+                            OTHER_TOKEN.get(entry["operand"], "Other"), "(c) 다른 확정 토큰"))
+    return mutants
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--manifest", default=mc.MANIFEST)
+    ap.add_argument("--crosscheck-pyyaml", action="store_true",
+                    help="PyYAML 이 있으면 manifest reader 결과를 그것과 대조한다")
+    args = ap.parse_args(argv)
+
+    if args.crosscheck_pyyaml:
+        print("pyyaml crosscheck OK — cases", mc.crosscheck_pyyaml(args.manifest))
+
+    cases = mc.authoritative_cases(args.manifest)
+    rows, demoted = [], set()
+    for cid, path, value, why in build_mutants(cases):
+        mutated = copy.deepcopy(mc.load_expected(cases[cid]))
+        mc.set_path(mutated, path, value)
+        passes = mc.holds(cases[cid], mutated)
+        rows.append((cid, path, why, passes))
+        if passes:
+            demoted.add(cid)
+
+    for row in sorted(rows):
+        print("%-28s %-24s %-26s %s" % (row[0], row[1], row[2], "PASSES" if row[3] else "caught"))
+    print()
+    print("강등 대상 (위반 변이체 통과):", len(demoted))
+    for cid in sorted(demoted):
+        print("  -", cid)
+    print("잔존 authoritative:", len(cases) - len(demoted))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

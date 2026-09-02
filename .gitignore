@@ -8,6 +8,9 @@ bid-vector
 # codex 리뷰 레인의 로컬 실행 산출물
 *.raw-output.txt
 
+# 커밋된 도구를 돌리면 생기는 바이트코드 (`fixtures/tools/` 는 모듈을 import 한다)
+__pycache__/
+
 # 전역 gitignore(~/.gitignore_global)가 CLAUDE.md를 제외하지만,
 # 이 프로젝트에서는 역할별 진입점 문서라 커밋 대상이다 (README '문서 읽는 순서')
 !CLAUDE.md

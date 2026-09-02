@@ -257,6 +257,49 @@ legacy 좌표를 저장소 안에 고정한 것이 `fixtures/legacy-reference-in
   `verifies` 를 **옳게 도출했는가**는 기계가 재지 못한다. 그것은 사람이 읽는 자리이고
   도출 규칙은 `manifest.yaml` 의 `schema.extensions.verified_paths` 가 적는다
 
+## F-8 · mutation 스윕 — 분류 기준의 재실행
+
+**분류를 결정하는 스윕이 저장소 안에 있다**(운영자 승인 2026-09-02, Codex 재리뷰 B10
+medium #3). 앞선 라운드는 `_workspace/`(`.gitignore`)에서 돌려 **감사자가 판정을 다시
+낼 수 없었다.** **방법·적대 집합 갈래·판정 기준의 정본은 `commands.md` **C-15** 이고**,
+이 항목은 그 판정을 **어떻게 다시 내는가**만 적는다.
+
+- cmd:
+  ```bash
+  python3 fixtures/tools/mutation_sweep_adversarial.py   # 분류를 결정하는 스윕
+  python3 fixtures/tools/mutation_sweep_targeted.py      # 표적 변이 + 표기 변형
+  ```
+- exit: 0 · 0
+- 핵심 결과: 적대 스윕의 **강등 대상 0**, 곧 `authoritative` 전건이 판정
+  「확장 적대 집합에서 위반 변이체 통과 0」을 만족한다. **잔존 수는 이 명령이 내고
+  분류별 분포는 F-7 이 낸다 — 여기 옮겨 적지 않는다.** 표적 스윕에서 통과하는 유일한
+  줄은 `대조군 — 무변이`(변이가 없어 통과가 정상)와 **승인 대기 절**이다
+
+**표준 라이브러리만 쓴다.** 이 저장소의 `python3` 에 `PyYAML` 이 없어 F-7·F-7b 는 격리
+venv 를 쓰지만, 스윕은 **clean HEAD 에서 추가 설치 없이** 돌아야 하므로 manifest 의 계약
+부분만 읽는 좁은 reader(`fixtures/tools/manifest_contract.py`)를 함께 둔다. 그 reader 가
+`PyYAML` 과 같은 값을 읽는지는 감사자가 직접 잰다:
+
+- cmd: `/tmp/fxvenv/bin/python fixtures/tools/mutation_sweep_adversarial.py --crosscheck-pyyaml`
+  (venv 준비는 **F-7** 이 적는다)
+- exit: 0
+- 핵심 결과: `pyyaml crosscheck OK` — reader 의 투영이 `PyYAML` 과 case 전건에서 일치.
+  어긋나면 `ManifestFormatError` 로 멈춘다(조용한 오독을 만들지 않는다)
+
+**강등 라운드 자체의 재현은 `--manifest` 가 받는다.** 기대값·입력 파일은 강등에서 바뀌지
+않았으므로 강등 **이전** manifest 를 물리면 그날의 판정이 그대로 다시 나온다:
+
+- cmd:
+  ```bash
+  git show 58e3331:fixtures/manifest.yaml > /tmp/pre-demotion-manifest.yaml
+  python3 fixtures/tools/mutation_sweep_adversarial.py --manifest /tmp/pre-demotion-manifest.yaml
+  ```
+- exit: 0
+- 핵심 결과: 강등 대상이 나온다. **그 수가 그날 내려간 수보다 크다 — 그것이 정상이다**:
+  현재 스크립트가 담은 (a) 기준은 **B10 이 조인 뒤**의 것이고, 조인 결과가 강등이 아니라
+  **계약 추가**였던 case 들은 그 옛 manifest 에서 아직 계약을 갖지 않는다. 두 집합의 차는
+  `git diff 58e3331 HEAD -- fixtures/manifest.yaml` 의 `verified_paths` 줄이 낸다
+
 ---
 
 ## 실행하지 않은 것 (승인 대상)
