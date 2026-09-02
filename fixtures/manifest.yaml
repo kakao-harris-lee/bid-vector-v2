@@ -77,6 +77,12 @@ layout:
         `reports/evidence/m0/0e/commands.md` **C-15** 가 호출하고, **분류를 정한 근거가 이 스크립트의 출력**이다.
     - path: fixtures/tools/mutation_sweep_targeted.py
       role: "표기 변형 등 지목 갈래의 스윕. 같은 **C-15** 가 함께 호출한다."
+    - path: fixtures/tools/manifest_prose_consistency.py
+      role: |-
+        **이 파일의 산문**이 현재형으로 주장하는 덮개와 각 case 의 `classification` 을 대조한다 —
+        강등이 서사를 낡게 만드는 자리를 잡는 검사다. 정의(블록 범위·주장형 동사·제외·못 보는 것)는
+        `reports/evidence/m0/0e/commands.md` **C-12b** 와 이 스크립트의 docstring 이 갖는다.
+        **계약을 재지 않는다** — 그쪽은 `manifest_contract.py` 와 두 스윕이다.
 
 schema:
   base: data-extract.md §3
