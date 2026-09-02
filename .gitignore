@@ -22,4 +22,8 @@ __pycache__/
 /*/build/
 /.gradle/
 /*/.gradle/
+# KGP 가 만드는 세션 디렉터리. `build/`·`.gradle/` 과 같은 가족이고 같은 이유로 앵커한다 —
+# `build-logic/.kotlin/` 은 in_scope 아래라 무시되지 않으면 clean-tree 게이트에 걸린다.
+/.kotlin/
+/*/.kotlin/
 !gradle/wrapper/gradle-wrapper.jar
