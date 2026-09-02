@@ -52,8 +52,10 @@ MockK 또는 test server/container를 쓴다.**
 - **대가 — `jqwik`이 탈락한다.** 1.10.1이 junit-platform **1.14.4**에 묶여 있고 2.x 라인이
   없다. §5가 요구하는 property test는 `kotest-property`가 든다. **§1.1의 「property test」
   요구 자체는 바뀌지 않는다** — 그것을 드는 라이브러리만 바뀐다.
-- **M1이 고정한 값**은 slice 계약(`reports/evidence/m1/1a/scope.md` D-1)이 갖는다. 이 절은
-  버전 숫자를 옮겨 적지 않는다 — 같은 사실을 두 자리에 두면 한쪽이 낡는다.
+- **승인 시점에 고정된 값**: 테스트 플랫폼 **JUnit 6.1.3**, 아키텍처 테스트 러너
+  **`com.tngtech.archunit:archunit-junit6` 1.5.0**. **이것은 승인 당시의 사실이라 낡지 않는다** —
+  이후 M1이 버전을 올리면 그것은 slice 계약(`reports/evidence/m1/1a/scope.md` D-1)이 들고,
+  이 줄은 「무엇이 승인됐는가」로 남는다. 두 자리의 역할이 다르다.
 
 ### 1.2 래칫만으로는 막히지 않았다는 관찰
 
