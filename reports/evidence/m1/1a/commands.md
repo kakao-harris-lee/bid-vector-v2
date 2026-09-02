@@ -177,6 +177,43 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 재현: (a) 는 루트에 `clean` task 를 만들어 그 빌드의 `:clean` 에 `dependsOn` 을 걸고 위 명령을
 돌린다. (b) 의 근거는 (a) 로그의 `> Task :build-logic:` 줄 순서다.
 
+### 우회 경로별 대응표 (설계 검토 §2 + Codex 4차)
+
+검토가 던진 여덟과 Codex 4차 둘. **각 행의 「막는 층」이 그 우회가 왜 닫혔는지의 정본**이다.
+
+| # | 우회 | 막는 층 | 실측 |
+| --- | --- | --- | --- |
+| `U-1` | `ResourceBundle` — classpath 자원 I/O, 추가 의존 0 | **T-C** 목록 밖 | fixture |
+| `U-2` | `Boolean.getBoolean` 등 시스템 프로퍼티 | **T-D** 멤버 단위 | fixture |
+| `U-3` | 모듈이 convention plugin 을 안 씀 → 게이트 소멸 | `conventionCoverageGate` | `E-21` |
+| `U-4` | `runtimeOnly` 등 다른 configuration | 혈통으로 고른 configuration 전건 + main 좌표 allow-list | `E-22` |
+| `U-5` | `srcDir("gen")` — 크기 래칫만 빠짐 | sizeGate 입력을 실제 srcDirs 로 | `E-23` |
+| `U-6` | `@Suppress("LongMethod")` — 승인 임계 소멸 | sizeGate 의 억제 검사 | `E-24` |
+| `U-7` | `Locale`/`TimeZone.getDefault` | **T-C** 목록 밖 | fixture |
+| `U-8` | `X::class.java` 클래스 리터럴 | **막지 못한다** — 상수 풀 엔트리는 ArchUnit 의존이 아니다 | 잔여(알려진 제한) |
+| Codex a | `Formatter(String)` — 허용 패키지 안의 파일 I/O | **T-C** 목록 밖 | fixture |
+| Codex b | Java source set — 소유·크기·경계 셋 다 비껴감 | `java.setSrcDirs` 봉쇄 + `sourceLanguageGate` | `E-25` |
+
+### 이 라운드의 게이트 실측
+
+| # | 심은 것 | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| `E-21` | `settlement` 를 `kotlin("jvm")` 로 바꿈 | `./gradlew --no-build-cache clean check` | 1 | `적용 안 됨: [settlement]` |
+| `E-22` | `decision` 에 `runtimeOnly("org.springframework:spring-core")` | `./gradlew :decision:moduleDependencyGate` | 1 | 무해한 좌표(commons-lang3)도 잡힌다 — 실패 방향이 닫혀 있다 |
+| `E-23` | `srcDir("gen")` 아래 500 줄 초과 파일 | `./gradlew :settlement:sizeGate` | 1 | `파일 500 줄 한도 초과` |
+| `E-24` | `@Suppress("LongMethod")` + 54 줄 함수 | `./gradlew :settlement:detekt` · `:settlement:sizeGate` | **0** · 1 | **detekt 은 억제된다.** sizeGate 가 억제 자체를 잡는다 |
+| `E-25` | `decision/src/main/java/Leak.java` | `./gradlew --no-build-cache clean check` | 1 | `main/java/Leak.java` |
+| `E-26` | 양성 corpus 에서 `kotlin.enums`·`kotlin.math`·`java.time.temporal`·`EnumMap` 을 각각 제거 | `./gradlew :app:test --tests '*ArchitectureGate*'` | 1 (넷 전부) | corpus 가 공허하지 않다 |
+
+### 설계 검토가 미확인으로 남긴 넷 — 실측으로 답한다
+
+| # | 물음 | 답 |
+| --- | --- | --- |
+| `M-1` | `@Suppress` 가 detekt 을 억제하는가 | **억제한다**(`E-24`). U-6 은 실재하는 우회였다 |
+| `M-2` | `java.setSrcDirs(emptyList())` 의 부작용 | **없다.** 기존 빌드 그대로 exit 0, Java 산출물 미생성. **다만 봉쇄된 파일은 어느 source set 에도 안 들어가서 srcDir 만 훑는 검사에는 보이지 않는다** — 그래서 관례 트리도 함께 훑는다 |
+| `M-3` | TestKit 이 이 빌드에서 도는가 | **재지 않았고 도입하지 않았다.** 사유는 알려진 제한 |
+| `M-4` | `external.allowed.domain` 의 집합 | **둘**(`kotlin-stdlib`·`annotations`). `--configuration compileClasspath` 실측 |
+
 ### 금지 가족을 어느 층이 잡는가
 
 **2차 열의 뜻이 바뀌었다** — 이제 domain 게이트는 금지 열거가 아니라 **allow-list(정확 패키지)** 다.
