@@ -36,6 +36,7 @@
 """
 import argparse
 import copy
+import json
 import os
 import sys
 
@@ -60,10 +61,20 @@ ASSERTED = {
     "base-amount-provenance-004":  ["$.outcome"],                          # "거부된다"
     "base-amount-provenance-005":  ["$.outcome"],                          # "거부된다"
     "verdict-004":                 ["$.overrideOutcome", "$.reasonCode"],  # "사유와 함께 거부되며"
+    "rate-unit-001":               ["$.outcome"],                          # "명시 변환된다" = 통과 상태
+    "rate-unit-002":               ["$.outcome"],                          # "그대로 통과한다"
+    "rate-unit-005":               ["$.outcome"],                          # "선언이 개연성을 이긴다" = 수용
 }
 
 # (c) 갈래가 쓰는 대체 토큰. 목록에 없는 피연산자는 `Other` 로 친다.
 OTHER_TOKEN = {"Inclusive": "Exclusive", "Clean": "DerivedVat", "Unmeasurable": "Computed"}
+
+# (a′) 갈래가 쓰는 **값 변이**. `ASSERTED` 의 경로에 삭제와 **별도로** 건다 —
+# 삭제만으로는 「경로는 있는데 값이 뒤집힌」 산출을 잡지 못한다(Codex B12 high 진단:
+# *"스윕은 존재하는 경로만 검증하고, 경로가 덮지 않는 주장은 탐지 못 한다"*).
+# 불리언은 반전하고, 문자열은 아래 표의 적대 토큰(없으면 `Other`)으로 바꾼다.
+ADVERSARIAL_VALUE = {"Accepted": "Rejected", "Rejected": "Accepted",
+                     "Comparable": "Rejected", "Uncertain": "Eligible"}
 
 
 def build_mutants(cases):
@@ -73,6 +84,16 @@ def build_mutants(cases):
             continue  # 강등된 case 는 대상이 아니다
         for path in paths:
             mutants.append((cid, path, mc.DELETE, "(a) verifies 주장 필드 삭제"))
+            ok, cur = mc.get(json.load(open(cases[cid]["expected_file"])), path)
+            if not ok:
+                continue
+            if isinstance(cur, bool):
+                flipped = not cur
+            elif isinstance(cur, str):
+                flipped = ADVERSARIAL_VALUE.get(cur, "Other")
+            else:
+                continue      # 수·객체·null 은 이 갈래의 대상이 아니다
+            mutants.append((cid, path, flipped, "(a') verifies 주장 필드 값 변이"))
     for cid, case in cases.items():
         for entry in case.get("verified_projections") or []:
             mutants.append((cid, entry["path"], None, "(b) projection 경로 null"))

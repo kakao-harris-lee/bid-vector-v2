@@ -493,13 +493,9 @@ numeric_discipline:
 cases:
   - id: rate-unit-001
     domain: rate-unit
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         선언된 percent 입력이 fraction으로 명시 변환된다. 원문 unit이 보존된다.
-    verified_paths:
-      - "$.rate.fraction"
-      - "$.conversionDivisor"
-      - "$.preservedSourceUnit"
     source:
       kind: approved-spec
       reference: |-
@@ -524,19 +520,44 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 7289b53dde1ef728688cfb54a8c4e883fcf2ec6d4441db22246b1d868901fffc
     expected_sha256: 1937c3ba8fec01bcd8cdf354457fa758ca13a1ecdf500d6116b886fe23e5b5f6
-    change_history: []
+    not_covered: |-
+      **수용측 상태(`$.outcome`)를 계약이 지키지 못한다** — 확장 적대 집합의 **(a)(a′)** 에서
+      삭제와 `Accepted`→`Rejected` 값 변이가 **둘 다 통과**했다. 즉 **모든 입력을 거부하면서 변환
+      숫자만 계산하는 산출**이 이 case 를 지나간다. **동결 어휘로는 표현할 수 없다** — `Accepted`·
+      `Rejected` 는 **승인 문면이 하나도 없는 가족 B 자작 토큰**이라(`v2-지침서.md`·ADR·커밋된 결정
+      기록 전수 0건) 정확 비교는 미승인 이름을 잠그고 `not-equals` 도 **부정 쪽 토큰으로 잠금을
+      옮길 뿐**이다(B5 논리). **`verifies` 를 좁혀 스윕을 통과시키지 않았다** — 주장을 고쳐 기준을
+      피하는 것이기 때문이다. 되돌림은 `uncovered_axes` 의 「**승인된 피연산자 부재**로 잠글 수 없는
+      결과 토큰」 축이 지목한다 — 막는 것이 술어가 아니라 **어휘**이고, `unblocks_when` 이 그 해제를
+      **운영자의 결과 토큰 어휘 명시 승인**(M1 계약 설계와 함께)으로 적는다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 `verified_paths` 를
+          걷었다. `not_covered` 를 신설했다. **`source.kind` 는 그대로** 두었다(사유가 근거의 층이 아니다).
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 18 — Codex 재리뷰 B12 `findings[0]`(high).** 이 case 의 `verifies` 가
+          「변환되어 통과한다」를 주장하는데 `$.outcome` 이 계약에 없어 **`Accepted`→`Rejected` 뒤집기가
+          통과**했다. **거울 모집단이 이미 같은 사유로 내려가 있었다** — 거부측 `rate-unit-003`·`004` 가
+          그것이다. 앞 라운드가 **「§4.1 은 거부 경로만 정한다」로 수용측을 남긴 해석선**을 심판이
+          기각했다: **`verifies` 가 주장하면 주장이다.**
+
+          **스윕에 (a′) 갈래를 신설**해 잡았다 — 삭제와 별도로 **주장 필드의 값을 변이**한다.
+          B12 진단 그대로 *"스윕은 존재하는 경로만 검증하고, 경로가 덮지 않는 주장은 탐지 못 한다"*.
+          그 갈래를 잔존 `authoritative` 전수에 돌린 결과가 이 강등이다.
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: rate-unit-002
     domain: rate-unit
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         선언된 fraction 입력은 배율 없이 그대로 통과한다.
-    verified_paths:
-      - "$.rate.fraction"
-      - "$.conversionDivisor"
     source:
       kind: approved-spec
       reference: |-
@@ -561,7 +582,35 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 30459cc29f32c6313b6c72e8eed645de6df0659a8b5488f07bbda5c4431f3b39
     expected_sha256: 771fc9af17a9445ec688ab5ff44bdc61088cd2b555974a4de13fd823abbfbd68
-    change_history: []
+    not_covered: |-
+      **수용측 상태(`$.outcome`)를 계약이 지키지 못한다** — 확장 적대 집합의 **(a)(a′)** 에서
+      삭제와 `Accepted`→`Rejected` 값 변이가 **둘 다 통과**했다. 즉 **모든 입력을 거부하면서 변환
+      숫자만 계산하는 산출**이 이 case 를 지나간다. **동결 어휘로는 표현할 수 없다** — `Accepted`·
+      `Rejected` 는 **승인 문면이 하나도 없는 가족 B 자작 토큰**이라(`v2-지침서.md`·ADR·커밋된 결정
+      기록 전수 0건) 정확 비교는 미승인 이름을 잠그고 `not-equals` 도 **부정 쪽 토큰으로 잠금을
+      옮길 뿐**이다(B5 논리). **`verifies` 를 좁혀 스윕을 통과시키지 않았다** — 주장을 고쳐 기준을
+      피하는 것이기 때문이다. 되돌림은 `uncovered_axes` 의 「**승인된 피연산자 부재**로 잠글 수 없는
+      결과 토큰」 축이 지목한다 — 막는 것이 술어가 아니라 **어휘**이고, `unblocks_when` 이 그 해제를
+      **운영자의 결과 토큰 어휘 명시 승인**(M1 계약 설계와 함께)으로 적는다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 `verified_paths` 를
+          걷었다. `not_covered` 를 신설했다. **`source.kind` 는 그대로** 두었다(사유가 근거의 층이 아니다).
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 18 — Codex 재리뷰 B12 `findings[0]`(high).** 이 case 의 `verifies` 가
+          「변환되어 통과한다」를 주장하는데 `$.outcome` 이 계약에 없어 **`Accepted`→`Rejected` 뒤집기가
+          통과**했다. **거울 모집단이 이미 같은 사유로 내려가 있었다** — 거부측 `rate-unit-003`·`004` 가
+          그것이다. 앞 라운드가 **「§4.1 은 거부 경로만 정한다」로 수용측을 남긴 해석선**을 심판이
+          기각했다: **`verifies` 가 주장하면 주장이다.**
+
+          **스윕에 (a′) 갈래를 신설**해 잡았다 — 삭제와 별도로 **주장 필드의 값을 변이**한다.
+          B12 진단 그대로 *"스윕은 존재하는 경로만 검증하고, 경로가 덮지 않는 주장은 탐지 못 한다"*.
+          그 갈래를 잔존 `authoritative` 전수에 돌린 결과가 이 강등이다.
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -686,13 +735,9 @@ cases:
       approved_by_user: false
   - id: rate-unit-005
     domain: rate-unit
-    classification: authoritative
+    classification: insufficient-evidence
     verifies: |-
         선언이 개연성을 이긴다 — percent로 선언된 0.875는 0.00875이지 0.875가 아니다.
-    verified_paths:
-      - "$.rate.fraction"
-      - "$.conversionDivisor"
-      - "$.preservedSourceUnit"
     source:
       kind: approved-spec
       reference: |-
@@ -717,7 +762,35 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 4b2f770c22b93947b5b24292f193614016a11d260a37f25d3ae63cebae84588e
     expected_sha256: a1a0e827c3af46a6b274e9fde8c9fcb90f4fc31217ec84983ff19a74e6722b96
-    change_history: []
+    not_covered: |-
+      **수용측 상태(`$.outcome`)를 계약이 지키지 못한다** — 확장 적대 집합의 **(a)(a′)** 에서
+      삭제와 `Accepted`→`Rejected` 값 변이가 **둘 다 통과**했다. 즉 **모든 입력을 거부하면서 변환
+      숫자만 계산하는 산출**이 이 case 를 지나간다. **동결 어휘로는 표현할 수 없다** — `Accepted`·
+      `Rejected` 는 **승인 문면이 하나도 없는 가족 B 자작 토큰**이라(`v2-지침서.md`·ADR·커밋된 결정
+      기록 전수 0건) 정확 비교는 미승인 이름을 잠그고 `not-equals` 도 **부정 쪽 토큰으로 잠금을
+      옮길 뿐**이다(B5 논리). **`verifies` 를 좁혀 스윕을 통과시키지 않았다** — 주장을 고쳐 기준을
+      피하는 것이기 때문이다. 되돌림은 `uncovered_axes` 의 「**승인된 피연산자 부재**로 잠글 수 없는
+      결과 토큰」 축이 지목한다 — 막는 것이 술어가 아니라 **어휘**이고, `unblocks_when` 이 그 해제를
+      **운영자의 결과 토큰 어휘 명시 승인**(M1 계약 설계와 함께)으로 적는다.
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `classification` 을 `authoritative` → **`insufficient-evidence`** 로 내리고 `verified_paths` 를
+          걷었다. `not_covered` 를 신설했다. **`source.kind` 는 그대로** 두었다(사유가 근거의 층이 아니다).
+          **기대값·입력·해시는 바꾸지 않았다.**
+        reason: |-
+          **0E 수정 라운드 18 — Codex 재리뷰 B12 `findings[0]`(high).** 이 case 의 `verifies` 가
+          「변환되어 통과한다」를 주장하는데 `$.outcome` 이 계약에 없어 **`Accepted`→`Rejected` 뒤집기가
+          통과**했다. **거울 모집단이 이미 같은 사유로 내려가 있었다** — 거부측 `rate-unit-003`·`004` 가
+          그것이다. 앞 라운드가 **「§4.1 은 거부 경로만 정한다」로 수용측을 남긴 해석선**을 심판이
+          기각했다: **`verifies` 가 주장하면 주장이다.**
+
+          **스윕에 (a′) 갈래를 신설**해 잡았다 — 삭제와 별도로 **주장 필드의 값을 변이**한다.
+          B12 진단 그대로 *"스윕은 존재하는 경로만 검증하고, 경로가 덮지 않는 주장은 탐지 못 한다"*.
+          그 갈래를 잔존 `authoritative` 전수에 돌린 결과가 이 강등이다.
+        policy_version: |-
+          해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4629,9 +4702,11 @@ uncovered_axes:
     owning_open:
       - "OPEN-REG-05 (활성) — ① 두 금액 차이의 **잔차 성분**(사정률 등) ② **저장 값의 행별 실제 과세 처리**"
     what_is_covered_instead: |-
-      `money-basis-001`·`004`가 **basis 태그가 다른 값 쌍**을 고정하되 **두 값의 수치를 같게 두어
-      어느 쪽이 크다는 전제를 넣지 않는다**(`regression-ledger.md` §10.1 인계의 요구).
-      `money-basis-006`이 legacy 유래 행을 정의상 기본값으로 자동 태깅하지 않음을 고정한다.
+      **열릴 당시에는** `money-basis-001`·`004`가 **basis 태그가 다른 값 쌍**을 고정하고(두 값의 수치를
+      같게 두어 어느 쪽이 크다는 전제를 넣지 않는다 — `regression-ledger.md` §10.1 인계의 요구),
+      `money-basis-006`이 legacy 유래 행의 자동 태깅 금지를 고정했다. **그 case 들이 2026-09-02 의
+      동결+강등으로 내려가 지금 이 축에 `authoritative` 덮개가 없다.** 어느 case 가 어느 층인지는
+      **각 case 의 `classification` 이 정본**이고 셈은 **F-7**·**C-15** 가 낸다.
     unblocks_when: OPEN-REG-05 가 닫히고 행별 과세 판정 근거가 생긴다.
 
   - axis: "`기초금액 ÷ 추정가격` 신뢰 상한의 경계값"
@@ -4989,9 +5064,9 @@ uncovered_axes:
     owning_open:
       - "소유 `OPEN` 없음 — **운영자 승인 부재**"
     what_is_covered_instead: |-
-      **basis 축은 덮인다** — `money-basis-001`·`004`가 「basis 가 다르면 비교·min/max 가 수행되지
-      않는다」를 `v2-지침서.md` §4.1 로 고정하고, `-006`이 legacy 유래 행의 자동 태깅 금지를
-      `U-1b`·`OPEN-DEC-08` 로 고정한다. **과세(`vatTreatment`) 축의 차단만 덮이지 않는다** —
+      **basis 축의 덮개도 2026-09-02 에 비었다** — 열릴 당시에는 `money-basis-001`·`004`가 「basis 가
+      다르면 비교·min/max 가 수행되지 않는다」를 `v2-지침서.md` §4.1 로, `-006`이 자동 태깅 금지를
+      `U-1b`·`OPEN-DEC-08` 로 고정했으나 **그 case 들이 내려갔다.** **과세(`vatTreatment`) 축의 차단만 덮이지 않는다** —
       `money-basis-005`는 `insufficient-evidence` 로 남아 있고 지워지지 않았다.
     unblocks_when: 운영자가 `data-dictionary.md` §1.2.1 의 타입 차단 규칙을 업무 규칙으로 명시 승인한다.
 
@@ -5009,8 +5084,8 @@ uncovered_axes:
     owning_open:
       - "소유 `OPEN` 없음 — 막는 것은 미결이 아니라 **운영자 승인 부재**다"
     what_is_covered_instead: |-
-      **basis 축의 비교 차단은 덮인다** — `money-basis-001`·`004`가 「basis 가 다르면 비교·min/max 가
-      수행되지 않는다」를 `v2-지침서.md` §4.1 로 고정한다. **덮이지 않는 것은 두 경로가 같은 basis 를
+      **basis 축의 비교 차단도 2026-09-02 에 덮개를 잃었다** — 열릴 당시에는 `money-basis-001`·`004`가
+      그것을 `v2-지침서.md` §4.1 로 고정했으나 **그 둘이 내려갔다.** **덮이지 않는 것은 두 경로가 같은 basis 를
       쓴다는 요구**다 — `money-basis-003`은 `insufficient-evidence` 로 남아 있고 지워지지 않았다.
     unblocks_when: |-
       운영자가 `regression-ledger.md` R-BASIS-01 의 「결정 무관(무조건)」 검증 방법 가운데
@@ -5037,9 +5112,9 @@ uncovered_axes:
       - "소유 `OPEN` 없음 — 막는 것은 미결이 아니라 **운영자 승인 부재**다"
       - "인접: `OPEN-DIC-03` (활성) — 어휘의 **전수성**을 소유한다. 이 축은 전수성이 아니라 **든 두 값의 근거**다"
     what_is_covered_instead: |-
-      **verdict 축이 통째로 비지는 않는다** — `verdict-004`(개연 밴드 밖 override 의 사유 있는 거부)는
-      `OPEN-DEC-04` 라는 **커밋된 결정 문면**이 직접 떠받치고 기대값이 사유 코드의 **이름**을 결정
-      문면에서 가져오지 않으므로 `authoritative` 로 남는다. **덮이지 않는 것은 「두 보류를 가르는
+      **열릴 당시에는 verdict 축이 통째로 비지 않았다** — `verdict-004`(개연 밴드 밖 override 의 사유
+      있는 거부)를 `OPEN-DEC-04` 라는 **커밋된 결정 문면**이 직접 떠받쳐 `authoritative` 였다.
+      **그 case 도 2026-09-02 에 내려가 지금 이 축에 `authoritative` 덮개가 없다.** **덮이지 않는 것은 「두 보류를 가르는
       사유 코드가 무엇인가」** 이고, 그 어휘를 기대값에 실은 셋이 다 내려가 있다 —
       `verdict-001`·`002`(자기 `verifies` 가 어휘를 잠근다) 와 `verdict-003`(규칙은 `OPEN-STR-03` 이
       떠받치나 기대값이 `LowPriority`·`BidNow` 를 잠근다). **셋 다 지워지지 않았다.**
