@@ -98,6 +98,19 @@ detekt 였으나(`T-2`) **실제로 깨진 것은 Spotless 다.** 처리는 아�
 | `E-9b` | 같은 상태에서 arch test 만 | `./gradlew :app:test --tests '*ArchitectureGateTest*'` | **0** | **2 차 그물은 못 본다** — 바이트코드 참조가 없다. `E-9` 가 1 차 강제의 존재 이유다 |
 | `E-10` | 정책의 `layer.domain.shareable` 에 `decision` 추가 | `./gradlew :build-logic:test` | 1 | 판정 테스트 2 건 실패 — 규칙이 느슨해지면 테스트가 죽는다 |
 
+### `E-11` — build-logic 청소의 기각된 후보 둘
+
+**왜 기각했는지의 정본은 `build-logic/build.gradle.kts:48`~`:52` 주석이다.** 여기는 그 판단을
+낸 실측만 든다 — 실패 이력은 결함이 아니라 검증이 작동했다는 증거다.
+
+| 후보 | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- |
+| (a) 루트 `clean` → `:build-logic:clean` 연결 | `./gradlew --no-build-cache clean check` | 1 | `:build-logic:compileTestKotlin` FAILED — 실행 중인 빌드의 산출물을 지운다 |
+| (b) 루트에서 그 빌드의 검증 산출물만 `Delete` | — | — | **실측 대상이 아니다.** (a) 의 로그가 `:build-logic:clean` 을 `compileKotlin`·`jar` **뒤**에 놓는다 — included build 의 task 는 루트가 요청한 `clean check` 순서에 매이지 않으므로 루트 쪽 Delete 도 검사 task 와의 순서를 잡을 수 없다 |
+
+재현: (a) 는 루트에 `clean` task 를 만들어 그 빌드의 `:clean` 에 `dependsOn` 을 걸고 위 명령을
+돌린다. (b) 의 근거는 (a) 로그의 `> Task :build-logic:` 줄 순서다.
+
 ### 금지 가족을 어느 층이 잡는가
 
 fixture 일곱이 이 표를 실측으로 만든다. **어느 한 층도 혼자로는 충분하지 않다.**
