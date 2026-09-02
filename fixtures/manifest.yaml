@@ -1450,6 +1450,7 @@ cases:
         운영자 보유 면허 미신고는 `Uncertain`이지 `Ineligible`이 아니다.
     verified_paths:
       - "$.verdict"
+      - "$.uncertainReason"
     source:
       kind: operator-decision
       reference: |-
@@ -1483,7 +1484,20 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: c6813f1968098092e8d81d5f900d63fc27b39c8ed7d355c0990bbeb0376121e5
     expected_sha256: bbcdcf5b9edf6dfc8419c0c888b401c3ba5128662e877b7f1bbaa112bf0d1fe9
-    change_history: []
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `verified_paths` 에 **`$.uncertainReason`** 를 더했다. **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 17 — Codex 재리뷰 B10(high)이 조인 (a) 갈래 기준.** 심판이 이 레인의
+          해석선(「사유를 괄호에 적은 case 만 주장으로 본다」)을 **기각**했다 — **`verifies` 가 근거로
+          인용한 결정의 사유 토큰·계약 형태도 주장의 일부**다. 그 기준으로 잔존 `authoritative` 를
+          전수 재스윕하니 이 case 의 **삭제 변이가 통과**했다: 사유 없는 일반 `Uncertain` 이 통과했다.
+          **동결 어휘로 표현되므로 강등이 아니라 계약 추가로 닫았다** — 정확 경로 비교이고 새 술어가 아니다.
+          근거는 **커밋된 운영자 결정 기록** `reports/evidence/m0/0c/decisions-2026-08-28.md` 의 **U-5**(「네 값으로 확정」 — `OperatorLicensesNotDeclared` 가 그 sealed enum 의 하나다).
+        policy_version: |-
+          해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -1962,6 +1976,7 @@ cases:
     verified_paths:
       - "$.qualificationVerdict"
       - "$.awardedContractLimitEmittedAsQualification"
+      - "$.suitabilityAxisAffected"
     source:
       kind: operator-decision
       reference: |-
@@ -1995,6 +2010,19 @@ cases:
     not_covered: |-
       적합도 점수의 값 — `capacity_score` 추측 정규화는 `폐기`이고 대체 산식이 없다
     change_history:
+      - date: 2026-09-02
+        change: |-
+          `verified_paths` 에 **`$.suitabilityAxisAffected`** 를 더했다. **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 17 — Codex 재리뷰 B10(high)이 조인 (a) 갈래 기준.** 심판이 이 레인의
+          해석선(「사유를 괄호에 적은 case 만 주장으로 본다」)을 **기각**했다 — **`verifies` 가 근거로
+          인용한 결정의 사유 토큰·계약 형태도 주장의 일부**다. 그 기준으로 잔존 `authoritative` 를
+          전수 재스윕하니 이 case 의 **삭제 변이가 통과**했다: 적합도 축 영향이 사라져도 통과했다.
+          **동결 어휘로 표현되므로 강등이 아니라 계약 추가로 닫았다** — 불리언이라 어휘를 잠그지 않는다.
+          근거는 `OPEN-QUAL-08` 분할 확정 축어(운영자 결정 2026-08-26) — 도급한도를 **자격이 아니라 적합도 축**에 넣는다는 그 결정의 양(陽)의 절반이다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
       - date: 2026-08-31
         change: |-
           `source.kind` 를 `operator-decision` 에서 `m0-derived-rule` 로, `classification` 을 `authoritative` 에서
@@ -2098,6 +2126,7 @@ cases:
         덮지 않는다(`floor-shortfall-001`~`006`이 그 축이다).
     verified_paths:
       - "$.sampleIsShortfall"
+      - "$.criticalAssessmentRate.fraction"
     source:
       kind: approved-spec
       reference: |-
@@ -2132,7 +2161,20 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 23b492f2aff8d2a617b5c873749d68151aad305b58d21a947bed78d178721749
     expected_sha256: d03e94b7b9b3ad309b8994ca6326f42eb9c0f65a6446554ff5adebbf7067d6e7
-    change_history: []
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `verified_paths` 에 **`$.criticalAssessmentRate.fraction`** 를 더했다. **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 17 — Codex 재리뷰 B10(high)이 조인 (a) 갈래 기준.** 심판이 이 레인의
+          해석선(「사유를 괄호에 적은 case 만 주장으로 본다」)을 **기각**했다 — **`verifies` 가 근거로
+          인용한 결정의 사유 토큰·계약 형태도 주장의 일부**다. 그 기준으로 잔존 `authoritative` 를
+          전수 재스윕하니 이 case 의 **삭제 변이가 통과**했다: 임계값이 사라져도 미달 여부만 남아 통과했다.
+          **동결 어휘로 표현되므로 강등이 아니라 계약 추가로 닫았다** — **수**라 어휘를 잠그지 않는다.
+          근거는 `v2-지침서.md` §4.4 — 이 case 의 주장이 **관계**(실현 대 임계)이므로 임계값은 그 주장의 축이지 동반 산출이 아니다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -2224,6 +2266,7 @@ cases:
         않는다(`floor-shortfall-001`~`006`이 그 축이다).
     verified_paths:
       - "$.sampleIsShortfall"
+      - "$.criticalAssessmentRate.fraction"
     source:
       kind: approved-spec
       reference: |-
@@ -2258,7 +2301,20 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: f7e5bbc2b7d75797f2893355967e9ca6e8c919ce2c09b7603b5d99ff18bfd11c
     expected_sha256: 6942d065010d2d5d8a654efc7459412939289b72485e79dfe366bbc688131f26
-    change_history: []
+    change_history:
+      - date: 2026-09-02
+        change: |-
+          `verified_paths` 에 **`$.criticalAssessmentRate.fraction`** 를 더했다. **분류·기대값·입력·해시 무접촉.**
+        reason: |-
+          **0E 수정 라운드 17 — Codex 재리뷰 B10(high)이 조인 (a) 갈래 기준.** 심판이 이 레인의
+          해석선(「사유를 괄호에 적은 case 만 주장으로 본다」)을 **기각**했다 — **`verifies` 가 근거로
+          인용한 결정의 사유 토큰·계약 형태도 주장의 일부**다. 그 기준으로 잔존 `authoritative` 를
+          전수 재스윕하니 이 case 의 **삭제 변이가 통과**했다: 임계값이 사라져도 미달 여부만 남아 통과했다.
+          **동결 어휘로 표현되므로 강등이 아니라 계약 추가로 닫았다** — **수**라 어휘를 잠그지 않는다.
+          근거는 `v2-지침서.md` §4.4 — 001 과 같은 자리이고 방향만 반대다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 확장이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
     review:
       claude_commit: pending
       codex_verdict: pending
