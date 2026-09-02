@@ -14,3 +14,8 @@ __pycache__/
 # 전역 gitignore(~/.gitignore_global)가 CLAUDE.md를 제외하지만,
 # 이 프로젝트에서는 역할별 진입점 문서라 커밋 대상이다 (README '문서 읽는 순서')
 !CLAUDE.md
+
+# Gradle 산출물
+build/
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar

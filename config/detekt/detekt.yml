@@ -1,0 +1,28 @@
+# detekt 2.0 설정. **2.0 키만 쓴다** — 1.x 의 `threshold` 계열은 2.0 에서 조용히 무시된다.
+# `buildUponDefaultConfig = true` 이므로 여기 없는 규칙은 도구 기본값으로 돈다.
+#
+# 임계 수치를 여기 적지 않는다. 승인 문서가 수치로 정한 것은 함수 50줄·파일 500줄 둘뿐이고
+# (v2-지침서.md §5:305) 그 둘의 자리는 config/quality/size-policy.properties 다 —
+# 함수 임계는 detektThresholdOverlay 가 생성해 이 파일 위에 얹는다.
+#
+# 아래는 v2-지침서.md §5 「크기와 결합도」가 요구하는 축 가운데 **도구 기본값이 꺼져 있는 것**만
+# 켠다. 켜는 것은 축의 채택이고 수치는 도구 기본값이다.
+
+complexity:
+  CognitiveComplexMethod:
+    active: true
+  ComplexInterface:
+    active: true
+  MethodOverloading:
+    active: true
+
+exceptions:
+  # business control flow 에 exception 을 쓰지 않는다(v2-지침서.md §5). 명시적 result type 을 쓴다.
+  TooGenericExceptionCaught:
+    active: true
+  SwallowedException:
+    active: true
+
+potential-bugs:
+  UnsafeCallOnNullableType:
+    active: true
