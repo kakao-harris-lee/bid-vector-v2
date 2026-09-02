@@ -19,9 +19,8 @@
   legacy 좌표 고정 산출물. **어느 파일이 있고 무엇을 하는지는 디렉터리와 각 파일의 docstring 이
   낸다** — 여기 열거하지 않는다. 호출 자리는 `fixtures-commands.md` 의 **F-3**(numeric
   discipline) · **F-5**(legacy 좌표) · **F-8**(mutation 스윕)이다.
-  **`manifest.yaml` 의 `layout.other_files` 는 앞의 둘만 선언한다** — 2026-09-02 에 들어온
-  스윕 셋은 아직 그 목록에 없다. manifest 무접촉 경계 아래서 옮긴 것이라 그 정합은 이
-  레인의 다음 manifest 라운드 몫이고, 그때까지 이 문장이 그 자리를 표시한다
+  **선언의 정본은 `manifest.yaml` 의 `layout.other_files` 다** — 이 디렉터리에 무엇이 있고
+  각각이 무슨 자리인지를 그 목록이 `path` 와 `role` 로 갖는다. 여기 다시 적지 않는다
 - `reports/evidence/m0/0e/fixtures-*.md`
 
 ## out_of_scope
