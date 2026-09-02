@@ -34,7 +34,10 @@ class ForbiddenFamilyCoverageTest {
         )
     }
 
-    /** 정확 패키지 허용 + `bidvector` 만 하위까지. 게이트의 판정과 같은 모양이다. */
+    /**
+     * 게이트의 판정과 같은 모양이다 — 정확 패키지, `bidvector` 하위, 그리고 **클래스 단위 허용
+     * 패키지는 그 자체로는 허용이 아니다**(안의 목록에 있는 클래스만 열린다).
+     */
     private fun isAllowed(candidate: String): Boolean =
         candidate in policy.allowedExactPackages ||
             policy.allowedSubtrees.any { candidate == it || candidate.startsWith("$it.") }
@@ -52,17 +55,33 @@ class ForbiddenFamilyCoverageTest {
     }
 
     /**
-     * 클래스 단위 금지는 **허용된 정확 패키지 안**에 있어야 뜻이 선다. 허용된 적 없는 패키지의
-     * 클래스를 적는 것은 아무것도 막지 않으면서 막는 것처럼 보인다. 이 잔여 deny 가 「무한 열거」가
-     * 아닌 근거이기도 하다 — 대상이 유한한 JDK 패키지 안으로 한정된다.
+     * **방향이 다시 뒤집혔다.** `class.forbidden` 이 사라지고 T-C(클래스 단위 허용)가 그 자리를
+     * 대신하므로, 이제 물음은 「금지가 허용 안에 있는가」가 아니라 **「허용이 제자리에 있는가」**다.
      */
     @Test
-    fun `클래스 금지는 허용된 정확 패키지 안에 있다`() {
+    fun `클래스 허용은 클래스 단위 패키지 안에 있다`() {
         val orphan =
-            policy.forbiddenClasses.filterNot { fqcn ->
-                fqcn.substringBeforeLast('.') in policy.allowedExactPackages
+            policy.allowedClasses.filterNot { fqcn ->
+                fqcn.substringBeforeLast('.').substringBefore('$') in policy.byClassPackages
             }
-        assertTrue(orphan.isEmpty(), "허용된 적 없는 패키지의 클래스를 금지했다: $orphan")
+        assertTrue(orphan.isEmpty(), "클래스 단위 패키지 밖의 클래스를 허용했다: $orphan")
+    }
+
+    /** T-D 의 owner 는 T-C 가 이미 연 클래스여야 한다 — 닫힌 클래스의 멤버를 또 막을 이유가 없다. */
+    @Test
+    fun `금지 멤버의 owner 는 허용된 클래스다`() {
+        val orphan = policy.forbiddenMembers.map { it.substringBefore('#') }.filterNot { it in policy.allowedClasses }
+        assertTrue(orphan.isEmpty(), "허용되지 않은 클래스의 멤버를 금지했다: $orphan")
+    }
+
+    /**
+     * **클래스 단위 패키지는 그 자체로 허용이 아니다.** `java.util` 이 `package.allowed.exact` 에
+     * 함께 들어가면 T-C 가 통째로 무력해진다 — 이 slice 가 실제로 그 상태였다.
+     */
+    @Test
+    fun `클래스 단위 패키지가 정확 패키지로도 열려 있지 않다`() {
+        val both = policy.byClassPackages.filter { it in policy.allowedExactPackages }
+        assertTrue(both.isEmpty(), "클래스 단위 패키지가 통째로도 열려 있다: $both")
     }
 
     private class Family(

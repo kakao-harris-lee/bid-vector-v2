@@ -22,7 +22,10 @@ internal class ModuleDependencyPolicy(
     val forbiddenGroups: List<String> get() = list("group.forbidden")
     val allowedSubtrees: List<String> get() = list("package.allowed.subtree")
     val allowedExactPackages: List<String> get() = list("package.allowed.exact")
-    val forbiddenClasses: List<String> get() = list("class.forbidden")
+    val byClassPackages: List<String> get() = list("package.allowed.byclass")
+    val allowedClasses: List<String> get() = list("class.allowed.api") + list("class.allowed.runtime")
+    val forbiddenMembers: List<String> get() = list("member.forbidden")
+    val domainAllowedExternals: List<String> get() = list("external.allowed.domain")
 
     fun layerOf(module: String): String? = modulesByLayer.entries.firstOrNull { (_, modules) -> module in modules }?.key
 
