@@ -201,7 +201,29 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   않았다.** 도구 없이도 대상 목록(D-3)은 확정되므로 이 항목이 D-3을 막지 않는다.
 - **소유**: M1.
 
-### `OPEN-ADR-08` · Detekt 버전 경로
+### ~~`OPEN-ADR-08`~~ · Detekt 버전 경로 — **해소**
+
+- **결정**: **(i) alpha 를 쓴다** — `dev.detekt:detekt-gradle-plugin:2.0.0-alpha.6`.
+  **groupId와 plugin id가 2.0에서 `io.gitlab.arturbosch.detekt` → `dev.detekt`로 바뀌었다.**
+- **결정자**: **M1 구현**(이 `OPEN`의 소유가 「M1 버전 고정」이므로 구현이 결정 주체다).
+  **시점**: **2026-09-02 · M1 slice 1A**. 근거는 `reports/evidence/m1/1a/scope.md` D-4.
+- **종료 조건과 그 충족**: 종료 조건은 **M1의 Kotlin 버전 고정**이었다. 1A가 **Kotlin 2.4.10**을
+  고정했고(`gradle/libs.versions.toml`) 그것이 나머지 선택지를 지운다 — **(iv)는 서지 않는다.**
+  Boot 4.1.1 BOM이 Kotlin 2.3.21을 관리하므로 2.0.x로 내려갈 자리가 없고, (ii)는 detekt
+  이슈 #8865가 **closed as not planned**로 닫혔다(1.23.8을 Kotlin 2.3+에 돌리면 메타데이터
+  버전 불일치로 대량 오탐이 나며 메인테이너가 백포트를 거부했다). (iii)은 출시 시점 확인 불가.
+- **alpha 채택의 대가와 그 완화** — 이 결정이 지우지 않는 것:
+  - **1.x와 설정 키가 호환되지 않는다**(`threshold` → `allowedLines`/`allowedComplexity`/…).
+    1.x 키로 쓴 설정은 **조용히 무시**되므로 `config/detekt/detekt.yml`은 2.0 키로만 쓴다.
+  - **게이트를 alpha에 종속시키지 않는다** — D-7이 요구한 자체 검사가 그대로 선다.
+    승인된 두 임계 중 **파일 500줄은 도구 없이 서는 `sizeGate` task**가 들고, 함수 50줄만
+    detekt이 맡되 그 수치는 detekt 설정이 아니라 `config/quality/size-policy.properties`가
+    갖는다. **detekt이 죽어도 파일 축 게이트는 계속 걸린다.**
+  - **configuration cache 비호환(#9390)은 alpha.6에 남아 있지 않다** — 1A 실측
+    (`reports/evidence/m1/1a/commands.md` `T-2`). 같은 축에서 **실제로 깨진 것은 Spotless**였고
+    1A가 포맷 도구를 ktlint Gradle 플러그인으로 바꿨다(`T-6`).
+
+**아래는 미결 당시의 기록이며 지우지 않는다.**
 
 - **결정 필요 사항**: (i) alpha(2.0.0-alpha.x)를 쓴다 (ii) 안정판 1.23.8을 상위 Kotlin
   소스에 쓴다 — **동작 미확인** (iii) 2.0 정식 출시를 기다린다 — **출시 시점 확인 불가**
