@@ -1,0 +1,47 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "78b98eee3010957b353f5ea839880c3304891ca6",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "fixtures/manifest.yaml",
+      "line": 497,
+      "evidence": "`rate-unit-001`, `rate-unit-002`, `rate-unit-005`는 유효한 선언 단위 입력의 변환·통과를 authoritative로 검증하지만 `verified_paths`가 기대값의 `$.outcome`을 보호하지 않는다. 세 기대값의 outcome을 `Accepted`에서 `Rejected`로 바꾼 인메모리 변이에 대해 `manifest_contract.holds()`가 모두 True였다. 특히 `rate-unit-002`의 `verifies`는 입력이 \"그대로 통과한다\"고 명시하므로, 모든 입력을 거부하면서 변환 숫자만 계산하는 production shortcut도 authoritative rate corpus를 통과한다. 같은 manifest는 거부를 주장한 `rate-unit-003`·`004`에서 outcome 미보호를 이유로 이미 강등했다.",
+      "required_fix": "세 case의 성공/통과 상태를 승인된 계약 경로로 기계적으로 보호해 outcome 거부 변이가 실패하게 한다. 동결된 계약이나 승인된 어휘로 이를 표현할 수 없다면 해당 case를 `insufficient-evidence`로 강등하고 미덮개 축을 기록한다."
+    },
+    {
+      "severity": "medium",
+      "file": "fixtures/manifest.yaml",
+      "line": 5040,
+      "evidence": "현재 분류는 `verdict-004`, `money-basis-001`, `money-basis-004`, `money-basis-006` 모두 `insufficient-evidence`인데, `uncovered_axes`는 5040~5043행에서 `verdict-004`가 authoritative로 남는다고 직접 주장한다. 4632~4634행과 4992~5014행도 세 money-basis case가 현재 basis 축을 고정·덮는다고 서술한다. 따라서 M1 fixture 준비 상태의 정본이 실제 분류와 모순되며, C-12b 검사는 case id와 `authoritative`가 서로 다른 줄에 있는 문단을 보지 못해 이 결함을 놓쳤다.",
+      "required_fix": "해당 `uncovered_axes` 문단들을 현재 분류에 맞춰 authoritative 덮개가 없음을 명시하고, 과거 상태는 시점이 표시된 이력으로만 분리한다. 같은 재발을 잡도록 문단 단위 분류 정합 검사를 재실행한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short && git rev-parse --verify 14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit} && git rev-parse --verify 78b98eee3010957b353f5ea839880c3304891ca6^{commit} && git rev-parse HEAD",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..78b98eee3010957b353f5ea839880c3304891ca6 && git log --oneline --decorate 14686dbf3bff4085203ffdcd931564fd1e36edf0..78b98eee3010957b353f5ea839880c3304891ca6",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..78b98eee3010957b353f5ea839880c3304891ca6 && git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..78b98eee3010957b353f5ea839880c3304891ca6",
+    "sed로 agent-workflow.md, v2-지침서.md, milestone-0.md, milestone-1.md, data-extract.md, ADR 0001~0009, capability-map.md 및 m0/0e evidence를 직접 검토",
+    "for f in reports/evidence/m0/0e/codex-review-*.json; do cat \"$f\"; done",
+    "git diff --unified=100 6bf9e2bbefd03dc762d8bbb8d1049d4d9b733558..78b98eee3010957b353f5ea839880c3304891ca6 -- fixtures/manifest.yaml fixtures/tools reports/evidence/m0/0e docs/discovery/capability-map.md milestone-0.md .claude/skills/codex-review-gate/SKILL.md CLAUDE.md",
+    "python3 fixtures/tools/mutation_sweep_adversarial.py && python3 fixtures/tools/mutation_sweep_targeted.py",
+    "awk로 manifest input/expected SHA-256 목록 생성 | shasum -a 256 -c -",
+    "python3으로 fixture JSON 126개 파싱 및 중복 JSON 키 검사; python3 fixtures/tools/check_legacy_numbers.py",
+    "Ruby Psych로 manifest 63건의 필수 키·분류·source kind·privacy·해시·파일 집합·verified_paths를 독립 검증",
+    "python3으로 네 registry의 활성 OPEN과 capability-map §14의 (B)/(C) 양방향 coverage 재검증",
+    "PYTHONPATH=fixtures/tools python3 인라인 검사로 rate-unit-001/002/005의 outcome=Rejected 및 axis 변경 변이를 계약 재평가",
+    "Ruby로 money-basis-001/004/006 및 verdict-004의 현재 classification을 재확인하고 관련 uncovered_axes 문면을 rg/nl로 대조",
+    "git fsck --no-dangling --no-reflogs --connectivity-only",
+    "git rev-list --count 14686dbf3bff4085203ffdcd931564fd1e36edf0..78b98eee3010957b353f5ea839880c3304891ca6 && git diff --name-only 14686dbf3bff4085203ffdcd931564fd1e36edf0..78b98eee3010957b353f5ea839880c3304891ca6 | wc -l && git diff --shortstat 14686dbf3bff4085203ffdcd931564fd1e36edf0..78b98eee3010957b353f5ea839880c3304891ca6 && git status --porcelain=v1 --untracked-files=all"
+  ],
+  "residual_risks": [
+    "현재 63개 case 중 authoritative는 21개, insufficient-evidence는 42개이며 uncovered_axes는 31개다. 부분 준비 상태의 M1 진입은 기록된 사용자 승인 범위이므로 그 자체는 finding으로 올리지 않았다.",
+    "clean worktree에 legacy bid-vector checkout이 없어 pinned commit과 legacy object id를 외부 원본 저장소에 대조하지 못했다. 저장소 내 index·해시·manifest 정합성까지만 확인했다.",
+    "운영 DB, KONEPS API, legacy Python 및 외부 호출은 승인 범위 밖이어서 실행하지 않았다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
