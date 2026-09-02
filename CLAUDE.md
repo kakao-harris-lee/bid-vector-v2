@@ -78,6 +78,6 @@ Codex가 `request_changes`를 반환하면 같은 scope에서 Claude가 수정�
 | 2026-09-02 | §4b 사전 스모크를 **acceptance 전건 · `--no-daemon`** 으로 | codex-review-gate | M1/1A 3차 — `qualityBaseline` 이 `check` 밖이라 산출물 없어 codex 재대조 불가 · 2차 정리 후 데몬이 worktree 에 registry 를 다시 써 3차 `worktree add` 실패 |
 | 2026-09-02 | **Phase 2.5 설계 검토** 신설 — 게이트·계약형 slice 는 구현 전 deep-reasoner 검토 필수(구성상 닫히는가·우회 경로 ≥5) | v2-slice-pipeline | 운영자 지시 — M1/1A 의 deny-list 설계를 Codex 3·verifier 7 라운드로 발견. 설계 리뷰 부재가 최대 비용 원인 |
 | 2026-09-02 | verifier **차단 문턱** — not-ready 는 산출물 blocker/high 만, 장부층·low 는 등재 후 일괄 | v2-slice-pipeline, agents/verifier | 운영자 지시 — 1A verifier not-ready 5 중 3 이 장부층 |
-| 2026-09-02 | 코드 slice 의 리뷰 preflight 정본을 **verdict JSON** 으로 — commands.md 라운드별 C-행 등재 폐지 | evidence-pack, codex-review-gate | 운영자 지시 — 라운드마다 등재 커밋 1 이 붙고 값은 JSON 과 중복 |
+| 2026-09-02 | 코드 slice 의 리뷰 preflight 정본을 **레인이 쓰는 형제 `codex-review-<UTC>.preflight.json`** 으로(reviewer 메타는 verdict JSON) — commands.md 라운드별 C-행 등재 폐지. `residual_risks` 는 Codex 소유라 레인이 쓰지 않음 | evidence-pack, codex-review-gate | 운영자 지시 — 라운드마다 등재 커밋 1 이 붙고 값은 JSON 과 중복 |
 | 2026-09-02 | 구현 레인 모델 **sonnet** (`kotlin-implementer`·`ml-implementer`), 판정·검증 레인 opus 유지 | agents, v2-slice-pipeline | 운영자 지시 — 진짜 결함은 검증 레인이 잡았고 기계적 수정에 opus 단가 불필요 |
 | 2026-09-02 | Codex 는 설계 검토·Phase 4 통과 뒤에만 — 게이트 강화의 실검증은 첫 도메인 코드 slice 에서 | v2-slice-pipeline | 운영자 지시 — 1A 의 결정적 결함(빈 도메인에서만 초록)은 실제 도메인 코드가 있어야 드러남 |
