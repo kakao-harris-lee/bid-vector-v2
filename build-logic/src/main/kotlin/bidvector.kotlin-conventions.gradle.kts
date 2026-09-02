@@ -1,3 +1,4 @@
+import bidvector.buildlogic.JarContentGateTask
 import bidvector.buildlogic.ModuleBaselineSpec
 import bidvector.buildlogic.ModuleDependencyGateTask
 import bidvector.buildlogic.PackageOwnershipGateTask
@@ -7,7 +8,6 @@ import bidvector.buildlogic.SourceLanguageGateTask
 import bidvector.buildlogic.lib
 import bidvector.buildlogic.version
 import bidvector.buildlogic.versionCatalog
-import org.gradle.api.file.SourceDirectorySet
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -106,22 +106,30 @@ val packageOwnershipGate =
         description = "모듈의 class output 이 그 모듈이 소유한 패키지 아래에만 있는지 잰다"
         policyFile = configDir.file("quality/architecture-policy.properties")
         moduleName = project.name
-        classDirectories.from(sourceSets.named("main").map { it.output.classesDirs })
-        dependsOn(tasks.named("classes"))
+        // test 출력은 뺀다 — fixture 는 일부러 `bidvector.archfixture` 에 산다. 그 대신
+        // source set 집합을 고정해 `create("extra")` 경로를 닫는다.
+        classDirectories.from(provider { sourceSets.filter { it.name != "test" }.flatMap { it.output.classesDirs } })
+        expectedSourceSets = setOf("main", "test")
+        actualSourceSets = provider { sourceSets.map { it.name }.toSet() }
+        dependsOn(provider { sourceSets.filter { it.name != "test" }.map { it.classesTaskName } })
         report = layout.buildDirectory.file("reports/package-ownership-gate/packages.txt")
     }
 
-// 손으로 쓴 소스의 실제 위치. `src/` 를 하드코딩하면 `srcDir("gen")` 으로 더한 트리가
-// 크기 래칫만 빠져나간다.
-val kotlinSourceDirectories =
+// 손으로 쓴 소스의 실제 위치. **`allSource` 는 살아 있는 뷰다** — 나중에 등록된 디렉터리를
+// 언어를 가리지 않고 그대로 본다. `kotlin` 확장의 `srcDirs` 를 읽으면 그 확장이 추적하는
+// 것만 보이고, 추적 여부는 KGP 의 내부 동작이라 우리가 기댈 계약이 아니다.
+// (실측: KGP 2.4.10 은 `java.srcDir` 를 kotlin srcDirs 에도 넣는다. 그래서 현행 배선도 그
+//  경로는 잡았다 — 다만 그 사실에 기대지 않는 편이 옳다.)
+val handWrittenSourceDirectories =
     provider {
-        sourceSets.flatMap { set -> (set.extensions.getByName("kotlin") as SourceDirectorySet).srcDirs }
+        val resources = sourceSets.flatMap { it.resources.srcDirs }.toSet()
+        sourceSets.flatMap { it.allSource.srcDirs } - resources
     }
 
 val sourceLanguageGate =
     tasks.register<SourceLanguageGateTask>("sourceLanguageGate") {
         description = "소스 트리에 Kotlin 아닌 소스가 있으면 실패한다 — java.setSrcDirs 봉쇄의 2차 그물"
-        sourceDirectories.from(layout.projectDirectory.dir("src"), kotlinSourceDirectories)
+        sourceDirectories.from(layout.projectDirectory.dir("src"), handWrittenSourceDirectories)
         excludedDirectories.from(provider { sourceSets.flatMap { it.resources.srcDirs } })
         // `md` 는 소스가 아니라 그 트리를 설명하는 문서다 — 컴파일되지 않으므로 class output 을
         // 만들 수 없고, 이 게이트가 막으려는 것(게이트를 비껴가는 산출물)에 해당하지 않는다.
@@ -129,11 +137,20 @@ val sourceLanguageGate =
         report = layout.buildDirectory.file("reports/source-language-gate/offenders.txt")
     }
 
+val jarContentGate =
+    tasks.register<JarContentGateTask>("jarContentGate") {
+        description = "배포되는 아카이브에 소유 밖 클래스가 들어 있는지 잰다"
+        policyFile = configDir.file("quality/architecture-policy.properties")
+        moduleName = project.name
+        archives.from(tasks.named("jar").map { (it as Jar).archiveFile })
+        report = layout.buildDirectory.file("reports/jar-content-gate/entries.txt")
+    }
+
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
         policyFile = sizePolicy
-        sources.from(kotlinSourceDirectories)
+        sources.from(handWrittenSourceDirectories)
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
     }
 
@@ -146,6 +163,7 @@ tasks.named("check") {
         moduleDependencyGate,
         packageOwnershipGate,
         sourceLanguageGate,
+        jarContentGate,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )
