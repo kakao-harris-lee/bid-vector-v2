@@ -55,6 +55,12 @@ tasks.withType<org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask>().config
 }
 
 dependencies {
+    // **compiler-embeddable 을 먼저 건다.** KGP 는 일부 패키지를 relocate 한 컴파일러를 품고 있어
+    // 뒤에 걸면 `KotlinCoreEnvironment` 가 그쪽으로 해석되고 시그니처가 어긋난다(실측).
+    implementation(libs.kotlin.compilerEmbeddable)
+    implementation(libs.kotlin.reflect)
+    implementation(libs.kotlinx.coroutines.core)
+
     implementation(libs.kotlin.gradlePlugin)
     implementation(libs.detekt.gradlePlugin)
     implementation(libs.ktlint.gradlePlugin)

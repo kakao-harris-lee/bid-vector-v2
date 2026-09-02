@@ -13,7 +13,13 @@ import org.gradle.api.tasks.TaskAction
 import java.io.File
 
 /**
- * 파일 크기 래칫. **확장자를 가리지 않는다** — 손으로 쓴 소스가 무엇이든 승인된 한도를 받는다.
+ * 크기 래칫. **파일 축과 함수 축을 둘 다 든다.**
+ *
+ * 함수 축은 Kotlin PSI 로 직접 잰다 — detekt 을 경유하지 않으므로 `@Suppress` 가 어떤 표기든
+ * (한 줄·다중 행·`@file:`·`@kotlin.`) 이 임계에 영향이 없다. 앞선 판은 그 표기를 텍스트로
+ * 막으려다 열거 게임에 들어갔다.
+ *
+ * 파일 축은 **확장자를 가리지 않는다** — 손으로 쓴 소스가 무엇이든 승인된 한도를 받는다.
  * 어떤 언어가 허용되는지는 `sourceLanguageGate` 가 따로 판정한다.
  * ADR 0007 D-7 이 요구한 **도구에 의존하지 않는 자체 검사**다 —
  * detekt 2.0 이 alpha 인 동안 승인된 임계가 alpha 도구와 함께 죽지 않게 한다.
@@ -52,32 +58,20 @@ abstract class SizeGateTask : DefaultTask() {
             )
         }
 
-        val suppressed = findSuppressions(policy.requireList("suppression.forbidden"), measured.map { it.first })
-        if (suppressed.isNotEmpty()) {
+        val functionLimit = policy.requireInt("limit.function.lines")
+        val longFunctions =
+            measureFunctions(measured.map { it.first })
+                .filter { it.lines > functionLimit }
+                .sortedByDescending { it.lines }
+        if (longFunctions.isNotEmpty()) {
             throw GradleException(
-                suppressed.joinToString(
-                    prefix = "승인된 크기 임계를 인라인으로 껐다 (ADR 0007 D-4 의 allowlist 형식으로만 연다):\n  ",
+                longFunctions.joinToString(
+                    prefix = "함수 $functionLimit 줄 한도 초과 ${longFunctions.size}건 (v2-지침서.md §5):\n  ",
                     separator = "\n  ",
-                ),
+                ) { "${it.lines} 줄 — ${it.file.path}:${it.startLine} ${it.name}" },
             )
         }
     }
-
-    /**
-     * 승인된 임계를 나르는 detekt 규칙을 `@Suppress` 로 끄는 것을 막는다. 함수 축의 정본이
-     * detekt 이라 억제가 곧 임계의 소멸이고, 그것은 도구가 죽는 것과 같은 효과다.
-     */
-    private fun findSuppressions(
-        ruleNames: List<String>,
-        files: List<File>,
-    ): List<String> =
-        files.flatMap { file ->
-            file
-                .readLines()
-                .withIndex()
-                .filter { (_, line) -> line.contains("@Suppress") && ruleNames.any { line.contains("\"$it\"") } }
-                .map { (index, line) -> "${file.path}:${index + 1} — ${line.trim()}" }
-        }
 
     private fun writeReport(
         policyVersion: String,

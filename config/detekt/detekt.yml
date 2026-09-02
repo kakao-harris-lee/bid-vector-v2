@@ -3,9 +3,9 @@
 #
 # **승인된 임계는 축마다 한 자리에만 산다.** 승인 문서가 수치로 정한 것은 둘이고
 # (v2-지침서.md §5:305) 강제하는 주체가 다르므로 자리도 다르다:
-#   - 함수 50줄 → 아래 `LongMethod.allowedLines`. detekt 이 이 축을 제공하므로 여기가 정본이다.
-#   - 파일 500줄 → config/quality/size-policy.properties. detekt 에 파일 길이 규칙이 없어
-#     도구 없이 서는 sizeGate task 가 든다(ADR 0007 D-7 이 요구한 자체 검사).
+#   - 함수 50줄·파일 500줄 → **둘 다 config/quality/size-policy.properties** 이고 도구 없이 서는
+#     sizeGate 가 든다(ADR 0007 D-7 이 요구한 자체 검사). 함수 축은 Kotlin PSI 로 직접 재므로
+#     detekt 의 억제가 그 임계에 영향을 주지 못한다 — 그래서 아래 LongMethod 는 비활성이다.
 # 같은 수를 두 자리에 적지 않으므로 옮겨 쓰는 생성 단계가 필요 없고, 이 파일 하나로
 # 애플리케이션 아홉 모듈과 build-logic 이 같은 임계를 받는다.
 #
@@ -13,10 +13,11 @@
 # 1A 가 지어내지 않는다.
 
 complexity:
-  # v2-지침서.md §5:305 — "Kotlin/Python 함수 50줄". 도구 기본값은 60 이다.
+  # **비활성이다.** 함수 50줄 축의 정본은 config/quality/size-policy.properties 이고
+  # sizeGate 가 Kotlin PSI 로 직접 잰다 — detekt 을 경유하지 않으므로 `@Suppress` 표기에
+  # 영향받지 않는다. 같은 수를 두 자리에 두지 않기 위해 여기서는 끈다.
   LongMethod:
-    active: true
-    allowedLines: 50
+    active: false
   CognitiveComplexMethod:
     active: true
   ComplexInterface:
