@@ -111,6 +111,13 @@ preflight 조사 1건. 각 scout에 앵커 파일 목록과 출력 경로를 프
 대상은 push/merge/배포). 수정 라운드에서는 Codex finding JSON 경로를 추가로 전달하고
 finding별 별도 커밋을 지시한다.
 
+**스테이징 규율 — 공유 working tree 에서 레인이 병렬로 산다.** 구현 레인은 `git add
+<in_scope 경로>` 만 쓰고 `-A`·`-a`·`.` 을 쓰지 않는다; 커밋 전 `git diff --cached
+--name-status` 로 in_scope 를 대조한다. 오케스트레이터(하네스 레인)도 `.claude/`·`CLAUDE.md`
+편집을 **미커밋 상태로 두지 않는다** — 편집 즉시 커밋한다. M1/1A 에서 하네스 레인의 미커밋
+스킬 편집이 구현 레인 커밋(`e733cfa`)에 혼입됐다(2026-09-02). 혼입이 생기면 이력을 되쓰지
+않고 evidence 의 레인 경계 검사에 사실로 선언한다.
+
 ### Phase 4: 검증
 
 **실행 모드:** 서브 에이전트 (verifier 1명)
