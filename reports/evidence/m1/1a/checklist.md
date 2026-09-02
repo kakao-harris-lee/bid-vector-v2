@@ -83,7 +83,26 @@
    필요해지면 `ADR 0007` D-4 의 allowlist 형식(사유 + 해소 계획)으로 연다.
    **함께 잰 것**: `java.math.BigDecimal` 과 `Charsets` 는 막히지 않는다 — 1B 의 금액 타입과
    인코딩은 안전하다.
-8. **RED/GREEN 커밋을 checkout 해서는 재현할 수 없다.** 빌드에 필요한 여덟 파일이 `90e46ff`
+8. **이 slice 의 `milestone-1.md` 편집이 `capability-map.md` 의 M0 작성 좌표를 깨뜨렸다 —
+   역방향 파급이다.** 지금까지의 처리는 전부 *"내가 쓰는 좌표"* 쪽만 봤고, **남이 나를 가리키던
+   좌표**는 규격에도 스윕에도 없었다(규격 정본은 `evidence-pack` 「낡는 좌표 — 역방향도 본다」).
+
+   **조건**: `e733cfa` 가 1A 모듈 목록을 개정하며 그 자리에 net +5 줄을 넣었다. 그러므로
+   **삽입 지점(1A 항목의 `bidding` 보류 문단) 아래를 가리키는 좌표는 +5 밀렸고, 그 위는 정확하다.**
+   영향 목록은 세지 말고 명령이 내게 한다:
+
+   ```
+   grep -n 'milestone-1.md:[0-9]' docs/discovery/capability-map.md
+   ```
+
+   **1A 가 고치지 않는다.** 그 좌표들은 이 slice 의 `capability-map.md` 편집 경계
+   (`§12 registry 의 해당 행`) 밖이고, 넘어서 고치면 계약 밖 편집이 된다. **운영자 결정
+   2026-09-02 로 이월**했고 담당은 `capability-map.md` §14 가 이미 예고한 **registry 통합 slice**다 —
+   §12 에 신설한 `OPEN-ADR-15` 가 그것을 들고 있다.
+
+   **`git diff` 에 나타나지 않는 부류라는 것이 요점이다** — 깨진 줄은 이 slice 가 건드린 줄이
+   아니어서 diff 를 읽는 리뷰로는 구조적으로 보이지 않는다. 그래서 여기 적는다.
+9. **RED/GREEN 커밋을 checkout 해서는 재현할 수 없다.** 빌드에 필요한 여덟 파일이 `90e46ff`
    에서 처음 등장하므로 그 앞 구간(RED·GREEN 커밋 포함)은 clean checkout 에서
    `:build-logic:compileKotlin` 이 깨진다. **이력은 되쓰지 않는다.** head 는 영향받지 않고
    주장 자체는 확인됐다 — verifier 가 그 구간에 파일을 복원해 **RED = 음성 단언 전부 실패 ·

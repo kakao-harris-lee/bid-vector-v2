@@ -202,8 +202,19 @@ sed -n '/^## M1 완료 조건 대조/,/^### /p' reports/evidence/m1/1a/checklist
 ```
 
 - exit: 0
-- 핵심 결과: **매치 0 인 줄이 없다.** 표 밖의 인용 넷(I/O 규정 · 범위 밖 · 1A 모듈 문장 ·
-  ratchet 열거)과 fixture 쪽 인용 하나도 같은 방식으로 확인했다
+- 핵심 결과: **매치 0 인 줄이 없다.** 표 밖 인용과 fixture 쪽 인용도 같은 방식으로 확인했다 —
+  대상은 아래 명령이 낸다(여기 열거하지 않는다)
+
+```
+grep -rhoF -f <(grep -oE '「[^」]{10,}」|\*"[^"]{10,}"\*' \
+      reports/evidence/m1/1a/checklist.md app/src/test/kotlin/bidvector/archfixture/violating/README.md \
+      app/src/test/kotlin/bidvector/app/architecture/ArchitectureGateCatchesViolationsTest.kt \
+    | tr -d '「」*"') milestone-1.md | sort -u
+```
+
+**첫 등재는 이 대조를 fixture README 에 걸지 않았다** — 「fixture 쪽 인용」이라 적었지만 실제로
+확인한 것은 `FileIoLeak.kt` 쪽이었고, README 의 인용은 조사 띄어쓰기가 원문과 달라 매치 0 이었다
+(verifier r6 L-1). 축어로 되돌렸고 이제 대상이 명령에서 나오므로 같은 누락이 생기지 않는다.
 
 ## 2026-09-02T08:55Z — 비밀값 스캔
 
