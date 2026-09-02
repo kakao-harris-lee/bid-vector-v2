@@ -30,10 +30,14 @@ out_of_scope:
   - bid-vector/ symlink 아래 기존 저장소   # 읽기 전용
   - _workspace/**                     # .gitignore 대상
 acceptance_commands:
-  - "./gradlew --no-build-cache clean check"       # A1
-  - "./gradlew :app:test --tests '*ArchitectureGate*'"   # A2 — 위반 fixture 음성 테스트 포함
-  - "./gradlew qualityBaseline"                    # A3 — OPEN-ADR-06 입력 실측
-  - "./gradlew compatibilitySmoke"                 # A4 — 채택 라이브러리 일곱 × Boot 4.1.1
+  # A-0 이 나머지의 전제다 — 구현자 working tree 가 아니라 **커밋된 것**이 도는지 먼저 잰다.
+  # working tree 에만 있는 파일은 ignored 이면 `git status --porcelain` 이 못 보므로
+  # clean-tree 게이트만으로는 이 부류가 잡히지 않는다(verifier B-1 이 그 실물이다).
+  - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # A-0
+  - "./gradlew --no-build-cache clean check"       # A-1
+  - "./gradlew :app:test --tests '*ArchitectureGate*'"   # A-2 — 위반 fixture 음성 테스트 포함
+  - "./gradlew qualityBaseline"                    # A-3 — OPEN-ADR-06 입력 실측
+  - "./gradlew compatibilitySmoke"                 # A-4 — 채택 라이브러리 일곱 × Boot 4.1.1
 rollback: |
     **정본은 `reports/evidence/m1/1a/rollback.md`**(`agent-workflow.md` §6 이 요구하는 파일).
     되풀이하지 않는다 — 같은 사실을 두 자리에 적으면 한쪽이 낡는다.

@@ -49,14 +49,38 @@ clean check` 가 **무작위 모듈 하나**에서 `LINE_UNDEFINED ktlint(Invoca
 `--no-parallel` 에서도 재현된다 — ktlint 버전 축이 아니다. 조사 노트가 지목한 alpha 위험은
 detekt 였으나(`T-2`) **실제로 깨진 것은 Spotless 다.** 처리는 아래 「계약 갱신」.
 
-## 2026-09-02T08:52Z — acceptance (scope.md `acceptance_commands`)
+## 2026-09-02T09:20Z — acceptance (scope.md `acceptance_commands`)
+
+**`A-0` 이 나머지의 전제다.** 앞선 실행은 전부 구현자 working tree 에서 돌았고, 그 트리에만
+있던 파일 여덟에 의존했다(verifier B-1). 아래는 `90e46ff` 이후 **커밋된 것만 있는 detached
+worktree** 에서 다시 잰 값이다.
 
 | # | cmd | exit | 핵심 결과 |
 | --- | --- | --- | --- |
+| `A-0` | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 | 커밋만으로 빌드된다. `build-logic/src/main/kotlin/bidvector/buildlogic/` 에 8 파일 |
 | `A-1` | `./gradlew --no-build-cache clean check` | 0 | 게이트 전부 통과. 3 회 연속 재현 |
 | `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 | 11 tests, 0 failed (양성 6 · 음성 5) |
 | `A-3` | `./gradlew qualityBaseline` | 0 | 값은 `build/reports/quality-baseline/quality-baseline.md` |
 | `A-4` | `./gradlew :app:compatibilitySmoke` | 0 | 값은 `app/build/reports/compatibility-smoke/resolved-modules.txt` |
+
+### `A-0b` — 커밋된 파일 집합과 디스크 실물의 대조
+
+`A-0` 이 「빌드되는가」를 재고, 이 둘이 **무엇이 빠졌는가**를 이름으로 낸다. 앞의 것은
+ignore 규칙이 소스를 삼키는 경우를, 뒤의 것은 그냥 커밋을 잊은 경우를 잡는다.
+
+```
+git ls-files --others --ignored --exclude-standard -- '*/src/*'
+diff <(find . -name '*.kt' -o -name '*.kts' | grep -vE '/(build|\.gradle|_workspace)/' \
+        | grep -v '^\./bid-vector/' | sed 's|^\./||' | sort) \
+     <(git ls-files '*.kt' '*.kts' | sort)
+```
+
+- exit: 첫 명령 출력 없음 · 둘째 exit 0(차이 없음)
+- 핵심 결과: ignore 에 걸린 소스 0 건 · 디스크와 커밋의 Kotlin 소스 집합이 같다
+- 첫 명령의 대상을 **`*/src/*` 로 좁히는 것이 요점**이다. `*.kt` 로 넓히면 Gradle 이 생성하는
+  `build-logic/build/generated-sources/**` 수백 건이 잡히는데 그것들은 **올바르게 ignore 된
+  것**이라 신호가 아니라 잡음이다. 손으로 쓴 소스는 언제나 `src/` 아래에 있고 빌드 산출물은
+  거기에 없다 — 그 비대칭이 이 명령을 판별자로 만든다
 
 ## 2026-09-02T08:55Z — secret 스캔
 
