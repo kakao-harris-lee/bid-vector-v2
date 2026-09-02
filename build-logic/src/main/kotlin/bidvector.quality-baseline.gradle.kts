@@ -1,4 +1,4 @@
-import bidvector.build.QualityBaselineTask
+import bidvector.buildlogic.QualityBaselineTask
 
 // 모듈별 입력은 각 모듈의 convention plugin 이 붙인다 — 루트가 subproject 의 configuration 을
 // 먼저 읽으려 하면 평가 순서에 걸린다.

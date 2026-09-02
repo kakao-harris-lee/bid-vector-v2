@@ -1,10 +1,10 @@
-import bidvector.build.DetektThresholdOverlayTask
-import bidvector.build.ModuleBaselineSpec
-import bidvector.build.QualityBaselineTask
-import bidvector.build.SizeGateTask
-import bidvector.build.lib
-import bidvector.build.version
-import bidvector.build.versionCatalog
+import bidvector.buildlogic.DetektThresholdOverlayTask
+import bidvector.buildlogic.ModuleBaselineSpec
+import bidvector.buildlogic.QualityBaselineTask
+import bidvector.buildlogic.SizeGateTask
+import bidvector.buildlogic.lib
+import bidvector.buildlogic.version
+import bidvector.buildlogic.versionCatalog
 
 plugins {
     id("org.jetbrains.kotlin.jvm")

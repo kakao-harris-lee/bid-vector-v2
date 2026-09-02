@@ -1,4 +1,4 @@
-import bidvector.build.CompatibilitySmokeTask
+import bidvector.buildlogic.CompatibilitySmokeTask
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {

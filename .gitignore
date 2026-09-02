@@ -15,7 +15,11 @@ __pycache__/
 # 이 프로젝트에서는 역할별 진입점 문서라 커밋 대상이다 (README '문서 읽는 순서')
 !CLAUDE.md
 
-# Gradle 산출물
-build/
-.gradle/
+# Gradle 산출물. **앵커 없는 `build/` 를 쓰지 않는다** — 그 형태는 경로 어디에서나 매치해
+# 패키지 디렉터리(`.../kotlin/bidvector/build/`)까지 삼킨다. Gradle 의 build 디렉터리는 언제나
+# 프로젝트 루트에 있으므로 그 자리만 적는다. 모듈을 더 깊이 중첩하면 그 자리를 여기 추가한다.
+/build/
+/*/build/
+/.gradle/
+/*/.gradle/
 !gradle/wrapper/gradle-wrapper.jar

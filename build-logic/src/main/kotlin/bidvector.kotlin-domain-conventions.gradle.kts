@@ -1,4 +1,4 @@
-import bidvector.build.DomainDependencyGateTask
+import bidvector.buildlogic.DomainDependencyGateTask
 
 plugins {
     id("bidvector.kotlin-conventions")
