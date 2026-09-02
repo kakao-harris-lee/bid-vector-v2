@@ -45,6 +45,15 @@ ktlint {
     version = ktlintVersion
 }
 
+// **이 빌드의 ktlint 검사는 매번 다시 돈다.** included build 라 루트 `clean` 이 닿지 않는데
+// (그 빌드의 `clean` 을 잇는 것은 위험하다 — 실행 중인 루트가 쓰는 plugin jar 를 지우고 같은
+// 그래프에서 그 빌드의 다른 task 와 경쟁한다), 위반 파일을 지워도 검사 task 가 UP-TO-DATE 로
+// 남아 낡은 리포트가 계속 실패를 냈다. 이 빌드의 소스는 열 몇 개라 재실행 비용이 무시할 만하고,
+// 게이트가 결정적으로 도는 편이 낫다.
+tasks.withType<org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask>().configureEach {
+    outputs.upToDateWhen { false }
+}
+
 dependencies {
     implementation(libs.kotlin.gradlePlugin)
     implementation(libs.detekt.gradlePlugin)
@@ -60,4 +69,10 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // 판정 테스트가 실제 정책 파일을 읽는다. input 으로 선언하지 않으면 정책을 느슨하게 고쳐도
+    // UP-TO-DATE 로 통과해 「규칙이 죽는다」는 단언이 조용히 무의미해진다.
+    // 경로도 넘긴다 — 작업 디렉터리에 기대면 실행 위치가 바뀔 때 조용히 깨진다(app 과 같은 형태).
+    val architecturePolicy = repoRoot.resolve("config/quality/architecture-policy.properties")
+    inputs.file(architecturePolicy).withPropertyName("architecturePolicy")
+    systemProperty("bidvector.architecture.policy", architecturePolicy.absolutePath)
 }

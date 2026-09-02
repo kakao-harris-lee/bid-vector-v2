@@ -76,7 +76,9 @@ class ModuleDependencyPolicyTest {
     }
 
     private companion object {
-        // build-logic 의 rootDir 은 build-logic/ 이다.
-        const val REAL_POLICY = "../config/quality/architecture-policy.properties"
+        /** 빌드가 절대 경로를 넘긴다 — 작업 디렉터리에 기대지 않는다. */
+        val REAL_POLICY: String =
+            System.getProperty("bidvector.architecture.policy")
+                ?: error("시스템 속성 'bidvector.architecture.policy' 가 없다 — 빌드가 넘긴다")
     }
 }
