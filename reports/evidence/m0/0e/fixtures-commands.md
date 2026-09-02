@@ -278,19 +278,14 @@ medium #3). 앞선 라운드는 `_workspace/`(`.gitignore`)에서 돌려 **감�
   분류별 분포는 F-7 이 낸다 — 여기 옮겨 적지 않는다.** 표적 스윕에서 통과하는 유일한
   줄은 `대조군 — 무변이`(변이가 없어 통과가 정상)와 **승인 대기 절**이다
 
-**표준 라이브러리만 쓴다.** 이 저장소의 `python3` 에 `PyYAML` 이 없어 F-7·F-7b 는 격리
-venv 를 쓰지만, 스윕은 **clean HEAD 에서 추가 설치 없이** 돌아야 하므로 manifest 의 계약
-부분만 읽는 좁은 reader(`fixtures/tools/manifest_contract.py`)를 함께 둔다. 그 reader 가
-`PyYAML` 과 같은 값을 읽는지는 감사자가 직접 잰다:
-
-- cmd: `/tmp/fxvenv/bin/python fixtures/tools/mutation_sweep_adversarial.py --crosscheck-pyyaml`
-  (venv 준비는 **F-7** 이 적는다)
-- exit: 0
-- 핵심 결과: `pyyaml crosscheck OK` — reader 의 투영이 `PyYAML` 과 case 전건에서 일치.
-  어긋나면 `ManifestFormatError` 로 멈춘다(조용한 오독을 만들지 않는다)
+**위 두 줄이 재현의 정본이고, 그것이 요구하는 것은 `python3` 하나다.** 이 저장소의 시스템
+`python3` 에 `PyYAML` 이 없어 F-7·F-7b 는 격리 venv 를 쓰지만, 스윕은 **clean HEAD 에서 추가
+설치 없이** 돌아야 하므로 manifest 의 계약 부분만 읽는 좁은 reader
+(`fixtures/tools/manifest_contract.py`)를 함께 둔다. **판정을 다시 내는 데 필요한 것은
+저장소와 `python3` 뿐이다** — 아래 대조는 그 위에 얹는 선택 절차이지 전제가 아니다.
 
 **강등 이전 상태에 대고 돌리는 것은 `--manifest` 가 받는다.** 기대값·입력 파일은 강등에서
-바뀌지 않았으므로 옛 manifest + 현재 fixture 로 성립한다:
+바뀌지 않았으므로 옛 manifest + 현재 fixture 로 성립한다. **이것도 `python3` 하나로 돈다.**
 
 - cmd:
   ```bash
@@ -302,6 +297,26 @@ venv 를 쓰지만, 스윕은 **clean HEAD 에서 추가 설치 없이** 돌아�
   현재 스크립트가 담은 (a) 기준은 **B10 이 조인 뒤**의 것이고, 조인 결과가 강등이 아니라
   **계약 추가**였던 case 들은 그 옛 manifest 에서 아직 계약을 갖지 않는다. 두 집합의 차는
   `git diff 58e3331 HEAD -- fixtures/manifest.yaml` 의 `verified_paths` 줄이 낸다
+
+### F-8b · (선택) reader ↔ 다른 YAML 구현 대조
+
+reader 가 범용 YAML 파서가 아니라 이 manifest 가 쓰는 블록 형태만 아는 좁은 것이라,
+**같은 값을 읽는지 재고 싶을 때** 쓴다. **재현의 정본 경로가 아니다** — 저장소 밖 YAML
+구현이 필요하고, 그것을 들이는 데 pip·네트워크가 든다. 그러므로 **clean 환경에서 이 절의
+명령은 그대로 돌지 않으며, 돌지 않는 것이 판정 재도출을 막지 않는다** — 판정은 위 F-8 이
+`python3` 만으로 낸다. 「clean 환경에서 그대로 돌지 않는 명령을 정본처럼 싣지 않는다」.
+
+- 준비(**F-7** 과 같은 격리 venv. 이미 있으면 건너뛴다. pip·네트워크가 든다):
+  ```bash
+  python3 -m venv /tmp/fxvenv && /tmp/fxvenv/bin/pip install -q pyyaml
+  ```
+- cmd: `/tmp/fxvenv/bin/python fixtures/tools/mutation_sweep_adversarial.py --crosscheck-pyyaml`
+- exit: 0
+- 핵심 결과: `pyyaml crosscheck OK` — reader 의 투영이 `PyYAML` 과 case 전건에서 일치.
+  어긋나면 `ManifestFormatError` 로 멈춘다(조용한 오독을 만들지 않는다)
+- **구현은 `PyYAML` 이 아니어도 된다.** B11 리뷰어는 `PyYAML` 이 없는 환경에서 Ruby 의
+  `psych` 로 같은 투영을 뽑아 대조했다. 무엇을 쓰든 이 검사가 재는 것은 **reader 의
+  신뢰도이지 분류의 판정이 아니다**
 
 ---
 
