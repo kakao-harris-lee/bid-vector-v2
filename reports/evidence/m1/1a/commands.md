@@ -85,6 +85,41 @@ Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramS
 만들고 거기서 `SocketException: Operation not permitted` 로 죽는다. 플래그로 우회할 수 없다.
 **그래서 2차의 두 finding 도 정적 판독이다** — verdict 의 `residual_risks` 가 같은 말을 한다.
 
+## 2026-09-02T13:25Z — Codex 3차 라운드의 preflight
+
+| # | 축 | 값 |
+| --- | --- | --- |
+| `C-15` | 산출물 열람 | **작동했다** — 커밋된 build report(test XML · Kover XML)를 읽고 대조했다 |
+| `C-16` | 조기 방출 | 1 |
+| `C-17` | 프롬프트 지시로 방출을 막을 수 있는가 | **없다** — 지시로 닫히지 않는 표면이다 |
+| `C-18` | 데몬 잔재 | 사고 있었다 |
+
+**`C-19` — 3차도 gradle 을 돌리지 않았다.** 이번엔 sandbox 제한이 지시로 주어져 시도 자체를
+하지 않았고, 대신 **커밋된 산출물을 정적으로 대조**했다(`C-15`). 그래서 두 finding 도 정적
+판독이나, **둘 다 실행 없이 서는 지적이고 이 라운드가 실측으로 닫았다.**
+
+**`C-20` — verdict 의 잔여 위험 하나는 이 라운드가 답할 수 없다.** *"`clean check` 산출물에
+`qualityBaseline` 보고서가 남아 있지 않아 A-3 을 재대조하지 못했다"* — 맞다. `qualityBaseline`
+은 **게이트가 아니라 측정**이라 `check` 에 걸지 않았고(`scope.md` D-6), 그래서 `clean check`
+산출물에 남지 않는다. CI 는 별도 단계로 돌려 아티팩트에 올린다(`.github/workflows/ci.yml`).
+**설계대로이며 결함이 아니다** — 다만 리뷰어가 `check` 산출물만으로 A-3 을 확인할 수 없다는
+사실은 그대로다.
+
+## 2026-09-02T13:50Z — 접근 전환 라운드의 실측
+
+| # | 심은 것 | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| `E-12` | 진짜 domain 모듈에서 `readln()` | `./gradlew :app:test --tests '*ArchitectureGateTest*'` | 1 | allow-list 가 잡는다 |
+| `E-12b` | 같은 상태의 1차 게이트 | `./gradlew :decision:moduleDependencyGate` | **0** | **못 잡는다** — 추가 의존이 없다. allow-list 가 필요한 이유 |
+| `E-13` | `decision` 에 **선언 없는** 클래스 + JDK HTTP | `./gradlew :decision:packageOwnershipGate` | 1 | `(기본 패키지 — 선언 없음)` |
+| `E-13b` | 같은 상태의 arch test | `./gradlew :app:test --tests '*ArchitectureGateTest*'` | **0** | **못 잡는다** — `importPackages("bidvector")` 의 대상이 아니다 |
+| `E-14` | `decision` 에 `bidvector.app.sneaky` + JDK HTTP | `./gradlew :decision:packageOwnershipGate` | 1 | app 층으로 위장한 것을 산출물 위치가 잡는다 |
+| `E-15` | 허용 목록에서 `kotlin.io` 제외를 걷음 | `./gradlew :build-logic:test` | 1 | 금지 가족이 허용으로 들어오는 것을 출처 대조가 잡는다 |
+| `E-16` | 허용된 적 없는 것을 제외 목록에 | `./gradlew :build-logic:test` | 1 | 제외 항목의 뜻이 서는지 본다 |
+
+`E-12b`·`E-13b` 가 이 라운드의 요점이다 — **같은 위반을 새 게이트만 잡는다.** 세 라운드 연속
+같은 가족이 샌 이유가 「목록이 짧아서」가 아니라 **판정 방향과 판정 근거**에 있었다는 뜻이다.
+
 ## 2026-09-02T10:10Z — 레인 경계 (선언)
 
 **`e733cfa` 에 하네스 레인의 변경이 섞여 있다.** 공유 working tree 에서 두 레인이 병행하는
@@ -117,7 +152,7 @@ Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramS
 
 ### `E-11` — build-logic 청소의 기각된 후보 둘
 
-**왜 기각했는지의 정본은 `build-logic/build.gradle.kts:48`~`:52` 주석이다.** 여기는 그 판단을
+**왜 기각했는지의 정본은 `build-logic/build.gradle.kts` 의 주석 「이 빌드의 ktlint 검사는 매번 다시 돈다」다.** 여기는 그 판단을
 낸 실측만 든다 — 실패 이력은 결함이 아니라 검증이 작동했다는 증거다.
 
 | 후보 | cmd | exit | 핵심 결과 |
@@ -130,9 +165,12 @@ Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramS
 
 ### 금지 가족을 어느 층이 잡는가
 
-가족마다 심은 fixture 가 이 표를 실측으로 만든다. **어느 한 층도 혼자로는 충분하지 않다.**
-가족 목록의 출처는 승인 문서이고 그 대조는 `build-logic` 의 `ForbiddenFamilyCoverageTest` 가
-든다 — 표를 손으로 맞추지 않는다.
+**2차 열의 뜻이 바뀌었다** — 이제 domain 게이트는 금지 열거가 아니라 **allow-list** 다. 아래
+가족은 전부 허용 목록 밖이라 잡히고, **목록에 이름이 없는 좌표도 함께 잡힌다**(그것이 전환의
+이유다). 표는 여전히 fixture 로 실측하지만 **완전성을 표가 지지 않는다** — allow-list 자신이 진다.
+
+가족 목록의 출처는 승인 문서이고 대조는 `build-logic` 의 `ForbiddenFamilyCoverageTest` 가
+**방향을 뒤집어** 든다(금지 가족이 허용 목록에 들어오지 않는가). 표를 손으로 맞추지 않는다.
 
 | 가족 | fixture | 1차(의존 그래프) | 2차(ArchUnit) |
 | --- | --- | --- | --- |
@@ -146,6 +184,7 @@ Gradle 이 프로젝트 구성 전에 `FileLockContentionHandler` 의 `DatagramS
 | nio channels | `ChannelLeak` | **못 잡는다** — 같은 이유 | 잡는다 |
 | gRPC | `GrpcLeak` | 잡는다 | 잡는다 |
 | Protobuf | `ProtobufLeak` | 잡는다 | 잡는다 |
+| I/O (Kotlin stdlib) | `ConsoleIoLeak` | **못 잡는다** — 추가 의존이 없다 | 잡는다 |
 
 반대로 `E-9`·`E-9b` 가 보이듯 **선언만 되고 참조가 없는 의존은 2 차가 못 본다.** 두 층의
 사각이 서로 반대라 둘 다 필요하다.
