@@ -51,9 +51,8 @@ detekt 였으나(`T-2`) **실제로 깨진 것은 Spotless 다.** 처리는 아�
 
 ## 2026-09-02T09:20Z — acceptance (scope.md `acceptance_commands`)
 
-**`A-0` 이 나머지의 전제다.** 앞선 실행은 전부 구현자 working tree 에서 돌았고, 그 트리에만
-있던 파일 여덟에 의존했다(verifier B-1). 아래 `A-0`·`A-2`~`A-4` 는 **커밋된 것만 있는 detached
-worktree** 에서 잰 값이고, `A-1` 만 working tree 에서 잰다(둘의 차이가 B-1 이 드러낸 것이다).
+아래 `A-0`·`A-2`~`A-4` 는 **커밋된 것만 있는 detached worktree** 에서 잰 값이고, `A-1` 만
+working tree 에서 잰다. **`A-0` 이 나머지의 전제인 이유는 `A-0b` 절이 갖는다.**
 
 | # | cmd | exit | 핵심 결과 |
 | --- | --- | --- | --- |
@@ -65,8 +64,13 @@ worktree** 에서 잰 값이고, `A-1` 만 working tree 에서 잰다(둘의 차
 
 ### `A-0b` — 커밋된 파일 집합과 디스크 실물의 대조
 
-`A-0` 이 「빌드되는가」를 재고, 이 둘이 **무엇이 빠졌는가**를 이름으로 낸다. 앞의 것은
-ignore 규칙이 소스를 삼키는 경우를, 뒤의 것은 그냥 커밋을 잊은 경우를 잡는다.
+**clean-tree 게이트가 왜 이것만으로 부족한지의 정본이 이 절이다** — `scope.md` 와
+`checklist.md` 는 여기를 가리킨다.
+
+`git status --porcelain` 은 **ignored 파일을 보지 못한다.** 그래서 빌드에 필요한 소스가
+ignore 규칙에 걸려 커밋에서 빠져도 트리는 깨끗해 보이고, 그것이 B-1 의 실물이었다.
+`A-0` 이 「커밋된 것만으로 빌드되는가」를 재고, 아래 둘이 **무엇이 빠졌는가**를 이름으로
+낸다 — 앞의 것은 ignore 규칙이 소스를 삼키는 경우를, 뒤의 것은 그냥 커밋을 잊은 경우를 잡는다.
 
 ```
 git ls-files --others --ignored --exclude-standard -- '*/src/*'

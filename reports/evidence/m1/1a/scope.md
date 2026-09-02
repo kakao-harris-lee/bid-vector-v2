@@ -32,8 +32,7 @@ out_of_scope:
   - _workspace/**                     # .gitignore 대상
 acceptance_commands:
   # A-0 이 나머지의 전제다 — 구현자 working tree 가 아니라 **커밋된 것**이 도는지 먼저 잰다.
-  # working tree 에만 있는 파일은 ignored 이면 `git status --porcelain` 이 못 보므로
-  # clean-tree 게이트만으로는 이 부류가 잡히지 않는다(verifier B-1 이 그 실물이다).
+  # 왜 clean-tree 게이트만으로 부족한지는 commands.md 의 `A-0b` 절이 갖는다.
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # A-0
   - "./gradlew --no-build-cache clean check"       # A-1
   - "./gradlew :app:test --tests '*ArchitectureGate*'"   # A-2 — 위반 fixture 음성 테스트 포함

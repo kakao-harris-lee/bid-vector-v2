@@ -38,8 +38,8 @@
 
 | 항목 | 상태 |
 | --- | --- |
-| 구현 diff 가 커밋되어 base/head 고정 | `git status --porcelain -- <in_scope 경로>` 가 비어 있어야 한다 — 판정은 verifier 레인이 재실행한다. **이 명령만으로는 부족하다**: ignored 파일은 여기서 비어 보이고 그것이 B-1 의 실물이었다. `commands.md` 의 `A-0`(커밋만 있는 worktree 에서 빌드)과 `A-0b`(ignore 에 걸린 소스·디스크와 커밋의 집합 차이)가 그 틈을 맡는다 |
-| `acceptance_commands` 전부 exit 0 | `commands.md` `A-1`~`A-4` |
+| 구현 diff 가 커밋되어 base/head 고정 | `git status --porcelain -- <in_scope 경로>` 가 비어 있어야 한다 — 판정은 verifier 레인이 재실행한다. **이 명령만으로는 부족하고** 그 틈은 `A-0`·`A-0b` 가 맡는다 — 근거는 `commands.md` 의 `A-0b` 절 |
+| `acceptance_commands` 전부 exit 0 | 전건. 목록은 `scope.md` 의 `acceptance_commands` 가 내고 결과는 `commands.md` 의 acceptance 절이 낸다 — 여기서 다시 열거하면 목록이 늘 때마다 낡는다 |
 | test/lint/type/architecture 통과 | `A-1` 이 전부를 든다 |
 | 변경된 fixture 와 정책 version 의 근거 | 정책 데이터 둘 다 `policy.version=1` 이고 값의 출처를 파일 주석이 든다. **1A 가 값을 고른 것은 없다** — `v2-지침서.md` §5:305 의 둘을 옮겼을 뿐이다 |
 | 알려진 제한과 rollback | 아래 「알려진 제한」 · `rollback.md` |
@@ -62,3 +62,20 @@
    모듈 사이다. 1B 가 패키지를 늘리면 그때 안쪽에서도 구속력이 생긴다.
 6. **CI 워크플로가 실행된 적 없다.** 원격에 push 하지 않았으므로 `.github/workflows/ci.yml` 은
    **문법만 갖춘 골격**이고 GitHub 러너에서 도는 것을 확인하지 못했다.
+7. **RED/GREEN 커밋을 checkout 해서는 재현할 수 없다.** 빌드에 필요한 여덟 파일이 `90e46ff`
+   에서 처음 등장하므로 그 앞 구간(RED·GREEN 커밋 포함)은 clean checkout 에서
+   `:build-logic:compileKotlin` 이 깨진다. **이력은 되쓰지 않는다.** head 는 영향받지 않고
+   주장 자체는 확인됐다 — verifier 가 그 구간에 파일을 복원해 **RED = 11 tests 5 failed(음성
+   단언 다섯 전부, 양성 여섯 통과) · GREEN = exit 0** 을 실측했다.
+
+   **현재 head 에서 RED 를 재현하는 방법** — 위반 fixture 를 지우면 음성 단언이 되살아난다.
+
+   ```
+   rm -r app/src/test/kotlin/bidvector/archfixture/violating
+   ./gradlew :app:test --tests '*ArchitectureGate*'      # 11 tests, 5 failed
+   git checkout -- app/src/test/kotlin/bidvector/archfixture
+   ```
+
+   테스트는 fixture 를 **패키지 이름 문자열로만** 참조하므로 fixture 가 없어도 컴파일된다 —
+   그래서 결과가 컴파일 오류가 아니라 「위반을 못 찾았다」가 되고, 그것이 음성 단언의
+   RED 다.
