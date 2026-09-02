@@ -1,0 +1,45 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "14686dbf3bff4085203ffdcd931564fd1e36edf0",
+  "reviewed_head": "6bf9e2bbefd03dc762d8bbb8d1049d4d9b733558",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "fixtures/manifest.yaml",
+      "line": 4770,
+      "evidence": "현재 YAML 파싱 결과 `rate-unit-003`·`004`와 `floor-shortfall-002`·`003`·`004`는 모두 `insufficient-evidence`다. 그런데 현재 상태를 설명하는 `uncovered_axes`는 4770행에서 `rate-unit-003`·`004`가 휴리스틱 금지를 authoritative로 고정한다고 하고, 5128~5148행에서는 `floor-shortfall-002`·`003`이 authoritative로 남아 N/N+1 경계를 고정하며 `-004`가 0.0과 판정 불가를 구별한다고 한다. 5071~5072행이 해당 모집단의 강등을 인정하면서 5090행은 다시 \"case를 내리지 않았다\"고도 한다. 따라서 M1 fixture 준비 상태의 정본이 실제 분류와 모순되고, 선언 없는 rate 거부 및 N/N+1·0빈도 축의 authoritative 미덮개를 숨긴다.",
+      "required_fix": "`uncovered_axes`의 현재 상태 서술을 실제 분류와 맞춘다. 위 case들이 더 이상 제공하지 않는 authoritative coverage를 명시하고 올바른 미덮개·대체 coverage·해제 조건을 기록하되, 과거 라운드 상태가 필요하면 현재 상태와 명확히 분리된 이력으로 남긴다."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse --verify 14686dbf3bff4085203ffdcd931564fd1e36edf0^{commit}; git rev-parse --verify 6bf9e2bbefd03dc762d8bbb8d1049d4d9b733558^{commit}; git rev-parse HEAD; git status --short --untracked-files=all",
+    "git diff --stat 14686dbf3bff4085203ffdcd931564fd1e36edf0..6bf9e2bbefd03dc762d8bbb8d1049d4d9b733558; git diff --name-status 14686dbf3bff4085203ffdcd931564fd1e36edf0..6bf9e2bbefd03dc762d8bbb8d1049d4d9b733558",
+    "git log --oneline --decorate 14686dbf3bff4085203ffdcd931564fd1e36edf0..6bf9e2bbefd03dc762d8bbb8d1049d4d9b733558",
+    "git diff --check 14686dbf3bff4085203ffdcd931564fd1e36edf0..6bf9e2bbefd03dc762d8bbb8d1049d4d9b733558",
+    "git rev-list --count 14686db..6bf9e2b; git merge-base 14686db 6bf9e2b; git fsck --no-dangling --no-reflogs --connectivity-only",
+    "sed/nl/rg로 agent-workflow.md, milestone-0.md, milestone-1.md, v2-지침서.md, data-extract.md, ADR 0001~0009, capability-map.md 및 m0/0e evidence 전수 점검",
+    "git diff --unified=80 7405714..6bf9e2b -- fixtures/manifest.yaml fixtures/tools reports/evidence/m0/0e docs/discovery/capability-map.md milestone-0.md",
+    "for f in reports/evidence/m0/0e/codex-review-*.json; do jq -c '{file:input_filename,verdict,reviewed_head,findings}' \"$f\"; done",
+    "awk로 manifest의 input/expected SHA-256 목록 생성 | shasum -a 256 -c -",
+    "python3으로 fixtures/input 및 fixtures/expected JSON 126개 파싱; python3 fixtures/tools/check_legacy_numbers.py",
+    "python3으로 fixtures/legacy-reference-index.json 파싱; manifest 선언 SHA-256 대조",
+    "grep secret/개인정보 패턴 fixtures/; grep 한글 문자열 fixtures/input fixtures/expected",
+    "python3으로 capability-map §14와 네 registry의 활성 OPEN 양방향 대조",
+    "ruby YAML 파싱으로 case 수, classification, source-kind 교차분포, uncovered/insufficient/access 수 및 verified_paths 구조 점검",
+    "python3 fixtures/tools/mutation_sweep_targeted.py; python3 fixtures/tools/mutation_sweep_adversarial.py",
+    "git show 58e3331:fixtures/manifest.yaml > /tmp/pre-demotion-manifest-0e-review.yaml; python3 fixtures/tools/mutation_sweep_adversarial.py --manifest /tmp/pre-demotion-manifest-0e-review.yaml",
+    "PYTHONPATH=fixtures/tools python3 인라인 검사로 authoritative verified_paths 67개 삭제 mutation 전수 재평가",
+    "ruby YAML 파싱으로 authoritative 21건의 verifies/source/verified_paths 전수 출력 및 기대값 대조",
+    "for f in reports/evidence/m0/**/*.json; do jq empty \"$f\" || exit 1; done; python3 ast.parse로 fixtures/tools/*.py 파싱",
+    "git status --porcelain=v1 --untracked-files=all"
+  ],
+  "residual_risks": [
+    "clean worktree에 legacy bid-vector checkout이 없어 pinned commit과 39개 legacy object-id의 외부 저장소 대조는 재실행하지 못했다. 저장소 내 index 파싱·해시·manifest 집합 정합성만 확인했다.",
+    "시스템 Python에 PyYAML이 없어 제공된 --crosscheck-pyyaml 명령은 ModuleNotFoundError가 났다. manifest 전체는 Ruby YAML로 파싱했고 커밋된 표준 라이브러리 reader로 mutation 스윕을 재실행했다.",
+    "운영 DB, KONEPS API, legacy Python 및 기타 외부 호출은 승인 범위 밖이어서 실행하지 않았다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
