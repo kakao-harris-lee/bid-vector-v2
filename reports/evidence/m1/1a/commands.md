@@ -70,10 +70,20 @@ detekt 였으나(`T-2`) **실제로 깨진 것은 Spotless 다.** 처리는 아�
 
 ## 2026-09-02T10:10Z — 레인 경계 (선언)
 
-**`e733cfa` 에 하네스 레인의 파일이 섞였다** — `.claude/skills/codex-review-gate/SKILL.md`.
-구현 레인이 `git add -A` 를 써서 다른 레인의 미커밋 편집을 쓸어 담았다. **이력을 되쓰지
-않고 사실로 선언한다.** 이후 커밋은 `git add <in_scope 경로>` 만 쓰고 `git diff --cached
---name-status` 로 대조한다. 대조: `git log --oneline 6b03c75..HEAD -- .claude/ CLAUDE.md`.
+**`e733cfa` 에 하네스 레인의 변경이 섞여 있다.** 공유 working tree 에서 두 레인이 병행하는
+동안 한쪽의 미커밋 편집이 남아 있었고 구현 레인이 `git add -A` 를 써서 함께 스테이징했다 —
+두 조건이 모두 있어야 생기는 혼입이다.
+
+**그 내용은 하네스 레인 소유이고 1A 의 산출물이 아니다.** 정본은 `CLAUDE.md` 변경 이력의
+`codex-review-gate` 행(하네스 레인이 `cb90507` 로 등재)이며 **여기서 되풀이하지 않는다** —
+파일 목록도 줄 수도 옮겨 적지 않는다. 낡을 자리를 만들지 않기 위해서다.
+
+**이력은 되쓰지 않는다**(amend·rebase 없음). 이후 커밋은 `git add <in_scope 경로>` 만 쓰고
+커밋 직전 `git diff --cached --name-status` 로 in_scope 를 대조했다.
+
+- 검출: `git log --oneline 6b03c75..HEAD -- .claude/ CLAUDE.md`
+- 판별: 그 목록에서 **`chore(harness)` 가 아닌 커밋이 혼입**이다. 나머지는 하네스 레인이
+  자기 몫으로 낸 커밋이라 레인 경계 위반이 아니다
 
 ## 2026-09-02T10:30Z — Codex 수정 라운드의 게이트 실측
 
