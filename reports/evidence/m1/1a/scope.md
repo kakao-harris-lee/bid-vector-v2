@@ -17,7 +17,8 @@ in_scope:
   - .editorconfig                     # ktlint 스타일. 규칙 집합의 유일한 자리
   - config/detekt/**                  # detekt 2.0 키 규칙 집합
   - .github/workflows/ci.yml
-  - docs/adr/0007-architecture-and-test-gates.md   # §5 의 OPEN-ADR-08 행 하나
+  - .gitignore                        # Gradle 산출물 규칙. 앵커 없는 `build/` 가 B-1 을 냈다
+  - docs/adr/0007-test-pyramid-and-ratchet.md      # §5 의 OPEN-ADR-08 행 하나
   - docs/discovery/capability-map.md               # §12 registry 의 해당 행 + bidding 보류 OPEN 신설
   - reports/evidence/m1/1a/{scope,commands,checklist,rollback}.md
 out_of_scope:
@@ -214,3 +215,15 @@ ktlint 1.8.0 을 구동. 스타일 규칙은 `.editorconfig` 그대로다.
 래퍼를 걷고 도구를 직접 쓴다.
 
 **부수 효과**: `check` 가 configuration cache 를 온전히 쓴다(`A-1`).
+
+### 2026-09-02 — `in_scope` 의 두 어긋남을 정정한다 (verifier M-2)
+
+**`.gitignore` 를 `in_scope` 에 넣는다.** 이 slice 가 Gradle 산출물 규칙을 넣으며 실제로
+변경했는데 계약에 없었다. **하필 그 파일이 B-1 의 원인**이다 — 계약 밖에서 바뀐 파일이
+빌드에 필요한 소스를 삼켰고, `in_scope` 가 그 파일을 들고 있었다면 계약 검토 자체가 한 번
+더 눈을 붙일 자리였다.
+
+**`docs/adr/0007-architecture-and-test-gates.md` → `docs/adr/0007-test-pyramid-and-ratchet.md`.**
+앞의 경로는 **존재하지 않는다.** 계약을 쓸 때 ADR 번호만 보고 파일명을 지어냈고, 실제 편집은
+올바른 파일에 했다. 계약이 없는 경로를 가리키면 「계약 밖 편집이 있었는가」를 그 계약으로
+판정할 수 없다.
