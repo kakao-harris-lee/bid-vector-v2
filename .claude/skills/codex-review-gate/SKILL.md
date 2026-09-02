@@ -257,8 +257,11 @@ export GRADLE_USER_HOME="$W/.gradle-home" GRADLE_RO_DEP_CACHE="$RO"
 (`BasicGlobalScopeServices.createFileLockContentionHandler()` 바이트코드에 프로퍼티 게이트 없음,
 플래그 우회 불가). 유일한 우회는 `sandbox_workspace_write.network_access=true` 인데 운영자가
 **열지 않기로** 결정했다. 그러므로 코드 slice 의 Codex 리뷰는 **정적 판독 + 레인이 만든 실행
-산출물 열람**이다: 레인은 사전 스모크(`./gradlew --offline --no-build-cache clean check`)의
-`build/` 산출물(테스트 XML·kover 리포트·게이트 출력)을 **지우지 않고** worktree 에 남기고,
+산출물 열람**이다: 레인은 사전 스모크 — `check` 만이 아니라 **scope.md 의
+`acceptance_commands` 전건**을 `--offline --no-build-cache --no-daemon` 으로(3차에서
+`qualityBaseline` 이 `check` 밖 task 라 산출물이 없어 codex 가 재대조 못 했다; `--no-daemon`
+은 정리 후 데몬이 worktree 에 registry 를 다시 써 다음 라운드 `worktree add` 를 막은 사고의
+재발 방지) — 의 `build/` 산출물(테스트 XML·kover 리포트·게이트 출력)을 **지우지 않고** worktree 에 남기고,
 프롬프트에 「`build/**` 는 리뷰 레인이 head 에서 오프라인으로 실행한 결과이며 codex 는 gradle
 을 실행할 수 없다」를 한 줄 적는다. 실행 재확인의 정본은 verifier 레인이다. `build/` 는 ignore
 대상이라 status 대조에 영향 없다.
