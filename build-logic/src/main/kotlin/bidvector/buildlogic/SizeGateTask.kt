@@ -51,7 +51,33 @@ abstract class SizeGateTask : DefaultTask() {
                 ) { (file, lines) -> "$lines 줄 — ${file.path}" },
             )
         }
+
+        val suppressed = findSuppressions(policy.requireList("suppression.forbidden"), measured.map { it.first })
+        if (suppressed.isNotEmpty()) {
+            throw GradleException(
+                suppressed.joinToString(
+                    prefix = "승인된 크기 임계를 인라인으로 껐다 (ADR 0007 D-4 의 allowlist 형식으로만 연다):\n  ",
+                    separator = "\n  ",
+                ),
+            )
+        }
     }
+
+    /**
+     * 승인된 임계를 나르는 detekt 규칙을 `@Suppress` 로 끄는 것을 막는다. 함수 축의 정본이
+     * detekt 이라 억제가 곧 임계의 소멸이고, 그것은 도구가 죽는 것과 같은 효과다.
+     */
+    private fun findSuppressions(
+        ruleNames: List<String>,
+        files: List<File>,
+    ): List<String> =
+        files.flatMap { file ->
+            file
+                .readLines()
+                .withIndex()
+                .filter { (_, line) -> line.contains("@Suppress") && ruleNames.any { line.contains("\"$it\"") } }
+                .map { (index, line) -> "${file.path}:${index + 1} — ${line.trim()}" }
+        }
 
     private fun writeReport(
         policyVersion: String,
