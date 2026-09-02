@@ -49,11 +49,19 @@ clean check` 가 **무작위 모듈 하나**에서 `LINE_UNDEFINED ktlint(Invoca
 `--no-parallel` 에서도 재현된다 — ktlint 버전 축이 아니다. 조사 노트가 지목한 alpha 위험은
 detekt 였으나(`T-2`) **실제로 깨진 것은 Spotless 다.** 처리는 아래 「계약 갱신」.
 
-## 2026-09-02T08:40Z — acceptance
+## 2026-09-02T08:52Z — acceptance (scope.md `acceptance_commands`)
 
 | # | cmd | exit | 핵심 결과 |
 | --- | --- | --- | --- |
-| `A-1` | `./gradlew --no-build-cache clean check` | 0 | 164 tasks. 3 회 연속 재현 |
+| `A-1` | `./gradlew --no-build-cache clean check` | 0 | 게이트 전부 통과. 3 회 연속 재현 |
 | `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 | 11 tests, 0 failed (양성 6 · 음성 5) |
-| `A-3` | `./gradlew qualityBaseline` | 0 | 모듈 아홉의 아홉 축 — 값은 `build/reports/quality-baseline/quality-baseline.md` |
-| `A-4` | `./gradlew :app:compatibilitySmoke` | 0 | 대상 아홉 전부 해석 — 값은 `build/reports/compatibility-smoke/resolved-modules.txt` |
+| `A-3` | `./gradlew qualityBaseline` | 0 | 값은 `build/reports/quality-baseline/quality-baseline.md` |
+| `A-4` | `./gradlew :app:compatibilitySmoke` | 0 | 값은 `app/build/reports/compatibility-smoke/resolved-modules.txt` |
+
+## 2026-09-02T08:55Z — secret 스캔
+
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1a/`
+- exit: 1 (매치 없음 = 통과)
+- 같은 패턴을 `git diff 6b03c75..HEAD` 에 대해서도 실행 — exit 1
+- 육안 확인: 1A 는 사업자 정보·Telegram 식별자·자격증명을 다루지 않는다. 외부 좌표는
+  Maven 아티팩트 GAV 와 공개 문서 URL 뿐이다
