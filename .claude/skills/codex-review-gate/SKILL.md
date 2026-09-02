@@ -251,6 +251,18 @@ export GRADLE_USER_HOME="$W/.gradle-home" GRADLE_RO_DEP_CACHE="$RO"
 - 의존이 로컬 캐시에 없으면(새 라이브러리) `--offline` 이 실패한다 — 그때는 구현 레인이 먼저
   로컬에서 한 번 빌드해 캐시를 채운 뒤 rsync 한다. 캐시 채우기는 심판이 아니라 구현 레인의 일이다.
 
+**한계 (M1/1A 2차 실측 · 운영자 결정 2026-09-02: 정적 리뷰 유지).** 위 절차로 캐시·쓰기 문제는
+해소됐으나 **codex 안에서는 gradle 이 시동조차 못 한다** — seatbelt sandbox 가 소켓 생성을
+금지하고 Gradle 은 시동 시 file-lock contention 용 `DatagramSocket` 을 조건 없이 만든다
+(`BasicGlobalScopeServices.createFileLockContentionHandler()` 바이트코드에 프로퍼티 게이트 없음,
+플래그 우회 불가). 유일한 우회는 `sandbox_workspace_write.network_access=true` 인데 운영자가
+**열지 않기로** 결정했다. 그러므로 코드 slice 의 Codex 리뷰는 **정적 판독 + 레인이 만든 실행
+산출물 열람**이다: 레인은 사전 스모크(`./gradlew --offline --no-build-cache clean check`)의
+`build/` 산출물(테스트 XML·kover 리포트·게이트 출력)을 **지우지 않고** worktree 에 남기고,
+프롬프트에 「`build/**` 는 리뷰 레인이 head 에서 오프라인으로 실행한 결과이며 codex 는 gradle
+을 실행할 수 없다」를 한 줄 적는다. 실행 재확인의 정본은 verifier 레인이다. `build/` 는 ignore
+대상이라 status 대조에 영향 없다.
+
 ### 5. 무효 라운드 검사
 
 실행 후 worktree의 오염을 확인한다:
