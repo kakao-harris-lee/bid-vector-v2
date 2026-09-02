@@ -458,6 +458,17 @@ numeric_discipline:
       (반올림 자리수) · `0`·`0.0`. 그 수들은 자기 축 밖에서 흔한 셈이라 **문자열 일치가 채택을
       뜻하지 않는다.** 그 축에서의 채택 여부는 사람이 읽는다. (검사가 못 보는 자리를 적어 둔다.)
     result: "0건 (2026-08-30). 재현 명령은 `reports/evidence/m0/0e/fixtures-commands.md` **F-3**."
+    prose_numerals: |-
+      **이 검사는 fixture 안의 수만 본다 — 산문이 주장하는 수는 보지 않는다.** 그 자리는
+      **Codex B13 medium 이 실제로 잡았다**: 반올림 축의 근거가 `0.945 ÷ 0.900` 과 `15/151` 을 적었는데
+      **둘 다 실제 fixture 값이 아니었다**(실제는 `0.91875 ÷ 0.875` 와 `18/151`).
+      **처방은 값 정정이 아니라 리터럴 제거였다** — 피연산자·분수를 걷고 **입력·기대값 파일 포인터**로
+      바꿨다(값을 박으면 fixture 가 바뀔 때 낡는다).
+      **전수 대조를 돌렸고 남는 의심은 0 이다** — 산문의 `÷ =` 주장 넷은 피연산자가 fixture 에 실재하고
+      산술도 맞는다. **십진 리터럴 전수 대조는 기계가 판정하지 못한다**: 산문은 fixture 에 없는 수를
+      **정당하게** 인용한다(조달청 서비스 **버전** `1.2` · 절 번호 `11.4` · 이 corpus 가 **쓰지 않는**
+      `authoritative` 수 `0.10` · numeric_discipline 이 **금지해서 없는** legacy 값 `1.15`·`1.1`·`0.05` ·
+      **정정하며 인용한 옛 오기**). 그래서 **이 클래스는 후보만 뽑고 판정은 사람이 한다.**
   authoritative_numbers_used:
     note: "§12.1이 `authoritative`로 등재한 수는 셋뿐이고(`100` · `150` · `0.10`) 이 corpus 는 그중 둘을 쓴다."
     entries:
@@ -4906,9 +4917,14 @@ uncovered_axes:
     owning_open:
       - "OPEN-DIC-10 (활성)"
     what_is_covered_instead: |-
-      기대값이 반올림에 의존하지 않게 설계했다 — `floor-threshold-*`는 `0.945 ÷ 0.900 = 1.05`처럼
-      십진에서 정확히 떨어지는 수만 쓰고, `floor-shortfall-003`은 빈도를 **유리수(15/151)**로 두고
-      십진 표현을 주장하지 않는다.
+      기대값이 반올림에 의존하지 않게 설계했다 — `floor-threshold-*`는 **십진에서 정확히 떨어지는
+      비**(`1.05`)만 쓴다. **그 피연산자를 여기 적지 않는다** — `fixtures/input/floor-threshold-*.json`
+      의 `recommendedBidRate.fraction` ÷ `floorRate.fraction` 이 낸다. `floor-shortfall-003`은 빈도를
+      **유리수**로 두고 십진 표현을 주장하지 않는다 — 분자·분모는
+      `fixtures/expected/floor-shortfall-003.json` 의 `frequency` 가 갖는다.
+      **피연산자·분수 리터럴을 산문에 박지 않는 이유**: 값을 박으면 fixture 가 바뀔 때 낡고,
+      **이 절이 실제로 그렇게 낡아 Codex B13 이 들었다**(`0.945 ÷ 0.900` · `15/151` 둘 다 실제 값이
+      아니었다). 남긴 `1.05` 는 「십진에서 정확히 떨어진다」는 주장 자체라 뺄 수 없고, 출처는 위 경로다.
     unblocks_when: OPEN-DIC-10 이 값을 정한다.
 
   - axis: 파생값의 되짚기 (`BidAmount` · `AssessmentRate` · `AwardRate`)
