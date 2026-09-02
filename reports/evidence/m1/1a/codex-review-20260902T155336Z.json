@@ -1,0 +1,45 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "454f17159cd154eabc0fbcb7d2b61ee1497b95eb",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts",
+      "line": 29,
+      "evidence": "Java 봉쇄는 convention plugin 적용 시 `java.setSrcDirs(emptyList())`를 한 번 호출할 뿐 source set 변경을 확정하거나 금지하지 않는다. 이후 모듈 build script가 `sourceSets.main { java.srcDir(\"domain-java\") }`로 디렉터리를 다시 등록할 수 있다. `sourceLanguageGate`는 `src/`와 Kotlin source directory만, `sizeGate`도 Kotlin source directory만 입력으로 받으므로 `domain-java/bidvector/decision/Leak.java`처럼 소유 패키지가 올바르고 허용된 JDK 타입만 사용하는 Java 소스는 package ownership과 ArchUnit을 통과하면서 Kotlin 전용 규율과 detekt/ktlint 및 500줄 게이트를 모두 우회한다. 커밋된 E-25 증거는 관례 경로 `src/main/java`만 시험하여 이 재등록 경로를 검증하지 않는다.",
+      "required_fix": "Java source directory 집합을 최종적으로 변경 불가능하게 만들거나, task 실행 시 실제 등록된 모든 source directory와 컴파일 산출물의 언어를 검사하고 모든 허용 언어에 동등한 크기·정적 규율을 적용한다. 관례 밖 Java source directory를 재등록했을 때 production `check`가 구체 사유로 실패하는 task 수준 음성 테스트를 추가한다."
+    },
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector/buildlogic/SizeGateTask.kt",
+      "line": 78,
+      "evidence": "함수 50줄 임계의 억제 방지는 한 줄에 `@Suppress`와 문자열 `\"LongMethod\"`가 동시에 있는지만 검사한다. Kotlin의 유효한 다중 행 표기 `@Suppress(\\n    \"LongMethod\",\\n)`에서는 어느 줄도 두 조건을 함께 만족하지 않으므로 sizeGate가 억제를 보지 못하지만 detekt는 해당 함수를 억제한다. 따라서 500줄 미만 파일의 50줄 초과 함수가 두 게이트를 모두 통과할 수 있다. E-24는 한 줄 표기만 시험해 이 우회를 놓친다.",
+      "required_fix": "공백과 줄바꿈에 무관하게 Suppress 애노테이션을 구조적으로 검사하거나 detekt의 금지-suppression 규칙으로 `LongMethod` 억제를 차단하고, 다중 행 억제와 상수 기반 억제가 실제 `check`를 실패시키는 음성 테스트를 추가한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short --untracked-files=all && git rev-parse 6b03c75016a1d5437ca7ff932282fc477be974e6 454f17159cd154eabc0fbcb7d2b61ee1497b95eb HEAD && git diff --stat 6b03c75016a1d5437ca7ff932282fc477be974e6..454f17159cd154eabc0fbcb7d2b61ee1497b95eb && git diff --name-status 6b03c75016a1d5437ca7ff932282fc477be974e6..454f17159cd154eabc0fbcb7d2b61ee1497b95eb && git log --oneline 6b03c75016a1d5437ca7ff932282fc477be974e6..454f17159cd154eabc0fbcb7d2b61ee1497b95eb",
+    "git merge-base 6b03c75016a1d5437ca7ff932282fc477be974e6 454f17159cd154eabc0fbcb7d2b61ee1497b95eb && git diff --check 6b03c75016a1d5437ca7ff932282fc477be974e6..454f17159cd154eabc0fbcb7d2b61ee1497b95eb",
+    "sed -n으로 v2-지침서.md §3~§5, agent-workflow.md §2~§5, milestone-1.md, ADR 0006·0007 및 관련 evidence를 확인",
+    "nl -ba로 settings.gradle.kts, 전체 모듈 build script, build-logic task/policy, architecture test/rules, compatibility smoke와 CI 설정을 확인",
+    "find로 build/test-results, Kover, detekt, dependency/package/source-language/size gate, qualityBaseline 및 compatibilitySmoke 산출물을 열거하고 내용을 대조",
+    "python3 ElementTree로 고유 test XML 6개를 집계 — 51 tests, failures/errors/skipped 0",
+    "python3 ElementTree로 Kover XML 9개와 detekt XML을 파싱 — Kover 전건 파싱 성공, detekt error 0",
+    "cat build/reports/convention-coverage/modules.txt build/reports/quality-baseline/quality-baseline.md app/build/reports/compatibility-smoke/resolved-modules.txt 및 모듈별 gate report",
+    "git status --porcelain=v1 --untracked-files=all -- ':!.gradle-home' && git ls-files --others --ignored --exclude-standard -- '*/src/*' ':!.gradle-home/**'",
+    "diff <(find . -path './.git' -prune -o -path './.gradle-home' -prune -o -path '*/build' -prune -o \\( -name '*.kt' -o -name '*.kts' \\) -type f -print | sed 's|^./||' | sort) <(git ls-files '*.kt' '*.kts' | sort)",
+    "unzip -tq gradle/wrapper/gradle-wrapper.jar; sh -n gradlew; bash -n gradlew; ruby -e 'require \"yaml\"; YAML.safe_load(File.read(\".github/workflows/ci.yml\"), aliases: true); puts \"yaml-ok\"'",
+    "git diff --unified=80 2ab63366eb7996280a559b5932197452522270b3..454f17159cd154eabc0fbcb7d2b61ee1497b95eb -- build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts build-logic/src/main/kotlin/bidvector/buildlogic/SizeGateTask.kt build-logic/src/main/kotlin/bidvector/buildlogic/SourceLanguageGateTask.kt config/quality/size-policy.properties app/src/test/kotlin/bidvector/app/architecture/ArchitectureGateCatchesViolationsTest.kt config/quality/architecture-policy.properties",
+    "rg -n 'LongMethod|allowedLines|source\\.setFrom|java\\.setSrcDirs|kotlinSourceDirectories|sourceDirectories\\.from|classDirectories\\.from|@Suppress' build-logic config reports/evidence/m1/1a --glob '!**/build/**'"
+  ],
+  "residual_risks": [
+    "지시된 sandbox 제한에 따라 Gradle은 실행하지 않았다. 제공된 HEAD build 산출물에서 테스트 51건, Kover 9개, detekt 및 각 gate report를 대조했다.",
+    "GitHub Actions는 실제 runner 실행 증거가 없으며 YAML 문법과 정적 배선만 확인했다.",
+    "coverage는 XML·HTML 측정만 배선됐고 실패 임계는 승인된 수치가 없어 1B로 이월된 상태다. 이 slice의 blocker로 판정하지 않았다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
