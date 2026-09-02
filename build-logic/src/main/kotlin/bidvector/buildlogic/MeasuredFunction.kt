@@ -4,12 +4,17 @@ import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.psi.KtAnonymousInitializer
+import org.jetbrains.kotlin.psi.KtClassInitializer
+import org.jetbrains.kotlin.psi.KtDeclarationWithBody
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtLambdaExpression
+import org.jetbrains.kotlin.psi.KtFunctionLiteral
 import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtPropertyAccessor
 import org.jetbrains.kotlin.psi.KtPsiFactory
+import org.jetbrains.kotlin.psi.KtSecondaryConstructor
 import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
-import org.jetbrains.kotlin.psi.psiUtil.getChildOfType
 import java.io.File
 
 internal class MeasuredFunction(
@@ -26,7 +31,13 @@ internal class MeasuredFunction(
  * 그 방식은 **표기의 열거 게임**이 된다 — 다중 행 `@Suppress`(Codex 5차 b) · `@file:Suppress` ·
  * `@kotlin.Suppress` · 상수 경유. 직접 재면 **억제가 이 임계에 아무 영향이 없어진다.**
  *
- * `funKeyword` 부터 세므로 KDoc 과 애노테이션은 길이에 들지 않는다 — 문서를 붙였다고 함수가
+ * 재는 대상은 **본문을 갖는 선언 전부**다(`size-policy.properties` 의 정의). 방문자 메서드를
+ * 골라 구현하면 그것도 열거 게임이 되므로 — 앞선 판이 함수와 람다만 구현해 접근자·`init`·보조
+ * 생성자가 임계를 지나갔다 — 노드 **타입**으로 판정한다. `KtDeclarationWithBody` 와
+ * `KtAnonymousInitializer` 는 PSI 가 「본문을 갖는다」를 표현하는 자리이므로, 새 표기가
+ * 생기더라도 그 둘 아래로 들어오는 한 자동으로 재진다.
+ *
+ * 선언 키워드부터 세므로 KDoc 과 애노테이션은 길이에 들지 않는다 — 문서를 붙였다고 함수가
  * 길어지지 않는다. **람다도 함께 잰다**: 재지 않으면 「45줄 함수 + 20줄 람다」가 한 줄짜리
  * 우회가 된다.
  *
@@ -74,22 +85,55 @@ private fun measureFile(
 
     ktFile.accept(
         object : KtTreeVisitorVoid() {
-            override fun visitNamedFunction(function: KtNamedFunction) {
-                // `funKeyword` 부터 — KDoc·애노테이션은 길이가 아니다.
-                val start = function.funKeyword?.textRange?.startOffset ?: function.textRange.startOffset
-                record(function.name ?: "<익명>", start, function.textRange.endOffset)
-                super.visitNamedFunction(function)
-            }
-
-            override fun visitLambdaExpression(lambdaExpression: KtLambdaExpression) {
-                val body = lambdaExpression.getChildOfType<org.jetbrains.kotlin.psi.KtFunctionLiteral>()
-                val range = (body ?: lambdaExpression).textRange
-                record("<람다>", range.startOffset, range.endOffset)
-                super.visitLambdaExpression(lambdaExpression)
+            override fun visitKtElement(element: KtElement) {
+                if (element.hasDeclarationBody()) {
+                    record(element.declarationName(), element.measurementStart(), element.textRange.endOffset)
+                }
+                super.visitKtElement(element)
             }
         },
     )
     return measured
+}
+
+/**
+ * **재는 대상의 정의.** PSI 에서 「본문을 갖는다」를 표현하는 타입은 둘뿐이므로 표기를 열거하지
+ * 않는다 — 함수·람다·프로퍼티 접근자·보조 생성자는 `KtDeclarationWithBody`, `init` 블록은
+ * `KtAnonymousInitializer` 아래로 들어온다. 본문이 없는 선언(주 생성자·추상 함수)은 이 축이
+ * 아니다.
+ */
+private fun KtElement.hasDeclarationBody(): Boolean =
+    when (this) {
+        is KtAnonymousInitializer -> body != null
+        is KtDeclarationWithBody -> hasBody()
+        else -> false
+    }
+
+/** 위반 보고에 쓸 이름. 이름이 없는 표기는 무엇이었는지 알아볼 수 있게 표시한다. */
+private fun KtElement.declarationName(): String =
+    when (this) {
+        is KtFunctionLiteral -> "<람다>"
+        is KtAnonymousInitializer -> "init"
+        is KtPropertyAccessor -> "${property.name ?: "<익명>"}.${if (isGetter) "get" else "set"}"
+        is KtSecondaryConstructor -> "constructor"
+        is KtNamedFunction -> name ?: "<익명>"
+        else -> "<본문 선언>"
+    }
+
+/**
+ * 길이의 시작점은 **선언 키워드**다 — KDoc 과 애노테이션은 그 앞에 있어 길이에 들지 않는다.
+ * 키워드를 모르는 노드는 노드 시작부터 세어 **길게** 잡는다: 게이트는 닫히는 쪽으로 틀린다.
+ */
+private fun KtElement.measurementStart(): Int {
+    val keyword =
+        when (this) {
+            is KtNamedFunction -> funKeyword
+            is KtSecondaryConstructor -> getConstructorKeyword()
+            is KtPropertyAccessor -> namePlaceholder
+            is KtClassInitializer -> initKeyword
+            else -> null
+        }
+    return (keyword ?: this).textRange.startOffset
 }
 
 private fun String.lineOf(offset: Int): Int = substring(0, offset.coerceAtMost(length)).count { it == '\n' } + 1

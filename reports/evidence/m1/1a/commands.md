@@ -191,7 +191,7 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `U-3` | 모듈이 convention plugin 을 안 씀 → 게이트 소멸 | `conventionCoverageGate` | `E-21` |
 | `U-4` | `runtimeOnly` 등 다른 configuration | 혈통으로 고른 configuration 전건 + main 좌표 allow-list | `E-22` |
 | `U-5` | `srcDir("gen")` — 크기 래칫만 빠짐 | sizeGate 입력을 실제 srcDirs 로 | `E-23` |
-| `U-6` | `@Suppress("LongMethod")` — 승인 임계 소멸 | sizeGate 의 억제 검사 | `E-24` |
+| `U-6` | `@Suppress("LongMethod")` — 승인 임계 소멸 | sizeGate 가 PSI 로 직접 잰다 — 억제가 이 임계에 닿지 않는다 | `E-24` · `E-31` |
 | `U-7` | `Locale`/`TimeZone.getDefault` | **T-C** 목록 밖 | fixture |
 | `U-8` | `X::class.java` 클래스 리터럴 | **막지 못한다** — 상수 풀 엔트리는 ArchUnit 의존이 아니다 | 잔여(알려진 제한) |
 | Codex a | `Formatter(String)` — 허용 패키지 안의 파일 I/O | **T-C** 목록 밖 | fixture |
@@ -223,6 +223,18 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `E-31` | 다중 행 `@Suppress` · `@file:Suppress` · `@kotlin.Suppress` + 54줄 함수 | 1 (셋 전부) | detekt 은 exit 0 — **그 축을 더는 detekt 이 들지 않는다** |
 | `E-32` | 50줄 넘는 람다 | 1 | 함수를 쪼개도 닫힌다 |
 
+### 본문을 갖는 선언 — 표기별 실측
+
+**정의의 정본은 `config/quality/size-policy.properties` 의 `limit.function.lines` 주석**이다.
+그 정의가 표기마다 실제로 서는지 `settlement` 에 심어 재고 되돌렸다. 방문자를 골라 구현하면
+구현하지 않은 표기가 곧 우회로가 되므로, 재는 대상을 노드 **타입**(`KtDeclarationWithBody` ·
+`KtAnonymousInitializer`)으로 판정한다.
+
+| # | 심은 것 | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| `E-33` | `get() { }` · `init { }` · 보조 생성자를 각 54 줄로 한 파일에 | `./gradlew :settlement:sizeGate` | 1 | **셋 다 보고**(`v.get` · `init` · `constructor`). 같은 파일의 **본문 없는 주 생성자는 보고되지 않는다** — 정의대로다 |
+| `E-34` | 위 파일 제거 | 같은 명령 | 0 | 되돌림 확인 |
+
 ### addendum 이 미확인으로 남긴 것 — 실측으로 답한다
 
 | 물음 | 답 |
@@ -237,7 +249,7 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `E-21` | `settlement` 를 `kotlin("jvm")` 로 바꿈 | `./gradlew --no-build-cache clean check` | 1 | `적용 안 됨: [settlement]` |
 | `E-22` | `decision` 에 `runtimeOnly("org.springframework:spring-core")` | `./gradlew :decision:moduleDependencyGate` | 1 | 무해한 좌표(commons-lang3)도 잡힌다 — 실패 방향이 닫혀 있다 |
 | `E-23` | `srcDir("gen")` 아래 500 줄 초과 파일 | `./gradlew :settlement:sizeGate` | 1 | `파일 500 줄 한도 초과` |
-| `E-24` | `@Suppress("LongMethod")` + 54 줄 함수 | `./gradlew :settlement:detekt` · `:settlement:sizeGate` | **0** · 1 | **detekt 은 억제된다.** sizeGate 가 억제 자체를 잡는다 |
+| `E-24` | `@Suppress("LongMethod")` + 54 줄 함수 | `./gradlew :settlement:detekt` · `:settlement:sizeGate` | **0** · 1 | **detekt 은 억제된다.** sizeGate 는 잡는다 — 억제가 그 임계에 닿지 않는다 |
 | `E-25` | `decision/src/main/java/Leak.java` | `./gradlew --no-build-cache clean check` | 1 | `main/java/Leak.java` |
 | `E-26` | 양성 corpus 에서 `kotlin.enums`·`kotlin.math`·`java.time.temporal`·`EnumMap` 을 각각 제거 | `./gradlew :app:test --tests '*ArchitectureGate*'` | 1 (넷 전부) | corpus 가 공허하지 않다 |
 

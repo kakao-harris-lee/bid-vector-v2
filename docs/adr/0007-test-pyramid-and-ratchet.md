@@ -216,9 +216,12 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   - **1.x와 설정 키가 호환되지 않는다**(`threshold` → `allowedLines`/`allowedComplexity`/…).
     1.x 키로 쓴 설정은 **조용히 무시**되므로 `config/detekt/detekt.yml`은 2.0 키로만 쓴다.
   - **게이트를 alpha에 종속시키지 않는다** — D-7이 요구한 자체 검사가 그대로 선다.
-    승인된 두 임계 중 **파일 500줄은 도구 없이 서는 `sizeGate` task**가 들고, 함수 50줄만
-    detekt이 맡되 그 수치는 detekt 설정이 아니라 `config/quality/size-policy.properties`가
-    갖는다. **detekt이 죽어도 파일 축 게이트는 계속 걸린다.**
+    승인된 두 임계를 **둘 다 도구 없이 서는 `sizeGate` task**가 든다. 파일 축은 detekt에
+    규칙이 아예 없어서, 함수 축은 **억제가 임계에 닿지 못하게** 하려고 그렇게 했다 —
+    `sizeGate`가 Kotlin PSI로 직접 재고 `detekt.yml`의 `LongMethod`는 비활성이다(같은 수가
+    두 자리에 있으면 안 된다). **detekt이 죽어도 승인된 임계 둘은 계속 걸린다.** detekt이
+    남아서 드는 것은 **승인 문서가 수치를 정하지 않은 축**(복잡도·중첩)이고, 그 값은 도구
+    기본값이며 `qualityBaseline`이 실측을 남긴다(`OPEN-ADR-06`).
   - **configuration cache 비호환(#9390)은 alpha.6에 남아 있지 않다** — 1A 실측
     (`reports/evidence/m1/1a/commands.md` `T-2`). 같은 축에서 **실제로 깨진 것은 Spotless**였고
     1A가 포맷 도구를 ktlint Gradle 플러그인으로 바꿨다(`T-6`).

@@ -38,7 +38,7 @@ ls settings.gradle.kts build.gradle.kts gradlew    # 셋 다 없어야 한다
 
 | 대상 | 방법 |
 | --- | --- |
-| detekt | `bidvector.kotlin-conventions.gradle.kts` 와 `build-logic/build.gradle.kts` 양쪽에서 `dev.detekt` 제거. **승인된 파일 500 줄 임계는 `sizeGate` 가 계속 든다**(ADR 0007 D-7 이 노린 성질). 함수 50줄 임계는 detekt 과 함께 사라진다 |
+| detekt | `bidvector.kotlin-conventions.gradle.kts` 와 `build-logic/build.gradle.kts` 양쪽에서 `dev.detekt` 제거. **승인된 두 임계(함수 50줄·파일 500줄)는 `sizeGate` 가 계속 든다**(ADR 0007 D-7 이 노린 성질). detekt 과 함께 사라지는 것은 **승인 문서가 수치를 정하지 않은 축**(복잡도·중첩·파라미터 수)뿐이다 |
 | ktlint | 같은 두 자리에서 `org.jlleitschuh.gradle.ktlint` 제거 |
 | architecture test | `app/src/test/kotlin/bidvector/app/architecture/` 와 `app/src/test/kotlin/bidvector/archfixture/` 제거. **1 차 강제인 `moduleDependencyGate` 는 남는다** |
 | build-logic 게이트만 | 루트 `bidvector.quality-baseline.gradle.kts` 의 `check` task 제거. 아홉 모듈의 게이트는 그대로 |

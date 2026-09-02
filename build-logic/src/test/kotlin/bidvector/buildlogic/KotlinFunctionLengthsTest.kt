@@ -85,4 +85,38 @@ class KotlinFunctionLengthsTest {
         val lambda = f.single { it.name == "<람다>" }
         assertTrue(lambda.lines > 30, "람다 ${lambda.lines} 줄")
     }
+
+    @Test
+    fun `프로퍼티 접근자도 잰다`() {
+        val f =
+            measure(
+                "package p\n\nclass C {\n    var v: Int = 0\n        get() {\n            var total = 0\n" +
+                    "${body(50)}\n            return total + field\n        }\n" +
+                    "        set(value) {\n            field = value\n        }\n}\n",
+            )
+        assertTrue(f.single { it.name == "v.get" }.lines > 50, "getter ${f.single { it.name == "v.get" }.lines} 줄")
+        assertEquals(3, f.single { it.name == "v.set" }.lines)
+    }
+
+    @Test
+    fun `init 블록도 잰다`() {
+        val f =
+            measure(
+                "package p\n\nclass C {\n    init {\n        var total = 0\n" +
+                    "${body(50)}\n        check(total > 0)\n    }\n}\n",
+            )
+        assertTrue(f.single { it.name == "init" }.lines > 50, "init ${f.single { it.name == "init" }.lines} 줄")
+    }
+
+    @Test
+    fun `보조 생성자는 재고 주 생성자는 재지 않는다`() {
+        val f =
+            measure(
+                "package p\n\nclass C(\n    n: Int,\n) {\n    constructor() : this(0) {\n        var total = 0\n" +
+                    "${body(50)}\n        check(total >= 0)\n    }\n}\n",
+            )
+        val ctor = f.single { it.name == "constructor" }
+        assertTrue(ctor.lines > 50, "보조 생성자 ${ctor.lines} 줄")
+        assertEquals(1, f.count { it.name == "constructor" }, "본문 없는 주 생성자는 이 축이 아니다")
+    }
 }
