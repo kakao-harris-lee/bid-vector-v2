@@ -47,12 +47,22 @@ class ArchitectureGateCatchesViolationsTest {
         "ProtobufLeak,com.google.protobuf",
         "ChannelLeak,java.nio.channels",
         "ConsoleIoLeak,kotlin.io",
+        "AllowListFileIoLeak,java.util.Formatter",
+        "ResourceBundleLeak,java.util.ResourceBundle",
+        "AmbientEnvLeak,java.util.Locale",
+        "ReflectionLeak,kotlin.reflect",
     )
     fun `금지 가족마다 심은 위반을 그 사유로 잡는다`(
         fixture: String,
         forbiddenTarget: String,
     ) {
         rules.domainMayOnlyDependOnAllowedPackages(fixtureRoot).mustReport(fixture, forbiddenTarget)
+    }
+
+    /** T-D 는 클래스가 아니라 **멤버**로 잡으므로 사유 문자열이 다르다 — 따로 단언한다. */
+    @Test
+    fun `허용된 클래스 안의 금지 멤버를 잡는다`() {
+        rules.domainMayOnlyDependOnAllowedPackages(fixtureRoot).mustReport("SystemPropertyLeak", "getBoolean")
     }
 
     /**

@@ -65,9 +65,11 @@ class ArchitectureRules(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
+                // `noClasses().should(...)` 는 조건을 뒤집는다 — **만족**이 곧 위반이다.
+                // `violated` 로 내면 뒤집혀 사라진다(실측으로 그 상태를 만났다).
                 item.accessesFromSelf
                     .filter { "${it.targetOwner.name}#${it.target.name}" in forbidden }
-                    .forEach { events.add(SimpleConditionEvent.violated(item, it.description)) }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, it.description)) }
             }
         }
     }
