@@ -1,0 +1,63 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "402b14c9dfe7cfa6f1c373c67c6c78a1afc124c8",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts",
+      "line": 30,
+      "evidence": "compilerSourceContainmentGate는 compileKotlin과 main Kotlin source set만 비교한다(30-42, 172-177행). 따라서 `tasks.named<KotlinCompileTool>(\"compileTestKotlin\") { source(\"outside/BadTest.kt\") }`처럼 기존 표준 테스트 컴파일 task에 source-set 밖 파일을 추가하면 봉쇄 대상이 아니다. 커밋된 E-63도 `source(...)`가 컴파일러 입력만 늘린다고 확인한다. test 산출물은 packageOwnershipGate와 jarContentGate에서도 명시적으로 제외되므로(126-132, 164-169행), 이 파일은 source-set 기반 ktlint·detekt·sizeGate를 우회하면서 실제 테스트 classpath에서 컴파일·실행될 수 있다. 이는 표준 task 설정과 테스트 fake shortcut을 포함하는 승인된 위협 모델 안의 재현 가능한 누락이다.",
+      "required_fix": "compileTestKotlin을 포함해 실제로 사용되는 모든 Kotlin compilation을 대응 source set과 비교하도록 봉쇄 게이트를 일반화한다. source-set 밖 BadTest.kt를 compileTestKotlin에 직접 추가했을 때 check가 해당 경로와 봉쇄 사유로 실패하는 음성 fixture를 커밋한다."
+    },
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts",
+      "line": 143,
+      "evidence": "sizeGate 입력을 만들 때 모든 source directory에서 resource directory를 디렉터리 단위로 차감한다(141-145행). 같은 `generated` 디렉터리를 main Kotlin source와 resources 양쪽에 평범하게 등록하면 Kotlin 컴파일과 compilerSourceContainmentGate에는 포함되지만 sizeGate에서는 통째로 빠지고 sourceLanguageGate도 이를 제외한다(147-151행). 따라서 그 디렉터리의 형식상 유효한 501줄 Kotlin 파일은 승인된 파일 500줄 한도를 위반해도 check가 이를 검출하지 못한다. 이는 source-dir 등록을 방어한다고 명시한 milestone-1.md의 위협 모델 안이다.",
+      "required_fix": "resource 디렉터리와 겹치더라도 Kotlin/손작성 source 파일은 sizeGate 입력에 남도록 파일 집합을 구성하고, 같은 디렉터리를 Kotlin source와 resources로 함께 등록한 501줄 Kotlin fixture가 `파일 500 줄 한도 초과` 사유로 실패하는 음성 테스트를 추가한다."
+    },
+    {
+      "severity": "medium",
+      "file": "build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts",
+      "line": 219,
+      "evidence": "qualityBaseline은 각 모듈의 production source와 class 입력을 실제 source set/output에서 얻지 않고 `src/main/kotlin`과 `build/classes/kotlin/main`으로 고정한다(219-220행). 이 slice가 지원하고 E-61로 검증한 추가 main Kotlin source directory는 컴파일·게이트 대상이어도 baseline의 files/lines/max-file 측정에서 빠진다. 표준 compileKotlin output 위치를 바꾸면 타입·public API·상속·결합도 측정도 빠질 수 있다. scope.md D-6/K-6은 1A 산출물의 핵심을 현재 바닥값이 아니라 측정 정의라고 명시하므로 이 정의는 불완전하다.",
+      "required_fix": "baseline source를 실제 main Kotlin SourceDirectorySet에서, class 입력을 실제 main SourceSet output classesDirs에서 가져오도록 배선하고, 추가 main source directory 및 표준 output 변경이 baseline 수치에 반영되는 테스트를 고정한다."
+    },
+    {
+      "severity": "medium",
+      "file": "app/build.gradle.kts",
+      "line": 48,
+      "evidence": "v2-지침서.md 281-283행은 변경 이력과 작업 메모를 코드 주석에 남기지 말라고 규정하지만 이 주석은 `Codex #4`라는 리뷰 이력을 유지한다. build-logic convention script 93행의 `(U-4)`도 evidence 내부 식별자를 production 빌드 코드에 남긴다. 이전 finding 대응 grep은 app/src와 build-logic/src만 검사해 모듈 build.gradle.kts를 누락했으므로 정리 완료 주장과 실제 범위가 다르다.",
+      "required_fix": "현재 제약을 설명하는 내용은 유지하되 `Codex #4`, `U-4` 같은 리뷰·작업 식별자를 제거하고, 모든 추적 Kotlin/Gradle 소스(`*.kt`, `*.kts`)를 포함하는 검사로 같은 종류의 잔존 주석이 없는지 확인한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short --branch && git rev-parse HEAD && git cat-file -t 6b03c75016a1d5437ca7ff932282fc477be974e6 && git cat-file -t 402b14c9dfe7cfa6f1c373c67c6c78a1afc124c8",
+    "git merge-base --is-ancestor 6b03c75016a1d5437ca7ff932282fc477be974e6 402b14c9dfe7cfa6f1c373c67c6c78a1afc124c8 && git rev-list --count 6b03c75016a1d5437ca7ff932282fc477be974e6..402b14c9dfe7cfa6f1c373c67c6c78a1afc124c8",
+    "git diff --stat 6b03c75016a1d5437ca7ff932282fc477be974e6..402b14c9dfe7cfa6f1c373c67c6c78a1afc124c8 && git log --oneline 6b03c75016a1d5437ca7ff932282fc477be974e6..402b14c9dfe7cfa6f1c373c67c6c78a1afc124c8",
+    "git diff --name-status 6b03c75016a1d5437ca7ff932282fc477be974e6..402b14c9dfe7cfa6f1c373c67c6c78a1afc124c8 && git status --porcelain --untracked-files=all",
+    "git diff --check 6b03c75016a1d5437ca7ff932282fc477be974e6..402b14c9dfe7cfa6f1c373c67c6c78a1afc124c8",
+    "sed 및 nl로 v2-지침서.md, agent-workflow.md, milestone-1.md, ADR 0001/0003/0004/0006/0007, capability-map.md의 요구사항과 판정 계약 확인",
+    "git diff --unified=100 617be7f..402b14c -- build-logic app config reports/evidence/m1/1a milestone-1.md docs/adr",
+    "이전 codex-review-*.json 아홉 건을 읽고 finding 및 현재 HEAD 대응 커밋 대조",
+    "nl -ba build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts 및 build-logic custom task 구현 전체 검토",
+    "nl -ba app/build.gradle.kts 및 app architecture/compatibility test와 음성 fixture 전체 검토",
+    "rg -n으로 compileKotlin, compileTestKotlin, source set, srcDir, resource exclusion, gate wiring, Codex/U-* 이력 주석 검색",
+    "find build/test-results -name '*.xml' 및 python3 XML 파싱으로 10 suites, 85 tests, failures/errors/skipped 0 확인",
+    "find build/reports에서 detekt, kover, quality-baseline, size, dependency, ownership, language, jar-content, compiler-containment, compatibility 산출물 검토",
+    "cmp로 config/quality/member-effects.properties와 재생성 산출물 비교 및 convention coverage expected/registered 모듈 대조",
+    "unzip -t gradle/wrapper/gradle-wrapper.jar && sh -n gradlew && bash -n gradlew && ruby -e YAML.safe_load로 CI YAML 구문 확인",
+    "jar tf, javap -verbose, shasum으로 모듈 jar 내용·Kotlin metadata·Java 21 class 및 gate 대상 class와 jar byte 일치 확인",
+    "codex --version && git status --short --branch && git rev-parse HEAD"
+  ],
+  "residual_risks": [
+    "sandbox의 DatagramSocket 제한 때문에 Gradle acceptance 명령을 독립 재실행하지 않았으며, 같은 HEAD에서 리뷰 레인이 생성했다고 제공된 build/** XML·리포트·산출물을 실행 증거로 검증했다.",
+    "class 파일 SourceFile 속성이 경로가 아닌 basename만 보존하므로, 신뢰 source와 같은 파일명의 별도 컴파일 산출물을 신뢰 output에 넣는 경로는 문서화된 잔여 위험으로 남는다.",
+    "detekt 2.0.0-alpha.6 사용과 Gradle 9.6.1이 KGP 문서상 검증 상한을 넘는 조합은 현재 스모크가 통과했어도 향후 도구 업데이트 시 재검증이 필요하다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
