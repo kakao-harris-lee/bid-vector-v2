@@ -199,9 +199,12 @@ val sourceSetLayoutGate =
             provider {
                 tasks
                     .withType(KotlinCompileTool::class.java)
-                    .associate { it.name to it.excludes.joinToString(",") }
+                    .associate { it.name to it.excludes.joinToString(",") } +
+                    sourceSets.associate { "sourceSet:${it.name}" to it.kotlin.excludes.joinToString(",") }
             },
         )
+        mainSourceRoot.from(layout.projectDirectory.dir("src/main/kotlin"))
+        testSourceRoot.from(layout.projectDirectory.dir("src/test/kotlin"))
         mainSourceSetFiles.from(sourceSetKotlinFiles)
         mainCompilerFiles.from(compiledSourceFiles)
         testSourceSetFiles.from(provider { sourceSets["test"].kotlin })

@@ -56,6 +56,23 @@ abstract class SourceSetLayoutGateTask : DefaultTask() {
     @get:Input
     abstract val compileFilters: MapProperty<String, String>
 
+    /**
+     * 관례 디렉터리 그 자체. **기준 집합은 이 디렉터리를 직접 걸어서 만든다** — Gradle 의
+     * `SourceDirectorySet` 에서 파생시키면 그 객체에 `exclude(...)` 한 줄로 기준과 비교 대상이
+     * **동시에** 사라져 자기 비교가 된다. 파일 시스템은 그 필터를 모른다.
+     *
+     * 입력으로는 디렉터리를 선언해 configuration cache 와 up-to-date 가 성립하게 하고,
+     * 걷는 것은 action 에서 한다. `walkTopDown` 은 심볼릭 링크를 따라가며 컴파일러·ktlint 와
+     * 같은 집합을 본다(실측).
+     */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val mainSourceRoot: ConfigurableFileCollection
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val testSourceRoot: ConfigurableFileCollection
+
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val mainSourceSetFiles: ConfigurableFileCollection
@@ -84,8 +101,8 @@ abstract class SourceSetLayoutGateTask : DefaultTask() {
         val violations =
             directoryViolations() +
                 setViolations() +
-                compileInputViolations("main", mainSourceSetFiles, mainCompilerFiles) +
-                compileInputViolations("test", testSourceSetFiles, testCompilerFiles) +
+                setViolationsFor("main", mainSourceRoot, mainSourceSetFiles, mainCompilerFiles) +
+                setViolationsFor("test", testSourceRoot, testSourceSetFiles, testCompilerFiles) +
                 filterViolations() +
                 resourceSourceViolations()
 
@@ -128,25 +145,34 @@ abstract class SourceSetLayoutGateTask : DefaultTask() {
         )
 
     /**
-     * **양방향 등식**이다 — `exclude(...)` 로 관례 안 파일을 빼는 것도 어긋남으로 잡는다.
-     * 비교 대상은 **컴파일 대상 확장자**뿐이다. source set 트리에는 그 트리를 설명하는 `.md`
-     * 같은 파일이 함께 살고 컴파일러는 그것을 먹지 않는다.
+     * 기준은 **파일 시스템**이고 등식이 둘이다 — 기준 대 source set, 기준 대 컴파일 입력.
+     * 어느 쪽이 어긋났는지 사유가 구분한다. 둘을 서로 비교하면 같은 객체에서 파생돼 자기
+     * 비교가 되므로, 양쪽 모두 **디스크의 관례 디렉터리**와 대조한다.
      */
-    private fun compileInputViolations(
+    private fun setViolationsFor(
         set: String,
+        root: ConfigurableFileCollection,
         declared: ConfigurableFileCollection,
         compiled: ConfigurableFileCollection,
     ): List<String> {
-        val inSet = declared.files.compilablePaths()
-        val inCompiler = compiled.files.compilablePaths()
-        return (inCompiler - inSet).sorted().map { "'$set' 컴파일 대상이 source set 밖에 있다 — $it" } +
-            (inSet - inCompiler).sorted().map { "'$set' source set 파일이 컴파일에서 빠졌다 — $it" }
+        val onDisk =
+            root.files
+                .filter(File::isDirectory)
+                .flatMap { dir -> dir.walkTopDown().filter { it.isFile }.toList() }
+                .compilablePaths()
+        return mismatch(onDisk, declared.files.compilablePaths(), set, "source set") +
+            mismatch(onDisk, compiled.files.compilablePaths(), set, "컴파일 입력")
     }
 
-    /**
-     * `sources` 는 **필터 전** 집합이라 `exclude(...)` 가 양방향 등식에 잡히지 않는다(실측).
-     * 그래서 패턴이 비어 있는지를 따로 단언한다 — 필터를 쓸 계획이 없어 비용이 0 이다.
-     */
+    private fun mismatch(
+        onDisk: Set<String>,
+        observed: Set<String>,
+        set: String,
+        what: String,
+    ): List<String> =
+        (onDisk - observed).sorted().map { "'$set' 관례 파일이 $what 에서 빠졌다 — $it" } +
+            (observed - onDisk).sorted().map { "'$set' $what 이 관례 디렉터리 밖에 있다 — $it" }
+
     private fun filterViolations(): List<String> =
         compileFilters
             .get()
