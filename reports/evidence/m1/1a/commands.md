@@ -237,6 +237,18 @@ grep -rnE 'Codex|verifier|addendum|앞선 판|이번 라운드|설계 검토|라
 - 근거 서술은 지우지 않았다 — 「애노테이션은 소스 한 줄로 위조된다」처럼 **현재형 이유**로 바꿔
   남겼다. 사라진 것은 그 이유를 **어느 라운드가 발견했는지**뿐이고, 그것은 git 과 evidence 가 든다
 
+**스윕 범위를 스크립트·설정까지 넓혔다.** 앞선 두 스윕이 `*.kt` 트리만 보아 모듈
+`build.gradle.kts` 와 `config/quality/**` 를 놓쳤다.
+
+```
+grep -rnE 'Codex|verifier|addendum|[0-9]+차 #|리뷰 [0-9]|라운드|\(U-[0-9]' --include='*.kts' --include='*.kt' --include='*.properties' --include='*.yml' --include='.editorconfig' . | grep -v bid-vector/ | grep -v /build/ | grep -v ^./reports/
+```
+
+- 결과: **0 건**
+- **`ADR NNNN D-N` 은 걷지 않는다.** 그것은 승인 문서의 결정 ID 이고 주석이 그 결정을 근거로
+  드는 것은 현재형 판단이다 — 걷으면 판정의 근거가 사라진다. 걷은 것은 **리뷰 차수**(`Codex #N`)와
+  **작업 산출물 식별자**(`U-4`), 그리고 라운드 서술뿐이다. `reports/` 는 evidence 라 대상이 아니다
+
 **스윕 범위를 위반 fixture 까지 넓혔다.** 첫 스윕이 `build-logic/src` 와 게이트 테스트만 보아
 `archfixture/` 의 귀속 괄호 둘을 놓쳤다. 지금 범위는 `app/src/test/kotlin` 전체 + `build-logic/src`
 이고 `.md` 도 포함한다.

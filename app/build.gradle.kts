@@ -45,7 +45,7 @@ tasks.test {
 }
 
 // 해석만 재면 「호환」을 주장할 수 없다 — 그 버전의 API 로 컴파일되고 JVM 에서 로드되는지는
-// 테스트가 잰다(Codex #4). 두 층을 한 명령으로 묶는다.
+// 테스트가 잰다. 두 층을 한 명령으로 묶는다.
 val compatibilitySmokeTest =
     tasks.register<Test>("compatibilitySmokeTest") {
         group = "verification"

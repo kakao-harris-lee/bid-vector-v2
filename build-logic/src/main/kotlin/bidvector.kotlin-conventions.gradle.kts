@@ -91,7 +91,7 @@ val moduleDependencyGate =
         policyFile = configDir.file("quality/architecture-policy.properties")
         moduleName = project.name
         // `compileClasspath` 둘만 보면 `runtimeOnly`·`annotationProcessor`·`ksp` 로 들어오는
-        // 프레임워크가 빠져나간다(U-4). 그렇다고 해석 가능한 전건을 넣으면 **컴파일러·도구 자신의
+        // 프레임워크가 빠져나간다. 그렇다고 해석 가능한 전건을 넣으면 **컴파일러·도구 자신의
         // classpath**(kotlinCompilerPluginClasspath·detekt·ktlint·kover)까지 들어와 오탐이 난다 —
         // 실제로 kotlinx-serialization 이 그 경로로 잡혔다.
         // 기준은 이름 열거가 아니라 **혈통**이다: 모듈이 *선언한* 의존이 흘러드는 configuration 만 본다.
