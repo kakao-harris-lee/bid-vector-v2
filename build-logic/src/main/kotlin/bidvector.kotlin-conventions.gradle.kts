@@ -1,3 +1,4 @@
+import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.JarContentGateTask
 import bidvector.buildlogic.ModuleBaselineSpec
 import bidvector.buildlogic.ModuleDependencyGateTask
@@ -217,6 +218,19 @@ val sourceSetLayoutGate =
         report = layout.buildDirectory.file("reports/source-set-layout/violations.txt")
     }
 
+// 게이트를 test 로 표현하면 그 test 를 실행 집합에서 빼는 것이 게이트를 끄는 것과 같아진다.
+// 「통과했다」와 「돌았다」는 다른 말이라 후자를 따로 단언한다.
+val gateExecutionGate =
+    tasks.register<GateExecutionGateTask>("gateExecutionGate") {
+        description = "게이트 test class 가 실제로 실행됐고 실패·건너뜀이 없는지 잰다"
+        policyFile = configDir.file("quality/gate-tests.properties")
+        moduleName = project.name
+        resultDirectories.from(
+            tasks.named("test", Test::class.java).map { it.reports.junitXml.outputLocation },
+        )
+        report = layout.buildDirectory.file("reports/gate-execution/violations.txt")
+    }
+
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
@@ -238,6 +252,7 @@ tasks.named("check") {
         sourceLanguageGate,
         jarContentGate,
         sourceSetLayoutGate,
+        gateExecutionGate,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )
