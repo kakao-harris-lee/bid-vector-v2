@@ -233,9 +233,21 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 grep -rnE 'Codex|verifier|addendum|앞선 판|이번 라운드|설계 검토|라운드' build-logic/src app/src/test/kotlin/bidvector/app --include='*.kt' --include='*.kts'
 ```
 
-- 제거 전: 매치 있음(파일 열다섯). 제거 후: **0 건**
+- 제거 전: 매치 있음. 제거 후: **0 건**
 - 근거 서술은 지우지 않았다 — 「애노테이션은 소스 한 줄로 위조된다」처럼 **현재형 이유**로 바꿔
   남겼다. 사라진 것은 그 이유를 **어느 라운드가 발견했는지**뿐이고, 그것은 git 과 evidence 가 든다
+
+**스윕 범위를 위반 fixture 까지 넓혔다.** 첫 스윕이 `build-logic/src` 와 게이트 테스트만 보아
+`archfixture/` 의 귀속 괄호 둘을 놓쳤다. 지금 범위는 `app/src/test/kotlin` 전체 + `build-logic/src`
+이고 `.md` 도 포함한다.
+
+```
+grep -rnE 'Codex|verifier|addendum|[0-9]+차 #|리뷰 [0-9]|라운드' app/src/test/kotlin build-logic/src --include='*.kt' --include='*.kts' --include='*.md'
+```
+
+- 결과: **0 건**
+- **패턴에서 맨 `[0-9]차` 를 뺐다** — `1차 게이트`·`2차 그물` 은 이 저장소의 층 어휘라 그대로
+  두어야 한다. 리뷰 귀속만 잡도록 `N차 #` 형태로 좁혔다
 
 ### 게이트 입력과 컴파일러 입력의 **쌍대 봉쇄** (Codex 9차)
 

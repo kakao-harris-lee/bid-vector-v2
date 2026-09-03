@@ -2,7 +2,7 @@ package bidvector.archfixture.violating.sharedkernel
 
 /**
  * 허용된 예외 계층이 **상속으로 들고 다니는 I/O**. `printStackTrace` 는 `System.err` 로 쓰는데
- * 바이트코드의 owner 는 구체 예외 타입이라, 멤버 규칙을 owner 로 재면 잡히지 않는다(Codex 6차 #1).
+ * 바이트코드의 owner 는 구체 예외 타입이라, 멤버 규칙을 owner 로 재면 잡히지 않는다.
  *
  * `Throwable` 을 허용 목록에서 빼는 것으로는 닫지 못한다 — `require`/`check`/`toInt()` 가
  * 컴파일러 산출로 내는 `IllegalArgumentException`·`IllegalStateException`·`NumberFormatException`
