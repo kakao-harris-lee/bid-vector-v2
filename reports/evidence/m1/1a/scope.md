@@ -226,6 +226,21 @@ task 를 쓸 수 없기 때문이다. 그 task 클래스가 바로 그 빌드의
 
 ## 계약 갱신
 
+### 2026-09-03 — 게이트 실행 집합을 줄이는 설정도 위협 모델 경계 밖이다 (Codex 12차 high · 운영자 결정)
+
+**넓힌 범위 없음** — `milestone-1.md` 와 `docs/adr/0007` 은 이미 `in_scope` 다. 편집 자리는
+「게이트 위협 모델」 절의 「방어하지 않는다」와 `ADR 0007` §1.1.2 의 개정 항목이다.
+
+**사유**: Codex 12차 high 가
+`tasks.test { filter { excludeTestsMatching("*ArchitectureGateCatchesViolationsTest") } }`
+한 줄로 위반 fixture 를 평가하는 test class 만 실행에서 빼는 경로를 실측했다 — `check` 는
+초록인데 게이트가 잡는다는 증거를 아무도 평가하지 않는다. 이미 있는 등가성 논증(게이트 test
+를 실행에서 빼는 것 = 게이트를 끄는 것)을 `Test.filter`(`excludeTestsMatching`·
+`excludePatterns`)·`--tests` 선택·게이트 task 의 `onlyIf` 로 넓혀 명시했다. **그럼에도
+`gateExecutionGate`(policy `config/quality/gate-tests.properties`)가 `Test.filter` 계열을
+구성상 잡는다** — 경계는 그 단언 자체를 끄는 편집에만 적용된다. 실측은 `commands.md` 의
+`E-a`~`E-c` 가 든다.
+
 ### 2026-09-02 — 포맷 도구를 Spotless 에서 ktlint Gradle 플러그인으로 바꾼다
 
 **바뀐 것**: `Spotless 8.10.1 + ktlint 1.8.0` → `org.jlleitschuh.gradle.ktlint 14.2.0` 이 같은

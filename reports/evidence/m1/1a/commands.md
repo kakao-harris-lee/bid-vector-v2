@@ -261,6 +261,22 @@ grep -rnE 'Codex|verifier|addendum|[0-9]+차 #|리뷰 [0-9]|라운드' app/src/t
 - **패턴에서 맨 `[0-9]차` 를 뺐다** — `1차 게이트`·`2차 그물` 은 이 저장소의 층 어휘라 그대로
   두어야 한다. 리뷰 귀속만 잡도록 `N차 #` 형태로 좁혔다
 
+### 게이트 test 의 **실행 단언** (Codex 12차)
+
+**「통과했다」와 「돌았다」는 다른 말이다.** `gateExecutionGate`(`d01f350`)가 정책에 열거된
+게이트 test class 마다 test 결과 XML 로 실행·실패·건너뜀을 잰다. 여기는 그 단언이 실제로
+도는지의 재확인이다 — commit 메시지의 서술을 그대로 믿지 않고 다시 심었다.
+
+| # | 심은 것 | exit | 사유 |
+| --- | --- | --- | --- |
+| `E-76` | `app/build.gradle.kts` 의 `tasks.test`에 `filter { excludeTestsMatching("*ArchitectureGateCatchesViolationsTest") } }` | 1 | `게이트 test class 가 실행되지 않았다 — bidvector.app.architecture.ArchitectureGateCatchesViolationsTest` — 되돌리면 `:app:check` 는 다시 exit 0 |
+| `E-77` | `A-2`(`./gradlew :app:test --tests '*ArchitectureGate*'`)로 만든 XML 에 `:app:gateExecutionGate` 를 잇는다 | 0 | 포함 패턴이 두 게이트 test class 를 모두 매치해 위반이 없다 — `A-2` 는 이 단언과 어긋나지 않는다 |
+| `E-78` | `app/build.gradle.kts` 의 `tasks.test`에 `enabled = false` | 1 | 두 게이트 test class 모두 `실행되지 않았다` — **이 경로는 `milestone-1.md` 「게이트 위협 모델」의 경계 밖**(task 전체 비활성)이지만 결과를 함께 남긴다. 되돌리면 `:app:check` 는 다시 exit 0 |
+
+세 fixture 모두 **되돌린 뒤 `:app:check --no-build-cache` 가 exit 0** 임을 확인했다(양성 대조).
+Configuration cache 는 다섯 실행 중 **저장 3 회 · 재사용 2 회** — 재사용이 fixture 유무에 따라
+갈리는 것은 예상대로다(빌드 스크립트 변경이 캐시를 무효화한다).
+
 ### 레이아웃 기준을 **파일 시스템**으로 (Codex 11차)
 
 **기준을 Gradle 객체에서 파생시키면 자기 비교가 된다.** 기준과 컴파일 입력이 둘 다

@@ -115,6 +115,13 @@ property test로 변환 왕복, 반올림 경계, 잘못된 단위 거부를 검
 게이트 정의의 일부이며** 여기서 그렇게 인정한다 — 다만 그 경로는 `build/` 아래라 소스 관례
 밖이고, 레이아웃을 관례로 고정하는 것과 어긋나지 않는다.
 
+**게이트를 실행하는 task 의 실행 집합을 줄이는 설정도 여기 든다**(운영자 결정 2026-09-03,
+Codex 12차 high) — `Test.filter`의 `excludeTestsMatching`·`excludePatterns`, `--tests` 선택,
+게이트 test 를 도는 task 의 `onlyIf` 가 그것이다. 게이트를 test 로 표현하면 그 test 를 실행
+집합에서 빼는 것이 게이트를 끄는 것과 같다는, 위 `enabled = false` 항목의 논증이 그대로
+적용된다. **그럼에도 `gateExecutionGate`(policy `config/quality/gate-tests.properties`)가
+`Test.filter` 계열을 구성상 잡는다** — 경계는 그 단언 자체를 끄는 편집에만 적용된다.
+
 **이것은 요구 축소가 아니라 미기재 사항의 명시다.** 위 완료 조건의 **fixture 항목**이 요구하는
 대상은 **소스 수준 위반**이지 빌드 배선 사보타주가 아니다. `v2-지침서.md` §5 「회귀의 구조적
 방지」(*"회귀 방어를 사람의 주의력에"* 맡기지 않는다)와 `ADR 0007` §1.2 는 둘 다 **회귀(drift)**

@@ -89,6 +89,16 @@ MockK 또는 test server/container를 쓴다.**
   현행 `[**/build/generated-sources/**] ktlint = disabled` 예외도 **게이트 정의의 일부**로
   인정한다 — 그 경로는 `build/` 아래라 소스 관례 밖이고 레이아웃 고정과 충돌하지 않는다.
   표면 목록의 출처는 `_workspace/m1-1a/22_design-check-layout.md` §6 이다.
+- **개정 2026-09-03 — 게이트를 실행하는 task 의 실행 집합을 줄이는 설정을 경계 밖에 명시한다
+  (Codex 12차 high).** **결정자**: 운영자. **시점**: 2026-09-03. **근거**: Codex 12차 high 가
+  `tasks.test { filter { excludeTestsMatching("*ArchitectureGateCatchesViolationsTest") } }`
+  한 줄로 위반 fixture 를 평가하는 test class 만 실행에서 빼는 경로를 실측했다 — `check` 는
+  초록이지만 게이트가 잡는다는 증거를 아무도 평가하지 않는다. **위 `enabled = false` 항목과
+  같은 등가성 논증**이 `Test.filter`(`excludeTestsMatching`·`excludePatterns`)·`--tests` 선택·
+  게이트 test 를 도는 task 의 `onlyIf` 에도 적용되므로 이 계열을 경계 밖에 더한다. **그럼에도
+  `gateExecutionGate`(policy `config/quality/gate-tests.properties`)가 `Test.filter` 계열을
+  구성상 잡는다** — 경계는 그 단언 자체를 끄는 편집에만 적용된다. 정본 문면은 `milestone-1.md`
+  「게이트 위협 모델」이고 이 절은 근거를 든다.
 
 ### 1.2 래칫만으로는 막히지 않았다는 관찰
 
