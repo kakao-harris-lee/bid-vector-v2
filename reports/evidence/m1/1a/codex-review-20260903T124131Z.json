@@ -1,0 +1,40 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "9baf084abfe4ae083f0c3bb73783e1979cb99a51",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts",
+      "line": 207,
+      "evidence": "sourceSetLayoutGate는 testSourceSetFiles에 이미 필터가 적용된 `sourceSets[\"test\"].kotlin`을 받고 이를 같은 source set을 입력으로 쓰는 compileTestKotlin.sources와 비교한다(207-212행). Gradle API를 javap으로 확인하면 SourceDirectorySet은 PatternFilterable이므로, 모듈 build script에 `sourceSets[\"test\"].kotlin.exclude(\"**/ArchitectureGateCatchesViolationsTest.kt\")`를 추가하면 음성 fixture 단언 파일이 source set과 컴파일러 양쪽에서 함께 사라진다. 디렉터리 집합은 그대로이고 compileFilters는 KotlinCompileTool 자체의 excludes만 읽으므로 sourceSetLayoutGate는 위반을 내지 않는다. A-2의 `--tests '*ArchitectureGate*'`도 남은 ArchitectureGateTest 7건을 실행해 성공할 수 있어, 금지 import·순환 fixture의 구속력 검증이 조용히 제거된다. 이는 승인된 위협 모델 안의 평범한 source/task 설정이며 test fake shortcut 위험이다.",
+      "required_fix": "관례 디렉터리의 실제 Kotlin 파일 집합과 SourceDirectorySet 파일 집합을 대조하거나 main/test SourceDirectorySet의 include/exclude 필터를 명시적으로 고정해 파일 누락을 실패시킨다. ArchitectureGateCatchesViolationsTest를 source-set filter로 제외했을 때 check 또는 sourceSetLayoutGate가 해당 파일과 누락 사유를 보고하며 실패하는 음성 회귀 테스트도 추가한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short --branch && git rev-parse HEAD && git cat-file -t 6b03c75016a1d5437ca7ff932282fc477be974e6 && git cat-file -t 9baf084abfe4ae083f0c3bb73783e1979cb99a51",
+    "git diff --stat 6b03c75016a1d5437ca7ff932282fc477be974e6..9baf084abfe4ae083f0c3bb73783e1979cb99a51 && git diff --name-status 6b03c75016a1d5437ca7ff932282fc477be974e6..9baf084abfe4ae083f0c3bb73783e1979cb99a51 && git log --oneline 6b03c75016a1d5437ca7ff932282fc477be974e6..9baf084abfe4ae083f0c3bb73783e1979cb99a51",
+    "git merge-base --is-ancestor 6b03c75016a1d5437ca7ff932282fc477be974e6 9baf084abfe4ae083f0c3bb73783e1979cb99a51 && git rev-list --count 6b03c75016a1d5437ca7ff932282fc477be974e6..9baf084abfe4ae083f0c3bb73783e1979cb99a51",
+    "nl 및 sed로 agent-workflow.md, v2-지침서.md, milestone-1.md, ADR 0001/0003/0004/0006/0007, capability-map.md와 slice evidence 전체 확인",
+    "git diff --unified=100 402b14c9dfe7cfa6f1c373c67c6c78a1afc124c8..9baf084abfe4ae083f0c3bb73783e1979cb99a51 -- build-logic app config docs milestone-1.md reports/evidence/m1/1a",
+    "nl -ba로 convention plugin, SourceSetLayoutGateTask, 나머지 custom gate, architecture/compatibility test와 fixture 구현 검토",
+    "find와 Python ElementTree로 build/test-results 및 build-logic/build/test-results XML 10개, 85 tests, failures/errors/skipped 0 확인",
+    "build/reports와 모듈별 build/reports의 quality baseline, Kover, detekt, dependency, ownership, language, layout, jar-content, compatibility 산출물 확인",
+    "cmp -s config/quality/member-effects.generated.properties build/reports/member-effects/derived.properties",
+    "unzip -t gradle/wrapper/gradle-wrapper.jar && sh -n gradlew && bash -n gradlew && ruby -e로 .github/workflows/ci.yml YAML 파싱",
+    "jar tf로 모듈 산출물의 class entry 확인",
+    "javap으로 KotlinCompileTool 및 Gradle SourceDirectorySet/PatternFilterable API와 KotlinCompile source 필터 구현 확인",
+    "jq로 이전 codex-review JSON 열의 findings 전건 확인",
+    "git diff --check 6b03c75016a1d5437ca7ff932282fc477be974e6..9baf084abfe4ae083f0c3bb73783e1979cb99a51",
+    "codex --version && git status --short --branch && git rev-parse HEAD"
+  ],
+  "residual_risks": [
+    "sandbox의 DatagramSocket 제한 때문에 Gradle acceptance 명령은 지시대로 실행하지 않았으며, 같은 HEAD에서 생성된 build/** XML·리포트·jar를 실행 증거로 대조했다.",
+    "class 파일 SourceFile 속성이 경로가 아닌 basename만 보존하므로 신뢰 source와 같은 파일명의 별도 컴파일 산출물을 구분하지 못하는 문서화된 잔여 위험이 있다.",
+    "detekt 2.0.0-alpha.6과 KGP 문서상 검증 상한을 넘는 Gradle 9.6.1 조합은 현재 산출물상 통과했지만 이후 도구 변경 시 재검증이 필요하다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
