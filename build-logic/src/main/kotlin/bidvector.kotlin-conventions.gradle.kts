@@ -253,7 +253,9 @@ rootProject.tasks.named<QualityBaselineTask>("qualityBaseline").configure {
                     .withType(ProjectDependency::class.java)
                     .map { it.path.removePrefix(":") }
                     .toSet()
-            sources.from(this@Project.layout.projectDirectory.dir("src/main/kotlin"))
-            classes.from(this@Project.layout.buildDirectory.dir("classes/kotlin/main"))
+            // 관례 경로를 박지 않고 **실제 source set 과 output** 에서 읽는다 — 측정 정의가
+            // 배선을 따라가야 하고, 위치를 고정하는 것은 레이아웃 게이트의 일이다.
+            sources.from(this@Project.provider { this@Project.sourceSets["main"].kotlin })
+            classes.from(this@Project.provider { this@Project.sourceSets["main"].output.classesDirs })
         }
 }
