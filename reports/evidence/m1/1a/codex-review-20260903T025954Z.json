@@ -1,0 +1,53 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "617be7f82860399c25500386a6441b43e2bfbe2e",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts",
+      "line": 69,
+      "evidence": "승인된 위협 모델은 평범한 source dir 등록·표준 task 설정으로 들어오는 형식 위반까지 방어한다고 명시하지만, ktlint는 source-set 기반 기본 입력만 사용하고 compileKotlin.sources는 받지 않는다. 예를 들어 source set 밖의 Bad.kt를 tasks.named<KotlinCompile>(\"compileKotlin\") { source(\"outside/Bad.kt\") }로 추가하면 compiledSourceFiles에 포함되어 sizeGate·sourceLanguageGate·detekt와 SourceFile 원산지 검사를 모두 통과하고 정상 jar에도 들어가지만 ktlint만 검사하지 않는다. checklist.md:308-312도 입력 누락을 인정하면서 SourceFile 검사가 잡는다고 주장하나, SourceFile 검사는 바로 그 compileKotlin.sources의 파일명을 신뢰 집합으로 사용하므로 이 경우 잡지 않는다.",
+      "required_fix": "compileKotlin이 소비하는 모든 손작성 Kotlin 소스를 ktlint와 동일한 형식 규칙으로 검사하거나, compileKotlin.sources가 ktlint가 검사하는 source-set 소스 밖으로 확장되면 실패시키는 production 게이트를 추가한다. source set 밖의 형식 위반 Kotlin 파일을 compileKotlin에 직접 추가했을 때 check가 형식 위반 사유로 실패하는 음성 테스트/fixture도 고정한다."
+    },
+    {
+      "severity": "medium",
+      "file": "build-logic/src/main/kotlin/bidvector/buildlogic/ClassOrigin.kt",
+      "line": 10,
+      "evidence": "v2-지침서.md:281-283은 변경 이력·작업 메모를 코드 주석에 남기지 말고 git이 소유하게 하라고 명시한다. 그런데 이 파일은 '앞선 판', 'Codex 8차'와 과거 구현 교체 경위를 주석으로 기록한다. 같은 형태가 MeasuredFunction.kt, JarContentPolicy.kt, PackageOwnershipGateTask.kt 및 convention script 등 production build logic 전반에서 rg로 반복 확인된다.",
+      "required_fix": "Kotlin/Gradle production source의 리뷰 차수·과거 구현·수정 경위 같은 이력성 주석을 제거하고, 현재 코드로 표현할 수 없는 불변 제약과 근거만 간결하게 남긴다. 변경 경위는 이미 있는 evidence와 git history에 둔다."
+    },
+    {
+      "severity": "low",
+      "file": "reports/evidence/m1/1a/checklist.md",
+      "line": 108,
+      "evidence": "알려진 제한 10은 현재 게이트가 kotlin.Metadata를 전수 검사한다고 서술하지만 HEAD는 해당 검사를 제거하고 SourceFile 대조로 교체했다. 같은 문서의 제한 26과 실제 ClassOrigin.kt가 이를 반증해 evidence가 내부적으로 모순된다.",
+      "required_fix": "폐기된 kotlin.Metadata 제한을 삭제하거나 현재 SourceFile 기반 검사의 실제 제한으로 갱신하여 제한 26과 중복·모순되지 않게 한다."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse --verify 6b03c75016a1d5437ca7ff932282fc477be974e6^{commit} && git rev-parse --verify 617be7f82860399c25500386a6441b43e2bfbe2e^{commit} && git rev-parse HEAD",
+    "git status --short --untracked-files=all",
+    "git diff --stat 6b03c75016a1d5437ca7ff932282fc477be974e6..617be7f82860399c25500386a6441b43e2bfbe2e && git diff --name-status 6b03c75016a1d5437ca7ff932282fc477be974e6..617be7f82860399c25500386a6441b43e2bfbe2e",
+    "git log --oneline 6b03c75016a1d5437ca7ff932282fc477be974e6..617be7f82860399c25500386a6441b43e2bfbe2e",
+    "sed -n '1,220p' agent-workflow.md; sed -n '1,180p' milestone-1.md; rg -n '모듈|Gradle|Kotlin|4\\.x|framework|DB|transport|domain|의존|architecture|gate|coverage|CI|baseline|ratchet|1a|1A' v2-지침서.md docs/adr/*.md docs/discovery/capability-map.md",
+    "sed -n '1,520p' reports/evidence/m1/1a/scope.md; sed -n '1,240p' reports/evidence/m1/1a/codex-review-20260902T235045Z.json",
+    "nl -ba build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts; nl -ba build-logic/src/main/kotlin/bidvector.quality-baseline.gradle.kts; nl -ba build-logic/src/main/kotlin/bidvector/buildlogic/*.kt; nl -ba app/src/test/kotlin/bidvector/app/architecture/*.kt",
+    "find . -path './.gradle-home' -prune -o -path '*/build/test-results/**/*.xml' -print | sort",
+    "ruby -r rexml/document -e 'files=Dir.glob(\"{app,build-logic}/build/test-results/**/*.xml\").sort; total=failures=errors=skipped=0; files.each{|f| r=REXML::Document.new(File.read(f)).root; total+=r.attributes[\"tests\"].to_i; failures+=r.attributes[\"failures\"].to_i; errors+=r.attributes[\"errors\"].to_i; skipped+=r.attributes[\"skipped\"].to_i}; puts \"files=#{files.size} tests=#{total} failures=#{failures} errors=#{errors} skipped=#{skipped}\"'",
+    "cmp -s config/quality/member-effects.generated.properties build/reports/member-effects/derived.properties",
+    "git diff --check 6b03c75016a1d5437ca7ff932282fc477be974e6..617be7f82860399c25500386a6441b43e2bfbe2e",
+    "jar tf */build/libs/*.jar; javap -verbose settlement/build/classes/kotlin/main/bidvector/settlement/ModuleBoundaryAnchor.class; shasum -a 256 settlement/build/classes/kotlin/main/bidvector/settlement/ModuleBoundaryAnchor.class; unzip -p settlement/build/libs/settlement.jar bidvector/settlement/ModuleBoundaryAnchor.class | shasum -a 256",
+    "unzip -t gradle/wrapper/gradle-wrapper.jar; git merge-base --is-ancestor 6b03c75016a1d5437ca7ff932282fc477be974e6 617be7f82860399c25500386a6441b43e2bfbe2e",
+    "rg -n 'Codex|앞선 판|앞선|라운드|실측|처음에는|그 전에는|바꿨|교체|재발|만났다|U-[0-9]|E-[0-9]|addendum' --glob '*.kt' --glob '*.kts' build-logic/src app/src *.gradle.kts */build.gradle.kts"
+  ],
+  "residual_risks": [
+    "sandbox 제한 때문에 Gradle은 직접 실행하지 않았고, HEAD에서 리뷰 레인이 생성한 XML·Kover·detekt·qualityBaseline·게이트 보고서를 대조했다. 확인된 테스트 산출물은 10개 suite, 85개 test, failure/error/skip 0이었다.",
+    "GitHub Actions 워크플로 자체는 원격 runner에서 실행된 증거가 없다.",
+    "coverage는 모든 모듈에서 리포트가 생성되지만 승인된 임계가 없어 측정만 하며, 임계 결정은 후속 slice로 이월돼 있다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
