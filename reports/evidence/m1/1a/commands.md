@@ -206,7 +206,7 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | --- | --- | --- |
 | `java.srcDir` 재등록 | `allSource`(살아 있는 뷰) + `src/` 병행 | `E-27` |
 | `sourceSets.create("extra")` | source set 집합 고정 | `E-28` |
-| 수제 `JavaCompile`·출력 리다이렉트 | **class 원산지**(`kotlin.Metadata` 부재) | `E-29` |
+| 수제 `JavaCompile`·출력 리다이렉트 | **class 원산지**(`SourceFile` 대조) | `E-29` · `E-53` |
 | `jar { from("prebuilt") }` | **포함 관계** — 아카이브 class 는 게이트를 통과한 산출물의 부분집합이어야 한다 | `E-30` · `E-47` |
 | `@Suppress` 다중 행·`@file:`·`@kotlin.` | **무의미해진다** — PSI 로 직접 잰다 | `E-31` |
 | 45줄 함수 + 20줄 람다 | 람다도 잰다 | `E-32` |
@@ -298,8 +298,8 @@ Java 클래스가 Kotlin 산출물을 참칭할 수 있었다. class 파일의 *
 통과하면서 원산지·ktlint·detekt·크기 게이트를 전부 비껴간다.
 
 그래서 판정을 열거가 아니라 **포함 관계**로 바꾼다 — 아카이브의 class 엔트리는 **경로와 내용
-해시가 모두** 게이트를 통과한 class output 과 일치해야 한다. 엔트리마다 원산지
-(`kotlin.Metadata`)도 함께 본다. 대상은 **class 엔트리뿐**이고 resource 는 컴파일 산출물이
+해시가 모두** 게이트를 통과한 class output 과 일치해야 한다. 엔트리마다 원산지도
+함께 본다(앵커는 뒤에 `SourceFile` 로 교체됐다). 대상은 **class 엔트리뿐**이고 resource 는 컴파일 산출물이
 아니라 이 판정의 대상이 아니다.
 
 | # | 심은 것 | cmd | exit | 핵심 결과 |
@@ -311,11 +311,8 @@ Java 클래스가 Kotlin 산출물을 참칭할 수 있었다. class 파일의 *
 | `E-51` | `src/main/resources` 에 `.properties` | 같은 명령 | **0** | **의도된 결과** — resource 는 이 판정의 대상이 아니다 |
 | `E-52` | `classes/kotlin/main` 에 심어 **포함 관계를 통과**시킴 | 같은 명령 | 1 | **두 번째 층이 서는 자리가 이것**이다. 사유는 앵커 교체로 `SourceFile` 대조가 됐다(`E-53`~`E-56`) — 심은 것이 metadata 없는 Java 라 옛 앵커로도 걸렸을 뿐이다 |
 
-**원산지 검사를 ArchUnit 으로 재지 않는 이유도 실측이다.** `ClassFileImporter().importJar` 은 이
-데몬 안에서 위 Java 클래스를 **조용히 건너뛰었다**(두 엔트리 중 Kotlin 것만 임포트). 같은 jar 를
-독립 JVM 에서 읽으면 둘 다 나온다. 잡아야 할 바로 그 클래스를 빠뜨리는 검사는 없는 것만 못하므로
-상수 풀에서 `kotlin/Metadata` 를 바이트로 찾는다. **`importPaths` 는 영향이 없다** —
-`packageOwnershipGate` 의 원산지 검사에 같은 클래스를 심어 재확인했다(exit 1).
+**이 절의 실측은 포함 관계 층의 것이다** — 그 층은 앵커 교체와 무관하게 그대로 선다.
+이 시점의 원산지 앵커는 `kotlin.Metadata` 였고 뒤에 `SourceFile` 로 교체됐다(아래 두 절).
 
 ### 효과 표면 도출 — T-D 를 열거에서 래칫으로
 
@@ -376,7 +373,7 @@ Java 클래스가 Kotlin 산출물을 참칭할 수 있었다. class 파일의 *
 | 물음 | 답 |
 | --- | --- |
 | KGP 아래 `kotlin.srcDirs` 가 `java.srcDirs` 를 추적하는가 | **추적한다**(`KOTLIN [kotlin, domain-java, kotlin]`). 그래서 Codex 시나리오가 현행 배선에도 걸렸다 — 다만 KGP 내부 동작이라 계약으로 삼지 않는다 |
-| `kotlin.Metadata` 를 전 Kotlin 산출물이 갖는가 | **이 저장소의 전 모듈 산출물에서 위반 0**(게이트가 `check` 마다 전수로 잰다). 「Kotlin 이 만든 모든 클래스」에 대한 일반 보증은 아니다 — 반례가 나오면 그 클래스가 게이트에 걸려 **시끄럽게** 드러난다 |
+| `kotlin.Metadata` 를 전 Kotlin 산출물이 갖는가 | 그때의 답은 「이 저장소 산출물에서 위반 0, 일반 보증은 아님」이었다. **이 물음은 지금 게이트에 걸리지 않는다** — 원산지 앵커가 `SourceFile` 로 바뀌어 그 애노테이션을 읽지 않는다(알려진 제한 26) |
 | jar 엔트리 검사 | **넣었다**(`E-30`) |
 | TestKit | **넣지 않았다.** 알려진 제한 |
 
