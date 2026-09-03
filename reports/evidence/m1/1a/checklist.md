@@ -175,6 +175,34 @@
    라운드에서도 같은 훑기를 돌렸고 **그쪽은 삽입 지점 위만 가리키고 있어 밀린 것이 없다** —
    그래도 그 파일로의 줄 번호는 인용문·절 제목으로 함께 걷었다. 재발을 막는 것은 스윕이
    아니라 **좌표의 형태**다.
+
+   **Codex 12차 거버넌스 라운드가 다시 밀었다 — 그리고 이번 스윕이 대상을 넓혔다.**
+   `milestone-1.md`(위협 모델 절 추가분, 삽입 지점 위 인용만 있어 안 밀림) ·
+   `docs/adr/0007-test-pyramid-and-ratchet.md`(§1.1.2 개정 + D-5 추가분, **삽입 지점 둘 다
+   D-6~OPEN-ADR-07 구간보다 위라 그 아래 인용 전부가 다시 밀렸다**) · `v2-지침서.md`(§5 한 줄,
+   삽입 지점이 §5 「Kotlin」 문면보다 아래라 안 밀림) 세 문서에 stem 기준
+   (`milestone-1`·`0007`·`지침서`) 역방향 파급 grep 을 **저장소 전체**에 돌렸다 — 앞선
+   라운드는 `docs/discovery/capability-map.md` 한 파일로 좁혀 돌렸는데 이번에 범위를 넓히자
+   **`capability-map.md` 밖의 citer 가 새로 드러났다**: `CLAUDE.md`·
+   `.claude/skills/evidence-pack/SKILL.md` 가 각각 `docs/adr/0007:186` 을 인용하고,
+   `evidence-pack/SKILL.md` 는 `ADR 0007 §6:172` 도 인용한다(이쪽은 §6 이 아니라 D-4 절이라
+   **이 라운드 이전부터 이미 어긋나 있었다**). 목록과 대상은 아래 명령이 낸다 — 셈은 옮겨
+   적지 않는다:
+
+   ```
+   grep -rnoE 'docs/adr/0007:[0-9]+|0007-test-pyramid-and-ratchet\.md:[0-9]+|ADR ?0007[^)]{0,3}:[0-9]+' \
+     --include='*.md' --include='*.kt' --include='*.kts' --include='*.properties' . \
+     | grep -v '^\./bid-vector/' | grep -v '/build/'
+   grep -rnoE 'milestone-1\.md:[0-9]+|milestone-1:[0-9]+' \
+     --include='*.md' --include='*.kt' --include='*.kts' --include='*.properties' . \
+     | grep -v '^\./bid-vector/' | grep -v '/build/'
+   ```
+
+   **1A 가 고치지 않는 이유가 더 넓어졌다** — `capability-map.md` 는 §14 가 예고한 registry
+   통합 slice 몫이라 쳐도, `CLAUDE.md` 와 `.claude/skills/**` 는 **이 slice 의 `in_scope`
+   문서가 아니고 v2-slice-pipeline 스킬의 소관도 아니다**(하네스 자체 수정은 별도 트랙).
+   담당은 여전히 운영자 결정과 §14 registry 통합 slice — `capability-map.md` 밖 citer 는 그
+   slice 가 처리 범위를 정할 때 함께 볼 항목으로 이월한다.
 17. **비결정성(시계·난수)은 게이트 대상이 아니다 — 1B 인계.** `Instant.now()`·`Clock`·
    `UUID.randomUUID()`·`java.util.Random` 이 전부 통과한다. **승인 문면이 그것을 domain 패키지
    금지로 다루지 않기 때문**이고, 1A 가 문서에 없는 정책을 지어내지 않는다: `v2-지침서.md` §3.1 은
@@ -333,6 +361,17 @@
     `source(...)`·둘째 컴파일 task 셋뿐이고 각각 다른 단언이 잡는다(확인). 남는 것은
     `.editorconfig`·`config/quality/**` 같은 **도구 설정**인데 그것은 제한이 아니라
     **경계 밖**이다 — `milestone-1.md` 「게이트 위협 모델」과 `ADR 0007` §1.1.2.
+
+32. **`gateExecutionGate` 의 policy 는 `app` class 만 열거한다 — `build-logic` 자체의 게이트
+    판정 test 는 이 단언의 대상이 아니다.** `config/quality/gate-tests.properties` 의
+    `gate.tests.app` 만 값을 갖고 다른 모듈 키는 없다. **비대칭이지만 결함이 아니다** — 이
+    대상 선택은 위협 모델의 경계와 정합한다: `build-logic/**` 편집 자체가 이미 「방어하지
+    않는다」의 경계 밖이므로(`milestone-1.md` 「게이트 위협 모델」·`ADR 0007` §1.1.2),
+    `build-logic` 이 자기 판정 로직을 재는 test(`SourceSetLayoutGateTask` 등의 순수 함수
+    테스트)는 `gateExecutionGate` 가 아니라 `build-logic` 자신의 `check`(`A-5`)가 언제나
+    전건 실행한다 — 그 `check` 를 우회하려면 `build-logic/**` 를 편집해야 하고 그것은 이미
+    별도로 경계 밖이다. `app` 만 열거한 이유는 **`app` 이 위반 fixture 를 실행하는 유일한
+    층**이기 때문이다(D-3 조합 지점).
 
 ## 1B 인계 목록
 

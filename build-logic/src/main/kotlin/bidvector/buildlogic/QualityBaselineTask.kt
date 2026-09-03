@@ -36,8 +36,9 @@ abstract class ModuleBaselineSpec {
  * `OPEN-ADR-06` 의 입력을 만드는 **측정** task 다. 게이트가 아니다 — 결정 주체가 운영자이고
  * (`capability-map.md` §12) 1A 는 축을 재서 등재할 뿐 임계를 자기 승인하지 않는다.
  *
- * 재는 축은 `v2-지침서.md` §5 「크기와 결합도」의 여섯과 `OPEN-ADR-06` 이 묻는 셋
- * (클래스/타입 크기 · 상속 깊이 · mixin 수)이다. 타입 축은 바이트코드에서 재므로
+ * 재는 축은 `v2-지침서.md` §5 「크기와 결합도」의 여섯 중 **다섯**과 `OPEN-ADR-06` 이 묻는 셋
+ * (클래스/타입 크기 · 상속 깊이 · mixin 수)이다. 여섯째 축(`duplicate mechanical helper`)의
+ * 측정 정의는 `ADR 0007` `OPEN-ADR-16` 으로 이월했다. 타입 축은 바이트코드에서 재므로
  * Kotlin `internal` 은 public 으로 보인다 — 그 한계는 리포트 머리말이 적는다.
  */
 abstract class QualityBaselineTask : DefaultTask() {
@@ -109,7 +110,8 @@ abstract class QualityBaselineTask : DefaultTask() {
                 "# quality baseline (OPEN-ADR-06 입력)",
                 "",
                 "게이트가 아니라 측정이다. 타입 축은 바이트코드 기준이라 Kotlin `internal` 이 public 으로 보인다.",
-                "duplicate mechanical helper 축은 기계적 판정 기준이 없어 재지 않는다.",
+                "duplicate mechanical helper 축은 이 task 가 재지 않는다 — 측정 정의는 " +
+                    "`ADR 0007` OPEN-ADR-16(운영자 결정 2026-09-03)으로 이월했다.",
                 "",
                 markdownRow(COLUMNS.map { it.header }),
                 markdownRow(COLUMNS.mapIndexed { index, _ -> if (index == 0) "---" else "--:" }),

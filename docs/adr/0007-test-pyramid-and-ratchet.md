@@ -190,6 +190,11 @@ fan-in/fan-out, public API 수, 순환 의존, duplicate mechanical helper. **�
 §1.3이 그 규칙이 필요한 이유의 실물이다. **클래스/타입 크기 축을 추가할지는
 `OPEN-ADR-06`**이며 이 ADR이 정하지 않는다.
 
+**`duplicate mechanical helper` 축의 측정 정의는 M1 slice 1A에서 확정되지 않는다** — 도메인
+코드가 없는 상태에서 그 축을 측정하면 공허하다(Codex 12차 medium). 나머지 다섯 축은 1A의
+`qualityBaseline`이 싣는다(`OPEN-ADR-06`이 묻는 세 축과 함께). **여섯째 축의 결정은 운영자,
+시점은 1B 도구 조사 뒤**이며 추적은 `OPEN-ADR-16`(아래 §5).
+
 ### D-6. 아키텍처 규칙 강제는 **ArchUnit**을 채택한다
 
 - **후보 3종 중 유일하게 활발한 안정 라인을 가진다** — 1.5.0(2026-08-04), 직전
@@ -260,6 +265,19 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   public API 수)으로 대신 잡는다 (c) 추가하지 않고 리뷰에 맡긴다 — **(c)는 §5의 "회귀
   방어를 사람의 주의력에 맡기지 않는다"와 충돌한다.**
 - **소유**: M1 래칫 구현.
+
+### `OPEN-ADR-16` · `duplicate mechanical helper` 축의 측정 정의
+
+- **결정 필요 사항**: D-5가 「함께 잰다」로 든 여섯 축 중 `duplicate mechanical helper`를
+  무엇으로, 어떤 기준으로 측정하는가.
+- **근거**: M1 slice 1A는 도메인 코드가 없어 이 축을 측정하면 공허하다(그린필드 바닥값) —
+  1A `qualityBaseline`(`reports/evidence/m1/1a/scope.md` D-6)이 나머지 다섯 축만 싣는다
+  (Codex 12차 medium).
+- **선택지**: (a) PMD CPD 등 기존 중복 탐지 도구의 Kotlin 지원 조사 후 채택 (b)
+  `qualityBaseline` 안에 자체 판정을 추가 (c) 측정하지 않고 리뷰에 맡긴다 — **(c)는 §5의
+  "회귀 방어를 사람의 주의력에 맡기지 않는다"와 충돌한다.**
+- **소유**: M1 1B — 첫 도메인 코드와 함께 도구 조사 후 확정.
+- **결정자·시점**: 운영자, 1B 도구 조사 뒤. (2026-09-03 신설 · Codex 12차 medium)
 
 ### `OPEN-ADR-07` · mutation 도구
 
