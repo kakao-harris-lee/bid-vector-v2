@@ -30,10 +30,10 @@ abstract class PackageOwnershipGateTask : DefaultTask() {
     @get:org.gradle.api.tasks.Input
     abstract val moduleName: Property<String>
 
-    /** 컴파일러가 실제로 먹은 소스. 그 **이름 집합**이 원산지 판정의 기준이다. */
+    /** 형식·크기·언어 도구가 검사한 소스. 그 **이름 집합**이 원산지 판정의 기준이다. */
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
-    abstract val compilerSources: ConfigurableFileCollection
+    abstract val verifiedSources: ConfigurableFileCollection
 
     /**
      * source set 이름 집합. `sourceSets.create("extra")` 로 만든 출력은 `main.output` 이 아니라
@@ -85,7 +85,7 @@ abstract class PackageOwnershipGateTask : DefaultTask() {
      * 무엇보다 **컴파일러가 먹은 파일 목록과 대조**되므로 위조만으로는 부족하다.
      */
     private fun foreignOrigin(module: String): List<String> {
-        val verified = verifiedSourceNames(compilerSources.files)
+        val verified = verifiedSourceNames(verifiedSources.files)
         return classDirectories.files
             .filter(File::isDirectory)
             .flatMap { root -> root.walkTopDown().filter { it.isFile && it.extension == "class" } }

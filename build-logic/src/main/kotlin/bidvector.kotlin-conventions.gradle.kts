@@ -1,3 +1,4 @@
+import bidvector.buildlogic.CompilerSourceContainmentGateTask
 import bidvector.buildlogic.JarContentGateTask
 import bidvector.buildlogic.ModuleBaselineSpec
 import bidvector.buildlogic.ModuleDependencyGateTask
@@ -25,14 +26,19 @@ val declarableBuckets =
 val configDir = layout.settingsDirectory.dir("config")
 val sizePolicy = configDir.file("quality/size-policy.properties")
 
-// **컴파일러가 실제로 먹은 소스.** 게이트 입력을 관례(디렉터리)가 아니라 컴파일 task 의
-// `source` 에 묶는다 — 「소스는 안 재고 class 는 신뢰」라는 틈(Codex 8차)이 정의상 사라지고,
-// 이 집합의 **파일 이름**이 원산지 판정(`SourceFile`)의 기준이 된다.
+// 컴파일 task 가 실제로 먹는 소스. 봉쇄 게이트의 한쪽 입력이다.
 val compiledSourceFiles =
     objects.fileCollection().from(
         tasks
             .named("compileKotlin", KotlinCompileTool::class.java)
             .map { it.sources },
+    )
+
+// 형식·크기·언어 도구가 보는 집합. **원산지 판정의 신뢰 이름 집합도 여기서 나온다** —
+// 컴파일러가 먹은 목록에서 뽑으면 거기 들어온 파일이 정의상 통과해 자기 인증이 된다.
+val sourceSetKotlinFiles =
+    objects.fileCollection().from(
+        provider { sourceSets["main"].extensions.getByName<SourceDirectorySet>("kotlin") },
     )
 
 // Java 소스를 구조적으로 봉쇄한다 — 산출물이 `classes/java/main` 으로 새면 소유·크기·경계
@@ -74,9 +80,6 @@ ktlint {
 detekt {
     buildUponDefaultConfig = true
     config.from(configDir.file("detekt/detekt.yml"))
-    // 컴파일러가 먹은 소스도 검사 대상이다 — source set 관례 밖에서 들어온 파일이 lint 를
-    // 비껴가지 않게(Codex 8차).
-    source.from(compiledSourceFiles)
 }
 
 // 경계의 1차 강제는 **모든 모듈**에 건다. domain 만 걸면 workflow 가 adapters 를 참조하는
@@ -123,7 +126,7 @@ val packageOwnershipGate =
         // test 출력은 뺀다 — fixture 는 일부러 `bidvector.archfixture` 에 산다. 그 대신
         // source set 집합을 고정해 `create("extra")` 경로를 닫는다.
         classDirectories.from(provider { sourceSets.filter { it.name != "test" }.flatMap { it.output.classesDirs } })
-        compilerSources.from(compiledSourceFiles)
+        verifiedSources.from(sourceSetKotlinFiles)
         expectedSourceSets = setOf("main", "test")
         actualSourceSets = provider { sourceSets.map { it.name }.toSet() }
         dependsOn(provider { sourceSets.filter { it.name != "test" }.map { it.classesTaskName } })
@@ -145,7 +148,6 @@ val sourceLanguageGate =
     tasks.register<SourceLanguageGateTask>("sourceLanguageGate") {
         description = "소스 트리에 Kotlin 아닌 소스가 있으면 실패한다 — java.setSrcDirs 봉쇄의 2차 그물"
         sourceDirectories.from(layout.projectDirectory.dir("src"), handWrittenSourceDirectories)
-        sourceFiles.from(compiledSourceFiles)
         excludedDirectories.from(provider { sourceSets.flatMap { it.resources.srcDirs } })
         // `md` 는 소스가 아니라 그 트리를 설명하는 문서다 — 컴파일되지 않으므로 class output 을
         // 만들 수 없고, 이 게이트가 막으려는 것(게이트를 비껴가는 산출물)에 해당하지 않는다.
@@ -159,12 +161,20 @@ val jarContentGate =
         policyFile = configDir.file("quality/architecture-policy.properties")
         moduleName = project.name
         archives.from(tasks.named("jar").map { (it as Jar).archiveFile })
-        compilerSources.from(compiledSourceFiles)
+        verifiedSources.from(sourceSetKotlinFiles)
         // 대조 대상 = 소유 게이트가 이미 본 class output. 판정이 「이름이 맞는가」가 아니라
         // **「게이트를 거친 바이트인가」**가 되려면 이 집합이 필요하다(Codex 7차).
         classDirectories.from(provider { sourceSets.filter { it.name != "test" }.flatMap { it.output.classesDirs } })
         dependsOn(provider { sourceSets.filter { it.name != "test" }.map { it.classesTaskName } })
         report = layout.buildDirectory.file("reports/jar-content-gate/entries.txt")
+    }
+
+val compilerSourceContainmentGate =
+    tasks.register<CompilerSourceContainmentGateTask>("compilerSourceContainmentGate") {
+        description = "컴파일 대상이 source set 안에 갇혀 있는지 잰다 — 형식·크기 도구의 사각을 없앤다"
+        compilerSources.from(compiledSourceFiles)
+        sourceSetSources.from(sourceSetKotlinFiles)
+        report = layout.buildDirectory.file("reports/compiler-source-containment/escaped.txt")
     }
 
 val sizeGate =
@@ -173,11 +183,7 @@ val sizeGate =
         policyFile = sizePolicy
         // 모듈의 빌드 스크립트도 잰다. 어느 source set 에도 속하지 않아 `allSource` 에 보이지
         // 않지만 실제 코드이고, 빼 두면 긴 함수가 그리로 옮겨 가는 것이 우회가 된다(Codex 6차).
-        sources.from(
-            handWrittenSourceDirectories,
-            layout.projectDirectory.file("build.gradle.kts"),
-            compiledSourceFiles,
-        )
+        sources.from(handWrittenSourceDirectories, layout.projectDirectory.file("build.gradle.kts"))
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
     }
 
@@ -191,6 +197,7 @@ tasks.named("check") {
         packageOwnershipGate,
         sourceLanguageGate,
         jarContentGate,
+        compilerSourceContainmentGate,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )

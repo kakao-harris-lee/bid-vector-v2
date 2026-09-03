@@ -50,10 +50,10 @@ abstract class JarContentGateTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val classDirectories: ConfigurableFileCollection
 
-    /** 컴파일러가 실제로 먹은 소스. 그 **이름 집합**이 원산지 판정의 기준이다. */
+    /** 형식·크기·언어 도구가 검사한 소스. 그 **이름 집합**이 원산지 판정의 기준이다. */
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
-    abstract val compilerSources: ConfigurableFileCollection
+    abstract val verifiedSources: ConfigurableFileCollection
 
     @get:Input
     abstract val moduleName: Property<String>
@@ -69,7 +69,7 @@ abstract class JarContentGateTask : DefaultTask() {
         val verified = verifiedClasses()
         val entries = archives.files.filter(File::isFile).flatMap(::classEntries)
 
-        val policy = JarContentPolicy(owned, verifiedSourceNames(compilerSources.files))
+        val policy = JarContentPolicy(owned, verifiedSourceNames(verifiedSources.files))
         val violations = policy.violations(entries, verified)
 
         val header =

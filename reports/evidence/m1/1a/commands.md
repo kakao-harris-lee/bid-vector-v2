@@ -223,6 +223,30 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `E-31` | 다중 행 `@Suppress` · `@file:Suppress` · `@kotlin.Suppress` + 54줄 함수 | 1 (셋 전부) | detekt 은 exit 0 — **그 축을 더는 detekt 이 들지 않는다** |
 | `E-32` | 50줄 넘는 람다 | 1 | 함수를 쪼개도 닫힌다 |
 
+### 게이트 입력과 컴파일러 입력의 **쌍대 봉쇄** (Codex 9차)
+
+**도구마다 입력을 넓히는 방식이 구멍의 원인이었다.** 형식·크기·언어 도구는 전부 source set 을
+입력으로 삼는데, 컴파일 task 에 source set 밖 파일을 직접 얹으면 그 파일만 전부 비껴간다.
+넓히기는 **도구 수만큼 반복해야 하고 하나(ktlint)를 빠뜨린 것이 9차**다. 그래서 넓히는 대신
+**좁힌다** — `compilerSourceContainmentGate` 가 두 집합의 차집합이 비기를 요구한다.
+
+**원산지 신뢰 집합의 출처도 함께 바꿨다.** 컴파일러가 먹은 목록에서 뽑으면 거기 들어온 파일이
+정의상 통과해 **자기 인증**이 된다. 출처를 source set 의 Kotlin 파일로 두면 쌍대가 뚫려도
+원산지 층이 독립적으로 잡는다.
+
+| # | 심은 것 | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| `E-60` | `compileKotlin { source("outside/.../Bad.kt") }` | `:settlement:compilerSourceContainmentGate` | 1 | `컴파일 대상이 source set 밖에 있다` + 그 파일 경로 |
+| `E-61` | `kotlin.srcDir("outside")` + 형식 위반 `.kt` | `:settlement:check` | 1 | **ktlint 가 실패한다**(`ktlintMainSourceSetCheck`) — 등록된 srcDir 은 살아 있는 FileCollection 이라 도구가 본다. 「좁히는 방향으로 닫힌다」의 양성 증거 |
+| `E-62` | 둘째 Kotlin 컴파일이 게이트 밖 `.kt` 를 신뢰 디렉터리에 | `:settlement:packageOwnershipGate` | 1 | 신뢰 출처를 source set 으로 바꾼 뒤에도 `SourceFile 'KtSneak.kt' …` 로 잡힌다 — 쌍대와 **독립**이다 |
+
+### 설계 확인이 미측정으로 남긴 둘
+
+| # | 물음 | 결과 |
+| --- | --- | --- |
+| `E-63` | java 스타일 `sourceSets["main"].kotlin` 과 KGP `kotlin.sourceSets["main"].kotlin` 이 같은 집합인가 | **같다.** `compileKotlin` 이 먹는 집합과도 같다(세 값이 일치). `compileKotlin { source(...) }` 로 얹으면 **컴파일러 쪽만** 늘고, `kotlin.srcDir(...)` 로 등록하면 **셋이 함께** 는다 — 봉쇄 게이트가 두 경우를 가르는 근거다 |
+| `E-64` | `KotlinCompileTool.sources` 를 configuration 시점 Provider 로 선언하면 **CC 적중 회차**에도 action 시점에 실제 목록을 주는가 | **준다** — 1·2 회차(`Configuration cache entry reused`) 값이 같다 |
+
 ### 원산지 앵커를 `kotlin.Metadata` 에서 `SourceFile` 로 (Codex 8차)
 
 **앵커가 위조 가능했다.** `kotlin.Metadata` 는 소스에 한 줄(`@kotlin.Metadata`)로 붙으므로
