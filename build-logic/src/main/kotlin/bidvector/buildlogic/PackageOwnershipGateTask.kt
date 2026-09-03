@@ -1,6 +1,5 @@
 package bidvector.buildlogic
 
-import com.tngtech.archunit.core.importer.ClassFileImporter
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
@@ -30,6 +29,11 @@ abstract class PackageOwnershipGateTask : DefaultTask() {
 
     @get:org.gradle.api.tasks.Input
     abstract val moduleName: Property<String>
+
+    /** 컴파일러가 실제로 먹은 소스. 그 **이름 집합**이 원산지 판정의 기준이다. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val compilerSources: ConfigurableFileCollection
 
     /**
      * source set 이름 집합. `sourceSets.create("extra")` 로 만든 출력은 `main.output` 이 아니라
@@ -73,21 +77,31 @@ abstract class PackageOwnershipGateTask : DefaultTask() {
 
     /**
      * **class 의 원산지 검사.** source set 을 안 거치는 경로(손으로 만든 `JavaCompile`,
-     * `destinationDirectory` 리다이렉트)는 소스 쪽 검사로 잡히지 않는다. Kotlin 컴파일러는
-     * 모든 산출 클래스에 `kotlin.Metadata` 를 단다 — 그것이 없는 클래스는 Kotlin 이 만든 것이
-     * 아니다. (표본 실측: value class·합성 `WhenMappings` 까지 전건 보유.)
+     * `destinationDirectory` 리다이렉트, `doLast` 복사)는 소스 쪽 검사로 잡히지 않는다.
+     *
+     * 판정은 class 의 **`SourceFile` 이 게이트를 통과한 소스 이름 집합에 드는가**다. 앞선 판은
+     * `kotlin.Metadata` 보유를 앵커로 썼는데 **소스에 한 줄로 위조된다** — Codex 8차가
+     * `@kotlin.Metadata` 를 단 Java 클래스로 그 층을 통과시켰다. `SourceFile` 은 컴파일러가 쓰고,
+     * 무엇보다 **컴파일러가 먹은 파일 목록과 대조**되므로 위조만으로는 부족하다.
      */
     private fun foreignOrigin(module: String): List<String> {
-        val roots =
-            classDirectories.files.filter { dir ->
-                dir.isDirectory && dir.walkTopDown().any { it.extension == "class" }
-            }
-        if (roots.isEmpty()) return emptyList()
-        return ClassFileImporter()
-            .importPaths(roots.map { it.toPath() })
-            .filterNot { it.isAnnotatedWith("kotlin.Metadata") }
-            .map { "'${it.name}' 에 kotlin.Metadata 가 없다 — Kotlin 이 만든 산출물이 아니다 (모듈 '$module')" }
+        val verified = verifiedSourceNames(compilerSources.files)
+        return classDirectories.files
+            .filter(File::isDirectory)
+            .flatMap { root -> root.walkTopDown().filter { it.isFile && it.extension == "class" } }
+            .mapNotNull { file -> originViolation(file, verified, module) }
             .sorted()
+    }
+
+    private fun originViolation(
+        file: File,
+        verified: Set<String>,
+        module: String,
+    ): String? {
+        val source = file.readBytes().sourceFileName()
+        if (source != null && source in verified) return null
+        val what = source?.let { "SourceFile '$it' 이 게이트를 통과한 소스가 아니다" } ?: "SourceFile 이 없다"
+        return "'${file.name}' — $what (모듈 '$module')"
     }
 
     /** class 파일의 **위치**가 패키지다 — 소스의 `package` 선언을 믿지 않는다. */

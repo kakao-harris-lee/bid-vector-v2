@@ -29,8 +29,9 @@ import java.util.jar.JarFile
  * (경로 + 내용 해시)의 부분집합이어야 한다. 게이트를 거치지 않은 바이트는 이름을 어떻게 짓든
  * 그 집합에 없다.
  *
- * 엔트리마다 **원산지도 함께 본다**(`kotlin.Metadata` 보유) — 검증 집합에 심어 포함 관계를
- * 통과시켜도 그 층이 잡는다(실측). 판정과 그 근거는 [JarContentPolicy] 가 갖는다.
+ * 엔트리마다 **원산지도 함께 본다** — class 의 `SourceFile` 이 **게이트를 통과한 소스 이름
+ * 집합**(컴파일러가 실제로 먹은 파일)에 드는가다. 검증 집합에 심어 포함 관계를 통과시켜도 그
+ * 층이 잡는다(실측). 판정과 그 근거는 [JarContentPolicy] 가 갖는다.
  *
  * 대상은 **class 엔트리뿐**이다. `.properties` 같은 resource 는 컴파일 산출물이 아니고
  * 소스·크기·경계 게이트의 대상도 아니므로 여기서 판정하지 않는다.
@@ -49,6 +50,11 @@ abstract class JarContentGateTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val classDirectories: ConfigurableFileCollection
 
+    /** 컴파일러가 실제로 먹은 소스. 그 **이름 집합**이 원산지 판정의 기준이다. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val compilerSources: ConfigurableFileCollection
+
     @get:Input
     abstract val moduleName: Property<String>
 
@@ -63,7 +69,8 @@ abstract class JarContentGateTask : DefaultTask() {
         val verified = verifiedClasses()
         val entries = archives.files.filter(File::isFile).flatMap(::classEntries)
 
-        val violations = JarContentPolicy(owned).violations(entries, verified)
+        val policy = JarContentPolicy(owned, verifiedSourceNames(compilerSources.files))
+        val violations = policy.violations(entries, verified)
 
         val header =
             listOf(
@@ -108,7 +115,7 @@ abstract class JarContentGateTask : DefaultTask() {
                 .filter { it.name.endsWith(".class") }
                 .map { entry ->
                     val bytes = jar.getInputStream(entry).use { stream -> stream.readBytes() }
-                    JarClassEntry(entry.name, bytes.digest(), bytes.hasKotlinMetadata())
+                    JarClassEntry(entry.name, bytes.digest(), bytes.sourceFileName())
                 }.toList()
         }
 }

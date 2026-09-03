@@ -30,6 +30,11 @@ abstract class SourceLanguageGateTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val sourceDirectories: ConfigurableFileCollection
 
+    /** 컴파일러가 실제로 먹은 파일. 디렉터리 관례 밖에서 들어온 소스도 이 판정을 받는다. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sourceFiles: ConfigurableFileCollection
+
     /** 리소스 트리는 소스가 아니다 — 여기서 빼지 않으면 `.yml`·`.properties` 가 전부 걸린다. */
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -45,13 +50,17 @@ abstract class SourceLanguageGateTask : DefaultTask() {
     fun gate() {
         val allowed = allowedExtensions.get()
         val excluded = excludedDirectories.files.map(File::getCanonicalPath)
-        val offenders =
+        val fromTrees =
             sourceDirectories.files
                 .filter(File::isDirectory)
                 .flatMap { root -> root.walkTopDown().filter { it.isFile }.map { root to it } }
-                .filterNot { (_, file) -> file.extension in allowed }
-                .filterNot { (_, file) -> excluded.any { file.canonicalPath.startsWith("$it${File.separator}") } }
-                .map { (root, file) -> file.relativeTo(root).path }
+                .map { (root, file) -> file to file.relativeTo(root).path }
+        val fromCompiler = sourceFiles.files.filter(File::isFile).map { it to it.name }
+        val offenders =
+            (fromTrees + fromCompiler)
+                .filterNot { (file, _) -> file.extension in allowed }
+                .filterNot { (file, _) -> excluded.any { file.canonicalPath.startsWith("$it${File.separator}") } }
+                .map { (_, label) -> label }
                 .distinct()
                 .sorted()
 

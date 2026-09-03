@@ -218,10 +218,40 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | --- | --- | --- | --- |
 | `E-27` | `java.srcDir("domain-java")` + `.java` | 1 | **Codex 시나리오는 현행 head 에서도 이미 잡혔다** — KGP 2.4.10 이 `java.srcDir` 를 kotlin srcDirs 에 넣기 때문(실측). 그 우연에 기대지 않으려 `allSource` 로 옮겼다 |
 | `E-28` | `sourceSets.create("extra")` | 1 | `예상 밖 source set 'extra'` |
-| `E-29` | 수제 `JavaCompile` → `classes/kotlin/main` | 1 | `kotlin.Metadata 가 없다` |
+| `E-29` | 수제 `JavaCompile` → `classes/kotlin/main` | 1 | 지금은 **`SourceFile` 대조**로 잡힌다 — 심은 것이 metadata 없는 Java 라 앞선 앵커로도 걸렸을 뿐이고, 앵커가 바뀐 뒤의 사유는 `E-53` 이 든다 |
 | `E-30` | `jar { from("prebuilt") }` 로 `evil/Sneak.class` | 1 | `아카이브에 소유 밖 클래스` |
 | `E-31` | 다중 행 `@Suppress` · `@file:Suppress` · `@kotlin.Suppress` + 54줄 함수 | 1 (셋 전부) | detekt 은 exit 0 — **그 축을 더는 detekt 이 들지 않는다** |
 | `E-32` | 50줄 넘는 람다 | 1 | 함수를 쪼개도 닫힌다 |
+
+### 원산지 앵커를 `kotlin.Metadata` 에서 `SourceFile` 로 (Codex 8차)
+
+**앵커가 위조 가능했다.** `kotlin.Metadata` 는 소스에 한 줄(`@kotlin.Metadata`)로 붙으므로
+Java 클래스가 Kotlin 산출물을 참칭할 수 있었다. class 파일의 **`SourceFile` 속성**은 컴파일러가
+쓰고, 무엇보다 **컴파일러가 실제로 먹은 파일 목록**(`compileKotlin` 의 `sources`)과 대조되므로
+위조만으로는 부족하다. 두 원산지 게이트(`packageOwnershipGate`·`jarContentGate`)가 같은 판정을 쓴다.
+
+| # | 심은 것 | cmd | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| `E-53` | 수제 `JavaCompile` 로 **`@kotlin.Metadata` 를 단** Java 를 `classes/kotlin/main` 에(Codex 8차 재현) | `:settlement:packageOwnershipGate` | 1 | `SourceFile 'MetaSneak.java' 이 게이트를 통과한 소스가 아니다` — **애노테이션을 붙여도 통과하지 못한다** |
+| `E-54` | `doLast` 로 외부 컴파일 class 복사(설계 검토 U-4) | 같은 명령 | 1 | `SourceFile 'Sneak.java' …` |
+| `E-55` | **둘째 Kotlin 컴파일**로 게이트 밖 `.kt` 를 신뢰 디렉터리에(U-2) | 같은 명령 | 1 | `SourceFile 'KtSneak.kt' …` — **확장자가 `.kt` 여도 컴파일된 소스 목록에 없으면 걸린다.** 판정이 「Kotlin 이 만들었나」가 아니라 「이 게이트를 통과한 소스에서 나왔나」임을 고정한다 |
+| `E-56` | `E-54` 의 class 를 jar 까지 | `:settlement:jarContentGate` | 1 | 같은 사유 — 두 게이트가 같은 앵커를 쓴다 |
+
+### 설계 검토 3차의 실측을 wrapper 9.6.1 에서 재확인
+
+격리 프로젝트·Gradle 9.1.0 으로 잰 것을 **이 저장소·wrapper 9.6.1** 에서 다시 쟀다.
+
+| # | 물음 | 결과 |
+| --- | --- | --- |
+| `E-57` | `doLast` 복사가 CC 켠 채 남는가 | **남는다** — 1회차·2회차(CC 적중) 모두 파일 잔존. 단 `doLast` 안에서 `file(...)` 를 부르면 CC 직렬화가 깨져 실패한다(값으로 캡처하면 통과) |
+| `E-58` | `whenReady` 가 CC 적중 회차에 도는가 | **안 돈다** — 1회차만 출력. 검사를 그 콜백에 걸면 CC 적중 때 조용히 죽는다 |
+| `E-59` | `kotlinc A.kt B.java` 가 `.java` 의 class 를 내는가 | **안 낸다** — 산출은 `p/A.class` 하나. `SourceFile` 은 각각 `"A.kt"`·`"B.java"` 로 갈린다 |
+
+**규격이 하나 어긋났고 고쳐서 진행했다.** 설계 검토는 *"KGP 의 `KotlinCompile` 은 `SourceTask`"*
+라 적었으나 이 버전에서는 아니다 — `tasks.named(..., SourceTask::class.java)` 가
+`is not a subclass of the given type` 로 실패한다. 실제 좌표는
+`KotlinCompileTool.sources`(`FileCollection`)이고 **의미는 같다**(컴파일 task 가 먹는 소스).
+좌표만 바꿔 배선했다.
 
 ### 아카이브 = 게이트를 통과한 산출물 (Codex 7차)
 
@@ -241,7 +271,7 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `E-49` | `from(zipTree(...))` 로 주입 | 같은 명령 | 1 | 주입 **경로**를 열거하지 않아도 닫힌다 |
 | `E-50` | `src/main/resources` 에 `.class` 를 두어 `processResources` 로 | 같은 명령 | 1 | resource 경로도 같은 판정을 받는다 |
 | `E-51` | `src/main/resources` 에 `.properties` | 같은 명령 | **0** | **의도된 결과** — resource 는 이 판정의 대상이 아니다 |
-| `E-52` | `classes/kotlin/main` 에 심어 **포함 관계를 통과**시킴 | 같은 명령 | 1 | `kotlin.Metadata 가 없다` — **두 번째 층이 서는 자리가 이것**이다 |
+| `E-52` | `classes/kotlin/main` 에 심어 **포함 관계를 통과**시킴 | 같은 명령 | 1 | **두 번째 층이 서는 자리가 이것**이다. 사유는 앵커 교체로 `SourceFile` 대조가 됐다(`E-53`~`E-56`) — 심은 것이 metadata 없는 Java 라 옛 앵커로도 걸렸을 뿐이다 |
 
 **원산지 검사를 ArchUnit 으로 재지 않는 이유도 실측이다.** `ClassFileImporter().importJar` 은 이
 데몬 안에서 위 Java 클래스를 **조용히 건너뛰었다**(두 엔트리 중 Kotlin 것만 임포트). 같은 jar 를
