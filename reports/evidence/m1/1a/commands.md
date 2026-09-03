@@ -634,6 +634,28 @@ grep -rhoF -f <(grep -oE '「[^」]{10,}」|\*"[^"]{10,}"\*' \
 > `evidence-pack` 의 clean-tree 정의를 쓰는 레인은 **경로를 하나씩 넘기고 양성 대조를 함께
 > 돌려야 한다** — 이 slice 가 게이트마다 붙여 온 「부재는 조용하다」와 같은 부류다.
 
+## 2026-09-03 — Codex 12차 거버넌스 라운드의 acceptance 재실행 · clean-tree · 비밀값
+
+`QualityBaselineTask.kt` 를 건드리는 커밋(`7082653`)은 빌드 입력 변경이라 문서만이 아니다 —
+`acceptance_commands` 전건을 그 SHA 에서 다시 돌렸다.
+
+| # | cmd | exit |
+| --- | --- | --- |
+| `A-0` | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 |
+| `A-1` | `./gradlew --no-build-cache clean check` | 0 |
+| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 |
+| `A-3` | `./gradlew qualityBaseline` | 0 — 산출물 머리말에 `duplicate mechanical helper` 축의
+  이월 포인터(`ADR 0007` `OPEN-ADR-16`)가 실제로 찍힌다(확인) |
+| `A-4` | `./gradlew :app:compatibilitySmoke` | 0 |
+| `A-5` | `./gradlew :build-logic:test` | 0 |
+
+clean-tree(경로 개별 인자, `scope.md` `in_scope` 전건) — 출력 없음. **양성 대조**: 커밋된
+`v2-지침서.md` 를 일부러 한 줄 건드리면 잡히고 되돌리면 다시 비는 것을 같은 라운드에서 확인했다.
+
+비밀값 스캔 — `evidence-pack` SKILL 의 패턴을 `reports/evidence/m1/1a/` 와
+`git diff d01f350..HEAD` 에 각각 실행: **둘 다 매치 없음(exit 1)**. 육안 확인은 앞선 라운드와
+같다(사업자 정보·Telegram 식별자·자격증명 없음, 외부 좌표는 Maven GAV 와 공개 문서 URL 뿐).
+
 ## 2026-09-02T08:55Z — 비밀값 스캔
 
 **패턴을 여기 옮겨 적지 않고 이 절의 이름도 한국어로 쓴다.** 정본은 `evidence-pack` SKILL 의
