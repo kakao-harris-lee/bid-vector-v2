@@ -249,6 +249,35 @@ grep -rnE 'Codex|verifier|addendum|[0-9]+차 #|리뷰 [0-9]|라운드' app/src/t
 - **패턴에서 맨 `[0-9]차` 를 뺐다** — `1차 게이트`·`2차 그물` 은 이 저장소의 층 어휘라 그대로
   두어야 한다. 리뷰 귀속만 잡도록 `N차 #` 형태로 좁혔다
 
+### 소스 레이아웃 고정 (Codex 10차)
+
+**도구는 전부 source set 을 입력으로 삼는다.** 그래서 소스가 관례 자리에 있고 컴파일 대상이
+그 자리에 갇혀 있으면 도구 전부가 같은 집합을 본다 — (source set × 도구) 축이 한 단언으로 닫힌다.
+`sourceSetLayoutGate` 가 다섯을 단언한다: 관례 디렉터리(java 는 비어 있음) · resources 와
+겹치지 않음 · 컴파일 입력이 source set 파일과 양방향으로 같음 · source set 과 컴파일 task 의
+집합 · `excludes` 없음.
+
+| # | 심은 것 | exit | 사유 |
+| --- | --- | --- | --- |
+| `E-65` | `compileTestKotlin { source("outside/Bad.kt") }` | 1 | `'test' 컴파일 대상이 source set 밖에 있다` |
+| `E-66` | 같은 `generated` 를 kotlin·resources 양쪽에 등록 | 1 | `kotlin 과 resources 디렉터리가 겹친다` |
+| `E-67` | `kotlin.srcDir("outside")` | 1 | `kotlin 디렉터리가 관례와 다르다` |
+| `E-68` | `java.srcDir("outside")` | 1 | `java 디렉터리가 등록돼 있다` |
+| `E-69` | `sourceSets.create("extra")` | 1 | `Kotlin 컴파일 task 집합이 다르다` |
+| `E-70` | `compileKotlin { exclude("**/Anchor.kt") }` | 1 | `source set 파일이 컴파일에서 빠졌다` **와** `컴파일 필터가 걸려 있다` — 두 단언이 각각 잡는다 |
+
+**심볼릭 링크는 새 칸을 만들지 않는다**(`E-71`). 관례 경로 안에 저장소 밖을 가리키는 링크를 두면
+**Gradle FileTree · `File.walkTopDown()` · Kotlin 컴파일러 · ktlint 가 전부 따라간다** — 넷이 같은
+집합을 보고 컴파일러는 그 class 를 낸다. 설계 확인이 걱정한 「컴파일러는 따라가는데 도구는 안
+따라가는」 자리가 이 저장소 도구 조합에서는 **실현되지 않는다.**
+
+**두 fixture 가 처음에 통과한 원인은 배선 결함이었다**(`E-72`). 게이트 블록을 편집하다 파일
+입력 전부(`main`·`test` 의 source set/컴파일러 집합, 컴파일 task 집합, resources)가 빠진 채로
+남았고, 그래서 ∅ 대 ∅ 를 비교해 위반이 0 이었다. **집합이 다른데 통과하면 판정이 아니라 배선을
+먼저 본다** — 「부재는 조용하다」의 같은 부류다. 배선을 되살리자 둘 다 자기 사유로 실패한다.
+**`sources` 가 필터 전 집합이라 `exclude` 를 못 본다는 첫 진단은 틀렸다** — 배선 복구 후
+양방향 등식이 그것을 잡는다. 필터 단언은 독립 층으로 남긴다.
+
 ### 게이트 입력과 컴파일러 입력의 **쌍대 봉쇄** (Codex 9차)
 
 **도구마다 입력을 넓히는 방식이 구멍의 원인이었다.** 형식·크기·언어 도구는 전부 source set 을

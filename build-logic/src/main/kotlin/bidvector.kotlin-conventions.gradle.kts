@@ -1,4 +1,3 @@
-import bidvector.buildlogic.CompilerSourceContainmentGateTask
 import bidvector.buildlogic.JarContentGateTask
 import bidvector.buildlogic.ModuleBaselineSpec
 import bidvector.buildlogic.ModuleDependencyGateTask
@@ -6,7 +5,9 @@ import bidvector.buildlogic.PackageOwnershipGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.SourceLanguageGateTask
+import bidvector.buildlogic.SourceSetLayoutGateTask
 import bidvector.buildlogic.lib
+import bidvector.buildlogic.sourceSetLayoutFacts
 import bidvector.buildlogic.version
 import bidvector.buildlogic.versionCatalog
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompileTool
@@ -38,7 +39,7 @@ val compiledSourceFiles =
 // 컴파일러가 먹은 목록에서 뽑으면 거기 들어온 파일이 정의상 통과해 자기 인증이 된다.
 val sourceSetKotlinFiles =
     objects.fileCollection().from(
-        provider { sourceSets["main"].extensions.getByName<SourceDirectorySet>("kotlin") },
+        provider { sourceSets["main"].kotlin },
     )
 
 // Java 소스를 구조적으로 봉쇄한다 — 산출물이 `classes/java/main` 으로 새면 소유·크기·경계
@@ -138,16 +139,13 @@ val packageOwnershipGate =
 // 것만 보이고, 추적 여부는 KGP 의 내부 동작이라 우리가 기댈 계약이 아니다.
 // (실측: KGP 2.4.10 은 `java.srcDir` 를 kotlin srcDirs 에도 넣는다. 그래서 현행 배선도 그
 //  경로는 잡았다 — 다만 그 사실에 기대지 않는 편이 옳다.)
-val handWrittenSourceDirectories =
-    provider {
-        val resources = sourceSets.flatMap { it.resources.srcDirs }.toSet()
-        sourceSets.flatMap { it.allSource.srcDirs } - resources
-    }
+val conventionSourceDirectories =
+    provider { sourceSets.map { layout.projectDirectory.dir("src/${it.name}/kotlin").asFile } }
 
 val sourceLanguageGate =
     tasks.register<SourceLanguageGateTask>("sourceLanguageGate") {
         description = "소스 트리에 Kotlin 아닌 소스가 있으면 실패한다 — java.setSrcDirs 봉쇄의 2차 그물"
-        sourceDirectories.from(layout.projectDirectory.dir("src"), handWrittenSourceDirectories)
+        sourceDirectories.from(layout.projectDirectory.dir("src"))
         excludedDirectories.from(provider { sourceSets.flatMap { it.resources.srcDirs } })
         // `md` 는 소스가 아니라 그 트리를 설명하는 문서다 — 컴파일되지 않으므로 class output 을
         // 만들 수 없고, 이 게이트가 막으려는 것(게이트를 비껴가는 산출물)에 해당하지 않는다.
@@ -169,12 +167,51 @@ val jarContentGate =
         report = layout.buildDirectory.file("reports/jar-content-gate/entries.txt")
     }
 
-val compilerSourceContainmentGate =
-    tasks.register<CompilerSourceContainmentGateTask>("compilerSourceContainmentGate") {
-        description = "컴파일 대상이 source set 안에 갇혀 있는지 잰다 — 형식·크기 도구의 사각을 없앤다"
-        compilerSources.from(compiledSourceFiles)
-        sourceSetSources.from(sourceSetKotlinFiles)
-        report = layout.buildDirectory.file("reports/compiler-source-containment/escaped.txt")
+val sourceSetLayoutGate =
+    tasks.register<SourceSetLayoutGateTask>("sourceSetLayoutGate") {
+        description = "소스가 관례 자리에 있고 컴파일 대상이 그 자리에 갇혀 있는지 잰다"
+        sourceDirs.putAll(
+            provider {
+                val root = layout.projectDirectory.asFile
+                sourceSets.fold(emptyMap<String, String>()) { acc, set ->
+                    acc +
+                        sourceSetLayoutFacts(
+                            set.name,
+                            set.kotlin.srcDirs,
+                            set.java.srcDirs,
+                            set.resources.srcDirs,
+                            root,
+                        )
+                }
+            },
+        )
+        expectedSourceSets = setOf("main", "test")
+        actualSourceSets = provider { sourceSets.map { it.name }.toSet() }
+        expectedCompileTasks = setOf("compileKotlin", "compileTestKotlin")
+        actualCompileTasks =
+            provider {
+                tasks
+                    .withType(KotlinCompileTool::class.java)
+                    .names
+                    .toSet()
+            }
+        compileFilters.putAll(
+            provider {
+                tasks
+                    .withType(KotlinCompileTool::class.java)
+                    .associate { it.name to it.excludes.joinToString(",") }
+            },
+        )
+        mainSourceSetFiles.from(sourceSetKotlinFiles)
+        mainCompilerFiles.from(compiledSourceFiles)
+        testSourceSetFiles.from(provider { sourceSets["test"].kotlin })
+        testCompilerFiles.from(
+            tasks
+                .named("compileTestKotlin", KotlinCompileTool::class.java)
+                .map { it.sources },
+        )
+        resourceFiles.from(provider { sourceSets.map { it.resources } })
+        report = layout.buildDirectory.file("reports/source-set-layout/violations.txt")
     }
 
 val sizeGate =
@@ -183,7 +220,7 @@ val sizeGate =
         policyFile = sizePolicy
         // 모듈의 빌드 스크립트도 잰다. 어느 source set 에도 속하지 않아 `allSource` 에 보이지
         // 않지만 실제 코드이고, 빼 두면 긴 함수가 그리로 옮겨 가는 것이 우회가 된다.
-        sources.from(handWrittenSourceDirectories, layout.projectDirectory.file("build.gradle.kts"))
+        sources.from(conventionSourceDirectories, layout.projectDirectory.file("build.gradle.kts"))
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
     }
 
@@ -197,7 +234,7 @@ tasks.named("check") {
         packageOwnershipGate,
         sourceLanguageGate,
         jarContentGate,
-        compilerSourceContainmentGate,
+        sourceSetLayoutGate,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )
