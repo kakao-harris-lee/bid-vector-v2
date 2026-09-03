@@ -42,7 +42,7 @@ val sourceSetKotlinFiles =
     )
 
 // Java 소스를 구조적으로 봉쇄한다 — 산출물이 `classes/java/main` 으로 새면 소유·크기·경계
-// 게이트가 통째로 비껴간다(Codex 4차 b). 봉쇄가 1차이고 sourceLanguageGate 가 2차 그물이다.
+// 게이트가 통째로 비껴간다. 봉쇄가 1차이고 sourceLanguageGate 가 2차 그물이다.
 sourceSets.configureEach {
     java.setSrcDirs(emptyList<String>())
 }
@@ -163,7 +163,7 @@ val jarContentGate =
         archives.from(tasks.named("jar").map { (it as Jar).archiveFile })
         verifiedSources.from(sourceSetKotlinFiles)
         // 대조 대상 = 소유 게이트가 이미 본 class output. 판정이 「이름이 맞는가」가 아니라
-        // **「게이트를 거친 바이트인가」**가 되려면 이 집합이 필요하다(Codex 7차).
+        // **「게이트를 거친 바이트인가」**가 되려면 이 집합이 필요하다.
         classDirectories.from(provider { sourceSets.filter { it.name != "test" }.flatMap { it.output.classesDirs } })
         dependsOn(provider { sourceSets.filter { it.name != "test" }.map { it.classesTaskName } })
         report = layout.buildDirectory.file("reports/jar-content-gate/entries.txt")
@@ -182,7 +182,7 @@ val sizeGate =
         description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
         policyFile = sizePolicy
         // 모듈의 빌드 스크립트도 잰다. 어느 source set 에도 속하지 않아 `allSource` 에 보이지
-        // 않지만 실제 코드이고, 빼 두면 긴 함수가 그리로 옮겨 가는 것이 우회가 된다(Codex 6차).
+        // 않지만 실제 코드이고, 빼 두면 긴 함수가 그리로 옮겨 가는 것이 우회가 된다.
         sources.from(handWrittenSourceDirectories, layout.projectDirectory.file("build.gradle.kts"))
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
     }

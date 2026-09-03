@@ -79,9 +79,9 @@ abstract class PackageOwnershipGateTask : DefaultTask() {
      * **class 의 원산지 검사.** source set 을 안 거치는 경로(손으로 만든 `JavaCompile`,
      * `destinationDirectory` 리다이렉트, `doLast` 복사)는 소스 쪽 검사로 잡히지 않는다.
      *
-     * 판정은 class 의 **`SourceFile` 이 게이트를 통과한 소스 이름 집합에 드는가**다. 앞선 판은
-     * `kotlin.Metadata` 보유를 앵커로 썼는데 **소스에 한 줄로 위조된다** — Codex 8차가
-     * `@kotlin.Metadata` 를 단 Java 클래스로 그 층을 통과시켰다. `SourceFile` 은 컴파일러가 쓰고,
+     * 판정은 class 의 **`SourceFile` 이 게이트를 통과한 소스 이름 집합에 드는가**다. 애노테이션
+     * (`kotlin.Metadata`)은 앵커가 되지 못한다 — 소스에 한 줄 붙이면 Java 클래스도 갖는다.
+     * `SourceFile` 은 컴파일러가 쓰고,
      * 무엇보다 **컴파일러가 먹은 파일 목록과 대조**되므로 위조만으로는 부족하다.
      */
     private fun foreignOrigin(module: String): List<String> {

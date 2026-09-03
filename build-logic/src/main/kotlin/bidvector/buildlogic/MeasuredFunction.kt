@@ -30,13 +30,13 @@ internal class MeasuredFunction(
 /**
  * 함수 길이를 **Kotlin PSI 로 직접** 잰다.
  *
- * 앞선 판은 detekt 이 그 축의 정본이고 sizeGate 가 `@Suppress("LongMethod")` 텍스트를 막았다.
- * 그 방식은 **표기의 열거 게임**이 된다 — 다중 행 `@Suppress`(Codex 5차 b) · `@file:Suppress` ·
- * `@kotlin.Suppress` · 상수 경유. 직접 재면 **억제가 이 임계에 아무 영향이 없어진다.**
+ * 억제 표기를 텍스트로 막으려 들면 **표기의 열거 게임**이 된다 — 다중 행 `@Suppress` ·
+ * `@file:Suppress` · `@kotlin.Suppress` · 상수 경유. 직접 재면 **억제가 이 임계에 아무 영향이
+ * 없어진다.**
  *
  * 재는 대상은 **본문을 갖는 선언 전부**다(`size-policy.properties` 의 정의). 방문자 메서드를
- * 골라 구현하면 그것도 열거 게임이 되므로 — 앞선 판이 함수와 람다만 구현해 접근자·`init`·보조
- * 생성자가 임계를 지나갔다 — 노드 **타입**으로 판정한다. `KtDeclarationWithBody` 와
+ * 골라 구현하면 구현하지 않은 표기(접근자·`init`·보조 생성자)가 그대로 임계를 지나가므로
+ * 노드 **타입**으로 판정한다. `KtDeclarationWithBody` 와
  * `KtAnonymousInitializer` 는 PSI 가 「본문을 갖는다」를 표현하는 자리이므로, 새 표기가
  * 생기더라도 그 둘 아래로 들어오는 한 자동으로 재진다.
  *
@@ -44,12 +44,12 @@ internal class MeasuredFunction(
  * 길어지지 않는다. **람다도 함께 잰다**: 재지 않으면 「45줄 함수 + 20줄 람다」가 한 줄짜리
  * 우회가 된다.
  *
- * lexer 로도 잴 수 있으나 상태 기계를 손으로 써야 하고, 설계 검토가 그 20줄짜리가 **식 본문
- * 함수에서 곧바로 틀리는 것**을 실측했다. PSI 는 문자열·주석·`"""`·식 본문을 이미 갈라 준다.
+ * lexer 로도 잴 수 있으나 상태 기계를 손으로 써야 하고 **식 본문 함수에서 곧바로 틀린다**(실측).
+ * PSI 는 문자열·주석·`"""`·식 본문을 이미 갈라 준다.
  */
 internal fun measureFunctions(files: List<File>): List<MeasuredFunction> {
     // `.kts` 도 잰다 — 빌드 로직은 이 저장소에서 실제 코드이고, 빼 두면 긴 함수가 스크립트로
-    // 옮겨 가는 것이 우회가 된다(Codex 6차). `KtPsiFactory.createFile` 이 확장자로 스크립트를
+    // 옮겨 가는 것이 우회가 된다. `KtPsiFactory.createFile` 이 확장자로 스크립트를
     // 판별하므로 파서를 따로 두지 않는다.
     val kotlinFiles = files.filter { it.extension in KOTLIN_EXTENSIONS }
     if (kotlinFiles.isEmpty()) return emptyList()

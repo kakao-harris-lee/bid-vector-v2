@@ -223,6 +223,20 @@ preflight 정본은 심판 레인이 쓰는 **형제 `codex-review-<UTC>.preflig
 | `E-31` | 다중 행 `@Suppress` · `@file:Suppress` · `@kotlin.Suppress` + 54줄 함수 | 1 (셋 전부) | detekt 은 exit 0 — **그 축을 더는 detekt 이 들지 않는다** |
 | `E-32` | 50줄 넘는 람다 | 1 | 함수를 쪼개도 닫힌다 |
 
+## 2026-09-03 — production 소스의 이력성 주석 제거
+
+`v2-지침서.md` §5 가 **변경 이력은 git 이 소유**한다고 적는데, build-logic 과 convention script,
+그리고 게이트 테스트의 주석이 리뷰 차수·과거 구현 교체 경위를 담고 있었다. 남기는 주석은
+「왜 이 판정인가」(현재형 근거)뿐이다.
+
+```
+grep -rnE 'Codex|verifier|addendum|앞선 판|이번 라운드|설계 검토|라운드' build-logic/src app/src/test/kotlin/bidvector/app --include='*.kt' --include='*.kts'
+```
+
+- 제거 전: 매치 있음(파일 열다섯). 제거 후: **0 건**
+- 근거 서술은 지우지 않았다 — 「애노테이션은 소스 한 줄로 위조된다」처럼 **현재형 이유**로 바꿔
+  남겼다. 사라진 것은 그 이유를 **어느 라운드가 발견했는지**뿐이고, 그것은 git 과 evidence 가 든다
+
 ### 게이트 입력과 컴파일러 입력의 **쌍대 봉쇄** (Codex 9차)
 
 **도구마다 입력을 넓히는 방식이 구멍의 원인이었다.** 형식·크기·언어 도구는 전부 source set 을

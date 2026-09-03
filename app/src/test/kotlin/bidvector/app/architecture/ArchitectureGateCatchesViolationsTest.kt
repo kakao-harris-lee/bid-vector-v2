@@ -31,8 +31,8 @@ class ArchitectureGateCatchesViolationsTest {
 
     /**
      * **가족마다 하나씩 심는다.** 한 가족(Spring)만 확인하면 나머지 금지 목록이 실제로 구속하는지
-     * 알 수 없고, 목록에 좌표 하나를 빠뜨린 것도 드러나지 않는다 — Codex #3 이 지적한 형태다
-     * (`java.net.http` 만 적어 `java.net.HttpURLConnection` 이 통과했다).
+     * 알 수 없고, 목록에 좌표 하나를 빠뜨린 것도 드러나지 않는다 — `java.net.http` 만 적으면
+     * `java.net.HttpURLConnection` 이 통과하는 식이다.
      */
     @ParameterizedTest(name = "{0} ← {1}")
     @CsvSource(
@@ -80,8 +80,8 @@ class ArchitectureGateCatchesViolationsTest {
     }
 
     /**
-     * **구체 예외 타입을 거쳐도 잡힌다.** 바이트코드의 owner 가 `IllegalStateException` 이라
-     * owner 로 재던 앞선 판은 이 접근을 통과시켰다 — Codex 6차 #1 의 실물이다.
+     * **구체 예외 타입을 거쳐도 잡힌다.** 바이트코드의 owner 가 `IllegalStateException` 이므로
+     * owner 로 재면 이 접근이 통과한다 — 그래서 선언 클래스로 잰다.
      */
     @Test
     fun `상속으로 물려받은 금지 멤버도 선언 클래스로 잡는다`() {

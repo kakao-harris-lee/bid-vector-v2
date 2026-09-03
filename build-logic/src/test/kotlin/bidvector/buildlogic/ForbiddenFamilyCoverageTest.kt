@@ -159,7 +159,7 @@ class ForbiddenFamilyCoverageTest {
                     listOf("org.postgresql"),
                 ),
                 Family("I/O (JDK)", IO_RULE, listOf("java.io", "java.nio")),
-                // Codex 3차 #2 의 실물. 승인 문서는 **I/O 를 금지**하지 그 언어의 좌표를 열거하지
+                // 승인 문서는 **I/O 를 금지**하지 그 언어의 좌표를 열거하지
                 // 않는다 — 같은 문면이 Kotlin 표준 I/O 도 덮는다. deny-list 시절에는 이 줄을 쓸
                 // 근거가 없어 보였고 그래서 `readln()` 이 새어 나갔다.
                 Family("I/O (Kotlin stdlib)", IO_RULE, listOf("kotlin.io")),

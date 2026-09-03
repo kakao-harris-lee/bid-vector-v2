@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Codex 3차 #1 이 든 두 우회를 고정한다. 둘 다 **클래스가 자기 패키지를 스스로 선언한다**는
+ * 두 우회를 고정한다. 둘 다 **클래스가 자기 패키지를 스스로 선언한다**는
  * 전제를 깨는 형태이고, 기존 위반 fixture 는 전부 자기 세그먼트를 옳게 선언했으므로
  * 그 전제를 시험하지 않았다.
  */

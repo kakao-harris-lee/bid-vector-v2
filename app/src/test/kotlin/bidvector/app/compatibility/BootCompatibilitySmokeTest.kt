@@ -15,7 +15,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 /**
  * `v2-지침서.md` §5 「Kotlin」의 `OPEN-OPS-07` 항목이 1A 에 지운 실측의 **두 번째·세 번째 층**이다. `compatibilitySmoke`
  * task 가 「해석되는가」를 재고, 이 테스트가 「그 버전의 API 로 **컴파일되는가**」와 「JDK 21 에서
- * **로드·초기화되는가**」를 잰다. 해석만 재면 조사 노트의 3.x 전제가 그대로 남는다(Codex #4).
+ * **로드·초기화되는가**」를 잰다. 해석만 재면 조사 노트의 3.x 전제가 그대로 남는다.
  *
  * 각 호출은 그 라이브러리의 대표 진입점을 건드리되 **부작용이 없는 것**만 고른다 — 스케줄을
  * 돌리지 않고, migration 을 실행하지 않고, 컨테이너를 띄우지 않는다(scope.md D-7).

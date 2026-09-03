@@ -8,8 +8,8 @@ import kotlin.test.assertTrue
  * 아카이브 판정. **패키지 접두를 맞춘 침입이 통과하지 않는다**는 것이 이 판정의 요점이라,
  * 각 단언은 「이름은 맞는데 그 산출물이 아닌」 형태를 하나씩 고정한다.
  *
- * 원산지 층은 **`SourceFile` 이 게이트를 통과한 소스 이름 집합에 드는가**다 — 앞선 판의
- * `kotlin.Metadata` 는 소스에 한 줄로 위조된다(Codex 8차).
+ * 원산지 층은 **`SourceFile` 이 게이트를 통과한 소스 이름 집합에 드는가**다 — 애노테이션은
+ * 소스에 한 줄로 붙어 위조되므로 앵커가 되지 못한다.
  */
 class JarContentPolicyTest {
     private val policy = JarContentPolicy("bidvector/settlement", setOf("Anchor.kt"))

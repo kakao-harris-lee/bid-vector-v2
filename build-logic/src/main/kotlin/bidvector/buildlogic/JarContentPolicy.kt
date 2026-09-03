@@ -10,11 +10,11 @@ internal class JarClassEntry(
  * 아카이브의 class 엔트리가 **게이트를 통과한 산출물 그 바이트인지** 판정한다.
  *
  * 판정이 포함 관계인 것이 요점이다 — 패키지 접두만 보면 넣는 쪽이 이름을 맞출 수 있어
- * `bidvector/<module>/Sneak.class` 가 통과했다(Codex 7차). 경로와 내용 해시가 모두 일치해야
+ * `bidvector/<module>/Sneak.class` 로 이름만 맞추면 통과한다. 경로와 내용 해시가 모두 일치해야
  * 「그 산출물」이고, 그렇지 않으면 어떤 경로로 들어왔든 위반이다.
  *
- * **원산지 층은 `SourceFile` 이 게이트를 통과한 소스 이름 집합에 드는가로 잰다**(Codex 8차).
- * 앞선 판의 `kotlin.Metadata` 는 소스에 한 줄로 위조된다.
+ * **원산지 층은 `SourceFile` 이 게이트를 통과한 소스 이름 집합에 드는가로 잰다.** 애노테이션은
+ * 소스에 한 줄로 붙어 위조되므로 앵커가 되지 못한다.
  */
 internal class JarContentPolicy(
     private val ownedPath: String,

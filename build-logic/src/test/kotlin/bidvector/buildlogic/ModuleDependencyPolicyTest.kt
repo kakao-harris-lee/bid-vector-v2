@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 경계 판정의 **음성** 쪽. Codex #2 가 지적한 구멍이 여기 고정된다 — 참조 없이 **선언만** 된
+ * 경계 판정의 **음성** 쪽. 참조 없이 **선언만** 된
  * 업무 모듈 사이의 project 의존은 architecture test 가 볼 수 없으므로 이 판정이 유일한 그물이다.
  *
  * 실제 정책 파일을 읽는다. 규칙을 테스트 안에 다시 적으면 정책이 바뀔 때 테스트가 낡은 규칙을

@@ -61,7 +61,7 @@ class ArchitectureRules(
     /**
      * **호출 지점의 owner 가 아니라 선언 클래스로 잰다.** `IllegalStateException("x").printStackTrace()`
      * 의 owner 는 구체 예외 타입이고 그 멤버는 `java.lang.Throwable` 이 선언한다 — owner 로 재면
-     * 잡히지 않고(Codex 6차 #1), `Throwable` 을 허용 목록에서 빼도 `require`/`check`/`toInt()` 가
+     * 잡히지 않고, `Throwable` 을 허용 목록에서 빼도 `require`/`check`/`toInt()` 가
      * 컴파일러 산출로 내는 구체 예외 타입들이 같은 멤버를 상속으로 갖는다.
      *
      * 목록은 손 열거가 아니라 `memberEffectGate` 가 도출한 후보의 분류다.
