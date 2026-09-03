@@ -81,6 +81,14 @@ MockK 또는 test server/container를 쓴다.**
   *"게이트가 있다는 주장이 아니라"* 로 시작하는 문장도 **증거 기준**이지 적대자 모델이 아니다.
 - **파급**: 이 경계 밖 계열(`-x`·`enabled = false`·`build-logic` 편집)의 리뷰 finding 은 수정
   대상이 아니라 **경계 참조로 답한다.** 경계 안에서 열려 있는 것은 계속 수정 대상이다.
+- **개정 2026-09-03 — 도구 설정 파일을 경계 밖에 명시한다.** **결정자**: 운영자. **시점**:
+  2026-09-03. **근거**: `.editorconfig`·`config/quality/**`·kover 필터·convention script 의
+  배선은 게이트가 **무엇을 거르는가**를 정의한다. `[**/domain/**] ktlint = disabled` 한 줄이면
+  형식 게이트가 그 트리에서 꺼지므로 `enabled = false` 와 성질이 같고, 그 편집을 모델 안에 두면
+  「게이트가 자기 설정을 지킨다」는 요구가 되어 §1.1.2 의 강제 논증이 그대로 적용된다.
+  현행 `[**/build/generated-sources/**] ktlint = disabled` 예외도 **게이트 정의의 일부**로
+  인정한다 — 그 경로는 `build/` 아래라 소스 관례 밖이고 레이아웃 고정과 충돌하지 않는다.
+  표면 목록의 출처는 `_workspace/m1-1a/22_design-check-layout.md` §6 이다.
 
 ### 1.2 래칫만으로는 막히지 않았다는 관찰
 
