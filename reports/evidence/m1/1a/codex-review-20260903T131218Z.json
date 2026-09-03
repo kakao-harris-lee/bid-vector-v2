@@ -1,0 +1,52 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "cd76e496b8570bdcc0e09d9f52b5569f85e45c06",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts",
+      "line": 68,
+      "evidence": "승인된 위협 모델은 모듈 build script의 평범한 표준 task 설정을 방어 범위에 포함하고, M1 완료 조건은 의도적 위반 fixture가 실제로 실패할 것을 요구한다. 그러나 공통 Test 설정은 useJUnitPlatform만 적용하며 TestFilter나 Test task의 include/exclude를 검증하지 않는다. SourceSetLayoutGate 역시 KotlinCompile/source-set 필터만 검사한다. 따라서 app/build.gradle.kts에 `tasks.test { filter { excludeTestsMatching(\"*ArchitectureGateCatchesViolationsTest\") } }`를 추가하면 음성 fixture 단언 26건만 실행에서 제외되고 ArchitectureGateTest 7건은 남는다. Gradle 9.6.1의 로컬 TestFilter API가 excludeTestsMatching 및 excludePatterns를 제공함을 javap으로 확인했으며, A-2의 명령행 `--tests '*ArchitectureGate*'` 포함 패턴도 task의 제외 패턴을 무효화하지 않는다. 현재 XML은 두 클래스가 각각 26건과 7건 실행됐다는 정상 상태만 증명할 뿐 이 표준 task 설정 우회를 막지 않는다.",
+      "required_fix": "표준 `test` task의 TestFilter 및 task-level include/exclude 상태를 별도 게이트에서 검증하여 ArchitectureGateCatchesViolationsTest를 제거하는 설정을 실패시키고, 해당 제외 설정을 심은 음성 fixture가 구체적인 위반 사유로 실패하는 증거를 추가한다."
+    },
+    {
+      "severity": "medium",
+      "file": "build-logic/src/main/kotlin/bidvector/buildlogic/QualityBaselineTask.kt",
+      "line": 112,
+      "evidence": "base와 HEAD의 `v2-지침서.md` §5는 함수/복잡도, 파일, fan-in/out, public API, 순환 의존과 함께 `duplicate mechanical helper`를 측정하라고 직접 규정한다. scope.md D-6도 여섯 축을 측정한다고 주장한다. 그러나 QualityBaselineTask와 HEAD에서 생성된 `build/reports/quality-baseline/quality-baseline.md`는 이 축을 기계적 기준이 없다는 이유로 측정하지 않는다고 명시하며, 저장소 검색에서도 다른 측정 구현이나 승인된 이탈 결정이 없다.",
+      "required_fix": "duplicate mechanical helper에 대한 결정적 측정 정의와 qualityBaseline 산출을 추가하거나, 이 축의 연기·제외를 승인권자가 승인한 요구사항 개정으로 먼저 기록한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short",
+    "git rev-parse --verify 6b03c75016a1d5437ca7ff932282fc477be974e6^{commit} && git rev-parse --verify cd76e496b8570bdcc0e09d9f52b5569f85e45c06^{commit} && git rev-parse HEAD",
+    "git diff --stat 6b03c75016a1d5437ca7ff932282fc477be974e6..cd76e496b8570bdcc0e09d9f52b5569f85e45c06",
+    "git diff --name-status 6b03c75016a1d5437ca7ff932282fc477be974e6..cd76e496b8570bdcc0e09d9f52b5569f85e45c06",
+    "git log --oneline 6b03c75016a1d5437ca7ff932282fc477be974e6..cd76e496b8570bdcc0e09d9f52b5569f85e45c06",
+    "sed -n '1,260p' agent-workflow.md; sed -n '1,260p' milestone-1.md; sed -n '1,260p' docs/adr/0006-gradle-modules.md; sed -n '1,280p' docs/adr/0007-test-pyramid-and-ratchet.md",
+    "python3으로 reports/evidence/m1/1a/codex-review-*.json의 이전 verdict와 finding을 추출",
+    "nl -ba build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts; nl -ba build-logic/src/main/kotlin/bidvector/buildlogic/SourceSetLayoutGateTask.kt",
+    "nl -ba build-logic/src/main/kotlin/bidvector.quality-baseline.gradle.kts; nl -ba build-logic/src/main/kotlin/bidvector/buildlogic/QualityBaselineTask.kt",
+    "find . -path '*/build/test-results/*/*.xml' -type f -print | sort",
+    "python3으로 build/test-results XML의 tests/failures/errors/skipped와 testcase 이름을 검증",
+    "cat build/reports/quality-baseline/quality-baseline.md; cat build/reports/size-gate/build-logic.txt; cat build/reports/size-gate/build-scripts.txt; cat build/reports/convention-coverage/modules.txt",
+    "git diff --check 6b03c75016a1d5437ca7ff932282fc477be974e6..cd76e496b8570bdcc0e09d9f52b5569f85e45c06",
+    "git ls-files -o --exclude-standard | sed '/^\\.gradle-home\\//d'",
+    "git fsck --no-progress --connectivity-only",
+    "javap -classpath .gradle-home/wrapper/dists/gradle-9.6.1-bin/4ticwg1pgcbps2hj28r8so764/gradle-9.6.1/lib/plugins/gradle-testing-base-9.6.1.jar org.gradle.api.tasks.testing.TestFilter",
+    "rg -n 'excludeTestsMatching|includeTestsMatching|filter\\s*\\{' --glob '*.kts' --glob '*.kt' .",
+    "git show 6b03c75016a1d5437ca7ff932282fc477be974e6:'v2-지침서.md' | sed -n '/### 크기와 결합도/,/## 6/p'",
+    "rg -n 'duplicate mechanical helper|기계적 판정 기준' reports/evidence/m1/1a build/reports/quality-baseline/quality-baseline.md build-logic/src/main/kotlin/bidvector/buildlogic/QualityBaselineTask.kt",
+    "shasum -a 256 gradle/wrapper/gradle-wrapper.jar"
+  ],
+  "residual_risks": [
+    "지시된 sandbox 제약 때문에 Gradle과 jshell은 실행하지 않았고, HEAD에서 생성된 테스트 XML·Kover·게이트·qualityBaseline 산출물과 로컬 Gradle 9.6.1 클래스의 javap 결과로 대조했다.",
+    "GitHub Actions 워크플로 자체는 원격 러너에서 실행된 증거가 없으며, 현재 증거는 로컬 clean-check 산출물이다.",
+    "승인된 위협 모델이 제외한 build-logic·정책/도구 설정·게이트 배선 자체의 편집과 `-x`/`enabled=false` 계열은 이번 finding으로 판정하지 않았다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
