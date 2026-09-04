@@ -16,6 +16,7 @@ import java.io.File
 
 /** 타입 표면에서 만난 좌표 하나. [name] 은 별칭을 해석한 뒤(D-9), [written] 은 소스 표기 그대로. */
 internal data class ApiTypeUse(
+    val fileName: String,
     val name: String,
     val written: String,
     val declaration: String,
@@ -24,6 +25,7 @@ internal data class ApiTypeUse(
 
 /** public 선언인데 타입이 없어(추론 자리, D-7) 이 게이트가 잴 수 없는 자리. */
 internal data class UntypedDeclaration(
+    val fileName: String,
     val declaration: String,
     val line: Int,
 )
@@ -44,13 +46,16 @@ internal object PublicApiTypes {
     fun extract(
         fileName: String,
         text: String,
-    ): PublicApiSurface = withKotlinPsi { factory -> surfaceOf(factory.createFile(fileName, text)) }
+    ): PublicApiSurface = withKotlinPsi { factory -> surfaceOf(factory.createFile(fileName, text), fileName) }
 
     /** task 용 — 환경을 파일마다 만들지 않는다(`KotlinPsi.parseKotlinFiles`). */
     fun extractAll(files: List<File>): List<PublicApiSurface> =
-        parseKotlinFiles(files) { ktFile, _ -> listOf(surfaceOf(ktFile)) }
+        parseKotlinFiles(files) { ktFile, file -> listOf(surfaceOf(ktFile, file.path)) }
 
-    private fun surfaceOf(ktFile: KtFile): PublicApiSurface {
+    private fun surfaceOf(
+        ktFile: KtFile,
+        fileName: String,
+    ): PublicApiSurface {
         val text = ktFile.text
         val aliases = ktFile.importAliases()
         val declarations = ktFile.declarations.flatMap { it.inScopeDeclarations() }
@@ -59,11 +64,11 @@ internal object PublicApiTypes {
         val untyped = mutableListOf<UntypedDeclaration>()
         declarations.forEach { entry ->
             entry.surfaceReferences().forEach { (slot, ref) ->
-                uses += ref.uses(aliases, "${entry.label}$slot", text)
+                uses += ref.uses(aliases, fileName, "${entry.label}$slot", text)
             }
             entry.untypedReason()?.let { reason ->
                 val line = text.lineOf(entry.declaration.textOffset)
-                untyped += UntypedDeclaration("${entry.label} — $reason", line)
+                untyped += UntypedDeclaration(fileName, "${entry.label} — $reason", line)
             }
         }
         return PublicApiSurface(declarations.size, uses, untyped)

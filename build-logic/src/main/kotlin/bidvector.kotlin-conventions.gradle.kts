@@ -1,3 +1,4 @@
+import bidvector.buildlogic.DomainApiTypeGateTask
 import bidvector.buildlogic.DomainSourceReferenceGateTask
 import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.JarContentGateTask
@@ -244,6 +245,19 @@ val domainSourceReferenceGate =
         report = layout.buildDirectory.file("reports/domain-source-reference/references.txt")
     }
 
+// public domain API 의 타입 표면에 raw 부동소수가 없는지 잰다 — milestone-1.md 「완료 조건」의
+// 강제 장치(설계 검토 부록 「요구의 귀속」 — 내용은 1B, 장치는 1A). 소스 참조 게이트와 축이
+// 달라(이름 참조 대 타입 표면) 별도 task 로 둔다.
+val domainApiTypeGate =
+    tasks.register<DomainApiTypeGateTask>("domainApiTypeGate") {
+        description = "domain main 의 public(+protected) API 타입 표면에 raw 부동소수가 없는지 잰다"
+        policyFile = configDir.file("quality/architecture-policy.properties")
+        apiPolicyFile = configDir.file("quality/api-type-policy.properties")
+        moduleName = project.name
+        sourceRoot.from(layout.projectDirectory.dir("src/main/kotlin"))
+        report = layout.buildDirectory.file("reports/domain-api-type/violations.txt")
+    }
+
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
@@ -267,6 +281,7 @@ tasks.named("check") {
         sourceSetLayoutGate,
         gateExecutionGate,
         domainSourceReferenceGate,
+        domainApiTypeGate,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )

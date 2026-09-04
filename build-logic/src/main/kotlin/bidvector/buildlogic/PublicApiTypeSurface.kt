@@ -85,9 +85,10 @@ internal fun KtFile.importAliases(): Map<String, String> =
 /** [KtTypeReference] 를 끝까지 재귀해 만난 [KtUserType] 마다 하나씩 [ApiTypeUse] 후보를 낸다. */
 internal fun KtTypeReference?.uses(
     aliases: Map<String, String>,
+    fileName: String,
     declaration: String,
     text: String,
-): List<ApiTypeUse> = this?.typeElement.userTypes().map { it.toUse(aliases, declaration, text) }
+): List<ApiTypeUse> = this?.typeElement.userTypes().map { it.toUse(aliases, fileName, declaration, text) }
 
 private fun KtTypeElement?.userTypes(): List<KtUserType> =
     when (val element = this) {
@@ -120,12 +121,13 @@ private fun KtTypeElement?.userTypes(): List<KtUserType> =
 
 private fun KtUserType.toUse(
     aliases: Map<String, String>,
+    fileName: String,
     declaration: String,
     text: String,
 ): ApiTypeUse {
     val written = qualifiedName()
     val resolved = if ('.' !in written) aliases[written] ?: written else written
-    return ApiTypeUse(resolved, written, declaration, text.lineOf(textRange.startOffset))
+    return ApiTypeUse(fileName, resolved, written, declaration, text.lineOf(textRange.startOffset))
 }
 
 private fun KtUserType.qualifiedName(): String =

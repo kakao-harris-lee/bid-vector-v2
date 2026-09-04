@@ -140,6 +140,29 @@ class ArchitectureGateCatchesViolationsTest {
         }
     }
 
+    /**
+     * **사각의 양성 고정 — raw `Double` public API.** `Double` 파라미터·반환은 JVM 에서
+     * primitive `D` 라 클래스 참조가 남지 않아 이 규칙(바이트코드 층)이 못 본다(설계 검토 부록
+     * §0). 그 주장을 evidence 산문이 아니라 이 단언이 고정한다 — 이 사각을 덮는 것은
+     * `domainApiTypeGate`(타입 표면 층)다. 소스 참조 층(13차)이 같은 fixture 를 못 보는 것은
+     * `build-logic` 자신의 테스트가 든다(app 에서 그 내부 API 를 부를 수 없다).
+     */
+    @Test
+    fun `raw Double public API 는 바이트코드 층이 보고하지 않는다`() {
+        val details =
+            rules
+                .domainMayOnlyDependOnAllowedPackages(fixtureRoot)
+                .flatMap { rule ->
+                    rule
+                        .allowEmptyShould(true)
+                        .evaluate(violating)
+                        .failureReport.details
+                }
+        listOf("RawDoubleApi", "AliasedDoubleApi", "TypeAliasDoubleApi").forEach { fixture ->
+            details.filter { it.contains(fixture) }.shouldBeEmpty()
+        }
+    }
+
     @Test
     fun `업무 모듈 사이의 직접 참조를 잡는다`() {
         rules.businessDomainModulesMustNotReferenceEachOther(fixtureRoot) mustReport "CycleLeft"

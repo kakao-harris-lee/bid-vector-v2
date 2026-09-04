@@ -67,7 +67,13 @@ data class Row(
 class DomainShapes {
     private val cache: Map<Kind, Long> by lazy { Kind.entries.associateWith { it.ordinal.toLong() } }
 
-    fun rounded(value: Double): Long = value.roundToLong()
+    /** private 표면의 `Double` 은 통과한다 — 막는 것은 **공개 선언의 타입**이다. */
+    private fun asDouble(value: BigDecimal): Double = value.toDouble()
+
+    fun rounded(value: BigDecimal): Long = asDouble(value).roundToLong()
+
+    /** `internal` 도 통과한다 — 요구 문면이 「public」이다(설계 검토 부록 §0). */
+    internal fun scaled(value: Double): Long = value.roundToLong()
 
     fun spanDays(
         from: LocalDate,
