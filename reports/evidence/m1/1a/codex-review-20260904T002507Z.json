@@ -1,0 +1,39 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "8ad2b983160398b2990e127e0692c5731307b6ad",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "app/src/test/kotlin/bidvector/app/architecture/ArchitectureRules.kt",
+      "line": 27,
+      "evidence": "`milestone-1.md:23`과 `v2-지침서.md:128-130`은 domain의 HTTP import 금지를 요구하고, 위협 모델도 domain 소스 위반을 방어 범위로 명시한다. 그러나 현재 규칙은 ArchUnit이 바이트코드 의존으로 인식한 클래스만 검사하며, 1차 게이트도 Maven 의존 그래프만 검사한다. 커밋된 `checklist.md:93-98`도 `import java.net.HttpURLConnection; val status = HttpURLConnection.HTTP_OK`처럼 컴파일 시 인라인되는 상수는 바이트코드 타입 참조가 사라져 두 게이트 모두 놓친다고 명시한다. `checklist.md:111-114`의 금지 타입 class literal도 같은 사각이다. 현재 HTTP 음성 fixture는 메서드 시그니처에 `HttpURLConnection`을 남겨 이 사각을 시험하지 않는다. 따라서 금지 HTTP import가 있는 domain 소스가 `check`를 통과할 수 있어 1A acceptance가 충족되지 않는다.",
+      "required_fix": "domain main Kotlin 소스의 금지 import 또는 완전수식 참조를 직접 검사하는 source-level 게이트를 승인된 정책에 연결하고 `check`에 배선한다. `HttpURLConnection.HTTP_OK`만 읽는 fixture와 금지 타입 class literal fixture가 바이트코드 의존 없이도 실제 게이트를 실패시키는 회귀 증거를 추가한다."
+    }
+  ],
+  "commands_run": [
+    "git status --short --branch; git rev-parse --verify <base>^{commit}; git rev-parse --verify <head>^{commit}; git rev-parse HEAD; git merge-base <base> <head>",
+    "git diff --stat <base>...<head>; git diff --name-status <base>...<head>; git ls-files --others --exclude-standard",
+    "rg로 agent-workflow.md, v2-지침서.md, milestone-1.md, ADR 0006/0007 및 evidence의 acceptance·위협 모델·범위 문면 검색",
+    "sed/nl로 요구사항, scope.md, checklist.md, commands.md, rollback.md와 직전 verdict 전체 또는 관련 절 판독",
+    "git log --oneline <base>..<head>; git diff --stat/name-status cd76e496b8570bdcc0e09d9f52b5569f85e45c06..<head>",
+    "git diff --check <base>..<head>; git fsck --no-progress --connectivity-only",
+    "./gradlew --offline --no-build-cache --no-daemon clean check (Gradle 시동 전 sandbox DatagramSocket 제한으로 exit 1)",
+    "find/rg로 app·build-logic 테스트 XML을 열람하고 architecture 33건, build-logic 45건, compatibility 7건의 failures/errors/skipped=0 확인",
+    "9개 모듈의 Kover XML/HTML, module-dependency, source-set-layout, package-ownership, jar-content 및 gate-execution 보고서 열람",
+    "build/reports/quality-baseline/quality-baseline.md, compatibility-smoke/resolved-modules.txt, member-effects/derived.properties, convention-coverage/modules.txt 열람",
+    "nl로 convention plugin, ArchitectureRules/Test, 음성 fixture, GateExecutionGateTask, ModuleDependencyPolicy, SourceLanguageGateTask 및 관련 정책 파일 정적 판독",
+    "rg로 production/test 코드의 DB·네트워크·외부 호출 및 source-level forbidden-import 검사 구현 여부 확인",
+    "shasum -a 256 gradle/wrapper/gradle-wrapper.jar; git ls-files -s gradlew gradle/wrapper/gradle-wrapper.jar",
+    "커밋된 codex-review JSON 12개 확인; 최종 git status에서 안내된 `.gradle-home/` 외 변경 없음 확인"
+  ],
+  "residual_risks": [
+    "직접 Gradle 재실행은 요청에 명시된 sandbox 소켓 제한으로 불가능해, 리뷰 레인이 head에서 생성한 테스트·Kover·게이트·qualityBaseline 산출물과 정적 판독으로 보완했다.",
+    "GitHub Actions 워크플로가 실제 원격 러너에서 실행된 증거는 없다.",
+    "승인된 위협 모델이 제외한 build-logic·정책/도구 설정·게이트 배선 자체의 편집과 task 실행집합 축소는 finding으로 판정하지 않았다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}

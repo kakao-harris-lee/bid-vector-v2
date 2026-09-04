@@ -1,0 +1,13 @@
+{
+  "traces": 14,
+  "stage1_matches": 0,
+  "stage1_total": 783,
+  "cli_version": "0.151.0",
+  "hooks_events": 8,
+  "hooks_stdout_bytes": 0,
+  "leak_matches": 2,
+  "leak_developer_region": 0,
+  "emissions": 5,
+  "premature_approves": 4,
+  "gradle_executed": false
+}
