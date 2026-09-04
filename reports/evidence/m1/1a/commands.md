@@ -879,3 +879,37 @@ clean-tree(경로 개별 인자, 양성 대조) — 출력 없음. 비밀값 스
 | `A-5` | `./gradlew :build-logic:test` — `SourceReferencesTest` 22개(신규 5) 포함 전건 | 0 |
 
 clean-tree(경로 개별 인자)·비밀값 스캔 — 이번 라운드도 통과(패턴·절차 동일, 매치 없음).
+
+### Codex 14차 수정 — 지역 선언 판별을 조상 사슬로, where 절 bound 를 타입 표면에 (high #1·#2)
+
+리포트 `reports/evidence/m1/1a/codex-review-20260904T032314Z.json`. #1 은 verifier r19 M-2
+수정이 만든 미탐, #2 는 `where` 절 누락 — 둘 다 domain 모듈에 임시로 두고 task 수준으로
+재현·해소를 확인한 뒤 지웠다(`git status --short -- qualification/ strategy/` 로 확인).
+
+**#1 — `ShadowedRootLeak`(Codex 원 재현, 다른 함수의 `val java = 1`).**
+
+| # | 조작 | `:qualification:domainSourceReferenceGate` |
+| --- | --- | --- |
+| `E-107` | `ShadowedRootLeak.kt` 를 둔다 | 1 — `ShadowedRootLeak.kt:15 java.net.HttpURLConnection — 허용 목록에 없다`(다른 함수의 동명 지역 변수가 더는 지우지 못한다) |
+| `E-108` | 지운다 | 0(양성 대조) |
+
+**#2 — `NumericBoxWithWhere`(class `where T : Number`) + `compareToLimit`(함수
+`where T : Comparable<Double>`, 중첩 타입 인자).**
+
+| # | 조작 | `:strategy:domainApiTypeGate` |
+| --- | --- | --- |
+| `E-109` | `NumericBoxWithWhere.kt` 를 둔다 | 1 — 두 줄 모두 잡힌다: `NumericBoxWithWhere 의 where 절 'T' bound — 'Number'` · `compareToLimit 의 where 절 'T' bound — 'Double'`(중첩 타입 인자까지 재귀로 잡힌다) |
+| `E-110` | 지운다 | 0(양성 대조) |
+
+**acceptance 전건 재실행(술어 변경 + fixture 추가라 `A-0` 격리 worktree 포함).**
+
+| # | cmd | exit |
+| --- | --- | --- |
+| `A-0` | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 |
+| `A-1` | `./gradlew --no-build-cache --no-daemon clean check` | 0 |
+| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 |
+| `A-3`·`A-4` | `qualityBaseline`·`:app:compatibilitySmoke` | 0(`check` 에 포함) |
+| `A-5` | `./gradlew :build-logic:test` — `SourceReferencesTest` 26개(신규 4)·`PublicApiTypesTest` 27개(신규 3)·`DomainSourceReferenceFixtureTest` 5개(신규 1)·`DomainApiTypeFixtureTest` 7개(신규 1) 포함 전건 | 0 |
+
+clean-tree(경로 개별 인자, 실제 변경분과 일치)·비밀값 스캔(`reports/evidence/m1/1a/` +
+`git diff e7ae8fd..HEAD`) — 매치 없음. 승인 문서 무변경.
