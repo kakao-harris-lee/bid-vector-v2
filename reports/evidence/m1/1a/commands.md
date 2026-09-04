@@ -1001,3 +1001,23 @@ Codex 14차 #1 이 값 체인으로 잡지만 `it` 는 PSI 에 파라미터 노�
 있다)이라 게이트 술어의 원칙(오탐이 미탐보다 낫다)에 어긋나지 않는다 — 미탐이 아니므로 이번
 라운드의 수정 대상이 아니다. 실제 도메인 코드에 등장하면 회피책은 제한 34①과 같다(이름 있는
 파라미터로 바꾼다).
+
+### Codex 15차 — slice 산출물을 in_scope 경로로 정의하고 하네스 레인 변경을 선언한다 (계약·rollback 정정, 코드 변경 없음)
+
+리포트 `reports/evidence/m1/1a/codex-review-20260904T052119Z.json`. high(계약·장부층) — 선언된
+slice 범위(`in_scope` 경로)와 고정된 리뷰 range(`6b03c75..HEAD`)가 어긋난다: range 에는
+계약에 없는 하네스 레인 커밋 13개가 섞여 있다. 운영자 결정 2026-09-04 — 격리 range 재요청
+대신, harness 경로를 `scope.md`「하네스 레인 변경」 상시 절로 명시하고 `rollback.md` 를
+in_scope 경로 한정으로 바꾼다(코드·정책·빌드 입력은 무변경).
+
+`E-115` — 되돌리는 절차(`rollback.md` 「되돌리는 절차」)의 성립을 **dry-run 으로만** 확인하고
+실제로 되돌리지 않는다. `git diff --name-status 6b03c75..HEAD -- <in_scope 경로 개별
+인자>`(26 경로)가 in_scope 변경만 내고(`A` 129 · `M` 6, 합 135 — 아홉 모듈 `build.gradle.kts`
+·`ModuleBoundaryAnchor.kt`·`build-logic` 전체·`config/quality/*.properties`·`app` 의
+architecture test·fixture 등) `CLAUDE.md`·`.claude/` 는 **0건**임을 확인했다 —
+전체 range 의 하네스 커밋 13개(scope.md 「하네스 레인 변경」 절)가 이 목록에 전혀 섞이지
+않는다.
+
+acceptance 재실행 불필요 — 이번 커밋은 `scope.md`·`rollback.md`·`checklist.md` 산문만
+고치고 코드·정책·fixture·빌드 입력을 하나도 건드리지 않는다(`git diff --stat` 이 evidence
+세 파일만 낸다). clean-tree(경로 개별 인자)·비밀값 스캔 — evidence 세 파일 diff 매치 없음.

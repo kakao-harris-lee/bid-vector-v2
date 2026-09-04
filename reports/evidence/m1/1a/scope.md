@@ -5,7 +5,9 @@ milestone: m1
 slice: 1a-project-ci-skeleton
 base_sha: 6b03c75016a1d5437ca7ff932282fc477be974e6
 head_sha: 리뷰 시점의 HEAD
-  # 1A 의 커밋 집합은 `git log --oneline 6b03c75..HEAD` 가 낸다(commands.md C-0).
+  # ~~1A 의 커밋 집합은 `git log --oneline 6b03c75..HEAD` 가 낸다(commands.md C-0).~~
+  # 1A 의 산출물은 in_scope 경로의 변경이다. range 에는 하네스 레인 커밋이 섞이며 아래
+  # 「하네스 레인 변경」 절이 가른다(evidence-pack SKILL.md 2026-09-04, Codex 1A 15차 high).
   # SHA 를 여기 박으면 커밋이 늘 때마다 낡으므로 range 로 적는다 — 선언 SHA 래칫을 두지 않는다.
 in_scope:
   - settings.gradle.kts · build.gradle.kts · gradle.properties
@@ -50,6 +52,31 @@ rollback: |
 작성: 2026-09-02, kotlin-implementer (v2-slice-pipeline).
 
 ---
+
+## 하네스 레인 변경 (상시 절, 2026-09-04)
+
+`git log --oneline 6b03c75..HEAD -- CLAUDE.md .claude/` 전건. 이 커밋들은 **slice 산출물이
+아니며 in_scope 밖**이고, 운영자 승인(2026-09-04) 하에 같은 range 에 있다 — 리뷰 range 는
+`6b03c75..HEAD` 그대로이고 Codex 는 이 절로 하네스 경로를 slice finding 에서 가른다.
+
+| SHA | 경로 | 목적 |
+| --- | --- | --- |
+| `089d8d3` | `.claude/skills/evidence-pack/SKILL.md` · `.claude/skills/v2-slice-pipeline/SKILL.md` · `CLAUDE.md` | slice 커밋 집합을 range 가 아니라 in_scope 경로의 변경으로 — 하네스 레인 절 상시화, rollback 은 경로 한정 (Codex 1A 15차 high) |
+| `82e50fe` | `.claude/skills/v2-slice-pipeline/SKILL.md` · `CLAUDE.md` | Phase 2.5 에 위협 모델 경계 문장을 우회 열거보다 앞에 — 경계 없는 우회 집합은 무한 (1A 설계 검토 3차) |
+| `00818c6` | `.claude/skills/evidence-pack/SKILL.md` · `CLAUDE.md` | 역방향 파급 grep 은 축약형까지 stem 기준으로 — 전체 파일명 0건 뒤에 숨은 ADR 번호 인용 (1A r12 L-1) |
+| `444d01e` | `.claude/skills/evidence-pack/SKILL.md` · `CLAUDE.md` | clean-tree 판정은 경로 개별 인자 + 양성 대조 — 변수 하나로 넘긴 pathspec 의 거짓 통과 (1A 실측) |
+| `a51a97c` | `.claude/skills/codex-review-gate/SKILL.md` · `CLAUDE.md` | §4b — `.gradle-home` 비대상 프롬프트 명시, 스모크 명령 변수 확장 금지 (1A 4차 실측) |
+| `fadf729` | `CLAUDE.md` | C 행 정정 — preflight 정본은 형제 preflight.json (`residual_risks` 는 Codex 소유) |
+| `604f587` | `.claude/skills/codex-review-gate/SKILL.md` · `.claude/skills/evidence-pack/SKILL.md` · `.claude/skills/v2-slice-pipeline/SKILL.md` · `CLAUDE.md` | 효율 개정 A~E — Phase 2.5 설계 검토(필수), verifier 차단 문턱, preflight 정본 이전, 구현 레인 sonnet, Codex 순서 (운영자 지시 2026-09-02) |
+| `7a3e05e` | `.claude/skills/codex-review-gate/SKILL.md` · `CLAUDE.md` | §4b 사전 스모크를 acceptance 전건·`--no-daemon` 으로 (M1/1A 3차 실측) |
+| `3eb3756` | `.claude/skills/evidence-pack/SKILL.md` · `CLAUDE.md` | 낡는 좌표 규격에 역방향 파급 검사 — 편집한 파일을 가리키는 타 문서 `file:line` 을 grep (M1/1A r6) |
+| `bde2364` | `.claude/skills/evidence-pack/SKILL.md` · `CLAUDE.md` | evidence-pack 에 낡는 좌표 금지 — 편집 대상 파일에 `file:line` 대신 인용문·절 제목·결정 ID (M1/1A r5) |
+| `fb55bec` | `.claude/skills/codex-review-gate/SKILL.md` · `CLAUDE.md` | §4b 한계 명기 — sandbox 소켓 금지로 gradle 시동 불가, 정적 리뷰 유지(운영자 결정), 레인 산출물 열람으로 보완 |
+| `79a0be4` | `.claude/skills/v2-slice-pipeline/SKILL.md` · `CLAUDE.md` | Phase 3 스테이징 규율 — in_scope 경로만 add, 하네스 편집 즉시 커밋(`e733cfa` 혼입 재발 방지) |
+| `cb90507` | `CLAUDE.md` | 코드 slice 리뷰에 오프라인 Gradle 실행 능력 — RO 캐시 사본 + worktree `GRADLE_USER_HOME` (운영자 채택 2026-09-02) |
+| `e733cfa` | `.claude/skills/codex-review-gate/SKILL.md`(혼입) | 주 산출물은 in_scope 편집(`docs/adr/0006-gradle-modules.md`·`milestone-1.md`·`reports/evidence/m1/1a/scope.md`) — 하네스 레인의 미커밋 SKILL.md 편집이 같은 커밋에 섞였다(2026-09-02 Phase 3 스테이징 규율 신설의 계기, 위 `79a0be4`) |
+
+목록이 비면 「없음」으로 적는다.
 
 ## 이 slice 가 하는 일
 
@@ -229,6 +256,31 @@ task 를 쓸 수 없기 때문이다. 그 task 클래스가 바로 그 빌드의
 ---
 
 ## 계약 갱신
+
+### 2026-09-04 — slice 산출물의 정의를 range 에서 in_scope 경로의 변경으로 바꾼다 (Codex 15차 high · 운영자 결정)
+
+**넓힌 범위 없음** — 이 갱신은 `in_scope`/`out_of_scope` 목록을 늘리지 않는다. 「slice 의
+커밋 집합」을 정의하는 방식 자체를 바꾼다. 편집 자리는 `head_sha` 아래 주석(위)과 신설
+「하네스 레인 변경」 절(위), `rollback.md`.
+
+**사유**: Codex 15차 high 인용 — *"slice 계약은 in_scope 경로를 열거하고 8행에서
+`6b03c75..HEAD` 전체를 1A 커밋 집합으로 정의하지만, 실제 base..head에는 계약에 없는
+`CLAUDE.md`와 `.claude/agents/**`, `.claude/skills/**` 7개 경로의 변경이 13개 커밋으로
+포함돼 있다. 이는 agent-workflow.md §2의 scope 확장 시 계약 갱신 요구와 충돌하며,
+rollback.md의 전체 range revert도 이 미선언 harness 변경을 함께 되돌린다. 따라서 선언된
+slice 범위와 고정된 리뷰 range가 일치하지 않는다."* — `required_fix`: *"해당 harness
+경로와 변경 목적을 운영자 승인 하에 slice 계약의 in_scope 및 rollback 영향에 명시하고
+함께 검증하거나, 선언된 1A 변경만 포함하는 격리된 base/head range로 리뷰를 다시
+요청한다."*
+
+**운영자 결정 2026-09-04**: 격리된 range 재요청(옵션 B) 대신, harness 경로를 계약에
+명시하고 함께 검증하는 쪽(옵션 A)을 택한다 — 하네스 레인이 오케스트레이터 세션에서 같은
+브랜치에 **즉시 커밋**하는 것이 2026-09-02 Phase 3 스테이징 규율(위 하네스 레인 변경 표의
+`79a0be4`)의 의도된 결과이기 때문이다. 격리된 range 는 그 규율과 충돌한다. 대신
+`evidence-pack` SKILL.md 에 「slice 의 커밋 집합은 range 가 아니라 in_scope 경로의
+변경」 규격을 신설해(하네스 커밋 `089d8d3`) 모든 slice 에 상시 적용하고, `scope.md` 는
+head_sha 주석 정정 + 「하네스 레인 변경」 상시 절, `rollback.md` 는 range revert 를
+in_scope 경로 한정으로 바꾼다.
 
 ### 2026-09-03 — 게이트 실행 집합을 줄이는 설정도 위협 모델 경계 밖이다 (Codex 12차 high · 운영자 결정)
 

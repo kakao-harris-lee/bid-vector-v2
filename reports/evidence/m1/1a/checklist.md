@@ -14,7 +14,7 @@
 | 금지 import와 순환 의존을 일부러 넣은 test fixture가 실제로 실패 | **충족** | `commands.md` RED → GREEN. 위반 다섯 형태(금지 import · 역방향 의존 · 업무 모듈 직접 참조 · 패키지 순환 · 기술 계층 패키지명)에 **금지 가족 일곱**(Spring·JPA·JSON·HTTP·broker·SQL·I/O)을 더해 심었고, fixture 가 없던 시점에 같은 단언이 **전부 실패**했다 |
 | 승인된 authoritative corpus 전체 통과 | **pending — 1B~1E** | 1A 는 corpus 를 소비하지 않는다. `golden-manifest.json` 이 없는 이유이기도 하다 |
 | 중요 rule mutation이 생존하지 않음 | **pending — 1B~1E** | 도구가 `OPEN-ADR-07` 로 미결. 카탈로그에 pitest 좌표만 등재하고 적용하지 않았다 |
-| raw `Double` 금액/rate가 public domain API에 없음 | **pending — 1B**. 1A 는 **게이트가 표현 가능한지**까지 | ArchUnit 이 시그니처 타입을 볼 수 있으므로 1B 가 값 타입을 넣는 시점에 규칙으로 표현 가능하다. **1A 는 그 규칙을 쓰지 않았다** — 지킬 대상이 없는 규칙은 빈 집합 위에서 통과하고, 그것이 이 slice 가 피한 형태다 |
+| raw `Double` 금액/rate가 public domain API에 없음 | **충족(게이트) · pending — 1B(값 타입)** | ~~1A 는 **게이트가 표현 가능한지**까지. ArchUnit 이 시그니처 타입을 볼 수 있으므로 1B 가 값 타입을 넣는 시점에 규칙으로 표현 가능하다. **1A 는 그 규칙을 쓰지 않았다** — 지킬 대상이 없는 규칙은 빈 집합 위에서 통과하고, 그것이 이 slice 가 피한 형태다.~~ **(정정, Codex 15차 low, 2026-09-04)** `domainApiTypeGate`(정책·fixture·테스트 포함)는 2026-09-04 계약 갱신(scope.md 「public domain API 의 raw `Double` 게이트를 1A 에서 세운다」)으로 **1A 가 구현·검증했다** — 위반 fixture 로 잡힘/양성 corpus 로 안 잡힘 둘 다 확인됐다(`commands.md` 「public domain API 의 raw `Double` 게이트」 절, `E-86`~`E-91`). **도메인 값 타입(`Money`/`Rate`) 자체는 여전히 1B 소유** — 1A 는 그 타입이 생기면 걸리는 규칙만 세웠고, 오늘 domain main 에 그 타입이 없어 규칙은 빈 집합 위가 아니라 committed fixture 위에서 실측됐다(`DomainApiTypeFixtureTest`) |
 | `Uncertain`/`Unmeasurable`가 성공 또는 0으로 합쳐지지 않음 | **pending — 1C·1D** | 도메인 타입이 없다 |
 | 신규 파일/함수 예산 위반 없음 | **부분 — 정의가 부재하다** | 아래 「예산」 |
 
@@ -220,6 +220,19 @@
    문서가 아니고 v2-slice-pipeline 스킬의 소관도 아니다**(하네스 자체 수정은 별도 트랙).
    담당은 여전히 운영자 결정과 §14 registry 통합 slice — `capability-map.md` 밖 citer 는 그
    slice 가 처리 범위를 정할 때 함께 볼 항목으로 이월한다.
+
+   **Codex 15차(계약·rollback 정정) 스윕 — 영향 없음.** 이번 라운드는 `scope.md`·`rollback.md`
+   자신을 편집했다(줄이 밀렸다). stem 기준(`scope`·`rollback`) 역방향 grep 을 저장소 전체에
+   돌렸다:
+
+   ```
+   grep -rn 'scope\.md:[0-9]\|rollback\.md:[0-9]' \
+     --include='*.md' --include='*.kt' --include='*.properties' .
+   ```
+
+   결과는 전부 `m0/0a2`·`m0/0a3`·`m0/0c` 의 **자기 slice 안 인용**(각 slice 의 `scope.md` 가
+   자기 자신을 가리킨다)이고, `m1/1a` 를 가리키는 citer 는 저장소 어디에도 없다 — 이번
+   편집이 밀어낸 좌표는 없다.
 17. **비결정성(시계·난수)은 게이트 대상이 아니다 — 1B 인계.** `Instant.now()`·`Clock`·
    `UUID.randomUUID()`·`java.util.Random` 이 전부 통과한다. **승인 문면이 그것을 domain 패키지
    금지로 다루지 않기 때문**이고, 1A 가 문서에 없는 정책을 지어내지 않는다: `v2-지침서.md` §3.1 은
