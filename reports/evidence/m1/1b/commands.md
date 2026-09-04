@@ -124,3 +124,47 @@ example 로 고정돼 있다** — `ArithmeticTest`의
 - exit: 0
 - 핵심 결과: 의도적 변경 1건이 잡혔고(`M shared-kernel/.../Basis.kt`), 원복 뒤 `git status`가
   다시 비었다 — clean-tree 판정이 공허하게 통과하는 것이 아님을 확인
+
+## Phase 4 — verifier r1 수정 라운드(H-1·H-2·M-1~M-5·low 6) 뒤 acceptance 전건 재실행
+
+최종 HEAD `a9e0448`(커밋 아홉, `checklist.md` 「verifier r1 수정 라운드」 표)에서
+`scope.md` `acceptance_commands`(B-0~B-7) 전부를 다시 돌렸다.
+
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check --no-daemon)`  (B-0)
+- exit: 0 — 262 task 전건 실행(캐시 없음), 격리 worktree
+- cmd: `./gradlew --no-build-cache clean check --no-daemon`  (B-1, 작업 트리)
+- exit: 0
+- cmd: `./gradlew :app:test --tests '*ArchitectureGate*' --no-daemon --no-build-cache`  (B-2)
+- exit: 0
+- cmd: `./gradlew :build-logic:test --no-daemon --no-build-cache`  (B-3)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:test --no-daemon --no-build-cache`  (B-4)
+- exit: 0 — 클래스별·전체 test 수는 verifier r1 L-2 정정에 따라 하드코딩하지 않는다.
+  명령 포인터:
+  ```
+  grep -oh 'tests="[0-9]*"' shared-kernel/build/test-results/test/TEST-bidvector.sharedkernel.*.xml
+  ```
+- cmd: `./gradlew qualityBaseline --no-daemon --no-build-cache`  (B-5)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:domainApiTypeGate :shared-kernel:domainSourceReferenceGate --no-daemon --no-build-cache`  (B-6·B-7)
+- exit: 0
+
+**하네스 레인 변경 재확인**: `git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/`
+— 여전히 없음(`scope.md` 「하네스 레인 변경」 절 그대로 유효).
+
+**clean-tree 재확인**: `git status --short` — 빈 출력. 양성 대조는 위 절이 이미 실측했고
+이 라운드가 그 판정을 다시 무효로 만들 변경을 하지 않았다.
+
+**secret 스캔 재확인**: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1b/ shared-kernel/src/ shared-kernel/build.gradle.kts build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts config/quality/gate-tests.properties`
+— 매치는 스캔 명령 문자열을 인용한 이 문서 자신뿐, 실제 비밀값 0.
+
+**verifier r1 finding 별 재현·해소 확인**:
+- H-1: `CompileFailureHarnessTest` 의 `6 파생 Money 는 모듈 밖에서 직접 생성할 수 없고 …` test — 통과(음성 「cannot access」·양성 OK)
+- H-2: `rollback.md` 실측 절 — 임시 clone diff 0(SHA-256 대조 포함)
+- M-1: `ArithmeticTest` 의 `M-1 UNNECESSARY 모드…`·`M-1 임의 mode·scale…` — 통과
+- M-2: `CompileFailureHarnessTest` 의 `3-M2`·`5-M2` 변이 test — 통과(변이가 새 단언을 만족시키지 않음을 확인)
+- M-3: `ArithmeticTest` 의 `M-3 원소 하나뿐이면…`·`M-3 원소가 하나뿐이어도…` — 통과
+- M-4: `scope.md` `OPEN-1B-PROVENANCE-NAME` 행 등재 확인(문서 diff 그대로, 재수정 없음)
+- M-5: `scope.md` 역방향 파급 절의 새 grep 명령이 위 명령 결과(11·12)와 일치
+- low: `checklist.md` 「verifier r1 low(L-1~L-6) 처리 결과」 표 등재 확인, kotest 시드
+  픽업은 이 절 B-4 재실행이 이미 간접 확인(재현 가능한 순서로 43 test 0 실패)

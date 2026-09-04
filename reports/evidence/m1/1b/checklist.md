@@ -46,6 +46,20 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 `git stash --keep-index` 로 이후 파일을 제외한 상태에서 `:shared-kernel:check` 를 실제로
 돌려 **각 커밋이 독립적으로 통과함을 실측**했다(`commands.md`).
 
+### verifier r1 수정 라운드 — 커밋 아홉(finding 별)
+
+| 커밋 | finding |
+| --- | --- |
+| `6a2f4af` | H-1 — `BidAmount`·파생 율 셋·`DerivationRecord` 주 생성자를 `internal`+`@ConsistentCopyVisibility` 로 닫는다. 음성·양성 fixture 6 추가 |
+| `a72660a` | H-2 — `rollback.md` 경로를 `scope.md` in_scope 전건으로 재구성, 임시 clone 실측(diff 0) |
+| `637bbd9` | M-1 — `roundedWith` 의 `setScale`/`longValueExact` 실패를 `runCatching` 안으로, `ReasonCode` 둘(`ROUNDING_NOT_REPRESENTABLE`·`NEGATIVE_AMOUNT`) 신설 |
+| `5a93ce2` | M-2 — 컴파일 하네스 음성 3·5 단언을 진단 종류(「receiver type mismatch」·「cannot access」)로 좁히고, 오타 변이가 새 단언을 만족시키지 않음을 test 로 고정 |
+| `6113acb` | M-3 — `sumOfBaseAmounts` 의 vat 전건이 첫 원소 자체의 `Unknown` 을 통과시키던 결함 수정 |
+| `e3437e8` | M-4 — `Provenance`/`FactProvenance` 표기 불일치를 `scope.md` OPEN 표에 `OPEN-1B-PROVENANCE-NAME` 으로 신설 등재(문서 수정 없음, 코드 변경 없음) |
+| `a007523` | M-5 — 역방향 파급 grep 에 `*.yaml`·`*.yml` 을 더해 `fixtures/manifest.yaml` 좌표 넷을 잡고, m0 evidence 좌표 수(「일곱」→ 명령 포인터, 실측 열하나/열둘)를 정정 |
+| `b33c4b2` | low L-1~L-6 — 시드 고정·「31 test」/「한 토큰」 문면 정정·근거 등재(상세는 아래 표) |
+| `a9e0448` | scope 정정 — `b33c4b2` 가 `build-logic/**`(in_scope 밖)에 건 시드 설정을 `shared-kernel/build.gradle.kts` 로 옮긴다. 이 레인이 스스로 발견하고 고쳤다 |
+
 ## evidence 최소 목록 (`agent-workflow.md` §6)
 
 | 파일 | 상태 |
