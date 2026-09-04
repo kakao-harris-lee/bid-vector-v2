@@ -60,6 +60,10 @@
 
 ## Codex 독립 리뷰
 
+> **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
+> 기본 경로가 아니며 운영자가 명시 요청할 때만 건다. 완료 조건의 「Codex `approve`」는
+> 「verifier `ready-for-review`」로 읽는다.
+
 - 외부 DTO가 domain으로 직접 새어 들어가는지
 - provenance/precedence가 타입과 DB constraint/test에 반영됐는지
 - retry가 무제한이거나 quota burst를 만드는지

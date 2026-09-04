@@ -74,6 +74,10 @@ Spring in-process event는 로컬 관찰용으로 쓸 수 있지만, 신뢰성 �
 
 ## Codex 독립 리뷰
 
+> **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
+> 기본 경로가 아니며 운영자가 명시 요청할 때만 건다. 완료 조건의 「Codex `approve`」는
+> 「verifier `ready-for-review`」로 읽는다.
+
 - transaction/outbox 사이에 유실 창이 있는지
 - invalid state/event가 조용히 허용되는지
 - retry와 idempotency가 함께 설계됐는지

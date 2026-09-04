@@ -82,6 +82,10 @@ transport는 별도 job API 또는 broker contract 중 ADR에서 하나를 선�
 
 ## Codex 독립 리뷰
 
+> **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
+> 기본 경로가 아니며 운영자가 명시 요청할 때만 건다. 완료 조건의 「Codex `approve`」는
+> 「verifier `ready-for-review`」로 읽는다.
+
 - 계약에 업무 규칙이나 DB coupling이 새어 들어갔는지
 - unit/basis/provenance가 모든 numeric field에 명시됐는지
 - oneof/error semantics가 양쪽에서 같은지

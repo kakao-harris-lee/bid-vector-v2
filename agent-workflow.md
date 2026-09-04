@@ -31,7 +31,7 @@ Codex가 수정안을 직접 커밋하면 독립성이 깨지므로, 그 라운�
 
 ### 사용자 — 승인권자
 
-다음 행위는 테스트와 Codex 승인이 있어도 자동 승인되지 않는다.
+다음 행위는 테스트와 리뷰 승인(verifier·Codex)이 있어도 자동 승인되지 않는다.
 
 - merge/push
 - 운영 DB write, backfill, schema writer 전환
@@ -85,12 +85,13 @@ rollback: 이번 slice의 신규 V2 wiring을 비활성화하는 방법
    - 실행 명령, 종료 코드, 핵심 결과
    - golden 변경 목록과 이유
    - 알려진 제한, rollback 방법
-6. **Codex 리뷰**
+6. **Codex 리뷰 — 운영자 명시 요청 시에만 (2026-09-04 개정)**
+   - 코드 slice 의 기본 경로는 5단계 verifier 로 끝난다. Codex 는 운영자가 요청한 경우에만 건다
    - clean worktree에서 `base...HEAD` 리뷰
    - `request_changes`면 Claude가 별도 커밋으로 수정
    - 같은 범위로 재검증·재리뷰
 7. **사용자 결정**
-   - Codex `approve`와 evidence를 함께 보고
+   - verifier 판정(Codex 를 걸었으면 그 verdict 도)과 evidence를 함께 보고
    - 사용자가 merge/release 여부 결정
 
 ## 4. Codex 판정 계약

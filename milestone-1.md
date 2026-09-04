@@ -7,7 +7,7 @@ broker 없이도 핵심 판정이 실행되는 순수 도메인부터 만든다.
 
 ## 선행 조건
 
-- M0 Codex `approve`와 사용자 승인
+- M0 사용자 승인 (M0 는 Codex `approve` 도 갖춰 닫혔다 — 2026-09-04 이후 코드 slice 는 Codex 불요, `milestone-0.md` 「Codex 독립 리뷰」 개정 참조)
 - 금액/rate/basis ADR 승인
 - 검증 fixture 중 `authoritative` case 준비
 
@@ -156,13 +156,17 @@ Codex 12차 high) — `Test.filter`의 `excludeTestsMatching`·`excludePatterns`
 
 ## Codex 독립 리뷰
 
+> **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
+> 기본 경로가 아니며 운영자가 명시 요청할 때만 건다. 완료 조건의 「Codex `approve`」는
+> 「verifier `ready-for-review`」로 읽는다.
+
 - 타입이 unit/basis 혼입을 실제로 막는지
 - test가 구현을 재진술할 뿐인 tautology가 아닌지
 - first-match 순서와 경계값이 승인 명세와 일치하는지
 - 과도한 pattern/abstraction이 새 결합을 만들지 않는지
 - architecture gate를 우회할 수 없는지
 
-각 slice별 승인을 받고, 1A~1E 전체가 승인되어야 M2로 진행한다.
+각 slice 별 verifier `ready-for-review` 와 사용자 승인을 받고, 1A~1E 전체가 승인되어야 M2로 진행한다.
 
 ## 범위 밖
 

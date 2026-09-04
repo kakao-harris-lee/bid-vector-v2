@@ -8,7 +8,7 @@
 
 ## 선행 조건
 
-- M1~M5 전체 Codex 승인
+- M1~M5 전체 승인 (slice 별 verifier `ready-for-review` + 사용자 승인; Codex 는 운영자 요청 시)
 - M0 capability map의 V2 필수 범위 확정
 - 실제 외부 호출/배포 여부에 대한 사용자 승인 경계 확인
 
@@ -65,9 +65,13 @@
 - 계약/모델/policy version으로 결과 재현
 - rollback/restore rehearsal 증거 존재
 - security/secret scan 통과
-- Codex 최종 `approve`와 사용자 release 승인
+- verifier 최종 `ready-for-review` 와 사용자 release 승인 (Codex 최종 리뷰는 운영자가 요청하면 추가)
 
 ## Codex 독립 리뷰
+
+> **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
+> 기본 경로가 아니며 운영자가 명시 요청할 때만 건다. 완료 조건의 「Codex `approve`」는
+> 「verifier `ready-for-review`」로 읽는다.
 
 - E2E가 fake shortcut으로 핵심 production wiring을 우회하지 않는지
 - 기존 프로젝트에 숨은 runtime dependency가 없는지
@@ -78,7 +82,7 @@
 
 ## 완료 후 별도 승인 사항
 
-Codex 승인은 다음을 자동 허용하지 않는다.
+verifier·Codex 승인은 다음을 자동 허용하지 않는다.
 
 - 실제 KONEPS/LLM/Telegram/email 호출
 - 운영 DB 또는 credential 사용

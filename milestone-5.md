@@ -82,6 +82,10 @@ LightGBM/KDE 관련 수학과 모델 생명주기를 독립 Python package로 �
 
 ## Codex 독립 리뷰
 
+> **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
+> 기본 경로가 아니며 운영자가 명시 요청할 때만 건다. 완료 조건의 「Codex `approve`」는
+> 「verifier `ready-for-review`」로 읽는다.
+
 - 이식 과정에서 service 결합(ORM, DB session, 설정 객체, Celery task, 업무 판정)이 함께
   딸려 왔는지
 - 재활용한 코드가 경계 규칙과 래칫을 우회하는 예외로 처리됐는지
