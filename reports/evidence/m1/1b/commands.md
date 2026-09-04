@@ -64,6 +64,32 @@ git diff --stat 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD
   처음 실효시켰다 — 1A는 committed fixture 위에서만 쟀다(`reports/evidence/m1/1a/checklist.md`
   알려진 제한 43)
 
+## Phase 3 후속 — 컴파일 실패 하네스 (운영자 결정 2026-09-04, 이월 항목 둘을 여기서 닫음)
+
+### E-1 — 하네스 실행과 소요 시간
+
+- cmd: `./gradlew :shared-kernel:test --tests "*CompileFailureHarnessTest*" --no-daemon --no-build-cache`
+- exit: 0
+- 핵심 결과: 5 test(음성·양성 다섯 쌍, 컴파일 10회) 0 실패 — `TEST-*.xml` `time="3.86"`초.
+  `:shared-kernel:check` 전체에 더해진 시간은 무시할 만하다(B-1 재실행이 여전히 수 초대,
+  아래 E-3)
+
+### E-2 — `gateExecutionGate` 가 실제로 실행을 강제하는지(음성 대조)
+
+- cmd: `./gradlew :shared-kernel:test --tests "*MoneyTest*" :shared-kernel:gateExecutionGate --no-daemon --no-build-cache`
+- exit: 1
+- 핵심 결과: 하네스 test class 를 실행 집합에서 뺀 뒤 `gateExecutionGate` 단독 실행이
+  `"게이트 test class 가 실행되지 않았다 — bidvector.sharedkernel.CompileFailureHarnessTest"`
+  로 실패했다 — 등재가 공허하지 않음을 실측으로 확인(이후 전건 재실행으로 정상 상태 복구,
+  아래 E-3)
+
+### E-3 — 등재 뒤 `:shared-kernel:check` 재확인
+
+- cmd: `./gradlew :shared-kernel:check --no-daemon --no-build-cache`
+- exit: 0
+- 핵심 결과: `gate.tests.shared-kernel` 등재 뒤 전체 게이트(도메인·크기·ktlint·detekt·
+  `gateExecutionGate`·kover) 재확인 통과
+
 ### secret 스캔
 
 - cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1b/ shared-kernel/src/`

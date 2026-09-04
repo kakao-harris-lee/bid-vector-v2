@@ -8,6 +8,7 @@ git restore --source=66c1ab79af4c5a68145811a9e87008dfdb10da3c --staged --worktre
   shared-kernel \
   config/quality/architecture-policy.properties \
   config/quality/member-effects.properties \
+  config/quality/gate-tests.properties \
   reports/evidence/m1/1b
 ```
 
@@ -21,7 +22,7 @@ git restore --source=66c1ab79af4c5a68145811a9e87008dfdb10da3c --staged --worktre
 
 되돌린 뒤:
 
-1. `git diff 66c1ab79af4c5a68145811a9e87008dfdb10da3c -- shared-kernel config/quality/architecture-policy.properties config/quality/member-effects.properties reports/evidence/m1/1b` 가 비어 있다.
+1. `git diff 66c1ab79af4c5a68145811a9e87008dfdb10da3c -- shared-kernel config/quality/architecture-policy.properties config/quality/member-effects.properties config/quality/gate-tests.properties reports/evidence/m1/1b` 가 비어 있다.
 2. 하네스 경로(`CLAUDE.md`·`.claude/**`)는 HEAD 그대로다 — `git diff HEAD -- CLAUDE.md .claude/` 가 비어 있다.
 
 ## 실측 (Phase 3, 임시 clone)

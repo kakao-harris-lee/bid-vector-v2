@@ -24,6 +24,8 @@ in_scope:
   - docs/discovery/capability-map.md    # 같은 갱신 — §14.2의 해당 행(OPEN-ADR-06·OPEN-DIC-08·
                                          # 신설 OPEN-1B-CONTRACT)과 그 안의 낡은 file:line
                                          # 정정만. 다른 절은 out
+  - config/quality/gate-tests.properties   # 운영자 결정 2026-09-04로 승격(계약 갱신) —
+                                            # gate.tests.shared-kernel 키 신설에 한정. app 키는 out
   - reports/evidence/m1/1b/**
 out_of_scope:
   - procurement · qualification · strategy · decision · settlement · workflow · adapters · app  # 1C~1E, M2~
@@ -33,8 +35,6 @@ out_of_scope:
   - corpus 재추출 · fixture 신설                      # fixture-curator 소관, OPEN-1B-CONTRACT 미결
   - Python ML · 기존 Python 과의 byte-for-byte 동등성
   - mutation testing 적용                            # OPEN-ADR-07 — 카탈로그 좌표 등재만(1A 관례 승계)
-  - config/quality/gate-tests.properties 신규 등재     # 1B 가 게이트 판정 test class 를 새로 만드는
-                                                       # 경우에만 필요 — 현재는 미정(조사 B §3.2)
   - bid-vector/ symlink 아래 기존 저장소                # 읽기 전용
   - _workspace/**                                    # .gitignore 대상
   - 승인 문서 편집 일체                                 # 기본 out. 운영자 결정이 실제로 난 항목만
@@ -262,4 +262,33 @@ grep -rnoE 'docs/adr/0002-money-rate-basis\.md:[0-9]+|docs/adr/0002:[0-9]+|ADR ?
 에서 재확인했다 — 결과는 `commands.md` Phase 3 절이 갖는다. 31 test 0 실패 0 skip,
 격리 worktree `check` 통과, `domainApiTypeGate`·`domainSourceReferenceGate` 실제 도메인
 API 위에서 단독 실행 통과.
-않았다 — 확인 명령은 `checklist.md`의 「알려진 제한」이 낸다.
+
+### 2026-09-04 — 운영자 결정: 이월 셋 중 컴파일 실패 하네스는 1B 안에서 닫는다
+
+**넓힌 범위**: `config/quality/gate-tests.properties`(`gate.tests.shared-kernel` 키 신설에
+한정 — 위 in_scope 표에 반영). fixture 되돌림(C13)은 여전히 이월 — fixture-curator 레인이
+병렬로 진행 중이며 `fixtures/**`·`golden-manifest.json`은 그대로 out_of_scope다.
+
+**사유**: 컴파일 실패 하네스는 milestone-1 1B 항목의 "basis 교차 대입 … 의 실패 계약"과
+설계 검토 L-2("상호 대입이 컴파일되지 않는다"가 CI로 증명되지 않음)의 유일한 기계적 증명
+수단이라 이월 대상이 아니다(운영자 결정 2026-09-04). `CompileFailureHarnessTest`(다섯
+음성·양성 쌍)를 `kotlin-compiler-embeddable`로 구현했고, `gateExecutionGate`가 그 실행을
+단언한다 — 음성 실측: `--tests "*MoneyTest*"`로 하네스를 실행 집합에서 뺀 뒤
+`gateExecutionGate`를 단독 돌려 "게이트 test class 가 실행되지 않았다"로 실패함을 확인했다
+(공허한 통과가 아니라는 증거, `commands.md`).
+
+**L-7(크기 기반 단위 추측 분기 부재의 architecture test) 판정**: **신규 architecture test를
+세우지 않고, 기존 property test(P-3a)·example test(E-3)로 충분하다고 판정한다.**
+`Rate.ofFraction`/`ofPercent`(`Rate.kt`)는 정의 자체가 값 크기를 보는 조건문을 전혀 갖지
+않는다 — 두 함수 다 `normalized(value)` 또는 `normalized(value.divide(100))`뿐이고 `if`가
+없다. P-3a가 "단위 선언 없이 Rate가 만들어지지 않는다"(경로가 이름 있는 팩토리 둘뿐)를,
+E-3이 legacy 임계 0.5·1.5·1.500001·2.0을 통과시켜 "크기와 무관하게 변환이 이름으로만
+갈린다"를 이미 실측으로 고정한다. **다만 이것은 build-logic 확장을 통한 회귀 방지
+게이트가 아니다** — 누군가 `Rate.kt`에 매직넘버 분기를 새로 넣어도 이 판정 자체는 CI가
+자동으로 막지 못하고, P-3a·E-3의 기존 기대값과 충돌해야 잡힌다(간접 방어). 직접적인
+구조적 게이트(예: 소스에서 `Rate.kt`·`MoneyArithmetic.kt` 안의 조건부 분기를 탐지)를
+세우려면 `build-logic/**` 확장이 필요하고, 그것은 이 slice 의 in_scope 밖이며 위협 모델
+경계(`milestone-1.md` 「게이트 위협 모델」)가 `build-logic/**`을 방어 대상 밖에 둔 것과
+같은 이유로 비용 대비 편익이 낮다고 판단했다(게이트 하나 도입에 리뷰 라운드를 크게 쓴
+이력, `CLAUDE.md` 변경 이력). **이월하지 않고 여기서 닫는다** — 미달로 등재하되
+`checklist.md`에 이 판정 전문을 남긴다.

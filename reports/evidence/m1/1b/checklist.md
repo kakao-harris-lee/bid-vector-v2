@@ -35,8 +35,10 @@ SKILL).
 | `feat(m1-1b): Rate 축별 뉴타입 넷과 percent/fraction 생성 지점을 둔다` | `Rate`·축별 넷(`AssessmentRate`·`AwardRate`·`FloorRate`·`BidRate`)·`origin` sealed 둘 |
 | `feat(m1-1b): 파생 금액 산술과 부재·overflow 합산 규칙, 회귀 example을 고정한다` | `times`·division 함수 셋·`sumOfBaseAmounts`·example test 다섯(E-1~E-5) |
 | `feat(m1-1b): 파생 Money·율이 입력 fact와 계산 정책 version을 되짚게 한다 (B11)` | `DerivationRecord`·`Derived<T>`, 파생 산출 넷의 반환형을 `Measurement<Derived<T>>` 로 확장 |
+| `feat(m1-1b): kotlin-compiler-embeddable로 상호 대입 컴파일 실패를 기계로 증명한다` | `CompileFailureHarnessTest` + 음성·양성 fixture 열(다섯 쌍) |
 
-**브리프(설계 검토 §4.8)와 갈린 점**: 브리프의 커밋 여덟 개(C1~C8) 대신 넷으로 묶었다 —
+**브리프(설계 검토 §4.8)와 갈린 점**: 브리프의 커밋 여덟 개(C1~C8) 대신 다섯(타입 넷 +
+컴파일 하네스 하나)으로 묶었다 —
 Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measurement.Measured` 가
 `PolicyVersion` 을, `Policy.kt`의 `Resolution` 이 `ReasonCode` 를 서로 참조) 브리프가 그린
 경계(①어휘 ②Rate ③carrier ④정책 ⑤파생)를 그대로 커밋 경계로 쓰면 중간 커밋이 컴파일되지
@@ -60,12 +62,12 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | # | 요지 | 처리 |
 | --- | --- | --- |
 | L-1 | `Unknown` 금액 산술 차단이 타입이 아니라 런타임(`sameKnownVat`) | **등재 유지.** `data-dictionary.md` §1.2.1 문면(「타입 차단」)과의 어긋남 — 과세 처리를 타입 파라미터로 올리면 I-4(개념마다 타입 하나)와 충돌해 불채택. 런타임 실패 계약(P-3c)으로 대신한다 |
-| L-2 | 「상호 대입이 컴파일되지 않는다」가 CI로 증명되지 않음 | **미착수.** 컴파일 실패 하네스(C8)를 이번 Phase 3 에서 붙이지 않았다 — 아래 「이월 항목」 |
+| L-2 | 「상호 대입이 컴파일되지 않는다」가 CI로 증명되지 않음 | **닫혔다(운영자 결정 2026-09-04).** `CompileFailureHarnessTest`(`kotlin-compiler-embeddable`)가 다섯 음성·양성 쌍을 컴파일해 실패·성공을 단언하고 `gate-tests.properties`(`gate.tests.shared-kernel`)에 등재돼 `gateExecutionGate` 가 실행을 강제한다 |
 | L-3 | `Long` 누출을 게이트가 재지 않음 | **`internal` 가시성으로 세웠다.** `Money.amount`·각 타입의 `won` 이 전부 `internal` — `api-type-policy.properties` 는 갱신하지 않았다(그러면 `AmountRecord` 조차 못 만든다) |
 | L-4 | `basis` 가 생성자 파라미터가 아니라 파생 `val` — `data-dictionary.md` §1.1 서명과 형태 차이 | **등재 유지.** 다섯 성분은 그대로 있어 D-1 충족. `override val basis: Basis = Basis.XXX` 로 각 타입이 상수를 낸다 |
 | L-5 | `PolicyVersion(effectiveFrom: LocalDate, …)` 문면과 `Initial` variant 요구가 같은 절에서 어긋남 | **`EffectiveFrom` sealed 로 구현.** `PolicyVersion.effectiveFrom: EffectiveFrom`(`LocalDate` 아님) — 문면 정정은 별도 승인 문서 개정이 필요하므로 이 slice 가 스스로 고치지 않는다 |
 | L-6 | 「승인된 authoritative corpus 전체 통과」— 1B 축 corpus 0 건 | **N/A + 사유로 판정(공집합 통과로 계상하지 않음).** 위 완료 조건 표 참조 |
-| L-7 | 크기 기반 단위 추측 분기 부재의 architecture test 축이 1A 게이트 집합에 없음 | **미착수.** `Rate.ofFraction`/`ofPercent` 는 실제로 이름만 보고 값 크기를 보지 않지만(P-3a), 이를 강제하는 architecture test 는 세우지 않았다 — 아래 「이월 항목」 |
+| L-7 | 크기 기반 단위 추측 분기 부재의 architecture test 축이 1A 게이트 집합에 없음 | **판정(운영자 결정 2026-09-04): 신규 architecture test 를 세우지 않는다 — 기존 property test(P-3a)·example test(E-3)로 충분하다고 판정한다.** `Rate.ofFraction`/`ofPercent` 정의 자체에 값 크기를 보는 `if` 가 없다(코드 실측). **한계**: 이것은 회귀 방지 게이트가 아니다 — 누가 나중에 매직넘버 분기를 넣어도 CI 가 자동으로 막지 못하고 P-3a·E-3 의 기존 기대값과 충돌해야 간접적으로 잡힌다. 직접 게이트는 `build-logic/**` 확장이 필요해 위협 모델 경계 밖 비용을 문다 — `scope.md` 「계약 갱신」 2026-09-04 절이 판정 전문을 갖는다 |
 | L-8 | `Provenance` ↔ `FactProvenance` 이름 불일치 | **승인 명세 표기(`Provenance`)를 채택.** A1·A2 와 같은 갈래 |
 | L-9 | `a == b` 만 쓰면 `UNKNOWN`×`UNKNOWN` 이 통과 | **닫혔다.** `sameKnownVat`(`a == b && a != UNKNOWN`) 를 산술 함수 전건의 유일한 자리로 두고 property test(P-3c)로 고정했다 |
 | L-10 | 잘못된 단위 거부 — 상한 밴드를 두면 D-4 금지 경로가 됨 | **하한만 둔다.** `Rate.init` 이 `fraction.signum() >= 0` 만 요구. E-4 example test 가 「2.0 을 클램프하지 않는다」를 고정한다 |
@@ -98,11 +100,12 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 
 ## 이월 항목 (Phase 3 범위 밖으로 명시 이월)
 
+**컴파일 실패 하네스(C8)와 L-7 은 운영자 결정 2026-09-04로 이월에서 닫힘으로 옮겼다** — 위
+완료 조건 표·설계 검토 처리 결과 표 참조. 아래 하나만 남는다.
+
 | 항목 | 왜 이번에 안 했는가 | 다음 |
 | --- | --- | --- |
-| **컴파일 실패 하네스**(설계 검토 §4.9, C8) | 설계 검토 자신이 "1B 의 마지막 커밋으로 미루고 타입 설계가 착지한 뒤에 붙이는 것을 추천"했고, `gate-tests.properties` 신규 등재(운영자 결정 지점)가 따라붙는다. 이 저장소가 게이트 하나마다 리뷰 라운드를 크게 쓴 이력(`CLAUDE.md` 변경 이력)을 고려해 타입 설계가 Codex 리뷰를 먼저 통과한 뒤 별도 slice 증분으로 붙이길 권한다 | 운영자 결정 대기 — 채택 시 `scope.md` out_of_scope → in_scope 승격 필요 |
-| **크기 기반 단위 추측 분기 부재의 architecture test**(L-7, 설계 검토 §3.2 미달 판정) | 1A 게이트 집합에 이 축이 없고, 새 architecture test 자체가 `build-logic` 확장이 필요할 수 있어(위협 모델 경계 — `milestone-1.md` 「게이트 위협 모델」이 `build-logic/**` 을 방어 대상 밖으로 둔다) 범위가 이 slice 를 넘을 수 있다 | 후속 slice 또는 별도 결정 |
-| **fixture 되돌림 실행**(C13, `OPEN-1B-CONTRACT`) | 계약 술어(presence/non-null·형태 / 의미 범주 / `equals-path`) 설계는 1B 소관이나 `fixtures/manifest.yaml` 편집(분류 되돌림·SHA-256 재기록)은 **fixture-curator 소관**이다(설계 검토 §4.7 단계 3). 이 slice(kotlin-implementer)가 직접 편집하면 레인 경계를 넘는다 | fixture-curator 에게 술어 설계를 넘기는 별도 요청 필요 — 이 checklist 가 그 설계 착수점(위 완료 조건 표의 `OPEN-1B-CONTRACT`)을 든다 |
+| **fixture 되돌림 실행**(C13, `OPEN-1B-CONTRACT`) | 계약 술어(presence/non-null·형태 / 의미 범주 / `equals-path`) 설계는 1B 소관이나 `fixtures/manifest.yaml` 편집(분류 되돌림·SHA-256 재기록)은 **fixture-curator 소관**이다(설계 검토 §4.7 단계 3). 이 slice(kotlin-implementer)가 직접 편집하면 레인 경계를 넘는다 — 실제로 fixture-curator 레인이 이 slice 와 병행해 그 작업을 진행 중이다(작업 트리에서 확인, 이 slice 는 관여하지 않는다) | fixture-curator 완료를 기다린다 |
 
 ## 리뷰 요청 조건 (`evidence-pack` SKILL)
 
