@@ -85,6 +85,19 @@ class DomainApiTypeFixtureTest {
     }
 
     /**
+     * **Codex 14차 #2.** `where` 절의 타입 제약(`typeConstraints`)이 `extendsBound` 와 같은
+     * 축으로 잡혀야 한다 — `class`(`T : Number`)와 `fun`(`T : Comparable<Double>`, 중첩 타입
+     * 인자) 두 형태를 함께 심는다.
+     */
+    @Test
+    fun `NumericBoxWithWhere 는 class 와 함수의 where 절 bound 를 모두 낸다`() {
+        val violations = violationsIn(File(VIOLATING, "strategy/NumericBoxWithWhere.kt"))
+        assertEquals(2, violations.size, "$violations")
+        assertTrue(violations.any { it.name == "Number" }, "$violations")
+        assertTrue(violations.any { it.name == "Double" }, "$violations")
+    }
+
+    /**
      * **사각의 양성 고정 — 소스 참조 층(13차)도 같은 fixture 를 못 본다.** 수식 없는 `Double`
      * 은 단순 이름이라 `SourceReferences` 가 아예 수집하지 않고(S-2 단언은 소문자 접두가
      * 있어야 후보를 만든다), `AliasedDoubleApi` 의 별칭 import(`kotlin.Double as Scalar`)는

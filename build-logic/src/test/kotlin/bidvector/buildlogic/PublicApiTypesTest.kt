@@ -209,6 +209,32 @@ class PublicApiTypesTest {
         assertTrue(surface.uses.any { it.name == "Number" })
     }
 
+    /**
+     * **Codex 14차 #2.** `where` 절(`typeConstraints`)은 `extendsBound` 와 다른 PSI 자리라
+     * 놓쳤다 — `class Numeric<T> where T : Number` 가 `uses=[]` 였다.
+     */
+    @Test
+    fun `Codex-2 class 의 where 절 bound 를 잡는다`() {
+        val surface =
+            PublicApiTypes.extract("Probe.kt", "package p\n\nclass Numeric<T>(val value: T) where T : Number\n")
+        assertTrue(surface.uses.any { it.name == "Number" }, "${surface.uses}")
+    }
+
+    @Test
+    fun `Codex-2 함수의 where 절 bound 는 중첩 타입 인자도 잡는다`() {
+        val surface =
+            PublicApiTypes.extract("Probe.kt", "package p\n\nfun <T> f(x: T): T where T : Comparable<Double> = x\n")
+        assertTrue(surface.uses.any { it.name == "Double" }, "${surface.uses}")
+    }
+
+    @Test
+    fun `Codex-2 where 절 bound 가 허용 타입이면 통과한다`() {
+        val surface =
+            PublicApiTypes.extract("Probe.kt", "package p\n\nclass Box<T>(val value: T) where T : CharSequence\n")
+        assertTrue(surface.uses.none { it.name == "Number" || it.name == "Double" }, "${surface.uses}")
+        assertTrue(surface.uses.any { it.name == "CharSequence" }, "${surface.uses}")
+    }
+
     @Test
     fun `D-19 함수 본문의 지역 선언은 대상이 아니다`() {
         val surface =

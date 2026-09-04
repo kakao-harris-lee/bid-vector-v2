@@ -34,7 +34,7 @@ internal fun Target.surfaceReferences(): List<Pair<String, KtTypeReference?>> =
                 // 명시하는 자리(verifier r18 F-2) — 명시됐으면 타입 미명시가 아니라 이 축(금지
                 // 타입 단언)이 잡아야 한다.
                 " 의 접근자 반환 타입" to d.getter?.returnTypeReference,
-            )
+            ) + d.typeParameterBounds()
         }
 
         is KtSecondaryConstructor -> {
@@ -58,10 +58,20 @@ internal fun Target.surfaceReferences(): List<Pair<String, KtTypeReference?>> =
         }
     }
 
+/**
+ * **Codex 14차 #2.** `T : Number` 형태(`extendsBound`)만 보고 `where T : Number` 형태
+ * (`typeConstraints`)를 놓쳤다 — `class Numeric<T> where T : Number` 가 두 단언 모두를
+ * 지났다. class·interface·function·(확장 프로퍼티의) property 전부 이 인터페이스를 구현하므로
+ * 한 자리에서 잡는다.
+ */
 private fun KtTypeParameterListOwner.typeParameterBounds(): List<Pair<String, KtTypeReference?>> =
     typeParameters.mapNotNull { param ->
         param.extendsBound?.let { bound -> " 의 타입 파라미터 '${param.name}' bound" to bound }
-    }
+    } +
+        typeConstraints.mapNotNull { constraint ->
+            val subject = constraint.subjectTypeParameterName?.getReferencedName()
+            constraint.boundTypeReference?.let { bound -> " 의 where 절 '$subject' bound" to bound }
+        }
 
 /** D-7 — 식 본문 함수와 초기화식·위임을 가진 프로퍼티가 타입을 명시하지 않으면 잴 수 없다. */
 internal fun Target.untypedReason(): String? =
