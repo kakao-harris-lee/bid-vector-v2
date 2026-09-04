@@ -1,0 +1,45 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "cca62d77484125fd2c6600c74f53f91c2d8a32b8",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "reports/evidence/m1/1a/scope.md",
+      "line": 10,
+      "evidence": "slice 계약은 in_scope 경로를 열거하고 8행에서 `6b03c75..HEAD` 전체를 1A 커밋 집합으로 정의하지만, 실제 base..head에는 계약에 없는 `CLAUDE.md`와 `.claude/agents/**`, `.claude/skills/**` 7개 경로의 변경이 13개 커밋으로 포함돼 있다. 이는 agent-workflow.md §2의 scope 확장 시 계약 갱신 요구와 충돌하며, rollback.md의 전체 range revert도 이 미선언 harness 변경을 함께 되돌린다. 따라서 선언된 slice 범위와 고정된 리뷰 range가 일치하지 않는다.",
+      "required_fix": "해당 harness 경로와 변경 목적을 운영자 승인 하에 slice 계약의 in_scope 및 rollback 영향에 명시하고 함께 검증하거나, 선언된 1A 변경만 포함하는 격리된 base/head range로 리뷰를 다시 요청한다."
+    },
+    {
+      "severity": "low",
+      "file": "reports/evidence/m1/1a/checklist.md",
+      "line": 17,
+      "evidence": "체크리스트는 1A가 raw Double 규칙을 쓰지 않았다고 명시하지만, scope.md의 2026-09-04 계약 갱신과 실제 HEAD는 `DomainApiTypeGateTask`, 정책, 음성 fixture 및 테스트를 1A 산출물로 포함한다. 판정 코드는 동작하지만 acceptance 장부가 현재 계약과 반대 내용을 기록한다.",
+      "required_fix": "이 행을 현재 계약에 맞춰 1A가 게이트를 구현·검증했고 도메인 값 타입 자체는 1B 소유임을 반영하도록 갱신한다."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse HEAD; git cat-file -t 6b03c75016a1d5437ca7ff932282fc477be974e6; git cat-file -t cca62d77484125fd2c6600c74f53f91c2d8a32b8",
+    "git status --short --untracked-files=all 및 `.gradle-home/` 제외 대조",
+    "git log --oneline c60bbe7..cca62d77484125fd2c6600c74f53f91c2d8a32b8",
+    "git diff --stat/--name-status/--numstat 6b03c75016a1d5437ca7ff932282fc477be974e6..cca62d77484125fd2c6600c74f53f91c2d8a32b8",
+    "sed와 rg로 agent-workflow.md, v2-지침서.md, milestone-1.md, ADR 0002/0004/0006/0007, capability-map.md, scope/commands/checklist/rollback 및 14차 verdict 판독",
+    "git diff c60bbe7..cca62d77484125fd2c6600c74f53f91c2d8a32b8 -- build-logic/src/main build-logic/src/test app/src/test reports/evidence/m1/1a",
+    "build/test-results의 TEST-*.xml 합산 — tests=192, failures=0, errors=0, skipped=0",
+    "cmp -s build/reports/member-effects/derived.properties config/quality/member-effects.generated.properties — exit 0",
+    "HEAD build-logic classpath에서 reflection으로 PublicApiTypes.extract 재실행 — class/function where-bound, 중첩 Double, suspend 함수 타입 검출 확인",
+    "HEAD build-logic classpath에서 reflection으로 SourceReferences.extract 재실행 — 다른 함수·뒤쪽 선언·자기 초기화식 사례 모두 java.net.HttpURLConnection 검출 확인",
+    "kotlin -e로 class/object/top-level 자기 초기화식의 이름 해석과 컴파일 결과 확인",
+    "git diff/log 6b03c75..HEAD -- .claude CLAUDE.md 및 scope.md in_scope 대조 — 미선언 7개 경로, 관련 커밋 13개 확인",
+    "git diff --check 6b03c75016a1d5437ca7ff932282fc477be974e6..cca62d77484125fd2c6600c74f53f91c2d8a32b8"
+  ],
+  "residual_risks": [
+    "sandbox의 DatagramSocket 금지 때문에 Gradle을 직접 재실행하지 못했으며, HEAD 커밋 이후 생성된 build 산출물과 테스트 XML을 재대조했다.",
+    "scope.md가 명시한 raw API 게이트의 알려진 한계인 `Any` 경유, `@PublishedApi internal`, context 파라미터는 남아 있다.",
+    "GitHub Actions 워크플로가 실제 원격 러너에서 실행됐다는 증거는 없다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
