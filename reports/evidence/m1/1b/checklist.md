@@ -14,7 +14,7 @@ SKILL).
 | --- | --- | --- |
 | `./gradlew check` 통과 | **충족** | `commands.md` B-0(격리 worktree)·B-1(작업 트리) |
 | 금지 import와 순환 의존을 일부러 넣은 test fixture가 실제로 실패 | **충족(1A 승계 확인)** | `commands.md` B-2 — `shared-kernel` 이 Spring·JPA·JSON·HTTP 를 import 하지 않음(`ADR 0002` D-9)이 걸린다. 1B 는 새 위반 fixture 를 추가하지 않았다(1A 것을 재확인만) |
-| 승인된 authoritative corpus 전체 통과 | **미충족.** | 1B 축 authoritative case 가 0 건이고 **fixture-curator 레인이 되돌림을 실제로 시도해 0 건이 확정됐다**(`fixtures.md` §1). 되돌리지 못한 사유 다섯(BLOCK-1~5, `fixtures.md`) — 술어 어휘가 도구(`manifest_contract.py`) 쪽에서 안 풀림 · 결과 토큰이 1B 계약과 다른 이름 · money-basis 둘째 자물쇠(운영자 승인 부재) · `money-basis-001`·`004`(basis 혼합이 컴파일 차단이라 거부 객체 자체가 없음) · `money-basis-003`(검색 경로 타입 계약에 없음). `OPEN-1B-CONTRACT`·`OPEN-1B-CORPUS`(`scope.md`)가 남은 미결을 든다 |
+| 승인된 authoritative corpus 전체 통과 | **1B 종결 조건 제외, `1B-c` 소유(운영자 결정 2026-09-04 decision 15).** | 1B 축 authoritative case 가 0 건이고 **fixture-curator 레인이 되돌림을 실제로 시도해 0 건이 확정됐다**(`fixtures.md` §1). 되돌리지 못한 사유 다섯(BLOCK-1~5, `fixtures.md`) — 술어 어휘가 도구(`manifest_contract.py`) 쪽에서 안 풀림 · 결과 토큰이 1B 계약과 다른 이름 · money-basis 둘째 자물쇠(운영자 승인 부재) · `money-basis-001`·`004`(basis 혼합이 컴파일 차단이라 거부 객체 자체가 없음) · `money-basis-003`(검색 경로 타입 계약에 없음). 이 미충족이 신설 slice `1B-c`(corpus 계약 정렬, fixture-curator+spec-writer, `milestone-1.md` 신설 항목·`scope.md` decision 15)로 이관된다 — `OPEN-1B-CONTRACT`·`OPEN-1B-CORPUS`(`scope.md`)의 담당도 `1B-c` |
 | 중요 rule mutation이 생존하지 않음 | **pending** | 도구는 `OPEN-ADR-07` 로 미결(1A 관례 승계, 카탈로그 좌표만) — 1B 는 mutation 을 적용하지 않는다(out_of_scope) |
 | raw `Double` 금액/rate가 public domain API에 없음 | **충족** | `commands.md` B-6 — `domainApiTypeGate` 가 실제 도메인 API(`Money`·`Rate`·`Measurement`·`Fact` 등, `Long`/`BigDecimal` 백킹) 위에서 처음 실효했다. 위반 0 |
 | `Uncertain`/`Unmeasurable`가 성공 또는 0으로 합쳐지지 않음 | **부분 충족(1B 몫은 완료)** | `Absent(reason)`·`Unmeasurable(reason)`·`Measured<T>` carrier 를 만들고 `orElse`·`getOrDefault`·`orZero`·`getOrThrow` 를 선언하지 않아 접는 API 자체가 없다. `sumOfBaseAmounts` 의 「빈 목록 = `Absent`, `0` 은 `Known(0)`과 분리」를 property test(P-4)로 고정했다. `Uncertain` variant 자체(1C·1D 소유)는 여전히 pending |
@@ -111,6 +111,27 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
   L-9 와 같은 성질의 오류라 판단해 `sameKnownVat` 전건을 합산에도 적용했다(사유:
   `VAT_TREATMENT_MISMATCH`). 값 결정이 아니라 기존 규율(L-9)의 일관 적용이라 `OPEN` 으로
   등재하지 않는다.
+- **`capability-map.md` 의 `milestone-1.md:NN` 인용 다수가 이 라운드의 편집 이전부터
+  이미 어긋나 있었다(decision 15·16 등재 라운드, 역방향 파급 실측).** `milestone-1.md`
+  에 「Slice 1B-c」를 신설하며 stem 기준 역방향 파급 grep 을 돌린 결과, `capability-map.md`
+  §14.2 의 `OPEN-ADR-07`(`:80`)·`OPEN-DEC-07`(`:48`)·`OPEN-DIC-01`(`:42`)·`OPEN-QUAL-07`
+  (`:42`·`:79`)·`OPEN-DIC-06`(`:60`)·`OPEN-COL`(`:98`)·`OPEN-ML`(`:99`)·`OPEN-ML-03`(`:82`)·
+  `OPEN-STR`(`:54`~`:56`)·N-5(`:42`) 열 곳이 인용한 줄이 **base(`HEAD` 이전) 시점에도 이미**
+  인용문과 다른 내용을 가리켰다(실측: `git show HEAD:milestone-1.md`의 해당 줄과 인용문
+  대조 — 전부 불일치). **이 slice 의 `milestone-1.md` 편집(+26줄)이 만든 새 어긋남이
+  아니다** — 편집 전부터 있던 drift 를 이 라운드의 역방향 파급 검사가 처음 발견했다(1B
+  H-2 라운드가 `capability-map.md` 의 다른 네 좌표에서 이미 확인한 것과 같은 패턴).
+  **고치지 않는다** — `capability-map.md`·`docs/adr/0007` 자체의 `file:line` 드리프트는
+  기존 `OPEN-ADR-15`(registry 통합 slice 소관)가 이미 추적 중이다(`scope.md` 「역방향
+  파급」절). 이 slice 가 신설한 `OPEN-1B-CONTRACT` 담당 정정·`OPEN-1B-CORPUS` 신설 행
+  자체는 절 제목 포인터(`milestone-1.md` 「Slice 1B-c」)만 쓰고 새 줄 번호를 심지
+  않았다 — 같은 부류의 drift 를 새로 만들지 않았다. 재현 명령:
+  ```
+  grep -rnoE 'milestone-1\.md:[0-9]+|milestone-1:[0-9]+' \
+    --include='*.md' --include='*.kt' --include='*.kts' --include='*.properties' \
+    --include='*.yaml' --include='*.yml' . \
+    | grep -v '^\./bid-vector/' | grep -v '/build/' | grep -v '^\./milestone-1.md:'
+  ```
 
 ### verifier r1 low(L-1~L-6) 처리 결과
 

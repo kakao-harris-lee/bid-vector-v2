@@ -39,6 +39,32 @@ capability가 `capability-map.md`에 없어 바로 위 문장이 그대로 적�
 
 property test로 변환 왕복, 반올림 경계, 잘못된 단위 거부를 검증한다.
 
+### Slice 1B-c — corpus 계약 정렬
+
+**운영자 결정 2026-09-04(decision 15) 로 신설.** 1B 완료 조건의 「승인된 authoritative
+corpus 전체 통과」는 1B slice 의 종결 조건에서 제외하고, 이 slice 가 마일스톤 수준에서
+채운다 — 착수는 1B approve 뒤 별도 계약 고정. 담당 레인은 fixture-curator + spec-writer다.
+
+**근거**: 1B 는 타입·계약 형태를 완성했으나(`reports/evidence/m1/1b/checklist.md` 「M1
+완료 조건 대조」) `money-basis` 6건·`rate-unit` 5건이 술어 미비로 `insufficient-evidence`
+강등돼 authoritative case 가 0건으로 남았다(`reports/evidence/m1/1b/fixtures.md`). 이
+간극은 타입 구현이 아니라 fixture 계약 술어·재추출의 문제라 corpus 전용 slice 로 분리하는
+것이 1B 를 계속 붙드는 것보다 낫다는 것이 운영자 판단이다.
+
+**in_scope 후보 셋**(계약 확정은 이 slice 착수 시점의 별도 slice 계약이 정본):
+
+1. `fixtures/tools/manifest_contract.py` — 술어 어휘 동결 해제. `holds()`와 스윕 변이체
+   생성 규칙을 실제 1B 계약 어휘(`Fact.Known`/`Absent`·`ReasonCode`)에 맞춰 확장한다.
+2. `fixtures/manifest.yaml`·`fixtures/expected/**` — `rate-unit` 5건 재추출. 기대값
+   토큰(`Accepted`/`Rejected` 등)을 1B 계약 어휘로 정렬한다(기대값 파일이 바뀌므로
+   되돌림이 아니라 재추출이다) — case 별 운영자 승인이 필요하다.
+3. money-basis 6건 — 명시 승인 또는 폐기/재정의 판단. `money-basis-001`·`-004`는 basis
+   혼합이 컴파일 차단이라 거부 객체 자체가 없고(BLOCK-4), `money-basis-003`는 검색 경로가
+   1B 계약에 없다(BLOCK-5) — 술어가 갖춰져도 이 셋은 별도 판단이 필요하다.
+
+관련 OPEN: `OPEN-1B-CONTRACT`·`OPEN-1B-CORPUS`(`reports/evidence/m1/1b/scope.md`, 담당을
+이 slice 로 정정), `capability-map.md` §14.2.
+
 ### Slice 1C — Qualification
 
 - 단일 면허 조건

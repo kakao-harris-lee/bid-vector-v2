@@ -96,11 +96,11 @@ canonical KONEPS fact와 derived fact / ML feature와 업무 판단의 경계.
 | 자리 | 정의 |
 | --- | --- |
 | **개념** | 원화 확정 금액 하나 |
-| **타입** | `Money(amount: Long, currency: Currency, basis: ~~AmountBasis~~ Basis, vatTreatment: VatTreatment, provenance: FactProvenance)` |
+| **타입** | `Money(amount: Long, currency: Currency, basis: ~~AmountBasis~~ Basis, vatTreatment: VatTreatment, provenance: ~~FactProvenance~~ Provenance)` |
 | **단위** | **원(KRW), 정수.** 소수 자리를 만들지 않는다 |
 | **basis** | ~~`AmountBasis`~~ **`Basis`**(운영자 결정 2026-09-04, 조사 C **D-2**) — §1.2의 개념 축. 승인 명세(`v2-지침서.md` §3.1 · `milestone-1.md` 1B)의 이름으로 정정한다 — 이 문서가 쓰던 `AmountBasis`는 0C 자체 표기였다 |
 | **부재 표현** | `Known(Money)` / `Absent(reason)` sealed. **`0`은 "0원"이지 "모름"이 아니다** |
-| **provenance / 층** | `FactProvenance`(§5.1). 층은 값마다 다르다 |
+| **provenance / 층** | ~~`FactProvenance`~~ **`Provenance`**(§5.1, 운영자 결정 2026-09-04, verifier r1 **M-4**) — 층은 값마다 다르다. 승인 명세(`v2-지침서.md` §4.1 · `milestone-1.md` 1B)의 이름으로 정정한다 — 이 문서가 쓰던 `FactProvenance`는 0C 자체 표기였다(A1·A2·D-1·D-2와 같은 갈래, 세 번째 이름 불일치) |
 
 **왜 `Long` 정수인가.** legacy는 모든 금액 컬럼이 `Column(Float)`이고
 (`app/models/models.py:264-306` · `app/models/pipeline.py:147-167`) 투찰가를
@@ -1193,12 +1193,20 @@ source)`) 한 축으로 충분하다 — `corpusScope`가 나눌 모집단이 �
 
 ## 5. 축 5 — canonical KONEPS fact와 derived fact
 
-### 5.1 `FactProvenance` — 값이 어디서 왔는가
+### 5.1 ~~`FactProvenance`~~ `Provenance` — 값이 어디서 왔는가
+
+~~`FactProvenance`~~ **`Provenance`**(운영자 결정 2026-09-04, verifier r1 **M-4**) — 승인
+명세(`v2-지침서.md` §4.1 · `milestone-1.md` 1B)의 이름으로 정정한다. 이 문서가 쓰던
+`FactProvenance`는 0C 자체 표기였다 — A1(`EstimatedAmount`)·A2(`Basis`)와 같은 갈래의
+세 번째 이름 불일치이고, 코드(`shared-kernel`)는 처음부터 `Provenance`로 구현돼 있었다
+(`scope.md` `OPEN-1B-PROVENANCE-NAME` 이 해소). 이 문서 안 다른 절(§1.2·§5.2 이후·`OPEN`
+표 등)의 `FactProvenance` 산문 인용은 정정하지 않는다 — 이름 정정은 이 절의 표제·정의
+자리(아래 sealed 선언)와 §1.1 요약 표(위)에 한정한다.
 
 legacy의 가장 성숙한 장치가 이 축에 있다. `EstimatedAmountSource` 넷과 **권위 집합이
 하나뿐**임을 데이터로 선언한다(`app/core/constants.py:179-222`).
 
-> `FactProvenance = sealed { Published(noticeRevision), DerivedFromOpening,
+> `Provenance = sealed { Published(noticeRevision), DerivedFromOpening,
 > FilledFromBudgetKey(key), CopiedFromBaseAmount, OperatorDeclared, Undeclared }`
 >
 > `isAuthoritative`는 **술어가 아니라 데이터로 선언한다** — 어휘가 늘 때 "덮을 수 있는가"를
