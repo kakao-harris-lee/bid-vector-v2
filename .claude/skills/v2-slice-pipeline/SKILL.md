@@ -144,6 +144,13 @@ finding별 별도 커밋을 지시한다.
 스킬 편집이 구현 레인 커밋(`e733cfa`)에 혼입됐다(2026-09-02). 혼입이 생기면 이력을 되쓰지
 않고 evidence 의 레인 경계 검사에 사실로 선언한다.
 
+**하네스 커밋은 slice range 에 섞이되 scope.md 가 가른다 (2026-09-04).** 즉시 커밋 규율의
+귀결로 `base..HEAD` 에는 하네스 레인 커밋이 늘 섞인다. slice 의 커밋 집합은 range 가 아니라
+**in_scope 경로의 변경**이고, 하네스 커밋은 scope.md 의 상시 「하네스 레인 변경」 절에
+리뷰 요청 시점마다 등재한다(규격은 `evidence-pack`). Phase 5 진입 전 오케스트레이터가 그
+절을 갱신했는지 확인한다 — rollback 도 range revert 가 아니라 in_scope 경로 한정이다.
+M1/1A Codex 15차 high 가 이 구조를 미선언 scope 확장으로 읽었다.
+
 ### Phase 4: 검증
 
 **실행 모드:** 서브 에이전트 (verifier 1명)

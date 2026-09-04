@@ -38,6 +38,16 @@ rollback: <이번 slice의 신규 wiring을 비활성화하는 방법>
 
 scope 확장이 필요해지면 이 파일을 갱신하고 갱신 사유를 하단에 append한다.
 
+**slice 의 커밋 집합은 range 가 아니라 in_scope 경로의 변경이다 (2026-09-04).** 하네스 레인
+(오케스트레이터)은 `CLAUDE.md`·`.claude/**` 를 같은 브랜치에 즉시 커밋하므로 `base..HEAD`
+range 에는 slice 산출물이 아닌 하네스 커밋이 반드시 섞인다. 그래서 scope.md 는 **「하네스 레인
+변경」 절**을 상시 둔다 — 리뷰 요청 시점마다 `git log --oneline <base>..HEAD -- CLAUDE.md
+.claude/` 를 돌려 커밋 목록·경로·목적 한 줄씩을 등재하고 「slice 산출물이 아니며 in_scope
+밖, 운영자 승인 하에 같은 range 에 있다」를 명시한다. 목록이 비면 「없음」으로 적는다. 리뷰
+range 는 그대로 `base..HEAD` 이고 Codex 는 이 절을 보고 하네스 경로를 slice finding 에서
+가른다. **M1/1A Codex 15차 high** — range 를 커밋 집합으로 정의한 채 하네스 커밋 13개가
+미선언이었고 rollback 의 range revert 가 그것까지 되돌렸다.
+
 ### commands.md — 실행 명령과 종료 코드
 
 명령 실행 직후 즉시 append한다:
@@ -110,6 +120,13 @@ verdict는 `legacy-defect | v2-defect | intentional-redesign | insufficient-evid
 ### rollback.md
 
 되돌리는 flag/route/writer, 예상 복구 시간, 검증 방법.
+
+**되돌림은 range revert 가 아니라 in_scope 경로 한정이다 (2026-09-04).** `git revert
+<base>..HEAD` 는 같은 range 의 하네스 레인 커밋까지 되돌린다. 대신 `git checkout <base> --
+<in_scope 경로 개별 인자>` 로 slice 산출물만 base 상태로 되돌리고(신규 파일은 `git rm`),
+하네스 경로(`CLAUDE.md`·`.claude/**`)와 승인 문서의 하네스 레인 편집은 **되돌리지 않는다**고
+명시한다. 되돌린 뒤 확인 지점은 「in_scope 경로의 `git diff <base> -- <경로>` 가 비어 있고
+하네스 경로는 HEAD 그대로」다.
 
 ### codex-review-*.json
 
