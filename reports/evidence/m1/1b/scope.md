@@ -68,10 +68,28 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절, 1A 관례 승계)
 
-`git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/` —
-**없음**(재확인: fixture-curator 레인 커밋 `93be34a` 합류 뒤에도 이 range 에 하네스 경로
-변경이 없다). 목록이 생기면 SHA·경로·목적 한 줄씩 등재하고 「slice 산출물이 아니며
-in_scope 밖, 운영자 승인 하에 같은 range 에 있다」를 명시한다.
+**verifier r4 L-4 정정 — 아래가 정본이다.** 이전 문면(「없음」)은 `93be34a` 합류 시점
+재확인이었고 그 뒤 `f95feac`·`551b603` 두 커밋이 이 range 에 들어와 낡았다.
+
+`git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/`:
+
+| SHA | 경로 | 목적 |
+| --- | --- | --- |
+| `f95feac` | `CLAUDE.md`·`.claude/agents/codex-reviewer.md`·`.claude/agents/spec-writer.md`·`.claude/skills/codex-review-gate/SKILL.md`·`.claude/skills/v2-slice-pipeline/SKILL.md` | 운영자 지시 2026-09-04 — 코드 slice 는 Phase 5(Codex)를 건너뛰고 verifier+사용자 승인으로 닫는다는 하네스 규율 성문화 |
+| `551b603` | `CLAUDE.md`·`.claude/agents/codex-reviewer.md`·`.claude/skills/codex-review-gate/SKILL.md`·`.claude/skills/v2-slice-pipeline/SKILL.md` | 같은 운영자 결정을 milestone 계약 쪽에도 반영 |
+
+둘 다 **slice 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은 range 에 있다**(evidence-pack
+SKILL 2026-09-04, 1A 관례 승계).
+
+**`551b603` 이 위 grep 패턴(`CLAUDE.md .claude/`)에 안 잡히는 in_scope 파일도 건드렸다** —
+`agent-workflow.md`·`milestone-0.md`·`milestone-1.md` 셋이다(`git show --stat 551b603`).
+`agent-workflow.md`·`milestone-0.md`는 in_scope 표에 없어 완전히 out_of_scope 파일에 하네스
+레인이 쓴 것이고, `milestone-1.md`는 in_scope지만 **1B 가 승격받은 절(「Slice 1B-c」신설)
+밖** — 「선행 조건」·「Codex 독립 리뷰」절(완료 조건을 verifier ready-for-review 로 정정)을
+편집했다(`git show 551b603 -- milestone-1.md` 실측). 셋 다 이 라운드가 만든 것이 아니라
+하네스 레인이 이번 세션 이전에 커밋한 것이며, 이 slice(kotlin-implementer)는 그 파일들을
+편집하지 않는다 — `git status --porcelain -- agent-workflow.md milestone-0.md milestone-1.md`
+가 빈 출력임이 그 증거다.
 
 ---
 
@@ -410,7 +428,10 @@ decision 16 은 **전건 해소**(A1·A2·D-1·D-2와 같은 갈래의 이름 �
   항상 `Unmeasurable`이라 이 test로 성공 경로를 못 낸다).
 
 **RED 확인**: `Derivation.kt`에서 `inputs` 필드만 먼저 제거한 상태로
-`./gradlew :shared-kernel:compileKotlin --no-daemon --no-build-cache`를 실행해 `MoneyArithmetic.kt:114`·
-`:175`에서 컴파일 실패(`No parameter with name 'inputs' found`·`Too many arguments for
-'constructor(policyVersion: PolicyVersion): DerivationRecord'`)를 실측했다 — 그 뒤 호출부를
+`./gradlew :shared-kernel:compileKotlin --no-daemon --no-build-cache`를 실행해 `MoneyArithmetic.kt`의
+`measured`(`DerivationRecord(inputs = …)` 호출 지점)와 `asRate`(`DerivationRecord(inputs, …)`
+호출 지점) 두 곳에서 컴파일 실패(`No parameter with name 'inputs' found`·`Too many arguments
+for 'constructor(policyVersion: PolicyVersion): DerivationRecord'`)를 실측했다(**verifier r4
+L-5 정정** — 이전 문면의 `:114`·`:175` 줄 번호는 이후 커밋(`aa64f02`·`50e77d9`)의 편집으로
+낡았다, `evidence-pack` 「낡는 좌표」 규격 위반이라 인용문 형태로 바꾼다) — 그 뒤 호출부를
 고쳐 GREEN 으로 옮겼다(`commands.md` 참고).

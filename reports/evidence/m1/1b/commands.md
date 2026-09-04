@@ -314,8 +314,11 @@ example 로 고정돼 있다** — `ArithmeticTest`의
 
 - cmd: `./gradlew :shared-kernel:compileKotlin --no-daemon --no-build-cache` (RED 확인 —
   `Derivation.kt`의 `inputs` 필드만 먼저 제거한 중간 상태)
-- exit: 1 — `MoneyArithmetic.kt:114`(`No parameter with name 'inputs' found`)·`:175`
-  (`Too many arguments for 'constructor(policyVersion: PolicyVersion): DerivationRecord'`)
+- exit: 1 — `MoneyArithmetic.kt`의 `measured`(`DerivationRecord(inputs = …)` 호출 지점,
+  `No parameter with name 'inputs' found`)와 `asRate`(`DerivationRecord(inputs, …)` 호출
+  지점, `Too many arguments for 'constructor(policyVersion: PolicyVersion): DerivationRecord'`)
+  **(verifier r4 L-5 정정 — 이전 문면의 `:114`·`:175` 줄 번호 인용은 이후 커밋으로 낡아
+  인용문 형태로 바꿨다)**
 - cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check --no-daemon)`  (B-0)
 - exit: 0 — 262 task 전건 실행(캐시 없음), 격리 worktree, `git worktree remove` 로 정리 완료
 - cmd: `./gradlew --no-build-cache clean check --no-daemon`  (B-1, 작업 트리)
@@ -339,8 +342,10 @@ example 로 고정돼 있다** — `ArithmeticTest`의
 - exit: 0
 
 **하네스 레인 변경 재확인**: `git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/`
-— `551b603`·`f95feac` 둘(이번 세션 이전 커밋, `scope.md` 「하네스 레인 변경」 절에 이미
-등재됨) 외 신규 없음.
+— `551b603`·`f95feac` 둘(이번 세션 이전 커밋) 외 신규 없음. **verifier r4 L-4 정정**: 이
+문서가 이전에 「`scope.md` 절에 이미 등재됨」이라 적었던 시점에는 그 절이 실제로는
+「없음」으로 낡아 있어 거짓 참조였다 — `scope.md` 「하네스 레인 변경」 절이 이제 이 둘을
+SHA·경로·목적 표로 정식 등재했다(이번 라운드 수정 사항).
 
 **clean-tree 재확인**: `git status --short` — 빈 출력.
 
@@ -356,3 +361,56 @@ example 로 고정돼 있다** — `ArithmeticTest`의
 `ArithmeticTest`의 개정된 B11 test(`같은 vat 이면 투찰율이 정상 산출되고 파생값은 계산
 정책 version 을 되짚는다`) 통과 — `derivedFrom.policyVersion`이 `roundedWith`·
 `bidRateAgainst` 양쪽에서 입력 정책의 version 과 같음을 확인.
+
+## Phase 9 — verifier r4 H-1·M-1 수정 라운드 뒤 acceptance 전건 재실행
+
+최종 HEAD `f750c60`(H-1·M-1 구현)에서 `scope.md` `acceptance_commands`(B-0~B-7) 전부를
+다시 돌렸다.
+
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check --no-daemon)`  (B-0)
+- exit: 0 — 262 task 전건 실행(캐시 없음), 격리 worktree, `git worktree remove` 로 정리 완료
+- cmd: `./gradlew --no-build-cache clean check --no-daemon`  (B-1, 작업 트리)
+- exit: 0
+- cmd: `./gradlew :app:test --tests '*ArchitectureGate*' --no-daemon --no-build-cache`  (B-2)
+- exit: 0
+- cmd: `./gradlew :build-logic:test --no-daemon --no-build-cache`  (B-3)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:test --no-daemon --no-build-cache`  (B-4)
+- exit: 0 — 명령 포인터(하드코딩 금지, L-2·L-10 원칙):
+  ```
+  grep -oh 'tests="[0-9]*"' shared-kernel/build/test-results/test/TEST-bidvector.sharedkernel.*.xml
+  ```
+  실측: `ArithmeticTest` 20 · `CompileFailureHarnessTest` 19 · `MoneyTest` 12 · `PolicyTest` 7 ·
+  `RateTest` 6 · `RegressionExampleTest` 5 · `UndeclaredProvenanceTest` 8, 합 77 — Phase 8의
+  72에서 **+5**: `CompileFailureHarnessTest` +2(fixture 11 negative/positive 쌍 test 1 +
+  mutant test 1) · `MoneyTest` +3(옛 공허 test 1 을 H-1 test 1 로 대체해 순증감 0, M-1 test
+  3 신설로 +3)
+- cmd: `./gradlew qualityBaseline --no-daemon --no-build-cache`  (B-5)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:domainApiTypeGate :shared-kernel:domainSourceReferenceGate --no-daemon --no-build-cache`  (B-6·B-7)
+- exit: 0
+
+**하네스 레인 변경 재확인**: `git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/`
+— `551b603`·`f95feac` 둘, 신규 없음(`scope.md` 「하네스 레인 변경」 절이 이번 라운드에
+SHA·경로·목적 표로 정식 등재됐다 — verifier r4 L-4).
+
+**clean-tree 재확인**: `git status --short` — 빈 출력. **양성 대조**: `reports/evidence/m1/1b/.verifier-r5-probe`
+를 만들어 `git status --porcelain -- shared-kernel reports/evidence/m1/1b` 가 `??` 항목을
+잡는 것을 확인한 뒤 삭제, 원복 확인(경로를 변수 하나로 넘기지 않았다).
+
+**fixtures/** 미접촉 재확인**: `git diff --stat fd9f621..HEAD -- fixtures/ reports/evidence/m1/1b/golden-manifest.json reports/evidence/m1/1b/fixtures.md`
+— 빈 출력.
+
+**secret 스캔 재확인**: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1b/ shared-kernel/src/`
+— 매치는 스캔 명령 문자열을 인용한 문서 자신들뿐, 실제 비밀값 0.
+
+**verifier r4 H-1 재현 확인**: 회귀 재현(구현 전 상태로 되돌려 fixture 11 을 돌림) —
+`assertNegativeFails` 가 `expected:<COMPILATION_ERROR> but was:<OK>` 로 실패해 회귀가 실제로
+있었음을 실측(로컬 되돌림, `git stash`/`git checkout` 으로 임시 재현 후 즉시 원복 — 최종
+`git diff` 빈 출력 확인). 수정 뒤 `CompileFailureHarnessTest` fixture 11(negative·positive·
+mutant) 3 test 전부 GREEN.
+
+**verifier r4 M-1 mutant 실측**: `compareSameType` 의 provenance 분기(`!hasDeclaredProvenance(...)
+-> ...`)를 `false ->` 로 죽인 로컬 mutant 로 `:shared-kernel:test --tests '*MoneyTest*'` 를
+돌려 M-1 test 셋(양쪽 Undeclared·한쪽만 Undeclared·순서 확인) 전부 실패(`Known`/
+`VAT_TREATMENT_MISMATCH` 를 냄)를 확인한 뒤 원복 — 원복 뒤 GREEN 재확인, `git diff` 빈 출력.
