@@ -793,3 +793,58 @@ fixture 함수를 걸어(`7809e8b`) 본문을 private 백킹 값 사용/파라�
 둘로 나눴다(`TypeAliasDoubleApi.kt` 신설). `scalar()` 도 반환형이 아니라 **파라미터** 로
 별칭을 시험한다 — 별칭 타입으로 값을 구성하는 자리(`0.0 as Scalar`·`Scalar.valueOf(0.0)`)가
 전부 같은 플랫폼 타입 불일치로 막혔다.
+
+### verifier r18 수정 — F-1·F-2·F-3·F-4
+
+리포트 `_workspace/m1-1a/28_verifier_r18.md`. RED 는 `SourceReferencesTest`·
+`PublicApiTypesTest`·`DomainApiTypeFixtureTest` 의 신설 테스트가 갖는다(각 fix 커밋에
+포함) — 여기는 task 수준 재현만 적는다.
+
+**F-1 — 완전수식 참조 뒤 호출.** verifier 가 심은 그대로
+(`java.net.HttpURLConnection.HTTP_OK.toString()`)를 `procurement` 에 두고
+`:procurement:domainSourceReferenceGate` 를 돌렸다.
+
+| # | 조작 | 결과 |
+| --- | --- | --- |
+| `E-92` | `StatusProbe.kt` 를 둔다 | 1 — `StatusProbe.kt:5 java.net.HttpURLConnection — 허용 목록에 없다` |
+| `E-93` | 같은 상태에서 `--no-build-cache clean check` | 1 — 같은 사유로 전건도 실패 |
+| `E-94` | `StatusProbe.kt` 를 지운다 | 0(양성 대조) |
+
+**F-2 — 접근자 전용 프로퍼티.** verifier 가 심은 그대로(`BidRate`)를 `strategy` 에 두고
+`:strategy:domainApiTypeGate` 를 돌렸다.
+
+| # | 조작 | 결과 |
+| --- | --- | --- |
+| `E-95` | `BidRate.kt` 를 둔다 | 1 — `BidRate.kt:8 rate — 초기화식/위임/접근자에서 타입이 추론된다` |
+| `E-96` | `BidRate.kt` 를 지운다 | 0(양성 대조) |
+
+**F-3 — SCREAMING_CASE 오탐.** `java.lang.Integer.MAX_VALUE` 를 `procurement` 에 두고
+`:procurement:domainSourceReferenceGate` 를 돌렸다 — 수정 전에는 이 형태 자체가
+`Integer$MAX_VALUE — 허용 목록에 없다` 로 실패했다(L-1 이 보고한 오탐).
+
+| # | 조작 | 결과 |
+| --- | --- | --- |
+| `E-97` | `BoundsProbe.kt`(`val max: Int = java.lang.Integer.MAX_VALUE`)를 둔다 | 0 — `references=1 violations=0`(오탐 해소, `java.lang.Integer` 만 후보로 남는다) |
+| `E-98` | `BoundsProbe.kt` 를 지운다 | 0(변화 없음) |
+
+세 실험 모두 파일을 저장소에 남기지 않았다(`git status --short -- procurement/ strategy/`
+로 확인).
+
+**F-4 — ktlint 증분 캐시(도구 거동, 알려진 제한만 등재, 코드 수정 없음).** 위반 파일을
+지운 뒤 `clean` 없이 `check` 를 돌리면 `ktlintMainSourceSetCheck` 가 삭제된 파일의
+캐시된 리포트로 실패할 수 있다 — `--no-build-cache clean check` 는 이 라운드 전건에서
+매번 `0` 이었다(`E-93` 포함). 게이트 결함이 아니라 ktlint-gradle 증분 거동이라 코드로
+닫지 않는다.
+
+**acceptance 전건 재실행.**
+
+| # | cmd | exit |
+| --- | --- | --- |
+| `A-0` | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 |
+| `A-1` | `./gradlew --no-build-cache --no-daemon clean check` | 0 |
+| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 |
+| `A-3`·`A-4` | `qualityBaseline`·`:app:compatibilitySmoke` | 0(`check` 에 포함) |
+| `A-5` | `./gradlew :build-logic:test` | 0 |
+
+clean-tree(경로 개별 인자, 양성 대조) — 출력 없음. 비밀값 스캔 — `reports/evidence/m1/1a/`
+매치 없음(exit 1).

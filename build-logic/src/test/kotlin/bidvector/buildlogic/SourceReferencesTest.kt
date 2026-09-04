@@ -146,4 +146,32 @@ class SourceReferencesTest {
             )
         assertEquals(1, refs.count { it.fqn == "java.net.HttpURLConnection" }, "$refs")
     }
+
+    /**
+     * **verifier r18 F-3.** 대문자·숫자·`_` 만으로 된 두 글자 이상 세그먼트(`MAX_VALUE`)는
+     * 멤버(상수) 접근으로 보고 타입 체인에 잇지 않는다 — 이어 붙이면 `java.lang.Integer$MAX_VALUE`
+     * 처럼 존재하지 않는 중첩 클래스 후보가 생겨 허용된 `java.lang.Integer` 접근까지 오탐으로
+     * 잡힌다. `java.util.Map.Entry` 처럼 실제 중첩 클래스 이름(`Entry`, 소문자를 포함)은 이
+     * 규칙의 영향을 받지 않는다(회귀).
+     */
+    @Test
+    fun `F-3 SCREAMING_CASE 세그먼트는 멤버로 보고 후보에서 뺀다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val max: Int = java.lang.Integer.MAX_VALUE\n}\n",
+            )
+        assertEquals(setOf("java.lang.Integer"), refs.map { it.fqn }.toSet(), "$refs")
+    }
+
+    @Test
+    fun `F-3 두 글자 미만 대문자 세그먼트는 여전히 타입 체인으로 잇는다`() {
+        // 한 글자 대문자 세그먼트(제네릭 타입 파라미터류)는 SCREAMING_CASE 로 보지 않는다.
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val e: java.util.Map.Entry<String, String>? = null\n}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.util.Map\$Entry" }, "$refs")
+    }
 }

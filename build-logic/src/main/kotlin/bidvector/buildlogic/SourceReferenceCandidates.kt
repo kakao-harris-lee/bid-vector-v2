@@ -11,6 +11,12 @@ package bidvector.buildlogic
  *
  * 첫 세그먼트가 대문자면 단순 이름 참조라 건너뛴다 — import 나 같은 파일 선언이 이미 푼다.
  * 대문자 세그먼트가 아예 없으면 값 체인이라 건너뛴다.
+ *
+ * **타입 축의 첫 세그먼트(뿌리) 다음은 SCREAMING_CASE 면 잇지 않는다**(verifier r18 F-3).
+ * `java.lang.Integer.MAX_VALUE` 처럼 상수 멤버가 대문자로 시작하면 존재하지 않는 중첩
+ * 클래스 `Integer$MAX_VALUE` 후보가 생겨 허용된 `Integer` 접근까지 오탐으로 잡힌다 —
+ * 뿌리 세그먼트 자신은 이 규칙의 대상이 아니다(클래스 이름이 우연히 전부 대문자여도 후보는
+ * 낸다).
  */
 internal fun candidateForms(segments: List<String>): List<String> {
     val typeIndex = segments.indexOfFirst { it.startsWithUpper() }
@@ -18,8 +24,17 @@ internal fun candidateForms(segments: List<String>): List<String> {
     if (isSimpleNameOrValueChain) return emptyList()
 
     val prefix = segments.subList(0, typeIndex).joinToString(".")
-    val typeSegments = segments.subList(typeIndex, segments.size).takeWhile { it.startsWithUpper() }
+    val root = segments[typeIndex]
+    val nested =
+        segments.subList(typeIndex + 1, segments.size).takeWhile {
+            it.startsWithUpper() &&
+                !it.isScreamingCase()
+        }
+    val typeSegments = listOf(root) + nested
     return typeSegments.indices.map { i -> "$prefix." + typeSegments.subList(0, i + 1).joinToString("$") }
 }
 
 private fun String.startsWithUpper(): Boolean = isNotEmpty() && first().isUpperCase()
+
+/** 대문자·숫자·`_` 만으로 된 두 글자 이상 — 관례상 상수 멤버 이름(`MAX_VALUE`·`HTTP_OK`). */
+private fun String.isScreamingCase(): Boolean = length >= 2 && all { it.isUpperCase() || it.isDigit() || it == '_' }

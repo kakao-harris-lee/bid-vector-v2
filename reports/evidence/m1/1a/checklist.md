@@ -441,6 +441,13 @@
     선언 `ModuleBoundaryAnchor` 가 `internal` 이다. `publicDeclarations > 0` 을 task 에
     걸면 안 된다(경계 앵커 설계를 흔든다) — liveness 는 `DomainApiTypeFixtureTest` 가
     fixture 로 고정한다. 1B 의 첫 public 선언부터 이 게이트가 실효한다.
+44. **ktlint 증분 캐시가 `clean` 없는 `check` 재실행에서 삭제된 파일을 잘못 실패시킬 수
+    있다(verifier r18 F-4, 도구 거동).** 위반 fixture 를 domain 모듈에 심었다가 지운 뒤
+    `clean` 을 건너뛰고 `check` 만 다시 돌리면 `ktlintMainSourceSetCheck` 가 삭제된
+    파일의 캐시된 리포트로 실패를 낼 수 있다. `--no-build-cache clean check`(이 slice의
+    acceptance 정본)는 매번 정상 종료했다 — ktlint-gradle 의 증분 판정 범위 문제이지 이
+    slice 의 게이트 결함이 아니다. task 수준 실측을 `clean` 없이 재실행할 때는 이 거동을
+    감안한다.
 
 ## 1B 인계 목록
 
