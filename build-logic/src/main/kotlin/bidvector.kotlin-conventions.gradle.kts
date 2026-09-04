@@ -1,3 +1,4 @@
+import bidvector.buildlogic.DomainSourceReferenceGateTask
 import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.JarContentGateTask
 import bidvector.buildlogic.ModuleBaselineSpec
@@ -231,6 +232,18 @@ val gateExecutionGate =
         report = layout.buildDirectory.file("reports/gate-execution/violations.txt")
     }
 
+// 바이트코드 층(ArchUnit)과 의존 그래프 층이 함께 놓치는 자리 — 컴파일 시 인라인되는 상수와
+// class literal 은 domain 소스가 **이름으로** 부르지만 산출물에 타입 참조를 남기지 않는다
+// (알려진 제한 7·11). 소스 자체를 걸어 그 사각을 덮는다.
+val domainSourceReferenceGate =
+    tasks.register<DomainSourceReferenceGateTask>("domainSourceReferenceGate") {
+        description = "domain main 소스가 허용 목록 밖 좌표를 이름으로 부르는지 잰다"
+        policyFile = configDir.file("quality/architecture-policy.properties")
+        moduleName = project.name
+        sourceRoot.from(layout.projectDirectory.dir("src/main/kotlin"))
+        report = layout.buildDirectory.file("reports/domain-source-reference/references.txt")
+    }
+
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
@@ -253,6 +266,7 @@ tasks.named("check") {
         jarContentGate,
         sourceSetLayoutGate,
         gateExecutionGate,
+        domainSourceReferenceGate,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )

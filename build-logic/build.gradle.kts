@@ -81,4 +81,14 @@ tasks.withType<Test>().configureEach {
     val architecturePolicy = repoRoot.resolve("config/quality/architecture-policy.properties")
     inputs.file(architecturePolicy).withPropertyName("architecturePolicy")
     systemProperty("bidvector.architecture.policy", architecturePolicy.absolutePath)
+
+    // DomainSourceReferenceFixtureTest 가 app 모듈에 커밋된 fixture 를 같은 판정 로직으로
+    // 재현한다 — project 의존을 만들지 않고 정책 파일과 같은 형태(경로를 시스템 속성으로)로 넘긴다.
+    val violatingFixtures = repoRoot.resolve("app/src/test/kotlin/bidvector/archfixture/violating")
+    inputs.dir(violatingFixtures).withPropertyName("violatingFixtures")
+    systemProperty("bidvector.archfixture.violating", violatingFixtures.absolutePath)
+
+    val allowedFixtures = repoRoot.resolve("app/src/test/kotlin/bidvector/archfixture/allowed")
+    inputs.dir(allowedFixtures).withPropertyName("allowedFixtures")
+    systemProperty("bidvector.archfixture.allowed", allowedFixtures.absolutePath)
 }

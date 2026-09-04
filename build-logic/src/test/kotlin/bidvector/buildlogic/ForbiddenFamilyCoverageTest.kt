@@ -17,30 +17,38 @@ import kotlin.test.assertTrue
 class ForbiddenFamilyCoverageTest {
     private val policy = ModuleDependencyPolicy.load(File(REAL_POLICY))
 
+    /** 소스 층의 **완전 술어**(설계 검토 §1) — 패키지 축과 클래스 축을 이 하나가 판정한다. */
+    private val sourcePolicy = SourceReferencePolicy.load(File(REAL_POLICY))
+
     /**
      * **방향이 뒤집혔다.** 예전에는 「가족이 금지 목록에 있는가」를 봤는데, 그 물음은 목록에 없는
      * 좌표(`kotlin.io`)를 정의상 잡지 못했다. 이제 domain 게이트가 allow-list 라 물음도 바뀐다 —
      * **승인 문서가 금지한 가족이 허용 목록으로 도로 들어오지 않는가.**
+     *
+     * 패키지 축(`family.packages`)은 [SourceReferencePolicy.admitsWildcard] 로, 클래스 축
+     * (`family.classes`)은 [SourceReferencePolicy.admits] 로 잰다 — 이 테스트가 예전에 갖고
+     * 있던 부분 술어(패키지 축만 보는 로컬 구현)를 걷어내고 production 이 쓰는 완전 술어를
+     * 그대로 쓴다(v2-지침서.md §5 「중복 금지」). 두 축을 하나의 술어로 합치지 않는 이유는
+     * `SourceReferencePolicyTest` 가 갖는다 — 패키지 문자열을 클래스 FQN 으로 재면 `kotlin`
+     * 처럼 bare 로 열린 exact 패키지가 `kotlin.io`·`kotlin.concurrent` 를 오판정한다.
      */
     @Test
     fun `승인 문서가 금지한 가족이 허용 목록에 들어오지 않는다`() {
         assertAll(
-            FAMILIES.map { family ->
-                {
-                    val admitted = family.packages.filter(::isAllowed)
-                    assertTrue(admitted.isEmpty(), "${family.name}(${family.source}) 가 허용된다: $admitted")
-                }
+            FAMILIES.flatMap { family ->
+                family.packages.map { pkg ->
+                    {
+                        assertTrue(!sourcePolicy.admitsWildcard(pkg), "${family.name}(${family.source}) 의 패키지가 허용된다: $pkg")
+                    }
+                } +
+                    family.classes.map { fqn ->
+                        {
+                            assertTrue(!sourcePolicy.admits(fqn), "${family.name}(${family.source}) 의 클래스가 허용된다: $fqn")
+                        }
+                    }
             },
         )
     }
-
-    /**
-     * 게이트의 판정과 같은 모양이다 — 정확 패키지, `bidvector` 하위, 그리고 **클래스 단위 허용
-     * 패키지는 그 자체로는 허용이 아니다**(안의 목록에 있는 클래스만 열린다).
-     */
-    private fun isAllowed(candidate: String): Boolean =
-        candidate in policy.allowedExactPackages ||
-            policy.allowedSubtrees.any { candidate == it || candidate.startsWith("$it.") }
 
     @Test
     fun `Maven 좌표가 있는 가족은 group 좌표계에도 전부 있다`() {
@@ -102,8 +110,10 @@ class ForbiddenFamilyCoverageTest {
     private class Family(
         val name: String,
         val source: String,
-        val packages: List<String>,
+        val packages: List<String> = emptyList(),
         val groups: List<String> = emptyList(),
+        /** T-C(클래스 단위) 축 좌표 — 패키지는 열려도 이 클래스만은 닫혀 있어야 한다. */
+        val classes: List<String> = emptyList(),
     )
 
     private companion object {
@@ -141,8 +151,9 @@ class ForbiddenFamilyCoverageTest {
                 Family(
                     "HTTP",
                     "지침서 §3.1 · ADR 0006 D-3",
-                    listOf("java.net", "okhttp3", "io.ktor"),
-                    listOf("com.squareup.okhttp3", "io.ktor"),
+                    packages = listOf("java.net", "okhttp3", "io.ktor"),
+                    groups = listOf("com.squareup.okhttp3", "io.ktor"),
+                    classes = listOf("java.net.HttpURLConnection"),
                 ),
                 Family(
                     "broker",
@@ -164,6 +175,14 @@ class ForbiddenFamilyCoverageTest {
                 // 근거가 없어 보였고 그래서 `readln()` 이 새어 나갔다.
                 Family("I/O (Kotlin stdlib)", IO_RULE, listOf("kotlin.io")),
                 Family("동시성", IO_RULE, listOf("java.util.concurrent", "kotlin.concurrent")),
+                // 패키지 자체(java.lang·java.util)는 T-C 로 열려 있다 — 문제는 그 안의 개별
+                // 클래스다. `architecture-policy.properties` 의 「일부러 넣지 않은 것」 주석이
+                // 이 좌표들을 든다.
+                Family(
+                    "환경·리플렉션 (JDK)",
+                    "architecture-policy.properties 「일부러 넣지 않은 것」 · v2-지침서.md §3.1",
+                    classes = listOf("java.lang.Class", "java.util.Locale"),
+                ),
             )
     }
 }

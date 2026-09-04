@@ -104,6 +104,37 @@ class ArchitectureGateCatchesViolationsTest {
         violations.shouldBeEmpty()
     }
 
+    /**
+     * **실측이 알려진 제한 11 의 전제를 정정한다.** 그 항목은 상수 풀의 Class 엔트리가 ArchUnit
+     * 의존으로 기록되지 않는다고 적었다(`javap` 기준). 이 fixture 로 재보면 ArchUnit 은 class
+     * literal 을 `references class object` 라는 **별도 의존 종류**로 추적한다 — 바이트코드
+     * 상수 풀의 모양과 ArchUnit 의 의미 모델은 다른 층이다. `checklist.md` 가 이 실측으로
+     * 정정된다.
+     */
+    @Test
+    fun `class literal 은 바이트코드 층도 별도 의존 종류로 잡는다`() {
+        rules
+            .domainMayOnlyDependOnAllowedPackages(fixtureRoot)
+            .mustReport("ClassLiteralLeak", "HttpURLConnection")
+    }
+
+    /**
+     * **사각의 양성 고정.** 알려진 제한 7 — 컴파일 시 인라인되는 상수는 바이트코드에 타입
+     * 참조를 남기지 않아 이 규칙이 못 본다(위 테스트가 보이듯 class literal 은 이 사각이
+     * 아니라 뺐다). 그 주장을 evidence 산문이 아니라 이 단언이 고정한다: 두 fixture 이름이
+     * 위반 상세 어디에도 없어야 한다. 이 사각을 덮는 것은 `domainSourceReferenceGate`(소스 층)다.
+     */
+    @Test
+    fun `인라인 상수는 바이트코드 층이 보고하지 않는다`() {
+        val details =
+            rules
+                .domainMayOnlyDependOnAllowedPackages(fixtureRoot)
+                .flatMap { rule -> rule.allowEmptyShould(true).evaluate(violating).failureReport.details }
+        listOf("InlinedConstantLeak", "FullyQualifiedReferenceLeak").forEach { fixture ->
+            details.filter { it.contains(fixture) }.shouldBeEmpty()
+        }
+    }
+
     @Test
     fun `업무 모듈 사이의 직접 참조를 잡는다`() {
         rules.businessDomainModulesMustNotReferenceEachOther(fixtureRoot) mustReport "CycleLeft"
