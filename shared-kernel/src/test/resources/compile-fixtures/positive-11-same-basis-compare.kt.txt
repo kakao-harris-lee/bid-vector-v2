@@ -1,0 +1,10 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BaseAmount
+import bidvector.sharedkernel.Fact
+import bidvector.sharedkernel.compareKnownVat
+
+fun sameBasisCompare(
+    left: BaseAmount,
+    right: BaseAmount,
+): Fact<Int> = compareKnownVat(left, right)

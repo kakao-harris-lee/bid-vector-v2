@@ -11,7 +11,8 @@ import org.junit.jupiter.api.assertThrows
 private fun sampleBaseAmount(
     won: Long = 1_000_000L,
     vat: VatTreatment = VatTreatment.INCLUSIVE,
-): BaseAmount = BaseAmount(won, Currency.KRW, vat, Provenance.OperatorDeclared)
+    provenance: Provenance = Provenance.OperatorDeclared,
+): BaseAmount = BaseAmount(won, Currency.KRW, vat, provenance)
 
 class MoneyTest {
     @Test
@@ -39,16 +40,53 @@ class MoneyTest {
         }
     }
 
+    /**
+     * verifier r4 H-1 — 이전 판(Codex 1차 #2)의 제네릭 `fun <T : Money> compareKnownVat(left:
+     * T, right: T)` 는 이 test 처럼 같은 타입 쌍만 불러 공허하게 통과했다 — Kotlin 이 `T` 를
+     * 두 인자의 최소 상위 타입(LUB)으로 추론해 `compareKnownVat(base, estimated)`(`T = Money`)
+     * 도 실제로는 컴파일됐다(회귀). 타입별 오버로드 여섯으로 되돌린 지금은 그 시그니처
+     * 자체가 없다 — 교차 쌍 컴파일 차단은 `CompileFailureHarnessTest` 의 fixture 11
+     * (모듈 밖, 별도 컴파일 단위)이 확인한다.
+     */
     @Test
-    fun `서로 다른 basis 금액은 같은 타입이 아니라 컴파일이 안 된다`() {
+    fun `H1 compareKnownVat 는 같은 basis 타입 쌍만 받는다`() {
         val base = sampleBaseAmount()
         val estimated = EstimatedAmount(1_000_000L, Currency.KRW, VatTreatment.EXCLUSIVE, Provenance.Published(1))
 
-        // `Money` 상위 타입에 이항 연산이 없어 f(a: Money, b: Money) 로 basis 를 섞는 시그니처가
-        // 존재하지 않는다 — 여기서는 각 타입이 자기 축의 compareKnownVat 만 받음을 확인한다
-        // (Codex 1차 #2 — 공개 Comparable 을 없앤 뒤의 유일한 비교 경로).
         compareKnownVat(base, base) shouldBe Fact.Known(0)
         compareKnownVat(estimated, estimated) shouldBe Fact.Known(0)
+    }
+
+    /**
+     * verifier r4 M-1 — `hasDeclaredProvenance` 의 KDoc(`MoneyArithmetic.kt`)은 자신을
+     * "산술·파생 성공 경계 전건의 유일한 자리"로 선언하는데, Codex 1차 #2 가 신설한
+     * `compareKnownVat` 는 그 전건을 부르지 않아 출처를 모르는 두 값의 순서가 성공으로
+     * 나왔다 — 이 셋이 그 회귀를 잡는다. 검사 순서는 `sumOfBaseAmounts`의 `accumulate`와
+     * 같다(provenance 먼저, VAT 다음) — 셋째 test 가 그 순서를 확인한다.
+     */
+    @Test
+    fun `M1 양쪽 provenance 가 Undeclared 면 vat 가 같은 known 이어도 compareKnownVat 는 거부한다`() {
+        val left = sampleBaseAmount(won = 1_000L, provenance = Provenance.Undeclared)
+        val right = sampleBaseAmount(won = 2_000L, provenance = Provenance.Undeclared)
+
+        compareKnownVat(left, right) shouldBe Fact.Absent(ReasonCode.UNDECLARED_PROVENANCE)
+    }
+
+    @Test
+    fun `M1 한쪽만 provenance 가 Undeclared 여도 compareKnownVat 는 거부한다`() {
+        val declared = sampleBaseAmount(won = 1_000L)
+        val undeclared = sampleBaseAmount(won = 2_000L, provenance = Provenance.Undeclared)
+
+        compareKnownVat(undeclared, declared) shouldBe Fact.Absent(ReasonCode.UNDECLARED_PROVENANCE)
+        compareKnownVat(declared, undeclared) shouldBe Fact.Absent(ReasonCode.UNDECLARED_PROVENANCE)
+    }
+
+    @Test
+    fun `M1 provenance 검사가 vat 검사보다 먼저다 — 둘 다 실패해도 UNDECLARED_PROVENANCE 가 나온다`() {
+        val left = sampleBaseAmount(won = 1_000L, vat = VatTreatment.INCLUSIVE, provenance = Provenance.Undeclared)
+        val right = sampleBaseAmount(won = 2_000L, vat = VatTreatment.EXCLUSIVE)
+
+        compareKnownVat(left, right) shouldBe Fact.Absent(ReasonCode.UNDECLARED_PROVENANCE)
     }
 
     /**

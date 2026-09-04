@@ -170,6 +170,28 @@ class CompileFailureHarnessTest {
             realDiagnosticFragment = "cannot access",
         )
     }
+
+    /**
+     * verifier r4 H-1 — 제네릭 `fun <T : Money> compareKnownVat(left: T, right: T)` 는
+     * Kotlin 이 `T` 를 두 인자의 최소 상위 타입(LUB)으로 추론해 basis 가 다른 두 `Money`
+     * 값도 `T = Money` 로 컴파일시켰다(회귀 — `MoneyTest` 의 옛 test 가 같은 타입 쌍만
+     * 불러 이 구멍을 놓쳤다). 타입별 오버로드 여섯으로 되돌린 지금은 이 fixture(basis
+     * 교차 쌍 호출)가 **모듈 밖에서도** 컴파일되지 않아야 한다 — 회귀가 다시 열리면 이
+     * test 가 초록으로 남아 알려주지 못하므로, 그 자체가 이 fixture 의 존재 이유다.
+     */
+    @Test
+    fun `11 compareKnownVat 는 basis 교차 쌍을 받지 않고 같은 basis 쌍은 받는다 (verifier r4 H-1)`() {
+        assertNegativeFails("11-cross-basis-compare", "type mismatch")
+        assertPositiveCompiles("11-same-basis-compare")
+    }
+
+    @Test
+    fun `11-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "11-cross-basis-compare-typo",
+            realDiagnosticFragment = "type mismatch",
+        )
+    }
 }
 
 private fun assertNegativeFails(

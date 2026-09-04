@@ -1,0 +1,10 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BaseAmount
+import bidvector.sharedkernel.EstimatedAmount
+import bidvector.sharedkernel.Fact
+
+fun crossBasisCompareTypo(
+    base: BaseAmount,
+    estimated: EstimatedAmount,
+): Fact<Int> = compareKnownVatTypo(base, estimated)

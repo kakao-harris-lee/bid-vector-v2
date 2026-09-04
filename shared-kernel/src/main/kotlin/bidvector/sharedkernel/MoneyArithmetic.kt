@@ -18,9 +18,12 @@ internal fun sameKnownVat(
 /**
  * `v2-지침서.md` §4.1 — "provenance가 없거나 모르는 값은 추측하지 않고 거부 또는
  * `Unmeasurable`로 반환한다." `Provenance.Undeclared`가 그 "모르는 값"의 명시적
- * 표현이다(Codex 1차 #1). 산술·파생 성공 경계 전건의 유일한 자리다.
+ * 표현이다(Codex 1차 #1). 산술·파생·비교 성공 경계 전건의 유일한 자리다 — `Money.kt`의
+ * `compareSameType`도 이 함수를 부른다(verifier r4 M-1 — Codex 1차 #2가 신설한 비교 경로가
+ * 이 전건을 부르지 않아 출처를 모르는 두 값의 순서 비교가 성공으로 새던 결함의 수정).
+ * `internal`로 열어 `Money.kt`(같은 모듈, 다른 파일)가 재사용한다 — 중복 선언하지 않는다.
  */
-private fun hasDeclaredProvenance(provenance: Provenance): Boolean = provenance != Provenance.Undeclared
+internal fun hasDeclaredProvenance(provenance: Provenance): Boolean = provenance != Provenance.Undeclared
 
 /**
  * 반올림 이전의 파생 투찰가. 반올림 이전 단계에서는 `BigDecimal`을 쓴다(`ADR 0002` §3 A-4).

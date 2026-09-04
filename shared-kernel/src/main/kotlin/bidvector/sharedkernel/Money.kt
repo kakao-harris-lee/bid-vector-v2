@@ -47,10 +47,55 @@ data class AmountRecord(
 fun Money.export(): AmountRecord = AmountRecord(amount, currency, basis, vatTreatment, provenance)
 
 /**
- * `sameKnownVat` 전건을 건 유일한 비교 경로다(Codex 1차 #2) — 여섯 `Money` 타입이 갖던
- * 공개 `Comparable`은 `won`만 비교해 `VAT` `UNKNOWN`과 `INCLUSIVE`도 정렬되고 동일 금액이면
- * `VAT`가 달라도 `compareTo`가 0을 냈다. 그 구현을 없애고 이 함수로 대체한다. 제네릭
- * `T : Money`가 같은 타입만 받으므로 basis 교차 비교는 이 함수로도 열리지 않는다(L-11).
+ * `sameKnownVat`·`hasDeclaredProvenance` 전건을 건 비교 경로 — 타입별 오버로드 여섯
+ * (`BaseAmount`~`AwardAmount`)이다(verifier r4 H-1 회귀 수정). 이전 판(Codex 1차 #2)은
+ * 제네릭 `fun <T : Money> compareKnownVat(left: T, right: T)` 하나였으나, Kotlin이 `T`를
+ * 두 인자의 **최소 상위 타입(LUB)**으로 추론해 `compareKnownVat(baseAmount,
+ * estimatedAmount)`가 `T = Money`로 컴파일됐다 — basis 교차 비교 차단이 구조적으로 뚫린
+ * 회귀였다(설계 검토 §5 L-11이 세운 경계와 같은 축). 오버로드 각각이 정확히 그 타입 하나만
+ * 받으므로 서로 다른 타입 인자로는 어떤 오버로드도 성립하지 않는다 — LUB 추론 자체가
+ * 일어날 자리가 없다. 공통 로직은 [compareSameType] 하나에 위임해 중복을 두지 않는다.
+ */
+fun compareKnownVat(
+    left: BaseAmount,
+    right: BaseAmount,
+): Fact<Int> = compareSameType(left, right)
+
+fun compareKnownVat(
+    left: EstimatedAmount,
+    right: EstimatedAmount,
+): Fact<Int> = compareSameType(left, right)
+
+fun compareKnownVat(
+    left: YegaAmount,
+    right: YegaAmount,
+): Fact<Int> = compareSameType(left, right)
+
+fun compareKnownVat(
+    left: BidAmount,
+    right: BidAmount,
+): Fact<Int> = compareSameType(left, right)
+
+fun compareKnownVat(
+    left: AllocatedBudget,
+    right: AllocatedBudget,
+): Fact<Int> = compareSameType(left, right)
+
+fun compareKnownVat(
+    left: AwardAmount,
+    right: AwardAmount,
+): Fact<Int> = compareSameType(left, right)
+
+/**
+ * `compareKnownVat` 여섯 오버로드가 공유하는 구현 — **검사 순서: provenance 먼저, VAT
+ * 다음**(`sumOfBaseAmounts`의 `accumulate`와 같은 순서 원칙, verifier r4 M-1). 어느
+ * 한쪽이라도 `Provenance.Undeclared`면 VAT 일치 여부와 무관하게 `UNDECLARED_PROVENANCE`가
+ * 먼저 나온다 — `hasDeclaredProvenance`의 "산술·파생·비교 성공 경계 전건의 유일한 자리"
+ * 계약(`MoneyArithmetic.kt`)이 비교 경로에도 실제로 걸리게 한다(Codex 1차 #2가 신설한
+ * 비교가 이 전건을 부르지 않아 출처를 모르는 두 값의 순서 비교가 성공으로 새던 결함의
+ * 수정). `private`다 — 호출부가 항상 같은 타입 쌍으로 여섯 오버로드를 거쳐 들어오므로
+ * 이 함수 자체가 `Money`/`Money` 시그니처를 공개할 필요가 없다(공개하면 H-1이 되돌리려는
+ * LUB 경로가 다시 열린다).
  *
  * `Measurement` 대신 `Fact`를 반환한다 — 비교는 정책 version 을 소비하지 않는다
  * (`sumOfBaseAmounts`가 이미 같은 이유로 `Fact`를 쓴다). `Measurement.Measured`가 요구하는
@@ -58,14 +103,22 @@ fun Money.export(): AmountRecord = AmountRecord(amount, currency, basis, vatTrea
  * 넘버 금지 원칙과 같은 성질), Codex 전달문의 "Unmeasurable" 표현 대신 `Fact.Absent`로
  * 낸다 — 사유 어휘(`VAT_TREATMENT_MISMATCH`)는 그대로다.
  */
-fun <T : Money> compareKnownVat(
-    left: T,
-    right: T,
+private fun compareSameType(
+    left: Money,
+    right: Money,
 ): Fact<Int> =
-    if (sameKnownVat(left.vatTreatment, right.vatTreatment)) {
-        Fact.Known(left.amount.compareTo(right.amount))
-    } else {
-        Fact.Absent(ReasonCode.VAT_TREATMENT_MISMATCH)
+    when {
+        !hasDeclaredProvenance(left.provenance) || !hasDeclaredProvenance(right.provenance) -> {
+            Fact.Absent(ReasonCode.UNDECLARED_PROVENANCE)
+        }
+
+        !sameKnownVat(left.vatTreatment, right.vatTreatment) -> {
+            Fact.Absent(ReasonCode.VAT_TREATMENT_MISMATCH)
+        }
+
+        else -> {
+            Fact.Known(left.amount.compareTo(right.amount))
+        }
     }
 
 private fun requireNonNegative(won: Long) {
