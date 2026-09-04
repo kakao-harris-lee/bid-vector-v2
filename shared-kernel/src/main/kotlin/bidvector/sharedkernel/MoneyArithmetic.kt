@@ -17,16 +17,18 @@ internal fun sameKnownVat(
 
 /**
  * 반올림 이전의 파생 투찰가. 반올림 이전 단계에서는 `BigDecimal`을 쓴다(`ADR 0002` §3 A-4).
- * `BidAmount`로 가는 유일한 멤버가 [roundedWith]다.
+ * `BidAmount`로 가는 유일한 멤버가 [roundedWith]다. 입력 `BaseAmount`의 [AmountRecord]를
+ * 잡아 두는 이유는 [Derived]가 되짚을 입력 fact 참조가 필요해서다(B11).
  */
 class UnroundedBidAmount internal constructor(
     internal val raw: BigDecimal,
     private val currency: Currency,
     private val vatTreatment: VatTreatment,
     private val provenance: Provenance,
+    private val baseInput: AmountRecord,
 ) {
     /** overflow는 `Math.*Exact`와 동등한 성질로 잡는다 — `longValueExact()`가 범위·소수부를 함께 잰다(A4). */
-    fun roundedWith(policy: Resolution.Resolved<RoundingPolicy>): Measurement<BidAmount> {
+    fun roundedWith(policy: Resolution.Resolved<RoundingPolicy>): Measurement<Derived<BidAmount>> {
         val scaled = raw.setScale(policy.value.scaleDigits, policy.value.mode)
         return runCatching { scaled.longValueExact() }
             .fold(
@@ -38,12 +40,15 @@ class UnroundedBidAmount internal constructor(
     private fun measured(
         won: Long,
         policyVersion: PolicyVersion,
-    ): Measurement<BidAmount> =
-        Measurement.Measured(
-            value = BidAmount(won, currency, vatTreatment, provenance),
+    ): Measurement<Derived<BidAmount>> {
+        val bidAmount = BidAmount(won, currency, vatTreatment, provenance)
+        val derivation = DerivationRecord(inputs = listOf(baseInput), policyVersion = policyVersion)
+        return Measurement.Measured(
+            value = Derived(bidAmount, derivation),
             sampleSize = 1,
             policyVersion = policyVersion,
         )
+    }
 }
 
 /** `BaseAmount × BidRate = BidAmount`만 — 다른 조합은 오버로드가 없어 컴파일되지 않는다. */
@@ -53,6 +58,7 @@ operator fun BaseAmount.times(rate: BidRate): UnroundedBidAmount =
         currency = currency,
         vatTreatment = vatTreatment,
         provenance = provenance,
+        baseInput = export(),
     )
 
 private fun divideForRate(
@@ -77,14 +83,17 @@ private fun divideForRate(
         }
     }
 
+/** 입력 둘(분자·분모)의 [AmountRecord]를 [DerivationRecord]에 실어 되짚을 수 있게 한다(B11). */
 private fun <T> asRate(
     ratio: Measurement<BigDecimal>,
+    inputs: List<AmountRecord>,
     wrap: (Rate) -> T,
-): Measurement<T> =
+): Measurement<Derived<T>> =
     when (ratio) {
         is Measurement.Measured -> {
             val rate = Rate.ofFraction(ratio.value)
-            Measurement.Measured(wrap(rate), ratio.sampleSize, ratio.policyVersion)
+            val derivation = DerivationRecord(inputs, ratio.policyVersion)
+            Measurement.Measured(Derived(wrap(rate), derivation), ratio.sampleSize, ratio.policyVersion)
         }
 
         is Measurement.Unmeasurable -> {
@@ -96,18 +105,18 @@ private fun <T> asRate(
 fun YegaAmount.assessmentRateAgainst(
     base: BaseAmount,
     policy: Resolution.Resolved<RoundingPolicy>,
-): Measurement<AssessmentRate> {
+): Measurement<Derived<AssessmentRate>> {
     val ratio = divideForRate(amount, vatTreatment, base.amount, base.vatTreatment, policy)
-    return asRate(ratio, ::AssessmentRate)
+    return asRate(ratio, listOf(export(), base.export()), ::AssessmentRate)
 }
 
 /** 낙찰률 = 낙찰가 / 기초금액. */
 fun AwardAmount.awardRateAgainst(
     base: BaseAmount,
     policy: Resolution.Resolved<RoundingPolicy>,
-): Measurement<AwardRate> {
+): Measurement<Derived<AwardRate>> {
     val ratio = divideForRate(amount, vatTreatment, base.amount, base.vatTreatment, policy)
-    return asRate(ratio, ::AwardRate)
+    return asRate(ratio, listOf(export(), base.export()), ::AwardRate)
 }
 
 /** 투찰율 = 투찰가 / 기초금액. `origin`은 관측값/추천값을 값으로는 못 가르는 자리라 인자로 받는다. */
@@ -115,9 +124,9 @@ fun BidAmount.bidRateAgainst(
     base: BaseAmount,
     origin: BidRateOrigin,
     policy: Resolution.Resolved<RoundingPolicy>,
-): Measurement<BidRate> {
+): Measurement<Derived<BidRate>> {
     val ratio = divideForRate(amount, vatTreatment, base.amount, base.vatTreatment, policy)
-    return asRate(ratio) { rate -> BidRate(rate, origin) }
+    return asRate(ratio, listOf(export(), base.export())) { rate -> BidRate(rate, origin) }
 }
 
 /** [sumOfBaseAmounts]가 목록을 접으며 나르는 중간 상태 — `Absent`가 나오면 이후 입력을 무시한다. */

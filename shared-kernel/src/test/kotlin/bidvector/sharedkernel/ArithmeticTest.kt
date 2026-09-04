@@ -45,7 +45,7 @@ class ArithmeticTest {
 
                 val result = (base(won) * rate).roundedWith(resolvedPolicy(mode))
 
-                result.shouldBeInstanceOf<Measurement.Measured<BidAmount>>()
+                result.shouldBeInstanceOf<Measurement.Measured<Derived<BidAmount>>>()
             }
         }
     }
@@ -62,13 +62,25 @@ class ArithmeticTest {
                 val unrounded = BigDecimal(floor).add(BigDecimal(epsilonWon).movePointLeft(3))
 
                 val raw =
-                    UnroundedBidAmount(unrounded, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.OperatorDeclared)
+                    UnroundedBidAmount(
+                        unrounded,
+                        Currency.KRW,
+                        VatTreatment.INCLUSIVE,
+                        Provenance.OperatorDeclared,
+                        base(floor).export(),
+                    )
                 val result = raw.roundedWith(resolvedPolicy(mode))
 
                 val roundedWon =
                     when (result) {
-                        is Measurement.Measured -> result.value.export().won
-                        is Measurement.Unmeasurable -> error("overflow 는 이 생성 범위에서 발생하지 않는다: $result")
+                        is Measurement.Measured -> {
+                            val bidAmount = result.value.value
+                            bidAmount.export().won
+                        }
+
+                        is Measurement.Unmeasurable -> {
+                            error("overflow 는 이 생성 범위에서 발생하지 않는다: $result")
+                        }
                     }
 
                 (roundedWon >= floor) shouldBe true
@@ -117,6 +129,7 @@ class ArithmeticTest {
                 Currency.KRW,
                 VatTreatment.INCLUSIVE,
                 Provenance.OperatorDeclared,
+                base(1L).export(),
             )
 
         huge.roundedWith(resolvedPolicy(RoundingMode.HALF_UP)) shouldBe
@@ -144,9 +157,12 @@ class ArithmeticTest {
 
         val result = yega.assessmentRateAgainst(base, resolvedPolicy(RoundingMode.HALF_UP))
 
-        result.shouldBeInstanceOf<Measurement.Measured<AssessmentRate>>()
-        val fraction = result.value.rate.fraction
+        result.shouldBeInstanceOf<Measurement.Measured<Derived<AssessmentRate>>>()
+        val fraction = result.value.value.rate.fraction
         fraction.compareTo(BigDecimal("1.1")) shouldBe 0
+
+        // B11 — 파생 율은 입력 fact(예정가·기초금액) 의 AmountRecord 를 되짚는다.
+        result.value.derivedFrom.inputs shouldBe listOf(yega.export(), base.export())
     }
 
     @Test

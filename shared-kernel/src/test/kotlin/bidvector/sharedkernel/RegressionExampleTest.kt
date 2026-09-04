@@ -79,6 +79,6 @@ class RegressionExampleTest {
 
         // BidAmount.export().won 은 Long 이라 애초에 소수 자리를 표현할 수 없다 — 반올림이
         // 자리수 0으로 이미 닫혔고(§1.1 정의 ①), legacy 의 `round(…, 2)` 경로가 여기 없다.
-        result.shouldBeInstanceOf<Measurement.Measured<BidAmount>>()
+        result.shouldBeInstanceOf<Measurement.Measured<Derived<BidAmount>>>()
     }
 }
