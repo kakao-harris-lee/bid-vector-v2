@@ -10,6 +10,15 @@ enum class ReasonCode {
     EMPTY_INPUT,
     POLICY_NOT_APPLICABLE,
     UNIT_NOT_DECLARED,
+
+    /**
+     * `RoundingPolicy.mode = RoundingMode.UNNECESSARY`인데 반올림 없이 정확히 표현할 수
+     * 없는 값이 들어온 경우 — overflow(표현 범위 초과)와는 다른 실패다(verifier r1 M-1).
+     */
+    ROUNDING_NOT_REPRESENTABLE,
+
+    /** 반올림된 결과가 음수다 — 금액 불변식(음수 금지) 위반. overflow와는 다른 실패다. */
+    NEGATIVE_AMOUNT,
 }
 
 /**

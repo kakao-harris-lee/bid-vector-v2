@@ -122,6 +122,51 @@ class ArithmeticTest {
     }
 
     @Test
+    fun `M-1 UNNECESSARY 모드에서 반올림이 필요한 값은 overflow 가 아닌 사유로 Unmeasurable 이 된다`() {
+        val raw =
+            UnroundedBidAmount(
+                BigDecimal("100.5"),
+                Currency.KRW,
+                VatTreatment.INCLUSIVE,
+                Provenance.OperatorDeclared,
+                base(100L).export(),
+            )
+        val policy = RoundingPolicy(MONEY_AXIS_SCALE_DIGITS, RoundingMode.UNNECESSARY)
+        val resolved = Resolution.Resolved(policy, PolicyVersion(EffectiveFrom.Initial, "test"))
+
+        // setScale(0, UNNECESSARY) 자체가 ArithmeticException 을 던진다 — overflow 가 아니다.
+        // runCatching 밖에 있으면 이 호출이 예외를 그대로 던져 테스트가 에러로 죽는다.
+        raw.roundedWith(resolved) shouldBe Measurement.Unmeasurable(ReasonCode.ROUNDING_NOT_REPRESENTABLE)
+    }
+
+    @Test
+    fun `M-1 임의 mode·scale 에서 roundedWith 는 예외를 누출하지 않는다`() {
+        runBlocking {
+            checkAll(
+                Arb.long(-1_000_000_000_000L, 1_000_000_000_000L),
+                Arb.element(RoundingMode.entries),
+                Arb.element(listOf(0, 1, 2, -1)),
+            ) { unscaledLong, mode, scale ->
+                val raw =
+                    UnroundedBidAmount(
+                        BigDecimal.valueOf(unscaledLong, 3),
+                        Currency.KRW,
+                        VatTreatment.INCLUSIVE,
+                        Provenance.OperatorDeclared,
+                        base(0L).export(),
+                    )
+                val policy = RoundingPolicy(scale, mode)
+                val resolved = Resolution.Resolved(policy, PolicyVersion(EffectiveFrom.Initial, "test"))
+
+                // 예외가 누출되면 이 호출 자체가 테스트를 에러로 죽인다 — 반환이 오는 것 자체가 단언이다.
+                val result = raw.roundedWith(resolved)
+
+                result.shouldBeInstanceOf<Measurement<Derived<BidAmount>>>()
+            }
+        }
+    }
+
+    @Test
     fun `P-5 반올림 경로도 overflow 를 Unmeasurable 로 바꾼다`() {
         val huge =
             UnroundedBidAmount(

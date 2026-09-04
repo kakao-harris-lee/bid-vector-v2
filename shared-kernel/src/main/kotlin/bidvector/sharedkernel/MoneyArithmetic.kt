@@ -27,14 +27,48 @@ class UnroundedBidAmount internal constructor(
     private val provenance: Provenance,
     private val baseInput: AmountRecord,
 ) {
-    /** overflow는 `Math.*Exact`와 동등한 성질로 잡는다 — `longValueExact()`가 범위·소수부를 함께 잰다(A4). */
+    /**
+     * `setScale` 자체가 던질 수 있다(`RoundingMode.UNNECESSARY`가 반올림을 요구하는 값을
+     * 받으면) — overflow와는 다른 실패라 별도 `ReasonCode`로 잡는다(verifier r1 M-1).
+     * overflow는 `Math.*Exact`와 동등한 성질로 잡는다 — `longValueExact()`가 범위·소수부를
+     * 함께 잰다(A4). 반올림 결과가 음수면(이론상만 — `times()`의 두 입력이 모두 비음수라
+     * 실제 경로에서는 나오지 않는다) `BidAmount.init`의 예외가 아니라 사유 있는 실패로 낸다.
+     */
     fun roundedWith(policy: Resolution.Resolved<RoundingPolicy>): Measurement<Derived<BidAmount>> {
-        val scaled = raw.setScale(policy.value.scaleDigits, policy.value.mode)
-        return runCatching { scaled.longValueExact() }
-            .fold(
-                onSuccess = { won -> measured(won, policy.version) },
-                onFailure = { Measurement.Unmeasurable(ReasonCode.AMOUNT_OVERFLOW) },
-            )
+        val scaling = runCatching { raw.setScale(policy.value.scaleDigits, policy.value.mode) }
+        return when {
+            scaling.isFailure -> Measurement.Unmeasurable(ReasonCode.ROUNDING_NOT_REPRESENTABLE)
+            else -> extractWon(scaling.getOrThrow(), policy)
+        }
+    }
+
+    /**
+     * `longValueExact()`가 던지는 이유는 둘이다 — ① 소수 자리가 남음(호출부가 자리수 0이
+     * 아닌 `scaleDigits`를 준 경우) ② 크기가 `Long` 범위를 벗어남. **정확한 사유를 낸다**
+     * (verifier r1 M-1) — 둘 다 `AMOUNT_OVERFLOW`로 뭉치면 소수 자리 문제가 overflow로
+     * 오라벨된다.
+     */
+    private fun extractWon(
+        scaled: BigDecimal,
+        policy: Resolution.Resolved<RoundingPolicy>,
+    ): Measurement<Derived<BidAmount>> {
+        val hasFraction = scaled.signum() != 0 && scaled.stripTrailingZeros().scale() > 0
+        return when {
+            hasFraction -> Measurement.Unmeasurable(ReasonCode.ROUNDING_NOT_REPRESENTABLE)
+            else -> extractLongValue(scaled, policy)
+        }
+    }
+
+    private fun extractLongValue(
+        scaled: BigDecimal,
+        policy: Resolution.Resolved<RoundingPolicy>,
+    ): Measurement<Derived<BidAmount>> {
+        val extraction = runCatching { scaled.longValueExact() }
+        return when {
+            extraction.isFailure -> Measurement.Unmeasurable(ReasonCode.AMOUNT_OVERFLOW)
+            extraction.getOrThrow() < 0L -> Measurement.Unmeasurable(ReasonCode.NEGATIVE_AMOUNT)
+            else -> measured(extraction.getOrThrow(), policy.version)
+        }
     }
 
     private fun measured(
