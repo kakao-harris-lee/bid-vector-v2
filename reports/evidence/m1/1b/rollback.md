@@ -31,14 +31,17 @@ git restore --source=66c1ab79af4c5a68145811a9e87008dfdb10da3c --staged --worktre
 실행했다 — 결과는 `commands.md` 가 아니라 이 자리에 남긴다(같은 사실을 두 자리에
 적지 않는다).
 
-- `git restore --source=<base> --staged --worktree -- shared-kernel config/quality/architecture-policy.properties config/quality/member-effects.properties reports/evidence/m1/1b` → **exit 0**
+- `git restore --source=<base> --staged --worktree -- shared-kernel config/quality/architecture-policy.properties config/quality/member-effects.properties config/quality/gate-tests.properties reports/evidence/m1/1b` → **exit 0**
 - 복구 뒤 `git diff <base> -- <같은 경로>` → **비어 있음**(base 상태와 완전히 일치)
-- `git status --porcelain`(HEAD 대비) 이 낸 변경 종류: **D 18**(1B 가 새로 만든
-  main·test·evidence 파일이 base 에 없어 삭제됨) · **M 1**(`shared-kernel/build.gradle.kts`
-  가 base 버전으로 되돌아감) · **A 1**(`ModuleBoundaryAnchor.kt` 가 base 에는 있고 HEAD 에는
-  없어, HEAD 기준으로는 "새로 생긴" 파일로 보고된다 — 실제로는 1B 가 지운 것의 복원이다)
+- `git status --porcelain`(HEAD `7487253` 대비) 이 낸 변경 종류: **D 29**(1B 가 새로 만든
+  main·test·evidence·fixture 파일이 base 에 없어 삭제됨) · **M 2**
+  (`shared-kernel/build.gradle.kts`·`config/quality/gate-tests.properties` 가 base 버전으로
+  되돌아감) · **A 1**(`ModuleBoundaryAnchor.kt` 가 base 에는 있고 HEAD 에는 없어, HEAD
+  기준으로는 "새로 생긴" 파일로 보고된다 — 실제로는 1B 가 지운 것의 복원이다)
 - 하네스 경로(`CLAUDE.md`·`.claude/**`) 확인: `git diff HEAD -- CLAUDE.md .claude/` **비어
   있음** — 되돌리지 않는다는 선언대로 손대지 않았다
+- 재측정 시점(컴파일 실패 하네스 등재 뒤, HEAD `7487253`)에도 exit 0·D/M/A 카운트가
+  일관됐다 — 되돌림 절차가 슬라이스가 자라도 계속 성립한다
 
 ## 되돌리는 flag/route/writer
 
