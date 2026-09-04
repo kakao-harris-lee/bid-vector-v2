@@ -65,6 +65,17 @@ SHA·경로·목적 한 줄씩 등재하고 「slice 산출물이 아니며 in_s
 range 에 있다」를 명시한다. 그 명령이 잡지 못하는 하네스 편집(`agent-workflow.md`·
 `milestone-*.md` 의 승격 절 밖 부분)도 같은 절에 손으로 적는다(1B r4 L-4 교훈).
 
+**계약 갱신 커밋(세션 모델, 2026-09-05)**: `977083b`(scope.md decision 18~22) · `8b393ce`(ADR 0007
+§5 OPEN-ADR-06/16 해소 +37줄, capability-map §14.2 행) · `94009f4`(milestone-1.md 「Slice 1A-b」 신설
++27줄, 「Slice 1B-c」 착수 문단). 셋 다 in_scope 의 계약 갱신 절이다.
+
+**역방향 파급 검사(evidence-pack 규격, stem 기준 grep)**: ADR 0007 삽입(258행 이후)을 가리키는
+`0007:<line>` 좌표 — **0건**. milestone-1.md 삽입(67행 이후)을 가리키는 `milestone-1.md:<line>` 좌표 —
+**4건, 전부 `capability-map.md` §14.2 의 M0 작성 좌표**(`:80`·`:82`·`:98`·`:99` — 완료 조건·구현
+규칙 절을 가리키며 이제 +27 밀렸다). 그 행들은 이 slice 의 승격 절(OPEN-1B-CONTRACT·OPEN-1B-CORPUS
+·OPEN-ADR-06 행) 밖이라 **고치지 않고 등재한다**(1B 관례 — M0 evidence 의 낡은 좌표는 범위 밖
+기존 부채). 1A-b 착수 시 그 slice 가 capability-map §14.2 를 승격하면 함께 정정한다.
+
 ---
 
 ## 이 slice 가 하는 일
