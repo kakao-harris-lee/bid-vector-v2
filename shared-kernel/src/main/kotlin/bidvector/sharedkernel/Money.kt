@@ -1,0 +1,150 @@
+package bidvector.sharedkernel
+
+/**
+ * 원화 확정 금액. 다섯 성분
+ * (`amount`·`currency`·`basis`·`vatTreatment`·`provenance`)을 갖는다(`ADR 0002` D-1).
+ * `basis`는 생성자 파라미터가 아니라 각 구현이 내는 파생 값이다 — `copy()`로 basis를 바꿀 수
+ * 없다. `data-dictionary.md` §1.1 서명과의 형태 차이는 설계 검토 §5 L-4로 등재한다.
+ *
+ * 이 상위 타입에 `Comparable`이나 이항 연산을 두지 않는다 — 두면 서로 다른 basis 금액이
+ * `f(a: Money, b: Money)`로 다시 섞인다(설계 검토 §1a·§5 L-11, 「개념마다 타입 하나」의
+ * 단일 실패점).
+ */
+sealed interface Money {
+    val currency: Currency
+    val basis: Basis
+    val vatTreatment: VatTreatment
+    val provenance: Provenance
+}
+
+/** 원 단위 값. `shared-kernel` 밖으로 내지 않는다 — `R-BASIS-01` 컴파일 차단의 필요조건. */
+internal val Money.amount: Long
+    get() =
+        when (this) {
+            is BaseAmount -> won
+            is EstimatedAmount -> won
+            is YegaAmount -> won
+            is BidAmount -> won
+            is AllocatedBudget -> won
+            is AwardAmount -> won
+        }
+
+/**
+ * 다섯 성분을 함께 내는 유일한 공개 export 경로 — `R-BASIS-06`이 금지한 "값만 있고 출처가
+ * 없는 응답"을 구성상 만들 수 없다.
+ */
+data class AmountRecord(
+    val won: Long,
+    val currency: Currency,
+    val basis: Basis,
+    val vatTreatment: VatTreatment,
+    val provenance: Provenance,
+)
+
+fun Money.export(): AmountRecord = AmountRecord(amount, currency, basis, vatTreatment, provenance)
+
+private fun requireNonNegative(won: Long) {
+    require(won >= 0L) { "금액은 음수일 수 없다: $won" }
+}
+
+/** 기초금액 / 사업금액(`bssAmt` 계열). 개념 정의는 `data-dictionary.md` §1.2. */
+data class BaseAmount(
+    internal val won: Long,
+    override val currency: Currency,
+    override val vatTreatment: VatTreatment,
+    override val provenance: Provenance,
+) : Money,
+    Comparable<BaseAmount> {
+    override val basis: Basis = Basis.BASE_AMOUNT
+
+    init {
+        requireNonNegative(won)
+    }
+
+    override fun compareTo(other: BaseAmount): Int = won.compareTo(other.won)
+}
+
+/** 추정가격(`presmptPrce`). 운영자 결정 2026-09-04(A1)로 승인 명세 이름을 채택했다. */
+data class EstimatedAmount(
+    internal val won: Long,
+    override val currency: Currency,
+    override val vatTreatment: VatTreatment,
+    override val provenance: Provenance,
+) : Money,
+    Comparable<EstimatedAmount> {
+    override val basis: Basis = Basis.ESTIMATED
+
+    init {
+        requireNonNegative(won)
+    }
+
+    override fun compareTo(other: EstimatedAmount): Int = won.compareTo(other.won)
+}
+
+/** 예정가(`planned_price`). 개념은 `legacy-behavior`(`data-dictionary.md` §1.2). */
+data class YegaAmount(
+    internal val won: Long,
+    override val currency: Currency,
+    override val vatTreatment: VatTreatment,
+    override val provenance: Provenance,
+) : Money,
+    Comparable<YegaAmount> {
+    override val basis: Basis = Basis.YEGA
+
+    init {
+        requireNonNegative(won)
+    }
+
+    override fun compareTo(other: YegaAmount): Int = won.compareTo(other.won)
+}
+
+/** 투찰가. 기초금액에 투찰율을 곱해 얻는 파생값 — 유일한 생성 경로는 [MoneyArithmetic.kt]의 반올림 함수다. */
+data class BidAmount(
+    internal val won: Long,
+    override val currency: Currency,
+    override val vatTreatment: VatTreatment,
+    override val provenance: Provenance,
+) : Money,
+    Comparable<BidAmount> {
+    override val basis: Basis = Basis.BID
+
+    init {
+        requireNonNegative(won)
+    }
+
+    override fun compareTo(other: BidAmount): Int = won.compareTo(other.won)
+}
+
+/** 배정예산(`asignBdgtAmt`·`bdgtAmt`). 운영자 결정 2026-09-04(A3)로 1B 금액 타입 집합에 포함됐다. */
+data class AllocatedBudget(
+    internal val won: Long,
+    override val currency: Currency,
+    override val vatTreatment: VatTreatment,
+    override val provenance: Provenance,
+) : Money,
+    Comparable<AllocatedBudget> {
+    override val basis: Basis = Basis.ALLOCATED_BUDGET
+
+    init {
+        requireNonNegative(won)
+    }
+
+    override fun compareTo(other: AllocatedBudget): Int = won.compareTo(other.won)
+}
+
+/** 낙찰가. 운영자 결정 2026-09-04(A3)로 1B 금액 타입 집합에 포함됐다. */
+data class AwardAmount(
+    internal val won: Long,
+    override val currency: Currency,
+    override val vatTreatment: VatTreatment,
+    override val provenance: Provenance,
+) : Money,
+    Comparable<AwardAmount> {
+    override val basis: Basis = Basis.AWARD
+
+    init {
+        requireNonNegative(won)
+    }
+
+    override fun compareTo(other: AwardAmount): Int = won.compareTo(other.won)
+}
