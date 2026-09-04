@@ -149,16 +149,15 @@ first-match rule 은 1D 소유다.
 | --- | --- | --- | --- |
 | ~~`OPEN-1B-PROVENANCE-NAME`~~ | 값 타입 이름이 둘 — `shared-kernel` 코드는 `Provenance`, `data-dictionary.md`는 `FactProvenance`를 쓴다. 이 불일치는 A1·A2(`EstimatedAmount`/`Basis`)와 같은 표기 불일치 계열이지만, 그 둘과 달리 운영자 결정을 받은 적이 없다(verifier r1 M-4) | 운영자(명세 개정 권한) | **해소 — 운영자 결정 2026-09-04(decision 16): `Provenance` 채택.** 코드는 변경 없음(처음부터 `Provenance`). `data-dictionary.md` §5.1 표제·정의 자리와 §1.1 요약 표를 취소선으로 정정했다(A1·A2와 같은 처리) |
 
-### Codex 1차 발견 — 신규 1건 (#4, 미착수·결정 요청)
+### Codex 1차 발견 — 신규 1건 (#4, 해소됨 — 운영자 결정 2026-09-04 decision 17)
 
 | id | 미결 요지 | 결정 주체 | 결정 없이 만들 수 있는 것 / 막히는 것 |
 | --- | --- | --- | --- |
-| `OPEN-1B-STABLE-FACT-REF` | `DerivationRecord.inputs`가 `AmountRecord` 값 스냅샷만 담아, 값·`provenance`가 같은 **서로 다른** 입력 fact 를 구분하지 못한다(Codex 1차 #4). `OPEN-DIC-08` 해소문(B11)은 "값이 입력 fact 의 **안정적 참조**와 계산 정책 version 을 나른다"(선택지 ②)를 채택했고, "참조·version 을 나르는 정확한 필드 형태는 M1 1B 구현이 정한다"고 **형태**는 1B 에 위임했다 — 그러나 **그 참조가 무엇을 가리키는 값인가**(어떤 안정적 identity 를 어디서 얻는가)는 위임 밖이다 | 운영자·spec-writer(참조가 가리킬 identity 시스템 자체를 정하는 결정) | **막힘 — 이 slice 는 구현하지 않고 여기 등재만 한다(team-lead 지시대로 정지).** 조사 결과: `data-dictionary.md` §12.2 「식별자」갈래(`limitGroupNo`·`licenseRegionCode`·`noticeRevision`·`deliveryKey`·`observationKey`·`key`·`sourceKey`·`modelArtifactId`·`inputSnapshotHash`·`policyVersion`)에 열거된 아홉은 전부 **다른 capability 소유**(면허·공고·전송/재관측 dedup·ML 모델)의 기존 식별자이지, "`AmountRecord`/입력 `Money` 값 하나를 가리키는 안정적 참조"로 이미 정의된 필드가 **없다**. `inputSnapshotHash`는 `DecisionProvenance`(§4.1, B11 이 **불채택**한 선택지 ①의 carrier) 소유라 그대로 재사용하면 불채택된 설계의 식별자를 끌어오는 것이 된다. **`Money` 자체에 여섯째 성분으로 참조를 추가하는 것도 막힌다** — `ADR 0002` D-1("다섯 중 어느 하나라도 없는 금액은 `Money`가 아니다")이 다섯 성분을 고정했다. **content-addressed(해시) 참조를 새로 짓는 것도, 그 밖의 identity 체계를 새로 짓는 것도 이 slice 권한 밖이다** — 그 자체가 여러 capability 에 걸치는 새 cross-cutting 개념이라 명세 승인 대상이다(team-lead 지시). 코드·문서 변경 없음 |
+| ~~`OPEN-1B-STABLE-FACT-REF`~~ | `DerivationRecord.inputs`가 `AmountRecord` 값 스냅샷만 담아, 값·`provenance`가 같은 **서로 다른** 입력 fact 를 구분하지 못한다(Codex 1차 #4). `OPEN-DIC-08` 해소문(B11)은 "값이 입력 fact 의 **안정적 참조**와 계산 정책 version 을 나른다"(선택지 ②)를 채택했고, "참조·version 을 나르는 정확한 필드 형태는 M1 1B 구현이 정한다"고 **형태**는 1B 에 위임했다 — 그러나 **그 참조가 무엇을 가리키는 값인가**(어떤 안정적 identity 를 어디서 얻는가)는 위임 밖이었다 | 운영자(참조가 가리킬 identity 시스템 자체를 정하는 결정) | **해소 — 운영자 결정 2026-09-04(decision 17): B11 을 ①의 변형으로 조정.** 새 identity 체계를 짓는 대신 **파생값이 나르는 것 자체를 계산 정책 version 한 축으로 줄였다** — 안정적 참조 축(값·provenance가 같은 서로 다른 fact 를 구분하는 문제)은 값의 책임에서 빠지고, 그 되짚기는 판정의 `DecisionProvenance`(§4.1, M2~ 판정 레이어)가 소유하는 것으로 정본이 갱신됐다(`data-dictionary.md` §9·§11.1, 커밋 `e972930`). 구현: `DerivationRecord`에서 `inputs: List<AmountRecord>`를 제거하고 `policyVersion`만 남겼다 — `Derived<T>`·`Measurement.Measured`의 `internal constructor`+`@ConsistentCopyVisibility`(verifier r2 H-3)는 값과 정책 version의 결속을 여전히 보증하므로 그대로 유지했다. **대가**: 값과 판정이 떨어지면 값만으로는 입력을 되짚지 않는다 — B11 이 열었던 안정적 참조 축 자체를 조정이 접었다 |
 
 **착수를 막는 항목은 없다** — 위 OPEN 전부 「형태·타입 계약은 결정 없이 선다」쪽이고, 값·범위·명세
 집합 변경이 걸린 항목만 구현의 뒤쪽(정책 엔트리 값, example fixture 승격, 완료 조건 판정)에서
-막힌다. **예외**: `OPEN-1B-STABLE-FACT-REF`(Codex #4)는 형태 자체가 미결이라 이 예외에서
-빠진다 — 구현은 운영자 결정을 기다린다.
+막힌다. **예외 없음** — `OPEN-1B-STABLE-FACT-REF`(Codex #4)는 decision 17 로 해소됐다(위 표).
 
 ---
 
@@ -370,3 +369,48 @@ decision 16 은 **전건 해소**(A1·A2·D-1·D-2와 같은 갈래의 이름 �
 
 **역방향 파급**: 편집한 승인 문서(`data-dictionary.md`·`capability-map.md`·`milestone-1.md`)
 각각 stem 기준 grep 결과는 `checklist.md` 「이 slice 가 실측으로 새로 발견한 것」에 있다.
+
+### 2026-09-04 — Codex M1/1B 1차 리뷰 #4 수정 라운드: decision 17 구현
+
+**넓힌 범위 없음** — `docs/discovery/data-dictionary.md` §9·§11.1 의 decision 17 문면은
+세션 모델이 이미 커밋 `e972930`에서 등재했다(이 slice(kotlin-implementer) 는 그 문서를
+편집하지 않는다 — 여전히 out_of_scope). 이 라운드가 편집하는 것은 `shared-kernel/**`
+코드·테스트뿐이다.
+
+| # | 결정 | 정본 |
+| --- | --- | --- |
+| 17 | `OPEN-DIC-08`(B11) — ~~선택지 ②(입력 fact 참조 + 계산 정책 version)~~ → **①의 변형으로 조정.** 파생 `Money`(`BidAmount`)·파생 율(`AssessmentRate`·`AwardRate`·`BidRate`)은 **계산 정책 version만** 값에 싣는다. 입력 fact 로의 되짚기는 그 값을 낸 판정의 `DecisionProvenance`(§4.1, M2~ 판정 레이어)가 소유한다 — `AmountRecord` 값 스냅샷은 안정적 참조가 아니므로 더 이상 싣지 않는다 | `data-dictionary.md` §9·§11.1(해소, 커밋 `e972930`) · 위 `OPEN-1B-STABLE-FACT-REF` 행(해소) |
+
+**갈래**: **부분 철회**(B11 이 채택했던 「입력 fact 참조」 축을 접고 「계산 정책 version만」
+으로 운반 범위를 좁힌 조정 — 되짚기 자체를 포기하는 것이 아니라 그 소유를
+`DerivationRecord`에서 `DecisionProvenance`로 옮긴 것이다).
+
+**구현 요지**(`shared-kernel/**`, 커밋 `50e77d9`):
+- `Derivation.kt`: `DerivationRecord`에서 `inputs: List<AmountRecord>` 제거, `policyVersion`만
+  남김. `Derived<T>`·`Measurement.Measured`의 `internal constructor`+`@ConsistentCopyVisibility`
+  (verifier r2 H-3 처방)는 값 그대로 유지 — 값과 정책 version의 결속 보증은 decision 17과
+  무관하게 여전히 필요하다.
+- `MoneyArithmetic.kt`: `UnroundedBidAmount`의 `baseInput: AmountRecord` 필드(죽은
+  파라미터가 됨)를 제거하고 `times` 연산자의 `baseInput = export()` 인자도 뺐다. `asRate`
+  의 `inputs: List<AmountRecord>` 매개변수를 제거하고 `assessmentRateAgainst`·
+  `awardRateAgainst`·`bidRateAgainst` 세 호출부의 `listOf(export(), base.export())` 인자를
+  뺐다.
+- KDoc 정정(팀장 브리프가 지목한 「입력 fact 를 되짚는다 / 선택지 ② / `AmountRecord` 를
+  싣는다」 서술): `Derivation.kt`(`DerivationRecord`·`Derived` 양쪽) · `MoneyArithmetic.kt`
+  (`UnroundedBidAmount`·`asRate`) · `CompileFailureHarnessTest.kt`(fixture 8 KDoc). **`Carrier.kt`
+  는 실측 결과 그런 서술이 없어 편집하지 않았다** — 팀장 브리프가 그 파일도 지목했으나,
+  `grep -n "되짚\|선택지 ②\|B11\|AmountRecord" Carrier.kt`가 0건이었다(그 파일의 H-3 KDoc은
+  「판정처럼 모듈 밖에서 조립된다」는 조립·위조 방지 서술뿐, B11 되짚기 서술이 없다).
+- `AmountRecord` 자체는 제거하지 않았다 — `Money.export()`의 반환 타입이자 `MoneyTest`가
+  직접 참조하는 공개 export 경로로 여전히 쓰인다(`grep -rn "AmountRecord"` 실측, 이 결정과
+  무관한 소비처).
+- `ArithmeticTest.kt`의 B11 test(`같은 vat 이면 투찰율이 정상 산출되고 B11 입력 fact 를
+  되짚는다`)를 `derivedFrom.policyVersion`이 계산에 쓴 정책의 version 과 같음을 확인하는
+  test로 바꿨다(파생 넷 중 `roundedWith`·`bidRateAgainst` 둘을 덮는다 — 나머지 둘은 B9로
+  항상 `Unmeasurable`이라 이 test로 성공 경로를 못 낸다).
+
+**RED 확인**: `Derivation.kt`에서 `inputs` 필드만 먼저 제거한 상태로
+`./gradlew :shared-kernel:compileKotlin --no-daemon --no-build-cache`를 실행해 `MoneyArithmetic.kt:114`·
+`:175`에서 컴파일 실패(`No parameter with name 'inputs' found`·`Too many arguments for
+'constructor(policyVersion: PolicyVersion): DerivationRecord'`)를 실측했다 — 그 뒤 호출부를
+고쳐 GREEN 으로 옮겼다(`commands.md` 참고).

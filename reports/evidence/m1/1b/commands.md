@@ -306,3 +306,53 @@ example 로 고정돼 있다** — `ArithmeticTest`의
 - #3: `ArithmeticTest` 의 `Codex3` 둘 + 정정된 `P-2b` property 통과, `RoundedBidAmount`
   가 소수 하한 미달을 `Unmeasurable(ROUNDED_BELOW_FLOOR)` 로 냄을 확인
 - #4: `scope.md` `OPEN-1B-STABLE-FACT-REF` 신설 등재 확인, 코드 변경 없음(diff 그대로)
+
+## Phase 8 — Codex 1차 finding #4 수정 라운드(decision 17 구현) 뒤 acceptance 전건 재실행
+
+최종 HEAD `50e77d9`(decision 17 구현)에서 `scope.md` `acceptance_commands`(B-0~B-7) 전부를
+다시 돌렸다.
+
+- cmd: `./gradlew :shared-kernel:compileKotlin --no-daemon --no-build-cache` (RED 확인 —
+  `Derivation.kt`의 `inputs` 필드만 먼저 제거한 중간 상태)
+- exit: 1 — `MoneyArithmetic.kt:114`(`No parameter with name 'inputs' found`)·`:175`
+  (`Too many arguments for 'constructor(policyVersion: PolicyVersion): DerivationRecord'`)
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check --no-daemon)`  (B-0)
+- exit: 0 — 262 task 전건 실행(캐시 없음), 격리 worktree, `git worktree remove` 로 정리 완료
+- cmd: `./gradlew --no-build-cache clean check --no-daemon`  (B-1, 작업 트리)
+- exit: 0
+- cmd: `./gradlew :app:test --tests '*ArchitectureGate*' --no-daemon --no-build-cache`  (B-2)
+- exit: 0
+- cmd: `./gradlew :build-logic:test --no-daemon --no-build-cache`  (B-3)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:test --no-daemon --no-build-cache`  (B-4)
+- exit: 0 — 명령 포인터(하드코딩 금지, L-2·L-10 원칙):
+  ```
+  grep -oh 'tests="[0-9]*"' shared-kernel/build/test-results/test/TEST-bidvector.sharedkernel.*.xml
+  ```
+  실측: `ArithmeticTest` 20 · `CompileFailureHarnessTest` 17 · `MoneyTest` 9 · `PolicyTest` 7 ·
+  `RateTest` 6 · `RegressionExampleTest` 5 · `UndeclaredProvenanceTest` 8, 합 72 — Phase 7의
+  72와 **동일**(이 라운드는 test를 하나 고쳐 썼을 뿐 추가·삭제하지 않았다 — B11 test 하나가
+  policyVersion 대조로 바뀌었다)
+- cmd: `./gradlew qualityBaseline --no-daemon --no-build-cache`  (B-5)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:domainApiTypeGate :shared-kernel:domainSourceReferenceGate --no-daemon --no-build-cache`  (B-6·B-7)
+- exit: 0
+
+**하네스 레인 변경 재확인**: `git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/`
+— `551b603`·`f95feac` 둘(이번 세션 이전 커밋, `scope.md` 「하네스 레인 변경」 절에 이미
+등재됨) 외 신규 없음.
+
+**clean-tree 재확인**: `git status --short` — 빈 출력.
+
+**fixtures/** 미접촉 재확인**: `git diff --stat fd9f621..HEAD -- fixtures/ reports/evidence/m1/1b/golden-manifest.json reports/evidence/m1/1b/fixtures.md`
+— 빈 출력.
+
+**secret 스캔 재확인**: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1b/ shared-kernel/src/`
+— 매치는 스캔 명령 문자열을 인용한 문서 자신들뿐, 실제 비밀값 0.
+
+**Codex 1차 #4 재현 확인**: `grep -rn "\.inputs\b" shared-kernel/src` — 0건(`DerivationRecord.inputs`
+참조가 코드 어디에도 남지 않음). `AmountRecord` 는 `Money.export()`·`MoneyTest` 소비처가
+남아 제거하지 않음(`grep -rn "AmountRecord" shared-kernel/src` — main 2건·test 1건).
+`ArithmeticTest`의 개정된 B11 test(`같은 vat 이면 투찰율이 정상 산출되고 파생값은 계산
+정책 version 을 되짚는다`) 통과 — `derivedFrom.policyVersion`이 `roundedWith`·
+`bidRateAgainst` 양쪽에서 입력 정책의 version 과 같음을 확인.
