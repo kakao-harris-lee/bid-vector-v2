@@ -307,4 +307,81 @@ class SourceReferencesTest {
             )
         assertTrue(refs.none { it.fqn.startsWith("tree") }, "$refs")
     }
+
+    /**
+     * **verifier r20 H-1 — ① 원 재현(P10).** Kotlin 의 지역 변수 스코프는 **선언 지점부터**
+     * 시작한다 — 참조보다 **뒤쪽**에 둔 동명 지역 변수는 그 참조를 가리지 못한다(그 자리에서
+     * `java` 는 아직 선언되지 않았으므로 패키지로 해석된다. 컴파일도 실제로 된다 — `val x = …;
+     * val java = 1; return x + java`). 위치를 가리지 않던 이전 판별은 이 경우도 값 체인으로
+     * 오판해 미탐을 냈다.
+     */
+    @Test
+    fun `r20 H-1 참조보다 뒤쪽에 선언된 동명 지역 변수는 그 참조를 가리지 못한다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(): Int {\n" +
+                    "    val x = java.net.HttpURLConnection.HTTP_OK\n" +
+                    "    val java = 1\n" +
+                    "    return x + java\n" +
+                    "}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.net.HttpURLConnection" }, "$refs")
+    }
+
+    /** **verifier r20 H-1 — ② 앞쪽 선언 회귀.** 참조보다 앞선 동명 지역 변수는 여전히 가린다. */
+    @Test
+    fun `r20 H-1 참조보다 앞쪽에 선언된 동명 지역 변수는 그 참조를 여전히 가린다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(): Int {\n" +
+                    "    val java = Any().hashCode()\n" +
+                    "    return java.net.hashCode()\n" +
+                    "}\n",
+            )
+        assertTrue(refs.none { it.fqn.startsWith("java.net") }, "$refs")
+    }
+
+    /**
+     * **verifier r20 H-1 — ③a 중첩 블록, 바깥의 앞쪽 선언.** 바깥 블록의 **앞쪽** 선언은 그
+     * 안쪽 블록에서도 값 체인이다(조상 사슬 + 위치 조건 둘 다 만족).
+     */
+    @Test
+    fun `r20 H-1 바깥 블록의 앞쪽 선언은 안쪽 블록에서도 값 체인이다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(flag: Boolean): Int {\n" +
+                    "    val java = 1\n" +
+                    "    if (flag) {\n" +
+                    "        return java.net.hashCode()\n" +
+                    "    }\n" +
+                    "    return java\n" +
+                    "}\n",
+            )
+        assertTrue(refs.none { it.fqn.startsWith("java.net") }, "$refs")
+    }
+
+    /**
+     * **verifier r20 H-1 — ③b 중첩 블록, 바깥의 뒤쪽 선언.** 안쪽 블록의 참조보다 바깥 블록의
+     * 동명 선언이 텍스트상 **나중에** 오면(안쪽 블록이 끝난 뒤에 선언), 그 선언은 안쪽 블록의
+     * 참조를 가리지 못한다 — 위치 조건이 조상 사슬을 거슬러 올라가는 매 단계에서 각각 적용돼야
+     * 한다(바깥 블록 자체의 offset 비교도 안쪽 참조의 offset 기준이어야 한다).
+     */
+    @Test
+    fun `r20 H-1 바깥 블록의 뒤쪽 선언은 그보다 앞선 안쪽 블록의 참조를 가리지 못한다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(flag: Boolean): Int {\n" +
+                    "    if (flag) {\n" +
+                    "        return java.net.HttpURLConnection.HTTP_OK\n" +
+                    "    }\n" +
+                    "    val java = 1\n" +
+                    "    return java\n" +
+                    "}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.net.HttpURLConnection" }, "$refs")
+    }
 }
