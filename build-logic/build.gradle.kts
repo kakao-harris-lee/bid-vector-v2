@@ -82,6 +82,12 @@ tasks.withType<Test>().configureEach {
     inputs.file(architecturePolicy).withPropertyName("architecturePolicy")
     systemProperty("bidvector.architecture.policy", architecturePolicy.absolutePath)
 
+    // ApiTypePolicyTest·DomainApiTypeFixtureTest 가 public API 타입 표면의 금지 목록을 읽는다 —
+    // 위와 같은 이유로 input 선언 + 경로를 시스템 속성으로 넘긴다.
+    val apiTypePolicy = repoRoot.resolve("config/quality/api-type-policy.properties")
+    inputs.file(apiTypePolicy).withPropertyName("apiTypePolicy")
+    systemProperty("bidvector.apitype.policy", apiTypePolicy.absolutePath)
+
     // DomainSourceReferenceFixtureTest 가 app 모듈에 커밋된 fixture 를 같은 판정 로직으로
     // 재현한다 — project 의존을 만들지 않고 정책 파일과 같은 형태(경로를 시스템 속성으로)로 넘긴다.
     val violatingFixtures = repoRoot.resolve("app/src/test/kotlin/bidvector/archfixture/violating")
