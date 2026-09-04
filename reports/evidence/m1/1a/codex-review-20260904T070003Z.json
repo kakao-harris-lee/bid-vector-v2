@@ -1,0 +1,36 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "843b002b2b1c2412a5654d8247e437d16cee4dde",
+  "findings": [
+    {
+      "severity": "low",
+      "file": "reports/evidence/m1/1a/commands.md",
+      "line": 6,
+      "evidence": "이 줄은 여전히 `6b03c75..HEAD` 전체를 “slice의 커밋 집합”이라고 정의하지만, scope.md의 갱신된 계약은 slice 산출물을 in_scope 경로의 변경으로 한정하고 같은 range의 하네스 커밋 15개를 slice 산출물에서 제외한다. 실제 rollback과 리뷰 범위는 갱신된 계약대로 동작하므로 acceptance를 막지는 않지만 evidence 머리말이 정본과 어긋난다.",
+      "required_fix": "승인을 막지 않는 장부 정리다. C-0을 전체 리뷰 range의 커밋 목록이라고 표현하고, slice 산출물은 scope.md의 in_scope 경로 정의를 가리키도록 정정한다."
+    }
+  ],
+  "commands_run": [
+    "pwd; git rev-parse HEAD; git cat-file -e <base/head>^{commit}; git status --short --untracked-files=all에서 `.gradle-home/` 제외 대조",
+    "git log --oneline dbe50b6..843b002b2b1c2412a5654d8247e437d16cee4dde; git diff --stat/--name-status 6b03c75016a1d5437ca7ff932282fc477be974e6..843b002b2b1c2412a5654d8247e437d16cee4dde",
+    "sed·rg·git diff로 agent-workflow.md, v2-지침서.md, milestone-1.md, ADR 0002/0004/0006/0007, capability-map.md와 scope/commands/checklist/rollback 전체 계약 대조",
+    "build/test-results의 TEST-*.xml 16개 판독 — tests=192, failures=0, errors=0, skipped=0이며 생성 시각이 reviewed_head 커밋 이후임을 확인",
+    "build/reports의 API·source-reference·layout·gate-execution·dependency·ownership·jar·size·quality-baseline·compatibility 결과 대조; cmp -s build/reports/member-effects/derived.properties config/quality/member-effects.generated.properties",
+    "컴파일된 HEAD build-logic classpath와 JShell reflection으로 PublicApiTypes.extract 재실행 — 괄호형·중첩 괄호형·generic 내부의 Double 타입을 모두 추출함을 확인",
+    "독립 임시 clone에서 rollback.md의 `git restore --source=6b03c75 --staged --worktree -- <in_scope 경로>` 실행 — exit 0, D 129·M 6, base 대비 in_scope diff 없음, 하네스 경로 무변경",
+    "git log 6b03c75..HEAD -- CLAUDE.md .claude/와 scope.md 하네스 표 대조 — 양쪽 모두 15건",
+    "unzip -t gradle/wrapper/gradle-wrapper.jar; 실행 비트·SHA-256·wrapper properties 확인",
+    "domain main의 framework/DB/transport/raw numeric/side-effect 참조 정적 검색과 detekt·Kover·compatibility 산출물 판독",
+    "git diff --check 6b03c75016a1d5437ca7ff932282fc477be974e6..843b002b2b1c2412a5654d8247e437d16cee4dde"
+  ],
+  "residual_risks": [
+    "sandbox의 DatagramSocket 금지 때문에 Gradle을 직접 재실행하지 못했다. 대신 reviewed_head 커밋 이후 생성된 오프라인 acceptance 산출물, 테스트 XML과 컴파일된 build-logic을 재대조했다.",
+    "GitHub Actions 워크플로가 실제 원격 러너에서 실행됐다는 증거는 없다.",
+    "승인된 경계 문서에 명시된 raw API 게이트의 한계인 `Any` 경유, `@PublishedApi internal`, context 파라미터는 남아 있다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
