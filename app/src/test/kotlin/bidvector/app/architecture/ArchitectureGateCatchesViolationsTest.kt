@@ -129,7 +129,12 @@ class ArchitectureGateCatchesViolationsTest {
         val details =
             rules
                 .domainMayOnlyDependOnAllowedPackages(fixtureRoot)
-                .flatMap { rule -> rule.allowEmptyShould(true).evaluate(violating).failureReport.details }
+                .flatMap { rule ->
+                    rule
+                        .allowEmptyShould(true)
+                        .evaluate(violating)
+                        .failureReport.details
+                }
         listOf("InlinedConstantLeak", "FullyQualifiedReferenceLeak").forEach { fixture ->
             details.filter { it.contains(fixture) }.shouldBeEmpty()
         }

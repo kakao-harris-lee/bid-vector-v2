@@ -43,7 +43,9 @@ internal fun <T> parseKotlinFiles(
 ): List<T> {
     val kotlinFiles = files.filter { it.extension in KOTLIN_EXTENSIONS }
     if (kotlinFiles.isEmpty()) return emptyList()
-    return withKotlinPsi { factory -> kotlinFiles.flatMap { file -> parse(factory.createFile(file.name, file.readText()), file) } }
+    return withKotlinPsi { factory ->
+        kotlinFiles.flatMap { file -> parse(factory.createFile(file.name, file.readText()), file) }
+    }
 }
 
 /** 오프셋을 1-based 줄 번호로. 텍스트 기준이라 PSI 노드 종류를 가리지 않는다. */

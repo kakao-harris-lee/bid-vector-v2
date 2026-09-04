@@ -85,7 +85,10 @@ internal object SourceReferences {
         offset: Int,
         fileName: String,
         text: String,
-    ): List<SourceReference> = candidateForms(segments.orEmpty()).map { form -> SourceReference(fileName, text.lineOf(offset), form) }
+    ): List<SourceReference> =
+        candidateForms(segments.orEmpty()).map { form ->
+            SourceReference(fileName, text.lineOf(offset), form)
+        }
 
     /**
      * 소문자 세그먼트를 접두로 모으고 첫 대문자 세그먼트까지가 후보다(설계 검토 §4 단계 2·3).
@@ -96,9 +99,10 @@ internal object SourceReferences {
      * 대문자 세그먼트가 아예 없으면 값 체인이라 건너뛴다.
      */
     private fun candidateForms(segments: List<String>): List<String> {
-        if (segments.isEmpty() || segments.first().startsWithUpper()) return emptyList()
         val typeIndex = segments.indexOfFirst { it.startsWithUpper() }
-        if (typeIndex < 0) return emptyList()
+        val isSimpleNameOrValueChain = segments.isEmpty() || segments.first().startsWithUpper() || typeIndex < 0
+        if (isSimpleNameOrValueChain) return emptyList()
+
         val prefix = segments.subList(0, typeIndex).joinToString(".")
         val typeSegments = segments.subList(typeIndex, segments.size).takeWhile { it.startsWithUpper() }
         return typeSegments.indices.map { i -> "$prefix." + typeSegments.subList(0, i + 1).joinToString("$") }
@@ -117,22 +121,23 @@ internal object SourceReferences {
         return names.asReversed()
     }
 
-    private fun KtDotQualifiedExpression.segments(): List<String>? {
-        val names = mutableListOf<String>()
-        var current: KtExpression = this
-        while (true) {
-            when (val node = current) {
-                is KtDotQualifiedExpression -> {
-                    val selector = node.selectorExpression as? KtSimpleNameExpression ?: return null
-                    names += selector.getReferencedName()
-                    current = node.receiverExpression
+    private fun KtDotQualifiedExpression.segments(): List<String>? = collectSegments(emptyList())?.asReversed()
+
+    /** 뿌리 방향으로 재귀하며 세그먼트를 잎→뿌리 순서로 쌓는다. 사슬이 끊기면(호출 등) `null`. */
+    private fun KtExpression.collectSegments(accumulated: List<String>): List<String>? =
+        when (this) {
+            is KtDotQualifiedExpression -> {
+                (selectorExpression as? KtSimpleNameExpression)?.let { selector ->
+                    receiverExpression.collectSegments(accumulated + selector.getReferencedName())
                 }
-                is KtSimpleNameExpression -> {
-                    names += node.getReferencedName()
-                    return names.asReversed()
-                }
-                else -> return null
+            }
+
+            is KtSimpleNameExpression -> {
+                accumulated + getReferencedName()
+            }
+
+            else -> {
+                null
             }
         }
-    }
 }

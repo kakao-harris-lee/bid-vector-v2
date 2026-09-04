@@ -38,7 +38,10 @@ class ForbiddenFamilyCoverageTest {
             FAMILIES.flatMap { family ->
                 family.packages.map { pkg ->
                     {
-                        assertTrue(!sourcePolicy.admitsWildcard(pkg), "${family.name}(${family.source}) 의 패키지가 허용된다: $pkg")
+                        assertTrue(
+                            !sourcePolicy.admitsWildcard(pkg),
+                            "${family.name}(${family.source}) 의 패키지가 허용된다: $pkg",
+                        )
                     }
                 } +
                     family.classes.map { fqn ->
