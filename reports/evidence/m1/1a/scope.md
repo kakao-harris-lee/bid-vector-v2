@@ -550,3 +550,13 @@ public 으로 보인다(알려진 제한 7). 지금 세우면 그 되돌리는 �
 
 **남는 미달**: `fun rate(): Any` 경유 · `@PublishedApi internal` · `context` 파라미터.
 `checklist.md` 「알려진 제한」(37~43)이 든다.
+
+## slice 종결 — Codex approve + 사용자 승인 (운영자 승인 2026-09-04)
+
+`milestone-0.md` 의 종결 조건(Codex `approve` 와 사용자 승인)을 충족한다. Codex 17차
+`codex-review-20260904T070003Z.json` 이 `approve`(low 1 — C-0 문면, `c3123c0` 으로 정정)이고,
+reviewed_head 는 `843b002`. 사용자 승인은 2026-09-04 이 세션에서 「승인」 한 마디로 내려졌다.
+
+승인의 범위는 **slice 산출물의 완료**다. merge · push · 배포 · 외부 공개는 이 승인에 포함되지
+않으며 별도 지시가 있어야 한다(`agent-workflow.md` 1절). `OPEN-ADR-06`·`OPEN-ADR-14`·
+`OPEN-ADR-16` 은 열린 채로 남고 소유자는 각 항목이 적은 대로다.
