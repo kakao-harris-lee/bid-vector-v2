@@ -5,9 +5,11 @@ package bidvector.archfixture.violating.strategy
  * `milestone-1.md` 「완료 조건」이 금지하는 형태다.
  */
 class RawDoubleApi {
-    fun rate(): Double = 0.0
+    private val base = 1.0
 
-    val ratio: Double? = null
+    fun rate(): Double = base
+
+    val ratio: Double? = base.takeIf { it > 0 }
 
     fun weights(values: List<Double>): Long = values.size.toLong()
 }

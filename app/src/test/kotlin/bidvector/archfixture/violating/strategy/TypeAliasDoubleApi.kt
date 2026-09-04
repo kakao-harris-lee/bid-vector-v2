@@ -8,5 +8,7 @@ typealias Amount = Double
  * `PublicApiTypesTest` 의 인라인 테스트가 잰다 — 이 fixture 는 실제로 쓰이는 형태를 고정한다.
  */
 class TypeAliasDoubleApi {
-    fun amount(): Amount = 0.0
+    private val base: Amount = 1.0
+
+    fun amount(): Amount = base
 }

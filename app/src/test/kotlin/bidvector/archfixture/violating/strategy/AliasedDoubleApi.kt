@@ -11,7 +11,7 @@ import kotlin.Double as Scalar
  * 파라미터 자리가 이 fixture 의 요점을 그대로 지키면서 이 자리를 피한다.
  */
 class AliasedDoubleApi {
-    fun scalar(x: Scalar): Long = 0L
+    fun scalar(x: Scalar): Long = x.toLong()
 
     val inferred = 0.5
 }
