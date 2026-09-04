@@ -944,3 +944,60 @@ TDD — 위치 필터를 잠시 되돌려(`KtBlockExpression` 분기의 offset �
 clean-tree(경로 개별 인자, 실제 변경분과 일치)·비밀값 스캔(`git diff --cached` 커밋 전) —
 매치 없음. 승인 문서 무변경. 제한 47 정정 — 「선언보다 앞서 쓰면 컴파일이 거부된다」는 이전
 근거를 실측(`COMPILE_EXIT=0`)에 맞춰 위치 조건 서술로 바꿨다.
+
+### verifier r21 H-1' — 가리는 선언의 초기화식 안 참조는 가리지 않는다
+
+리포트 `_workspace/m1-1a/31_verifier_r21.md`. r20 H-1 정정(`startOffset` 비교)이 참조가 그
+선언 자신의 초기화식 안에 있는 경우(`val java = java.net.…`)를 가려지는 것으로 오판했다 — 비교
+기준을 `declaration.endOffset <= reference.startOffset` 로 바꿨다. `qualification` 모듈에
+임시로 두고 task 수준으로 재현·해소를 확인한 뒤 지웠다(`git status --short -- qualification/`
+로 확인).
+
+| # | 조작 | `:qualification:domainSourceReferenceGate` |
+| --- | --- | --- |
+| `E-113` | `SelfInitShadow.kt`(verifier 원 재현 — `val java = java.net.HttpURLConnection.HTTP_OK; return java`)를 둔다 | 1 — `SelfInitShadow.kt:5 java.net.HttpURLConnection — 허용 목록에 없다`(자기 초기화식 안 참조가 더는 가려지지 않는다) |
+| `E-114` | 지운다 | 0(양성 대조) |
+
+**acceptance 전건 재실행(술어 변경이라 `A-0` 격리 worktree 포함).**
+
+| # | cmd | exit |
+| --- | --- | --- |
+| `A-0` | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache --no-daemon clean check)` | 0 |
+| `A-1` | `./gradlew --no-build-cache --no-daemon clean check` | 0 |
+| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 |
+| `A-5` | `./gradlew :build-logic:test` — `SourceReferencesTest` 35개(신규 5)·`DomainSourceReferenceFixtureTest` 7개(신규 1) 포함, `build-logic` 전건 149 tests / 0 failed | 0 |
+
+TDD — 비교 기준을 `endOffset`에서 `startOffset`으로 잠시 되돌려 verifier 지정 5개 시나리오 중
+초기화식 의존 3건(자기 초기화식 `val`·`var`·초기화식 안 람다)만 실패하고 나머지 2건
+(`when(val)` subject·앞쪽 선언 회귀)은 그대로 통과함을 확인한 뒤 복원했다.
+
+clean-tree(경로 개별 인자, 실제 변경분과 일치)·비밀값 스캔(`git diff --cached` 커밋 전) —
+매치 없음. 승인 문서 무변경.
+
+**Kotlin 지역 스코프 경계 표 — `visibleLocalNames` 가 각 경계를 어떻게 판정하는지.** 이
+술어(형제 지역 선언의 가림 조건)를 세 번 고쳤다(r19 M-2 파일 전체 → Codex 14차 #1 조상 사슬 →
+r20 H-1 `startOffset` → r21 H-1' `endOffset`) — 다음은 그 경계를 직접 심어 `SourceReferences`
+로 추출해 대조한 결과다(`ScopeBoundaryProbeTest`, 검증 후 파기 — 커밋하지 않는다).
+
+| 경계 | 가림/안 가림/컴파일 불가 | 근거 |
+| --- | --- | --- |
+| 가림 시작 지점 | **선언의 `endOffset`부터**(자기 초기화식 안은 안 가림) | `KtBlockExpression` 형제 `KtProperty` 는 `declaration.endOffset <= reference.startOffset` 일 때만 가린다(이번 수정) |
+| 함수·람다·보조 생성자·접근자 파라미터 | **위치 무관 — 항상 가림** | Kotlin 은 함수 본문 전체에서 파라미터가 처음부터 보인다. 구현은 `valueParameters`/`parameter` 를 오프셋 비교 없이 그대로 추가한다 |
+| 감싸는 클래스 프로퍼티·주 생성자 파라미터, 파일 top-level 프로퍼티·import 별칭 | **위치 무관 — 항상 가림** | 같은 이유(Kotlin 자체가 위치 무관) — 구현도 오프셋 비교 없이 추가한다 |
+| 중첩 블록 | **각 조상 블록마다 독립적으로 같은 위치 조건** | `visibleLocalNames` 가 조상 사슬을 거슬러 올라가며 매 `KtBlockExpression` 에서 같은 `referenceOffset` 기준으로 그 블록의 형제만 본다 — `SourceReferencesTest`의 r20 H-1 ③a·③b 두 단언(바깥 앞쪽은 안쪽에서 값 체인·바깥 뒤쪽은 안쪽 참조를 못 가림)으로 안팎 두 방향 모두 실측 |
+| 명명된 람다 파라미터(`{ tree -> tree.Node() }`) | **가림** | `KtFunctionLiteral.valueParameters` 로 잡힌다(Codex 14차 #1 ③) |
+| **`it` 무명 파라미터** | **안 가림 — 구현이 다루지 않는다** | `it` 는 명시적 `KtParameter` PSI 노드가 없어 `valueParameters` 가 비어 있다 — `list.map { it.Node() }` 형태의 `it.Foo` 는 소문자 뿌리 다음이 대문자라 **후보가 생성된다**(오늘 실측: `it.Node`). M-2 와 같은 형태지만 이름 있는 파라미터와 달리 **닫히는 방향**(정당한 도메인 코드를 오탐으로 막을 수 있다)이라 게이트 술어 원칙상 안전하지만, 이름 있는 파라미터와의 비대칭이다 — 아래 「구현이 못 다루는 항목」 참고 |
+| 지역 함수 이름(`fun java() = 1`) | **안 가림(정당)** | `KtNamedFunction` 은 블록 순회에서 `KtProperty` 로 안 잡힌다 — Kotlin 도 함수 이름은 단순 식별자로 값 해석되지 않아 `java.net.…` 이 패키지로 풀린다(실측: `references=[java.net.HttpURLConnection]`) |
+| 지역 클래스 이름(`class java`) | **안 가림(정당)** | `KtClass` 도 `KtProperty` 아님 — 값이 아닌 타입이라 Kotlin 도 안 가린다(실측 동일) |
+| `for (java in …)` 루프 변수 | **안 가림(정당, 루프 밖에서는 스코프 자체가 없다)** | `KtParameter` 가 `KtBlockExpression.statements` 에 없다 — 루프가 끝나면 Kotlin 스코프에서도 사라진다(실측 동일). 루프 **안**에서 진짜로 가려지는 경우는 `.net` 이 존재하지 않는 멤버라 애초에 컴파일이 안 된다 |
+| `catch (java: Exception)` | **안 가림(정당, catch 블록 밖은 스코프 자체가 없다)** | 위와 같은 구조 — `catch` 파라미터는 그 블록 안에서만 Kotlin 스코프고, 그 블록 밖 참조는 조상 사슬에 없다(실측 동일) |
+| 구조 분해(`val (java, other) = …`) | **안 가림 — 위치 무관하게 항상 안 가림(잔여)** | `KtDestructuringDeclaration` 은 `KtProperty` 가 아니다 — **앞쪽에 둬도** 안 가린다. 실제로는 `.net` 없는 타입이라 그 형태 자체가 컴파일 안 되는 경우가 대부분이라 안전하지만, `endOffset` 규칙이 구조 분해까지는 미치지 않는다는 뜻이다 |
+| 백틱 이름(`` val `java` = 1 ``) | **가림(정당 — 보통의 `KtProperty` 와 동일)** | `.name` 이 백틱을 벗기므로 일반 지역 `val` 과 똑같이 처리된다(실측: `references=[]`) |
+| `when (val java = …)` subject | **가림 없음이 필요 없다 — 원래 조상 사슬에 없다** | subject 변수는 `KtBlockExpression.statements` 가 아니라 `KtWhenExpression` 의 자식이라 블록 순회가 애초에 보지 못한다(verifier r21 H-1' ③, 오늘 실측으로 재확인) |
+
+**표에서 구현이 못 다루는 항목.** `it` 무명 람다 파라미터 하나 — 명명된 파라미터는
+Codex 14차 #1 이 값 체인으로 잡지만 `it` 는 PSI 에 파라미터 노드가 없어 같은 처리를 할 수
+없다. 다만 이 비대칭의 방향은 **닫힘**(정당한 `it.PascalCaseMember` 형태를 오탐으로 막을 수
+있다)이라 게이트 술어의 원칙(오탐이 미탐보다 낫다)에 어긋나지 않는다 — 미탐이 아니므로 이번
+라운드의 수정 대상이 아니다. 실제 도메인 코드에 등장하면 회피책은 제한 34①과 같다(이름 있는
+파라미터로 바꾼다).
