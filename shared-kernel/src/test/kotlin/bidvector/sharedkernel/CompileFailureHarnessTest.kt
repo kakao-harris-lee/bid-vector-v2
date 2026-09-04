@@ -91,10 +91,30 @@ class CompileFailureHarnessTest {
         assertPositiveCompiles("6-input-money-direct-construction")
     }
 
+    /**
+     * verifier r2 L-7 — fixture 3·5·8·9·10 에는 변이 쌍둥이가 있었는데 6·7 에는 없었다.
+     * 3·5 와 같은 자리(정당한 양성 경로에 오타만 넣는다)에 채운다.
+     */
+    @Test
+    fun `6-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "6-derived-money-direct-construction-typo",
+            realDiagnosticFragment = "cannot access",
+        )
+    }
+
     @Test
     fun `7 vat 고정 Money 는 vatTreatment 인자를 받지 않고 인자 없이는 생성할 수 있다 (운영자 결정 B9)`() {
         assertNegativeFails("7-vat-fixed-money-explicit-vat", "too many arguments for")
         assertPositiveCompiles("7-vat-fixed-money-no-vat-arg")
+    }
+
+    @Test
+    fun `7-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다 (verifier r2 L-7)`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "7-vat-fixed-money-explicit-vat-typo",
+            realDiagnosticFragment = "too many arguments for",
+        )
     }
 
     /**

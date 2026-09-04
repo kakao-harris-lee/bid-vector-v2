@@ -1,0 +1,9 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BaseAmount
+import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.Provenance
+import bidvector.sharedkernel.VatTreatment
+
+fun makeBaseAmountTypo(provenance: Provenance): BaseAmount =
+    BaseAmount(999_999L, Currency.KRW, VatTreatment.INCLUSIVE, provenanceTypo)

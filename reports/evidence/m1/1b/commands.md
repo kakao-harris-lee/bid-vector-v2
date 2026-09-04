@@ -25,7 +25,8 @@ git diff --stat 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD
 - exit: 0 (매 회)
 - 핵심 결과: 게이트 전건(`domainApiTypeGate`·`domainSourceReferenceGate`·`packageOwnershipGate`·
   `jarContentGate`·`sizeGate`·ktlint·detekt·`sourceSetLayoutGate`·`gateExecutionGate`·kover)
-  통과, test 31건 0 실패 0 skip
+  통과, 0 실패 0 skip(당시 test 수는 그 시점 기록이라 낡는다 — **verifier r2 L-10 정정**:
+  현재 test 수는 이 문서 하드코딩이 아니라 Phase 5 절의 명령 포인터가 정본이다)
 
 - cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)`  (B-0)
 - exit: 0

@@ -1,0 +1,8 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.Provenance
+import bidvector.sharedkernel.YegaAmount
+
+fun makeYegaTypo(provenance: Provenance): YegaAmount =
+    YegaAmount(1_000_000L, Currency.KRW, provenanceTypo)
