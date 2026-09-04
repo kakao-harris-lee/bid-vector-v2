@@ -259,3 +259,50 @@ example 로 고정돼 있다** — `ArithmeticTest`의
   `IllegalArgumentException` 을 던짐을 확인
 - low: `CompileFailureHarnessTest` 의 `6-M2`·`7-M2` 변이 test, `checklist.md` 의 L-9·L-10
   등재, 이 문서 Phase 3 절의 「31건」 정정 확인
+
+## Phase 7 — Codex 1차 리뷰 수정(#1~#4) 뒤 acceptance 전건 재실행
+
+최종 HEAD `f6363b1`(Codex 1차 finding 넷 — `0ffd32c` #1, `480eb57` #2, `aa64f02` #3,
+`f6363b1` #4(등재만))에서 `scope.md` `acceptance_commands`(B-0~B-7) 전부를 다시 돌렸다.
+
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check --no-daemon)`  (B-0)
+- exit: 0 — 262 task 전건 실행(캐시 없음), 격리 worktree
+- cmd: `./gradlew --no-build-cache clean check --no-daemon`  (B-1, 작업 트리)
+- exit: 0
+- cmd: `./gradlew :app:test --tests '*ArchitectureGate*' --no-daemon --no-build-cache`  (B-2)
+- exit: 0
+- cmd: `./gradlew :build-logic:test --no-daemon --no-build-cache`  (B-3)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:test --no-daemon --no-build-cache`  (B-4)
+- exit: 0 — 명령 포인터(하드코딩 금지, L-2·L-10 원칙):
+  ```
+  grep -oh 'tests="[0-9]*"' shared-kernel/build/test-results/test/TEST-bidvector.sharedkernel.*.xml
+  ```
+  실측: `ArithmeticTest` 20 · `CompileFailureHarnessTest` 17 · `MoneyTest` 9 · `PolicyTest` 7 ·
+  `RateTest` 6 · `RegressionExampleTest` 5 · `UndeclaredProvenanceTest`(신설) 8, 합 72
+  (Codex #1 이 새 class 로 분리한 8 + #2 의 MoneyTest 신규 4 + #3 의 ArithmeticTest 신규 2 로
+  58 → 72)
+- cmd: `./gradlew qualityBaseline --no-daemon --no-build-cache`  (B-5)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:domainApiTypeGate :shared-kernel:domainSourceReferenceGate --no-daemon --no-build-cache`  (B-6·B-7)
+- exit: 0
+
+**하네스 레인 변경 재확인**: `git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/`
+— 여전히 없음.
+
+**clean-tree 재확인**: `git status --short` — 빈 출력.
+
+**fixtures/** 미접촉 재확인**: `git diff --stat fd9f621..HEAD -- fixtures/ reports/evidence/m1/1b/golden-manifest.json reports/evidence/m1/1b/fixtures.md`
+— 빈 출력(이번 라운드가 그 경로들을 하나도 건드리지 않았다).
+
+**secret 스캔 재확인**: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1b/ shared-kernel/src/`
+— 매치는 스캔 명령 문자열을 인용한 문서 자신들뿐, 실제 비밀값 0.
+
+**Codex 1차 finding 별 재현 확인**:
+- #1: `UndeclaredProvenanceTest` 전 8 test 통과(times→roundedWith·assessmentRateAgainst·
+  awardRateAgainst·bidRateAgainst·sumOfBaseAmounts 전 경로에서 `Undeclared` 거부 확인)
+- #2: `MoneyTest` 의 `Codex2` 넷(같은 vat 비교·다른 vat 거부·UNKNOWN 대 UNKNOWN 거부·property)
+  통과, 여섯 타입에 `Comparable` 미구현 확인(컴파일 자체가 증거)
+- #3: `ArithmeticTest` 의 `Codex3` 둘 + 정정된 `P-2b` property 통과, `RoundedBidAmount`
+  가 소수 하한 미달을 `Unmeasurable(ROUNDED_BELOW_FLOOR)` 로 냄을 확인
+- #4: `scope.md` `OPEN-1B-STABLE-FACT-REF` 신설 등재 확인, 코드 변경 없음(diff 그대로)
