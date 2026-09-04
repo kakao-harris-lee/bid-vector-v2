@@ -27,7 +27,14 @@ internal fun Target.surfaceReferences(): List<Pair<String, KtTypeReference?>> =
         }
 
         is KtProperty -> {
-            listOf(" 의 타입" to d.typeReference, " 의 확장 수신자" to d.receiverTypeReference)
+            listOf(
+                " 의 타입" to d.typeReference,
+                " 의 확장 수신자" to d.receiverTypeReference,
+                // `val rate get(): Double = …` 처럼 프로퍼티 자신이 아니라 getter 가 타입을
+                // 명시하는 자리(verifier r18 F-2) — 명시됐으면 타입 미명시가 아니라 이 축(금지
+                // 타입 단언)이 잡아야 한다.
+                " 의 접근자 반환 타입" to d.getter?.returnTypeReference,
+            )
         }
 
         is KtSecondaryConstructor -> {
@@ -68,11 +75,19 @@ private fun Target.functionUntypedReason(function: KtNamedFunction): String? =
     "함수 본문에서 반환 타입이 추론된다"
         .takeIf { isInScope() && !function.hasBlockBody() && function.typeReference == null }
 
-private fun Target.propertyUntypedReason(property: KtProperty): String? =
-    "초기화식/위임에서 타입이 추론된다"
-        .takeIf {
-            isInScope() && property.typeReference == null && (property.hasInitializer() || property.hasDelegate())
-        }
+/**
+ * **verifier r18 F-2.** 초기화식·위임뿐 아니라 **접근자 본문만 있는 프로퍼티**도 타입 미명시다
+ * (`val rate get() = 0.5`) — 이전 조건은 `hasInitializer() || hasDelegate()` 만 봐서 접근자
+ * 전용 형태를 놓쳤다. 다만 **getter 가 스스로 반환 타입을 명시하면**(`get(): Double = …`)
+ * 타입 미명시가 아니다 — 그 타입은 `surfaceReferences` 가 별도 슬롯으로 잡아 금지 타입
+ * 단언으로 넘긴다.
+ */
+private fun Target.propertyUntypedReason(property: KtProperty): String? {
+    val getter = property.getter
+    val isUntyped = property.typeReference == null && getter?.returnTypeReference == null
+    val hasInferredSource = property.hasInitializer() || property.hasDelegate() || getter?.hasBody() == true
+    return "초기화식/위임/접근자에서 타입이 추론된다".takeIf { isInScope() && isUntyped && hasInferredSource }
+}
 
 internal fun KtFile.importAliases(): Map<String, String> =
     importDirectives

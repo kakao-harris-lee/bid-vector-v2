@@ -69,6 +69,49 @@ class PublicApiTypesTest {
         assertEquals(2, surface.untyped.size)
     }
 
+    /**
+     * **verifier r18 F-2.** 접근자 본문만 있는 프로퍼티(초기화식도 위임도 없다)는 기존 조건
+     * (`hasInitializer() || hasDelegate()`)이 false 라 타입 미명시로 잡히지 않았다 — 넓힘 ④가
+     * 막으려던 바로 그 우회로(`val rate = 0.5` 는 막히는데 `val rate get() = 0.5` 는 연다).
+     */
+    @Test
+    fun `F-2 getter 본문만 있고 타입이 없는 프로퍼티는 타입 미명시다`() {
+        val surface = PublicApiTypes.extract("Probe.kt", "package p\n\nclass C {\n    val rate get() = 0.5\n}\n")
+        assertEquals(1, surface.untyped.size, "${surface.untyped}")
+        assertTrue(
+            surface.untyped
+                .single()
+                .declaration
+                .contains("rate"),
+        )
+        assertTrue(surface.uses.none { it.name == "Double" }, "${surface.uses}")
+    }
+
+    @Test
+    fun `F-2 var 의 getter 본문만 있어도 타입 미명시다`() {
+        val surface =
+            PublicApiTypes.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    var margin\n        get() = 0.5\n        set(value) {}\n}\n",
+            )
+        assertTrue(surface.untyped.any { it.declaration.contains("margin") }, "${surface.untyped}")
+    }
+
+    /** getter 가 반환 타입을 명시하면 그것을 프로퍼티의 타입 표면으로 본다 — 금지 타입 단언이 잡아야 한다. */
+    @Test
+    fun `F-2 getter 가 반환 타입을 명시하면 타입 미명시가 아니라 금지 타입 단언이 잡는다`() {
+        val surface =
+            PublicApiTypes.extract("Probe.kt", "package p\n\nclass C {\n    val rate\n        get(): Double = 0.5\n}\n")
+        assertTrue(surface.untyped.isEmpty(), "${surface.untyped}")
+        assertTrue(surface.uses.any { it.name == "Double" && it.declaration.contains("rate") }, "${surface.uses}")
+    }
+
+    @Test
+    fun `F-2 private 프로퍼티의 getter 전용 타입 미명시는 대상이 아니다`() {
+        val surface = PublicApiTypes.extract("Probe.kt", "package p\n\nclass C {\n    private val x get() = 0.5\n}\n")
+        assertTrue(surface.untyped.isEmpty(), "${surface.untyped}")
+    }
+
     @Test
     fun `블록 본문 함수와 타입 명시 프로퍼티는 타입 미명시가 아니다`() {
         val surface =

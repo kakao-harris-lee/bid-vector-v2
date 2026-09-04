@@ -66,6 +66,25 @@ class DomainApiTypeFixtureTest {
     }
 
     /**
+     * **verifier r18 F-2.** 접근자 본문만 있고 타입이 없는 프로퍼티(초기화식·위임 없음)도
+     * 타입 미명시다 — `val rate = 0.5` 는 막히고 `val rate get() = 0.5` 는 열리던 우회로.
+     */
+    @Test
+    fun `GetterOnlyDoubleApi 는 타입 미명시로 잡힌다`() {
+        val file = File(VIOLATING, "strategy/GetterOnlyDoubleApi.kt")
+        val surface = PublicApiTypes.extract(file.path, file.readText())
+        val violations = surface.uses.filter { apiPolicy.forbids(it.name) != null }
+        assertTrue(violations.isEmpty(), "$violations")
+        assertEquals(1, surface.untyped.size, "${surface.untyped}")
+        assertTrue(
+            surface.untyped
+                .single()
+                .declaration
+                .contains("rate"),
+        )
+    }
+
+    /**
      * **사각의 양성 고정 — 소스 참조 층(13차)도 같은 fixture 를 못 본다.** 수식 없는 `Double`
      * 은 단순 이름이라 `SourceReferences` 가 아예 수집하지 않고(S-2 단언은 소문자 접두가
      * 있어야 후보를 만든다), `AliasedDoubleApi` 의 별칭 import(`kotlin.Double as Scalar`)는
