@@ -102,7 +102,7 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | L-8 | `Provenance` ↔ `FactProvenance` 이름 불일치 | **승인 명세 표기(`Provenance`)를 채택.** A1·A2 와 같은 갈래 |
 | L-9 | `a == b` 만 쓰면 `UNKNOWN`×`UNKNOWN` 이 통과 | **닫혔다.** `sameKnownVat`(`a == b && a != UNKNOWN`) 를 산술 함수 전건의 유일한 자리로 두고 property test(P-3c)로 고정했다 |
 | L-10 | 잘못된 단위 거부 — 상한 밴드를 두면 D-4 금지 경로가 됨 | **하한만 둔다.** `Rate.init` 이 `fraction.signum() >= 0` 만 요구. E-4 example test 가 「2.0 을 클램프하지 않는다」를 고정한다 |
-| L-11 | `Money` 상위 타입에 이항 연산이 들어가면 basis 차단이 무너짐 | **지켰다.** `Money` 는 `Comparable`·이항 연산을 구현하지 않는다. 각 금액 타입이 자기 축의 `Comparable<Self>` 만 구현 |
+| L-11 | `Money` 상위 타입에 이항 연산이 들어가면 basis 차단이 무너짐 | **지켰다(Codex 1차 #2 로 처방이 갈렸다 — 이 행은 그 갈림을 반영해 갱신).** `Money` 는 여전히 `Comparable`·이항 연산을 구현하지 않는다. **각 금액 타입도 더는 자기 축의 공개 `Comparable<Self>`를 구현하지 않는다** — `won`만 비교해 `VAT`를 안 보던 결함(Codex #2)을 고치며 아예 없앴다. 비교는 `sameKnownVat` 전건을 건 `compareKnownVat(...)`(→ `Fact<Int>`)가 유일한 경로다. basis 교차 비교 차단은 여전히 지켜진다 — 제네릭 `T : Money`가 같은 타입만 받는다 |
 | L-12 | 서브패키지 분할이 `packagesMustBeFreeOfCycles` 순환을 만듦(금액↔율) | **평면 패키지 하나(`bidvector.sharedkernel`)로 지켰다** |
 
 ### 이 slice 가 실측으로 새로 발견한 것
@@ -187,11 +187,12 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | L-11 | `rollback.md` 의 awk 파생이 in_scope 항목 줄이 `out_of_scope` 관례(`a · b · c` 한 줄에 여럿)를 쓰면 깨진 pathspec 하나를 조용히 만들 수 있다(지금 in_scope 에 그런 줄은 0건). 확인 지점 2(개수 대조)는 이 오류를 못 잡는다 — 수는 맞고 내용만 틀리기 때문이다 | **닫혔다.** `rollback.md` 의 awk 파생 뒤 각 줄을 `·` 로 다시 나눠 항목마다 배열 원소로 넣게 하고, 새 확인 지점 5(파생된 pathspec 각각이 `git ls-files` 로 실재 경로에 매치되는지, restore 전에 강제 확인)를 추가했다. 임시 clone 에서 `in_scope` 에 `·` 로 묶인 줄을 실제로 넣어 파생이 두 개별 경로로 정확히 갈라짐을 실측했다(verifier r3 가 H-4 를 검증한 것과 같은 「실제로 늘려서 따라오는지 본다」 방법) |
 | L-12 | 하네스 `6-M2` KDoc 이 "fixture 3·5·8·9·10 에는 변이 쌍둥이가 있었는데 6·7 에는 없었다"로 적으나 8·9·10 은 자기 쌍둥이와 같은 커밋에서 생겨 그 「없었다」의 시점이 성립하지 않는다(production 이력 서술) | **닫혔다.** KDoc 을 이력 비교 대신 현재 규칙만 적도록 정정했다 — "모든 음성 fixture 는 변이 쌍둥이를 갖는다"(verifier r1 M-2 원칙) |
 
-### Codex 1차 발견 — #1 처리 결과
+### Codex 1차 발견 — #1·#2 처리 결과
 
 | # | 요지 | 처리 |
 | --- | --- | --- |
 | #1 | `MoneyArithmetic` 의 산술·파생 성공 경계(`times`→`roundedWith`·`divideForRate`·`sumOfBaseAmounts`)가 `Provenance.Undeclared`를 검사하지 않고 성공 `Measured`로 통과시킨다 — `v2-지침서.md` §4.1("provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다")을 어긴다 | **닫혔다.** `hasDeclaredProvenance` 전건을 신설해 세 성공 경계 전부(`UnroundedBidAmount.roundedWith`·`divideForRate`(→`assessmentRateAgainst`·`awardRateAgainst`·`bidRateAgainst`가 공유)·`sumOfBaseAmounts`의 `accumulate`)에 건다. 새 `ReasonCode.UNDECLARED_PROVENANCE`. **순서 결정**: provenance 검사를 vat·overflow 검사보다 먼저 한다 — 여러 실패가 동시에 걸려도 "출처를 모른다"가 먼저 나온다. **`OPEN-DIC-06`(어댑터 write 경로가 `Undeclared`를 거부하는가)과는 다른 축임을 KDoc·test 양쪽에 명시** — 그 결정은 수집 시점 수용 여부이고, 여기서 막는 것은 이미 도메인에 들어온 값의 계산이다(data-dictionary.md 자신이 그 결정을 "어댑터의 의무"로 분류해 이 문서가 정할 자리가 아니라고 적는다 — 그래서 OPEN-DIC-06 을 건드리지 않고도 이 finding 을 닫을 수 있었다). **테스트 설계 메모**: `YegaAmount`/`AwardAmount`는 B9(vatTreatment 고정 Unknown)로 `assessmentRateAgainst`/`awardRateAgainst`가 이미 항상 `Unmeasurable`이라 "declared 면 성공" 대조를 못 낸다 — 그 대조(property, 임의 provenance 조합에서 Undeclared 하나라도 있으면 실패·아니면 성공)는 vat 제약이 없는 `bidRateAgainst`(`BidAmount`×`BaseAmount`)로 냈다 |
+| #2 | 여섯 `Money` 타입의 `compareTo`가 `won`만 비교해 `VAT` `UNKNOWN`/`INCLUSIVE` 도 정렬되고, 동일 금액이면 `VAT` 가 달라도 0을 냈다 — `data-dictionary.md` 의 "Unknown 금액은 다른 과세 처리의 금액과 산술 비교에 들어갈 수 없다" 규칙 위반 | **닫혔다 — team-lead 결정대로 공개 `Comparable<Self>` 를 여섯 타입 전부에서 제거**하고 `sameKnownVat` 전건을 건 명시 API `compareKnownVat(left, right)` 로 대체했다(`Money.kt`, `export()` 옆). `UNKNOWN`/`UNKNOWN`·서로 다른 known VAT 비교가 실패하는 test, 같은 vat 이면 `won` 순서와 일치하는 property test 를 추가했다. **반환 타입 갈림(달리한 결정)**: 전달문은 "`VAT_TREATMENT_MISMATCH`/`Unmeasurable` 반환"이라 적었으나, `Measurement.Measured` 는 `policyVersion`/`sampleSize` 를 요구하고 비교에는 그 둘의 자연스러운 입력이 없다(정책을 소비하지 않는다) — 지어내면 매직 넘버 금지 원칙과 같은 성질의 문제가 된다. `sumOfBaseAmounts`(같은 "정책 비소비" 성질의 함수)가 이미 `Fact` 를 쓰는 것과 같은 판단으로, `Measurement.Unmeasurable` 대신 **`Fact.Absent(VAT_TREATMENT_MISMATCH)`** 를 썼다 — 사유 어휘(`VAT_TREATMENT_MISMATCH`)는 전달문 그대로다. 기존 `MoneyTest` 의 `compareTo` 기반 test(같은 `basis` 비교 확인용) 도 `compareKnownVat` 로 옮겼다 |
 
 ## 이월 항목
 
