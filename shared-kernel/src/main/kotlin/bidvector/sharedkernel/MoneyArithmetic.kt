@@ -43,13 +43,23 @@ class UnroundedBidAmount internal constructor(
      * 입력 `BaseAmount`의 `provenance`가 `Undeclared`면 다른 검사보다 먼저 막는다
      * (`v2-지침서.md` §4.1, Codex 1차 #1) — "출처를 모른다"는 값 오염이 계산에 들어가지
      * 않는다.
+     *
+     * `floor`(적용 하한, Codex 1차 #3) — 준다면 반올림 결과가 그 미만일 때
+     * `ROUNDED_BELOW_FLOOR`로 막는다. 하한 자신이 소수일 수 있다(하한율×기초금액 같은
+     * 계산에서 나온다) — `1000.4`를 `scale=0`·`DOWN`으로 내리면 `1000`이고 이는 `1000.4`
+     * 미만이다(`data-dictionary.md` §1.1 정의 ②·`capability-map.md` DEC-02 무조건
+     * acceptance). 기본값 `null`은 이 축을 아직 모르는 기존 호출부와 호환된다 — 하한을
+     * 아는 호출부만 이 보증을 켠다.
      */
-    fun roundedWith(policy: Resolution.Resolved<RoundingPolicy>): Measurement<Derived<BidAmount>> {
+    fun roundedWith(
+        policy: Resolution.Resolved<RoundingPolicy>,
+        floor: BigDecimal? = null,
+    ): Measurement<Derived<BidAmount>> {
         val scaling = runCatching { raw.setScale(policy.value.scaleDigits, policy.value.mode) }
         return when {
             !hasDeclaredProvenance(provenance) -> Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
             scaling.isFailure -> Measurement.Unmeasurable(ReasonCode.ROUNDING_NOT_REPRESENTABLE)
-            else -> extractWon(scaling.getOrThrow(), policy)
+            else -> extractWon(scaling.getOrThrow(), policy, floor)
         }
     }
 
@@ -62,23 +72,37 @@ class UnroundedBidAmount internal constructor(
     private fun extractWon(
         scaled: BigDecimal,
         policy: Resolution.Resolved<RoundingPolicy>,
+        floor: BigDecimal?,
     ): Measurement<Derived<BidAmount>> {
         val hasFraction = scaled.signum() != 0 && scaled.stripTrailingZeros().scale() > 0
         return when {
             hasFraction -> Measurement.Unmeasurable(ReasonCode.ROUNDING_NOT_REPRESENTABLE)
-            else -> extractLongValue(scaled, policy)
+            else -> extractLongValue(scaled, policy, floor)
         }
     }
 
     private fun extractLongValue(
         scaled: BigDecimal,
         policy: Resolution.Resolved<RoundingPolicy>,
+        floor: BigDecimal?,
     ): Measurement<Derived<BidAmount>> {
         val extraction = runCatching { scaled.longValueExact() }
         return when {
-            extraction.isFailure -> Measurement.Unmeasurable(ReasonCode.AMOUNT_OVERFLOW)
-            extraction.getOrThrow() < 0L -> Measurement.Unmeasurable(ReasonCode.NEGATIVE_AMOUNT)
-            else -> measured(extraction.getOrThrow(), policy.version)
+            extraction.isFailure -> {
+                Measurement.Unmeasurable(ReasonCode.AMOUNT_OVERFLOW)
+            }
+
+            extraction.getOrThrow() < 0L -> {
+                Measurement.Unmeasurable(ReasonCode.NEGATIVE_AMOUNT)
+            }
+
+            floor != null && BigDecimal(extraction.getOrThrow()) < floor -> {
+                Measurement.Unmeasurable(ReasonCode.ROUNDED_BELOW_FLOOR)
+            }
+
+            else -> {
+                measured(extraction.getOrThrow(), policy.version)
+            }
         }
     }
 

@@ -12,21 +12,21 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
 
-private val ALL_ROUNDING_MODES =
+internal val ALL_ROUNDING_MODES =
     listOf(RoundingMode.HALF_UP, RoundingMode.HALF_DOWN, RoundingMode.HALF_EVEN, RoundingMode.DOWN, RoundingMode.UP)
 
-private fun resolvedPolicy(mode: RoundingMode): Resolution.Resolved<RoundingPolicy> {
+internal fun resolvedPolicy(mode: RoundingMode): Resolution.Resolved<RoundingPolicy> {
     val policy = RoundingPolicy(MONEY_AXIS_SCALE_DIGITS, mode)
     return Resolution.Resolved(policy, PolicyVersion(EffectiveFrom.Initial, "test"))
 }
 
-private fun base(
+internal fun base(
     won: Long,
     vat: VatTreatment = VatTreatment.INCLUSIVE,
     provenance: Provenance = Provenance.OperatorDeclared,
 ): BaseAmount = BaseAmount(won, Currency.KRW, vat, provenance)
 
-private val DECLARED_PROVENANCES =
+internal val DECLARED_PROVENANCES =
     listOf(
         Provenance.Published(1),
         Provenance.DerivedFromOpening,
@@ -35,7 +35,7 @@ private val DECLARED_PROVENANCES =
         Provenance.OperatorDeclared,
     )
 
-private val ALL_PROVENANCES = DECLARED_PROVENANCES + Provenance.Undeclared
+internal val ALL_PROVENANCES = DECLARED_PROVENANCES + Provenance.Undeclared
 
 class ArithmeticTest {
     @Test
@@ -62,40 +62,103 @@ class ArithmeticTest {
         }
     }
 
+    /**
+     * Codex 1차 #3 — 이전 판은 `floor`(정수)에 `ε < 1원`을 더한 원시값만 생성해, 반올림
+     * 뒤 값이 항상 그 **정수** `floor` 이상으로만 떨어졌다(`DOWN`이 최악이어도 정수부
+     * `floor` 로 떨어지지 `floor` 미만으로는 못 간다) — 그래서 "예외 없음"이 곧 "하한
+     * 이상"으로 보였다. 실제 반례는 `floor` **자신이 소수**일 때다(`data-dictionary.md`
+     * §1.1 정의 ②가 요구하는 하한은 원 단위로 딱 떨어진다는 보장이 없다 — 하한율×기초금액
+     * 같은 계산에서 나온다). `floor=1000.4`·`scale=0`·`DOWN` 이면 결과가 `1000`인데 이는
+     * `1000.4` **미만**이다.
+     *
+     * **처리 방식 판단(evidence)**: clamp(하한으로 올림) 대신 `Unmeasurable`(새
+     * `ReasonCode.ROUNDED_BELOW_FLOOR`)을 택했다 — `capability-map.md` DEC-02 acceptance가
+     * "최종 추천가가 어느 제약에 binding됐는지가 결과에 실린다"를 요구하는데, 그 binding
+     * 추적은 DEC-02 의 더 큰 산정 알고리즘(하한·상한·신뢰비율)의 몫이지 1B 의 순수 반올림
+     * 함수가 가질 장치가 아니다. `roundedWith` 가 스스로 값을 하한으로 올려 버리면(clamp)
+     * 그 값이 "왜 그 값인지"(원 계산값 그대로인지, clamp 로 올라간 값인지)를 잃어 DEC-02
+     * 의 그 요구를 오히려 어길 위험이 있다 — 사유 있는 실패로 돌려주면 그 판단(clamp 할지,
+     * 다른 값을 찾을지)을 DEC-02 알고리즘을 실제로 구현하는 slice 가 온전한 정보로 내릴
+     * 수 있다.
+     */
     @Test
-    fun `P-2b mode 가 무엇이든 반올림된 투찰가는 적용 하한 이상이다 (DEC-02 무조건 acceptance)`() {
+    fun `Codex3 소수 하한 1000_4 에서 scale0 DOWN 은 하한 미만 값을 조용히 내지 않는다`() {
+        val floor = BigDecimal("1000.4")
+        val raw =
+            UnroundedBidAmount(
+                floor,
+                Currency.KRW,
+                VatTreatment.INCLUSIVE,
+                Provenance.OperatorDeclared,
+                base(1000L).export(),
+            )
+
+        val result = raw.roundedWith(resolvedPolicy(RoundingMode.DOWN), floor)
+
+        result shouldBe Measurement.Unmeasurable(ReasonCode.ROUNDED_BELOW_FLOOR)
+    }
+
+    @Test
+    fun `Codex3 하한을 안 주면 이전처럼 하한 미만도 성공한다 (기존 호출부 호환)`() {
+        val floor = BigDecimal("1000.4")
+        val raw =
+            UnroundedBidAmount(
+                floor,
+                Currency.KRW,
+                VatTreatment.INCLUSIVE,
+                Provenance.OperatorDeclared,
+                base(1000L).export(),
+            )
+
+        val result = raw.roundedWith(resolvedPolicy(RoundingMode.DOWN))
+
+        result.shouldBeInstanceOf<Measurement.Measured<Derived<BidAmount>>>()
+        result.value.value
+            .export()
+            .won shouldBe 1000L
+    }
+
+    /**
+     * `P-2b` 정정(Codex 1차 #3) — 이전 판이 놓친 소수 하한 반례를 임의 mode 전역에서
+     * 낸다. 원시값을 하한과 **정확히 같게**(Codex 반례와 같은 가장 빡빡한 경계) 두고,
+     * `setScale` 오라클로 기대값을 직접 계산해 비교한다 — mode 별 반올림 방향을 하드코딩
+     * 하지 않는다. **하한 검사를 지우는 mutant가 이 test 를 실패시킨다** — `DOWN`·
+     * `HALF_DOWN`류가 하한 바로 아래로 접힐 때마다 `Unmeasurable` 을 기대하므로, 검사가
+     * 없으면 그 자리에서 `Measured`(다른 값)가 나와 단언이 깨진다.
+     */
+    @Test
+    fun `P-2b mode 가 무엇이든 반올림된 투찰가는 적용 하한 이상이거나 사유 있는 실패다 (DEC-02 무조건 acceptance)`() {
         runBlocking {
             checkAll(
                 Arb.long(0L, 1_000_000_000L),
-                Arb.long(0L, 999L),
+                Arb.long(1L, 999L),
                 Arb.element(ALL_ROUNDING_MODES),
-            ) { floor, epsilonWon, mode ->
-                // 하한 바로 위 잔차 구간(floor + ε, ε < 1원)을 집중 생성한다.
-                val unrounded = BigDecimal(floor).add(BigDecimal(epsilonWon).movePointLeft(3))
-
+            ) { floorWon, floorFractionMil, mode ->
+                // 하한 자신이 소수다 — 원 단위로 딱 떨어지지 않는 실제 적용 하한(하한율×기초금액
+                // 같은 계산 결과)을 흉내낸다. 원시값은 그 하한과 정확히 같게 둔다(가장 빡빡한 경계).
+                val floor = BigDecimal(floorWon).add(BigDecimal(floorFractionMil).movePointLeft(3))
                 val raw =
                     UnroundedBidAmount(
-                        unrounded,
+                        floor,
                         Currency.KRW,
                         VatTreatment.INCLUSIVE,
                         Provenance.OperatorDeclared,
-                        base(floor).export(),
+                        base(floorWon).export(),
                     )
-                val result = raw.roundedWith(resolvedPolicy(mode))
 
-                val roundedWon =
-                    when (result) {
-                        is Measurement.Measured -> {
-                            val bidAmount = result.value.value
-                            bidAmount.export().won
-                        }
+                val result = raw.roundedWith(resolvedPolicy(mode), floor)
 
-                        is Measurement.Unmeasurable -> {
-                            error("overflow 는 이 생성 범위에서 발생하지 않는다: $result")
-                        }
-                    }
-
-                (roundedWon >= floor) shouldBe true
+                val oracleScaled = floor.setScale(MONEY_AXIS_SCALE_DIGITS, mode)
+                if (oracleScaled.compareTo(floor) >= 0) {
+                    result.shouldBeInstanceOf<Measurement.Measured<Derived<BidAmount>>>()
+                    val won =
+                        result.value.value
+                            .export()
+                            .won
+                    (BigDecimal(won).compareTo(floor) >= 0) shouldBe true
+                } else {
+                    result shouldBe Measurement.Unmeasurable(ReasonCode.ROUNDED_BELOW_FLOOR)
+                }
             }
         }
     }
@@ -275,164 +338,6 @@ class ArithmeticTest {
 
         result.shouldBeInstanceOf<Measurement.Measured<Derived<BidRate>>>()
         result.value.derivedFrom.inputs shouldBe listOf(bidAmount.export(), theBase.export())
-    }
-
-    /**
-     * Codex 1차 #1 — `v2-지침서.md` §4.1 "provenance가 없거나 모르는 값은 추측하지 않고
-     * 거부 또는 `Unmeasurable`로 반환한다"를 산술·파생 성공 경계(`times`→`roundedWith`,
-     * `divideForRate`, `sumOfBaseAmounts`)에 건다. `Provenance.Undeclared`가 그 "모르는
-     * 값"의 명시적 표현이다(`data-dictionary.md` §5.1 sealed 정의의 여섯째 variant).
-     * `OPEN-DIC-06`(어댑터 write 경로가 `Undeclared`를 거부하는가)과는 다른 축이다 — 그
-     * 결정은 **수집 시점** 수용 여부이고, 여기서 막는 것은 **이미 도메인에 들어온 값의
-     * 계산** 이다. 값이 같아도 provenance 가 다른 fact 를 구분 못 하는 문제(Codex #4)와도
-     * 다른 축 — 여기는 "구분"이 아니라 "출처 모름을 계산에 쓰지 않는다"이다.
-     */
-    @Test
-    fun `Codex1 Undeclared provenance 인 기초금액은 times 로 만든 투찰가가 항상 Unmeasurable 이다`() {
-        val undeclaredBase = base(1_000_000L, provenance = Provenance.Undeclared)
-        val rate = BidRate(Rate.ofFraction(BigDecimal("0.955")), BidRateOrigin.Recommended)
-
-        val result = (undeclaredBase * rate).roundedWith(resolvedPolicy(RoundingMode.HALF_UP))
-
-        result shouldBe Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
-    }
-
-    @Test
-    fun `Codex1 임의 mode·금액에서 Undeclared 기초금액은 항상 Unmeasurable 이다`() {
-        runBlocking {
-            checkAll(Arb.long(1L, 1_000_000_000L), Arb.element(ALL_ROUNDING_MODES)) { won, mode ->
-                val undeclaredBase = base(won, provenance = Provenance.Undeclared)
-                val rate = BidRate(Rate.ofFraction(BigDecimal("0.955")), BidRateOrigin.Recommended)
-
-                val result = (undeclaredBase * rate).roundedWith(resolvedPolicy(mode))
-
-                result shouldBe Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
-            }
-        }
-    }
-
-    /**
-     * `YegaAmount`는 B9(운영자 결정)로 `vatTreatment`가 항상 `UNKNOWN` 고정이라
-     * `assessmentRateAgainst`는 provenance 와 무관하게 이미 `VAT_TREATMENT_MISMATCH`로
-     * 항상 `Unmeasurable`이다(B9 「사실상 죽은 경로」, `scope.md` `OPEN-DIC-04` 참고).
-     * 여기서 증명하는 것은 「Undeclared 가 그 실패 사유를 가린다」— `divideForRate`가
-     * vat 검사보다 provenance 검사를 먼저 하므로, provenance 가 Undeclared 면 vat 상태와
-     * 무관하게 `UNDECLARED_PROVENANCE`가 나온다(둘 다 실패해도 사유는 하나만 낸다).
-     * "declared 면 성공" 대조는 vat 축이 이미 막혀 있어 이 함수로는 못 낸다 — 그 대조는
-     * vat 제약이 없는 [bidRateAgainst] 로 아래에서 낸다.
-     */
-    @Test
-    fun `Codex1 분자·분모 어느 쪽이 Undeclared 여도 사정률은 Unmeasurable 이다`() {
-        val declaredYega = YegaAmount(1_100_000L, Currency.KRW, Provenance.Published(1))
-        val declaredBase = base(1_000_000L, vat = VatTreatment.INCLUSIVE)
-        val undeclaredYega = YegaAmount(1_100_000L, Currency.KRW, Provenance.Undeclared)
-        val undeclaredBase = base(1_000_000L, vat = VatTreatment.INCLUSIVE, provenance = Provenance.Undeclared)
-
-        val numeratorUndeclared =
-            undeclaredYega.assessmentRateAgainst(declaredBase, resolvedPolicy(RoundingMode.HALF_UP))
-        val denominatorUndeclared =
-            declaredYega.assessmentRateAgainst(undeclaredBase, resolvedPolicy(RoundingMode.HALF_UP))
-
-        numeratorUndeclared shouldBe Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
-        denominatorUndeclared shouldBe Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
-    }
-
-    @Test
-    fun `Codex1 Undeclared AwardAmount 는 낙찰률을 Unmeasurable 로 막는다`() {
-        val undeclaredAward = AwardAmount(950_000L, Currency.KRW, Provenance.Undeclared)
-        val declaredBase = base(1_000_000L, vat = VatTreatment.INCLUSIVE)
-
-        val result = undeclaredAward.awardRateAgainst(declaredBase, resolvedPolicy(RoundingMode.HALF_UP))
-
-        result shouldBe Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
-    }
-
-    @Test
-    fun `Codex1 Undeclared 기초금액은 투찰율도 Unmeasurable 로 막는다`() {
-        val theBase = base(1_000_000L, vat = VatTreatment.INCLUSIVE, provenance = Provenance.Undeclared)
-        val rate = BidRate(Rate.ofFraction(BigDecimal("0.955")), BidRateOrigin.Recommended)
-        val rounded =
-            (base(1_000_000L, vat = VatTreatment.INCLUSIVE) * rate).roundedWith(resolvedPolicy(RoundingMode.HALF_UP))
-        rounded.shouldBeInstanceOf<Measurement.Measured<Derived<BidAmount>>>()
-        val bidAmount = rounded.value.value
-
-        val result = bidAmount.bidRateAgainst(theBase, BidRateOrigin.Recommended, resolvedPolicy(RoundingMode.HALF_UP))
-
-        result shouldBe Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
-    }
-
-    /**
-     * `BidAmount`·`BaseAmount` 축은 B9 의 vat 고정을 받지 않아(둘 다 `vatTreatment`가
-     * 자유 파라미터다) "declared 면 성공, Undeclared 면 실패"를 같은 test 로 대조할 수
-     * 있는 유일한 파생 율 경로다 — 여기서 team-lead 가 요구한 property(임의 provenance
-     * 조합에서 Undeclared 하나라도 있으면 실패)를 낸다. `BidAmount`는 `internal` 생성자지만
-     * 이 test 가 같은 모듈(shared-kernel) 안이라 직접 생성할 수 있다(H-1 이 막는 것은
-     * 모듈 밖 생성이다).
-     */
-    @Test
-    fun `Codex1 임의 provenance 조합에서 Undeclared 하나라도 있으면 투찰율은 Unmeasurable 이고 아니면 정상 산출된다`() {
-        runBlocking {
-            checkAll(
-                Arb.element(ALL_PROVENANCES),
-                Arb.element(ALL_PROVENANCES),
-            ) { bidProvenance, baseProvenance ->
-                val bidAmount = BidAmount(955_000L, Currency.KRW, VatTreatment.INCLUSIVE, bidProvenance)
-                val theBase = base(1_000_000L, vat = VatTreatment.INCLUSIVE, provenance = baseProvenance)
-
-                val result =
-                    bidAmount.bidRateAgainst(theBase, BidRateOrigin.Recommended, resolvedPolicy(RoundingMode.HALF_UP))
-
-                val eitherUndeclared = bidProvenance == Provenance.Undeclared || baseProvenance == Provenance.Undeclared
-                if (eitherUndeclared) {
-                    result shouldBe Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
-                } else {
-                    result.shouldBeInstanceOf<Measurement.Measured<Derived<BidRate>>>()
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `Codex1 Undeclared 원소가 있으면 sumOfBaseAmounts 는 사유 있는 부재다`() {
-        sumOfBaseAmounts(
-            listOf(Fact.Known(base(500L, provenance = Provenance.Undeclared))),
-        ) shouldBe Fact.Absent(ReasonCode.UNDECLARED_PROVENANCE)
-
-        sumOfBaseAmounts(
-            listOf(
-                Fact.Known(base(100L)),
-                Fact.Known(base(200L, provenance = Provenance.Undeclared)),
-                Fact.Known(base(300L)),
-            ),
-        ) shouldBe Fact.Absent(ReasonCode.UNDECLARED_PROVENANCE)
-    }
-
-    @Test
-    fun `Codex1 임의 목록에서 Undeclared 원소 하나라도 있으면 합은 항상 Absent 다`() {
-        runBlocking {
-            checkAll(
-                Arb.element(ALL_PROVENANCES),
-                Arb.element(ALL_PROVENANCES),
-                Arb.long(0L, 1_000_000L),
-                Arb.long(0L, 1_000_000L),
-            ) { firstProvenance, secondProvenance, firstWon, secondWon ->
-                val result =
-                    sumOfBaseAmounts(
-                        listOf(
-                            Fact.Known(base(firstWon, provenance = firstProvenance)),
-                            Fact.Known(base(secondWon, provenance = secondProvenance)),
-                        ),
-                    )
-
-                val eitherUndeclared =
-                    firstProvenance == Provenance.Undeclared || secondProvenance == Provenance.Undeclared
-                if (eitherUndeclared) {
-                    result shouldBe Fact.Absent(ReasonCode.UNDECLARED_PROVENANCE)
-                } else {
-                    result shouldBe Fact.Known(firstWon + secondWon)
-                }
-            }
-        }
     }
 
     @Test

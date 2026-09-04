@@ -27,6 +27,15 @@ enum class ReasonCode {
      * 결정은 수집 시점 수용 여부이고, 이 사유는 이미 도메인에 들어온 값의 계산을 막는다.
      */
     UNDECLARED_PROVENANCE,
+
+    /**
+     * 반올림 결과가 호출부가 준 적용 하한 미만이다 — `data-dictionary.md` §1.1 정의 ②·
+     * `capability-map.md` DEC-02 「결정 무관(무조건)」 acceptance(Codex 1차 #3).
+     * clamp(하한으로 올림) 대신 사유 있는 실패를 낸다 — DEC-02 acceptance 가 요구하는
+     * "어느 제약에 binding됐는지" 추적은 1B 의 순수 반올림 함수가 아니라 그 알고리즘을
+     * 구현하는 slice 의 몫이다.
+     */
+    ROUNDED_BELOW_FLOOR,
 }
 
 /**
