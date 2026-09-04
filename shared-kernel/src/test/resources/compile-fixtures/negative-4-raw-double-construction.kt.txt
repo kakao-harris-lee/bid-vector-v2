@@ -1,0 +1,10 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BaseAmount
+import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.Provenance
+import bidvector.sharedkernel.VatTreatment
+
+fun wrongConstruct(provenance: Provenance) {
+    val amount = BaseAmount(1000.0, Currency.KRW, VatTreatment.INCLUSIVE, provenance)
+}

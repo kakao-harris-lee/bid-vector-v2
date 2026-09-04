@@ -1,0 +1,12 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BaseAmount
+import bidvector.sharedkernel.BidRate
+import bidvector.sharedkernel.times
+
+fun rightMultiply(
+    base: BaseAmount,
+    rate: BidRate,
+) {
+    val result = base * rate
+}

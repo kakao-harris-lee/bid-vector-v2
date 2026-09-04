@@ -1,0 +1,12 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BidRate
+import bidvector.sharedkernel.YegaAmount
+import bidvector.sharedkernel.times
+
+fun wrongMultiply(
+    yega: YegaAmount,
+    rate: BidRate,
+) {
+    val result = yega * rate
+}

@@ -1,0 +1,8 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BaseAmount
+import bidvector.sharedkernel.EstimatedAmount
+
+fun crossAssign(estimated: EstimatedAmount) {
+    val wrong: BaseAmount = estimated
+}

@@ -1,0 +1,8 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.AwardRate
+import bidvector.sharedkernel.BidRate
+
+fun crossAssign(award: AwardRate) {
+    val wrong: BidRate = award
+}
