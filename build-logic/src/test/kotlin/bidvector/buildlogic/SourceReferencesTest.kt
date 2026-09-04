@@ -98,4 +98,52 @@ class SourceReferencesTest {
             )
         assertEquals(setOf("java.util.Map", "java.util.Map\$Entry"), refs.map { it.fqn }.toSet())
     }
+
+    /**
+     * **verifier r18 F-1.** 완전수식 참조가 다른 수식 표현의 **수신자**(여기서는 `.toString()`
+     * 호출의 receiver)이면, 바깥 노드(`selector` 가 `KtCallExpression` 이라 `collectSegments`
+     * 가 null)가 후보를 못 만드는데도 안쪽 노드가 「부모가 dot-qualified」라는 이유만으로
+     * 방문에서 빠졌다. 설계 검토 §4 S-2 단언 6항 — 자식을 건너뛰는 것은 부모가 **실제로 후보를
+     * 만들었을 때만**이다.
+     */
+    @Test
+    fun `F-1 완전수식 참조 뒤에 메서드 호출이 이어져도 잡는다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val status: String = java.net.HttpURLConnection.HTTP_OK.toString()\n}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.net.HttpURLConnection" }, "$refs")
+    }
+
+    @Test
+    fun `F-1 완전수식 호출의 수신자도 잡는다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val encoded: String = java.net.URLEncoder.encode(\"x\", \"UTF-8\")\n}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.net.URLEncoder" }, "$refs")
+    }
+
+    @Test
+    fun `F-1 생성자 호출의 완전수식 callee 도 잡는다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val name: String = java.io.File(\"x\").name\n}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.io.File" }, "$refs")
+    }
+
+    /** 회귀 — 후보를 만든 노드의 자식은 여전히 중복 보고되지 않는다. */
+    @Test
+    fun `F-1 정상 체인은 여전히 한 번만 잡는다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val v: Int = java.net.HttpURLConnection.HTTP_OK\n}\n",
+            )
+        assertEquals(1, refs.count { it.fqn == "java.net.HttpURLConnection" }, "$refs")
+    }
 }
