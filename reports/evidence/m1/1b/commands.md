@@ -168,3 +168,49 @@ example 로 고정돼 있다** — `ArithmeticTest`의
 - M-5: `scope.md` 역방향 파급 절의 새 grep 명령이 위 명령 결과(11·12)와 일치
 - low: `checklist.md` 「verifier r1 low(L-1~L-6) 처리 결과」 표 등재 확인, kotest 시드
   픽업은 이 절 B-4 재실행이 이미 간접 확인(재현 가능한 순서로 43 test 0 실패)
+
+## Phase 5 — decision 15·16 등재·B9 구현 뒤 acceptance 전건 재실행
+
+최종 HEAD `b656b60`(Phase 4 이후 커밋 둘 — `617b9f3` decision 15·16, `b656b60` B9,
+`checklist.md` 「verifier r2 이전 후속 지시」 표)에서 `scope.md` `acceptance_commands`
+(B-0~B-7) 전부를 다시 돌렸다.
+
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check --no-daemon)`  (B-0)
+- exit: 0 — 262 task 전건 실행(캐시 없음), 격리 worktree
+- cmd: `./gradlew --no-build-cache clean check --no-daemon`  (B-1, 작업 트리)
+- exit: 0
+- cmd: `./gradlew :app:test --tests '*ArchitectureGate*' --no-daemon --no-build-cache`  (B-2)
+- exit: 0
+- cmd: `./gradlew :build-logic:test --no-daemon --no-build-cache`  (B-3)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:test --no-daemon --no-build-cache`  (B-4)
+- exit: 0 — 클래스별·전체 test 수는 명령 포인터가 정본(L-2 원칙 유지):
+  ```
+  grep -oh 'tests="[0-9]*"' shared-kernel/build/test-results/test/TEST-bidvector.sharedkernel.*.xml
+  ```
+  실측: `ArithmeticTest` 18 · `CompileFailureHarnessTest` 9 · `MoneyTest` 5 · `PolicyTest` 4 ·
+  `RateTest` 6 · `RegressionExampleTest` 5, 합 47 — B9(fixture 7 추가, B11 이관 test 셋 순증가)
+  뒤의 새 값이다
+- cmd: `./gradlew qualityBaseline --no-daemon --no-build-cache`  (B-5)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:domainApiTypeGate :shared-kernel:domainSourceReferenceGate --no-daemon --no-build-cache`  (B-6·B-7)
+- exit: 0
+
+**하네스 레인 변경 재확인**: `git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/`
+— 여전히 없음.
+
+**clean-tree 재확인**: `git status --short` — 이 evidence 갱신 커밋 자체를 스테이징하기
+전에는 `checklist.md` 한 줄만 미스테이징 상태였고(이 명령 자체가 그 증거), 커밋 뒤에는
+빈 출력이다.
+
+**secret 스캔 재확인**: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1b/ shared-kernel/src/`
+— 매치는 스캔 명령 문자열을 인용한 문서 자신들뿐, 실제 비밀값 0.
+
+**decision 15·16·B9 재현 확인**:
+- decision 15: `milestone-1.md` 「Slice 1B-c」·`scope.md` `OPEN-1B-CORPUS`(해소)·
+  `capability-map.md` §14.2 두 행 확인
+- decision 16: `data-dictionary.md` §5.1·§1.1 취소선, `scope.md` `OPEN-1B-PROVENANCE-NAME`
+  취소선 확인
+- B9: `CompileFailureHarnessTest` 의 `7 vat 고정 Money…` test 통과(음성 「too many arguments
+  for」·양성 OK), `ArithmeticTest` 의 `B9 …` 넷(고정 선언 둘·Unmeasurable property 둘) +
+  B11 이관 test(`같은 vat 이면 투찰율이…`) 통과, `scope.md` `OPEN-DIC-04` 행 갱신 확인

@@ -60,6 +60,13 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | `b33c4b2` | low L-1~L-6 — 시드 고정·「31 test」/「한 토큰」 문면 정정·근거 등재(상세는 아래 표) |
 | `a9e0448` | scope 정정 — `b33c4b2` 가 `build-logic/**`(in_scope 밖)에 건 시드 설정을 `shared-kernel/build.gradle.kts` 로 옮긴다. 이 레인이 스스로 발견하고 고쳤다 |
 
+### verifier r2 이전 후속 지시 — 커밋 둘(팀장 전달)
+
+| 커밋 | 내용 |
+| --- | --- |
+| `617b9f3` | decision 15·16 — corpus 종결 조건을 `1B-c` 로 이관(`milestone-1.md` 「Slice 1B-c」 신설, `scope.md`·`capability-map.md` 담당 정정), `Provenance` 이름 확정(`data-dictionary.md` §5.1·§1.1 취소선 정정). 코드 무변경 |
+| `b656b60` | B9 구현 — `AllocatedBudget`·`YegaAmount`·`AwardAmount` 의 `vatTreatment` 를 `Unknown` 고정으로 바꾼다(위 L-5 갱신 참고). `sameKnownVat` 전건이 `assessmentRateAgainst`·`awardRateAgainst` 를 항상 `Unmeasurable` 로 막는 property test, 컴파일 하네스 fixture 7, B11 커버리지 이관(`bidRateAgainst`) 포함 |
+
 ## evidence 최소 목록 (`agent-workflow.md` §6)
 
 | 파일 | 상태 |
