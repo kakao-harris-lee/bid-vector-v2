@@ -234,3 +234,32 @@ grep -rnoE 'docs/adr/0002-money-rate-basis\.md:[0-9]+|docs/adr/0002:[0-9]+|ADR ?
 `OPEN-ADR-15`(registry 통합 slice 소관)가 이미 추적 중이며 이 slice의 `docs/adr/0007`
 편집(결정 시점 추가, §5 하단)은 그 등재보다 아래 지점이라 기존 인용 좌표를 추가로 밀지
 않았다 — 확인 명령은 `checklist.md`의 「알려진 제한」이 낸다.
+
+### 2026-09-04 — Phase 3 구현 완료. 설계 검토(`04_design-review.md`) 브리프와 갈린 결정 셋
+
+**넓힌 범위 없음** — 아래는 브리프의 세부 지시와 실제 구현이 갈린 지점의 사유이지 in_scope
+변경이 아니다.
+
+1. **커밋 경계를 여덟(C1~C8)에서 넷으로 묶었다.** Kotlin 은 모듈 소스 전체를 한 번의
+   `compileKotlin` 으로 컴파일하므로 `Carrier.kt`(`Measurement.Measured` 가
+   `PolicyVersion` 참조) ↔ `Policy.kt`(`Resolution.NotApplicable` 이 `ReasonCode` 참조)
+   처럼 상호 참조하는 파일은 브리프가 그은 개념 경계(①어휘 ②Rate ③carrier ④정책 ⑤파생)
+   대로 커밋을 쪼개면 중간 커밋이 컴파일되지 않는다. 파일 의존 순서를 실측해 네 커밋으로
+   재구성했고, 각 커밋을 `git stash --keep-index` 로 이후 파일을 제외한 상태에서
+   `:shared-kernel:check` 를 실제로 돌려 독립 통과를 확인했다(`commands.md`·`checklist.md`
+   「커밋 목록」).
+2. **컴파일 실패 하네스(C8)와 크기 기반 분기 부재 architecture test(L-7)를 이월했다.**
+   브리프 자신이 C8을 "마지막 커밋으로 미루고 타입 설계가 착지한 뒤에 붙이는 것을 추천"
+   했고, 게이트 하나 도입에 이 저장소가 리뷰 라운드를 크게 쓴 이력(`CLAUDE.md` 변경 이력)
+   을 고려해 이번 slice 에서는 붙이지 않는다. 사유·이월 대상은 `checklist.md` 「이월 항목」.
+3. **fixture 되돌림(C13)을 술어 설계까지만 하고 `fixtures/manifest.yaml` 편집은 하지
+   않았다.** manifest 편집은 fixture-curator 소관이라고 브리프 §4.7 단계 3 자신이 적는다 —
+   kotlin-implementer 레인이 그 파일을 편집하면 레인 경계를 넘는다. `OPEN-1B-CONTRACT` 는
+   담당(1B)만 확정된 채로 남고, 술어 자체의 설계는 fixture-curator 협업이 필요한 별도
+   착수점으로 `checklist.md` 에 남긴다.
+
+**acceptance 전건 재실행**: `scope.md` `acceptance_commands`(B-0~B-7 전부) 를 최종 HEAD
+에서 재확인했다 — 결과는 `commands.md` Phase 3 절이 갖는다. 31 test 0 실패 0 skip,
+격리 worktree `check` 통과, `domainApiTypeGate`·`domainSourceReferenceGate` 실제 도메인
+API 위에서 단독 실행 통과.
+않았다 — 확인 명령은 `checklist.md`의 「알려진 제한」이 낸다.
