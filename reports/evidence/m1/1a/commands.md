@@ -3,7 +3,7 @@
 실행 명령과 종료 코드. **출력 전문을 붙이지 않는다** — `핵심 결과`는 한 줄이고 감사자는 명령을
 다시 돌린다. 수·좌표가 필요하면 그 셈을 내는 명령을 가리킨다.
 
-- `C-0` 이 slice 의 커밋 집합: `git log --oneline 6b03c75..HEAD`
+- `C-0` ~~이 slice 의 커밋 집합~~ **전체 리뷰 range 의 커밋 목록**: `git log --oneline 6b03c75..HEAD` — slice 산출물의 정의는 scope.md 의 in_scope 경로 변경이고, range 에 섞인 하네스 레인 커밋은 scope.md 「하네스 레인 변경」 절이 가른다(Codex 17차 low)
 - 재현 전제: JDK 21 이 `JAVA_HOME`. Gradle 은 wrapper 가 내려받는다(설치본 불필요).
 
 ---
