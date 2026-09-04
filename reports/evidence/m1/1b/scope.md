@@ -89,6 +89,11 @@ in_scope 밖, 운영자 승인 하에 같은 range 에 있다」를 명시한다
 1B 산출물이다. `BaseAmountProvenance` 라벨 타입(승인 명세 다섯 값)은 1B 가 선언하되
 first-match rule 은 1D 소유다.
 
+**하류 인계(verifier r3 M-7)**: `Measurement.Measured<T>` 가 `internal` 생성자다(H-3) —
+1C~1E 가 자기 축의 **성공** 판정(`Measured`)을 직접 만들 수 없고, `shared-kernel` 이 여는
+파생 함수/팩토리를 통해야 한다. 그 팩토리는 이 slice 가 아니라 1C~1E 자기 계약에서 연다
+— 지금 열지 않는다(`checklist.md` 「verifier r3 발견」 M-7).
+
 ---
 
 ## D-결정 — 조사 B 가 확정한 것

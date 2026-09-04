@@ -179,6 +179,14 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | L-9 | `BidRate` 생성자를 `internal` 로 닫으면서 `BidRateOrigin.Recommended` 의 공개 생성 경로가 사라졌고, 그 결과 `BaseAmount.times(rate: BidRate)`(파생 투찰가 경로 전체)가 모듈 밖에서 호출 불가가 됐다. KDoc 에만 「알려진 한계」로 적혀 있고 `checklist.md` 알려진 제한에는 없었다 | **등재만 한다 — 알려진 제한(KDoc `Rate.kt`의 `BidRate` 와 같은 문면을 여기 옮긴다).** 1B 는 관측(`bidRateAgainst`) 경로만 만들고 추천 입력 경로는 만들지 않았다 — ML 추천을 받는 M2/M5 가 그 경로(이름 있는 factory, `Rate.ofFraction` 과 같은 형태)를 열어야 한다. 코드 변경 없음(이번 라운드에서 그 factory 를 새로 만들지 않는다 — 근거 없는 형태 확장 금지) |
 | L-10 | `commands.md` Phase 3 절이 여전히 「test 31건」으로 적는다 — Phase 5 절이 47 을 명령 포인터로 갖고 있어 정본은 최신이나 같은 문서에 수가 둘 남아 있었다 | **닫혔다.** Phase 3 절의 「31건」을 산문 하드코딩 대신 Phase 5 의 명령 포인터를 가리키는 문장으로 바꿨다(L-2 원칙의 일관 적용 — 같은 문서 안에 낡을 수 있는 두 번째 숫자를 남기지 않는다) |
 
+### verifier r3 발견 — M-7·low 2 처리 결과
+
+| # | 요지 | 처리 |
+| --- | --- | --- |
+| M-7 | H-3 처방(`Measurement.Measured` 를 `internal` 로 닫음)의 부수효과 — 하류 도메인 모듈(1C~1E)이 `Measurement` 의 실패(`Unmeasurable`)는 만들 수 있으나 성공(`Measured`)은 만들 수 없다. `Fact` 는 `Known`/`Absent` 두 팔이 대칭인데 `Measurement` 만 비대칭이 됐다. `milestone-1.md` 완료 조건이 이 어휘를 M1 전체 축으로 들고 1E 항목이 `Unmeasurable` 을 직접 이름 든다 — 1C~1E 가 자기 축의 **성공** 측정을 이 어휘로 낼 수 없다는 제약이 후속 slice 설계를 구속한다 | **등재만 한다 — 알려진 제한(L-9 와 같은 기준).** **닫으라는 뜻이 아니다** — verifier r3 원문이 "열지 말지는 운영자·후속 slice 판단"이라 명시한다. 하류 slice 가 `Measured` 를 만들려면 `shared-kernel` 이 제공하는 파생 함수/팩토리를 통해야 하고, 그 팩토리는 1C~1E 자기 계약에서 연다 — 이번 라운드는 그 팩토리를 새로 만들지 않는다(근거 없는 API 확장 금지, L-9 와 같은 판단). `scope.md` 「이 slice 가 하는 일」 절에도 한 줄을 더했다 |
+| L-11 | `rollback.md` 의 awk 파생이 in_scope 항목 줄이 `out_of_scope` 관례(`a · b · c` 한 줄에 여럿)를 쓰면 깨진 pathspec 하나를 조용히 만들 수 있다(지금 in_scope 에 그런 줄은 0건). 확인 지점 2(개수 대조)는 이 오류를 못 잡는다 — 수는 맞고 내용만 틀리기 때문이다 | **닫혔다.** `rollback.md` 의 awk 파생 뒤 각 줄을 `·` 로 다시 나눠 항목마다 배열 원소로 넣게 하고, 새 확인 지점 5(파생된 pathspec 각각이 `git ls-files` 로 실재 경로에 매치되는지, restore 전에 강제 확인)를 추가했다. 임시 clone 에서 `in_scope` 에 `·` 로 묶인 줄을 실제로 넣어 파생이 두 개별 경로로 정확히 갈라짐을 실측했다(verifier r3 가 H-4 를 검증한 것과 같은 「실제로 늘려서 따라오는지 본다」 방법) |
+| L-12 | 하네스 `6-M2` KDoc 이 "fixture 3·5·8·9·10 에는 변이 쌍둥이가 있었는데 6·7 에는 없었다"로 적으나 8·9·10 은 자기 쌍둥이와 같은 커밋에서 생겨 그 「없었다」의 시점이 성립하지 않는다(production 이력 서술) | **닫혔다.** KDoc 을 이력 비교 대신 현재 규칙만 적도록 정정했다 — "모든 음성 fixture 는 변이 쌍둥이를 갖는다"(verifier r1 M-2 원칙) |
+
 ## 이월 항목
 
 **컴파일 실패 하네스(C8)·L-7·fixture 되돌림(C13) 셋 다 더는 이월이 아니다** — 앞 둘은

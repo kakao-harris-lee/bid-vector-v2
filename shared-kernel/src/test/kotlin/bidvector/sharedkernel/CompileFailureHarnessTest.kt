@@ -92,8 +92,8 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * verifier r2 L-7 — fixture 3·5·8·9·10 에는 변이 쌍둥이가 있었는데 6·7 에는 없었다.
-     * 3·5 와 같은 자리(정당한 양성 경로에 오타만 넣는다)에 채운다.
+     * 규칙(verifier r1 M-2) — 모든 음성 fixture 는 변이 쌍둥이를 갖는다: 정당한 양성
+     * 경로에 오타만 넣은 코드가 그 진단 단편을 만족시키지 않아야 한다(verifier r2 L-7).
      */
     @Test
     fun `6-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
