@@ -84,8 +84,17 @@ data class EffectiveDatedPolicy<T>(
  * 반올림 정책. 금액 축의 `scaleDigits`는 이미 원 단위 정수(0)로 닫혔다
  * (`data-dictionary.md` §1.1 정의 ①) — `mode` 값은 `OPEN-DIC-10` 미결이라 이 타입은 형태만
  * 두고 값을 이 모듈이 지어내지 않는다. 호출부가 주입한다.
+ *
+ * `scaleDigits`는 하한(0 이상)만 이 타입이 건다 — 상한(금액 축 밖 자리수)은 `OPEN-DIC-10`
+ * 미결이라 여기서 지어내지 않는다. 음수는 검사 없이 방치하면 조용히 성공해 백 원 단위
+ * 반올림 같은 값 오염이 통과한다(verifier r2 M-6) — `Rate.init`·`BaseAmount.init`이 이미
+ * 쓰는 construction-time invariant 관례(`require`로 던진다)를 그대로 따른다.
  */
 data class RoundingPolicy(
     val scaleDigits: Int,
     val mode: RoundingMode,
-)
+) {
+    init {
+        require(scaleDigits >= 0) { "scaleDigits는 음수일 수 없다: $scaleDigits" }
+    }
+}

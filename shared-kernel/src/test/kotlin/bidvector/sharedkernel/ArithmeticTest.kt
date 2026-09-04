@@ -155,12 +155,16 @@ class ArithmeticTest {
     }
 
     @Test
-    fun `M-1 임의 mode·scale 에서 roundedWith 는 예외를 누출하지 않는다`() {
+    fun `M-1 임의 mode·유효 scale 에서 roundedWith 는 예외를 누출하지 않는다`() {
+        // scale 후보에서 -1 을 뺐다(verifier r2 M-6) — 음수 scaleDigits 는 이제
+        // RoundingPolicy 생성 시점에 거부된다(PolicyTest 의 M-6 test 가 그 자리를 잰다).
+        // 여기서 검증하는 것은 "유효한 정책이 어떤 원시값을 만나도 roundedWith 가 예외를
+        // 던지지 않는다"이지 "정책 자체의 정의역"이 아니다 — 두 층을 섞지 않는다.
         runBlocking {
             checkAll(
                 Arb.long(-1_000_000_000_000L, 1_000_000_000_000L),
                 Arb.element(RoundingMode.entries),
-                Arb.element(listOf(0, 1, 2, -1)),
+                Arb.element(listOf(0, 1, 2)),
             ) { unscaledLong, mode, scale ->
                 val raw =
                     UnroundedBidAmount(
