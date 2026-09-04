@@ -1006,7 +1006,9 @@ Codex 14차 #1 이 값 체인으로 잡지만 `it` 는 PSI 에 파라미터 노�
 
 리포트 `reports/evidence/m1/1a/codex-review-20260904T052119Z.json`. high(계약·장부층) — 선언된
 slice 범위(`in_scope` 경로)와 고정된 리뷰 range(`6b03c75..HEAD`)가 어긋난다: range 에는
-계약에 없는 하네스 레인 커밋 13개가 섞여 있다. 운영자 결정 2026-09-04 — 격리 range 재요청
+계약에 없는 하네스 레인 커밋들이 섞여 있다(개수는 scope.md 「하네스 레인 변경」 표와
+`git log --oneline 6b03c75..HEAD -- CLAUDE.md .claude/` 가 정본 — 커밋마다 늘므로 여기 박지
+않는다). 운영자 결정 2026-09-04 — 격리 range 재요청
 대신, harness 경로를 `scope.md`「하네스 레인 변경」 상시 절로 명시하고 `rollback.md` 를
 in_scope 경로 한정으로 바꾼다(코드·정책·빌드 입력은 무변경).
 
@@ -1015,9 +1017,44 @@ in_scope 경로 한정으로 바꾼다(코드·정책·빌드 입력은 무변�
 인자>`(26 경로)가 in_scope 변경만 내고(`A` 129 · `M` 6, 합 135 — 아홉 모듈 `build.gradle.kts`
 ·`ModuleBoundaryAnchor.kt`·`build-logic` 전체·`config/quality/*.properties`·`app` 의
 architecture test·fixture 등) `CLAUDE.md`·`.claude/` 는 **0건**임을 확인했다 —
-전체 range 의 하네스 커밋 13개(scope.md 「하네스 레인 변경」 절)가 이 목록에 전혀 섞이지
+전체 range 의 하네스 커밋(scope.md 「하네스 레인 변경」 절이 정본)이 이 목록에 전혀 섞이지
 않는다.
 
 acceptance 재실행 불필요 — 이번 커밋은 `scope.md`·`rollback.md`·`checklist.md` 산문만
 고치고 코드·정책·fixture·빌드 입력을 하나도 건드리지 않는다(`git diff --stat` 이 evidence
 세 파일만 낸다). clean-tree(경로 개별 인자)·비밀값 스캔 — evidence 세 파일 diff 매치 없음.
+
+### Codex 16차 — rollback 명령을 `git restore --source` 로 교체하고 임시 clone 에서 실측한다 (high · low)
+
+리포트 `reports/evidence/m1/1a/codex-review-20260904T054442Z.json`. high(장부층) — 독립 임시
+clone 에서 이전 rollback 명령(`git checkout 6b03c75 -- <in_scope 경로>`)을 그대로 실행하면
+base 에 없는 신규 경로(129 개)마다 `pathspec ... did not match any file(s) known to git` 로
+exit 1 이 되고 아무것도 적용되지 않는다 — `agent-workflow.md` §4 가 필수로 정한 실제 실행
+가능한 rollback 이 없었다. low(장부) — 하네스 커밋 수를 rollback.md·commands.md 양쪽에
+고정 개수 「13」으로 박아 커밋이 늘 때마다 낡는다.
+
+수정: 되돌리는 명령을 `git restore --source=6b03c75 --staged --worktree -- <in_scope 경로
+개별 인자>` 로 교체했다(`--source` 에 없는 경로는 삭제되므로 신규 파일 `git rm` 단계가
+사라진다). 「base 에 없으면 아무것도 하지 않는다」는 문장도 지운다 — 실측이 반증한다. 고정
+개수 「13」은 rollback.md·commands.md 양쪽에서 「scope.md 「하네스 레인 변경」 표와
+`git log --oneline 6b03c75..HEAD -- CLAUDE.md .claude/` 가 정본」 포인터로 바꿨다. `scope.md`
+「하네스 레인 변경」 표에 이번 하네스 커밋(`a585cfb`, 규격 정정 자신)을 추가했다.
+
+`E-116` — **dry-run 이 아니라 독립 임시 clone 에서 실제로 명령을 돌렸다**(`--no-hardlinks`
+로 저장소 밖 scratchpad 에 clone, probe 는 실측 뒤 삭제):
+
+```
+git clone --no-hardlinks -q . <scratchpad>/rollback-probe
+cd <scratchpad>/rollback-probe
+git restore --source=6b03c75 --staged --worktree -- <in_scope 경로 개별 인자, rollback.md 와 동일>
+```
+
+exit=0. `git status --porcelain | awk '{print $1}' | sort | uniq -c` — `D` 129 · `M` 6(합
+135, E-115 의 `A`129·`M`6 과 대칭 — 그때 신규였던 것이 지금은 삭제 대상이다). `git diff
+--cached --stat 6b03c75 -- <같은 경로>` 의 마지막 줄 — **빈 출력**(base 대비 in_scope diff
+없음, staged 상태가 정확히 base 와 같다). `git status --short -- CLAUDE.md .claude/` — 빈
+출력(하네스 경로 무변경). probe clone 삭제 확인(`ls` 없음).
+
+acceptance 재실행 불필요 — 코드·정책·fixture·빌드 입력 무변경, `scope.md`·`rollback.md`·
+`commands.md` 산문만 고쳤다(`git diff --stat` 이 evidence 세 파일만 낸다). clean-tree(경로
+개별 인자)·비밀값 스캔 — evidence 세 파일 diff 매치 없음.

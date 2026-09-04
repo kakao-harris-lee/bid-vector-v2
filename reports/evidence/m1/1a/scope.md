@@ -61,6 +61,7 @@ rollback: |
 
 | SHA | 경로 | 목적 |
 | --- | --- | --- |
+| `a585cfb` | `.claude/skills/evidence-pack/SKILL.md` · `CLAUDE.md` | 경로 한정 rollback 명령을 `git restore --source` 로 정정하고 임시 clone 실측을 의무화한다 (Codex 1A 16차 high) |
 | `089d8d3` | `.claude/skills/evidence-pack/SKILL.md` · `.claude/skills/v2-slice-pipeline/SKILL.md` · `CLAUDE.md` | slice 커밋 집합을 range 가 아니라 in_scope 경로의 변경으로 — 하네스 레인 절 상시화, rollback 은 경로 한정 (Codex 1A 15차 high) |
 | `82e50fe` | `.claude/skills/v2-slice-pipeline/SKILL.md` · `CLAUDE.md` | Phase 2.5 에 위협 모델 경계 문장을 우회 열거보다 앞에 — 경계 없는 우회 집합은 무한 (1A 설계 검토 3차) |
 | `00818c6` | `.claude/skills/evidence-pack/SKILL.md` · `CLAUDE.md` | 역방향 파급 grep 은 축약형까지 stem 기준으로 — 전체 파일명 0건 뒤에 숨은 ADR 번호 인용 (1A r12 L-1) |
