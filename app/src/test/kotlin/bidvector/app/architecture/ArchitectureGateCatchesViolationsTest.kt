@@ -141,11 +141,15 @@ class ArchitectureGateCatchesViolationsTest {
     }
 
     /**
-     * **사각의 양성 고정 — raw `Double` public API.** `Double` 파라미터·반환은 JVM 에서
-     * primitive `D` 라 클래스 참조가 남지 않아 이 규칙(바이트코드 층)이 못 본다(설계 검토 부록
-     * §0). 그 주장을 evidence 산문이 아니라 이 단언이 고정한다 — 이 사각을 덮는 것은
-     * `domainApiTypeGate`(타입 표면 층)다. 소스 참조 층(13차)이 같은 fixture 를 못 보는 것은
-     * `build-logic` 자신의 테스트가 든다(app 에서 그 내부 API 를 부를 수 없다).
+     * **사각의 양성 고정 — raw `Double` public API.** 사각의 이유는 fixture 형태마다 다르다
+     * (`javap` 로 확인) — `rate(): Double` 처럼 수식 없는 반환은 JVM primitive `D` 라 클래스
+     * 참조가 아예 안 남는다. `ratio: Double?`·`weights(List<Double>)` 는 boxing·제네릭 소거로
+     * `java.lang.Double`/`Number` 참조가 **남지만**, 그 좌표는 `class.allowed.api` 가 이미 여는
+     * T-C 클래스라 이 규칙이 위반으로 세지 않는다 — 「참조가 없어서」와 「참조는 있어도 허용
+     * 목록 안이라서」 둘 다 같은 결론(미보고)에 이른다. 이 사각을 덮는 것은
+     * `domainApiTypeGate`(타입 표면 층 — 소스의 이름 자체를 본다)다. 소스 참조 층(13차)이 같은
+     * fixture 를 못 보는 것은 `build-logic` 자신의 테스트가 든다(app 에서 그 내부 API 를 부를
+     * 수 없다).
      */
     @Test
     fun `raw Double public API 는 바이트코드 층이 보고하지 않는다`() {
