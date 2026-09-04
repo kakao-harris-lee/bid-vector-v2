@@ -149,9 +149,16 @@ first-match rule 은 1D 소유다.
 | --- | --- | --- | --- |
 | ~~`OPEN-1B-PROVENANCE-NAME`~~ | 값 타입 이름이 둘 — `shared-kernel` 코드는 `Provenance`, `data-dictionary.md`는 `FactProvenance`를 쓴다. 이 불일치는 A1·A2(`EstimatedAmount`/`Basis`)와 같은 표기 불일치 계열이지만, 그 둘과 달리 운영자 결정을 받은 적이 없다(verifier r1 M-4) | 운영자(명세 개정 권한) | **해소 — 운영자 결정 2026-09-04(decision 16): `Provenance` 채택.** 코드는 변경 없음(처음부터 `Provenance`). `data-dictionary.md` §5.1 표제·정의 자리와 §1.1 요약 표를 취소선으로 정정했다(A1·A2와 같은 처리) |
 
+### Codex 1차 발견 — 신규 1건 (#4, 미착수·결정 요청)
+
+| id | 미결 요지 | 결정 주체 | 결정 없이 만들 수 있는 것 / 막히는 것 |
+| --- | --- | --- | --- |
+| `OPEN-1B-STABLE-FACT-REF` | `DerivationRecord.inputs`가 `AmountRecord` 값 스냅샷만 담아, 값·`provenance`가 같은 **서로 다른** 입력 fact 를 구분하지 못한다(Codex 1차 #4). `OPEN-DIC-08` 해소문(B11)은 "값이 입력 fact 의 **안정적 참조**와 계산 정책 version 을 나른다"(선택지 ②)를 채택했고, "참조·version 을 나르는 정확한 필드 형태는 M1 1B 구현이 정한다"고 **형태**는 1B 에 위임했다 — 그러나 **그 참조가 무엇을 가리키는 값인가**(어떤 안정적 identity 를 어디서 얻는가)는 위임 밖이다 | 운영자·spec-writer(참조가 가리킬 identity 시스템 자체를 정하는 결정) | **막힘 — 이 slice 는 구현하지 않고 여기 등재만 한다(team-lead 지시대로 정지).** 조사 결과: `data-dictionary.md` §12.2 「식별자」갈래(`limitGroupNo`·`licenseRegionCode`·`noticeRevision`·`deliveryKey`·`observationKey`·`key`·`sourceKey`·`modelArtifactId`·`inputSnapshotHash`·`policyVersion`)에 열거된 아홉은 전부 **다른 capability 소유**(면허·공고·전송/재관측 dedup·ML 모델)의 기존 식별자이지, "`AmountRecord`/입력 `Money` 값 하나를 가리키는 안정적 참조"로 이미 정의된 필드가 **없다**. `inputSnapshotHash`는 `DecisionProvenance`(§4.1, B11 이 **불채택**한 선택지 ①의 carrier) 소유라 그대로 재사용하면 불채택된 설계의 식별자를 끌어오는 것이 된다. **`Money` 자체에 여섯째 성분으로 참조를 추가하는 것도 막힌다** — `ADR 0002` D-1("다섯 중 어느 하나라도 없는 금액은 `Money`가 아니다")이 다섯 성분을 고정했다. **content-addressed(해시) 참조를 새로 짓는 것도, 그 밖의 identity 체계를 새로 짓는 것도 이 slice 권한 밖이다** — 그 자체가 여러 capability 에 걸치는 새 cross-cutting 개념이라 명세 승인 대상이다(team-lead 지시). 코드·문서 변경 없음 |
+
 **착수를 막는 항목은 없다** — 위 OPEN 전부 「형태·타입 계약은 결정 없이 선다」쪽이고, 값·범위·명세
 집합 변경이 걸린 항목만 구현의 뒤쪽(정책 엔트리 값, example fixture 승격, 완료 조건 판정)에서
-막힌다.
+막힌다. **예외**: `OPEN-1B-STABLE-FACT-REF`(Codex #4)는 형태 자체가 미결이라 이 예외에서
+빠진다 — 구현은 운영자 결정을 기다린다.
 
 ---
 
