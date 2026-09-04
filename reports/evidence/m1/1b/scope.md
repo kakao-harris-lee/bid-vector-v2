@@ -64,8 +64,9 @@ rollback: |
 ## 하네스 레인 변경 (상시 절, 1A 관례 승계)
 
 `git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/` —
-**없음**(base_sha 가 이 계약 작성 시점의 HEAD 와 같다). 목록이 생기면 SHA·경로·목적 한 줄씩
-등재하고 「slice 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은 range 에 있다」를 명시한다.
+**없음**(재확인: fixture-curator 레인 커밋 `93be34a` 합류 뒤에도 이 range 에 하네스 경로
+변경이 없다). 목록이 생기면 SHA·경로·목적 한 줄씩 등재하고 「slice 산출물이 아니며
+in_scope 밖, 운영자 승인 하에 같은 range 에 있다」를 명시한다.
 
 ---
 
@@ -129,8 +130,8 @@ first-match rule 은 1D 소유다.
 
 | id | 미결 요지 | 결정 주체 | 결정 없이 만들 수 있는 것 / 막히는 것 |
 | --- | --- | --- | --- |
-| `OPEN-1B-CONTRACT` | fixture 계약 술어 설계(presence/non-null·형태 · 의미 범주 · `equals-path`)가 1B in_scope 인가 — `money-basis` 6건·`rate-unit` 5건이 2026-09-02 `insufficient-evidence` 로 강등됐고, `uncovered_axes` 의 `unblocks_when` 이 그 소유를 「M1 계약 설계」에만 두고 slice 를 지정하지 않았다 | 운영자·spec-writer | **가능**: 타입 계약 자체는 이 술어 설계 없이도 선다(§1B 완료 조건 대조가 그 분리를 이미 확인). **막힘**: `milestone-1.md` 완료 조건 「승인된 authoritative corpus 전체 통과」를 1B 축에서 증명하는 것 — 술어가 없으면 그 corpus 는 여전히 0건이다 — **운영자 결정 2026-09-04(C13): 「M1 계약 술어 설계」의 소유 slice = M1 1B.** `capability-map.md` §14.2에 신설 행으로 등재. **술어 자체는 아직 미설계 — 담당만 확정** |
-| `OPEN-1B-CORPUS` | 1B 축 authoritative corpus 0건인 채로 완료 조건을 어떻게 다루는가 | 운영자 | **가능**: example test 를 「입력 형태·기대 방향의 참고」로 쓰되 「승인된 corpus 통과」로 계상하지 않는다(조사 B §4.2). **막힘**: 위와 동일 — 그 완료 조건 자체 — **운영자 결정 2026-09-04(C13): 「승인된 authoritative corpus 전체 통과」는 위 술어를 갖춰 되돌린 뒤 계상한다 — `checklist.md`에 명시** |
+| `OPEN-1B-CONTRACT` | fixture 계약 술어 설계(presence/non-null·형태 · 의미 범주 · `equals-path`)가 1B in_scope 인가 — `money-basis` 6건·`rate-unit` 5건이 2026-09-02 `insufficient-evidence` 로 강등됐고, `uncovered_axes` 의 `unblocks_when` 이 그 소유를 「M1 계약 설계」에만 두고 slice 를 지정하지 않았다 | 운영자·spec-writer | **가능**: 타입 계약 자체는 이 술어 설계 없이도 선다(§1B 완료 조건 대조가 그 분리를 이미 확인). **막힘**: `milestone-1.md` 완료 조건 「승인된 authoritative corpus 전체 통과」를 1B 축에서 증명하는 것 — 술어가 없으면 그 corpus 는 여전히 0건이다 — **운영자 결정 2026-09-04(C13): 「M1 계약 술어 설계」의 소유 slice = M1 1B.** `capability-map.md` §14.2에 신설 행으로 등재. **fixture-curator 레인이 담당을 이어받아 실행했다(`fixtures.md`)**: 술어 셋(`is-present`·`differs-from-path`·`differs-from-case`)의 **설계는 `fixtures/manifest.yaml`의 `m1_contract_binding.predicate_design`에 있다.** **실행 도구 확장(`fixtures/tools/manifest_contract.py`의 `holds()`·스윕 변이체 생성 규칙)은 미착수** — 그 파일은 in_scope 밖이라 이 레인이 열지 않았다(`fixtures.md` 알려진 제한 2) |
+| `OPEN-1B-CORPUS` | 1B 축 authoritative corpus 0건인 채로 완료 조건을 어떻게 다루는가 | 운영자 | **가능**: example test 를 「입력 형태·기대 방향의 참고」로 쓰되 「승인된 corpus 통과」로 계상하지 않는다(조사 B §4.2). **막힘**: 위와 동일 — 그 완료 조건 자체 — **운영자 결정 2026-09-04(C13)이 되돌림 조건을 정했으나 fixture-curator 레인 실행 결과 되돌린 case 는 0건이다**(`fixtures.md` §1). 남은 미결 요지를 다시 좁힌다 — **① 술어 어휘 동결 해제(도구 범위, `manifest_contract.py`) ② fixture 결과 토큰(`Accepted`/`Rejected` 등)과 1B 계약 어휘(`Fact.Known`/`Absent`·`ReasonCode`)의 정렬 = 재추출**(기대값 파일이 바뀌므로 되돌림이 아니다). **결정 주체는 운영자, 담당 slice는 미정**(오케스트레이터가 그 결정을 운영자에게 올린다) — `money-basis-001`·`004`(BLOCK-4, 컴파일 차단이라 거부 객체 자체가 없음)와 `money-basis-003`(BLOCK-5, 검색 경로 타입 부재)은 술어가 갖춰져도 별도로 막힌다 |
 
 **착수를 막는 항목은 없다** — 위 OPEN 전부 「형태·타입 계약은 결정 없이 선다」쪽이고, 값·범위·명세
 집합 변경이 걸린 항목만 구현의 뒤쪽(정책 엔트리 값, example fixture 승격, 완료 조건 판정)에서

@@ -98,6 +98,23 @@ git diff --stat 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD
   누출 검사 판독 규칙과 같은 부류 — developer가 인용한 패턴 문자열은 실제 비밀값이 아니다.
   육안 확인으로 실제 비밀값 부재를 재확인했다
 
+## fixture-curator 레인 결과 (커밋 `93be34a`, 이 레인 밖 — 포인터만)
+
+fixture 되돌림(C13) 실행 결과와 사유 다섯(BLOCK-1~5)의 정본은
+`reports/evidence/m1/1b/fixtures.md`와 그 레인이 쓴
+`reports/evidence/m1/1b/golden-manifest.json`이 갖는다 — 이 문서(구현 레인 소유)에
+옮겨 적지 않는다. 요지 한 줄: 되돌린 case 0건, 술어 설계는 `fixtures/manifest.yaml`
+`m1_contract_binding.predicate_design`에 있으나 실행 도구(`manifest_contract.py`)
+확장은 미착수.
+
+**`money-basis-005`(`sameKnownVat` + `ReasonCode.VAT_TREATMENT_MISMATCH`) 는 이미
+example 로 고정돼 있다** — `ArithmeticTest`의
+`vatTreatment 가 다르거나 Unknown 이면 율 계산이 Unmeasurable 을 낸다 (P-3c, B9)`와
+`P-3c sameKnownVat 는 Unknown 곱하기 Unknown 을 통과시키지 않는다`가 "값이 같아도
+`UNKNOWN`이면 막는 런타임 전건"을 구체 입력으로 실측한다. `fixtures.md` §4의 그
+행이 가리키는 계약 경로(`sameKnownVat`·`ReasonCode.VAT_TREATMENT_MISMATCH`)와
+일치한다 — 새 test 를 추가하지 않았다(중복 금지).
+
 ### 양성 대조 — clean-tree 게이트가 실제로 in_scope 변경을 잡는지
 
 - cmd: `echo "// probe" >> shared-kernel/src/main/kotlin/bidvector/sharedkernel/Basis.kt && git status --porcelain -- shared-kernel/src/main/kotlin/bidvector/sharedkernel/Basis.kt reports/evidence/m1/1b/scope.md reports/evidence/m1/1b/checklist.md reports/evidence/m1/1b/commands.md reports/evidence/m1/1b/rollback.md && git checkout -- shared-kernel/src/main/kotlin/bidvector/sharedkernel/Basis.kt`

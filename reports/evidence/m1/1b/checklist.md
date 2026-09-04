@@ -14,7 +14,7 @@ SKILL).
 | --- | --- | --- |
 | `./gradlew check` 통과 | **충족** | `commands.md` B-0(격리 worktree)·B-1(작업 트리) |
 | 금지 import와 순환 의존을 일부러 넣은 test fixture가 실제로 실패 | **충족(1A 승계 확인)** | `commands.md` B-2 — `shared-kernel` 이 Spring·JPA·JSON·HTTP 를 import 하지 않음(`ADR 0002` D-9)이 걸린다. 1B 는 새 위반 fixture 를 추가하지 않았다(1A 것을 재확인만) |
-| 승인된 authoritative corpus 전체 통과 | **N/A(1B 축) + 사유** | 1B 축 authoritative case 가 0 건이다. `OPEN-1B-CONTRACT`(계약 술어 설계, 담당은 1B 로 확정됐으나 술어 자체는 이번 Phase 3 범위 밖 — 아래 「이월 항목」) 가 닫혀야 계상된다 |
+| 승인된 authoritative corpus 전체 통과 | **미충족.** | 1B 축 authoritative case 가 0 건이고 **fixture-curator 레인이 되돌림을 실제로 시도해 0 건이 확정됐다**(`fixtures.md` §1). 되돌리지 못한 사유 다섯(BLOCK-1~5, `fixtures.md`) — 술어 어휘가 도구(`manifest_contract.py`) 쪽에서 안 풀림 · 결과 토큰이 1B 계약과 다른 이름 · money-basis 둘째 자물쇠(운영자 승인 부재) · `money-basis-001`·`004`(basis 혼합이 컴파일 차단이라 거부 객체 자체가 없음) · `money-basis-003`(검색 경로 타입 계약에 없음). `OPEN-1B-CONTRACT`·`OPEN-1B-CORPUS`(`scope.md`)가 남은 미결을 든다 |
 | 중요 rule mutation이 생존하지 않음 | **pending** | 도구는 `OPEN-ADR-07` 로 미결(1A 관례 승계, 카탈로그 좌표만) — 1B 는 mutation 을 적용하지 않는다(out_of_scope) |
 | raw `Double` 금액/rate가 public domain API에 없음 | **충족** | `commands.md` B-6 — `domainApiTypeGate` 가 실제 도메인 API(`Money`·`Rate`·`Measurement`·`Fact` 등, `Long`/`BigDecimal` 백킹) 위에서 처음 실효했다. 위반 0 |
 | `Uncertain`/`Unmeasurable`가 성공 또는 0으로 합쳐지지 않음 | **부분 충족(1B 몫은 완료)** | `Absent(reason)`·`Unmeasurable(reason)`·`Measured<T>` carrier 를 만들고 `orElse`·`getOrDefault`·`orZero`·`getOrThrow` 를 선언하지 않아 접는 API 자체가 없다. `sumOfBaseAmounts` 의 「빈 목록 = `Absent`, `0` 은 `Known(0)`과 분리」를 property test(P-4)로 고정했다. `Uncertain` variant 자체(1C·1D 소유)는 여전히 pending |
@@ -52,7 +52,7 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | --- | --- |
 | `scope.md`·`rollback.md`·`commands.md`·`checklist.md` | 있다 |
 | `differential.json` | **N/A** — 1B 는 legacy 코드와의 수치 비교(Python 대비 diagnostic run)를 만들지 않았다. 회귀 대응은 example test(E-1~E-5)가 문면·조사 A 인용으로 고정한다 |
-| `golden-manifest.json` | **N/A** — 1B 축 authoritative fixture 가 0 건이라 소비한 corpus 가 없다(`OPEN-1B-CONTRACT`) |
+| `golden-manifest.json` | **fixture-curator 레인 소유.** `reports/evidence/m1/1b/golden-manifest.json`이 그 레인의 산출물이다 — 1B(kotlin-implementer)는 이 파일을 만들지도 편집하지도 않는다. 이 slice 가 소비한 authoritative corpus 는 여전히 0 건이다 |
 | `codex-review-*.json` | 심판 레인 소유. 이 레인이 만들지 않는다 |
 
 ## 알려진 제한
@@ -66,7 +66,7 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | L-3 | `Long` 누출을 게이트가 재지 않음 | **`internal` 가시성으로 세웠다.** `Money.amount`·각 타입의 `won` 이 전부 `internal` — `api-type-policy.properties` 는 갱신하지 않았다(그러면 `AmountRecord` 조차 못 만든다) |
 | L-4 | `basis` 가 생성자 파라미터가 아니라 파생 `val` — `data-dictionary.md` §1.1 서명과 형태 차이 | **등재 유지.** 다섯 성분은 그대로 있어 D-1 충족. `override val basis: Basis = Basis.XXX` 로 각 타입이 상수를 낸다 |
 | L-5 | `PolicyVersion(effectiveFrom: LocalDate, …)` 문면과 `Initial` variant 요구가 같은 절에서 어긋남 | **`EffectiveFrom` sealed 로 구현.** `PolicyVersion.effectiveFrom: EffectiveFrom`(`LocalDate` 아님) — 문면 정정은 별도 승인 문서 개정이 필요하므로 이 slice 가 스스로 고치지 않는다 |
-| L-6 | 「승인된 authoritative corpus 전체 통과」— 1B 축 corpus 0 건 | **N/A + 사유로 판정(공집합 통과로 계상하지 않음).** 위 완료 조건 표 참조 |
+| L-6 | 「승인된 authoritative corpus 전체 통과」— 1B 축 corpus 0 건 | **미충족으로 판정한다(공집합 통과로 계상하지 않는다).** fixture-curator 레인이 되돌림을 실제로 시도해 0 건으로 확정됐다 — 위 완료 조건 표·`fixtures.md` 참조 |
 | L-7 | 크기 기반 단위 추측 분기 부재의 architecture test 축이 1A 게이트 집합에 없음 | **판정(운영자 결정 2026-09-04): 신규 architecture test 를 세우지 않는다 — 기존 property test(P-3a)·example test(E-3)로 충분하다고 판정한다.** `Rate.ofFraction`/`ofPercent` 정의 자체에 값 크기를 보는 `if` 가 없다(코드 실측). **한계**: 이것은 회귀 방지 게이트가 아니다 — 누가 나중에 매직넘버 분기를 넣어도 CI 가 자동으로 막지 못하고 P-3a·E-3 의 기존 기대값과 충돌해야 간접적으로 잡힌다. 직접 게이트는 `build-logic/**` 확장이 필요해 위협 모델 경계 밖 비용을 문다 — `scope.md` 「계약 갱신」 2026-09-04 절이 판정 전문을 갖는다 |
 | L-8 | `Provenance` ↔ `FactProvenance` 이름 불일치 | **승인 명세 표기(`Provenance`)를 채택.** A1·A2 와 같은 갈래 |
 | L-9 | `a == b` 만 쓰면 `UNKNOWN`×`UNKNOWN` 이 통과 | **닫혔다.** `sameKnownVat`(`a == b && a != UNKNOWN`) 를 산술 함수 전건의 유일한 자리로 두고 property test(P-3c)로 고정했다 |
@@ -98,14 +98,14 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
   `VAT_TREATMENT_MISMATCH`). 값 결정이 아니라 기존 규율(L-9)의 일관 적용이라 `OPEN` 으로
   등재하지 않는다.
 
-## 이월 항목 (Phase 3 범위 밖으로 명시 이월)
+## 이월 항목
 
-**컴파일 실패 하네스(C8)와 L-7 은 운영자 결정 2026-09-04로 이월에서 닫힘으로 옮겼다** — 위
-완료 조건 표·설계 검토 처리 결과 표 참조. 아래 하나만 남는다.
-
-| 항목 | 왜 이번에 안 했는가 | 다음 |
-| --- | --- | --- |
-| **fixture 되돌림 실행**(C13, `OPEN-1B-CONTRACT`) | 계약 술어(presence/non-null·형태 / 의미 범주 / `equals-path`) 설계는 1B 소관이나 `fixtures/manifest.yaml` 편집(분류 되돌림·SHA-256 재기록)은 **fixture-curator 소관**이다(설계 검토 §4.7 단계 3). 이 slice(kotlin-implementer)가 직접 편집하면 레인 경계를 넘는다 — 실제로 fixture-curator 레인이 이 slice 와 병행해 그 작업을 진행 중이다(작업 트리에서 확인, 이 slice 는 관여하지 않는다) | fixture-curator 완료를 기다린다 |
+**컴파일 실패 하네스(C8)·L-7·fixture 되돌림(C13) 셋 다 더는 이월이 아니다** — 앞 둘은
+운영자 결정 2026-09-04로 닫혔고(위 완료 조건 표·설계 검토 처리 결과 표), fixture
+되돌림은 fixture-curator 레인이 **실행해 결과를 냈다**(`fixtures.md`, 커밋 `93be34a`) —
+되돌린 case 0 건, 술어 설계는 나왔으나 실행 도구 확장은 미착수. 이월 항목 표는 이제
+비어 있다. 남은 미결은 `scope.md`의 `OPEN-1B-CONTRACT`·`OPEN-1B-CORPUS`가 든다 — 값·범위
+결정을 운영자에게 올리는 것이 다음 단계이지, 이 slice 가 더 실행할 남은 작업이 아니다.
 
 ## 리뷰 요청 조건 (`evidence-pack` SKILL)
 
