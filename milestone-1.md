@@ -65,6 +65,31 @@ corpus 전체 통과」는 1B slice 의 종결 조건에서 제외하고, 이 sl
 관련 OPEN: `OPEN-1B-CONTRACT`·`OPEN-1B-CORPUS`(`reports/evidence/m1/1b/scope.md`, 담당을
 이 slice 로 정정), `capability-map.md` §14.2.
 
+**착수 2026-09-04 · 운영자 결정 2026-09-05(decision 18~22)**: 술어 어휘 동결 해제(셋 전부),
+결과 토큰 어휘 = 1B 계약 어휘, BLOCK-3 은 case 별 승인, 11 case 처분 표 전체 승인, 소비
+테스트는 shared-kernel `testFixtures` projection + `app/src/test` runner. 계약 정본은
+`reports/evidence/m1/1b-c/scope.md`. 담당 레인은 fixture-curator + kotlin-implementer
+(spec-writer 는 2026-09-04 지시로 세션 모델이 대신한다).
+
+### Slice 1A-b — 래칫·게이트 확장 (하네스)
+
+**운영자 결정 2026-09-05 로 신설.** 1B 종료 시점에 함께 결정한 `OPEN-ADR-06`·`OPEN-ADR-16`
+과 1B-c 조사가 드러낸 게이트 사각의 **배선**을 한 slice 에 모은다 — 도메인 코드가 아니라
+`build-logic/**`·`config/quality/**` 를 만지는 하네스 slice 라 1A 의 승계다. 착수는 1B-c
+종결 뒤 별도 계약 고정.
+
+- `sizeGate` 에 **타입 멤버 수 상한 30**(Kotlin PSI 소스 기준) + 상속 깊이·구현 인터페이스 수
+  **래칫**(shared-kernel baseline 2·1 대비 증가 금지) — `OPEN-ADR-06` (a), `docs/adr/0007` §5.
+- **PMD CPD** 배선(`de.aaschmid.cpd`, `language = kotlin`, `toolVersion` 으로 엔진 독립,
+  `minimumTokenCount` 50, **관찰 모드** — 리포트만, 실패 모드 전환은 1C 종료 시 결정).
+  acceptance 에 **Gradle 9.6.1 스모크** — 실패 시 (b) `qualityBaseline` 자체 판정으로 후퇴 —
+  `OPEN-ADR-16` (a).
+- 1차 게이트(`moduleDependencyGate`)의 declared 판정에 **`testFixtures*` 의존 버킷** 포함 —
+  `OPEN-1BC-TESTFIXTURES-GATE`(1B-c 조사 §8 실측 사각).
+
+완료 조건은 M1 공통 조건 + 위 셋의 위반 fixture 가 실제로 걸림(관찰 모드인 CPD 는 리포트
+산출로 대신). 게이트 위협 모델(「완료 조건」 절)은 그대로 적용된다.
+
 ### Slice 1C — Qualification
 
 - 단일 면허 조건
