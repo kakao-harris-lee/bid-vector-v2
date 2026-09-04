@@ -154,6 +154,16 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | L-5 | 운영자 결정 B9(「세 타입을 `vatTreatment = Unknown` 으로 선언」)이 코드에 없다 — 여섯 금액 타입 전부 `vatTreatment` 를 호출부 인자로 받는다 | **닫혔다 — 구현함(운영자 재확인, 2026-09-04 후속 지시).** 이 표에는 처음에 「원문(low)을 따라 구현하지 않는다」고 적었으나, team-lead 가 근거를 밝히며 재확인했다 — `data-dictionary.md` §1.2 가 `Unknown` 을 「정의상 현재 값, 미결의 표현이지 답이 아니다」로 정의하므로 `vatTreatment = Unknown` **선언**은 `OPEN-DIC-04`(실제 과세 처리 값)를 해소하는 것이 아니라 「모른다」를 타입에 싣는 것뿐이다 — `scope.md` 「OPEN 을 임의로 해소하지 않는다」위반이 아니다. `AllocatedBudget`·`YegaAmount`·`AwardAmount` 세 타입의 주 생성자에서 `vatTreatment` 파라미터를 제거하고 `Unknown` 고정 `val` 로 바꿨다(`Money.kt`, 커밋 `feat(m1-1b): 세 금액의 과세 처리를 Unknown 으로 고정 선언한다 (운영자 결정 B9)`) — `sameKnownVat` 전건이 이미 있어 `assessmentRateAgainst`·`awardRateAgainst` 가 항상 `Unmeasurable` 이 되는 것으로 산술 차단이 자동 성립한다. **부작용**: 두 함수가 지금 항상 `Unmeasurable` 이라 사실상 죽은 경로가 된다 — `OPEN-DIC-04` 가 실제 값으로 해소돼야 다시 살아난다. `scope.md` `OPEN-DIC-04` 행에 반영 |
 | L-6 | kotest 시드 미고정 — property 실패의 재현이 그 실행에 찍힌 시드에만 의존. `divideForRate` 가 분모 0 을 `EMPTY_INPUT` 으로 라벨 | **시드는 닫혔다** — `build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts` 의 `tasks.withType<Test>` 에 `systemProperty("kotest.proptest.default.seed", "20260904")` 를 걸었다(kotest 의 JUnit5 러너를 안 붙이므로 `AbstractProjectConfig` 자동탐지가 아니라 이 시스템 property 가 유일한 전역 지점이다 — 실측: 값을 읽어 콘솔에 찍는 임시 test 로 확인 후 제거). **`EMPTY_INPUT` 라벨은 등재 유지.** 분모 0 은 "입력이 비었다"가 아니라 "0으로 나눌 수 없다"는 별도 사유이지만, `ReasonCode` 에 나눗셈 전용 코드를 새로 만들 근거(legacy 실측·운영자 결정)가 없어 이 slice 는 새 코드를 짓지 않는다 — 다음 slice 가 나눗셈 전건이 늘면 재검토 대상 |
 
+### verifier r2 발견 — H-3·H-4·M-6·low 4 처리 결과
+
+**주의 — `_workspace/m1-1b/06_verifier_r2.md` 의 번호를 그대로 쓴다.** H·M 은 위
+설계 검토·verifier r1 표와 다른 라운드다. low 는 L-7~L-10(verifier r2 §7 번호).
+
+| # | 요지 | 처리 |
+| --- | --- | --- |
+| H-3 | `DerivationRecord` 생성자만 닫혀 있고 그것을 나르는 `Derived<T>`·`Measurement.Measured<T>` 는 공개 생성자·공개 `copy()` 를 가져, B11 이 요구하는 "값이 **자기** 입력 fact 를 되짚는다"가 `a.copy(derivedFrom = b.derivedFrom)`(기록 교체)·`Derived(a.value, b.derivedFrom)`(위조 wrapper)·`Measurement.Measured(Derived(x, d.derivedFrom), 1, pv)`(임의 타입 포장) 세 형태로 모듈 밖에서 무너진다 | **닫혔다.** `Derived`·`Measurement.Measured` 양쪽에 `internal constructor`+`@ConsistentCopyVisibility` 를 걸었다(`Rate`·파생 `Money`·`DerivationRecord` 가 이미 쓴 처방과 동일). 「형제 다섯」식 부분 열거를 반복하지 않도록, `DerivationRecord`·`Derived<` 를 필드 타입으로 갖는 선언을 grep 으로 전수 확인해 이 둘이 B11 carrier 전부임을 확인했다(`Fact`·`Measurement.Unmeasurable` 은 파생 기록을 나르지 않아 대상이 아니다). 컴파일 하네스 fixture 8·9·10(음성 셋 + 양성 쌍둥이 + 변이 쌍둥이 각 하나, 변이는 정당한 읽기 경로에 오타만 넣어 "cannot access" 를 만족시키지 않음을 확인) |
+| L-8(합침) | 리플렉션이 `Derived`·`Measurement.Measured` 의 새 컴파일 시점 보증을 둘 다 우회한다(설계 검토 §2 #14 가 "경계 밖"으로 이미 분류했으나 evidence 에 없었다) | **등재만 한다 — 알려진 제한.** `internal constructor`+`@ConsistentCopyVisibility` 는 컴파일 시점 API 표면만 막는다. `kotlin.reflect`/`java.lang.reflect` 로 `Derived`·`Measurement.Measured`(및 앞서 잠근 `Rate`·파생 `Money`·`DerivationRecord`) 의 생성자·필드에 접근하면 여전히 우회된다 — JVM 가시성 자체가 리플렉션을 막지 않는 것과 같은 성질이라 이 slice 의 게이트 구조(컴파일 실패 하네스)로는 닫을 수 없다. 런타임 리플렉션 사용 자체를 막는 것은 별도 architecture test(허용 import 목록에서 `kotlin.reflect`/`java.lang.reflect` 제외)가 필요하고 이는 `build-logic` 확장이라 위협 모델 경계 밖(L-7, 설계 검토 표와 같은 판단) |
+
 ## 이월 항목
 
 **컴파일 실패 하네스(C8)·L-7·fixture 되돌림(C13) 셋 다 더는 이월이 아니다** — 앞 둘은

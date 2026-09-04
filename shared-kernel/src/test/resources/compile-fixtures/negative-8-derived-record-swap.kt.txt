@@ -1,0 +1,6 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BidAmount
+import bidvector.sharedkernel.Derived
+
+fun swap(a: Derived<BidAmount>, b: Derived<BidAmount>): Derived<BidAmount> = a.copy(derivedFrom = b.derivedFrom)

@@ -1,0 +1,11 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.Derived
+import bidvector.sharedkernel.Measurement
+import bidvector.sharedkernel.PolicyVersion
+
+fun wrap(
+    x: String,
+    d: Derived<String>,
+    pv: PolicyVersion,
+): Measurement<Derived<String>> = Measurement.Measured(Derived(x, d.derivedFrom), 1, pv)

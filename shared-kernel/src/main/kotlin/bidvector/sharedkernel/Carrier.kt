@@ -41,7 +41,15 @@ sealed interface Fact<out T> {
  * 문면이 두 쌍을 다른 자리에서 정의한다).
  */
 sealed interface Measurement<out T> {
-    data class Measured<out T>(
+    /**
+     * 공개 생성자를 열어 두면 이미 만들어진 [Derived] 값(그 자체는 `internal` 생성자로
+     * 막혀 있어도, 함수 매개변수로 전달받은 기존 인스턴스는 여전히 읽을 수 있다)을 감싸
+     * `Measurement.Measured(Derived(x, d.derivedFrom), 1, pv)` 형태로 임의 값이 진짜
+     * 판정처럼 모듈 밖에서 조립된다(verifier r2 H-3). `Derived`·`DerivationRecord`와 같은
+     * 처방을 적용한다 — 생성 경로는 `MoneyArithmetic.kt`의 파생 함수만이다.
+     */
+    @ConsistentCopyVisibility
+    data class Measured<out T> internal constructor(
         val value: T,
         val sampleSize: Int,
         val policyVersion: PolicyVersion,

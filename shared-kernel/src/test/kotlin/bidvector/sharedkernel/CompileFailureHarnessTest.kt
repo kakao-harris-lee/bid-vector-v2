@@ -96,6 +96,60 @@ class CompileFailureHarnessTest {
         assertNegativeFails("7-vat-fixed-money-explicit-vat", "too many arguments for")
         assertPositiveCompiles("7-vat-fixed-money-no-vat-arg")
     }
+
+    /**
+     * verifier r2 H-3 — `DerivationRecord`의 생성자만 닫고 그것을 나르는 [Derived]를 열어
+     * 두면 B11 보증("파생값이 **자기** 입력 fact 를 되짚는다")이 `copy(derivedFrom = …)`로
+     * 깨진다. 읽기(`positive-8`)는 여전히 열려 있어야 한다 — 소비자는 값을 읽어야 한다.
+     */
+    @Test
+    fun `8 Derived 의 기록은 copy 로 교체할 수 없고 읽을 수는 있다 (verifier r2 H-3)`() {
+        assertNegativeFails("8-derived-record-swap", "cannot access")
+        assertPositiveCompiles("8-derived-record-read")
+    }
+
+    @Test
+    fun `8-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "8-derived-record-swap-typo",
+            realDiagnosticFragment = "cannot access",
+        )
+    }
+
+    /** verifier r2 H-3 — `Derived(a.value, b.derivedFrom)`로 값과 다른 계산의 기록을 갈아 끼워 위조한다. */
+    @Test
+    fun `9 Derived 는 값과 기록을 재조합해 위조할 수 없고 값을 읽을 수는 있다 (verifier r2 H-3)`() {
+        assertNegativeFails("9-derived-recombine-forge", "cannot access")
+        assertPositiveCompiles("9-derived-value-read")
+    }
+
+    @Test
+    fun `9-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "9-derived-recombine-forge-typo",
+            realDiagnosticFragment = "cannot access",
+        )
+    }
+
+    /**
+     * verifier r2 H-3 — `Derived`만 닫고 [Measurement.Measured]를 열어 두면 임의 타입 값을
+     * 진짜 `DerivationRecord`로 감싼 `Derived`를 다시 `Measurement.Measured`로 포장해
+     * 모듈 밖에서 "판정"을 조립할 수 있다. `Unmeasurable` 형제는 `ReasonCode`만 나르므로
+     * 위조 대상이 없어 계속 공개다(positive-10).
+     */
+    @Test
+    fun `10 Measurement Measured 는 임의 타입을 진짜 기록으로 포장할 수 없고 Unmeasurable 은 여전히 공개다 (verifier r2 H-3)`() {
+        assertNegativeFails("10-measured-arbitrary-type-wrap", "cannot access")
+        assertPositiveCompiles("10-unmeasurable-still-public")
+    }
+
+    @Test
+    fun `10-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "10-measured-arbitrary-type-wrap-typo",
+            realDiagnosticFragment = "cannot access",
+        )
+    }
 }
 
 private fun assertNegativeFails(

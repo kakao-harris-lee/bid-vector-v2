@@ -1,0 +1,6 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BidAmount
+import bidvector.sharedkernel.Derived
+
+fun readValueTypo(a: Derived<BidAmount>): BidAmount = a.valueTypo

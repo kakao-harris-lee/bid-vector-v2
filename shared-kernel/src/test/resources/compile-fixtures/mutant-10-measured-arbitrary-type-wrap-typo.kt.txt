@@ -1,0 +1,7 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.Derived
+import bidvector.sharedkernel.Measurement
+import bidvector.sharedkernel.ReasonCode
+
+fun wrapAsUnmeasurableTypo(): Measurement<Derived<String>> = Measurement.UnmeasurableTypo(ReasonCode.EMPTY_INPUT)
