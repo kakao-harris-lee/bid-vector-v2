@@ -1,0 +1,44 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "6b03c75016a1d5437ca7ff932282fc477be974e6",
+  "reviewed_head": "dbe50b6291de6b287fb6270a6ad51d9f1158751d",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "reports/evidence/m1/1a/rollback.md",
+      "line": 24,
+      "evidence": "HEAD의 독립 임시 clone에서 문서의 첫 rollback 명령을 그대로 실행하면 base에 없는 `settings.gradle.kts`, `build-logic`, 아홉 모듈 등 신규 경로마다 `pathspec ... did not match any file(s) known to git`가 발생해 exit 1로 끝나고 변경도 적용되지 않는다. 37행의 “base에 없으면 아무것도 하지 않는다”는 Git 동작과 다르며, in_scope 변경 135개 중 129개가 신규라 검증 절차도 같은 지점에서 실패한다. 따라서 agent-workflow.md §4가 필수로 정한 실제 실행 가능한 rollback이 없다.",
+      "required_fix": "신규 경로도 삭제할 수 있는 `git restore --source=6b03c75 --staged --worktree -- <in_scope 경로>`로 실행·검증 절차를 교체하거나, A 경로를 먼저 `git rm`하고 M 경로만 base에서 복원하도록 분리한다. 전자는 임시 clone에서 exit 0, D 129·M 6, base 대비 in_scope diff 없음으로 확인됐다."
+    },
+    {
+      "severity": "low",
+      "file": "reports/evidence/m1/1a/rollback.md",
+      "line": 19,
+      "evidence": "문서는 현재 range의 하네스 레인 커밋을 13개라고 하지만 `git log 6b03c75..dbe50b6 -- CLAUDE.md .claude/`는 14개를 내며, scope.md의 하네스 표도 `089d8d3`부터 `e733cfa`까지 14행이다. commands.md의 현재-range 설명에도 13개가 남아 있어 장부가 HEAD와 어긋난다.",
+      "required_fix": "현재 값을 14개로 정정하거나 커밋이 추가될 때 낡지 않도록 고정 개수를 제거하고 명령·표를 정본으로 가리킨다."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse HEAD; git cat-file -e <base/head>^{commit}; git status --short --untracked-files=all 및 `.gradle-home/` 제외 대조",
+    "git log --oneline cca62d7..dbe50b6 및 git diff --stat/--name-status 6b03c75..dbe50b6",
+    "sed·rg·git diff로 agent-workflow.md, v2-지침서.md, milestone-1.md, ADR 0002/0004/0006/0007, capability-map.md와 scope/commands/checklist/rollback 판독",
+    "build/test-results의 TEST-*.xml 16개 합산 — tests=192, failures=0, errors=0, skipped=0",
+    "build/reports의 architecture·source·API·layout·gate-execution 리포트 위반 대조 및 `cmp -s build/reports/member-effects/derived.properties config/quality/member-effects.generated.properties` — exit 0",
+    "HEAD build-logic classpath에서 reflection으로 PublicApiTypes.extract 재실행 — where bound, getter 추론, import alias, 중첩 함수 타입의 raw Double 검출 확인",
+    "HEAD build-logic classpath에서 reflection으로 SourceReferences.extract 재실행 — 다른 함수의 동명 지역 변수, 뒤쪽 선언, 자기 초기화식 사례에서 java.net.HttpURLConnection 검출 확인",
+    "독립 임시 clone에서 rollback.md 24~34행의 `git checkout 6b03c75 -- <in_scope 경로>` 재현 — exit 1, 변경 없음",
+    "같은 임시 clone에서 `git restore --source=6b03c75 --staged --worktree -- <in_scope 경로>` 대안 검증 — exit 0, D 129·M 6, base 대비 in_scope diff 없음",
+    "git log 6b03c75..dbe50b6 -- CLAUDE.md .claude/ 개수·scope.md 하네스 표 대조 — 실제 14개",
+    "git diff --check 6b03c75..dbe50b6",
+    "gradle wrapper ZIP 무결성 검사, 실행 비트와 domain main의 금지 의존·raw numeric·side-effect 참조 정적 검색"
+  ],
+  "residual_risks": [
+    "sandbox의 DatagramSocket 금지 때문에 Gradle을 직접 재실행하지 못했으며, 제공된 HEAD 빌드 산출물과 테스트 XML 및 컴파일된 build-logic을 재대조했다.",
+    "GitHub Actions 워크플로가 실제 원격 러너에서 실행됐다는 증거는 없다.",
+    "scope.md가 승인된 경계로 명시한 raw API 게이트의 잔여 한계인 `Any` 경유, `@PublishedApi internal`, context 파라미터는 남아 있다."
+  ],
+  "reviewer": {
+    "cli_version": "0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}
