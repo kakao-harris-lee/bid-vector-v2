@@ -185,12 +185,21 @@ private fun combine(
         else -> accumulate(state as SumState.Accumulating, (entry as Fact.Known).value)
     }
 
+/**
+ * `seenVat == null`(첫 원소)이라고 전건을 건너뛰면 안 된다 — 이전 원소가 없을 뿐, 이
+ * 원소 자체의 `vatTreatment`가 `UNKNOWN`이면 그 자체로 실패다(verifier r1 M-3, 단일
+ * `UNKNOWN` 원소가 `Known`으로 새던 결함).
+ */
 private fun accumulate(
     state: SumState.Accumulating,
     current: BaseAmount,
 ): SumState {
     val seenVat = state.vat
-    val vatOk = seenVat == null || sameKnownVat(seenVat, current.vatTreatment)
+    val vatOk =
+        when (seenVat) {
+            null -> current.vatTreatment != VatTreatment.UNKNOWN
+            else -> sameKnownVat(seenVat, current.vatTreatment)
+        }
     val next = if (vatOk) runCatching { Math.addExact(state.total, current.amount) }.getOrNull() else null
     return when {
         !vatOk -> SumState.Failed(ReasonCode.VAT_TREATMENT_MISMATCH)

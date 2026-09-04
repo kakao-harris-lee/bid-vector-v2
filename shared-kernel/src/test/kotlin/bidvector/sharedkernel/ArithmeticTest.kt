@@ -111,6 +111,21 @@ class ArithmeticTest {
     }
 
     @Test
+    fun `M-3 원소 하나뿐이면 그 값 그대로가 합이다`() {
+        sumOfBaseAmounts(listOf(Fact.Known(base(500L)))) shouldBe Fact.Known(500L)
+    }
+
+    @Test
+    fun `M-3 원소가 하나뿐이어도 그 vatTreatment 가 Unknown 이면 합은 부재다`() {
+        // seenVat 이 null 로 시작하므로 첫 원소는 이전 원소와 비교할 대상이 없다 — 그렇다고
+        // Unknown 이 전건을 그냥 통과해서는 안 된다(verifier r1 M-3). 이전에는 seenVat==null
+        // 분기가 current.vatTreatment 자체를 보지 않아 이 케이스가 Fact.Known 으로 샜다.
+        sumOfBaseAmounts(
+            listOf(Fact.Known(base(500L, vat = VatTreatment.UNKNOWN))),
+        ) shouldBe Fact.Absent(ReasonCode.VAT_TREATMENT_MISMATCH)
+    }
+
+    @Test
     fun `P-5 overflow 는 조용히 감기지 않고 사유 있는 실패를 낸다 (A4, O-1)`() {
         val overflowing =
             listOf(
