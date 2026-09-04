@@ -670,3 +670,63 @@ M0 가 「스캐너가 자기 출력을 스캔해 재귀 차단까지」 간 경
 - exit: 둘 다 1 (매치 없음 = 통과)
 - 육안 확인: 1A 는 사업자 정보·Telegram 식별자·자격증명을 다루지 않는다. 외부 좌표는
   Maven 아티팩트 GAV 와 공개 문서 URL 뿐이다
+
+### 소스 층 참조 게이트 — 셋째 층 신설 (Codex 13차)
+
+설계 검토 `_workspace/m1-1a/26_design-check-source-import.md` §4 브리프를 그대로 따른다.
+`domainSourceReferenceGate` 가 domain main 소스를 PSI 로 걸어 허용 목록 밖 좌표를 이름으로
+잡는다 — ArchUnit(바이트코드)·1차 의존 그래프가 함께 놓치는 인라인 상수(알려진 제한 7)를
+덮는다. 새 정책 키는 없다 — `architecture-policy.properties` 의 같은 네 키를 세 번째
+표현으로 읽는다.
+
+**javap 실측 — 세 fixture 의 바이트코드 유무.**
+
+| # | fixture | `HttpURLConnection` 타입 참조 |
+| --- | --- | --- |
+| `E-79` | `InlinedConstantLeak` | 없음 |
+| `E-80` | `FullyQualifiedReferenceLeak` | 없음 |
+| `E-81` | `ClassLiteralLeak` | **있음** — `ldc #15 // class java/net/HttpURLConnection` |
+
+`E-81` 이 알려진 제한 11 의 전제(상수 풀 Class 엔트리는 ArchUnit 의존으로 기록되지 않는다)를
+뒤집는다 — 상수 풀 엔트리는 실제로 있고, ArchUnit 은 그것을 `references class object` 라는
+**별도 의존 종류**로 추적한다(`ArchitectureGateCatchesViolationsTest` 의 신설 단언
+`class literal 은 바이트코드 층도 별도 의존 종류로 잡는다` 가 고정). 바이트코드 층의 진짜
+사각은 인라인 상수 둘(`InlinedConstantLeak`·`FullyQualifiedReferenceLeak`)뿐이다 — 같은
+클래스의 `인라인 상수는 바이트코드 층이 보고하지 않는다` 가 그 사각을 고정한다.
+
+**task 수준 RED→GREEN.** 세 fixture(패키지 선언만 `bidvector.settlement` 로 맞춰)를
+`settlement/src/main/kotlin/bidvector/settlement/` 에 임시로 두고 되돌렸다 — 저장소에는
+남기지 않는다(`git status --short -- settlement/` 로 확인).
+
+| # | 조작 | `:settlement:domainSourceReferenceGate` | 사유 |
+| --- | --- | --- | --- |
+| `E-82` | `settlement` 의 유일한 소스(`ModuleBoundaryAnchor.kt`)를 치운다 | 1 | `도메인 모듈 'settlement' 의 소스 트리가 비어 있다 — 게이트가 아무것도 보지 못했다` |
+| `E-83` | 되돌린다 | 0 | (양성 대조) |
+| `E-84` | 세 fixture 를 복사한다 | 1 | 세 파일 각각 `file:line FQN` 사유 — `FullyQualifiedReferenceLeak` 는 `HttpURLConnection` 과 `HttpURLConnection$HTTP_OK` 두 후보를 낸다(대문자 상수 접미를 중첩 클래스 세그먼트와 같은 규칙으로 재는 데서 오는 과잉 후보 — 판정 결과는 맞고 사유 줄만 하나 는다) |
+| `E-85` | 세 fixture 를 지운다 | 0 | (양성 대조) |
+
+**acceptance 전건 재실행.**
+
+| # | cmd | exit |
+| --- | --- | --- |
+| `A-0` | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 |
+| `A-1` | `./gradlew --no-build-cache --no-daemon clean check` | 0 |
+| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 |
+| `A-3` | `./gradlew qualityBaseline` | 0 (`A-0`·`A-1` 의 `check` 에도 포함돼 돈다) |
+| `A-4` | `./gradlew :app:compatibilitySmoke` | 0 (같은 이유로 `check` 에도 포함) |
+| `A-5` | `./gradlew :build-logic:test` | 0 |
+
+`domainSourceReferenceGate` 가 아홉 모듈 전건에서 실제로 돌았음을 각 모듈의
+`build/reports/domain-source-reference/references.txt` 로 확인했다(`A-1` 산출물) — domain
+여섯은 `files=1 references=0 violations=0`(anchor 만 존재), 나머지 셋(`workflow`·`adapters`·
+`app`)은 `files=0`(domain 이 아니라 판정을 걷는다).
+
+clean-tree(경로 개별 인자, `scope.md` `in_scope` 전건) — 출력 없음. 양성 대조: `v2-지침서.md`
+를 한 줄 건드리면 잡히고 되돌리면 다시 빈다(같은 라운드에서 확인).
+
+비밀값 스캔 — `evidence-pack` SKILL 의 패턴을 `reports/evidence/m1/1a/` 와
+`git diff 6b03c75..HEAD` 에: 둘 다 매치 없음(exit 1). 육안 확인은 앞선 라운드와 같다.
+
+**ktlint·detekt.** `ktlintFormat` 이 줄바꿈·중괄호 정렬을 고쳤고, detekt `ReturnCount`(함수당
+반환 2개 한도)가 `candidateForms`·`KtDotQualifiedExpression.segments` 를 걸어 재귀 축적
+형태로 바꿨다(`91a0fa7`) — 판정 로직은 그대로이고 `SourceReferencesTest` 11개가 회귀를 든다.

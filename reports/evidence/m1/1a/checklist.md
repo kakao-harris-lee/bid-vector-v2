@@ -90,12 +90,12 @@
    `commands.md` 의 가족별 표가 그 분담의 실측이다. Kotlin `internal` 이 바이트코드에서
    public 으로 보이는 것도 같은 성질이고, `qualityBaseline` 의 public API 수가 그 영향을 받는다.
 
-   **두 사각이 겹치는 자리가 하나 있다 — 컴파일 시 인라인되는 상수.** domain 이
-   `java.net.HttpURLConnection.HTTP_OK` 만 쓰면 바이트코드에 그 타입 참조가 한 건도 남지
-   않아(`javap` 로 확인) 2 차가 못 보고, JDK 타입이라 Maven group 이 없어 1 차도 못 본다 —
-   **어느 층도 잡지 못한다.** 실질 위험은 낮다: 넘어오는 것이 `int` 값 하나라 프레임워크
-   결합이 실제로 들어오지는 않는다. 그러나 「두 사각이 서로 반대라 둘이면 덮인다」는 말은
-   **이 자리에서 참이 아니다.**
+   **두 사각이 겹치는 자리가 하나 있었다 — 컴파일 시 인라인되는 상수. 이제는 셋째 층이
+   덮는다.** domain 이 `java.net.HttpURLConnection.HTTP_OK` 만 쓰면 바이트코드에 그 타입
+   참조가 한 건도 남지 않아(`javap` 로 확인, `commands.md` `E-79`·`E-80`) 2 차가 못 보고, JDK
+   타입이라 Maven group 이 없어 1 차도 못 본다. `domainSourceReferenceGate`(소스 층, Codex
+   13차)가 이 자리를 덮는다 — 소스가 그 이름을 **부른다는 사실 자체**를 PSI 로 보므로 바이트코드
+   에 남는지와 무관하다. 남는 사각은 소스에도 이름이 없는 형태(미수식 참조, 제한 18)뿐이다.
 8. **승인된 두 임계는 이제 둘 다 도구 비의존이다.** 함수 축을 Kotlin PSI 로 직접 재므로
    detekt 이 죽어도, `@Suppress` 를 어떤 표기로 쓰든 임계가 남는다 — `detekt.yml` 의
    `LongMethod` 는 껐다. detekt 은 그 위의 축(복잡도·중첩·파라미터 수)만 맡고 **그 축들은
@@ -108,10 +108,18 @@
 10. **(폐기) `kotlin.Metadata` 원산지 검사** — 그 검사는 더 이상 존재하지 않는다. 원산지 층의
    현재 판정과 그 잔여는 **알려진 제한 26** 이 든다. 다른 항목이 이 목록을 번호로 가리키므로
    번호는 비우지 않고 남긴다.
-11. **`X::class.java` 클래스 리터럴은 게이트가 보지 못한다.** 상수 풀의 Class 엔트리는 ArchUnit
-   의존으로 기록되지 않는다(설계 검토 U-8, `javap` 로 확인). 얻은 `Class` 로 무언가 하려면 그
-   다음 호출의 owner 가 `java.lang.Class` 라 T-C 가 잡지만, 리터럴 자체는 잔여다. 「두 게이트의 사각이 서로 반대다」가 든
-   인라인 상수와 같은 성질 — **정밀도의 한계이지 목록의 누락이 아니다.**
+11. **(정정, Codex 13차 실측) `X::class.java` 클래스 리터럴은 바이트코드 층도 잡는다.** 이전
+   판정(설계 검토 U-8, `javap` 만 근거)은 상수 풀의 Class 엔트리가 ArchUnit 의존으로 기록되지
+   않는다고 봤다. `ClassLiteralLeak` fixture 로 재보니 그 반대다 — 상수 풀 엔트리는 있고
+   (`javap`, `commands.md` `E-81`: `ldc #15 // class java/net/HttpURLConnection`), ArchUnit 은
+   그것을 `references class object` 라는 **별도 의존 종류**로 이미 추적한다
+   (`ArchitectureGateCatchesViolationsTest` 의 `class literal 은 바이트코드 층도 별도 의존
+   종류로 잡는다` 가 실측을 고정). 바이트코드 상수 풀의 모양과 ArchUnit 의 의미 모델은 다른
+   층이라, `javap` 로 「엔트리가 있다」를 본 것과 「ArchUnit 이 의존으로 세는가」는 별개
+   물음이었다 — 전자만 보고 후자를 단정한 것이 이전 판정의 오류다. 얻은 `Class` 로 무언가
+   더 하면 그 다음 호출의 owner 가 `java.lang.Class` 라 T-C 도 잡는다(원래 서술). 실제 잔여는
+   없다 — 컴파일 시 인라인되는 **상수**(제한 7)만 두 게이트 모두의 사각이었고, 그 자리는
+   `domainSourceReferenceGate`(소스 층)가 덮는다.
 12. **게이트 *배선*의 task 수준 음성이 자동화돼 있지 않다.** 판정 로직은 순수 함수 테스트로
    고정돼 있고(경계·소유·가족·함수 길이), 배선은 실측으로 확인했다(`E-21`~`E-32`). 그러나
    「Gradle task 가 실제로 실패한다」를 **테스트로** 고정하려면 중첩 빌드(GradleRunner/TestKit)가
@@ -372,6 +380,24 @@
     전건 실행한다 — 그 `check` 를 우회하려면 `build-logic/**` 를 편집해야 하고 그것은 이미
     별도로 경계 밖이다. `app` 만 열거한 이유는 **`app` 이 위반 fixture 를 실행하는 유일한
     층**이기 때문이다(D-3 조합 지점).
+
+33. **미수식 참조는 소스 층이 보지 못한다(설계 검토 S-13).** default import·확장 함수·수신자
+    추론으로 이름 없이 풀리는 참조(`println`·`readln`)는 소스에 부를 이름이 없어
+    `domainSourceReferenceGate` 가 볼 수 없다. 바이트코드 층이 정본이고 `ConsoleIoLeak`
+    fixture 가 그 증거다 — 소스 게이트를 걸어도 이 fixture 는 여전히 2 차만 잡는다.
+34. **완전수식 참조의 FQN 판별은 대소문자 관례에 기댄다.** 소문자 세그먼트 뒤 첫 대문자
+    세그먼트를 타입의 시작으로 읽는다(설계 검토 §4 단계 2·3). 알려진 결과 둘: ① 소문자 지역
+    이름 뒤 대문자 멤버(`config.MAX`)는 **오탐**이고 방향은 닫히는 쪽이다 — 조치는 import 로
+    바꾸거나 이름을 바꾸는 것. ② 대문자로 시작하는 패키지 세그먼트를 쓰는 외부 좌표는 접두에서
+    잘리지만, 잘린 접두가 실제 허용인 경우는 `kotlin`·`java.math`·`bidvector` 뿐이고 그 아래는
+    이미 전면 허용이라 누출은 없다.
+35. **대상은 domain `main` Kotlin 소스뿐이다(설계 검토 S-17).** `test` 소스와 `.kts` 빌드
+    스크립트는 이 게이트의 대상이 아니다 — test 산출물은 배포되지 않고 `jarContentGate` 가
+    그것을 든다, `.kts` 는 Gradle 타입을 정당하게 부르는 별도 표면이라 `sizeGate` 가 따로 잰다.
+36. **generated source 를 들이면 이 게이트의 입력에도 더해야 한다.** `sourceRoot` 가 관례
+    디렉터리(`src/main/kotlin`)를 직접 걷는다 — 알려진 제한 30(레이아웃 게이트의 같은 성질)과
+    짝이다. 1B 가 KSP·kapt 를 들이면 관례 디렉터리 목록과 함께 이 task 의 `sourceRoot` 도
+    갱신한다.
 
 ## 1B 인계 목록
 
