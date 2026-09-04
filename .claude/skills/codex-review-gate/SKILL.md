@@ -270,7 +270,13 @@ export GRADLE_USER_HOME="$W/.gradle-home" GRADLE_RO_DEP_CACHE="$RO"
 `acceptance_commands` 전건**을 `--offline --no-build-cache --no-daemon` 으로(3차에서
 `qualityBaseline` 이 `check` 밖 task 라 산출물이 없어 codex 가 재대조 못 했다; `--no-daemon`
 은 정리 후 데몬이 worktree 에 registry 를 다시 써 다음 라운드 `worktree add` 를 막은 사고의
-재발 방지) — 의 `build/` 산출물(테스트 XML·kover 리포트·게이트 출력)을 **지우지 않고** worktree 에 남기고,
+재발 **완화**일 뿐 방지가 아니다 — 1A 13차 레인 실측(2026-09-04): JVM 설정이 다르면 Gradle 은
+`--no-daemon` 에도 「single-use Daemon process will be forked」로 데몬을 띄우고, 그 데몬이
+종료하며 이미 삭제된 worktree 경로에 `.gradle-home/daemon/<ver>/registry.bin` 을 다시 만든다.
+그래서 **worktree 제거 뒤 잔여 디렉터리 확인이 절차다**: 경로가 남아 있으면 `.git` 이 없고
+내용이 데몬 registry 뿐임을 확인한 뒤 지운다. 근본 정합은 worktree 의 `gradle.properties`
+`org.gradle.jvmargs` 와 레인 JVM 을 맞춰 fork 자체를 없애는 것이나 미실측이다) — 의 `build/`
+산출물(테스트 XML·kover 리포트·게이트 출력)을 **지우지 않고** worktree 에 남기고,
 프롬프트에 「`build/**` 는 리뷰 레인이 head 에서 오프라인으로 실행한 결과이며 codex 는 gradle
 을 실행할 수 없다」를 한 줄 적는다. 실행 재확인의 정본은 verifier 레인이다. `build/` 는 ignore
 대상이라 status 대조에 영향 없다.
