@@ -81,15 +81,24 @@ data class EstimatedAmount(
     override fun compareTo(other: EstimatedAmount): Int = won.compareTo(other.won)
 }
 
-/** 예정가(`planned_price`). 개념은 `legacy-behavior`(`data-dictionary.md` §1.2). */
+/**
+ * 예정가(`planned_price`). 개념은 `legacy-behavior`(`data-dictionary.md` §1.2).
+ *
+ * `vatTreatment`는 생성자 파라미터가 아니라 `Unknown` 고정이다(운영자 결정 2026-09-04
+ * B9) — `data-dictionary.md` §1.2의 `Unknown` 정의("정의상 현재 값 — 미결의 표현이지
+ * 답이 아니다")를 그대로 싣는다. `OPEN-DIC-04`(실제 과세 처리 값)는 이 선언으로 해소되지
+ * 않는다 — 값이 정해지면 이 필드가 `INCLUSIVE`/`EXCLUSIVE`로 바뀌는 것이 해소다. 다른
+ * 값을 넣을 생성 경로가 없으므로 `sameKnownVat` 전건이 이 타입을 낀 산술(예:
+ * [assessmentRateAgainst])을 항상 `Unmeasurable`로 막는다.
+ */
 data class YegaAmount(
     internal val won: Long,
     override val currency: Currency,
-    override val vatTreatment: VatTreatment,
     override val provenance: Provenance,
 ) : Money,
     Comparable<YegaAmount> {
     override val basis: Basis = Basis.YEGA
+    override val vatTreatment: VatTreatment = VatTreatment.UNKNOWN
 
     init {
         requireNonNegative(won)
@@ -121,15 +130,18 @@ data class BidAmount internal constructor(
     override fun compareTo(other: BidAmount): Int = won.compareTo(other.won)
 }
 
-/** 배정예산(`asignBdgtAmt`·`bdgtAmt`). 운영자 결정 2026-09-04(A3)로 1B 금액 타입 집합에 포함됐다. */
+/**
+ * 배정예산(`asignBdgtAmt`·`bdgtAmt`). 운영자 결정 2026-09-04(A3)로 1B 금액 타입 집합에
+ * 포함됐다. `vatTreatment`는 `YegaAmount`와 같은 이유로 `Unknown` 고정이다(B9).
+ */
 data class AllocatedBudget(
     internal val won: Long,
     override val currency: Currency,
-    override val vatTreatment: VatTreatment,
     override val provenance: Provenance,
 ) : Money,
     Comparable<AllocatedBudget> {
     override val basis: Basis = Basis.ALLOCATED_BUDGET
+    override val vatTreatment: VatTreatment = VatTreatment.UNKNOWN
 
     init {
         requireNonNegative(won)
@@ -138,15 +150,19 @@ data class AllocatedBudget(
     override fun compareTo(other: AllocatedBudget): Int = won.compareTo(other.won)
 }
 
-/** 낙찰가. 운영자 결정 2026-09-04(A3)로 1B 금액 타입 집합에 포함됐다. */
+/**
+ * 낙찰가. 운영자 결정 2026-09-04(A3)로 1B 금액 타입 집합에 포함됐다. `vatTreatment`는
+ * `YegaAmount`와 같은 이유로 `Unknown` 고정이다(B9) — [awardRateAgainst]가 항상
+ * `Unmeasurable`이 된다.
+ */
 data class AwardAmount(
     internal val won: Long,
     override val currency: Currency,
-    override val vatTreatment: VatTreatment,
     override val provenance: Provenance,
 ) : Money,
     Comparable<AwardAmount> {
     override val basis: Basis = Basis.AWARD
+    override val vatTreatment: VatTreatment = VatTreatment.UNKNOWN
 
     init {
         requireNonNegative(won)

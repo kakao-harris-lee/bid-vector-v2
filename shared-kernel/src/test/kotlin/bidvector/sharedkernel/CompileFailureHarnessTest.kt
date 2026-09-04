@@ -90,6 +90,12 @@ class CompileFailureHarnessTest {
         assertNegativeFails("6-derived-money-direct-construction", "cannot access")
         assertPositiveCompiles("6-input-money-direct-construction")
     }
+
+    @Test
+    fun `7 vat 고정 Money 는 vatTreatment 인자를 받지 않고 인자 없이는 생성할 수 있다 (운영자 결정 B9)`() {
+        assertNegativeFails("7-vat-fixed-money-explicit-vat", "too many arguments for")
+        assertPositiveCompiles("7-vat-fixed-money-no-vat-arg")
+    }
 }
 
 private fun assertNegativeFails(

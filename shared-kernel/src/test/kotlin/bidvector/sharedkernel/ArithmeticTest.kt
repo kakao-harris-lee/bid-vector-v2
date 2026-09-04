@@ -197,32 +197,68 @@ class ArithmeticTest {
     }
 
     @Test
-    fun `vatTreatment 가 다르거나 Unknown 이면 율 계산이 Unmeasurable 을 낸다 (P-3c, B9)`() {
-        val yega = YegaAmount(1_000_000L, Currency.KRW, VatTreatment.EXCLUSIVE, Provenance.Published(1))
-        val mismatchedBase = base(500_000L, vat = VatTreatment.INCLUSIVE)
-        val unknownBase = base(500_000L, vat = VatTreatment.UNKNOWN)
-        val yegaUnknown = YegaAmount(1_000_000L, Currency.KRW, VatTreatment.UNKNOWN, Provenance.Published(1))
+    fun `B9 YegaAmount 는 vatTreatment 를 Unknown 으로 고정 선언한다 — 다른 값을 넣을 수단이 없다`() {
+        val yega = YegaAmount(1_000_000L, Currency.KRW, Provenance.Published(1))
 
-        val mismatched = yega.assessmentRateAgainst(mismatchedBase, resolvedPolicy(RoundingMode.HALF_UP))
-        val bothUnknown = yegaUnknown.assessmentRateAgainst(unknownBase, resolvedPolicy(RoundingMode.HALF_UP))
-
-        mismatched.shouldBeInstanceOf<Measurement.Unmeasurable>()
-        bothUnknown.shouldBeInstanceOf<Measurement.Unmeasurable>()
+        yega.vatTreatment shouldBe VatTreatment.UNKNOWN
     }
 
     @Test
-    fun `같은 vat 이면 사정률이 정상 산출된다`() {
-        val yega = YegaAmount(1_100_000L, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.Published(1))
-        val base = base(1_000_000L, vat = VatTreatment.INCLUSIVE)
+    fun `B9 AllocatedBudget·AwardAmount 도 vatTreatment 를 Unknown 으로 고정 선언한다`() {
+        val allocated = AllocatedBudget(500_000L, Currency.KRW, Provenance.OperatorDeclared)
+        val award = AwardAmount(950_000L, Currency.KRW, Provenance.OperatorDeclared)
 
-        val result = yega.assessmentRateAgainst(base, resolvedPolicy(RoundingMode.HALF_UP))
+        allocated.vatTreatment shouldBe VatTreatment.UNKNOWN
+        award.vatTreatment shouldBe VatTreatment.UNKNOWN
+    }
 
-        result.shouldBeInstanceOf<Measurement.Measured<Derived<AssessmentRate>>>()
-        val fraction = result.value.value.rate.fraction
-        fraction.compareTo(BigDecimal("1.1")) shouldBe 0
+    @Test
+    fun `B9 YegaAmount 는 항상 Unknown 이라 사정률이 어떤 기초금액에도 Unmeasurable 이다`() {
+        runBlocking {
+            checkAll(Arb.long(1L, 10_000_000L), Arb.element(VatTreatment.entries)) { won, baseVat ->
+                val yega = YegaAmount(1_000_000L, Currency.KRW, Provenance.Published(1))
+                val theBase = base(won, vat = baseVat)
 
-        // B11 — 파생 율은 입력 fact(예정가·기초금액) 의 AmountRecord 를 되짚는다.
-        result.value.derivedFrom.inputs shouldBe listOf(yega.export(), base.export())
+                val result = yega.assessmentRateAgainst(theBase, resolvedPolicy(RoundingMode.HALF_UP))
+
+                result.shouldBeInstanceOf<Measurement.Unmeasurable>()
+            }
+        }
+    }
+
+    @Test
+    fun `B9 AwardAmount 도 항상 Unknown 이라 낙찰률이 어떤 기초금액에도 Unmeasurable 이다`() {
+        runBlocking {
+            checkAll(Arb.long(1L, 10_000_000L), Arb.element(VatTreatment.entries)) { won, baseVat ->
+                val award = AwardAmount(900_000L, Currency.KRW, Provenance.OperatorDeclared)
+                val theBase = base(won, vat = baseVat)
+
+                val result = award.awardRateAgainst(theBase, resolvedPolicy(RoundingMode.HALF_UP))
+
+                result.shouldBeInstanceOf<Measurement.Unmeasurable>()
+            }
+        }
+    }
+
+    /**
+     * B9 이후 [YegaAmount.assessmentRateAgainst]가 항상 `Unmeasurable`이 되면서, B11(파생 율이
+     * 입력 fact 를 되짚는다)의 필드 단언을 낼 유일한 예제였던 「같은 vat 이면 사정률이 정상
+     * 산출된다」가 구조적으로 불가능해졌다 — `bidRateAgainst`(vat 제약이 없는 `BidAmount` 축)로
+     * 옮겨 B11 커버리지를 보존한다. `bidRateAgainst` 자체는 이전까지 어떤 test 도 부르지 않던
+     * 자리라 이 test 가 그 공백도 함께 닫는다.
+     */
+    @Test
+    fun `같은 vat 이면 투찰율이 정상 산출되고 B11 입력 fact 를 되짚는다`() {
+        val theBase = base(1_000_000L, vat = VatTreatment.INCLUSIVE)
+        val rate = BidRate(Rate.ofFraction(BigDecimal("0.955")), BidRateOrigin.Recommended)
+        val rounded = (theBase * rate).roundedWith(resolvedPolicy(RoundingMode.HALF_UP))
+        rounded.shouldBeInstanceOf<Measurement.Measured<Derived<BidAmount>>>()
+        val bidAmount = rounded.value.value
+
+        val result = bidAmount.bidRateAgainst(theBase, BidRateOrigin.Recommended, resolvedPolicy(RoundingMode.HALF_UP))
+
+        result.shouldBeInstanceOf<Measurement.Measured<Derived<BidRate>>>()
+        result.value.derivedFrom.inputs shouldBe listOf(bidAmount.export(), theBase.export())
     }
 
     @Test
