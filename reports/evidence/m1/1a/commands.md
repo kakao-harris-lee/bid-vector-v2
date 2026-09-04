@@ -848,3 +848,34 @@ fixture 함수를 걸어(`7809e8b`) 본문을 private 백킹 값 사용/파라�
 
 clean-tree(경로 개별 인자, 양성 대조) — 출력 없음. 비밀값 스캔 — `reports/evidence/m1/1a/`
 매치 없음(exit 1).
+
+### verifier r19 medium 3 — 세그먼트 판별을 글자 모양에서 실재로 (M-1·M-2·M-3)
+
+리포트 `_workspace/m1-1a/29_verifier_r19.md`. `isScreamingCase()`(글자 모양)를 존재 판별
+(`Class.forName`, JDK 이름공간만) + 지역 선언 판별(`locallyDeclaredNames`)로 바꿨다. 세 실험
+모두 `procurement` 에 파일을 임시로 두고 `:procurement:domainSourceReferenceGate` 로 재현한
+뒤 지웠다(`git status --short -- procurement/` 로 확인) — `A-0` 격리 worktree 는 이번 라운드
+는 생략한다, 사유: 세 finding 모두 `SourceReferences`/`SourceReferenceCandidates` 순수 함수
+경로만 바꿨고 배선·정책 파일은 무변경이라 worktree 격리가 배선 누락을 잡을 표면이 없다 —
+`A-1`(전건 `clean check`)이 같은 커밋 내용을 이미 재현한다.
+
+| # | 조작 | 결과 |
+| --- | --- | --- |
+| `E-99` | `ConstantsProbe.kt`(`java.lang.Double.NaN`·`java.lang.Math.E`·`java.lang.Integer.MAX_VALUE`)를 둔다 | 0 — `references=3 violations=0`(M-1 오탐 해소, F-3 회귀 없음) |
+| `E-100` | 지운다 | 0(양성 대조) |
+| `E-101` | `TreeProbe.kt`(`inner class Node` + `fun buildNode(tree: Tree) = tree.Node()`)를 둔다 | 0 — `references=0`(M-2 오탐 해소) |
+| `E-102` | 지운다 | 0(양성 대조) |
+| `E-103` | `EntryProbe.kt`(`val x: Any? = java.util.Map.ENTRY`)를 둔다 | 0 — `references=1 violations=0`(뿌리 `Map` 만 남고 존재하지 않는 `ENTRY` 는 멤버로 멈춘다 — M-3 이 「실재하지 않는 이름은 컴파일도 안 된다」로 닫히는 것을 실측) |
+| `E-104` | 지운다 | 0(양성 대조) |
+| `E-105` | 회귀 — `StatusProbe.kt`(verifier r18 F-1 원 형태)를 다시 둔다 | 1 — `StatusProbe.kt:5 java.net.HttpURLConnection — 허용 목록에 없다`(F-1 이 여전히 잡는다) |
+| `E-106` | 지운다 | 0(양성 대조) |
+
+**acceptance 재실행.**
+
+| # | cmd | exit |
+| --- | --- | --- |
+| `A-1` | `./gradlew --no-build-cache --no-daemon clean check` | 0 |
+| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 |
+| `A-5` | `./gradlew :build-logic:test` — `SourceReferencesTest` 22개(신규 5) 포함 전건 | 0 |
+
+clean-tree(경로 개별 인자)·비밀값 스캔 — 이번 라운드도 통과(패턴·절차 동일, 매치 없음).

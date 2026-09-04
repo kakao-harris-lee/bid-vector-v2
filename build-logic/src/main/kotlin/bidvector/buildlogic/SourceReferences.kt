@@ -6,6 +6,8 @@ import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtImportList
 import org.jetbrains.kotlin.psi.KtPackageDirective
+import org.jetbrains.kotlin.psi.KtParameter
+import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
 import org.jetbrains.kotlin.psi.KtUserType
@@ -60,6 +62,7 @@ internal object SourceReferences {
         fileName: String,
     ): List<SourceReference> {
         val text = ktFile.text
+        val localNames = ktFile.locallyDeclaredNames()
         val found = mutableListOf<SourceReference>()
         ktFile.accept(
             object : KtTreeVisitorVoid() {
@@ -76,13 +79,30 @@ internal object SourceReferences {
 
                 override fun visitDotQualifiedExpression(expression: KtDotQualifiedExpression) {
                     if (!expression.isClaimedByParent()) {
-                        found += candidatesAt(expression.segments(), expression.textRange.startOffset, fileName, text)
+                        found += candidatesAtUnlessLocalValue(expression, localNames, fileName, text)
                     }
                     super.visitDotQualifiedExpression(expression)
                 }
             },
         )
         return found
+    }
+
+    /**
+     * **verifier r19 M-2.** F-1 이 `KtCallExpression` 의 callee 도 세그먼트로 받으면서
+     * `tree.Node()`(`tree: Tree` 파라미터의 `inner class` 인스턴스화)가 `tree.Node` 라는 가짜
+     * 후보를 냈다 — 소문자 뿌리가 **같은 파일에 선언된 이름**이면 패키지 접두가 아니라 값
+     * 체인이므로 건너뛴다.
+     */
+    private fun candidatesAtUnlessLocalValue(
+        expression: KtDotQualifiedExpression,
+        localNames: Set<String>,
+        fileName: String,
+        text: String,
+    ): List<SourceReference> {
+        val segments = expression.segments()
+        if (segments != null && segments.first() in localNames) return emptyList()
+        return candidatesAt(segments, expression.textRange.startOffset, fileName, text)
     }
 
     private fun KtUserType.isClaimedByParent(): Boolean = (parent as? KtUserType)?.segments() != null

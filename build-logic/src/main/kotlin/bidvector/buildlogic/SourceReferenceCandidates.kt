@@ -12,11 +12,7 @@ package bidvector.buildlogic
  * 첫 세그먼트가 대문자면 단순 이름 참조라 건너뛴다 — import 나 같은 파일 선언이 이미 푼다.
  * 대문자 세그먼트가 아예 없으면 값 체인이라 건너뛴다.
  *
- * **타입 축의 첫 세그먼트(뿌리) 다음은 SCREAMING_CASE 면 잇지 않는다**(verifier r18 F-3).
- * `java.lang.Integer.MAX_VALUE` 처럼 상수 멤버가 대문자로 시작하면 존재하지 않는 중첩
- * 클래스 `Integer$MAX_VALUE` 후보가 생겨 허용된 `Integer` 접근까지 오탐으로 잡힌다 —
- * 뿌리 세그먼트 자신은 이 규칙의 대상이 아니다(클래스 이름이 우연히 전부 대문자여도 후보는
- * 낸다).
+ * **뿌리 다음 세그먼트를 잇는 판별은 존재다**(verifier r19 M-1·M-3 — [nestedSegments] 참고).
  */
 internal fun candidateForms(segments: List<String>): List<String> {
     val typeIndex = segments.indexOfFirst { it.startsWithUpper() }
@@ -25,16 +21,65 @@ internal fun candidateForms(segments: List<String>): List<String> {
 
     val prefix = segments.subList(0, typeIndex).joinToString(".")
     val root = segments[typeIndex]
-    val nested =
-        segments.subList(typeIndex + 1, segments.size).takeWhile {
-            it.startsWithUpper() &&
-                !it.isScreamingCase()
-        }
-    val typeSegments = listOf(root) + nested
+    val typeSegments = listOf(root) + nestedSegments(prefix, root, segments.subList(typeIndex + 1, segments.size))
     return typeSegments.indices.map { i -> "$prefix." + typeSegments.subList(0, i + 1).joinToString("$") }
 }
 
+/**
+ * 뿌리 다음 대문자 세그먼트를 얼마나 이어 붙이는지 — **글자 모양이 아니라 존재로 판별한다**
+ * (verifier r19 M-1·M-3). 이전의 SCREAMING_CASE 규칙은 한 글자(`Math.E`)·혼합 대소문자
+ * (`Double.NaN`) 상수를 멤버로 못 보고(M-1 오탐), 반대 방향으로 전대문자 이름의 **실재하는**
+ * 중첩 클래스가 있다면 그것도 멤버로 오인했을 것이다(M-3).
+ *
+ * JDK 이름공간(`java.`·`javax.`·`jdk.`·`kotlin.`)은 후보 FQN 이 **실재하는 클래스일 때만**
+ * 잇는다 — `Class.forName` 이 이 코드를 실은 Gradle JVM 의 JDK/stdlib 판을 기준으로 판정한다
+ * (`memberEffectGate` 의 T-D 도출과 같은 성질의 의존 — 알려진 제한). 존재하지 않으면(예:
+ * `java.lang.Integer$MAX_VALUE`) 그 세그먼트부터 멤버로 보고 멈춘다.
+ *
+ * 비 JDK 이름공간은 실재를 확인할 수 없으므로 **닫히는 방향을 유지한다** — 대문자로 시작하는
+ * 세그먼트는 예전 규칙대로 전부 잇는다(전부 허용 목록에 있어야 통과한다).
+ */
+private fun nestedSegments(
+    prefix: String,
+    root: String,
+    remaining: List<String>,
+): List<String> {
+    if (!prefix.isJdkNamespace()) {
+        return remaining.takeWhile { it.startsWithUpper() }
+    }
+    val nested = mutableListOf<String>()
+    var owner = "$prefix.$root"
+    for (segment in remaining) {
+        val candidate = "$owner\$$segment"
+        if (!segment.startsWithUpper() || !classExists(candidate)) break
+        nested += segment
+        owner = candidate
+    }
+    return nested
+}
+
+private fun String.isJdkNamespace(): Boolean =
+    this == "java" || startsWith("java.") ||
+        this == "javax" || startsWith("javax.") ||
+        this == "jdk" || startsWith("jdk.") ||
+        this == "kotlin" || startsWith("kotlin.")
+
 private fun String.startsWithUpper(): Boolean = isNotEmpty() && first().isUpperCase()
 
-/** 대문자·숫자·`_` 만으로 된 두 글자 이상 — 관례상 상수 멤버 이름(`MAX_VALUE`·`HTTP_OK`). */
-private fun String.isScreamingCase(): Boolean = length >= 2 && all { it.isUpperCase() || it.isDigit() || it == '_' }
+/** 재귀 게이트 실행 한 번에 같은 이름을 여러 번 물을 수 있어 판정을 캐싱한다. */
+private val classExistenceCache = mutableMapOf<String, Boolean>()
+
+private fun classExists(fqcn: String): Boolean =
+    classExistenceCache.getOrPut(fqcn) {
+        try {
+            Class.forName(fqcn, false, ClassExistenceProbe::class.java.classLoader)
+            true
+        } catch (ignoredNotFound: ClassNotFoundException) {
+            false
+        } catch (ignoredLinkageError: LinkageError) {
+            false
+        }
+    }
+
+/** `Class.forName` 에 넘길 클래스로더의 앵커 — 이 파일을 실은 로더가 JDK·kotlin-stdlib 를 본다. */
+private object ClassExistenceProbe

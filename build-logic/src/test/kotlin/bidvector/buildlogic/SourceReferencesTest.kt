@@ -148,14 +148,13 @@ class SourceReferencesTest {
     }
 
     /**
-     * **verifier r18 F-3.** 대문자·숫자·`_` 만으로 된 두 글자 이상 세그먼트(`MAX_VALUE`)는
-     * 멤버(상수) 접근으로 보고 타입 체인에 잇지 않는다 — 이어 붙이면 `java.lang.Integer$MAX_VALUE`
-     * 처럼 존재하지 않는 중첩 클래스 후보가 생겨 허용된 `java.lang.Integer` 접근까지 오탐으로
-     * 잡힌다. `java.util.Map.Entry` 처럼 실제 중첩 클래스 이름(`Entry`, 소문자를 포함)은 이
-     * 규칙의 영향을 받지 않는다(회귀).
+     * **verifier r18 F-3 (verifier r19 M-1·M-3 로 판별 기준이 바뀌었다).** 글자 모양
+     * (SCREAMING_CASE) 대신 **존재**로 판별한다 — `java.lang.Integer$MAX_VALUE` 는 실재하는
+     * 클래스가 아니므로(`Class.forName` 이 못 찾는다) 체인이 뿌리에서 멈추고 `java.lang.Integer`
+     * 만 후보로 남는다.
      */
     @Test
-    fun `F-3 SCREAMING_CASE 세그먼트는 멤버로 보고 후보에서 뺀다`() {
+    fun `MAX_VALUE 처럼 실재하지 않는 중첩 클래스는 뿌리에서 체인이 멈춘다`() {
         val refs =
             SourceReferences.extract(
                 "Probe.kt",
@@ -165,13 +164,91 @@ class SourceReferencesTest {
     }
 
     @Test
-    fun `F-3 두 글자 미만 대문자 세그먼트는 여전히 타입 체인으로 잇는다`() {
-        // 한 글자 대문자 세그먼트(제네릭 타입 파라미터류)는 SCREAMING_CASE 로 보지 않는다.
+    fun `Map-Entry 처럼 실재하는 중첩 클래스는 두 형태를 모두 낸다`() {
         val refs =
             SourceReferences.extract(
                 "Probe.kt",
                 "package p\n\nclass C {\n    val e: java.util.Map.Entry<String, String>? = null\n}\n",
             )
         assertTrue(refs.any { it.fqn == "java.util.Map\$Entry" }, "$refs")
+    }
+
+    /**
+     * **verifier r19 M-1.** 한 글자(`E`)·혼합 대소문자(`NaN`) 상수는 SCREAMING_CASE 글자
+     * 모양 규칙으로는 멤버로 안 잡혔다 — `java.lang.Double$NaN`·`java.lang.Math$E` 가 실재하지
+     * 않는 클래스이므로 존재 판별로는 둘 다 뿌리에서 멈춘다.
+     */
+    @Test
+    fun `M-1 한 글자·혼합 대소문자 상수도 실재하지 않으면 뿌리에서 멈춘다`() {
+        val nan =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val nan: Double = java.lang.Double.NaN\n}\n",
+            )
+        assertEquals(setOf("java.lang.Double"), nan.map { it.fqn }.toSet(), "$nan")
+
+        val e =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val e: Double = java.lang.Math.E\n}\n",
+            )
+        assertEquals(setOf("java.lang.Math"), e.map { it.fqn }.toSet(), "$e")
+    }
+
+    /**
+     * **verifier r19 M-3 이 닫히는 근거.** `java.util.Map.ENTRY` 는 실재하는 클래스가 아니므로
+     * (진짜 이름은 `Entry`) 체인이 `Map` 에서 멈춘다 — 만들어 낸 이름을 컴파일할 도리가 없어
+     * 「도달 불가」였던 것이 존재 판별로도 같은 결론(뿌리만 검사)에 이른다.
+     */
+    @Test
+    fun `M-3 존재하지 않는 전대문자 이름은 뿌리에서 멈춘다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val x: Any? = java.util.Map.ENTRY\n}\n",
+            )
+        assertEquals(setOf("java.util.Map"), refs.map { it.fqn }.toSet(), "$refs")
+    }
+
+    /**
+     * **비 JDK 루트는 존재를 확인할 수 없다 — 닫히는 방향을 유지한다.** `foo.Bar.BAZ` 는
+     * `foo`·`javax`·`jdk`·`kotlin` 어느 것도 아니므로 존재 판별 없이 예전 규칙(대문자 세그먼트는
+     * 전부 체인에 잇는다)을 그대로 쓴다 — `foo.Bar$BAZ` 까지 요구해야 한다.
+     */
+    @Test
+    fun `비 JDK 루트는 존재 판별 없이 대문자 세그먼트를 전부 체인에 잇는다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val x: Int = foo.Bar.BAZ\n}\n",
+            )
+        assertEquals(setOf("foo.Bar", "foo.Bar\$BAZ"), refs.map { it.fqn }.toSet(), "$refs")
+    }
+
+    /**
+     * **verifier r19 M-2.** F-1 이 `KtCallExpression` 의 callee 도 세그먼트로 받으면서
+     * `tree.Node()`(`tree: Tree` 파라미터의 `inner class` 인스턴스화)가 `tree.Node` 라는 가짜
+     * 패키지 후보를 냈다. 소문자 뿌리가 **같은 파일에 선언된 이름**(여기서는 함수 파라미터)이면
+     * 값 체인이라 건너뛴다.
+     */
+    @Test
+    fun `M-2 소문자 뿌리가 같은 파일의 선언 이름이면 값 체인으로 건너뛴다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass Tree {\n    inner class Node\n}\n\nfun f(tree: Tree) = tree.Node()\n",
+            )
+        assertTrue(refs.none { it.fqn.startsWith("tree") }, "$refs")
+    }
+
+    /** 회귀 — 지역 선언과 무관한 완전수식 참조(F-1)는 그대로 잡힌다. */
+    @Test
+    fun `M-2 이후에도 완전수식 생성자 호출은 그대로 잡힌다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass C {\n    val name: String = java.io.File(\"x\").name\n}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.io.File" }, "$refs")
     }
 }
