@@ -134,6 +134,35 @@ commit `c4ec93b`(#262) *"refactor(domain): money 타입(`BaseAmount`)을 bid_bas
 모듈 경계와 의존 방향은 **ADR 0006**이 소유한다. `shared-kernel`은 Spring·JPA·JSON·
 HTTP를 import하지 않는다.
 
+### D-10. `Long` 원 단위 연산의 overflow는 1급 실패다
+
+**운영자 결정 2026-09-04**(M1/1B 계약 갱신). D-2가 확정 금액의 백킹 타입을 `Long` 원
+단위로 채택했으나, 그 연산이 표현 범위를 넘을 때의 계약을 이 ADR도 `v2-지침서.md`도
+서술하지 않았다 — `milestone-1.md` 1B 항목이 *"percent/fraction, basis 교차 대입,
+overflow, unknown provenance의 실패 계약"*으로 이름만 든다(조사 C **O-1**). 이 D가 그
+공백을 채운다.
+
+> **결정**: `Long` 원 단위 산술(덧셈·뺄셈·곱셈)은 `Math.addExact`/`Math.subtractExact`/
+> `Math.multiplyExact` 계열로 실행한다. overflow는 예외로 새지 않고 **1급 실패**로
+> 변환한다 — D-5(부재·측정 불가는 1급 상태)가 이미 요구하는 `Unmeasurable` 계열의 사유
+> 있는 실패이며, `0`이나 성공으로 접히지 않는다.
+
+**근거**: D-5가 이미 *"어떤 계산도 부재·측정 불가를 `0`이나 성공으로 접을 수 없다"*를
+원칙으로 세웠다 — overflow도 같은 성질의 계산 실패이므로 같은 원칙이 적용된다. `Math.*Exact`
+계열은 JDK 표준이라 새 라이브러리를 들이지 않는다.
+
+**이 D가 정하지 않는 것**: `Unmeasurable`의 어떤 `reason` 값이 overflow를 나타내는지는
+D-5 단서가 이미 적은 대로 어휘 소유자(0C 데이터 사전 계승, M1 1B 구현)가 정한다 — 이
+결정은 **실패해야 한다는 것**과 **그 실패의 성질(1급, exact 연산)**만 확정한다.
+
+### D-9의 §6 ① 정정 — 기법 선택의 실질 소유는 1B다
+
+**운영자 결정 2026-09-04**(조사 C **O-4**). §6 ①은 *"value class, 일반 data class, sealed
+계층 중 무엇인지는 M1 slice 1A의 구현 결정이다"*로 적었으나, **1A는 값 타입을 만들지
+않았다** — `reports/evidence/m1/1a/checklist.md`가 *"도메인 값 타입(`Money`/`Rate`) 자체는
+여전히 1B 소유"*로 명시한다. §6 ①의 「1A」는 「1B」로 읽는다. 이 정정은 §6 ①의 원문을
+지우지 않고 여기서 정정만 남긴다 — 원문은 §6에 그대로 있다.
+
 ---
 
 ## 3. 대안
@@ -206,6 +235,8 @@ mutation 대상 선정은 **ADR 0007**이 이 표를 입력으로 쓴다.
 - **Kotlin에서 별개 금액 타입을 어떤 기법으로 만들 것인지 정하지 않았다** — `value class`,
   일반 `data class`, sealed 계층 중 무엇인지는 M1 slice 1A의 구현 결정이다. 이 ADR이
   요구하는 것은 **상호 대입이 컴파일되지 않는다**는 성질 하나다.
+  **⚠ 정정(운영자 결정 2026-09-04, 조사 C O-4) — 「1A」는 「1B」로 읽는다.** 실질 소유는
+  §2 D-9 정정 절이 갖는다.
 - **정책 데이터의 저장 형태와 effective date 모델을 정하지 않았다** — 0C 데이터 사전 소관.
 - **`R-BASIS-01` 계열의 fixture 경계 쌍을 만들지 않았다.** `regression-ledger.md`의
   `R-BASIS-01` `검증 방법`이 **조건부**로 적는다 — 과세/비과세로 정의된 경계 쌍은

@@ -13,7 +13,7 @@ Phase 4(검증)에서 실측 결과로 채운다 — 지금 채우면 실행 없
 | --- | --- | --- |
 | `./gradlew check` 통과 | 1B 코드가 들어와도 유지 | 예정 — `scope.md` `B-1` |
 | 금지 import와 순환 의존을 일부러 넣은 test fixture가 실제로 실패 | `shared-kernel` 이 Spring·JPA·JSON·HTTP 를 import 하지 않음(`ADR 0002` D-9)이 기존 게이트에 걸림 | 예정 — `scope.md` `B-2` + 1A 의 의도적 위반 fixture 승계 |
-| 승인된 authoritative corpus 전체 통과 | **1B 가 첫 소비자.** `golden-manifest.json` 신설 | 예정 — `OPEN-1B-CONTRACT`·`OPEN-1B-CORPUS` 미결 상태에 따라 「N/A + 사유」로 판정될 수 있음(`scope.md` OPEN 표) |
+| 승인된 authoritative corpus 전체 통과 | **1B 가 첫 소비자.** `golden-manifest.json` 신설. **운영자 결정 2026-09-04(C13)**: 「M1 계약 술어 설계」의 소유 slice는 1B로 확정됐으나 술어 자체는 아직 미설계다 — 이 조건은 **money-basis·rate-unit case를 그 술어로 authoritative로 되돌린 뒤에만 계상**한다. 되돌리기 전에는 이 조건을 「N/A + 사유(계약 술어 미설계, `OPEN-1B-CONTRACT`)」로 판정하고 술어 설계·되돌림을 별도 Phase 3 작업으로 명시한다 | 예정 — `capability-map.md` §14.2 `OPEN-1B-CONTRACT` 행 · `scope.md` OPEN 표 |
 | 중요 rule mutation이 생존하지 않음 | `M-1`(금액 basis 자리 바꿔치기) · `M-2`(rate scale 변환 지점 이동·중복) · `M-3`(측정 불가/부재를 숫자로 접기)가 1B 대상 | 예정 — 도구는 `OPEN-ADR-07` 로 미결(1A 관례 승계, 카탈로그 좌표만) |
 | raw `Double` 금액/rate가 public domain API에 없음 | **값 타입 투입 시 `domainApiTypeGate` 가 committed fixture 가 아니라 실제 도메인 API 위에서 돈다** | 예정 — `scope.md` `B-6` |
 | `Uncertain`/`Unmeasurable`가 성공 또는 0으로 합쳐지지 않음 | **carrier 는 1B 가 만든다** — `Absent(reason)`·`Unmeasurable(reason)`·`Measured<T>`. `Uncertain` variant 자체는 1C·1D | 예정 — property test(조사 C §5 P-4) + 타입 차단 |
@@ -50,6 +50,14 @@ Phase 4(검증)에서 실측 결과로 채운다 — 지금 채우면 실행 없
   (시계 port), coverage 임계, `java.net.URI` 등 허용 확장, mutation 도구, 모듈 내부 패키지
   순환, `class.allowed` 실사용 확장 여섯 항목. 1B 가 실제로 필요로 하는 것만 이 slice 안에서
   닫고 나머지는 그대로 후속 slice 로 다시 넘긴다.
+- **1A 「알려진 제한」 16(줄 번호 낡음)의 계열 — 이 slice(운영자 결정 등재)가 재현했다.**
+  `data-dictionary.md`·`docs/adr/0002-money-rate-basis.md`에 줄을 넣어(§1.4.2·§4.1·§9·§11·
+  §2 D-10) 그 두 파일을 가리키는 `capability-map.md` §14.2의 네 `file:line`
+  (`OPEN-QUAL-11`·`OPEN-DIC-03`·`OPEN-DEC-03`·`OPEN-REG-05` 행)이 밀렸다. 이 slice가 그
+  네 자리를 절 제목·인용문으로 정정했다(`scope.md` 「계약 갱신」 절 참조) — 정정 중 실측한
+  것은 **그 네 좌표가 이 slice의 편집 이전, HEAD 시점부터 이미 어긋나 있었다**는 사실이다.
+  `reports/evidence/m0/0c/**`·`m0/0d/**`의 일곱 `file:line`은 봉인된 evidence라 고치지
+  않았다 — 재현 명령은 `scope.md` 「역방향 파급」 절이 갖는다.
 
 ## 리뷰 요청 조건 (`evidence-pack` SKILL) — Phase 1 시점 상태
 

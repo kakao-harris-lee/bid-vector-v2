@@ -96,9 +96,9 @@ canonical KONEPS fact와 derived fact / ML feature와 업무 판단의 경계.
 | 자리 | 정의 |
 | --- | --- |
 | **개념** | 원화 확정 금액 하나 |
-| **타입** | `Money(amount: Long, currency: Currency, basis: AmountBasis, vatTreatment: VatTreatment, provenance: FactProvenance)` |
+| **타입** | `Money(amount: Long, currency: Currency, basis: ~~AmountBasis~~ Basis, vatTreatment: VatTreatment, provenance: FactProvenance)` |
 | **단위** | **원(KRW), 정수.** 소수 자리를 만들지 않는다 |
-| **basis** | `AmountBasis` — §1.2의 개념 축 |
+| **basis** | ~~`AmountBasis`~~ **`Basis`**(운영자 결정 2026-09-04, 조사 C **D-2**) — §1.2의 개념 축. 승인 명세(`v2-지침서.md` §3.1 · `milestone-1.md` 1B)의 이름으로 정정한다 — 이 문서가 쓰던 `AmountBasis`는 0C 자체 표기였다 |
 | **부재 표현** | `Known(Money)` / `Absent(reason)` sealed. **`0`은 "0원"이지 "모름"이 아니다** |
 | **provenance / 층** | `FactProvenance`(§5.1). 층은 값마다 다르다 |
 
@@ -150,7 +150,7 @@ legacy는 **한 basis 태그가 두 개념을 덮고**(추정가격 ↔ 배정�
 
 | 개념 | 타입 | 단위 / basis | 과세 처리(정의) | 층 |
 | --- | --- | --- | --- | --- |
-| **추정가격** (`presmptPrce`) | `EstimatedPrice` | 원 / 추정가격 | **`Exclusive`(부가세 제외)** | `authoritative` — 조달청 정의 (**U-1**) |
+| **추정가격** (`presmptPrce`) | ~~`EstimatedPrice`~~ **`EstimatedAmount`**(운영자 결정 2026-09-04, 조사 C **D-1** — 승인 명세 `v2-지침서.md` §4.1·`ADR 0002` D-3·`milestone-1.md` 1B의 이름으로 정정) | 원 / 추정가격 | **`Exclusive`(부가세 제외)** | `authoritative` — 조달청 정의 (**U-1**) |
 | **기초금액 / 사업금액** (`bssAmt` 계열) | `BaseAmount` | 원 / 기초금액 | **`Inclusive`(부가세 포함)** | `authoritative` — 운영자 결정 2026-08-28 (**U-1b**) |
 | **배정예산** (`asignBdgtAmt`·`bdgtAmt`) | `AllocatedBudget` | 원 / 배정예산 | `Unknown` — 정해진 바 없다 | 개념 분리는 legacy 선언(`app/services/koneps/field_contract_spec.py:137-161`), 과세는 미정 |
 | **예정가** (`planned_price`) | `YegaAmount` | 원 / 예정가 | `Unknown` — 정해진 바 없다 | 개념은 `legacy-behavior` |
@@ -353,6 +353,12 @@ legacy는 `0.0`을 부재 표현으로 쓴다 — `HistoricalData.base_amount`·
 > `FloorRateOrigin = sealed { NoticeValue(noticeRevision), StatutoryTable(effectiveFrom) }`
 >
 > `BidRateOrigin = sealed { ObservedFromSamples, Recommended }`
+
+**`Rate`의 백킹 `BigDecimal`은 값 동등으로 비교한다(운영자 결정 2026-09-04, 조사 C
+**O-2**).** `BigDecimal.equals`는 scale까지 보아 `1.10`과 `1.100`을 다른 값으로 판정하지만,
+이 축에서 scale은 표현일 뿐 축의 값을 바꾸지 않는다 — `Rate` 동등성은 `compareTo(other) == 0`
+(scale-무관 산술 값 동등)을 쓰고, scale 자체는 provenance가 아니라 **표현**으로만 남는다.
+이 결정 없이는 반올림·왕복 property test의 기대값이 서지 않는다.
 
 | 타입 | 분자 / 분모 | 단위 | 값의 provenance · 층 | 부재 표현 |
 | --- | --- | --- | --- | --- |
@@ -1029,6 +1035,13 @@ legacy는 게이트 사다리 first-match로 `action`을 정하고, **두 보류
 > `corpusScope`(입력 모집단이 무엇인가). **한 축만 두는 설계를 채택하지 않는다.**
 > "규칙이 안 바뀌었는데 입력 모집단이 바뀐" 경우를 version 하나가 잡지 못한다.
 
+**예외 — 코퍼스 무관 정책(운영자 결정 2026-09-04, 조사 C O-3).** 이 두 축 규칙은 **입력
+모집단에 의존하는 정책**(학습 코퍼스·표본 축이 있는 판정)을 겨눈다. `RoundingPolicy`처럼
+**입력 모집단과 무관하게 규칙 자체만 바뀌는 정책**은 `ruleVersion`(=`PolicyVersion(effectiveFrom,
+source)`) 한 축으로 충분하다 — `corpusScope`가 나눌 모집단이 애초에 없다. 이 예외는
+`RoundingPolicy`에 한정되며, 다른 정책이 같은 예외를 주장하려면 「입력 모집단과 무관함」을
+같은 근거로 보여야 한다.
+
 **sentinel version을 만들지 않는다.** legacy는 `model_version default="current"` ·
 `strategy_version default="local"`이라 그 행으로 어느 정책이 판정을 냈는지 재현할 수 없다
 (`app/models/models.py:458-477`).
@@ -1614,11 +1627,15 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 
 ## 9. `OPEN` — 이 문서가 판정하지 못한 것
 
-**아래 표에 등록한 것은 전부 활성이다.** 어느 것이 **이 slice가 등재한 운영자 결정의
-미완에서 나왔는지**는 아래 표의 **「어느 결정의 잔여인가」** 칸이 적는다.
-**결정을 물어 답을 받은 것과 그 축에 남은 것이 없는 것은 다르다.**
+**아래 표에 등록한 것은 이 slice(0C) 작성 시점에는 전부 활성이었다.** 어느 것이 **이
+slice가 등재한 운영자 결정의 미완에서 나왔는지**는 아래 표의 **「어느 결정의 잔여인가」**
+칸이 적는다. **결정을 물어 답을 받은 것과 그 축에 남은 것이 없는 것은 다르다.**
 **셈은 이 산문이 내지 않는다** — `commands.md` **C-6.2**·**C-6.3**이 낸다.
 앞서 이 자리가 셈을 적었고 **`OPEN`이 늘 때마다 낡았다.**
+
+**후속 해소 — `OPEN-DIC-08`(운영자 결정 2026-09-04, M1/1B).** 아래 표의 그 행이 해소를
+직접 적는다. 이 문서(0C) 작성 이후 다른 slice가 낸 결정이라 위 「전부 활성」 문장이
+가리키던 시점과 다르다 — 표의 취소선이 정본이다.
 
 | id | 질문 | 어느 결정의 잔여인가 | 왜 여기서 못 닫는가 | 걸린 자리 |
 | --- | --- | --- | --- | --- |
@@ -1629,8 +1646,9 @@ legacy의 수가 인용 금지가 된 이유가 정확히 맥락 중 셋(방법�
 | **`OPEN-DIC-05`** | **`BaseAmountProvenance`의 승인 라벨 다섯이 legacy 실측을 덮는가** — ① `suspect-fractional`에 대응하는 이름이 승인 명세에 없다 ② **미판정(`NULL`)과 「출처를 모름」(`Unknown`)이 같은 값인가** | — (0C 자체 발견) | **승인 명세(`v2-지침서.md` §4.3)의 집합을 이 문서가 바꿀 수 없다.** `OPEN-DEC-08`은 **legacy `clean` 승계 금지**만 확정했고 라벨 집합 변경을 승인하지 않았다. **바꾸려면 별도 결정이 필요하다** | §3.4 |
 | **`OPEN-DIC-06`** | **V2 canonical write 경로가 `Undeclared` provenance를 거부하는가** — 거부한다면 그 경계의 입력 타입은 `FactProvenance`의 진부분집합이다 | — (0C 자체 발견) | **근거가 한쪽으로 서지 않는다.** §5.1의 **둘째 규율**은 `Undeclared`를 **권위로 취급하지 않을** 뿐 **금지하지 않고**, 같은 축의 `vatTreatment`에서 §1.2.1은 *"선언을 만들 수 없으면 `Unknown`"*을 **허용**한다. **어댑터의 의무를 정하는 결정**이므로 이 문서가 정할 자리가 아니다 | §7.1 · §5.1 |
 | **`OPEN-DIC-07`** | **전송 멱등 키와 재관측 키가 각각 무엇으로 이루어지는가** — 무엇이 **한 전송**을 식별하고 무엇이 **같은 사실**을 식별하는가 | **U-3이 fold 재정의만 정했다** | **두 역할을 한 키가 겸할 수 없다는 것**은 모순 제거로 확정되나(§2.2.3) **키의 구성**은 아니다. **U-3은 fold로의 재정의를 정했고 멱등 키의 구성을 정하지 않았다.** `OPEN-SET-04`가 소유한 것은 **재관측의 노출 여부**이지 키의 구성이 아니다 | §2.2.3 |
-| **`OPEN-DIC-08`** | **파생 `Money`와 파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가.** 걸리는 값은 `BidAmount`(기초금액 × 투찰율)와 `AssessmentRate`·`AwardRate`다. **선택지 셋** — ① **아무것도 싣지 않는다.** 되짚기는 그 값을 낸 판정의 `DecisionProvenance`(§4.1: `policyVersion`·`inputSnapshotHash`)로만 하고, 값과 판정이 떨어지면 되짚지 않는 것을 받아들인다 ② **값이 입력 fact의 안정적 참조와 계산 정책 version을 나른다**(참조는 §12.2의 식별자 갈래) ③ **`FactProvenance`에 파생 산출 variant를 더해** 그 안에 ②를 넣는다 | — (Codex 리뷰 라운드 5가 드러냈다) | **운반 범위를 정하는 결정**이다. 저장·전송되는 값에 무엇을 얹을지는 이 문서가 근거로 고를 수 없다 — `v2-지침서.md` §4.1은 `provenance`를 **필수**로만 두고 **파생값이 무엇을 실을지 정하지 않으며**, legacy에는 파생 금액의 provenance 자리 자체가 없다 | §1.2 · §1.4.2 · §5.1 · §12.2 |
+| ~~`OPEN-DIC-08`~~ | **파생 `Money`와 파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가.** 걸리는 값은 `BidAmount`(기초금액 × 투찰율)와 `AssessmentRate`·`AwardRate`다. **선택지 셋** — ① **아무것도 싣지 않는다.** 되짚기는 그 값을 낸 판정의 `DecisionProvenance`(§4.1: `policyVersion`·`inputSnapshotHash`)로만 하고, 값과 판정이 떨어지면 되짚지 않는 것을 받아들인다 ② **값이 입력 fact의 안정적 참조와 계산 정책 version을 나른다**(참조는 §12.2의 식별자 갈래) ③ **`FactProvenance`에 파생 산출 variant를 더해** 그 안에 ②를 넣는다 | — (Codex 리뷰 라운드 5가 드러냈다) | **해소 — 운영자 결정 2026-09-04(M1/1B 계약 갱신).** **선택지 ②를 채택한다** — 파생 `Money`(`BidAmount`)와 파생 율(`AssessmentRate`·`AwardRate`) 모두 입력 fact의 안정적 참조와 계산 정책 version을 값에 함께 싣는다. **금액과 율에 같은 답을 쓴다** — 조사 B가 열어 둔 「율은 ②, 금액은 ①」 갈림은 채택하지 않는다. `FloorRateOrigin`·`BidRateOrigin`은 이미 런타임 구별 축을 나르고 있어 그와 어긋나지 않는다. **①·③은 불채택** — ①은 값과 판정이 떨어지면 되짚기를 포기하는데 D-1(`Money`는 다섯 성분)의 취지와 맞지 않고, ③은 `FactProvenance` 어휘 자체의 변경이라 이 결정의 범위를 넘는다. **이 결정이 정하지 않는 것**: 참조·version을 나르는 정확한 필드 형태(타입 서명)는 M1 1B 구현이 정한다 | §1.2 · §1.4.2 · §5.1 · §12.2 |
 | **`OPEN-DIC-09`** | **fold의 순서 술어 — ① 총순서 키가 무엇으로 이루어지는가 ② 그 키가 같을 때 무엇으로 가르는가**(늦은 관측의 보존과 적용은 둘 다 미결이 아니다 — **§2.2.3이 그 둘의 근거를 축별로 가른다.** 보존은 **append-only 입력과 `deliveryKey` 규칙**이 **이 두 물음과 무관하게** 내고, 적용은 **필드별 fold**가 **이 두 물음이 닫히면** 낸다). **선택지** — 키: ⓐ `observedAt` 단독 ⓑ `observedAt` + 생산자를 가르는 보조 축 ⓒ 관측이 나르는 별도 순번. tie-break: ⓐ 두지 않는다(같은 키의 두 관측은 같은 값이어야 한다) ⓑ 명시 우선순위를 둔다 | **U-3이 fold 재정의만 정했다** | **정책 결정**이다. **legacy에 답이 없다** — 전달 순서대로 in-place mutate하고 순서 키를 읽지 않으며(`app/services/tender_result_persistence.py:25-49`), `observed_at`이 **nullable**이고(`app/models/pipeline.py:130-144`) 생산자마다 다른 시각을 넣는다(`app/services/tender_result_persistence.py:72-84` · `app/services/opening_result_collection.py:373-380`) | §2.2.3 |
+| **`OPEN-DIC-11`**(신설, M1/1B 조사 A) | **`AwardRate`(낙찰률)의 분모가 legacy 안에서 다수설이 아니다.** 위 §1.4.2 표는 `AwardRate`의 분모를 「기초금액」으로 적고 `app/services/paper_bidding_backtest/settlement.py:49-58`을 근거로 인용하는데, **그 근거 파일 자신이 `app/services/koneps/scsbid.py`를 "같은 base-relative 정규화"라 인용하면서 정작 `scsbid.py`는 그 자리에서 예정가-relative 값(`sucsfbidRate` = 낙찰가/예정가)을 쓴다.** 예정가 편에 서는 자리가 legacy에 셋 더 있다(`app/domain/award_rate_label.py` · `app/ai/predictors/distribution_extraction.py` · `app/services/query_predicates.py`) | — (M1/1B 조사 A 자체 발견, `_workspace/m1-1b/01_scout_legacy-money.md` 축 2 R-8) | **legacy 실측이 갈린다.** 「기초금액이 분모」라는 §1.4.2의 서술은 legacy의 다수설이 아니라 **한 인용의 재인용**이다. 이 문서가 그 서술을 정정할지, `AwardRate` 분모를 별도 축 결정으로 미룰지는 이 문서가 판정하지 않는다 — **M1/1B 범위 밖**(운영자 결정 2026-09-04, M1/1B 계약 갱신이 등재만 하고 판정을 넘긴다) | §1.4.2 |
 | **`OPEN-DIC-10`** | **`RoundingPolicy`의 `mode` 값, 금액 축 밖의 `scaleDigits`, 첫 `effectiveFrom`, 그리고 「금액 축 밖」의 경계 — 금액을 집계해 낸 값이 어느 쪽인가.** **선택지** — `mode`(정의 ②의 하한 이상 보장은 어느 값을 골라도 그대로 걸린다 — §1.1): ⓐ 사사오입 ⓑ 짝수 자리 반올림 ⓒ 작은 쪽으로 버림 ⓓ 큰 쪽으로 올림 ⓔ 그 넷 밖의 모드. 금액 축 밖 `scaleDigits`: ⓐ legacy의 자리수를 축별로 승계 ⓑ 축 하나로 통일. 첫 `effectiveFrom`: ⓐ 과거를 모두 덮어 그 이전 공고에도 같은 정책이 걸린다 ⓑ 시행 시점을 명시하고 그 이전에는 정책이 없다(§4.1의 `NotApplicable`). 금액의 집계: ⓐ 금액 축이다 — §1.1 정의 ①이 닫으므로 이 `OPEN`이 그 자리수를 고르지 않는다 ⓑ 금액 축 밖이다 — 그 자리수가 이 `OPEN`이 고를 값에 든다. **「금액 축 밖」이 「금액 축」의 여집합이므로 셋째가 없다.** | — (Codex 리뷰 라운드 5가 드러냈다 · 경계는 0C 자체 발견) | **값의 결정**이다. 승인 명세가 요구하는 것은 **형태**(`RoundingPolicy`와 version)뿐이고 값을 고를 근거가 이 저장소에 없다. §12.1의 legacy 자리수 가운데 **금액 축의 것은 §1.1 정의 ①이 닫아 V2 미채택**이고, **금액 축 밖의 것은 승계할지 여부부터 이 미결 안에 있다.** **정해진 둘(금액 축의 자리수 · 하한 이상 보장)은 §1.1이 갖는다.** **경계가 이 `OPEN`에 드는 것은 그것이 이 미결의 범위를 이루기 때문이다** — 「금액 축 밖의 `scaleDigits`」가 무엇을 가리키는지가 그 경계로 정해지므로, 경계를 밖에 두면 이 `OPEN`이 답할 수 있는 형태가 아니다. **그 경계에 걸리는 자리가 legacy에 실재한다** — `app/services/opportunity_analysis/market.py:91`이 금액을 평균 내며 자리수 `2`로 반올림한다. §12.1의 `2` 행이 인용한 자리와 다르다 | §1.1 · §12.1 · §12.2 |
 
 **활성 `OPEN`은 해소하지 않았다.** 이 문서가 문면에서 마주친 것 — `OPEN-QUAL-05` ·
@@ -1805,6 +1823,22 @@ U-5로 **새로 닫는다**고 적었으나 **2026-08-26에 이미 닫혀 있었
 더해 **「저장 값 비일관」**이다(§1.2.1). 각 행의 실제 과세 처리를 **행별로 판정**해야
 경계 쌍을 만들 수 있고, 그 행별 판정 자체가 그 `OPEN`이 남긴 축이다(§1.2.2).
 **`regression-ledger.md`는 고치지 않았다** — 고칠 것이 없다.
+
+### 11.1 후속 등재 — M1/1B 계약 갱신(2026-09-04, 이 slice(0C) 밖의 결정)
+
+**이 표는 0C 작성 시점의 것이 아니다** — 위 「이 slice에서 「전건 해소」는 없다」는 문장은
+0C 자신의 발견에 대한 것이고, 아래 행은 **뒤따르는 slice(M1/1B)의 결정**이라 갈래가 다를
+수 있다.
+
+| `OPEN` | 원 질문 | 결정이 답한 축 | 갈래 · 남는 축 | 등재 자리 |
+| --- | --- | --- | --- | --- |
+| **`OPEN-DIC-08`** | 파생 `Money`·파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가 | **선택지 ②를 채택**(입력 fact 참조 + 계산 정책 version, 금액·율 동일) | **전건 해소.** 남는 축은 없다 — 정확한 필드 형태(타입 서명)는 「무엇을 싣는가」의 답이 아니라 구현 세부이므로 M1 1B 구현이 정한다 | **§9의 그 행** |
+
+**`OPEN-DIC-04`·`OPEN-DIC-05`·`OPEN-DIC-10`·`OPEN-REG-05`·`OPEN-DEC-07`은 이 갱신으로
+닫히지 않는다.** 운영자 결정 2026-09-04는 각 `OPEN`이 **결정 없이 만들 수 있다고 이미
+적어 둔 부분**(§9의 각 행 참조)을 1B가 실제로 그렇게 구현하도록 승인했을 뿐, 그 `OPEN`의
+원 질문이 요구하는 **값**(과세 처리 자체, 미판정 별도 상태 여부, `mode` 값, 잔차 성분,
+마진 값)에는 답하지 않았다 — 이 문서의 §9 표는 그대로 활성으로 남긴다.
 
 ---
 
