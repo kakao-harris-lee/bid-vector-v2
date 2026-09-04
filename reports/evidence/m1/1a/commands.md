@@ -913,3 +913,34 @@ clean-tree(경로 개별 인자)·비밀값 스캔 — 이번 라운드도 통�
 
 clean-tree(경로 개별 인자, 실제 변경분과 일치)·비밀값 스캔(`reports/evidence/m1/1a/` +
 `git diff e7ae8fd..HEAD`) — 매치 없음. 승인 문서 무변경.
+
+### verifier r20 H-1 — 감싸는 블록의 지역 선언은 참조보다 앞설 때만 가린다
+
+리포트 `_workspace/m1-1a/30_verifier_r20.md`. Codex 14차 #1 정정(조상 사슬)이 감싸는 **블록
+안에서는** 여전히 위치를 가리지 않아, 참조 뒤쪽의 동명 지역 변수(verifier P10 형태)도 값
+체인으로 오판했다. `KtBlockExpression` 조상에서만 `declaration.textOffset <
+reference.textOffset` 조건을 추가했다 — 함수·람다·클래스·top-level 은 Kotlin 도 위치 무관이라
+그대로 둔다. `qualification` 모듈에 임시로 두고 task 수준으로 재현·해소를 확인한 뒤 지웠다
+(`git status --short -- qualification/` 로 확인).
+
+| # | 조작 | `:qualification:domainSourceReferenceGate` |
+| --- | --- | --- |
+| `E-111` | `P10.kt`(verifier 원 재현 — `val x = java.net.HttpURLConnection.HTTP_OK; val java = 1; return x + java`)를 둔다 | 1 — `P10.kt:5 java.net.HttpURLConnection — 허용 목록에 없다`(뒤쪽 동명 선언이 더는 가리지 못한다) |
+| `E-112` | 지운다 | 0(양성 대조) |
+
+**acceptance 전건 재실행(술어 변경이라 `A-0` 격리 worktree 포함).**
+
+| # | cmd | exit |
+| --- | --- | --- |
+| `A-0` | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache --no-daemon clean check)` | 0 |
+| `A-1` | `./gradlew --no-build-cache --no-daemon clean check` | 0 |
+| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 |
+| `A-5` | `./gradlew :build-logic:test` — `SourceReferencesTest` 30개(신규 4)·`DomainSourceReferenceFixtureTest` 6개(신규 1) 포함, `build-logic` 전건 143 tests / 0 failed | 0 |
+
+TDD — 위치 필터를 잠시 되돌려(`KtBlockExpression` 분기의 offset 조건 제거) 신설 테스트 3종 중
+위치 의존 2종(뒤쪽 선언·중첩 블록의 바깥 뒤쪽 선언)만 실패함을 확인한 뒤 복원했다(회귀 고정
+2종은 그대로 통과 — 필터 부재가 원인임을 가른다).
+
+clean-tree(경로 개별 인자, 실제 변경분과 일치)·비밀값 스캔(`git diff --cached` 커밋 전) —
+매치 없음. 승인 문서 무변경. 제한 47 정정 — 「선언보다 앞서 쓰면 컴파일이 거부된다」는 이전
+근거를 실측(`COMPILE_EXIT=0`)에 맞춰 위치 조건 서술로 바꿨다.
