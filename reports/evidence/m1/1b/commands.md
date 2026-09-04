@@ -215,3 +215,47 @@ example 로 고정돼 있다** — `ArithmeticTest`의
 - B9: `CompileFailureHarnessTest` 의 `7 vat 고정 Money…` test 통과(음성 「too many arguments
   for」·양성 OK), `ArithmeticTest` 의 `B9 …` 넷(고정 선언 둘·Unmeasurable property 둘) +
   B11 이관 test(`같은 vat 이면 투찰율이…`) 통과, `scope.md` `OPEN-DIC-04` 행 갱신 확인
+
+## Phase 6 — verifier r2 수정 라운드(H-3·H-4·M-6·low 4) 뒤 acceptance 전건 재실행
+
+최종 HEAD `90eef2c`(Phase 5 이후 커밋 넷 — `6f0a507` H-3, `5290fd5` H-4, `796311e` M-6,
+`90eef2c` low 4)에서 `scope.md` `acceptance_commands`(B-0~B-7) 전부를 다시 돌렸다.
+
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check --no-daemon)`  (B-0)
+- exit: 0 — 262 task 전건 실행(캐시 없음), 격리 worktree
+- cmd: `./gradlew --no-build-cache clean check --no-daemon`  (B-1, 작업 트리)
+- exit: 0
+- cmd: `./gradlew :app:test --tests '*ArchitectureGate*' --no-daemon --no-build-cache`  (B-2)
+- exit: 0
+- cmd: `./gradlew :build-logic:test --no-daemon --no-build-cache`  (B-3)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:test --no-daemon --no-build-cache`  (B-4)
+- exit: 0 — 명령 포인터(하드코딩 금지, L-2·L-10 원칙):
+  ```
+  grep -oh 'tests="[0-9]*"' shared-kernel/build/test-results/test/TEST-bidvector.sharedkernel.*.xml
+  ```
+  실측: `ArithmeticTest` 18 · `CompileFailureHarnessTest` 17 · `MoneyTest` 5 · `PolicyTest` 7 ·
+  `RateTest` 6 · `RegressionExampleTest` 5, 합 58(H-3 의 fixture 8·9·10 각 2 test ·
+  M-6 의 `PolicyTest` 3 test · L-7 의 fixture 6·7 변이 test 2 로 47 → 58)
+- cmd: `./gradlew qualityBaseline --no-daemon --no-build-cache`  (B-5)
+- exit: 0
+- cmd: `./gradlew :shared-kernel:domainApiTypeGate :shared-kernel:domainSourceReferenceGate --no-daemon --no-build-cache`  (B-6·B-7)
+- exit: 0
+
+**하네스 레인 변경 재확인**: `git log --oneline 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD -- CLAUDE.md .claude/`
+— 여전히 없음.
+
+**clean-tree 재확인**: `git status --short` — 빈 출력.
+
+**secret 스캔 재확인**: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1b/ shared-kernel/src/ shared-kernel/build.gradle.kts config/quality/gate-tests.properties`
+— 매치는 스캔 명령 문자열을 인용한 문서 자신들뿐, 실제 비밀값 0.
+
+**H-3·H-4·M-6·low 4 재현 확인**:
+- H-3: `CompileFailureHarnessTest` 의 `8`·`9`·`10` 번 test(음성·양성·변이 각 쌍) 통과 —
+  `Derived`·`Measurement.Measured` 양쪽 `internal constructor`+`@ConsistentCopyVisibility` 확인
+- H-4: `rollback.md` 를 실제로 임시 clone(별도)에서 실행 — 파생 배열 11개 원소,
+  확인 지점 1~4 전부 통과(문서의 「실측」 절이 그 결과를 갖는다)
+- M-6: `PolicyTest` 의 `M-6` 셋(예제·property 둘) 통과, `RoundingPolicy(-2, …)` 가
+  `IllegalArgumentException` 을 던짐을 확인
+- low: `CompileFailureHarnessTest` 의 `6-M2`·`7-M2` 변이 test, `checklist.md` 의 L-9·L-10
+  등재, 이 문서 Phase 3 절의 「31건」 정정 확인

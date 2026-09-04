@@ -66,6 +66,16 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | --- | --- |
 | `617b9f3` | decision 15·16 — corpus 종결 조건을 `1B-c` 로 이관(`milestone-1.md` 「Slice 1B-c」 신설, `scope.md`·`capability-map.md` 담당 정정), `Provenance` 이름 확정(`data-dictionary.md` §5.1·§1.1 취소선 정정). 코드 무변경 |
 | `b656b60` | B9 구현 — `AllocatedBudget`·`YegaAmount`·`AwardAmount` 의 `vatTreatment` 를 `Unknown` 고정으로 바꾼다(위 L-5 갱신 참고). `sameKnownVat` 전건이 `assessmentRateAgainst`·`awardRateAgainst` 를 항상 `Unmeasurable` 로 막는 property test, 컴파일 하네스 fixture 7, B11 커버리지 이관(`bidRateAgainst`) 포함 |
+| `a58871e` | Phase 5 evidence — B-0~B-7 재실행, 하네스 레인·clean-tree·secret 재확인 |
+
+### verifier r2 수정 라운드 — 커밋 넷(finding 별)
+
+| 커밋 | finding |
+| --- | --- |
+| `6f0a507` | H-3 — `Derived`·`Measurement.Measured` 를 `internal`+`@ConsistentCopyVisibility` 로 닫는다(B11 위조 세 형태 차단). fixture 8·9·10(음성·양성·변이 각 쌍), 리플렉션 우회를 알려진 제한으로 등재(L-8 합침) |
+| `5290fd5` | H-4 — `rollback.md` 가 `scope.md` `in_scope` 를 손 목록이 아니라 awk 파싱으로 파생하게 한다. 실측 중 「restore 가 scope.md 자신을 지워 확인 지점 2 가 실패하는」 진짜 버그를 발견해 캡처 순서를 고쳤다. `mapfile`(bash4+) 이 이 하네스의 macOS 기본 bash(3.2)에 없음도 실측으로 발견 |
+| `796311e` | M-6 — `RoundingPolicy.init` 에 `require(scaleDigits >= 0)` 를 건다(`Rate`·`BaseAmount` 와 같은 construction-time invariant 관례). `ArithmeticTest` M-1 property test 의 scale 후보에서 `-1` 을 뺐다(층이 다르다) |
+| `90eef2c` | low L-7·L-9·L-10 — fixture 6·7 변이 쌍둥이 추가, `BidRateOrigin.Recommended` 제한을 checklist 에도 등재, `commands.md` Phase 3 의 「31건」 하드코딩을 명령 포인터로 |
 
 ## evidence 최소 목록 (`agent-workflow.md` §6)
 
