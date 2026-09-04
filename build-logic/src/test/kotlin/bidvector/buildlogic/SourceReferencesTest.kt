@@ -384,4 +384,88 @@ class SourceReferencesTest {
             )
         assertTrue(refs.any { it.fqn == "java.net.HttpURLConnection" }, "$refs")
     }
+
+    /**
+     * **verifier r21 H-1' — ① 자기 초기화식(원 재현).** `startOffset` 만 비교하면 선언의 `val`
+     * 키워드가 참조보다 앞서므로 가려지는 것으로 오판한다 — Kotlin 은 초기화식 안에서 그 지역
+     * 변수를 아직 보지 않으므로(자기 자신을 참조할 수 없다) `java` 는 이 자리에서 패키지로
+     * 해석되고 컴파일도 된다. `endOffset`(선언 서브트리 전체의 끝) 비교로 자동 제외된다.
+     */
+    @Test
+    fun `r21 H-1' 가리는 선언 자신의 초기화식 안 참조는 가려지지 않는다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(): Int {\n" +
+                    "    val java = java.net.HttpURLConnection.HTTP_OK\n" +
+                    "    return java\n" +
+                    "}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.net.HttpURLConnection" }, "$refs")
+    }
+
+    /** **verifier r21 H-1' — ② `var` 판.** */
+    @Test
+    fun `r21 H-1' var 의 자기 초기화식 안 참조도 가려지지 않는다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(): Int {\n" +
+                    "    var java = java.net.HttpURLConnection.HTTP_OK\n" +
+                    "    java += 1\n" +
+                    "    return java\n" +
+                    "}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.net.HttpURLConnection" }, "$refs")
+    }
+
+    /**
+     * **verifier r21 H-1' — ③ `when (val java = …)` subject.** subject 변수는 블록의 형제
+     * 문장이 아니라 `KtWhenExpression` 의 자식이라 애초에 [visibleLocalNames] 의 블록 순회에
+     * 잡히지 않는다 — 별도 조치 없이 닫힌다는 것을 여기서 고정한다.
+     */
+    @Test
+    fun `r21 H-1' when subject 의 자기 초기화식 안 참조도 가려지지 않는다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(): Int =\n" +
+                    "    when (val java = java.net.HttpURLConnection.HTTP_OK) {\n" +
+                    "        else -> java\n" +
+                    "    }\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.net.HttpURLConnection" }, "$refs")
+    }
+
+    /** **verifier r21 H-1' — ④ 앞쪽 선언 회귀.** 진짜 값 체인은 여전히 건너뛴다. */
+    @Test
+    fun `r21 H-1' 앞쪽에 끝난 선언은 뒤쪽 참조를 여전히 가린다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(): Int {\n" +
+                    "    val java = Any().hashCode()\n" +
+                    "    return java.net.hashCode()\n" +
+                    "}\n",
+            )
+        assertTrue(refs.none { it.fqn.startsWith("java.net") }, "$refs")
+    }
+
+    /**
+     * **verifier r21 H-1' — ⑤ 초기화식 안 람다.** 초기화식이 람다를 한 겹 더 두르고 있어도
+     * ([KtFunctionLiteral] 의 본문 블록에는 `java` 선언이 없으므로) 조상 사슬을 거슬러 선언
+     * 자신의 블록에 이르렀을 때 같은 `endOffset` 비교로 걸러진다.
+     */
+    @Test
+    fun `r21 H-1' 초기화식 안 람다에 감싸인 참조도 가려지지 않는다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(): Int {\n" +
+                    "    val java = run { java.net.HttpURLConnection.HTTP_OK }\n" +
+                    "    return java\n" +
+                    "}\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.net.HttpURLConnection" }, "$refs")
+    }
 }

@@ -45,6 +45,15 @@ class DomainSourceReferenceFixtureTest {
         assertViolates(File(VIOLATING, "qualification/TrailingShadowLeak.kt"), "java.net.HttpURLConnection")
     }
 
+    /**
+     * **verifier r21 H-1' 회귀 고정.** 참조를 가리는 선언 자신의 초기화식 안(`val java =
+     * java.net.…`) 에 둔 완전수식 참조도 지워지지 않는다 — production 게이트 회귀 fixture.
+     */
+    @Test
+    fun `가리는 선언 자신의 초기화식 안 완전수식 참조도 지워지지 않는다`() {
+        assertViolates(File(VIOLATING, "qualification/SelfInitShadowLeak.kt"), "java.net.HttpURLConnection")
+    }
+
     @Test
     fun `실제 도메인 형태는 위반이 없다`() {
         val file = File(ALLOWED, "settlement/DomainShapes.kt")

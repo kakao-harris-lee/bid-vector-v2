@@ -140,6 +140,7 @@ class ArchitectureGateCatchesViolationsTest {
             "FullyQualifiedReferenceLeak",
             "ShadowedRootLeak",
             "TrailingShadowLeak",
+            "SelfInitShadowLeak",
         ).forEach { fixture ->
             details.filter { it.contains(fixture) }.shouldBeEmpty()
         }
