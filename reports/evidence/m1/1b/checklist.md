@@ -254,3 +254,4 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | 변경된 fixture 와 정책 version 의 근거 | **N/A** — 이 slice 는 fixture 를 변경하지 않았다(`fixtures/manifest.yaml` 미편집). 정책 version 은 `VAT_RATE_POLICY`(source 문자열이 `data-dictionary.md` §12.1 을 가리킨다) 하나뿐이고 그 근거는 `PolicyTable.kt` 주석이 든다 |
 | 알려진 제한과 rollback | 위 절들 + `rollback.md` |
 | 비밀값 스캔 | **충족.** `commands.md` — 매치는 스캔 명령 자신의 인용문뿐(판독 규칙 적용) |
+| verifier `ready-for-review` | **충족.** verifier r5(2026-09-04, HEAD `a6d849f`, 코드 `f750c60`) — 산출물 blocker/high 0, r4 H-1·M-1 실행 실측으로 닫힘, acceptance B-0~B-7 exit 0(shared-kernel 77 tests). 재작업 누계 4회/상한 5(verifier not-ready 3 + Codex request_changes 1). 남은 것은 사용자 승인이다 |
