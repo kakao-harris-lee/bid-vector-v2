@@ -1,0 +1,174 @@
+package bidvector.sharedkernel
+
+import java.math.BigDecimal
+import java.math.MathContext
+
+private const val RATE_DIVISION_PRECISION = 20
+private val RATE_DIVISION_CONTEXT = MathContext(RATE_DIVISION_PRECISION)
+
+/**
+ * `vatTreatment` 산술 전건 — 같고, `UNKNOWN`이 아니어야 한다. `a == b`만 쓰면 `UNKNOWN` 둘이
+ * 통과한다(설계 검토 §5 L-9의 반례) — 이 함수가 그 전건을 한 곳에 둔다.
+ */
+internal fun sameKnownVat(
+    left: VatTreatment,
+    right: VatTreatment,
+): Boolean = left == right && left != VatTreatment.UNKNOWN
+
+/**
+ * 반올림 이전의 파생 투찰가. 반올림 이전 단계에서는 `BigDecimal`을 쓴다(`ADR 0002` §3 A-4).
+ * `BidAmount`로 가는 유일한 멤버가 [roundedWith]다.
+ */
+class UnroundedBidAmount internal constructor(
+    internal val raw: BigDecimal,
+    private val currency: Currency,
+    private val vatTreatment: VatTreatment,
+    private val provenance: Provenance,
+) {
+    /** overflow는 `Math.*Exact`와 동등한 성질로 잡는다 — `longValueExact()`가 범위·소수부를 함께 잰다(A4). */
+    fun roundedWith(policy: Resolution.Resolved<RoundingPolicy>): Measurement<BidAmount> {
+        val scaled = raw.setScale(policy.value.scaleDigits, policy.value.mode)
+        return runCatching { scaled.longValueExact() }
+            .fold(
+                onSuccess = { won -> measured(won, policy.version) },
+                onFailure = { Measurement.Unmeasurable(ReasonCode.AMOUNT_OVERFLOW) },
+            )
+    }
+
+    private fun measured(
+        won: Long,
+        policyVersion: PolicyVersion,
+    ): Measurement<BidAmount> =
+        Measurement.Measured(
+            value = BidAmount(won, currency, vatTreatment, provenance),
+            sampleSize = 1,
+            policyVersion = policyVersion,
+        )
+}
+
+/** `BaseAmount × BidRate = BidAmount`만 — 다른 조합은 오버로드가 없어 컴파일되지 않는다. */
+operator fun BaseAmount.times(rate: BidRate): UnroundedBidAmount =
+    UnroundedBidAmount(
+        raw = BigDecimal(amount).multiply(rate.rate.fraction),
+        currency = currency,
+        vatTreatment = vatTreatment,
+        provenance = provenance,
+    )
+
+private fun divideForRate(
+    numerator: Long,
+    numeratorVat: VatTreatment,
+    denominator: Long,
+    denominatorVat: VatTreatment,
+    policy: Resolution.Resolved<RoundingPolicy>,
+): Measurement<BigDecimal> =
+    when {
+        !sameKnownVat(numeratorVat, denominatorVat) -> {
+            Measurement.Unmeasurable(ReasonCode.VAT_TREATMENT_MISMATCH)
+        }
+
+        denominator == 0L -> {
+            Measurement.Unmeasurable(ReasonCode.EMPTY_INPUT)
+        }
+
+        else -> {
+            val quotient = BigDecimal(numerator).divide(BigDecimal(denominator), RATE_DIVISION_CONTEXT)
+            Measurement.Measured(value = quotient, sampleSize = 1, policyVersion = policy.version)
+        }
+    }
+
+private fun <T> asRate(
+    ratio: Measurement<BigDecimal>,
+    wrap: (Rate) -> T,
+): Measurement<T> =
+    when (ratio) {
+        is Measurement.Measured -> {
+            val rate = Rate.ofFraction(ratio.value)
+            Measurement.Measured(wrap(rate), ratio.sampleSize, ratio.policyVersion)
+        }
+
+        is Measurement.Unmeasurable -> {
+            ratio
+        }
+    }
+
+/** 사정률 = 예정가 / 기초금액. */
+fun YegaAmount.assessmentRateAgainst(
+    base: BaseAmount,
+    policy: Resolution.Resolved<RoundingPolicy>,
+): Measurement<AssessmentRate> {
+    val ratio = divideForRate(amount, vatTreatment, base.amount, base.vatTreatment, policy)
+    return asRate(ratio, ::AssessmentRate)
+}
+
+/** 낙찰률 = 낙찰가 / 기초금액. */
+fun AwardAmount.awardRateAgainst(
+    base: BaseAmount,
+    policy: Resolution.Resolved<RoundingPolicy>,
+): Measurement<AwardRate> {
+    val ratio = divideForRate(amount, vatTreatment, base.amount, base.vatTreatment, policy)
+    return asRate(ratio, ::AwardRate)
+}
+
+/** 투찰율 = 투찰가 / 기초금액. `origin`은 관측값/추천값을 값으로는 못 가르는 자리라 인자로 받는다. */
+fun BidAmount.bidRateAgainst(
+    base: BaseAmount,
+    origin: BidRateOrigin,
+    policy: Resolution.Resolved<RoundingPolicy>,
+): Measurement<BidRate> {
+    val ratio = divideForRate(amount, vatTreatment, base.amount, base.vatTreatment, policy)
+    return asRate(ratio) { rate -> BidRate(rate, origin) }
+}
+
+/** [sumOfBaseAmounts]가 목록을 접으며 나르는 중간 상태 — `Absent`가 나오면 이후 입력을 무시한다. */
+private sealed interface SumState {
+    data class Accumulating(
+        val total: Long,
+        val vat: VatTreatment?,
+    ) : SumState
+
+    data class Failed(
+        val reason: ReasonCode,
+    ) : SumState
+}
+
+private fun combine(
+    state: SumState,
+    entry: Fact<BaseAmount>,
+): SumState =
+    when {
+        state is SumState.Failed -> state
+        entry is Fact.Absent -> SumState.Failed(entry.reason)
+        else -> accumulate(state as SumState.Accumulating, (entry as Fact.Known).value)
+    }
+
+private fun accumulate(
+    state: SumState.Accumulating,
+    current: BaseAmount,
+): SumState {
+    val seenVat = state.vat
+    val vatOk = seenVat == null || sameKnownVat(seenVat, current.vatTreatment)
+    val next = if (vatOk) runCatching { Math.addExact(state.total, current.amount) }.getOrNull() else null
+    return when {
+        !vatOk -> SumState.Failed(ReasonCode.VAT_TREATMENT_MISMATCH)
+        next == null -> SumState.Failed(ReasonCode.AMOUNT_OVERFLOW)
+        else -> SumState.Accumulating(next, current.vatTreatment)
+    }
+}
+
+/**
+ * `BaseAmount` 목록의 합산 규칙 넷 — 전부 `Known`이면 `Known(합)`(overflow는 `AMOUNT_OVERFLOW`),
+ * 하나라도 `Absent`면 그 사유를 그대로 전파, `vatTreatment`가 갈리면 `VAT_TREATMENT_MISMATCH`,
+ * **빈 목록은 `Absent(EMPTY_INPUT)`다 — `Known(0원)`이 아니다.** 이 넷째 규칙은 승인 문면이
+ * 직접 말하지 않는 자리라 1B가 형태로 정한다(값 결정이 아니므로 `OPEN`이 아니다).
+ *
+ * 원 단위 `Long`을 나르므로 공개하지 않는다 — `internal`.
+ */
+internal fun sumOfBaseAmounts(amounts: List<Fact<BaseAmount>>): Fact<Long> {
+    val initial: SumState =
+        if (amounts.isEmpty()) SumState.Failed(ReasonCode.EMPTY_INPUT) else SumState.Accumulating(0L, vat = null)
+    return when (val result = amounts.fold(initial, ::combine)) {
+        is SumState.Accumulating -> Fact.Known(result.total)
+        is SumState.Failed -> Fact.Absent(result.reason)
+    }
+}
