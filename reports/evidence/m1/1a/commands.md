@@ -991,7 +991,7 @@ r20 H-1 `startOffset` → r21 H-1' `endOffset`) — 다음은 그 경계를 직�
 | 지역 클래스 이름(`class java`) | **안 가림(정당)** | `KtClass` 도 `KtProperty` 아님 — 값이 아닌 타입이라 Kotlin 도 안 가린다(실측 동일) |
 | `for (java in …)` 루프 변수 | **안 가림(정당, 루프 밖에서는 스코프 자체가 없다)** | `KtParameter` 가 `KtBlockExpression.statements` 에 없다 — 루프가 끝나면 Kotlin 스코프에서도 사라진다(실측 동일). 루프 **안**에서 진짜로 가려지는 경우는 `.net` 이 존재하지 않는 멤버라 애초에 컴파일이 안 된다 |
 | `catch (java: Exception)` | **안 가림(정당, catch 블록 밖은 스코프 자체가 없다)** | 위와 같은 구조 — `catch` 파라미터는 그 블록 안에서만 Kotlin 스코프고, 그 블록 밖 참조는 조상 사슬에 없다(실측 동일) |
-| 구조 분해(`val (java, other) = …`) | **안 가림 — 위치 무관하게 항상 안 가림(잔여)** | `KtDestructuringDeclaration` 은 `KtProperty` 가 아니다 — **앞쪽에 둬도** 안 가린다. 실제로는 `.net` 없는 타입이라 그 형태 자체가 컴파일 안 되는 경우가 대부분이라 안전하지만, `endOffset` 규칙이 구조 분해까지는 미치지 않는다는 뜻이다 |
+| 구조 분해(`val (java, other) = …`) | **안 가림 — 위치 무관하게 항상 안 가림(잔여)** | `KtDestructuringDeclaration` 은 `KtProperty` 가 아니다 — **앞쪽에 둬도** 안 가린다. 구조 분해된 값 뒤에 대문자 멤버 호출을 두면(`val (java, other) = Pair(t, 1)` 뒤 `java.Node()`) 컴파일되면서 게이트가 오탐을 낸다(verifier r22 실측) — 닫힘 방향이고 미탐이 아니다. `endOffset` 규칙이 구조 분해까지는 미치지 않는다는 뜻이다 |
 | 백틱 이름(`` val `java` = 1 ``) | **가림(정당 — 보통의 `KtProperty` 와 동일)** | `.name` 이 백틱을 벗기므로 일반 지역 `val` 과 똑같이 처리된다(실측: `references=[]`) |
 | `when (val java = …)` subject | **가림 없음이 필요 없다 — 원래 조상 사슬에 없다** | subject 변수는 `KtBlockExpression.statements` 가 아니라 `KtWhenExpression` 의 자식이라 블록 순회가 애초에 보지 못한다(verifier r21 H-1' ③, 오늘 실측으로 재확인) |
 
