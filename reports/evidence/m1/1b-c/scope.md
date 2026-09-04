@@ -18,9 +18,11 @@ in_scope:
   - fixtures/expected/money-basis-00[1-6].json    # ③ 처분 결정에 따라 — 재추출 또는 무변경(폐기는 파일 삭제가 아니라 classification 변경)
   - fixtures/input/rate-unit-00[1-5].json         # ② 조건부 — 입력 토큰 정렬(ESTIMATED_PRICE → ESTIMATED 류)이 필요할 때만
   - fixtures/input/money-basis-00[1-6].json       # ③ 같은 조건
-  - shared-kernel/src/test/**                     # ④ corpus 소비 테스트(conformance runner) — 위치는 D5 결정 뒤 확정
-  - shared-kernel/build.gradle.kts                # ④ 조건부 — 소비 테스트가 test 전용 JSON 의존을 요구하면(D5)
-  - config/quality/gate-tests.properties          # ④ 조건부 — 소비 테스트를 gate.tests.shared-kernel 에 등재할 때만
+  - shared-kernel/src/testFixtures/**             # ④ D5(b′) — JSON 무의존 projection(값→Map). internal 접근은 KGP 기본 associate(조사 §8 실측)
+  - shared-kernel/build.gradle.kts                # ④ `java-test-fixtures` 플러그인 적용만. testFixtures 버킷에 외부 의존을 넣지 않는다
+  - app/src/test/**                               # ④ corpus 소비 테스트(conformance runner) — JSON 역직렬화는 여기서만(app 은 domain 층 밖)
+  - app/build.gradle.kts                          # ④ `testImplementation(testFixtures(project(":shared-kernel")))` 한 줄
+  - config/quality/gate-tests.properties          # ④ `gate.tests.app` 에 소비 테스트 FQCN 등재(gateExecutionGate 실행 강제)
   - docs/discovery/data-dictionary.md             # 계약 갱신 — 운영자 결정이 실제로 난 항목의 해당 행만(§9 OPEN 표)
   - docs/discovery/capability-map.md              # 계약 갱신 — §14.2 OPEN-1B-CONTRACT · OPEN-1B-CORPUS 행만
   - milestone-1.md                                # 계약 갱신 — 「Slice 1B-c」 항목만
@@ -91,7 +93,7 @@ range 에 있다」를 명시한다. 그 명령이 잡지 못하는 하네스 �
 | **D2** | **결과 토큰 어휘** — fixture 직렬화가 쓸 상태·사유 이름을 1B 계약 이름으로 채택하는가 | (a) 1B 계약 어휘 그대로(`Fact.Known`/`Absent` · `Measurement.Measured`/`Unmeasurable` · `ReasonCode` enum 이름 · `Basis.ESTIMATED`) (b) fixture 어휘 유지 + 매핑 표 (c) 새 중립 어휘 | **(a)** — 계약이 채택한 이름을 그대로 쓰면 「승인 문면 없는 자작 토큰」 문제가 정의상 사라지고 매핑 층(낡는 자리)이 생기지 않는다. `uncovered_axes` 「승인된 피연산자 부재」 축의 `unblocks_when`(결과 토큰 어휘 명시 승인)이 이 결정으로 충족된다 | 착수 전 |
 | **D3** | **BLOCK-3 해제** — money-basis 축의 둘째 자물쇠(운영자 명시 승인 부재) | (a) 축 전체 승인 (b) case 별 승인(D4 로 흡수) (c) 축 유지 → money-basis 6 은 이 slice 밖 | **(b)** — 001·004·003 은 처분이 다르므로 축 단위 승인은 그 차이를 덮는다 | 착수 전 |
 | **D4** | **case 별 처분** — 아래 처분 표 | 표 참조 | 표 참조 | 재추출 직전(Phase 3 시작), 처분 표를 evidence 로 올려 승인 |
-| **D5** | **소비 테스트의 위치와 JSON 읽기** — **Phase 2 조사(2026-09-04, `_workspace/m1-1b-c/01_scout_preflight.md` §1)가 (a)를 반증했다**: 1차 게이트 `moduleDependencyGate` 가 domain 모듈의 **test 의존까지** `group.forbidden`(jackson·kotlinx-serialization·gson·org.json 전부)으로 막고(실측 FAILED), ADR 0002 D-9 문면도 main/test 를 구분하지 않는다 | (a) ~~shared-kernel test + jackson~~ — 게이트 정책·ADR D-9 개정 없이 불가 · (a′) ADR D-9 와 게이트에 test-scope 예외를 명시 개정 · **(b′) shared-kernel `testFixtures`(java-test-fixtures) 에 JSON 무의존 projection(값→`Map`)을 두고, runner 는 `app/src/test` 에서 `testFixtures(project(":shared-kernel"))` + jackson 으로 JSON 을 읽어 대조** — `internal`(`Rate.fraction`) 은 testFixtures 가 main 과 associate 되면 보인다 · (c) JSON 파서 없이 manifest→Kotlin 소스 생성 | **(b′)** — 커널의 어느 scope 에도 JSON 이 들어가지 않아 D-9 를 문면 그대로 지키고, 게이트·ADR 개정이 없다. projection 이 「계약이 나르는 축」(`contract_binding.carries`)을 코드로 고정하는 부수 효과도 있다. (a′) 는 게이트 정의 축소라 위협 모델상 피하고, (c) 는 생성 코드 유지가 corpus 보다 커진다. **전건 실측 셋(testFixtures 의 internal 가시성 · 1차 게이트 통과 · gate-tests 등재)이 Phase 2 후속으로 진행 중** — 하나라도 어긋나면 (a′) 로 올린다 | Phase 2 후속 실측 뒤 |
+| **D5** | **소비 테스트의 위치와 JSON 읽기** — **Phase 2 조사(2026-09-04, `_workspace/m1-1b-c/01_scout_preflight.md` §1)가 (a)를 반증했다**: 1차 게이트 `moduleDependencyGate` 가 domain 모듈의 **test 의존까지** `group.forbidden`(jackson·kotlinx-serialization·gson·org.json 전부)으로 막고(실측 FAILED), ADR 0002 D-9 문면도 main/test 를 구분하지 않는다 | (a) ~~shared-kernel test + jackson~~ — 게이트 정책·ADR D-9 개정 없이 불가 · (a′) ADR D-9 와 게이트에 test-scope 예외를 명시 개정 · **(b′) shared-kernel `testFixtures`(java-test-fixtures) 에 JSON 무의존 projection(값→`Map`)을 두고, runner 는 `app/src/test` 에서 `testFixtures(project(":shared-kernel"))` + jackson 으로 JSON 을 읽어 대조** — `internal`(`Rate.fraction`) 은 testFixtures 가 main 과 associate 되면 보인다 · (c) JSON 파서 없이 manifest→Kotlin 소스 생성 | **(b′)** — 커널의 어느 scope 에도 JSON 이 들어가지 않아 D-9 를 문면 그대로 지키고, 게이트·ADR 개정이 없다. projection 이 「계약이 나르는 축」(`contract_binding.carries`)을 코드로 고정하는 부수 효과도 있다. (a′) 는 게이트 정의 축소라 위협 모델상 피하고, (c) 는 생성 코드 유지가 corpus 보다 커진다. **전건 실측 셋 통과(2026-09-04, `01_scout_preflight.md` §8)**: ① `java-test-fixtures` 만 붙이면 KGP 가 testFixtures 를 main 과 associate 해 `Rate.fraction` 접근이 추가 설정 없이 컴파일된다 ② testFixturesCompileClasspath 는 shared-kernel 자신 + kotlin-stdlib 뿐이고, app 의 testFixtures 의존도 `moduleDependencyGate` 를 통과한다 ③ `gate.tests.app` 에 FQCN 을 더해 실행을 강제할 수 있다. **알려진 제한으로 등재할 것**: 1차 게이트의 declared 판정이 `testFixtures*` 의존 버킷을 보지 않아, 뒷날 `testFixturesImplementation` 으로 금지 group 을 넣어도 지금은 걸리지 않는다 — 이 slice 는 그 버킷에 외부 의존을 하나도 넣지 않는 것으로 답하고 게이트 확장은 하네스 slice 로 이월한다(`OPEN-1BC-TESTFIXTURES-GATE`) | **운영자 승인 대기 — 실측 조건은 해제됨** |
 
 ### D4 — case 처분 표(초안, 운영자 승인 대상)
 
@@ -120,6 +122,7 @@ range 에 있다」를 명시한다. 그 명령이 잡지 못하는 하네스 �
 | `OPEN-1B-CONTRACT` | 계약 술어 설계·실행 | **이 slice 가 소유**(1B 로부터 이관, decision 15). ① 이 닫는다. 정본 `capability-map.md` §14.2 |
 | `OPEN-1B-CORPUS` | 1B 축 authoritative 0건과 M1 완료 조건 | **이 slice 가 소유.** ②③④ 가 닫는다 — 닫힘 조건은 「1B 축 authoritative ≥ 1 이고 소비 테스트가 `check` 안에서 그 전건을 통과」 |
 | `OPEN-1BC-STR16`(신설 예정) | money-basis-003 의 검색 경로 타입 | strategy slice 로 이월. `fixtures/manifest.yaml` `uncovered_axes` 에 등재 |
+| `OPEN-1BC-TESTFIXTURES-GATE`(신설 예정) | 1차 게이트 `moduleDependencyGate` 의 declared 판정이 `testFixtures*` 의존 버킷을 보지 않는다(조사 §8 실측) | 하네스 slice(래칫·게이트 확장 — OPEN-ADR-06/16 배선과 같은 자리)로 이월. 이 slice 는 그 버킷에 외부 의존 0 으로 답한다 |
 | `OPEN-1BC-SOURCE-UNIT`(신설 예정) | `preservedSourceUnit`(원문 unit 보존)의 소유 층 — 1C+ 어댑터 계약 | 재추출 시 기대값에서 빼는 축. 어댑터 slice 가 받는다 |
 
 ---
