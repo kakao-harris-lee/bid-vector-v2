@@ -1,9 +1,5 @@
 package bidvector.buildlogic
 
-import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
-import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
-import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
-import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.psi.KtAnonymousInitializer
 import org.jetbrains.kotlin.psi.KtClassInitializer
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody
@@ -12,13 +8,10 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtFunctionLiteral
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtPropertyAccessor
-import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtScriptInitializer
 import org.jetbrains.kotlin.psi.KtSecondaryConstructor
 import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
 import java.io.File
-
-private val KOTLIN_EXTENSIONS = setOf("kt", "kts")
 
 internal class MeasuredFunction(
     val file: File,
@@ -47,31 +40,11 @@ internal class MeasuredFunction(
  * lexer 로도 잴 수 있으나 상태 기계를 손으로 써야 하고 **식 본문 함수에서 곧바로 틀린다**(실측).
  * PSI 는 문자열·주석·`"""`·식 본문을 이미 갈라 준다.
  */
-internal fun measureFunctions(files: List<File>): List<MeasuredFunction> {
+internal fun measureFunctions(files: List<File>): List<MeasuredFunction> =
     // `.kts` 도 잰다 — 빌드 로직은 이 저장소에서 실제 코드이고, 빼 두면 긴 함수가 스크립트로
-    // 옮겨 가는 것이 우회가 된다. `KtPsiFactory.createFile` 이 확장자로 스크립트를
-    // 판별하므로 파서를 따로 두지 않는다.
-    val kotlinFiles = files.filter { it.extension in KOTLIN_EXTENSIONS }
-    if (kotlinFiles.isEmpty()) return emptyList()
-
-    // 전역 application environment 를 잡으므로 task action 안에서 만들고 반드시 dispose 한다 —
-    // 데몬이 재사용되므로 누수가 쌓인다.
-    val disposable = Disposer.newDisposable("bidvector-size-gate")
-    return try {
-        // K1 PSI 파서다. K2 의 공개 파싱 API 가 서면 옮긴다 — 그때도 재는 대상은 같다.
-        @OptIn(CompilerConfiguration.Internals::class, org.jetbrains.kotlin.K1Deprecation::class)
-        val environment =
-            KotlinCoreEnvironment.createForProduction(
-                disposable,
-                CompilerConfiguration(),
-                EnvironmentConfigFiles.JVM_CONFIG_FILES,
-            )
-        val factory = KtPsiFactory(environment.project)
-        kotlinFiles.flatMap { file -> measureFile(factory.createFile(file.name, file.readText()), file) }
-    } finally {
-        Disposer.dispose(disposable)
-    }
-}
+    // 옮겨 가는 것이 우회가 된다. `KtPsiFactory.createFile` 이 확장자로 스크립트를 판별하므로
+    // 파서를 따로 두지 않는다. K1 PSI 파서다 — K2 의 공개 파싱 API 가 서면 옮긴다.
+    parseKotlinFiles(files, ::measureFile)
 
 private fun measureFile(
     ktFile: KtFile,
@@ -148,5 +121,3 @@ private fun KtElement.measurementStart(): Int {
         }
     return (keyword ?: this).textRange.startOffset
 }
-
-private fun String.lineOf(offset: Int): Int = substring(0, offset.coerceAtMost(length)).count { it == '\n' } + 1
