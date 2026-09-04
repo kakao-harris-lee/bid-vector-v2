@@ -251,4 +251,60 @@ class SourceReferencesTest {
             )
         assertTrue(refs.any { it.fqn == "java.io.File" }, "$refs")
     }
+
+    /**
+     * **Codex 14차 #1 — ① 원 재현.** M-2 수정이 판별을 파일 전체 이름 집합으로 했다가, **다른
+     * 함수**의 동명 지역 변수(`val java = 1`)가 이 함수의 완전수식 참조까지 지우는 미탐을 냈다.
+     * `java` 와 그 참조가 선언되는 함수는 서로의 조상이 아니므로 [KtElement.visibleLocalNames]
+     * 로는 보이지 않아야 한다 — 게이트 술어는 미탐보다 오탐을 택한다.
+     */
+    @Test
+    fun `Codex-1 다른 함수의 동명 지역 변수는 이 함수의 완전수식 참조를 지우지 못한다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun other() {\n    val java = 1\n}\n\n" +
+                    "fun target(): String = java.net.HttpURLConnection.HTTP_OK.toString()\n",
+            )
+        assertTrue(refs.any { it.fqn == "java.net.HttpURLConnection" }, "$refs")
+    }
+
+    /**
+     * **Codex 14차 #1 — ② 같은 함수의 진짜 값 체인(회귀).** `val java = 1` 이 **같은 함수**의
+     * 앞선 문장이면 Kotlin 은 실제로 그 지역 변수를 가리키므로(뒤 문장에서 참조하지 않으면
+     * 컴파일도 안 된다) 값 체인으로 건너뛰는 것이 옳다.
+     */
+    @Test
+    fun `Codex-1 같은 함수 안의 앞선 지역 변수는 여전히 값 체인이다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nfun target(): Int {\n    val java = 1\n    return java.net.hashCode()\n}\n",
+            )
+        assertTrue(refs.none { it.fqn.startsWith("java.net") }, "$refs")
+    }
+
+    /** **Codex 14차 #1 — ③ 람다 파라미터.** */
+    @Test
+    fun `Codex-1 람다 파라미터도 값 체인으로 건너뛴다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass Tree {\n    inner class Node\n}\n\n" +
+                    "fun f(trees: List<Tree>) = trees.map { tree -> tree.Node() }\n",
+            )
+        assertTrue(refs.none { it.fqn.startsWith("tree") }, "$refs")
+    }
+
+    /** **Codex 14차 #1 — ④ 감싸는 클래스의 프로퍼티(중첩 클래스 포함).** */
+    @Test
+    fun `Codex-1 감싸는 클래스의 프로퍼티도 값 체인으로 건너뛴다`() {
+        val refs =
+            SourceReferences.extract(
+                "Probe.kt",
+                "package p\n\nclass Tree {\n    inner class Node\n}\n\n" +
+                    "class Holder(private val tree: Tree) {\n    fun build() = tree.Node()\n}\n",
+            )
+        assertTrue(refs.none { it.fqn.startsWith("tree") }, "$refs")
+    }
 }

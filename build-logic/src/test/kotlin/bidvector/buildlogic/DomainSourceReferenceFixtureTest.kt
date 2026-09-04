@@ -27,6 +27,15 @@ class DomainSourceReferenceFixtureTest {
         assertViolates(File(VIOLATING, "settlement/FullyQualifiedReferenceLeak.kt"), "java.net.HttpURLConnection")
     }
 
+    /**
+     * **Codex 14차 #1 회귀 고정.** 다른 함수의 동명 지역 변수(`val java = 1`)가 이 함수의
+     * 완전수식 참조를 지우지 못한다 — production 게이트 회귀 fixture.
+     */
+    @Test
+    fun `다른 함수의 동명 지역 변수가 완전수식 참조를 지우지 못한다`() {
+        assertViolates(File(VIOLATING, "qualification/ShadowedRootLeak.kt"), "java.net.HttpURLConnection")
+    }
+
     @Test
     fun `실제 도메인 형태는 위반이 없다`() {
         val file = File(ALLOWED, "settlement/DomainShapes.kt")

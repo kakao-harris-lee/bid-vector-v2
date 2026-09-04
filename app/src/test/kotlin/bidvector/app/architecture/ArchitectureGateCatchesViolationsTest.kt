@@ -135,7 +135,7 @@ class ArchitectureGateCatchesViolationsTest {
                         .evaluate(violating)
                         .failureReport.details
                 }
-        listOf("InlinedConstantLeak", "FullyQualifiedReferenceLeak").forEach { fixture ->
+        listOf("InlinedConstantLeak", "FullyQualifiedReferenceLeak", "ShadowedRootLeak").forEach { fixture ->
             details.filter { it.contains(fixture) }.shouldBeEmpty()
         }
     }
