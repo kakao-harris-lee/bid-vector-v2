@@ -24,15 +24,15 @@ private fun hasDeclaredProvenance(provenance: Provenance): Boolean = provenance 
 
 /**
  * 반올림 이전의 파생 투찰가. 반올림 이전 단계에서는 `BigDecimal`을 쓴다(`ADR 0002` §3 A-4).
- * `BidAmount`로 가는 유일한 멤버가 [roundedWith]다. 입력 `BaseAmount`의 [AmountRecord]를
- * 잡아 두는 이유는 [Derived]가 되짚을 입력 fact 참조가 필요해서다(B11).
+ * `BidAmount`로 가는 유일한 멤버가 [roundedWith]다. 입력 fact 로의 되짚기는 이 타입의
+ * 책임이 아니다 — `DecisionProvenance`(§4.1, M2~ 판정 레이어)가 소유한다(decision 17) —
+ * 그래서 이 타입은 입력 `Money` 값 자체를 잡아 두지 않는다.
  */
 class UnroundedBidAmount internal constructor(
     internal val raw: BigDecimal,
     private val currency: Currency,
     private val vatTreatment: VatTreatment,
     private val provenance: Provenance,
-    private val baseInput: AmountRecord,
 ) {
     /**
      * `setScale` 자체가 던질 수 있다(`RoundingMode.UNNECESSARY`가 반올림을 요구하는 값을
@@ -111,7 +111,7 @@ class UnroundedBidAmount internal constructor(
         policyVersion: PolicyVersion,
     ): Measurement<Derived<BidAmount>> {
         val bidAmount = BidAmount(won, currency, vatTreatment, provenance)
-        val derivation = DerivationRecord(inputs = listOf(baseInput), policyVersion = policyVersion)
+        val derivation = DerivationRecord(policyVersion)
         return Measurement.Measured(
             value = Derived(bidAmount, derivation),
             sampleSize = 1,
@@ -127,7 +127,6 @@ operator fun BaseAmount.times(rate: BidRate): UnroundedBidAmount =
         currency = currency,
         vatTreatment = vatTreatment,
         provenance = provenance,
-        baseInput = export(),
     )
 
 /**
@@ -163,16 +162,15 @@ private fun divideForRate(
         }
     }
 
-/** 입력 둘(분자·분모)의 [AmountRecord]를 [DerivationRecord]에 실어 되짚을 수 있게 한다(B11). */
+/** [ratio]가 낸 값을 [wrap]으로 감싸 계산에 쓴 정책 version을 [DerivationRecord]에 싣는다(decision 17). */
 private fun <T> asRate(
     ratio: Measurement<BigDecimal>,
-    inputs: List<AmountRecord>,
     wrap: (Rate) -> T,
 ): Measurement<Derived<T>> =
     when (ratio) {
         is Measurement.Measured -> {
             val rate = Rate.ofFraction(ratio.value)
-            val derivation = DerivationRecord(inputs, ratio.policyVersion)
+            val derivation = DerivationRecord(ratio.policyVersion)
             Measurement.Measured(Derived(wrap(rate), derivation), ratio.sampleSize, ratio.policyVersion)
         }
 
@@ -187,7 +185,7 @@ fun YegaAmount.assessmentRateAgainst(
     policy: Resolution.Resolved<RoundingPolicy>,
 ): Measurement<Derived<AssessmentRate>> {
     val ratio = divideForRate(amount, vatTreatment, provenance, base.amount, base.vatTreatment, base.provenance, policy)
-    return asRate(ratio, listOf(export(), base.export()), ::AssessmentRate)
+    return asRate(ratio, ::AssessmentRate)
 }
 
 /** 낙찰률 = 낙찰가 / 기초금액. */
@@ -196,7 +194,7 @@ fun AwardAmount.awardRateAgainst(
     policy: Resolution.Resolved<RoundingPolicy>,
 ): Measurement<Derived<AwardRate>> {
     val ratio = divideForRate(amount, vatTreatment, provenance, base.amount, base.vatTreatment, base.provenance, policy)
-    return asRate(ratio, listOf(export(), base.export()), ::AwardRate)
+    return asRate(ratio, ::AwardRate)
 }
 
 /** 투찰율 = 투찰가 / 기초금액. `origin`은 관측값/추천값을 값으로는 못 가르는 자리라 인자로 받는다. */
@@ -206,7 +204,7 @@ fun BidAmount.bidRateAgainst(
     policy: Resolution.Resolved<RoundingPolicy>,
 ): Measurement<Derived<BidRate>> {
     val ratio = divideForRate(amount, vatTreatment, provenance, base.amount, base.vatTreatment, base.provenance, policy)
-    return asRate(ratio, listOf(export(), base.export())) { rate -> BidRate(rate, origin) }
+    return asRate(ratio) { rate -> BidRate(rate, origin) }
 }
 
 /** [sumOfBaseAmounts]가 목록을 접으며 나르는 중간 상태 — `Absent`가 나오면 이후 입력을 무시한다. */

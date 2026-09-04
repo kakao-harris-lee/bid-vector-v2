@@ -90,7 +90,6 @@ class ArithmeticTest {
                 Currency.KRW,
                 VatTreatment.INCLUSIVE,
                 Provenance.OperatorDeclared,
-                base(1000L).export(),
             )
 
         val result = raw.roundedWith(resolvedPolicy(RoundingMode.DOWN), floor)
@@ -107,7 +106,6 @@ class ArithmeticTest {
                 Currency.KRW,
                 VatTreatment.INCLUSIVE,
                 Provenance.OperatorDeclared,
-                base(1000L).export(),
             )
 
         val result = raw.roundedWith(resolvedPolicy(RoundingMode.DOWN))
@@ -143,7 +141,6 @@ class ArithmeticTest {
                         Currency.KRW,
                         VatTreatment.INCLUSIVE,
                         Provenance.OperatorDeclared,
-                        base(floorWon).export(),
                     )
 
                 val result = raw.roundedWith(resolvedPolicy(mode), floor)
@@ -219,7 +216,6 @@ class ArithmeticTest {
                 Currency.KRW,
                 VatTreatment.INCLUSIVE,
                 Provenance.OperatorDeclared,
-                base(100L).export(),
             )
         val policy = RoundingPolicy(MONEY_AXIS_SCALE_DIGITS, RoundingMode.UNNECESSARY)
         val resolved = Resolution.Resolved(policy, PolicyVersion(EffectiveFrom.Initial, "test"))
@@ -247,7 +243,6 @@ class ArithmeticTest {
                         Currency.KRW,
                         VatTreatment.INCLUSIVE,
                         Provenance.OperatorDeclared,
-                        base(0L).export(),
                     )
                 val policy = RoundingPolicy(scale, mode)
                 val resolved = Resolution.Resolved(policy, PolicyVersion(EffectiveFrom.Initial, "test"))
@@ -268,7 +263,6 @@ class ArithmeticTest {
                 Currency.KRW,
                 VatTreatment.INCLUSIVE,
                 Provenance.OperatorDeclared,
-                base(1L).export(),
             )
 
         huge.roundedWith(resolvedPolicy(RoundingMode.HALF_UP)) shouldBe
@@ -320,24 +314,32 @@ class ArithmeticTest {
     }
 
     /**
-     * B9 이후 [YegaAmount.assessmentRateAgainst]가 항상 `Unmeasurable`이 되면서, B11(파생 율이
-     * 입력 fact 를 되짚는다)의 필드 단언을 낼 유일한 예제였던 「같은 vat 이면 사정률이 정상
-     * 산출된다」가 구조적으로 불가능해졌다 — `bidRateAgainst`(vat 제약이 없는 `BidAmount` 축)로
-     * 옮겨 B11 커버리지를 보존한다. `bidRateAgainst` 자체는 이전까지 어떤 test 도 부르지 않던
-     * 자리라 이 test 가 그 공백도 함께 닫는다.
+     * decision 17(운영자 결정 2026-09-04, Codex M1/1B 1차 리뷰 #4) — B11(선택지 ②, "입력
+     * fact 의 안정적 참조를 값에 싣는다")은 그 참조가 가리킬 identity 가 없어 ①의 변형으로
+     * 조정됐다. 파생값은 **계산에 쓴 정책 version 만** 싣는다 — 입력 fact 로의 되짚기는
+     * 그 값을 낸 판정의 `DecisionProvenance`(§4.1, M2~ 판정 레이어)가 소유한다. 이 test 는
+     * 파생 넷(`roundedWith`·`assessmentRateAgainst`·`awardRateAgainst`·`bidRateAgainst`)
+     * 중 성공 경로를 낼 수 있는 둘(`roundedWith`·`bidRateAgainst`)의 `derivedFrom.policyVersion`
+     * 이 계산에 쓴 정책의 version 과 같음을 확인한다 — 나머지 둘은 B9(YegaAmount·AwardAmount
+     * 의 vatTreatment 고정)로 항상 `Unmeasurable`이라 이 test 로 성공 경로를 낼 수 없다
+     * (위 B9 test 들이 그 실패 경로를 이미 잰다).
      */
     @Test
-    fun `같은 vat 이면 투찰율이 정상 산출되고 B11 입력 fact 를 되짚는다`() {
+    fun `같은 vat 이면 투찰율이 정상 산출되고 파생값은 계산 정책 version 을 되짚는다`() {
+        val policy = resolvedPolicy(RoundingMode.HALF_UP)
         val theBase = base(1_000_000L, vat = VatTreatment.INCLUSIVE)
         val rate = BidRate(Rate.ofFraction(BigDecimal("0.955")), BidRateOrigin.Recommended)
-        val rounded = (theBase * rate).roundedWith(resolvedPolicy(RoundingMode.HALF_UP))
+
+        val rounded = (theBase * rate).roundedWith(policy)
+
         rounded.shouldBeInstanceOf<Measurement.Measured<Derived<BidAmount>>>()
+        rounded.value.derivedFrom.policyVersion shouldBe policy.version
         val bidAmount = rounded.value.value
 
-        val result = bidAmount.bidRateAgainst(theBase, BidRateOrigin.Recommended, resolvedPolicy(RoundingMode.HALF_UP))
+        val result = bidAmount.bidRateAgainst(theBase, BidRateOrigin.Recommended, policy)
 
         result.shouldBeInstanceOf<Measurement.Measured<Derived<BidRate>>>()
-        result.value.derivedFrom.inputs shouldBe listOf(bidAmount.export(), theBase.export())
+        result.value.derivedFrom.policyVersion shouldBe policy.version
     }
 
     @Test

@@ -119,8 +119,8 @@ class CompileFailureHarnessTest {
 
     /**
      * verifier r2 H-3 — `DerivationRecord`의 생성자만 닫고 그것을 나르는 [Derived]를 열어
-     * 두면 B11 보증("파생값이 **자기** 입력 fact 를 되짚는다")이 `copy(derivedFrom = …)`로
-     * 깨진다. 읽기(`positive-8`)는 여전히 열려 있어야 한다 — 소비자는 값을 읽어야 한다.
+     * 두면 값과 계산 정책 version의 결속(decision 17)이 `copy(derivedFrom = …)`로 깨진다.
+     * 읽기(`positive-8`)는 여전히 열려 있어야 한다 — 소비자는 값을 읽어야 한다.
      */
     @Test
     fun `8 Derived 의 기록은 copy 로 교체할 수 없고 읽을 수는 있다 (verifier r2 H-3)`() {
