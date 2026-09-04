@@ -214,14 +214,18 @@ first-match rule 은 1D 소유다.
 ### 역방향 파급 — data-dictionary.md·ADR 0002 편집이 만든 줄 밀림
 
 이 slice가 `data-dictionary.md`·`docs/adr/0002-money-rate-basis.md`에 줄을 넣었으므로
-그 두 파일을 가리키는 다른 문서의 `file:line`을 stem 기준으로 훑었다:
+그 두 파일을 가리키는 다른 문서의 `file:line`을 stem 기준으로 훑었다. **verifier r1
+M-5 정정**: 최초 스윕의 `--include` 목록에 `*.yaml`·`*.yml`이 빠져 `fixtures/manifest.yaml`
+안의 살아 있는 좌표 넷을 놓쳤다 — 아래는 그 목록을 채운 명령이다.
 
 ```
 grep -rnoE 'data-dictionary\.md:[0-9]+|data-dictionary:[0-9]+' \
-  --include='*.md' --include='*.kt' --include='*.kts' --include='*.properties' . \
+  --include='*.md' --include='*.kt' --include='*.kts' --include='*.properties' \
+  --include='*.yaml' --include='*.yml' . \
   | grep -v '^\./bid-vector/' | grep -v '/build/' | grep -v '^\./docs/discovery/data-dictionary.md:'
 grep -rnoE 'docs/adr/0002-money-rate-basis\.md:[0-9]+|docs/adr/0002:[0-9]+|ADR ?0002[^)]{0,3}:[0-9]+' \
-  --include='*.md' --include='*.kt' --include='*.kts' --include='*.properties' . \
+  --include='*.md' --include='*.kt' --include='*.kts' --include='*.properties' \
+  --include='*.yaml' --include='*.yml' . \
   | grep -v '^\./bid-vector/' | grep -v '/build/' | grep -v '^\./docs/adr/0002-money-rate-basis.md:'
 ```
 
@@ -232,15 +236,40 @@ grep -rnoE 'docs/adr/0002-money-rate-basis\.md:[0-9]+|docs/adr/0002:[0-9]+|ADR ?
 아니라 **이 slice의 역방향 파급 검사가 이전부터 있던 drift를 발견**한 사례다. 줄 번호 대신
 절 제목·인용문으로 바꿔 다시 밀리지 않게 했다.
 
-**`reports/evidence/m0/0c/**`·`m0/0d/**`의 일곱 좌표는 고치지 않는다.** 그 evidence는
+**채운 목록이 `fixtures/manifest.yaml` 안의 살아 있는 좌표 넷을 추가로 낸다 —
+`data-dictionary.md:960` 셋(3539·5401·5406행), `data-dictionary.md:980` 하나(4956행).**
+이 slice는 그 파일을 **편집하지 않는다**(`fixtures/**`는 표준 지침·fixture-curator 소관 —
+이 레인이 손대는 것 자체가 경계 위반이다). 그 좌표들이 지금 실제로 가리키는 자리를 읽기
+전용으로 확인만 했다 — `:960`(FloorApplicability sealed 정의)이 가리키던 자리는 이 slice의
+`data-dictionary.md` 편집으로 그 sealed 정의 시작 줄(`> \`FloorApplicability = sealed {\``)이
+965행으로, `:980`(Verdict sealed 정의)이 가리키던 자리는 986행으로 밀렸다(둘 다 +6, 이
+문서 앞쪽 절의 이 slice 삽입량과 일치). **되짚은 좌표는 report 만 하고 고치지 않는다** —
+같은 원칙이 바로 아래 m0 evidence 문단에도 적용된다(fixture-curator 레인이 다음 `fixtures/**`
+편집 때 반영할 대상).
+
+**`reports/evidence/m0/0c/**`·`m0/0d/**`의 좌표는 고치지 않는다.** 그 evidence는
 닫힌 slice의 봉인된 기록이라(evidence-pack SKILL — 이력은 되쓰지 않는다) 이 slice가
-편집할 수 없다. 이 slice의 `data-dictionary.md`·`docs/adr/0002` 편집으로 그 좌표들이
-가리키는 실제 줄이 이동했을 수 있으나, **그 evidence는 작성 시점의 상태에 대한 기록이므로
-사후 이동은 정의상 발생한다**(같은 원칙이 1A checklist 「낡는 좌표」 절이 이미 확인한 것과
-같다). `capability-map.md`·`docs/adr/0007` 자체의 `file:line` 드리프트는 기존
-`OPEN-ADR-15`(registry 통합 slice 소관)가 이미 추적 중이며 이 slice의 `docs/adr/0007`
-편집(결정 시점 추가, §5 하단)은 그 등재보다 아래 지점이라 기존 인용 좌표를 추가로 밀지
-않았다 — 확인 명령은 `checklist.md`의 「알려진 제한」이 낸다.
+편집할 수 없다. **verifier r1 M-5 정정**: 이 절이 이전에 「일곱」이라 적었던 것은
+`m0/0d/**`를 빠뜨리고 `m0/0c/**`의 ADR 0002 좌표만 센 값이다 — 아래 명령이 정본이고
+(산문 개수 대신 명령 결과를 참조), `m0/0c`+`m0/0d`를 함께 스캔하면 ADR 0002 좌표만
+열하나(0c 일곱 + 0d 넷)이고, `data-dictionary.md` 좌표 하나(0c, `commands.md:223`)를
+더하면 열둘이다:
+
+```
+grep -rnoE 'docs/adr/0002-money-rate-basis\.md:[0-9]+|docs/adr/0002:[0-9]+|ADR ?0002[^)]{0,3}:[0-9]+' \
+  --include='*.md' reports/evidence/m0/0c reports/evidence/m0/0d | wc -l   # 11
+
+grep -rnoE 'data-dictionary\.md:[0-9]+|data-dictionary:[0-9]+|docs/adr/0002-money-rate-basis\.md:[0-9]+|docs/adr/0002:[0-9]+|ADR ?0002[^)]{0,3}:[0-9]+' \
+  --include='*.md' reports/evidence/m0/0c reports/evidence/m0/0d | wc -l   # 12
+```
+
+이 slice의 `data-dictionary.md`·`docs/adr/0002` 편집으로 그 좌표들이 가리키는 실제 줄이
+이동했을 수 있으나, **그 evidence는 작성 시점의 상태에 대한 기록이므로 사후 이동은 정의상
+발생한다**(같은 원칙이 1A checklist 「낡는 좌표」 절이 이미 확인한 것과 같다).
+`capability-map.md`·`docs/adr/0007` 자체의 `file:line` 드리프트는 기존 `OPEN-ADR-15`
+(registry 통합 slice 소관)가 이미 추적 중이며 이 slice의 `docs/adr/0007` 편집(결정 시점
+추가, §5 하단)은 그 등재보다 아래 지점이라 기존 인용 좌표를 추가로 밀지 않았다 — 확인
+명령은 `checklist.md`의 「알려진 제한」이 낸다.
 
 ### 2026-09-04 — Phase 3 구현 완료. 설계 검토(`04_design-review.md`) 브리프와 갈린 결정 셋
 
