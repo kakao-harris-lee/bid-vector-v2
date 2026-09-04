@@ -122,10 +122,15 @@ verdict는 `legacy-defect | v2-defect | intentional-redesign | insufficient-evid
 되돌리는 flag/route/writer, 예상 복구 시간, 검증 방법.
 
 **되돌림은 range revert 가 아니라 in_scope 경로 한정이다 (2026-09-04).** `git revert
-<base>..HEAD` 는 같은 range 의 하네스 레인 커밋까지 되돌린다. 대신 `git checkout <base> --
-<in_scope 경로 개별 인자>` 로 slice 산출물만 base 상태로 되돌리고(신규 파일은 `git rm`),
-하네스 경로(`CLAUDE.md`·`.claude/**`)와 승인 문서의 하네스 레인 편집은 **되돌리지 않는다**고
-명시한다. 되돌린 뒤 확인 지점은 「in_scope 경로의 `git diff <base> -- <경로>` 가 비어 있고
+<base>..HEAD` 는 같은 range 의 하네스 레인 커밋까지 되돌린다. 대신 `git restore
+--source=<base> --staged --worktree -- <in_scope 경로 개별 인자>` 로 slice 산출물만 base
+상태로 되돌린다 — `--source` 에 없는 경로는 삭제되므로 신규 파일에 별도 `git rm` 이 필요
+없다. **`git checkout <base> -- <경로>` 는 쓰지 않는다** — base 에 없는 경로마다 pathspec
+오류로 exit 1 이고 아무것도 적용되지 않는다(Codex 1A 16차 high — 신규 129/변경 6 인 slice
+에서 첫 명령이 실패). 하네스 경로(`CLAUDE.md`·`.claude/**`)와 승인 문서의 하네스 레인 편집은
+**되돌리지 않는다**고 명시한다. rollback.md 의 명령은 **임시 clone 에서 실제로 돌려 exit 0
+과 D/M 수를 실측**해 commands.md 에 한 줄 남긴다 — dry-run 성립 확인은 명령의 실행 가능성을
+증명하지 않는다. 되돌린 뒤 확인 지점은 「in_scope 경로의 `git diff <base> -- <경로>` 가 비어 있고
 하네스 경로는 HEAD 그대로」다.
 
 ### codex-review-*.json
