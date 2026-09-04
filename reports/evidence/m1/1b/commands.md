@@ -49,8 +49,11 @@ git diff --stat 66c1ab79af4c5a68145811a9e87008dfdb10da3c..HEAD
 
 - cmd: `./gradlew :shared-kernel:test --no-daemon`  (B-4)
 - exit: 0
-- 핵심 결과: 31 test, 0 실패, 0 skip(`MoneyTest` 5·`RateTest` 6·`PolicyTest` 4·
-  `ArithmeticTest` 11·`RegressionExampleTest` 5)
+- 핵심 결과: 0 실패, 0 skip. **verifier r1 L-2** — 클래스별·전체 test 수는 fixture·finding
+  추가마다 밀리는 산문 하드코딩 대신 아래 명령이 정본이다:
+  ```
+  grep -oh 'tests="[0-9]*"' shared-kernel/build/test-results/test/TEST-bidvector.sharedkernel.*.xml
+  ```
 
 - cmd: `./gradlew qualityBaseline --no-daemon`  (B-5)
 - exit: 0

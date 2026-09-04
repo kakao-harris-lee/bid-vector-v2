@@ -15,7 +15,8 @@ import java.nio.file.Files
  * 컴파일 실패 하네스 — `ADR 0002` §6 ①이 요구하는 "상호 대입이 컴파일되지 않는다"를
  * 기계로 증명한다(설계 검토 §4.9). `kotlin-compiler-embeddable` 로 음성 fixture를 이 모듈의
  * 산출 classpath 위에서 **별도 컴파일 단위**로 돌려 실패와 기대 진단을 단언하고, 음성마다
- * 한 토큰만 다른 양성 쌍둥이가 성공함을 함께 단언한다 — exit code만 보면 오타도 통과시킨다
+ * 2~3 토큰(함수명·변수명·import)만 다른 양성 쌍둥이가 성공함을 함께 단언한다(verifier r1
+ * L-3 정정 — 「한 토큰만」은 부정확했다) — exit code만 보면 오타도 통과시킨다
  * (설계 검토 §4.9 하드 요구, 「공허한 통과」방지).
  *
  * fixture 여섯째(`VatTreatment` 다른 금액의 비교)는 여기 없다 — `Money`가 basis 축을

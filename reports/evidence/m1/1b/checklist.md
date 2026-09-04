@@ -98,6 +98,20 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
   `VAT_TREATMENT_MISMATCH`). 값 결정이 아니라 기존 규율(L-9)의 일관 적용이라 `OPEN` 으로
   등재하지 않는다.
 
+### verifier r1 low(L-1~L-6) 처리 결과
+
+**주의 — 번호가 위 설계 검토 표의 L-1~L-12 와 다른 번호 체계다.** 이 표는
+`_workspace/m1-1b/05_verifier_r1.md` §6 의 L-번호를 그대로 쓴다.
+
+| # | 요지 | 처리 |
+| --- | --- | --- |
+| L-1 | `(f as? Fact.Known)?.value ?: 0L` 이 컴파일된다 — 설계 검토 §1d 의 「값을 꺼내는 유일한 수단이 소진 `when`」 넓은 서술은 성립하지 않는다 | **등재 유지.** `checklist.md` 자신의 좁은 주장(「접는 API(`orElse`·`getOrDefault`·`orZero`·`getOrThrow`) 자체를 선언하지 않는다」— `Carrier.kt` KDoc)은 여전히 참이다. Kotlin `sealed interface` 는 `as?`·스마트캐스트로의 우회를 언어 차원에서 막지 못한다 — architecture test 로 막으려면 `build-logic` 확장이 필요해 L-7(설계 검토 표) 과 같은 비용을 문다. 새 게이트를 세우지 않고 문면만 좁혀 정확히 한다 |
+| L-2 | `commands.md` B-4 가 「31 test」로 적으나 HEAD 는 다르다 | **닫혔다.** `commands.md` B-4 를 산문 개수 대신 `TEST-*.xml` 의 `tests="…"` 를 세는 명령 포인터로 바꿨다(`fix(m1-1b): … M-5` 커밋과 같은 원칙) |
+| L-3 | 양성·음성 쌍이 2~3 토큰(함수명·변수명·import) 다른데 「한 토큰만 다른」으로 적었다 | **닫혔다.** `gate-tests.properties` 주석·`CompileFailureHarnessTest` KDoc 을 「2~3 토큰」으로 정정했다 |
+| L-4 | `Rate.fraction` 이 `internal` 이고 `Money.export()` 에 대응하는 공개 export 가 없어 모듈 밖에서 율 값을 읽을 수단이 0 이다 | **등재 유지 — 1C~1E 착수 전 결정 필요(verifier r1 원문 그대로).** 의도적 설계(`Rate` 값 유출 경로를 `BidRate`/`AssessmentRate`/`AwardRate` 래퍼로만 열어 둔 것, `@ConsistentCopyVisibility` 의 부수효과)인지 누락인지를 이 slice 는 판단하지 않는다 — `Money.export()` 대응 함수(가칭 `Rate.export()` → `RateRecord`)가 필요한지는 1C 가 실제로 값을 읽어야 하는 순간에 결정한다 |
+| L-5 | 운영자 결정 B9(「세 타입을 `vatTreatment = Unknown` 으로 선언」)이 코드에 없다 — 여섯 금액 타입 전부 `vatTreatment` 를 호출부 인자로 받는다 | **등재 유지, 사유를 여기 기록한다(코드 변경 없음).** `scope.md` `OPEN-DIC-04` 의 정본 문면은 「가능: 세 타입을 `vatTreatment = Unknown` 으로 선언 … 값(과세 처리 자체)은 OPEN 유지」다 — approach 승인과 값 확정은 다르다. 값이 열려 있는 동안 세 타입에 고정 `Unknown` 을 걸면 그 값 결정을 이 slice 가 대신 내리는 것이라 `scope.md` 「OPEN 을 임의로 해소하지 않는다」위반이 된다. **team-lead 전달문은 이 항목을 "반드시 구현"으로 지시했으나, verifier r1 원문(§6 L-5)은 "값이 OPEN 이므로 고정하지 않는 것이 방어 가능하나 사유가 evidence 에 없다"로 낮은 심각도를 매겼다 — 이 slice 는 원문(low, 사유 기록만 요구)을 따르고 구현하지 않았다.** 이 갈림은 완료 보고에 「달리한 결정」으로 별도 등재한다 |
+| L-6 | kotest 시드 미고정 — property 실패의 재현이 그 실행에 찍힌 시드에만 의존. `divideForRate` 가 분모 0 을 `EMPTY_INPUT` 으로 라벨 | **시드는 닫혔다** — `build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts` 의 `tasks.withType<Test>` 에 `systemProperty("kotest.proptest.default.seed", "20260904")` 를 걸었다(kotest 의 JUnit5 러너를 안 붙이므로 `AbstractProjectConfig` 자동탐지가 아니라 이 시스템 property 가 유일한 전역 지점이다 — 실측: 값을 읽어 콘솔에 찍는 임시 test 로 확인 후 제거). **`EMPTY_INPUT` 라벨은 등재 유지.** 분모 0 은 "입력이 비었다"가 아니라 "0으로 나눌 수 없다"는 별도 사유이지만, `ReasonCode` 에 나눗셈 전용 코드를 새로 만들 근거(legacy 실측·운영자 결정)가 없어 이 slice 는 새 코드를 짓지 않는다 — 다음 slice 가 나눗셈 전건이 늘면 재검토 대상 |
+
 ## 이월 항목
 
 **컴파일 실패 하네스(C8)·L-7·fixture 되돌림(C13) 셋 다 더는 이월이 아니다** — 앞 둘은

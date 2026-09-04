@@ -74,6 +74,12 @@ tasks.withType<Test>().configureEach {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
+    // kotest-property 시드 고정(verifier r1 L-6) — 이 모듈들은 kotest 의 JUnit5 러너를 붙이지
+    // 않으므로(순수 junit-jupiter + kotest-property, 위 dependencies 주석 참고) 시스템 property
+    // `kotest.proptest.default.seed`가 시드를 거는 유일한 전역 지점이다. 미고정 시, property
+    // 실패의 재현이 그 실행에서 콘솔에 찍힌 시드 값에만 의존해 재현성이 없다. 값은 임의
+    // 상수다 — 반복 실행 안정성(같은 시드 = 같은 케이스 순서)만 목적이고 도메인 의미는 없다.
+    systemProperty("kotest.proptest.default.seed", "20260904")
 }
 
 ktlint {

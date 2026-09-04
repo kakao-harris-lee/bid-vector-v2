@@ -295,9 +295,9 @@ grep -rnoE 'data-dictionary\.md:[0-9]+|data-dictionary:[0-9]+|docs/adr/0002-mone
    착수점으로 `checklist.md` 에 남긴다.
 
 **acceptance 전건 재실행**: `scope.md` `acceptance_commands`(B-0~B-7 전부) 를 최종 HEAD
-에서 재확인했다 — 결과는 `commands.md` Phase 3 절이 갖는다. 31 test 0 실패 0 skip,
-격리 worktree `check` 통과, `domainApiTypeGate`·`domainSourceReferenceGate` 실제 도메인
-API 위에서 단독 실행 통과.
+에서 재확인했다 — 결과는 `commands.md` Phase 3 절이 갖는다. 0 실패 0 skip(전체 test 수는
+verifier r1 L-2 정정 뒤 `commands.md` B-4 의 명령 포인터가 정본), 격리 worktree `check`
+통과, `domainApiTypeGate`·`domainSourceReferenceGate` 실제 도메인 API 위에서 단독 실행 통과.
 
 ### 2026-09-04 — 운영자 결정: 이월 셋 중 컴파일 실패 하네스는 1B 안에서 닫는다
 
