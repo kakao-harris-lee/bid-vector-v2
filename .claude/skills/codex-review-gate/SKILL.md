@@ -5,6 +5,10 @@ description: "Codex CLI로 base...head diff의 독립 리뷰를 clean worktree�
 
 # Codex Review Gate — 독립 리뷰 실행 절차
 
+> **범위 제한 (2026-09-04 운영자 지시): 코드 slice 와 기획 문서는 이 게이트를 타지 않는다.**
+> 코드 slice 의 완료 조건은 verifier `ready-for-review` + 사용자 승인이다. 아래 절차는
+> 운영자가 명시 지정한 코드 외 산출물에만 적용된다.
+
 codex CLI(로컬 `codex`, v0.151 기준)로 slice diff의 독립 리뷰를 실행하고 판정 JSON을
 보존한다. 판정 계약과 리뷰 기준은 `CODEX-REVIEW.md`와 `agent-workflow.md` 4~5절이
 정의하며, 이 스킬은 실행 mechanics만 다룬다.

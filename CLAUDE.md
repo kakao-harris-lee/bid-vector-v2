@@ -2,6 +2,19 @@
 
 이 저장소에서 애플리케이션 코드는 Claude가 구현한다. Codex는 독립 리뷰어다.
 
+## 운영자 지시 2026-09-04 — 아래 모든 절보다 우선
+
+- **Codex 심판에서 코드 부분을 제외한다.** 코드 slice 의 diff·구현 결과는 Codex 로 보내지
+  않는다. 코드 리뷰는 Claude 측 `verifier`(저작 레인과 다른 패스)가 본다. milestone 계약의
+  「Codex approve + 사용자 승인」은 코드 slice 에서 **「verifier ready-for-review + 사용자
+  승인」** 으로 읽는다. 이유: 외부 유료 호출이 너무 잦아져 비용·시간이 늘었다(1A 에서
+  Codex 16라운드).
+- **목표·마일스톤·로드맵·스팩(명세·ADR·discovery·slice 계약)은 세션 모델(Opus 5 [1m]
+  또는 Fable 5.1 [1m]) 하나가 단독으로 쓴다.** `spec-writer`·`deep-reasoner`·legacy-scout
+  팬아웃 같은 다단계 기획 파이프라인과 Codex 검토를 붙이지 않는다. 세션 모델이 저장소를
+  직접 읽고 문서를 직접 쓴다. 이유: 스팩 하나에 몇 시간이 걸렸다.
+- Codex 레인은 운영자가 코드·기획 문서 외 산출물을 명시 지정해 요청할 때만 남는다.
+
 ## 시작 전 필수 읽기
 
 1. `README.md`
@@ -46,6 +59,7 @@ Codex가 `request_changes`를 반환하면 같은 scope에서 Claude가 수정�
 | 날짜 | 변경 내용 | 대상 | 사유 |
 |------|----------|------|------|
 | 2026-08-22 | 초기 구성 (에이전트 7종, 스킬 3종) | 전체 | - |
+| 2026-09-04 | **Codex 심판에서 코드 제외** — Phase 5 를 코드 slice 에서 건너뛰고 완료 조건을 verifier+사용자 승인으로 · **기획 문서(명세·ADR·slice 계약) 단독 저작** — 세션 모델(Opus 5 [1m]/Fable 5.1 [1m])이 spec-writer·deep-reasoner 없이 직접 작성 | CLAUDE.md, codex-reviewer, spec-writer, codex-review-gate, v2-slice-pipeline | 운영자 지시 — 외부 유료 호출 과다(1A Codex 16라운드)와 스팩 저작 지연 |
 | 2026-08-22 | 재활용 우선 방침 반영 — Python ML 재활용, 라이브러리 조사 선행, 재작성 목적(유지보수·회귀 감소) 명시 | ml-implementer, kotlin-implementer, legacy-scout, v2-slice-pipeline | 운영자 지시 |
 | 2026-08-22 | 두 갈래 전략 확정 — service만 Kotlin 재작성, ML은 재활용+튜닝 (지침서 greenfield 서술 개정과 동기화) | ml-implementer, v2-slice-pipeline | 운영자 지시로 지침서 개정 |
 | 2026-08-22 | 독립 감사 반영 — Codex 리뷰를 저장소 밖 clean worktree로 격리, .gitignore 추가, clean-tree 게이트 단일 정의(in_scope 한정), 커밋 단계·안전 규칙·재작업 상한(총 4회)·OPEN 에스컬레이션·secret 스캔 추가, M0 문서 slice N/A 규칙, verdict JSON schema 번들 | 전 에이전트, 전 스킬, .gitignore | 하네스 독립 감사 blocker 3건·high 9건 수정 |

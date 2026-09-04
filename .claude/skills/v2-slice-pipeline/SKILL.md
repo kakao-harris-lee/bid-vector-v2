@@ -188,7 +188,16 @@ slice 전체에서 구현 재작업이 **5회에 이르면 멈춘다.** 카운�
 않은지. **진단을 붙여 보고하고 사용자 판단을 받는다.** 라운드 연장을 기본값으로 두지
 않는다 — 다섯 번 고쳐서 안 끝났으면 고치는 방법이 틀린 것이다.
 
-### Phase 5: Codex 독립 리뷰
+### Phase 5: Codex 독립 리뷰 — **코드 slice 는 건너뛴다 (2026-09-04 운영자 지시)**
+
+**코드 slice 와 기획 문서 slice 는 Phase 5 를 타지 않는다.** Phase 4 verifier
+`ready-for-review` 뒤 곧바로 Phase 6(사용자 보고)으로 간다. 완료 조건의 「Codex approve」는
+「verifier ready-for-review」로 읽는다. 아래 절차는 운영자가 코드 외 산출물을 명시 지정해
+Codex 리뷰를 요청한 경우에만 적용된다. 이유: 외부 유료 호출 과다(1A Codex 16라운드).
+
+**기획 문서(명세·ADR·discovery·slice 계약)는 세션 모델(Opus 5 [1m]/Fable 5.1 [1m])이
+단독으로 직접 쓴다** — spec-writer·deep-reasoner·legacy-scout 팬아웃을 태우지 않는다.
+Phase 2.5 설계 검토도 별도 에이전트가 아니라 세션 모델이 직접 수행한다.
 
 **실행 모드:** 격리 서브 에이전트 (codex-reviewer)
 
