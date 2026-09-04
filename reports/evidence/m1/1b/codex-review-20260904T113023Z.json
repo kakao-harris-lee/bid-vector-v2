@@ -1,0 +1,62 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "66c1ab79af4c5a68145811a9e87008dfdb10da3c",
+  "reviewed_head": "fd9f621d0fec1507e0ca26c029fbca6ec77b746e",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "shared-kernel/src/main/kotlin/bidvector/sharedkernel/MoneyArithmetic.kt",
+      "line": 89,
+      "evidence": "BaseAmount.times는 Provenance.Undeclared를 검사하지 않고 성공한 Measurement.Measured<Derived<BidAmount>>에 그대로 전달한다. sumOfBaseAmounts도 VAT와 overflow만 검사한다. unknown provenance의 명시적 실패 계약을 요구하는 milestone-1 §1B, v2-지침서 §4.1, ADR-0002 D5 및 scope.md의 런타임 실패 계약을 충족하지 않는다.",
+      "required_fix": "Undeclared provenance가 계산 성공, 0 또는 fallback으로 변환되지 않도록 승인된 실패 계약을 산술·파생 성공 경계에 적용하고, reasoned failure를 반환하는 예제 및 property test를 추가한다."
+    },
+    {
+      "severity": "high",
+      "file": "shared-kernel/src/main/kotlin/bidvector/sharedkernel/Money.kt",
+      "line": 64,
+      "evidence": "BaseAmount.compareTo를 비롯한 여섯 Money 타입의 compareTo가 won만 비교한다. 따라서 VAT UNKNOWN과 INCLUSIVE 금액도 정상적으로 정렬되며, 동일 금액이면 서로 다른 VAT인데도 compareTo가 0이다. sameKnownVat 검사는 일부 산술 함수에만 적용되고 공개 Comparable 경로에는 적용되지 않는다. 이는 data-dictionary의 'Unknown 금액은 다른 과세 처리의 금액과 산술 비교에 들어갈 수 없다'는 규칙과 scope.md의 VAT 혼입 비교 실패 계약을 위반한다.",
+      "required_fix": "검사 없는 Comparable 구현을 제거하거나 제한하고, known VAT 일치 여부를 확인해 VAT_TREATMENT_MISMATCH 같은 명시적 결과를 반환하는 비교 API로 대체한다. UNKNOWN/UNKNOWN 및 서로 다른 known VAT 비교가 실패하는 테스트를 추가한다."
+    },
+    {
+      "severity": "high",
+      "file": "shared-kernel/src/main/kotlin/bidvector/sharedkernel/MoneyArithmetic.kt",
+      "line": 37,
+      "evidence": "UnroundedBidAmount.roundedWith는 raw.setScale(scaleDigits, mode)만 수행하며 적용 하한을 입력받거나 사후 검증하지 않는다. 예를 들어 정확한 하한이 1000.4원이고 scale=0, mode=DOWN이면 결과는 1000원으로 하한보다 작다. ArithmeticTest의 P-2b는 정수 floor에 epsilon을 더한 뒤 같은 정수와 비교해 이 반례를 포착하지 못한다. data-dictionary, capability-map DEC-02 및 scope.md B-7의 하한 보장 요구를 충족하지 않는다.",
+      "required_fix": "정확한 적용 하한을 반올림 정책에 전달하거나 사후 제약으로 모델링해 모든 지원 모드에서 결과가 하한 이상임을 보장한다. 소수 원 단위의 실제 하한 반례와 하한 검사를 제거한 mutant가 실패하는 테스트를 추가한다."
+    },
+    {
+      "severity": "high",
+      "file": "shared-kernel/src/main/kotlin/bidvector/sharedkernel/Derivation.kt",
+      "line": 12,
+      "evidence": "DerivationRecord.inputs가 AmountRecord 값 스냅샷 목록일 뿐 안정적인 fact 식별자나 참조를 포함하지 않는다. 값과 provenance가 같은 서로 다른 입력 fact는 구분할 수 없어 discovery data-dictionary의 B11 결정인 '입력 fact의 안정적 참조 + policy version' 중 참조 요건을 만족하지 않는다.",
+      "required_fix": "파생 기록에 식별자 브랜치의 안정적인 입력 fact ID/reference를 포함하거나 content-addressed 참조를 사용할 경우 그 계약을 명세 승인받는다. 동일 값을 가진 서로 다른 fact도 추적 가능한 테스트를 추가하고 policyVersion은 유지한다."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse HEAD; git cat-file -t <base> <head>; git merge-base <base> <head>",
+    "git diff --stat --name-status --check 66c1ab79af4c5a68145811a9e87008dfdb10da3c...fd9f621d0fec1507e0ca26c029fbca6ec77b746e",
+    "git log 66c1ab79af4c5a68145811a9e87008dfdb10da3c..fd9f621d0fec1507e0ca26c029fbca6ec77b746e -- CLAUDE.md .claude/",
+    "git status --porcelain=v1 --untracked-files=all",
+    "rg 및 sed로 v2-지침서.md, agent-workflow.md, milestone-1.md, ADR, discovery, scope/checklist/commands/fixtures/rollback과 변경 소스·테스트를 대조",
+    "shared-kernel 및 build-logic의 build/test-results/test/TEST-*.xml과 Kover·API/source-reference/member-effect/size/qualityBaseline 보고서 파싱",
+    "PYTHONDONTWRITEBYTECODE=1 python3 fixtures/tools/mutation_sweep_adversarial.py",
+    "PYTHONDONTWRITEBYTECODE=1 python3 fixtures/tools/mutation_sweep_adversarial.py --crosscheck-pyyaml",
+    "PYTHONDONTWRITEBYTECODE=1 python3 fixtures/tools/mutation_sweep_targeted.py",
+    "PYTHONDONTWRITEBYTECODE=1 python3 fixtures/tools/manifest_prose_consistency.py",
+    "PYTHONDONTWRITEBYTECODE=1 python3 fixtures/tools/check_legacy_numbers.py",
+    "javap -c bidvector.sharedkernel.BaseAmount",
+    "kotlin -classpath <compiled-classpath> -e <comparison probe> (로컬 Kotlin 2.2와 산출물 metadata 2.4 비호환으로 실행 불가)",
+    "jshell --execution local --class-path <compiled-classpath> (classloader 의존성 오류로 실행 불가)",
+    "codex --version"
+  ],
+  "residual_risks": [
+    "sandbox의 DatagramSocket 제한 때문에 Gradle acceptance 명령을 직접 재실행하지 않았으며, verifier 레인이 남긴 XML과 gate 보고서를 검사했다. 보고된 shared-kernel 58개 및 build-logic 149개 테스트는 실패·오류·skip 없이 통과했고 gate 위반은 0이었다.",
+    "현재 1B authoritative fixture는 0개이며 operator 결정에 따라 1B-c로 이관됐다. 따라서 이번 구현의 의미 규칙은 주로 일반 테스트와 사전 생성 보고서로 검증됐다.",
+    "Rate의 원 단위 기록은 승인된 discovery 계약상 adapter/field contract 책임이라 이번 slice finding에서 제외했다. 해당 adapter 계약이 구현될 때 percent/fraction 원 단위 보존을 별도로 검증해야 한다.",
+    "worktree의 신규 파일 5,619개는 모두 리뷰 레인이 둔 .gradle-home/ 캐시였고, 그 밖의 tracked 변경이나 untracked 파일은 없었다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.151.0",
+    "model": "gpt-5.6-sol (reasoning effort: high)"
+  }
+}

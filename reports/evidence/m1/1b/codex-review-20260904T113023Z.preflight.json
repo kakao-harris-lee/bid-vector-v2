@@ -1,0 +1,21 @@
+{
+  "slice": "m1/1b",
+  "round": 1,
+  "reviewed_base": "66c1ab79af4c5a68145811a9e87008dfdb10da3c",
+  "reviewed_head": "fd9f621d0fec1507e0ca26c029fbca6ec77b746e",
+  "traces": 14,
+  "stage1_matches": 0,
+  "stage1_total": 787,
+  "cli_version": "codex-cli 0.151.0",
+  "hooks_events": "orca codex-hook.sh registered on all events",
+  "hooks_stdout_bytes": 0,
+  "leak_matches": 907,
+  "leak_developer_region": 0,
+  "leak_injection_markers": 0,
+  "emissions": 5,
+  "premature_approves": 2,
+  "gradle_executed": false,
+  "gradle_pre_smoke": "B-1..B-7 all exit 0 (7 BUILD SUCCESSFUL, 0 FAILED), offline --no-build-cache --no-daemon",
+  "reasoning_effort": "high",
+  "notes": "terminal emission (raw line 15394) byte-identical to saved verdict; premature approves at 1% and 52% both empty-finding status stubs, not captured; injection markers (MEMORY_SUMMARY/memories/bid_vector_db/kis_unified_sts) all 0; leak_matches dominated by .gradle-home lock hex (0a2) and own-prompt doc pointers, none in developer region"
+}
