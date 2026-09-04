@@ -19,6 +19,14 @@ enum class ReasonCode {
 
     /** 반올림된 결과가 음수다 — 금액 불변식(음수 금지) 위반. overflow와는 다른 실패다. */
     NEGATIVE_AMOUNT,
+
+    /**
+     * 입력 `Money` 중 하나 이상의 `provenance`가 `Provenance.Undeclared`다 — "출처를
+     * 모른다"를 산술·파생 계산에 쓰지 않는다(`v2-지침서.md` §4.1, Codex 1차 #1).
+     * `OPEN-DIC-06`(어댑터 write 경로가 `Undeclared`를 거부하는가)과는 다른 축이다 — 그
+     * 결정은 수집 시점 수용 여부이고, 이 사유는 이미 도메인에 들어온 값의 계산을 막는다.
+     */
+    UNDECLARED_PROVENANCE,
 }
 
 /**

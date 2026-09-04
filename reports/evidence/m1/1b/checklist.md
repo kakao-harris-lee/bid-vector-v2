@@ -187,6 +187,12 @@ Kotlin 은 모듈 전체를 한 번에 컴파일하므로(`Carrier.kt`의 `Measu
 | L-11 | `rollback.md` 의 awk 파생이 in_scope 항목 줄이 `out_of_scope` 관례(`a · b · c` 한 줄에 여럿)를 쓰면 깨진 pathspec 하나를 조용히 만들 수 있다(지금 in_scope 에 그런 줄은 0건). 확인 지점 2(개수 대조)는 이 오류를 못 잡는다 — 수는 맞고 내용만 틀리기 때문이다 | **닫혔다.** `rollback.md` 의 awk 파생 뒤 각 줄을 `·` 로 다시 나눠 항목마다 배열 원소로 넣게 하고, 새 확인 지점 5(파생된 pathspec 각각이 `git ls-files` 로 실재 경로에 매치되는지, restore 전에 강제 확인)를 추가했다. 임시 clone 에서 `in_scope` 에 `·` 로 묶인 줄을 실제로 넣어 파생이 두 개별 경로로 정확히 갈라짐을 실측했다(verifier r3 가 H-4 를 검증한 것과 같은 「실제로 늘려서 따라오는지 본다」 방법) |
 | L-12 | 하네스 `6-M2` KDoc 이 "fixture 3·5·8·9·10 에는 변이 쌍둥이가 있었는데 6·7 에는 없었다"로 적으나 8·9·10 은 자기 쌍둥이와 같은 커밋에서 생겨 그 「없었다」의 시점이 성립하지 않는다(production 이력 서술) | **닫혔다.** KDoc 을 이력 비교 대신 현재 규칙만 적도록 정정했다 — "모든 음성 fixture 는 변이 쌍둥이를 갖는다"(verifier r1 M-2 원칙) |
 
+### Codex 1차 발견 — #1 처리 결과
+
+| # | 요지 | 처리 |
+| --- | --- | --- |
+| #1 | `MoneyArithmetic` 의 산술·파생 성공 경계(`times`→`roundedWith`·`divideForRate`·`sumOfBaseAmounts`)가 `Provenance.Undeclared`를 검사하지 않고 성공 `Measured`로 통과시킨다 — `v2-지침서.md` §4.1("provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다")을 어긴다 | **닫혔다.** `hasDeclaredProvenance` 전건을 신설해 세 성공 경계 전부(`UnroundedBidAmount.roundedWith`·`divideForRate`(→`assessmentRateAgainst`·`awardRateAgainst`·`bidRateAgainst`가 공유)·`sumOfBaseAmounts`의 `accumulate`)에 건다. 새 `ReasonCode.UNDECLARED_PROVENANCE`. **순서 결정**: provenance 검사를 vat·overflow 검사보다 먼저 한다 — 여러 실패가 동시에 걸려도 "출처를 모른다"가 먼저 나온다. **`OPEN-DIC-06`(어댑터 write 경로가 `Undeclared`를 거부하는가)과는 다른 축임을 KDoc·test 양쪽에 명시** — 그 결정은 수집 시점 수용 여부이고, 여기서 막는 것은 이미 도메인에 들어온 값의 계산이다(data-dictionary.md 자신이 그 결정을 "어댑터의 의무"로 분류해 이 문서가 정할 자리가 아니라고 적는다 — 그래서 OPEN-DIC-06 을 건드리지 않고도 이 finding 을 닫을 수 있었다). **테스트 설계 메모**: `YegaAmount`/`AwardAmount`는 B9(vatTreatment 고정 Unknown)로 `assessmentRateAgainst`/`awardRateAgainst`가 이미 항상 `Unmeasurable`이라 "declared 면 성공" 대조를 못 낸다 — 그 대조(property, 임의 provenance 조합에서 Undeclared 하나라도 있으면 실패·아니면 성공)는 vat 제약이 없는 `bidRateAgainst`(`BidAmount`×`BaseAmount`)로 냈다 |
+
 ## 이월 항목
 
 **컴파일 실패 하네스(C8)·L-7·fixture 되돌림(C13) 셋 다 더는 이월이 아니다** — 앞 둘은

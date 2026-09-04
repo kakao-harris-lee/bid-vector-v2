@@ -16,6 +16,13 @@ internal fun sameKnownVat(
 ): Boolean = left == right && left != VatTreatment.UNKNOWN
 
 /**
+ * `v2-지침서.md` §4.1 — "provenance가 없거나 모르는 값은 추측하지 않고 거부 또는
+ * `Unmeasurable`로 반환한다." `Provenance.Undeclared`가 그 "모르는 값"의 명시적
+ * 표현이다(Codex 1차 #1). 산술·파생 성공 경계 전건의 유일한 자리다.
+ */
+private fun hasDeclaredProvenance(provenance: Provenance): Boolean = provenance != Provenance.Undeclared
+
+/**
  * 반올림 이전의 파생 투찰가. 반올림 이전 단계에서는 `BigDecimal`을 쓴다(`ADR 0002` §3 A-4).
  * `BidAmount`로 가는 유일한 멤버가 [roundedWith]다. 입력 `BaseAmount`의 [AmountRecord]를
  * 잡아 두는 이유는 [Derived]가 되짚을 입력 fact 참조가 필요해서다(B11).
@@ -33,10 +40,14 @@ class UnroundedBidAmount internal constructor(
      * overflow는 `Math.*Exact`와 동등한 성질로 잡는다 — `longValueExact()`가 범위·소수부를
      * 함께 잰다(A4). 반올림 결과가 음수면(이론상만 — `times()`의 두 입력이 모두 비음수라
      * 실제 경로에서는 나오지 않는다) `BidAmount.init`의 예외가 아니라 사유 있는 실패로 낸다.
+     * 입력 `BaseAmount`의 `provenance`가 `Undeclared`면 다른 검사보다 먼저 막는다
+     * (`v2-지침서.md` §4.1, Codex 1차 #1) — "출처를 모른다"는 값 오염이 계산에 들어가지
+     * 않는다.
      */
     fun roundedWith(policy: Resolution.Resolved<RoundingPolicy>): Measurement<Derived<BidAmount>> {
         val scaling = runCatching { raw.setScale(policy.value.scaleDigits, policy.value.mode) }
         return when {
+            !hasDeclaredProvenance(provenance) -> Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
             scaling.isFailure -> Measurement.Unmeasurable(ReasonCode.ROUNDING_NOT_REPRESENTABLE)
             else -> extractWon(scaling.getOrThrow(), policy)
         }
@@ -95,14 +106,25 @@ operator fun BaseAmount.times(rate: BidRate): UnroundedBidAmount =
         baseInput = export(),
     )
 
+/**
+ * provenance 검사를 vat·overflow 검사보다 먼저 한다(Codex 1차 #1) — 값을 어디서
+ * 얻었는지 모르면 그 값이 다른 값과 vat·0-나눗셈 조건을 만족하는지 자체가 의미 없다.
+ * 그래서 여러 실패가 동시에 걸려도 `UNDECLARED_PROVENANCE`가 먼저 나온다.
+ */
 private fun divideForRate(
     numerator: Long,
     numeratorVat: VatTreatment,
+    numeratorProvenance: Provenance,
     denominator: Long,
     denominatorVat: VatTreatment,
+    denominatorProvenance: Provenance,
     policy: Resolution.Resolved<RoundingPolicy>,
 ): Measurement<BigDecimal> =
     when {
+        !hasDeclaredProvenance(numeratorProvenance) || !hasDeclaredProvenance(denominatorProvenance) -> {
+            Measurement.Unmeasurable(ReasonCode.UNDECLARED_PROVENANCE)
+        }
+
         !sameKnownVat(numeratorVat, denominatorVat) -> {
             Measurement.Unmeasurable(ReasonCode.VAT_TREATMENT_MISMATCH)
         }
@@ -140,7 +162,7 @@ fun YegaAmount.assessmentRateAgainst(
     base: BaseAmount,
     policy: Resolution.Resolved<RoundingPolicy>,
 ): Measurement<Derived<AssessmentRate>> {
-    val ratio = divideForRate(amount, vatTreatment, base.amount, base.vatTreatment, policy)
+    val ratio = divideForRate(amount, vatTreatment, provenance, base.amount, base.vatTreatment, base.provenance, policy)
     return asRate(ratio, listOf(export(), base.export()), ::AssessmentRate)
 }
 
@@ -149,7 +171,7 @@ fun AwardAmount.awardRateAgainst(
     base: BaseAmount,
     policy: Resolution.Resolved<RoundingPolicy>,
 ): Measurement<Derived<AwardRate>> {
-    val ratio = divideForRate(amount, vatTreatment, base.amount, base.vatTreatment, policy)
+    val ratio = divideForRate(amount, vatTreatment, provenance, base.amount, base.vatTreatment, base.provenance, policy)
     return asRate(ratio, listOf(export(), base.export()), ::AwardRate)
 }
 
@@ -159,7 +181,7 @@ fun BidAmount.bidRateAgainst(
     origin: BidRateOrigin,
     policy: Resolution.Resolved<RoundingPolicy>,
 ): Measurement<Derived<BidRate>> {
-    val ratio = divideForRate(amount, vatTreatment, base.amount, base.vatTreatment, policy)
+    val ratio = divideForRate(amount, vatTreatment, provenance, base.amount, base.vatTreatment, base.provenance, policy)
     return asRate(ratio, listOf(export(), base.export())) { rate -> BidRate(rate, origin) }
 }
 
@@ -188,20 +210,25 @@ private fun combine(
 /**
  * `seenVat == null`(첫 원소)이라고 전건을 건너뛰면 안 된다 — 이전 원소가 없을 뿐, 이
  * 원소 자체의 `vatTreatment`가 `UNKNOWN`이면 그 자체로 실패다(verifier r1 M-3, 단일
- * `UNKNOWN` 원소가 `Known`으로 새던 결함).
+ * `UNKNOWN` 원소가 `Known`으로 새던 결함). `provenance` 검사를 `vat` 검사보다 먼저
+ * 한다(Codex 1차 #1과 같은 순서 원칙 — `divideForRate` 참고) — 출처를 모르는 값은
+ * vat 일관성을 따지기 전에 이미 계산에 못 쓴다.
  */
 private fun accumulate(
     state: SumState.Accumulating,
     current: BaseAmount,
 ): SumState {
     val seenVat = state.vat
+    val provenanceOk = hasDeclaredProvenance(current.provenance)
     val vatOk =
         when (seenVat) {
             null -> current.vatTreatment != VatTreatment.UNKNOWN
             else -> sameKnownVat(seenVat, current.vatTreatment)
         }
-    val next = if (vatOk) runCatching { Math.addExact(state.total, current.amount) }.getOrNull() else null
+    val next =
+        if (provenanceOk && vatOk) runCatching { Math.addExact(state.total, current.amount) }.getOrNull() else null
     return when {
+        !provenanceOk -> SumState.Failed(ReasonCode.UNDECLARED_PROVENANCE)
         !vatOk -> SumState.Failed(ReasonCode.VAT_TREATMENT_MISMATCH)
         next == null -> SumState.Failed(ReasonCode.AMOUNT_OVERFLOW)
         else -> SumState.Accumulating(next, current.vatTreatment)
