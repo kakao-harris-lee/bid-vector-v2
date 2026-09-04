@@ -467,3 +467,33 @@ class 를 넣으면 jar 게이트를 통과하면서 원산지·ktlint·detekt·
 앞의 경로는 **존재하지 않는다.** 계약을 쓸 때 ADR 번호만 보고 파일명을 지어냈고, 실제 편집은
 올바른 파일에 했다. 계약이 없는 경로를 가리키면 「계약 밖 편집이 있었는가」를 그 계약으로
 판정할 수 없다.
+
+### 2026-09-04 — public domain API 의 raw `Double` 게이트를 1A 에서 세운다 (운영자 결정)
+
+**넓힌 범위**: `in_scope` 에 `config/quality/api-type-policy.properties`(신설) ·
+`build-logic` 의 `ApiTypePolicy`/`PublicApiTypes`/`PublicApiTypeSurface`/
+`DomainApiTypeGateTask` · `app/src/test/.../archfixture` 의 fixture(`RawDoubleApi`·
+`AliasedDoubleApi`·`TypeAliasDoubleApi`)와 `DomainShapes.kt` 수정을 더한다. 이미 declared
+in_scope 인 `build-logic/**` · `app` 모듈 · `config/quality/**` 경로 아래이므로 이 항목들
+자체는 새 최상위 경로를 추가하지 않는다 — 신설 파일명을 여기 기록해 둘 뿐이다.
+**승인 문서는 고치지 않는다** — 요구가 이미 `milestone-1.md` 「완료 조건」에 있다.
+
+**귀속의 명시**: 그 완료 조건은 **1A 의 조건이 아니다.** 마일스톤 1 전체의 조건이고 내용의
+소유자는 1B(Money/Rate/Basis)다. 1A 가 세우는 것은 그 조건을 **강제하는 장치**이며, 근거는
+셋이다. ① 게이트 가족 전체가 1A 의 산출물이다. ② `_workspace/m1-1a/26_design-check-source-import.md`
+§5 가 이 자리를 잔여 ① · 「가장 유력한 다음 finding」으로 등재했다. ③ 1B 가 나중에 만들면
+**바이트코드 층에서 만들 공산이 크고 그 층은 틀리다** — Kotlin `internal` 이 바이트코드에서
+public 으로 보인다(알려진 제한 7). 지금 세우면 그 되돌리는 라운드를 아낀다.
+
+**문면보다 넓힌 것 넷과 그 사유**(운영자 결정 2026-09-04):
+1. 「금액/rate」 한정을 **타입 전체 금지**로. 게이트가 의미를 판별할 수 없고, 판별의 유일한
+   후보인 이름 규약은 `ADR 0002` A-1 이 불채택했다(*"이름 규약은 컴파일러가 읽지 않는다"*).
+2. `Float`·`DoubleArray`·`FloatArray` 포함. 같은 취지의 우회로다.
+3. `Number` 포함. 금액 문맥의 수치 상위 타입은 `v2-지침서.md` §2 가 경계한
+   *"값 크기로 단위·basis를 추측하는 fallback"* 의 타입 표현이다.
+4. **public 선언의 타입 명시 요구**(신설). 1~3 을 닫는 필요조건이다 — `val rate = 0.5` 는
+   public `Double` 인데 소스에 그 이름이 없고, PSI 는 추론 타입을 보지 못한다.
+   `explicitApi()` 는 `@Suppress` 로 꺼지므로 쓰지 않는다(알려진 제한 8 의 계보).
+
+**남는 미달**: `fun rate(): Any` 경유 · `@PublishedApi internal` · `context` 파라미터.
+`checklist.md` 「알려진 제한」(37~43)이 든다.

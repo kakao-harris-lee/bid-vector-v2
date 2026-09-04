@@ -96,6 +96,15 @@
    타입이라 Maven group 이 없어 1 차도 못 본다. `domainSourceReferenceGate`(소스 층, Codex
    13차)가 이 자리를 덮는다 — 소스가 그 이름을 **부른다는 사실 자체**를 PSI 로 보므로 바이트코드
    에 남는지와 무관하다. 남는 사각은 소스에도 이름이 없는 형태(미수식 참조, 제한 18)뿐이다.
+
+   **세 번째 인스턴스 — raw `Double` public API(운영자 결정 2026-09-04).** `rate(): Double`
+   같은 수식 없는 반환은 JVM primitive `D` 라 바이트코드에 클래스 참조가 아예 없다. **다만
+   `Double?`·`List<Double>` 은 boxing·제네릭 소거로 `java.lang.Double`/`Number` 참조가
+   실제로 남는다**(`javap` 로 확인, `commands.md` `E-86`) — 그런데도 안 잡히는 이유는 참조
+   부재가 아니라 그 좌표가 이미 `class.allowed.api`(T-C)로 열려 있기 때문이다. 사각의 이유가
+   fixture 형태마다 다르다는 것이 이번에 새로 드러난 것이고, 그 구분 없이 「primitive 라
+   참조가 없다」로만 적으면 제한 11 이 겪은 것과 같은 오류가 된다. `domainApiTypeGate`(타입
+   표면 층)가 이름 자체를 보므로 참조 유무와 무관하게 덮는다.
 8. **승인된 두 임계는 이제 둘 다 도구 비의존이다.** 함수 축을 Kotlin PSI 로 직접 재므로
    detekt 이 죽어도, `@Suppress` 를 어떤 표기로 쓰든 임계가 남는다 — `detekt.yml` 의
    `LongMethod` 는 껐다. detekt 은 그 위의 축(복잡도·중첩·파라미터 수)만 맡고 **그 축들은
@@ -398,6 +407,40 @@
     디렉터리(`src/main/kotlin`)를 직접 걷는다 — 알려진 제한 30(레이아웃 게이트의 같은 성질)과
     짝이다. 1B 가 KSP·kapt 를 들이면 관례 디렉터리 목록과 함께 이 task 의 `sourceRoot` 도
     갱신한다.
+
+### raw `Double` public API 게이트 (`domainApiTypeGate`, 운영자 결정 2026-09-04)
+
+`milestone-1.md` 「완료 조건」이 요구하는 축을 1A 가 강제 장치로 세운다 — 내용(값 타입)의
+소유자는 1B, 게이트의 소유자는 1A(설계 검토 부록 「요구의 귀속」).
+
+37. **문면보다 넓다.** 승인 문면은 「금액/rate」 한정이지만 게이트는 의미를 판별할 수 없다 —
+    이름 규약은 `ADR 0002` A-1 이 이미 불채택했다. 그래서 넷을 넓혔다(운영자 결정
+    2026-09-04): ① 「금액/rate」 한정 → **타입 전체 금지** ② `Float`·`DoubleArray`·
+    `FloatArray` 포함(같은 취지의 우회로) ③ `Number` 포함(값 크기로 단위를 추측하는 표면)
+    ④ **public 선언의 타입 명시 요구**(신설) — ①을 닫는 필요조건이다, `val rate = 0.5`
+    는 소스에 `Double` 이라는 이름이 없어 PSI 만으로는 못 본다.
+38. **타입 이름을 재지 의미를 재지 않는다.** `fun rate(): Any`·`fun rate(): String` 은 잡히지
+    않는다 — 리뷰 항목으로 남긴다.
+39. **`@PublishedApi internal` + `public inline fun` 은 대상이 아니다.** 바이너리 표면에는
+    오르지만 공개 시그니처에 `Double` 이라는 이름이 없다. 해석 없이는 본문의 참조가 어느
+    선언인지 모른다.
+40. **`context` 파라미터·`expect`/`actual` 은 표면에 없다.** 이 저장소에 없는 형태다 — 1B 가
+    들이면 타입 표면 순회에 더한다.
+41. **별칭 해석은 파일 단위이고, `typealias` 는 해석 대신 선언 자리에서 잡힌다.** import
+    별칭(`import kotlin.Double as Scalar`)은 원 FQN 으로 해석해서 대조하지만, `typealias
+    Amount = Double` 뒤 `fun f(): Amount` 는 별칭을 풀지 않는다 — `typealias` 선언 그 자체의
+    우변이 걸린다(D-5). 모듈 밖에서 들여온 public typealias 는 그 선언 모듈에서 잡힌다.
+42. **`typealias` 우변과 별칭 import 를 한 파일에서 함께 쓰면, 그 별칭으로 리터럴 값을
+    구성하는 자리가 컴파일되지 않을 수 있다(Kotlin 컴파일러 실측, 원인 미규명).**
+    `import kotlin.Double as Scalar` 가 있는 파일에서 `typealias Amount = Double` 뒤
+    `fun f(): Amount = 0.0` 를 쓰면 `kotlin.Double` 대 `java.lang.Double` 플랫폼 타입
+    불일치로 컴파일러가 거부한다(`app:compileTestKotlin` 실측) — 두 선언을 각각 다른
+    파일에 두면 문제가 없다. 1B 가 값 타입에 별칭·typealias 를 함께 쓸 계획이면 이 조합을
+    피하거나 재현 조건을 먼저 좁힌다.
+43. **오늘 domain main 에 public 선언이 0 이라 task 단언은 실질적으로 비어 있다.** 유일한
+    선언 `ModuleBoundaryAnchor` 가 `internal` 이다. `publicDeclarations > 0` 을 task 에
+    걸면 안 된다(경계 앵커 설계를 흔든다) — liveness 는 `DomainApiTypeFixtureTest` 가
+    fixture 로 고정한다. 1B 의 첫 public 선언부터 이 게이트가 실효한다.
 
 ## 1B 인계 목록
 

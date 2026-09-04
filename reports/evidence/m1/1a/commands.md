@@ -730,3 +730,66 @@ clean-tree(경로 개별 인자, `scope.md` `in_scope` 전건) — 출력 없음
 **ktlint·detekt.** `ktlintFormat` 이 줄바꿈·중괄호 정렬을 고쳤고, detekt `ReturnCount`(함수당
 반환 2개 한도)가 `candidateForms`·`KtDotQualifiedExpression.segments` 를 걸어 재귀 축적
 형태로 바꿨다(`91a0fa7`) — 판정 로직은 그대로이고 `SourceReferencesTest` 11개가 회귀를 든다.
+
+### public domain API 의 raw `Double` 게이트 (운영자 결정 2026-09-04, 같은 라운드 증분)
+
+설계 검토 부록 `_workspace/m1-1a/27_design-check-raw-double.md` §4 브리프를 따른다.
+`domainApiTypeGate` 가 domain main 의 public(+protected) 선언 타입 표면에 raw 부동소수가
+있으면 잡는다. 새 정책 파일 `config/quality/api-type-policy.properties`(`policy.version=1`,
+`architecture-policy.properties` 와는 다른 축이라 별도) — `architecture-policy.properties` 는
+건드리지 않는다.
+
+**javap 실측 — 사각의 이유가 형태마다 다르다(`E-86`).** `RawDoubleApi` 를 domain 모듈에 임시
+컴파일해 확인했다.
+
+| 형태 | 바이트코드 | 사각인 이유 |
+| --- | --- | --- |
+| `rate(): Double`(수식 없는 반환) | `double`(primitive), 클래스 참조 없음 | 참조 자체가 없다 |
+| `ratio: Double?`(nullable) | `java.lang.Double` boxing, 참조 **있음** | 참조는 있으나 `class.allowed.api`(T-C)가 이미 연다 |
+| `weights(List<Double>)`(제네릭) | `java.lang.Number`/`Double` 소거, 참조 **있음** | 같은 이유 |
+
+`ArchitectureGateCatchesViolationsTest` 의 KDoc(`43b709e`)이 이 구분을 정정한다 — 원래
+「primitive 라 참조가 안 남는다」로만 적었던 것은 셋 중 하나에만 참이었다.
+
+**task 수준 RED→GREEN(`E-87`~`E-91`).** 세 fixture(패키지 선언만 `bidvector.settlement`
+로 맞춰)를 `settlement/src/main/kotlin/bidvector/settlement/` 에 임시로 두고 되돌렸다 —
+저장소에는 남기지 않는다(`git status --short -- settlement/` 로 확인).
+
+| # | 조작 | `:settlement:domainApiTypeGate` | 사유 |
+| --- | --- | --- | --- |
+| `E-87` | 세 fixture 를 복사한다 | 1 | 5건 — 각 `file:line 선언 — '표기' (엔트리)` 형태, 파일명이 함께 나와 다중 파일에서도 출처가 갈린다 |
+| `E-88` | `RawDoubleApi`·`TypeAliasDoubleApi` 를 지우고 `AliasedDoubleApi` 만 남긴다 | 1 | 금지 타입 위반(1건, `scalar` 파라미터)이 타입 미명시(`inferred`)보다 먼저 실패한다 — 둘 다 리포트 수치엔 잡히지만 예외는 먼저 것만 던진다 |
+| `E-89` | `AliasedDoubleApi` 도 지우고 금지 타입 없이 타입 미명시만 있는 파일(`val label = "x"`)을 둔다 | 1 | `초기화식/위임에서 타입이 추론된다` — 타입 미명시 단독 실패 경로 실측 |
+| `E-90` | 되돌린다(`ModuleBoundaryAnchor.kt` 만 남김) | 0 | (양성 대조) |
+| `E-91` | `ModuleBoundaryAnchor.kt` 도 치운다 | 1 | `도메인 모듈 'settlement' 의 소스 트리가 비어 있다` — 공허 통과 방지 |
+
+되돌린 뒤 exit 0 을 재확인했다(`E-91` 다음).
+
+**acceptance 전건 재실행.**
+
+| # | cmd | exit |
+| --- | --- | --- |
+| `A-0` | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 |
+| `A-1` | `./gradlew --no-build-cache --no-daemon clean check` | 0 |
+| `A-2` | `./gradlew :app:test --tests '*ArchitectureGate*'` | 0 |
+| `A-3`·`A-4` | `qualityBaseline`·`:app:compatibilitySmoke` | 0(`check` 에 포함) |
+| `A-5` | `./gradlew :build-logic:test` | 0 |
+
+`domainApiTypeGate` 가 아홉 모듈 전건에서 돌았음을 각 모듈의
+`build/reports/domain-api-type/violations.txt` 로 확인했다 — domain 여섯은
+`publicDeclarations=0 typeUses=0 violations=0`(anchor 만 존재, internal), 나머지 셋은
+`files=0`(domain 이 아니라 판정을 걷는다).
+
+clean-tree(경로 개별 인자, 양성 대조) — 출력 없음, `v2-지침서.md` 한 줄로 잡히는 것 확인.
+비밀값 스캔 — `reports/evidence/m1/1a/` 매치 없음(exit 1).
+
+**detekt.** 기본 규칙 `FunctionOnlyReturningConstant`·`UnusedParameter` 가 리터럴만 반환하는
+fixture 함수를 걸어(`7809e8b`) 본문을 private 백킹 값 사용/파라미터 실사용으로 고쳤다 —
+판정 대상(타입 표면)은 그대로다.
+
+**브리프와 다르게 결정한 것.** `AliasedDoubleApi`(별칭 import)와 `typealias Amount = Double`
+을 한 파일에 두는 브리프의 구성은 컴파일되지 않는다(실측, `app:compileTestKotlin`) —
+`kotlin.Double` 대 `java.lang.Double` 플랫폼 타입 불일치로 리터럴 대입이 거부된다. 파일을
+둘로 나눴다(`TypeAliasDoubleApi.kt` 신설). `scalar()` 도 반환형이 아니라 **파라미터** 로
+별칭을 시험한다 — 별칭 타입으로 값을 구성하는 자리(`0.0 as Scalar`·`Scalar.valueOf(0.0)`)가
+전부 같은 플랫폼 타입 불일치로 막혔다.
