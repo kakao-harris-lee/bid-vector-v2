@@ -54,6 +54,12 @@ class CompileFailureHarnessTest {
         assertNegativeFails("5-internal-accessor", "amount")
         assertPositiveCompiles("5-export")
     }
+
+    @Test
+    fun `6 파생 Money 는 모듈 밖에서 직접 생성할 수 없고 입력 Money 는 생성할 수 있다 (verifier r1 H-1)`() {
+        assertNegativeFails("6-derived-money-direct-construction", "cannot access")
+        assertPositiveCompiles("6-input-money-direct-construction")
+    }
 }
 
 private fun assertNegativeFails(

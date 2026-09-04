@@ -98,8 +98,14 @@ data class YegaAmount(
     override fun compareTo(other: YegaAmount): Int = won.compareTo(other.won)
 }
 
-/** 투찰가. 기초금액에 투찰율을 곱해 얻는 파생값 — 유일한 생성 경로는 [MoneyArithmetic.kt]의 반올림 함수다. */
-data class BidAmount(
+/**
+ * 투찰가. 기초금액에 투찰율을 곱해 얻는 파생값 — 유일한 생성 경로는 [MoneyArithmetic.kt]의
+ * 반올림 함수다. 생성자를 `internal`로 닫아 이 보증을 컴파일 시점에 강제한다(verifier r1
+ * H-1) — `Rate`가 이미 쓴 처방과 같다. `@ConsistentCopyVisibility`가 없으면 기본 공개
+ * `copy()`가 이 경계를 우회한다(Kotlin 2.4.10 `-Werror`가 그 경고를 실제로 낸다).
+ */
+@ConsistentCopyVisibility
+data class BidAmount internal constructor(
     internal val won: Long,
     override val currency: Currency,
     override val vatTreatment: VatTreatment,

@@ -7,7 +7,8 @@ package bidvector.sharedkernel
  * 나르는 정확한 필드 형태」는 그 결정이 정하지 않고 M1 1B 구현이 정한다
  * (`data-dictionary.md` §9·§11.1 해소 블록).
  */
-data class DerivationRecord(
+@ConsistentCopyVisibility
+data class DerivationRecord internal constructor(
     val inputs: List<AmountRecord>,
     val policyVersion: PolicyVersion,
 )

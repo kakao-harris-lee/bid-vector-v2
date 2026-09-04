@@ -33,13 +33,18 @@ data class Rate internal constructor(
     }
 }
 
-/** 사정률 — 예정가 / 기초금액. 축만 더하는 뉴타입이다(`data-dictionary.md` §1.4.2). */
-data class AssessmentRate(
+/**
+ * 사정률 — 예정가 / 기초금액. 축만 더하는 뉴타입이다(`data-dictionary.md` §1.4.2). 파생값이라
+ * 생성자를 `internal`로 닫는다 — 유일한 생성 경로는 [assessmentRateAgainst]다(verifier r1 H-1).
+ */
+@ConsistentCopyVisibility
+data class AssessmentRate internal constructor(
     val rate: Rate,
 )
 
-/** 낙찰률 — 낙찰가 / 기초금액. */
-data class AwardRate(
+/** 낙찰률 — 낙찰가 / 기초금액. 유일한 생성 경로는 [awardRateAgainst]다(verifier r1 H-1). */
+@ConsistentCopyVisibility
+data class AwardRate internal constructor(
     val rate: Rate,
 )
 
@@ -67,8 +72,17 @@ sealed interface BidRateOrigin {
     data object Recommended : BidRateOrigin
 }
 
-/** 투찰율 — 투찰가 / 기초금액. */
-data class BidRate(
+/**
+ * 투찰율 — 투찰가 / 기초금액. 유일한 생성 경로는 [bidRateAgainst]다(verifier r1 H-1).
+ *
+ * **알려진 한계**: `BaseAmount.times(rate: BidRate)`(파생 투찰가 곱셈)의 입력도 `BidRate`라,
+ * `BidRateOrigin.Recommended`(외부 추천 엔진이 낸 값)를 이 모듈 밖에서 구성할 공개 경로가
+ * 지금 없다. 1B는 관측(`bidRateAgainst`)만 만들고 추천 입력 경로는 만들지 않았다 —
+ * ML 추천을 받는 M2/M5가 그 경로(이름 있는 factory, `Rate.ofFraction`과 같은 형태)를
+ * 열어야 한다.
+ */
+@ConsistentCopyVisibility
+data class BidRate internal constructor(
     val rate: Rate,
     val origin: BidRateOrigin,
 )
