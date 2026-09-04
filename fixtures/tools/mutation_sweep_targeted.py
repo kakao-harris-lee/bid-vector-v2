@@ -64,11 +64,21 @@ PENDING = [
 ]
 
 
+# `operand` 가 **리터럴 토큰이 아닌** 술어. 대소문자 변형의 대상이 아니다 —
+# `differs-from-path` 의 피연산자는 **경로**이고 `differs-from-case` 의 것은 **case id** 라,
+# `.upper()` 를 걸면 기대값에 없는 문자열을 심어 「표기 변형이 통과했다」로 오독한다
+# (운영자 결정 2026-09-05 decision 18 · 조사 §2 의 가드 요구). `is-present` 는 피연산자가
+# 아예 없다.
+NON_LITERAL_OPERAND = ("is-present", "differs-from-path", "differs-from-case")
+
+
 def notation_variants(cases):
     """projection 이 건 값의 표기를 흔든다 — 대소문자 변형 적대 집합(verifier r16 F-8)."""
     variants = []
     for cid, case in cases.items():
         for entry in case.get("verified_projections") or []:
+            if entry["projection"] in NON_LITERAL_OPERAND:
+                continue
             operand = entry["operand"]
             for variant in (operand.upper(), operand.lower(),
                             operand[:1].lower() + operand[1:].upper()):
@@ -78,7 +88,7 @@ def notation_variants(cases):
     return variants
 
 
-def run(cases, mutants):
+def run(cases, mutants, registry=None, manifest=mc.MANIFEST):
     passed = []
     for cid, muts, why in mutants:
         if cid not in cases:
@@ -87,7 +97,7 @@ def run(cases, mutants):
         mutated = copy.deepcopy(mc.load_expected(case))
         for path, value in muts:
             mc.set_path(mutated, path, value)
-        ok = mc.holds(case, mutated)
+        ok = mc.holds(case, mutated, cases=registry, manifest=manifest)
         print("%-26s %-9s %s" % (cid, "PASSES" if ok else "caught", why))
         if ok:
             passed.append((cid, [p for p, _ in muts]))
@@ -104,16 +114,17 @@ def main(argv=None):
     if args.crosscheck_pyyaml:
         print("pyyaml crosscheck OK — cases", mc.crosscheck_pyyaml(args.manifest))
 
+    registry = mc.all_cases(args.manifest)
     cases = mc.authoritative_cases(args.manifest)
 
     print("%-26s %-9s %s" % ("case", "mutant", "why"))
-    passed = run(cases, MUTANTS + notation_variants(cases))
+    passed = run(cases, MUTANTS + notation_variants(cases), registry, args.manifest)
     print()
     print("위반 변이체가 통과한 자리:", passed if passed else "없음")
     print("  ※ `대조군 — 무변이` 줄은 변이가 없어 통과가 정상이고, 위 목록에 그 구성으로 든다.")
 
     print("\n--- 승인 대기 (고치지 않은 자리) ---")
-    run(cases, PENDING)
+    run(cases, PENDING, registry, args.manifest)
     return 0
 
 

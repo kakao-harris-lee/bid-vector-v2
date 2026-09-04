@@ -5,15 +5,23 @@
 판정: **`authoritative` = 확장 적대 집합에서 위반 변이체 통과 0**
 (운영자 결정 2026-09-02 「동결+강등」, Codex 재리뷰 B9 가 쓴 수).
 통과가 하나라도 있으면 그 case 는 기계적으로 `insufficient-evidence` 로 내려간다 —
-술어를 새로 만들지 않는다(`manifest.yaml` `schema.extensions` 의 동결).
+**리뷰 압력 아래서 술어를 발명하지 않는다.** 어휘를 늘리는 것은 운영자 결정의 일이고,
+**2026-09-05 decision 18** 이 `is-present`·`differs-from-path`·`differs-from-case` 셋을
+더했다(2026-09-02 동결의 개정). 정의의 정본은 `manifest.yaml` `schema.extensions` 다.
 
 방법·갈래 정의의 정본은 `reports/evidence/m0/0e/commands.md` **C-15** 다.
-여기서 도는 세 갈래는 그 항목의 확장 셋이다.
+여기서 도는 갈래는 그 항목의 확장이다.
 
   (a) `verifies` 가 **주장하는 필드의 삭제** — 아래 `ASSERTED` 가 case 별로 든다.
   (b) projection 경로의 **null 치환** — projection 전건에서 기계로 생성한다.
   (c) projection 피연산자와 다른 **확정 토큰 치환** — 같음.
   (d) 기대값이 **`null` 인 필드의 non-null 치환** — `NULL_ASSERTED` 가 case 별로 든다.
+  (b′) `differs-from-path` 의 **거울 경로 값 대입**, (c′) `differs-from-case` 의 **거울 case
+  값 대입** — 술어가 막는 「둘이 같아짐」을 직접 만든다. 갈래를 술어별로 가르는 것은
+  [projection_mutants] 이고, 그 함수가 **어휘 밖 술어를 예외로 낸다**.
+
+`main()` 이 스윕 전에 `manifest_contract.self_check()` 를 돌린다 — 판정이 술어 구현 위에
+서므로 구현이 정의와 맞는지 먼저 잰다. 그 검사는 corpus 를 읽지 않는다.
 
 **(a) 만 사람의 판단이다.** 어느 필드가 `verifies` 의 주장에 드는지는 기계가 읽지
 못한다. 그래서 `ASSERTED` 의 각 줄이 **근거를 오른쪽 주석에 싣는다** — 이 파일에서
@@ -75,7 +83,10 @@ OTHER_TOKEN = {"Inclusive": "Exclusive", "Clean": "DerivedVat", "Unmeasurable": 
 # *"스윕은 존재하는 경로만 검증하고, 경로가 덮지 않는 주장은 탐지 못 한다"*).
 # 불리언은 반전하고, 문자열은 아래 표의 적대 토큰(없으면 `Other`)으로 바꾼다.
 ADVERSARIAL_VALUE = {"Accepted": "Rejected", "Rejected": "Accepted",
-                     "Comparable": "Rejected", "Uncertain": "Eligible"}
+                     "Comparable": "Rejected", "Uncertain": "Eligible",
+                     # 1B 계약 어휘(운영자 결정 2026-09-05 decision 19). 상태 토큰의 적대값은
+                     # **반대 상태**다 — `Other` 같은 무의미 토큰보다 강한 변이다.
+                     "Known": "Absent", "Absent": "Known"}
 
 # (d) 기대값이 **`null`** 인데 `verifies` 가 그 **부재**를 주장하는 경로 — 사람의 판단이다.
 #     Codex B14 high 의 진단: 적대 집합이 null 기대값을 한 번도 변이하지 않아 「강등 대상 0」이
@@ -90,7 +101,41 @@ NULL_REPLACEMENTS = [0.0, {"numerator": 0, "denominator": 149}, 0,
                      {"numerator": 0, "denominator": 0}, "0%"]
 
 
-def build_mutants(cases):
+def projection_mutants(cid, case, entry, registry):
+    """술어 하나가 잡아야 하는 변이체. **술어마다 갈래가 다르다.**
+
+    정의의 정본은 `manifest.yaml` 의 `schema.extensions.verified_projections` 이고
+    갈래는 그 「잡는 것」 열의 기계 표현이다(운영자 결정 2026-09-05 decision 18).
+    `not-equals` 의 갈래는 동결분 그대로다 — 늘리지도 줄이지도 않았다.
+    """
+    path, projection = entry["path"], entry["projection"]
+    if projection == "not-equals":
+        return [(cid, path, None, "(b) projection 경로 null"),
+                (cid, path, OTHER_TOKEN.get(entry["operand"], "Other"), "(c) 다른 확정 토큰")]
+    if projection == "is-present":
+        return [(cid, path, mc.DELETE, "(a) projection 경로 삭제"),
+                (cid, path, None, "(b) projection 경로 null")]
+
+    rows = [(cid, path, mc.DELETE, "(a) projection 경로 삭제"),
+            (cid, path, None, "(b) projection 경로 null")]
+    if projection == "differs-from-path":
+        # (b′) 거울 **경로**의 값을 이 경로에 대입한다 — 술어가 막는 「둘이 같아짐」이다.
+        status, twin = mc.get(mc.load_expected(case), entry["operand"])
+        why = "(b′) 거울 경로 값 대입"
+    elif projection == "differs-from-case":
+        # (c′) 거울 **case** 의 같은 경로 값을 대입한다. 거울은 강등 여부와 무관하게 찾는다 —
+        # 대조 대상은 분류가 아니라 그 case 의 기대값이다.
+        mirror = mc._mirror_case(case, entry["operand"], registry, mc.MANIFEST)
+        status, twin = mc.get(mc.load_expected(mirror), path)
+        why = "(c′) 거울 case 값 대입"
+    else:
+        raise mc.ManifestFormatError("어휘 밖의 술어: %r" % projection)
+    if status == "OK":
+        rows.append((cid, path, twin, why))
+    return rows
+
+
+def build_mutants(cases, registry=None):
     mutants = []
     for cid, paths in ASSERTED.items():
         if cid not in cases:
@@ -118,9 +163,7 @@ def build_mutants(cases):
                 mutants.append((cid, path, rep, "(d) null 기대값의 non-null 치환"))
     for cid, case in cases.items():
         for entry in case.get("verified_projections") or []:
-            mutants.append((cid, entry["path"], None, "(b) projection 경로 null"))
-            mutants.append((cid, entry["path"],
-                            OTHER_TOKEN.get(entry["operand"], "Other"), "(c) 다른 확정 토큰"))
+            mutants.extend(projection_mutants(cid, case, entry, registry))
     return mutants
 
 
@@ -134,12 +177,17 @@ def main(argv=None):
     if args.crosscheck_pyyaml:
         print("pyyaml crosscheck OK — cases", mc.crosscheck_pyyaml(args.manifest))
 
+    # 술어 어휘의 실행이 정의와 맞는지 먼저 잰다 — 스윕의 판정이 그 위에 서기 때문이다.
+    # corpus 를 읽지 않는 격리 검사라 이 스윕의 수치에 영향을 주지 않는다.
+    print("술어 self-check OK — 검사", mc.self_check())
+
+    registry = mc.all_cases(args.manifest)
     cases = mc.authoritative_cases(args.manifest)
     rows, demoted = [], set()
-    for cid, path, value, why in build_mutants(cases):
+    for cid, path, value, why in build_mutants(cases, registry):
         mutated = copy.deepcopy(mc.load_expected(cases[cid]))
         mc.set_path(mutated, path, value)
-        passes = mc.holds(cases[cid], mutated)
+        passes = mc.holds(cases[cid], mutated, cases=registry, manifest=args.manifest)
         rows.append((cid, path, why, passes))
         if passes:
             demoted.add(cid)

@@ -216,29 +216,201 @@ def load_expected(case):
         return json.load(fh)
 
 
-def holds(case, mutated):
+def all_cases(path=MANIFEST):
+    """id → case 전수. `differs-from-case` 가 거울 case 를 찾는 자리다."""
+    return {c["id"]: c for c in read_cases(path)}
+
+
+def _folded(left, right, normalize):
+    if normalize == "case-fold":
+        left = left.casefold() if isinstance(left, str) else left
+        right = right.casefold() if isinstance(right, str) else right
+    return left, right
+
+
+def _mirror_case(case, operand, cases, manifest):
+    """`differs-from-case` 의 거울 case. 자기 참조와 미지 id 를 거부한다."""
+    if operand == case["id"]:
+        raise ManifestFormatError("`differs-from-case` 가 자기 자신을 거울로 든다: %r" % operand)
+    registry = all_cases(manifest) if cases is None else cases
+    if operand not in registry:
+        raise ManifestFormatError("`differs-from-case` 의 거울 case 를 찾지 못했다: %r" % operand)
+    return registry[operand]
+
+
+def holds(case, mutated, cases=None, manifest=MANIFEST):
     """계약(`verified_paths` 정확 비교 ∪ `verified_projections` 술어)이 원본과 같은 판정인가.
 
-    술어 어휘는 `not-equals` 하나로 **동결**돼 있다(운영자 결정 2026-09-02,
-    `manifest.yaml` 의 `schema.extensions.verified_projections`). 모르는 술어는
-    조용히 통과시키지 않고 예외를 낸다.
+    **술어 어휘는 넷이다** — `not-equals`(2026-09-02 동결분) 에 **운영자 결정 2026-09-05
+    decision 18** 이 `is-present` · `differs-from-path` · `differs-from-case` 를 더했다.
+    정의의 정본은 `manifest.yaml` 의 `schema.extensions.verified_projections` 이고 이 함수는
+    그 정의의 실행이다. **모르는 술어는 조용히 통과시키지 않고 예외를 낸다.**
+
+    **`not-equals` 의 의미는 한 글자도 바뀌지 않았다** — null 치환이 이 술어를 빠져나가는
+    것은 문서화된 한계이고(`uncovered_axes` 「계약 술어 부재」 축의 ②), 그 구멍을 여기서
+    조용히 메우면 동결분의 의미를 몰래 바꾸는 것이 된다. 새 술어 셋에만 **존재·비-null
+    전건**이 선다.
     """
     original = load_expected(case)
     for path in case.get("verified_paths") or []:
         if get(mutated, path) != get(original, path):
             return False
     for entry in case.get("verified_projections") or []:
-        if entry["projection"] != "not-equals":
-            raise ManifestFormatError("동결된 어휘 밖의 술어: %r" % entry["projection"])
+        projection = entry["projection"]
+        normalize = entry.get("normalize")
         status, value = get(mutated, entry["path"])
-        left, right = value, entry["operand"]
-        if entry.get("normalize") == "case-fold":
-            left = left.casefold() if isinstance(left, str) else left
-            right = right.casefold() if isinstance(right, str) else right
-        if not (status == "OK" and left != right):
+
+        if projection == "not-equals":
+            left, right = _folded(value, entry["operand"], normalize)
+            if not (status == "OK" and left != right):
+                return False
+            continue
+
+        if projection not in ("is-present", "differs-from-path", "differs-from-case"):
+            raise ManifestFormatError("어휘 밖의 술어: %r" % projection)
+
+        # 새 술어 셋의 공통 전건 — (a) 삭제와 (b) null 치환이 여기서 걸린다.
+        if status != "OK" or value is None:
+            return False
+
+        if projection == "is-present":
+            if entry.get("operand") not in (None, ""):
+                raise ManifestFormatError("`is-present` 는 피연산자를 받지 않는다: %r" % entry)
+            continue
+
+        if projection == "differs-from-path":
+            other_status, other = get(mutated, entry["operand"])
+        else:
+            mirror = _mirror_case(case, entry["operand"], cases, manifest)
+            other_status, other = get(load_expected(mirror), entry["path"])
+        if other_status != "OK" or other is None:
+            return False
+        left, right = _folded(value, other, normalize)
+        if left == right:
             return False
     return True
 
 
 def authoritative_cases(path=MANIFEST):
     return {c["id"]: c for c in read_cases(path) if c["classification"] == "authoritative"}
+
+
+# -----------------------------------------------------------------------------
+# 술어 self-check — 어휘 넷의 실행이 정의와 맞는가
+#
+# **corpus 를 읽지 않는다.** 임시 디렉터리에 최소 기대값 두 개를 쓰고 그 위에서만 돈다 —
+# 실제 fixture·manifest 는 열지 않으므로 case 가 바뀌어도 이 검사는 흔들리지 않는다.
+# 새 도구를 만들지 않으려고 여기 둔다(1B-c scope: acceptance 명령 집합을 늘리지 않는다) —
+# **C-5** 가 `mutation_sweep_adversarial.py` 를 통해 이것을 함께 돌린다.
+# -----------------------------------------------------------------------------
+_SUBJECT = {"fact": "Known", "rate": {"fraction": 0.875}, "left": "X", "right": "Y"}
+_MIRROR = {"fact": "Absent", "rate": None}
+
+
+def _case(tmp, cid, expected, **extra):
+    target = os.path.join(tmp, cid + ".json")
+    with open(target, "w", encoding="utf-8") as fh:
+        json.dump(expected, fh)
+    case = {"id": cid, "classification": "authoritative", "expected_file": target}
+    case.update(extra)
+    return case
+
+
+def self_check():
+    """술어 넷의 통과·실패·거부를 잰다. 어긋나면 `ManifestFormatError`."""
+    import copy
+    import tempfile
+
+    checks, failures = 0, []
+
+    def expect(label, want, thunk):
+        nonlocal checks
+        checks += 1
+        try:
+            got = thunk()
+        except ManifestFormatError as exc:
+            got = ("raises", type(exc).__name__)
+        if got != want:
+            failures.append("%s — want %r, got %r" % (label, want, got))
+
+    tmp = tempfile.mkdtemp(prefix="predicate-self-check-")
+    subject = _case(tmp, "subject", _SUBJECT)
+    mirror = _case(tmp, "mirror", _MIRROR)
+    registry = {"subject": subject, "mirror": mirror}
+
+    def run(case, mutations):
+        mutated = copy.deepcopy(load_expected(case))
+        for path, value in mutations:
+            set_path(mutated, path, value)
+        return holds(case, mutated, cases=registry)
+
+    def with_projection(entry, **extra):
+        case = dict(subject)
+        case["verified_projections"] = [entry]
+        case.update(extra)
+        return case
+
+    present = with_projection({"path": "$.fact", "projection": "is-present"})
+    expect("is-present 무변이", True, lambda: run(present, []))
+    expect("is-present (a) 삭제", False, lambda: run(present, [("$.fact", DELETE)]))
+    expect("is-present (b) null", False, lambda: run(present, [("$.fact", None)]))
+    expect("is-present (a′) 값 변이는 못 잡는다(명세대로)", True,
+           lambda: run(present, [("$.fact", "Absent")]))
+    expect("is-present 는 피연산자를 거부한다", ("raises", "ManifestFormatError"),
+           lambda: run(with_projection(
+               {"path": "$.fact", "projection": "is-present", "operand": "Known"}), []))
+
+    from_path = with_projection(
+        {"path": "$.left", "projection": "differs-from-path", "operand": "$.right"})
+    expect("differs-from-path 무변이", True, lambda: run(from_path, []))
+    expect("differs-from-path (b′) 거울 경로 값 대입", False,
+           lambda: run(from_path, [("$.left", "Y")]))
+    expect("differs-from-path (a) 삭제", False, lambda: run(from_path, [("$.left", DELETE)]))
+    expect("differs-from-path (b) null", False, lambda: run(from_path, [("$.left", None)]))
+    expect("differs-from-path 거울 경로가 비면 실패", False,
+           lambda: run(from_path, [("$.right", None)]))
+
+    from_case = with_projection(
+        {"path": "$.fact", "projection": "differs-from-case", "operand": "mirror"})
+    expect("differs-from-case 무변이", True, lambda: run(from_case, []))
+    expect("differs-from-case (c′) 거울 case 값 대입", False,
+           lambda: run(from_case, [("$.fact", "Absent")]))
+    expect("differs-from-case (a) 삭제", False, lambda: run(from_case, [("$.fact", DELETE)]))
+    expect("differs-from-case (b) null", False, lambda: run(from_case, [("$.fact", None)]))
+    expect("differs-from-case case-fold 가 표기 변형을 접는다", False,
+           lambda: run(with_projection({"path": "$.fact", "projection": "differs-from-case",
+                                        "operand": "mirror", "normalize": "case-fold"}),
+                       [("$.fact", "aBsEnT")]))
+    expect("differs-from-case 자기 참조 거부", ("raises", "ManifestFormatError"),
+           lambda: run(with_projection(
+               {"path": "$.fact", "projection": "differs-from-case", "operand": "subject"}), []))
+    expect("differs-from-case 미지 거울 거부", ("raises", "ManifestFormatError"),
+           lambda: run(with_projection(
+               {"path": "$.fact", "projection": "differs-from-case", "operand": "없는-case"}), []))
+    expect("differs-from-case 거울 경로가 비면 실패", False,
+           lambda: run(with_projection(
+               {"path": "$.rate", "projection": "differs-from-case", "operand": "mirror"},
+               verified_paths=[]), [("$.rate", {"fraction": 0.5})]))
+
+    equals = with_projection(
+        {"path": "$.fact", "projection": "not-equals", "operand": "Absent"})
+    expect("not-equals 무변이", True, lambda: run(equals, []))
+    expect("not-equals (c) 피연산자 치환", False, lambda: run(equals, [("$.fact", "Absent")]))
+    expect("not-equals 의 null 구멍은 그대로다(동결분 의미 불변)", True,
+           lambda: run(equals, [("$.fact", None)]))
+
+    expect("미지 술어 거부", ("raises", "ManifestFormatError"),
+           lambda: run(with_projection({"path": "$.fact", "projection": "equals-path",
+                                        "operand": "$.right"}), []))
+
+    for path in (subject["expected_file"], mirror["expected_file"]):
+        os.remove(path)
+    os.rmdir(tmp)
+
+    if failures:
+        raise ManifestFormatError("술어 self-check 실패 %d 건: %s" % (len(failures), failures))
+    return checks
+
+
+if __name__ == "__main__":
+    print("술어 self-check OK — 검사", self_check())
