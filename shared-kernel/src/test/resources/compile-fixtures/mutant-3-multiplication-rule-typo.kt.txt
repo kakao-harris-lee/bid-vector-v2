@@ -1,0 +1,11 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BidRate
+import bidvector.sharedkernel.YegaAmount
+
+fun typoMultiply(
+    yega: YegaAmount,
+    rate: BidRate,
+) {
+    val result = yega.timesTypo(rate)
+}

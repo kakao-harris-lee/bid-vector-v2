@@ -2,6 +2,7 @@ package bidvector.sharedkernel
 
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.junit.jupiter.api.Test
@@ -39,8 +40,22 @@ class CompileFailureHarnessTest {
 
     @Test
     fun `3 곱셈 규칙 위반은 컴파일되지 않고 승인된 조합은 컴파일된다`() {
-        assertNegativeFails("3-multiplication-rule", "times")
+        assertNegativeFails("3-multiplication-rule", "receiver type mismatch")
         assertPositiveCompiles("3-multiplication-rule")
+    }
+
+    /**
+     * verifier r1 M-2 — 식별자 부분 문자열(`"times"`)은 오타만 낸 변이(`timesTypo`)도
+     * 만족시킨다(그 진단문에 "times"가 부분 문자열로 들어 있다). "receiver type mismatch"는
+     * 후보 시그니처가 있는데 receiver 타입이 안 맞아 나는 진단 **종류**라 오타(후보 자체가
+     * 없음)의 "unresolved reference" 진단에는 나타나지 않는다 — 실측으로 확인한다.
+     */
+    @Test
+    fun `3-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "3-multiplication-rule-typo",
+            realDiagnosticFragment = "receiver type mismatch",
+        )
     }
 
     @Test
@@ -51,8 +66,22 @@ class CompileFailureHarnessTest {
 
     @Test
     fun `5 internal 원 단위 접근자는 모듈 밖에서 못 부르고 export 는 부를 수 있다`() {
-        assertNegativeFails("5-internal-accessor", "amount")
+        assertNegativeFails("5-internal-accessor", "cannot access")
         assertPositiveCompiles("5-export")
+    }
+
+    /**
+     * verifier r1 M-2 — `"amount"`는 오타 변이(`amountTypo`)의 진단문에도 부분 문자열로
+     * 들어 있다("unresolved reference 'amountTypo'"의 "amountTypo"가 "amount"를 포함).
+     * "cannot access"는 선언이 실존하고 접근만 막힌 경우의 진단 종류라 오타(선언 자체가
+     * 없음)의 "unresolved reference" 진단에는 나타나지 않는다 — 실측으로 확인한다.
+     */
+    @Test
+    fun `5-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "5-internal-accessor-typo",
+            realDiagnosticFragment = "cannot access",
+        )
     }
 
     @Test
@@ -75,6 +104,22 @@ private fun assertPositiveCompiles(fixtureName: String) {
     val result = compileFixture("positive-$fixtureName")
     io.kotest.assertions.withClue(result.output) {
         result.exitCode shouldBe ExitCode.OK
+    }
+}
+
+/**
+ * 변이(오타만 넣고 계약 위반은 없는 fixture)가 여전히 컴파일에 실패하되(참조 자체가
+ * 없으므로), 실 위반 fixture 를 식별하는 진단 단편은 **만족시키지 않음**을 확인한다
+ * (verifier r1 M-2) — 단언이 종류를 보는지, 부분 문자열만 보는지를 가르는 실측이다.
+ */
+private fun assertMutantDoesNotMatchRealFragment(
+    mutantFixtureName: String,
+    realDiagnosticFragment: String,
+) {
+    val result = compileFixture("mutant-$mutantFixtureName")
+    io.kotest.assertions.withClue(result.output) {
+        result.exitCode shouldBe ExitCode.COMPILATION_ERROR
+        result.output shouldNotContain realDiagnosticFragment
     }
 }
 

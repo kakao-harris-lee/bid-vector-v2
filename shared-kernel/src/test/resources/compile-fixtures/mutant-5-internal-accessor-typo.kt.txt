@@ -1,0 +1,5 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.BaseAmount
+
+fun leakAmountTypo(money: BaseAmount): Long = money.amountTypo
