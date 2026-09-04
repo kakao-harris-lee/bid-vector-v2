@@ -91,26 +91,25 @@ range 에 있다」를 명시한다. 그 명령이 잡지 못하는 하네스 �
 | **D2** | **결과 토큰 어휘** — fixture 직렬화가 쓸 상태·사유 이름을 1B 계약 이름으로 채택하는가 | (a) 1B 계약 어휘 그대로(`Fact.Known`/`Absent` · `Measurement.Measured`/`Unmeasurable` · `ReasonCode` enum 이름 · `Basis.ESTIMATED`) (b) fixture 어휘 유지 + 매핑 표 (c) 새 중립 어휘 | **(a)** — 계약이 채택한 이름을 그대로 쓰면 「승인 문면 없는 자작 토큰」 문제가 정의상 사라지고 매핑 층(낡는 자리)이 생기지 않는다. `uncovered_axes` 「승인된 피연산자 부재」 축의 `unblocks_when`(결과 토큰 어휘 명시 승인)이 이 결정으로 충족된다 | 착수 전 |
 | **D3** | **BLOCK-3 해제** — money-basis 축의 둘째 자물쇠(운영자 명시 승인 부재) | (a) 축 전체 승인 (b) case 별 승인(D4 로 흡수) (c) 축 유지 → money-basis 6 은 이 slice 밖 | **(b)** — 001·004·003 은 처분이 다르므로 축 단위 승인은 그 차이를 덮는다 | 착수 전 |
 | **D4** | **case 별 처분** — 아래 처분 표 | 표 참조 | 표 참조 | 재추출 직전(Phase 3 시작), 처분 표를 evidence 로 올려 승인 |
-| **D5** | **소비 테스트의 위치와 JSON 읽기** | (a) `shared-kernel/src/test` + test 전용 JSON 의존(`jackson-databind`, 카탈로그 有) — `Rate.fraction` 등 `internal` 이 보여 값 대조 가능 (b) `app/src/test` — 공개 API 만 보여 rate 값 대조 불가(1B r1 L-4) (c) JSON 없이 manifest→Kotlin 소스 생성 | **(a)**, 단 Phase 2 조사로 「1차 게이트 `external.allowed.domain` 이 test 소스 집합을 덮지 않음」과 「ADR 0002 D-9 가 test 전용 의존을 금하지 않음」을 실측·문면으로 확인한 뒤. 둘 중 하나라도 어긋나면 결정을 다시 올린다 | Phase 2 뒤 |
+| **D5** | **소비 테스트의 위치와 JSON 읽기** — **Phase 2 조사(2026-09-04, `_workspace/m1-1b-c/01_scout_preflight.md` §1)가 (a)를 반증했다**: 1차 게이트 `moduleDependencyGate` 가 domain 모듈의 **test 의존까지** `group.forbidden`(jackson·kotlinx-serialization·gson·org.json 전부)으로 막고(실측 FAILED), ADR 0002 D-9 문면도 main/test 를 구분하지 않는다 | (a) ~~shared-kernel test + jackson~~ — 게이트 정책·ADR D-9 개정 없이 불가 · (a′) ADR D-9 와 게이트에 test-scope 예외를 명시 개정 · **(b′) shared-kernel `testFixtures`(java-test-fixtures) 에 JSON 무의존 projection(값→`Map`)을 두고, runner 는 `app/src/test` 에서 `testFixtures(project(":shared-kernel"))` + jackson 으로 JSON 을 읽어 대조** — `internal`(`Rate.fraction`) 은 testFixtures 가 main 과 associate 되면 보인다 · (c) JSON 파서 없이 manifest→Kotlin 소스 생성 | **(b′)** — 커널의 어느 scope 에도 JSON 이 들어가지 않아 D-9 를 문면 그대로 지키고, 게이트·ADR 개정이 없다. projection 이 「계약이 나르는 축」(`contract_binding.carries`)을 코드로 고정하는 부수 효과도 있다. (a′) 는 게이트 정의 축소라 위협 모델상 피하고, (c) 는 생성 코드 유지가 corpus 보다 커진다. **전건 실측 셋(testFixtures 의 internal 가시성 · 1차 게이트 통과 · gate-tests 등재)이 Phase 2 후속으로 진행 중** — 하나라도 어긋나면 (a′) 로 올린다 | Phase 2 후속 실측 뒤 |
 
 ### D4 — case 처분 표(초안, 운영자 승인 대상)
 
 | case | 지금 막는 것 | 추천 처분 | 되돌아오면 계약 경로 |
 | --- | --- | --- | --- |
-| rate-unit-001 | `outcome: Accepted`·`preservedSourceUnit` | **재추출** — `fact: Known`, `rate.fraction`·`conversionDivisor` 유지, `preservedSourceUnit` 제거(어댑터 층 축, 1C+). 술어: `differs-from-case`(거울 003) + `is-present`(`$.rate.fraction`) | `Rate.ofPercent` |
+| rate-unit-001 | `outcome: Accepted`·`preservedSourceUnit` | **재추출** — `fact: Known`, `rate.fraction`·`conversionDivisor` 유지, `preservedSourceUnit` 제거(어댑터 층 축, 1C+). 술어: `differs-from-case`(거울 003) + `is-present`(`$.rate.fraction`) **⚠ 조사 대조 「바뀜」** — `verifies` 가 「원문 unit 이 보존된다」를 명시 주장한다. 재추출은 `verifies` 를 「percent→fraction 명시 변환」으로 **좁히고** 보존 축을 `uncovered_axes`(`OPEN-1BC-SOURCE-UNIT`, 1C+ 어댑터 소유)로 **명시 이관**한다 — 주장을 지우는 것이 아니라 소유를 옮기는 것이며, 그 이관 자체가 운영자 승인 대상이다 | `Rate.ofPercent` |
 | rate-unit-002 | 같음 | **재추출** — 같은 형태(거울 없음 → `is-present` + `verified_paths` 의 `$.rate.fraction` 정확 비교) | `Rate.ofFraction` |
 | rate-unit-003 | `Rejected`·`RateUnitUndeclared` | **재추출** — `fact: Absent`, `reasonCode: UNIT_NOT_DECLARED`(승인 어휘, D2), `guessAttempted` 제거(구성상 불가는 컴파일 fixture 가 증명) | `Rate` internal 생성자 + `Fact.Absent` |
 | rate-unit-004 | 같음 + case 간 동등 주장 | **재추출** — 003 과 같은 형태. 「크기가 결과를 가르지 않는다」는 `differs-from-case` 가 아니라 003 과의 **같은 기대값**으로 표현(주장 자체는 `verifies` 문면) | 같음 |
 | rate-unit-005 | `Accepted` | **재추출** — 001 과 같은 형태, 상한 밴드 부재(2.0 보존)는 `$.rate.fraction` 정확 비교로 잠금 | `Rate.ofPercent` |
-| money-basis-001 | BLOCK-4(컴파일 차단) | **재정의** — 기대값을 「표현 불가」 형태로: `{"representable": false}` 하나 + `is-present`. 실행자는 `CompileFailureHarnessTest` 의 basis 교차 negative fixture 를 이 case 의 `type_path` 로 등재(이미 존재, 1B fixture 11). 폐기하지 않는다 — 계약이 지키는 사실이고 corpus 에 남아야 한다 | 컴파일 fixture |
+| money-basis-001 | BLOCK-4(컴파일 차단) | **재정의** — 기대값을 「표현 불가」 형태로: `{"representable": false}` 하나 + `is-present`. 실행자는 `CompileFailureHarnessTest` 의 basis 교차 negative fixture 를 이 case 의 `type_path` 로 등재(이미 존재, 1B fixture 11). 폐기하지 않는다 — 계약이 지키는 사실이고 corpus 에 남아야 한다 **⚠ 조사 대조 「바뀜」** — `verifies` 가 「사유와 함께 거부된다」(런타임 거부 객체)를 주장하고 계약은 컴파일 차단이다. 승인된 계약(1B)이 이기므로 `verifies` 를 「basis 가 다른 두 금액의 비교는 **표현 불가**(컴파일 차단)」로 다시 쓴다. 입력 파일의 `ESTIMATED_PRICE` → `ESTIMATED` 정렬 동반 | 컴파일 fixture |
 | money-basis-002 | 술어 부재 · `contract_binding` 낡음 | **재추출** — `fact: Known`, `comparedBases` 유지, `result` 제거(경계 포함성은 이 case 가 잠그지 않음). `contract_binding` 을 `compareKnownVat(BaseAmount, BaseAmount)` 로 정정 | `compareKnownVat` |
 | money-basis-003 | BLOCK-5(검색 경로 타입 부재) | **이월** — strategy slice(STR-16 소유)로. 이 slice 는 `uncovered_axes` 에 소유 OPEN 을 달고 classification 유지 | — |
-| money-basis-004 | BLOCK-4 | **재정의** — 001 과 같은 형태(min/max 혼합의 표현 불가) | 컴파일 fixture |
+| money-basis-004 | BLOCK-4 | **재정의** — 001 과 같은 형태(min/max 혼합의 표현 불가) **⚠ 조사 대조 「불명」** — `verifies` 는 「들어갈 수 없다」만 주장해 컴파일 차단도 형식상 만족하나 재구성 방식이 001 과 같다. **001 과 묶어 한 결정**으로 올린다. 입력 `ESTIMATED_PRICE` 정렬 동반 | 컴파일 fixture |
 | money-basis-005 | 표기(`VatTreatmentMismatch`) | **재추출** — `fact: Absent`, `reasonCode: VAT_TREATMENT_MISMATCH`, `operationPerformed` 제거 | `compareKnownVat` / `sameKnownVat` |
-| money-basis-006 | 술어 부재 | **재추출** — 토큰은 이미 일치(`UNKNOWN`·`Undeclared`). `eligibleForAuthoritativeCorpus` 는 corpus 메타이지 계약 산출이 아니라 제거, `is-present`/정확 비교로 잠금 | `Money` 필수 파라미터 |
+| money-basis-006 | 술어 부재 | **재추출** — 토큰은 이미 일치(`UNKNOWN`·`Undeclared`). `eligibleForAuthoritativeCorpus` 는 corpus 메타이지 계약 산출이 아니라 제거, `is-present`/정확 비교로 잠금 **⚠ 조사 대조 「바뀜」 — 처분 정정**: `not_covered` 문면이 `$.eligibleForAuthoritativeCorpus` 를 이미 「실질이 덮이는 세 축」의 하나로 적어 두었다. 제거하지 않고 **유지**하며 `verified_paths` 정확 비교로 잠근다 | `Money` 필수 파라미터 |
 
-처분 표는 **초안**이다 — Phase 2 조사(기대값 재작성이 각 case 의 `verifies`·`expected_reasoning` 을 그대로
-지키는지)가 확인한 뒤 evidence 로 다시 올리고, 운영자 승인 뒤에만 파일을 바꾼다.
+처분 표는 Phase 2 조사(2026-09-04)로 대조됐다 — **유지 7 · 바뀜 3(rate-unit-001·money-basis-001·006) · 불명 1(money-basis-004)**. 바뀜·불명 넷은 위 ⚠ 표기대로 `verifies`/`not_covered` 문면 재작성이 따른다. 운영자 승인(D4) 뒤에만 파일을 바꾼다.
 
 ---
 
