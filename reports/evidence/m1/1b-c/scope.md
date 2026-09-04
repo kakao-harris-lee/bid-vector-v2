@@ -111,7 +111,21 @@ range 에 있다」를 명시한다. 그 명령이 잡지 못하는 하네스 �
 | money-basis-005 | 표기(`VatTreatmentMismatch`) | **재추출** — `fact: Absent`, `reasonCode: VAT_TREATMENT_MISMATCH`, `operationPerformed` 제거 | `compareKnownVat` / `sameKnownVat` |
 | money-basis-006 | 술어 부재 | **재추출** — 토큰은 이미 일치(`UNKNOWN`·`Undeclared`). `eligibleForAuthoritativeCorpus` 는 corpus 메타이지 계약 산출이 아니라 제거, `is-present`/정확 비교로 잠금 **⚠ 조사 대조 「바뀜」 — 처분 정정**: `not_covered` 문면이 `$.eligibleForAuthoritativeCorpus` 를 이미 「실질이 덮이는 세 축」의 하나로 적어 두었다. 제거하지 않고 **유지**하며 `verified_paths` 정확 비교로 잠근다 | `Money` 필수 파라미터 |
 
-처분 표는 Phase 2 조사(2026-09-04)로 대조됐다 — **유지 7 · 바뀜 3(rate-unit-001·money-basis-001·006) · 불명 1(money-basis-004)**. 바뀜·불명 넷은 위 ⚠ 표기대로 `verifies`/`not_covered` 문면 재작성이 따른다. 운영자 승인(D4) 뒤에만 파일을 바꾼다.
+처분 표는 Phase 2 조사(2026-09-04)로 대조됐다 — **유지 7 · 바뀜 3(rate-unit-001·money-basis-001·006) · 불명 1(money-basis-004)**. 바뀜·불명 넷은 위 ⚠ 표기대로 `verifies`/`not_covered` 문면 재작성이 따른다. **운영자 승인 2026-09-05(decision 21) — 전체 승인, 바뀜 3·불명 1 포함.**
+
+---
+
+## 운영자 결정 (2026-09-05, decision 18~22 — 1B 의 17 을 잇는다)
+
+| # | 결정 | 내용 | 정본 자리 |
+| --- | --- | --- | --- |
+| **18** | D1 술어 어휘 동결 해제 | **(a) 셋 전부** — `is-present`·`differs-from-path`·`differs-from-case` 를 `schema.extensions.verified_projections` 어휘에 더한다. 2026-09-02 동결 결정의 개정. `operand` 의미는 술어별로 갈린다(`is-present` 없음 · `differs-from-path` 경로 · `differs-from-case` case id, 조사 §2) | `fixtures/manifest.yaml` `schema.extensions`(Phase 3 ①) |
+| **19** | D2 결과 토큰 어휘 | **(a) 1B 계약 어휘 그대로** — 상태 `Fact.Known`/`Absent`·`Measurement.Measured`/`Unmeasurable`, 사유 `ReasonCode` enum 이름, `Basis.ESTIMATED`. 자작 토큰(`Accepted`·`Rejected`·`Comparable`·`Uncertain`·`RateUnitUndeclared`·`VatTreatmentMismatch`·`BasisMismatch`·`ESTIMATED_PRICE`)은 재추출로 사라진다. `uncovered_axes` 「승인된 피연산자 부재」 축의 `unblocks_when` 충족 | `fixtures/manifest.yaml` `uncovered_axes`(Phase 3 ②) · `data-dictionary.md` §9 해당 행 |
+| **20** | D3 BLOCK-3 | **(b) case 별 승인** — D4 처분 표가 흡수 | 이 문서 D4 표 |
+| **21** | D4 case 처분 | **전체 승인**(바뀜 3·불명 1 포함) — 위 처분 표가 정본. money-basis-003 은 strategy 이월(`OPEN-1BC-STR16`), rate-unit-001 보존 축은 `OPEN-1BC-SOURCE-UNIT` 로 이관 | 이 문서 D4 표 · `fixtures/manifest.yaml` 각 case `change_history` |
+| **22** | D5 소비 테스트 | **(b′)** — shared-kernel `testFixtures` 의 JSON 무의존 projection + `app/src/test` runner(jackson) + `gate.tests.app` 등재. testFixtures 버킷에 외부 의존 0. 사각은 `OPEN-1BC-TESTFIXTURES-GATE` 로 1A-b 이월 | 이 문서 in_scope · `docs/adr/0002` 는 개정 없음(D-9 문면 그대로 충족) |
+
+**같은 날 함께 난 결정(이 slice 밖, 등재만)**: `OPEN-ADR-06` **(a)** — sizeGate 에 타입 멤버 수 상한 **30**(PSI 소스 기준) + 상속 깊이·인터페이스 수는 baseline(2·1) 대비 증가 금지 래칫 · `OPEN-ADR-16` **(a)** — PMD CPD(`de.aaschmid.cpd`, `toolVersion` 으로 엔진 독립), **관찰 모드** 시작(리포트만, 1C 종료 시 실패 모드 전환 결정), `minimumTokenCount` **50**(도구 기본값 유지), 첫 배선 acceptance 에 Gradle 9.6.1 스모크(실패 시 (b) 자체 구현 후퇴). 둘의 배선은 **하네스 slice `1A-b` 신설**(`OPEN-1BC-TESTFIXTURES-GATE` 도 같은 자리). 정본은 `docs/adr/0007` §5 · `capability-map.md` §14.2 · `milestone-1.md` 「Slice 1A-b」.
 
 ---
 
