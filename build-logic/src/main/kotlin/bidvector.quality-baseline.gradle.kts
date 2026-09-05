@@ -2,6 +2,15 @@ import bidvector.buildlogic.ConventionCoverageGateTask
 import bidvector.buildlogic.MemberEffectGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
+import bidvector.buildlogic.readPolicy
+import bidvector.buildlogic.requireList
+
+// D-6(Phase 3 중 신설) — 타입 멤버 축이 재는 source set 이름. `build-logic/src/<name>` 으로
+// 그대로 디렉터리가 된다 — included build 는 Gradle source set 이 아니라 원시 디렉터리라
+// kotlin-conventions 의 `sourceSets[...]` 조회를 쓸 수 없다.
+private val typeMemberSourceSets =
+    readPolicy(layout.settingsDirectory.file("config/quality/size-policy.properties").asFile)
+        .requireList("limit.type.members.source-sets")
 
 // 모듈별 입력은 각 모듈의 convention plugin 이 붙인다 — 루트가 subproject 의 configuration 을
 // 먼저 읽으려 하면 평가 순서에 걸린다.
@@ -20,6 +29,10 @@ val buildLogicSizeGate =
         description = "included build 의 소스에도 파일 크기 래칫을 건다"
         policyFile = layout.settingsDirectory.file("config/quality/size-policy.properties")
         sources.from(layout.settingsDirectory.dir("build-logic/src"))
+        // D-6 — 타입 멤버 축은 `main`만(정책 데이터, `typeMemberSourceSets`). 이 값이
+        // build-logic 자신의 `SourceReferencesTest`(35개, D-5 트리거)를 그 축에서 뺀다 —
+        // 파일·함수 축(`sources`)은 여전히 test 를 포함한다.
+        typeSources.from(typeMemberSourceSets.map { layout.settingsDirectory.dir("build-logic/src/$it") })
         report = layout.buildDirectory.file("reports/size-gate/build-logic.txt")
     }
 
@@ -53,6 +66,9 @@ val scriptSizeGate =
         description = "모듈 밖 빌드 스크립트에도 크기 래칫을 건다"
         policyFile = layout.settingsDirectory.file("config/quality/size-policy.properties")
         sources.from(looseBuildScripts)
+        // 루트 밖 스크립트는 source set 구분이 없다(전부 build 로직) — 타입 멤버 축도
+        // 같은 집합을 그대로 잰다.
+        typeSources.from(looseBuildScripts)
         report = layout.buildDirectory.file("reports/size-gate/build-scripts.txt")
     }
 

@@ -33,6 +33,16 @@ abstract class SizeGateTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val sources: ConfigurableFileCollection
 
+    /**
+     * D-6 — 타입 멤버 축만 **이** 집합을 잰다(`limit.type.members.source-sets` 가 고른
+     * source set, 관례상 `main`). 파일·함수 축은 여전히 [sources](모든 source set)를 쓴다 —
+     * 면제는 멤버 축 하나뿐이다. 배선하지 않으면 빈 집합이라 그 모듈의 타입 멤버 축은
+     * 관찰만 남고 아무것도 실패시키지 않는다 — 호출부가 반드시 채워야 한다.
+     */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val typeSources: ConfigurableFileCollection
+
     @get:OutputFile
     abstract val report: RegularFileProperty
 
@@ -52,10 +62,23 @@ abstract class SizeGateTask : DefaultTask() {
                 .sortedByDescending { it.lines }
 
         val typeLimit = policy.requireInt("limit.type.members")
-        val types = measureTypes(measured.map { it.first })
-        val oversizedTypes = types.filter { it.memberCount > typeLimit }.sortedByDescending { it.memberCount }
+        // 관찰(모든 source set) — 실패시키지 않는다, 리포트에만 남는다(D-6).
+        val observedTypes = measureTypes(measured.map { it.first })
+        // 게이트(정책이 고른 source set 만) — 여기서만 실패한다.
+        // `asFileTree`로 풀어야 한다 — 디렉터리를 그대로 `from()`에 넘겼을 때 `.files`는
+        // 그 디렉터리 자체를 낼 뿐 안의 파일을 재귀적으로 내지 않는다(실측).
+        val gatedTypes = measureTypes(typeSources.asFileTree.files.toList())
+        val oversizedTypes = gatedTypes.filter { it.memberCount > typeLimit }.sortedByDescending { it.memberCount }
 
-        writeReport(policy.requireValue("policy.version"), limit, functionLimit, typeLimit, measured, types)
+        writeReport(
+            policy.requireValue("policy.version"),
+            limit,
+            functionLimit,
+            typeLimit,
+            measured,
+            observedTypes,
+            gatedTypes,
+        )
 
         failOnFileOffenders(measured, limit)
         failOnLongFunctions(longFunctions, functionLimit)
@@ -109,18 +132,23 @@ abstract class SizeGateTask : DefaultTask() {
         functionLimit: Int,
         typeLimit: Int,
         measured: List<Pair<File, Int>>,
-        types: List<MeasuredType>,
+        observedTypes: List<MeasuredType>,
+        gatedTypes: List<MeasuredType>,
     ) {
         val body =
             measured.joinToString(separator = "\n") { (file, lines) -> "$lines\t${file.name}" }
-        val maxType = types.maxByOrNull { it.memberCount }
+        val maxObserved = observedTypes.maxByOrNull { it.memberCount }
+        val maxGated = gatedTypes.maxByOrNull { it.memberCount }
         report.get().asFile.apply { parentFile.mkdirs() }.writeText(
             "policy.version=$policyVersion\n" +
                 "limit.file.lines=$fileLimit\n" +
                 "limit.function.lines=$functionLimit\n" +
                 "limit.type.members=$typeLimit\n" +
                 "files=${measured.size}\n" +
-                "max.type.members=${maxType?.memberCount ?: 0}\t${maxType?.name ?: ""}\n" +
+                // 게이트 대상(D-6 정책이 고른 source set) — 실패 판정은 이 값을 쓴다.
+                "max.type.members.gated=${maxGated?.memberCount ?: 0}\t${maxGated?.name ?: ""}\n" +
+                // 관찰(모든 source set, 실패 없음) — test 등 면제된 source set 도 여기 남는다.
+                "max.type.members.observed=${maxObserved?.memberCount ?: 0}\t${maxObserved?.name ?: ""}\n" +
                 "$body\n",
         )
     }

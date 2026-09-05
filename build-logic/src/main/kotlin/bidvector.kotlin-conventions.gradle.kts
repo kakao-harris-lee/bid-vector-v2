@@ -58,6 +58,13 @@ private val expectedModuleSourceSets =
         .requireList("module.expected-source-sets")
         .toSet()
 
+// D-6(Phase 3 중 신설) — 타입 멤버 축만 이 source set 집합을 잰다(관례상 `main`). 파일·함수
+// 축은 여전히 전 source set 을 받는다 — 면제는 멤버 축 하나뿐이다.
+private val typeMemberSourceSets =
+    readPolicy(sizePolicy.asFile)
+        .requireList("limit.type.members.source-sets")
+        .toSet()
+
 // 컴파일 task 가 실제로 먹는 소스. 봉쇄 게이트의 한쪽 입력이다.
 val compiledSourceFiles =
     objects.fileCollection().from(
@@ -333,6 +340,9 @@ val sizeGate =
         // 모듈의 빌드 스크립트도 잰다. 어느 source set 에도 속하지 않아 `allSource` 에 보이지
         // 않지만 실제 코드이고, 빼 두면 긴 함수가 그리로 옮겨 가는 것이 우회가 된다.
         sources.from(conventionSourceDirectories, layout.projectDirectory.file("build.gradle.kts"))
+        // D-6 — 타입 멤버 축은 `main`만(build.gradle.kts 는 함수·파일 축에서만 잰다, 타입
+        // 없는 스크립트라 실질 영향은 없다).
+        typeSources.from(provider { sourceSets.filter { it.name in typeMemberSourceSets }.map { it.kotlin } })
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
     }
 
