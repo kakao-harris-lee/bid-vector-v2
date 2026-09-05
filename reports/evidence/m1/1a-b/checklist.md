@@ -37,10 +37,12 @@ set 손 등록 — ④(b)(c)(d) 방어 심층). 나머지는 scope.md 가 이미
 ## 알려진 제한
 
 - **PSI 상한 30 대 실측 최대 21(main, 이 slice 로 넓어진 build-logic 자신 포함) — 여전히
-  느슨하다.** shared-kernel 최대는 6(D-1 실측)이었으나 build-logic 자신의 main 타입
-  (`SourceSetLayoutGateTask` 류, task 설정 객체라 프로퍼티가 자연히 많다)이 21 로 재서
-  간극이 좁혀졌다. 그래도 30 은 보수적이며, 이 값의 재조정은 이 slice 밖(운영자 재확인
-  요청 등재만 — scope D-5 「수치를 자기 승인하지 않는다」).
+  느슨하다.** (verifier r1 B-1 정정) D-1 preflight 의 「6」은 shared-kernel **모듈 최대**가
+  아니라 `BaseAmount` **한 타입**의 값이었다 — 게이트 배선 뒤 실측한 모듈 전체 최대(main,
+  gated)는 shared-kernel 8(`UnroundedBidAmount`)·저장소 전체 21(build-logic 자신의
+  `SourceSetLayoutGateTask`, task 설정 객체라 프로퍼티가 자연히 많다)이다. 그래도 30 은
+  보수적이며, 이 값의 재조정은 이 slice 밖(운영자 재확인 요청 등재만 — scope D-5 「수치를
+  자기 승인하지 않는다」).
 - **CPD 관찰 한계** — 토큰 50 미만으로 잘린 조각, 의미적 중복(변수명만 다른 코드)은 CPD 가
   재지 못한다(scope.md 위협 모델 우회 6, 등재만).
 - **확장 함수는 타입 멤버 축 밖** — 정의상 타입의 멤버가 아니다. 남용은 결합도 축
@@ -50,12 +52,49 @@ set 손 등록 — ④(b)(c)(d) 방어 심층). 나머지는 scope.md 가 이미
   격리 fixture project 에 다시 주입한다 — 이 test 하나가 `:build-logic:test` 실행 시간의
   체감 가능한 몫을 차지한다(다른 test 는 순수 함수라 밀리초 단위). fixture 를 플러그인
   하나만 적용하도록 최소화했지만 classpath 자체를 줄일 방법은 없다.
-- **④(b)(c)(d) 전용 음성 fixture 부재** — (a)가 project 평가를 그 즉시 끊으므로,
-  `testFixturesCompileClasspath`·source-set 집합 불일치·ArchUnit import option 이 실제로
-  「걸리는」 상황은 (a)를 손으로 우회해야만 재현된다. 그 우회를 만드는 fixture 를 새로
-  심는 것은 이 slice 범위를 넘는다고 판단해 만들지 않았다 — 세 게이트 각각의 판정 로직은
-  기존 패턴(정책 파싱·`when` 분기·ArchUnit 옵션 체이닝)을 그대로 쓰므로 그 패턴의 기존
-  test 커버리지가 이미 회귀를 잡는다.
+- **④(b)(c)(d) 전용 음성 fixture 부재 — (b) 는 verifier r1 이 실측으로 닫았다.** (b)
+  (`packageOwnershipGate`의 source-set 집합 비교)는 verifier 가 가드 (a)를 로컬로 제거하고
+  `java-test-fixtures`를 적용해 `예상 밖 source set 'testFixtures'` 로 실제로 잡히는 것을
+  확인했다(N16, commands.md 「verifier r1 재현」절). (c)(`testFixturesCompileClasspath`
+  분기)·(d)(ArchUnit import option)는 여전히 전용 fixture 없이 미실증이다 — (a)가 project
+  평가를 그 자리에서 끊어 재현하려면 (a)를 손으로 우회해야 하고, 그 우회 fixture 를 새로
+  심는 것은 이 slice 범위를 넘는다고 판단해 만들지 않았다. 판정 로직 자체는 기존 패턴
+  (정책 파싱·`when` 분기·ArchUnit 옵션 체이닝)을 그대로 쓰므로 그 패턴의 기존 test
+  커버리지가 회귀를 잡는다.
+
+## Verifier r1 반영 (M-1~M-3·L-1~L-3, head 이전 `cfcb023` → 이번 커밋)
+
+| id | 조치 | 재현(commands.md) |
+| --- | --- | --- |
+| M-1 | 모듈 `sizeGate`의 `typeSources`에 `build.gradle.kts` 추가(`scriptSizeGate`와 대칭) + size-policy 주석의 「타입 없는 스크립트」 정정 | 31개 멤버 클래스를 `shared-kernel/build.gradle.kts`에 심음 → exit 1 → 원복 |
+| M-2 | `bidvector.quality-baseline.gradle.kts`에 `buildLogicTypeShapeGate` 신설(build-logic 자신의 `build/classes/kotlin/main`을 배선) | **새 finding** — 아래 절 |
+| M-3 | `buildLogicGateExecutionGate` 신설(루트, 순환 회피) + `gate-tests.properties`에 `gate.tests.build-logic`(18개 test 전부 — 이 모듈은 게이트 정의 자체가 사는 곳이라 test 스위트 전체가 "게이트가 잡는다는 증거") | `TestFixturesGateTest.kt`를 컴파일 대상에서 빼고 재실행 → `buildLogicGateExecutionGate` 실패 → 원복 |
+| L-1 | `TypeShapeGateTask`의 실패 메시지에 `docs/adr/0007-test-pyramid-and-ratchet.md §5 OPEN-ADR-06 해소 절` 상향 경로 명시 | — |
+| L-2 | size-policy.properties 주석에 「형태 래칫도 main 한정」 한 줄 추가 | — |
+| L-3 | `CpdReportPresenceGateTask.cpdXmlReport`를 `@InputFile`→`@Internal`로(순서는 명시 `dependsOn`이 이미 짐) — 「존재하지 않는다」 사유가 실제로 로그에 나온다 | 리포트 삭제 + `-x cpdCheck` → D-4 사유 메시지 확인(이전엔 Gradle 일반 메시지) |
+
+### M-2 가 드러낸 새 finding — D-5 스타일, 임계·코드 미변경
+
+`buildLogicTypeShapeGate`를 배선하고 실측하니 build-logic 자신의 상속 깊이 최대가 **3**이라
+래칫 상한(2)을 넘는다 — 위반 17건 전부 depth 3, interfaces 는 1로 안 넘는다. 원인은 위반
+목록 자체가 보여준다: `bidvector.buildlogic.*GateTask`류(`abstract class X : DefaultTask()`)
+와 정확히 이 slice·1A 가 등록한 것과 같은 이름들, 그리고 정밀 스크립트 컴파일 클래스
+(`Bidvector_kotlin_conventions_gradle`·`Bidvector_quality_baseline_gradle`) 둘이다.
+**Gradle 의 `DefaultTask`(정확히는 `AbstractTask`) 자체가 이미 2단 상속을 쓰므로, 어떤
+Gradle Task 구현이든 `: DefaultTask()`를 확장하는 순간 depth 3 이 된다** — mixin 팽창이
+아니라 프레임워크가 강제하는 최소 깊이다. baseline(2)은 shared-kernel 의 도메인 타입에서만
+실측됐고(Phase 2 preflight), build-logic 자신의 Task 구현 형태는 스코프 밖이었다 — ①의
+D-5/D-6 과 같은 계열의 사각이다.
+
+D-5 원칙대로 래칫 값도 이 위반을 만든 어떤 코드도 손대지 않았다. `buildLogicTypeShapeGate`는
+계약대로 배선·`check`에 연결돼 있고(M-2 요구 충족), 그 결과 **저장소 전체 `clean check`가
+이 task 하나로 지금 실패한다**(291 task 중 1건, 나머지 전부 GREEN — commands.md). 운영자
+결정이 필요한 지점: (a) build-logic 자신의 Task/Plugin 구현 클래스를 이 축에서 면제(D-6 과
+같은 형태의 정책 키, 예: 대상에서 build-logic 전체를 빼거나 "DefaultTask 서브타입은
+프레임워크 강제 깊이로 시작한다"는 사실을 반영해 build-logic 만 baseline 을 3으로), (b)
+`buildLogicTypeShapeGate`를 통과만 하고 실패는 안 하는 관찰 task 로 낮춘다(CPD 관찰 모드와
+같은 형태), (c) 다른 판단. 결정 전까지 이 task 는 계약대로 배선된 채 **의도적으로 빨간
+상태**로 둔다 — 팀 리드에게 즉시 보고했다.
 
 ## 문서 갱신 잔여 (이 slice 범위 밖 — 세션 모델 소관)
 
