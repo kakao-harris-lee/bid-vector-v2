@@ -214,6 +214,26 @@ class CompileFailureHarnessTest {
             realDiagnosticFragment = "cannot access",
         )
     }
+
+    /**
+     * M1/1A-b ⑥(1B-c 알려진 제한) — `BaseAmount`는 `won`·`currency`·`vatTreatment`·
+     * `provenance` 넷을 다 받아야 하고 기본값이 없다(fixture 7은 `vatTreatment` 인자
+     * 부재라는 다른 명제다 — 이 fixture는 개수 자체의 회귀를 고정한다). 기본값이 조용히
+     * 생기면 인자 둘만으로 만들 수 있게 되므로, 그 회귀를 컴파일 실패로 잡는다.
+     */
+    @Test
+    fun `13 BaseAmount 는 인자 둘로 만들 수 없고 넷을 다 주면 만들 수 있다 (M1 1A-b)`() {
+        assertNegativeFails("13-base-amount-default-less", "no value passed for parameter")
+        assertPositiveCompiles("13-base-amount-default-less")
+    }
+
+    @Test
+    fun `13-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "13-base-amount-default-less-typo",
+            realDiagnosticFragment = "no value passed for parameter",
+        )
+    }
 }
 
 private fun assertNegativeFails(
