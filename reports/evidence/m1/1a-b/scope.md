@@ -110,10 +110,16 @@ rollback: |
 
 ---
 
-## 조사(Phase 2) 항목 — `_workspace/m1-1a-b/01_scout_preflight.md`
+## 조사(Phase 2) 결과 — `_workspace/m1-1a-b/01_scout_preflight.md` (2026-09-05)
 
-CPD 플러그인 Gradle 9.6.1 스모크(H-5 전건) · PSI 대 바이트코드 멤버 계수 대조(D-1) · 9 모듈 depth/interfaces 현재값(D-3 baseline) ·
-게이트 음성 test 관례 · testFixtures 넷의 편집 지점 · 낡은 좌표 4건 · runner low ① 코드 · 스윕 종료 코드(참고).
+- **H-5 전건 충족**: `de.aaschmid.cpd` 3.5(Plugin Portal 최신 안정) + PMD `toolVersion=7.7.0` 이 Gradle 9.6.1·Kotlin 2.4.10·configuration cache 에서 `cpdCheck` 정상 실행. 현 9 모듈 중복 0(관찰 baseline), 인위 중복은 탐지되고 `ignoreFailures=true` 로 exit 0 — 관찰 모드 성립. (b) 후퇴 불필요.
+- **D-1 실측**: shared-kernel 최대 타입의 바이트코드 멤버 20 은 필드 5 + data class 합성 메서드 14~15 이고, **PSI 소스 선언은 6**(생성자 프로퍼티 4 + 본문 프로퍼티 1 + init 1). 상한 30 은 운영자 값 그대로 두되 **현 최대 6 대비 5배로 느슨함**을 알려진 제한에 등재하고 Phase 6 에서 재확인을 올린다 — 임계를 구현이 고치지 않는다(D-5, 1A D-6). PSI 멤버 카운터 헬퍼는 없어 신설한다.
+- **D-3 baseline 확정**: 9 모듈 depth/interfaces 최댓값 **2·1**(shared-kernel; 나머지 자리표시자 1·0) — ADR 해소문과 일치.
+- 음성 test 관례: build-logic 은 순수 함수(`@TempDir` 문자열), app 은 `archfixture.violating` evaluate. **testFixtures 거부(④a)만 TestKit(`GradleRunner`)이 필요 — 이 저장소 첫 사례**, 대가를 evidence 에.
+- testFixtures 편집 지점 셋 확정. ArchUnit 1.5.0 에 `ImportOption.Predefined.DO_NOT_INCLUDE_TEST_FIXTURES` 가 내장(경로 정규식 실측) — 커스텀 옵션 불필요.
+- 낡은 좌표: 4건 + 부수 `:50` 1건(같은 계열) — ⑦ 에 포함.
+- runner low ①: `Regex("fixture $n(?!\\d)")` 한 줄.
+- 스윕 종료 코드: 호출 분리가 이미 답이라 예외 처리 불필요 — 이 slice 밖, 등재만.
 
 ## OPEN — 수령·신설
 
