@@ -106,6 +106,34 @@ test: `TypeShapeFixtureTest`에 Gradle `DefaultTask` 확장(depth 0, build-logic
 소유 체인 fixture 의 상대 비교(middle>root, leaf>middle)는 절대값이 바뀌어도 여전히 성립해
 그대로 뒀다.
 
+## verifier r2 처리(2026-09-06, 커밋 `8549144`) — H-1(high)·M-1(medium)
+
+**H-1 — D-7 의 「소유 타입」 집합이 스캔 단위(보통 한 모듈)라 모듈 경계를 넘는 소유 클래스
+상속이 미탐이었다.** shared-kernel 의 `open class`를 workflow 가 상속하는 실제 구조가 이
+사각에 걸린다. 소유 판정을 `ownedTypeNames`(이번 스캔 집합) **이거나** 루트 패키지
+(`architecture-policy.properties` 의 `package.root`, ADR 0006 D-3 — 하드코딩하지 않고
+같은 정책 소스에서 읽는다) 아래로 넓혔다. `qualityBaseline`·`typeShapeGate`·
+`buildLogicTypeShapeGate` 가 전부 같은 공유 함수를 쓰므로 세 곳이 함께 바뀐다.
+
+재현 — verifier 의 VProbe 셋(shared-kernel 에 `open class VProbeBase`, workflow 에
+`VProbeDerived : VProbeBase()`·`VProbeDeeper : VProbeDerived()`)을 그대로 임시 배치하고
+`:workflow:typeShapeGate` 실행: 수정 전엔 `VProbeDeeper`(같은 모듈 상속, depth 1)만
+잡고 `VProbeDerived`(교차 모듈, 이전 정의로는 depth 0)를 놓쳤다. 수정 후엔 **둘 다** 잡힌다
+(`VProbeDerived` depth 1 · `VProbeDeeper` depth 2). 원복 확인.
+
+**M-1 — `TypeShapeGateTask` 는 입력 경로가 어긋나면 조용히 통과했다.** 스캔한 타입이 0개면
+`cpdReportPresenceGate`(D-4)와 대칭으로 실패하는 비공허 단언을 추가했다. 재현 —
+`buildLogicTypeShapeGate` 의 하드코딩 경로를 `.../kotlin/mainRENAMED` 로 바꾸면 실패
+(「스캔한 타입이 0개다」), 원복 후 `types=282` 확인. 자리표시자 모듈(타입 1개)은 이 단언에
+걸리지 않는다.
+
+test: `TypeShapeFixtureTest`에 `CrossModuleDerived`(다른 모듈의 소유 타입을 흉내 — 일부러
+`importClasses`에 그 상위 `CrossModuleBase`를 넣지 않는다) case 추가 — depth 1로 잡혀야
+스캔 집합만으로는 놓치던 것을 루트 패키지 접두가 잡는다는 것을 고정한다.
+
+실측: `clean check` 전건(291 task, isolated worktree 콜드 빌드 포함) BUILD SUCCESSFUL,
+`:build-logic:test` 176 test(19 class) 0 failed.
+
 ## 문서 갱신 잔여 (이 slice 범위 밖 — 세션 모델 소관)
 
 scope.md in_scope 에 `docs/adr/0007-test-pyramid-and-ratchet.md`(§5 해소 절 포인터)·

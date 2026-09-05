@@ -2,8 +2,8 @@
 
 base `e0aae7f2242f3cffe8f4c32bae2ecec7a3b89b46`. **head 선언은 옮겨 적을 때마다 낡는다
 (verifier r1 B-5 가 잡은 그대로) — 정확한 값은 `git log --oneline -1`을 가리킨다.** 이
-문서를 쓴 시점의 최신 code 커밋은 `03349ad`(D-7, M-2 해소)이고 그 앞은 `5564b47`
-(verifier r1 M-1~M-3·L-1·L-3 반영)이다.
+문서를 쓴 시점의 최신 code 커밋은 `8549144`(verifier r2 H-1·M-1 반영)이고, 그 앞은
+`03349ad`(D-7, M-2 해소) → `5564b47`(verifier r1 M-1~M-3·L-1·L-3 반영) 순.
 
 D-6 커밋(`d0ce669`)이 최초 D-5 finding 을 해소한 뒤 acceptance H-0~H-6 을 그 head 에서
 전건 재실행했다(아래 첫 블록, 중간 실패 이력은 D-5/D-6 절). verifier r1(`_workspace/
@@ -248,3 +248,62 @@ m1-1a-b/02_verifier_r1.md`, ready-for-review, high 0·medium 3·low 3·장부층
   신규 경로 없이 기존 6개 파일만 수정 — 목록 변경 없음)
 - exit: 0
 - 핵심 결과: `git diff <base> -- <in_scope 경로>` 빈 출력(완전 복원 확인)
+
+---
+
+## verifier r2 반영(H-1·M-1) — 최종 acceptance 상태, 커밋 `8549144`
+
+### H-1 재현(수정 확인)
+
+## 2026-09-06T00:10:00Z
+- cmd: `shared-kernel/.../VProbeBase.kt`(open class) + `workflow/.../VProbeDerived.kt`
+  (`VProbeDerived : VProbeBase()`·`VProbeDeeper : VProbeDerived()`) 임시 배치 →
+  `./gradlew --no-daemon --no-build-cache :workflow:typeShapeGate`
+- exit: 1
+- 핵심 결과: `상속 깊이 1 > 0 — bidvector.workflow.VProbeDerived`·
+  `상속 깊이 2 > 0 — bidvector.workflow.VProbeDeeper` **둘 다** 잡힘(verifier r2 는 수정 전
+  `VProbeDerived`(교차 모듈, depth 0)가 빠지는 것을 실측했었다). 파일 삭제 후
+  `git status --short -- shared-kernel/src/main workflow/src/main` 빈 것 확인
+
+### M-1 재현(수정 확인)
+
+## 2026-09-06T00:20:00Z
+- cmd: `buildLogicTypeShapeGate`의 `classes` 경로를 `.../kotlin/mainRENAMED`로 로컬 변경 →
+  `./gradlew --no-daemon --no-build-cache buildLogicTypeShapeGate`
+- exit: 1
+- 핵심 결과: `스캔한 타입이 0개다 — 입력 경로가 비었거나 배선이 어긋났다고 의심된다(D-4
+  대칭, verifier r2 M-1)`. 파일 원복 후 재실행 exit 0, `types=282` 확인
+
+### acceptance 전건
+
+## 2026-09-06T00:25:00Z
+- cmd: `git worktree add --detach <scratchpad>/h0-r2 HEAD(8549144) && (cd <dir> && ./gradlew --no-daemon --no-build-cache clean check)` (H-0)
+- exit: 0
+- 핵심 결과: 291/291 task 콜드 실행 전건 GREEN. worktree 제거 후 잔여 없음 확인
+
+## 2026-09-06T00:30:00Z
+- cmd: `./gradlew --no-daemon --no-build-cache clean check`(H-1) ·
+  `:build-logic:test --rerun-tasks`(H-2) ·
+  `:app:test --tests '*ArchitectureGate*' --tests '*Conformance*'`(H-3) · `qualityBaseline`(H-4) ·
+  `:shared-kernel:test`(H-6) · `:shared-kernel:cpdCheck :shared-kernel:cpdReportPresenceGate` + `test -s`(H-5)
+- exit: 0 (여섯 전부)
+- 핵심 결과: 전부 BUILD SUCCESSFUL. `:build-logic:test` 176 test(19 class) 0 failed 0 skipped.
+  H-5 리포트 3106 bytes
+
+## 2026-09-06T00:35:00Z
+- cmd: 임시 clone(HEAD `8549144`) + rollback.md 명령 그대로 실행(경로 27개, 이번 라운드도
+  신규 경로 없음 — 기존 7개 파일만 수정)
+- exit: 0
+- 핵심 결과: `git diff <base> -- <in_scope 경로>` 빈 출력(완전 복원 확인)
+
+## 2026-09-06T00:36:00Z
+- cmd: `git status --porcelain -- <in_scope 경로 24개, 개별 인자>`
+- exit: 0
+- 핵심 결과: 결과 없음(전부 커밋됨). 양성 대조 — `config/quality/gate-tests.properties`에
+  한 줄 추가 → 잡힘 → `git checkout --`로 원복, 두 상태 다 확인
+
+## 2026-09-06T00:36:30Z
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1a-b/*.md`
+- exit: 0
+- 핵심 결과: 매치는 기존에 이미 등재된 오탐(`79-token`, CPD 토큰 수 — 비밀값 아님) 하나뿐,
+  육안 확인 완료
