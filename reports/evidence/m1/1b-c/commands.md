@@ -3,25 +3,38 @@
 실행 명령과 종료 코드. 출력 전문을 붙이지 않는다 — 핵심 결과는 한 줄이다(`evidence-pack`
 SKILL). 라운드 이력 절은 만들지 않는다 — 그 기록은 git log 와 리뷰 verdict 가 갖는다.
 
-## C-0 — `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check --offline)`
+**verifier r1 L-2 — `--offline` 갈래.** `scope.md` `acceptance_commands` 문면에는
+`--offline` 플래그가 없다 — **정본은 무플래그**다. 이 레인의 로컬 실행은 반복 속도를 위해
+`--offline` 을 동반했고(RO 의존 캐시가 이미 다 채워져 있어 결과가 같다), 아래 최종 수치는
+**무플래그로 재실행해 얻었다**(verifier r1 이 이미 그렇게 실행해 exit 0 을 확인한 방식과
+같다). 이후 라운드에서 다시 로컬 반복 속도가 필요하면 `--offline` 을 동반하되 이 갈래를
+다시 적지 않는다.
 
-- HEAD: `50ed9cd`(runner+배선 커밋).
+## C-0 — `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)`
+
+- HEAD(최종): `ae0d9ad`(verifier r1 M-1~M-3·L-1 처리 + 크기 한도 분리 + fixture 7 위임 철회).
 - exit: 0
-- 핵심 결과: 격리 worktree 에서 `clean check` 전건 통과. `app:test` 12/12(conformance runner
-  10 case + dispatch 완결성·insufficient-evidence 필터 test 둘) · `shared-kernel:test`
-  `CompileFailureHarnessTest` 21/21. worktree 는 검증 뒤 `git worktree remove`(scratchpad
-  경로, `.gradle-home` 잔여 없음 확인) — evidence-pack 규격.
+- 핵심 결과: 격리 worktree 에서 `clean check` 전건 통과(262 tasks). `app:test` 12/12
+  (conformance runner 10 case + dispatch 완결성·insufficient-evidence 필터 test 둘) ·
+  `shared-kernel:test` `CompileFailureHarnessTest` 21/21(XML `tests=` 실측). worktree 는
+  검증 뒤 `git worktree remove`(scratchpad 경로, 잔여 없음 확인) — evidence-pack 규격.
 
-## C-1 — `./gradlew --no-build-cache clean check --offline`
+## C-1 — `./gradlew --no-build-cache clean check`
 
+- HEAD(최종): `ae0d9ad`.
 - exit: 0
-- 핵심 결과: 9 모듈 전건 `check` 통과. **D5 기제 변경(아래 참고) 전 최초 실측은 4 failures**
-  였다 — `shared-kernel testFixtures` 채택 직후 `packageOwnershipGate`·`sourceSetLayoutGate`
-  ·`ArchitectureGateTest`(ArchUnit 프로덕션 스캔) 셋이 동시에 깨졌다(각 사유는 「D5 기제
-  변경」 절). D5(d) 전환 뒤 원인 자체가 사라져 재실측 exit 0.
+- 핵심 결과: 9 모듈 전건 `check` 통과(253 tasks). **D5 기제 변경(아래 참고) 전 최초 실측은
+  4 failures** 였다 — `shared-kernel testFixtures` 채택 직후 `packageOwnershipGate`·
+  `sourceSetLayoutGate`·`ArchitectureGateTest`(ArchUnit 프로덕션 스캔) 셋이 동시에
+  깨졌다(각 사유는 「D5 기제 변경」 절). **verifier r1 수정 라운드 중간에도 한 번 더
+  실패**했다 — `SharedKernelCorpusConformanceTest.kt` 가 506 줄로 `sizeGate` 500 줄
+  한도를 넘어(M-1~M-3·L-1 추가분), `CorpusExecutors.kt`(신규, 251 줄)로 관심사를 갈라
+  재해소했다(기계적 분할이 아니라 「fixture 인프라」 대 「계약 dispatch」 분리 — 각 파일
+  KDoc 참고). 최종 재실측 exit 0.
 
-## C-2 — `./gradlew :shared-kernel:test :app:test --offline`
+## C-2 — `./gradlew :shared-kernel:test :app:test`
 
+- HEAD(최종): `ae0d9ad`.
 - exit: 0
 - 핵심 결과: `shared-kernel:test` — `CompileFailureHarnessTest` 21/21(기존 19 + fixture 12
   둘). `app:test` — `SharedKernelCorpusConformanceTest` 12/12(rate-unit 5·money-basis
@@ -30,16 +43,36 @@ SKILL). 라운드 이력 절은 만들지 않는다 — 그 기록은 git log �
   사는 것이 확인된 뒤 팀장이 **`:app:test` 를 더해 acceptance 문면 자체를 갱신**했다
   (`scope.md` 참고 — 「C-2 보강」 별도 표기 불필요, 이미 명령 자체에 반영됨).
 
-## C-3 — `./gradlew :shared-kernel:domainApiTypeGate :shared-kernel:domainSourceReferenceGate --offline`
+## C-3 — `./gradlew :shared-kernel:domainApiTypeGate :shared-kernel:domainSourceReferenceGate`
 
+- HEAD(최종): `ae0d9ad`.
 - exit: 0
 - 핵심 결과: 둘 다 UP-TO-DATE(전건 exit 0) — `shared-kernel/src/main` 무변경 확인(이 slice
-  는 그 트리를 건드리지 않는다).
+  는 그 트리를 건드리지 않는다, verifier r1 수정 라운드도 포함).
 
-## C-4 — `./gradlew qualityBaseline --offline`
+## C-4 — `./gradlew qualityBaseline`
 
+- HEAD(최종): `ae0d9ad`.
 - exit: 0
 - 핵심 결과: UP-TO-DATE(전건 exit 0).
+
+## 변이 실측 — verifier r1 재현 셋(M-1·M-2·M-3)
+
+최종 HEAD `ae0d9ad` 에서 재실측, 전부 원복 후 `git diff` 빈 것 확인.
+
+1. **M-1(fallback 부재)** — `fixtures/input/money-basis-006.json` 의
+   `row.declaredVatTreatment` 를 로컬에서 `null` 로 되돌리고 재실행 →
+   `IllegalArgumentException: 이 case 는 declaredVatTreatment 가 명시 선언(예: UNKNOWN)
+   이어야 한다` 로 `money-basis-006` 만 FAILED(다른 11 은 그대로 초록). 접기가 완전히
+   없어졌음을 확인한다.
+2. **M-2(declaredUnit 주도)** — `fixtures/input/rate-unit-005.json` 의 `declaredUnit`
+   을 `"percent"` → `"fraction"` 으로 바꾸고 재실행 → `rate-unit-005` 만 FAILED
+   (`Rate.ofFraction(0.875)` ≠ 기대값 `Rate.ofFraction(0.00875)`). executor 가 실제로
+   그 필드를 읽는다.
+3. **M-3(존재 단언)** — `fixtures/manifest.yaml` 의 `money-basis-002` `verified_paths`
+   에 `- "$.bogusNotThere"` 를 추가하고 재실행 → `money-basis-002` FAILED(`경로
+   $.bogusNotThere 가 actual projection 에 없다`). 정정 전에는 이 변이가 **초록**이었다
+   (verifier r1 우회 7 재현).
 
 ## D5 기제 변경 — (b′) testFixtures → (d) 공개 API 동등 비교 (2026-09-05)
 
