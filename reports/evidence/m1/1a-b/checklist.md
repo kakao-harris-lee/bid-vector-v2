@@ -155,6 +155,14 @@ CLAUDE.md 운영자 지시(2026-09-04, 2026-09-05 세션 모델 단독 저작)�
 가 아니라 세션 모델이 쓴다. 구현은 완료됐고 배선 완료 포인터·D-6 등재만 남았다 — 팀 리드에게
 인계.
 
+## 사용자 승인 — 2026-09-06, slice 1A-b 종결
+
+verifier r3 `ready-for-review`(HEAD `4ceb008`, 장부층 evidence `cc90670`) 위에서 **사용자 승인 2026-09-06**.
+D-2(`java-test-fixtures` 전 모듈 불허)·D-6(형태 두 축 `main` 한정)·D-7(깊이 = 소유 타입 체인, 소유 = 스캔 집합 ∨ 루트
+패키지 접두, 값 0) 사후 확인 포함. **타입 멤버 상한 30 유지**(운영자 재확인 — `docs/adr/0007` §5). 이월·알려진 제한
+(CPD 실패 모드 전환은 1C 종료 시 · 방어 심층 (c)(d) 전용 fixture 부재 · 스윕 종료 코드 · capability-map 잔여 좌표 23건)은
+그대로 등재. `OPEN-1BC-TESTFIXTURES-GATE` 는 이 slice 로 해소(D-2). 다음 slice 1C 착수 지시 같은 날.
+
 ## 스코프 경로 표기 정정 (등재만)
 
 scope.md in_scope 는 ⑤ 편집 파일을 `app/src/test/kotlin/bidvector/app/conformance/

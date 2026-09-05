@@ -273,7 +273,8 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   이 축의 근거인 §1.3 합성 팽창의 대상이 아니다, 1A-b D-6) + `ratchet.type.inheritance-depth.max=0`(아래
   D-7 정의)·`ratchet.type.interfaces.max=1`(바이트코드, `qualityBaseline`과 같은 계수 함수). 정본은
   `config/quality/size-policy.properties`, evidence는 `reports/evidence/m1/1a-b/`. **실측 주의**: PSI
-  멤버 계수의 현 최대는 도메인 8·저장소 전체 21(main 기준)이라 상한 30은 느슨하다 — 값 재조정은 운영자 몫.
+  멤버 계수의 현 최대는 도메인 8·저장소 전체 21(main 기준)이라 상한 30은 느슨하다 — **운영자 재확인
+  2026-09-06(1A-b 종결 승인 시): 30 유지.**
 - **상속 깊이 정의 정제(1A-b D-7, 2026-09-05)**: 위 「깊이 2」는 `java.lang.Object`까지 포함한 체인 길이였다.
   build-logic 을 같은 래칫에 넣자 Gradle `DefaultTask` 확장만으로 깊이 3이 되어 — 프레임워크가 강제하는
   기저 깊이는 우리가 늘리지도 줄이지도 못한다 — **깊이 = 프로젝트가 소유한 타입 안에서의 상위 클래스
