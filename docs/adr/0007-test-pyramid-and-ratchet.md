@@ -274,6 +274,14 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   `ratchet.type.interfaces.max=1`(바이트코드, `qualityBaseline`과 같은 계수 함수). 정본은
   `config/quality/size-policy.properties`, evidence는 `reports/evidence/m1/1a-b/`. **실측 주의**: PSI
   멤버 계수의 현 최대는 도메인 6·저장소 전체 21이라 상한 30은 느슨하다 — 값 재조정은 운영자 몫.
+- **상속 깊이 정의 정제(1A-b D-7, 2026-09-05)**: 위 「깊이 2」는 `java.lang.Object`까지 포함한 체인 길이였다.
+  build-logic 을 같은 래칫에 넣자 Gradle `DefaultTask` 확장만으로 깊이 3이 되어 — 프레임워크가 강제하는
+  기저 깊이는 우리가 늘리지도 줄이지도 못한다 — **깊이 = 프로젝트가 소유한 타입 안에서의 상위 클래스
+  체인 길이**(스캔 밖 외부 상위 타입에서 계수 종료)로 정의를 정제했다. 새 정의의 실측 최댓값은 **모든 모듈 0**
+  (도메인 계층이 sealed *인터페이스* 구현이라 클래스 체인이 없다 — 인터페이스는 인터페이스 수 축이 잰다),
+  인터페이스 수는 shared-kernel·build-logic 1. `ratchet.type.inheritance-depth.max=0`·`ratchet.type.interfaces.max=1`.
+  **귀결**: 소유 타입 간 클래스 상속(sealed class 계층 포함)을 새로 두려면 이 절을 개정해 키를 올린다 —
+  래칫의 설계 그대로다. 형태 래칫도 멤버 축과 같이 `main` classes 만 잰다(D-6).
 - **불채택**: (b)는 mixin 우회(§1.3)를 직접 막지 못하고, (c)는 §5와 충돌한다.
 
 **아래는 미결 당시의 기록이며 지우지 않는다.**
