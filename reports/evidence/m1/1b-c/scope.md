@@ -21,7 +21,10 @@ in_scope:
   - shared-kernel/src/testFixtures/**             # ④ D5(b′) — JSON 무의존 projection(값→Map). internal 접근은 KGP 기본 associate(조사 §8 실측)
   - shared-kernel/build.gradle.kts                # ④ `java-test-fixtures` 플러그인 적용만. testFixtures 버킷에 외부 의존을 넣지 않는다
   - app/src/test/**                               # ④ corpus 소비 테스트(conformance runner) — JSON 역직렬화는 여기서만(app 은 domain 층 밖)
-  - app/build.gradle.kts                          # ④ `testImplementation(testFixtures(project(":shared-kernel")))` 한 줄
+  - app/build.gradle.kts                          # ④ `testImplementation(testFixtures(project(":shared-kernel")))` + `testImplementation(libs.snakeyaml)`
+  - gradle/libs.versions.toml                     # ④ 계약 갱신 2026-09-05(팀장) — `snakeyaml` 카탈로그 등재 한 줄 한정(버전은 Boot BOM,
+                                                  #   app testCompileClasspath 에 이미 transitively 해석되는 좌표를 카탈로그 관례대로 명시할 뿐).
+                                                  #   runner 가 manifest.yaml 을 읽기 위함. 다른 카탈로그 편집은 out
   - config/quality/gate-tests.properties          # ④ `gate.tests.app` 에 소비 테스트 FQCN 등재(gateExecutionGate 실행 강제)
   - shared-kernel/src/test/**                     # ④ 계약 갱신 2026-09-05(팀장, 아래 「Phase 3 중 계약 정정」) — 컴파일 fixture 12
                                                   #   (negative/positive/mutant-12-rate-undeclared-unit) + CompileFailureHarnessTest 등재 한정.
