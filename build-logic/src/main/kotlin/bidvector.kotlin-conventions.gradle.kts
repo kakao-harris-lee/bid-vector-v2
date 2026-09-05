@@ -15,6 +15,7 @@ import bidvector.buildlogic.TypeShapeGateTask
 import bidvector.buildlogic.lib
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
+import bidvector.buildlogic.requireValue
 import bidvector.buildlogic.sourceSetLayoutFacts
 import bidvector.buildlogic.version
 import bidvector.buildlogic.versionCatalog
@@ -57,6 +58,13 @@ private val expectedModuleSourceSets =
     readPolicy(configDir.file("quality/architecture-policy.properties").asFile)
         .requireList("module.expected-source-sets")
         .toSet()
+
+// D-7·verifier r2 H-1 — 상속 깊이의 소유 판정을 넓히는 루트 패키지 접두. 하드코딩하지 않고
+// architecture-policy.properties 의 package.root(ADR 0006 D-3)를 그대로 읽는다 — 경계
+// 규칙이 쓰는 값과 다른 값을 이 축이 따로 정의하면 두 자리가 어긋날 수 있다.
+private val typeShapeRootPackagePrefix =
+    readPolicy(configDir.file("quality/architecture-policy.properties").asFile)
+        .requireValue("package.root")
 
 // D-6(Phase 3 중 신설) — 타입 멤버 축만 이 source set 집합을 잰다(관례상 `main`). 파일·함수
 // 축은 여전히 전 source set 을 받는다 — 면제는 멤버 축 하나뿐이다.
@@ -359,6 +367,7 @@ val typeShapeGate =
         description = "상속 깊이·구현 인터페이스 수 래칫 — 증가 금지(D-3, OPEN-ADR-06 (a))"
         policyFile = sizePolicy
         classes.from(provider { sourceSets["main"].output.classesDirs })
+        rootPackagePrefix = typeShapeRootPackagePrefix
         dependsOn(tasks.named("classes"))
         report = layout.buildDirectory.file("reports/type-shape-gate/type-shape-gate.txt")
     }
@@ -401,5 +410,6 @@ rootProject.tasks.named<QualityBaselineTask>("qualityBaseline").configure {
             // 배선을 따라가야 하고, 위치를 고정하는 것은 레이아웃 게이트의 일이다.
             sources.from(this@Project.provider { this@Project.sourceSets["main"].kotlin })
             classes.from(this@Project.provider { this@Project.sourceSets["main"].output.classesDirs })
+            rootPackagePrefix = typeShapeRootPackagePrefix
         }
 }

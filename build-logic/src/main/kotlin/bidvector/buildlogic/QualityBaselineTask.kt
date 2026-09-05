@@ -30,6 +30,10 @@ abstract class ModuleBaselineSpec {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val classes: ConfigurableFileCollection
+
+    /** D-7·verifier r2 H-1 — [TypeShapeGateTask.rootPackagePrefix] 와 같은 값, 같은 이유. */
+    @get:Input
+    abstract val rootPackagePrefix: Property<String>
 }
 
 /**
@@ -67,8 +71,10 @@ abstract class QualityBaselineTask : DefaultTask() {
                 .files
         val lineCounts = sourceFiles.map { it.readLines().size }
         val types = importTypes(spec)
-        // D-7 — 상속 깊이는 이 모듈이 소유한 타입(= 이번 import 로 스캔한 집합) 안에서만 잰다.
+        // D-7·verifier r2 H-1 — 소유 판정 = 이번 import 로 스캔한 집합이거나 루트 패키지 아래.
+        // 스캔 집합만으로는 모듈 경계를 넘는 소유 클래스 상속을 놓친다(TypeShapeGateTask 와 동일).
         val ownedTypeNames = types.map { it.name }.toSet()
+        val rootPackagePrefix = spec.rootPackagePrefix.get()
         return BaselineRow(
             module = spec.moduleName.get(),
             projectDependencies = spec.projectDependencies.get(),
@@ -77,7 +83,7 @@ abstract class QualityBaselineTask : DefaultTask() {
             maxFileLines = lineCounts.maxOrNull() ?: 0,
             types = types.size,
             maxTypeMembers = types.maxOfOrNull { it.methods.size + it.fields.size } ?: 0,
-            maxInheritanceDepth = types.maxOfOrNull { it.inheritanceDepth(ownedTypeNames) } ?: 0,
+            maxInheritanceDepth = types.maxOfOrNull { it.inheritanceDepth(ownedTypeNames, rootPackagePrefix) } ?: 0,
             maxInterfaces = types.maxOfOrNull { it.interfaceCount() } ?: 0,
             publicApi = types.sumOf(::publicMemberCount),
         )
@@ -111,8 +117,10 @@ abstract class QualityBaselineTask : DefaultTask() {
                 "게이트가 아니라 측정이다. 타입 축은 바이트코드 기준이라 Kotlin `internal` 이 public 으로 보인다.",
                 "duplicate mechanical helper 축은 이 task 가 재지 않는다 — 측정 정의는 " +
                     "`ADR 0007` OPEN-ADR-16(운영자 결정 2026-09-03)으로 이월했다.",
-                "`max depth`(D-7, 2026-09-05 정제) — 상속 깊이는 이 모듈이 소유한 타입 안에서만 " +
-                    "잰다. `java.lang.Object`·프레임워크 기저 클래스를 만나면 멈춘다.",
+                "`max depth`(D-7 · verifier r2 H-1) — 상속 깊이는 이 모듈이 스캔한 타입이거나 " +
+                    "루트 패키지(`package.root`) 아래인 타입 안에서만 잰다. `java.lang.Object`·" +
+                    "프레임워크 기저 클래스를 만나면 멈춘다 — 모듈 경계를 넘는 소유 클래스 상속은 " +
+                    "잡되 프레임워크 상속은 세지 않는다.",
                 "",
                 markdownRow(COLUMNS.map { it.header }),
                 markdownRow(COLUMNS.mapIndexed { index, _ -> if (index == 0) "---" else "--:" }),

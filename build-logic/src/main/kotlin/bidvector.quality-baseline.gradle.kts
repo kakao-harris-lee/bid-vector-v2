@@ -6,6 +6,7 @@ import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.TypeShapeGateTask
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
+import bidvector.buildlogic.requireValue
 
 // D-6(Phase 3 중 신설) — 타입 멤버 축이 재는 source set 이름. `build-logic/src/<name>` 으로
 // 그대로 디렉터리가 된다 — included build 는 Gradle source set 이 아니라 원시 디렉터리라
@@ -13,6 +14,11 @@ import bidvector.buildlogic.requireList
 private val typeMemberSourceSets =
     readPolicy(layout.settingsDirectory.file("config/quality/size-policy.properties").asFile)
         .requireList("limit.type.members.source-sets")
+
+// D-7·verifier r2 H-1 — kotlin-conventions 의 `typeShapeRootPackagePrefix` 와 같은 값·같은 이유.
+private val typeShapeRootPackagePrefix =
+    readPolicy(layout.settingsDirectory.file("config/quality/architecture-policy.properties").asFile)
+        .requireValue("package.root")
 
 // 모듈별 입력은 각 모듈의 convention plugin 이 붙인다 — 루트가 subproject 의 configuration 을
 // 먼저 읽으려 하면 평가 순서에 걸린다.
@@ -52,6 +58,7 @@ val buildLogicTypeShapeGate =
         description = "included build main 에도 상속 깊이·인터페이스 수 래칫을 건다"
         policyFile = layout.settingsDirectory.file("config/quality/size-policy.properties")
         classes.from(layout.settingsDirectory.dir("build-logic/build/classes/kotlin/main"))
+        rootPackagePrefix = typeShapeRootPackagePrefix
         dependsOn(gradle.includedBuild("build-logic").task(":classes"))
         report = layout.buildDirectory.file("reports/type-shape-gate/build-logic.txt")
     }

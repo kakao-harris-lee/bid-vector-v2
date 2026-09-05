@@ -1,10 +1,13 @@
 package bidvector.buildlogic
 
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputFile
@@ -26,6 +29,11 @@ abstract class TypeShapeGateTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val classes: ConfigurableFileCollection
 
+    /** D-7·verifier r2 H-1 — 소유 판정을 넓히는 루트 패키지 접두. `architecture-policy.properties`
+     * 의 `package.root`(ADR 0006 D-3)에서 호출부가 읽어 넘긴다 — 하드코딩하지 않는다. */
+    @get:Input
+    abstract val rootPackagePrefix: Property<String>
+
     @get:OutputFile
     abstract val report: RegularFileProperty
 
@@ -39,12 +47,29 @@ abstract class TypeShapeGateTask : DefaultTask() {
             } else {
                 ClassFileImporter().importPaths(roots).filterNot { it.isAnonymousClass }
             }
-        // D-7 — 상속 깊이는 이 배선이 스캔한 집합(= 이 모듈이 소유한 타입) 안에서만 잰다.
+        failOnEmptyScan(imported)
+        // D-7 — 소유 판정 = 이 배선이 스캔한 집합이거나 루트 패키지 아래(verifier r2 H-1 — 모듈
+        // 경계를 넘는 소유 클래스 상속도 계수하기 위해 스캔 집합만으로는 부족했다).
         val ownedTypeNames = imported.map { it.name }.toSet()
-        val shapes = imported.map { it.toTypeShape(ownedTypeNames) }
+        val prefix = rootPackagePrefix.get()
+        val shapes = imported.map { it.toTypeShape(ownedTypeNames, prefix) }
 
         writeReport(policy, shapes)
         failOnViolations(policy, shapes)
+    }
+
+    /**
+     * verifier r2 M-1 — `classes` 입력 경로가 배선 실수로 어긋나면(예: 존재하지 않는 디렉터리)
+     * `roots`가 비어 `imported`도 비고, 그러면 조용히 「위반 0건」으로 통과했다 —
+     * `cpdReportPresenceGate`(D-4)가 막는 것과 같은 계열의 퇴화다. 자리표시자 모듈(타입 1개)은
+     * 이 단언에 걸리지 않는다 — 걸리는 것은 정확히 0개일 때뿐이다.
+     */
+    private fun failOnEmptyScan(imported: List<JavaClass>) {
+        if (imported.isNotEmpty()) return
+        throw GradleException(
+            "스캔한 타입이 0개다 — 입력 경로가 비었거나 배선이 어긋났다고 의심된다(D-4 대칭, " +
+                "verifier r2 M-1). `classes` 입력이 실제 컴파일 산출물 디렉터리를 가리키는지 확인한다.",
+        )
     }
 
     private fun failOnViolations(

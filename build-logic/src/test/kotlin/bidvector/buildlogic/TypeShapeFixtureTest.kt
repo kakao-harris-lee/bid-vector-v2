@@ -3,6 +3,7 @@ package bidvector.buildlogic
 import bidvector.buildlogic.typeshapefixture.ChainLeaf
 import bidvector.buildlogic.typeshapefixture.ChainMiddle
 import bidvector.buildlogic.typeshapefixture.ChainRoot
+import bidvector.buildlogic.typeshapefixture.CrossModuleDerived
 import bidvector.buildlogic.typeshapefixture.DelegatingGreeter
 import bidvector.buildlogic.typeshapefixture.FakeGradleTask
 import bidvector.buildlogic.typeshapefixture.Status
@@ -17,8 +18,9 @@ import kotlin.test.assertTrue
  * Kotlin 바이트코드**에서 옳게 재는지 고정한다 — preflight §3의 미실측(`by` 위임)을 닫고,
  * `qualityBaseline`과 `typeShapeGate`가 같은 함수를 쓰므로 이 test 가 둘 모두를 검증한다.
  *
- * D-7(verifier r1 M-2) — 상속 깊이는 **이 test 가 `importClasses`로 명시한 집합** 안에서만
- * 잰다. 그 집합 밖의 클래스(`java.lang.Enum`·Gradle `DefaultTask`)를 만나면 멈춘다.
+ * D-7(verifier r1 M-2) · verifier r2 H-1 — 상속 깊이는 **이 test 가 `importClasses`로 명시한
+ * 집합이거나 루트 패키지(`bidvector.`) 아래** 안에서만 잰다. 둘 다 아닌 클래스
+ * (`java.lang.Enum`·Gradle `DefaultTask`)를 만나면 멈춘다.
  */
 class TypeShapeFixtureTest {
     private val classes =
@@ -30,10 +32,14 @@ class TypeShapeFixtureTest {
             Status::class.java,
             DelegatingGreeter::class.java,
             FakeGradleTask::class.java,
+            // `CrossModuleBase`는 일부러 넣지 않는다 — 다른 모듈의 소유 타입(스캔 밖이지만
+            // `bidvector.` 아래)을 흉내내야 한다(verifier r2 H-1).
+            CrossModuleDerived::class.java,
         )
     private val ownedTypeNames = classes.map { it.name }.toSet()
+    private val rootPackagePrefix = "bidvector"
 
-    private fun shapeOf(cls: Class<*>) = classes.get(cls).toTypeShape(ownedTypeNames)
+    private fun shapeOf(cls: Class<*>) = classes.get(cls).toTypeShape(ownedTypeNames, rootPackagePrefix)
 
     @Test
     fun `상속 체인의 깊이가 단계마다 늘어난다`() {
@@ -63,6 +69,13 @@ class TypeShapeFixtureTest {
     @Test
     fun `Gradle DefaultTask 를 확장해도 집합 밖이라 depth 가 0이다 (D-7, build-logic 자신의 형태)`() {
         assertEquals(0, shapeOf(FakeGradleTask::class.java).inheritanceDepth)
+    }
+
+    @Test
+    fun `스캔 집합 밖이라도 루트 패키지 아래면 상속 깊이에 잡힌다 (verifier r2 H-1)`() {
+        // CrossModuleDerived 의 상위 CrossModuleBase 는 importClasses 목록에 없다(스캔 밖) —
+        // 다른 모듈이 소유한 타입을 흉내낸다. 그래도 `bidvector.` 아래라 계수를 계속해야 한다.
+        assertEquals(1, shapeOf(CrossModuleDerived::class.java).inheritanceDepth)
     }
 
     @Test
