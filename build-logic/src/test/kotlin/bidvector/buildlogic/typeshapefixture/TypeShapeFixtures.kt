@@ -43,3 +43,10 @@ internal enum class Status {
 internal class DelegatingGreeter(
     delegate: Greeter,
 ) : Greeter by delegate
+
+/**
+ * D-7(verifier r1 M-2) — build-logic 자신의 실제 형태(`abstract class X : DefaultTask()`)를
+ * 그대로 고정한다. `DefaultTask`는 이 fixture 컴파일 단위 밖(Gradle API)이라 import 집합에
+ * 없다 — depth 는 0 이어야 한다.
+ */
+internal abstract class FakeGradleTask : org.gradle.api.DefaultTask()

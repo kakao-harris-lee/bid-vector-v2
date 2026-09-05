@@ -33,15 +33,15 @@ abstract class TypeShapeGateTask : DefaultTask() {
     fun gate() {
         val policy = TypeShapeRatchetPolicy.load(policyFile.get().asFile)
         val roots = classes.files.filter { it.isDirectory }.map { it.toPath() }
-        val shapes =
+        val imported =
             if (roots.isEmpty()) {
                 emptyList()
             } else {
-                ClassFileImporter()
-                    .importPaths(roots)
-                    .filterNot { it.isAnonymousClass }
-                    .map { it.toTypeShape() }
+                ClassFileImporter().importPaths(roots).filterNot { it.isAnonymousClass }
             }
+        // D-7 — 상속 깊이는 이 배선이 스캔한 집합(= 이 모듈이 소유한 타입) 안에서만 잰다.
+        val ownedTypeNames = imported.map { it.name }.toSet()
+        val shapes = imported.map { it.toTypeShape(ownedTypeNames) }
 
         writeReport(policy, shapes)
         failOnViolations(policy, shapes)
