@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.detekt.gradlePlugin)
     implementation(libs.ktlint.gradlePlugin)
     implementation(libs.kover.gradlePlugin)
+    implementation(libs.cpd.gradlePlugin)
     implementation(libs.archunit.core)
 
     testImplementation(platform(libs.junit.bom))

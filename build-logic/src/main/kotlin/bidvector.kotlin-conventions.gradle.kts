@@ -1,5 +1,7 @@
+import bidvector.buildlogic.CpdReportPresenceGateTask
 import bidvector.buildlogic.DomainApiTypeGateTask
 import bidvector.buildlogic.DomainSourceReferenceGateTask
+import bidvector.buildlogic.DuplicatePolicy
 import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.JarContentGateTask
 import bidvector.buildlogic.ModuleBaselineSpec
@@ -21,6 +23,7 @@ plugins {
     id("dev.detekt")
     id("org.jlleitschuh.gradle.ktlint")
     id("org.jetbrains.kotlinx.kover")
+    id("de.aaschmid.cpd")
 }
 
 val libs = versionCatalog
@@ -86,6 +89,39 @@ detekt {
     buildUponDefaultConfig = true
     config.from(configDir.file("detekt/detekt.yml"))
 }
+
+// M1/1A-b ③(OPEN-ADR-16 (a)) — PMD CPD **관찰 모드**. 값은 전부 정책 데이터에서 온다
+// (`duplicate-policy.properties`, 매직 넘버 금지) — `ignoreFailures`가 `mode=observe`를
+// 그대로 번역하므로 이 편집 한 줄이 곧 실패 모드로의 전환 스위치가 되지 않는다(D-4).
+// Kotlin property 문법(`ext.language = ...`)은 `CodeQualityExtension`이 상속받은
+// `ignoreFailures`에서 private field 접근으로 오판되어 컴파일이 안 됐다 — 명시적 setter
+// 호출로 그 모호성을 피한다.
+private val duplicatePolicy = DuplicatePolicy.load(configDir.file("quality/duplicate-policy.properties").asFile)
+
+extensions.configure(de.aaschmid.gradle.plugins.cpd.CpdExtension::class.java) {
+    setLanguage(duplicatePolicy.language)
+    setMinimumTokenCount(duplicatePolicy.minimumTokenCount)
+    setToolVersion(duplicatePolicy.toolVersion)
+    setIgnoreFailures(duplicatePolicy.ignoreFailures)
+}
+
+// 리포트 위치를 우리가 직접 정한다 — 플러그인 기본 report 객체의 `outputLocation`을 다른
+// task 의 input 으로 그대로 연결하면 "does not have a task associated with it"로 구성
+// 단계에서 실패한다(실측). 경로를 명시하면 이 모호성이 없다.
+val cpdReportFile = layout.buildDirectory.file("reports/cpd/${project.name}.xml")
+
+tasks.named<de.aaschmid.gradle.plugins.cpd.Cpd>("cpdCheck") {
+    reports.xml.required.set(true)
+    reports.xml.outputLocation.set(cpdReportFile)
+}
+
+// 관찰 모드가 "실행 안 함"으로 조용히 퇴화하지 않게 리포트 산출 자체를 단언한다(D-4).
+val cpdReportPresenceGate =
+    tasks.register<CpdReportPresenceGateTask>("cpdReportPresenceGate") {
+        description = "PMD CPD 리포트 산출을 단언한다 — 관찰 모드가 '실행 안 함'으로 퇴화하지 않게(D-4)"
+        cpdXmlReport.set(cpdReportFile)
+        dependsOn(tasks.named("cpdCheck"))
+    }
 
 // 경계의 1차 강제는 **모든 모듈**에 건다. domain 만 걸면 workflow 가 adapters 를 참조하는
 // 역방향 선언이 1차에서 통과한다 — 층 규칙은 domain 전용이 아니다(ADR 0006 D-3).
@@ -295,6 +331,7 @@ tasks.named("check") {
         gateExecutionGate,
         domainSourceReferenceGate,
         domainApiTypeGate,
+        cpdReportPresenceGate,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )

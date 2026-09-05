@@ -7,6 +7,10 @@ ktlint = "1.8.0"
 ktlint-gradle = "14.2.0"
 kover = "0.9.9"
 archunit = "1.5.0"
+# M1/1A-b ③(OPEN-ADR-16 (a)) — PMD CPD 관찰 모드. 플러그인 버전만 여기 둔다 — PMD 엔진
+# 자체의 `toolVersion`(7.7.0, Gradle 9.6.1 스모크 확인)은 정책 데이터라
+# `config/quality/duplicate-policy.properties`가 갖는다(매직 넘버·중복 금지).
+cpd = "3.5"
 junit = "6.1.3"
 kotest = "6.2.4"
 coroutines = "1.10.2"
@@ -25,6 +29,7 @@ kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", ve
 detekt-gradlePlugin = { module = "dev.detekt:detekt-gradle-plugin", version.ref = "detekt" }
 ktlint-gradlePlugin = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint-gradle" }
 kover-gradlePlugin = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", version.ref = "kover" }
+cpd-gradlePlugin = { module = "de.aaschmid:gradle-cpd-plugin", version.ref = "cpd" }
 
 # quality baseline task 가 컴파일된 바이트코드에서 타입 축을 잰다(OPEN-ADR-06 입력).
 archunit-core = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
