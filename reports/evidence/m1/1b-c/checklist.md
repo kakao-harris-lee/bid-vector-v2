@@ -147,4 +147,8 @@ domain 층이 아니라 `moduleDependencyGate` 의 `group.forbidden` 대상이 �
   접두 안전하지 않다(11→1 도 번호 단언은 통과) ② capability-map OPEN-1B-CORPUS 행 수치(`16053f2` 로 정정)
   ③ commands/checklist/rollback 의 기록 HEAD 가 `ae0d9ad` 로 최종 `e12c605` 가 아니다(evidence 커밋 자신이
   HEAD 를 만드는 구조적 지연 — 빌드 영향 없음, verifier 가 최종 HEAD 재실행) ④ `fixtures.md` §4 의 낡은
-  명령형 한 문장 ⑤ `fixtures.md` §2 혼입 문단 줄바꿈. **남은 것은 사용자 승인이다.**
+  명령형 한 문장 ⑤ `fixtures.md` §2 혼입 문단 줄바꿈.
+- **사용자 승인 2026-09-05 — slice 1B-c 종결.** 계약 정정 둘(산출하지 않는 축 미잠금 · D5 (b′)→(d)) 사후 확인 포함.
+  `OPEN-1B-CONTRACT`·`OPEN-1B-CORPUS` 종결(`capability-map.md` §14.2). r2 low ①(fixture 번호 대조 접두 안전성)은
+  운영자 결정으로 **1A-b 로 이월**, ③~⑤ 는 등재로 종결. 이월 넷(`OPEN-1BC-STR16`·`SOURCE-UNIT`·`ELIGIBILITY`·
+  `TESTFIXTURES-GATE`)은 각 소유 slice 로.
