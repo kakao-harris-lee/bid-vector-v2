@@ -1,0 +1,157 @@
+{
+  "milestone": "m1",
+  "slice": "1b-c-corpus-contract-alignment",
+  "role": "fixture-curator",
+  "lane": "①②③ — 술어 어휘 확장 · rate-unit 재추출 · money-basis 처분 (④ 소비 테스트는 별도 레인)",
+  "generated_at": "2026-09-05",
+  "base_sha": "a5ea955c44a935c3245288e6a72c830eeeee64b8",
+  "head_sha": "ed87da6988cabfb4a492ff4a6a5582483dc06aea",
+  "contract_read_at": "shared-kernel/src/main/kotlin/bidvector/sharedkernel/{Money,Rate,Carrier,Provenance,Basis,MoneyArithmetic}.kt @ 977083b — 이 레인은 그 경로를 읽기만 했고 쓰지 않았다",
+  "operator_decisions": [
+    "decision 18 (2026-09-05) — 술어 어휘 동결 해제 (a) 셋 전부",
+    "decision 19 (2026-09-05) — 결과 토큰 어휘 (a) 1B 계약 이름 그대로",
+    "decision 20 (2026-09-05) — BLOCK-3 을 case 별 승인으로",
+    "decision 21 (2026-09-05) — D4 처분 표 전체 승인 (바뀜 3 · 불명 1 포함)"
+  ],
+  "purpose": "1B 축 corpus 열하나의 처분 결과와 그 근거. 분류의 정본은 fixtures/manifest.yaml 이고 이 파일은 그 투영이다.",
+  "summary": {
+    "cases_examined": 11,
+    "restored_to_authoritative": 10,
+    "still_insufficient_evidence": 1,
+    "expected_files_modified": 9,
+    "input_files_modified": 3,
+    "sha_mismatches": 0,
+    "authoritative_total": 28,
+    "authoritative_outside_1b_axis": 18,
+    "authoritative_outside_1b_axis_changed": false
+  },
+  "predicates_added": [
+    {
+      "name": "is-present",
+      "operand": "없음",
+      "catches": ["(a) 삭제", "(b) null 치환"],
+      "misses": ["(a′) 값 변이 — 설계상"],
+      "used_by": ["money-basis-006 $.reasonCode"],
+      "why": "이름이 계약 어휘 밖인 사유 코드의 존재만 잠근다"
+    },
+    {
+      "name": "differs-from-path",
+      "operand": "같은 기대값 안의 경로 문자열",
+      "catches": ["(a) 삭제", "(b) null 치환", "(b′) 거울 경로 값 대입"],
+      "used_by": [],
+      "why": "정의만 세웠다 — 이 corpus 에 그 형태를 주장하는 자리가 아직 없다"
+    },
+    {
+      "name": "differs-from-case",
+      "operand": "거울 case id (자기 참조·미지 id 는 ManifestFormatError)",
+      "catches": ["(a) 삭제", "(b) null 치환", "(c′) 거울 case 값 대입"],
+      "used_by": [],
+      "why": "정의만 세웠다 — decision 19 로 상태 토큰이 승인 어휘가 돼 쌍 주장을 정확 비교가 더 강하게 잠근다"
+    }
+  ],
+  "dispositions": [
+    {
+      "case": "rate-unit-001",
+      "action": "재추출",
+      "classification": "authoritative",
+      "contract_type_path": "Rate.Companion.ofPercent(BigDecimal)",
+      "verified_paths": ["$.fact", "$.rate.fraction", "$.conversionDivisor"],
+      "verified_projections": [],
+      "note": "verifies 를 「percent→fraction 명시 변환」으로 좁히고 원문 unit 보존 축을 OPEN-1BC-SOURCE-UNIT 로 이관"
+    },
+    {
+      "case": "rate-unit-002",
+      "action": "재추출",
+      "classification": "authoritative",
+      "contract_type_path": "Rate.Companion.ofFraction(BigDecimal)",
+      "verified_paths": ["$.fact", "$.rate.fraction", "$.conversionDivisor"],
+      "verified_projections": []
+    },
+    {
+      "case": "rate-unit-003",
+      "action": "재추출",
+      "classification": "authoritative",
+      "contract_type_path": "Rate 의 internal 생성자 + Fact.Absent(ReasonCode.UNIT_NOT_DECLARED)",
+      "verified_paths": ["$.fact", "$.reasonCode", "$.rate"],
+      "verified_projections": [],
+      "note": "guessAttempted 제거 — 구성상 불가는 컴파일 fixture 와 ADR 0002 D-4 가 증명한다"
+    },
+    {
+      "case": "rate-unit-004",
+      "action": "재추출",
+      "classification": "authoritative",
+      "contract_type_path": "rate-unit-003 과 같다",
+      "verified_paths": ["$.fact", "$.reasonCode", "$.rate"],
+      "verified_projections": [],
+      "note": "003 과 기대값 내용이 같다 — 쌍 주장의 기계 표현이고 갈라지면 C-10 이 잡는다"
+    },
+    {
+      "case": "rate-unit-005",
+      "action": "재추출",
+      "classification": "authoritative",
+      "contract_type_path": "Rate.Companion.ofPercent(BigDecimal)",
+      "verified_paths": ["$.fact", "$.rate.fraction", "$.conversionDivisor"],
+      "verified_projections": []
+    },
+    {
+      "case": "money-basis-001",
+      "action": "재정의",
+      "classification": "authoritative",
+      "contract_type_path": "CompileFailureHarnessTest fixture 11 (negative-11-cross-basis-compare / positive-11-same-basis-compare) + Money · Basis",
+      "verified_paths": ["$.representable"],
+      "verified_projections": [],
+      "note": "기대값이 {\"representable\": false} 하나. 입력 basis ESTIMATED_PRICE → ESTIMATED"
+    },
+    {
+      "case": "money-basis-002",
+      "action": "재추출",
+      "classification": "authoritative",
+      "contract_type_path": "compareKnownVat(BaseAmount, BaseAmount) + Basis.BASE_AMOUNT",
+      "verified_paths": ["$.fact", "$.comparedBases"],
+      "verified_projections": [],
+      "note": "result·comparisonPerformed 제거. type_path 를 낡은 BaseAmount.compareTo 에서 정정"
+    },
+    {
+      "case": "money-basis-003",
+      "action": "이월",
+      "classification": "insufficient-evidence",
+      "contract_type_path": "없다 — 검색 경로(STR-16)를 나르는 타입이 계약에 없다",
+      "verified_paths": [],
+      "verified_projections": [],
+      "note": "기대값·입력·해시 무접촉. 소유는 OPEN-1BC-STR16 (strategy slice)"
+    },
+    {
+      "case": "money-basis-004",
+      "action": "재정의",
+      "classification": "authoritative",
+      "contract_type_path": "CompileFailureHarnessTest fixture 11 + Money (상위 타입에 이항 연산 없음)",
+      "verified_paths": ["$.representable"],
+      "verified_projections": [],
+      "note": "001 과 기대값이 같다. min/max 를 이름으로 가진 함수가 1B 에 없다는 부재가 이 case 가 재는 것"
+    },
+    {
+      "case": "money-basis-005",
+      "action": "재추출 + 입력 정렬",
+      "classification": "authoritative",
+      "contract_type_path": "compareKnownVat(BaseAmount, BaseAmount) — 전건 sameKnownVat + Fact.Absent(ReasonCode.VAT_TREATMENT_MISMATCH)",
+      "verified_paths": ["$.fact", "$.reasonCode"],
+      "verified_projections": [],
+      "note": "입력 둘째 금액 provenance Undeclared → Published. 계약이 provenance 를 VAT 보다 먼저 보므로 두 전건이 함께 깨진 입력에서는 이 case 의 사유가 나올 수 없었다"
+    },
+    {
+      "case": "money-basis-006",
+      "action": "계약만 신설 (기대값 무변경)",
+      "classification": "authoritative",
+      "contract_type_path": "VatTreatment.UNKNOWN · Provenance.Undeclared · Money 다섯 성분의 필수 파라미터",
+      "verified_paths": ["$.vatTreatment", "$.provenance", "$.autoTaggedFromDefinitionDefault", "$.eligibleForAuthoritativeCorpus"],
+      "verified_projections": ["$.reasonCode is-present"],
+      "note": "정확 비교가 앞선 not-equals+case-fold 보다 강하다 — 배제 목록이 아니라 미상 쪽 이름을 잠근다"
+    }
+  ],
+  "open_items_created": [
+    "OPEN-1BC-SOURCE-UNIT — 원문 unit 보존. 소유는 1C 이후 어댑터 slice",
+    "OPEN-1BC-STR16 — 검색 경로의 basis 일치. 소유는 strategy slice"
+  ],
+  "usage_note": "money-basis-003 을 뺀 열은 이제 authoritative 다 — 「승인된 authoritative corpus 통과」의 모집단에 든다. 다만 그 통과를 실제로 실행하는 것은 ④ 소비 테스트이고 이 레인은 만들지 않았다.",
+  "handoff_to_runner": "각 case 의 verified_paths·verified_projections 가 runner 가 대조해야 하는 경로다. contract_binding.does_not_carry 를 단언하면 계약에 없는 이름을 테스트가 굳힌다. rate-unit 다섯과 money-basis-001·004 는 계약에 그 상태를 방출하는 함수가 없다 — 상세는 fixtures.md §4."
+}
