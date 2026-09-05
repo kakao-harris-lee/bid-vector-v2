@@ -206,12 +206,13 @@ internal val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
         // 아니라 runner 상수가 지게 된다(재현: fallback 을 INCLUSIVE 로 바꿔도 그 case 만
         // FAILED, shared-kernel 무변경 — 계약이 아니라 runner 가 답을 정하고 있었다는 뜻).
         // 입력이 **명시 선언**(UNKNOWN·Undeclared)을 갖고 있어야 하고, 없으면 지어내지 않고
-        // 실패한다. 「정의상 기본값 없음」의 실질은 계약의 구성적 사실(생성자에 기본값 없는
-        // 필수 파라미터 — compile fixture 7 `vat-fixed-money-no-vat-arg`/`explicit-vat`
-        // 가족이 증명)이라 그 위임도 함께 건다 — 이 case 는 「선언 값 왕복(value) +
-        // compile-fixture 7 위임」 둘을 겸한다.
+        // 실패한다. 이 case 는 **선언 값 왕복(value executor)** 만 겐다 — compile fixture
+        // 위임은 걷었다: fixture 7(`vat-fixed-money-no-vat-arg`/`explicit-vat`)은
+        // `YegaAmount` 가 **명시 VAT 인자를 거부**함을 재는 다른 명제이지 `BaseAmount` 의
+        // `vatTreatment`/`provenance` 가 기본값 없는 필수 파라미터라는 사실을 재지 않는다
+        // (curator `fixtures.md` §7-8 실측). 그 축을 재는 컴파일 fixture 는 지금 없고,
+        // 새 fixture 신설은 이 slice `out_of_scope` 라 알려진 제한으로만 등재한다.
         "money-basis-006" to { input ->
-            assertCompileFixtureFamilyExists(NO_DEFAULT_VAT_PROVENANCE_FIXTURE)
             val row = input.atDollarPath("$.row")
             require(row.path("conceptSlot").asString() == "BASE_AMOUNT") { "이 case 는 BASE_AMOUNT 슬롯만 다룬다" }
             val won = row.path("amount").asLong()
@@ -248,12 +249,3 @@ internal val COMPILE_DELEGATION_FIXTURES: Map<String, Int> =
         "rate-unit-003" to 12,
         "rate-unit-004" to 12,
     )
-
-/**
- * `money-basis-006` 이 함께 거는 compile-fixture — `vatTreatment`·`provenance` 가 기본값
- * 없는 필수 파라미터라는 구성적 사실(`vat-fixed-money-no-vat-arg`/`explicit-vat` 가족).
- * `COMPILE_DELEGATION_FIXTURES` 에 넣지 않는 이유: 그 표는 「대조 대상이 컴파일 실패뿐인」
- * case 전용이고 006 은 value executor 를 겸하기 때문이다 — 표 하나에 성질이 둘인 항목을
- * 두면 `dispatch 표 밖의 authoritative case 가 없다` test 의 「셋 중 하나」가정이 깨진다.
- */
-private const val NO_DEFAULT_VAT_PROVENANCE_FIXTURE = 7
