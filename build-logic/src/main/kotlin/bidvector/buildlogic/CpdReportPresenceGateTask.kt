@@ -3,9 +3,7 @@ package bidvector.buildlogic
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.tasks.InputFile
-import org.gradle.api.tasks.PathSensitive
-import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import java.io.File
 
@@ -22,9 +20,14 @@ internal fun cpdReportPresenceViolation(report: File): String? =
     }
 
 abstract class CpdReportPresenceGateTask : DefaultTask() {
-    /** `cpdCheck`의 XML 리포트 — provider 로 연결되므로 이 task 가 `cpdCheck` 뒤에 자동으로 돈다. */
-    @get:InputFile
-    @get:PathSensitive(PathSensitivity.NONE)
+    /**
+     * `cpdCheck`의 XML 리포트 경로. **`@InputFile`이 아니라 `@Internal`이다** — verifier r1
+     * L-3: `@InputFile`은 task 실행 전에 Gradle 자체가 파일 존재를 검증해 "Input file does
+     * not exist"로 죽으므로 [cpdReportPresenceViolation]의 「존재하지 않는다」 사유가 프로덕션
+     * 배선에서는 닿지 못하는 죽은 가지였다(`-x cpdCheck`로 재현). 순서 보장은 `@InputFile`의
+     * 암묵적 의존이 아니라 배선부의 명시적 `dependsOn(cpdCheck)`가 이미 진다.
+     */
+    @get:Internal
     abstract val cpdXmlReport: RegularFileProperty
 
     @TaskAction

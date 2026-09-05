@@ -1,7 +1,9 @@
 import bidvector.buildlogic.ConventionCoverageGateTask
+import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.MemberEffectGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
+import bidvector.buildlogic.TypeShapeGateTask
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
 
@@ -34,6 +36,42 @@ val buildLogicSizeGate =
         // 파일·함수 축(`sources`)은 여전히 test 를 포함한다.
         typeSources.from(typeMemberSourceSets.map { layout.settingsDirectory.dir("build-logic/src/$it") })
         report = layout.buildDirectory.file("reports/size-gate/build-logic.txt")
+    }
+
+// verifier r1 M-2 — 세 축(파일·함수·타입 멤버)은 위에서 build-logic 을 재지만 넷째 축(상속
+// 깊이·인터페이스 수 래칫)은 `kotlin-conventions`(9 모듈)에만 등록돼 build-logic 자신은
+// 빠져 있었다. `TypeShapeGateTask`는 **바이트코드**가 필요해(PSI로는 상위 타입 해석이 안
+// 된다) `SizeGateTask`처럼 소스를 텍스트로 읽을 수 없다 — 대신 이미 컴파일된 build-logic
+// 자신의 main 산출물(`build-logic/build/classes/kotlin/main`)을 가리키고, 그 산출물을 만드는
+// `:build-logic:classes`에 명시적으로 dependsOn 한다. 이것은 "included build 안에서
+// SizeGateTask를 쓰는" 순환(스크립트 자신이 자기 산출물에 의존)과 다르다 — 루트가 이미 완성된
+// build-logic 산출물을 **바깥에서** 읽을 뿐이라 순환이 아니다.
+val buildLogicTypeShapeGate =
+    tasks.register<TypeShapeGateTask>("buildLogicTypeShapeGate") {
+        group = "verification"
+        description = "included build main 에도 상속 깊이·인터페이스 수 래칫을 건다"
+        policyFile = layout.settingsDirectory.file("config/quality/size-policy.properties")
+        classes.from(layout.settingsDirectory.dir("build-logic/build/classes/kotlin/main"))
+        dependsOn(gradle.includedBuild("build-logic").task(":classes"))
+        report = layout.buildDirectory.file("reports/type-shape-gate/build-logic.txt")
+    }
+
+// verifier r1 M-3 — build-logic 자신에는 `gateExecutionGate`가 없어 이 slice 가 더한 test
+// 여섯(과 1A 부터의 기존 게이트 test 열둘)이 "돌았다"는 증거층 밖이었다. `--tests` 로
+// `TestFixturesGateTest`(④(a)의 유일한 실행 증거)를 빼도 아무도 알려주지 못했다. 이 task 도
+// `GateExecutionGateTask` 클래스를 build-logic 자신의 build.gradle.kts 안에서 쓸 수 없어
+// (같은 순환 — 그 클래스가 이 빌드의 산출물이다) 루트에 둔다. JUnit XML 만 읽으므로
+// `buildLogicTypeShapeGate`와 달리 컴파일된 클래스는 필요 없다 — `:build-logic:test` 산출물
+// 디렉터리만 가리키면 된다.
+val buildLogicGateExecutionGate =
+    tasks.register<GateExecutionGateTask>("buildLogicGateExecutionGate") {
+        group = "verification"
+        description = "build-logic 자신의 게이트 test 가 실제로 돌았는지 잰다(M-3)"
+        policyFile = layout.settingsDirectory.file("config/quality/gate-tests.properties")
+        moduleName = "build-logic"
+        resultDirectories.from(layout.settingsDirectory.dir("build-logic/build/test-results/test"))
+        dependsOn(gradle.includedBuild("build-logic").task(":test"))
+        report = layout.buildDirectory.file("reports/gate-execution/build-logic.txt")
     }
 
 // 허용 클래스 **안**의 효과 멤버는 손으로 열거하지 않고 도출한다. 루트에 두는 이유는 모듈과
@@ -88,6 +126,13 @@ val conventionCoverageGate =
 tasks.register("check") {
     group = "verification"
     description = "included build 의 검증까지 루트 check 에 포함한다"
-    dependsOn(buildLogicSizeGate, scriptSizeGate, conventionCoverageGate, memberEffectGate)
+    dependsOn(
+        buildLogicSizeGate,
+        buildLogicTypeShapeGate,
+        buildLogicGateExecutionGate,
+        scriptSizeGate,
+        conventionCoverageGate,
+        memberEffectGate,
+    )
     dependsOn(gradle.includedBuild("build-logic").task(":check"))
 }

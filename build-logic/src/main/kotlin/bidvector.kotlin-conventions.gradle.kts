@@ -340,9 +340,15 @@ val sizeGate =
         // 모듈의 빌드 스크립트도 잰다. 어느 source set 에도 속하지 않아 `allSource` 에 보이지
         // 않지만 실제 코드이고, 빼 두면 긴 함수가 그리로 옮겨 가는 것이 우회가 된다.
         sources.from(conventionSourceDirectories, layout.projectDirectory.file("build.gradle.kts"))
-        // D-6 — 타입 멤버 축은 `main`만(build.gradle.kts 는 함수·파일 축에서만 잰다, 타입
-        // 없는 스크립트라 실질 영향은 없다).
-        typeSources.from(provider { sourceSets.filter { it.name in typeMemberSourceSets }.map { it.kotlin } })
+        // D-6 — 타입 멤버 축은 `main`만. **모듈 `build.gradle.kts` 도 이 축에 넣는다** —
+        // verifier r1 M-1 실측: 스크립트 안에 31개 멤버 클래스를 심으면 이 축이 놓쳤다
+        // (스크립트에 타입을 둘 수 없다는 이전 주석은 틀렸다). `scriptSizeGate`(루트·loose
+        // 스크립트 레인)는 이미 자신의 `typeSources`에 스크립트를 넣어 대칭이었다 — 이 모듈
+        // 레인만 어긋나 있었다.
+        typeSources.from(
+            provider { sourceSets.filter { it.name in typeMemberSourceSets }.map { it.kotlin } },
+            layout.projectDirectory.file("build.gradle.kts"),
+        )
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
     }
 

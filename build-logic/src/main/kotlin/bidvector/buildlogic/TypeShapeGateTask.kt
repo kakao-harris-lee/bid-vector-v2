@@ -53,9 +53,15 @@ abstract class TypeShapeGateTask : DefaultTask() {
     ) {
         val violations = policy.violations(shapes)
         if (violations.isEmpty()) return
+        // verifier r1 L-1 — `sizeGate`의 파일·함수 축은 위반 메시지가 `v2-지침서.md §5`를
+        // 문면으로 가리킨다. 이 축도 같은 형태로 상향 경로를 명시한다 — 빌드 로그만 보는
+        // 개발자가 결정 ID(D-3)만으로는 그 문면에 닿지 못한다.
         throw GradleException(
             violations.joinToString(
-                prefix = "상속 깊이·인터페이스 수 래칫 위반 ${violations.size}건 (D-3, OPEN-ADR-06 (a)):\n  ",
+                prefix =
+                    "상속 깊이·인터페이스 수 래칫 위반 ${violations.size}건 — 증가는 금지다(D-3). " +
+                        "올리려면 `docs/adr/0007-test-pyramid-and-ratchet.md` §5 OPEN-ADR-06 해소 절을 " +
+                        "먼저 개정한다:\n  ",
                 separator = "\n  ",
             ),
         )
