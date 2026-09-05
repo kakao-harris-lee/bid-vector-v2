@@ -60,8 +60,8 @@ ASSERTED = {
     "capacity-gate-003":           ["$.suitabilityAxisAffected"],          # OPEN-QUAL-08 분할의 양(陽)의 절반
     "floor-threshold-001":         ["$.criticalAssessmentRate.fraction"],  # 관계 주장의 축(임계값)
     "floor-threshold-003":         ["$.criticalAssessmentRate.fraction"],
-    "rate-unit-003":               ["$.outcome"],                          # "거부된다"
-    "rate-unit-004":               ["$.outcome"],                          # "거부된다"
+    "rate-unit-003":               ["$.fact", "$.reasonCode"],             # "거부된다" + 그 사유(1B-c 재추출)
+    "rate-unit-004":               ["$.fact", "$.reasonCode"],             # "거부된다" + 그 사유(1B-c 재추출)
     "money-basis-001":             ["$.outcome", "$.reasonCode"],          # "사유와 함께 거부된다"
     "money-basis-002":             ["$.comparedBases"],                    # "basis 가 같으면"
     "money-basis-004":             ["$.outcome"],                          # "들어갈 수 없다"
@@ -70,9 +70,10 @@ ASSERTED = {
     "base-amount-provenance-004":  ["$.outcome"],                          # "거부된다"
     "base-amount-provenance-005":  ["$.outcome"],                          # "거부된다"
     "verdict-004":                 ["$.overrideOutcome", "$.reasonCode"],  # "사유와 함께 거부되며"
-    "rate-unit-001":               ["$.outcome"],                          # "명시 변환된다" = 통과 상태
-    "rate-unit-002":               ["$.outcome"],                          # "그대로 통과한다"
-    "rate-unit-005":               ["$.outcome"],                          # "선언이 개연성을 이긴다" = 수용
+    "rate-unit-001":               ["$.fact", "$.rate.fraction"],          # "명시 변환된다" = 값 있는 상태 + 변환 결과
+    "rate-unit-002":               ["$.fact", "$.rate.fraction",
+                                    "$.conversionDivisor"],                # "배율 없이" = 제수 1
+    "rate-unit-005":               ["$.fact", "$.rate.fraction"],          # "선언이 개연성을 이긴다"
 }
 
 # (c) 갈래가 쓰는 대체 토큰. 목록에 없는 피연산자는 `Other` 로 친다.
@@ -96,6 +97,8 @@ NULL_ASSERTED = {
     "floor-shortfall-001": ["$.frequency"],   # "값이 아니라 사유 있는 측정 불가"
     "license-009":         ["$.requiredLicenses"],  # "수집 실패" — 요건이 있으면 수집된 것이다
     "license-007":         ["$.requiredLicenses"],  # "요건 원문이 없으면" — 없음이 주장이다
+    "rate-unit-003":       ["$.rate"],              # "거부된다" — 값이 나오면 거부가 아니다(1B-c)
+    "rate-unit-004":       ["$.rate"],              # 동상
 }
 NULL_REPLACEMENTS = [0.0, {"numerator": 0, "denominator": 149}, 0,
                      {"numerator": 0, "denominator": 0}, "0%"]

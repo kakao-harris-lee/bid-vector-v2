@@ -46,14 +46,19 @@ MUTANTS = [
     ("verdict-004", [("$.overrideOutcome", "Accepted")], "거부돼야 할 override 가 통과된다"),
     ("money-basis-002", [("$.comparedBases", ["BASE_AMOUNT", "ESTIMATED_PRICE"])],
      "basis 가 다른데도 비교가 수행됐다고 주장한다"),
-    ("rate-unit-003", [("$.outcome", "Accepted")], "미선언 입력이 수용된다"),
+    ("rate-unit-003", [("$.fact", "Known")],
+     "미선언 입력이 수용된다 — 1B-c 재추출로 상태 토큰이 `$.fact` 가 됐다(경로만 옮겼다)"),
     ("license-006", [("$.uncertainReason", "OperatorLicensesNotDeclared")], "대조군 — 무변이"),
 ]
 
 # **승인 대기로 남긴 자리** — 고치지 않기로 한 자리라 수정 뒤에도 통과해야 정상이다.
+# **1B-c(2026-09-05) 재추출로 닫힌 자리는 이제 `caught` 가 정상이다** — `rate-unit-003`·`004` ·
+# `money-basis-002` · `money-basis-006` 표기 셋이 그것이고, 그 전환 자체가 재추출의 실증이라
+# 목록에서 지우지 않는다(감사 추적). 경로가 재추출로 사라진 줄은 **새 경로로 옮겨** 둔다 —
+# 없는 경로에 값을 심으면 계약이 보지 않는 자리라 무조건 `PASSES` 로 찍혀 거짓을 말한다.
 PENDING = [
-    ("rate-unit-003", [("$.outcome", "Accepted")], "outcome 이 가족 B 자작 토큰"),
-    ("rate-unit-004", [("$.outcome", "Accepted")], "동상"),
+    ("rate-unit-003", [("$.fact", "Known")], "1B-c 재추출로 닫힘 — 상태 토큰이 계약 어휘가 됐다"),
+    ("rate-unit-004", [("$.fact", "Known")], "동상"),
     ("money-basis-002", [("$.comparedBases", ["BASE_AMOUNT", "ESTIMATED_PRICE"])],
      "경로 간 동등 술어가 없다"),
     ("verdict-004", [("$.overrideOutcome", "Accepted")], "overrideOutcome 이 가족 B 자작 토큰"),

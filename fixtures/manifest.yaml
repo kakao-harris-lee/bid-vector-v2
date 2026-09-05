@@ -578,9 +578,13 @@ numeric_discipline:
 cases:
   - id: rate-unit-001
     domain: rate-unit
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
-        선언된 percent 입력이 fraction으로 명시 변환된다. 원문 unit이 보존된다.
+        선언된 percent 입력이 fraction으로 명시 변환된다.
+    verified_paths:
+      - "$.fact"
+      - "$.rate.fraction"
+      - "$.conversionDivisor"
     source:
       kind: approved-spec
       reference: |-
@@ -589,6 +593,10 @@ cases:
       v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
       기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
       data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+      **결과 토큰의 어휘는 운영자 결정 2026-09-05 decision 19 가 정한다** — 상태는 `Fact.Known`/
+      `Fact.Absent`(`data-dictionary.md` §1.1), 사유는 `ReasonCode` enum 이름이다. **V2 산출을 근거로
+      들지 않았다** — 재추출한 값은 위 승인 문면과 그 결정에서만 나왔고, 이 case 가 주장하는 규칙은
+      재추출 전후로 같다.
     input_file: fixtures/input/rate-unit-001.json
     expected_file: fixtures/expected/rate-unit-001.json
     normalization:
@@ -604,17 +612,22 @@ cases:
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
     sha256: 7289b53dde1ef728688cfb54a8c4e883fcf2ec6d4441db22246b1d868901fffc
-    expected_sha256: 1937c3ba8fec01bcd8cdf354457fa758ca13a1ecdf500d6116b886fe23e5b5f6
+    expected_sha256: 439e1475fd1a9c02191aab9dc940a52f12bb2fdc19d01a510159f88e54f67b1c
+    owning_open: |-
+      OPEN-1BC-SOURCE-UNIT (신설 2026-09-05) — 원문 unit 보존. 이 case 는 그 축을 더 이상 주장하지 않는다
     not_covered: |-
-      **수용측 상태(`$.outcome`)를 계약이 지키지 못한다** — 확장 적대 집합의 **(a)(a′)** 에서
-      삭제와 `Accepted`→`Rejected` 값 변이가 **둘 다 통과**했다. 즉 **모든 입력을 거부하면서 변환
-      숫자만 계산하는 산출**이 이 case 를 지나간다. **동결 어휘로는 표현할 수 없다** — `Accepted`·
-      `Rejected` 는 **승인 문면이 하나도 없는 가족 B 자작 토큰**이라(`v2-지침서.md`·ADR·커밋된 결정
-      기록 전수 0건) 정확 비교는 미승인 이름을 잠그고 `not-equals` 도 **부정 쪽 토큰으로 잠금을
-      옮길 뿐**이다(B5 논리). **`verifies` 를 좁혀 스윕을 통과시키지 않았다** — 주장을 고쳐 기준을
-      피하는 것이기 때문이다. 되돌림은 `uncovered_axes` 의 「**승인된 피연산자 부재**로 잠글 수 없는
-      결과 토큰」 축이 지목한다 — 막는 것이 술어가 아니라 **어휘**이고, `unblocks_when` 이 그 해제를
-      **운영자의 결과 토큰 어휘 명시 승인**(M1 계약 설계와 함께)으로 적는다.
+      **원문 unit 보존은 이 case 의 주장에서 빠졌다** — `verifies` 가 「원문 unit이 보존된다」를 함께
+      주장하던 자리를 「percent→fraction 명시 변환」으로 **좁혔다**. 주장을 지운 것이 아니라 **소유를
+      옮긴 것**이고, 받는 자리는 `uncovered_axes` 의 `OPEN-1BC-SOURCE-UNIT`(1C 이후 어댑터 계약)이다.
+      `v2-지침서.md` §4.1 의 *"원문 unit을 기록한다"* 는 어댑터 층의 의무이고 `Rate` 의 성분은
+      `fraction` 하나뿐이라 값에 실을 자리가 없다. **이 이관 자체가 운영자 승인 대상이었고**
+      decision 21 이 승인했다.
+      **상태를 방출하는 함수가 1B 계약에 아직 없다.** `Rate.ofPercent`·`ofFraction` 은 `Rate` 를 직접
+      내고 `Fact` 로 감싸지 않는다. `$.fact` 가 잠그는 것은 **상태 축에 계약이 채택한 어휘**이고, 그
+      상태를 실제로 방출하는 자리는 단위 선언을 읽는 **어댑터**다 — 그 층은 1C 이후다. **소비 테스트는
+      그 자리를 testFixtures projection 으로 표현해야 하고 계약에 없는 함수를 지어내면 안 된다.**
+      **`$.rate.axis` 는 나르기만 한다** — 축은 `Rate` 가 아니라 축 뉴타입(`BidRate` 등)의 성분이라
+      이 case 가 잠그지 않는다.
     contract_binding:
       type_path: "bidvector.sharedkernel.Rate.Companion.ofPercent(BigDecimal)"
       fixed_by: |-
@@ -623,12 +636,16 @@ cases:
       carries: |-
         **percent → fraction 명시 변환.** `ofPercent` 가 승인된 제수 `100` 으로 나누고 결과를
         정규화한다. 기대값의 `$.rate.fraction` 과 `$.conversionDivisor` 가 실리는 자리다.
+        **상태 축의 어휘도 계약에 있다** — `Fact.Known`/`Fact.Absent`(`Carrier.kt`)가 그것이고
+        decision 19 가 fixture 직렬화 토큰을 그 이름으로 정렬했다.
       does_not_carry: |-
-        **① 수용 상태.** `$.outcome` 의 `Accepted` — `Rate` 는 상태를 나르지 않고, 1B 가 그 축에
-        채택한 어휘는 `Fact.Known`/`Fact.Absent` 다.
-        **② 원문 unit 보존.** `$.preservedSourceUnit` — `Rate` 의 성분은 `fraction` 하나뿐이라
-        **원문 unit 을 값에 싣지 않는다.** `v2-지침서.md` §4.1 의 *"원문 unit을 기록한다"* 는
-        어댑터 층의 의무이고 그 층은 1B 에 없다(1C 이후). **계약에 자리가 아직 없는 축이다.**
+        **① 원문 unit 보존.** `$.preservedSourceUnit` 은 재추출로 기대값에서 **빠졌다** —
+        `Rate` 의 성분은 `fraction` 하나뿐이라 원문 unit 을 값에 싣지 않는다. `v2-지침서.md` §4.1 의
+        *"원문 unit을 기록한다"* 는 어댑터 층의 의무이고 그 층은 1B 에 없다(1C 이후) —
+        `OPEN-1BC-SOURCE-UNIT` 이 받는다.
+        **② 축 이름.** `$.rate.axis` 의 `bidRate` — `Rate` 자신은 축을 나르지 않는다.
+        **③ 상태를 방출하는 함수.** `ofPercent` 는 `Rate` 를 직접 내고 `Fact` 로 감싸지 않는다 —
+        `$.fact` 가 잠그는 것은 그 축의 **어휘**이지 방출 경로가 아니다(`not_covered` 참조).
     change_history:
       - date: 2026-09-02
         change: |-
@@ -661,15 +678,38 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **재추출.** 기대값을 1B 계약 어휘로 다시 썼다 — 상태 `$.outcome`(`Accepted`) 을
+          `$.fact`(`Known`) 로 바꾸고 `$.preservedSourceUnit` 을 뺐다. `verifies` 를 「percent→fraction
+          명시 변환」으로 **좁히고** 원문 unit 보존 축을 `OPEN-1BC-SOURCE-UNIT` 으로 **이관**했다.
+          `verified_paths` 셋을 달고 `classification` 을 **`authoritative`** 로 되돌렸다.
+          **입력 파일과 `sha256` 은 그대로다** — 입력 토큰(`percent`)이 계약의 공개 경로 이름
+          (`ofPercent`)과 어긋나지 않아 정렬할 것이 없었고, 그래서 `extracted_at` 도 그대로다.
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 18·19·21.** 18 이 술어 어휘 동결을 풀어 도구 쪽 실행이
+          섰고(BLOCK-1 해소), 19 가 결과 토큰 어휘를 **1B 계약 이름 그대로** 채택해 「승인 문면 없는
+          자작 토큰」이라는 강등 사유가 사라졌으며(BLOCK-2 해소), 21 이 이 case 의 처분을 —
+          **`verifies` 를 좁히는 것과 보존 축 이관을 포함해** — 승인했다.
+          **되돌림이 아니라 재추출이다** — 기대값 파일이 실제로 바뀌었다. **자동 생성이 아니다**:
+          새 값은 `expected_reasoning` 이 드는 승인 문면에서 나왔고 V2 산출을 복사하지 않았다.
+        policy_version: |-
+          해당 없음 — 기대값이 effective-dated 정책에 의존하지 않는다. 변환 제수 `100` 은
+          `data-dictionary.md` §12.1 의 단위 정의이지 versioned 정책이 아니다.
+        previous_expected_sha256: 1937c3ba8fec01bcd8cdf354457fa758ca13a1ecdf500d6116b886fe23e5b5f6
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: rate-unit-002
     domain: rate-unit
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         선언된 fraction 입력은 배율 없이 그대로 통과한다.
+    verified_paths:
+      - "$.fact"
+      - "$.rate.fraction"
+      - "$.conversionDivisor"
     source:
       kind: approved-spec
       reference: |-
@@ -678,6 +718,10 @@ cases:
       v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
       기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
       data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+      **결과 토큰의 어휘는 운영자 결정 2026-09-05 decision 19 가 정한다** — 상태는 `Fact.Known`/
+      `Fact.Absent`(`data-dictionary.md` §1.1), 사유는 `ReasonCode` enum 이름이다. **V2 산출을 근거로
+      들지 않았다** — 재추출한 값은 위 승인 문면과 그 결정에서만 나왔고, 이 case 가 주장하는 규칙은
+      재추출 전후로 같다.
     input_file: fixtures/input/rate-unit-002.json
     expected_file: fixtures/expected/rate-unit-002.json
     normalization:
@@ -693,17 +737,17 @@ cases:
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
     sha256: 30459cc29f32c6313b6c72e8eed645de6df0659a8b5488f07bbda5c4431f3b39
-    expected_sha256: 771fc9af17a9445ec688ab5ff44bdc61088cd2b555974a4de13fd823abbfbd68
+    expected_sha256: ff5347b6a3fb304511e6b615438086bc9e420f5a21f52c98f890cb4ff7eb4d3f
     not_covered: |-
-      **수용측 상태(`$.outcome`)를 계약이 지키지 못한다** — 확장 적대 집합의 **(a)(a′)** 에서
-      삭제와 `Accepted`→`Rejected` 값 변이가 **둘 다 통과**했다. 즉 **모든 입력을 거부하면서 변환
-      숫자만 계산하는 산출**이 이 case 를 지나간다. **동결 어휘로는 표현할 수 없다** — `Accepted`·
-      `Rejected` 는 **승인 문면이 하나도 없는 가족 B 자작 토큰**이라(`v2-지침서.md`·ADR·커밋된 결정
-      기록 전수 0건) 정확 비교는 미승인 이름을 잠그고 `not-equals` 도 **부정 쪽 토큰으로 잠금을
-      옮길 뿐**이다(B5 논리). **`verifies` 를 좁혀 스윕을 통과시키지 않았다** — 주장을 고쳐 기준을
-      피하는 것이기 때문이다. 되돌림은 `uncovered_axes` 의 「**승인된 피연산자 부재**로 잠글 수 없는
-      결과 토큰」 축이 지목한다 — 막는 것이 술어가 아니라 **어휘**이고, `unblocks_when` 이 그 해제를
-      **운영자의 결과 토큰 어휘 명시 승인**(M1 계약 설계와 함께)으로 적는다.
+      **원문 unit 보존은 이 case 가 주장한 적이 없다** — `verifies` 는 「배율 없이 통과」만 주장하고
+      기대값이 나르던 `$.preservedSourceUnit` 은 계약에 자리가 없어 재추출에서 뺐다. 그 축의 소유는
+      `uncovered_axes` 의 `OPEN-1BC-SOURCE-UNIT`(1C 이후 어댑터)이다.
+      **상태를 방출하는 함수가 1B 계약에 아직 없다.** `Rate.ofPercent`·`ofFraction` 은 `Rate` 를 직접
+      내고 `Fact` 로 감싸지 않는다. `$.fact` 가 잠그는 것은 **상태 축에 계약이 채택한 어휘**이고, 그
+      상태를 실제로 방출하는 자리는 단위 선언을 읽는 **어댑터**다 — 그 층은 1C 이후다. **소비 테스트는
+      그 자리를 testFixtures projection 으로 표현해야 하고 계약에 없는 함수를 지어내면 안 된다.**
+      **`$.rate.axis` 는 나르기만 한다** — 축은 `Rate` 가 아니라 축 뉴타입(`BidRate` 등)의 성분이라
+      이 case 가 잠그지 않는다.
     contract_binding:
       type_path: "bidvector.sharedkernel.Rate.Companion.ofFraction(BigDecimal)"
       fixed_by: |-
@@ -713,8 +757,9 @@ cases:
         **fraction 무배율 통과.** `ofFraction` 은 정규화(후행 0 제거)만 하고 배율을 곱하지 않는다 —
         `$.conversionDivisor` 의 `1` 이 뜻하는 그것이다. 정규화가 값을 보존한다는 것이 P-1c 의 성질이다.
       does_not_carry: |-
-        `$.outcome`(상태 토큰이 계약에 없다) · `$.preservedSourceUnit`(원문 unit 을 나르는 성분이
-        `Rate` 에 없다). 둘 다 001 과 같은 사유다.
+        `$.preservedSourceUnit`(원문 unit 을 나르는 성분이 `Rate` 에 없다 — 재추출로 뺐다) ·
+        `$.rate.axis`(축은 `Rate` 의 성분이 아니다) · **상태를 방출하는 함수**(`ofFraction` 은
+        `Rate` 를 직접 낸다). 셋 다 001 과 같은 사유다.
     change_history:
       - date: 2026-09-02
         change: |-
@@ -747,15 +792,35 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **재추출.** 기대값을 1B 계약 어휘로 다시 썼다 — 상태 `$.outcome`(`Accepted`) 을 `$.fact`(`Known`) 로 바꾸고 `$.preservedSourceUnit` 을 뺐다.
+          `verified_paths` 를 도출해 달고 `classification` 을 **`authoritative`** 로 되돌렸다.
+          **입력 파일과 `sha256` 은 그대로다** — 입력 토큰이 계약의 공개 경로 이름과 어긋나지 않아
+          정렬할 것이 없었고, 그래서 `extracted_at` 도 그대로다.
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 18·19·21.** 18 이 술어 어휘 동결을 풀어 도구 쪽 실행이
+          섰고(BLOCK-1 해소), 19 가 결과 토큰 어휘를 **1B 계약 이름 그대로** 채택해 「승인 문면 없는
+          자작 토큰」이라는 강등 사유가 사라졌으며(BLOCK-2 해소), 21 이 이 case 의 처분을 승인했다.
+          **되돌림이 아니라 재추출이다** — 기대값 파일이 실제로 바뀌었다. **자동 생성이 아니다**:
+          새 값은 `expected_reasoning` 이 드는 승인 문면에서 나왔고 V2 산출을 복사하지 않았다.
+        policy_version: |-
+          해당 없음 — 기대값이 effective-dated 정책에 의존하지 않는다. 변환 제수 `100` 은
+          `data-dictionary.md` §12.1 의 단위 정의이지 versioned 정책이 아니다.
+        previous_expected_sha256: 771fc9af17a9445ec688ab5ff44bdc61088cd2b555974a4de13fd823abbfbd68
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: rate-unit-003
     domain: rate-unit
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         unit 미선언 입력은 크기와 무관하게 거부된다 (percent 모양). 004와 쌍이다.
+    verified_paths:
+      - "$.fact"
+      - "$.reasonCode"
+      - "$.rate"
     source:
       kind: approved-spec
       reference: |-
@@ -764,6 +829,10 @@ cases:
       v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
       기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
       data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+      **결과 토큰의 어휘는 운영자 결정 2026-09-05 decision 19 가 정한다** — 상태는 `Fact.Known`/
+      `Fact.Absent`(`data-dictionary.md` §1.1), 사유는 `ReasonCode` enum 이름이다. **V2 산출을 근거로
+      들지 않았다** — 재추출한 값은 위 승인 문면과 그 결정에서만 나왔고, 이 case 가 주장하는 규칙은
+      재추출 전후로 같다.
     input_file: fixtures/input/rate-unit-003.json
     expected_file: fixtures/expected/rate-unit-003.json
     normalization:
@@ -779,14 +848,19 @@ cases:
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
     sha256: 5b6933acb516fe36b08a4fa5ff308dbb47e122dca16ed4c2e07792ff51719b03
-    expected_sha256: 7b4f00d137ffaa6ba731bcdeaae8c0fac6fb34336f712ebedf168ece4592c7bd
+    expected_sha256: 8f7a0f91e025e73d3d510ab0cf5c5fb98d9444d2dc9c1b55cf93cf0746ac2dd8
     not_covered: |-
-      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
-      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제. 동결된 술어 어휘
-      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
-      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
-      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
-      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+      **`$.guessAttempted` 는 재추출에서 뺐다** — 「값 크기로 단위를 추측하지 않는다」는 **구성상
+      불가**이고 그 증명은 기대값의 불리언이 아니라 컴파일 fixture(`CompileFailureHarnessTest` 의
+      단위 축 negative)와 `Rate` 에 상한 밴드가 없다는 선언(ADR 0002 D-4)이 든다. 기대값이 그
+      불리언을 나르면 **계약이 잠그지 않는 축을 golden 이 굳힌다.**
+      **거부를 방출하는 함수가 1B 계약에 아직 없다.** 계약은 이 자리를 **구성상 불가**로 지었다 —
+      `Rate` 의 생성자가 `internal` 이고 공개 경로는 단위를 이름에 담은 둘뿐이라 **단위 미선언 입력으로
+      `Rate` 를 만들 수단이 없다.** 그래서 런타임 거부 객체가 생기는 자리가 아니고, `$.fact` 의
+      `Absent` 와 `$.reasonCode` 의 `UNIT_NOT_DECLARED` 가 잠그는 것은 **그 축에 계약이 채택한 어휘**다
+      (`Carrier.kt` 의 `Fact.Absent` · `ReasonCode.UNIT_NOT_DECLARED`). 그 상태를 실제로 방출하는 자리는
+      단위 선언을 읽는 **어댑터**이고 그 층은 1C 이후다. **소비 테스트는 그 자리를 testFixtures
+      projection 으로 표현해야 하고 계약에 없는 함수를 지어내면 안 된다.**
     contract_binding:
       type_path: "bidvector.sharedkernel.Rate 의 `internal` 생성자 + `Fact.Absent(ReasonCode.UNIT_NOT_DECLARED)`"
       fixed_by: |-
@@ -799,10 +873,12 @@ cases:
         **값 크기로 단위를 가르는 경로가 타입 안에 없고**, `ofFraction(87.5)` 이 통과하는 것이 그
         증거다. 사유 축은 `ReasonCode.UNIT_NOT_DECLARED` 가 나른다.
       does_not_carry: |-
-        **① 거부 상태 토큰.** `$.outcome` 의 `Rejected` — 계약에 없다(`Fact.Absent` 가 그 자리다).
-        **② 사유 토큰의 표기.** `$.reasonCode` 의 `RateUnitUndeclared` 대
-        `ReasonCode.UNIT_NOT_DECLARED` — **개념은 같고 이름이 다르다.** `normalize: case-fold` 는
-        대소문자만 접어 이 차이를 덮지 못한다.
+        **① 추측 시도 여부.** `$.guessAttempted` 는 재추출로 **빠졌다** — 구성상 불가를 불리언으로
+        다시 적는 자리였다.
+        **② 거부를 방출하는 함수.** 계약은 이 자리를 컴파일 차단으로 지어 런타임 거부 객체가 생기지
+        않는다 — `$.fact`·`$.reasonCode` 가 잠그는 것은 그 축의 **어휘**다(`not_covered` 참조).
+        **표기 불일치는 해소됐다** — `RateUnitUndeclared` → `ReasonCode.UNIT_NOT_DECLARED`
+        (decision 19).
     change_history:
       - date: 2026-09-02
         change: |-
@@ -835,15 +911,39 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **재추출.** 기대값을 1B 계약 어휘로 다시 썼다 — 상태 `$.outcome`(`Rejected`) 을 `$.fact`(`Absent`) 로, 사유 `$.reasonCode` 를
+          `RateUnitUndeclared` 에서 계약 이름 **`UNIT_NOT_DECLARED`** 로 바꾸고 `$.guessAttempted` 를 뺐다.
+          `verified_paths` 를 도출해 달고 `classification` 을 **`authoritative`** 로 되돌렸다.
+          **입력 파일과 `sha256` 은 그대로다** — 입력 토큰이 계약의 공개 경로 이름과 어긋나지 않아
+          정렬할 것이 없었고, 그래서 `extracted_at` 도 그대로다.
+          **003·004 의 기대값은 재추출 뒤에도 서로 같다** — 「크기가 결과를 가르지 않는다」는 쌍
+          주장을 두 파일의 **동일한 내용**으로 표현하는 형태를 그대로 지켰다(그래서 `expected_sha256`
+          도 둘이 같다).
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 18·19·21.** 18 이 술어 어휘 동결을 풀어 도구 쪽 실행이
+          섰고(BLOCK-1 해소), 19 가 결과 토큰 어휘를 **1B 계약 이름 그대로** 채택해 「승인 문면 없는
+          자작 토큰」이라는 강등 사유가 사라졌으며(BLOCK-2 해소), 21 이 이 case 의 처분을 승인했다.
+          **되돌림이 아니라 재추출이다** — 기대값 파일이 실제로 바뀌었다. **자동 생성이 아니다**:
+          새 값은 `expected_reasoning` 이 드는 승인 문면에서 나왔고 V2 산출을 복사하지 않았다.
+        policy_version: |-
+          해당 없음 — 기대값이 effective-dated 정책에 의존하지 않는다. 변환 제수 `100` 은
+          `data-dictionary.md` §12.1 의 단위 정의이지 versioned 정책이 아니다.
+        previous_expected_sha256: 7b4f00d137ffaa6ba731bcdeaae8c0fac6fb34336f712ebedf168ece4592c7bd
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: rate-unit-004
     domain: rate-unit
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         unit 미선언 입력은 크기와 무관하게 거부된다 (fraction 모양). 003과 같은 결과여야 한다 — 값 크기로 단위를 추측하는 경로가 없음을 이 쌍이 고정한다.
+    verified_paths:
+      - "$.fact"
+      - "$.reasonCode"
+      - "$.rate"
     source:
       kind: approved-spec
       reference: |-
@@ -852,6 +952,10 @@ cases:
       v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
       기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
       data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+      **결과 토큰의 어휘는 운영자 결정 2026-09-05 decision 19 가 정한다** — 상태는 `Fact.Known`/
+      `Fact.Absent`(`data-dictionary.md` §1.1), 사유는 `ReasonCode` enum 이름이다. **V2 산출을 근거로
+      들지 않았다** — 재추출한 값은 위 승인 문면과 그 결정에서만 나왔고, 이 case 가 주장하는 규칙은
+      재추출 전후로 같다.
     input_file: fixtures/input/rate-unit-004.json
     expected_file: fixtures/expected/rate-unit-004.json
     normalization:
@@ -867,14 +971,19 @@ cases:
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
     sha256: 12eb4ac8ae9230c0d999a89b7d5d7b85ff91e99e83d4cb27e1b3e7a0ab139e04
-    expected_sha256: 7b4f00d137ffaa6ba731bcdeaae8c0fac6fb34336f712ebedf168ece4592c7bd
+    expected_sha256: 8f7a0f91e025e73d3d510ab0cf5c5fb98d9444d2dc9c1b55cf93cf0746ac2dd8
     not_covered: |-
-      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
-      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제. 동결된 술어 어휘
-      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
-      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
-      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
-      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+      **`$.guessAttempted` 는 재추출에서 뺐다** — 「값 크기로 단위를 추측하지 않는다」는 **구성상
+      불가**이고 그 증명은 기대값의 불리언이 아니라 컴파일 fixture(`CompileFailureHarnessTest` 의
+      단위 축 negative)와 `Rate` 에 상한 밴드가 없다는 선언(ADR 0002 D-4)이 든다. 기대값이 그
+      불리언을 나르면 **계약이 잠그지 않는 축을 golden 이 굳힌다.**
+      **거부를 방출하는 함수가 1B 계약에 아직 없다.** 계약은 이 자리를 **구성상 불가**로 지었다 —
+      `Rate` 의 생성자가 `internal` 이고 공개 경로는 단위를 이름에 담은 둘뿐이라 **단위 미선언 입력으로
+      `Rate` 를 만들 수단이 없다.** 그래서 런타임 거부 객체가 생기는 자리가 아니고, `$.fact` 의
+      `Absent` 와 `$.reasonCode` 의 `UNIT_NOT_DECLARED` 가 잠그는 것은 **그 축에 계약이 채택한 어휘**다
+      (`Carrier.kt` 의 `Fact.Absent` · `ReasonCode.UNIT_NOT_DECLARED`). 그 상태를 실제로 방출하는 자리는
+      단위 선언을 읽는 **어댑터**이고 그 층은 1C 이후다. **소비 테스트는 그 자리를 testFixtures
+      projection 으로 표현해야 하고 계약에 없는 함수를 지어내면 안 된다.**
     contract_binding:
       type_path: "bidvector.sharedkernel.Rate 의 `internal` 생성자 + `Fact.Absent(ReasonCode.UNIT_NOT_DECLARED)`"
       fixed_by: |-
@@ -884,9 +993,11 @@ cases:
         아예 없으므로 `87.5` 든 `0.875` 든 **같은 이유로 값이 만들어지지 않는다.** 크기가 결과를
         가르는 분기가 타입에 존재하지 않는다.
       does_not_carry: |-
-        003 과 같다 — `$.outcome` 의 `Rejected` · `$.reasonCode` 의 `RateUnitUndeclared` 표기.
-        **덧붙여 「003 과 같은 결과여야 한다」는 case 간 동등 주장 자체**를 manifest 계약이 표현할
-        수단이 없다(`m1_contract_binding.predicate_design` 의 `differs-from-case` 가 그 반대쪽이다).
+        003 과 같다 — `$.guessAttempted` 와 거부를 방출하는 함수.
+        **「003 과 같은 결과여야 한다」는 case 간 동등 주장은 술어가 아니라 두 기대값의 동일함으로
+        표현한다** — decision 18 이 푼 셋 가운데 `differs-from-case` 는 **다름**을 재는 쪽이라 이
+        자리의 술어가 아니고, `equals-case` 는 어휘에 없다. 두 파일의 내용이 같고 `expected_sha256`
+        이 같은 것이 그 주장의 기계 표현이며, 어느 한쪽이 갈라지면 해시 대조(**C-10**)가 잡는다.
     change_history:
       - date: 2026-09-02
         change: |-
@@ -919,15 +1030,39 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **재추출.** 기대값을 1B 계약 어휘로 다시 썼다 — 상태 `$.outcome`(`Rejected`) 을 `$.fact`(`Absent`) 로, 사유 `$.reasonCode` 를
+          `RateUnitUndeclared` 에서 계약 이름 **`UNIT_NOT_DECLARED`** 로 바꾸고 `$.guessAttempted` 를 뺐다.
+          `verified_paths` 를 도출해 달고 `classification` 을 **`authoritative`** 로 되돌렸다.
+          **입력 파일과 `sha256` 은 그대로다** — 입력 토큰이 계약의 공개 경로 이름과 어긋나지 않아
+          정렬할 것이 없었고, 그래서 `extracted_at` 도 그대로다.
+          **003·004 의 기대값은 재추출 뒤에도 서로 같다** — 「크기가 결과를 가르지 않는다」는 쌍
+          주장을 두 파일의 **동일한 내용**으로 표현하는 형태를 그대로 지켰다(그래서 `expected_sha256`
+          도 둘이 같다).
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 18·19·21.** 18 이 술어 어휘 동결을 풀어 도구 쪽 실행이
+          섰고(BLOCK-1 해소), 19 가 결과 토큰 어휘를 **1B 계약 이름 그대로** 채택해 「승인 문면 없는
+          자작 토큰」이라는 강등 사유가 사라졌으며(BLOCK-2 해소), 21 이 이 case 의 처분을 승인했다.
+          **되돌림이 아니라 재추출이다** — 기대값 파일이 실제로 바뀌었다. **자동 생성이 아니다**:
+          새 값은 `expected_reasoning` 이 드는 승인 문면에서 나왔고 V2 산출을 복사하지 않았다.
+        policy_version: |-
+          해당 없음 — 기대값이 effective-dated 정책에 의존하지 않는다. 변환 제수 `100` 은
+          `data-dictionary.md` §12.1 의 단위 정의이지 versioned 정책이 아니다.
+        previous_expected_sha256: 7b4f00d137ffaa6ba731bcdeaae8c0fac6fb34336f712ebedf168ece4592c7bd
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: rate-unit-005
     domain: rate-unit
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         선언이 개연성을 이긴다 — percent로 선언된 0.875는 0.00875이지 0.875가 아니다.
+    verified_paths:
+      - "$.fact"
+      - "$.rate.fraction"
+      - "$.conversionDivisor"
     source:
       kind: approved-spec
       reference: |-
@@ -936,6 +1071,10 @@ cases:
       v2-지침서.md §4.1 *"`Rate`는 내부 fraction 표현 하나만 사용한다. percent 입력은 adapter에서 명시적으로 변환하며 원문 unit을
       기록한다"* + *"unit/basis/provenance가 없거나 모르는 값은 추측하지 않고 거부 또는 `Unmeasurable`로 반환한다"*. 변환 제수 `100`은
       data-dictionary.md §12.1이 `authoritative`(단위 정의)로 등재한 유일한 율 관련 수다.
+      **결과 토큰의 어휘는 운영자 결정 2026-09-05 decision 19 가 정한다** — 상태는 `Fact.Known`/
+      `Fact.Absent`(`data-dictionary.md` §1.1), 사유는 `ReasonCode` enum 이름이다. **V2 산출을 근거로
+      들지 않았다** — 재추출한 값은 위 승인 문면과 그 결정에서만 나왔고, 이 case 가 주장하는 규칙은
+      재추출 전후로 같다.
     input_file: fixtures/input/rate-unit-005.json
     expected_file: fixtures/expected/rate-unit-005.json
     normalization:
@@ -951,17 +1090,18 @@ cases:
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
     sha256: 4b2f770c22b93947b5b24292f193614016a11d260a37f25d3ae63cebae84588e
-    expected_sha256: a1a0e827c3af46a6b274e9fde8c9fcb90f4fc31217ec84983ff19a74e6722b96
+    expected_sha256: 7cecb14c18f382196152ecfa17bc8a263c83c462eff23f5afd317dfcdd8f1a23
     not_covered: |-
-      **수용측 상태(`$.outcome`)를 계약이 지키지 못한다** — 확장 적대 집합의 **(a)(a′)** 에서
-      삭제와 `Accepted`→`Rejected` 값 변이가 **둘 다 통과**했다. 즉 **모든 입력을 거부하면서 변환
-      숫자만 계산하는 산출**이 이 case 를 지나간다. **동결 어휘로는 표현할 수 없다** — `Accepted`·
-      `Rejected` 는 **승인 문면이 하나도 없는 가족 B 자작 토큰**이라(`v2-지침서.md`·ADR·커밋된 결정
-      기록 전수 0건) 정확 비교는 미승인 이름을 잠그고 `not-equals` 도 **부정 쪽 토큰으로 잠금을
-      옮길 뿐**이다(B5 논리). **`verifies` 를 좁혀 스윕을 통과시키지 않았다** — 주장을 고쳐 기준을
-      피하는 것이기 때문이다. 되돌림은 `uncovered_axes` 의 「**승인된 피연산자 부재**로 잠글 수 없는
-      결과 토큰」 축이 지목한다 — 막는 것이 술어가 아니라 **어휘**이고, `unblocks_when` 이 그 해제를
-      **운영자의 결과 토큰 어휘 명시 승인**(M1 계약 설계와 함께)으로 적는다.
+      **상한 밴드의 부재 자체는 이 case 가 잠그지 않는다** — `$.rate.fraction` 의 정확 비교가
+      「`0.875` percent 는 `0.00875` 다」를 잠그고, 값 크기로 단위를 가르는 경로가 **타입에 없다**는
+      것은 `Rate` 선언(ADR 0002 D-4, 하한만 두고 상한을 두지 않는다)과 컴파일 fixture 가 든다.
+      **원문 unit 보존**은 001 과 같은 사유로 `OPEN-1BC-SOURCE-UNIT` 이 받는다 — 기대값에서 뺐다.
+      **상태를 방출하는 함수가 1B 계약에 아직 없다.** `Rate.ofPercent`·`ofFraction` 은 `Rate` 를 직접
+      내고 `Fact` 로 감싸지 않는다. `$.fact` 가 잠그는 것은 **상태 축에 계약이 채택한 어휘**이고, 그
+      상태를 실제로 방출하는 자리는 단위 선언을 읽는 **어댑터**다 — 그 층은 1C 이후다. **소비 테스트는
+      그 자리를 testFixtures projection 으로 표현해야 하고 계약에 없는 함수를 지어내면 안 된다.**
+      **`$.rate.axis` 는 나르기만 한다** — 축은 `Rate` 가 아니라 축 뉴타입(`BidRate` 등)의 성분이라
+      이 case 가 잠그지 않는다.
     contract_binding:
       type_path: "bidvector.sharedkernel.Rate.Companion.ofPercent(BigDecimal)"
       fixed_by: |-
@@ -971,7 +1111,7 @@ cases:
         fraction 처럼 보인다는 사실이 변환에 개입하지 않는다. `Rate` 에 상한 밴드가 없는 것(D-4)이
         그 개입 경로를 타입에서 없앤 자리다.
       does_not_carry: |-
-        001 과 같다 — `$.outcome` 의 상태 토큰과 `$.preservedSourceUnit` 둘 다 계약에 자리가 없다.
+        001 과 같다 — `$.preservedSourceUnit`(재추출로 뺐다) · `$.rate.axis` · 상태를 방출하는 함수.
     change_history:
       - date: 2026-09-02
         change: |-
@@ -1004,6 +1144,22 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **재추출.** 기대값을 1B 계약 어휘로 다시 썼다 — 상태 `$.outcome`(`Accepted`) 을 `$.fact`(`Known`) 로 바꾸고 `$.preservedSourceUnit` 을 뺐다.
+          `verified_paths` 를 도출해 달고 `classification` 을 **`authoritative`** 로 되돌렸다.
+          **입력 파일과 `sha256` 은 그대로다** — 입력 토큰이 계약의 공개 경로 이름과 어긋나지 않아
+          정렬할 것이 없었고, 그래서 `extracted_at` 도 그대로다.
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 18·19·21.** 18 이 술어 어휘 동결을 풀어 도구 쪽 실행이
+          섰고(BLOCK-1 해소), 19 가 결과 토큰 어휘를 **1B 계약 이름 그대로** 채택해 「승인 문면 없는
+          자작 토큰」이라는 강등 사유가 사라졌으며(BLOCK-2 해소), 21 이 이 case 의 처분을 승인했다.
+          **되돌림이 아니라 재추출이다** — 기대값 파일이 실제로 바뀌었다. **자동 생성이 아니다**:
+          새 값은 `expected_reasoning` 이 드는 승인 문면에서 나왔고 V2 산출을 복사하지 않았다.
+        policy_version: |-
+          해당 없음 — 기대값이 effective-dated 정책에 의존하지 않는다. 변환 제수 `100` 은
+          `data-dictionary.md` §12.1 의 단위 정의이지 versioned 정책이 아니다.
+        previous_expected_sha256: a1a0e827c3af46a6b274e9fde8c9fcb90f4fc31217ec84983ff19a74e6722b96
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -5101,6 +5257,11 @@ m1_contract_binding:
     실리는가**를 case 마다 적었다. 읽은 것은 커밋된 Kotlin 선언과 그 회귀 테스트의 성질이며,
     **기대값·입력 파일·해시는 열지도 바꾸지도 않았다.**
   result: |-
+    **아래는 1B 레인(2026-09-04)의 기록이다** — 그 시점의 판정이고 현재 상태가 아니다.
+    **2026-09-05 갱신(1B-c)**: 운영자 결정 18·19·21 이 ①②를 풀었고 열하나 가운데 열이
+    재추출·재정의로 `authoritative` 로 돌아왔다(`money-basis-003` 은 이월). **현재 분류의
+    정본은 각 case 의 `classification` 이고 셈은 C-5 가 낸다** — 아래 문단을 현재형으로 읽지 않는다.
+
     **되돌린 case 는 0 건이다.** 11 case 전부 `insufficient-evidence` 인 채로 있다.
     막은 것은 둘이고 **둘 다 이 레인의 쓰기 범위 밖**이다.
 
@@ -5152,6 +5313,10 @@ m1_contract_binding:
     가를 수 없고, `sameKnownVat` 전건과 `ReasonCode.VAT_TREATMENT_MISMATCH` 가 **런타임에**
     나른다. 그래서 `money-basis-005` 는 개념이 계약에 그대로 있다.
   predicate_design: |-
+    **2026-09-05 갱신 — 정의의 정본이 옮겨갔다.** decision 18 이 셋을 어휘로 채택했고 정의·실행·
+    한계는 이제 `schema.extensions.verified_projections` 의 「술어 어휘」 절이 갖는다. 아래는
+    **그 채택 이전의 설계문**이며 시점 기록으로만 읽는다(문면은 그 절이 승계했다).
+
     **설계만 남기고 구현하지 않는다.** 아래 셋은 Codex 재리뷰 B9 가 이름 든 술어를 이 corpus 의
     실제 변이체 위에서 다시 정의한 것이다. **어느 case 에도 달지 않았다** — 달면 현재 도구가
     「동결된 어휘 밖의 술어」로 멈춘다. 구현 자리는 `fixtures/tools/manifest_contract.py` 의
@@ -5671,6 +5836,13 @@ uncovered_axes:
       「동결된 어휘 밖의 술어」로 멈춘다.** 분류를 정하는 것이 산문이 아니라 스윕이므로, 돌릴 수
       없는 술어로는 되돌림을 **증명할 수단이 없다.**
 
+      **2026-09-05 해소 — 운영자 결정 decision 18(1B-c).** 정의와 실행이 함께 섰다: 어휘 정의는
+      `schema.extensions.verified_projections` 의 「술어 어휘」 절이 갖고, 실행은
+      `manifest_contract.holds()` · `mutation_sweep_adversarial.projection_mutants()` ·
+      `mutation_sweep_targeted.notation_variants()` 의 가드다. **이 축이 막던 case 의 되돌림은
+      이제 스윕이 판정한다** — 어느 case 가 남았는지는 이 산문이 세지 않고 **C-5** 가 낸다.
+      **축을 지우지 않는다** — 뒷날 다시 표현되지 않는 주장이 나오면 같은 자리로 돌아온다.
+
   - axis: "계약이 덮지 못한 축 — **승인된 피연산자 부재**로 잠글 수 없는 결과 토큰"
     domain: 여러 축에 걸친다
     why_blocked: |-
@@ -5713,6 +5885,17 @@ uncovered_axes:
       `m1_contract_binding.predicate_design` 에 나왔다(실행은 위 축의 갱신이 적는다).
       **basis 축에는 셋째가 있다** — 계약이 그 자리를 컴파일 차단으로 지어 **거부 객체 자체가 생기지
       않는다**(`m1_contract_binding.design_divergence`). 토큰 정렬로 메울 수 있는 차이가 아니다.
+
+      **2026-09-05 해소 — 운영자 결정 decision 19(1B-c).** ①이 열렸다: 결과 토큰 어휘로 **1B 계약
+      이름 그대로**(상태 `Fact.Known`/`Fact.Absent` · `Measurement.Measured`/`Unmeasurable`, 사유
+      `ReasonCode` enum 이름, `Basis.ESTIMATED`)를 명시 승인했고, 그래서 그 이름들의 **정확 비교가
+      미승인 리터럴을 잠그지 않는다.** 정렬은 기대값 파일을 바꾸므로 **재추출**로 했다 —
+      `previous_expected_sha256` 를 실은 각 case 의 `change_history` 가 그 기록이다. ②(`equals-path`)는
+      **여전히 어휘에 없다** — decision 18 이 푼 셋은 `is-present`·`differs-from-path`·
+      `differs-from-case` 이고 **동등** 술어는 그 안에 없다. **셋째(컴파일 차단)도 그대로다** —
+      그쪽은 토큰이 아니라 설계 차이라 기대값을 「표현 불가」 형태로 다시 쓰는 것으로만 닫힌다
+      (decision 21 이 그 재정의를 승인했다).
+      **축을 지우지 않는다** — 남은 ②·셋째가 이 자리를 계속 쓴다.
 
   - axis: "승인 부재로 authoritative 덮개를 잃은 축 — floor-threshold (경계 등가의 미달 판정)"
     domain: floor-threshold
@@ -5783,6 +5966,26 @@ uncovered_axes:
       규칙(최소 표본 수와 그 경계)은 이미 `OPEN-DEC-01` 이 갖는다. 운영자가 대신 **다른 표현을
       지정**하면 그때는 기대값 파일이 바뀌므로 `change_history` 에 `previous_expected_sha256` 를
       함께 싣는다.
+
+  - axis: "원문 unit 보존 — 선언된 단위를 값과 함께 기록하는 자리"
+    domain: rate-unit
+    why_blocked: |-
+      **계약에 자리가 없다.** `v2-지침서.md` §4.1 은 *"percent 입력은 adapter에서 명시적으로
+      변환하며 **원문 unit을 기록한다**"* 로 이 의무를 **어댑터 층**에 둔다. 1B 가 세운 `Rate` 의
+      성분은 `fraction` 하나뿐이라 값에 원문 unit 을 실을 자리가 없고, 어댑터 계약은 1C 이후다.
+      **막는 것은 근거도 술어도 아니라 계약 층의 부재**다 — 근거(§4.1)는 승인 문면이고 술어도
+      갖춰져 있다.
+    owning_open:
+      - "`OPEN-1BC-SOURCE-UNIT` (신설 2026-09-05, 1B-c) — 소유는 1C 이후 어댑터 slice 다"
+    what_is_covered_instead: |-
+      변환 자체는 덮인다 — `rate-unit-001`·`005` 의 `$.rate.fraction`·`$.conversionDivisor` 정확
+      비교가 percent→fraction 변환과 승인된 제수 `100` 을 잠근다. **비는 것은 「변환 뒤에도 원문이
+      무엇이었는지 남는가」** 하나이며, 그 주장은 2026-09-05 재추출에서 `rate-unit-001` 의
+      `verifies` 밖으로 **이관**됐다(decision 21 승인). 기대값의 `$.preservedSourceUnit` 도 함께
+      빠졌으므로 **이 축에는 지금 fixture 가 없다.**
+    unblocks_when: |-
+      어댑터 계약이 원문 unit 을 나르는 자리를 세운다(1C 이후). 그때 이 축의 case 를 **새로 만들고**
+      — 기존 case 에 주장을 되돌려 붙이지 않는다 — `verifies` 를 그 계약 위에서 쓴다.
 
 # =============================================================================
 # 출처를 확정할 수 없어 fixture 로 만들지 않은 후보 (`data-extract.md` 에러 핸들링)

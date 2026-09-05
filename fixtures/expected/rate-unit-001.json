@@ -1,9 +1,8 @@
 {
-  "outcome": "Accepted",
+  "fact": "Known",
   "rate": {
     "fraction": 0.875,
     "axis": "bidRate"
   },
-  "preservedSourceUnit": "percent",
   "conversionDivisor": 100
 }

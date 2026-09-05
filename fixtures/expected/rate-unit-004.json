@@ -1,6 +1,5 @@
 {
-  "outcome": "Rejected",
-  "reasonCode": "RateUnitUndeclared",
-  "rate": null,
-  "guessAttempted": false
+  "fact": "Absent",
+  "reasonCode": "UNIT_NOT_DECLARED",
+  "rate": null
 }
