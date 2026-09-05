@@ -240,7 +240,10 @@ private fun assertFixtureNumberMatchesContractBinding(
 ) {
     val typePath = contractBindingTypePath ?: error("case $caseId 의 manifest 에 contract_binding.type_path 가 없다")
     withClue("case $caseId 의 contract_binding.type_path 가 'fixture $fixtureNumber' 를 언급해야 한다 — 실제: $typePath") {
-        typePath.contains("fixture $fixtureNumber") shouldBe true
+        // 1A-b ⑤(1B-c verifier r2 low ①) — `contains("fixture $n")`는 접두 오탐이 있다
+        // (`fixture 1`이 `fixture 11`·`fixture 12`에도 부분 문자열로 든다). 단어 경계로
+        // 안전화한다 — 뒤에 숫자가 이어지지 않을 때만 대조된 것으로 본다.
+        Regex("fixture $fixtureNumber(?!\\d)").containsMatchIn(typePath) shouldBe true
     }
 }
 
