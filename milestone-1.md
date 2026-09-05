@@ -93,8 +93,10 @@ corpus 전체 통과」는 1B slice 의 종결 조건에서 제외하고, 이 sl
 **착수·구현 2026-09-05** — 계약 정본 `reports/evidence/m1/1a-b/scope.md`. 결정 D-1(멤버 정의: 본문
 선언 수, 중첩·companion 은 별도 타입) · D-2(**`java-test-fixtures` 전 모듈 불허** — 허용은 ADR 선행) ·
 D-3(래칫 = 증가 금지, 상향은 ADR 개정) · D-4(CPD 관찰 모드도 리포트 산출은 `check` 가 강제) ·
-D-5(새 축이 현 코드를 빨갛게 하면 임계를 만지지 않고 보고) · D-6(타입 멤버 축은 `main` source set
-만 — 테스트 클래스 `SourceReferencesTest` 35 가 계기). 부수 산출물: 1B-c 이월 둘(runner fixture 번호
+D-5(새 축이 현 코드를 빨갛게 하면 임계를 만지지 않고 보고) · D-6(타입 형태 두 축은 `main` source set
+만 — 테스트 클래스 `SourceReferencesTest` 35 가 계기) · D-7(상속 깊이 = 프로젝트 소유 타입 안의 체인
+길이, 소유 판정은 스캔 집합 ∨ 루트 패키지 접두 — Gradle `DefaultTask` 기저 깊이 3 이 계기, 실측 전
+모듈 0 이라 `ratchet.type.inheritance-depth.max=0`; verifier r2 가 모듈 경계 미탐을 잡아 접두 판정 추가). 부수 산출물: 1B-c 이월 둘(runner fixture 번호
 대조 단어 경계 · compile fixture 13 `BaseAmount` 기본값 부재), capability-map §14.2 낡은 좌표 5건 정정.
 
 ### Slice 1C — Qualification
