@@ -90,6 +90,13 @@ corpus 전체 통과」는 1B slice 의 종결 조건에서 제외하고, 이 sl
 완료 조건은 M1 공통 조건 + 위 셋의 위반 fixture 가 실제로 걸림(관찰 모드인 CPD 는 리포트
 산출로 대신). 게이트 위협 모델(「완료 조건」 절)은 그대로 적용된다.
 
+**착수·구현 2026-09-05** — 계약 정본 `reports/evidence/m1/1a-b/scope.md`. 결정 D-1(멤버 정의: 본문
+선언 수, 중첩·companion 은 별도 타입) · D-2(**`java-test-fixtures` 전 모듈 불허** — 허용은 ADR 선행) ·
+D-3(래칫 = 증가 금지, 상향은 ADR 개정) · D-4(CPD 관찰 모드도 리포트 산출은 `check` 가 강제) ·
+D-5(새 축이 현 코드를 빨갛게 하면 임계를 만지지 않고 보고) · D-6(타입 멤버 축은 `main` source set
+만 — 테스트 클래스 `SourceReferencesTest` 35 가 계기). 부수 산출물: 1B-c 이월 둘(runner fixture 번호
+대조 단어 경계 · compile fixture 13 `BaseAmount` 기본값 부재), capability-map §14.2 낡은 좌표 5건 정정.
+
 ### Slice 1C — Qualification
 
 - 단일 면허 조건

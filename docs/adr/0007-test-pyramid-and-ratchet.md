@@ -268,6 +268,12 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   「수치를 자기 승인하지 않는다」에 따라 구현이 아니라 운영자가 값을 냈다).
 - **배선 소유**: **하네스 slice `1A-b`**(신설, `milestone-1.md` 「Slice 1A-b」) — `OPEN-ADR-16`의
   CPD 배선, `OPEN-1BC-TESTFIXTURES-GATE`(1차 게이트의 testFixtures 버킷 사각)와 같은 자리.
+- **배선 완료(M1/1A-b, 2026-09-05)**: `sizeGate` 셋째 축 `limit.type.members=30`(PSI 소스 기준,
+  대상 source set 은 `limit.type.members.source-sets=main` — 테스트 클래스는 case 수만큼 커지므로
+  이 축의 근거인 §1.3 합성 팽창의 대상이 아니다, 1A-b D-6) + `ratchet.type.inheritance-depth.max=2`·
+  `ratchet.type.interfaces.max=1`(바이트코드, `qualityBaseline`과 같은 계수 함수). 정본은
+  `config/quality/size-policy.properties`, evidence는 `reports/evidence/m1/1a-b/`. **실측 주의**: PSI
+  멤버 계수의 현 최대는 도메인 6·저장소 전체 21이라 상한 30은 느슨하다 — 값 재조정은 운영자 몫.
 - **불채택**: (b)는 mixin 우회(§1.3)를 직접 막지 못하고, (c)는 §5와 충돌한다.
 
 **아래는 미결 당시의 기록이며 지우지 않는다.**
@@ -302,6 +308,11 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   `kotlin-compiler-embeddable`로 PSI를 쓴다(`sizeGate`) — (b)의 진짜 대가는 새 의존이 아니라
   **중복 탐지 알고리즘을 직접 짓고 유지하는 것**이고, 재활용 우선 방침이 (a)를 고른다.
 - **배선 소유**: **하네스 slice `1A-b`**(`OPEN-ADR-06`과 같은 자리).
+- **배선 완료(M1/1A-b, 2026-09-05)**: `de.aaschmid.cpd` 3.5 + PMD `toolVersion` 7.7.0, 정책 데이터는
+  `config/quality/duplicate-policy.properties`(`language=kotlin`·`minimumTokenCount=50`·`mode=observe`).
+  Gradle 9.6.1 스모크 통과(configuration cache 포함), 현 baseline 중복 0. `check`가 `cpdCheck`와
+  **리포트 산출 단언**에 의존해 관찰 모드가 「실행 안 함」으로 퇴화하지 않는다. `mode=fail` 전환은
+  1C 종료 시 운영자 결정.
 
 **아래는 미결 당시의 기록이며 지우지 않는다.**
 
