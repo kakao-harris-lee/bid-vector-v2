@@ -1,5 +1,4 @@
 {
-  "outcome": "Rejected",
-  "reasonCode": "VatTreatmentMismatch",
-  "operationPerformed": false
+  "fact": "Absent",
+  "reasonCode": "VAT_TREATMENT_MISMATCH"
 }

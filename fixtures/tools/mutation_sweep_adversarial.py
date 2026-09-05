@@ -62,10 +62,19 @@ ASSERTED = {
     "floor-threshold-003":         ["$.criticalAssessmentRate.fraction"],
     "rate-unit-003":               ["$.fact", "$.reasonCode"],             # "거부된다" + 그 사유(1B-c 재추출)
     "rate-unit-004":               ["$.fact", "$.reasonCode"],             # "거부된다" + 그 사유(1B-c 재추출)
-    "money-basis-001":             ["$.outcome", "$.reasonCode"],          # "사유와 함께 거부된다"
-    "money-basis-002":             ["$.comparedBases"],                    # "basis 가 같으면"
-    "money-basis-004":             ["$.outcome"],                          # "들어갈 수 없다"
-    "money-basis-006":             ["$.reasonCode"],                       # "승격되지 않는다" 의 사유
+    "money-basis-001":             ["$.representable"],                    # "표현 불가"(1B-c 재정의)
+    "money-basis-002":             ["$.fact", "$.comparedBases"],          # "basis 가 같으면" + 비교 성립
+    "money-basis-004":             ["$.representable"],                    # "표현 불가"(1B-c 재정의)
+    "money-basis-005":             ["$.fact", "$.reasonCode"],             # "비교에 들어갈 수 없다" + 그 사유
+    # `money-basis-006` 의 `$.reasonCode` 는 **여기 들지 않는다** — 2026-09-05(1B-c) 판단.
+    #   그 case 가 주장하는 것은 **사유가 함께 나온다**(존재)이고 **어느 이름인가**가 아니다:
+    #   `LegacyOriginNotPromotable` 은 corpus 운영 규칙의 이름이라 `ReasonCode` enum 에 없고
+    #   (`contract_binding.does_not_carry`), decision 19 가 세운 승인 어휘 밖이라 **정확 비교로
+    #   잠글 수 없다.** (a′) 갈래는 「그 값을 잠글 자격이 있는 경로」를 전제하므로 이런 자리에는
+    #   설 수 없다. 존재 주장은 `verified_projections` 의 `is-present` 가 지고, 그 술어가 (a)
+    #   삭제와 (b) null 을 **여기서 잃는 것보다 넓게** 생성한다 — 적대 집합이 줄지 않는다.
+    #   **값을 잠글 자격이 있는 경로를 이 목록에서 빼는 것은 다른 일이다** — 그것은 우회이고
+    #   위협 모델 (3)이 막는다.
     "floor-shortfall-006":         ["$.outcome"],                          # "정상 처리된다"
     "base-amount-provenance-004":  ["$.outcome"],                          # "거부된다"
     "base-amount-provenance-005":  ["$.outcome"],                          # "거부된다"

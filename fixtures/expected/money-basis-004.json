@@ -1,6 +1,3 @@
 {
-  "outcome": "Rejected",
-  "reasonCode": "BasisMismatch",
-  "operationPerformed": false,
-  "directionAsserted": false
+  "representable": false
 }

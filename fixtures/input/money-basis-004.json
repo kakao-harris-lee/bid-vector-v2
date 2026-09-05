@@ -11,7 +11,7 @@
     {
       "amount": 900000000,
       "currency": "KRW",
-      "basis": "ESTIMATED_PRICE",
+      "basis": "ESTIMATED",
       "vatTreatment": "EXCLUSIVE",
       "provenance": "Published"
     }

@@ -1,7 +1,5 @@
 {
-  "outcome": "Comparable",
-  "comparisonPerformed": true,
-  "result": true,
+  "fact": "Known",
   "comparedBases": [
     "BASE_AMOUNT",
     "BASE_AMOUNT"

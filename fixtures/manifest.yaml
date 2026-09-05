@@ -1166,9 +1166,11 @@ cases:
       approved_by_user: false
   - id: money-basis-001
     domain: money-basis
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
-        basis 태그가 다른 두 금액의 비교가 수행되지 않고 사유와 함께 거부된다. 두 값의 수치가 같으므로 대소 전제가 들어가지 않는다.
+        basis 태그가 다른 두 금액의 비교는 표현 불가다 — 컴파일 차단이라 거부 객체가 생기지 않는다. 두 값의 수치가 같으므로 대소 전제가 들어가지 않는다.
+    verified_paths:
+      - "$.representable"
     source:
       kind: operator-decision
       reference: |-
@@ -1178,6 +1180,9 @@ cases:
       한다"* + capability-map.md DEC-02 결정 무관(무조건) acceptance *"서로 다른 basis의 금액이 하나의 min/max 연산에 함께 들어갈
       수 없다"* + STR-16 acceptance *"금액 범위로 검색할 때 그 값이 어느 basis인지가 선언돼 있고, 비교 대상 금액과 basis가 같다"*. 두 값의
       수치를 같게 두어 **어느 쪽이 크다는 전제를 넣지 않는다** — regression-ledger.md §10.1 fixture-curator 인계의 요구다.
+      **「거부」의 형태는 운영자 결정 2026-09-05 decision 21 이 정한다** — 승인된 1B 계약이 이 자리를
+      **컴파일 차단**으로 지어 런타임 거부 객체가 존재하지 않으므로, 같은 요구를 「그 조합은 **표현
+      불가**」로 적는다. **V2 산출을 근거로 들지 않았다** — 근거는 위 §4.1·DEC-02 문면과 그 결정이다.
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -1199,32 +1204,40 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 3d6dbe0b54213bb662cc420885199bcecb4fe248ff59d49eb3a1a293d7b2c141
-    expected_sha256: 6ace534b600427c387784d5316b10951ce206632db5f3ccaef7b54bd30b970e0
+    sha256: 07642e37e00ba1481516b0711599dc0678065ad2ee741aa2b649a23af4ede0c7
+    expected_sha256: 6c4a591fbe998ff847336e95488706c51b41388a6b7c2e3388ffcbc00da70d0d
     owning_open: |-
       OPEN-REG-05 (두 금액 차이의 잔차·행별 실제 과세) — 이 case는 그 축을 건드리지 않는다
     not_covered: |-
-      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
-      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제 · $.reasonCode (a) verifies 주장 필드 삭제. 동결된 술어 어휘
-      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
-      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
-      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
-      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+      **거부의 런타임 표현이 이 case 에 없다 — 계약이 그 자리를 컴파일 차단으로 지었다.**
+      기대값이 적던 `$.outcome`·`$.reasonCode`·`$.comparedBases`·`$.directionAsserted` 는 재정의로
+      전부 **빠졌다**. `Money` 상위 타입에 `Comparable` 도 이항 연산도 없고 여섯 금액 타입이 각자
+      제 타입만 받으므로 **basis 가 다른 두 값이 만나는 함수 서명 자체가 없다** — 거부 객체도 사유
+      코드도 생기지 않는다. `ReasonCode` 에 `BASIS_MISMATCH` 가 없는 것이 그 설계의 결과다.
+      **그래서 이 case 가 잠그는 것은 값 하나(`$.representable: false`)뿐이고, 그 사실을 실제로
+      증명하는 것은 기대값이 아니라 컴파일 fixture 다** — `contract_binding.fixed_by` 가 그 자리를
+      가리킨다. **소비 테스트는 이 case 를 실행 산출과 대조할 수 없다** — 대조 대상이 컴파일
+      실패이기 때문이며, ④ runner 는 그 fixture 의 판정을 projection 으로 받아야 한다.
+      **두 값의 수치를 같게 둔 전제는 그대로다** — 대소 전제를 넣지 않는다는 요구
+      (`regression-ledger.md` §10.1)는 입력이 지고 있고 기대값이 그것을 다시 적지 않는다.
     contract_binding:
-      type_path: "bidvector.sharedkernel.Money (상위 타입에 `Comparable`·이항 연산을 두지 않는다) + `Basis`"
+      type_path: "`CompileFailureHarnessTest` fixture 11 (`negative-11-cross-basis-compare` / `positive-11-same-basis-compare`) + bidvector.sharedkernel.Money · Basis"
       fixed_by: |-
-        `Money` 선언 자체 — 여섯 금액 타입이 각자 `Comparable<자기 타입>` 만 구현하고, `basis` 는
-        생성자 파라미터가 아니라 각 구현이 내는 값이라 `copy()` 로 바꿀 수 없다.
+        **컴파일 fixture 11 이 이 case 의 실행자다** — `compareKnownVat` 가 basis 교차 쌍을 받지
+        않고 같은 basis 쌍은 받는다를 `kotlin-compiler-embeddable` 로 실측한다(음성·양성·변이
+        쌍둥이 셋). 그것을 떠받치는 선언은 `Money` 자신이다 — 상위 타입에 `Comparable` 도 이항
+        연산도 없고, `basis` 는 생성자 파라미터가 아니라 각 구현이 내는 값이라 `copy()` 로 바꿀 수
+        없다.
       carries: |-
         **basis 가 다른 두 금액이 하나의 비교에 들어가지 않는다.** 계약은 그것을 **컴파일 차단**으로
         지었다 — `BaseAmount` 와 `EstimatedAmount` 사이에는 비교 연산이 존재하지 않는다.
         `$.comparisonPerformed` 의 `false` 가 가리키는 자리다.
       does_not_carry: |-
-        **거부의 런타임 표현 전체.** `$.outcome` 의 `Uncertain` 과 `$.reasonCode` 의 `BasisMismatch` —
-        차단이 컴파일 시점이라 **거부 객체도 사유 코드도 생기지 않는다.** `ReasonCode` 에
-        `BASIS_MISMATCH` 가 없는 것은 누락이 아니라 그 설계의 결과다(상세는
-        `m1_contract_binding.design_divergence`).
-        **입력의 `ESTIMATED_PRICE` 도 계약 이름과 다르다** — 계약은 `Basis.ESTIMATED` 다.
+        **거부의 런타임 표현 전체** — `$.outcome`·`$.reasonCode`·`$.comparedBases`·
+        `$.directionAsserted` 는 재정의로 기대값에서 **빠졌다**. 차단이 컴파일 시점이라 거부 객체도
+        사유 코드도 생기지 않고, `ReasonCode` 에 `BASIS_MISMATCH` 가 없는 것은 누락이 아니라 그
+        설계의 결과다(상세는 `m1_contract_binding.design_divergence`).
+        **입력의 `ESTIMATED_PRICE` 표기 차이는 해소됐다** — `Basis.ESTIMATED` 로 정렬했다.
     change_history:
       - date: 2026-09-02
         change: |-
@@ -1259,15 +1272,37 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **재정의.** 기대값을 「사유와 함께 거부되는 런타임 객체」에서 **「그 조합은 표현 불가」**
+          한 값(`{"representable": false}`)으로 다시 썼다. `verifies` 도 그 형태로 다시 썼다 —
+          「수행되지 않고 사유와 함께 거부된다」를 「표현 불가(컴파일 차단)」로. **입력의 `basis: ESTIMATED_PRICE` 를 계약 이름
+          `ESTIMATED` 로 정렬**했다(`Basis.ESTIMATED`). `verified_paths` 를 달고 `classification` 을
+          **`authoritative`** 로 되돌렸으며 `contract_binding.type_path` 를 컴파일 fixture 로 옮겼다.
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 19·20·21.** 20 이 BLOCK-3(운영자 명시 승인 부재)을
+          **case 별 승인**으로 풀었고 21 이 이 case 의 처분을 — **`verifies` 재작성을 포함해** —
+          승인했다. 19 가 `Basis.ESTIMATED` 를 입력 토큰의 정본으로 세웠다.
+          **승인된 계약이 이긴다**: 기대값이 적던 런타임 거부는 1B 가 채택한 설계와 다르고
+          (`m1_contract_binding.design_divergence`), fixture 를 계약에 맞추는 것이 이 slice 의
+          방향이다(계약을 fixture 에 맞추지 않는다). **자동 생성이 아니다** — 새 기대값은
+          `v2-지침서.md` §4.1 과 DEC-02 acceptance 에서 나왔고 V2 산출을 복사하지 않았다.
+        policy_version: |-
+          해당 없음 — 기대값이 effective-dated 정책에 의존하지 않는다.
+        previous_expected_sha256: 6ace534b600427c387784d5316b10951ce206632db5f3ccaef7b54bd30b970e0
+        previous_sha256: 3d6dbe0b54213bb662cc420885199bcecb4fe248ff59d49eb3a1a293d7b2c141
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: money-basis-002
     domain: money-basis
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         basis가 같으면 비교가 수행된다 — 001의 대조군.
+    verified_paths:
+      - "$.fact"
+      - "$.comparedBases"
     source:
       kind: operator-decision
       reference: |-
@@ -1277,6 +1312,9 @@ cases:
       한다"* + capability-map.md DEC-02 결정 무관(무조건) acceptance *"서로 다른 basis의 금액이 하나의 min/max 연산에 함께 들어갈
       수 없다"* + STR-16 acceptance *"금액 범위로 검색할 때 그 값이 어느 basis인지가 선언돼 있고, 비교 대상 금액과 basis가 같다"*. 두 값의
       수치를 같게 두어 **어느 쪽이 크다는 전제를 넣지 않는다** — regression-ledger.md §10.1 fixture-curator 인계의 요구다.
+      **결과 토큰의 어휘는 운영자 결정 2026-09-05 decision 19 가 정한다** — 비교가 수행돼 값이 나온
+      상태는 `Fact.Known`(`data-dictionary.md` §1.1)이고 `comparedBases` 의 두 값은 `Basis.BASE_AMOUNT`
+      와 이름까지 같다. **V2 산출을 근거로 들지 않았다.**
     input_file: fixtures/input/money-basis-002.json
     expected_file: fixtures/expected/money-basis-002.json
     normalization:
@@ -1292,30 +1330,36 @@ cases:
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
     sha256: 4e19b0d22d5f9f532aff33d4c5da840e9d16a9e1fbe16cd67736a233f649a185
-    expected_sha256: 99f56b4282cb9ab2d3c1840f32fef247075c5df13c60c4cca4ee4d5d297563af
+    expected_sha256: 006d43a102edd6da8d6c7dfe8d4686312ae2cbd63055aa1c01a77819b9da2381
     not_covered: |-
-      **비교의 결과값과 그 경계 포함성** — 기대값은 `result: true` 를 나르지만 이 case 는 그것을 검증 대상으로
-      잠그지 않는다. 이 corpus 는 두 금액의 **수치를 같게** 두어 어느 쪽이 크다는 전제를 넣지 않으므로
-      (`expected_reasoning`), `result: true` 를 계약에 넣으면 **같은 값에서 비교가 참**이라는 경계 포함성을
-      잠근다 — 이 case 가 재는 것은 그것이 아니다. **경계 포함성을 실제로 재려면 별도 case 와 별도 근거가
+      **비교의 결과값과 그 경계 포함성** — 기대값이 나르던 `$.result: true` 는 재추출에서 **뺐다**.
+      이 corpus 는 두 금액의 **수치를 같게** 두어 어느 쪽이 크다는 전제를 넣지 않으므로
+      (`expected_reasoning`), `result: true` 를 계약에 넣으면 **같은 값에서 비교가 참**이라는 경계
+      포함성을 잠근다 — 이 case 가 재는 것은 그것이 아니다. `Fact.Known` 이 나르는 `Int` 비교 결과도
+      같은 이유로 기대값에 싣지 않는다. **경계 포함성을 실제로 재려면 별도 case 와 별도 근거가
       필요하다** — 그 축은 이 corpus 에 없다.
-      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
-      위반 변이체가 통과했다: $.comparedBases (a) verifies 주장 필드 삭제. 동결된 술어 어휘
-      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
-      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
-      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
-      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+      **`$.comparisonPerformed` 도 뺐다** — 「비교가 수행됐다」는 `$.fact` 의 `Known` 이 그대로 나르는
+      축이라(`compareKnownVat` 는 전건이 서면 `Fact.Known` 을 내고 아니면 `Fact.Absent` 를 낸다) 두
+      이름으로 같은 축을 적는 자리였다. 001 과의 대조도 이제 `$.comparisonPerformed` 가 아니라
+      **`$.fact` 의 유무**로 선다 — 001 은 컴파일 차단이라 그 축의 값 자체가 없다.
+      **provenance 전건은 이 case 가 재지 않는다** — `compareKnownVat` 는 VAT 보다 provenance 를
+      **먼저** 본다(`compareSameType`). 입력 둘이 다 선언된 provenance 라 그 전건을 지나갈 뿐이고,
+      그 순서를 잠그는 것은 이 case 가 아니다.
     contract_binding:
-      type_path: "bidvector.sharedkernel.BaseAmount.compareTo(BaseAmount) + `Basis.BASE_AMOUNT`"
+      type_path: "bidvector.sharedkernel.compareKnownVat(BaseAmount, BaseAmount) + `Basis.BASE_AMOUNT`"
       fixed_by: |-
-        `BaseAmount` 선언 — `Comparable<BaseAmount>` 이고 `basis` 는 구현이 내는 값이라 위조되지 않는다.
+        `compareKnownVat` 의 **타입별 오버로드 여섯** — 각각이 정확히 한 타입만 받으므로 서로 다른
+        타입 인자로는 어떤 오버로드도 서지 않는다(verifier r4 H-1 이 되돌린 LUB 추론 구멍).
+        `basis` 는 구현이 내는 값이라 위조되지 않는다. **`Comparable<Self>` 를 가리키던 앞 판은
+        낡았다** — Codex 1차 #2 가 공개 `compareTo` 를 걷고 이 함수를 유일 경로로 세웠다.
       carries: |-
         **basis 가 같으면 비교가 수행된다.** 같은 타입끼리만 `compareTo` 가 서고 그 타입이 곧 같은
         basis 다. `$.comparedBases` 의 두 값이 `Basis.BASE_AMOUNT` 와 **이름까지 일치**한다 —
         11 case 를 통틀어 결과 축 토큰이 계약과 어긋나지 않는 몇 안 되는 자리다.
       does_not_carry: |-
-        `$.outcome` 의 `Comparable`(상태 토큰이 계약에 없다) · `$.result` 의 `true`(경계 포함성은
-        이 case 가 잠그지 않는다 — 사유는 위 `not_covered` 가 갖는다).
+        `$.result` 의 `true`(경계 포함성) · `$.comparisonPerformed`(=`$.fact` 와 같은 축) ·
+        `Fact.Known` 이 감싸는 **비교 결과 `Int`**. 셋 다 재추출로 기대값에서 빠졌고 사유는 위
+        `not_covered` 가 갖는다. **provenance 전건의 검사 순서**도 이 case 의 축이 아니다.
     change_history:
       - date: 2026-09-02
         change: |-
@@ -1370,6 +1414,23 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **재추출.** 상태 `$.outcome`(`Comparable`) 을 `$.fact`(`Known`) 로 바꾸고 `$.result` 와
+          `$.comparisonPerformed` 를 뺐다. `$.comparedBases` 는 그대로다 — 토큰이 `Basis.BASE_AMOUNT`
+          와 이름까지 같다. `verified_paths` 둘을 달고 `classification` 을 **`authoritative`** 로
+          되돌렸으며, `contract_binding.type_path` 를 낡은 `BaseAmount.compareTo` 에서
+          **`compareKnownVat(BaseAmount, BaseAmount)`** 로 정정했다.
+          **입력 파일과 `sha256` 은 그대로다** — 토큰이 계약과 어긋나지 않는다.
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 19·20·21.** 20 이 BLOCK-3 을 case 별 승인으로 풀었고
+          21 이 이 case 의 처분을 승인했으며, 19 가 상태 토큰을 계약 이름으로 세웠다.
+          `type_path` 정정은 **1B Codex 1차 #2** 가 공개 `compareTo` 를 걷고 `compareKnownVat` 를
+          유일 비교 경로로 세운 것을 따라가는 것이다 — 포인터가 낡아 있었다.
+          **자동 생성이 아니다** — 새 값은 `expected_reasoning` 이 드는 승인 문면에서 나왔다.
+        policy_version: |-
+          해당 없음 — 기대값이 effective-dated 정책에 의존하지 않는다.
+        previous_expected_sha256: 99f56b4282cb9ab2d3c1840f32fef247075c5df13c60c4cca4ee4d5d297563af
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -1409,8 +1470,12 @@ cases:
         **감시 경로 쪽 절반만 계약에 있다** — 같은 basis 의 `BaseAmount` 비교가 그것이고 002 와 같은 자리다.
       does_not_carry: |-
         **두 경로가 같은 답을 낸다는 주장 자체.** 검색 경로는 1B 가 만들지 않았고 `$.perPath` 를
-        나르는 타입이 없다. 이 case 의 둘째 자물쇠(운영자 명시 승인 부재)와 **별개로 계약 자리도
-        아직 없다** — 자물쇠가 둘이 아니라 셋인 유일한 case 다.
+        나르는 타입이 없다.
+        **2026-09-05 이월(1B-c).** 앞선 자물쇠 셋 가운데 둘이 풀렸다 — 술어 어휘(decision 18)와
+        운영자 승인(decision 20·21, 이 case 의 처분은 **이월**)이다. **남은 하나가 계약 자리의
+        부재**이고 그것은 이 slice 밖이다(`out_of_scope`: STR-16 이 요구하는 검색 경로 타입).
+        소유는 `uncovered_axes` 의 **`OPEN-1BC-STR16`**(strategy slice)이 받는다. **분류는
+        `insufficient-evidence` 그대로이고 기대값·입력·해시는 무접촉이다.**
     change_history:
       - date: 2026-08-31
         change: |-
@@ -1454,15 +1519,30 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **이월.** `classification` 은 `insufficient-evidence` **그대로**이고 기대값·입력 파일·
+          `sha256`·`expected_sha256` 도 그대로다 — 되돌리지 않았다. `contract_binding.does_not_carry`
+          에 이월 표기를 넣고 소유 OPEN(`OPEN-1BC-STR16`)을 `uncovered_axes` 에 신설했다.
+        reason: |-
+          **운영자 결정 2026-09-05 decision 21** 이 이 case 의 처분을 **strategy slice 이월**로
+          승인했다. 1B-c 가 푼 둘(술어 어휘·운영자 승인)로는 이 case 가 돌아오지 않는다 —
+          **검색 경로(`STR-16`)를 나르는 타입이 계약에 없고**, 그 타입을 만드는 것은 이 slice 의
+          `out_of_scope` 다. 열한 case 가운데 유일하게 되돌리지 못한 자리다.
+        policy_version: |-
+          해당 없음 — 문서 포인터와 소유 OPEN 의 등재이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: money-basis-004
     domain: money-basis
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
-        서로 다른 basis의 금액이 하나의 min/max 연산에 들어갈 수 없다 — R-BASIS-04가 남긴 형태.
+        서로 다른 basis의 금액이 하나의 min/max 연산에 들어가는 것은 표현 불가다 — 컴파일 차단이라 거부 객체가 생기지 않는다. R-BASIS-04가 남긴 형태.
+    verified_paths:
+      - "$.representable"
     source:
       kind: approved-spec
       reference: |-
@@ -1473,6 +1553,9 @@ cases:
       상호 대입하지 못하게 한다"*. 서로 다른 basis 의 두 금액을 하나의 min/max 에 넣는 것이 곧 그 상호 대입이다.
       capability-map.md DEC-02 acceptance *"서로 다른 basis의 금액이 하나의 min/max 연산에 함께 들어갈 수 없다"* 가 같은 요구를
       이 형태로 적는다. 두 인자의 수치를 같게 두어 대소 전제를 넣지 않는다.
+      **「들어갈 수 없다」의 형태는 운영자 결정 2026-09-05 decision 21 이 정한다** — 승인된 1B 계약이
+      `Money` 상위 타입에 이항 연산을 두지 않아 두 값이 만나는 함수 서명 자체가 없으므로, 같은
+      요구를 「그 조합은 **표현 불가**」로 적는다. **V2 산출을 근거로 들지 않았다.**
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -1493,26 +1576,36 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 4d8c3dddf8f166d059576059abaa383ea390f3bd6087a6c153ce9be7b6c5722d
-    expected_sha256: de3923d8969df8d51462ebfdf69679bb6164970bf2c28d5de4f8ca65cad2f1ba
+    sha256: 3ec10f0826b3887ce49b7966cdd6937805441948b8dd3971b846530024b2cc75
+    expected_sha256: 6c4a591fbe998ff847336e95488706c51b41388a6b7c2e3388ffcbc00da70d0d
     not_covered: |-
-      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
-      위반 변이체가 통과했다: $.outcome (a) verifies 주장 필드 삭제. 동결된 술어 어휘
-      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
-      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
-      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
-      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+      **거부의 런타임 표현이 이 case 에 없다 — 계약이 그 자리를 컴파일 차단으로 지었다.**
+      기대값이 적던 `$.outcome`·`$.reasonCode`·`$.comparedBases`·`$.directionAsserted` 는 재정의로
+      전부 **빠졌다**. `Money` 상위 타입에 `Comparable` 도 이항 연산도 없고 여섯 금액 타입이 각자
+      제 타입만 받으므로 **basis 가 다른 두 값이 만나는 함수 서명 자체가 없다** — 거부 객체도 사유
+      코드도 생기지 않는다. `ReasonCode` 에 `BASIS_MISMATCH` 가 없는 것이 그 설계의 결과다.
+      **그래서 이 case 가 잠그는 것은 값 하나(`$.representable: false`)뿐이고, 그 사실을 실제로
+      증명하는 것은 기대값이 아니라 컴파일 fixture 다** — `contract_binding.fixed_by` 가 그 자리를
+      가리킨다. **001 과 기대값이 같다** — 둘 다 「표현 불가」 하나로 좁혀졌고, 가르는 것은 `verifies`(비교 대
+      min/max)와 `contract_binding` 이다. **소비 테스트는 이 case 를 실행 산출과 대조할 수 없다** — 대조 대상이 컴파일
+      실패이기 때문이며, ④ runner 는 그 fixture 의 판정을 projection 으로 받아야 한다.
+      **두 값의 수치를 같게 둔 전제는 그대로다** — 대소 전제를 넣지 않는다는 요구
+      (`regression-ledger.md` §10.1)는 입력이 지고 있고 기대값이 그것을 다시 적지 않는다.
     contract_binding:
-      type_path: "bidvector.sharedkernel.Money (상위 타입에 이항 연산을 두지 않는다)"
+      type_path: "`CompileFailureHarnessTest` fixture 11 (basis 교차 negative) + bidvector.sharedkernel.Money (상위 타입에 이항 연산을 두지 않는다)"
       fixed_by: |-
-        `Money` 선언 — 이항 연산을 상위 타입에 두면 서로 다른 basis 금액이 `f(a: Money, b: Money)` 로
-        다시 섞인다는 설계 검토 L-11 의 반례가 그 자리를 비워 둔 이유다.
+        **컴파일 fixture 11 이 basis 교차 쌍의 차단을 실측한다** — min/max 는 그 차단의 한 형태다
+        (두 값을 받는 함수가 성립해야 min/max 가 서고, 그 함수가 없다). 떠받치는 선언은 `Money` 다 —
+        이항 연산을 상위 타입에 두면 서로 다른 basis 금액이 `f(a: Money, b: Money)` 로 다시 섞인다는
+        설계 검토 L-11 의 반례가 그 자리를 비워 둔 이유다. **min/max 를 이름으로 가진 함수는 1B 에
+        없다** — 그 부재 자체가 이 case 가 재는 것이다.
       carries: |-
         **basis 가 다른 금액이 하나의 min/max 연산에 들어가지 않는다** — 상위 타입에 연산이 없어
         섞일 함수 서명 자체가 없다. `$.operationPerformed` 의 `false` 가 가리키는 자리다.
       does_not_carry: |-
-        001 과 같다 — `$.outcome` 의 `Rejected` 와 `$.reasonCode` 의 `BasisMismatch` 는 컴파일 차단
-        설계에서 생기지 않고, 입력의 `ESTIMATED_PRICE` 이름 차이도 같다.
+        001 과 같다 — `$.outcome`·`$.reasonCode`·`$.operationPerformed`·`$.directionAsserted` 는
+        재정의로 빠졌다. 입력의 `ESTIMATED_PRICE` 표기 차이도 001 과 같이 `Basis.ESTIMATED` 로
+        정렬했다.
     change_history:
       - date: 2026-09-02
         change: |-
@@ -1547,15 +1640,37 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **재정의.** 기대값을 「사유와 함께 거부되는 런타임 객체」에서 **「그 조합은 표현 불가」**
+          한 값(`{"representable": false}`)으로 다시 썼다. `verifies` 도 그 형태로 다시 썼다 —
+          「들어갈 수 없다」를 「표현 불가(컴파일 차단)」로. **입력의 `basis: ESTIMATED_PRICE` 를 계약 이름
+          `ESTIMATED` 로 정렬**했다(`Basis.ESTIMATED`). `verified_paths` 를 달고 `classification` 을
+          **`authoritative`** 로 되돌렸으며 `contract_binding.type_path` 를 컴파일 fixture 로 옮겼다.
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 19·20·21.** 20 이 BLOCK-3(운영자 명시 승인 부재)을
+          **case 별 승인**으로 풀었고 21 이 이 case 의 처분을 — **`verifies` 재작성을 포함해** —
+          승인했다. 19 가 `Basis.ESTIMATED` 를 입력 토큰의 정본으로 세웠다.
+          **승인된 계약이 이긴다**: 기대값이 적던 런타임 거부는 1B 가 채택한 설계와 다르고
+          (`m1_contract_binding.design_divergence`), fixture 를 계약에 맞추는 것이 이 slice 의
+          방향이다(계약을 fixture 에 맞추지 않는다). **자동 생성이 아니다** — 새 기대값은
+          `v2-지침서.md` §4.1 과 DEC-02 acceptance 에서 나왔고 V2 산출을 복사하지 않았다.
+        policy_version: |-
+          해당 없음 — 기대값이 effective-dated 정책에 의존하지 않는다.
+        previous_expected_sha256: de3923d8969df8d51462ebfdf69679bb6164970bf2c28d5de4f8ca65cad2f1ba
+        previous_sha256: 4d8c3dddf8f166d059576059abaa383ea390f3bd6087a6c153ce9be7b6c5722d
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: money-basis-005
     domain: money-basis
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         과세 처리가 `Unknown`인 금액은 다른 과세 처리의 금액과 산술 비교에 들어갈 수 없다.
+    verified_paths:
+      - "$.fact"
+      - "$.reasonCode"
     source:
       kind: m0-derived-rule
       reference: |-
@@ -1563,6 +1678,9 @@ cases:
     expected_reasoning: |-
       data-dictionary.md §1.2.1 *"선언을 만들 수 없으면 `Unknown`이고, `Unknown` 금액은 다른 과세 처리의 금액과 산술 비교에 들어갈 수
       없다(타입 차단)"*.
+      **결과 토큰의 어휘는 운영자 결정 2026-09-05 decision 19 가 정한다** — 상태는 `Fact.Absent`,
+      사유는 `ReasonCode.VAT_TREATMENT_MISMATCH` 다. **V2 산출을 근거로 들지 않았다** — 이 둘은
+      `Carrier.kt` 의 선언 이름이고, 기대값이 주장하는 **규칙**은 위 §1.2.1 문면 그대로다.
     input_file: fixtures/input/money-basis-005.json
     expected_file: fixtures/expected/money-basis-005.json
     normalization:
@@ -1577,10 +1695,22 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 77a4079b0b832116df68dd9e552b015fe499a110204755f883c48ae022a98a29
-    expected_sha256: 3c8516bd2261103c32916fb66dc0987a284ad493efd9ffdb5698f07214c6ec71
+    sha256: f137eafa86051937b4853599a7d3b11ad89b360546e1d454db58a418a2eb97e3
+    expected_sha256: 1fb7d6606f18bcd7cdd56f1e4a627f8d7b20866804d46cf8e074fca48a21c2df
+    not_covered: |-
+      **`$.operationPerformed` 는 재추출에서 뺐다** — 「연산이 수행되지 않았다」는 `$.fact` 의
+      `Absent` 가 그대로 나르는 축이라 두 이름으로 같은 것을 적는 자리였다.
+      **provenance 전건은 이 case 가 재지 않는다** — `compareKnownVat` 의 검사 순서는
+      **provenance 가 먼저**이고(`compareSameType`, verifier r4 M-1) VAT 가 다음이다. 그래서 두
+      전건이 함께 깨진 입력은 **VAT 축을 재지 못한다** — 먼저 걸리는 사유가 나온다. 이 case 가
+      과세 축 하나만 재도록 **입력의 둘째 금액 provenance 를 `Undeclared` 에서 `Published` 로
+      정렬**했다(아래 `change_history`). **검사 순서 자체를 잠그는 것은 이 case 가 아니다** —
+      그 축을 재려면 provenance 만 깨진 별도 case 가 필요하고 그것은 이 corpus 에 없다.
+      **`Unmeasurable` 이 아니라 `Absent` 인 이유도 이 case 가 정하지 않는다** — 계약이 비교에
+      `Fact` 를 쓰는 것은 비교가 정책 version 을 소비하지 않기 때문이고(`Money.kt`), 그 선택은
+      1B 승인 산출이다.
     contract_binding:
-      type_path: "bidvector.sharedkernel.sameKnownVat + `ReasonCode.VAT_TREATMENT_MISMATCH`"
+      type_path: "bidvector.sharedkernel.compareKnownVat(BaseAmount, BaseAmount) — 전건 `sameKnownVat` + `Fact.Absent(ReasonCode.VAT_TREATMENT_MISMATCH)`"
       fixed_by: |-
         `sameKnownVat` — `a == b` 만 쓰면 `UNKNOWN` 둘이 통과하는 설계 검토 L-9 의 반례를 막으려고
         전건을 한 곳에 둔 함수. `divideForRate` 와 `sumOfBaseAmounts` 가 그 전건을 쓴다.
@@ -1589,10 +1719,12 @@ cases:
         **값이 같아도 `UNKNOWN` 이면 막아야** 해서 타입으로 가를 수 없고, 그래서 계약이 이 축만
         **런타임 전건**으로 남겼다. 거부와 사유가 실제로 값으로 나온다.
       does_not_carry: |-
-        **① 상태 토큰.** `$.outcome` 의 `Rejected` — 계약은 `Measurement.Unmeasurable` 이나
-        `Fact.Absent` 로 낸다.
-        **② 사유 토큰의 표기.** `$.reasonCode` 의 `VatTreatmentMismatch` 대
-        `ReasonCode.VAT_TREATMENT_MISMATCH` — 개념 일치, 표기 불일치.
+        **① 연산 수행 여부의 별도 표현.** `$.operationPerformed` 는 재추출로 빠졌다 — `$.fact` 와
+        같은 축이다.
+        **② 전건의 검사 순서.** provenance 가 VAT 보다 먼저라는 사실은 이 case 가 잠그지 않는다
+        (`not_covered` 참조).
+        **표기 불일치는 해소됐다** — `Rejected`·`VatTreatmentMismatch` → `Fact.Absent`·
+        `ReasonCode.VAT_TREATMENT_MISMATCH`(decision 19).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -1631,16 +1763,55 @@ cases:
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **재추출 + 입력 정렬.** 상태 `$.outcome`(`Rejected`) 을 `$.fact`(`Absent`) 로, 사유를
+          `VatTreatmentMismatch` 에서 계약 이름 **`VAT_TREATMENT_MISMATCH`** 로 바꾸고
+          `$.operationPerformed` 를 뺐다. `verified_paths` 둘을 달고 `classification` 을
+          **`authoritative`** 로 되돌렸다.
+          **입력도 바꿨다** — 둘째 금액의 `provenance` 를 `Undeclared` 에서 **`Published`** 로
+          정렬해 `sha256` 이 바뀌었다(`previous_sha256` 동반).
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 19·20·21** 이 어휘·승인·처분을 정했다.
+          **입력 정렬의 사유는 계약의 검사 순서다.** 승인된 1B 계약에서 `compareKnownVat` 는
+          **provenance 를 먼저** 보고 VAT 를 다음에 본다(`compareSameType`, verifier r4 M-1). 앞선
+          입력은 둘째 금액이 `provenance: Undeclared` 이자 `vatTreatment: UNKNOWN` 이라 **두 전건이
+          함께 깨져** 있었고, 그 위에서 이 case 가 주장하는 사유(`VAT_TREATMENT_MISMATCH`)는 나올 수
+          없다 — 먼저 걸리는 `UNDECLARED_PROVENANCE` 가 나온다. **case 의 의미를 지키려고 입력을
+          계약에 맞춘 것**이고(과세 축 하나만 재게 한다), 그 반대(사유를 바꿔 계약에 맞추기)는
+          decision 21 이 승인한 처분과 어긋난다. `$.vatTreatment: UNKNOWN` 은 그대로라 case 가 재는
+          축은 바뀌지 않았다 — **`Published` 이면서 과세 처리가 미상인 금액**은 계약이 표현할 수
+          있는 값이다(`BaseAmount` 가 `vatTreatment` 를 파라미터로 받는다).
+          **자동 생성이 아니다** — 새 기대값은 `data-dictionary.md` §1.2.1 과 decision 19 에서 나왔다.
+        policy_version: |-
+          해당 없음 — 기대값이 effective-dated 정책에 의존하지 않는다.
+        previous_expected_sha256: 3c8516bd2261103c32916fb66dc0987a284ad493efd9ffdb5698f07214c6ec71
+        previous_sha256: 77a4079b0b832116df68dd9e552b015fe499a110204755f883c48ae022a98a29
     review:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
   - id: money-basis-006
     domain: money-basis
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         legacy 유래 행을 정의상 기본값 과세로 자동 태깅하지 않는다 — 저장 값이 정의를 따른다는 근거가 없다. 값은 기초금액 자리에 있으나 `Inclusive`로 승격되지
         않는다.
+    verified_paths:
+      - "$.vatTreatment"
+      - "$.provenance"
+      - "$.autoTaggedFromDefinitionDefault"
+      - "$.eligibleForAuthoritativeCorpus"
+    verified_projections:
+      - path: "$.reasonCode"
+        projection: is-present
+        operand_source: |-
+            해당 없음 — `is-present` 는 피연산자를 받지 않는다(decision 18).
+        means: |-
+            **승격되지 않은 이유가 함께 나온다.** 어느 이름인지는 잠그지 않는다 —
+            `LegacyOriginNotPromotable` 은 corpus 운영 규칙의 이름이고 `ReasonCode` enum 에 없다
+            (`contract_binding.does_not_carry`). 그 이름을 정확 비교로 잠그면 계약이 채택하지 않은
+            어휘가 M1 golden 이 된다.
     source:
       kind: operator-decision
       reference: |-
@@ -1648,6 +1819,9 @@ cases:
     expected_reasoning: |-
       data-dictionary.md §1.2.1 *"legacy 유래 행은 정의상 기본값으로 자동 태깅하지 않는다 — 저장 값이 정의를 따른다는 근거가 없다"* + 운영자
       결정 `OPEN-DEC-08` *"legacy `clean` 라벨을 V2 corpus에 승계하지 않는다 … legacy 유래 행은 provenance 미상으로 격리"*.
+      **기대값의 토큰은 이미 1B 계약 이름이다** — `VatTreatment.UNKNOWN` · `Provenance.Undeclared`
+      (운영자 결정 2026-09-05 decision 19 가 그 어휘를 정본으로 세웠다). **그래서 이 case 는 재추출이
+      아니고 기대값 파일이 바뀌지 않았다.** V2 산출을 근거로 들지 않았다.
     input_file: fixtures/input/money-basis-006.json
     expected_file: fixtures/expected/money-basis-006.json
     normalization:
@@ -1667,11 +1841,15 @@ cases:
     owning_open: |-
       OPEN-REG-05 (저장 값의 행별 실제 과세) — 이 case는 그 판정을 하지 않고 판정하지 않음을 고정한다
     not_covered: |-
-      **대소문자 밖의 표기 변형** — 과세 승격은 `normalize: case-fold` 로 표기와 무관하게 걸리지만, 공백·구분자
-      까지 다른 변형(`INCLUSIVE_VAT` 류)은 여전히 밖이다. 그 통일은 **M1/M2 계약 설계 몫**이다(4문 4답 가족 C).
-      미상 쪽의 이름(`UNKNOWN`)도 계약하지 않는다 — 가족 A 다.
-      **세 축의 실질은 덮인다** — 과세 승격(위 projection) · provenance 승격(같은 자리) · corpus 적격
-      (`$.eligibleForAuthoritativeCorpus`).
+      **표기 변형은 이제 밖이 아니다** — decision 19 가 `VatTreatment.UNKNOWN`·`Provenance.Undeclared`
+      를 승인 어휘로 세워, 「승격되지 않는다」를 **`not-equals` + `case-fold`(승격 쪽 한 표기를 배제)**
+      가 아니라 **미상 쪽 이름의 정확 비교**로 잠갔다. 정확 비교는 `INCLUSIVE`·`Inclusive`·`cLEAN`·
+      공백·구분자 변형·null·삭제를 **전부** 잡는다 — 배제 목록을 늘리는 방식이 아니기 때문이다.
+      **네 축의 실질이 덮인다** — 과세 승격 · provenance 승격 · 자동 태깅 여부 · corpus 적격
+      (`$.eligibleForAuthoritativeCorpus`). 넷 다 `verified_paths` 의 정확 비교다.
+      **덮이지 않는 것은 승격 거부의 사유 이름**이다 — `LegacyOriginNotPromotable` 은 corpus 운영
+      규칙의 이름이고 `ReasonCode` enum 에 없어, 존재만 `is-present` 로 잠근다. 그 이름이 계약에
+      채택되면 경로를 `verified_paths` 로 옮기고 `change_history` 에 승인 기록의 좌표를 적는다.
       **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
       위반 변이체가 통과했다: $.provenance (b) projection 경로 null · $.provenance (c) 다른 확정 토큰 · $.reasonCode (a) verifies 주장 필드 삭제 · $.vatTreatment (b) projection 경로 null · $.vatTreatment (c) 다른 확정 토큰. 동결된 술어 어휘
       (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
@@ -1688,9 +1866,13 @@ cases:
         계약의 `VatTreatment.UNKNOWN`·`Provenance.Undeclared` 와 **이름까지 일치**하고,
         `$.autoTaggedFromDefinitionDefault` 의 `false` 는 **기본값이 없다**는 구성 사실이 낸다.
       does_not_carry: |-
-        **승격 판정과 그 사유.** `$.eligibleForAuthoritativeCorpus` 와 `$.reasonCode` 의
-        `LegacyOriginNotPromotable` 은 corpus 운영 규칙이지 값 타입의 축이 아니라 `shared-kernel` 에
-        자리가 없다.
+        **승격 거부의 사유 이름.** `$.reasonCode` 의 `LegacyOriginNotPromotable` 은 corpus 운영
+        규칙의 이름이지 값 타입의 축이 아니라 `shared-kernel` 에 자리가 없다 — 그래서 정확 비교가
+        아니라 `is-present` 로 존재만 잠근다.
+        **`$.eligibleForAuthoritativeCorpus` 는 계약 밖이지만 잠근다** — corpus 운영 규칙의 판정이라
+        `shared-kernel` 에 자리가 없으나, **불리언이라 어휘를 잠그지 않고** 이 case 의 `verifies` 가
+        주장하는 축이다(2026-09-02 라운드 12 가 그 근거로 이미 `verified_paths` 에 넣었던 자리다).
+        소비 테스트는 이 경로를 **계약 산출과 대조하지 않는다** — 값 타입이 내는 축이 아니다.
     change_history:
       - date: 2026-09-02
         change: |-
@@ -1793,6 +1975,26 @@ cases:
           승인**은 이 작업 밖이고 `review.approved_by_user` 는 `false` 다.
         policy_version: |-
           해당 없음 — 문서 포인터의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          `verified_paths` 넷(`$.vatTreatment`·`$.provenance`·`$.autoTaggedFromDefinitionDefault`·
+          `$.eligibleForAuthoritativeCorpus`)과 `verified_projections` 하나(`$.reasonCode` 의
+          `is-present`)를 달고 `classification` 을 **`authoritative`** 로 되돌렸다.
+          **기대값·입력 파일·`sha256`·`expected_sha256` 은 그대로다 — 재추출이 아니다.**
+          앞선 두 `not-equals` projection(`INCLUSIVE`·`Clean` 배제 + `case-fold`)은 **되살리지 않고
+          정확 비교로 갈음**했다.
+        reason: |-
+          **운영자 결정 2026-09-05 — decision 18·19·20·21.** 19 가 `VatTreatment.UNKNOWN`·
+          `Provenance.Undeclared` 를 승인 어휘로 세워 **미상 쪽 이름의 정확 비교가 미승인 리터럴을
+          잠그지 않게** 됐다 — 그래서 「승격 쪽 한 표기를 배제」하던 projection 보다 **강한** 계약이
+          섰다(B7·B8·r16 이 뚫었던 표기 우회가 구조적으로 사라진다). 18 이 푼 `is-present` 는
+          **계약 어휘 밖인 사유 이름** 하나에만 쓴다. 20·21 이 이 case 의 처분을 승인했다.
+          **처분 표의 「`eligibleForAuthoritativeCorpus` 제거」는 조사 §3 이 정정했고 그 정정이
+          승인분에 들어 있다** — 이 case 의 `not_covered` 가 그 필드를 이미 「덮이는 축」으로 적고
+          있었다. 제거하지 않고 정확 비교로 잠갔다.
+        policy_version: |-
+          해당 없음 — assertion 계약의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
     review:
       claude_commit: pending
@@ -5756,8 +5958,13 @@ uncovered_axes:
       - "소유 `OPEN` 없음 — 막는 것은 미결이 아니라 **운영자 승인 부재**다"
     what_is_covered_instead: |-
       **basis 축의 비교 차단도 2026-09-02 에 덮개를 잃었다** — 열릴 당시에는 `money-basis-001`·`004`가
-      그것을 `v2-지침서.md` §4.1 로 고정했으나 **그 둘이 내려갔다.** **덮이지 않는 것은 두 경로가 같은 basis 를
-      쓴다는 요구**다 — `money-basis-003`은 `insufficient-evidence` 로 남아 있고 지워지지 않았다.
+      그것을 `v2-지침서.md` §4.1 로 고정했으나 **그 둘이 내려갔다.**
+      **2026-09-05 에 그 덮개가 돌아왔다(1B-c)** — 다만 **형태가 다르다**: 두 case 의 기대값이
+      「사유와 함께 거부되는 런타임 객체」에서 **「그 조합은 표현 불가」**로 재정의됐고, 실행자는
+      기대값이 아니라 컴파일 fixture 다. 어느 case 가 어느 층인지는 **각 case 의 `classification` 이
+      정본**이고 셈은 **C-5** 가 낸다.
+      **덮이지 않는 것은 두 경로가 같은 basis 를 쓴다는 요구**다 — 그 축의 case 는
+      `insufficient-evidence` 로 남아 있고 지워지지 않았다.
     unblocks_when: |-
       운영자가 `regression-ledger.md` R-BASIS-01 의 「결정 무관(무조건)」 검증 방법 가운데
       **「같은 쌍이 감시 경로와 검색 경로(R-BASIS-02)에서 같은 답을 내는지도 함께 고정한다」**를
@@ -5768,6 +5975,16 @@ uncovered_axes:
       **도구 구현이 남아 있다.** 그것이 끝나도 **이 축은 열리지 않는다** — 여기서 막는 것은 술어가
       아니라 **운영자 명시 승인**이고, 여섯 case 의 `review.approved_by_user` 는 `false` 다.
       **`money-basis-003` 은 자물쇠가 하나 더 있다** — 검색 경로를 나르는 타입이 1B 계약에 없다.
+
+      **2026-09-05 — 승인 자물쇠가 풀렸고 이 축은 한 case 로 좁아졌다(1B-c).** 운영자 결정
+      **decision 20** 이 이 축의 승인을 **축 단위가 아니라 case 별**로 주기로 하고, **decision 21** 이
+      여섯 case 의 처분을 각각 승인했다 — 그래서 여기서 막던 「운영자 명시 승인 부재」는 다섯 case
+      에서 해소됐다(넷은 재추출·재정의로, 하나는 계약 어휘와 이미 일치해 계약만 달아서).
+      **남은 것은 `money-basis-003` 하나이고 그 자물쇠는 승인이 아니라 계약 자리의 부재**다 —
+      검색 경로(`STR-16`)를 나르는 타입이 없다. 소유는 아래 **`OPEN-1BC-STR16`** 이 받는다.
+      **`review.approved_by_user` 는 여전히 `false` 다** — 그 필드는 63 case 전부에서 slice 리뷰
+      흐름이 채우는 자리이고(2026-09-05 시점 `true` 인 case 가 하나도 없다) case 처분 승인의
+      기록자가 아니다. 처분 승인의 정본은 각 case 의 `change_history` 가 인용하는 decision 20·21 이다.
 
   - axis: "승인 부재로 authoritative 덮개를 잃은 축 — verdict (`SkipReason` 구체 어휘)"
     domain: verdict
@@ -5966,6 +6183,26 @@ uncovered_axes:
       규칙(최소 표본 수와 그 경계)은 이미 `OPEN-DEC-01` 이 갖는다. 운영자가 대신 **다른 표현을
       지정**하면 그때는 기대값 파일이 바뀌므로 `change_history` 에 `previous_expected_sha256` 를
       함께 싣는다.
+
+  - axis: "검색 경로의 basis 일치 — 감시 경로와 같은 답을 내는가"
+    domain: money-basis
+    why_blocked: |-
+      **계약에 자리가 없다.** 검색 경로(`STR-16`)를 나르는 타입이 1B `shared-kernel` 에 없고, 그
+      타입을 만드는 것은 1B-c 의 `out_of_scope` 다(slice 계약이 명시적으로 뺐다). 이 축을 막던
+      다른 둘 — 술어 어휘와 운영자 명시 승인 — 은 2026-09-05 에 풀렸다(decision 18 · 20·21).
+      **남은 하나가 이것이고 성격이 다르다**: 근거도 술어도 승인도 아니라 **계약 층의 부재**다.
+    owning_open:
+      - "`OPEN-1BC-STR16` (신설 2026-09-05, 1B-c) — 소유는 strategy slice(`STR-16` 신설)다"
+      - "인접: 위 「승인 부재로 authoritative 덮개를 잃은 축 — money-basis」 — 그 축의 승인 자물쇠는 풀렸고 남은 case 가 이 축으로 넘어왔다"
+    what_is_covered_instead: |-
+      감시 경로 절반은 덮인다 — 같은 basis 두 금액의 비교가 `compareKnownVat` 위에 서고
+      `money-basis-002` 가 그것을 잠근다. **비는 것은 「두 경로가 같은 답을 낸다」는 주장 자체**이며,
+      그 주장을 지고 있는 case 는 `insufficient-evidence` 로 남아 있고 기대값·입력·해시가 그대로다.
+    unblocks_when: |-
+      strategy slice 가 검색 경로를 나르는 타입을 세우고, 운영자가 `regression-ledger.md` R-BASIS-01 의
+      「같은 쌍이 감시 경로와 검색 경로에서 같은 답을 내는지도 함께 고정한다」를 업무 규칙으로 명시
+      승인한다(그 축을 소유한 `STR-16` 의 신설 승인을 겸한다). 되돌릴 때 `change_history` 에 그
+      계약 경로와 승인 기록의 좌표를 적는다.
 
   - axis: "원문 unit 보존 — 선언된 단위를 값과 함께 기록하는 자리"
     domain: rate-unit

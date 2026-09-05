@@ -10,7 +10,7 @@
   "noticeAmount": {
     "amount": 1234000000,
     "currency": "KRW",
-    "basis": "ESTIMATED_PRICE",
+    "basis": "ESTIMATED",
     "vatTreatment": "EXCLUSIVE",
     "provenance": "Published",
     "noticeRevision": "000"
