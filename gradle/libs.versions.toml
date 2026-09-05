@@ -66,6 +66,12 @@ jackson-databind = { module = "tools.jackson.core:jackson-databind" }
 grpc-api = { module = "io.grpc:grpc-api" }
 protobuf-java = { module = "com.google.protobuf:protobuf-java" }
 
+# M1/1B-c ④ corpus 소비 테스트(app/src/test)가 `fixtures/manifest.yaml` 을 읽는다. 버전을 적지
+# 않는다 — Boot 4.1.1 BOM 이 관리하고(`org.yaml:snakeyaml:2.6`, 실측 2026-09-05) app 의 test
+# classpath 에 이미 transitively 해석돼 있다(Boot 의 `application.yml` 지원 경로). domain
+# 모듈이 아니라 `moduleDependencyGate` 의 `group.forbidden` 대상도 아니다.
+snakeyaml = { module = "org.yaml:snakeyaml" }
+
 db-scheduler = { module = "com.github.kagkarlsson:db-scheduler", version.ref = "db-scheduler" }
 resilience4j-retry = { module = "io.github.resilience4j:resilience4j-retry", version.ref = "resilience4j" }
 

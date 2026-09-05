@@ -31,6 +31,16 @@ dependencies {
     testImplementation(libs.jackson.databind)
     testImplementation(libs.grpc.api)
     testImplementation(libs.protobuf.java)
+
+    // M1/1B-c ④(decision 22, D5(d)) — corpus 소비 테스트(conformance runner). shared-kernel
+    // 공개 API 만으로 값을 대조한다(testFixtures 는 하네스 게이트 셋을 깨 쓰지 않는다 —
+    // `scope.md` 「Phase 3 중 계약 정정」). `adapters`·`workflow` 가 shared-kernel 을
+    // `implementation`(비전이)으로 물어 app 의 compile classpath 에 원래 없었다 — runner 가
+    // `Rate`·`Money`·`Fact` 등 공개 API 를 직접 참조하려면 이 test 전용 의존이 필요하다.
+    testImplementation(project(":shared-kernel"))
+    // manifest.yaml(YAML) 을 읽기 위한 snakeyaml — 카탈로그 좌표는 이미 Boot BOM 관리 하에
+    // transitively 해석되던 것을 명시로 올린 것뿐이다(`gradle/libs.versions.toml` 주석 참고).
+    testImplementation(libs.snakeyaml)
 }
 
 // 아키텍처 게이트는 조합 지점에서 돈다 — app 의 test runtime classpath 에 아홉 모듈이 모두 있다.
@@ -42,6 +52,22 @@ tasks.test {
     val memberEffects = layout.settingsDirectory.file("config/quality/member-effects.properties")
     inputs.file(memberEffects).withPropertyName("memberEffects")
     systemProperty("bidvector.member.effects", memberEffects.asFile.absolutePath)
+
+    // M1/1B-c ④ — corpus 소비 테스트(`SharedKernelCorpusConformanceTest`)가 manifest 와
+    // 그 아래 input/expected fixture 전체를 읽는다. `ArchitecturePolicy.kt` 와 같은
+    // `System.getProperty` 주입 관례(조사 §6)를 그대로 쓴다.
+    val fixturesRoot = layout.settingsDirectory.dir("fixtures")
+    inputs.dir(fixturesRoot).withPropertyName("fixturesRoot")
+    systemProperty("bidvector.fixtures.root", fixturesRoot.asFile.absolutePath)
+    val fixturesManifest = fixturesRoot.file("manifest.yaml")
+    systemProperty("bidvector.fixtures.manifest", fixturesManifest.asFile.absolutePath)
+
+    // rate-unit-003·004·money-basis-001·004(compile-fixture 위임)가 이 디렉터리 안 fixture
+    // 가족(negative/positive/mutant-N)의 존재만 확인한다 — 컴파일 실패 자체의 단언은
+    // `CompileFailureHarnessTest`(`gate.tests.shared-kernel`)의 몫이다.
+    val sharedKernelCompileFixtures = layout.settingsDirectory.dir("shared-kernel/src/test/resources/compile-fixtures")
+    inputs.dir(sharedKernelCompileFixtures).withPropertyName("sharedKernelCompileFixtures")
+    systemProperty("bidvector.sharedkernel.compile-fixtures", sharedKernelCompileFixtures.asFile.absolutePath)
 }
 
 // 해석만 재면 「호환」을 주장할 수 없다 — 그 버전의 API 로 컴파일되고 JVM 에서 로드되는지는
