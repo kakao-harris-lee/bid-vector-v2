@@ -49,6 +49,21 @@ import java.io.File
  * 감싸지 않고 제수를 방출하지 않는 것처럼, 이 runner 도 계약이 실제로 내는 값만 조립한다.
  * `Provenance` variant 이름은 리플렉션(`::class.simpleName`) 대신 소진 `when` 으로 얻는다 —
  * sealed 라 새 variant 가 생기면 컴파일이 이 파일에서 먼저 깨진다.
+ *
+ * **verifier r1 수정 라운드(M-1~M-3, L-1)**:
+ * - **M-1** — `money-basis-006` 은 입력의 `declaredVatTreatment`/`declaredProvenance`
+ *   누락을 `UNKNOWN`/`Undeclared` 로 접지 않는다(그 접기가 runner 자신을 정답으로 만들었다).
+ *   명시 선언을 요구하고, 「정의상 기본값 없음」의 구성적 사실은 compile fixture 7 위임으로
+ *   함께 증명한다 — 이 case 는 **value executor(선언 값 왕복) + compile-fixture 7 위임**
+ *   둘을 겸한다.
+ * - **M-2** — `rate-unit-001`·`002`·`005` 는 입력 `$.rawRate.declaredUnit` 로 percent/
+ *   fraction 갈래를 정한다(`rateFromDeclaredUnit`) — case 별 하드코딩을 없애 `rate-unit-005`
+ *   의 「선언이 개연성을 이긴다」를 기계가 실제로 재게 한다.
+ * - **M-3** — `assertPathEquals` 가 값을 비교하기 전에 actual·expected 양쪽에 그 경로가
+ *   실존함을 먼저 단언한다 — 존재하지 않는 경로가 missing==missing 으로 공허하게 통과하던
+ *   자리를 닫는다.
+ * - **L-1** — `COMPILE_DELEGATION_FIXTURES` 의 번호가 manifest `contract_binding.type_path`
+ *   의 「fixture N」표기와 실제로 같은 숫자를 가리키는지 대조한다.
  */
 class SharedKernelCorpusConformanceTest {
     @TestFactory
@@ -81,7 +96,9 @@ class SharedKernelCorpusConformanceTest {
         val expected = readFixtureJson(case.expectedFile)
         when {
             case.id in COMPILE_DELEGATION_FIXTURES -> {
-                assertCompileFixtureFamilyExists(COMPILE_DELEGATION_FIXTURES.getValue(case.id))
+                val fixtureNumber = COMPILE_DELEGATION_FIXTURES.getValue(case.id)
+                assertFixtureNumberMatchesContractBinding(case.id, fixtureNumber, case.contractBindingTypePath)
+                assertCompileFixtureFamilyExists(fixtureNumber)
                 val actual = MAPPER.valueToTree<JsonNode>(REPRESENTABLE_FALSE)
                 case.verifiedPaths.forEach { path -> assertPathEquals(actual, expected, path) }
             }
@@ -126,6 +143,8 @@ private data class ManifestCase(
     val verifiedPaths: List<String>,
     val inputFile: String,
     val expectedFile: String,
+    /** compile-delegation case 의 fixture 번호 대조(L-1)에만 쓴다 — 그 밖의 case 는 안 읽는다. */
+    val contractBindingTypePath: String?,
 )
 
 private fun allCases(): List<ManifestCase> {
@@ -149,6 +168,7 @@ private fun toManifestCase(raw: Map<String, Any?>): ManifestCase =
         verifiedPaths = (raw["verified_paths"] as? List<String>).orEmpty(),
         inputFile = raw.getValue("input_file") as String,
         expectedFile = raw.getValue("expected_file") as String,
+        contractBindingTypePath = (raw["contract_binding"] as? Map<String, Any?>)?.get("type_path") as? String,
     )
 
 private fun targetCases(): List<ManifestCase> =
@@ -197,15 +217,45 @@ private fun valuesMatch(
         }
     }
 
+/**
+ * verifier r1 M-3 — 존재하지 않는 경로가 missing==missing 으로 공허하게 통과하던 자리.
+ * 값을 비교하기 전에 **두 쪽 다 경로가 실존함**을 먼저 단언한다(explicit `null` 은 통과 —
+ * `isMissingNode` 만 본다, 그런 case 는 이 corpus 에 없지만 구분을 지운다).
+ */
 private fun assertPathEquals(
     actual: JsonNode,
     expected: JsonNode,
     path: String,
 ) {
-    val actualValue = actual.atDollarPath(path).canonical()
-    val expectedValue = expected.atDollarPath(path).canonical()
+    val actualNode = actual.atDollarPath(path)
+    val expectedNode = expected.atDollarPath(path)
+    withClue("경로 $path 가 actual projection 에 없다 — verified_paths 와 executor 가 어긋난다") {
+        actualNode.isMissingNode shouldBe false
+    }
+    withClue("경로 $path 가 기대값 파일에 없다 — manifest verified_paths 가 잘못됐거나 fixture 가 낡았다") {
+        expectedNode.isMissingNode shouldBe false
+    }
+    val actualValue = actualNode.canonical()
+    val expectedValue = expectedNode.canonical()
     withClue("경로 $path — actual=$actualValue expected=$expectedValue") {
         valuesMatch(actualValue, expectedValue) shouldBe true
+    }
+}
+
+/**
+ * verifier r1 L-1 — `COMPILE_DELEGATION_FIXTURES` 의 번호와 manifest
+ * `contract_binding.type_path` 산문의 「fixture N」표기가 어긋나도 잡는 장치가 없었다
+ * (runner 는 파일 접두만 본다 — 번호가 틀려도 다른 fixture 가족이 있으면 초록). 두 벌
+ * 표기가 실제로 같은 숫자를 가리키는지 여기서 대조한다.
+ */
+private fun assertFixtureNumberMatchesContractBinding(
+    caseId: String,
+    fixtureNumber: Int,
+    contractBindingTypePath: String?,
+) {
+    val typePath = contractBindingTypePath ?: error("case $caseId 의 manifest 에 contract_binding.type_path 가 없다")
+    withClue("case $caseId 의 contract_binding.type_path 가 'fixture $fixtureNumber' 를 언급해야 한다 — 실제: $typePath") {
+        typePath.contains("fixture $fixtureNumber") shouldBe true
     }
 }
 
@@ -249,12 +299,18 @@ private fun assertRateFractionMatches(
 /** 이 corpus 의 어느 case 도 `noticeRevision` 을 값으로 주장하지 않는다 — 없으면 쓰는 자리표시자. */
 private const val UNASSERTED_NOTICE_REVISION = 0
 
-private fun provenanceFrom(node: JsonNode): Provenance {
-    val provenanceNode = node.path("provenance")
-    if (provenanceNode.isMissingNode || provenanceNode.isNull) return Provenance.Undeclared
-    return when (val name = provenanceNode.asString()) {
+/**
+ * `provenance` 토큰 문자열 → 계약 값. 형제 노드(`siblingNode`)는 `Published` 의
+ * `noticeRevision`·`FilledFromBudgetKey` 의 `key` 처럼 variant 별 부가 성분을 읽는 자리다.
+ */
+private fun provenanceFromToken(
+    name: String,
+    siblingNode: JsonNode,
+): Provenance =
+    when (name) {
         "Published" -> {
-            val noticeRevision = node.path("noticeRevision").asString(null)?.toIntOrNull() ?: UNASSERTED_NOTICE_REVISION
+            val noticeRevision =
+                siblingNode.path("noticeRevision").asString(null)?.toIntOrNull() ?: UNASSERTED_NOTICE_REVISION
             Provenance.Published(noticeRevision)
         }
 
@@ -263,7 +319,7 @@ private fun provenanceFrom(node: JsonNode): Provenance {
         }
 
         "FilledFromBudgetKey" -> {
-            Provenance.FilledFromBudgetKey(node.path("key").asString())
+            Provenance.FilledFromBudgetKey(siblingNode.path("key").asString())
         }
 
         "CopiedFromBaseAmount" -> {
@@ -282,6 +338,19 @@ private fun provenanceFrom(node: JsonNode): Provenance {
             error("이 corpus 가 다루지 않는 provenance 토큰: $name")
         }
     }
+
+/**
+ * verifier r1 M-1 과 같은 원칙 — `provenance` 누락을 `Undeclared` 로 접지 않는다. 이 helper 를
+ * 쓰는 money-basis-002·005 의 입력은 전부 명시 선언(`OperatorDeclared`·`Published`)이라
+ * 이 요구가 실제로 실패를 내는 자리는 없다 — 관대한 fallback 을 남겨 두지 않는 것 자체가
+ * 목적이다.
+ */
+private fun provenanceFrom(node: JsonNode): Provenance {
+    val provenanceNode = node.path("provenance")
+    require(!provenanceNode.isMissingNode && !provenanceNode.isNull) {
+        "provenance 는 명시 선언이어야 한다 — 이 corpus 는 누락을 Undeclared 로 지어내지 않는다"
+    }
+    return provenanceFromToken(provenanceNode.asString(), node)
 }
 
 /** `Provenance` variant 이름 — 리플렉션 대신 소진 `when`(sealed 라 컴파일러가 소진을 강제한다). */
@@ -338,20 +407,31 @@ private fun factComparisonProjection(
 
 // ---- dispatch 표 ----
 
+/**
+ * verifier r1 M-2 — 입력의 `$.rawRate.declaredUnit` 이 percent/fraction 갈래를 정한다.
+ * case 별 하드코딩을 두면 `rate-unit-005`(*"선언이 개연성을 이긴다"*)의 실질을 기계가
+ * 재지 못한다 — `declaredUnit` 을 바꿔도 결과가 그대로면 이 executor 가 놓친 것이다.
+ */
+private fun rateFromDeclaredUnit(input: JsonNode): Rate {
+    val numeric = input.atDollarPath("$.rawRate.numeric").decimalValue()
+    return when (val declaredUnit = input.atDollarPath("$.rawRate.declaredUnit").asString()) {
+        "percent" -> Rate.ofPercent(numeric)
+        "fraction" -> Rate.ofFraction(numeric)
+        else -> error("이 corpus 는 declaredUnit='$declaredUnit' 를 다루지 않는다 — 지원: percent, fraction")
+    }
+}
+
 /** `Rate` 값 동등 비교로 대조하는 case — `internal fraction` 을 읽지 않는다(D5(d)). */
 private val RATE_EXECUTORS: Map<String, (JsonNode, JsonNode, List<String>) -> Unit> =
     mapOf(
         "rate-unit-001" to { input, expected, verifiedPaths ->
-            val actual = Rate.ofPercent(input.atDollarPath("$.rawRate.numeric").decimalValue())
-            assertRateFractionMatches(actual, expected, verifiedPaths)
+            assertRateFractionMatches(rateFromDeclaredUnit(input), expected, verifiedPaths)
         },
         "rate-unit-002" to { input, expected, verifiedPaths ->
-            val actual = Rate.ofFraction(input.atDollarPath("$.rawRate.numeric").decimalValue())
-            assertRateFractionMatches(actual, expected, verifiedPaths)
+            assertRateFractionMatches(rateFromDeclaredUnit(input), expected, verifiedPaths)
         },
         "rate-unit-005" to { input, expected, verifiedPaths ->
-            val actual = Rate.ofPercent(input.atDollarPath("$.rawRate.numeric").decimalValue())
-            assertRateFractionMatches(actual, expected, verifiedPaths)
+            assertRateFractionMatches(rateFromDeclaredUnit(input), expected, verifiedPaths)
         },
     )
 
@@ -368,25 +448,31 @@ private val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
             val right = moneyFrom(operands.path(1))
             factComparisonProjection(compareBaseAmounts(left, right), left, right)
         },
+        // verifier r1 M-1 — null → UNKNOWN/Undeclared 로 접는 fallback 을 없앤다. 그 접기가
+        // 있으면 「legacy 유래 행을 정의상 기본값으로 자동 태깅하지 않는다」의 실질을 계약이
+        // 아니라 runner 상수가 지게 된다(재현: fallback 을 INCLUSIVE 로 바꿔도 그 case 만
+        // FAILED, shared-kernel 무변경 — 계약이 아니라 runner 가 답을 정하고 있었다는 뜻).
+        // 입력이 **명시 선언**(UNKNOWN·Undeclared)을 갖고 있어야 하고, 없으면 지어내지 않고
+        // 실패한다. 「정의상 기본값 없음」의 실질은 계약의 구성적 사실(생성자에 기본값 없는
+        // 필수 파라미터 — compile fixture 7 `vat-fixed-money-no-vat-arg`/`explicit-vat`
+        // 가족이 증명)이라 그 위임도 함께 건다 — 이 case 는 「선언 값 왕복(value) +
+        // compile-fixture 7 위임」 둘을 겸한다.
         "money-basis-006" to { input ->
+            assertCompileFixtureFamilyExists(NO_DEFAULT_VAT_PROVENANCE_FIXTURE)
             val row = input.atDollarPath("$.row")
             require(row.path("conceptSlot").asString() == "BASE_AMOUNT") { "이 case 는 BASE_AMOUNT 슬롯만 다룬다" }
             val won = row.path("amount").asLong()
             val currency = Currency.valueOf(row.path("currency").asString())
             val vatTreatmentNode = row.path("declaredVatTreatment")
-            val vatTreatment =
-                if (vatTreatmentNode.isMissingNode || vatTreatmentNode.isNull) {
-                    VatTreatment.UNKNOWN
-                } else {
-                    VatTreatment.valueOf(vatTreatmentNode.asString())
-                }
+            require(!vatTreatmentNode.isMissingNode && !vatTreatmentNode.isNull) {
+                "이 case 는 declaredVatTreatment 가 명시 선언(예: UNKNOWN)이어야 한다 — null 을 UNKNOWN 으로 지어내지 않는다"
+            }
+            val vatTreatment = VatTreatment.valueOf(vatTreatmentNode.asString())
             val provenanceNode = row.path("declaredProvenance")
-            val provenance =
-                if (provenanceNode.isMissingNode || provenanceNode.isNull) {
-                    Provenance.Undeclared
-                } else {
-                    error("이 corpus 는 legacy 행의 선언된 provenance 를 다루지 않는다")
-                }
+            require(!provenanceNode.isMissingNode && !provenanceNode.isNull) {
+                "이 case 는 declaredProvenance 가 명시 선언(예: Undeclared)이어야 한다 — null 을 Undeclared 로 지어내지 않는다"
+            }
+            val provenance = provenanceFromToken(provenanceNode.asString(), row)
             val baseAmount = BaseAmount(won, currency, vatTreatment, provenance)
             mapOf(
                 "vatTreatment" to baseAmount.vatTreatment.name,
@@ -409,3 +495,12 @@ private val COMPILE_DELEGATION_FIXTURES: Map<String, Int> =
         "rate-unit-003" to 12,
         "rate-unit-004" to 12,
     )
+
+/**
+ * `money-basis-006` 이 함께 거는 compile-fixture — `vatTreatment`·`provenance` 가 기본값
+ * 없는 필수 파라미터라는 구성적 사실(`vat-fixed-money-no-vat-arg`/`explicit-vat` 가족).
+ * `COMPILE_DELEGATION_FIXTURES` 에 넣지 않는 이유: 그 표는 「대조 대상이 컴파일 실패뿐인」
+ * case 전용이고 006 은 value executor 를 겸하기 때문이다 — 표 하나에 성질이 둘인 항목을
+ * 두면 `dispatch 표 밖의 authoritative case 가 없다` test 의 「셋 중 하나」가정이 깨진다.
+ */
+private const val NO_DEFAULT_VAT_PROVENANCE_FIXTURE = 7
