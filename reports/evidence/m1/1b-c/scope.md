@@ -31,7 +31,10 @@ in_scope:
                                                   #   (negative/positive/mutant-12-rate-undeclared-unit) + CompileFailureHarnessTest 등재 한정.
                                                   #   rate-unit-003·004 의 실행자다. 다른 test 편집은 out
   - docs/discovery/data-dictionary.md             # 계약 갱신 — 운영자 결정이 실제로 난 항목의 해당 행만(§9 OPEN 표)
-  - docs/discovery/capability-map.md              # 계약 갱신 — §14.2 OPEN-1B-CONTRACT · OPEN-1B-CORPUS 행만
+  - docs/discovery/capability-map.md              # 계약 갱신 — §14.2 OPEN-1B-CONTRACT · OPEN-1B-CORPUS 행 + OPEN-ADR-06 행(운영자 결정 2026-09-05 등재,
+                                                  #   verifier r1 M-4 로 명시 승격 — 세션 모델 커밋 8b393ce)
+  - docs/adr/0007-test-pyramid-and-ratchet.md     # 계약 갱신 — §5 OPEN-ADR-06·OPEN-ADR-16 해소 절만(운영자 결정 2026-09-05, 세션 모델 커밋 8b393ce;
+                                                  #   verifier r1 M-4 로 명시 승격). 다른 절은 out
   - milestone-1.md                                # 계약 갱신 — 「Slice 1B-c」 항목만
   - reports/evidence/m1/1b-c/**
 out_of_scope:
@@ -74,7 +77,9 @@ range 에 있다」를 명시한다. 그 명령이 잡지 못하는 하네스 �
 
 **계약 갱신 커밋(세션 모델, 2026-09-05)**: `977083b`(scope.md decision 18~22) · `8b393ce`(ADR 0007
 §5 OPEN-ADR-06/16 해소 +37줄, capability-map §14.2 행) · `94009f4`(milestone-1.md 「Slice 1A-b」 신설
-+27줄, 「Slice 1B-c」 착수 문단). 셋 다 in_scope 의 계약 갱신 절이다.
++25줄(176→201), 「Slice 1B-c」 착수 문단). 셋 다 운영자 결정(2026-09-05)의 정본 등재이고 **in_scope 계약 갱신 절로
+승격됐다** — 단 `8b393ce` 의 ADR 0007 §5 절과 capability-map OPEN-ADR-06 행은 착수 시점 in_scope 문면에 없었고
+**verifier r1 M-4 로 사후 승격**한 것이다(위 YAML 주석). rollback 은 이 셋을 되돌리지 않는다(`rollback.md` 「되돌리지 않는 것」).
 
 **역방향 파급 검사(evidence-pack 규격, stem 기준 grep)**: ADR 0007 삽입(258행 이후)을 가리키는
 `0007:<line>` 좌표 — **0건**. milestone-1.md 삽입(67행 이후)을 가리키는 `milestone-1.md:<line>` 좌표 —
