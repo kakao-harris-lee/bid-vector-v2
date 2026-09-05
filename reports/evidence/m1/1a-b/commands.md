@@ -1,9 +1,9 @@
 # Commands — M1 / 1A-b
 
-base `e0aae7f2242f3cffe8f4c32bae2ecec7a3b89b46`, head `5564b47b16c4dac1d912b83eb265137d99c77bc9`
-(verifier r1 M-1~M-3·L-1·L-3 반영 커밋. **verifier r1 B-5 정정** — 이전 판은 head 를
-`d0ce669`로 적었으나 그 사이 팀 리드 커밋 둘(`729eb79` evidence·`cfcb023` 문서)이 더 있었다.
-head 선언은 낡기 쉬우므로 이후로는 값을 옮겨 적기보다 `git log --oneline -1`을 가리킨다).
+base `e0aae7f2242f3cffe8f4c32bae2ecec7a3b89b46`. **head 선언은 옮겨 적을 때마다 낡는다
+(verifier r1 B-5 가 잡은 그대로) — 정확한 값은 `git log --oneline -1`을 가리킨다.** 이
+문서를 쓴 시점의 최신 code 커밋은 `03349ad`(D-7, M-2 해소)이고 그 앞은 `5564b47`
+(verifier r1 M-1~M-3·L-1·L-3 반영)이다.
 
 D-6 커밋(`d0ce669`)이 최초 D-5 finding 을 해소한 뒤 acceptance H-0~H-6 을 그 head 에서
 전건 재실행했다(아래 첫 블록, 중간 실패 이력은 D-5/D-6 절). verifier r1(`_workspace/
@@ -214,3 +214,37 @@ m1-1a-b/02_verifier_r1.md`, ready-for-review, high 0·medium 3·low 3·장부층
 - cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1a-b/checklist.md reports/evidence/m1/1a-b/rollback.md`
 - exit: 1(매치 없음)
 - 핵심 결과: 매치 0건
+
+---
+
+## D-7 반영(M-2 해소, 상속 깊이 정의 정제) — 최종 acceptance 상태, 커밋 `03349ad`
+
+## 2026-09-05T13:31:00Z
+- cmd: `./gradlew --no-daemon --no-build-cache :build-logic:check`(정의 정제 직후, detekt 1건 확인)
+- exit: 1 → `LoopWithTooManyJumpStatements`(명령형 루프의 break 2개) → `generateSequence.
+  drop(1).takeWhile.count()` 함수형으로 재작성 → 재실행 exit 0
+
+## 2026-09-05T13:33:00Z
+- cmd: `./gradlew --no-daemon --no-build-cache --continue clean check`(재작성 후, 커밋 전)
+- exit: 0
+- 핵심 결과: 291 task 전건 GREEN — `buildLogicTypeShapeGate` 포함 회귀 없음
+
+## 2026-09-05T13:40:00Z
+- cmd: `git worktree add --detach <scratchpad>/h0-d7 HEAD(03349ad) && (cd <dir> && ./gradlew --no-daemon --no-build-cache clean check)` (H-0)
+- exit: 0
+- 핵심 결과: 291/291 task 콜드 실행 전건 GREEN. worktree 제거 후 잔여 없음 확인
+
+## 2026-09-05T13:42:00Z
+- cmd: `./gradlew --no-daemon --no-build-cache clean check`(H-1) · `:build-logic:test`(H-2) ·
+  `:app:test --tests '*ArchitectureGate*' --tests '*Conformance*'`(H-3) · `qualityBaseline`(H-4) ·
+  `:shared-kernel:test`(H-6) · `:shared-kernel:cpdCheck :shared-kernel:cpdReportPresenceGate` + `test -s`(H-5)
+- exit: 0 (여섯 전부)
+- 핵심 결과: 전부 BUILD SUCCESSFUL. H-5 리포트 3106 bytes. `quality-baseline.md` 값은
+  checklist.md 「M-2 가 드러낸 finding → D-7 로 해소」절의 표 참고(모듈별 depth/interfaces,
+  낡는 좌표 방지를 위해 여기 다시 옮기지 않는다)
+
+## 2026-09-05T13:45:00Z
+- cmd: 임시 clone(HEAD `03349ad`) + rollback.md 명령 그대로 실행(경로 27개, 이번 라운드는
+  신규 경로 없이 기존 6개 파일만 수정 — 목록 변경 없음)
+- exit: 0
+- 핵심 결과: `git diff <base> -- <in_scope 경로>` 빈 출력(완전 복원 확인)

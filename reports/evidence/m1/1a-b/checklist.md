@@ -73,28 +73,38 @@ set 손 등록 — ④(b)(c)(d) 방어 심층). 나머지는 scope.md 가 이미
 | L-2 | size-policy.properties 주석에 「형태 래칫도 main 한정」 한 줄 추가 | — |
 | L-3 | `CpdReportPresenceGateTask.cpdXmlReport`를 `@InputFile`→`@Internal`로(순서는 명시 `dependsOn`이 이미 짐) — 「존재하지 않는다」 사유가 실제로 로그에 나온다 | 리포트 삭제 + `-x cpdCheck` → D-4 사유 메시지 확인(이전엔 Gradle 일반 메시지) |
 
-### M-2 가 드러낸 새 finding — D-5 스타일, 임계·코드 미변경
+### M-2 가 드러낸 finding → D-7 로 해소(측정 정의 정제, 팀장 결정)
 
 `buildLogicTypeShapeGate`를 배선하고 실측하니 build-logic 자신의 상속 깊이 최대가 **3**이라
-래칫 상한(2)을 넘는다 — 위반 17건 전부 depth 3, interfaces 는 1로 안 넘는다. 원인은 위반
-목록 자체가 보여준다: `bidvector.buildlogic.*GateTask`류(`abstract class X : DefaultTask()`)
-와 정확히 이 slice·1A 가 등록한 것과 같은 이름들, 그리고 정밀 스크립트 컴파일 클래스
-(`Bidvector_kotlin_conventions_gradle`·`Bidvector_quality_baseline_gradle`) 둘이다.
-**Gradle 의 `DefaultTask`(정확히는 `AbstractTask`) 자체가 이미 2단 상속을 쓰므로, 어떤
-Gradle Task 구현이든 `: DefaultTask()`를 확장하는 순간 depth 3 이 된다** — mixin 팽창이
-아니라 프레임워크가 강제하는 최소 깊이다. baseline(2)은 shared-kernel 의 도메인 타입에서만
-실측됐고(Phase 2 preflight), build-logic 자신의 Task 구현 형태는 스코프 밖이었다 — ①의
-D-5/D-6 과 같은 계열의 사각이다.
+래칫 상한(2)을 넘었다 — 위반 17건 전부 depth 3, interfaces 는 1로 안 넘었다. 원인은
+`bidvector.buildlogic.*GateTask`류(`abstract class X : DefaultTask()`)와 정밀 스크립트
+컴파일 클래스 둘 — **Gradle 의 `DefaultTask` 자체가 이미 2단 상속이라 어떤 Task 구현이든
+그것을 확장하는 순간 depth 3 이 됐다**(mixin 팽창이 아니라 프레임워크 강제 깊이). D-5
+원칙대로 임계·코드를 손대지 않고 보고했고, 팀장이 **D-7**로 결정했다: 상속 깊이의 정의를
+「프로젝트가 소유한 타입 안에서의 상위 체인 길이」로 정제 — 상위 클래스를 따라 올라가다
+import 집합(같은 `ClassFileImporter` 스캔) 밖의 클래스를 만나면 멈춘다.
 
-D-5 원칙대로 래칫 값도 이 위반을 만든 어떤 코드도 손대지 않았다. `buildLogicTypeShapeGate`는
-계약대로 배선·`check`에 연결돼 있고(M-2 요구 충족), 그 결과 **저장소 전체 `clean check`가
-이 task 하나로 지금 실패한다**(291 task 중 1건, 나머지 전부 GREEN — commands.md). 운영자
-결정이 필요한 지점: (a) build-logic 자신의 Task/Plugin 구현 클래스를 이 축에서 면제(D-6 과
-같은 형태의 정책 키, 예: 대상에서 build-logic 전체를 빼거나 "DefaultTask 서브타입은
-프레임워크 강제 깊이로 시작한다"는 사실을 반영해 build-logic 만 baseline 을 3으로), (b)
-`buildLogicTypeShapeGate`를 통과만 하고 실패는 안 하는 관찰 task 로 낮춘다(CPD 관찰 모드와
-같은 형태), (c) 다른 판단. 결정 전까지 이 task 는 계약대로 배선된 채 **의도적으로 빨간
-상태**로 둔다 — 팀 리드에게 즉시 보고했다.
+구현(`03349ad`): 공유 함수 `JavaClass.inheritanceDepth(ownedTypeNames)` 하나만 고쳤다
+(`qualityBaseline`·`typeShapeGate`·`buildLogicTypeShapeGate` 전부 같은 함수). 9모듈 +
+build-logic 전체 재실측 결과:
+
+| 모듈 | max depth(이전 정의) | max depth(D-7) | max interfaces |
+| --- | --: | --: | --: |
+| shared-kernel | 2 | **0** | 1 |
+| adapters·app·decision·procurement·qualification·settlement·strategy·workflow | 1 | **0** | 0 |
+| build-logic | 3(위반) | **0** | 1 |
+
+**팀장의 예상("도메인 sealed 1")과 다르게 실측값은 9모듈+build-logic 전부 0이다** —
+shared-kernel 을 포함한 모든 모듈이 sealed **인터페이스**(클래스 아님)를 구현하는 형태라
+`rawSuperclass` 체인에 소유 클래스가 하나도 안 걸린다(인터페이스는 이 축에 안 잡힌다,
+`interfaceCount`가 별도로 잰다). `ratchet.type.inheritance-depth.max` 를 실측대로 **0**
+으로 낮췄다. `buildLogicTypeShapeGate`는 이제 통과하고(D-3 대로 위반 0건), 저장소 전체
+`clean check` 가 291/291 task 전건 GREEN 이다(isolated worktree 콜드 빌드 포함).
+
+test: `TypeShapeFixtureTest`에 Gradle `DefaultTask` 확장(depth 0, build-logic 시나리오 그대로)
+· 소유 2단 체인(depth 1) 두 case 추가, enum test 를 새 정의(0, 이전 2)로 갱신. 기존 3단
+소유 체인 fixture 의 상대 비교(middle>root, leaf>middle)는 절대값이 바뀌어도 여전히 성립해
+그대로 뒀다.
 
 ## 문서 갱신 잔여 (이 slice 범위 밖 — 세션 모델 소관)
 
