@@ -60,8 +60,8 @@ ASSERTED = {
     "capacity-gate-003":           ["$.suitabilityAxisAffected"],          # OPEN-QUAL-08 분할의 양(陽)의 절반
     "floor-threshold-001":         ["$.criticalAssessmentRate.fraction"],  # 관계 주장의 축(임계값)
     "floor-threshold-003":         ["$.criticalAssessmentRate.fraction"],
-    "rate-unit-003":               ["$.fact", "$.reasonCode"],             # "거부된다" + 그 사유(1B-c 재추출)
-    "rate-unit-004":               ["$.fact", "$.reasonCode"],             # "거부된다" + 그 사유(1B-c 재추출)
+    "rate-unit-003":               ["$.representable"],                    # "표현 불가"(1B-c 정정)
+    "rate-unit-004":               ["$.representable"],                    # "표현 불가"(1B-c 정정)
     "money-basis-001":             ["$.representable"],                    # "표현 불가"(1B-c 재정의)
     "money-basis-002":             ["$.fact", "$.comparedBases"],          # "basis 가 같으면" + 비교 성립
     "money-basis-004":             ["$.representable"],                    # "표현 불가"(1B-c 재정의)
@@ -79,10 +79,13 @@ ASSERTED = {
     "base-amount-provenance-004":  ["$.outcome"],                          # "거부된다"
     "base-amount-provenance-005":  ["$.outcome"],                          # "거부된다"
     "verdict-004":                 ["$.overrideOutcome", "$.reasonCode"],  # "사유와 함께 거부되며"
-    "rate-unit-001":               ["$.fact", "$.rate.fraction"],          # "명시 변환된다" = 값 있는 상태 + 변환 결과
-    "rate-unit-002":               ["$.fact", "$.rate.fraction",
-                                    "$.conversionDivisor"],                # "배율 없이" = 제수 1
-    "rate-unit-005":               ["$.fact", "$.rate.fraction"],          # "선언이 개연성을 이긴다"
+    # `rate-unit-001`·`002`·`005` 의 `$.fact`·`$.conversionDivisor` 는 **여기 들지 않는다** —
+    #   2026-09-05 정정. `ofPercent`/`ofFraction` 은 `Rate` 를 직접 내고 제수는 `private const` 라
+    #   **계약이 방출하지 않는 축**이다(`money-basis-006` 의 `$.reasonCode` 와 같은 갈래).
+    #   변환 성공은 `$.rate.fraction` 이 진다 — 실패하면 `Rate` 자체가 없다.
+    "rate-unit-001":               ["$.rate.fraction"],                    # "명시 변환된다" 의 결과
+    "rate-unit-002":               ["$.rate.fraction"],                    # "배율 없이 그대로"
+    "rate-unit-005":               ["$.rate.fraction"],                    # "선언이 개연성을 이긴다"
 }
 
 # (c) 갈래가 쓰는 대체 토큰. 목록에 없는 피연산자는 `Other` 로 친다.
@@ -106,8 +109,8 @@ NULL_ASSERTED = {
     "floor-shortfall-001": ["$.frequency"],   # "값이 아니라 사유 있는 측정 불가"
     "license-009":         ["$.requiredLicenses"],  # "수집 실패" — 요건이 있으면 수집된 것이다
     "license-007":         ["$.requiredLicenses"],  # "요건 원문이 없으면" — 없음이 주장이다
-    "rate-unit-003":       ["$.rate"],              # "거부된다" — 값이 나오면 거부가 아니다(1B-c)
-    "rate-unit-004":       ["$.rate"],              # 동상
+    # `rate-unit-003`·`004` 의 `$.rate`(null)는 2026-09-05 정정으로 기대값에서 사라졌다 —
+    #   기대값이 `{"representable": false}` 하나이고 그 자리는 `ASSERTED` 가 진다.
 }
 NULL_REPLACEMENTS = [0.0, {"numerator": 0, "denominator": 149}, 0,
                      {"numerator": 0, "denominator": 0}, "0%"]

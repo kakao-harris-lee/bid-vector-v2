@@ -1,5 +1,3 @@
 {
-  "fact": "Absent",
-  "reasonCode": "UNIT_NOT_DECLARED",
-  "rate": null
+  "representable": false
 }

@@ -41,13 +41,17 @@ MUTANTS = [
      "B7 재현 — legacy 값이 Inclusive 로 승격되고 provenance 가 Clean 이 된다"),
     ("money-basis-006", [("$.vatTreatment", "INCLUSIVE")], "과세만 세탁"),
     ("money-basis-006", [("$.provenance", "Clean")], "provenance 만 승격"),
-    ("money-basis-006", [("$.eligibleForAuthoritativeCorpus", True)], "corpus 적격만 뒤집기"),
+    # **이 줄은 2026-09-05 정정 뒤 `PASSES` 가 정상이다** — 적격성 판정은 1B 가 내지 않아
+    # `verified_paths` 에서 빠졌고(`OPEN-1BC-ELIGIBILITY`, 소유 1D), 그래서 B7 의 셋째 갈래가
+    # 다시 열렸다. **지우지 않는다** — 열린 사실을 이 줄이 매 실행 눈에 보이게 지고 있다.
+    ("money-basis-006", [("$.eligibleForAuthoritativeCorpus", True)],
+     "corpus 적격만 뒤집기 — 1B-c 정정으로 다시 열림(OPEN-1BC-ELIGIBILITY)"),
     ("floor-shortfall-001", [("$.renderedAsZeroPercent", True)], "측정 불가가 0% 로 렌더된다"),
     ("verdict-004", [("$.overrideOutcome", "Accepted")], "거부돼야 할 override 가 통과된다"),
     ("money-basis-002", [("$.comparedBases", ["BASE_AMOUNT", "ESTIMATED_PRICE"])],
      "basis 가 다른데도 비교가 수행됐다고 주장한다"),
-    ("rate-unit-003", [("$.fact", "Known")],
-     "미선언 입력이 수용된다 — 1B-c 재추출로 상태 토큰이 `$.fact` 가 됐다(경로만 옮겼다)"),
+    ("rate-unit-003", [("$.representable", True)],
+     "미선언 입력이 수용된다 — 1B-c 정정으로 그 자리가 `$.representable` 이 됐다(경로만 옮겼다)"),
     ("license-006", [("$.uncertainReason", "OperatorLicensesNotDeclared")], "대조군 — 무변이"),
 ]
 
@@ -57,8 +61,8 @@ MUTANTS = [
 # 목록에서 지우지 않는다(감사 추적). 경로가 재추출로 사라진 줄은 **새 경로로 옮겨** 둔다 —
 # 없는 경로에 값을 심으면 계약이 보지 않는 자리라 무조건 `PASSES` 로 찍혀 거짓을 말한다.
 PENDING = [
-    ("rate-unit-003", [("$.fact", "Known")], "1B-c 재추출로 닫힘 — 상태 토큰이 계약 어휘가 됐다"),
-    ("rate-unit-004", [("$.fact", "Known")], "동상"),
+    ("rate-unit-003", [("$.representable", True)], "1B-c 정정으로 닫힘 — 표현 불가를 잠근다"),
+    ("rate-unit-004", [("$.representable", True)], "동상"),
     ("money-basis-002", [("$.comparedBases", ["BASE_AMOUNT", "ESTIMATED_PRICE"])],
      "경로 간 동등 술어가 없다"),
     ("verdict-004", [("$.overrideOutcome", "Accepted")], "overrideOutcome 이 가족 B 자작 토큰"),
