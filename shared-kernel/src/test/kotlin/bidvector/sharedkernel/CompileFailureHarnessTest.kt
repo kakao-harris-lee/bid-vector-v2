@@ -192,6 +192,28 @@ class CompileFailureHarnessTest {
             realDiagnosticFragment = "type mismatch",
         )
     }
+
+    /**
+     * M1/1B-c ④(decision 21, `scope.md` in_scope 승격 2026-09-05) — `rate-unit-003`·`004`
+     * (compile-fixture 위임)의 실행자. `Rate` 의 생성자가 `internal` 이고 공개 경로는 단위를
+     * 이름에 담은 `ofPercent`·`ofFraction` 둘뿐이라 단위 미선언 값으로 `Rate` 를 만들 함수
+     * 서명 자체가 없다 — 그 부재를 여기서 실측한다. `SharedKernelCorpusConformanceTest`
+     * (app/src/test)는 이 판정을 실행하지 않고 이 fixture 가족(negative/positive/mutant-12)
+     * 이 존재함만 확인해 위임받는다(`fixtures/manifest.yaml` 의 두 case `contract_binding`).
+     */
+    @Test
+    fun `12 Rate 는 단위 미선언 값으로 만들 수 없고 명시 단위 경로로는 만들 수 있다 (M1 1B-c)`() {
+        assertNegativeFails("12-rate-undeclared-unit", "cannot access")
+        assertPositiveCompiles("12-rate-declared-unit")
+    }
+
+    @Test
+    fun `12-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "12-rate-undeclared-unit-typo",
+            realDiagnosticFragment = "cannot access",
+        )
+    }
 }
 
 private fun assertNegativeFails(

@@ -1,0 +1,6 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.Rate
+import java.math.BigDecimal
+
+fun declaredUnitRateTypo(value: BigDecimal): Rate = Rate.ofFractionTypo(value)

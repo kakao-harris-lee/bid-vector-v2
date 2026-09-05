@@ -1,0 +1,6 @@
+package bidvector.sharedkernel.compilefixtures
+
+import bidvector.sharedkernel.Rate
+import java.math.BigDecimal
+
+fun undeclaredUnitRate(value: BigDecimal): Rate = Rate(value)
