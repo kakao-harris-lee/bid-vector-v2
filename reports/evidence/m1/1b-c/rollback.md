@@ -104,13 +104,13 @@ git status --short   # in_scope 경로 전건이 staged 로 반영됐는지 확�
 git diff --cached --stat -- $(git diff --name-only HEAD~0 2>/dev/null)  # 육안 대조
 ```
 
-실측(2026-09-05): 위 두 블록을 임시 clone(`/tmp/1bc-rollback-rehearsal`)에서 그대로
-실행 — `restore` 명령 exit 0(신규 경로가 섞이지 않아 `1A 16차 high` 가 잡은 「base 에
-없는 경로에 대한 pathspec 오류」재현 없음), `rm -f` exit 0. 복원 뒤 `git status --short`
-가 위 전건을 staged 변경/삭제로 보였고, `fixtures/manifest.yaml`·`rate-unit-00[1-5].json`
-등의 내용이 base(`a5ea955`) 값(예: `rate-unit-001.json` 의 `outcome: Accepted` 류 옛
-토큰)으로 돌아온 것을 `git show a5ea955:fixtures/expected/rate-unit-001.json` 과 diff 로
-대조했다. 임시 clone 은 실측 뒤 삭제했다.
+실측(2026-09-05, HEAD `2049fd9`): 위 두 블록을 임시 clone(`/tmp/1bc-rollback-rehearsal`,
+`--no-local`)에서 그대로 실행 — `restore` 명령 exit 0(신규 경로가 섞이지 않아 `1A 16차
+high` 가 잡은 「base 에 없는 경로에 대한 pathspec 오류」 재현 없음), `git rm -f` 도 exit 0
+(대상 10개 전부 실제 삭제 로그 확인). `git status --short` 가 위 전건을 정확히 `M`(복원)/
+`D`(삭제)로 보였고, `git diff --cached a5ea955 -- <복원 대상 전체>` 가 **빈 출력**이었다
+— 복원된 내용이 base 와 바이트 단위로 같음을 그렇게 확인했다(개별 파일 육안 대조를
+대신한다). 임시 clone 은 실측 뒤 삭제했다.
 
 ## 범위 밖 — rollback 이 되돌리지 않는 것
 
