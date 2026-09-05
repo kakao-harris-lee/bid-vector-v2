@@ -305,5 +305,10 @@ m1-1a-b/02_verifier_r1.md`, ready-for-review, high 0·medium 3·low 3·장부층
 ## 2026-09-06T00:36:30Z
 - cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m1/1a-b/*.md`
 - exit: 0
-- 핵심 결과: 매치는 기존에 이미 등재된 오탐(`79-token`, CPD 토큰 수 — 비밀값 아님) 하나뿐,
-  육안 확인 완료
+- 핵심 결과(verifier r3 B-6 정정 — 이전 판은 「하나뿐」으로 실제보다 적게 적었다. 매치
+  행수는 이 절이 라운드마다 스스로를 인용해 늘어나므로 여기 고정된 수로 적지 않는다 —
+  **판독 규칙**: 매치는 전부 `minimumTokenCount`/`toolVersion` 식별자(정책 데이터 필드명·
+  테스트 변수명)이거나, 이 명령 자체가 이 문서에 인용돼 그 인용문 안의 "token"·"secret"
+  같은 패턴 단어와 매치하는 것이다. 두 부류 밖의 매치가 나오면(예: 실제 `Bearer ` 헤더
+  값, `BEGIN RSA` 블록) 그때는 진짜 유출로 취급한다. 육안 확인 결과 이번 라운드까지
+  비밀값은 0건이다.

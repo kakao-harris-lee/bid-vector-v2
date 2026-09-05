@@ -68,7 +68,7 @@ set 손 등록 — ④(b)(c)(d) 방어 심층). 나머지는 scope.md 가 이미
 | --- | --- | --- |
 | M-1 | 모듈 `sizeGate`의 `typeSources`에 `build.gradle.kts` 추가(`scriptSizeGate`와 대칭) + size-policy 주석의 「타입 없는 스크립트」 정정 | 31개 멤버 클래스를 `shared-kernel/build.gradle.kts`에 심음 → exit 1 → 원복 |
 | M-2 | `bidvector.quality-baseline.gradle.kts`에 `buildLogicTypeShapeGate` 신설(build-logic 자신의 `build/classes/kotlin/main`을 배선) | **새 finding** — 아래 절 |
-| M-3 | `buildLogicGateExecutionGate` 신설(루트, 순환 회피) + `gate-tests.properties`에 `gate.tests.build-logic`(18개 test 전부 — 이 모듈은 게이트 정의 자체가 사는 곳이라 test 스위트 전체가 "게이트가 잡는다는 증거") | `TestFixturesGateTest.kt`를 컴파일 대상에서 빼고 재실행 → `buildLogicGateExecutionGate` 실패 → 원복 |
+| M-3 | `buildLogicGateExecutionGate` 신설(루트, 순환 회피) + `gate-tests.properties`에 `gate.tests.build-logic`(**19개**(신규 6 + 기존 13) test 전부 — 이 모듈은 게이트 정의 자체가 사는 곳이라 test 스위트 전체가 "게이트가 잡는다는 증거", verifier r3 장부층 ④ 정정 — 이전 판은 「18개」) | `TestFixturesGateTest.kt`를 컴파일 대상에서 빼고 재실행 → `buildLogicGateExecutionGate` 실패 → 원복 |
 | L-1 | `TypeShapeGateTask`의 실패 메시지에 `docs/adr/0007-test-pyramid-and-ratchet.md §5 OPEN-ADR-06 해소 절` 상향 경로 명시 | — |
 | L-2 | size-policy.properties 주석에 「형태 래칫도 main 한정」 한 줄 추가 | — |
 | L-3 | `CpdReportPresenceGateTask.cpdXmlReport`를 `@InputFile`→`@Internal`로(순서는 명시 `dependsOn`이 이미 짐) — 「존재하지 않는다」 사유가 실제로 로그에 나온다 | 리포트 삭제 + `-x cpdCheck` → D-4 사유 메시지 확인(이전엔 Gradle 일반 메시지) |
@@ -133,6 +133,19 @@ test: `TypeShapeFixtureTest`에 `CrossModuleDerived`(다른 모듈의 소유 타
 
 실측: `clean check` 전건(291 task, isolated worktree 콜드 빌드 포함) BUILD SUCCESSFUL,
 `:build-logic:test` 176 test(19 class) 0 failed.
+
+## 리뷰 요청 조건 — verifier 판정 이력
+
+| 라운드 | 판정 | 요지 | head |
+| --- | --- | --- | --- |
+| r1 | ready-for-review | high 0 · medium 3(M-1·M-2·M-3) · low 3(L-1·L-2·L-3) | `cfcb023` |
+| r2 | **not-ready** | high 1(H-1, 소유 판정이 모듈 경계를 넘는 상속을 놓침) · medium 1(M-1, 비공허 단언 부재) | `c045c77` |
+| r3 | ready-for-review | high 0 · medium 0 · low 1(ADR §5 소유 판정 서술이 논리합 중 한쪽만 적음) · 장부층 6(B-1~B-6) | `4ceb008` |
+
+수정 라운드 누계 **1/5**(r2 not-ready 에 대한 대응 1회 — H-1·M-1). r3 low 1 과 장부층
+①②③⑤(ADR §5·capability-map.md·milestone-1.md 등 정본 문서 수치)는 팀 리드가 처리한다
+(포인터만, 이 evidence 의 산출물 대상 아님). 장부층 ④(등재 수)·⑥(secret 스캔 판독)은
+이 커밋이 정정했다. **남은 것은 사용자 승인이다.**
 
 ## 문서 갱신 잔여 (이 slice 범위 밖 — 세션 모델 소관)
 

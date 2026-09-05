@@ -64,7 +64,8 @@ val buildLogicTypeShapeGate =
     }
 
 // verifier r1 M-3 — build-logic 자신에는 `gateExecutionGate`가 없어 이 slice 가 더한 test
-// 여섯(과 1A 부터의 기존 게이트 test 열둘)이 "돌았다"는 증거층 밖이었다. `--tests` 로
+// 여섯(과 1A 부터의 기존 게이트 test 열셋 — verifier r3 장부층 ④ 정정, 이전 판은 「열둘」로
+// 하나 적었다)이 "돌았다"는 증거층 밖이었다. `--tests` 로
 // `TestFixturesGateTest`(④(a)의 유일한 실행 증거)를 빼도 아무도 알려주지 못했다. 이 task 도
 // `GateExecutionGateTask` 클래스를 build-logic 자신의 build.gradle.kts 안에서 쓸 수 없어
 // (같은 순환 — 그 클래스가 이 빌드의 산출물이다) 루트에 둔다. JUnit XML 만 읽으므로
