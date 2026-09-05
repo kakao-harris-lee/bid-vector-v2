@@ -139,3 +139,12 @@ domain 층이 아니라 `moduleDependencyGate` 의 `group.forbidden` 대상이 �
 - 알려진 제한·rollback: 위 「알려진 제한」·`rollback.md`.
 - **종결 조건(운영자 지시 2026-09-04, CLAUDE.md)**: 코드 slice 는 Codex 심판 대상이 아니다
   — **verifier ready-for-review + 사용자 승인**으로 완료한다. Codex 는 대상 아님.
+- **verifier 판정**: r1 `ready-for-review`(HEAD `757d2e4`, high 0 · medium 5 · low 6) → 일괄 처리 →
+  **r2 표적 재검증 `ready-for-review`(2026-09-05, HEAD `e12c605`, high 0 · medium 0 · low 5)** —
+  r1 medium 다섯·low 여섯 전부 닫힘, 우회 다섯 재실측 여전히 막힘, acceptance C-0~C-10 최종 HEAD 전건
+  exit 0, rollback 최종 HEAD 임시 clone 리허설 base 대비 diff 공백. 재작업 누계 0회(not-ready 없음).
+  **r2 low 다섯은 등재만(사용자 승인 뒤 정리 여부 결정)**: ① fixture 번호 대조 `contains("fixture N")` 가
+  접두 안전하지 않다(11→1 도 번호 단언은 통과) ② capability-map OPEN-1B-CORPUS 행 수치(`16053f2` 로 정정)
+  ③ commands/checklist/rollback 의 기록 HEAD 가 `ae0d9ad` 로 최종 `e12c605` 가 아니다(evidence 커밋 자신이
+  HEAD 를 만드는 구조적 지연 — 빌드 영향 없음, verifier 가 최종 HEAD 재실행) ④ `fixtures.md` §4 의 낡은
+  명령형 한 문장 ⑤ `fixtures.md` §2 혼입 문단 줄바꿈. **남은 것은 사용자 승인이다.**
