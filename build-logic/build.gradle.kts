@@ -72,6 +72,12 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(kotlin("test"))
     testRuntimeOnly(libs.junit.platform.launcher)
+
+    // M1/1A-b ④(a) — 이 저장소에서 TestKit 을 쓰는 첫 사례. `withPluginClasspath()`가
+    // `pluginUnderTestMetadata`(kotlin-dsl 이 자동 생성)로 이 모듈의 runtime classpath 를
+    // 격리된 fixture 프로젝트에 주입해, 오프라인으로 실제 `bidvector.kotlin-conventions`
+    // 플러그인을 적용해 볼 수 있다.
+    testImplementation(gradleTestKit())
 }
 
 tasks.withType<Test>().configureEach {

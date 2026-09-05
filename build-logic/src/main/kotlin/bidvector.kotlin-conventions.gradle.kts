@@ -13,6 +13,8 @@ import bidvector.buildlogic.SourceLanguageGateTask
 import bidvector.buildlogic.SourceSetLayoutGateTask
 import bidvector.buildlogic.TypeShapeGateTask
 import bidvector.buildlogic.lib
+import bidvector.buildlogic.readPolicy
+import bidvector.buildlogic.requireList
 import bidvector.buildlogic.sourceSetLayoutFacts
 import bidvector.buildlogic.version
 import bidvector.buildlogic.versionCatalog
@@ -26,6 +28,20 @@ plugins {
     id("de.aaschmid.cpd")
 }
 
+// M1/1A-b ④(a)(D-2) — `java-test-fixtures` 는 전 모듈에서 허용하지 않는다. 그 source set 을
+// 순수성 규칙(도메인 게이트 면제 여부)이 어떻게 다룰지 ADR 로 먼저 정해야 하고 지금 그 요구가
+// 없다(1B-c 가 공개 API 로 해결했다) — `OPEN-1BC-TESTFIXTURES-GATE`. `plugins.withId`는 이
+// 편집(뒤) 이전에 적용됐든 이후에 적용됐든 같은 프로젝트 안에서는 반드시 한 번 불린다 —
+// 플러그인 선언 순서를 가리지 않는다. 나머지 세 게이트((b)(c)(d))는 이 constructive 차단을
+// 손으로 우회했을 때(예: `java-test-fixtures`와 이름만 같은 source set 을 직접 만드는 경로)
+// 를 잡는 방어 심층이다.
+plugins.withId("java-test-fixtures") {
+    throw GradleException(
+        "모듈 '${project.name}'이 'java-test-fixtures'를 적용했다 — 전 모듈에서 허용하지 않는다 " +
+            "(D-2, OPEN-1BC-TESTFIXTURES-GATE). 면제·순수성 규칙을 ADR 로 먼저 정한 뒤에 연다.",
+    )
+}
+
 val libs = versionCatalog
 
 /** 사용자가 의존을 **선언하는** 버킷. 도구 자신의 classpath 는 이 혈통을 갖지 않는다. */
@@ -33,6 +49,14 @@ val declarableBuckets =
     listOf("implementation", "api", "compileOnly", "compileOnlyApi", "runtimeOnly", "annotationProcessor")
 val configDir = layout.settingsDirectory.dir("config")
 val sizePolicy = configDir.file("quality/size-policy.properties")
+
+// M1/1A-b ④(b)(D-2) — 모듈이 가질 수 있는 source set 집합. 정책 데이터 하나가 아래 두
+// 게이트의 리터럴을 대신한다(중복 금지) — `java-test-fixtures`가 추가하는 `testFixtures`는
+// 이 집합 밖이다.
+private val expectedModuleSourceSets =
+    readPolicy(configDir.file("quality/architecture-policy.properties").asFile)
+        .requireList("module.expected-source-sets")
+        .toSet()
 
 // 컴파일 task 가 실제로 먹는 소스. 봉쇄 게이트의 한쪽 입력이다.
 val compiledSourceFiles =
@@ -150,7 +174,14 @@ val moduleDependencyGate =
                 val root = incoming.resolutionResult.rootComponent
                 when {
                     !name.startsWith("test") -> graphs.add(root)
+
                     name == "testCompileClasspath" -> testGraphs.add(root)
+
+                    // M1/1A-b ④(c) — constructive 가드(④(a))를 우회해 `java-test-fixtures`
+                    // 없이 같은 이름의 configuration 을 손으로 만드는 경로까지 1차 게이트가
+                    // 보게 한다(방어 심층). 실제로는 ④(a)가 이 configuration 이 생기기 전에
+                    // project 평가를 끊으므로 이 분기가 정상 경로에서 값을 받는 일은 없다.
+                    name == "testFixturesCompileClasspath" -> testGraphs.add(root)
                 }
             }
         }
@@ -168,7 +199,7 @@ val packageOwnershipGate =
         // source set 집합을 고정해 `create("extra")` 경로를 닫는다.
         classDirectories.from(provider { sourceSets.filter { it.name != "test" }.flatMap { it.output.classesDirs } })
         verifiedSources.from(sourceSetKotlinFiles)
-        expectedSourceSets = setOf("main", "test")
+        expectedSourceSets = expectedModuleSourceSets
         actualSourceSets = provider { sourceSets.map { it.name }.toSet() }
         dependsOn(provider { sourceSets.filter { it.name != "test" }.map { it.classesTaskName } })
         report = layout.buildDirectory.file("reports/package-ownership-gate/packages.txt")
@@ -225,7 +256,7 @@ val sourceSetLayoutGate =
                 }
             },
         )
-        expectedSourceSets = setOf("main", "test")
+        expectedSourceSets = expectedModuleSourceSets
         actualSourceSets = provider { sourceSets.map { it.name }.toSet() }
         expectedCompileTasks = setOf("compileKotlin", "compileTestKotlin")
         actualCompileTasks =

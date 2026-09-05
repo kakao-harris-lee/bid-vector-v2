@@ -23,6 +23,9 @@ class ArchitectureGateTest {
     private val production: JavaClasses =
         ClassFileImporter()
             .withImportOption(ImportOption.DoNotIncludeTests())
+            // M1/1A-b ④(d)(D-2, 방어 심층) — `testFixtures` 산출물이 있다면(constructive
+            // 가드 ④(a)를 우회했을 때) 이 production 스캔에 섞여 들지 않게 한다.
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TEST_FIXTURES)
             .importPackages(policy.packageRoot)
 
     /**
