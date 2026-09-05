@@ -13,7 +13,7 @@ import org.gradle.api.tasks.TaskAction
 import java.io.File
 
 /**
- * 크기 래칫. **파일 축과 함수 축을 둘 다 든다.**
+ * 크기 래칫. **파일 축·함수 축·타입 멤버 축 셋을 든다.**
  *
  * 함수 축은 Kotlin PSI 로 직접 잰다 — detekt 을 경유하지 않으므로 `@Suppress` 가 어떤 표기든
  * (한 줄·다중 행·`@file:`·`@kotlin.`) 이 임계에 영향이 없다. 억제 표기를 텍스트로 막으려
@@ -45,42 +45,83 @@ abstract class SizeGateTask : DefaultTask() {
                 .map { it to it.readLines().size }
                 .sortedByDescending { (_, lines) -> lines }
 
-        writeReport(policy.requireValue("policy.version"), limit, measured)
-
-        val offenders = measured.filter { (_, lines) -> lines > limit }
-        if (offenders.isNotEmpty()) {
-            throw GradleException(
-                offenders.joinToString(
-                    prefix = "파일 $limit 줄 한도 초과 ${offenders.size}건 (v2-지침서.md §5):\n  ",
-                    separator = "\n  ",
-                ) { (file, lines) -> "$lines 줄 — ${file.path}" },
-            )
-        }
-
         val functionLimit = policy.requireInt("limit.function.lines")
         val longFunctions =
             measureFunctions(measured.map { it.first })
                 .filter { it.lines > functionLimit }
                 .sortedByDescending { it.lines }
-        if (longFunctions.isNotEmpty()) {
-            throw GradleException(
-                longFunctions.joinToString(
-                    prefix = "함수 $functionLimit 줄 한도 초과 ${longFunctions.size}건 (v2-지침서.md §5):\n  ",
-                    separator = "\n  ",
-                ) { "${it.lines} 줄 — ${it.file.path}:${it.startLine} ${it.name}" },
-            )
-        }
+
+        val typeLimit = policy.requireInt("limit.type.members")
+        val types = measureTypes(measured.map { it.first })
+        val oversizedTypes = types.filter { it.memberCount > typeLimit }.sortedByDescending { it.memberCount }
+
+        writeReport(policy.requireValue("policy.version"), limit, functionLimit, typeLimit, measured, types)
+
+        failOnFileOffenders(measured, limit)
+        failOnLongFunctions(longFunctions, functionLimit)
+        failOnOversizedTypes(oversizedTypes, typeLimit)
+    }
+
+    /** 세 축의 실패를 각자 한 자리에서 던진다 — `gate()`에 셋을 모으면 `ThrowsCount`에 걸린다. */
+    private fun failOnFileOffenders(
+        measured: List<Pair<File, Int>>,
+        limit: Int,
+    ) {
+        val offenders = measured.filter { (_, lines) -> lines > limit }
+        if (offenders.isEmpty()) return
+        throw GradleException(
+            offenders.joinToString(
+                prefix = "파일 $limit 줄 한도 초과 ${offenders.size}건 (v2-지침서.md §5):\n  ",
+                separator = "\n  ",
+            ) { (file, lines) -> "$lines 줄 — ${file.path}" },
+        )
+    }
+
+    private fun failOnLongFunctions(
+        longFunctions: List<MeasuredFunction>,
+        functionLimit: Int,
+    ) {
+        if (longFunctions.isEmpty()) return
+        throw GradleException(
+            longFunctions.joinToString(
+                prefix = "함수 $functionLimit 줄 한도 초과 ${longFunctions.size}건 (v2-지침서.md §5):\n  ",
+                separator = "\n  ",
+            ) { "${it.lines} 줄 — ${it.file.path}:${it.startLine} ${it.name}" },
+        )
+    }
+
+    private fun failOnOversizedTypes(
+        oversizedTypes: List<MeasuredType>,
+        typeLimit: Int,
+    ) {
+        if (oversizedTypes.isEmpty()) return
+        throw GradleException(
+            oversizedTypes.joinToString(
+                prefix = "타입 멤버 $typeLimit 개 한도 초과 ${oversizedTypes.size}건 (OPEN-ADR-06 (a)):\n  ",
+                separator = "\n  ",
+            ) { "${it.memberCount} 개 — ${it.file.path}:${it.startLine} ${it.name}" },
+        )
     }
 
     private fun writeReport(
         policyVersion: String,
-        limit: Int,
+        fileLimit: Int,
+        functionLimit: Int,
+        typeLimit: Int,
         measured: List<Pair<File, Int>>,
+        types: List<MeasuredType>,
     ) {
         val body =
             measured.joinToString(separator = "\n") { (file, lines) -> "$lines\t${file.name}" }
+        val maxType = types.maxByOrNull { it.memberCount }
         report.get().asFile.apply { parentFile.mkdirs() }.writeText(
-            "policy.version=$policyVersion\nlimit.file.lines=$limit\nfiles=${measured.size}\n$body\n",
+            "policy.version=$policyVersion\n" +
+                "limit.file.lines=$fileLimit\n" +
+                "limit.function.lines=$functionLimit\n" +
+                "limit.type.members=$typeLimit\n" +
+                "files=${measured.size}\n" +
+                "max.type.members=${maxType?.memberCount ?: 0}\t${maxType?.name ?: ""}\n" +
+                "$body\n",
         )
     }
 }

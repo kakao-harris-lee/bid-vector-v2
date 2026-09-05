@@ -9,6 +9,7 @@ import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.SourceLanguageGateTask
 import bidvector.buildlogic.SourceSetLayoutGateTask
+import bidvector.buildlogic.TypeShapeGateTask
 import bidvector.buildlogic.lib
 import bidvector.buildlogic.sourceSetLayoutFacts
 import bidvector.buildlogic.version
@@ -260,12 +261,23 @@ val domainApiTypeGate =
 
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
-        description = "파일 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
+        description = "파일·함수·타입 멤버 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
         policyFile = sizePolicy
         // 모듈의 빌드 스크립트도 잰다. 어느 source set 에도 속하지 않아 `allSource` 에 보이지
         // 않지만 실제 코드이고, 빼 두면 긴 함수가 그리로 옮겨 가는 것이 우회가 된다.
         sources.from(conventionSourceDirectories, layout.projectDirectory.file("build.gradle.kts"))
         report = layout.buildDirectory.file("reports/size-gate/size-gate.txt")
+    }
+
+// 상속 깊이·구현 인터페이스 수 래칫(D-3) — 바이트코드 기준이라 sizeGate(PSI)와 별도 task.
+// qualityBaseline 이 같은 함수(`TypeShape.kt`)로 재는 값과 어긋나지 않는다(중복 금지).
+val typeShapeGate =
+    tasks.register<TypeShapeGateTask>("typeShapeGate") {
+        description = "상속 깊이·구현 인터페이스 수 래칫 — 증가 금지(D-3, OPEN-ADR-06 (a))"
+        policyFile = sizePolicy
+        classes.from(provider { sourceSets["main"].output.classesDirs })
+        dependsOn(tasks.named("classes"))
+        report = layout.buildDirectory.file("reports/type-shape-gate/type-shape-gate.txt")
     }
 
 // coverage 는 **측정만** 한다. 승인 문서에 임계 수치가 없어 검증 규칙을 두지 않지만
@@ -274,6 +286,7 @@ val sizeGate =
 tasks.named("check") {
     dependsOn(
         sizeGate,
+        typeShapeGate,
         moduleDependencyGate,
         packageOwnershipGate,
         sourceLanguageGate,

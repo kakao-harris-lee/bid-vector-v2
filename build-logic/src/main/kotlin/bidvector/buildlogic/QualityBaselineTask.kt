@@ -75,8 +75,8 @@ abstract class QualityBaselineTask : DefaultTask() {
             maxFileLines = lineCounts.maxOrNull() ?: 0,
             types = types.size,
             maxTypeMembers = types.maxOfOrNull { it.methods.size + it.fields.size } ?: 0,
-            maxInheritanceDepth = types.maxOfOrNull(::inheritanceDepth) ?: 0,
-            maxInterfaces = types.maxOfOrNull { it.rawInterfaces.size } ?: 0,
+            maxInheritanceDepth = types.maxOfOrNull { it.inheritanceDepth() } ?: 0,
+            maxInterfaces = types.maxOfOrNull { it.interfaceCount() } ?: 0,
             publicApi = types.sumOf(::publicMemberCount),
         )
     }
@@ -89,9 +89,6 @@ abstract class QualityBaselineTask : DefaultTask() {
         if (roots.isEmpty()) return emptyList()
         return ClassFileImporter().importPaths(roots).filterNot { it.isAnonymousClass }
     }
-
-    private fun inheritanceDepth(type: JavaClass): Int =
-        generateSequence(type) { it.rawSuperclass.orElse(null) }.count() - 1
 
     private fun publicMemberCount(type: JavaClass): Int =
         if (!type.modifiers.contains(JavaModifier.PUBLIC)) {
