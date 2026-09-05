@@ -27,7 +27,7 @@
 잠그지 않는다」를 요구해 `verified_paths` 를 좁혔다. **분류는 하나도 바뀌지 않았다** — 열이
 `authoritative` 그대로이고 잠그는 경로만 줄었다.
 
-**되돌림이 아니라 재추출이다.** 기대값 9 · 입력 3 파일이 실제로 바뀌었고 전부
+**되돌림이 아니라 재추출이다.** 기대값 9 · 입력 4 파일이 실제로 바뀌었고 전부
 `previous_expected_sha256`/`previous_sha256` 을 해당 case 의 `change_history` 에 실었다.
 **기대값은 승인 문면에서만 나왔다** — 각 case 의 `expected_reasoning` 이 `v2-지침서.md` §4.1 ·
 `data-dictionary.md` §1.1·§1.2.1·§12.1 · `capability-map.md` DEC-02 · decision 19·21 을 인용하고,
@@ -41,8 +41,9 @@
 | `fb8d4c6` | ② `rate-unit` 5 재추출 — 기대값 5, manifest 5 case, 스윕 `ASSERTED`/`NULL_ASSERTED` |
 | `ed87da6` | ③ `money-basis` 6 처분 — 기대값 4 · 입력 3, manifest 6 case, `uncovered_axes` 두 축 |
 | `6ef8fb5` | **계약 정정** — `verified_paths` 를 1B 계약이 산출하는 축으로 좁힘(§9) |
+| `58a3c6e` | **verifier r1 처리** — M-1(006 입력 명시 선언) · L-6(003·004 기대값 형태 근거) |
 
-base `a5ea955` · head `6ef8fb5`. **하네스 레인 변경 없음** —
+base `a5ea955` · head `58a3c6e`(이 레인 마지막 산출물 커밋). **하네스 레인 변경 없음** —
 `git log --oneline a5ea955..HEAD -- CLAUDE.md .claude/` 이 빈 목록이고, 그 명령이 잡지 못하는
 하네스 편집(`agent-workflow.md`·`milestone-*.md` 의 승격 절 밖)도 이 레인은 하지 않았다.
 
@@ -84,7 +85,7 @@ base `a5ea955` · head `6ef8fb5`. **하네스 레인 변경 없음** —
 | `money-basis-003` | insufficient-evidence | 없음 | 대상 아님(이월) |
 | `money-basis-004` | authoritative | `$.representable` | **컴파일 fixture 11 위임** |
 | `money-basis-005` | authoritative | `$.fact` · `$.reasonCode` | `compareKnownVat(...)` → `Fact.Absent(VAT_TREATMENT_MISMATCH)` |
-| `money-basis-006` | authoritative | `$.vatTreatment` · `$.provenance` | 입력 다섯 성분으로 `BaseAmount` 구성 → projection |
+| `money-basis-006` | authoritative | `$.vatTreatment` · `$.provenance` | 입력이 **선언한** 미상 두 값으로 `BaseAmount` 구성 → 되읽기(구성 왕복) |
 
 **`verified_projections` 는 열하나 어디에도 없다** — §9 정정으로 마지막 하나가 걷혔다.
 runner 는 정확 비교만 구현하면 되고, 술어 넷의 실행은 Python 쪽 self-check 가 계속 잰다.
@@ -94,6 +95,12 @@ runner 는 정확 비교만 구현하면 되고, 술어 넷의 실행은 Python 
 `money-basis-006` 의 `$.autoTaggedFromDefinitionDefault`·`$.eligibleForAuthoritativeCorpus`·
 `$.reasonCode`. **이것들을 단언하면 계약에 없는 값을 테스트가 굳힌다** —
 `contract_binding.does_not_carry` 가 case 마다 그 목록을 갖는다.
+
+**`money-basis-006` 은 runner 가 상수를 대지 않는다 — verifier r1 M-1 처리.** 입력이 미상을
+`"UNKNOWN"`·`"Undeclared"` 로 **선언**하므로 runner 는 `null` 을 접을 것이 없다. **대신 이 case 가
+기계로 잠그는 것은 구성 왕복까지**이고 「기본값이 없어서 자동 태깅될 수 없다」는 구성 사실은
+`Money.kt` 선언이 진다 — **그것을 재는 회귀 테스트는 오늘 없다**(§7 「기본값 부재를 재는 컴파일 fixture 가 없다」). runner 는 explicit
+provenance 를 받도록 고쳐야 한다(앞선 판은 `error()` 로 거부했다).
 
 **컴파일 fixture 위임 넷은 실행 산출과 대조하지 않는다.** `$.representable: false` 는 「그
 조합은 표현 불가」의 표기이고, 그것을 증명하는 것은 `CompileFailureHarnessTest` 다 —
@@ -109,7 +116,7 @@ fixture 11(basis 교차)은 이미 있고 **fixture 12(단위 미선언 `Rate` �
 
 ## 6. 판단이 갈린 자리 (넷)
 
-기록만 하고 되돌리지 않았다 — 셋 다 승인 문면과 계약 위에서 고른 것이고 근거를 해당 case 의
+기록만 하고 되돌리지 않았다 — 넷 다 승인 문면과 계약 위에서 고른 것이고 근거를 해당 case 의
 `change_history` 가 갖는다.
 
 1. **`money-basis-005` 의 입력을 바꿨다.** D4 표는 기대값만 말하나, 승인된 계약에서
@@ -154,10 +161,20 @@ fixture 11(basis 교차)은 이미 있고 **fixture 12(단위 미선언 `Rate` �
 7. **`not-equals` 의 null 구멍을 고치지 않았다.** 동결분의 의미를 바꾸면 그 술어를 단 case 의
    계약이 소급해 달라지므로 새 술어 셋에만 존재·비-null 전건을 세웠다. 현재 `not-equals`
    사용처는 0 이다.
-8. **secret 스캔** `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
-   reports/evidence/m1/1b-c/` — 매치 **4**. 셋은 이 파일의 스캔 명령 문자열 자신이고 하나는
-   `scope.md` 의 `minimumTokenCount`(CPD 설정값, `Token` 이 부분 문자열로 걸린다). **실제
-   secret 0.**
+8. **`BaseAmount` 의 기본값 부재를 재는 컴파일 fixture 가 없다**(verifier r1 M-1 처리 중 실측).
+   여섯 금액 타입이 `vatTreatment`·`provenance` 를 기본값 없는 필수 파라미터로 받는 것은 선언이
+   지고, 인자를 빠뜨린 호출이 컴파일에 실패함을 보이는 음성 fixture 는 없다(있는 넷은 전부 네
+   인자를 넘긴다). **fixture 7 은 그 자리가 아니다** — `YegaAmount` 가 **명시 VAT 인자를 거부**함을
+   재는 다른 명제다. 메우려면 `BaseAmount(won, currency)` 가 *"no value passed for parameter"* 로
+   실패하는 음성 fixture 가 필요하고, **새 fixture 신설은 이 slice 의 `out_of_scope`** 라 만들지
+   않고 등재만 한다.
+9. **secret 스캔** `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+   reports/evidence/m1/1b-c/` — **실제 secret 0.** 매치는 **전부 두 부류이고 그 밖의 매치가
+   없다는 것이 이 항목의 주장**이다: **(a) 이 절이 인용한 스캔 정규식과 그것을 가리키는 문장
+   자신** — 이 절이 자라면 (a)도 함께 늘므로 **수는 낡는다**, 그래서 수가 아니라 부류로 적는다 ·
+   **(b) `scope.md` 의 `minimumTokenCount`**(PMD CPD 설정값, `Token` 이 부분 문자열로 걸린다).
+   **2026-09-05 실측 5**(a 넷 · b 하나) — verifier r1 L-4 가 앞선 「4」를 낡은 수로 잡았고,
+   고친 것은 수가 아니라 **적는 방식**이다.
 
 ## 8. rollback (이 레인 몫)
 
@@ -176,17 +193,18 @@ git restore --source=a5ea955 --staged --worktree -- \
   fixtures/expected/money-basis-001.json fixtures/expected/money-basis-002.json \
   fixtures/expected/money-basis-004.json fixtures/expected/money-basis-005.json \
   fixtures/input/money-basis-001.json fixtures/input/money-basis-004.json \
-  fixtures/input/money-basis-005.json
+  fixtures/input/money-basis-005.json fixtures/input/money-basis-006.json
 git rm -f reports/evidence/m1/1b-c/fixtures.md reports/evidence/m1/1b-c/golden-manifest.json \
   reports/evidence/m1/1b-c/commands.md
 ```
 
 **base 에 없는 신규 경로는 evidence 셋뿐이라 `git rm` 이 그 셋을 받는다** — `fixtures/` 아래
-16 경로는 전부 base 에 있으므로 `git restore` 로 되돌아간다.
+17 경로는 전부 base 에 있으므로 `git restore` 로 되돌아간다.
 
-**임시 clone 실측** — 위 두 명령을 임시 clone 에서 실제로 돌렸고 계약 정정(`6ef8fb5`) 뒤에
-다시 돌렸다: 두 번 다 exit 0 · `M` 16 · `D` 3 · `git diff a5ea955 -- fixtures/` 0 행 ·
-`scope.md` 와 ④ 레인 경로 무변경.
+**임시 clone 실측** — 위 두 명령을 임시 clone 에서 실제로 돌렸고, 계약 정정(`6ef8fb5`)과
+verifier r1 처리(`58a3c6e`) 뒤에 각각 다시 돌렸다: 세 번 다 exit 0 · `git diff a5ea955 -- fixtures/`
+0 행 · `scope.md` 와 ④ 레인 경로 무변경. 마지막 회차는 `M` 17 · `D` 3(경로가 하나 늘었다 —
+`money-basis-006` 입력).
 
 ## 9. 계약 정정 (2026-09-05, `6ef8fb5`)
 

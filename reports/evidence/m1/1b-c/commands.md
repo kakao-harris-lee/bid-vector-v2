@@ -136,9 +136,10 @@ ArchUnit `DoNotIncludeTests()` 가 `testFixtures` 를 인식하지 못하는 사
 ## C-10 — 11 case 의 `input_file`·`expected_file` SHA-256 재계산 후 manifest 값과 대조
 
 - exit: 0
-- 핵심 결과: **63 case 126 해시 전수 대조, 불일치 0.** 값이 바뀐 자리는 기대값 11(같은 파일을
-  두 번 쓴 `rate-unit-003`·`004` 포함) · 입력 3 이고, 전부 해당 case 의 `change_history` 에
-  `previous_expected_sha256`/`previous_sha256` 을 실었다.
+- 핵심 결과: **63 case 126 해시 전수 대조, 불일치 0.** 값이 바뀐 파일은 기대값 **9** · 입력 **4**
+  이고(11 은 처분한 case 수다 — verifier r1 L-4), 전부 해당 case 의 `change_history` 에
+  `previous_expected_sha256`/`previous_sha256` 을 실었다. `golden-manifest.json` 이 case 별
+  `sha256`·`expected_sha256` 을 함께 싣고(L-5) 이 명령이 그것을 재대조한다.
 
 ## 무해성 대조 (착수 시점 기준선)
 

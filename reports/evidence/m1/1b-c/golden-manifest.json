@@ -5,7 +5,7 @@
   "lane": "①②③ — 술어 어휘 확장 · rate-unit 재추출 · money-basis 처분 (④ 소비 테스트는 별도 레인)",
   "generated_at": "2026-09-05",
   "base_sha": "a5ea955c44a935c3245288e6a72c830eeeee64b8",
-  "head_sha": "6ef8fb5",
+  "head_sha": "58a3c6e",
   "contract_read_at": "shared-kernel/src/main/kotlin/bidvector/sharedkernel/{Money,Rate,Carrier,Provenance,Basis,MoneyArithmetic}.kt @ 977083b — 이 레인은 그 경로를 읽기만 했고 쓰지 않았다",
   "operator_decisions": [
     "decision 18 (2026-09-05) — 술어 어휘 동결 해제 (a) 셋 전부",
@@ -18,12 +18,15 @@
     "cases_examined": 11,
     "restored_to_authoritative": 10,
     "still_insufficient_evidence": 1,
-    "expected_files_modified": 11,
-    "input_files_modified": 3,
+    "expected_files_modified": 9,
+    "input_files_modified": 4,
     "sha_mismatches": 0,
     "authoritative_total": 28,
     "authoritative_outside_1b_axis": 18,
-    "authoritative_outside_1b_axis_changed": false
+    "authoritative_outside_1b_axis_changed": false,
+    "cases_with_rewritten_expected": 9,
+    "cases_with_realigned_input": 4,
+    "field_note": "expected_files_modified 는 **파일 수**다(rate-unit 5 + money-basis 001·002·004·005). 11 은 처분한 case 수이고 summary.cases_examined 가 그것이다 — verifier r1 L-4 가 그 둘이 한 필드에 섞여 있던 것을 잡았다. money-basis-006 은 기대값 무변경이고 입력만 정렬됐다(M-1)."
   },
   "predicates_added": [
     {
@@ -72,7 +75,12 @@
         "$.rate.fraction"
       ],
       "verified_projections": [],
-      "note": "verifies 를 「percent→fraction 명시 변환」으로 좁히고 원문 unit 보존 축을 OPEN-1BC-SOURCE-UNIT 로 이관 / 2026-09-05 정정: $.fact·$.conversionDivisor 는 나르기만 — Fact 로 감싸는 계약 함수가 없고 제수는 private const"
+      "note": "verifies 를 「percent→fraction 명시 변환」으로 좁히고 원문 unit 보존 축을 OPEN-1BC-SOURCE-UNIT 로 이관 / 2026-09-05 정정: $.fact·$.conversionDivisor 는 나르기만 — Fact 로 감싸는 계약 함수가 없고 제수는 private const",
+      "source_kind": "approved-spec",
+      "input_file": "fixtures/input/rate-unit-001.json",
+      "expected_file": "fixtures/expected/rate-unit-001.json",
+      "sha256": "7289b53dde1ef728688cfb54a8c4e883fcf2ec6d4441db22246b1d868901fffc",
+      "expected_sha256": "439e1475fd1a9c02191aab9dc940a52f12bb2fdc19d01a510159f88e54f67b1c"
     },
     {
       "case": "rate-unit-002",
@@ -83,7 +91,12 @@
         "$.rate.fraction"
       ],
       "verified_projections": [],
-      "note": "2026-09-05 정정: $.fact·$.conversionDivisor 는 나르기만 — ofFraction 에는 제수 자체가 없다"
+      "note": "2026-09-05 정정: $.fact·$.conversionDivisor 는 나르기만 — ofFraction 에는 제수 자체가 없다",
+      "source_kind": "approved-spec",
+      "input_file": "fixtures/input/rate-unit-002.json",
+      "expected_file": "fixtures/expected/rate-unit-002.json",
+      "sha256": "30459cc29f32c6313b6c72e8eed645de6df0659a8b5488f07bbda5c4431f3b39",
+      "expected_sha256": "ff5347b6a3fb304511e6b615438086bc9e420f5a21f52c98f890cb4ff7eb4d3f"
     },
     {
       "case": "rate-unit-003",
@@ -94,7 +107,12 @@
         "$.representable"
       ],
       "verified_projections": [],
-      "note": "guessAttempted 제거 — 구성상 불가는 컴파일 fixture 와 ADR 0002 D-4 가 증명한다 / 2026-09-05 정정: 표현 불가로 재정의(2026-09-05 정정). UNIT_NOT_DECLARED 방출은 OPEN-1BC-SOURCE-UNIT(1C+ 어댑터)"
+      "note": "guessAttempted 제거 — 구성상 불가는 컴파일 fixture 와 ADR 0002 D-4 가 증명한다 / 2026-09-05 정정: 표현 불가로 재정의(2026-09-05 정정). UNIT_NOT_DECLARED 방출은 OPEN-1BC-SOURCE-UNIT(1C+ 어댑터) / verifier r1 L-6: expected_reasoning 에 표현 불가 형태 자체의 근거 문단 추가",
+      "source_kind": "approved-spec",
+      "input_file": "fixtures/input/rate-unit-003.json",
+      "expected_file": "fixtures/expected/rate-unit-003.json",
+      "sha256": "5b6933acb516fe36b08a4fa5ff308dbb47e122dca16ed4c2e07792ff51719b03",
+      "expected_sha256": "6c4a591fbe998ff847336e95488706c51b41388a6b7c2e3388ffcbc00da70d0d"
     },
     {
       "case": "rate-unit-004",
@@ -105,7 +123,12 @@
         "$.representable"
       ],
       "verified_projections": [],
-      "note": "003 과 기대값 내용이 같다 — 쌍 주장의 기계 표현이고 갈라지면 C-10 이 잡는다 / 2026-09-05 정정: 003 과 기대값 동일 — 쌍 주장"
+      "note": "003 과 기대값 내용이 같다 — 쌍 주장의 기계 표현이고 갈라지면 C-10 이 잡는다 / 2026-09-05 정정: 003 과 기대값 동일 — 쌍 주장 / verifier r1 L-6: expected_reasoning 에 표현 불가 형태 자체의 근거 문단 추가",
+      "source_kind": "approved-spec",
+      "input_file": "fixtures/input/rate-unit-004.json",
+      "expected_file": "fixtures/expected/rate-unit-004.json",
+      "sha256": "12eb4ac8ae9230c0d999a89b7d5d7b85ff91e99e83d4cb27e1b3e7a0ab139e04",
+      "expected_sha256": "6c4a591fbe998ff847336e95488706c51b41388a6b7c2e3388ffcbc00da70d0d"
     },
     {
       "case": "rate-unit-005",
@@ -116,7 +139,12 @@
         "$.rate.fraction"
       ],
       "verified_projections": [],
-      "note": "2026-09-05 정정: $.fact·$.conversionDivisor 는 나르기만"
+      "note": "2026-09-05 정정: $.fact·$.conversionDivisor 는 나르기만",
+      "source_kind": "approved-spec",
+      "input_file": "fixtures/input/rate-unit-005.json",
+      "expected_file": "fixtures/expected/rate-unit-005.json",
+      "sha256": "4b2f770c22b93947b5b24292f193614016a11d260a37f25d3ae63cebae84588e",
+      "expected_sha256": "7cecb14c18f382196152ecfa17bc8a263c83c462eff23f5afd317dfcdd8f1a23"
     },
     {
       "case": "money-basis-001",
@@ -127,7 +155,12 @@
         "$.representable"
       ],
       "verified_projections": [],
-      "note": "기대값이 {\"representable\": false} 하나. 입력 basis ESTIMATED_PRICE → ESTIMATED"
+      "note": "기대값이 {\"representable\": false} 하나. 입력 basis ESTIMATED_PRICE → ESTIMATED",
+      "source_kind": "operator-decision",
+      "input_file": "fixtures/input/money-basis-001.json",
+      "expected_file": "fixtures/expected/money-basis-001.json",
+      "sha256": "07642e37e00ba1481516b0711599dc0678065ad2ee741aa2b649a23af4ede0c7",
+      "expected_sha256": "6c4a591fbe998ff847336e95488706c51b41388a6b7c2e3388ffcbc00da70d0d"
     },
     {
       "case": "money-basis-002",
@@ -139,7 +172,12 @@
         "$.comparedBases"
       ],
       "verified_projections": [],
-      "note": "result·comparisonPerformed 제거. type_path 를 낡은 BaseAmount.compareTo 에서 정정"
+      "note": "result·comparisonPerformed 제거. type_path 를 낡은 BaseAmount.compareTo 에서 정정",
+      "source_kind": "operator-decision",
+      "input_file": "fixtures/input/money-basis-002.json",
+      "expected_file": "fixtures/expected/money-basis-002.json",
+      "sha256": "4e19b0d22d5f9f532aff33d4c5da840e9d16a9e1fbe16cd67736a233f649a185",
+      "expected_sha256": "006d43a102edd6da8d6c7dfe8d4686312ae2cbd63055aa1c01a77819b9da2381"
     },
     {
       "case": "money-basis-003",
@@ -148,7 +186,12 @@
       "contract_type_path": "없다 — 검색 경로(STR-16)를 나르는 타입이 계약에 없다",
       "verified_paths": [],
       "verified_projections": [],
-      "note": "기대값·입력·해시 무접촉. 소유는 OPEN-1BC-STR16 (strategy slice)"
+      "note": "기대값·입력·해시 무접촉. 소유는 OPEN-1BC-STR16 (strategy slice)",
+      "source_kind": "m0-derived-rule",
+      "input_file": "fixtures/input/money-basis-003.json",
+      "expected_file": "fixtures/expected/money-basis-003.json",
+      "sha256": "472dcedf7a35b51772140ef471051905e6eb96b74be18b4a5459d587c8daffbd",
+      "expected_sha256": "810b6e95be545d9be5b41fc792f088af490e718c536f89ba8648ef39b5053c9d"
     },
     {
       "case": "money-basis-004",
@@ -159,7 +202,12 @@
         "$.representable"
       ],
       "verified_projections": [],
-      "note": "001 과 기대값이 같다. min/max 를 이름으로 가진 함수가 1B 에 없다는 부재가 이 case 가 재는 것"
+      "note": "001 과 기대값이 같다. min/max 를 이름으로 가진 함수가 1B 에 없다는 부재가 이 case 가 재는 것",
+      "source_kind": "approved-spec",
+      "input_file": "fixtures/input/money-basis-004.json",
+      "expected_file": "fixtures/expected/money-basis-004.json",
+      "sha256": "3ec10f0826b3887ce49b7966cdd6937805441948b8dd3971b846530024b2cc75",
+      "expected_sha256": "6c4a591fbe998ff847336e95488706c51b41388a6b7c2e3388ffcbc00da70d0d"
     },
     {
       "case": "money-basis-005",
@@ -171,7 +219,12 @@
         "$.reasonCode"
       ],
       "verified_projections": [],
-      "note": "입력 둘째 금액 provenance Undeclared → Published. 계약이 provenance 를 VAT 보다 먼저 보므로 두 전건이 함께 깨진 입력에서는 이 case 의 사유가 나올 수 없었다"
+      "note": "입력 둘째 금액 provenance Undeclared → Published. 계약이 provenance 를 VAT 보다 먼저 보므로 두 전건이 함께 깨진 입력에서는 이 case 의 사유가 나올 수 없었다",
+      "source_kind": "m0-derived-rule",
+      "input_file": "fixtures/input/money-basis-005.json",
+      "expected_file": "fixtures/expected/money-basis-005.json",
+      "sha256": "f137eafa86051937b4853599a7d3b11ad89b360546e1d454db58a418a2eb97e3",
+      "expected_sha256": "1fb7d6606f18bcd7cdd56f1e4a627f8d7b20866804d46cf8e074fca48a21c2df"
     },
     {
       "case": "money-basis-006",
@@ -183,7 +236,12 @@
         "$.provenance"
       ],
       "verified_projections": [],
-      "note": "정확 비교가 앞선 not-equals+case-fold 보다 강하다 — 배제 목록이 아니라 미상 쪽 이름을 잠근다 / 2026-09-05 정정: 적격성 셋은 나르기만 — OPEN-1BC-ELIGIBILITY(1D). B7 셋째 갈래가 다시 열렸다"
+      "note": "정확 비교가 앞선 not-equals+case-fold 보다 강하다 — 배제 목록이 아니라 미상 쪽 이름을 잠근다 / 2026-09-05 정정: 적격성 셋은 나르기만 — OPEN-1BC-ELIGIBILITY(1D). B7 셋째 갈래가 다시 열렸다 / verifier r1 M-1: 입력이 미상을 값으로 선언(declaredVatTreatment=UNKNOWN · declaredProvenance=Undeclared)하도록 정렬 — runner 의 null 접기를 없앤다. 이 case 가 잠그는 것은 구성 왕복이고, 기본값 부재를 재는 회귀 테스트는 없다(fixture 7 은 YegaAmount 가 명시 VAT 인자를 거부하는 다른 명제다).",
+      "source_kind": "operator-decision",
+      "input_file": "fixtures/input/money-basis-006.json",
+      "expected_file": "fixtures/expected/money-basis-006.json",
+      "sha256": "bf697f2e57e4fe0740fdb68a829c006f6c33d446a7002ee80b0defa9836e63e8",
+      "expected_sha256": "d155ce45da58dfdb04eafff4a22baac9c709a7849e72b1e184387ff1987e48f0"
     }
   ],
   "open_items_created": [
@@ -193,5 +251,6 @@
   "usage_note": "money-basis-003 을 뺀 열은 이제 authoritative 다 — 「승인된 authoritative corpus 통과」의 모집단에 든다. 다만 그 통과를 실제로 실행하는 것은 ④ 소비 테스트이고 이 레인은 만들지 않았다.",
   "handoff_to_runner": "각 case 의 verified_paths 가 runner 가 대조해야 하는 전부다 — 계약이 산출하지 않는 축은 이미 걷어냈으므로 runner 는 지어낼 것이 없다. money-basis-002·005 는 compareKnownVat 호출로, 나머지 authoritative 여덟 가운데 rate-unit-001·002·005 는 ofPercent/ofFraction 호출로, rate-unit-003·004 와 money-basis-001·004 는 컴파일 fixture 위임으로 대조한다. 상세는 fixtures.md §4.",
   "contract_correction": "2026-09-05 팀장 판단(scope.md 「Phase 3 중 계약 정정」, 운영자 사후 확인 대상) — verified_paths 는 1B 계약이 실제로 산출하는 축만 잠근다. 계약이 내지 않는 값은 기대값에 남기되 나르기만 한다(운영자 결정 2026-08-31).",
-  "predicate_usage_note": "네 술어(not-equals 포함)의 사용처가 모두 0 이다. 계약이 산출하는 축은 이름이 승인돼 있어 정확 비교가 서고, 계약이 산출하지 않는 축은 애초에 잠글 대상이 아니다. 실행은 manifest_contract.self_check() 22 건이 C-5 안에서 계속 잰다."
+  "predicate_usage_note": "네 술어(not-equals 포함)의 사용처가 모두 0 이다. 계약이 산출하는 축은 이름이 승인돼 있어 정확 비교가 서고, 계약이 산출하지 않는 축은 애초에 잠글 대상이 아니다. 실행은 manifest_contract.self_check() 22 건이 C-5 안에서 계속 잰다.",
+  "sha_note": "case 별 sha256·expected_sha256 은 fixtures/manifest.yaml 의 값을 그대로 옮긴 것이고 실제 파일과의 일치는 C-10 이 63 case 126 해시 전수로 재대조한다(불일치 0). verifier r1 L-5 로 신설 — evidence-pack 규격이 요구하는 「사용한 fixture id·출처 분류·SHA-256」이다."
 }
