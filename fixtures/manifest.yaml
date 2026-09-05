@@ -877,6 +877,15 @@ cases:
       `Fact.Absent`(`data-dictionary.md` §1.1), 사유는 `ReasonCode` enum 이름이다. **V2 산출을 근거로
       들지 않았다** — 재추출한 값은 위 승인 문면과 그 결정에서만 나왔고, 이 case 가 주장하는 규칙은
       재추출 전후로 같다.
+      **`{"representable": false}` 라는 형태의 근거 — 계약 정정 첫째(2026-09-05).** §4.1 이 요구하는
+      *"추측하지 않고 거부"* 를 1B 계약은 **런타임 거부가 아니라 구성상 불가**로 지켰다: `Rate` 의
+      생성자가 `internal` 이고 모듈 밖 공개 경로는 **단위를 이름에 담은 `ofPercent`·`ofFraction`
+      둘뿐**이라, 단위를 모르는 값으로 `Rate` 를 만들 함수가 없다(`@ConsistentCopyVisibility` 가
+      `copy()` 우회도 막는다). 그러므로 거부 객체·사유 코드가 **생기지 않고**, 이 case 가 적을 수 있는
+      기대값은 「그 조합은 **표현 불가**」 하나다. **`money-basis-001`·`004` 와 같은 형태이고 같은
+      근거 구조**다 — 그쪽은 basis 교차, 이쪽은 단위 미선언이며 둘 다 컴파일 fixture 가 실행자다.
+      **운영자 결정 decision 21** 이 「승인된 계약이 이긴다」로 이 형태의 재작성을 승인했다.
+      **V2 산출을 근거로 들지 않았다** — 근거는 §4.1 문면과 `Rate` 선언의 가시성, 그리고 그 결정이다.
     input_file: fixtures/input/rate-unit-003.json
     expected_file: fixtures/expected/rate-unit-003.json
     normalization:
@@ -1020,6 +1029,15 @@ cases:
       `Fact.Absent`(`data-dictionary.md` §1.1), 사유는 `ReasonCode` enum 이름이다. **V2 산출을 근거로
       들지 않았다** — 재추출한 값은 위 승인 문면과 그 결정에서만 나왔고, 이 case 가 주장하는 규칙은
       재추출 전후로 같다.
+      **`{"representable": false}` 라는 형태의 근거 — 계약 정정 첫째(2026-09-05).** §4.1 이 요구하는
+      *"추측하지 않고 거부"* 를 1B 계약은 **런타임 거부가 아니라 구성상 불가**로 지켰다: `Rate` 의
+      생성자가 `internal` 이고 모듈 밖 공개 경로는 **단위를 이름에 담은 `ofPercent`·`ofFraction`
+      둘뿐**이라, 단위를 모르는 값으로 `Rate` 를 만들 함수가 없다(`@ConsistentCopyVisibility` 가
+      `copy()` 우회도 막는다). 그러므로 거부 객체·사유 코드가 **생기지 않고**, 이 case 가 적을 수 있는
+      기대값은 「그 조합은 **표현 불가**」 하나다. **`money-basis-001`·`004` 와 같은 형태이고 같은
+      근거 구조**다 — 그쪽은 basis 교차, 이쪽은 단위 미선언이며 둘 다 컴파일 fixture 가 실행자다.
+      **운영자 결정 decision 21** 이 「승인된 계약이 이긴다」로 이 형태의 재작성을 승인했다.
+      **V2 산출을 근거로 들지 않았다** — 근거는 §4.1 문면과 `Rate` 선언의 가시성, 그리고 그 결정이다.
     input_file: fixtures/input/rate-unit-004.json
     expected_file: fixtures/expected/rate-unit-004.json
     normalization:
@@ -1904,8 +1922,7 @@ cases:
     domain: money-basis
     classification: authoritative
     verifies: |-
-        legacy 유래 행을 정의상 기본값 과세로 자동 태깅하지 않는다 — 저장 값이 정의를 따른다는 근거가 없다. 값은 기초금액 자리에 있으나 `Inclusive`로 승격되지
-        않는다.
+        legacy 유래 행의 과세·provenance가 **미상으로 선언된 채** `BaseAmount` 로 구성되고 그대로 되읽힌다 — 정의상 기본값(`Inclusive`)으로 조용히 바뀌지 않는다.
     verified_paths:
       - "$.vatTreatment"
       - "$.provenance"
@@ -1919,6 +1936,12 @@ cases:
       **기대값의 토큰은 이미 1B 계약 이름이다** — `VatTreatment.UNKNOWN` · `Provenance.Undeclared`
       (운영자 결정 2026-09-05 decision 19 가 그 어휘를 정본으로 세웠다). **그래서 이 case 는 재추출이
       아니고 기대값 파일이 바뀌지 않았다.** V2 산출을 근거로 들지 않았다.
+      **입력이 그 미상을 값으로 선언한다 — 2026-09-05 정정(verifier r1 M-1).** `data-dictionary.md`
+      §1.2.1 의 `Unknown` 은 *"선언을 만들 수 없으면 `Unknown`"* 이라 **미상 그 자체가 선언 가능한
+      값**이고, `Provenance.Undeclared` 도 같은 성질이다(`Carrier.kt`·`Provenance.kt`). 그래서 입력의
+      `declaredVatTreatment`·`declaredProvenance` 를 `null` 이 아니라 `"UNKNOWN"`·`"Undeclared"` 로
+      적는다 — **소비 테스트가 `null` 을 그 두 값으로 접으면 계약이 아니라 runner 의 상수가 기대값을
+      정하기 때문**이고, 그것은 「지어내지 않는다」에 어긋난다.
     input_file: fixtures/input/money-basis-006.json
     expected_file: fixtures/expected/money-basis-006.json
     normalization:
@@ -1933,22 +1956,28 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 2bd60764160fe33ef894b8b48491b6a6df1cac0d0f8bf42c5ed5641088635197
+    sha256: bf697f2e57e4fe0740fdb68a829c006f6c33d446a7002ee80b0defa9836e63e8
     expected_sha256: d155ce45da58dfdb04eafff4a22baac9c709a7849e72b1e184387ff1987e48f0
     owning_open: |-
       OPEN-REG-05 (저장 값의 행별 실제 과세) — 이 case는 그 판정을 하지 않고 판정하지 않음을 고정한다
     not_covered: |-
+      **이 case 가 잠그는 것은 구성 왕복이다 — 2026-09-05 정정(verifier r1 M-1).** 입력이 선언한
+      미상 두 값으로 `BaseAmount` 를 만들고 되읽어 같은 값이 나오는 것까지이며, **「기본값이 없어서
+      자동 태깅될 수 없다」는 구성 사실 자체는 이 기대값이 잠그지 않는다.** 그 사실은 `Money.kt` 의
+      선언이 진다 — 여섯 금액 타입이 `vatTreatment`·`provenance` 를 **기본값 없는 필수 파라미터**로
+      받으므로 채워 넣을 값이 타입에 없다. **그것을 재는 회귀 테스트는 오늘 없다**(아래
+      `contract_binding.fixed_by` 가 그 공백을 적는다). 왕복이 약한 계약임을 감추지 않는다 —
+      대신 **runner 가 상수를 대는 자리는 사라졌다**: 접기를 없앴으므로 기대값을 정하는 것은 입력과
+      계약뿐이다.
       **표기 변형은 밖이 아니다** — decision 19 가 `VatTreatment.UNKNOWN`·`Provenance.Undeclared` 를
       승인 어휘로 세워, 「승격되지 않는다」를 **미상 쪽 이름의 정확 비교**로 잠갔다. 정확 비교는
       `INCLUSIVE`·`Inclusive`·`cLEAN`·공백/구분자 변형·null·삭제를 **전부** 잡는다 — 배제 목록을
-      늘리는 방식이 아니기 때문이다.
-      **적격성 축 셋은 나르기만 한다 — 2026-09-05 정정.** `$.autoTaggedFromDefinitionDefault` ·
+      늘리는 방식이 아니기 때문이다. **`definitionDefaultForSlot` 의 `INCLUSIVE` 는 입력이 나르는
+      함정**이고 기대값이 그것을 따라가지 않는 것이 이 case 의 그림이다.
+      **적격성 축 셋은 나르기만 한다** — `$.autoTaggedFromDefinitionDefault` ·
       `$.eligibleForAuthoritativeCorpus` · `$.reasonCode`(`LegacyOriginNotPromotable`) 는 기대값에
-      남기되 `verified_paths` 에서 뺐다. **1B 는 적격성을 판정하지 않는다** — 입력 다섯 성분으로
-      `Money` 를 만들면 나오는 것은 `vatTreatment` 와 `provenance` 뿐이고, 「기본값으로 자동
-      태깅되지 않았다」는 **기본값이 타입에 없다**는 구성 사실이지 값으로 방출되는 축이 아니며,
-      corpus 적격성 판정은 provenance first-match rule 을 세우는 **1D** 소유다. 그 축은
-      `uncovered_axes` 의 `OPEN-1BC-ELIGIBILITY` 가 받는다.
+      남기되 `verified_paths` 에서 뺐다. corpus 적격성 판정은 provenance first-match rule 을 세우는
+      **1D** 소유이고 그 축은 `uncovered_axes` 의 `OPEN-1BC-ELIGIBILITY` 가 받는다.
       **그 대가를 적어 둔다** — 적격성 불리언만 뒤집는 변이(Codex B7 이 실증한 셋째 갈래)가 이제
       계약에 걸리지 않는다. 과세·provenance 세탁이라는 **B7 의 실질은 여전히 잡히지만**, 그 한
       갈래는 `OPEN-1BC-ELIGIBILITY` 가 닫힐 때까지 열려 있다(`commands.md` C-7 이 그 자리를 이름으로
@@ -1956,8 +1985,15 @@ cases:
     contract_binding:
       type_path: "bidvector.sharedkernel.VatTreatment.UNKNOWN · Provenance.Undeclared · `Money` 다섯 성분의 필수 파라미터"
       fixed_by: |-
-        여섯 금액 타입 전부 `vatTreatment` 와 `provenance` 를 **기본값 없는 필수 파라미터**로 받는다 —
-        채워 넣을 기본값이 타입에 없다.
+        **선언 자체뿐이고 회귀 테스트가 없다 — 2026-09-05 실측(verifier r1 M-1).** 여섯 금액 타입
+        전부 `vatTreatment` 와 `provenance` 를 **기본값 없는 필수 파라미터**로 받아 채워 넣을 값이
+        타입에 없다(`Money.kt`). 그러나 **그 부재를 재는 컴파일 fixture 는 오늘 없다** — 인자를 빠뜨린
+        `BaseAmount(...)` 호출이 컴파일에 실패함을 보이는 음성 fixture 가 없고, 있는 넷은 전부 네 인자를
+        다 넘긴다(`positive-4`·`positive-6`·`negative-4`·`mutant-6`). **fixture 7 은 이 자리가 아니다** —
+        그것은 `YegaAmount`(VAT 고정 타입)가 **명시 VAT 인자를 거부**함을 재고, 「기본값이 없다」와는
+        다른 명제다. 그 공백을 메우려면 `BaseAmount(won, currency)` 호출이
+        *"no value passed for parameter"* 로 실패하는 음성 fixture 가 필요하다 — 이 slice 의
+        `out_of_scope`(새 fixture 신설)라 만들지 않고 여기 적어 둔다.
       carries: |-
         **정의 기본값으로 자동 태깅되지 않는다.** 기대값의 `$.vatTreatment` 와 `$.provenance` 가
         계약의 `VatTreatment.UNKNOWN`·`Provenance.Undeclared` 와 **이름까지 일치**하고,
@@ -2107,6 +2143,26 @@ cases:
         policy_version: |-
           해당 없음 — assertion 계약의 범위 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-05
+        change: |-
+          **입력 정렬.** `row.declaredVatTreatment`·`declaredProvenance` 를 `null` 에서
+          **`"UNKNOWN"`·`"Undeclared"`** 로 바꿔 미상을 **값으로 선언**하게 했다(`sha256` 갱신,
+          `previous_sha256` 동반). `verifies` 를 「구성 왕복」으로, `not_covered`·
+          `contract_binding.fixed_by` 를 그 성질과 회귀 테스트 공백으로 정정했다.
+          **기대값 파일과 `expected_sha256` 은 그대로다** — 잠그는 값은 바뀌지 않았다.
+        reason: |-
+          **verifier r1 M-1(medium).** 앞선 형태에서는 입력이 `null` 이라 소비 테스트가
+          `null → VatTreatment.UNKNOWN` · `null → Provenance.Undeclared` 로 **접은 뒤** 그 값을
+          `BaseAmount` 에 넣어 되읽었다 — 기대값을 정하는 것이 계약이 아니라 **runner 의 상수**였고
+          (`fixtures.md` §4 *"runner 가 지어낼 것이 없다"* 가 이 case 에서만 서지 않았다), 그 상수를
+          `INCLUSIVE` 로 바꾸면 이 case 만 빨개지는 것이 재현됐다. 입력이 미상을 값으로 선언하면
+          **접을 것이 없어지고** 기대값은 입력과 계약만으로 정해진다.
+          **주장이 좁아진 것을 감추지 않는다** — 「자동 태깅되지 않는다」의 실질(기본값 부재)은
+          선언이 지고 회귀 테스트가 없으며, 이 case 가 기계로 잠그는 것은 **구성 왕복**이다.
+          위 `not_covered`·`fixed_by` 가 그 경계를 적는다.
+        policy_version: |-
+          해당 없음 — 입력 표기와 문면의 정정이고 기대값이 effective-dated 정책에 의존하지 않는다.
+        previous_sha256: 2bd60764160fe33ef894b8b48491b6a6df1cac0d0f8bf42c5ed5641088635197
     review:
       claude_commit: pending
       codex_verdict: pending

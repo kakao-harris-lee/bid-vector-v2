@@ -4,8 +4,8 @@
     "conceptSlot": "BASE_AMOUNT",
     "amount": 800000000,
     "currency": "KRW",
-    "declaredVatTreatment": null,
-    "declaredProvenance": null
+    "declaredVatTreatment": "UNKNOWN",
+    "declaredProvenance": "Undeclared"
   },
   "definitionDefaultForSlot": {
     "basis": "BASE_AMOUNT",
