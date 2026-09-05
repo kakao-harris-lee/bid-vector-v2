@@ -18,10 +18,11 @@ in_scope:
   - fixtures/expected/money-basis-00[1-6].json    # ③ 처분 결정에 따라 — 재추출 또는 무변경(폐기는 파일 삭제가 아니라 classification 변경)
   - fixtures/input/rate-unit-00[1-5].json         # ② 조건부 — 입력 토큰 정렬(ESTIMATED_PRICE → ESTIMATED 류)이 필요할 때만
   - fixtures/input/money-basis-00[1-6].json       # ③ 같은 조건
-  - shared-kernel/src/testFixtures/**             # ④ D5(b′) — JSON 무의존 projection(값→Map). internal 접근은 KGP 기본 associate(조사 §8 실측)
-  - shared-kernel/build.gradle.kts                # ④ `java-test-fixtures` 플러그인 적용만. testFixtures 버킷에 외부 의존을 넣지 않는다
-  - app/src/test/**                               # ④ corpus 소비 테스트(conformance runner) — JSON 역직렬화는 여기서만(app 은 domain 층 밖)
-  - app/build.gradle.kts                          # ④ `testImplementation(testFixtures(project(":shared-kernel")))` + `testImplementation(libs.snakeyaml)`
+  # ~~shared-kernel/src/testFixtures/** · shared-kernel/build.gradle.kts~~ — D5 기제 변경 2026-09-05(아래 「Phase 3 중 계약 정정」 둘째):
+  #   testFixtures 는 하네스 게이트 셋(packageOwnershipGate·sourceSetLayoutGate·ArchUnit 프로덕션 스캔)을 깨는 것이 실측돼 쓰지 않는다.
+  #   shared-kernel 은 build.gradle.kts 포함 무접촉(아래 src/test 의 fixture 12 만 예외).
+  - app/src/test/**                               # ④ corpus 소비 테스트(conformance runner) — 공개 API 만, JSON/YAML 역직렬화는 여기서만(app 은 domain 층 밖)
+  - app/build.gradle.kts                          # ④ `testImplementation(libs.snakeyaml)` 한 줄(testFixtures 의존은 없다)
   - gradle/libs.versions.toml                     # ④ 계약 갱신 2026-09-05(팀장) — `snakeyaml` 카탈로그 등재 한 줄 한정(버전은 Boot BOM,
                                                   #   app testCompileClasspath 에 이미 transitively 해석되는 좌표를 카탈로그 관례대로 명시할 뿐).
                                                   #   runner 가 manifest.yaml 을 읽기 위함. 다른 카탈로그 편집은 out
@@ -165,6 +166,22 @@ case = 실패), executor 는 value(계약 함수 호출 → JSON 무의존 proje
 compile-fixture 위임(`$.representable == false` + fixture 파일 실재 단언, 컴파일 실패 단언은
 `CompileFailureHarnessTest` 가 `gate.tests.shared-kernel` 로 강제) 둘.
 
+**둘째 정정 — D5 기제 변경 (b′) → (d), 2026-09-05(팀장 판단, 운영자 사후 확인 요청).** runner 레인이
+C-1 전체 `clean check` 에서 실측: shared-kernel 에 `java-test-fixtures` 를 켜면 하네스 게이트 셋이 깨진다 —
+`packageOwnershipGate`·`sourceSetLayoutGate` 의 `expectedSourceSets = {main, test}` 하드코딩 둘, ArchUnit
+`DoNotIncludeTests()` 가 `testFixtures` 세그먼트를 거르지 않아 testFixtures 산출물이 프로덕션 바이트코드로
+스캔됨(Phase 2 §8 은 컴파일·1차 게이트만 봤다). 셋 다 `build-logic` 편집이라 게이트 정의 = 하네스 slice 소유.
+**testFixtures 가 필요했던 유일한 이유는 `Rate.fraction`(internal) 읽기**이고 그것은 공개 API 로 대체된다:
+`Rate` 는 data class 라 `Rate.ofFraction(기대값) == 실제값` 동등 비교가 값을 잠근다(P-1a 왕복 성질). 나머지
+경로(`compareKnownVat` 의 `Fact<Int>`·`basis.name`·`vatTreatment.name`·`Provenance` variant 는 소진 `when`)는
+원래 공개다. 그래서 **(d) app/src/test runner, 공개 API 만, testFixtures·projection 계층 없음** — shared-kernel 은
+fixture 12 밖에서 무접촉으로 돌아간다. decision 22 의 취지(커널 어느 scope 에도 JSON 없음·게이트/ADR 개정 없음)는
+그대로고 강화됐다. 부수 사실: verifier r1 L-4(모듈 밖에서 율 값을 읽을 수단 0)는 동등 비교로 우회된다 —
+1C~1E 가 율 값을 소비할 때의 결정은 여전히 열려 있다. `OPEN-1BC-TESTFIXTURES-GATE` 는 「1차 게이트 사각」에서
+**「하네스 게이트 넷이 testFixtures 를 모른다(1차 declared 판정·expectedSourceSets 둘·ArchUnit 필터)」** 로 문면을
+넓혀 1A-b 에 이월한다 — testFixtures 를 쓰는 slice 가 생기기 전에 게이트가 그 source set 을 어떻게 다룰지
+(순수성 규칙 적용/면제) 결정해야 한다.
+
 **같은 날 함께 난 결정(이 slice 밖, 등재만)**: `OPEN-ADR-06` **(a)** — sizeGate 에 타입 멤버 수 상한 **30**(PSI 소스 기준) + 상속 깊이·인터페이스 수는 baseline(2·1) 대비 증가 금지 래칫 · `OPEN-ADR-16` **(a)** — PMD CPD(`de.aaschmid.cpd`, `toolVersion` 으로 엔진 독립), **관찰 모드** 시작(리포트만, 1C 종료 시 실패 모드 전환 결정), `minimumTokenCount` **50**(도구 기본값 유지), 첫 배선 acceptance 에 Gradle 9.6.1 스모크(실패 시 (b) 자체 구현 후퇴). 둘의 배선은 **하네스 slice `1A-b` 신설**(`OPEN-1BC-TESTFIXTURES-GATE` 도 같은 자리). 정본은 `docs/adr/0007` §5 · `capability-map.md` §14.2 · `milestone-1.md` 「Slice 1A-b」.
 
 ---
@@ -176,7 +193,7 @@ compile-fixture 위임(`$.representable == false` + fixture 파일 실재 단언
 | `OPEN-1B-CONTRACT` | 계약 술어 설계·실행 | **이 slice 가 소유**(1B 로부터 이관, decision 15). ① 이 닫는다. 정본 `capability-map.md` §14.2 |
 | `OPEN-1B-CORPUS` | 1B 축 authoritative 0건과 M1 완료 조건 | **이 slice 가 소유.** ②③④ 가 닫는다 — 닫힘 조건은 「1B 축 authoritative ≥ 1 이고 소비 테스트가 `check` 안에서 그 전건을 통과」 |
 | `OPEN-1BC-STR16`(신설 예정) | money-basis-003 의 검색 경로 타입 | strategy slice 로 이월. `fixtures/manifest.yaml` `uncovered_axes` 에 등재 |
-| `OPEN-1BC-TESTFIXTURES-GATE`(신설 예정) | 1차 게이트 `moduleDependencyGate` 의 declared 판정이 `testFixtures*` 의존 버킷을 보지 않는다(조사 §8 실측) | 하네스 slice(래칫·게이트 확장 — OPEN-ADR-06/16 배선과 같은 자리)로 이월. 이 slice 는 그 버킷에 외부 의존 0 으로 답한다 |
+| `OPEN-1BC-TESTFIXTURES-GATE`(신설 예정) | 하네스 게이트 넷이 `testFixtures` source set 을 모른다 — 1차 `moduleDependencyGate` declared 판정이 `testFixtures*` 의존 버킷을 안 봄(조사 §8) · `packageOwnershipGate`·`sourceSetLayoutGate` 의 `expectedSourceSets={main,test}` 하드코딩 · ArchUnit `DoNotIncludeTests()` 가 testFixtures 산출물을 프로덕션으로 스캔(runner 레인 C-1 실측, 4 failures) | 하네스 slice 1A-b 로 이월. **이 slice 는 testFixtures 를 쓰지 않는 것으로 답한다**(D5 기제 변경 (d)). testFixtures 를 도입하는 slice 가 생기기 전에 게이트가 그 source set 에 순수성 규칙을 적용할지 면제할지 결정 필요 |
 | `OPEN-1BC-SOURCE-UNIT`(신설 예정) | `preservedSourceUnit`(원문 unit 보존)의 소유 층 — 1C+ 어댑터 계약 | 재추출 시 기대값에서 빼는 축. 어댑터 slice 가 받는다 |
 
 ---
