@@ -4,7 +4,8 @@
 SKILL). 라운드 이력 절은 만들지 않는다 — 그 기록은 git log 와 리뷰 verdict 가 갖는다.
 
 **C-0~C-4(Gradle acceptance)는 ④ 레인(소비 테스트)이 적는다.** 아래는 corpus 레인(①②③)의
-몫인 **C-5~C-10** 이고, 각 커밋 뒤에 전건을 다시 돌렸다 — 아래 수치는 `ed87da6` 시점이다.
+몫인 **C-5~C-10** 이고, 각 커밋 뒤에 전건을 다시 돌렸다 — 아래 수치는 **`6ef8fb5`**(계약 정정
+포함) 시점이다.
 
 ## C-5 — `python3 fixtures/tools/mutation_sweep_adversarial.py`
 
@@ -25,9 +26,12 @@ SKILL). 라운드 이력 절은 만들지 않는다 — 그 기록은 git log �
 ## C-7 — `python3 fixtures/tools/mutation_sweep_targeted.py`
 
 - exit: 0
-- 핵심 결과: 통과 자리는 `license-006` **대조군(무변이)** 하나뿐 — 착수 시점과 같다. 앞선
-  라운드가 실증한 세탁 변이체(B7 넷 · B8 표기 셋)가 **전부 caught 로 바뀌었다**(착수 시점에는
-  그 case 가 강등돼 있어 아예 돌지 않았다).
+- 핵심 결과: 통과 자리 **둘**. ① `license-006` **대조군(무변이)** — 착수 시점과 같다.
+  ② `money-basis-006` 의 **`$.eligibleForAuthoritativeCorpus` 단독 뒤집기** — 2026-09-05 계약
+  정정으로 적격성 축이 `verified_paths` 에서 빠져(1D 이관, `OPEN-1BC-ELIGIBILITY`) **B7 의 셋째
+  갈래가 다시 열린 자리**다. 표적을 지우지 않고 남겨 매 실행 눈에 보이게 뒀다.
+  나머지 세탁 변이체(B7 의 과세·provenance·전체 · B8 표기 셋)는 **전부 caught** 다 — 착수
+  시점에는 그 case 가 강등돼 있어 아예 돌지 않았다.
 
 ## C-8 — `python3 fixtures/tools/manifest_prose_consistency.py`
 
@@ -40,26 +44,30 @@ SKILL). 라운드 이력 절은 만들지 않는다 — 그 기록은 git log �
 ## C-9 — `python3 fixtures/tools/check_legacy_numbers.py`
 
 - exit: 0
-- 핵심 결과: legacy-number hits **0**. 재추출이 새로 실은 수는 `100`·`1`·`0.875`·`0.00875`
-  뿐이고 넷 다 `FORBIDDEN` 밖이다.
+- 핵심 결과: legacy-number hits **0**. 재추출이 실은 수는 `100`·`1`·`0.875`·`0.00875` 뿐이고
+  넷 다 `FORBIDDEN` 밖이다(정정으로 `rate-unit-003`·`004` 에서는 수가 아예 사라졌다).
 
 ## C-10 — 11 case 의 `input_file`·`expected_file` SHA-256 재계산 후 manifest 값과 대조
 
 - exit: 0
-- 핵심 결과: **63 case 126 해시 전수 대조, 불일치 0.** 값이 바뀐 자리는 기대값 9 · 입력 3 이고
-  전부 해당 case 의 `change_history` 에 `previous_expected_sha256`/`previous_sha256` 을 실었다.
+- 핵심 결과: **63 case 126 해시 전수 대조, 불일치 0.** 값이 바뀐 자리는 기대값 11(같은 파일을
+  두 번 쓴 `rate-unit-003`·`004` 포함) · 입력 3 이고, 전부 해당 case 의 `change_history` 에
+  `previous_expected_sha256`/`previous_sha256` 을 실었다.
 
 ## 무해성 대조 (착수 시점 기준선)
 
 기준선은 `_workspace/m1-1b-c/01_scout_preflight.md` §5 가 HEAD `edbeee5` 에서 잰 값이고, 이
 레인이 **편집 직전에 다시 재서** 같은 값임을 확인한 뒤 그 위에서 작업했다.
 
-| 도구 | 착수 시점 | ① 뒤 | ③ 뒤 |
-| --- | --- | --- | --- |
-| C-5 강등 / 잔존 | 0 / 18 | 0 / 18 | 0 / 28 |
-| C-7 통과 자리 | `license-006` 대조군 | 같음 | 같음 |
-| C-8 불일치 | 8 · 11 | 8 · 11 | 7 · 10 |
-| C-9 hits | 0 | 0 | 0 |
+| 도구 | 착수 시점 | ① 뒤 | ③ 뒤 | 계약 정정 뒤 |
+| --- | --- | --- | --- | --- |
+| C-5 강등 / 잔존 | 0 / 18 | 0 / 18 | 0 / 28 | 0 / 28 |
+| C-7 통과 자리 | `license-006` 대조군 | 같음 | 같음 | **둘**(대조군 + 적격성) |
+| C-8 불일치 | 8 · 11 | 8 · 11 | 7 · 10 | 7 · 10 |
+| C-9 hits | 0 | 0 | 0 | 0 |
+
+**계약 정정은 authoritative 수를 바꾸지 않았다** — 잠그는 경로가 줄었을 뿐 어느 case 도
+내려가지 않았고, 1B 축 밖 18 은 base 집합과 여전히 같다(빠짐 0).
 
 **① 뒤 전건이 착수 시점과 같다는 것이 술어 확장의 무해성 증거다** — 어휘를 넓혔을 뿐 어느
 case 의 계약도 바뀌지 않았고, `not-equals` 의 의미는 한 글자도 건드리지 않았다.

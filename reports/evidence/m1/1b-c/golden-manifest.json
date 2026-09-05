@@ -5,7 +5,7 @@
   "lane": "①②③ — 술어 어휘 확장 · rate-unit 재추출 · money-basis 처분 (④ 소비 테스트는 별도 레인)",
   "generated_at": "2026-09-05",
   "base_sha": "a5ea955c44a935c3245288e6a72c830eeeee64b8",
-  "head_sha": "ed87da6988cabfb4a492ff4a6a5582483dc06aea",
+  "head_sha": "6ef8fb5",
   "contract_read_at": "shared-kernel/src/main/kotlin/bidvector/sharedkernel/{Money,Rate,Carrier,Provenance,Basis,MoneyArithmetic}.kt @ 977083b — 이 레인은 그 경로를 읽기만 했고 쓰지 않았다",
   "operator_decisions": [
     "decision 18 (2026-09-05) — 술어 어휘 동결 해제 (a) 셋 전부",
@@ -18,7 +18,7 @@
     "cases_examined": 11,
     "restored_to_authoritative": 10,
     "still_insufficient_evidence": 1,
-    "expected_files_modified": 9,
+    "expected_files_modified": 11,
     "input_files_modified": 3,
     "sha_mismatches": 0,
     "authoritative_total": 28,
@@ -29,24 +29,37 @@
     {
       "name": "is-present",
       "operand": "없음",
-      "catches": ["(a) 삭제", "(b) null 치환"],
-      "misses": ["(a′) 값 변이 — 설계상"],
-      "used_by": ["money-basis-006 $.reasonCode"],
-      "why": "이름이 계약 어휘 밖인 사유 코드의 존재만 잠근다"
+      "catches": [
+        "(a) 삭제",
+        "(b) null 치환"
+      ],
+      "misses": [
+        "(a′) 값 변이 — 설계상"
+      ],
+      "used_by": [],
+      "why": "2026-09-05 계약 정정 전에는 money-basis-006 의 $.reasonCode 가 썼으나 그 경로가 1D 로 이관돼 사용처가 0 이 됐다"
     },
     {
       "name": "differs-from-path",
       "operand": "같은 기대값 안의 경로 문자열",
-      "catches": ["(a) 삭제", "(b) null 치환", "(b′) 거울 경로 값 대입"],
+      "catches": [
+        "(a) 삭제",
+        "(b) null 치환",
+        "(b′) 거울 경로 값 대입"
+      ],
       "used_by": [],
-      "why": "정의만 세웠다 — 이 corpus 에 그 형태를 주장하는 자리가 아직 없다"
+      "why": "정의만 세웠다 — 이 corpus 에 그 형태를 주장하는 자리가 없다"
     },
     {
       "name": "differs-from-case",
       "operand": "거울 case id (자기 참조·미지 id 는 ManifestFormatError)",
-      "catches": ["(a) 삭제", "(b) null 치환", "(c′) 거울 case 값 대입"],
+      "catches": [
+        "(a) 삭제",
+        "(b) null 치환",
+        "(c′) 거울 case 값 대입"
+      ],
       "used_by": [],
-      "why": "정의만 세웠다 — decision 19 로 상태 토큰이 승인 어휘가 돼 쌍 주장을 정확 비교가 더 강하게 잠근다"
+      "why": "정의만 세웠다 — decision 19 로 상태 토큰이 승인 어휘가 돼 정확 비교가 더 강하게 잠근다"
     }
   ],
   "dispositions": [
@@ -55,50 +68,64 @@
       "action": "재추출",
       "classification": "authoritative",
       "contract_type_path": "Rate.Companion.ofPercent(BigDecimal)",
-      "verified_paths": ["$.fact", "$.rate.fraction", "$.conversionDivisor"],
+      "verified_paths": [
+        "$.rate.fraction"
+      ],
       "verified_projections": [],
-      "note": "verifies 를 「percent→fraction 명시 변환」으로 좁히고 원문 unit 보존 축을 OPEN-1BC-SOURCE-UNIT 로 이관"
+      "note": "verifies 를 「percent→fraction 명시 변환」으로 좁히고 원문 unit 보존 축을 OPEN-1BC-SOURCE-UNIT 로 이관 / 2026-09-05 정정: $.fact·$.conversionDivisor 는 나르기만 — Fact 로 감싸는 계약 함수가 없고 제수는 private const"
     },
     {
       "case": "rate-unit-002",
       "action": "재추출",
       "classification": "authoritative",
       "contract_type_path": "Rate.Companion.ofFraction(BigDecimal)",
-      "verified_paths": ["$.fact", "$.rate.fraction", "$.conversionDivisor"],
-      "verified_projections": []
+      "verified_paths": [
+        "$.rate.fraction"
+      ],
+      "verified_projections": [],
+      "note": "2026-09-05 정정: $.fact·$.conversionDivisor 는 나르기만 — ofFraction 에는 제수 자체가 없다"
     },
     {
       "case": "rate-unit-003",
-      "action": "재추출",
+      "action": "재정의 (2026-09-05 정정)",
       "classification": "authoritative",
-      "contract_type_path": "Rate 의 internal 생성자 + Fact.Absent(ReasonCode.UNIT_NOT_DECLARED)",
-      "verified_paths": ["$.fact", "$.reasonCode", "$.rate"],
+      "contract_type_path": "CompileFailureHarnessTest fixture 12 (negative-12-rate-undeclared-unit — 모듈 밖 Rate(BigDecimal) 생성자 호출 컴파일 실패, ④ 레인이 신설 중) + Rate 의 internal 생성자",
+      "verified_paths": [
+        "$.representable"
+      ],
       "verified_projections": [],
-      "note": "guessAttempted 제거 — 구성상 불가는 컴파일 fixture 와 ADR 0002 D-4 가 증명한다"
+      "note": "guessAttempted 제거 — 구성상 불가는 컴파일 fixture 와 ADR 0002 D-4 가 증명한다 / 2026-09-05 정정: 표현 불가로 재정의(2026-09-05 정정). UNIT_NOT_DECLARED 방출은 OPEN-1BC-SOURCE-UNIT(1C+ 어댑터)"
     },
     {
       "case": "rate-unit-004",
-      "action": "재추출",
+      "action": "재정의 (2026-09-05 정정)",
       "classification": "authoritative",
       "contract_type_path": "rate-unit-003 과 같다",
-      "verified_paths": ["$.fact", "$.reasonCode", "$.rate"],
+      "verified_paths": [
+        "$.representable"
+      ],
       "verified_projections": [],
-      "note": "003 과 기대값 내용이 같다 — 쌍 주장의 기계 표현이고 갈라지면 C-10 이 잡는다"
+      "note": "003 과 기대값 내용이 같다 — 쌍 주장의 기계 표현이고 갈라지면 C-10 이 잡는다 / 2026-09-05 정정: 003 과 기대값 동일 — 쌍 주장"
     },
     {
       "case": "rate-unit-005",
       "action": "재추출",
       "classification": "authoritative",
       "contract_type_path": "Rate.Companion.ofPercent(BigDecimal)",
-      "verified_paths": ["$.fact", "$.rate.fraction", "$.conversionDivisor"],
-      "verified_projections": []
+      "verified_paths": [
+        "$.rate.fraction"
+      ],
+      "verified_projections": [],
+      "note": "2026-09-05 정정: $.fact·$.conversionDivisor 는 나르기만"
     },
     {
       "case": "money-basis-001",
       "action": "재정의",
       "classification": "authoritative",
       "contract_type_path": "CompileFailureHarnessTest fixture 11 (negative-11-cross-basis-compare / positive-11-same-basis-compare) + Money · Basis",
-      "verified_paths": ["$.representable"],
+      "verified_paths": [
+        "$.representable"
+      ],
       "verified_projections": [],
       "note": "기대값이 {\"representable\": false} 하나. 입력 basis ESTIMATED_PRICE → ESTIMATED"
     },
@@ -107,7 +134,10 @@
       "action": "재추출",
       "classification": "authoritative",
       "contract_type_path": "compareKnownVat(BaseAmount, BaseAmount) + Basis.BASE_AMOUNT",
-      "verified_paths": ["$.fact", "$.comparedBases"],
+      "verified_paths": [
+        "$.fact",
+        "$.comparedBases"
+      ],
       "verified_projections": [],
       "note": "result·comparisonPerformed 제거. type_path 를 낡은 BaseAmount.compareTo 에서 정정"
     },
@@ -125,7 +155,9 @@
       "action": "재정의",
       "classification": "authoritative",
       "contract_type_path": "CompileFailureHarnessTest fixture 11 + Money (상위 타입에 이항 연산 없음)",
-      "verified_paths": ["$.representable"],
+      "verified_paths": [
+        "$.representable"
+      ],
       "verified_projections": [],
       "note": "001 과 기대값이 같다. min/max 를 이름으로 가진 함수가 1B 에 없다는 부재가 이 case 가 재는 것"
     },
@@ -134,7 +166,10 @@
       "action": "재추출 + 입력 정렬",
       "classification": "authoritative",
       "contract_type_path": "compareKnownVat(BaseAmount, BaseAmount) — 전건 sameKnownVat + Fact.Absent(ReasonCode.VAT_TREATMENT_MISMATCH)",
-      "verified_paths": ["$.fact", "$.reasonCode"],
+      "verified_paths": [
+        "$.fact",
+        "$.reasonCode"
+      ],
       "verified_projections": [],
       "note": "입력 둘째 금액 provenance Undeclared → Published. 계약이 provenance 를 VAT 보다 먼저 보므로 두 전건이 함께 깨진 입력에서는 이 case 의 사유가 나올 수 없었다"
     },
@@ -143,9 +178,12 @@
       "action": "계약만 신설 (기대값 무변경)",
       "classification": "authoritative",
       "contract_type_path": "VatTreatment.UNKNOWN · Provenance.Undeclared · Money 다섯 성분의 필수 파라미터",
-      "verified_paths": ["$.vatTreatment", "$.provenance", "$.autoTaggedFromDefinitionDefault", "$.eligibleForAuthoritativeCorpus"],
-      "verified_projections": ["$.reasonCode is-present"],
-      "note": "정확 비교가 앞선 not-equals+case-fold 보다 강하다 — 배제 목록이 아니라 미상 쪽 이름을 잠근다"
+      "verified_paths": [
+        "$.vatTreatment",
+        "$.provenance"
+      ],
+      "verified_projections": [],
+      "note": "정확 비교가 앞선 not-equals+case-fold 보다 강하다 — 배제 목록이 아니라 미상 쪽 이름을 잠근다 / 2026-09-05 정정: 적격성 셋은 나르기만 — OPEN-1BC-ELIGIBILITY(1D). B7 셋째 갈래가 다시 열렸다"
     }
   ],
   "open_items_created": [
@@ -153,5 +191,7 @@
     "OPEN-1BC-STR16 — 검색 경로의 basis 일치. 소유는 strategy slice"
   ],
   "usage_note": "money-basis-003 을 뺀 열은 이제 authoritative 다 — 「승인된 authoritative corpus 통과」의 모집단에 든다. 다만 그 통과를 실제로 실행하는 것은 ④ 소비 테스트이고 이 레인은 만들지 않았다.",
-  "handoff_to_runner": "각 case 의 verified_paths·verified_projections 가 runner 가 대조해야 하는 경로다. contract_binding.does_not_carry 를 단언하면 계약에 없는 이름을 테스트가 굳힌다. rate-unit 다섯과 money-basis-001·004 는 계약에 그 상태를 방출하는 함수가 없다 — 상세는 fixtures.md §4."
+  "handoff_to_runner": "각 case 의 verified_paths 가 runner 가 대조해야 하는 전부다 — 계약이 산출하지 않는 축은 이미 걷어냈으므로 runner 는 지어낼 것이 없다. money-basis-002·005 는 compareKnownVat 호출로, 나머지 authoritative 여덟 가운데 rate-unit-001·002·005 는 ofPercent/ofFraction 호출로, rate-unit-003·004 와 money-basis-001·004 는 컴파일 fixture 위임으로 대조한다. 상세는 fixtures.md §4.",
+  "contract_correction": "2026-09-05 팀장 판단(scope.md 「Phase 3 중 계약 정정」, 운영자 사후 확인 대상) — verified_paths 는 1B 계약이 실제로 산출하는 축만 잠근다. 계약이 내지 않는 값은 기대값에 남기되 나르기만 한다(운영자 결정 2026-08-31).",
+  "predicate_usage_note": "네 술어(not-equals 포함)의 사용처가 모두 0 이다. 계약이 산출하는 축은 이름이 승인돼 있어 정확 비교가 서고, 계약이 산출하지 않는 축은 애초에 잠글 대상이 아니다. 실행은 manifest_contract.self_check() 22 건이 C-5 안에서 계속 잰다."
 }

@@ -23,6 +23,10 @@
 | BLOCK-4 | basis 혼합이 컴파일 차단이라 거부 객체가 없다 | **재정의로 우회** — 기대값을 「표현 불가」로 다시 썼다(decision 21) |
 | BLOCK-5 | 검색 경로 타입이 계약에 없다 | **남았다** — `money-basis-003` 이월, `OPEN-1BC-STR16` 신설 |
 
+**같은 날 계약 정정이 한 번 더 있었다(§9).** ④ 실행자 설계가 「계약이 산출하지 않는 축은
+잠그지 않는다」를 요구해 `verified_paths` 를 좁혔다. **분류는 하나도 바뀌지 않았다** — 열이
+`authoritative` 그대로이고 잠그는 경로만 줄었다.
+
 **되돌림이 아니라 재추출이다.** 기대값 9 · 입력 3 파일이 실제로 바뀌었고 전부
 `previous_expected_sha256`/`previous_sha256` 을 해당 case 의 `change_history` 에 실었다.
 **기대값은 승인 문면에서만 나왔다** — 각 case 의 `expected_reasoning` 이 `v2-지침서.md` §4.1 ·
@@ -36,8 +40,9 @@
 | `0ab22a5` | ① 술어 어휘 셋 확장 — `schema.extensions` 정의 + `holds()` + 두 스윕의 갈래·가드 + self-check |
 | `fb8d4c6` | ② `rate-unit` 5 재추출 — 기대값 5, manifest 5 case, 스윕 `ASSERTED`/`NULL_ASSERTED` |
 | `ed87da6` | ③ `money-basis` 6 처분 — 기대값 4 · 입력 3, manifest 6 case, `uncovered_axes` 두 축 |
+| `6ef8fb5` | **계약 정정** — `verified_paths` 를 1B 계약이 산출하는 축으로 좁힘(§9) |
 
-base `a5ea955` · head `ed87da6`. **하네스 레인 변경 없음** —
+base `a5ea955` · head `6ef8fb5`. **하네스 레인 변경 없음** —
 `git log --oneline a5ea955..HEAD -- CLAUDE.md .claude/` 이 빈 목록이고, 그 명령이 잡지 못하는
 하네스 편집(`agent-workflow.md`·`milestone-*.md` 의 승격 절 밖)도 이 레인은 하지 않았다.
 
@@ -49,7 +54,7 @@ base `a5ea955` · head `ed87da6`. **하네스 레인 변경 없음** —
 | --- | --- |
 | C-5 | exit 0 · 강등 0 · 잔존 authoritative **18 → 28** · 술어 self-check 22 통과 |
 | C-6 | exit 0 · reader ↔ PyYAML 63 case 일치 |
-| C-7 | exit 0 · 통과는 `license-006` 대조군뿐 · B7·B8 세탁 변이체가 전부 caught 로 전환 |
+| C-7 | exit 0 · 통과 **둘** — `license-006` 대조군 + `money-basis-006` 적격성 단독 뒤집기(§9 의 대가) |
 | C-8 | exit 0 · 불일치 8·11 → **7·10**(낡은 덮개 하나 소멸, 새 불일치 0) |
 | C-9 | exit 0 · legacy-number hits 0 |
 | C-10 | 63 case 126 해시 대조 · 불일치 0 |
@@ -61,27 +66,38 @@ base `a5ea955` · head `ed87da6`. **하네스 레인 변경 없음** —
 실패(RED)** 를 확인한 뒤 구현했고, 구현 뒤 22 건 통과(GREEN)했다. 새 acceptance 명령을
 늘리지 않으려고 그 검사를 C-5 안에 넣었다.
 
-## 4. ④ 레인 인계 — projection 이 내야 하는 필드
+## 4. ④ 레인 인계 — case 별 최종 `verified_paths`
 
-`fixtures/manifest.yaml` 각 case 의 `verified_paths`·`verified_projections` 가 정본이고
-`golden-manifest.json` 의 `dispositions` 가 그 표다. **`does_not_carry` 를 단언하면 계약에
-없는 이름을 테스트가 굳힌다.**
+**이 표가 runner 의 기대다.** 계약이 산출하지 않는 축은 §9 정정으로 이미 걷어냈으므로
+**runner 가 지어낼 것이 없다.** 정본은 `fixtures/manifest.yaml` 각 case 이고
+`golden-manifest.json` 의 `dispositions` 가 같은 표를 기계가 읽는 형태로 갖는다.
 
-**대조 전에 읽어야 할 세 가지.**
+| case | 분류 | `verified_paths` | runner 가 부르는 것 |
+| --- | --- | --- | --- |
+| `rate-unit-001` | authoritative | `$.rate.fraction` | `Rate.ofPercent(87.5)` → projection `{fraction}` |
+| `rate-unit-002` | authoritative | `$.rate.fraction` | `Rate.ofFraction(0.875)` → 같음 |
+| `rate-unit-003` | authoritative | `$.representable` | **컴파일 fixture 12 위임** |
+| `rate-unit-004` | authoritative | `$.representable` | **컴파일 fixture 12 위임** |
+| `rate-unit-005` | authoritative | `$.rate.fraction` | `Rate.ofPercent(0.875)` → 같음 |
+| `money-basis-001` | authoritative | `$.representable` | **컴파일 fixture 11 위임** |
+| `money-basis-002` | authoritative | `$.fact` · `$.comparedBases` | `compareKnownVat(BaseAmount, BaseAmount)` → `Fact.Known` |
+| `money-basis-003` | insufficient-evidence | 없음 | 대상 아님(이월) |
+| `money-basis-004` | authoritative | `$.representable` | **컴파일 fixture 11 위임** |
+| `money-basis-005` | authoritative | `$.fact` · `$.reasonCode` | `compareKnownVat(...)` → `Fact.Absent(VAT_TREATMENT_MISMATCH)` |
+| `money-basis-006` | authoritative | `$.vatTreatment` · `$.provenance` | 입력 다섯 성분으로 `BaseAmount` 구성 → projection |
 
-1. **`rate-unit` 다섯은 계약에 그 상태를 방출하는 함수가 없다.** `Rate.ofPercent`·`ofFraction`
-   은 `Rate` 를 직접 내고 `Fact` 로 감싸지 않으며, 미선언 입력을 받는 공개 경로는 아예 없다.
-   `$.fact` 가 잠그는 것은 **상태 축에 계약이 채택한 어휘**이고 그 상태를 실제로 방출하는
-   자리는 어댑터(1C 이후)다. runner 의 testFixtures projection 이 그 자리를 표현해야 하며
-   **계약에 없는 함수를 지어내면 안 된다.**
-2. **`money-basis-001`·`004` 는 실행 산출과 대조할 수 없다.** 대조 대상이 컴파일 실패이고,
-   실행자는 이미 있는 `CompileFailureHarnessTest` fixture 11 이다. runner 는 그 판정을 받아야
-   한다 — 기대값 `{"representable": false}` 는 그 사실의 표기이지 실행 산출이 아니다.
-3. **`money-basis-006` 의 `$.eligibleForAuthoritativeCorpus` 는 계약 산출이 아니다.** corpus
-   운영 규칙의 판정이라 값 타입이 내지 않는다 — 잠그되 runner 가 계약 산출과 대조하지 않는다.
+**`verified_projections` 는 열하나 어디에도 없다** — §9 정정으로 마지막 하나가 걷혔다.
+runner 는 정확 비교만 구현하면 되고, 술어 넷의 실행은 Python 쪽 self-check 가 계속 잰다.
 
-바로 대조 가능한 자리는 **`money-basis-002`·`005`** 둘이다 — `compareKnownVat(BaseAmount,
-BaseAmount)` 가 `Fact.Known` / `Fact.Absent(VAT_TREATMENT_MISMATCH)` 를 실제로 낸다.
+**기대값에 남아 있으나 대조하지 않는 필드**(나르기만): `rate-unit-001`·`002`·`005` 의
+`$.fact`·`$.conversionDivisor`·`$.rate.axis` · `money-basis-002` 의 없음 ·
+`money-basis-006` 의 `$.autoTaggedFromDefinitionDefault`·`$.eligibleForAuthoritativeCorpus`·
+`$.reasonCode`. **이것들을 단언하면 계약에 없는 값을 테스트가 굳힌다** —
+`contract_binding.does_not_carry` 가 case 마다 그 목록을 갖는다.
+
+**컴파일 fixture 위임 넷은 실행 산출과 대조하지 않는다.** `$.representable: false` 는 「그
+조합은 표현 불가」의 표기이고, 그것을 증명하는 것은 `CompileFailureHarnessTest` 다 —
+fixture 11(basis 교차)은 이미 있고 **fixture 12(단위 미선언 `Rate` 생성)는 ④ 레인이 신설한다.**
 
 ## 5. 개인정보
 
@@ -91,7 +107,7 @@ BaseAmount)` 가 `Fact.Known` / `Fact.Absent(VAT_TREATMENT_MISMATCH)` 를 실제
 `ESTIMATED`·`Published` 두 계약 이름이다). **운영 DB·API·로그를 열지 않았고 masking 전 값을
 이 문서에 남기지 않았다.** secret 스캔은 §7 에 있다.
 
-## 6. 판단이 갈린 자리 (셋)
+## 6. 판단이 갈린 자리 (넷)
 
 기록만 하고 되돌리지 않았다 — 셋 다 승인 문면과 계약 위에서 고른 것이고 근거를 해당 case 의
 `change_history` 가 갖는다.
@@ -112,7 +128,12 @@ BaseAmount)` 가 `Fact.Known` / `Fact.Absent(VAT_TREATMENT_MISMATCH)` 를 실제
    「그 값을 잠글 자격이 있는 경로」를 전제하는데 `LegacyOriginNotPromotable` 은 `ReasonCode`
    enum 밖이라 정확 비교가 **금지된** 자리다. 존재 주장은 `is-present` 가 (a)(b)로 **더 넓게**
    지므로 적대 집합이 줄지 않는다. **값을 잠글 자격이 있는 경로를 빼는 것은 다른 일이고**
-   위협 모델 (3)이 막는 우회다 — 그것은 하지 않았다.
+   위협 모델 (3)이 막는 우회다 — 그것은 하지 않았다. **§9 정정이 이 자리를 한 걸음 더 밀었다** —
+   그 경로가 1D 로 이관되면서 `is-present` 째로 걷혔다.
+4. **§9 정정에서 `$.conversionDivisor` 를 001·005 에서도 뺐다.** 팀장 지시는 002 만 이름으로
+   들었으나(`ofFraction` 에 제수가 없으므로), `ofPercent` 의 제수 `100` 도 `Rate.kt` 의
+   **`private const`** 라 반환값에 실리지 않는다 — 같은 규칙이 같은 결론을 낸다. 셋을 다르게
+   두면 runner 가 001·005 에서만 제수를 지어내야 한다.
 
 ## 7. 알려진 제한
 
@@ -123,12 +144,17 @@ BaseAmount)` 가 `Fact.Known` / `Fact.Absent(VAT_TREATMENT_MISMATCH)` 를 실제
 3. **`rate-unit` 의 원문 unit 보존 축에 지금 fixture 가 없다.** 기대값에서 뺐고 새 case 는
    어댑터 계약이 선 뒤에 만든다(`OPEN-1BC-SOURCE-UNIT`) — 기존 case 에 주장을 되돌려 붙이지
    않는다.
-4. **`equals-path` 는 여전히 어휘에 없다.** decision 18 이 푼 셋에 **동등** 술어가 없어
+4. **네 술어의 사용처가 0 이다**(§9). 계약이 산출하는 축은 이름이 승인돼 있어 정확 비교가 서고,
+   산출하지 않는 축은 잠글 대상이 아니다. 그 사이(산출하되 이름이 미승인)에 술어가 설 자리가
+   있으나 이 corpus 에는 없다. 정의는 유지하고 self-check 22 건이 실행을 계속 잰다.
+5. **B7 셋째 갈래가 다시 열렸다**(§9). 적격성 불리언 단독 변이가 계약에 걸리지 않는다 —
+   `OPEN-1BC-ELIGIBILITY` 가 닫힐 때까지다. 과세·provenance 세탁이라는 B7 의 실질은 잡힌다.
+6. **`equals-path` 는 여전히 어휘에 없다.** decision 18 이 푼 셋에 **동등** 술어가 없어
    `uncovered_axes` 의 ②는 그대로 살아 있다.
-5. **`not-equals` 의 null 구멍을 고치지 않았다.** 동결분의 의미를 바꾸면 그 술어를 단 case 의
+7. **`not-equals` 의 null 구멍을 고치지 않았다.** 동결분의 의미를 바꾸면 그 술어를 단 case 의
    계약이 소급해 달라지므로 새 술어 셋에만 존재·비-null 전건을 세웠다. 현재 `not-equals`
    사용처는 0 이다.
-6. **secret 스캔** `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+8. **secret 스캔** `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
    reports/evidence/m1/1b-c/` — 매치 **4**. 셋은 이 파일의 스캔 명령 문자열 자신이고 하나는
    `scope.md` 의 `minimumTokenCount`(CPD 설정값, `Token` 이 부분 문자열로 걸린다). **실제
    secret 0.**
@@ -158,6 +184,30 @@ git rm -f reports/evidence/m1/1b-c/fixtures.md reports/evidence/m1/1b-c/golden-m
 **base 에 없는 신규 경로는 evidence 셋뿐이라 `git rm` 이 그 셋을 받는다** — `fixtures/` 아래
 16 경로는 전부 base 에 있으므로 `git restore` 로 되돌아간다.
 
-**임시 clone 실측 결과는 §3 의 표 아래에 두지 않고 여기 둔다** — 위 두 명령을 임시 clone 에서
-실제로 돌렸다: 둘 다 exit 0 · `M` 16 · `D` 3 · `git diff a5ea955 -- fixtures/` 0 행 ·
+**임시 clone 실측** — 위 두 명령을 임시 clone 에서 실제로 돌렸고 계약 정정(`6ef8fb5`) 뒤에
+다시 돌렸다: 두 번 다 exit 0 · `M` 16 · `D` 3 · `git diff a5ea955 -- fixtures/` 0 행 ·
 `scope.md` 와 ④ 레인 경로 무변경.
+
+## 9. 계약 정정 (2026-09-05, `6ef8fb5`)
+
+**규칙**: `verified_paths` 의 정의가 *"M1 소비 테스트는 이 경로만 정확 비교해야 한다"* 이므로,
+**runner 가 계약 함수를 불러 만들어 낼 수 없는 경로는 그 목록에 설 수 없다.** 뺀 값은 기대값에
+남겨 나르기만 한다 — 「어휘를 나르기만 하는 것은 이 층을 막지 않는다」(운영자 결정 2026-08-31).
+근거와 승인 상태는 `scope.md` 「Phase 3 중 계약 정정」이 갖는다(팀장 판단, 운영자 사후 확인 대상).
+
+| case | 정정 | 계약 쪽 사실 |
+| --- | --- | --- |
+| `rate-unit-003`·`004` | 기대값을 `{"representable": false}` 로 재정의, `verifies` 를 「구성상 만들 수 없다」로 | `Fact.Absent(UNIT_NOT_DECLARED)` 를 내는 main 코드가 저장소에 없다 — 어휘만 `Carrier.kt` 에 선언돼 있다 |
+| `rate-unit-001`·`002`·`005` | `verified_paths` → `$.rate.fraction` 하나 | `ofPercent`/`ofFraction` 은 `Rate` 를 직접 내고, 제수는 `private const` 라 반환값에 없다 |
+| `money-basis-006` | `verified_paths` → `$.vatTreatment`·`$.provenance`, `is-present` 걷음 | 적격성 판정은 provenance first-match rule 위에 서고 그 rule 은 1D 소유다 |
+
+**이관된 축 둘.** `OPEN-1BC-SOURCE-UNIT` 을 넓혀 **미선언 거부의 방출**(어떤 사유로 거부되는가)을
+원문 unit 보존과 함께 받게 했고, `OPEN-1BC-ELIGIBILITY`(소유 1D)를 신설해 적격성 셋을 받게 했다.
+
+**대가 하나를 감추지 않는다.** 적격성 축이 빠지면서 **Codex B7 의 셋째 갈래**(적격성 불리언만
+뒤집는 변이)가 다시 열렸다. `mutation_sweep_targeted.py` 의 그 표적을 **지우지 않고 남겨** 매
+실행 `PASSES` 로 보이게 했고, C-7 · 해당 case 의 `not_covered` · `OPEN-1BC-ELIGIBILITY` 셋이 그
+사실을 적는다. 닫히는 시점은 1D 가 그 판정을 계약으로 세울 때다.
+
+**분류는 하나도 바뀌지 않았다** — C-5 강등 0, 잔존 authoritative 28, 1B 축 밖 18 이 base 집합과
+같다(빠짐 0).
