@@ -270,16 +270,17 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   CPD 배선, `OPEN-1BC-TESTFIXTURES-GATE`(1차 게이트의 testFixtures 버킷 사각)와 같은 자리.
 - **배선 완료(M1/1A-b, 2026-09-05)**: `sizeGate` 셋째 축 `limit.type.members=30`(PSI 소스 기준,
   대상 source set 은 `limit.type.members.source-sets=main` — 테스트 클래스는 case 수만큼 커지므로
-  이 축의 근거인 §1.3 합성 팽창의 대상이 아니다, 1A-b D-6) + `ratchet.type.inheritance-depth.max=2`·
-  `ratchet.type.interfaces.max=1`(바이트코드, `qualityBaseline`과 같은 계수 함수). 정본은
+  이 축의 근거인 §1.3 합성 팽창의 대상이 아니다, 1A-b D-6) + `ratchet.type.inheritance-depth.max=0`(아래
+  D-7 정의)·`ratchet.type.interfaces.max=1`(바이트코드, `qualityBaseline`과 같은 계수 함수). 정본은
   `config/quality/size-policy.properties`, evidence는 `reports/evidence/m1/1a-b/`. **실측 주의**: PSI
-  멤버 계수의 현 최대는 도메인 6·저장소 전체 21이라 상한 30은 느슨하다 — 값 재조정은 운영자 몫.
+  멤버 계수의 현 최대는 도메인 8·저장소 전체 21(main 기준)이라 상한 30은 느슨하다 — 값 재조정은 운영자 몫.
 - **상속 깊이 정의 정제(1A-b D-7, 2026-09-05)**: 위 「깊이 2」는 `java.lang.Object`까지 포함한 체인 길이였다.
   build-logic 을 같은 래칫에 넣자 Gradle `DefaultTask` 확장만으로 깊이 3이 되어 — 프레임워크가 강제하는
   기저 깊이는 우리가 늘리지도 줄이지도 못한다 — **깊이 = 프로젝트가 소유한 타입 안에서의 상위 클래스
-  체인 길이**로 정의를 정제했다. **「소유」의 판정은 루트 패키지 접두(`bidvector.`, ADR 0006 D-3)다** —
-  모듈 단위 스캔 집합이 아니다(1A-b verifier r2 H-1: 스캔 집합으로 판정하면 shared-kernel 의 클래스를
-  workflow 가 확장하는 모듈 간 소유 상속이 미탐이 된다). 그 밖의 상위 타입(`java.*`·`org.gradle.*`·Spring 등)에서
+  체인 길이**로 정의를 정제했다. **「소유」의 판정은 「이번 스캔 집합에 있다 ∨ 루트 패키지 접두
+  (`bidvector.`, ADR 0006 D-3) 아래다」의 논리합**이다 — 스캔 집합만으로 판정하면 shared-kernel 의 클래스를
+  workflow 가 확장하는 모듈 간 소유 상속이 미탐이 되고(1A-b verifier r2 H-1), 접두만으로 판정하면 루트
+  패키지 밖 이름의 소유 클래스(build-logic 의 precompiled script 클래스)가 빠진다. 방향은 「더 넓게 잡는다」다. 그 밖의 상위 타입(`java.*`·`org.gradle.*`·Spring 등)에서
   계수가 끝난다. 새 정의의 실측 최댓값은 **모든 모듈 0**
   (도메인 계층이 sealed *인터페이스* 구현이라 클래스 체인이 없다 — 인터페이스는 인터페이스 수 축이 잰다),
   인터페이스 수는 shared-kernel·build-logic 1. `ratchet.type.inheritance-depth.max=0`·`ratchet.type.interfaces.max=1`.
