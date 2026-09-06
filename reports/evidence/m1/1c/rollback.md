@@ -4,7 +4,7 @@
 신규 경로 삭제. **range revert 금지** — in_scope 경로에만 적용한다.
 
 base_sha: `4a6ca5c4ee5bb666fe786fbe395c5c00be775e75`
-head_sha(이 문서 정본 시점): `50ca8e1`(+ 이 문서를 포함한 evidence 커밋 예정)
+head_sha(이 문서 정본 시점): `bb85177`(verifier r1 수정 라운드 완료 뒤)
 
 ## 변경 파일 전건 (`git diff --name-status <base>..HEAD`, in_scope 경로만)
 
@@ -19,6 +19,7 @@ M  docs/discovery/capability-map.md
 M  docs/discovery/data-dictionary.md
 M  qualification/build.gradle.kts
 A  qualification/src/main/kotlin/bidvector/qualification/LicenseEligibility.kt
+A  qualification/src/main/kotlin/bidvector/qualification/LicenseGroupFolding.kt
 A  qualification/src/main/kotlin/bidvector/qualification/LicenseInputs.kt
 A  qualification/src/main/kotlin/bidvector/qualification/LicensePolicy.kt
 A  qualification/src/main/kotlin/bidvector/qualification/LicenseVerdict.kt
@@ -29,6 +30,9 @@ A  reports/evidence/m1/1c/commands.md
 A  reports/evidence/m1/1c/rollback.md
 A  reports/evidence/m1/1c/scope.md
 ```
+
+`LicenseGroupFolding.kt` 는 verifier r1 수정 라운드 중 detekt `TooManyFunctions` 회피로
+`LicenseEligibility.kt` 에서 갈라낸 신규 파일이다(그룹 폴딩 관심사, commit `1c6ee2e`).
 
 `config/quality/api-type-policy.properties`·`architecture-policy.properties`·
 `fixtures/manifest.yaml`·`milestone-1.md` 는 scope.md 가 조건부로 열어 두었으나 **무접촉**
@@ -52,6 +56,7 @@ git restore --source="$BASE" --staged --worktree -- \
 
 git rm -f \
   qualification/src/main/kotlin/bidvector/qualification/LicenseEligibility.kt \
+  qualification/src/main/kotlin/bidvector/qualification/LicenseGroupFolding.kt \
   qualification/src/main/kotlin/bidvector/qualification/LicenseInputs.kt \
   qualification/src/main/kotlin/bidvector/qualification/LicensePolicy.kt \
   qualification/src/main/kotlin/bidvector/qualification/LicenseVerdict.kt \
@@ -68,8 +73,8 @@ git rm -f \
 
 ## 임시 clone 실측
 
-`git clone --no-hardlinks` 로 별도 디렉터리에 이 저장소를 복제하고 위 두 명령을
-그대로 실행 — `git restore`·`git rm` 둘 다 exit 0, 이후 `git status --short` 가
+`git clone --no-hardlinks` 로 별도 디렉터리에 이 저장소를 복제하고(head `bb85177`) 위 두
+명령을 그대로 실행 — `git restore`·`git rm` 둘 다 exit 0, 이후 `git status --short` 가
 `config/quality/gate-tests.properties`·`docs/discovery/capability-map.md`·
 `docs/discovery/data-dictionary.md`·`app/build.gradle.kts`·`qualification/build.gradle.kts`
 5개 `M`(base 로 복원된 diff)과 나머지 삭제 항목의 `D` 만 보임을 확인했다(clone 은
