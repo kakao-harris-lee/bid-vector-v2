@@ -18,6 +18,7 @@ in_scope:
   - app/build.gradle.kts                       # 조건부 — testImplementation(project(":strategy")) 한 줄
   - fixtures/manifest.yaml                     # 조건부 — D-2 승인 시 money-basis-003 의 contract_binding·승격, D-3 승인 시 strategy 축 case 신설(fixture-curator 소관, 기존 기대값 무변경)
   - fixtures/input/**, fixtures/expected/**    # 조건부 — D-3 승인 시 **신설 case 파일만**(authored-from-approved-spec). 기존 파일 무접촉
+  - fixtures/tools/mutation_sweep_adversarial.py   # 신설·승격 case 12 의 ASSERTED·NULL_ASSERTED 행 + ADVERSARIAL_VALUE 에 1E 결과 토큰 — 변이체 0 이 공허 통과가 되지 않게(1D 선례, curator 발견 2026-09-06 추가)
   - docs/discovery/capability-map.md           # 계약 갱신 — §14.2·§14.3 의 `OPEN-1BC-STR16`·`OPEN-STR-*` 행과 STR-16 신설 승인 기록만
   - docs/discovery/data-dictionary.md          # 계약 갱신 — 운영자 결정이 실제로 난 행만(D-4 (a) 시 §2.2 에 전략 어휘 자리 한 절)
   - milestone-1.md                             # 계약 갱신 — 「Slice 1E」 항목만, **착수 시**
