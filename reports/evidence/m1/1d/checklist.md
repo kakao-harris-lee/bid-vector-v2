@@ -4,7 +4,7 @@
 (`evidence-pack` 규격). 종결 = **verifier ready-for-review + 사용자 승인**(Codex 없음,
 CLAUDE.md 운영자 지시 2026-09-04).
 
-## 구현 순서(커밋 4개, TDD RED→GREEN)
+## 구현 순서(커밋 4개, TDD RED→GREEN + 후속 1개)
 
 1. `95585b5` — shared-kernel 좁은 확장(D-1(a)+D-9): `Rate.fraction` 공개 읽기 +
    `Comparable<Rate>`, `BidRate.recommended`·`AssessmentRate.observed` factory,
@@ -14,6 +14,10 @@ CLAUDE.md 운영자 지시 2026-09-04).
 3. `ccc1f1b` — corpus runner 확장(`ProvenanceFloorExecutors.kt` 신규, `TARGET_DOMAINS`
    +3축). authoritative 7 case 전건 대조.
 4. `bc15983` — `gate-tests.properties` 에 `gate.tests.decision` 등재.
+5. `af25a38`(후속, curator `32b1b39`·`cec7732` 뒤) — `floor-threshold-002` dispatch
+   등재(P-5 복구) + `floorThresholdExecutor`가 입력 `policy` 블록을 실제로 읽도록
+   수정(아래 「판단이 갈린 지점」) + 스윕 `ASSERTED` 표 한 행. authoritative 8 case
+   전건 대조로 갱신.
 
 ## D-1(a)/D-9 셋+하나 이행 대조
 
@@ -42,7 +46,7 @@ scope.md 운영자 결정: "in_scope 의 shared-kernel 세 경로가 열린다"(
 | (e) 최소 표본·경계 비교·밴드가 리터럴 | `domainSourceReferenceGate` 는 못 잡는다(1C F-3 과 같은 한계) — 정책 파일 키 부재 → 구성 실패로 대신, main 소스 리터럴 스캔은 코드 리뷰 | 육안 확인(아래 「main 리터럴 부재 확인」) |
 | (f) 밴드 밖 표본이 분모에 잔류 | `ShortfallTally.qualifiedDenominator = rawCount - outsideBand`(계산 프로퍼티, 별도 생성자 인자 아님) | 변이 3 |
 | (g) 규칙 무매치가 `Clean` 으로 접힘 | `classificationFor(null) = Unknown`, `Clean` 은 `CleanInteger` 매치 경로로만 | 변이 5 |
-| (경계 등가) DEC-04 무조건 acceptance | `ShortfallComparison.StrictlyGreater`(decision 28) — 정확히 경계값인 표본은 미달 아님 | 변이 4(단위 test 단독 방어 — 알려진 제한 ② 참고) |
+| (경계 등가) DEC-04 무조건 acceptance | `ShortfallComparison.StrictlyGreater`(decision 28) — 정확히 경계값인 표본은 미달 아님 | 변이 4 — 최초 단위 test 단독 방어, 후속(`af25a38`, ft-002 배선) 재실측으로 corpus(`floor-threshold-002`)도 함께 캐치 확인(알려진 제한 ② 갱신) |
 
 ## main 리터럴 부재 확인
 
@@ -76,15 +80,16 @@ scope.md 운영자 결정: "in_scope 의 shared-kernel 세 경로가 열린다"(
    필드·타입 이름에 `probab` 없음)에만 의존한다. 1C 도 같은 한계(우회 (5), `typeShapeGate`
    가 문자열 내용을 못 본다)를 알려진 제한으로 등재했다 — 이름 스캔 gate 신설은 이
    slice `out_of_scope`(게이트 정의 편집은 하네스 저자 소관).
-2. **경계 등가 방어(변이 4)는 corpus 가 아니라 단위 test 단독 책임이다** — authoritative
-   `floor-threshold-001`·`003` 의 realized 값(1.0499·1.0501)이 critical(1.05)과 정확히
-   같지 않아 그 fixture 쌍은 경계 등가 자체를 겨누지 않는다. `FloorShortfallKernelTest.④`
-   가 유일한 방어선 — fixture 승격(정확히 critical 과 같은 realized 표본)은 fixture-curator
-   소관, 이 slice `out_of_scope`.
-3. **`floor-threshold-002`(경계 등가 case)는 여전히 insufficient-evidence** — D-3(decision
-   28)이 `shortfallComparison` 초기값을 정책으로 승인했지만, `002` 를 authoritative 로
-   되돌리는 재추출(fixture 입력에 policy version 을 싣는 작업)은 fixture-curator 소관이라
-   이 slice 가 수행하지 않았다. 8번째 authoritative case 후보로 남는다.
+2. **[해소 — 후속 커밋 `af25a38`] 경계 등가 방어는 이제 corpus 도 진다.** `floor-threshold-001`·
+   `003`의 realized 값(1.0499·1.0501)은 critical(1.05)과 정확히 같지 않아 그 쌍은 경계
+   등가 자체를 겨누지 않는다는 것은 여전히 사실이나, curator 가 승격한
+   `floor-threshold-002`(realized=critical=1.05)가 그 자리를 authoritative corpus 로
+   채웠다 — `mutation_sweep_adversarial.py`의 `$.sampleIsShortfall` 값 변이가 캐치됨을
+   실측(변이 44→47). `FloorShortfallKernelTest.④`는 여전히 두 번째 방어선(다른 축의
+   critical 값)이다.
+3. **[해소 — 후속 커밋 `af25a38`] `floor-threshold-002`는 authoritative 8번째 case로
+   등재됐다**(curator `32b1b39`) — dispatch 표에 등재하고, runner가 그 입력의
+   `policy.shortfallComparison`을 실제로 읽도록 고쳤다(아래 「판단이 갈린 지점」).
 4. **어휘 ⑥(`AmountNotRepresentable`)은 미채택** — `base-amount-provenance-004`·`005`
    가 강등 상태라 계약에 걸리지 않는다. `ReasonCode` 에 여섯째 값을 더하지 않았다(scout
    §5.2 ⑥ 그대로).
@@ -106,16 +111,35 @@ scope.md 운영자 결정: "in_scope 의 shared-kernel 세 경로가 열린다"(
    아니라 세션 모델이 착수 전(base_sha 이후 8커밋)에 이미 완료했다** — CLAUDE.md 「기획
    문서 레인」 규율 그대로(1C 알려진 제한 ⑥과 같은 경계).
 
+## 판단이 갈린 지점 — 후속 커밋 `af25a38`
+
+**001·003(정책 블록 없는 입력)의 판정을 어떻게 낼 것인가** — 팀장 지시가 준 선택지:
+(a) 두 정책값(`StrictlyGreater`·`GreaterOrEqual`) 모두로 판정해 같음을 단언하고 그
+공유값을 낸다(입력 무변경) / (b) curator 에게 001·003 도 `policy` 를 싣도록 요청한다.
+**(a) 채택**(팀장 추천과 일치) — 이유: 001·003 의 `verifies` 는 방향(미달/적격)만
+주장하고 경계 자체를 주장하지 않으므로, 그 case 들이 어느 비교값에도 무관하게 같은
+결과를 내야 한다는 사실 자체가 검증할 가치가 있는 불변식이다(`shortfallWithoutPolicy`
+의 `check()`가 그 불변식을 실행마다 재확인한다 — 어느 한쪽만 부르는 것보다 강하다).
+(b)는 입력을 늘려야 하고 001·003 의 `verifies` 문면과도 맞지 않는다(그 case 들은
+정책 자체를 주장 대상으로 삼지 않는다).
+
+**manifest 갱신 필요 — curator 인계**: `floor-threshold-002`의 `contract_binding.
+does_not_carry` ⑦(*"현재 `floorThresholdExecutor`는 `ShortfallComparison.
+StrictlyGreater`를 호출부에서 직접 주고 입력의 `policy` 블록을 읽지 않는다"*, 커밋
+`cec7732`)은 이 후속 커밋으로 **낡았다** — runner 가 이제 그 블록을 읽는다. `does_not_carry`
+문구 갱신은 fixture-curator 소관이라 이 슬라이스가 manifest 를 직접 고치지 않는다.
+
 ## acceptance 전건 (`commands.md` 상세)
 
-P-0(격리 worktree `clean check`)·P-1(`--no-build-cache clean check`)·P-2
-(`:decision:test`)·P-3(`:shared-kernel:test`)·P-4(도메인 게이트 다섯)·P-5
-(`:app:test --tests '*Conformance*'`)·P-6(`qualityBaseline`)·P-8(`:build-logic:test`)
-전부 exit 0. P-7(스윕)은 `fixtures/manifest.yaml` 무편집이라 생략(scope.md 조건).
+P-0(격리 worktree `clean check`)·P-1(`--no-build-cache clean check`, **2회** 재검증)·
+P-2(`:decision:test`)·P-3(`:shared-kernel:test`)·P-4(도메인 게이트 다섯)·P-5
+(`:app:test --tests '*Conformance*'`, authoritative **8** case)·P-6(`qualityBaseline`)·
+P-7(스윕, curator 의 manifest 편집으로 조건 성립 — `mutation_sweep_adversarial.py`
+exit 0, 변이 44→47)·P-8(`:build-logic:test`) 전부 exit 0.
 
 ## 완료 판정 — 1D 축
 
-`milestone-1.md` 「완료 조건」 대조: **authoritative 7 case 전건이 `check` 안에서 실행·
+`milestone-1.md` 「완료 조건」 대조: **authoritative 8 case 전건이 `check` 안에서 실행·
 대조된다**(`gate.tests.app`·`gate.tests.decision` 등재, `gateExecutionGate` 강제).
 `Unmeasurable`이 값·0·`Measured`로 접히는 공개 경로가 없다(내부 생성자 + 위협 모델 (a)
 변이 실측). rule order 는 정책 데이터로만 온다(위협 모델 (c) 변이 실측). 판정: **1D 축은
