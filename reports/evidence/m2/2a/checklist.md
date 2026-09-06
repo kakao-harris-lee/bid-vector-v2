@@ -84,6 +84,14 @@ Phase 2.5 설계 검토(prep 리뷰 r4)가 `external=<개수>` 형식일 가능�
 `^bidvector:ml-contract` 앵커가 정확히 그 줄에 매치한다(commands.md S-1b). scope.md의
 acceptance 명령 문면을 정정할 필요가 없었다.
 
+## 사용자 승인 — 2026-09-07, slice 2A 종결
+
+verifier r1 `ready-for-review`(head `a78959f`, 잔여 일괄 `d3708f2`·`cbfb180`, 세션 모델 OPEN 등재 `ddd82fb`) 위에서
+**사용자 승인 2026-09-07**. 재작업 0/5. 게이트 술어 정정(`ResolvedDependencies` 한 분기)은 변이 7 표적 재검증으로 미탐 없음.
+알려진 제한(결과 봉투 oneof 는 2B·2C 소유 · 끝머리 미지 필드는 2D · Python 툴체인은 Gradle check 밖 · `ml-contract` 무소스
+단언이 유일 방어)은 등재 유지. verifier 레인의 보고서 파일은 그 레인의 hook 이 막아 오케스트레이터가 메시지를
+`_workspace/m2-2a/02_verifier_report.md` 로 옮겨 적었다. 다음 slice 2B 착수 지시 같은 날(D-2B-1~4 전부 추천안).
+
 ## 커밋 목록
 
 **Phase 3 최초 구현**(base `040ab9d`) — 2A 자신의 커밋 7개(순서대로): `15ee75d`(contracts/) ·

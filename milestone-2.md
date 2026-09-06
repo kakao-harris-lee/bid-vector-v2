@@ -53,6 +53,15 @@ composite 치환 의존 분류 정정 한 분기뿐이다(D-2A-0 (c)). 생성 Ja
 
 업무 최종 verdict, operator 권한, DB id 조회, notification 여부는 메시지에 넣지 않는다.
 
+**2A 종결·2B 착수 2026-09-07** — 2A 는 verifier ready-for-review + 사용자 승인으로 닫혔다(`reports/evidence/m2/2a/checklist.md`
+「사용자 승인」). 2B 계약 정본 `reports/evidence/m2/2b/scope.md`. 착수 전 운영자 결정 넷(전부 추천안): **D-2B-1 (a)** wire 는 변환된
+피처 벡터가 아니라 **원 fact**(`FeatureInputs`) — 변환은 ml-engine `features/` 가 training·serving 공용으로 하고 피처 이름·순서
+계약은 ml-engine 안(5B)에 남는다(§3.2 training-serving skew 방지) · **D-2B-2 (a)** 응답은 **율만** — 원 단위 투찰가는 Kotlin 이
+1B 산술(`RoundingPolicy`)로 만든다 · **D-2B-3 (a)** 경쟁 표본은 식별자 없는 `CompetitionSample`(+ `ReserveDrawObservation`:
+예비가격 15·추첨번호 4) — 정제는 송신 전 Kotlin 어댑터, serving 은 DB 를 갖지 않는다 · **D-2B-4 (a)** `OptimizationObjective`
+enum 은 M5 지원값 하나(`SCENARIO_TRIPLE`)만, 미지원 fail-closed. `EstimateShortfall` 은 D-M2-4 로 제외. 후보는 항상 3(보수/기준/
+공격, 라벨 enum + 순서), 점수는 `PriceFitness`, 불확실성은 §6.5 세 성분, 낙찰 확률 필드 없음(D-M2-8).
+
 ### Slice 2C — 비동기 training 계약
 
 장시간 학습은 동기 RPC 응답을 기다리지 않는다.

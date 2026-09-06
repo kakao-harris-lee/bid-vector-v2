@@ -7,7 +7,7 @@
 ```yaml
 milestone: m2
 slice: 2b-prediction-rpc
-base_sha: c9022d9989c4b2a09cf8b9ff94795176dc5dc00c   # 초안 작성 시점 HEAD — **2A 승인 뒤 착수 시 재고정**
+base_sha: cbfb180   # 착수 2026-09-07 재고정(2A 잔여 일괄 커밋 = 2A 종결 시점). 초안 시점은 c9022d9 였다
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - contracts/proto/bidvector/ml/v1/prediction.proto  # BidPredictionService { CalculateOptimalBid, GetModelMetadata } + 요청·응답 메시지
@@ -45,7 +45,12 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — **착수 시 재고정한 base 로 다시 낸다.** 초안 시점은 해당 없음.
+`git log --oneline cbfb180..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-07) **없음**.
+
+**착수 2026-09-07 — 운영자 결정**: D-2B-1 (a) 원 fact · D-2B-2 (a) 율만 · D-2B-3 (a) `CompetitionSample` + `ReserveDrawObservation`,
+식별자 없음 · D-2B-4 (a) `OptimizationObjective { SCENARIO_TRIPLE }` 만. 2A 종결 승인 같은 날. 정본: `milestone-2.md` 2B 착수 문단.
+2A 인계 수령: 결과 봉투 `oneof result { Success, Unmeasurable, ApplicationFailure }` 의 첫 실물은 이 slice 의 응답 메시지다(2A
+checklist 알려진 제한 7 · 위협 (a) 「oneof + test」가 여기서 성립).
 
 ---
 
@@ -69,7 +74,7 @@ rollback: |
 
 ---
 
-## 운영자 결정 필요 — 착수 전(D-2B-1~4) · 계약 고정(D-2B-5~8)
+## 운영자 결정 필요 — 착수 전(D-2B-1~4, **전부 (a) 채택 2026-09-07**) · 계약 고정(D-2B-5~8)
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
