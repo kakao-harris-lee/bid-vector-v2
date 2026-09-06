@@ -7,7 +7,7 @@
 ```yaml
 milestone: m2
 slice: 2c-training-job-contract
-base_sha: c9022d9989c4b2a09cf8b9ff94795176dc5dc00c   # 초안 작성 시점 HEAD — **2A 승인 뒤 착수 시 재고정**
+base_sha: fa2bb72   # 착수 2026-09-07 재고정(2B 잔여 일괄 커밋 = 2B 종결 시점). 초안 시점은 c9022d9 였다
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - contracts/proto/bidvector/ml/v1/training.proto    # TrainingJobService { StartTraining, GetTrainingJob, CancelTrainingJob } + 상태 enum·전이표(주석)·참조 메시지
@@ -44,7 +44,12 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — **착수 시 재고정한 base 로 다시 낸다.** 초안 시점은 해당 없음.
+`git log --oneline fa2bb72..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-07) **없음**.
+
+**착수 2026-09-07 — 운영자 결정**: D-2C-1 (a) `idempotency_key` 는 Kotlin 발급(업무 의도 단위), ml-engine 은 불투명 문자열로
+저장·대조만 · D-2C-2 (a) `training_spec_version` 은 ml-engine 안 versioned spec(5C 소유), 요청은 version 문자열만, 미지 version 은
+`StartTraining` 거부(`UNSUPPORTED_TRAINING_SPEC`). 2B 종결 승인 같은 날. 정본: `milestone-2.md` 2C 착수 문단. 2A 인계(결과 봉투
+oneof)는 2B 가 첫 실물을 냈고 2C 의 세 응답도 같은 패턴을 따른다.
 
 ---
 
@@ -69,7 +74,7 @@ rollback: |
 
 ---
 
-## 운영자 결정 필요 — 착수 전(D-2C-1~2) · 계약 고정(D-2C-3~6)
+## 운영자 결정 필요 — 착수 전(D-2C-1~2, **둘 다 (a) 채택 2026-09-07**) · 계약 고정(D-2C-3~6)
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |

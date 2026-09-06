@@ -74,6 +74,15 @@ enum 은 M5 지원값 하나(`SCENARIO_TRIPLE`)만, 미지원 fail-closed. `Esti
 
 transport는 별도 job API 또는 broker contract 중 ADR에서 하나를 선택한다.
 
+**2B 종결·2C 착수 2026-09-07** — 2B 는 verifier ready-for-review + 사용자 승인으로 닫혔다(`reports/evidence/m2/2b/checklist.md`
+「사용자 승인」; 신설 OPEN 셋은 `capability-map.md` §14.3). 2C 계약 정본 `reports/evidence/m2/2c/scope.md`. transport 는 `ADR 0010`
+D-8 대로 **별도 job API**(같은 gRPC 서버의 unary 셋 `StartTraining`·`GetTrainingJob`·`CancelTrainingJob`, Kotlin 이 폴링, broker·
+서버 스트리밍 불채택). 착수 전 운영자 결정 둘(추천안): **D-2C-1 (a)** `idempotency_key` 는 Kotlin 이 업무 의도 단위로 발급하고
+ml-engine 은 불투명 문자열로 저장·대조만 · **D-2C-2 (a)** `training_spec_version` 은 ml-engine 안의 versioned training spec(5C
+소유)을 가리키며 요청은 version 문자열만 — 미지 version 은 job 실패가 아니라 `StartTraining` 거부(`UNSUPPORTED_TRAINING_SPEC`).
+전이표 `ACCEPTED → RUNNING → SUCCEEDED | FAILED`, `ACCEPTED | RUNNING → CANCELLED`, 표 밖 전이 거부. `JobFailureCode` 는 2A
+`FailureCode` 와 다른 enum(층이 다르다). 시각은 UTC `Timestamp`, job 목록 조회 없음(D-2C-6).
+
 ### Slice 2D — 생성·호환성·provider test
 
 - canonical `.proto` 단일 출처

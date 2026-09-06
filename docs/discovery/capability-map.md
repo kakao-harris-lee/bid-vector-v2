@@ -3452,6 +3452,9 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-2A-INCLUDED-BUILD` (M2/2A 신설, 2026-09-06) | 게이트 밖 빌드 하나(`ml-contract`, included build)의 존재 — 「그 빌드에 손으로 쓴 소스가 생기지 않는다」를 S-5 무소스 단언이 지키고 2D 가 `contractGate` 로 올린다. `ADR 0006` 모듈 목록·§9 소유 축 표 갱신 후보 | **M2 2D**(게이트) · ADR 0006 갱신은 2D 종결 시 | 2D | **정본**(2A scope OPEN 표) |
 | `OPEN-2A-RELEASE-CHECK-4D` (M2/2A 신설, 2026-09-06) | 제3 변환 금지(`ADR 0010` D-3)의 **client 집행** — `latest_promoted` 응답의 `release_id` 를 `GetModelMetadata.promoted` 와 대조하는 규칙은 M2 에서 fake 위의 test 까지이고 실제 client 는 M4 4D 소유. 4D 착수 계약이 그 test 를 실제 배선에 재사용해야 한다 | **M4 4D** | 4D 착수 계약 | **정본**(2A scope OPEN 표) — 선언만 있고 강제되지 않는 ML-03 형태를 피하기 위한 활성 등재 |
 | `OPEN-M2-DEADLINE-VALUES` (ADR 0010 신설, 2026-09-06) | 초기 deadline·재시도·백오프·breaker 값의 실측 근거 — 규칙은 ADR 0010, 값은 `adapters` 정책 데이터(D-M2-9 (a)) | **M5 5E**(실측) → **M4 4D**(정책 version) | 5E 실측 | **정본**(`ADR 0010` §5) |
+| `OPEN-2B-OBJECTIVE-VALUES` (M2/2B 신설, 2026-09-07) | `OptimizationObjective` 의 M5 지원 집합 — 2B 는 `SCENARIO_TRIPLE` 하나만 정의(D-2B-4), 값 추가는 호환 변경 | **M5 5D** | 5D | **정본**(`reports/evidence/m2/2b/scope.md` OPEN 표) |
+| `OPEN-2B-AGENCY-ID` (M2/2B 신설, 2026-09-07) | `FeatureInputs.agency_id`(불투명 식별자, DB id 아님)의 정본 — 발급·안정성 | **M3**(수집 축) | 3B | **정본**(2B scope OPEN 표) |
+| `OPEN-2B-TEST-DISCOVERY-GUARD` (M2/2B 신설, 2026-09-07) | 식 본문 `fun x() = runBlocking { … shouldBe … }` 는 반환 타입이 `Unit` 이 아니라 JUnit 이 조용히 discover 하지 않는다(2B 에서 25/27 가짜 초록 실측) — `gate.tests.minimum=1` 은 class 당 1 이라 구조가 못 막는다. 하네스 후보: `@Test` 메서드 반환 타입 `Unit` 강제(ArchUnit 또는 detekt 규칙) | **하네스 slice**(미지정) | 운영자 | **정본**(2B checklist 알려진 제한) |
 
 ### 14.4 이월되는 비-`OPEN` 사실
 

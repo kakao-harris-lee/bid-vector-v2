@@ -167,7 +167,14 @@
 이 range의 나머지 커밋(`8cc7e19` — M3/M4/M5 준비 문서 리뷰 반영)은 병행 레인 산출물이며
 commands.md 「하네스 레인 변경」 절이 사유를 갖는다.
 
-## 사용자 승인 대기
+## 사용자 승인 — 2026-09-07, slice 2B 종결
+
+verifier r1 `ready-for-review`(head `4f41501`, 잔여 일괄 `7460dbd`·`fa2bb72`, 세션 모델 계약 정정 `d097fe0`) 위에서
+**사용자 승인 2026-09-07**. 재작업 0/5. D-2B-1~8 사후 확인 포함. 신설 OPEN 셋(`OPEN-2B-OBJECTIVE-VALUES`·`OPEN-2B-AGENCY-ID`·
+`OPEN-2B-TEST-DISCOVERY-GUARD`)은 `capability-map.md` §14.3 에 등재. 알려진 제한(`optional` 추가는 breaking gate 밖 · 실제
+socket·deadline·cancel 은 2D · conftest 생성 로직 중복은 5A 인계)은 등재 유지. 다음 slice 2C 착수 지시 같은 날(D-2C-1·2 추천안).
+
+## (이전 문면) 사용자 승인 대기
 
 verifier 검증 전. 운영자 지시(CLAUDE.md 2026-09-04)에 따라 이 slice는 코드 slice이므로
 Codex 리뷰 대상이 아니다 — 완료 조건은 **verifier ready-for-review + 사용자 승인**이다.
