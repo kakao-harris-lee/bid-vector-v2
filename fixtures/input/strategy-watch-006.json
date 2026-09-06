@@ -1,0 +1,24 @@
+{
+  "subject": {
+    "categories": [],
+    "keywordText": "항만 준설 공사",
+    "fullText": "항만 준설 공사",
+    "baseAmount": {
+      "absent": "EMPTY_INPUT"
+    }
+  },
+  "watchRules": {
+    "focusCategories": [],
+    "focusRegionTerms": [],
+    "excludeRegionTerms": [],
+    "requiredKeywordTerms": [
+      "준설"
+    ],
+    "excludeKeywordTerms": [],
+    "budget": {
+      "min": null,
+      "max": null,
+      "inclusivity": "Inclusive"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "subject": {
+    "categories": [
+      "technical-service"
+    ],
+    "keywordText": "",
+    "fullText": "",
+    "baseAmount": {
+      "absent": "EMPTY_INPUT"
+    }
+  },
+  "watchRules": {
+    "focusCategories": [
+      "service"
+    ],
+    "focusRegionTerms": [],
+    "excludeRegionTerms": [],
+    "requiredKeywordTerms": [],
+    "excludeKeywordTerms": [],
+    "budget": {
+      "min": null,
+      "max": null,
+      "inclusivity": "Inclusive"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "subject": {
+    "categories": [],
+    "keywordText": "시스템 유지보수 용역",
+    "fullText": "시스템 유지보수 용역 부산지방해양수산청",
+    "baseAmount": {
+      "absent": "EMPTY_INPUT"
+    }
+  },
+  "watchRules": {
+    "focusCategories": [],
+    "focusRegionTerms": [
+      "부산"
+    ],
+    "excludeRegionTerms": [],
+    "requiredKeywordTerms": [],
+    "excludeKeywordTerms": [],
+    "budget": {
+      "min": null,
+      "max": null,
+      "inclusivity": "Inclusive"
+    }
+  }
+}

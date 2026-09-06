@@ -1,0 +1,28 @@
+{
+  "subject": {
+    "categories": [
+      "service"
+    ],
+    "keywordText": "시설 청소 용역",
+    "fullText": "시설 청소 용역",
+    "baseAmount": {
+      "absent": "EMPTY_INPUT"
+    }
+  },
+  "watchRules": {
+    "focusCategories": [
+      "service"
+    ],
+    "focusRegionTerms": [],
+    "excludeRegionTerms": [],
+    "requiredKeywordTerms": [
+      "유지보수"
+    ],
+    "excludeKeywordTerms": [],
+    "budget": {
+      "min": null,
+      "max": null,
+      "inclusivity": "Inclusive"
+    }
+  }
+}

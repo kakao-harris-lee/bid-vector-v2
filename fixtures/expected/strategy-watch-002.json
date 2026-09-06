@@ -1,0 +1,9 @@
+{
+  "verdict": "Passed",
+  "matched": [
+    "FocusCategory",
+    "RequiredKeyword"
+  ],
+  "failed": null,
+  "reason": null
+}

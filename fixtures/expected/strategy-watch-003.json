@@ -1,0 +1,8 @@
+{
+  "verdict": "Rejected",
+  "matched": null,
+  "failed": [
+    "RequiredKeyword"
+  ],
+  "reason": null
+}

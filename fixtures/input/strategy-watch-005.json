@@ -1,0 +1,24 @@
+{
+  "subject": {
+    "categories": [],
+    "keywordText": "항만 시설 유지보수 용역",
+    "fullText": "항만 시설 유지보수 용역 준설토 투기장 인근",
+    "baseAmount": {
+      "absent": "EMPTY_INPUT"
+    }
+  },
+  "watchRules": {
+    "focusCategories": [],
+    "focusRegionTerms": [],
+    "excludeRegionTerms": [],
+    "requiredKeywordTerms": [
+      "준설"
+    ],
+    "excludeKeywordTerms": [],
+    "budget": {
+      "min": null,
+      "max": null,
+      "inclusivity": "Inclusive"
+    }
+  }
+}

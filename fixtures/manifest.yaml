@@ -5937,6 +5937,483 @@ cases:
       codex_verdict: pending
       approved_by_user: false
 
+# -----------------------------------------------------------------------------
+# strategy 축 (M1/1E 신설, 2026-09-06) — 운영자 결정 30 이 STR-01 acceptance 넷 · STR-02
+# acceptance 넷 · STR-03 acceptance 셋을 **업무 규칙으로 명시 승인**했다. 아래 case 는 그
+# 문면에서 손으로 쓴 것이고 legacy 출력을 옮기지 않았다(`legacy_reference` 가 없는 이유다).
+#
+# **「ML port 0회」(STR-01 acceptance 넷째)는 값 case 가 아니라 구조 case 다** — `strategy`
+# 모듈의 의존 선언에 ML·adapters 가 없다는 것을 **모듈 의존 게이트**가 재고, 기대값 파일로
+# 표현하지 않는다(`reports/evidence/m1/1e/scope.md` D-3 아래 문단·① 「모듈 의존 게이트가
+# 구조로 보장」). 그래서 이 축의 case 는 넷이 아니라 **셋 + STR-02 넷**이다.
+# -----------------------------------------------------------------------------
+  - id: strategy-watch-001
+    domain: strategy-watch
+    classification: authoritative
+    verifies: |-
+        중점 카테고리는 **완전일치 집합 멤버십**이다 — 부분문자열로 겹치는 공고 카테고리(`technical-service`)는 중점 카테고리(`service`)로 통과하지 않고 그 규칙이 실패로 실린다.
+    verified_paths:
+      - "$.verdict"
+      - "$.failed"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석이 정본이다:
+          *"위 acceptance 넷을 **업무 규칙으로 명시 승인**한다 — M1/1E 가 그 문면에서 `strategy-watch-*` authoritative
+          case 를 신설하는 근거(`source.kind: operator-decision`). STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다"*.
+          결정 기록은 `reports/evidence/m1/1e/scope.md` 「착수 2026-09-06 — 운영자 결정」 문단(D-3 (a))과 그 아래
+          「D-3 승인 대상 acceptance 목록」 표가 갖는다.
+    expected_reasoning: |-
+      **근거는 승인된 acceptance 문면 하나다** — STR-01 첫째 *"중점 카테고리는 완전일치다 — `service`가 `technical-service`에
+      부분일치로 통과하지 않는다"*. 두 토큰은 그 문면이 **직접 든 값**이라 합성 어휘로 바꾸지 않았다.
+      결과 어휘(`Rejected`)는 `data-dictionary.md` §2.2.6 이 든 `WatchVerdict` sealed(운영자 결정 2026-09-06 decision 31),
+      규칙 id(`FocusCategory`)는 `reports/evidence/m1/1e/scope.md` D-7 의 `WatchRuleId` 일곱이다 — 둘 다 승인 어휘다.
+    input_file: fixtures/input/strategy-watch-001.json
+    expected_file: fixtures/expected/strategy-watch-001.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 입력에 금액이 없다(`baseAmount` 가 `Fact.Absent`, 예산 규칙도 없다)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. `WatchSubject`·`WatchRules` 에는 **식별자 필드가 없어**
+        `SYN-` 접두 id 를 실을 자리가 없고, 카테고리 값은 승인 acceptance 문면이 직접 든 두 토큰이다.
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: ca9e67e6d3bab3e9461b2439c3f860855aa6565eb2b56e02914fde199f0c9ab1
+    expected_sha256: ff720adaeae0972ad5be5e642078b7b006e2858ac0b427fea2b4bf06c3dafea3
+    not_covered: |-
+      **카테고리 문자열의 정규화 규칙**(공백 다듬기·대소문자 접기) — 이 case 의 두 값은 접기와 무관하게 다르므로
+      접기가 돌든 안 돌든 같은 답이 나온다. 접기 규칙 자체는 `legacy-behavior` 이고 test 정책에만 쓴다(scope.md D-5).
+    contract_binding:
+      type_path: "bidvector.strategy.WatchRules.evaluate(WatchSubject): WatchVerdict"
+      fixed_by: |-
+        `WatchRulesTest` — 「STR-01 1 중점 카테고리는 완전일치다」와 그 짝 「STR-01 1 완전일치면 통과한다」가
+        같은 규칙에서 통과·탈락 양쪽을 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        **완전일치 집합 멤버십**이 커널 안 정의다 — 카테고리 축만 집합 비교이고 지역·키워드는 부분문자열이다.
+        `Rejected.failed` 가 `WatchRuleId` 의 부분집합이라는 것과 **비어 있을 수 없다**는 것은 타입(`init` 거부, D-7).
+      does_not_carry: |-
+        **① `Rejected.failed` 가 실패 규칙을 전부 담는가.** D-7 이 요구하는 것은 「부분집합」이고 커널은 D-9 우선순위상
+        먼저인 규칙 하나만 싣는다. **이 case 는 규칙이 하나뿐이라 그 물음을 재지 않는다** — 단일 원소를 전수성의 근거로 읽으면 안 된다.
+        **② `$.matched`·`$.reason` 의 `null`.** variant 부재의 투영이지 계약 필드가 아니다 — `Rejected` 에는 그 자리가 없다.
+        **③ 투영 키 `verdict` 의 철자.** `failed` 는 `WatchVerdict.Rejected.failed` 그대로이나 `verdict` 는 sealed variant
+        이름을 싣는 **runner 투영 축**이고 타입에 그 이름의 필드가 없다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: strategy-watch-002
+    domain: strategy-watch
+    classification: authoritative
+    verifies: |-
+        중점 카테고리와 필수 키워드는 **AND** 로 결합된다 — 둘 다 충족하면 통과하고 매치한 규칙 둘이 결과에 함께 실린다.
+    verified_paths:
+      - "$.verdict"
+      - "$.matched"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석
+          (*"위 acceptance 넷을 업무 규칙으로 명시 승인한다"*). 결정 기록은 `reports/evidence/m1/1e/scope.md` D-3 (a)다.
+    expected_reasoning: |-
+      **근거는 STR-01 acceptance 둘째** *"중점 카테고리와 필수 키워드는 AND로 결합된다"*. AND 의 양(陽)의 절반 —
+      두 축을 다 만족하면 통과한다 — 을 이 case 가, 음(陰)의 절반을 `strategy-watch-003` 이 진다.
+      키워드는 STR-01 분류 근거의 *"지역·키워드는 **부분문자열 OR**"* 대로 부분문자열로 걸리게 두었다.
+    input_file: fixtures/input/strategy-watch-002.json
+    expected_file: fixtures/expected/strategy-watch-002.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 입력에 금액이 없다(`baseAmount` 가 `Fact.Absent`, 예산 규칙도 없다)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. `WatchSubject`·`WatchRules` 에는 식별자 필드가 없어 `SYN-` 접두 id 를
+        실을 자리가 없고, 카테고리는 승인 문면의 토큰, 텍스트는 합성 어휘다 — 실재 공고 원문이 아니다.
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: 51c0f81cf664c53701e586be214e8f8a96a75de13f4ef6077ef29eef313d1c90
+    expected_sha256: 723ebd89ecaf40079808eeaf57937f9b901c2b60d65c93a8864a83efa419252b
+    not_covered: |-
+      **세 축 이상의 결합과 제외 규칙과의 상호작용** — 제외 우선(D-9)은 이 case 가 재지 않는다.
+      한 축만 결여한 반대쪽은 `strategy-watch-003` 이 진다.
+    contract_binding:
+      type_path: "bidvector.strategy.WatchRules.evaluate(WatchSubject): WatchVerdict"
+      fixed_by: |-
+        `WatchRulesTest` — 「STR-01 2 중점 카테고리와 필수 키워드는 AND로 결합된다」가 한 test 안에서 세 조합
+        (둘 충족 · 키워드 결여 · 카테고리 결여)을 함께 고정한다. corpus 대조는 app conformance runner 다.
+      carries: |-
+        **포함 규칙의 AND 결합**이 커널 안 정의다(D-9) — 축 안은 OR, 축 사이는 AND 이고 순서는 정책이 아니라 의미다.
+        `Passed.matched` 가 매치한 축의 규칙을 모아 싣는 것도 커널 안 정의다.
+      does_not_carry: |-
+        **① `$.matched` 의 원소 순서.** `Passed.matched` 는 `Set<WatchRuleId>` 라 순서가 없다 — 직렬화 순서는
+        **runner 투영이 정한다.** 이 corpus 는 D-7 선언 순서를 쓰고, 이 case 에서는 알파벳 순서와 결과가 같다.
+        example test 가 순서를 단언하면 계약에 없는 것을 굳힌다.
+        **② `Passed` 의 생성 경로.** `internal constructor` 라 커널 밖에서 조립되지 않는다는 것은 타입이지 이 기대값이 아니다.
+        **③ 투영 키 `verdict` 의 철자**(001 ③과 같다).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: strategy-watch-003
+    domain: strategy-watch
+    classification: authoritative
+    verifies: |-
+        같은 AND 결합에서 필수 키워드 축만 결여하면 카테고리를 만족해도 탈락한다 — AND 가 OR 로 접히지 않는다.
+    verified_paths:
+      - "$.verdict"
+      - "$.failed"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석
+          (*"위 acceptance 넷을 업무 규칙으로 명시 승인한다"*). 결정 기록은 `reports/evidence/m1/1e/scope.md` D-3 (a)다.
+    expected_reasoning: |-
+      **근거는 STR-01 acceptance 둘째의 음(陰)의 절반** *"중점 카테고리와 필수 키워드는 AND로 결합된다"* —
+      결합이 AND 라면 한 축의 결여가 곧 탈락이다. 입력은 `strategy-watch-002` 와 **같은 규칙**을 두고
+      키워드 축만 결여시켜, 갈린 것이 규칙이 아니라 공고 사실임을 형태로 남긴다.
+    input_file: fixtures/input/strategy-watch-003.json
+    expected_file: fixtures/expected/strategy-watch-003.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 입력에 금액이 없다(`baseAmount` 가 `Fact.Absent`, 예산 규칙도 없다)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. `WatchSubject`·`WatchRules` 에는 식별자 필드가 없어 `SYN-` 접두 id 를
+        실을 자리가 없고, 카테고리는 승인 문면의 토큰, 텍스트는 합성 어휘다 — 실재 공고 원문이 아니다.
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: fa34768b73567d6de42f22e7d00ec5fc52401aac5068235636cba6748da183b1
+    expected_sha256: 5e47aef17d9fa5991cfdfcb147110ab3d44dc8c0b09cbfc828260e3cf36e53de
+    not_covered: |-
+      **카테고리 축만 결여한 대칭 자리** — 이 case 는 결합이 AND 임을 한 방향으로만 재고, 대칭은 재지 않는다.
+      **기대값 파일이 `strategy-watch-005` 와 같은 내용이다** — 두 case 가 나르는 의미는 입력이 가른다
+      (여기는 AND 결합의 결여, 거기는 텍스트 범위의 비대칭). 한 파일을 두 의미에 재사용한 것이 아니라 파일이 둘이다.
+    contract_binding:
+      type_path: "bidvector.strategy.WatchRules.evaluate(WatchSubject): WatchVerdict"
+      fixed_by: |-
+        `WatchRulesTest` — 「STR-01 2 중점 카테고리와 필수 키워드는 AND로 결합된다」의 둘째 단언(키워드 결여 → `Rejected`).
+        corpus 대조는 app conformance runner 다.
+      carries: |-
+        **첫 실패에서 확정 탈락**(D-9 단락 평가)과 그때 실린 규칙 id 가 커널 안 정의다.
+      does_not_carry: |-
+        **① `Rejected.failed` 의 전수성**(001 ①과 같다) — 여기서도 실패 축이 하나뿐이다.
+        **② 축 평가 순서의 관측 가능성.** 커널은 제외 둘을 먼저 보고 그 다음 카테고리·지역·키워드·예산 순이나,
+        **이 case 는 그 순서를 재지 않는다** — 실패 축이 하나여서 어느 순서로도 같은 답이다.
+        **③ 투영 키 `verdict` 의 철자**(001 ③과 같다).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: strategy-watch-004
+    domain: strategy-watch
+    classification: authoritative
+    verifies: |-
+        watch 필드가 전부 비어 있는 전략은 「게이트 없음」으로 판정되며 「모든 공고 통과」와 **결과 타입에서** 구분된다 — 통과 결과가 아니다.
+    verified_paths:
+      - "$.verdict"
+      - "$.matched"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석
+          (*"위 acceptance 넷을 업무 규칙으로 명시 승인한다"*). 결정 기록은 `reports/evidence/m1/1e/scope.md` D-3 (a)다.
+    expected_reasoning: |-
+      **근거는 STR-01 acceptance 셋째** *"watch 필드가 전부 비어 있는 전략은 「게이트 없음」으로 판정되며, 「모든 공고 통과」와
+      결과 타입에서 구분된다"*. 「구분된다」를 기계로 재는 자리가 `$.verdict` 와 `$.matched` 의 **쌍**이다 — 공고는 통과할
+      만한 값을 갖고 있는데도 결과가 통과 variant 가 아니고, 매치 집합이 **빈 집합이 아니라 부재**다.
+      「빈 집합인 통과」쪽 거울은 `strategy-watch-007` 이 진다. 부재를 `null` 로 투영하는 것은 1B 이래의 corpus 관례이며
+      `0`·`[]` 로 접지 않는다(`data-dictionary.md` §1.1 — 부재는 값이 아니다).
+    input_file: fixtures/input/strategy-watch-004.json
+    expected_file: fixtures/expected/strategy-watch-004.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 입력에 금액이 없다(`baseAmount` 가 `Fact.Absent`, 예산 규칙도 없다)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. `WatchSubject`·`WatchRules` 에는 식별자 필드가 없어 `SYN-` 접두 id 를
+        실을 자리가 없고, 카테고리는 승인 문면의 토큰, 텍스트는 합성 어휘다 — 실재 공고 원문이 아니다.
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: e8bcb92a02d3ee3529a25214120b717c5597efb56efadce524a7bb03b3eac09f
+    expected_sha256: becf1e38ef534a1de90df75fdbaba040a359e22dd2bead2084baf4e182b42cfe
+    not_covered: |-
+      **「전략이 설정됐는가」** — 임계치만 있고 watch 가 빈 전략에서 두 술어가 갈리는 자리는 다른 물음이고
+      `strategy-validation-003` 이 진다. 이 case 가 재는 것은 감시 predicate 의 결과 타입뿐이다.
+      **예산 한계의 `0원` 과 「규칙 없음」의 구별**도 재지 않는다 — 이 case 의 한계는 둘 다 부재다.
+    contract_binding:
+      type_path: "bidvector.strategy.WatchRules.evaluate(WatchSubject): WatchVerdict"
+      fixed_by: |-
+        `WatchRulesTest` — 「STR-01 3 watch 필드가 전부 비어 있으면 게이트 없음이고 모든 공고 통과와 결과 타입에서
+        구분된다」와 property 「규칙이 하나도 없으면 항상 `NoGate` 다」. 후자가 임의 공고 위에서 같은 명제를 진다.
+        corpus 대조는 app conformance runner 다.
+      carries: |-
+        **`NoGate` 가 `Passed` 와 다른 variant 라는 것**이 타입이고, 「규칙이 하나도 없다」의 판정(`WatchRules.isEmpty()`)이
+        커널 안 정의다 — 예산 축은 `min`·`max` 가 둘 다 `null` 일 때만 빈 것으로 센다.
+      does_not_carry: |-
+        **① `NoGate` 의 하류 소비.** 「게이트 없음」을 받은 쪽이 무엇을 하는가는 M4 다 — 이 case 는 결과 타입까지다.
+        **② `$.matched` 의 `null` 이 계약 필드라는 읽기.** `NoGate` 는 `data object` 라 필드가 없다 — `null` 은
+        **runner 투영이 variant 부재를 적는 방식**이고, 007 의 `[]`(빈 집합인 통과)와 갈리는 것이 이 case 의 주장이다.
+        **③ 투영 키 `verdict` 의 철자**(001 ③과 같다).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: strategy-watch-005
+    domain: strategy-watch
+    classification: authoritative
+    verifies: |-
+        필수 키워드가 공고 description 에만 있으면 후보가 아니다 — 키워드 규칙이 보는 텍스트에 description 이 들어 있지 않다.
+    verified_paths:
+      - "$.verdict"
+      - "$.failed"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석이
+          *"STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다"* 로 STR-02 를 함께 든다. 승인 문면은 STR-02 블록의
+          Acceptance scenario 넷이고, 결정 기록은 `reports/evidence/m1/1e/scope.md` D-3 (a)와 「D-3 승인 대상 acceptance 목록」이다.
+    expected_reasoning: |-
+      **근거는 STR-02 acceptance 첫째** *"필수 키워드가 공고 description에만 있으면 후보가 아니다"*. 입력은 같은 낱말이
+      **전체 범위 텍스트에는 있고 키워드 범위 텍스트에는 없는** 형태로 그 비대칭을 표현한다 — 두 텍스트를 어떻게 조립하는가는
+      어댑터(M3) 몫이라 이 case 가 정하지 않는다. `strategy-watch-006` 과 **같은 키워드·같은 규칙**을 두고 텍스트 범위만 갈랐다.
+    input_file: fixtures/input/strategy-watch-005.json
+    expected_file: fixtures/expected/strategy-watch-005.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 입력에 금액이 없다(`baseAmount` 가 `Fact.Absent`, 예산 규칙도 없다)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. `WatchSubject`·`WatchRules` 에는 식별자 필드가 없어 `SYN-` 접두 id 를
+        실을 자리가 없고, 텍스트는 합성 어휘다 — 실재 공고 원문이 아니다.
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: 0e85a00cb7c903d9bdab3c848eb4fad3cfd30fb7595b0b9344c7976317cb708b
+    expected_sha256: 5e47aef17d9fa5991cfdfcb147110ab3d44dc8c0b09cbfc828260e3cf36e53de
+    not_covered: |-
+      **어댑터가 두 텍스트를 정직하게 조립하는가** — 두 타입 모두 `String` 을 감싸므로 전체 텍스트를 키워드 범위 타입에
+      넣는 어댑터는 서명이 막지 못한다(scope.md 위협 모델 「방어하지 않는다」). 이 case 가 재는 것은 **커널이 어느 텍스트를
+      보는가**까지다. **기대값 파일이 `strategy-watch-003` 과 같은 내용이다** — 의미를 가르는 것은 입력이고 파일은 둘이다.
+    contract_binding:
+      type_path: "bidvector.strategy.WatchRules.evaluate(WatchSubject): WatchVerdict — 키워드 축은 KeywordScopeText 만 받는다"
+      fixed_by: |-
+        `WatchRulesTest` — 「STR-02 1 필수 키워드가 description 에만 있으면 후보가 아니다」. 서명 강제는 test 가 아니라
+        `CompileFailureHarnessTest` 의 컴파일 fixture(`FullScopeText` 를 키워드 자리에 넘길 수 없다)가 진다.
+        corpus 대조는 app conformance runner 다.
+      carries: |-
+        **키워드 규칙이 `KeywordScopeText` 만 본다는 것은 서명**이고(STR-02 「타입 수준 분리」), 두 텍스트가
+        서로 다른 타입이라는 것이 그 강제다.
+      does_not_carry: |-
+        **① 텍스트 조립 규칙**(제목+요건+카테고리 대 +description) — 어댑터 계약(M3, scope.md `out_of_scope`)이다.
+        **② 텍스트 접기·토큰화 규칙.** 커널은 부분문자열 매칭만 한다 — 형태소 분석·정규화는 M3 이고 접기는 `legacy-behavior`.
+        **③ 투영 키 `verdict` 의 철자**(001 ③과 같다).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: strategy-watch-006
+    domain: strategy-watch
+    classification: authoritative
+    verifies: |-
+        같은 키워드가 제목·요건 텍스트에 있으면 후보다 — 005 와 같은 키워드·같은 규칙에서 텍스트 범위만 달라 결과가 갈린다.
+    verified_paths:
+      - "$.verdict"
+      - "$.matched"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석이
+          *"STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다"* 로 STR-02 를 함께 든다. 결정 기록은
+          `reports/evidence/m1/1e/scope.md` D-3 (a)와 「D-3 승인 대상 acceptance 목록」이다.
+    expected_reasoning: |-
+      **근거는 STR-02 acceptance 둘째** *"같은 키워드가 title 또는 requirements에 있으면 후보다"*. 「같은 키워드」가
+      문면의 무게중심이라 `strategy-watch-005` 와 키워드·규칙을 **같게** 두고 키워드 범위 텍스트만 갈랐다 —
+      두 case 를 함께 읽어야 비대칭이 주장으로 선다.
+    input_file: fixtures/input/strategy-watch-006.json
+    expected_file: fixtures/expected/strategy-watch-006.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 입력에 금액이 없다(`baseAmount` 가 `Fact.Absent`, 예산 규칙도 없다)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. `WatchSubject`·`WatchRules` 에는 식별자 필드가 없어 `SYN-` 접두 id 를
+        실을 자리가 없고, 텍스트는 합성 어휘다 — 실재 공고 원문이 아니다.
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: ce30789ede3aa263db01edc36d33dcc50553fae6a53f44ccf6c3803fbebec112
+    expected_sha256: c040af401fa04b0cac74f04653e08275e6679ec3695bcf44604e0c98cad09cdb
+    not_covered: |-
+      **제목과 요건의 구별** — 커널은 둘을 합친 한 텍스트를 받으므로 「제목에 있었는가 요건에 있었는가」를 답하지 못한다.
+      그 분해는 어댑터(M3)가 갖고 이 case 는 문면의 「또는」을 그대로 둔다.
+    contract_binding:
+      type_path: "bidvector.strategy.WatchRules.evaluate(WatchSubject): WatchVerdict — 키워드 축은 KeywordScopeText 만 받는다"
+      fixed_by: |-
+        `WatchRulesTest` — 「STR-02 2 같은 키워드가 title 또는 requirements 에 있으면 후보다」.
+        corpus 대조는 app conformance runner 다.
+      carries: |-
+        **키워드 축이 부분문자열 OR 로 매치한다**는 것(STR-01 분류 근거)과 매치한 규칙이 `Passed.matched` 에 실린다는 것.
+      does_not_carry: |-
+        **① 텍스트 조립 규칙**(005 ①과 같다). **② 매칭이 부분문자열인지 낱말 경계인지의 정책적 선택** —
+        `OPEN-STR-05` 가 부분문자열 유지를 정했고 이 case 는 그 결정의 소비이지 근거가 아니다.
+        **③ 투영 키 `verdict` 의 철자**(001 ③과 같다).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: strategy-watch-007
+    domain: strategy-watch
+    classification: authoritative
+    verifies: |-
+        제외 키워드가 공고 description 에만 있으면 후보를 떨어뜨리지 않는다 — 제외 규칙도 키워드 범위 텍스트만 본다.
+    verified_paths:
+      - "$.verdict"
+      - "$.matched"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석이
+          *"STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다"* 로 STR-02 를 함께 든다. 결정 기록은
+          `reports/evidence/m1/1e/scope.md` D-3 (a)와 「D-3 승인 대상 acceptance 목록」이다.
+    expected_reasoning: |-
+      **근거는 STR-02 acceptance 셋째** *"제외 키워드가 description에만 있으면 후보를 떨어뜨리지 않는다"*. 텍스트 범위의
+      비대칭이 **포함 규칙만이 아니라 제외 규칙에도** 걸린다는 것이 이 문면이고, STR-02 사용자 가치 절이 든 오탐 형태
+      (발주기관명이 키워드를 false-trigger 한다)를 그대로 쓴다.
+      **`$.matched` 가 빈 집합인 것도 주장이다** — 제외 규칙만 있는 전략은 「게이트 없음」이 아니라 「게이트는 있고
+      매치한 포함 규칙이 없는 통과」다. `strategy-watch-004` 의 `null` 과 갈리는 자리이며, STR-01 acceptance 셋째의
+      「게이트 없음 대 모든 공고 통과」 구분을 반대편에서 고정한다.
+    input_file: fixtures/input/strategy-watch-007.json
+    expected_file: fixtures/expected/strategy-watch-007.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 입력에 금액이 없다(`baseAmount` 가 `Fact.Absent`, 예산 규칙도 없다)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. `WatchSubject`·`WatchRules` 에는 식별자 필드가 없어 `SYN-` 접두 id 를
+        실을 자리가 없다. **공공기관명이 텍스트에 그대로 든다** — `capability-map.md` STR-02 사용자 가치 절이 오탐 형태를
+        설명하며 든 **공개 정부기관 이름**이고 개인정보·거래처 식별자가 아니다. 공고 원문에서 가져온 값이 아니라
+        그 문면을 옮긴 합성 문장이다.
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: ec5c6fbc99dd34fb4cdbe34c17569338ea720fc2c5a00f9e0a6112593ad82ee3
+    expected_sha256: fec0485fae42045cabfb1e2cfb52b80a5782d14e0221d0b3fba41b39c3420f70
+    not_covered: |-
+      **제외 키워드가 키워드 범위 텍스트에 있을 때 떨어뜨리는가** — 양(陽)의 절반은 이 축에 case 가 없다.
+      제외 우선(D-9)과 제외 지역 축도 재지 않는다. **어댑터의 조립 정직성**은 005 와 같은 이유로 밖이다.
+    contract_binding:
+      type_path: "bidvector.strategy.WatchRules.evaluate(WatchSubject): WatchVerdict — 제외 키워드 축도 KeywordScopeText 만 받는다"
+      fixed_by: |-
+        `WatchRulesTest` — 「STR-02 3 제외 키워드가 description 에만 있으면 후보를 떨어뜨리지 않는다」.
+        corpus 대조는 app conformance runner 다.
+      carries: |-
+        **제외 축이 키워드 범위 텍스트를 본다**는 서명과, 제외 규칙이 매치하지 않으면 그 축이 결과에 규칙을 싣지 않는다는
+        커널 안 정의(제외는 통과의 근거가 아니다).
+      does_not_carry: |-
+        **① 「빈 `matched` 인 통과」라는 이름.** 그 상태를 부르는 어휘는 계약에 없다 — 계약이 나르는 것은
+        `Passed` variant 와 그 집합이 비어 있다는 사실뿐이다. example test 가 새 이름을 붙이면 안 된다.
+        **② 제외 규칙이 하나도 매치하지 않았다는 사실의 방출.** 결과에 그 자리가 없다.
+        **③ 투영 키 `verdict` 의 철자**(001 ③과 같다).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: strategy-watch-008
+    domain: strategy-watch
+    classification: authoritative
+    verifies: |-
+        중점 지역은 description 을 포함한 **전체 텍스트**에 매칭된다 — 지역명이 기관명에만 있어도 통과한다.
+    verified_paths:
+      - "$.verdict"
+      - "$.matched"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석이
+          *"STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다"* 로 STR-02 를 함께 든다. 결정 기록은
+          `reports/evidence/m1/1e/scope.md` D-3 (a)와 「D-3 승인 대상 acceptance 목록」이다.
+    expected_reasoning: |-
+      **근거는 STR-02 acceptance 넷째** *"중점 지역은 description을 포함한 전체 텍스트에 매칭된다"*. 지역 축은 키워드 축과
+      **반대 방향의 비대칭**을 갖는다는 것이 STR-02 분류 근거이고(*"지역은 기관명에 정당하게 들어있기 때문"*), 사용자 가치 절이
+      그 반증까지 적는다(*"반대로 지역에서 이 비대칭을 제거하면 「부산지방해양수산청」 공고가 부산 필터에서 탈락한다"*).
+      입력은 지역명이 **전체 범위 텍스트에만** 있는 형태라, 통과가 곧 「전체 텍스트를 봤다」의 증거다.
+    input_file: fixtures/input/strategy-watch-008.json
+    expected_file: fixtures/expected/strategy-watch-008.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 입력에 금액이 없다(`baseAmount` 가 `Fact.Absent`, 예산 규칙도 없다)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. `WatchSubject`·`WatchRules` 에는 식별자 필드가 없어 `SYN-` 접두 id 를
+        실을 자리가 없다. **공공기관명이 텍스트에 그대로 든다** — `capability-map.md` STR-02 사용자 가치 절이 반증 예로 든
+        **공개 정부기관 이름**이고 개인정보·거래처 식별자가 아니다. 공고 원문이 아니라 그 문면을 옮긴 합성 문장이다.
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: 006baff53325f26a22bd4a641f29295115c1d71bd1ecd96cbf0df266b21431c7
+    expected_sha256: 7bd25847b539e98e710dd01af4d5c1b2dade69bae50e8d2d2c60b17e2ff248c6
+    not_covered: |-
+      **제외 지역 축** — 같은 텍스트 범위를 쓰는지는 이 case 가 재지 않는다.
+      **지역 어휘의 정규화**(행정구역 이름의 동의어·약칭)도 밖이다 — 커널은 부분문자열만 본다.
+    contract_binding:
+      type_path: "bidvector.strategy.WatchRules.evaluate(WatchSubject): WatchVerdict — 지역 축은 FullScopeText 를 받는다"
+      fixed_by: |-
+        `WatchRulesTest` — 「STR-02 4 중점 지역은 description 을 포함한 전체 텍스트에 매칭된다」.
+        corpus 대조는 app conformance runner 다.
+      carries: |-
+        **지역 축이 `FullScopeText` 를 본다**는 서명 — 키워드 축과 다른 타입을 받는 것이 STR-02 가 요구한 「타입 수준 분리」다.
+      does_not_carry: |-
+        **① 텍스트 조립 규칙**(005 ①과 같다) — 전체 범위가 실제로 description 을 포함하는지는 어댑터 몫이다.
+        **② 「기관명에 든 지역명이 정당하다」는 판단.** 그것은 이 비대칭의 **사유**이지 커널이 내는 값이 아니다.
+        **③ 투영 키 `verdict` 의 철자**(001 ③과 같다).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
 # =============================================================================
 # M1 계약 대조 — 1B 가 세운 shared-kernel 타입 계약과 이 corpus 의 대조 (운영자 결정 C13)
 # =============================================================================
