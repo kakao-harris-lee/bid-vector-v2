@@ -3455,6 +3455,8 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-2B-OBJECTIVE-VALUES` (M2/2B 신설, 2026-09-07) | `OptimizationObjective` 의 M5 지원 집합 — 2B 는 `SCENARIO_TRIPLE` 하나만 정의(D-2B-4), 값 추가는 호환 변경 | **M5 5D** | 5D | **정본**(`reports/evidence/m2/2b/scope.md` OPEN 표) |
 | `OPEN-2B-AGENCY-ID` (M2/2B 신설, 2026-09-07) | `FeatureInputs.agency_id`(불투명 식별자, DB id 아님)의 정본 — 발급·안정성 | **M3**(수집 축) | 3B | **정본**(2B scope OPEN 표) |
 | `OPEN-2B-TEST-DISCOVERY-GUARD` (M2/2B 신설, 2026-09-07) | 식 본문 `fun x() = runBlocking { … shouldBe … }` 는 반환 타입이 `Unit` 이 아니라 JUnit 이 조용히 discover 하지 않는다(2B 에서 25/27 가짜 초록 실측) — `gate.tests.minimum=1` 은 class 당 1 이라 구조가 못 막는다. 하네스 후보: `@Test` 메서드 반환 타입 `Unit` 강제(ArchUnit 또는 detekt 규칙) | **하네스 slice**(미지정) | 운영자 | **정본**(2B checklist 알려진 제한) |
+| `OPEN-2C-FAILURE-CODES` (M2/2C 신설, 2026-09-07) | `JobFailureCode` 최소 집합 여섯(`DATASET_UNREADABLE`·`DATASET_CHECKSUM_MISMATCH`·`TRAINING_ERROR`·`EVALUATION_ERROR`·`CANCELLED_BY_REQUEST`·`WORKER_RESOURCE_EXHAUSTED`)의 5C 확장 — 호환 추가 규칙(제공자 먼저 배포, `ADR 0010` D-7) | **M5 5C** | 5C | **정본**(`reports/evidence/m2/2c/scope.md` OPEN 표) |
+| `OPEN-2C-DATASET-URI-SCHEME` (M2/2C 신설, 2026-09-07) | `DatasetReference.uri` 의 허용 scheme(file/s3/…) — 계약은 uri 를 불투명 문자열로 두고(위협 우회 (4)) 허용 집합은 ml-engine adapters(5C)와 배치(M6 6C)가 정한다 | **M5 5C** · **M6 6C** | 5C·6C | **정본**(2C scope OPEN 표) |
 
 ### 14.4 이월되는 비-`OPEN` 사실
 
