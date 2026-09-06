@@ -134,6 +134,16 @@ shared-kernel 변경이라 1C `out_of_scope` — scope 안에서 가능한 최�
     이 된다(PROBE MIX2). 안전한 방향(과추천 없음)이고 §3.2.5 임시 처리 의도와 일치하므로
     결함이 아니라 정밀도 손실로만 등재한다 — `OPEN-QUAL-11` 해소 시 함께 정밀화될 수 있다.
 
+## 사용자 승인 — 2026-09-06, slice 1C 종결
+
+verifier r2 `ready-for-review`(HEAD `f3a9dba`, 잔여 non-blocker 일괄 `f9d80e2`, milestone 문단 `269c522`)
+위에서 **사용자 승인 2026-09-06**. 재작업 1/5(verifier r1 not-ready — F-1 high 공허 충족). D-2~D-7 사후
+확인 포함. 같은 자리의 운영자 결정 셋: **`OPEN-QUAL-11` 담당을 M3 3B 수집 뒤 관측으로 재조정**(D-4),
+**`data-dictionary.md` §3.2.5 문면을 구현 규칙으로 갱신**(decision 26 — 알려진 제한 8 해소), **PMD CPD
+를 main source set 한정 실패 모드로 전환**(1A-b 이월, 하네스 레인 별도 커밋). 알려진 제한 1·7·9·10 과
+N-3(`Resolution.Resolved` 생성자 좁힘 = shared-kernel 변경) 은 등재 유지. 지역 판정 slice(D-5)·license-*
+`contract_binding` 신설은 후속 지시 대상.
+
 ## acceptance 전건 (`commands.md` 상세)
 
 Q-0(격리 worktree `clean check`) · Q-1(`clean check`, `--no-build-cache`) · Q-2
