@@ -15,7 +15,7 @@
 
 - **재활용이 기본 전략**(§3.2): 8 수학 커널(`app/domain/` 2,166줄, 전부 stdlib·순수, 래칫 통과 — ML-11.1·11.2)을 **새 패키지 경계로 이식**하고
   ORM·settings·Celery·업무 판정·로깅 결합을 잘라낸다(ML-11.3). 기대값은 legacy 출력이 아니라 승인 명세·authoritative fixture(§3.2 「기존 출력은 정답이 아니다」).
-- M2 가 세우는 것: `ml-engine/pyproject.toml` + `contracts/` 임시 생성 + round-trip test(2A D-M2-3 (a)). 5A 는 그 위에 패키지 여덟·경계·툴체인을 완성.
+- M2 가 세우는 것(실물): `ml-engine/pyproject.toml` + `tests/conftest.py`(pytest 가 `grpc_tools.protoc` 로 **임시 생성**, 네임스페이스 `bidvector.ml.v1.*_pb2`, VCS 밖) + `tests/test_contract_roundtrip.py`(2A D-M2-3 (a)). **`src/`·`ml_engine` 패키지·`contracts/` 디렉터리는 없다.** 5A 는 conftest 의 생성 배선을 승계하고(5A D-5A-0) 패키지 일곱·경계·툴체인을 완성.
 - 소비자: M4 4D(Kotlin client) ↔ 5E(servicer). 5D 의 커널 출력은 2B 의 `Success`(후보 3·`PriceFitness`·`Uncertainty` 성분 셋·`Unmeasurable` 사유)로 5E 가 매핑.
 
 ---
@@ -35,18 +35,19 @@ legacy predictor 출력과의 무조건 동일성 · win-proxy(`OPEN-ML-06` 결�
 
 ---
 
-## 3. 착수 전 결정 후보 D-M5-1~8
+## 3. 착수 전 결정 후보 D-M5-1~9
 
 | ID | 물음 | 선택지 | 추천·근거 |
 | --- | --- | --- | --- |
 | **D-M5-1** | **패키지 관리·lock** | (a) **`uv`**(lock + 오프라인 wheel 캐시 + extras 분리) (b) pip-tools (c) poetry | 조사 노트 02 결과에 따름 — 잠정 (a): 단일 도구로 lock·가상환경·실행, 리뷰 레인 오프라인 설치는 wheel 디렉터리로 |
 | **D-M5-2** | **typecheck 도구·strict 범위** | (a) **mypy strict 를 신규 코드 전건, 이식 커널은 모듈 단위 allowlist 로 점진**(사유·해소 계획 기록 — §5 「예외가 필요하면 allowlist 사유와 해소 계획」) (b) pyright | 조사 02. strict 범위 축소는 allowlist 로만, baseline 완화 금지 |
 | **D-M5-3** | **크기·복잡도 래칫 도구** | (a) **legacy `_design_ratchet_*.py` 의 측정 정의(함수 50/파일 500·`dict[str, Any]` 경계 수)를 이식해 pytest 게이트로** — 위반 0 또는 allowlist (b) radon/xenon | **(a)** — 측정 정의가 이미 V2 한도와 같고(ML-11.2) 재활용 대상. baseline allowance 방식(증가만 차단)은 채택하지 않는다(§5 「baseline 을 느슨하게 갱신해서 우회하지 않는다」) |
-| **D-M5-4** | **import-linter 계약의 형태** — `serving` 금지 목록 | (a) **layers 계약(`serving → inference → features`, `training → features`)+ forbidden 계약(`serving` 은 `sqlalchemy`·`requests`·`httpx`·`celery`·업무 모듈 import 금지)** (b) 금지 목록만 | **(a)** — §3.2 경계는 방향과 금지 둘 다. M2 2A 가 만든 `contracts/` 는 `serving`·`training` 양쪽이 참조 가능한 최하층 |
+| **D-M5-4** | **import-linter 계약의 형태** — `serving` 금지 목록 | (a) **layers 계약(`serving → inference → features`, `training → features`)+ forbidden 계약(`serving` 은 `sqlalchemy`·`requests`·`httpx`·`celery`·업무 모듈 import 금지)** (b) 금지 목록만 | **(a)** — §3.2 경계는 방향과 금지 둘 다. 생성 stub(`bidvector.ml.v1`, 2A 임시 생성)은 `serving`·`training` 양쪽이 참조 가능한 최하층이되 외부 패키지로 취급 — 5A D-5A-0 (b) 채택 시 `ml_engine.contracts` 재수출이 layers 의 항이 된다 |
 | **D-M5-5** | **커널 이식 순서**(5D) | (a) **의존 없는 것부터**: `reserve_draw_distribution` → `assessment_shrinkage` → `award_rate_features`(5B, `reliable_base` enum 만 들어올림) → `settlement_maturity`(계산만) → LightGBM predict adapter → (D-M5-8 결정 뒤) `award_margin_distribution`(KDE)·`award_landing_curve_builders`·`award_landing_distribution`·`award_landing_curve` (b) 응답 경로 순 | **(a)** — 각 커널이 자기 property test 와 함께 들어오고 상위가 하위를 참조. **조사 (a) 실측**: KDE 와 곡선 빌더는 win-proxy 체인 안에서만 소비되므로 D-M5-8 뒤로 밀린다 |
 | **D-M5-6** | **`OPEN-ML-05` 정책 값 33개 분류** | (a) **조사 (b) 의 1차 분류(도메인 정책 vs 환경)를 표로 받아 운영자 승인, 도메인 정책은 versioned policy 데이터(YAML)로 `registry/` 가 로드, 환경은 설정** (b) 전부 설정 | **(a)** — ADR 0006 D-7 「분류가 끝난 뒤 그 데이터가 어느 모듈에 속하는가」. 발주기관별 값 등은 도메인 지식(ML-11.3) |
 | **D-M5-7** | **5D 의 authoritative corpus** — `ml-boundary` 6·`verdict` 6 의 layer 는 조사 (f) | (a) **커널 수준 golden(입력→출력 수치, 정밀도 명시)을 `authored-from-approved-spec` 으로 curator 가 신설**(ML-02·03·04 acceptance 문면 승인) (b) legacy 출력을 `legacy-behavior` 로만 | **(a)** — 「기존 출력은 정답이 아니다」. legacy 출력은 회귀 대조(`legacy-behavior`)에 쓰되 판정 근거는 승인 문면 |
-| **D-M5-8** | **`OPEN-ML-06` win-proxy 커널 포함 여부** — 조사 (a): 이 결정이 끄는 것은 커널 둘이 아니라 **넷**(KDE·곡선 빌더가 win-proxy 체인 안에서만 소비, 1,296/2,166줄) | (a) **5D 밖 — 사용자 도달 경로 없음(ML-06)**, KDE 포함 넷을 함께 미룸 (b) 보존 이식(넷 전부) (c) KDE 만 이식(소비자 없는 순수 커널) | **(a)** — `capability-map.md` OPEN 문면 「코드 품질은 최상급이나 사용자 도달 경로가 없다」. (c) 는 소비자 없는 코드를 래칫 아래 두는 것이라 §7 과 어긋난다. **대가**: ML-04(예정가 분포)가 KDE 를 요구하는지 착수 시 확인 — 조사 (a) 의 간선상 ML-04 는 `reserve_draw_distribution`+`assessment_shrinkage` 로 서고 KDE 는 낙찰률 마진 분포(win-proxy 입력)다. 운영자 즉답 대상 |
+| **D-M5-8** | **`OPEN-ML-06` — win-proxy 커널 둘**(`award_landing_curve`·`award_landing_distribution`, OPEN 문면·ADR 0001 §4.1 이 지목한 대상)의 5D 포함 여부 | (a) **5D 밖 — 사용자 도달 경로 없음(ML-06)** (b) 보존 이식 | **(a)** — `capability-map.md` OPEN 문면 「코드 품질은 최상급이나 사용자 도달 경로가 없다」. 이식은 도달 경로(capability)가 생길 때 |
+| **D-M5-9** | **`OPEN-ML-01` 하류 「이식 대상 8개」 목록의 개정** — 조사 (a) 실측: 반사 KDE(`award_margin_distribution`)와 곡선 빌더(`award_landing_curve_builders`)는 **win-proxy 체인 안에서만 소비**된다(둘 합쳐 D-M5-8 과 함께 1,296/2,166줄). 둘은 `OPEN-ML-06` 의 문면 대상이 **아니고** ADR 0001 §4.1 의 8개 확정 목록 안이다. `milestone-5.md` 5D 문면 「기존 KDE density/optimization 커널 이식」도 이 둘을 가리킨다 | (a) **8개 목록을 개정해 둘을 D-M5-8 과 같은 조건(도달 경로 생길 때)으로 미룸** — ADR 0001 §4.1 ·`milestone-5.md` 5D 문면의 **개정(운영자 승인)** 동반 (b) 8개 목록 유지 — 둘을 소비자 없이 이식(래칫 아래 두되 호출 경로 없음) (c) KDE 만 이식하고 곡선 빌더는 미룸 | **(a)** — 소비자 없는 코드를 래칫 아래 두는 것은 §7 과 어긋나고, 상위 문서를 고치지 않고 범위를 줄이면 「임의 축소」(agent-workflow 금지)다. (b)·(c) 는 도달 경로 없는 이식. **대가**: ADR 0001 §4.1 표와 milestone-5 5D 문면 개정이 착수 전건 — 5D scope 의 「만들지 않는 것」에 milestone 문면 항목 하나가 빠진다는 사실을 명시(5D ①). ML-04(예정가 분포)는 `reserve_draw_distribution`+`assessment_shrinkage` 로 서고 KDE 는 낙찰률 마진 분포(win-proxy 입력) — 착수 시 간선으로 재확인 |
 
 ---
 
@@ -55,7 +56,9 @@ legacy predictor 출력과의 무조건 동일성 · win-proxy(`OPEN-ML-06` 결�
 | OPEN | M5 처리 |
 | --- | --- |
 | `OPEN-ML-05` | D-M5-6 — 5A 가 분류 표, 5C·5D 가 소비 |
-| `OPEN-ML-06` | D-M5-8 (a) — 활성 유지(범위 밖 확정은 운영자) |
+| `OPEN-ML-06` | D-M5-8 (a) — 활성 유지(범위 밖 확정은 운영자). KDE·곡선 빌더는 이 OPEN 밖 — D-M5-9(8개 목록 개정, ADR 0001 §4.1·milestone-5 5D 문면 동반) |
+| `OPEN-ADR-10`(닫힘)의 D-6 검사 | 5A ⑦ `reuse_provenance_check.py` — 첫 이식 slice 가 형태를 정한다(ADR 0009 D-6.2) |
+| `base_sha` 표기 | 여섯 scope 초안의 7자 앵커는 착수 시 **40자**로 재고정(evidence-pack 규격) |
 | `OPEN-ML-02`·`OPEN-ML-03` | M2 가 계약 수준 처리(D-M2-8·11). 5D 는 `PriceFitness`≠확률 을 타입으로 승계 |
 | `OPEN-ADR-10`(닫힘) | 재활용 출처 기록 = (d) 조합 — 5A 가 모듈 docstring 포인터 + `reports/evidence/m5/<slice>/reuse.md` |
 | 신설 후보 `OPEN-5A-PY-CI` | Python CI job 의 러너·오프라인 wheel — 조사 02 |
@@ -73,7 +76,7 @@ legacy predictor 출력과의 무조건 동일성 · win-proxy(`OPEN-ML-06` 결�
 
 - `01_scout_ml_package.md`(legacy `ed4b06c`, 2026-09-07):
   - **`OPEN-ML-06` 이 끄는 커널은 둘이 아니라 넷** — AST import 간선으로 반사 KDE 모듈(`award_margin_distribution`)과 곡선 빌더가 **win-proxy 체인 안에서만** 소비된다.
-    win-proxy 를 미루면 2,166줄 중 1,296줄(59.8%)이 같이 미뤄진다. ADR 0001 §4.1 은 둘만 지목 → **D-M5-8 의 대가가 커졌다**(5D ① 정정).
+    win-proxy 를 미루면 2,166줄 중 1,296줄(59.8%)이 같이 미뤄진다. ADR 0001 §4.1 은 둘만 지목하고 KDE·곡선 빌더는 8개 확정 목록 안 → **D-M5-8(OPEN-ML-06 둘)과 D-M5-9(8개 목록 개정)로 결정을 갈랐다**(5D ① 정정).
   - **corpus 수치 정정**: `ml-boundary` 4(authoritative 2)·`verdict` 4 — 브리프의 6·6 은 오기. 어떤 authoritative 도 커널 수치 거동을 고정하지 않으며 `ml-boundary-003` 의 `not_covered`
     가 그 공백을 스스로 적는다 → **D-M5-7 (a) 확정 근거**: 5D 는 fixture 를 소비하는 slice 가 아니라 **만드는** slice.
   - 커널 8 은 V2 래칫을 **이미 통과**(3rd-party import 0·50줄 초과 0·`dict[str, Any]` 경계 0·legacy baseline 등재 0). ADR 0001 §4.2 수치 재현(56 파일·50줄 초과 29·100줄 초과 4·최대 491줄).

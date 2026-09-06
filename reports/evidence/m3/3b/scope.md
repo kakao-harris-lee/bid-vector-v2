@@ -11,8 +11,7 @@ head_sha: 리뷰 시점의 HEAD
 in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/koneps/**   # port 구현: HTTP client·envelope 검증·pagination·parse·회계 산출·정책 소비
   - adapters/src/test/kotlin/bidvector/adapters/koneps/**   # contract mock server test·골든 응답 재생·429/timeout/partial/duplicate 시나리오
-  - adapters/src/test/resources/koneps/**                    # 골든 응답(fixture 에서 복사가 아니라 참조 — `contracts/testdata` 와 같은 원칙: 정본은 fixtures)
-  - adapters/build.gradle.kts                                # implementation(project(":procurement")) · resilience4j-kotlin · (D-M3-2 (a) 시) mockwebserver test 의존 — **2A 가 넣은 줄과 병합**
+  - adapters/build.gradle.kts                                # implementation(project(":procurement")) · resilience4j-kotlin · (D-M3-2 (a) 시) mockwebserver test 의존 · test 가 `fixtures/input/koneps/**` 를 시스템 프로퍼티(`bidvector.fixtures.koneps`)로 받는 배선(2A 의 `bidvector.contracts.testdata` 관례) — **2A 가 넣은 줄과 병합**. test 리소스 디렉터리에 골든 사본을 두지 않는다(D-3B-1 (a))
   - config/quality/gate-tests.properties                     # 조건부 — `gate.tests.adapters` 에 3B test 추가(2A·2D 가 만든 키에 병합)
   - milestone-3.md                                           # 「Slice 3B」 착수 문단
   - reports/evidence/m3/3b/**
@@ -27,7 +26,8 @@ acceptance_commands:
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # S-0
   - "./gradlew --no-build-cache clean check"                                                          # S-1
   - "./gradlew :adapters:test --tests 'bidvector.adapters.koneps.*'"                                 # S-2 — mock server 위 전 시나리오(네트워크 0 — 소켓은 loopback in-process)
-  - "./gradlew :adapters:moduleDependencyGate"                                                        # S-3 — 도메인 방향(adapters → procurement 만)
+  - "./gradlew :adapters:moduleDependencyGate"                                                        # S-3 — adapters 가 상위 층(app)을 참조하지 않음(정책은 아래 층 전부를 허용하고 외부 좌표는 domain 층에서만 검사 — 「procurement 외 domain 참조 없음」은 이 게이트가 재지 않는다)
+  - "./gradlew :adapters:test --tests '*KonepsAdapterDependencyTest*'"                                # S-3b — 「koneps 패키지가 참조하는 domain 모듈은 procurement·shared-kernel 뿐」 단언(ArchUnit 또는 import 스캔 test)
   - "./gradlew qualityBaseline"                                                                        # S-4
 rollback: |
     **정본은 `reports/evidence/m3/3b/rollback.md`**(착수 시). `adapters/.../koneps/**` 와 build 의존 줄을 걷으면 3A 상태. 2A 가 넣은 줄은 되돌리지 않는다.

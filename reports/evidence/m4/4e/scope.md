@@ -1,7 +1,8 @@
 # Slice 계약 — M4 / 4E · notification adapter contract — **초안, 구현 전**
 
-> **지위**: M2 진행 중 세션 모델이 쓴 초안. 착수는 M1~M3 승인 뒤, `prep/m4-prep.md` D-M4-8 답 수령 뒤. M2 와 독립. 4C(outbox)와는 **계약만** 맞춘다 —
-> 4E 는 「배달 요청 → 배달 결과」 어댑터 계약과 fake sender, outbox 등록·클레임은 4C.
+> **지위**: M2 진행 중 세션 모델이 쓴 초안. 착수는 M1~M3 승인 뒤, `prep/m4-prep.md` D-M4-8 답 수령 뒤(`base_sha` 40자 재고정). M2 와 독립. 4C(outbox)와는 **계약만** 맞춘다 —
+> 4E 는 「배달 요청 → 배달 결과」 어댑터 계약과 fake sender, outbox 등록·클레임은 4C. **masking·idempotency 타입 불변식을 세우는 slice 이므로 Phase 2.5 설계 검토 대상** —
+> 아래 「위협 모델」·「우회 후보」 절은 저작 레인이 쓴 검토 입력이지 검토 결과가 아니다.
 
 ```yaml
 milestone: m4
@@ -11,6 +12,7 @@ head_sha: 리뷰 시점의 HEAD
 in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/notification/**   # port: `NotificationSender`(delivery request → result)·`ContentRenderer`(request → rendered)·배달 경로 판정(정책 vs 환경)·masking·idempotency 규칙·결과 enum
   - workflow/src/test/**                                            # fake sender·dry-run·masking property·판정 enum 전수
+  - config/quality/secret-patterns.txt                              # S-3 스캔 패턴 정책 파일(신설 — 패턴을 계약 문서 밖에 둔다)
   - adapters/src/main/kotlin/bidvector/adapters/notification/**     # fake/dry-run sender 구현만(실 Telegram/email 은 out) — **2A 가 adapters 편집을 끝낸 뒤**
   - adapters/src/test/kotlin/bidvector/adapters/notification/**
   - config/quality/gate-tests.properties                            # 조건부
@@ -20,12 +22,15 @@ out_of_scope:
   - outbox 등록·클레임·상태(4C, `OPEN-OPS-10`)                     # 4E 는 outbox 가 부르는 sender 계약까지
   - 피로도 게이트(NOTI-02 `후속`)·채널 fallback(NOTI-11)·앱 알림함 UI(6A)
   - 알림 **내용**의 업무 판정(무엇을 알릴지 — 4B `NotificationRequested` 가 결정)
+  - 앱 알림함 **기록**의 생성(NOTI-01 「억제되어도 기록 1건」)   # 4B 소유(m4-prep §2) — 4E 의 `Suppressed` 는 채널 억제일 뿐 기록을 만들지도 막지도 않는다
   - M2 경로·capability-map·data-dictionary 편집
 acceptance_commands:
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # S-0
   - "./gradlew --no-build-cache clean check"                                                          # S-1
   - "./gradlew :workflow:test --tests 'bidvector.workflow.notification.*' :adapters:test --tests 'bidvector.adapters.notification.*'"   # S-2
-  - "grep -rniE '(api[_-]?key|secret|token|Bearer )' reports/evidence/m4/4e/ workflow/src adapters/src/main/kotlin/bidvector/adapters/notification; test $? -eq 1"   # S-3 — secret·raw 식별자 스캔(evidence 규격)
+  - "grep -rniE -f config/quality/secret-patterns.txt workflow/src adapters/src/main/kotlin/bidvector/adapters/notification adapters/src/test/kotlin/bidvector/adapters/notification; test $? -eq 1"   # S-3 — secret·raw 식별자 스캔: 패턴은 **파일 밖**(정책 파일)에서 읽고 evidence 디렉터리는 대상에서 뺀다(scope.md 자신이 패턴을 담아 항상 매치되는 false-positive 회피 — codex-review-gate 판독 규칙과 같은 갈래). exit 1 = 매치 0 = 통과, exit 2(경로 없음)는 실패
+  - "d=$(mktemp -d) && printf 'val t = \"Bearer abc\"\\n' > \"$d/Leak.kt\" && grep -rniE -f config/quality/secret-patterns.txt \"$d\"; test $? -eq 0"   # S-3b — 양성 대조: 심은 표본이 매치돼 exit 0 — 스캔이 실제로 잡는다
+  - "grep -rniE -f config/quality/secret-patterns.txt reports/evidence/m4/4e/ --exclude=scope.md; test $? -eq 1"   # S-3c — evidence 디렉터리(계약 문서 제외)의 secret 스캔(evidence-pack 규격)
   - "./gradlew qualityBaseline"                                                                        # S-4
 rollback: |
     **정본은 `reports/evidence/m4/4e/rollback.md`**(착수 시). notification 패키지 둘을 걷으면 앵커 상태.

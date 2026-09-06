@@ -24,11 +24,11 @@ out_of_scope:
   - 합성 `confidence`(§6.5 「사전에 올리지 않는다」)
   - contracts/** 내용(M2)
 acceptance_commands:
-  - "(cd ml-engine && uv sync --frozen --all-extras && lint-imports && ruff check . && mypy --strict src/ml_engine)"   # S-1
-  - "(cd ml-engine && python -m pytest tests/inference -q)"                                            # S-2 — property·경계·golden
-  - "(cd ml-engine && python -m pytest tests/gates -q && python tools/design_ratchet.py --check)"      # S-3 — 래칫(이식 코드 포함)
-  - "(cd ml-engine && python -m pytest tests/inference -q -m legacy_parity)"                           # S-4 — legacy 출력 대조(정밀도 명시) — **판정 근거 아님**, 회귀 관측
-  - "./gradlew :app:test --tests '*Conformance*'"                                                      # S-5 — 조건부(fixture 신설 시 runner 가 ml-engine 을 부르지 않으므로 해당 없음 — 5D corpus 는 pytest golden 으로만; 여기서는 Kotlin 쪽 무영향 확인)
+  - "(cd ml-engine && uv sync --frozen --all-extras --no-index --find-links=<wheelhouse> && uv run lint-imports && uv run ruff check . && uv run mypy --strict src/ml_engine)"   # S-1
+  - "(cd ml-engine && uv run python -m pytest tests/inference -q)"                                     # S-2 — property·경계·golden
+  - "(cd ml-engine && uv run python -m pytest tests/gates -q && uv run python tools/design_ratchet.py --check && uv run python tools/reuse_provenance_check.py)"   # S-3 — 래칫(이식 코드 포함) + 재활용 출처 두 자리 대조
+  - "(cd ml-engine && uv run python -m pytest tests/inference -q -m legacy_parity)"                    # S-4 — legacy 출력 대조(정밀도 명시) — **판정 근거 아님**, 회귀 관측
+  - "./gradlew --no-build-cache clean check"                                                          # S-5 — Kotlin 쪽 무영향 확인(5D corpus 는 pytest golden — Kotlin runner 는 ml-engine 을 부르지 않는다)
 rollback: |
     **정본은 `reports/evidence/m5/5d/rollback.md`**(착수 시). inference/·registry/ 를 걷으면 5A/5B 상태.
 ```
@@ -48,15 +48,15 @@ rollback: |
 
 | # | 일 | 승인 문면 |
 | --- | --- | --- |
-| ① | **순수 커널 이식(수학 유지, 결합 제거)** — `reserve_draw_distribution`(4/15 추첨 닫힌식) · `assessment_shrinkage`(계층 수축 사후분포) · `settlement_maturity`(성숙도 **계산**만 — 판정은 Kotlin, §6.4). **`award_margin_distribution`(반사 KDE)·곡선 빌더·`award_landing_*` 넷은 win-proxy 체인 안에서만 소비되므로 D-M5-8 결정 뒤**(조사 01 (a) — 1,296/2,166줄). 각각 원본 경로·commit 을 docstring 포인터로, 수정 내역은 `reuse.md`. 커널은 이미 래칫 통과·strict 섬(7/8)이라 이식은 **결합 절단 + 경계 dataclass 화**가 전부 | ML-04·ML-11.1 · `OPEN-ML-01` 해소 「수학 커널 = ml-engine」 · ADR 0009 |
-| ② | **LightGBM predict adapter** — artifact 의 `feature_names`·`categories`·`denominator_sources` 와 요청 피처의 **정확 일치**가 아니면 `Unavailable`(fail-closed, legacy 유지) · 미학습 공종(학습 행 수 임계 미만)은 **`UNTRAINED_SEGMENT`**, 표본 얕음은 **`INSUFFICIENT_SAMPLES`** — 다른 값, **설정으로 끌 수 없음**(임계 `max(1, …)` 클램프 형태 유지) · 가용성 게이트와 예측 경로가 같은 판정 함수 | ML-02 acceptance 셋 · M2 D-2A-3 |
+| ① | **순수 커널 이식(수학 유지, 결합 제거)** — `reserve_draw_distribution`(4/15 추첨 닫힌식) · `assessment_shrinkage`(계층 수축 사후분포 — **입력 provenance 게이트**: `clean` 이외 provenance 행은 분포 추정 입력에 들어갈 수 없다, 타입으로) · `settlement_maturity`(성숙도 **계산**만 — 판정은 Kotlin, §6.4). **`award_margin_distribution`(반사 KDE)·`award_landing_curve_builders` 는 `OPEN-ML-06` 밖의 8개 목록 항목이나 win-proxy 체인 안에서만 소비되므로 D-M5-9(목록 개정, ADR 0001 §4.1·milestone-5 5D 문면 개정 동반) 뒤**; `award_landing_*` 둘은 D-M5-8. (a) 채택 시 `milestone-5.md` 5D 문면 「기존 KDE density/optimization 커널 이식」 항목이 이 slice 에서 **빠진다** — 「만들지 않는 것」에 명시. 각각 원본 경로·commit 을 docstring 포인터로, 수정 내역은 `reuse.md`. **`app/domain/` 커널**은 이미 래칫 통과·strict 섬(7/8)이라 이식은 **결합 절단 + 경계 dataclass 화**가 전부 — ② 의 predict adapter 는 다르다 | ML-04 acceptance(provenance 필터)·ML-11.1 · `OPEN-ML-01` 해소 「수학 커널 = ml-engine」 · ADR 0009 |
+| ② | **LightGBM predict adapter + artifact 무결성 게이트** — `registry` 가 artifact 를 열 때 **checksum(manifest 의 sha256) 불일치 = 로드 거부**(inference fail-closed; readiness 쪽 표현은 5E), `feature_names`·`categories`·`denominator_sources` 와 요청 피처의 **정확 일치**가 아니면 `Unavailable`(fail-closed, legacy 유지) · 미학습 공종(학습 행 수 임계 미만)은 **`UNTRAINED_SEGMENT`**, 표본 얕음은 **`INSUFFICIENT_SAMPLES`** — 다른 값, **설정으로 끌 수 없음**(임계 `max(1, …)` 클램프 형태 유지) · 가용성 게이트와 예측 경로가 같은 판정 함수. **출처는 `app/ai/predictors/`(app/domain 아님)** — ML-11.2: 50줄 초과 7·100줄 초과 3(payload 조립 + 통계 추정이 한 함수) → **분해 후 이식**(D-5A-3 위반 0 이 강제) | ML-02 acceptance 셋 · M5 완료 조건 「artifact checksum 불일치 시 readiness/inference fail-closed」 · ML-11.2 · M2 D-2A-3 |
 | ③ | **결과 타입** — `KernelResult = Success(candidates[3], fitness, uncertainty, diagnostics) | Unmeasurable(reason)`. **예외로 실패를 나르지 않는다**; `except Exception → 다른 predictor 폴백`(legacy c-2) 없음. 후보 3 은 `CONSERVATIVE·BASE·AGGRESSIVE` 순서 고정, 율은 `Decimal`(fraction)로 — float 는 커널 내부까지만, 경계에서 `Decimal` 로 한 번 | ML-01 · M2 2B ③·④ · ADR 0001 D-6 · ADR 0010 D-3 제3 변환 금지 |
 | ④ | **불확실성 성분 셋 + 출처** — `sample_size`(그 추정에 실제로 쓰인 표본)·`dispersion`·`estimate_margin` + `interval_source ∈ {CROSS_VALIDATION_RESIDUAL, TIME_HOLDOUT_RESIDUAL}`. 합성 `confidence`(계수 아홉 아핀 결합·[0.45,0.95] 클램프) **이식하지 않음** | §6.5 · ML-03 「표본 부족이 confidence 0 이 아니라 사유 있는 측정 불가」 · H-4 |
-| ⑤ | **경계 거동** — 최소 표본 미만 → `INSUFFICIENT_SAMPLES`; singular(분산 0)·NaN·Infinity 입력 → `Unmeasurable(FEATURE_ABSENT|DEGENERATE)`(예외 아님); `0` 원·음수 금액은 커널 입력에서 거부(legacy `max(amount, 1.0)` 바닥 **불채택**). 각각 property test | 5D 「최소 표본, singular input, NaN/Infinity 처리」 · 조사 01 (c-3) |
-| ⑥ | **objective 별 후보·diagnostics** — `OptimizationObjective`(2B D-2B-4, 초기 `SCENARIO_TRIPLE` 하나)에 따라 시나리오 z(±1.2816)·가중치(0.24/0.52/0.24)는 **versioned policy 데이터**(legacy 릴리스 상수 → D-M5-6 분류)이고 응답이 policy version 을 싣는다. diagnostics 는 타입 있는 필드만(`training_row_count`·`segment_support`) | 5D 「optimization objective 별 후보와 diagnostics」 · M2 2B ⑦ · §5 매직넘버 |
+| ⑤ | **경계 거동** — 최소 표본 미만 → `INSUFFICIENT_SAMPLES`; singular(분산 0)·NaN·Infinity 입력 → `Unmeasurable(FEATURE_ABSENT|DEGENERATE)`(예외 아님); `0` 원·음수 금액은 커널 입력에서 거부(legacy `max(amount, 1.0)` 바닥 **불채택**); **`settlement_maturity` 의 분모 `0` → `Maturity.NoObservation`**(legacy 의 `0.0` 반환 **불채택** — 「`0/0` 을 비율로 표현할 수 있는 경로를 만들지 않는다」, ① 의 「결합 절단이 전부」에 대한 유일한 예외). 각각 property test | 5D 「최소 표본, singular input, NaN/Infinity 처리」 · `data-dictionary.md` §6.4 · 조사 01 (c-3) |
+| ⑥ | **objective 별 후보·diagnostics** — `OptimizationObjective`(2B D-2B-4, 초기 `SCENARIO_TRIPLE` 하나)에 따라 시나리오 z(±1.2816)·가중치(0.24/0.52/0.24)는 **versioned policy 데이터**(legacy 릴리스 상수 → D-M5-6 분류)이고 응답이 policy version 을 싣는다. diagnostics 는 타입 있는 필드만(`training_row_count`·`segment_support`·**`shrinkage_weight`** — 기관 표본이 임계 미만이면 수축 가중치가 응답 근거에 실린다, ML-04) — 2B `Diagnostics` 에 `shrinkage_weight` 가 없으면 **호환 추가**(제공자 먼저, 5E 에서 M2 계약 갱신) | 5D 「optimization objective 별 후보와 diagnostics」 · ML-04 acceptance · M2 2B ⑦ · §5 매직넘버 |
 | ⑦ | **golden corpus** — D-M5-7 (a): ML-02·03·04 acceptance 문면에서 curator 가 `authored-from-approved-spec` case 신설(입력 표본·기대 후보/사유·정밀도). legacy 출력 대조는 `legacy_parity` 마커로 분리(판정 아님) | §3.2 「기대값은 승인된 명세와 authoritative fixture」 |
 
-**만들지 않는 것**: 변환(5B) · 학습(5C) · servicer(5E) · 가격 산출(Kotlin) · 임계치 소비 사다리(M4 4B) · win-proxy · 합성 신뢰도 · 폴백.
+**만들지 않는 것**: 변환(5B) · 학습(5C) · servicer(5E) · 가격 산출(Kotlin) · 임계치 소비 사다리(M4 4B) · win-proxy 둘(D-M5-8) · **반사 KDE·곡선 빌더(D-M5-9 (a) 시 — `milestone-5.md` 5D 문면 「KDE density/optimization 커널 이식」 항목이 이 slice 에서 빠지며 그 문면 개정이 착수 전건)** · 합성 신뢰도 · 폴백 · readiness 표현(5E).
 
 ---
 
@@ -73,10 +73,10 @@ rollback: |
 
 ## 위협 모델 — 5D 고유 경계
 
-**방어한다**: (a) 실패의 폴백 접힘(③ 결과 타입 — 예외 경로 없음, `except Exception` 금지는 ruff `BLE001`) (b) 두 사유의 합침(② enum 분리 test) (c) 가드 비활성화(D-5D-3 불변식 test — 임계 0 을 줘도 1) (d) 피처 순서 불일치의 조용한 통과(② fail-closed test) (e) 합성 신뢰도 재유입(④ 필드 부재 + 리뷰) (f) `dict[str, Any]` 경계 재유입(래칫 0) (g) 매직넘버(⑥ 정책 데이터 부재 시 구성 실패).
+**방어한다**: (a) 실패의 폴백 접힘(③ 결과 타입 — 예외 경로 없음, `except Exception` 금지는 ruff `BLE001`) (b) 두 사유의 합침(② enum 분리 test) (c) 가드 비활성화(D-5D-3 불변식 test — 임계 0 을 줘도 1) (d) 피처 순서 불일치의 조용한 통과(② fail-closed test) (e) 합성 신뢰도 재유입(④ 필드 부재 + 리뷰) (f) `dict[str, Any]` 경계 재유입(래칫 0) (g) 매직넘버(⑥ 정책 데이터 부재 시 구성 실패) (h) **checksum 불일치 artifact 의 로드**(② — 변조 표본 test) (i) `0/0` 성숙도의 비율화(⑤).
 **방어하지 않는다**: 수학의 옳음 자체(재활용 — 승인 명세·golden 이 판정) · 학습 데이터 편향(5C·ML-07) · wire 매핑(5E) · 정책 값 내용.
 
-**우회 후보(≥5)**: (1) `Unmeasurable` 대신 후보 3 을 `0` 율로 → `Candidate.bid_rate > 0` 불변식 (2) 예외를 잡아 `Success` 로 → `BLE001` + 결과 타입 test (3) 임계를 정책에서 `0` → 클램프 (4) `feature_names` 대조를 부분집합으로 → 정확 일치 test(순서 포함) (5) NaN 을 `0.0` 으로 치환 → 경계 property test (6) `confidence` 를 diagnostics 에 실음 → diagnostics 는 닫힌 dataclass, 필드 추가는 리뷰 (7) legacy parity 를 판정 test 로 승격 → 마커 분리·완료 조건 문면.
+**우회 후보(≥5)**: (1) `Unmeasurable` 대신 후보 3 을 `0` 율로 → `Candidate.bid_rate > 0` 불변식 (2) 예외를 잡아 `Success` 로 → `BLE001` + 결과 타입 test (3) 임계를 정책에서 `0` → 클램프 (4) `feature_names` 대조를 부분집합으로 → 정확 일치 test(순서 포함) (5) NaN 을 `0.0` 으로 치환 → 경계 property test (6) `confidence` 를 diagnostics 에 실음 → diagnostics 는 닫힌 dataclass, 필드 추가는 리뷰 (7) legacy parity 를 판정 test 로 승격 → 마커 분리·완료 조건 문면 (8) manifest 의 checksum 을 로드 뒤에 검사하거나 검사 결과를 무시 → `registry` 의 로드 함수가 검증 실패 시 artifact 객체를 **만들지 않는다**(타입 — 검증 통과 증거 없이 생성자 호출 불가) (9) `NoObservation` 을 `0.0` 으로 접는 소비자 → sealed 소진 `match`.
 
 ---
 
