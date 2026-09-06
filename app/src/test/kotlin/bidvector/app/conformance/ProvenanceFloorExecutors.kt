@@ -10,6 +10,7 @@ import bidvector.decision.ProvenanceRuleId
 import bidvector.decision.ProvenanceRules
 import bidvector.decision.ShortfallComparison
 import bidvector.decision.ShortfallTally
+import bidvector.decision.criticalAssessmentRateFor
 import bidvector.decision.isShortfall
 import bidvector.decision.measureFloorShortfall
 import bidvector.sharedkernel.AssessmentRate
@@ -17,6 +18,7 @@ import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.BaseAmountProvenance
 import bidvector.sharedkernel.BidRate
 import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.Derived
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.FloorRate
@@ -186,20 +188,28 @@ private const val UNASSERTED_FLOOR_RATE_NOTICE_REVISION = 0
 /** legacy 6자리(조사 §2.1) — main 정책이 아니라 이 runner 의 test 정책 인스턴스에만 쓴다. */
 private const val LEGACY_CRITICAL_RATE_SCALE_DIGITS = 6
 
-private fun criticalAssessmentRateFrom(input: JsonNode): AssessmentRate {
-    val bidRate = BidRate.recommended(rateFromFractionNode(input.atDollarPath("$.recommendedBidRate")))
-    val floorRate =
-        FloorRate(
-            rateFromFractionNode(input.atDollarPath("$.floorRate")),
-            FloorRateOrigin.NoticeValue(UNASSERTED_FLOOR_RATE_NOTICE_REVISION),
-        )
+private fun bidRateFrom(input: JsonNode): BidRate =
+    BidRate.recommended(rateFromFractionNode(input.atDollarPath("$.recommendedBidRate")))
+
+private fun floorRateFrom(input: JsonNode): FloorRate =
+    FloorRate(
+        rateFromFractionNode(input.atDollarPath("$.floorRate")),
+        FloorRateOrigin.NoticeValue(UNASSERTED_FLOOR_RATE_NOTICE_REVISION),
+    )
+
+/**
+ * `floor-threshold` 축 전용 — `FloorShortfallPolicyData`가 없는 입력(ft-001·003)에서도
+ * 임계을 낸다. `Derived<AssessmentRate>`를 그대로 돌려준다(verifier r1 F-1) — 벗겨서
+ * bare rate 로 두지 않는다.
+ */
+private fun criticalAssessmentRateFrom(input: JsonNode): Derived<AssessmentRate> {
     val scalePolicy =
         Resolution.Resolved(
             RoundingPolicy(LEGACY_CRITICAL_RATE_SCALE_DIGITS, RoundingMode.HALF_UP),
             PolicyVersion(EffectiveFrom.Initial, "test-critical-rate-scale"),
         )
-    val measurement = criticalAssessmentRate(bidRate, floorRate, scalePolicy)
-    check(measurement is Measurement.Measured<AssessmentRate>) {
+    val measurement = criticalAssessmentRate(bidRateFrom(input), floorRateFrom(input), scalePolicy)
+    check(measurement is Measurement.Measured<Derived<AssessmentRate>>) {
         "이 corpus 는 floorRate=0 을 다루지 않는다 — criticalAssessmentRate 가 Unmeasurable 을 냈다"
     }
     return measurement.value
@@ -236,6 +246,9 @@ private fun shortfallWithoutPolicy(
  * floor-threshold 실행자(②, D-4 — 표본 하나의 미달 술어). 입력이 정책을 실으면 그것을
  * 읽고(`policy.shortfallComparison`, ft-002), 없으면 정책 독립적 판정으로 대신한다
  * (ft-001·003, [shortfallWithoutPolicy]) — 어느 쪽도 runner 가 값을 지어내지 않는다.
+ * `critical`은 `Derived<AssessmentRate>`다(verifier r1 F-1) — `isShortfall`(bare 값을
+ * 받는 순수 술어)을 부를 때만 `.value`로 벗기고, 봉투에는 담지 않는다(floor-threshold
+ * 축은 그 자체가 봉투를 만들지 않는다 — D-4 표본 단건 술어).
  */
 private fun floorThresholdExecutor(input: JsonNode): Map<String, Any?> {
     val critical = criticalAssessmentRateFrom(input)
@@ -243,13 +256,13 @@ private fun floorThresholdExecutor(input: JsonNode): Map<String, Any?> {
     val policyNode = input.path("policy")
     val sampleIsShortfall =
         if (policyNode.isMissingNode) {
-            shortfallWithoutPolicy(realized, critical)
+            shortfallWithoutPolicy(realized, critical.value)
         } else {
             val comparison = shortfallComparisonFromToken(policyNode.path("shortfallComparison").asString())
-            isShortfall(realized, critical, comparison)
+            isShortfall(realized, critical.value, comparison)
         }
     return mapOf(
-        "criticalAssessmentRate" to mapOf("fraction" to critical.rate.fraction),
+        "criticalAssessmentRate" to mapOf("fraction" to critical.value.rate.fraction),
         "sampleIsShortfall" to sampleIsShortfall,
         "comparison" to "realizedAssessmentRate > criticalAssessmentRate",
     )
@@ -362,13 +375,21 @@ private fun floorShortfallResultProjection(
     return projection
 }
 
-/** floor-shortfall 실행자(⑤⑥, D-4 — 집계에서 판정). */
+/**
+ * floor-shortfall 실행자(⑤⑥, D-4 — 집계에서 판정). 임계는
+ * `bidvector.decision.criticalAssessmentRateFor`로 낸다(verifier r1 F-3) — 이 경로가
+ * `FloorShortfallPolicyData.criticalRateScale`을 실제로 소비하는 유일한 자리다. 별도
+ * `RoundingPolicy`를 runner 가 조립하지 않는다(F-1과 F-3을 한 호출로 함께 만족한다).
+ */
 private fun floorShortfallExecutor(input: JsonNode): Map<String, Any?> {
-    val critical = criticalAssessmentRateFrom(input)
     val policy = floorShortfallPolicyFrom(input)
+    val measurement = criticalAssessmentRateFor(bidRateFrom(input), floorRateFrom(input), policy)
+    check(measurement is Measurement.Measured<Derived<AssessmentRate>>) {
+        "이 corpus 는 floorRate=0 을 다루지 않는다 — criticalAssessmentRate 가 Unmeasurable 을 냈다"
+    }
     val tally = shortfallTallyFrom(input)
 
-    val judgement = measureFloorShortfall(tally, critical, policy)
+    val judgement = measureFloorShortfall(tally, measurement.value, policy)
     val projection = floorShortfallResultProjection(judgement.result, tally, policy.value.minAssessmentSamples)
     projection["policyVersion"] = policy.version.source
     return projection

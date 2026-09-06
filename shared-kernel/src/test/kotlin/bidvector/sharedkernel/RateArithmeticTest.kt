@@ -47,9 +47,21 @@ class RateArithmeticTest {
 
         val result = criticalAssessmentRate(bid, floor, scalePolicy(6))
 
-        result.shouldBeInstanceOf<Measurement.Measured<AssessmentRate>>()
-        val fraction = result.value.rate.fraction
+        result.shouldBeInstanceOf<Measurement.Measured<Derived<AssessmentRate>>>()
+        val fraction = result.value.value.rate.fraction
         fraction.compareTo(BigDecimal("1.05")) shouldBe 0
+    }
+
+    @Test
+    fun `verifier r1 F-1 — criticalAssessmentRate 는 형제 파생과 같은 형태로 DerivationRecord 를 싣는다`() {
+        val bid = BidRate.recommended(Rate.ofFraction(BigDecimal("0.91875")))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("0.875")), FloorRateOrigin.NoticeValue(0))
+        val policy = scalePolicy(6)
+
+        val result = criticalAssessmentRate(bid, floor, policy)
+
+        result.shouldBeInstanceOf<Measurement.Measured<Derived<AssessmentRate>>>()
+        result.value.derivedFrom.policyVersion shouldBe policy.version
     }
 
     @Test
@@ -68,11 +80,11 @@ class RateArithmeticTest {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal.ONE))
         val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(0))
 
-        val coarse = criticalAssessmentRate(bid, floor, scalePolicy(2)) as Measurement.Measured<AssessmentRate>
-        val fine = criticalAssessmentRate(bid, floor, scalePolicy(6)) as Measurement.Measured<AssessmentRate>
+        val coarse = criticalAssessmentRate(bid, floor, scalePolicy(2)) as Measurement.Measured<Derived<AssessmentRate>>
+        val fine = criticalAssessmentRate(bid, floor, scalePolicy(6)) as Measurement.Measured<Derived<AssessmentRate>>
 
-        coarse.value.rate.fraction shouldBe BigDecimal("0.33")
-        fine.value.rate.fraction shouldBe BigDecimal("0.333333")
+        coarse.value.value.rate.fraction shouldBe BigDecimal("0.33")
+        fine.value.value.rate.fraction shouldBe BigDecimal("0.333333")
     }
 
     @Test

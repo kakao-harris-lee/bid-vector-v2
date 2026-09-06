@@ -1,10 +1,17 @@
 package bidvector.decision
 
 import bidvector.sharedkernel.AssessmentRate
+import bidvector.sharedkernel.BidRate
+import bidvector.sharedkernel.Derived
 import bidvector.sharedkernel.EffectiveFrom
+import bidvector.sharedkernel.FloorRate
+import bidvector.sharedkernel.FloorRateOrigin
+import bidvector.sharedkernel.Measurement
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
+import bidvector.sharedkernel.RoundingPolicy
+import bidvector.sharedkernel.criticalAssessmentRate
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -15,12 +22,30 @@ import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
+import java.math.RoundingMode
 
 private val TEST_VERSION = PolicyVersion(EffectiveFrom.Initial, "test-floor-shortfall-policy")
 private val FULL_RANGE_BAND = AssessmentBand(BigDecimal("-1000000"), BigDecimal("1000000"))
 private val TIGHT_INDETERMINATE_BAND = AssessmentBand(BigDecimal("0.999"), BigDecimal("1.001"))
 
 private fun rate(value: String): AssessmentRate = AssessmentRate.observed(Rate.ofFraction(BigDecimal(value)))
+
+/**
+ * `measureFloorShortfall`은 `Derived<AssessmentRate>`를 요구한다(verifier r1 F-1) —
+ * `decision`은 `Derived`를 새로 만들 수 없으므로(shared-kernel `internal` 생성자) 실제
+ * 파생 경로(`criticalAssessmentRate`)를 불러 정당한 값을 얻는다. `floor = 1`로 두면
+ * 몫이 `value` 그대로 나온다.
+ */
+private fun criticalRate(value: String): Derived<AssessmentRate> {
+    val bid = BidRate.recommended(Rate.ofFraction(BigDecimal(value)))
+    val floor = FloorRate(Rate.ofFraction(BigDecimal.ONE), FloorRateOrigin.NoticeValue(0))
+    val scalePolicy = Resolution.Resolved(RoundingPolicy(10, RoundingMode.HALF_UP), TEST_VERSION)
+    val measurement = criticalAssessmentRate(bid, floor, scalePolicy)
+    check(measurement is Measurement.Measured<Derived<AssessmentRate>>) {
+        "test 설정 오류 — floor=1 은 항상 Measured 다"
+    }
+    return measurement.value
+}
 
 private fun policyOf(
     minAssessmentSamples: Int = 150,
@@ -63,7 +88,7 @@ class FloorShortfallKernelTest {
         val tally = ShortfallTally(rawCount = 149, outsideBand = 0, shortfallNumerator = 12)
         val policy = policyOf(minAssessmentSamples = 150)
 
-        val judgement = measureFloorShortfall(tally, rate("1.05"), policy)
+        val judgement = measureFloorShortfall(tally, criticalRate("1.05"), policy)
 
         val result = judgement.result
         result.shouldBeInstanceOf<FloorShortfall.Unmeasurable>()
@@ -78,7 +103,7 @@ class FloorShortfallKernelTest {
         val tally = ShortfallTally(rawCount = 150, outsideBand = 0, shortfallNumerator = 12)
         val policy = policyOf(minAssessmentSamples = 150)
 
-        val judgement = measureFloorShortfall(tally, rate("1.05"), policy)
+        val judgement = measureFloorShortfall(tally, criticalRate("1.05"), policy)
 
         val measured = judgement.result
         measured.shouldBeInstanceOf<FloorShortfall.Measured>()
@@ -89,7 +114,7 @@ class FloorShortfallKernelTest {
     fun `⑥ 151 표본도 측정 가능이다`() {
         val tally = ShortfallTally(rawCount = 151, outsideBand = 0, shortfallNumerator = 12)
 
-        val judgement = measureFloorShortfall(tally, rate("1.05"), policyOf(minAssessmentSamples = 150))
+        val judgement = measureFloorShortfall(tally, criticalRate("1.05"), policyOf(minAssessmentSamples = 150))
 
         judgement.result.shouldBeInstanceOf<FloorShortfall.Measured>()
     }
@@ -99,7 +124,7 @@ class FloorShortfallKernelTest {
         // rawCount 152 는 문턱(150) 이상이지만 밴드 밖 3개를 빼면 149로 줄어든다.
         val tally = ShortfallTally(rawCount = 152, outsideBand = 3, shortfallNumerator = 10)
 
-        val judgement = measureFloorShortfall(tally, rate("1.05"), policyOf(minAssessmentSamples = 150))
+        val judgement = measureFloorShortfall(tally, criticalRate("1.05"), policyOf(minAssessmentSamples = 150))
 
         tally.qualifiedDenominator shouldBe 149
         val result = judgement.result
@@ -163,7 +188,7 @@ class FloorShortfallKernelTest {
         val judgement =
             measureFloorShortfall(
                 ShortfallTally(rawCount = 150, outsideBand = 0, shortfallNumerator = 10),
-                rate("1.5"),
+                criticalRate("1.5"),
                 policyOf(minAssessmentSamples = 150, biasIndeterminateBand = TIGHT_INDETERMINATE_BAND),
             )
 
@@ -175,11 +200,29 @@ class FloorShortfallKernelTest {
         val judgement =
             measureFloorShortfall(
                 ShortfallTally(rawCount = 150, outsideBand = 0, shortfallNumerator = 10),
-                rate("1.0"),
+                criticalRate("1.0"),
                 policyOf(minAssessmentSamples = 150, biasIndeterminateBand = TIGHT_INDETERMINATE_BAND),
             )
 
         (judgement.result as FloorShortfall.Measured).biasDirection shouldBe BiasDirection.Indeterminate
+    }
+
+    @Test
+    fun `criticalAssessmentRateFor 는 criticalRateScale 슬롯을 실제로 소비한다 — F-3`() {
+        val bid = BidRate.recommended(Rate.ofFraction(BigDecimal.ONE))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(0))
+
+        val coarsePolicy = policyOf(minAssessmentSamples = 150)
+        val coarseMeasurement = criticalAssessmentRateFor(bid, floor, coarsePolicy)
+        val coarse = coarseMeasurement as Measurement.Measured<Derived<AssessmentRate>>
+        val finePolicyData = policyOf(minAssessmentSamples = 150).value.copy(criticalRateScale = 2)
+        val finePolicy = Resolution.Resolved(finePolicyData, TEST_VERSION)
+        val fineMeasurement = criticalAssessmentRateFor(bid, floor, finePolicy)
+        val fine = fineMeasurement as Measurement.Measured<Derived<AssessmentRate>>
+
+        // criticalRateScale 이 6(기본값)일 때와 2일 때 서로 다른 정밀도로 나온다.
+        coarse.value.value.rate.fraction shouldBe BigDecimal("0.333333")
+        fine.value.value.rate.fraction shouldBe BigDecimal("0.33")
     }
 
     @Test

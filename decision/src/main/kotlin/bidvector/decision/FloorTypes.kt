@@ -1,6 +1,7 @@
 package bidvector.decision
 
 import bidvector.sharedkernel.AssessmentRate
+import bidvector.sharedkernel.Derived
 import bidvector.sharedkernel.PolicyVersion
 import java.math.BigDecimal
 
@@ -90,12 +91,18 @@ data class ShortfallTally(
  * 하한 미달 빈도 판정(§3.3) — `Measured` 생성 경로를 [bidvector.decision.measureFloorShortfall]
  * 하나로 닫는다(`internal constructor`, 위협 모델 (2)) — `frequency=0/0` 같은 임의 조립을
  * 막는다. `Unmeasurable`은 값 생성자가 공개다(사유 있는 실패는 어디서든 만들 수 있다).
+ *
+ * `criticalAssessmentRate`는 `Derived<AssessmentRate>`다(verifier r1 F-1) — 임계 사정률은
+ * 파생값이라 계산에 쓴 정책 version이 `DerivationRecord`에 실려야 한다(decision 17). 벗겨서
+ * bare `AssessmentRate`로 두면 그 결속(어느 정책 version의 나눗셈인지)을 잃는다. `decision`
+ * 모듈은 `Derived`를 새로 만들 수 없다(`internal` 생성자, shared-kernel 소유) — 이 필드는
+ * shared-kernel의 [bidvector.sharedkernel.criticalAssessmentRate]가 만든 값을 그대로 나른다.
  */
 sealed interface FloorShortfall {
     @ConsistentCopyVisibility
     data class Measured internal constructor(
         val frequency: Frequency,
-        val criticalAssessmentRate: AssessmentRate,
+        val criticalAssessmentRate: Derived<AssessmentRate>,
         val band: AssessmentBand,
         val biasDirection: BiasDirection,
         val policyVersion: PolicyVersion,
@@ -106,9 +113,13 @@ sealed interface FloorShortfall {
     ) : FloorShortfall
 }
 
-/** 판정 봉투(D-13) — 집계·임계·결과를 함께 나른다(감사 가능성). */
+/**
+ * 판정 봉투(D-13) — 집계·임계·결과를 함께 나른다(감사 가능성). `critical`도
+ * `Derived<AssessmentRate>`다(F-1과 같은 이유 — [FloorShortfall.Measured.criticalAssessmentRate]
+ * 참고).
+ */
 data class FloorShortfallJudgement(
     val tally: ShortfallTally,
-    val critical: AssessmentRate,
+    val critical: Derived<AssessmentRate>,
     val result: FloorShortfall,
 )

@@ -55,6 +55,12 @@ data class AssessmentRate internal constructor(
          * 다시 감싼다. **파생이 아니다** — [assessmentRateAgainst]처럼 `YegaAmount ÷
          * BaseAmount`에서 새로 계산하지 않는다(이름이 그 차이를 진술한다). 값이 어디서
          * 왔는지(관측인지 계산인지)는 호출부 책임이고, 이 factory는 형태만 연다.
+         *
+         * **경계(verifier r1 F-1)**: 새로 계산해 내는 파생값(예: [criticalAssessmentRate])의
+         * 생성 경로가 아니다 — 파생값은 정책 version을 `DerivationRecord`에 실어
+         * `Derived<AssessmentRate>`로 나가야 하고(decision 17), 이 factory는 그 결속을
+         * 만들지 않는다. 같은 모듈의 파생 함수는 이 factory 대신 `internal` 생성자를
+         * 직접 쓴다.
          */
         fun observed(rate: Rate): AssessmentRate = AssessmentRate(rate)
     }
