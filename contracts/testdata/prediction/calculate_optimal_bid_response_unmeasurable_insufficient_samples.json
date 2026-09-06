@@ -1,0 +1,6 @@
+{
+  "unmeasurable": {
+    "reason": "UNMEASURABLE_REASON_INSUFFICIENT_SAMPLES",
+    "detailCode": "CATEGORY_SAMPLE_COUNT_BELOW_MIN_TRAINING_ROWS"
+  }
+}

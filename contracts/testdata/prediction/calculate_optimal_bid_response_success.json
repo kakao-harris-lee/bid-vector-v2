@@ -1,0 +1,59 @@
+{
+  "success": {
+    "candidates": [
+      {
+        "label": "CANDIDATE_LABEL_CONSERVATIVE",
+        "bidRate": {
+          "fraction": "0.8620"
+        },
+        "origin": "BID_RATE_ORIGIN_RECOMMENDED",
+        "weight": {
+          "fraction": "0.2400"
+        },
+        "weightPolicyVersion": "candidate-weight-v1"
+      },
+      {
+        "label": "CANDIDATE_LABEL_BASE",
+        "bidRate": {
+          "fraction": "0.8870"
+        },
+        "origin": "BID_RATE_ORIGIN_RECOMMENDED",
+        "weight": {
+          "fraction": "0.5200"
+        },
+        "weightPolicyVersion": "candidate-weight-v1"
+      },
+      {
+        "label": "CANDIDATE_LABEL_AGGRESSIVE",
+        "bidRate": {
+          "fraction": "0.9120"
+        },
+        "origin": "BID_RATE_ORIGIN_RECOMMENDED",
+        "weight": {
+          "fraction": "0.2400"
+        },
+        "weightPolicyVersion": "candidate-weight-v1"
+      }
+    ],
+    "fitness": {
+      "score": "0.7340"
+    },
+    "uncertainty": {
+      "sampleSize": 58,
+      "dispersion": "0.0410",
+      "estimateMargin": "0.0125",
+      "intervalSource": "INTERVAL_SOURCE_CROSS_VALIDATION_RESIDUAL"
+    },
+    "release": {
+      "releaseId": "release-2026-09-01",
+      "artifactChecksum": "sha256:1f2e3d4c5b6a79881f2e3d4c5b6a7988",
+      "featureSchemaVersion": "award-rate-v1",
+      "codeVersion": "ml-engine-0.1.0",
+      "datasetId": "dataset-2026-08-corpus"
+    },
+    "diagnostics": {
+      "trainingRowCount": 4120,
+      "segmentSupport": "SEGMENT_SUPPORT_DIRECT"
+    }
+  }
+}

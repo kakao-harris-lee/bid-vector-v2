@@ -1,0 +1,187 @@
+{
+  "envelope": {
+    "base": {
+      "requestId": "req-2b-01",
+      "correlationId": "corr-2b-01"
+    },
+    "featureSchemaVersion": "award-rate-v1",
+    "modelReleaseSelector": {
+      "exactRelease": {
+        "releaseId": "release-2026-09-01",
+        "artifactChecksum": "sha256:1f2e3d4c5b6a79881f2e3d4c5b6a7988"
+      }
+    },
+    "deadlinePolicyVersion": "ml-deadline-v1"
+  },
+  "features": {
+    "baseAmount": {
+      "value": {
+        "amountWon": "512000000",
+        "currency": "CURRENCY_KRW",
+        "basis": "BASIS_BASE_AMOUNT",
+        "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+        "provenance": "AMOUNT_PROVENANCE_KIND_PUBLISHED"
+      }
+    },
+    "categoryCode": {
+      "value": "CAT-0821"
+    },
+    "agencyId": {
+      "value": "agency-opaque-771"
+    },
+    "baseAmountProvenanceLabel": {
+      "value": "BASE_AMOUNT_PROVENANCE_LABEL_CLEAN"
+    }
+  },
+  "competitionSamples": [
+    {
+      "observedBidRate": {
+        "fraction": "0.8820"
+      },
+      "origin": "BID_RATE_ORIGIN_OBSERVED",
+      "baseAmount": {
+        "amountWon": "498000000",
+        "currency": "CURRENCY_KRW",
+        "basis": "BASIS_BASE_AMOUNT",
+        "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+        "provenance": "AMOUNT_PROVENANCE_KIND_PUBLISHED"
+      },
+      "baseAmountProvenanceLabel": "BASE_AMOUNT_PROVENANCE_LABEL_CLEAN",
+      "openedOn": "2026-06-12",
+      "awardRate": {
+        "fraction": "0.8905"
+      },
+      "reserveDraw": {
+        "reservePrices": [
+          {
+            "amountWon": "495000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "496000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "497000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "498000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "499000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "500000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "501000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "502000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "503000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "504000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "505000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "506000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "507000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "508000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          },
+          {
+            "amountWon": "509000000",
+            "currency": "CURRENCY_KRW",
+            "basis": "BASIS_BASE_AMOUNT",
+            "vatTreatment": "VAT_TREATMENT_EXCLUSIVE",
+            "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+          }
+        ],
+        "selectedNumbers": [
+          2,
+          5,
+          9,
+          13
+        ]
+      }
+    },
+    {
+      "observedBidRate": {
+        "fraction": "0.9110"
+      },
+      "origin": "BID_RATE_ORIGIN_OBSERVED",
+      "baseAmount": {
+        "amountWon": "210000000",
+        "currency": "CURRENCY_KRW",
+        "basis": "BASIS_BASE_AMOUNT",
+        "vatTreatment": "VAT_TREATMENT_INCLUSIVE",
+        "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
+      },
+      "baseAmountProvenanceLabel": "BASE_AMOUNT_PROVENANCE_LABEL_DERIVED_YEGA",
+      "openedOn": "2025-11-03"
+    }
+  ],
+  "objective": "OPTIMIZATION_OBJECTIVE_SCENARIO_TRIPLE"
+}

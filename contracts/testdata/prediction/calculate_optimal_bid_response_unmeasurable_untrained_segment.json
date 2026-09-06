@@ -1,0 +1,6 @@
+{
+  "unmeasurable": {
+    "reason": "UNMEASURABLE_REASON_UNTRAINED_SEGMENT",
+    "detailCode": "CATEGORY_NOT_IN_TRAINING_CORPUS"
+  }
+}
