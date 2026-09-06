@@ -126,10 +126,14 @@ checkout --`/파일 백업 복원)으로 확인했다. 변이 2·3·6은 순수 
 
 - cmd: `git log --oneline fa2bb72..HEAD -- CLAUDE.md .claude/`
 - exit: 0
-- 핵심 결과: 출력 없음 — 없음. `fa2bb72..HEAD` range의 커밋 6개는 전부 이 slice
-  산출물(`f50bb0d`·`8093131`·`f30c16a`·`e8602f6`·`9eeecfd`)과 착수 커밋
-  (`08af165`, 2C 착수 문단·D-2C-1·2 (a) 기록 — 세션 모델 단독 저작, 2C 구현 이전에
-  이미 존재)뿐이다.
+- 핵심 결과: 출력 없음 — 없음(r1 리뷰 시점·잔여 반영 완료 시점 둘 다 재확인).
+  `fa2bb72..HEAD` range의 커밋 중 이 slice 산출물은
+  `f50bb0d`·`8093131`·`f30c16a`·`e8602f6`·`9eeecfd`·`2e08937`·`c99cc5d`(F-1·F-3
+  반영)다. 그 밖에 `08af165`(2C 착수 문단, 세션 모델 단독 저작, 구현 이전 기존)·
+  `62abbef`(team-lead가 verifier r1 F-2로 `capability-map.md` §14.3에
+  `OPEN-2C-FAILURE-CODES`·`OPEN-2C-DATASET-URI-SCHEME` 등재)·`4e21185`(다른 세션의
+  `docs/discovery/ux-journey-research.md` 신설 — 이 slice와 무관한 병행 레인)가
+  섞여 있다 — 전부 in_scope 밖이고 하네스 경로(`CLAUDE.md`·`.claude/**`)는 아니다.
 
 ## clean-tree 게이트(경로 개별 인자 + 양성 대조)
 
@@ -139,6 +143,17 @@ checkout --`/파일 백업 복원)으로 확인했다. 변이 2·3·6은 순수 
   계속 편집 중이라 목록에서 제외.
 - 양성 대조: `training.proto`에 한 줄 추가 → `git status --porcelain`이 `M`을 냄 →
   `git checkout -- <파일>`로 원복 → 다시 빈 출력.
+
+## clean-tree 게이트(r1 잔여 반영 후 재확인 — 25경로)
+
+- cmd: `git status --porcelain <in_scope 25개 경로 개별 인자, F-1·F-3 반영으로
+  ContractTestdataSupport.kt·ContractRoundTripTest.kt·PredictionContractTest.kt
+  추가>`
+- exit: 0
+- 핵심 결과: 빈 출력. `docs/discovery/capability-map.md`(F-2, team-lead `62abbef`)는
+  scope.md in_scope 밖이라 이 목록에 넣지 않는다.
+- 양성 대조: `ContractTestdataSupport.kt`에 한 줄 추가 → `M` 출력 → `git checkout
+  --`로 원복 → 다시 빈 출력.
 
 ## rollback 실측(임시 clone)
 
@@ -150,3 +165,39 @@ checkout --`/파일 백업 복원)으로 확인했다. 변이 2·3·6은 순수 
   복원 뒤 `(cd contracts && buf lint && buf build)` exit 0(2A/2B 상태 —
   `TrainingJobService` 없는 계약으로 정상 복귀, `common.proto`·`error.proto`·
   `features.proto`·`prediction.proto`만으로 계약이 자족).
+
+## verifier r1 잔여 반영(F-1·F-3, F-2 는 team-lead 소관) — 한 커밋 일괄
+
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0(322 actionable tasks — 1차 시도는 신규 `TrainingContractTest.kt` 라인의
+  ktlint 위반(체이닝 개행)으로 FAILED, `ktlintTestSourceSetFormat`으로 자동 정리 후
+  재실행 exit 0)
+- cmd: `./gradlew --no-daemon :adapters:test --tests '*Training*Contract*'`
+- exit: 0 — `TrainingContractTest tests="43"`(F-1 test 1건 추가, `failures="0"`,
+  소스 `@Test` 개수 43과 일치 — discovery guard 미충돌).
+- cmd: `(cd ml-engine && .venv/bin/python -m pytest tests/test_training_contract.py
+  tests/test_contract_roundtrip.py -q)`
+- exit: 0 — 52 passed(신규 43 = 42 + F-1 1건, `test_contract_roundtrip.py` 9 불변).
+- **F-1 변이 재현(K14/P14)**: Kotlin `isValidJobCombination`의
+  `JOB_STATE_UNSPECIFIED, UNRECOGNIZED -> false`를 `true`로 바꾸면 새 test가
+  `expected:<false> but was:<true>`로 red(`tests completed=43, failed=1`). Python
+  `_is_valid_job_combination` 말미 `return False`를 `return True`로 바꾸면 새
+  test가 `assert not True`로 red(`1 failed, 42 passed`). 양쪽 원복 후
+  `git status --porcelain`이 빈 출력임을 확인, 재실행 green.
+- **F-3 CPD 재확인**: `adapters/build/reports/cpd/adapters-observed.xml`에
+  `<duplication>` 태그 **0건**(수정 전 2건 — `ContractRoundTripTest`·
+  `PredictionContractTest`·`TrainingContractTest` 세 파일의 testdata 로더·
+  canonicalization 중복이 `ContractTestdataSupport.kt`로 추출되며 소멸). 각 파일의
+  `totalNumberOfTokens`만 보고되고 중복 쌍 없음.
+- **F-2**: team-lead 소관(`capability-map.md` §14.3 등재) — 이 커밋은 손대지 않음.
+
+## secret 스캔(r1 반영분)
+
+- cmd: `grep -lniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))'
+  adapters/src/test/kotlin/bidvector/adapters/contract/ContractRoundTripTest.kt
+  adapters/src/test/kotlin/bidvector/adapters/contract/PredictionContractTest.kt
+  adapters/src/test/kotlin/bidvector/adapters/contract/TrainingContractTest.kt
+  adapters/src/test/kotlin/bidvector/adapters/contract/ContractTestdataSupport.kt
+  ml-engine/tests/test_training_contract.py`
+- exit: 1(매치 없음)
+- 핵심 결과: 변경 파일(Kotlin 4·Python 1) 전건 매치 0건.

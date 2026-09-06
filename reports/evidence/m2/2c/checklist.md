@@ -31,6 +31,17 @@
 5. `9eeecfd` — `TrainingContractTest.kt` 500줄 사이즈 게이트 위반(698줄) 수정.
    `TrainingContractRules.kt`(순수 함수)·`FakeTrainingJobServicer.kt`(상태 기계)로
    분리, 동작 변경 없음(「판단이 갈린 지점」).
+6. `2e08937` — evidence(commands/checklist/rollback.md), r1 리뷰 요청 시점.
+7. `c99cc5d` — verifier r1 F-1·F-3 잔여 반영(코드+test 한 커밋, 재검증 없음). F-2는
+   team-lead가 `capability-map.md` §14.3에 별도 등재.
+
+## verifier r1 finding 반영
+
+| id | 심각도 | 반영 |
+| --- | --- | --- |
+| F-1 | medium | `isValidJobCombination`/`_is_valid_job_combination`의 `UNSPECIFIED`·정의 밖 정수 분기(`-> false`)를 단언하는 test를 언어당 1개 추가(`UNSPECIFIED 정의 밖 정수 상태의 job 은 조합 불변식을 위반한다`/`test_unspecified_or_undefined_state_job_violates_combination_invariant`). 해당 분기를 `true`로 바꾸는 변이(K14/P14)를 실제로 주입해 양쪽 언어 red 확인 후 원복(commands.md) |
+| F-2 | low | team-lead 소관 — 이 커밋에서 건드리지 않음 |
+| F-3 | low | testdata 로더(`bytes`)·`canonicalBytes`가 `ContractRoundTripTest`(2A)·`PredictionContractTest`(2B)·`TrainingContractTest`(2C) 세 파일에 중복돼 있던 것을 `ContractTestdataSupport.kt`(신규, 2A `ContractFractionRules.kt`와 같은 관례)로 추출. `adapters-observed.xml`의 `<duplication>` 태그 2건 → 0건(commands.md) |
 
 ## 판단이 갈린 지점 — team-lead 지시와 다르게 구현한 자리
 
@@ -153,8 +164,8 @@ fork-불안전(5A).
 
 | OPEN | 2C 처리 |
 | --- | --- |
-| `OPEN-2C-FAILURE-CODES` | `JobFailureCode` 최소 집합의 5C 확장 — 호환 추가 규칙(제공자 먼저 배포). 이 slice는 등재만 |
-| `OPEN-2C-DATASET-URI-SCHEME` | `DatasetReference.uri`의 허용 scheme — 5A·M6 6C 소관. 이 slice는 등재만 |
+| `OPEN-2C-FAILURE-CODES` | `JobFailureCode` 최소 집합의 5C 확장 — 호환 추가 규칙(제공자 먼저 배포). `capability-map.md` §14.3 등재 완료(verifier r1 F-2, team-lead `62abbef`) |
+| `OPEN-2C-DATASET-URI-SCHEME` | `DatasetReference.uri`의 허용 scheme — 5A·M6 6C 소관. `capability-map.md` §14.3 등재 완료(verifier r1 F-2, team-lead `62abbef`) |
 
 ## 사용자 승인
 
