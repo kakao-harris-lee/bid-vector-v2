@@ -4359,8 +4359,9 @@ cases:
           하한으로 조용히 판정하지 않고, 하한 체계 미지원을 관측 가능한 상태로 산출한다"* — 이다.
           같은 파일의 provenance 표(「이 파일의 구성 — provenance」)가 그 절에 slice 가 넣은 것을
           훅 `300`·`302`(legacy 인용 정정) **뿐**으로 전수 열거하므로 `317` 은 **원본**이고,
-          `capability-map.md:1448` 도 그 문장을 「확정 (운영자 결정 2026-08-26), `OPEN-DEC-09` 해소」
-          블록 안에 싣는다. 곧 **커밋된 운영자 결정 기록 안의 기록자 bullet** 이므로 위 결정에 따라
+          `capability-map.md` DEC-03(「법정 낙찰하한율 해석 (우선순위 + 적용 범위)」) 도 그 문장을
+          *"**확정 (운영자 결정 2026-08-26), `OPEN-DEC-09` 해소 — 지방계약(지자체) 하한 체계는 V2 범위
+          밖이다.**"* bullet 안에 싣는다. 곧 **커밋된 운영자 결정 기록 안의 기록자 bullet** 이므로 위 결정에 따라
           `classification_policy.authoritative` ②에 든다. 같은 파일·같은 형태인 `OPEN-DEC-04` 의
           기록자 bullet 에 기댄 `verdict-004` 와 잣대가 같아졌다.
         policy_version: |-
@@ -4377,7 +4378,8 @@ cases:
 
           **내려가는 것은 어휘 축이다.** 이 case 의 `verifies` 는 그 규칙만이 아니라 상태의 **이름**을
           괄호로 붙여 함께 고정한다 — *"**관측 가능한 미적용 상태**(`OutOfScope`)로 산출된다"*. 그
-          리터럴이 나오는 자리는 `data-dictionary.md:960`의 sealed 정의 한 곳뿐이고, 같은 문서가
+          리터럴이 나오는 자리는 `data-dictionary.md` §3.5(「하한 적용 범위 rule」)의 `FloorApplicability`
+          sealed 정의 — *"… `SeparateRegime(regime)`, **`OutOfScope(regime)`** }"* — 한 곳뿐이고, 같은 문서가
           *"**`OutOfScope`가 0C가 더하는 variant다**"* 라 스스로 적는다 — **M0 산출 문서가 이름을
           더했다**는 자기 진술이다. 결정 기록 두 파일과 `v2-지침서.md` 어디에도 이 어휘가 없고,
           기대값이 함께 고정하는 `regime` 리터럴 `LOCAL_CONTRACT_ACT` 는 M0 산출 문서에도 없다.
@@ -5859,7 +5861,8 @@ cases:
           이 case 의 `verifies`(우회의 출처가 판정 결과에 노출된다)는 운영자 결정 `OPEN-STR-03` 이
           떠받친다. 그러나 기대값이 함께 고정하는 리터럴 가운데 `supersededReason` 자리의
           **`LowPriority`** 는 **`verdict-002` 가 이 날 강등된 바로 그 어휘**이고,
-          `verdict` 자리의 `BidNow` 는 `data-dictionary.md:980` 의 sealed `Verdict` 정의에서만 나온다.
+          `verdict` 자리의 `BidNow` 는 `data-dictionary.md` §3.6(「투찰 판정 rule — `Verdict`」)의 sealed
+          정의 — *"`Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }`"* — 에서만 나온다.
           `override.source` 자리의 `OPERATOR_STRATEGY_FLAG` 는 M0 산출 문서에도 없다.
           `Skip` 하나만 결정 기록(`OPEN-DEC-05` 행)에 실재한다.
 
@@ -6983,13 +6986,14 @@ uncovered_axes:
       결정 기록이 아니라 `capability-map.md` DEC-03 acceptance 와 `data-dictionary.md` §1.4.2 의 자체
       도출이다. `-001` 은 **규칙**이 커밋된 결정 기록 안의 문면(`reports/evidence/m0/0a2/decisions.md:317`
       의 `OPEN-DEC-09` 결정 절 본문 bullet)으로 서지만, 그 case 의 `verifies` 가 상태의 **이름**
-      (`OutOfScope`)까지 괄호로 함께 고정하고 그 어휘는 `data-dictionary.md:960`(스스로 *"0C가 더하는
-      variant"* 라 적는다)에서만 나온다 — 어휘 축이 아래 「승인 부재로 authoritative 덮개를 잃은 축 —
+      (`OutOfScope`)까지 괄호로 함께 고정하고 그 어휘는 `data-dictionary.md` §3.5(「하한 적용 범위 rule」)의
+      `FloorApplicability` sealed 정의(같은 절이 스스로 *"**`OutOfScope`가 0C가 더하는 variant다**"* 라
+      적는다)에서만 나온다 — 어휘 축이 아래 「승인 부재로 authoritative 덮개를 잃은 축 —
       verdict (`SkipReason` 구체 어휘)」와 같은 형태로 막는다. **다섯 다 지워지지 않았다.**
     unblocks_when: |-
       `-002`~`-005`: 운영자가 DEC-03 acceptance 와 §1.4.2 를 업무 규칙으로 명시 승인한다.
-      `-001`: 규칙은 이미 섰고 **어휘 승인 하나만 남는다** — 운영자가 `data-dictionary.md:960`의
-      `FloorApplicability` sealed 정의 가운데 **`OutOfScope`** 라는 이름(과 `regime` 리터럴)을
+      `-001`: 규칙은 이미 섰고 **어휘 승인 하나만 남는다** — 운영자가 `data-dictionary.md` §3.5
+      (「하한 적용 범위 rule」)의 `FloorApplicability` sealed 정의 가운데 **`OutOfScope`** 라는 이름(과 `regime` 리터럴)을
       업무 규칙으로 명시 승인한다.
 
   - axis: 승인 부재로 authoritative 덮개를 잃은 축 — KONEPS 필드 계약 강제와 코드·라벨 분리
