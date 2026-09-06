@@ -2,6 +2,7 @@ package bidvector.qualification
 
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
+import bidvector.sharedkernel.Resolution
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -14,6 +15,9 @@ import org.junit.jupiter.api.Test
 class LicenseEligibilityTest {
     private val version = PolicyVersion(EffectiveFrom.Initial, "test-policy")
     private val emptyPolicy = LicenseQualificationPolicyData(LicenseAliasTable(emptyList()), emptyList())
+
+    /** verifier r1 F-5 — `judge` 가 값과 version 을 하나로 묶은 `Resolution.Resolved` 하나만 받는다. */
+    private val resolvedPolicy = Resolution.Resolved(emptyPolicy, version)
 
     private fun row(
         group: String?,
@@ -33,7 +37,7 @@ class LicenseEligibilityTest {
     private fun judge(
         rows: List<RequirementRow>,
         held: OperatorLicenses,
-    ): LicenseJudgement = LicenseEligibility.judge(RequirementCollection.Collected(rows), held, emptyPolicy, version)
+    ): LicenseJudgement = LicenseEligibility.judge(RequirementCollection.Collected(rows), held, resolvedPolicy)
 
     @Test
     fun `그룹 내 전부 보유하면 Eligible`() {
@@ -79,7 +83,7 @@ class LicenseEligibilityTest {
 
     @Test
     fun `요건 데이터 자체가 없으면 Uncertain RequirementDataAbsent이고 requiredLicenses는 null`() {
-        val result = LicenseEligibility.judge(RequirementCollection.DataAbsent, declared("토목공사업"), emptyPolicy, version)
+        val result = LicenseEligibility.judge(RequirementCollection.DataAbsent, declared("토목공사업"), resolvedPolicy)
         result.verdict shouldBe LicenseVerdict.Uncertain(UncertainReason.RequirementDataAbsent)
         result.requiredLicenses shouldBe null
     }
@@ -87,7 +91,7 @@ class LicenseEligibilityTest {
     @Test
     fun `수집이 실패하면 Uncertain CollectionFailed`() {
         val result =
-            LicenseEligibility.judge(RequirementCollection.CollectionFailed, declared("토목공사업"), emptyPolicy, version)
+            LicenseEligibility.judge(RequirementCollection.CollectionFailed, declared("토목공사업"), resolvedPolicy)
         result.verdict shouldBe LicenseVerdict.Uncertain(UncertainReason.CollectionFailed)
     }
 
@@ -158,8 +162,7 @@ class LicenseEligibilityTest {
             LicenseEligibility.judge(
                 RequirementCollection.Collected(rows),
                 declared("엔지니어링"),
-                aliasPolicy,
-                version,
+                Resolution.Resolved(aliasPolicy, version),
             )
         result.verdict shouldBe
             LicenseVerdict.Ineligible(

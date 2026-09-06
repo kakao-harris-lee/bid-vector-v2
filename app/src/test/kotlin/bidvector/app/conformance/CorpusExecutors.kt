@@ -4,6 +4,7 @@ import bidvector.qualification.LICENSE_QUALIFICATION_POLICY
 import bidvector.qualification.LicenseEligibility
 import bidvector.qualification.LicenseJudgement
 import bidvector.qualification.LicenseName
+import bidvector.qualification.LicenseQualificationPolicyData
 import bidvector.qualification.LicenseValidity
 import bidvector.qualification.LicenseVerdict
 import bidvector.qualification.LmtGrpNo
@@ -16,11 +17,9 @@ import bidvector.qualification.RequirementSourceField
 import bidvector.qualification.UncertainReason
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
-import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.EstimatedAmount
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.Money
-import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
@@ -253,9 +252,29 @@ private val MONEY_BASIS_VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, A
 
 // ---- license value executor 보조 — M1/1C, qualification 공개 API 호출 → projection ----
 
-/** OPEN-QUAL-07 — 내용이 비어 있는 정책을 실제로 resolve 해서 쓴다(지어낸 리터럴이 아니다). */
-private val LICENSE_POLICY_DATA =
-    (LICENSE_QUALIFICATION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved).value
+/**
+ * OPEN-QUAL-07 — 내용이 비어 있는 정책을 실제로 resolve 해서 쓴다(지어낸 리터럴이 아니다).
+ * `judge` 가 `Resolution.Resolved` 하나를 받으므로(verifier r1 F-5) 값과 version 이
+ * 여기서부터 같은 객체로 나온다 — runner 가 값만 꺼내고 version 을 fixture 문자열로 따로
+ * 만드는 경로 자체가 없어졌다.
+ *
+ * verifier r1 F-8 — `LocalDate.now()` 는 이 정책에 `Initial` 하나뿐인 지금은 항상 성립하지만
+ * 미래 일자 항목이 생기면 test 가 벽시계에 의존하게 되고, `as Resolution.Resolved` 강제
+ * 캐스트는 그때 `ClassCastException` 으로 죽는다. 고정 기준일 + 소진 `when` 으로 두 문제를
+ * 함께 없앤다 — `NotApplicable` 이 나오면 (지금은 나올 수 없지만) 캐스트 실패 대신 이 자리를
+ * 정확히 지목하는 메시지로 멈춘다.
+ */
+private val LICENSE_POLICY_REFERENCE_DATE: LocalDate = LocalDate.of(2026, 8, 30)
+
+private val LICENSE_RESOLVED_POLICY: Resolution.Resolved<LicenseQualificationPolicyData> =
+    when (val resolution = LICENSE_QUALIFICATION_POLICY.resolve(LICENSE_POLICY_REFERENCE_DATE)) {
+        is Resolution.Resolved -> resolution
+        is Resolution.NotApplicable ->
+            error(
+                "LICENSE_QUALIFICATION_POLICY 가 $LICENSE_POLICY_REFERENCE_DATE 에 해석되지 않는다 " +
+                    "— reason=${resolution.reason}",
+            )
+    }
 
 /**
  * verifier r1 F-7 — 물리 행 하나가 `lcnsLmtNm`(항상)과 `permsnIndstrytyList`(선택, 배열)를
@@ -317,9 +336,6 @@ private fun operatorLicensesFrom(input: JsonNode): OperatorLicenses {
         }
     return OperatorLicenses.Declared(names)
 }
-
-private fun policyVersionFrom(input: JsonNode): PolicyVersion =
-    PolicyVersion(EffectiveFrom.Initial, input.atDollarPath("$.policy.licenseGroupingPolicyVersion").asString())
 
 private fun requirementGroupIdKey(id: RequirementGroupId): String =
     when (id) {
@@ -397,8 +413,7 @@ private fun licenseJudgementProjection(judgement: LicenseJudgement): Map<String,
 private fun licenseExecutor(input: JsonNode): Map<String, Any?> {
     val collection = requirementCollectionFrom(input.path("notice"))
     val operatorLicenses = operatorLicensesFrom(input)
-    val policyVersion = policyVersionFrom(input)
-    val judgement = LicenseEligibility.judge(collection, operatorLicenses, LICENSE_POLICY_DATA, policyVersion)
+    val judgement = LicenseEligibility.judge(collection, operatorLicenses, LICENSE_RESOLVED_POLICY)
     return licenseJudgementProjection(judgement)
 }
 

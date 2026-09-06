@@ -2,6 +2,7 @@ package bidvector.qualification
 
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
+import bidvector.sharedkernel.Resolution
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
@@ -22,6 +23,9 @@ import org.junit.jupiter.api.Test
 class LicenseEligibilityPropertyTest {
     private val version = PolicyVersion(EffectiveFrom.Initial, "test-policy")
     private val emptyPolicy = LicenseQualificationPolicyData(LicenseAliasTable(emptyList()), emptyList())
+
+    /** verifier r1 F-5 — 값과 version 을 하나로 묶은 Resolution.Resolved 하나만 judge 에 넘긴다. */
+    private val resolvedPolicy = Resolution.Resolved(emptyPolicy, version)
     private val licenseNameArb: Arb<String> = Arb.string(1..8, "abcde")
 
     private fun judgeSingleGroup(
@@ -38,8 +42,7 @@ class LicenseEligibilityPropertyTest {
         return LicenseEligibility.judge(
             RequirementCollection.Collected(listOf(row)),
             OperatorLicenses.Declared(heldNames.map(::LicenseName)),
-            emptyPolicy,
-            version,
+            resolvedPolicy,
         )
     }
 
@@ -78,8 +81,7 @@ class LicenseEligibilityPropertyTest {
                     LicenseEligibility.judge(
                         RequirementCollection.Collected(rows),
                         OperatorLicenses.Declared(emptyList()),
-                        emptyPolicy,
-                        version,
+                        resolvedPolicy,
                     )
                 val verdict = result.verdict
                 withClue("결측 그룹 행이 있으면 미보유이므로 항상 Ineligible이어야 한다: $verdict") {
@@ -112,8 +114,7 @@ class LicenseEligibilityPropertyTest {
                     LicenseEligibility.judge(
                         RequirementCollection.Collected(rows),
                         OperatorLicenses.NotDeclared,
-                        emptyPolicy,
-                        version,
+                        resolvedPolicy,
                     )
                 result.verdict shouldBe LicenseVerdict.Uncertain(UncertainReason.OperatorLicensesNotDeclared)
             }
@@ -146,8 +147,7 @@ class LicenseEligibilityPropertyTest {
                     LicenseEligibility.judge(
                         RequirementCollection.Collected(rows),
                         OperatorLicenses.Declared(emptyList()),
-                        emptyPolicy,
-                        version,
+                        resolvedPolicy,
                     )
                 withClue("보유 0인데 Eligible이 나왔다: ${result.verdict}") {
                     (result.verdict is LicenseVerdict.Eligible) shouldBe false
@@ -173,10 +173,10 @@ class LicenseEligibilityPropertyTest {
                     }
                 val held = OperatorLicenses.Declared(listOf(LicenseName("shared")))
                 val forward =
-                    LicenseEligibility.judge(RequirementCollection.Collected(rows), held, emptyPolicy, version).verdict
+                    LicenseEligibility.judge(RequirementCollection.Collected(rows), held, resolvedPolicy).verdict
                 val reversed =
                     LicenseEligibility
-                        .judge(RequirementCollection.Collected(rows.reversed()), held, emptyPolicy, version)
+                        .judge(RequirementCollection.Collected(rows.reversed()), held, resolvedPolicy)
                         .verdict
                 forward shouldBe reversed
             }

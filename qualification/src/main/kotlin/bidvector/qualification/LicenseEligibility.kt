@@ -1,30 +1,35 @@
 package bidvector.qualification
 
 import bidvector.sharedkernel.PolicyVersion
+import bidvector.sharedkernel.Resolution
 
 /**
  * 면허 자격 판정 커널 — U-8(그룹 간 OR·그룹 내 AND) 폴딩을 커널 하나로 낸다(R-QUAL-01·02,
  * QUAL-03). 두 번째 fold 구현을 두지 않는다 — 다른 축(기술부문·협회 등)이 같은 규칙을
  * 필요로 하면 이 객체를 재사용한다.
+ *
+ * verifier r1 F-5 — `policy` 는 값과 그 값을 해석한 `PolicyVersion` 을 함께 나르는
+ * `Resolution.Resolved` 하나다. 값과 version 을 독립 인자로 받으면 호출부가 서로 다른
+ * 정책 시점을 섞어 부를 수 있어 decision 23(「판정에 쓴 정책의 version 을 싣는다」)이
+ * 관례에 머문다 — 하나로 받으면 그 사실이 타입으로 강제된다.
  */
 object LicenseEligibility {
     fun judge(
         collection: RequirementCollection,
         operatorLicenses: OperatorLicenses,
-        policyData: LicenseQualificationPolicyData,
-        policyVersion: PolicyVersion,
+        policy: Resolution.Resolved<LicenseQualificationPolicyData>,
     ): LicenseJudgement =
         when (collection) {
             RequirementCollection.DataAbsent -> {
-                absentJudgement(UncertainReason.RequirementDataAbsent, policyVersion)
+                absentJudgement(UncertainReason.RequirementDataAbsent, policy.version)
             }
 
             RequirementCollection.CollectionFailed -> {
-                absentJudgement(UncertainReason.CollectionFailed, policyVersion)
+                absentJudgement(UncertainReason.CollectionFailed, policy.version)
             }
 
             is RequirementCollection.Collected -> {
-                judgeCollected(collection.rows, operatorLicenses, policyData, policyVersion)
+                judgeCollected(collection.rows, operatorLicenses, policy)
             }
         }
 }
@@ -91,30 +96,23 @@ private fun uncertainJudgement(
 private fun judgeCollected(
     rows: List<RequirementRow>,
     operatorLicenses: OperatorLicenses,
-    policyData: LicenseQualificationPolicyData,
-    policyVersion: PolicyVersion,
+    policy: Resolution.Resolved<LicenseQualificationPolicyData>,
 ): LicenseJudgement {
-    if (rows.isEmpty()) return absentJudgement(UncertainReason.RequirementDataAbsent, policyVersion)
+    if (rows.isEmpty()) return absentJudgement(UncertainReason.RequirementDataAbsent, policy.version)
 
     val summary = summarize(rows)
     val groups = groupRows(summary.parsedRows)
     return when {
         groups.isEmpty() -> {
-            uncertainJudgement(UncertainReason.RequirementUnparsable, summary, policyVersion)
+            uncertainJudgement(UncertainReason.RequirementUnparsable, summary, policy.version)
         }
 
         operatorLicenses is OperatorLicenses.NotDeclared -> {
-            uncertainJudgement(UncertainReason.OperatorLicensesNotDeclared, summary, policyVersion)
+            uncertainJudgement(UncertainReason.OperatorLicensesNotDeclared, summary, policy.version)
         }
 
         else -> {
-            judgeWithHeldLicenses(
-                operatorLicenses as OperatorLicenses.Declared,
-                groups,
-                summary,
-                policyData,
-                policyVersion,
-            )
+            judgeWithHeldLicenses(operatorLicenses as OperatorLicenses.Declared, groups, summary, policy)
         }
     }
 }
@@ -123,18 +121,18 @@ private fun judgeWithHeldLicenses(
     operatorLicenses: OperatorLicenses.Declared,
     groups: Map<RequirementGroupId, List<RequirementRow.Parsed>>,
     summary: RowSummary,
-    policyData: LicenseQualificationPolicyData,
-    policyVersion: PolicyVersion,
+    policy: Resolution.Resolved<LicenseQualificationPolicyData>,
 ): LicenseJudgement {
-    val heldKeys = operatorLicenses.licenseNames.map { licenseComparisonKey(it, policyData.aliasTable) }.toSet()
-    val verdict = foldGroups(groups, heldKeys, policyData.aliasTable)
+    val aliasTable = policy.value.aliasTable
+    val heldKeys = operatorLicenses.licenseNames.map { licenseComparisonKey(it, aliasTable) }.toSet()
+    val verdict = foldGroups(groups, heldKeys, aliasTable)
     return LicenseJudgement(
         verdict = verdict,
         requiredLicenses = summary.requiredLicenses,
         missingByGroup = (verdict as? LicenseVerdict.Ineligible)?.missingByGroup.orEmpty(),
         unparsableRowCount = summary.unparsableCount,
         requirementSourceFields = summary.sourceFields,
-        policyVersion = policyVersion,
+        policyVersion = policy.version,
     )
 }
 
