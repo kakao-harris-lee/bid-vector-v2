@@ -92,9 +92,20 @@ rollback: |
 
 ---
 
-## 조사(Phase 2) 항목 — `_workspace/m1-1c/`
+## 조사(Phase 2) 결과 — `_workspace/m1-1c/` (2026-09-06)
 
-legacy 판정 알고리즘·별칭 테이블 형태·요건 행 원문 형태·회귀 테스트 목록·OPEN-QUAL-11 관측 가능성(`01_scout_legacy-qualification.md`) · fixture 어휘 ↔ §3.2.1 대응·authoritative 8 의 실행 가능성·입력 모델 경계·shared-kernel 재사용·runner 확장 지점·게이트 영향(typeShapeGate depth 0 — sealed **interface** 로)(`02_scout_contract.md`).
+- **authoritative 8(002·003·004·005·006·007·009·012) 전부 실행 가능** — 구조화 요건 행 + 보유 면허 목록으로 fold·결측 폴딩·사유 파생·U-7 표시가 산출된다. `policyVersion` 은 어느 case 의 verified_paths 에도 없다(값은 있으나 잠기지 않음 — decision 23 이 형태를 정했다).
+- **어휘 불일치 7 → 계약 고정(D-6·D-7, 세션 모델 판단·사후 확인)**: ① `satisfiedGroup`(명세 단수) vs fixture 복수 → **명세를 복수로 정정**(§3.2.1, decision 24 — OR 이라 둘 이상 충족 가능) ② `missingByGroup["__ungrouped__"]` → 그룹 id 를 `sealed { Numbered, Ungrouped }` 로, `__ungrouped__` 는 직렬화 표기(§3.2.1 등재) ③ `foldedUngroupedRowsIntoSingleAndGroup` → `Ungrouped` 그룹의 존재에서 파생(projection), 커널 필드 아님 ④ license-011 의 다섯째 `UncertainReason` `PermittedIndustryCombinationRuleUndecided` → **§3.2.3 에 variant 추가**(decision 25, U-5 「필요해지면 더한다」의 첫 적용) ⑤ license-010 의 `requirementsBySourceField` → 1C 는 flat `requirementSourceFields` 만(010 은 OPEN-QUAL-11 로 insufficient 유지) ⑥ U-7 표시(`licenseValidityUnverified`·`expiryEvaluated`) → 판정 봉투의 동반 산출로 sealed 단일 variant `ValidityNotVerified`(검증 variant 없음), 불리언은 projection 이 낸다 ⑦ `policyVersion` 평문 vs `PolicyVersion(effectiveFrom, source)` → projection 이 `source` 를 낸다(잠기지 않는 축).
+- **입력 경계(D-3 확인)**: 구조화 행(`lmtGrpNo` nullable·`lmtSno`·`lcnsLmtNm`·`permsnIndstrytyList` optional) + `operatorLicenses`(nullable → `OperatorLicensesNotDeclared`) + 수집 실패 표현(009) + 정책. 커널에 남는 파싱은 면허명 → 비교 키 정규화 하나이고 그것은 정책 데이터(별칭 테이블) 소비다.
+- **legacy 알고리즘**(`01_scout_legacy-qualification.md`): 행→요건, 결측은 단일 키 한 그룹 AND, 그룹 0 이면 `unknown`(행 있었으면 파싱불가/없었으면 부재), 보유 비면 `unknown`, 그룹별 요구 ⊆ 보유 → 충족, 하나라도 충족 → eligible. V2 는 같은 규칙을 커널 하나로 재작성(재사용 코드 없음 — service 재작성 갈래).
+- **게이트 영향**: `LicenseVerdict`·`UncertainReason`·그룹 id 는 **`sealed interface`**(typeShapeGate depth 래칫 0 — sealed class 는 즉시 위반). `domainApiTypeGate` 는 부동소수만 막아 `String` 면허명 통과. sizeGate 멤버 30 은 fold·사유 파생·표시를 타입/함수로 가르면 여유.
+- **OPEN-QUAL-11 관측 불가**(D-4 확정): 저장소 DB 덤프(2026-05-19)에 `eligibility_raw` 컬럼 자체가 없고 goldens 에 `lcnsLmtNm` 캡처 0, 유일 실측 1건은 (a)/(b) 를 구별 못 한다. **담당 재조정(M3 3B 수집 뒤 관측)을 Phase 6 에 올린다.**
+- runner 확장: `TARGET_DOMAINS` 에 `license` 추가 + dispatch(executor 는 `qualification` 공개 API 호출 → projection). app 은 최상위라 `testImplementation(project(":qualification"))` 허용(layer).
+
+| id | 결정(세션 모델, 사후 확인) | 내용 |
+| --- | --- | --- |
+| **D-6** | `satisfiedGroups` 복수 · 그룹 id sealed(`Numbered`/`Ungrouped`) | 명세 §3.2.1 정정(decision 24). 근거 위 ① ② |
+| **D-7** | `UncertainReason` 다섯째 값 | 명세 §3.2.3 추가(decision 25). license-011 은 여전히 insufficient(OPEN-QUAL-11) — 값은 커널이 방출하되 corpus 승격은 아니다 |
 
 ## OPEN — 수령·신설
 

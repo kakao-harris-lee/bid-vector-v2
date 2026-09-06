@@ -760,7 +760,7 @@ legacy에는 reason code가 **없다.** 판정 근거가 한국어 완성 문장
 | 자리 | 정의 |
 | --- | --- |
 | **입력** | 공고의 요건 원문(`Notice`가 소유): 면허 요건 행 집합(`lcnsLmtNm` · `lmtGrpNo` · `lmtSno` · `permsnIndstrytyList`) + 운영자 보유 면허 선언 |
-| **출력** | `LicenseVerdict = sealed { Eligible(satisfiedGroup), Ineligible(missingByGroup), Uncertain(reason: UncertainReason) }` |
+| **출력** | `LicenseVerdict = sealed { Eligible(satisfiedGroups), Ineligible(missingByGroup), Uncertain(reason: UncertainReason) }` — **정정 2026-09-06(M1/1C 착수, decision 24)**: `satisfiedGroup` 단수 → **`satisfiedGroups` 복수**. 그룹 간 OR 이라 둘 이상이 동시에 충족될 수 있고 단수는 그 정보를 버린다(QUAL-01 「무엇만 더 갖추면」 관점은 충족 집합 전체를 전제). authoritative fixture(license-*) 어휘도 복수다. **`lmtGrpNo` 결측 행을 폴딩한 단일 그룹의 식별자는 번호가 아니다** — 그룹 id 는 `sealed { Numbered(lmtGrpNo), Ungrouped }` 이고 직렬화 표기는 `__ungrouped__`(fixture 어휘) |
 | **동반 산출** | 요구 면허 전체 집합, 그룹별 미충족 집합, **파싱 실패 행 수**, 판정에 쓰인 요건 소스 집합 |
 
 legacy의 출력은 `verdict: str` + 표시용 튜플들이라 사유가 구조화돼 있지 않다
@@ -818,7 +818,13 @@ indstrytyMfrcFldList가 "와"를 `^`로, "또는"을 대괄호로 구분한다�
 #### 3.2.3 `UncertainReason` — 네 값 확정 (**U-5**)
 
 > `UncertainReason = sealed { RequirementDataAbsent, RequirementUnparsable,
-> OperatorLicensesNotDeclared, CollectionFailed }`
+> OperatorLicensesNotDeclared, CollectionFailed, PermittedIndustryCombinationRuleUndecided }`
+>
+> **다섯째 값 추가 — 2026-09-06(M1/1C 착수, decision 25).** §3.2.5 의 운영자 판정(2026-08-30)은
+> 허용업종 단독 보유를 「사유 있는 `Uncertain`」으로 임시 처리하라 했고, 그 사유는 위 넷 어디에도
+> 맞지 않는다(요건도 보유 선언도 있고 파싱도 됐다 — 결합 **규칙**이 미결인 것이다). U-5 가 예고한
+> 「필요해지면 variant 를 더한다 — 명세 변경」의 첫 적용이며, 그 variant 는 `OPEN-QUAL-11` 이 닫히면
+> 방출 자리가 사라진다(값 자체는 이력으로 남는다).
 
 - 앞 셋은 legacy의 evidence 문자열 셋에 대응한다
   (`app/services/license_eligibility.py:161-164`). **`CollectionFailed`는 수집 축(COL)에서
