@@ -15,6 +15,7 @@ in_scope:
   - contracts/testdata/prediction/**                  # round-trip·fake servicer 표본(canonical 바이트 + 사람이 읽는 JSON 원본)
   - adapters/src/test/kotlin/**                        # 생성 stub 위의 consumer test — Kotlin in-process fake servicer 대상(실제 client 배선은 M4)
   - ml-engine/tests/test_prediction_contract.py       # provider 쪽 계약 test — fake servicer 가 계약 규칙(fail-closed·oneof)을 지키는지
+  - config/quality/gate-tests.properties              # `gate.tests.adapters` 등재 수 갱신(2A 관례) — verifier r1 F-1 로 계약 정정(사후 확인, 2026-09-07). rollback·clean-tree 는 처음부터 이 파일을 덮고 있었다
   - milestone-2.md                                    # 「Slice 2B」 착수 문단, **착수 시**
   - reports/evidence/m2/2b/**
 out_of_scope:
