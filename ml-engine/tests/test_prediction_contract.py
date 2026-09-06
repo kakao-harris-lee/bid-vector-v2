@@ -177,6 +177,22 @@ def test_two_candidates_violates_the_contract_invariant(prediction_pb2):
     assert not _has_three_ordered_candidates(prediction_pb2, response.success)
 
 
+# ---- 후보 origin 은 항상 RECOMMENDED(scope.md ④, verifier r1 F-2) ----
+
+
+def test_success_testdata_candidates_are_all_recommended_origin(prediction_pb2, common_pb2):
+    response = prediction_pb2.CalculateOptimalBidResponse()
+    response.ParseFromString(_read("calculate_optimal_bid_response_success.binpb"))
+    assert _candidates_have_recommended_origin(response.success, common_pb2)
+
+
+def test_one_observed_origin_candidate_violates_the_contract_invariant(prediction_pb2, common_pb2):
+    response = prediction_pb2.CalculateOptimalBidResponse()
+    response.ParseFromString(_read("calculate_optimal_bid_response_success.binpb"))
+    response.success.candidates[0].origin = common_pb2.BID_RATE_ORIGIN_OBSERVED
+    assert not _candidates_have_recommended_origin(response.success, common_pb2)
+
+
 # ---- Unmeasurable 두 사유 구분 ----
 
 
@@ -283,6 +299,58 @@ def test_success_testdata_candidate_fractions_are_all_valid(prediction_pb2):
     response.ParseFromString(_read("calculate_optimal_bid_response_success.binpb"))
     for candidate in response.success.candidates:
         assert _is_valid_bid_rate_fraction(candidate.bid_rate.fraction)
+
+
+# ---- decimal string 정규형(Kotlin ContractFractionRules.isNormalizedFraction 과 대칭,
+# verifier r1 F-3) — Rate 셋 + decimal 넷 ----
+
+
+def test_exponential_notation_is_rejected_for_bid_rate_and_weight():
+    # verifier r1 변이 T7 — `bid_rate="8.87E-1"`·`weight="5.2E-1"`가 값으로는 [0,1] 안이라
+    # 범위 검사만으로는 통과했었다. 정규형 검사를 선행 조건으로 걸어 막는다.
+    assert not _is_valid_bid_rate_fraction("8.87E-1")
+    assert not _is_normalized_fraction("5.2E-1")
+    assert not _is_normalized_fraction("8.87E-1")
+
+
+def test_testdata_rate_fields_are_all_normalized(prediction_pb2):
+    request = prediction_pb2.CalculateOptimalBidRequest()
+    request.ParseFromString(_read("calculate_optimal_bid_request.binpb"))
+    for sample in request.competition_samples:
+        assert _is_normalized_fraction(sample.observed_bid_rate.fraction)
+        if sample.HasField("award_rate"):
+            assert _is_normalized_fraction(sample.award_rate.fraction)
+
+    response = prediction_pb2.CalculateOptimalBidResponse()
+    response.ParseFromString(_read("calculate_optimal_bid_response_success.binpb"))
+    for candidate in response.success.candidates:
+        assert _is_normalized_fraction(candidate.bid_rate.fraction)
+
+
+def test_testdata_decimal_string_fields_are_all_normalized(prediction_pb2):
+    response = prediction_pb2.CalculateOptimalBidResponse()
+    response.ParseFromString(_read("calculate_optimal_bid_response_success.binpb"))
+    for candidate in response.success.candidates:
+        assert _is_normalized_fraction(candidate.weight.fraction)
+    assert _is_normalized_fraction(response.success.fitness.score)
+    assert _is_normalized_fraction(response.success.uncertainty.dispersion)
+    assert _is_normalized_fraction(response.success.uncertainty.estimate_margin)
+
+
+def test_nan_fraction_is_rejected():
+    # Kotlin 대칭(verifier r1 F-6) — `Decimal("NaN")`은 생성은 되지만 뒤의 범위 비교가
+    # `InvalidOperation`을 던진다(수정 전 버그). `_is_normalized_fraction`이 그 앞에서
+    # 명시적으로 걸러 예외 없이 `False`를 낸다.
+    assert not _is_valid_bid_rate_fraction("NaN")
+    assert not _is_normalized_fraction("NaN")
+
+
+def test_fraction_with_surrounding_whitespace_is_rejected():
+    # Kotlin 대칭(verifier r1 F-6) — `Decimal(" 0.5 ")`는 파싱되지만(Python이 공백을
+    # 허용) `BigDecimal(" 0.5 ")`는 예외를 던진다(Java는 공백을 허용하지 않음). 정규형
+    # 검사(재직렬화 문자열과의 완전 일치)가 공백을 실측하지 못한 차이로 잡는다.
+    assert not _is_valid_bid_rate_fraction(" 0.5 ")
+    assert not _is_normalized_fraction(" 0.5 ")
 
 
 # ---- Uncertainty.sample_size >= 1(우회 후보 (3)) ----
@@ -398,6 +466,10 @@ def _has_three_ordered_candidates(prediction_pb2, success) -> bool:
     ]
 
 
+def _candidates_have_recommended_origin(success, common_pb2) -> bool:
+    return all(candidate.origin == common_pb2.BID_RATE_ORIGIN_RECOMMENDED for candidate in success.candidates)
+
+
 def _release_satisfies_selector(selector, response_release, promoted) -> bool:
     which = selector.WhichOneof("selector")
     if which == "exact_release":
@@ -424,12 +496,28 @@ def _is_acceptable_candidate_label(prediction_pb2, value: int) -> bool:
     return value != prediction_pb2.CANDIDATE_LABEL_UNSPECIFIED and value in known_values
 
 
-def _is_valid_bid_rate_fraction(fraction: str) -> bool:
+def _is_normalized_fraction(fraction: str) -> bool:
+    """Kotlin `ContractFractionRules.isNormalizedFraction`(2A가 세우고 2B가 재사용, scale
+    보존·지수 표기 거부)과 대칭인 Python 술어(verifier r1 F-3). `Decimal`은 Java의
+    `BigDecimal`과 달리 앞뒤 공백과 `NaN`/`Infinity`를 파싱하므로(F-6 비대칭의 원인),
+    재직렬화한 문자열이 입력과 완전히 같은지 비교해 그 차이를 없앤다 — 공백이 섞이면
+    재직렬화 결과에 공백이 없어 불일치, `NaN`은 `is_nan()`으로 명시 거부한다."""
+    if not fraction or "e" in fraction or "E" in fraction:
+        return False
     try:
         value = Decimal(fraction)
     except InvalidOperation:
         return False
-    return value >= 0 and value <= Decimal("1")
+    if value.is_nan() or value.is_infinite():
+        return False
+    return format(value, "f") == fraction
+
+
+def _is_valid_bid_rate_fraction(fraction: str) -> bool:
+    if not _is_normalized_fraction(fraction):
+        return False
+    value = Decimal(fraction)
+    return Decimal("0") <= value <= Decimal("1")
 
 
 def _is_acceptable_success(success) -> bool:

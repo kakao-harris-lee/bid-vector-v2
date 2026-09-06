@@ -19,7 +19,6 @@ import contract.bidvector.ml.v1.VatTreatment
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayOutputStream
-import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -247,12 +246,9 @@ class ContractRoundTripTest {
             .setProvenance(AmountProvenanceKind.AMOUNT_PROVENANCE_KIND_PUBLISHED)
 
     // ---- 계약이 요구하는 거부 규칙 — 순수 함수. Kotlin 쪽 실제 validation 구현은 M4 몫이고,
-    // 여기서는 round-trip test 가 그 규칙을 문서화·고정한다(scope.md 「구현 순서」 4). ----
-
-    private fun isNormalizedFraction(fraction: String): Boolean {
-        if (fraction.isEmpty() || fraction.any { it == 'e' || it == 'E' }) return false
-        return runCatching { BigDecimal(fraction).toPlainString() == fraction }.getOrDefault(false)
-    }
+    // 여기서는 round-trip test 가 그 규칙을 문서화·고정한다(scope.md 「구현 순서」 4).
+    // `isNormalizedFraction`은 `ContractFractionRules.kt`(같은 패키지) 공유 함수다 — 2B의
+    // `PredictionContractTest`와 중복 정의하지 않는다(verifier r1 F-3). ----
 
     private fun isAcceptableMoney(money: Money): Boolean =
         isKnown(money.currency, Currency.CURRENCY_UNSPECIFIED, Currency.UNRECOGNIZED) &&

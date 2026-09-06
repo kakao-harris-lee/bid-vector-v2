@@ -6,6 +6,7 @@ import contract.bidvector.ml.v1.AgencyIdFact
 import contract.bidvector.ml.v1.BaseAmountFact
 import contract.bidvector.ml.v1.BaseAmountProvenanceLabelFact
 import contract.bidvector.ml.v1.BidPredictionServiceGrpcKt
+import contract.bidvector.ml.v1.BidRateOrigin
 import contract.bidvector.ml.v1.CalculateOptimalBidRequest
 import contract.bidvector.ml.v1.CalculateOptimalBidResponse
 import contract.bidvector.ml.v1.Candidate
@@ -164,6 +165,26 @@ class PredictionContractTest {
         hasExactlyThreeOrderedCandidates(mutated.success) shouldBe false
     }
 
+    // ---- 후보 origin 은 항상 RECOMMENDED(scope.md ④, verifier r1 F-2) ----
+
+    @Test
+    fun `testdata 의 모든 후보 origin 은 RECOMMENDED 다`() {
+        val success = CalculateOptimalBidResponse.parseFrom(successBytes).success
+        candidatesHaveRecommendedOrigin(success) shouldBe true
+    }
+
+    @Test
+    fun `후보 하나라도 origin 이 OBSERVED 면 계약 불변식 위반이다`() {
+        val response = CalculateOptimalBidResponse.parseFrom(successBytes)
+        val mutated =
+            response
+                .toBuilder()
+                .also {
+                    it.successBuilder.getCandidatesBuilder(0).origin = BidRateOrigin.BID_RATE_ORIGIN_OBSERVED
+                }.build()
+        candidatesHaveRecommendedOrigin(mutated.success) shouldBe false
+    }
+
     // ---- Unmeasurable 두 사유 구분 ----
 
     @Test
@@ -262,6 +283,55 @@ class PredictionContractTest {
         success.candidatesList.forEach { candidate ->
             isValidBidRateFraction(candidate.bidRate.fraction) shouldBe true
         }
+    }
+
+    // ---- decimal string 정규형(2A 술어 재사용, verifier r1 F-3) — Rate 셋 + decimal 넷 ----
+
+    @Test
+    fun `지수 표기는 bid_rate 에서도 weight 에서도 거부된다(T7 재현)`() {
+        // verifier r1 변이 T7 — `bid_rate="8.87E-1"`·`weight="5.2E-1"`가 값으로는 [0,1]
+        // 안이라 범위 검사만으로는 통과했었다. 정규형 검사를 선행 조건으로 걸어 막는다.
+        isValidBidRateFraction("8.87E-1") shouldBe false
+        isNormalizedFraction("5.2E-1") shouldBe false
+        isNormalizedFraction("8.87E-1") shouldBe false
+    }
+
+    @Test
+    fun `testdata 의 Rate 자리(observed_bid_rate bid_rate award_rate)는 전부 정규형이다`() {
+        val request = CalculateOptimalBidRequest.parseFrom(requestBytes)
+        request.competitionSamplesList.forEach { sample ->
+            isNormalizedFraction(sample.observedBidRate.fraction) shouldBe true
+            if (sample.hasAwardRate()) {
+                isNormalizedFraction(sample.awardRate.fraction) shouldBe true
+            }
+        }
+        val success = CalculateOptimalBidResponse.parseFrom(successBytes).success
+        success.candidatesList.forEach { candidate ->
+            isNormalizedFraction(candidate.bidRate.fraction) shouldBe true
+        }
+    }
+
+    @Test
+    fun `testdata 의 decimal string 넷(weight fitness score dispersion estimate_margin)은 전부 정규형이다`() {
+        val success = CalculateOptimalBidResponse.parseFrom(successBytes).success
+        success.candidatesList.forEach { candidate ->
+            isNormalizedFraction(candidate.weight.fraction) shouldBe true
+        }
+        isNormalizedFraction(success.fitness.score) shouldBe true
+        isNormalizedFraction(success.uncertainty.dispersion) shouldBe true
+        isNormalizedFraction(success.uncertainty.estimateMargin) shouldBe true
+    }
+
+    @Test
+    fun `NaN 은 fraction 으로 거부된다(Kotlin Python 대칭, verifier r1 F-6)`() {
+        isValidBidRateFraction("NaN") shouldBe false
+        isNormalizedFraction("NaN") shouldBe false
+    }
+
+    @Test
+    fun `앞뒤 공백을 포함한 fraction 은 거부된다(Kotlin Python 대칭, verifier r1 F-6)`() {
+        isValidBidRateFraction(" 0.5 ") shouldBe false
+        isNormalizedFraction(" 0.5 ") shouldBe false
     }
 
     // ---- Uncertainty.sample_size >= 1(우회 후보 (3)) ----
@@ -399,11 +469,15 @@ class PredictionContractTest {
     private fun isAcceptableCandidateLabel(label: CandidateLabel): Boolean =
         label != CandidateLabel.CANDIDATE_LABEL_UNSPECIFIED && label != CandidateLabel.UNRECOGNIZED
 
-    private fun isValidBidRateFraction(fraction: String): Boolean =
-        runCatching {
-            val value = BigDecimal(fraction)
-            value.signum() >= 0 && value <= BigDecimal.ONE
-        }.getOrDefault(false)
+    // `isNormalizedFraction`(scale 보존·지수 표기 거부)을 선행 조건으로 건다(verifier r1
+    // F-3) — 범위(`0..1`)만 보면 `"8.87E-1"`처럼 값은 범위 안이나 정규형이 아닌 입력을
+    // 놓친다(T7 재현, 위 test). 함수 자체는 `ContractFractionRules.kt`(같은 패키지, 2A와
+    // 공유)에 있다.
+    private fun isValidBidRateFraction(fraction: String): Boolean {
+        if (!isNormalizedFraction(fraction)) return false
+        val value = BigDecimal(fraction)
+        return value.signum() >= 0 && value <= BigDecimal.ONE
+    }
 
     private fun isAcceptableSuccess(success: Success): Boolean = success.uncertainty.sampleSize >= 1
 
@@ -412,4 +486,9 @@ class PredictionContractTest {
             features.categoryCode.factCase != CategoryCodeFact.FactCase.FACT_NOT_SET &&
             features.agencyId.factCase != AgencyIdFact.FactCase.FACT_NOT_SET &&
             features.baseAmountProvenanceLabel.factCase != BaseAmountProvenanceLabelFact.FactCase.FACT_NOT_SET
+
+    // ---- 후보 origin 은 항상 RECOMMENDED(verifier r1 F-2) ----
+
+    private fun candidatesHaveRecommendedOrigin(success: Success): Boolean =
+        success.candidatesList.all { it.origin == BidRateOrigin.BID_RATE_ORIGIN_RECOMMENDED }
 }
