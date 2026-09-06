@@ -23,9 +23,19 @@
     python3 fixtures/tools/mutation_sweep_targeted.py
     python3 fixtures/tools/mutation_sweep_targeted.py --crosscheck-pyyaml
     python3 fixtures/tools/mutation_sweep_targeted.py --manifest <경로>
+
+종료 코드(2026-09-06, 1B-c 이월 — verifier r1 *"exit code 로 강제되지 않는다"*):
+
+    0  정상 — `MUTANTS` + 표기 변형 가운데 `EXPECTED_PASSES` 밖의 통과 0
+    1  위반 변이체 통과 ≥1 — 통과한 (case, 경로들, 이유) 를 stderr 에 한 줄씩 낸다
+    2  도구·manifest 형식 오류 — `ManifestFormatError` · 파일 열기 실패 · 기대값 JSON 파싱 실패
+
+「승인 대기」 절은 관찰용이라 종료 코드에 들지 않는다(고치지 않기로 한 자리는 통과가
+정상이다). 판정 로직은 그대로다 — 통과 자리 목록이 종료 코드로 나갈 뿐이다.
 """
 import argparse
 import copy
+import json
 import os
 import sys
 
@@ -54,6 +64,15 @@ MUTANTS = [
      "미선언 입력이 수용된다 — 1B-c 정정으로 그 자리가 `$.representable` 이 됐다(경로만 옮겼다)"),
     ("license-006", [("$.uncertainReason", "OperatorLicensesNotDeclared")], "대조군 — 무변이"),
 ]
+
+# **통과가 정상인 자리** — 종료 코드가 위반으로 세지 않는다. 키는 `run()` 이 내는
+# (case, 변이 경로들) 이라 `MUTANTS` 의 행을 고치지 않고 등재한다. 열린 사각은 그 OPEN 항목이
+# 닫혀 `caught` 로 돌아서면 여기서 뺀다 — 남겨 두어도 `caught` 행은 이 표를 보지 않는다.
+EXPECTED_PASSES = {
+    ("license-006", ("$.uncertainReason",)): "대조군 — 무변이",
+    ("money-basis-006", ("$.eligibleForAuthoritativeCorpus",)):
+        "OPEN-1BC-ELIGIBILITY — 적격성 축이 `verified_paths` 밖(소유 1D), 의도된 관찰 표적",
+}
 
 # **승인 대기로 남긴 자리** — 고치지 않기로 한 자리라 수정 뒤에도 통과해야 정상이다.
 # **1B-c(2026-09-05) 재추출로 닫힌 자리는 이제 `caught` 가 정상이다** — `rate-unit-003`·`004` ·
@@ -119,7 +138,14 @@ def main(argv=None):
     ap.add_argument("--crosscheck-pyyaml", action="store_true",
                     help="PyYAML 이 있으면 manifest reader 결과를 그것과 대조한다")
     args = ap.parse_args(argv)
+    try:
+        return sweep(args)
+    except (mc.ManifestFormatError, OSError, json.JSONDecodeError) as exc:
+        print("도구 오류 (%s): %s" % (type(exc).__name__, exc), file=sys.stderr)
+        return 2
 
+
+def sweep(args):
     if args.crosscheck_pyyaml:
         print("pyyaml crosscheck OK — cases", mc.crosscheck_pyyaml(args.manifest))
 
@@ -134,7 +160,12 @@ def main(argv=None):
 
     print("\n--- 승인 대기 (고치지 않은 자리) ---")
     run(cases, PENDING, registry, args.manifest)
-    return 0
+
+    violations = [(cid, paths) for cid, paths in passed
+                  if (cid, tuple(paths)) not in EXPECTED_PASSES]
+    for cid, paths in violations:
+        print("위반 변이체 통과: %s %s" % (cid, " ".join(paths)), file=sys.stderr)
+    return 1 if violations else 0
 
 
 if __name__ == "__main__":

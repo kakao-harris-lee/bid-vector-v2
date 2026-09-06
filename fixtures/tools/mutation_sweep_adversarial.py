@@ -42,6 +42,15 @@
 
 `--manifest` 는 강등 **이전** manifest 를 물려 그날의 판정을 재현할 때 쓴다
 (기대값·입력 파일은 강등에서 바뀌지 않았으므로 옛 manifest + 현재 fixture 로 성립한다).
+
+종료 코드(2026-09-06, 1B-c 이월 — verifier r1 *"exit code 로 강제되지 않는다"*):
+
+    0  정상 — 위반 변이체 통과 0(강등 대상 0)
+    1  위반 변이체 통과 ≥1 — 통과한 (case, 경로, 갈래) 를 stderr 에 한 줄씩 낸다
+    2  도구·manifest 형식 오류 — `ManifestFormatError` · 파일 열기 실패 · 기대값 JSON 파싱 실패
+
+판정 로직은 그대로다 — 「강등 대상」 수치가 종료 코드로 나갈 뿐이라, acceptance 가
+`check` 처럼 종료 코드 하나로 판정을 읽는다.
 """
 import argparse
 import copy
@@ -188,7 +197,14 @@ def main(argv=None):
     ap.add_argument("--crosscheck-pyyaml", action="store_true",
                     help="PyYAML 이 있으면 manifest reader 결과를 그것과 대조한다")
     args = ap.parse_args(argv)
+    try:
+        return sweep(args)
+    except (mc.ManifestFormatError, OSError, json.JSONDecodeError) as exc:
+        print("도구 오류 (%s): %s" % (type(exc).__name__, exc), file=sys.stderr)
+        return 2
 
+
+def sweep(args):
     if args.crosscheck_pyyaml:
         print("pyyaml crosscheck OK — cases", mc.crosscheck_pyyaml(args.manifest))
 
@@ -214,7 +230,11 @@ def main(argv=None):
     for cid in sorted(demoted):
         print("  -", cid)
     print("잔존 authoritative:", len(cases) - len(demoted))
-    return 0
+
+    for cid, path, why, passes in sorted(rows):
+        if passes:
+            print("위반 변이체 통과: %s %s %s" % (cid, path, why), file=sys.stderr)
+    return 1 if demoted else 0
 
 
 if __name__ == "__main__":
