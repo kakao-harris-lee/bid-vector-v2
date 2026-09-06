@@ -1,8 +1,10 @@
 # ADR 0010 — ML 호출의 시간·실패 예산, error mapping, 호환성 규칙, training transport
 
-- **상태**: **초안 — M2 착수 시 승인 대상**(`v2-지침서.md` §3.3 *"M2에서 deadline, retry, error mapping,
-  compatibility를 포함한 ADR을 승인한다"*). M1/1E 병행 중에 세션 모델이 단독으로 썼다(CLAUDE.md 운영자 지시
-  2026-09-04). 값은 정하지 않고 규칙을 정한다(§2 D-1). 운영자 결정이 필요한 자리는 §4.
+- **상태**: **초안 — M2 slice 2A 착수 전건으로 승인 대상**(`v2-지침서.md` §3.3 *"M2에서 deadline, retry, error mapping,
+  compatibility를 포함한 ADR을 승인한다"*). 2A ④(정책 참조)·⑥(제3 변환 금지)과 2D ⑥(deadline·재시도 test)이 이 ADR 의
+  D-1·D-2·D-3·D-4 위에 서므로 **2A 보다 먼저 승인**한다 — 2C 가 갱신할 상태가 아니다. M1/1E 병행 중에 세션 모델이 단독으로
+  썼다(CLAUDE.md 운영자 지시 2026-09-04). 값은 정하지 않고 규칙을 정한다(§2 D-1). 운영자 결정이 필요한 자리는 §4 이고
+  `reports/evidence/m2/m2-prep.md` 의 착수 전 결정 D-M2-12~14 가 그것을 수령한다.
 - **작성일**: 2026-09-06
 - **대응**: `ADR 0003` D-9(*"구체 semantics는 M2 ADR이 확정한다"*) · `ADR 0003` §5 `OPEN-ADR-11` · `milestone-2.md`
   2A 「deadline 정책」·「retryable/non-retryable application error」 · 2C 「transport는 별도 job API 또는 broker
@@ -69,8 +71,14 @@ deadline·재시도 횟수·백오프·circuit breaker 임계는 **Kotlin `adapt
 - **제3 변환 금지 — `Unmeasurable` 을 다른 predictor 의 성공값으로 접지 않는다.** legacy 는 모든 추론 실패를 `except Exception`
   으로 받아 historical predictor 의 값 있는 답으로 바꿨다(조사 노트 01 (c-2), `orchestration.py:264-273` — 응답 shape 이 성공과
   같고 차이는 자유 문자열 `fallback_reason`). 계약은 이것을 형태로 막는다: `Success` 는 **요청이 지목한 release**(`exact_release`)
-  로만 답하고, 다른 artifact 가 답하면 `ApplicationFailure(UNSUPPORTED_RELEASE)` 다. predictor 교체는 운영자의 승격 결정
-  (`latest_promoted` 갱신)이지 요청 처리 중의 폴백이 아니다. `Success` 에 fallback 표지·자유 문자열 사유 필드를 두지 않는다.
+  로만 답하고, 다른 artifact 가 답하면 `ApplicationFailure(UNSUPPORTED_RELEASE)` 다. **`latest_promoted` 요청에도 구멍이 없다** —
+  servicer 는 그 시점의 승격 release 로만 답하고 client 는 응답의 `release_id` 를 `GetModelMetadata.promoted` 와 대조한다
+  (불일치 = `UNSUPPORTED_RELEASE` 취급; 승격이 그 사이 바뀐 정상 경우는 재호출로 수렴). legacy 반례는 정확히 요청이 release 를
+  지목하지 않는 경로에서 일어났으므로 이 경로에 규칙이 없으면 금지가 비어 있다. predictor 교체는 운영자의 승격 결정(`promoted`
+  갱신)이지 요청 처리 중의 폴백이 아니다. `Success` 에 fallback 표지·자유 문자열 사유 필드를 두지 않는다.
+- **어휘 소유** — application failure 의 `FailureCode` 는 2A 가 단독 소유하고(`UNSUPPORTED_SCHEMA`·`UNSUPPORTED_RELEASE`·
+  `UNSUPPORTED_TRAINING_SPEC`·`INVALID_REQUEST`·`MODEL_NOT_READY`·`IDEMPOTENCY_CONFLICT`·`JOB_NOT_FOUND`), transport status 이름
+  (`RESOURCE_EXHAUSTED` 등)과 겹치는 값을 두지 않는다. training job 의 종료 사유는 별도 enum(`JobFailureCode`, 2C) — 층이 다르다.
 - servicer 가 `INVALID_ARGUMENT` 같은 gRPC status 로 **계약 위반**을 표현하는 것은 허용하되(예: 파싱 불가), **계약이
   정의한 실패**는 application failure 로 낸다 — 두 층에 같은 실패를 이중으로 두지 않는다. 어느 것이 어느 층인지는 2A
   `error.proto` 의 주석이 표로 갖는다.
@@ -108,15 +116,15 @@ deadline·재시도 횟수·백오프·circuit breaker 임계는 **Kotlin `adapt
   증명).
 - `feature_schema_version` 은 패키지 version 과 **다른 축**이다 — 계약 형태는 같고 피처 집합만 바뀌는 경우를 위한 것.
   servicer 가 아는 집합 밖이면 `UNSUPPORTED_SCHEMA`(fail-closed).
-- 생성 코드는 수동 편집하지 않는다 — 재생성 diff 0 이 게이트(2D).
+- 생성 코드는 수동 편집하지 않는다 — 생성물은 VCS 밖(`build/generated/`)이라 구조적으로 불가하고, 생성의 결정성과 비커밋을 2D 가 실측한다(2A D-2A-0a).
 
 ### D-8. training transport — 별도 job API, 같은 gRPC 서버, Kotlin 이 폴링
 
 `milestone-2.md` 2C 의 양자택일에서 **별도 job API** 를 택한다.
 
-- `TrainingJobService { StartTraining, GetTrainingJob, CancelTrainingJob }` — 전부 unary. 상태 `ACCEPTED → RUNNING →
-  SUCCEEDED | FAILED | CANCELLED`, 표에 없는 전이는 거부(`data-dictionary.md` §2.2 관례와 같은 형태 — 전이표는 계약 주석과
-  provider test 가 갖는다).
+- `TrainingJobService { StartTraining, GetTrainingJob, CancelTrainingJob }` — 전부 unary. 전이표: `ACCEPTED → RUNNING →
+  SUCCEEDED | FAILED` 와 `ACCEPTED | RUNNING → CANCELLED`(취소는 두 비종료 상태 모두에서). 표에 없는 전이는 거부
+  (`data-dictionary.md` §2.2 관례와 같은 형태 — 전이표는 계약 주석과 provider test 가 갖는다, 2C ④·⑤ 와 동일 표기).
 - Kotlin 이 **주기 조회**한다(ADR 0003 D-5). 조회 주기는 `ADR 0005` 의 DB 기반 스케줄러가 든다 — 브로커 없음.
 - 서버 스트리밍 push 는 불채택 — 장시간 연결은 「동기 RPC 로 붙잡지 않는다」(ADR 0003 D-4)의 취지를 형태만 바꿔 어긴다.
 - broker contract 는 불채택 — 측정된 필요 없음(§7), 두 runtime 사이에 세 번째 구성요소, ml-engine 이 브로커 어휘를 알아야 함.
@@ -139,7 +147,7 @@ deadline·재시도 횟수·백오프·circuit breaker 임계는 **Kotlin `adapt
 
 ---
 
-## 4. 운영자 결정이 필요한 자리 (M2 착수 시 — 묻지 않고 등재)
+## 4. 운영자 결정이 필요한 자리 (2A 착수 전 — `m2-prep.md` D-M2-12~14 로 수령, 여기서는 묻지 않는다)
 
 | 물음 | 선택지 | 추천 |
 | --- | --- | --- |
