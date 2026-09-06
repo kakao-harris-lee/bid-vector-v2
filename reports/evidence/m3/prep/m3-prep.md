@@ -87,3 +87,5 @@
 - **라이브 LLM 경로 없음** — 3C 전부 신설, 유일한 실물인 degrade(근거 없음 → `0.0`)는 **이식 금지**.
 - **`Provenance.Published(noticeRevision: Int)` 가 `R-QUAL-05` 를 재현할 수 있다** — M1 은 값을 주장하지 않아 비껴갔으나 3A 는 차수를 표적조회 필수 입력으로 쓴다 → **D-3A-0 신설(착수 전)**.
 - **`koneps-collection` 9 case 전부 `insufficient-evidence`**, 회계·백오프·rate limit·타임존 case 없음 → **D-M3-8 (a) 확정**: authoritative 승격 + 신설이 3A/3B 선행 작업(curator).
+- **회계 항등식의 셈이 문면과 legacy 에서 다르다** — legacy `dropped_count` 는 중복을 포함, COL-06 문면은 `duplicate` 를 따로 더한다 → 3A ⑦ 은 서로소로 정의하고 문면 정정을 착수 시(`OPEN-3A-ACCOUNTING-IDENTITY`).
+- **일시 출처 타임존 미확정(관측)** — legacy 는 KONEPS 벽시계 문자열을 UTC 로 파싱하는데 원문은 KST 로 보인다(9시간 어긋남 가능, 피해 기록·ledger 등재 없음) → 3A D-3A-4 는 해석 규칙을 정책 데이터로, `OPEN-3A-SOURCE-TZ`.
