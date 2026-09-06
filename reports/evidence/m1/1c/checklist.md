@@ -144,6 +144,12 @@ verifier r2 `ready-for-review`(HEAD `f3a9dba`, 잔여 non-blocker 일괄 `f9d80e
 N-3(`Resolution.Resolved` 생성자 좁힘 = shared-kernel 변경) 은 등재 유지. 지역 판정 slice(D-5)·license-*
 `contract_binding` 신설은 후속 지시 대상.
 
+**역방향 파급(등재만, evidence-pack 규격)** — decision 26 이 `data-dictionary.md` §3.2.5 에 넣은 줄로
+닫힌 slice evidence 의 좌표 셋이 낡았다: `reports/evidence/m1/1b/scope.md` 274행의 `data-dictionary.md:960`·
+`:980`, `reports/evidence/m0/0c/commands.md` 223행의 `:1551`. 닫힌 slice 의 문서라 고치지 않고 등재한다
+(capability-map 잔여 좌표 23 과 같은 M0 부채 갈래). 같은 날 capability-map §14.2 행 편집은 행 안 편집이라
+줄 수 무변경.
+
 ## acceptance 전건 (`commands.md` 상세)
 
 Q-0(격리 worktree `clean check`) · Q-1(`clean check`, `--no-build-cache`) · Q-2

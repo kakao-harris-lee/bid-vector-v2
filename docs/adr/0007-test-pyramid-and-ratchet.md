@@ -326,6 +326,17 @@ D-1~D-3의 테스트 층을 대체하지 않고 보완한다.
   Gradle 9.6.1 스모크 통과(configuration cache 포함), 현 baseline 중복 0. `check`가 `cpdCheck`와
   **리포트 산출 단언**에 의존해 관찰 모드가 「실행 안 함」으로 퇴화하지 않는다. `mode=fail` 전환은
   1C 종료 시 운영자 결정.
+- **실패 모드 전환(2026-09-06, 1C 종결 시 운영자 결정)**: **`main` source set 한정 `mode=fail`**,
+  test 는 관찰 유지 — `sizeGate` 타입 형태 두 축의 `main` 한정(1A-b D-6)과 같은 관례. 결정 근거는
+  1C HEAD 실측: main 중복 0, `qualification` test 파일 안 7–8줄(54–65 토큰) 중복 3 건. 배선은
+  `duplicate-policy.properties` `fail.source-sets=main`(version 2) · `cpdCheck` 의 source 를 실패
+  집합으로 교체(플러그인 기본 배선은 additive 라 `setSource` 로 덮는다) · 보수 집합(expected
+  source sets − 실패 집합)을 재는 `cpdCheckObserved`(항상 리포트만) 둘로 나눈다 — CPD 의
+  `ignoreFailures` 가 task 단위라 한 task 로는 「한 집합은 실패, 다른 집합은 관찰」이 안 된다.
+  리포트 산출 단언은 **소스가 있는 집합에만** 요구한다(adapters 에 test 소스 0 → 리포트 부재가
+  위반이 아니다; 소스가 있는데 리포트가 없으면 여전히 실패). 실측: main 주입 → `check` 실패,
+  test 주입 → 통과 + observed 리포트에 기록. 이 술어 변경은 verifier 표적 재검증 대상(2026-09-04
+  규정).
 
 **아래는 미결 당시의 기록이며 지우지 않는다.**
 
