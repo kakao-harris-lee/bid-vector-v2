@@ -52,7 +52,7 @@ import java.io.File
  */
 class SharedKernelCorpusConformanceTest {
     @TestFactory
-    fun `authoritative rate-unit·money-basis case 가 1B 계약과 대조된다`(): List<DynamicTest> =
+    fun `authoritative rate-unit·money-basis·license case 가 1B·1C 계약과 대조된다`(): List<DynamicTest> =
         targetCases().map { case -> dynamicTest(case.id) { runCase(case) } }
 
     /** 위협 모델 우회 (4) — 소비 테스트를 실행 집합에서 빼거나 dispatch 표에서 새 case 를 빠뜨리는 것을 막는다. */
@@ -70,11 +70,26 @@ class SharedKernelCorpusConformanceTest {
     /** money-basis-003(`OPEN-1BC-STR16` 이월)만 남아야 한다 — 「④가 넷을 닫는다」의 인계 경계. */
     @Test
     fun `1B 축 insufficient-evidence 이월은 money-basis-003 하나뿐이다`() {
+        val axisDomains = setOf("rate-unit", "money-basis")
         val ids =
             allCases()
-                .filter { it.domain in TARGET_DOMAINS && it.classification == "insufficient-evidence" }
+                .filter { it.domain in axisDomains && it.classification == "insufficient-evidence" }
                 .map { it.id }
         ids shouldBe listOf("money-basis-003")
+    }
+
+    /**
+     * M1/1C — license-001(policyVersion 요구가 QUAL-03 acceptance 축 위반) · 008(파싱 실패
+     * 행 수 근거 부족) · 010(`requirementsBySourceField` 초과 주장) · 011(`OPEN-QUAL-11`
+     * provisional 자체)은 인계 경계다(scope.md 「조사 결과」).
+     */
+    @Test
+    fun `1C 축 insufficient-evidence 이월은 license-001·008·010·011 넷뿐이다`() {
+        val ids =
+            allCases()
+                .filter { it.domain == "license" && it.classification == "insufficient-evidence" }
+                .map { it.id }
+        ids shouldBe listOf("license-001", "license-008", "license-010", "license-011")
     }
 
     private fun runCase(case: ManifestCase) {
@@ -103,7 +118,7 @@ class SharedKernelCorpusConformanceTest {
     }
 }
 
-internal val TARGET_DOMAINS = setOf("rate-unit", "money-basis")
+internal val TARGET_DOMAINS = setOf("rate-unit", "money-basis", "license")
 
 private const val MANIFEST_PROPERTY = "bidvector.fixtures.manifest"
 private const val FIXTURES_ROOT_PROPERTY = "bidvector.fixtures.root"
@@ -170,6 +185,11 @@ private fun readFixtureJson(manifestRelativePath: String): JsonNode {
 internal fun JsonNode.atDollarPath(path: String): JsonNode =
     path.removePrefix("$.").split(".").fold(this) { node, segment -> node.path(segment) }
 
+/**
+ * M1/1C — `missingByGroup`(license-002·003·005)이 JSON object 다. 순서 무관 비교라
+ * `LinkedHashMap`(Map.equals)에 맡긴다 — `atDollarPath` 가 세그먼트 이름으로만 내려가므로
+ * object 는 오직 이 leaf 비교 경로에서만 나타난다(중첩 object 순회는 하지 않는다).
+ */
 private fun JsonNode.canonical(): Any? =
     when {
         isMissingNode || isNull -> null
@@ -177,6 +197,7 @@ private fun JsonNode.canonical(): Any? =
         isNumber -> decimalValue()
         isString -> asString()
         isArray -> values().map { it.canonical() }
+        isObject -> properties().associate { (key, value) -> key to value.canonical() }
         else -> error("이 runner 가 다루지 않는 JSON 노드 형태: $this")
     }
 

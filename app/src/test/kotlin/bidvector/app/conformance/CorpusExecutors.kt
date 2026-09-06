@@ -1,27 +1,45 @@
 package bidvector.app.conformance
 
+import bidvector.qualification.LICENSE_QUALIFICATION_POLICY
+import bidvector.qualification.LicenseEligibility
+import bidvector.qualification.LicenseJudgement
+import bidvector.qualification.LicenseName
+import bidvector.qualification.LicenseValidity
+import bidvector.qualification.LicenseVerdict
+import bidvector.qualification.LmtGrpNo
+import bidvector.qualification.LmtSno
+import bidvector.qualification.OperatorLicenses
+import bidvector.qualification.RequirementCollection
+import bidvector.qualification.RequirementGroupId
+import bidvector.qualification.RequirementRow
+import bidvector.qualification.RequirementSourceField
+import bidvector.qualification.UncertainReason
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.EstimatedAmount
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.Money
+import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
+import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.compareKnownVat
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import tools.jackson.databind.JsonNode
+import java.time.LocalDate
 
 /*
- * M1/1B-c ④ — case id → executor dispatch 표와 1B 계약 호출부.
+ * M1/1B-c ④ · M1/1C — case id → executor dispatch 표와 1B·1C 계약 호출부.
  * `SharedKernelCorpusConformanceTest.kt` 가 fixture/JSON 인프라를 갖고, 이 파일은 「계약과
  * 무엇을 대조하는가」만 갖는다(크기 한도 회피가 아니라 관심사 분리 — 클래스 KDoc 참고).
  *
  * 계약에 없는 함수를 지어내지 않는다 — `Rate.ofPercent`/`ofFraction` 이 `Fact` 로
  * 감싸지 않고 제수를 방출하지 않는 것처럼, 이 파일도 계약이 실제로 내는 값만 조립한다.
- * `Provenance` variant 이름은 리플렉션(`::class.simpleName`) 대신 소진 `when` 으로 얻는다 —
- * sealed 라 새 variant 가 생기면 컴파일이 여기서 먼저 깨진다.
+ * sealed 타입의 variant 이름은 리플렉션(`::class.simpleName`) 대신 소진 `when` 으로 얻는다 —
+ * 새 variant 가 생기면 컴파일이 여기서 먼저 깨진다.
  */
 
 // ---- rate-unit 실행자 보조 — Rate 는 data class 라 구조적 동등이 internal 을 대신한다 ----
@@ -60,6 +78,20 @@ private fun rateFromDeclaredUnit(input: JsonNode): Rate {
         else -> error("이 corpus 는 declaredUnit='$declaredUnit' 를 다루지 않는다 — 지원: percent, fraction")
     }
 }
+
+/** `Rate` 값 동등 비교로 대조하는 case — `internal fraction` 을 읽지 않는다(D5(d)). */
+internal val RATE_EXECUTORS: Map<String, (JsonNode, JsonNode, List<String>) -> Unit> =
+    mapOf(
+        "rate-unit-001" to { input, expected, verifiedPaths ->
+            assertRateFractionMatches(rateFromDeclaredUnit(input), expected, verifiedPaths)
+        },
+        "rate-unit-002" to { input, expected, verifiedPaths ->
+            assertRateFractionMatches(rateFromDeclaredUnit(input), expected, verifiedPaths)
+        },
+        "rate-unit-005" to { input, expected, verifiedPaths ->
+            assertRateFractionMatches(rateFromDeclaredUnit(input), expected, verifiedPaths)
+        },
+    )
 
 // ---- money-basis value executor 보조 — Money 조립 ----
 
@@ -172,23 +204,7 @@ private fun factComparisonProjection(
     return projection
 }
 
-// ---- dispatch 표 ----
-
-/** `Rate` 값 동등 비교로 대조하는 case — `internal fraction` 을 읽지 않는다(D5(d)). */
-internal val RATE_EXECUTORS: Map<String, (JsonNode, JsonNode, List<String>) -> Unit> =
-    mapOf(
-        "rate-unit-001" to { input, expected, verifiedPaths ->
-            assertRateFractionMatches(rateFromDeclaredUnit(input), expected, verifiedPaths)
-        },
-        "rate-unit-002" to { input, expected, verifiedPaths ->
-            assertRateFractionMatches(rateFromDeclaredUnit(input), expected, verifiedPaths)
-        },
-        "rate-unit-005" to { input, expected, verifiedPaths ->
-            assertRateFractionMatches(rateFromDeclaredUnit(input), expected, verifiedPaths)
-        },
-    )
-
-internal val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
+private val MONEY_BASIS_VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
     mapOf(
         "money-basis-002" to { input ->
             val left = moneyFrom(input.atDollarPath("$.operatorFilter"))
@@ -234,6 +250,155 @@ internal val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
             )
         },
     )
+
+// ---- license value executor 보조 — M1/1C, qualification 공개 API 호출 → projection ----
+
+/** OPEN-QUAL-07 — 내용이 비어 있는 정책을 실제로 resolve 해서 쓴다(지어낸 리터럴이 아니다). */
+private val LICENSE_POLICY_DATA =
+    (LICENSE_QUALIFICATION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved).value
+
+private fun requirementRowFrom(rowNode: JsonNode): RequirementRow.Parsed {
+    val groupNoNode = rowNode.path("lmtGrpNo")
+    val groupNo = if (groupNoNode.isMissingNode || groupNoNode.isNull) null else LmtGrpNo(groupNoNode.asString())
+    return RequirementRow.Parsed(
+        groupNo = groupNo,
+        serialNo = LmtSno(rowNode.path("lmtSno").asString()),
+        sourceField = RequirementSourceField.LcnsLmtNm,
+        licenseNames = listOf(LicenseName(rowNode.path("lcnsLmtNm").asString())),
+    )
+}
+
+/** 「행이 없다」(`notice.licenseLimitRows` null)와 「수집이 실패했다」(`notice.collection.status`)는 다른 사유다. */
+private fun requirementCollectionFrom(noticeNode: JsonNode): RequirementCollection {
+    val collectionNode = noticeNode.path("collection")
+    val collectionFailed =
+        !collectionNode.isMissingNode && !collectionNode.isNull && collectionNode.path("status").asString() == "FAILED"
+    val rowsNode = noticeNode.path("licenseLimitRows")
+    return when {
+        collectionFailed -> RequirementCollection.CollectionFailed
+        rowsNode.isMissingNode || rowsNode.isNull -> RequirementCollection.DataAbsent
+        else -> RequirementCollection.Collected(rowsNode.values().map(::requirementRowFrom))
+    }
+}
+
+/**
+ * `operatorLicenses` 는 대부분 문자열 배열이지만 license-012 는 `{name, validUntil}` 객체
+ * 배열이다 — 유효기간은 이 slice 가 검증하지 않으므로(U-7) `name` 만 읽는다.
+ */
+private fun operatorLicensesFrom(input: JsonNode): OperatorLicenses {
+    val node = input.path("operatorLicenses")
+    if (node.isMissingNode || node.isNull) return OperatorLicenses.NotDeclared
+    val names =
+        node.values().map { element ->
+            LicenseName(if (element.isObject) element.path("name").asString() else element.asString())
+        }
+    return OperatorLicenses.Declared(names)
+}
+
+private fun policyVersionFrom(input: JsonNode): PolicyVersion =
+    PolicyVersion(EffectiveFrom.Initial, input.atDollarPath("$.policy.licenseGroupingPolicyVersion").asString())
+
+private fun requirementGroupIdKey(id: RequirementGroupId): String =
+    when (id) {
+        is RequirementGroupId.Numbered -> id.groupNo.value
+        RequirementGroupId.Ungrouped -> "__ungrouped__"
+    }
+
+private fun licenseVerdictName(verdict: LicenseVerdict): String =
+    when (verdict) {
+        is LicenseVerdict.Eligible -> "Eligible"
+        is LicenseVerdict.Ineligible -> "Ineligible"
+        is LicenseVerdict.Uncertain -> "Uncertain"
+    }
+
+private fun uncertainReasonName(reason: UncertainReason): String =
+    when (reason) {
+        UncertainReason.RequirementDataAbsent -> "RequirementDataAbsent"
+        UncertainReason.RequirementUnparsable -> "RequirementUnparsable"
+        UncertainReason.OperatorLicensesNotDeclared -> "OperatorLicensesNotDeclared"
+        UncertainReason.CollectionFailed -> "CollectionFailed"
+        UncertainReason.PermittedIndustryCombinationRuleUndecided -> "PermittedIndustryCombinationRuleUndecided"
+    }
+
+private fun requirementSourceFieldName(field: RequirementSourceField): String =
+    when (field) {
+        RequirementSourceField.LcnsLmtNm -> "lcnsLmtNm"
+        RequirementSourceField.PermsnIndstrytyList -> "permsnIndstrytyList"
+    }
+
+/**
+ * license-005(결측 그룹) 전용 파생값 — 조사 §1 어휘 불일치 ③. 커널 필드가 아니라 `Ungrouped`
+ * 그룹의 존재에서 낸다(verdict 가 그 그룹을 어느 쪽으로 접었든 존재 자체가 신호다).
+ */
+private fun foldedUngrouped(verdict: LicenseVerdict): Boolean =
+    when (verdict) {
+        is LicenseVerdict.Eligible -> RequirementGroupId.Ungrouped in verdict.satisfiedGroups
+        is LicenseVerdict.Ineligible -> RequirementGroupId.Ungrouped in verdict.missingByGroup.keys
+        is LicenseVerdict.Uncertain -> false
+    }
+
+private fun licenseJudgementProjection(judgement: LicenseJudgement): Map<String, Any?> {
+    val verdict = judgement.verdict
+    val projection =
+        mutableMapOf<String, Any?>(
+            "verdict" to licenseVerdictName(verdict),
+            "requiredLicenses" to judgement.requiredLicenses?.map { it.value },
+            "missingByGroup" to
+                judgement.missingByGroup.entries.associate { (id, names) ->
+                    requirementGroupIdKey(id) to names.map { it.value }
+                },
+            "unparsableRowCount" to judgement.unparsableRowCount,
+            "requirementSourceFields" to judgement.requirementSourceFields.map(::requirementSourceFieldName),
+            "policyVersion" to judgement.policyVersion.source,
+            "licenseValidityUnverified" to (judgement.validity is LicenseValidity.NotVerified),
+            "expiryEvaluated" to false,
+            "foldedUngroupedRowsIntoSingleAndGroup" to foldedUngrouped(verdict),
+        )
+    when (verdict) {
+        is LicenseVerdict.Eligible -> {
+            projection["satisfiedGroups"] = verdict.satisfiedGroups.map(::requirementGroupIdKey)
+        }
+
+        is LicenseVerdict.Uncertain -> {
+            projection["uncertainReason"] = uncertainReasonName(verdict.reason)
+        }
+
+        is LicenseVerdict.Ineligible -> {
+            // 사유 있는 미충족은 이미 projection["missingByGroup"]에 있다 — 더할 것이 없다.
+        }
+    }
+    return projection
+}
+
+/** authoritative 8건(002·003·004·005·006·007·009·012) 전부가 같은 executor 를 공유한다 — 입력 형태가 같다. */
+private fun licenseExecutor(input: JsonNode): Map<String, Any?> {
+    val collection = requirementCollectionFrom(input.path("notice"))
+    val operatorLicenses = operatorLicensesFrom(input)
+    val policyVersion = policyVersionFrom(input)
+    val judgement = LicenseEligibility.judge(collection, operatorLicenses, LICENSE_POLICY_DATA, policyVersion)
+    return licenseJudgementProjection(judgement)
+}
+
+internal val LICENSE_AUTHORITATIVE_CASE_IDS =
+    listOf(
+        "license-002",
+        "license-003",
+        "license-004",
+        "license-005",
+        "license-006",
+        "license-007",
+        "license-009",
+        "license-012",
+    )
+
+internal val LICENSE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
+    LICENSE_AUTHORITATIVE_CASE_IDS.associateWith { ::licenseExecutor }
+
+// ---- dispatch 표 ----
+
+/** money-basis(1B-c)·license(1C) 두 축의 value executor 를 하나의 dispatch 표로 합친다. */
+internal val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
+    MONEY_BASIS_VALUE_EXECUTORS + LICENSE_EXECUTORS
 
 /**
  * compile-fixture 위임 case → shared-kernel `compile-fixtures` 의 fixture 번호. 실제

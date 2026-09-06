@@ -38,6 +38,9 @@ dependencies {
     // `implementation`(비전이)으로 물어 app 의 compile classpath 에 원래 없었다 — runner 가
     // `Rate`·`Money`·`Fact` 등 공개 API 를 직접 참조하려면 이 test 전용 의존이 필요하다.
     testImplementation(project(":shared-kernel"))
+    // M1/1C — license-* corpus 실행자가 qualification 공개 API(`LicenseEligibility.judge` 등)를
+    // 직접 부른다. 같은 이유로 shared-kernel 을 test 전용으로 무는 것과 같은 배선이다.
+    testImplementation(project(":qualification"))
     // manifest.yaml(YAML) 을 읽기 위한 snakeyaml — 카탈로그 좌표는 이미 Boot BOM 관리 하에
     // transitively 해석되던 것을 명시로 올린 것뿐이다(`gradle/libs.versions.toml` 주석 참고).
     testImplementation(libs.snakeyaml)
