@@ -1564,16 +1564,30 @@ cases:
       approved_by_user: false
   - id: money-basis-003
     domain: money-basis
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         같은 입력 쌍이 감시 경로와 검색 경로에서 같은 답을 낸다 — 두 경로가 다른 basis를 쓰면 "제안에는 뜨는데 검색에는 안 나온다"가 된다.
+    verified_paths:
+      - "$.perPath.MONITORING_FILTER.result"
+      - "$.perPath.MONITORING_FILTER.basisUsed"
+      - "$.perPath.SEARCH_QUERY.result"
+      - "$.perPath.SEARCH_QUERY.basisUsed"
+      - "$.pathsAgree"
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
-          OPEN-STR-01 · capability-map.md STR-16 · regression-ledger.md R-BASIS-01·R-BASIS-02
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 29)** — `capability-map.md` STR-16 블록의 승인 주석이 정본이다:
+          *"이 capability 의 신설과 R-BASIS-01 의 「같은 쌍이 감시 경로와 검색 경로에서 같은 답을 낸다」를 **업무 규칙으로 명시 승인**한다"*.
+          결정 기록은 `reports/evidence/m1/1e/scope.md` 「착수 2026-09-06 — 운영자 결정」 문단(D-2 (a) = decision 29)이 갖는다.
+          인계 근거: `regression-ledger.md` R-BASIS-01·R-BASIS-02 · `OPEN-STR-01`.
     expected_reasoning: |-
-      regression-ledger.md R-BASIS-01 검증 방법 결정 무관(무조건) — *"같은 쌍이 감시 경로와 검색 경로(R-BASIS-02)에서 같은 답을 내는지도
-      함께 고정한다"*.
+      **근거는 커밋된 운영자 결정이다** — `capability-map.md` STR-16 「운영자 승인 2026-09-06(decision 29)」이 R-BASIS-01 의
+      「검증 방법 · 결정 무관(무조건)」 한 문장(*"같은 쌍이 감시 경로와 검색 경로(R-BASIS-02)에서 같은 답을 내는지도 함께 고정한다"*)을
+      **업무 규칙으로 명시 승인**하고 그 축을 소유한 STR-16 의 신설을 함께 승인했다. 2026-08-31 강등이 든 사유(*"근거가 M0 산출 문서의
+      자체 acceptance 뿐"*)가 이 승인으로 사라진다 — 이제 그 문장은 **인용된 운영자 결정 문면**이다.
+      같은 STR-16 블록의 acceptance *"금액 범위로 검색할 때 그 값이 어느 basis인지가 선언돼 있고, **비교 대상 금액과 basis가 같다**"* 가
+      `basisUsed` 두 자리를, *"감시 경로(STR-02 계열)와 **같은 basis**를 쓰는지가 이 항목으로 고정된다"* 가 `pathsAgree` 를 떠받친다.
+      **어느 쪽이 크다는 전제를 넣지 않는다** — 입력 쌍은 한계 하나(`minBudget`)와 공고 금액 하나이고 두 경로에 **같은 값**이 들어간다.
     input_file: fixtures/input/money-basis-003.json
     expected_file: fixtures/expected/money-basis-003.json
     normalization:
@@ -1591,18 +1605,31 @@ cases:
     sha256: 472dcedf7a35b51772140ef471051905e6eb96b74be18b4a5459d587c8daffbd
     expected_sha256: 810b6e95be545d9be5b41fc792f088af490e718c536f89ba8648ef39b5053c9d
     contract_binding:
-      type_path: "없다 — 검색 경로(`STR-16`)를 나르는 타입이 1B 계약에 없다"
-      fixed_by: 해당 없음
+      type_path: "bidvector.strategy.WatchRules.evaluate(WatchSubject): WatchVerdict 의 예산 축 + bidvector.sharedkernel.compareKnownVat(BaseAmount, BaseAmount): Fact<Int>"
+      fixed_by: |-
+        `WatchRulesTest` — ④ 예산 축의 하한·상한·등호 판정 넷이 **`compareKnownVat` 하나 위에** 서는 것을 고정하고,
+        「STR-01 4 watch rule 판정은 ML port 를 0회 호출한다」가 같은 입력에 같은 출력(부작용 없음)을 실측한다.
+        **경로 분기가 커널에 없다는 것은 test 가 아니라 서명**이다 — `WatchRules.evaluate` 는 `EvaluationPath` 를 받지 않는다.
+        corpus 대조(두 경로 투영과 `pathsAgree`)는 app conformance runner 가 진다.
       carries: |-
-        **감시 경로 쪽 절반만 계약에 있다** — 같은 basis 의 `BaseAmount` 비교가 그것이고 002 와 같은 자리다.
+        **「두 경로가 같은 답」이 주장이 아니라 구조다**(D-2 (a)·⑩) — 예산 비교 경로가 함수 **하나**이고
+        `WatchRules.evaluate` 의 서명에 경로가 없어 같은 입력을 두 번 부른 결과가 같을 수밖에 없다.
+        `$.perPath.*.basisUsed` 두 자리가 STR-16 acceptance 의 「비교 대상 금액과 basis 가 같다」이고
+        `$.pathsAgree` 가 그 동일성이다. 한계 값이 `OperatorDeclared`·`INCLUSIVE` 로만 구성된다는 D-6 요건은
+        `validate` 가 `StrategyViolation.BudgetLimitNotComparable` 로 집행한다.
       does_not_carry: |-
-        **두 경로가 같은 답을 낸다는 주장 자체.** 검색 경로는 1B 가 만들지 않았고 `$.perPath` 를
-        나르는 타입이 없다.
-        **2026-09-05 이월(1B-c).** 앞선 자물쇠 셋 가운데 둘이 풀렸다 — 술어 어휘(decision 18)와
-        운영자 승인(decision 20·21, 이 case 의 처분은 **이월**)이다. **남은 하나가 계약 자리의
-        부재**이고 그것은 이 slice 밖이다(`out_of_scope`: STR-16 이 요구하는 검색 경로 타입).
-        소유는 `uncovered_axes` 의 **`OPEN-1BC-STR16`**(strategy slice)이 받는다. **분류는
-        `insufficient-evidence` 그대로이고 기대값·입력·해시는 무접촉이다.**
+        **① `$.perPath.*.outcome` 의 토큰 `Comparable`.** 계약 어휘가 아니다 — `m1_contract_binding.token_alignment`
+        가 그 자리를 **「부재」**로 적었고 1E 도 채택하지 않았다(비교 성부는 `Fact.Known`/`Fact.Absent` 가 나른다).
+        그래서 **`verified_paths` 에 두지 않는다** — 2026-09-01 결정(미승인 리터럴은 정확 비교에 두지 않는다)이 그대로 막고,
+        `verifies` 도 그 이름을 주장하지 않는다(도출 규칙 ③, 동반 산출).
+        **② `$.perPath.*.result` 의 불리언은 runner 투영이다** — `WatchVerdict` 에 `passes()`·`toBoolean()` 이 없다
+        (scope.md 위협 모델 (a)). example test 가 커널 타입에서 이 이름을 찾으면 안 된다.
+        **③ `evaluatedVia`·`perPath` 의 키(`MONITORING_FILTER`·`SEARCH_QUERY`)는 커널 입력이 아니다** —
+        `EvaluationPath = sealed { MonitoringFilter, SearchQuery }` 는 **runner 투영의 축**이고 커널 함수는 이 타입을
+        모른다(D-11). 문자열 표기와 sealed variant 이름의 결속은 **runner 소유**다.
+        **④ 검색 API**(엔드포인트·페이지네이션·정렬)는 M3 — 이 case 가 고정하는 것은 **predicate 가 하나**라는 사실까지다.
+        **⑤ 입력 키 `amount` 의 철자.** 계약 필드는 `AmountRecord.won` 이고 `Money.amount` 는 `internal` 이다 —
+        `amount` 는 이 corpus 의 직렬화 관례이며 결속은 runner 소유다.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -1658,6 +1685,27 @@ cases:
           `out_of_scope` 다. 열한 case 가운데 유일하게 되돌리지 못한 자리다.
         policy_version: |-
           해당 없음 — 문서 포인터와 소유 OPEN 의 등재이고 기대값이 정책 데이터에 의존하지 않는다.
+          입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
+      - date: 2026-09-06
+        change: |-
+          **되돌렸다.** `classification` 을 `insufficient-evidence` 에서 `authoritative` 로, `source.kind` 를
+          `m0-derived-rule` 에서 `operator-decision` 으로 올리고 `verified_paths` 다섯과 1E 계약 `contract_binding` 을 달았다.
+          **입력·기대값 파일과 `sha256`·`expected_sha256` 는 바꾸지 않았다** — 그래서 `previous_sha256`·
+          `previous_expected_sha256` 가 없다.
+        reason: |-
+          **자물쇠 둘이 같은 날 함께 풀렸다.** ① **운영자 승인** — `capability-map.md` STR-16 「운영자 승인 2026-09-06
+          (M1/1E 착수, decision 29)」이 R-BASIS-01 의 「같은 쌍이 감시 경로와 검색 경로에서 같은 답을 낸다」를 업무 규칙으로,
+          STR-16 신설을 capability 로 **함께 명시 승인**했다 — `uncovered_axes` 의 `unblocks_when` 이 요구하던 문면 그대로다.
+          ② **계약 자리** — 2026-09-05 이월의 사유였던 *"검색 경로(`STR-16`)를 나르는 타입이 계약에 없다"* 가 M1/1E 로 닫혔다.
+          다만 **선 것은 「검색 경로 타입」이 아니라 그보다 강한 형태**다(D-2 (a)·D-11): 경로를 나르는 타입을 predicate 입력에
+          두지 않고 `WatchRules.evaluate` **함수 하나**를 두 경로가 함께 쓰게 했다. `EvaluationPath` 는 runner 투영의 축이다.
+          그래서 「두 경로가 같은 답」이 주장이 아니라 **구조**가 됐다.
+          **`verified_paths` 에 `$.perPath.*.outcome` 을 넣지 않았다** — 토큰 `Comparable` 이 계약 어휘 밖이고
+          (`m1_contract_binding.token_alignment` 「부재」) 2026-09-01 결정이 미승인 리터럴의 정확 비교를 막는다.
+          `verifies` 가 주장하는 것은 **「같은 답」과 그 basis** 이며 결과 상태의 이름이 아니다(도출 규칙 ③).
+          소유 축 `OPEN-1BC-STR16` 은 `uncovered_axes` 에서 **해소로 갱신**했고 축 자체는 지우지 않았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 분류의 변경과 계약 필드의 신설이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `previous_sha256`·`previous_expected_sha256` 가 없다.
     review:
       claude_commit: pending
@@ -6410,8 +6458,9 @@ uncovered_axes:
       「사유와 함께 거부되는 런타임 객체」에서 **「그 조합은 표현 불가」**로 재정의됐고, 실행자는
       기대값이 아니라 컴파일 fixture 다. 어느 case 가 어느 층인지는 **각 case 의 `classification` 이
       정본**이고 셈은 **C-5** 가 낸다.
-      **덮이지 않는 것은 두 경로가 같은 basis 를 쓴다는 요구**다 — 그 축의 case 는
-      `insufficient-evidence` 로 남아 있고 지워지지 않았다.
+      **두 경로가 같은 basis 를 쓴다는 요구는 2026-09-06 까지 덮이지 않았다** — 그 축의 case 는
+      `insufficient-evidence` 로 남아 있었고 지워지지 않았다. **그날 M1/1E 가 그 자리를 닫았다** —
+      아래 「검색 경로의 basis 일치」 축의 해소 기록과 `money-basis-003` 의 `change_history` 2026-09-06 항목이 정본이다.
     unblocks_when: |-
       운영자가 `regression-ledger.md` R-BASIS-01 의 「결정 무관(무조건)」 검증 방법 가운데
       **「같은 쌍이 감시 경로와 검색 경로(R-BASIS-02)에서 같은 답을 내는지도 함께 고정한다」**를
@@ -6639,25 +6688,32 @@ uncovered_axes:
       지정**하면 그때는 기대값 파일이 바뀌므로 `change_history` 에 `previous_expected_sha256` 를
       함께 싣는다.
 
-  - axis: "검색 경로의 basis 일치 — 감시 경로와 같은 답을 내는가"
+  - axis: "검색 경로의 basis 일치 — 감시 경로와 같은 답을 내는가 (**해소 2026-09-06, M1/1E**)"
     domain: money-basis
+    status: 해소 — 축은 이력으로 남긴다(지우지 않는다)
     why_blocked: |-
-      **계약에 자리가 없다.** 검색 경로(`STR-16`)를 나르는 타입이 1B `shared-kernel` 에 없고, 그
-      타입을 만드는 것은 1B-c 의 `out_of_scope` 다(slice 계약이 명시적으로 뺐다). 이 축을 막던
-      다른 둘 — 술어 어휘와 운영자 명시 승인 — 은 2026-09-05 에 풀렸다(decision 18 · 20·21).
-      **남은 하나가 이것이고 성격이 다르다**: 근거도 술어도 승인도 아니라 **계약 층의 부재**다.
+      **막던 것은 계약 층의 부재였다.** 검색 경로(`STR-16`)를 나르는 타입이 1B `shared-kernel` 에 없었고 그
+      타입을 만드는 것은 1B-c 의 `out_of_scope` 였다(slice 계약이 명시적으로 뺐다). 이 축을 막던
+      다른 둘 — 술어 어휘와 운영자 명시 승인 — 은 2026-09-05 에 풀렸었다(decision 18 · 20·21).
+      **남은 하나가 그것이었고 성격이 달랐다**: 근거도 술어도 승인도 아니라 계약 층의 부재였다.
     owning_open:
-      - "`OPEN-1BC-STR16` (신설 2026-09-05, 1B-c) — 소유는 strategy slice(`STR-16` 신설)다"
-      - "인접: 위 「승인 부재로 authoritative 덮개를 잃은 축 — money-basis」 — 그 축의 승인 자물쇠는 풀렸고 남은 case 가 이 축으로 넘어왔다"
+      - "~~`OPEN-1BC-STR16`~~ (신설 2026-09-05, 1B-c · **해소 2026-09-06, M1/1E**) — 소유였던 strategy slice 가 닫았다"
+      - "인접: 위 「승인 부재로 authoritative 덮개를 잃은 축 — money-basis」 — 그 축의 승인 자물쇠는 2026-09-05 에 풀렸고 넘어온 case 가 이 축에서 닫혔다"
     what_is_covered_instead: |-
-      감시 경로 절반은 덮인다 — 같은 basis 두 금액의 비교가 `compareKnownVat` 위에 서고
-      `money-basis-002` 가 그것을 잠근다. **비는 것은 「두 경로가 같은 답을 낸다」는 주장 자체**이며,
-      그 주장을 지고 있는 case 는 `insufficient-evidence` 로 남아 있고 기대값·입력·해시가 그대로다.
+      **이제 축 자체가 덮인다.** `money-basis-003` 이 2026-09-06 에 `authoritative` 로 돌아왔고
+      `$.perPath.*.basisUsed` 둘과 `$.pathsAgree` 가 계약이다. 감시 경로 절반을 지던
+      `money-basis-002`(같은 basis 두 금액의 비교가 `compareKnownVat` 위에 선다)는 그대로다.
+      **덮이지 않고 남는 것 둘** — ① 결과 상태의 **이름**(`$.perPath.*.outcome` 의 `Comparable`)은
+      계약 어휘 밖이라 정확 비교에 두지 않았다(`money-basis-003` 의 `contract_binding.does_not_carry` ①,
+      아래 「승인된 피연산자 부재」 계열과 같은 잣대) ② 검색 **API**(엔드포인트·페이지네이션)는 M3 다.
     unblocks_when: |-
-      strategy slice 가 검색 경로를 나르는 타입을 세우고, 운영자가 `regression-ledger.md` R-BASIS-01 의
-      「같은 쌍이 감시 경로와 검색 경로에서 같은 답을 내는지도 함께 고정한다」를 업무 규칙으로 명시
-      승인한다(그 축을 소유한 `STR-16` 의 신설 승인을 겸한다). 되돌릴 때 `change_history` 에 그
-      계약 경로와 승인 기록의 좌표를 적는다.
+      **닫힌 조건 그대로다.** ① 운영자가 `regression-ledger.md` R-BASIS-01 의 「같은 쌍이 감시 경로와 검색
+      경로에서 같은 답을 내는지도 함께 고정한다」를 업무 규칙으로 명시 승인하고(그 축을 소유한 `STR-16` 의
+      신설 승인을 겸한다) ② strategy slice 가 그 축의 계약 자리를 세운다 — **둘 다 2026-09-06 에 났다**
+      (`capability-map.md` STR-16 승인 주석 = decision 29 · M1/1E `WatchRules.evaluate` + `compareKnownVat`).
+      ②의 형태는 예고와 다르다 — 「검색 경로를 나르는 타입」이 아니라 **경로를 모르는 함수 하나**를
+      두 경로가 공유한다(D-2 (a)·D-11). 계약 경로와 승인 좌표는 `money-basis-003` 의 `change_history`
+      2026-09-06 항목이 갖는다.
 
   - axis: "corpus 적격성 판정 — legacy 유래 행이 승격 대상인가"
     domain: money-basis
