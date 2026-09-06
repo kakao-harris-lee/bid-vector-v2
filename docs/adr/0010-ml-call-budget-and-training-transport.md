@@ -151,6 +151,11 @@ deadline·재시도 횟수·백오프·circuit breaker 임계는 **Kotlin `adapt
 
 ## 6. 확인하지 않은 것
 
-- Kotlin coroutine cancellation → gRPC cancel 전파와 Python `context.is_active()` 의 실제 거동(조사 노트 02 · 2D test).
+- Kotlin coroutine cancellation → gRPC cancel 전파와 Python `context.is_active()` 의 실제 거동. 조사 노트 02 가 미해결 버그
+  (grpc/grpc#36193 — 콜백 중 `cancelled()` 가 False)를 찾았다 — **2D 의 cancellation test 는 servicer 의 플래그 폴링이 아니라
+  취소 뒤 실제 리소스 해제(계산 중단·연결 반환)로 검증한다.** D-2 의 「긴 계산 앞에서 확인」은 유지하되 그것만으로 충분하다고
+  보지 않는다.
+- gRPC Python 의 fork-불안전(조사 노트 02) — 2C training 워커가 fork 기반이면 servicer 프로세스와 분리해야 한다. 프로세스
+  모델은 M5 5A·5E 소유이고 이 ADR 은 「servicer 프로세스 안에서 fork 하지 않는다」만 요구한다.
 - `latest_promoted` 와 재시도의 상호작용을 fake servicer 로 재현할 수 있는지(2D).
 - 학습 job 의 `FAILED` 사유 어휘 — 5C 가 evaluation report 형태를 낸 뒤 2C 가 enum 을 확정.
