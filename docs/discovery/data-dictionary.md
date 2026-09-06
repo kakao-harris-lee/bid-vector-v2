@@ -936,6 +936,13 @@ legacy가 스스로 공시한 편향이 있다 — 표본 필터가 사정률 `1
 
 **최소 표본 수는 정책 데이터다** — §4.3.
 
+**운영자 결정 2026-09-06(M1/1D 착수, decision 28) — 경계 등가의 미달 판정.** `v2-지침서.md` §4.4 가
+「경계의 포함/제외는 versioned 정책」으로 미룬 값의 **초기값을 `strictly-greater`**(실현 사정률이 임계와
+**같으면 미달이 아니다**)로 승인한다 — 위 「핵심 관계」의 `하한 미달 ⟺ 실현 사정률 > 임계 사정률` 과
+DEC-04 acceptance 문면 그대로다. 정책 데이터 `FloorShortfallPolicyData.shortfallComparison` 의 version 1
+값이며, 바꾸려면 새 version 이다. 이 결정으로 `floor-threshold-002` 는 정책 version 을 입력에 실어
+`authoritative` 로 되돌릴 근거를 얻는다(0E 라운드 11 강등 사유 「정책 부재」의 해소).
+
 ### 3.4 기초금액 provenance rule
 
 `v2-지침서.md` §4.3이 라벨 집합을 **승인 명세로** 정한다.
@@ -960,6 +967,15 @@ legacy가 스스로 공시한 편향이 있다 — 표본 필터가 사정률 `1
 > **바뀌지 않는 요구**: **"아직 판정하지 않음"이 "신뢰함"으로 접히면 안 된다.**
 > 그 요구를 **승인 명세의 어느 variant가 나르는가**(`Unknown`에 접는가, 별도 variant를
 > 더하는가)는 이 문서가 정하지 않는다 → **`OPEN-DIC-05`**.
+>
+> **해소 — 운영자 결정 2026-09-06(M1/1D 착수, decision 27).** 승인 라벨 다섯은 **바꾸지 않는다.**
+> ① legacy `suspect-fractional`(비정수 금액)은 라벨이 아니라 **1B `Money` 경계의 거부**
+> (`AmountNotRepresentable` — 원화 확정 금액은 정수, `base-amount-provenance-004`·`005` 가 그 자리)로
+> 흡수된다 — 비정수 금액은 provenance 커널에 도달하지 않는다. ② **`Unknown` = 「규칙 무매치」**(커널
+> 출력)이고 **「아직 판정하지 않음」은 판정 레코드(`ProvenanceJudgement`)의 부재**다 — persistence 의
+> 상태이며 커널 값이 아니다. 「미판정 ≠ 신뢰」는 variant 가 아니라 **타입 경계**가 나른다: 판정 레코드
+> 없이 `Clean` 을 얻는 공개 경로가 없고, 소비자는 `Fact<ProvenanceJudgement>` 의 `Absent` 를 `Clean` 으로
+> 읽을 수 없다(legacy `bid_base.py:84-104` 의 「`NULL` = `clean`」 경로가 타입으로 막히는 자리).
 
 **first-match 순서가 load-bearing이다.** 비율 의심이 정수 판정 앞, 정수 판정이 VAT 파생
 앞이며 그 이유가 코드에 선언돼 있다. **순서를 정책 데이터로 선언하고 테스트와 정책
@@ -1673,7 +1689,7 @@ slice가 등재한 운영자 결정의 미완에서 나왔는지**는 아래 표
 | **`OPEN-DIC-02`** | **시공능력평가액 공시의 갱신 주기와 시행 구간.** "직전 연도"와 "공고일 기준 직전 해"가 같으려면 갱신이 역년 경계여야 한다 | **U-2b의 잔여** | 이 저장소에 근거가 없다. 조달청·협회 문서 확인이 필요하다 | §1.2.4 |
 | **`OPEN-DIC-03`** | **`SkipReason` 어휘의 전수성.** 최소 두 값은 legacy 게이트 사다리에서 확인되나 목록이 닫혔는지는 미확인 | — (0C 자체 발견) | legacy 사다리를 M1에서 옮길 때 확정된다. 지금 닫으면 옮기는 과정에서 발견될 사유가 갈 곳을 잃는다 | §3.6 |
 | **`OPEN-DIC-04`** | **`AllocatedBudget`·`YegaAmount`·`AwardAmount`의 과세 처리** | **U-1·U-1b가 금액 둘만 정했다** | U-1·U-1b는 추정가격과 기초금액 둘만 정했다. 나머지 셋은 결정도 문서 근거도 없다 | §1.2 |
-| **`OPEN-DIC-05`** | **`BaseAmountProvenance`의 승인 라벨 다섯이 legacy 실측을 덮는가** — ① `suspect-fractional`에 대응하는 이름이 승인 명세에 없다 ② **미판정(`NULL`)과 「출처를 모름」(`Unknown`)이 같은 값인가** | — (0C 자체 발견) | **승인 명세(`v2-지침서.md` §4.3)의 집합을 이 문서가 바꿀 수 없다.** `OPEN-DEC-08`은 **legacy `clean` 승계 금지**만 확정했고 라벨 집합 변경을 승인하지 않았다. **바꾸려면 별도 결정이 필요하다** | §3.4 |
+| ~~**`OPEN-DIC-05`**~~ | **`BaseAmountProvenance`의 승인 라벨 다섯이 legacy 실측을 덮는가** — ① `suspect-fractional`에 대응하는 이름이 승인 명세에 없다 ② **미판정(`NULL`)과 「출처를 모름」(`Unknown`)이 같은 값인가** | — (0C 자체 발견) | **승인 명세(`v2-지침서.md` §4.3)의 집합을 이 문서가 바꿀 수 없다.** `OPEN-DEC-08`은 **legacy `clean` 승계 금지**만 확정했고 라벨 집합 변경을 승인하지 않았다. **바꾸려면 별도 결정이 필요하다.** **해소 — 운영자 결정 2026-09-06(M1/1D, decision 27): 집합 불변.** ① 은 1B `Money` 경계 거부로 흡수, ② 는 `Unknown` = 규칙 무매치 / 미판정 = 판정 레코드 부재(커널 값 아님) — 해소 전문은 §3.4 의 블록이 갖는다 | §3.4 |
 | **`OPEN-DIC-06`** | **V2 canonical write 경로가 `Undeclared` provenance를 거부하는가** — 거부한다면 그 경계의 입력 타입은 `FactProvenance`의 진부분집합이다 | — (0C 자체 발견) | **근거가 한쪽으로 서지 않는다.** §5.1의 **둘째 규율**은 `Undeclared`를 **권위로 취급하지 않을** 뿐 **금지하지 않고**, 같은 축의 `vatTreatment`에서 §1.2.1은 *"선언을 만들 수 없으면 `Unknown`"*을 **허용**한다. **어댑터의 의무를 정하는 결정**이므로 이 문서가 정할 자리가 아니다 | §7.1 · §5.1 |
 | **`OPEN-DIC-07`** | **전송 멱등 키와 재관측 키가 각각 무엇으로 이루어지는가** — 무엇이 **한 전송**을 식별하고 무엇이 **같은 사실**을 식별하는가 | **U-3이 fold 재정의만 정했다** | **두 역할을 한 키가 겸할 수 없다는 것**은 모순 제거로 확정되나(§2.2.3) **키의 구성**은 아니다. **U-3은 fold로의 재정의를 정했고 멱등 키의 구성을 정하지 않았다.** `OPEN-SET-04`가 소유한 것은 **재관측의 노출 여부**이지 키의 구성이 아니다 | §2.2.3 |
 | ~~`OPEN-DIC-08`~~ | **파생 `Money`와 파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가.** 걸리는 값은 `BidAmount`(기초금액 × 투찰율)와 `AssessmentRate`·`AwardRate`다. **선택지 셋** — ① **아무것도 싣지 않는다.** 되짚기는 그 값을 낸 판정의 `DecisionProvenance`(§4.1: `policyVersion`·`inputSnapshotHash`)로만 하고, 값과 판정이 떨어지면 되짚지 않는 것을 받아들인다 ② **값이 입력 fact의 안정적 참조와 계산 정책 version을 나른다**(참조는 §12.2의 식별자 갈래) ③ **`FactProvenance`에 파생 산출 variant를 더해** 그 안에 ②를 넣는다 | — (Codex 리뷰 라운드 5가 드러냈다) | **해소 — 운영자 결정 2026-09-04(M1/1B 계약 갱신).** **선택지 ②를 채택한다** — 파생 `Money`(`BidAmount`)와 파생 율(`AssessmentRate`·`AwardRate`) 모두 입력 fact의 안정적 참조와 계산 정책 version을 값에 함께 싣는다. **금액과 율에 같은 답을 쓴다** — 조사 B가 열어 둔 「율은 ②, 금액은 ①」 갈림은 채택하지 않는다. `FloorRateOrigin`·`BidRateOrigin`은 이미 런타임 구별 축을 나르고 있어 그와 어긋나지 않는다. **①·③은 불채택** — ①은 값과 판정이 떨어지면 되짚기를 포기하는데 D-1(`Money`는 다섯 성분)의 취지와 맞지 않고, ③은 `FactProvenance` 어휘 자체의 변경이라 이 결정의 범위를 넘는다. **이 결정이 정하지 않는 것**: 참조·version을 나르는 정확한 필드 형태(타입 서명)는 M1 1B 구현이 정한다. **⚠ 조정 — 운영자 결정 2026-09-04(decision 17, Codex M1/1B 1차 리뷰 #4 → 선택지 A 채택).** ②가 요구한 「입력 fact의 안정적 참조」는 이 문서 안에 가리킬 identity가 없다 — §12.2 「식별자」 갈래 아홉은 전부 다른 capability 소유의 기존 식별자이고, `inputSnapshotHash`는 ①의 carrier(`DecisionProvenance`, §4.1) 소유다. `AmountRecord` 값 스냅샷은 참조가 아니다(값·provenance가 같은 서로 다른 fact를 구분하지 못한다 — Codex #4). content-addressed 해시 등 새 identity 체계는 여러 capability에 걸치는 cross-cutting 명세라 1B가 지을 수 없다. 그래서 **B11을 ①의 변형으로 조정한다**: 파생 `Money`(`BidAmount`)·파생 율(`AssessmentRate`·`AwardRate`·`BidRate`)은 **계산 정책 version만** 값에 싣고(`DerivationRecord(policyVersion)`), **입력 fact로의 되짚기는 그 값을 낸 판정의 `DecisionProvenance`(§4.1 — `policyVersion`·`inputSnapshotHash`)가 소유한다.** ①에 대한 원 반론(D-1 취지)은 철회한다 — D-1은 `Money`의 다섯 성분을 고정하는 결정이고, 파생값이 되짚기 정보를 나르는가와는 독립이다. 조정이 바꾸지 않는 것: 금액과 율에 같은 답 · `FloorRateOrigin`·`BidRateOrigin`의 런타임 구별 축 · ③ 불채택. **대가**: 값과 판정이 떨어지면 값만으로는 입력을 되짚지 않는다 — ①의 원문이 적은 그 대가를 받아들인 것이다. 대안 B(fact-id 신설 slice)·C(content-addressed 참조를 1B 안에서 승인)는 불채택 | §1.2 · §1.4.2 · §4.1 · §5.1 · §12.2 |
