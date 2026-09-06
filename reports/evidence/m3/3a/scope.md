@@ -89,10 +89,10 @@ rollback: |
 
 ## 위협 모델 — 3A 고유 경계
 
-**방어한다**: (a) 파생값이 canonical 자리를 덮음(타입 ⑥ + `isAuthoritative` 데이터) (b) 미지 raw 키의 조용한 소비(④ 타입 — 계약 없는 키는 소비 함수에 못 들어간다) (c) 차수의 `int` 변환(③ 타입) (d) 단위 추측(⑧ — 계약 `scale` 없이는 변환 불가) (e) 회계 항등식 파괴(⑦ 생성자 불변식) (f) 상태 전이의 조용한 무시(⑨ 거부 관측) (g) 정책 데이터 리터럴의 main 유입(1C·1D 관례, 코드 리뷰).
+**방어한다**: (a) 파생값이 canonical 자리를 덮음(타입 ⑥ + `isAuthoritative` 데이터) (b) 미지 raw 키의 조용한 소비(④ 타입 — 계약 없는 키는 소비 함수에 못 들어간다) (c) 차수의 `int` 변환(③ 타입) (d) 단위 추측(⑧ — 계약 `scale` 없이는 변환 불가) (e) 회계 항등식 파괴(⑦ 생성자 불변식) (f) 상태 전이의 조용한 무시(⑨ 거부 관측) (g) 정책 데이터 리터럴의 main 유입(1C·1D 관례, 코드 리뷰) (h) 조회 가치 술어(⑪)의 우회 — 상세 조회 port 의 서명이 `DetailFetchDecision.Fetch` 값을 인자로 요구해(타입 증거) 술어를 거치지 않은 호출이 컴파일되지 않는다.
 **방어하지 않는다**: 어댑터가 원문을 **정직하게** 옮기는가(3B test) · DB write 의 점유 가드 실행(3D) · 정책 데이터 **내용**(승인) · KONEPS 자체의 필드 변경(④ 는 관측까지) · 스케줄·중복 실행(OPS-01/02).
 
-**우회 후보(≥5)**: (1) `RawKey` 를 문자열로 만들어 계약 없는 키 소비 → 소비 함수 서명이 `KonepsFieldContract` 요구 (2) 회계를 `copy(dropped = …)` 로 조작 → 불변식 재검사(init) (3) `NoticeRound("0")` 와 `"000"` 을 같게 봄 → 값 객체 등가성은 원문 문자열 (4) `ResolvedBaseAmount.Direct` 를 예산 키 값으로 조립 → `Direct` 는 `Provenance.Published` 만 받는 생성자 (5) 전이표 밖 전이를 `copy(status=…)` 로 → `Notice` 상태 변경은 `transition(event)` 하나(1E 관례 — `@ConsistentCopyVisibility` + `internal constructor` **조합**이 `copy()` 를 닫는다) (6) 정책 해석 순서를 코드에 하드코딩 → `domainSourceReferenceGate` 는 못 잡음 — 리뷰 항목·정책 데이터 부재 시 구성 실패.
+**우회 후보(≥5)**: (1) `RawKey` 를 문자열로 만들어 계약 없는 키 소비 → 소비 함수 서명이 `KonepsFieldContract` 요구 (2) 회계를 `copy(dropped = …)` 로 조작 → 불변식 재검사(init) (3) `NoticeRound("0")` 와 `"000"` 을 같게 봄 → 값 객체 등가성은 원문 문자열 (4) `ResolvedBaseAmount.Direct` 를 예산 키 값으로 조립 → `Direct` 는 `Provenance.Published` 만 받는 생성자 (5) 전이표 밖 전이를 `copy(status=…)` 로 → `Notice` 상태 변경은 `transition(event)` 하나(1E 관례 — `@ConsistentCopyVisibility` + `internal constructor` **조합**이 `copy()` 를 닫는다) (6) 정책 해석 순서를 코드에 하드코딩 → `domainSourceReferenceGate` 는 못 잡음 — 리뷰 항목·정책 데이터 부재 시 구성 실패 (7) 어댑터가 ⑪ 을 건너뛰고 상세 조회를 부름 → port 서명이 `Fetch` 증거를 요구(방어 (h)) + COL-03 acceptance test(gate 미만 공고의 상세 호출 0회, gate 뒤 정확히 1회) (8) `DetailFetchDecision.Fetch` 를 어댑터가 직접 조립 → `internal constructor`(술어 함수만 생성).
 
 ---
 

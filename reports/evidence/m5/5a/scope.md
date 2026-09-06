@@ -21,7 +21,7 @@ in_scope:
   - ml-engine/tools/design_ratchet.py                 # legacy `_design_ratchet_*.py` 이식(재활용 출처 기록) — D-M5-3
   - ml-engine/tools/reuse_provenance_check.py         # ADR 0009 D-6 검사 — 모듈 docstring 의 출처 포인터(원본 경로·commit)와 `reports/evidence/m5/*/reuse.md` 가 같은 모듈에 대해 같은 값을 말하는지
   - ml-engine/README.md                               # 패키지 경계·재활용 출처 기록 규약(ADR 0009 (d): 모듈 docstring 포인터 + evidence 상세)
-  - .github/workflows/ci.yml                          # Python job 신설(2D D-2D-4 (a) 가 5A 소유로) — setup-python·오프라인 wheel 캐시·`uv sync --frozen`·pytest
+  - .github/workflows/ci.yml                          # Python job 신설(2D D-2D-4 (a) 가 5A 소유로) — setup-python·오프라인 wheel 캐시·S-1b·S-2~S-7(D-6 검사 포함)
   - milestone-5.md, reports/evidence/m5/5a/**
 out_of_scope:
   - 커널·변환·학습·serving 코드                          # 5B~5E
@@ -31,7 +31,7 @@ out_of_scope:
   - legacy bid-vector/ 편집
 acceptance_commands:
   - "(cd ml-engine && uv sync --frozen --all-extras --no-index --find-links=<wheelhouse>)"            # S-1 — lock 재현(오프라인 wheel 캐시에서). 이 명령은 extras 분리를 증명하지 않는다(S-1b)
-  - "(cd ml-engine && uv sync --frozen --extra serving --no-dev --no-index --find-links=<wheelhouse> && ! uv run python -c 'import sqlalchemy, psycopg, requests, celery')"   # S-1b — serving extras 만 설치한 환경에 금지 패키지 부재(lock 그래프 실측)
+  - "(cd ml-engine && uv sync --frozen --extra serving --no-dev --no-index --find-links=<wheelhouse> && for m in sqlalchemy psycopg requests celery; do ! uv run python -c \"import $m\" || exit 1; done)"   # S-1b — serving extras 만 설치한 환경에 금지 패키지 **넷 각각** 부재(하나의 import 문이면 하나만 없어도 통과하므로 개별로) — lock 그래프 실측
   - "(cd ml-engine && uv run ruff check . && uv run ruff format --check .)"                            # S-2
   - "(cd ml-engine && uv run mypy --strict src/ml_engine)"                                            # S-3 — allowlist 는 pyproject 의 per-module override 로만, 사유 주석 필수
   - "(cd ml-engine && uv run lint-imports)"                                                           # S-4 — layers·forbidden 계약 통과
@@ -63,7 +63,7 @@ M2 `2a/scope.md`(골격)·`2d/scope.md` D-2D-4 · 조사 노트 02.
 | ③ | **import-linter 계약** — layers: `serving > inference > features`, `training > evaluation > features`, `registry` 는 `features` 만(생성 stub `bidvector.ml.v1` 은 **외부 패키지**로 취급 — `serving`·`training` 이 참조 가능한 최하층이되 layers 계약의 항이 아니다; D-5A-0 (b) 채택 시 `ml_engine.contracts` 재수출 패키지가 최하층 항으로 들어간다); forbidden: `serving`·`inference` 가 `sqlalchemy`·`psycopg`·`requests`·`httpx`·`celery`·`ml_engine.training`·`ml_engine.adapters` 를 import 금지 — 단 **`serving.grpc`(진입점) 만 `grpcio` 허용**(조사 02 — 예외 없이는 servicer 가 설 수 없다; 예외는 그 모듈 하나로 좁힌다). **양성 대조**: 금지 import 를 넣은 임시 모듈로 `lint-imports` 가 실패함을 test | 5A 「`serving` 의 DB/HTTP 수집/business module import 금지 gate」 · 완료 조건 「금지 import mutation 이 CI 에서 실패」 |
 | ④ | **품질 도구** — ruff(lint+format), mypy strict(이식 모듈은 per-module allowlist + 사유·해소 계획), pytest(+hypothesis), 크기·복잡도 래칫(D-M5-3 이식 스크립트, 함수 50/파일 500/`dict[str, Any]` 경계 0 — 계약이 있으므로 원천 차단, ML-11.2) | §5 「Ruff, strict typecheck 범위, pytest, import boundary, size ratchet 를 CI 에」 |
 | ⑤ | **정책 값 로드 자리** — `registry/policy.py` 가 versioned YAML 을 읽는 형태(값 없음). D-M5-6 분류 표는 evidence 에 | ADR 0006 D-7 · `OPEN-ML-05` |
-| ⑥ | **CI Python job** — `.github/workflows/ci.yml` 에 job 추가: setup-python 3.12, 오프라인 wheel 캐시(`uv sync --frozen`), S-2~S-6. Kotlin job 과 독립 | 2D D-2D-4 (a) 「Python CI 는 5A 소유」 |
+| ⑥ | **CI Python job** — `.github/workflows/ci.yml` 에 job 추가: setup-python 3.12, 오프라인 wheel 캐시(`uv sync --frozen`), **S-1b·S-2~S-7 전부**(ADR 0009 D-6 「CI 가 확인한다」 — S-7 의 두 자리 대조와 S-1b 의 extras 분리가 CI 안). Kotlin job 과 독립 | 2D D-2D-4 (a) · ADR 0009 D-6 「Python CI 는 5A 소유」 |
 | ⑦ | **재활용 출처 기록 규약 + 두 자리 대조 검사** — `reports/evidence/m5/<slice>/reuse.md` 표(원본 파일·commit `ed4b06c`·이식 대상·수행한 수정·튜닝) + 모듈 docstring 포인터. **ADR 0009 D-6 의 검사**를 5A 가 구현한다(D-6.2 가 「M5 의 이식 slice 가 형태를 정한다」로 위임): `tools/reuse_provenance_check.py` 가 (ㄱ) 이식 모듈마다 docstring 포인터가 **있음** (ㄴ) 그 원본 경로·commit 이 `reuse.md` 의 같은 모듈 행과 **같음**을 재고, 어긋나면 exit 1(S-7, 양성 대조 표본 동반). 형태: docstring 첫 줄 `Reuse: <원본 경로>@<commit>`, `reuse.md` 는 같은 두 값을 표의 열로. 5A 는 규약·검사·`design_ratchet.py` 자신의 기록 | ADR 0009 D-1·D-5·**D-6**(「CI 가 확인한다」·D-6.2 형태 위임·D-6.3) · §3.2 「각 모듈에 재활용 출처와 튜닝 내용을 기록」 |
 
 **만들지 않는 것**: 커널 코드 · 변환 코드 · servicer · 정책 값 · Kotlin 쪽 변경 · Docker 이미지(M6 6C).
