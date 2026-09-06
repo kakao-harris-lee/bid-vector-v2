@@ -103,7 +103,6 @@ grpc-protoc-gen-grpc-kotlin = { module = "io.grpc:protoc-gen-grpc-kotlin", versi
 grpc-bom = { module = "io.grpc:grpc-bom", version.ref = "grpc-java" }
 grpc-stub = { module = "io.grpc:grpc-stub" }
 grpc-protobuf = { module = "io.grpc:grpc-protobuf" }
-grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded" }
 grpc-testing = { module = "io.grpc:grpc-testing" }
 # in-process transport(`io.grpc.inprocess.*`)는 `grpc-core`가 아니라 별도 좌표
 # `grpc-inprocess`에 있다(실측 — jar 내용 확인). `grpc-stub`/`grpc-kotlin-stub`/`grpc-testing`은

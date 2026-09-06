@@ -56,14 +56,19 @@ dependencies {
 // 증거는 `adapters/src/test/kotlin/.../GrpcKotlinStackSmokeTest.kt`가 따로 든다.
 protobuf {
     protoc {
-        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.runtime.get()}"
+        // 정본은 카탈로그의 `protobuf-protoc` alias 하나다 — 좌표 문자열을 여기서 다시
+        // 적지 않는다(verifier r1 F-5, 이전 판은 `libs.versions.protobuf.runtime` 를 직접
+        // 보간해 alias 를 우회했다).
+        artifact = libs.protobuf.protoc.get().let { "${it.group}:${it.name}:${it.version}" }
     }
     plugins {
         create("grpc") {
             artifact = "io.grpc:protoc-gen-grpc-java:${libs.versions.grpc.java.get()}"
         }
         create("grpckt") {
-            artifact = "io.grpc:protoc-gen-grpc-kotlin:${libs.versions.grpc.kotlin.get()}:jdk8@jar"
+            // 카탈로그의 `grpc-protoc-gen-grpc-kotlin` alias — jdk8 classifier 는 이
+            // 플러그인 특유의 배포 형태(조사 노트 02)라 alias 밖(문자열 접미사)에 남는다.
+            artifact = libs.grpc.protoc.gen.grpc.kotlin.get().let { "${it.group}:${it.name}:${it.version}:jdk8@jar" }
         }
     }
     generateProtoTasks {
