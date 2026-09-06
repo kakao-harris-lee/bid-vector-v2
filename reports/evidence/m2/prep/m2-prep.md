@@ -47,6 +47,10 @@ broker/DB · Kotlin client 의 circuit breaker·retry 배선(M4 4D — M2 는 �
 
 ---
 
+> **착수 2026-09-06(운영자 결정)**: `ADR 0010` 승인 · **D-M2-1~14 전부 추천안 채택**(1 (c) included build · 2 (a) · 3 (a) · 4 (a)
+> EstimateShortfall 제외 · 5 (a) job API · 6 (a) int64 원/decimal string · 7 (a) proto3 · 8 (a) · 9 (a) · 10 (a) · 11 (a) · 12 (a) ·
+> 13 (a) · 14 (a)) · 2A D-2A-0 (c)·D-2A-7 (a). 2A base `040ab9d`(M1 전체 승인 커밋). 정본은 각 slice scope.md 와 `ADR 0010` 머리.
+
 ## 3. 착수 전 결정 후보 D-M2-1~14 (운영자 · 이 문서는 묻지 않는다)
 
 > 1E 세션과 운영자가 같으므로 착수 시 한 번에 받는다. 각 행은 「선택지 + 추천 + 근거」로 닫혀 있다.

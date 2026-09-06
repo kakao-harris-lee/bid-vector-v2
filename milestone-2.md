@@ -24,6 +24,19 @@ Kotlin application과 Python ML engine 사이의 유일한 동기 계약을 먼�
 - retryable/non-retryable application error
 - 지원하지 않는 enum/schema를 조용히 fallback하지 않는 규칙
 
+**M2 착수·2A 착수 2026-09-06** — 선행 조건 충족(M1 1A~1E 종결 승인 `040ab9d`, `ADR 0003` 승인, `ADR 0002` canonical 표현).
+준비 정본 `reports/evidence/m2/prep/m2-prep.md`(slice 지도·착수 전 결정 D-M2-1~14, 준비 세션의 리뷰 r1~r4 반영), 2A 계약
+`reports/evidence/m2/2a/scope.md`. 운영자 결정: **`ADR 0010` 승인**(값은 정책 데이터·규칙은 ADR, deadline 필수, transport/
+application/domain 3층 분리, 제3 변환 금지, training 은 별도 job API 로 Kotlin 이 폴링 — `OPEN-ADR-11` 닫힘) · D-M2-1~14 전부
+추천안. 구조는 **`contracts/proto/` 단일 출처 + `ml-contract` included build**(생성물 VCS 밖, `build-logic` 선례) — 1A 게이트
+가족이 subproject 안의 생성물을 어떤 형태로든 거부함을 준비 리뷰가 실측했고, 게이트 정의 편집은 `ResolvedDependencies` 의
+composite 치환 의존 분류 정정 한 분기뿐이다(D-2A-0 (c)). 생성 Java 패키지 루트는 `bidvector` 밖(`contract.bidvector.ml.v1`)
+이라 도메인의 import 는 T-A 가 구조적으로 거부한다. 2A 가 양쪽 생성 + round-trip 을 선행 흡수하고(D-M2-2) 2D 는 게이트 증명만.
+`EstimateShortfall` RPC 는 제외(1D 가 Kotlin `decision` 에 둠, D-M2-4). money 는 `int64` 원·rate 는 decimal string·`double`
+없음(D-M2-6), proto3(D-M2-7). 계약 어휘: `PriceFitness`·`Uncertainty` 세 성분만, 낙찰 확률 필드 없음(`OPEN-ML-03` 계약 수준
+닫힘), `denominator_source` 는 V2 라벨만(재학습은 M5), Platt 자격 라벨은 계약 밖(`OPEN-ML-02` 남은 물음은 M5·M4). 환경
+전건으로 buf 1.72.0 을 설치했고 Python `grpcio-tools` 는 `ml-engine` 가상환경에 2A 가 둔다.
+
 ### Slice 2B — Prediction RPC
 
 `BidPredictionService`에 최소 다음 RPC를 정의한다.
