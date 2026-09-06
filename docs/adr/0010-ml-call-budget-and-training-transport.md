@@ -66,6 +66,11 @@ deadline·재시도 횟수·백오프·circuit breaker 임계는 **Kotlin `adapt
 
 - `Unmeasurable` 은 **성공한 호출의 정직한 답**이다. transport error 로 바꾸지 않고, `0`·빈 후보·기본값으로 접지 않는다
   (`milestone-2.md` 완료 조건 · ADR 0001 D-6).
+- **제3 변환 금지 — `Unmeasurable` 을 다른 predictor 의 성공값으로 접지 않는다.** legacy 는 모든 추론 실패를 `except Exception`
+  으로 받아 historical predictor 의 값 있는 답으로 바꿨다(조사 노트 01 (c-2), `orchestration.py:264-273` — 응답 shape 이 성공과
+  같고 차이는 자유 문자열 `fallback_reason`). 계약은 이것을 형태로 막는다: `Success` 는 **요청이 지목한 release**(`exact_release`)
+  로만 답하고, 다른 artifact 가 답하면 `ApplicationFailure(UNSUPPORTED_RELEASE)` 다. predictor 교체는 운영자의 승격 결정
+  (`latest_promoted` 갱신)이지 요청 처리 중의 폴백이 아니다. `Success` 에 fallback 표지·자유 문자열 사유 필드를 두지 않는다.
 - servicer 가 `INVALID_ARGUMENT` 같은 gRPC status 로 **계약 위반**을 표현하는 것은 허용하되(예: 파싱 불가), **계약이
   정의한 실패**는 application failure 로 낸다 — 두 층에 같은 실패를 이중으로 두지 않는다. 어느 것이 어느 층인지는 2A
   `error.proto` 의 주석이 표로 갖는다.
