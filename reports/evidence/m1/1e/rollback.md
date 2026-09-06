@@ -8,8 +8,12 @@ slice 는 `git log 2af32f6..HEAD -- CLAUDE.md .claude/` 결과가 비어 하네�
 ## 되돌리는 것
 
 `strategy/**`의 1E 신규 구현(값 타입 전부·`WatchRules.evaluate`·`validate`·컴파일 실패
-하네스)과 `config/quality/gate-tests.properties`의 `gate.tests.strategy` 등재. `strategy`
-모듈은 자리표시자(`ModuleBoundaryAnchor.kt`)로 돌아간다.
+하네스)과 `config/quality/gate-tests.properties`의 `gate.tests.strategy` 등재, 그리고
+후속 라운드(runner dispatch ⑪)가 더한 app conformance runner 배선·스윕 표 등재.
+`strategy` 모듈은 자리표시자(`ModuleBoundaryAnchor.kt`)로 돌아간다. curator 가 낸
+fixture(`fixtures/input|expected/strategy-*`·`money-basis-003`)와 `fixtures/manifest.yaml`
+편집은 이 문서가 되돌리지 않는다 — fixture-curator 소관이고 이 rollback 은 구현 레인
+산출물(strategy 모듈·app runner·gate 설정·스윕 표)만 겨눈다.
 
 ## 명령 (임시 clone 에서 실측 — `commands.md` 「rollback 명령 실측」)
 
@@ -32,19 +36,32 @@ git restore --source=2af32f6 --staged --worktree -- \
   strategy/src/test/kotlin/bidvector/strategy/StrategyValidationTest.kt \
   strategy/src/test/kotlin/bidvector/strategy/WatchRulesTest.kt \
   strategy/src/test/resources/compile-fixtures \
-  config/quality/gate-tests.properties
+  config/quality/gate-tests.properties \
+  app/build.gradle.kts \
+  app/src/test/kotlin/bidvector/app/conformance/CorpusExecutors.kt \
+  app/src/test/kotlin/bidvector/app/conformance/SharedKernelCorpusConformanceTest.kt \
+  app/src/test/kotlin/bidvector/app/conformance/StrategyExecutors.kt \
+  fixtures/tools/mutation_sweep_adversarial.py
 ```
 
-`--source`에 없는 경로(전부 신규 파일)는 삭제로 스테이징된다 — 별도 `git rm`이 필요
-없다(evidence-pack 규격). `strategy/build.gradle.kts`·`config/quality/gate-tests.properties`는
-base 내용으로 되돌아간다.
+`--source`에 없는 경로(신규 파일: `strategy/**` 대부분, `StrategyExecutors.kt`)는
+삭제로 스테이징된다 — 별도 `git rm`이 필요 없다(evidence-pack 규격). 기존 파일
+(`strategy/build.gradle.kts`·`config/quality/gate-tests.properties`·`app/build.gradle.kts`·
+`CorpusExecutors.kt`·`SharedKernelCorpusConformanceTest.kt`·`mutation_sweep_adversarial.py`)는
+base 내용으로 되돌아간다 — 되돌리면 `TARGET_DOMAINS`·`VALUE_EXECUTORS`·`ASSERTED` 에서
+1E 축이 빠지고, `1B 축 insufficient-evidence 이월` test 는 base 판(「money-basis-003
+하나뿐」 기대)으로 돌아간다 — 그 test 는 base 시점엔 참이었으므로 되돌림 자체는
+일관적이다(money-basis-003 의 classification 은 fixture 소관이라 이 되돌림이 만들지
+않는다 — curator 산출물이 그대로면 그 test 는 되돌린 뒤에도 여전히 실패할 수 있다는
+뜻이고, 그 경우는 fixture 도 함께 되돌려야 함을 「되돌리는 것」 절이 이미 밝힌다).
 
 ## 확인 지점
 
-`git diff 2af32f6 -- strategy/ config/quality/gate-tests.properties`가 빈 결과 —
-임시 clone에서 실측 완료(`commands.md`). `git status`에서 위 파일들이 삭제/수정으로
-스테이징됨을 확인한 뒤 `git commit`으로 되돌림을 확정한다(이 문서는 명령만 제공하고
-실제 커밋은 운영자 승인 하에 별도로 한다).
+`git diff 2af32f6 -- strategy/ config/quality/gate-tests.properties app/build.gradle.kts
+app/src/test/kotlin/bidvector/app/conformance/ fixtures/tools/mutation_sweep_adversarial.py`가
+빈 결과 — 임시 clone에서 실측 완료(`commands.md`). `git status`에서 위 파일들이
+삭제/수정으로 스테이징됨을 확인한 뒤 `git commit`으로 되돌림을 확정한다(이 문서는
+명령만 제공하고 실제 커밋은 운영자 승인 하에 별도로 한다).
 
 ## 예상 복구 시간
 

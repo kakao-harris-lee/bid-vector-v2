@@ -88,3 +88,77 @@ S-4(`:app:test --tests '*Conformance*'`)·S-6(mutation_sweep_adversarial.py)는 
   `config/quality/gate-tests.properties`가 수정으로 스테이징됐고
   `git diff 2af32f6 -- strategy/ config/quality/gate-tests.properties`가 빈 결과였다
   (정본은 `rollback.md`).
+
+---
+
+## 후속 — runner dispatch(⑪) 라운드 (base `0ee0f2c`, head `fa1db98`)
+
+curator가 `c9022d9`·`90948da`·`2b04b4b`로 case 12건(money-basis-003 승격 1·strategy-watch
+001~008·strategy-validation 001~003)을 authoritative로 냈고, 이 라운드가 그것을 app
+conformance runner에 배선한다. 다른 세션의 `7a102cc docs(m2-prep)`가 사이에 끼어
+있으나 무관하다(건드리지 않았다).
+
+## 2026-09-06T22:46Z
+- cmd: `./gradlew :app:test --tests '*Conformance*'`(초기 시도, 배선 전)
+- exit: 1 — `1B 축 insufficient-evidence 이월은 money-basis-003 하나뿐이다` FAILED
+  (`expected:<["money-basis-003"]> but was:<[]>`) — money-basis-003 승격으로 그 test의
+  전제 자체가 낡았다. `SharedKernelCorpusConformanceTest`를 갱신해 기대값을
+  `emptyList()`로 고쳤다(아래 재실행 참고).
+
+## 2026-09-06T22:47Z
+- cmd: `./gradlew :app:test --tests '*Conformance*'`(배선 후, `TARGET_DOMAINS`에
+  `strategy-watch`·`strategy-validation` 추가 + `STRATEGY_EXECUTORS` 배선 +
+  위 test 갱신 뒤)
+- exit: 0
+- 핵심 결과: `SharedKernelCorpusConformanceTest` 41 tests, 실패·건너뜀 0(동적 test 38건 +
+  고정 test 3건 — dispatch 완전성·1B 이월·1C 이월).
+
+## 비-vacuity — 기대값 임시 변조
+- cmd: `fixtures/expected/strategy-watch-002.json`의 `$.verdict`를 `"Passed"`→`"Rejected"`로
+  임시 변조 후 `./gradlew :app:test --tests '*Conformance*'`
+- exit: 1 — `strategy-watch-002` FAILED(단 하나만 실패, 나머지 40건 통과 — dispatch가
+  case별로 정확히 대조됨을 확인)
+- 원복: `cp` 백업본으로 복구, `git status --short fixtures/expected/strategy-watch-002.json`
+  결과 없음(추적 파일이라 diff 없음 = 원복 확인).
+
+## 2026-09-06T22:53Z (S-1 재확인)
+- cmd: `./gradlew --no-build-cache clean check`(저장소 루트)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL in 13s, 309 actionable tasks: 293 executed, 16 up-to-date
+
+## 2026-09-06T22:54Z (S-2·S-4·S-6·S-7 개별 재확인)
+- `./gradlew :strategy:test` — exit 0
+- `./gradlew :app:test --tests '*Conformance*'` — exit 0
+- `python3 fixtures/tools/mutation_sweep_adversarial.py` — exit 0, 강등 대상 0, 잔존
+  authoritative 41, 캐치 65 → **116**(+51 — curator ASSERTED 12 case ·
+  NULL_ASSERTED(`strategy-watch-004`) · `ADVERSARIAL_VALUE` 신설 토큰 4개 적용분)
+- `./gradlew :build-logic:test` — exit 0
+
+## clean-tree 게이트 재확인
+- cmd: `git status --porcelain -- strategy/ config/quality/gate-tests.properties
+  reports/evidence/m1/1e/ app/build.gradle.kts
+  app/src/test/kotlin/bidvector/app/conformance/ fixtures/tools/mutation_sweep_adversarial.py`
+- exit: 0, 결과: 코드 커밋(`fa1db98`) 직후 빈 문자열
+
+## secret 스캔 재확인
+- cmd: `git diff 0ee0f2c..fa1db98 -- app/ fixtures/tools/mutation_sweep_adversarial.py |
+  grep -niE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"`
+- exit: 0(매치 5건) — 전부 `token`이 "adversarial token"/"policy token"(도메인 어휘,
+  예: `inclusivityFromToken` 함수명·"토큰" 주석)의 부분 문자열이라 오탐이다. 육안 확인:
+  자격증명·API 키·개인식별정보 없음.
+
+## 스윕 표(ASSERTED) 회귀 방지 — `"Rejected"` 키 충돌 회피 실측
+- 편집 전 `ADVERSARIAL_VALUE`에 `"Rejected": "Accepted"`가 이미 있었다. `"Passed"`↔
+  `"Rejected"` 요구를 그대로 옮기면 `"Rejected": "Passed"`가 뒤 값으로 덮어써 그 매핑이
+  깨진다(파이썬 dict 리터럴의 중복 키 규칙) — `"Passed": "Rejected"`·`"NoGate": "Passed"`만
+  추가하고 `"Rejected"` 키는 다시 매핑하지 않아 피했다.
+- **정정(초안 오류)**: 이 절 초안이 "`verdict-004`가 `"Rejected": "Accepted"`를 쓴다"고
+  적었으나 grep으로 재확인한 결과 `verdict-004`는 `classification: insufficient-evidence`라
+  `mc.authoritative_cases()`가 거르는 `cases` 딕셔너리에 애초에 들지 않는다(스윕 출력에
+  `verdict-004`가 한 줄도 없음, 명령: `python3 fixtures/tools/mutation_sweep_adversarial.py
+  | grep "verdict-004"` → 빈 출력). 그 case는 `"Rejected"` 키 충돌과 무관하다 — 삭제한다.
+- **실측으로 확인한 사실**: `"Rejected"` 키를 다시 매핑하지 않은 선택이 실제로 쓰이는
+  자리는 `strategy-watch-001`·`003`·`005`의 `$.verdict`(기대값 `"Rejected"`)다. 스윕
+  출력에서 세 case 모두 `$.verdict (a') verifies 주장 필드 값 변이 caught`로 캐치됨을
+  확인했다 — 기존 `"Rejected":"Accepted"` fallback이 「기대값과 다른 확정 토큰」이라는
+  스윕의 요구를 그대로 만족한다(도메인 어휘는 아니지만 값 변이 탐지에는 충분하다).

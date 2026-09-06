@@ -5,11 +5,14 @@ CLAUDE.md 운영자 지시(2026-09-04)에 따라 코드 slice의 완료 조건�
 「리뷰 요청 조건 점검」을 이 slice에 적용한 자기 점검이다 — verifier가 독립적으로 재확인한다.
 
 - [x] 구현 diff가 커밋되어 base/head 고정 — `git status --porcelain -- strategy/
-      config/quality/gate-tests.properties reports/evidence/m1/1e/` 빈 결과, 양성 대조
-      (`Score.kt` 한 줄 추가 → 잡힘 → 복원 → 다시 빈 결과) 완료(`commands.md`).
+      config/quality/gate-tests.properties reports/evidence/m1/1e/ app/build.gradle.kts
+      app/src/test/kotlin/bidvector/app/conformance/ fixtures/tools/mutation_sweep_adversarial.py`
+      빈 결과, 양성 대조(`Score.kt` 한 줄 추가 → 잡힘 → 복원 → 다시 빈 결과, 후속 라운드는
+      `strategy-watch-002` 기대값 변조 → FAILED → 복원) 완료(`commands.md`).
 - [x] scope.md의 acceptance_commands가 전부 exit 0으로 commands.md에 기록됨 — S-0·S-1·
-      S-2·S-3·S-5·S-7 전부 exit 0. S-4·S-6은 조건부(D-2·D-3 authoritative case 신설
-      시)라 이번 라운드 대상 아님을 명시(`commands.md`).
+      S-2·S-3·S-5·S-7 전부 exit 0(구현 라운드). 후속 라운드(runner dispatch ⑪)에서
+      curator가 case 12건을 신설·승격한 뒤 S-4·S-6도 exit 0으로 채워졌다(`commands.md`
+      「후속 — runner dispatch」).
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — `:strategy:check`(detekt·
       ktlint·아키텍처 게이트·CPD·gateExecutionGate·koverVerify 포함) 및 저장소 전체
       `check` 통과.
@@ -63,11 +66,28 @@ ML·adapters·procurement에 대한 의존 선언이 없어 "watch rule 판정�
 호출한다"가 `moduleDependencyGate`로 구조적으로 보장된다(`WatchRulesTest`의 STR-01 4번
 test가 값으로도 보조 확인).
 
-## corpus runner 확장(⑪) — 이번 라운드 미실행
+## corpus runner 확장(⑪) — 후속 라운드에서 완료
 
-`app/src/test/kotlin/bidvector/app/conformance/**`·`fixtures/manifest.yaml`·
-`fixtures/input|expected/**`를 손대지 않았다. D-2·D-3의 승인은 scope.md에 이미
-기록됐으나(decision 29·30) 실제 `strategy-watch-*`·`strategy-validation-*`·
-`money-basis-003` case 신설은 fixture-curator 소관이고 이번 커밋 다섯 개는 구현
-레인의 범위(커널·validation·컴파일 하네스·게이트 등재)만 담았다. curator가 case를
-만든 뒤 runner dispatch 확장이 후속 작업이다.
+curator가 `c9022d9`(money-basis-003 승격)·`90948da`(strategy-watch-001~008)·
+`2b04b4b`(strategy-validation-001~003)로 case 12건을 신설·승격한 뒤(authoritative
+29→41), 구현 레인이 `StrategyExecutors.kt`(신설)로 `TARGET_DOMAINS`·`VALUE_EXECUTORS`에
+배선했다(커밋 `fa1db98`). `SharedKernelCorpusConformanceTest`의 「1B 축
+insufficient-evidence 이월」 test가 이제 빈 목록을 기대하도록 갱신됐다 — money-basis-003
+승격으로 그 축의 이월이 0건이 됐기 때문이다(`OPEN-1BC-STR16` 해소).
+
+**curator의 `outcome` 미채택 사유(알려진 제한 추가 항목)**: money-basis-003의 기대값
+파일에 `$.perPath.<PATH>.outcome: "Comparable"`이 있지만, curator가 이를
+`verified_paths`·스윕 `ASSERTED`에서 제외했다 — `"Comparable"`은 승인 어휘(`Fact`의
+`Known`/`Absent`, `data-dictionary.md` §1.1) 밖의 미승인 토큰이라 값을 잠글 자격이
+없다는 판단이다(`money-basis-006`의 `$.reasonCode` 미채택과 같은 갈래 — case의
+`change_history`가 근거를 갖는다). `StrategyExecutors.kt`의 `moneyBasis003Executor`는
+그 판단을 그대로 받아 `outcome` 필드를 아예 내지 않는다 — 낼 수도 있었으나(팀 리드
+지시: "내지 않아도 되나 내면 Fact 이름으로") 승인 어휘에 없는 필드를 만드는 대신
+생략을 택했다. `verified_paths`가 실제로 체크하는 다섯 경로(`pathsAgree`·경로별
+`result`·`basisUsed`)는 전부 대조되므로 이 생략은 계약 커버리지를 줄이지 않는다.
+
+**변이 실측 갱신**: 스윕 캐치 수가 65 → 116(+51, curator ASSERTED 12행 · NULL_ASSERTED
+1행 · 신설 ADVERSARIAL_VALUE 토큰 4개). 강등 대상 0, 잔존 authoritative 41.
+`ADVERSARIAL_VALUE`에 `"Rejected"` 키를 다시 매핑하지 않은 이유(기존
+`"Rejected":"Accepted"`와 충돌)는 `mutation_sweep_adversarial.py`의 주석과
+`commands.md`에 기록했다.
