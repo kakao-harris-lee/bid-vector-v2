@@ -1,0 +1,9 @@
+{
+  "validation": "Invalid",
+  "violations": [
+    "MinBudgetAboveMaxBudget"
+  ],
+  "policyVersion": "SYN-POLICY-2026-09-06",
+  "isConfigured": null,
+  "watchRulesEmpty": null
+}

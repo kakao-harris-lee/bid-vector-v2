@@ -1,0 +1,35 @@
+{
+  "draft": {
+    "minBudget": {
+      "amount": 1850000000,
+      "currency": "KRW",
+      "basis": "BASE_AMOUNT",
+      "vatTreatment": "INCLUSIVE",
+      "provenance": "OperatorDeclared"
+    },
+    "maxBudget": {
+      "amount": 1240000000,
+      "currency": "KRW",
+      "basis": "BASE_AMOUNT",
+      "vatTreatment": "INCLUSIVE",
+      "provenance": "OperatorDeclared"
+    }
+  },
+  "revision": 1,
+  "policy": {
+    "matchScoreRange": {
+      "min": 0,
+      "max": 1
+    },
+    "probabilityScoreRange": {
+      "min": 0,
+      "max": 1
+    },
+    "priorityScoreRange": {
+      "min": 0,
+      "max": 1
+    },
+    "budgetBoundInclusivity": "Inclusive",
+    "policyVersion": "SYN-POLICY-2026-09-06"
+  }
+}

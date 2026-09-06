@@ -1,0 +1,9 @@
+{
+  "validation": "Invalid",
+  "violations": [
+    "ReviewAboveBidNow"
+  ],
+  "policyVersion": "SYN-POLICY-2026-09-06",
+  "isConfigured": null,
+  "watchRulesEmpty": null
+}

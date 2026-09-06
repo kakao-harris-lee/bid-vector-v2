@@ -1,0 +1,23 @@
+{
+  "draft": {
+    "bidNowThreshold": 0.73,
+    "reviewThreshold": 0.88
+  },
+  "revision": 1,
+  "policy": {
+    "matchScoreRange": {
+      "min": 0,
+      "max": 1
+    },
+    "probabilityScoreRange": {
+      "min": 0,
+      "max": 1
+    },
+    "priorityScoreRange": {
+      "min": 0,
+      "max": 1
+    },
+    "budgetBoundInclusivity": "Inclusive",
+    "policyVersion": "SYN-POLICY-2026-09-06"
+  }
+}

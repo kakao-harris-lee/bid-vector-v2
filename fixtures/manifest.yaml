@@ -6413,6 +6413,199 @@ cases:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
+  - id: strategy-validation-001
+    domain: strategy-validation
+    classification: authoritative
+    verifies: |-
+        `reviewThreshold` 가 `bidNowThreshold` 보다 큰 편집은 거부되고 그 사유가 구조화 코드로 실린다 — 문장이 아니다.
+    verified_paths:
+      - "$.validation"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석이
+          *"STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다"* 로 STR-03 을 함께 든다. 승인 문면은 STR-03 블록의
+          Acceptance scenario 셋이고, 결정 기록은 `reports/evidence/m1/1e/scope.md` D-3 (a)와 「D-3 승인 대상 acceptance 목록」이다.
+    expected_reasoning: |-
+      **근거는 STR-03 acceptance 첫째** *"`review_threshold > bid_now_threshold`인 편집은 **모든 경로**에서 거부되고
+      저장된 전략은 변하지 않는다"*. 「모든 경로에서」를 V2 는 **경로마다 검사를 반복하는 방식이 아니라 생성 경로를 하나로 만드는
+      방식**으로 지킨다(STR-03 legacy 형태 처리 *"편집 경로마다 불변식을 재구현하는 형태는 채택하지 않는다"*, scope.md ⑤).
+      위반 어휘 `ReviewAboveBidNow` 는 scope.md ⑤가 든 `StrategyViolation` 목록의 첫 값이고 `data-dictionary.md`
+      §2.2.6(decision 31)이 `StrategyViolation`(구조화 코드, 문장 아님)을 어휘로 세운다.
+      **임계치 값은 legacy 기본값(0.6/0.55/0.7/0.45)을 쓰지 않는다** — 그 여섯은 `legacy-behavior` 이고 이 case 가 재는 것은
+      두 값의 **관계**이지 어느 값이 옳은가가 아니다. 점수 허용 범위는 `Score` 축이 정의상 갖는 구조적 범위를 그대로 주어,
+      기대값이 정책 **내용**에 의존하지 않게 했다(scope.md ⑧ — 내용은 main 에 없다).
+    input_file: fixtures/input/strategy-validation-001.json
+    expected_file: fixtures/expected/strategy-validation-001.json
+    normalization:
+      rate_unit: "해당 없음 — 임계치는 율이 아니라 무차원 점수다(scope.md D-1·D-13)"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액이 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 `SYN-` 접두의 안정적 합성 policy version 하나뿐이다."
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: e68c786305661dad68dcd4bfbe64611023a24ffcf5f87fa76b96252e0b25bbd1
+    expected_sha256: 671dbce145549da1165767fb5cffebf88dedb5e82285723c52903340e8aff8f6
+    not_covered: |-
+      **「저장된 전략은 변하지 않는다」의 저장 쪽 절반** — 영속 계층은 M3(3D)이고 scope.md `out_of_scope` 다.
+      이 case 가 재는 것은 **거부 판정이 나고 유효 전략이 생기지 않는다**까지다.
+      **경계 등호(`review == bidNow`)의 처리**도 재지 않는다 — 문면이 든 것은 `>` 이고 등호 허용은 `legacy-behavior` 다.
+      **`isConfigured`·`watchRulesEmpty` 가 `null` 인 것은 주장이 아니다** — 거부된 편집에는 전략 값이 없어 두 술어가 설 자리가 없다.
+    contract_binding:
+      type_path: "bidvector.strategy.validate(StrategyDraft, StrategyRevision, Resolution.Resolved<StrategyPolicyData>): StrategyValidation"
+      fixed_by: |-
+        `StrategyValidationTest` — 「STR-03 1 review 가 bidNow 보다 크면 거부된다」와 그 경계 짝
+        「review 와 bidNow 가 같으면 허용된다」. 「생성 경로가 하나」는 test 가 아니라 `OperatorStrategy` 의
+        `internal constructor` 가 진다. corpus 대조는 app conformance runner 다.
+      carries: |-
+        **교차 불변식이 한 자리에만 있다**는 것이 계약의 무게중심이다 — `Invalid` 는 `OperatorStrategy` 를 내지 않고,
+        `OperatorStrategy` 는 `validate` 를 거쳐서만 생긴다. 위반이 구조화 코드라는 것은 `StrategyViolation` sealed.
+      does_not_carry: |-
+        **① `$.violations` 의 원소 순서와 전수성.** `Invalid.violations` 는 `List` 이나 이 case 는 위반이 하나뿐이라
+        순서를 재지 않는다 — 「위반을 전부 모아 낸다」(D-10)는 다른 성질이고 이 corpus 에 그 case 가 없다.
+        **② 사유 어휘의 전수성.** `StrategyViolation` 의 여섯 값이 필요충분한지는 재지 않는다.
+        **③ 임계치의 소비.** BidNow/Review/Skip 사다리는 M4 4B 다 — 1E 는 값의 validation 만 한다.
+        **④ 투영 키 `validation` 의 철자.** `StrategyValidation` sealed variant 이름을 싣는 **runner 투영 축**이고
+        타입에 그 이름의 필드가 없다. `violations`·`policyVersion` 은 `Invalid` 의 필드 그대로다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: strategy-validation-002
+    domain: strategy-validation
+    classification: authoritative
+    verifies: |-
+        `minBudget` 이 `maxBudget` 보다 큰 편집은 둘 다 유효한 값이어도 거부되고 그 사유가 구조화 코드로 실린다.
+    verified_paths:
+      - "$.validation"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석이
+          *"STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다"* 로 STR-03 을 함께 든다. 결정 기록은
+          `reports/evidence/m1/1e/scope.md` D-3 (a)와 「D-3 승인 대상 acceptance 목록」이다.
+    expected_reasoning: |-
+      **근거는 STR-03 acceptance 둘째** *"`min_budget > max_budget`(둘 다 유효값)은 거부된다"*. *"둘 다 유효값"* 이
+      문면의 전건이라 두 한계를 **비교가 성립하는 형태**로 구성했다 — `BASE_AMOUNT` basis, `OperatorDeclared` provenance,
+      `INCLUSIVE` 과세 처리(scope.md D-6 *"한계 값은 `OperatorDeclared`·`INCLUSIVE` 로만 구성한다"*). 그래서 이 case 가 내는
+      위반은 **순서 하나**이고 비교 불가 사유가 섞이지 않는다.
+      **basis 는 `OPEN-STR-01` 결정(「(c) + 기초금액」)이 정한다** — 운영자가 적은 예산 값은 기초금액이며 추정가격과 비교하지 않는다.
+      두 금액의 크기 관계 외에 어느 값이 옳다는 전제를 넣지 않았고, 액수는 `data-dictionary.md` §12.1 이 `legacy-behavior` 로
+      등재한 수를 피한 합성값이다.
+    input_file: fixtures/input/strategy-validation-002.json
+    expected_file: fixtures/expected/strategy-validation-002.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 `SYN-` 접두의 안정적 합성 policy version 하나뿐이고 금액은 합성값이다."
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: d2d6ac466a076308a3798c4b6854ed348edd3e5b4281df7899b5882159a58702
+    expected_sha256: 468894228113df70b9294ba29a198406a585eed843bbf99d4e85ff231967fa94
+    not_covered: |-
+      **비교가 성립하지 않는 한계**(`UNKNOWN` 과세 처리·`Undeclared` provenance)의 거부 — 그 자리는 D-6 의 다른 위반
+      (`BudgetLimitNotComparable`)이고 이 corpus 에 case 가 없다.
+      **`0원` 한계와 「규칙 없음」의 구별**(위협 모델 (g))도 재지 않는다. **경계 등호**(`min == max`)의 처리도 밖이다.
+      **`isConfigured`·`watchRulesEmpty` 가 `null` 인 것은 주장이 아니다**(001 과 같다).
+    contract_binding:
+      type_path: "bidvector.strategy.validate(StrategyDraft, StrategyRevision, Resolution.Resolved<StrategyPolicyData>): StrategyValidation"
+      fixed_by: |-
+        `StrategyValidationTest` — 「STR-03 2 min_budget 이 max_budget 보다 크면 거부된다」와 그 이웃
+        「D-6 예산 한계가 OperatorDeclared 아니면 BudgetLimitNotComparable 이다」가 전건을 갈라 준다.
+        corpus 대조는 app conformance runner 다.
+      carries: |-
+        **예산 순서 검사가 `compareKnownVat(BaseAmount, BaseAmount)` 위에 선다**는 것 — `money-basis-003` 이 잠그는
+        그 함수와 **같은 자리**다. 다른 basis 의 금액이 한계로 들어오는 것은 타입이 컴파일에서 막는다(R-BASIS-01).
+      does_not_carry: |-
+        **① 두 한계의 크기 관계 밖의 basis 판정.** 이 case 의 두 금액은 basis·과세 처리·provenance 가 같아
+        `compareKnownVat` 의 전건 자체를 재지 않는다 — 그 축은 `money-basis-002`·`005` 가 진다.
+        **② 입력 키 `amount` 의 철자.** 계약 필드는 `AmountRecord.won` 이고 `Money.amount` 는 `internal` 이다 —
+        `amount` 는 이 corpus 의 직렬화 관례이며 결속은 runner 소유다.
+        **③ 투영 키 `validation` 의 철자**(001 ④와 같다).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: strategy-validation-003
+    domain: strategy-validation
+    classification: authoritative
+    verifies: |-
+        임계치만 있고 watch 필드가 비어 있는 전략에 대해 「전략이 설정됐는가」와 「감시 범위를 좁히는 규칙이 있는가」가 서로 다른 값으로 답해진다.
+    verified_paths:
+      - "$.validation"
+      - "$.isConfigured"
+      - "$.watchRulesEmpty"
+    source:
+      kind: operator-decision
+      reference: |-
+          **운영자 승인 2026-09-06(M1/1E 착수, decision 30)** — `capability-map.md` STR-01 블록의 승인 주석이
+          *"STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다"* 로 STR-03 을 함께 든다. 결정 기록은
+          `reports/evidence/m1/1e/scope.md` D-3 (a)와 「D-3 승인 대상 acceptance 목록」이다.
+    expected_reasoning: |-
+      **근거는 STR-03 acceptance 셋째** *"임계치만 바꾸고 watch 필드가 비어 있는 전략에 대해, 「전략이 설정됐는가」와
+      「감시 범위를 좁히는 규칙이 있는가」가 서로 다른 값으로 답해진다"*. 그 문면이 요구하는 것은 **두 술어가 다른 것을 본다**는
+      사실이고, 이 입력에서 그 다름이 값으로 드러난다 — 설정은 됐고(`true`) 좁히는 규칙은 없다(비어 있음 `true`).
+      legacy 는 이 두 물음을 **두 구현으로** 갈라 놓아 대상 필드 목록이 손으로 두 번 적혀 있었다(scope.md 조사 §1) —
+      STR-03 의 「편집 경로마다 재구현 폐기」와 같은 결함이다.
+      임계치 값은 legacy 기본값을 쓰지 않았고 두 값이 `review ≤ bidNow` 를 만족해 이 case 가 순서 축을 재지 않게 했다.
+    input_file: fixtures/input/strategy-validation-003.json
+    expected_file: fixtures/expected/strategy-validation-003.json
+    normalization:
+      rate_unit: "해당 없음 — 임계치는 율이 아니라 무차원 점수다(scope.md D-1·D-13)"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액이 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 `SYN-` 접두의 안정적 합성 policy version 하나뿐이다."
+    extracted_at: 2026-09-06
+    extraction_method: authored-from-approved-spec
+    sha256: 3d6c01833f426b5d150ec54017ed9e261dc6568f0320258bbe28a4e55508138c
+    expected_sha256: 382af19848dcca53996be81748904bfd74f572f4367d727ef830aa922caae4eb
+    not_covered: |-
+      **두 술어가 항상 반대값을 낸다는 읽기는 이 case 가 주지 않는다** — 문면이 든 것은 「서로 다른 값으로 답해진다」이고
+      그것은 **두 술어가 다른 것을 본다**는 뜻이지 상보성이 아니다. 반대 조합(watch 만 있고 임계치가 없는 전략,
+      둘 다 없는 전략)은 이 corpus 에 case 가 없다.
+      **감시 predicate 의 결과**(빈 `WatchRules` → `NoGate`)는 다른 물음이고 `strategy-watch-004` 가 진다.
+    contract_binding:
+      type_path: "bidvector.strategy.OperatorStrategy.isConfigured(): Boolean · bidvector.strategy.WatchRules.isEmpty(): Boolean"
+      fixed_by: |-
+        `StrategyValidationTest` — 「STR-03 3 임계치만 바꾸고 watch 필드가 비어 있으면 설정됐는가와 감시 범위를
+        좁히는가가 다른 값이다」와 그 이웃 「⑥ watch 필드도 임계치도 전혀 없는 draft 는 설정되지 않았다고 답한다」.
+        corpus 대조는 app conformance runner 다.
+      carries: |-
+        **두 물음이 두 술어로 서 있고 각자 다른 값을 본다** — `isConfigured` 는 봉투(watch·임계·상한)를,
+        `WatchRules.isEmpty` 는 감시 필드 일곱만 본다(D-15, scope.md ⑥). 임계치가 전부 nullable 이라
+        「미설정」과 「값 0」이 다른 상태라는 것도 타입이다.
+      does_not_carry: |-
+        **① 투영 키 `watchRulesEmpty` 의 철자.** 계약 이름은 `WatchRules.isEmpty()` 이고 이 키는 그 술어를
+        `OperatorStrategy.watchRules` 위에서 부른 **runner 투영**이다 — 타입에 이 이름의 필드가 없다.
+        **② `$.violations` 가 빈 배열인 것.** `Valid` 에는 그 자리가 없다 — 투영이 형태를 맞추려고 싣는 값이고
+        이 case 의 주장이 아니라 `verified_paths` 밖이다.
+        **③ 투영 키 `validation` 의 철자**(001 ④와 같다).
+        **④ 「설정됐다」의 하류 소비.** 온보딩·미리보기 노출은 STR-07·`OPEN-STR-02` 이고 M4 다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
 
 # =============================================================================
 # M1 계약 대조 — 1B 가 세운 shared-kernel 타입 계약과 이 corpus 의 대조 (운영자 결정 C13)
