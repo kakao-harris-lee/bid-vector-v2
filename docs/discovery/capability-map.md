@@ -723,17 +723,17 @@ pull 모델이 실제로 줄이는 큐 부하는 **투찰가 배치 산출분**�
   STR 축의 다음 번호 `STR-16`이다.
 - **legacy 형태 처리**: legacy의 **배치 선산출**(lineage `selected → workload →
   decision → notification → completed`)은 채택하지 않는다 — 요청 시 산출한다(§0.7).
-- **운영자 승인 2026-09-06(M1/1E 착수, decision 29)**: 이 capability 의 신설과 R-BASIS-01 의 「같은 쌍이
-  감시 경로와 검색 경로에서 같은 답을 낸다」를 **업무 규칙으로 명시 승인**한다 — `fixtures/manifest.yaml`
-  `uncovered_axes` 의 `OPEN-1BC-STR16` 축이 `unblocks_when` 으로 요구한 승인 둘. M1/1E 가 검색 경로와 감시
-  경로가 **같은 predicate 함수**를 쓰는 구조(`EvaluationPath` 는 runner 투영의 축)로 받고 `money-basis-003` 을
-  authoritative 로 되돌린다. 검색 **API**(엔드포인트·페이지네이션)는 여전히 M3.
   검색 경로(`projects.py:56-119`)는 형태가 실재하며 아래 둘로 갈린다.
   - **채택 가능**: `ILIKE` 부분 일치 검색과 `X-Total-Count` 페이지네이션의 **계약 형태**.
     STR-05(텍스트 매칭 부분문자열 유지) 결정과 방향이 같다.
   - **`폐기`**: 금액 필터가 `Project.budget_estimate`(**추정가격**)와 비교하는 형태
     (`projects.py:112-116`). **`OPEN-STR-01` 결정으로 `legacy-defect`가 된 것과 같은
     결함**이며, 감시 경로(`filters.py`)와 **같은 뿌리**다. §13 0B 인계 참조.
+- **운영자 승인 2026-09-06(M1/1E 착수, decision 29)**: 이 capability 의 신설과 R-BASIS-01 의 「같은 쌍이
+  감시 경로와 검색 경로에서 같은 답을 낸다」를 **업무 규칙으로 명시 승인**한다 — `fixtures/manifest.yaml`
+  `uncovered_axes` 의 `OPEN-1BC-STR16` 축이 `unblocks_when` 으로 요구한 승인 둘. M1/1E 가 검색 경로와 감시
+  경로가 **같은 predicate 함수**를 쓰는 구조(`EvaluationPath` 는 runner 투영의 축)로 받고 `money-basis-003` 을
+  authoritative 로 되돌린다. 검색 **API**(엔드포인트·페이지네이션)는 여전히 M3.
 - **Acceptance scenario**
   - 운영자가 제목·관심사(키워드)로 입찰 목록을 검색하면, **감시 조건 통과 여부와 무관하게**
     수집된 공고가 조회된다. 제안 목록에 없던 공고도 찾을 수 있다.
