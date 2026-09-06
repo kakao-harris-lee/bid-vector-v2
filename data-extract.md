@@ -155,6 +155,13 @@ Python과 V2를 같은 입력으로 실행했을 때:
 Python 출력 diff 0은 V2 합격 조건이 아니며, diff 발생 자체도 실패가 아니다. 판정 근거가
 없는 diff만 실패다.
 
+fixture 스윕(`fixtures/tools/mutation_sweep_adversarial.py` · `mutation_sweep_targeted.py`)의
+종료 코드가 곧 판정이다(2026-09-06, 1B-c 이월) — `0` 정상(위반 변이체 통과 0) · `1` 위반
+변이체 통과 ≥1(어느 case·어느 변이인지 stderr 한 줄씩) · `2` 도구·manifest 형식 오류. 이로써
+「`authoritative` = 확장 적대 집합에서 위반 변이체 통과 0」 판정이 `check` 처럼 종료 코드로
+강제되고, acceptance 는 exit code 만 읽으며 출력 수치를 문서에 박지 않는다. targeted 스윕의
+「승인 대기」 절과 통과가 정상인 자리(`EXPECTED_PASSES`)는 종료 코드에 들지 않는다.
+
 ## 7. 금지 사항
 
 - `KONEPS_*_GOLDEN_REGEN=1` 같은 재생성 명령으로 V2 기대값 자동 승인
