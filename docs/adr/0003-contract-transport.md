@@ -172,8 +172,13 @@ ADR 0001 D-6이 소유한다. 이 계약 축에서의 귀결만 적는다 — **
 
 ## 5. 이 ADR이 등록하는 `OPEN`
 
-### `OPEN-ADR-11` · ML 호출의 시간·실패 예산
+### ~~`OPEN-ADR-11`~~ · ML 호출의 시간·실패 예산 — **해소**
 
+- **해소 — `ADR 0010` 승인, 운영자 결정 2026-09-06(M2 착수).** 규칙은 그 ADR 이 고정한다: deadline 은 필수이고
+  호출자가 정한다(D-2) · transport/application/domain 세 층을 섞지 않고 `Unmeasurable` 은 재시도 대상이 아니다(D-3) ·
+  재시도는 멱등성과 gRPC status 로만(D-4) · 미가용의 이름은 `MlUnavailable(reason)` 하나(D-6, 사전 등재는 M4 4D 착수 시).
+  **값(deadline·재시도 횟수·백오프·breaker 임계)은 `adapters` 정책 데이터**이고 초기값의 실측 근거는 신설
+  `OPEN-M2-DEADLINE-VALUES`(M5 5E 실측 → M4 4D version)가 소유한다. **아래는 미결 당시의 기록이며 지우지 않는다.**
 - **결정 필요 사항**: deadline 값, 재시도 횟수·백오프, 어떤 오류를 재시도 가능으로 볼지,
   ml-engine 미가용의 하류 상태 이름.
 - **왜 미결인가**: `v2-지침서.md` §3.3이 그 ADR을 **M2에서 승인**하라고 규정했고, 값을
