@@ -150,6 +150,23 @@ class LicenseEligibilityTest {
             )
     }
 
+    /**
+     * verifier r1 F-4·PROBE F2 — legacy `_KEY_NOISE_RE` 는 전각 괄호 `（）`도 잡음으로
+     * 제거한다. 이전 판(반각 괄호만)은 이 문자를 품은 면허명을 거짓 `Ineligible` 로 냈다.
+     */
+    @Test
+    fun `전각 괄호가 있어도 정규화 키가 같아지면 Eligible이다`() {
+        val result = judge(listOf(row("1", "1", "토목공사업（전문）")), declared("토목공사업(전문)"))
+        result.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("1"))))
+    }
+
+    /** verifier r1 F-4·PROBE F3 — 나카구로 `・` 도 legacy 잡음 집합에 있다. */
+    @Test
+    fun `나카구로가 있어도 정규화 키가 같아지면 Eligible이다`() {
+        val result = judge(listOf(row("1", "1", "항만・해안공사업")), declared("항만해안공사업"))
+        result.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("1"))))
+    }
+
     @Test
     fun `별칭 미등재 면허는 원문 정규화 키로 보존되고 collapse되지 않는다`() {
         val aliasPolicy =

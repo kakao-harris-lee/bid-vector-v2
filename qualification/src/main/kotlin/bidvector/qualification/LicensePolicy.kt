@@ -41,7 +41,25 @@ val LICENSE_QUALIFICATION_POLICY: EffectiveDatedPolicy<LicenseQualificationPolic
             ),
     )
 
-private val KEY_STRIP_CHARS = charArrayOf(' ', '·', '(', ')', ',', '.', '-', '_', '/')
+/**
+ * verifier r1 F-4 — legacy `_KEY_NOISE_RE = re.compile(r"[\s·・‧⋅,.\-_/()\[\]（）]+")`
+ * (`bid-vector/app/services/license_eligibility.py:142`) 가 정본이다. 이전 판은 이 집합보다
+ * 좁아(공백 하나·나카구로 `・`·`‧`·`⋅`·대괄호·전각 괄호 `（）` 없음) 그 문자를 품은 면허명이
+ * 거짓 `Ineligible` 을 냈다(PROBE F2·F3 실측 — 방향은 보수적/과차단이라 high 는 아니다).
+ * 이 집합은 R-QUAL-03(별칭·포괄 코드 정책 데이터)의 대상이 아니다 — 별칭은 「어떤 면허를
+ * 같은 것으로 볼까」라는 업무 판단이고, 이 집합은 legacy 가 정규식 상수로 고정해 둔 순수한
+ * 표기 잡음(공백·구두점) 제거 규칙이다. R-QUAL-03 이 막는 것은 포괄 substring 별칭이
+ * 서로 다른 전문분야를 collapse 시키는 것이지, 이 축의 문자 제거는 같은 면허명의 다른
+ * 표기(전각/반각, 가운뎃점 종류)를 하나로 모을 뿐 서로 다른 면허를 모으지 않는다 — 그래서
+ * `LicenseAliasTable`(정책 데이터)로 옮기지 않고 legacy 와 같은 상수로 유지한다.
+ */
+private val KEY_STRIP_CHARS =
+    charArrayOf(
+        ' ', '\t', '\n', '\r',
+        '·', '・', '‧', '⋅',
+        ',', '.', '-', '_', '/',
+        '(', ')', '[', ']', '（', '）',
+    )
 private const val ASCII_CASE_OFFSET = 'a' - 'A'
 
 /**
