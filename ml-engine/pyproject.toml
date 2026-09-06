@@ -1,0 +1,26 @@
+[project]
+name = "ml-engine"
+version = "0.1.0"
+description = "bid-vector V2 ML engine — M2/2A 최소 골격(계약 round-trip). 패키지 구조·import 경계는 M5 5A 가 완성한다 (m2-prep.md D-M2-3)."
+requires-python = ">=3.12"
+dependencies = [
+    # 버전 근거: _workspace/m2-prep/02_grpc_stack_compat.md(PyPI 메타데이터 curl 실측) —
+    # Kotlin 쪽 grpc-java 1.84.0/grpc-kotlin 1.5.0 과 wire format(proto3)에서만 호환,
+    # 버전 숫자로 "같은 축"을 주장하지 않는다.
+    "grpcio==1.83.1",
+    "protobuf==7.36.1",
+]
+
+[project.optional-dependencies]
+# 생성·test 전용 — 실제 serving(5A)은 grpcio-tools 를 런타임에 필요로 하지 않는다.
+dev = [
+    "grpcio-tools==1.83.1",
+    "pytest==9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

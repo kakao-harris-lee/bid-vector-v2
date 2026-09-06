@@ -11,6 +11,13 @@ bid-vector
 # 커밋된 도구를 돌리면 생기는 바이트코드 (`fixtures/tools/` 는 모듈을 import 한다)
 __pycache__/
 
+# M2/2A — ml-engine 은 pyproject.toml 기반 별도 패키지(ADR 0006 D-8). 가상환경·테스트 캐시·
+# 빌드 메타데이터는 로컬 산출물이지 계약이 아니다. Python 생성 stub 은 pytest fixture 가
+# 시스템 임시 디렉터리에 만들어 저장소 안에 아예 생기지 않는다(conftest.py).
+ml-engine/.venv/
+ml-engine/.pytest_cache/
+ml-engine/*.egg-info/
+
 # 전역 gitignore(~/.gitignore_global)가 CLAUDE.md를 제외하지만,
 # 이 프로젝트에서는 역할별 진입점 문서라 커밋 대상이다 (README '문서 읽는 순서')
 !CLAUDE.md
