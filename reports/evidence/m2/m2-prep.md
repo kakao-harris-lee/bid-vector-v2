@@ -94,4 +94,16 @@ broker/DB · Kotlin client 의 circuit breaker·retry 배선(M4 4D — M2 는 �
 > 조사 레인 둘의 요약을 이 절에 인라인한다. 레인 완료 전에는 「대기」.
 
 - `01_scout_ml_interface.md`(legacy ML 인터페이스 실물): 대기
-- `02_grpc_stack_compat.md`(gRPC 스택 버전 호환): 대기
+- `02_grpc_stack_compat.md`(gRPC 스택 버전 호환, 2026-09-06 — Maven Central·PyPI 메타데이터 curl 실측 기준):
+  - **고정 후보 조합**: Kotlin `grpc-kotlin-stub`/`protoc-gen-grpc-kotlin` **1.5.0 리터럴**(Maven `latest` 메타데이터가 커밋 해시를
+    가리켜 동적 버전은 재현 불가) · grpc-java 계열(`grpc-netty-shaded`·`grpc-protobuf`·`grpc-stub`·`grpc-testing`) **1.84.0** BOM ·
+    `protobuf-java` **3.25.9**(grpc-java 1.84.0 의 실제 의존; Protobuf 4.x 전환은 grpc-java 이슈 #11015 open) · Python `grpcio`/
+    `grpcio-tools`/`grpcio-testing` **1.83.1** + `protobuf` **7.36.1**(Python 3.12·macOS arm64 wheel 확인) · `buf` CLI **1.72.0**.
+  - **D-M2-7 → proto3 확정 근거**: edition 2023 은 grpc-java/grpc-kotlin codegen 지원 미성숙(이슈 #11526 open).
+  - **buf 는 lint·breaking 전부 로컬 완결**(BSR 불요) — codex-review-gate 의 네트워크 차단 운영과 맞는다.
+  - **위험**: ① grpc-kotlin 1.5.0 POM 이 `grpc-stub:1.62.2` 를 선언해 1.84.0 과 22 마이너 차 — 검증 이력 없음, **2A 착수 시
+    컴파일+런타임 스모크 필수**. ② Java `protobuf-java`(3.x/4.x)와 Python `protobuf`(7.x)는 **독립 버전 축** — 「같은 major 라
+    호환」 서술 금지, 교차 언어 호환은 wire format(proto3)에서만. ③ gRPC Python 은 fork-불안전(`GRPC_ENABLE_FORK_SUPPORT` 는
+    poll/epoll1 에서만) — 2C training 워커의 프로세스 모델을 먼저 확정. ④ Kotlin 취소 → Python `ServicerContext.cancelled()`
+    미해결 버그(grpc/grpc#36193) — 2D cancellation test 는 폴링이 아니라 **실제 리소스 해제**로 검증(ADR 0010 D-2 갱신 근거).
+  - 미확인: `grpcio-tools` 번들 protoc 정확 버전(명령 한 번으로 해소), `grpcio-testing` 의 `grpc.aio` in-process fake 1급 지원.

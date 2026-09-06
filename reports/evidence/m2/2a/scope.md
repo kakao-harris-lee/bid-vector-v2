@@ -96,7 +96,11 @@ rollback: |
 ## 조사 결과 — 이 slice 에 영향을 주는 것 (`_workspace/m2-prep/`, 레인 완료 후 인라인)
 
 - legacy 인터페이스 실물(율의 단위·금액 표현·결측 접힘): 대기
-- gRPC 스택 고정 버전 조합·proto3/editions·buf 로컬 실행 가능성: 대기
+- gRPC 스택(`02_grpc_stack_compat.md`): 고정 후보 grpc-kotlin **1.5.0 리터럴** · grpc-java **1.84.0** · protobuf-java **3.25.9** ·
+  grpcio/grpcio-tools **1.83.1** · protobuf(py) **7.36.1** · buf **1.72.0**. **proto3 확정**(editions codegen 미성숙). buf lint·
+  breaking 로컬 완결(S-2 의 「네트워크 없이」 성립). **2A 착수 시 grpc-kotlin 1.5.0 + grpc-java 1.84.0 조합의 컴파일·런타임 스모크가
+  선행 조건**(POM 선언 `grpc-stub:1.62.2` 와 22 마이너 차, 검증 이력 없음). Java·Python protobuf 런타임은 독립 버전 축 — 계약
+  문서에 「같은 major」 서술 금지. 상세는 `m2-prep.md` §6.
 
 ---
 
