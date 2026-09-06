@@ -30,7 +30,7 @@ acceptance_commands:
   - "./gradlew :workflow:test --tests 'bidvector.workflow.notification.*' :adapters:test --tests 'bidvector.adapters.notification.*'"   # S-2
   - "grep -rniE -f config/quality/secret-patterns.txt workflow/src adapters/src/main/kotlin/bidvector/adapters/notification adapters/src/test/kotlin/bidvector/adapters/notification; test $? -eq 1"   # S-3 — secret·raw 식별자 스캔: 패턴은 **파일 밖**(정책 파일)에서 읽고 evidence 디렉터리는 대상에서 뺀다(scope.md 자신이 패턴을 담아 항상 매치되는 false-positive 회피 — codex-review-gate 판독 규칙과 같은 갈래). exit 1 = 매치 0 = 통과, exit 2(경로 없음)는 실패
   - "d=$(mktemp -d) && printf 'val t = \"Bearer abc\"\\n' > \"$d/Leak.kt\" && grep -rniE -f config/quality/secret-patterns.txt \"$d\"; test $? -eq 0"   # S-3b — 양성 대조: 심은 표본이 매치돼 exit 0 — 스캔이 실제로 잡는다
-  - "grep -rniE -f config/quality/secret-patterns.txt reports/evidence/m4/4e/ --exclude=scope.md; test $? -eq 1"   # S-3c — evidence 디렉터리(계약 문서 제외)의 secret 스캔(evidence-pack 규격)
+  - "grep -rniE -f config/quality/secret-patterns.txt reports/evidence/m4/4e/ --exclude=scope.md; test $? -eq 1"   # S-3c — evidence 디렉터리의 secret 스캔(evidence-pack 규격). `scope.md` 는 패턴 문자열을 담는 계약 문서라 **영구 제외**하고 대신 **사람 리뷰 대상**으로 명시(리뷰 요청 조건의 육안 확인 항목에 등재)
   - "./gradlew qualityBaseline"                                                                        # S-4
 rollback: |
     **정본은 `reports/evidence/m4/4e/rollback.md`**(착수 시). notification 패키지 둘을 걷으면 앵커 상태.

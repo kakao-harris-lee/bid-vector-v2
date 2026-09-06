@@ -9,7 +9,7 @@ slice: 5d-inference-kernels
 base_sha: 040ab9d   # 초안 앵커 — **5A 승인 뒤 재고정**
 head_sha: 리뷰 시점의 HEAD
 in_scope:
-  - ml-engine/src/ml_engine/inference/**              # 커널 이식: reserve_draw_distribution · assessment_shrinkage · award_margin_distribution(반사 KDE+Silverman) · settlement_maturity(계산만) · LightGBM predict adapter · scenario(후보 3) · 결과 타입
+  - ml-engine/src/ml_engine/inference/**              # 커널 이식: reserve_draw_distribution · assessment_shrinkage · settlement_maturity(계산만) · LightGBM predict adapter(분해 후) · scenario(후보 3) · 결과 타입. 반사 KDE·곡선 빌더는 D-M5-9, landing 둘은 D-M5-8 결정 뒤
   - ml-engine/src/ml_engine/registry/**               # artifact 로드·checksum 검증·feature_names 대조(불일치 = fail-closed) — 5C 가 쓰는 manifest 는 2C 형태
   - ml-engine/tests/inference/**                       # property(수학 불변식)·경계(최소 표본·singular·NaN/Inf)·golden(D-M5-7)·legacy 회귀 대조(`legacy-behavior`)
   - ml-engine/tests/gates/**                          # 래칫 갱신(이식 코드 동일 적용)
@@ -18,7 +18,8 @@ in_scope:
   - milestone-5.md, reports/evidence/m5/5d/**
 out_of_scope:
   - features/ 변환(5B) · training/evaluation(5C) · serving(5E)
-  - win-proxy 커널(`award_landing_*`) — D-M5-8 결정 전
+  - win-proxy 커널 둘(`award_landing_curve`·`award_landing_distribution`) — D-M5-8 결정 전
+  - 반사 KDE·곡선 빌더(`award_margin_distribution`·`award_landing_curve_builders`) — D-M5-9(8개 목록 개정) 결정 전
   - 업무 법정 하한·자격·최종 결정(Kotlin decision·qualification) · `review_required`·guardrail 10필드(조사 01 (b-5))
   - Platt 캘리브레이션의 자격 라벨(D-M2-11 (a))
   - 합성 `confidence`(§6.5 「사전에 올리지 않는다」)
@@ -95,5 +96,6 @@ rollback: |
 | --- | --- |
 | `OPEN-ML-03` | `PriceFitness` 타입 ≠ 확률 — Python 쪽 타입 분리(NewType) 로 승계 |
 | `OPEN-ML-05` | ⑥ 시나리오 상수·임계 → 정책 데이터(D-M5-6 분류) |
-| `OPEN-ML-06` | 범위 밖(D-M5-8) |
+| `OPEN-ML-06` | 범위 밖(D-M5-8 — landing 둘) |
+| `OPEN-ML-01` 하류 8개 목록 | D-M5-9 — 반사 KDE·곡선 빌더의 이식 시점(ADR 0001 §4.1·milestone-5 5D 문면 개정 동반) |
 | `OPEN-SET-06`(성숙도 embargo 임계) | 5D 는 계산만 — 값·판정은 Kotlin·그 OPEN |
