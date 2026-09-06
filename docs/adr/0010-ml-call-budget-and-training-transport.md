@@ -4,7 +4,7 @@
   compatibility를 포함한 ADR을 승인한다"*). 2A ④(정책 참조)·⑥(제3 변환 금지)과 2D ⑥(deadline·재시도 test)이 이 ADR 의
   D-1·D-2·D-3·D-4 위에 서므로 **2A 보다 먼저 승인**한다 — 2C 가 갱신할 상태가 아니다. M1/1E 병행 중에 세션 모델이 단독으로
   썼다(CLAUDE.md 운영자 지시 2026-09-04). 값은 정하지 않고 규칙을 정한다(§2 D-1). 운영자 결정이 필요한 자리는 §4 이고
-  `reports/evidence/m2/m2-prep.md` 의 착수 전 결정 D-M2-12~14 가 그것을 수령한다.
+  `reports/evidence/m2/prep/m2-prep.md` 의 착수 전 결정 D-M2-12~14 가 그것을 수령한다.
 - **작성일**: 2026-09-06
 - **대응**: `ADR 0003` D-9(*"구체 semantics는 M2 ADR이 확정한다"*) · `ADR 0003` §5 `OPEN-ADR-11` · `milestone-2.md`
   2A 「deadline 정책」·「retryable/non-retryable application error」 · 2C 「transport는 별도 job API 또는 broker

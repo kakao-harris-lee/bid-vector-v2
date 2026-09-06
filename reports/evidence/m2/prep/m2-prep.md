@@ -80,6 +80,7 @@ broker/DB · Kotlin client 의 circuit breaker·retry 배선(M4 4D — M2 는 �
 | `OPEN-ML-05`·`OPEN-ML-06` | M5 소유, M2 무관 |
 | `OPEN-DIC-03`(`SkipReason`) | DEC 축, 계약에 실리지 않는다(verdict 는 Kotlin) |
 | 신설 후보 `OPEN-M2-DEADLINE-VALUES` | D-M2-9 (a) 의 대가 — 초기 deadline·retry 값의 실측 근거를 5E 가 낸 뒤 정책 version 갱신 |
+| 신설 후보 `OPEN-2A-RELEASE-CHECK-4D` | 제3 변환 금지(2A ⑥)의 client 집행을 M4 4D 가 인계 — M2 는 fake 위의 test 까지(리뷰 r1) |
 
 ---
 

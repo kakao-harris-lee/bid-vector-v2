@@ -10,11 +10,11 @@ slice: 2d-generation-compat-and-provider-tests
 base_sha: c9022d9989c4b2a09cf8b9ff94795176dc5dc00c   # 초안 작성 시점 HEAD — **2A~2C 승인 뒤 착수 시 재고정**
 head_sha: 리뷰 시점의 HEAD
 in_scope:
-  - contracts/buf.yaml                                # breaking 규칙(FILE 카테고리) + against 기준(승인 태그)
+  - contracts/buf.yaml                                # breaking 규칙 카테고리(FILE). `against` 는 buf.yaml 이 아니라 `contractGate` 가 정책의 승인 태그를 `--against` 로 넘긴다
   - contracts/tools/**                                # breaking mutation 표본 생성·실행 스크립트(mutation 은 저장소에 커밋하지 않고 임시 디렉터리에서 만든다)
-  - build-logic/**                                    # `contractGate` task: buf lint·breaking·generateProto 결정성(두 번 생성 diff 0)·생성물 비커밋 실측
+  - build-logic/**                                    # `contractGate` task: 도구 버전 assertion·buf lint·breaking(`--against <승인 태그>`)·generateProto 결정성(두 번 생성 diff 0)·생성물 비커밋 실측
   - config/quality/gate-tests.properties              # `gate.tests.adapters` 키(키는 Gradle 모듈 이름 규약 — 2D 의 손으로 쓴 test 는 전부 adapters 에 있다; 게이트 정의 편집, 사유를 evidence 에)
-  - config/quality/contract-policy.properties         # 정책 데이터: max_message_bytes · 승인 태그 이름 규칙 · mutation 집합 목록과 최소 크기(매직넘버 금지)
+  - config/quality/contract-policy.properties         # 정책 데이터: max_message_bytes · 승인 태그 이름 규칙 · mutation 집합 목록과 최소 크기 · 도구 버전 리터럴(buf·protoc·protoc-gen-grpc-kotlin·grpcio-tools·protobuf)(매직넘버 금지)
   - adapters/src/test/kotlin/**                        # Kotlin 쪽 전부: unknown field·unknown enum·max payload·deadline·cancellation·round-trip(in-process grpc-testing) + 2B·2C consumer test 한 suite. `ml-contract` 는 생성물만(2A D-2A-0a·D-2A-6)
   - ml-engine/tests/**                                 # provider test: fake servicer 계약 준수 + 같은 testdata round-trip + async(grpc.aio) in-process
   - ml-engine/pyproject.toml                          # grpcio-testing dev 의존만(serving 런타임 아님)
@@ -61,7 +61,7 @@ contract 층·래칫 · `ADR 0010` 초안 D-2·D-4·D-7·§6 · `milestone-1.md`
 
 | # | 일 | 승인 문면 |
 | --- | --- | --- |
-| ① | **breaking gate 의 증명** — `contracts/tools/breaking-mutations.sh` 가 승인된 `.proto` 에 mutation 집합을 **임시 디렉터리**에서 하나씩 적용하고 `buf breaking --against <승인 태그>` 가 **전건 실패**함을 낸다. 집합(정책 데이터 `contract-policy.properties` 에 목록): 필드 삭제 · 필드 번호 변경 · 타입 변경(`int64 → string`) · enum 값 삭제 · enum 값 번호 변경 · `oneof` 에서 필드 빼기 · RPC 삭제 · RPC 스트리밍 전환 · 패키지 이름 변경 · `reserved` 번호 재사용 · `optional` 제거. 종료 코드는 스윕 규약(0/1/2). **잡히지 않는 mutation 이 하나라도 있으면 게이트는 증명되지 않은 것** | 완료 조건 「compatibility gate가 실제 breaking mutation을 잡는지」 · `ADR 0003` D-6 「게이트가 실제로 잡는다는 증거가 기준」 |
+| ① | **breaking gate 의 증명** — `contracts/tools/breaking-mutations.sh` 가 승인된 `.proto` 에 mutation 집합을 **임시 디렉터리**에서 하나씩 적용하고 `buf breaking --against <승인 태그>` 가 **전건 실패**함을 낸다. 집합(정책 데이터 `contract-policy.properties` 에 목록): 필드 삭제 · 필드 번호 변경 · 타입 변경(`int64 → string`) · enum 값 삭제 · enum 값 번호 변경 · `oneof` 에서 필드 빼기 · RPC 삭제 · RPC 스트리밍 전환 · 패키지 이름 변경 · `reserved` 번호 재사용 · `optional` 제거. 종료 코드는 스윕 규약(0/1/2). **잡히지 않는 mutation 이 하나라도 있으면 게이트는 증명되지 않은 것**이고, 그때의 규칙: 그 항목을 집합에서 빼고(정책 데이터 갱신) **남는 위험을 알려진 제한에 등재**하며 **대체 검출 수단**(예: descriptor 비교 스크립트, 리뷰 체크리스트 항목)을 같은 커밋에 붙인다 — 조사 노트 02 가 `optional` 제거의 buf 검출 여부를 확인하지 않았으므로 그 항목이 첫 후보. **도구 버전 assertion**: `contractGate` 가 `buf --version`·protoc·`protoc-gen-grpc-kotlin` 버전을 `contract-policy.properties` 의 리터럴과 대조하고 불일치를 실패로 낸다(codex 바이너리 핀과 같은 재현성 사유). Python 쪽은 S-5 의 pytest 가 `grpcio-tools`·`protobuf` 버전을 같은 정책 값과 대조 | 완료 조건 「compatibility gate가 실제 breaking mutation을 잡는지」 · `ADR 0003` D-6 「게이트가 실제로 잡는다는 증거가 기준」 · codex-review-gate 바이너리 버전 assertion(2026-09-01) |
 | ② | **호환 변경은 통과함도 증명** — 필드 추가·enum 값 추가·RPC 추가·메시지 추가는 `buf breaking` 통과(양성 대조). 게이트가 모든 변경을 막는 것이 아니라 breaking 만 막는다는 것 | ADR 0010 D-7 |
 | ③ | **생성물은 VCS 밖, 생성은 결정적** — 2A D-2A-0a 로 생성물은 `build/generated/` 에만 있어 수동 편집이 **구조적으로 불가**하다. `contractGate` 는 (a) `generateProto` 가 `check` 의 의존임 (b) 두 번 생성한 산출물이 바이트 동일함(결정성 — protoc·플러그인 버전 리터럴 고정의 실측) (c) `git status --porcelain -- ml-contract` 가 빔을 낸다. Python 생성물도 VCS 밖(pytest fixture 가 `grpc_tools.protoc` 로 임시 생성) — **Gradle `check` 는 Python 을 부르지 않는다**(CI·리뷰 레인의 오프라인 worktree 에 Python 의존이 없다) | 「설계 규칙」 생성된 코드는 수동 편집하지 않는다 · 2A D-2A-0a |
 | ④ | **unknown field / unknown enum** — Kotlin·Python 양쪽에서 (a) 정의 밖 필드 번호가 든 바이트를 파싱하면 **보존**되고(proto3 unknown field 보존) 응답으로 되돌아오지 않는다 (b) 정의 밖 enum 정수는 **거부**(2A ⑥ fail-closed — 파서는 통과시키므로 validation 층이 잡는다는 test). 두 성질은 다르다 — (a) 는 전방 호환, (b) 는 의미 안전 | 2D 「unknown field/enum」 · 2A ⑥ |
@@ -71,7 +71,7 @@ contract 층·래칫 · `ADR 0010` 초안 D-2·D-4·D-7·§6 · `milestone-1.md`
 | ⑧ | **consumer/provider(fake)** — 2B·2C 의 fake servicer test 를 한 suite 로 묶고, provider 쪽(Python)은 `grpc.aio` in-process 로 같은 규칙을 낸다. **교차 언어 socket 스모크 1회**(S-6): Python fake servicer 를 localhost 에 띄우고 Kotlin 생성 client 로 2B·2C 를 한 번씩 부른다 — 「요청만으로 Python 이 DB 조회 없이 계산 가능」의 형태 증명(fake 는 DB 를 갖지 않는다) | 2D 「fake servicer를 이용한 consumer/provider test」 · 완료 조건 「요청만으로 Python serving이 DB 조회 없이 계산 가능」 |
 | ⑨ | **게이트 등재** — `gate.tests.adapters` 키(모듈 이름 규약)로 1A 의 `gateExecutionGate` 가 2D test 의 실행을 강제(제외·필터 우회 차단 — 1A 관례). `contractGate` 는 `check` 의 의존 | `milestone-1.md` 「완료 조건 — 게이트 회피 경계」 · 1A `gate-tests.properties` |
 
-**만들지 않는 것**: 계약 내용 변경 · 실제 client/servicer · 성능 측정 · 코드 mutation test · CI 인프라 신설(정의가 없으면 로컬 `check` 가 게이트).
+**만들지 않는 것**: 계약 내용 변경 · 실제 client/servicer · 성능 측정 · 코드 mutation test · CI 의 Python 툴체인(D-2D-4 — 기존 `.github/workflows/ci.yml` 은 JDK + `gradlew check` 뿐이고 `contractGate` 는 그 `check` 안에 든다).
 
 ---
 
