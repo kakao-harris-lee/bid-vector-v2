@@ -55,10 +55,25 @@ val LICENSE_QUALIFICATION_POLICY: EffectiveDatedPolicy<LicenseQualificationPolic
  */
 private val KEY_STRIP_CHARS =
     charArrayOf(
-        ' ', '\t', '\n', '\r',
-        '·', '・', '‧', '⋅',
-        ',', '.', '-', '_', '/',
-        '(', ')', '[', ']', '（', '）',
+        ' ',
+        '\t',
+        '\n',
+        '\r',
+        '·',
+        '・',
+        '‧',
+        '⋅',
+        ',',
+        '.',
+        '-',
+        '_',
+        '/',
+        '(',
+        ')',
+        '[',
+        ']',
+        '（',
+        '）',
     )
 private const val ASCII_CASE_OFFSET = 'a' - 'A'
 

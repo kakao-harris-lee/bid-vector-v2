@@ -268,12 +268,16 @@ private val LICENSE_POLICY_REFERENCE_DATE: LocalDate = LocalDate.of(2026, 8, 30)
 
 private val LICENSE_RESOLVED_POLICY: Resolution.Resolved<LicenseQualificationPolicyData> =
     when (val resolution = LICENSE_QUALIFICATION_POLICY.resolve(LICENSE_POLICY_REFERENCE_DATE)) {
-        is Resolution.Resolved -> resolution
-        is Resolution.NotApplicable ->
+        is Resolution.Resolved -> {
+            resolution
+        }
+
+        is Resolution.NotApplicable -> {
             error(
                 "LICENSE_QUALIFICATION_POLICY 가 $LICENSE_POLICY_REFERENCE_DATE 에 해석되지 않는다 " +
                     "— reason=${resolution.reason}",
             )
+        }
     }
 
 /**
