@@ -449,9 +449,12 @@ internal val LICENSE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
 
 // ---- dispatch 표 ----
 
-/** money-basis(1B-c)·license(1C)·provenance/floor(1D) 세 축의 value executor 를 하나의 dispatch 표로 합친다. */
+/**
+ * money-basis(1B-c)·license(1C)·provenance/floor(1D)·strategy-watch·strategy-validation·
+ * money-basis-003(1E) 여섯 축의 value executor 를 하나의 dispatch 표로 합친다.
+ */
 internal val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
-    MONEY_BASIS_VALUE_EXECUTORS + LICENSE_EXECUTORS + PROVENANCE_FLOOR_EXECUTORS
+    MONEY_BASIS_VALUE_EXECUTORS + LICENSE_EXECUTORS + PROVENANCE_FLOOR_EXECUTORS + STRATEGY_EXECUTORS
 
 /**
  * compile-fixture 위임 case → shared-kernel `compile-fixtures` 의 fixture 번호. 실제

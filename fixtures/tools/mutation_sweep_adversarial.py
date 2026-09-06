@@ -107,6 +107,35 @@ ASSERTED = {
     "rate-unit-001":               ["$.rate.fraction"],                    # "명시 변환된다" 의 결과
     "rate-unit-002":               ["$.rate.fraction"],                    # "배율 없이 그대로"
     "rate-unit-005":               ["$.rate.fraction"],                    # "선언이 개연성을 이긴다"
+    # M1/1E — curator 판단(2026-09-06). money-basis-003 은 decision 29 로 authoritative 로
+    #   되돌아갔다 — "같은 쌍이 감시·검색 경로에서 같은 답을 낸다"가 verifies 의 주장이다.
+    #   `$.perPath.*.outcome`(`Comparable`)은 여기 들지 않는다 — 미승인 토큰이라 값을
+    #   잠글 자격이 없다(change_history, money-basis-006 의 `$.reasonCode` 와 같은 갈래).
+    "money-basis-003": [
+        "$.pathsAgree",
+        "$.perPath.MONITORING_FILTER.result",
+        "$.perPath.MONITORING_FILTER.basisUsed",
+        "$.perPath.SEARCH_QUERY.result",
+        "$.perPath.SEARCH_QUERY.basisUsed",
+    ],
+    # STR-01 acceptance 넷·STR-02 acceptance 넷(decision 30) — `$.verdict` 는 모든 watch
+    # case 의 무게중심이고, `$.matched`/`$.failed` 는 case 마다 그 문면이 직접 드는 규칙이다.
+    "strategy-watch-001": ["$.verdict", "$.failed"],    # "완전일치가 아니면 탈락하고 그 규칙이 실린다"
+    "strategy-watch-002": ["$.verdict", "$.matched"],   # "AND 결합의 양(陽) — 둘 다 통과"
+    "strategy-watch-003": ["$.verdict", "$.failed"],    # "AND 결합의 음(陰) — 한 축 결여로 탈락"
+    "strategy-watch-004": ["$.verdict", "$.matched"],   # "게이트 없음 ≠ 모든 공고 통과"(결과 타입에서 구분)
+    "strategy-watch-005": ["$.verdict", "$.failed"],    # "필수 키워드가 description 에만 있으면 탈락"
+    "strategy-watch-006": ["$.verdict", "$.matched"],   # "같은 키워드가 title/requirements 에 있으면 통과"
+    "strategy-watch-007": ["$.verdict", "$.matched"],   # "제외 키워드가 description 에만 있으면 안 떨어짐"
+    "strategy-watch-008": ["$.verdict", "$.matched"],   # "중점 지역은 description 포함 전체 텍스트에 매칭"
+    # STR-03 acceptance 셋(decision 30) — `$.validation`(sealed variant)과 그 근거.
+    "strategy-validation-001": ["$.validation", "$.violations"],  # "review>bidNow 는 모든 경로에서 거부"
+    "strategy-validation-002": ["$.validation", "$.violations"],  # "min>max(둘 다 유효값) 거부"
+    "strategy-validation-003": [
+        "$.validation",
+        "$.isConfigured",
+        "$.watchRulesEmpty",
+    ],  # "설정됐는가"≠"좁히는가"가 서로 다른 값
 }
 
 # (c) 갈래가 쓰는 대체 토큰. 목록에 없는 피연산자는 `Other` 로 친다.
@@ -120,7 +149,20 @@ ADVERSARIAL_VALUE = {"Accepted": "Rejected", "Rejected": "Accepted",
                      "Comparable": "Rejected", "Uncertain": "Eligible",
                      # 1B 계약 어휘(운영자 결정 2026-09-05 decision 19). 상태 토큰의 적대값은
                      # **반대 상태**다 — `Other` 같은 무의미 토큰보다 강한 변이다.
-                     "Known": "Absent", "Absent": "Known"}
+                     "Known": "Absent", "Absent": "Known",
+                     # M1/1E — `WatchVerdict`(decision 31) 상태 토큰. `NoGate`→`Passed`가
+                     # STR-01 acceptance 셋째가 막는 바로 그 접기다("게이트 없음"이 "모든
+                     # 공고 통과"로 접히면 안 된다) — 역방향(`Passed`→`NoGate`)은 같은
+                     # 위험을 겨누지 않아 넣지 않는다. `"Rejected"` 키는 이미 위에서
+                     # `"Accepted"`(다른 도메인의 상태 토큰)로 매핑돼 있다 — 여기서
+                     # `"Passed"`로 덮어쓰면 그 매핑이 조용히 깨진다(파이썬 dict 리터럴의
+                     # 중복 키는 뒤 값이 이긴다). 그래서 `strategy-watch-001`·`003`·`005`의
+                     # `"Rejected"` verdict는 그 기존 매핑(`"Accepted"`)을 그대로 쓴다 —
+                     # 도메인 어휘는 아니지만 기대값과 **다른 확정 토큰**이라는 스윕의
+                     # 요구는 그대로 만족한다.
+                     "Passed": "Rejected", "NoGate": "Passed",
+                     # `StrategyValidation`(decision 31) 상태 토큰.
+                     "Valid": "Invalid", "Invalid": "Valid"}
 
 # (d) 기대값이 **`null`** 인데 `verifies` 가 그 **부재**를 주장하는 경로 — 사람의 판단이다.
 #     Codex B14 high 의 진단: 적대 집합이 null 기대값을 한 번도 변이하지 않아 「강등 대상 0」이
@@ -132,6 +174,10 @@ NULL_ASSERTED = {
     "license-007":         ["$.requiredLicenses"],  # "요건 원문이 없으면" — 없음이 주장이다
     # `rate-unit-003`·`004` 의 `$.rate`(null)는 2026-09-05 정정으로 기대값에서 사라졌다 —
     #   기대값이 `{"representable": false}` 하나이고 그 자리는 `ASSERTED` 가 진다.
+    # M1/1E — STR-01 acceptance 셋째 "게이트 없음"이 결과 타입에서 구분된다는 것은
+    #   `$.matched` 가 **부재**(`null`)라는 사실 자체가 주장이다(`Passed(emptySet())`와
+    #   달리 `NoGate`는 matched 자리가 없다) — non-null 로 채워지면 그 구분이 사라진다.
+    "strategy-watch-004": ["$.matched"],
 }
 NULL_REPLACEMENTS = [0.0, {"numerator": 0, "denominator": 149}, 0,
                      {"numerator": 0, "denominator": 0}, "0%"]

@@ -67,15 +67,19 @@ class SharedKernelCorpusConformanceTest {
         }
     }
 
-    /** money-basis-003(`OPEN-1BC-STR16` 이월)만 남아야 한다 — 「④가 넷을 닫는다」의 인계 경계. */
+    /**
+     * M1/1E ⑪ — `money-basis-003`가 curator 커밋(`c9022d9`, decision 29)으로 authoritative에
+     * 되돌아가 이 축의 insufficient-evidence 이월이 0건이 됐다(`OPEN-1BC-STR16` 해소).
+     * 「④가 넷을 닫는다」의 인계 경계가 이제 빈 목록이라는 것 자체가 그 해소의 증거다.
+     */
     @Test
-    fun `1B 축 insufficient-evidence 이월은 money-basis-003 하나뿐이다`() {
+    fun `1B 축 insufficient-evidence 이월은 이제 없다 — money-basis-003 승격으로 닫혔다`() {
         val axisDomains = setOf("rate-unit", "money-basis")
         val ids =
             allCases()
                 .filter { it.domain in axisDomains && it.classification == "insufficient-evidence" }
                 .map { it.id }
-        ids shouldBe listOf("money-basis-003")
+        ids shouldBe emptyList()
     }
 
     /**
@@ -128,6 +132,11 @@ internal val TARGET_DOMAINS =
         "base-amount-provenance",
         "floor-shortfall",
         "floor-threshold",
+        // M1/1E ⑪ — 감시 predicate·전략 값 validation 커널 둘(scope.md 「이 slice 가
+        // 하는 일」①·⑤). money-basis-003 은 이미 money-basis 축에 있어 여기 추가하지
+        // 않는다 — curator 가 되돌린 authoritative case 가 위 목록으로 이미 대상이 된다.
+        "strategy-watch",
+        "strategy-validation",
     )
 
 private const val MANIFEST_PROPERTY = "bidvector.fixtures.manifest"

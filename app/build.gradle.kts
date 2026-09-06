@@ -44,6 +44,9 @@ dependencies {
     // M1/1D — base-amount-provenance·floor-shortfall·floor-threshold corpus 실행자가
     // decision 공개 API(`ProvenanceRules.judge`·`measureFloorShortfall` 등)를 직접 부른다.
     testImplementation(project(":decision"))
+    // M1/1E — strategy-watch·strategy-validation corpus 실행자가 strategy 공개 API
+    // (`WatchRules.evaluate`·`validate` 등)를 직접 부른다.
+    testImplementation(project(":strategy"))
     // manifest.yaml(YAML) 을 읽기 위한 snakeyaml — 카탈로그 좌표는 이미 Boot BOM 관리 하에
     // transitively 해석되던 것을 명시로 올린 것뿐이다(`gradle/libs.versions.toml` 주석 참고).
     testImplementation(libs.snakeyaml)
