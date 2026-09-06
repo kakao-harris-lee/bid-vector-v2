@@ -64,8 +64,10 @@ class PredictionContractTest {
 
     private val requestBytes = bytes("calculate_optimal_bid_request.binpb")
     private val successBytes = bytes("calculate_optimal_bid_response_success.binpb")
-    private val unmeasurableUntrainedBytes = bytes("calculate_optimal_bid_response_unmeasurable_untrained_segment.binpb")
-    private val unmeasurableInsufficientBytes = bytes("calculate_optimal_bid_response_unmeasurable_insufficient_samples.binpb")
+    private val unmeasurableUntrainedBytes =
+        bytes("calculate_optimal_bid_response_unmeasurable_untrained_segment.binpb")
+    private val unmeasurableInsufficientBytes =
+        bytes("calculate_optimal_bid_response_unmeasurable_insufficient_samples.binpb")
     private val failureBytes = bytes("calculate_optimal_bid_response_failure_unsupported_schema.binpb")
     private val metadataBytes = bytes("get_model_metadata_response.binpb")
 
@@ -86,8 +88,9 @@ class PredictionContractTest {
         val serverName = "bidvector-2b-fake-${System.nanoTime()}"
         val servicer =
             object : BidPredictionServiceGrpcKt.BidPredictionServiceCoroutineImplBase() {
-                override suspend fun calculateOptimalBid(request: CalculateOptimalBidRequest): CalculateOptimalBidResponse =
-                    calculate ?: error("이 test 는 CalculateOptimalBid 응답을 배선하지 않았다")
+                override suspend fun calculateOptimalBid(
+                    request: CalculateOptimalBidRequest,
+                ): CalculateOptimalBidResponse = calculate ?: error("이 test 는 CalculateOptimalBid 응답을 배선하지 않았다")
 
                 override suspend fun getModelMetadata(request: GetModelMetadataRequest): GetModelMetadataResponse =
                     metadata ?: error("이 test 는 GetModelMetadata 응답을 배선하지 않았다")
@@ -213,7 +216,12 @@ class PredictionContractTest {
 
     @Test
     fun `OptimizationObjective 정의 밖 정수(99)는 거부된다`() {
-        val request = CalculateOptimalBidRequest.parseFrom(requestBytes).toBuilder().setObjectiveValue(99).build()
+        val request =
+            CalculateOptimalBidRequest
+                .parseFrom(requestBytes)
+                .toBuilder()
+                .setObjectiveValue(99)
+                .build()
         request.objective shouldBe OptimizationObjective.UNRECOGNIZED
         isAcceptableObjective(request.objective) shouldBe false
     }
@@ -368,14 +376,20 @@ class PredictionContractTest {
         promoted: ModelRelease?,
     ): Boolean =
         when (selector.selectorCase) {
-            ModelReleaseSelector.SelectorCase.EXACT_RELEASE ->
+            ModelReleaseSelector.SelectorCase.EXACT_RELEASE -> {
                 responseRelease.releaseId == selector.exactRelease.releaseId &&
                     responseRelease.artifactChecksum == selector.exactRelease.artifactChecksum
-            ModelReleaseSelector.SelectorCase.LATEST_PROMOTED ->
+            }
+
+            ModelReleaseSelector.SelectorCase.LATEST_PROMOTED -> {
                 promoted != null &&
                     responseRelease.releaseId == promoted.releaseId &&
                     responseRelease.artifactChecksum == promoted.artifactChecksum
-            ModelReleaseSelector.SelectorCase.SELECTOR_NOT_SET, null -> false
+            }
+
+            ModelReleaseSelector.SelectorCase.SELECTOR_NOT_SET, null -> {
+                false
+            }
         }
 
     private fun isAcceptableObjective(objective: OptimizationObjective): Boolean =
