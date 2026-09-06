@@ -145,8 +145,10 @@ corpus 에 관측치가 없어(DB 덤프에 컬럼 부재·goldens 캡처 0) 1C 
 은 규칙 무매치. **decision 28** — 경계 등가(실현 사정률 = 임계)는 미달이 아니다(`strictly-greater`)를 정책 version 1
 값으로 승인, `floor-threshold-002` 복귀 근거. 커널은 둘이고 층은 셋이다 — provenance 는 정책 데이터가 정한 순서·부분집합의
 first-match(술어 넷은 정책값 주입, 값은 main 에 없음 — `OPEN-DEC-07`), floor 는 표본 단건 술어 → 집계(tally) → 측정으로
-나눠 corpus 입력이 가진 층에서 실행한다(runner 가 표본을 지어내지 않는다). `FloorShortfall` 은 §3.3 서명 그대로의 1D
-소유 sealed(`FloorUnmeasurableReason` 은 `ReasonCode` 와 다른 축), 빈도는 유리수만(십진 렌더링은 `OPEN-DIC-10`).
+나눠 corpus 입력이 가진 층에서 실행한다(runner 가 표본을 지어내지 않는다). `FloorShortfall` 은 §3.3 의 두 variant 를 가진 1D
+소유 sealed 이고 `Measured` 는 §3.3 의 일곱 자리 가운데 분자·분모를 `Frequency` 유리수 하나로 접어 다섯 필드로 나른다
+(`FloorUnmeasurableReason` 은 `ReasonCode` 와 다른 축), 십진 렌더링은 `OPEN-DIC-10`. 임계 사정률은 파생값이라 decision 17
+대로 `Derived<AssessmentRate>` 로 나른다(verifier r1 이 계약 초안의 서명 오기를 잡아 정정).
 복구 추정치는 입력으로 받아 별도 필드에 보존만 한다(15개 예가 range 중점 규칙은 예가 수집과 함께). 표본 수집·오염
 필터·미판정 저장 상태는 M3 소관으로 커널 밖이다.
 
