@@ -12,7 +12,6 @@ head_sha: 리뷰 시점의 HEAD
 in_scope:
   - contracts/proto/bidvector/ml/v1/training.proto    # TrainingJobService { StartTraining, GetTrainingJob, CancelTrainingJob } + 상태 enum·전이표(주석)·참조 메시지
   - contracts/testdata/training/**
-  - ml-contract/**, ml-engine/src/ml_engine/contracts/**   # 재생성 결과
   - adapters/src/test/kotlin/**                        # consumer test — 상태 전이·idempotency·cancel 의미를 fake servicer 로
   - ml-engine/tests/test_training_contract.py         # provider 쪽 계약 test(전이표 밖 전이 거부·미지 상태 없음)
   - milestone-2.md                                    # 「Slice 2C」 착수 문단, **착수 시**
@@ -23,6 +22,7 @@ out_of_scope:
   - Kotlin 쪽 폴링 스케줄(주기·재시도)                 # ADR 0005 DB 스케줄러 + M4. 2C 는 「Kotlin 이 조회한다」는 방향만(ADR 0003 D-5)
   - 모델 승격(promotion)·롤아웃                         # ML-07·ML-08 — M5. 학습 성공 ≠ 승격
   - broker contract · 서버 스트리밍 push                # ADR 0010 D-8 불채택
+  - ml-contract/**, ml-engine/src/ml_engine/contracts/**   # 생성물은 VCS 밖(2A D-2A-0 (c)) — 변경이 나올 수 없는 경로라 in_scope 아님
   - Celery 이름·raw_status 노출                          # H-12 직접 위반 — 계약은 자기 상태 어휘만
   - shared-kernel/**, 도메인 모듈, fixtures/**
 acceptance_commands:
