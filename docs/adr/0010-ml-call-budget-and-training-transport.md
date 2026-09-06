@@ -1,7 +1,9 @@
 # ADR 0010 — ML 호출의 시간·실패 예산, error mapping, 호환성 규칙, training transport
 
-- **상태**: **초안 — M2 slice 2A 착수 전건으로 승인 대상**(`v2-지침서.md` §3.3 *"M2에서 deadline, retry, error mapping,
-  compatibility를 포함한 ADR을 승인한다"*). 2A ④(정책 참조)·⑥(제3 변환 금지)과 2D ⑥(deadline·재시도 test)이 이 ADR 의
+- **상태**: **승인 — 운영자 결정 2026-09-06(M2 착수, 2A 전건).** §4 의 세 물음은 추천안대로 확정됐다 — `latest_promoted`
+  선택자를 계약에 둔다(D-M2-12 (a)) · `MODEL_NOT_READY` 는 application failure(`retryable=true`)(D-M2-13 (a)) · training job
+  조회 주기는 `adapters` 정책 데이터(D-M2-14 (a)). `OPEN-ADR-11` 은 이 승인으로 닫힌다(§5). 원 지위: 초안 — M2 slice 2A 착수
+  전건으로 승인 대상(`v2-지침서.md` §3.3 *"M2에서 deadline, retry, error mapping, compatibility를 포함한 ADR을 승인한다"*). 2A ④(정책 참조)·⑥(제3 변환 금지)과 2D ⑥(deadline·재시도 test)이 이 ADR 의
   D-1·D-2·D-3·D-4 위에 서므로 **2A 보다 먼저 승인**한다 — 2C 가 갱신할 상태가 아니다. M1/1E 병행 중에 세션 모델이 단독으로
   썼다(CLAUDE.md 운영자 지시 2026-09-04). 값은 정하지 않고 규칙을 정한다(§2 D-1). 운영자 결정이 필요한 자리는 §4 이고
   `reports/evidence/m2/prep/m2-prep.md` 의 착수 전 결정 D-M2-12~14 가 그것을 수령한다.

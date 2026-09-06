@@ -10,7 +10,7 @@
 ```yaml
 milestone: m2
 slice: 2a-common-values-and-errors
-base_sha: c9022d9989c4b2a09cf8b9ff94795176dc5dc00c   # 초안 작성 시점 HEAD — **M1 전체 승인 뒤 착수 시 재고정**
+base_sha: 040ab9d   # 착수 2026-09-06 재고정(M1 1E 종결 승인 커밋 = M1 전체 승인). 초안 시점은 c9022d9 였다
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - contracts/proto/bidvector/ml/v1/common.proto      # 값 타입·enum·봉투(RequestEnvelope 필수 둘 + PredictionEnvelope)
@@ -60,7 +60,14 @@ subproject 형태 자체가 원인이라 **included build** 로 재설계(D-2A-0
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — **착수 시 재고정한 base 로 다시 낸다.** 초안 시점은 해당 없음.
+`git log --oneline 040ab9d..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-06) **없음**.
+
+**착수 2026-09-06 — 운영자 결정**: `ADR 0010` 승인(§4 셋 추천안 = D-M2-12~14 (a)) · `prep/m2-prep.md` D-M2-1~11 전부 추천안 ·
+**D-2A-0 (c)** included build + `ResolvedDependencies` 분류 정정 한 분기 · **D-2A-7 (a)** 율의 source 는 wire 필드가 아니라
+이름·`origin` · 환경 설치(buf 1.72.0 Homebrew, `ml-engine` 가상환경의 grpcio-tools 1.83.1)는 이 세션이 진행. Phase 2.5 는
+준비 세션의 리뷰 r1~r4(`_workspace/m2-prep/03~06_review_*.md`, PR #2)가 게이트 가족·의존 분류·봉투·어휘 축을 검토한 것으로
+갈음하고, 위협 모델 (0) 경계 문장은 이 문서 「위협 모델」 절이 갖는다. 정본: `ADR 0010` 머리 · `milestone-2.md` 착수 문단 ·
+`capability-map.md` §14.2 `OPEN-ADR-11`·`OPEN-ML-02`·`OPEN-ML-03` 행.
 
 ---
 
