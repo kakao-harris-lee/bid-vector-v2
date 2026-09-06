@@ -14,6 +14,13 @@ dependencies {
     testImplementation(libs.grpc.kotlin.stub)
     testImplementation(libs.grpc.stub)
     testImplementation(libs.kotlinx.coroutines.core)
+    // §4b 런타임 스모크(GrpcKotlinStackSmokeTest) 전용 — in-process 채널/서버 구성에
+    // `io.grpc:grpc-core`가 필요하다(`grpc-stub`/`grpc-kotlin-stub`은 그것을 끌어오지 않고,
+    // `grpc-testing`도 전이하지 않음을 실측). 조사 노트 02 가 권고한 in-process 대역
+    // (2D 의 fake servicer consumer/provider test 도 재사용할 후보).
+    testImplementation(libs.grpc.testing)
+    testImplementation(libs.grpc.core)
+    testImplementation(libs.grpc.inprocess)
 }
 
 // M2/2A — `ContractRoundTripTest`가 `contracts/testdata/*.binpb`(canonical, VCS 커밋)를 읽는다.

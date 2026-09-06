@@ -105,6 +105,11 @@ grpc-stub = { module = "io.grpc:grpc-stub" }
 grpc-protobuf = { module = "io.grpc:grpc-protobuf" }
 grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded" }
 grpc-testing = { module = "io.grpc:grpc-testing" }
+# in-process transport(`io.grpc.inprocess.*`)는 `grpc-core`가 아니라 별도 좌표
+# `grpc-inprocess`에 있다(실측 — jar 내용 확인). `grpc-stub`/`grpc-kotlin-stub`/`grpc-testing`은
+# 이것을 끌어오지 않는다 — §4b 런타임 스모크·2D fake servicer test 전용.
+grpc-core = { module = "io.grpc:grpc-core" }
+grpc-inprocess = { module = "io.grpc:grpc-inprocess" }
 protobuf-java-runtime = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf-runtime" }
 protobuf-protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf-runtime" }
 
