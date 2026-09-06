@@ -1,7 +1,9 @@
 # M2/2A commands.md
 
 정본은 명령과 exit code, 핵심 결과 한 줄이다. 출력 전문은 재현 명령으로 대신한다.
-base `040ab9d`, head `48e9980d1efdefa774c3f177463015a373fbf84c`.
+base `040ab9d`, head는 리뷰 시점의 HEAD — 구체 SHA 를 여기 박지 않는다(verifier r1 F-1,
+값을 박으면 후속 커밋마다 낡는다). Phase 3 구현 커밋 목록은 진행 순서로 `checklist.md`
+「커밋 목록」이 갖는다.
 
 ## §4b 스모크 (선행, 구현 순서 0)
 

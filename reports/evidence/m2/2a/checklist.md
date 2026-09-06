@@ -29,8 +29,9 @@
 
 ## 위협 모델 「방어한다」 목록과의 대응(scope.md)
 
-(a) `Unmeasurable`이 transport error나 0으로 접힘 → oneof 부재이자 별도 메시지(`error.proto`) +
-round-trip test가 실제 파싱을 검증. (b) 미지 enum 정수·UNSPECIFIED 통과 → 변이 실측 있음.
+(a) `Unmeasurable`이 transport error나 0으로 접힘 → `Unmeasurable`을 `error.proto`의 독립
+메시지로 두고(oneof 결과 봉투에 실릴 자리는 2B·2C가 짓는다 — 알려진 제한 7) round-trip
+test가 실제 파싱을 검증. (b) 미지 enum 정수·UNSPECIFIED 통과 → 변이 실측 있음.
 (c) 율의 double 유출·scale 손실 → `Rate`는 `string fraction` 하나뿐(타입에 double 없음) +
 정규형 test. (d) basis·provenance 없는 금액 → 위 ①. (e) 생성물 수동 편집 → S-4·S-5.
 (f) 도메인이 계약 타입을 import → T-A(`package.allowed.subtree=bidvector`)가 구조적으로
@@ -46,7 +47,8 @@ provenance 두 축 혼용 → `AmountProvenanceKind`/`BaseAmountProvenanceLabel`
    성립함을 실측했다. map 필드가 없고 unknown field도 없는 이 testdata 범위에서는
    deterministic serialization이 필드 번호 오름차순으로 결정적이다 — map 필드가 도입되는
    2B 이후에는 이 제안을 재검토해야 한다(map 순서는 deterministic 모드에서도 삽입 순서
-   보존이 아니라 별도 정렬 규칙을 따른다).
+   보존이 아니라 별도 정렬 규칙을 따른다). **등재 완료(verifier r1 F-3)** —
+   `capability-map.md` §14.3에 세션 모델이 신설했다(`ddd82fb`).
 2. **`OPEN-2A-INCLUDED-BUILD`** — `ml-contract`는 게이트 가족 밖의 빌드다. S-5(무소스
    단언)가 이 slice의 유일한 방어이고, 2D가 이것을 `contractGate`로 정식화해야 한다.
 3. **`OPEN-2A-RELEASE-CHECK-4D`** — ⑥의 제3 변환 금지(다른 release 응답을 client가
@@ -60,6 +62,19 @@ provenance 두 축 혼용 → `AmountProvenanceKind`/`BaseAmountProvenanceLabel`
    round-trip은 이 slice의 로컬 실행(commands.md)으로만 증명됐고, CI 자동화는 범위 밖.
 6. **`ml-engine`의 패키지 구조·import 경계는 미완성** — `pyproject.toml` + `tests/`만
    있고 실제 `ml_engine` 패키지 코드는 없다(D-M2-3 (a), M5 5A가 완성).
+7. **결과 봉투 `oneof result { Success, Unmeasurable, ApplicationFailure }`는 2A에 없다**
+   (verifier r1 F-2) — 2A가 실제로 내는 것은 `Unmeasurable`·`ApplicationFailure` 두
+   **독립 메시지**와 그 필드·enum 규칙뿐이다. 그 둘을 감싸는 `oneof result`는 실제 RPC
+   응답 메시지(`CalculateOptimalBid`·`GetModelMetadata`의 응답, 2B 소유 / training job
+   RPC 응답, 2C 소유)가 짓는다 — 그 메시지 자체가 2A 범위 밖(out_of_scope: `prediction.proto`·
+   `training.proto`, scope.md)이기 때문이다. 위협 모델 (a)의 「oneof + test」 방어는
+   **그 oneof가 실제로 존재하는 2B·2C에서 성립**하고, 2A는 oneof의 두 가지(variant) 타입과
+   fail-closed 규칙까지만 낸다. **2B·2C 인계 항목**: 응답 메시지의 `oneof result`에
+   `Unmeasurable`을 다른 모델의 성공값으로 접지 않는다는 test(제3 변환 금지, ⑥)를
+   같은 자리에서 검증해야 한다 — `OPEN-2A-RELEASE-CHECK-4D`(항목 3)와 같은 인계 축이다.
+8. **끝머리 미지 필드는 양쪽(Kotlin·Python)에서 조용히 통과한다**(verifier r1 F-4, info) —
+   proto3 unknown field 보존은 표준 동작이고 이 slice가 막을 규칙이 아니다. breaking
+   change 증명(필드 재사용·reserved 위반 탐지)은 2D의 breaking gate 소관.
 
 ## S-1b 관련 — r4 N-11 앵커 우려의 사후 확인
 
@@ -71,12 +86,20 @@ acceptance 명령 문면을 정정할 필요가 없었다.
 
 ## 커밋 목록
 
-`040ab9d..48e9980` range 중 2A 자신의 커밋 7개(순서대로): `15ee75d`(contracts/) ·
+**Phase 3 최초 구현**(base `040ab9d`) — 2A 자신의 커밋 7개(순서대로): `15ee75d`(contracts/) ·
 `667d9bd`(ml-contract/ 골격 + §4b 컴파일 스모크) · `e307395`(ResolvedDependencies 분류
 정정 + test) · `45d550b`(round-trip Kotlin 23건 + testdata) · `87ccf86`(ktlint/detekt
 정정) · `28c845a`(ml-engine/ 골격 + Python round-trip 9건) · `48e9980`(§4b 런타임
-스모크). range의 나머지 커밋은 병행 레인 산출물이며 commands.md 「하네스 레인 변경」
-절이 목록과 사유를 갖는다.
+스모크) · `a78959f`(evidence pack 최초본).
+
+**verifier r1 수정**(`02_verifier_report.md` F-1·F-2·F-5) — `ddd82fb`(세션 모델,
+capability-map §14.3 OPEN 등재, F-3) · `d3708f2`(alias 정합 — protoc·grpc-kotlin 플러그인
+좌표를 카탈로그 alias 로, `grpc-netty-shaded` 제거, F-5) · 이 evidence 커밋
+자신(head_sha 관례 정정 F-1 + oneof 인계 등재 F-2 + F-4 한 줄). 이 목록은 열린
+목록이다 — base/head를 하나의 값으로 고정하지 않는다(verifier r1 F-1과 같은 이유).
+
+이 range의 나머지 커밋(M2 착수 기록·M3/M4/M5 준비 초안)은 병행 레인 산출물이며
+commands.md 「하네스 레인 변경」 절이 목록과 사유를 갖는다.
 
 ## 판단이 갈린 지점
 
