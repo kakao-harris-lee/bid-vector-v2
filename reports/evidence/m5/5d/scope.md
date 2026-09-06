@@ -1,7 +1,7 @@
 # Slice 계약 — M5 / 5D · inference kernels — **초안, 구현 전**
 
-> **지위**: M2 진행 중 세션 모델이 쓴 초안. 착수는 5A(·5B 변환) 뒤 운영자 지시. 커널 이식은 M2 와 독립이나 출력 어휘는 2B 와 같은 형태(후보 3·
-> 성분 셋·`Unmeasurable` 두 사유)로 둔다 — wire 매핑은 5E.
+> **지위**: M2 진행 중 세션 모델이 쓴 초안. 착수는 5A(·5B 변환) 뒤 운영자 지시, **그리고 `OPEN-ML-05`(임계값 정책 분류, D-M5-6)·`OPEN-ML-06`(win-proxy, D-M5-8)
+> 결정이 착수 전건**(조사 01: 둘 다 5D 를 막는다). 커널 이식은 M2 와 독립이나 출력 어휘는 2B 와 같은 형태(후보 3·성분 셋·`Unmeasurable` 두 사유)로 둔다 — wire 매핑은 5E.
 
 ```yaml
 milestone: m5
@@ -48,7 +48,7 @@ rollback: |
 
 | # | 일 | 승인 문면 |
 | --- | --- | --- |
-| ① | **순수 커널 이식(수학 유지, 결합 제거)** — `reserve_draw_distribution`(4/15 추첨 닫힌식) · `assessment_shrinkage`(계층 수축 사후분포) · `award_margin_distribution`(반사 보정 KDE + Silverman) · `settlement_maturity`(성숙도 **계산**만 — 판정은 Kotlin, §6.4). 각각 원본 경로·commit 을 docstring 포인터로, 수정 내역은 `reuse.md`. `dict[str, Any]` 경계 0 — 입력·출력은 dataclass | ML-04·ML-11.1 · `OPEN-ML-01` 해소 「수학 커널 = ml-engine」 · ADR 0009 |
+| ① | **순수 커널 이식(수학 유지, 결합 제거)** — `reserve_draw_distribution`(4/15 추첨 닫힌식) · `assessment_shrinkage`(계층 수축 사후분포) · `settlement_maturity`(성숙도 **계산**만 — 판정은 Kotlin, §6.4). **`award_margin_distribution`(반사 KDE)·곡선 빌더·`award_landing_*` 넷은 win-proxy 체인 안에서만 소비되므로 D-M5-8 결정 뒤**(조사 01 (a) — 1,296/2,166줄). 각각 원본 경로·commit 을 docstring 포인터로, 수정 내역은 `reuse.md`. 커널은 이미 래칫 통과·strict 섬(7/8)이라 이식은 **결합 절단 + 경계 dataclass 화**가 전부 | ML-04·ML-11.1 · `OPEN-ML-01` 해소 「수학 커널 = ml-engine」 · ADR 0009 |
 | ② | **LightGBM predict adapter** — artifact 의 `feature_names`·`categories`·`denominator_sources` 와 요청 피처의 **정확 일치**가 아니면 `Unavailable`(fail-closed, legacy 유지) · 미학습 공종(학습 행 수 임계 미만)은 **`UNTRAINED_SEGMENT`**, 표본 얕음은 **`INSUFFICIENT_SAMPLES`** — 다른 값, **설정으로 끌 수 없음**(임계 `max(1, …)` 클램프 형태 유지) · 가용성 게이트와 예측 경로가 같은 판정 함수 | ML-02 acceptance 셋 · M2 D-2A-3 |
 | ③ | **결과 타입** — `KernelResult = Success(candidates[3], fitness, uncertainty, diagnostics) | Unmeasurable(reason)`. **예외로 실패를 나르지 않는다**; `except Exception → 다른 predictor 폴백`(legacy c-2) 없음. 후보 3 은 `CONSERVATIVE·BASE·AGGRESSIVE` 순서 고정, 율은 `Decimal`(fraction)로 — float 는 커널 내부까지만, 경계에서 `Decimal` 로 한 번 | ML-01 · M2 2B ③·④ · ADR 0001 D-6 · ADR 0010 D-3 제3 변환 금지 |
 | ④ | **불확실성 성분 셋 + 출처** — `sample_size`(그 추정에 실제로 쓰인 표본)·`dispersion`·`estimate_margin` + `interval_source ∈ {CROSS_VALIDATION_RESIDUAL, TIME_HOLDOUT_RESIDUAL}`. 합성 `confidence`(계수 아홉 아핀 결합·[0.45,0.95] 클램프) **이식하지 않음** | §6.5 · ML-03 「표본 부족이 confidence 0 이 아니라 사유 있는 측정 불가」 · H-4 |
@@ -83,7 +83,9 @@ rollback: |
 ## 조사 결과 — 이 slice 에 영향을 주는 것
 
 - M2 조사 01 (b)~(c): 후보 3·인덱스 1 기준·`confidence` 클램프·(c-2) 폴백·(c-3) 값 접힘 — ③④⑤ 근거.
-- 대기(조사 노트 `_workspace/m5-prep/01_scout_ml_package.md` (a)·(d)·(f)·(g)).
+- 조사 01(패키지): **corpus 정정** — `ml-boundary` 4(authoritative 2)·`verdict` 4, 어느 것도 커널 수치 거동을 고정하지 않음(`ml-boundary-003` 의 `not_covered` 가 자인) → ⑦ D-M5-7 (a) 확정:
+  5D 는 fixture 를 **만든다** · **`OPEN-ML-05` 가 5D 를 막는다** — 표본 수 임계 넷 이상이 추론 술어에 직접 들어가므로 ②·⑤ 의 임계는 정책 데이터 분류(D-M5-6) 승인이 착수 전건 ·
+  `OPEN-ML-06` 이 커널 넷을 끈다(① 정정) · 커널 8 은 래칫 통과·3rd-party 0 · feature 커널의 `reliable_base` enum 의존은 enum 만 들어올림(5B).
 
 ---
 

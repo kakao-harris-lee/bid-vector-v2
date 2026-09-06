@@ -53,7 +53,7 @@ M2 `2a/scope.md`(골격)·`2d/scope.md` D-2D-4 · 조사 노트 02.
 | --- | --- | --- |
 | ① | **패키지 여덟** — `contracts`(2A)·`features`·`training`·`evaluation`·`inference`·`registry`·`serving`·`adapters`. 각 `__init__.py` 에 경계 한 줄과 재활용 출처 포인터 규약(ADR 0009 D-5 (d): 모듈 docstring 은 원본 경로·commit 포인터, 상세는 evidence) | 5A 「패키지」 · §3.2 패키지 트리 · ADR 0009 |
 | ② | **extras 분리** — `[project.optional-dependencies]` 의 `serving`(grpcio·protobuf·numpy·lightgbm 런타임)·`training`(+ storage adapter 의존)·`dev`(도구). **serving 에 SQLAlchemy·DB driver·requests 없음**은 lock 의 의존 그래프 test 로 단언 | 5A 「serving/training dependency 분리」 · §3.2 「serving process 에는 SQLAlchemy, DB driver, requests 기반 외부 수집, 업무 entity 가 없다」 · M5 완료 조건 「serving image/package 에 DB driver 와 service ORM 이 없음」 |
-| ③ | **import-linter 계약** — layers: `serving > inference > features > contracts`, `training > evaluation > features > contracts`, `registry` 는 `features`·`contracts` 만; forbidden: `serving`·`inference` 가 `sqlalchemy`·`psycopg`·`requests`·`httpx`·`celery`·`ml_engine.training`·`ml_engine.adapters` 를 import 금지. **양성 대조**: 금지 import 를 넣은 임시 모듈로 `lint-imports` 가 실패함을 test | 5A 「`serving` 의 DB/HTTP 수집/business module import 금지 gate」 · 완료 조건 「금지 import mutation 이 CI 에서 실패」 |
+| ③ | **import-linter 계약** — layers: `serving > inference > features > contracts`, `training > evaluation > features > contracts`, `registry` 는 `features`·`contracts` 만; forbidden: `serving`·`inference` 가 `sqlalchemy`·`psycopg`·`requests`·`httpx`·`celery`·`ml_engine.training`·`ml_engine.adapters` 를 import 금지 — 단 **`serving.grpc`(진입점) 만 `grpcio` 허용**(조사 02 — 예외 없이는 servicer 가 설 수 없다; 예외는 그 모듈 하나로 좁힌다). **양성 대조**: 금지 import 를 넣은 임시 모듈로 `lint-imports` 가 실패함을 test | 5A 「`serving` 의 DB/HTTP 수집/business module import 금지 gate」 · 완료 조건 「금지 import mutation 이 CI 에서 실패」 |
 | ④ | **품질 도구** — ruff(lint+format), mypy strict(이식 모듈은 per-module allowlist + 사유·해소 계획), pytest(+hypothesis), 크기·복잡도 래칫(D-M5-3 이식 스크립트, 함수 50/파일 500/`dict[str, Any]` 경계 0 — 계약이 있으므로 원천 차단, ML-11.2) | §5 「Ruff, strict typecheck 범위, pytest, import boundary, size ratchet 를 CI 에」 |
 | ⑤ | **정책 값 로드 자리** — `registry/policy.py` 가 versioned YAML 을 읽는 형태(값 없음). D-M5-6 분류 표는 evidence 에 | ADR 0006 D-7 · `OPEN-ML-05` |
 | ⑥ | **CI Python job** — `.github/workflows/ci.yml` 에 job 추가: setup-python 3.12, 오프라인 wheel 캐시(`uv sync --frozen`), S-2~S-6. Kotlin job 과 독립 | 2D D-2D-4 (a) 「Python CI 는 5A 소유」 |
@@ -85,7 +85,11 @@ M2 `2a/scope.md`(골격)·`2d/scope.md` D-2D-4 · 조사 노트 02.
 
 ## 조사 결과 — 이 slice 에 영향을 주는 것
 
-- 대기(조사 노트 01 (b)·(e), 02 전체).
+- 조사 02(툴체인): Python 3.12.14 · numpy 2.5.2(스모크 1회 뒤 확정) · lightgbm 4.7.0 · scipy 는 전이 의존 · pandas/sklearn 불채택 · ruff 0.16.6 · mypy 2.3.1 · pytest 9.1.1 ·
+  hypothesis 6.167.1 · import-linter 2.15 · uv(`uv sync --frozen --no-index --find-links=<wheelhouse>` 로 오프라인) · CI Python job 없음(5A 최초) · ruff 0.16 default 확장 → **explicit `select`** ·
+  import-linter forbidden 은 **gRPC 진입점(`serving.grpc`)만 `grpcio` 허용** 예외 필요(③ 에 반영).
+- 조사 01(패키지): serving 경로에 ORM 0·Celery 0 이라 ③ 게이트는 사실 고정 · 8 커널 중 7 이 이미 strict 섬(`settlement_maturity` 만 allowlist 후보 — `OPEN-5A-MYPY-ALLOWLIST` 초기 1건) ·
+  legacy 래칫 baseline 에 커널 등재 0 → D-5A-3 위반 0 출발 가능 · 설정 33 = 정책 23·환경 6·미분류 4(⑤ 의 분류 표 입력).
 
 ---
 

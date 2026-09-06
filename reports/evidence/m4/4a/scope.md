@@ -63,12 +63,12 @@ rollback: |
 
 ---
 
-## 운영자 결정 필요 — 착수 전(D-4A-1) · 계약 고정(D-4A-2~5)
+## 운영자 결정 필요 — 착수 전(D-4A-1·2) · 계약 고정(D-4A-3~5)
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
 | **D-4A-1** | **corpus 신설** | (a) **STR-11·STR-03 문면 승인 → curator 신설(`authored-from-approved-spec`)** (b) 1E case 재사용만 | **(a)** — 1E case 는 validation 만 덮고 전이·timeout·중복은 없음 | 착수 전 |
-| **D-4A-2** | 세션 aggregate 는 `workflow` 소유(application) — 도메인 모듈에 두지 않는다(편집 흐름은 운영 관심사, ADR 0005 D-9·D-10 과 같은 갈래). 도메인 `strategy` 는 `validate`·`StrategyUpdated` 만 제공 | — | 계약 고정 |
+| **D-4A-2** | **상태 기계의 자리** — 조사 (g): `db-scheduler`·`resilience4j` 는 `group.forbidden` 이라 domain 금지이나 **순수 전이 함수**는 프레임워크 무의존 | (a) **`workflow`(application) 안에 순수 Kotlin 으로**(만료 트리거·저장·재시도와 같은 모듈, 도메인 게이트는 안 걸리므로 `group.forbidden` 무관 — 단 전이 함수 자체는 외부 import 0 을 test 로 단언) (b) `strategy` 도메인 모듈에 전이 함수만 두고 `workflow` 가 트리거(1E 승인 산출물 편집 — 계약 갱신 필요) | **(a)** — 편집 흐름은 운영 관심사(ADR 0005 D-9·D-10 과 같은 갈래)이고 1E 가 도메인 어휘를 「전략이 바뀌었다」까지로 닫았다(§2.2.6). (b) 는 도메인 게이트(타입 멤버 30·API 타입)가 세션 타입까지 재고 1E 재승인이 필요. `milestone-4.md` 「domain state 가 Telegram library 를 import 하지 않는다」는 (a) 에서 「전이 함수 외부 import 0」 test 로 성립 | 착수 전 |
 | **D-4A-3** | timeout 값·재확인 창은 정책 데이터 슬롯(값은 승인) — legacy 값이 있으면 `legacy-behavior` 로 test 정책에만 | — | 계약 고정 |
 | **D-4A-4** | `Expired`·`Cancelled` 는 종단 — 재개는 새 세션(같은 draft 를 seed 로 복사는 허용, 상태 재사용 금지) | — | 계약 고정 |
 | **D-4A-5** | `System` actor 의 `Confirmed` 는 **거부**(STR-15 `후속` — 실험 갱신도 사람이 확인) — 타입은 있으나 전이표에 `System` 행이 없다 | D-M4-2 | 계약 고정 |
@@ -87,7 +87,8 @@ rollback: |
 ## 조사 결과 — 이 slice 에 영향을 주는 것
 
 - 1E 조사(`_workspace/m1-1e/01_scout_preflight.md`): legacy 에 편집 상태 기계 없음(`updated_at` 만), STR-11 의 2단 흐름은 Telegram 모듈 안·pending 은 analytics 로그 행 → ①·D-M4-3.
-- 대기(`_workspace/m4-prep/01_scout_workflow.md` (a)).
+- 조사 (a): `Expired` TTL 슬롯 0건·전이표 0건·invalid transition 개념 없음(「목표 상태 → 효과」 룩업) → 4A 는 신설. `OPEN-STR-04` 실물은 운영자 POST + 가드 셋, 빠진 것은 actor 기록 → ③ 의 actor 는 기록 필수.
+  fixture 0건 → D-4A-1 (a). `OPEN-STR-12` 는 착수 전 운영자 결정(Telegram 어댑터 포함 여부 — 상태 기계는 무관). 배치: 순수 전이는 어느 층이든, 트리거·재시도는 workflow/adapters → D-4A-2.
 
 ---
 

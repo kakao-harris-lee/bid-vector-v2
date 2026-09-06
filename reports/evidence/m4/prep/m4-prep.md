@@ -38,7 +38,7 @@
 | ID | 물음 | 선택지 | 추천·근거 |
 | --- | --- | --- | --- |
 | **D-M4-1** | **`OPEN-STR-12` Telegram 편집 채널 채택 여부** — 4A 의 전제 | (a) **4A 는 채널 독립 use case + 상태 기계를 세우고 Telegram 어댑터는 `후속`으로 분리(웹 어댑터도 M6 6A)** — 채택 여부와 무관하게 상태 기계는 필요(STR-11 「결정과 무관하게 확정」: 편집은 채널 독립 유스케이스 하나) (b) Telegram 채택 확정 후 4A (c) 4A 자체를 후속 | **(a)** — STR-11 분류가 `근거 부족`(운영자 실사용 불명)이라 채택 결정은 관측 없이 못 내린다. 상태 기계는 웹 편집(6A)에도 같이 쓰이므로 4A 의 가치는 채널과 독립. Telegram DTO 는 어댑터에만(4A 문면) |
-| **D-M4-2** | **`OPEN-STR-04` 실험의 무승인 갱신** — actor 슬롯의 형태 | (a) **`StrategyEvent` 봉투(4C)에 `actor: sealed { Operator(id), System(reason) }` 를 두고, `System` 갱신은 4A 상태 기계에서 `WaitingForConfirmation` 을 **건너뛸 수 없다**(STR-15 `후속` 이라 System 경로는 값 없이 타입만)** (b) actor 없음 | **(a)** — 1E D-17 이 「4A 가 봉투에서 넓힌다」로 보냈다. 타입만 두고 System 경로의 실행은 STR-15 채택 시 |
+| **D-M4-2** | **`OPEN-STR-04` 실험의 무승인 갱신** — actor 슬롯의 형태 | (a) **`StrategyEvent` 봉투(4C)에 `actor: sealed { Operator(id), System(reason) }` 를 두고, `System` 갱신은 4A 상태 기계에서 `WaitingForConfirmation` 을 **건너뛸 수 없다**(STR-15 `후속` 이라 System 경로는 값 없이 타입만)** (b) actor 없음 | **(a)** — 1E D-17 이 「4A 가 봉투에서 넓힌다」로 보냈다. **조사 (a) 실물**: legacy 의 실험 갱신은 운영자 HTTP POST + 가드 셋이고 빠진 것은 승인 게이트가 아니라 **actor 기록**(`updated_by`·`revision` 부재)이다 — 그래서 actor 슬롯은 「누가 바꿨나」의 기록으로 필수이고, `System` 확인 경로 거부는 STR-15 채택 전까지의 보수적 기본값. `OPEN-STR-04` 의 재해석(자동 갱신이 아니라 기록 부재) 채택은 운영자 몫 |
 | **D-M4-3** | **편집 상태의 저장 자리** — legacy 는 analytics 이벤트 로그에 pending 저장(`폐기`) | (a) **`workflow` 소유 `StrategyEditSession` aggregate + 3D 스키마의 별도 테이블(canonical 아님·audit 아님 — 세션 상태)** (b) 메모리 (c) outbox 재사용 | **(a)** — timeout·중복 command·crash 뒤 재개가 요구되므로 영속. 로그 스캔(최근 100행) 형태 폐기 |
 | **D-M4-4** | **이벤트 봉투 형태**(4C, `OPEN-DIC-07`·`OPEN-DIC-09`) | (a) **`EventEnvelope<P>(eventId: UUIDv7, aggregateId, aggregateVersion, occurredAt, correlationId, causationId?, idempotencyKey, actor?, payload: P)`** — payload 는 도메인 sealed(1E `StrategyUpdated` 등) (b) 평면 필드 | **(a)** — 봉투와 payload 의 소유가 다르다(봉투 = workflow, payload = 도메인). `idempotencyKey` 는 부작용 선언(ADR 0005 D-3)의 키 |
 | **D-M4-5** | **`OutboxEntryState` 어휘**(`OPEN-OPS-10`) | (a) **`Pending → Claimed → Delivered \| Failed(final) \| Isolated`** — `Claimed` 에서 워커 사망 시 **`Isolated`(수동 검토, 재실행 없음 — at-most-once)**, `Failed(final)` 은 최대 시도 소진(sweep 무한 점유 금지) (b) db-scheduler 내부 상태 노출 | **(a)** — NOTI-05 「running 으로 남은 행은 자동 재발송하지 않고 격리」·OPS-03 acceptance. db-scheduler 상태는 어댑터 안(D-9) |
@@ -72,6 +72,17 @@
 
 ---
 
-## 6. 조사 결과 요약 (`_workspace/m4-prep/01_scout_workflow.md`)
+## 6. 조사 결과 요약 (`_workspace/m4-prep/01_scout_workflow.md`, legacy `ed4b06c`, 2026-09-07)
 
-- 대기.
+- **4A 는 legacy 선례가 거의 없다** — `Expired` 에 대응하는 TTL·시각 슬롯이 pending payload 에 0건, (상태, 이벤트) 전이표가 저장소 전체에 없음, 가장 가까운 구조는 「목표 상태 → 효과」 룩업이라
+  invalid transition 개념 자체가 없다 → 4A 는 이식이 아니라 신설(`data-dictionary.md` §2.2.6 「legacy 에 편집 상태 기계는 없다」와 일치).
+- **`OPEN-STR-04` 의 실물이 문서 서술과 다르다** — 실험의 전략 갱신은 자동 트리거가 아니라 **운영자 HTTP POST 둘 + 가드 셋**이고, 없는 것은 승인 게이트가 아니라 **actor 기록**(전략 테이블에
+  `updated_by`·`revision` 없음 — 사람 편집과 실험 적용이 같은 컬럼을 구분 없이 덮음). 이 재해석의 채택은 운영자 몫 → **D-M4-2 갱신**: actor 슬롯은 「승인 게이트」가 아니라 **기록**으로 필요하고, 1E 의 `StrategyRevision` 이 `revision` 부재를 이미 닫았다.
+- **outbox 가 둘이고 성숙도가 갈린다** — 알림 쪽은 dialect 분기·`id ASC`·재시도 0·기본 비활성, 추론 쪽은 엔진 무관 조건부 UPDATE 클레임·지수 백오프·dedupe 키 → **4C 의 기준선은 추론 쪽**.
+- **trace 축은 전부 신설** — correlation id·causation id·aggregate version 이 legacy 에 각 0건(D-M4-4 봉투는 이식이 아님).
+- **4E 핵심 반례**: outbox 행이 **렌더된 문자열**을 저장(요청/렌더 미분리 — 4E ① 의 근거), 피로도 게이트가 직접 배달 경로에만 걸려 outbox 경로를 우회(게이트 위치의 교훈 — 4E 밖이나 4C 가 참조).
+  반대로 **배달 경로 resolver**(정책/환경 분리·first-match·status 11종)는 순수 함수라 **재사용 1순위**(4E ②).
+- **차단 항목은 하나** — `OPEN-STR-12`(Telegram 편집 채택)가 4A 착수 전 운영자 결정. 나머지 `OPEN-NOTI-*`·`OPEN-OPS-03/04` 는 범위를 좁힐 뿐, `OPEN-OPS-10`·`OPEN-ADR-13`·`OPEN-DIC-07/09` 는 4C 안에서 닫힘.
+  → D-M4-1 (a) 의 읽기: 상태 기계는 채널 독립이라 **결정의 대상은 4A 착수 여부가 아니라 Telegram 어댑터의 포함 여부**로 좁힌다.
+- **fixture 0건** — 알림·outbox·편집 상태 축 case 없음. `strategy-validation`·`strategy-watch` 11건은 전이를 재지 않음 → 4A D-4A-1 (a).
+- **배치 제약** — `db-scheduler`·`resilience4j` 가 `group.forbidden` 이라 domain 층 금지. 상태 기계(순수 전이)는 프레임워크 무의존이면 어느 층이든 가능, 만료 트리거·재시도는 `workflow`/`adapters` → 4A D-4A-2 선택지 갱신.
