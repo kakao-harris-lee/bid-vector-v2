@@ -11,7 +11,7 @@
 milestone: m2
 slice: 2a-common-values-and-errors
 base_sha: 040ab9d   # 착수 2026-09-06 재고정(M1 1E 종결 승인 커밋 = M1 전체 승인). 초안 시점은 c9022d9 였다
-head_sha: 리뷰 시점의 HEAD
+head_sha: 48e9980d1efdefa774c3f177463015a373fbf84c   # 구현 완료 시점(2026-09-06). Phase 3 커밋 7개 — 아래 checklist.md 「커밋 목록」
 in_scope:
   - contracts/proto/bidvector/ml/v1/common.proto      # 값 타입·enum·봉투(RequestEnvelope 필수 둘 + PredictionEnvelope)
   - contracts/proto/bidvector/ml/v1/error.proto       # ApplicationFailure(FailureCode 전체 어휘 — 2B·2C 가 쓰는 값 포함)·Unmeasurable·oneof 결과 봉투 패턴
