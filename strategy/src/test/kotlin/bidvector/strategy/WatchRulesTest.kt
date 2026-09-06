@@ -316,4 +316,16 @@ class WatchRulesTest {
             }
         }
     }
+
+    /**
+     * 변이 실측(구현 레인 mutation sweep) — 축 리스트 순서를 category 먼저로 바꾸면 이
+     * test 만 실패한다(기존 「D-9 제외 규칙이 우선이다」 test 는 category 가 통과하는
+     * 입력이라 한 축만 Failed 여서 순서 무관 — 이 test 가 그 사각을 메운다).
+     */
+    @Test
+    fun `D-9 카테고리도 실패하고 exclude 도 매치하면 exclude 가 이긴다 — 동시 실패 우선순위`() {
+        val rules = rulesOf(focusCategories = setOf("service"), excludeRegionTerms = listOf("제주"))
+        val verdict = rules.evaluate(subject(categories = setOf("goods"), fullText = "제주 지역 공고"))
+        verdict shouldBe WatchVerdict.Rejected(setOf(WatchRuleId.ExcludeRegion))
+    }
 }
