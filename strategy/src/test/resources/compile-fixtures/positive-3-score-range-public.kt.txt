@@ -1,0 +1,10 @@
+import bidvector.strategy.MatchScore
+import bidvector.strategy.ScoreRange
+import java.math.BigDecimal
+
+fun positiveScoreRangePublic(matchScore: MatchScore) {
+    val range = ScoreRange(BigDecimal.ZERO, BigDecimal.ONE)
+    val inRange = range.contains(BigDecimal("0.5"))
+    val value = matchScore.score.value
+    check(inRange && value >= BigDecimal.ZERO)
+}

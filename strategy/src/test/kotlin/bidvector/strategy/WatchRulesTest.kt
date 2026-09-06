@@ -147,6 +147,34 @@ class WatchRulesTest {
         verdict.shouldBeInstanceOf<WatchVerdict.Passed>()
     }
 
+    // --- F-2(verifier r1) — ASCII 대소문자 접기 잠금. D-5 문면 갈림(checklist "판단이 갈린
+    // 지점" 1)은 남지만, 채택한 동작(legacy `.strip().lower()` 상당, ASCII만)을 example로
+    // 고정한다 — 운영자 사후 확인 대상은 Phase 6가 별도로 올린다.
+
+    @Test
+    fun `F-2 카테고리 완전일치는 ASCII 대소문자와 무관하다 — Service 는 service 와 같다`() {
+        val rules = rulesOf(focusCategories = setOf("Service"))
+        val verdict = rules.evaluate(subject(categories = setOf("service")))
+
+        verdict.shouldBeInstanceOf<WatchVerdict.Passed>()
+    }
+
+    @Test
+    fun `F-2 키워드 부분문자열 매칭은 ASCII 대소문자와 무관하다 — KEYWORD 는 keyword 와 같다`() {
+        val rules = rulesOf(requiredKeywordTerms = listOf("KEYWORD"))
+        val verdict = rules.evaluate(subject(keywordText = "설명서에 keyword 라는 낱말이 있다"))
+
+        verdict.shouldBeInstanceOf<WatchVerdict.Passed>()
+    }
+
+    @Test
+    fun `F-2 한글 등 비ASCII 문자는 접기 대상이 아니다 — 대소문자 낱말 주변 한글이 그대로 매칭된다`() {
+        val rules = rulesOf(requiredKeywordTerms = listOf("ABC"))
+        val verdict = rules.evaluate(subject(keywordText = "설명서 abc 작성 용역"))
+
+        verdict.shouldBeInstanceOf<WatchVerdict.Passed>()
+    }
+
     // --- ④ 예산 basis ---
 
     @Test
@@ -163,6 +191,36 @@ class WatchRulesTest {
         val verdict = rules.evaluate(subject(baseAmount = Fact.Known(baseAmount(1_000_000))))
 
         verdict shouldBe WatchVerdict.Passed(setOf(WatchRuleId.MinBudget))
+    }
+
+    // --- F-3(verifier r1) — BudgetBoundInclusivity.Exclusive 분기 잠금. STRATEGY_POLICY 는
+    // Inclusive 만 내지만(D-15) 타입 자체는 Exclusive 도 나른다(§1.4.3) — test 정책
+    // 인스턴스로 그 갈래가 살아 있음을 example 로 고정한다.
+
+    @Test
+    fun `F-3 예산 하한과 같으면 Exclusive 에서는 탈락한다 — Inclusive 와 반대`() {
+        val rules = rulesOf(minBudget = baseAmount(1_000_000), inclusivity = BudgetBoundInclusivity.Exclusive)
+        val verdict = rules.evaluate(subject(baseAmount = Fact.Known(baseAmount(1_000_000))))
+
+        verdict shouldBe WatchVerdict.Rejected(setOf(WatchRuleId.MinBudget))
+    }
+
+    @Test
+    fun `F-3 예산 하한을 초과하면 Exclusive 에서도 통과한다`() {
+        val rules = rulesOf(minBudget = baseAmount(1_000_000), inclusivity = BudgetBoundInclusivity.Exclusive)
+        val verdict = rules.evaluate(subject(baseAmount = Fact.Known(baseAmount(1_000_001))))
+
+        verdict shouldBe WatchVerdict.Passed(setOf(WatchRuleId.MinBudget))
+    }
+
+    @Test
+    fun `F-3 예산 상한과 같으면 Exclusive 에서는 탈락한다 — Inclusive 에서는 통과와 반대`() {
+        val inclusiveRules = rulesOf(maxBudget = baseAmount(1_000_000), inclusivity = BudgetBoundInclusivity.Inclusive)
+        val exclusiveRules = rulesOf(maxBudget = baseAmount(1_000_000), inclusivity = BudgetBoundInclusivity.Exclusive)
+        val subjectAtLimit = subject(baseAmount = Fact.Known(baseAmount(1_000_000)))
+
+        inclusiveRules.evaluate(subjectAtLimit) shouldBe WatchVerdict.Passed(setOf(WatchRuleId.MaxBudget))
+        exclusiveRules.evaluate(subjectAtLimit) shouldBe WatchVerdict.Rejected(setOf(WatchRuleId.MaxBudget))
     }
 
     @Test

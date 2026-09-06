@@ -1,0 +1,8 @@
+import bidvector.strategy.Score
+import bidvector.strategy.ScoreRange
+import java.math.BigDecimal
+
+fun negativeScoreOfOutsideModuleTypo() {
+    val range = ScoreRange(BigDecimal.ZERO, BigDecimal.ONE)
+    Score.ofTypo(BigDecimal("0.5"), range)
+}

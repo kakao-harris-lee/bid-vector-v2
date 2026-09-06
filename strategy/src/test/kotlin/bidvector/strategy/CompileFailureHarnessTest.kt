@@ -53,6 +53,25 @@ class CompileFailureHarnessTest {
             realDiagnosticFragment = "type mismatch",
         )
     }
+
+    /**
+     * verifier r1 F-1 — `Score.of`는 `internal`이라 모듈 밖에서 못 부르고(`strategy` 저장소
+     * 전체 유일 호출자는 `StrategyValidation.kt`), 이미 만들어진 `Score`를 옮겨 담는
+     * `MatchScore`의 값 읽기와 `ScoreRange`의 생성·`contains`는 여전히 공개다.
+     */
+    @Test
+    fun `3 Score of 는 모듈 밖에서 못 부르고 ScoreRange 공개 API 는 부를 수 있다`() {
+        assertNegativeFails("3-score-of-outside-module", "cannot access")
+        assertPositiveCompiles("3-score-range-public")
+    }
+
+    @Test
+    fun `3-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "3-score-of-outside-module-typo",
+            realDiagnosticFragment = "cannot access",
+        )
+    }
 }
 
 private fun assertNegativeFails(

@@ -7,8 +7,8 @@ import bidvector.sharedkernel.ReasonCode
 /**
  * 예산 한계 경계 포함성(`data-dictionary.md` §1.4.3 「경계 포함성(이상/초과)을 값과 함께
  * 선언한다」, D-15) — 초기값은 [Inclusive](legacy `budget == min`·`budget == max` 통과,
- * 스카우트 §1.3 `:65-68`). 정책 데이터 슬롯([StrategyPolicyData.budgetBoundInclusivity]) —
- * main 이 비교 연산자로 굳히지 않는다.
+ * 스카우트 §1.3 "예산 하한 … 등호 통과(budget == min 은 통과)"). 정책 데이터 슬롯
+ * ([StrategyPolicyData.budgetBoundInclusivity]) — main 이 비교 연산자로 굳히지 않는다.
  */
 sealed interface BudgetBoundInclusivity {
     data object Inclusive : BudgetBoundInclusivity
