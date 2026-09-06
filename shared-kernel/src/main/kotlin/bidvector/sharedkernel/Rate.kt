@@ -22,6 +22,9 @@ private fun normalized(value: BigDecimal): BigDecimal =
  * 불변식을 깨지 않는다 — `Money`의 [export]에 대응한다. `Comparable<Rate>`도 같은
  * 이유로 연다 — 두 `Rate`의 비교는 `fraction`의 정규화된 값 비교이고, `Money`처럼 basis가
  * 섞이는 위험이 없다(`Rate`는 basis를 나르지 않는다).
+ *
+ * `fraction` 공개 읽기 + `Comparable<Rate>`는 M1/1D D-9(운영자 승인 2026-09-06) — 1B가
+ * 닫은 것은 구성이고 정규화된 값의 읽기는 불변식을 깨지 않는다; 생성자는 internal.
  */
 @ConsistentCopyVisibility
 data class Rate internal constructor(
