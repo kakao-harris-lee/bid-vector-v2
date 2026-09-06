@@ -69,6 +69,10 @@ ASSERTED = {
     "capacity-gate-003":           ["$.suitabilityAxisAffected"],          # OPEN-QUAL-08 분할의 양(陽)의 절반
     "floor-threshold-001":         ["$.criticalAssessmentRate.fraction"],  # 관계 주장의 축(임계값)
     "floor-threshold-003":         ["$.criticalAssessmentRate.fraction"],
+    # curator 발견(2026-09-06) — 승격 case(decision 28)의 `verifies`가 **경계 등가 자체**를
+    # 주장하므로 `$.sampleIsShortfall`(그 경계 판정의 결과)도 여기 든다. 001·003과 달리 이
+    # case는 방향이 아니라 등가를 겨눈다.
+    "floor-threshold-002":         ["$.sampleIsShortfall", "$.criticalAssessmentRate.fraction"],
     "rate-unit-003":               ["$.representable"],                    # "표현 불가"(1B-c 정정)
     "rate-unit-004":               ["$.representable"],                    # "표현 불가"(1B-c 정정)
     "money-basis-001":             ["$.representable"],                    # "표현 불가"(1B-c 재정의)

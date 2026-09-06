@@ -205,11 +205,49 @@ private fun criticalAssessmentRateFrom(input: JsonNode): AssessmentRate {
     return measurement.value
 }
 
-/** floor-threshold 실행자(②, D-4 — 표본 하나의 미달 술어). */
+/** 입력 `policy.shortfallComparison` 문자열 → 계약 값(ft-002 승격분, decision 28). */
+private fun shortfallComparisonFromToken(token: String): ShortfallComparison =
+    when (token) {
+        "strictly-greater" -> ShortfallComparison.StrictlyGreater
+        "greater-or-equal" -> ShortfallComparison.GreaterOrEqual
+        else -> error("이 corpus 가 다루지 않는 shortfallComparison 토큰: $token")
+    }
+
+/**
+ * `floor-threshold-001`·`003`의 입력에는 `policy` 블록이 없다 — 그 case 들의 `verifies`는
+ * 방향(미만/초과)만 겨냥하고 경계 등가를 겨냥하지 않으므로, 어느 `ShortfallComparison`으로
+ * 판정해도 같은 결과가 나와야 한다(D-3 정책 독립성 — curator `32b1b39` 논의). runner 가
+ * 정책값을 지어내는 대신 **두 값 모두로 판정해 결과가 같음을 단언**하고 그 공유값을 낸다 —
+ * 입력이 갖지 않은 정보를 만들어 넣지 않는다.
+ */
+private fun shortfallWithoutPolicy(
+    realized: AssessmentRate,
+    critical: AssessmentRate,
+): Boolean {
+    val strictly = isShortfall(realized, critical, ShortfallComparison.StrictlyGreater)
+    val orEqual = isShortfall(realized, critical, ShortfallComparison.GreaterOrEqual)
+    check(strictly == orEqual) {
+        "정책 없는 입력은 방향만 겨냥해야 한다 — StrictlyGreater=$strictly, GreaterOrEqual=$orEqual 로 갈렸다"
+    }
+    return strictly
+}
+
+/**
+ * floor-threshold 실행자(②, D-4 — 표본 하나의 미달 술어). 입력이 정책을 실으면 그것을
+ * 읽고(`policy.shortfallComparison`, ft-002), 없으면 정책 독립적 판정으로 대신한다
+ * (ft-001·003, [shortfallWithoutPolicy]) — 어느 쪽도 runner 가 값을 지어내지 않는다.
+ */
 private fun floorThresholdExecutor(input: JsonNode): Map<String, Any?> {
     val critical = criticalAssessmentRateFrom(input)
     val realized = AssessmentRate.observed(rateFromFractionNode(input.atDollarPath("$.sample.realizedAssessmentRate")))
-    val sampleIsShortfall = isShortfall(realized, critical, ShortfallComparison.StrictlyGreater)
+    val policyNode = input.path("policy")
+    val sampleIsShortfall =
+        if (policyNode.isMissingNode) {
+            shortfallWithoutPolicy(realized, critical)
+        } else {
+            val comparison = shortfallComparisonFromToken(policyNode.path("shortfallComparison").asString())
+            isShortfall(realized, critical, comparison)
+        }
     return mapOf(
         "criticalAssessmentRate" to mapOf("fraction" to critical.rate.fraction),
         "sampleIsShortfall" to sampleIsShortfall,
@@ -342,6 +380,7 @@ internal val PROVENANCE_FLOOR_EXECUTORS: Map<String, (JsonNode) -> Map<String, A
         "base-amount-provenance-002" to ::baseAmountProvenanceExecutor,
         "base-amount-provenance-003" to ::baseAmountProvenanceExecutor,
         "floor-threshold-001" to ::floorThresholdExecutor,
+        "floor-threshold-002" to ::floorThresholdExecutor,
         "floor-threshold-003" to ::floorThresholdExecutor,
         "floor-shortfall-001" to ::floorShortfallExecutor,
         "floor-shortfall-005" to ::floorShortfallExecutor,
