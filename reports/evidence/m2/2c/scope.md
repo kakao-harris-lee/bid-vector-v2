@@ -46,6 +46,8 @@ rollback: |
 ## 하네스 레인 변경 (상시 절)
 
 `git log --oneline fa2bb72..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-07) **없음**.
+구현 완료·리뷰 요청 시점(2026-09-07) 재확인 — **여전히 없음**(commands.md 「하네스 레인
+변경」).
 
 **착수 2026-09-07 — 운영자 결정**: D-2C-1 (a) `idempotency_key` 는 Kotlin 발급(업무 의도 단위), ml-engine 은 불투명 문자열로
 저장·대조만 · D-2C-2 (a) `training_spec_version` 은 ml-engine 안 versioned spec(5C 소유), 요청은 version 문자열만, 미지 version 은
