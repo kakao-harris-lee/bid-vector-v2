@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+// M2/2B — 피처 계약. 정본은 `reports/evidence/m2/2b/scope.md` ①·②와
+// `docs/discovery/data-dictionary.md` §6.3("피처 계약은 M2 gRPC 스키마가 소유"). GBM이
+// 보는 원 fact 넷을 나른다(D-2B-1 (a)) — log·target encoding·범주 코드화 같은 변환은
+// `ml-engine` `features/`가 training·serving 공용으로 한다(`v2-지침서.md` §3.2
+// training-serving skew 방지, 조사 노트 01 (a-2)). 대상 공고의 `opened_on`과 floor rate는
+// 여기 없다 — 전자는 legacy에서도 cutoff·홀드아웃 분할 전용이고(조사 (a-2)), 후자는 모델
+// 입력이 아니라 guardrail 입력이었다(조사 (a-4), V2는 Kotlin `decision` 소유).
+//
+// **모든 fact는 `oneof { value, MissingReason missing }`이다**(data-dictionary.md §6.3
+// "결측 사유를 나르는 필드가 legacy에 없다"의 반례 시정 — legacy는 결측을 `-1.0`·`0`으로
+// 접었다, 조사 01 (a-2)). oneof 미설정은 수신 측이 거부한다(fail-closed, common.proto의
+// 관례와 같다 — 위협 모델 (f)).
+package bidvector.ml.v1;
+
+import "bidvector/ml/v1/common.proto";
+
+option java_package = "contract.bidvector.ml.v1";
+option java_multiple_files = true;
+
+// 기초금액 fact — 값이면 `Money`(`basis`는 `BASIS_BASE_AMOUNT`만 허용, 그 밖은 계약
+// 위반이나 검증 구현은 M4 소관). 결측 사유는 공통 `MissingReason`.
+message BaseAmountFact {
+  oneof fact {
+    Money value = 1;
+    MissingReason missing = 2;
+  }
+}
+
+// 업종/공종 코드 — 불투명 문자열(`bidvector.strategy.CategoryCode.value`와 같은 형태).
+// 어휘 안에서의 **위치**로 부호화하지 않는다 — 그 부호화(범주 코드화)는 D-2B-1에 따라
+// ml-engine의 학습 통계 소관이다.
+message CategoryCodeFact {
+  oneof fact {
+    string value = 1;
+    MissingReason missing = 2;
+  }
+}
+
+// 발주기관 식별자 — 불투명 문자열이고 DB 내부 id가 아니다(`OPEN-2B-AGENCY-ID` — 발급·
+// 안정성의 정본은 M3). 위협 모델 (e) — DB id의 wire 유입을 이 필드가 대신하지 않는다.
+message AgencyIdFact {
+  oneof fact {
+    string value = 1;
+    MissingReason missing = 2;
+  }
+}
+
+// 기초금액 판정 라벨 — GBM `denominator_source` 피처 자리(조사 01 (a-2) #4). `Money`의
+// 성분인 `provenance`(획득 축)와는 다른 축이다(common.proto `BaseAmountProvenanceLabel`
+// 주석, D-M2-10 — 혼용 금지).
+message BaseAmountProvenanceLabelFact {
+  oneof fact {
+    BaseAmountProvenanceLabel value = 1;
+    MissingReason missing = 2;
+  }
+}
+
+// `CalculateOptimalBid`가 보는 원 fact 넷(D-2B-1 (a)). `feature_schema_version`은
+// `PredictionEnvelope`가 이미 나른다(common.proto) — 같은 사실을 두 자리에 두지 않는다.
+// 이 메시지는 그 schema 아래의 이름 붙은 fact만 갖는다.
+message FeatureInputs {
+  BaseAmountFact base_amount = 1;
+  CategoryCodeFact category_code = 2;
+  AgencyIdFact agency_id = 3;
+  BaseAmountProvenanceLabelFact base_amount_provenance_label = 4;
+}
+
+// 예비가격 추첨 관측 — distribution predictor가 과거 표본 행마다 읽는다(조사 노트 01
+// (a-3), legacy `predictors/distribution.py:_extract_reserve_observations`). **대상
+// 공고**가 아니라 **과거 표본**의 관측이라 §6.3의 누수 차단(대상 공고 피처에 대한 규칙)
+// 대상이 아니다 — D-2B-3 (a)의 근거. GBM은 표본을 쓰지 않으므로 이 메시지가 비어 있는
+// 표본과 함께 와도 유효하다.
+message ReserveDrawObservation {
+  // 예비가격 15개(`basis`는 `BASIS_BASE_AMOUNT`만 허용 — 그 표본 행의 원문 축).
+  repeated Money reserve_prices = 1;
+  // 추첨된 4개 번호. 값의 도메인 의미(추첨 규칙)는 Kotlin/ml-engine 각자가 갖는다 —
+  // 계약은 개수와 형태만 나른다.
+  repeated uint32 selected_numbers = 2;
+}
+
+// 경쟁 표본 한 건(D-2B-3 (a)) — **식별자 없음**. legacy는 `historical_data_id`·
+// `project_id`·`tender_result_id`(DB id 셋)를 표본에 실었다(조사 01 (a-3)) — `milestone-2.md`
+// "DB id 조회를 메시지에 넣지 않는다"의 직접 반례였고, 이 메시지는 그것을 만들지 않는다.
+// 정제(어느 행을 버리는가)는 송신 전 Kotlin 어댑터(M4)의 소관이고, serving은 DB를 갖지
+// 않는다(`v2-지침서.md` §3.2).
+message CompetitionSample {
+  // 관측된 투찰율 — `origin`은 항상 `BID_RATE_ORIGIN_OBSERVED`(common.proto D-2A-7).
+  Rate observed_bid_rate = 1;
+  BidRateOrigin origin = 2;
+  Money base_amount = 3;
+  BaseAmountProvenanceLabel base_amount_provenance_label = 4;
+  // 표본 공고의 개찰일 — ISO-8601 날짜(`YYYY-MM-DD`) 문자열. `google.type.Date` 같은
+  // well-known 패키지를 새로 끌어들이지 않는다 — 이 계약은 BSR 의존 없이 buf 로컬로
+  // 완결한다(`contracts/buf.yaml` 주석 "BSR 의존이 없다")는 축을 지키고, 날짜 성분 하나로
+  // 그 축을 깨뜨릴 이유가 없다(evidence에 판단 근거 기록, 자체 `Date{year,month,day}`
+  // 메시지도 동등 후보였으나 문자열이 JSON 표본·round-trip에서 더 단순하다).
+  string opened_on = 5;
+  optional Rate award_rate = 6;
+  optional ReserveDrawObservation reserve_draw = 7;
+}
+
+// M5가 지원하는 목적함수 값(D-2B-4 (a)) — 지금은 하나(`SCENARIO_TRIPLE`, legacy
+// `scenario_spec.py`의 보수/기준/공격 3분위 시나리오 셋에 대응). 미지원 값은 servicer가
+// fail-closed로 거부한다(구현은 M5 5D). 지원 집합의 확정 근거는
+// `OPEN-2B-OBJECTIVE-VALUES`.
+enum OptimizationObjective {
+  OPTIMIZATION_OBJECTIVE_UNSPECIFIED = 0;
+  OPTIMIZATION_OBJECTIVE_SCENARIO_TRIPLE = 1;
+}
