@@ -62,7 +62,7 @@ rollback: |
 | ③ | **enum 셋** — `Basis`·`VatTreatment` 는 shared-kernel enum 값을 **이름까지** 미러(값 추가는 양쪽 동시, 계약 version 상승). `ProvenanceKind` 는 `BaseAmountProvenance` 승인 라벨 다섯(decision 27, 라벨 집합 불변)을 미러 — `data-dictionary.md` §6.3 「`denominator_source` 피처는 도메인 provenance 어휘를 그대로 피처 공간에 싣는다」 | §6.3 · `capability-map.md` §14.2 `OPEN-DIC-05` 닫힘 |
 | ④ | **요청 봉투** — `RequestEnvelope { request_id, correlation_id, feature_schema_version, model_release_selector, deadline_budget }`. `deadline_budget` 은 **값이 아니라 정책 참조**(`policy_version`) — 실제 deadline 은 gRPC 메타데이터로 나가고 봉투는 「어느 정책으로 정했는가」만 싣는다(ADR 0010 D-1). `model_release_selector = oneof { latest_promoted, exact_release(release_id, checksum) }` — 미지정 거부 | 2A 「`request_id`, `correlation_id`, `feature_schema_version`」·「`model_release_selector`, deadline 정책」 · §9 「계약 version과 모델 artifact로 모든 추천을 재현 가능」 |
 | ⑤ | **결과 봉투 패턴** — 모든 응답은 `oneof result { <Success>, Unmeasurable unmeasurable, ApplicationFailure failure }`. `Unmeasurable { UnmeasurableReason reason, string detail_code }` 는 **transport error 가 아니다**(gRPC status `OK` 위의 도메인 결과). `ApplicationFailure { FailureCode code, bool retryable, string detail_code }` | 2A 「retryable/non-retryable application error」 · 「설계 규칙」 `oneof` · 완료 조건 「`Unmeasurable`가 transport error나 0으로 변환되지 않음」 · ADR 0001 D-6 |
-| ⑥ | **fail-closed 규칙** — 모든 enum 은 `*_UNSPECIFIED = 0` 이고 수신 측은 `UNSPECIFIED` 와 **정의 밖 정수**를 거부한다(proto3 open enum). `feature_schema_version` 이 servicer 가 아는 집합 밖이면 `ApplicationFailure(UNSUPPORTED_SCHEMA, retryable=false)`. `model_release_selector.exact_release` 가 없으면 `UNSUPPORTED_RELEASE`. **조용한 기본값 대체 없음** | 2A 「지원하지 않는 enum/schema를 조용히 fallback하지 않는 규칙」 · 완료 조건 「미지원 schema/release가 fail-closed」 |
+| ⑥ | **fail-closed 규칙** — 모든 enum 은 `*_UNSPECIFIED = 0` 이고 수신 측은 `UNSPECIFIED` 와 **정의 밖 정수**를 거부한다(proto3 open enum). `feature_schema_version` 이 servicer 가 아는 집합 밖이면 `ApplicationFailure(UNSUPPORTED_SCHEMA, retryable=false)`. `model_release_selector.exact_release` 가 없으면 `UNSUPPORTED_RELEASE`. **조용한 기본값 대체 없음.** **제3 변환 금지** — `Success` 가 지목한 release 가 요청의 `exact_release` 와 다르면 client 가 `UNSUPPORTED_RELEASE` 로 취급한다(다른 predictor 로의 폴백은 계약 위반 — ADR 0010 D-3, legacy (c-2) 반례) | 2A 「지원하지 않는 enum/schema를 조용히 fallback하지 않는 규칙」 · 완료 조건 「미지원 schema/release가 fail-closed」 |
 | ⑦ | **round-trip** — Kotlin 생성물과 Python 생성물이 같은 `contracts/testdata/*.binpb` 를 읽어 canonicalization(JSON canonical form 또는 deterministic serialization) 후 바이트 동일. `Rate.fraction` 정규형이 양쪽에서 같은 문자열 | 완료 조건 「Kotlin/Python round-trip 결과가 canonicalization 후 일치」 |
 | ⑧ | **lint** — buf lint 표준 규칙 + 패키지 `bidvector.ml.v1` + 필드 번호 재사용 금지·`reserved` 규칙은 2D 의 breaking gate 가 증명 | 「설계 규칙」 필드 번호·`reserved` |
 
@@ -95,7 +95,14 @@ rollback: |
 
 ## 조사 결과 — 이 slice 에 영향을 주는 것 (`_workspace/m2-prep/`, 레인 완료 후 인라인)
 
-- legacy 인터페이스 실물(율의 단위·금액 표현·결측 접힘): 대기
+- legacy 인터페이스 실물(`01_scout_ml_interface.md`, `ed4b06c`): 피처 금액은 태그 없는 `float` 원(① 의 다섯 성분 근거 —
+  `won` 만이면 R-BASIS-06 재발) · 율은 `float` fraction(② decimal string + scale 근거) · 응답 모델 식별은 `model_version` 문자열
+  하나, checksum·schema version 없음(④ 근거) · **모든 추론 실패가 다른 predictor 의 값 있는 답으로 접힘**(`orchestration.py:
+  264-273`, `fallback_reason` 자유 문자열) — ⑤·⑥ 에 **제3 변환 금지** 규칙: `Success` 는 요청의 `exact_release` 와 같은
+  release 를 지목해야 하고 다르면 client 가 `ApplicationFailure(UNSUPPORTED_RELEASE)` 로 취급, `Success` 에 fallback 표지·자유
+  문자열 사유 필드 없음 · `confidence` 는 [0.45, 0.95] 클램프라 「측정 불가」 표현 부재(D-2A-3 의 `Unmeasurable` 어휘 근거) ·
+  `Provenance` 는 라벨만 wire 로, `noticeRevision`·`FilledFromBudgetKey.key` 는 Kotlin 에 남김(D-2A-2 확인) · `denominator_source`
+  어휘는 V2 라벨과 **다른 축**(`m2-prep.md` D-M2-10). 상세는 `m2-prep.md` §6.
 - gRPC 스택(`02_grpc_stack_compat.md`): 고정 후보 grpc-kotlin **1.5.0 리터럴** · grpc-java **1.84.0** · protobuf-java **3.25.9** ·
   grpcio/grpcio-tools **1.83.1** · protobuf(py) **7.36.1** · buf **1.72.0**. **proto3 확정**(editions codegen 미성숙). buf lint·
   breaking 로컬 완결(S-2 의 「네트워크 없이」 성립). **2A 착수 시 grpc-kotlin 1.5.0 + grpc-java 1.84.0 조합의 컴파일·런타임 스모크가
