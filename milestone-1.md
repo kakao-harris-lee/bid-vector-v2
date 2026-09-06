@@ -158,6 +158,21 @@ first-match(술어 넷은 정책값 주입, 값은 main 에 없음 — `OPEN-DEC
 - 전략 값 validation
 - 필요한 최소 sealed state/event 타입
 
+**착수 2026-09-06** — 계약 정본 `reports/evidence/m1/1e/scope.md`(1D 병행 중 별도 세션이 초안, 1D 종결 뒤 base
+재고정). 모듈은 `strategy`(STR-01·02·03·06·16 소유). 착수 전 운영자 결정 넷(전부 추천안): **D-1 (a)** 점수 임계치는
+strategy 안 `Score` + 축별 뉴타입(`MatchScore`·`ProbabilityScore`·`PriorityScore`, BigDecimal 백킹) — shared-kernel
+승격은 M4 4B 가 `decision` 에서 소비할 때 그 slice 의 결정(`OPEN-1E-SCORE`). **D-2 (a)** `OPEN-1BC-STR16`(money-basis-003,
+감시·검색 경로가 같은 predicate)을 1E 가 받는다 — 전제로 R-BASIS-01 「같은 쌍이 두 경로에서 같은 답」을 업무 규칙으로,
+STR-16 capability 를 승인(**decision 29**). **D-3 (a)** strategy 축 authoritative 가 0 이라 STR-01 acceptance 넷 · STR-02 넷 ·
+STR-03 셋을 업무 규칙으로 명시 승인하고 curator 가 1E 안에서 `strategy-watch-*`·`strategy-validation-*` 를 신설(**decision
+30**). **D-4 (a)** 「필요한 최소 sealed state/event」 = 결과 어휘(`WatchVerdict` 넷·`StrategyValidation`·`StrategyViolation`·
+`WatchRuleId`) + `StrategyRevision` + `StrategyUpdated(revision, policyVersion)` payload 까지, 전이·편집 상태 기계 없음
+(`data-dictionary.md` §2.2.6, **decision 31**). 커널은 감시 predicate 하나 + validation 하나: 텍스트 범위는 타입으로
+(`KeywordScopeText` 는 description 제외, `FullScopeText` 는 포함), 예산은 `BaseAmount` 끼리 `compareKnownVat` 로만
+(추정가격과의 비교는 컴파일 차단 — R-BASIS-01), 「0 = 무제한」 sentinel 미채택, `OperatorStrategy` 는 validation 을 거쳐서만
+생김(legacy 의 네 자리 재구현 폐기). 임계치는 validation 만 하고 소비하지 않는다(사다리는 M4 4B). 범위 밖: 텍스트 정규화,
+공고 상태 필터, 스냅샷·run·스케줄, 편집 상태 기계, 저장, 검색 API.
+
 ## 구현 규칙
 
 - domain은 I/O가 없는 입력→출력 함수/객체다.

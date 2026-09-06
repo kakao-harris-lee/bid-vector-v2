@@ -425,6 +425,9 @@ pull 모델이 실제로 줄이는 큐 부하는 **투찰가 배치 산출분**�
     결과 타입에서 구분된다.
   - watch rule 판정은 ML port를 0회 호출한다.
 - **경계**: 자격 게이트는 이 게이트 **뒤에** 온다(순서 계약만 여기서 확정, 판정은 QUAL-02).
+- **운영자 승인 2026-09-06(M1/1E 착수, decision 30)**: 위 acceptance 넷을 **업무 규칙으로 명시 승인**한다 —
+  M1/1E 가 그 문면에서 `strategy-watch-*` authoritative case 를 신설하는 근거(`source.kind: operator-decision`).
+  STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다(`reports/evidence/m1/1e/scope.md` D-3).
 
 ### STR-02 · 키워드 매칭 대상 텍스트 범위 제어 (오탐 차단)
 
@@ -720,6 +723,11 @@ pull 모델이 실제로 줄이는 큐 부하는 **투찰가 배치 산출분**�
   STR 축의 다음 번호 `STR-16`이다.
 - **legacy 형태 처리**: legacy의 **배치 선산출**(lineage `selected → workload →
   decision → notification → completed`)은 채택하지 않는다 — 요청 시 산출한다(§0.7).
+- **운영자 승인 2026-09-06(M1/1E 착수, decision 29)**: 이 capability 의 신설과 R-BASIS-01 의 「같은 쌍이
+  감시 경로와 검색 경로에서 같은 답을 낸다」를 **업무 규칙으로 명시 승인**한다 — `fixtures/manifest.yaml`
+  `uncovered_axes` 의 `OPEN-1BC-STR16` 축이 `unblocks_when` 으로 요구한 승인 둘. M1/1E 가 검색 경로와 감시
+  경로가 **같은 predicate 함수**를 쓰는 구조(`EvaluationPath` 는 runner 투영의 축)로 받고 `money-basis-003` 을
+  authoritative 로 되돌린다. 검색 **API**(엔드포인트·페이지네이션)는 여전히 M3.
   검색 경로(`projects.py:56-119`)는 형태가 실재하며 아래 둘로 갈린다.
   - **채택 가능**: `ILIKE` 부분 일치 검색과 `X-Total-Count` 페이지네이션의 **계약 형태**.
     STR-05(텍스트 매칭 부분문자열 유지) 결정과 방향이 같다.
@@ -3304,6 +3312,7 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | ~~`OPEN-DIC-01`~~ | 면허·지역 축이 정책 version을 싣는가 — **해소(운영자 결정 2026-09-06, M1/1C 착수, decision 23): 읽기 ② — 싣는다.** 면허 축은 자기 축의 versioned policy(별칭·포괄 코드 테이블)를 갖고 `LicenseVerdict`가 그 `PolicyVersion`을 싣는다. U-6의 제외 절은 「U-6가 정한 `PolicyVersion` 어휘의 대상이 아니다」로 읽는다. 해소 전문은 `data-dictionary.md` §9 그 행 | **M1 1C** | **운영자**(결정 완료) | `milestone-1.md` 「Slice 1C」 · `data-dictionary.md` §9 | **정본**(범위) · slice는 **유도** |
 | `OPEN-DIC-04` | `AllocatedBudget`·`YegaAmount`·`AwardAmount`의 과세 처리 | **M1 1B** | **운영자** | `milestone-1.md` 「Slice 1B」(*"`BaseAmount`, `EstimatedAmount`, `YegaAmount`, `BidAmount`"*)이 `YegaAmount`를 명시 · `:31`의 `VatTreatment` · `v2-지침서.md` §4.1 | **유도** |
 | ~~`OPEN-DIC-05`~~ | `BaseAmountProvenance` 승인 라벨 다섯이 legacy 실측을 덮는가 · `NULL`과 `Unknown`이 같은가 | **M1 1B · 1D** | **운영자** (승인 명세 집합 변경) | `milestone-1.md` 「Slice 1B」(*"`Rate(unit=fraction)`, `Basis`, `VatTreatment`, `Provenance`"*) · `:33` `unknown provenance의 실패 계약` · `:46` `- 기초금액 provenance first-match rule과 reason` · `v2-지침서.md` §4.3 | **닫혔다 — M1 1D 착수, 2026-09-06(decision 27).** 라벨 집합 불변 — `suspect-fractional` 은 1B `Money` 경계 거부로 흡수, 미판정은 판정 레코드의 부재(커널 값 아님)이고 `Unknown` 은 규칙 무매치. 해소 전문은 `data-dictionary.md` §3.4 블록이 갖는다 |
+| ~~`OPEN-1BC-STR16`~~ | `money-basis-003` — 감시 경로와 검색 경로가 같은 예산 predicate 를 쓴다는 것을 나르는 타입의 부재(1B-c 이월, `fixtures/manifest.yaml` `uncovered_axes`) | **M1 1E** | **운영자** (R-BASIS-01 업무 규칙 · STR-16 승인) | `reports/evidence/m1/1b-c/scope.md` decision 21 · `regression-ledger.md` R-BASIS-01·02 | **닫혔다 — M1 1E 착수, 2026-09-06(decision 29).** 승인 둘을 STR-16 블록이 갖는다. 1E 가 `EvaluationPath` 태그 + 단일 predicate 로 받고 curator 가 003 을 authoritative 로 되돌린다(`reports/evidence/m1/1e/scope.md` D-2) |
 | ~~`OPEN-DIC-08`~~ | 파생 `Money`·파생 율이 자기 값에 무엇을 실어 입력 fact를 되짚게 하는가 | **M1 1B** | **운영자** (운반 범위) | `milestone-1.md` 「Slice 1B」(*"`BaseAmount`, `EstimatedAmount`, `YegaAmount`, `BidAmount`"*)이 `BidAmount`(기초금액 × 투찰율)를 직접 든다 · `:31`의 `Provenance` · `v2-지침서.md` §4.1이 `provenance`를 `Money`의 필수 성분으로 둔다 | **닫혔다 — M1 1B, 2026-09-04.** 선택지 ②(입력 fact 참조 + 계산 정책 version, 금액·율 동일)를 채택했고, **같은 날 decision 17(Codex 1B 1차 #4)로 ①의 변형으로 조정했다** — 파생값은 계산 정책 version만 싣고 되짚기는 판정의 `DecisionProvenance` 소유. 해소·조정 전문은 `data-dictionary.md` §9·§11.1의 해소 블록이 갖는다 — 여기서 되풀이하지 않는다 |
 | `OPEN-DIC-10` | `RoundingPolicy`의 `mode` 값 · 금액 축 밖 `scaleDigits` · 첫 `effectiveFrom` · 「금액 축 밖」의 경계 | **M1 1B** | **운영자** (값 결정) | `milestone-1.md` 「Slice 1B」 `- versioned \`RoundingPolicy\`` — **(B) 중 가장 강한 결속** · `:35`의 *"반올림 경계"* · `v2-지침서.md` §4.1 | **유도** — 같은 사유. §9의 그 행에 slice 지목이 없다 |
 | ~~`OPEN-1B-CONTRACT`~~ (신설 M1/1B · **해소 — 사용자 승인 2026-09-05, M1/1B-c 종결**) | **「M1 계약 술어 설계」의 소유 slice.** `fixtures/manifest.yaml`의 `uncovered_axes`(「계약 술어 부재로 authoritative를 유지하지 못한 축」·「승인된 피연산자 부재로 잠글 수 없는 결과 토큰」)가 이 소유를 「M1 계약 설계가 필요한 술어를 갖추면」으로만 적고 slice를 지정하지 않았다 — money-basis 6건·rate-unit 5건이 2026-09-02에 `insufficient-evidence`로 강등된 채**였다**. **2026-09-05 상태(M1/1B-c, decision 18)**: 술어 어휘 동결이 해제되고 `is-present`·`differs-from-path`·`differs-from-case` 셋이 `schema.extensions`와 `manifest_contract.py` `holds()`·두 스윕에 구현됐다(사용처는 0 — decision 19로 계약 어휘가 승인돼 정확 비교가 서고, 계약이 산출하지 않는 축은 잠글 대상이 아니다). **종결은 1B-c 사용자 승인으로**(`reports/evidence/m1/1b-c/scope.md`) | **`M1 1B-c`**(담당 정정 — 운영자 결정 2026-09-04, decision 15, verifier r1 수정 라운드) | **운영자**(술어 설계 자체는 `1B-c`가 조사·제안, 채택은 운영자 — decision 18로 채택됨) | `fixtures/manifest.yaml` `unblocks_when`: *"M1 계약 설계가 필요한 술어를 갖추면 그 case에 계약을 달고 authoritative로 되돌린다 … 술어의 확장 소유권이 M1에 있다는 것이 동결의 내용이다"* | **정본**(담당을 `M1 1B`에서 `M1 1B-c`로 정정 — `1B`는 타입 계약을 완성했으나 corpus 정렬은 신설 slice `1B-c`가 잇는다, `milestone-1.md` 「Slice 1B-c」) |
