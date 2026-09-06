@@ -42,23 +42,26 @@ val LICENSE_QUALIFICATION_POLICY: EffectiveDatedPolicy<LicenseQualificationPolic
     )
 
 /**
- * verifier r1 F-4 — legacy `_KEY_NOISE_RE = re.compile(r"[\s·・‧⋅,.\-_/()\[\]（）]+")`
- * (`bid-vector/app/services/license_eligibility.py:142`) 가 정본이다. 이전 판은 이 집합보다
- * 좁아(공백 하나·나카구로 `・`·`‧`·`⋅`·대괄호·전각 괄호 `（）` 없음) 그 문자를 품은 면허명이
- * 거짓 `Ineligible` 을 냈다(PROBE F2·F3 실측 — 방향은 보수적/과차단이라 high 는 아니다).
- * 이 집합은 R-QUAL-03(별칭·포괄 코드 정책 데이터)의 대상이 아니다 — 별칭은 「어떤 면허를
+ * verifier r1 F-4 · r2 N-2 — legacy `_KEY_NOISE_RE = re.compile(r"[\s·・‧⋅,.\-_/()\[\]（）]+")`
+ * (`bid-vector/app/services/license_eligibility.py:142`) 가 정본이다. **`\s` 는 리터럴로
+ * 옮기지 않는다** — Python `str` 정규식의 `\s` 는 유니코드 공백 전체(전각 공백 `U+3000`·
+ * NBSP `U+00A0`·`U+2000`~`U+200A`·`U+202F`·`U+205F`·줄/문단 구분자 `U+2028`·`U+2029` 포함,
+ * 실측: `re.fullmatch(r"\s", chr(cp))`)를 매치하는데, 이전 판(공백 넷 `' ' '\t' '\n' '\r'`
+ * 리터럴 나열)은 전각 공백 등을 놓쳐 거짓 `Ineligible` 을 냈다(PROBE WS 실측). Kotlin
+ * `Char.isWhitespace()` 는 `Character.isWhitespace(code) || Character.isSpaceChar(code)`
+ * 의 합집합이라(stdlib 정의) 정확히 이 codepoint 집합을 덮는다(Java `Character.isWhitespace`
+ * 단독은 NBSP·`U+2007`·`U+202F` 를 **일부러** 제외하므로 그것만으로는 부족하다 — 실측).
+ * 둘 다 `U+FEFF`(zero-width no-break space, 공백 아님)는 `false` 로 일치한다.
+ *
+ * 구두점(가운뎃점·괄호류)은 `Char.isWhitespace()` 대응이 없어 리터럴 집합으로 남긴다. 이
+ * 집합은 R-QUAL-03(별칭·포괄 코드 정책 데이터)의 대상이 아니다 — 별칭은 「어떤 면허를
  * 같은 것으로 볼까」라는 업무 판단이고, 이 집합은 legacy 가 정규식 상수로 고정해 둔 순수한
- * 표기 잡음(공백·구두점) 제거 규칙이다. R-QUAL-03 이 막는 것은 포괄 substring 별칭이
- * 서로 다른 전문분야를 collapse 시키는 것이지, 이 축의 문자 제거는 같은 면허명의 다른
- * 표기(전각/반각, 가운뎃점 종류)를 하나로 모을 뿐 서로 다른 면허를 모으지 않는다 — 그래서
- * `LicenseAliasTable`(정책 데이터)로 옮기지 않고 legacy 와 같은 상수로 유지한다.
+ * 표기 잡음 제거 규칙이다. 서로 다른 면허를 collapse 시키지 않고 같은 면허명의 다른
+ * 표기(전각/반각, 가운뎃점 종류)만 하나로 모은다 — 그래서 `LicenseAliasTable`(정책
+ * 데이터)로 옮기지 않고 legacy 와 같은 상수로 유지한다.
  */
-private val KEY_STRIP_CHARS =
+private val KEY_STRIP_PUNCTUATION =
     charArrayOf(
-        ' ',
-        '\t',
-        '\n',
-        '\r',
         '·',
         '・',
         '‧',
@@ -77,20 +80,23 @@ private val KEY_STRIP_CHARS =
     )
 private const val ASCII_CASE_OFFSET = 'a' - 'A'
 
+private fun isKeyNoise(c: Char): Boolean = c.isWhitespace() || c in KEY_STRIP_PUNCTUATION
+
 /**
  * 구분자 제거 + ASCII `A`~`Z` 소문자화를 한 loop 로 낸다 — 면허명은 한글·라틴 알파벳
  * (`ENG001` 류 코드)만 쓰고 한글은 대소문자가 없다. Kotlin stdlib 의 `filterNot`·`map`·
  * `lowercase()`·`joinToString` 은 전부 내부적으로 `java.lang.Appendable`(JVM `lowercase()`
  * 는 그 위에 `Locale.ROOT` 까지)을 거치는데, 그 인터페이스가 domain 허용 목록 밖이라
  * `ArchitectureGateTest` 가 잡는다(실측). `CharArray` 직접 조립 + `String(CharArray, Int,
- * Int)` 생성자만 쓰면 그 표면에 닿지 않는다.
+ * Int)` 생성자만 쓰면 그 표면에 닿지 않는다. `Char.isWhitespace()`(`Character.isWhitespace`/
+ * `isSpaceChar` 위임)는 이 표면을 건드리지 않는다(실측 — `ArchitectureGateTest` 그대로 초록).
  */
 private fun stripAndLowercase(value: String): String {
     val chars = CharArray(value.length)
     var count = 0
     for (i in value.indices) {
         val c = value[i]
-        if (c !in KEY_STRIP_CHARS) {
+        if (!isKeyNoise(c)) {
             chars[count] = if (c in 'A'..'Z') c + ASCII_CASE_OFFSET else c
             count++
         }

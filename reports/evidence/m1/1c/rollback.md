@@ -4,7 +4,9 @@
 신규 경로 삭제. **range revert 금지** — in_scope 경로에만 적용한다.
 
 base_sha: `4a6ca5c4ee5bb666fe786fbe395c5c00be775e75`
-head_sha(이 문서 정본 시점): `bb85177`(verifier r1 수정 라운드 완료 뒤)
+head_sha(이 문서 정본 시점): **이 커밋 자신**(verifier r2 표적 재검증 잔여 non-blocker 처리
+뒤 — evidence 커밋은 정의상 자기 해시를 미리 적을 수 없다, verifier r2 F-9/N-3 등재와
+같은 구조적 한계. `git log -1 -- reports/evidence/m1/1c/` 로 확인).
 
 ## 변경 파일 전건 (`git diff --name-status <base>..HEAD`, in_scope 경로만)
 
@@ -73,7 +75,8 @@ git rm -f \
 
 ## 임시 clone 실측
 
-`git clone --no-hardlinks` 로 별도 디렉터리에 이 저장소를 복제하고(head `bb85177`) 위 두
+`git clone --no-hardlinks` 로 별도 디렉터리에 이 저장소를 복제하고(head — 이 커밋 자신,
+verifier r2 처리 완료 시점) 위 두
 명령을 그대로 실행 — `git restore`·`git rm` 둘 다 exit 0, 이후 `git status --short` 가
 `config/quality/gate-tests.properties`·`docs/discovery/capability-map.md`·
 `docs/discovery/data-dictionary.md`·`app/build.gradle.kts`·`qualification/build.gradle.kts`

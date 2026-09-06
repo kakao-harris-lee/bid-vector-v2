@@ -241,6 +241,58 @@ class LicenseEligibilityTest {
         result.verdict shouldBe LicenseVerdict.Uncertain(UncertainReason.PermittedIndustryCombinationRuleUndecided)
     }
 
+    /**
+     * verifier r2 N-1·PROBE A3 — `foldGroups` 의 `when` 은 「실제 충족 그룹이 있으면 그쪽이
+     * 먼저 이긴다」는 §3.2.5 운영자 판정을 분기 **순서**로 구현한다. 그 순서를 잠그는 test가
+     * r1 라운드에 없었다(두 분기를 맞바꿔도 전건 초록이었다 — verifier r2 실측). 그룹1은
+     * 제한 면허로 실제 충족, 그룹2는 허용업종 전용(결합 미결)이 공존할 때 전체는 반드시
+     * `Eligible(그룹1)`이어야 한다 — `ambiguous` 쪽이 먼저 걸리면 전체가 `Uncertain`으로
+     * 샌다.
+     */
+    @Test
+    fun `실제 충족 그룹이 있으면 다른 그룹이 허용업종 전용이라도 Eligible이 이긴다 — PROBE A3`() {
+        val rows =
+            listOf(
+                row("1", "1", "토목공사업"),
+                row("2", "1", "축조업", source = RequirementSourceField.PermsnIndstrytyList),
+            )
+        val result = judge(rows, declared("토목공사업"))
+        result.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("1"))))
+    }
+
+    /**
+     * verifier r2 N-2·PROBE WS — legacy `\s`(Python 유니코드 공백)는 전각 공백(`U+3000`)·
+     * NBSP(`U+00A0`)도 잡음으로 제거한다. 이전 판(공백 리터럴 넷)은 이 문자들을 놓쳐 거짓
+     * `Ineligible` 을 냈다.
+     */
+    @Test
+    fun `전각 공백이 있어도 정규화 키가 같아지면 Eligible이다 — PROBE WS 3000`() {
+        val result = judge(listOf(row("1", "1", "토목공사업　(전문)")), declared("토목공사업(전문)"))
+        result.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("1"))))
+    }
+
+    @Test
+    fun `NBSP 얇은 공백이 있어도 정규화 키가 같아지면 Eligible이다 — PROBE WS A0 2009`() {
+        val nbsp = "\ud1a0\ubaa9\u00a0\uacf5\uc0ac\uc5c5"
+        val nbspResult = judge(listOf(row("1", "1", nbsp)), declared("토목공사업"))
+        nbspResult.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("1"))))
+
+        val thinSpace = "\ud1a0\ubaa9\u2009\uacf5\uc0ac\uc5c5"
+        val thinSpaceResult = judge(listOf(row("2", "1", thinSpace)), declared("토목공사업"))
+        thinSpaceResult.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("2"))))
+    }
+
+    @Test
+    fun `수직탭 폼피드가 있어도 정규화 키가 같아지면 Eligible이다 — PROBE WS 0B 0C`() {
+        val verticalTab = "\ud1a0\ubaa9\u000b\uacf5\uc0ac\uc5c5"
+        val verticalTabResult = judge(listOf(row("1", "1", verticalTab)), declared("토목공사업"))
+        verticalTabResult.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("1"))))
+
+        val formFeed = "\ud1a0\ubaa9\u000c\uacf5\uc0ac\uc5c5"
+        val formFeedResult = judge(listOf(row("2", "1", formFeed)), declared("토목공사업"))
+        formFeedResult.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("2"))))
+    }
+
     /** verifier r1 F-2 — 이름을 하나도 못 읽은 행은 `Unparsable` 이어야지 빈 목록 `Parsed` 가 아니다. */
     @Test
     fun `licenseNames가 빈 Parsed 행은 구성 시점에 거부된다`() {

@@ -10,10 +10,15 @@ import bidvector.sharedkernel.Resolution
  * `LicenseGroupFolding.kt` 가 갖는다 — 이 파일은 판정 봉투 조립(요약·분기·`LicenseJudgement`
  * 구성)만 갖는다(detekt `TooManyFunctions`, 크기 한도 회피가 아니라 관심사 분리).
  *
- * verifier r1 F-5 — `policy` 는 값과 그 값을 해석한 `PolicyVersion` 을 함께 나르는
+ * verifier r1 F-5 · r2 N-3 — `policy` 는 값과 그 값을 해석한 `PolicyVersion` 을 함께 나르는
  * `Resolution.Resolved` 하나다. 값과 version 을 독립 인자로 받으면 호출부가 서로 다른
  * 정책 시점을 섞어 부를 수 있어 decision 23(「판정에 쓴 정책의 version 을 싣는다」)이
- * 관례에 머문다 — 하나로 받으면 그 사실이 타입으로 강제된다.
+ * 관례에 머문다 — 하나로 받으면 그 어긋남 표면(값 따로 · version 따로 조립)이 사라진다.
+ * **타입으로 강제되지는 않는다** — `Resolution.Resolved` 는 shared-kernel 의 public data
+ * class 라 호출부가 `Resolution.Resolved(임의 정책값, 무관한 version)` 을 여전히 조립할 수
+ * 있다(실측 — PROBE VER). 그 생성자를 좁히는 것은 shared-kernel 변경이라 1C `out_of_scope`
+ * 다 — scope 안에서 가능한 최선은 「값과 version 을 분리해 부르는 경로 자체를 없애는 것」
+ * 까지다(OPEN 후보로 보고).
  */
 object LicenseEligibility {
     fun judge(
