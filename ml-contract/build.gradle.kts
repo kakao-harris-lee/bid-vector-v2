@@ -9,6 +9,10 @@ import com.google.protobuf.gradle.id
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.protobuf)
+    // 생성 메시지 타입이 `com.google.protobuf.Message`/`GeneratedMessageV3`를 상위 타입으로
+    // 공개한다 — 소비자(`adapters`)의 컴파일 classpath 에도 그 타입이 보여야 하므로 `api`가
+    // 필요하고, `api` configuration 은 `java-library`가 있어야 존재한다.
+    `java-library`
 }
 
 // `bidvector:ml-contract` composite 치환이 이 group:name 좌표로 성립한다
@@ -35,12 +39,14 @@ sourceSets {
 }
 
 dependencies {
-    implementation(platform(libs.grpc.bom))
-    implementation(libs.protobuf.java.runtime)
-    implementation(libs.grpc.protobuf)
-    implementation(libs.grpc.stub)
-    implementation(libs.grpc.kotlin.stub)
-    implementation(libs.kotlinx.coroutines.core)
+    api(platform(libs.grpc.bom))
+    // 생성 message/stub 타입이 이 넷을 시그니처(상위 타입·메서드 파라미터)에 노출한다 —
+    // consumer 컴파일 classpath 에도 있어야 하므로 `api`(위 plugins 주석).
+    api(libs.protobuf.java.runtime)
+    api(libs.grpc.protobuf)
+    api(libs.grpc.stub)
+    api(libs.grpc.kotlin.stub)
+    api(libs.kotlinx.coroutines.core)
 }
 
 // §4b 스모크(scope.md D-2A-0 대가 ③) — grpc-kotlin 1.5.0 + grpc-java 1.84.0 + protobuf-java

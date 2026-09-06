@@ -15,3 +15,11 @@ dependencies {
     testImplementation(libs.grpc.stub)
     testImplementation(libs.kotlinx.coroutines.core)
 }
+
+// M2/2A — `ContractRoundTripTest`가 `contracts/testdata/*.binpb`(canonical, VCS 커밋)를 읽는다.
+// 다른 게이트 test 의 System.getProperty 주입 관례(app/build.gradle.kts)와 같은 형태.
+tasks.test {
+    val contractsTestdata = layout.settingsDirectory.dir("contracts/testdata")
+    inputs.dir(contractsTestdata).withPropertyName("contractsTestdata")
+    systemProperty("bidvector.contracts.testdata", contractsTestdata.asFile.absolutePath)
+}
