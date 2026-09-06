@@ -1,0 +1,25 @@
+{
+  "job": {
+    "jobId": "018f2b21-9c4a-7c3d-8b2a-6e1f4d9a7c53",
+    "state": "JOB_STATE_SUCCEEDED",
+    "acceptedAt": "2026-09-07T01:00:00Z",
+    "startedAt": "2026-09-07T01:00:05Z",
+    "finishedAt": "2026-09-07T01:45:12Z",
+    "artifact": {
+      "uri": "s3://bidvector-training/artifacts/2026-09/model-002.tar.gz",
+      "release": {
+        "releaseId": "release-2026-09-07-a",
+        "artifactChecksum": "62b34c0a5432f3d3d059b78291022e6c3c2a648de46158dfd8d06b949f2ac386",
+        "featureSchemaVersion": "award-rate-v1",
+        "codeVersion": "ml-engine-0.1.0",
+        "datasetId": "dataset-2026-09-002"
+      },
+      "manifestSchemaVersion": "manifest-v1"
+    },
+    "evaluation": {
+      "uri": "s3://bidvector-training/eval/2026-09/eval-002.json",
+      "checksum": "6ef18b9ef62b8d53ac95b9cfaf5ad8e425180bab9754b54e51d10f34cb35e032",
+      "reportSchemaVersion": "eval-report-v1"
+    }
+  }
+}

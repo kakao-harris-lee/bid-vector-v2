@@ -1,0 +1,14 @@
+{
+  "job": {
+    "jobId": "018f2b21-9c4a-7c3d-8b2a-6e1f4d9a7c53",
+    "state": "JOB_STATE_FAILED",
+    "acceptedAt": "2026-09-07T01:00:00Z",
+    "startedAt": "2026-09-07T01:00:05Z",
+    "finishedAt": "2026-09-07T01:10:33Z",
+    "failure": {
+      "code": "JOB_FAILURE_CODE_TRAINING_ERROR",
+      "retryable": false,
+      "detailCode": "lightgbm-fit-error"
+    }
+  }
+}

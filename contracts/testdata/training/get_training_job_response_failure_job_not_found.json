@@ -1,0 +1,7 @@
+{
+  "failure": {
+    "code": "FAILURE_CODE_JOB_NOT_FOUND",
+    "retryable": false,
+    "detailCode": "job-id-unknown"
+  }
+}

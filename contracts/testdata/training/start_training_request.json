@@ -1,0 +1,13 @@
+{
+  "envelope": {
+    "requestId": "req-2c-01",
+    "correlationId": "corr-2c-01"
+  },
+  "idempotencyKey": "train-req-2026-09-07-001",
+  "dataset": {
+    "uri": "s3://bidvector-training/datasets/2026-09/dataset-002.parquet",
+    "manifestChecksum": "6cea372ee569b33714262a46123353971cdd97b779f7829df4de1b3e430c425d",
+    "datasetId": "dataset-2026-09-002"
+  },
+  "trainingSpecVersion": "training-spec-2026.3"
+}

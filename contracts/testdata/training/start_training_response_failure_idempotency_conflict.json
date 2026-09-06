@@ -1,0 +1,7 @@
+{
+  "failure": {
+    "code": "FAILURE_CODE_IDEMPOTENCY_CONFLICT",
+    "retryable": false,
+    "detailCode": "idempotency-key-dataset-mismatch"
+  }
+}
