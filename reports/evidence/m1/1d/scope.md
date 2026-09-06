@@ -102,9 +102,41 @@ rollback: |
 
 ---
 
-## 조사(Phase 2) 결과 — `_workspace/m1-1d/` (착수 시점 진행 중)
+## 조사(Phase 2) 결과 — `_workspace/m1-1d/01_scout_preflight.md` (2026-09-06)
 
-`01_scout_preflight.md`(legacy-scout) 대기. 반영 시 이 절이 D-5·D-8 의 값·층과 어휘 불일치 목록을 받는다.
+- **구조적 막힘 셋(shared-kernel)**: ① `Rate.fraction` 이 `internal` — 모듈 밖에서 율 값을 읽거나 두 율을 비교할 수 없다
+  (`$.criticalAssessmentRate.fraction` 투영 불가) ② 율 ÷ 율 파생 함수 부재 ③ `AssessmentRate` 생성자 internal +
+  `YegaAmount` VAT `UNKNOWN` 고정으로 `assessmentRateAgainst` 가 항상 `Unmeasurable`(사정률을 하나도 만들 수 없다 —
+  `OPEN-DIC-04` 소유, 1D 축 아님). ①② 는 D-1(a) 의 확장이 푼다 — **D-9** 로 읽기 경로를 명시. `decision` 은 앵커만이라
+  1C `qualification/build.gradle.kts` 배선을 복제한다.
+- **막지 않는 것**: `Measurement.Measured` internal(authoritative 가 `Measured` 를 요구하지 않음 — 002·003·004 강등),
+  `OPEN-DIC-05`(D-2 해소)·`OPEN-DEC-06`(해소, 계약 case 없음)·`OPEN-DEC-07`(값을 코드에 안 넣으면)·`OPEN-DEC-03`(1D 축 아님)·
+  `OPEN-DIC-10`(막는 case 가 이미 강등). 신규 외부 라이브러리 **없음**(rule table = 리스트 + firstOrNull, 유리수 = java.math).
+- **legacy 실물**: provenance 규칙 넷 `suspect-ratio(base/estimate > 1.15, 엄격)` → `clean(|base−round(base)| < 1e-6)` →
+  `derived-yega(|base×winning_rate − winning_amount| < 1.0원)` → `derived-vat(|base×1.1 − round(base×1.1)| < 0.01)`, fallthrough
+  `suspect-fractional`(V2: `Unknown`, decision 27). 값 다섯은 전부 `legacy-behavior`(§12.1; `1.15`·`0.05` 만 OPEN-DEC-07).
+  floor: 임계 = 추천율 ÷ 하한율(6자리) · 미달 ⟺ 실현 > 임계 · usable = [0.90, 1.10] 경계 포함 · 150 미만 `None` · 편향 밴드 `1 ± 1e-3`.
+  **승계 금지 둘**: `aggregates.rate()` 분모 0 → `0.0`, `get_reliable_base` 의 `NULL → clean` 폴백.
+- **`floor-threshold-*` 는 1D 축**(같은 커널의 표본 단건 단면) — D-4 의 세 층이 그 답. 실행 계약이 걸린 authoritative 는 **6**
+  (bap 001·002·003 · ft 001·003 · fs 001·005 — 스카우트 셈 6 은 fs 둘을 하나로 묶은 것, 실제 case 는 7) + D-3 로 ft-002 복귀 시 8.
+- **어휘 불일치 아홉 → 계약 고정(D-10~D-14, 세션 모델 판단·사후 확인)**: ① `classification` = sealed 이름 문자열(투영, 1B-c 관례)
+  ② rule 이름은 **술어 어휘**(kebab-case `suspect-ratio`·`clean-integer`·`derived-yega`·`derived-vat`)이고 라벨 어휘와 다르다 —
+  D-12 ③ fixture `ruleOrder` 에 `derived-yega` 없음 → 정책이 규칙의 **부분집합·순서**를 정한다(D-12) ④ `evidence.firstMatchedRule`(001)
+  vs `firstMatchedRule`(002·003) → 투영이 같은 값을 두 자리에 낸다(verified_paths 는 열거 경로만 정확 비교, D-13) ⑤ `policyVersion`
+  평문 → 투영이 `source`(1C ⑦ 관례) ⑥ `AmountNotRepresentable` — 004·005 강등이라 미채택, 등재만 ⑦ `SampleInsufficient` 는
+  §3.3 의 1D 소유 sealed(D-14) ⑧ `result` 이름 = sealed variant 이름(투영) ⑨ 감사 boolean 여섯은 투영(D-13).
+
+| ID | 판단 | 근거 |
+| --- | --- | --- |
+| **D-9** | D-1(a) 확장에 **읽기 경로**를 포함한다: `Rate.fraction` 을 공개 읽기(`val`)로, `Rate : Comparable<Rate>`. 생성자는 `internal` 그대로 — 1B 가 닫은 것은 **구성**이고 정규화된 값의 읽기는 불변식을 깨지 않는다. `Money` 의 `export()` 대응물 | 스카우트 §4.2 ①. 없으면 `floor-threshold` authoritative 둘을 실행할 방법이 없다. **운영자 사후 확인 대상**(D-1 (a) 의 「셋」 밖 넷째 항목) |
+| **D-10** | 임계 사정률 나눗셈의 자리수는 정책 데이터(`criticalRateScale`, legacy 6 = `legacy-behavior`) — 1B `divideForRate` 와 같은 반올림 경로를 쓴다. 십진 빈도는 내지 않는다(D-7) | §12.1 · OPEN-DIC-10 은 금액 축 밖 scale 을 미결로 두므로 값은 test 정책에만, 형태만 main |
+| **D-11** | 두 커널 모두 **`decision`** 모듈. provenance 분류는 DEC-08 소유이고 ADR 0006 이 `decision` 을 「법정 하한, 추천 후보 평가, reason code」로 적는다. 수집 write 가드(COL-02)는 adapters 몫이라 갈림이 아니다 | 스카우트 §4.3 OPEN → 세션 모델 판정 |
+| **D-12** | **규칙 표는 정책 데이터** — `ProvenanceRuleId` 넷(술어 어휘)과 각 규칙이 내는 라벨의 결속은 커널 안 정의, **순서·부분집합**은 정책(`ruleOrder`). 미지 id·중복 → 정책 로드 거부. 매치 없음 → `Unknown`. 술어는 정책값(허용 오차·배수·상한)을 주입받는 순수 함수 — 값은 main 에 없다 | §3.4 「순서를 정책 데이터로」· decision 27 · OPEN-DEC-07 |
+| **D-13** | 커널 출력 봉투 `ProvenanceJudgement(original: BaseAmount, classification, evidence: ProvenanceEvidence(firstMatchedRule, ruleOrder, policyVersion), recoveryEstimate: Fact<Money>)` · `FloorShortfallJudgement(tally: ShortfallTally, critical: AssessmentRate, result: FloorShortfall)`. 감사 boolean·`transitionedFrom`·평문 version·두 깊이의 `firstMatchedRule` 은 **runner 투영**이 봉투에서 낸다 — 입력·기대값에서 읽지 않는다 | 1C ⑥·⑦ 관례 |
+| **D-14** | `FloorUnmeasurableReason` 은 §3.3 의 **1D 소유 sealed**(payload 있는 `SampleInsufficient`) — `ReasonCode` enum 과 다른 축. `FloorShortfall.Unmeasurable(reason: FloorUnmeasurableReason)` 이고 `Measurement<T>` 를 재사용하지 않는다(§3.3 서명 그대로). 두 어휘의 다리는 만들지 않고 OPEN 후보로 등재 | §3.3 · 스카우트 §5.2 ⑦ |
+
+**정책 데이터 내용은 main 에 없다** — 1C 와 같이 형태·version 배관만. legacy 값(허용 오차·밴드·자리수)은 `legacy-behavior` 로
+test 정책 인스턴스에만 쓰고 §12.1 좌표를 주석에 남긴다. 「66% 오염」은 인용 금지(`OPEN-NUM-01`).
 
 ---
 
