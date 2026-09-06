@@ -8,8 +8,8 @@ import contract.bidvector.ml.v1.Basis
 import contract.bidvector.ml.v1.Currency
 import contract.bidvector.ml.v1.FailureCode
 import contract.bidvector.ml.v1.LatestPromoted
-import contract.bidvector.ml.v1.Money
 import contract.bidvector.ml.v1.ModelReleaseSelector
+import contract.bidvector.ml.v1.Money
 import contract.bidvector.ml.v1.PredictionEnvelope
 import contract.bidvector.ml.v1.Rate
 import contract.bidvector.ml.v1.RequestEnvelope
@@ -152,13 +152,23 @@ class ContractRoundTripTest {
 
     @Test
     fun `RequestEnvelope 는 request_id 가 빈 문자열이면 거부된다`() {
-        val envelope = RequestEnvelope.newBuilder().setRequestId("").setCorrelationId("corr-1").build()
+        val envelope =
+            RequestEnvelope
+                .newBuilder()
+                .setRequestId("")
+                .setCorrelationId("corr-1")
+                .build()
         isAcceptableRequestEnvelope(envelope) shouldBe false
     }
 
     @Test
     fun `RequestEnvelope 는 correlation_id 가 빈 문자열이면 거부된다`() {
-        val envelope = RequestEnvelope.newBuilder().setRequestId("req-1").setCorrelationId("").build()
+        val envelope =
+            RequestEnvelope
+                .newBuilder()
+                .setRequestId("req-1")
+                .setCorrelationId("")
+                .build()
         isAcceptableRequestEnvelope(envelope) shouldBe false
     }
 
@@ -240,13 +250,8 @@ class ContractRoundTripTest {
     // 여기서는 round-trip test 가 그 규칙을 문서화·고정한다(scope.md 「구현 순서」 4). ----
 
     private fun isNormalizedFraction(fraction: String): Boolean {
-        if (fraction.isEmpty()) return false
-        if (fraction.any { it == 'e' || it == 'E' }) return false
-        return try {
-            BigDecimal(fraction).toPlainString() == fraction
-        } catch (malformed: NumberFormatException) {
-            false
-        }
+        if (fraction.isEmpty() || fraction.any { it == 'e' || it == 'E' }) return false
+        return runCatching { BigDecimal(fraction).toPlainString() == fraction }.getOrDefault(false)
     }
 
     private fun isAcceptableMoney(money: Money): Boolean =
@@ -266,7 +271,11 @@ class ContractRoundTripTest {
         envelope.modelReleaseSelector.selectorCase != ModelReleaseSelector.SelectorCase.SELECTOR_NOT_SET
 
     private fun isAcceptableUnmeasurable(unmeasurable: Unmeasurable): Boolean =
-        isKnown(unmeasurable.reason, UnmeasurableReason.UNMEASURABLE_REASON_UNSPECIFIED, UnmeasurableReason.UNRECOGNIZED)
+        isKnown(
+            unmeasurable.reason,
+            UnmeasurableReason.UNMEASURABLE_REASON_UNSPECIFIED,
+            UnmeasurableReason.UNRECOGNIZED,
+        )
 
     private fun <T> isKnown(
         value: T,
