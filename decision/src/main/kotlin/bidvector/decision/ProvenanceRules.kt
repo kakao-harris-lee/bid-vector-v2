@@ -36,13 +36,17 @@ internal fun isSuspectRatio(
         row.rawBaseAmount.divide(estimate, RATIO_DIVISION_CONTEXT) > trustRatioMax
 }
 
-/** `|base - round(base)| < tolerance`(허용 오차 미만, 조사 §1.1). */
+/**
+ * `|base - round(base)| < tolerance`(허용 오차 미만, 조사 §1.1). `roundingMode`는 정책
+ * 슬롯에서 온다(verifier r2 N-1) — 이 함수가 값을 지어내지 않는다.
+ */
 internal fun isCleanInteger(
     row: ProvenanceRow,
     tolerance: BigDecimal,
+    roundingMode: RoundingMode,
 ): Boolean {
     if (row.rawBaseAmount.signum() <= 0) return false
-    val nearestInteger = row.rawBaseAmount.setScale(0, RoundingMode.HALF_UP)
+    val nearestInteger = row.rawBaseAmount.setScale(0, roundingMode)
     return row.rawBaseAmount.subtract(nearestInteger).abs() < tolerance
 }
 
@@ -66,15 +70,19 @@ private fun yegaGap(
     winningAmount: BigDecimal,
 ): BigDecimal = rawBaseAmount.multiply(winningRateFraction).subtract(winningAmount).abs()
 
-/** `|base × vatMultiplier − round(base × vatMultiplier)| < tolerance`(허용 오차 미만, 조사 §1.1). */
+/**
+ * `|base × vatMultiplier − round(base × vatMultiplier)| < tolerance`(허용 오차 미만,
+ * 조사 §1.1). `roundingMode`는 정책 슬롯에서 온다(verifier r2 N-1).
+ */
 internal fun isDerivedVat(
     row: ProvenanceRow,
     multiplier: BigDecimal,
     tolerance: BigDecimal,
+    roundingMode: RoundingMode,
 ): Boolean {
     if (row.rawBaseAmount.signum() <= 0) return false
     val withVat = row.rawBaseAmount.multiply(multiplier)
-    val rounded = withVat.setScale(0, RoundingMode.HALF_UP)
+    val rounded = withVat.setScale(0, roundingMode)
     return withVat.subtract(rounded).abs() < tolerance
 }
 
@@ -88,10 +96,21 @@ private fun matches(
     policy: ProvenancePolicyData,
 ): Boolean =
     when (ruleId) {
-        ProvenanceRuleId.SuspectRatio -> isSuspectRatio(row, requireNotNull(policy.trustRatioMax).fraction)
-        ProvenanceRuleId.CleanInteger -> isCleanInteger(row, policy.cleanIntegerTolerance)
-        ProvenanceRuleId.DerivedYega -> isDerivedYega(row, policy.yegaTolerance)
-        ProvenanceRuleId.DerivedVat -> isDerivedVat(row, policy.vatMultiplier, policy.vatTolerance)
+        ProvenanceRuleId.SuspectRatio -> {
+            isSuspectRatio(row, requireNotNull(policy.trustRatioMax).fraction)
+        }
+
+        ProvenanceRuleId.CleanInteger -> {
+            isCleanInteger(row, policy.cleanIntegerTolerance, policy.integerRoundingMode)
+        }
+
+        ProvenanceRuleId.DerivedYega -> {
+            isDerivedYega(row, policy.yegaTolerance)
+        }
+
+        ProvenanceRuleId.DerivedVat -> {
+            isDerivedVat(row, policy.vatMultiplier, policy.vatTolerance, policy.integerRoundingMode)
+        }
     }
 
 /** 행에 정책의 술어 넷을 돌려 매치 집합을 낸다(단위 test 층 진입점, D-4). */

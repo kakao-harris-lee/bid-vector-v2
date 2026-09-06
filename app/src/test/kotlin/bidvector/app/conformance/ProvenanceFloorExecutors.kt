@@ -107,6 +107,9 @@ private fun provenancePolicyFrom(input: JsonNode): Resolution.Resolved<Provenanc
             vatMultiplier = BigDecimal.ONE,
             vatTolerance = BigDecimal.ZERO,
             yegaTolerance = BigDecimal.ZERO,
+            // 술어가 한 번도 안 불리는 orderer 층 경로다(D-4) — trustRatioMax 자리표시자와
+            // 같은 이유로 값 자체는 무의미하다.
+            integerRoundingMode = RoundingMode.HALF_UP,
         )
     return Resolution.Resolved(policyData, PolicyVersion(EffectiveFrom.Initial, policyVersionSource))
 }
@@ -353,7 +356,7 @@ private fun floorShortfallPolicyFrom(input: JsonNode): Resolution.Resolved<Floor
             denominatorBand = denominatorBand,
             shortfallComparison = ShortfallComparison.StrictlyGreater,
             biasIndeterminateBand = UNASSERTED_FULL_RANGE_BAND,
-            criticalRateScale = LEGACY_CRITICAL_RATE_SCALE_DIGITS,
+            criticalRateRounding = RoundingPolicy(LEGACY_CRITICAL_RATE_SCALE_DIGITS, RoundingMode.HALF_UP),
         )
     return Resolution.Resolved(policyData, PolicyVersion(EffectiveFrom.Initial, policyVersionSource))
 }

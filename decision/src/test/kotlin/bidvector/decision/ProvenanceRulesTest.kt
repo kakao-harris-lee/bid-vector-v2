@@ -16,6 +16,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
+import java.math.RoundingMode
 
 private val VERSION_A = PolicyVersion(EffectiveFrom.Initial, "test-policy-a")
 private val VERSION_B = PolicyVersion(EffectiveFrom.Initial, "test-policy-b")
@@ -32,15 +33,18 @@ private fun policyOf(
     ruleOrder: List<ProvenanceRuleId>,
     version: PolicyVersion = VERSION_A,
     trustRatioMax: Rate? = Rate.ofFraction(BigDecimal("1.15")),
+    cleanIntegerTolerance: BigDecimal = BigDecimal("0.000001"),
+    integerRoundingMode: RoundingMode = RoundingMode.HALF_UP,
 ): Resolution.Resolved<ProvenancePolicyData> =
     Resolution.Resolved(
         ProvenancePolicyData(
             ruleOrder = ruleOrder,
             trustRatioMax = trustRatioMax,
-            cleanIntegerTolerance = BigDecimal("0.000001"),
+            cleanIntegerTolerance = cleanIntegerTolerance,
             vatMultiplier = BigDecimal("1.1"),
             vatTolerance = BigDecimal("0.01"),
             yegaTolerance = BigDecimal.ONE,
+            integerRoundingMode = integerRoundingMode,
         ),
         version,
     )
@@ -137,21 +141,49 @@ class ProvenanceRulesTest {
     fun `술어 — clean-integer 는 허용 오차 미만이면 매치한다`() {
         val clean = ProvenanceRow(BigDecimal("1000000"), null, null, null)
 
-        isCleanInteger(clean, BigDecimal("0.000001")) shouldBe true
+        isCleanInteger(clean, BigDecimal("0.000001"), RoundingMode.HALF_UP) shouldBe true
     }
 
     @Test
     fun `술어 — clean-integer 는 허용 오차를 벗어나면 매치하지 않는다 — F-2`() {
         val notClean = ProvenanceRow(BigDecimal("1000000.5"), null, null, null)
 
-        isCleanInteger(notClean, BigDecimal("0.000001")) shouldBe false
+        isCleanInteger(notClean, BigDecimal("0.000001"), RoundingMode.HALF_UP) shouldBe false
     }
 
     @Test
     fun `술어 — clean-integer 는 정확히 허용 오차인 값은 매치하지 않는다 — F-2 경계(미만만 참)`() {
         val boundary = ProvenanceRow(BigDecimal("1000000.000002"), null, null, null)
 
-        isCleanInteger(boundary, BigDecimal("0.000002")) shouldBe false
+        isCleanInteger(boundary, BigDecimal("0.000002"), RoundingMode.HALF_UP) shouldBe false
+    }
+
+    @Test
+    fun `술어 — clean-integer 는 반올림 모드가 바뀌면 결과가 바뀐다 — N-1`() {
+        val row = ProvenanceRow(BigDecimal("1000000.1"), null, null, null)
+
+        isCleanInteger(row, BigDecimal("0.5"), RoundingMode.HALF_UP) shouldBe true
+        isCleanInteger(row, BigDecimal("0.5"), RoundingMode.CEILING) shouldBe false
+    }
+
+    @Test
+    fun `evaluateHits — 정책의 integerRoundingMode 가 clean-integer 매치 여부를 실제로 바꾼다 — N-1`() {
+        val row = ProvenanceRow(BigDecimal("1000000.1"), null, null, null)
+        val halfUpPolicy =
+            policyOf(
+                listOf(ProvenanceRuleId.CleanInteger),
+                cleanIntegerTolerance = BigDecimal("0.5"),
+                integerRoundingMode = RoundingMode.HALF_UP,
+            )
+        val ceilingPolicy =
+            policyOf(
+                listOf(ProvenanceRuleId.CleanInteger),
+                cleanIntegerTolerance = BigDecimal("0.5"),
+                integerRoundingMode = RoundingMode.CEILING,
+            )
+
+        row.evaluateHits(halfUpPolicy.value) shouldBe setOf(ProvenanceRuleId.CleanInteger)
+        row.evaluateHits(ceilingPolicy.value) shouldBe emptySet()
     }
 
     @Test
@@ -179,21 +211,21 @@ class ProvenanceRulesTest {
     fun `술어 — derived-vat 는 base 곱하기 배수가 정수에 근사할 때만 매치한다`() {
         val row = ProvenanceRow(BigDecimal("1000000"), null, null, null)
 
-        isDerivedVat(row, BigDecimal("1.1"), BigDecimal("0.01")) shouldBe true
+        isDerivedVat(row, BigDecimal("1.1"), BigDecimal("0.01"), RoundingMode.HALF_UP) shouldBe true
     }
 
     @Test
     fun `술어 — derived-vat 는 배수 곱한 값이 정수에서 멀면 매치하지 않는다 — F-2`() {
         val row = ProvenanceRow(BigDecimal("1000005"), null, null, null)
 
-        isDerivedVat(row, BigDecimal("1.1"), BigDecimal("0.01")) shouldBe false
+        isDerivedVat(row, BigDecimal("1.1"), BigDecimal("0.01"), RoundingMode.HALF_UP) shouldBe false
     }
 
     @Test
     fun `술어 — derived-vat 는 정확히 허용 오차인 값은 매치하지 않는다 — F-2 경계(미만만 참)`() {
         val row = ProvenanceRow(BigDecimal("1000000.25"), null, null, null)
 
-        isDerivedVat(row, BigDecimal("2"), BigDecimal("0.5")) shouldBe false
+        isDerivedVat(row, BigDecimal("2"), BigDecimal("0.5"), RoundingMode.HALF_UP) shouldBe false
     }
 
     @Test

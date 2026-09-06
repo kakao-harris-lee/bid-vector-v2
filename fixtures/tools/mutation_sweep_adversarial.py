@@ -67,6 +67,14 @@ import manifest_contract as mc  # noqa: E402
 ASSERTED = {
     "license-006":                 ["$.uncertainReason"],                  # U-5 sealed enum 의 사유 토큰
     "capacity-gate-003":           ["$.suitabilityAxisAffected"],          # OPEN-QUAL-08 분할의 양(陽)의 절반
+    # verifier r2 N-5 — bap 001·002·003 은 적대 스윕에서 변이체가 하나도 생성되지 않아
+    # (ASSERTED·NULL_ASSERTED·verified_projections 어디에도 없었다) 「강등 대상 0」이
+    # 공허했다(1D 이전부터의 이월 부채, r1 N-1). first-match 결과(`classification`)와
+    # 그 근거(`firstMatchedRule`/`evidence.firstMatchedRule`)·`policyVersion`은
+    # `verifies`가 직접 주장하는 값이다.
+    "base-amount-provenance-001": ["$.classification", "$.evidence.firstMatchedRule", "$.policyVersion"],
+    "base-amount-provenance-002": ["$.classification", "$.firstMatchedRule", "$.policyVersion"],
+    "base-amount-provenance-003": ["$.classification", "$.firstMatchedRule", "$.policyVersion"],
     "floor-threshold-001":         ["$.criticalAssessmentRate.fraction"],  # 관계 주장의 축(임계값)
     "floor-threshold-003":         ["$.criticalAssessmentRate.fraction"],
     # curator 발견(2026-09-06) — 승격 case(decision 28)의 `verifies`가 **경계 등가 자체**를

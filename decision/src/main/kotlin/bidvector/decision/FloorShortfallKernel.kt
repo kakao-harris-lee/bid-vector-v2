@@ -6,9 +6,7 @@ import bidvector.sharedkernel.Derived
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.Measurement
 import bidvector.sharedkernel.Resolution
-import bidvector.sharedkernel.RoundingPolicy
 import bidvector.sharedkernel.criticalAssessmentRate
-import java.math.RoundingMode
 
 /**
  * 표본 하나의 미달 술어(②, D-4 — `floor-threshold` 축의 유일한 진입점). 경계 비교 방향은
@@ -83,18 +81,16 @@ fun measureFloorShortfall(
 }
 
 /**
- * `FloorShortfallPolicyData.criticalRateScale`(D-10)에서 나눗셈 정책을 만들어 임계 사정률을
- * 계산한다(verifier r1 F-3) — 이 함수가 그 정책 슬롯의 유일한 소비자다. 반올림 모드
- * (`HALF_UP`)는 이 함수가 호출부로서 주입하는 구조적 관례이지 versioned 정책값이 아니다
- * (`OPEN-DIC-10`은 모드의 legacy 값 자체를 아직 정하지 않았지만, `criticalRateScale`
- * 슬롯이 갖는 것은 자리수뿐이라 모드는 이 계층이 정할 수밖에 없다 — 판단은 evidence 참고).
+ * `FloorShortfallPolicyData.criticalRateRounding`(D-10)에서 나눗셈 정책을 만들어 임계
+ * 사정률을 계산한다(verifier r1 F-3) — 이 함수가 그 정책 슬롯의 유일한 소비자다.
+ * **verifier r2 N-1 정정**: 반올림 모드를 이 함수가 리터럴로 지어내던 이전 판을 없앴다 —
+ * 자리수·모드 둘 다 정책 슬롯에서 그대로 온다. main 에 `RoundingMode` 리터럴이 없다.
  */
 fun criticalAssessmentRateFor(
     bid: BidRate,
     floor: FloorRate,
     policy: Resolution.Resolved<FloorShortfallPolicyData>,
 ): Measurement<Derived<AssessmentRate>> {
-    val roundingPolicy = RoundingPolicy(policy.value.criticalRateScale, RoundingMode.HALF_UP)
-    val scalePolicy = Resolution.Resolved(roundingPolicy, policy.version)
+    val scalePolicy = Resolution.Resolved(policy.value.criticalRateRounding, policy.version)
     return criticalAssessmentRate(bid, floor, scalePolicy)
 }

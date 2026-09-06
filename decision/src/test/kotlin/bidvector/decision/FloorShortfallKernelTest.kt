@@ -60,7 +60,7 @@ private fun policyOf(
             denominatorBand = denominatorBand,
             shortfallComparison = shortfallComparison,
             biasIndeterminateBand = biasIndeterminateBand,
-            criticalRateScale = 6,
+            criticalRateRounding = RoundingPolicy(6, RoundingMode.HALF_UP),
         ),
         TEST_VERSION,
     )
@@ -208,21 +208,55 @@ class FloorShortfallKernelTest {
     }
 
     @Test
-    fun `criticalAssessmentRateFor 는 criticalRateScale 슬롯을 실제로 소비한다 — F-3`() {
+    fun `criticalAssessmentRateFor 는 criticalRateRounding 자리수를 실제로 소비한다 — F-3`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal.ONE))
         val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(0))
 
+        val basePolicyData = policyOf(minAssessmentSamples = 150).value
         val coarsePolicy = policyOf(minAssessmentSamples = 150)
         val coarseMeasurement = criticalAssessmentRateFor(bid, floor, coarsePolicy)
         val coarse = coarseMeasurement as Measurement.Measured<Derived<AssessmentRate>>
-        val finePolicyData = policyOf(minAssessmentSamples = 150).value.copy(criticalRateScale = 2)
+        val fineRounding = RoundingPolicy(2, RoundingMode.HALF_UP)
+        val finePolicyData = basePolicyData.copy(criticalRateRounding = fineRounding)
         val finePolicy = Resolution.Resolved(finePolicyData, TEST_VERSION)
         val fineMeasurement = criticalAssessmentRateFor(bid, floor, finePolicy)
         val fine = fineMeasurement as Measurement.Measured<Derived<AssessmentRate>>
 
-        // criticalRateScale 이 6(기본값)일 때와 2일 때 서로 다른 정밀도로 나온다.
+        // 자리수가 6(기본값)일 때와 2일 때 서로 다른 정밀도로 나온다.
         coarse.value.value.rate.fraction shouldBe BigDecimal("0.333333")
         fine.value.value.rate.fraction shouldBe BigDecimal("0.33")
+    }
+
+    @Test
+    fun `criticalAssessmentRateFor 는 criticalRateRounding 모드를 실제로 소비한다 — N-1`() {
+        val bid = BidRate.recommended(Rate.ofFraction(BigDecimal("2")))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(0))
+
+        val basePolicyData = policyOf(minAssessmentSamples = 150).value
+        val halfUpRounding = RoundingPolicy(1, RoundingMode.HALF_UP)
+        val halfUpPolicyData = basePolicyData.copy(criticalRateRounding = halfUpRounding)
+        val halfUp = criticalAssessmentRateFor(bid, floor, Resolution.Resolved(halfUpPolicyData, TEST_VERSION))
+        val downRounding = RoundingPolicy(1, RoundingMode.DOWN)
+        val downPolicyData = basePolicyData.copy(criticalRateRounding = downRounding)
+        val down = criticalAssessmentRateFor(bid, floor, Resolution.Resolved(downPolicyData, TEST_VERSION))
+
+        // 비종결 몫(2÷3=0.6666...)에서 HALF_UP 과 DOWN 이 자리수 1에서 다른 값을 낸다.
+        halfUp.shouldBeInstanceOf<Measurement.Measured<Derived<AssessmentRate>>>()
+        down.shouldBeInstanceOf<Measurement.Measured<Derived<AssessmentRate>>>()
+        halfUp.value.value.rate.fraction shouldBe BigDecimal("0.7")
+        down.value.value.rate.fraction shouldBe BigDecimal("0.6")
+    }
+
+    @Test
+    fun `criticalAssessmentRateFor 가 만드는 DerivationRecord 의 policyVersion 은 policy version 과 같다 — N-3`() {
+        val bid = BidRate.recommended(Rate.ofFraction(BigDecimal.ONE))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(0))
+        val policy = policyOf(minAssessmentSamples = 150)
+
+        val measurement = criticalAssessmentRateFor(bid, floor, policy)
+
+        measurement.shouldBeInstanceOf<Measurement.Measured<Derived<AssessmentRate>>>()
+        measurement.value.derivedFrom.policyVersion shouldBe policy.version
     }
 
     @Test
