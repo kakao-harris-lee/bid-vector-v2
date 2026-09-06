@@ -3448,6 +3448,10 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-STR-02` | 온보딩 확정 직후 미리보기 노출 창의 실제 크기 | **실행 검증** — M4/M6 · slice 미지목 | 관측 (**미측정**) | **유도** |
 | `OPEN-STR-04` | 실험이 운영자 전략을 무승인 갱신하는 현행이 의도인가 | **M4 4A**(Strategy edit state machine) | **운영자** (legacy 의도 판정) | **유도** |
 | `OPEN-STR-12` | 대화형 채널(Telegram) 전략 편집을 V2 capability로 채택할 것인가 | **M4 4A** | **운영자** (범위) | **유도** |
+| `OPEN-2A-CANONICAL-FORM` (M2/2A 신설, 2026-09-06) | round-trip 의 canonicalization 방식 — protobuf deterministic serialization 이 canonical 로 충분한가(2A 는 map 필드 0 인 범위에서 실측·제안) | **M2 2D**(게이트 증명 시 확정) | 2D 실측 → 운영자 | **정본**(`reports/evidence/m2/2a/scope.md` OPEN 표) |
+| `OPEN-2A-INCLUDED-BUILD` (M2/2A 신설, 2026-09-06) | 게이트 밖 빌드 하나(`ml-contract`, included build)의 존재 — 「그 빌드에 손으로 쓴 소스가 생기지 않는다」를 S-5 무소스 단언이 지키고 2D 가 `contractGate` 로 올린다. `ADR 0006` 모듈 목록·§9 소유 축 표 갱신 후보 | **M2 2D**(게이트) · ADR 0006 갱신은 2D 종결 시 | 2D | **정본**(2A scope OPEN 표) |
+| `OPEN-2A-RELEASE-CHECK-4D` (M2/2A 신설, 2026-09-06) | 제3 변환 금지(`ADR 0010` D-3)의 **client 집행** — `latest_promoted` 응답의 `release_id` 를 `GetModelMetadata.promoted` 와 대조하는 규칙은 M2 에서 fake 위의 test 까지이고 실제 client 는 M4 4D 소유. 4D 착수 계약이 그 test 를 실제 배선에 재사용해야 한다 | **M4 4D** | 4D 착수 계약 | **정본**(2A scope OPEN 표) — 선언만 있고 강제되지 않는 ML-03 형태를 피하기 위한 활성 등재 |
+| `OPEN-M2-DEADLINE-VALUES` (ADR 0010 신설, 2026-09-06) | 초기 deadline·재시도·백오프·breaker 값의 실측 근거 — 규칙은 ADR 0010, 값은 `adapters` 정책 데이터(D-M2-9 (a)) | **M5 5E**(실측) → **M4 4D**(정책 version) | 5E 실측 | **정본**(`ADR 0010` §5) |
 
 ### 14.4 이월되는 비-`OPEN` 사실
 
