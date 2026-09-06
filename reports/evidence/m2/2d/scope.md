@@ -7,7 +7,7 @@
 ```yaml
 milestone: m2
 slice: 2d-generation-compat-and-provider-tests
-base_sha: c9022d9989c4b2a09cf8b9ff94795176dc5dc00c   # 초안 작성 시점 HEAD — **2A~2C 승인 뒤 착수 시 재고정**
+base_sha: e3ac98b   # 착수 2026-09-07 재고정(2C 잔여 일괄 커밋 = 2C 종결 시점). 초안 시점은 c9022d9 였다. 승인 태그 `contracts/v1-approved-2026-09-07` 는 2C 승인 기록 커밋에 붙는다
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - contracts/buf.yaml                                # breaking 규칙 카테고리(FILE). `against` 는 buf.yaml 이 아니라 `contractGate` 가 정책의 승인 태그를 `--against` 로 넘긴다
@@ -51,7 +51,14 @@ contract 층·래칫 · `ADR 0010` 초안 D-2·D-4·D-7·§6 · `milestone-1.md`
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — **착수 시 재고정한 base 로 다시 낸다.** 초안 시점은 해당 없음.
+`git log --oneline e3ac98b..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-07) **없음**.
+
+**착수 2026-09-07 — 운영자 결정**: D-2D-1 (a) `against` = 승인 태그(`contracts/v1-approved-2026-09-07`, 이름 규칙은 정책 데이터) ·
+D-2D-3 (a) 교차 언어 socket 스모크는 로컬 실측 1회 + evidence 한 줄, 상시 게이트는 in-process · D-2D-4 (a) Python test 는 로컬
+acceptance 만, CI 등재는 5A. D-2D-2 는 2A 로 닫힘. 2C 종결 승인 같은 날. Phase 2.5 는 준비 세션 리뷰 r1~r4(`_workspace/m2-prep/
+03~06`)가 2D 의 게이트 가족 충돌·mutation 규칙·도구 버전 assertion·S-1b 앵커를 검토한 것으로 갈음하고, (0) 경계 문장은 이 문서
+「위협 모델」 절이 갖는다. **게이트 정의(`build-logic/**`)를 편집하는 slice 이므로 Phase 4 는 술어 변경 전건이 표적 재검증 대상.**
+정본: `milestone-2.md` 2D 착수 문단.
 
 ---
 
@@ -75,7 +82,7 @@ contract 층·래칫 · `ADR 0010` 초안 D-2·D-4·D-7·§6 · `milestone-1.md`
 
 ---
 
-## 운영자 결정 필요 — 착수 전(D-2D-1~3) · 계약 고정(D-2D-4~6)
+## 운영자 결정 필요 — 착수 전(D-2D-1·3·4, **전부 (a) 채택 2026-09-07**; D-2D-2 는 2A 로 닫힘) · 계약 고정(D-2D-5~7)
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |

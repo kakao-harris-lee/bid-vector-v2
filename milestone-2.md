@@ -92,6 +92,17 @@ ml-engine 은 불투명 문자열로 저장·대조만 · **D-2C-2 (a)** `traini
 - unknown field/enum, max payload, deadline, cancellation test
 - fake servicer를 이용한 consumer/provider test
 
+**2C 종결·2D 착수 2026-09-07** — 2C 는 verifier ready-for-review + 사용자 승인으로 닫혔다(`reports/evidence/m2/2c/checklist.md`
+「사용자 승인」; 신설 OPEN 둘은 `capability-map.md` §14.3). 2A~2C 승인 시점 HEAD 에 **승인 태그 `contracts/v1-approved-2026-09-07`**
+을 붙였다(D-2D-1 (a) — breaking gate 의 `against` 기준, 태그 이름 규칙은 정책 데이터). 2D 계약 정본 `reports/evidence/m2/2d/scope.md`.
+착수 전 운영자 결정 셋(추천안): **D-2D-1 (a)** breaking 은 승인 태그 대비(`origin/main`·직전 커밋 대비는 「승인된 계약」이 아니라
+두 커밋에 걸친 breaking 을 못 잡는다) · **D-2D-3 (a)** 교차 언어 socket 스모크는 착수·리뷰 요청 시 로컬 실측 1회 + evidence 한 줄,
+상시 게이트는 in-process 만(socket 은 리뷰 sandbox 금지; 상시 통합 검증은 M6 6C) · **D-2D-4 (a)** Python test 는 로컬 acceptance
+만, CI 등재는 M5 5A 소유. D-2D-2 는 2A D-2A-0 (c) 로 닫혀 있다(생성물 VCS 밖, 2D 는 결정성·비커밋·무소스 실측만). 2D 는 생성
+자체가 아니라 **게이트가 실제로 잡는다는 증거**다 — breaking mutation 집합(저장소 밖 임시 생성, 최소 크기 정책 데이터), unknown
+field·enum, `max_message_bytes` 경계 쌍(양쪽 수용·양쪽 거부), deadline, cancellation(플래그가 아니라 자원 해제), 생성 재현 diff 0,
+`ml-contract` 무소스 단언의 게이트화(`OPEN-2A-INCLUDED-BUILD`).
+
 ## 설계 규칙
 
 - `oneof`로 success/unmeasurable/application failure를 구분한다.

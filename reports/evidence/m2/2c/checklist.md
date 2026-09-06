@@ -167,7 +167,15 @@ fork-불안전(5A).
 | `OPEN-2C-FAILURE-CODES` | `JobFailureCode` 최소 집합의 5C 확장 — 호환 추가 규칙(제공자 먼저 배포). `capability-map.md` §14.3 등재 완료(verifier r1 F-2, team-lead `62abbef`) |
 | `OPEN-2C-DATASET-URI-SCHEME` | `DatasetReference.uri`의 허용 scheme — 5A·M6 6C 소관. `capability-map.md` §14.3 등재 완료(verifier r1 F-2, team-lead `62abbef`) |
 
-## 사용자 승인
+## 사용자 승인 — 2026-09-07, slice 2C 종결
+
+verifier r1 `ready-for-review`(head `2e08937`, 잔여 일괄 `c99cc5d`·`e3ac98b`, 세션 모델 OPEN 등재 `62abbef`) 위에서
+**사용자 승인 2026-09-07**. 재작업 0/5. D-2C-1~6 사후 확인 포함. 알려진 제한(fake 의 SUCCEEDED/FAILED 실전이 경로 없음 — 5C
+재확인 · uri 불투명·`detail_code` 원문은 리뷰 항목 · 실제 취소 존중은 5C)은 등재 유지. 같은 승인에서 2A~2C 승인 시점 HEAD 에
+**승인 태그 `contracts/v1-approved-2026-09-07`** 을 붙인다(2D D-2D-1 (a) — breaking gate 의 `against` 기준). 다음 slice 2D 착수
+지시 같은 날(D-2D-1·3·4 추천안).
+
+## (이전 문면) 사용자 승인
 
 대기 — verifier ready-for-review 이후 운영자 결정(CLAUDE.md 운영자 지시
 2026-09-04, 코드 slice는 Codex 심판 제외).
