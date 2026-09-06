@@ -116,7 +116,7 @@ deadline·재시도 횟수·백오프·circuit breaker 임계는 **Kotlin `adapt
   증명).
 - `feature_schema_version` 은 패키지 version 과 **다른 축**이다 — 계약 형태는 같고 피처 집합만 바뀌는 경우를 위한 것.
   servicer 가 아는 집합 밖이면 `UNSUPPORTED_SCHEMA`(fail-closed).
-- 생성 코드는 수동 편집하지 않는다 — 생성물은 VCS 밖(`build/generated/`)이라 구조적으로 불가하고, 생성의 결정성과 비커밋을 2D 가 실측한다(2A D-2A-0a).
+- 생성 코드는 수동 편집하지 않는다 — 생성물은 게이트 밖 included build(`ml-contract`)의 `build/` 에만 있어 구조적으로 불가하고, 생성의 결정성·비커밋·무소스를 2D 가 실측한다(2A D-2A-0 (c)).
 
 ### D-8. training transport — 별도 job API, 같은 gRPC 서버, Kotlin 이 폴링
 

@@ -29,7 +29,7 @@ acceptance_commands:
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # S-0
   - "./gradlew --no-build-cache clean check"                                                          # S-1
   - "(cd contracts && buf lint && buf build)"                                                          # S-2
-  - "./gradlew :ml-contract:generateProto :adapters:test --tests '*Training*Contract*'"               # S-3
+  - "./gradlew :adapters:test --tests '*Training*Contract*'"                                          # S-3 — 생성은 included build 가 adapters 의 test 의존으로 수행
   - "(cd ml-engine && python -m pytest tests/test_training_contract.py tests/test_contract_roundtrip.py -q)"   # S-4
   - "./gradlew qualityBaseline"                                                                        # S-5
 rollback: |
