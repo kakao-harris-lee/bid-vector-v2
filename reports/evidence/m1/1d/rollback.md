@@ -129,6 +129,7 @@ git status --short
 실측 결과: `restore exit: 0` · `rm exit: 0`. `git status --short` 는 정확히 위 목록대로
 `M` 6개(`app/build.gradle.kts`·`CorpusExecutors.kt`·`SharedKernelCorpusConformanceTest.kt`·
 `config/quality/gate-tests.properties`·`decision/build.gradle.kts`·`Rate.kt`) +
-`D` 12개(신규 파일 전건)만 나왔다 — `docs/discovery/*.md`·`milestone-1.md`·
-`data-extract.md`·`fixtures/tools/*.py`는 목록에 없어 그대로 HEAD 상태(무변경)임을
-확인했다. clone 은 검증 뒤 `rm -rf` 로 삭제, 원본 저장소 무변경.
+`D` **14개**(신규 파일 전건 — verifier r1 F-5·r2 G-2가 잡은 「12개」오기를 여기(정본)에서
+정정한다. `git rm -f` 목록의 실제 항목 수와 일치)만 나왔다 — `docs/discovery/*.md`·
+`milestone-1.md`·`data-extract.md`·`fixtures/tools/*.py`는 목록에 없어 그대로 HEAD
+상태(무변경)임을 확인했다. clone 은 검증 뒤 `rm -rf` 로 삭제, 원본 저장소 무변경.
