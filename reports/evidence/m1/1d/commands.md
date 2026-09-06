@@ -26,6 +26,38 @@
 - **P-8** `./gradlew :build-logic:test` — exit 0(최초는 `qualityBaseline` 묶음 실행에 포함,
   후속 재검증에서 단독 실행으로도 exit 0).
 
+## verifier r1 수정 라운드 재검증 (F-1·F-3·F-2·F-4 뒤, 커밋 `1ddbb69`·`f7cc530`·`e0b8a3b`)
+
+- **P-0** 격리 worktree(`p0-worktree-r1`) `--no-build-cache clean check` — exit 0,
+  312 tasks 전건 executed. worktree 는 검증 뒤 `git worktree remove --force`.
+- **P-1** `./gradlew --no-build-cache clean check` — exit 0, 303 actionable tasks
+  (288 executed, F-4 커밋 이전 상태 기준) — F-1+F-3+F-2+F-4 전부 반영된 HEAD에서도
+  같은 명령 재확인(287 executed, 캐시 차이).
+- **P-2·P-3·P-4·P-6·P-8** 한 명령으로 묶어 재실행 — exit 0.
+- **P-5** `./gradlew :app:test --tests '*Conformance*'` — exit 0,
+  `tests="29" failures="0" errors="0"`(authoritative 8 case 그대로, 회귀 없음).
+- **P-7** `mutation_sweep_adversarial.py`·`mutation_sweep_targeted.py`·
+  `manifest_contract.py`·`check_legacy_numbers.py` 전부 exit 0(변이 47건 그대로,
+  회귀 없음).
+- **secret 스캔** `git diff 41d730b..e0b8a3b | grep -niE "..."` — 매치 4건, 전부
+  `comparisonStringFor`/`shortfallComparisonFromToken`의 `token` 변수명 부분 문자열
+  오탐. 실제 비밀값 없음.
+
+## F-2 변이 재실측 — 술어 셋을 항상 true 로
+
+`isCleanInteger`·`isDerivedYega`·`isDerivedVat` 세 함수 본문을 전부 `return true`로
+바꾸고 `:decision:test`를 돌렸다 — 신규 음성·경계 test 6건 전부 즉시 실패
+(`expected:<false> but was:<true>`, 19 tests 중 6 failed). `cp`로 원본을 백업해 둔
+뒤 되돌려 재통과를 확인했다.
+
+## F-1 컴파일 봉인 재확인 — bare AssessmentRate 는 컴파일되지 않는다
+
+`decision/src/test`에 probe 파일을 추가해 `measureFloorShortfall(tally,
+AssessmentRate.observed(...), policy)`(Derived로 감싸지 않은 bare 값)를 시도 —
+`:decision:compileTestKotlin`이 `Argument type mismatch: actual type is
+'AssessmentRate', but 'Derived<AssessmentRate>' was expected`로 즉시 실패. probe
+파일은 확인 직후 삭제(커밋에 없음).
+
 ## 모듈별 게이트(개별 확인)
 
 - `./gradlew :app:check` — exit 0.
@@ -37,7 +69,8 @@
 
 `rollback.md`의 두 명령(`git restore --source=<base> ...`·`git rm -f ...`)을 head
 `c501183`에서 clone한 `/tmp/1d-rollback-check`에서 실제로 실행 — 둘 다 exit 0,
-`git status --short`가 rollback.md 목록과 정확히 일치(M 6·D 12). clone은 검증 뒤 삭제.
+`git status --short`가 rollback.md 목록과 정확히 일치(M 6·D 14 — verifier r1 F-5가
+잡은 「D 12」오기를 정정, `git rm -f` 목록 실제 항목 수와 일치). clone은 검증 뒤 삭제.
 
 ## secret 스캔
 

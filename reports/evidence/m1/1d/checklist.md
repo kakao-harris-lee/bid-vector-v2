@@ -18,6 +18,23 @@ CLAUDE.md 운영자 지시 2026-09-04).
    등재(P-5 복구) + `floorThresholdExecutor`가 입력 `policy` 블록을 실제로 읽도록
    수정(아래 「판단이 갈린 지점」) + 스윕 `ASSERTED` 표 한 행. authoritative 8 case
    전건 대조로 갱신.
+6. `1ddbb69`(verifier r1 F-1+F-3) · `f7cc530`(F-4) · `e0b8a3b`(F-2) — 아래
+   「verifier r1 수정 라운드 처리」 참고.
+
+## verifier r1 수정 라운드 처리 (재작업 누계 1/5)
+
+`_workspace/m1-1d/02_verifier_report.md` not-ready(F-1 high) 뒤 finding 별로 처리했다.
+D-10 서명 정정(`41d730b`, scope.md·milestone-1.md)은 팀장(세션 모델)이 먼저 커밋했다 —
+이 레인은 그 정정을 구현했다.
+
+| id | sev | 처리 |
+| --- | --- | --- |
+| F-1 | high | `criticalAssessmentRate`가 `Measurement<Derived<AssessmentRate>>`를 낸다(decision 17). `AssessmentRate.observed` 대신 같은 모듈의 `internal` 생성자를 직접 쓴다. `FloorShortfallJudgement.critical`·`FloorShortfall.Measured.criticalAssessmentRate`도 `Derived<AssessmentRate>`로 바꿔 봉투가 정책 version을 그대로 나른다. 컴파일 probe로 bare `AssessmentRate`가 `measureFloorShortfall`에 타입 불일치로 거부됨을 실측(`1ddbb69`). |
+| F-3 | low(F-1과 동봉) | 새 함수 `criticalAssessmentRateFor(bid, floor, policy: Resolution.Resolved<FloorShortfallPolicyData>)`가 `criticalRateScale` 슬롯에서 `RoundingPolicy`를 만든다 — 이 함수가 그 슬롯의 유일한 소비자다. `floorShortfallExecutor`가 이 경로로 바꿔 배선을 완성했다(`1ddbb69`). |
+| F-2 | medium | `isCleanInteger`·`isDerivedYega`·`isDerivedVat` 각각에 음성 case·경계 case(허용 오차 미만만 참) 를 추가했다. 세 술어를 실제로 항상 true 로 바꿔 신규 6 test 전부가 즉시 실패함을 확인(`e0b8a3b`). |
+| F-4 | low | `floorThresholdExecutor`의 `$.comparison` 문자열이 이제 `policy.shortfallComparison` 토큰에서 나온다(`comparisonStringFor`). 정책 부재 입력은 decision 28 초기값 문면을 쓴다(`f7cc530`). |
+| F-5 | low(장부) | `commands.md`의 「M 6·D 12」를 「M 6·D 14」로 정정 — `git rm -f` 목록 실제 항목 수(14)와 재실측 결과가 일치한다. |
+| F-6 | low(장부) | 팀장(세션 모델)이 `milestone-1.md`에서 이미 처리(`41d730b`) — 이 레인은 건드리지 않았다. |
 
 ## D-1(a)/D-9 셋+하나 이행 대조
 
@@ -29,7 +46,7 @@ scope.md 운영자 결정: "in_scope 의 shared-kernel 세 경로가 열린다"(
 | --- | --- | --- |
 | `BidRate.recommended(rate)` | `companion object` factory, origin=`Recommended` | `Rate.kt` |
 | `AssessmentRate.observed(rate)` | `companion object` factory, KDoc이 "파생 아님"을 진술 | `Rate.kt` |
-| `criticalAssessmentRate(bid, floor, scale)` | `Measurement<AssessmentRate>` 반환, VAT 전건 없음(Rate 는 그 축을 안 나름) | `RateArithmetic.kt`(신규 파일) |
+| `criticalAssessmentRate(bid, floor, scale)` | `Measurement<Derived<AssessmentRate>>` 반환(verifier r1 F-1 — decision 17), VAT 전건 없음(Rate 는 그 축을 안 나름) | `RateArithmetic.kt`(신규 파일) |
 | D-9 (사후 확인) `Rate.fraction` 공개 + `Comparable<Rate>` | 생성자는 `internal` 그대로, 읽기만 공개 | `Rate.kt` |
 
 **사후 확인**: D-9 없이는 `floor-threshold-001`·`003`(`$.criticalAssessmentRate.fraction`
@@ -123,19 +140,36 @@ scope.md 운영자 결정: "in_scope 의 shared-kernel 세 경로가 열린다"(
 (b)는 입력을 늘려야 하고 001·003 의 `verifies` 문면과도 맞지 않는다(그 case 들은
 정책 자체를 주장 대상으로 삼지 않는다).
 
-**manifest 갱신 필요 — curator 인계**: `floor-threshold-002`의 `contract_binding.
-does_not_carry` ⑦(*"현재 `floorThresholdExecutor`는 `ShortfallComparison.
-StrictlyGreater`를 호출부에서 직접 주고 입력의 `policy` 블록을 읽지 않는다"*, 커밋
-`cec7732`)은 이 후속 커밋으로 **낡았다** — runner 가 이제 그 블록을 읽는다. `does_not_carry`
-문구 갱신은 fixture-curator 소관이라 이 슬라이스가 manifest 를 직접 고치지 않는다.
+**manifest 갱신 — curator 완료**: `floor-threshold-002`의 `contract_binding.
+does_not_carry` ⑦이 이 후속 커밋(`af25a38`)으로 낡았던 것을 curator 가 `6f60c3f`로
+정정했다(⑦ 문면을 인용해 배선된 현재 거동을 적고, 결속 소유는 여전히 runner라고
+못 박음 — D-12와 같은 갈래). 이 레인이 별도로 인계할 항목은 없다.
+
+## 판단이 갈린 지점 — verifier r1 수정 라운드(`1ddbb69`)
+
+**F-3 배선에서 반올림 모드를 누가 정하는가.** `FloorShortfallPolicyData`는
+`criticalRateScale`(자리수)만 갖고 `RoundingMode`는 갖지 않는다 — `OPEN-DIC-10`이
+모드의 legacy 값 자체를 아직 정하지 않았기 때문이다(D-10). 그런데 `RoundingPolicy`는
+자리수와 모드를 함께 요구한다. 선택지: (a) `criticalAssessmentRateFor`(decision
+main)가 `RoundingMode.HALF_UP`을 구조적 관례로 주입한다 (b) `FloorShortfallPolicyData`에
+`mode: RoundingMode` 필드를 추가해 정책이 값을 싣게 한다. **(a) 채택** — (b)는
+`OPEN-DIC-10`이 아직 안 정한 것을 이 slice가 먼저 정하는 셈이라 범위를 넘는다(D-5의
+`trustRatioMax` 슬롯-only 처방과 같은 원칙). (a)는 F-3이 요구하는 "슬롯의 실제
+소비"를 만족시키면서 모드값 자체는 지어내지 않는다 — `HALF_UP`은 반올림 방향
+자체가 어느 쪽이든 결과가 크게 갈리지 않는 범용 규칙이지 legacy 재현 대상 값이
+아니다(1B `resolvedPolicy` test 헬퍼도 같은 값을 기본으로 쓴다). 이 판단은 F-3의
+"단순 소비자 신설"이라는 낮은 심각도에 맞는 범위로 유지했다 — `OPEN-DIC-10` 자체를
+닫지 않는다.
 
 ## acceptance 전건 (`commands.md` 상세)
 
-P-0(격리 worktree `clean check`)·P-1(`--no-build-cache clean check`, **2회** 재검증)·
+P-0(격리 worktree `clean check`)·P-1(`--no-build-cache clean check`, **3회** 재검증)·
 P-2(`:decision:test`)·P-3(`:shared-kernel:test`)·P-4(도메인 게이트 다섯)·P-5
 (`:app:test --tests '*Conformance*'`, authoritative **8** case)·P-6(`qualityBaseline`)·
-P-7(스윕, curator 의 manifest 편집으로 조건 성립 — `mutation_sweep_adversarial.py`
-exit 0, 변이 44→47)·P-8(`:build-logic:test`) 전부 exit 0.
+P-7(스윕 — `mutation_sweep_adversarial.py`·`mutation_sweep_targeted.py`·
+`manifest_contract.py`·`check_legacy_numbers.py`)·P-8(`:build-logic:test`) 전부 exit 0.
+verifier r1 수정 라운드 뒤 P-0·P-1·P-2·P-3·P-4·P-5·P-6·P-7·P-8 전건을 이 순서로
+foreground 재실행했다(commands.md 상세).
 
 ## 완료 판정 — 1D 축
 
