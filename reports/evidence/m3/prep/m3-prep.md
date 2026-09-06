@@ -26,7 +26,7 @@
 
 | slice | 하는 일(요지) | in_scope 후보 | M2 의존 | 정본 |
 | --- | --- | --- | --- | --- |
-| **3A 수집 port 와 canonical fact** | `NoticeSourcePort`·`OpeningResultSourcePort`·`DocumentSourcePort`(도메인 소유 port, ADR 0006 D-3) · 외부 DTO ↔ 도메인 command 분리 · 원문 field·canonical 값·provenance·observed-at 보존 · 공고 식별자 값 객체(번호+제로패딩 차수)·수정 version · **필드 계약 레지스트리**(§5.3, COL-07 — 정책 데이터) · 수집 회계 항등식(COL-06) · provenance first-match **한 지점**(§5.1·§4.3) | `procurement/**`(도메인)·정책 데이터 파일·fixtures `koneps-collection` 승격(curator)·`app` conformance runner dispatch | 없음 | `3a/scope.md`(초안 있음) |
+| **3A 수집 port 와 canonical fact** | `NoticeSourcePort`·`OpeningResultSourcePort`·`DocumentSourcePort`(도메인 소유 port, ADR 0006 D-3) · 외부 DTO ↔ 도메인 command 분리 · 원문 field·canonical 값·provenance·observed-at 보존 · 공고 식별자 값 객체(번호+제로패딩 차수)·수정 version · **필드 계약 레지스트리**(§5.3, COL-07 — 정책 데이터) · 수집 회계 항등식(COL-06) · provenance first-match **한 지점**(§5.1·§4.3) | `procurement/**`(도메인)·정책 데이터 파일·fixtures `koneps-collection` 승격(curator)·`app` conformance runner dispatch·`gate-tests` 등재 | **내용 의존 없음 · 경로 겹침 있음**(`config/quality/gate-tests.properties`·`app/**` 는 2A 가 편집 — 2A 머지 뒤 병합) | `3a/scope.md`(초안 있음) |
 | **3B OpenAPI adapter** | HTTP client(timeout·quota·bounded retry/backoff — Resilience4j, ADR 0005 D-6·D-11) · envelope/resultCode 검증(17 코드 정책 데이터, `OPEN-COL-02` 확정) · pagination·runaway 백스톱·partial·duplicate · parse 실패의 명시적 결과 · contract mock server test | `adapters/src/main/kotlin/bidvector/adapters/koneps/**`·`adapters/src/test/**`·`adapters/build.gradle.kts`(의존) | 없음 — 단 **경로가 M2 2A 와 겹친다**(`adapters/build.gradle.kts`·`adapters/src/test`) → 3B 코드는 2A 머지 뒤 | `3b/scope.md`(초안 있음) |
 | **3C 문서/LLM extraction** | `matches` 통과 뒤에만 · provider/model 주입 · JSON Schema structured result · chunk·예산·timeout·circuit breaker · provenance·schema/model version · 근거 부족은 `Uncertain` · fake LLM server 만 | `adapters/.../extraction/**`·`qualification` 의 `Uncertain` 소비(1C 어휘) | 없음(ML 축 아님) — **LLM provider 결정**(D-M3-6)이 선행 | 착수 시 `3c/scope.md` |
 | **3D persistence adapter** | Flyway `V1__` 부터(ADR 0004 D-4) · Testcontainers PostgreSQL · raw/canonical/audit 스키마 분리(D-5) · 같은 공고 재수집의 멱등 upsert/versioning · 점유 가드 precedence(§5.1 규율 1) · 감사 보존 | `adapters/.../persistence/**`·`adapters/src/main/resources/db/migration/**`·`app` 통합 test | 없음 — M4 4C outbox 가 같은 스키마 소유자(Kotlin 하나, D-3)를 전제 | 착수 시 `3d/scope.md` |
@@ -69,7 +69,8 @@
 - **M3 코드 착수 금지**(M2 계약 승인 선행). 이 문서·3A·3B 계약 초안·조사 노트까지.
 - 금지 경로: M2 in_scope 전부(`contracts/**`·`ml-contract/**`·`ml-engine/**`·`adapters/build.gradle.kts`·`adapters/src/test/**`·`build-logic/**`·
   `config/quality/**`·`settings.gradle.kts`·`gradle/libs.versions.toml`·`milestone-2.md`·`reports/evidence/m2/**`) + `capability-map.md`·`data-dictionary.md`.
-- 착수 순서: 3A(도메인, 경로 무충돌) → 3B(2A 가 `adapters` 편집을 끝낸 뒤) → 3D → 3C.
+- 착수 순서: 3A(도메인 코드는 무충돌 — 조건부 `gate-tests`·`app/**` 는 2A 머지 뒤 병합) → 3B(2A 가 `adapters` 편집을 끝낸 뒤) → 3D → 3C. 착수 시 `base_sha` 는 40자로.
+- **Phase 2.5**: 3A(정책 데이터 분리·불변식·필드 계약 타입)·3D(스키마 precedence)는 설계 검토 대상 — scope 의 위협 모델 절은 검토 입력.
 
 ---
 
@@ -87,5 +88,5 @@
 - **라이브 LLM 경로 없음** — 3C 전부 신설, 유일한 실물인 degrade(근거 없음 → `0.0`)는 **이식 금지**.
 - **`Provenance.Published(noticeRevision: Int)` 가 `R-QUAL-05` 를 재현할 수 있다** — M1 은 값을 주장하지 않아 비껴갔으나 3A 는 차수를 표적조회 필수 입력으로 쓴다 → **D-3A-0 신설(착수 전)**.
 - **`koneps-collection` 9 case 전부 `insufficient-evidence`**, 회계·백오프·rate limit·타임존 case 없음 → **D-M3-8 (a) 확정**: authoritative 승격 + 신설이 3A/3B 선행 작업(curator).
-- **회계 항등식의 셈이 문면과 legacy 에서 다르다** — legacy `dropped_count` 는 중복을 포함, COL-06 문면은 `duplicate` 를 따로 더한다 → 3A ⑦ 은 서로소로 정의하고 문면 정정을 착수 시(`OPEN-3A-ACCOUNTING-IDENTITY`).
+- **회계 항등식의 셈이 legacy 와 문면에서 다르다** — legacy `dropped_count` 는 중복을 포함, COL-06 문면은 `duplicate` 를 따로 더한다(서로소). **V2 는 문면을 그대로 채택**하고 legacy 와의 차이만 계약 주석·property test 로 고정(3A ⑦) — 문면 정정 대상 아님.
 - **일시 출처 타임존 미확정(관측)** — legacy 는 KONEPS 벽시계 문자열을 UTC 로 파싱하는데 원문은 KST 로 보인다(9시간 어긋남 가능, 피해 기록·ledger 등재 없음) → 3A D-3A-4 는 해석 규칙을 정책 데이터로, `OPEN-3A-SOURCE-TZ`.

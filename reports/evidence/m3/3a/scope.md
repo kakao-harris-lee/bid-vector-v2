@@ -1,8 +1,10 @@
 # Slice 계약 — M3 / 3A · 수집 port 와 canonical fact — **초안, 구현 전**
 
 > **지위**: M2 진행 중에 세션 모델이 쓴 **계약 초안**. 구현·gradle·fixture 편집 없음. 착수는 M2 계약 승인 뒤 운영자 지시로 하며 그때
-> `base_sha` 재고정, `prep/m3-prep.md` D-M3-3·4·8 과 아래 D-3A-1~2 답 수령, `milestone-3.md` 착수 문단. 3A 는 **도메인 모듈만**
-> 만지므로 M2 경로와 겹치지 않는다.
+> `base_sha` 재고정(40자), `prep/m3-prep.md` D-M3-3·4·8 과 아래 D-3A-0~2 답 수령, `milestone-3.md` 착수 문단. 3A 의 도메인 코드는 M2 경로와
+> 겹치지 않으나 **조건부 경로 둘(`config/quality/gate-tests.properties`·`app/**`)은 2A 가 편집한 파일이라 2A 머지 뒤 병합**(3B 와 같은 형태).
+> **정책 데이터 분리·회계 항등식 불변식·필드 계약 타입을 세우는 slice 이므로 Phase 2.5 설계 검토 대상**이다 — 아래 「위협 모델」·「우회 후보」
+> 절은 저작 레인이 쓴 **검토 입력**이지 검토 결과가 아니다.
 
 ```yaml
 milestone: m3
@@ -12,10 +14,9 @@ head_sha: 리뷰 시점의 HEAD
 in_scope:
   - procurement/**                                    # 도메인: canonical fact 타입·수집 command·port 인터페이스 셋·식별자 값 객체·필드 계약 레지스트리 타입·수집 회계·provenance 판정 지점·정책 데이터 형태·test
   - procurement/src/main/resources/policy/**          # 정책 데이터 형태만(값은 curator·운영자): 필드 계약 목록 · resultCode 17 범주 · 해석 순서(§5.2)
-  - config/quality/api-type-policy.properties         # 조건부 — 도메인 API 타입 허용 목록에 3A 값 타입 등재 시(게이트 정의 편집, 사유 evidence)
-  - config/quality/gate-tests.properties              # 조건부 — `gate.tests.procurement`
-  - app/src/test/kotlin/bidvector/app/conformance/**   # 조건부 — `koneps-collection` authoritative 가 있을 때 runner dispatch(1B-c~1E 관례)
-  - app/build.gradle.kts                              # 조건부 — testImplementation(project(":procurement")) 한 줄
+  - config/quality/gate-tests.properties              # 조건부 — `gate.tests.procurement` (2A 가 편집한 파일 — **2A 머지 뒤 병합**)
+  - app/src/test/kotlin/bidvector/app/conformance/**   # 조건부 — `koneps-collection` authoritative 가 있을 때 runner dispatch(1B-c~1E 관례). 2A 머지 뒤
+  - app/build.gradle.kts                              # 조건부 — testImplementation(project(":procurement")) 한 줄. 2A 머지 뒤
   - fixtures/manifest.yaml, fixtures/input/**, fixtures/expected/**   # 조건부 — D-M3-8 승격·신설(curator, 기존 기대값 무변경)
   - milestone-3.md                                    # 「Slice 3A」 착수 문단, 착수 시
   - reports/evidence/m3/3a/**
@@ -25,7 +26,9 @@ out_of_scope:
   - 감시·자격·판정 소비                                 # M4 4B
   - 공고 상태 전이표의 실행(§2.2.1)                       # `NoticeStatus` 값·전이 test 는 3A 가 두되 **이벤트를 만드는 use case** 는 4B
   - 브라우저 크롤(COL-09)·mock 데이터(COL-10)·수집 스케줄·lease(OPS-01/02)
-  - M2 경로 일체, capability-map.md·data-dictionary.md 편집
+  - config/quality/api-type-policy.properties         # 허용 목록이 없는 파일(금지 타입 목록뿐) — 새 값 타입에 편집 불요, 편집 = 게이트 완화
+  - decision/** 의 BaseAmountProvenance 판정(first-match 커널) # 1D 소유. 3A 는 부르지도 복제하지도 않는다(⑤) — 두 축의 교차는 M4 workflow
+  - M2 경로 일체, capability-map.md·data-dictionary.md 편집   # 필요한 개정 사실(COL-06 셈·§5.1 차수 타입)은 OPEN 으로 **등재만**, 개정은 별도 문서 slice·운영자 승인
 acceptance_commands:
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # S-0
   - "./gradlew --no-build-cache clean check"                                                          # S-1
@@ -53,19 +56,20 @@ rollback: |
 
 | # | 일 | 승인 문면 |
 | --- | --- | --- |
-| ① | **port 셋** — `NoticeSourcePort`·`OpeningResultSourcePort`·`DocumentSourcePort` 를 `procurement` 안에 **도메인 소유 인터페이스**로. 입력은 조회 조건 값 객체(기준일 = KST 캘린더 일자 타입, 페이지 커서), 출력은 `SourceBatch<Observation>`(원문 항목 + 회계). 어댑터(3B)가 구현 | 3A 「port」 · ADR 0006 D-3 「domain 이 의존하는 port 는 domain 안에」 · COL-01 「KST 기준일」 |
+| ① | **port 셋** — `NoticeSourcePort`·`OpeningResultSourcePort`·`DocumentSourcePort` 를 `procurement` 안에 **도메인 소유 인터페이스**로. 입력은 조회 조건 값 객체(기준일 = KST 캘린더 일자 타입, 페이지 커서), 출력은 `SourceBatch<Observation>`(원문 항목 + 회계). 어댑터(3B)가 구현 | 3A 「port」 · ADR 0006 **D-2** 표(「`procurement` — KONEPS 공고·개찰 canonical facts 와 수집 port」) · ADR 0005 D-10.1 방향 점검(「domain 이 의존하는 port 는 domain 안에 선다」) · COL-01 「KST 기준일」 |
 | ② | **외부 DTO 와 command 의 분리** — `RawNoticeObservation`(원문 키→문자열 값 그대로, `observedAt`, 출처) ↔ `NoticeCollected` command(canonical 값 + provenance). 변환은 **한 함수**(`canonicalize`)이고 원문은 버리지 않는다(감사) | 3A 「외부 DTO 와 domain command 분리」·「원문 field, canonical value, provenance, observed-at 보존」 |
 | ③ | **식별자 값 객체** — `NoticeId(number: NoticeNumber, round: NoticeRound)`. `NoticeRound` 는 **제로패딩 문자열 식별자**(`"000"` 보존, `int` 변환 금지 — R-QUAL-05). 정규화 규칙은 값 객체가 소유(호출부 반복 금지 — COL-05). `source_url` 정규화 불변식(같은 url ⇒ 같은 id)은 property test | COL-01 acceptance 「제로패딩 차수 원문 보존」 · COL-05 「식별자 값 객체가 정규화 규칙을 소유」 · §5.3 「식별자는 숫자가 아니다」 |
-| ④ | **필드 계약 레지스트리(타입 + 정책 데이터)** — `KonepsFieldContract(rawName, concept, basis, scale, unit, nullability, vatTreatment, authoritative, presentIn, provenance, effectiveFrom, expectedRange)`. **등재되지 않은 raw 키는 canonical 값으로 소비될 수 없다**(타입: 소비 함수가 계약을 인자로 요구) — 미지 키는 회계 `unknownFields` 로 계수. `scale`·`basis` 어긋남(fraction 자리에 백분율)은 항목 거부 + 사유 | §5.3 · COL-07 acceptance 둘 · D-M3-3 |
-| ⑤ | **provenance 판정 지점 하나** — 기초금액·추정가격 해석 순서는 정책 데이터(§5.2 「해석 순서는 정책 데이터」, 추정가격 순서에 기초금액 키 없음), `0`·미상 후보는 건너뜀, 결과는 `Provenance`(1B) + `BaseAmountProvenance` 라벨(1D decision 27) 을 **같은 지점**이 낸다. 검증기도 같은 함수를 호출 | §5.1 「KONEPS 수집 경로의 variant 전부를 같은 판정 지점이 낸다」 · §4.3 · §5.2 「해석을 한 지점에」 |
+| ④ | **필드 계약 레지스트리(타입 + 정책 데이터)** — `KonepsFieldContract(rawName, concept, basis, scale, unit, nullability, vatTreatment, authoritative, presentIn, provenance, effectiveFrom, expectedRange)`. **등재되지 않은 raw 키는 canonical 값으로 소비될 수 없다**(타입: 소비 함수가 계약을 인자로 요구) — 미지 키는 회계 `unknownFields` 로 계수. `scale`·`basis` 어긋남(fraction 자리에 백분율)은 항목 거부 + 사유. **`expectedRange` 는 밴드를 재선언하지 않고 단일 출처(밴드 정책 데이터 — DTO 게이트와 판정이 같은 값을 읽는 자리)를 참조**한다 | §5.3(규율 1·**규율 2 「계약이 밴드를 재선언하지 않고 단일 출처를 참조한다」**) · COL-07 acceptance 둘 · D-M3-3 |
+| ⑤ | **`Provenance` 해석 지점 하나(수집 경로 축만)** — 기초금액·추정가격 해석 순서는 정책 데이터(§5.2 「해석 순서는 정책 데이터」, 추정가격 순서에 기초금액 키 없음), `0`·미상 후보는 건너뜀, KONEPS 수집 경로의 `Provenance` variant(`Published`·`DerivedFromOpening`·`FilledFromBudgetKey`·`CopiedFromBaseAmount`·`Undeclared`) 전부를 **한 함수**가 낸다. 검증기도 같은 함수를 호출. **`BaseAmountProvenance` 라벨(판정 축)은 3A 가 내지 않는다** — 판정 커널은 `decision`(1D) 소유이고 `procurement` 는 같은 층의 `decision` 을 볼 수 없다(ADR 0006 D-4 — 공유 가능한 domain 모듈은 `shared-kernel` 뿐). 두 축의 교차(수집 fact → 판정 입력)는 `workflow`(M4 4B)가 조합 | §5.1 「KONEPS 수집 경로의 variant 전부를 같은 판정 지점이 낸다」 · §4.3 · §5.2 「해석을 한 지점에」 · COL-02 경계 「판정은 DEC-08 소유」 · ADR 0006 D-4 · M2 D-M2-10(두 축을 한 enum 에 접지 않는다) |
 | ⑥ | **파생이 원본을 덮지 않는다 — 타입** — `ResolvedBaseAmount = sealed { Direct(Published), FallbackFromBudget(sourceKey), DerivedFromOpening }`. 개찰 행의 `sucsfbidRate`(사정률)는 기초금액을 배출하지 않고 예정가를 **파생 필드 + provenance** 로. 점유 가드(권위값만 덮음)는 3D 의 write 규칙이고 3A 는 **「덮어도 되는가」를 `isAuthoritative` 데이터**로 선언 | COL-02 acceptance 둘 · §5.1 규율 1·2 · §5.2 「자리가 같아야 한다면 타입이 달라야 한다」 · ADR 0004 D-5 |
-| ⑦ | **수집 회계** — `CollectionAccounting(received, normalized, duplicate, dropped, dropReasons, sourceTotal, pagesFetched, truncated, unknownFields)`, **`received = normalized + duplicate + dropped` 항등식은 생성자 불변식**(위반 = 생성 실패). `dropReasons` 는 sealed 코드. 뺄셈 역산·`setdefault` 채움 없음. **주의(조사)**: legacy 의 `dropped_count` 는 중복을 **포함**하므로 COL-06 문면의 항등식은 legacy 와 다른 셈 — V2 는 `duplicate` 와 `dropped` 를 **서로소**로 정의하고(`dropReasons` 에 `Duplicate` 없음) 그 정의를 계약 주석과 property test 로 고정한다. 문면 정정은 착수 시 `capability-map.md` COL-06 에 반영 | COL-06 acceptance 「항등식 위반 시 산출 실패」 · legacy 형태 처리 · 조사 요약(중복 이중 계수) |
+| ⑦ | **수집 회계** — `CollectionAccounting(received, normalized, duplicate, dropped, dropReasons, sourceTotal, pagesFetched, truncated, unknownFields)`, **`received = normalized + duplicate + dropped` 항등식은 생성자 불변식**(위반 = 생성 실패). `dropReasons` 는 sealed 코드. 뺄셈 역산·`setdefault` 채움 없음. **셈의 정의**: COL-06 문면의 항등식은 `duplicate` 와 `dropped` 가 **서로소**인 셈이고 V2 는 그 문면을 그대로 채택한다(`dropReasons` 에 `Duplicate` 없음). legacy 의 `dropped_count` 는 중복을 포함해 **문면과 다르다**(조사) — 정정 대상은 문면이 아니라 legacy 형태이며, 그 차이를 계약 주석과 property test 로 고정한다 | COL-06 acceptance 「항등식 위반 시 산출 실패」 · legacy 형태 처리 · 조사 요약(legacy 중복 계수) |
 | ⑧ | **금액·율·일시 canonical** — 콤마 금액 문자열·백분율 문자열(`"87.995"`)·타임존 없는 일시는 **어댑터가 원문 unit 을 기록하며 변환**하고 3A 는 `Money`(1B)·`Rate`(fraction)·`Instant`+KST 일자 타입만 받는다. 값 크기로 단위 추측 금지(ADR 0002 D-4) — percent/fraction 은 필드 계약의 `scale` 이 정한다 | §4.1 · COL-01 골든 형태 · R-RATE-01 |
 | ⑨ | **`NoticeStatus` 와 전이표(값·거부만)** — `Open·Renoticed·Closed·Awarded·Failed·Cancelled`, 표에 없는 쌍은 거부이며 관측 가능. `isBiddable(notice, now)` 파생 술어. 이벤트를 만드는 use case 는 4B | §2.2.1 · §13.2 「전이표는 명시적 state/event table」 |
 | ⑩ | **corpus** — `koneps-collection` case 를 runner 가 `canonicalize`·회계·식별자 정규화 위에서 대조(입력에 없는 값을 runner 가 만들지 않는다 — 1D 관례). authoritative 수는 D-M3-8 | M3 완료 조건 「fixture 기반 입력 전체가 명세대로 정규화」 |
+| ⑪ | **조회 가치 술어(COL-03 의 도메인 판단)** — `DetailFetchDecision = sealed { Fetch, Skip(reason ∈ { AlreadyHeld, AgeGateNotPassed(until), RecheckGateNotPassed(until) }) }` 를 `procurement` 의 **순수 함수**로: 예비가격이 이미 저장된 공고는 `AlreadyHeld`, 개찰 후 age-gate 미만은 `AgeGateNotPassed`, gate 를 넘긴 뒤는 `Fetch` **정확히 1회**(recheck-gate 가 다음 창을 정함). 값(24h/48h)은 정책 데이터. 3B 는 이 술어의 결과를 **실행**하고 `Skip` 을 회계 `backoffSkipped` 로 계수. 백오프 상태를 데이터 테이블 컬럼에 얹지 않는다(COL-03 legacy 형태 처리 — 상태는 관측 시각에서 파생) | COL-03 경계 「무엇을 언제 조회할 가치가 있는가라는 도메인 판단만 소유」 · acceptance 셋 · 3B ⑧ |
 
-**만들지 않는 것**: HTTP·재시도(3B) · DB write·upsert(3D) · LLM(3C) · 스케줄·lease · 감시/자격 소비 · 마감일시 `or` 폴백 사슬(COL-01 「채택하지 않는다」) ·
-`"미상" = 0.0` 관례(COL-02) · 코드+라벨 한 셀의 도메인 유입(COL-08).
+**만들지 않는 것**: HTTP·재시도(3B) · DB write·upsert(3D) · LLM(3C) · 스케줄·lease · 감시/자격 소비 · **`BaseAmountProvenance` 판정**(`decision` 1D 소유 — 3A 는 `Provenance` 해석까지) ·
+마감일시 `or` 폴백 사슬(COL-01 「채택하지 않는다」) · `"미상" = 0.0` 관례(COL-02) · 코드+라벨 한 셀의 도메인 유입(COL-08) · capability-map·data-dictionary 개정(OPEN 등재만).
 
 ---
 
@@ -73,7 +77,7 @@ rollback: |
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
-| **D-3A-0** | **`Provenance.Published(noticeRevision: Int)` 의 정정** — shared-kernel(1B)의 `Published` 가 차수를 `Int` 로 나른다. M1 은 값을 주장하지 않아 비껴갔지만 3A 는 차수를 표적조회 필수 입력(`bidNtceOrd`, 제로패딩 `"000"`)으로 쓴다 — `Int` 면 `R-QUAL-05`(1차 공고 전부 자격 상실) 재현 경로(조사 요약 11) | (a) **shared-kernel 좁은 확장**(1D D-1 (a) 선례): `Published(noticeRevision: NoticeRound)` 로 타입 교체, `NoticeRound` 는 제로패딩 문자열 값 객체를 shared-kernel 에 신설 (b) 3A 가 `procurement` 안에서 `NoticeRound` 를 두고 `Published` 는 건드리지 않음 — 두 값이 두 자리 (c) `Published(noticeRevision: String)` | **(a)** — 같은 사실이 두 타입으로 있으면(b) 변환 자리에서 `int` 회귀가 되살아난다. (c) 는 정규화 규칙 없는 문자열. **대가**: 승인 산출물(1B) 편집 → 계약 갱신 + 운영자 승인, `data-dictionary.md` §5.1 문면 갱신은 착수 시. 1B 코퍼스의 `Published` 사용 case 는 값 변경 없이 타입만 | 착수 전 |
+| **D-3A-0** | **`Provenance.Published(noticeRevision: Int)` 의 정정** — shared-kernel(1B)의 `Published` 가 차수를 `Int` 로 나른다. M1 은 값을 주장하지 않아 비껴갔지만 3A 는 차수를 표적조회 필수 입력(`bidNtceOrd`, 제로패딩 `"000"`)으로 쓴다 — `Int` 면 `R-QUAL-05`(1차 공고 전부 자격 상실) 재현 경로(조사 요약 11) | (a) **shared-kernel 좁은 확장**(1D D-1 (a) 선례): `Published(noticeRevision: NoticeRound)` 로 타입 교체, `NoticeRound` 는 제로패딩 문자열 값 객체를 shared-kernel 에 신설 (b) 3A 가 `procurement` 안에서 `NoticeRound` 를 두고 `Published` 는 건드리지 않음 — 두 값이 두 자리 (c) `Published(noticeRevision: String)` | **(a)** — 같은 사실이 두 타입으로 있으면(b) 변환 자리에서 `int` 회귀가 되살아난다. (c) 는 정규화 규칙 없는 문자열. **대가**: 승인 산출물(1B) 편집 → 계약 갱신 + 운영자 승인; `data-dictionary.md` §5.1 문면(`Published(noticeRevision)`)의 타입 갱신은 **별도 문서 개정**(3A out_of_scope — 여기서는 `OPEN-3A-NOTICE-ROUND` 로 등재만). 1B 코퍼스의 `Published` 사용 case 는 값 변경 없이 타입만 | 착수 전 |
 | **D-3A-1** | **canonical fact 의 aggregate 경계** — `Notice` 하나에 공고·자격 원문·예비가격·개찰 결과를 다 두는가 | (a) **`Notice`(공고 fact + 상태) · `OpeningResult`(개찰·예비가격·낙찰) · `QualificationText`(자격 원문) 셋을 `NoticeId` 로 묶는 별도 fact** (b) `Notice` 단일 aggregate | **(a)** — 셋은 출처(피드)·시점·수집 실패 단위가 다르고(COL-03 「공고 1건당 별도 호출」, COL-04 「표적조회 서브콜」), 단일 aggregate 면 멤버 30 게이트와 「부분 성공」 표현이 어긋난다. §2.1 aggregate 경계 넷과 대조해 착수 시 확정 | 착수 전 |
 | **D-3A-2** | **정책 데이터 초기값의 출처** — 필드 계약 목록·resultCode 17·해석 순서 | (a) **legacy `field_contract_spec.py`·조달청 참고자료 §에러코드에서 curator 가 추출, `legacy-behavior`/`authoritative`(문서 출처) 층 표기, 운영자 승인** (b) 세션 모델이 직접 기입 | **(a)** — 값은 승인 대상(§5.3 「소비되는 모든 키에 필수」). 3A 는 형태·version 배관만 | 착수 전 |
 | **D-3A-3** | 원문 보존 형태 — `RawNoticeObservation.fields: Map<RawKey, String>`(문자열 그대로)이고 타입 변환은 canonical 쪽에서만. `RawKey` 는 값 객체(문자열 키 dict 의 오타 무시 회귀 — legacy `base.py` 자인) | — | 계약 고정 |
@@ -88,7 +92,7 @@ rollback: |
 **방어한다**: (a) 파생값이 canonical 자리를 덮음(타입 ⑥ + `isAuthoritative` 데이터) (b) 미지 raw 키의 조용한 소비(④ 타입 — 계약 없는 키는 소비 함수에 못 들어간다) (c) 차수의 `int` 변환(③ 타입) (d) 단위 추측(⑧ — 계약 `scale` 없이는 변환 불가) (e) 회계 항등식 파괴(⑦ 생성자 불변식) (f) 상태 전이의 조용한 무시(⑨ 거부 관측) (g) 정책 데이터 리터럴의 main 유입(1C·1D 관례, 코드 리뷰).
 **방어하지 않는다**: 어댑터가 원문을 **정직하게** 옮기는가(3B test) · DB write 의 점유 가드 실행(3D) · 정책 데이터 **내용**(승인) · KONEPS 자체의 필드 변경(④ 는 관측까지) · 스케줄·중복 실행(OPS-01/02).
 
-**우회 후보(≥5)**: (1) `RawKey` 를 문자열로 만들어 계약 없는 키 소비 → 소비 함수 서명이 `KonepsFieldContract` 요구 (2) 회계를 `copy(dropped = …)` 로 조작 → 불변식 재검사(init) (3) `NoticeRound("0")` 와 `"000"` 을 같게 봄 → 값 객체 등가성은 원문 문자열 (4) `ResolvedBaseAmount.Direct` 를 예산 키 값으로 조립 → `Direct` 는 `Provenance.Published` 만 받는 생성자 (5) 전이표 밖 전이를 `copy(status=…)` 로 → `Notice` 상태 변경은 `transition(event)` 하나(1E `internal constructor` 관례) (6) 정책 해석 순서를 코드에 하드코딩 → `domainSourceReferenceGate` 는 못 잡음 — 리뷰 항목·정책 데이터 부재 시 구성 실패.
+**우회 후보(≥5)**: (1) `RawKey` 를 문자열로 만들어 계약 없는 키 소비 → 소비 함수 서명이 `KonepsFieldContract` 요구 (2) 회계를 `copy(dropped = …)` 로 조작 → 불변식 재검사(init) (3) `NoticeRound("0")` 와 `"000"` 을 같게 봄 → 값 객체 등가성은 원문 문자열 (4) `ResolvedBaseAmount.Direct` 를 예산 키 값으로 조립 → `Direct` 는 `Provenance.Published` 만 받는 생성자 (5) 전이표 밖 전이를 `copy(status=…)` 로 → `Notice` 상태 변경은 `transition(event)` 하나(1E 관례 — `@ConsistentCopyVisibility` + `internal constructor` **조합**이 `copy()` 를 닫는다) (6) 정책 해석 순서를 코드에 하드코딩 → `domainSourceReferenceGate` 는 못 잡음 — 리뷰 항목·정책 데이터 부재 시 구성 실패.
 
 ---
 
@@ -113,4 +117,4 @@ rollback: |
 | `OPEN-REG-05` | 기초금액·추정가격 과세 처리 — 3A 는 필드 계약의 `vatTreatment` 슬롯까지, 값은 그 OPEN |
 | 신설 후보 `OPEN-3A-AGGREGATE` | D-3A-1 의 경계와 §2.1 aggregate 넷의 정합 — 착수 시 |
 | 신설 후보 `OPEN-3A-SOURCE-TZ` | KONEPS 일시 문자열의 출처 타임존(조사: legacy 는 UTC 파싱, 원문은 KST 로 보임 — 9시간 어긋남 가능, 운영 피해 기록 없음) — 공식 문서 확인 뒤 정책값 승인. regression-ledger 등재 후보 |
-| 신설 후보 `OPEN-3A-ACCOUNTING-IDENTITY` | COL-06 문면과 legacy 의 중복 계수 차이 — V2 정의(서로소)로 문면 정정, 착수 시 capability-map 반영 |
+| 신설 후보 `OPEN-3A-NOTICE-ROUND` | D-3A-0 채택 시 `data-dictionary.md` §5.1 `Published(noticeRevision)` 타입 문면 개정(별도 문서 slice·운영자 승인) — 3A 는 등재만 |
