@@ -67,6 +67,13 @@ D-2 (a) `OPEN-1BC-STR16` 수령 + 전제 승인 둘(R-BASIS-01 「같은 쌍이 
 **decision 30** · D-4 (a) 결과 어휘 + 이벤트 payload 까지, 전이·상태 기계 없음, `data-dictionary.md` §2.2.6 어휘 자리 = **decision 31**.
 정본: `capability-map.md` STR-01·02·03·16 블록 승인 주석 + §14.2 `OPEN-1BC-STR16` 행 · `data-dictionary.md` §2.2.6.
 
+**역방향 파급(evidence-pack 규격, verifier r1 장부 지적으로 등재 2026-09-06)** — 착수 문서 삽입(capability-map STR-01 +3·STR-16 +5·§14.2
++1, data-dictionary §2.2.6 +24)으로 낡은 좌표: `fixtures/manifest.yaml` 산문의 `capability-map.md:1448`(4362행 부근)·
+`data-dictionary.md:960`(셋)·`:980`(하나) — curator 가 절 제목·인용문으로 정정(기대값·해시 무접촉); 닫힌 slice evidence
+(`reports/evidence/m1/1b/scope.md` 274행 · `m0/0c/commands.md` 223행 · m0 evidence 의 capability-map 좌표 37건)는
+M0 부채 갈래로 등재만(1C·1D checklist 와 같다). STR-16 승인 주석은 처음 「legacy 형태 처리」 bullet 의 이어지는 문단 앞에
+끼어 그 하위 bullet 이 승인 내용처럼 읽혔다(verifier r1 F-4) — bullet 뒤로 옮겼다.
+
 ---
 
 ## 이 slice 가 하는 일
