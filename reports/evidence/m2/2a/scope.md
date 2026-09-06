@@ -39,7 +39,8 @@ out_of_scope:
 acceptance_commands:
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # S-0
   - "./gradlew --no-build-cache clean check"                                                          # S-1 — 기존 게이트 전건 초록 + included build 가 `adapters` 의 test 의존으로 빌드됨
-  - "./gradlew :adapters:moduleDependencyGate && grep -E '^external=.*bidvector:ml-contract' adapters/build/reports/module-dependency-gate/resolved.txt"   # S-1b — 치환 의존이 project 가 아니라 external 로 분류됨(ⓕ 정정의 실측) + 양성 대조: domain 모듈 하나에 같은 의존을 임시 선언하면 `external.allowed.domain` 밖이라 실패
+  - "./gradlew :adapters:moduleDependencyGate && grep -E '^bidvector:ml-contract' adapters/build/reports/module-dependency-gate/resolved.txt && ! grep -E '^projects=.*ml-contract' adapters/build/reports/module-dependency-gate/resolved.txt"   # S-1b — 치환 의존이 external 좌표 줄(`group:name:version` 한 줄씩)에 있고 `projects=` 목록에는 없음(ⓕ 정정의 실측; `external=` 줄은 개수라 앵커로 쓰지 않는다)
+  - "git worktree add --detach <dir> HEAD && (cd <dir> && printf '\\ndependencies { implementation(\"bidvector:ml-contract\") }\\n' >> shared-kernel/build.gradle.kts && ! ./gradlew :shared-kernel:moduleDependencyGate)"   # S-1c — 양성 대조: domain 모듈에 같은 의존을 임시 선언하면 `external.allowed.domain` 밖이라 게이트가 **실패해야** 한다(임시 worktree, 원본 무접촉)
   - "(cd contracts && buf lint && buf build)"                                                          # S-2 — lint·컴파일(네트워크 없이 — buf 1.72.0 로컬 완결)
   - "./gradlew :adapters:test --tests '*ContractRoundTrip*'"                                          # S-3 — included build 생성(build/ 아래) + round-trip
   - "./gradlew --project-dir ml-contract build && ./gradlew --project-dir ml-contract build && git status --porcelain -- ml-contract contracts"   # S-4 — 두 번 빌드해도 VCS 무접촉(빈 출력) — 생성물 비커밋 실측
