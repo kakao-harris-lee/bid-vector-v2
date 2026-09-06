@@ -108,6 +108,26 @@ D-5(새 축이 현 코드를 빨갛게 하면 임계를 만지지 않고 보고)
 - **유효기간은 다루지 않는다** — `v2-지침서.md` §4.2(운영자 결정 2026-08-28 U-7, 문면
   집행 2026-08-29 Q2). **대신 자격 판정 결과에 「유효기간 미검증」이 드러나야 한다**
 
+**착수·구현 2026-09-06** — 계약 정본 `reports/evidence/m1/1c/scope.md`. 착수 전 결정 D-1(`OPEN-DIC-01` ②
+— 면허 축은 자기 축의 versioned policy 를 쓰고 `LicenseVerdict` 가 그 `PolicyVersion` 을 싣는다, decision 23) ·
+Phase 2 가 낸 명세 정정 둘(decision 24 — `satisfiedGroups` 복수·그룹 id `sealed { Numbered, Ungrouped }`,
+표기 `__ungrouped__` · decision 25 — `UncertainReason` 다섯째 값 `PermittedIndustryCombinationRuleUndecided`,
+§3.2.5 임시 처리의 사유). 출력 형태는 위 셋째 항목의 `Ineligible(reasons)` 가 아니라
+`sealed { Eligible(satisfiedGroups), Ineligible(missingByGroup), Uncertain(reason) }` 이며 유효기간은
+`LicenseValidity.NotVerified` 하나로 드러난다. 그룹 접기(U-8)는 그룹 간 OR · 그룹 내 AND · `lmtGrpNo` 결측
+행 = 하나의 AND 그룹, `R-QUAL-06`(`missingByGroup ⊆ required − held`) 은 property 로 잠갔다. corpus runner 는
+`license-*` authoritative 8 을 `check` 안에서 대조한다(1B-c 관례). **위 넷째 항목의 지역 조건은 이 slice 가
+다루지 않았다** — 별칭·포괄 코드만 versioned policy 로 분리했고 지역 판정은 별도 slice 로 이월한다.
+`permsnIndstrytyList`(§3.2.5 임시 처리)는 verifier r1 이 **보유 면허 0 으로도 `Eligible`** 이 나오는 공허 충족
+(허용업종 전용 그룹의 빈 요구 집합)을 잡아 한 라운드 고쳤다 — 지금 규칙은 「실충족 그룹이 있으면 `Eligible`,
+없고 허용업종 전용 그룹이 있으면 `Uncertain(PermittedIndustryCombinationRuleUndecided)`, 그것도 없으면
+`Ineligible`」이고 혼합 그룹은 허용업종 면허 실보유 때만 `Uncertain` 이다(두 읽기 (a)·(b) 가 갈리는 한 칸만
+미결로 남긴다). 이 규칙은 §3.2.5 문면보다 앞서 있어 문면 갱신이 운영자 결정 대기다. `OPEN-QUAL-11` 은 저장소
+corpus 에 관측치가 없어(DB 덤프에 컬럼 부재·goldens 캡처 0) 1C 에서 닫지 못했고 담당을 M3 3B 수집 뒤로
+재조정한다. 도메인 코드가 처음으로 1A-b 게이트에 걸렸고(`sortedBy` 합성 클래스의 stdlib SourceFile →
+`jarContentGate`, `String.lowercase()` 의 `Locale` 참조 → 아키텍처 T-C, detekt 함수 수 상한) 임계를 만지지 않고
+코드 쪽에서 풀었다(1A-b D-5 관례).
+
 ### Slice 1D — Provenance와 Floor Shortfall
 
 - 기초금액 provenance first-match rule과 reason
