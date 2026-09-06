@@ -15,6 +15,7 @@ in_scope:
   - adapters/src/test/kotlin/**                        # consumer test — 상태 전이·idempotency·cancel 의미를 fake servicer 로
   - ml-engine/tests/test_training_contract.py         # provider 쪽 계약 test(전이표 밖 전이 거부·미지 상태 없음)
   - milestone-2.md                                    # 「Slice 2C」 착수 문단, **착수 시**
+  - config/quality/gate-tests.properties              # gate.tests.adapters 에 TrainingContractTest 등재(2B d097fe0 관례 — 구현 착수 후 세션 모델 정정, F-1 재발 방지)
   - reports/evidence/m2/2c/**
 out_of_scope:
   - 학습 실행·아티팩트 생성·evaluation report 의 내용   # M5 5C — 2C 는 참조(uri + checksum)의 형태만
