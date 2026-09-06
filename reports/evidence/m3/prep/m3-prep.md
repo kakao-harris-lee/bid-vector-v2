@@ -47,7 +47,7 @@
 | **D-M3-5** | **서비스 키 3-variant 재시도**(`OPEN-COL-01`)·**rate limit 수치**(`OPEN-COL-05`) | (a) **키 variant 재시도는 채택하지 않고 단일 인코딩**(근거 문서 없음), rate limit 은 정책 데이터에 「보수적 초기값 + 429 관측으로 갱신」 (b) legacy 그대로 | **(a)** — 두 OPEN 다 「외부 문서 선행」인데 문서가 없다. 코드가 자기 근거를 갖지 않는 관용은 옮기지 않는다(§2). 429 는 Resilience4j rate limiter + bounded retry 로 정책값 갱신 근거를 수집한다 |
 | **D-M3-6** | **3C LLM provider 결정**(3C 착수 전건) | (a) **provider 를 port 뒤에 두고 M3 는 fake 만** — 실제 provider 선택은 M6 6C 배치 결정과 함께 (b) 지금 provider 지정 | **(a)** — `milestone-3.md` 「특정 모델 이름을 코드에 고정하지 않는다·테스트는 fake LLM server 만」. 실제 호출은 사용자 승인 사항(agent-workflow §1) |
 | **D-M3-7** | **3D 의 Testcontainers 실행 환경** — 리뷰 레인은 네트워크·소켓 차단(codex-review-gate §4b) | (a) **3D 통합 test 는 verifier 가 로컬에서 실측, Codex 는 코드 slice 비대상(2026-09-04)이라 무관**; CI 는 Docker 가능 러너 확인 후 등재 (b) H2 등 대체 엔진 | **(a)** — ADR 0004 D-1 「대체 엔진 dialect 분기를 만들지 않는다」가 (b) 를 막는다. Docker 부재 시 3D acceptance 는 「환경 미충족」으로 붉게 남긴다(조용한 skip 금지) |
-| **D-M3-8** | **`koneps-collection` fixture 의 authoritative 승격** — 9 case 의 현재 layer 는 조사 (g) | (a) **3A 착수 전 curator 가 `data-extract.md` 절차로 골든(`openapi_notice_collect.json` 등)에서 재추출 + 운영자 승인**(1B-c 선례) (b) 3A 안에서 신설 | 조사 결과에 따름 — authoritative 0 이면 (a), 있으면 그 수 위에서 시작 |
+| **D-M3-8** | **`koneps-collection` fixture 의 authoritative 승격** — 9 case 의 현재 layer 는 조사 (g) | (a) **3A 착수 전 curator 가 `data-extract.md` 절차로 골든(`openapi_notice_collect.json` 등)에서 재추출 + 운영자 승인**(1B-c 선례) (b) 3A 안에서 신설 | **(a) 확정** — 조사 (g): 9 case 전부 `insufficient-evidence`(authoritative 0), 회계·백오프·rate limit·타임존 축 case 없음. 골든(`openapi_notice_collect.json` 등)에서 재추출 + COL-01·05·06·07 acceptance 문면 승인으로 신설 |
 
 ---
 
@@ -73,6 +73,17 @@
 
 ---
 
-## 6. 조사 결과 요약 (`_workspace/m3-prep/01_scout_collection.md` — gitignore)
+## 6. 조사 결과 요약 (`_workspace/m3-prep/01_scout_collection.md` — gitignore, legacy `ed4b06c`, 2026-09-07)
 
-- 대기.
+- **OpenAPI 경로에 재시도·backoff 가 없다** — 401 키 variant 순회만 있고 429·5xx 는 예외로 던져진다 → 3B 의 bounded retry 는 이식이 아니라 **Resilience4j 신설**(D-M3-5 (a) 의 「키 variant 불채택」 근거 보강).
+- **rate limit 의 원인은 총량이 아니라 동시성**이고 429 는 약 2분에 회복된다 → 3B 정책 데이터의 1차 근거는 **동시성 상한 + 회복 대기**(rate limiter 형태), 총량 예산은 2차.
+- **`resultCode` 부재가 `"00"` 으로 굳는 조각**이 잔존 → `R-COL-01` 「부재 = 분류 불가」 — 3B ③ 은 부재를 `Unclassified` 실패로.
+- **페이지네이션에 진행 보장 검사가 없다** — 같은 페이지 반복이 상한 소진으로 조용히 끝남 → `R-COL-04` 신규 요구 = 3B ④ 백스톱(`truncated` 표시).
+- **parse 실패가 전부 `None` → DTO 에서 `0.0`** — 실패·0원·미상이 한 값 → 3B ⑥ 결과 타입·3A ⑥ provenance 가 이 접힘을 타입으로 가른다.
+- **율의 단위를 값 크기로 판별**(`PERCENT_SCALE_THRESHOLD=1.5`) — ADR 0002 D-4 금지 경로 → 3B 는 §5.3 계약의 `unit`/`scale` 선언에서만 읽는다(3A ④·⑧).
+- **raw payload 가 저장되지 않는다**(메모리에만) → 3D 의 raw/canonical 분리는 legacy 선례 없이 ADR 0004 D-5 가 세운다.
+- **점유 가드는 `budget_estimate` 한 축에만** — `base_amount` 는 양수 가드뿐 → 3A ⑥ `isAuthoritative` 데이터 + 3D write 규칙이 전 금액 축에 같은 가드.
+- **배치 전체 한 번 commit, per-item savepoint 없음** → 3D 완료 조건 「반쯤 commit 하지 않음」의 반대 위험(전부 잃음)이 legacy 형태 — 3D 는 항목 단위 원자성과 배치 회계를 분리.
+- **라이브 LLM 경로 없음** — 3C 전부 신설, 유일한 실물인 degrade(근거 없음 → `0.0`)는 **이식 금지**.
+- **`Provenance.Published(noticeRevision: Int)` 가 `R-QUAL-05` 를 재현할 수 있다** — M1 은 값을 주장하지 않아 비껴갔으나 3A 는 차수를 표적조회 필수 입력으로 쓴다 → **D-3A-0 신설(착수 전)**.
+- **`koneps-collection` 9 case 전부 `insufficient-evidence`**, 회계·백오프·rate limit·타임존 case 없음 → **D-M3-8 (a) 확정**: authoritative 승격 + 신설이 3A/3B 선행 작업(curator).
