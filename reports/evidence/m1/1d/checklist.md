@@ -213,6 +213,15 @@ main)가 `RoundingMode.HALF_UP`을 구조적 관례로 주입한다 (b) `FloorSh
 "인용한 선례가 실제로 같은 방향을 가리키는지"를 판단이 갈린 지점에 적을 때
 재확인해야 한다.
 
+## 사용자 승인 — 2026-09-06, slice 1D 종결
+
+verifier r2 `ready-for-review`(head `b837b4c`, 잔여 일괄 `b1d1c17`·`c61d328`, 계약 정정 `41d730b`·`438c938`)
+위에서 **사용자 승인 2026-09-06**. 재작업 1/5(verifier r1 F-1 high — 계약 초안의 서명 오기 기인, decision 17 로
+정정). **D-9 사후 확인 승인** — `Rate.fraction` 공개 읽기 + `Comparable<Rate>`(D-1 (a) 셋 밖 넷째, 생성자 internal
+유지). D-2~D-8·D-10~D-14 사후 확인 포함. 알려진 제한(OPEN-DEC-07 슬롯만 · `observed` 되돌림 미탐 ·
+`FloorUnmeasurableReason`↔`ReasonCode` 다리 없음 · `Measured` 요구 authoritative 부재)은 등재 유지. 혼입
+`bc15983`(병행 세션 스윕 편집, `6974151` 자인)은 선언대로. 다음 slice 1E 착수 지시 같은 날.
+
 ## acceptance 전건 (`commands.md` 상세)
 
 P-0(격리 worktree `clean check`)·P-1(`--no-build-cache clean check`, **3회** 재검증)·
