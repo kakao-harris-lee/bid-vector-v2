@@ -2,6 +2,7 @@ package bidvector.qualification
 
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -188,6 +189,49 @@ class LicenseEligibilityTest {
         val result = judge(rows, declared("토목공사업", "축조업"))
         result.requirementSourceFields shouldBe
             setOf(RequirementSourceField.LcnsLmtNm, RequirementSourceField.PermsnIndstrytyList)
+    }
+
+    /**
+     * verifier r1 F-1·PROBE A — 그룹의 행이 전부 `PermsnIndstrytyList` 면 보유가 전혀
+     * 없어도 예전엔 `restrictedRows` 가 비어 `containsAll(emptySet())` 가 공허하게 참이었다
+     * (공허한 충족). 이제 제한 면허 행이 아예 없는 그룹은 그 자체로 결합 규칙 미결이다 —
+     * 보유 여부와 무관하게 `Uncertain`, 「과추천」(`Eligible`)도 「과차단」(`Ineligible`도
+     * 아니라는 확정)도 아니다.
+     */
+    @Test
+    fun `그룹의 행이 전부 permsnIndstrytyList면 보유가 없어도 공허하게 충족되지 않는다 — PROBE A`() {
+        val rows = listOf(row("1", "1", "축조업", source = RequirementSourceField.PermsnIndstrytyList))
+        val result = judge(rows, declared())
+        result.verdict shouldBe LicenseVerdict.Uncertain(UncertainReason.PermittedIndustryCombinationRuleUndecided)
+    }
+
+    /**
+     * verifier r1 F-1·PROBE D — 그룹 간 OR 이라도 공허하게 충족된 그룹이 다른 그룹의 실제
+     * 미충족을 덮어 공고 전체를 `Eligible` 로 만들면 안 된다. 그룹1(제한 면허, 미보유)·
+     * 그룹2(허용업종 전용)에서 어느 쪽도 `Eligible` 을 내지 않고 전체가 `Uncertain` 이다.
+     */
+    @Test
+    fun `허용업종 전용 그룹이 다른 그룹의 실제 미충족을 Eligible로 덮지 않는다 — PROBE D`() {
+        val rows =
+            listOf(
+                row("1", "1", "토목공사업"),
+                row("2", "1", "축조업", source = RequirementSourceField.PermsnIndstrytyList),
+            )
+        val result = judge(rows, declared())
+        result.verdict shouldBe LicenseVerdict.Uncertain(UncertainReason.PermittedIndustryCombinationRuleUndecided)
+    }
+
+    /** verifier r1 F-2 — 이름을 하나도 못 읽은 행은 `Unparsable` 이어야지 빈 목록 `Parsed` 가 아니다. */
+    @Test
+    fun `licenseNames가 빈 Parsed 행은 구성 시점에 거부된다`() {
+        shouldThrow<IllegalArgumentException> {
+            RequirementRow.Parsed(
+                groupNo = LmtGrpNo("1"),
+                serialNo = LmtSno("1"),
+                sourceField = RequirementSourceField.LcnsLmtNm,
+                licenseNames = emptyList(),
+            )
+        }
     }
 
     /**

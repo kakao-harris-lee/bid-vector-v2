@@ -143,7 +143,7 @@ private fun groupRows(parsedRows: List<RequirementRow.Parsed>): Map<RequirementG
 
 /**
  * 그룹 하나의 평가 — 제한 면허(`LcnsLmtNm`)만으로 충족되는지와, 허용업종(`PermsnIndstrytyList`)
- * 단독 보유로 인해 결합 규칙이 갈리는지(ambiguous)를 함께 낸다(§3.2.5, `OPEN-QUAL-11`).
+ * 결합 규칙이 그룹의 운명을 갈라(ambiguous) `OPEN-QUAL-11` 로 미뤄야 하는지를 함께 낸다.
  */
 private data class GroupEvaluation(
     val id: RequirementGroupId,
@@ -157,6 +157,31 @@ private fun requiredKeys(
     aliasTable: LicenseAliasTable,
 ): Set<LicenseName> = rows.flatMap { it.licenseNames }.map { licenseComparisonKey(it, aliasTable) }.toSet()
 
+/**
+ * verifier r1 F-1 — `restrictedRows` 가 비면 `containsAll(emptySet())` 이 공허하게 참이 되어
+ * 허용업종 전용 그룹이 보유 0으로도 충족된 것처럼 보였다. **제한 면허 행이 실제로 있고 그
+ * 요구를 전부 보유할 때만** 충족으로 센다.
+ */
+private fun restrictedSatisfied(
+    restrictedRows: List<RequirementRow.Parsed>,
+    heldKeys: Set<LicenseName>,
+    aliasTable: LicenseAliasTable,
+): Boolean = restrictedRows.isNotEmpty() && heldKeys.containsAll(requiredKeys(restrictedRows, aliasTable))
+
+/**
+ * verifier r1 재라운드 지침 — 그룹의 행이 **전부** `PermsnIndstrytyList` 면(제한 면허 행이
+ * 하나도 없으면) 그 그룹의 운명 자체가 `OPEN-QUAL-11` (a)/(b) 그 질문이다. 보유 여부와
+ * 무관하게 항상 결합 규칙 미결로 미룬다 — `Ineligible`(reading (b) 확정)·`Eligible`
+ * (reading (a) 확정) 어느 쪽으로도 미결을 확정으로 쓰지 않는다. 제한 면허 행이 하나라도
+ * 섞인 그룹(혼합 그룹)은 이 규칙 밖이다 — 제한 면허만으로 이미 갈릴 수 있고(§3.2.5 운영자
+ * 판정: 제한 면허 충족이 이긴다), 갈리지 않을 때만(제한 미충족 + 허용업종 실제 보유)
+ * 결합 규칙이 문제된다(license-011 대응).
+ */
+private fun isPermsnOnlyGroup(
+    restrictedRows: List<RequirementRow.Parsed>,
+    permsnRows: List<RequirementRow.Parsed>,
+): Boolean = restrictedRows.isEmpty() && permsnRows.isNotEmpty()
+
 private fun evaluateGroup(
     id: RequirementGroupId,
     rows: List<RequirementRow.Parsed>,
@@ -165,16 +190,16 @@ private fun evaluateGroup(
 ): GroupEvaluation {
     val restrictedRows = rows.filter { it.sourceField == RequirementSourceField.LcnsLmtNm }
     val permsnRows = rows.filter { it.sourceField == RequirementSourceField.PermsnIndstrytyList }
-    val restrictedSatisfied = heldKeys.containsAll(requiredKeys(restrictedRows, aliasTable))
+    val restricted = restrictedSatisfied(restrictedRows, heldKeys, aliasTable)
     val permsnSatisfied = permsnRows.isNotEmpty() && heldKeys.containsAll(requiredKeys(permsnRows, aliasTable))
-    val ambiguous = !restrictedSatisfied && permsnSatisfied
+    val ambiguous = !restricted && (isPermsnOnlyGroup(restrictedRows, permsnRows) || permsnSatisfied)
     val missing =
         rows
             .flatMap { it.licenseNames }
             .distinct()
             .filterNot { licenseComparisonKey(it, aliasTable) in heldKeys }
             .toSet()
-    return GroupEvaluation(id, restrictedSatisfied, ambiguous, missing)
+    return GroupEvaluation(id, restricted, ambiguous, missing)
 }
 
 /**

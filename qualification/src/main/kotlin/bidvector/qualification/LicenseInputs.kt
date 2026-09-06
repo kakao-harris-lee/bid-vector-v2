@@ -31,12 +31,24 @@ enum class RequirementSourceField {
  * 하나의 그룹으로 AND 폴딩된다([RequirementGroupId.Ungrouped]).
  */
 sealed interface RequirementRow {
+    /**
+     * `licenseNames` 는 비어 있을 수 없다(verifier r1 F-2) — 이름을 하나도 못 읽었으면
+     * [Unparsable] 을 쓴다(D-3). 빈 목록을 허용하면 그 행의 요구 키 집합이 공집합이 되어
+     * `heldKeys.containsAll(emptySet())` 가 보유 0에서도 참이 되는 공허한 충족을 만든다.
+     */
     data class Parsed(
         val groupNo: LmtGrpNo?,
         val serialNo: LmtSno,
         val sourceField: RequirementSourceField,
         val licenseNames: List<LicenseName>,
-    ) : RequirementRow
+    ) : RequirementRow {
+        init {
+            require(licenseNames.isNotEmpty()) {
+                "RequirementRow.Parsed.licenseNames 는 비어 있을 수 없다(serialNo=$serialNo) — " +
+                    "이름을 못 읽었으면 RequirementRow.Unparsable 을 쓴다"
+            }
+        }
+    }
 
     /** 파싱 실패 표시 — 이름 목록을 지어내지 않는다. [serialNo] 만 원문 추적용으로 남긴다. */
     data class Unparsable(

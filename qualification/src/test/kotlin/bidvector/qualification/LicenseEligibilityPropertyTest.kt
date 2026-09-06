@@ -5,6 +5,7 @@ import bidvector.sharedkernel.PolicyVersion
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.map
@@ -115,6 +116,42 @@ class LicenseEligibilityPropertyTest {
                         version,
                     )
                 result.verdict shouldBe LicenseVerdict.Uncertain(UncertainReason.OperatorLicensesNotDeclared)
+            }
+        }
+    }
+
+    /**
+     * verifier r1 F-1 — 그룹 유형(제한 면허·허용업종 전용·혼합)과 그룹 번호를 임의로 섞어도
+     * 보유가 전혀 없으면 어떤 조합도 `Eligible` 을 내지 않는다. `restrictedRows` 가 빈 그룹의
+     * `containsAll(emptySet())` 공허 참(PROBE A·D)이 회귀하면 이 property 가 잡는다.
+     */
+    @Test
+    fun `보유 면허가 0이면 어떤 요건 조합에서도 Eligible이 나오지 않는다`() {
+        runBlocking {
+            checkAll(
+                Arb.list(licenseNameArb, 1..5),
+                Arb.list(Arb.int(1..3).map(Int::toString), 1..4),
+                Arb.list(Arb.element(RequirementSourceField.entries), 1..5),
+            ) { names, groupNos, sourceFields ->
+                val rows =
+                    names.mapIndexed { index, name ->
+                        RequirementRow.Parsed(
+                            groupNo = LmtGrpNo(groupNos[index % groupNos.size]),
+                            serialNo = LmtSno(index.toString()),
+                            sourceField = sourceFields[index % sourceFields.size],
+                            licenseNames = listOf(LicenseName(name)),
+                        )
+                    }
+                val result =
+                    LicenseEligibility.judge(
+                        RequirementCollection.Collected(rows),
+                        OperatorLicenses.Declared(emptyList()),
+                        emptyPolicy,
+                        version,
+                    )
+                withClue("보유 0인데 Eligible이 나왔다: ${result.verdict}") {
+                    (result.verdict is LicenseVerdict.Eligible) shouldBe false
+                }
             }
         }
     }

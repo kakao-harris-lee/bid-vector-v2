@@ -257,15 +257,38 @@ private val MONEY_BASIS_VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, A
 private val LICENSE_POLICY_DATA =
     (LICENSE_QUALIFICATION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved).value
 
-private fun requirementRowFrom(rowNode: JsonNode): RequirementRow.Parsed {
+/**
+ * verifier r1 F-7 — 물리 행 하나가 `lcnsLmtNm`(항상)과 `permsnIndstrytyList`(선택, 배열)를
+ * 동시에 가질 수 있다(조사 §3 — 동반 필드, 별도 행 아님). 이전 판은 `sourceField` 를
+ * `LcnsLmtNm` 으로 하드코딩해 `permsnIndstrytyList` 를 조용히 무시했다 — 지어내지 않기
+ * 원칙(1B-c 관례) 위반이었다. 이제 실제로 읽어 두 번째 `RequirementRow.Parsed`(같은
+ * `groupNo`, `sourceField=PermsnIndstrytyList`)를 만든다. 배열이 아니거나 빈 배열이면
+ * 이 corpus 가 다루지 않는 형태이니 지어내지 않고 멈춘다.
+ */
+private fun requirementRowsFrom(rowNode: JsonNode): List<RequirementRow.Parsed> {
     val groupNoNode = rowNode.path("lmtGrpNo")
     val groupNo = if (groupNoNode.isMissingNode || groupNoNode.isNull) null else LmtGrpNo(groupNoNode.asString())
-    return RequirementRow.Parsed(
-        groupNo = groupNo,
-        serialNo = LmtSno(rowNode.path("lmtSno").asString()),
-        sourceField = RequirementSourceField.LcnsLmtNm,
-        licenseNames = listOf(LicenseName(rowNode.path("lcnsLmtNm").asString())),
-    )
+    val serialNo = LmtSno(rowNode.path("lmtSno").asString())
+    val restrictedRow =
+        RequirementRow.Parsed(
+            groupNo = groupNo,
+            serialNo = serialNo,
+            sourceField = RequirementSourceField.LcnsLmtNm,
+            licenseNames = listOf(LicenseName(rowNode.path("lcnsLmtNm").asString())),
+        )
+    val permsnNode = rowNode.path("permsnIndstrytyList")
+    if (permsnNode.isMissingNode || permsnNode.isNull) return listOf(restrictedRow)
+    require(permsnNode.isArray) { "permsnIndstrytyList 는 배열이어야 한다 — 이 corpus 가 다루지 않는 형태: $permsnNode" }
+    val permsnNames = permsnNode.values().map { LicenseName(it.asString()) }
+    require(permsnNames.isNotEmpty()) { "permsnIndstrytyList 가 빈 배열이다 — 이 corpus 는 다루지 않는다" }
+    val permsnRow =
+        RequirementRow.Parsed(
+            groupNo = groupNo,
+            serialNo = serialNo,
+            sourceField = RequirementSourceField.PermsnIndstrytyList,
+            licenseNames = permsnNames,
+        )
+    return listOf(restrictedRow, permsnRow)
 }
 
 /** 「행이 없다」(`notice.licenseLimitRows` null)와 「수집이 실패했다」(`notice.collection.status`)는 다른 사유다. */
@@ -277,7 +300,7 @@ private fun requirementCollectionFrom(noticeNode: JsonNode): RequirementCollecti
     return when {
         collectionFailed -> RequirementCollection.CollectionFailed
         rowsNode.isMissingNode || rowsNode.isNull -> RequirementCollection.DataAbsent
-        else -> RequirementCollection.Collected(rowsNode.values().map(::requirementRowFrom))
+        else -> RequirementCollection.Collected(rowsNode.values().flatMap(::requirementRowsFrom))
     }
 }
 
