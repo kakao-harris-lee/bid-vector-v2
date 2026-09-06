@@ -2,6 +2,7 @@ package bidvector.buildlogic
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -46,5 +47,14 @@ class DuplicatePolicyTest {
     @Test
     fun `fail source-sets 는 여러 항목도 받는다`() {
         assertEquals(listOf("main", "test"), policy("fail", failSourceSets = "main, test").failSourceSets)
+    }
+
+    @Test
+    fun `fail source-sets 가 빈 값이면 거부한다`() {
+        // verifier r1 C-2 — 키는 있는데 값이 비면(`fail.source-sets=`) requireList 가
+        // 빈 리스트를 그대로 내 cpdCheck 의 source 와 프레즌스 게이트의 expectedSource 가
+        // 함께 비어 실패가 침묵으로 통과했다. 키 부재뿐 아니라 빈 값도 정책 오류다.
+        val error = assertFailsWith<IllegalArgumentException> { policy("fail", failSourceSets = "").failSourceSets }
+        assertTrue(error.message.orEmpty().contains("fail.source-sets"), "${error.message}")
     }
 }
