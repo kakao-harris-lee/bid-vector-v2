@@ -96,6 +96,16 @@ ML·adapters·procurement에 대한 의존 선언이 없어 "watch rule 판정�
 호출한다"가 `moduleDependencyGate`로 구조적으로 보장된다(`WatchRulesTest`의 STR-01 4번
 test가 값으로도 보조 확인).
 
+## 사용자 승인 — 2026-09-06, slice 1E 종결
+
+verifier r1 `ready-for-review`(head `36c7f0c`, 잔여 일괄 `cda8fef`·`fdfea30`, F-4 `1db3758`, 역방향 파급 등재 `430513a`,
+manifest 좌표 정정 `30826c0`) 위에서 **사용자 승인 2026-09-06**. 재작업 0/5. **D-6 사후 확인 승인**(운영자 예산 한계는
+`BaseAmount`·`OperatorDeclared`·부가세 포함으로만 구성, `UNKNOWN`·`EXCLUSIVE` 한계는 validation 거부 — U-1b) ·
+**ASCII 대소문자 접기 승인**(legacy-behavior 를 업무 규칙으로, decision 32 — `capability-map.md` STR-01 블록 주석).
+D-5·D-7~D-17 사후 확인 포함. 알려진 제한(`OperatorStrategy` internal 생성자의 같은 모듈 우회 · 어댑터 텍스트 조립의
+정직성 · `OPEN-1E-SCORE` · `OPEN-1E-CAPACITY-OWNER`(운영자 지목 필요) · manifest `capability-map.md:164` 둘의 좌표 형태)은
+등재 유지. **같은 승인에서 운영자 지시대로 `origin/main` push**(M1 1A~1E 종결 시점).
+
 ## corpus runner 확장(⑪) — 후속 라운드에서 완료
 
 curator가 `c9022d9`(money-basis-003 승격)·`90948da`(strategy-watch-001~008)·

@@ -428,6 +428,10 @@ pull 모델이 실제로 줄이는 큐 부하는 **투찰가 배치 산출분**�
 - **운영자 승인 2026-09-06(M1/1E 착수, decision 30)**: 위 acceptance 넷을 **업무 규칙으로 명시 승인**한다 —
   M1/1E 가 그 문면에서 `strategy-watch-*` authoritative case 를 신설하는 근거(`source.kind: operator-decision`).
   STR-02·STR-03 의 acceptance 도 같은 결정이 승인했다(`reports/evidence/m1/1e/scope.md` D-3).
+- **운영자 승인 2026-09-06(M1/1E 종결, decision 32)**: 카테고리 완전일치와 키워드·지역 매칭은 **ASCII 대소문자에
+  무관**하다(legacy `strip().lower()` 와 같은 `legacy-behavior`, 한글·비ASCII 무변경) — 위 acceptance 문면이 대소문자를
+  말하지 않아 사후 확인으로 업무 규칙에 올린다. 같은 승인에서 D-6(운영자 예산 한계는 `BaseAmount`·`OperatorDeclared`·
+  부가세 포함으로만 구성, `UNKNOWN`·`EXCLUSIVE` 한계는 validation 거부 — U-1b) 도 확인했다.
 
 ### STR-02 · 키워드 매칭 대상 텍스트 범위 제어 (오탐 차단)
 
