@@ -1,8 +1,10 @@
 # M1/1E — 실행 명령과 종료 코드
 
-base_sha: `2af32f6` · head_sha: `41ed454` (5개 slice 커밋: `0ef1228`·`0d02b9b`·`07450a1`·
-`e3ef928`·`41ed454`, 하네스 레인 변경 없음 — `git log --oneline 2af32f6..HEAD -- CLAUDE.md
-.claude/` 결과 없음).
+base_sha: `2af32f6` · head_sha: `456b982` (6개 slice 커밋: `0ef1228`·`0d02b9b`·`07450a1`·
+`e3ef928`·`41ed454`·`456b982`, 하네스 레인 변경 없음 — `git log --oneline 2af32f6..HEAD --
+CLAUDE.md .claude/` 결과 없음). S-0·S-1의 타임스탬프는 `41ed454` 시점 실측이고, 뒤이은
+`456b982`(변이 실측이 드러낸 test 신설)은 `:strategy:check`·전체 `check` 재실행으로
+회귀 없음을 재확인했다(아래 「변이 실측」 절 뒤 재확인 로그).
 
 ## 2026-09-06T13:11:15Z
 - cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` (S-0)
@@ -55,6 +57,28 @@ S-4(`:app:test --tests '*Conformance*'`)·S-6(mutation_sweep_adversarial.py)는 
 - exit: 1 (grep 매치 없음 = 통과)
 - 육안 확인: 이 slice는 Telegram id·사업자 정보 등 개인식별정보를 다루지 않는다(순수
   도메인 값 타입·predicate 뿐).
+
+## 변이 실측 (구현 레인 mutation sweep, 6건 — 전부 최소 하나의 test/게이트로 잡힘)
+각 변이는 코드를 실제로 바꿔 대상 test를 재실행하고(`:strategy:test --tests
+"bidvector.strategy.WatchRulesTest"` 또는 `:strategy:cpdCheck`) 실패를 확인한 뒤
+원본으로 되돌렸다(작업 트리는 변이 뒤 매번 `git status`로 깨끗함을 재확인).
+
+1. **NoGate → Passed 접기** — `evaluate`의 `isEmpty()` 분기를 `Passed(emptySet())`로
+   바꿈 → `WatchRulesTest` 3건 FAILED(exit 1).
+2. **제외 우선 뒤집기** — 축 평가 순서를 category 먼저로 바꿈 → 기존 test는 안 잡았고
+   (category·exclude 중 하나만 Failed인 입력이라 순서 무관), category 도 실패하고
+   exclude 도 매치하는 새 입력으로 실측해 FAILED 확인 → 그 test를 영구 등재(`456b982`).
+3. **키워드가 FullScopeText 를 봄** — `requiredKeywordOutcome`이 `fullText`를 읽게 바꿈
+   → `WatchRulesTest` 4건 FAILED(exit 1).
+4. **Undeterminable → Rejected 접기** — `combineAxes`에서 `Undeterminable`을 `Rejected`로
+   접음 → `WatchRulesTest` 2건 FAILED(exit 1).
+5. **0 = 무제한 sentinel 재도입** — `singleBoundOutcome`에 `limit`이 0원이면 규칙 없음
+   취급하는 legacy 게이트를 재도입 → `WatchRulesTest` 1건 FAILED(exit 1).
+6. **둘째 validation 경로(D-10 「네 자리 재구현」 재현)** — `buildActionThresholds`의
+   점수·`review<=bidNow` 블록을 복사해 `secondPathReviewCheck` 함수를 신설 →
+   `:strategy:cpdCheck` FAILED(exit 1, "CPD found duplicate code").
+
+재확인: 원본 복구 뒤 `./gradlew check`(전체) exit 0 — 6건 모두 회귀 없이 원상태.
 
 ## rollback 명령 실측 (임시 clone)
 - cmd: 임시 `git clone` 위에서 `git restore --source=2af32f6 --staged --worktree -- <in_scope 경로 18개 개별 인자>`
