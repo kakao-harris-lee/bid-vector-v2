@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+// M2/2A — 오류·결과 봉투 계약. 정본은 `reports/evidence/m2/2a/scope.md` ⑤~⑥과
+// `ADR 0010` D-3(결과 셋과 상태의 분리). 이 파일이 `Unmeasurable`·`ApplicationFailure`·
+// `FailureCode`를 갖는다 — 2A가 이 어휘를 단독 소유하고 2B·2C가 쓴다(D-3 「어휘 소유」).
+//
+// **층 표(ADR 0010 D-3)**:
+//   transport      | gRPC status != OK                              | 재시도는 상태별(D-4)
+//   application    | status OK + oneof result = ApplicationFailure   | `retryable` 필드가 정한다
+//   domain result  | status OK + oneof result = Unmeasurable/Success | 재시도 대상 아님(같은 입력 = 같은 답)
+// 이 세 층을 섞지 않는다 — `FailureCode`는 transport status 이름(`RESOURCE_EXHAUSTED` 등)과
+// 겹치는 값을 두지 않는다. training job 실패 사유는 별도 enum(`JobFailureCode`, 2C 소유).
+package bidvector.ml.v1;
+
+option java_package = "contract.bidvector.ml.v1";
+option java_multiple_files = true;
+
+// domain result 층(ADR 0010 D-3) — **성공한 호출의 정직한 답**이다. transport error로
+// 바꾸지 않고, 다른 predictor의 값 있는 답으로도 접지 않는다(⑥의 제3 변환 금지, 조사 01
+// (c-2) 반례). `UNMEASURABLE_REASON_UNSPECIFIED`는 거부한다(⑥).
+enum UnmeasurableReason {
+  UNMEASURABLE_REASON_UNSPECIFIED = 0;
+  UNMEASURABLE_REASON_INSUFFICIENT_SAMPLES = 1;
+  UNMEASURABLE_REASON_UNTRAINED_SEGMENT = 2;
+  UNMEASURABLE_REASON_FEATURE_ABSENT = 3;
+}
+
+// `Unmeasurable`은 재시도 대상이 아니다(D-3) — 같은 입력은 같은 답. `detail_code`는 사람이
+// 읽는 문장이 아니라 코드다(「만들지 않는 것」).
+message Unmeasurable {
+  UnmeasurableReason reason = 1;
+  string detail_code = 2;
+}
+
+// application failure 어휘 — **2A가 단독 소유**하고 2B·2C가 쓰는 값도 여기 등재한다(D-3
+// 「어휘 소유」). transport status 이름과 겹치지 않는다. `MODEL_NOT_READY`만 `retryable=true`
+// 후보다(ADR 0010 D-4, D-M2-13 (a)) — 나머지는 `false`.
+enum FailureCode {
+  FAILURE_CODE_UNSPECIFIED = 0;
+  FAILURE_CODE_UNSUPPORTED_SCHEMA = 1;
+  FAILURE_CODE_UNSUPPORTED_RELEASE = 2;
+  FAILURE_CODE_UNSUPPORTED_TRAINING_SPEC = 3;
+  FAILURE_CODE_INVALID_REQUEST = 4;
+  FAILURE_CODE_MODEL_NOT_READY = 5;
+  FAILURE_CODE_IDEMPOTENCY_CONFLICT = 6;
+  FAILURE_CODE_JOB_NOT_FOUND = 7;
+}
+
+// application failure 층(ADR 0010 D-3) — status `OK` + 이 메시지. `retryable`은 계약이
+// 정하는 값이지 호출자의 추측이 아니다. `detail_code`는 코드이지 사람이 읽는 문장이 아니다.
+message ApplicationFailure {
+  FailureCode code = 1;
+  bool retryable = 2;
+  string detail_code = 3;
+}

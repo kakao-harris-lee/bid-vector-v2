@@ -1,0 +1,8 @@
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+# breaking 규칙은 2D 의 몫이다(scope.md 「이 slice 가 하는 일」 ⑧ — 필드 번호·reserved 증명은
+# breaking gate 가 낸다). `buf.lock` 은 두지 않는다 — BSR 의존이 없다(scope.md in_scope 주석).
