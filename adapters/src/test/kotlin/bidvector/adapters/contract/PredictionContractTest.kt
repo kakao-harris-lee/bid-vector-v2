@@ -1,7 +1,5 @@
 package bidvector.adapters.contract
 
-import com.google.protobuf.CodedOutputStream
-import com.google.protobuf.Message
 import contract.bidvector.ml.v1.AgencyIdFact
 import contract.bidvector.ml.v1.BaseAmountFact
 import contract.bidvector.ml.v1.BaseAmountProvenanceLabelFact
@@ -29,9 +27,7 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
-import java.io.ByteArrayOutputStream
 import java.math.BigDecimal
-import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -45,23 +41,9 @@ import java.nio.file.Path
  * 문서화하고 고정한다.
  */
 class PredictionContractTest {
-    private val testdataRoot: Path =
-        Path
-            .of(
-                System.getProperty("bidvector.contracts.testdata")
-                    ?: error("시스템 속성 'bidvector.contracts.testdata' 가 없다 — 빌드가 넘긴다"),
-            ).resolve("prediction")
+    private val testdataRoot: Path = contractTestdataRoot("prediction")
 
-    private fun bytes(name: String): ByteArray = Files.readAllBytes(testdataRoot.resolve(name))
-
-    private fun canonicalBytes(message: Message): ByteArray {
-        val buffer = ByteArrayOutputStream()
-        val coded = CodedOutputStream.newInstance(buffer)
-        coded.useDeterministicSerialization()
-        message.writeTo(coded)
-        coded.flush()
-        return buffer.toByteArray()
-    }
+    private fun bytes(name: String): ByteArray = readTestdataBytes(testdataRoot, name)
 
     private val requestBytes = bytes("calculate_optimal_bid_request.binpb")
     private val successBytes = bytes("calculate_optimal_bid_response_success.binpb")

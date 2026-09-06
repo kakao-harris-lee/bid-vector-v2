@@ -1,7 +1,5 @@
 package bidvector.adapters.contract
 
-import com.google.protobuf.CodedOutputStream
-import com.google.protobuf.Message
 import contract.bidvector.ml.v1.AmountProvenanceKind
 import contract.bidvector.ml.v1.ApplicationFailure
 import contract.bidvector.ml.v1.Basis
@@ -18,8 +16,6 @@ import contract.bidvector.ml.v1.UnmeasurableReason
 import contract.bidvector.ml.v1.VatTreatment
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import java.io.ByteArrayOutputStream
-import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -34,23 +30,9 @@ import java.nio.file.Path
  * 않는다(scope.md 「구현 순서」 4). 여기서는 계약이 요구하는 거부 규칙을 test 가 문서화한다.
  */
 class ContractRoundTripTest {
-    private val testdataRoot: Path =
-        Path.of(
-            System.getProperty("bidvector.contracts.testdata")
-                ?: error("시스템 속성 'bidvector.contracts.testdata' 가 없다 — 빌드가 넘긴다"),
-        )
+    private val testdataRoot: Path = contractTestdataRoot()
 
-    private fun bytes(name: String): ByteArray = Files.readAllBytes(testdataRoot.resolve(name))
-
-    /** OPEN-2A-CANONICAL-FORM — protobuf deterministic serialization. */
-    private fun canonicalBytes(message: Message): ByteArray {
-        val buffer = ByteArrayOutputStream()
-        val coded = CodedOutputStream.newInstance(buffer)
-        coded.useDeterministicSerialization()
-        message.writeTo(coded)
-        coded.flush()
-        return buffer.toByteArray()
-    }
+    private fun bytes(name: String): ByteArray = readTestdataBytes(testdataRoot, name)
 
     // ---- ⑦ round-trip: 원본 testdata == parse 후 canonical 재직렬화 ----
 

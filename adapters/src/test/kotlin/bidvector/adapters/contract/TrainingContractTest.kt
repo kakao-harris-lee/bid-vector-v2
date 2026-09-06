@@ -1,7 +1,5 @@
 package bidvector.adapters.contract
 
-import com.google.protobuf.CodedOutputStream
-import com.google.protobuf.Message
 import contract.bidvector.ml.v1.CancelTrainingJobRequest
 import contract.bidvector.ml.v1.CancelTrainingJobResponse
 import contract.bidvector.ml.v1.FailureCode
@@ -12,6 +10,7 @@ import contract.bidvector.ml.v1.JobFailureCode
 import contract.bidvector.ml.v1.JobState
 import contract.bidvector.ml.v1.StartTrainingRequest
 import contract.bidvector.ml.v1.StartTrainingResponse
+import contract.bidvector.ml.v1.TrainingJob
 import contract.bidvector.ml.v1.TrainingJobHandle
 import contract.bidvector.ml.v1.TrainingJobServiceGrpcKt
 import io.grpc.ManagedChannel
@@ -22,8 +21,6 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
-import java.io.ByteArrayOutputStream
-import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -42,23 +39,9 @@ import java.nio.file.Path
  * 실제 Kotlin validation 구현은 M4 몫이고, 여기서는 test가 그 불변식을 문서화·고정한다.
  */
 class TrainingContractTest {
-    private val testdataRoot: Path =
-        Path
-            .of(
-                System.getProperty("bidvector.contracts.testdata")
-                    ?: error("시스템 속성 'bidvector.contracts.testdata' 가 없다 — 빌드가 넘긴다"),
-            ).resolve("training")
+    private val testdataRoot: Path = contractTestdataRoot("training")
 
-    private fun bytes(name: String): ByteArray = Files.readAllBytes(testdataRoot.resolve(name))
-
-    private fun canonicalBytes(message: Message): ByteArray {
-        val buffer = ByteArrayOutputStream()
-        val coded = CodedOutputStream.newInstance(buffer)
-        coded.useDeterministicSerialization()
-        message.writeTo(coded)
-        coded.flush()
-        return buffer.toByteArray()
-    }
+    private fun bytes(name: String): ByteArray = readTestdataBytes(testdataRoot, name)
 
     private val requestBytes = bytes("start_training_request.binpb")
     private val acceptedBytes = bytes("start_training_response_accepted.binpb")
@@ -340,6 +323,20 @@ class TrainingContractTest {
     fun `testdata 의 CANCELLED RUNNING 은 artifact evaluation failure 가 전부 없다`() {
         isValidJobCombination(GetTrainingJobResponse.parseFrom(cancelledBytes).job) shouldBe true
         isValidJobCombination(GetTrainingJobResponse.parseFrom(runningBytes).job) shouldBe true
+    }
+
+    @Test
+    fun `UNSPECIFIED 정의 밖 정수 상태의 job 은 조합 불변식을 위반한다(fail-closed, verifier r1 F-1)`() {
+        val unspecified = TrainingJob.newBuilder().setJobId("job-unspecified").build()
+        val undefinedInt =
+            TrainingJob
+                .newBuilder()
+                .setJobId("job-undefined")
+                .setStateValue(77)
+                .build()
+        undefinedInt.state shouldBe JobState.UNRECOGNIZED
+        isValidJobCombination(unspecified) shouldBe false
+        isValidJobCombination(undefinedInt) shouldBe false
     }
 
     // ---- timestamp 순서(D-2C-5) — accepted_at ≤ started_at ≤ finished_at ----

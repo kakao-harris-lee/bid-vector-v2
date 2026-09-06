@@ -393,6 +393,18 @@ def test_cancelled_and_running_testdata_have_no_artifact_evaluation_failure(trai
     assert _is_valid_job_combination(training_pb2, running.job)
 
 
+def test_unspecified_or_undefined_state_job_violates_combination_invariant(training_pb2):
+    # verifier r1 F-1 — fail-closed 가지(UNSPECIFIED·정의 밖 정수)가 단언되지 않아
+    # `_is_valid_job_combination` 말미 `return False`를 `return True`로 바꿔도 초록이었다.
+    unspecified = training_pb2.TrainingJob()
+    unspecified.job_id = "job-unspecified"
+    undefined = training_pb2.TrainingJob()
+    undefined.job_id = "job-undefined"
+    undefined.state = 77  # proto3 open enum — 정의 밖 정수
+    assert not _is_valid_job_combination(training_pb2, unspecified)
+    assert not _is_valid_job_combination(training_pb2, undefined)
+
+
 # ---- timestamp 순서(D-2C-5) — accepted_at ≤ started_at ≤ finished_at ----
 
 
