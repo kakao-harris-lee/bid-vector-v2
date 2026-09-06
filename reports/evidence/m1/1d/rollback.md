@@ -4,7 +4,8 @@
 신규 경로 삭제. **range revert 금지** — in_scope 경로에만 적용한다.
 
 base_sha: `14495d035a55baaa7ee6618e2857d9096804c686`
-head_sha(이 문서 정본 시점): 이 커밋 자신(`git log -1 -- reports/evidence/m1/1d/` 로 확인).
+head_sha(이 문서 정본 시점): `c501183`(evidence pack 커밋. `git log -1 --format=%H --
+reports/evidence/m1/1d/` 로 확인 — 이 파일 자신의 최종 개정이 있으면 그 값이 갱신된다).
 
 ## 변경 파일 전건 (`git diff --name-status <base>..HEAD`, in_scope 코드·설정 경로만)
 
@@ -84,7 +85,7 @@ git rm -f \
 `AssessmentRate` factory 없음)로 되돌아간다 — 1B 회귀 test(`RateTest.kt`)는 그대로
 base 상태이므로 영향 없다.
 
-## 임시 clone 실측
+## 임시 clone 실측 (head `c501183`, 완료)
 
 ```
 git clone --no-hardlinks /Users/harris/Development/private/bid-vector-v2 /tmp/1d-rollback-check
@@ -93,7 +94,9 @@ cd /tmp/1d-rollback-check
 git status --short
 ```
 
-실측 결과: `git restore`·`git rm` 둘 다 exit 0. `git status --short` 는 위 6개 `M`
-(base 로 복원된 diff)과 나머지 삭제 항목의 `D` 만 보였다 — `docs/discovery/*.md`·
-`milestone-1.md`·`data-extract.md`·`fixtures/tools/*.py`는 그대로 HEAD 상태(무변경).
-clone 은 검증 뒤 삭제, 원본 저장소 무변경.
+실측 결과: `restore exit: 0` · `rm exit: 0`. `git status --short` 는 정확히 위 목록대로
+`M` 6개(`app/build.gradle.kts`·`CorpusExecutors.kt`·`SharedKernelCorpusConformanceTest.kt`·
+`config/quality/gate-tests.properties`·`decision/build.gradle.kts`·`Rate.kt`) +
+`D` 12개(신규 파일 전건)만 나왔다 — `docs/discovery/*.md`·`milestone-1.md`·
+`data-extract.md`·`fixtures/tools/*.py`는 목록에 없어 그대로 HEAD 상태(무변경)임을
+확인했다. clone 은 검증 뒤 `rm -rf` 로 삭제, 원본 저장소 무변경.

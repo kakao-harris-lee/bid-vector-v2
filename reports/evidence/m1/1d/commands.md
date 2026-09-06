@@ -22,6 +22,12 @@
 - `./gradlew :shared-kernel:check` — exit 0.
 - `./gradlew :decision:gateExecutionGate :app:gateExecutionGate` — exit 0(`gate.tests.decision` 신설분 포함).
 
+## rollback 임시 clone 실측
+
+`rollback.md`의 두 명령(`git restore --source=<base> ...`·`git rm -f ...`)을 head
+`c501183`에서 clone한 `/tmp/1d-rollback-check`에서 실제로 실행 — 둘 다 exit 0,
+`git status --short`가 rollback.md 목록과 정확히 일치(M 6·D 12). clone은 검증 뒤 삭제.
+
 ## secret 스캔
 
 `git diff 95585b5^..bc15983 | grep -niE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"`
