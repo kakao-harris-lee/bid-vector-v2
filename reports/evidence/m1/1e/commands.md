@@ -1,10 +1,12 @@
 # M1/1E — 실행 명령과 종료 코드
 
-base_sha: `2af32f6` · head_sha: `456b982` (6개 slice 커밋: `0ef1228`·`0d02b9b`·`07450a1`·
-`e3ef928`·`41ed454`·`456b982`, 하네스 레인 변경 없음 — `git log --oneline 2af32f6..HEAD --
-CLAUDE.md .claude/` 결과 없음). S-0·S-1의 타임스탬프는 `41ed454` 시점 실측이고, 뒤이은
-`456b982`(변이 실측이 드러낸 test 신설)은 `:strategy:check`·전체 `check` 재실행으로
-회귀 없음을 재확인했다(아래 「변이 실측」 절 뒤 재확인 로그).
+base_sha: `2af32f6`. **정정(verifier r1 L-3)**: head_sha가 이 문서 세 곳에서 서로 달라
+실제 리뷰 head 가 어디에도 없었다 — 진행 순서대로 `456b982`(구현 완료, 아래 초기
+절) → `fa1db98`(runner dispatch) → `36c7f0c`(evidence, **verifier r1이 이 head 에서
+ready-for-review 판정**) → 이번 라운드(F-1·F-2·F-3 수정 + 장부 정정, 코드+evidence
+일괄 1커밋)로 이어진다. 최종 head는 이 파일 하단 「verifier r1 finding 반영」 절의
+커밋 SHA다. 하네스 레인 변경은 전 구간 없음(`git log --oneline 2af32f6..HEAD --
+CLAUDE.md .claude/` 결과 없음, r1 재확인 포함).
 
 ## 2026-09-06T13:11:15Z
 - cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` (S-0)
@@ -17,10 +19,15 @@ CLAUDE.md .claude/` 결과 없음). S-0·S-1의 타임스탬프는 `41ed454` 시
 - 핵심 결과: BUILD SUCCESSFUL in 16s, 318 actionable tasks: 293 executed, 25 up-to-date
 
 ## 2026-09-06T13:10:07Z
-- cmd: `./gradlew :strategy:test` (S-2)
+- cmd: `./gradlew :strategy:test` (S-2, 이 시점 head `41ed454`)
 - exit: 0
-- 핵심 결과: strategy 도메인 test 42건(WatchRulesTest 24·StrategyValidationTest 14·
-  CompileFailureHarnessTest 4) 전부 통과, 실패·건너뜀 0
+- 핵심 결과: strategy 도메인 test 43건(WatchRulesTest 25·StrategyValidationTest 14·
+  CompileFailureHarnessTest 4) 전부 통과, 실패·건너뜀 0. **정정(verifier r1 L-4)**:
+  이 문서 이전 판이 "42건(WatchRulesTest 24)"라고 적었으나, 같은 head에서 `456b982`가
+  이미 WatchRulesTest에 test 하나(D-9 동시 실패 우선순위)를 더해 head 시점 실제 합은
+  43(25+14+4)이다 — 명령이 내는 셈을 산문에 옮겨 적어 낡은 사례(evidence-pack 금지
+  항목). 이후 F-1·F-2·F-3 라운드가 test를 더 추가했으므로 최종 건수는 하단
+  「verifier r1 finding 반영」 절의 재실행 결과를 정본으로 한다.
 
 ## 2026-09-06T13:10:08Z
 - cmd: `./gradlew :strategy:domainApiTypeGate :strategy:domainSourceReferenceGate :strategy:typeShapeGate :strategy:sizeGate :strategy:cpdCheck` (S-3)
@@ -162,3 +169,43 @@ conformance runner에 배선한다. 다른 세션의 `7a102cc docs(m2-prep)`가 
   출력에서 세 case 모두 `$.verdict (a') verifies 주장 필드 값 변이 caught`로 캐치됨을
   확인했다 — 기존 `"Rejected":"Accepted"` fallback이 「기대값과 다른 확정 토큰」이라는
   스윕의 요구를 그대로 만족한다(도메인 어휘는 아니지만 값 변이 탐지에는 충분하다).
+
+---
+
+## verifier r1 finding 반영 라운드 (base `36c7f0c`, 코드+test 커밋 `cda8fef`)
+
+verifier r1(`_workspace/m1-1e/02_verifier_report.md`, head `36c7f0c`) = ready-for-review,
+medium 4·장부 5. F-4(capability-map STR-16 주석 위치)는 팀 리드 소유라 이 라운드가
+건드리지 않는다. 아래는 F-1·F-2·F-3(코드) + L-2·L-3·L-4·L-5(장부) 일괄 수정이다.
+
+### 코드 변경
+- **F-1**: `Score.of`를 `internal fun`으로(`Score.kt`). 컴파일 fixture 3
+  (`negative/positive/mutant-3-score-of-*`) + `CompileFailureHarnessTest` test 2개 신설.
+- **F-2**: `WatchRulesTest`에 example 3개(카테고리·키워드 ASCII 대소문자 무관, 한글
+  주변 텍스트 무변화).
+- **F-3**: `WatchRulesTest`에 example 3개(`Exclusive` 하한 경계 탈락·하한 초과 통과·상한
+  `Inclusive` vs `Exclusive` 대비).
+- **L-5**: `WatchTypes.kt` KDoc의 `:65-68` 줄 범위 인용을 축어 인용문으로 교체.
+
+### 변이 재확인 (verifier가 「살아남음」으로 표시한 둘)
+- cmd: `AxisOutcome.kt`의 `foldCase`를 항등 함수로 변이 → `./gradlew :strategy:test --tests bidvector.strategy.WatchRulesTest`
+- exit: 1 — F-2 example 3개 전부 FAILED. 원복 확인(`git status` 빈 결과).
+- cmd: `WatchBudgetAxis.kt`의 `Exclusive` 갈래 부등호 반전(`cmp <= 0`→`cmp > 0`,
+  `cmp >= 0`→`cmp < 0`) → 같은 test 재실행
+- exit: 1 — F-3 example 3개 전부 FAILED. 원복 확인(`git status` 빈 결과).
+
+### acceptance 재실행 (전부 foreground, exit 0만 확인)
+- 2026-09-06T14:21:34Z `./gradlew --no-build-cache clean check`(저장소 루트) — exit 0,
+  BUILD SUCCESSFUL in 14s, 309 tasks: 294 executed, 15 up-to-date.
+- `./gradlew :strategy:test` — exit 0. 도메인 test 51건(WatchRulesTest 31·
+  StrategyValidationTest 14·CompileFailureHarnessTest 6), 실패·건너뜀 0.
+- `./gradlew :app:test --tests '*Conformance*'` — exit 0. `SharedKernelCorpusConformanceTest`
+  41건, 실패·건너뜀 0(F-1~F-3는 app 계약과 무관해 case 수 불변).
+- `python3 fixtures/tools/mutation_sweep_adversarial.py` — exit 0. 강등 대상 0, 잔존
+  authoritative 41(캐치 수는 이 라운드가 스윕 표를 건드리지 않아 116 그대로).
+- `./gradlew :build-logic:test` — exit 0.
+
+### clean-tree 게이트 (이 라운드 in_scope)
+- cmd: `git status --porcelain -- strategy/ reports/evidence/m1/1e/`
+- 커밋 직전 빈 결과 확인(m2-prep 관련 파일들은 다른 세션 소유라 이 게이트 범위 밖 —
+  건드리지 않았다).

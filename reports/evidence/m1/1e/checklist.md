@@ -16,38 +16,68 @@ CLAUDE.md 운영자 지시(2026-09-04)에 따라 코드 slice의 완료 조건�
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — `:strategy:check`(detekt·
       ktlint·아키텍처 게이트·CPD·gateExecutionGate·koverVerify 포함) 및 저장소 전체
       `check` 통과.
-- [x] 변경된 fixture와 정책 version의 근거가 기록됨 — 이번 slice는 fixture를 신설하지
-      않았다(`fixtures/manifest.yaml`·`fixtures/input|expected/**` 무접촉, in_scope 조건
-      미충족). `STRATEGY_POLICY`(`StrategyPolicyData.kt`)의 근거 문자열이 「점수 범위
-      내용 미확정, 형태만」을 명시하고 `budgetBoundInclusivity`만 D-15 결정값(`Inclusive`)임을
-      KDoc에 적었다.
+- [x] 변경된 fixture와 정책 version의 근거가 기록됨 — **정정(verifier r1 L-2)**: 이 항목의
+      이전 판이 "이번 slice는 fixture를 신설하지 않았다"고 적었으나 head 기준 거짓이다 —
+      curator가 `c9022d9`(money-basis-003 승격, decision 29)·`90948da`(strategy-watch-001~008)·
+      `2b04b4b`(strategy-validation-001~003)로 `fixtures/manifest.yaml`을 세 번 편집하고
+      case 12건을 `fixtures/input|expected/**`에 신설했다(authoritative 29→41, 근거는
+      아래 「corpus runner 확장」 절과 `commands.md`). `STRATEGY_POLICY`(`StrategyPolicyData.kt`)의
+      근거 문자열이 「점수 범위 내용 미확정, 형태만」을 명시하고 `budgetBoundInclusivity`만
+      D-15 결정값(`Inclusive`)임을 KDoc에 적었다.
 - [x] 알려진 제한과 rollback 방법이 기록됨 — `rollback.md` 「알려진 제한」 5건, 되돌리는
       명령은 임시 clone에서 실측(exit 0).
 - [x] secret 스캔 통과 — `commands.md` 「secret 스캔」, grep 매치 0. 이 slice는 개인식별
       정보를 다루지 않는다(순수 도메인 값 타입).
 
-## 판단이 갈린 지점 (구현자 판단, verifier 재검토 대상)
+## 판단이 갈린 지점 (구현자 판단, verifier r1 재검토 완료 — 아래 「verifier r1 finding 반영」 참고)
 
 1. **텍스트 매칭 대소문자 접기 채택 여부** — scope.md D-5의 "legacy-behavior로 test
    정책에만"이라는 문면과 "1C의 lowercase() 게이트 회피 선례를 따른다"는 문면이 서로
    당기는 방향이 달랐다. lowercase() 회피 선례를 언급하는 것 자체가 실제로 fold 함수를
    구현함을 전제한다고 읽어 **구현했다**(legacy `strip().lower()` 상당, ASCII만, 1C
    `LicensePolicy.kt`의 `CharArray` 직접 조립 관례). CPD 실측(cpdCheck 통과)으로
-   shared-kernel 승격이 불필요함을 확인했다.
+   shared-kernel 승격이 불필요함을 확인했다. **접기는 legacy-behavior(`strip().lower()`)이고
+   승인 문면(capability-map STR-01·02)은 대소문자를 한 마디도 말하지 않는다 — 운영자
+   사후 확인 대상(Phase 6에 올린다).** verifier r1이 무커버리지를 F-2로 지적해 example
+   test 셋으로 example로 고정했다(아래 참고).
 2. **`Score.of`의 `Fact.Absent` 사유 코드** — D-1이 `Fact<Score>`를 명시하는데 D-16은
    `ReasonCode`를 늘리지 않는다. `POLICY_NOT_APPLICABLE`을 재사용하고 그 값이 `validate`
    내부에서만 소비돼 `StrategyViolation.ScoreOutOfRange`로 번역됨을 근거로 들었다
-   (`Score.kt` KDoc).
+   (`Score.kt` KDoc). verifier r1 F-1이 "밖으로 새지 않는다"가 관례일 뿐 가시성이 아니라고
+   지적해 `Score.of`를 `internal`로 닫았다(아래 참고) — 이제 그 주장이 구조다.
 3. **`StrategyRevision`을 `StrategyDraft`에 넣지 않음** — D-10이 "전부 optional"이라
    적지만 revision은 시스템이 매기는 시퀀스값이라 `validate`의 별도 인자로 뺐다
-   (`StrategyValidation.kt` KDoc).
+   (`StrategyValidation.kt` KDoc). verifier r1이 타당하다고 확인(⑤).
 4. **`BudgetBound`에 `BudgetBoundInclusivity` 필드 신설** — `data-dictionary.md` §1.4.3
    "경계 포함성을 값과 함께 선언한다" 원칙과 D-15 "초기값 Inclusive, 정책 데이터 슬롯"을
-   결합해 새 타입을 만들었다(`WatchTypes.kt`).
+   결합해 새 타입을 만들었다(`WatchTypes.kt`). verifier r1 F-3이 `Exclusive` 분기가
+   무커버리지라고 지적해 example test 셋으로 경계값 반전을 잠갔다(아래 참고).
 5. **D-9 결합에서 동시 매치 exclude 규칙의 보고 범위** — `Rejected.failed`가 우선순위상
    먼저인 규칙 하나만 싣도록 구현했다(`combineAxes`의 `firstOrNull` 단락 평가). D-7의
    "부분집합" 요건은 충족하나 "전체 집합"은 아니다(`rollback.md` 알려진 제한, `WatchRules.kt`
-   KDoc).
+   KDoc). verifier r1이 D-7과 충돌하지 않는다고 확인(집중 표적 ②).
+
+## verifier r1 finding 반영 (medium 3건 — 일괄 수정, 재검증 없음)
+
+- **F-1**(`Score.of`가 public이라 재사용한 `ReasonCode.POLICY_NOT_APPLICABLE`이 호출부에
+  노출될 수 있었다) — `Score.of`를 `internal`로 좁혔다(`Score.kt`). 컴파일 fixture 3
+  신설(`negative-3-score-of-outside-module`·`positive-3-score-range-public`·
+  `mutant-3-score-of-outside-module-typo`) — 모듈 밖 호출은 "cannot access"로 컴파일
+  실패, `ScoreRange`의 공개 API(생성·`contains`)와 이미 만들어진 `MatchScore`의 값 읽기는
+  여전히 컴파일된다. `CompileFailureHarnessTest`에 test 2개 추가.
+- **F-2**(ASCII 대소문자 접기가 전혀 커버되지 않아 항등 함수로 바꿔도 green) —
+  `WatchRulesTest`에 example 셋 추가: 카테고리 완전일치(`Service`≡`service`)·키워드
+  부분문자열(`KEYWORD`≡`keyword`)·한글 주변 텍스트 무변경(`abc`가 한글 사이에서도
+  매칭). `foldCase`를 항등 함수로 바꾸는 변이로 재확인 — 셋 다 FAILED(캐치됨).
+- **F-3**(`BudgetBoundInclusivity.Exclusive` 분기가 dead — 부등호를 뒤집어도 green) —
+  `WatchRulesTest`에 test 정책 인스턴스(`inclusivity = Exclusive`)로 example 셋 추가:
+  하한 경계값 탈락·하한 초과 통과·상한 경계값이 Inclusive(통과)와 Exclusive(탈락)에서
+  갈림. `boundFails`의 `Exclusive` 갈래 부등호를 뒤집는 변이로 재확인 — 셋 다
+  FAILED(캐치됨).
+- **F-4**(capability-map.md STR-16 승인 항목 삽입 위치) — 팀 리드 소유, 이 라운드가
+  건드리지 않았다.
+- **L-5**(`WatchTypes.kt` KDoc의 파일 앵커 없는 줄 범위 `:65-68`) — 인용문
+  ("등호 통과(budget == min 은 통과)")으로 교체했다.
 
 ## 위협 모델 우회 ↔ 방어 대응표 (Phase 2.5 설계 검토 대응)
 
