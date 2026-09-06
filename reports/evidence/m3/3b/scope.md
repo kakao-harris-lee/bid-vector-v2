@@ -84,7 +84,10 @@ rollback: |
 
 ## 조사 결과 — 이 slice 에 영향을 주는 것
 
-- 대기(`_workspace/m3-prep/01_scout_collection.md` (a)·(f)).
+- 조사 (a): **legacy 에 재시도·backoff 없음**(401 키 variant 순회만, 429·5xx 는 예외) → ② 는 이식이 아니라 Resilience4j 신설 · **429 의 원인은 동시성, 회복 약 2분** → 정책 데이터의 1차 축은
+  동시성 상한(rate limiter)·회복 대기, 총량 예산은 2차 · `resultCode` 부재 → `"00"` 잔존(R-COL-01) → ③ 부재 = `Unclassified` 실패 · 진행 보장 검사 없음(R-COL-04) → ④ · parse 실패 `None → 0.0` → ⑥ ·
+  단위 크기 판별(`PERCENT_SCALE_THRESHOLD`) → ⑥ 은 계약 `scale` 만 · 골든 4건 중 3건이 「기초금액 키 없어 예산 키 폴백」 상태(COL-07 관찰) — 표본 편향 주의.
+- 조사 (f): 재사용 — 식별자 canonicalization·`normalize_notice_number` 규칙은 3A 값 객체로(이식 가치), HTTP 라이브러리는 JDK 로 충분(D-M3-1). `OPEN-COL-01/05` 는 3B 를 막지 않음(조사 (h)).
 
 ---
 
