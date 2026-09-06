@@ -243,6 +243,21 @@ private fun shortfallWithoutPolicy(
 }
 
 /**
+ * `$.comparison` 문자열(verifier r1 F-4) — 정책 토큰에서 낸다. 001·003(정책 부재)은
+ * decision 28 초기값(strictly-greater)의 문면을 쓴다 — [shortfallWithoutPolicy]가 실제로는
+ * 두 비교값이 같은 결과임을 이미 확인했으므로 어느 쪽 문구를 써도 값 자체는 어긋나지
+ * 않는다. 이 필드는 계약 타입이 아니다(`does_not_carry` ①) — 사람이 읽는 설명일 뿐이다.
+ */
+private fun comparisonStringFor(policyNode: JsonNode): String {
+    val token = if (policyNode.isMissingNode) "strictly-greater" else policyNode.path("shortfallComparison").asString()
+    return when (token) {
+        "strictly-greater" -> "realizedAssessmentRate > criticalAssessmentRate"
+        "greater-or-equal" -> "realizedAssessmentRate >= criticalAssessmentRate"
+        else -> error("이 corpus 가 다루지 않는 shortfallComparison 토큰: $token")
+    }
+}
+
+/**
  * floor-threshold 실행자(②, D-4 — 표본 하나의 미달 술어). 입력이 정책을 실으면 그것을
  * 읽고(`policy.shortfallComparison`, ft-002), 없으면 정책 독립적 판정으로 대신한다
  * (ft-001·003, [shortfallWithoutPolicy]) — 어느 쪽도 runner 가 값을 지어내지 않는다.
@@ -264,7 +279,7 @@ private fun floorThresholdExecutor(input: JsonNode): Map<String, Any?> {
     return mapOf(
         "criticalAssessmentRate" to mapOf("fraction" to critical.value.rate.fraction),
         "sampleIsShortfall" to sampleIsShortfall,
-        "comparison" to "realizedAssessmentRate > criticalAssessmentRate",
+        "comparison" to comparisonStringFor(policyNode),
     )
 }
 
