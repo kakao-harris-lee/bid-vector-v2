@@ -2,9 +2,6 @@ package bidvector.adapters.contract
 
 import com.google.protobuf.CodedOutputStream
 import com.google.protobuf.Message
-import com.google.protobuf.Timestamp
-import contract.bidvector.ml.v1.ApplicationFailure
-import contract.bidvector.ml.v1.ArtifactReference
 import contract.bidvector.ml.v1.CancelTrainingJobRequest
 import contract.bidvector.ml.v1.CancelTrainingJobResponse
 import contract.bidvector.ml.v1.FailureCode
@@ -15,7 +12,6 @@ import contract.bidvector.ml.v1.JobFailureCode
 import contract.bidvector.ml.v1.JobState
 import contract.bidvector.ml.v1.StartTrainingRequest
 import contract.bidvector.ml.v1.StartTrainingResponse
-import contract.bidvector.ml.v1.TrainingJob
 import contract.bidvector.ml.v1.TrainingJobHandle
 import contract.bidvector.ml.v1.TrainingJobServiceGrpcKt
 import io.grpc.ManagedChannel
@@ -29,23 +25,21 @@ import org.junit.jupiter.api.Test
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.time.Instant
 
 /**
  * M2/2C — `TrainingJobService` 계약 consumer test. Kotlin in-process fake servicer
- * (`FakeTrainingJobServicer`, 아래)가 **실제 상태 기계**(job 저장소 map, idempotency 키
- * 대조)를 갖고 `contracts/testdata/training/`의 canonical 바이트를 답으로 낸다. 실제
- * socket 배선·폴링 주기·취소 존중은 M4·5C 몫이다(scope.md 「만들지 않는 것」).
- *
+ * (`FakeTrainingJobServicer.kt`, 같은 패키지)가 **실제 상태 기계**(job 저장소 map,
+ * idempotency 키 대조)를 갖고 canonical 바이트(`contracts/testdata/training/`)를 답으로
+ * 낸다. 실제 socket 배선·폴링·취소 존중은 M4·5C 몫이다(scope.md 「만들지 않는 것」).
  * **모든 test는 블록 본문(`{ }`)이다** — `= runBlocking { ... shouldBe }`(식 본문)로 쓰면
  * kotest `shouldBe`가 수신자를 반환해 함수의 추론 반환 타입이 `Unit`이 아니게 되고 JUnit
  * Jupiter가 test로 discover하지 않는다(2B `PredictionContractTest`의 실측 버그,
  * `OPEN-2B-TEST-DISCOVERY-GUARD`). 블록 본문은 항상 `Unit`이라 이 함정이 없다.
  *
  * **거부 규칙(전이표·조합 불변식·timestamp 순서·dataset_id 일치·fail-closed enum·checksum
- * 정규형)은 이 test 안의 순수 함수다** — 2A `ContractRoundTripTest`·2B
- * `PredictionContractTest`와 같은 관례. 실제 Kotlin validation 구현은 M4 몫이고, 여기서는
- * test가 계약이 요구하는 불변식을 문서화하고 고정한다.
+ * 정규형)은 `TrainingContractRules.kt`(같은 패키지)의 순수 함수다** — 2A
+ * `ContractFractionRules.kt`와 같은 관례(파일 분리는 v2-지침서.md §5 500줄 한도).
+ * 실제 Kotlin validation 구현은 M4 몫이고, 여기서는 test가 그 불변식을 문서화·고정한다.
  */
 class TrainingContractTest {
     private val testdataRoot: Path =
@@ -502,197 +496,5 @@ class TrainingContractTest {
     @Test
     fun `GetTrainingJobResponse JOB_NOT_FOUND 실패는 canonicalization 후 원본과 바이트가 같다`() {
         canonicalBytes(GetTrainingJobResponse.parseFrom(jobNotFoundBytes)).toList() shouldBe jobNotFoundBytes.toList()
-    }
-
-    // ---- 계약이 요구하는 거부 규칙 — 순수 함수. 실제 Kotlin validation 구현은 M4 몫이고,
-    // 여기서는 test 가 그 규칙을 문서화·고정한다(scope.md 「구현 순서」 4). ----
-
-    private val allowedTransitions =
-        setOf(
-            JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_RUNNING,
-            JobState.JOB_STATE_RUNNING to JobState.JOB_STATE_SUCCEEDED,
-            JobState.JOB_STATE_RUNNING to JobState.JOB_STATE_FAILED,
-            JobState.JOB_STATE_ACCEPTED to JobState.JOB_STATE_CANCELLED,
-            JobState.JOB_STATE_RUNNING to JobState.JOB_STATE_CANCELLED,
-        )
-
-    private fun isAllowedTransition(
-        from: JobState,
-        target: JobState,
-    ): Boolean = (from to target) in allowedTransitions
-
-    private fun isValidJobCombination(job: TrainingJob): Boolean =
-        when (job.state) {
-            JobState.JOB_STATE_SUCCEEDED -> {
-                job.hasArtifact() && job.hasEvaluation() && !job.hasFailure()
-            }
-
-            JobState.JOB_STATE_FAILED -> {
-                job.hasFailure() && !job.hasArtifact() && !job.hasEvaluation()
-            }
-
-            JobState.JOB_STATE_ACCEPTED, JobState.JOB_STATE_RUNNING, JobState.JOB_STATE_CANCELLED -> {
-                !job.hasArtifact() && !job.hasEvaluation() && !job.hasFailure()
-            }
-
-            JobState.JOB_STATE_UNSPECIFIED, JobState.UNRECOGNIZED -> {
-                false
-            }
-        }
-
-    private fun compareTimestamps(
-        left: Timestamp,
-        right: Timestamp,
-    ): Int {
-        val bySeconds = left.seconds.compareTo(right.seconds)
-        return if (bySeconds != 0) bySeconds else left.nanos.compareTo(right.nanos)
-    }
-
-    private fun isValidTimestampOrder(job: TrainingJob): Boolean {
-        val acceptedBeforeStarted = !job.hasStartedAt() || compareTimestamps(job.acceptedAt, job.startedAt) <= 0
-        val acceptedBeforeFinished = !job.hasFinishedAt() || compareTimestamps(job.acceptedAt, job.finishedAt) <= 0
-        val startedBeforeFinished =
-            !job.hasFinishedAt() || !job.hasStartedAt() || compareTimestamps(job.startedAt, job.finishedAt) <= 0
-        return acceptedBeforeStarted && acceptedBeforeFinished && startedBeforeFinished
-    }
-
-    private fun artifactMatchesRequestedDataset(
-        artifact: ArtifactReference,
-        requestedDatasetId: String,
-    ): Boolean = artifact.release.datasetId == requestedDatasetId
-
-    private fun isAcceptableJobState(state: JobState): Boolean =
-        state != JobState.JOB_STATE_UNSPECIFIED && state != JobState.UNRECOGNIZED
-
-    private fun isAcceptableJobFailureCode(code: JobFailureCode): Boolean =
-        code != JobFailureCode.JOB_FAILURE_CODE_UNSPECIFIED && code != JobFailureCode.UNRECOGNIZED
-
-    private val sha256HexPattern = Regex("^[0-9a-f]{64}$")
-
-    private fun isValidSha256Hex(value: String): Boolean = sha256HexPattern.matches(value)
-
-    private fun isValidStartTrainingRequest(request: StartTrainingRequest): Boolean =
-        request.idempotencyKey.isNotBlank() &&
-            request.trainingSpecVersion.isNotBlank() &&
-            request.dataset.uri.isNotBlank() &&
-            request.dataset.datasetId.isNotBlank() &&
-            isValidSha256Hex(request.dataset.manifestChecksum)
-}
-
-/**
- * in-process fake servicer — **실제 상태 기계**를 갖는다(scope.md 「구현 순서」 3). job
- * 저장소(`recordsByJobId`)와 idempotency 대조(`jobIdByIdempotencyKey`)로 같은 키 두 번은
- * 같은 `job_id`를, 다른 dataset 이면 `IDEMPOTENCY_CONFLICT`를 낸다(ADR 0010 D-4). 취소는
- * `ACCEPTED`·`RUNNING`에서만 `CANCELLED`로 전이하고 종료 상태에서는 멱등 no-op이다
- * (scope.md ⑤). 실제 학습 실행·취소 존중은 흉내 내지 않는다 — 이 fake 는 계약의 상태
- * 어휘만 지킨다.
- */
-private class FakeTrainingJobServicer : TrainingJobServiceGrpcKt.TrainingJobServiceCoroutineImplBase() {
-    // D-2C-2 (a) — ml-engine 이 아는 versioned training spec 집합(5C 소유, 이 fake 에서는
-    // testdata 가 쓰는 하나만 안다).
-    private val knownTrainingSpecVersions = setOf("training-spec-2026.3")
-    private val jobIdByIdempotencyKey = mutableMapOf<String, String>()
-    private val recordsByJobId = mutableMapOf<String, TrainingJob>()
-    private val datasetIdByJobId = mutableMapOf<String, String>()
-    private var sequence = 0
-
-    fun jobCount(): Int = recordsByJobId.size
-
-    /** test 전용 — RUNNING 전이를 흉내 내 cancel 이 두 비종료 상태 모두에서 동작함을 검증한다. */
-    fun advanceToRunning(jobId: String) {
-        val current = recordsByJobId.getValue(jobId)
-        val running =
-            current
-                .toBuilder()
-                .setState(JobState.JOB_STATE_RUNNING)
-                .setStartedAt(nowTimestamp())
-                .build()
-        recordsByJobId[jobId] = running
-    }
-
-    override suspend fun startTraining(request: StartTrainingRequest): StartTrainingResponse {
-        if (request.trainingSpecVersion !in knownTrainingSpecVersions) {
-            return failureResponse(FailureCode.FAILURE_CODE_UNSUPPORTED_TRAINING_SPEC)
-        }
-        val existingJobId = jobIdByIdempotencyKey[request.idempotencyKey]
-        return if (existingJobId == null) {
-            acceptNewJob(request)
-        } else if (datasetIdByJobId.getValue(existingJobId) != request.dataset.datasetId) {
-            failureResponse(FailureCode.FAILURE_CODE_IDEMPOTENCY_CONFLICT)
-        } else {
-            val existingJob = recordsByJobId.getValue(existingJobId)
-            StartTrainingResponse
-                .newBuilder()
-                .setHandle(TrainingJobHandle.newBuilder().setJobId(existingJobId).setState(existingJob.state))
-                .build()
-        }
-    }
-
-    private fun acceptNewJob(request: StartTrainingRequest): StartTrainingResponse {
-        val jobId = "fake-job-${sequence++}"
-        val job =
-            TrainingJob
-                .newBuilder()
-                .setJobId(jobId)
-                .setState(JobState.JOB_STATE_ACCEPTED)
-                .setAcceptedAt(nowTimestamp())
-                .build()
-        recordsByJobId[jobId] = job
-        datasetIdByJobId[jobId] = request.dataset.datasetId
-        jobIdByIdempotencyKey[request.idempotencyKey] = jobId
-        return StartTrainingResponse
-            .newBuilder()
-            .setHandle(TrainingJobHandle.newBuilder().setJobId(jobId).setState(JobState.JOB_STATE_ACCEPTED))
-            .build()
-    }
-
-    private fun failureResponse(code: FailureCode): StartTrainingResponse =
-        StartTrainingResponse.newBuilder().setFailure(applicationFailure(code)).build()
-
-    override suspend fun getTrainingJob(request: GetTrainingJobRequest): GetTrainingJobResponse {
-        val job =
-            recordsByJobId[request.jobId]
-                ?: return GetTrainingJobResponse
-                    .newBuilder()
-                    .setFailure(applicationFailure(FailureCode.FAILURE_CODE_JOB_NOT_FOUND))
-                    .build()
-        return GetTrainingJobResponse.newBuilder().setJob(job).build()
-    }
-
-    override suspend fun cancelTrainingJob(request: CancelTrainingJobRequest): CancelTrainingJobResponse {
-        val current =
-            recordsByJobId[request.jobId]
-                ?: return CancelTrainingJobResponse
-                    .newBuilder()
-                    .setFailure(applicationFailure(FailureCode.FAILURE_CODE_JOB_NOT_FOUND))
-                    .build()
-        val next =
-            if (current.state == JobState.JOB_STATE_ACCEPTED || current.state == JobState.JOB_STATE_RUNNING) {
-                current
-                    .toBuilder()
-                    .setState(JobState.JOB_STATE_CANCELLED)
-                    .setFinishedAt(nowTimestamp())
-                    .build()
-            } else {
-                current // 종료 상태 — 멱등 no-op(scope.md ⑤), 새 전이가 아니다.
-            }
-        recordsByJobId[request.jobId] = next
-        return CancelTrainingJobResponse.newBuilder().setJob(next).build()
-    }
-
-    private fun applicationFailure(code: FailureCode): ApplicationFailure =
-        ApplicationFailure
-            .newBuilder()
-            .setCode(code)
-            .setRetryable(false)
-            .build()
-
-    private fun nowTimestamp(): Timestamp {
-        val instant = Instant.now()
-        return Timestamp
-            .newBuilder()
-            .setSeconds(instant.epochSecond)
-            .setNanos(instant.nano)
-            .build()
     }
 }
