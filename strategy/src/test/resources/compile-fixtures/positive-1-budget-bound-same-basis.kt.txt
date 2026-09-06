@@ -1,0 +1,11 @@
+import bidvector.sharedkernel.BaseAmount
+import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.Provenance
+import bidvector.sharedkernel.VatTreatment
+import bidvector.strategy.BudgetBound
+import bidvector.strategy.BudgetBoundInclusivity
+
+fun positiveBudgetBoundSameBasis() {
+    val base = BaseAmount(1_000_000L, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.OperatorDeclared)
+    BudgetBound(base, null, BudgetBoundInclusivity.Inclusive)
+}

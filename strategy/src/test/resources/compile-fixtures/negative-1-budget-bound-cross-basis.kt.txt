@@ -1,0 +1,11 @@
+import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.EstimatedAmount
+import bidvector.sharedkernel.Provenance
+import bidvector.sharedkernel.VatTreatment
+import bidvector.strategy.BudgetBound
+import bidvector.strategy.BudgetBoundInclusivity
+
+fun negativeBudgetBoundCrossBasis() {
+    val estimated = EstimatedAmount(1_000_000L, Currency.KRW, VatTreatment.EXCLUSIVE, Provenance.OperatorDeclared)
+    BudgetBound(estimated, null, BudgetBoundInclusivity.Inclusive)
+}
