@@ -376,6 +376,17 @@ private fun foldedUngrouped(verdict: LicenseVerdict): Boolean =
         is LicenseVerdict.Uncertain -> false
     }
 
+/**
+ * verifier r1 F-6 — `$.expiryEvaluated` 를 runner 리터럴 `false` 가 답하면 그 경로는 계약이
+ * 내는 값을 재지 않는다(1B-c verifier r1 M-1 과 같은 갈래). `LicenseValidity` 를 소진
+ * `when` 으로 소비해서 낸다 — 지금은 `NotVerified` 단일 variant라 값이 같지만, `Verified`
+ * variant 가 생기면 이 `when` 이 컴파일 에러로 먼저 깨져 리터럴이 조용히 낡는 것을 막는다.
+ */
+private fun expiryEvaluated(validity: LicenseValidity): Boolean =
+    when (validity) {
+        LicenseValidity.NotVerified -> false
+    }
+
 private fun licenseJudgementProjection(judgement: LicenseJudgement): Map<String, Any?> {
     val verdict = judgement.verdict
     val projection =
@@ -390,7 +401,7 @@ private fun licenseJudgementProjection(judgement: LicenseJudgement): Map<String,
             "requirementSourceFields" to judgement.requirementSourceFields.map(::requirementSourceFieldName),
             "policyVersion" to judgement.policyVersion.source,
             "licenseValidityUnverified" to (judgement.validity is LicenseValidity.NotVerified),
-            "expiryEvaluated" to false,
+            "expiryEvaluated" to expiryEvaluated(judgement.validity),
             "foldedUngroupedRowsIntoSingleAndGroup" to foldedUngrouped(verdict),
         )
     when (verdict) {
