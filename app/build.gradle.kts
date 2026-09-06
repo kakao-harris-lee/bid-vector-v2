@@ -41,6 +41,9 @@ dependencies {
     // M1/1C — license-* corpus 실행자가 qualification 공개 API(`LicenseEligibility.judge` 등)를
     // 직접 부른다. 같은 이유로 shared-kernel 을 test 전용으로 무는 것과 같은 배선이다.
     testImplementation(project(":qualification"))
+    // M1/1D — base-amount-provenance·floor-shortfall·floor-threshold corpus 실행자가
+    // decision 공개 API(`ProvenanceRules.judge`·`measureFloorShortfall` 등)를 직접 부른다.
+    testImplementation(project(":decision"))
     // manifest.yaml(YAML) 을 읽기 위한 snakeyaml — 카탈로그 좌표는 이미 Boot BOM 관리 하에
     // transitively 해석되던 것을 명시로 올린 것뿐이다(`gradle/libs.versions.toml` 주석 참고).
     testImplementation(libs.snakeyaml)

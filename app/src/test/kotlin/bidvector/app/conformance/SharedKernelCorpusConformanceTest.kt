@@ -118,7 +118,17 @@ class SharedKernelCorpusConformanceTest {
     }
 }
 
-internal val TARGET_DOMAINS = setOf("rate-unit", "money-basis", "license")
+internal val TARGET_DOMAINS =
+    setOf(
+        "rate-unit",
+        "money-basis",
+        "license",
+        // M1/1D — provenance first-match·floor shortfall 커널 둘(scope.md 「이 slice 가
+        // 하는 일」⑩).
+        "base-amount-provenance",
+        "floor-shortfall",
+        "floor-threshold",
+    )
 
 private const val MANIFEST_PROPERTY = "bidvector.fixtures.manifest"
 private const val FIXTURES_ROOT_PROPERTY = "bidvector.fixtures.root"
