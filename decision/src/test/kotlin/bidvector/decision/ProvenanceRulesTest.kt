@@ -141,6 +141,20 @@ class ProvenanceRulesTest {
     }
 
     @Test
+    fun `술어 — clean-integer 는 허용 오차를 벗어나면 매치하지 않는다 — F-2`() {
+        val notClean = ProvenanceRow(BigDecimal("1000000.5"), null, null, null)
+
+        isCleanInteger(notClean, BigDecimal("0.000001")) shouldBe false
+    }
+
+    @Test
+    fun `술어 — clean-integer 는 정확히 허용 오차인 값은 매치하지 않는다 — F-2 경계(미만만 참)`() {
+        val boundary = ProvenanceRow(BigDecimal("1000000.000002"), null, null, null)
+
+        isCleanInteger(boundary, BigDecimal("0.000002")) shouldBe false
+    }
+
+    @Test
     fun `술어 — derived-yega 는 base 곱하기 낙찰률이 낙찰가와 근사할 때만 매치한다`() {
         val row = ProvenanceRow(BigDecimal("1000000"), null, BigDecimal("900000"), Rate.ofFraction(BigDecimal("0.9")))
 
@@ -148,10 +162,38 @@ class ProvenanceRulesTest {
     }
 
     @Test
+    fun `술어 — derived-yega 는 낙찰가가 멀면 매치하지 않는다 — F-2`() {
+        val row = ProvenanceRow(BigDecimal("1000000"), null, BigDecimal("800000"), Rate.ofFraction(BigDecimal("0.9")))
+
+        isDerivedYega(row, BigDecimal.ONE) shouldBe false
+    }
+
+    @Test
+    fun `술어 — derived-yega 는 정확히 허용 오차인 값은 매치하지 않는다 — F-2 경계(미만만 참)`() {
+        val row = ProvenanceRow(BigDecimal("1000000"), null, BigDecimal("899999"), Rate.ofFraction(BigDecimal("0.9")))
+
+        isDerivedYega(row, BigDecimal.ONE) shouldBe false
+    }
+
+    @Test
     fun `술어 — derived-vat 는 base 곱하기 배수가 정수에 근사할 때만 매치한다`() {
         val row = ProvenanceRow(BigDecimal("1000000"), null, null, null)
 
         isDerivedVat(row, BigDecimal("1.1"), BigDecimal("0.01")) shouldBe true
+    }
+
+    @Test
+    fun `술어 — derived-vat 는 배수 곱한 값이 정수에서 멀면 매치하지 않는다 — F-2`() {
+        val row = ProvenanceRow(BigDecimal("1000005"), null, null, null)
+
+        isDerivedVat(row, BigDecimal("1.1"), BigDecimal("0.01")) shouldBe false
+    }
+
+    @Test
+    fun `술어 — derived-vat 는 정확히 허용 오차인 값은 매치하지 않는다 — F-2 경계(미만만 참)`() {
+        val row = ProvenanceRow(BigDecimal("1000000.25"), null, null, null)
+
+        isDerivedVat(row, BigDecimal("2"), BigDecimal("0.5")) shouldBe false
     }
 
     @Test
