@@ -93,6 +93,43 @@
 8. **2A `checklist.md` 알려진 제한 7(결과 봉투 oneof의 첫 실물)은 이 slice가 닫는다** —
    `CalculateOptimalBidResponse.result`가 그 실물이고, `GetModelMetadataResponse`도
    같은 패턴(`metadata`/`failure`)을 따른다(scope.md ⑧ 권고 채택).
+9. **`OPEN-2B-TEST-DISCOVERY-GUARD`(신설, verifier r1 F-4·등재만)** — 식 본문
+   `= runBlocking { … shouldBe }` 함정(Phase 3 자가 수정 사례)을 구조가 막지 않는다.
+   `gate.tests.minimum=1`은 class당 test **개수**만 보므로 27개 중 2개가 discover되지
+   않아도(`tests="25"`) exit 0으로 통과한다 — 구조적 회귀 방지 미충족(v2-지침서.md §5).
+   verifier r1이 K1 변이(두 test를 식 본문으로 되돌림)로 재현: `tests="25"`,
+   `BUILD SUCCESSFUL`, 어떤 게이트도 잡지 않음. 하네스 후보(이 slice가 지금 만들지
+   않는다 — 게이트 정의 편집은 하네스 slice 몫): `@Test` 메서드의 반환 타입이 `Unit`
+   임을 강제하는 ArchUnit 규칙 또는 detekt custom rule.
+
+## verifier r1 반영 — F-2·F-3·F-5·F-6 수정, F-4 등재, F-1 은 team-lead 계약 정정
+
+- **F-2 수정** — `Candidate.origin`이 항상 `RECOMMENDED`임을 양쪽 언어의 순수 술어로
+  잠갔다: Kotlin `candidatesHaveRecommendedOrigin`(`PredictionContractTest.kt`) ·
+  Python `_candidates_have_recommended_origin`(`test_prediction_contract.py`). testdata
+  positive 확인 2건 + `OBSERVED`로 덮어쓴 변이 negative 확인 2건(양쪽 언어 합 4건).
+- **F-3 수정** — 2A `ContractRoundTripTest`의 `isNormalizedFraction`(scale 보존·지수
+  표기 거부)을 신설 파일 `ContractFractionRules.kt`(같은 패키지, 두 test 파일이 공유 —
+  CPD 중복 없음)로 추출하고, `isValidBidRateFraction`의 선행 조건으로 걸었다. Python
+  쪽은 대칭 함수 `_is_normalized_fraction`을 `test_prediction_contract.py`에 신설하고
+  `_is_valid_bid_rate_fraction`의 선행 조건으로 걸었다. 검증 대상: `observed_bid_rate`·
+  `bid_rate`·`award_rate`(Rate 셋) + `Weight.fraction`·`PriceFitness.score`·
+  `Uncertainty.dispersion`·`Uncertainty.estimate_margin`(decimal 넷) — testdata 값
+  전부가 정규형임을 확인하는 test와, `"8.87E-1"`·`"5.2E-1"`(verifier r1 변이 T7 그대로)이
+  거부됨을 확인하는 test를 양쪽에 추가했다.
+- **F-6 수정** — Python `_is_valid_bid_rate_fraction`이 `Decimal("NaN")`을 생성은
+  허용하되 뒤의 범위 비교(`value >= 0`)에서 `InvalidOperation`을 **미포착 예외**로
+  던지던 결함을, `_is_normalized_fraction`이 `is_nan()`/`is_infinite()`를 명시적으로
+  걸러 앞에서 차단하도록 고쳤다. 공백 포함 입력(`" 0.5 "`)은 Python `Decimal`이
+  파싱하지만(Java `BigDecimal`은 예외) 재직렬화 문자열과의 완전 일치 비교가 그 차이를
+  잡는다. `"NaN"`·`" 0.5 "` 두 예제를 Kotlin·Python 양쪽에 대칭으로 추가해 같은
+  거부(`false`)를 확인했다.
+- **F-5 수정** — `rollback.md`의 첫 확인 지점 문면을 정정했다(「빈 출력」은 사실과
+  달랐다 — `git restore --staged --worktree` 뒤에는 staged `D`/`M` 17행이 남는다).
+  임시 clone 재실행으로 17행·`git diff` 빈 출력·`buf lint`/`build` exit 0을 재확인.
+- **F-4는 등재만** — 위 「알려진 제한」 9. 게이트 편집은 하네스 slice 몫이라 이 구현
+  레인이 지금 만들지 않는다(운영자 차단 문턱 — 구조적 방지 미충족은 등재 후 일괄).
+- **F-1은 team-lead가 scope.md를 직접 정정**(`d097fe0`) — 이 구현 레인은 손대지 않았다.
 
 ## 판단이 갈린 지점
 

@@ -36,12 +36,21 @@ pathspec 오류를 지적한 뒤의 정정된 형태).
 
 ## 확인 지점
 
-- `git status --porcelain -- <위 6개 경로>`가 빈 출력.
-- `git diff "$BASE" -- config/quality/gate-tests.properties`가 빈 출력(2A 상태로 완전
-  복귀).
+- **`git status --porcelain -- <위 6개 경로>`는 빈 출력이 아니다**(verifier r1 F-5 —
+  이전 판은 이 자리를 「빈 출력」으로 잘못 적었다). `git restore --staged --worktree`는
+  작업 트리를 base 상태로 되돌리되 그 변경 자체는 staged 상태로 **남는다** — 실제로는
+  신규 파일 17개가 `D`(삭제), `config/quality/gate-tests.properties` 1개가 `M`(수정)으로
+  17행이 찍힌다(임시 clone 실측). 「복원됐다」의 확인은 이 명령이 빈 것이 아니라 **아래
+  두 가지**로 한다.
+- `git diff "$BASE" -- config/quality/gate-tests.properties`가 빈 출력(작업 트리 내용이
+  2A 상태와 완전히 같다 — staged 표시와 무관하게 파일 바이트 자체는 base와 동일하다는
+  뜻).
 - `(cd contracts && buf lint && buf build)`가 exit 0(2A 상태 — `service` 없는 계약으로
   정상 복귀, `BidPredictionService`가 사라져도 `common.proto`·`error.proto`만으로 계약이
   자족한다).
+- (선택) 완전히 커밋까지 마치려면 `git add -A`(이 좁은 6경로 범위에서만, 트리 전체에
+  쓰지 않는다) 후 커밋 — 그러면 `git status --porcelain`이 빈 출력이 된다. 이 evidence의
+  범위는 「작업 트리 복원」까지이고 커밋 여부는 운영자 결정.
 
 ## 예상 복구 시간
 

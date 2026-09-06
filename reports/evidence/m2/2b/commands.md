@@ -145,3 +145,43 @@ testdata) · `fd98ccf`(test_prediction_contract.py) · `2ce838b`(ktlint/detekt �
   `ml-engine/tests/test_prediction_contract.py` 삭제, `config/quality/gate-tests.properties`
   는 2A 상태로 복원(`git diff <base>`가 빈 출력). 롤백 뒤 `(cd contracts && buf lint && buf build)`
   통과(2A 상태로 정상 복귀 — `service` 없는 계약).
+
+## verifier r1 잔여 반영(F-2·F-3·F-5·F-6, F-4 등재) — 한 커밋 일괄
+
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0(322 tasks, ktlint/detekt 위반 0 — 이번 편집분은 처음부터 형식 통과)
+- cmd: `(cd contracts && buf lint && buf build)`
+- exit: 0(proto 무편집 — F-2·F-3·F-6은 test 전용 수정)
+- cmd: `./gradlew --no-build-cache :adapters:cleanTest :adapters:test --tests '*Prediction*Contract*' --tests '*ContractRoundTrip*'`
+- exit: 0 — `PredictionContractTest tests="34"`(27 + F-2 2건 + F-3 4건 + F-6 2건 — 소계
+  8건 중 F-3은 4건: 지수 거부 1·Rate 셋 정규형 1·decimal 넷 정규형 1·NaN/공백은 F-6에 셈)
+  `ContractRoundTripTest tests="23"`(불변, `isNormalizedFraction`을 `ContractFractionRules.kt`
+  공유 함수로 추출만 — 동작 변경 없음).
+- cmd: `(cd ml-engine && .venv/bin/python -m pytest tests/test_prediction_contract.py tests/test_contract_roundtrip.py -q)`
+- exit: 0 — 44 passed(신규 35 = 28 + F-2 2 + F-3 3 + F-6 2, `test_contract_roundtrip.py` 9 불변).
+- **F-2 변이 재현**: `candidatesHaveRecommendedOrigin`/`_candidates_have_recommended_origin`에
+  후보 하나의 `origin`을 `BID_RATE_ORIGIN_OBSERVED`로 덮어쓴 사본을 넣으면 `false`
+  (verifier r1 T2 그대로) — 수정 전에는 이 술어 자체가 없어 T2가 초록이었다.
+- **F-3 변이 재현**: `isNormalizedFraction`/`_is_normalized_fraction("8.87E-1")`
+  `("5.2E-1")`이 `false`(verifier r1 T7 그대로) — 수정 전 `isValidBidRateFraction`은
+  범위(`≤1`)만 봐서 이 값들을 통과시켰다.
+- **F-6 변이 재현**: `isValidBidRateFraction`/`_is_valid_bid_rate_fraction("NaN")`과
+  `(" 0.5 ")`이 양쪽 다 `false`(예외 없이) — 수정 전 Python은 `"NaN"`에서
+  `InvalidOperation` 미포착 예외, `" 0.5 "`에서 `true`(Kotlin은 `false`)로 갈렸었다.
+- **F-5 재확인**: `rollback.md`의 명령을 새 임시 clone에서 재실행 — `git status
+  --porcelain -- <6경로>` **17행**(정정된 문면과 일치, 이전 판은 "빈 출력"으로 오기),
+  `git diff <base> -- config/quality/gate-tests.properties` 빈 출력, `buf lint && buf
+  build` exit 0.
+- **F-1**: team-lead가 `d097fe0`(scope.md in_scope에 `config/quality/gate-tests.properties`
+  추가)로 직접 정정 — 이 커밋에 포함하지 않는다.
+- **F-4**: 등재만(checklist.md 「알려진 제한」 9, `OPEN-2B-TEST-DISCOVERY-GUARD`) — 게이트
+  편집 없음, 코드 변경 없음.
+
+## secret 스캔(r1 반영분)
+
+- cmd: `grep -lniE '(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))' adapters/src/test/kotlin/bidvector/adapters/contract/ContractFractionRules.kt adapters/src/test/kotlin/bidvector/adapters/contract/ContractRoundTripTest.kt adapters/src/test/kotlin/bidvector/adapters/contract/PredictionContractTest.kt ml-engine/tests/test_prediction_contract.py reports/evidence/m2/2b/rollback.md`
+- exit: 1(매치 없음 — 코드·rollback.md만, 판독 규칙 적용 범위)
+- 참고: 같은 패턴을 `commands.md`·`checklist.md` 자신에 돌리면 grep 패턴 문자열을
+  인용하는 자리(이 절 제목·secret 스캔 통과 체크 항목)에서 2건 매치한다 — 실제 secret
+  아님(2A CLAUDE.md 이력의 developer-구간 오탐과 같은 판독 규칙, 자기 문서가 자기 grep
+  명령을 인용하면 상시 발생).
