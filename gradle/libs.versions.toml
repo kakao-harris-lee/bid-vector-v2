@@ -23,6 +23,17 @@ resilience4j = "2.4.0"
 pitest-plugin = "1.19.0"
 pitest = "1.30.0"
 
+# M2/2A — gRPC/Protobuf 내부 계약(ADR 0003·0006 D-8). 버전 근거는
+# `_workspace/m2-prep/02_grpc_stack_compat.md`(curl 로 Maven Central/PyPI 메타데이터 직접 실측).
+# `ml-contract/` included build 전용 — 어느 domain 모듈에도 적용하지 않는다
+# (`architecture-policy.properties` `group.forbidden=io.grpc,com.google.protobuf`).
+grpc-kotlin = "1.5.0"
+# grpc-kotlin-stub:1.5.0 의 POM 은 grpc-stub:1.62.2 를 선언한다(22 마이너 차) — grpc-bom 이
+# io.grpc:* 좌표를 이 버전으로 강제 정렬한다. §4b 스모크가 이 정렬의 컴파일·런타임을 확인한다.
+grpc-java = "1.84.0"
+protobuf-runtime = "3.25.9"
+protobuf-gradle-plugin = "0.10.0"
+
 [libraries]
 # build-logic 이 convention plugin 안에서 plugin id 로 적용하려면 marker 아티팩트가 필요하다.
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -84,6 +95,19 @@ resilience4j-retry = { module = "io.github.resilience4j:resilience4j-retry", ver
 # 적용 slice 는 pitestVersion 을 반드시 명시해야 한다.
 pitest-engine = { module = "org.pitest:pitest", version.ref = "pitest" }
 
+# M2/2A — `ml-contract/` included build 전용 좌표. 기존 `grpc-api`·`protobuf-java`(버전 없음,
+# app 위반 fixture 전용)와 별개 alias 다 — 저 둘은 Boot BOM 이 관리하는 다른 자리라 여기서
+# 버전을 얹으면 그 용도가 깨진다.
+grpc-kotlin-stub = { module = "io.grpc:grpc-kotlin-stub", version.ref = "grpc-kotlin" }
+grpc-protoc-gen-grpc-kotlin = { module = "io.grpc:protoc-gen-grpc-kotlin", version.ref = "grpc-kotlin" }
+grpc-bom = { module = "io.grpc:grpc-bom", version.ref = "grpc-java" }
+grpc-stub = { module = "io.grpc:grpc-stub" }
+grpc-protobuf = { module = "io.grpc:grpc-protobuf" }
+grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded" }
+grpc-testing = { module = "io.grpc:grpc-testing" }
+protobuf-java-runtime = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf-runtime" }
+protobuf-protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf-runtime" }
+
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
@@ -91,3 +115,4 @@ detekt = { id = "dev.detekt", version.ref = "detekt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint-gradle" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 pitest = { id = "info.solidsoft.pitest", version.ref = "pitest-plugin" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-gradle-plugin" }
