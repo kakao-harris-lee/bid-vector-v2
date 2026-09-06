@@ -136,6 +136,20 @@ corpus 에 관측치가 없어(DB 덤프에 컬럼 부재·goldens 캡처 0) 1C 
 - 최소 표본 미달의 `Unmeasurable`
 - 빈도를 실제 확률로 표현하지 않는 output contract
 
+**착수 2026-09-06** — 계약 정본 `reports/evidence/m1/1d/scope.md`. 모듈은 `decision`(DEC-04·DEC-08 소유, ADR 0006).
+착수 전 운영자 결정 셋: **D-1 (a)** — 1B 가 `AssessmentRate`·`BidRate` 생성자를 닫아(파생 경로만) 임계 사정률·추천
+투찰율 입력·관측 사정률 재구성의 공개 경로가 없었으므로 shared-kernel 에 이름 있는 factory 둘과 율 ÷ 율 파생 함수
+하나를 1D in_scope 로 연다(1B 가 「M2/M5 가 열어야 한다」고 적은 한계를 1D 가 닫는다; 조사가 드러낸 `Rate.fraction`
+`internal` 읽기 막힘은 D-9 로 공개 읽기 + `Comparable` — 사후 확인). **decision 27** — `OPEN-DIC-05` 해소: 승인 라벨
+다섯 불변, `suspect-fractional` 은 1B `Money` 경계 거부로 흡수, 미판정은 판정 레코드의 부재(커널 값 아님)이고 `Unknown`
+은 규칙 무매치. **decision 28** — 경계 등가(실현 사정률 = 임계)는 미달이 아니다(`strictly-greater`)를 정책 version 1
+값으로 승인, `floor-threshold-002` 복귀 근거. 커널은 둘이고 층은 셋이다 — provenance 는 정책 데이터가 정한 순서·부분집합의
+first-match(술어 넷은 정책값 주입, 값은 main 에 없음 — `OPEN-DEC-07`), floor 는 표본 단건 술어 → 집계(tally) → 측정으로
+나눠 corpus 입력이 가진 층에서 실행한다(runner 가 표본을 지어내지 않는다). `FloorShortfall` 은 §3.3 서명 그대로의 1D
+소유 sealed(`FloorUnmeasurableReason` 은 `ReasonCode` 와 다른 축), 빈도는 유리수만(십진 렌더링은 `OPEN-DIC-10`).
+복구 추정치는 입력으로 받아 별도 필드에 보존만 한다(15개 예가 range 중점 규칙은 예가 수집과 함께). 표본 수집·오염
+필터·미판정 저장 상태는 M3 소관으로 커널 밖이다.
+
 ### Slice 1E — Strategy와 상태
 
 - 저비용 `OperatorStrategy.matches` 순수 predicate
