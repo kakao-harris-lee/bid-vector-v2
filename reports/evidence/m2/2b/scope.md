@@ -13,8 +13,6 @@ in_scope:
   - contracts/proto/bidvector/ml/v1/prediction.proto  # BidPredictionService { CalculateOptimalBid, GetModelMetadata } + 요청·응답 메시지
   - contracts/proto/bidvector/ml/v1/features.proto    # FeatureInputs(feature_schema_version 아래의 이름 붙은 입력 fact, 각 fact 는 oneof { value, MissingReason })
   - contracts/testdata/prediction/**                  # round-trip·fake servicer 표본(canonical 바이트 + 사람이 읽는 JSON 원본)
-  - ml-contract/**                                    # 재생성 결과(생성물만)
-  - ml-engine/src/ml_engine/contracts/**              # 재생성 결과
   - adapters/src/test/kotlin/**                        # 생성 stub 위의 consumer test — Kotlin in-process fake servicer 대상(실제 client 배선은 M4)
   - ml-engine/tests/test_prediction_contract.py       # provider 쪽 계약 test — fake servicer 가 계약 규칙(fail-closed·oneof)을 지키는지
   - milestone-2.md                                    # 「Slice 2B」 착수 문단, **착수 시**
@@ -27,6 +25,7 @@ out_of_scope:
   - 경쟁 표본의 정제 규칙                               # 어느 행을 버리는가는 Kotlin 어댑터(M4)·ml-engine(M5) 각자의 소유. 계약은 표본의 형태만
   - 자격 라벨·Platt P(낙찰)                            # OPEN-ML-02 — 받지 않는다(D-M2-8)
   - 실제 client(4D)·실제 servicer(5E)·breaking gate 증명(2D)
+  - ml-contract/**, ml-engine/src/ml_engine/contracts/**   # 생성물은 VCS 밖(2A D-2A-0 (c)) — 변경이 나올 수 없는 경로라 in_scope 아님
   - shared-kernel/**, 도메인 모듈, fixtures/**
 acceptance_commands:
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # S-0

@@ -3,8 +3,9 @@
 > **지위**: M1/1E 병행 중에 세션 모델이 쓴 **계약 초안**이다. 구현·gradle·의존성 추가·fixture 편집은 하지 않았다.
 > 착수는 M1 전체 승인 뒤 운영자 별도 지시로 하며, 그때 `base_sha` 를 재고정하고 `prep/m2-prep.md` 「착수 전 결정」
 > D-M2-1~14 와 아래 D-2A-0·7 의 답을 받고 **`ADR 0010` 을 승인**(2A 착수 전건 — ④·⑥ 이 그 D-1·D-3 위에 선다)한 뒤
-> `milestone-2.md` 착수 문단을 쓴다. **빌드 경계(included build 신설)와 게이트 증명 자리(2D)를 여는 slice 이므로 Phase 2.5
-> 설계 검토 대상**이다(1A·1A-b 와 같은 급).
+> `milestone-2.md` 착수 문단을 쓴다. **빌드 경계(included build 신설)를 열고 게이트 정의 한 파일(`ResolvedDependencies` 의 의존
+> 분류 한 분기)을 정정하는 slice 이므로 Phase 2.5 설계 검토 대상**이다(1A·1A-b 와 같은 급). 게이트 정의 편집은 그 한 분기와
+> 게이트 등재(`gate-tests` 한 줄)뿐이고 층·convention·`architecture-policy` 편집은 없다.
 
 ```yaml
 milestone: m2
@@ -17,15 +18,16 @@ in_scope:
   - contracts/buf.yaml                                # lint 규칙(proto3, enum UNSPECIFIED=0, 패키지 `bidvector.ml.v1`, `option java_package` 규칙). `buf.lock` 은 BSR 의존이 없으면 생기지 않는다 — 두지 않는다
   - ml-contract/settings.gradle.kts, ml-contract/build.gradle.kts, ml-contract/gradle.properties   # D-2A-0 (c) — **included build**(`build-logic` 과 같은 형태). proto srcDir 는 `../contracts/proto` 를 **srcDir 참조**로(symlink 금지 — `SourceLanguageGate` 가 링크를 따라간다). `src/` 디렉터리 없음
   - settings.gradle.kts                               # `includeBuild("ml-contract")` 한 줄 — `include(...)` 목록(subprojects)에는 넣지 않는다
-  - gradle/libs.versions.toml                         # grpc/protobuf/protoc/grpc-kotlin 버전 리터럴 고정(조사 노트 02) — included build 도 같은 카탈로그를 읽는다(`build-logic` 선례)
+  - gradle/libs.versions.toml                         # grpc/protobuf/protoc/grpc-kotlin 버전 리터럴 고정(조사 노트 02). included build 는 루트 카탈로그를 자동으로 보지 못하므로 `ml-contract/settings.gradle.kts` 가 `build-logic` 과 같은 `versionCatalogs { from(files("../gradle/libs.versions.toml")) }` 블록을 갖는다
   - adapters/build.gradle.kts                         # `testImplementation("bidvector:ml-contract")` 한 줄(included build 치환 — round-trip test 가 생성 stub 을 본다). main 의존은 M4 4D
+  - build-logic/src/main/kotlin/bidvector/buildlogic/ResolvedDependencies.kt   # **게이트 정의 정정 한 분기** — `resolveDependencies` 가 `ProjectComponentIdentifier` 를 전부 `projectPaths` 로 접어 composite 치환 의존(`bidvector:ml-contract`)이 project 의존으로 분류된다(리뷰 r3 ⓕ). 다른 빌드의 project 는 `externalModules`(`group:name`)로 분류하도록 build 신원을 본다 — 예외가 아니라 분류의 정정. Phase 2.5
   - config/quality/gate-tests.properties              # `gate.tests.adapters` — 2A round-trip test 등재(키는 모듈 이름 규약)
   - ml-engine/pyproject.toml, ml-engine/tests/conftest.py(생성 fixture), ml-engine/tests/test_contract_roundtrip.py   # D-M2-3 (a) — 최소 골격. Python 생성물도 VCS 밖(pytest 가 grpc_tools.protoc 로 임시 생성)
   - adapters/src/test/kotlin/**                        # round-trip test(Kotlin 쪽) — 계약 타입 ↔ 도메인 타입 매핑은 **M4**, 여기서는 wire ↔ wire 만. 손으로 쓰는 test 는 전부 여기
   - milestone-2.md                                    # 「Slice 2A」 착수 문단, **착수 시**
   - reports/evidence/m2/2a/**
 out_of_scope:
-  - build-logic/**, config/quality/architecture-policy.properties   # D-2A-0 (c) 로 **게이트 정의 편집 없음** — 층 신설 없음, convention 편집 없음. 착수 시 실측이 편집을 요구하면 멈추고 계약 갱신
+  - build-logic/** (위 `ResolvedDependencies.kt` 한 분기 제외), config/quality/architecture-policy.properties   # 층 신설 없음, convention 편집 없음, 정책 키 편집 없음. 착수 시 실측이 그 밖의 편집을 요구하면 멈추고 계약 갱신
   - app/src/test/kotlin/bidvector/app/architecture/**  # ArchUnit 등식은 `bidvector` 루트만 세고 생성 패키지 루트는 그 밖(D-2A-0b) — 편집 불요
   - shared-kernel/**, decision/**, qualification/**, strategy/**, procurement/**, settlement/**, workflow/**   # 도메인은 계약 타입을 보지 못한다(ADR 0006 D-6)
   - adapters/src/main/**                              # 도메인 ↔ 계약 매핑·client 배선은 M4 4D
@@ -36,7 +38,8 @@ out_of_scope:
   - fixtures/**                                       # 2A 의 round-trip 표본은 `contracts/testdata/` 의 canonical 바이트 — fixture corpus 와 별개 축
 acceptance_commands:
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # S-0
-  - "./gradlew --no-build-cache clean check"                                                          # S-1 — 기존 게이트 전건 초록(게이트 정의 무편집) + included build 가 `adapters` 의 test 의존으로 빌드됨
+  - "./gradlew --no-build-cache clean check"                                                          # S-1 — 기존 게이트 전건 초록 + included build 가 `adapters` 의 test 의존으로 빌드됨
+  - "./gradlew :adapters:moduleDependencyGate && grep -E '^external=.*bidvector:ml-contract' adapters/build/reports/module-dependency-gate/resolved.txt"   # S-1b — 치환 의존이 project 가 아니라 external 로 분류됨(ⓕ 정정의 실측) + 양성 대조: domain 모듈 하나에 같은 의존을 임시 선언하면 `external.allowed.domain` 밖이라 실패
   - "(cd contracts && buf lint && buf build)"                                                          # S-2 — lint·컴파일(네트워크 없이 — buf 1.72.0 로컬 완결)
   - "./gradlew :adapters:test --tests '*ContractRoundTrip*'"                                          # S-3 — included build 생성(build/ 아래) + round-trip
   - "./gradlew --project-dir ml-contract build && ./gradlew --project-dir ml-contract build && git status --porcelain -- ml-contract contracts"   # S-4 — 두 번 빌드해도 VCS 무접촉(빈 출력) — 생성물 비커밋 실측
@@ -76,7 +79,7 @@ subproject 형태 자체가 원인이라 **included build** 로 재설계(D-2A-0
 | ⑧ | **lint** — buf lint 표준 규칙 + 패키지 `bidvector.ml.v1` + **`option java_package = "contract.bidvector.ml.v1"`**(D-2A-0b — Java 패키지 루트를 `bidvector` **밖**에 둔다) + 필드 번호·`reserved` 규칙은 2D 의 breaking gate 가 증명 | 「설계 규칙」 필드 번호·`reserved` · 1A `package.allowed.subtree=bidvector`(T-A) |
 
 **만들지 않는 것**: 피처 벡터 메시지(2B) · training job(2C) · breaking mutation 증명·fake servicer·무소스 단언 게이트화(2D) · 도메인 ↔ 계약 매핑(M4)
-· Python 쪽 validation 구현(5E — 2A 는 규칙을 계약 주석과 test 로만) · 사람이 읽는 오류 문장(`detail_code` 는 코드) · 생성물의 VCS 등재 · 게이트 정의 편집.
+· Python 쪽 validation 구현(5E — 2A 는 규칙을 계약 주석과 test 로만) · 사람이 읽는 오류 문장(`detail_code` 는 코드) · 생성물의 VCS 등재 · 층·convention·정책 키 편집(게이트 정의 편집은 `ResolvedDependencies` 분류 정정 한 분기, 게이트 등재는 `gate-tests` 한 줄뿐).
 
 ---
 
@@ -84,7 +87,7 @@ subproject 형태 자체가 원인이라 **included build** 로 재설계(D-2A-0
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
-| **D-2A-0** | **생성 코드가 1A 게이트 가족과 공존하는 방식.** 게이트 가족(리뷰 r1·r2 실측)은 subproject 에 대해 ⓐ `ConventionCoverageGate` — 모든 `subprojects` 가 convention 을 적용해야 함 ⓑ `SourceLanguageGate` — `src/` 의 확장자 `kt`·`kts`·`md` 만(디렉터리 symlink 도 따라감) ⓒ `SourceSetLayoutGate` — `main.java` srcDirs 가 비어야 하고 `main.kotlin` 이 `src/main/kotlin` 과 정확히 같아야 하며, source set 파일 집합과 컴파일 입력이 디스크 `src/main/kotlin` walk 와 등식 ⓓ `PackageOwnershipGate.foreignOrigin`·`JarContentGate` — class 의 `SourceFile` 이 `sourceSets["main"].kotlin` 안이어야 함 ⓔ `module.expected-source-sets=main,test`. **어떤 형태로든 subproject 안에서 생성물을 컴파일하면 ⓒ·ⓓ 가 깨진다** — 생성 디렉터리가 `src/` 밖일수록 ⓒ 의 등식은 더 확실히 깨진다 | (a) subproject + 생성물 `build/generated/`(r1 채택안) (b) subproject + 생성물 커밋 + 게이트 예외 셋 (c) **included build** — `ml-contract/` 를 `includeBuild` 로 두고(`build-logic` 선례, `include(...)` 목록 밖) `adapters` 가 `"bidvector:ml-contract"` 로 의존. convention 미적용(ⓐ 는 `subprojects` 만 대조), `src/` 없음(ⓑ·ⓒ·ⓓ·ⓔ 대상 아님) | **(c)** — (a) 는 ⓒ 두 단언·ⓓ 둘에 걸려 예외가 넷 필요하고, (b) 는 ⓑ·ⓔ·java srcDirs 예외 셋 — 둘 다 「게이트 예외 위에 게이트를 세우는」 형태라 같은 근거로 기각. (c) 는 **게이트 정의 편집 0**, 층 신설 0(N-1 소멸). **대가와 방어**: ① 게이트 밖 빌드가 하나 생긴다 — 그 내용물이 빌드 스크립트뿐임을 S-5 가 실측하고 2D 가 게이트로 올린다(`OPEN-2A-INCLUDED-BUILD`); ② `adapters` 의 의존이 project 가 아니라 외부 모듈 형태 — `ModuleDependencyPolicy` 의 외부 의존 검사는 **domain 층에만** 걸리므로(`mainExternalViolations`·`groupViolations` 가 `isDomain` 아니면 빈 목록, 리뷰 r2 실측) adapters 는 무편집 통과, domain 은 `bidvector:ml-contract` 를 선언하는 순간 `external.allowed.domain` 밖이라 실패(구조); ③ included build 의 protoc·플러그인은 Maven 아티팩트라 RO 의존 캐시가 덮는다 — 착수 시 §4b 스모크 | 착수 전 · Phase 2.5 |
+| **D-2A-0** | **생성 코드가 1A 게이트 가족과 공존하는 방식.** 게이트 가족(리뷰 r1·r2 실측)은 subproject 에 대해 ⓐ `ConventionCoverageGate` — 모든 `subprojects` 가 convention 을 적용해야 함 ⓑ `SourceLanguageGate` — `src/` 의 확장자 `kt`·`kts`·`md` 만(디렉터리 symlink 도 따라감) ⓒ `SourceSetLayoutGate` — `main.java` srcDirs 가 비어야 하고 `main.kotlin` 이 `src/main/kotlin` 과 정확히 같아야 하며, source set 파일 집합과 컴파일 입력이 디스크 `src/main/kotlin` walk 와 등식 ⓓ `PackageOwnershipGate.foreignOrigin`·`JarContentGate` — class 의 `SourceFile` 이 `sourceSets["main"].kotlin` 안이어야 함 ⓔ `module.expected-source-sets=main,test`. **어떤 형태로든 subproject 안에서 생성물을 컴파일하면 ⓒ·ⓓ 가 깨진다** — 생성 디렉터리가 `src/` 밖일수록 ⓒ 의 등식은 더 확실히 깨진다 | (a) subproject + 생성물 `build/generated/`(r1 채택안) (b) subproject + 생성물 커밋 + 게이트 예외 셋 (c) **included build** — `ml-contract/` 를 `includeBuild` 로 두고(`build-logic` 선례, `include(...)` 목록 밖) `adapters` 가 `"bidvector:ml-contract"` 로 의존. convention 미적용(ⓐ 는 `subprojects` 만 대조), `src/` 없음(ⓑ·ⓒ·ⓓ·ⓔ 대상 아님) | **(c)** — (a) 는 ⓒ 두 단언·ⓓ 둘에 걸려 예외가 넷 필요하고, (b) 는 ⓑ·ⓔ·java srcDirs 예외 셋 — 둘 다 「게이트 예외 위에 게이트를 세우는」 형태라 같은 근거로 기각. (c) 는 층 신설 0(N-1 소멸)·convention·정책 편집 0 이고 게이트 정의 편집은 **분류 정정 한 분기**(아래 ②)뿐 — 예외가 아니라 버그 수정이라 (a)·(b) 의 예외와 종류가 다르다. **`build-logic` 선례의 정확한 읽기**: 그 included build 는 자기 몫의 게이트 셋을 루트 `check` 에 **따로 배선**했다. `ml-contract` 는 손으로 쓴 소스가 0 이라 잴 것이 없어 **무소스 단언 하나**로 그 배선을 대신한다(S-5 → 2D). **대가와 방어**: ① 게이트 밖 빌드가 하나 생긴다 — 내용물이 빌드 파일 셋뿐임을 S-5 가 실측하고 2D 가 게이트로 올린다(`OPEN-2A-INCLUDED-BUILD`); ② `adapters` 의 의존은 composite 치환이라 `resolveDependencies` 가 **`ProjectComponentIdentifier` 로 받아 `projectPaths` 에 넣는다**(리뷰 r3 ⓕ — r2 는 이 분류를 보지 않았다) → 현 코드로는 `adapters:moduleDependencyGate` 가 실패. 다른 빌드의 project 를 `externalModules` 로 분류하도록 **한 분기 정정**하면 외부 의존 검사는 domain 층에만 걸리므로(`mainExternalViolations`·`groupViolations` 가 `isDomain` 아니면 빈 목록) adapters 는 통과하고 domain 은 `external.allowed.domain` 밖이라 실패(구조) — S-1b 가 실측; ③ included build 의 protoc·플러그인은 Maven 아티팩트라 RO 의존 캐시가 덮는다 — 착수 시 §4b 스모크 | 착수 전 · Phase 2.5 |
 | **D-2A-0b** | **생성 Java 패키지의 루트** — (c) 에서 층 배치는 불요하나 ArchUnit 등식(`app` 의 「`bidvector` 루트 아래 1급 패키지 = 승인 모듈 집합」)과 T-A(`package.allowed.subtree=bidvector`)가 남는다 | `option java_package = "contract.bidvector.ml.v1"` — 루트 `contract` 를 `bidvector` **밖**에 둔다. ArchUnit 은 `importPackages("bidvector")` 라 등식이 그대로이고, domain 이 `contract.*` 를 import 하면 T-A(허용 subtree 는 `bidvector` 뿐) 가 **구조적으로** 거부한다 — 층 신설도 `ArchitecturePolicy` 편집도 없다. proto 패키지 `bidvector.ml.v1`(wire·Python 쪽)은 그대로 | — | 계약 고정 |
 | **D-2A-7** | **승인 문면 「source 명시」의 읽기.** 두 읽기가 있다 — (i) 율의 **축**(floor/assessment/bid/award) (ii) §4.1 「percent 입력은 adapter 에서 변환하며 **원문 unit 을 기록**」의 unit 출처 | (a) **어느 쪽도 wire 필드로 두지 않는다** — 축은 필드·메시지 이름이 나르고(조사 g-1), 원문 unit 은 Kotlin 어댑터 provenance 소유. 대신 V2 가 실제로 갖는 구분 **`BidRateOrigin { OBSERVED, RECOMMENDED }`** 을 `bid_rate` 가 있는 자리(`CompetitionSample`·`Candidate`)에 `origin` 으로 싣는다(shared-kernel `BidRate.origin` 미러) (b) `RateSource` 축 enum (c) 원문 unit enum | **(a)** — (b) 는 이름이 이미 나르는 사실을 두 자리에 두고 관측/추천 구분을 잃는다(리뷰 r1). (c) 는 ml-engine 이 알 이유가 없는 어댑터 사정 | 착수 전 |
 | **D-2A-1** | `Money` 에 **`EstimatedAmount`·`YegaAmount` 를 위한 타입 분리를 wire 에 두지 않는다** — wire 는 `Money + basis` 하나이고 축 분리는 Kotlin 도메인(1B)이 소유. ML 이 받는 금액은 `BASE_AMOUNT` basis 뿐(2B 가 입력 필드 이름으로 고정) | — | §3.2 · ADR 0003 D-2 | 계약 고정 |
@@ -129,5 +132,5 @@ subproject 형태 자체가 원인이라 **included build** 로 재설계(D-2A-0
 | `OPEN-ML-03` | D-M2-8 (a) — 2A 는 「`double` 없음」과 「점수는 축 이름을 가진 메시지」 규칙까지, 메시지는 2B |
 | `OPEN-DIC-05`(닫힘) | `BaseAmountProvenanceLabel` 다섯 미러 — 소비만 |
 | 신설 후보 `OPEN-2A-CANONICAL-FORM` | round-trip canonicalization 방식(protobuf deterministic serialization vs JSON canonical) — 착수 시 확정 |
-| 신설 후보 `OPEN-2A-INCLUDED-BUILD` | 게이트 밖 빌드 하나(`ml-contract`)의 존재 — 무소스 단언(S-5 → 2D `contractGate`)이 유일한 방어. `build-logic` 과 같은 급의 예외임을 `capability-map.md` §9 소유 축 표·ADR 0006 갱신 후보로 등재(착수 시) |
+| 신설 후보 `OPEN-2A-INCLUDED-BUILD` | 게이트 밖 빌드 하나(`ml-contract`)의 존재. `build-logic` 선례는 자기 몫의 게이트를 루트 `check` 에 따로 배선했고, `ml-contract` 는 손으로 쓴 소스가 0 이라 잴 것이 없어 **무소스 단언 하나**(S-5 → 2D `contractGate`)가 그 배선을 대신한다 — 이 OPEN 이 지키는 것은 「그 빌드에 소스가 생기지 않는다」다. `capability-map.md` §9 소유 축 표·ADR 0006 갱신 후보로 등재(착수 시) |
 | 신설 후보 `OPEN-2A-RELEASE-CHECK-4D` | ⑥ 의 제3 변환 금지는 **client 가 집행**하는 규칙인데 실제 client 는 M4 4D 소유 — M2 는 fake 위의 test 까지. 4D 착수 계약이 이 test 를 실제 client 배선에 재사용해야 함을 **활성 OPEN 으로 등재**(선언이 어디에도 강제되지 않는 ML-03 형태를 피한다). `milestone-4.md` 4D 문면 갱신은 4D 착수 시 |
