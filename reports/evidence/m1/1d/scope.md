@@ -15,6 +15,8 @@ in_scope:
   - app/src/test/kotlin/bidvector/app/conformance/**   # corpus runner dispatch 를 base-amount-provenance·floor-shortfall·floor-threshold authoritative 로 확장(1B-c·1C 관례)
   - app/build.gradle.kts                       # 조건부 — testImplementation(project(":decision")) 한 줄
   - fixtures/manifest.yaml                     # 조건부 — 1D 축 case 의 contract_binding 신설·D-3 승인 시 floor-threshold-002 승격(fixture-curator 소관, 기대값 무변경 원칙)
+  - fixtures/input/floor-threshold-002.json    # D-3 승격 — 입력에 정책 version 을 싣는 재추출(curator `32b1b39`). 기대값 무변경
+  - fixtures/tools/mutation_sweep_adversarial.py   # ASSERTED 표에 floor-threshold-002 한 행 — 승격 case 에 변이체가 생성되지 않아 exit 0 이 공허함을 curator 가 발견(2026-09-06 추가)
   - docs/discovery/data-dictionary.md          # 계약 갱신 — §3.3·§3.4·§9 의 운영자 결정이 실제로 난 행만
   - docs/discovery/capability-map.md           # 계약 갱신 — §14.2 OPEN-DIC-05·OPEN-DEC-07 행만
   - milestone-1.md                             # 계약 갱신 — 「Slice 1D」 항목만
