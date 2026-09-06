@@ -689,6 +689,29 @@ legacy에 DB 기반 outbox의 상태·클레임 구조가 있으나
 `OutboxEntryState`가 sealed 어휘와 명시 전이표를 가져야 한다는 **형태 요구**만 적고
 값 집합을 정하지 않는다. 브로커 없음 결정(`OPEN-OPS-05`)의 파급이 그 `OPEN`에 걸려 있다.
 
+#### 2.2.6 전략 — 어휘 자리만 둔다 (운영자 결정 2026-09-06, M1/1E 착수, decision 31)
+
+legacy 에 「전략 편집」 상태 기계는 없다(`updated_at` 갱신뿐). 감시 run 5값·lineage stage 5값·
+스냅샷 3값은 DB·시계에 묶인 상태이고 `stale` 은 상태가 아니라 파생 술어다
+(`_workspace/m1-1e/01_scout_preflight.md`). **편집 흐름 상태 기계**(`WaitingForValue →
+WaitingForConfirmation → Applied/Cancelled/Expired`)는 `milestone-4.md` 4A 가 소유하고 Telegram
+채널 채택(`OPEN-STR-12`)에 걸려 있으므로 이 문서는 세우지 않는다.
+
+**M1/1E 가 세우는 것은 결과 어휘와 「전략이 바뀌었다」는 사실을 나르는 타입까지다** — 전이표 없음:
+
+> `WatchVerdict = sealed { Passed(matched), Rejected(failed), NoGate, Undeterminable(reason) }` — 「게이트
+> 없음」(감시 필드 전부 비어 있음)과 「모든 공고 통과」는 결과 타입에서 갈린다(STR-01 acceptance 셋째)
+>
+> `StrategyValidation = sealed { Valid(strategy, policyVersion), Invalid(violations, policyVersion) }` ·
+> `StrategyViolation`(구조화 코드, 문장 아님) · `WatchRuleId`(감시 필드 일곱)
+>
+> `StrategyRevision`(값) · `StrategyEvent.StrategyUpdated(revision, policyVersion)` — **payload 타입**까지.
+> 봉투(event id·aggregate version·idempotency/correlation/causation id)는 M4 4C(`OPEN-DIC-07`·`OPEN-DIC-09`)가,
+> 변경 주체(actor) 슬롯은 `OPEN-STR-04` 소유라 M4 4A 가 넓힌다.
+
+`SnapshotFreshness(Fresh/Stale)` 는 스냅샷(파생 산출물)의 소유이지 전략의 어휘가 아니라 여기 두지
+않는다. 정본 계약은 `reports/evidence/m1/1e/scope.md` D-4·⑨.
+
 ### 2.3 "정산됨"의 정의 — **이 절이 정본이다** (§10 **X-5**)
 
 `capability-map.md` §9.1이 이 통합 여부를 **0C에 위임했다**(*"SET-07에 네 개 병기, 통합

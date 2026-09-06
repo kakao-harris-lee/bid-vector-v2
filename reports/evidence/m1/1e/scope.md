@@ -8,7 +8,7 @@
 ```yaml
 milestone: m1
 slice: 1e-strategy-and-state
-base_sha: 4a4d1aa05e1157150f942346e9c0cd45b69aa28d   # 초안 작성 시점 HEAD — **1D 종결 뒤 착수 시 재고정**
+base_sha: 2af32f6   # 착수 2026-09-06 재고정(1D 종결 승인 커밋). 초안 시점은 4a4d1aa 였다
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - strategy/**                                # 도메인 모듈(ADR 0006 D-2 「운영자 감시 조건과 전략」; STR-01·02·03·06 소유). 감시 predicate·validation·결과/이벤트 타입·정책 데이터 형태·test
@@ -58,7 +58,13 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — **착수 시 재고정한 base 로 다시 낸다.** 초안 시점은 해당 없음.
+`git log --oneline 2af32f6..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-06) **없음**.
+
+**착수 2026-09-06 — 운영자 결정(착수 전 D-1~D-4 전부 추천안)**: D-1 (a) strategy 안 `Score` + 축별 뉴타입(`OPEN-1E-SCORE` 등재) ·
+D-2 (a) `OPEN-1BC-STR16` 수령 + 전제 승인 둘(R-BASIS-01 「같은 쌍이 감시·검색 경로에서 같은 답」 업무 규칙 · STR-16 capability
+승인) = **decision 29** · D-3 (a) STR-01 acceptance 넷 · STR-02 넷 · STR-03 셋을 업무 규칙으로 명시 승인 + 1E 안에서 case 신설 =
+**decision 30** · D-4 (a) 결과 어휘 + 이벤트 payload 까지, 전이·상태 기계 없음, `data-dictionary.md` §2.2.6 어휘 자리 = **decision 31**.
+정본: `capability-map.md` STR-01·02·03·16 블록 승인 주석 + §14.2 `OPEN-1BC-STR16` 행 · `data-dictionary.md` §2.2.6.
 
 ---
 
