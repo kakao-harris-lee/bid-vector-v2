@@ -79,7 +79,9 @@ rollback: |
 
 ## 조사 결과 — 이 slice 에 영향을 주는 것
 
-- 대기(`_workspace/m4-prep/01_scout_workflow.md` (c)).
+- 조사 (c): **반례** — legacy outbox 행이 렌더된 문자열을 저장(요청/렌더 미분리 → ① 의 근거) · 피로도 게이트가 직접 배달 경로에만 걸려 outbox 경로 우회(게이트는 sender 앞이 아니라 요청 생성 자리 — 4B/4C 참조).
+  **재사용 1순위** — 배달 경로 resolver(정책/환경 분리·first-match·status 11종)가 순수 함수 → ② 는 이식(`legacy-behavior` 로 test 정책, 어휘는 4E sealed 로 재선언). 알림 outbox 는 dialect 분기·재시도 0·기본 비활성이라 4C 기준선은 추론 쪽 outbox.
+  fixture 0건 → 4E golden 은 ② 전수 표(정책×환경 조합)를 `authored-from-approved-spec` 으로 신설(curator, 착수 시).
 
 ---
 
