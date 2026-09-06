@@ -129,14 +129,29 @@ detekt {
     config.from(configDir.file("detekt/detekt.yml"))
 }
 
-// M1/1A-b ③(OPEN-ADR-16 (a)) — PMD CPD **관찰 모드**. 값은 전부 정책 데이터에서 온다
-// (`duplicate-policy.properties`, 매직 넘버 금지) — `ignoreFailures`가 `mode=observe`를
-// 그대로 번역하므로 이 편집 한 줄이 곧 실패 모드로의 전환 스위치가 되지 않는다(D-4).
+// M1/1A-b ③(OPEN-ADR-16 (a)) — PMD CPD. 값은 전부 정책 데이터에서 온다
+// (`duplicate-policy.properties`, 매직 넘버 금지). 운영자 결정 2026-09-06 — `mode=fail`,
+// 범위는 **main source set 한정**(D-6 `limit.type.members.source-sets` 와 같은 관례:
+// `fail.source-sets`). 나머지 source set(관례상 test)은 항상 관찰만 하는 별도 task 로
+// 낸다 — `mode`가 무엇이든 그 task 는 절대 실패시키지 않는다(관찰이 그 task 의 정체성이지
+// `mode` 로 토글되는 속성이 아니다). `mode=observe`로 되돌리면 main 도 실패시키지 않게
+// 되돌아간다(기존 전체-관찰 동작과 동일) — 이 되돌림 경로가 rollback.md 의 근거다.
 // Kotlin property 문법(`ext.language = ...`)은 `CodeQualityExtension`이 상속받은
 // `ignoreFailures`에서 private field 접근으로 오판되어 컴파일이 안 됐다 — 명시적 setter
 // 호출로 그 모호성을 피한다.
 private val duplicatePolicy = DuplicatePolicy.load(configDir.file("quality/duplicate-policy.properties").asFile)
 
+// `fail.source-sets`(정책 데이터, main)에 있는 source set 만 실패로 셀 수 있다. 나머지는
+// `expectedModuleSourceSets`(D-2, `module.expected-source-sets`)와의 차집합으로 낸다 —
+// source set 이름을 여기서 다시 열거하면 그 열거 자체가 D-2 값과 어긋날 수 있는 두 번째
+// 자리가 된다.
+private val cpdFailSourceSets = duplicatePolicy.failSourceSets.toSet()
+private val cpdObservedSourceSets = expectedModuleSourceSets - cpdFailSourceSets
+
+// `CpdPlugin.setupTaskDefaults`가 `tasks.withType(Cpd::class).configureEach { ... }`로
+// **모든** `Cpd` task(플러그인이 만든 것이든 우리가 register 한 것이든)에 이 extension 값을
+// 먼저 얹는다(decompile 확인) — 아래 두 task 각각의 설정 블록이 그 뒤에 적용돼 필요한
+// 값만 이 기본값 위에 덮어쓴다.
 extensions.configure(de.aaschmid.gradle.plugins.cpd.CpdExtension::class.java) {
     setLanguage(duplicatePolicy.language)
     setMinimumTokenCount(duplicatePolicy.minimumTokenCount)
@@ -147,19 +162,53 @@ extensions.configure(de.aaschmid.gradle.plugins.cpd.CpdExtension::class.java) {
 // 리포트 위치를 우리가 직접 정한다 — 플러그인 기본 report 객체의 `outputLocation`을 다른
 // task 의 input 으로 그대로 연결하면 "does not have a task associated with it"로 구성
 // 단계에서 실패한다(실측). 경로를 명시하면 이 모호성이 없다.
-val cpdReportFile = layout.buildDirectory.file("reports/cpd/${project.name}.xml")
+val cpdReportDir = layout.buildDirectory.dir("reports/cpd")
+val cpdMainReportFile = cpdReportDir.map { it.file("${project.name}.xml") }
+val cpdObservedReportFile = cpdReportDir.map { it.file("${project.name}-observed.xml") }
 
+// 플러그인이 만드는 유일한 task(`cpdCheck`)는 기본으로 **모든** source set(main+test)을
+// `sourceSets.all { cpdCheck.source(it.allJava) }`로 additive 하게 받는다(decompile 확인,
+// `CpdPlugin#createTask`/`lambda$createTask$7`). main 만 실패로 세려면 그 기본 배선을
+// **덮어써야** 한다 — `setSource`(`SourceTask` 상속)는 additive 한 `source(...)`와 달리
+// 대체라 이 덮어쓰기가 성립한다.
 tasks.named<de.aaschmid.gradle.plugins.cpd.Cpd>("cpdCheck") {
+    setSource(cpdFailSourceSets.map { name -> sourceSets[name].kotlin })
     reports.xml.required.set(true)
-    reports.xml.outputLocation.set(cpdReportFile)
+    reports.xml.outputLocation.set(cpdMainReportFile)
 }
 
-// 관찰 모드가 "실행 안 함"으로 조용히 퇴화하지 않게 리포트 산출 자체를 단언한다(D-4).
+// main 밖(관례상 test)은 항상 관찰만 한다 — `ignoreFailures`를 정책의 `mode`가 아니라
+// 이 자리에서 직접 참으로 고정한다(위 configureEach 뒤에 적용되므로 이 값이 이긴다).
+val cpdCheckObserved =
+    tasks.register<de.aaschmid.gradle.plugins.cpd.Cpd>("cpdCheckObserved") {
+        group = "verification"
+        description = "PMD CPD — fail.source-sets 밖의 source set 을 항상 관찰만 한다(운영자 결정 2026-09-06)"
+        setSource(cpdObservedSourceSets.map { name -> sourceSets[name].kotlin })
+        setIgnoreFailures(true)
+        reports.xml.required.set(true)
+        reports.xml.outputLocation.set(cpdObservedReportFile)
+    }
+
+// 관찰이 "실행 안 함"으로 조용히 퇴화하지 않게 두 task 모두 리포트 산출 자체를 단언한다(D-4).
+// main 쪽은 실패 모드에서도 리포트가 나온다는 것을, observed 쪽은 항상 관찰이 실제로 도는
+// 것을 각각 증명한다 — 하나로 합치면 어느 쪽이 no-op 로 퇴화해도 다른 쪽 존재가 가려준다.
 val cpdReportPresenceGate =
     tasks.register<CpdReportPresenceGateTask>("cpdReportPresenceGate") {
-        description = "PMD CPD 리포트 산출을 단언한다 — 관찰 모드가 '실행 안 함'으로 퇴화하지 않게(D-4)"
-        cpdXmlReport.set(cpdReportFile)
+        description = "PMD CPD(fail.source-sets) 리포트 산출을 단언한다 — 실패 모드가 '실행 안 함'으로 퇴화하지 않게(D-4)"
+        cpdXmlReport.set(cpdMainReportFile)
+        expectedSource.from(cpdFailSourceSets.map { name -> sourceSets[name].kotlin })
         dependsOn(tasks.named("cpdCheck"))
+    }
+
+val cpdReportPresenceGateObserved =
+    tasks.register<CpdReportPresenceGateTask>("cpdReportPresenceGateObserved") {
+        description = "PMD CPD(관찰 대상 source set) 리포트 산출을 단언한다 — 관찰이 '실행 안 함'으로 퇴화하지 않게(D-4)"
+        cpdXmlReport.set(cpdObservedReportFile)
+        // `adapters`처럼 test source set 이 비어 있는 모듈은 `cpdCheckObserved`가
+        // NO-SOURCE 로 건너뛰어 리포트를 안 낸다 — 이 값이 비어 있으면 그 부재는 위반이
+        // 아니다(gate task 의 hasExpectedSource 분기, 위 KDoc).
+        expectedSource.from(cpdObservedSourceSets.map { name -> sourceSets[name].kotlin })
+        dependsOn(cpdCheckObserved)
     }
 
 // 경계의 1차 강제는 **모든 모듈**에 건다. domain 만 걸면 workflow 가 adapters 를 참조하는
@@ -388,6 +437,7 @@ tasks.named("check") {
         domainSourceReferenceGate,
         domainApiTypeGate,
         cpdReportPresenceGate,
+        cpdReportPresenceGateObserved,
         tasks.named("koverXmlReport"),
         tasks.named("koverHtmlReport"),
     )
