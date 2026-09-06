@@ -47,13 +47,13 @@ broker/DB · Kotlin client 의 circuit breaker·retry 배선(M4 4D — M2 는 �
 
 ---
 
-## 3. 착수 전 결정 후보 (운영자 · 이 문서는 묻지 않는다)
+## 3. 착수 전 결정 후보 D-M2-1~14 (운영자 · 이 문서는 묻지 않는다)
 
 > 1E 세션과 운영자가 같으므로 착수 시 한 번에 받는다. 각 행은 「선택지 + 추천 + 근거」로 닫혀 있다.
 
 | ID | 물음 | 선택지 | 추천·근거 |
 | --- | --- | --- | --- |
-| **D-M2-1** | **`.proto` 와 생성 코드의 자리.** ADR 0006 D-6 은 「도메인에서 보이지 않는다」만 요구하고 별도 빌드 모듈 여부를 M2 에 맡겼다 | (a) **저장소 루트 `contracts/proto/`(단일 출처, Gradle 모듈 아님) + Kotlin 생성 전용 모듈 `ml-contract`(생성물만, `adapters` 가 의존) + Python 생성물은 `ml-engine/src/ml_engine/contracts/`** (b) `adapters` 안에 `.proto` 와 생성물 (c) `.proto` 만 루트, 생성물은 양쪽 빌드 산출물(커밋 안 함) | **(a)** — ① 단일 출처가 어느 한쪽 언어의 모듈 안에 있으면 다른 쪽이 「남의 모듈」을 읽는다. ② 생성물은 크기·복잡도·CPD 래칫을 통과할 수 없고 통과시켜서도 안 된다 — 별도 모듈이면 래칫 제외를 **모듈 단위**로 선언할 수 있다(`adapters` 안이면 경로 allowlist 가 필요하고 그것이 우회 표면). ③ (c) 는 생성물 diff 가 리뷰에 안 보여 「생성 코드 수동 편집 금지」 게이트를 증명할 대상이 없다. **대가**: 모듈 하나 추가(`settings.gradle.kts`·`architecture-policy` 의존 방향 표에 `ml-contract` 등재 — `adapters <- ml-contract`, 도메인은 참조 금지) |
+| **D-M2-1** | **`.proto` 와 생성 코드의 자리.** ADR 0006 D-6 은 「도메인에서 보이지 않는다」만 요구하고 별도 빌드 모듈 여부를 M2 에 맡겼다 | (a) **저장소 루트 `contracts/proto/`(단일 출처, Gradle 모듈 아님) + Kotlin 생성 전용 모듈 `ml-contract`(생성물만, `adapters` 가 의존) + Python 생성물은 `ml-engine/src/ml_engine/contracts/`** (b) `adapters` 안에 `.proto` 와 생성물 (c) `.proto` 만 루트, 생성물은 양쪽 빌드 산출물(커밋 안 함) | **(a)** — ① 단일 출처가 어느 한쪽 언어의 모듈 안에 있으면 다른 쪽이 「남의 모듈」을 읽는다. ② 생성물은 크기·복잡도·CPD 래칫을 통과할 수 없고 통과시켜서도 안 된다 — 별도 모듈이면 래칫 제외를 **모듈 단위**로 선언할 수 있다(`adapters` 안이면 경로 allowlist 가 필요하고 그것이 우회 표면). ③ 생성물은 **VCS 밖**(`build/generated/`)에 둔다 — 2A D-2A-0a: 1A 게이트 가족(`SourceLanguageGate` 의 확장자 제한·`expected-source-sets`·java srcDirs 비움)이 커밋된 `.java` 생성물과 충돌하고, VCS 밖이면 수동 편집이 구조적으로 불가하다. **대가**: 모듈 하나 추가 + **층 신설**(`architecture-policy` 는 의존 표가 아니라 `layer.order`·`layer.<층>` 목록이다 — `layer.contract=ml-contract` 를 `application` 과 `adapters` 사이에, 2A D-2A-0b, Phase 2.5) + convention 에서 그 모듈만 java 컴파일 |
 | **D-M2-2** | **2A 가 생성 배선을 포함하는가.** `milestone-2.md` 는 생성을 2D 에 둔다 | (a) **2A 에 「양쪽 생성 + round-trip」 최소 배선을 선행 흡수**, 2D 는 게이트 **증명**(breaking mutation·unknown field·deadline·cancellation·fake servicer) (b) 문면대로 2A 는 `.proto` 문서만, 생성은 2D | **(a)** — `.proto` 는 컴파일되기 전엔 계약이 아니라 텍스트다. 2A 의 acceptance 가 「round-trip 일치」를 내려면 생성이 있어야 하고, 2B·2C 가 그 위에 선다. 2D 의 정체성은 「게이트가 실제로 잡는다」는 증거(`ADR 0003` D-6)라 생성 자체를 미룰 이유가 없다 |
 | **D-M2-3** | **Python 쪽 자리.** `ml-engine/` 은 M5 5A 가 만든다 | (a) **M2 가 `ml-engine/` 최소 골격(`pyproject.toml` + `contracts/` 생성물 + round-trip test)만 세우고 5A 가 나머지 패키지·import boundary 를 완성** (b) M2 는 Python 생성물을 임시 디렉터리에만 두고 5A 가 이전 | **(a)** — (b) 는 이전 누락 위험(ADR 0009 D-3 「`_workspace/` 는 기록 자리가 아니다」와 같은 갈래). 5A 의 선행 조건 문면이 「M2 proto 와 provider contract 승인」이라 M2 가 Python 생성물을 어디엔가 두어야 한다. serving/training dependency 분리(§5)는 5A 소관이고 M2 는 `grpcio`·`protobuf` 런타임만 lock 한다 |
 | **D-M2-4** | **`EstimateShortfall` RPC.** `milestone-2.md` 2B: *"이 계산을 Python에 둘 필요가 M0에서 승인된 경우에만 정의"* | (a) **제외** (b) 정의 | **(a)** — M0 은 승인하지 않았고, 1D 가 floor-shortfall 커널을 Kotlin `decision` 모듈에 두었다(`decision/…/FloorShortfallKernel.kt`, decision 28). `v2-지침서.md` §3.2 「Kotlin이 이미 판정한 자격·법정 하한을 Python이 다시 판정하지 않는다」. 조사 노트 01 (e) 실측 — legacy 에서도 이 계산은 ML 경로 밖(`app/domain`+`app/services`)이었다 |
@@ -61,8 +61,12 @@ broker/DB · Kotlin client 의 circuit breaker·retry 배선(M4 4D — M2 는 �
 | **D-M2-6** | **율·금액의 wire 표현.** 2A 문면: money 「정수 원화 **또는** scale 명시 decimal string」 | (a) **money = `int64` 원(`currency` 필수, KRW 만 허용값) · rate = decimal string + `scale`(`double` 금지)** (b) 둘 다 decimal string (c) rate 를 `double` | **(a)** — 원화는 소수 단위가 없어 정수가 정확하고 `Money.amount` 의 V2 내부 표현과 일치. 율은 `double` 로 나가면 「계약 version 과 artifact 로 모든 추천 재현」(§9)이 부동소수 표현 경계에서 깨지고 도메인 `api.forbidden.types` 가 `Double` 을 막는 취지와 어긋난다. Python 은 5E 의 request validation·Numpy conversion 자리에서 `Decimal → float` 를 **한 번** 한다(변환 지점이 하나) |
 | **D-M2-7** | **proto3 vs editions.** | (a) **proto3** (b) edition 2023 | 조사 노트 `02_grpc_stack_compat.md` 결과에 따른다 — 잠정 **(a)**: Kotlin `protoc-gen-grpc-kotlin`·Python `grpcio-tools`·buf 세 도구가 전부 안정 지원하는 교집합이 proto3 이고, editions 의 이점(필드 presence 기본값 제어)은 `optional` 키워드로 충분하다. **enum 은 `_UNSPECIFIED = 0` 필수 + 미지원 값 fail-closed**(open enum 이라 미지의 정수가 파싱을 통과한다 — 2A 규칙) |
 | **D-M2-8** | **`OPEN-ML-03` 을 계약이 받는가** — 가격 적합도와 낙찰 확률의 구분을 타입으로 | (a) **계약 수준 타입 분리**: 응답 메시지 이름과 필드 이름에 `probability`·`win_rate` 를 두지 않고 `PriceFitness`(점수)와 `Uncertainty`(§6.5 세 성분 `sample_size`·`dispersion`·`estimate_margin`)만 정의. 낙찰 확률 축은 **필드가 없다** — 필요해지면 breaking 아닌 추가로 별도 메시지 (b) 문서 규율 | **(a)** — `capability-map.md` ML-03 「메커니즘이 선언된 형태로 하나 존재해야 한다」. 계약은 양쪽이 공유하는 유일한 타입 자리라 여기서 갈라 두면 4개 파일 복제 경고가 필요 없다. `OPEN-ML-02`(Platt → 자격 라벨 계약)는 **받지 않는다** — 자격은 Kotlin 소유(1C)이고 계약에 자격 라벨을 실으면 §3.2 경계 위반 |
-| **D-M2-10** | **`denominator_source` 피처의 어휘 축.** legacy 피처 값은 `ReliableBaseSource`(선택 결과 넷), V2 provenance 라벨은 `BaseAmountProvenance`(판정 라벨 다섯) — 다른 축이라 1:1 매핑이 없고, 바꾸면 피처 공간이 바뀌어 **재학습**이 필요하다(§6.3) | (a) **계약은 V2 라벨(`ProvenanceKind`)만 싣고, 피처 공간 전환(재학습)은 M5 5B·5C 소유로 명시** — legacy 어휘를 계약에 넣지 않는다 (b) 계약에 legacy 어휘 enum 을 두고 Kotlin 이 매핑 (c) 두 어휘를 다 실음 | **(a)** — (b) 는 ml-engine 이 「어느 값을 골랐나」라는 Kotlin 판정 과정을 알게 되는 경계 위반이고 매핑이 정보를 만들어 낸다(Unknown ↔ unavailable 만 대응). (c) 는 같은 사실 두 자리. **대가**: 5B 가 피처 공간을 V2 라벨 위에서 다시 정의하고 5C 가 재학습 — `capability-map.md` ML-11.4 F3(백필 상태가 피처였던 대가)와 같은 갈래의 정리 |
 | **D-M2-9** | **`OPEN-ADR-11` 값의 자리** — deadline·재시도·백오프 | (a) **규칙은 ADR 0010 이 고정, 값은 `adapters` 정책 데이터(versioned)로 두고 초기값은 5E 실측 전까지 「보수적 상한 + 측정 의무」** (b) ADR 에 값을 박음 | **(a)** — legacy 에 gRPC 경로가 없어 이식할 실측이 없다(ADR 0003 §5). 값을 ADR 에 박으면 첫 실측에서 ADR 을 고쳐야 한다. §5 매직넘버 규율(근거와 policy version) |
+| **D-M2-10** | **`denominator_source` 피처의 어휘 축.** legacy 피처 값은 `ReliableBaseSource`(선택 결과 넷), V2 판정 라벨은 `BaseAmountProvenance`(다섯) — 다른 축이라 1:1 매핑이 없고, 바꾸면 피처 공간이 바뀌어 **재학습**이 필요하다(§6.3) | (a) **계약은 V2 라벨(`BaseAmountProvenanceLabel`, 2A ③)만 싣고, 피처 공간 전환(재학습)은 M5 5B·5C 소유로 명시** — legacy 어휘를 계약에 넣지 않는다 (b) 계약에 legacy 어휘 enum 을 두고 Kotlin 이 매핑 (c) 두 어휘를 다 실음 | **(a)** — (b) 는 ml-engine 이 「어느 값을 골랐나」라는 Kotlin 판정 과정을 알게 되는 경계 위반이고 매핑이 정보를 만들어 낸다(Unknown ↔ unavailable 만 대응). (c) 는 같은 사실 두 자리. **대가**: 5B 가 피처 공간을 V2 라벨 위에서 다시 정의하고 5C 가 재학습 — `capability-map.md` ML-11.4 F3(백필 상태가 피처였던 대가)와 같은 갈래의 정리. 같은 이유로 `Money.provenance`(금액 획득 축, 여섯)와 이 라벨(판정 축, 다섯)도 **한 enum 에 접지 않는다**(리뷰 r1) |
+| **D-M2-11** | **`OPEN-ML-02` — Platt 캘리브레이션의 자격 라벨을 M2 계약에 넣는가.** 정본 행(§14.2)의 결정 주체는 운영자, 대상은 M2. 조사 (b-5): 캘리브레이션은 price prediction 응답엔 없지만 opportunity analysis 의 P(낙찰)로 사용자에게 도달하고 라벨이 **자격 판정 결과**에 의존한다 | (a) **넣지 않는다** — 자격은 Kotlin 1C 소유(§3.2), 계약에 자격 라벨을 실으면 ml-engine 이 업무 판정을 입력으로 받는다. P(낙찰) 축은 계약에 필드가 없다(D-M2-8) (b) 자격 라벨을 피처 fact 로 실어 캘리브레이션을 M5 가 이식 | **(a)** — ML-09 의 「결정 전에 확정되는 제약」(가격 적합도와 확률의 혼동 금지)이 (b) 의 전제를 이미 막는다. 남는 물음 「Platt 가 사용자 응답에 도달해야 하는가」는 M5 5C·5D 와 M4(opportunity 축 소유 slice)로 이월 |
+| **D-M2-12** | **`latest_promoted` 선택자를 계약에 두는가**(ADR 0010 §4) | (a) 둔다 — 재현성은 응답의 `release_id` 로, client 는 `GetModelMetadata.promoted` 와 대조(2A ⑥ (b)) (b) `exact_release` 만 | **(a)** — 4D 가 「현재 승격 릴리스」를 알려면 어차피 `GetModelMetadata` 를 불러야 하고, 그 사이 승격이 바뀌는 창은 (b) 에도 있다. (a) 의 구멍(폴백 predictor)은 2A ⑥ (b) 의 대조 규칙이 막는다 |
+| **D-M2-13** | **`MODEL_NOT_READY` 의 층**(ADR 0010 §4) | (a) application failure(`retryable=true`) (b) gRPC `UNAVAILABLE` | **(a)** — 프로세스는 살아 있고 계약이 정의한 상태라 D-3 의 층 구분상 application |
+| **D-M2-14** | **training job 조회 주기의 자리**(ADR 0010 §4) | (a) `adapters` 정책 데이터 (b) 스케줄러 설정 | **(a)** — D-M2-9 와 같은 이유 |
 
 ---
 
@@ -72,7 +76,7 @@ broker/DB · Kotlin client 의 circuit breaker·retry 배선(M4 4D — M2 는 �
 | --- | --- |
 | `OPEN-ADR-11` | **닫는 후보** — ADR 0010 이 규칙·error mapping·재시도 가능 분류·미가용 상태 이름을 고정, 값은 D-M2-9 |
 | `OPEN-ML-03` | D-M2-8 (a) 로 **계약 수준에서 닫는 후보**. M5 구현 축은 5D 가 승계 |
-| `OPEN-ML-02` | **받지 않는다** — 자격 라벨은 계약 밖(§3.2). 남는 물음 「Platt 가 사용자 응답에 도달하는가」는 M5 5C·5D |
+| `OPEN-ML-02` | **D-M2-11**(운영자 결정 행) — 추천 (a) 넣지 않음. 남는 물음 「Platt 가 사용자 응답에 도달해야 하는가」는 M5 5C·5D·M4 |
 | `OPEN-ML-05`·`OPEN-ML-06` | M5 소유, M2 무관 |
 | `OPEN-DIC-03`(`SkipReason`) | DEC 축, 계약에 실리지 않는다(verdict 는 Kotlin) |
 | 신설 후보 `OPEN-M2-DEADLINE-VALUES` | D-M2-9 (a) 의 대가 — 초기 deadline·retry 값의 실측 근거를 5E 가 낸 뒤 정책 version 갱신 |
@@ -85,8 +89,9 @@ broker/DB · Kotlin client 의 circuit breaker·retry 배선(M4 4D — M2 는 �
 - 금지 경로: 1E in_scope 전부(`strategy/**`·`config/quality/**`·`app/**`·`fixtures/**`·`milestone-1.md`·
   `reports/evidence/m1/1e/**`) + `docs/discovery/capability-map.md`·`data-dictionary.md`(1E 가 §14.2·§2.2.6 편집 중).
 - gradle 미실행. 편집 즉시 pathspec 커밋(`git add <경로>` → `git commit -- <같은 경로>`).
-- 착수 시 할 일: 각 slice `base_sha` 재고정 → D-M2-1~9 답 수령 → `milestone-2.md` 착수 문단 → `capability-map.md`
-  §14.2 반영 → 2A 부터.
+- 착수 시 할 일: 각 slice `base_sha` 재고정 → **`ADR 0010` 승인**(2A 전건) → 착수 전 결정 수령 — **D-M2-1~14**(이 표) ·
+  2A D-2A-0a·0b·7 · 2B D-2B-1~4 · 2C D-2C-1~2 · 2D D-2D-1·3·4 → `milestone-2.md` 착수 문단 → `capability-map.md` §14.2 반영
+  (`OPEN-ADR-11`·`OPEN-ML-02`·`OPEN-ML-03`, H-1 `agency_sample_count` 이름 정정) → 2A 부터(첫 단계 grpc-kotlin 1.5.0 + grpc-java 1.84.0 스모크).
 
 ---
 

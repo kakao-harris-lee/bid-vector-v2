@@ -1,8 +1,8 @@
 # Slice 계약 — M2 / 2C · 비동기 training 계약 (`TrainingJobService`) — **초안, 구현 전**
 
 > **지위**: M1/1E 병행 중에 세션 모델이 쓴 **계약 초안**이다. 구현·gradle·의존성 추가·fixture 편집은 하지 않았다.
-> 착수는 2A(그리고 2B — 병행 가능) 승인 뒤 운영자 지시로 하며, 그때 `base_sha` 를 재고정하고 `ADR 0010` 승인(D-8 transport)을
-> 전제로 `milestone-2.md` 착수 문단을 쓴다.
+> 착수는 2A(그리고 2B — 병행 가능) 승인 뒤 운영자 지시로 하며, 그때 `base_sha` 를 재고정하고 `milestone-2.md` 착수 문단을 쓴다.
+> `ADR 0010`(D-8 transport 포함)은 **2A 착수 전건으로 이미 승인돼 있다** — 2C 가 그 상태를 바꾸지 않는다.
 
 ```yaml
 milestone: m2
@@ -15,7 +15,6 @@ in_scope:
   - ml-contract/**, ml-engine/src/ml_engine/contracts/**   # 재생성 결과
   - adapters/src/test/kotlin/**                        # consumer test — 상태 전이·idempotency·cancel 의미를 fake servicer 로
   - ml-engine/tests/test_training_contract.py         # provider 쪽 계약 test(전이표 밖 전이 거부·미지 상태 없음)
-  - docs/adr/0010-ml-call-budget-and-training-transport.md   # 승인 상태 갱신만(초안 → 결정), 2C 착수 시
   - milestone-2.md                                    # 「Slice 2C」 착수 문단, **착수 시**
   - reports/evidence/m2/2c/**
 out_of_scope:
@@ -62,7 +61,7 @@ rollback: |
 | ④ | **`JobState` 와 전이표** — `ACCEPTED → RUNNING → SUCCEEDED \| FAILED`, `ACCEPTED \| RUNNING → CANCELLED`. 표에 없는 쌍은 provider 가 만들지 않고 consumer 가 거부한다(관측 가능한 거부). **미지 상태 없음** — `UNSPECIFIED` 와 정의 밖 정수 거부(2A ⑥). legacy 는 미지 Celery 상태를 `queued` 로 접었다(조사 (d)) | `data-dictionary.md` §2.2 「표에 없는 쌍은 거부이며 거부가 관측 가능해야 한다」 · 2C 「cancel/retry 권한과 상태 전이」 |
 | ⑤ | **`CancelTrainingJob(job_id)`** → `TrainingJob`. `ACCEPTED`·`RUNNING` 에서만 `CANCELLED` 로, 종료 상태에서는 **멱등 no-op**(현재 상태 반환, 오류 아님). 취소 권한은 계약 밖(M6 인증) — 계약은 「취소가 있다」와 전이만 | 2C 「cancel/retry 권한과 상태 전이」 |
 | ⑥ | **retry 는 새 job** — `FAILED` job 을 되살리는 RPC 는 없다. 재시도는 새 `idempotency_key` 의 `StartTraining`(같은 `dataset` 참조 재사용). 계약이 「어떤 실패가 재시도 가치가 있는가」를 `JobFailure.retryable` 로 싣는다(ADR 0010 D-3 의 application failure 와 같은 형태) | 2C 「cancel/retry」 · ADR 0010 D-4 |
-| ⑦ | **`ArtifactReference { string uri, string checksum, ModelRelease release }`** — `release` 는 2B 의 다섯 성분(`release_id`·`artifact_checksum`·`feature_schema_version`·`code_version`·`dataset_id`)이고 `dataset_id` 는 요청의 것과 같아야 한다(consumer test). **manifest 의 내용**(재현성 파라미터·metric·`sample_scope`·서명)은 M5 5C 소유 — 계약은 참조 + `manifest_schema_version` 만 | `v2-지침서.md` §5 · ML-05 「재현성 파라미터가 manifest 에 기록」(내용은 5C) · ML-08 서명(5C) |
+| ⑦ | **`ArtifactReference { string uri, ModelRelease release }`** — checksum 은 `release.artifact_checksum` **한 자리**(같은 사실 두 자리 금지). `release` 는 2B 의 다섯 성분(`release_id`·`artifact_checksum`·`feature_schema_version`·`code_version`·`dataset_id`)이고 `dataset_id` 는 요청의 것과 같아야 한다(consumer test). **manifest 의 내용**(재현성 파라미터·metric·`sample_scope`·서명)은 M5 5C 소유 — 계약은 참조 + `manifest_schema_version` 만 | `v2-지침서.md` §5 · ML-05 「재현성 파라미터가 manifest 에 기록」(내용은 5C) · ML-08 서명(5C) |
 | ⑧ | **`EvaluationReportReference { string uri, string checksum, string report_schema_version }`** — 승격 판정(ML-07)은 Kotlin 도 ml-engine 도 아닌 **운영자 결정**이고 이 참조는 그 입력이다. 학습 성공이 승격이 아니다 | ML-07 「사전 선언 판정식」 · 5C 「promotion은 측정 결과를 만들 뿐 자동 운영 배포하지 않음」 |
 | ⑨ | **transport** — 세 RPC 전부 unary, 같은 gRPC 서버(`bidvector.ml.v1`), Kotlin 이 폴링. deadline 은 각 unary 호출에만 걸리고 job 수명과 무관. Celery·큐·task 이름은 wire 에 없다(H-12) | `ADR 0010` D-8 · §3.3 |
 
@@ -75,9 +74,9 @@ rollback: |
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
 | **D-2C-1** | **`idempotency_key` 의 발급 주체와 의미.** | (a) **Kotlin 이 발급(업무 의도 단위 — 「이 dataset 으로 이 spec 의 학습 한 번」), ml-engine 은 저장·대조만** (b) ml-engine 이 `dataset_id + training_spec_version` 해시로 유도 | **(a)** — (b) 는 「같은 데이터로 두 번 학습」(seed 실험 등)을 계약이 금지하게 되고, 의도 단위는 업무 쪽이 안다. ml-engine 은 키를 해석하지 않는다(불투명 문자열, 길이 상한) | 착수 전 |
-| **D-2C-2** | **`training_spec_version` 이 가리키는 것.** 학습 파라미터(seed·num_threads·boosting rounds·holdout 규칙)는 어디에 사는가 | (a) **ml-engine 안의 versioned training spec(5C 소유), 요청은 version 문자열만** (b) 요청 본문에 파라미터를 실음 | **(a)** — (b) 는 Kotlin 이 LightGBM 파라미터를 알게 된다(§3.2 경계). legacy 의 재현성 파라미터는 코드 상수였고 manifest 에 없었다(조사 (d)) — 5C 가 spec 을 versioned 로 두고 manifest 에 싣는다. 미지 version 은 `FAILED(UNSUPPORTED_TRAINING_SPEC)` 이 아니라 **`StartTraining` 거부**(`ApplicationFailure(UNSUPPORTED_SCHEMA)` 계열 — 시작 전 알 수 있는 것은 시작 전에) | 착수 전 |
+| **D-2C-2** | **`training_spec_version` 이 가리키는 것.** 학습 파라미터(seed·num_threads·boosting rounds·holdout 규칙)는 어디에 사는가 | (a) **ml-engine 안의 versioned training spec(5C 소유), 요청은 version 문자열만** (b) 요청 본문에 파라미터를 실음 | **(a)** — (b) 는 Kotlin 이 LightGBM 파라미터를 알게 된다(§3.2 경계). legacy 의 재현성 파라미터는 코드 상수였고 manifest 에 없었다(조사 (d)) — 5C 가 spec 을 versioned 로 두고 manifest 에 싣는다. 미지 version 은 job 실패가 아니라 **`StartTraining` 거부** — `ApplicationFailure(UNSUPPORTED_TRAINING_SPEC, retryable=false)`(2A ⑤ 가 소유하는 `FailureCode` 값 — 시작 전 알 수 있는 것은 시작 전에) | 착수 전 |
 | **D-2C-3** | `job_id` 는 ml-engine 발급 불투명 문자열(UUID 권장, 계약은 형식을 정하지 않음). Kotlin 은 저장·조회 키로만 | — | 계약 고정 |
-| **D-2C-4** | `JobFailure { FailureCode code, bool retryable, string detail_code }` — `FailureCode` 어휘는 **2C 가 최소 집합**(`DATASET_UNREADABLE`·`DATASET_CHECKSUM_MISMATCH`·`TRAINING_ERROR`·`EVALUATION_ERROR`·`CANCELLED_BY_REQUEST`·`RESOURCE_EXHAUSTED`)으로 열고 5C 가 값을 더한다(호환 추가). 자유 문자열 사유 없음 | — | 계약 고정 |
+| **D-2C-4** | `JobFailure { JobFailureCode code, bool retryable, string detail_code }` — **`JobFailureCode` 는 2A 의 `FailureCode`(application 어휘)와 다른 enum** 이고 이름을 겹치지 않는다(같은 패키지에서 같은 이름은 protoc 이 거부하고, 층이 다르다 — application 실패는 RPC 응답, job 실패는 job 의 종료 사유). 최소 집합 `DATASET_UNREADABLE`·`DATASET_CHECKSUM_MISMATCH`·`TRAINING_ERROR`·`EVALUATION_ERROR`·`CANCELLED_BY_REQUEST`·`WORKER_RESOURCE_EXHAUSTED`(transport status `RESOURCE_EXHAUSTED` 와 이름을 겹치지 않는다 — ADR 0010 D-3 「두 층에 같은 실패를 두지 않는다」) 으로 열고 5C 가 값을 더한다(호환 추가). 2C 가 RPC 응답에서 쓰는 application 값(`IDEMPOTENCY_CONFLICT`·`JOB_NOT_FOUND`·`UNSUPPORTED_TRAINING_SPEC`)은 **2A ⑤ 에 등재돼 있다**. 자유 문자열 사유 없음 | — | 계약 고정 |
 | **D-2C-5** | 시각은 `google.protobuf.Timestamp`(UTC). KST 해석은 Kotlin. `accepted_at ≤ started_at ≤ finished_at` 불변식은 consumer test | — | 계약 고정 |
 | **D-2C-6** | job 목록 조회(`ListTrainingJobs`)는 **두지 않는다** — Kotlin 이 자기가 시작한 job 만 안다(ADR 0003 D-5 방향). 필요가 측정되면 호환 추가 | — | 계약 고정 |
 
@@ -88,7 +87,7 @@ rollback: |
 **방어한다**: (a) 중복 학습(`idempotency_key` — 같은 키 두 번 = job 하나, provider test) (b) 미지 상태의 조용한 접힘(`UNSPECIFIED`·정의 밖 거부, 전이표 밖 전이 거부) (c) `SUCCEEDED` 인데 artifact 없음 / `FAILED` 인데 failure 없음(조합 불변식 test) (d) dataset 이 요청 시점과 다른 것으로 바뀜(immutable reference + checksum — 불일치는 `FAILED`) (e) Celery·task 이름의 wire 유입(필드 부재 + lint) (f) 응답 artifact 의 `dataset_id` 가 요청과 다름(consumer test) (g) 동기 RPC 로 학습을 붙잡음(모든 RPC 가 unary 이고 `StartTraining` 이 즉시 `ACCEPTED` 를 돌려준다는 provider test).
 **방어하지 않는다**: ml-engine 이 실제로 취소를 존중하는가(5C — 계약은 상태만) · 폴링 주기·재시도(M4/ADR 0005) · dataset 의 내용 무결성(checksum 은 바이트 동일성까지) · 인증·권한(M6) · manifest 서명 검증(ML-08, 5C) · fork-불안전(ADR 0010 §6 — 5A 프로세스 모델).
 
-**우회 후보(≥5)**: (1) `idempotency_key` 를 빈 문자열로 → 필수 필드 validation (2) `RUNNING → ACCEPTED` 역전이 → 전이표 test (3) `CANCELLED` 에 artifact 첨부 → 조합 불변식 (4) `dataset.uri` 에 DB 연결 문자열 → 계약은 못 막는다(uri 는 불투명) — 5A 의 serving/training import boundary(§3.2) 가 잡는다, 알려진 제한 (5) `JobFailure.detail_code` 에 Celery 원문 → lint 는 못 잡는다 — 리뷰 항목 (6) `GetTrainingJob` 을 스트리밍으로 바꿈 → breaking gate (7) 같은 `idempotency_key` 로 다른 `dataset` → `ApplicationFailure(IDEMPOTENCY_CONFLICT, retryable=false)` — provider test.
+**우회 후보(≥5)**: (1) `idempotency_key` 를 빈 문자열로 → 필수 필드 validation (2) `RUNNING → ACCEPTED` 역전이 → 전이표 test (3) `CANCELLED` 에 artifact 첨부 → 조합 불변식 (4) `dataset.uri` 에 DB 연결 문자열 → 계약은 못 막는다(uri 는 불투명) — 5A 의 serving/training import boundary(§3.2) 가 잡는다, 알려진 제한 (5) `JobFailure.detail_code` 에 Celery 원문 → lint 는 못 잡는다 — 리뷰 항목 (6) `GetTrainingJob` 을 스트리밍으로 바꿈 → breaking gate (7) 같은 `idempotency_key` 로 다른 `dataset` → `ApplicationFailure(IDEMPOTENCY_CONFLICT, retryable=false)`(2A 소유 값) — provider test.
 
 ---
 
