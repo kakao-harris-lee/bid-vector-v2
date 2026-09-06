@@ -3181,22 +3181,31 @@ cases:
       approved_by_user: false
   - id: floor-threshold-002
     domain: floor-threshold
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         임계 사정률 경계 — 실현 사정률이 임계 **와 같으면** 미달이 아니다 (초과가 아니므로 적격). 이 case는 **표본 하나의 미달 여부**만 고정한다 — 밴드
         필터·최소 표본 수·집계 빈도는 덮지 않는다(`floor-shortfall-001`~`006`이 그 축이다).
-        **이 주장을 떠받치는 authoritative 근거가 없다** — 사유는 `not_covered` 와 `change_history` 가 적는다.
+    verified_paths:
+      - "$.sampleIsShortfall"
+      - "$.criticalAssessmentRate.fraction"
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
-          capability-map.md DEC-04 결정 무관 acceptance *"임계 사정률이 정확히 경계값인 표본은 미달로 세지 않는다"* —
-          **M0 산출 문서의 자체 도출**이다. `v2-지침서.md` §4.4 는 경계의 포함/제외를 **versioned 정책**으로 두어
-          이 선택을 정하지 않는다.
+          **운영자 결정 2026-09-06 (M1/1D 착수 D-3, decision 28)** — 경계 등가의 미달 판정을
+          `shortfallComparison = strictly-greater` 로 정하고 그것을 **정책 version 1 의 값**으로 승인했다.
+          정본은 `docs/discovery/data-dictionary.md` §3.3 의 decision 28 블록이고, 계약 문면은
+          `reports/evidence/m1/1d/scope.md` D-3 · `milestone-1.md` 「Slice 1D」가 함께 싣는다.
+          `capability-map.md` DEC-04 acceptance 와 `v2-지침서.md` §4.4 는 **이 결정이 가리키는 포인터**로만 쓴다.
     expected_reasoning: |-
-      v2-지침서.md §4.4 *"`추천 투찰률 / 낙찰하한율`이 임계 사정률이라는 basis 관계를 타입과 설명으로 보존한다"* + capability-map.md
-      DEC-04 결정 무관 acceptance *"임계 사정률이 정확히 경계값인 표본은 미달로 세지 않는다(초과가 아니므로 적격)"* — 즉 **하한 미달 ⟺ 실현 사정률 >
-      임계 사정률**의 **엄격 부등호**다. `0.91875 ÷ 0.875 = 1.05`는 십진에서 정확히 떨어지므로 이 case의 기대값은 반올림
-      정책(`OPEN-DIC-10`)에 의존하지 않는다.
+      **기대값은 승인된 정책값에서 도출된다.** decision 28 이 `shortfallComparison` 의 version 1 값을
+      `strictly-greater` 로 승인했고, 그 값에서 **하한 미달 ⟺ 실현 사정률 > 임계 사정률**의 엄격 부등호가
+      나온다 — 실현과 임계가 **같은** 이 입력은 초과가 아니므로 `$.sampleIsShortfall: false` 다.
+      임계 사정률 자체는 `v2-지침서.md` §4.4 *"`추천 투찰률 / 낙찰하한율`이 임계 사정률이라는 basis 관계를
+      타입과 설명으로 보존한다"* 가 정한다. `0.91875 ÷ 0.875 = 1.05`는 십진에서 정확히 떨어지므로 이 case의
+      기대값은 반올림 정책(`OPEN-DIC-10`)에 의존하지 않는다.
+      **`capability-map.md` DEC-04 acceptance 를 근거로 세우지 않는다** — 그 문면(*"임계 사정률이 정확히
+      경계값인 표본은 미달로 세지 않는다"*)은 M0 산출 문서의 자체 도출이라 0E 라운드 11 강등의 사유였다.
+      그 자리를 **정책과 결정**이 대신하고, acceptance 는 결정과 문면이 같음을 보이는 참조로만 남는다.
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -3217,20 +3226,24 @@ cases:
       contains_personal_data: false
       synthetic: true
       method: not-applicable-synthetic
-      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다. 입력의 `policy.policyVersion` 도 `SYN-` 접두의 합성 version id 다 — 운영 정책 표에서 가져온 값이 아니다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: d6aa107d20eb06103efa9a3bdf89ad56a4a984129f98c6ddafff4a8ffe4ea97b
+    sha256: 134f5887b0e0677a6b8b0f1857808dd2d376995af2aa81492aca5e92fa15b88d
     expected_sha256: d03e94b7b9b3ad309b8994ca6326f42eb9c0f65a6446554ff5adebbf7067d6e7
     not_covered: |-
-      **경계 등가의 미달 판정** — 실현 사정률이 임계와 **같을 때** 미달인가 아닌가. 기대값은 **엄격 부등호**
-      (미달 ⟺ 실현 > 임계)를 고르지만 **그 선택을 정하는 승인 문면이 없다.** `v2-지침서.md` §4.4 는 경계의
-      포함/제외를 **versioned 정책**으로 두는데 **그 정책이 아직 없다** — 세 입력 어디에도 경계 정책도
-      policy version 도 없다. 유일한 직접 근거인 `capability-map.md` DEC-04 acceptance 는 **M0 자체 도출**이라
-      `classification_policy.authoritative` ①②③ 어디에도 서지 않는다. **경계 정책의 결정은 M1/M2 소관**이고
-      승인 경로는 `uncovered_axes` 의 「승인 부재로 authoritative 덮개를 잃은 축 — floor-threshold (경계 등가의
-      미달 판정)」이 지목한다. **형제 `001`(임계 미만)·`003`(임계 초과)은 이 선택에 의존하지 않아
-      `authoritative` 그대로다.**
+      **정책 슬롯이 실제로 술어를 고른다는 것을 이 case 가 잠그지 않는다.** 입력이 이제
+      `policy.shortfallComparison` 을 싣지만 이 case 의 계약은 **그 값이 `strictly-greater` 일 때의
+      판정 하나**다 — 반대 값(`greater-or-equal`)에서 같은 입력이 미달이 되는지는 이 case 밖이고,
+      「비교 방향이 코드 상수가 아니라 정책 데이터에서 온다」는 **1D 도메인 test 의 성질**이 진다
+      (`contract_binding.fixed_by`). corpus 소비 테스트가 정책값을 바꿔 가며 이 기대값을 재사용하면
+      **한 case 의 기대값을 여러 의미에 재사용**하는 것이라(`data-extract.md` §7) 금지다.
+      **`$.comparison` 문자열은 나르기만 한다** — `"realizedAssessmentRate > criticalAssessmentRate"` 는
+      계약 타입이 아니라 사람이 읽는 설명이고, `verified_paths` 밖이다. 방향의 계약은
+      `ShortfallComparison` sealed 어휘가 지고 그 어휘는 이 기대값에 실리지 않는다.
+      **`policy.policyVersion` 되울림도 잠그지 않는다** — `floor-threshold` 투영은 version 을 내지 않는다
+      (`floor-shortfall` 축의 `$.policyVersion` 이 그 자리다).
+      **밴드 필터·최소 표본 수·집계 빈도는 이 case 의 축이 아니다** — `floor-shortfall-001`~`006`.
     change_history:
       - date: 2026-09-02
         change: |-
@@ -3254,6 +3267,51 @@ cases:
           되돌림은 그 정책이 M1/M2 에서 서고 기대값이 **그 정책에서 도출**될 때이며, 그때는 policy version 을
           입력에 싣는다. 입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다
           (그래서 `previous_*` 항목이 없다).
+      - date: 2026-09-06
+        change: |-
+          **되돌림 — `classification` 을 `insufficient-evidence` → `authoritative`.** 입력에 정책을 실었다
+          (`policy.shortfallComparison: strictly-greater` · `policy.policyVersion: SYN-POLICY-2026-09-06`) —
+          그래서 `sha256` 이 바뀌고 `previous_sha256` 이 붙는다. `source.kind` 를 `m0-derived-rule` →
+          **`operator-decision`** 으로, `reference` 를 decision 28 로 고쳤다. `verified_paths` 를 형제
+          `001`·`003` 과 같게 다시 달고(`$.sampleIsShortfall` · `$.criticalAssessmentRate.fraction`)
+          `expected_reasoning` 을 정책 도출로 다시 썼으며 `not_covered` 를 갱신했다.
+          **기대값 파일은 한 바이트도 바꾸지 않았다** — `sampleIsShortfall: false` 그대로이고
+          `expected_sha256` 도 그대로다. 되돌림이 기대값 재작성이 아님을 그 불변이 보인다.
+        reason: |-
+          **운영자 결정 2026-09-06 — M1/1D 착수 D-3 (a) 채택, decision 28.** 2026-09-02 강등의 사유는
+          「경계 등가를 정하는 versioned 정책의 부재」였고 직전 항목의 `policy_version` 이 되돌림 조건을
+          *"그 정책이 M1/M2 에서 서고 기대값이 **그 정책에서 도출**될 때이며, 그때는 policy version 을
+          입력에 싣는다"* 로 적어 두었다. decision 28 이 그 조건 셋을 다 채운다 — 정책 슬롯
+          `FloorShortfallPolicyData.shortfallComparison` 이 1D 계약으로 서고, 그 **version 1 값**이
+          `strictly-greater` 로 승인됐으며, 이 case 의 기대값이 그 값에서 도출된다.
+          `classification_policy.authoritative` 의 **②「커밋된 운영자 결정 기록」** 자리다 —
+          `approved-spec`(③ `v2-지침서.md`)이 아니다. §4.4 는 이 선택을 여전히 정하지 않고 정책으로 미루며,
+          그 미룸을 받은 것이 decision 28 이기 때문이다. 강등을 부른 `source.kind` 어긋남을 되풀이하지 않으려고
+          `kind` 를 결정의 층에 맞췄다.
+          **되돌림이 자동이 아니다** — `data-extract.md` §1 이 요구하는 「별도의 수작업 판정과 승인 근거」가
+          이 결정이고, 기대값은 재생성 명령이 아니라 **원래 값 그대로** 남았다.
+
+          **되돌림이 두 자리를 열어 두고 끝난다 — 이 커밋은 둘 다 닫지 못한다(쓰기 범위 밖).**
+          **① 적대 집합에 이 case 가 없다.** `mutation_sweep_adversarial.py` 의 `ASSERTED` 는 사람이 쓴
+          표이고 형제 `001`·`003` 만 든다(`$.criticalAssessmentRate.fraction`). 그래서 이 case 는 (a)(a′)
+          변이체가 **하나도 생성되지 않는다** — 스윕의 「강등 대상 0」이 이 case 에 대해서는 **공허하다.**
+          Codex B14 high 가 null 기대값에 대해 쓴 진단(*"적대 집합이 한 번도 변이하지 않아 「강등 대상 0」이
+          건전성의 증거가 아니었다"*)과 같은 갈래다. 닫는 자리는 그 스크립트의 `ASSERTED` 에 이 case 의
+          `$.criticalAssessmentRate.fraction` 을 형제와 같은 근거로 더하는 것이고, `fixtures/tools/**` 는
+          이 레인의 쓰기 범위가 아니다.
+          **② runner dispatch 표에 이 case 가 없다.** `floor-threshold` 는 `TARGET_DOMAINS` 안이고
+          `SharedKernelCorpusConformanceTest` 의 「dispatch 표 밖의 authoritative case 가 없다」가
+          `authoritative` 전수를 요구하므로, `PROVENANCE_FLOOR_EXECUTORS` 에 이 id 가 없으면
+          **그 게이트가 이 승격으로 떨어진다.** `reports/evidence/m1/1d/scope.md` P-5 가 그 자리를
+          *"D-3 승인 시 ft 002"* 로 예고해 두었다 — 구현 레인이 같은 executor(`floorThresholdExecutor`,
+          형제 둘과 입력 형태가 같다)로 한 줄 더하면 닫힌다. **승격과 그 한 줄 사이에서 acceptance 는
+          붉다** — 순서를 숨기지 않는다.
+        policy_version: |-
+          **`SYN-POLICY-2026-09-06`** — 입력 `policy.policyVersion` 에 실린 합성 version id 이며 decision 28 의
+          version 1 을 가리킨다. 값 자체는 synthetic 이다(운영 정책 표에서 가져오지 않았다) — 이 corpus 의
+          다른 정책 입력(`floor-shortfall-001` 의 `SYN-POLICY-2026-08-30`)과 같은 규율이다.
+          비교 방향을 바꾸려면 **새 version** 이고 그때는 이 case 의 기대값을 다시 판정한다.
+        previous_sha256: d6aa107d20eb06103efa9a3bdf89ad56a4a984129f98c6ddafff4a8ffe4ea97b
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -6281,29 +6339,37 @@ uncovered_axes:
       (decision 21 이 그 재정의를 승인했다).
       **축을 지우지 않는다** — 남은 ②·셋째가 이 자리를 계속 쓴다.
 
-  - axis: "승인 부재로 authoritative 덮개를 잃은 축 — floor-threshold (경계 등가의 미달 판정)"
+  - axis: "**해소(2026-09-06, decision 28)** — 승인 부재로 authoritative 덮개를 잃은 축이었던 floor-threshold (경계 등가의 미달 판정)"
     domain: floor-threshold
     why_blocked: |-
+      **아래는 열려 있던 동안(2026-09-02 ~ 2026-09-06)의 기록이다 — 현재형으로 읽지 않는다.**
       「실현 사정률이 임계와 **같으면** 미달이 아니다」(`floor-threshold-002`)의 근거가
       `capability-map.md` DEC-04 결정 무관 acceptance *"임계 사정률이 정확히 경계값인 표본은 미달로 세지
-      않는다(초과가 아니므로 적격)"* **하나**이고 그것은 **M0 산출 문서의 자체 도출**이다.
-      **인용되던 `v2-지침서.md` §4.4 는 이 선택을 정하지 않는다** — 오히려 *"표본 필터 범위, 최소 표본 수,
-      **경계의 포함/제외**는 versioned 정책이다"* 라 적어 **결정을 정책으로 미룬다.** 그런데 **그 정책이 없다**:
-      세 `floor-threshold` 입력 어디에도 경계 정책도 policy version 도 없다. 그래서 이 case 는
-      `approved-spec` 으로 설 수 없고 `classification_policy.authoritative` ①②③ 어디에도 서지 않는다.
+      않는다(초과가 아니므로 적격)"* **하나**였고 그것은 **M0 산출 문서의 자체 도출**이었다.
+      **인용되던 `v2-지침서.md` §4.4 는 그 선택을 정하지 않는다** — 오히려 *"표본 필터 범위, 최소 표본 수,
+      **경계의 포함/제외**는 versioned 정책이다"* 라 적어 **결정을 정책으로 미룬다.** 그런데 **그 정책이 없었다**:
+      세 `floor-threshold` 입력 어디에도 경계 정책도 policy version 도 없었다. 그래서 그 case 는
+      `approved-spec` 으로 서지 못했고 `classification_policy.authoritative` ①②③ 어디에도 서지 않았다.
     owning_open:
-      - "소유 `OPEN` 없음 — 막는 것은 미결 `OPEN` 이 아니라 **versioned 경계 정책의 부재**다"
-      - "인접: `OPEN-DIC-10` (활성) — 반올림 자리수를 소유한다. 이 축은 반올림이 아니라 **경계의 포함/제외**다"
+      - "소유 `OPEN` 없음 — 막던 것은 미결 `OPEN` 이 아니라 **versioned 경계 정책의 부재**였다"
+      - "인접: `OPEN-DIC-10` (활성) — 반올림 자리수를 소유한다. 이 축은 반올림이 아니라 **경계의 포함/제외**였다"
     what_is_covered_instead: |-
-      **경계의 양쪽은 덮인다** — `floor-threshold-001`(임계 **미만**) · `003`(임계 **초과**)이 `authoritative`
-      로 남는다. 둘의 기대값은 **경계 포함/제외 선택에 의존하지 않으므로** 이 강등이 그 둘을 건드리지 않는다.
-      **덮이지 않는 것은 등가점 하나**다 — 실현 = 임계일 때의 판정. `floor-threshold-002` 는
-      `insufficient-evidence` 로 남아 있고 **지워지지 않았다**(입력·기대값·해시 그대로).
+      **이제 등가점도 덮인다.** `floor-threshold-001`(임계 **미만**) · `002`(임계 **등가**) · `003`(임계 **초과**)
+      셋이 `authoritative` 다. `001`·`003` 은 강등 기간에도 그대로였다 — 둘의 기대값이 경계 포함/제외 선택에
+      의존하지 않기 때문이며, 그 사실은 지금도 같다. **비지 않는 것을 비었다고 적지 않는다** — 분류의 정본은
+      각 case 의 `classification` 이고 셈은 스윕이 낸다.
+      **여전히 이 축 밖인 것**: 정책값을 반대로(`greater-or-equal`) 두었을 때의 판정은 corpus 가 아니라
+      **1D 도메인 test** 가 진다(`floor-threshold-002.contract_binding.fixed_by`). 한 case 의 기대값을
+      두 정책값에 재사용하지 않는다(`data-extract.md` §7).
     unblocks_when: |-
-      **경계의 포함/제외가 versioned 정책으로 서고** 이 case 의 기대값이 **그 정책에서 도출**된다. 그 정책의
-      결정은 **M1/M2 계약 설계 소관**이다(`v2-지침서.md` §4.4 가 그리로 미뤘다). 되돌릴 때는 policy version 을
-      입력에 싣고 `change_history` 에 그 정책의 좌표를 적는다. **운영자가 대신 DEC-04 acceptance 의 그 문장을
-      업무 규칙으로 명시 승인**해도 올라가나, 그때도 **정책 version 없는 경계**라는 사실은 남는다.
+      **해소됐다 — 운영자 결정 2026-09-06(M1/1D 착수 D-3 (a), decision 28).** 열릴 때 적어 둔 조건이
+      *"경계의 포함/제외가 versioned 정책으로 서고 이 case 의 기대값이 그 정책에서 도출된다"* 였고
+      셋 다 채워졌다: 정책 슬롯 `FloorShortfallPolicyData.shortfallComparison` 이 1D 계약으로 섰고,
+      그 **version 1 값**이 `strictly-greater` 로 승인됐으며(정본 `docs/discovery/data-dictionary.md` §3.3),
+      `floor-threshold-002` 의 입력이 그 정책과 policy version 을 싣고 기대값이 거기서 도출된다.
+      **기대값 파일은 바뀌지 않았다** — 되돌림이 재작성이 아님을 `expected_sha256` 불변이 보인다.
+      경로는 그 case 의 `change_history` 2026-09-06 항목이 갖는다.
+      **축을 지우지 않는다** — 비교 방향을 바꾸는 것은 **새 policy version** 이고, 그때 이 자리가 다시 열린다.
 
   - axis: "승인 부재로 **검증 주장에서 내린** 축 — `floor-shortfall` 빈도 결과의 출력 표현 (여섯 항목 묶음 · 유리수 분자/분모)"
     domain: floor-shortfall
