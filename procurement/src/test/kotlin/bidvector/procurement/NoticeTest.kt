@@ -25,6 +25,8 @@ private val COMMAND =
         estimatedAmount = null,
         allocatedBudget = null,
         floorRate = null,
+        deadlineAt = null,
+        openingScheduledAt = null,
         raw = OBSERVATION,
     )
 
@@ -59,13 +61,18 @@ class NoticeTest {
     }
 
     @Test
-    fun `우회 (5) — copy(status=X) 로 전이표를 우회할 수 없다`() {
+    fun `같은 모듈 안에서는 copy(status=X) 가 열려 있다 — 경계는 모듈 밖뿐이다(우회 5, N-5 이름 정정)`() {
         val notice = Notice.collected(COMMAND)
 
-        // Notice(internal constructor)와 달리 copy()는 같은 가시성이라 여전히 호출 가능하지만,
-        // 그 자체가 곧 「이 모듈 안 저자」의 몫이다(위협 모델 (0) — 경계 밖). 이 test 가 실제로
-        // 재는 것은 그 호출이 여전히 값 하나(다음 status)만 바꿀 뿐 전이표를 검사하지 않는다는
-        // 사실 자체다 — 그래서 applyEvent 가 유일한 "검사되는" 경로임을 대조로 보인다.
+        // 이 test 이름이 이전 판(verifier r2 N-5)과 반대로 읽힌다 — 실제로 이 호출은
+        // *성공*한다. `Notice`(internal constructor + @ConsistentCopyVisibility)가 닫는
+        // 것은 **모듈 경계**이지 파일 경계가 아니다(위협 모델 (0) — 같은 모듈 안의 저자는
+        // 방어 대상 밖이다, scope.md 「방어하지 않는 것」). 우회 (5)의 실제 폐쇄(다른 모듈,
+        // 예: adapters 에서 `notice.copy(status = …)` 호출)는 격리 worktree 에서 컴파일
+        // 실패로 실측했다(evidence `commands.md`/`checklist.md` N-1·5 실측 기록) — 그 증거는
+        // 컴파일 실패 자체라 이 gate 안의 test 로 상주하지 않는다. 이 test 가 남기는 것은
+        // 대조군(같은 모듈에서는 검사 없이 값이 바뀐다)과, 표 자체는 여전히 그 전이를
+        // 거부로 판정한다는 사실(`transition` 직접 호출)이다.
         val bypassed = notice.copy(status = NoticeStatus.Awarded)
 
         bypassed.status shouldBe NoticeStatus.Awarded

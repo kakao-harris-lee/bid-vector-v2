@@ -20,6 +20,7 @@ data class Notice internal constructor(
     val estimatedAmount: ResolvedEstimatedAmount?,
     val allocatedBudget: AllocatedBudget?,
     val floorRate: FloorRate?,
+    val deadlineAt: Instant?,
 ) {
     /** 유일한 상태 변경 경로 — 표 밖의 전이는 [NoticeTransitionOutcome.Rejected]로 관측된다. */
     fun applyEvent(event: NoticeEvent): NoticeTransitionOutcome =
@@ -39,6 +40,7 @@ data class Notice internal constructor(
                 estimatedAmount = command.estimatedAmount,
                 allocatedBudget = command.allocatedBudget,
                 floorRate = command.floorRate,
+                deadlineAt = command.deadlineAt,
             )
     }
 }

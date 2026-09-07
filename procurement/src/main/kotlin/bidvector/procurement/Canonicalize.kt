@@ -10,8 +10,6 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
 
 /**
  * `canonicalize`가 원문에서 실제로 낸 canonical 값(②) — 원문(`raw`)은 감사를 위해 그대로
@@ -25,6 +23,8 @@ data class NoticeCollected(
     val estimatedAmount: ResolvedEstimatedAmount?,
     val allocatedBudget: AllocatedBudget?,
     val floorRate: FloorRate?,
+    val deadlineAt: Instant?,
+    val openingScheduledAt: Instant?,
     val raw: RawNoticeObservation,
 )
 
@@ -184,6 +184,13 @@ private fun normalizedCommand(
                     estimatedAmount = estimatedAmountAsResolved(estimatedResolution),
                     allocatedBudget = allocatedBudgetFrom(observation, policy.fieldContracts, noticeId.round),
                     floorRate = floorRateFrom(observation, policy.fieldContracts, noticeId.round),
+                    deadlineAt = instantFrom(observation, policy.fieldContracts, FieldConcept.DEADLINE_AT),
+                    openingScheduledAt =
+                        instantFrom(
+                            observation,
+                            policy.fieldContracts,
+                            FieldConcept.OPENING_SCHEDULED_AT,
+                        ),
                     raw = observation,
                 ),
                 unknownFieldCount,
@@ -207,17 +214,4 @@ fun canonicalize(
     } else {
         normalizedCommand(observation, policy, noticeId, unknownFieldCount)
     }
-}
-
-/** D-3A-4 — 타임존 없는 KONEPS 일시 문자열을 [SourceZoneRuleId]로 해석한다. */
-fun parseSourceZonedInstant(
-    raw: String,
-    rule: SourceZoneRuleId,
-): Instant? {
-    val local = runCatching { LocalDateTime.parse(raw) }.getOrNull() ?: return null
-    val zone =
-        when (rule) {
-            SourceZoneRuleId.ASSUME_KST -> ZoneId.of("Asia/Seoul")
-        }
-    return local.atZone(zone).toInstant()
 }

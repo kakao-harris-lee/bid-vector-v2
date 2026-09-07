@@ -22,6 +22,8 @@ private fun testContract(
     scale: FieldScale,
     basis: Basis? = null,
     provenanceTemplate: FieldProvenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+    vatTreatment: VatTreatment = VatTreatment.UNKNOWN,
+    sourceZone: SourceZoneRuleId? = null,
 ): KonepsFieldContract =
     KonepsFieldContract.of(
         rawName = RawKey(rawName),
@@ -29,11 +31,12 @@ private fun testContract(
         basis = basis,
         scale = scale,
         nullability = FieldNullability.OPTIONAL,
-        vatTreatment = VatTreatment.UNKNOWN,
+        vatTreatment = vatTreatment,
         authoritative = true,
         presentIn = setOf(SourceEndpoint.NOTICE_LIST),
         provenanceTemplate = provenanceTemplate,
         effectiveFrom = EffectiveFrom.Initial,
+        sourceZone = sourceZone,
     )
 
 /** legacy-behavior — test 전용 정책 인스턴스(조사 b-4). main `KONEPS_COLLECTION_POLICY`는 형태만 갖는다. */
@@ -48,6 +51,9 @@ private val TEST_REGISTRY =
                 FieldScale.WON_INTEGER,
                 Basis.BASE_AMOUNT,
                 FieldProvenanceTemplate.PUBLISHED,
+                // N-2 회귀 가드 — INCLUSIVE 는 코드의 VatTreatment.UNKNOWN 리터럴과 값이 달라야
+                // "계약에서 읽는다" test 가 실제로 그 리터럴 회귀를 잡는다(verifier r2 실측).
+                VatTreatment.INCLUSIVE,
             ),
             testContract(
                 "bdgtAmt",
@@ -62,6 +68,9 @@ private val TEST_REGISTRY =
                 FieldScale.WON_INTEGER,
                 Basis.ESTIMATED,
                 FieldProvenanceTemplate.PUBLISHED,
+                // curator 표(policy-values.md §1.1)의 실제 값과 같다 — EXCLUSIVE. N-2 와 같은
+                // 이유로 UNKNOWN 리터럴 회귀를 이 값이 잡는다.
+                VatTreatment.EXCLUSIVE,
             ),
             testContract(
                 "wrongScaleAmt",
@@ -80,6 +89,18 @@ private val TEST_REGISTRY =
             testContract("bsnsDivCd", FieldConcept.BUSINESS_CATEGORY_CODE, FieldScale.OPAQUE_TEXT),
             testContract("bsnsDivNm", FieldConcept.BUSINESS_CATEGORY_LABEL, FieldScale.OPAQUE_TEXT),
             testContract("sucsfbidLwltRate", FieldConcept.FLOOR_RATE, FieldScale.PERCENT),
+            testContract(
+                "bidClseDt",
+                FieldConcept.DEADLINE_AT,
+                FieldScale.DATETIME_NO_ZONE,
+                sourceZone = SourceZoneRuleId.ASSUME_KST,
+            ),
+            testContract(
+                "opengDt",
+                FieldConcept.OPENING_SCHEDULED_AT,
+                FieldScale.DATETIME_NO_ZONE,
+                sourceZone = SourceZoneRuleId.ASSUME_KST,
+            ),
         ),
     )
 
@@ -242,14 +263,30 @@ class CanonicalizeTest {
     }
 
     @Test
-    fun `기초금액 통화·과세는 계약에서 읽는다 — F-2 리터럴 금지`() {
+    fun `기초금액 통화·과세는 계약에서 읽는다 — F-2 리터럴 금지, N-2 회귀 가드`() {
         val observation =
             observationOf(mapOf("bidNtceNo" to "20260101001", "bidNtceOrd" to "000", "bssAmt" to "1000000"))
 
         val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
         val direct = outcome.command.baseAmount as ResolvedBaseAmount.Direct
 
-        direct.amount.vatTreatment shouldBe VatTreatment.UNKNOWN
+        // 계약의 값(INCLUSIVE)은 코드가 예전에 쓰던 리터럴(UNKNOWN)과 달라야 한다 — 리터럴로
+        // 되돌리는 변이가 이 test 를 실제로 실패시킨다(verifier r2 N-2, 재발 방지).
+        direct.amount.vatTreatment shouldBe VatTreatment.INCLUSIVE
+    }
+
+    @Test
+    fun `추정가격 통화·과세도 계약에서 읽는다 — N-2 회귀 가드(두 번째 표본)`() {
+        val observation =
+            observationOf(
+                mapOf("bidNtceNo" to "20260101001", "bidNtceOrd" to "000", "presmptPrce" to "1000000"),
+            )
+
+        val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
+
+        outcome.command.estimatedAmount
+            ?.amount
+            ?.vatTreatment shouldBe VatTreatment.EXCLUSIVE
     }
 
     @Test
@@ -300,6 +337,37 @@ class CanonicalizeTest {
 
         outcome.command.floorRate shouldBe
             FloorRate(Rate.ofPercent(BigDecimal("87.995")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
+    }
+
+    @Test
+    fun `마감·개찰예정 일시는 계약의 sourceZone 규칙으로 Instant 로 해석된다 — N-3`() {
+        val observation =
+            observationOf(
+                mapOf(
+                    "bidNtceNo" to "20260101001",
+                    "bidNtceOrd" to "000",
+                    "bidClseDt" to "2026-09-10T14:00:00",
+                    "opengDt" to "2026-09-11T10:00:00",
+                ),
+            )
+
+        val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
+
+        outcome.command.deadlineAt shouldBe parseSourceZonedInstant("2026-09-10T14:00:00", SourceZoneRuleId.ASSUME_KST)
+        outcome.command.openingScheduledAt shouldBe
+            parseSourceZonedInstant("2026-09-11T10:00:00", SourceZoneRuleId.ASSUME_KST)
+        // 원문은 raw 에서 그대로 확인 가능하다 — 해석은 별도 필드일 뿐 원문을 지우지 않는다.
+        outcome.command.raw.valueOf(TEST_REGISTRY.contractFor(RawKey("bidClseDt"))!!) shouldBe "2026-09-10T14:00:00"
+    }
+
+    @Test
+    fun `마감일시 필드가 없으면 deadlineAt 은 null 이다 — 지어내지 않는다`() {
+        val observation = observationOf(mapOf("bidNtceNo" to "20260101001", "bidNtceOrd" to "000"))
+
+        val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
+
+        outcome.command.deadlineAt shouldBe null
+        outcome.command.openingScheduledAt shouldBe null
     }
 }
 
