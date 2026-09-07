@@ -3264,7 +3264,7 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 
 **수를 산문에 박지 않는다.** 전수와 셈은 `reports/evidence/m0/0e/commands.md`의 명령이 낸다.
 **네 registry의 합을 「총계」로 쓰지 마라** — 계열 간 **같은 쟁점이 둘 실재**한다
-(`regression-ledger.md:1386`·`:1387`이 `OPEN-REG-04` ↔ `OPEN-NUM-01`,
+(`regression-ledger.md:1388`·`:1389`이 `OPEN-REG-04` ↔ `OPEN-NUM-01`,
 `OPEN-REG-01` ↔ `OPEN-OPS-01`을 같은 쟁점으로 적고 지우지 않은 이유까지 남긴다).
 **총계 확정은 registry 통합 slice의 몫**이며 이 절이 하지 않는다.
 
@@ -3363,7 +3363,7 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-REG-01` | rate limit 실패가 재시도 폭주를 실제로 만들었는가 | **`OPEN-OPS-01`과 같은 쟁점** — 그 담당을 따른다(측정: 운영 로그 열람 승인 = 운영자 · 정책: **M3 3B**) | `regression-ledger.md:1387`이 두 id를 같은 쟁점으로 적고 지우지 않은 이유까지 남긴다 | **정본**(동일 쟁점) · 자리는 **유도** |
 | `OPEN-REG-02` | legacy DB 접근이 필요한 항목 | **미지목** — **legacy DB 열람 승인(운영자)이 선행**한다 | `milestone-0.md` 금지 사항 *"운영 DB query … (별도 사용자 승인 제외)"* | **유도**(선행 조건만 지목) |
 | `OPEN-REG-03` | 코퍼스 재계산이 필요한 항목 | **V2 코퍼스 확보 뒤** — fixture 레인 · **미지목** | 재계산의 입력이 아직 없다 | **유도**(선행 조건만 지목) |
-| `OPEN-REG-04` | `OPEN-NUM-01`("66% 오염")과 같은 쟁점 | **`OPEN-NUM-01`의 담당을 따른다** | `regression-ledger.md:1386` | **정본**(동일 쟁점) |
+| `OPEN-REG-04` | `OPEN-NUM-01`("66% 오염")과 같은 쟁점 | **`OPEN-NUM-01`의 담당을 따른다** | `regression-ledger.md:1388` | **정본**(동일 쟁점) |
 
 **`OPEN-COL` — 수집 어댑터 축. `milestone-1.md` 「범위 밖」이 `- KONEPS/LLM/gRPC 실제 호출`을 M1 범위 밖으로 둔다**
 
