@@ -1,11 +1,78 @@
 # 실행 명령과 종료 코드 — M3 / 3A
 
 base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f`, 구현 head(r0) `b0b40cd`, 수정 라운드 1 head
-`a9383b7`, 수정 라운드 2 head `74cf7b6f33950ca7c09306f73aad1f3e9081c8b1`, **3A 잔여 일괄
-head** `649866fc55b365c9e786dd5610f8f13b082b8df2`(코드·게이트 커밋 기준 — 이 evidence 커밋
-자신은 항상 한 칸 뒤진다). verifier r1 은 `_workspace/m3-3a/02_verifier_report.md`, r2
-(N-1~N-7)는 `_workspace/m3-3a/03_verifier_report_r2.md` 참고. 출력 전문은 남기지 않는다
-(evidence-pack 스킬 규격) — 핵심 결과 한 줄만.
+`a9383b7`, 수정 라운드 2 head `74cf7b6f33950ca7c09306f73aad1f3e9081c8b1`, 3A 잔여 일괄(①~④)
+head `649866fc55b365c9e786dd5610f8f13b082b8df2`, **3A 잔여 일괄 v2-defect 수정 head**
+`04d103c5d0efa332516c9e24061f54be7777c07c`(코드·게이트 커밋 기준 — 이 evidence 커밋 자신은
+항상 한 칸 뒤진다). verifier r1 은 `_workspace/m3-3a/02_verifier_report.md`, r2(N-1~N-7)는
+`_workspace/m3-3a/03_verifier_report_r2.md` 참고. 출력 전문은 남기지 않는다(evidence-pack
+스킬 규격) — 핵심 결과 한 줄만.
+
+## v2-defect 수정 — team-lead 판정(2026-09-07) 뒤 commit 목록
+
+team-lead 가 판정 필요 7건(002·003·004·016·018·023·026) 전부를 v2-defect 로 확정하고
+verifier r3 전 production 수정을 지시했다. 「계약 안 항목이라... 값을 맞추려 runner 를
+손대지 말고 production 을 고친 뒤 dispatch 예외 목록에서 빼라」는 지시를 그대로 따랐다.
+
+| 커밋 | 내용 |
+| --- | --- |
+| `3e387b0` | 003·004 — `RawValue`(`Present`/`ExplicitNull`)·`FieldPresence` 신설, `RawNoticeObservation.presenceOf` |
+| `2e1b051` | 023 — `NoticeNumber` 정규화를 trim 넘어 ASCII 대문자화·내부 공백→`-` 로 확장 |
+| `3b247da` | 002·016·018·026 — `RangeBand`/`ContractViolationAxis.RANGE`·`DocumentedVocabulary`·`FieldScale.DELIMITED_LIST`+`UnnormalizedFigure`·`DateTimePatternId`. 넷을 한 커밋으로 묶은 이유는 커밋 메시지 본문에 있다(공유 정책 인프라 파일, 중간 분할 시 컴파일 불가) |
+| `04d103c` | dispatch — `KonepsCollectionDefectFixExecutors.kt` 신설, 27 case 전건 dispatch, `KONEPS_COLLECTION_PENDING_CAPABILITY` 를 빈 집합으로 정정 |
+
+## v2-defect 수정 — acceptance_commands 재실행(head `04d103c`)
+
+### S-0 — 격리 worktree `clean check`
+## 2026-09-07T00:00:00Z
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`, 347 actionable tasks 전부 실행. `git worktree remove --force`로 정리, 잔여 없음 확인.
+
+### S-1 — 저장소 루트 `clean check`
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`, 338 actionable tasks. 이 재실행에서 `ArchitectureGateTest`
+  실패를 잡았다 — `NoticeNumber.of` 의 `String.uppercase()`(인자 없음)가 컴파일된
+  바이트코드에서 `java.util.Locale.ROOT` 를 참조해 domain 허용 목록 밖이었다(`java.util`
+  허용 예외 62종에 `Locale` 없음). `LicensePolicy.kt` `stripAndLowercase` 와 같은 기법
+  (CharArray 직접 조립, ASCII 전용)으로 닫았다 — `:procurement:check`(모듈 단독)는 이
+  위반을 못 잡는다(`ArchitectureGateTest` 는 9 모듈이 조합되는 `app` 모듈에만 있다),
+  전체 `clean check` 재실행이 왜 필수인지의 실측 사례다.
+
+### S-2 — 도메인 test
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew :procurement:test`
+- exit: 0
+- 핵심 결과: 94 tests, 0 failed, 0 error(v2-defect 6건의 신규 test 20건 포함, 이전
+  라운드 78건 대비 증가분).
+
+### S-3 — 도메인 게이트 5종
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew :procurement:domainApiTypeGate :procurement:domainSourceReferenceGate :procurement:typeShapeGate :procurement:sizeGate :procurement:cpdCheck`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`.
+
+### S-4 — app conformance
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew :app:test --tests '*Conformance*'`
+- exit: 0
+- 핵심 결과: 69 tests, 0 failed. **koneps-collection 27/27 case dispatch 통과**
+  (기존 20 + v2-defect 수정으로 새로 연 7). `KONEPS_COLLECTION_PENDING_CAPABILITY`
+  는 이제 빈 집합 — 그 잠금 test 가 그 상태를 잡는다.
+
+### S-5 — quality baseline
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew qualityBaseline`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`.
+
+### S-6 — 적대 스윕
+## 2026-09-07T00:00:00Z
+- cmd: `python3 fixtures/tools/mutation_sweep_adversarial.py`
+- exit: 0
+- 핵심 결과: 강등 대상 0, 잔존 authoritative 68(manifest 미편집 라운드라 변화 없음).
 
 ## 3A 잔여 일괄 — commit 목록(4 커밋 단위, verifier r3 전)
 

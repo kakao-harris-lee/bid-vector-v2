@@ -1,25 +1,24 @@
 # 리뷰 요청 조건 점검 · 판단이 갈린 지점 · 알려진 제한 — M3 / 3A
 
 F-6(low, verifier r1)에 따라 `commands.md`에 있던 「판단이 갈린 지점」·「알려진 제한」과
-병렬 레인 경계 검사를 이 문서로 옮겼다. 이 갱신은 3A 잔여 일괄(head `649866f`, verifier r3
-전) 반영판이다. acceptance 실행 결과·exit code는 `commands.md`가 갖는다.
+병렬 레인 경계 검사를 이 문서로 옮겼다. 이 갱신은 3A 잔여 일괄의 v2-defect 수정 라운드
+(head `04d103c`, verifier r3 전) 반영판이다. acceptance 실행 결과·exit code는
+`commands.md`가 갖는다.
 
-## 3A 잔여 일괄 — 판정 필요 case 7건
+## 3A 잔여 일괄 — 판정 필요 case 7건 → v2-defect 수정으로 전건 해소
 
-`koneps-collection` 27 case 중 7건은 procurement 능력 공백이라 dispatch 하지 않는다(값을
-맞추기 위해 production 코드를 고치지 않았다). 근거·재현 방법은
-`KonepsCollectionExecutors.kt`/`KonepsCollectionAccountingExecutors.kt` 머리 문서와 각 case 의
-manifest `contract_binding.does_not_carry` 에도 있다 — 여기는 판정 요약표다.
+team-lead 판정(2026-09-07, 「7건 전부 v2-defect 로 동의」)에 따라 6개 결함을 production
+수정으로 닫고 27 case 전건을 dispatch 했다(`commands.md` 「v2-defect 수정」 절 참고). 아래
+표는 각 판정이 실제로 어떻게 닫혔는지의 기록이다 — 더는 미해결 판정표가 아니다.
 
-| case | 판정 | 능력 공백 | 후속 제안 |
+| case | 판정 | 닫은 방법 | 커밋 |
 | --- | --- | --- | --- |
-| 002 | v2-defect | `ExpectedRangeKey`(FieldContract.kt)가 데이터 슬롯만 있고 어디서도 강제되지 않는다 — `synFloorRt` 같은 선언된 범위(0~1) 위반 raw 값을 거부하는 코드가 없다 | 밴드 정책 데이터(§5.3 규율 2 「단일 출처」)와 강제 지점을 별도 slice 로 신설하거나, 운영자가 이 축을 3A 범위 밖으로 재확인 |
-| 003 | v2-defect | `RawNoticeObservation`이 값 부재만 나르고 부재의 **사유**(`ExplicitNull` vs `KeyMissing`)를 나르지 않는다 | `RawKey`→값 맵의 값 타입을 `String?`(키 존재+null) vs 키 자체 부재로 구분하는 표현으로 확장할지 결정 필요 — 값 크기의 변경이라 별도 설계 검토 대상 |
-| 004 | v2-defect | 003 과 같은 능력 공백(짝 case) | 003 과 같은 후속 |
-| 016 | v2-defect | 업무구분명(`bsnsDivNm`) 문서 열거값(물품/용역/공사/외자) 자체를 나르는 procurement 타입이 없다 | 문서 열거 어휘를 정책 데이터로 인스턴스화하고 `BusinessCategory`/`CategoryLabel` 판정에 연결할지 결정 필요 |
-| 018 | v2-defect | D-3A-8(§5.5)이 지정한 `UnnormalizedFigure` + 필드 계약(수집 형태만)이 아직 미신설 — `cnstrtnAbltyEvlAmtList`(시공능력평가금액목록) 파싱 함수가 없다 | D-3A-8 착수(별도 커밋/slice) — 이 배치 범위 밖으로 이미 scope.md 가 표시한 축 |
-| 023 | v2-defect | `NoticeNumber.of`는 `trim()`만 하고 대소문자·구분자 정규화를 하지 않는다 — `" syn-ntc-2301 "`·`"SYN-NTC-2301"`·`"SYN NTC 2301"` 세 표기가 값으로 같아지지 않는다(NoticeId.kt KDoc이 이 한계를 명시한다) | 정규화 규칙 확장(대소문자 접기·구분자 통일)의 승인 여부를 운영자에게 확인 — 확장하면 `source_url` 동일성 불변식(COL-05)의 재검증이 필요 |
-| 026(신규 발견) | v2-defect | `parseSourceZonedInstant`가 `LocalDateTime.parse`(ISO `T` 구분자)만 받는데 KONEPS 실제 wire 형식(공식 문서, "YYYY-MM-DD HH:MM:SS")은 **공백** 구분자다 — 직접 JVM 실측(`LocalDateTime.parse("2026-05-20 10:00:00")` → `DateTimeParseException`)으로 확인. 실제 응답에서 이 함수는 **항상 null**을 낸다 | **우선순위 높음** — `deadlineAt`/`openingScheduledAt`이 실제 KONEPS 데이터에서 전부 null 로 떨어진다는 뜻이라 3B 착수 전에 고쳐야 한다. 고정 포맷 파서(`DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")`) 채택 여부는 별도 커밋(3A 잔여 일괄 범위 밖)으로 운영자 확인 요청 |
+| 002 | v2-defect(해소) | `RangeBand`·`ContractViolationAxis.RANGE` 신설, `resolveAmount` 의 amount 축에 배선. 운영 정책의 `rangeBands` 는 여전히 빈 표(`sucsfbidLwltRate` B6 밴드는 `legacy-behavior`, 값 확정은 활성 `OPEN-DEC-10` 소유) — 메커니즘만 실장, 실값은 미확정 | `3b247da` |
+| 003·004 | v2-defect(해소) | `RawValue`(`Present`/`ExplicitNull`)·`FieldPresence`(`Present`/`ExplicitNull`/`Missing`) 신설, `RawNoticeObservation.presenceOf` | `3e387b0` |
+| 016 | v2-defect(해소) | `DocumentedVocabulary` 신설, `policy-values.md` §1.5(조달청 OpenAPI 참고자료 인용)의 「물품·용역·공사·외자」를 옮김. **후속 필요** — 아래 「판단이 갈린 지점」 | `3b247da` |
+| 018 | v2-defect(해소) | `FieldScale.DELIMITED_LIST`·`UnnormalizedFigure`·`parseDelimitedFigureList` 신설(D-3A-8, §5.5 「수집 형태만」) — 단위·과세 정규화는 여전히 안 한다(`OPEN-QUAL-10` 소유) | `3b247da` |
+| 023 | v2-defect(해소) | `NoticeNumber.of` 정규화를 trim 넘어 ASCII 대문자화 + 내부 공백→`-` 로 확장(팀리드 결정 「구분자 처리는 case 기대값대로」) | `2e1b051` |
+| 026(신규 발견) | v2-defect(해소, 우선순위 높음이었음) | `DateTimePatternId` 신설(선택은 정책 데이터, 의미는 고정 파서), `policy-values.md` §1.4 authoritative 형식("YYYY-MM-DD HH:MM:SS")을 옮김. `instantFrom` 이 `InstantResolutionOutcome`(`Resolved`/`Absent`/`ParseFailed`)을 내 파싱 실패를 조용한 null 이 아니라 `CollectionParseFailure(DATE_TIME)`으로 회계한다(음성 test 로 확인) | `3b247da` |
 
 **026은 team-lead 가 사전 지정한 6건에 들지 않았다** — dispatch 배선 중 신규 발견했다. 이
 발견 자체가 이 일괄 작업의 목적(fixture 를 실제 production 함수 위에서 실행)이 작동했다는
@@ -42,39 +41,56 @@ manifest `contract_binding.does_not_carry` 에도 있다 — 여기는 판정 �
   fixture 가 요구하지 않고(verified_paths 밖), 값을 맞추기 위한 것도 아니다 — 실 정책 값
   위에서 계산되는 추가 배선일 뿐이라 「값을 맞추지 않는다」 원칙과 충돌하지 않는다고
   판단했다.
-- **26을 6건 사전 지정 목록에 추가**(vs 값을 어떻게든 맞춰 dispatch) — `parseSourceZonedInstant`
-  를 이 배치에서 고쳐 26을 통과시킬 수도 있었으나(포맷 문자열 하나만 바꾸면 되는 작은
-  수정), team-lead 의 명시 지시("기대값이 어긋나면 값을 맞추지 말고... 멈춰 보고")를
-  문면 그대로 따라 고치지 않았다 — 이 함수를 고치는 것은 「27 case 전건에 대한 판정」이
-  아니라 「production 코드 수정」이고, 4개 커밋 단위 어디에도 속하지 않는 범위 확장이다.
+- **(정정, 이전 라운드 판단 번복) 026 을 이번 라운드에서 실제로 고쳤다** — 직전 라운드는
+  「값을 맞추려 production 을 손대지 않는다」는 원칙에 따라 `parseSourceZonedInstant` 를
+  고치지 않고 판정만 보고했다. team-lead 가 그 보고를 받아 026 을 포함한 7건 전부를
+  v2-defect 로 확정하고 명시적으로 수정을 지시했다(2026-09-07, 「값을 맞추려 runner 를
+  손대지 말고 production 을 고친 뒤 dispatch 예외 목록에서 빼라」) — 그 지시를 받은
+  뒤에는 production 수정이 이 slice 의 정당한 범위다. 이전 판단(「고치지 않는다」)은
+  team-lead 승인 이전의 자기 판단이었고, 지금 판단(「고친다」)은 그 승인을 반영한다 —
+  두 판단이 다른 시점의 다른 권한 상태를 반영하는 것이지 번복 자체가 임의는 아니다.
+- **016 정책 값의 출처가 P-1~P-6 급 「운영자 승인」 항목이 아니다** —
+  `policy-values.md` §1.5 는 이미 「물품·용역·공사·외자」를 `authoritative`(문서 인용)로
+  적고 있으나, 그 자리는 일반 필드 조사 표(§1.1~§1.6)이지 §6 의 P-1~P-6 승인 결정문
+  형식이 아니다. team-lead 지시대로 이 값은 그대로 채택하되(값을 지어낸 것이 아니라
+  문서 인용을 그대로 옮겼다), **policy-values.md 에 이 값을 별도 승인 결정 항목(예:
+  P-7)으로 명시 등재하는 후속을 curator 레인에 요청한다** — 지금은 §1.5 표 자체가
+  근거이고 그 근거가 이미 `authoritative` 층이라 즉시 구성을 막지는 않지만, 다른 여섯
+  P-값과 같은 층위로 정합시키는 것이 일관적이다.
 
-## 리뷰 요청 조건(3A 잔여 일괄, head `649866f`)
+- **`String.uppercase()`(인자 없음)가 domain 모듈에서 컴파일되지만 런타임 아키텍처
+  게이트에 걸린다** — Kotlin stdlib 의 무인자 `uppercase()`는 내부적으로
+  `java.util.Locale.ROOT` 를 참조하는 바이트코드를 만든다. `:procurement:compileKotlin`·
+  `:procurement:domainSourceReferenceGate`(소스 레벨 import 검사)는 이것을 잡지 못했고,
+  `app` 모듈의 `ArchitectureGateTest`(ArchUnit 바이트코드 스캔, 9 모듈 조합 시점에만 존재)
+  가 `clean check`(S-1) 재실행에서 처음 잡았다 — **모듈 단독 `:procurement:check` 만으로는
+  이 결함이 안 보인다.** `LicensePolicy.kt` 의 `stripAndLowercase` 선례(같은 이유로 이미
+  CharArray 기법을 쓰고 있었다)를 그대로 따라 ASCII 전용 대문자화를 손으로 짰다.
 
-- [x] 구현 diff 커밋, base/head 고정 — base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f`, 3A
-      잔여 일괄 head `649866fc55b365c9e786dd5610f8f13b082b8df2`(이 evidence 커밋 자신은 항상
-      한 칸 뒤진다).
-- [x] acceptance_commands 전부 exit 0 — `commands.md` S-0~S-6 전건(이번 배치는 manifest 를
-      편집해 S-6 이 조건부로 활성화됨, 편집 전후 둘 다 exit 0·강등 대상 0).
+## 리뷰 요청 조건(3A 잔여 일괄 v2-defect 수정, head `04d103c`)
+
+- [x] 구현 diff 커밋, base/head 고정 — base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f`, head
+      `04d103c5d0efa332516c9e24061f54be7777c07c`(이 evidence 커밋 자신은 항상 한 칸 뒤진다).
+      `git status --porcelain -- <in_scope 경로 개별 인자>` — evidence 두 파일(이 커밋
+      대상) 외 결과 없음.
+- [x] acceptance_commands 전부 exit 0 — `commands.md` 「v2-defect 수정 — acceptance_commands
+      재실행」 S-0~S-6 전건.
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — `clean check`(S-1, S-0 격리
-      worktree 포함) 통과. 재실행에서 발견한 sizeGate·detekt·ktlint 위반 셋은 `649866f`로
-      닫고 재확인.
-- [x] 변경된 fixture와 정책 version 근거 기록 — `fixtures/manifest.yaml`은 koneps-collection
-      27 case 의 `contract_binding` 필드만 편집했다(scope.md 명시 예외). 정책 값(①)의
-      근거는 `policy-values.md` 「운영자 승인 2026-09-07」 절이고, `CollectionPolicyTest`
-      가 그 표와 실값을 대조한다(`commands.md` 「정책 값 비교 결과」).
-- [x] 알려진 제한과 rollback 방법 기록 — 아래 「알려진 제한」(신규 항목 추가). `rollback.md`의
-      명령이 app 쪽 경로를 파일 개별 나열로 두고 있어 이번 배치의 신규 파일
-      (`KonepsCollectionExecutors.kt`·`KonepsCollectionAccountingExecutors.kt`)과 편집
-      (`app/build.gradle.kts`)을 못 담는 것을 발견해 그 목록을 디렉터리 전체
-      (`app/src/test/kotlin/bidvector/app/conformance/`) + `app/build.gradle.kts`로
-      고쳤다 — 임시 clone 실측으로 exit 0·`git diff <base>` 0줄을 재확인했다(rollback.md
-      「임시 clone 실측」). `fixtures/manifest.yaml`은 rollback 대상이 아니다(curator 소유
-      경로, scope.md `out_of_scope`) — `contract_binding` 필드 되돌림이 필요하면 curator
-      레인이 별도로 판단한다.
-- [x] secret 스캔 통과 — `git diff 74cf7b6..HEAD -- procurement/ app/src/test/kotlin/bidvector/app/conformance/ fixtures/manifest.yaml | grep -niE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"`
-      매치 15건은 전부 `token`(도메인 어휘 — `equalToUnpaddedToken`·`provenanceToken`·
-      `detailFetchDecisionToken`·`tokenComparison` 등, `fixtures-koneps-collection.md`
-      F-8 이 이미 등재한 상시 false-positive 바닥). `token` 제외 패턴은 매치 0(exit 1).
+      worktree 포함) 통과. 이 재실행에서 `ArchitectureGateTest` 실패(`NoticeNumber.of`의
+      `uppercase()` → `Locale.ROOT`)를 잡아 닫았다(`commands.md` S-1 항목, 위 「판단이
+      갈린 지점」).
+- [x] 변경된 fixture와 정책 version 근거 기록 — 이번 라운드는 `fixtures/manifest.yaml`을
+      편집하지 않았다(production 코드만). 신설 정책 슬롯(`rangeBands`·
+      `businessCategoryDocumentedLabels`·`dateTimePatterns`·`listComponentSeparator`)의
+      근거는 각각 `policy-values.md` §1.4·§1.5(`3b247da` 커밋 메시지에 축어 인용) 또는
+      명시적으로 빈 표(`rangeBands` — `OPEN-DEC-10` 미해소).
+- [x] 알려진 제한과 rollback 방법 기록 — 아래 「알려진 제한」(갱신). rollback.md 의
+      `app/src/test/.../conformance/` 디렉터리 전체 복원 방식은 이번 라운드의 신규 파일
+      (`KonepsCollectionDefectFixExecutors.kt`)도 그대로 담는다(경로가 아니라 디렉터리
+      단위라 재검증 불요, 이전 라운드에서 이미 clone 실측 완료).
+- [x] secret 스캔 통과 — `git diff eaf4d8b..HEAD -- procurement/ app/src/test/kotlin/bidvector/app/conformance/ | grep -niE "(api[_-]?key|secret|password|Bearer |BEGIN (RSA|EC|OPENSSH))"`
+      (`token` 을 이번엔 뺐다 — 상시 false-positive 로 이미 별도 등재돼 있어 매 라운드
+      재확인할 정보가 없다) — 매치 0(exit 1).
 
 ## 병렬 레인 경계 검사
 
@@ -84,6 +100,11 @@ manifest `contract_binding.does_not_carry` 에도 있다 — 여기는 판정 �
 둘이 공유 working tree에 **미커밋 상태로 수정돼 있는 것을 관측**했다(다른 세션의 진행 중
 작업) — 내 clean-tree 점검은 그 경로를 감시 대상에 넣지 않으므로 스테이징하지 않았고 영향도
 없다.
+
+**v2-defect 수정 라운드(`3e387b0`·`2e1b051`·`3b247da`·`04d103c`)** — `git show --stat`
+으로 네 커밋 전부 확인, 파일 목록이 `procurement/src/**`·
+`app/src/test/kotlin/bidvector/app/conformance/**` 밖을 한 줄도 안 나간다(`fixtures/**`·
+`docs/**`·`build-logic/**`·curator 소유 evidence 혼입 0건).
 
 ## 판단이 갈린 지점
 
@@ -119,30 +140,45 @@ manifest `contract_binding.does_not_carry` 에도 있다 — 여기는 판정 �
   승인 표와 실값을 대조한다. **age/recheck-gate(24h/48h)는 여전히 「측정 전 잠정값」**
   (P-5, `policy-values.md`)이고, 「미확정」 칸(`bssAmt`·`bssAmtPurcnstcst`·`presmptAmt`·
   `usefulAmt`·율 밴드 둘·개찰·예비가격 17건)은 인스턴스화하지 않았다.
-- **(3A 잔여 일괄로 부분 해소)** `koneps-collection` corpus 는 27 case 중 20건이
-  dispatch 됐다(그중 4건, 013·014·022·027은 procurement 함수를 호출하지 않고 문서·회계
-  사실만 대조 — 위 판정표 참고). 나머지 7건(002·003·004·016·018·023·026)은 procurement
-  능력 공백으로 dispatch 하지 않는다 — 판정·근거·후속 제안은 위 「판정 필요 case 7건」 표.
+- **(v2-defect 수정으로 해소)** `koneps-collection` corpus 는 이제 **27/27 case 전건이
+  dispatch** 된다 — `KONEPS_COLLECTION_PENDING_CAPABILITY`는 빈 집합이다. 그중 4건
+  (013·014·022·027)은 procurement 함수를 호출하지 않고 문서·회계 사실만 대조한다는
+  성질은 그대로다(위 판정표, 능력 공백이 아니라 애초에 procurement 런타임 범위 밖).
 - `Notice`·`OpeningResult`·`QualificationText`는 값 객체까지다 — repository·이벤트 발행·상태
   저장(영속화)은 두지 않는다(3D·4B 소관). `Notice.applyEvent`는 순수 함수이고 이 slice는
   그 결과를 어디에도 쓰지 않는다.
 - `Notice.collected()`는 procurement 밖에서도 호출 가능하다(의도적 — 위 「판단이 갈린
   지점」). `internal`인 것은 `copy(status=…)`뿐이다.
-- **`parseSourceZonedInstant`가 KONEPS 실제 wire 형식(공백 구분자)을 파싱하지 못한다**
-  (3A 잔여 일괄 신규 발견, koneps-collection-026 판정 — v2-defect, 위 판정표 「우선순위
-  높음」). `ASSUME_KST` 매핑 자체는 `ZoneId.of("Asia/Seoul")` 리터럴을 쓴다는 기존 제한도
-  그대로다 — 규칙 **선택**은 정책 데이터(계약의 `sourceZone`)지만 규칙의 **의미**(문자열→
-  ZoneId)는 상수다. `OPEN-3A-SOURCE-TZ`는 활성 남는다.
-- `FieldUnit`은 `WON`·`PERCENT`·`NONE` 세 값뿐이고 `scale`이 전결한다(verifier r2 §1 "슬롯
-  축약" 지적, 차단 아님) — §5.5 `UnnormalizedFigure`(단위 미확정, `OPEN-QUAL-10`)처럼 단위
-  자체가 미확정인 필드는 이 slice가 다루지 않는다(수집 형태만, D-3A-8 — koneps-collection-018
-  이 그 공백을 구체적으로 드러낸다, 위 판정표).
-- `ExpectedRangeKey`(FieldContract.kt)는 여전히 데이터 슬롯뿐이고 어디서도 강제되지 않는다
-  (§5.3 규율 2 「단일 출처」 미착수, koneps-collection-002 가 드러낸 공백, 위 판정표).
-- `RawNoticeObservation`은 값 부재의 **사유**(명시 null vs 키 자체 부재)를 나르지 않는다
-  (koneps-collection-003·004, 위 판정표).
-- `NoticeNumber.of`의 정규화는 trim 뿐이다 — 대소문자·구분자 통일은 하지 않는다
-  (koneps-collection-023, 위 판정표. `NoticeId.kt` KDoc이 이 한계를 이미 명시하고 있었다).
+- **(v2-defect 026 수정으로 해소)** `parseSourceZonedInstant`는 이제 정책이 든
+  `DateTimePatternId` 목록(현재 `KONEPS_SPACE_DELIMITED_19` 하나, policy-values.md §1.4
+  authoritative 형식)으로 KONEPS 실제 wire 형식을 파싱한다. `ASSUME_KST` **매핑 자체**
+  (`ZoneId.of("Asia/Seoul")`)는 여전히 상수다 — 규칙 **선택**은 정책 데이터(계약의
+  `sourceZone`)지만 규칙의 **의미**(문자열→ZoneId)는 그대로 코드 상수다(`DateTimePatternId`
+  와 같은 원칙). `OPEN-3A-SOURCE-TZ`는 활성 남는다.
+- `FieldUnit`은 `WON`·`PERCENT`·`NONE` 세 값이던 것이 v2-defect 018 수정으로 **네 값**
+  (`DELIMITED_LIST`도 `NONE`)이 됐다 — `scale`이 여전히 `unit`을 전결한다(verifier r2 §1
+  "슬롯 축약" 지적, 차단 아님). `cnstrtnAbltyEvlAmtList`는 이제 §5.5 `UnnormalizedFigure`
+  로 **수집 형태(레코드→성분 분해)까지는** 열렸지만, 단위·과세 정규화(Money 변환)는
+  여전히 하지 않는다(`OPEN-QUAL-10` 소유 — 그 OPEN 이 닫히기 전까지 의도된 제한).
+- **(v2-defect 002 수정으로 부분 해소)** `ExpectedRangeKey`가 참조하는 밴드를 실제로
+  강제하는 `RangeBand`/`ContractViolationAxis.RANGE` 메커니즘이 `resolveAmount`의 amount
+  축에 배선됐다 — 그러나 운영 정책의 `rangeBands`는 **여전히 빈 표**다.
+  `sucsfbidLwltRate`의 B6 밴드 값은 `legacy-behavior`이고 확정은 활성 `OPEN-DEC-10` 소유라,
+  그 OPEN 이 닫히기 전까지 실 데이터에서 이 메커니즘은 **아무 필드에도 걸리지 않는다**
+  (inert). floor-rate 개념(`floorRateFrom`) 자체에는 아직 배선하지 않았다 — 현재 이 개념의
+  어떤 실제 필드도 `expectedRange`를 갖지 않기 때문이다(합성 sanity test 로만 증명).
+- **(v2-defect 016 수정으로 해소, 후속 남음)** 업무구분명 문서 열거 어휘(`DocumentedVocabulary`,
+  물품·용역·공사·외자)가 이제 procurement 타입으로 존재한다 — 다만 그 값의 출처가
+  `policy-values.md`의 P-1~P-6 급 「운영자 승인」 항목이 아니라 §1.5 일반 조사 표라, curator
+  레인에 별도 승인 항목 등재를 요청했다(위 「판단이 갈린 지점」).
+- **(v2-defect 003·004 수정으로 해소)** `RawNoticeObservation`이 이제 `presenceOf`로 값
+  부재의 사유(`ExplicitNull` vs `Missing`)를 구분한다 — 기존 `valueOf`(하위호환)는 여전히
+  그 둘을 `null`로 접는다.
+- **(v2-defect 023 수정으로 해소)** `NoticeNumber.of`의 정규화가 trim 을 넘어 ASCII
+  대문자화 + 내부 공백→`-` 로 넓어졌다 — legacy `normalize_notice_number`의 리터럴
+  (공백 완전 제거)과는 다른 결과다(팀리드 결정, 위 「판단이 갈린 지점」). 한글·비 ASCII
+  문자의 대소문자 접기는 다루지 않는다(공고번호는 숫자·라틴 알파벳·구분자만 쓴다는 관측
+  전제, `NoticeId.kt` KDoc).
 - **`AmountResolutionOutcome.Resolved.unit`은 현재 데이터로는 항상 `WON`이다** — `resolveAmount`가
   `WON_INTEGER` scale 계약만 성공 경로로 흘려보내므로(다른 scale은 전부 `SCALE` 위반으로
   거부), unit 값이 다른 경로로 갈리는 실제 시나리오가 이 슬라이스 안에 없다. N-2와 같은
