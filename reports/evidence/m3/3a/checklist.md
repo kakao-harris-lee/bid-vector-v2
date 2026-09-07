@@ -1,9 +1,49 @@
 # 리뷰 요청 조건 점검 · 판단이 갈린 지점 · 알려진 제한 — M3 / 3A
 
 F-6(low, verifier r1)에 따라 `commands.md`에 있던 「판단이 갈린 지점」·「알려진 제한」과
-병렬 레인 경계 검사를 이 문서로 옮겼다. 이 갱신은 3A 잔여 일괄의 v2-defect 수정 라운드
-(head `04d103c`, verifier r3 전) 반영판이다. acceptance 실행 결과·exit code는
-`commands.md`가 갖는다.
+병렬 레인 경계 검사를 이 문서로 옮겼다. 이 갱신은 verifier r3(`ready-for-review`,
+`_workspace/m3-3a/04_verifier_report_r3.md` N3-1~N3-9) 반영판이다. acceptance 실행
+결과·exit code는 `commands.md`가 갖는다.
+
+## verifier r3 N3-1~N3-9 — 등재/수정 결과
+
+r3 는 blocker·high 0 으로 `ready-for-review` 판정을 냈다(medium 4·low 5, 전부 차단 아님).
+team-lead 지시대로 재검증 없이 한 커밋으로 처리한다 — N3-1 만 `gateExecutionGate` 초록
+한 줄을 남긴다.
+
+- **N3-1**(medium, 게이트 장부) — `gate.tests.procurement` 가 11 class 였는데 실제는 13
+  class(`CollectionPolicyTest`·`ParseDelimitedFigureListTest` 누락). `config/quality/
+  gate-tests.properties` 에 두 class 를 더했다. **`gateExecutionGate` 가 이 방향(등재
+  누락)을 못 잡는 이유**: 이 게이트는 「등재된 class 가 실제로 돌았는가」만 검사하는
+  단방향 술어다(등재 ⊆ 실행이면 통과) — 「실행된 모든 class 가 등재됐는가」(실행 ⊆ 등재)
+  는 재지 않는다. 알려진 제한에 등재한다(아래). 재실행: `./gradlew :procurement:
+  gateExecutionGate --rerun` → `BUILD SUCCESSFUL`.
+- **N3-2**(medium, corpus 결속) — 002·003/004·026 corpus dispatch 가 `verified_paths`
+  로는 production 변이를 판별하지 못한다(002 는 executor 가 밴드를 fixture 에서 직접
+  조립, 003/004 는 유일한 판별값 `reason` 이 `verified_paths` 밖, 026 은 판별값이 아예
+  전부 상수 경로). 판별은 procurement 단위 test(`ResolveAmountTest`·`RawObservationTest`·
+  `CanonicalizeTest`)가 진다 — verifier 의 변이 실측(M4·M5·M6)이 이를 확인했다. **읽는
+  법**: 「27/27 dispatch」는 「27 case 가 production 거동을 잠근다」로 읽지 않는다 — 아래
+  「알려진 제한」에 등재한다. curator 결함이 아니다(`policy-values.md` 가 2026-09-01
+  규칙으로 그 어휘를 의도적으로 뺐다). 어휘 승인 후속을 016 의 P-7 요청과 함께 curator
+  레인에 요청한다.
+- **N3-3**(medium, 장부) — manifest `contract_binding` 8 건(002·003·004·014·016·018·023·
+  026)이 v2-defect 수정 뒤에도 「미배선」 산문 그대로였다 — production 이 실제로 무엇을
+  고쳤는지로 갱신했다(`fixtures/manifest.yaml`, `contract_binding` 필드만, 이 커밋의
+  `git diff` 로 대조 가능). 002 의 일본어 조각(`のどこも`)도 정정했다.
+- **N3-4**(medium, 장부) — `rollback.md` 에 `fixtures/manifest.yaml` 이 되돌림 대상이
+  아닌 이유와 그 결과(되돌린 뒤에도 `contract_binding` 산문이 삭제된 타입을 가리킴)를
+  명시했다 — 수동 되돌림 절차도 적었다.
+- **N3-5**(low) — 아래 「알려진 제한」에 등재(과세 미확정 vs `UNKNOWN` 표기 층위 차이).
+- **N3-6**(low) — `CollectionPolicy.kt` 의 `estimatedPriceResolutionOrder` 옆과 아래
+  「판단이 갈린 지점」에 좁힘 판단 근거를 남겼다.
+- **N3-7**(low) — `NoticeId.kt` KDoc 과 아래 「알려진 제한」에 비 ASCII 공백(전각 공백
+  등) 미흡수를 명시했다(직접 JVM 실측으로 재확인: `"SYN　NTC".replaceAll("\\s+","-")`
+  결과가 원문 그대로).
+- **N3-8**(low) — `NoticeId.kt` 의 legacy 좌표를 `parsing.py:270-273`(줄 번호)에서
+  `parsing.py`(심볼 `normalize_notice_number`)로 정정했다(`policy-values.md` §0 규약).
+- **N3-9**(low) — `commands.md`·아래 「알려진 제한」의 "필드 계약 10" 표기를 실제 값
+  "11"로 정정했다(018 수정이 `cnstrtnAbltyEvlAmtList` 를 더했다).
 
 ## 3A 잔여 일괄 — 판정 필요 case 7건 → v2-defect 수정으로 전건 해소
 
@@ -132,14 +172,41 @@ team-lead 판정(2026-09-07, 「7건 전부 v2-defect 로 동의」)에 따라 6
   둘 다 지목했고, 하나만 배선하면 같은 형태의 미배선 지적이 다음 라운드에 재발할 것으로
   판단해 함께 처리했다.
 - **커밋 메시지 test 수 오기**(r0, 정정 완료) — `commands.md`가 정본이라는 선언 유지.
+- **추정가격 해석 순서를 legacy 4키 폴백에서 `presmptPrce` 하나로 좁힘**(3A 잔여 일괄,
+  verifier r3 N3-6) — `policy-values.md` P-3 는 기초금액 순서의 legacy 불채택만 결정하고
+  추정가격 순서 자체는 「기초금액 키 없음 성질 유지」만 요구해 좁힘의 채택 여부를 명언하지
+  않는다. `presmptAmt`(legacy 둘째 후보)는 이 저장소 문서에 없는 미등재 키이고, 배정예산
+  둘(`asignBdgtAmt`·`bdgtAmt`)을 추정가격 폴백으로도 쓰면 승인 표(§1.1)가 비판하는 legacy
+  `KEY_BASIS` 접힘(서로 다른 개념 넷을 한 basis 로 접음)이 되살아난다고 판단해 `presmptPrce`
+  하나만 남겼다 — `CollectionPolicy.kt` 주석에도 같은 근거를 남겼다.
 
 ## 알려진 제한
 
 - **(3A 잔여 일괄로 해소)** `KONEPS_COLLECTION_POLICY`는 이제 운영자 승인 2026-09-07 값을
-  담는다(필드 계약 10·resultCode 16·해석 순서 둘·gate) — `CollectionPolicyTest`(8 test)가
-  승인 표와 실값을 대조한다. **age/recheck-gate(24h/48h)는 여전히 「측정 전 잠정값」**
-  (P-5, `policy-values.md`)이고, 「미확정」 칸(`bssAmt`·`bssAmtPurcnstcst`·`presmptAmt`·
-  `usefulAmt`·율 밴드 둘·개찰·예비가격 17건)은 인스턴스화하지 않았다.
+  담는다(필드 계약 **11**·resultCode 16·해석 순서 둘·gate, `018` 수정이
+  `cnstrtnAbltyEvlAmtList` 를 더해 10→11 이 됐다 — verifier r3 N3-9) —
+  `CollectionPolicyTest`가 승인 표와 실값을 대조한다. **age/recheck-gate(24h/48h)는
+  여전히 「측정 전 잠정값」**(P-5, `policy-values.md`)이고, 「미확정」 칸(`bssAmt`·
+  `bssAmtPurcnstcst`·`presmptAmt`·`usefulAmt`·율 밴드 둘·개찰·예비가격 17건)은
+  인스턴스화하지 않았다.
+- **「미확정」 과세와 `UNKNOWN` 이 같은 토큰으로 접힌다**(verifier r3 N3-5) — 승인 표는
+  `asignBdgtAmt`/`bdgtAmt`의 **`UNKNOWN`**(문서가 과세를 아예 선언하지 않음)과 `bssamt`의
+  **미확정**(`OPEN-REG-05`, 상반 방증 있음 — 다른 층위)을 다른 칸으로 적는데, 세 필드
+  인스턴스 모두 `VatTreatment.UNKNOWN`이다. 행 단위로 읽으면 어긋나지 않는다(`bssamt`
+  행 자체는 단위가 authoritative 라 채택 대상이고, `UNKNOWN`은 주장의 부재라 값을
+  지어낸 것도 아니다) — `CollectionPolicy.kt`의 `bssamt` 행 주석이 이미 그 구분을
+  적고 있다. `OPEN-REG-05`가 닫히면 이 셋이 다른 값으로 갈릴 수 있다.
+- **002·003/004·026 corpus dispatch 는 production 변이를 판별하지 못한다**(verifier r3
+  N3-2) — 27/27 dispatch 는 27 case 가 실행되고 `verified_paths` 가 통과한다는 뜻이지,
+  27 case **전부**가 production 코드 변경을 잡아낸다는 뜻이 아니다. 002 는 executor 가
+  fixture 가 선언한 밴드를 직접 조립해 `RangeBand.violates`만 부르고 `resolveAmount`를
+  지나지 않는다. 003·004 는 유일한 판별값(`reason`: `ExplicitNull`/`KeyMissing`)이
+  `verified_paths` 밖이라 두 case 가 corpus 안에서 서로 구별되지 않는다. 026 은
+  `verified_paths`(`interpretedZone`·`instantDerived`·`assumedUtc`)가 전부 파싱 성공
+  여부의 상수 경로로도 나올 수 있는 값이라 진짜 판별력이 약하다. **판별은 procurement
+  단위 test 가 진다**(`ResolveAmountTest`·`RawObservationTest`·`CanonicalizeTest`) —
+  verifier 의 변이 실측(M4·M5·M6)이 이를 직접 확인했다. curator 결함이 아니다 — 어휘
+  승인 후속을 016 의 P-7 요청과 함께 curator 레인에 요청한다.
 - **(v2-defect 수정으로 해소)** `koneps-collection` corpus 는 이제 **27/27 case 전건이
   dispatch** 된다 — `KONEPS_COLLECTION_PENDING_CAPABILITY`는 빈 집합이다. 그중 4건
   (013·014·022·027)은 procurement 함수를 호출하지 않고 문서·회계 사실만 대조한다는
@@ -174,11 +241,16 @@ team-lead 판정(2026-09-07, 「7건 전부 v2-defect 로 동의」)에 따라 6
 - **(v2-defect 003·004 수정으로 해소)** `RawNoticeObservation`이 이제 `presenceOf`로 값
   부재의 사유(`ExplicitNull` vs `Missing`)를 구분한다 — 기존 `valueOf`(하위호환)는 여전히
   그 둘을 `null`로 접는다.
-- **(v2-defect 023 수정으로 해소)** `NoticeNumber.of`의 정규화가 trim 을 넘어 ASCII
-  대문자화 + 내부 공백→`-` 로 넓어졌다 — legacy `normalize_notice_number`의 리터럴
-  (공백 완전 제거)과는 다른 결과다(팀리드 결정, 위 「판단이 갈린 지점」). 한글·비 ASCII
-  문자의 대소문자 접기는 다루지 않는다(공고번호는 숫자·라틴 알파벳·구분자만 쓴다는 관측
-  전제, `NoticeId.kt` KDoc).
+- **(v2-defect 023 수정으로 해소, ASCII 한정 — verifier r3 N3-7)** `NoticeNumber.of`의
+  정규화가 trim 을 넘어 ASCII 대문자화 + 내부 ASCII 공백→`-` 로 넓어졌다 — legacy
+  `normalize_notice_number`의 리터럴(공백 완전 제거)과는 다른 결과다(팀리드 결정, 위
+  「판단이 갈린 지점」). **비 ASCII 공백(전각 공백 `U+3000` 등)은 흡수하지 않는다** —
+  Java `\s`(기본 문자 클래스)는 ASCII 전용이라 `"SYN　NTC"`(전각 공백)와 `"SYN NTC"`
+  (반각 공백)가 다른 `NoticeNumber`로 남는다(`"SYN　NTC".replaceAll("\\s+","-")`를 직접
+  JVM 실측해 원문 그대로 나옴을 확인). 한글 문자 자체의 대소문자 접기도 다루지 않는다
+  (한글은 대소문자가 없어 대상이 없다). 공고번호 형식이 문서상 라틴·숫자·구분자만이라는
+  관측(`policy-values.md` §1.1)을 전제로 운영 위험을 낮게 판단했다 — `NoticeId.kt` KDoc
+  에도 이 한계를 명시했다.
 - **`AmountResolutionOutcome.Resolved.unit`은 현재 데이터로는 항상 `WON`이다** — `resolveAmount`가
   `WON_INTEGER` scale 계약만 성공 경로로 흘려보내므로(다른 scale은 전부 `SCALE` 위반으로
   거부), unit 값이 다른 경로로 갈리는 실제 시나리오가 이 슬라이스 안에 없다. N-2와 같은

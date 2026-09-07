@@ -276,6 +276,13 @@ val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
                         fieldContracts = KonepsFieldContractRegistry.of(KONEPS_OPERATIONAL_FIELD_CONTRACTS),
                         resultCodeCategories = KONEPS_OPERATIONAL_RESULT_CODE_CATEGORIES,
                         baseAmountResolutionOrder = listOf(RawKey("bssamt"), RawKey("asignBdgtAmt"), RawKey("bdgtAmt")),
+                        // P-3 는 기초금액 순서의 legacy 불채택만 결정하고 추정가격 순서는
+                        // "기초금액 키 없음" 성질만 요구한다 — legacy 의 4키 폴백 사슬
+                        // (presmptPrce → presmptAmt → asignBdgtAmt → bdgtAmt)에서 첫 키
+                        // 하나만 남긴 이 좁힘은 3A 자신의 판단이다(verifier r3 N3-6):
+                        // presmptAmt 는 문서 미등재 키이고, 배정예산 둘을 추정가격 폴백으로
+                        // 쓰면 §1.1 표가 비판하는 legacy KEY_BASIS 접힘(넷을 한 basis 로
+                        // 접음)이 되살아난다.
                         estimatedPriceResolutionOrder = listOf(RawKey("presmptPrce")),
                         dateInterpretation = SourceZoneRuleId.ASSUME_KST,
                         detailFetchGates = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48),

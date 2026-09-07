@@ -103,7 +103,9 @@ verifier r3 전 production 수정을 지시했다. 「계약 안 항목이라...
 ## 2026-09-07T00:00:00Z
 - cmd: `./gradlew --no-daemon :procurement:test --tests 'bidvector.procurement.CollectionPolicyTest'`
 - exit: 0
-- 핵심 결과: 8 tests, 0 failed — 필드 계약 10건 항목 수·`presmptPrce`(EXCLUSIVE·WON·ESTIMATED)·
+- 핵심 결과: 8 tests, 0 failed — 필드 계약 10건(이 커밋 `33acf1a` 시점 수치. v2-defect 018
+  수정(`3b247da`)이 `cnstrtnAbltyEvlAmtList` 를 더해 **현재는 11건** — verifier r3 N3-9
+  정정) 항목 수·`presmptPrce`(EXCLUSIVE·WON·ESTIMATED)·
   `asignBdgtAmt`/`bdgtAmt`(UNKNOWN·ALLOCATED_BUDGET·FILLED_FROM_BUDGET_KEY)·`bssamt` 단독
   기초금액 키·해석 순서 둘(`bssamt→asignBdgtAmt→bdgtAmt`, `presmptPrce`)·resultCode 16건
   (`03`→NO_DATA·`08`→INPUT_ERROR·`22`→QUOTA_EXCEEDED·`30`→NOT_RETRYABLE)·일시 두 필드

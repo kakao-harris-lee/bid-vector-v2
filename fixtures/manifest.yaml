@@ -4880,18 +4880,22 @@ cases:
     sha256: ae828bee7c168918f3aaf5fe6ee1cabb8f872c32eb03368e055df2e54e07cb87
     expected_sha256: 8686077f2e848967b896bd6d3110e2daf5c73ef6c9c64ba4b0bbe5f8da10b3ae
     contract_binding:
-      type_path: "없음 — ExpectedRangeKey(FieldContract.kt)는 데이터 슬롯만 있고 어디서도 강제되지 않는다"
+      type_path: "bidvector.procurement.RangeBand.violates(BigDecimal) / resolveAmount 의 amount 축(ContractViolationAxis.RANGE)"
       fixed_by: |-
-        없음 — 이 case 를 통과시키는 procurement 함수가 없다. KonepsCollectionExecutors.kt 는
-        이 case 를 dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+        KonepsCollectionDefectFixExecutors.kt case002 + procurement ResolveAmountTest(`expectedRange
+        밴드 밖 값은 RANGE 위반으로 거부된다` · `...밴드 안 값은 정상 해석된다` ·
+        `정책에 밴드가 없으면...거부하지 않는다`).
       carries: |-
-        없음.
+        RangeBand.violates 가 선언된 범위 밖 값을 실제로 판별하고, resolveAmount 의 amount 축이
+        그 결과를 ContractViolationAxis.RANGE 로 거부한다 — procurement 단위 test 가 이 판별을
+        지킨다(변이 M6 이 그 test 만 죽인다, checklist.md N3-2).
       does_not_carry: |-
-        `synFloorRt`(0~1 fraction 선언) 같은 필드가 선언된 범위를 벗어나면 거부해야 한다는
-        요구(§5.3 규율 2, `expectedRange` 참조)를 procurement のどこも 검사하지 않는다 —
-        `ExpectedRangeKey` 는 계약에 슬롯만 있고 값도, 강제 지점도 없다. 판정: v2-defect
-        (능력 공백) — 밴드 정책 데이터와 강제 지점이 이 slice 범위 밖(§5.3 「단일 출처」 미착수).
-        checklist.md 「판정 필요 case」 참고.
+        이 case 의 dispatch(KonepsCollectionExecutors 실행자)는 fixture 가 선언한 밴드를 직접
+        조립해 RangeBand.violates 만 부른다 — resolveAmount 를 지나지 않는다. verified_paths
+        넷 중 셋(unitInferred·accountedInRunReport·consumedAsDomainValue.synFloorRt)은
+        executor 상수라 이 corpus 자체는 production 변이를 판별하지 못한다(N3-2) — 판별은
+        procurement 단위 test 가 진다. 밴드 값 자체(rangeBands)는 운영 정책에서 여전히 빈
+        표다(OPEN-DEC-10 대기).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4993,16 +4997,19 @@ cases:
     sha256: 861bd0ac27816329d101f827e89f68f4f55884936a45d7a05f9943203c2f14be
     expected_sha256: 96403e77df23cee01254e961b0651c3ebe9a33065faa2d95f53296c3c8f5dd6d
     contract_binding:
-      type_path: "없음 — RawNoticeObservation.of 가 null 값을 값 맵에서 필터링해 「명시 null」과"
+      type_path: "bidvector.procurement.RawValue / FieldPresence / RawNoticeObservation.presenceOf"
       fixed_by: |-
-        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+        KonepsCollectionDefectFixExecutors.kt estimatedPriceAbsenceCase + procurement
+        RawObservationTest(`presenceOf 는 명시 null 과 키 부재를 구분한다`).
       carries: |-
-        없음.
+        presenceOf 가 명시 null(RawValue.ExplicitNull)과 키 부재(Missing)를 실제로 구분한다 —
+        procurement 단위 test 가 이 판별을 지킨다(변이 M4 가 그 test 만 죽인다).
       does_not_carry: |-
-        `presmptPrce: null`(명시 null)과 키 자체 부재(koneps-collection-004)를 구분하는
-        타입이 procurement 에 없다 — `RawNoticeObservation`은 값 유무만 나르고 부재의
-        **사유**(ExplicitNull vs KeyMissing)는 나르지 않는다. 판정: v2-defect(능력 공백).
-        checklist.md 「판정 필요 case」 참고.
+        이 case 의 유일한 판별값(reason: ExplicitNull)이 verified_paths 밖이고 남은 값 중
+        둘(state·foldedToZero)은 executor 상수라, 003·004 두 case 가 corpus 안에서는 서로
+        구별되지 않는다(N3-2 — curator 결함 아님, 2026-09-01 미승인 리터럴 정확 비교 금지
+        규칙에 따른 의도적 설계). 어휘 승인 후속을 curator 레인에 요청한다(016 의 P-7
+        요청과 같은 갈래, checklist.md 「판단이 갈린 지점」).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5114,14 +5121,17 @@ cases:
     sha256: f5ec900e0f4c3b404c76473e5a7fa3b18b1a663a93c4d6538eba8439a6787794
     expected_sha256: 8353cc69dd9a7599af86bacadc16f85b52fa9542c0c1fbf1c3e1607dc8a491d6
     contract_binding:
-      type_path: "없음 — koneps-collection-003 과 같은 능력 공백(ExplicitNull vs KeyMissing 미구분)"
+      type_path: "bidvector.procurement.RawValue / FieldPresence / RawNoticeObservation.presenceOf"
       fixed_by: |-
-        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+        KonepsCollectionDefectFixExecutors.kt estimatedPriceAbsenceCase(003 과 같은 함수) +
+        procurement RawObservationTest(`presenceOf 는 명시 null 과 키 부재를 구분한다`).
       carries: |-
-        없음.
+        presenceOf 가 키 부재(FieldPresence.Missing)를 명시 null 과 실제로 구분한다 —
+        procurement 단위 test 가 이 판별을 지킨다(변이 M4 가 그 test 만 죽인다).
       does_not_carry: |-
-        koneps-collection-003 과 동일한 판정 — `RawNoticeObservation`이 부재의 사유를
-        나르지 않아 「키 자체가 없음」과 「값이 null」을 구분할 procurement 타입이 없다.
+        koneps-collection-003 과 동일한 판정(N3-2) — reason: KeyMissing 이 verified_paths
+        밖이라 이 case 도 corpus 안에서는 003 과 구별되지 않는다. 어휘 승인 후속은 003 과
+        같다.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -6150,10 +6160,10 @@ cases:
         이 계약(`KonepsFieldContract.sourceZone`)에서 별도로 온다는 **설계** 사실 — 값
         자체에서 타임존을 추측하지 않는다(D-3A-4).
       does_not_carry: |-
-        실제 파싱 호출(`parseSourceZonedInstant`)의 거동은 이 case 가 겨냥하지 않는다 —
-        그 거동은 koneps-collection-026 이 겨냥했고, 거기서 v2-defect(KONEPS 실제 공백
-        구분자 형식을 파싱하지 못함)를 발견했다(해당 case 는 dispatch 하지 않는다,
-        KonepsCollectionExecutors.kt 머리 문서 참고).
+        실제 파싱 호출(parseSourceZonedInstant)의 거동은 이 case 가 겨냥하지 않는다 — 그
+        거동은 koneps-collection-026 이 겨냥했고, v2-defect(KONEPS 실제 공백 구분자 형식을
+        파싱하지 못함)를 발견해 production 수정(DateTimePatternId 신설)으로 닫았다. **026 은
+        이제 dispatch 된다** — 이 문장은 더 이상 최신이 아니었다(N3-3 정정).
     change_history: []
     review:
       claude_commit: pending
@@ -6279,16 +6289,18 @@ cases:
     owning_open: |-
       OPEN-COL-03 (활성) — 코드 체계의 출처.
     contract_binding:
-      type_path: "없음 — 업무구분명(bsnsDivNm)의 문서 열거 어휘(물품/용역/공사/외자)를 나르는 procurement 타입이 없다"
+      type_path: "bidvector.procurement.DocumentedVocabulary / KONEPS_COLLECTION_POLICY.businessCategoryDocumentedLabels"
       fixed_by: |-
-        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+        KonepsCollectionDefectFixExecutors.kt case016 + procurement
+        CollectionPolicyTest(`업무구분명 문서 열거 어휘는 물품_용역_공사_외자 넷이다`).
       carries: |-
-        없음.
+        문서 열거 어휘(물품·용역·공사·외자)가 이제 DocumentedVocabulary 로 정책에 실제로
+        존재하고 covers() 로 판정 가능하다(policy-values.md §1.5 조달청 문서 인용을 그대로
+        옮겼다).
       does_not_carry: |-
-        `BusinessCategory`/`CategoryLabel`은 임의 문자열을 나르는 값 객체이지, 문서가
-        선언한 4개 열거값 자체를 계약으로 갖지 않는다 — 「관측값이 문서 열거 안에 있는가」
-        를 판정할 procurement 타입이 없다. 판정: v2-defect(능력 공백, 문서 열거 자체가
-        정책 데이터로 인스턴스화되지 않았다). checklist.md 「판정 필요 case」 참고.
+        이 값의 출처가 policy-values.md 의 P-1~P-6 급 별도 「운영자 승인」 항목이 아니라
+        §1.5 일반 조사 표다 — curator 레인에 별도 승인 항목(예 P-7) 등재를 요청했다
+        (checklist.md 「판단이 갈린 지점」).
     change_history: []
     review:
       claude_commit: pending
@@ -6443,16 +6455,19 @@ cases:
     owning_open: |-
       OPEN-QUAL-10 (활성) — 게시 요건 축의 단위·과세.
     contract_binding:
-      type_path: "없음 — cnstrtnAbltyEvlAmtList(시공능력평가금액목록) 파싱 함수가 없다"
+      type_path: "bidvector.procurement.FieldScale.DELIMITED_LIST / UnnormalizedFigure / parseDelimitedFigureList"
       fixed_by: |-
-        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+        KonepsCollectionDefectFixExecutors.kt case018 + procurement
+        ParseDelimitedFigureListTest, FieldContractTest(`DELIMITED_LIST 계약은
+        listComponentSeparator 를 요구한다`).
       carries: |-
-        없음.
+        cnstrtnAbltyEvlAmtList 가 이제 DELIMITED_LIST 계약(listComponentSeparator=`^`)을
+        갖고 parseDelimitedFigureList 가 레코드→성분으로 실제로 쪼갠다 — procurement·corpus
+        둘 다 이 판별을 지킨다(변이 M7 이 ParseDelimitedFigureListTest 와 corpus -018 둘
+        다 죽인다).
       does_not_carry: |-
-        D-3A-8(§5.5)이 지정한 `UnnormalizedFigure` + 필드 계약(수집 형태만)이 아직
-        신설되지 않았다 — `^` 구분 복합 문자열을 구성요소로 쪼개거나 개수를 세는 함수가
-        procurement 에 없다. 판정: v2-defect(능력 공백, D-3A-8 미착수).
-        checklist.md 「판정 필요 case」 참고.
+        단위·과세 정규화(Money 변환)는 여전히 하지 않는다(D-3A-8·§5.5 「수집 형태만」,
+        `OPEN-QUAL-10` 소유).
     change_history: []
     review:
       claude_commit: pending
@@ -6962,17 +6977,20 @@ cases:
     owning_open: |-
       (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
     contract_binding:
-      type_path: "없음 — NoticeNumber.of 는 trim 만 하고 대소문자·구분자 정규화를 하지 않는다"
+      type_path: "bidvector.procurement.NoticeNumber.Companion.of"
       fixed_by: |-
-        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+        KonepsCollectionDefectFixExecutors.kt case023 + procurement
+        NoticeIdTest(`NoticeNumber 는 대소문자·내부 공백 표기가 달라도 같은 정규형으로
+        모인다` · `NoticeNumber 정규화는 멱등이다`).
       carries: |-
-        없음.
+        trim + ASCII 대문자화 + 내부 공백→`-` 정규화가 세 표기를 실제로 같은 식별자로
+        모은다 — procurement·corpus 둘 다 이 판별을 지킨다(변이 M3 이 NoticeIdTest 와
+        corpus -023 둘 다 죽인다).
       does_not_carry: |-
-        `" syn-ntc-2301 "`·`"SYN-NTC-2301"`·`"SYN NTC 2301"` 세 표기가 값으로
-        같아진다는 이 case 의 주장을, `NoticeNumber.of(raw.trim())`은 만족하지 못한다
-        (NoticeId.kt 의 명시 KDoc — 「정규화: 앞뒤 공백 제거 하나뿐」). 판정:
-        v2-defect(능력 공백, 정규화 규칙 범위가 이 slice 승인 범위보다 좁다).
-        checklist.md 「판정 필요 case」 참고.
+        비 ASCII 공백(전각 공백 U+3000 등)은 대문자화·구분자 합침의 대상이 아니다 — Java
+        `\s` 가 ASCII 전용이라 `"SYN　NTC"`(전각 공백)와 `"SYN NTC"`는 다른
+        NoticeNumber 로 남는다(checklist.md 알려진 제한, N3-7). 한글 문자 자체의 대소문자
+        접기도 다루지 않는다(대상이 없다 — 한글은 대소문자가 없다).
     change_history:
       - date: 2026-09-07
         change: |-
@@ -7226,20 +7244,20 @@ cases:
     owning_open: |-
       OPEN-3A-SOURCE-TZ (신설 예정, 문서 레인 등재) — 출처 타임존의 값과 regression-ledger 등재.
     contract_binding:
-      type_path: "procurement 함수 호출 없음(v2-defect 로 dispatch 보류) — bidvector.procurement.parseSourceZonedInstant"
+      type_path: "bidvector.procurement.DateTimePatternId / parseSourceZonedInstant / instantFrom"
       fixed_by: |-
-        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+        KonepsCollectionDefectFixExecutors.kt case026 + procurement CanonicalizeTest(`마감일시가
+        정책 패턴 어디로도 파싱되지 않으면 항목이 DATE_TIME 파싱 실패로 탈락한다`),
+        CollectionPolicyTest(`일시 패턴은 문서 authoritative 형식(공백 구분자) 하나다`).
       carries: |-
-        없음.
+        parseSourceZonedInstant 가 정책의 DateTimePatternId 목록(KONEPS_SPACE_DELIMITED_19)
+        으로 KONEPS 실제 공백 구분자 형식을 실제로 파싱한다 — procurement 단위 test 가 이
+        판별을 지킨다(변이 M5 가 그 test 만 죽인다). instantFrom 이 파싱 실패를 조용한
+        null 이 아니라 CollectionParseFailure(DATE_TIME) 로 회계한다(음성 test 로 확인).
       does_not_carry: |-
-        `parseSourceZonedInstant`가 `LocalDateTime.parse`(ISO `T` 구분자)만 받는데,
-        KONEPS 실제 wire 형식(koneps-collection-014 가 인용하는 공식 문서
-        "YYYY-MM-DD HH:MM:SS")은 **공백** 구분자다 — 직접 JVM 실측
-        (`LocalDateTime.parse("2026-05-20 10:00:00")` → `DateTimeParseException`)으로
-        확인했다. 즉 실제 응답에서 이 함수는 **항상 null**을 낸다. 기존
-        `CanonicalizeTest`가 ISO `T` 표기만 써서 가려져 있었다. 판정: v2-defect —
-        값을 맞추기 위해 이 배치에서 production 코드를 고치지 않는다.
-        checklist.md 「판정 필요 case」 참고.
+        이 case 의 dispatch 는 verified_paths 로 production 변이를 판별하지 못한다(N3-2 와
+        같은 성질) — 판별은 procurement 단위 test 가 진다. ASSUME_KST 매핑 자체
+        (`ZoneId.of("Asia/Seoul")`)는 여전히 코드 상수다(`OPEN-3A-SOURCE-TZ` 활성).
     change_history:
       - date: 2026-09-07
         change: |-

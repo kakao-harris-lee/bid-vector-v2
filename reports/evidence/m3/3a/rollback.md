@@ -93,6 +93,26 @@ Phase 0 의 D-3A-0 파급(`noticeRevision`의 `Int` 접힘을 `NoticeRound`로 �
 `gate.tests.procurement` 키가 없어진 `config/quality/gate-tests.properties` 가 base 와 동일하며,
 하네스 경로(`CLAUDE.md`·`.claude/**`)는 손대지 않아 HEAD 그대로다.
 
+## 알려진 제한 — `fixtures/manifest.yaml` 은 이 명령의 대상이 아니다(verifier r3 N3-4)
+
+위 `git restore` 목록에 `fixtures/manifest.yaml` 이 없다 — **의도적**이다. `manifest.yaml`
+은 curator 소유(scope.md `out_of_scope`)이고, 3A 구현 레인이 편집할 수 있는 것은 그중
+`koneps-collection` 27 case 의 `contract_binding` 필드뿐이다(scope.md 명시 예외). base 로
+되돌리면 curator 커밋(`5acd5f0`·`aecddbb` 등, 27 case 의 authoritative 승격 자체)까지
+되돌아가 이 rollback 의 의도(3A 산출물만 비활성화)를 넘어선다 — 그래서 `manifest.yaml`
+을 이 명령의 대상에 넣지 않았다.
+
+**결과**: in_scope 경로를 되돌린 뒤에도 `contract_binding` 산문은 삭제된
+`bidvector.procurement.*` 타입·함수(`RangeBand`·`DocumentedVocabulary`·
+`parseDelimitedFigureList` 등)를 계속 가리킨다 — 임시 clone 재실측(HEAD 기준)으로
+`bidvector.procurement.` 패턴이 되돌린 뒤에도 15건 남는 것을 확인했다. **기능적으로는
+깨지지 않는다** — `contract_binding`은 산문 문서 필드이고, 유일한 기계 검사(manifest
+`contract_binding.type_path` 의 「fixture N」표기 대 `COMPILE_DELEGATION_FIXTURES`
+숫자 대조)는 그 대조 대상 자체가 이번 rollback 으로 되돌아가는 conformance test 안에
+있다. `contract_binding` 을 되돌리려면 **수동 절차**가 필요하다 — 해당 27 case 의
+`contract_binding` 필드를 `pending-3a` 로 손으로 되돌리거나(3A 배선 이전 상태), curator
+승인 자체를 되돌릴지 별도로 판단해야 한다(그 판단은 이 rollback 의 범위 밖이다).
+
 ## 예상 복구 시간
 
 수 분 이내(코드 삭제 + `./gradlew :app:test --tests '*Conformance*'` 로 나머지 다섯 축 corpus 회귀 재확인).
