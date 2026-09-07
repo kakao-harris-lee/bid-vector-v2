@@ -70,6 +70,8 @@ rollback: |
 | **D-3B-3** | 재시도 계층은 **Resilience4j 하나** — 스케줄러(M4)는 3B 호출을 재실행하지 않는다(ADR 0005 D-11 표 「외부 호출」 행) | — | 계약 고정 |
 | **D-3B-4** | mock server 는 loopback in-process — verifier 로컬 실측 가능, Codex 레인은 코드 slice 비대상. CI 러너에서 loopback 소켓 허용 여부는 착수 시 확인 | — | 계약 고정 |
 | **D-3B-5** | 인증(서비스 키)은 설정에서 주입, 로그·evidence·회계에 **절대 노출 금지**(secret 스캔 대상) | — | 계약 고정 |
+| **D-3B-6** ✅ 결정 2026-09-07 (curator 승인 요청 Q-3 P-6, 운영자 「curator 승인」) | **개찰·예비가격 축(`OpeningResultSourcePort` 구현)은 ScsbidInfoService 참고자료 확보를 선행 조건으로 둔다 — 공고 축(`NoticeSourcePort` 구현)은 진행한다.** 근거: legacy 소비 키 60 중 17 이 그 서비스 소관이고 항목크기·단위·과세를 문서로 모른다 — 없이 만들면 개찰 축이 legacy 형태 이식이 된다(`data-extract.md` §1 금지). 사업자 성명·등록번호가 그 축에 있어 masking 정책도 함께 필요. 정본 `reports/evidence/m3/3a/policy-values.md` §6 P-6·§1.7 | (a) 개찰 축만 선행 (b) 3B 전체 선행 (c) 선행 조건 없음 | **(a)** 채택 — 3B 를 외부 문서에 통째로 막지 않는다. 착수 시 ① 의 port 구현 범위를 「공고 축」으로 좁혀 in_scope 를 정정하고, 개찰 축은 문서 확보 뒤 같은 slice 의 후속 커밋 또는 3B-2 로 | 결정됨 |
+| **D-3B-7** (착수 전 확인 — curator 발견 셋, `policy-values.md` §3) | ③ envelope 검증이 받는 정책 표가 바뀌었다 — `resultCode` 표 16 코드 + `00`(P-4 승인: 범주 5 · **`03`(No Data) 는 성공도 실패도 아닌 세 번째 상태**, legacy `OK_RESULT_CODES={"00","03"}` 불채택) · quota 가 HTTP 429 뿐 아니라 **`resultCode 22`** 로도 온다(② 의 회계 `quotaExceeded` 는 두 표면을 다 센다) · **`30`** 은 「서비스 키 URL 미인코딩」이라 D-M3-5 (a) 키 variant 불채택의 근거가 「문서 없음」에서 「원인이 인코딩이고 한 번 바르게 하면 사라진다」로 바뀐다(결정 불변) | — | 계약 고정(착수 시 ②③ 문면에 반영) |
 
 ---
 
