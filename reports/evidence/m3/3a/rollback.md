@@ -6,11 +6,13 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f`. 되돌림은 **range revert 가
 
 ## 되돌리는 대상
 
-이 slice 가 신설·수정한 것은 새 Gradle 모듈(`procurement`)의 코드와, shared-kernel 의 좁은 타입 교체
-(`Provenance.Published`·`FloorRateOrigin.NoticeValue` 의 `noticeRevision` 타입) 뿐이다. **활성 배선(스케줄·
-runtime 등록)은 없다** — `procurement` 는 아직 어떤 어댑터도 구현하지 않고, `app` 모듈은 이 모듈을
-compile/test 의존으로도 물지 않았다(dispatch 미등록). 따라서 "끄는 flag"가 아니라 **경로 원복**이 곧
-비활성화다.
+**정정(verifier r2 N-6)** — `procurement` 모듈 자체는 base 에 이미 있었다(`procurement/build.gradle.kts`·
+`ModuleBoundaryAnchor.kt`, `settings.gradle.kts` 의 `include("procurement")`도 base 에 있다 — M2 단계의
+빈 골격). 이 slice 가 신설·수정한 것은 그 골격 **안의 도메인 코드 전부**(`ModuleBoundaryAnchor.kt` 제외한
+`procurement/src/**` 신규 파일)와, shared-kernel 의 좁은 타입 교체(`Provenance.Published`·
+`FloorRateOrigin.NoticeValue`의 `noticeRevision` 타입) 뿐이다. **활성 배선(스케줄·runtime 등록)은 없다** —
+`procurement`는 아직 어떤 어댑터도 구현하지 않고, `app` 모듈은 이 모듈을 compile/test 의존으로도 물지
+않았다(dispatch 미등록). 따라서 "끄는 flag"가 아니라 **경로 원복**이 곧 비활성화다.
 
 ## 명령(개별 경로 인자)
 
@@ -34,13 +36,13 @@ git restore --source=a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f --staged --worktre
 `--source=<base>`에 없는 신규 경로(`procurement/` 전체, `shared-kernel/.../NoticeRound.kt`)는 `--worktree`가
 삭제로 처리한다 — 별도 `git rm`이 필요 없다.
 
-## 임시 clone 실측
+## 임시 clone 실측(재측정, verifier r2 N-6 — head `74cf7b6f33950ca7c09306f73aad1f3e9081c8b1`)
 
-## 2026-09-07T05:48:21Z
+## 2026-09-07T06:54:38Z
 - cmd:
   ```bash
-  rm -rf /tmp/m3-3a-rollback-check && git clone --no-hardlinks --quiet . /tmp/m3-3a-rollback-check && \
-  cd /tmp/m3-3a-rollback-check && git checkout --quiet 041d39ac11ae0090aba45cac580cb9c6d0e938ae && \
+  rm -rf /tmp/m3-3a-r2-rollback-check && git clone --no-hardlinks --quiet . /tmp/m3-3a-r2-rollback-check && \
+  cd /tmp/m3-3a-r2-rollback-check && git checkout --quiet 74cf7b6f33950ca7c09306f73aad1f3e9081c8b1 && \
   git restore --source=a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f --staged --worktree -- \
     procurement/ \
     shared-kernel/src/main/kotlin/bidvector/sharedkernel/NoticeRound.kt \
@@ -58,9 +60,14 @@ git restore --source=a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f --staged --worktre
   git status --porcelain -- procurement/ shared-kernel/ decision/ app/ config/
   ```
 - exit: 0
-- 핵심 결과: `procurement/` 삭제(D, untracked 신규 파일이라 status 에는 안 잡히고 디렉터리 자체가 없어짐),
-  `shared-kernel/.../NoticeRound.kt` 삭제, 나머지 6개 파일 base 내용으로 원복(수정 없음 = `git diff` 비어 있음).
-  clone 은 확인 뒤 폐기(`rm -rf /tmp/m3-3a-rollback-check`).
+- 핵심 결과(N-6 정정판 — base 에 이미 있던 `procurement/build.gradle.kts`·`ModuleBoundaryAnchor.kt`는
+  **남는다**, 신규 도메인 파일만 삭제된다): `procurement/src/main/.../{Accounting,AmountResolutionOutcome,
+  BusinessCategory,Canonicalize,CollectionPolicy,DateTimeInterpretation,DetailFetch,FieldContract,
+  NoticeFacts,NoticeId,NoticeStatus,Ports,RawObservation,ResolvedBaseAmount}.kt`(14개)와
+  `procurement/src/test/.../*Test.kt`(9개) 삭제(D, 신규 파일이라 `status`에는 잡히지 않고 파일 자체가
+  없어짐) + `ModuleBoundaryAnchor.kt`는 그대로 남음. `shared-kernel/.../NoticeRound.kt` 삭제.
+  `procurement/build.gradle.kts`·`Provenance.kt`·`Rate.kt`·`gate-tests.properties` 등 base 에 이미 있던
+  파일은 base 내용으로 원복(`git diff <base>` 가 그 파일들에서 0줄). clone 은 확인 뒤 폐기.
 
 ## 확인 지점
 
