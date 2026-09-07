@@ -11,8 +11,9 @@ verifier ready-for-review + 사용자 승인(scope.md 지위 문단).
       결과 없음(commands.md 에 셋 커밋 반영 후 실측 — 이 문서 작성 시점 기준 이 파일들
       자체는 아직 미커밋이라 별도 커밋으로 뒤따른다).
 - [x] scope.md 의 acceptance_commands(S-0~S-6) 전부 실행·기록됨 — S-2~S-6 은 exit 0.
-      S-0/S-1 은 exit 1(procurement 의 out_of_scope 위반 1건 때문 — 아래 「게이트가 잡은
-      실제 위반(범위 밖)」).
+      S-0/S-1 은 procurement 의 out_of_scope 위반 1건 때문에 exit 1 이었으나(아래 「게이트가
+      잡은 실제 위반(범위 밖)」), 3A 커밋 `b72b712` 뒤 S-0 재실행이 **exit 0**(head
+      `9baef6b`) — 정본 acceptance 가 초록으로 해소됐다.
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — `build-logic:test`·
       `build-logic:detekt`·`contractGate`·`qualityBaseline` 전부 통과(S-0/S-1 실행 중
       확인). 유일한 미통과는 procurement(out_of_scope) 의 `testShapeGate`.
@@ -49,6 +50,7 @@ verifier ready-for-review + 사용자 승인(scope.md 지위 문단).
 | 담당 레인 | M3/3A(procurement 소유). 이 slice 는 out_of_scope 라 직접 수정하지 않았다 — team-lead 에게 즉시 보고(2026-09-07)하고 3A 레인의 한 줄 수정(`runBlocking { }` 을 블록 본문으로, `=` 제거)을 요청했다 |
 | 해소 조건 | 3A 가 위 함수를 블록 본문으로 고친 커밋이 들어온 뒤 `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)`(S-0) 재실행이 exit 0. 재실행은 team-lead 지시로 진행 |
 | 귀속 증거 | `./gradlew --no-build-cache clean check -x :procurement:testShapeGate`(HEAD `4a73268`) exit 0 — 그 1건을 빼면 전부 초록(commands.md). 이 명령은 acceptance 판정을 대신하지 않는 귀속용이다 |
+| **해소** | 3A 커밋 `b72b712`(「F-1 blocker — COL-06 property test 를 JUnit 이 discover 하게 정정」) — S-0 재실행 **exit 0**(head `9baef6b`, commands.md 「S-0 재실행」). 정본 acceptance 가 처음으로 초록 |
 
 이 발견은 게이트의 결함이 아니라 **설계 의도대로 작동한 증거**다(2B 에서 25/27
 가짜 초록을 낸 것과 같은 패턴을 처음 실전 코드에서 잡았다) — 다만 그로 인해

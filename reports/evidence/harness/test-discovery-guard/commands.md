@@ -78,6 +78,11 @@ base `7581106ecf7c52bbf8bb032adc233e90a8f1eb9b` · 구현 커밋 `c7aaf5c`(게�
 - exit: 0
 - 핵심 결과: 그 1건을 빼면 이 slice 의 나머지 8 모듈 + build-logic + 루트 게이트 전부 초록 — S-0/S-1 의 유일한 원인이 procurement 그 1건임을 귀속한다(이 명령은 acceptance 판정을 대신하지 않는다, S-0/S-1 정본은 그대로 exit 1).
 
+## S-0 재실행 — 3A 수정(`b72b712`) 뒤, team-lead 지시(2026-09-07)
+
+- cmd: `git worktree add --detach <dir> HEAD(9baef6b) && (cd <dir> && ./gradlew --no-build-cache clean check)`
+- exit: 0 — `BUILD SUCCESSFUL`(347 tasks). 3A 가 `b72b712`(「F-1 blocker — COL-06 property test 를 JUnit 이 discover 하게 정정」)로 `AccountingTest.kt` 를 고친 뒤 S-0 정본이 처음으로 초록. worktree 는 확인 뒤 제거(`git worktree list` 본 저장소 한 줄만 재확인).
+
 ## secret 스캔
 
 - cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" <이 slice 편집 파일 8개>`
