@@ -83,10 +83,18 @@ internal object Sql {
             observed_at, revision, observation_key
         ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
         ON CONFLICT (notice_number, notice_round) DO UPDATE SET
-            winning_rate_fraction = EXCLUDED.winning_rate_fraction,
-            derived_base_amount_won = EXCLUDED.derived_base_amount_won,
-            derived_base_amount_currency = EXCLUDED.derived_base_amount_currency,
-            derived_base_amount_vat = EXCLUDED.derived_base_amount_vat,
+            -- M-c(verifier r2) — COALESCE로 NULL 유입이 기존 값을 지우지 않게 한다(설계
+            -- 검토 ④ 「비었으면 지우지 않는다」). winningRate만 실은 더 늦은 관측이 오면
+            -- derivedBaseAmount 세 컬럼은 EXCLUDED에서 전부 NULL인데, COALESCE 없이 그대로
+            -- SET하면 기존 값을 지워 존재 가드가 항목을 통째로 실패시켰다(부분 관측이
+            -- 정상인데도).
+            winning_rate_fraction = COALESCE(EXCLUDED.winning_rate_fraction, opening_result.winning_rate_fraction),
+            derived_base_amount_won =
+                COALESCE(EXCLUDED.derived_base_amount_won, opening_result.derived_base_amount_won),
+            derived_base_amount_currency =
+                COALESCE(EXCLUDED.derived_base_amount_currency, opening_result.derived_base_amount_currency),
+            derived_base_amount_vat =
+                COALESCE(EXCLUDED.derived_base_amount_vat, opening_result.derived_base_amount_vat),
             observed_at = EXCLUDED.observed_at,
             revision = opening_result.revision + 1,
             observation_key = EXCLUDED.observation_key,
