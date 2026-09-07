@@ -39,24 +39,38 @@ internal fun bufProcessViolation(
         "$step 실패(exit=$exitCode):\n$output"
     }
 
-/** (d) `generateProto`를 두 번 실행한 산출물이 바이트 단위로 같은지 — 결정성 실측. 파일
- * 집합(상대 경로)이 다르거나 내용 해시가 다르면 위반. */
+/**
+ * (d) `generateProto`를 두 번 실행한 산출물이 바이트 단위로 같은지 — 결정성 실측. 파일
+ * 집합(상대 경로)이 다르거나 내용 해시가 다르면 위반.
+ *
+ * **verifier r1 F-1(high) — 빈 집합 둘도 위반이다.** 산출물 경로가 바뀌거나(플러그인 상향
+ * 등) `hashDirectoryContents`가 디렉터리 부재로 `emptyMap()`을 두 번 내면, 이전 판은
+ * "집합이 같고 내용도 같다"로 읽어 조용히 통과했다 — 아무것도 안 재고 통과하는 것과
+ * "결정적으로 같다"를 구분하지 못했다. 빈 집합은 애초에 잴 것이 없다는 사실이지 결정성의
+ * 증거가 아니다.
+ */
 internal fun generationDeterminismViolation(
     first: Map<String, String>,
     second: Map<String, String>,
-): String? {
-    if (first.keys != second.keys) {
-        val onlyFirst = first.keys - second.keys
-        val onlySecond = second.keys - first.keys
-        return "두 번의 generateProto 산출물 파일 집합이 다르다 — 1회차에만: $onlyFirst, 2회차에만: $onlySecond"
+): String? =
+    when {
+        first.isEmpty() && second.isEmpty() -> {
+            "두 번의 generateProto 산출물이 모두 비어 있다 — 결정성을 잴 대상이 없다(산출물 경로가 바뀌었는지 확인하라)"
+        }
+
+        first.keys != second.keys -> {
+            val onlyFirst = first.keys - second.keys
+            val onlySecond = second.keys - first.keys
+            "두 번의 generateProto 산출물 파일 집합이 다르다 — 1회차에만: $onlyFirst, 2회차에만: $onlySecond"
+        }
+
+        else -> {
+            val mismatched = first.keys.filter { first[it] != second[it] }.sorted()
+            mismatched
+                .takeIf { it.isNotEmpty() }
+                ?.let { "두 번의 generateProto 산출물이 바이트 단위로 다르다(결정성 위반) — $it" }
+        }
     }
-    val mismatched = first.keys.filter { first[it] != second[it] }.sorted()
-    return if (mismatched.isEmpty()) {
-        null
-    } else {
-        "두 번의 generateProto 산출물이 바이트 단위로 다르다(결정성 위반) — $mismatched"
-    }
-}
 
 /** [generationDeterminismViolation]에 넘길 입력 — 디렉터리 아래 전 파일의 상대경로→sha256 hex. */
 internal fun hashDirectoryContents(root: File): Map<String, String> {

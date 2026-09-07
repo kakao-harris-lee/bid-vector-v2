@@ -127,6 +127,13 @@ abstract class ContractGateTask : DefaultTask() {
         }
     }
 
+    /**
+     * verifier r1 F-1(high) — 이 중첩 호출에 `--no-build-cache`가 없으면 격리 사본의
+     * `ml-contract/gradle.properties`(`org.gradle.caching=true`)가 공유 build cache 를 켠
+     * 채로 두 회차 모두 **같은 캐시 엔트리에서 복원**된다(`generateProto FROM-CACHE` 두 번,
+     * 실측). 그러면 비교되는 두 해시 집합이 같은 복원본이라 결정성 검사가 구조적으로
+     * 실패할 수 없다 — `--no-build-cache`로 매 회차가 실제 protoc 실행이게 한다.
+     */
     private fun generateProtoOnce(
         workingDir: File,
         gradlew: String,
@@ -134,7 +141,16 @@ abstract class ContractGateTask : DefaultTask() {
         label: String,
     ): List<String> {
         val result =
-            run(workingDir, gradlew, "--offline", "--project-dir", mlContractDir.path, "clean", "generateProto")
+            run(
+                workingDir,
+                gradlew,
+                "--offline",
+                "--no-build-cache",
+                "--project-dir",
+                mlContractDir.path,
+                "clean",
+                "generateProto",
+            )
         return listOfNotNull(bufProcessViolation("generateProto($label)", result.exitCode, result.output))
     }
 
