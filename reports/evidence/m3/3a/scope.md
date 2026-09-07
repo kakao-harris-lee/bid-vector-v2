@@ -27,7 +27,7 @@ in_scope:
 out_of_scope:
   - adapters/**                                       # HTTP·파싱·DB 는 3B·3D. 3A 는 port 와 타입만
   - shared-kernel/** 의 위 넷 밖                        # 1B·1D 승인 산출물 — 필요한 carrier 부재 시 멈추고 보고
-  - fixtures/manifest.yaml, fixtures/input/**, fixtures/expected/**   # **curator 레인(별도 세션) 소유** — D-M3-8 (a) 승격·신설. 3A 구현 레인은 편집하지 않는다(runner 는 읽기만)
+  - fixtures/manifest.yaml, fixtures/input/**, fixtures/expected/**   # **curator 레인(별도 세션) 소유** — D-M3-8 (a) 승격·신설(완료·승인 `5acd5f0`). 3A 구현 레인은 case 내용을 편집하지 않는다. **예외(잔여 일괄, 2026-09-07 세션 모델)**: `koneps-collection` case 의 `contract_binding` 필드만 3A 가 채운다(`pending-3a` → 실제 타입·executor, 1D ft-002 관례) — 그 밖의 필드·해시·기대값 무편집
   - 감시·자격·판정 소비                                 # M4 4B
   - 공고 상태 전이표의 실행(§2.2.1)                       # `NoticeStatus` 값·전이 test 는 3A 가 두되 **이벤트를 만드는 use case** 는 4B
   - 브라우저 크롤(COL-09)·mock 데이터(COL-10)·수집 스케줄·lease(OPS-01/02)
