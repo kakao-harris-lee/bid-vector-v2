@@ -1,9 +1,13 @@
 # M3/3D — checklist.md
 
-base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · head `6332158`(수정 라운드 2, verifier r2
-N-1·N-2·N-4·N-5 대응 — F-1~F-8은 `782c4ae` 시점과 변경 없음). 정본 순서: `scope.md` →
-`_workspace/m3-3d/01_design-review.md`(Phase 2.5) → `_workspace/m3-3d/02_verifier_report.md`
-(verifier r1) → `_workspace/m3-3d/03_verifier_report_r2.md`(verifier r2) → 이 문서.
+base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · head `15f3325`(수정 라운드 3, verifier r3
+P-1 대응 — F-1~F-8·N-1~N-5는 `2e31d4e` 시점과 변경 없음). base..HEAD 사이 `9089bd4`는
+3C(다른 slice) 착수 커밋으로 `milestone-3.md`·`reports/evidence/m3/3c/scope.md`만
+건드린다 — 3D in_scope 밖, 레인 혼입 아님(commands.md 「레인 혼입」 절 참고). 정본 순서:
+`scope.md` → `_workspace/m3-3d/01_design-review.md`(Phase 2.5) →
+`_workspace/m3-3d/02_verifier_report.md`(verifier r1) →
+`_workspace/m3-3d/03_verifier_report_r2.md`(verifier r2) →
+`_workspace/m3-3d/04_verifier_report_r3.md`(verifier r3) → 이 문서.
 
 ## 완료 조건 대응표 — scope.md 「이 slice 가 하는 일」
 
@@ -42,6 +46,16 @@ N-1·N-2·N-4·N-5 대응 — F-1~F-8은 `782c4ae` 시점과 변경 없음). 정
 | N-5(medium, 커버리지) | F-8이 바꾼 술어(표 밖 상태 → 예외)를 지키는 test가 없었다 | `EVENT_PATH_TO_STATUS` 맵을 exhaustive `when`(`eventPathFor`)으로 교체 — 분기 누락이 컴파일 실패가 된다(런타임 test보다 이른 방어) | `NoticeReconstructionTest`(양성 경로 고정) |
 | N-6(low) | "sourceText 리터럴을 공유해 하나의 값으로 잇는다"는 말이 실물보다 강함(진짜 공유 상수가 아니라 같은 문자열을 손으로 두 번 쓴 것) | **미수정 — 표현을 완화**(아래 F-7 절 문구 정정) | checklist.md 「F-7」 절 |
 | N-7(low, 장부) | evidence head 선언·rollback 커밋 수 주장·checklist ⑧ 대시 참조·위협모델 과대진술 | 이 evidence 갱신 자체 | commands.md·rollback.md·checklist.md(이 문서) |
+
+## finding 대응표 — verifier r3(수정 라운드 3)
+
+| finding | 요지 | 대응 | 재검증 |
+| --- | --- | --- | --- |
+| P-1(medium) | 가드 축 밖 라벨 컬럼 다섯(`*_provenance_detail`·`estimated_amount_source_key`·`floor_rate_origin_kind`/`_detail`)이 미선언인 채 열려 있었다 | `guard_authoritative_slot`·`guard_existence_and_freshness` 트리거 인자(동반 컬럼)에 다섯 컬럼 추가(함수 본문 무변경) | `PrecedenceLabelColumnTest`(위조 넷 재현 + 정상 fold 통과), `CleanMigrationTriggerTest`(가드 인자 완전성 대조) |
+| P-2(low, 경계 미선언) | `notice.status`가 3D 쓰기 경로에서 한 번 쓰고 끝(Open 고정)이라는 사실이 어디에도 없었다 | **미수정 — 경계 문장에 명시**(코드 변경 없음, M4 소유 상태 전이와 무관) | checklist.md 위협 모델 경계 문장(위) |
+| P-3(low, 장부) | 경계 문장의 `business_category` 사유("변경 경로 자체가 없다")가 사실과 다름(실물은 UPDATE_NOTICE가 매번 SET, 위조도 통과) | 사유 정정(「가드 축이 아니다」만 유지) | checklist.md 경계 문장(위) |
+| P-4(low, 장부) | evidence 선언 head가 한 커밋 낡음(`6332158`→실제 HEAD `2e31d4e`), `2e31d4e`가 evidence 3종만 만졌다는 사실이 어디에도 없음 | head 재고정 + 이 사실 commands.md에 명시 | commands.md 머리말 |
+| P-5(low, 규격) | `rollback.md`에 라운드 이력 절("이전 실측 — 결과 동일, 기록 보존")이 있어 evidence-pack 「라운드 이력 절 금지」 위반 | 절 삭제, 이번 실측 하나만 남김 | rollback.md |
 
 ### F-7 — 3A·3B·3D 몫 전부 닫힘(운영자 결정 2026-09-08 원 결정 + 3B 확장 (a))
 
@@ -92,18 +106,30 @@ adapter 어댑터 경계, persistence는 저장 계층)이 서로 다른 관심�
    이제 `Map.getValue`가 예외로 던진다(F-8 뒤 「조용한 Open」 제거, verifier 부분 동의를
    완전 동의로 좁혔다).
 
-## 위협 모델 대응표 — scope.md 「방어한다」(F-1~F-6 뒤 갱신, verifier r2 N-1·N-2 뒤 재정정)
+## 위협 모델 대응표 — scope.md 「방어한다」(F-1~F-6 뒤 갱신, verifier r2 N-1·N-2·r3 P-1 뒤 재정정)
 
-**경계 문장(verifier r2 N-2·N-7 뒤 명시)** — (a)가 실제로 방어하는 범위는 「금액 축 셋
-(base/estimated/allocated)의 값·provenance·동반 컬럼(통화·과세, allocated는 동반 컬럼
-없음)」과 「status」다. **방어하지 않는 것**: `deadline_at`(위조 가능, 알려진 제한) ·
+**경계 문장(verifier r2 N-2·N-7, r3 P-1·P-2·P-3 뒤 명시)** — (a)가 실제로 방어하는 범위는
+「금액 축 셋(base/estimated/allocated)의 값·provenance kind·provenance detail·동반 컬럼
+(통화·과세, allocated는 통화·과세 자체가 없음)」·「estimated_amount_source_key」·
+「floor_rate_fraction과 그 출처 라벨(origin kind·detail)」·「status」다(P-1 뒤 라벨
+컬럼까지 전부 포함). **방어하지 않는 것**: `deadline_at`(위조 가능, 알려진 제한) ·
 raw_observation을 app 역할이 스스로 새로 만들어 그 key로 값을 바꾸는 경로(N-3, raw
 INSERT 권한이 정상 경로에 필요해 경계 밖) · `business_category_code`/`_label`(가드 축이
-아니다, 최초 기재 뒤에는 변경 경로 자체가 없다).
+아니다 — **정정, P-3**: 「최초 기재 뒤 변경 경로 자체가 없다」는 틀렸다. 정상 fold도
+`Sql.UPDATE_NOTICE`가 이 두 컬럼을 매번 SET하고, 직접 SQL 위조도 통과한다. 가드 축이
+아니라는 결론만 맞다).
+
+**P-2(verifier r3, low, 경계 미선언) — `status`는 이 slice의 쓰기 경로에서 한 번 쓰고
+끝이다.** `NoticeCollected.toNoticeRow()`가 `status = NoticeStatus.Open.name`으로
+고정하고 `Sql.UPDATE_NOTICE`는 `status`를 SET하지 않는다 — `NoticeRepository`에는
+`persist`·`find`뿐이라 상태 전이를 적용할 port가 3D에는 없다. 즉 **canonical status는
+3D를 통해 `Open` 말고 다른 값이 될 수 없다**(상태 전이는 M4 소유, 결함 아님). 신설된
+`guard_notice_status`의 신선도 분기는 그래서 정상 경로에서 발동할 자리가 없고, 직접
+SQL 위조를 막는 방어로만 실효를 갖는다 — 이 사실이 이전 판 어디에도 적혀 있지 않았다.
 
 | 방어 항목 | 메커니즘 | 증거 |
 | --- | --- | --- |
-| (a) 파생/비권위 write가 권위 자리를 덮음, 값·provenance·동반 컬럼(통화·과세)·status 변경 | `guard_authoritative_slot()`(존재+점유+신선도, 값·provenance·동반 컬럼 중 하나라도 바뀌면 적용) + `guard_existence_and_freshness('status')` | `PrecedenceMutationTest` 11건 |
+| (a) 파생/비권위 write가 권위 자리를 덮음, 값·provenance kind/detail·동반 컬럼(통화·과세)·estimated source key·floor_rate origin·status 변경 | `guard_authoritative_slot()`(존재+점유+신선도, 값·provenance·동반 컬럼 중 하나라도 바뀌면 적용, P-1 뒤 라벨 컬럼 포함) + `guard_existence_and_freshness()`(status·floor_rate origin, P-1 뒤 대칭 확장) | `PrecedenceMutationTest` 11건, `PrecedenceLabelColumnTest` 5건, `CleanMigrationTriggerTest`(가드 인자 완전성) |
 | (b) raw·audit의 갱신·삭제·위조 INSERT | `reject_mutation()` 트리거 + GRANT 미부여 + SECURITY DEFINER(audit INSERT는 트리거만) | `RawAppendOnlyTest` 8건 |
 | (c) 재수집 중복 효과, 32비트 해시 충돌에 의한 유실 | `observation_key`(SHA-256) UNIQUE + `ON CONFLICT DO NOTHING` | `NoticeVersioningTest`, `F2CollisionRegressionTest` |
 | (d) 배치 통째 소실·반쯤 commit | 항목 하나 = 트랜잭션 하나 | `ItemAtomicityTest` |
@@ -165,4 +191,4 @@ INSERT 권한이 정상 경로에 필요해 경계 밖) · `business_category_co
   조용히 끊길 수 있다 — 두 test가 서로 다른 모듈 경계(koneps 어댑터 vs persistence 저장
   계층)를 검증하므로 상수 하나로 억지로 묶지 않고 이 사실만 등재한다.
 
-## 재작업 누계: 2회(수정 라운드 1 F-1~F-8, 수정 라운드 2 N-1·N-2·N-4·N-5), 상한 5(v2-slice-pipeline).
+## 재작업 누계: 3회(수정 라운드 1 F-1~F-8, 수정 라운드 2 N-1·N-2·N-4·N-5, 수정 라운드 3 P-1), 상한 5(v2-slice-pipeline). 운영자 결정: P-1 수정 + r4 표적 재검증 뒤 종결.
