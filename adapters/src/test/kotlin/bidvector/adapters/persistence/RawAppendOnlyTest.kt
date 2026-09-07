@@ -11,7 +11,6 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import org.postgresql.util.PSQLException
-import java.sql.Timestamp
 import java.time.Instant
 
 private fun observationAt(second: Int): RawNoticeObservation {
@@ -25,19 +24,53 @@ private fun observationAt(second: Int): RawNoticeObservation {
  * 「audit을 지워 이력 소거」).
  */
 class RawAppendOnlyTest : PersistenceTestSupport() {
-    private fun insertRawObservation(observation: RawNoticeObservation): ObservationKey {
-        val key = ObservationKey.of(observation)
-        dataSource().connection.use { connection ->
-            connection.prepareStatement(Sql.INSERT_RAW_OBSERVATION).use { statement ->
-                statement.setString(1, key.value)
-                statement.setString(2, observation.sourceEndpoint.name)
-                statement.setString(3, "{}")
-                statement.setTimestamp(4, Timestamp.from(observation.observedAt))
-                statement.setString(5, "test-release")
-                statement.executeUpdate()
-            }
-        }
+    private fun insertRawObservation(observation: RawNoticeObservation): ObservationKey =
+        appendRawObservation(observation)
+
+    /** deadline만 실은 최소 notice 하나를 심는다 — audit 관련 test 셋이 공유하는 준비 단계. */
+    private fun seedSimpleNotice(
+        id: NoticeId,
+        observation: RawNoticeObservation,
+        deadline: Instant,
+    ): ObservationKey {
+        val key = insertRawObservation(observation)
+        val command =
+            NoticeCollected(
+                id = id,
+                businessCategory = null,
+                baseAmount = null,
+                estimatedAmount = null,
+                allocatedBudget = null,
+                floorRate = null,
+                deadlineAt = deadline,
+                openingScheduledAt = null,
+                raw = observation,
+            )
+        JdbcNoticeRepository(dataSource()).persist(command, key)
         return key
+    }
+
+    /** [seedSimpleNotice]가 심은 행의 deadline을 새 관측으로 갱신한다(revision 증가 유발). */
+    private fun bumpDeadline(
+        id: NoticeId,
+        raw: RawNoticeObservation,
+        nextObservation: RawNoticeObservation,
+        newDeadline: Instant,
+    ) {
+        val nextKey = insertRawObservation(nextObservation)
+        val command =
+            NoticeCollected(
+                id = id,
+                businessCategory = null,
+                baseAmount = null,
+                estimatedAmount = null,
+                allocatedBudget = null,
+                floorRate = null,
+                deadlineAt = newDeadline,
+                openingScheduledAt = null,
+                raw = raw,
+            )
+        JdbcNoticeRepository(dataSource()).persist(command, nextKey)
     }
 
     @Test
@@ -115,25 +148,8 @@ class RawAppendOnlyTest : PersistenceTestSupport() {
         // 올려야 AFTER UPDATE 트리거가 audit 행을 낸다(초기 insert 자체는 audit을 만들지 않는다).
         val id = NoticeId(NoticeNumber.of("AUDIT-APPEND-ONLY"), NoticeRound.of("000"))
         val firstObservation = observationAt(3)
-        val firstKey = insertRawObservation(firstObservation)
-        val command =
-            NoticeCollected(
-                id = id,
-                businessCategory = null,
-                baseAmount = null,
-                estimatedAmount = null,
-                allocatedBudget = null,
-                floorRate = null,
-                deadlineAt = Instant.parse("2026-09-07T03:00:00Z"),
-                openingScheduledAt = null,
-                raw = firstObservation,
-            )
-        val repository = JdbcNoticeRepository(dataSource())
-        repository.persist(command, firstKey)
-
-        val secondObservation = observationAt(4)
-        val secondKey = insertRawObservation(secondObservation)
-        repository.persist(command.copy(deadlineAt = Instant.parse("2026-09-07T05:00:00Z")), secondKey)
+        seedSimpleNotice(id, firstObservation, Instant.parse("2026-09-07T03:00:00Z"))
+        bumpDeadline(id, firstObservation, observationAt(4), Instant.parse("2026-09-07T05:00:00Z"))
 
         dataSource().connection.use { connection ->
             connection.autoCommit = false
@@ -142,5 +158,60 @@ class RawAppendOnlyTest : PersistenceTestSupport() {
             }
             connection.rollback()
         }
+    }
+
+    @Test
+    fun `F-6 재현 — 애플리케이션 역할은 notice_audit 에 위조 행을 직접 INSERT 할 수 없다`() {
+        appConnection().use { connection ->
+            shouldThrow<PSQLException> {
+                connection
+                    .prepareStatement(
+                        "INSERT INTO notice_audit " +
+                            "(notice_number, notice_round, revision, observation_key, reason, previous_row) " +
+                            "VALUES ('FORGED', '000', 1, 'forged-key', 'FORGED', '{}'::jsonb)",
+                    ).use { it.executeUpdate() }
+            }
+            connection.rollback()
+        }
+    }
+
+    @Test
+    fun `F-6 — 애플리케이션 역할이 정상 UPDATE 로 값을 바꾸면 SECURITY DEFINER 트리거가 audit 행을 여전히 남긴다`() {
+        // notice_audit에 직접 INSERT 권한이 없어도(위 test), 트리거를 통한 audit 삽입은
+        // SECURITY DEFINER로 동작해야 한다 — 권한 축소가 정상 감사 경로까지 막으면 안 된다.
+        val id = NoticeId(NoticeNumber.of("AUDIT-SECURITY-DEFINER"), NoticeRound.of("000"))
+        seedSimpleNotice(id, observationAt(5), Instant.parse("2026-09-07T03:00:00Z"))
+
+        val secondKey = insertRawObservation(observationAt(6))
+        appConnection().use { connection ->
+            connection
+                .prepareStatement(
+                    "UPDATE notice SET deadline_at = ?, observation_key = ? " +
+                        "WHERE notice_number = ? AND notice_round = ?",
+                ).use { statement ->
+                    statement.setTimestamp(1, java.sql.Timestamp.from(Instant.parse("2026-09-07T09:00:00Z")))
+                    statement.setString(2, secondKey.value)
+                    statement.setString(3, id.number.value)
+                    statement.setString(4, id.round.value)
+                    statement.executeUpdate()
+                }
+            connection.commit()
+        }
+
+        val auditCount =
+            dataSource().connection.use { connection ->
+                connection
+                    .prepareStatement(
+                        "SELECT count(*) FROM notice_audit WHERE notice_number = ? AND notice_round = ?",
+                    ).use { statement ->
+                        statement.setString(1, id.number.value)
+                        statement.setString(2, id.round.value)
+                        statement.executeQuery().use { rs ->
+                            rs.next()
+                            rs.getLong(1)
+                        }
+                    }
+            }
+        auditCount shouldBe 1L
     }
 }
