@@ -72,6 +72,14 @@ quota 는 HTTP 429 뿐 아니라 `resultCode 22·30`(키 미인코딩) 도 신�
 
 특정 모델 이름을 코드에 고정하지 않는다. 테스트는 fake LLM server만 사용한다.
 
+**3C 착수 2026-09-08** — 3D 는 verifier r3 ready-for-review 뒤 P-1(가드 라벨 컬럼) 수정·r4 표적 중이며 경로가 분리돼 병행한다. 계약 정본
+`reports/evidence/m3/3c/scope.md`(base `2e31d4e`). 착수 전 결정: **D-3C-1 (a)** procurement 소유 port — 착수 시 정정으로 **두 파일**(첨부 취득
+`AttachmentDocumentPort`·추출 `RequirementExtractionPort`; 3A `DocumentSourcePort` 는 KONEPS 자격 원문 서브콜이라 3B-2 소관) · **D-3C-2 (a)**
+`networknt json-schema-validator` · **D-3C-4 (a)** PDF 텍스트 층 + 플레인 텍스트만, 그 밖은 `Uncertain` + 회계 · D-M3-6 (a) fake LLM 만. 세션 모델 계약 고정:
+**D-3C-6** 「`matches` 통과 뒤에만」 게이트는 adapters 층 공개 진입점(`WatchGatedExtractor`, `WatchVerdict.Passed` 외 호출 0)에 선다 — 같은 층 도메인 모듈끼리
+참조 불가(ADR 0006 D-4)라 procurement port 가 1E 타입을 받을 수 없다 · **D-3C-7** prompt 는 adapters 리소스 파일(파일명 = version, 스키마와 짝). 1C 어휘
+(`RequirementRow`·`UncertainReason`) 변환은 adapters 한 함수, 호출은 M4 4B. Phase 2.5 필수(fail-open) — 세션 모델 직접 `_workspace/m3-3c/01_design-review.md`.
+
 ### Slice 3D — persistence adapter
 
 - Flyway migration과 Testcontainers PostgreSQL test

@@ -1,4 +1,4 @@
-# Slice 계약 — M3 / 3C · 문서/LLM extraction adapter — **초안, 구현 전**
+# Slice 계약 — M3 / 3C · 문서/LLM extraction adapter — **착수 2026-09-08**
 
 > **지위**: M3 착수 직후(2026-09-07) 세션 모델이 단독으로 쓴 **계약 초안**(문서 레인, 브리프 2). 구현·gradle·의존성 편집 없음.
 > 착수는 **3A 승인 → 3B → 3D 뒤**(`prep/m3-prep.md` §5 순서)이며, 그때 `base_sha` 재고정(40자), 아래 D-3C-1~4 답 수령, `milestone-3.md`
@@ -8,13 +8,14 @@
 ```yaml
 milestone: m3
 slice: 3c-document-llm-extraction-adapter
-base_sha: 착수 시 재고정   # 초안 시점 앵커 1f3c4ff
+base_sha: 2e31d4ede2fef9f1100bbdf71da0a1e0725b0f00   # 착수 2026-09-08 재고정 = 3D 수정 라운드 2 head(3D r4 와 병행 — 경로 분리). 초안 시점 앵커 1f3c4ff
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/extraction/**   # 문서 취득(`DocumentSourcePort` 구현)·chunk·LLM client port·JSON Schema 검증·provenance 조립·예산/timeout/breaker 배선
   - adapters/src/test/kotlin/bidvector/adapters/extraction/**   # fake LLM server 위 시나리오 전부(정상·schema 위반·timeout·예산 초과·breaker open·비지원 문서 형식)·게이트 test(호출 0회)
   - adapters/build.gradle.kts                                   # (D-3C-2 시) JSON Schema 검증 의존 한 줄 · resilience4j-kotlin(3B 가 이미 넣었으면 병합)
-  - procurement/src/main/kotlin/bidvector/procurement/RequirementExtractionPort.kt   # 조건부 — 3A 가 port 를 정의하지 않았을 때만 **도메인 소유 port 한 파일** 추가(ADR 0005 D-10.1). 그 밖의 procurement 편집 금지
+  - procurement/src/main/kotlin/bidvector/procurement/{RequirementExtractionPort,AttachmentDocumentPort}.kt, procurement/src/test/kotlin/**   # **조건 충족(착수 시 확인)** — 3A 의 `DocumentSourcePort` 는 KONEPS 자격 원문 서브콜(3B-2 소관)이라 3C 의 첨부 취득·추출 port 가 아니다 → 도메인 소유 port **두 파일**(첨부 취득 `AttachmentDocumentPort`, 추출 `RequirementExtractionPort` + 결과 타입 `ExtractedRequirements`·`ExtractionOutcome`·`ExtractionFailure`). 그 밖의 procurement 편집 금지
+  - gradle/libs.versions.toml                                   # json-schema-validator 좌표(전례)
   - config/quality/gate-tests.properties                        # 조건부 — `gate.tests.adapters` 에 3C test 추가(3B 가 만든 키에 병합)
   - milestone-3.md                                              # 「Slice 3C」 착수 문단
   - reports/evidence/m3/3c/**
@@ -46,7 +47,22 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시.
+`git log --oneline 2e31d4e..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-08) **없음**.
+
+**착수 2026-09-08 — 운영자 결정**: D-3C-1 (a) · D-3C-2 (a) · D-3C-4 (a) · D-M3-6 (a). **세션 모델 계약 정정·고정(착수 시)**: ① 3A `DocumentSourcePort.fetchQualificationText`
+는 KONEPS 자격 원문 서브콜(3B-2)이라 3C ① 은 그것을 구현하지 않고 신설 `AttachmentDocumentPort`(첨부 URL → `FetchedDocument`)를 구현한다. ② **게이트의
+자리(D-3C-6, 계약 고정)**: 같은 층 도메인 모듈끼리는 참조할 수 없어(ADR 0006 D-4) `procurement` port 가 1E `WatchVerdict` 를 인자로 받을 수 없다 — 「타입 증거」
+게이트는 **adapters 층**에 선다: 공개 진입점 `WatchGatedExtractor.extract(verdict: WatchVerdict, document)` 만 존재하고 `Passed` 외에는 port 구현을 호출하지
+않으며(`Skipped(NotWatched)` 값), port 구현 클래스(`HttpLlmRequirementExtractor`)는 `internal` 이라 adapters 밖에서 게이트 없이 구성할 수 없다. S-3 이 실행 증거(0회/1회).
+③ **결과 타입의 자리**: `ExtractedRequirements`(schema 검증 통과한 구조화 요건 — 그룹 번호·일련·출처 필드 라벨·면허명 문자열 목록·근거 구간)는 `procurement`
+타입이고, 1C `RequirementRow`·`UncertainReason` 로의 변환은 **adapters 한 함수**(`ExtractionToQualification`, D-3C-3 (a) — adapters 는 아래 층 전부를 볼 수 있다)에
+두어 M4 4B 가 부른다. ④ **prompt 버전(D-3C-7, 계약 고정)**: prompt 문면은 adapters 리소스 `prompts/requirement-extraction.v1.txt`, version 은 파일명이며
+스키마 `schema/requirement-extraction.v1.json` 과 짝으로 `promptVersion`·`schemaVersion` 에 실린다. 변경은 새 version 파일 + evidence(OPEN 등재 없음 —
+`OPEN-3C-PROMPT-VERSIONING` 후보 닫힘). ⑤ `OPEN-3C-DOC-FORMATS` 는 종결 시 §14.3 등재.
+
+**병렬 레인 경계**: 3D 수정 라운드(r4 표적)가 같은 트리에서 병행한다 — `adapters/build.gradle.kts`·`gradle/libs.versions.toml`·`config/quality/gate-tests.properties`
+는 **공유 파일**: 편집 전 `git status --porcelain -- <파일>` 로 다른 레인의 미커밋 변경이 없음을 확인하고, 있으면 그 파일 편집을 미루고 보고. 3C 는
+`adapters/.../extraction/**`·`adapters/src/main/resources/{schema,prompts}/**`·procurement 두 파일·`reports/evidence/m3/3c/**` 만.
 
 ---
 
@@ -72,10 +88,10 @@ rollback: |
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
-| **D-3C-1** | **extraction port 의 자리** — 3A 는 `DocumentSourcePort`(취득)만 정의한다. 「문서 → 구조화 요건」 port 는 어디에 서는가 | (a) **`procurement` 소유 `RequirementExtractionPort`**(자격 원문 fact `QualificationText` 의 구조화는 수집 축 — 3A 가 정의하거나 3C 가 조건부로 한 파일 추가) (b) `qualification` 소유(소비자 쪽) (c) adapters 안에만(port 없음) | **(a)** — ADR 0005 D-10.1 「domain 이 의존하는 port 는 domain 안에 선다」. (b) 는 qualification 이 문서 취득 개념을 알게 되고, (c) 는 M4 use case 가 adapters 타입을 import 하게 된다 | 착수 전 |
-| **D-3C-2** | **JSON Schema 검증 라이브러리** | (a) **`com.networknt:json-schema-validator`**(Draft 2020-12, JVM 단일 의존) (b) kotlinx.serialization strict 디코딩만(스키마 파일 없음 — 「JSON Schema 기반」 문면 미충족) (c) everit | **(a)** — 문면이 「JSON Schema」를 요구하고, 스키마 파일이 version 의 정본이 된다. §7(측정된 필요) 은 이 한 줄에 충족 | 착수 전 |
+| **D-3C-1** ✅ (a) 승인 2026-09-08(port 두 파일로 정정) | **extraction port 의 자리** — 3A 는 `DocumentSourcePort`(취득)만 정의한다. 「문서 → 구조화 요건」 port 는 어디에 서는가 | (a) **`procurement` 소유 `RequirementExtractionPort`**(자격 원문 fact `QualificationText` 의 구조화는 수집 축 — 3A 가 정의하거나 3C 가 조건부로 한 파일 추가) (b) `qualification` 소유(소비자 쪽) (c) adapters 안에만(port 없음) | **(a)** — ADR 0005 D-10.1 「domain 이 의존하는 port 는 domain 안에 선다」. (b) 는 qualification 이 문서 취득 개념을 알게 되고, (c) 는 M4 use case 가 adapters 타입을 import 하게 된다 | 착수 전 |
+| **D-3C-2** ✅ (a) 승인 2026-09-08 | **JSON Schema 검증 라이브러리** | (a) **`com.networknt:json-schema-validator`**(Draft 2020-12, JVM 단일 의존) (b) kotlinx.serialization strict 디코딩만(스키마 파일 없음 — 「JSON Schema 기반」 문면 미충족) (c) everit | **(a)** — 문면이 「JSON Schema」를 요구하고, 스키마 파일이 version 의 정본이 된다. §7(측정된 필요) 은 이 한 줄에 충족 | 착수 전 |
 | **D-3C-3** | **1C `UncertainReason` 과의 접점** — 3C 의 실패 사유(예산 초과·breaker open·비지원 형식)는 1C 다섯(`RequirementDataAbsent`·`RequirementUnparsable`·`OperatorLicensesNotDeclared`·`CollectionFailed`·`PermittedIndustryCombinationRuleUndecided`)에 1:1 로 없다 | (a) **adapters 안 `ExtractionFailure` sealed 를 두고 1C 로의 변환표(취득 실패 → `CollectionFailed`, 나머지 전부 → `RequirementUnparsable`)를 한 함수에** — 1C 어휘 불변, 세부 사유는 provenance·회계에 남김 (b) 1C `UncertainReason` 에 variant 추가(명세 변경·qualification 편집) | **(a)** — 1C 는 승인 산출물이고 변환표 한 곳이면 세부 사유가 사라지지 않는다. 변환표가 두 번째 자리에 생기지 않게 CPD 항목 | 계약 고정 |
-| **D-3C-4** | **문서 형식 범위** — 첨부는 PDF·HWP·HWPX·텍스트가 섞인다 | (a) **PDF 텍스트 층 + 플레인 텍스트만**, 그 밖(HWP/HWPX/스캔 PDF)은 `Uncertain(RequirementUnparsable)` + 회계 `unsupportedFormat` (b) HWP 파서 의존 추가 | **(a)** — HWP 파서는 무거운 의존이고 근거(첨부 형식 분포)가 없다. 분포는 3B 수집 회계로 관측한 뒤 결정(`OPEN-3C-DOC-FORMATS`) | 착수 전 |
+| **D-3C-4** ✅ (a) 승인 2026-09-08 | **문서 형식 범위** — 첨부는 PDF·HWP·HWPX·텍스트가 섞인다 | (a) **PDF 텍스트 층 + 플레인 텍스트만**, 그 밖(HWP/HWPX/스캔 PDF)은 `Uncertain(RequirementUnparsable)` + 회계 `unsupportedFormat` (b) HWP 파서 의존 추가 | **(a)** — HWP 파서는 무거운 의존이고 근거(첨부 형식 분포)가 없다. 분포는 3B 수집 회계로 관측한 뒤 결정(`OPEN-3C-DOC-FORMATS`) | 착수 전 |
 | **D-3C-5** | 정책값(chunk 크기·문서당 호출 상한·토큰 상한·timeout·breaker 임계)은 adapters 정책 데이터, 초기값 「보수적 + 관측 갱신」 — 3B D-3B-2·ADR 0010 D-1 과 같은 배관. 값은 이 문서에 적지 않는다 | — | 계약 고정 |
 
 ---
@@ -106,4 +122,4 @@ rollback: |
 | `OPEN-COL-04` | 브라우저 크롤 미채택 — 취득은 게시 URL 만. 활성 유지 |
 | `OPEN-QUAL-06`(정밀도 실측) | 추출 정밀도는 3C 가 재지 않는다 — provenance 가 실측 가능한 형태를 남길 뿐 |
 | 신설 후보 `OPEN-3C-DOC-FORMATS` | 첨부 형식 분포(PDF/HWP/HWPX/스캔)와 HWP 파서 채택 — D-3C-4 (a) 뒤 3B 수집 회계로 관측한 값이 근거. 등재는 착수 시 §14.3 |
-| 신설 후보 `OPEN-3C-PROMPT-VERSIONING` | prompt 문면의 version·보관 자리(정책 데이터인가 리소스인가)와 변경 승인 절차 — ⑥ 의 `promptVersion` 이 가리키는 정본. 착수 시 결정 후보로 승격 |
+| ~~신설 후보 `OPEN-3C-PROMPT-VERSIONING`~~ | 착수 시 계약 고정 **D-3C-7**(adapters 리소스 파일, 파일명 = version, 스키마와 짝)으로 닫힘 |
