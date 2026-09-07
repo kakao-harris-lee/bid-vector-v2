@@ -113,4 +113,56 @@ class AccountingTest {
 
         allReasons.none { it.toString().contains("Duplicate") } shouldBe true
     }
+
+    // M3/3B 좁은 확장(verifier r1 H-3) — truncated 와 truncationCause 결합 불변식.
+    @Test
+    fun `truncated=true 인데 truncationCause 가 없으면 생성이 거부된다`() {
+        shouldThrow<IllegalArgumentException> {
+            accounting(received = 1, normalized = 1, duplicate = 0, dropped = 0).copy(truncated = true)
+        }
+    }
+
+    @Test
+    fun `truncated=false 인데 truncationCause 가 있으면 생성이 거부된다`() {
+        shouldThrow<IllegalArgumentException> {
+            accounting(received = 1, normalized = 1, duplicate = 0, dropped = 0)
+                .copy(truncationCause = TruncationCause.MaxPages)
+        }
+    }
+
+    @Test
+    fun `truncated=true 와 truncationCause 가 짝지어지면 생성된다 — 사유별로 값이 갈린다`() {
+        val causes =
+            listOf(
+                TruncationCause.MaxPages,
+                TruncationCause.RepeatedPage,
+                TruncationCause.QuotaExhausted,
+                TruncationCause.Timeout,
+                TruncationCause.TransportFailure,
+                TruncationCause.ServerError,
+                TruncationCause.NotRetryable,
+                TruncationCause.InputError,
+                TruncationCause.Unclassified,
+                TruncationCause.StructureFailure,
+                TruncationCause.SelfThrottled,
+            )
+
+        val results =
+            causes.map { cause ->
+                accounting(received = 0, normalized = 0, duplicate = 0, dropped = 0)
+                    .copy(truncated = true, truncationCause = cause)
+            }
+
+        results.map { it.truncationCause }.toSet().size shouldBe causes.size
+    }
+
+    @Test
+    fun `quotaExceeded·backoffSkipped 는 음수를 거부한다`() {
+        shouldThrow<IllegalArgumentException> {
+            accounting(received = 0, normalized = 0, duplicate = 0, dropped = 0).copy(quotaExceeded = -1)
+        }
+        shouldThrow<IllegalArgumentException> {
+            accounting(received = 0, normalized = 0, duplicate = 0, dropped = 0).copy(backoffSkipped = -1)
+        }
+    }
 }

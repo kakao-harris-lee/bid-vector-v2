@@ -41,10 +41,56 @@ sealed interface CollectionDropReason {
 }
 
 /**
+ * 걷기가 `truncated` 로 끝난 실제 사유(M3/3B 좁은 확장, 운영자 결정 2026-09-07 verifier r1
+ * H-3) — 3B 의 page-walk 가 백스톱·재시도 소진으로 종료될 때 「왜 빠졌는가」를 회계가
+ * 구별하게 한다(COL-06 사용자 가치). 3B(어댑터)만 이 값을 만든다 — procurement 는 형태만
+ * 소유한다.
+ */
+sealed interface TruncationCause {
+    /** 정책 `maxPages` 백스톱. */
+    data object MaxPages : TruncationCause
+
+    /** 동일 페이지 내용 반복 감지. */
+    data object RepeatedPage : TruncationCause
+
+    /** HTTP 429 또는 `resultCode 22` — quota 신호(두 표면, D-3B-7)가 재시도를 소진시켰다. */
+    data object QuotaExhausted : TruncationCause
+
+    /** 전송 timeout 이 재시도를 소진시켰다. */
+    data object Timeout : TruncationCause
+
+    /** timeout 이 아닌 전송 실패(연결 거부 등)가 재시도를 소진시켰다. */
+    data object TransportFailure : TruncationCause
+
+    /** `resultCode` 가 3A 표의 재시도 가능 범주(01/02/04/05)인 채로 재시도를 소진시켰다. */
+    data object ServerError : TruncationCause
+
+    /** `resultCode` 가 3A 표의 비재시도 범주(12/20/30/31/32). */
+    data object NotRetryable : TruncationCause
+
+    /** `resultCode` 가 3A 표의 입력 오류 범주(06/07/08/10/11), 또는 cursor 토큰 자체가 무효(M-5). */
+    data object InputError : TruncationCause
+
+    /** `resultCode` 가 부재이거나 3A 표에 없다(fail-safe 비재시도). */
+    data object Unclassified : TruncationCause
+
+    /** envelope JSON 구조 자체가 무너짐(파싱 실패·필수 형태 위반). */
+    data object StructureFailure : TruncationCause
+
+    /** rate limiter 자체 거부(허가 대기 시간 초과)가 재시도를 소진시켰다 — 호출조차 못 나갔다. */
+    data object SelfThrottled : TruncationCause
+}
+
+/**
  * 수집 회계(⑦, COL-06) — `received = normalized + duplicate + dropped` 항등식은 생성자
  * 불변식이다(위반 시 생성 실패, `copy()`도 이 생성자를 다시 지나므로 재검사된다). legacy의
  * `setdefault` 채움·뺄셈 역산(`cap_skipped_count`)은 채택하지 않는다 — 값은 전부 호출부가
  * 직접 센 수만 받는다.
+ *
+ * **`truncationCause`·`quotaExceeded`·`backoffSkipped`는 M3/3B 좁은 확장이다**(운영자 결정
+ * 2026-09-07, verifier r1 H-3) — 기본값이 있어 기존 생성자 호출처(3A corpus 실행자·
+ * `AccountingTest`)는 그대로 컴파일된다. `truncated`↔`truncationCause` 결합 불변식만
+ * 새로 추가한다 — 다른 기존 불변식은 손대지 않는다.
  */
 data class CollectionAccounting(
     val received: Int,
@@ -56,6 +102,9 @@ data class CollectionAccounting(
     val pagesFetched: Int,
     val truncated: Boolean,
     val unknownFields: Int,
+    val truncationCause: TruncationCause? = null,
+    val quotaExceeded: Int = 0,
+    val backoffSkipped: Int = 0,
 ) {
     init {
         require(received >= 0 && normalized >= 0 && duplicate >= 0 && dropped >= 0) {
@@ -71,5 +120,10 @@ data class CollectionAccounting(
         require(pagesFetched >= 0) { "pagesFetched는 음수일 수 없다" }
         require(unknownFields >= 0) { "unknownFields는 음수일 수 없다" }
         if (sourceTotal != null) require(sourceTotal >= 0) { "sourceTotal은 음수일 수 없다" }
+        require(truncated == (truncationCause != null)) {
+            "truncated 는 truncationCause 존재와 같아야 한다(H-3) — truncated=$truncated truncationCause=$truncationCause"
+        }
+        require(quotaExceeded >= 0) { "quotaExceeded는 음수일 수 없다" }
+        require(backoffSkipped >= 0) { "backoffSkipped는 음수일 수 없다" }
     }
 }
