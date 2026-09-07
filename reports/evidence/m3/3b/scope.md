@@ -13,6 +13,7 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/koneps/**   # contract mock server test·골든 응답 재생·429/timeout/partial/duplicate 시나리오
   - adapters/build.gradle.kts                                # implementation(project(":procurement")) · resilience4j-kotlin · (D-M3-2 (a) 시) mockwebserver test 의존 · test 가 `fixtures/input/koneps/**` 를 시스템 프로퍼티(`bidvector.fixtures.koneps`)로 받는 배선(2A 의 `bidvector.contracts.testdata` 관례) — **2A 가 넣은 줄과 병합**. test 리소스 디렉터리에 골든 사본을 두지 않는다(D-3B-1 (a))
   - config/quality/gate-tests.properties                     # 조건부 — `gate.tests.adapters` 에 3B test 추가(2A·2D 가 만든 키에 병합)
+  - gradle/libs.versions.toml                                # resilience4j 카탈로그 좌표(구현 레인 발견으로 착수 뒤 추가 — 세션 모델 정정, 3A F-15 와 같은 갈래)
   - milestone-3.md                                           # 「Slice 3B」 착수 문단
   - reports/evidence/m3/3b/**
 out_of_scope:
