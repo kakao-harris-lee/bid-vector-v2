@@ -118,9 +118,14 @@ internal fun basisMismatch(contract: KonepsFieldContract): Boolean {
  * canonical 값으로 소비될 수 없다 — 소비 함수([RawNoticeObservation.valueOf])가 이 타입을
  * 인자로 요구하는 구조 자체가 그 닫힘이다.
  *
- * **생성자가 `internal`이다**(verifier r1 F-4) — 공개였다면 다른 모듈이 그 자리에서 계약을
- * 지어내 미등재 키를 읽을 수 있었다(우회 (1b)·(10) 실측). 운영 인스턴스는
- * [KONEPS_COLLECTION_POLICY] 하나이고, procurement 밖에서 이 타입을 조립하는 경로는 없다.
+ * **생성자와 [of] 팩토리가 모두 `internal`이다**(verifier r1 F-4, r2 N-1 정정) — 생성자만
+ * 닫았던 r1 판은 `of()`가 public이라 다른 모듈이 그 자리에서 계약을 지어내 미등재 키를 읽는
+ * 경로가 그대로 열려 있었다(r2 실측: 격리 worktree의 `adapters`에서 `KonepsFieldContract.of(
+ * rawName = RawKey("ghostKey"), …)`가 컴파일·실행됨). `of()`까지 `internal`로 낮춰 같은 모듈
+ * 밖에서는 이 타입을 조립하는 경로가 없다 — 운영 인스턴스는 [KONEPS_COLLECTION_POLICY]
+ * 하나다. **경계는 모듈이지 파일이 아니다** — 같은 모듈 안(이 파일의 다른 저자, test 소스셋)의
+ * 조립은 여전히 열려 있고, 그것은 위협 모델이 방어 대상으로 두지 않은 자리다(scope.md
+ * 「방어하지 않는 것」).
  */
 @ConsistentCopyVisibility
 data class KonepsFieldContract internal constructor(
@@ -149,7 +154,7 @@ data class KonepsFieldContract internal constructor(
     }
 
     companion object {
-        fun of(
+        internal fun of(
             rawName: RawKey,
             concept: FieldConcept,
             basis: Basis?,
@@ -182,8 +187,9 @@ data class KonepsFieldContract internal constructor(
 }
 
 /**
- * 계약 레지스트리 — raw 키 하나에 계약 하나(중복 등재는 구성 오류). **생성자가 `internal`이다**
- * (F-4) — [KonepsCollectionPolicyData] 를 통해서만 만들어진다.
+ * 계약 레지스트리 — raw 키 하나에 계약 하나(중복 등재는 구성 오류). **생성자와 [of] 팩토리가
+ * 모두 `internal`이다**(F-4, r2 N-1 정정 — 생성자만으로는 팩토리가 같은 능력을 돌려줬다).
+ * [KonepsCollectionPolicyData]를 통해서만(procurement 안에서) 만들어진다.
  */
 @ConsistentCopyVisibility
 data class KonepsFieldContractRegistry internal constructor(
@@ -205,7 +211,7 @@ data class KonepsFieldContractRegistry internal constructor(
     fun unknownKeysIn(observation: RawNoticeObservation): Set<RawKey> = observation.keys - byRawName.keys
 
     companion object {
-        fun of(contracts: List<KonepsFieldContract>): KonepsFieldContractRegistry =
+        internal fun of(contracts: List<KonepsFieldContract>): KonepsFieldContractRegistry =
             KonepsFieldContractRegistry(contracts)
     }
 }
