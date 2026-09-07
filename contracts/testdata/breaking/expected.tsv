@@ -1,13 +1,13 @@
-mutation	outcome	exit_code
-field-delete	caught	100
-field-number-change	caught	100
-type-change	caught	100
-enum-value-delete	caught	100
-enum-value-number-change	caught	100
-oneof-field-remove	caught	100
-rpc-delete	caught	100
-rpc-streaming-change	caught	100
-package-rename	caught	100
-reserved-number-reuse	caught	100
-optional-removal	caught	100
-compatible-additions(positive-control)	passed	0
+mutation	outcome	exit_code	rule_type
+field-delete	caught	100	FIELD_NO_DELETE
+field-number-change	caught	100	FIELD_NO_DELETE
+type-change	caught	100	FIELD_SAME_TYPE
+enum-value-delete	caught	100	ENUM_VALUE_NO_DELETE
+enum-value-number-change	caught	100	ENUM_VALUE_NO_DELETE
+oneof-field-remove	caught	100	FIELD_NO_DELETE
+rpc-delete	caught	100	RPC_NO_DELETE
+rpc-streaming-change	caught	100	RPC_SAME_SERVER_STREAMING
+package-rename	caught	100	FILE_SAME_PACKAGE
+reserved-number-reuse	caught	100	RESERVED_MESSAGE_NO_DELETE
+optional-removal	caught	100	FIELD_SAME_CARDINALITY
+compatible-additions(positive-control)	passed	0	

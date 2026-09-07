@@ -9,10 +9,15 @@
 #
 # 종료 코드는 `data-extract.md` §6 스윕 규약과 같다 — 0 정상(mutation 전건이 잡히고 양성
 # 대조도 기대대로 통과) · 1 위반(잡히지 않은 mutation, 또는 양성 대조가 예기치 않게
-# breaking 으로 잡힘) · 2 도구 오류(buf 부재·정책 키 부재·git 태그 없음 등 환경 문제).
-# **verifier r1 F-8** — `buf breaking`의 exit 100 만 "위반 검출"(=caught)로 센다. `buf`는
-# 위반에 100, 파싱·환경 오류에는 다른 값(관례상 1)을 내므로 `code -ne 0` 만으로는 sed 가
-# 만든 구문 오류까지 "잡힘"으로 셀 위험이 있었다 — 100/0 밖의 값은 즉시 도구 오류(exit 2).
+# breaking 으로 잡힘) · 2 도구 오류(buf 부재·정책 키 부재·git 태그 없음·컴파일 오류 등
+# 환경/스크립트 문제).
+# **verifier r1 F-8, r2 F-14 로 정정** — `buf breaking`의 exit code 는 **위반과 컴파일
+# 오류를 가르지 않는다**(실측: `.proto` 구문이 깨진 사본에도 exit 100 이 난다 — F-8 이
+# 전제했던 "파싱 오류는 1" 은 거짓이었다). exit 100 은 "caught 후보"일 뿐이고, 그 안에서
+# `--error-format=json`의 `"type"` 필드를 봐야 한다 — 컴파일 오류는 전부
+# `breaking.compile-error.type`(정책 데이터, `COMPILE`) 값이고, 진짜 breaking 규칙은
+# `FIELD_NO_DELETE` 같은 규칙 이름이다. 이 값이 하나라도 섞이면 mutation 적용 자체가
+# 구문을 깬 것이지 breaking 규칙이 잡은 것이 아니므로 즉시 도구 오류(exit 2)로 멈춘다.
 #
 # 결과표는 `contracts/testdata/breaking/expected.tsv`에 쓴다(mutation → 잡힘/못잡힘/exit).
 #
@@ -59,6 +64,7 @@ fi
 APPROVED_TAG=$(policy_value "approved.tag")
 MUTATIONS_RAW=$(policy_value "breaking.mutations")
 MUTATIONS_MIN=$(policy_value "breaking.mutations.min")
+COMPILE_ERROR_TYPE=$(policy_value "breaking.compile-error.type")
 MUTATIONS=()
 if [[ -n "$MUTATIONS_RAW" ]]; then
     IFS=',' read -r -a MUTATIONS <<<"$MUTATIONS_RAW"
@@ -83,11 +89,28 @@ fresh_scratch() {
 
 run_buf_breaking() {
     local scratch_contracts="$1"
-    buf breaking "$scratch_contracts" --against "$AGAINST" >/tmp/bidvector-breaking-out.$$ 2>&1
+    buf breaking "$scratch_contracts" --against "$AGAINST" --error-format=json \
+        >/tmp/bidvector-breaking-out.$$ 2>&1
     local code=$?
     cat /tmp/bidvector-breaking-out.$$
     rm -f /tmp/bidvector-breaking-out.$$
     return $code
+}
+
+# verifier r2 F-14 — `--error-format=json`의 각 finding 줄에서 `"type"` 값만 뽑는다.
+finding_types() {
+    printf '%s\n' "$1" | grep -o '"type":"[A-Za-z_]*"' | sed -E 's/"type":"([A-Za-z_]*)"/\1/'
+}
+
+# 컴파일 오류(정책 `breaking.compile-error.type`) 가 하나라도 섞여 있으면 위반이 아니라
+# mutation 적용이 구문을 깬 것이다 — genuine breaking 규칙과 구분한다.
+has_compile_error() {
+    finding_types "$1" | grep -qx "$COMPILE_ERROR_TYPE"
+}
+
+# evidence 열용 — 첫 finding 의 규칙 이름(컴파일 오류가 아닌 경우의 대표값).
+first_rule_type() {
+    finding_types "$1" | grep -vx "$COMPILE_ERROR_TYPE" | head -1
 }
 
 # ---- mutation 적용 함수 — 각각 승인된 스키마의 알려진 좌표를 바꾼다 ----
@@ -171,7 +194,7 @@ message Sample {
   string reused_field = 2;
 }
 PROTO
-    buf breaking "$new" --against "$old" >/tmp/bidvector-breaking-out.$$ 2>&1
+    buf breaking "$new" --against "$old" --error-format=json >/tmp/bidvector-breaking-out.$$ 2>&1
     local code=$?
     cat /tmp/bidvector-breaking-out.$$
     rm -f /tmp/bidvector-breaking-out.$$
@@ -180,8 +203,8 @@ PROTO
 }
 
 record() {
-    local mutation="$1" outcome="$2" exit_code="$3"
-    RESULT_ROWS+=("$mutation	$outcome	$exit_code")
+    local mutation="$1" outcome="$2" exit_code="$3" rule_type="${4:-}"
+    RESULT_ROWS+=("$mutation	$outcome	$exit_code	$rule_type")
 }
 
 echo "== breaking mutation 증명 — 승인 태그 $APPROVED_TAG 대비 =="
@@ -202,14 +225,18 @@ for mutation in "${MUTATIONS[@]}"; do
         rm -rf "$scratch"
     fi
 
-    # verifier r1 F-8 — buf 는 breaking **위반**에 exit 100, 파싱·환경 오류에는 다른 값
-    # (관례상 1)을 낸다. `code -ne 0`만으로는 sed 가 만든 구문 오류까지 "잡힘"으로 셀 수
-    # 있었다(현재 실측은 11종 전부 정확히 100 이라 거짓 양성은 없었지만, 판정 자체가 그
-    # 구분을 하지 않았다). 위반(100)과 무위반(0)만 판정 대상으로 삼고, 그 밖은 도구 오류로
-    # 스윕을 즉시 멈춘다.
-    if [[ $code -eq 100 ]]; then
-        echo "[잡힘] $mutation (exit=$code)"
-        record "$mutation" "caught" "$code"
+    # verifier r2 F-14 — exit 100 은 진짜 breaking 위반과 `.proto` 컴파일 오류 둘 다에서
+    # 난다(실측). `--error-format=json`의 `"type"` 을 봐서 컴파일 오류(정책
+    # `breaking.compile-error.type`)가 하나라도 섞이면 mutation 적용이 구문을 깬 것이지
+    # breaking 규칙이 잡은 게 아니다 — 도구 오류로 즉시 멈춘다(오탐이 미탐보다 낫다).
+    if [[ $code -eq 100 ]] && has_compile_error "$output"; then
+        echo "buf 도구 오류(exit=100 이지만 컴파일 오류 — breaking 규칙 위반이 아니다) — mutation '$mutation'" >&2
+        echo "$output" >&2
+        exit 2
+    elif [[ $code -eq 100 ]]; then
+        rule_type=$(first_rule_type "$output")
+        echo "[잡힘] $mutation (exit=$code, rule=$rule_type)"
+        record "$mutation" "caught" "$code" "$rule_type"
     elif [[ $code -eq 0 ]]; then
         echo "[미검출] $mutation — buf breaking 이 이 mutation 을 통과시켰다"
         echo "$output"
@@ -254,10 +281,14 @@ rm -rf "$positive_scratch"
 if [[ $positive_code -eq 0 ]]; then
     echo "[통과] 호환 변경 넷은 breaking 으로 잡히지 않는다(기대대로)"
     record "compatible-additions(positive-control)" "passed" "$positive_code"
+elif [[ $positive_code -eq 100 ]] && has_compile_error "$positive_output"; then
+    echo "buf 도구 오류(exit=100 이지만 컴파일 오류) — 양성 대조 mutation 자체가 구문을 깼다" >&2
+    echo "$positive_output" >&2
+    exit 2
 elif [[ $positive_code -eq 100 ]]; then
     echo "[예기치 않은 실패] 호환 변경이 breaking 으로 잡혔다:"
     echo "$positive_output"
-    record "compatible-additions(positive-control)" "unexpected-failure" "$positive_code"
+    record "compatible-additions(positive-control)" "unexpected-failure" "$positive_code" "$(first_rule_type "$positive_output")"
     OVERALL_STATUS=1
 else
     echo "buf 도구 오류(exit=$positive_code) — 양성 대조" >&2
@@ -268,7 +299,7 @@ fi
 # ---- 결과표 기록 ----
 mkdir -p "$(dirname "$EXPECTED_TSV")"
 {
-    echo -e "mutation\toutcome\texit_code"
+    echo -e "mutation\toutcome\texit_code\trule_type"
     for row in "${RESULT_ROWS[@]}"; do
         echo -e "$row"
     done
