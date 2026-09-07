@@ -1,4 +1,4 @@
-# Slice 계약 — M3 / 3B · OpenAPI adapter — **착수 2026-09-07**
+# Slice 계약 — M3 / 3B · OpenAPI adapter — **종결 2026-09-07(공고 축) · 개찰 축은 3B-2**
 
 > **지위**: M2 진행 중에 세션 모델이 쓴 **계약 초안**. 착수는 3A 승인 뒤, 그리고 **M2 2A 가 `adapters/build.gradle.kts`·`adapters/src/test`
 > 편집을 끝낸 뒤**(경로 겹침 — 내용 의존은 없음). 그때 `base_sha` 재고정, `prep/m3-prep.md` D-M3-1·2·5 답 수령, 착수 문단.
@@ -54,6 +54,10 @@ rollback: |
 관측 갱신」, 출처 조사 a-4·a-5, `legacy-behavior`/`observed` 층 표기).
 
 **수정 라운드 1(2026-09-07) — 운영자 결정**: verifier r1 H-3(quota 회계가 3A 타입에 없음)은 **3A 좁은 확장을 3B scope 예외로**(위 in_scope 행). H-1 의 교훈: `config/quality/gate-tests.properties` 는 하네스 레인과 공유하는 파일이라 경로 한정 `git restore` 가 하네스 커밋(`7ee8fed`) 까지 되돌린다 — rollback 은 그 파일에 한해 **3B 가 넣은 줄만 제거**하는 절차로 기술한다(evidence-pack 경로 한정 규칙의 파일 공유 예외).
+
+**종결 시점(2026-09-07, 최종 head `01ecbba`)** — 하네스 커밋 없음. range 의 `7ee8fed`(하네스 test-discovery-guard 등재)·세션 모델 정정 커밋은 slice 밖.
+verifier r1 not-ready → r2 ready-for-review, 재작업 1/5. **범위 분할 확정(운영자 결정)**: 정정 ③ 의 「2차 커밋 묶음 또는 3B-2」 는 **3B-2 별도 slice** 로 —
+선행 조건은 ScsbidInfoService 참고자료 확보(curator 필드 계약 추가 → 3B-2 계약). scope ⑧ 행 전체(표적조회 `inqryDiv=2`·license-limit 서브콜·예비가격)가 3B-2 로 간다.
 
 **병렬 레인 경계(공유 working tree)**: 3B 구현 레인은 `adapters/src/{main,test}/kotlin/bidvector/adapters/koneps/**`·`adapters/build.gradle.kts`·
 `config/quality/gate-tests.properties`·`reports/evidence/m3/3b/**` 만. `procurement/**`·`fixtures/**`·`docs/**`·`build-logic/**` 은 다른 레인·slice 소유.

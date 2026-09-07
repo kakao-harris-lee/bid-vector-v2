@@ -52,6 +52,14 @@ D-M3-5 (a) 키 variant 불채택 + rate limit 정책값. 문서 레인이 미리
 quota 는 HTTP 429 뿐 아니라 `resultCode 22·30`(키 미인코딩) 도 신호. 3A 의 port 가 동기 시그니처이므로 3B 어댑터가 timeout·취소·deadline 을 자기
 경계 안에서 처리하고 port 계약은 그대로 구현한다. 설계 노트 `_workspace/m3-3b/01_design-review.md`(세션 모델 직접).
 
+**3B(공고 축) 종결 2026-09-07 · 3B-2 분할** — verifier r2 ready-for-review + 사용자 승인(`reports/evidence/m3/3b/checklist.md` 「사용자 승인」, 최종 head
+`01ecbba`). 산출: `KonepsOpenApiNoticeSource`(동기 facade, JDK HttpClient + Resilience4j 한 계층), HTTP 정책 데이터, envelope·resultCode 분류(`03` 세 번째
+상태·`22`/`30`), pagination 백스톱·재개 커서, 원문 무변환 mapper, 자체 JSON 파서(깊이 상한 정책값), 서비스 키 값 객체, JDK HttpServer mock 시나리오 23 test.
+검증이 드러낸 것: 공유 파일(`gate-tests.properties`) 의 경로 한정 rollback 이 다른 레인 등재를 되돌림(절차 예외 기록), quota 회계가 3A 타입에 없어 **3A
+`CollectionAccounting` 좁은 확장**(운영자 결정, 추가만: truncation 사유·`quotaExceeded`·`backoffSkipped`). **분할**: 개찰·예비가격 축(`OpeningResultSourcePort`·
+표적조회·license-limit 서브콜, scope ⑧)은 ScsbidInfoService 참고자료가 저장소에 없어 **3B-2 별도 slice** 로 — 자료 확보 → curator 필드 계약 추가 → 3B-2 계약 →
+구현(D-3B-6 귀결). 3A 후속 셋(드롭 사유·`InputError`·quota 표면 구분)은 3B checklist 알려진 제한.
+
 ### Slice 3C — 문서/LLM extraction adapter
 
 - M1 `OperatorStrategy.matches` 통과 후에만 실행
@@ -71,6 +79,12 @@ quota 는 HTTP 429 뿐 아니라 `resultCode 22·30`(키 미인코딩) 도 신�
 - 같은 공고 재수집의 멱등 upsert/versioning
 - 파생값이 공식값을 조용히 덮지 못하는 precedence rule
 - 원본, 판정, 오류를 감사 가능하게 보존
+
+**3D 착수 2026-09-07** — 3B 종결 같은 날(순서 3A → 3B → 3D → 3C, 3B-2 는 자료 뒤). 계약 정본 `reports/evidence/m3/3d/scope.md`(base `01ecbba`). 착수 전
+결정: **D-3D-1 (a)** JDBC 직접 + 작은 mapper(신규 의존은 드라이버·Flyway·Testcontainers 만) · **D-3D-2 (a)** 점유 가드의 DB 측 실물은 `BEFORE UPDATE` 트리거 +
+`provenance_authority` 표(전 금액 축, 3A `isAuthoritative` 데이터의 DB 사본) · D-M3-7 (a) Testcontainers 로컬 실측(Docker 29.5.3), Docker 부재는 붉게. 계약 고정
+D-3D-3~5(문자열 키·항목 단위 트랜잭션·NULL 부재). 3A 가 저장 port 를 정의하지 않았으므로 도메인 소유 repository port 파일을 `procurement` 에 둔다(ADR 0005
+D-10.1, in_scope 조건 충족). **Phase 2.5 필수**(스키마 precedence) — 세션 모델 직접, `_workspace/m3-3d/01_design-review.md`.
 
 ## 완료 조건
 

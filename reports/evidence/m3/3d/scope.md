@@ -1,4 +1,4 @@
-# Slice 계약 — M3 / 3D · persistence adapter — **초안, 구현 전**
+# Slice 계약 — M3 / 3D · persistence adapter — **착수 2026-09-07**
 
 > **지위**: M3 착수 직후(2026-09-07) 세션 모델이 단독으로 쓴 **계약 초안**(문서 레인, 브리프 2). 구현·gradle·의존성·migration 편집 없음.
 > 착수는 **3A 승인 → 3B 뒤**(`prep/m3-prep.md` §5 순서: 3A → 3B → 3D → 3C)이며, 그때 `base_sha` 재고정(40자), 아래 D-3D-1~3 답 수령,
@@ -8,14 +8,15 @@
 ```yaml
 milestone: m3
 slice: 3d-persistence-adapter
-base_sha: 착수 시 재고정   # 초안 시점 앵커 1f3c4ff
+base_sha: 01ecbba69e21e4b85ee8303416fe06a77b919fd6   # 착수 2026-09-07 재고정 = 3B(공고 축) 최종 head. 초안 시점 앵커 1f3c4ff
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - adapters/src/main/resources/db/migration/**                 # Flyway `V1__*.sql` 부터(ADR 0004 D-2·D-4) — raw / canonical / audit / collection_run 스키마, 점유 가드 DB 측 실물
   - adapters/src/main/kotlin/bidvector/adapters/persistence/**  # 3A fact 의 저장 port 구현(`NoticeRepository`·`OpeningResultRepository`·`RawObservationStore`·`CollectionRunStore`)·write 규칙·fold·항목 단위 트랜잭션
   - adapters/src/test/kotlin/bidvector/adapters/persistence/**  # Testcontainers PostgreSQL 통합 test — 멱등 upsert·재수집 versioning·점유 가드 mutation 실패·항목 원자성·clean DB migration 재현
   - adapters/build.gradle.kts                                   # Flyway core · PostgreSQL JDBC driver · (D-3D-1) DB 접근 라이브러리 · Testcontainers(test) — 2A·3B 가 넣은 줄과 병합
-  - procurement/src/main/kotlin/bidvector/procurement/*Repository.kt   # 조건부 — 3A 가 저장 port 를 정의하지 않았을 때만 **도메인 소유 port 파일**(ADR 0005 D-10.1). 그 밖의 procurement 편집 금지
+  - procurement/src/main/kotlin/bidvector/procurement/*Repository.kt, procurement/src/test/kotlin/**   # **조건 충족(착수 시 확인 — 3A 는 repository port 를 두지 않았다)**: 도메인 소유 저장 port 파일 신설(ADR 0005 D-10.1) + 그 test. 그 밖의 procurement 편집 금지(3B 가 확장한 `Accounting.kt` 포함)
+  - gradle/libs.versions.toml                                   # Flyway·PostgreSQL JDBC·Testcontainers 카탈로그 좌표(3A F-15·3B 판단 5 전례로 착수 시 등재)
   - config/quality/gate-tests.properties                        # 조건부 — `gate.tests.adapters` 에 3D test 추가(병합)
   - milestone-3.md                                              # 「Slice 3D」 착수 문단
   - reports/evidence/m3/3d/**
@@ -49,7 +50,15 @@ aggregate 에 나누지 않음)·§2.2.3(`observationKey`·`deliveryKey`)·§5.1
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시.
+`git log --oneline 01ecbba..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-07) **없음**.
+
+**착수 2026-09-07 — 운영자 결정**: D-3D-1 (a) · D-3D-2 (a) · D-M3-7 (a)(M3 착수 시). **세션 모델 계약 고정 D-3D-6**(OPEN 후보 `OPEN-3D-SCHEMA-SNAPSHOT` 의
+결정): S-5 의 기대 스키마는 **information_schema·pg_catalog 질의 단언**(테이블·컬럼·타입·NOT NULL·UNIQUE·FK·트리거·CHECK 목록을 test 가 열거)으로 고정한다 —
+pg_dump 텍스트 골든은 바이너리 버전에 묶이고 리뷰 sandbox 에서 재현이 어렵다. 6B 가 같은 단언을 재사용한다. **착수 시 계약 정정**: 3B 가 `CollectionAccounting` 을
+확장했으므로(truncation 사유·quota·backoff) `collection_run` 스키마는 그 필드까지 담는다(①·⑥). 3A 의 `Notice`·`OpeningResult`·`QualificationText` fact 셋이
+저장 단위이며 §2.1 aggregate 조립은 3D 가 **테이블 셋을 `notice_number`+`notice_round` 키로 묶는 것**까지(`OPEN-3A-AGGREGATE` 참조).
+
+**병렬 레인 경계**: 3D 구현 레인은 in_scope 경로만. `adapters/.../koneps/**`(3B 종결)·`fixtures/**`·`docs/**`·`build-logic/**` 은 편집 금지.
 
 ---
 
@@ -75,8 +84,8 @@ aggregate 에 나누지 않음)·§2.2.3(`observationKey`·`deliveryKey`)·§5.1
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
-| **D-3D-1** | **DB 접근 라이브러리** | (a) **JDBC 직접 + 작은 mapper 함수**(신규 의존 0 — 드라이버·Flyway만) (b) jOOQ(코드 생성 — migration 뒤 생성물 관리) (c) Exposed/Hibernate(ORM — ADR 0004 D-2 「ORM 이 스키마를 만들지 않는다」 아래에서만) | **(a)** 1차 — 테이블 넷·쿼리 형태가 단순(키 정확 일치·append·fold)하고 §7(측정된 필요) 을 넘을 근거가 없다. 쿼리가 늘어 유지비가 커지면 (b) 로 승격(결정 갱신) | 착수 전 |
-| **D-3D-2** | **점유 가드의 DB 측 실물** | (a) **`BEFORE UPDATE` 트리거 + `provenance_authority` 표**(전 금액 축, 일반화된 한 함수) (b) 컬럼별 CHECK(행 간 비교 불가라 「이전 값」을 못 본다 — 부적합) (c) Kotlin 규칙만(DB 측 없음 — 직접 SQL 우회 열림) | **(a)** — 완료 조건이 「mutation 이 실패」이고 리뷰 관점이 「DB constraint/test 에 반영」이다. (c) 는 M6 운영 접근·백필 스크립트가 우회한다(`R-PROV-04` 실물) | 착수 전 |
+| **D-3D-1** ✅ (a) 승인 2026-09-07 | **DB 접근 라이브러리** | (a) **JDBC 직접 + 작은 mapper 함수**(신규 의존 0 — 드라이버·Flyway만) (b) jOOQ(코드 생성 — migration 뒤 생성물 관리) (c) Exposed/Hibernate(ORM — ADR 0004 D-2 「ORM 이 스키마를 만들지 않는다」 아래에서만) | **(a)** 1차 — 테이블 넷·쿼리 형태가 단순(키 정확 일치·append·fold)하고 §7(측정된 필요) 을 넘을 근거가 없다. 쿼리가 늘어 유지비가 커지면 (b) 로 승격(결정 갱신) | 착수 전 |
+| **D-3D-2** ✅ (a) 승인 2026-09-07 | **점유 가드의 DB 측 실물** | (a) **`BEFORE UPDATE` 트리거 + `provenance_authority` 표**(전 금액 축, 일반화된 한 함수) (b) 컬럼별 CHECK(행 간 비교 불가라 「이전 값」을 못 본다 — 부적합) (c) Kotlin 규칙만(DB 측 없음 — 직접 SQL 우회 열림) | **(a)** — 완료 조건이 「mutation 이 실패」이고 리뷰 관점이 「DB constraint/test 에 반영」이다. (c) 는 M6 운영 접근·백필 스크립트가 우회한다(`R-PROV-04` 실물) | 착수 전 |
 | **D-3D-3** | canonical 키는 `(notice_number TEXT, notice_round TEXT)` — 정수 컬럼 금지(§12.2 「정수 변환 금지」, D-3A-0). 3A `NoticeRound` 의 정규화 규칙을 DB 가 재선언하지 않는다(CHECK 는 형식 `^[0-9]{3}$` 만) | — | 계약 고정 |
 | **D-3D-4** | 트랜잭션 경계는 **항목 단위**(⑤). 배치 단위·페이지 단위 commit 은 두지 않는다. 4C outbox 가 같은 항목 트랜잭션에 이벤트를 넣는 자리를 남긴다(ADR 0005 D-2 — 3D 는 자리만, 어휘는 4C) | — | 계약 고정 |
 | **D-3D-5** | 부재는 NULL — `0`·빈 문자열을 「미상」으로 쓰지 않는다(§1.3). 금액 컬럼은 `NUMERIC(…,0)` 정수 원, 율은 `NUMERIC` fraction + `scale` 재선언 없음(값의 단위는 3A 계약이 정하고 DB 는 저장만) | — | 계약 고정 |
@@ -112,4 +121,4 @@ aggregate 에 나누지 않음)·§2.2.3(`observationKey`·`deliveryKey`)·§5.1
 | `OPEN-DIC-09` | fold 순서 술어 — 3D 는 잠정 ⓐ(`observed_at` 단독, 동률은 conflict 로 audit)로 구현하고 결정이 오면 fold 함수 하나만 바뀐다. 활성 유지 |
 | `OPEN-DIC-06` | canonical write 가 `Undeclared` 를 거부하는가 — 3D 는 **거부하지 않고 권위 없음으로 저장**(§5.1 둘째 규율 — 빈 자리만 채움). 결정이 오면 트리거 표 한 행 |
 | `OPEN-DEC-08`·ADR 0004 D-4 | legacy 행 이관 없음 — 이관 시 provenance 미상 격리는 그 결정의 몫 |
-| 신설 후보 `OPEN-3D-SCHEMA-SNAPSHOT` | S-5 의 「기대 스키마」를 무엇으로 고정하는가(pg_dump 스키마 텍스트 골든 vs 정보 스키마 질의 단언) — 6B 와 같은 형태여야 한다. 착수 시 결정 후보 |
+| ~~신설 후보 `OPEN-3D-SCHEMA-SNAPSHOT`~~ | 착수 시 세션 모델 계약 고정 **D-3D-6**(정보 스키마 질의 단언)으로 닫힘 — OPEN 등재 없음 |

@@ -189,3 +189,11 @@ gate-tests.properties`·`procurement/src/main/.../Accounting.kt`·`procurement/s
 전 커밋이 `git add <in_scope 경로>` 개별 인자(`-A`·`-a`·`.` 미사용) 뒤 `git commit`(같은
 메시지 안에서 add+commit 분리 없음 — parallel-lane 오염 회피). 3A `Accounting.kt`·
 `AccountingTest.kt` 편집은 H-3 운영자 결정으로 in_scope 예외가 열린 뒤에만, 별도 커밋으로.
+
+## 사용자 승인 — 2026-09-07, slice 3B(공고 축) 종결
+
+verifier r1 `not-ready`(H-1 공유 파일 rollback · H-2 빈 공고번호 · H-3 quota 회계) → 수정 라운드 1(3A `CollectionAccounting` 좁은 확장은 운영자 결정으로
+scope 예외) → r2 `ready-for-review` + low 8 일괄 `01ecbba` 위에서 **사용자 승인 2026-09-07**. 재작업 1/5. 세션 모델 계약 정정 `8aca477`·`62b0856`.
+알려진 제한(3A 후속 셋: 차수 탈락 사유·`InputError` 병합·quota 두 표면 · wire envelope 골든 부재 · `Throttled` 전용 test 없음)은 등재 유지.
+운영자 결정 셋: 개찰·예비가격 축(`OpeningResultSourcePort`·표적조회·license-limit 서브콜)은 **ScsbidInfoService 참고자료 확보 뒤 3B-2 별도
+slice**(D-3B-6 귀결, `milestone-3.md` 에 분할 기록) · 다음 slice **3D 착수** + D-3D-1 (a)·D-3D-2 (a) · `origin/main` push 지금.
