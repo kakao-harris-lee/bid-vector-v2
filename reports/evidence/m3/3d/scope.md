@@ -17,6 +17,8 @@ in_scope:
   - adapters/build.gradle.kts                                   # Flyway core · PostgreSQL JDBC driver · (D-3D-1) DB 접근 라이브러리 · Testcontainers(test) — 2A·3B 가 넣은 줄과 병합
   - procurement/src/main/kotlin/bidvector/procurement/{*Repository,RawObservationStore,CollectionRunStore}.kt, procurement/src/test/kotlin/**   # **조건 충족(착수 시 확인 — 3A 는 repository port 를 두지 않았다)**. 글롭은 리뷰 시점 정정(구현 판단 2 — port 다섯 중 둘은 `*Store`): 도메인 소유 저장 port 파일 신설(ADR 0005 D-10.1) + 그 test. 그 밖의 procurement 편집 금지(3B 가 확장한 `Accounting.kt` 포함)
   - gradle/libs.versions.toml                                   # Flyway·PostgreSQL JDBC·Testcontainers 카탈로그 좌표(3A F-15·3B 판단 5 전례로 착수 시 등재)
+  - procurement/src/main/kotlin/bidvector/procurement/RawObservation.kt   # **3A 좁은 확장(운영자 결정 2026-09-08, verifier r1 F-7)** — `RawNoticeObservation` 에 `sourceText: String?`(원문 JSON 텍스트, 저장 전용 — 계약 열람 규칙과 무관, 도메인 소비 함수가 읽지 않음) **추가만**. corpus 27/27·기존 test 불변
+  - adapters/src/main/kotlin/bidvector/adapters/koneps/**(mapper 한 파일)   # **3B 좁은 확장(같은 결정)** — 항목 원문 JSON 텍스트를 `sourceText` 에 채움. 그 밖의 koneps 편집 금지
   - config/quality/gate-tests.properties                        # 조건부 — `gate.tests.adapters` 에 3D test 추가(병합)
   - milestone-3.md                                              # 「Slice 3D」 착수 문단
   - reports/evidence/m3/3d/**
@@ -57,6 +59,8 @@ aggregate 에 나누지 않음)·§2.2.3(`observationKey`·`deliveryKey`)·§5.1
 pg_dump 텍스트 골든은 바이너리 버전에 묶이고 리뷰 sandbox 에서 재현이 어렵다. 6B 가 같은 단언을 재사용한다. **착수 시 계약 정정**: 3B 가 `CollectionAccounting` 을
 확장했으므로(truncation 사유·quota·backoff) `collection_run` 스키마는 그 필드까지 담는다(①·⑥). 3A 의 `Notice`·`OpeningResult`·`QualificationText` fact 셋이
 저장 단위이며 §2.1 aggregate 조립은 3D 가 **테이블 셋을 `notice_number`+`notice_round` 키로 묶는 것**까지(`OPEN-3A-AGGREGATE` 참조).
+
+**수정 라운드 1(2026-09-08) — 운영자 결정**: verifier r1 F-7(raw payload 가 계약 등재 필드만 — 3B mapper 가 원문 JSON 을 버리고 3A 타입에 자리 없음)은 **3A·3B 좁은 확장을 3D scope 예외로**(위 in_scope 두 행). raw_observation 은 원문 전체(`sourceText`)를 저장하고 등재분 투영은 별도 컬럼 또는 파생으로. Docker 부재 라이브 재현 실패(양 레인, 소켓 심링크)는 알려진 제한.
 
 **병렬 레인 경계**: 3D 구현 레인은 in_scope 경로만. `adapters/.../koneps/**`(3B 종결)·`fixtures/**`·`docs/**`·`build-logic/**` 은 편집 금지.
 
