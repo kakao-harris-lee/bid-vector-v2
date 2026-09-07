@@ -21,7 +21,7 @@
         "type": "money",
         "unit": "KRW",
         "scale": "integer",
-        "basis": "ESTIMATED_PRICE",
+        "basis": "ESTIMATED",
         "vatTreatment": "EXCLUSIVE",
         "nullability": "nullable",
         "provenance": "Published",

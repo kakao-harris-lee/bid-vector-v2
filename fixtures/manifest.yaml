@@ -54,6 +54,42 @@ legacy_repo:
     `legacy_reference`가 가리키는 **legacy 좌표 전수**를 `index_file` 이 저장소 안의 불변 산출물로
     고정한다 — legacy 파일 **내용**은 옮기지 않고 git object id 만 싣는다. 재검증 절차는 F-5 가 적는다.
 
+official_documents:
+  note: |-
+    **`classification_policy.authoritative` ①(조달청 공식 문서 인용)의 출처 목록**이다. `legacy_repo` 와
+    같은 문제를 진다 — 이 파일은 `.gitignore` 된 `./bid-vector` symlink 아래에 있어 **clean review
+    worktree 에 없다.** 그래서 legacy blob id 와 SHA-256 을 함께 고정한다. 문서 **내용**은 옮기지
+    않고, 각 case 가 자기 `source.reference` 와 입력 파일에 **인용할 행만 축어로** 싣는다.
+  entries:
+    - id: koneps-openapi-reference-1.2
+      title: "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스"
+      document_version: "1.2"
+      service_version: "3.1"
+      published_at: 2025-01-06
+      path: "bid-vector/docs/조달청_OpenAPI참고자료_나라장터_입찰공고정보서비스_1.2.docx"
+      legacy_repo_sha: ed4b06c
+      legacy_blob_id: 0891365ddb201afe9ed84a113b4889b68fcda22b
+      sha256: 1d79e0bc23b2ff253212e47c4421141b4624c2496bba4513127aeb986dd75a8d
+      accessed: "2026-09-07 — read-only (M3/3A curator 레인). legacy 저장소를 수정하지 않았다."
+      what_it_declares: |-
+        23 오퍼레이션의 요청·응답 메시지 명세 — **항목명(영문) · 항목명(국문) · 항목크기 ·
+        항목구분(필수 `1` / 옵션 `0` / `1..n` / `0..n`) · 샘플데이터 · 항목설명**. 금액·율 항목의
+        항목설명이 **단위와 과세를 문면으로 적는 자리**가 여기다(예: 추정가격의 *"부가가치세 및 조달
+        수수료를 제외한 금액(원화,원)"* · 낙찰하한율의 *"개찰시 사용하는 낙찰하한율(%)"*).
+        `koneps-collection-010`~`018` 이 이 표를 인용한다.
+      what_it_does_not_contain: |-
+        **`resultCode` 의 17 범주 분류표(「OPEN API 에러코드별 조치방안」)가 이 문서에 없다.**
+        `resultCode` 는 응답 항목 명세에 **항목크기 2 · 항목구분 필수 · 샘플 `00`** 으로만 실리고,
+        코드값의 의미·조치 표는 어느 절에도 없다. 저장소 전체 검색으로도 다른 사본을 찾지 못했다.
+        그래서 **`OPEN-COL-02` 가 결정으로는 해소됐으나 표 본문은 여전히 미확보**이고,
+        `uncovered_axes` 의 「KONEPS — `resultCode` 분류표」 축은 열린 채로 남는다.
+      privacy: |-
+        문서에는 실제 기관명·담당자 성명·전화번호·이메일과 실제 공고번호가 실려 있다.
+        **fixture 에 옮기지 않았다** — 인용 대상은 항목 명세 행(영문 키 · 국문 개념 · 크기 · 구분 ·
+        항목설명)과 형식 문면뿐이고, 기관·개인 식별자를 담은 샘플 값은 인용하지 않았다.
+        공고번호·금액·율의 샘플 값도 `SYN-` 접두 합성값으로 대체했다(`numeric_discipline` 이
+        금지하는 legacy 수와 겹치는 샘플이 있었다 — 각 case 의 `note` 가 그 자리를 적는다).
+
 layout:
   note: |-
     `data-extract.md` §3의 예시는 `expected/<id>.json`을 저장소 루트 형제로 둔다. 이 slice 의
@@ -4651,8 +4687,15 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: ab0885dacd851bd2c112aee9a34985229c850c2d4cf0009cb5fe07518abab819
+    sha256: c28b04d563eca0709e05b89d29582bc789b7c05996ac9a44b18b019b33f152f1
     expected_sha256: 993b5b9d4ceb1ee41f0ff09256fe089e9c9890c70de77a53492783a8428fb875
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
+      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
+      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
+      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
+      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
+      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4665,6 +4708,21 @@ cases:
         policy_version: |-
           해당 없음 — 분류 변경이고 기대값이 정책 데이터에 의존하지 않는다. 입력·기대값이 그대로이므로
           `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-07
+        change: |-
+          입력·기대값의 basis 토큰 `ESTIMATED_PRICE` 를 코드 토큰 `ESTIMATED` 로 정합했다
+          (`slot`·`targetSlot`·`basis`·`resultBasis` 자리). **기대값의 의미는 바뀌지 않았다** —
+          같은 개념을 가리키는 이름 하나를 코드 정본에 맞춘 것이다. `contract_binding` 을 함께
+          달았다(`pending-3a`).
+        reason: |-
+          M3/3A 계약 고정 **D-3A-7** — Basis 토큰의 정본은 `shared-kernel` 의
+          `enum class Basis { BASE_AMOUNT, ESTIMATED, YEGA, BID, ALLOCATED_BUDGET, AWARD }` 이고
+          **runner 는 fixture 토큰을 매핑하지 않는다.** 조사 노트 `01_scout_collection.md` **G-2** 가
+          이 불일치를 들었고, `money-basis-001`·`money-basis-004` 가 앞서 같은 정합을 받은 선례다.
+        policy_version: |-
+          해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
+          의존하지 않는다.
+        previous_sha256: ab0885dacd851bd2c112aee9a34985229c850c2d4cf0009cb5fe07518abab819
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4706,8 +4764,15 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 27cb306a50eca9cb8227aeee4213604037444bea75217960300ee4395e91c544
+    sha256: ae828bee7c168918f3aaf5fe6ee1cabb8f872c32eb03368e055df2e54e07cb87
     expected_sha256: 8686077f2e848967b896bd6d3110e2daf5c73ef6c9c64ba4b0bbe5f8da10b3ae
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
+      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
+      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
+      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
+      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
+      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4720,6 +4785,21 @@ cases:
         policy_version: |-
           해당 없음 — 분류 변경이고 기대값이 정책 데이터에 의존하지 않는다. 입력·기대값이 그대로이므로
           `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-07
+        change: |-
+          입력·기대값의 basis 토큰 `ESTIMATED_PRICE` 를 코드 토큰 `ESTIMATED` 로 정합했다
+          (`slot`·`targetSlot`·`basis`·`resultBasis` 자리). **기대값의 의미는 바뀌지 않았다** —
+          같은 개념을 가리키는 이름 하나를 코드 정본에 맞춘 것이다. `contract_binding` 을 함께
+          달았다(`pending-3a`).
+        reason: |-
+          M3/3A 계약 고정 **D-3A-7** — Basis 토큰의 정본은 `shared-kernel` 의
+          `enum class Basis { BASE_AMOUNT, ESTIMATED, YEGA, BID, ALLOCATED_BUDGET, AWARD }` 이고
+          **runner 는 fixture 토큰을 매핑하지 않는다.** 조사 노트 `01_scout_collection.md` **G-2** 가
+          이 불일치를 들었고, `money-basis-001`·`money-basis-004` 가 앞서 같은 정합을 받은 선례다.
+        policy_version: |-
+          해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
+          의존하지 않는다.
+        previous_sha256: 27cb306a50eca9cb8227aeee4213604037444bea75217960300ee4395e91c544
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4760,8 +4840,15 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 1eee2e90c676377ea3bdcb8261693824c69b09372e7ac5b140049d6e2f7ca7a1
+    sha256: 861bd0ac27816329d101f827e89f68f4f55884936a45d7a05f9943203c2f14be
     expected_sha256: 96403e77df23cee01254e961b0651c3ebe9a33065faa2d95f53296c3c8f5dd6d
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
+      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
+      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
+      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
+      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
+      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4785,6 +4872,21 @@ cases:
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-07
+        change: |-
+          입력·기대값의 basis 토큰 `ESTIMATED_PRICE` 를 코드 토큰 `ESTIMATED` 로 정합했다
+          (`slot`·`targetSlot`·`basis`·`resultBasis` 자리). **기대값의 의미는 바뀌지 않았다** —
+          같은 개념을 가리키는 이름 하나를 코드 정본에 맞춘 것이다. `contract_binding` 을 함께
+          달았다(`pending-3a`).
+        reason: |-
+          M3/3A 계약 고정 **D-3A-7** — Basis 토큰의 정본은 `shared-kernel` 의
+          `enum class Basis { BASE_AMOUNT, ESTIMATED, YEGA, BID, ALLOCATED_BUDGET, AWARD }` 이고
+          **runner 는 fixture 토큰을 매핑하지 않는다.** 조사 노트 `01_scout_collection.md` **G-2** 가
+          이 불일치를 들었고, `money-basis-001`·`money-basis-004` 가 앞서 같은 정합을 받은 선례다.
+        policy_version: |-
+          해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
+          의존하지 않는다.
+        previous_sha256: 1eee2e90c676377ea3bdcb8261693824c69b09372e7ac5b140049d6e2f7ca7a1
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4824,8 +4926,15 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 266c62e4b998b864b62a629c587abb25a23520e425235c37a95cece865052a00
+    sha256: f5ec900e0f4c3b404c76473e5a7fa3b18b1a663a93c4d6538eba8439a6787794
     expected_sha256: 8353cc69dd9a7599af86bacadc16f85b52fa9542c0c1fbf1c3e1607dc8a491d6
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
+      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
+      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
+      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
+      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
+      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4846,6 +4955,21 @@ cases:
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-07
+        change: |-
+          입력·기대값의 basis 토큰 `ESTIMATED_PRICE` 를 코드 토큰 `ESTIMATED` 로 정합했다
+          (`slot`·`targetSlot`·`basis`·`resultBasis` 자리). **기대값의 의미는 바뀌지 않았다** —
+          같은 개념을 가리키는 이름 하나를 코드 정본에 맞춘 것이다. `contract_binding` 을 함께
+          달았다(`pending-3a`).
+        reason: |-
+          M3/3A 계약 고정 **D-3A-7** — Basis 토큰의 정본은 `shared-kernel` 의
+          `enum class Basis { BASE_AMOUNT, ESTIMATED, YEGA, BID, ALLOCATED_BUDGET, AWARD }` 이고
+          **runner 는 fixture 토큰을 매핑하지 않는다.** 조사 노트 `01_scout_collection.md` **G-2** 가
+          이 불일치를 들었고, `money-basis-001`·`money-basis-004` 가 앞서 같은 정합을 받은 선례다.
+        policy_version: |-
+          해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
+          의존하지 않는다.
+        previous_sha256: 266c62e4b998b864b62a629c587abb25a23520e425235c37a95cece865052a00
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4885,8 +5009,15 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: a3ef8104ce07ab670b0b04c40b2896b86cc06ea3b4e030fa2e27ae3fc5e5b42f
+    sha256: a8dadcb05c535a1fbe81f80d54988628d05f1ce5503c8fd5962fbd15c327d9ff
     expected_sha256: b28ddecd57ea96db662a7bec403f4990170a7c8d77ab9034deb4d01758c4cd96
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
+      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
+      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
+      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
+      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
+      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4899,6 +5030,21 @@ cases:
         policy_version: |-
           해당 없음 — 분류 변경이고 기대값이 정책 데이터에 의존하지 않는다. 입력·기대값이 그대로이므로
           `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-07
+        change: |-
+          입력·기대값의 basis 토큰 `ESTIMATED_PRICE` 를 코드 토큰 `ESTIMATED` 로 정합했다
+          (`slot`·`targetSlot`·`basis`·`resultBasis` 자리). **기대값의 의미는 바뀌지 않았다** —
+          같은 개념을 가리키는 이름 하나를 코드 정본에 맞춘 것이다. `contract_binding` 을 함께
+          달았다(`pending-3a`).
+        reason: |-
+          M3/3A 계약 고정 **D-3A-7** — Basis 토큰의 정본은 `shared-kernel` 의
+          `enum class Basis { BASE_AMOUNT, ESTIMATED, YEGA, BID, ALLOCATED_BUDGET, AWARD }` 이고
+          **runner 는 fixture 토큰을 매핑하지 않는다.** 조사 노트 `01_scout_collection.md` **G-2** 가
+          이 불일치를 들었고, `money-basis-001`·`money-basis-004` 가 앞서 같은 정합을 받은 선례다.
+        policy_version: |-
+          해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
+          의존하지 않는다.
+        previous_sha256: a3ef8104ce07ab670b0b04c40b2896b86cc06ea3b4e030fa2e27ae3fc5e5b42f
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4940,6 +5086,13 @@ cases:
     expected_sha256: d89c5fabd09e9b53667098bcb965f7f27c965874c2e15c8ff6d76bf41e4472c1
     not_covered: |-
       전체 업무구분 코드 체계 — `OPEN-COL-03`
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
+      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
+      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
+      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
+      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
+      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4952,6 +5105,15 @@ cases:
         policy_version: |-
           해당 없음 — 분류 변경이고 기대값이 정책 데이터에 의존하지 않는다. 입력·기대값이 그대로이므로
           `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-07
+        change: |-
+          `contract_binding` 을 `pending-3a` 로 달았다. **입력·기대값·해시는 바꾸지 않았다** —
+          이 case 에는 `ESTIMATED_PRICE` 토큰이 없어 D-3A-7 정합의 대상이 아니다.
+        reason: |-
+          M3/3A 착수 — 이 corpus 를 소비할 계약이 `procurement` 에 서기 전에 그 포인터 자리를
+          비워 두지 않는다(schema 의 `contract_binding` 정의).
+        policy_version: |-
+          해당 없음 — 문서 포인터 필드의 추가이고 기대값이 정책 데이터에 의존하지 않는다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -4984,6 +5146,13 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 5dd3775f0833947a81568fdf16936751a86aca5c016ae00a7d32fb29c5b7f37c
     expected_sha256: 132dccb9841f9025e0b54bd7deaf644d4185a1a4cab3543a70dac281c15db8f1
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
+      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
+      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
+      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
+      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
+      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4996,6 +5165,15 @@ cases:
         policy_version: |-
           해당 없음 — 분류 변경이고 기대값이 정책 데이터에 의존하지 않는다. 입력·기대값이 그대로이므로
           `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-07
+        change: |-
+          `contract_binding` 을 `pending-3a` 로 달았다. **입력·기대값·해시는 바꾸지 않았다** —
+          이 case 에는 `ESTIMATED_PRICE` 토큰이 없어 D-3A-7 정합의 대상이 아니다.
+        reason: |-
+          M3/3A 착수 — 이 corpus 를 소비할 계약이 `procurement` 에 서기 전에 그 포인터 자리를
+          비워 두지 않는다(schema 의 `contract_binding` 정의).
+        policy_version: |-
+          해당 없음 — 문서 포인터 필드의 추가이고 기대값이 정책 데이터에 의존하지 않는다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -5018,7 +5196,7 @@ cases:
 
       **유입값의 basis·과세는 §1.2가 정한다.** 그 표의 배정예산 행이 *"`asignBdgtAmt`·`bdgtAmt` | `AllocatedBudget` |
       원 / 배정예산 | `Unknown` — 정해진 바 없다"*이므로 `asignBdgtAmt`에서 온 값은 `ALLOCATED_BUDGET` · `UNKNOWN`으로
-      기록된다. **대상 자리(`ESTIMATED_PRICE`)의 basis 로 다시 표기하지 않는다** — 그것이 §1.2 머리가 legacy 결함으로 든
+      기록된다. **대상 자리(`ESTIMATED`)의 basis 로 다시 표기하지 않는다** — 그것이 §1.2 머리가 legacy 결함으로 든
       *"한 basis 태그가 두 개념을 덮고"*이고, §1.2.1의 *"legacy 유래 행은 정의상 기본값으로 **자동 태깅하지 않는다**"*가
       같은 방향을 금지한다. 유입이 **어느 자리를 채우려 했는가**는 입력의 `targetSlot`이 별도 필드로 나른다 —
       해석 대상 역할이 원천 표기를 덮지 않는다.
@@ -5044,8 +5222,15 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 89d61f17ad40846153e088465433a067c4a85324a2566bce22219a993a690117
-    expected_sha256: 99fac1176eca4f1f4c285b5838f2cffc8c48e3f416fa9e5669b1464f189281fd
+    sha256: 9f2a5ebeb08116b96893da7b1495900f7e3bb952f83d7497505faf2fddb519d9
+    expected_sha256: 7864705a33fbfaad86c63257b7072a28a3ef7d8f16ca306f11ab02f1c61d9f2f
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
+      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
+      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
+      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
+      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
+      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5087,6 +5272,22 @@ cases:
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-07
+        change: |-
+          입력·기대값의 basis 토큰 `ESTIMATED_PRICE` 를 코드 토큰 `ESTIMATED` 로 정합했다
+          (`slot`·`targetSlot`·`basis`·`resultBasis` 자리). **기대값의 의미는 바뀌지 않았다** —
+          같은 개념을 가리키는 이름 하나를 코드 정본에 맞춘 것이다. `contract_binding` 을 함께
+          달았다(`pending-3a`).
+        reason: |-
+          M3/3A 계약 고정 **D-3A-7** — Basis 토큰의 정본은 `shared-kernel` 의
+          `enum class Basis { BASE_AMOUNT, ESTIMATED, YEGA, BID, ALLOCATED_BUDGET, AWARD }` 이고
+          **runner 는 fixture 토큰을 매핑하지 않는다.** 조사 노트 `01_scout_collection.md` **G-2** 가
+          이 불일치를 들었고, `money-basis-001`·`money-basis-004` 가 앞서 같은 정합을 받은 선례다.
+        policy_version: |-
+          해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
+          의존하지 않는다.
+        previous_sha256: 89d61f17ad40846153e088465433a067c4a85324a2566bce22219a993a690117
+        previous_expected_sha256: 99fac1176eca4f1f4c285b5838f2cffc8c48e3f416fa9e5669b1464f189281fd
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -5145,6 +5346,13 @@ cases:
     not_covered: |-
       배정예산의 **실제** 과세 처리 — `OPEN-DIC-04`가 소유한다. 이 case 가 싣는 `UNKNOWN`은 그 미결의 회피가 아니라
       §1.2가 정한 **선언값 자체**이며(*"`Unknown` — 정해진 바 없다"*), `OPEN-DIC-04`가 닫히면 이 값도 함께 교체된다.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
+      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
+      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
+      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
+      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
+      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5185,6 +5393,15 @@ cases:
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-07
+        change: |-
+          `contract_binding` 을 `pending-3a` 로 달았다. **입력·기대값·해시는 바꾸지 않았다** —
+          이 case 에는 `ESTIMATED_PRICE` 토큰이 없어 D-3A-7 정합의 대상이 아니다.
+        reason: |-
+          M3/3A 착수 — 이 corpus 를 소비할 계약이 `procurement` 에 서기 전에 그 포인터 자리를
+          비워 두지 않는다(schema 의 `contract_binding` 정의).
+        policy_version: |-
+          해당 없음 — 문서 포인터 필드의 추가이고 기대값이 정책 데이터에 의존하지 않는다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -6657,7 +6874,7 @@ m1_contract_binding:
     | fixture 토큰 | 1B 계약 | 판정 |
     | --- | --- | --- |
     | `basis: BASE_AMOUNT` | `Basis.BASE_AMOUNT` | 일치 |
-    | `basis: ESTIMATED_PRICE` | `Basis.ESTIMATED` | **불일치**(같은 개념, 다른 이름) |
+    | `basis: ESTIMATED` | `Basis.ESTIMATED` | **해소**(2026-09-07, D-3A-7) — `koneps-collection` 입력·기대값의 `ESTIMATED_PRICE` 를 코드 토큰으로 정합했다 |
     | `vatTreatment: INCLUSIVE`·`EXCLUSIVE`·`UNKNOWN` | `VatTreatment` 세 값 | 일치 |
     | `provenance: OperatorDeclared`·`Published`·`Undeclared` | `Provenance` 세 variant | 일치 |
     | `reasonCode: VatTreatmentMismatch` | `ReasonCode.VAT_TREATMENT_MISMATCH` | 개념 일치·**표기 불일치** |

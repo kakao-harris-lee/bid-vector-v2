@@ -1,9 +1,9 @@
 {
   "storedValue": {
-    "slot": "ESTIMATED_PRICE",
+    "slot": "ESTIMATED",
     "amount": 900000000,
     "currency": "KRW",
-    "basis": "ESTIMATED_PRICE",
+    "basis": "ESTIMATED",
     "vatTreatment": "EXCLUSIVE",
     "provenance": "Published",
     "noticeRevision": "000"
@@ -15,7 +15,7 @@
     "vatTreatment": "UNKNOWN",
     "provenance": "FilledFromBudgetKey",
     "sourceKey": "asignBdgtAmt",
-    "targetSlot": "ESTIMATED_PRICE",
+    "targetSlot": "ESTIMATED",
     "note": "원천 표기다. `asignBdgtAmt`는 배정예산이므로 basis 는 `ALLOCATED_BUDGET`, 과세는 `UNKNOWN`이다(data-dictionary.md §1.2). `targetSlot`은 이 유입이 채우려는 **대상 자리**이고, 그 자리의 basis 로 값을 다시 표기하지 않는다."
   },
   "provenanceAuthorityTable": {

@@ -1,7 +1,7 @@
 {
   "storedValueOverwritten": false,
   "resultAmount": 900000000,
-  "resultBasis": "ESTIMATED_PRICE",
+  "resultBasis": "ESTIMATED",
   "resultVatTreatment": "EXCLUSIVE",
   "resultProvenance": "Published",
   "incomingRecordedAs": "NonAuthoritativeFillOnly",
