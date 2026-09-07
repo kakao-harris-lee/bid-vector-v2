@@ -16,6 +16,8 @@ in_scope:
   - config/quality/gate-tests.properties              # `gate.tests.adapters` 키(키는 Gradle 모듈 이름 규약 — 2D 의 손으로 쓴 test 는 전부 adapters 에 있다; 게이트 정의 편집, 사유를 evidence 에)
   - config/quality/contract-policy.properties         # 정책 데이터: max_message_bytes · 승인 태그 이름 규칙 · mutation 집합 목록과 최소 크기 · 도구 버전 리터럴(buf·protoc·protoc-gen-grpc-kotlin·grpcio-tools·protobuf)(매직넘버 금지)
   - adapters/src/test/kotlin/**                        # Kotlin 쪽 전부: unknown field·unknown enum·max payload·deadline·cancellation·round-trip(in-process grpc-testing) + 2B·2C consumer test 한 suite. `ml-contract` 는 생성물만(2A D-2A-0 (c)·D-2A-6)
+  - adapters/build.gradle.kts                        # 리뷰 시점 추가(verifier r2 F-15) — `crossLangSmokeTest` task 등록·`PresentSpec` 배선·`grpc-netty-shaded` test 의존·정책 파일 시스템 프로퍼티. 착수 판은 test 소스만 두고 모듈 빌드 파일을 빠뜨렸다
+  - gradle/libs.versions.toml                        # 리뷰 시점 추가(F-15) — `grpc-netty-shaded` 좌표 신설(max payload 경계 test 가 실제 socket 을 요구, in-process 는 크기 미강제)
   - ml-engine/tests/**                                 # provider test: fake servicer 계약 준수 + 같은 testdata round-trip + async(grpc.aio) in-process
   - ml-engine/pyproject.toml                          # grpcio-testing dev 의존만(serving 런타임 아님)
   - contracts/testdata/**                             # canonical 바이트 + JSON 원본 + **breaking mutation 기대 결과 표**
@@ -54,7 +56,7 @@ contract 층·래칫 · `ADR 0010` 초안 D-2·D-4·D-7·§6 · `milestone-1.md`
 
 `git log --oneline e3ac98b..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-07) **없음**.
 
-**리뷰 요청 시점(2026-09-07, head `4031d98` + 이 정정 커밋)** — 하네스 커밋 **없음**. range 에는 다른 세션의 discovery 커밋
+**리뷰 요청 시점(2026-09-07, 구현 head `4031d98` → verifier r1 not-ready → 수정 라운드 1 head `39fda2c` → verifier r2 ready-for-review; 이 절 갱신 커밋이 그 뒤)** — 하네스 커밋 **없음**. range 에는 다른 세션의 discovery 커밋
 `4695ce8`(`docs/discovery/` 학습 데이터·모델 위치 조사)이 섞여 있으며 in_scope 밖이라 slice 커밋 집합이 아니다(커밋 집합 = in_scope 경로 변경).
 
 **착수 2026-09-07 — 운영자 결정**: D-2D-1 (a) `against` = 승인 태그(`contracts/v1-approved-2026-09-07`, 이름 규칙은 정책 데이터) ·
