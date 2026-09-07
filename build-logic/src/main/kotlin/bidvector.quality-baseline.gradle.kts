@@ -98,6 +98,9 @@ val contractGate =
         rootGradlew = layout.settingsDirectory.file("gradlew")
         catalogProtobufRuntimeVersion = versionCatalog.version("protobuf-runtime")
         catalogGrpcKotlinVersion = versionCatalog.version("grpc-kotlin")
+        // verifier r1 F-13 — `ml-contract`가 `protoc-gen-grpc-java`를 이 카탈로그 버전
+        // 그대로 참조한다(별도 alias 없음, ContractPolicy.protocGenGrpcJavaVersion 참고).
+        catalogGrpcJavaVersion = versionCatalog.version("grpc-java")
         report = layout.buildDirectory.file("reports/contract-gate/violations.txt")
         outputs.upToDateWhen { false }
     }

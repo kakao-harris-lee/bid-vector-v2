@@ -36,6 +36,10 @@ abstract class ContractGateTask : DefaultTask() {
     @get:Internal
     abstract val catalogGrpcKotlinVersion: Property<String>
 
+    // verifier r1 F-13 — 생성물의 Java/gRPC 절반을 만드는 플러그인 버전도 대조한다.
+    @get:Internal
+    abstract val catalogGrpcJavaVersion: Property<String>
+
     @get:Internal
     abstract val report: RegularFileProperty
 
@@ -67,10 +71,12 @@ abstract class ContractGateTask : DefaultTask() {
         val bufVersion = run(root, "buf", "--version").output
         val protobufCatalog = catalogProtobufRuntimeVersion.get()
         val grpcKotlinCatalog = catalogGrpcKotlinVersion.get()
+        val grpcJavaCatalog = catalogGrpcJavaVersion.get()
         return listOfNotNull(
             toolVersionViolation("buf", bufVersion, policy.bufVersion),
             toolVersionViolation("protobuf-runtime(카탈로그)", protobufCatalog, policy.protocVersion),
             toolVersionViolation("grpc-kotlin(카탈로그)", grpcKotlinCatalog, policy.protocGenGrpcKotlinVersion),
+            toolVersionViolation("protoc-gen-grpc-java(카탈로그)", grpcJavaCatalog, policy.protocGenGrpcJavaVersion),
             approvedTagViolation(policy.approvedTag, policy.approvedTagPattern),
         )
     }

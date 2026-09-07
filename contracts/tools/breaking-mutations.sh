@@ -10,6 +10,9 @@
 # 종료 코드는 `data-extract.md` §6 스윕 규약과 같다 — 0 정상(mutation 전건이 잡히고 양성
 # 대조도 기대대로 통과) · 1 위반(잡히지 않은 mutation, 또는 양성 대조가 예기치 않게
 # breaking 으로 잡힘) · 2 도구 오류(buf 부재·정책 키 부재·git 태그 없음 등 환경 문제).
+# **verifier r1 F-8** — `buf breaking`의 exit 100 만 "위반 검출"(=caught)로 센다. `buf`는
+# 위반에 100, 파싱·환경 오류에는 다른 값(관례상 1)을 내므로 `code -ne 0` 만으로는 sed 가
+# 만든 구문 오류까지 "잡힘"으로 셀 위험이 있었다 — 100/0 밖의 값은 즉시 도구 오류(exit 2).
 #
 # 결과표는 `contracts/testdata/breaking/expected.tsv`에 쓴다(mutation → 잡힘/못잡힘/exit).
 #
@@ -36,6 +39,16 @@ policy_value() {
         exit 2
     fi
     echo "${line#*=}"
+}
+
+# verifier r1 F-9 — `sed -i ''`는 BSD sed(macOS) 전용 문법이다. GNU sed(Linux, 미래 CI)는
+# 같은 자리에서 다음 인자를 in-place 접미사로 먹어 버린다. 임시 파일 경유로 두 구현
+# 모두에서 동작하게 한다.
+sed_inplace() {
+    local pattern="$1" file="$2"
+    local tmp
+    tmp=$(mktemp)
+    sed "$pattern" "$file" >"$tmp" && mv "$tmp" "$file"
 }
 
 if ! command -v buf >/dev/null 2>&1; then
@@ -89,39 +102,39 @@ apply_mutation() {
     local t="$scratch/contracts/$TRAINING"
     case "$mutation" in
     field-delete)
-        sed -i '' '/Currency currency = 2;/d' "$c"
+        sed_inplace '/Currency currency = 2;/d' "$c"
         ;;
     field-number-change)
-        sed -i '' 's/Currency currency = 2;/Currency currency = 9;/' "$c"
+        sed_inplace 's/Currency currency = 2;/Currency currency = 9;/' "$c"
         ;;
     type-change)
-        sed -i '' 's/int64 amount_won = 1;/string amount_won = 1;/' "$c"
+        sed_inplace 's/int64 amount_won = 1;/string amount_won = 1;/' "$c"
         ;;
     enum-value-delete)
-        sed -i '' '/CURRENCY_KRW = 1;/d' "$c"
+        sed_inplace '/CURRENCY_KRW = 1;/d' "$c"
         ;;
     enum-value-number-change)
-        sed -i '' 's/CURRENCY_KRW = 1;/CURRENCY_KRW = 7;/' "$c"
+        sed_inplace 's/CURRENCY_KRW = 1;/CURRENCY_KRW = 7;/' "$c"
         ;;
     oneof-field-remove)
-        sed -i '' '/ExactRelease exact_release = 2;/d' "$c"
+        sed_inplace '/ExactRelease exact_release = 2;/d' "$c"
         ;;
     rpc-delete)
-        sed -i '' '/rpc GetModelMetadata/d' "$p"
+        sed_inplace '/rpc GetModelMetadata/d' "$p"
         ;;
     rpc-streaming-change)
-        sed -i '' \
+        sed_inplace \
             's/rpc GetModelMetadata(GetModelMetadataRequest) returns (GetModelMetadataResponse);/rpc GetModelMetadata(GetModelMetadataRequest) returns (stream GetModelMetadataResponse);/' \
             "$p"
         ;;
     package-rename)
         for f in "$c" "$scratch/contracts/proto/bidvector/ml/v1/error.proto" \
             "$scratch/contracts/proto/bidvector/ml/v1/features.proto" "$p" "$t"; do
-            sed -i '' 's/package bidvector.ml.v1;/package bidvector.ml.v2;/' "$f"
+            sed_inplace 's/package bidvector.ml.v1;/package bidvector.ml.v2;/' "$f"
         done
         ;;
     optional-removal)
-        sed -i '' 's/optional string requested_release_id = 5;/string requested_release_id = 5;/' "$t"
+        sed_inplace 's/optional string requested_release_id = 5;/string requested_release_id = 5;/' "$t"
         ;;
     *)
         echo "알 수 없는 mutation '$mutation'" >&2
@@ -189,14 +202,23 @@ for mutation in "${MUTATIONS[@]}"; do
         rm -rf "$scratch"
     fi
 
-    if [[ $code -ne 0 ]]; then
+    # verifier r1 F-8 — buf 는 breaking **위반**에 exit 100, 파싱·환경 오류에는 다른 값
+    # (관례상 1)을 낸다. `code -ne 0`만으로는 sed 가 만든 구문 오류까지 "잡힘"으로 셀 수
+    # 있었다(현재 실측은 11종 전부 정확히 100 이라 거짓 양성은 없었지만, 판정 자체가 그
+    # 구분을 하지 않았다). 위반(100)과 무위반(0)만 판정 대상으로 삼고, 그 밖은 도구 오류로
+    # 스윕을 즉시 멈춘다.
+    if [[ $code -eq 100 ]]; then
         echo "[잡힘] $mutation (exit=$code)"
         record "$mutation" "caught" "$code"
-    else
+    elif [[ $code -eq 0 ]]; then
         echo "[미검출] $mutation — buf breaking 이 이 mutation 을 통과시켰다"
         echo "$output"
         record "$mutation" "not-caught" "$code"
         OVERALL_STATUS=1
+    else
+        echo "buf 도구 오류(exit=$code, 위반도 무위반도 아니다) — mutation '$mutation'" >&2
+        echo "$output" >&2
+        exit 2
     fi
 done
 
@@ -205,8 +227,8 @@ echo "== 양성 대조 — 호환 변경 넷(필드·enum 값·RPC·메시지 �
 positive_scratch=$(fresh_scratch)
 pc="$positive_scratch/contracts/$COMMON"
 pp="$positive_scratch/contracts/$PREDICTION"
-sed -i '' 's/AmountProvenanceKind provenance = 5;/AmountProvenanceKind provenance = 5;\n  string new_compatible_field = 6;/' "$pc"
-sed -i '' 's/CURRENCY_KRW = 1;/CURRENCY_KRW = 1;\n  CURRENCY_USD = 2;/' "$pc"
+sed_inplace 's/AmountProvenanceKind provenance = 5;/AmountProvenanceKind provenance = 5;\n  string new_compatible_field = 6;/' "$pc"
+sed_inplace 's/CURRENCY_KRW = 1;/CURRENCY_KRW = 1;\n  CURRENCY_USD = 2;/' "$pc"
 cat >>"$pc" <<'PROTO'
 
 message NewCompatibleMessage {
@@ -223,7 +245,7 @@ message PingResponse {
   RequestEnvelope envelope = 1;
 }
 PROTO
-sed -i '' \
+sed_inplace \
     's/rpc GetModelMetadata(GetModelMetadataRequest) returns (GetModelMetadataResponse);/rpc GetModelMetadata(GetModelMetadataRequest) returns (GetModelMetadataResponse);\n  rpc Ping(PingRequest) returns (PingResponse);/' \
     "$pp"
 positive_output=$(run_buf_breaking "$positive_scratch/contracts")
@@ -232,11 +254,15 @@ rm -rf "$positive_scratch"
 if [[ $positive_code -eq 0 ]]; then
     echo "[통과] 호환 변경 넷은 breaking 으로 잡히지 않는다(기대대로)"
     record "compatible-additions(positive-control)" "passed" "$positive_code"
-else
+elif [[ $positive_code -eq 100 ]]; then
     echo "[예기치 않은 실패] 호환 변경이 breaking 으로 잡혔다:"
     echo "$positive_output"
     record "compatible-additions(positive-control)" "unexpected-failure" "$positive_code"
     OVERALL_STATUS=1
+else
+    echo "buf 도구 오류(exit=$positive_code) — 양성 대조" >&2
+    echo "$positive_output" >&2
+    exit 2
 fi
 
 # ---- 결과표 기록 ----

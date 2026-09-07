@@ -140,6 +140,46 @@ def _encode_varint(value: int) -> bytes:
             return bytes(out)
 
 
+def _read_varint(data: bytes, index: int) -> tuple[int, int]:
+    result = 0
+    shift = 0
+    while True:
+        byte = data[index]
+        index += 1
+        result |= (byte & 0x7F) << shift
+        if not (byte & 0x80):
+            return result, index
+        shift += 7
+
+
+def _top_level_field_numbers(data: bytes) -> set[int]:
+    """verifier r1 F-7 — `UnknownFields()`는 이 환경의 `upb` 백엔드에서
+    `NotImplementedError`를 던진다(실측) — 대신 wire 를 직접 훑어 실제로 어떤 필드 번호가
+    실렸는지 관측한다(그룹 wire type 3/4 는 이 계약에 없으므로 지원하지 않는다). 이전 판의
+    "재직렬화 길이가 자기 자신과 같다"는 어떤 메시지에도 참인 항진명제였다 — 이 함수는
+    실제 관측 가능한 성질(어떤 field number 가 wire 에 있는가)을 낸다."""
+    numbers: set[int] = set()
+    index = 0
+    length = len(data)
+    while index < length:
+        tag, index = _read_varint(data, index)
+        field_number = tag >> 3
+        wire_type = tag & 0x7
+        numbers.add(field_number)
+        if wire_type == 0:  # varint
+            _, index = _read_varint(data, index)
+        elif wire_type == 1:  # 64-bit
+            index += 8
+        elif wire_type == 2:  # length-delimited
+            value_length, index = _read_varint(data, index)
+            index += value_length
+        elif wire_type == 5:  # 32-bit
+            index += 4
+        else:
+            raise ValueError(f"지원하지 않는 wire type {wire_type}(field {field_number}) — 이 계약에 group 은 없다")
+    return numbers
+
+
 async def _serve_prediction(prediction_pb2_grpc, servicer) -> tuple[grpc.aio.Server, str]:
     server = grpc.aio.server()
     prediction_pb2_grpc.add_BidPredictionServiceServicer_to_server(servicer, server)
@@ -179,10 +219,14 @@ def test_unknown_field_survives_real_aio_round_trip_and_is_absent_from_response(
                 stub = prediction_pb2_grpc.BidPredictionServiceStub(channel)
                 response = await stub.CalculateOptimalBid(request_with_unknown_field)
                 assert response.WhichOneof("result") == "failure"
-                assert len(response.SerializeToString()) == len(
-                    prediction_pb2.CalculateOptimalBidResponse.FromString(response.SerializeToString())
-                    .SerializeToString()
-                )
+                # F-7 — 응답(다른 메시지 타입)의 wire 를 직접 훑어 알려진 field number 만
+                # 있는지 확인한다. field 999 는 요청에만 있었고 응답에는 나타나지 않는다.
+                known_numbers = {
+                    field.number for field in prediction_pb2.CalculateOptimalBidResponse.DESCRIPTOR.fields
+                }
+                observed_numbers = _top_level_field_numbers(response.SerializeToString())
+                assert observed_numbers <= known_numbers
+                assert 999 not in observed_numbers
         finally:
             await server.stop(grace=None)
 
@@ -190,14 +234,19 @@ def test_unknown_field_survives_real_aio_round_trip_and_is_absent_from_response(
     assert observed["has_unknown_bytes"] == 1
 
 
-def test_unknown_field_is_preserved_by_local_parse_reserialize() -> None:
+def test_unknown_field_is_preserved_by_local_parse_reserialize(prediction_pb2) -> None:
     """소켓 없이도 성립하는 성질 — protobuf-python 은 proto3 unknown field 를 파싱 시
-    보존하고 재직렬화에 되싣는다(Kotlin `ContractUnknownFieldPreservationTest`와 대칭)."""
-    from bidvector.ml.v1 import prediction_pb2 as prediction_pb2_module  # noqa: PLC0415
+    보존하고 재직렬화에 되싣는다(Kotlin `ContractUnknownFieldPreservationTest`와 대칭).
 
+    verifier r1 F-6 — 이전 판은 `prediction_pb2` fixture 를 인자로 받지 않고 생성 stub 을
+    함수 안에서 직접 import 했다. pytest 는 요청된 fixture 만 해석하므로, 이 test 를
+    단독 선택(`-k`)해 돌리면 `generated_stub_path`(sys.path 에 임시 생성물을 얹는 module
+    fixture)가 전혀 실행되지 않아 `ModuleNotFoundError: No module named 'bidvector'`로
+    죽었다(재현 확인). fixture 를 인자로 받으면 단독 실행도 정상화된다.
+    """
     original = _read("calculate_optimal_bid_request.binpb")
     with_unknown = _append_unknown_varint_field(original, field_number=999, value=42)
-    parsed = prediction_pb2_module.CalculateOptimalBidRequest()
+    parsed = prediction_pb2.CalculateOptimalBidRequest()
     parsed.ParseFromString(with_unknown)
     reserialized = parsed.SerializeToString(deterministic=True)
     assert len(reserialized) == len(with_unknown)

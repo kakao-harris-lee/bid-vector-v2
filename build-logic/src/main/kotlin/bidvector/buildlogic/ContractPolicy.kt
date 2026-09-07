@@ -19,6 +19,10 @@ internal class ContractPolicy(
     val protocVersion: String get() = values.requireValue("tool.protoc")
     val protocGenGrpcKotlinVersion: String get() = values.requireValue("tool.protoc.gen.grpc.kotlin")
 
+    // verifier r1 F-13 — 생성물의 Java/gRPC 절반을 만드는 플러그인. `grpc-java` 카탈로그
+    // 버전과 1:1 로 묶여 있다(`ml-contract/build.gradle.kts`).
+    val protocGenGrpcJavaVersion: String get() = values.requireValue("tool.protoc.gen.grpc.java")
+
     companion object {
         fun load(file: File): ContractPolicy = ContractPolicy(readPolicy(file))
     }

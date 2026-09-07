@@ -26,6 +26,7 @@ class ContractPolicyTest {
         tool.buf.version=1.72.0
         tool.protoc=3.25.9
         tool.protoc.gen.grpc.kotlin=1.5.0
+        tool.protoc.gen.grpc.java=1.84.0
         """.trimIndent()
 
     @Test
@@ -38,6 +39,7 @@ class ContractPolicyTest {
         assertEquals("1.72.0", policy.bufVersion)
         assertEquals("3.25.9", policy.protocVersion)
         assertEquals("1.5.0", policy.protocGenGrpcKotlinVersion)
+        assertEquals("1.84.0", policy.protocGenGrpcJavaVersion)
     }
 
     @Test
