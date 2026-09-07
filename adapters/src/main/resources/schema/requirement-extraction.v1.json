@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bidvector.internal/schema/requirement-extraction.v1.json",
+  "title": "requirement-extraction.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assertedAbsent", "items"],
+  "properties": {
+    "assertedAbsent": {
+      "type": "boolean",
+      "description": "모델이 '이 공고에 자격 요건이 없다'고 명시적으로 답했는가."
+    },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "if": {
+    "properties": { "assertedAbsent": { "const": true } },
+    "required": ["assertedAbsent"]
+  },
+  "then": {
+    "properties": { "items": { "maxItems": 0 } }
+  },
+  "else": {
+    "properties": { "items": { "minItems": 1 } }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serialNo", "sourceField", "licenseNames", "evidence"],
+      "properties": {
+        "groupNo": {
+          "type": ["string", "null"]
+        },
+        "serialNo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceField": {
+          "type": "string",
+          "enum": ["LICENSE_LIMIT_NAME", "PERMITTED_INDUSTRY_LIST"]
+        },
+        "licenseNames": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["charStart", "charEnd"],
+          "properties": {
+            "charStart": { "type": "integer", "minimum": 0 },
+            "charEnd": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}
