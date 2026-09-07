@@ -87,6 +87,19 @@ Phase 0 의 D-3A-0 파급(`noticeRevision`의 `Int` 접힘을 `NoticeRound`로 �
   base 에 이미 있어 그대로 남는다. 되돌린 뒤 `git diff <base>`(위 in_scope 경로 전체)가
   **0줄** — 복구가 완전함을 확인했다. clone 은 확인 뒤 폐기.
 
+## 임시 clone 재실측(verifier r3 N3-4 대응 — head `30cc2482e6495b44c11ee41e81306603e6ce111b`)
+
+## 2026-09-07T00:00:00Z
+- cmd: 위와 같은 명령(head 만 `30cc248`)에
+  `grep -c "bidvector\.procurement\." fixtures/manifest.yaml` 을 더해 돌렸다.
+- exit: 0
+- 핵심 결과: in_scope 경로 복구는 여전히 완전(`git diff <base>` 0줄). `fixtures/manifest.yaml`
+  은 이 명령의 대상이 아니므로 그대로 남고, `bidvector.procurement.` 패턴이 **21건**
+  남는다(N3-3 이 8 case 의 `contract_binding` 을 「없음」에서 실제 타입 이름으로 채운
+  뒤라서 이전 측정치 15건보다 늘었다 — 이 셈은 `contract_binding` 내용이 바뀔 때마다
+  달라지므로, rollback.md 본문의 절대값은 최신 커밋에서 재측정해야 정확하다). clone 은
+  확인 뒤 폐기.
+
 ## 확인 지점
 
 되돌린 뒤 `git diff a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f -- <in_scope 경로>` 가 비어 있고,
@@ -104,14 +117,18 @@ Phase 0 의 D-3A-0 파급(`noticeRevision`의 `Int` 접힘을 `NoticeRound`로 �
 
 **결과**: in_scope 경로를 되돌린 뒤에도 `contract_binding` 산문은 삭제된
 `bidvector.procurement.*` 타입·함수(`RangeBand`·`DocumentedVocabulary`·
-`parseDelimitedFigureList` 등)를 계속 가리킨다 — 임시 clone 재실측(HEAD 기준)으로
-`bidvector.procurement.` 패턴이 되돌린 뒤에도 15건 남는 것을 확인했다. **기능적으로는
-깨지지 않는다** — `contract_binding`은 산문 문서 필드이고, 유일한 기계 검사(manifest
-`contract_binding.type_path` 의 「fixture N」표기 대 `COMPILE_DELEGATION_FIXTURES`
-숫자 대조)는 그 대조 대상 자체가 이번 rollback 으로 되돌아가는 conformance test 안에
-있다. `contract_binding` 을 되돌리려면 **수동 절차**가 필요하다 — 해당 27 case 의
-`contract_binding` 필드를 `pending-3a` 로 손으로 되돌리거나(3A 배선 이전 상태), curator
-승인 자체를 되돌릴지 별도로 판단해야 한다(그 판단은 이 rollback 의 범위 밖이다).
+`parseDelimitedFigureList` 등)를 계속 가리킨다 — 임시 clone 재실측(head `30cc248` 기준,
+N3-3 이 8 case 의 `contract_binding` 을 실제 타입 이름으로 채운 뒤 재측정)으로
+`bidvector.procurement.` 패턴이 되돌린 뒤에도 **21건** 남는 것을 확인했다(이 수는 N3-3
+갱신 전 15건보다 많다 — N3-3 이 이전에 "없음"이던 7 case 의 `type_path`/`carries` 에
+실제 타입·함수 이름을 채웠기 때문이다, 셈이 갱신마다 달라질 수 있다는 뜻이라 재측정
+없이 재사용하지 않는다). **기능적으로는 깨지지 않는다** — `contract_binding`은 산문
+문서 필드이고, 유일한 기계 검사(manifest `contract_binding.type_path` 의 「fixture N」
+표기 대 `COMPILE_DELEGATION_FIXTURES` 숫자 대조)는 그 대조 대상 자체가 이번 rollback
+으로 되돌아가는 conformance test 안에 있다. `contract_binding` 을 되돌리려면 **수동
+절차**가 필요하다 — 해당 27 case 의 `contract_binding` 필드를 `pending-3a` 로 손으로
+되돌리거나(3A 배선 이전 상태), curator 승인 자체를 되돌릴지 별도로 판단해야 한다(그
+판단은 이 rollback 의 범위 밖이다).
 
 ## 예상 복구 시간
 
