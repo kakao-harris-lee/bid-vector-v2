@@ -584,6 +584,10 @@ private fun case027(input: JsonNode): Map<String, Any?> {
         "totalDistinctCodes" to documentedCodes.size + if (successInTable) 0 else 1,
         "documentDeclaresRetryCategory" to false,
         "appliesToBidPublicInfoServiceDeclared" to false,
+        // verified_paths 밖의 실측 배선 — REAL_POLICY(운영 승인 값)의 resultCode 코드
+        // 집합이 이 문서의 에러코드 표와 같은 16개인지 실제로 대조한다(contract_binding
+        // 「carries」 참고). 검증되진 않지만 real 정책 값 위에서 계산되는 값이다.
+        "policyCodeSetMatchesDocument" to (REAL_POLICY.resultCodeCategories.map { it.code }.toSet() == documentedCodes.toSet()),
         "codes" to codes,
     )
 }
