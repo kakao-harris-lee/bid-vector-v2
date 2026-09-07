@@ -17,6 +17,7 @@ in_scope:
   - shared-kernel/src/main/kotlin/bidvector/sharedkernel/Provenance.kt     # D-3A-0 (a) — `Published(noticeRevision: NoticeRound)` 타입 교체(좁은 확장, 1D D-1 선례)
   - shared-kernel/src/main/kotlin/bidvector/sharedkernel/Rate.kt           # D-3A-0 (a) — `FloorRateOrigin.NoticeValue(noticeRevision)` 도 같은 타입(조사 G-1: 같은 사실이 두 자리) — 이 파일의 다른 편집 금지
   - shared-kernel/src/test/kotlin/**                   # 위 타입 교체의 영향 test 만(값 불변, 생성자 인자 형태만)
+  - decision/src/test/kotlin/**                        # 같은 타입 교체의 영향 test 만(`FloorShortfallKernelTest` 의 `NoticeValue(0)` 4곳 → `NoticeRound`, 인자 형태만·값 불변) — 구현 레인 발견으로 착수 뒤 추가(세션 모델 정정). `decision/src/main/**` 은 여전히 out_of_scope
   - config/quality/gate-tests.properties              # `gate.tests.procurement`(M2 종결로 조건 해제 — 2A·2D 가 만든 키에 병합)
   - app/src/test/kotlin/bidvector/app/conformance/**   # (i) 기존 executor 의 `noticeRevision` `toInt` 접힘을 `NoticeRound` 로 정정(D-3A-0 파급 — `CorpusExecutors`·`StrategyExecutors`) (ii) `koneps-collection` dispatch 는 curator 승격 뒤 병합(authoritative ≥ 1 이 조건)
   - app/build.gradle.kts                              # testImplementation(project(":procurement")) 한 줄
