@@ -149,6 +149,11 @@ finding_types() {
 # 컴파일 오류(정책 `breaking.compile-error.type`) 가 하나라도 섞여 있으면 위반이 아니라
 # mutation 적용이 구문을 깬 것이다 — genuine breaking 규칙과 구분한다.
 #
+# **verifier r1 F-8(info)** — 이 함수와 `first_rule_type` 은 호출자 스코프의 전역
+# `COMPILE_ERROR_TYPE` 을 전제한다(`main` 이 `require_policy_value` 로 채운다). 그 전역
+# 없이(예: `source` 만 하고) 직접 부르면 `unbound variable` 로 죽는다 — `breaking-mutations-
+# selftest.sh` 는 호출 전 직접 설정하므로 이 전제를 충족한다.
+#
 # **F-23(하네스 B-3)** — `finding_types` 결과를 변수 `types`에 담고 판정은 개행으로
 # 감싼 부분 문자열 매칭이다. 파이프도 조기 종료(`grep -q`)도 없어 대용량 출력에서
 # `pipefail`이 상류를 SIGPIPE 로 죽이는 표면이 없다.

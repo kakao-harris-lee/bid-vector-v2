@@ -43,8 +43,8 @@ verifier ready-for-review + 사용자 승인(scope.md 지위 문단).
 
 | 항목 | 값 |
 | --- | --- |
-| 파일 | `procurement/src/test/kotlin/bidvector/procurement/AccountingTest.kt:79` |
-| 패턴 | `@Test fun \`property — 음이 아닌 세 값의 합을 received 로 주면 항상 성립한다\`() = runBlocking { checkAll(...) { ... } }` — 식 본문이라 반환 타입이 `Unit` 이 아님(2B 원 사례와 동일 패턴) |
+| 파일 | `procurement/src/test/kotlin/bidvector/procurement/AccountingTest.kt`(**verifier r1 F-6** — `file:line` 대신 함수 이름으로 인용한다, 3A 수정 즉시 줄 번호가 낡는다) |
+| 패턴 | `` @Test fun `property — 음이 아닌 세 값의 합을 received 로 주면 항상 성립한다`() = runBlocking { checkAll(...) { ... } } `` — 식 본문이라 반환 타입이 `Unit` 이 아님(2B 원 사례와 동일 패턴) |
 | 커밋 | `b8d4c4e`(M3/3A 레인) — 이 slice 의 base_sha(`7581106`) **이후** 신규. preflight §4.4(현 트리 실측 0건)의 전제가 이 커밋 이후로는 더 이상 사실이 아니다 |
 | 담당 레인 | M3/3A(procurement 소유). 이 slice 는 out_of_scope 라 직접 수정하지 않았다 — team-lead 에게 즉시 보고(2026-09-07)하고 3A 레인의 한 줄 수정(`runBlocking { }` 을 블록 본문으로, `=` 제거)을 요청했다 |
 | 해소 조건 | 3A 가 위 함수를 블록 본문으로 고친 커밋이 들어온 뒤 `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)`(S-0) 재실행이 exit 0. 재실행은 team-lead 지시로 진행 |
@@ -54,13 +54,25 @@ verifier ready-for-review + 사용자 승인(scope.md 지위 문단).
 가짜 초록을 낸 것과 같은 패턴을 처음 실전 코드에서 잡았다) — 다만 그로 인해
 S-0/S-1(공유 트리 전체 `clean check`)은 3A 가 고칠 때까지 exit 1 로 남는다.
 
+## verifier r1 일괄 수정 (`_workspace/harness-test-shape/03_verifier_report.md` §7, ready-for-review·low 7·info 1)
+
+한 커밋으로 처리(2026-09-02 차단 문턱 규칙 — 재검증 없이 다음 라운드로). F-1·F-6 은
+알려진 제한 문면 갱신(위 두 절), F-2·F-3 은 술어 불변·알려진 제한 등재(아래 5·6),
+F-4·F-5 는 장부층(scope.md·rollback.md, 값 대신 명령/재실측), F-7 은 코드 라벨 변경
+(`files=` → `scanned=`, `TestShapeGateTask.kt`) + S-2·S-3 재실행(둘 다 exit 0,
+commands.md), F-8 은 `breaking-mutations.sh` 주석 한 줄(`COMPILE_ERROR_TYPE` 전역 전제).
+F-2·F-3 은 **술어를 건드리지 않았다** — 건드리면 표적 재검증 대상이 된다.
+
 ## 알려진 제한
 
 1. **`gate.tests.build-logic` 에 `TestShapesTest` 미등재**(scope.md 착수 시 알려진
    제한 1과 동일, A-8) — `gate-tests.properties` 는 3A in_scope. 3A 종결 뒤 한 줄 병합
    대상. 그때까지 S-2 가 실행을 직접 보인다.
-2. **typealias 로 숨긴 test 어노테이션은 못 본다**(우회 (4), 착수 시 알려진 제한 2와
-   동일) — 저자 의도 우회로 경계 밖.
+2. **typealias·import alias 로 숨긴 test 어노테이션은 못 본다**(우회 (4), 착수 시 알려진
+   제한 2 확장 — **verifier r1 F-1**) — `typealias TA = Test` 뿐 아니라 `import
+   org.junit.jupiter.api.Test as TT` + `@TT` 도 같은 이유(PSI 짧은 이름 매칭)로 통과한다
+   (실측: probe worktree, `:settlement:testShapeGate` 위반 0). 저자 의도 우회로 경계
+   밖 — 완화는 `test.shape.method-annotations` 정책 목록에 별칭을 추가하는 편집.
 3. **S-1 은 3A 사유로 붉을 수 있다는 착수 시 서술이 실측으로 갱신됨** — 원 서술은
    「3A 의 미커밋 파일」을 가정했으나, 실제로는 3A 의 **커밋된**(`b8d4c4e`) test
    코드 자체가 원인이다(상세는 위 「게이트가 잡은 실제 위반(범위 밖)」). S-0(격리
@@ -74,3 +86,13 @@ S-0/S-1(공유 트리 전체 `clean check`)은 3A 가 고칠 때까지 exit 1 �
    9, 문면은 10). exit 0(매치 존재)으로 acceptance 자체는 충족되나, 「9+루트=10」 증거는
    보조 대소문자 무시 명령(`grep -ci`, 실측 10)으로 별도 확인했다. 명명 규칙(scope.md
    가 지정)과 acceptance 문구(같은 문서) 사이의 사소한 불일치이며 기능 결함은 아니다.
+5. **`@TestFactory fun x() = Unit`(식 본문·명시 타입 없음)은 잡히지 않는다**(**verifier r1
+   F-2**) — factory 축은 **명시** 반환 타입만 본다(`typeReference?.text == "Unit"`). 이
+   형태는 위협 (A)(조용한 미실행) 밖이다 — JUnit 이 `DynamicNode` 아닌 값을 받으면
+   런타임에 시끄럽게 실패하므로 가짜 초록이 아니다. 수정 불요, 완화가 필요해지면 factory
+   축도 식 본문을 위반으로 잡도록 A-2 와 대칭시킨다.
+6. **`@Test fun x(): kotlin.Unit { }` 이 오탐된다**(**verifier r1 F-3**) — `typeReference.text`
+   가 `"kotlin.Unit"`(FQN)이면 `"Unit"` 과 문자열이 달라 「블록 본문이지만 명시 반환
+   타입이 Unit 이 아니다」로 잘못 위반 처리한다. 방향이 안전측(A-2 「오탐이 미탐보다
+   낫다」)이라 차단 아님 — 고치지 않는다(**술어를 건드리면 표적 재검증 대상**, 2026-09-04
+   규칙). 완화가 필요해지면 허용 이름 집합(`Unit`·`kotlin.Unit`)을 정책 키로 둔다.

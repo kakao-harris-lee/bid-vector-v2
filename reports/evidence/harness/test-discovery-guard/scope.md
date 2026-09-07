@@ -7,7 +7,11 @@
 milestone: harness
 slice: test-discovery-guard
 base_sha: 7581106ecf7c52bbf8bb032adc233e90a8f1eb9b
-head_sha: 6752791f04b0f3321345b478c406293ece35c0b6   # 리뷰 요청 시점(2026-09-07)
+# verifier r1 F-4 — 값을 SHA 로 박으면 뒤 커밋마다 낡는다(장부층). 리뷰 시점 HEAD 는
+# 「이 slice 의 마지막 in_scope 커밋」이고, 그 커밋은 항상 아래 명령으로 낸다(정본은
+# 명령이지 값이 아니다):
+#   git log --oneline 7581106..HEAD -- <in_scope 경로 12개>  |  head -1
+head_sha: 리뷰 시점 HEAD = 이 절의 마지막 커밋(위 명령으로 확인)
 in_scope:
   - build-logic/src/main/kotlin/bidvector/buildlogic/TestShapes.kt          # 순수 함수 — PSI 위 test 메서드 형태 판정
   - build-logic/src/main/kotlin/bidvector/buildlogic/TestShapeGateTask.kt   # Gradle task — 배선·report 만
@@ -48,6 +52,8 @@ rollback: |
 `git log --oneline 7581106..HEAD -- CLAUDE.md .claude/` — 착수 시 없음. (이 slice 자체가 하네스 레인이다 — 3A 의 scope 「하네스 레인 변경」 절에 이 slice 의 커밋이 등재된다.)
 
 **리뷰 요청 시점(head `6752791`) 재확인 — 없음.** `git log --oneline 7581106..6752791 -- CLAUDE.md .claude/` 0건.
+
+**verifier r1 일괄 수정 커밋(head_sha F-4 반영) 재확인 — 없음.** `git log --oneline 7581106..HEAD -- CLAUDE.md .claude/` 는 매 리뷰 요청 시점마다 이 명령으로 다시 낸다(값을 박지 않는다).
 
 ## 이 slice 가 하는 일
 

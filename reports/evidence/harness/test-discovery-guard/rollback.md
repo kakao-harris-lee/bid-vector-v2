@@ -19,12 +19,19 @@ git restore --source=7581106ecf7c52bbf8bb032adc233e90a8f1eb9b --staged --worktre
   docs/discovery/capability-map.md
 ```
 
-**임시 clone 실측**(2026-09-07, head `6752791`) — exit 0. `git status --porcelain` 변화:
-6D(신규 파일 삭제 — `TestShapes.kt`·`TestShapeGateTask.kt`·`TestShapesTest.kt`·
-`test-shape-policy.properties`·`breaking-mutations-selftest.sh`·evidence
-`scope.md`) + 5M(수정 파일 원복 — `kotlin-conventions.gradle.kts`·`quality-baseline.gradle.kts`·
-`breaking-mutations.sh`·`capability-map.md`·`m2/2d/checklist.md`). `contracts/testdata/breaking/**`
-는 base 와 내용 동일(S-4 가 무변경으로 실측)이라 이 경로는 diff 에 나타나지 않는다.
+**verifier r1 F-5** — D(삭제) 수는 `reports/evidence/harness/test-discovery-guard/` 아래
+신규 파일 수에 따라 늘어난다(evidence 라운드마다 새 문서가 생기므로) — 값을 여기 박지
+않는다. 코드/설정 경로(신규 6개: `TestShapes.kt`·`TestShapeGateTask.kt`·`TestShapesTest.kt`·
+`test-shape-policy.properties`·`breaking-mutations-selftest.sh`)는 고정이고 M(수정 원복,
+5개: `kotlin-conventions.gradle.kts`·`quality-baseline.gradle.kts`·`breaking-mutations.sh`·
+`capability-map.md`·`m2/2d/checklist.md`)도 고정이다 — 매 라운드 재실측할 것은 evidence
+디렉터리의 D 수뿐이다. `contracts/testdata/breaking/**` 는 base 와 내용 동일(S-4 가
+무변경으로 실측)이라 이 경로는 diff 에 나타나지 않는다.
+
+**재실측**(2026-09-07, head `a4d5c46` — 이 F-5 수정 직전의 마지막 in_scope 커밋) — 임시
+clone 에서 exit 0. `git status --porcelain` 변화: **9D**(evidence 디렉터리 신규 파일
+`scope.md`·`commands.md`·`checklist.md`·`rollback.md` 4개 + 코드/설정 신규 5개) **+ 5M**.
+다음 리뷰 요청 시점에는 D 수를 다시 재는 것이 정본이다(고정값 아님).
 
 **효과**: `testShapeGate`/`buildLogicTestShapeGate` 가 9 모듈 + 루트 `check` 에서 빠지고
 `OPEN-2B-TEST-DISCOVERY-GUARD` 방어가 사라진다(2B 원 사례가 재발해도 다시 무방비).

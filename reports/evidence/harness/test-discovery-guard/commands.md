@@ -58,6 +58,15 @@ base `7581106ecf7c52bbf8bb032adc233e90a8f1eb9b` · 구현 커밋 `c7aaf5c`(게�
 - cmd: `./gradlew qualityBaseline`
 - exit: 0
 
+## verifier r1 F-7 반영 뒤 재실행 — `files=` → `scanned=` 라벨 변경(판정 불변)
+
+- cmd: `./gradlew -p build-logic test --tests '*TestShapes*'`(S-2)
+- exit: 0 — `TestShapesTest` 16/16 그대로.
+- cmd: `./gradlew check --dry-run | grep -c 'testShapeGate'`(S-3)
+- exit: 0, 출력 `9`(불변).
+- cmd: `./gradlew :shared-kernel:testShapeGate` 뒤 `cat shared-kernel/build/reports/test-shape-gate/test-shape-gate.txt`
+- 핵심 결과: `scanned=8` `violations=0` — 라벨만 바뀌고 판정 값은 이전과 동일.
+
 ## S-0/S-1 — clean check(정본/공유 트리)
 
 - cmd: `git worktree add --detach <dir> HEAD(6752791) && (cd <dir> && ./gradlew --no-build-cache clean check)`

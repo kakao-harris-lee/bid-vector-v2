@@ -43,9 +43,13 @@ abstract class TestShapeGateTask : DefaultTask() {
         val violations =
             TestShapes.extractAll(files, policy).sortedWith(compareBy({ it.fileName }, { it.line }))
 
+        // verifier r1 F-7 — `scanned=`(스캔 대상 파일 총수, 확장자 무관 — `sources` 는
+        // `sourceSetLayoutGate` 가 인정하는 test source set 트리 전체다)과 `parsed 없음` 을
+        // 구분한다. `TestShapes.extractAll` 이 Kotlin 이 아닌 파일을 걸러 파싱하므로(`.md`
+        // 등은 0건 기여), 이 값을 "파싱한 Kotlin 파일 수"로 읽으면 어긋난다.
         report.get().asFile.apply { parentFile.mkdirs() }.writeText(
             (
-                listOf("files=${files.size}", "violations=${violations.size}") +
+                listOf("scanned=${files.size}", "violations=${violations.size}") +
                     violations.map { "${it.fileName}:${it.line} ${it.functionName} — ${it.reason}" }
             ).joinToString("\n", postfix = "\n"),
         )
