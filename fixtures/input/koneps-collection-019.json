@@ -1,0 +1,31 @@
+{
+  "pages": [
+    {
+      "pageNo": 1,
+      "rows": [
+        {
+          "bidNtceNo": "SYN-NTC-1901",
+          "bidNtceOrd": "000"
+        },
+        {
+          "bidNtceNo": "SYN-NTC-1902",
+          "bidNtceOrd": "000"
+        }
+      ]
+    },
+    {
+      "pageNo": 2,
+      "rows": [
+        {
+          "bidNtceNo": "SYN-NTC-1903",
+          "bidNtceOrd": "000"
+        },
+        {
+          "bidNtceNm": "공고번호 없는 행"
+        }
+      ]
+    }
+  ],
+  "sourceTotalCount": 4,
+  "pageSize": 2
+}

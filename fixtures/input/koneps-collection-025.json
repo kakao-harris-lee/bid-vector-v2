@@ -1,0 +1,28 @@
+{
+  "policy": {
+    "id": "SYN-POLICY-detail-fetch-2026-09-07",
+    "ageGateHours": 8,
+    "recheckGateHours": 20,
+    "note": "SYNTHETIC 정책 입력이다. legacy 실물 값(24h·48h)은 옮기지 않았다."
+  },
+  "notice": {
+    "noticeNumber": "SYN-NTC-2501",
+    "noticeOrder": "000",
+    "openedAt": "2026-05-20T02:00:00Z",
+    "reservePricesHeld": false
+  },
+  "sweeps": [
+    {
+      "id": "SYN-SWEEP-1",
+      "now": "2026-05-20T06:00:00Z"
+    },
+    {
+      "id": "SYN-SWEEP-2",
+      "now": "2026-05-20T11:00:00Z"
+    },
+    {
+      "id": "SYN-SWEEP-3",
+      "now": "2026-05-20T16:00:00Z"
+    }
+  ]
+}

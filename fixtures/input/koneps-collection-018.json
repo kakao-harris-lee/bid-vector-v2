@@ -1,0 +1,18 @@
+{
+  "sourceDocument": {
+    "id": "koneps-openapi-reference",
+    "title": "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스",
+    "note": "문서 version·발행일·경로·SHA-256·legacy blob id 의 정본은 `fixtures/manifest.yaml` 의 `official_documents` 항목 하나다. 여기 두 번 적지 않는다 — version 문자열이 numeric_discipline 검사의 밴드 수와 글자로 겹치기도 한다."
+  },
+  "fieldDeclaration": {
+    "rawName": "cnstrtnAbltyEvlAmtList",
+    "conceptKo": "시공능력평가금액목록",
+    "documentFieldSize": 4000,
+    "documentRequirement": "0..n",
+    "documentDescriptionQuote": "공고의 시공능력평가금액목록 [제한그룹번호^면허지역통합코드명^면허지역통합코드^시공능력평가금액],[제한그룹번호^면허지역통합코드명^면허지역통합코드^시공능력평가금액]"
+  },
+  "payload": {
+    "cnstrtnAbltyEvlAmtList": "[1^SYN-LICENSE-AA^0001^700000000],"
+  },
+  "note": "샘플 값은 SYNTHETIC 이다 — 문서에서 가져오는 것은 형식 선언과 단위·과세의 부재다."
+}

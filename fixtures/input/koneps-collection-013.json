@@ -1,0 +1,28 @@
+{
+  "sourceDocument": {
+    "id": "koneps-openapi-reference",
+    "title": "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스",
+    "note": "문서 version·발행일·경로·SHA-256·legacy blob id 의 정본은 `fixtures/manifest.yaml` 의 `official_documents` 항목 하나다. 여기 두 번 적지 않는다 — version 문자열이 numeric_discipline 검사의 밴드 수와 글자로 겹치기도 한다."
+  },
+  "fieldDeclaration": {
+    "rawName": "resultCode",
+    "conceptKo": "결과코드",
+    "documentFieldSize": 2,
+    "documentRequirement": "필수",
+    "documentSampleQuote": "00",
+    "documentDescriptionQuote": "결과코드"
+  },
+  "envelopes": [
+    {
+      "id": "SYN-ENV-0001",
+      "header": {
+        "resultCode": "00"
+      }
+    },
+    {
+      "id": "SYN-ENV-0002",
+      "header": {}
+    }
+  ],
+  "note": "17 범주 분류표는 이 문서에 없다 — 이 case 는 분류표를 주장하지 않고 **항목구분 「필수」** 하나만 문서에서 가져온다."
+}

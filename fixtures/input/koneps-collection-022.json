@@ -1,0 +1,34 @@
+{
+  "sourceTotalCount": null,
+  "maxPages": 4,
+  "pageResponses": [
+    {
+      "requestedPageNo": 1,
+      "returnedNoticeNumbers": [
+        "SYN-NTC-2201",
+        "SYN-NTC-2202"
+      ]
+    },
+    {
+      "requestedPageNo": 2,
+      "returnedNoticeNumbers": [
+        "SYN-NTC-2201",
+        "SYN-NTC-2202"
+      ]
+    },
+    {
+      "requestedPageNo": 3,
+      "returnedNoticeNumbers": [
+        "SYN-NTC-2201",
+        "SYN-NTC-2202"
+      ]
+    },
+    {
+      "requestedPageNo": 4,
+      "returnedNoticeNumbers": [
+        "SYN-NTC-2201",
+        "SYN-NTC-2202"
+      ]
+    }
+  ]
+}

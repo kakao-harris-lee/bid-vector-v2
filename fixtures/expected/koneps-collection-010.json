@@ -1,0 +1,8 @@
+{
+  "declaredUnit": "percent",
+  "conversionDivisor": 100,
+  "rate": {
+    "fraction": 0.875
+  },
+  "unitInferredFromMagnitude": false
+}

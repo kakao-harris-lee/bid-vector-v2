@@ -10,6 +10,12 @@
 #      모든 식별자를 `SYN-` 접두로 두고 `privacy.synthetic: true`를 case마다 적는다.
 #      따라서 **`observed` 층 case는 0건이다** — 그 층은 운영 데이터 접근 승인이 선행한다
 #      (`access_approval_required` 참조).
+#      **2026-09-07 단서 — 값이 아니라 「선언」을 인용한 입력이 생겼다.** `koneps-collection-010`~`018`
+#      의 입력은 조달청 공식 문서의 **항목 명세 행**(항목명·항목크기·항목구분·항목설명)을 축어로
+#      싣는다. 그것은 운영 데이터가 아니라 **공표된 명세**이므로 `observed` 가 아니고, 문서가 어느
+#      필드를 어떻게 선언하는지가 곧 기대값의 근거다. 그 입력의 **샘플 값**(공고번호·금액·율)은
+#      여전히 `SYN-` 접두 합성값이다 — 문서 샘플에는 실제 기관·개인 식별자와 `numeric_discipline` 이
+#      금지한 legacy 수가 섞여 있어 옮기지 않았다. 문서 자체는 `official_documents` 가 고정한다.
 #   2. **legacy 출력을 정답으로 복사한 case가 하나도 없다.** 이 slice는 기존 Python을 실행하지
 #      않았고 `tests/goldens/**`의 기대값을 읽어 옮기지 않았다. `legacy_reference`는 **입력 형태와
 #      회귀 사례의 출처**로만 달려 있으며 각 항목이 그 사실을 `role`에 적는다.
@@ -61,7 +67,7 @@ official_documents:
     worktree 에 없다.** 그래서 legacy blob id 와 SHA-256 을 함께 고정한다. 문서 **내용**은 옮기지
     않고, 각 case 가 자기 `source.reference` 와 입력 파일에 **인용할 행만 축어로** 싣는다.
   entries:
-    - id: koneps-openapi-reference-1.2
+    - id: koneps-openapi-reference
       title: "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스"
       document_version: "1.2"
       service_version: "3.1"
@@ -271,7 +277,7 @@ schema:
     expected_sha256: 기대값 파일의 SHA-256. §3은 fixture 해시만 요구하나 기대값도 사후 변경 탐지 대상이다.
     privacy.synthetic: 입력이 합성인지. 운영 데이터 유래가 아님을 case 마다 명시한다.
     privacy.method: 비식별화 방식. 합성 입력은 `not-applicable-synthetic`.
-    extracted_at / extraction_method: 추출 시점과 방법. 합성 입력은 `authored-from-approved-spec`.
+    extracted_at / extraction_method: 추출 시점과 방법. 합성 입력은 `authored-from-approved-spec`. 조달청 공식 문서의 항목 명세 행을 축어로 인용한 입력은 **`quoted-from-official-doc`** 이다(2026-09-07 신설, `official_documents` 가 문서를 고정한다).
     normalization.source_form: 정규화 **전** 원본의 형태(§3 「정규화 전 원본과 정규화 후 fixture 구분」).
     provisional: 이 기대값이 어느 활성 `OPEN`의 결정 전 **임시 처리**인가. 그 `OPEN`이 닫히면 교체된다.
     owning_open: 이 case 가 **건드리지 않는** 인접 축의 소유 `OPEN`. 원칙은 활성 id 이나, 이미 해소된 id 를 드는 자리는 **해소 시점을 함께 적는다** — 이 필드가 든 id 가 활성임을 함의하지 않는다.
@@ -568,6 +574,12 @@ numeric_discipline:
       (반올림 자리수) · `0`·`0.0`. 그 수들은 자기 축 밖에서 흔한 셈이라 **문자열 일치가 채택을
       뜻하지 않는다.** 그 축에서의 채택 여부는 사람이 읽는다. (검사가 못 보는 자리를 적어 둔다.)
     result: "0건 (2026-08-30). 재현 명령은 `reports/evidence/m0/0e/fixtures-commands.md` **F-3**."
+    false_positive_note: |-
+      **검사는 문자열 부분일치라 도메인 밖의 수도 잡는다 — 2026-09-07 실측.** 신설 case 가
+      `official_documents` 항목의 문서 version `1.2` 를 입력에 실었더니 §12.1 의 **사정률 관측 편입
+      필터 밴드 상한 `1.2`** 로 9건 잡혔다. **값을 예외 처리하지 않고 자리를 없앴다** — 문서의
+      version·발행일·경로·해시는 `official_documents` 한 자리가 정본이고 fixture 는 문서 **id** 만
+      나른다(그 id 에도 version 을 두지 않는다). 「정본은 한 자리」가 검사의 오탐도 함께 지웠다.
     prose_numerals: |-
       **이 검사는 fixture 안의 수만 본다 — 산문이 주장하는 수는 보지 않는다.** 그 자리는
       **Codex B13 medium 이 실제로 잡았다**: 반올림 축의 근거가 `0.945 ÷ 0.900` 과 `15/151` 을 적었는데
@@ -586,7 +598,7 @@ numeric_discipline:
         unit: 무차원
         role: percent → fraction 변환 제수 (정의상 `1` percent = `1` ÷ `100`)
         source: "data-dictionary.md §12.1 — 층 `authoritative`(단위 정의)"
-        used_in: [rate-unit-001, rate-unit-005]
+        used_in: [rate-unit-001, rate-unit-005, koneps-collection-010]
         note: "`rate-unit-002`는 fraction 입력이라 제수가 `1`이고, `floor-shortfall-006`은 같은 변환을 쓰되 제수를 기대값에 싣지 않는다."
       - value: 150
         unit: 건수
@@ -611,6 +623,8 @@ numeric_discipline:
       - "SYN-POLICY-agency-regime (기관 유형 → 하한 모델 매핑) — 순서·매핑 모두 정책 데이터"
       - "SYN-POLICY-A/B-2026-08-30 (기초금액 provenance rule order) — 두 순서의 **대조**가 목적이고 어느 쪽도 정답으로 두지 않는다"
       - "SYN-POLICY-2026-08-30 (면허 결합 규칙 · 최소 표본 정책의 version 문자열)"
+      - "SYN-POLICY-detail-fetch-2026-09-07 (상세 조회 가치 게이트 — age·recheck 시간) — legacy 실물은 24h·48h(`app/core/config.py`, `legacy-behavior`)이고 **옮기지 않았다.** `koneps-collection-024`·`025` 의 기대값은 그 값이 아니라 스윕 시각과 게이트의 **대소 관계**에만 의존한다"
+      - "SYN-TZRULE-001 (타임존 없는 일시의 출처 zone 해석 규칙) — 값(`Asia/Seoul`)은 정답으로 두지 않는다. `koneps-collection-026` 의 기대값은 「규칙이 있으면 그 id 가 남고 없으면 변환되지 않는다」에만 의존하며, 값의 승인은 `OPEN-3A-SOURCE-TZ` 가 받는다"
   band_axis_separation:
     rule: |-
       `data-dictionary.md` §13.1 — 「값이 같고 축이 다른 **B4·B5를 한 case 에 섞지 않는다**」.
@@ -5406,6 +5420,870 @@ cases:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
+  - id: koneps-collection-010
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        율의 단위는 **필드 계약의 선언**에서 읽고 값 크기로 추론하지 않는다 — 공식 문서가 `sucsfbidLwltRate` 를 백분율로 선언하므로 원문 `"87.500"` 은 승인된 제수
+        `100` 으로 나뉘어 fraction `0.875` 가 된다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스 v1.2 (`official_documents` 의 `koneps-openapi-reference`) — 응답 항목 명세의 `sucsfbidLwltRate` 행 항목설명 *"개찰시 사용하는 낙찰하한율(%)"*. 제수 `100` 은 `data-dictionary.md` §12.1 이 `authoritative`(단위 정의)로 등재한 수다.
+    expected_reasoning: |-
+      단위 선언은 공식 문서 문면 *"개찰시 사용하는 낙찰하한율(%)"* 하나에서 나온다 — 이 case 는 그 선언을 읽을 뿐 값 크기로 percent 인지 fraction 인지 되짚지 않는다(`ADR 0002` D-4 · `data-dictionary.md` §1.4.1 이 금지한 경로이고, legacy `PERCENT_SCALE_THRESHOLD = 1.5` 가 그 경로의 실물이다).
+      변환 제수 `100` 은 §12.1 의 `authoritative` 수이며 `rate-unit-001` 이 같은 자리에서 쓴다.
+      **값 자체는 SYNTHETIC 이다** — 문서의 샘플(`89.745`·`87.745`)은 §12.1 이 `legacy-behavior` 로 등재한 법정 하한율과 같은 수라 `numeric_discipline` 상 fixture 에 실을 수 없다. 기대값은 그 샘플이 아니라 **선언 + 제수 규칙**에만 의존한다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/field_contract_spec.py
+        - app/domain/rate_normalization.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-010.json
+    expected_file: fixtures/expected/koneps-collection-010.json
+    verified_paths:
+      - "$.declaredUnit"
+      - "$.conversionDivisor"
+      - "$.rate.fraction"
+      - "$.unitInferredFromMagnitude"
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "quoted-from-official-doc"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "문서의 항목 명세 행만 인용했다. 기관명·담당자 성명·연락처·실제 공고번호는 옮기지 않았고 샘플 값은 `SYN-` 접두 합성값으로 대체했다. 운영 DB·API·로그에서 가져온 값이 없다."
+    extracted_at: 2026-09-07
+    extraction_method: quoted-from-official-doc
+    sha256: ecd61477c478823641a23d5a3bd3eab3729457e87fd5e700cf2de528fc435987
+    expected_sha256: be948968d908dcd53832bb389efcd5c43e3b35111a7d913ae4e0e4aca13873e1
+    not_covered: |-
+      `sucsfbidLwltRate` 의 **개연 밴드**(신뢰 상한·하한) — 그 값은 `legacy-behavior` 이고 `OPEN-DEC-10`·§1.4.3 B6 이 소유한다. 이 case 는 밴드를 주장하지 않는다.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-011
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        추정가격(`presmptPrce`)의 과세 처리와 통화 단위는 **공식 문서 문면**이 정한다 — 부가가치세 **제외**, 원화·원. legacy 주석의 「부가세 포함」은 기대값의 근거가
+        되지 않는다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스 v1.2 (`official_documents` 의 `koneps-openapi-reference`) — `presmptPrce` 행 항목설명 *"… 부가가치세 및 조달 수수료를 제외한 금액(원화,원)"*, 항목크기 25, 항목구분 옵션.
+    expected_reasoning: |-
+      공식 문서가 *"부가가치세 및 조달 수수료를 **제외**한 금액(원화,원)"* 이라고 직접 적는다. 따라서 `vatTreatment` 는 `EXCLUSIVE`, 통화 단위는 원(KRW)이고, 항목구분이 **옵션**이므로 `nullability` 는 nullable 이다.
+      **legacy 는 반대로 적는다** — `field_contract_spec.py` 와 `app/domain/money.py` 의 주석이 *"추정가격(부가세 포함)"* 이다. `data-dictionary.md` §1.2.1 이 그 선언을 `legacy-defect`(U-1)로 이미 판정했고, 조사 노트 **G-8** 이 같은 결론을 낸다. **이 case 는 그 판정을 공식 문서로 뒷받침한다** — M0 문서의 자체 도출이 아니라 원문 인용이 근거다.
+      **과세를 값 크기로 되짚지 않는다** — `vatTreatmentInferredFromValue: false` 가 그 자리다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/field_contract_spec.py
+        - app/domain/money.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-011.json
+    expected_file: fixtures/expected/koneps-collection-011.json
+    verified_paths:
+      - "$.vatTreatment"
+      - "$.currencyUnit"
+      - "$.nullability"
+      - "$.vatTreatmentInferredFromValue"
+      - "$.legacyAnnotationUsedAsBasis"
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "quoted-from-official-doc"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "문서의 항목 명세 행만 인용했다. 기관명·담당자 성명·연락처·실제 공고번호는 옮기지 않았고 샘플 값은 `SYN-` 접두 합성값으로 대체했다. 운영 DB·API·로그에서 가져온 값이 없다."
+    extracted_at: 2026-09-07
+    extraction_method: quoted-from-official-doc
+    sha256: 3ae46913414e763ace770e9afdf9b133cb2a5d9e39a152df8b5a43eb06adb992
+    expected_sha256: a42a9b7ad2ea50e253d41119818e15273c7884d6ffc68f93cb7da1047c394425
+    owning_open: |-
+      OPEN-REG-05 (활성) — 기초금액·추정가격의 과세 처리 **전반**. 이 case 는 그중 `presmptPrce` 한 키의 문서 선언만 고정하고 나머지 축은 그 `OPEN` 이 소유한다.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-012
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        공고 차수(`bidNtceOrd`)의 원문 토큰은 **폭 3의 제로패딩 문자열**이며 수집·재조회 왕복에서 보존된다. `"000"` 과 `"0"` 은 같은 토큰이 아니다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스 v1.2 (`official_documents` 의 `koneps-openapi-reference`) — `bidNtceOrd` 행: 항목크기 **3**, 항목구분 **필수**, 샘플데이터 **`000`**, 항목설명 *"입찰공고차수는 해당 입찰공고에 대한 재공고 및 재입찰 등이 발생되었을 경우 증가되는 수"*.
+    expected_reasoning: |-
+      공식 문서가 이 항목의 **크기를 3으로 고정**하고 **샘플을 `000`** 으로 싣는다. 폭이 고정된 자리에서 선행 0 은 표기가 아니라 **토큰의 일부**이므로 `"000"` 과 `"0"` 은 다른 원문 토큰이고, 왕복에서 폭이 보존되어야 같은 공고를 다시 조회할 수 있다.
+      **이 case 는 「산술이 정의되지 않는다」를 주장하지 않는다** — 그것은 `data-dictionary.md` §5.3 과 `regression-ledger.md` `R-QUAL-05` 가 세운 V2 설계 규칙이고 `koneps-collection-005` 가 그 자리를 진다(그 case 는 `insufficient-evidence`). 여기서 문서가 떠받치는 것은 **원문 형태와 왕복 보존**뿐이다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/openapi.py
+        - app/services/koneps/field_contract_spec.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-012.json
+    expected_file: fixtures/expected/koneps-collection-012.json
+    verified_paths:
+      - "$.noticeOrder.value"
+      - "$.noticeOrder.type"
+      - "$.roundTripPreserved"
+      - "$.widthPreserved"
+      - "$.equalToUnpaddedToken"
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "quoted-from-official-doc"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "문서의 항목 명세 행만 인용했다. 기관명·담당자 성명·연락처·실제 공고번호는 옮기지 않았고 샘플 값은 `SYN-` 접두 합성값으로 대체했다. 운영 DB·API·로그에서 가져온 값이 없다."
+    extracted_at: 2026-09-07
+    extraction_method: quoted-from-official-doc
+    sha256: abef1d19f65b87c4f1bb4eb6c6ac67914c68373b37d826ddf699a363e587ce28
+    expected_sha256: 9ad6a3e62ee630985eb8ae3024283d61bf3b89ae81d259fd3aa8b7ffecd7ba57
+    not_covered: |-
+      식별자 타입에 산술이 정의되지 않는다는 V2 규칙 — `koneps-collection-005` 소유 (`insufficient-evidence`).
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-013
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        `resultCode` 는 응답 봉투의 **필수 항목**이다 — 코드가 없는 봉투는 「정상」이 아니라 계약 위반이다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스 v1.2 (`official_documents` 의 `koneps-openapi-reference`) — 응답 메시지 명세의 `resultCode` 행: 항목크기 2, **항목구분 필수(`1`)**, 샘플 `00`.
+    expected_reasoning: |-
+      공식 문서가 `resultCode` 를 **필수 항목**으로 선언한다. 필수 항목이 없는 봉투는 명세를 만족하지 않으므로, 부재를 **성공 코드로 승격**하는 처리는 문서에 근거가 없다.
+      **legacy 는 정확히 그 승격을 한다** — `http_client.py` 가 *"an empty/absent code is treated as OK"* 로 빈 코드를 통과시키고 `collection.py` 가 `result_code or "00"` 으로 회계에 굳힌다. `regression-ledger.md` `R-COL-01` 이 그 자리를 겨눈다. **이 case 는 그 제약을 공식 문서로 뒷받침한다.**
+      **17 범주 분류표는 주장하지 않는다** — 그 표는 이 문서에 없다(`official_documents` 의 `what_it_does_not_contain`). 여기서 고정하는 것은 **필수성** 하나이고, 코드값별 재시도 가능/불가 분류는 여전히 미확보다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/http_client.py
+        - app/services/koneps/collection.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-013.json
+    expected_file: fixtures/expected/koneps-collection-013.json
+    verified_paths:
+      - "$.declaredRequired"
+      - "$.envelopeResults[1].codePresent"
+      - "$.envelopeResults[1].treatedAsNormal"
+      - "$.envelopeResults[1].contractViolation"
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "quoted-from-official-doc"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "문서의 항목 명세 행만 인용했다. 기관명·담당자 성명·연락처·실제 공고번호는 옮기지 않았고 샘플 값은 `SYN-` 접두 합성값으로 대체했다. 운영 DB·API·로그에서 가져온 값이 없다."
+    extracted_at: 2026-09-07
+    extraction_method: quoted-from-official-doc
+    sha256: b769ee40f37593fc8aa9cecc4a2ca1fe3cd6c306bda58bd173dcf4b3f1085320
+    expected_sha256: 302b82e1f6357b760de13b223c59b8899cffccf20d628a683161348197fd159f
+    not_covered: |-
+      `resultCode` 17 범주(재시도 가능/불가·quota·입력 오류·데이터 없음) 분류표 — **원문 미확보**. `uncovered_axes` 의 「KONEPS — `resultCode` 분류표」가 받는다.
+    owning_open: |-
+      OPEN-COL-02 — 등재 **결정**은 2026-08-26 해소됐으나 **표 본문이 아직 어느 문서에도 없다**. 이 case 는 그 표를 대신하지 않는다.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-014
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        일시 항목(`bidClseDt`·`opengDt`·`bidNtceDt`)의 **출처 타임존을 공식 문서가 선언하지 않는다** — 형식만 정해져 있으므로 해석 규칙 없이는 `Instant` 로
+        변환할 수 없다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스 v1.2 (`official_documents` 의 `koneps-openapi-reference`) — 세 일시 항목의 항목설명이 형식 *"YYYY-MM-DD HH:MM:SS"* 만 적고 타임존·UTC offset 을 적지 않는다(항목크기 19 = offset 자리가 없는 폭).
+    expected_reasoning: |-
+      **부재의 확인이 이 case 의 주장이다.** 공식 문서는 세 일시 항목의 **형식을 선언하고 타임존은 선언하지 않는다** — 항목크기 19 가 `YYYY-MM-DD HH:MM:SS` 를 꽉 채워 offset 자리가 없다는 것도 같은 방향이다. 그러므로 원문 문자열 하나만으로는 어느 순간(instant)인지 정해지지 않는다.
+      **이 case 는 그 zone 이 무엇인지 주장하지 않는다.** legacy 는 naive 문자열을 **UTC 로 가정**해 파싱하고(`app/core/time.py` *"assuming naive values are already UTC"*) 원문은 한국 현지시각으로 보이지만, 그 판정의 근거 문서를 찾지 못했다 — 조사 노트 **a-10**, `OPEN-3A-SOURCE-TZ`. 여기서 고정하는 것은 「문서가 정하지 않는다」와 「따라서 규칙 없이는 변환 불가」 둘뿐이고, 규칙의 값은 `koneps-collection-026` 이 정책 입력으로 받는다.
+      **`data-dictionary.md` §1.5 는 저장·전송을 `Instant`(UTC)로 정하지만 원문의 출처 zone 을 정하지 않는다** — §5.3 필드 계약에 `sourceZone` 자리가 없다는 것이 조사 **G-7** 이고 D-3A-4 가 그 슬롯을 더한다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/parsing.py
+        - app/core/time.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-014.json
+    expected_file: fixtures/expected/koneps-collection-014.json
+    verified_paths:
+      - "$.documentDeclaresDatetimeFormat"
+      - "$.documentDeclaresSourceTimezone"
+      - "$.rawTextPreserved"
+      - "$.convertibleToInstantWithoutInterpretationRule"
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "quoted-from-official-doc"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "문서의 항목 명세 행만 인용했다. 기관명·담당자 성명·연락처·실제 공고번호는 옮기지 않았고 샘플 값은 `SYN-` 접두 합성값으로 대체했다. 운영 DB·API·로그에서 가져온 값이 없다."
+    extracted_at: 2026-09-07
+    extraction_method: quoted-from-official-doc
+    sha256: a4c926f61d8ff904189f87c61f77bf770cc54ef94761e8ccbd62c9aa6f8ea5dd
+    expected_sha256: 5b6894a301a68f023d314432967ce74f7ea33641d466c2b965295e80e52f32a5
+    owning_open: |-
+      OPEN-3A-SOURCE-TZ (신설 예정, 문서 레인 등재) — 출처 타임존의 **값**. 이 case 는 그 값이 문서에 없다는 사실만 고정한다.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-015
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        예산 키(`asignBdgtAmt`·`bdgtAmt`)는 통화 단위가 선언되고 **과세 처리는 선언되지 않는다** — 이웃 항목(`presmptPrce`)의 과세 선언이 이 키들로 전이되지
+        않는다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스 v1.2 (`official_documents` 의 `koneps-openapi-reference`) — `asignBdgtAmt` 항목설명 *"사업목적물을 달성하기 위하여 배정된 예산액 또는 설계금액(원화,원)"* · `bdgtAmt` 항목설명 *"공고의 예산금액(원화,원)"*. 둘 다 부가가치세를 언급하지 않는다.
+    expected_reasoning: |-
+      두 항목설명이 **단위만** `(원화,원)` 으로 적고 과세를 적지 않는다. 같은 문서의 `presmptPrce` 행은 *"부가가치세 및 조달 수수료를 제외한"* 을 명시하므로, **이 문서는 과세를 적을 자리가 있는데 이 두 키에는 적지 않았다** — 누락이 아니라 미선언으로 읽는 근거다.
+      따라서 `vatTreatment` 는 `UNKNOWN` 이고, 이웃 필드의 선언을 기본값으로 물려주지 않는다 (`vatTreatmentDefaultedFromNeighbourField: false`). `data-dictionary.md` §1.2 가 배정예산을 *"`AllocatedBudget` | 원 / 배정예산 | `Unknown` — 정해진 바 없다"* 로 두는 것과 같은 결론이고, §1.2.1 의 *"정의상 기본값으로 자동 태깅하지 않는다"* 가 전이를 금지한다.
+      **basis 는 이 case 가 주장하지 않는다** — `ALLOCATED_BUDGET` 라벨은 §1.2 의 자체 도출이고 `koneps-collection-008`·`009` 가 그 자리를 진다(둘 다 `insufficient-evidence`).
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/field_contract_spec.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-015.json
+    expected_file: fixtures/expected/koneps-collection-015.json
+    verified_paths:
+      - "$.fields[0].currencyUnit"
+      - "$.fields[0].documentDeclaresVatTreatment"
+      - "$.fields[0].vatTreatment"
+      - "$.fields[1].currencyUnit"
+      - "$.fields[1].documentDeclaresVatTreatment"
+      - "$.fields[1].vatTreatment"
+      - "$.vatTreatmentDefaultedFromNeighbourField"
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "quoted-from-official-doc"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "문서의 항목 명세 행만 인용했다. 기관명·담당자 성명·연락처·실제 공고번호는 옮기지 않았고 샘플 값은 `SYN-` 접두 합성값으로 대체했다. 운영 DB·API·로그에서 가져온 값이 없다."
+    extracted_at: 2026-09-07
+    extraction_method: quoted-from-official-doc
+    sha256: 4c82aff2bc3238845f28e378155d559d5861a63eebefdf8eec846a07a14de2cc
+    expected_sha256: 99147d01959d3bb104f46cb36ba370672c70355f571ec5518c7063a51b8dd257
+    not_covered: |-
+      예산 키의 **basis 라벨**(`ALLOCATED_BUDGET`)과 점유 가드 — `koneps-collection-008`·`009` 소유.
+    owning_open: |-
+      OPEN-REG-05 (활성) — 과세 처리의 결정.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-016
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        업무구분명(`bsnsDivNm`)의 값 집합을 **공식 문서가 넷으로 열거**한다 — 열거 밖의 값은 그 문서가 떠받치지 않는다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스 v1.2 (`official_documents` 의 `koneps-openapi-reference`) — `bsnsDivNm` 행 항목설명 *"입찰업무를 구분하는 명으로 물품, 용역, 공사, 외자로 구분함"*, 항목크기 30, 항목구분 필수.
+    expected_reasoning: |-
+      공식 문서가 업무구분명을 **물품·용역·공사·외자** 넷으로 직접 열거한다. 이 case 가 고정하는 것은 그 열거와, 관측값이 그 안에 드는지의 판정뿐이다.
+      **「기술용역」은 다른 축의 라벨이다** — legacy `html_parsing.py` 가 개찰결과 그리드의 **업무코드** 를 `{"01":"물품","03":"일반용역","05":"기술용역","07":"공사"}` 로 매핑하는데, 그 넷은 코드→라벨 매핑이고 문서의 업무구분**명** 열거와 값 집합이 다르다. 이 case 는 그 매핑을 정답으로 두지 않고 **문서 열거에 들지 않는다**는 사실만 낸다.
+      **미지 값의 처리(임의 라벨 금지)는 주장하지 않는다** — `capability-map.md` COL-08 의 자체 도출이며 `koneps-collection-006`·`007` 이 그 자리를 진다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/html_parsing.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-016.json
+    expected_file: fixtures/expected/koneps-collection-016.json
+    verified_paths:
+      - "$.documentEnumeratedValues"
+      - "$.observed[0].coveredByDocumentEnumeration"
+      - "$.observed[1].coveredByDocumentEnumeration"
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "quoted-from-official-doc"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "문서의 항목 명세 행만 인용했다. 기관명·담당자 성명·연락처·실제 공고번호는 옮기지 않았고 샘플 값은 `SYN-` 접두 합성값으로 대체했다. 운영 DB·API·로그에서 가져온 값이 없다."
+    extracted_at: 2026-09-07
+    extraction_method: quoted-from-official-doc
+    sha256: 55a7c23436c618a275b1c6c7fae1dbb039462d70571b0a49b01ac2850e265101
+    expected_sha256: 99237867746f75794b555b4b6b36d5826d9506b72a63b448c8b298ccce1b27ac
+    not_covered: |-
+      업무구분 **코드 체계 전체**와 미지 코드의 표현 — `OPEN-COL-03` 및 `koneps-collection-006`·`007`(둘 다 `insufficient-evidence`).
+    owning_open: |-
+      OPEN-COL-03 (활성) — 코드 체계의 출처.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-017
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        기초금액의 공식 raw 키는 **`bssamt` 하나**다 — legacy 가 후보로 순회하는 `bssAmt`·`bssAmtPurcnstcst` 는 이 문서의 어느 오퍼레이션 명세에도 없다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스 v1.2 (`official_documents` 의 `koneps-openapi-reference`) — 물품·공사·용역 **기초금액조회** 세 오퍼레이션의 응답 항목 명세에 `bssamt`(기초금액, 항목크기 21, 옵션) 행이 있고 `bssAmt`·`bssAmtPurcnstcst` 행은 없다.
+    expected_reasoning: |-
+      세 기초금액조회 오퍼레이션의 응답 명세가 **`bssamt`**(소문자 `a`) 하나를 싣는다. 항목설명이 *"예정가격 작성 과정에서 … 검토조정한 가격(기초금액)(원화,원)"* 이므로 단위는 원(KRW)이고 **과세는 적히지 않는다.**
+      legacy 의 `TRUE_BASE_KEYS = ("bssAmt", "bssamt", "bssAmtPurcnstcst")` 는 세 후보를 순회하는데, 그중 둘은 이 문서에 근거가 없다 — **미등재 키**이고 §5.3 규율 1 이 그런 키를 「미지 필드」로 돌린다.
+      **과세를 비고 필드의 샘플로 정하지 않는다.** 같은 오퍼레이션의 `rmrk1`(비고1) **샘플데이터**가 *"기초금액은 부가세 포함 가격임."* 인데, 그것은 공고 담당자가 업체에 보내는 **메시지 예시**이지 항목의 규범 선언이 아니다. `remarkSampleUsedAsVatBasis: false` 가 그 구별을 고정하고, 과세 축의 결정은 `OPEN-REG-05` 가 소유한다.
+      **「이 문서에 없다」는 이 문서에 한정된 주장이다** — ScsbidInfoService 등 다른 서비스의 참고자료는 저장소에 없어 열람하지 못했다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/field_contract_spec.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-017.json
+    expected_file: fixtures/expected/koneps-collection-017.json
+    verified_paths:
+      - "$.documentedBaseAmountKey"
+      - "$.candidateKeys[0].declaredInDocument"
+      - "$.candidateKeys[1].declaredInDocument"
+      - "$.candidateKeys[2].declaredInDocument"
+      - "$.currencyUnit"
+      - "$.documentDeclaresVatTreatment"
+      - "$.remarkSampleUsedAsVatBasis"
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "quoted-from-official-doc"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "문서의 항목 명세 행만 인용했다. 기관명·담당자 성명·연락처·실제 공고번호는 옮기지 않았고 샘플 값은 `SYN-` 접두 합성값으로 대체했다. 운영 DB·API·로그에서 가져온 값이 없다."
+    extracted_at: 2026-09-07
+    extraction_method: quoted-from-official-doc
+    sha256: da1883ff3ac8f6120162b1523ecbfd87c58787f3e49c169d486d8a546e58b36a
+    expected_sha256: 045f8a6bacdc5a0136e31b96cc1e52ca5945923b65385a23727f6aa6f0ca4616
+    not_covered: |-
+      기초금액의 **과세 처리** — 비고 샘플은 근거가 아니며 `OPEN-REG-05` 가 소유한다. 다른 KONEPS 서비스(ScsbidInfoService 등)의 참고자료는 미열람.
+    owning_open: |-
+      OPEN-REG-05 (활성) — 기초금액의 과세 처리.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-018
+    domain: koneps-collection
+    classification: authoritative
+    verifies: |-
+        시공능력평가금액목록(`cnstrtnAbltyEvlAmtList`)은 **형식이 선언되고 단위·과세는 선언되지 않는다** — 그래서 이 값은 `Money` 로 정규화되지 않는다.
+    source:
+      kind: official-doc
+      reference: |-
+          조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스 v1.2 (`official_documents` 의 `koneps-openapi-reference`) — `cnstrtnAbltyEvlAmtList` 행: 항목크기 4000, 항목구분 `0..n`, 항목설명 *"공고의 시공능력평가금액목록 [제한그룹번호^면허지역통합코드명^면허지역통합코드^시공능력평가금액],…"*.
+    expected_reasoning: |-
+      항목설명이 목록의 **구성 요소 넷과 구분자 `^`** 를 직접 적는다 — 형식은 선언돼 있다. 반면 같은 행이 **단위를 적지 않는다**: 같은 문서의 다른 금액 항목은 전부 `(원화,원)` 을 다는데 이 항목에는 그것이 없고, 과세도 없다.
+      `data-dictionary.md` §5.5 가 정확히 이 상태를 위해 `UnnormalizedFigure` 를 두었다 — *"어떤 값을 `Money` 로 선언하는 것은 그 값의 단위를 원으로 확정하는 것"* 이므로 단위가 미선언인 자리를 `Money` 로 쓸 수 없다. `normalizedToMoney: false` 가 그 결론이다.
+      조사 **G-9**: legacy 는 이 필드를 **수집하지 않는다**(grep 0건). 그래서 이 case 의 근거는 legacy 형태가 아니라 공식 문서 문면 하나다.
+    input_file: fixtures/input/koneps-collection-018.json
+    expected_file: fixtures/expected/koneps-collection-018.json
+    verified_paths:
+      - "$.documentDeclaresListFormat"
+      - "$.componentSeparator"
+      - "$.componentCount"
+      - "$.documentDeclaresUnit"
+      - "$.documentDeclaresVatTreatment"
+      - "$.normalizedToMoney"
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "quoted-from-official-doc"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "문서의 항목 명세 행만 인용했다. 기관명·담당자 성명·연락처·실제 공고번호는 옮기지 않았고 샘플 값은 `SYN-` 접두 합성값으로 대체했다. 운영 DB·API·로그에서 가져온 값이 없다."
+    extracted_at: 2026-09-07
+    extraction_method: quoted-from-official-doc
+    sha256: 085b6970c80812d8c6b669ed6aa69e0dfd8aae41e61ba8cc22705a406aaaec57
+    expected_sha256: 7bc581dbe8afb568a45727d980dac5bd8e384c52fc2407c0ef09ac16f5f5c75d
+    not_covered: |-
+      시공능력평가금액의 **단위·과세·기준 시점** — `OPEN-QUAL-10` 이 소유한다. 보유액과의 비교도 이 case 밖이다(§5.5 가 타입으로 막는 자리).
+    owning_open: |-
+      OPEN-QUAL-10 (활성) — 게시 요건 축의 단위·과세.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-019
+    domain: koneps-collection
+    classification: insufficient-evidence
+    verifies: |-
+        필수 식별자가 없는 행은 **항목 단위로만** 버려지고 run 은 성공으로 끝난다 — 4행 중 1행이 공고번호를 빠뜨리면 수집 3건, `dropped=1`, 사유는 「공고번호 없음」 하나다.
+    source:
+      kind: m0-derived-rule
+      reference: |-
+          `capability-map.md` COL-01 acceptance 첫째 — **M0 산출 문서의 자체 도출**. 「run 은 성공으로 끝난다」와 `drop_reasons` 어휘는 그 문서가 세운 것이고 운영자 결정·조달청 문서 문면이 그 자리에 없다.
+          **부분 근거는 공식 문서에 있다** — `bidNtceNo` 는 응답 명세의 **필수 항목**이므로 그것이 없는 행이 명세를 만족하지 않는다는 것까지는 문서가 떠받친다(`koneps-collection-013` 과 같은 형태). 그러나 **그 행을 어떻게 회계에 싣는가**는 문서에 없다.
+    expected_reasoning: |-
+      `capability-map.md` COL-01 acceptance *"특정 등록일의 공고가 4건이고 그중 1건에 공고번호가 없으면, 수집 결과는 3건이고 `dropped_count=1` / `drop_reasons.missing_notice_number=1`이며 run은 성공으로 끝난다"*.
+      **drop 사유 어휘는 소스 중립이다** — 조사 **G-5** 가 legacy 의 공고 경로(`parse_rejected`)와 개찰 경로(`missing_notice_number`)가 같은 사유를 다른 키로 세는 것을 legacy 결함으로 든다. 이 case 는 한 이름(`MissingNoticeNumber`)만 쓴다 — 3A `scope.md` D-3A-6.
+      **그 이름은 아직 승인 어휘가 아니다** — 그래서 이 case 에는 `verified_paths` 를 두지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/collection.py
+        - app/services/koneps/openapi.py
+        - tests/test_koneps_collection_characterization.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-019.json
+    expected_file: fixtures/expected/koneps-collection-019.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-09-07
+    extraction_method: authored-from-approved-spec
+    sha256: 89b6ceb825f27450d2bbcc3a064dfd8d3db413649ef3087b392feeba11e84fe1
+    expected_sha256: 65a068827d3d9742a07ceb70ebb8cb548c4e525ae015eee82e362199c6160d45
+    owning_open: |-
+      (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**. 승인되면 `authoritative` 로 올라간다(`classification_policy.insufficient_evidence` 의 되돌림 경로).
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-020
+    domain: koneps-collection
+    classification: insufficient-evidence
+    verifies: |-
+        수집 회계의 항등식 `received = normalized + duplicate + dropped` 가 성립하면 회계가 생성되고, `duplicate` 는 `dropped` 안에 이중으로
+        세지지 않는다.
+    source:
+      kind: m0-derived-rule
+      reference: |-
+          `capability-map.md` COL-06 acceptance — **M0 산출 문서의 자체 도출**.
+    expected_reasoning: |-
+      `capability-map.md` COL-06 acceptance *"수집 1회 결과에서 `received = normalized + duplicate + dropped` 항등식이 항상 성립하고, 위반 시 산출이 실패한다"*.
+      **셈의 정의가 legacy 와 다르다.** legacy 는 `dropped_count = parse_rejected + duplicate_notice + max_items_cap` 로 **중복을 `dropped` 안에 포함**하므로 legacy 항등식은 `received = normalized + dropped` 다(조사 **G-4**). V2 는 문면을 그대로 채택해 `duplicate` 와 `dropped` 를 **서로소**로 두고, 그 차이를 `duplicateCountedInsideDropped: false` 로 고정한다 — 3A `scope.md` ⑦.
+      **뺄셈 역산을 하지 않는다** — legacy 의 `cap_skipped_count = max(0, received - normalized - parse_drop - duplicate)` 는 항등식이 깨져도 음수가 `0` 으로 접혀 드러나지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/collection.py
+        - app/services/koneps/collection_accounting.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-020.json
+    expected_file: fixtures/expected/koneps-collection-020.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-09-07
+    extraction_method: authored-from-approved-spec
+    sha256: 95f4f0d5a72d975cdcddaf958d1b825379c70fb5f2b2fec0add18b7c9342d62d
+    expected_sha256: b552f75849d3c2bb69172315557ede7f425b4905eb4e8e73974e322823e1e87d
+    owning_open: |-
+      (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-021
+    domain: koneps-collection
+    classification: insufficient-evidence
+    verifies: |-
+        회계 항등식이 깨지면 **회계 객체가 만들어지지 않는다** — 음수 잔차를 `0` 으로 접어 숨기지 않는다.
+    source:
+      kind: m0-derived-rule
+      reference: |-
+          `capability-map.md` COL-06 acceptance 의 후건(*"위반 시 산출이 실패한다"*) — **M0 산출 문서의 자체 도출**.
+    expected_reasoning: |-
+      `capability-map.md` COL-06 acceptance *"… 항등식이 항상 성립하고, **위반 시 산출이 실패한다**"*. 3A `scope.md` ⑦ 이 그것을 **생성자 불변식**으로 옮긴다(위반 = 생성 실패).
+      `020` 의 쌍이다 — 같은 항등식의 성립과 위반을 두 case 로 가른다.
+      **legacy 형태 처리**: `collection.py` 의 `max(0, …)` 접기가 이 case 가 막는 바로 그 자리다 (`negativeResidualFoldedToZero: false`). 실패 사유 이름(`AccountingIdentityViolated`)은 아직 승인 어휘가 아니므로 `verified_paths` 를 두지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/collection.py
+        - app/services/koneps/collection_accounting.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-021.json
+    expected_file: fixtures/expected/koneps-collection-021.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-09-07
+    extraction_method: authored-from-approved-spec
+    sha256: 6a7a9045729a2f1d46ddfd634c4fb526c4be3c6e3fc92d3d97c3c446951d0ddb
+    expected_sha256: 4725c22ac0434dc4a19f5a3a1ef10c571024d840980cca8db621abdc01454171
+    owning_open: |-
+      (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-022
+    domain: koneps-collection
+    classification: insufficient-evidence
+    verifies: |-
+        `totalCount` 가 없고 API 가 같은 페이지를 계속 돌려주면 수집은 **유한 페이지 안에 끝나고** `truncated=true` 로 표시된다.
+    source:
+      kind: m0-derived-rule
+      reference: |-
+          `capability-map.md` COL-06 acceptance 둘째 · `regression-ledger.md` `R-COL-04` — **M0 산출 문서의 자체 도출**.
+    expected_reasoning: |-
+      `capability-map.md` COL-06 acceptance *"`totalCount`가 없고 API가 같은 페이지를 계속 반환하면 수집은 유한 페이지 안에 종료하고 `truncated=true`로 표시된다"*.
+      **legacy 에 대응물이 없는 신규 요구다** — 조사 **a-6**: legacy 에는 진행 보장 검사가 없고 같은 페이지가 반복돼도 「진행 없음」으로 실패하지 않으며 상한 소진으로 조용히 끝난다. `R-COL-04` 의 V2 제약이 *"같은 커서로 같은 페이지가 돌아오면 진행 없음을 감지해 실패로 산출"* 이다.
+      **이 case 가 재는 것은 종료의 유한성과 표시**이고, 「진행 없음」의 산출 형태(실패인가 표시인가)는 3B 가 정한다 — `progressObserved` 는 관측 사실만 나른다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/collection.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-022.json
+    expected_file: fixtures/expected/koneps-collection-022.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-09-07
+    extraction_method: authored-from-approved-spec
+    sha256: c1dcb6d8aeb50e6e690968848f27ac41d8a020c20ee06739e259926f478b1f2d
+    expected_sha256: 9e73c54946d8405318196eec78869e451f0e845810171f99d84b12f0a2e9f7a5
+    not_covered: |-
+      「진행 없음」을 실패로 낼 것인가 표시로 낼 것인가 — 3B 의 결정. 이 case 는 유한 종료와 `truncated` 표시까지만 잰다.
+    owning_open: |-
+      (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-023
+    domain: koneps-collection
+    classification: insufficient-evidence
+    verifies: |-
+        공고 식별자의 정규화 규칙(공백 제거·대문자화)을 **값 객체가 소유**하고 호출부가 반복하지 않는다 — 같은 `source_url` 은 같은 식별자를 낸다.
+    source:
+      kind: m0-derived-rule
+      reference: |-
+          `capability-map.md` COL-05 acceptance 와 「legacy 형태 처리」 — **M0 산출 문서의 자체 도출**.
+    expected_reasoning: |-
+      `capability-map.md` COL-05 「legacy 형태 처리」 *"`normalize_notice_number`를 호출부마다 부르는 형태는 채택하지 않는다. **식별자 값 객체가 정규화 규칙을 소유한다**"* + 같은 항목의 불변식 *"`source_url` 정규화가 `bidNtceNo`/`bidNtceOrd`만 남기므로 source_url 동일 ⇒ notice_number 동일"*.
+      정규화 규칙 자체는 legacy 의 순수 함수 형태와 같다 — `re.sub(r"\s+", "", str(v).strip().upper())`. **그 규칙이 어디에 사는가**가 이 case 의 주장이고, 그것이 M0 문서의 도출이다.
+      두 `source_url` 은 질의 키 순서와 추적 파라미터만 다르다 — 정규화가 `bidNtceNo`/`bidNtceOrd` 만 남기면 같은 식별자가 된다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/parsing.py
+        - app/services/koneps/persistence.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-023.json
+    expected_file: fixtures/expected/koneps-collection-023.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-09-07
+    extraction_method: authored-from-approved-spec
+    sha256: 0a74f658c27917d29c2f0ca8ba5c5f9650434fa0243bde0cc7ced037f6cafd65
+    expected_sha256: ce8bde7fde913e894b6d41b95c673e6ad12d53d0ada20d2f174960afe4716507
+    owning_open: |-
+      (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-024
+    domain: koneps-collection
+    classification: insufficient-evidence
+    verifies: |-
+        예비가격을 이미 보유한 공고는 재수집 스윕에서 **상세 조회를 하지 않는다** — 그 판단은 도메인 술어가 내고 백오프 상태를 데이터 테이블 컬럼에 얹지 않는다.
+    source:
+      kind: m0-derived-rule
+      reference: |-
+          `capability-map.md` COL-03 acceptance 첫째와 「legacy 형태 처리」 — **M0 산출 문서의 자체 도출**.
+    expected_reasoning: |-
+      `capability-map.md` COL-03 acceptance *"예비가격이 이미 저장된 공고는 재수집 스윕에서 상세 HTTP 호출이 0회다"* + 「legacy 형태 처리」 *"백오프 상태를 개찰 데이터 테이블 컬럼에 얹은 것(`HistoricalData.reserve_detail_checked_at`)도 채택하지 않는다"*.
+      3A `scope.md` ⑪ 이 이것을 `DetailFetchDecision = sealed { Fetch, Skip(reason) }` 순수 함수로 둔다 — COL-03 의 경계가 *"무엇을 언제 조회할 가치가 있는가라는 도메인 판단만 소유한다"* 이고 호출 예산·throttle 은 OPS-08 이다.
+      **게이트 값은 SYNTHETIC 정책 입력이다** — legacy 실물(age 24h · recheck 48h)을 옮기지 않았다. 기대값은 그 값이 아니라 **「이미 보유하면 조회하지 않는다」는 규칙**에만 의존한다.
+      사유 이름(`AlreadyHeld`)은 아직 승인 어휘가 아니므로 `verified_paths` 를 두지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/core/config.py
+        - app/services/koneps/collector.py
+        - app/services/koneps/persistence.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-024.json
+    expected_file: fixtures/expected/koneps-collection-024.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-09-07
+    extraction_method: authored-from-approved-spec
+    sha256: 4947b80eec908fa3b2650aa133703e7571d7dc1e13dc53af38352a343d9ebf7c
+    expected_sha256: b391ae3871a13f366f29986598da165eb0bc481c9cf298471ddb0f4fc098cb92
+    owning_open: |-
+      (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**. 호출 예산·throttle 정책은 OPS-08.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-025
+    domain: koneps-collection
+    classification: insufficient-evidence
+    verifies: |-
+        age-gate 를 넘기지 못한 공고는 이번 스윕에서 상세 조회를 하지 않고 백오프로 계수되며, gate 를 넘긴 뒤 스윕에서 **정확히 1회** 조회된다.
+    source:
+      kind: m0-derived-rule
+      reference: |-
+          `capability-map.md` COL-03 acceptance 둘째 — **M0 산출 문서의 자체 도출**.
+    expected_reasoning: |-
+      `capability-map.md` COL-03 acceptance *"개찰 후 age-gate 미만 경과한 공고는 이번 스윕에서 상세 조회를 하지 않고 `backoff_skipped`로 계수된다. gate를 넘긴 뒤 스윕에서는 **정확히 1회** 조회된다"*.
+      세 스윕을 두어 **1회성**을 실제로 잰다 — gate 이전(Skip) · gate 직후(Fetch 1회) · 그 뒤(recheck-gate 로 Skip). 마지막 스윕이 없으면 「정확히 1회」가 「최소 1회」와 구별되지 않는다.
+      **게이트 값은 SYNTHETIC 정책 입력이다** — legacy 실물(24h·48h)을 옮기지 않았고, 기대값은 그 값이 아니라 스윕 시각과 게이트의 **대소 관계**에만 의존한다.
+      사유 이름 셋(`AgeGateNotPassed`·`RecheckGateNotPassed`·`Fetch`)은 아직 승인 어휘가 아니므로 `verified_paths` 를 두지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/core/config.py
+        - app/services/koneps/collector.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-025.json
+    expected_file: fixtures/expected/koneps-collection-025.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-09-07
+    extraction_method: authored-from-approved-spec
+    sha256: 98ba3694df43087477cdc2cc3c318181bedaa0305602288084cb22fe74fe9ba3
+    expected_sha256: f6ff83f396729536c7cfaecf1dced2748723df01c7db98cc6345e1a15e313d9b
+    owning_open: |-
+      (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+  - id: koneps-collection-026
+    domain: koneps-collection
+    classification: insufficient-evidence
+    verifies: |-
+        타임존 없는 일시 문자열은 **선언된 해석 규칙이 있을 때만** `Instant` 가 되고, 원문 문자열은 어느 쪽이든 보존된다 — 규칙이 없으면 UTC 로 가정하지 않는다.
+    source:
+      kind: m0-derived-rule
+      reference: |-
+          3A `scope.md` **D-3A-4**(필드 계약에 `sourceZone` 슬롯을 더한다) · `data-dictionary.md` §1.5·§5.3 — **M0 산출 문서와 slice 계약의 도출**이고 운영자 결정 문면이 아직 없다.
+    expected_reasoning: |-
+      `koneps-collection-014` 가 「공식 문서가 출처 타임존을 선언하지 않는다」를 고정한다. 이 case 는 그 **뒤처리**를 잰다 — 해석 규칙을 **정책 데이터**로 받아 그 id 가 결과에 남고, 규칙이 없으면 `Instant` 가 나오지 않는다.
+      **legacy 는 규칙 없이 UTC 로 가정한다** — `app/core/time.py` 의 *"assuming naive values are already UTC"* 이고 골든에 `"2026-05-20 10:00:00"` → `"…T10:00:00+00:00"` 으로 찍혀 있다. 원문이 한국 현지시각으로 보이므로 9시간 어긋났을 수 있으나 **운영 피해 기록을 찾지 못했다**(조사 **a-10**). `assumedUtc: false` 가 그 가정을 막는 자리다.
+      **해석 규칙의 값(`Asia/Seoul`)을 정답으로 두지 않는다** — 입력의 SYNTHETIC 정책이 나르고, 기대값은 「규칙이 있으면 그 id 가 남는다 / 없으면 변환되지 않는다」에만 의존한다. 값의 승인은 `OPEN-3A-SOURCE-TZ` 가 받는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/koneps/parsing.py
+        - app/core/time.py
+      role: |-
+        입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
+    input_file: fixtures/input/koneps-collection-026.json
+    expected_file: fixtures/expected/koneps-collection-026.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "KRW 원 단위 정수"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
+    extracted_at: 2026-09-07
+    extraction_method: authored-from-approved-spec
+    sha256: a059c5eb11fe92cb1b626f74355329a3014a606e55455be99b3999a237307cbb
+    expected_sha256: f443db4de521f7e8ebd5bf7715dc2c3c919e364b9f27320bd2a9235f4b4d562a
+    owning_open: |-
+      OPEN-3A-SOURCE-TZ (신설 예정, 문서 레인 등재) — 출처 타임존의 값과 regression-ledger 등재.
+    contract_binding: |-
+      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
+      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
+      **지금 이 필드가 잠그는 것은 없다.**
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
   - id: base-amount-provenance-001
     domain: base-amount-provenance
     classification: authoritative
@@ -7116,9 +7994,22 @@ uncovered_axes:
     why_blocked: |-
       `resultCode` 분류표는 운영자 결정 `OPEN-COL-02`가 소유한다고 §4.3.2가 적으나 **표의 내용이
       이 저장소의 문서에 실려 있지 않다.** 인코딩·구분자 정규화 규칙은 승인된 명세가 없다.
+
+      **2026-09-07 재확인(M3/3A curator) — 조달청 원문에도 없다.** legacy 저장소의 공식 문서
+      (`official_documents` 의 `koneps-openapi-reference`)를 전수 검색했고, `resultCode` 는 **응답 항목
+      명세에 항목크기 2 · 항목구분 필수 · 샘플 `00` 으로만** 실린다. 「OPEN API 에러코드별 조치방안」에
+      해당하는 절도, 코드값별 의미·조치 표도 그 문서의 어느 절에도 없다. legacy 저장소 전체에서도
+      다른 사본을 찾지 못했다(`에러코드`·`조치방안` 검색). **그러므로 이 축은 열린 채로 남고, 3B 는
+      17 범주를 정책 데이터로 받을 자리만 만들어 둔 채 값을 비워야 한다.**
+
+      **문서가 떠받치는 절반은 `koneps-collection-013` 이 가져갔다** — 「`resultCode` 는 필수 항목이므로
+      부재를 정상으로 승격할 수 없다」(`R-COL-01`)까지는 원문 인용으로 선다. 막힌 것은 **코드값 → 범주**
+      매핑이다.
     owning_open:
-      - "OPEN-COL-02 — **활성 아님. 2026-08-26 해소**(분류표 등재 결정은 내려졌다). 그럼에도 **표의 내용이 이 저장소 문서에 없어** 이 축은 막혀 있고, 그 자리를 소유한 활성 `OPEN`도 없다 · (인코딩·구분자) 소유 `OPEN` 없음 — 명세 부재"
-    unblocks_when: 분류표 본문이 명세에 등재되고 정규화 규칙이 정해진다.
+      - "OPEN-COL-02 — **활성 아님. 2026-08-26 해소**(분류표 등재 결정은 내려졌다). 그럼에도 **표의 내용이 조달청 참고자료 원문에도 이 저장소 문서에도 없어**(2026-09-07 실측) 이 축은 막혀 있고, 그 자리를 소유한 활성 `OPEN`도 없다 · (인코딩·구분자) 소유 `OPEN` 없음 — 명세 부재"
+    unblocks_when: |-
+      분류표 본문이 확보되어(공공데이터포털의 서비스 상세 화면 또는 조달청 별도 안내 문서) 명세에
+      등재되고 정규화 규칙이 정해진다. **저장소 안 문서로는 닫히지 않는다 — 외부 자료 확보가 선행한다.**
 
   - axis: ML — 피처 스키마 version · artifact checksum · LightGBM 오류 · KDE singular · deterministic seed
     domain: ml-boundary
@@ -7235,10 +8126,24 @@ uncovered_axes:
       `provenance` 필수와 원시 숫자 상호 대입 금지(= basis·과세 보존)까지이고, 두 case 의 **주
       규칙인 「점유 가드」(§5.1 계승 규율 1)와 「derived fact 가 canonical fact 의 자리를 차지할 수
       없다」(§5.2)** 는 `data-dictionary.md` 가 legacy 코드에서 도출해 세운 자체 규칙이다.
-      **이 도메인은 `authoritative` corpus 에서 전건 덮이지 않는다.**
+
+      **2026-09-07(M3/3A curator) — 이 축의 절반이 다른 근거로 덮였다.** `koneps-collection-010`~`018`
+      아홉이 **조달청 공식 문서의 항목 명세 행**(`official_documents` 의 `koneps-openapi-reference`)을
+      인용해 `authoritative` 로 선다 — `classification_policy.authoritative` ①(조달청 공식 문서 인용)이
+      그 자리다. **덮인 것은 「문서가 선언한 것」과 「선언하지 않은 것」이다**: 율의 단위(`010`) · 추정가격의
+      과세와 통화(`011`) · 차수의 제로패딩 폭과 왕복(`012`) · `resultCode` 의 필수성(`013`) · 일시의
+      타임존 미선언(`014`) · 예산 키의 과세 미선언(`015`) · 업무구분명의 열거(`016`) · 기초금액 키의
+      공식 이름(`017`) · 시공능력평가금액목록의 형식과 단위 미선언(`018`).
+
+      **덮이지 않은 채 남는 절반이 위 다섯 문장 그대로다** — 미지 키의 **계수와 소비 차단**, 선언 위반의
+      **거부와 회계 등재**, 식별자에 **산술이 정의되지 않음**, 코드·라벨 **두 값 저장**, 미지 코드에
+      **임의 라벨 금지**. 그 다섯은 여전히 `capability-map.md` COL-07·COL-08 의 자체 도출이 유일한
+      근거이고 `-001`·`-002`·`-005`·`-006`·`-007` 이 `insufficient-evidence` 로 지고 있다. **회계·조회
+      가치·식별자 정규화 축(`019`~`026`)도 같은 자리**다.
     unblocks_when: |-
       운영자가 COL-07·COL-08 acceptance 와 **§1.3 광의 부재 금지 규칙 · §5.1 계승 규율 · §5.2 경계
-      규칙**을 업무 규칙으로 명시 승인한다.
+      규칙**을 업무 규칙으로 명시 승인한다. 승인 요청 표는 `_workspace/m3-3a/02_curator_approval_request.md`
+      이고 근거 정리는 `reports/evidence/m3/3a/fixtures-koneps-collection.md` 다.
 
   - axis: 승인 부재로 authoritative 덮개를 잃은 축 — ML 피처 결측 provenance 와 누수 차단 시그니처
     domain: ml-boundary

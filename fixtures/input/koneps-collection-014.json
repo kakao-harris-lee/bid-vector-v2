@@ -1,0 +1,30 @@
+{
+  "sourceDocument": {
+    "id": "koneps-openapi-reference",
+    "title": "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스",
+    "note": "문서 version·발행일·경로·SHA-256·legacy blob id 의 정본은 `fixtures/manifest.yaml` 의 `official_documents` 항목 하나다. 여기 두 번 적지 않는다 — version 문자열이 numeric_discipline 검사의 밴드 수와 글자로 겹치기도 한다."
+  },
+  "fieldDeclarations": [
+    {
+      "rawName": "bidClseDt",
+      "conceptKo": "입찰마감일시",
+      "documentFieldSize": 19,
+      "documentDescriptionQuote": "입찰서의 제출을 마감하는 일시 “YYYY-MM-DD HH:MM:SS”"
+    },
+    {
+      "rawName": "opengDt",
+      "conceptKo": "개찰일시",
+      "documentFieldSize": 19,
+      "documentDescriptionQuote": "집행관이 개찰을 수행할 수 있는 시작일시이며개찰일시 이후에 개찰이 가능함실제 개찰을 수행한 시간을 의미하지 않음 “YYYY-MM-DD HH:MM:SS”"
+    },
+    {
+      "rawName": "bidNtceDt",
+      "conceptKo": "입찰공고일시",
+      "documentFieldSize": 19,
+      "documentDescriptionQuote": "입찰공고서를 공고한 일시 “YYYY-MM-DD HH:MM:SS”"
+    }
+  ],
+  "payload": {
+    "bidClseDt": "2026-05-20 10:00:00"
+  }
+}

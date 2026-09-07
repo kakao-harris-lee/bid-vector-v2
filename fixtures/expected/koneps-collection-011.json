@@ -1,0 +1,7 @@
+{
+  "vatTreatment": "EXCLUSIVE",
+  "currencyUnit": "KRW",
+  "nullability": "nullable",
+  "vatTreatmentInferredFromValue": false,
+  "legacyAnnotationUsedAsBasis": false
+}

@@ -1,0 +1,9 @@
+{
+  "noticeOrder": {
+    "value": "000",
+    "type": "identifier"
+  },
+  "roundTripPreserved": true,
+  "widthPreserved": 3,
+  "equalToUnpaddedToken": false
+}

@@ -1,0 +1,6 @@
+{
+  "identityHolds": false,
+  "constructed": false,
+  "failureReason": "AccountingIdentityViolated",
+  "negativeResidualFoldedToZero": false
+}

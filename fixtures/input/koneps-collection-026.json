@@ -1,0 +1,16 @@
+{
+  "rawValue": "2026-05-20 10:00:00",
+  "items": [
+    {
+      "id": "SYN-TS-WITH-RULE",
+      "sourceZoneRule": {
+        "id": "SYN-TZRULE-001",
+        "zone": "Asia/Seoul"
+      }
+    },
+    {
+      "id": "SYN-TS-NO-RULE",
+      "sourceZoneRule": null
+    }
+  ]
+}

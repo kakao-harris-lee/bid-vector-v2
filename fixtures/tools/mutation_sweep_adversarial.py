@@ -136,6 +136,75 @@ ASSERTED = {
         "$.isConfigured",
         "$.watchRulesEmpty",
     ],  # "설정됐는가"≠"좁히는가"가 서로 다른 값
+    # M3/3A — curator 판단(2026-09-07). 신설 `koneps-collection-010`~`018` 은 근거가
+    #   조달청 공식 문서의 **항목 명세 행**이라 `source.kind: official-doc` 으로 서고,
+    #   `verifies` 가 주장하는 것은 **문서가 선언한 것**(단위·과세·필수성·형식·열거)과
+    #   **선언하지 않은 것**(타임존·예산 키 과세·목록 단위)이다. 아래 경로가 그 주장이다.
+    #   **부재를 주장하는 자리는 `false` 불리언이라 (a′) 가 뒤집기를 만든다** — 그 자리가
+    #   `true` 로 뒤집혀도 통과하면 「문서가 선언하지 않는다」가 계약이 아니었던 것이다.
+    "koneps-collection-010": [
+        "$.declaredUnit",               # 단위는 선언에서 온다
+        "$.conversionDivisor",          # 승인된 제수 100
+        "$.rate.fraction",              # 변환 결과
+        "$.unitInferredFromMagnitude",  # 값 크기로 되짚지 않는다(ADR 0002 D-4)
+    ],
+    "koneps-collection-011": [
+        "$.vatTreatment",                    # "부가가치세 … 제외"
+        "$.currencyUnit",                    # "(원화,원)"
+        "$.nullability",                     # 항목구분 옵션
+        "$.vatTreatmentInferredFromValue",   # 값 크기로 과세를 되짚지 않는다
+        "$.legacyAnnotationUsedAsBasis",     # legacy 주석("부가세 포함")은 근거가 아니다
+    ],
+    "koneps-collection-012": [
+        "$.noticeOrder.value",      # 원문 토큰 "000"
+        "$.noticeOrder.type",       # 식별자
+        "$.roundTripPreserved",     # 왕복 보존
+        "$.widthPreserved",         # 항목크기 3
+        "$.equalToUnpaddedToken",   # "000" ≠ "0"
+    ],
+    "koneps-collection-013": [
+        "$.declaredRequired",                      # 항목구분 필수
+        "$.envelopeResults[1].codePresent",        # 부재 관측
+        "$.envelopeResults[1].treatedAsNormal",    # 부재를 "00" 으로 승격하지 않는다(R-COL-01)
+        "$.envelopeResults[1].contractViolation",  # 부재 = 계약 위반
+    ],
+    "koneps-collection-014": [
+        "$.documentDeclaresDatetimeFormat",                    # 형식은 선언돼 있다
+        "$.documentDeclaresSourceTimezone",                    # 타임존은 선언돼 있지 않다
+        "$.rawTextPreserved",                                  # 원문 보존
+        "$.convertibleToInstantWithoutInterpretationRule",     # 규칙 없이는 변환 불가
+    ],
+    "koneps-collection-015": [
+        "$.fields[0].currencyUnit",
+        "$.fields[0].documentDeclaresVatTreatment",
+        "$.fields[0].vatTreatment",
+        "$.fields[1].currencyUnit",
+        "$.fields[1].documentDeclaresVatTreatment",
+        "$.fields[1].vatTreatment",
+        "$.vatTreatmentDefaultedFromNeighbourField",  # 이웃 필드 선언의 전이 금지(§1.2.1)
+    ],
+    "koneps-collection-016": [
+        "$.documentEnumeratedValues",                   # 문서가 넷으로 열거한다
+        "$.observed[0].coveredByDocumentEnumeration",   # 열거 안
+        "$.observed[1].coveredByDocumentEnumeration",   # 열거 밖(다른 축의 라벨)
+    ],
+    "koneps-collection-017": [
+        "$.documentedBaseAmountKey",              # 공식 키는 bssamt 하나
+        "$.candidateKeys[0].declaredInDocument",  # bssAmt — 문서에 없다
+        "$.candidateKeys[1].declaredInDocument",  # bssamt — 문서에 있다
+        "$.candidateKeys[2].declaredInDocument",  # bssAmtPurcnstcst — 문서에 없다
+        "$.currencyUnit",
+        "$.documentDeclaresVatTreatment",         # 과세는 선언돼 있지 않다
+        "$.remarkSampleUsedAsVatBasis",           # 비고 필드의 샘플을 근거로 쓰지 않는다
+    ],
+    "koneps-collection-018": [
+        "$.documentDeclaresListFormat",      # 형식은 선언돼 있다
+        "$.componentSeparator",
+        "$.componentCount",
+        "$.documentDeclaresUnit",            # 단위는 선언돼 있지 않다
+        "$.documentDeclaresVatTreatment",    # 과세도 선언돼 있지 않다
+        "$.normalizedToMoney",               # 그래서 Money 가 아니다(§5.5)
+    ],
 }
 
 # (c) 갈래가 쓰는 대체 토큰. 목록에 없는 피연산자는 `Other` 로 친다.

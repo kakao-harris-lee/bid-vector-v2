@@ -1,0 +1,18 @@
+{
+  "documentEnumeratedValues": [
+    "물품",
+    "용역",
+    "공사",
+    "외자"
+  ],
+  "observed": [
+    {
+      "value": "용역",
+      "coveredByDocumentEnumeration": true
+    },
+    {
+      "value": "기술용역",
+      "coveredByDocumentEnumeration": false
+    }
+  ]
+}

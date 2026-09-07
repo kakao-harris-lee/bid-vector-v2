@@ -1,0 +1,15 @@
+{
+  "policy": {
+    "id": "SYN-POLICY-detail-fetch-2026-09-07",
+    "ageGateHours": 8,
+    "recheckGateHours": 20,
+    "note": "SYNTHETIC 정책 입력이다. legacy 실물 값(24h·48h)은 옮기지 않았다."
+  },
+  "notice": {
+    "noticeNumber": "SYN-NTC-2401",
+    "noticeOrder": "000",
+    "openedAt": "2026-05-20T02:00:00Z",
+    "reservePricesHeld": true
+  },
+  "now": "2026-05-22T02:00:00Z"
+}

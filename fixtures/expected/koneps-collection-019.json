@@ -1,0 +1,16 @@
+{
+  "received": 4,
+  "normalized": 3,
+  "duplicate": 0,
+  "dropped": 1,
+  "dropReasons": {
+    "MissingNoticeNumber": 1
+  },
+  "pagesFetched": 2,
+  "runOutcome": "Success",
+  "normalizedNoticeNumbers": [
+    "SYN-NTC-1901",
+    "SYN-NTC-1902",
+    "SYN-NTC-1903"
+  ]
+}

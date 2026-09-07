@@ -1,0 +1,17 @@
+{
+  "fields": [
+    {
+      "rawName": "asignBdgtAmt",
+      "currencyUnit": "KRW",
+      "documentDeclaresVatTreatment": false,
+      "vatTreatment": "UNKNOWN"
+    },
+    {
+      "rawName": "bdgtAmt",
+      "currencyUnit": "KRW",
+      "documentDeclaresVatTreatment": false,
+      "vatTreatment": "UNKNOWN"
+    }
+  ],
+  "vatTreatmentDefaultedFromNeighbourField": false
+}

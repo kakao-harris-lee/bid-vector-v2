@@ -1,0 +1,16 @@
+{
+  "declaredRequired": true,
+  "envelopeResults": [
+    {
+      "id": "SYN-ENV-0001",
+      "codePresent": true,
+      "contractViolation": false
+    },
+    {
+      "id": "SYN-ENV-0002",
+      "codePresent": false,
+      "treatedAsNormal": false,
+      "contractViolation": true
+    }
+  ]
+}

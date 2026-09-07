@@ -1,0 +1,23 @@
+{
+  "sourceDocument": {
+    "id": "koneps-openapi-reference",
+    "title": "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스",
+    "note": "문서 version·발행일·경로·SHA-256·legacy blob id 의 정본은 `fixtures/manifest.yaml` 의 `official_documents` 항목 하나다. 여기 두 번 적지 않는다 — version 문자열이 numeric_discipline 검사의 밴드 수와 글자로 겹치기도 한다."
+  },
+  "fieldDeclaration": {
+    "rawName": "sucsfbidLwltRate",
+    "conceptKo": "낙찰하한율",
+    "documentFieldSize": 22,
+    "documentRequirement": "옵션",
+    "documentDescriptionQuote": "개찰시 사용하는 낙찰하한율(%)",
+    "declaredUnit": "percent",
+    "presentIn": [
+      "getBidPblancListInfoServc",
+      "getBidPblancListInfoCnstwk"
+    ]
+  },
+  "payload": {
+    "sucsfbidLwltRate": "87.500"
+  },
+  "note": "값은 SYNTHETIC 이다. 문서의 샘플(89.745·87.745)은 data-dictionary.md §12.1 이 `legacy-behavior` 로 등재한 법정 하한율과 같은 수라 numeric_discipline 상 fixture 에 싣지 않는다. 이 case 가 문서에서 가져오는 것은 **단위 선언** 하나다."
+}

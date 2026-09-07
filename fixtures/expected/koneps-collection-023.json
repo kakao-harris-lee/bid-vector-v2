@@ -1,0 +1,11 @@
+{
+  "normalized": [
+    "SYN-NTC-2301",
+    "SYN-NTC-2301",
+    "SYN-NTC-2301"
+  ],
+  "sameIdentity": true,
+  "normalizationOwnedByValueObject": true,
+  "normalizationRepeatedAtCallSites": false,
+  "sameSourceUrlImpliesSameNoticeId": true
+}

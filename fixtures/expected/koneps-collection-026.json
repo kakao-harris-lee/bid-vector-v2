@@ -1,0 +1,17 @@
+{
+  "results": [
+    {
+      "id": "SYN-TS-WITH-RULE",
+      "rawTextPreserved": "2026-05-20 10:00:00",
+      "interpretationRuleId": "SYN-TZRULE-001",
+      "interpretedZone": "Asia/Seoul",
+      "instantDerived": true
+    },
+    {
+      "id": "SYN-TS-NO-RULE",
+      "rawTextPreserved": "2026-05-20 10:00:00",
+      "instantDerived": false,
+      "assumedUtc": false
+    }
+  ]
+}

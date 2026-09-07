@@ -1,0 +1,23 @@
+{
+  "sourceDocument": {
+    "id": "koneps-openapi-reference",
+    "title": "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스",
+    "note": "문서 version·발행일·경로·SHA-256·legacy blob id 의 정본은 `fixtures/manifest.yaml` 의 `official_documents` 항목 하나다. 여기 두 번 적지 않는다 — version 문자열이 numeric_discipline 검사의 밴드 수와 글자로 겹치기도 한다."
+  },
+  "fieldDeclaration": {
+    "rawName": "bidNtceOrd",
+    "conceptKo": "입찰공고차수",
+    "documentFieldSize": 3,
+    "documentRequirement": "필수",
+    "documentSampleQuote": "000",
+    "documentDescriptionQuote": "입찰공고차수는 해당 입찰공고에 대한 재공고 및 재입찰 등이 발생되었을 경우 증가되는 수"
+  },
+  "roundTrip": {
+    "received": "000",
+    "reQueried": "000"
+  },
+  "tokenComparison": {
+    "left": "000",
+    "right": "0"
+  }
+}

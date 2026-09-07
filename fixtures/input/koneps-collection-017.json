@@ -1,0 +1,30 @@
+{
+  "sourceDocument": {
+    "id": "koneps-openapi-reference",
+    "title": "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 입찰공고정보서비스",
+    "note": "문서 version·발행일·경로·SHA-256·legacy blob id 의 정본은 `fixtures/manifest.yaml` 의 `official_documents` 항목 하나다. 여기 두 번 적지 않는다 — version 문자열이 numeric_discipline 검사의 밴드 수와 글자로 겹치기도 한다."
+  },
+  "fieldDeclaration": {
+    "rawName": "bssamt",
+    "conceptKo": "기초금액",
+    "documentFieldSize": 21,
+    "documentRequirement": "옵션",
+    "documentDescriptionQuote": "예정가격 작성 과정에서 거래실례가격, 원가계산가격 등에 의하여 조사한 가격이나 설계가격에 대하여 계약담당공무원이 그 적정여부를 검토조정한 가격(기초금액)(원화,원)",
+    "presentIn": [
+      "getBidPblancListInfoThngBsisAmount",
+      "getBidPblancListInfoCnstwkBsisAmount",
+      "getBidPblancListInfoServcBsisAmount"
+    ]
+  },
+  "candidateKeysFromLegacy": [
+    "bssAmt",
+    "bssamt",
+    "bssAmtPurcnstcst"
+  ],
+  "remarkFieldSampleQuote": {
+    "rawName": "rmrk1",
+    "conceptKo": "비고1",
+    "sample": "기초금액은 부가세 포함 가격임.",
+    "note": "이것은 **비고 필드의 샘플 데이터**이지 항목 설명의 규범 문장이 아니다. 과세 축의 판단 근거로 쓰지 않는다 — `OPEN-REG-05` 소유."
+  }
+}

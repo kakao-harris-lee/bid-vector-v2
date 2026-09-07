@@ -1,0 +1,20 @@
+{
+  "documentedBaseAmountKey": "bssamt",
+  "candidateKeys": [
+    {
+      "rawName": "bssAmt",
+      "declaredInDocument": false
+    },
+    {
+      "rawName": "bssamt",
+      "declaredInDocument": true
+    },
+    {
+      "rawName": "bssAmtPurcnstcst",
+      "declaredInDocument": false
+    }
+  ],
+  "currencyUnit": "KRW",
+  "documentDeclaresVatTreatment": false,
+  "remarkSampleUsedAsVatBasis": false
+}

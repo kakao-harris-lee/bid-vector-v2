@@ -1,0 +1,24 @@
+{
+  "sweepResults": [
+    {
+      "id": "SYN-SWEEP-1",
+      "decision": "Skip",
+      "reason": "AgeGateNotPassed",
+      "backoffSkipped": 1,
+      "detailFetchCallCount": 0
+    },
+    {
+      "id": "SYN-SWEEP-2",
+      "decision": "Fetch",
+      "detailFetchCallCount": 1
+    },
+    {
+      "id": "SYN-SWEEP-3",
+      "decision": "Skip",
+      "reason": "RecheckGateNotPassed",
+      "backoffSkipped": 1,
+      "detailFetchCallCount": 0
+    }
+  ],
+  "totalDetailFetchCallCount": 1
+}

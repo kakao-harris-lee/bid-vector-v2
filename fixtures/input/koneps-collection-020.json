@@ -1,0 +1,15 @@
+{
+  "accounting": {
+    "received": 10,
+    "normalized": 7,
+    "duplicate": 2,
+    "dropped": 1,
+    "dropReasons": {
+      "MissingNoticeNumber": 1
+    },
+    "sourceTotal": 10,
+    "pagesFetched": 3,
+    "truncated": false,
+    "unknownFields": {}
+  }
+}

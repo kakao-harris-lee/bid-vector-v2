@@ -1,0 +1,11 @@
+{
+  "rawNoticeNumbers": [
+    " syn-ntc-2301 ",
+    "SYN-NTC-2301",
+    "SYN NTC 2301"
+  ],
+  "sourceUrls": [
+    "https://syn.example.invalid/detail?bidNtceNo=SYN-NTC-2301&bidNtceOrd=000",
+    "https://syn.example.invalid/detail?bidNtceOrd=000&bidNtceNo=SYN-NTC-2301&trackingParam=SYN-TRACK-1"
+  ]
+}

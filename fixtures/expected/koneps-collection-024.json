@@ -1,0 +1,6 @@
+{
+  "decision": "Skip",
+  "reason": "AlreadyHeld",
+  "detailFetchCallCount": 0,
+  "backoffStateStoredOnDataTable": false
+}
