@@ -7,6 +7,15 @@ plugins {
 dependencies {
     implementation(project(":workflow"))
     implementation(project(":shared-kernel"))
+    // M3/3B — `KonepsOpenApiNoticeSource : NoticeSourcePort` 구현이 3A 의 도메인 타입
+    // (`RawNoticeObservation`·`CollectionAccounting`·`KONEPS_COLLECTION_POLICY` 등)을 쓴다.
+    // procurement 는 domain 층이라 adapters(그 위 층)의 허용 project 의존이다.
+    implementation(project(":procurement"))
+    // M3/3B ② — quota·bounded retry/backoff·rate limiter Resilience4j **한 계층**(ADR 0005
+    // D-11). `resilience4j-kotlin`은 카탈로그에만 두고 여기서 끌어오지 않는다(D-3B-2,
+    // gradle/libs.versions.toml 주석 — Java API로 충분해 불필요한 결합을 늘리지 않는다).
+    implementation(libs.resilience4j.retry)
+    implementation(libs.resilience4j.ratelimiter)
 
     // M2/2A — round-trip test 가 ml-contract 의 생성 stub 을 본다. composite 치환(같은
     // 좌표를 `settings.gradle.kts`의 `includeBuild("ml-contract")`가 잇는다) — main 의존은

@@ -90,6 +90,13 @@ snakeyaml = { module = "org.yaml:snakeyaml" }
 
 db-scheduler = { module = "com.github.kagkarlsson:db-scheduler", version.ref = "db-scheduler" }
 resilience4j-retry = { module = "io.github.resilience4j:resilience4j-retry", version.ref = "resilience4j" }
+# M3/3B — KONEPS HTTP 어댑터의 quota·bounded retry/backoff·rate limiter(②, ADR 0005 D-11
+# 「외부 호출의 재시도는 Resilience4j 한 곳」). `resilience4j-kotlin`은 scope.md D-3B-2 가
+# 카탈로그 등재를 요구해 좌표만 둔다 — 실제 구현은 Java API(`Retry.of`·`decorateSupplier`)로
+# 충분해 어느 모듈도 이 좌표를 `implementation`으로 끌어오지 않는다(불필요한 결합 회피,
+# checklist.md 「판단이 갈린 지점」).
+resilience4j-ratelimiter = { module = "io.github.resilience4j:resilience4j-ratelimiter", version.ref = "resilience4j" }
+resilience4j-kotlin = { module = "io.github.resilience4j:resilience4j-kotlin", version.ref = "resilience4j" }
 
 # OPEN-ADR-07 이 닫힐 때까지 좌표만 든다. gradle-pitest-plugin 의 기본 PIT 는 1.22.1 이라
 # 적용 slice 는 pitestVersion 을 반드시 명시해야 한다.
