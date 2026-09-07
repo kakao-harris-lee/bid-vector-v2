@@ -459,10 +459,16 @@ internal val LICENSE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
 
 /**
  * money-basis(1B-c)·license(1C)·provenance/floor(1D)·strategy-watch·strategy-validation·
- * money-basis-003(1E) 여섯 축의 value executor 를 하나의 dispatch 표로 합친다.
+ * money-basis-003(1E)·koneps-collection(3A) 축의 value executor 를 하나의 dispatch 표로
+ * 합친다. koneps-collection 은 27 case 중 21건만 담는다 —
+ * `KONEPS_COLLECTION_PENDING_CAPABILITY`(3A 잔여 일괄 ②)가 나머지 6건의 예외를 진다.
  */
 internal val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
-    MONEY_BASIS_VALUE_EXECUTORS + LICENSE_EXECUTORS + PROVENANCE_FLOOR_EXECUTORS + STRATEGY_EXECUTORS
+    MONEY_BASIS_VALUE_EXECUTORS +
+        LICENSE_EXECUTORS +
+        PROVENANCE_FLOOR_EXECUTORS +
+        STRATEGY_EXECUTORS +
+        KONEPS_COLLECTION_EXECUTORS
 
 /**
  * compile-fixture 위임 case → shared-kernel `compile-fixtures` 의 fixture 번호. 실제

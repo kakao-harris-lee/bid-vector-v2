@@ -47,6 +47,10 @@ dependencies {
     // M1/1E — strategy-watch·strategy-validation corpus 실행자가 strategy 공개 API
     // (`WatchRules.evaluate`·`validate` 등)를 직접 부른다.
     testImplementation(project(":strategy"))
+    // M3/3A — koneps-collection corpus 실행자가 procurement 공개 API(`canonicalize`·
+    // `resolveAmount`·`decideDetailFetch`·`transition`·`mayOverwrite`·`parseSourceZonedInstant`
+    // 등)를 직접 부른다. 27 case 전건 authoritative 승격(운영자 승인 2026-09-07) 뒤 배선한다.
+    testImplementation(project(":procurement"))
     // manifest.yaml(YAML) 을 읽기 위한 snakeyaml — 카탈로그 좌표는 이미 Boot BOM 관리 하에
     // transitively 해석되던 것을 명시로 올린 것뿐이다(`gradle/libs.versions.toml` 주석 참고).
     testImplementation(libs.snakeyaml)
