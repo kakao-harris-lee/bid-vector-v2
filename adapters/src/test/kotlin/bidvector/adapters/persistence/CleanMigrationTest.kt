@@ -352,34 +352,7 @@ class CleanMigrationTest : PersistenceTestSupport() {
         actual shouldContainExactlyInAnyOrder expectedForeignKeys
     }
 
-    // =========================================================================
-    // 축 7 — 트리거(verifier r1 뒤 F-5로 3개 신설 — opening_result 2·qualification_text 1.
-    // verifier r2 N-2 뒤 status 축 1개 추가)
-    // =========================================================================
-    private val expectedTriggers =
-        setOf(
-            "guard_notice_base_amount",
-            "guard_notice_estimated_amount",
-            "guard_notice_allocated_budget",
-            "guard_notice_floor_rate",
-            "guard_notice_status",
-            "notice_revision_bump_trigger",
-            "notice_audit_insert_trigger",
-            "raw_observation_append_only",
-            "notice_audit_append_only",
-            "guard_opening_result_winning_rate",
-            "guard_opening_result_derived_base_amount",
-            "guard_qualification_text_raw_text",
-        )
-
-    @Test
-    fun `축7 트리거 목록이 기대와 같다`() {
-        val actual =
-            queryStrings(
-                "SELECT DISTINCT trigger_name FROM information_schema.triggers WHERE trigger_schema = 'public'",
-            )
-        actual shouldContainExactlyInAnyOrder expectedTriggers
-    }
+    // 축 7(트리거)은 `CleanMigrationTriggerTest`로 분리했다(sizeGate 500줄).
 
     // =========================================================================
     // 축 8 — CHECK(테이블별 개수 + verifier가 실측한 세 CHECK의 본문 부분 문자열)

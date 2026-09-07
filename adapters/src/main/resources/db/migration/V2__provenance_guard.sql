@@ -103,38 +103,61 @@ BEGIN
 END;
 $guard$ LANGUAGE plpgsql;
 
+-- P-1(verifier r3, medium) — 동반 컬럼에 provenance의 detail 절반
+-- (`*_provenance_detail`)과 estimated_amount의 sourceKey를 더한다. 함수 본문은 그대로다
+-- (인자 확장만) — `ProvenanceCodec`는 provenance를 kind(`*_provenance`)+detail
+-- (`*_provenance_detail`) 두 컬럼에 나눠 담는데, kind만 가드가 보면 값의 절반이
+-- 무방비였다(예: FilledFromBudgetKey의 RawKey가 detail에 산다).
 CREATE TRIGGER guard_notice_base_amount
     BEFORE UPDATE ON notice
     FOR EACH ROW EXECUTE FUNCTION guard_authoritative_slot(
-        'base_amount_won', 'base_amount_provenance', 'base_amount_currency', 'base_amount_vat');
+        'base_amount_won', 'base_amount_provenance',
+        'base_amount_currency', 'base_amount_vat', 'base_amount_provenance_detail');
 
 CREATE TRIGGER guard_notice_estimated_amount
     BEFORE UPDATE ON notice
     FOR EACH ROW EXECUTE FUNCTION guard_authoritative_slot(
-        'estimated_amount_won', 'estimated_amount_provenance', 'estimated_amount_currency', 'estimated_amount_vat');
+        'estimated_amount_won', 'estimated_amount_provenance',
+        'estimated_amount_currency', 'estimated_amount_vat',
+        'estimated_amount_provenance_detail', 'estimated_amount_source_key');
 
--- allocated_budget은 동반 컬럼(통화·과세) 자체가 스키마에 없다 — 통화는 항상 KRW로
--- 고정이라 컬럼화하지 않았고, vat 축도 두지 않았다(V1__schema.sql).
+-- allocated_budget은 통화·과세 동반 컬럼이 스키마에 없다 — 통화는 항상 KRW로 고정이라
+-- 컬럼화하지 않았고, vat 축도 두지 않았다(V1__schema.sql). provenance detail은 있다(P-1).
 CREATE TRIGGER guard_notice_allocated_budget
     BEFORE UPDATE ON notice
-    FOR EACH ROW EXECUTE FUNCTION guard_authoritative_slot('allocated_budget_won', 'allocated_budget_provenance');
+    FOR EACH ROW EXECUTE FUNCTION guard_authoritative_slot(
+        'allocated_budget_won', 'allocated_budget_provenance', 'allocated_budget_provenance_detail');
 
 -- =============================================================================
 -- guard_existence_and_freshness() — provenance 축이 없는 값 컬럼용(F-5). 존재 가드(1)와
 -- 신선도 가드(3)만 진다 — 「권위」 개념 자체가 없는 축이라 (2)는 적용되지 않는다.
--- TG_ARGV[0] = 값 컬럼 이름.
+-- TG_ARGV[0] = 값 컬럼 이름. TG_ARGV[1..] = 동반 컬럼(P-1, verifier r3) —
+-- guard_authoritative_slot의 TG_ARGV[2..]와 같은 대칭 확장이다. 함수 본문은 그대로고
+-- 인자만 늘린다.
 -- =============================================================================
 CREATE FUNCTION guard_existence_and_freshness() RETURNS trigger AS $guard2$
 DECLARE
     value_col TEXT := TG_ARGV[0];
     old_value TEXT := (to_jsonb(OLD) ->> value_col);
     new_value TEXT := (to_jsonb(NEW) ->> value_col);
+    companion_col TEXT;
+    axis_changed BOOLEAN;
 BEGIN
     IF old_value IS NULL THEN
         RETURN NEW;
     END IF;
 
-    IF old_value IS NOT DISTINCT FROM new_value THEN
+    axis_changed := old_value IS DISTINCT FROM new_value;
+
+    IF NOT axis_changed THEN
+        FOR companion_col IN SELECT unnest(TG_ARGV[1:TG_NARGS - 1]) LOOP
+            IF (to_jsonb(OLD) ->> companion_col) IS DISTINCT FROM (to_jsonb(NEW) ->> companion_col) THEN
+                axis_changed := TRUE;
+            END IF;
+        END LOOP;
+    END IF;
+
+    IF NOT axis_changed THEN
         RETURN NEW;
     END IF;
 
@@ -144,7 +167,7 @@ BEGIN
     END IF;
 
     IF NEW.observation_key = OLD.observation_key THEN
-        RAISE EXCEPTION 'guard_existence_and_freshness: % 값 변경은 새 observation_key(새 관측)를 동반해야 한다', value_col
+        RAISE EXCEPTION 'guard_existence_and_freshness: % 축 변경은 새 observation_key(새 관측)를 동반해야 한다', value_col
             USING ERRCODE = 'P0001';
     END IF;
 
@@ -152,9 +175,13 @@ BEGIN
 END;
 $guard2$ LANGUAGE plpgsql;
 
+-- P-1(verifier r3) — floor_rate_origin_kind·_detail은 floor_rate_fraction의 출처 라벨이다
+-- (base_amount의 *_provenance_detail과 같은 자리). 값은 가드가 무는데 출처만 안 물면
+-- FloorRateOriginCodec.decode가 다른 FloorRateOrigin을 낸다.
 CREATE TRIGGER guard_notice_floor_rate
     BEFORE UPDATE ON notice
-    FOR EACH ROW EXECUTE FUNCTION guard_existence_and_freshness('floor_rate_fraction');
+    FOR EACH ROW EXECUTE FUNCTION guard_existence_and_freshness(
+        'floor_rate_fraction', 'floor_rate_origin_kind', 'floor_rate_origin_detail');
 
 -- N-2(verifier r2, medium) — status는 provenance 축이 없는 상태 라벨이라(권위 계층 개념
 -- 자체가 없음) guard_authoritative_slot이 아니라 이 함수를 쓴다. status는 NOT NULL이라
