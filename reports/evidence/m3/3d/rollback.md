@@ -50,16 +50,17 @@ reports/evidence/m3/3d/scope.md`가 빈 결과임을 확인).
 자동 제거) — 운영 DB에 적용된 migration이 없다. 되돌릴 운영 데이터가 없다(scope.md
 rollback 절 그대로).
 
-## 실측(임시 clone)
+## 실측(임시 clone, verifier r1 수정 라운드 1 뒤 재실측)
 
-1. `/tmp/.../rollback-clone-3d`에 이 head(`6a1fe68`)를 clone, `main` 체크아웃.
+1. 임시 clone에 이 head(`a79a6d6`)를 clone, `main` 체크아웃.
 2. 위 `git restore` + `git clean` 두 명령 실행 — `exit=0`.
 3. `git status --short` — `adapters/build.gradle.kts`·`gradle/libs.versions.toml`·
    `config/quality/gate-tests.properties` 3개 `M`(base 내용으로 복원), 나머지 신규
-   디렉터리·파일 전부 사라짐(작업 트리에서 완전 제거, untracked 잔존 없음).
+   디렉터리·파일(`ObservationKeyDerivation.kt`·`F2CollisionRegressionTest.kt`·
+   `NoticeFindRoundTripTest.kt` 등 수정 라운드 1이 더한 파일 포함) 전부 사라짐(작업
+   트리에서 완전 제거, untracked 잔존 없음) — 디렉터리 단위 경로라 새 파일도 자동으로
+   덮인다(경로 목록 자체는 갱신할 필요가 없었다).
 4. 되돌린 트리에서 `./gradlew --no-build-cache clean check` — **SUCCESS**(3B 상태로
-   돌아간 저장소가 여전히 초록임을 확인 — `buildLogicGateExecutionGate`·
-   `adapters:moduleDependencyGate` 포함).
-5. `grep -c "koneps\." config/quality/gate-tests.properties` → 3B 등재분 생존 확인
-   (3D가 그 줄들을 건드리지 않았음).
+   돌아간 저장소가 여전히 초록임을 확인).
+5. `grep -c "koneps\." config/quality/gate-tests.properties` → 3B 등재분 생존 확인.
 6. 임시 clone 삭제.
