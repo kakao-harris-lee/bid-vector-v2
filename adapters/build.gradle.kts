@@ -1,3 +1,5 @@
+import bidvector.buildlogic.PresentSpec
+
 plugins {
     id("bidvector.kotlin-conventions")
 }
@@ -39,4 +41,36 @@ tasks.test {
     inputs.file(contractPolicy).withPropertyName("contractPolicy")
     systemProperty("bidvector.contracts.testdata", contractsTestdata.asFile.absolutePath)
     systemProperty("bidvector.contracts.policy", contractPolicy.asFile.absolutePath)
+    // M2/2D S-6, D-2D-3 (a) — 교차 언어 socket 스모크는 상시 게이트가 아니다. 일반 `test`
+    // (따라서 `check`)는 이 class 를 이름으로 제외한다 — Python 서버 없이 도는 보통의
+    // 실행에서 연결 실패로 죽지 않게 한다. 실행은 `crossLangSmokeTest`(아래)만 한다.
+    filter { excludeTestsMatching("*CrossLangSmokeTest") }
 }
+
+// M2/2D S-6 — `tools/contract-crosslang-smoke.sh`가 Python 서버를 띄운 뒤 이 task 만 골라
+// 돈다(로컬 실측 1회, D-2D-3 (a)). 같은 test 소스셋을 재사용하되 이 class 하나만 포함한다.
+// **실측(2026-09-07)** — Gradle 은 `Test` 타입 task 를 `group`·이름과 무관하게 `check`의
+// 의존 그래프에 자동으로 엮는다(`./gradlew :adapters:check --dry-run` 로 확인). `dependsOn`
+// 을 직접 걷어내는 것은 base plugin 배선 순서에 기대는 취약한 우회라, 대신 **task 자신이
+// 전제 부재를 스스로 건너뛴다** — `bidvector.crosslang.address` 프로퍼티가 없으면(보통의
+// `check`) `onlyIf` 가 이 task 를 SKIPPED 로 낸다. 이 프로퍼티는 스크립트만 명시적으로
+// 넘긴다 — D-2D-3 (a)의 "상시 게이트가 아니다"를 실행 결과가 아니라 실행 여부로 만족한다.
+// config cache 안전을 위해 `onlyIf { ... }` 스크립트 람다 대신 컴파일된 `PresentSpec`
+// (build-logic)을 쓴다 — 스크립트 closure 는 지역 값만 참조해도 그 람다가 사는 스크립트
+// 클래스 자체를 붙들어 "cannot (de)serialize Gradle script object references"로 config
+// cache 저장이 깨진다(실측, M2/2D). 값 자체는 구성 시점의 평범한 Boolean/String 이다.
+val crossLangAddressPresent = project.hasProperty("bidvector.crosslang.address")
+val crossLangAddressValue = project.findProperty("bidvector.crosslang.address") as String? ?: "127.0.0.1:50099"
+val crossLangSmokeTest =
+    tasks.register<Test>("crossLangSmokeTest") {
+        group = "verification (manual)"
+        description = "M2/2D S-6 — 교차 언어 socket 스모크(Python 서버 필요, check 밖, 수동 실행 전용)"
+        testClassesDirs = sourceSets["test"].output.classesDirs
+        classpath = sourceSets["test"].runtimeClasspath
+        useJUnitPlatform()
+        filter { includeTestsMatching("*CrossLangSmokeTest") }
+        onlyIf(PresentSpec(crossLangAddressPresent))
+        systemProperty("bidvector.crosslang.address", crossLangAddressValue)
+        val crossLangTestdata = layout.settingsDirectory.dir("contracts/testdata")
+        systemProperty("bidvector.contracts.testdata", crossLangTestdata.asFile.absolutePath)
+    }
