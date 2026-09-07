@@ -109,6 +109,12 @@ grpc-testing = { module = "io.grpc:grpc-testing" }
 # 이것을 끌어오지 않는다 — §4b 런타임 스모크·2D fake servicer test 전용.
 grpc-core = { module = "io.grpc:grpc-core" }
 grpc-inprocess = { module = "io.grpc:grpc-inprocess" }
+# M2/2D ⑤ — in-process transport 는 메시지를 marshaling 없이 참조로 넘겨 `maxInboundMessageSize`를
+# 강제하지 않는다(실측 — in-process 채널/서버에 정책 상한을 걸어도 초과 표본이 그냥 통과했다).
+# 경계 쌍(D-2D-6)의 실제 강제를 재려면 진짜 wire marshaling 이 필요해 localhost 전용으로
+# 이 좌표를 쓴다 — cross-language socket 스모크(D-2D-3, S-6)와는 다른 용도(같은 JVM 안의
+# 실제 프레이밍 경로 실측)다.
+grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded" }
 protobuf-java-runtime = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf-runtime" }
 protobuf-protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf-runtime" }
 
