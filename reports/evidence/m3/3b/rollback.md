@@ -28,6 +28,13 @@ git restore --source="$HARNESS" --staged --worktree -- \
 파일은 이 slice 가 건드리지 않았다. `adapters/build.gradle.kts` 를 base 로 되돌려도
 M2/2A 가 넣은 줄(`project(":workflow")`·grpc 의존)은 base 시점에 이미 있었으므로 살아남는다.
 
+**`milestone-3.md`(N-7, verifier r2)** — scope.md in_scope 목록에 「Slice 3B 착수 문단」
+으로 실려 있으나, 팀리드 지시(구현 착수 시점)로 이 구현 레인은 그 파일을 **한 번도 편집
+하지 않았다** — 「되돌린다」 목록에도 「되돌리지 않는다」 목록에도 없는 이유는 대상 자체가
+아니기 때문이다(문서 레인이 착수 커밋 `b9dd07c` 에서 이미 그 문단을 넣었다). 실측:
+`git log --oneline c9d7563..HEAD -- milestone-3.md` 는 `b9dd07c` 한 건뿐 — 이 slice 의
+16개 구현 커밋 중 그 파일을 건드린 것은 0건.
+
 ## 왜 `config/quality/gate-tests.properties` 만 명령을 가르는가 (H-1)
 
 `git log --oneline c9d7563..HEAD -- config/quality/gate-tests.properties` 는 이 파일에
@@ -39,9 +46,14 @@ check` 는 여전히 초록이라 이전 판의 실측이 이 손상을 못 봤�
 건드리기 직전의 마지막 상태)를 소스로 쓰면 하네스 등재는 살아남고 3B 가 넣은 3줄+주석만
 없어진다 — 다른 in_scope 파일은 3B 단독 소유라 base 되돌림이 정확하다.
 
-## 실측(임시 clone, 2026-09-07 — verifier r1 수정 라운드 재실측)
+## 실측(임시 clone — verifier r1·r2 두 라운드에서 각각 재실측, 결과 동일)
 
-1. `/private/tmp/.../rollback-clone-3b-r1` 로 clone, `main` 체크아웃(`head 401a353`).
+1. `/private/tmp/.../rollback-clone-3b-r1`(verifier r1 뒤 head, `436a755` — 이 SHA 는 그
+   라운드에서 확정돼 이후 안 바뀐다)와 `/private/tmp/.../rollback-clone-3b-r2`(verifier r2
+   저low 8건 일괄 뒤 head — 이 커밋은 자기참조 SHA 문제(N-6) 회피로 `git rev-parse HEAD` 를
+   그때그때 읽어 썼다) 두 시점에서 각각 clone, `main` 체크아웃. 두 시점의 **되돌림 대상
+   경로 집합은 동일**하다(r2 는 그 경로 안의 파일 내용만 바꿨을 뿐 대상 목록을 안 늘렸다) —
+   두 실측이 같은 결과를 낸 것은 그 경로 불변을 재확인한다.
 2. 위 두 명령 실행 — 둘 다 `exit=0`. `git status --short`: koneps 디렉터리 16 파일 삭제(`D`,
    H-3 라운드에서 늘어난 `KonepsTruncationCause.kt` 포함), `adapters/build.gradle.kts`·
    `gradle/libs.versions.toml`·`procurement/.../Accounting.kt`·`procurement/.../

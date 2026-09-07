@@ -1,8 +1,12 @@
 # M3/3B — checklist.md
 
-base `c9d75632d3acafcaf41f0454e941dc49c62063ea` · head `401a3535bf1a8600d1ed8630441d7d1dfff8c777`
-(verifier r1 수정 라운드 1 뒤, evidence 커밋 제외). 정본 순서: `scope.md` →
-`_workspace/m3-3b/01_design-review.md` → `_workspace/m3-3b/02_verifier_report.md` → 이 문서.
+base `c9d75632d3acafcaf41f0454e941dc49c62063ea` · head — **이 문서를 담은 커밋 자신**(`git rev-parse HEAD`, verifier r2 저low 8건 일괄
+수정 커밋). N-6(verifier r2) 재발 방지로 SHA 를 하드코딩하지 않는다 — 자기참조 SHA 를
+문면에 박으면 그 문면을 담는 커밋 자체가 새로 계산돼 값이 반영구적으로 어긋난다(실측:
+이 라운드 안에서 실제로 한 번 발생 — 아래 참고). 정본
+순서: `scope.md` → `_workspace/m3-3b/01_design-review.md` →
+`_workspace/m3-3b/02_verifier_report.md` → `_workspace/m3-3b/03_verifier_report_r2.md` →
+이 문서.
 
 ## 완료 조건 대응표 — scope.md 「이 slice 가 하는 일」
 
@@ -17,7 +21,7 @@ base `c9d75632d3acafcaf41f0454e941dc49c62063ea` · head `401a3535bf1a8600d1ed863
 | ⑦ | mock server, scope 시나리오 | `MockKonepsServer`(JDK `HttpServer`, loopback) | 아래 시나리오 표 |
 | ⑧ | 표적조회·서브콜 | **범위 밖**(D-3B-6, 아래 「범위 분할」) | — |
 
-## 시나리오 대응표 — scope.md ⑦(9 항목, test 는 10개 — 마지막 항목이 22·30 두 test 로 갈린다, L-9 정정)
+## 시나리오 대응표 — scope.md ⑦(N-8 정정: 문면은 **6 항목**, 표는 D-3B-7 파생 4 항목을 더해 **10 행** — 부재 resultCode·03 NoData·22/30 quota 구분은 scope ⑦ 문면 자체가 아니라 D-3B-7 이 나중에 확정한 것)
 
 | 시나리오(scope 문면) | test 메서드(`KonepsOpenApiNoticeSourceTest`) | 결과 |
 | --- | --- | --- |
@@ -32,16 +36,19 @@ base `c9d75632d3acafcaf41f0454e941dc49c62063ea` · head `401a3535bf1a8600d1ed863
 | quota `22` | `resultCode 22 는 quota 초과로 재시도 대상이다` | PASS(재시도 뒤 성공, quotaExceeded=1) |
 | 등록되지 않은 키 `30` | `resultCode 30 은 등록되지 않은 서비스 키 — 비재시도` | PASS(truncationCause=NotRetryable) |
 
-## verifier r1 finding 재현 test — scope ⑦ 목록 밖(추가 test, 대응표는 아래 「finding 대응」)
+## verifier finding 재현 test — scope ⑦ 목록 밖(추가 test, 대응표는 아래 「finding 대응」)
 
-`H-2 — 빈 문자열·공백 공고번호도 COL-01 탈락에 걸린다` · `H-3 — 다섯 truncation 사유가
+r1: `H-2 — 빈 문자열·공백 공고번호도 COL-01 탈락에 걸린다` · `H-3 — 다섯 truncation 사유가
 회계에서 바이트 동일하지 않고 서로 구별된다` · `M-1 — JSON boolean 은 Y N 으로 바뀌지
 않고 원문 토큰 텍스트 그대로 옮겨진다` · `M-2 — canonical 공고번호가 같으면 원문 표기가
 달라도 duplicate 로 계수된다` · `M-5 — cursor 토큰이 숫자가 아니거나 0 이하면 조용히
 page 1 로 접지 않고 명시 실패를 낸다` · `L-5 — 항목 안 중복 JSON 키는 마지막 값이
 승리한다` · `M-4 — JSON 중첩 깊이가 정책 상한을 넘으면 StructureFailure 로 접히고 예외가
-안 샌다`. 전 7건 PASS. `KonepsOpenApiNoticeSourceTest` 총 17 test + `ServiceKeyTest`
-3(D-3B-5) + `KonepsAdapterDependencyTest` 1(S-3b) = **21 test**.
+안 샌다`(7건). r2: `N-4 — 재시도로 뚫릴 수 있는 사유(반복 페이지)는 next 를 낸다` +
+기존 미지/부재 resultCode·resultCode 30 test 에 `next shouldBe null` 단언 추가 ·
+`N-5 — cursor 토큰의 선행 0·부호 기호도 조용히 수용하지 않고 명시 실패를 낸다`(2건 신규
++ 기존 2건 확장). 전건 PASS. `KonepsOpenApiNoticeSourceTest` 총 19 test + `ServiceKeyTest`
+3(D-3B-5) + `KonepsAdapterDependencyTest` 1(S-3b) = **23 test**.
 
 ## 위협 모델 대응표 — scope.md 「방어한다」
 
@@ -74,6 +81,19 @@ scope.md 「이 slice 가 하는 일」 표의 ⑧행(표적조회·서브콜)�
 공고 축이므로 포함」이라 적고 정정 ③ 은 `inqryDiv=2` 를 직접 언급하지 않아, 두 문서 문면이
 어긋난 채 남아 있다. 이 문서(구현 레인 소유)가 아니라 설계 노트(세션 모델 소유) 쪽의 정정이
 필요해 이 slice 가 고치지 않는다 — 오케스트레이터에 등재만 한다.
+
+## verifier r2 산출물 finding 대응 — 한 줄씩
+
+- **N-1** 차수 탈락과 공고번호 탈락이 같은 사유로 계수됨 — 3A 후속(위 「알려진 제한」).
+- **N-2** `InputError` 가 서버측 입력오류와 무효 cursor 두 원인을 접음 — 3A 후속(위).
+- **N-3** quota 두 표면(HTTP 429·`resultCode 22`)이 구별 안 됨 — 3A 후속(위).
+- **N-4** 비재시도 사유(`NotRetryable`·`Unclassified`·`InputError`)에도 `next` 가 붙던 것을
+  고쳤다 — `KonepsPageWalkAccumulator.nextCursor()`가 `isResumable(cause)` 로 재시도 가능
+  축(백스톱·전송·quota·rate limiter 자체 거부·구조 실패)만 cursor 를 낸다. `StructureFailure`
+  는 재개 가능 축에 넣었다(서버가 그 순간 보낸 응답이 무너졌다는 관측이지 입력·구성이
+  틀렸다는 판정이 아니라서다) — 판단이 갈린 지점 3 의 연장.
+- **N-5** cursor 토큰이 `"007"`·`"+4"` 처럼 선행 0·부호 기호를 관대하게 수용하던 것을
+  `[1-9][0-9]*` 정규식으로 좁혔다 — 순수 양의 정수(부호·선행 0 없음)만 통과한다.
 
 ## 판단이 갈린 지점 — 계약이 명시하지 않아 이 레인이 정한 것
 
@@ -137,6 +157,23 @@ scope.md 「이 slice 가 하는 일」 표의 ⑧행(표적조회·서브콜)�
   승인 뒤에만 닫힌다.
 - **표적조회·`OpeningResultSourcePort`·license-limit 서브콜 없음**(D-3B-6, 범위 분할 ③).
 - **L-7 미해결** — 위 「범위 분할」 절 참고. 설계 노트 문면 정정은 세션 모델 소관.
+- **N-1(verifier r2) 차수(`bidNtceOrd`) 탈락도 `CollectionMissingNoticeNumber` 로 계수된다
+  — 3A 후속.** `bidNtceOrd` 가 부재·빈 문자열·공백이어도 사유가 공고번호 축과 같은 코드다.
+  3A `CollectionDropReason`(`CollectionMissingNoticeNumber`·`CollectionUnknownField`·
+  `CollectionContractViolation`·`CollectionParseFailure`) 에 차수 축을 가리키는 어휘가
+  없다 — 이번 라운드는 procurement 추가 편집이 금지돼(팀리드 지시) 새 sealed 변형을
+  만들 수 없다. 후속 slice 가 procurement 를 다시 열 때 `CollectionMissingNoticeRound`
+  같은 변형을 추가하면 닫힌다.
+- **N-2(verifier r2) `TruncationCause.InputError` 가 두 원인을 접는다 — 3A 후속.** 서버가
+  낸 입력 오류(`resultCode` 06/07/08/10/11)와 어댑터가 스스로 거부한 무효 cursor(M-5)가
+  같은 사유값이다. `Accounting.kt` KDoc 의 「3B(어댑터)만 이 값을 만든다」선언과는
+  어긋나지 않으나(둘 다 3B 가 만든다), 회계만 보는 소비자는 「질의가 틀렸다」와 「재개
+  토큰이 틀렸다」를 못 가른다. `TruncationCause` 에 축 하나를 더 여는 것은 procurement
+  편집이라 이번 라운드 밖이다.
+- **N-3(verifier r2) quota 두 표면(HTTP 429·`resultCode 22`)이 `QuotaExhausted` 하나로
+  접힌다 — 3A 후속.** D-3B-7(「두 표면을 다 센다」)의 의도한 귀결이라 설계와는 일치하고
+  `quotaExceeded` 총량은 정확하지만, 표면 구별이 필요해지면 `TruncationCause` 의 두 번째
+  확장 결정이 필요하다(이번 라운드는 procurement 편집 금지).
 
 ## 병렬 레인 경계 확인
 

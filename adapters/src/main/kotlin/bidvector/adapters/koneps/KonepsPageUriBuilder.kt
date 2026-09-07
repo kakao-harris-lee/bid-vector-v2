@@ -117,8 +117,18 @@ private class KonepsPageWalkAccumulator {
         return items.size + duplicate + dropped >= total
     }
 
-    /** M-3 — truncated 로 끝났으면 재개 지점을 실은 cursor, 아니면 null(완료를 거짓 진술하지 않는다). */
-    fun nextCursor(): PageCursor? = if (truncated) resumePageNo?.let { PageCursor(it.toString()) } else null
+    /**
+     * M-3 — truncated 로 끝났으면 재개 지점을 실은 cursor, 아니면 null(완료를 거짓 진술하지
+     * 않는다). **N-4(verifier r2)** — 사유가 비재시도 축(`NotRetryable`·`Unclassified`·
+     * `InputError`)이면 `next` 를 안 낸다. 같은 cursor 로 다시 불러도 서버 응답·요청 형태가
+     * 안 바뀌는 한 같은 실패가 재현될 뿐이라, `truncationCause` 를 안 보고 `next` 만 따라가는
+     * 소비자가 같은 실패를 무한 재개하는 것을 막는다.
+     */
+    fun nextCursor(): PageCursor? =
+        truncationCause
+            ?.takeIf(::isResumable)
+            ?.let { resumePageNo }
+            ?.let { PageCursor(it.toString()) }
 
     fun toAccounting(counters: KonepsAttemptCounters): CollectionAccounting =
         CollectionAccounting(
@@ -136,6 +146,32 @@ private class KonepsPageWalkAccumulator {
             backoffSkipped = counters.backoffSkipped,
         )
 }
+
+/**
+ * N-4(verifier r2) — 사유가 「다시 시도하면 뚫릴 수 있는」 축(백스톱·전송·quota·rate limiter
+ * 자체 거부)이면 재개 가능, 「입력·구성 자체가 틀렸다」 축(비재시도 resultCode·미지 코드·
+ * 무효 cursor)이면 재개 불가로 둔다 — `when` 이 [TruncationCause] 전 분기를 소진해 새 사유가
+ * 추가되면 컴파일이 깨진다(회귀 방지).
+ */
+private fun isResumable(cause: TruncationCause): Boolean =
+    when (cause) {
+        TruncationCause.MaxPages,
+        TruncationCause.RepeatedPage,
+        TruncationCause.QuotaExhausted,
+        TruncationCause.Timeout,
+        TruncationCause.TransportFailure,
+        TruncationCause.ServerError,
+        TruncationCause.SelfThrottled,
+        // 구조 실패는 서버가 그 순간 보낸 응답이 무너졌다는 관측이지 입력·구성이 틀렸다는
+        // 판정이 아니다 — 다음 호출은 정상 JSON 을 낼 수 있어 재개 가능 축에 둔다.
+        TruncationCause.StructureFailure,
+        -> true
+
+        TruncationCause.NotRetryable,
+        TruncationCause.Unclassified,
+        TruncationCause.InputError,
+        -> false
+    }
 
 private fun applySuccess(
     accumulator: KonepsPageWalkAccumulator,
@@ -244,9 +280,15 @@ private fun invalidCursorBatch(): SourceBatch<RawNoticeObservation> {
     return SourceBatch(emptyList(), accounting, next = null)
 }
 
+// N-5(verifier r2) — `toIntOrNull()` 단독은 "007"·"+4" 처럼 표기가 관대한 토큰도 받아준다
+// (선행 0·부호 기호). 이 어댑터가 스스로 내는 cursor(`resumePageNo.toString()`)는 항상 이
+// 형식(선행 0·부호 없는 순수 양의 정수)이므로 실질 위험은 낮지만, 「엄격 파싱」을 형태
+// 자체로 강제해 다른 발급자가 끼어들 여지를 남기지 않는다.
+private val STRICT_PAGE_TOKEN = Regex("[1-9][0-9]*")
+
 private fun startPageOf(cursor: PageCursor?): Int? {
     val token = cursor?.token ?: return START_PAGE
-    return token.toIntOrNull()?.takeIf { it > 0 }
+    return token.takeIf(STRICT_PAGE_TOKEN::matches)?.toIntOrNull()
 }
 
 /**

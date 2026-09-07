@@ -159,6 +159,8 @@ class KonepsOpenApiNoticeSourceTest {
             batch.accounting.truncated shouldBe true
             batch.accounting.truncationCause shouldBe TruncationCause.Unclassified
             server.requestCount shouldBe 1
+            // N-4 — 비재시도 사유는 next 를 안 낸다(같은 실패를 무한 재개하지 않는다).
+            batch.next shouldBe null
         }
     }
 
@@ -239,6 +241,36 @@ class KonepsOpenApiNoticeSourceTest {
             batch.accounting.truncated shouldBe true
             batch.accounting.truncationCause shouldBe TruncationCause.NotRetryable
             server.requestCount shouldBe 1
+            // N-4 — 비재시도 사유는 next 를 안 낸다.
+            batch.next shouldBe null
+        }
+    }
+
+    @Test
+    fun `N-4 — 재시도로 뚫릴 수 있는 사유(반복 페이지)는 next 를 낸다`() {
+        val items = listOf(mapOf("bidNtceNo" to "SYN-3B-0018", "bidNtceOrd" to "000"))
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = null, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server, testKonepsHttpPolicy(maxPages = 5)).fetchNotices(REFERENCE_DATE, null)
+
+            batch.accounting.truncationCause shouldBe TruncationCause.RepeatedPage
+            batch.next shouldNotBe null
+        }
+    }
+
+    @Test
+    fun `N-5 — cursor 토큰의 선행 0·부호 기호도 조용히 수용하지 않고 명시 실패를 낸다`() {
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, "{}"))).use { server ->
+            val source = newSource(server, testKonepsHttpPolicy())
+
+            val leadingZero = source.fetchNotices(REFERENCE_DATE, PageCursor("007"))
+            val plusSign = source.fetchNotices(REFERENCE_DATE, PageCursor("+4"))
+            val leadingSpace = source.fetchNotices(REFERENCE_DATE, PageCursor(" 3"))
+
+            leadingZero.accounting.truncationCause shouldBe TruncationCause.InputError
+            plusSign.accounting.truncationCause shouldBe TruncationCause.InputError
+            leadingSpace.accounting.truncationCause shouldBe TruncationCause.InputError
+            server.requestCount shouldBe 0
         }
     }
 
