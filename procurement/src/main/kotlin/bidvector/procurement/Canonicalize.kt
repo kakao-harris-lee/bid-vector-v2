@@ -4,9 +4,11 @@ import bidvector.sharedkernel.AllocatedBudget
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EstimatedAmount
+import bidvector.sharedkernel.FloorRate
+import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
-import bidvector.sharedkernel.VatTreatment
+import bidvector.sharedkernel.Rate
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -22,6 +24,7 @@ data class NoticeCollected(
     val baseAmount: ResolvedBaseAmount?,
     val estimatedAmount: ResolvedEstimatedAmount?,
     val allocatedBudget: AllocatedBudget?,
+    val floorRate: FloorRate?,
     val raw: RawNoticeObservation,
 )
 
@@ -46,6 +49,12 @@ sealed interface CanonicalizationOutcome {
     ) : CanonicalizationOutcome
 }
 
+private fun currencyFor(unit: FieldUnit): Currency =
+    when (unit) {
+        FieldUnit.WON -> Currency.KRW
+        else -> error("금액 축 계약의 unit은 WON이어야 한다: $unit")
+    }
+
 private fun identifierValue(
     observation: RawNoticeObservation,
     registry: KonepsFieldContractRegistry,
@@ -65,17 +74,19 @@ private fun resolvedNoticeId(
     }
 }
 
+/** 통화·과세는 계약에서 읽는다(verifier r1 F-2) — 리터럴로 짓지 않는다. */
 private fun baseAmountAsResolved(outcome: AmountResolutionOutcome): ResolvedBaseAmount? {
     if (outcome !is AmountResolutionOutcome.Resolved) return null
+    val currency = currencyFor(outcome.unit)
     return when (val provenance = outcome.provenance) {
         is Provenance.Published -> {
-            ResolvedBaseAmount.Direct.of(outcome.won, Currency.KRW, VatTreatment.UNKNOWN, provenance)
+            ResolvedBaseAmount.Direct.of(outcome.won, currency, outcome.vatTreatment, provenance)
         }
 
         is Provenance.FilledFromBudgetKey -> {
             ResolvedBaseAmount.FallbackFromBudget(
                 outcome.sourceKey,
-                BaseAmount(outcome.won, Currency.KRW, VatTreatment.UNKNOWN, provenance),
+                BaseAmount(outcome.won, currency, outcome.vatTreatment, provenance),
             )
         }
 
@@ -89,9 +100,62 @@ private fun estimatedAmountAsResolved(outcome: AmountResolutionOutcome): Resolve
     if (outcome !is AmountResolutionOutcome.Resolved) return null
     return ResolvedEstimatedAmount(
         outcome.sourceKey,
-        EstimatedAmount(outcome.won, Currency.KRW, VatTreatment.UNKNOWN, outcome.provenance),
+        EstimatedAmount(outcome.won, currencyFor(outcome.unit), outcome.vatTreatment, outcome.provenance),
     )
 }
+
+/** 업무구분(⑤ D-3A-5, COL-08) — 코드·라벨 두 값. 매핑 없는 라벨은 `null`(임의 라벨 금지). */
+private fun businessCategoryFrom(
+    observation: RawNoticeObservation,
+    registry: KonepsFieldContractRegistry,
+): BusinessCategory? =
+    registry
+        .contractsFor(FieldConcept.BUSINESS_CATEGORY_CODE)
+        .firstOrNull()
+        ?.let(observation::valueOf)
+        ?.let { code ->
+            val label =
+                registry.contractsFor(FieldConcept.BUSINESS_CATEGORY_LABEL).firstOrNull()?.let(observation::valueOf)
+            BusinessCategory(CategoryCode(code), label?.let(::CategoryLabel))
+        }
+
+/**
+ * 배정예산(F-5) — `FilledFromBudgetKey` 폴백과는 **다른 자리**다. 자기 개념(`ALLOCATED_BUDGET`)
+ * 필드에 값이 있으면 그 자체로 게시값이라 `Provenance.Published`를 받는다(폴백에 쓰였는지
+ * 여부와 무관 — 축이 다르다, §5.2).
+ */
+private fun allocatedBudgetFrom(
+    observation: RawNoticeObservation,
+    registry: KonepsFieldContractRegistry,
+    noticeRound: NoticeRound,
+): AllocatedBudget? =
+    registry
+        .contractsFor(FieldConcept.ALLOCATED_BUDGET)
+        .firstOrNull()
+        ?.takeIf { it.scale == FieldScale.WON_INTEGER && !basisMismatch(it) }
+        ?.let { contract ->
+            observation
+                .valueOf(contract)
+                ?.replace(",", "")
+                ?.trim()
+                ?.toLongOrNull()
+                ?.takeIf { it > 0L }
+                ?.let { won -> AllocatedBudget(won, currencyFor(contract.unit), Provenance.Published(noticeRound)) }
+        }
+
+/** 게시 낙찰하한율(F-5) — 원문 percent → canonical fraction 은 계약 `scale` 지시로만 연다(ADR 0002 D-4). */
+private fun floorRateFrom(
+    observation: RawNoticeObservation,
+    registry: KonepsFieldContractRegistry,
+    noticeRound: NoticeRound,
+): FloorRate? =
+    registry
+        .contractsFor(FieldConcept.FLOOR_RATE)
+        .firstOrNull()
+        ?.takeIf { it.scale == FieldScale.PERCENT }
+        ?.let(observation::valueOf)
+        ?.toBigDecimalOrNull()
+        ?.let { numeric -> FloorRate(Rate.ofPercent(numeric), FloorRateOrigin.NoticeValue(noticeRound)) }
 
 /** 식별자가 선 뒤의 나머지 canonicalize — 금액 해석 둘 중 하나라도 계약 위반이면 항목 전체가 탈락한다(④·⑦). */
 private fun normalizedCommand(
@@ -100,10 +164,8 @@ private fun normalizedCommand(
     noticeId: NoticeId,
     unknownFieldCount: Int,
 ): CanonicalizationOutcome {
-    val baseAmountResolution =
-        resolveAmount(observation, noticeId.round, policy.baseAmountResolutionOrder, policy.fieldContracts)
-    val estimatedResolution =
-        resolveAmount(observation, noticeId.round, policy.estimatedPriceResolutionOrder, policy.fieldContracts)
+    val baseAmountResolution = resolveAmount(observation, noticeId.round, AmountAxis.BASE, policy)
+    val estimatedResolution = resolveAmount(observation, noticeId.round, AmountAxis.ESTIMATED, policy)
     return when {
         baseAmountResolution is AmountResolutionOutcome.Rejected -> {
             CanonicalizationOutcome.Dropped(baseAmountResolution.reason, unknownFieldCount)
@@ -117,10 +179,11 @@ private fun normalizedCommand(
             CanonicalizationOutcome.Normalized(
                 NoticeCollected(
                     id = noticeId,
-                    businessCategory = null,
+                    businessCategory = businessCategoryFrom(observation, policy.fieldContracts),
                     baseAmount = baseAmountAsResolved(baseAmountResolution),
                     estimatedAmount = estimatedAmountAsResolved(estimatedResolution),
-                    allocatedBudget = null,
+                    allocatedBudget = allocatedBudgetFrom(observation, policy.fieldContracts, noticeId.round),
+                    floorRate = floorRateFrom(observation, policy.fieldContracts, noticeId.round),
                     raw = observation,
                 ),
                 unknownFieldCount,

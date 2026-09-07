@@ -73,15 +73,62 @@ enum class SourceZoneRuleId {
 }
 
 /**
+ * 원문 값이 **무엇을 재는가**(§5.3 `unit` 슬롯, verifier r1 F-2 — `scale`과 분리된 슬롯이
+ * 승인 명세에 있는데 이전 판이 빠뜨렸다). `scale`이 파싱 **규칙**이라면 `unit`은 그 규칙이
+ * 적용되는 **물리 단위**다 — `data-dictionary.md` §1.4.1 "원문 unit이 보존되는 자리는 값이
+ * 아니라 필드 계약이다"의 그 자리.
+ */
+enum class FieldUnit {
+    WON,
+    PERCENT,
+    NONE,
+}
+
+/** `scale`↔`unit` 결속 — 하나가 다른 하나를 결정한다(같은 축의 두 이름이 서로 어긋나지 않게). */
+private val SCALE_UNIT_PAIRING: Map<FieldScale, FieldUnit> =
+    mapOf(
+        FieldScale.WON_INTEGER to FieldUnit.WON,
+        FieldScale.PERCENT to FieldUnit.PERCENT,
+        FieldScale.FRACTION to FieldUnit.NONE,
+        FieldScale.IDENTIFIER to FieldUnit.NONE,
+        FieldScale.DATETIME_NO_ZONE to FieldUnit.NONE,
+        FieldScale.OPAQUE_TEXT to FieldUnit.NONE,
+    )
+
+/**
+ * 개념이 요구하는 basis — 값이 있으면 그 개념의 계약은 반드시 이 basis 여야 한다(F-3,
+ * legacy `KEY_BASIS`가 `presmptPrce`·`presmptAmt`·`asignBdgtAmt`·`bdgtAmt` 넷을
+ * `BUDGET_ESTIMATE` 하나로 접은 것을 되돌린다 — 키마다 자기 basis 를 갖는다).
+ */
+private val CONCEPT_EXPECTED_BASIS: Map<FieldConcept, Basis> =
+    mapOf(
+        FieldConcept.BASE_AMOUNT to Basis.BASE_AMOUNT,
+        FieldConcept.ESTIMATED_AMOUNT to Basis.ESTIMATED,
+        FieldConcept.ALLOCATED_BUDGET to Basis.ALLOCATED_BUDGET,
+    )
+
+/** `contract`의 `concept`·`basis` 선언이 서로 어긋나는가 — 어긋나면 [resolveAmount]가 항목을 거부한다(F-3). */
+internal fun basisMismatch(contract: KonepsFieldContract): Boolean {
+    val expected = CONCEPT_EXPECTED_BASIS[contract.concept] ?: return false
+    return contract.basis != expected
+}
+
+/**
  * KONEPS 원문 필드의 의미 계약(④, §5.3) — **소비되는 모든 키에 필수**. 등재되지 않은 키는
  * canonical 값으로 소비될 수 없다 — 소비 함수([RawNoticeObservation.valueOf])가 이 타입을
  * 인자로 요구하는 구조 자체가 그 닫힘이다.
+ *
+ * **생성자가 `internal`이다**(verifier r1 F-4) — 공개였다면 다른 모듈이 그 자리에서 계약을
+ * 지어내 미등재 키를 읽을 수 있었다(우회 (1b)·(10) 실측). 운영 인스턴스는
+ * [KONEPS_COLLECTION_POLICY] 하나이고, procurement 밖에서 이 타입을 조립하는 경로는 없다.
  */
-data class KonepsFieldContract(
+@ConsistentCopyVisibility
+data class KonepsFieldContract internal constructor(
     val rawName: RawKey,
     val concept: FieldConcept,
     val basis: Basis?,
     val scale: FieldScale,
+    val unit: FieldUnit,
     val nullability: FieldNullability,
     val vatTreatment: VatTreatment,
     val authoritative: Boolean,
@@ -96,11 +143,50 @@ data class KonepsFieldContract(
         require((scale == FieldScale.DATETIME_NO_ZONE) == (sourceZone != null)) {
             "sourceZone은 DATETIME_NO_ZONE 필드에만 있어야 한다: $rawName"
         }
+        require(unit == SCALE_UNIT_PAIRING.getValue(scale)) {
+            "unit은 scale이 정하는 값이어야 한다: scale=$scale 기대 unit=${SCALE_UNIT_PAIRING.getValue(scale)} 실제=$unit ($rawName)"
+        }
+    }
+
+    companion object {
+        fun of(
+            rawName: RawKey,
+            concept: FieldConcept,
+            basis: Basis?,
+            scale: FieldScale,
+            nullability: FieldNullability,
+            vatTreatment: VatTreatment,
+            authoritative: Boolean,
+            presentIn: Set<SourceEndpoint>,
+            provenanceTemplate: FieldProvenanceTemplate,
+            effectiveFrom: EffectiveFrom,
+            expectedRange: ExpectedRangeKey? = null,
+            sourceZone: SourceZoneRuleId? = null,
+        ): KonepsFieldContract =
+            KonepsFieldContract(
+                rawName = rawName,
+                concept = concept,
+                basis = basis,
+                scale = scale,
+                unit = SCALE_UNIT_PAIRING.getValue(scale),
+                nullability = nullability,
+                vatTreatment = vatTreatment,
+                authoritative = authoritative,
+                presentIn = presentIn,
+                provenanceTemplate = provenanceTemplate,
+                effectiveFrom = effectiveFrom,
+                expectedRange = expectedRange,
+                sourceZone = sourceZone,
+            )
     }
 }
 
-/** 계약 레지스트리 — raw 키 하나에 계약 하나(중복 등재는 구성 오류). */
-data class KonepsFieldContractRegistry(
+/**
+ * 계약 레지스트리 — raw 키 하나에 계약 하나(중복 등재는 구성 오류). **생성자가 `internal`이다**
+ * (F-4) — [KonepsCollectionPolicyData] 를 통해서만 만들어진다.
+ */
+@ConsistentCopyVisibility
+data class KonepsFieldContractRegistry internal constructor(
     val contracts: List<KonepsFieldContract>,
 ) {
     private val byRawName: Map<RawKey, KonepsFieldContract> = contracts.associateBy { it.rawName }
@@ -117,4 +203,9 @@ data class KonepsFieldContractRegistry(
 
     /** 관측이 가진 키 중 이 레지스트리에 없는 키 — 미지 필드(COL-07 acceptance). */
     fun unknownKeysIn(observation: RawNoticeObservation): Set<RawKey> = observation.keys - byRawName.keys
+
+    companion object {
+        fun of(contracts: List<KonepsFieldContract>): KonepsFieldContractRegistry =
+            KonepsFieldContractRegistry(contracts)
+    }
 }

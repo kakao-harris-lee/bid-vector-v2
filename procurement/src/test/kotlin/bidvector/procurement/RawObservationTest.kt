@@ -10,7 +10,7 @@ import java.time.Instant
 private val NOW = Instant.parse("2026-09-07T00:00:00Z")
 
 private fun contract(rawName: String): KonepsFieldContract =
-    KonepsFieldContract(
+    KonepsFieldContract.of(
         rawName = RawKey(rawName),
         concept = FieldConcept.BASE_AMOUNT,
         basis = null,
@@ -21,8 +21,6 @@ private fun contract(rawName: String): KonepsFieldContract =
         presentIn = setOf(SourceEndpoint.NOTICE_LIST),
         provenanceTemplate = FieldProvenanceTemplate.PUBLISHED,
         effectiveFrom = EffectiveFrom.Initial,
-        expectedRange = null,
-        sourceZone = null,
     )
 
 /** ②④ — 원문은 감사를 위해 보존하되, 값 취득은 계약을 인자로 요구하는 [RawNoticeObservation.valueOf] 하나뿐이다. */

@@ -1,25 +1,32 @@
 package bidvector.procurement
 
+import bidvector.sharedkernel.AllocatedBudget
+import bidvector.sharedkernel.Basis
 import bidvector.sharedkernel.EffectiveFrom
+import bidvector.sharedkernel.FloorRate
+import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
+import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.VatTreatment
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
 import java.time.Instant
 
 private fun testContract(
     rawName: String,
     concept: FieldConcept,
     scale: FieldScale,
+    basis: Basis? = null,
     provenanceTemplate: FieldProvenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
 ): KonepsFieldContract =
-    KonepsFieldContract(
+    KonepsFieldContract.of(
         rawName = RawKey(rawName),
         concept = concept,
-        basis = null,
+        basis = basis,
         scale = scale,
         nullability = FieldNullability.OPTIONAL,
         vatTreatment = VatTreatment.UNKNOWN,
@@ -27,35 +34,52 @@ private fun testContract(
         presentIn = setOf(SourceEndpoint.NOTICE_LIST),
         provenanceTemplate = provenanceTemplate,
         effectiveFrom = EffectiveFrom.Initial,
-        expectedRange = null,
-        sourceZone = null,
     )
 
 /** legacy-behavior — test 전용 정책 인스턴스(조사 b-4). main `KONEPS_COLLECTION_POLICY`는 형태만 갖는다. */
 private val TEST_REGISTRY =
-    KonepsFieldContractRegistry(
+    KonepsFieldContractRegistry.of(
         listOf(
             testContract("bidNtceNo", FieldConcept.NOTICE_NUMBER, FieldScale.IDENTIFIER),
             testContract("bidNtceOrd", FieldConcept.NOTICE_ROUND, FieldScale.IDENTIFIER),
-            testContract("bssAmt", FieldConcept.BASE_AMOUNT, FieldScale.WON_INTEGER, FieldProvenanceTemplate.PUBLISHED),
+            testContract(
+                "bssAmt",
+                FieldConcept.BASE_AMOUNT,
+                FieldScale.WON_INTEGER,
+                Basis.BASE_AMOUNT,
+                FieldProvenanceTemplate.PUBLISHED,
+            ),
             testContract(
                 "bdgtAmt",
                 FieldConcept.ALLOCATED_BUDGET,
                 FieldScale.WON_INTEGER,
+                Basis.ALLOCATED_BUDGET,
                 FieldProvenanceTemplate.FILLED_FROM_BUDGET_KEY,
             ),
             testContract(
                 "presmptPrce",
                 FieldConcept.ESTIMATED_AMOUNT,
                 FieldScale.WON_INTEGER,
+                Basis.ESTIMATED,
                 FieldProvenanceTemplate.PUBLISHED,
             ),
             testContract(
                 "wrongScaleAmt",
                 FieldConcept.BASE_AMOUNT,
                 FieldScale.PERCENT,
+                Basis.BASE_AMOUNT,
                 FieldProvenanceTemplate.PUBLISHED,
             ),
+            testContract(
+                "wrongBasisAmt",
+                FieldConcept.BASE_AMOUNT,
+                FieldScale.WON_INTEGER,
+                Basis.ESTIMATED,
+                FieldProvenanceTemplate.PUBLISHED,
+            ),
+            testContract("bsnsDivCd", FieldConcept.BUSINESS_CATEGORY_CODE, FieldScale.OPAQUE_TEXT),
+            testContract("bsnsDivNm", FieldConcept.BUSINESS_CATEGORY_LABEL, FieldScale.OPAQUE_TEXT),
+            testContract("sucsfbidLwltRate", FieldConcept.FLOOR_RATE, FieldScale.PERCENT),
         ),
     )
 
@@ -78,30 +102,32 @@ class ResolveAmountTest {
     fun `첫 후보가 값을 가지면 Published 로 해석한다`() {
         val observation = observationOf(mapOf("bssAmt" to "1,000,000", "bdgtAmt" to "500000"))
 
-        val outcome =
-            resolveAmount(observation, NoticeRound.of("000"), TEST_POLICY.baseAmountResolutionOrder, TEST_REGISTRY)
+        val outcome = resolveAmount(observation, NoticeRound.of("000"), AmountAxis.BASE, TEST_POLICY)
 
-        outcome shouldBe
-            AmountResolutionOutcome.Resolved(RawKey("bssAmt"), 1_000_000L, Provenance.Published(NoticeRound.of("000")))
+        outcome.shouldBeInstanceOf<AmountResolutionOutcome.Resolved>()
+        outcome.sourceKey shouldBe RawKey("bssAmt")
+        outcome.won shouldBe 1_000_000L
+        outcome.unit shouldBe FieldUnit.WON
+        outcome.provenance shouldBe Provenance.Published(NoticeRound.of("000"))
     }
 
     @Test
     fun `0 이나 결측 후보는 건너뛰고 다음 후보로 폴백한다 — §5-2`() {
         val observation = observationOf(mapOf("bssAmt" to "0", "bdgtAmt" to "500000"))
 
-        val outcome =
-            resolveAmount(observation, NoticeRound.of("000"), TEST_POLICY.baseAmountResolutionOrder, TEST_REGISTRY)
+        val outcome = resolveAmount(observation, NoticeRound.of("000"), AmountAxis.BASE, TEST_POLICY)
 
-        outcome shouldBe
-            AmountResolutionOutcome.Resolved(RawKey("bdgtAmt"), 500_000L, Provenance.FilledFromBudgetKey("bdgtAmt"))
+        outcome.shouldBeInstanceOf<AmountResolutionOutcome.Resolved>()
+        outcome.sourceKey shouldBe RawKey("bdgtAmt")
+        outcome.won shouldBe 500_000L
+        outcome.provenance shouldBe Provenance.FilledFromBudgetKey("bdgtAmt")
     }
 
     @Test
     fun `모든 후보가 없거나 0 이면 Unresolved 다`() {
         val observation = observationOf(mapOf("bssAmt" to "0"))
 
-        val outcome =
-            resolveAmount(observation, NoticeRound.of("000"), TEST_POLICY.baseAmountResolutionOrder, TEST_REGISTRY)
+        val outcome = resolveAmount(observation, NoticeRound.of("000"), AmountAxis.BASE, TEST_POLICY)
 
         outcome shouldBe AmountResolutionOutcome.Unresolved
     }
@@ -109,8 +135,9 @@ class ResolveAmountTest {
     @Test
     fun `scale 이 WON_INTEGER 가 아니면 항목을 거부한다 — 다음 후보로 넘어가지 않는다`() {
         val observation = observationOf(mapOf("wrongScaleAmt" to "87.995"))
+        val policy = TEST_POLICY.copy(baseAmountResolutionOrder = listOf(RawKey("wrongScaleAmt")))
 
-        val outcome = resolveAmount(observation, NoticeRound.of("000"), listOf(RawKey("wrongScaleAmt")), TEST_REGISTRY)
+        val outcome = resolveAmount(observation, NoticeRound.of("000"), AmountAxis.BASE, policy)
 
         outcome shouldBe
             AmountResolutionOutcome.Rejected(
@@ -120,10 +147,24 @@ class ResolveAmountTest {
     }
 
     @Test
+    fun `basis 가 concept 과 어긋나면 항목을 거부한다 — F-3`() {
+        val observation = observationOf(mapOf("wrongBasisAmt" to "1000000"))
+        val policy = TEST_POLICY.copy(baseAmountResolutionOrder = listOf(RawKey("wrongBasisAmt")))
+
+        val outcome = resolveAmount(observation, NoticeRound.of("000"), AmountAxis.BASE, policy)
+
+        outcome shouldBe
+            AmountResolutionOutcome.Rejected(
+                RawKey("wrongBasisAmt"),
+                CollectionDropReason.CollectionContractViolation(ContractViolationAxis.BASIS),
+            )
+    }
+
+    @Test
     fun `숫자로 파싱되지 않는 값은 ParseFailure 다`() {
         val observation = observationOf(mapOf("bssAmt" to "not-a-number"))
 
-        val outcome = resolveAmount(observation, NoticeRound.of("000"), listOf(RawKey("bssAmt")), TEST_REGISTRY)
+        val outcome = resolveAmount(observation, NoticeRound.of("000"), AmountAxis.BASE, TEST_POLICY)
 
         outcome shouldBe
             AmountResolutionOutcome.Rejected(
@@ -135,14 +176,9 @@ class ResolveAmountTest {
     @Test
     fun `등재되지 않은 순서 항목은 건너뛴다 — 정책 구성 오류를 방어적으로 흡수`() {
         val observation = observationOf(mapOf("bdgtAmt" to "500000"))
+        val policy = TEST_POLICY.copy(baseAmountResolutionOrder = listOf(RawKey("bdgtAmt")))
 
-        val outcome =
-            resolveAmount(
-                observation,
-                NoticeRound.of("000"),
-                listOf(RawKey("neverRegistered"), RawKey("bdgtAmt")),
-                TEST_REGISTRY,
-            )
+        val outcome = resolveAmount(observation, NoticeRound.of("000"), AmountAxis.BASE, policy)
 
         outcome.shouldBeInstanceOf<AmountResolutionOutcome.Resolved>()
     }
@@ -203,6 +239,67 @@ class CanonicalizeTest {
         val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
 
         outcome.command.baseAmount.shouldBeInstanceOf<ResolvedBaseAmount.FallbackFromBudget>()
+    }
+
+    @Test
+    fun `기초금액 통화·과세는 계약에서 읽는다 — F-2 리터럴 금지`() {
+        val observation =
+            observationOf(mapOf("bidNtceNo" to "20260101001", "bidNtceOrd" to "000", "bssAmt" to "1000000"))
+
+        val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
+        val direct = outcome.command.baseAmount as ResolvedBaseAmount.Direct
+
+        direct.amount.vatTreatment shouldBe VatTreatment.UNKNOWN
+    }
+
+    @Test
+    fun `업무구분 코드·라벨이 있으면 businessCategory 를 채운다 — F-5`() {
+        val observation =
+            observationOf(
+                mapOf(
+                    "bidNtceNo" to "20260101001",
+                    "bidNtceOrd" to "000",
+                    "bsnsDivCd" to "0411",
+                    "bsnsDivNm" to "기술용역",
+                ),
+            )
+
+        val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
+
+        outcome.command.businessCategory shouldBe BusinessCategory(CategoryCode("0411"), CategoryLabel("기술용역"))
+    }
+
+    @Test
+    fun `배정예산 필드가 있으면 allocatedBudget 을 자기 자리로 채운다 — 예산 키 폴백과 다른 축`() {
+        val observation =
+            observationOf(
+                mapOf(
+                    "bidNtceNo" to "20260101001",
+                    "bidNtceOrd" to "000",
+                    "bssAmt" to "1000000",
+                    "bdgtAmt" to "500000",
+                ),
+            )
+
+        val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
+        val budget = outcome.command.allocatedBudget
+
+        budget.shouldBeInstanceOf<AllocatedBudget>()
+        budget.provenance shouldBe Provenance.Published(NoticeRound.of("000"))
+        outcome.command.baseAmount.shouldBeInstanceOf<ResolvedBaseAmount.Direct>()
+    }
+
+    @Test
+    fun `게시 낙찰하한율은 percent 원문을 fraction 으로 바꿔 FloorRateOrigin_NoticeValue 로 낸다 — F-5`() {
+        val observation =
+            observationOf(
+                mapOf("bidNtceNo" to "20260101001", "bidNtceOrd" to "000", "sucsfbidLwltRate" to "87.995"),
+            )
+
+        val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
+
+        outcome.command.floorRate shouldBe
+            FloorRate(Rate.ofPercent(BigDecimal("87.995")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
     }
 }
 
