@@ -11,8 +11,13 @@ private val REFERENCE_DATE: LocalDate = LocalDate.of(2026, 9, 7)
 
 private val RESOLVED_POLICY: KonepsCollectionPolicyData =
     when (val resolution = KONEPS_COLLECTION_POLICY.resolve(REFERENCE_DATE)) {
-        is Resolution.Resolved -> resolution.value
-        is Resolution.NotApplicable -> error("KONEPS_COLLECTION_POLICY 가 $REFERENCE_DATE 에 해석되지 않는다: ${resolution.reason}")
+        is Resolution.Resolved -> {
+            resolution.value
+        }
+
+        is Resolution.NotApplicable -> {
+            error("KONEPS_COLLECTION_POLICY 가 $REFERENCE_DATE 에 해석되지 않는다: ${resolution.reason}")
+        }
     }
 
 /**
@@ -22,7 +27,9 @@ private val RESOLVED_POLICY: KonepsCollectionPolicyData =
 class CollectionPolicyTest {
     @Test
     fun `필드 계약은 승인된 채택분 열 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
-        RESOLVED_POLICY.fieldContracts.contracts.map { it.rawName.name }.toSet() shouldBe
+        RESOLVED_POLICY.fieldContracts.contracts
+            .map { it.rawName.name }
+            .toSet() shouldBe
             setOf(
                 "bidNtceNo",
                 "bidNtceOrd",
@@ -73,11 +80,12 @@ class CollectionPolicyTest {
 
     @Test
     fun `resultCode 범주는 16 코드를 담고 03 은 NO_DATA 다 — P-4`() {
-        RESOLVED_POLICY.resultCodeCategories.size shouldBe 16
-        RESOLVED_POLICY.resultCodeCategories.first { it.code == "03" }.category shouldBe ResultCodeCategory.NO_DATA
-        RESOLVED_POLICY.resultCodeCategories.first { it.code == "08" }.category shouldBe ResultCodeCategory.INPUT_ERROR
-        RESOLVED_POLICY.resultCodeCategories.first { it.code == "22" }.category shouldBe ResultCodeCategory.QUOTA_EXCEEDED
-        RESOLVED_POLICY.resultCodeCategories.first { it.code == "30" }.category shouldBe ResultCodeCategory.NOT_RETRYABLE
+        val categories = RESOLVED_POLICY.resultCodeCategories
+        categories.size shouldBe 16
+        categories.first { it.code == "03" }.category shouldBe ResultCodeCategory.NO_DATA
+        categories.first { it.code == "08" }.category shouldBe ResultCodeCategory.INPUT_ERROR
+        categories.first { it.code == "22" }.category shouldBe ResultCodeCategory.QUOTA_EXCEEDED
+        categories.first { it.code == "30" }.category shouldBe ResultCodeCategory.NOT_RETRYABLE
     }
 
     @Test
