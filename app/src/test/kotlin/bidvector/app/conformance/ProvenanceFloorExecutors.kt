@@ -25,6 +25,7 @@ import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.sharedkernel.Measurement
 import bidvector.sharedkernel.Money
+import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
@@ -186,7 +187,7 @@ private fun rateFromFractionNode(node: JsonNode): Rate {
 }
 
 /** 이 corpus 의 어느 case 도 `noticeRevision`을 값으로 주장하지 않는다(1B-c 관례와 같다). */
-private const val UNASSERTED_FLOOR_RATE_NOTICE_REVISION = 0
+private val UNASSERTED_FLOOR_RATE_NOTICE_REVISION = NoticeRound.of("000")
 
 /** legacy 6자리(조사 §2.1) — main 정책이 아니라 이 runner 의 test 정책 인스턴스에만 쓴다. */
 private const val LEGACY_CRITICAL_RATE_SCALE_DIGITS = 6

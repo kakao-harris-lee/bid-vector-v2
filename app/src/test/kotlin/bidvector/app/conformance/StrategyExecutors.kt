@@ -4,6 +4,7 @@ import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.Fact
+import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.ReasonCode
@@ -75,7 +76,7 @@ private fun strategyProvenanceFrom(node: JsonNode): Provenance {
     }
     return when (val name = provenanceNode.asString()) {
         "OperatorDeclared" -> Provenance.OperatorDeclared
-        "Published" -> Provenance.Published(node.path("noticeRevision").asString("0").toIntOrNull() ?: 0)
+        "Published" -> Provenance.Published(NoticeRound.of(node.path("noticeRevision").asString("000")))
         else -> error("이 corpus 가 다루지 않는 provenance 토큰: $name")
     }
 }

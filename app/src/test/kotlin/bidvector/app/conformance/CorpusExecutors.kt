@@ -20,6 +20,7 @@ import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EstimatedAmount
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.Money
+import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
@@ -95,11 +96,13 @@ internal val RATE_EXECUTORS: Map<String, (JsonNode, JsonNode, List<String>) -> U
 // ---- money-basis value executor 보조 — Money 조립 ----
 
 /** 이 corpus 의 어느 case 도 `noticeRevision` 을 값으로 주장하지 않는다 — 없으면 쓰는 자리표시자. */
-private const val UNASSERTED_NOTICE_REVISION = 0
+private val UNASSERTED_NOTICE_REVISION = NoticeRound.of("000")
 
 /**
  * `provenance` 토큰 문자열 → 계약 값. 형제 노드(`siblingNode`)는 `Published` 의
  * `noticeRevision`·`FilledFromBudgetKey` 의 `key` 처럼 variant 별 부가 성분을 읽는 자리다.
+ * `noticeRevision` 은 [NoticeRound] 다(M3/3A D-3A-0 (a)) — fixture 는 이미 제로패딩 문자열
+ * (`"000"`)을 준다, `toInt` 접힘을 두지 않는다(R-QUAL-05).
  */
 private fun provenanceFromToken(
     name: String,
@@ -107,8 +110,13 @@ private fun provenanceFromToken(
 ): Provenance =
     when (name) {
         "Published" -> {
+            val noticeRevisionNode = siblingNode.path("noticeRevision")
             val noticeRevision =
-                siblingNode.path("noticeRevision").asString(null)?.toIntOrNull() ?: UNASSERTED_NOTICE_REVISION
+                if (noticeRevisionNode.isMissingNode || noticeRevisionNode.isNull) {
+                    UNASSERTED_NOTICE_REVISION
+                } else {
+                    NoticeRound.of(noticeRevisionNode.asString())
+                }
             Provenance.Published(noticeRevision)
         }
 
