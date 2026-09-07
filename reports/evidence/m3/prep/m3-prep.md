@@ -1,4 +1,4 @@
-# M3 준비 — KONEPS 수집·정규화·저장 경계 · slice 지도와 착수 전 결정 후보 (초안, 구현 전)
+# M3 준비 — KONEPS 수집·정규화·저장 경계 · slice 지도와 착수 전 결정 후보 — **착수 2026-09-07**
 
 > **지위**: M2 진행 중에 세션 모델(Fable 5.1)이 단독으로 쓴 **준비 문서**다(CLAUDE.md 운영자 지시 2026-09-04). 구현·gradle·
 > 의존성·fixture 편집은 하지 않았다. **M3 착수는 M2 계약 승인 뒤 운영자 별도 지시**(`milestone-3.md` 「선행 조건」 — M1 domain
@@ -9,6 +9,13 @@
 > 작성 시점 HEAD `040ab9d` 이후(2026-09-07). 근거: `milestone-3.md` · `v2-지침서.md` §3.1·§4.1·§4.3·§4.5·§6 · `ADR 0004` D-1~D-6 ·
 > `ADR 0005` D-1~D-11 · `ADR 0006` D-2~D-7 · `data-dictionary.md` §2.2.1·§5.1~5.3·§13.4 · `capability-map.md` COL-01~COL-10·§14.2
 > `OPEN-COL-*` · `data-extract.md` 「KONEPS 수집」 · 조사 노트 `_workspace/m3-prep/01_scout_collection.md`.
+
+**착수 기록 2026-09-07(세션 모델)** — 선행 조건: M1 승인 `040ab9d` · M2 완료 `a9f1ff9`(2D 종결·push·태그) · KONEPS fixture 는 D-M3-8 (a) 대로
+curator 선행(별도 세션). **운영자 결정: D-M3-1~8 전부 추천안** — (1) JDK `HttpClient` + 코루틴 (2) JDK `HttpServer` mock 1차 (3) 필드 계약은
+`procurement` 정책 데이터 (4) resultCode 17 범주도 `procurement` 정책 데이터 (5) 키 variant 불채택 + rate limit 정책값·관측 갱신 (6) LLM 은 port 뒤
+fake 만 (7) Testcontainers 로컬 실측(Docker 29.5.3 확인) (8) fixture 승격은 curator. 3A 착수 전 결정 D-3A-0·1·2 전부 (a). 병렬 레인 셋을 별도
+세션으로(브리프 `_workspace/briefs/2026-09-07-m3-parallel-briefs.md`): curator(fixture 승격·신설 + 정책 값 표) · 문서(3C·3D 계약 초안 + `OPEN-3A-*`
+등재) · 하네스(`OPEN-2B-TEST-DISCOVERY-GUARD` + 2D 알려진 제한 11~13). §5 병행 규칙의 「M3 코드 착수 금지」는 M2 완료로 해제.
 
 ---
 

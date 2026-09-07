@@ -1,4 +1,4 @@
-# Slice 계약 — M3 / 3A · 수집 port 와 canonical fact — **초안, 구현 전**
+# Slice 계약 — M3 / 3A · 수집 port 와 canonical fact — **착수 2026-09-07**
 
 > **지위**: M2 진행 중에 세션 모델이 쓴 **계약 초안**. 구현·gradle·fixture 편집 없음. 착수는 M2 계약 승인 뒤 운영자 지시로 하며 그때
 > `base_sha` 재고정(40자), `prep/m3-prep.md` D-M3-3·4·8 과 아래 D-3A-0~2 답 수령, `milestone-3.md` 착수 문단. 3A 의 도메인 코드는 M2 경로와
@@ -9,20 +9,24 @@
 ```yaml
 milestone: m3
 slice: 3a-collection-ports-and-canonical-facts
-base_sha: 040ab9d   # 초안 시점 앵커(M1 전체 승인) — **M2 승인 뒤 착수 시 재고정**
+base_sha: a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f   # 착수 2026-09-07 재고정 = M2 완료·push 시점. 초안 시점은 040ab9d
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - procurement/**                                    # 도메인: canonical fact 타입·수집 command·port 인터페이스 셋·식별자 값 객체·필드 계약 레지스트리 타입·수집 회계·provenance 판정 지점·정책 데이터 형태·test
-  - procurement/src/main/resources/policy/**          # 정책 데이터 형태만(값은 curator·운영자): 필드 계약 목록 · resultCode 17 범주 · 해석 순서(§5.2)
-  - config/quality/gate-tests.properties              # 조건부 — `gate.tests.procurement` (2A 가 편집한 파일 — **2A 머지 뒤 병합**)
-  - app/src/test/kotlin/bidvector/app/conformance/**   # 조건부 — `koneps-collection` authoritative 가 있을 때 runner dispatch(1B-c~1E 관례). 2A 머지 뒤
-  - app/build.gradle.kts                              # 조건부 — testImplementation(project(":procurement")) 한 줄. 2A 머지 뒤
-  - fixtures/manifest.yaml, fixtures/input/**, fixtures/expected/**   # 조건부 — D-M3-8 승격·신설(curator, 기존 기대값 무변경)
+  - shared-kernel/src/main/kotlin/bidvector/sharedkernel/NoticeRound.kt   # D-3A-0 (a) 승인 — 신설: 제로패딩 문자열 값 객체(정규화 규칙 소유, 산술 미정의, 등가성은 원문 문자열)
+  - shared-kernel/src/main/kotlin/bidvector/sharedkernel/Provenance.kt     # D-3A-0 (a) — `Published(noticeRevision: NoticeRound)` 타입 교체(좁은 확장, 1D D-1 선례)
+  - shared-kernel/src/main/kotlin/bidvector/sharedkernel/Rate.kt           # D-3A-0 (a) — `FloorRateOrigin.NoticeValue(noticeRevision)` 도 같은 타입(조사 G-1: 같은 사실이 두 자리) — 이 파일의 다른 편집 금지
+  - shared-kernel/src/test/kotlin/**                   # 위 타입 교체의 영향 test 만(값 불변, 생성자 인자 형태만)
+  - config/quality/gate-tests.properties              # `gate.tests.procurement`(M2 종결로 조건 해제 — 2A·2D 가 만든 키에 병합)
+  - app/src/test/kotlin/bidvector/app/conformance/**   # (i) 기존 executor 의 `noticeRevision` `toInt` 접힘을 `NoticeRound` 로 정정(D-3A-0 파급 — `CorpusExecutors`·`StrategyExecutors`) (ii) `koneps-collection` dispatch 는 curator 승격 뒤 병합(authoritative ≥ 1 이 조건)
+  - app/build.gradle.kts                              # testImplementation(project(":procurement")) 한 줄
+  - reports/evidence/m3/3a/policy-values.md           # **curator 레인 산출**(별도 세션, D-3A-2 (a)) — 필드 계약 목록·resultCode 17 범주·해석 순서의 승인 표(층 표기·출처). 3A 구현 레인은 읽기만
   - milestone-3.md                                    # 「Slice 3A」 착수 문단, 착수 시
   - reports/evidence/m3/3a/**
 out_of_scope:
   - adapters/**                                       # HTTP·파싱·DB 는 3B·3D. 3A 는 port 와 타입만
-  - shared-kernel/**                                  # 1B·1D 승인 산출물 — 필요한 carrier 부재 시 멈추고 보고. **예외 후보: D-3A-0 (a) 채택 시 `Provenance.Published` 의 차수 타입 교체 한 곳**(좁은 확장, 1D 선례) — 채택되면 in_scope 로 이동
+  - shared-kernel/** 의 위 넷 밖                        # 1B·1D 승인 산출물 — 필요한 carrier 부재 시 멈추고 보고
+  - fixtures/manifest.yaml, fixtures/input/**, fixtures/expected/**   # **curator 레인(별도 세션) 소유** — D-M3-8 (a) 승격·신설. 3A 구현 레인은 편집하지 않는다(runner 는 읽기만)
   - 감시·자격·판정 소비                                 # M4 4B
   - 공고 상태 전이표의 실행(§2.2.1)                       # `NoticeStatus` 값·전이 test 는 3A 가 두되 **이벤트를 만드는 use case** 는 4B
   - 브라우저 크롤(COL-09)·mock 데이터(COL-10)·수집 스케줄·lease(OPS-01/02)
@@ -48,7 +52,20 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시 재고정한 base 로 낸다.
+`git log --oneline a9f1ff9..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-07) **없음**.
+
+**착수 2026-09-07 — 운영자 결정**: D-M3-1~8 전부 추천안(`prep/m3-prep.md` §3) · D-3A-0 (a) · D-3A-1 (a) · D-3A-2 (a) · 착수 순서 「curator 선행(별도
+세션) → 3A 계약 확정 → Phase 2.5(세션 모델 직접, `_workspace/m3-3a/01_design-review.md`) → 3A 구현」, 3A 도메인 코드는 fixture 승인 전에
+시작하되 runner dispatch 는 승인 뒤 병합. **계약 정정 둘(착수 시, 세션 모델)**: ① 정책 데이터의 자리는 리소스 파일이 아니라 **Kotlin
+`EffectiveDatedPolicy` 인스턴스**(1C `LICENSE_QUALIFICATION_POLICY`·1D `ProvenancePolicyData` 관례 — `source` 에 출처·승인일) — 3A 는
+형태 + test 정책 인스턴스까지, 운영 값 인스턴스는 curator 승인 표(`policy-values.md`) 수령 뒤 **한 커밋**(3A 잔여 일괄 또는 3B 착수 전).
+corpus 9 case 는 입력 안에 `fieldContract.registeredKeys` 를 들고 있어 정책 값에 의존하지 않는다. ② D-3A-0 의 좁은 확장은 `Published`
+하나가 아니라 **`FloorRateOrigin.NoticeValue(noticeRevision)`(조사 G-1)과 app conformance executor 의 `toInt` 접힘**(fixture 15건이 이미
+`"noticeRevision": "000"` 문자열)까지다 — 그 접힘이 정확히 R-QUAL-05 형태라 3A 가 함께 정정한다.
+
+**병렬 레인 경계(착수 시, 공유 working tree)**: curator 레인 = `fixtures/**` + `reports/evidence/m3/3a/policy-values.md` + `fixtures-*.md` evidence ·
+문서 레인 = `docs/discovery/**`·`reports/evidence/m3/{3c,3d}/**` · 하네스 레인 = `build-logic/**`·`contracts/tools/**`·`config/quality/**` **단
+`gate-tests.properties` 제외**(3A in_scope). 3A 구현 레인은 그 경로들을 편집하지 않고, 각 레인은 자기 경로만 개별 `git add` 후 즉시 커밋.
 
 ---
 
@@ -77,13 +94,15 @@ rollback: |
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
-| **D-3A-0** | **`Provenance.Published(noticeRevision: Int)` 의 정정** — shared-kernel(1B)의 `Published` 가 차수를 `Int` 로 나른다. M1 은 값을 주장하지 않아 비껴갔지만 3A 는 차수를 표적조회 필수 입력(`bidNtceOrd`, 제로패딩 `"000"`)으로 쓴다 — `Int` 면 `R-QUAL-05`(1차 공고 전부 자격 상실) 재현 경로(조사 요약 11) | (a) **shared-kernel 좁은 확장**(1D D-1 (a) 선례): `Published(noticeRevision: NoticeRound)` 로 타입 교체, `NoticeRound` 는 제로패딩 문자열 값 객체를 shared-kernel 에 신설 (b) 3A 가 `procurement` 안에서 `NoticeRound` 를 두고 `Published` 는 건드리지 않음 — 두 값이 두 자리 (c) `Published(noticeRevision: String)` | **(a)** — 같은 사실이 두 타입으로 있으면(b) 변환 자리에서 `int` 회귀가 되살아난다. (c) 는 정규화 규칙 없는 문자열. **대가**: 승인 산출물(1B) 편집 → 계약 갱신 + 운영자 승인; `data-dictionary.md` §5.1 문면(`Published(noticeRevision)`)의 타입 갱신은 **별도 문서 개정**(3A out_of_scope — 여기서는 `OPEN-3A-NOTICE-ROUND` 로 등재만). 1B 코퍼스의 `Published` 사용 case 는 값 변경 없이 타입만 | 착수 전 |
-| **D-3A-1** | **canonical fact 의 aggregate 경계** — `Notice` 하나에 공고·자격 원문·예비가격·개찰 결과를 다 두는가 | (a) **`Notice`(공고 fact + 상태) · `OpeningResult`(개찰·예비가격·낙찰) · `QualificationText`(자격 원문) 셋을 `NoticeId` 로 묶는 별도 fact** (b) `Notice` 단일 aggregate | **(a)** — 셋은 출처(피드)·시점·수집 실패 단위가 다르고(COL-03 「공고 1건당 별도 호출」, COL-04 「표적조회 서브콜」), 단일 aggregate 면 멤버 30 게이트와 「부분 성공」 표현이 어긋난다. §2.1 aggregate 경계 넷과 대조해 착수 시 확정 | 착수 전 |
-| **D-3A-2** | **정책 데이터 초기값의 출처** — 필드 계약 목록·resultCode 17·해석 순서 | (a) **legacy `field_contract_spec.py`·조달청 참고자료 §에러코드에서 curator 가 추출, `legacy-behavior`/`authoritative`(문서 출처) 층 표기, 운영자 승인** (b) 세션 모델이 직접 기입 | **(a)** — 값은 승인 대상(§5.3 「소비되는 모든 키에 필수」). 3A 는 형태·version 배관만 | 착수 전 |
+| **D-3A-0** ✅ (a) 승인 2026-09-07 | **`Provenance.Published(noticeRevision: Int)` 의 정정** — shared-kernel(1B)의 `Published` 가 차수를 `Int` 로 나른다. M1 은 값을 주장하지 않아 비껴갔지만 3A 는 차수를 표적조회 필수 입력(`bidNtceOrd`, 제로패딩 `"000"`)으로 쓴다 — `Int` 면 `R-QUAL-05`(1차 공고 전부 자격 상실) 재현 경로(조사 요약 11) | (a) **shared-kernel 좁은 확장**(1D D-1 (a) 선례): `Published(noticeRevision: NoticeRound)` 로 타입 교체, `NoticeRound` 는 제로패딩 문자열 값 객체를 shared-kernel 에 신설 (b) 3A 가 `procurement` 안에서 `NoticeRound` 를 두고 `Published` 는 건드리지 않음 — 두 값이 두 자리 (c) `Published(noticeRevision: String)` | **(a)** — 같은 사실이 두 타입으로 있으면(b) 변환 자리에서 `int` 회귀가 되살아난다. (c) 는 정규화 규칙 없는 문자열. **대가**: 승인 산출물(1B) 편집 → 계약 갱신 + 운영자 승인; `data-dictionary.md` §5.1 문면(`Published(noticeRevision)`)의 타입 갱신은 **별도 문서 개정**(3A out_of_scope — 여기서는 `OPEN-3A-NOTICE-ROUND` 로 등재만). 1B 코퍼스의 `Published` 사용 case 는 값 변경 없이 타입만 | 착수 전 |
+| **D-3A-1** ✅ (a) 승인 2026-09-07 | **canonical fact 의 aggregate 경계** — `Notice` 하나에 공고·자격 원문·예비가격·개찰 결과를 다 두는가 | (a) **`Notice`(공고 fact + 상태) · `OpeningResult`(개찰·예비가격·낙찰) · `QualificationText`(자격 원문) 셋을 `NoticeId` 로 묶는 별도 fact** (b) `Notice` 단일 aggregate | **(a)** — 셋은 출처(피드)·시점·수집 실패 단위가 다르고(COL-03 「공고 1건당 별도 호출」, COL-04 「표적조회 서브콜」), 단일 aggregate 면 멤버 30 게이트와 「부분 성공」 표현이 어긋난다. §2.1 aggregate 경계 넷과 대조해 착수 시 확정 | 착수 전 |
+| **D-3A-2** ✅ (a) 승인 2026-09-07 — curator 는 별도 세션 | **정책 데이터 초기값의 출처** — 필드 계약 목록·resultCode 17·해석 순서 | (a) **legacy `field_contract_spec.py`·조달청 참고자료 §에러코드에서 curator 가 추출, `legacy-behavior`/`authoritative`(문서 출처) 층 표기, 운영자 승인** (b) 세션 모델이 직접 기입 | **(a)** — 값은 승인 대상(§5.3 「소비되는 모든 키에 필수」). 3A 는 형태·version 배관만 | 착수 전 |
 | **D-3A-3** | 원문 보존 형태 — `RawNoticeObservation.fields: Map<RawKey, String>`(문자열 그대로)이고 타입 변환은 canonical 쪽에서만. `RawKey` 는 값 객체(문자열 키 dict 의 오타 무시 회귀 — legacy `base.py` 자인) | — | 계약 고정 |
-| **D-3A-4** | 일시는 `Instant` + 원문 문자열 + 해석 규칙 id(정책) — 「타임존 없는 일시 문자열」은 KST 로 해석하되 그 해석이 provenance 에 남는다. **조사 관측(미확정, ledger 미등재)**: legacy 는 KONEPS 벽시계 문자열을 **UTC 로 파싱**하는데 원문은 한국 현지시각으로 보여 저장 마감이 9시간 밀렸을 수 있다 — 공식 문서로 출처 타임존을 확인 못 함. V2 는 해석 규칙을 **정책 데이터**(`KST` 초기값, 출처 문서 확인 뒤 승인)로 두고 원문을 보존하므로 규칙이 틀려도 재해석 가능. 착수 시 `OPEN-3A-SOURCE-TZ` 등재 | — | 계약 고정 |
+| **D-3A-4** | 일시는 `Instant` + 원문 문자열 + 해석 규칙 id(정책). **착수 보강(조사 G-7)**: §5.3 계약에 시각 축 슬롯 `sourceZone` 을 더해 「타임존 없는 문자열의 출처 zone」이 필드 계약에서 읽히게 한다(값 크기·형태로 추측 금지와 같은 갈래) — 「타임존 없는 일시 문자열」은 KST 로 해석하되 그 해석이 provenance 에 남는다. **조사 관측(미확정, ledger 미등재)**: legacy 는 KONEPS 벽시계 문자열을 **UTC 로 파싱**하는데 원문은 한국 현지시각으로 보여 저장 마감이 9시간 밀렸을 수 있다 — 공식 문서로 출처 타임존을 확인 못 함. V2 는 해석 규칙을 **정책 데이터**(`KST` 초기값, 출처 문서 확인 뒤 승인)로 두고 원문을 보존하므로 규칙이 틀려도 재해석 가능. 착수 시 `OPEN-3A-SOURCE-TZ` 등재 | — | 계약 고정 |
 | **D-3A-5** | 업무구분은 `BusinessCategory(code: CategoryCode, label: Label?)` 두 값 — 매핑 없는 코드는 `label = null`(미지), 임의 라벨 금지(COL-08) | — | 계약 고정 |
-| **D-3A-6** | 회계의 `dropReasons` 어휘는 3A 소유 sealed(`MissingNoticeNumber`·`UnknownField`·`ContractViolation(scale/basis)`·`ParseFailure(kind)`) — OPS-09 실패 분류와 겹치지 않게 접두 | — | 계약 고정 |
+| **D-3A-6** | 회계의 `dropReasons` 어휘는 3A 소유 sealed(`MissingNoticeNumber`·`UnknownField`·`ContractViolation(scale/basis)`·`ParseFailure(kind)`) — OPS-09 실패 분류와 겹치지 않게 접두. **소스 중립**(조사 G-5: legacy 는 공고 경로 `parse_rejected`·개찰 경로 `missing_notice_number` 로 갈렸다) | — | 계약 고정 |
+| **D-3A-7** | **Basis 토큰의 정본은 코드**(`Basis.ESTIMATED` 등, 조사 G-2) — fixture 문자열 `ESTIMATED_PRICE` 는 curator 승격 시 코드 토큰으로 정합(기대값 의미 불변), runner 는 매핑하지 않는다 | — | 계약 고정(curator 브리프) |
+| **D-3A-8** | **§5.5 시공능력 수집 필드**(`cnstrtnAbltyEvlAmtList`, 조사 G-9)는 3A 가 `UnnormalizedFigure` + 필드 계약으로 **수집 형태만** 둔다 — 단위·과세 정규화는 `OPEN-QUAL-10` 소유 | — | 계약 고정 |
 
 ---
 
@@ -115,6 +134,6 @@ rollback: |
 | `OPEN-COL-03` | `BusinessCategory` 두 값 + 미지 코드 표현까지. 전체 코드표는 활성 유지 |
 | `OPEN-DIC-08`(닫힘) | 파생값은 계산 정책 version 만 — `DerivedFromOpening` 의 predecessor 참조는 `DecisionProvenance` 소유(1B 조정) |
 | `OPEN-REG-05` | 기초금액·추정가격 과세 처리 — 3A 는 필드 계약의 `vatTreatment` 슬롯까지, 값은 그 OPEN |
-| 신설 후보 `OPEN-3A-AGGREGATE` | D-3A-1 의 경계와 §2.1 aggregate 넷의 정합 — 착수 시 |
+| 신설 `OPEN-3A-AGGREGATE` | D-3A-1 (a) 의 **수집 fact 셋**(`Notice`·`OpeningResult`·`QualificationText`, `NoticeId` 로 묶임)과 §2.1 aggregate 넷의 정합 — §2.1 은 `Notice` 가 자격 원문을 **소유**한다고 적는다. 3A 의 셋은 **수집 단위**(출처·시점·실패 단위)이지 소유권 재배정이 아니다: aggregate 조립은 3D·4B. 문면 정합은 문서 레인이 등재(`capability-map.md` §14.3) |
 | 신설 후보 `OPEN-3A-SOURCE-TZ` | KONEPS 일시 문자열의 출처 타임존(조사: legacy 는 UTC 파싱, 원문은 KST 로 보임 — 9시간 어긋남 가능, 운영 피해 기록 없음) — 공식 문서 확인 뒤 정책값 승인. regression-ledger 등재 후보 |
 | 신설 후보 `OPEN-3A-NOTICE-ROUND` | D-3A-0 채택 시 `data-dictionary.md` §5.1 `Published(noticeRevision)` 타입 문면 개정(별도 문서 slice·운영자 승인) — 3A 는 등재만 |
