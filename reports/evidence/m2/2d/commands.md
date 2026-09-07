@@ -1,7 +1,7 @@
 # M2/2D — commands.md
 
-base_sha: `e3ac98b`(scope.md 와 정합, verifier r1 F-4) · head_sha: `0a71e71`(verifier r2
-수정 라운드 완료 — 커밋 목록은 맨 끝 「verifier r2 수정 라운드 요약」 절)
+base_sha: `e3ac98b`(scope.md 와 정합, verifier r1 F-4) · head_sha: `fbad213`(verifier r3
+수정 라운드 완료 — 커밋 목록은 맨 끝 「verifier r3 수정 라운드 요약」 절)
 
 **verifier r2 F-16** — 이 필드는 항상 "이 문서를 갱신하는 커밋 직전의 마지막 코드
 커밋"을 가리킨다(evidence 문서 자신의 커밋은 코드에 영향이 없어 head 로 세지 않는다).
@@ -88,6 +88,43 @@ base_sha: `e3ac98b`(scope.md 와 정합, verifier r1 F-4) · head_sha: `0a71e71`
 - cmd: `(cd contracts && ./tools/breaking-mutations.sh)`
 - exit: 0
 - 핵심 결과: `11/11 mutation 잡힘, 최소 요구 11` — 격리 worktree(S-0)·작업 트리(S-1) 양쪽 `--no-build-cache clean check`도 이 head 에서 재확인(`BUILD SUCCESSFUL`)
+
+### verifier r3 F-18(medium)·F-19(medium)·F-20(low) 회귀 6종(전부 원복 후 재확인 exit 0)
+- cmd: (정책 키 `breaking.compile-error.type` 삭제 후) `(cd contracts && ./tools/breaking-mutations.sh)`
+- exit: 2
+- 핵심 결과: `정책 키 'breaking.compile-error.type' 가 ... 에 없다` — F-18 재현이 아니라 수정 확인(이전 코드는 이 조작에 exit 0 이었다)
+- cmd: (정책 키 `breaking.mutations.min` 삭제 후) 같은 명령
+- exit: 2
+- 핵심 결과: `정책 키 'breaking.mutations.min' 가 ... 에 없다`
+- cmd: (`breaking.mutations=`— 키는 있고 값만 빈 문자열) 같은 명령
+- exit: 1
+- 핵심 결과: `0/0 mutation 잡힘, 최소 요구 11` — 의도된 정상 실패 경로(우회 후보 (1)이 최소 크기 단언에 걸림, exit 2 가 아니다)
+- cmd: (스크립트의 `--error-format=json`을 `text`로 임시 치환 — F-19 재현) 같은 명령
+- exit: 2
+- 핵심 결과: `buf 도구 오류(exit=100 이지만 유효한 breaking 규칙을 확인하지 못했다) — mutation 'field-delete'` — 이전 코드는 이 조작에서 `rule=`(빈 문자열)로 거짓 `[잡힘]` × 11, exit 0 이었다
+- cmd: (`tool.buf.version=9.99.9`로 정책 값만 변경) 같은 명령
+- exit: 2
+- 핵심 결과: `buf 버전이 정책과 다르다 — 실측 '1.72.0', 정책 '9.99.9'` — S-3 스크립트 자신의 버전 대조 신설 확인
+- cmd: (`expected.tsv`의 `field-delete` 행 `rule_type`을 `SOME_OTHER_RULE`로 변경 — F-20 규칙 표류) 같은 명령
+- exit: 1
+- 핵심 결과: `[규칙 표류] field-delete — 기대 'SOME_OTHER_RULE', 실측 'FIELD_NO_DELETE'`, `10/11 mutation 잡힘` — 파일은 비교만 하고 쓰지 않음(`git status --porcelain` 로 원복 확인)
+- cmd: (전부 원복 후) `(cd contracts && ./tools/breaking-mutations.sh)`
+- exit: 0
+- 핵심 결과: `11/11 mutation 잡힘, 최소 요구 11`, `expected.tsv` 무접촉(`git status --porcelain` 빈 출력 — 비교 모드는 파일을 쓰지 않는다)
+- cmd: `(cd contracts && ./tools/breaking-mutations.sh --update)`
+- exit: 0
+- 핵심 결과: `expected.tsv 갱신됨(--update)` — 내용이 기존과 같아 `git status --porcelain` 빈 출력(결정적 재생성 확인)
+
+### verifier r3 수정 라운드 최종 S-0·S-1·S-3 재확인(head `fbad213`)
+- cmd: `git worktree add --detach <tmp> HEAD && (cd <tmp> && ./gradlew --no-build-cache clean check)`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`, 332 tasks 전건 executed
+- cmd: `./gradlew --no-build-cache clean check`(작업 트리)
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`, 323 tasks
+- cmd: `(cd contracts && ./tools/breaking-mutations.sh)`
+- exit: 0
+- 핵심 결과: `11/11 mutation 잡힘, 최소 요구 11`
 
 ## S-4 — Kotlin 계약 test
 
@@ -301,3 +338,31 @@ F-16(head 어긋남)·F-17(S-4 캐시 복원 가능)은 이 문서 자체와 위
 ### 최종 clean-tree(head `0a71e71`, `commands.md` 자체 편집 중 제외)
 
 - `git status --porcelain -- contracts/buf.yaml contracts/tools contracts/testdata build-logic config/quality/gate-tests.properties config/quality/contract-policy.properties adapters/src/test/kotlin adapters/build.gradle.kts ml-engine/tests ml-engine/pyproject.toml .github/workflows milestone-2.md reports/evidence/m2/2d gradle/libs.versions.toml tools` → 출력 없음(`commands.md` 편집만 남은 상태에서 확인)
+
+## verifier r3 수정 라운드 요약
+
+커밋(전부 `main`, base `e3ac98b`):
+1. `fbad213` — F-18(medium)·F-19(medium)·F-20(low): `breaking-mutations.sh`를 양성 단언
+   구조로 재작성. `policy_value`가 실패를 `exit`이 아니라 `return 1`로 내고 호출부가
+   `VAR=$(...) || exit 2`로 부모 셸에서 받는다(F-18). `caught`을 "컴파일 오류 없음 AND
+   진짜 규칙 이름 확보"로 좁히고 S-3 자신도 `buf --version`을 정책과 대조한다(F-19).
+   `expected.tsv`를 커밋된 기대값으로 읽어 `rule_type` 불일치를 exit 1로 내고, 갱신은
+   `--update` 플래그로만 한다(F-20).
+
+### 최종 acceptance 전건 재실행(head `fbad213`)
+
+| # | 명령 | exit | 비고 |
+| --- | --- | --- | --- |
+| S-0 | 격리 worktree `--no-build-cache clean check` | 0 | 332 tasks 전건 executed |
+| S-1 | `./gradlew --no-build-cache clean check`(작업 트리) | 0 | 323 tasks |
+| S-2 | `./gradlew contractGate` | 0 | `violations=0` |
+| S-3 | `(cd contracts && ./tools/breaking-mutations.sh)` | 0 | 11/11, F-18·F-19·F-20 반영(양성 단언 구조) |
+| S-4 | `./gradlew :adapters:test --tests '*Contract*' --rerun-tasks` | 0 | 27 tasks 전건 executed |
+| S-5 | `(cd ml-engine && .venv/bin/python -m pytest tests -q)` | 0 | 95 passed |
+| S-6 | `./tools/contract-crosslang-smoke.sh` | 0 | 실제 socket 실행(캐시 표시 없음) |
+| S-7 | `./gradlew qualityBaseline` | 0 | — |
+
+### 최종 secret 스캔·clean-tree(head `fbad213`)
+
+- `grep -rniE "..." reports/evidence/m2/2d/ --exclude=commands.md --exclude=checklist.md` → exit 1(매치 0건)
+- `git status --porcelain -- <in_scope 경로 개별 인자>` → 출력 없음
