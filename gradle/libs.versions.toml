@@ -69,10 +69,20 @@ archunit-junit6 = { module = "com.tngtech.archunit:archunit-junit6", version.ref
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
 flyway-core = { module = "org.flywaydb:flyway-core" }
+# M3/3D — PostgreSQL 전용 Flyway 파서/DB 지원 모듈(ADR 0004 D-1). Flyway 10+ 는 엔진별 지원을
+# 별도 모듈로 분리했다 — `flyway-core` 만으로는 `jdbc:postgresql:` URL 을 인식하지 못한다.
+flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
 micrometer-core = { module = "io.micrometer:micrometer-core" }
 # Testcontainers 2.x 가 좌표를 바꿨다 — 1.x 의 `org.testcontainers:postgresql` 은 1.21.4 에서 멈췄고
 # Boot 4.1.1 BOM 이 끌어오는 testcontainers-bom 2.0.5 는 `testcontainers-postgresql` 을 관리한다.
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
+# M3/3D — JUnit 5 확장(`@Testcontainers`/`@Container`) 좌표. `testcontainers-postgresql` 은
+# 컨테이너 정의만 주고 JUnit 라이프사이클 통합은 이 모듈이 따로 갖는다. Testcontainers 2.x 는
+# 이 모듈도 `testcontainers-` 접두로 이름을 바꿨다(실측 — `org.testcontainers:junit-jupiter`는
+# 이 BOM 아래서 해석되지 않는다, 위 `testcontainers-postgresql` 좌표 개명과 같은 축).
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+# M3/3D — D-3D-1 (a) JDBC 직접 접근(HikariCP 없음, `PGSimpleDataSource`). 버전은 Boot BOM 관리.
+postgresql-driver = { module = "org.postgresql:postgresql" }
 
 # 금지 가족마다 위반 fixture 를 컴파일하기 위한 좌표. app 의 **test** 에만 오르며 어떤 모듈도
 # production 에서 쓰지 않는다 — 게이트가 그 가족을 실제로 잡는지 재는 것이 유일한 용도다.

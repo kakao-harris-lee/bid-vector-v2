@@ -17,6 +17,14 @@ dependencies {
     implementation(libs.resilience4j.retry)
     implementation(libs.resilience4j.ratelimiter)
 
+    // M3/3D — D-3D-1 (a) JDBC 직접 + Flyway(ADR 0004 D-1·D-2). `flyway-core`·`postgresql-driver`
+    // 는 카탈로그에 버전이 없다 — Boot BOM 이 관리한다(app 의 관례와 같다, `app/build.gradle.kts`).
+    // HikariCP 는 넣지 않는다(측정된 필요 없음, 3D 설계 검토 「구현 지침」).
+    implementation(platform(libs.spring.boot.bom))
+    implementation(libs.flyway.core)
+    implementation(libs.flyway.database.postgresql)
+    implementation(libs.postgresql.driver)
+
     // M2/2A — round-trip test 가 ml-contract 의 생성 stub 을 본다. composite 치환(같은
     // 좌표를 `settings.gradle.kts`의 `includeBuild("ml-contract")`가 잇는다) — main 의존은
     // M4 4D(도메인 ↔ 계약 매핑·client 배선)까지 미룬다.
@@ -36,6 +44,11 @@ dependencies {
     // 참조로 넘겨 `maxInboundMessageSize`를 강제하지 않는다(실측) — 경계 쌍(D-2D-6)의 실제
     // 강제를 재려면 localhost 소켓의 진짜 프레이밍 경로가 필요하다.
     testImplementation(libs.grpc.netty.shaded)
+
+    // M3/3D S-2~S-5 — Testcontainers PostgreSQL 통합 test(ADR 0004 D-1). BOM 은 main 쪽에서
+    // 이미 platform 으로 얹었으므로 test 는 모듈 좌표만 더한다.
+    testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.testcontainers.junit.jupiter)
 }
 
 // M2/2A — `ContractRoundTripTest`가 `contracts/testdata/*.binpb`(canonical, VCS 커밋)를 읽는다.
