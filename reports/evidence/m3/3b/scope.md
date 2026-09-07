@@ -14,6 +14,7 @@ in_scope:
   - adapters/build.gradle.kts                                # implementation(project(":procurement")) · resilience4j-kotlin · (D-M3-2 (a) 시) mockwebserver test 의존 · test 가 `fixtures/input/koneps/**` 를 시스템 프로퍼티(`bidvector.fixtures.koneps`)로 받는 배선(2A 의 `bidvector.contracts.testdata` 관례) — **2A 가 넣은 줄과 병합**. test 리소스 디렉터리에 골든 사본을 두지 않는다(D-3B-1 (a))
   - config/quality/gate-tests.properties                     # 조건부 — `gate.tests.adapters` 에 3B test 추가(2A·2D 가 만든 키에 병합)
   - gradle/libs.versions.toml                                # resilience4j 카탈로그 좌표(구현 레인 발견으로 착수 뒤 추가 — 세션 모델 정정, 3A F-15 와 같은 갈래)
+  - procurement/src/main/kotlin/bidvector/procurement/Accounting.kt, procurement/src/test/kotlin/**   # **3A 좁은 확장(운영자 결정 2026-09-07, verifier r1 H-3)** — `CollectionAccounting` 에 truncation 사유(sealed)·`quotaExceeded`·`backoffSkipped` 를 **추가만**(기존 항등식·필드·사용처·corpus 27/27 불변). 다른 procurement 파일 편집 금지
   - milestone-3.md                                           # 「Slice 3B」 착수 문단
   - reports/evidence/m3/3b/**
 out_of_scope:
@@ -51,6 +52,8 @@ rollback: |
 `OpeningResultSourcePort`(⑧ 의 예비가격·개찰) 는 D-3B-6 선행 조건 충족 뒤 **같은 slice 의 2차 커밋 묶음 또는 별도 slice 3B-2** — 착수 시 미정, 참고자료 도착
 시 운영자 결정. 정책 값 초기값은 3A `policy-values.md` §3(resultCode 범주)·`adapters` 정책 데이터(timeout·retry·backoff·rate·최대 페이지 — 「보수적 +
 관측 갱신」, 출처 조사 a-4·a-5, `legacy-behavior`/`observed` 층 표기).
+
+**수정 라운드 1(2026-09-07) — 운영자 결정**: verifier r1 H-3(quota 회계가 3A 타입에 없음)은 **3A 좁은 확장을 3B scope 예외로**(위 in_scope 행). H-1 의 교훈: `config/quality/gate-tests.properties` 는 하네스 레인과 공유하는 파일이라 경로 한정 `git restore` 가 하네스 커밋(`7ee8fed`) 까지 되돌린다 — rollback 은 그 파일에 한해 **3B 가 넣은 줄만 제거**하는 절차로 기술한다(evidence-pack 경로 한정 규칙의 파일 공유 예외).
 
 **병렬 레인 경계(공유 working tree)**: 3B 구현 레인은 `adapters/src/{main,test}/kotlin/bidvector/adapters/koneps/**`·`adapters/build.gradle.kts`·
 `config/quality/gate-tests.properties`·`reports/evidence/m3/3b/**` 만. `procurement/**`·`fixtures/**`·`docs/**`·`build-logic/**` 은 다른 레인·slice 소유.
