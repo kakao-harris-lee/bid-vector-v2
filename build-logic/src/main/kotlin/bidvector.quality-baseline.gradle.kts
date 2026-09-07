@@ -4,6 +4,7 @@ import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.MemberEffectGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
+import bidvector.buildlogic.TestShapeGateTask
 import bidvector.buildlogic.TypeShapeGateTask
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
@@ -85,6 +86,18 @@ val buildLogicGateExecutionGate =
         report = layout.buildDirectory.file("reports/gate-execution/build-logic.txt")
     }
 
+// 하네스 `test-discovery-guard`(`OPEN-2B-TEST-DISCOVERY-GUARD`) — build-logic 자신의 test
+// 소스에도 test-shape 게이트를 건다(M-3 계열, `buildLogicGateExecutionGate` 와 같은 이유로
+// 루트에 둔다 — 순환 회피). 소스를 텍스트로 읽을 뿐이라 순환이 없다(`buildLogicSizeGate` 관례).
+val buildLogicTestShapeGate =
+    tasks.register<TestShapeGateTask>("buildLogicTestShapeGate") {
+        group = "verification"
+        description = "included build 의 test 소스에도 test-shape 게이트를 건다"
+        policyFile = layout.settingsDirectory.file("config/quality/test-shape-policy.properties")
+        sources.from(layout.settingsDirectory.dir("build-logic/src/test"))
+        report = layout.buildDirectory.file("reports/test-shape-gate/build-logic.txt")
+    }
+
 // M2/2D — `.proto` 계약 drift·생성물 수동 편집·게이트 밖 소스를 잡는 게이트(scope.md
 // 「이 slice 가 하는 일」 ①②③). `contracts`·`ml-contract`는 어느 subproject 에도 속하지 않아
 // (2A D-2A-0 (c)) 다른 곳의 게이트가 자연히 못 본다 — build-logic 자신처럼 루트에 둔다.
@@ -161,6 +174,7 @@ tasks.register("check") {
         buildLogicSizeGate,
         buildLogicTypeShapeGate,
         buildLogicGateExecutionGate,
+        buildLogicTestShapeGate,
         scriptSizeGate,
         conventionCoverageGate,
         memberEffectGate,

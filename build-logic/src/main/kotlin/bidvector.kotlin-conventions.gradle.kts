@@ -11,6 +11,7 @@ import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.SourceLanguageGateTask
 import bidvector.buildlogic.SourceSetLayoutGateTask
+import bidvector.buildlogic.TestShapeGateTask
 import bidvector.buildlogic.TypeShapeGateTask
 import bidvector.buildlogic.lib
 import bidvector.buildlogic.readPolicy
@@ -365,6 +366,18 @@ val gateExecutionGate =
         report = layout.buildDirectory.file("reports/gate-execution/violations.txt")
     }
 
+// 하네스 `test-discovery-guard`(`OPEN-2B-TEST-DISCOVERY-GUARD`) — JUnit 이 조용히 discover
+// 하지 않는 test 메서드 형태(식 본문·비-Unit 명시 반환·suspend·private)를 잡는다. main 외
+// 전 source set(test·testFixtures)의 Kotlin 소스가 대상 — `gateExecutionGate`(돌았는가)와
+// 축이 다르다(이쪽은 형태만).
+val testShapeGate =
+    tasks.register<TestShapeGateTask>("testShapeGate") {
+        description = "test-메서드가 JUnit 이 조용히 discover 하지 않는 형태(식 본문 등)인지 잰다"
+        policyFile = configDir.file("quality/test-shape-policy.properties")
+        sources.from(provider { sourceSets.filter { it.name != "main" }.map { it.kotlin } })
+        report = layout.buildDirectory.file("reports/test-shape-gate/test-shape-gate.txt")
+    }
+
 // 바이트코드 층(ArchUnit)과 의존 그래프 층이 함께 놓치는 자리 — 컴파일 시 인라인되는 상수와
 // class literal 은 domain 소스가 **이름으로** 부르지만 산출물에 타입 참조를 남기지 않는다
 // (알려진 제한 7·11). 소스 자체를 걸어 그 사각을 덮는다.
@@ -434,6 +447,7 @@ tasks.named("check") {
         jarContentGate,
         sourceSetLayoutGate,
         gateExecutionGate,
+        testShapeGate,
         domainSourceReferenceGate,
         domainApiTypeGate,
         cpdReportPresenceGate,
