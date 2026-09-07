@@ -121,3 +121,60 @@ class FieldContractTest {
         registry.contractsFor(FieldConcept.BASE_AMOUNT).map { it.rawName } shouldBe listOf(RawKey("bssAmt"))
     }
 }
+
+/** v2-defect 018 수정(3A 잔여 일괄 verifier r3 전) — §5.5 D-3A-8 「수집 형태만」. */
+class ParseDelimitedFigureListTest {
+    @Test
+    fun `한 레코드를 캐럿 성분으로 쪼갠다 — koneps-collection-018 표본`() {
+        val records = parseDelimitedFigureList("[1^SYN-LICENSE-AA^0001^700000000],", '^')
+
+        records shouldBe
+            listOf(
+                listOf(
+                    UnnormalizedFigure("1"),
+                    UnnormalizedFigure("SYN-LICENSE-AA"),
+                    UnnormalizedFigure("0001"),
+                    UnnormalizedFigure("700000000"),
+                ),
+            )
+    }
+
+    @Test
+    fun `레코드가 여럿이면 레코드별로 나뉜다`() {
+        val records = parseDelimitedFigureList("[1^AA^0001^700000000],[2^BB^0002^500000000]", '^')
+
+        records.size shouldBe 2
+        records[1] shouldBe
+            listOf(
+                UnnormalizedFigure("2"),
+                UnnormalizedFigure("BB"),
+                UnnormalizedFigure("0002"),
+                UnnormalizedFigure("500000000"),
+            )
+    }
+
+    @Test
+    fun `빈 문자열은 레코드가 없다 — 지어내지 않는다`() {
+        parseDelimitedFigureList("", '^') shouldBe emptyList()
+    }
+
+    @Test
+    fun `DELIMITED_LIST 계약은 listComponentSeparator 를 요구한다`() {
+        shouldThrow<IllegalArgumentException> {
+            KonepsFieldContract.of(
+                rawName = RawKey("cnstrtnAbltyEvlAmtList"),
+                concept = FieldConcept.CONSTRUCTION_CAPACITY_REQUIREMENT,
+                basis = null,
+                scale = FieldScale.DELIMITED_LIST,
+                nullability = FieldNullability.OPTIONAL,
+                vatTreatment = VatTreatment.UNKNOWN,
+                authoritative = true,
+                presentIn = setOf(SourceEndpoint.NOTICE_LIST),
+                provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+                effectiveFrom = EffectiveFrom.Initial,
+                // listComponentSeparator 를 일부러 생략(기본값 null) — DELIMITED_LIST 와 짝이
+                // 안 맞아 구성이 실패해야 한다.
+            )
+        }
+    }
+}

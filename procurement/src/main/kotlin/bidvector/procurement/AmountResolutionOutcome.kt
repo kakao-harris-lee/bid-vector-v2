@@ -3,6 +3,7 @@ package bidvector.procurement
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.VatTreatment
+import java.math.BigDecimal
 
 /** [resolveAmount] 한 지점의 결과(⑤) — 매치 없음(`Unresolved`)과 계약 위반(`Rejected`)을 구분한다. */
 sealed interface AmountResolutionOutcome {
@@ -53,11 +54,27 @@ private fun provenanceFor(
         }
     }
 
+/**
+ * `expectedRange`(있으면)가 참조하는 [RangeBand]를 정책에서 찾아 `won`이 그 밖인지 잰다 —
+ * v2-defect 002 수정. 계약에 `expectedRange`가 없거나 정책에 그 id 의 밴드가 없으면(운영
+ * 정책은 아직 빈 표다) 위반이 아니다 — **단위를 값 크기로 되짚지 않는다**(ADR 0002 D-4,
+ * `unitInferred`는 항상 거짓인 이유).
+ */
+private fun violatesExpectedRange(
+    contract: KonepsFieldContract,
+    policy: KonepsCollectionPolicyData,
+    won: Long,
+): Boolean {
+    val band = contract.expectedRange?.let { policy.rangeBands[it.id] } ?: return false
+    return band.violates(BigDecimal.valueOf(won))
+}
+
 private fun resolvedOrParseFailure(
     raw: String,
     rawKey: RawKey,
     contract: KonepsFieldContract,
     noticeRound: NoticeRound,
+    policy: KonepsCollectionPolicyData,
 ): AmountResolutionOutcome? {
     val won = parseWonInteger(raw)
     return when {
@@ -68,6 +85,11 @@ private fun resolvedOrParseFailure(
 
         won == 0L -> {
             null
+        }
+
+        violatesExpectedRange(contract, policy, won) -> {
+            val reason = CollectionDropReason.CollectionContractViolation(ContractViolationAxis.RANGE)
+            AmountResolutionOutcome.Rejected(rawKey, reason)
         }
 
         else -> {
@@ -92,17 +114,17 @@ private fun contractViolationOrNull(contract: KonepsFieldContract): ContractViol
 private fun evaluateCandidate(
     observation: RawNoticeObservation,
     noticeRound: NoticeRound,
-    registry: KonepsFieldContractRegistry,
+    policy: KonepsCollectionPolicyData,
     rawKey: RawKey,
 ): AmountResolutionOutcome? {
-    val contract = registry.contractFor(rawKey)
+    val contract = policy.fieldContracts.contractFor(rawKey)
     val raw = contract?.let { observation.valueOf(it) }
     if (contract == null || raw == null) return null
     val violation = contractViolationOrNull(contract)
     return if (violation != null) {
         AmountResolutionOutcome.Rejected(rawKey, CollectionDropReason.CollectionContractViolation(violation))
     } else {
-        resolvedOrParseFailure(raw, rawKey, contract, noticeRound)
+        resolvedOrParseFailure(raw, rawKey, contract, noticeRound, policy)
     }
 }
 
@@ -125,7 +147,7 @@ fun resolveAmount(
             AmountAxis.ESTIMATED -> policy.estimatedPriceResolutionOrder
         }
     return order.firstNotNullOfOrNull { rawKey ->
-        evaluateCandidate(observation, noticeRound, policy.fieldContracts, rawKey)
+        evaluateCandidate(observation, noticeRound, policy, rawKey)
     }
         ?: AmountResolutionOutcome.Unresolved
 }

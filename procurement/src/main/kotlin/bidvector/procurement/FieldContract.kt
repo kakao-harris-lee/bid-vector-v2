@@ -3,6 +3,7 @@ package bidvector.procurement
 import bidvector.sharedkernel.Basis
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.VatTreatment
+import java.math.BigDecimal
 
 /**
  * raw 값이 표현하는 수치·문자 축의 형태 — [canonicalize] 변환 규칙을 정한다(§5.3,
@@ -26,6 +27,14 @@ enum class FieldScale {
 
     /** 코드+라벨 등 추가 파싱 없이 원문 그대로 두는 축. */
     OPAQUE_TEXT,
+
+    /**
+     * 구분자로 나뉜 복합 목록(`[a^b^c],[a^b^c]`류) — §5.5 D-3A-8, v2-defect 018 수정(3A
+     * 잔여 일괄 verifier r3 전). 레코드·성분으로 쪼개는 **수집 형태만** 열고, 단위·과세
+     * 정규화(Money 변환)는 하지 않는다(`OPEN-QUAL-10` 소유) — [UnnormalizedFigure]가 그
+     * 미확정을 타입으로 나른다.
+     */
+    DELIMITED_LIST,
 }
 
 /** 이 필드가 나르는 도메인 개념 — [canonicalize]의 목적지(②). */
@@ -61,11 +70,29 @@ enum class FieldNullability {
 
 /**
  * 기대 범위의 단일 출처 참조 — 계약이 밴드를 재선언하지 않는다(§5.3 규율 2). 실제 밴드
- * 값은 이 slice 밖의 정책 데이터가 소유한다 — 3A는 참조 자리만 둔다.
+ * 값은 [KonepsCollectionPolicyData.rangeBands]가 이 id 로 참조되는 단일 출처로 소유한다
+ * (v2-defect 002 수정, 3A 잔여 일괄 verifier r3 전 — 이전 판은 이 슬롯이 어디서도
+ * 강제되지 않았다).
  */
 data class ExpectedRangeKey(
     val id: String,
 )
+
+/**
+ * `expectedRange` 가 참조하는 실제 (최소, 최대) 경계 — [ExpectedRangeKey]는 이름표,
+ * `RangeBand`는 그 이름표가 가리키는 값이다(§5.3 규율 2 「계약이 밴드를 재선언하지 않고
+ * 단일 출처를 참조한다」의 그 출처). 경계는 포함이다(`min`·`max` 자체는 위반이 아니다).
+ */
+data class RangeBand(
+    val min: BigDecimal,
+    val max: BigDecimal,
+) {
+    init {
+        require(min <= max) { "RangeBand의 min 은 max 이하여야 한다: min=$min max=$max" }
+    }
+
+    fun violates(value: BigDecimal): Boolean = value < min || value > max
+}
 
 /** 타임존 없는 KONEPS 일시 문자열의 해석 규칙 id — 값은 정책 데이터(D-3A-4, `OPEN-3A-SOURCE-TZ`). */
 enum class SourceZoneRuleId {
@@ -93,7 +120,34 @@ private val SCALE_UNIT_PAIRING: Map<FieldScale, FieldUnit> =
         FieldScale.IDENTIFIER to FieldUnit.NONE,
         FieldScale.DATETIME_NO_ZONE to FieldUnit.NONE,
         FieldScale.OPAQUE_TEXT to FieldUnit.NONE,
+        // 단위 미확정(OPEN-QUAL-10) — NONE 이 그 미확정의 표현이다(§5.5, 수집 형태만).
+        FieldScale.DELIMITED_LIST to FieldUnit.NONE,
     )
+
+/**
+ * `[a^b^c],[a^b^c]`류 원문의 성분 하나 — §5.5 D-3A-8, v2-defect 018 수정. 단위·과세가
+ * 미확정이라 [bidvector.sharedkernel.Money]로 정규화하지 않는다(`OPEN-QUAL-10` 소유) —
+ * 원문 문자열 그대로 나른다.
+ */
+data class UnnormalizedFigure(
+    val raw: String,
+)
+
+private val BRACKETED_RECORD = Regex("""\[([^\[\]]*)]""")
+
+/**
+ * 구분자 목록 원문을 레코드(`[...]`) → 성분(`componentSeparator`로 나뉨) 목록으로 쪼갠다 —
+ * D-3A-8 「수집 형태만」. 값을 해석·정규화하지 않는다(§5.5) — [UnnormalizedFigure]로만 낸다.
+ * 구분자(`componentSeparator`)는 계약이 나르는 정책 데이터이지 이 함수의 리터럴이 아니다.
+ */
+fun parseDelimitedFigureList(
+    raw: String,
+    componentSeparator: Char,
+): List<List<UnnormalizedFigure>> =
+    BRACKETED_RECORD
+        .findAll(raw)
+        .map { match -> match.groupValues[1].split(componentSeparator).map(::UnnormalizedFigure) }
+        .toList()
 
 /**
  * 개념이 요구하는 basis — 값이 있으면 그 개념의 계약은 반드시 이 basis 여야 한다(F-3,
@@ -142,11 +196,17 @@ data class KonepsFieldContract internal constructor(
     val effectiveFrom: EffectiveFrom,
     val expectedRange: ExpectedRangeKey?,
     val sourceZone: SourceZoneRuleId?,
+    // v2-defect 018 수정(3A 잔여 일괄 verifier r3 전) — `DELIMITED_LIST` 축의 성분 구분자.
+    // `sourceZone`과 같은 자리(축 전용 슬롯, 그 축에만 쌍을 이룬다).
+    val listComponentSeparator: Char?,
 ) {
     init {
         require(presentIn.isNotEmpty()) { "presentIn은 비어 있을 수 없다: $rawName" }
         require((scale == FieldScale.DATETIME_NO_ZONE) == (sourceZone != null)) {
             "sourceZone은 DATETIME_NO_ZONE 필드에만 있어야 한다: $rawName"
+        }
+        require((scale == FieldScale.DELIMITED_LIST) == (listComponentSeparator != null)) {
+            "listComponentSeparator는 DELIMITED_LIST 필드에만 있어야 한다: $rawName"
         }
         require(unit == SCALE_UNIT_PAIRING.getValue(scale)) {
             "unit은 scale이 정하는 값이어야 한다: scale=$scale 기대 unit=${SCALE_UNIT_PAIRING.getValue(scale)} 실제=$unit ($rawName)"
@@ -167,6 +227,7 @@ data class KonepsFieldContract internal constructor(
             effectiveFrom: EffectiveFrom,
             expectedRange: ExpectedRangeKey? = null,
             sourceZone: SourceZoneRuleId? = null,
+            listComponentSeparator: Char? = null,
         ): KonepsFieldContract =
             KonepsFieldContract(
                 rawName = rawName,
@@ -182,6 +243,7 @@ data class KonepsFieldContract internal constructor(
                 effectiveFrom = effectiveFrom,
                 expectedRange = expectedRange,
                 sourceZone = sourceZone,
+                listComponentSeparator = listComponentSeparator,
             )
     }
 }

@@ -1,9 +1,14 @@
 package bidvector.procurement
 
-/** scale/basis 계약 위반의 축 — `ContractViolation(scale/basis)`(D-3A-6). */
+/**
+ * scale/basis/range 계약 위반의 축 — `ContractViolation(scale/basis/range)`(D-3A-6).
+ * `RANGE`는 v2-defect 수정(3A 잔여 일괄 verifier r3 전, koneps-collection-002)이 더했다 —
+ * [RangeBand]가 참조하는 `expectedRange`(§5.3 규율 2 단일 출처) 위반을 나른다.
+ */
 enum class ContractViolationAxis {
     SCALE,
     BASIS,
+    RANGE,
 }
 
 /** 파싱 실패의 종류 — `ParseFailure(kind)`(D-3A-6). */

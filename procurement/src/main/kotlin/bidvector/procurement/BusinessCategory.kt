@@ -23,3 +23,15 @@ data class BusinessCategory(
     val code: CategoryCode,
     val label: CategoryLabel?,
 )
+
+/**
+ * 업무구분명(`bsnsDivNm`)의 **문서 열거 어휘** — v2-defect 016 수정(3A 잔여 일괄 verifier
+ * r3 전). 문서(`policy-values.md` §1.5, 조달청 OpenAPI 참고자료 — *"물품 · 용역 · 공사 ·
+ * 외자"*, 필수·항목크기 30)가 정확히 이 넷을 든다. **순서가 문서 표기 순서**다(왕복
+ * 비교에 쓰인다) — 임의로 재정렬하지 않는다.
+ */
+data class DocumentedVocabulary(
+    val values: List<String>,
+) {
+    fun covers(value: String): Boolean = value in values
+}

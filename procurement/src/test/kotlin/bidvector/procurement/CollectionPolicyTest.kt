@@ -26,7 +26,7 @@ private val RESOLVED_POLICY: KonepsCollectionPolicyData =
  */
 class CollectionPolicyTest {
     @Test
-    fun `필드 계약은 승인된 채택분 열 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
+    fun `필드 계약은 승인된 채택분 열한 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contracts
             .map { it.rawName.name }
             .toSet() shouldBe
@@ -41,7 +41,18 @@ class CollectionPolicyTest {
                 "bidClseDt",
                 "opengDt",
                 "bsnsDivNm",
+                // v2-defect 018 수정(3A 잔여 일괄 verifier r3 전) — D-3A-8, §5.5.
+                "cnstrtnAbltyEvlAmtList",
             )
+    }
+
+    @Test
+    fun `시공능력평가금액목록은 캐럿 구분 DELIMITED_LIST 다 — policy-values md 1-5, v2-defect 018 회귀 가드`() {
+        val contract = RESOLVED_POLICY.fieldContracts.contractFor(RawKey("cnstrtnAbltyEvlAmtList"))!!
+
+        contract.scale shouldBe FieldScale.DELIMITED_LIST
+        contract.listComponentSeparator shouldBe '^'
+        contract.unit shouldBe FieldUnit.NONE
     }
 
     @Test
@@ -98,5 +109,16 @@ class CollectionPolicyTest {
     @Test
     fun `조회 가치 게이트는 24h_48h 잠정값을 담는다 — P-5`() {
         RESOLVED_POLICY.detailFetchGates shouldBe DetailFetchGates(ageGateHours = 24, recheckGateHours = 48)
+    }
+
+    @Test
+    fun `업무구분명 문서 열거 어휘는 물품_용역_공사_외자 넷이다 — policy-values md 1-5, v2-defect 016 회귀 가드`() {
+        RESOLVED_POLICY.businessCategoryDocumentedLabels shouldBe
+            DocumentedVocabulary(listOf("물품", "용역", "공사", "외자"))
+    }
+
+    @Test
+    fun `일시 패턴은 문서 authoritative 형식(공백 구분자) 하나다 — policy-values md 1-4, v2-defect 026 회귀 가드`() {
+        RESOLVED_POLICY.dateTimePatterns shouldBe listOf(DateTimePatternId.KONEPS_SPACE_DELIMITED_19)
     }
 }

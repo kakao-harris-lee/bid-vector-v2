@@ -39,6 +39,21 @@ data class KonepsCollectionPolicyData(
     val estimatedPriceResolutionOrder: List<RawKey>,
     val dateInterpretation: SourceZoneRuleId,
     val detailFetchGates: DetailFetchGates,
+    // v2-defect(3A 잔여 일괄 verifier r3 전 수정) — `dateTimePatterns`가 정책 밖(main 함수
+    // 리터럴)에 있어 `parseSourceZonedInstant`가 ISO `T` 구분자만 받았다. KONEPS 실제 wire
+    // 형식(공식 문서, "YYYY-MM-DD HH:MM:SS")은 이 목록으로만 온다 — 매직 패턴 리터럴 금지.
+    val dateTimePatterns: List<DateTimePatternId>,
+    // v2-defect 002 수정(3A 잔여 일괄 verifier r3 전) — `ExpectedRangeKey.id` → `RangeBand`
+    // 단일 출처(§5.3 규율 2). 운영 정책은 아직 **빈 표**다 — `sucsfbidLwltRate`의 B6 밴드는
+    // `legacy-behavior`이고 값 확정은 활성 `OPEN-DEC-10` 소유라, 승인 전 실값을 main 에
+    // 지어내지 않는다(「미확정 칸은 인스턴스화하지 않는다」와 같은 원칙). 메커니즘은
+    // `resolveAmount`의 amount 축에 실제로 배선돼 있다(`AmountResolutionOutcome.kt`).
+    val rangeBands: Map<String, RangeBand> = emptyMap(),
+    // v2-defect 016 수정(3A 잔여 일괄 verifier r3 전) — `bsnsDivNm`(업무구분명) 문서 열거
+    // 어휘. `policy-values.md` §1.5 표에 이미 `authoritative` 로 있으나 P-1~P-6 같은 별도
+    // 「운영자 승인」 항목이 아니다 — checklist.md 「판단이 갈린 지점」에 policy-values.md
+    // 후속 등재 요청을 남긴다(curator 레인 소관, 이 필드 자체는 지어낸 값이 아니다).
+    val businessCategoryDocumentedLabels: DocumentedVocabulary = DocumentedVocabulary(emptyList()),
 ) {
     init {
         val baseAmountKeys = fieldContracts.contractsFor(FieldConcept.BASE_AMOUNT).map { it.rawName }.toSet()
@@ -52,6 +67,9 @@ data class KonepsCollectionPolicyData(
         }
         require(resultCodeCategories.map { it.code }.toSet().size == resultCodeCategories.size) {
             "resultCodeCategories에 중복 코드가 있다: $resultCodeCategories"
+        }
+        require(dateTimePatterns.isNotEmpty()) {
+            "dateTimePatterns는 비어 있을 수 없다 — 타임존 없는 일시를 해석할 형식이 최소 하나 필요하다"
         }
     }
 }
@@ -73,6 +91,7 @@ private data class FieldContractRow(
     val vatTreatment: VatTreatment,
     val provenanceTemplate: FieldProvenanceTemplate,
     val sourceZone: SourceZoneRuleId? = null,
+    val listComponentSeparator: Char? = null,
 ) {
     fun toContract(): KonepsFieldContract =
         KonepsFieldContract.of(
@@ -87,6 +106,7 @@ private data class FieldContractRow(
             provenanceTemplate = provenanceTemplate,
             effectiveFrom = EffectiveFrom.Initial,
             sourceZone = sourceZone,
+            listComponentSeparator = listComponentSeparator,
         )
 }
 
@@ -196,6 +216,18 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             VatTreatment.UNKNOWN,
             FieldProvenanceTemplate.NOT_APPLICABLE,
         ),
+        // D-3A-8·§5.5 — 시공능력평가금액목록. 형식(`^` 구분, `[...]` 레코드)만 authoritative
+        // (policy-values.md §1.5) — 단위·과세는 미확정(OPEN-QUAL-10)이라 수집 형태만 연다.
+        FieldContractRow(
+            rawName = RawKey("cnstrtnAbltyEvlAmtList"),
+            concept = FieldConcept.CONSTRUCTION_CAPACITY_REQUIREMENT,
+            basis = null,
+            scale = FieldScale.DELIMITED_LIST,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            listComponentSeparator = '^',
+        ),
     )
 
 private val KONEPS_OPERATIONAL_FIELD_CONTRACTS: List<KonepsFieldContract> =
@@ -247,6 +279,12 @@ val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
                         estimatedPriceResolutionOrder = listOf(RawKey("presmptPrce")),
                         dateInterpretation = SourceZoneRuleId.ASSUME_KST,
                         detailFetchGates = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48),
+                        // policy-values.md §1.4 authoritative — "YYYY-MM-DD HH:MM:SS"(항목크기
+                        // 19, offset 없음). koneps-collection-026 이 이 배선을 고정한다.
+                        dateTimePatterns = listOf(DateTimePatternId.KONEPS_SPACE_DELIMITED_19),
+                        // policy-values.md §1.5 authoritative(조달청 OpenAPI 참고자료,
+                        // koneps-collection-016 이 이 배선을 고정한다) — 문서 표기 순서 그대로.
+                        businessCategoryDocumentedLabels = DocumentedVocabulary(listOf("물품", "용역", "공사", "외자")),
                     ),
             ),
     )

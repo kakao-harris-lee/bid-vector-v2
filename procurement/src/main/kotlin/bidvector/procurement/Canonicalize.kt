@@ -157,7 +157,19 @@ private fun floorRateFrom(
         ?.toBigDecimalOrNull()
         ?.let { numeric -> FloorRate(Rate.ofPercent(numeric), FloorRateOrigin.NoticeValue(noticeRound)) }
 
-/** 식별자가 선 뒤의 나머지 canonicalize — 금액 해석 둘 중 하나라도 계약 위반이면 항목 전체가 탈락한다(④·⑦). */
+/**
+ * [InstantResolutionOutcome.Resolved]는 값으로, [InstantResolutionOutcome.Absent]는 `null`로
+ * 접는다 — [InstantResolutionOutcome.ParseFailed]는 이 함수가 다루지 않는다(호출부가 먼저
+ * 걸러야 한다, `normalizedCommand`의 `when` 참고).
+ */
+private fun instantOrNull(outcome: InstantResolutionOutcome): Instant? =
+    when (outcome) {
+        is InstantResolutionOutcome.Resolved -> outcome.instant
+        InstantResolutionOutcome.Absent -> null
+        InstantResolutionOutcome.ParseFailed -> null
+    }
+
+/** 식별자가 선 뒤의 나머지 canonicalize — 금액 해석·일시 해석 중 하나라도 계약 위반이면 항목 전체가 탈락한다(④·⑦). */
 private fun normalizedCommand(
     observation: RawNoticeObservation,
     policy: KonepsCollectionPolicyData,
@@ -166,6 +178,9 @@ private fun normalizedCommand(
 ): CanonicalizationOutcome {
     val baseAmountResolution = resolveAmount(observation, noticeId.round, AmountAxis.BASE, policy)
     val estimatedResolution = resolveAmount(observation, noticeId.round, AmountAxis.ESTIMATED, policy)
+    val deadlineResolution = instantFrom(observation, policy, FieldConcept.DEADLINE_AT)
+    val openingResolution = instantFrom(observation, policy, FieldConcept.OPENING_SCHEDULED_AT)
+    val dateTimeParseFailure = CollectionDropReason.CollectionParseFailure(ParseFailureKind.DATE_TIME)
     return when {
         baseAmountResolution is AmountResolutionOutcome.Rejected -> {
             CanonicalizationOutcome.Dropped(baseAmountResolution.reason, unknownFieldCount)
@@ -173,6 +188,14 @@ private fun normalizedCommand(
 
         estimatedResolution is AmountResolutionOutcome.Rejected -> {
             CanonicalizationOutcome.Dropped(estimatedResolution.reason, unknownFieldCount)
+        }
+
+        deadlineResolution is InstantResolutionOutcome.ParseFailed -> {
+            CanonicalizationOutcome.Dropped(dateTimeParseFailure, unknownFieldCount)
+        }
+
+        openingResolution is InstantResolutionOutcome.ParseFailed -> {
+            CanonicalizationOutcome.Dropped(dateTimeParseFailure, unknownFieldCount)
         }
 
         else -> {
@@ -184,13 +207,8 @@ private fun normalizedCommand(
                     estimatedAmount = estimatedAmountAsResolved(estimatedResolution),
                     allocatedBudget = allocatedBudgetFrom(observation, policy.fieldContracts, noticeId.round),
                     floorRate = floorRateFrom(observation, policy.fieldContracts, noticeId.round),
-                    deadlineAt = instantFrom(observation, policy.fieldContracts, FieldConcept.DEADLINE_AT),
-                    openingScheduledAt =
-                        instantFrom(
-                            observation,
-                            policy.fieldContracts,
-                            FieldConcept.OPENING_SCHEDULED_AT,
-                        ),
+                    deadlineAt = instantOrNull(deadlineResolution),
+                    openingScheduledAt = instantOrNull(openingResolution),
                     raw = observation,
                 ),
                 unknownFieldCount,
