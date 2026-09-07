@@ -18,7 +18,7 @@ in_scope:
   - procurement/src/main/kotlin/bidvector/procurement/{*Repository,RawObservationStore,CollectionRunStore}.kt, procurement/src/test/kotlin/**   # **조건 충족(착수 시 확인 — 3A 는 repository port 를 두지 않았다)**. 글롭은 리뷰 시점 정정(구현 판단 2 — port 다섯 중 둘은 `*Store`): 도메인 소유 저장 port 파일 신설(ADR 0005 D-10.1) + 그 test. 그 밖의 procurement 편집 금지(3B 가 확장한 `Accounting.kt` 포함)
   - gradle/libs.versions.toml                                   # Flyway·PostgreSQL JDBC·Testcontainers 카탈로그 좌표(3A F-15·3B 판단 5 전례로 착수 시 등재)
   - procurement/src/main/kotlin/bidvector/procurement/RawObservation.kt   # **3A 좁은 확장(운영자 결정 2026-09-08, verifier r1 F-7)** — `RawNoticeObservation` 에 `sourceText: String?`(원문 JSON 텍스트, 저장 전용 — 계약 열람 규칙과 무관, 도메인 소비 함수가 읽지 않음) **추가만**. corpus 27/27·기존 test 불변
-  - adapters/src/main/kotlin/bidvector/adapters/koneps/**(mapper 한 파일)   # **3B 좁은 확장(같은 결정)** — 항목 원문 JSON 텍스트를 `sourceText` 에 채움. 그 밖의 koneps 편집 금지
+  - adapters/src/main/kotlin/bidvector/adapters/koneps/**(mapper 한 파일 + `KonepsJson.kt`)   # **3B 좁은 확장(같은 결정)** — 항목 원문 JSON 텍스트를 `sourceText` 에 채움. **정정(2026-09-08, 세션 모델)**: 파서가 object 의 원문 span 을 버려 mapper 만으로는 바이트 원문을 못 내므로 `KonepsJson.kt` 에 `JsonObject.sourceText`(파서가 시작·끝 위치로 substring) **추가만** 허용. 기존 파싱 로직·다른 필드·다른 koneps 파일 무편집
   - config/quality/gate-tests.properties                        # 조건부 — `gate.tests.adapters` 에 3D test 추가(병합)
   - milestone-3.md                                              # 「Slice 3D」 착수 문단
   - reports/evidence/m3/3d/**
