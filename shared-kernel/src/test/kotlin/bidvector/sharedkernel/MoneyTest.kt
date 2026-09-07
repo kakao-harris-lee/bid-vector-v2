@@ -51,7 +51,13 @@ class MoneyTest {
     @Test
     fun `H1 compareKnownVat 는 같은 basis 타입 쌍만 받는다`() {
         val base = sampleBaseAmount()
-        val estimated = EstimatedAmount(1_000_000L, Currency.KRW, VatTreatment.EXCLUSIVE, Provenance.Published(1))
+        val estimated =
+            EstimatedAmount(
+                1_000_000L,
+                Currency.KRW,
+                VatTreatment.EXCLUSIVE,
+                Provenance.Published(NoticeRound.of("001")),
+            )
 
         compareKnownVat(base, base) shouldBe Fact.Known(0)
         compareKnownVat(estimated, estimated) shouldBe Fact.Known(0)

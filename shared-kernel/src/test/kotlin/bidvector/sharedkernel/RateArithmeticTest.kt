@@ -43,7 +43,7 @@ class RateArithmeticTest {
     @Test
     fun `criticalAssessmentRate 는 추천 투찰율 나누기 낙찰하한율이다`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal("0.91875")))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal("0.875")), FloorRateOrigin.NoticeValue(0))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("0.875")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
 
         val result = criticalAssessmentRate(bid, floor, scalePolicy(6))
 
@@ -55,7 +55,7 @@ class RateArithmeticTest {
     @Test
     fun `verifier r1 F-1 — criticalAssessmentRate 는 형제 파생과 같은 형태로 DerivationRecord 를 싣는다`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal("0.91875")))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal("0.875")), FloorRateOrigin.NoticeValue(0))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("0.875")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
         val policy = scalePolicy(6)
 
         val result = criticalAssessmentRate(bid, floor, policy)
@@ -67,7 +67,7 @@ class RateArithmeticTest {
     @Test
     fun `낙찰하한율이 0이면 임계 사정률은 정의되지 않는다`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal("0.9")))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal.ZERO), FloorRateOrigin.NoticeValue(0))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal.ZERO), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
 
         val result = criticalAssessmentRate(bid, floor, scalePolicy(6))
 
@@ -78,7 +78,7 @@ class RateArithmeticTest {
     @Test
     fun `D-10 나눗셈 자리수는 호출부가 정책으로 준다 — 자리수를 바꾸면 결과가 바뀐다`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal.ONE))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(0))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
 
         val coarse = criticalAssessmentRate(bid, floor, scalePolicy(2)) as Measurement.Measured<Derived<AssessmentRate>>
         val fine = criticalAssessmentRate(bid, floor, scalePolicy(6)) as Measurement.Measured<Derived<AssessmentRate>>

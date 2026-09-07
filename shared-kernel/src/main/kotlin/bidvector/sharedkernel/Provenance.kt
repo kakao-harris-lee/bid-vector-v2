@@ -5,8 +5,13 @@ package bidvector.sharedkernel
  * 승인 명세 표기다(운영자 결정 2026-09-04 — A2와 같은 갈래로 승인 명세 이름을 채택한다).
  */
 sealed interface Provenance {
+    /**
+     * `noticeRevision`은 [NoticeRound]다(M3/3A D-3A-0 (a), 운영자 결정 2026-09-07) — 표적조회
+     * 필수 입력이라 `Int`로 나르면 1차 공고(`"000"`) 전부의 자격을 잃는 회귀를 재현한다
+     * (R-QUAL-05).
+     */
     data class Published(
-        val noticeRevision: Int,
+        val noticeRevision: NoticeRound,
     ) : Provenance
 
     data object DerivedFromOpening : Provenance

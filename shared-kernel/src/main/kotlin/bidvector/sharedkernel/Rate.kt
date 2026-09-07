@@ -77,8 +77,13 @@ data class AwardRate internal constructor(
 
 /** `FloorRate`의 출처 — 게시값과 법정 하한율 표를 섞지 않는다(`data-dictionary.md` §1.4.2). */
 sealed interface FloorRateOrigin {
+    /**
+     * `noticeRevision`은 [NoticeRound]다(M3/3A D-3A-0 (a) — 조사 G-1, `Provenance.Published`와
+     * 같은 사실이 두 자리에 있어 타입도 같아야 한다. 다르면 변환 자리에서 `Int` 회귀가
+     * 되살아난다).
+     */
     data class NoticeValue(
-        val noticeRevision: Int,
+        val noticeRevision: NoticeRound,
     ) : FloorRateOrigin
 
     data class StatutoryTable(

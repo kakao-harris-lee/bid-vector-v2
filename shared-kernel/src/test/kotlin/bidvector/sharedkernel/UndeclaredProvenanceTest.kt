@@ -67,7 +67,7 @@ class UndeclaredProvenanceTest {
      */
     @Test
     fun `Codex1 분자·분모 어느 쪽이 Undeclared 여도 사정률은 Unmeasurable 이다`() {
-        val declaredYega = YegaAmount(1_100_000L, Currency.KRW, Provenance.Published(1))
+        val declaredYega = YegaAmount(1_100_000L, Currency.KRW, Provenance.Published(NoticeRound.of("001")))
         val declaredBase = base(1_000_000L, vat = VatTreatment.INCLUSIVE)
         val undeclaredYega = YegaAmount(1_100_000L, Currency.KRW, Provenance.Undeclared)
         val undeclaredBase = base(1_000_000L, vat = VatTreatment.INCLUSIVE, provenance = Provenance.Undeclared)

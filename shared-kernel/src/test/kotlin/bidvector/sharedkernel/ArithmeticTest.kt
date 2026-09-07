@@ -28,7 +28,7 @@ internal fun base(
 
 internal val DECLARED_PROVENANCES =
     listOf(
-        Provenance.Published(1),
+        Provenance.Published(NoticeRound.of("001")),
         Provenance.DerivedFromOpening,
         Provenance.FilledFromBudgetKey("key"),
         Provenance.CopiedFromBaseAmount,
@@ -271,7 +271,7 @@ class ArithmeticTest {
 
     @Test
     fun `B9 YegaAmount 는 vatTreatment 를 Unknown 으로 고정 선언한다 — 다른 값을 넣을 수단이 없다`() {
-        val yega = YegaAmount(1_000_000L, Currency.KRW, Provenance.Published(1))
+        val yega = YegaAmount(1_000_000L, Currency.KRW, Provenance.Published(NoticeRound.of("001")))
 
         yega.vatTreatment shouldBe VatTreatment.UNKNOWN
     }
@@ -289,7 +289,7 @@ class ArithmeticTest {
     fun `B9 YegaAmount 는 항상 Unknown 이라 사정률이 어떤 기초금액에도 Unmeasurable 이다`() {
         runBlocking {
             checkAll(Arb.long(1L, 10_000_000L), Arb.element(VatTreatment.entries)) { won, baseVat ->
-                val yega = YegaAmount(1_000_000L, Currency.KRW, Provenance.Published(1))
+                val yega = YegaAmount(1_000_000L, Currency.KRW, Provenance.Published(NoticeRound.of("001")))
                 val theBase = base(won, vat = baseVat)
 
                 val result = yega.assessmentRateAgainst(theBase, resolvedPolicy(RoundingMode.HALF_UP))
