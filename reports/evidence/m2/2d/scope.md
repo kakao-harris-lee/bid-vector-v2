@@ -19,6 +19,7 @@ in_scope:
   - ml-engine/tests/**                                 # provider test: fake servicer 계약 준수 + 같은 testdata round-trip + async(grpc.aio) in-process
   - ml-engine/pyproject.toml                          # grpcio-testing dev 의존만(serving 런타임 아님)
   - contracts/testdata/**                             # canonical 바이트 + JSON 원본 + **breaking mutation 기대 결과 표**
+  - tools/contract-crosslang-smoke.sh                 # S-6 교차 언어 socket 스모크 스크립트(저장소 루트 `tools/`). 리뷰 요청 시점 추가 — 착수 판에서 S-6·「하는 일」⑧ 이 이 경로를 지정하고도 in_scope 에 빠져 있었다(구현 레인 evidence 가 누락으로 판단·기록, 세션 모델이 정정)
   - .github/workflows/**                             # 조건부 — `contractGate` 는 `check` 안이라 등재 불요. **CI 에는 Python 툴체인이 없다**(setup-java + `gradlew check` 뿐) — Python 쪽(S-5)은 로컬 acceptance 이고 CI 등재는 Python 설치 단계 추가 결정(D-2D-4)
   - milestone-2.md                                    # 「Slice 2D」 착수 문단, **착수 시**
   - reports/evidence/m2/2d/**
@@ -52,6 +53,9 @@ contract 층·래칫 · `ADR 0010` 초안 D-2·D-4·D-7·§6 · `milestone-1.md`
 ## 하네스 레인 변경 (상시 절)
 
 `git log --oneline e3ac98b..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-07) **없음**.
+
+**리뷰 요청 시점(2026-09-07, head `4031d98` + 이 정정 커밋)** — 하네스 커밋 **없음**. range 에는 다른 세션의 discovery 커밋
+`4695ce8`(`docs/discovery/` 학습 데이터·모델 위치 조사)이 섞여 있으며 in_scope 밖이라 slice 커밋 집합이 아니다(커밋 집합 = in_scope 경로 변경).
 
 **착수 2026-09-07 — 운영자 결정**: D-2D-1 (a) `against` = 승인 태그(`contracts/v1-approved-2026-09-07`, 이름 규칙은 정책 데이터) ·
 D-2D-3 (a) 교차 언어 socket 스모크는 로컬 실측 1회 + evidence 한 줄, 상시 게이트는 in-process · D-2D-4 (a) Python test 는 로컬
