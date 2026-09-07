@@ -27,6 +27,9 @@ out_of_scope:
   - fixtures/**                                                             # curator 레인
   - 다른 게이트 task·정책 파일의 변경 · detekt/ArchUnit 규칙 추가
   - 기존 test 소스의 수정(위반 0건이라 고칠 것이 없다 — preflight §4)
+    # 정정(리뷰 요청 시점, 운영자 확인) — 위 "0건"은 preflight 시점(착수 전) 기준이다.
+    # 착수 뒤 3A 커밋 b8d4c4e(procurement/AccountingTest.kt)에서 1건 발생 — 이 slice
+    # out_of_scope 이며 3A 소유. checklist.md 「게이트가 잡은 실제 위반(범위 밖)」 참고.
 acceptance_commands:
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # S-0 — **정본**(HEAD 만, 다른 레인의 미커밋 파일 배제). `testShapeGate`·`buildLogicTestShapeGate` 가 `check` 안에
   - "./gradlew --no-build-cache clean check"                                                          # S-1 — 공유 트리(3A 미커밋 파일 포함이라 3A 사유로 붉을 수 있음 — 그 경우 S-0 이 판정)

@@ -61,11 +61,13 @@ base `7581106ecf7c52bbf8bb032adc233e90a8f1eb9b` · 구현 커밋 `c7aaf5c`(게�
 ## S-0/S-1 — clean check(정본/공유 트리)
 
 - cmd: `git worktree add --detach <dir> HEAD(6752791) && (cd <dir> && ./gradlew --no-build-cache clean check)`
-- exit: 1
-- 핵심 결과: 유일 실패 `procurement:testShapeGate` — `AccountingTest.kt:79`(property test, `= runBlocking { checkAll(…) }`)가 2B 와 같은 패턴의 **실제** 위반. 이 파일은 커밋 `b8d4c4e`(M3/3A 레인, 이 slice 의 base_sha 이후 신규)에 있고 `procurement/**` 는 이 slice 의 out_of_scope — 구현 레인이 수정하지 않았다(team-lead 에 보고, 알려진 제한 참고). `build-logic:check`·`contractGate`·`qualityBaseline` 등 나머지 전부 통과.
+- exit: 1, 실패 사유 = `testShapeGate` 가 procurement `AccountingTest.kt`(3A 커밋 `b8d4c4e`, out_of_scope)의 식 본문 `@Test` 1건을 검출 — **게이트가 실제 위반을 잡은 첫 실측**(설계 의도대로 동작, 구현 결함 아님). `build-logic:check`·`contractGate`·`qualityBaseline` 등 나머지 전부 통과. 상세는 checklist.md 「게이트가 잡은 실제 위반(범위 밖)」.
 - cmd: `./gradlew --no-build-cache clean check`(공유 트리)
 - exit: 1
 - 핵심 결과: 위와 동일한 단일 실패(`procurement:testShapeGate`) — S-0 과 S-1 이 같은 원인으로 일치, 다른 실패 없음.
+- cmd(귀속 증거, 우회 아님 — team-lead 지시 2026-09-07): `./gradlew --no-build-cache clean check -x :procurement:testShapeGate`(HEAD `4a73268` worktree, out_of_scope 위반 1건만 제외)
+- exit: 0
+- 핵심 결과: 그 1건을 빼면 이 slice 의 나머지 8 모듈 + build-logic + 루트 게이트 전부 초록 — S-0/S-1 의 유일한 원인이 procurement 그 1건임을 귀속한다(이 명령은 acceptance 판정을 대신하지 않는다, S-0/S-1 정본은 그대로 exit 1).
 
 ## secret 스캔
 

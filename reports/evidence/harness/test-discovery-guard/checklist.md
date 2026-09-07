@@ -11,7 +11,8 @@ verifier ready-for-review + 사용자 승인(scope.md 지위 문단).
       결과 없음(commands.md 에 셋 커밋 반영 후 실측 — 이 문서 작성 시점 기준 이 파일들
       자체는 아직 미커밋이라 별도 커밋으로 뒤따른다).
 - [x] scope.md 의 acceptance_commands(S-0~S-6) 전부 실행·기록됨 — S-2~S-6 은 exit 0.
-      S-0/S-1 은 exit 1(procurement 의 out_of_scope 파일 때문 — 아래 「알려진 제한」).
+      S-0/S-1 은 exit 1(procurement 의 out_of_scope 위반 1건 때문 — 아래 「게이트가 잡은
+      실제 위반(범위 밖)」).
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — `build-logic:test`·
       `build-logic:detekt`·`contractGate`·`qualityBaseline` 전부 통과(S-0/S-1 실행 중
       확인). 유일한 미통과는 procurement(out_of_scope) 의 `testShapeGate`.
@@ -38,18 +39,20 @@ verifier ready-for-review + 사용자 승인(scope.md 지위 문단).
 - **F-21~F-23 재현** — `breaking-mutations-selftest.sh` 가 buf 호출 없이 세 함수를
   직접 실측(commands.md S-5).
 
-## 예상치 못한 발견 — procurement 의 실제 test-discovery 위반(out_of_scope)
+## 게이트가 잡은 실제 위반(범위 밖)
 
-S-0(격리 worktree)에서 `testShapeGate`가 `procurement/src/test/kotlin/bidvector/
-procurement/AccountingTest.kt:79`(`@Test fun … () = runBlocking { checkAll(...) { ... } }`)
-를 잡았다 — 2B 와 동일한 패턴의 **실제** 가짜 초록이다. 이 파일은 커밋 `b8d4c4e`(M3/3A
-레인)에 있고, 이 slice 의 base_sha(`7581106`) **이후** 신규 커밋이라 preflight(§4.4,
-현 트리 실측 0건)의 전제가 이 파일이 생긴 뒤로는 더 이상 사실이 아니게 됐다.
-`procurement/**` 는 이 slice 의 out_of_scope(3A 소유)라 구현 레인이 직접 고치지 않았다
-— team-lead 에게 즉시 보고(2026-09-07)하고 3A 레인의 한 줄 수정(`runBlocking { }` 을
-블록 본문으로)을 요청했다. 이 발견은 게이트의 결함이 아니라 **설계 의도대로 작동한
-증거**다 — 다만 그로 인해 S-0/S-1(공유 트리 전체 `clean check`)은 3A 가 고칠 때까지
-exit 1 로 남는다.
+| 항목 | 값 |
+| --- | --- |
+| 파일 | `procurement/src/test/kotlin/bidvector/procurement/AccountingTest.kt:79` |
+| 패턴 | `@Test fun \`property — 음이 아닌 세 값의 합을 received 로 주면 항상 성립한다\`() = runBlocking { checkAll(...) { ... } }` — 식 본문이라 반환 타입이 `Unit` 이 아님(2B 원 사례와 동일 패턴) |
+| 커밋 | `b8d4c4e`(M3/3A 레인) — 이 slice 의 base_sha(`7581106`) **이후** 신규. preflight §4.4(현 트리 실측 0건)의 전제가 이 커밋 이후로는 더 이상 사실이 아니다 |
+| 담당 레인 | M3/3A(procurement 소유). 이 slice 는 out_of_scope 라 직접 수정하지 않았다 — team-lead 에게 즉시 보고(2026-09-07)하고 3A 레인의 한 줄 수정(`runBlocking { }` 을 블록 본문으로, `=` 제거)을 요청했다 |
+| 해소 조건 | 3A 가 위 함수를 블록 본문으로 고친 커밋이 들어온 뒤 `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)`(S-0) 재실행이 exit 0. 재실행은 team-lead 지시로 진행 |
+| 귀속 증거 | `./gradlew --no-build-cache clean check -x :procurement:testShapeGate`(HEAD `4a73268`) exit 0 — 그 1건을 빼면 전부 초록(commands.md). 이 명령은 acceptance 판정을 대신하지 않는 귀속용이다 |
+
+이 발견은 게이트의 결함이 아니라 **설계 의도대로 작동한 증거**다(2B 에서 25/27
+가짜 초록을 낸 것과 같은 패턴을 처음 실전 코드에서 잡았다) — 다만 그로 인해
+S-0/S-1(공유 트리 전체 `clean check`)은 3A 가 고칠 때까지 exit 1 로 남는다.
 
 ## 알려진 제한
 
@@ -60,10 +63,11 @@ exit 1 로 남는다.
    동일) — 저자 의도 우회로 경계 밖.
 3. **S-1 은 3A 사유로 붉을 수 있다는 착수 시 서술이 실측으로 갱신됨** — 원 서술은
    「3A 의 미커밋 파일」을 가정했으나, 실제로는 3A 의 **커밋된**(`b8d4c4e`) test
-   코드 자체가 원인이다. S-0(격리 worktree, HEAD 기준)도 커밋된 코드는 그대로 담기
-   때문에 같은 이유로 붉다 — 「S-0 이 정본」이라는 서술은 판정 신뢰성(다른 레인의
-   *미커밋* 파일에 영향받지 않음)에는 여전히 유효하지만, 「S-0 은 초록일 것」이라는
-   기대는 3A 종결 전까지 성립하지 않는다.
+   코드 자체가 원인이다(상세는 위 「게이트가 잡은 실제 위반(범위 밖)」). S-0(격리
+   worktree, HEAD 기준)도 커밋된 코드는 그대로 담기 때문에 같은 이유로 붉다 —
+   「S-0 이 정본」이라는 서술은 판정 신뢰성(다른 레인의 *미커밋* 파일에 영향받지
+   않음)에는 여전히 유효하지만, 「S-0 은 초록일 것」이라는 기대는 3A 종결 전까지
+   성립하지 않는다.
 4. **S-3 문면과 대소문자 구분 grep 의 불일치**(commands.md 에 상세) — scope.md 가 지정한
    루트 task 이름 `buildLogicTestShapeGate`(대문자 T, 기존 `buildLogicSizeGate` 등 관례
    준수)는 대소문자 구분 `grep -c 'testShapeGate'` 패턴과 정확히 일치하지 않는다(실측
