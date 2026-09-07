@@ -2,8 +2,12 @@ package bidvector.adapters.koneps
 
 import bidvector.procurement.CollectionDropReason
 import bidvector.procurement.CollectionReferenceDate
+import bidvector.procurement.FieldConcept
+import bidvector.procurement.PageCursor
+import bidvector.procurement.TruncationCause
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
 import java.net.http.HttpClient
 import java.time.Clock
@@ -28,6 +32,20 @@ private fun newSource(
         clock = FIXED_CLOCK,
     )
 
+private fun truncationCauseFor(
+    script: List<MockKonepsResponse>,
+    maxAttempts: Int = 1,
+): TruncationCause? =
+    MockKonepsServer.start(script).use { server ->
+        newSource(server, testKonepsHttpPolicy(maxAttempts = maxAttempts))
+            .fetchNotices(REFERENCE_DATE, null)
+            .accounting
+            .truncationCause
+    }
+
+private fun fieldContractFor(concept: FieldConcept) =
+    resolvedCollectionPolicy(REFERENCE_DATE).fieldContracts.contractsFor(concept).first()
+
 /**
  * ⑦ mock server 시나리오 — scope.md 「이 slice 가 하는 일」 ⑦, D-3B-4(loopback in-process,
  * 네트워크 0). 각 test 가 scope ⑦ 목록의 한 항목에 대응한다(대응표는 checklist.md).
@@ -50,6 +68,26 @@ class KonepsOpenApiNoticeSourceTest {
             batch.accounting.dropped shouldBe 1
             batch.accounting.dropReasons[CollectionDropReason.CollectionMissingNoticeNumber] shouldBe 1
             batch.accounting.truncated shouldBe false
+            batch.next shouldBe null
+        }
+    }
+
+    @Test
+    fun `H-2 — 빈 문자열·공백 공고번호도 COL-01 탈락에 걸린다`() {
+        val items =
+            listOf(
+                mapOf("bidNtceNo" to "", "bidNtceOrd" to "000"),
+                mapOf("bidNtceNo" to "   ", "bidNtceOrd" to "000"),
+                mapOf("bidNtceNo" to "SYN-3B-0009", "bidNtceOrd" to "   "),
+                mapOf("bidNtceNo" to "SYN-3B-0010", "bidNtceOrd" to "000"),
+            )
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 4, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server, testKonepsHttpPolicy()).fetchNotices(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 1
+            batch.accounting.dropped shouldBe 3
+            batch.accounting.dropReasons[CollectionDropReason.CollectionMissingNoticeNumber] shouldBe 3
         }
     }
 
@@ -74,6 +112,9 @@ class KonepsOpenApiNoticeSourceTest {
             batch.items.size shouldBe 1
             server.requestCount shouldBe 3
             batch.accounting.truncated shouldBe false
+            // H-3 — 최종 성공 이전에 관측된 429 두 번이 quotaExceeded 로 남는다(스스로 회복
+            // 해도 quota 압력을 겪은 사실 자체는 사라지지 않는다).
+            batch.accounting.quotaExceeded shouldBe 2
         }
     }
 
@@ -100,6 +141,11 @@ class KonepsOpenApiNoticeSourceTest {
             batch.accounting.truncated shouldBe true
             batch.items.size shouldBe 1
             server.requestCount shouldBe 2
+            // L-8 — 백스톱을 발동시킨 반복 페이지도 HTTP 호출은 실제로 나갔으니 센다.
+            batch.accounting.pagesFetched shouldBe 2
+            batch.accounting.truncationCause shouldBe TruncationCause.RepeatedPage
+            // M-3 — 완료를 거짓 진술하지 않는다: 다음 페이지가 있을 수 있으니 재개 커서를 낸다.
+            batch.next shouldNotBe null
         }
     }
 
@@ -111,6 +157,7 @@ class KonepsOpenApiNoticeSourceTest {
 
             batch.items.shouldBeEmpty()
             batch.accounting.truncated shouldBe true
+            batch.accounting.truncationCause shouldBe TruncationCause.Unclassified
             server.requestCount shouldBe 1
         }
     }
@@ -123,6 +170,7 @@ class KonepsOpenApiNoticeSourceTest {
 
             batch.items.shouldBeEmpty()
             batch.accounting.truncated shouldBe true
+            batch.accounting.truncationCause shouldBe TruncationCause.Unclassified
             server.requestCount shouldBe 1
         }
     }
@@ -178,6 +226,7 @@ class KonepsOpenApiNoticeSourceTest {
 
             batch.items.size shouldBe 1
             server.requestCount shouldBe 2
+            batch.accounting.quotaExceeded shouldBe 1
         }
     }
 
@@ -188,7 +237,106 @@ class KonepsOpenApiNoticeSourceTest {
             val batch = newSource(server, testKonepsHttpPolicy(maxAttempts = 3)).fetchNotices(REFERENCE_DATE, null)
 
             batch.accounting.truncated shouldBe true
+            batch.accounting.truncationCause shouldBe TruncationCause.NotRetryable
             server.requestCount shouldBe 1
+        }
+    }
+
+    @Test
+    fun `H-3 — 다섯 truncation 사유가 회계에서 바이트 동일하지 않고 서로 구별된다`() {
+        val quota429 = truncationCauseFor(List(3) { MockKonepsResponse.Reply(429, "") }, maxAttempts = 2)
+        val quota22 =
+            truncationCauseFor(
+                List(3) { MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("22", "quota")) },
+                maxAttempts = 2,
+            )
+        val unclassified =
+            truncationCauseFor(listOf(MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("99", "?"))))
+        val structureFailure = truncationCauseFor(listOf(MockKonepsResponse.Reply(200, "not-json")))
+        val notRetryable =
+            truncationCauseFor(listOf(MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("30", "bad key"))))
+
+        quota429 shouldBe TruncationCause.QuotaExhausted
+        quota22 shouldBe TruncationCause.QuotaExhausted
+        unclassified shouldBe TruncationCause.Unclassified
+        structureFailure shouldBe TruncationCause.StructureFailure
+        notRetryable shouldBe TruncationCause.NotRetryable
+        setOf(quota429, quota22, unclassified, structureFailure, notRetryable).size shouldBe 4
+    }
+
+    @Test
+    fun `M-1 — JSON boolean 은 Y N 으로 바뀌지 않고 원문 토큰 텍스트 그대로 옮겨진다`() {
+        val body =
+            """{"response":{"header":{"resultCode":"00","resultMsg":"ok"},"body":{"items":""" +
+                """[{"bidNtceNo":"SYN-3B-0015","bidNtceOrd":"000","bsnsDivNm":true}],""" +
+                """"numOfRows":100,"pageNo":1,"totalCount":1}}}"""
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server, testKonepsHttpPolicy()).fetchNotices(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 1
+            batch.items.first().valueOf(fieldContractFor(FieldConcept.BUSINESS_CATEGORY_LABEL)) shouldBe "true"
+        }
+    }
+
+    @Test
+    fun `M-2 — canonical 공고번호가 같으면 원문 표기가 달라도 duplicate 로 계수된다`() {
+        val items =
+            listOf(
+                mapOf("bidNtceNo" to "vp 0004", "bidNtceOrd" to "000"),
+                mapOf("bidNtceNo" to "VP-0004", "bidNtceOrd" to "000"),
+            )
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 2, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server, testKonepsHttpPolicy()).fetchNotices(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 1
+            batch.accounting.duplicate shouldBe 1
+        }
+    }
+
+    @Test
+    fun `M-5 — cursor 토큰이 숫자가 아니거나 0 이하면 조용히 page 1 로 접지 않고 명시 실패를 낸다`() {
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, "{}"))).use { server ->
+            val source = newSource(server, testKonepsHttpPolicy())
+
+            val opaque = source.fetchNotices(REFERENCE_DATE, PageCursor("opaque-token"))
+            val zero = source.fetchNotices(REFERENCE_DATE, PageCursor("0"))
+            val negative = source.fetchNotices(REFERENCE_DATE, PageCursor("-5"))
+
+            opaque.accounting.truncationCause shouldBe TruncationCause.InputError
+            zero.accounting.truncationCause shouldBe TruncationCause.InputError
+            negative.accounting.truncationCause shouldBe TruncationCause.InputError
+            opaque.items.shouldBeEmpty()
+            server.requestCount shouldBe 0
+        }
+    }
+
+    @Test
+    fun `L-5 — 항목 안 중복 JSON 키는 마지막 값이 승리한다`() {
+        val body =
+            """{"response":{"header":{"resultCode":"00","resultMsg":"ok"},"body":{"items":""" +
+                """[{"bidNtceNo":"SYN-3B-0016","bidNtceNo":"SYN-3B-0017","bidNtceOrd":"000"}],""" +
+                """"numOfRows":100,"pageNo":1,"totalCount":1}}}"""
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server, testKonepsHttpPolicy()).fetchNotices(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 1
+            batch.items.first().valueOf(fieldContractFor(FieldConcept.NOTICE_NUMBER)) shouldBe "SYN-3B-0017"
+        }
+    }
+
+    @Test
+    fun `M-4 — JSON 중첩 깊이가 정책 상한을 넘으면 StructureFailure 로 접히고 예외가 안 샌다`() {
+        val deepArray = "[".repeat(50) + "]".repeat(50)
+        val body =
+            """{"response":{"header":{"resultCode":"00"},"body":{"items":$deepArray,""" +
+                """"numOfRows":1,"pageNo":1,"totalCount":0}}}"""
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch =
+                newSource(server, testKonepsHttpPolicy(maxAttempts = 1, maxJsonDepth = 10))
+                    .fetchNotices(REFERENCE_DATE, null)
+
+            batch.accounting.truncationCause shouldBe TruncationCause.StructureFailure
         }
     }
 }

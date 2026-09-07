@@ -15,6 +15,7 @@ internal fun testKonepsHttpPolicy(
     maxAttempts: Int = 3,
     maxPages: Int = 5,
     requestTimeout: Duration = Duration.ofMillis(200),
+    maxJsonDepth: Int = 32,
 ): KonepsHttpPolicyData =
     KonepsHttpPolicyData(
         requestTimeout = requestTimeout,
@@ -24,6 +25,7 @@ internal fun testKonepsHttpPolicy(
         rateLimiterPeriod = Duration.ofMillis(100),
         rateLimiterWait = Duration.ofSeconds(2),
         maxPages = maxPages,
+        maxJsonDepth = maxJsonDepth,
     )
 
 /** 3A 운영 정책을 그대로 resolve — 3B 는 필드 계약·resultCode 범주표를 재선언하지 않는다. */
