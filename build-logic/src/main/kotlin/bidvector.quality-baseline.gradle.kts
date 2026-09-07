@@ -1,3 +1,4 @@
+import bidvector.buildlogic.ContractGateTask
 import bidvector.buildlogic.ConventionCoverageGateTask
 import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.MemberEffectGateTask
@@ -7,6 +8,8 @@ import bidvector.buildlogic.TypeShapeGateTask
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
 import bidvector.buildlogic.requireValue
+import bidvector.buildlogic.version
+import bidvector.buildlogic.versionCatalog
 
 // D-6(Phase 3 중 신설) — 타입 멤버 축이 재는 source set 이름. `build-logic/src/<name>` 으로
 // 그대로 디렉터리가 된다 — included build 는 Gradle source set 이 아니라 원시 디렉터리라
@@ -82,6 +85,23 @@ val buildLogicGateExecutionGate =
         report = layout.buildDirectory.file("reports/gate-execution/build-logic.txt")
     }
 
+// M2/2D — `.proto` 계약 drift·생성물 수동 편집·게이트 밖 소스를 잡는 게이트(scope.md
+// 「이 slice 가 하는 일」 ①②③). `contracts`·`ml-contract`는 어느 subproject 에도 속하지 않아
+// (2A D-2A-0 (c)) 다른 곳의 게이트가 자연히 못 본다 — build-logic 자신처럼 루트에 둔다.
+// 외부 프로세스(`buf`·`gradlew`·`git`)에 기댄 판정이라 항상 재실행한다.
+val contractGate =
+    tasks.register<ContractGateTask>("contractGate") {
+        group = "verification"
+        description = "buf lint·breaking(승인 태그)·generateProto 결정성·비커밋·무소스를 증명한다"
+        policyFile = layout.settingsDirectory.file("config/quality/contract-policy.properties")
+        repoRoot = layout.settingsDirectory
+        rootGradlew = layout.settingsDirectory.file("gradlew")
+        catalogProtobufRuntimeVersion = versionCatalog.version("protobuf-runtime")
+        catalogGrpcKotlinVersion = versionCatalog.version("grpc-kotlin")
+        report = layout.buildDirectory.file("reports/contract-gate/violations.txt")
+        outputs.upToDateWhen { false }
+    }
+
 // 허용 클래스 **안**의 효과 멤버는 손으로 열거하지 않고 도출한다. 루트에 두는 이유는 모듈과
 // 무관한 전역 사실(JDK 바이트코드 + 허용 목록)이기 때문이다 — 모듈마다 돌릴 이유가 없다.
 val memberEffectGate =
@@ -141,6 +161,7 @@ tasks.register("check") {
         scriptSizeGate,
         conventionCoverageGate,
         memberEffectGate,
+        contractGate,
     )
     dependsOn(gradle.includedBuild("build-logic").task(":check"))
 }
