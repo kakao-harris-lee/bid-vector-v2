@@ -94,6 +94,12 @@ quota 는 HTTP 429 뿐 아니라 `resultCode 22·30`(키 미인코딩) 도 신�
 D-3D-3~5(문자열 키·항목 단위 트랜잭션·NULL 부재). 3A 가 저장 port 를 정의하지 않았으므로 도메인 소유 repository port 파일을 `procurement` 에 둔다(ADR 0005
 D-10.1, in_scope 조건 충족). **Phase 2.5 필수**(스키마 precedence) — 세션 모델 직접, `_workspace/m3-3d/01_design-review.md`.
 
+**3D 종결 2026-09-08** — verifier r4 ready-for-review + 사용자 승인(`reports/evidence/m3/3d/checklist.md` 「사용자 승인」, 최종 head `a2e12e3`). 산출: Flyway V1~V3(raw/
+canonical/audit/collection_run, 점유 가드 트리거 + `provenance_authority` 표, raw·audit append-only 두 겹, SECURITY DEFINER audit), 도메인 소유 저장 port 다섯 + `ObservationKey`
+(SHA-256), JDBC 직접 repository, Testcontainers PostgreSQL 통합 test 59. 검증이 드러낸 것: 값만 바꾸는 직접 SQL 통과(r1) → 그 수정이 provenance 강등을 통과시킴(r2 회귀) →
+라벨 컬럼 미선언(r3·r4) — 가드 술어를 네 번 재작성했고 V-1(opening_result 라벨)은 후속 소폭으로 등재. **원문 전체 보존(F-7)**은 운영자 결정으로 3A·3B 좁은 확장
+(`sourceText`)까지 닿았다. Docker 부재 시 붉음은 두 레인 다 라이브 재현 실패(소켓 심링크) — 코드 판독으로 skip 경로 부재 확정, 알려진 제한.
+
 ## 완료 조건
 
 - fixture 기반 OpenAPI/문서 입력 전체가 명세대로 정규화

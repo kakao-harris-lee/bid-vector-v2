@@ -1,4 +1,4 @@
-# Slice 계약 — M3 / 3D · persistence adapter — **착수 2026-09-07**
+# Slice 계약 — M3 / 3D · persistence adapter — **종결 2026-09-08**
 
 > **지위**: M3 착수 직후(2026-09-07) 세션 모델이 단독으로 쓴 **계약 초안**(문서 레인, 브리프 2). 구현·gradle·의존성·migration 편집 없음.
 > 착수는 **3A 승인 → 3B 뒤**(`prep/m3-prep.md` §5 순서: 3A → 3B → 3D → 3C)이며, 그때 `base_sha` 재고정(40자), 아래 D-3D-1~3 답 수령,
@@ -61,6 +61,9 @@ pg_dump 텍스트 골든은 바이너리 버전에 묶이고 리뷰 sandbox 에�
 저장 단위이며 §2.1 aggregate 조립은 3D 가 **테이블 셋을 `notice_number`+`notice_round` 키로 묶는 것**까지(`OPEN-3A-AGGREGATE` 참조).
 
 **수정 라운드 1(2026-09-08) — 운영자 결정**: verifier r1 F-7(raw payload 가 계약 등재 필드만 — 3B mapper 가 원문 JSON 을 버리고 3A 타입에 자리 없음)은 **3A·3B 좁은 확장을 3D scope 예외로**(위 in_scope 두 행). raw_observation 은 원문 전체(`sourceText`)를 저장하고 등재분 투영은 별도 컬럼 또는 파생으로. Docker 부재 라이브 재현 실패(양 레인, 소켓 심링크)는 알려진 제한.
+
+**종결 시점(2026-09-08, 최종 head `a2e12e3`)** — 하네스 커밋 없음. range 에 3C 착수·구현 커밋(`9089bd4`·`8b6ea7f`~`8acc71e`)과 세션 모델 정정이 섞임 — slice 밖(공유 파일
+`adapters/build.gradle.kts`·`libs.versions.toml`·`gate-tests.properties` 는 두 slice 가 각자 줄을 넣었고 rollback 은 줄 단위). verifier r1·r2 not-ready → r3·r4 ready-for-review, 재작업 2/5.
 
 **병렬 레인 경계**: 3D 구현 레인은 in_scope 경로만. `adapters/.../koneps/**`(3B 종결)·`fixtures/**`·`docs/**`·`build-logic/**` 은 편집 금지.
 

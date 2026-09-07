@@ -239,3 +239,12 @@ SQL 위조를 막는 방어로만 실효를 갖는다 — 이 사실이 이전 �
   가드 메시지를 받는 것은 verifier가 직접 SQL로 확인했다(현재 실해 없음, 관례상 개선).
 
 ## 재작업 누계: 3회(수정 라운드 1 F-1~F-8, 수정 라운드 2 N-1·N-2·N-4·N-5, 수정 라운드 3 P-1), 상한 5(v2-slice-pipeline). verifier r4 판정: ready-for-review(회귀 0, blocker/high 0) — 운영자 종결 결정.
+
+## 사용자 승인 — 2026-09-08, slice 3D 종결
+
+verifier r1 `not-ready`(F-1 값만 UPDATE 통과 · F-2 ObservationKey hashCode 충돌 유실 · F-3 스키마 검사 2축) → r2 `not-ready`(N-1 회귀 — 「값 변경 시만 검사」가
+provenance 강등을 통과) → r3 `ready-for-review`(P-1 medium) → P-1 수정 → r4 `ready-for-review` + V-1~V-4 등재 `a2e12e3` 위에서 **사용자 승인 2026-09-08**(결정
+「P-1 수정 + r4 표적 뒤 종결」이 r4 판정으로 성립). 재작업 2/5(not-ready 기준). 세션 모델 계약 정정 `2e10699`·`09d6947`·`4762d8a`, 운영자 결정으로 3A `RawNoticeObservation.sourceText`·
+3B `KonepsJson.JsonObject.sourceText` 좁은 확장(F-7 원문 전체 보존). 가드 술어는 네 번 재작성됐고(r1 F-1 → r2 N-1 회귀 → r3 P-1 → r4 V-1) 마지막 두 번은 같은 계열(미선언
+동반·라벨 컬럼)이라 **V-1(opening_result 통화·과세 라벨, 완전성 질의 notice 한정)은 3D 후속 소폭**으로 등재 후 종결한다. 알려진 제한(N-3 app 역할 자작 raw 행·`deadline_at`·
+PK/`created_at` 권한 경계·Docker 부재 라이브 재현 불가)은 등재 유지. push 는 이 종결 커밋 뒤.
