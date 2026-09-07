@@ -7,6 +7,7 @@ import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.sharedkernel.Measurement
+import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
@@ -38,7 +39,7 @@ private fun rate(value: String): AssessmentRate = AssessmentRate.observed(Rate.o
  */
 private fun criticalRate(value: String): Derived<AssessmentRate> {
     val bid = BidRate.recommended(Rate.ofFraction(BigDecimal(value)))
-    val floor = FloorRate(Rate.ofFraction(BigDecimal.ONE), FloorRateOrigin.NoticeValue(0))
+    val floor = FloorRate(Rate.ofFraction(BigDecimal.ONE), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
     val scalePolicy = Resolution.Resolved(RoundingPolicy(10, RoundingMode.HALF_UP), TEST_VERSION)
     val measurement = criticalAssessmentRate(bid, floor, scalePolicy)
     check(measurement is Measurement.Measured<Derived<AssessmentRate>>) {
@@ -210,7 +211,7 @@ class FloorShortfallKernelTest {
     @Test
     fun `criticalAssessmentRateFor 는 criticalRateRounding 자리수를 실제로 소비한다 — F-3`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal.ONE))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(0))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
 
         val basePolicyData = policyOf(minAssessmentSamples = 150).value
         val coarsePolicy = policyOf(minAssessmentSamples = 150)
@@ -230,7 +231,7 @@ class FloorShortfallKernelTest {
     @Test
     fun `criticalAssessmentRateFor 는 criticalRateRounding 모드를 실제로 소비한다 — N-1`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal("2")))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(0))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
 
         val basePolicyData = policyOf(minAssessmentSamples = 150).value
         val halfUpRounding = RoundingPolicy(1, RoundingMode.HALF_UP)
@@ -250,7 +251,7 @@ class FloorShortfallKernelTest {
     @Test
     fun `criticalAssessmentRateFor 가 만드는 DerivationRecord 의 policyVersion 은 policy version 과 같다 — N-3`() {
         val bid = BidRate.recommended(Rate.ofFraction(BigDecimal.ONE))
-        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(0))
+        val floor = FloorRate(Rate.ofFraction(BigDecimal("3")), FloorRateOrigin.NoticeValue(NoticeRound.of("000")))
         val policy = policyOf(minAssessmentSamples = 150)
 
         val measurement = criticalAssessmentRateFor(bid, floor, policy)
