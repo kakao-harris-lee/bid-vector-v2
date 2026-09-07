@@ -12,6 +12,12 @@ package bidvector.adapters.koneps
 internal sealed interface JsonValue {
     data class JsonObject(
         val fields: Map<String, JsonValue>,
+        /**
+         * 이 객체의 원문 텍스트 — 파서가 `{`를 읽기 시작한 위치부터 짝 `}`까지의 원문
+         * substring 그대로다(F-7 3B 몫, 운영자 결정 2026-09-08 (a)). [render](재직렬화)를
+         * 쓰지 않는다 — 공백·키 순서·escape 형태가 원문과 정확히 같아야 하기 때문이다.
+         */
+        val sourceText: String,
     ) : JsonValue {
         fun member(name: String): JsonValue? = fields[name]
     }
@@ -168,6 +174,7 @@ private class JsonReader(
      * 이 선택을 명시로 남긴다(우연이 아니다).
      */
     private fun readObject(): JsonValue.JsonObject {
+        val start = cursor.position
         enterNesting()
         try {
             cursor.expect('{')
@@ -189,7 +196,7 @@ private class JsonReader(
                         else -> throw JsonParseException("객체 안에서 ',' 또는 '}' 를 기대했다 at ${cursor.position}")
                     }
             }
-            return JsonValue.JsonObject(fields)
+            return JsonValue.JsonObject(fields, cursor.substring(start, cursor.position))
         } finally {
             depth--
         }

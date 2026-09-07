@@ -114,7 +114,9 @@ internal fun mapRawItem(
     if (numberRaw.isNullOrBlank() || roundRaw.isNullOrBlank()) {
         return RawItemOutcome.Dropped(CollectionDropReason.CollectionMissingNoticeNumber)
     }
-    val observation = RawNoticeObservation.ofRawValues(fields, sourceEndpoint, observedAt)
+    // F-7 3B 몫(운영자 결정 2026-09-08 (a)) — item.sourceText 는 파서가 잡은 원문 substring
+    // 그대로다(재직렬화 없음, KonepsJson.kt). RawNoticeObservation 은 저장 전용으로만 나른다.
+    val observation = RawNoticeObservation.ofRawValues(fields, sourceEndpoint, observedAt, item.sourceText)
     val unknownFieldCount = policy.fieldContracts.unknownKeysIn(observation).size + blankKeyCount
     return RawItemOutcome.Mapped(observation, identityOf(numberRaw, roundRaw), unknownFieldCount)
 }

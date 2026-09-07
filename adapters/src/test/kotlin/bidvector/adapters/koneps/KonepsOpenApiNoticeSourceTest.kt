@@ -311,6 +311,23 @@ class KonepsOpenApiNoticeSourceTest {
     }
 
     @Test
+    fun `F-7 3B 몫 — sourceText 는 서빙한 항목 바이트와 정확히 같다(불규칙 공백·키 순서 포함)`() {
+        // 표준 정렬(키 알파벳 순)과 다른 순서 + 불규칙 공백을 일부러 둔다 — 재직렬화를
+        // 거치면(render() 등) 이 형태가 사라진다. 3D `RawObservationSourceTextRoundTripTest`
+        // 가 같은 문자열로 저장 계층까지의 바이트 동일성을 이어서 잰다(F-7 운영자 결정 (a)).
+        val servedItemBytes = "{\"bidNtceOrd\":  \"000\", \"bidNtceNo\":\"SRC-TEXT-001\"}"
+        val body =
+            """{"response":{"header":{"resultCode":"00","resultMsg":"ok"},"body":{"items":""" +
+                """[$servedItemBytes],"numOfRows":100,"pageNo":1,"totalCount":1}}}"""
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server, testKonepsHttpPolicy()).fetchNotices(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 1
+            batch.items.single().sourceText shouldBe servedItemBytes
+        }
+    }
+
+    @Test
     fun `M-2 — canonical 공고번호가 같으면 원문 표기가 달라도 duplicate 로 계수된다`() {
         val items =
             listOf(
