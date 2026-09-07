@@ -128,13 +128,24 @@ build cache 를 복원해 소켓을 열지 않고 exit 0 을 낼 수 있었다 �
     (행 하나 삭제 시 11/11 exit 0 실측). 비적대적 촉발은 mutation 추가 시 `--update` 누락.
     **운영자 결정 2026-09-07**: 등재 후 종결, 필요하면 M6 하네스 일괄에서 「목록의 모든
     mutation 에 행이 있어야 exit 0」 단언으로 닫는다.
+    **닫힘(harness/test-discovery-guard, `fe7d133`)** — `assert_expected_tsv_complete` 가
+    루프 전에 `breaking.mutations`(+양성 대조)와 `expected.tsv` 의 mutation 열을 양방향
+    대조한다(표에 없는 mutation·표류한 표 둘 다 exit 2). 「빈 값이면 대조를 건너뛴다」
+    관용을 제거했다 — 실측은 `reports/evidence/harness/test-discovery-guard/commands.md`.
 12. **`--update` 가 규칙 표류를 exit 0 으로 굳힌다(F-22)** — 갱신 모드는 대조를 건너뛰므로
     표류한 규칙 이름이 그대로 새 기대값이 된다. 검출은 커밋 전 표의 diff 리뷰뿐이다. 같은
     운영자 결정(등재 후 종결).
+    **닫힘(harness/test-discovery-guard, `fe7d133`)** — `write_expected_tsv` 가 갱신 전/후
+    표를 diff 하고 표류가 있으면 파일은 갱신하되 exit 1, `--update --accept-drift` 만
+    수용해 exit 0. 표가 없던 최초 실행은 비교 대상이 없어 exit 0.
 13. **`pipefail` + `grep -q` 의 대용량 출력 거짓 음성(F-23, 잠재)** — buf 출력이 64 KiB 를
     넘고 컴파일 오류와 breaking 규칙이 **섞여** 나올 때만 `has_compile_error` 가 거짓 음성이
     된다. 현 buf 1.72.0 에서는 두 번째 절(규칙 이름 확보)이 덮어 결과가 바뀌지 않는다. 같은
     운영자 결정(등재 후 종결; 닫을 때는 타입 목록을 변수에 담아 파이프를 없앤다).
+    **닫힘(harness/test-discovery-guard, `fe7d133`)** — `has_compile_error`/`first_rule_type`
+    이 `finding_types` 결과를 변수에 담아 bash 패턴 매칭/here-string 으로 판정한다 —
+    `grep -q`·`head -1` 로의 파이프를 없애 SIGPIPE 오판 표면을 구조적으로 지웠다.
+    `breaking-mutations-selftest.sh` 가 147KB 합성 JSON 으로 재현한다.
 
 ## 판단이 갈린 지점
 
