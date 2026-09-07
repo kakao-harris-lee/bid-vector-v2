@@ -15,7 +15,7 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/persistence/**  # 3A fact 의 저장 port 구현(`NoticeRepository`·`OpeningResultRepository`·`RawObservationStore`·`CollectionRunStore`)·write 규칙·fold·항목 단위 트랜잭션
   - adapters/src/test/kotlin/bidvector/adapters/persistence/**  # Testcontainers PostgreSQL 통합 test — 멱등 upsert·재수집 versioning·점유 가드 mutation 실패·항목 원자성·clean DB migration 재현
   - adapters/build.gradle.kts                                   # Flyway core · PostgreSQL JDBC driver · (D-3D-1) DB 접근 라이브러리 · Testcontainers(test) — 2A·3B 가 넣은 줄과 병합
-  - procurement/src/main/kotlin/bidvector/procurement/*Repository.kt, procurement/src/test/kotlin/**   # **조건 충족(착수 시 확인 — 3A 는 repository port 를 두지 않았다)**: 도메인 소유 저장 port 파일 신설(ADR 0005 D-10.1) + 그 test. 그 밖의 procurement 편집 금지(3B 가 확장한 `Accounting.kt` 포함)
+  - procurement/src/main/kotlin/bidvector/procurement/{*Repository,RawObservationStore,CollectionRunStore}.kt, procurement/src/test/kotlin/**   # **조건 충족(착수 시 확인 — 3A 는 repository port 를 두지 않았다)**. 글롭은 리뷰 시점 정정(구현 판단 2 — port 다섯 중 둘은 `*Store`): 도메인 소유 저장 port 파일 신설(ADR 0005 D-10.1) + 그 test. 그 밖의 procurement 편집 금지(3B 가 확장한 `Accounting.kt` 포함)
   - gradle/libs.versions.toml                                   # Flyway·PostgreSQL JDBC·Testcontainers 카탈로그 좌표(3A F-15·3B 판단 5 전례로 착수 시 등재)
   - config/quality/gate-tests.properties                        # 조건부 — `gate.tests.adapters` 에 3D test 추가(병합)
   - milestone-3.md                                              # 「Slice 3D」 착수 문단
