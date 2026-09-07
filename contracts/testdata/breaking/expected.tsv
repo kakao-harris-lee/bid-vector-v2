@@ -1,0 +1,13 @@
+mutation	outcome	exit_code
+field-delete	caught	100
+field-number-change	caught	100
+type-change	caught	100
+enum-value-delete	caught	100
+enum-value-number-change	caught	100
+oneof-field-remove	caught	100
+rpc-delete	caught	100
+rpc-streaming-change	caught	100
+package-rename	caught	100
+reserved-number-reuse	caught	100
+optional-removal	caught	100
+compatible-additions(positive-control)	passed	0
