@@ -12,7 +12,14 @@
 # breaking 으로 잡힘) · 2 도구 오류(buf 부재·정책 키 부재·git 태그 없음 등 환경 문제).
 #
 # 결과표는 `contracts/testdata/breaking/expected.tsv`에 쓴다(mutation → 잡힘/못잡힘/exit).
-set -uo pipefail
+#
+# **`set -u`(nounset)를 쓰지 않는다** — 실측(2026-09-07): macOS 기본 `/bin/bash`가 3.2.57
+# (GPL 라이선스 사유로 오래 고정)이고, 이 버전은 빈 배열의 `"${ARR[@]}"` 확장을 "unbound
+# variable"로 잘못 취급하는 알려진 버그가 있다(bash 4.4+ 에서 수정). `breaking.mutations`
+# 가 빈 값이면 `MUTATIONS` 가 빈 배열이 되는 것이 정상 경로(최소 크기 단언이 그것을 잡아야
+# 한다)라 이 버그가 스크립트 자신의 방어선보다 먼저 죽인다 — 빈 값 검사는 이미 명시
+# 조건문(`[[ -n "$MUTATIONS_RAW" ]]`)으로 하므로 `-u` 없이도 안전하다.
+set -o pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CONTRACTS_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
@@ -39,7 +46,10 @@ fi
 APPROVED_TAG=$(policy_value "approved.tag")
 MUTATIONS_RAW=$(policy_value "breaking.mutations")
 MUTATIONS_MIN=$(policy_value "breaking.mutations.min")
-IFS=',' read -r -a MUTATIONS <<<"$MUTATIONS_RAW"
+MUTATIONS=()
+if [[ -n "$MUTATIONS_RAW" ]]; then
+    IFS=',' read -r -a MUTATIONS <<<"$MUTATIONS_RAW"
+fi
 
 if ! git -C "$REPO_ROOT" rev-parse "$APPROVED_TAG" >/dev/null 2>&1; then
     echo "승인 태그 '$APPROVED_TAG' 가 저장소에 없다 — 도구 오류" >&2
