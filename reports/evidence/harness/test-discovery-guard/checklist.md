@@ -96,3 +96,12 @@ F-2·F-3 은 **술어를 건드리지 않았다** — 건드리면 표적 재검
    타입이 Unit 이 아니다」로 잘못 위반 처리한다. 방향이 안전측(A-2 「오탐이 미탐보다
    낫다」)이라 차단 아님 — 고치지 않는다(**술어를 건드리면 표적 재검증 대상**, 2026-09-04
    규칙). 완화가 필요해지면 허용 이름 집합(`Unit`·`kotlin.Unit`)을 정책 키로 둔다.
+
+## 종결 — 운영자 승인 2026-09-07
+
+- verifier r1 `ready-for-review`(`_workspace/harness-test-shape/03_verifier_report.md`, head `a4d5c46` 기준 판정 유지) + low 7·info 1 일괄
+  커밋 `e703873` 뒤 **운영자 승인**(「하네스 slice test-discovery-guard 승인」, 2026-09-07). 완료 조건(verifier ready-for-review + 사용자 승인) 충족.
+- 승인 시점 in_scope 커밋: `git log --oneline 7581106..e703873 -- build-logic config/quality/test-shape-policy.properties contracts/tools contracts/testdata/breaking reports/evidence/harness/test-discovery-guard reports/evidence/m2/2d/checklist.md docs/discovery/capability-map.md`.
+- **승인과 무관하게 열린 것 하나**: 공유 트리의 S-0/S-1 은 3A 소유 `AccountingTest` 의 식 본문 `@Test`(「게이트가 잡은 실제 위반(범위 밖)」 절)가 고쳐질 때까지
+  exit 1 — 해소는 3A 레인 커밋 + S-0 재실행 한 줄(commands.md). 이 slice 의 결함이 아니라 게이트의 첫 실측 검출이다.
+- `gate.tests.build-logic` 에 `TestShapesTest` 등재는 3A 종결 뒤 한 줄 병합(알려진 제한 1) — 그때까지 실행 증거는 S-2.
