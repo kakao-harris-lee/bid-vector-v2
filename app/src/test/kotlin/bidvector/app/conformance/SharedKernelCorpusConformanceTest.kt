@@ -52,10 +52,11 @@ import java.io.File
  */
 class SharedKernelCorpusConformanceTest {
     /**
-     * `KONEPS_COLLECTION_PENDING_CAPABILITY`(3A 잔여 일괄 ②) 7건은 이 dynamic 실행 집합에서
-     * 뺀다 — `classification: authoritative`라 [targetCases]엔 남지만, dispatch 표가
-     * 의도적으로 비어 있으므로 이 자리에서 돌리면 예외를 흉내 낸 것일 뿐이다. 완전성은
-     * [`dispatch 표 밖의 authoritative case 가 없다`]가 별도로 지킨다.
+     * `KONEPS_COLLECTION_PENDING_CAPABILITY`(3A 잔여 일괄 ②)는 team-lead 판정(v2-defect
+     * 7건, 2026-09-07)에 따른 production 수정 뒤 **빈 집합**이 됐다 — 이 `filterNot`은
+     * 이제 아무것도 걸러내지 않지만, 예외 자리가 다시 쓰일 때(새 능력 공백 발견) 같은
+     * 배선을 재사용할 수 있도록 남겨 둔다. 완전성은 [`dispatch 표 밖의 authoritative case
+     * 가 없다`]가 별도로 지킨다.
      */
     @TestFactory
     fun `authoritative rate-unit·money-basis·license case 가 1B·1C 계약과 대조된다`(): List<DynamicTest> =
@@ -66,9 +67,9 @@ class SharedKernelCorpusConformanceTest {
     /**
      * 위협 모델 우회 (4) — 소비 테스트를 실행 집합에서 빼거나 dispatch 표에서 새 case 를
      * 빠뜨리는 것을 막는다. `KONEPS_COLLECTION_PENDING_CAPABILITY`(3A 잔여 일괄 ②)는
-     * 값을 맞추기 위한 예외가 아니라 — 능력 공백을 정직하게 등재한 목록이다. 목록의
-     * **정확한 6건 구성**은 아래 별도 test 가 잠가, 새 case 가 이 예외를 통해 조용히
-     * 빠지지 못하게 한다.
+     * 값을 맞추기 위한 예외가 아니라 — 능력 공백을 정직하게 등재하는 자리이고, 지금은
+     * 비어 있다. 목록의 **정확한 구성(빈 집합)**은 아래 별도 test 가 잠가, 새 case 가 이
+     * 예외를 통해 조용히 빠지지 못하게 한다.
      */
     @Test
     fun `dispatch 표 밖의 authoritative case 가 없다`() {
@@ -85,26 +86,17 @@ class SharedKernelCorpusConformanceTest {
     }
 
     /**
-     * M3/3A 잔여 일괄 ② — koneps-collection 7건은 procurement 공개 API 로 값을 만들면
-     * fixture 가 요구하는 축(판정 근거는 evidence `checklist.md` 「판정 필요 case」표)을
-     * 강제로 맞추게 된다 — 이 slice 는 그렇게 하지 않는다. 002·003·004·016·018·023 은
-     * 팀리드 사전 지정, 026 은 배선 중 신규 발견(v2-defect — `KonepsCollectionExecutors.kt`
-     * 머리 문서 참고). 이 test 는 예외 목록이 **정확히 이 7건**임을 잠가, 목록이 새 case 로
-     * 조용히 자라거나(값 우회 은폐) 줄어드는데(능력이 생겼는데 미반영) evidence 갱신 없이
-     * 지나가지 못하게 한다.
+     * M3/3A 잔여 일괄 ② → verifier r3 전 정정 — team-lead 가 002·003·004·016·018·023·026
+     * 7건 전부를 v2-defect 로 판정하고 production 수정을 지시했다(2026-09-07, 「계약 안
+     * 항목이라 verifier r3 전에 고친다... 값을 맞추려 runner 를 손대지 말고 production
+     * 을 고친 뒤 dispatch 예외 목록에서 빼라」). 6개 결함을 모두 고친 뒤
+     * [KonepsCollectionDefectFixExecutors.kt]가 7건 전부를 dispatch 한다 — 이 test 는
+     * 예외 목록이 **정확히 빈 집합**임을 잠가, 새 case 가 이 예외를 통해 조용히 빠지지
+     * 못하게 한다.
      */
     @Test
-    fun `koneps-collection 판정 필요 7건은 예외로 고정된다`() {
-        KONEPS_COLLECTION_PENDING_CAPABILITY shouldBe
-            setOf(
-                "koneps-collection-002",
-                "koneps-collection-003",
-                "koneps-collection-004",
-                "koneps-collection-016",
-                "koneps-collection-018",
-                "koneps-collection-023",
-                "koneps-collection-026",
-            )
+    fun `koneps-collection 판정 필요 case 는 이제 없다 — v2-defect 7건 production 수정으로 닫혔다`() {
+        KONEPS_COLLECTION_PENDING_CAPABILITY shouldBe emptySet()
     }
 
     /**

@@ -460,9 +460,10 @@ internal val LICENSE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
 /**
  * money-basis(1B-c)·license(1C)·provenance/floor(1D)·strategy-watch·strategy-validation·
  * money-basis-003(1E)·koneps-collection(3A) 축의 value executor 를 하나의 dispatch 표로
- * 합친다. koneps-collection 은 27 case 중 20건만 담는다(`KonepsCollectionExecutors.kt` +
- * `KonepsCollectionAccountingExecutors.kt` 둘로 나뉜다, 500줄 한도가 아니라 관심사 분리) —
- * `KONEPS_COLLECTION_PENDING_CAPABILITY`(3A 잔여 일괄 ②)가 나머지 7건의 예외를 진다.
+ * 합친다. koneps-collection 은 이제 27 case 전건을 담는다 — 세 파일로 나뉜다
+ * (`KonepsCollectionExecutors.kt`·`KonepsCollectionAccountingExecutors.kt`·
+ * `KonepsCollectionDefectFixExecutors.kt`, 500줄 한도가 아니라 관심사 분리).
+ * `KONEPS_COLLECTION_PENDING_CAPABILITY`(3A 잔여 일괄 ②)는 이제 빈 집합이다.
  */
 internal val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
     MONEY_BASIS_VALUE_EXECUTORS +
@@ -470,7 +471,8 @@ internal val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
         PROVENANCE_FLOOR_EXECUTORS +
         STRATEGY_EXECUTORS +
         KONEPS_COLLECTION_FIELD_EXECUTORS +
-        KONEPS_COLLECTION_ACCOUNTING_EXECUTORS
+        KONEPS_COLLECTION_ACCOUNTING_EXECUTORS +
+        KONEPS_COLLECTION_DEFECT_FIX_EXECUTORS
 
 /**
  * compile-fixture 위임 case → shared-kernel `compile-fixtures` 의 fixture 번호. 실제

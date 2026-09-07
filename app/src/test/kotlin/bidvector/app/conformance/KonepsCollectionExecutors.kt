@@ -41,24 +41,11 @@ import java.time.LocalDate
  * **이 파일은 필드 계약·업무구분·율·금액 해석 축(001·005~015·017)을 갖는다.** 회계·조회
  * 가치·resultCode 축(019~027)은 크기 한도(v2-지침서.md §5, 500줄) 때문이 아니라 —
  * 회계·gate 계약군이 관심사가 다르다는 이유로 [KonepsCollectionAccountingExecutors.kt]
- * 에 둔다(`CorpusExecutors.kt`가 두 표를 합친다).
- *
- * **판정 필요 7건은 dispatch 하지 않는다**(`SharedKernelCorpusConformanceTest`의
- * `KONEPS_COLLECTION_PENDING_CAPABILITY` 참고, 팀리드 사전 지정 6건 + 배선 중 신규 발견
- * 1건) —
- * `002`(`expectedRange` 위반 거부 — 이 slice 에 그 축 실행 경로가 없다)·`003`·`004`(옵션
- * 금액의 `ExplicitNull` vs `KeyMissing` 구분 — `RawNoticeObservation`이 값 부재만 나르고
- * 부재의 **사유**를 나르지 않는다)·`016`(문서 열거값 자체가 procurement 타입이 아니다)·
- * `018`(§5.5 `UnnormalizedFigure` 미신설)·`023`(`NoticeNumber.of`는 trim 만 하고 대소문자·
- * 구분자 정규화를 하지 않는다 — 이 case 의 세 표기가 값으로는 같아지지 않는다)·
- * **`026`(신규 발견, v2-defect)** — `parseSourceZonedInstant`가 `LocalDateTime.parse`
- * (ISO `T` 구분자)만 받는데, KONEPS 실제 wire 형식은 공식 문서(`koneps-collection-014`가
- * 인용하는 "YYYY-MM-DD HH:MM:SS")대로 **공백** 구분자다 — `LocalDateTime.parse("2026-05-20
- * 10:00:00")`가 `DateTimeParseException`을 던진다(직접 JVM 실측 확인). 즉 실제 KONEPS
- * 응답에서 이 함수는 **항상 null**을 낸다. 기존 procurement test(`CanonicalizeTest`)가
- * ISO `T` 표기(`"2026-09-10T14:00:00"`)만 써서 이 결함이 가려져 있었다. 값을 맞추기 위해
- * `parseSourceZonedInstant`를 이 배치에서 고치지 않는다 — 3A 잔여 일괄 범위(4개 커밋
- * 단위) 밖의 변경이라 checklist 에 v2-defect 로 등재하고 멈춰 보고한다.
+ * 에 둔다(`CorpusExecutors.kt`가 세 표를 합친다). **v2-defect 로 판정된 7건(002·003·004·
+ * 016·018·023·026)은 production 수정 뒤 [KonepsCollectionDefectFixExecutors.kt]가 dispatch
+ * 한다** — team-lead 판정(2026-09-07, 「7건 전부 v2-defect 로 동의, 계약 안 항목이라
+ * verifier r3 전에 고친다」) 뒤 이 slice 배치의 두 번째 라운드에서 고쳤다.
+ * `KONEPS_COLLECTION_PENDING_CAPABILITY`는 이제 빈 집합이다 — 27 case 전건 dispatch.
  */
 
 private val REFERENCE_DATE: LocalDate = LocalDate.of(2026, 9, 7)
@@ -74,17 +61,13 @@ internal val REAL_POLICY: KonepsCollectionPolicyData =
         }
     }
 
-/** case 의 판정이 procurement 능력 공백을 요구해 dispatch 하지 않는 7건(evidence 참고). */
-internal val KONEPS_COLLECTION_PENDING_CAPABILITY: Set<String> =
-    setOf(
-        "koneps-collection-002",
-        "koneps-collection-003",
-        "koneps-collection-004",
-        "koneps-collection-016",
-        "koneps-collection-018",
-        "koneps-collection-023",
-        "koneps-collection-026",
-    )
+/**
+ * case 의 판정이 procurement 능력 공백을 요구해 dispatch 하지 않는 집합 — v2-defect 7건이
+ * production 수정(3A 잔여 일괄 verifier r3 전)으로 전부 닫혀 지금은 **빈 집합**이다.
+ * 자리를 지운다(타입을 없애지 않는다) — `SharedKernelCorpusConformanceTest`의 잠금 test 가
+ * 이 빈 상태를 잠가, 새 case 가 조용히 이 예외를 통해 다시 빠지지 못하게 한다.
+ */
+internal val KONEPS_COLLECTION_PENDING_CAPABILITY: Set<String> = emptySet()
 
 /** `FieldUnit` → 표시 통화/단위 문자열. 이 corpus 가 다루는 단위는 원화뿐이다. */
 internal fun currencyUnitOf(unit: FieldUnit): String? =
