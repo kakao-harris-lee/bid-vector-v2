@@ -7,6 +7,7 @@ import bidvector.procurement.PageCursor
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
+import bidvector.procurement.TruncationCause
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
 import java.net.http.HttpClient
@@ -44,6 +45,8 @@ private class KonepsPageWalkAccumulator {
         private set
     var sourceTotal: Int? = null
         private set
+    private var truncationCause: TruncationCause? = null
+    private var resumePageNo: Int? = null
     private var lastPageSignature: List<String>? = null
 
     fun isRepeatOf(signature: List<String>): Boolean = lastPageSignature != null && lastPageSignature == signature
@@ -90,8 +93,23 @@ private class KonepsPageWalkAccumulator {
         sourceTotal = sourceTotal ?: 0
     }
 
-    fun markTruncated() {
+    /**
+     * L-8(verifier r1) — 반복 감지로 걷기를 멈추는 페이지도 HTTP 호출은 실제로 나갔으니
+     * `pagesFetched` 에 센다(항목은 이미 이전 페이지에서 셌으므로 다시 세지 않는다).
+     */
+    fun recordRepeatedPage(resumeAt: Int) {
+        pagesFetched++
+        markTruncated(TruncationCause.RepeatedPage, resumeAt)
+    }
+
+    /** M-3·H-3(verifier r1) — 사유와 재개 지점을 함께 남긴다. */
+    fun markTruncated(
+        cause: TruncationCause,
+        resumeAt: Int,
+    ) {
         truncated = true
+        truncationCause = cause
+        resumePageNo = resumeAt
     }
 
     fun currentlyComplete(): Boolean {
@@ -99,7 +117,10 @@ private class KonepsPageWalkAccumulator {
         return items.size + duplicate + dropped >= total
     }
 
-    fun toAccounting(): CollectionAccounting =
+    /** M-3 — truncated 로 끝났으면 재개 지점을 실은 cursor, 아니면 null(완료를 거짓 진술하지 않는다). */
+    fun nextCursor(): PageCursor? = if (truncated) resumePageNo?.let { PageCursor(it.toString()) } else null
+
+    fun toAccounting(counters: KonepsAttemptCounters): CollectionAccounting =
         CollectionAccounting(
             received = items.size + duplicate + dropped,
             normalized = items.size,
@@ -110,6 +131,9 @@ private class KonepsPageWalkAccumulator {
             pagesFetched = pagesFetched,
             truncated = truncated,
             unknownFields = unknownFields,
+            truncationCause = truncationCause,
+            quotaExceeded = counters.quotaExceeded,
+            backoffSkipped = counters.backoffSkipped,
         )
 }
 
@@ -118,10 +142,11 @@ private fun applySuccess(
     page: KonepsEnvelopeOutcome.Success,
     policy: KonepsCollectionPolicyData,
     clock: Clock,
+    pageNo: Int,
 ): WalkStep {
     val signature = page.items.map { it.render() }
     if (accumulator.isRepeatOf(signature)) {
-        accumulator.markTruncated()
+        accumulator.recordRepeatedPage(pageNo)
         return WalkStep.STOP
     }
     accumulator.recordPage(page, signature, clock.instant(), policy)
@@ -133,10 +158,11 @@ private fun applyOutcome(
     outcome: KonepsCallOutcome,
     policy: KonepsCollectionPolicyData,
     clock: Clock,
+    pageNo: Int,
 ): WalkStep =
     when (outcome) {
         is KonepsCallOutcome.Success -> {
-            applySuccess(accumulator, outcome.body, policy, clock)
+            applySuccess(accumulator, outcome.body, policy, clock, pageNo)
         }
 
         KonepsCallOutcome.NoData -> {
@@ -145,12 +171,12 @@ private fun applyOutcome(
         }
 
         is KonepsCallOutcome.Failed -> {
-            accumulator.markTruncated()
+            accumulator.markTruncated(outcome.cause, pageNo)
             WalkStep.STOP
         }
 
         is KonepsCallOutcome.Throttled -> {
-            accumulator.markTruncated()
+            accumulator.markTruncated(TruncationCause.SelfThrottled, pageNo)
             WalkStep.STOP
         }
     }
@@ -164,6 +190,7 @@ private class KonepsWalkContext(
     val httpPolicy: KonepsHttpPolicyData,
     val collectionPolicy: KonepsCollectionPolicyData,
     val clock: Clock,
+    val counters: KonepsAttemptCounters,
 )
 
 /** 페이지 하나를 부르고 누적한다 — 반환값은 「다음 페이지로 계속할지」. */
@@ -181,8 +208,9 @@ private fun fetchNextPage(
             uri,
             context.httpPolicy,
             context.collectionPolicy,
+            context.counters,
         )
-    val step = applyOutcome(accumulator, outcome, context.collectionPolicy, context.clock)
+    val step = applyOutcome(accumulator, outcome, context.collectionPolicy, context.clock, pageNo)
     return step == WalkStep.CONTINUE
 }
 
@@ -192,11 +220,34 @@ private fun nextWalkState(
     pageNo: Int,
 ): Boolean =
     if (accumulator.pagesFetched >= context.httpPolicy.maxPages) {
-        accumulator.markTruncated()
+        accumulator.markTruncated(TruncationCause.MaxPages, pageNo)
         false
     } else {
         fetchNextPage(accumulator, context, pageNo)
     }
+
+/** M-5(verifier r1) — cursor 토큰이 숫자가 아니거나 0 이하면 조용히 page 1 로 접지 않고 명시 실패를 낸다. */
+private fun invalidCursorBatch(): SourceBatch<RawNoticeObservation> {
+    val accounting =
+        CollectionAccounting(
+            received = 0,
+            normalized = 0,
+            duplicate = 0,
+            dropped = 0,
+            dropReasons = emptyMap(),
+            sourceTotal = null,
+            pagesFetched = 0,
+            truncated = true,
+            unknownFields = 0,
+            truncationCause = TruncationCause.InputError,
+        )
+    return SourceBatch(emptyList(), accounting, next = null)
+}
+
+private fun startPageOf(cursor: PageCursor?): Int? {
+    val token = cursor?.token ?: return START_PAGE
+    return token.toIntOrNull()?.takeIf { it > 0 }
+}
 
 /**
  * 공고 목록 page-walk(④⑤, COL-06) — `cursor`가 시작 페이지, 종료는 `totalCount` 도달·짧은
@@ -215,13 +266,16 @@ internal fun walkKonepsNoticePages(
     clock: Clock,
     cursor: PageCursor?,
 ): SourceBatch<RawNoticeObservation> {
-    val context = KonepsWalkContext(httpClient, retry, rateLimiter, uriBuilder, httpPolicy, collectionPolicy, clock)
+    val startPage = startPageOf(cursor) ?: return invalidCursorBatch()
+    val counters = KonepsAttemptCounters()
+    val context =
+        KonepsWalkContext(httpClient, retry, rateLimiter, uriBuilder, httpPolicy, collectionPolicy, clock, counters)
     val accumulator = KonepsPageWalkAccumulator()
-    var pageNo = cursor?.token?.toIntOrNull() ?: START_PAGE
+    var pageNo = startPage
     var walking = true
     while (walking) {
         walking = nextWalkState(accumulator, context, pageNo)
         if (walking) pageNo++
     }
-    return SourceBatch(accumulator.items, accumulator.toAccounting(), next = null)
+    return SourceBatch(accumulator.items, accumulator.toAccounting(counters), next = accumulator.nextCursor())
 }

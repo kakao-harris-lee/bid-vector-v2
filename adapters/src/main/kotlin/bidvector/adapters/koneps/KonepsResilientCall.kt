@@ -2,6 +2,7 @@ package bidvector.adapters.koneps
 
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.ResultCodeCategory
+import bidvector.procurement.TruncationCause
 import io.github.resilience4j.core.IntervalFunction
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.ratelimiter.RateLimiterConfig
@@ -21,8 +22,9 @@ internal sealed interface KonepsCallOutcome {
 
     data object NoData : KonepsCallOutcome
 
-    /** 비재시도 실패 — 재시도 가능 범주를 소진했거나 처음부터 비재시도 범주다. */
+    /** 비재시도 실패 — 재시도 가능 범주를 소진했거나 처음부터 비재시도 범주다(H-3, 사유가 갈린다). */
     data class Failed(
+        val cause: TruncationCause,
         val detail: String,
     ) : KonepsCallOutcome
 
@@ -30,6 +32,28 @@ internal sealed interface KonepsCallOutcome {
     data class Throttled(
         val detail: String,
     ) : KonepsCallOutcome
+}
+
+/**
+ * 걷기 전체(여러 페이지 호출)에 걸쳐 quota 신호·자체 backoff 스킵을 누적한다(H-3, verifier
+ * r1 — scope ② 「quota 초과는 회계에 backoffSkipped/quotaExceeded로」). `quotaExceeded`는
+ * HTTP 429·`resultCode 22` 를 **관측할 때마다**(그 시도가 나중에 성공하든 소진되든) 센다.
+ * `backoffSkipped`는 rate limiter 자신이 허가를 거부해(`RequestNotPermitted`) 실제 호출조차
+ * 나가지 못한 시도 수다.
+ */
+internal class KonepsAttemptCounters {
+    var quotaExceeded: Int = 0
+        private set
+    var backoffSkipped: Int = 0
+        private set
+
+    fun recordQuotaSignal() {
+        quotaExceeded++
+    }
+
+    fun recordBackoffSkipped() {
+        backoffSkipped++
+    }
 }
 
 /** 전송+envelope 판정 한 스텝 — Resilience4j `retryOnResult` predicate 의 최소 단위. */
@@ -52,7 +76,7 @@ private fun rawStep(
     val transport = sendKonepsRequest(httpClient, uri, httpPolicy.requestTimeout)
     return when {
         transport is KonepsTransportOutcome.Received && transport.status != HTTP_TOO_MANY_REQUESTS -> {
-            KonepsRawStep.EnvelopeStep(parseKonepsEnvelope(transport.body, collectionPolicy))
+            KonepsRawStep.EnvelopeStep(parseKonepsEnvelope(transport.body, collectionPolicy, httpPolicy.maxJsonDepth))
         }
 
         else -> {
@@ -77,32 +101,17 @@ private fun isRetryableStep(step: KonepsRawStep): Boolean =
         }
     }
 
-private fun describeTransport(outcome: KonepsTransportOutcome): String =
-    when (outcome) {
-        KonepsTransportOutcome.TimedOut -> "timeout"
-        is KonepsTransportOutcome.TransportFailed -> outcome.message
-        is KonepsTransportOutcome.Received -> "HTTP ${outcome.status}"
-    }
-
-private fun describeEnvelope(outcome: KonepsEnvelopeOutcome): String =
-    when (outcome) {
-        is KonepsEnvelopeOutcome.Classified -> "resultCode ${outcome.code}(${outcome.category})"
-        is KonepsEnvelopeOutcome.Unclassified -> "resultCode 미지·부재(${outcome.code})"
-        is KonepsEnvelopeOutcome.StructureFailure -> outcome.reason
-        else -> error("성공/NoData 는 foldFinal 의 별도 분기가 처리한다")
-    }
-
 private fun foldFinal(step: KonepsRawStep): KonepsCallOutcome =
     when (step) {
         is KonepsRawStep.TransportStep -> {
-            KonepsCallOutcome.Failed(describeTransport(step.outcome))
+            KonepsCallOutcome.Failed(causeFor(step), describeTransport(step.outcome))
         }
 
         is KonepsRawStep.EnvelopeStep -> {
             when (val envelope = step.outcome) {
                 is KonepsEnvelopeOutcome.Success -> KonepsCallOutcome.Success(envelope)
                 KonepsEnvelopeOutcome.NoData -> KonepsCallOutcome.NoData
-                else -> KonepsCallOutcome.Failed(describeEnvelope(envelope))
+                else -> KonepsCallOutcome.Failed(causeFor(step), describeEnvelope(envelope))
             }
         }
     }
@@ -146,9 +155,11 @@ internal fun buildKonepsRateLimiter(
 }
 
 /**
- * Resilience4j **한 계층**(ADR 0005 D-11) — `Retry`가 바깥, `RateLimiter`가 안쪽이다. `RateLimiter`
- * 가 `RequestNotPermitted`를 던지면 `Retry`의 `retryOnException`이 그것도 재시도 대상으로
- * 잡는다(백오프를 태운 뒤에도 허가를 못 받으면 [KonepsCallOutcome.Throttled]).
+ * Resilience4j **한 계층**(ADR 0005 D-11) — `Retry`가 바깥, `RateLimiter`가 안쪽이다.
+ * `RateLimiter`가 `RequestNotPermitted`를 던지면 `Retry`의 `retryOnException`이 그것도
+ * 재시도 대상으로 잡는다(백오프를 태운 뒤에도 허가를 못 받으면 [KonepsCallOutcome
+ * .Throttled]). `counters`는 매 시도(재시도 포함)를 관찰해 quota 신호·자체 throttle 스킵을
+ * 센다 — Resilience4j 가 내부에서 삼키는 중간 실패도 놓치지 않는다(H-3).
  */
 internal fun fetchPageResilient(
     httpClient: HttpClient,
@@ -157,10 +168,23 @@ internal fun fetchPageResilient(
     uri: URI,
     httpPolicy: KonepsHttpPolicyData,
     collectionPolicy: KonepsCollectionPolicyData,
+    counters: KonepsAttemptCounters,
 ): KonepsCallOutcome {
-    val supplier = { rawStep(httpClient, uri, httpPolicy, collectionPolicy) }
+    val supplier = {
+        val step = rawStep(httpClient, uri, httpPolicy, collectionPolicy)
+        if (isQuotaSignal(step)) counters.recordQuotaSignal()
+        step
+    }
     val rateLimited = RateLimiter.decorateSupplier(rateLimiter, supplier)
-    val decorated = Retry.decorateSupplier(retry, rateLimited)
+    val counted: () -> KonepsRawStep = {
+        try {
+            rateLimited.get()
+        } catch (refused: RequestNotPermitted) {
+            counters.recordBackoffSkipped()
+            throw refused
+        }
+    }
+    val decorated = Retry.decorateSupplier(retry, counted)
     return try {
         foldFinal(decorated.get())
     } catch (throttled: RequestNotPermitted) {

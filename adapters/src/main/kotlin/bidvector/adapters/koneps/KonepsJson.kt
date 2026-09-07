@@ -65,12 +65,23 @@ internal class JsonParseException(
 ) : RuntimeException(message)
 
 internal object KonepsJsonParser {
-    fun parse(text: String): JsonValue {
-        val reader = JsonReader(text)
-        reader.skipWhitespace()
+    /**
+     * `maxDepth`(정책값, M-4) — object/array 중첩 상한. 상한 없이 깊게 중첩된 입력을
+     * 그대로 재귀 판독하면 `StackOverflowError`(예외가 아니라 `Throwable`)가 나는데
+     * `parseKonepsEnvelope` 의 `runCatching` 이 그것까지 삼켜 `StructureFailure` 로 접는다
+     * — 오늘도 봉쇄는 되지만(예외가 port 밖으로 안 나간다) 실제 JVM 스택 한계 근처까지
+     * 재귀를 태우는 것 자체가 취약하다. 상한을 미리 걸어 훨씬 이른 지점에서 통제된
+     * `JsonParseException` 으로 끝낸다.
+     */
+    fun parse(
+        text: String,
+        maxDepth: Int,
+    ): JsonValue {
+        val reader = JsonReader(text, maxDepth)
+        reader.cursor.skipWhitespace()
         val value = reader.readValue()
-        reader.skipWhitespace()
-        if (!reader.atEnd()) throw JsonParseException("JSON 뒤에 남은 문자가 있다 at ${reader.position}")
+        reader.cursor.skipWhitespace()
+        if (!reader.cursor.atEnd()) throw JsonParseException("JSON 뒤에 남은 문자가 있다 at ${reader.position}")
         return value
     }
 }
@@ -115,14 +126,14 @@ private class CharCursor(
 /** 커서 기반 recursive-descent 판독기(문법 규칙) — 문자 이동은 [CharCursor]에 위임한다. */
 private class JsonReader(
     text: String,
+    private val maxDepth: Int,
 ) {
-    private val cursor = CharCursor(text)
+    // 비공개가 아니다 — 같은 파일의 KonepsJsonParser 가 직접 위임 호출한다(atEnd/
+    // skipWhitespace 래퍼 함수 둘을 없애 detekt TooManyFunctions 상한 11을 지킨다).
+    val cursor = CharCursor(text)
+    private var depth = 0
 
     val position: Int get() = cursor.position
-
-    fun atEnd(): Boolean = cursor.atEnd()
-
-    fun skipWhitespace() = cursor.skipWhitespace()
 
     fun readValue(): JsonValue {
         cursor.skipWhitespace()
@@ -150,46 +161,69 @@ private class JsonReader(
         return value
     }
 
+    /**
+     * 객체 안 중복 키는 **마지막 값이 승리**한다(L-5, `LinkedHashMap` 대입이 자연히 그렇게
+     * 한다) — `resultCode` 가 중복이어도 같은 규칙이라 마지막 값이 미지 코드면
+     * fail-safe(비재시도) 방향으로 접힌다. RFC 8259 는 중복 키의 처리를 정하지 않는다 —
+     * 이 선택을 명시로 남긴다(우연이 아니다).
+     */
     private fun readObject(): JsonValue.JsonObject {
-        cursor.expect('{')
-        val fields = LinkedHashMap<String, JsonValue>()
-        cursor.skipWhitespace()
-        var more = cursor.peek() != '}'
-        if (!more) cursor.advance()
-        while (more) {
+        enterNesting()
+        try {
+            cursor.expect('{')
+            val fields = LinkedHashMap<String, JsonValue>()
             cursor.skipWhitespace()
-            val key = readString()
-            cursor.skipWhitespace()
-            cursor.expect(':')
-            fields[key] = readValue()
-            cursor.skipWhitespace()
-            more =
-                when (cursor.advance()) {
-                    ',' -> true
-                    '}' -> false
-                    else -> throw JsonParseException("객체 안에서 ',' 또는 '}' 를 기대했다 at ${cursor.position}")
-                }
+            var more = cursor.peek() != '}'
+            if (!more) cursor.advance()
+            while (more) {
+                cursor.skipWhitespace()
+                val key = readString()
+                cursor.skipWhitespace()
+                cursor.expect(':')
+                fields[key] = readValue()
+                cursor.skipWhitespace()
+                more =
+                    when (cursor.advance()) {
+                        ',' -> true
+                        '}' -> false
+                        else -> throw JsonParseException("객체 안에서 ',' 또는 '}' 를 기대했다 at ${cursor.position}")
+                    }
+            }
+            return JsonValue.JsonObject(fields)
+        } finally {
+            depth--
         }
-        return JsonValue.JsonObject(fields)
     }
 
     private fun readArray(): JsonValue.JsonArray {
-        cursor.expect('[')
-        val items = mutableListOf<JsonValue>()
-        cursor.skipWhitespace()
-        var more = cursor.peek() != ']'
-        if (!more) cursor.advance()
-        while (more) {
-            items += readValue()
+        enterNesting()
+        try {
+            cursor.expect('[')
+            val items = mutableListOf<JsonValue>()
             cursor.skipWhitespace()
-            more =
-                when (cursor.advance()) {
-                    ',' -> true
-                    ']' -> false
-                    else -> throw JsonParseException("배열 안에서 ',' 또는 ']' 를 기대했다 at ${cursor.position}")
-                }
+            var more = cursor.peek() != ']'
+            if (!more) cursor.advance()
+            while (more) {
+                items += readValue()
+                cursor.skipWhitespace()
+                more =
+                    when (cursor.advance()) {
+                        ',' -> true
+                        ']' -> false
+                        else -> throw JsonParseException("배열 안에서 ',' 또는 ']' 를 기대했다 at ${cursor.position}")
+                    }
+            }
+            return JsonValue.JsonArray(items)
+        } finally {
+            depth--
         }
-        return JsonValue.JsonArray(items)
+    }
+
+    private fun enterNesting() {
+        depth++
+        if (depth > maxDepth) {
+            throw JsonParseException("JSON 중첩 깊이가 정책 상한을 넘었다(M-4): depth=$depth max=$maxDepth")
+        }
     }
 
     private fun readString(): String {

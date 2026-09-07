@@ -18,6 +18,11 @@ data class KonepsHttpPolicyData(
     val rateLimiterPeriod: Duration,
     val rateLimiterWait: Duration,
     val maxPages: Int,
+    // verifier r1 M-4 — JSON 중첩 깊이 상한. 상한 없이는 악의적으로 깊은 envelope 가
+    // `StackOverflowError`(Throwable, 예외가 아니다)를 던지고 `runCatching` 이 그것까지
+    // 삼켜 StructureFailure 로 접는다(오늘도 봉쇄는 되지만 정공법이 아니다) — 명시 상한을
+    // 두면 실제 JVM 스택 한계에 닿기 훨씬 전에 통제된 `JsonParseException` 으로 끝난다.
+    val maxJsonDepth: Int,
 ) {
     init {
         require(maxAttempts >= 1) { "maxAttempts는 1 이상이어야 한다: $maxAttempts" }
@@ -26,6 +31,7 @@ data class KonepsHttpPolicyData(
         }
         require(rateLimiterPermits >= 1) { "rateLimiterPermits는 1 이상이어야 한다: $rateLimiterPermits" }
         require(maxPages >= 1) { "maxPages는 1 이상이어야 한다: $maxPages" }
+        require(maxJsonDepth >= 1) { "maxJsonDepth는 1 이상이어야 한다: $maxJsonDepth" }
     }
 }
 
@@ -53,6 +59,10 @@ val KONEPS_HTTP_POLICY: EffectiveDatedPolicy<KonepsHttpPolicyData> =
                         rateLimiterPeriod = Duration.ofSeconds(1),
                         rateLimiterWait = Duration.ofSeconds(20),
                         maxPages = 50,
+                        // 실제 envelope 깊이는 response→body→items→item→field 로 5 안팎이다
+                        // (`policy-values.md` §1.6 봉투 키 표) — 32 는 그 위에 넉넉한 여유를
+                        // 두면서도 실제 JVM 스택 한계(수천~수만)와는 자릿수가 다르다(M-4).
+                        maxJsonDepth = 32,
                     ),
             ),
     )

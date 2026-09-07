@@ -46,8 +46,9 @@ private const val NO_DATA_CODE = "03"
 internal fun parseKonepsEnvelope(
     body: String,
     policy: KonepsCollectionPolicyData,
+    maxJsonDepth: Int,
 ): KonepsEnvelopeOutcome =
-    runCatching { KonepsJsonParser.parse(body) }
+    runCatching { KonepsJsonParser.parse(body, maxJsonDepth) }
         .fold(
             onSuccess = { root -> classifyRoot(root, policy) },
             onFailure = { failure -> KonepsEnvelopeOutcome.StructureFailure("JSON 파싱 실패: ${failure.message}") },
