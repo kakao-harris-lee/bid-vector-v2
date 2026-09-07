@@ -1,13 +1,20 @@
 # M3/3D — checklist.md
 
-base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · head `15f3325`(수정 라운드 3, verifier r3
-P-1 대응 — F-1~F-8·N-1~N-5는 `2e31d4e` 시점과 변경 없음). base..HEAD 사이 `9089bd4`는
-3C(다른 slice) 착수 커밋으로 `milestone-3.md`·`reports/evidence/m3/3c/scope.md`만
-건드린다 — 3D in_scope 밖, 레인 혼입 아님(commands.md 「레인 혼입」 절 참고). 정본 순서:
-`scope.md` → `_workspace/m3-3d/01_design-review.md`(Phase 2.5) →
+base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · 코드 head `15f3325`(수정 라운드 3,
+verifier r3 P-1 대응 — F-1~F-8·N-1~N-5는 `2e31d4e` 시점과 변경 없음, 이 문서의 이번
+갱신도 코드는 무변경이다). verifier r4는 `ready-for-review`(blocker/high 0, 회귀 0) —
+신규 V-1~V-4(medium 둘·low 둘)는 운영자 결정으로 **코드 수정 없이 등재만** 하고 이
+slice를 종결한다. base..HEAD 사이 3C(다른 slice)의 착수 커밋(`9089bd4`)과 구현 커밋
+다섯(`b013eb6`~`1db93dd`)이 섞여 있다 — 전부 `extraction/**`·`qualification`/
+`strategy` 등 3D in_scope 밖 파일이거나(착수 커밋은 `milestone-3.md`·
+`reports/evidence/m3/3c/scope.md`만), 공유 카탈로그 파일(`adapters/build.gradle.kts`·
+`gradle/libs.versions.toml`·`config/quality/gate-tests.properties`)에 3C 몫만 추가한
+것이라 3D 등재분과 충돌하지 않는다(commands.md 머리말의 「경과」 절 실측). 정본 순서: `scope.md` →
+`_workspace/m3-3d/01_design-review.md`(Phase 2.5) →
 `_workspace/m3-3d/02_verifier_report.md`(verifier r1) →
 `_workspace/m3-3d/03_verifier_report_r2.md`(verifier r2) →
-`_workspace/m3-3d/04_verifier_report_r3.md`(verifier r3) → 이 문서.
+`_workspace/m3-3d/04_verifier_report_r3.md`(verifier r3) →
+`_workspace/m3-3d/05_verifier_report_r4.md`(verifier r4) → 이 문서.
 
 ## 완료 조건 대응표 — scope.md 「이 slice 가 하는 일」
 
@@ -56,6 +63,15 @@ P-1 대응 — F-1~F-8·N-1~N-5는 `2e31d4e` 시점과 변경 없음). base..HEA
 | P-3(low, 장부) | 경계 문장의 `business_category` 사유("변경 경로 자체가 없다")가 사실과 다름(실물은 UPDATE_NOTICE가 매번 SET, 위조도 통과) | 사유 정정(「가드 축이 아니다」만 유지) | checklist.md 경계 문장(위) |
 | P-4(low, 장부) | evidence 선언 head가 한 커밋 낡음(`6332158`→실제 HEAD `2e31d4e`), `2e31d4e`가 evidence 3종만 만졌다는 사실이 어디에도 없음 | head 재고정 + 이 사실 commands.md에 명시 | commands.md 머리말 |
 | P-5(low, 규격) | `rollback.md`에 라운드 이력 절("이전 실측 — 결과 동일, 기록 보존")이 있어 evidence-pack 「라운드 이력 절 금지」 위반 | 절 삭제, 이번 실측 하나만 남김 | rollback.md |
+
+## finding 대응표 — verifier r4(운영자 종결 결정 — 등재만, 코드 수정 없음)
+
+| finding | 요지 | 대응 | 재검증 |
+| --- | --- | --- | --- |
+| V-1(medium) | `opening_result.derived_base_amount_currency`/`_vat`가 P-1에서 빠짐, same key 위조 가능 | **미수정 — 알려진 제한에 후속 소폭으로 등재**(트리거 인자 확장 + 완전성 대조 질의를 세 테이블로, M6 6B/M4 4C 착수 시 한 커밋) | checklist.md 알려진 제한(위) |
+| V-2(medium) | canonical PK·`created_at`·`observation_key` 단독 교체가 app 역할에 열려 있고 경계 문장에 없음 | **미수정 — 경계 문장에 명시**(권한 경계, 권위 계층은 넘지 않음) | checklist.md 알려진 제한(위) |
+| V-3(low, 서술 정확성) | 「완전성 가드」 주석이 완전성을 증명한다고 과대 진술 — 실제로는 `CleanMigrationTriggerTest`(트리거 인자 축)와 `CleanMigrationTest`(컬럼 축)가 짝을 이뤄야 닫힌다 | **미수정 — 등재만**(보호 자체는 있음, 귀속 서술만 부정확) | checklist.md 알려진 제한(위) |
+| V-4(low) | `PrecedenceLabelColumnTest.forgeColumn`이 예외 종류만 확인, SQLSTATE·메시지 미확인 | **미수정 — 등재만**(현재 실해 없음, 관례상 개선 여지) | checklist.md 알려진 제한(위) |
 
 ### F-7 — 3A·3B·3D 몫 전부 닫힘(운영자 결정 2026-09-08 원 결정 + 3B 확장 (a))
 
@@ -108,16 +124,22 @@ adapter 어댑터 경계, persistence는 저장 계층)이 서로 다른 관심�
 
 ## 위협 모델 대응표 — scope.md 「방어한다」(F-1~F-6 뒤 갱신, verifier r2 N-1·N-2·r3 P-1 뒤 재정정)
 
-**경계 문장(verifier r2 N-2·N-7, r3 P-1·P-2·P-3 뒤 명시)** — (a)가 실제로 방어하는 범위는
-「금액 축 셋(base/estimated/allocated)의 값·provenance kind·provenance detail·동반 컬럼
-(통화·과세, allocated는 통화·과세 자체가 없음)」·「estimated_amount_source_key」·
-「floor_rate_fraction과 그 출처 라벨(origin kind·detail)」·「status」다(P-1 뒤 라벨
-컬럼까지 전부 포함). **방어하지 않는 것**: `deadline_at`(위조 가능, 알려진 제한) ·
-raw_observation을 app 역할이 스스로 새로 만들어 그 key로 값을 바꾸는 경로(N-3, raw
-INSERT 권한이 정상 경로에 필요해 경계 밖) · `business_category_code`/`_label`(가드 축이
-아니다 — **정정, P-3**: 「최초 기재 뒤 변경 경로 자체가 없다」는 틀렸다. 정상 fold도
-`Sql.UPDATE_NOTICE`가 이 두 컬럼을 매번 SET하고, 직접 SQL 위조도 통과한다. 가드 축이
-아니라는 결론만 맞다).
+**경계 문장(verifier r2 N-2·N-7, r3 P-1·P-2·P-3, r4 V-1·V-2 뒤 명시)** — (a)가 실제로
+방어하는 범위는 「금액 축 셋(base/estimated/allocated)의 값·provenance kind·provenance
+detail·동반 컬럼(통화·과세, allocated는 통화·과세 자체가 없음)」·
+「estimated_amount_source_key」·「floor_rate_fraction과 그 출처 라벨(origin kind·detail,
+notice 소유)」·「status」다(P-1 뒤 라벨 컬럼까지 전부 포함, **notice 테이블 한정**).
+**방어하지 않는 것**: `deadline_at`(위조 가능, 알려진 제한) · raw_observation을 app
+역할이 스스로 새로 만들어 그 key로 값을 바꾸는 경로(N-3, raw INSERT 권한이 정상 경로에
+필요해 경계 밖) · `business_category_code`/`_label`(가드 축이 아니다 — **정정, P-3**:
+「최초 기재 뒤 변경 경로 자체가 없다」는 틀렸다. 정상 fold도 `Sql.UPDATE_NOTICE`가 이 두
+컬럼을 매번 SET하고, 직접 SQL 위조도 통과한다. 가드 축이 아니라는 결론만 맞다) ·
+**opening_result.derived_base_amount_currency/_vat**(V-1, medium — P-1이 `notice`
+넷에만 라벨 동반 컬럼을 넣었고 `opening_result`의 `derived_base_amount_won` 트리거는
+그대로라 같은 observation_key로 위조 가능하다. N-2와 같은 클래스, 후속 소폭으로 등재
+— 아래 「알려진 제한」) · **canonical PK(`notice_number`/`notice_round`)·`created_at`·
+`observation_key` 단독 교체**(V-2, medium — app 역할에 열려 있다. 권한 경계일 뿐 가드
+축이 아니고, 권위 계층 자체를 넘지는 않는다 — 아래 「알려진 제한」).
 
 **P-2(verifier r3, low, 경계 미선언) — `status`는 이 slice의 쓰기 경로에서 한 번 쓰고
 끝이다.** `NoticeCollected.toNoticeRow()`가 `status = NoticeStatus.Open.name`으로
@@ -190,5 +212,30 @@ SQL 위조를 막는 방어로만 실효를 갖는다 — 이 사실이 이전 �
   손으로 적은 것이지 진짜 공유 상수가 아니다(위 F-7 절 정정). 한쪽만 바뀌면 조율 없이
   조용히 끊길 수 있다 — 두 test가 서로 다른 모듈 경계(koneps 어댑터 vs persistence 저장
   계층)를 검증하므로 상수 하나로 억지로 묶지 않고 이 사실만 등재한다.
+- **V-1(verifier r4, medium) — 미방어, 열려 있음**: `opening_result.derived_base_amount_
+  currency`/`_vat`가 P-1 수정에서 빠졌다 — `guard_opening_result_derived_base_amount`는
+  여전히 인자가 `derived_base_amount_won` 하나뿐이라 통화·과세 라벨을 같은
+  observation_key로 위조할 수 있다(N-2와 같은 클래스). **후속 소폭으로 등재**: 트리거
+  인자에 두 컬럼을 추가하고 `CleanMigrationTriggerTest`의 완전성 대조 질의를
+  `notice`(`tgrelid = 'notice'::regclass`) 고정에서 `opening_result`까지 포함한 세
+  테이블로 넓힌다(함수 본문 무변경, P-1과 같은 인자 확장) — M6 6B 또는 M4 4C 착수 시
+  한 커밋으로 닫는다. `qualification_text`는 값 컬럼이 `raw_text` 하나뿐이라 이 문제가
+  없다(실측 확인).
+- **V-2(verifier r4, medium) — 미방어, 미선언**: canonical 행의 식별자(`notice_number`·
+  `notice_round`, PK)와 `created_at`·`observation_key` 단독 교체가 app 역할에 열려
+  있음 — 권한 경계일 뿐 가드 축이 아니다. PK를 다른 값으로 옮기면 값·권위가 그대로
+  따라가 `notice_audit`에 옛 식별자를 가리키는 고아 행이 남는다(권위 계층을 넘지
+  않으므로 medium — scope.md 방어 목록 (a)~(g) 중 식별자 불변을 주장하는 항목이 없다).
+  `updated_at`·`revision`은 트리거가 덮어써 실효가 없다.
+- **V-3(verifier r4, low, 서술 정확성)** — `CleanMigrationTriggerTest`의 「값 컬럼을
+  늘리고 동반 컬럼 등재를 잊으면 이 test가 잡는다」는 서술은 정확히는 절반만 맞다.
+  `expectedGuardArguments`는 손으로 쓴 map이라, 트리거 인자에서 라벨을 빼면 이 test가
+  잡지만 새 라벨 컬럼을 스키마에 추가하고 트리거에 등재하지 않으면 이 test는 통과하고
+  `CleanMigrationTest`의 컬럼 축(축2·3·4)이 대신 FAIL한다 — 두 test가 짝을 이루어
+  보호 자체는 있으나, 이 test 혼자 완전성을 증명하지는 않는다. 주석 정확도 문제.
+- **V-4(verifier r4, low)** — `PrecedenceLabelColumnTest.forgeColumn`이
+  `shouldThrow<PSQLException>`만 확인하고 SQLSTATE(`P0001`)나 메시지는 보지 않는다 —
+  다른 종류의 `PSQLException`(CHECK 위반 등)도 통과시킬 여지가 있다. 다섯 test가 실제로
+  가드 메시지를 받는 것은 verifier가 직접 SQL로 확인했다(현재 실해 없음, 관례상 개선).
 
-## 재작업 누계: 3회(수정 라운드 1 F-1~F-8, 수정 라운드 2 N-1·N-2·N-4·N-5, 수정 라운드 3 P-1), 상한 5(v2-slice-pipeline). 운영자 결정: P-1 수정 + r4 표적 재검증 뒤 종결.
+## 재작업 누계: 3회(수정 라운드 1 F-1~F-8, 수정 라운드 2 N-1·N-2·N-4·N-5, 수정 라운드 3 P-1), 상한 5(v2-slice-pipeline). verifier r4 판정: ready-for-review(회귀 0, blocker/high 0) — 운영자 종결 결정.

@@ -1,26 +1,31 @@
 # M3/3D — commands.md
 
-base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · head `15f33251cb61435b5b16f47d0b6c3cf00bc5eba7`
+base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · 코드 head `15f33251cb61435b5b16f47d0b6c3cf00bc5eba7`
 (verifier r3 수정 라운드 3, P-1 뒤 재고정 — 이 evidence 커밋 자신은 이 SHA를 가리킬 수
-없다는 구조적 한계다, verifier r2 N-7·r3 P-4). 이 커밋 자신은 `commands.md`·
-`checklist.md`·`rollback.md` 셋만 만진다. 전 명령 로컬 실측(2026-09-08), 출력 전문은
-담지 않는다(evidence 규격). 커밋 목록은 rollback.md.
+없다는 구조적 한계다, verifier r2 N-7·r3 P-4). verifier r4는 `ready-for-review` — 신규
+V-1~V-4는 운영자 결정으로 코드 수정 없이 등재만 하고 종결한다(checklist.md 참고). 이
+커밋 자신도 `commands.md`·`checklist.md`·`rollback.md` 셋만 만진다. 전 명령 로컬 실측
+(2026-09-08), 출력 전문은 담지 않는다(evidence 규격). 커밋 목록은 rollback.md.
 
-**S-0~S-7과 아래 표는 공유 working tree 오염(3C 레인이 동시에 커밋 안 된 컴파일 안 되는
-파일을 `adapters/src/main/kotlin/bidvector/adapters/extraction/**`에 두고 있었다)을 피해
-격리된 `git worktree add --detach <dir> HEAD`에서 실측했다** — 이 head(`15f3325`)의
-git 커밋 상태만 반영하고 3C의 미커밋 작업과 무관하다.
+**경과(진행 중 관측, 등재만)** — 이 라운드 작업 도중 본체 작업 트리에 3C 레인(`impl-3c`)의
+미커밋 편집(신규 `extraction/**` 파일 다수, 3D in_scope에 속한 공유 파일 셋
+`adapters/build.gradle.kts`·`gradle/libs.versions.toml`·`config/quality/gate-tests.properties`
+포함, 셋 다 diff 확인상 내용은 전부 3C 것)이 있어 한때 본체에서 `clean check`가 3C WIP
+때문에 성립하지 않았다 — 그래서 처음에는 격리 worktree(`15f3325`)로 S-0~S-7을 실측했다.
+그 뒤 3C가 자신의 작업을 커밋했고(`b013eb6`~`1db93dd`), 3D 자신의 등재분(gate-tests.properties
+의 persistence 15종 등)은 온전히 보존됐다 — 이제 본체 작업 트리에서 재실측해도 결과가
+같음을 아래로 재확인했다(head `1db93dd`, 코드는 여전히 `15f3325` 그대로다).
 
 verifier r1(수정 라운드 1) F-1~F-8·r2(수정 라운드 2) N-1~N-5·r3(수정 라운드 3) P-1
 대응은 checklist.md 「finding 대응표」. **F-1~F-8·N-1·N-2·N-4·N-5·P-1은 이 head에서
-닫혔다. N-3·deadline_at·business_category는 설계상 열려 있는 알려진 제한(등재만),
-N-6·P-2·P-3은 문서 정정이다.**
+닫혔다. N-3·deadline_at·business_category·V-1·V-2는 설계상/후속으로 열려 있는 알려진
+제한(등재만), N-6·P-2·P-3·V-3·V-4는 문서 정정/서술 등재다.**
 
 | # | 명령 | 결과 |
 | --- | --- | --- |
-| S-0 | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | SUCCESS — 348 tasks 전부 executed |
-| S-1 | `./gradlew --no-build-cache clean check`(같은 격리 worktree) | SUCCESS — qualityBaseline 포함 |
-| S-2 | `./gradlew :adapters:test --tests 'bidvector.adapters.persistence.*' --rerun --no-build-cache` | SUCCESS — test class 15종 전부 통과(아래 표) |
+| S-0 | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | SUCCESS — head `1db93dd`에서 348 tasks 전부 executed(격리 worktree, 3C 커밋 뒤 재확인) |
+| S-1 | `./gradlew --no-build-cache clean check`(본체 작업 트리, 3C 커밋 뒤) | SUCCESS — qualityBaseline 포함, 339 tasks(314 executed) |
+| S-2 | `./gradlew :adapters:test --tests 'bidvector.adapters.persistence.*'`(본체) | SUCCESS — test class 15종 전부 통과(아래 표) |
 | S-3 | `./gradlew :adapters:test --tests '*PrecedenceMutationTest*'` | SUCCESS — 11 test |
 | S-4 | `./gradlew :adapters:test --tests '*ItemAtomicityTest*'` | SUCCESS — 3 test |
 | S-5 | `./gradlew :adapters:test --tests '*CleanMigrationTest*'` | SUCCESS — 12 test(축7은 `CleanMigrationTriggerTest`로 분리) |
@@ -54,7 +59,7 @@ N-6·P-2·P-3은 문서 정정이다.**
 `procurement`: `ObservationKeyTest` 4 test(값 타입 불변식만) 전건 PASS — `AccountingTest`
 등 3A 기존 test는 무변경 통과.
 
-## 직접 SQL 우회 재검증(verifier r3 지시 — 전건 재실측)
+## 직접 SQL 우회 재검증(verifier r3 지시 — 전건 재실측, V-1·V-2 두 행은 verifier r4가 독립 실측한 신규 finding 등재)
 
 격리 probe 컨테이너(`postgres:16.4`, docker run, gradle 밖에서 psql로 V1→V2→V3 적용, head
 `15f3325`)에 `SET ROLE bidvector_app`으로 재현 — Kotlin 경로를 전혀 타지 않는다.
@@ -78,6 +83,8 @@ N-6·P-2·P-3은 문서 정정이다.**
 | **N-3(알려진 제한, 열려 있음)** | app 역할이 새 raw 행을 스스로 만들고 그 key로 값 변경 | 통과(raw INSERT 권한이 정상 경로에 필요) |
 | **알려진 제한(열려 있음)** | `deadline_at`만 직접 위조(같은 key) | 통과 — 가드 축 밖 |
 | **알려진 제한(열려 있음)** | `business_category_code`만 직접 위조(같은 key) | 통과 — 가드 축 아님(P-3 뒤 사유 정정, checklist.md) |
+| **V-1(신규, 알려진 제한 — 열려 있음)** | `opening_result.derived_base_amount_currency`/`_vat`만 직접 위조(같은 key) | 통과 — P-1이 `notice` 넷에만 라벨 동반 컬럼을 넣었다, `opening_result` 트리거는 미확장(후속 소폭으로 등재, checklist.md) |
+| **V-2(신규, 알려진 제한 — 열려 있음)** | `notice_number`/`notice_round`(PK) 이동, `created_at`·`observation_key` 단독 교체 | 통과 — 권한 경계, 가드 축 아님(경계 문장에 명시, checklist.md) |
 
 ## Docker 부재 시 붉음 — 실측과 한계(변경 없음, 알려진 제한 유지)
 
@@ -91,7 +98,7 @@ N-6·P-2·P-3은 문서 정정이다.**
 
 | 검사 | 명령 요지 | 결과 |
 | --- | --- | --- |
-| clean-tree 게이트(개별 pathspec) | `git status --porcelain -- <in_scope 경로 10개 개별 인자>` | 빈 출력(clean, 3D in_scope 파일 기준 — 3C의 미커밋 `extraction/**`은 3D in_scope 밖이라 이 게이트 대상이 아니다) |
+| clean-tree 게이트(개별 pathspec) | `git status --porcelain -- <in_scope 경로 10개 개별 인자>` | 빈 출력(clean) — 3C가 자신의 작업을 커밋한 뒤(§상단 「경과」) 본체 작업 트리에서 재확인 |
 | secret 스캔 | `grep -rn "PGPASSWORD\|password.*=.*['\"]" adapters/src/main/kotlin/bidvector/adapters/persistence/ procurement/.../RawObservation.kt` | main 소스 0건 |
 | Docker 버전 | `docker --version` | `Docker version 29.5.3, build d1c06ef` |
 | 컨테이너 이미지 태그 | `PersistenceTestSupport.POSTGRES_IMAGE = "postgres:16.4"` | 코드 상수, 출처 KDoc |
