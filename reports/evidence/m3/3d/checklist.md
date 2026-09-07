@@ -1,8 +1,9 @@
 # M3/3D — checklist.md
 
-base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · head `a79a6d61da151d30615c7105971e0b9c88ffbb0c`.
-정본 순서: `scope.md` → `_workspace/m3-3d/01_design-review.md`(Phase 2.5) →
-`_workspace/m3-3d/02_verifier_report.md`(verifier r1) → 이 문서.
+base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · head `eb82bb8`(수정 라운드 1, F-7 3A·3D 몫
+이어붙임 — F-1~F-6·F-8은 `a79a6d6` 시점과 변경 없음). 정본 순서: `scope.md` →
+`_workspace/m3-3d/01_design-review.md`(Phase 2.5) → `_workspace/m3-3d/02_verifier_report.md`
+(verifier r1) → 이 문서.
 
 ## 완료 조건 대응표 — scope.md 「이 slice 가 하는 일」
 
@@ -27,21 +28,45 @@ base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · head `a79a6d61da151d30615c710
 | F-4(medium) | 비권위→비권위 write가 통과(Kotlin·DB 술어 불일치) | 트리거를 「이미 값 있으면 유입이 권위 있어야」로 통일(기존 권위는 안 봄, mayOverwrite와 동일) | `PrecedenceMutationTest`(단일 재현 + 12쌍 parity test) |
 | F-5(medium) | opening_result·qualification_text에 DB 가드 없음 | `guard_existence_and_freshness()`를 세 컬럼에 추가(존재+신선도, 점유 없음 — provenance 축 자체가 없어서) | `OpeningQualificationRepositoryTest` 3건 |
 | F-6(medium) | app 역할이 notice_audit에 위조 INSERT 가능 | INSERT 권한 제거 + 트리거 함수 SECURITY DEFINER | `RawAppendOnlyTest` 2건 |
-| F-7(medium) | raw payload가 미등재 필드 값을 버림(원문 전체 아님) | **미해결 — OPEN, 아래 참고** | — |
+| F-7(medium) | raw payload가 미등재 필드 값을 버림(원문 전체 아님) | **부분 해결 — 3A·3D 몫 완료, 3B 몫 새 OPEN(아래)** | `RawObservationSourceTextRoundTripTest` |
 | F-8(medium) | 재구성 폴백이 조용히 Open을 냄, find() 왕복 test 부재 | `EVENT_PATH_TO_STATUS.getValue`(표에 없으면 예외)로 교체 | `NoticeFindRoundTripTest` |
 
-### F-7 — OPEN(운영자 결정 필요, 구현 중단)
+### F-7 — 3A·3D 몫 닫힘(운영자 결정 2026-09-08), 3B 몫 새 OPEN
 
-`raw_observation.payload`는 `KONEPS_COLLECTION_POLICY`의 계약 등재 필드만 담는다 — scope.md
-① 문면(「원문 그대로」)과 조사 c-1이 요구한 "원본이 커밋과 함께 사라지지 않는다"의 **완전한**
-형태가 아니다. 확인한 것: 3B의 `KonepsRawItemMapper.mapRawItem`은 이미 `RawNoticeObservation`
-으로 접는 시점에 원문 JSON 텍스트 자체를 버리고 `Map<RawKey, RawValue>`만 남긴다 — 3D가
-`RawObservationStore` port 시그니처를 넓혀도(그 파일은 3D 소유라 편집 가능) **3B/3A 어느
-계층에도 원문 바이트를 들고 있는 호출부가 없다.** 완전한 원문 캡처를 만들려면 (a)
-`RawObservation.kt`(procurement, 3A 소유·편집 금지)에 전체 열람 API를 더하거나 (b) 3B의
-koneps mapper(편집 금지)가 원문 텍스트를 별도로 보존해 넘겨야 한다 — 둘 다 이 slice의
-scope 밖이다. 브리프 지시("3B 인터페이스가 부족하면 멈추고 보고")대로 코드를 더 고치지
-않고 여기 등재한다 — 운영자 결정 필요.
+**닫힌 부분(3A·3D, 커밋 `eb82bb8`)**: `RawNoticeObservation`에 `sourceText: String?`(저장
+전용, 도메인 소비 함수 무열람)을 추가만 했다 — 기존 생성자 호출처·corpus 27/27·3A test
+불변(default `null`). `raw_observation.payload`를 TEXT로 바꿔 `sourceText`를 재직렬화 없이
+그대로 싣고, 이전 payload(계약 등재 필드만의 JSONB 투영)는 `payload_fields`로 옮겼다.
+`ObservationKeyDerivation.of`의 재료에 `sourceText`를 더해 "등재분은 같은데 원문이 다른"
+관측을 구분한다. `RawObservationSourceTextRoundTripTest`가 「저장 → 조회 → 바이트 동일」을
+불규칙 공백·키 순서를 일부러 둔 원문으로 잰다(재직렬화를 거치면 이 형태가 사라진다).
+`sourceText`가 없는 관측(koneps 밖 호출부·구 fixture)은 `payload_fields`로 만든 문자열을
+대신 싣는다 — 그 경우 바이트 동일은 보장하지 않는다(알려진 제한, 아래).
+
+**새 OPEN — 3B(koneps mapper)의 `sourceText` 채움은 구현하지 않았다**: 운영자 결정이
+"koneps mapper 한 파일만" + "파서가 받은 토큰 범위 그대로, 재직렬화 금지" + "sourceText =
+서빙한 항목 바이트"(byte 단위)를 요구했는데, 이 셋을 **그 한 파일 안에서 동시에 만족할
+인터페이스가 없다**(실측):
+- `KonepsRawItemMapper.mapRawItem`이 받는 `item: JsonValue.JsonObject`(`KonepsJson.kt`)는
+  원문 문자열 안에서 자신이 어디서 시작·끝나는지(위치·span)를 전혀 들고 있지 않다 —
+  `JsonReader.readObject()`(`KonepsJson.kt`)가 위치를 버리고 구조(`Map<String, JsonValue>`)만
+  만든다.
+- 그 object를 낳은 원문 전체(`body: String`, `parseKonepsEnvelope`의 인자)도 `mapRawItem`
+  호출 경로(`KonepsPageUriBuilder.kt` → `KonepsRawItemMapper.kt`) 어디에도 전달되지 않는다.
+- 유일하게 mapper 파일 하나만으로 문자열을 만드는 길은 이미 있는 `JsonValue.render()`
+  (`KonepsJson.kt`)를 부르는 것인데, 그 함수 자신의 KDoc이 "원문 보존 **재직렬화**(감사용)"
+  라고 스스로 이름 붙였다 — 운영자 지시 "재직렬화 금지"가 정확히 겨눈 것과 같은 함수다.
+  `LinkedHashMap`이 키 순서는 보존하지만 공백·숫자 표기·유니코드 escape 형태는
+  재구성이라 "서빙한 항목 바이트"와 다를 수 있다(byte 단위 test가 이 차이를 잡는다).
+
+  결론: byte 단위 원문을 얻으려면 `JsonReader`가 파싱 중 각 object의 시작·끝 위치를
+  잡아 원문 substring을 함께 내야 하는데, 그 변경은 `KonepsJson.kt`에 있고 "다른 koneps
+  파일 무편집" 경계 밖이다. 브리프 지시("3B 인터페이스가 부족하면 멈추고 보고")대로 이
+  이상 코드를 고치지 않고 보고한다. 선택지: (a) 3B 확장 범위를 `KonepsJson.kt` 한 파일
+  추가로(순수 additive — `JsonObject`에 `sourceText: String` 필드 하나, 파서가 이미 도는
+  `CharCursor.position`을 object 시작·끝에서 한 번씩 읽어 substring) 넓히거나, (b)
+  "재직렬화 금지"/"바이트 동일"을 완화해 `render()` 기반 재구성(알려진 차이 문서화)을
+  받아들인다 — 운영자 결정 필요.
 
 ## 판단이 갈린 지점(evidence 필수 절, verifier가 재확인한 5건 + 뒤 추가)
 
@@ -52,7 +77,8 @@ scope 밖이다. 브리프 지시("3B 인터페이스가 부족하면 멈추고 
 2. **`ObservationKey`(값)는 procurement, 유도(`ObservationKeyDerivation`)는 adapters.**
    F-2 뒤 새로 갈린 지점 — SHA-256(`java.security.MessageDigest`)이 domain 허용 목록 밖이라
    procurement는 결정 규칙을 가질 수 없다. verifier가 정확히 이 형태를 제안했다(§3 "지목만").
-3. **raw_observation.payload는 계약 등재 필드만**(F-7, 위 OPEN).
+3. **raw_observation.payload는 원문(sourceText)이 있으면 원문, 없으면 등재분 투영으로
+   대체한다**(F-7 — 3A·3D 몫은 닫힘, 3B가 sourceText를 채우는 몫은 새 OPEN, 위).
 4. **`releaseSha`는 구성 근이 주입하는 문자열**, 실제 출처는 M6 6C 소관(verifier 동의).
 5. **`Notice.reconstructNotice`는 `collected()`+`applyEvent()` 이벤트 체인**, 표 밖 상태는
    이제 `Map.getValue`가 예외로 던진다(F-8 뒤 「조용한 Open」 제거, verifier 부분 동의를
@@ -92,7 +118,9 @@ scope 밖이다. 브리프 지시("3B 인터페이스가 부족하면 멈추고 
 
 ## 알려진 제한
 
-- **F-7(raw_observation.payload가 계약 등재 필드만 담는다)은 OPEN — 운영자 결정 필요**(위).
+- **F-7 3B 몫(koneps mapper가 sourceText를 채우는 것)은 OPEN — 운영자 결정 필요**(위,
+  「3B 인터페이스가 부족」). sourceText가 없는 관측은 payload가 등재분 투영과 같아지고
+  바이트 동일을 보장하지 않는다 — 3A·3D 몫 자체는 닫혔다.
 - **Docker 부재 시 실제 실패 재현을 완결하지 못했다** — commands.md 참고. 코드 구조로
   「스킵이 아니라 실패」를 보장하나, 이 공유 개발 머신에서 라이브 재현은 안 됐다(verifier
   독립 레인도 같은 결론).

@@ -1,23 +1,28 @@
 # M3/3D — commands.md
 
-base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · head `a79a6d61da151d30615c7105971e0b9c88ffbb0c`.
-전 명령 로컬 실측(2026-09-07/08, macOS, Docker Desktop 29.5.3), 출력 전문은 담지 않는다
-(evidence 규격). 커밋 목록은 rollback.md.
+base `01ecbba69e21e4b85ee8303416fe06a77b919fd6` · head `eb82bb814847e7e689554711bedc0d10fc51b0b7`
+(F-7 3A·3D 몫 이어붙임 뒤 재고정 — 이전 실측 head `a79a6d6`). 전 명령 로컬 실측
+(2026-09-07/08, macOS, Docker Desktop 29.5.3), 출력 전문은 담지 않는다(evidence 규격).
+커밋 목록은 rollback.md.
 
-verifier r1(수정 라운드 1) — F-1~F-8 대응은 checklist.md 「finding 대응표」.
+verifier r1(수정 라운드 1) — F-1~F-8 대응은 checklist.md 「finding 대응표」. F-7은 3A·3D
+몫만 이 head에서 닫혔고 3B 몫은 새 OPEN(checklist.md 「F-7」).
 
 | # | 명령 | 결과 |
 | --- | --- | --- |
-| S-0 | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | SUCCESS — 348 tasks 전부 executed(격리 worktree, 캐시 미재사용) |
-| S-1 | `./gradlew --no-build-cache clean check` | SUCCESS — qualityBaseline 포함 |
-| S-2 | `./gradlew :adapters:test --tests 'bidvector.adapters.persistence.*'` | SUCCESS — test class 10종 전부 통과(아래 표) |
+| S-0 | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | SUCCESS — head `eb82bb8`에서 348 tasks 전부 executed(격리 worktree, 캐시 미재사용) |
+| S-1 | `./gradlew --no-build-cache clean check` | SUCCESS — qualityBaseline 포함, 339 tasks(316 executed) |
+| S-2 | `./gradlew :adapters:test --tests 'bidvector.adapters.persistence.*'` | SUCCESS — test class 11종 전부 통과(아래 표) |
 | S-3 | `./gradlew :adapters:test --tests '*PrecedenceMutationTest*'` | SUCCESS — 8 test |
 | S-4 | `./gradlew :adapters:test --tests '*ItemAtomicityTest*'` | SUCCESS — 3 test |
-| S-5 | `./gradlew :adapters:test --tests '*CleanMigrationTest*'` | SUCCESS — 13 test(D-3D-6 여덟 축 전부) |
+| S-5 | `./gradlew :adapters:test --tests '*CleanMigrationTest*'` | SUCCESS — 13 test(D-3D-6 여덟 축 전부, raw_observation CHECK 4개로 갱신) |
 | S-6 | `./gradlew :adapters:moduleDependencyGate` | SUCCESS |
 | S-7 | `./gradlew qualityBaseline`(및 위 `check`에 포함된 전 게이트) | SUCCESS |
+| 추가(F-7 지시) | `./gradlew :procurement:test` | SUCCESS — corpus 27/27·`ObservationKeyTest` 등 무변경 통과 |
+| 추가(F-7 지시) | `./gradlew :app:test --tests '*Conformance*'` | SUCCESS — `SharedKernelCorpusConformanceTest` |
+| 추가(F-7 지시) | `./gradlew :adapters:test --tests 'bidvector.adapters.koneps.*'` | SUCCESS — 3B 몫 미착수라 변경 없음(3건 클래스 그대로 통과) |
 
-## S-2 test class 10종 전건(persistence 패키지)
+## S-2 test class 11종 전건(persistence 패키지)
 
 | class | test 수 | 요지 |
 | --- | --- | --- |
@@ -31,7 +36,8 @@ verifier r1(수정 라운드 1) — F-1~F-8 대응은 checklist.md 「finding �
 | `PersistenceAdapterDependencyTest` | 1 | persistence 패키지 domain import 경계 |
 | `F2CollisionRegressionTest` | 1 | F-2 — "Aa"/"BB" 32비트 hashCode 충돌쌍이 이제 서로 다른 키·raw 2행을 낸다 |
 | `NoticeFindRoundTripTest` | 1 | F-8 — 금액·범주·마감 전부 실은 notice의 `find()` 왕복 손실 없음 |
-| **합계** | **44** | 전건 PASS, 0 skipped |
+| `RawObservationSourceTextRoundTripTest` | 3 | F-7(3A·3D 몫) — sourceText 있으면 payload 바이트 동일(재직렬화 없음), 없으면 등재분 투영 대체, sourceText 다르면 다른 ObservationKey |
+| **합계** | **47** | 전건 PASS, 0 skipped |
 
 `procurement`: `ObservationKeyTest` 4 test(값 타입 불변식만, F-2 뒤 유도 규칙 제거) 전건
 PASS — `AccountingTest` 등 3A 기존 test는 무변경 통과.
@@ -70,7 +76,8 @@ PASS — `AccountingTest` 등 3A 기존 test는 무변경 통과.
 | 검사 | 명령 요지 | 결과 |
 | --- | --- | --- |
 | clean-tree 게이트(개별 pathspec) | `git status --porcelain -- <in_scope 경로 9개 개별 인자>` | 빈 출력(clean) |
-| secret 스캔 | `grep -rn "PGPASSWORD\|password.*=.*['\"]" adapters/src/main/kotlin/bidvector/adapters/persistence/` | main 소스 0건 |
+| clean-tree 게이트(F-7 재검, `RawObservation.kt` 포함) | `git status --porcelain -- <경로 7개, RawObservation.kt 포함>` | 빈 출력(clean) |
+| secret 스캔 | `grep -rn "PGPASSWORD\|password.*=.*['\"]" adapters/src/main/kotlin/bidvector/adapters/persistence/ procurement/.../RawObservation.kt` | main 소스 0건 |
 | Docker 버전 | `docker --version` | `Docker version 29.5.3, build d1c06ef` |
 | 컨테이너 이미지 태그 | `PersistenceTestSupport.POSTGRES_IMAGE = "postgres:16.4"` | 코드 상수, 출처 KDoc |
 | 역방향 좌표 파급 | `grep -rn "V1__schema.sql:[0-9]\|V2__provenance_guard.sql:[0-9]\|CleanMigrationTest.kt:[0-9]" **/*.md` | 0건 |
