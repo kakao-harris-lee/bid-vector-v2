@@ -353,7 +353,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
     }
 
     // =========================================================================
-    // 축 7 — 트리거(verifier r1 뒤 F-5로 3개 신설 — opening_result 2·qualification_text 1)
+    // 축 7 — 트리거(verifier r1 뒤 F-5로 3개 신설 — opening_result 2·qualification_text 1.
+    // verifier r2 N-2 뒤 status 축 1개 추가)
     // =========================================================================
     private val expectedTriggers =
         setOf(
@@ -361,6 +362,7 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "guard_notice_estimated_amount",
             "guard_notice_allocated_budget",
             "guard_notice_floor_rate",
+            "guard_notice_status",
             "notice_revision_bump_trigger",
             "notice_audit_insert_trigger",
             "raw_observation_append_only",

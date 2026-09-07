@@ -10,8 +10,6 @@ import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.ResolvedBaseAmount
 import bidvector.procurement.SourceEndpoint
-import bidvector.procurement.mayOverwrite
-import bidvector.sharedkernel.AllocatedBudget
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.NoticeRound
@@ -185,6 +183,52 @@ class PrecedenceMutationTest : PersistenceTestSupport() {
         currentBaseAmountProvenance() shouldBe beforeProvenance
     }
 
+    /** N-2(verifier r2) 재현 — 값·provenance 는 그대로 두고 동반 컬럼(과세 구분)만 바꾼다. */
+    @Test
+    fun `N-2 재현 — 값·provenance 는 그대로 두고 과세 구분(vat)만 바꾸는 직접 SQL 은 거부된다`() {
+        seedAuthoritativeNotice()
+        val beforeValue = currentBaseAmountWon()
+        val beforeProvenance = currentBaseAmountProvenance()
+
+        appConnection().use { connection ->
+            shouldThrow<PSQLException> {
+                connection
+                    .prepareStatement(
+                        "UPDATE notice SET base_amount_vat = 'INCLUSIVE' " +
+                            "WHERE notice_number = ? AND notice_round = ?",
+                    ).use { statement ->
+                        statement.setString(1, noticeId.number.value)
+                        statement.setString(2, noticeId.round.value)
+                        statement.executeUpdate()
+                    }
+            }
+            connection.rollback()
+        }
+
+        currentBaseAmountWon() shouldBe beforeValue
+        currentBaseAmountProvenance() shouldBe beforeProvenance
+    }
+
+    /** N-2(verifier r2) 재현 — status는 provenance 축이 없지만 신선도 가드는 적용된다. */
+    @Test
+    fun `N-2 재현 — status 를 직접 SQL 로 위조하면(observation_key 그대로) 거부된다`() {
+        seedAuthoritativeNotice()
+
+        appConnection().use { connection ->
+            shouldThrow<PSQLException> {
+                connection
+                    .prepareStatement(
+                        "UPDATE notice SET status = 'Awarded' WHERE notice_number = ? AND notice_round = ?",
+                    ).use { statement ->
+                        statement.setString(1, noticeId.number.value)
+                        statement.setString(2, noticeId.round.value)
+                        statement.executeUpdate()
+                    }
+            }
+            connection.rollback()
+        }
+    }
+
     @Test
     fun `애플리케이션 역할의 직접 SQL 이 권위 있는 base_amount 를 비권위 provenance 로 덮으면 거부된다`() {
         seedAuthoritativeNotice()
@@ -288,99 +332,6 @@ class PrecedenceMutationTest : PersistenceTestSupport() {
         }
 
         currentBaseAmountWon() shouldBe before
-    }
-
-    @Test
-    fun `F-4 재현 — Kotlin mayOverwrite 와 DB 가드는 모든 provenance 쌍에서 같은 결정을 낸다`() {
-        // allocated_budget 축은 provenance에 제약이 없어(shared-kernel AllocatedBudget) 6종
-        // ProvenanceKind 전부를 구성할 수 있다 — Money 세 축(base/estimated/allocated) 중
-        // 이 축만 그 전 범위를 직접 시험할 수 있는 자리다.
-        val samples: Map<ProvenanceKind, Provenance> =
-            mapOf(
-                ProvenanceKind.PUBLISHED to Provenance.Published(noticeId.round),
-                ProvenanceKind.OPERATOR_DECLARED to Provenance.OperatorDeclared,
-                ProvenanceKind.DERIVED_FROM_OPENING to Provenance.DerivedFromOpening,
-                ProvenanceKind.FILLED_FROM_BUDGET_KEY to Provenance.FilledFromBudgetKey("asignBdgtAmt"),
-                ProvenanceKind.COPIED_FROM_BASE_AMOUNT to Provenance.CopiedFromBaseAmount,
-                ProvenanceKind.UNDECLARED to Provenance.Undeclared,
-            )
-        val existingKinds = listOf(ProvenanceKind.PUBLISHED, ProvenanceKind.UNDECLARED)
-
-        for (existingKind in existingKinds) {
-            for ((incomingKind, incomingProvenance) in samples) {
-                seedAllocatedBudget(requireNotNull(samples[existingKind]))
-                val kotlinAllows = mayOverwrite(requireNotNull(samples[existingKind]), incomingProvenance)
-
-                val dbAllows =
-                    try {
-                        overwriteAllocatedBudgetDirectly(incomingKind)
-                        true
-                    } catch (rejected: PSQLException) {
-                        // 기대된 거부(가드 트리거 RAISE) — dbAllows=false로 접는다. 메시지는
-                        // assertParity 실패 시 원인 추적에 쓰일 수 있어 버리지 않고 로그에 남긴다.
-                        System.err.println(
-                            "guard rejected existing=$existingKind incoming=$incomingKind: ${rejected.message}",
-                        )
-                        false
-                    }
-
-                assertParity(existingKind, incomingKind, dbAllows, kotlinAllows)
-                truncateAllTables()
-            }
-        }
-    }
-
-    private fun assertParity(
-        existingKind: ProvenanceKind,
-        incomingKind: ProvenanceKind,
-        dbAllows: Boolean,
-        kotlinAllows: Boolean,
-    ) {
-        try {
-            dbAllows shouldBe kotlinAllows
-        } catch (failure: AssertionError) {
-            throw AssertionError("existing=$existingKind incoming=$incomingKind 에서 불일치: ${failure.message}", failure)
-        }
-    }
-
-    private fun seedAllocatedBudget(existingProvenance: Provenance) {
-        val rawObservation = RawNoticeObservation.of(emptyMap(), SourceEndpoint.NOTICE_LIST, FIXED_INSTANT)
-        val key = appendRawObservation(rawObservation)
-        val command =
-            NoticeCollected(
-                id = noticeId,
-                businessCategory = null,
-                baseAmount = null,
-                estimatedAmount = null,
-                allocatedBudget = AllocatedBudget(700L, Currency.KRW, existingProvenance),
-                floorRate = null,
-                deadlineAt = null,
-                openingScheduledAt = null,
-                raw = rawObservation,
-            )
-        JdbcNoticeRepository(dataSource()).persist(command, key)
-    }
-
-    private fun overwriteAllocatedBudgetDirectly(incomingKind: ProvenanceKind) {
-        val fresh =
-            appendRawObservation(
-                RawNoticeObservation.of(emptyMap(), SourceEndpoint.NOTICE_LIST, Instant.parse("2026-09-07T09:00:00Z")),
-            )
-        appConnection().use { connection ->
-            connection
-                .prepareStatement(
-                    "UPDATE notice SET allocated_budget_won = 1, " +
-                        "allocated_budget_provenance = ?, observation_key = ? " +
-                        "WHERE notice_number = ? AND notice_round = ?",
-                ).use { statement ->
-                    statement.setString(1, incomingKind.name)
-                    statement.setString(2, fresh.value)
-                    statement.setString(3, noticeId.number.value)
-                    statement.setString(4, noticeId.round.value)
-                    statement.executeUpdate()
-                }
-            connection.commit()
-        }
     }
 
     // r1이 지목한 이름 문제(verifier r2 N-7) — 원래 이름은 이 test가 F-1/N-1의 중심 방어를

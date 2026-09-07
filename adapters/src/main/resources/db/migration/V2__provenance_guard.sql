@@ -41,6 +41,9 @@ INSERT INTO provenance_authority (provenance, authoritative) VALUES
 -- guard_authoritative_slot() — provenance 축이 있는 금액 컬럼용(base/estimated/allocated).
 -- TG_ARGV[0] = 값 컬럼 이름, TG_ARGV[1] = provenance 컬럼 이름.
 -- =============================================================================
+-- N-2(verifier r2, medium) 뒤 — TG_ARGV[2..]는 같은 축의 동반 컬럼(통화·과세 등)이다.
+-- 값·provenance가 그대로여도 동반 컬럼만 바뀌면(예: base_amount_vat만 EXCLUSIVE→INCLUSIVE)
+-- 같은 금액 사실의 경제적 의미가 달라진다 — 축 변경 여부 판정에 반드시 포함한다.
 CREATE FUNCTION guard_authoritative_slot() RETURNS trigger AS $guard$
 DECLARE
     value_col TEXT := TG_ARGV[0];
@@ -50,6 +53,8 @@ DECLARE
     old_provenance TEXT := (to_jsonb(OLD) ->> provenance_col);
     new_provenance TEXT := (to_jsonb(NEW) ->> provenance_col);
     new_authoritative BOOLEAN;
+    companion_col TEXT;
+    axis_changed BOOLEAN;
 BEGIN
     IF old_value IS NULL THEN
         RETURN NEW;
@@ -57,7 +62,17 @@ BEGIN
 
     -- N-1(verifier r2, 회귀) — 값만 보면 「값은 그대로 두고 provenance만 강등」을 놓친다.
     -- 값과 provenance 가 둘 다 안 바뀔 때만(이 축에 손이 안 닿은 wide UPDATE) 통과시킨다.
-    IF old_value IS NOT DISTINCT FROM new_value AND old_provenance IS NOT DISTINCT FROM new_provenance THEN
+    axis_changed := old_value IS DISTINCT FROM new_value OR old_provenance IS DISTINCT FROM new_provenance;
+
+    IF NOT axis_changed THEN
+        FOR companion_col IN SELECT unnest(TG_ARGV[2:TG_NARGS - 1]) LOOP
+            IF (to_jsonb(OLD) ->> companion_col) IS DISTINCT FROM (to_jsonb(NEW) ->> companion_col) THEN
+                axis_changed := TRUE;
+            END IF;
+        END LOOP;
+    END IF;
+
+    IF NOT axis_changed THEN
         RETURN NEW;
     END IF;
 
@@ -74,10 +89,13 @@ BEGIN
             USING ERRCODE = 'P0001';
     END IF;
 
-    -- 신선도 가드는 값이 실제로 바뀐 경우에만 새 관측을 요구한다 — provenance만 바뀌고
-    -- 값은 그대로인 write는 위 점유 가드가 이미 권위 여부로 걸렀다.
-    IF old_value IS DISTINCT FROM new_value AND NEW.observation_key = OLD.observation_key THEN
-        RAISE EXCEPTION 'guard_authoritative_slot: % 값 변경은 새 observation_key(새 관측)를 동반해야 한다', value_col
+    -- 신선도 가드 — N-2(verifier r2) 뒤 값만이 아니라 축 전체(값·provenance·동반 컬럼)가
+    -- 대상이다. 값이 안 바뀌어도 동반 컬럼(과세 구분 등)만 바뀌면 점유 가드(위)는 새
+    -- provenance가 여전히 권위 있으면 그냥 통과시키므로(권위는 그대로다), 신선도 가드가
+    -- 없으면 「같은 관측인데 과세 구분만 슬쩍 바뀐다」가 열린다 — axis_changed 전체에
+    -- 새 관측을 요구해 막는다.
+    IF axis_changed AND NEW.observation_key = OLD.observation_key THEN
+        RAISE EXCEPTION 'guard_authoritative_slot: % 축 변경은 새 observation_key(새 관측)를 동반해야 한다', value_col
             USING ERRCODE = 'P0001';
     END IF;
 
@@ -87,12 +105,16 @@ $guard$ LANGUAGE plpgsql;
 
 CREATE TRIGGER guard_notice_base_amount
     BEFORE UPDATE ON notice
-    FOR EACH ROW EXECUTE FUNCTION guard_authoritative_slot('base_amount_won', 'base_amount_provenance');
+    FOR EACH ROW EXECUTE FUNCTION guard_authoritative_slot(
+        'base_amount_won', 'base_amount_provenance', 'base_amount_currency', 'base_amount_vat');
 
 CREATE TRIGGER guard_notice_estimated_amount
     BEFORE UPDATE ON notice
-    FOR EACH ROW EXECUTE FUNCTION guard_authoritative_slot('estimated_amount_won', 'estimated_amount_provenance');
+    FOR EACH ROW EXECUTE FUNCTION guard_authoritative_slot(
+        'estimated_amount_won', 'estimated_amount_provenance', 'estimated_amount_currency', 'estimated_amount_vat');
 
+-- allocated_budget은 동반 컬럼(통화·과세) 자체가 스키마에 없다 — 통화는 항상 KRW로
+-- 고정이라 컬럼화하지 않았고, vat 축도 두지 않았다(V1__schema.sql).
 CREATE TRIGGER guard_notice_allocated_budget
     BEFORE UPDATE ON notice
     FOR EACH ROW EXECUTE FUNCTION guard_authoritative_slot('allocated_budget_won', 'allocated_budget_provenance');
@@ -133,6 +155,14 @@ $guard2$ LANGUAGE plpgsql;
 CREATE TRIGGER guard_notice_floor_rate
     BEFORE UPDATE ON notice
     FOR EACH ROW EXECUTE FUNCTION guard_existence_and_freshness('floor_rate_fraction');
+
+-- N-2(verifier r2, medium) — status는 provenance 축이 없는 상태 라벨이라(권위 계층 개념
+-- 자체가 없음) guard_authoritative_slot이 아니라 이 함수를 쓴다. status는 NOT NULL이라
+-- 존재 가드는 사실상 발동하지 않고(제약이 이미 막는다), 신선도 가드가 실질 방어다 —
+-- 직접 SQL로 status만 위조하면(observation_key 그대로) 거부된다.
+CREATE TRIGGER guard_notice_status
+    BEFORE UPDATE ON notice
+    FOR EACH ROW EXECUTE FUNCTION guard_existence_and_freshness('status');
 
 -- F-5 — opening_result·qualification_text는 provenance 축이 없다(파생/최신-관측-우선).
 -- 존재 가드 + 신선도 가드는 「전 금액 축」(§5.1)에 여전히 적용된다: 이미 있는 값을 같은
