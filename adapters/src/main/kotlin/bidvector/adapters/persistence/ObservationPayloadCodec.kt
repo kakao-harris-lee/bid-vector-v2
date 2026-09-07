@@ -15,19 +15,18 @@ private val CONTRACT_RAW_NAME_ORDER =
     Comparator<KonepsFieldContract> { left, right -> left.rawName.name.compareTo(right.rawName.name) }
 
 /**
- * [RawNoticeObservation]을 `raw_observation.payload` JSONB 문자열로 직렬화한다(①·②).
+ * [RawNoticeObservation]을 `raw_observation.payload_fields` JSONB 문자열로 직렬화한다(①·②).
  *
  * **알려진 제한** — [RawNoticeObservation]은 계약 없는 값 열람을 막는다(위협 모델 우회
  * (1)(10), `RawObservation.kt` 헤더 KDoc) — `keys`(필드 이름 집합)는 공개지만 값은
  * [RawNoticeObservation.presenceOf]가 등재된 [bidvector.procurement.KonepsFieldContract]를
- * 요구한다. 그래서 이 payload는 **레지스트리가 계약을 등재한 필드만** 담는다 — 「원문
- * 그대로」는 계약 등재분 한정이고, 미등재("unknown") 필드는 여기 실리지 않는다(회계의
- * `unknownFields` 축이 그 수를 별도로 센다). 완전한 원문 캡처는 `RawObservation.kt`에
- * 전체 열람 API를 더해야 하는데, 그 파일은 이 slice의 편집 대상이 아니다(scope.md
- * out_of_scope).
+ * 요구한다. 그래서 이 투영은 **레지스트리가 계약을 등재한 필드만** 담는다 — 미등재
+ * ("unknown") 필드는 여기 실리지 않는다(회계의 `unknownFields` 축이 그 수를 별도로 센다).
+ * 원문 전체는 [RawNoticeObservation.sourceText]가 나르고 `raw_observation.payload`(TEXT)에
+ * 그대로 실린다(F-7 운영자 결정 2026-09-08) — 이 객체는 그 등재분 투영만 만든다.
  *
  * Jackson 등 무거운 JSON 라이브러리를 새로 끌어오지 않는다(측정된 필요 없음, §7) — 이
- * payload는 문자열 값의 flat object 하나뿐이라 손으로 짠 이스케이프면 충분하다.
+ * 투영은 문자열 값의 flat object 하나뿐이라 손으로 짠 이스케이프면 충분하다.
  */
 internal object ObservationPayloadCodec {
     /** JSON 문자열에서 이스케이프가 필요한 제어문자 상한(U+0020 미만, RFC 8259). */

@@ -76,7 +76,7 @@ class RawAppendOnlyTest : PersistenceTestSupport() {
     @Test
     fun `애플리케이션 역할은 raw_observation 을 UPDATE 할 권한이 없다`() {
         val key = insertRawObservation(observationAt(0))
-        val sql = "UPDATE raw_observation SET payload = '{\"x\":1}'::jsonb WHERE observation_key = ?"
+        val sql = "UPDATE raw_observation SET payload = 'TAMPERED' WHERE observation_key = ?"
 
         appConnection().use { connection ->
             shouldThrow<PSQLException> {
@@ -92,7 +92,7 @@ class RawAppendOnlyTest : PersistenceTestSupport() {
     @Test
     fun `superuser 의 직접 UPDATE 도 append-only 트리거가 거부한다`() {
         val key = insertRawObservation(observationAt(1))
-        val sql = "UPDATE raw_observation SET payload = '{\"x\":1}'::jsonb WHERE observation_key = ?"
+        val sql = "UPDATE raw_observation SET payload = 'TAMPERED' WHERE observation_key = ?"
 
         dataSource().connection.use { connection ->
             connection.autoCommit = false

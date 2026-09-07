@@ -67,6 +67,14 @@ class RawNoticeObservation private constructor(
     private val fields: Map<RawKey, RawValue>,
     val sourceEndpoint: SourceEndpoint,
     val observedAt: Instant,
+    /**
+     * 항목 원문 JSON 텍스트(**저장 전용**, verifier r1 F-7 뒤 운영자 결정 2026-09-08) —
+     * 계약 열람 규칙([valueOf]·[presenceOf])과 무관하다. 도메인 소비 함수는 이 값을
+     * 읽지 않는다 — raw persistence 어댑터(3D)가 append 감사 기록에 원문 그대로 싣기
+     * 위한 통로일 뿐, 계약 없는 값의 도메인 유입 금지(위협 모델 우회 (1)(10))는 그대로다.
+     * 원문이 없는 관측(3B 밖 호출부, 기존 fixture)은 `null`.
+     */
+    val sourceText: String? = null,
 ) {
     val keys: Set<RawKey> get() = fields.keys
 
@@ -89,9 +97,10 @@ class RawNoticeObservation private constructor(
         other is RawNoticeObservation &&
             fields == other.fields &&
             sourceEndpoint == other.sourceEndpoint &&
-            observedAt == other.observedAt
+            observedAt == other.observedAt &&
+            sourceText == other.sourceText
 
-    override fun hashCode(): Int = Objects.hash(fields, sourceEndpoint, observedAt)
+    override fun hashCode(): Int = Objects.hash(fields, sourceEndpoint, observedAt, sourceText)
 
     override fun toString(): String =
         "RawNoticeObservation(keys=${fields.keys}, sourceEndpoint=$sourceEndpoint, observedAt=$observedAt)"
@@ -102,14 +111,21 @@ class RawNoticeObservation private constructor(
             fields: Map<RawKey, String>,
             sourceEndpoint: SourceEndpoint,
             observedAt: Instant,
+            sourceText: String? = null,
         ): RawNoticeObservation =
-            RawNoticeObservation(fields.mapValues { (_, text) -> RawValue.Present(text) }, sourceEndpoint, observedAt)
+            RawNoticeObservation(
+                fields.mapValues { (_, text) -> RawValue.Present(text) },
+                sourceEndpoint,
+                observedAt,
+                sourceText,
+            )
 
         /** 명시 `null`을 나를 수 있는 관측 — 부재(사유)를 구분해야 하는 호출부(예: [presenceOf] 소비자)용. */
         fun ofRawValues(
             fields: Map<RawKey, RawValue>,
             sourceEndpoint: SourceEndpoint,
             observedAt: Instant,
-        ): RawNoticeObservation = RawNoticeObservation(fields.toMap(), sourceEndpoint, observedAt)
+            sourceText: String? = null,
+        ): RawNoticeObservation = RawNoticeObservation(fields.toMap(), sourceEndpoint, observedAt, sourceText)
     }
 }

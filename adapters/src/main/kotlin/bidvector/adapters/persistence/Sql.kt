@@ -12,8 +12,9 @@ package bidvector.adapters.persistence
 internal object Sql {
     const val INSERT_RAW_OBSERVATION =
         """
-        INSERT INTO raw_observation (observation_key, source_endpoint, payload, observed_at, release_sha)
-        VALUES (?, ?, ?::jsonb, ?, ?)
+        INSERT INTO raw_observation
+            (observation_key, source_endpoint, payload, payload_fields, observed_at, release_sha)
+        VALUES (?, ?, ?, ?::jsonb, ?, ?)
         ON CONFLICT (observation_key) DO NOTHING
         """
 

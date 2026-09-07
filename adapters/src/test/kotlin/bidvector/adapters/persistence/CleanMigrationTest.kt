@@ -55,7 +55,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
         listOf(
             ColumnSpec("raw_observation", "observation_key", "text", false),
             ColumnSpec("raw_observation", "source_endpoint", "text", false),
-            ColumnSpec("raw_observation", "payload", "jsonb", false),
+            // F-7 운영자 결정 — 원문 전체는 TEXT(재직렬화 없이), 등재분 투영은 별도 JSONB.
+            ColumnSpec("raw_observation", "payload", "text", false),
+            ColumnSpec("raw_observation", "payload_fields", "jsonb", false),
             ColumnSpec("raw_observation", "observed_at", "timestamp with time zone", false),
             ColumnSpec("raw_observation", "release_sha", "text", false),
             ColumnSpec("raw_observation", "inserted_at", "timestamp with time zone", false),
@@ -388,7 +390,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "opening_result" to 5,
             "provenance_authority" to 1,
             "qualification_text" to 3,
-            "raw_observation" to 3,
+            // F-7 운영자 결정 — payload 가 TEXT 로 바뀌며 `payload <> ''` CHECK 가 하나 늘었다.
+            "raw_observation" to 4,
             "rejected_write" to 1,
         )
 

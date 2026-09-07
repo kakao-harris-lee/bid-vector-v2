@@ -22,16 +22,23 @@ internal object ObservationKeyDerivation {
 
     /**
      * `canonicalPayload`는 [ObservationPayloadCodec.encode]가 낸 **같은** 문자열을 호출부가
-     * 그대로 넘긴다 — `raw_observation.payload`에 저장되는 정본과 키 유도 재료가 한 몸이다
-     * (이중 계산·이중 정의를 피한다).
+     * 그대로 넘긴다 — `raw_observation.payload_fields`에 저장되는 등재분 투영과 키 유도
+     * 재료가 한 몸이다(이중 계산·이중 정의를 피한다). `observation.sourceText`(원문, F-7
+     * 운영자 결정)도 재료에 더한다 — 등재분이 같아도 원문이 다르면(예: 미등재 필드만 바뀜)
+     * 다른 관측으로 본다. 원문이 없으면 빈 문자열로 접는다(등재분만으로 유도하던 기존
+     * 동작과 하위호환).
      */
     fun of(
         observation: RawNoticeObservation,
         canonicalPayload: String,
     ): ObservationKey {
         val material =
-            listOf(observation.sourceEndpoint.name, observation.observedAt.toString(), canonicalPayload)
-                .joinToString(separator = SEPARATOR)
+            listOf(
+                observation.sourceEndpoint.name,
+                observation.observedAt.toString(),
+                canonicalPayload,
+                observation.sourceText ?: "",
+            ).joinToString(separator = SEPARATOR)
         val digest = MessageDigest.getInstance("SHA-256").digest(material.toByteArray(StandardCharsets.UTF_8))
         return ObservationKey(digest.toHexString())
     }

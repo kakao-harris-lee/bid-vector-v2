@@ -9,10 +9,15 @@
 CREATE TABLE raw_observation (
     observation_key TEXT PRIMARY KEY CHECK (observation_key <> ''),
     source_endpoint TEXT NOT NULL CHECK (source_endpoint <> ''),
-    -- ⑥ 「원문 그대로」 — 계약이 등재한 필드만 담는다(RawNoticeObservation이 계약 없는 값
-    -- 열람을 막는다, 위협 모델 우회 (1)(10)). 미등재("unknown") 필드는 회계의 unknownFields
-    -- 축이 세지만 이 payload에는 실리지 않는다 — 알려진 제한(evidence 기록).
-    payload JSONB NOT NULL,
+    -- ⑥ 「원문 전체, 재직렬화 없이」(verifier r1 F-7 뒤 운영자 결정 2026-09-08) — 항목의
+    -- 원문 JSON 텍스트를 파서가 받은 토큰 범위 그대로 TEXT 로 담는다. JSONB 로 담으면
+    -- 재직렬화라 키 순서·공백·escape 형태를 잃는다(그래서 TEXT). 원문이 없는 관측
+    -- (koneps 밖 호출부·구 fixture)은 payload_fields 로부터 재구성한 문자열을 대신 싣는다
+    -- (알려진 제한 — 그 경우 바이트 동일을 보장하지 않는다, evidence 기록).
+    payload TEXT NOT NULL CHECK (payload <> ''),
+    -- 계약이 등재한 필드만 담는 투영(구 payload 정의) — 조회·회계 편의용, 원문 정본은 위 payload.
+    -- 미등재("unknown") 필드는 회계의 unknownFields 축이 세지만 이 투영에는 실리지 않는다.
+    payload_fields JSONB NOT NULL,
     observed_at TIMESTAMPTZ NOT NULL,
     -- ⑥ 감사 — 이 행을 만든 배포 식별자(구성 근의 주입값, git SHA 등). 3D는 값의 출처를
     -- 정하지 않는다(운영 배선은 M6 6C 소관) — 빈 문자열만 거부한다.
