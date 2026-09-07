@@ -1,0 +1,131 @@
+{
+  "sourceDocument": {
+    "id": "pps-openapi-guide",
+    "title": "조달청 공공데이터 개방 OpenAPI 활용가이드 — 나라장터 공공데이터개방표준서비스",
+    "note": "문서 version·발행일·경로·SHA-256 의 정본은 `fixtures/manifest.yaml` 의 `official_documents` 항목 하나다. **대상 서비스가 `koneps-collection` 의 주 서비스와 다르다** — 이 가이드는 `PubDataOpnStdService`(공공데이터개방표준서비스)의 것이고 「에러코드별 조치방안」 절은 공공데이터포털 공통 절이다. 적용 범위 판정은 이 case 가 하지 않는다."
+  },
+  "errorCodeTable": {
+    "sectionTitleQuote": "OPEN API 에러코드별 조치방안",
+    "columnsQuote": [
+      "코드값",
+      "설명",
+      "조치방안"
+    ],
+    "rows": [
+      {
+        "code": "01",
+        "nameQuote": "Application Error",
+        "descriptionQuote": "제공기관 서비스 제공 상태가 원할하지 않습니다.",
+        "actionQuote": "서비스 제공기관의 관리자에게 문의하시기 바랍니다."
+      },
+      {
+        "code": "02",
+        "nameQuote": "DB Error",
+        "descriptionQuote": "제공기관 서비스 제공 상태가 원할하지 않습니다.",
+        "actionQuote": "서비스 제공기관의 관리자에게 문의하시기 바랍니다."
+      },
+      {
+        "code": "03",
+        "nameQuote": "No Data",
+        "descriptionQuote": "데이터 없음 에러",
+        "actionQuote": ""
+      },
+      {
+        "code": "04",
+        "nameQuote": "HTTP Error",
+        "descriptionQuote": "제공기관 서비스 제공 상태가 원할하지 않습니다.",
+        "actionQuote": "서비스 제공기관의 관리자에게 문의하시기 바랍니다."
+      },
+      {
+        "code": "05",
+        "nameQuote": "service time out",
+        "descriptionQuote": "제공기관 서비스 제공 상태가 원할하지 않습니다",
+        "actionQuote": "서비스 제공기관의 관리자에게 문의하시기 바랍니다."
+      },
+      {
+        "code": "06",
+        "nameQuote": "날짜Format 에러",
+        "descriptionQuote": "날짜 Default, Format Error",
+        "actionQuote": "날짜형식을 확인 하시기 바랍니다."
+      },
+      {
+        "code": "07",
+        "nameQuote": "입력범위값 초과 에러",
+        "descriptionQuote": "요청하신 OpenAPI의 파라미터 입력값 범위가 초과 되었습니다.",
+        "actionQuote": "기술문서를 다시 한번 확인하여 주시기 바랍니다."
+      },
+      {
+        "code": "08",
+        "nameQuote": "필수값 입력 에러",
+        "descriptionQuote": "요청하신 OpenAPI의 필수 파라미터가 누락되었습니다.",
+        "actionQuote": "기술문서를 다시 한번 확인하여 주시기 바랍니다."
+      },
+      {
+        "code": "10",
+        "nameQuote": "잘못된 요청 파라미터 에러",
+        "descriptionQuote": "OpenAPI 요청시 ServiceKey 파라미터가 없음",
+        "actionQuote": "-OpenAPI 요청시 ServiceKey 파라미터가 누락되었습니다. -OpenAPI 요청 URL을 확인하시기 바랍니다."
+      },
+      {
+        "code": "11",
+        "nameQuote": "필수 요청 파라미터가 없음",
+        "descriptionQuote": "요청하신 OpenAPI의 필수 파라미터가 누락되었습니다.",
+        "actionQuote": "기술문서를 다시 한번 확인하시어 주시기 바랍니다."
+      },
+      {
+        "code": "12",
+        "nameQuote": "해당 오픈API 서비스가 없거나 폐기됨",
+        "descriptionQuote": "OpenAPI 호출시 URL이 잘못됨",
+        "actionQuote": "-제공기관 관리자에게 폐기된 서비스인지 확인바랍니다. 폐기된 서비스가 아니면 개발가이드에서 OpenAPI요청 URL을 다시 확인하시기 바랍니다."
+      },
+      {
+        "code": "20",
+        "nameQuote": "서비스 접근 거부",
+        "descriptionQuote": "활용승인이 되지 않은 OpenAPI호출",
+        "actionQuote": "-OpenAPI활용신청정보의 승인상태를 확인하시기 바랍니다. -활용신청에 대해 제공기관 담당자가 확인 후 '승인'이후 부터 사용할 수 있습니다. -신청 후 2~3일 소요되고 결과는 회원가입 시 등록한 e-mail로 발송됩니다."
+      },
+      {
+        "code": "22",
+        "nameQuote": "서비스 요청 제한 횟수 초과 에러",
+        "descriptionQuote": "일일 활용건수가 초과함(활용건수 증가 필요)",
+        "actionQuote": "-OpenAPI활용신청정보의 서비스 상세기능별 일일 트래픽량을 확인하시기 바랍니다. -개발계정의 경우 제공기관에서 정의한 트래픽을 초과하여 활용할 수 없습니다. -운영계정의 경우 변경신청을 통해서 일일트래픽량을 변경 할 수 있습니다."
+      },
+      {
+        "code": "30",
+        "nameQuote": "등록되지 않은 서비스 키",
+        "descriptionQuote": "잘못된 서비스키를 사용하였거나 서비스키를 URL인코딩하지 않음",
+        "actionQuote": "-OpenAPI활용신청정보의 발급받은 서비스키를 다시 확인하시기 바랍니다. - 서비스키 값이 같다면 서비스키가 URL 인코등 되었는지 다시 확인하시기 바랍니다."
+      },
+      {
+        "code": "31",
+        "nameQuote": "기한 만료된 서비스 키",
+        "descriptionQuote": "OpenAPI 사용기간이 만료됨 (활용연장신청 후 사용가능)",
+        "actionQuote": "-OpenAPI 활용신청정보의 활용기간을 확인합니다. -활용기간이 지난 서비스는 이용할 수 없으며 연장신청을 통해 승인 받은 후 다시 이용가능 합니다."
+      },
+      {
+        "code": "32",
+        "nameQuote": "등록되지 않은 도메인명 또는 IP주소",
+        "descriptionQuote": "활용신청한 서버의 IP와 실제 OpenAPI호출한 서버가 다를 경우",
+        "actionQuote": "-OpenAPI 활용신청정보의 등록된 도메인명이나 IP주소를 다시 확인합니다. -IP나 도메인의 정보를 변경하기 위해 변경신청을 할 수 있습니다."
+      }
+    ]
+  },
+  "responseSpecSample": {
+    "rawName": "resultCode",
+    "documentFieldSize": 2,
+    "documentRequirement": "필수",
+    "sampleQuote": "00",
+    "siblingSampleQuote": {
+      "rawName": "resultMsg",
+      "sampleQuote": "정상"
+    },
+    "note": "같은 문서의 응답 메시지 명세와 응답 예시가 `00`/`정상` 을 싣는다. 그 코드는 에러 표에 없다."
+  },
+  "legacyTreatment": {
+    "okResultCodes": [
+      "00",
+      "03"
+    ],
+    "source": "legacy `http_client.OK_RESULT_CODES` — `03` 을 성공으로 둔다."
+  }
+}

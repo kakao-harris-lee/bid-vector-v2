@@ -1,0 +1,49 @@
+{
+  "documentedErrorCodes": [
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "10",
+    "11",
+    "12",
+    "20",
+    "22",
+    "30",
+    "31",
+    "32"
+  ],
+  "documentedErrorCodeCount": 16,
+  "successCodeInErrorTable": false,
+  "successCodeFromResponseSample": "00",
+  "totalDistinctCodes": 17,
+  "documentDeclaresRetryCategory": false,
+  "appliesToBidPublicInfoServiceDeclared": false,
+  "codes": [
+    {
+      "code": "03",
+      "nameQuote": "No Data",
+      "listedInErrorTable": true,
+      "prescribedActionPresent": false,
+      "declaredSuccessByDocument": false
+    },
+    {
+      "code": "08",
+      "nameQuote": "필수값 입력 에러",
+      "listedInErrorTable": true,
+      "prescribedActionPresent": true,
+      "declaredSuccessByDocument": false
+    },
+    {
+      "code": "22",
+      "nameQuote": "서비스 요청 제한 횟수 초과 에러",
+      "listedInErrorTable": true,
+      "prescribedActionPresent": true,
+      "declaredSuccessByDocument": false
+    }
+  ]
+}

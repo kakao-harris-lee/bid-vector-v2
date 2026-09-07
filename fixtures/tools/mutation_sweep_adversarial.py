@@ -210,6 +210,23 @@ ASSERTED = {
         "$.documentDeclaresVatTreatment",    # 과세도 선언돼 있지 않다
         "$.normalizedToMoney",               # 그래서 Money 가 아니다(§5.5)
     ],
+    # `-027` 은 다른 문서(활용가이드 `pps-openapi-guide`)를 인용한다. 주장은 **표가 무엇을
+    #   담는가**와 **무엇을 담지 않는가** 둘이고, 뒤쪽 셋이 `false` 불리언이라 (a′) 뒤집기가
+    #   「문서가 정하지 않는다」를 계약으로 세운다.
+    "koneps-collection-027": [
+        "$.documentedErrorCodes",                    # 16 코드 전수
+        "$.documentedErrorCodeCount",
+        "$.successCodeInErrorTable",                 # 00 은 에러 표에 없다
+        "$.successCodeFromResponseSample",           # 00 은 응답 명세가 준다
+        "$.totalDistinctCodes",                      # 16 + 00 = 17 (OPEN-COL-02 문면과 대조)
+        "$.documentDeclaresRetryCategory",           # 범주는 문서가 주지 않는다
+        "$.appliesToBidPublicInfoServiceDeclared",   # 적용 범위를 문서가 선언하지 않는다
+        "$.codes[0].listedInErrorTable",             # 03 — legacy 는 성공으로 두는데 표는 에러로 싣는다
+        "$.codes[0].prescribedActionPresent",        # 03 의 조치방안 칸은 비어 있다
+        "$.codes[0].declaredSuccessByDocument",
+        "$.codes[1].prescribedActionPresent",        # 08 — legacy 가 대상 서비스에서 관측한 코드
+        "$.codes[2].prescribedActionPresent",        # 22 — quota 축이 resultCode 에도 있다
+    ],
 }
 
 # (c) 갈래가 쓰는 대체 토큰. 목록에 없는 피연산자는 `Other` 로 친다.

@@ -18,7 +18,8 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f` · 2026-09-07 · 별도 세션(c
 | F-4 | `python3 fixtures/tools/check_legacy_numbers.py` | 0 | legacy-number hits 0 |
 | F-5 | `python3 fixtures/tools/manifest_prose_consistency.py` | 0 | 불일치 5/6 — **기준선과 동일**(F-6) |
 | F-6 | 같은 명령을 이 slice **이전** manifest 사본에 | 0 | 같은 5/6 — 이 slice 가 새 불일치를 만들지 않았다 |
-| F-7 | manifest 선언 해시 대 파일 실측 전수 대조(인라인 python) | 0 | 182건 대조, 불일치 0 |
+| F-7 | manifest 선언 해시 대 파일 실측 전수 대조(인라인 python) | 0 | 184건 대조, 불일치 0 |
+| F-10 | 활용가이드 docx 원문에서 에러코드 표 **독립 재추출** 후 인수본과 대조 | 0 | 16행 일치 · SHA-256 `afba38e6…` 일치 |
 
 > **F-1 이 분류를 정한다.** `authoritative` = 확장 적대 집합에서 위반 변이체 통과 0 이고, 종료 코드가
 > 곧 판정이다(`data-extract.md` §6). 신설 authoritative 9 건은 `mutation_sweep_adversarial.ASSERTED`
@@ -42,11 +43,11 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f` · 2026-09-07 · 별도 세션(c
 | 축 | 수 |
 | --- | --- |
 | 기존 case 재추출·정합 | 9 |
-| 신설 case | 17 (`koneps-collection-010` ~ `-026`) |
-| 그중 `authoritative` | **9** (`-010` ~ `-018`) |
+| 신설 case | 18 (`koneps-collection-010` ~ `-027`) |
+| 그중 `authoritative` | **10** (`-010` ~ `-018` · `-027`) |
 | 그중 `insufficient-evidence` | 8 (`-019` ~ `-026`) |
-| 도메인 `authoritative` 수 | 0 → **9** |
-| corpus 전체 `authoritative` 수 | 41 → **50** |
+| 도메인 `authoritative` 수 | 0 → **10** |
+| corpus 전체 `authoritative` 수 | 41 → **51** |
 
 **3A `scope.md` ⑩ 의 조건이 충족됐다** — runner dispatch 의 전건이 「authoritative ≥ 1」이다.
 
@@ -74,6 +75,7 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f` · 2026-09-07 · 별도 세션(c
 | `-016` | 업무구분명의 **4값 열거** |
 | `-017` | 기초금액 키는 `bssamt` 하나 · `bssAmtPurcnstcst` 는 **다른 개념** |
 | `-018` | 시공능력평가금액목록의 **형식 선언**과 **단위·과세 미선언** |
+| `-027` | 「OPEN API 에러코드별 조치방안」 표의 **16 코드**와 그 문면 · `00` 이 표 밖이라는 것 · 표가 **범주와 적용 범위를 주지 않는다**는 것 |
 
 **부재를 주장하는 셋(`-014`·`-015`·`-018`)의 기대값은 `false` 불리언**이라 적대 스윕의 값 변이
 갈래가 그것을 뒤집는다 — 「문서가 선언하지 않는다」가 계약이 아니었다면 그 변이가 통과한다.
@@ -128,7 +130,8 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f` · 2026-09-07 · 별도 세션(c
 
 | 축 | 왜 못 만들었나 | 소유 |
 | --- | --- | --- |
-| **`resultCode` 17 범주 분류표** | 조달청 참고자료 원문 전수 검색 결과 **해당 절이 없다**. legacy 저장소에서도 `에러코드`·`조치방안` 매치가 docstring 한 줄뿐이고 표가 아니다. **저장소 안 문서로는 닫히지 않는다** | `OPEN-COL-02`(결정은 2026-08-26 해소, **본문 미확보**). `uncovered_axes` 갱신 |
+| **`resultCode` 코드 → 범주 매핑** | **표 본문은 2026-09-07 확보됐다**(`pps-openapi-guide` · `-027`). 그러나 표가 주는 것은 사람이 읽는 조치방안 문면이고 **재시도 가능/불가 분류는 어느 문서에도 없다** — V2 판정이라 승인 대상 | `OPEN-COL-02`. `policy-values.md` §3.2 의 「V2 범주 후보」 열이 제안이고 층이 없다 |
+| **에러코드 표의 적용 범위** | 활용가이드는 `PubDataOpnStdService` 의 것이고 수집이 부르는 `BidPublicInfoService` 가 아니다. 공통 절로 보이나 **문서가 그렇게 선언하지 않는다** | 승인 대상(P-4). 방증 둘은 `observed`/`legacy-behavior` 층 |
 | **개찰·예비가격 필드 계약** | ScsbidInfoService 참고자료가 이 저장소에 없다. legacy 소비 키 60 중 17 이 그 서비스 소관이고 항목크기·항목구분·단위·과세를 모른다 | 3B 선행 조건 후보(승인 요청 P-6) |
 | **rate limit 수치** | 관찰된 것은 문구(`API token quota exceeded`)와 회복 시간(약 2분), 원인(동시성)뿐이고 공식 한도가 없다 | `OPEN-COL-05` · D-M3-5 (a) |
 | **잘못된 인코딩 case** | legacy 에 대응 처리가 없고(응답을 그대로 쓴다) 승인된 정규화 규칙도 없다 | 소유 `OPEN` 없음 — 명세 부재 |
@@ -150,6 +153,12 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f` · 2026-09-07 · 별도 세션(c
    함수에 못 들어간다」이므로 그 키들은 **소비 불가** 상태로 3B 를 맞는다.
 5. **문서의 항목 명세를 기계로 파싱했다**(docx → 표 행). 파싱 오류가 표에 섞였을 가능성은 각 case 의
    `documentDescriptionQuote` 축어로 감사할 수 있다 — 원문과 대조하면 드러난다.
+6. **`-027` 의 원 docx 는 저장소에 없다.** `_workspace/` 는 `.gitignore` 대상이고 legacy symlink 처럼
+   blob id 로 고정할 수도 없다 — 재취득은 `source_url` + SHA-256 대조로만 된다. **그래서 표 본문의
+   커밋된 정본을 fixture 입력에 두었다.** 그 파일이 원문과 같은지는 이 레인의 독립 재추출(F-10)이
+   근거이고, 감사자는 URL 에서 다시 받아 같은 절차로 대조할 수 있다.
+7. **`-027` 은 이 corpus 에서 유일하게 `privacy.synthetic: false` 다** — 입력이 합성이 아니라 공표된
+   문서의 인용이기 때문이다. manifest 머리의 「전부 synthetic」 문장에 이미 단서가 달려 있다.
 
 ---
 
