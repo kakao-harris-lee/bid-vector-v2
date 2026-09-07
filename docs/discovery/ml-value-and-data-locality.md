@@ -287,4 +287,5 @@ HuggingFace 에서 받는다(서버 자산이 아니다).
   1차 사후분석) · `app/services/ml_training/award_rate_holdout.py` · `app/domain/reserve_draw_distribution.py`
   · commits `ceea4e1` · `5d38ac1` · `bf7c15c`.
 - 조사 원문: `scratchpad/data-locality-report.md` · `scratchpad/ml-value-report.md` (세션 임시, 저장소 밖).
-- 시뮬레이션: `scratchpad/lottery_sim2.py` (세션 임시).
+- 시뮬레이션: `docs/discovery/ml-value-sim/lottery_sim.py` (Q-10 (b) 결정으로 저장소에 둠, 2026-09-07).
+- 후속 결정 기록: `docs/discovery/decisions-2026-09-07.md` (Q-1~Q-12).
