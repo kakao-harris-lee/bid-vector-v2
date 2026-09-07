@@ -12,8 +12,14 @@
     "documentDescriptionQuote": "개찰시 사용하는 낙찰하한율(%)",
     "declaredUnit": "percent",
     "presentIn": [
+      "getBidPblancListInfoCnstwk",
+      "getBidPblancListInfoCnstwkPPSSrch",
+      "getBidPblancListInfoFrgcpt",
+      "getBidPblancListInfoFrgcptPPSSrch",
       "getBidPblancListInfoServc",
-      "getBidPblancListInfoCnstwk"
+      "getBidPblancListInfoServcPPSSrch",
+      "getBidPblancListInfoThng",
+      "getBidPblancListInfoThngPPSSrch"
     ]
   },
   "payload": {

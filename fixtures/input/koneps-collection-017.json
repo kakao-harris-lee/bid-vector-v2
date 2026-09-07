@@ -16,15 +16,28 @@
       "getBidPblancListInfoServcBsisAmount"
     ]
   },
-  "candidateKeysFromLegacy": [
-    "bssAmt",
-    "bssamt",
-    "bssAmtPurcnstcst"
-  ],
+  "candidateKeysFromLegacy": {
+    "keys": [
+      "bssAmt",
+      "bssamt",
+      "bssAmtPurcnstcst"
+    ],
+    "source": "legacy `field_contract_spec.py` 의 `TRUE_BASE_KEYS` — 셋 다 기초금액 후보로 순회한다."
+  },
   "remarkFieldSampleQuote": {
     "rawName": "rmrk1",
     "conceptKo": "비고1",
     "sample": "기초금액은 부가세 포함 가격임.",
     "note": "이것은 **비고 필드의 샘플 데이터**이지 항목 설명의 규범 문장이 아니다. 과세 축의 판단 근거로 쓰지 않는다 — `OPEN-REG-05` 소유."
+  },
+  "neighbourDeclaration": {
+    "rawName": "bssAmtPurcnstcst",
+    "conceptKo": "기초금액순공사비",
+    "documentFieldSize": 22,
+    "documentRequirement": "옵션",
+    "documentDescriptionQuote": "기초금액 중 순공사원가 (재료비,노무비,경비,및 이에 대한 부가가치세 합산금액)",
+    "presentIn": [
+      "getBidPblancListInfoCnstwkBsisAmount"
+    ]
   }
 }

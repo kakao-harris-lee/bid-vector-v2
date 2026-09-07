@@ -189,13 +189,18 @@ ASSERTED = {
         "$.observed[1].coveredByDocumentEnumeration",   # 열거 밖(다른 축의 라벨)
     ],
     "koneps-collection-017": [
-        "$.documentedBaseAmountKey",              # 공식 키는 bssamt 하나
-        "$.candidateKeys[0].declaredInDocument",  # bssAmt — 문서에 없다
-        "$.candidateKeys[1].declaredInDocument",  # bssamt — 문서에 있다
-        "$.candidateKeys[2].declaredInDocument",  # bssAmtPurcnstcst — 문서에 없다
-        "$.currencyUnit",
-        "$.documentDeclaresVatTreatment",         # 과세는 선언돼 있지 않다
-        "$.remarkSampleUsedAsVatBasis",           # 비고 필드의 샘플을 근거로 쓰지 않는다
+        "$.documentedBaseAmountKey",                    # 공식 기초금액 키는 bssamt 하나
+        "$.candidateKeys[0].declaredInDocument",        # bssAmt — 문서에 없다
+        "$.candidateKeys[0].sameConceptAsBaseAmount",
+        "$.candidateKeys[1].declaredInDocument",        # bssamt — 문서에 있다
+        "$.candidateKeys[1].documentedConcept",
+        "$.candidateKeys[1].sameConceptAsBaseAmount",
+        "$.candidateKeys[2].declaredInDocument",        # bssAmtPurcnstcst — 문서에 **있다**
+        "$.candidateKeys[2].documentedConcept",         # 그러나 개념이 다르다(기초금액순공사비)
+        "$.candidateKeys[2].sameConceptAsBaseAmount",   # 부분을 전체 자리에 넣지 않는다
+        "$.baseAmountKeyDeclaration.currencyUnit",
+        "$.baseAmountKeyDeclaration.documentDeclaresVatTreatment",  # 과세는 선언돼 있지 않다
+        "$.remarkSampleUsedAsVatBasis",                 # 비고 필드의 샘플을 근거로 쓰지 않는다
     ],
     "koneps-collection-018": [
         "$.documentDeclaresListFormat",      # 형식은 선언돼 있다

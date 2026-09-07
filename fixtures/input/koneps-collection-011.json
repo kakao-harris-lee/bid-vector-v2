@@ -11,8 +11,17 @@
     "documentRequirement": "옵션",
     "documentDescriptionQuote": "물품/공사/용역 등의 조달 계약을 체결함에 있어 국제입찰 대상여부를 판단하는 기준 등으로 삼기 위하여 예정가격이 결정되기 전에 예산에 계상된 금액 등을 기준으로 하여 부가가치세 및 조달 수수료를 제외한 금액(원화,원)",
     "presentIn": [
+      "getBidPblancListBidPrceCalclAInfo",
+      "getBidPblancListInfoCnstwk",
+      "getBidPblancListInfoCnstwkPPSSrch",
+      "getBidPblancListInfoEtc",
+      "getBidPblancListInfoEtcPPSSrch",
+      "getBidPblancListInfoFrgcpt",
+      "getBidPblancListInfoFrgcptPPSSrch",
       "getBidPblancListInfoServc",
-      "getBidPblancListInfoCnstwk"
+      "getBidPblancListInfoServcPPSSrch",
+      "getBidPblancListInfoThng",
+      "getBidPblancListInfoThngPPSSrch"
     ]
   },
   "legacyAnnotationQuote": "추정가격(부가세 포함)"

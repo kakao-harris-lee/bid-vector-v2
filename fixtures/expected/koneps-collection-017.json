@@ -3,18 +3,27 @@
   "candidateKeys": [
     {
       "rawName": "bssAmt",
-      "declaredInDocument": false
+      "declaredInDocument": false,
+      "documentedConcept": null,
+      "sameConceptAsBaseAmount": false
     },
     {
       "rawName": "bssamt",
-      "declaredInDocument": true
+      "declaredInDocument": true,
+      "documentedConcept": "기초금액",
+      "sameConceptAsBaseAmount": true
     },
     {
       "rawName": "bssAmtPurcnstcst",
-      "declaredInDocument": false
+      "declaredInDocument": true,
+      "documentedConcept": "기초금액순공사비",
+      "sameConceptAsBaseAmount": false
     }
   ],
-  "currencyUnit": "KRW",
-  "documentDeclaresVatTreatment": false,
+  "baseAmountKeyDeclaration": {
+    "rawName": "bssamt",
+    "currencyUnit": "KRW",
+    "documentDeclaresVatTreatment": false
+  },
   "remarkSampleUsedAsVatBasis": false
 }
