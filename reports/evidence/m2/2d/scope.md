@@ -1,4 +1,4 @@
-# Slice 계약 — M2 / 2D · 생성·호환성·provider test (게이트 증명) — **초안, 구현 전**
+# Slice 계약 — M2 / 2D · 생성·호환성·provider test (게이트 증명) — **종결 2026-09-07**
 
 > **지위**: M1/1E 병행 중에 세션 모델이 쓴 **계약 초안**이다. 구현·gradle·의존성 추가·fixture 편집은 하지 않았다.
 > 착수는 2A~2C 승인 뒤 운영자 지시로 한다. 2A 가 생성 배선을 선행 흡수했으므로(D-M2-2 (a)) 2D 의 정체성은 **「게이트가
@@ -58,6 +58,11 @@ contract 층·래칫 · `ADR 0010` 초안 D-2·D-4·D-7·§6 · `milestone-1.md`
 
 **리뷰 요청 시점(2026-09-07, 구현 head `4031d98` → verifier r1 not-ready → 수정 라운드 1 head `39fda2c` → verifier r2 ready-for-review; 이 절 갱신 커밋이 그 뒤)** — 하네스 커밋 **없음**. range 에는 다른 세션의 discovery 커밋
 `4695ce8`(`docs/discovery/` 학습 데이터·모델 위치 조사)이 섞여 있으며 in_scope 밖이라 slice 커밋 집합이 아니다(커밋 집합 = in_scope 경로 변경).
+
+**종결 시점(2026-09-07, 최종 head `4b2f01e`)** — 하네스 커밋 **없음**(`git log e3ac98b..4b2f01e -- CLAUDE.md .claude/` 0건, verifier r4
+재확인). range 의 다른 세션 커밋 둘(`4695ce8`·`560ea15` — docs/discovery 조사·운영자 결정 기록·추첨 시뮬레이션 스크립트 편입)은
+in_scope 밖. verifier 라운드 r1 not-ready → r2·r3·r4 ready-for-review, 재작업 1/5. 종결 문서 커밋(이 문서·`milestone-2.md`·
+`capability-map.md`·`ADR 0006`·checklist 승인 절)이 그 뒤에 온다.
 
 **착수 2026-09-07 — 운영자 결정**: D-2D-1 (a) `against` = 승인 태그(`contracts/v1-approved-2026-09-07`, 이름 규칙은 정책 데이터) ·
 D-2D-3 (a) 교차 언어 socket 스모크는 로컬 실측 1회 + evidence 한 줄, 상시 게이트는 in-process · D-2D-4 (a) Python test 는 로컬

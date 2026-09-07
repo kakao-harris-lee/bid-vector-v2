@@ -132,6 +132,13 @@ ADR 0003의 `.proto` 생성 코드와 ML client는 **`adapters`가 소유**한�
 **생성 stub을 별도 빌드 모듈로 뺄지는 M2의 구현 결정**이며, 이 ADR이 요구하는 것은
 *"도메인에서 보이지 않는다"* 하나다.
 
+**M2 결정 기록(2A D-2A-0 (c) 2026-09-06 · 2D 종결 2026-09-07).** 생성 stub 은 별도 **included build `ml-contract`**
+(`contracts/proto/` 단일 출처, 생성물은 VCS 밖, 손으로 쓴 소스 0)에 두고 `adapters` 가 test 의존으로만 잇는다. 이유: M1 1A
+게이트 가족이 subproject 안의 생성물을 어떤 형태로든 거부했고, `build-logic` 이 같은 형태의 선례다. 생성 Java 패키지 루트는
+`bidvector` 밖(`contract.bidvector.ml.v1`)이라 도메인 import 는 T-A 가 구조적으로 거부한다 — 이 D-6 의 요구는 그대로 선다.
+「그 빌드에 소스가 생기지 않는다」는 2D `contractGate` 가 상시 단언한다(`OPEN-2A-INCLUDED-BUILD`, `capability-map.md` §14.3).
+이 ADR 의 모듈 목록(D-2)에 `ml-contract` 를 정식 행으로 올릴지는 별도 개정으로 남긴다.
+
 ### D-7. 정책 데이터는 모듈의 자산이지 코드가 아니다
 
 `v2-지침서.md` §5가 도메인 정책 값(임계, 하한, 표본 수, 반올림 규칙)을 **versioned policy

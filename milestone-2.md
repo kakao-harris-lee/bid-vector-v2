@@ -103,6 +103,14 @@ ml-engine 은 불투명 문자열로 저장·대조만 · **D-2C-2 (a)** `traini
 field·enum, `max_message_bytes` 경계 쌍(양쪽 수용·양쪽 거부), deadline, cancellation(플래그가 아니라 자원 해제), 생성 재현 diff 0,
 `ml-contract` 무소스 단언의 게이트화(`OPEN-2A-INCLUDED-BUILD`).
 
+**2D 종결·M2 완료 2026-09-07** — 2D 는 verifier r4 ready-for-review + 사용자 승인으로 닫혔다(`reports/evidence/m2/2d/checklist.md`
+「사용자 승인」; r1 은 not-ready — 결정성 검사가 build cache 복원 둘을 비교하던 high 를 잡았고, 이후 세 라운드가 breaking mutation
+스크립트의 fail-open 술어를 양성 단언 구조로 닫았다). 실측으로 닫힌 조사 미확인 셋: `optional` 제거는 buf STANDARD 가 직접 잡는다 ·
+`grpcio-testing` 은 `grpc.aio` 를 지원하지 않아 loopback 서버로 대체(`OPEN-2D-AIO-INPROCESS` 는 등재 없이 닫힘) · in-process 전송은
+메시지 크기를 강제하지 않아 경계 쌍은 실제 socket 으로 잰다. 신설 `OPEN-2D-CROSSLANG-CI`(교차 언어 스모크 상시화 자리 M6),
+`OPEN-2A-INCLUDED-BUILD` 는 `contractGate` 가 지키는 상태로 갱신(`capability-map.md` §14.3), `ml-contract` included build 는
+`ADR 0006` D-6 에 M2 결정으로 기록. 아래 「완료 조건」 일곱 전부 충족 — **M2 완료**.
+
 ## 설계 규칙
 
 - `oneof`로 success/unmeasurable/application failure를 구분한다.
@@ -121,6 +129,10 @@ field·enum, `max_message_bytes` 경계 쌍(양쪽 수용·양쪽 거부), deadl
 - 요청만으로 Python serving이 DB 조회 없이 계산 가능
 - 최대 메시지 크기와 deadline 정책이 근거와 함께 문서화됨
 - fake server 장애 시 retry 가능한 경우만 제한 횟수로 재시도
+
+**M2 완료 2026-09-07** — 일곱 조건 전부 충족(2A~2C 가 round-trip·fail-closed·`Unmeasurable` 분리를, 2D 가 lint/breaking 게이트·
+DB 없는 serving 스모크·크기/deadline 정책 문서화·제한 재시도 test 를 닫았다). deadline **값**은 `OPEN-M2-DEADLINE-VALUES`(5E → 4D)
+로 등재된 미룸이고 규칙은 `ADR 0010` 이 정본. 대응표는 `reports/evidence/m2/2d/checklist.md` 「게이트가 실제로 잡는다는 증거」.
 
 ## Codex 독립 리뷰
 

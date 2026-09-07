@@ -123,6 +123,19 @@ build cache 를 복원해 소켓을 열지 않고 exit 0 을 낼 수 있었다 �
     S-1(`--no-build-cache clean check`)이 같은 test 를 매번 실제 실행하므로 acceptance
     전체로는 덮인다 — commands.md 는 이 지점부터 `--rerun-tasks`를 붙여 기록한다.
 
+11. **`expected.tsv` 의 완전성이 단언되지 않는다(verifier r4 F-21)** — 표에 행이 없는
+    mutation 은 규칙 이름 대조를 건너뛰고 「규칙 이름이 비어 있지 않으면 caught」로 돌아간다
+    (행 하나 삭제 시 11/11 exit 0 실측). 비적대적 촉발은 mutation 추가 시 `--update` 누락.
+    **운영자 결정 2026-09-07**: 등재 후 종결, 필요하면 M6 하네스 일괄에서 「목록의 모든
+    mutation 에 행이 있어야 exit 0」 단언으로 닫는다.
+12. **`--update` 가 규칙 표류를 exit 0 으로 굳힌다(F-22)** — 갱신 모드는 대조를 건너뛰므로
+    표류한 규칙 이름이 그대로 새 기대값이 된다. 검출은 커밋 전 표의 diff 리뷰뿐이다. 같은
+    운영자 결정(등재 후 종결).
+13. **`pipefail` + `grep -q` 의 대용량 출력 거짓 음성(F-23, 잠재)** — buf 출력이 64 KiB 를
+    넘고 컴파일 오류와 breaking 규칙이 **섞여** 나올 때만 `has_compile_error` 가 거짓 음성이
+    된다. 현 buf 1.72.0 에서는 두 번째 절(규칙 이름 확보)이 덮어 결과가 바뀌지 않는다. 같은
+    운영자 결정(등재 후 종결; 닫을 때는 타입 목록을 변수에 담아 파이프를 없앤다).
+
 ## 판단이 갈린 지점
 
 - **`tools/**`(저장소 루트)가 scope.md 의 in_scope 경로 목록에 없었다 — 정정 확인
@@ -153,3 +166,13 @@ build cache 를 복원해 소켓을 열지 않고 exit 0 을 낼 수 있었다 �
   양성이 없었지만(재확인: `expected.tsv`의 `rule_type` 열), 판정 로직 자체가 그 구분을
   하지 않던 것을 F-14 수정으로 닫았다 — 앞으로 mutation 목록이 늘어도 스크립트가 스스로
   안전측(exit 2)으로 실패한다.
+
+## 사용자 승인 — 2026-09-07, slice 2D 종결 · M2 완료
+
+verifier r1 `not-ready`(F-1 high — 결정성 검사가 build cache 복원 둘을 비교) → 수정 라운드 1 → r2·r3·r4
+`ready-for-review`(최종 head `4b2f01e`, 세션 모델의 scope 정정 `9d9e863`·`466b191`) 위에서 **사용자 승인 2026-09-07**.
+재작업 1/5. 같은 스크립트(`breaking-mutations.sh`)의 fail-open 술어를 세 라운드에 걸쳐 고쳤고(F-8 → F-14 → F-18·F-19)
+마지막은 양성 단언 구조로 재작성했다 — r4 가 조작 13종으로 닫힘을 실측. 운영자 결정 셋: r4 low 셋(F-21~F-23)은 알려진
+제한 11~13 으로 등재 후 종결 · **M2 완료 선언**(완료 조건 7/7 — 대응표는 `_workspace/m2-2d/02_verifier_report.md` §7 과
+이 문서 「게이트가 실제로 잡는다는 증거」) · `origin/main` push + 승인 태그(`--tags`). 신설 `OPEN-2D-CROSSLANG-CI` 와
+`OPEN-2A-INCLUDED-BUILD` 상태 갱신은 `capability-map.md` §14.3, `ml-contract` 결정 기록은 `ADR 0006` D-6.
