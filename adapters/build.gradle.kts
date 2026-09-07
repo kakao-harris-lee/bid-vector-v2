@@ -11,11 +11,24 @@ dependencies {
     // (`RawNoticeObservation`·`CollectionAccounting`·`KONEPS_COLLECTION_POLICY` 등)을 쓴다.
     // procurement 는 domain 층이라 adapters(그 위 층)의 허용 project 의존이다.
     implementation(project(":procurement"))
+    // M3/3C — `WatchGatedExtractor`가 1E `WatchVerdict`를(게이트 인자), `ExtractionToQualification`
+    // 이 1C `RequirementRow`/`RequirementCollection`을 쓴다(D-3C-3 1C 변환, D-3C-6 게이트).
+    // adapters 는 domain 층이 아니라 이 둘을 함께 참조할 수 있다(ModuleDependencyGate S-5).
+    implementation(project(":qualification"))
+    implementation(project(":strategy"))
     // M3/3B ② — quota·bounded retry/backoff·rate limiter Resilience4j **한 계층**(ADR 0005
     // D-11). `resilience4j-kotlin`은 카탈로그에만 두고 여기서 끌어오지 않는다(D-3B-2,
     // gradle/libs.versions.toml 주석 — Java API로 충분해 불필요한 결합을 늘리지 않는다).
     implementation(libs.resilience4j.retry)
     implementation(libs.resilience4j.ratelimiter)
+    // M3/3C ⑤ — LLM 호출의 TimeLimiter+CircuitBreaker 한 계층(ADR 0005 D-11).
+    implementation(libs.resilience4j.circuitbreaker)
+    implementation(libs.resilience4j.timelimiter)
+    // M3/3C ④ D-3C-2 — JSON Schema(Draft 2020-12) 검증(운영자 승인). Jackson 은 이 좌표의
+    // 전이 의존으로만 쓴다(별도 선언 없음, libs.versions.toml 주석).
+    implementation(libs.json.schema.validator)
+    // M3/3C D-3C-4 (a) — PDF 텍스트 층 추출 한 의존(운영자 승인).
+    implementation(libs.pdfbox)
 
     // M3/3D — D-3D-1 (a) JDBC 직접 + Flyway(ADR 0004 D-1·D-2). `flyway-core`·`postgresql-driver`
     // 는 카탈로그에 버전이 없다 — Boot BOM 이 관리한다(app 의 관례와 같다, `app/build.gradle.kts`).
@@ -24,7 +37,13 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
     implementation(libs.postgresql.driver)
+}
 
+// M3/3C — sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties). 위
+// `dependencies {}` 가 3C 추가로 그 상한에 닿아, 관련 없는 두 번째 배선(M2/2A gRPC 계약
+// 셋)을 별도 블록으로 나눈다 — Gradle 은 같은 스크립트 안 `dependencies {}` 를 여러 번
+// 받아 누적 적용한다(내용 변경 없음, 크기 축 회피만).
+dependencies {
     // M2/2A — round-trip test 가 ml-contract 의 생성 stub 을 본다. composite 치환(같은
     // 좌표를 `settings.gradle.kts`의 `includeBuild("ml-contract")`가 잇는다) — main 의존은
     // M4 4D(도메인 ↔ 계약 매핑·client 배선)까지 미룬다.

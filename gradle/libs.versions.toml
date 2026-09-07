@@ -19,6 +19,13 @@ coroutines = "1.10.2"
 db-scheduler = "16.12.0"
 resilience4j = "2.4.0"
 
+# M3/3C D-3C-2 — JSON Schema(Draft 2020-12) 검증. 1.x 계열 최신(networknt 는 2.x/3.x 에서
+# API 를 갈아엎었다 — 1.5.x 를 고정해 이 slice 가 아는 API 형태를 유지한다).
+json-schema-validator = "1.5.9"
+# M3/3C D-3C-4 (a) — PDF 텍스트 층 추출 한 의존(운영자 승인 문면 근거). 로컬 의존 캐시에
+# 이미 있는 버전(3.0.7 도 있으나 3.0.5 로 고정 — 스모크 확인).
+pdfbox = "3.0.5"
+
 # OPEN-ADR-07 — mutation 도구는 미결이다. 좌표만 등재하고 어느 모듈에도 적용하지 않는다.
 pitest-plugin = "1.19.0"
 pitest = "1.30.0"
@@ -107,6 +114,17 @@ resilience4j-retry = { module = "io.github.resilience4j:resilience4j-retry", ver
 # checklist.md 「판단이 갈린 지점」).
 resilience4j-ratelimiter = { module = "io.github.resilience4j:resilience4j-ratelimiter", version.ref = "resilience4j" }
 resilience4j-kotlin = { module = "io.github.resilience4j:resilience4j-kotlin", version.ref = "resilience4j" }
+# M3/3C ⑤ — LLM 호출의 TimeLimiter+CircuitBreaker **한 계층**(ADR 0005 D-11, D-1).
+resilience4j-circuitbreaker = { module = "io.github.resilience4j:resilience4j-circuitbreaker", version.ref = "resilience4j" }
+resilience4j-timelimiter = { module = "io.github.resilience4j:resilience4j-timelimiter", version.ref = "resilience4j" }
+
+# M3/3C D-3C-2 — networknt json-schema-validator 는 Jackson(`com.fasterxml.jackson.databind`)
+# 을 전이로 끌어온다. 별도 jackson 좌표를 이 카탈로그에 더하지 않는다(측정된 필요 없음,
+# adapters 는 domain 이 아니라 `group.forbidden`(jackson) 대상이 아니다 — 3B `KonepsJson.kt`
+# 의 자체 파서는 domain 원칙의 **자발적** 적용이었을 뿐, 이 slice 는 운영자 승인(D-3C-2)에
+# 따라 networknt 를 쓴다).
+json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "json-schema-validator" }
+pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 
 # OPEN-ADR-07 이 닫힐 때까지 좌표만 든다. gradle-pitest-plugin 의 기본 PIT 는 1.22.1 이라
 # 적용 slice 는 pitestVersion 을 반드시 명시해야 한다.
