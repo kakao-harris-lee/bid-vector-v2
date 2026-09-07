@@ -75,20 +75,31 @@ class AccountingTest {
         shouldThrow<IllegalArgumentException> { accounting(received = -1, normalized = 0, duplicate = 0, dropped = 0) }
     }
 
+    // 블록 본문 + 명시 반환 타입 없음(= Unit 고정)이어야 JUnit Jupiter 가 discover 한다 —
+    // `= runBlocking { checkAll(…) }` 식 본문은 반환형이 `PropertyContext`로 추론돼 조용히
+    // 건너뛴다(`test-discovery-guard`, MoneyTest.kt `P-3b`와 같은 회귀 형태, verifier r1 F-1).
     @Test
-    fun `property — 음이 아닌 세 값의 합을 received 로 주면 항상 성립한다`() =
+    fun `property — 음이 아닌 세 값의 합을 received 로 주면 항상 성립한다`() {
         runBlocking {
             checkAll(Arb.int(0..1000), Arb.int(0..1000), Arb.int(0..1000)) { normalized, duplicate, dropped ->
+                val dropReasons: Map<CollectionDropReason, Int> =
+                    if (dropped > 0) {
+                        mapOf(CollectionDropReason.CollectionMissingNoticeNumber to dropped)
+                    } else {
+                        emptyMap()
+                    }
                 val result =
                     accounting(
                         received = normalized + duplicate + dropped,
                         normalized = normalized,
                         duplicate = duplicate,
                         dropped = dropped,
+                        dropReasons = dropReasons,
                     )
                 result.received shouldBe normalized + duplicate + dropped
             }
         }
+    }
 
     @Test
     fun `CollectionDropReason 어휘에는 Duplicate 변형이 없다 — 서로소 셈은 타입으로 보증된다`() {
