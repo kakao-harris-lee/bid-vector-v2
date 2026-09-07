@@ -1,7 +1,13 @@
 # M2/2D — commands.md
 
-base_sha: `e3ac98b`(scope.md 와 정합, verifier r1 F-4) · head_sha: `d32a591`(verifier r1
-수정 라운드 1 완료 — 커밋 목록은 맨 끝 「verifier r1 수정 라운드 요약」 절)
+base_sha: `e3ac98b`(scope.md 와 정합, verifier r1 F-4) · head_sha: `0a71e71`(verifier r2
+수정 라운드 완료 — 커밋 목록은 맨 끝 「verifier r2 수정 라운드 요약」 절)
+
+**verifier r2 F-16** — 이 필드는 항상 "이 문서를 갱신하는 커밋 직전의 마지막 코드
+커밋"을 가리킨다(evidence 문서 자신의 커밋은 코드에 영향이 없어 head 로 세지 않는다).
+그래서 이 문서를 커밋하는 순간 실제 git HEAD 는 여기 적힌 값보다 하나 앞선다 — 이
+어긋남 자체가 매 라운드 재발하는 구조적 성질이므로, 검증은 이 필드가 아니라 각 커밋의
+실제 SHA(아래 각 절의 회귀 실측·「수정 라운드 요약」)로 한다.
 
 ## Preflight
 
@@ -67,6 +73,22 @@ base_sha: `e3ac98b`(scope.md 와 정합, verifier r1 F-4) · head_sha: `d32a591`
 - exit: 0
 - 핵심 결과: 11/11 그대로(exit code 판정 방식만 바뀌었고 실측 결과는 불변), `expected.tsv` diff 없음(결정적 재생성 확인)
 
+### verifier r2 F-14(medium, 게이트 술어) 재현 + 수정 확인
+- cmd: (수정 전 코드로) `field-delete`의 `sed_inplace` 패턴을 `s/Currency currency = 2;/@@@ BROKEN @@@/`로 임시 교체 후 `(cd contracts && ./tools/breaking-mutations.sh)`
+- exit: 0
+- 핵심 결과: `[잡힘] field-delete (exit=100)` — 구문을 깬 mutation 이 거짓으로 "잡힘" 처리됨(verifier 지적 재현 확인)
+- cmd: (수정 후, `--error-format=json`의 `"type"` 필드로 `COMPILE` 을 가름) 같은 임시 교체 상태에서 같은 명령
+- exit: 2
+- 핵심 결과: `buf 도구 오류(exit=100 이지만 컴파일 오류 — breaking 규칙 위반이 아니다)` — 구문 파괴를 정확히 도구 오류로 분류, 즉시 중단(패턴 원복 후 재확인)
+- cmd: (원복 뒤) `(cd contracts && ./tools/breaking-mutations.sh)`
+- exit: 0
+- 핵심 결과: 11/11 그대로, `expected.tsv`에 신설 `rule_type` 열 — 11종 각각 서로 다른 진짜 규칙(`FIELD_NO_DELETE`·`FIELD_SAME_TYPE`·`ENUM_VALUE_NO_DELETE`·`RPC_NO_DELETE`·`RPC_SAME_SERVER_STREAMING`·`FILE_SAME_PACKAGE`·`RESERVED_MESSAGE_NO_DELETE`·`FIELD_SAME_CARDINALITY`), 양성 대조 그대로 `passed 0`
+
+### verifier r2 수정 라운드 최종 S-3 재확인(head `0a71e71`)
+- cmd: `(cd contracts && ./tools/breaking-mutations.sh)`
+- exit: 0
+- 핵심 결과: `11/11 mutation 잡힘, 최소 요구 11` — 격리 worktree(S-0)·작업 트리(S-1) 양쪽 `--no-build-cache clean check`도 이 head 에서 재확인(`BUILD SUCCESSFUL`)
+
 ## S-4 — Kotlin 계약 test
 
 ### 2026-09-07T09:05:00Z
@@ -86,6 +108,11 @@ base_sha: `e3ac98b`(scope.md 와 정합, verifier r1 F-4) · head_sha: `d32a591`
 - cmd: `./gradlew contractGate`
 - exit: 0
 - 핵심 결과: `violations=0` — 카탈로그 `grpc-java`(1.84.0)와 정책 값이 일치
+
+### verifier r2 F-17(low) — S-4 를 build cache 복원이 아니라 실제 실행으로 기록
+- cmd: `./gradlew :adapters:test --tests '*Contract*' --rerun-tasks`(head `0a71e71`)
+- exit: 0
+- 핵심 결과: `27 actionable tasks: 27 executed`(캐시 표시 없음) — 이번 실행이 실제로 test 를 돌렸다는 서술이 성립. 이 명령을 플래그 없이 다시 돌리면 `FROM-CACHE`로 복원될 수 있다(F-2 와 같은 갈래, checklist 알려진 제한 10번) — S-1 이 매번 `--no-build-cache`로 같은 test 를 실제 실행하므로 acceptance 전체로는 덮인다
 
 ## S-5 — Python 계약 test
 
@@ -246,3 +273,31 @@ base_sha: `e3ac98b`(scope.md 와 정합, verifier r1 F-4) · head_sha: `d32a591`
 
 - `grep -rniE "..." reports/evidence/m2/2d/ --exclude=commands.md --exclude=checklist.md` → exit 1(매치 0건)
 - `git status --porcelain -- <in_scope 경로 개별 인자>` → 출력 없음(이 커밋 전 확인, `commands.md` 자체 편집만 남은 상태)
+
+## verifier r2 수정 라운드 요약
+
+커밋(전부 `main`, base `e3ac98b`):
+1. `0a71e71` — F-14(medium, 게이트 술어): `caught` 판정에 `--error-format=json`의 `"type"`
+   대조를 더해 컴파일 오류(`COMPILE`)와 진짜 breaking 규칙을 가른다. `expected.tsv`에
+   `rule_type` 열 신설.
+
+F-15(in_scope 미선언)는 세션 모델이 `466b191`로 scope.md 를 정정했다(`adapters/
+build.gradle.kts`·`gradle/libs.versions.toml` 추가) — 이 라운드에서 코드 변경 없음.
+F-16(head 어긋남)·F-17(S-4 캐시 복원 가능)은 이 문서 자체와 위 S-4 절 갱신으로 처리했다.
+
+### 최종 acceptance 전건 재실행(head `0a71e71`)
+
+| # | 명령 | exit | 비고 |
+| --- | --- | --- | --- |
+| S-0 | 격리 worktree `--no-build-cache clean check` | 0 | 332 tasks 전건 executed |
+| S-1 | `./gradlew --no-build-cache clean check`(작업 트리) | 0 | 323 tasks |
+| S-2 | `./gradlew contractGate` | 0 | `violations=0` |
+| S-3 | `(cd contracts && ./tools/breaking-mutations.sh)` | 0 | 11/11, F-14 반영(rule_type 열) |
+| S-4 | `./gradlew :adapters:test --tests '*Contract*' --rerun-tasks` | 0 | 27 tasks 전건 executed(F-17 반영) |
+| S-5 | `(cd ml-engine && .venv/bin/python -m pytest tests -q)` | 0 | 95 passed |
+| S-6 | `./tools/contract-crosslang-smoke.sh` | 0 | 실제 socket 실행(캐시 표시 없음) |
+| S-7 | `./gradlew qualityBaseline` | 0 | — |
+
+### 최종 clean-tree(head `0a71e71`, `commands.md` 자체 편집 중 제외)
+
+- `git status --porcelain -- contracts/buf.yaml contracts/tools contracts/testdata build-logic config/quality/gate-tests.properties config/quality/contract-policy.properties adapters/src/test/kotlin adapters/build.gradle.kts ml-engine/tests ml-engine/pyproject.toml .github/workflows milestone-2.md reports/evidence/m2/2d gradle/libs.versions.toml tools` → 출력 없음(`commands.md` 편집만 남은 상태에서 확인)

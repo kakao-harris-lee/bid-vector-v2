@@ -44,6 +44,17 @@ unknown enum 거부 제거·도구 버전 리터럴 어긋남·ml-contract 무�
 build cache 를 복원해 소켓을 열지 않고 exit 0 을 낼 수 있었다 — `--rerun-tasks
 --no-build-cache` 추가 뒤 연속 두 번 실행 모두 실제 소켓 실행으로 확인했다.
 
+**verifier r2 F-14(medium) 수정 뒤 추가 확인**: `breaking-mutations.sh`의 `caught = exit
+100` 전제가 거짓이었다 — buf 1.72.0 은 `.proto` **컴파일 오류에도 exit 100**을 낸다(실측:
+`buf breaking`·`buf lint` 둘 다 구문 깨진 사본에 100). 그래서 sed 가 mutation 을 잘못
+적용해 구문을 깨도 `[잡힘]`으로 셀 수 있었다(재현: `field-delete`의 sed 를 `@@@ BROKEN
+@@@`로 바꿔도 수정 전 코드는 `[잡힘] (exit=100)`, 스윕 exit 0). `--error-format=json`의
+`"type"` 필드로 컴파일 오류(정책 `breaking.compile-error.type=COMPILE`)와 진짜 breaking
+규칙(`FIELD_NO_DELETE` 등)을 가른다 — COMPILE 이 섞이면 즉시 exit 2 로 중단한다. 같은
+구문 파괴 재현이 수정 뒤에는 exit 2 를 낸다. 11종 각각의 실제 규칙 이름을
+`expected.tsv`의 신설 `rule_type` 열에 남겼다(전부 서로 다른 진짜 규칙 — 우연한 우회
+가능성도 배제).
+
 ## 알려진 제한
 
 1. **buf 가 못 잡는 mutation — 없음(실측으로 닫힘), 단 STANDARD 규칙집합 전제.** 조사
@@ -87,6 +98,14 @@ build cache 를 복원해 소켓을 열지 않고 exit 0 을 낼 수 있었다 �
 9. **`sed -i ''`(BSD 전용) 의존을 걷었다(verifier r1 F-9)** — `breaking-mutations.sh`가
    임시 파일 경유 `sed_inplace` 헬퍼로 GNU/BSD 양쪽에서 동작한다. D-2D-4 (a)로 이 스크립트
    자체는 지금 CI 밖이라 이전에도 무해했지만, 이식성 자체를 닫아 M5 5A 승계 부담을 줄인다.
+   **verifier r2 실측** — 이 환경에 GNU sed(`gsed`)가 없어 GNU 쪽은 미실측이다. 헬퍼가
+   구현 의존 문법(`-i` 접미사 등)을 쓰지 않으므로 구성상 안전하다는 것이 근거다.
+10. **S-4 단독 재실행은 build cache 복원이 가능하다(verifier r2 F-17)** — `./gradlew
+    :adapters:test --tests '*Contract*'`를 이 명령 그대로 다시 돌리면 `FROM-CACHE`로
+    돌아올 수 있다(F-2·F-17 과 같은 갈래). 결과 XML 은 이전 실제 실행분의 복원이라
+    건전성 문제는 아니지만 "이번 실행이 test 를 돌렸다"는 서술은 성립하지 않는다.
+    S-1(`--no-build-cache clean check`)이 같은 test 를 매번 실제 실행하므로 acceptance
+    전체로는 덮인다 — commands.md 는 이 지점부터 `--rerun-tasks`를 붙여 기록한다.
 
 ## 판단이 갈린 지점
 
@@ -109,3 +128,12 @@ build cache 를 복원해 소켓을 열지 않고 exit 0 을 낼 수 있었다 �
   `onlyIf(PresentSpec(...))`로 전제 부재 시 자체 skip 하도록 바꿨다. 컴파일된
   `PresentSpec`(build-logic)을 쓴 것은 config cache 가 스크립트 closure 의 암묵적
   캡처를 직렬화하지 못해서다(실측).
+- **buf exit 100 의 의미(verifier r2 F-14) — 닫힘, 알려진 제한 아님.** exit 100 은 "breaking
+  위반"이 아니라 "buf breaking 이 diagnostic 을 하나 이상 냈다"는 뜻이고, 그 diagnostic
+  이 진짜 breaking 규칙(`FIELD_NO_DELETE` 등)인지 `.proto` 컴파일 오류(`COMPILE`)인지는
+  종료 코드가 구분하지 않는다(실측: 구문 깨진 사본에 `buf breaking`·`buf lint` 둘 다
+  100). r1 단계의 "파싱 오류는 1" 전제는 틀렸다 — `--error-format=json`의 `"type"`
+  필드까지 봐야 안전하다. 이 slice 의 11종 mutation 은 전부 진짜 규칙으로 잡혀 거짓
+  양성이 없었지만(재확인: `expected.tsv`의 `rule_type` 열), 판정 로직 자체가 그 구분을
+  하지 않던 것을 F-14 수정으로 닫았다 — 앞으로 mutation 목록이 늘어도 스크립트가 스스로
+  안전측(exit 2)으로 실패한다.
