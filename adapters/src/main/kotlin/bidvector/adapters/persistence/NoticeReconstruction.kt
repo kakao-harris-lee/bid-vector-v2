@@ -40,11 +40,18 @@ private fun businessCategoryOf(row: NoticeRow): BusinessCategory? {
     return BusinessCategory(CategoryCode(code), row.businessCategoryLabel?.let(::CategoryLabel))
 }
 
+/**
+ * verifier r1 F-8 뒤 개정 — `Map.getValue`(표에 없으면 `NoSuchElementException`)로 바꾼다.
+ * 이전 판(`EVENT_PATH_TO_STATUS[status] ?: return collected`)은 표에 없는 상태를 만나면
+ * 예외 대신 **조용히 `Open`을 냈다** — 지금은 [NoticeStatus]가 여섯 값뿐이고 표가 그 여섯을
+ * 전부 담아 도달 불가지만, 새 상태가 추가되고 이 표를 잊으면 예전 판은 그 사실을 삼켰다.
+ * `getValue`는 그 실수를 즉시 예외로 드러낸다(「회귀 구조적 방지」).
+ */
 private fun applyStatusPath(
     collected: Notice,
     status: NoticeStatus,
 ): Notice {
-    val path = EVENT_PATH_TO_STATUS[status] ?: return collected
+    val path = EVENT_PATH_TO_STATUS.getValue(status)
     return path.fold(collected) { notice, event ->
         when (val outcome = notice.applyEvent(event)) {
             is NoticeTransitionOutcome.Applied -> outcome.notice
