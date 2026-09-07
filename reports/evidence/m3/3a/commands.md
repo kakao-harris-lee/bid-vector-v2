@@ -1,11 +1,101 @@
 # 실행 명령과 종료 코드 — M3 / 3A
 
 base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f`, 구현 head(r0) `b0b40cd`, 수정 라운드 1 head
-`a9383b7`, **수정 라운드 2 head** `74cf7b6f33950ca7c09306f73aad1f3e9081c8b1`(코드·게이트 커밋
-기준 — 이 evidence 커밋 자신은 항상 한 칸 뒤진다, N-7). verifier r1 은
-`_workspace/m3-3a/02_verifier_report.md`, r2(N-1~N-7)는
-`_workspace/m3-3a/03_verifier_report_r2.md` 참고. 출력 전문은 남기지 않는다(evidence-pack
-스킬 규격) — 핵심 결과 한 줄만.
+`a9383b7`, 수정 라운드 2 head `74cf7b6f33950ca7c09306f73aad1f3e9081c8b1`, **3A 잔여 일괄
+head** `649866fc55b365c9e786dd5610f8f13b082b8df2`(코드·게이트 커밋 기준 — 이 evidence 커밋
+자신은 항상 한 칸 뒤진다). verifier r1 은 `_workspace/m3-3a/02_verifier_report.md`, r2
+(N-1~N-7)는 `_workspace/m3-3a/03_verifier_report_r2.md` 참고. 출력 전문은 남기지 않는다
+(evidence-pack 스킬 규격) — 핵심 결과 한 줄만.
+
+## 3A 잔여 일괄 — commit 목록(4 커밋 단위, verifier r3 전)
+
+| 단위 | 내용 | 커밋 |
+| --- | --- | --- |
+| ① 정책 값 채움 | `KONEPS_COLLECTION_POLICY` 를 운영자 승인 2026-09-07 값(필드 계약 10·resultCode 16·해석 순서 둘·gate)으로 채우고 `CollectionPolicyTest`(8 test) 로 승인 표와 대조 | `33acf1a` |
+| ② corpus dispatch | `KonepsCollectionExecutors.kt`/`KonepsCollectionAccountingExecutors.kt` 로 20 case dispatch, dispatch 완전성 test·7건 예외 잠금 test 추가 | `dfae9a8`, `a85724f`(case027 REAL_POLICY 대조 보강) |
+| ③ manifest `contract_binding` | koneps-collection 27 case 의 `contract_binding` 필드만 pending-3a → 실제 채움(`fixtures/manifest.yaml` 이 필드 외 무편집, 아래 「manifest 편집 범위 검증」) | `27ad8dd` |
+| — 게이트 수정 | `clean check`(S-1) 재실행에서 발견한 sizeGate(617줄)·detekt(MaxLineLength 7건)·ktlint 위반을 닫는다(파일 분할 + 줄바꿈 + 자동 포맷) | `649866f` |
+| ④ evidence | 이 커밋(commands.md·checklist.md 갱신) | (이 커밋) |
+
+`fixtures/tools/mutation_sweep_adversarial.py`의 `ASSERTED`/`NULL_ASSERTED`/`ADVERSARIAL_VALUE`
+표는 curator 커밋 `5acd5f0`(이 배치 이전, 같은 날)이 koneps-collection 27 case 전건을 이미
+담고 있어 이 배치는 그 파일을 편집하지 않았다(S-6 재확인만 함).
+
+## manifest 편집 범위 검증(③)
+## 2026-09-07T00:00:00Z(시각은 로컬 커밋 순서 참고용 — 정본은 git log)
+- cmd: `git show --stat 27ad8dd`
+- 핵심 결과: `fixtures/manifest.yaml` 1개 파일만 변경.
+- cmd: `git diff 5acd5f0..27ad8dd -- fixtures/manifest.yaml | grep "^[-+].*id: " | grep -v koneps-collection`
+- exit: 1(grep 매치 없음 관례), 출력 없음 — koneps-collection 27건 외 case id 가 diff 에 등장하지 않는다.
+- cmd: `git diff 5acd5f0..27ad8dd -- fixtures/manifest.yaml | grep -E "^[-+]" | grep -v "^+++\|^---" | grep -iE "sha256|verified_paths|expected_file|input_file|classification:|domain:|^\+    source:|change_history|extracted_at|privacy|normalization"`
+- exit: 0, 매치 2건 — 둘 다 신설 `contract_binding` 본문 안에서 "verified_paths"라는 낱말을
+  산문으로 인용한 줄이지 실제 `verified_paths:` 필드 변경이 아니다(원문 대조로 확인). 이
+  둘을 빼면 `contract_binding` 필드 밖의 다른 필드는 손대지 않았다.
+
+## 정책 값 비교 결과(①)
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew --no-daemon :procurement:test --tests 'bidvector.procurement.CollectionPolicyTest'`
+- exit: 0
+- 핵심 결과: 8 tests, 0 failed — 필드 계약 10건 항목 수·`presmptPrce`(EXCLUSIVE·WON·ESTIMATED)·
+  `asignBdgtAmt`/`bdgtAmt`(UNKNOWN·ALLOCATED_BUDGET·FILLED_FROM_BUDGET_KEY)·`bssamt` 단독
+  기초금액 키·해석 순서 둘(`bssamt→asignBdgtAmt→bdgtAmt`, `presmptPrce`)·resultCode 16건
+  (`03`→NO_DATA·`08`→INPUT_ERROR·`22`→QUOTA_EXCEEDED·`30`→NOT_RETRYABLE)·일시 두 필드
+  `ASSUME_KST`·gate `24h/48h` 를 `policy-values.md` §6 승인 표와 실값으로 대조해 전부 일치.
+  기존 `init` 불변식(추정가격 순서에 기초금액 키 없음, 해석 순서 키 전건 등재, resultCode
+  중복 없음)도 실값 위에서 재확인(생성 성공 자체가 그 증거).
+
+## 3A 잔여 일괄 — acceptance_commands 재실행(head `649866f`)
+
+### S-0 — 격리 worktree `clean check`
+## 2026-09-07T00:00:00Z
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`, 347 actionable tasks 전부 실행. `git worktree remove --force`로 정리, 잔여 없음 확인(`git worktree list`).
+
+### S-1 — 저장소 루트 `clean check`
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`, 338 actionable tasks(sizeGate·detekt·ktlint 위반 셋을 이 재실행에서 발견해 `649866f`로 닫았다 — 위 표).
+
+### S-2 — 도메인 test
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew :procurement:test`
+- exit: 0
+- 핵심 결과: 78 tests, 0 failed, 0 error(신설 `CollectionPolicyTest` 8건 포함).
+
+### S-3 — 도메인 게이트 5종
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew :procurement:domainApiTypeGate :procurement:domainSourceReferenceGate :procurement:typeShapeGate :procurement:sizeGate :procurement:cpdCheck`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL` — `CollectionPolicy.kt` 의 필드 계약 열을 `FieldContractRow` 위치
+  인자 표로 재구성해 `cpdCheck`(named-arg 반복 50토큰 초과 중복)를 닫았다.
+
+### S-4 — app conformance
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew :app:test --tests '*Conformance*'`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`, 62 tests, 0 failed — koneps-collection 20 case 신규 통과 포함,
+  기존 다섯 축 회귀 무손상. **case 통과 수: koneps-collection 20/27 dispatch, 27/27 케이스
+  분류(20 dispatch 통과 + 7 판정 필요 예외로 명시 등재, `dispatch 표 밖의 authoritative case
+  가 없다` 완전성 test 가 그 7건 구성을 잠근다)**.
+
+### S-5 — quality baseline
+## 2026-09-07T00:00:00Z
+- cmd: `./gradlew qualityBaseline`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`.
+
+### S-6 — 적대 스윕(manifest 편집 전후 둘 다 실행)
+## 2026-09-07T00:00:00Z
+- cmd: `python3 fixtures/tools/mutation_sweep_adversarial.py`(manifest 편집 `27ad8dd` 전)
+- exit: 0
+- 핵심 결과: 강등 대상 0, 잔존 authoritative 68.
+## 2026-09-07T00:00:00Z
+- cmd: `python3 fixtures/tools/mutation_sweep_adversarial.py`(manifest 편집 `27ad8dd` 후, head `649866f`)
+- exit: 0
+- 핵심 결과: 강등 대상 0, 잔존 authoritative 68(변화 없음 — `contract_binding` 편집은 이
+  스윕이 읽는 `ASSERTED`/`verified_paths`/기대값에 영향을 주지 않는다).
 
 ## 수정 라운드 2 — finding 처리 한 줄씩
 

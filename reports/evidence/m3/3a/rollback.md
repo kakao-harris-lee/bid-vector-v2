@@ -16,6 +16,13 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f`. 되돌림은 **range revert 가
 
 ## 명령(개별 경로 인자)
 
+**3A 잔여 일괄 갱신** — app 쪽 경로를 개별 파일로만 나열해 왔는데, 이번 배치가 그 디렉터리에
+새 파일 둘(`KonepsCollectionExecutors.kt`·`KonepsCollectionAccountingExecutors.kt`)을 더하고
+`SharedKernelCorpusConformanceTest.kt`(TARGET_DOMAINS·완전성 test·`atDollarPath` 배열 인덱스
+지원)를 편집했다 — 개별 나열 방식은 새 파일을 원천적으로 못 담으므로 여기서 아예 그
+**디렉터리 전체**로 바꾼다. `app/build.gradle.kts`(scope.md in_scope, `testImplementation(
+project(":procurement"))` 한 줄)도 이번 배치에서 처음 추가돼 목록에 없었다 — 더한다.
+
 ```bash
 git restore --source=a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f --staged --worktree -- \
   procurement/ \
@@ -27,22 +34,30 @@ git restore --source=a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f --staged --worktre
   shared-kernel/src/test/kotlin/bidvector/sharedkernel/RateArithmeticTest.kt \
   shared-kernel/src/test/kotlin/bidvector/sharedkernel/UndeclaredProvenanceTest.kt \
   decision/src/test/kotlin/bidvector/decision/FloorShortfallKernelTest.kt \
-  app/src/test/kotlin/bidvector/app/conformance/CorpusExecutors.kt \
-  app/src/test/kotlin/bidvector/app/conformance/StrategyExecutors.kt \
-  app/src/test/kotlin/bidvector/app/conformance/ProvenanceFloorExecutors.kt \
+  app/src/test/kotlin/bidvector/app/conformance/ \
+  app/build.gradle.kts \
   config/quality/gate-tests.properties
 ```
 
-`--source=<base>`에 없는 신규 경로(`procurement/` 전체, `shared-kernel/.../NoticeRound.kt`)는 `--worktree`가
-삭제로 처리한다 — 별도 `git rm`이 필요 없다.
+`--source=<base>`에 없는 신규 경로(`procurement/` 전체, `shared-kernel/.../NoticeRound.kt`,
+`app/src/test/.../conformance/` 안의 koneps 실행자 둘)는 `--worktree`가 삭제로 처리한다 —
+별도 `git rm`이 필요 없다. `CorpusExecutors.kt`·`StrategyExecutors.kt`·
+`ProvenanceFloorExecutors.kt`·`SharedKernelCorpusConformanceTest.kt`는 base 에 이미 있던
+파일이라(1B~1E 산출물) `--source=base`가 그 파일들을 **base 시점 내용으로 원복**한다 —
+넷 다 3A 가 실제로 건드렸다: `StrategyExecutors.kt`·`ProvenanceFloorExecutors.kt`는 착수
+Phase 0 의 D-3A-0 파급(`noticeRevision`의 `Int` 접힘을 `NoticeRound`로 정정)을,
+`CorpusExecutors.kt`는 같은 파급에 더해 이번 배치의 `VALUE_EXECUTORS` 병합을,
+`SharedKernelCorpusConformanceTest.kt`는 이번 배치의 `TARGET_DOMAINS`·완전성 test·
+`atDollarPath` 배열 인덱스 지원을 담고 있다 — `--source=base`가 넷 전부를 base 시점
+내용(D-3A-0 이전, koneps 배선 이전)으로 되돌린다.
 
-## 임시 clone 실측(재측정, verifier r2 N-6 — head `74cf7b6f33950ca7c09306f73aad1f3e9081c8b1`)
+## 임시 clone 실측(재측정, 3A 잔여 일괄 — head `649866fc55b365c9e786dd5610f8f13b082b8df2`)
 
-## 2026-09-07T06:54:38Z
+## 2026-09-07T00:00:00Z
 - cmd:
   ```bash
-  rm -rf /tmp/m3-3a-r2-rollback-check && git clone --no-hardlinks --quiet . /tmp/m3-3a-r2-rollback-check && \
-  cd /tmp/m3-3a-r2-rollback-check && git checkout --quiet 74cf7b6f33950ca7c09306f73aad1f3e9081c8b1 && \
+  rm -rf /tmp/m3-3a-rollback-check && git clone --no-hardlinks --quiet . /tmp/m3-3a-rollback-check && \
+  cd /tmp/m3-3a-rollback-check && git checkout --quiet 649866fc55b365c9e786dd5610f8f13b082b8df2 && \
   git restore --source=a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f --staged --worktree -- \
     procurement/ \
     shared-kernel/src/main/kotlin/bidvector/sharedkernel/NoticeRound.kt \
@@ -53,21 +68,24 @@ git restore --source=a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f --staged --worktre
     shared-kernel/src/test/kotlin/bidvector/sharedkernel/RateArithmeticTest.kt \
     shared-kernel/src/test/kotlin/bidvector/sharedkernel/UndeclaredProvenanceTest.kt \
     decision/src/test/kotlin/bidvector/decision/FloorShortfallKernelTest.kt \
-    app/src/test/kotlin/bidvector/app/conformance/CorpusExecutors.kt \
-    app/src/test/kotlin/bidvector/app/conformance/StrategyExecutors.kt \
-    app/src/test/kotlin/bidvector/app/conformance/ProvenanceFloorExecutors.kt \
+    app/src/test/kotlin/bidvector/app/conformance/ \
+    app/build.gradle.kts \
     config/quality/gate-tests.properties && \
-  git status --porcelain -- procurement/ shared-kernel/ decision/ app/ config/
+  git status --porcelain -- procurement/ shared-kernel/ decision/ app/ config/ && \
+  git diff a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f -- procurement/ shared-kernel/src/main/kotlin/bidvector/sharedkernel/NoticeRound.kt shared-kernel/src/main/kotlin/bidvector/sharedkernel/Provenance.kt shared-kernel/src/main/kotlin/bidvector/sharedkernel/Rate.kt app/src/test/kotlin/bidvector/app/conformance/ app/build.gradle.kts config/quality/gate-tests.properties | wc -l
   ```
 - exit: 0
-- 핵심 결과(N-6 정정판 — base 에 이미 있던 `procurement/build.gradle.kts`·`ModuleBoundaryAnchor.kt`는
-  **남는다**, 신규 도메인 파일만 삭제된다): `procurement/src/main/.../{Accounting,AmountResolutionOutcome,
+- 핵심 결과: `git status --porcelain`이 `procurement/src/main/.../{Accounting,AmountResolutionOutcome,
   BusinessCategory,Canonicalize,CollectionPolicy,DateTimeInterpretation,DetailFetch,FieldContract,
-  NoticeFacts,NoticeId,NoticeStatus,Ports,RawObservation,ResolvedBaseAmount}.kt`(14개)와
-  `procurement/src/test/.../*Test.kt`(9개) 삭제(D, 신규 파일이라 `status`에는 잡히지 않고 파일 자체가
-  없어짐) + `ModuleBoundaryAnchor.kt`는 그대로 남음. `shared-kernel/.../NoticeRound.kt` 삭제.
-  `procurement/build.gradle.kts`·`Provenance.kt`·`Rate.kt`·`gate-tests.properties` 등 base 에 이미 있던
-  파일은 base 내용으로 원복(`git diff <base>` 가 그 파일들에서 0줄). clone 은 확인 뒤 폐기.
+  NoticeFacts,NoticeId,NoticeStatus,Ports,RawObservation,ResolvedBaseAmount}.kt`(14개)·
+  `procurement/src/test/.../*Test.kt`(10개, `CollectionPolicyTest.kt` 포함)·
+  `shared-kernel/.../NoticeRound.kt`·`app/src/test/.../conformance/{KonepsCollectionExecutors,
+  KonepsCollectionAccountingExecutors}.kt`(2개)를 `D`(삭제)로, `app/build.gradle.kts`·
+  `procurement/build.gradle.kts`·`Provenance.kt`·`Rate.kt`·`gate-tests.properties`·
+  `CorpusExecutors.kt`·`StrategyExecutors.kt`·`ProvenanceFloorExecutors.kt`·
+  `SharedKernelCorpusConformanceTest.kt`를 `M`(원복)으로 낸다 — `ModuleBoundaryAnchor.kt`는
+  base 에 이미 있어 그대로 남는다. 되돌린 뒤 `git diff <base>`(위 in_scope 경로 전체)가
+  **0줄** — 복구가 완전함을 확인했다. clone 은 확인 뒤 폐기.
 
 ## 확인 지점
 
