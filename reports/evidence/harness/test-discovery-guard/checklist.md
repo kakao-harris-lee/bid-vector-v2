@@ -107,3 +107,8 @@ F-2·F-3 은 **술어를 건드리지 않았다** — 건드리면 표적 재검
 - **승인과 무관하게 열린 것 하나**: 공유 트리의 S-0/S-1 은 3A 소유 `AccountingTest` 의 식 본문 `@Test`(「게이트가 잡은 실제 위반(범위 밖)」 절)가 고쳐질 때까지
   exit 1 — 해소는 3A 레인 커밋 + S-0 재실행 한 줄(commands.md). 이 slice 의 결함이 아니라 게이트의 첫 실측 검출이다.
 - `gate.tests.build-logic` 에 `TestShapesTest` 등재는 3A 종결 뒤 한 줄 병합(알려진 제한 1) — 그때까지 실행 증거는 S-2.
+
+## 알려진 제한 1 닫힘 — 2026-09-07 (3A 종결 `b9dd07c` 뒤)
+
+- `config/quality/gate-tests.properties` `gate.tests.build-logic` 에 `bidvector.buildlogic.TestShapesTest` 병합(운영자 지시 「3A 종결되면 등재」).
+  `buildLogicGateExecutionGate` exit 0(commands.md 같은 날짜 절). 이제 게이트 자신의 단위 test 실행이 `gateExecutionGate` 로 단언된다.

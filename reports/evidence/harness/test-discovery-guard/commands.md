@@ -98,3 +98,8 @@ base `7581106ecf7c52bbf8bb032adc233e90a8f1eb9b` · 구현 커밋 `c7aaf5c`(게�
 - 결과: `reports/evidence/m2/2d/checklist.md:11~13` 을 가리키는 외부 `file:line` 인용 없음(전부 다른 마일스톤의 `checklist.md` — `m0/0a`·`m0/0a2`·`m0/0a3`). 영향 없음.
 - cmd: `grep -rn 'capability-map\.md:[0-9]' --include='*.md' --include='*.kt' --include='*.properties' .` (편집 전)
 - 결과: `capability-map.md:3457`(OPEN-2B 행)을 가리키는 인용 없음. 편집도 같은 줄 치환(줄 수 불변, `git diff -U0` 단일 hunk 확인)이라 그 아래 좌표도 밀리지 않는다.
+
+## 2026-09-07 — 알려진 제한 1 닫힘 (3A 종결 `b9dd07c` 뒤 병합)
+- cmd: `./gradlew buildLogicGateExecutionGate`
+- exit: 0
+- 핵심 결과: `gate.tests.build-logic` 에 `bidvector.buildlogic.TestShapesTest` 등재(23개) 뒤 통과 — 결과 XML `TEST-bidvector.buildlogic.TestShapesTest.xml` tests="16"
