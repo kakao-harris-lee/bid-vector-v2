@@ -4766,13 +4766,17 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: c28b04d563eca0709e05b89d29582bc789b7c05996ac9a44b18b019b33f152f1
     expected_sha256: 993b5b9d4ceb1ee41f0ff09256fe089e9c9890c70de77a53492783a8428fb875
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
-      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
-      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
-      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
-      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
-      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
+    contract_binding:
+      type_path: "bidvector.procurement.KonepsFieldContractRegistry.unknownKeysIn(RawNoticeObservation)"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-001, KonepsCollectionExecutors.case001) —
+        실제 KONEPS_COLLECTION_POLICY 레지스트리(운영 승인 값) 위에서 미지 키를 계수한다.
+      carries: |-
+        raw 키가 계약에 없으면 unknownKeysIn 이 그 키를 관측 가능한 집합(unknownFields)으로 낸다 —
+        계약 없는 키가 canonical 값으로 조용히 소비되지 않는다(COL-07, 위협 모델 방어 (b)).
+      does_not_carry: |-
+        「사람의 재검토가 필요하다」는 판단(requiresHumanReviewBeforeConsumption)을 나르는
+        procurement 타입은 없다 — executor 가 「미지 필드 > 0」이면 참으로 계산해 붙인 것이다.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4875,13 +4879,19 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: ae828bee7c168918f3aaf5fe6ee1cabb8f872c32eb03368e055df2e54e07cb87
     expected_sha256: 8686077f2e848967b896bd6d3110e2daf5c73ef6c9c64ba4b0bbe5f8da10b3ae
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
-      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
-      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
-      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
-      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
-      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
+    contract_binding:
+      type_path: "없음 — ExpectedRangeKey(FieldContract.kt)는 데이터 슬롯만 있고 어디서도 강제되지 않는다"
+      fixed_by: |-
+        없음 — 이 case 를 통과시키는 procurement 함수가 없다. KonepsCollectionExecutors.kt 는
+        이 case 를 dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+      carries: |-
+        없음.
+      does_not_carry: |-
+        `synFloorRt`(0~1 fraction 선언) 같은 필드가 선언된 범위를 벗어나면 거부해야 한다는
+        요구(§5.3 규율 2, `expectedRange` 참조)를 procurement のどこも 검사하지 않는다 —
+        `ExpectedRangeKey` 는 계약에 슬롯만 있고 값도, 강제 지점도 없다. 판정: v2-defect
+        (능력 공백) — 밴드 정책 데이터와 강제 지점이 이 slice 범위 밖(§5.3 「단일 출처」 미착수).
+        checklist.md 「판정 필요 case」 참고.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -4982,13 +4992,17 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 861bd0ac27816329d101f827e89f68f4f55884936a45d7a05f9943203c2f14be
     expected_sha256: 96403e77df23cee01254e961b0651c3ebe9a33065faa2d95f53296c3c8f5dd6d
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
-      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
-      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
-      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
-      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
-      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
+    contract_binding:
+      type_path: "없음 — RawNoticeObservation.of 가 null 값을 값 맵에서 필터링해 「명시 null」과"
+      fixed_by: |-
+        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+      carries: |-
+        없음.
+      does_not_carry: |-
+        `presmptPrce: null`(명시 null)과 키 자체 부재(koneps-collection-004)를 구분하는
+        타입이 procurement 에 없다 — `RawNoticeObservation`은 값 유무만 나르고 부재의
+        **사유**(ExplicitNull vs KeyMissing)는 나르지 않는다. 판정: v2-defect(능력 공백).
+        checklist.md 「판정 필요 case」 참고.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5099,13 +5113,15 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: f5ec900e0f4c3b404c76473e5a7fa3b18b1a663a93c4d6538eba8439a6787794
     expected_sha256: 8353cc69dd9a7599af86bacadc16f85b52fa9542c0c1fbf1c3e1607dc8a491d6
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
-      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
-      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
-      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
-      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
-      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
+    contract_binding:
+      type_path: "없음 — koneps-collection-003 과 같은 능력 공백(ExplicitNull vs KeyMissing 미구분)"
+      fixed_by: |-
+        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+      carries: |-
+        없음.
+      does_not_carry: |-
+        koneps-collection-003 과 동일한 판정 — `RawNoticeObservation`이 부재의 사유를
+        나르지 않아 「키 자체가 없음」과 「값이 null」을 구분할 procurement 타입이 없다.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5214,13 +5230,17 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: a8dadcb05c535a1fbe81f80d54988628d05f1ce5503c8fd5962fbd15c327d9ff
     expected_sha256: b28ddecd57ea96db662a7bec403f4990170a7c8d77ab9034deb4d01758c4cd96
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
-      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
-      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
-      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
-      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
-      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
+    contract_binding:
+      type_path: "bidvector.sharedkernel.NoticeRound"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-005) + shared-kernel `NoticeRound`
+        값 객체 자체(Int 변환 API 부재, D-3A-0).
+      carries: |-
+        `bidNtceOrd` 는 `NoticeRound.of` 로 원문 제로패딩 문자열 그대로 남는다 — 타입에
+        Int 변환 함수가 없어 산술이 정의되지 않는다(R-QUAL-05, 위협 모델 방어 (c)).
+      does_not_carry: |-
+        차수의 '산술 미정의'는 함수의 **부재**로 표현된다 — procurement/shared-kernel
+        어디에도 `NoticeRound`를 정수로 바꿔 참을 내는 함수는 없다.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5320,13 +5340,17 @@ cases:
     expected_sha256: d89c5fabd09e9b53667098bcb965f7f27c965874c2e15c8ff6d76bf41e4472c1
     not_covered: |-
       전체 업무구분 코드 체계 — `OPEN-COL-03`
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
-      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
-      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
-      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
-      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
-      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
+    contract_binding:
+      type_path: "bidvector.procurement.BusinessCategory / CategoryCode / CategoryLabel"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-006).
+      carries: |-
+        코드+라벨 셀이 분리된 뒤에는 `BusinessCategory(code, label)` 두 값으로만 존재한다 —
+        결합 문자열(`"0411 기술용역"`)이 파서를 지나 값 자리에 남지 않는다(COL-08).
+      does_not_carry: |-
+        코드+라벨 한 셀의 실제 분리(split)는 procurement 타입이 아니다 — 3A 는 분리된
+        결과만 받는다(scope.md ⑤ 「분리는 어댑터(3B) 소관」). executor 의 `splitCodeCell`
+        은 procurement 공개 API 가 아니라 이 corpus 가 입력 형태를 흉내 낸 헬퍼다.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5412,13 +5436,15 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 5dd3775f0833947a81568fdf16936751a86aca5c016ae00a7d32fb29c5b7f37c
     expected_sha256: 132dccb9841f9025e0b54bd7deaf644d4185a1a4cab3543a70dac281c15db8f1
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
-      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
-      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
-      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
-      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
-      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
+    contract_binding:
+      type_path: "bidvector.procurement.BusinessCategory / CategoryCode / CategoryLabel"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-007).
+      carries: |-
+        매핑에 없는 코드는 `label = null`(미지)이고 procurement 는 임의 라벨을 만들지
+        않는다(COL-08 acceptance, 위협 모델 방어 대상 밖 — 이 값은 조립만 확인한다).
+      does_not_carry: |-
+        koneps-collection-006 과 동일 — 코드+라벨 셀 분리 자체는 어댑터(3B) 소관.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5526,13 +5552,17 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 9f2a5ebeb08116b96893da7b1495900f7e3bb952f83d7497505faf2fddb519d9
     expected_sha256: 7864705a33fbfaad86c63257b7072a28a3ef7d8f16ca306f11ab02f1c61d9f2f
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
-      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
-      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
-      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
-      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
-      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
+    contract_binding:
+      type_path: "bidvector.procurement.mayOverwrite(Provenance?, Provenance) / IS_AUTHORITATIVE"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-008) + ResolvedBaseAmountTest 의
+        `isAuthoritative`/`mayOverwrite` 단언.
+      carries: |-
+        점유 가드는 술어가 아니라 `IS_AUTHORITATIVE` 데이터가 정한다(§5.1) — 배정예산
+        폴백(FilledFromBudgetKey) 유입은 이미 있는 Published 값을 덮지 못한다.
+      does_not_carry: |-
+        점유 가드의 **실행**(실제 write 시점 적용)은 procurement 소관이 아니다(3D,
+        COL-02 경계) — `mayOverwrite` 는 「덮어도 되는가」의 판정만 낸다.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5687,13 +5717,19 @@ cases:
     not_covered: |-
       배정예산의 **실제** 과세 처리 — `OPEN-DIC-04`가 소유한다. 이 case 가 싣는 `UNKNOWN`은 그 미결의 회피가 아니라
       §1.2가 정한 **선언값 자체**이며(*"`Unknown` — 정해진 바 없다"*), `OPEN-DIC-04`가 닫히면 이 값도 함께 교체된다.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물
-      (`KonepsFieldContract` · `CollectionAccounting` · `NoticeId`/`NoticeRound` ·
-      `ResolvedBaseAmount` · `DetailFetchDecision`)이고 **저장소에 아직 없다.** 네 자리
-      (`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다 —
-      3A `scope.md` 「이 slice 가 하는 일」 ③④⑥⑦⑪ 이 그 자리를 지목한다.
-      **지금 이 필드가 잠그는 것은 없다**(schema 의 `contract_binding` 정의가 그렇게 적는다).
+    contract_binding:
+      type_path: "bidvector.procurement.resolveAmount(...) / bidvector.procurement.ResolvedBaseAmount.FallbackFromBudget"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-009) + ResolvedBaseAmountTest.
+      carries: |-
+        기초금액이 비어 있으면 정책의 `baseAmountResolutionOrder`(bssamt→asignBdgtAmt→bdgtAmt)를
+        따라 배정예산으로 폴백하고, 그 결과는 `Direct`와 타입이 다른 `FallbackFromBudget`이다 —
+        파생값이 원본과 같은 타입으로 기초금액 자리에 섞이지 않는다(⑥, 위협 모델 방어 (a)(4)).
+      does_not_carry: |-
+        예산 값을 기초금액 basis 로 재기입하는 산술은 procurement 에 없다 — 유입 자신의
+        basis(ALLOCATED_BUDGET)는 원천 raw 키(`asignBdgtAmt`)의 계약이 그대로 유지한다
+        (`BaseAmount.basis` 는 대상 슬롯 타입 정체성이라 항상 BASE_AMOUNT — 원천 basis 는
+        resolveAmount 가 고른 sourceKey 의 계약에서 별도로 읽어야 한다).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -5814,10 +5850,18 @@ cases:
     expected_sha256: be948968d908dcd53832bb389efcd5c43e3b35111a7d913ae4e0e4aca13873e1
     not_covered: |-
       `sucsfbidLwltRate` 의 **개연 밴드**(신뢰 상한·하한) — 그 값은 `legacy-behavior` 이고 `OPEN-DEC-10`·§1.4.3 B6 이 소유한다. 이 case 는 밴드를 주장하지 않는다.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.sharedkernel.Rate.Companion.ofPercent(BigDecimal)"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-010) — rate-unit 축과 같은
+        shared-kernel 함수 위에서 이 문서 선언(퍼센트, 제수 100)을 대조한다.
+      carries: |-
+        `sucsfbidLwltRate` 의 percent 선언은 shared-kernel `Rate.ofPercent`가 승인된
+        제수 100 으로 fraction 변환한다 — 값 크기로 단위를 추측하지 않는다(ADR 0002 D-4).
+      does_not_carry: |-
+        procurement 자신은 `sucsfbidLwltRate` 계약에 `FieldProvenanceTemplate.NOT_APPLICABLE`
+        만 두고 이 율을 canonical `NoticeCollected` 필드로 소비하지 않는다 — floor rate 판정은
+        1D(`decision`)/4B(`workflow`) 소관이다(scope.md 「만들지 않는 것」).
     change_history:
       - date: 2026-09-07
         change: |-
@@ -5884,10 +5928,18 @@ cases:
     expected_sha256: a42a9b7ad2ea50e253d41119818e15273c7884d6ffc68f93cb7da1047c394425
     owning_open: |-
       OPEN-REG-05 (활성) — 기초금액·추정가격의 과세 처리 **전반**. 이 case 는 그중 `presmptPrce` 한 키의 문서 선언만 고정하고 나머지 축은 그 `OPEN` 이 소유한다.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.procurement.KonepsFieldContract(rawName=presmptPrce)"
+      fixed_by: |-
+        CollectionPolicyTest(`presmptPrce 는 과세 제외·원화 단위다`) +
+        SharedKernelCorpusConformanceTest(koneps-collection-011).
+      carries: |-
+        `presmptPrce` 계약의 `vatTreatment=EXCLUSIVE`·`nullability=OPTIONAL`은 문서 선언
+        (부가세 제외, 항목구분 옵션)을 그대로 옮긴 값이다 — legacy 주석('부가세 포함')을
+        근거로 쓰지 않는다(OPEN-REG-05 와 다른 축).
+      does_not_carry: |-
+        값 크기로 과세를 추정하는 경로는 procurement 에 없다 — `vatTreatment`는 항상
+        계약에서 읽지 값에서 되짚지 않는다.
     change_history:
       - date: 2026-09-07
         change: |-
@@ -5952,10 +6004,17 @@ cases:
     expected_sha256: 9ad6a3e62ee630985eb8ae3024283d61bf3b89ae81d259fd3aa8b7ffecd7ba57
     not_covered: |-
       식별자 타입에 산술이 정의되지 않는다는 V2 규칙 — `koneps-collection-005` 소유 (`insufficient-evidence`).
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.sharedkernel.NoticeRound"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-012) + shared-kernel `NoticeRound`
+        값 객체(정규식 `\d{3}` 등가성).
+      carries: |-
+        제로패딩 3자리 문자열의 왕복 보존과 `"000"`≠`"0"` 등가성 거부가 타입 수준에서
+        성립한다(값 객체 등가성은 원문 문자열, 위협 모델 방어 (c)).
+      does_not_carry: |-
+        표적조회 재질의(reQueried) 자체를 만드는 API 호출은 procurement 에 없다 — 이
+        case 는 값 객체의 등가성만 잰다.
     change_history: []
     review:
       claude_commit: pending
@@ -6012,10 +6071,20 @@ cases:
       `resultCode` 17 범주(재시도 가능/불가·quota·입력 오류·데이터 없음) 분류표 — **원문 미확보**. `uncovered_axes` 의 「KONEPS — `resultCode` 분류표」가 받는다.
     owning_open: |-
       OPEN-COL-02 — 등재 **결정**은 2026-08-26 해소됐으나 **표 본문이 아직 어느 문서에도 없다**. 이 case 는 그 표를 대신하지 않는다.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "procurement 함수 호출 없음 — resultCode 존재/부재를 판정하는 procurement 타입이 없다"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-013) — 이 case 는 procurement
+        함수를 부르지 않는다. `KonepsCollectionExecutors.case013`은 입력 JSON 의 envelope
+        구조를 직접 읽어 문서 선언(항목구분 필수)과 부재 관측을 계산한다.
+      carries: |-
+        resultCode 부재를 성공(`"00"`)으로 접는 fallback 이 procurement 어디에도 없다는
+        **부정 사실** — R-COL-01 이 막는 회귀가 애초에 만들어질 코드 자리가 없다.
+      does_not_carry: |-
+        envelope 의 resultCode 존재 여부에서 실제로 계약 위반을 판정하고 회계(`unknownFields`
+        류)에 기록하는 로직은 procurement 에 없다(3B/3D 가 배선). `ResultCodeCategory`/
+        `ResultCodeCategoryEntry`는 코드가 이미 주어졌을 때의 분류만 갖고, 존재 판정은
+        갖지 않는다.
     change_history: []
     review:
       claude_commit: pending
@@ -6071,10 +6140,20 @@ cases:
     expected_sha256: 5b6894a301a68f023d314432967ce74f7ea33641d466c2b965295e80e52f32a5
     owning_open: |-
       OPEN-3A-SOURCE-TZ (신설 예정, 문서 레인 등재) — 출처 타임존의 **값**. 이 case 는 그 값이 문서에 없다는 사실만 고정한다.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "procurement 함수 호출 없음 — 이 case 는 문서 사실(형식 선언·타임존 미선언)만 대조한다"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-014) — `parseSourceZonedInstant`
+        등 실제 파싱 함수는 부르지 않는다.
+      carries: |-
+        일시 필드는 원문 문자열 그대로 `RawNoticeObservation`에 남고, 해석 규칙(`sourceZone`)
+        이 계약(`KonepsFieldContract.sourceZone`)에서 별도로 온다는 **설계** 사실 — 값
+        자체에서 타임존을 추측하지 않는다(D-3A-4).
+      does_not_carry: |-
+        실제 파싱 호출(`parseSourceZonedInstant`)의 거동은 이 case 가 겨냥하지 않는다 —
+        그 거동은 koneps-collection-026 이 겨냥했고, 거기서 v2-defect(KONEPS 실제 공백
+        구분자 형식을 파싱하지 못함)를 발견했다(해당 case 는 dispatch 하지 않는다,
+        KonepsCollectionExecutors.kt 머리 문서 참고).
     change_history: []
     review:
       claude_commit: pending
@@ -6134,10 +6213,17 @@ cases:
       예산 키의 **basis 라벨**(`ALLOCATED_BUDGET`)과 점유 가드 — `koneps-collection-008`·`009` 소유.
     owning_open: |-
       OPEN-REG-05 (활성) — 과세 처리의 결정.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.procurement.KonepsFieldContract(rawName=asignBdgtAmt|bdgtAmt)"
+      fixed_by: |-
+        CollectionPolicyTest(`asignBdgtAmt·bdgtAmt 는 과세 미선언(UNKNOWN)이고 배정예산
+        basis 다`) + SharedKernelCorpusConformanceTest(koneps-collection-015).
+      carries: |-
+        두 배정예산 키의 `vatTreatment=UNKNOWN`은 문서가 과세를 선언하지 않는다는 사실을
+        그대로 옮긴다 — 이웃 필드(`presmptPrce`)의 선언을 전이해 오지 않는다(§1.2.1).
+      does_not_carry: |-
+        과세 UNKNOWN 의 최종 확정(OPEN-REG-05)은 이 계약 밖이다 — 계약은 슬롯만 갖고
+        값의 최종 확정은 별도 OPEN 이 진다.
     change_history: []
     review:
       claude_commit: pending
@@ -6192,10 +6278,17 @@ cases:
       업무구분 **코드 체계 전체**와 미지 코드의 표현 — `OPEN-COL-03` 및 `koneps-collection-006`·`007`(둘 다 `insufficient-evidence`).
     owning_open: |-
       OPEN-COL-03 (활성) — 코드 체계의 출처.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "없음 — 업무구분명(bsnsDivNm)의 문서 열거 어휘(물품/용역/공사/외자)를 나르는 procurement 타입이 없다"
+      fixed_by: |-
+        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+      carries: |-
+        없음.
+      does_not_carry: |-
+        `BusinessCategory`/`CategoryLabel`은 임의 문자열을 나르는 값 객체이지, 문서가
+        선언한 4개 열거값 자체를 계약으로 갖지 않는다 — 「관측값이 문서 열거 안에 있는가」
+        를 판정할 procurement 타입이 없다. 판정: v2-defect(능력 공백, 문서 열거 자체가
+        정책 데이터로 인스턴스화되지 않았다). checklist.md 「판정 필요 case」 참고.
     change_history: []
     review:
       claude_commit: pending
@@ -6268,10 +6361,18 @@ cases:
       기초금액의 **과세 처리** — 비고 샘플은 근거가 아니며 `OPEN-REG-05` 가 소유한다. 다른 KONEPS 서비스(ScsbidInfoService 등)의 참고자료는 미열람.
     owning_open: |-
       OPEN-REG-05 (활성) — 기초금액의 과세 처리.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.procurement.KonepsFieldContractRegistry.contractsFor(FieldConcept.BASE_AMOUNT) / KonepsFieldContract(rawName=bssamt)"
+      fixed_by: |-
+        CollectionPolicyTest(`bssamt 가 문서로 서는 유일한 기초금액 raw 키다`) +
+        SharedKernelCorpusConformanceTest(koneps-collection-017).
+      carries: |-
+        `BASE_AMOUNT` 개념에 등재된 raw 키는 `bssamt` 하나뿐이다 — `bssAmt`(미등재)·
+        `bssAmtPurcnstcst`(다른 개념)는 계약에 없다는 사실이 `contractsFor` 호출로
+        확인된다(P-3).
+      does_not_carry: |-
+        `bssAmtPurcnstcst` 자체(기초금액순공사비 개념)의 계약은 procurement 에 없다 —
+        이 case 는 그 부재만 확인하고, 그 개념의 계약화는 이 slice 범위 밖이다.
     change_history:
       - date: 2026-09-07
         change: |-
@@ -6341,10 +6442,17 @@ cases:
       시공능력평가금액의 **단위·과세·기준 시점** — `OPEN-QUAL-10` 이 소유한다. 보유액과의 비교도 이 case 밖이다(§5.5 가 타입으로 막는 자리).
     owning_open: |-
       OPEN-QUAL-10 (활성) — 게시 요건 축의 단위·과세.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "없음 — cnstrtnAbltyEvlAmtList(시공능력평가금액목록) 파싱 함수가 없다"
+      fixed_by: |-
+        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+      carries: |-
+        없음.
+      does_not_carry: |-
+        D-3A-8(§5.5)이 지정한 `UnnormalizedFigure` + 필드 계약(수집 형태만)이 아직
+        신설되지 않았다 — `^` 구분 복합 문자열을 구성요소로 쪼개거나 개수를 세는 함수가
+        procurement 에 없다. 판정: v2-defect(능력 공백, D-3A-8 미착수).
+        checklist.md 「판정 필요 case」 참고.
     change_history: []
     review:
       claude_commit: pending
@@ -6432,10 +6540,19 @@ cases:
       **이 표의 입찰공고정보서비스 적용 여부** — 문서가 선언하지 않는다.
     owning_open: |-
       OPEN-COL-02 — 이 case 로 **표 본문이 확보됐다**. 남은 것은 범주 매핑과 적용 범위 승인이다.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "procurement 함수 호출 일부 — bidvector.procurement.KONEPS_COLLECTION_POLICY.resultCodeCategories"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-027). `documentedErrorCodes` 등
+        verified_paths 자체는 입력 문서 표를 직접 읽어 계산하고(procurement 호출 없음),
+        verified_paths 밖의 `policyCodeSetMatchesDocument` 필드만 REAL_POLICY 를 부른다.
+      carries: |-
+        운영 승인 정책(`KONEPS_COLLECTION_POLICY`)의 resultCode 코드 집합이 이 문서의
+        에러코드 표 16개와 실제로 일치한다(비검증 필드지만 real 정책 값 위에서 계산).
+      does_not_carry: |-
+        이 문서(활용가이드 `pps-openapi-guide`)가 이 corpus 의 주 서비스
+        (`getBidPblancListInfo*`)에 적용된다는 선언 자체는 procurement 에 없다 — 그
+        적용 범위 판정은 이 case 가 하지 않는다(입력의 note 문면 그대로).
     change_history: []
     review:
       claude_commit: pending
@@ -6498,10 +6615,17 @@ cases:
     expected_sha256: 65a068827d3d9742a07ceb70ebb8cb548c4e525ae015eee82e362199c6160d45
     owning_open: |-
       (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**. 승인되면 `authoritative` 로 올라간다(`classification_policy.insufficient_evidence` 의 되돌림 경로).
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.procurement.CollectionAccounting / bidvector.procurement.NoticeNumber.Companion.of"
+      fixed_by: |-
+        AccountingTest + SharedKernelCorpusConformanceTest(koneps-collection-019).
+      carries: |-
+        회계 항등식(`received = normalized + duplicate + dropped`)과 결측 공고번호의
+        `CollectionMissingNoticeNumber` 계수, 정규화된 공고번호 목록이 실제
+        `CollectionAccounting`/`NoticeNumber` 위에서 성립한다(COL-06).
+      does_not_carry: |-
+        페이지 순회·다음 페이지 요청 자체는 procurement 밖이다(3B) — 이 case 는 이미
+        모인 행을 회계로 접는 것만 잰다.
     change_history:
       - date: 2026-09-07
         change: |-
@@ -6578,10 +6702,16 @@ cases:
     expected_sha256: b552f75849d3c2bb69172315557ede7f425b4905eb4e8e73974e322823e1e87d
     owning_open: |-
       (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.procurement.CollectionAccounting"
+      fixed_by: |-
+        AccountingTest + SharedKernelCorpusConformanceTest(koneps-collection-020).
+      carries: |-
+        항등식이 성립하는 값은 생성자 호출이 그대로 성공한다(뺄셈 역산·`setdefault`
+        채움 없이, COL-06 acceptance).
+      does_not_carry: |-
+        cap 초과분을 뺄셈으로 역산해 채우는 legacy 형태(`cap_skipped_count`)는
+        procurement 에 없다.
     change_history:
       - date: 2026-09-07
         change: |-
@@ -6656,10 +6786,16 @@ cases:
     expected_sha256: 4725c22ac0434dc4a19f5a3a1ef10c571024d840980cca8db621abdc01454171
     owning_open: |-
       (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.procurement.CollectionAccounting"
+      fixed_by: |-
+        AccountingTest + SharedKernelCorpusConformanceTest(koneps-collection-021).
+      carries: |-
+        항등식이 깨지는 값은 생성자 호출 자체가 `IllegalArgumentException`으로 실패한다
+        (init 불변식) — 위반이 조용히 통과하지 않는다(COL-06 acceptance 「항등식 위반
+        시 산출 실패」).
+      does_not_carry: |-
+        음수 잔여를 0으로 접는 legacy 형태는 없다 — 실패는 실패로 관측된다.
     change_history:
       - date: 2026-09-07
         change: |-
@@ -6737,10 +6873,18 @@ cases:
       「진행 없음」을 실패로 낼 것인가 표시로 낼 것인가 — 3B 의 결정. 이 case 는 유한 종료와 `truncated` 표시까지만 잰다.
     owning_open: |-
       (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "procurement 함수 호출 없음 — 여러 페이지에 걸친 순회 종료 판단을 갖는 procurement 타입이 없다"
+      fixed_by: |-
+        SharedKernelCorpusConformanceTest(koneps-collection-022) — `KonepsCollectionExecutors
+        .case022`는 입력이 나르는 페이지 응답을 직접 읽어 최댓값 도달·중복 여부를 계수한다.
+      carries: |-
+        없음 — 이 case 가 실제로 잠그는 procurement 타입/함수는 없다.
+      does_not_carry: |-
+        페이지 순회·최대 페이지 종료·진행 관측은 `Ports.kt`의 `SourceBatch<T>`(개별 배치와
+        회계만 나른다)에도, 다른 어떤 procurement 함수에도 없다 — 여러 페이지에 걸친 종료
+        판단은 어댑터(3B)가 `NoticeSourcePort`를 반복 호출하며 구현한다. 이 case 는
+        그 구현이 서기 전까지 값을 맞추기 위한 fixture 자기 일관성 확인에 가깝다.
     change_history:
       - date: 2026-09-07
         change: |-
@@ -6817,10 +6961,18 @@ cases:
     expected_sha256: ce8bde7fde913e894b6d41b95c673e6ad12d53d0ada20d2f174960afe4716507
     owning_open: |-
       (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "없음 — NoticeNumber.of 는 trim 만 하고 대소문자·구분자 정규화를 하지 않는다"
+      fixed_by: |-
+        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+      carries: |-
+        없음.
+      does_not_carry: |-
+        `" syn-ntc-2301 "`·`"SYN-NTC-2301"`·`"SYN NTC 2301"` 세 표기가 값으로
+        같아진다는 이 case 의 주장을, `NoticeNumber.of(raw.trim())`은 만족하지 못한다
+        (NoticeId.kt 의 명시 KDoc — 「정규화: 앞뒤 공백 제거 하나뿐」). 판정:
+        v2-defect(능력 공백, 정규화 규칙 범위가 이 slice 승인 범위보다 좁다).
+        checklist.md 「판정 필요 case」 참고.
     change_history:
       - date: 2026-09-07
         change: |-
@@ -6896,10 +7048,16 @@ cases:
     expected_sha256: b391ae3871a13f366f29986598da165eb0bc481c9cf298471ddb0f4fc098cb92
     owning_open: |-
       (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**. 호출 예산·throttle 정책은 OPS-08.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.procurement.decideDetailFetch(...) / bidvector.procurement.DetailFetchDecision"
+      fixed_by: |-
+        DetailFetchTest + SharedKernelCorpusConformanceTest(koneps-collection-024).
+      carries: |-
+        예비가격이 이미 저장된 공고는 age/recheck gate 값과 무관하게 `Skip(AlreadyHeld)`다
+        (COL-03 acceptance, 위협 모델 방어 (h)).
+      does_not_carry: |-
+        상세 조회의 실제 실행(HTTP 호출)은 procurement 밖이다(3B) — `decideDetailFetch`
+        는 판정만 낸다.
     change_history:
       - date: 2026-09-07
         change: |-
@@ -6978,10 +7136,17 @@ cases:
     expected_sha256: f6ff83f396729536c7cfaecf1dced2748723df01c7db98cc6345e1a15e313d9b
     owning_open: |-
       (acceptance 비준) 소유 `OPEN` 없음 — **운영자 승인 부재**.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "bidvector.procurement.decideDetailFetch(...) / bidvector.procurement.DetailFetchDecision"
+      fixed_by: |-
+        DetailFetchTest + SharedKernelCorpusConformanceTest(koneps-collection-025).
+      carries: |-
+        age-gate 미만은 `Skip(AgeGateNotPassed)`, gate 를 넘긴 뒤 첫 스윕은
+        `Fetch`(정확히 1회), 그 뒤 recheck-gate 미만은 `Skip(RecheckGateNotPassed)`다
+        (COL-03 acceptance 「gate 뒤 정확히 1회」).
+      does_not_carry: |-
+        백오프 상태를 데이터 테이블 컬럼에 얹는 것은 없다(COL-03 legacy 형태 처리) —
+        `lastCheckedAt`은 이 case 의 executor 가 sweep 마다 순수하게 재계산한다.
     change_history:
       - date: 2026-09-07
         change: |-
@@ -7060,10 +7225,21 @@ cases:
     expected_sha256: f443db4de521f7e8ebd5bf7715dc2c3c919e364b9f27320bd2a9235f4b4d562a
     owning_open: |-
       OPEN-3A-SOURCE-TZ (신설 예정, 문서 레인 등재) — 출처 타임존의 값과 regression-ledger 등재.
-    contract_binding: |-
-      **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
-      네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
-      **지금 이 필드가 잠그는 것은 없다.**
+    contract_binding:
+      type_path: "procurement 함수 호출 없음(v2-defect 로 dispatch 보류) — bidvector.procurement.parseSourceZonedInstant"
+      fixed_by: |-
+        없음 — dispatch 하지 않는다(KONEPS_COLLECTION_PENDING_CAPABILITY).
+      carries: |-
+        없음.
+      does_not_carry: |-
+        `parseSourceZonedInstant`가 `LocalDateTime.parse`(ISO `T` 구분자)만 받는데,
+        KONEPS 실제 wire 형식(koneps-collection-014 가 인용하는 공식 문서
+        "YYYY-MM-DD HH:MM:SS")은 **공백** 구분자다 — 직접 JVM 실측
+        (`LocalDateTime.parse("2026-05-20 10:00:00")` → `DateTimeParseException`)으로
+        확인했다. 즉 실제 응답에서 이 함수는 **항상 null**을 낸다. 기존
+        `CanonicalizeTest`가 ISO `T` 표기만 써서 가려져 있었다. 판정: v2-defect —
+        값을 맞추기 위해 이 배치에서 production 코드를 고치지 않는다.
+        checklist.md 「판정 필요 case」 참고.
     change_history:
       - date: 2026-09-07
         change: |-
