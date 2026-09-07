@@ -13,8 +13,13 @@ dependencies = [
 
 [project.optional-dependencies]
 # 생성·test 전용 — 실제 serving(5A)은 grpcio-tools 를 런타임에 필요로 하지 않는다.
+# M2/2D — grpcio-testing 은 승인됨(pip 네트워크 허용, 그 밖 네트워크 없음). 실측(2026-09-07,
+# test_contract_resilience.py 상단 docstring): `grpc_testing` 모듈은 `grpc.aio`를 지원하지
+# 않는다(`OPEN-2D-AIO-INPROCESS` 닫힘) — 그래도 정책 데이터 대조 test(도구 버전)가 이
+# 패키지의 실제 설치를 전제하므로 dev 의존에 남긴다.
 dev = [
     "grpcio-tools==1.83.1",
+    "grpcio-testing==1.83.1",
     "pytest==9.1.1",
 ]
 
