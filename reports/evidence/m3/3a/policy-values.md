@@ -1,15 +1,53 @@
-# 3A 정책 데이터 값 표 — **승인 대기**
+# 3A 정책 데이터 값 표 — **운영자 승인 2026-09-07**
 
-> **승인일**: 미승인. 운영자 승인을 받으면 이 줄에 승인일과 결정 기록의 좌표를 적는다.
-> 승인 요청 표는 `_workspace/m3-3a/02_curator_approval_request.md` 다.
+> **승인일: 2026-09-07.** 승인 요청 표는 `_workspace/m3-3a/02_curator_approval_request.md` 이고,
+> 결정 원문은 아래 「운영자 승인 2026-09-07」 절이다. **`fixtures/manifest.yaml` 의 승격된 case 들이
+> `source.kind: operator-decision` 의 reference 로 그 절을 가리킨다** — 이 문서가 그 결정의 정본이다.
 >
 > **지위**: M3/3A curator 레인(별도 세션)의 산출물이다 — `3a/scope.md` in_scope 의
 > `reports/evidence/m3/3a/policy-values.md`, 착수 결정 **D-3A-2 (a)**. 3A 구현 레인은 이 표를 **읽기만**
 > 하고, 승인 뒤 Kotlin `EffectiveDatedPolicy` 인스턴스로 옮긴다(1C `LICENSE_QUALIFICATION_POLICY` ·
 > 1D `ProvenancePolicyData` 관례). **이 문서는 Kotlin 을 쓰지 않는다.**
 >
-> **이 표의 값을 승인 없이 쓰지 않는다.** `legacy-behavior` 행은 정답 지위가 없고
-> (`data-extract.md` §1), 「미확정」 칸은 비워 둔 것이 아니라 **근거가 없다는 판정**이다.
+> **승인된 것과 아닌 것이 표 안에서 갈린다.** `authoritative` 행과 §6 의 P-1~P-6 은 승인됐다.
+> **「미확정」 칸은 그대로 미확정**이며 비워 둔 것이 아니라 **근거가 없다는 판정**이다 —
+> `legacy-behavior` 행도 정답 지위를 얻지 않았다(`data-extract.md` §1). 승인이 바꾼 것은
+> **어느 값을 초기값으로 쓸 것인가**이지 근거의 층이 아니다.
+
+---
+
+## 운영자 승인 2026-09-07 — 결정 원문
+
+> 아래는 운영자 결정의 **축어**다. 이 레인이 대신 판단하지 않는다.
+
+**「curator 승인」(추천안 그대로, P-4·P-6 은 오케스트레이터 수정안).**
+
+- **Q-1: 예** — 갈래 A 아홉 건(`-010`~`-018`) `authoritative` 유지(공식 문서 인용).
+  `-011`(추정가격 부가세 제외)도 포함.
+- **Q-2: B-1~B-10 전부 승인** — 해당 case(`-019`~`-026`, 기존 `-001`~`-009`)
+  `insufficient-evidence` → `authoritative`, `source.kind` `m0-derived-rule` → `operator-decision`,
+  `verified_paths` 도출. 어휘 미승인 경로(`MissingNoticeNumber`·`AlreadyHeld`·`AgeGateNotPassed` 등
+  사유 이름)는 목록에 넣지 않는다(2026-09-01 규칙) — 3A 가 계약 어휘를 세운 뒤 별도.
+- **Q-3**: P-1 **채택** · P-2 `sourceZone` 초기값 **`Asia/Seoul`**, `OPEN-3A-SOURCE-TZ` 열어 둠 ·
+  P-3 legacy `BASE_RESOLUTION_ORDER` **불채택**(문서로 서는 키는 `bssamt` 하나,
+  `ESTIMATED_RESOLUTION_ORDER` 의 「기초금액 키 없음」 성질은 유지) · P-4 ① **적용된다고 본다**
+  ② **범주 후보 열 채택**(재시도 가능 01·02·04·05 / 입력 오류 06·07·08·10·11 /
+  재시도 불가·인증 12·20·30·31·32 / quota 22 / 데이터 없음 03) ③ **`03` 은 성공도 실패도 아닌
+  세 번째 상태**, legacy `OK_RESULT_CODES={"00","03"}` 불채택, 부재·미지 코드 `Unclassified`
+  비재시도 · P-5 24h/48h **「측정 전 잠정」 채택** · P-6 **개찰·예비가격 축
+  (`OpeningResultSourcePort` 구현)만 ScsbidInfoService 참고자료 확보를 선행 조건으로, 공고 축 3B 는
+  진행** — 3B scope 의 착수 전 결정 후보로 등재.
+
+**승인 범위는 `koneps-collection` 도메인이다.** 다른 도메인의 case 는 이 결정의 대상이 아니고
+`review.approved_by_user: false` 로 남는다.
+
+**승인이 잠그지 못한 자리.** Q-2 의 단서대로 사유·상태 토큰(`ValueOutsideDeclaredRange` ·
+`ExplicitNull` · `KeyMissing` · `CodeNotInMapping` · `OccupancyGuard` ·
+`NonAuthoritativeFillOnly` · `FallbackFromBudget` · `MissingNoticeNumber` · `Success` ·
+`AccountingIdentityViolated` · `Skip`/`Fetch`/`AlreadyHeld`/`AgeGateNotPassed`/`RecheckGateNotPassed`)은
+`verified_paths` 에 들지 않았다. 각 case 는 그 주장을 **불리언·셈·합성 식별자로 우회해** 잠근다 —
+예: 「조회하지 않는다」를 `$.detailFetchCallCount: 0` 으로, 「정확히 1회」를
+`$.totalDetailFetchCallCount: 1` 로. **어휘 승인은 3A 의 계약 타입 확정 뒤**다.
 
 ---
 
@@ -309,7 +347,9 @@ COL-03 의 4겹 게이트 가운데 **도메인 판단에 해당하는 두 값**
 | (참고) 상세 백필 호출 간 throttle | 1.0 초 | 상세 엔드포인트가 목록보다 강하게 제한된다는 관찰의 대응 | `config.KONEPS_SCSBID_RESERVE_DETAIL_REQUEST_DELAY_SECONDS` | 같음 |
 
 **두 값 다 근거 문서가 없다.** legacy 주석이 **왜 게이트가 필요한가**는 적지만 **왜 24 와 48 인가**는
-적지 않는다. 그래서 **초기값 후보이고 승인 대상**이다.
+적지 않는다. **운영자 승인 2026-09-07(P-5) — 「측정 전 잠정」으로 채택한다.** 층은 여전히
+`legacy-behavior` 이고, 승인이 준 것은 **초기값으로 쓸 권한**이지 근거가 아니다. 관측이 쌓이면
+정책 데이터의 값만 바꾼다.
 
 **fixture 는 이 값을 쓰지 않는다.** `koneps-collection-024`·`025` 는 `SYN-POLICY-detail-fetch-2026-09-07`
 (8h · 20h)를 입력으로 받고, 기대값은 값이 아니라 **스윕 시각과 게이트의 대소 관계**에만 의존한다
@@ -343,16 +383,23 @@ legacy `html_parsing` 이 **개찰결과 그리드의 업무코드**를 라벨�
 
 ---
 
-## 6. 승인 요청 요약
+## 6. 승인 결과 — 2026-09-07
 
-| # | 승인 대상 | 지금 층 | 승인하면 |
+**P-1 ~ P-6 전부 승인됐다**(P-4·P-6 은 오케스트레이터 수정안). 원문은 위 「운영자 승인 2026-09-07」 절.
+
+| # | 승인 대상 | 층 | **결정** |
 | --- | --- | --- | --- |
-| P-1 | §1.1~§1.6 의 `authoritative` 칸을 **3A 필드 계약 정책 데이터의 초기값**으로 채택 | `authoritative`(문서 출처) | 3A 가 `KonepsFieldContract` 인스턴스로 옮긴다. 값 자체는 문서 인용이라 새 주장이 아니다 |
-| P-2 | §1.4 의 `sourceZone` 초기값을 **`Asia/Seoul`** 로 두되 `OPEN-3A-SOURCE-TZ` 를 열어 둠 | 미확정 | 원문 보존 + 규칙 id 기록으로 재해석 경로가 남는다. **틀려도 되돌릴 수 있는 형태** |
-| P-3 | §2 의 두 해석 순서를 **legacy 실물로 등재하되 `BASE_RESOLUTION_ORDER` 는 그대로 채택하지 않음** | `legacy-behavior` | 3A 가 `bssamt` 를 유일한 기초금액 키로 두고 나머지 폴백의 provenance 를 나눈다 |
+| P-1 | §1.1~§1.6 의 `authoritative` 칸을 **3A 필드 계약 정책 데이터의 초기값**으로 | `authoritative`(문서 출처) | **채택.** 3A 가 `KonepsFieldContract` 인스턴스로 옮긴다. 값 자체가 문서 인용이라 새 주장이 아니다 |
+| P-2 | §1.4 의 `sourceZone` 초기값 | 값은 **미확정** — 승인은 초기값 채택이지 근거가 아니다 | **`Asia/Seoul` 채택, `OPEN-3A-SOURCE-TZ` 는 열어 둔다.** 원문 보존 + 규칙 id 기록이라 재해석 경로가 남는다. `koneps-collection-026` 이 그 배관을 잠근다 |
+| P-3 | §2 의 두 해석 순서 | `legacy-behavior` | **legacy `BASE_RESOLUTION_ORDER` 불채택.** 문서로 서는 기초금액 키는 `bssamt` 하나이고 `bssAmtPurcnstcst` 는 부분 개념이다. 3A 가 `bssamt` 를 유일한 기초금액 키로 두고 나머지 폴백의 provenance 를 나눈다. **`ESTIMATED_RESOLUTION_ORDER` 의 「기초금액 키 없음」 성질은 유지** |
 | P-4 | §3.2 의 **범주 후보 열**을 초기값으로 채택하고 표가 **입찰공고정보서비스에도 적용된다**고 보는가 (표 본문은 2026-09-07 확보) | 코드·문면 `authoritative` · 범주·적용 범위 **미확정** | **채택.** 방증 둘(두 문서의 `resultCode` 선언 일치 · legacy 가 대상 서비스에서 관측한 `08` 문면 일치)이 있고, 틀려도 정책 데이터라 값만 바꾼다. **`03` 은 성공도 실패도 아닌 「데이터 없음」 세 번째 상태**로 두고 legacy 의 성공 처리는 채택하지 않는다. 부재·미지 코드는 `Unclassified`(fail-safe 비재시도) |
-| P-5 | §4 의 게이트 초기값 **24h · 48h** 채택 여부 | `legacy-behavior` | 채택하면 `legacy-behavior` 값을 운영 정책으로 올리는 것이라 근거 기록이 필요하다. 대안은 보수적 synthetic 초기값 + 관측 갱신 |
-| P-6 | §1.7 의 **ScsbidInfoService 참고자료 확보**를 3B 선행 조건으로 둘지 | 미확보 | 없이 진행하면 개찰 축이 legacy 형태 이식이 된다 |
+| P-5 | §4 의 게이트 초기값 **24h · 48h** | `legacy-behavior` — 승인이 층을 올리지 않는다 | **「측정 전 잠정」으로 채택.** 근거 문서가 없다는 사실은 그대로 남고, 관측이 쌓이면 정책 데이터의 값만 바꾼다. fixture 는 이 값을 쓰지 않으므로(합성 정책 입력) corpus 가 흔들리지 않는다 |
+| P-6 | §1.7 의 **ScsbidInfoService 참고자료 확보**를 3B 선행 조건으로 둘지 | 미확보 | **축을 갈라 둔다**(오케스트레이터 수정안). **개찰·예비가격 축(`OpeningResultSourcePort` 구현)만** 참고자료 확보를 선행 조건으로 하고 **공고 축 3B 는 진행**한다. 3B `scope.md` 의 착수 전 결정 후보로 등재 |
 
-**승인 전까지 3A 구현 레인은 이 표의 값을 인스턴스화하지 않는다** — 형태와 test 정책 인스턴스까지가
-3A 의 몫이고, 운영 값 인스턴스는 승인 뒤 한 커밋이다(`3a/scope.md` 계약 정정 ①).
+**3A 구현 레인은 이제 이 표의 값을 인스턴스화할 수 있다.** `3a/scope.md` 계약 정정 ① 이 정한 대로
+운영 값 `EffectiveDatedPolicy` 인스턴스는 **한 커밋**으로 들어간다(3A 잔여 일괄 또는 3B 착수 전).
+**「미확정」 칸은 인스턴스화하지 않는다** — 그 자리는 소유 `OPEN` 이 닫힌 뒤다.
+
+**P-6 이 3B 를 둘로 가른다.** 공고 축(`NoticeSourcePort`)은 진행하고, **개찰·예비가격 축
+(`OpeningResultSourcePort` 구현)만 ScsbidInfoService 참고자료 확보를 선행 조건**으로 둔다 —
+3B `scope.md` 의 착수 전 결정 후보로 등재한다(이 레인의 경로가 아니라 문서 레인·3B 소관).

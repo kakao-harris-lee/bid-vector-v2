@@ -1,6 +1,13 @@
 # M3/3A — `koneps-collection` corpus evidence (curator 레인)
 
 base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f` · 2026-09-07 · 별도 세션(curator).
+
+> **운영자 승인 2026-09-07 「curator 승인」 — 반영 완료.** Q-1(갈래 A 열 건 `authoritative` 유지) ·
+> Q-2(B-1~B-10 전부 승인 → 열일곱 승격) · Q-3(P-1~P-6, P-4·P-6 은 오케스트레이터 수정안).
+> **결정 원문의 정본은 `policy-values.md` 의 「운영자 승인 2026-09-07」 절**이고, 승격된 case 들의
+> `source.kind: operator-decision` reference 가 그 절을 가리킨다. `koneps-collection` **27 case 전부가
+> `authoritative` · `approved_by_user: true`** 이며, 승인 범위가 이 도메인 한정임을 각 case 의
+> `review.approval_scope` 가 적는다.
 경로: `fixtures/**` · `reports/evidence/m3/3a/policy-values.md` · 이 파일. 다른 레인 경로 무편집.
 
 **정본은 `fixtures/manifest.yaml`** — case 별 `verifies` · `source` · `expected_reasoning` ·
@@ -20,6 +27,8 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f` · 2026-09-07 · 별도 세션(c
 | F-6 | 같은 명령을 이 slice **이전** manifest 사본에 | 0 | 같은 5/6 — 이 slice 가 새 불일치를 만들지 않았다 |
 | F-7 | manifest 선언 해시 대 파일 실측 전수 대조(인라인 python) | 0 | 184건 대조, 불일치 0 |
 | F-10 | 활용가이드 docx 원문에서 에러코드 표 **독립 재추출** 후 인수본과 대조 | 0 | 16행 일치 · SHA-256 `afba38e6…` 일치 |
+| F-11 | 승인 반영 뒤 적대 스윕 재실행 | 0 | 강등 대상 0 · 잔존 authoritative **68** |
+| F-12 | 승격 17 case 의 변이체 생성 확인(스윕 출력에서 case 별 계수) | 0 | 전 case 변이체 ≥ 3 · 통과 0 — **공허한 「강등 0」이 아니다** |
 
 > **F-1 이 분류를 정한다.** `authoritative` = 확장 적대 집합에서 위반 변이체 통과 0 이고, 종료 코드가
 > 곧 판정이다(`data-extract.md` §6). 신설 authoritative 9 건은 `mutation_sweep_adversarial.ASSERTED`
@@ -44,12 +53,13 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f` · 2026-09-07 · 별도 세션(c
 | --- | --- |
 | 기존 case 재추출·정합 | 9 |
 | 신설 case | 18 (`koneps-collection-010` ~ `-027`) |
-| 그중 `authoritative` | **10** (`-010` ~ `-018` · `-027`) |
-| 그중 `insufficient-evidence` | 8 (`-019` ~ `-026`) |
-| 도메인 `authoritative` 수 | 0 → **10** |
-| corpus 전체 `authoritative` 수 | 41 → **51** |
+| 그중 `authoritative` | **18** — 승인 전 10(`-010`~`-018` · `-027`) + 승인으로 승격 8(`-019`~`-026`) |
+| 기존 9 case | 전부 승격(`-001`~`-009`) |
+| 도메인 `authoritative` 수 | 0 → **27**(전건) |
+| corpus 전체 `authoritative` 수 | 41 → **68** |
+| 승격이 잠그지 못한 사유·상태 토큰 | 14종 — `verified_paths` 밖, 3A 어휘 확정 뒤 별도 |
 
-**3A `scope.md` ⑩ 의 조건이 충족됐다** — runner dispatch 의 전건이 「authoritative ≥ 1」이다.
+**3A `scope.md` ⑩ 의 조건이 충족됐다** — runner dispatch 의 전건이 「authoritative ≥ 1」이고 27 이다.
 
 ---
 
@@ -84,28 +94,42 @@ base `a9f1ff9c54b62fb7cfa859fff43dae7b943daf8f` · 2026-09-07 · 별도 세션(c
 `-005`), `-016` 은 「미지 코드에 임의 라벨 금지」를 주장하지 않으며(`-006`·`-007`), `-013` 은
 **17 범주 분류표를 주장하지 않는다**(원문 미확보 — §5).
 
-### 3.2 `insufficient-evidence` 8 건 — 승인 대기
+### 3.2 승인으로 승격된 열일곱 — `-001`~`-009` · `-019`~`-026`
 
-`-019` ~ `-026` 의 근거는 `capability-map.md` COL-01·03·05·06 acceptance 와 3A `scope.md` D-3A-4 로,
-**M0 산출 문서와 slice 계약의 자체 도출**이다. `classification_policy.insufficient_evidence` 의
-되돌림 경로대로 **운영자가 그 acceptance 를 업무 규칙으로 명시 승인하면 `authoritative` 로 올라간다.**
+이 열일곱의 근거는 `capability-map.md` COL-01·03·05·06·07·08 acceptance 와
+`data-dictionary.md` §1.3·§5.1·§5.2·§5.3, 그리고 3A `scope.md` D-3A-4 다 — 전부 **M0 산출 문서와
+slice 계약의 자체 도출**이었다. **운영자가 2026-09-07 에 그것을 업무 규칙으로 비준했고**
+(`classification_policy.insufficient_evidence` 가 적어 둔 되돌림 경로), 열일곱이 `authoritative` 로
+올라가며 `source.kind` 가 `m0-derived-rule` → `operator-decision` 이 됐다.
+**그 경로가 실제로 쓰인 것은 이번이 처음이다** — 서술로만 있던 되돌림이 실행됐다.
 
-이 여덟은 사유 어휘(`MissingNoticeNumber` · `AccountingIdentityViolated` · `AlreadyHeld` ·
-`AgeGateNotPassed` · `RecheckGateNotPassed`)를 기대값에 나르지만 **`verified_paths` 를 두지 않는다** —
-아직 승인 어휘가 아니라 정확 비교로 잠그면 미승인 이름을 golden 으로 굳힌다(2026-09-01 결정).
+**승격이 잠그지 못한 자리를 각 case 의 `change_history` 가 든다.** 운영자가 Q-2 답에 단 단서대로
+사유·상태 토큰은 `verified_paths` 에 넣지 않았다 — `ValueOutsideDeclaredRange` · `ExplicitNull` ·
+`KeyMissing` · `CodeNotInMapping` · `OccupancyGuard` · `NonAuthoritativeFillOnly` ·
+`FallbackFromBudget` · `MissingNoticeNumber` · `Success` · `AccountingIdentityViolated` ·
+`Skip`/`Fetch`/`AlreadyHeld`/`AgeGateNotPassed`/`RecheckGateNotPassed` 열넷이다. 2026-09-01 결정이
+미승인 리터럴의 정확 비교를 막는다.
 
-### 3.3 기존 9 건 — 승격하지 않았다
+**대신 각 case 는 자기 주장을 불리언·셈·합성 식별자로 우회해 잠근다.** COL-03 의 「상세 호출 0회」는
+`$.detailFetchCallCount`, 「정확히 1회」는 `$.totalDetailFetchCallCount`, COL-06 의 항등식은
+`$.identityHolds`·`$.constructed`, 「거부됐다」는 `$.rejectedItems[0].rawName`, 「타입이 다르다」는
+`$.typeDistinctFromDirect` 다. **acceptance 의 측정치가 대부분 수·불리언이라 이 우회가 약하지 않다** —
+잠그지 못한 것은 결과의 **이름**이지 결과가 아니다.
 
-전부 `insufficient-evidence` 로 남는다. 이 slice 가 한 것은 둘이다.
+**`Absent` 와 `Asia/Seoul` 은 잠갔다.** 앞은 1B 계약 어휘(decision 19), 뒤는 **P-2 로 승인된 값**이다.
+
+### 3.3 기존 9 건 — 이 slice 가 한 것과 승인이 한 것
+
+**이 slice 가 한 것은 둘이다**(승격이 아니다).
 
 1. **basis 토큰 정합**(D-3A-7) — 입력·기대값의 `ESTIMATED_PRICE` 를 코드 토큰 `ESTIMATED` 로.
    **의미 불변**이고 `money-basis-001`·`-004` 가 앞서 받은 같은 처리다. 각 case 의 `change_history` 에
    사유와 이전 해시를 남겼다.
 2. **`contract_binding: pending-3a`** — 계약 타입이 3A 산출물이라 아직 없다.
 
-**승격 후보의 지위가 달라진 것이 있다.** `-005`(제로패딩)와 `-002`(선언 범위 위반)는 이제 문서
-근거를 **부분적으로** 얻었다 — 원문 형태·단위 선언은 `-012`·`-010` 이 authoritative 로 지고, 남은
-절반(「산술 미정의」·「거부와 회계 등재」)만 승인 대기다. 승인 요청 표가 그 절반을 든다.
+**승격은 운영자 승인이 했다**(Q-2 의 B-5~B-9). `-005`(제로패딩)와 `-002`(선언 범위 위반)는 문서
+근거를 **부분적으로** 이미 얻고 있었고 — 원문 형태·단위 선언은 `-012`·`-010` 이 authoritative 로
+진다 — 남은 절반(「산술 미정의」·「거부와 회계 등재」)을 이번 승인이 비준했다.
 
 ---
 

@@ -31,10 +31,15 @@
 #      다 — `data-extract.md` §1의 세 층 어디에도 들지 않는 자리이고 §6이 그 어휘와 **완료 gate 실패**를
 #      준다. case 는 지우지 않았고 되돌림 경로가 있다.
 #      근거·경로·셈은 `classification_policy.insufficient_evidence`와 **F-7** 이 갖는다.
-#   5. **case 단위로는 아직 아무것도 승인되지 않았다.** 모든 case의 `review.approved_by_user`가
-#      `false`이고 `review.codex_verdict`가 `pending`이다. `review.claude_commit`은 이 파일을 담은
+#      **그 되돌림 경로가 2026-09-07 에 처음 실제로 쓰였다** — `koneps-collection` 의 `m0-derived-rule`
+#      case 아홉이 운영자 승인으로 `authoritative` 로 올라갔고 `source.kind` 가 `operator-decision` 이
+#      됐다. **경로가 서술로만 있던 것이 아니라는 실증**이고, 각 case 의 `change_history` 가 그 좌표를 든다.
+#   5. **case 단위 승인이 한 도메인에 있다 — 2026-09-07.** 운영자가 M3/3A curator 레인의 승인 요청에
+#      「curator 승인」으로 답했고, **`koneps-collection` 27 case 가 `review.approved_by_user: true`**
+#      다(승인일·좌표는 각 case 의 `review`, 범위 한정은 `approval_scope`). **다른 도메인은 그대로**
+#      `false` 이며 아래 서술은 그쪽에 그대로 적용된다. `review.codex_verdict`는 전 case `pending` 이다. `review.claude_commit`은 이 파일을 담은
 #      커밋이 자기 SHA를 담을 수 없으므로 `pending`이며 리뷰 라운드에서 채운다.
-#      **운영자는 2026-08-30 「M0 승인」을 냈으나**(`milestone-0.md`의 「사용자 명시 승인」)
+#      **그 전까지는 아무것도 승인되지 않았다.** 운영자는 2026-08-30 「M0 승인」을 냈으나(`milestone-0.md`의 「사용자 명시 승인」)
 #      그 기록이 덮는 것은 활성 `OPEN`의 이월 · **그날의** fixture 미덮개 축 · 부분 만족인 채로 M1
 #      진입이고, **개별 case 의 기대값 비준은 그 안에 없다.** 같은 기록이 0E의 Codex `approve`도 승인
 #      밖으로 둔다. **2026-08-31 결정과 그날의 전수 재판정이 더한 미덮개 축은 그 기록보다 뒤라 그 안에
@@ -402,7 +407,16 @@ classification_policy:
 
     **되돌림 경로 — 무엇이 승인되면 어디로 올라가는가.** 운영자가 각 case 의 `source.reference` 가 든
     **M0 산출 문서의 acceptance 를 업무 규칙으로 명시 승인**하면 그 case 는 `authoritative` 로
-    올라간다. `license-011`은 그 승인만으로는 부족하다 — **활성 `OPEN-QUAL-11`이 닫혀 `provisional`
+    올라간다.
+
+    **2026-09-07 — 이 경로가 처음 실행됐다.** 운영자가 M3/3A curator 레인의 승인 요청에
+    「curator 승인」으로 답하며 `capability-map.md` COL-01·03·05·06·07·08 acceptance 와
+    `data-dictionary.md` §1.3·§5.1·§5.2·§5.3 을 **업무 규칙으로 비준**했고, `koneps-collection` 의
+    열일곱(`-001`~`-009` · `-019`~`-026`)이 `authoritative` 로 올라갔다. **`source.kind` 는
+    `m0-derived-rule` → `operator-decision`** 이 된다 — 근거가 이제 M0 문서의 자체 도출이 아니라
+    그것을 비준한 **커밋된 운영자 결정 기록**이기 때문이다(`classification_policy.authoritative` ②).
+    **승격이 잠그지 못한 자리가 남는다** — 어휘가 아직 계약이 아닌 사유·상태 토큰은
+    `verified_paths` 에 들지 않았고 각 case 의 `change_history` 가 그 목록을 든다. `license-011`은 그 승인만으로는 부족하다 — **활성 `OPEN-QUAL-11`이 닫혀 `provisional`
     기대값이 교체된 뒤**에야 올라간다. 올릴 때는 `classification` 을 되돌리고 `change_history` 에
     승인 기록의 좌표를 적는다. **case 를 지우지 않는 이유가 이 경로다.**
 
@@ -4707,12 +4721,16 @@ cases:
       approved_by_user: false
   - id: koneps-collection-001
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         선언에 없는 raw 키가 응답에 나오면 미지 필드로 계수되고 그 값이 도메인 값으로 소비되지 않는다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           capability-map.md COL-07 acceptance — **M0 산출 문서의 자체 도출**. 「계약 테스트로 승격한다」는 판단은
           `data-dictionary.md` §5.3 이 0C 에 넘긴 것을 **0C slice 가** 내린 것이며 운영자 결정이 아니다.
     expected_reasoning: |-
@@ -4728,6 +4746,12 @@ cases:
         필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
     input_file: fixtures/input/koneps-collection-001.json
     expected_file: fixtures/expected/koneps-collection-001.json
+    verified_paths:
+      - "$.unknownFields"
+      - "$.unknownFieldCount"
+      - "$.consumedAsDomainValue.synNewKey"
+      - "$.silentlySwallowed"
+      - "$.requiresHumanReviewBeforeConsumption"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -4776,19 +4800,46 @@ cases:
           해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
           의존하지 않는다.
         previous_sha256: ab0885dacd851bd2c112aee9a34985229c850c2d4cf0009cb5fe07518abab819
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: 없음 — 이 case 의 기대값에 미승인 토큰이 없다(계수·불리언·raw 키 이름뿐).
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-002
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         선언된 `scale`/`expectedRange`와 어긋나는 값(fraction 자리에 백분율)이 오면 그 항목이 거부되고 사유가 회계에 남는다. **선언된 범위와의
         대조**이지 값 크기로 단위를 추측하는 경로가 아니다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           capability-map.md COL-07 acceptance — **M0 산출 문서의 자체 도출**. 「계약 테스트로 승격한다」는 판단은
           `data-dictionary.md` §5.3 이 0C 에 넘긴 것을 **0C slice 가** 내린 것이며 운영자 결정이 아니다.
     expected_reasoning: |-
@@ -4805,6 +4856,11 @@ cases:
         필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
     input_file: fixtures/input/koneps-collection-002.json
     expected_file: fixtures/expected/koneps-collection-002.json
+    verified_paths:
+      - "$.rejectedItems[0].rawName"
+      - "$.unitInferred"
+      - "$.accountedInRunReport"
+      - "$.consumedAsDomainValue.synFloorRt"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -4853,18 +4909,45 @@ cases:
           해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
           의존하지 않는다.
         previous_sha256: 27cb306a50eca9cb8227aeee4213604037444bea75217960300ee4395e91c544
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.rejectedItems[0].reasonCode`(`ValueOutsideDeclaredRange`) — 거부 사유의 이름이 아직 계약 어휘가 아니다. **거부됐다는 사실은 `$.rejectedItems[0].rawName` 이 잠근다.**
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-003
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         optional 필드의 **명시적 null**은 `Absent`이며 `0`이 아니다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           OPEN-ML-04 (문면은 **「미정산」을 `0`으로 적재하지 않는다** — 정산 축 한정이며 이 case 의 금액 축을
           덮지 않는다) · **실제 근거는 data-dictionary.md §1.3 의 광의 「부재 금지 규칙」이고 그것은 그 문서의
           자체 도출이다**(*"0C가 도출하는 것은 그 금지가 적용되는 컬럼 집합"* · *"정산 축만으로 좁히지 않는다"*)
@@ -4881,6 +4964,10 @@ cases:
         필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
     input_file: fixtures/input/koneps-collection-003.json
     expected_file: fixtures/expected/koneps-collection-003.json
+    verified_paths:
+      - "$.estimatedPrice.state"
+      - "$.foldedToZero"
+      - "$.presentInPayload"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -4940,19 +5027,46 @@ cases:
           해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
           의존하지 않는다.
         previous_sha256: 1eee2e90c676377ea3bdcb8261693824c69b09372e7ac5b140049d6e2f7ca7a1
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.estimatedPrice.reason`(`ExplicitNull`) — 부재 사유의 이름. 상태 토큰 `Absent` 는 1B 계약 어휘라 잠근다.
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-004
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         optional 필드의 **키 부재**도 `Absent`이며 `0`이 아니다. 003과 함께 `Absent` ≠ `0`을 고정하고, 두 부재가 payload 등장 여부로
         구별된다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           OPEN-ML-04 (문면은 **「미정산」** 한정이다 — 003 과 같다) · **실제 근거는 data-dictionary.md §1.3 의
           광의 「부재 금지 규칙」(자체 도출) 과 §5.3 의 `KonepsFieldContract.presentIn` 이다**
     expected_reasoning: |-
@@ -4967,6 +5081,10 @@ cases:
         필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
     input_file: fixtures/input/koneps-collection-004.json
     expected_file: fixtures/expected/koneps-collection-004.json
+    verified_paths:
+      - "$.estimatedPrice.state"
+      - "$.foldedToZero"
+      - "$.presentInPayload"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -5023,18 +5141,45 @@ cases:
           해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
           의존하지 않는다.
         previous_sha256: 266c62e4b998b864b62a629c587abb25a23520e425235c37a95cece865052a00
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.estimatedPrice.reason`(`KeyMissing`) — 003 과 같다. **003 과의 구별은 `$.presentInPayload` 가 잠근다.**
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-005
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         제로패딩 식별자(`bidNtceOrd` = `"000"`)가 정수 변환 없이 그대로 전달된다. 식별자 타입에 산술 연산이 정의되지 않는다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           capability-map.md COL-07 acceptance — **M0 산출 문서의 자체 도출**. 「계약 테스트로 승격한다」는 판단은
           `data-dictionary.md` §5.3 이 0C 에 넘긴 것을 **0C slice 가** 내린 것이며 운영자 결정이 아니다.
     expected_reasoning: |-
@@ -5050,6 +5195,11 @@ cases:
         기대값의 근거가 아니다.
     input_file: fixtures/input/koneps-collection-005.json
     expected_file: fixtures/expected/koneps-collection-005.json
+    verified_paths:
+      - "$.noticeOrder.value"
+      - "$.noticeOrder.type"
+      - "$.intConversionPerformed"
+      - "$.arithmeticDefined"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -5098,18 +5248,45 @@ cases:
           해당 없음 — 토큰 표기 정합이고 이 case 의 기대값은 effective-dated 정책 데이터에
           의존하지 않는다.
         previous_sha256: a3ef8104ce07ab670b0b04c40b2896b86cc06ea3b4e030fa2e27ae3fc5e5b42f
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: 없음.
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-006
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         코드와 라벨이 한 문자열로 오는 외부 형태가 파싱 경계 밖으로 흐르지 않는다 — 두 값으로 저장된다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           capability-map.md COL-08 acceptance — **M0 산출 문서의 자체 도출**. COL-08 자신이 「코드 체계 출처는
           `OPEN-COL-03`」(활성)이라 적는다.
     expected_reasoning: |-
@@ -5123,6 +5300,10 @@ cases:
         셀 형태와 휴리스틱 분리 규칙의 출처. 기대값의 근거가 아니다.
     input_file: fixtures/input/koneps-collection-006.json
     expected_file: fixtures/expected/koneps-collection-006.json
+    verified_paths:
+      - "$.code"
+      - "$.label"
+      - "$.combinedStringLeakedPastParser"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -5167,24 +5348,56 @@ cases:
           비워 두지 않는다(schema 의 `contract_binding` 정의).
         policy_version: |-
           해당 없음 — 문서 포인터 필드의 추가이고 기대값이 정책 데이터에 의존하지 않는다.
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: 없음 — `$.code`·`$.label` 은 입력 매핑에서 온 합성값이다.
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-007
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         매핑에 없는 코드가 오면 미지 코드로 표시되고 임의 라벨이 붙지 않는다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           capability-map.md COL-08 acceptance — **M0 산출 문서의 자체 도출**. COL-08 자신이 「코드 체계 출처는
           `OPEN-COL-03`」(활성)이라 적는다.
     expected_reasoning: |-
       capability-map.md COL-08 acceptance *"매핑에 없는 코드가 오면 미지 코드로 표시되고 임의 라벨이 붙지 않는다"*.
     input_file: fixtures/input/koneps-collection-007.json
     expected_file: fixtures/expected/koneps-collection-007.json
+    verified_paths:
+      - "$.code"
+      - "$.codeKnown"
+      - "$.label.state"
+      - "$.labelInvented"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -5227,19 +5440,46 @@ cases:
           비워 두지 않는다(schema 의 `contract_binding` 정의).
         policy_version: |-
           해당 없음 — 문서 포인터 필드의 추가이고 기대값이 정책 데이터에 의존하지 않는다.
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.label.reason`(`CodeNotInMapping`).
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-008
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         점유 가드 — 권위 없는 유입이 이미 있는 값을 덮지 않고 빈 자리만 채운다. **유입값은 대상 자리의 basis 로
         다시 표기되지 않는다** — 예산 키 유입은 자기 basis(`ALLOCATED_BUDGET`)와 과세(`UNKNOWN`)를 그대로 지고 기록된다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           data-dictionary.md §5.1 계승 규율 1 · §1.2(배정예산 = `AllocatedBudget`, basis 배정예산, 과세 `Unknown`) ·
           §1.2.1(정의상 기본값 자동 태깅 금지) · v2-지침서.md §4.1(provenance 필수 · 원시 숫자 상호 대입 금지)
     expected_reasoning: |-
@@ -5263,6 +5503,15 @@ cases:
         필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
     input_file: fixtures/input/koneps-collection-008.json
     expected_file: fixtures/expected/koneps-collection-008.json
+    verified_paths:
+      - "$.storedValueOverwritten"
+      - "$.resultAmount"
+      - "$.resultBasis"
+      - "$.resultVatTreatment"
+      - "$.resultProvenance"
+      - "$.incomingReBasedToTargetSlotBasis"
+      - "$.incomingRecordedBasis"
+      - "$.incomingRecordedVatTreatment"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -5341,19 +5590,46 @@ cases:
           의존하지 않는다.
         previous_sha256: 89d61f17ad40846153e088465433a067c4a85324a2566bce22219a993a690117
         previous_expected_sha256: 99fac1176eca4f1f4c285b5838f2cffc8c48e3f416fa9e5669b1464f189281fd
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.incomingRecordedAs`(`NonAuthoritativeFillOnly`) · `$.reasonCode`(`OccupancyGuard`) — 둘 다 미승인 사유 토큰. **점유 가드의 결과는 `$.storedValueOverwritten`·`$.result*` 넷이 잠근다.**
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-009
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         derived fact가 canonical fact의 자리를 차지하지 않는다 — 기초금액 자리를 예산 키로 채운 결과는 직접 게시값과
         **타입이 다르고**, 그 값은 **자기 basis(`ALLOCATED_BUDGET`)와 과세(`UNKNOWN`)를 그대로 진다**.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           data-dictionary.md §5.2 규칙 · §1.2(배정예산 = `AllocatedBudget`, basis 배정예산, 과세 `Unknown`) ·
           §1.2.1(정의상 기본값 자동 태깅 금지 · `Unknown` 금액의 산술 비교 차단) · §5.1(`FilledFromBudgetKey`) ·
           v2-지침서.md §4.1
@@ -5382,6 +5658,18 @@ cases:
         필드 계약 구조와 미지 필드 리포트 형태의 출처. 기대값의 근거가 아니다.
     input_file: fixtures/input/koneps-collection-009.json
     expected_file: fixtures/expected/koneps-collection-009.json
+    verified_paths:
+      - "$.resolvedBaseAmount.sourceKey"
+      - "$.resolvedBaseAmount.targetSlot"
+      - "$.resolvedBaseAmount.amount"
+      - "$.resolvedBaseAmount.currency"
+      - "$.resolvedBaseAmount.basis"
+      - "$.resolvedBaseAmount.vatTreatment"
+      - "$.resolvedBaseAmount.provenance"
+      - "$.storedInCanonicalDirectSlot"
+      - "$.typeDistinctFromDirect"
+      - "$.reBasedToBaseAmount"
+      - "$.arithmeticComparisonWithBaseAmountBasisAllowed"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -5455,10 +5743,33 @@ cases:
           비워 두지 않는다(schema 의 `contract_binding` 정의).
         policy_version: |-
           해당 없음 — 문서 포인터 필드의 추가이고 기대값이 정책 데이터에 의존하지 않는다.
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.resolvedBaseAmount.variant`(`FallbackFromBudget`) — `ResolvedBaseAmount` 는 3A 산출물이라 variant 이름이 아직 서지 않는다. **타입이 다르다는 주장은 `$.typeDistinctFromDirect` 가 잠근다.**
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-010
     domain: koneps-collection
     classification: authoritative
@@ -5521,7 +5832,13 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-011
     domain: koneps-collection
     classification: authoritative
@@ -5585,7 +5902,13 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-012
     domain: koneps-collection
     classification: authoritative
@@ -5637,7 +5960,13 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-013
     domain: koneps-collection
     classification: authoritative
@@ -5691,7 +6020,13 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-014
     domain: koneps-collection
     classification: authoritative
@@ -5744,7 +6079,13 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-015
     domain: koneps-collection
     classification: authoritative
@@ -5801,7 +6142,13 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-016
     domain: koneps-collection
     classification: authoritative
@@ -5853,7 +6200,13 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-017
     domain: koneps-collection
     classification: authoritative
@@ -5941,7 +6294,13 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-018
     domain: koneps-collection
     classification: authoritative
@@ -5990,7 +6349,13 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-027
     domain: koneps-collection
     classification: authoritative
@@ -6075,15 +6440,25 @@ cases:
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-019
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         필수 식별자가 없는 행은 **항목 단위로만** 버려지고 run 은 성공으로 끝난다 — 4행 중 1행이 공고번호를 빠뜨리면 수집 3건, `dropped=1`, 사유는 「공고번호 없음」 하나다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           `capability-map.md` COL-01 acceptance 첫째 — **M0 산출 문서의 자체 도출**. 「run 은 성공으로 끝난다」와 `drop_reasons` 어휘는 그 문서가 세운 것이고 운영자 결정·조달청 문서 문면이 그 자리에 없다.
           **부분 근거는 공식 문서에 있다** — `bidNtceNo` 는 응답 명세의 **필수 항목**이므로 그것이 없는 행이 명세를 만족하지 않는다는 것까지는 문서가 떠받친다(`koneps-collection-013` 과 같은 형태). 그러나 **그 행을 어떻게 회계에 싣는가**는 문서에 없다.
     expected_reasoning: |-
@@ -6100,6 +6475,13 @@ cases:
         입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
     input_file: fixtures/input/koneps-collection-019.json
     expected_file: fixtures/expected/koneps-collection-019.json
+    verified_paths:
+      - "$.received"
+      - "$.normalized"
+      - "$.duplicate"
+      - "$.dropped"
+      - "$.pagesFetched"
+      - "$.normalizedNoticeNumbers"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -6120,20 +6502,47 @@ cases:
       **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
       네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
       **지금 이 필드가 잠그는 것은 없다.**
-    change_history: []
+    change_history:
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.dropReasons.MissingNoticeNumber`(경로에 사유 이름이 박혀 있다) · `$.runOutcome`(`Success`) — 운영자 결정이 명시적으로 뺀 자리다. **회계의 셈과 살아남은 행은 잠근다.**
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-020
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         수집 회계의 항등식 `received = normalized + duplicate + dropped` 가 성립하면 회계가 생성되고, `duplicate` 는 `dropped` 안에 이중으로
         세지지 않는다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           `capability-map.md` COL-06 acceptance — **M0 산출 문서의 자체 도출**.
     expected_reasoning: |-
       `capability-map.md` COL-06 acceptance *"수집 1회 결과에서 `received = normalized + duplicate + dropped` 항등식이 항상 성립하고, 위반 시 산출이 실패한다"*.
@@ -6148,6 +6557,11 @@ cases:
         입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
     input_file: fixtures/input/koneps-collection-020.json
     expected_file: fixtures/expected/koneps-collection-020.json
+    verified_paths:
+      - "$.identityHolds"
+      - "$.constructed"
+      - "$.capSkippedDerivedBySubtraction"
+      - "$.duplicateCountedInsideDropped"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -6168,19 +6582,46 @@ cases:
       **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
       네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
       **지금 이 필드가 잠그는 것은 없다.**
-    change_history: []
+    change_history:
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: 없음.
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-021
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         회계 항등식이 깨지면 **회계 객체가 만들어지지 않는다** — 음수 잔차를 `0` 으로 접어 숨기지 않는다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           `capability-map.md` COL-06 acceptance 의 후건(*"위반 시 산출이 실패한다"*) — **M0 산출 문서의 자체 도출**.
     expected_reasoning: |-
       `capability-map.md` COL-06 acceptance *"… 항등식이 항상 성립하고, **위반 시 산출이 실패한다**"*. 3A `scope.md` ⑦ 이 그것을 **생성자 불변식**으로 옮긴다(위반 = 생성 실패).
@@ -6195,6 +6636,10 @@ cases:
         입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
     input_file: fixtures/input/koneps-collection-021.json
     expected_file: fixtures/expected/koneps-collection-021.json
+    verified_paths:
+      - "$.identityHolds"
+      - "$.constructed"
+      - "$.negativeResidualFoldedToZero"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -6215,19 +6660,46 @@ cases:
       **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
       네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
       **지금 이 필드가 잠그는 것은 없다.**
-    change_history: []
+    change_history:
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.failureReason`(`AccountingIdentityViolated`).
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-022
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         `totalCount` 가 없고 API 가 같은 페이지를 계속 돌려주면 수집은 **유한 페이지 안에 끝나고** `truncated=true` 로 표시된다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           `capability-map.md` COL-06 acceptance 둘째 · `regression-ledger.md` `R-COL-04` — **M0 산출 문서의 자체 도출**.
     expected_reasoning: |-
       `capability-map.md` COL-06 acceptance *"`totalCount`가 없고 API가 같은 페이지를 계속 반환하면 수집은 유한 페이지 안에 종료하고 `truncated=true`로 표시된다"*.
@@ -6241,6 +6713,12 @@ cases:
         입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
     input_file: fixtures/input/koneps-collection-022.json
     expected_file: fixtures/expected/koneps-collection-022.json
+    verified_paths:
+      - "$.terminated"
+      - "$.truncated"
+      - "$.pagesFetched"
+      - "$.normalized"
+      - "$.progressObserved"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -6263,19 +6741,46 @@ cases:
       **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
       네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
       **지금 이 필드가 잠그는 것은 없다.**
-    change_history: []
+    change_history:
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: 없음.
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-023
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         공고 식별자의 정규화 규칙(공백 제거·대문자화)을 **값 객체가 소유**하고 호출부가 반복하지 않는다 — 같은 `source_url` 은 같은 식별자를 낸다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           `capability-map.md` COL-05 acceptance 와 「legacy 형태 처리」 — **M0 산출 문서의 자체 도출**.
     expected_reasoning: |-
       `capability-map.md` COL-05 「legacy 형태 처리」 *"`normalize_notice_number`를 호출부마다 부르는 형태는 채택하지 않는다. **식별자 값 객체가 정규화 규칙을 소유한다**"* + 같은 항목의 불변식 *"`source_url` 정규화가 `bidNtceNo`/`bidNtceOrd`만 남기므로 source_url 동일 ⇒ notice_number 동일"*.
@@ -6290,6 +6795,12 @@ cases:
         입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
     input_file: fixtures/input/koneps-collection-023.json
     expected_file: fixtures/expected/koneps-collection-023.json
+    verified_paths:
+      - "$.normalized"
+      - "$.sameIdentity"
+      - "$.normalizationOwnedByValueObject"
+      - "$.normalizationRepeatedAtCallSites"
+      - "$.sameSourceUrlImpliesSameNoticeId"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -6310,19 +6821,46 @@ cases:
       **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
       네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
       **지금 이 필드가 잠그는 것은 없다.**
-    change_history: []
+    change_history:
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: 없음 — `$.normalized` 는 정규화 **결과**이지 입력 되울림이 아니다.
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-024
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         예비가격을 이미 보유한 공고는 재수집 스윕에서 **상세 조회를 하지 않는다** — 그 판단은 도메인 술어가 내고 백오프 상태를 데이터 테이블 컬럼에 얹지 않는다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           `capability-map.md` COL-03 acceptance 첫째와 「legacy 형태 처리」 — **M0 산출 문서의 자체 도출**.
     expected_reasoning: |-
       `capability-map.md` COL-03 acceptance *"예비가격이 이미 저장된 공고는 재수집 스윕에서 상세 HTTP 호출이 0회다"* + 「legacy 형태 처리」 *"백오프 상태를 개찰 데이터 테이블 컬럼에 얹은 것(`HistoricalData.reserve_detail_checked_at`)도 채택하지 않는다"*.
@@ -6339,6 +6877,9 @@ cases:
         입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
     input_file: fixtures/input/koneps-collection-024.json
     expected_file: fixtures/expected/koneps-collection-024.json
+    verified_paths:
+      - "$.detailFetchCallCount"
+      - "$.backoffStateStoredOnDataTable"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -6359,19 +6900,46 @@ cases:
       **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
       네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
       **지금 이 필드가 잠그는 것은 없다.**
-    change_history: []
+    change_history:
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.decision`(`Skip`) · `$.reason`(`AlreadyHeld`) — `DetailFetchDecision` 은 3A 산출물이다. **acceptance 의 측정치인 「상세 호출 0회」는 `$.detailFetchCallCount` 가 잠근다.**
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-025
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         age-gate 를 넘기지 못한 공고는 이번 스윕에서 상세 조회를 하지 않고 백오프로 계수되며, gate 를 넘긴 뒤 스윕에서 **정확히 1회** 조회된다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           `capability-map.md` COL-03 acceptance 둘째 — **M0 산출 문서의 자체 도출**.
     expected_reasoning: |-
       `capability-map.md` COL-03 acceptance *"개찰 후 age-gate 미만 경과한 공고는 이번 스윕에서 상세 조회를 하지 않고 `backoff_skipped`로 계수된다. gate를 넘긴 뒤 스윕에서는 **정확히 1회** 조회된다"*.
@@ -6387,6 +6955,13 @@ cases:
         입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
     input_file: fixtures/input/koneps-collection-025.json
     expected_file: fixtures/expected/koneps-collection-025.json
+    verified_paths:
+      - "$.sweepResults[0].detailFetchCallCount"
+      - "$.sweepResults[0].backoffSkipped"
+      - "$.sweepResults[1].detailFetchCallCount"
+      - "$.sweepResults[2].detailFetchCallCount"
+      - "$.sweepResults[2].backoffSkipped"
+      - "$.totalDetailFetchCallCount"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -6407,19 +6982,46 @@ cases:
       **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
       네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
       **지금 이 필드가 잠그는 것은 없다.**
-    change_history: []
+    change_history:
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.sweepResults[*].decision`·`reason` — 024 와 같다. **「정확히 1회」는 `$.totalDetailFetchCallCount` 가 잠근다.**
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: koneps-collection-026
     domain: koneps-collection
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         타임존 없는 일시 문자열은 **선언된 해석 규칙이 있을 때만** `Instant` 가 되고, 원문 문자열은 어느 쪽이든 보존된다 — 규칙이 없으면 UTC 로 가정하지 않는다.
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
+          **운영자 승인 2026-09-07 「curator 승인」** — 아래 M0 acceptance 를 **업무 규칙으로 비준**한
+          결정 기록이 이 case 의 출처다. 좌표: `reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6).
+          비준 이전의 근거 서술을 지우지 않고 아래에 그대로 남긴다.
+
           3A `scope.md` **D-3A-4**(필드 계약에 `sourceZone` 슬롯을 더한다) · `data-dictionary.md` §1.5·§5.3 — **M0 산출 문서와 slice 계약의 도출**이고 운영자 결정 문면이 아직 없다.
     expected_reasoning: |-
       `koneps-collection-014` 가 「공식 문서가 출처 타임존을 선언하지 않는다」를 고정한다. 이 case 는 그 **뒤처리**를 잰다 — 해석 규칙을 **정책 데이터**로 받아 그 id 가 결과에 남고, 규칙이 없으면 `Instant` 가 나오지 않는다.
@@ -6434,6 +7036,14 @@ cases:
         입력 형태와 legacy 거동의 출처. **기대값의 근거가 아니다.**
     input_file: fixtures/input/koneps-collection-026.json
     expected_file: fixtures/expected/koneps-collection-026.json
+    verified_paths:
+      - "$.results[0].rawTextPreserved"
+      - "$.results[0].interpretationRuleId"
+      - "$.results[0].interpretedZone"
+      - "$.results[0].instantDerived"
+      - "$.results[1].rawTextPreserved"
+      - "$.results[1].instantDerived"
+      - "$.results[1].assumedUtc"
     normalization:
       rate_unit: "fraction"
       money_unit: "KRW 원 단위 정수"
@@ -6454,11 +7064,34 @@ cases:
       **`pending-3a`.** 이 case 가 실릴 계약은 `procurement` 의 M3/3A 산출물이고 저장소에 아직 없다.
       네 자리(`type_path`·`fixed_by`·`carries`·`does_not_carry`)는 3A 가 타입 이름을 확정한 뒤 채운다.
       **지금 이 필드가 잠그는 것은 없다.**
-    change_history: []
+    change_history:
+      - date: 2026-09-07
+        change: |-
+          `classification` 을 `insufficient-evidence` 에서 **`authoritative`** 로 되돌리고
+          `source.kind` 를 `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verifies` 에서
+          `verified_paths` 를 도출해 달았다. **입력·기대값·해시는 바꾸지 않았다.**
+        reason: |-
+          **운영자 승인 2026-09-07 「curator 승인」 — Q-2 의 B-1~B-10 전부 승인.** 이 case 가 인용한
+          M0 산출 문서의 acceptance 가 **업무 규칙으로 비준**됐고, 그것이
+          `classification_policy.insufficient_evidence` 가 적어 둔 **되돌림 경로**다
+          (*"운영자가 각 case 의 `source.reference` 가 든 M0 산출 문서의 acceptance 를 업무 규칙으로
+          명시 승인하면 그 case 는 `authoritative` 로 올라간다"*).
+          **`verified_paths` 에서 뺀 자리**: `$.results[*]` 의 상태 이름 없음. `$.results[0].interpretedZone` 의 `Asia/Seoul` 은 **P-2 로 승인된 값**이라 잠근다.
+          2026-09-01 결정(미승인 리터럴의 정확 비교 금지)이 그 자리를 막고, 3A 가 계약 어휘를 세운 뒤
+          별도로 올린다 — 운영자가 Q-2 답에서 같은 단서를 달았다.
+        policy_version: |-
+          해당 없음 — 분류·출처 승격이고 기대값이 effective-dated 정책 데이터에 의존하지 않는다.
+          입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
     review:
       claude_commit: pending
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-07
+      approval_record: "`reports/evidence/m3/3a/policy-values.md` 「운영자 승인 2026-09-07」 절 — 「curator 승인」(Q-1 · Q-2 B-1~B-10 · Q-3 P-1~P-6)"
+      approval_scope: |-
+        **`koneps-collection` 도메인 한정이다.** 이 승인은 M3/3A curator 레인의 승인 요청
+        (`_workspace/m3-3a/02_curator_approval_request.md`)에 대한 답이고 다른 도메인의 case 는
+        대상이 아니다 — 그쪽은 여전히 `approved_by_user: false` 다.
   - id: base-amount-provenance-001
     domain: base-amount-provenance
     classification: authoritative
@@ -8164,7 +8797,7 @@ uncovered_axes:
       **어느 case 가 어느 층인지는 여기서 열거하지 않는다** — 각 case 의 `classification` 이 정본이고
       셈은 **F-7**·**C-15** 가 낸다.
 
-  - axis: KONEPS — `resultCode` **범주 매핑** · 잘못된 인코딩 · 천 단위 구분자
+  - axis: KONEPS — 잘못된 인코딩 · 천 단위 구분자 (**`resultCode` 축은 2026-09-07 해소**)
     domain: koneps-collection
     why_blocked: |-
       `resultCode` 분류표는 운영자 결정 `OPEN-COL-02`가 소유한다고 §4.3.2가 적으나 **표의 내용이
@@ -8181,22 +8814,24 @@ uncovered_axes:
       「17」과 맞는다. `koneps-collection-027` 이 표를 인용하고 **그 입력 파일이 16행 전문의 커밋된
       정본**이다(원 docx 는 `_workspace/` 아래라 저장소에 없다).
 
-      **그래도 이 축은 닫히지 않는다 — 남은 것이 둘이다.**
-      ① **코드 → 범주**(재시도 가능/불가·quota·입력 오류·데이터 없음) 매핑을 **문서가 주지 않는다.**
-      표가 주는 것은 사람이 읽는 조치방안 문면이고, 「이 실패를 재시도해도 되는가」는 V2 판정이라
-      **운영자 승인 대상**이다(D-M3-4 가 `procurement` 정책 데이터로 두기로 한 자리).
-      ② **적용 범위**: 활용가이드는 `PubDataOpnStdService` 의 것이고 수집이 부르는
-      `BidPublicInfoService` 가 아니다. 그 절이 공공데이터포털 공통으로 보이나 **문서가 그렇게 선언하지
-      않는다.** 방증 둘은 `observed`/`legacy-behavior` 층이다 — 두 문서의 `resultCode` 선언 일치, legacy 가
-      대상 서비스에서 관측한 `08` 의 문면 일치.
+      **그리고 같은 날 오후 남은 둘도 승인됐다 — `resultCode` 축은 해소된다.** 운영자가 P-4 에 답했다.
+      ① **적용 범위**: 이 표가 `BidPublicInfoService` 에도 적용된다고 본다(방증 둘 — 두 문서의
+      `resultCode` 선언 일치, legacy 가 대상 서비스에서 관측한 `08` 의 문면 일치).
+      ② **범주 매핑**: `policy-values.md` §3.2 의 「V2 범주 후보」 열을 정책 데이터 초기값으로 채택 —
+      재시도 가능 `01`·`02`·`04`·`05` / 입력 오류 `06`·`07`·`08`·`10`·`11` / 재시도 불가·인증
+      `12`·`20`·`30`·`31`·`32` / quota `22` / 데이터 없음 `03`.
+      ③ **`03` 은 성공도 실패도 아닌 세 번째 상태**로 두고 legacy 의 `OK_RESULT_CODES = {"00","03"}` 는
+      채택하지 않는다. 부재·미지 코드는 `Unclassified`(fail-safe 비재시도).
+      **범주는 문서가 아니라 운영자 결정이 준다** — `koneps-collection-027` 의 기대값이
+      `documentDeclaresRetryCategory: false` 로 그 구별을 계속 진다.
 
-      **인코딩·구분자 정규화 규칙은 여전히 승인된 명세가 없다** — 그 절반은 그대로 막혀 있다.
+      **남는 것은 인코딩·구분자뿐이다** — 정규화 규칙에 승인된 명세가 없고 legacy 에 대응 처리도 없다
+      (응답을 그대로 쓴다). 이 축의 이름을 그쪽으로 좁혔다.
     owning_open:
-      - "OPEN-COL-02 — **활성 아님. 2026-08-26 해소**(분류표 등재 결정은 내려졌다). **표 본문은 2026-09-07 확보**(`pps-openapi-guide` · `koneps-collection-027`). 남은 미결은 **범주 매핑**과 **적용 범위**이고 둘 다 운영자 승인 대상이다 · (인코딩·구분자) 소유 `OPEN` 없음 — 명세 부재"
+      - "OPEN-COL-02 — **완전 해소 2026-09-07.** 등재 결정(2026-08-26) → 표 본문 확보(`pps-openapi-guide` · `koneps-collection-027`) → 범주 매핑·적용 범위 승인(P-4). 값은 `policy-values.md` §3.2 · (인코딩·구분자) 소유 `OPEN` 없음 — **명세 부재로 이 축의 유일한 잔여**"
     unblocks_when: |-
-      운영자가 ① 코드 → 범주 매핑(`policy-values.md` §3.2 의 「V2 범주 후보」 열)과 ② 이 표가
-      입찰공고정보서비스에도 적용된다는 판단을 승인하고, ③ 인코딩·구분자 정규화 규칙이 정해진다.
-      **표 본문 확보라는 전건은 해소됐다.**
+      인코딩·천 단위 구분자 정규화 규칙이 승인된 명세로 정해진다. **`resultCode` 축은 더 이상 이 축을
+      막지 않는다** — 표·범주·적용 범위가 모두 섰다.
 
   - axis: ML — 피처 스키마 version · artifact checksum · LightGBM 오류 · KDE singular · deterministic seed
     domain: ml-boundary
@@ -8291,7 +8926,7 @@ uncovered_axes:
       (「하한 적용 범위 rule」)의 `FloorApplicability` sealed 정의 가운데 **`OutOfScope`** 라는 이름(과 `regime` 리터럴)을
       업무 규칙으로 명시 승인한다.
 
-  - axis: 승인 부재로 authoritative 덮개를 잃은 축 — KONEPS 필드 계약 강제와 코드·라벨 분리
+  - axis: (**해소 2026-09-07**) 승인 부재로 authoritative 덮개를 잃은 축 — KONEPS 필드 계약 강제와 코드·라벨 분리
     domain: koneps-collection
     why_blocked: |-
       「미지 키가 계수되고 소비되지 않는다」 · 「선언 범위와 어긋난 값이 거부되고 사유가 남는다」 ·
@@ -8322,15 +8957,22 @@ uncovered_axes:
       타임존 미선언(`014`) · 예산 키의 과세 미선언(`015`) · 업무구분명의 열거(`016`) · 기초금액 키의
       공식 이름(`017`) · 시공능력평가금액목록의 형식과 단위 미선언(`018`).
 
-      **덮이지 않은 채 남는 절반이 위 다섯 문장 그대로다** — 미지 키의 **계수와 소비 차단**, 선언 위반의
-      **거부와 회계 등재**, 식별자에 **산술이 정의되지 않음**, 코드·라벨 **두 값 저장**, 미지 코드에
-      **임의 라벨 금지**. 그 다섯은 여전히 `capability-map.md` COL-07·COL-08 의 자체 도출이 유일한
-      근거이고 `-001`·`-002`·`-005`·`-006`·`-007` 이 `insufficient-evidence` 로 지고 있다. **회계·조회
-      가치·식별자 정규화 축(`019`~`026`)도 같은 자리**다.
+      **나머지 절반도 2026-09-07 에 덮였다 — 이 축은 해소된다.** 운영자가 「curator 승인」으로
+      `capability-map.md` COL-01·03·05·06·07·08 acceptance 와 `data-dictionary.md` §1.3·§5.1·§5.2·§5.3 을
+      **업무 규칙으로 비준**했고, `-001`·`-002`·`-005`·`-006`·`-007` 과 회계·조회 가치·식별자 정규화
+      축(`-019`~`-026`)이 `authoritative` 로 올라갔다. **`koneps-collection` 27 case 전부가
+      `authoritative` 다.**
+
+      **그래도 잠기지 않은 자리가 남는다 — 축을 바꿔 적는다.** 승격된 case 들의 **사유·상태 토큰**
+      (`ValueOutsideDeclaredRange` · `ExplicitNull` · `KeyMissing` · `CodeNotInMapping` ·
+      `OccupancyGuard` · `NonAuthoritativeFillOnly` · `FallbackFromBudget` · `MissingNoticeNumber` ·
+      `Success` · `AccountingIdentityViolated` · `Skip`/`Fetch`/`AlreadyHeld`/`AgeGateNotPassed`/
+      `RecheckGateNotPassed`)은 **계약 어휘가 아니라 `verified_paths` 에 들지 않았다.** 각 case 는 그
+      주장을 **불리언·셈·합성 식별자로 우회해** 잠근다(예: 「조회하지 않는다」를 `$.detailFetchCallCount: 0`
+      으로). **어휘 자체의 승인은 3A 가 계약 타입을 세운 뒤**이고, 그때 경로를 목록에 더한다.
     unblocks_when: |-
-      운영자가 COL-07·COL-08 acceptance 와 **§1.3 광의 부재 금지 규칙 · §5.1 계승 규율 · §5.2 경계
-      규칙**을 업무 규칙으로 명시 승인한다. 승인 요청 표는 `_workspace/m3-3a/02_curator_approval_request.md`
-      이고 근거 정리는 `reports/evidence/m3/3a/fixtures-koneps-collection.md` 다.
+      **해소됨**(2026-09-07 운영자 승인). 남은 후속은 위 사유·상태 토큰의 **어휘 승인**이며 3A 의
+      계약 타입 확정에 종속한다. 근거 정리는 `reports/evidence/m3/3a/fixtures-koneps-collection.md` 다.
 
   - axis: 승인 부재로 authoritative 덮개를 잃은 축 — ML 피처 결측 provenance 와 누수 차단 시그니처
     domain: ml-boundary

@@ -213,6 +213,111 @@ ASSERTED = {
     # `-027` 은 다른 문서(활용가이드 `pps-openapi-guide`)를 인용한다. 주장은 **표가 무엇을
     #   담는가**와 **무엇을 담지 않는가** 둘이고, 뒤쪽 셋이 `false` 불리언이라 (a′) 뒤집기가
     #   「문서가 정하지 않는다」를 계약으로 세운다.
+    # 운영자 승인 2026-09-07(Q-2 B-1~B-10)으로 승격된 열일곱. 각 줄의 경로는 그 case 의
+    #   `verified_paths` 부분집합이다 — 계약 밖 경로를 여기 넣으면 변이체가 통과해
+    #   기계적으로 강등된다. 미승인 사유·상태 토큰은 두 목록 어디에도 없다.
+    "koneps-collection-001": [
+        "$.consumedAsDomainValue.synNewKey",
+        "$.silentlySwallowed",
+        "$.requiresHumanReviewBeforeConsumption",
+        "$.unknownFields",
+    ],
+    "koneps-collection-002": [
+        "$.unitInferred",
+        "$.accountedInRunReport",
+        "$.consumedAsDomainValue.synFloorRt",
+        "$.rejectedItems[0].rawName",
+    ],
+    "koneps-collection-003": [
+        "$.estimatedPrice.state",
+        "$.foldedToZero",
+        "$.presentInPayload",
+    ],
+    "koneps-collection-004": [
+        "$.estimatedPrice.state",
+        "$.foldedToZero",
+        "$.presentInPayload",
+    ],
+    "koneps-collection-005": [
+        "$.noticeOrder.value",
+        "$.noticeOrder.type",
+        "$.intConversionPerformed",
+        "$.arithmeticDefined",
+    ],
+    "koneps-collection-006": [
+        "$.code",
+        "$.label",
+        "$.combinedStringLeakedPastParser",
+    ],
+    "koneps-collection-007": [
+        "$.code",
+        "$.codeKnown",
+        "$.label.state",
+        "$.labelInvented",
+    ],
+    "koneps-collection-008": [
+        "$.storedValueOverwritten",
+        "$.resultBasis",
+        "$.resultVatTreatment",
+        "$.resultProvenance",
+        "$.incomingReBasedToTargetSlotBasis",
+        "$.incomingRecordedBasis",
+        "$.incomingRecordedVatTreatment",
+    ],
+    "koneps-collection-009": [
+        "$.resolvedBaseAmount.targetSlot",
+        "$.resolvedBaseAmount.basis",
+        "$.resolvedBaseAmount.vatTreatment",
+        "$.resolvedBaseAmount.provenance",
+        "$.storedInCanonicalDirectSlot",
+        "$.typeDistinctFromDirect",
+        "$.reBasedToBaseAmount",
+        "$.arithmeticComparisonWithBaseAmountBasisAllowed",
+    ],
+    "koneps-collection-019": [
+        "$.received",
+        "$.normalized",
+        "$.dropped",
+        "$.normalizedNoticeNumbers",
+    ],
+    "koneps-collection-020": [
+        "$.identityHolds",
+        "$.constructed",
+        "$.capSkippedDerivedBySubtraction",
+        "$.duplicateCountedInsideDropped",
+    ],
+    "koneps-collection-021": [
+        "$.identityHolds",
+        "$.constructed",
+        "$.negativeResidualFoldedToZero",
+    ],
+    "koneps-collection-022": [
+        "$.terminated",
+        "$.truncated",
+        "$.progressObserved",
+    ],
+    "koneps-collection-023": [
+        "$.sameIdentity",
+        "$.normalizationOwnedByValueObject",
+        "$.normalizationRepeatedAtCallSites",
+        "$.sameSourceUrlImpliesSameNoticeId",
+        "$.normalized",
+    ],
+    "koneps-collection-024": [
+        "$.detailFetchCallCount",
+        "$.backoffStateStoredOnDataTable",
+    ],
+    "koneps-collection-025": [
+        "$.sweepResults[0].detailFetchCallCount",
+        "$.sweepResults[1].detailFetchCallCount",
+        "$.totalDetailFetchCallCount",
+    ],
+    "koneps-collection-026": [
+        "$.results[0].interpretedZone",
+        "$.results[0].instantDerived",
+        "$.results[1].instantDerived",
+        "$.results[1].assumedUtc",
+    ],
     "koneps-collection-027": [
         "$.documentedErrorCodes",                    # 16 코드 전수
         "$.documentedErrorCodeCount",
