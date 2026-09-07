@@ -62,4 +62,44 @@ class RawObservationTest {
     fun `RawKey 는 빈 문자열을 거부한다`() {
         shouldThrow<IllegalArgumentException> { RawKey("") }
     }
+
+    // v2-defect(3A 잔여 일괄 verifier r3 전 수정, koneps-collection-003·004) — 명시 null 과
+    // 키 부재를 presenceOf 로 구분한다. valueOf 는 하위호환으로 둘 다 null 로 접는다.
+    @Test
+    fun `presenceOf 는 명시 null 과 키 부재를 구분한다`() {
+        val observation =
+            RawNoticeObservation.ofRawValues(
+                mapOf(RawKey("presmptPrce") to RawValue.ExplicitNull),
+                SourceEndpoint.NOTICE_LIST,
+                NOW,
+            )
+
+        observation.presenceOf(contract("presmptPrce")) shouldBe FieldPresence.ExplicitNull
+        observation.presenceOf(contract("otherKey")) shouldBe FieldPresence.Missing
+        observation.valueOf(contract("presmptPrce")) shouldBe null
+    }
+
+    @Test
+    fun `presenceOf 는 문자열 값이 있으면 Present 를 낸다`() {
+        val observation =
+            RawNoticeObservation.ofRawValues(
+                mapOf(RawKey("presmptPrce") to RawValue.Present("900000000")),
+                SourceEndpoint.NOTICE_LIST,
+                NOW,
+            )
+
+        observation.presenceOf(contract("presmptPrce")) shouldBe FieldPresence.Present("900000000")
+    }
+
+    @Test
+    fun `ofRawValues 로 만든 관측도 keys 에 명시 null 키를 포함한다`() {
+        val observation =
+            RawNoticeObservation.ofRawValues(
+                mapOf(RawKey("presmptPrce") to RawValue.ExplicitNull),
+                SourceEndpoint.NOTICE_LIST,
+                NOW,
+            )
+
+        observation.keys shouldBe setOf(RawKey("presmptPrce"))
+    }
 }
