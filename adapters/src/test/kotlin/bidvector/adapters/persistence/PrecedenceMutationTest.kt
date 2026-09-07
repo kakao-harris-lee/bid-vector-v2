@@ -108,6 +108,31 @@ class PrecedenceMutationTest : PersistenceTestSupport() {
         }
     }
 
+    /** N-1의 정확한 재현 — 값은 손대지 않고 provenance만 강등한다(observation_key도 그대로). */
+    private fun attemptProvenanceOnlyDowngrade(connection: Connection) {
+        val sql = "UPDATE notice SET base_amount_provenance = ? WHERE notice_number = ? AND notice_round = ?"
+        connection.prepareStatement(sql).use { statement ->
+            statement.setString(1, ProvenanceKind.UNDECLARED.name)
+            statement.setString(2, noticeId.number.value)
+            statement.setString(3, noticeId.round.value)
+            statement.executeUpdate()
+        }
+    }
+
+    private fun currentBaseAmountProvenance(): String {
+        val sql = "SELECT base_amount_provenance FROM notice WHERE notice_number = ? AND notice_round = ?"
+        return dataSource().connection.use { connection ->
+            connection.prepareStatement(sql).use { statement ->
+                statement.setString(1, noticeId.number.value)
+                statement.setString(2, noticeId.round.value)
+                statement.executeQuery().use { rs ->
+                    rs.next()
+                    requireNotNull(rs.getString("base_amount_provenance"))
+                }
+            }
+        }
+    }
+
     @Test
     fun `F-1 재현 — provenance 를 그대로 둔 채 금액만 바꾸는 직접 SQL 은 새 관측이 없어 거부된다`() {
         seedAuthoritativeNotice()
@@ -119,6 +144,45 @@ class PrecedenceMutationTest : PersistenceTestSupport() {
         }
 
         currentBaseAmountWon() shouldBe before
+    }
+
+    @Test
+    fun `N-1 재현(회귀) — 값은 그대로 두고 provenance 만 강등하는 직접 SQL 은 거부된다`() {
+        seedAuthoritativeNotice()
+        val beforeValue = currentBaseAmountWon()
+        val beforeProvenance = currentBaseAmountProvenance()
+
+        appConnection().use { connection ->
+            shouldThrow<PSQLException> { attemptProvenanceOnlyDowngrade(connection) }
+            connection.rollback()
+        }
+
+        currentBaseAmountWon() shouldBe beforeValue
+        currentBaseAmountProvenance() shouldBe beforeProvenance
+    }
+
+    @Test
+    fun `값·provenance 둘 다 불변인 wide UPDATE 는 이 축을 건드리지 않아 통과한다`() {
+        seedAuthoritativeNotice()
+        val beforeValue = currentBaseAmountWon()
+        val beforeProvenance = currentBaseAmountProvenance()
+
+        appConnection().use { connection ->
+            connection
+                .prepareStatement(
+                    "UPDATE notice SET base_amount_won = base_amount_won, " +
+                        "base_amount_provenance = base_amount_provenance, business_category_code = 'X' " +
+                        "WHERE notice_number = ? AND notice_round = ?",
+                ).use { statement ->
+                    statement.setString(1, noticeId.number.value)
+                    statement.setString(2, noticeId.round.value)
+                    statement.executeUpdate()
+                }
+            connection.commit()
+        }
+
+        currentBaseAmountWon() shouldBe beforeValue
+        currentBaseAmountProvenance() shouldBe beforeProvenance
     }
 
     @Test
@@ -319,8 +383,12 @@ class PrecedenceMutationTest : PersistenceTestSupport() {
         }
     }
 
+    // r1이 지목한 이름 문제(verifier r2 N-7) — 원래 이름은 이 test가 F-1/N-1의 중심 방어를
+    // 보여주는 것처럼 읽혔지만, 실제로는 「빈 자리에 provenance 없이 금액만 채우는」 좁은
+    // CHECK 불변식 하나만 잰다(진짜 재현은 위 F-1/N-1 전용 test들이 덮는다) — 이름을 실물에
+    // 맞춘다.
     @Test
-    fun `provenance 없이 금액만 갱신하면 CHECK 제약이 거부한다 — 금액과 provenance 는 함께만 갱신 가능`() {
+    fun `CHECK 불변식 — 빈 자리에 provenance 없이 금액만 채우는 직접 SQL 은 거부된다`() {
         // base_amount가 아직 없는(둘 다 NULL) 행을 심는다 — 그래야 「금액만 채우고 provenance는
         // 비워 둔」 위반이 실제로 만들어진다(이미 둘 다 값이 있는 행에 won만 다시 쓰면 provenance
         // 열은 손대지 않은 채 그대로 남아 CHECK를 어기지 않는다).

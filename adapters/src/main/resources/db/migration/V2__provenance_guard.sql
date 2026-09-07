@@ -5,14 +5,24 @@
 --
 -- verifier r1(F-1·F-4·F-5) 뒤 개정 — 원래 판(값이 있고 provenance가 내려갈 때만 거부)은
 -- 「값은 바뀌었는데 provenance는 그대로」인 write(F-1)와 「비권위→비권위」(F-4)를 놓쳤다.
--- 새 규칙은 축 하나당 셋을 함께 본다 — **값이 실제로 바뀔 때만** 적용된다(값이 그대로인
--- wide UPDATE의 다른 컬럼 변경은 건드리지 않는다):
+-- 새 규칙은 축 하나당 셋을 함께 본다:
 --   (1) 존재 가드 — 새 값이 NULL이면 거부.
 --   (2) 점유 가드 — 새 provenance가 권위 없으면 거부(Kotlin mayOverwrite와 같은 술어 —
 --       기존 provenance의 권위는 더 이상 보지 않는다. 「이미 값이 있다」가 전제이므로
 --       그 사실 하나가 「새 유입은 권위 있어야 한다」를 결정한다).
---   (3) 신선도 가드(F-1) — observation_key가 그대로면 거부. 「같은 관측을 다시 실었다」는
---       것을 그 값이 왜 바뀌었는지 설명하지 못하면 값 변경 자체가 성립하지 않는다.
+--   (3) 신선도 가드(F-1) — 값이 바뀌었는데 observation_key가 그대로면 거부. 「같은 관측을
+--       다시 실었다」는 것을 그 값이 왜 바뀌었는지 설명하지 못하면 값 변경 자체가 성립하지
+--       않는다.
+--
+-- verifier r2(N-1, 회귀) 뒤 재개정 — 위 (1)~(3)은 **값이 실제로 바뀔 때만** 적용됐는데, 그
+-- 단락이 「값은 그대로 두고 provenance만 강등」(직접 SQL이 새 관측 없이 `*_provenance`만
+-- `UNDECLARED`로 바꿈)을 놓쳤다 — provenance는 가드가 보는 「값」이 아니라 보조 입력일
+-- 뿐이라, 값만 고정하면 provenance를 어느 값으로든 바꿀 수 있었다. 이제 단락 조건을
+-- 「값과 provenance 가 **둘 다** 안 바뀔 때만」으로 좁힌다 — 즉 이 축에 실제로 손이 닿았는지
+-- (값 또는 provenance 중 하나라도 변경)를 먼저 보고, 손이 닿았으면 (1)(2)를 항상 적용한다.
+-- (3) 신선도 가드는 여전히 「값이 바뀐 경우」에만 새 관측을 요구한다 — provenance만 바뀌고
+-- 값은 그대로인 write는 (2) 점유 가드가 이미 막으므로(권위 강등이면 거부) 별도 신선도
+-- 요구가 필요 없다.
 
 -- =============================================================================
 -- provenance_authority seed — bidvector.procurement.IS_AUTHORITATIVE(ResolvedBaseAmount.kt)
@@ -37,6 +47,7 @@ DECLARE
     provenance_col TEXT := TG_ARGV[1];
     old_value TEXT := (to_jsonb(OLD) ->> value_col);
     new_value TEXT := (to_jsonb(NEW) ->> value_col);
+    old_provenance TEXT := (to_jsonb(OLD) ->> provenance_col);
     new_provenance TEXT := (to_jsonb(NEW) ->> provenance_col);
     new_authoritative BOOLEAN;
 BEGIN
@@ -44,7 +55,9 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    IF old_value IS NOT DISTINCT FROM new_value THEN
+    -- N-1(verifier r2, 회귀) — 값만 보면 「값은 그대로 두고 provenance만 강등」을 놓친다.
+    -- 값과 provenance 가 둘 다 안 바뀔 때만(이 축에 손이 안 닿은 wide UPDATE) 통과시킨다.
+    IF old_value IS NOT DISTINCT FROM new_value AND old_provenance IS NOT DISTINCT FROM new_provenance THEN
         RETURN NEW;
     END IF;
 
@@ -61,7 +74,9 @@ BEGIN
             USING ERRCODE = 'P0001';
     END IF;
 
-    IF NEW.observation_key = OLD.observation_key THEN
+    -- 신선도 가드는 값이 실제로 바뀐 경우에만 새 관측을 요구한다 — provenance만 바뀌고
+    -- 값은 그대로인 write는 위 점유 가드가 이미 권위 여부로 걸렀다.
+    IF old_value IS DISTINCT FROM new_value AND NEW.observation_key = OLD.observation_key THEN
         RAISE EXCEPTION 'guard_authoritative_slot: % 값 변경은 새 observation_key(새 관측)를 동반해야 한다', value_col
             USING ERRCODE = 'P0001';
     END IF;
