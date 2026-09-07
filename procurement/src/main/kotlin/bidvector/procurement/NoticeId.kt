@@ -6,9 +6,15 @@ import bidvector.sharedkernel.NoticeRound
  * 공고번호(`bidNtceNo`) — KONEPS 의 권위 유니크 키(COL-05). 정규화 규칙은 이 값 객체가
  * 소유한다(legacy `normalize_notice_number` 를 호출부마다 부르는 형태를 채택하지 않는다).
  *
- * 정규화: 앞뒤 공백 제거 하나뿐이다 — legacy 불변식(`source_url` 정규화가 `bidNtceNo`/
- * `bidNtceOrd` 만 남기므로 source_url 동일 ⇒ notice_number 동일)은 이 값이 **원문 그대로**
- * 유지될 때만 성립한다. 자릿수·구분자 형식을 임의로 바꾸면 그 불변식이 깨진다.
+ * **정규화(v2-defect 023 수정, 3A 잔여 일괄 verifier r3 전) — trim + 대문자화 + 내부 공백
+ * 연속을 `-`로 합친다.** legacy `normalize_notice_number`(`parsing.py:270-273`,
+ * `re.sub(r"\s+", "", str(v).strip().upper())`)는 내부 공백을 **제거**하는데,
+ * koneps-collection-023 이 요구하는 정규형은 공백을 구분자(`-`)로 **치환**한다 — 팀리드
+ * 결정(2026-09-07, 「구분자 처리는 case 기대값대로」)으로 legacy 리터럴 대신 이 case 의
+ * 기대값(`"SYN NTC 2301"` → `"SYN-NTC-2301"`)을 따른다. **의도적으로 넓힌 정규화**라는
+ * 것을 KDoc 에 남긴다 — 대소문자·공백 표기 차이만 흡수하고, 자릿수·글자 자체를 바꾸지
+ * 않으므로 `source_url` 동일성 불변식(같은 source_url ⇒ 같은 notice_number)은 여전히
+ * 성립한다(그 불변식은 「같은 원문이 같은 결과로 결정론적으로 사상된다」는 성질만 요구한다).
  */
 data class NoticeNumber(
     val value: String,
@@ -19,8 +25,27 @@ data class NoticeNumber(
     }
 
     companion object {
+        private val WHITESPACE_RUN = Regex("\\s+")
+        private const val ASCII_LOWER_TO_UPPER_OFFSET = 'A' - 'a'
+
+        /**
+         * ASCII `a`~`z`만 대문자화한다 — `String.uppercase()`(인자 없음)는 컴파일된 바이트코드가
+         * `java.util.Locale.ROOT`를 참조해 domain 허용 목록 밖이다(실측:
+         * `ArchitectureGateTest` 실패, `Locale`은 `java.util` 허용 예외 62종에 없다).
+         * `LicensePolicy.kt`의 `stripAndLowercase`와 같은 이유·같은 기법(CharArray 직접
+         * 조립)이다 — 공고번호는 숫자·라틴 알파벳·구분자만 쓴다(한글은 대소문자가 없다).
+         */
+        private fun asciiUppercase(value: String): String {
+            val chars = CharArray(value.length)
+            for (i in value.indices) {
+                val c = value[i]
+                chars[i] = if (c in 'a'..'z') c + ASCII_LOWER_TO_UPPER_OFFSET else c
+            }
+            return String(chars)
+        }
+
         /** 원문 공고번호 문자열에서 정규화한다 — 정규화 규칙은 여기 하나뿐이다(COL-05). */
-        fun of(raw: String): NoticeNumber = NoticeNumber(raw.trim())
+        fun of(raw: String): NoticeNumber = NoticeNumber(asciiUppercase(raw.trim()).replace(WHITESPACE_RUN, "-"))
     }
 }
 

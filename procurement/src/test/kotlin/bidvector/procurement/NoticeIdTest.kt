@@ -8,8 +8,31 @@ import org.junit.jupiter.api.Test
 /** ③ — 식별자 값 객체가 정규화 규칙을 소유한다(COL-05). */
 class NoticeIdTest {
     @Test
-    fun `NoticeNumber 는 원문을 trim 만 하고 그대로 보존한다`() {
+    fun `NoticeNumber 는 trim 한 자릿수·구분자 원문을 그대로 보존한다`() {
         NoticeNumber.of("  20260101001-00  ") shouldBe NoticeNumber("20260101001-00")
+    }
+
+    // v2-defect 023 수정(3A 잔여 일괄 verifier r3 전) — 대소문자·내부 공백 표기 차이를
+    // 같은 식별자로 정규화한다(팀리드 결정 「구분자 처리는 case 기대값대로」).
+    @Test
+    fun `NoticeNumber 는 대소문자·내부 공백 표기가 달라도 같은 정규형으로 모인다`() {
+        val fromLowercase = NoticeNumber.of(" syn-ntc-2301 ")
+        val fromUppercase = NoticeNumber.of("SYN-NTC-2301")
+        val fromSpaceDelimited = NoticeNumber.of("SYN NTC 2301")
+
+        fromLowercase shouldBe NoticeNumber("SYN-NTC-2301")
+        fromUppercase shouldBe NoticeNumber("SYN-NTC-2301")
+        fromSpaceDelimited shouldBe NoticeNumber("SYN-NTC-2301")
+        (fromLowercase == fromUppercase) shouldBe true
+        (fromLowercase == fromSpaceDelimited) shouldBe true
+    }
+
+    @Test
+    fun `NoticeNumber 정규화는 멱등이다`() {
+        val once = NoticeNumber.of("SYN NTC 2301")
+        val twice = NoticeNumber.of(once.value)
+
+        twice shouldBe once
     }
 
     @Test
