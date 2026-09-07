@@ -44,20 +44,7 @@ class ItemAtomicityTest : PersistenceTestSupport() {
         )
     }
 
-    private fun appendRaw(observation: RawNoticeObservation): ObservationKey {
-        val key = ObservationKey.of(observation)
-        dataSource().connection.use { connection ->
-            connection.prepareStatement(Sql.INSERT_RAW_OBSERVATION).use { statement ->
-                statement.setString(1, key.value)
-                statement.setString(2, observation.sourceEndpoint.name)
-                statement.setString(3, "{}")
-                statement.setTimestamp(4, java.sql.Timestamp.from(observation.observedAt))
-                statement.setString(5, "test-release")
-                statement.executeUpdate()
-            }
-        }
-        return key
-    }
+    private fun appendRaw(observation: RawNoticeObservation): ObservationKey = appendRawObservation(observation)
 
     private fun countNoticeRows(): Long =
         dataSource().connection.use { connection ->

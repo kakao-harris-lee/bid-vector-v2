@@ -3,49 +3,26 @@ package bidvector.procurement
 /**
  * raw 관측의 결정적 식별자(③, M3/3D 신설, ADR 0005 D-10.1 「domain이 의존하는 port는 domain
  * 안에 선다」) — 재수집 재시도가 같은 [RawNoticeObservation]을 다시 보내면 같은 키를 낸다
- * (append 멱등의 유일한 근거). [RawNoticeObservation]은 계약 없는 값 열람을 막으므로(위협
- * 모델 우회 (1)(10), `RawObservation.kt` 헤더 KDoc) 이 키는 그 클래스가 이미 공개한 표면만
- * 으로 짓는다 — [RawNoticeObservation.sourceEndpoint]·[RawNoticeObservation.observedAt]·
- * [RawNoticeObservation.keys](필드 **이름** 집합이지 값이 아니다) · `hashCode()`.
+ * (append 멱등의 유일한 근거). 이 타입 자체는 **값만** 나른다 — 유도(어떤 문자열을
+ * `ObservationKey`로 만들지 결정하는 규칙)는 **어댑터(3D adapters) 소유**다
+ * (verifier r1 F-2 뒤 정정).
  *
- * `hashCode()`는 `Objects.hash(fields, sourceEndpoint, observedAt)`이고, `String.hashCode()`는
- * JDK 문서가 다항식 공식을 고정하며 `Map.hashCode()`는 항목별 `key.hashCode() xor
- * value.hashCode()`의 합으로 정의된 인터페이스 계약이다 — `fields`(내용, 값 포함)·
- * `sourceEndpoint`·`observedAt`이 같으면 실행·JVM 세션이 달라도 **항상 같은 값**이 나온다.
- * 이것은 오버라이드하지 않은 `Object.hashCode()`(세션마다 달라짐)와는 다른 성질이다.
- *
- * **알려진 제한**: `hashCode()`는 32비트라 이론상 서로 다른 내용이 같은 지문으로 충돌할 수
- * 있다. sourceEndpoint·observedAt·필드 이름 집합을 함께 섞어 실무 위험을 낮추지만 완전히
- * 배제하지는 않는다 — 완전한 배제는 [RawNoticeObservation]에 전체 내용을 노출하는 API를
- * 더해야 하는데, 그 파일은 이 slice의 편집 대상이 아니다(scope.md out_of_scope, 「그 밖의
- * procurement 편집 금지」).
+ * **왜 procurement가 유도 규칙을 갖지 않는가**: 충돌에 강한 유도(암호학적 해시)는
+ * `java.security.MessageDigest`가 필요한데 domain 모듈은 그 패키지를 볼 수 없다
+ * (`architecture-policy.properties` T-C 허용 목록 밖). [RawNoticeObservation]이 계약 없는
+ * 값 열람도 막으므로(위협 모델 우회 (1)(10)) procurement 안에서 만들 수 있는 유일한
+ * 내용-기반 지문은 `Object.hashCode()`류(32비트, 충돌 가능 — 실측: `"Aa"`·`"BB"`가
+ * `String.hashCode()`에서 같은 값을 낸다)뿐이었고, 그것이 F-2의 원인이었다. 어댑터는
+ * `KonepsFieldContractRegistry`(계약 등재 필드 전체)에 접근할 수 있어 완전한 정본
+ * 직렬화(`ObservationPayloadCodec.encode`)를 얻고, `MessageDigest`도 domain 제약 밖이라
+ * SHA-256을 쓸 수 있다 — 실제 유도는 `bidvector.adapters.persistence
+ * .ObservationKeyDerivation.of(observation, fieldContracts)`.
  */
 data class ObservationKey(
     val value: String,
 ) {
     init {
         require(value.isNotBlank()) { "ObservationKey는 빈 문자열일 수 없다" }
-    }
-
-    companion object {
-        private const val SEPARATOR = "|"
-
-        /** [RawNoticeObservation] 하나에서 결정적으로 유도한다 — 같은 내용은 항상 같은 키. */
-        fun of(observation: RawNoticeObservation): ObservationKey {
-            val sortedKeyNames =
-                observation.keys
-                    .map { it.name }
-                    .sorted()
-                    .joinToString(separator = SEPARATOR)
-            val parts =
-                listOf(
-                    observation.sourceEndpoint.name,
-                    observation.observedAt.toString(),
-                    sortedKeyNames,
-                    observation.hashCode().toString(),
-                )
-            return ObservationKey(parts.joinToString(separator = SEPARATOR))
-        }
     }
 }
 

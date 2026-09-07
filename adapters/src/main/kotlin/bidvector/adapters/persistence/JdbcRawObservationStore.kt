@@ -22,8 +22,8 @@ class JdbcRawObservationStore(
     }
 
     override fun append(observation: RawNoticeObservation): ObservationKey {
-        val key = ObservationKey.of(observation)
         val payload = ObservationPayloadCodec.encode(observation, fieldContracts)
+        val key = ObservationKeyDerivation.of(observation, payload)
         dataSource.connection.use { connection ->
             connection.prepareStatement(Sql.INSERT_RAW_OBSERVATION).use { statement ->
                 var index = 1

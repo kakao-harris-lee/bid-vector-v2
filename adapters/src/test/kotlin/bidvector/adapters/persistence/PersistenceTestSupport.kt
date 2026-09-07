@@ -1,5 +1,9 @@
 package bidvector.adapters.persistence
 
+import bidvector.procurement.KONEPS_COLLECTION_POLICY
+import bidvector.procurement.KonepsFieldContractRegistry
+import bidvector.procurement.RawNoticeObservation
+import bidvector.sharedkernel.Resolution
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.BeforeEach
 import org.postgresql.ds.PGSimpleDataSource
@@ -7,7 +11,11 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import java.sql.Connection
+import java.time.LocalDate
 import javax.sql.DataSource
+
+/** test 전역 고정 배포 식별자 — 실제 출처는 M6 6C 소관, 여기서는 비어 있지 않은 값만 필요하다. */
+internal const val TEST_RELEASE_SHA = "test-release"
 
 /**
  * S-2~S-5 공유 하네스 — Testcontainers `PostgreSQLContainer` 하나를 재사용한다(3D 설계
@@ -29,6 +37,23 @@ abstract class PersistenceTestSupport {
             autoCommit = false
             createStatement().use { it.execute("SET ROLE bidvector_app") }
         }
+
+    /**
+     * 운영 필드 계약 레지스트리 — `KONEPS_COLLECTION_POLICY`는 `EffectiveFrom.Initial` 한
+     * entry뿐이라 기준일 값 자체는 관측에 영향이 없다(항상 적용된다).
+     */
+    protected fun testFieldContracts(): KonepsFieldContractRegistry {
+        val resolution = KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 9, 7))
+        return (resolution as Resolution.Resolved).value.fieldContracts
+    }
+
+    /**
+     * 실제 production 경로([JdbcRawObservationStore])로 raw를 append한다 — 손으로 짠 SQL
+     * 사본을 두지 않는다(verifier r1 「범위 밖 참고」 — production 경로 대신 test 사본을
+     * 지나는 자리였다).
+     */
+    protected fun appendRawObservation(observation: RawNoticeObservation) =
+        JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE_SHA).append(observation)
 
     @BeforeEach
     fun truncateAllTables() {
