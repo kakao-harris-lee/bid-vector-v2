@@ -7,7 +7,7 @@
 milestone: harness
 slice: test-discovery-guard
 base_sha: 7581106ecf7c52bbf8bb032adc233e90a8f1eb9b
-head_sha: 리뷰 시점의 HEAD
+head_sha: 6752791f04b0f3321345b478c406293ece35c0b6   # 리뷰 요청 시점(2026-09-07)
 in_scope:
   - build-logic/src/main/kotlin/bidvector/buildlogic/TestShapes.kt          # 순수 함수 — PSI 위 test 메서드 형태 판정
   - build-logic/src/main/kotlin/bidvector/buildlogic/TestShapeGateTask.kt   # Gradle task — 배선·report 만
@@ -43,6 +43,8 @@ rollback: |
 ## 하네스 레인 변경 (상시 절)
 
 `git log --oneline 7581106..HEAD -- CLAUDE.md .claude/` — 착수 시 없음. (이 slice 자체가 하네스 레인이다 — 3A 의 scope 「하네스 레인 변경」 절에 이 slice 의 커밋이 등재된다.)
+
+**리뷰 요청 시점(head `6752791`) 재확인 — 없음.** `git log --oneline 7581106..6752791 -- CLAUDE.md .claude/` 0건.
 
 ## 이 slice 가 하는 일
 
