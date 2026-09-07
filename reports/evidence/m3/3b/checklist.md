@@ -1,44 +1,55 @@
 # M3/3B — checklist.md
 
-base `c9d75632d3acafcaf41f0454e941dc49c62063ea` · head `3822351d6a3c4bbc38ac94acd5406297938bda3c`.
-정본 순서: `scope.md` → `_workspace/m3-3b/01_design-review.md` → 이 문서.
+base `c9d75632d3acafcaf41f0454e941dc49c62063ea` · head `401a3535bf1a8600d1ed8630441d7d1dfff8c777`
+(verifier r1 수정 라운드 1 뒤, evidence 커밋 제외). 정본 순서: `scope.md` →
+`_workspace/m3-3b/01_design-review.md` → `_workspace/m3-3b/02_verifier_report.md` → 이 문서.
 
 ## 완료 조건 대응표 — scope.md 「이 slice 가 하는 일」
 
 | # | 요구 | 구현 | test |
 | --- | --- | --- | --- |
 | ① | `NoticeSourcePort` 구현, 동기 facade, deadline·취소 | `KonepsOpenApiNoticeSource`(port impl) + `sendKonepsRequest`(JDK `HttpClient.sendAsync`+`future.get(timeout)`+`cancel(true)`) | 전 시나리오 test 가 이 경로를 통과 |
-| ② | Resilience4j 한 계층, 429/quota bounded retry+backoff | `buildKonepsRetry`+`buildKonepsRateLimiter`(`KonepsResilientCall.kt`) — `Retry`(바깥)·`RateLimiter`(안쪽) | 429 연속→성공, resultCode 22→성공 |
+| ② | Resilience4j 한 계층, 429/quota bounded retry+backoff, **회계에 quotaExceeded/backoffSkipped**(verifier r1 H-3 뒤 문면 그대로 충족) | `buildKonepsRetry`+`buildKonepsRateLimiter`(`KonepsResilientCall.kt`) + `KonepsAttemptCounters`(매 시도 관찰) + `CollectionAccounting.quotaExceeded`/`backoffSkipped`(procurement 좁은 확장) | 429 연속→성공(quotaExceeded=2), resultCode 22→성공(quotaExceeded=1) |
 | ③ | envelope·resultCode 검증, 3A 표 재사용 | `parseKonepsEnvelope`가 `KONEPS_COLLECTION_POLICY.resultCodeCategories` 를 읽기만 함 | 미지/부재 resultCode 2건 |
-| ④ | pagination 백스톱 | `maxPages`+동일 페이지 해시(`render()`) 반복 감지 | totalCount 없음+반복 페이지 |
-| ⑤ | partial·duplicate | 걷기 전체에 걸친 `NoticeIdentity` dedup(`KonepsPageWalkAccumulator.seenIdentities`) | — (직접 assert 는 안 했으나 429 재시도 시나리오가 같은 페이지를 다시 안 세는 것으로 간접 확인, 아래 「미달」 참고) |
-| ⑥ | parse 실패는 명시값, 숫자/일시 변환 없음 | `mapRawItem`은 raw 문자열만 옮긴다(`toRawValue`) — canonicalize 안 부름 | COL-07(unknownFields) |
+| ④ | pagination 백스톱 | `maxPages`+동일 페이지 해시(`render()`) 반복 감지(직전 한 페이지와만 비교 — 아래 「알려진 제한」) | totalCount 없음+반복 페이지 |
+| ⑤ | partial·duplicate | 걷기 전체에 걸친 `NoticeIdentity` dedup(공고번호는 canonical `NoticeNumber`, 차수는 형식이 맞으면 canonical·아니면 원문 — verifier r1 M-2) | M-2 test(canonical 같음·원문 다름 → duplicate) |
+| ⑥ | parse 실패는 명시값, 숫자/일시 변환 없음 | `mapRawItem`은 raw 문자열만 옮긴다(`toRawValue`, JSON boolean 도 토큰 텍스트 그대로 — verifier r1 M-1) | COL-07(unknownFields), M-1(boolean byte-identity) |
 | ⑦ | mock server, scope 시나리오 | `MockKonepsServer`(JDK `HttpServer`, loopback) | 아래 시나리오 표 |
 | ⑧ | 표적조회·서브콜 | **범위 밖**(D-3B-6, 아래 「범위 분할」) | — |
 
-## 시나리오 대응표 — scope.md ⑦
+## 시나리오 대응표 — scope.md ⑦(9 항목, test 는 10개 — 마지막 항목이 22·30 두 test 로 갈린다, L-9 정정)
 
 | 시나리오(scope 문면) | test 메서드(`KonepsOpenApiNoticeSourceTest`) | 결과 |
 | --- | --- | --- |
 | 4건 중 1건 공고번호 없음 → 3+dropped=1(COL-01) | `COL-01 — 4건 중 1건 공고번호 없음이면 3건 수집 + dropped 1` | PASS |
-| 429 연속 n회 뒤 성공(호출 횟수=서버 카운터) | `429 연속 실패 뒤 성공 — 재시도 상한 안에서 회복, 호출 횟수는 서버 카운터로 단언` | PASS(호출 3회 단언) |
-| timeout | `timeout 이 반복되면 재시도 상한 뒤 truncated 로 종료된다` | PASS(호출 2회, 서버는 스레드풀 executor 필요 — 아래 「알려진 함정」) |
-| totalCount 없음+같은 페이지 반복→truncated | `totalCount 없음 + 같은 페이지 반복이면 유한 페이지에서 truncated 로 끝난다` | PASS(2회 호출 뒤 종료) |
-| 미지 resultCode | `미지 resultCode 는 Unclassified 로 비재시도 실패한다` | PASS(1회, 비재시도 확인) |
-| 부재 resultCode | `resultCode 자체가 부재하면 Unclassified 로 비재시도 실패한다` | PASS |
+| 429 연속 n회 뒤 성공(호출 횟수=서버 카운터) | `429 연속 실패 뒤 성공 — 재시도 상한 안에서 회복, 호출 횟수는 서버 카운터로 단언` | PASS(호출 3회, quotaExceeded=2) |
+| timeout | `timeout 이 반복되면 재시도 상한 뒤 truncated 로 종료된다` | PASS(호출 2회 — mock server 는 지연 응답 중에도 재시도 요청을 받을 수 있는 스레드풀 executor 가 필요하다, 「알려진 함정」) |
+| totalCount 없음+같은 페이지 반복→truncated | `totalCount 없음 + 같은 페이지 반복이면 유한 페이지에서 truncated 로 끝난다` | PASS(2회 호출, pagesFetched=2 — 반복 페이지도 호출은 나갔으므로 센다, L-8) |
+| 미지 resultCode | `미지 resultCode 는 Unclassified 로 비재시도 실패한다` | PASS(1회, truncationCause=Unclassified) |
+| 부재 resultCode | `resultCode 자체가 부재하면 Unclassified 로 비재시도 실패한다` | PASS(truncationCause=Unclassified) |
 | 미지 raw 키(COL-07 unknownFields) | `계약에 없는 raw 키는 항목을 살리되 unknownFields 로 계수한다 COL-07` | PASS |
 | `03` NoData | `resultCode 03 은 실패가 아니라 데이터 없음이다` | PASS(sourceTotal=0, truncated=false) |
-| `22`/`30` quota | `resultCode 22 는 quota 초과로 재시도 대상이다` · `resultCode 30 은 등록되지 않은 서비스 키 — 비재시도` | PASS(22=재시도, 30=비재시도 — D-3B-7 구별 확인) |
+| quota `22` | `resultCode 22 는 quota 초과로 재시도 대상이다` | PASS(재시도 뒤 성공, quotaExceeded=1) |
+| 등록되지 않은 키 `30` | `resultCode 30 은 등록되지 않은 서비스 키 — 비재시도` | PASS(truncationCause=NotRetryable) |
 
-부가: `ServiceKeyTest`(D-3B-5, 3 test) · `KonepsAdapterDependencyTest`(S-3b, 1 test). 총 14 test.
+## verifier r1 finding 재현 test — scope ⑦ 목록 밖(추가 test, 대응표는 아래 「finding 대응」)
+
+`H-2 — 빈 문자열·공백 공고번호도 COL-01 탈락에 걸린다` · `H-3 — 다섯 truncation 사유가
+회계에서 바이트 동일하지 않고 서로 구별된다` · `M-1 — JSON boolean 은 Y N 으로 바뀌지
+않고 원문 토큰 텍스트 그대로 옮겨진다` · `M-2 — canonical 공고번호가 같으면 원문 표기가
+달라도 duplicate 로 계수된다` · `M-5 — cursor 토큰이 숫자가 아니거나 0 이하면 조용히
+page 1 로 접지 않고 명시 실패를 낸다` · `L-5 — 항목 안 중복 JSON 키는 마지막 값이
+승리한다` · `M-4 — JSON 중첩 깊이가 정책 상한을 넘으면 StructureFailure 로 접히고 예외가
+안 샌다`. 전 7건 PASS. `KonepsOpenApiNoticeSourceTest` 총 17 test + `ServiceKeyTest`
+3(D-3B-5) + `KonepsAdapterDependencyTest` 1(S-3b) = **21 test**.
 
 ## 위협 모델 대응표 — scope.md 「방어한다」
 
 | 방어 항목 | 메커니즘 | 증거 |
 | --- | --- | --- |
-| (a) 무한 pagination | `maxPages` + 동일 페이지 해시 감지, 종료가 구성상(루프에 무한 경로 없음) | 「totalCount 없음+반복」 test |
-| (b) 429 폭주 | `RateLimiter`(자체 quota 보호)+`Retry`(bounded, backoff 시도별 목록) | 429 test, `Throttled` 코드 경로(직접 test 없음, 아래 「미달」) |
-| (c) parse 실패의 조용한 0/None | 3B 는 숫자·일시를 파싱하지 않는다(⑥) — 실패할 파싱 자체가 없다. envelope 구조 실패는 `StructureFailure`(페이지 종료, `truncated`) | JSON 파서 단위 동작은 envelope test 가 간접 커버 |
+| (a) 무한 pagination | `maxPages` + 직전 한 페이지와의 내용 해시 비교(연속 반복만 직접 감지 — 비연속 순환은 `maxPages` 백스톱이 닫는다, 아래 「알려진 제한」) | 「totalCount 없음+반복」 test |
+| (b) 429 폭주 | `RateLimiter`(자체 quota 보호)+`Retry`(bounded, backoff 시도별 목록), `quotaExceeded`/`backoffSkipped` 계수(H-3) | 429/22 test, `Throttled` 코드 경로(직접 test 없음, 「알려진 제한」) |
+| (c) parse 실패의 조용한 0/None | 3B 는 숫자·일시를 파싱하지 않는다(⑥) — 실패할 파싱 자체가 없다. envelope 구조 실패는 `StructureFailure`(페이지 종료, `truncated`, `truncationCause`로 구별) | M-4(깊이 상한), envelope test |
 | (d) 미지 resultCode 의 성공 취급 | `classify`가 `00`/`03`/등재 코드 외 전부 `Unclassified`(비재시도) | 미지·부재 resultCode 2 test |
 | (e) 서비스 키 노출 | `ServiceKey.toString()` 가림, `urlEncoded` 만 요청 URI 생성에 쓰인다 | `ServiceKeyTest` + secret 스캔(commands.md) |
 | (f) 재시도 이중화 | 어댑터 안에 `Retry` 인스턴스 하나(생성자에서 1회 구성) — 스케줄러 재실행 배선은 M4 리뷰 항목(3B 는 만들지 않는다) | 코드 열람(`KonepsOpenApiNoticeSource` 생성자) |
@@ -47,9 +58,9 @@ base `c9d75632d3acafcaf41f0454e941dc49c62063ea` · head `3822351d6a3c4bbc38ac94a
 
 | # | 우회 | 막는 장치 |
 | --- | --- | --- |
-| 1 | 429 를 catch 해 빈 배치로 성공 위장 | `isRetryableStep`이 HTTP 429/`resultCode` RETRYABLE·QUOTA_EXCEEDED 를 재시도로만 두고, 소진 시 `Failed`→`markTruncated()` — 「조용한 성공」 경로 없음(429 test 가 최종 성공 시 `truncated=false`, 실패 소진 시나리오는 timeout/미지코드 test 가 `truncated=true` 로 확인) |
-| 2 | `totalCount` 무시, 고정 페이지 수 | 반복 페이지 백스톱 test 가 `truncated=true` 를 직접 단언 |
-| 3 | parse 실패를 `0` 으로 | 3B 에 숫자 파싱 코드가 없다(`mapRawItem`이 `toRawValue`로 원문만 옮김) — 리뷰로 확인 가능, 정적 근거: `KonepsRawItemMapper.kt` 에 `toInt`/`toBigDecimal`/`toDouble` 호출 0건 |
+| 1 | 429 를 catch 해 빈 배치로 성공 위장 | `isRetryableStep`이 HTTP 429/`resultCode` RETRYABLE·QUOTA_EXCEEDED 를 재시도로만 두고, 소진 시 `Failed(TruncationCause.QuotaExhausted,…)`→`markTruncated` — 회계에 `quotaExceeded` 로 실린다(H-3) |
+| 2 | `totalCount` 무시, 고정 페이지 수 | 반복 페이지 백스톱 test 가 `truncated=true`·`truncationCause=RepeatedPage` 를 직접 단언 |
+| 3 | parse 실패를 `0` 으로 | 3B 에 숫자 파싱 코드가 없다(`mapRawItem`이 `toRawValue`로 원문만 옮김) — 정적 근거: `KonepsRawItemMapper.kt` 에 `toInt`/`toBigDecimal`/`toDouble` 호출 0건 |
 | 4 | client+Resilience4j 이중 재시도 | `sendKonepsRequest` 자체는 재시도하지 않는다(단발 호출) — 재시도는 `fetchPageResilient` 한 곳에서만 감싼다 |
 | 5 | 서비스 키를 URL 로그에 | `ServiceKey`는 `urlEncoded`(get-only)로만 원문을 노출하고 `toString()`은 가린다 — 로깅 코드 자체가 없다(3B 는 로그를 남기지 않는다) |
 | 6 | 골든을 test 리소스에 복사 | `fixtures/input/koneps/**` 가 없어 참조할 golden 자체가 없다 — self-authored 데이터임을 KDoc·이 문서에 명시, 바이트 교집합 0 실측(commands.md) |
@@ -59,7 +70,10 @@ base `c9d75632d3acafcaf41f0454e941dc49c62063ea` · head `3822351d6a3c4bbc38ac94a
 scope.md 「이 slice 가 하는 일」 표의 ⑧행(표적조회·서브콜)은 **착수 시 계약 정정 ③** 이
 범위 밖으로 이미 옮겼다 — `OpeningResultSourcePort`·`DocumentSourcePort`·license-limit
 서브콜·`inqryDiv=2` 표적조회는 이 커밋 묶음에 없다. `NoticeSourcePort`(`inqryDiv=1`, 날짜
-조회)만 구현한다.
+조회)만 구현한다. **L-7(verifier r1)** — 설계 노트(`01_design-review.md` ⑧행)는 「표적조회는
+공고 축이므로 포함」이라 적고 정정 ③ 은 `inqryDiv=2` 를 직접 언급하지 않아, 두 문서 문면이
+어긋난 채 남아 있다. 이 문서(구현 레인 소유)가 아니라 설계 노트(세션 모델 소유) 쪽의 정정이
+필요해 이 slice 가 고치지 않는다 — 오케스트레이터에 등재만 한다.
 
 ## 판단이 갈린 지점 — 계약이 명시하지 않아 이 레인이 정한 것
 
@@ -67,58 +81,74 @@ scope.md 「이 slice 가 하는 일」 표의 ⑧행(표적조회·서브콜)�
    만 보면 「페이지 하나=호출 하나」로도 읽을 수 있으나, scope ⑦의 「totalCount 없음+같은
    페이지 반복 → truncated」 시나리오가 **단일 어댑터 호출**을 겨눈 mock server test 로
    서술돼 있어 내부 다중 페이지 순회로 해석했다. `cursor`는 재개 시작 페이지로만 쓴다.
-2. **dedup 식별자는 canonical `NoticeId`가 아니라 원문 텍스트 짝(`NoticeIdentity`).**
-   `NoticeRound.of`가 제로패딩 3자리 형식을 `require`로 강제해, 원문이 그 형식을 벗어나면
-   dedup 계산 자체가 예외를 던질 위험이 있었다 — 「업무 control flow 에 exception 안 씀」
-   원칙에 따라 원문 비교로 낮췄다.
+   verifier r1 이 동의했다(§3 (1)) — 다만 그 해석은 `next` 가 의미 있어야 한다는 의무를
+ 지는데 초판은 항상 `null` 이었다 → **M-3 로 닫았다**(truncated 시 재개 cursor를 낸다).
+2. **dedup 식별자 — verifier r1 M-2 로 절반 정정.** 초판은 원문 텍스트 짝이었다(`NoticeRound
+   .of`가 제로패딩 3자리를 강제해 예외 위험이 있다는 이유). 재검증(P6)이 그 근거가
+   **차수 축에만** 서고 공고번호 축(`NoticeNumber.of`는 blank 외에 안 던진다)에는 서지
+   않음을 실측했다 — H-2 로 blank 를 먼저 걸러 공고번호 축을 canonical 로 좁혔다. 차수
+   축은 형식이 맞을 때만 canonical, 아니면 원문 폴백(예외 위험은 남겨 두되 흐르지 않게).
 3. **envelope 구조 실패(JSON 파싱 실패·`response`/`body`/`items` 형태 위반)는 페이지 단위
-   종료(`StructureFailure`→`truncated`)로 처리했다** — 설계 검토 KDoc 이 언급한
-   `ParseFailure(kind=Envelope)`는 3A `ParseFailureKind`(NUMERIC/DATE_TIME/IDENTIFIER)에
-   그 축이 없어(procurement 는 범위 밖) 항목 단위 사유로 표현할 수 없었다.
-4. **quota/429 소진의 회계 표현은 `CollectionAccounting.truncated=true`(+`pagesFetched`
-   축소) 하나다.** scope 문면의 "회계에 `backoffSkipped`/`quotaExceeded`로" 는 3A
-   `CollectionAccounting`(procurement, 범위 밖)에 그런 필드가 없어 문자 그대로 옮길 수
-   없었다 — COL-03 acceptance의 실질("나머지 수집은 계속되며 회계에 실린다")은 이미 수집된
-   페이지까지는 살아남고 `truncated` 로 그 사실이 관측 가능하다는 형태로 만족한다.
+   종료(`StructureFailure`→`truncated`, `truncationCause=StructureFailure`)로 처리했다** —
+   설계 검토 KDoc 이 언급한 `ParseFailure(kind=Envelope)`는 3A `ParseFailureKind`
+   (NUMERIC/DATE_TIME/IDENTIFIER)에 그 축이 없어 항목 단위 사유로 표현할 수 없었다. 그
+   결과 회계에 흔적이 안 남는다는 verifier r1 지적(§3 (3))은 **H-3 의 `truncationCause`
+   로 닫혔다** — 구조 실패는 이제 다른 네 사유와 바이트로 구별된다.
+4. **quota/429 회계 — verifier r1 H-3 로 해소.** 초판은 `CollectionAccounting.truncated`
+   하나로만 표현했다(3A 타입에 `quotaExceeded`/`backoffSkipped` 필드가 없었다). 운영자
+   결정 2026-09-07 로 그 두 필드가 3A 좁은 확장으로 추가돼(procurement in_scope 예외)
+   scope ② 문면을 그대로 충족한다 — 더 이상 「대체 표현」이 아니다.
 5. **JSON 파서를 새로 짰다**(외부 좌표 미도입) — envelope 형태가 좁고, `architecture-policy`
    의 `group.forbidden`(jackson·kotlinx-serialization·gson·org.json)이 domain 층 금지
    결의를 이 adapters 패키지도 자체 적용했다(CLAUDE.md 재사용 우선 방침의 "무거운 도구는
    측정된 필요 없이 도입 안 함" 축). `resilience4j-kotlin`은 카탈로그에만 등재하고
-   실제로는 끌어오지 않았다(Java API 로 충분).
+   실제로는 끌어오지 않았다(Java API 로 충분). 파서에 중첩 깊이 상한을 추가했다(M-4).
 6. **`gradle/libs.versions.toml` 을 편집했다** — scope.md in_scope 목록에 이 파일이
    명시되지 않았으나 `adapters/build.gradle.kts` 가 요구하는 카탈로그 좌표
    (`resilience4j-ratelimiter`·`resilience4j-kotlin`)의 기계적 선행 조건이라 함께
-   편집했다. rollback.md 도 같은 경계로 되돌린다.
+   편집했다. 세션 모델이 착수 뒤 in_scope 에 추가해 정정됐다(verifier r1 §3 (5), 이의 없음).
 7. **업종별(물품/용역/공사/외자) KONEPS 오퍼레이션 선택은 미정이다** — `baseUri` 생성자
    인자로 열어 두고 이 slice 는 어느 것이 옳은지 검증하지 않는다(실제 호출이 범위
    밖이라 검증 수단이 없다).
 
 ## 알려진 제한
 
-- **골든 fixture 부재** — `fixtures/input/koneps/**`(D-3B-1 (a) 정본 자리)가 아직 없다.
-  시나리오 test 의 envelope JSON 은 curator 승인 case 의 바이트 복제가 아니라 이 레인이
-  authoritative 필드명(`policy-values.md` §1.1·§1.3·§1.6)으로 직접 지었다 — curator 가
-  실제 KONEPS wire-format 골든을 확보하면 `bidvector.fixtures.koneps` 시스템 프로퍼티
-  배선(2A `bidvector.contracts.testdata` 관례)을 추가해 이 test 들을 그쪽으로 옮기는
-  후속 작업이 필요하다(이번 slice 는 그 배선 자체를 넣지 않았다 — 가리킬 디렉터리가
-  없는 채로 `inputs.dir`를 걸면 오해를 부른다고 판단).
+- **골든 fixture 부재 — 문면을 좁힌다(verifier r1 L-3).** `fixtures/input/koneps-collection-
+  *.json` 27개는 **실재한다**(3A 가 만든 curator 승인 corpus). 없는 것은 (a) 실제 KONEPS
+  wire envelope 형태(`response.header.resultCode`/`body.items` 를 가진 JSON — 27개 중
+  `resultCode` 를 담은 것은 013·027 둘뿐이고 둘 다 문서 발췌 형태다) (b) `fixtures/input/
+  koneps/**` 라는 하위 디렉터리(D-3B-1 (a) 가 정한 정본 자리). 시나리오 test 의 envelope
+  JSON 은 curator 승인 case 의 바이트 복제가 아니라 이 레인이 authoritative
+  필드명(`policy-values.md` §1.1·§1.3·§1.6)으로 직접 지었다 — curator 가 실제 wire-format
+  골든을 확보하면 `bidvector.fixtures.koneps` 시스템 프로퍼티 배선(2A `bidvector
+  .contracts.testdata` 관례)을 추가해 이 test 들을 그쪽으로 옮기는 후속 작업이 필요하다
+  (이번 slice 는 그 배선 자체를 넣지 않았다 — 가리킬 디렉터리가 없는 채로 `inputs.dir`를
+  걸면 오해를 부른다고 판단).
 - **rate limiter 자체 거부(`Throttled`) 경로에 전용 test 가 없다** — scope ⑦ 목록에
   없고, 결정론적으로 유발하려면 동시 호출이 필요해 단위 test 로 만들면 flaky 해진다.
-  코드 경로는 있다(`fetchPageResilient`의 `catch (RequestNotPermitted)`).
+  코드 경로는 있다(`fetchPageResilient`의 `catch (RequestNotPermitted)` →
+  `TruncationCause.SelfThrottled`).
+- **반복 페이지 감지는 직전 한 페이지만 본다(verifier r1 L-6).** `lastPageSignature` 는
+  가장 최근 페이지 하나와만 비교한다 — 교대 패턴(A,B,A,B…)처럼 비연속 반복은 이 감지기
+  단독으로 못 잡는다(R2 probe 실측). `maxPages` 백스톱과 걷기 전체 dedup 이 함께 닫는다
+  (교대 페이지가 40장 와도 `maxPages` 에서 종료하고 중복 항목은 `duplicate` 로 계수된다).
 - **실제 KONEPS 호출 정확성은 검증하지 않는다**(out_of_scope) — 오퍼레이션 경로·쿼리
   파라미터 이름(`inqryBgnDt`/`inqryEndDt` 등)이 실물과 다를 위험은 실제 네트워크 호출
   승인 뒤에만 닫힌다.
 - **표적조회·`OpeningResultSourcePort`·license-limit 서브콜 없음**(D-3B-6, 범위 분할 ③).
+- **L-7 미해결** — 위 「범위 분할」 절 참고. 설계 노트 문면 정정은 세션 모델 소관.
 
 ## 병렬 레인 경계 확인
 
 `git status --porcelain` 최종 상태 — `adapters/src/{main,test}/kotlin/bidvector/adapters/
-koneps/**`·`adapters/build.gradle.kts`·`config/quality/gate-tests.properties`·
-`gradle/libs.versions.toml`·`reports/evidence/m3/3b/**` 만 변경. `procurement/**`·
-`fixtures/**`·`docs/**`·`build-logic/**`·다른 세션의 untracked 파일 없음(commands.md
-clean-tree 절 참고).
+koneps/**`·`adapters/build.gradle.kts`·`gradle/libs.versions.toml`·`config/quality/
+gate-tests.properties`·`procurement/src/main/.../Accounting.kt`·`procurement/src/test/
+.../AccountingTest.kt`(H-3 좁은 확장, in_scope)·`reports/evidence/m3/3b/**` 만 변경.
+`fixtures/**`·`docs/**`·`build-logic/**`·다른 procurement 파일·다른 세션의 untracked
+파일 없음(commands.md clean-tree 절 참고).
 
 ## 스테이징 규율
 
 전 커밋이 `git add <in_scope 경로>` 개별 인자(`-A`·`-a`·`.` 미사용) 뒤 `git commit`(같은
-메시지 안에서 add+commit 분리 없음 — parallel-lane 오염 회피).
+메시지 안에서 add+commit 분리 없음 — parallel-lane 오염 회피). 3A `Accounting.kt`·
+`AccountingTest.kt` 편집은 H-3 운영자 결정으로 in_scope 예외가 열린 뒤에만, 별도 커밋으로.
