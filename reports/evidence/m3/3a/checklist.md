@@ -257,3 +257,13 @@ team-lead 판정(2026-09-07, 「7건 전부 v2-defect 로 동의」)에 따라 6
   방식의 "unit 리터럴 회귀 가드"는 그래서 이 축에 대해서는 무의미하다(항상 같은 값이라
   회귀와 정상을 구별할 표본이 만들어지지 않는다) — vatTreatment처럼 여러 실제 값이 흐르는
   축이 아니다.
+
+## 사용자 승인 — 2026-09-07, slice 3A 종결
+
+verifier r1 `not-ready`(F-1 blocker 미발견 property test · F-2 high `unit` 슬롯) → r2 `not-ready`(N-1 high `of()` 팩토리로 조립 폐쇄 미완) →
+r3 `ready-for-review`(head `d8f396e`) + 잔여 일괄 `30cc248`·`c9d7563` 위에서 **사용자 승인 2026-09-07**. 재작업 2/5. 세션 모델 계약 정정
+`55f25ee`·`e2a879a`·`f5b4ea1`. curator 레인 승인(27 case authoritative `5acd5f0`, `policy-values.md` 2026-09-07) 뒤 잔여 일괄로 정책 값·
+dispatch 27/27·binding 을 흡수했고, corpus 가 드러낸 v2-defect 7건(002·003·004·016·018·023·026)은 전부 production 수정으로 닫았다.
+알려진 제한(밴드 표 빈 것 `OPEN-DEC-10` · 「미확정」 과세 = `UNKNOWN` `OPEN-REG-05` · 002·003/004 corpus 판별력 없음 · gateExecutionGate 단방향 ·
+비ASCII 공백)은 등재 유지. 운영자 결정 셋: 016 업무구분 열거값의 정책 표 별도 승인 항목(P-7)은 **curator 레인에 전달**(인계
+`_workspace/m3-3a/05_handoff_to_curator_P7.md`) · 3B 착수 전 결정 **D-3B-1 (a)**(fixtures 정본, 사본 금지) + 3B 착수 · **`origin/main` push** 지금.

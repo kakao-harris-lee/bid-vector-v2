@@ -1,4 +1,4 @@
-# Slice 계약 — M3 / 3B · OpenAPI adapter — **초안, 구현 전**
+# Slice 계약 — M3 / 3B · OpenAPI adapter — **착수 2026-09-07**
 
 > **지위**: M2 진행 중에 세션 모델이 쓴 **계약 초안**. 착수는 3A 승인 뒤, 그리고 **M2 2A 가 `adapters/build.gradle.kts`·`adapters/src/test`
 > 편집을 끝낸 뒤**(경로 겹침 — 내용 의존은 없음). 그때 `base_sha` 재고정, `prep/m3-prep.md` D-M3-1·2·5 답 수령, 착수 문단.
@@ -6,7 +6,7 @@
 ```yaml
 milestone: m3
 slice: 3b-openapi-adapter
-base_sha: 040ab9d   # 초안 시점 앵커 — **3A 승인·2A 머지 뒤 착수 시 재고정**
+base_sha: c9d75632d3acafcaf41f0454e941dc49c62063ea   # 착수 2026-09-07 재고정 = 3A 최종 head(종결 승인 시점). 초안 시점은 040ab9d
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/koneps/**   # port 구현: HTTP client·envelope 검증·pagination·parse·회계 산출·정책 소비
@@ -40,7 +40,19 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시.
+`git log --oneline c9d7563..HEAD -- CLAUDE.md .claude/` — 착수 시점(2026-09-07) **없음**.
+
+**착수 2026-09-07 — 운영자 결정**: D-3B-1 (a) · D-M3-1 (a)·D-M3-2 (c)·D-M3-5 (a)(M3 착수 시) · D-3B-6(공고 축 먼저, 개찰·예비가격 축은 ScsbidInfoService
+참고자료 확보 뒤 — 문서 레인 등재) · D-3B-7(resultCode `03` 세 번째 상태 · quota 신호 `22`·`30`). **착수 시 계약 정정(세션 모델)**: ① 3A 의 port 는 `suspend` 없는
+동기 시그니처(`Continuation` 이 domain 허용 밖)이므로 ① 「각 호출에 deadline·취소 전파」는 어댑터 경계 안(JDK `HttpClient` 비동기 + timeout, 코루틴은
+어댑터 내부)에서 하고 port 구현은 동기 facade — 3A `Ports.kt` KDoc 이 그렇게 위임한다. ② in_scope 의 `adapters/build.gradle.kts` 병합 주석은 M2 종결로
+조건 해제. ③ **범위 분할**: 이 slice 는 `NoticeSourcePort` 구현 + 공통 기반(HTTP client·Resilience4j·envelope·pagination·parse 실패·회계·mock server)까지,
+`OpeningResultSourcePort`(⑧ 의 예비가격·개찰) 는 D-3B-6 선행 조건 충족 뒤 **같은 slice 의 2차 커밋 묶음 또는 별도 slice 3B-2** — 착수 시 미정, 참고자료 도착
+시 운영자 결정. 정책 값 초기값은 3A `policy-values.md` §3(resultCode 범주)·`adapters` 정책 데이터(timeout·retry·backoff·rate·최대 페이지 — 「보수적 +
+관측 갱신」, 출처 조사 a-4·a-5, `legacy-behavior`/`observed` 층 표기).
+
+**병렬 레인 경계(공유 working tree)**: 3B 구현 레인은 `adapters/src/{main,test}/kotlin/bidvector/adapters/koneps/**`·`adapters/build.gradle.kts`·
+`config/quality/gate-tests.properties`·`reports/evidence/m3/3b/**` 만. `procurement/**`·`fixtures/**`·`docs/**`·`build-logic/**` 은 다른 레인·slice 소유.
 
 ---
 
@@ -65,7 +77,7 @@ rollback: |
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
-| **D-3B-1** | **골든 응답의 정본 자리** — `fixtures/input/koneps/**`(curator 관리) vs `adapters/src/test/resources` | (a) **fixtures 가 정본, test 는 경로 참조**(1B-c 관례 — 복사본 금지) (b) test 리소스로 복사 | **(a)** — 두 자리에 같은 바이트가 있으면 갈린다 | 착수 전 |
+| **D-3B-1** ✅ (a) 승인 2026-09-07 | **골든 응답의 정본 자리** — `fixtures/input/koneps/**`(curator 관리) vs `adapters/src/test/resources` | (a) **fixtures 가 정본, test 는 경로 참조**(1B-c 관례 — 복사본 금지) (b) test 리소스로 복사 | **(a)** — 두 자리에 같은 바이트가 있으면 갈린다 | 착수 전 |
 | **D-3B-2** | 정책값(timeout·retry 상한·백오프·rate·최대 페이지)은 `adapters` 정책 데이터, 초기값 「보수적 + 관측 갱신」(D-M3-5) | — | 계약 고정 |
 | **D-3B-3** | 재시도 계층은 **Resilience4j 하나** — 스케줄러(M4)는 3B 호출을 재실행하지 않는다(ADR 0005 D-11 표 「외부 호출」 행) | — | 계약 고정 |
 | **D-3B-4** | mock server 는 loopback in-process — verifier 로컬 실측 가능, Codex 레인은 코드 slice 비대상. CI 러너에서 loopback 소켓 허용 여부는 착수 시 확인 | — | 계약 고정 |

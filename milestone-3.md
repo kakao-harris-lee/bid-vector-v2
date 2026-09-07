@@ -29,6 +29,14 @@
 정합은 `OPEN-3A-AGGREGATE`) · **D-3A-2 (a)** 정책 값은 curator 가 legacy `field_contract_spec.py`·조달청 참고자료에서 추출 + 운영자 승인, 3A 는 형태
 + test 인스턴스, 운영 값 인스턴스(Kotlin `EffectiveDatedPolicy`, 1C 관례)는 승인 뒤 한 커밋. Phase 2.5 설계 검토는 세션 모델이 직접 한다.
 
+**3A 종결 2026-09-07** — verifier r3 ready-for-review + 사용자 승인(`reports/evidence/m3/3a/checklist.md` 「사용자 승인」, 최종 head `c9d7563`).
+산출: shared-kernel `NoticeRound`(`Published`·`FloorRateOrigin.NoticeValue` 타입 교체, app executor 의 `toInt` 접힘 제거), `procurement` 도메인(식별자·
+원문 관측 `RawValue`·필드 계약 레지스트리 열셋 슬롯·`canonicalize`/`resolveAmount` 한 지점·`ResolvedBaseAmount`·회계 항등식·전이표·조회 가치 술어·
+port 셋·수집 fact 셋·시각 해석·§5.5 수집 형태), 승인 정책 값 인스턴스, `koneps-collection` 27/27 dispatch. 검증이 드러낸 것: 미발견 property test
+(하네스 `testShapeGate` 첫 실전), `of()` 팩토리의 조립 폐쇄 미완, corpus 가 잡은 v2-defect 7(그중 026 은 KONEPS 실제 시각 형식에서 파서가 항상
+null). port 는 `suspend` 없이 동기 시그니처(`Continuation` 이 domain 허용 밖) — 취소·deadline 전파는 3B 어댑터. 후속: 016 업무구분 열거값의 정책 표
+P-7 등재(curator).
+
 ### Slice 3B — OpenAPI adapter
 
 - 비동기 HTTP client, timeout, quota, bounded retry/backoff
@@ -36,6 +44,13 @@
 - pagination, partial response, duplicate item 처리
 - contract mock server test
 - 숫자/날짜/encoding parse failure를 명시적 결과로 반환
+
+**3B 착수 2026-09-07** — 3A 종결 같은 날. 계약 정본 `reports/evidence/m3/3b/scope.md`(base `c9d7563`). 착수 전 결정: **D-3B-1 (a)** 골든 응답의 정본은
+`fixtures/input/koneps/**`(curator 관리), test 는 경로 참조(1B-c 관례, 사본 금지) · D-M3-1 (a) JDK `HttpClient` + 코루틴 · D-M3-2 (c) JDK `HttpServer` mock 1차 ·
+D-M3-5 (a) 키 variant 불채택 + rate limit 정책값. 문서 레인이 미리 등재한 **D-3B-6**: 개찰·예비가격 축(`OpeningResultSourcePort` 구현)은 ScsbidInfoService
+참고자료 확보를 선행 조건으로 두고 **공고 축(`NoticeSourcePort` 구현)부터 진행** · **D-3B-7**: resultCode `03`(No Data) 은 성공도 실패도 아닌 세 번째 상태,
+quota 는 HTTP 429 뿐 아니라 `resultCode 22·30`(키 미인코딩) 도 신호. 3A 의 port 가 동기 시그니처이므로 3B 어댑터가 timeout·취소·deadline 을 자기
+경계 안에서 처리하고 port 계약은 그대로 구현한다. 설계 노트 `_workspace/m3-3b/01_design-review.md`(세션 모델 직접).
 
 ### Slice 3C — 문서/LLM extraction adapter
 

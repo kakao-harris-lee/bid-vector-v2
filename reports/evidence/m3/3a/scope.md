@@ -1,4 +1,4 @@
-# Slice 계약 — M3 / 3A · 수집 port 와 canonical fact — **착수 2026-09-07**
+# Slice 계약 — M3 / 3A · 수집 port 와 canonical fact — **종결 2026-09-07**
 
 > **지위**: M2 진행 중에 세션 모델이 쓴 **계약 초안**. 구현·gradle·fixture 편집 없음. 착수는 M2 계약 승인 뒤 운영자 지시로 하며 그때
 > `base_sha` 재고정(40자), `prep/m3-prep.md` D-M3-3·4·8 과 아래 D-3A-0~2 답 수령, `milestone-3.md` 착수 문단. 3A 의 도메인 코드는 M2 경로와
@@ -67,6 +67,11 @@ corpus 9 case 는 입력 안에 `fieldContract.registeredKeys` 를 들고 있어
 **병렬 레인 경계(착수 시, 공유 working tree)**: curator 레인 = `fixtures/**` + `reports/evidence/m3/3a/policy-values.md` + `fixtures-*.md` evidence ·
 문서 레인 = `docs/discovery/**`·`reports/evidence/m3/{3c,3d}/**` · 하네스 레인 = `build-logic/**`·`contracts/tools/**`·`config/quality/**` **단
 `gate-tests.properties` 제외**(3A in_scope). 3A 구현 레인은 그 경로들을 편집하지 않고, 각 레인은 자기 경로만 개별 `git add` 후 즉시 커밋.
+
+**종결 시점(2026-09-07, 최종 head `c9d7563`)** — 하네스 커밋(`CLAUDE.md`·`.claude/`) **없음**. range 에 병렬 레인 커밋이 섞여 있다: curator(fixtures 승격·신설·승인,
+`policy-values.md`), 문서(3C·3D 초안·`OPEN-3A-*` 등재·3B D-3B-6·7), 하네스 slice `test-discovery-guard`(`build-logic/**`·`config/quality/test-shape-policy.properties`·
+`contracts/tools/**`·`reports/evidence/harness/**`), 다른 세션 discovery 문서 — 전부 in_scope 밖이고 slice 커밋 집합은 in_scope 경로 변경 + manifest
+`contract_binding` 예외뿐. verifier r1·r2 not-ready → r3 ready-for-review, 재작업 2/5. 종결 문서 커밋이 그 뒤.
 
 ---
 
