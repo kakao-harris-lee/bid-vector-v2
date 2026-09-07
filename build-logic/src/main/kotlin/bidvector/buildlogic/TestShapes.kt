@@ -91,8 +91,9 @@ internal object TestShapes {
         if (!isFactory && !isMethod) return null
 
         val reasons = suspendPrivateReasons(policy) + shapeReason(isFactory)
-        if (reasons.isEmpty()) return null
-        return TestShapeViolation(fileName, text.lineOf(textOffset), name ?: "<익명>", reasons.joinToString("; "))
+        return reasons.takeIf { it.isNotEmpty() }?.let { r ->
+            TestShapeViolation(fileName, text.lineOf(textOffset), name ?: "<익명>", r.joinToString("; "))
+        }
     }
 
     private fun KtNamedFunction.suspendPrivateReasons(policy: TestShapePolicy): List<String> =
