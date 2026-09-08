@@ -17,10 +17,11 @@ sealed interface CommandResult {
 
 /**
  * 채널 독립 use case(scope.md ⑦, STR-11) — 4개 command 처리 + `begin`·`expire`. 어댑터
- * (Telegram/웹)는 이 클래스 밖에 산다(D-M4-1). 모든 전략 write 는 이 클래스를 지난다
- * (⑥) — [strategies]는 `public`(설계 검토 (2) #3 실측 판정, `Ports.kt` 참고,
- * `OPEN-4A-WRITE-PATH-GATE`), 우회 (3)의 차단은 타입 근거(`TransitionOutcome.Applied`만
- * 저장 인자를 낸다)에 의존한다.
+ * (Telegram/웹)는 이 클래스 밖에 산다(D-M4-1). 모든 전략 write 는 이 클래스를 지난다(⑥) —
+ * [strategies]는 `public`(설계 검토 (2) #3 실측 판정, `Ports.kt` 참고)이지만, 우회 (3)의
+ * 차단은 [AppliedStrategy](`internal constructor`, `workflow` 밖에서 생성 불가)라는
+ * **인자 타입** 근거에 의존한다 — `OperatorStrategy` 자체는 `validate()`가 public 이라
+ * 누구나 얻을 수 있어 그 타입 근거는 서지 않았었다(verifier H-1 실측, `Ports.kt` KDoc 참고).
  */
 class EditStrategyWorkflow(
     private val sessions: EditSessionRepository,
@@ -61,7 +62,7 @@ class EditStrategyWorkflow(
         val outcome = apply(session, command, clock.now(), strategies.load(), strategyPolicy)
         sessions.save(outcome.session)
         if (outcome is TransitionOutcome.Applied) {
-            strategies.save(outcome.strategy)
+            strategies.save(outcome.applied)
             events.publish(outcome.event)
         }
         return CommandResult.Processed(outcome)

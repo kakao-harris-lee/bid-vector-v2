@@ -52,8 +52,8 @@ private class InMemoryStrategyRepository(
 ) : StrategyRepository {
     override fun load(): OperatorStrategy = strategy
 
-    override fun save(strategy: OperatorStrategy) {
-        this.strategy = strategy
+    override fun save(applied: AppliedStrategy) {
+        this.strategy = applied.strategy
     }
 }
 

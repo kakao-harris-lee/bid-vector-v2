@@ -119,7 +119,7 @@ class EditSessionTransitionTableTest {
         outcome.shouldBeInstanceOf<TransitionOutcome.Applied>()
         outcome.session.state shouldBe EditSessionState.Applied(StrategyRevision(2))
         outcome.event.revision shouldBe StrategyRevision(2)
-        outcome.strategy.revision shouldBe StrategyRevision(2)
+        outcome.applied.strategy.revision shouldBe StrategyRevision(2)
     }
 
     @Test

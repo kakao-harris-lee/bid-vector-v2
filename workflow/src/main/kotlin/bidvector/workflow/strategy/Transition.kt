@@ -202,7 +202,7 @@ private fun onConfirm(
                 )
             TransitionOutcome.Applied(
                 next,
-                result.strategy,
+                AppliedStrategy(result.strategy),
                 StrategyEvent.StrategyUpdated(nextRevision, result.policyVersion),
             )
         }
