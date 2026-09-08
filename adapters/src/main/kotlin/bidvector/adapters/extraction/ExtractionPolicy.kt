@@ -17,7 +17,21 @@ data class ExtractionPolicyData(
     val maxChunksPerDocument: Int,
     val maxCallsPerDocument: Int,
     val maxTokensPerCall: Int,
+    /**
+     * resilience4j `TimeLimiter`의 시한 — 이 값이 「timeout」의 정본이다(scope ⑤).
+     * [httpRequestTimeout]과 값을 공유하지 않는다(verifier r1 F-2) — 예전엔 둘이 같은
+     * 값을 써서 JDK `HttpClient`의 자체 시한과 `TimeLimiter`가 경합했다(같은 시각에
+     * 둘 다 만료 가능 → `Uncertain(Timeout)`과 `Uncertain(TransportFailed)`가 실행마다
+     * 갈렸다, `ExtractionFailOpenTest` flaky 실측 S-2·S-4). `httpRequestTimeout`이 이
+     * 값보다 항상 크므로(`init` 강제) `TimeLimiter`가 항상 먼저 끊어 분류가 결정론적이다.
+     */
     val callTimeout: Duration,
+    /**
+     * JDK `HttpClient` 자신의 요청 시한 — [callTimeout]보다 항상 크다(`init`). 이 값이
+     * 만료되는 정상 상황은 없어야 한다 — `TimeLimiter`가 항상 먼저 끊고 실행 중이던
+     * 호출을 취소(interrupt)한다. 존재 이유는 순수히 방어적 상한(스레드 누수 봉쇄)이다.
+     */
+    val httpRequestTimeout: Duration,
     val breakerFailureRateThresholdPercent: Int,
     val breakerSlidingWindowSize: Int,
     val breakerWaitDurationInOpenState: Duration,
@@ -28,6 +42,10 @@ data class ExtractionPolicyData(
         require(maxChunksPerDocument > 0) { "maxChunksPerDocument는 0보다 커야 한다: $maxChunksPerDocument" }
         require(maxCallsPerDocument > 0) { "maxCallsPerDocument는 0보다 커야 한다: $maxCallsPerDocument" }
         require(maxTokensPerCall > 0) { "maxTokensPerCall은 0보다 커야 한다: $maxTokensPerCall" }
+        require(httpRequestTimeout > callTimeout) {
+            "httpRequestTimeout($httpRequestTimeout)은 callTimeout($callTimeout)보다 커야 한다 " +
+                "— 같거나 작으면 TimeLimiter와 HttpClient 자체 시한이 경합한다(verifier r1 F-2)"
+        }
         require(breakerFailureRateThresholdPercent in MIN_PERCENT..MAX_PERCENT) {
             "breakerFailureRateThresholdPercent는 $MIN_PERCENT~$MAX_PERCENT 이어야 한다: $breakerFailureRateThresholdPercent"
         }
@@ -69,6 +87,7 @@ val EXTRACTION_POLICY: EffectiveDatedPolicy<ExtractionPolicyData> =
                         maxCallsPerDocument = 20,
                         maxTokensPerCall = 4000,
                         callTimeout = Duration.ofSeconds(30),
+                        httpRequestTimeout = Duration.ofSeconds(45),
                         breakerFailureRateThresholdPercent = 50,
                         breakerSlidingWindowSize = 10,
                         breakerWaitDurationInOpenState = Duration.ofSeconds(30),
