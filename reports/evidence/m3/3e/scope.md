@@ -21,6 +21,7 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/persistence/**             # Testcontainers 통합 test
   - adapters/src/main/kotlin/bidvector/adapters/koneps/**, adapters/src/test/kotlin/bidvector/adapters/koneps/**   # **조건부** — 어댑터가 행 구별 축을 관측에 실어야 할 때만(설계 검토 결론에 따름). 3B-2 시나리오 test 는 편집 없이 초록이어야 한다
   - config/quality/gate-tests.properties                                   # 신규 test 등재(추가만, 공유 파일)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/{CleanMigrationTest.kt,CleanMigrationTriggerTest.kt}   # **운영자 승인 2026-09-08 — 3D test 편집 예외(추가만)**. 이 둘은 `information_schema` 를 질의해 테이블·컬럼·PK·FK·CHECK·트리거를 **정확히 일치**로 대조하는 **스키마 스냅샷 래칫**이라 마이그레이션이 하나라도 늘면 구조적으로 깨진다(우회 경로 없음 — 컨테이너를 전 test 클래스가 공유한다). **허용되는 편집은 기대값 집합에 신규 항목을 더하는 것뿐이다** — 기존 항목 삭제·수정 금지, 단언 완화 금지(`shouldContainExactlyInAnyOrder` → `shouldContain` 류로 바꾸지 마라: 그러면 래칫이 죽는다). 이 예외는 **3E 에 한정**되고, 뒤 slice 는 자기 계약에서 다시 받는다
   - milestone-3.md                                                          # 「Slice 3E」 착수 문단 — **문서 레인이 쓴다**
   - reports/evidence/m3/3e/**
   - docs/discovery/capability-map.md                                        # **문서 레인 전용** — `OPEN-3B2-STORAGE-ROW-KEY-COLLISION`·`OPEN-3B2-OPENING-FACT-SLOTS` 상태 갱신만
@@ -53,6 +54,27 @@ rollback: |
 ## 하네스 레인 변경 (상시 절)
 
 `git log --oneline 9948c6e..HEAD -- CLAUDE.md .claude/` — 착수 시점 **없음**(base 자신이 하네스 커밋이라 range 밖).
+
+## 스키마 스냅샷 래칫의 예외 — 운영자 승인 2026-09-08
+
+**물음**: `opening_reserve_price` 자식 표와 `opening_result` 신규 컬럼을 더하면 3D 의
+`CleanMigrationTest`·`CleanMigrationTriggerTest` 가 **반드시** 깨진다. 둘 다 정확 일치 대조이고
+Testcontainers 인스턴스를 전 test 클래스가 공유해 격리 우회가 없다.
+
+**결정 (a)**: 그 두 파일을 **3E in_scope 예외**로 두고 **기대값에 신규 항목을 더하는 편집만** 허용한다.
+
+**왜 test 를 고치는 것이 여기서는 정당한가.** 이 둘은 행동 회귀 test 가 아니라 **스키마 형태 래칫**이다 —
+「스키마가 내가 선언한 것과 정확히 같은가」를 재고, 스키마가 정당하게 늘면 선언도 늘어야 한다.
+금지 규율이 겨누는 것은 「내 코드를 통과시키려고 남의 판정 기준을 **느슨하게** 만드는 것」이고,
+**추가만 하는 편집은 기준을 느슨하게 만들지 않는다** — 래칫의 눈금이 하나 늘 뿐이다.
+
+**그래서 경계를 문장으로 못 박는다.** 허용: 기대 집합에 신규 테이블·컬럼·제약·트리거 이름을 **더하기**.
+금지: 기존 항목 삭제·이름 변경 · 단언을 포함 관계로 완화 · 대조 대상 축소 · 두 파일 밖의 3D test 편집.
+**검증 레인이 이 diff 를 표적으로 재검증한다**(판정 기준을 바꾸는 편집이므로 severity 무관).
+
+**되풀이될 문제라는 것을 안다** — 앞으로 모든 마이그레이션이 같은 자리에 걸린다. 이 예외는 3E 에
+한정하고, 「기대값을 test 밖 선언으로 빼 마이그레이션 저자가 그 선언을 갱신하게」 하는 구조 개선은
+**3D 후속 또는 M6 운영 축**으로 남긴다(신설 후보 `OPEN-3E-SCHEMA-SNAPSHOT-MAINTENANCE`).
 
 ## 레인 경계 — 커밋 혼입 선언 (2026-09-08, 이력 되쓰지 않음)
 
