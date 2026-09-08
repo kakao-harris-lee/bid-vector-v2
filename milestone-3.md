@@ -151,6 +151,31 @@ P-8 + 정책 값 커밋).
 
 **잔여 후속(M3 완료 조건 밖, M4 와 병행)**: 개찰완료 오퍼레이션 — `COL-03` 문면의 **추첨번호**(`drwtNo1`·`drwtNo2`)와 투찰 축(`bidprcAmt`·`bidprcrt`)을 주는 유일한 오퍼레이션이고 D-3B2-9 (a) 로 이번 slice 밖 · `OpeningResult` fact 확장 + 3D 스키마(D-3B2-8, P-10 masking 반영) · 3D V-1 · 3A 후속 셋(3B checklist) · `OPEN-3C-ATTACHMENT-FIELD-CONTRACT`(P-8) · P-7(업무구분 열거값 승인 항목화) · 3B-2 fixture case(후보 여덟, `_workspace/m3-3b2/01_curator_approval_request.md`). **OPEN 넷 신설** `capability-map.md` §14.3 — `OPEN-3B2-TARGETED-OPENING-QUERY`(문서는 공고번호 표적 개찰 조회를 선언하고 legacy 실측은 불가라 적는다 — 실제 호출 승인 뒤 닫히며 SET-02 의 소스 제약과 쿼터 계산이 걸려 있다) · `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` · `OPEN-3B2-STORAGE-ROW-KEY-COLLISION`(G-1 해결이 어댑터 층 한정 — 3D `observation_key` 가 행 식별자 부재 행을 구별하지 못한다) · `OPEN-3B2-OPENING-FACT-SLOTS`. **M3 는 이제 잔여 slice 가 없다.**
 
+### Slice 3E — 개찰 fact 슬롯과 저장 행 키
+
+**착수 2026-09-08.** 3B-2 가 남긴 후속 둘(**D-3B2-8** fact 슬롯 부재 · **`OPEN-3B2-STORAGE-ROW-KEY-COLLISION`** 행 식별자 없는 복수 행이 저장에서 접힘)을 한 slice 로 묶었다 —
+둘 다 `procurement` fact 타입 + 3D 저장 스키마·키 유도를 건드려 마이그레이션 하나로 가는 편이 옳았다. 계약 정본 `reports/evidence/m3/3e/scope.md`(base `9948c6e`).
+착수 전 결정: **D-3E-1a** raw 층 행 구별은 **값 우선 · 부재 시 응답 안 위치**(설계 검토가 계약 초안의 전제를 정정했다 — `observedAt` 이 fetch 마다 새로 잡혀 raw 키는 이미
+fetch 마다 다르고, 「retry 후 canonical effect 하나」는 canonical 기본키가 지킨다. 긴장은 raw 가 아니라 **canonical 자식 행의 정체성**에만 있다) · **D-3E-1b (a) 운영자 승인**
+순번이 부재·공백인 행은 **canonical 승격 없이 회계**(정체성을 지어내지 않는다 — 응답 안 위치를 키로 쓰면 문서가 선언하지 않는 행 순서 안정성에 기댄다) · D-3E-2 (a) 자식 표
+신설 · D-3E-3 (a) 사라진 행을 지우지 않고 관측 시각으로 구분 · D-3E-4 (a) 부모 + 자식 목록 한 aggregate. **Phase 2.5 설계 검토**(세션 모델 직접) `_workspace/m3-3e/01_design-review.md`.
+
+**실측이 설계를 한 자리 바꿨다** — 운영자 승인(2026-09-08) 아래 조달청 OpenAPI 를 **읽기 전용으로** 호출해 `policy-values.md` **§1.9.7** 에 등재했다. 순번 공백은 **총예가건수가 1**
+일 때만 났고 **복수예비가격 15행은 순번이 전부 채워져** 있었다. 그래서 예정가격·기초금액·총예가건수·실개찰일시를 **공고 층(부모)** 으로 올리고 자식은 순번·기초예정가격·추첨
+축으로 좁혔다 — 단수 예가 건도 부모 값을 잃지 않는다. 같은 호출이 **`OPEN-3B2-TARGETED-OPENING-QUERY` 를 닫았다**(표적조회는 가능하다 — legacy 의 「불가(실측)」와 SET-02 의
+소스 제약을 폐기). 부수로 `OPEN-3E-RESERVE-FLAG-MISMATCH`(예비가격 파일 플래그가 상세 0행과 어긋남 2/8)를 신설했다.
+
+**운영자 결정 하나 더** — 마이그레이션이 늘면 3D 의 스키마 스냅샷 test 둘이 **반드시** 깨진다(정확 일치 대조 + 공유 컨테이너라 우회 없음). **「기대값에 추가만」 예외**를 승인받았다
+(단언 완화·기존 항목 삭제 금지, 검증 레인이 그 diff 를 표적으로 재검증). 앞으로 모든 마이그레이션이 같은 자리에 걸리므로 구조 개선은 `OPEN-3E-SCHEMA-SNAPSHOT-MAINTENANCE` 로 남겼다.
+
+**검증이 드러낸 것 둘 — 둘 다 「저장 왕복에서 값의 뜻이 조용히 바뀐다」**: ① 읽기 경로가 세 금액의 provenance 를 `Published` 상수로 **지어내** `Undeclared` 가 왕복만으로 권위를
+얻었다(H-1) — provenance 컬럼을 더해 저장한 것을 그대로 복원하는 것으로 닫았고, **권위 가드 적용 여부**는 3D 설계 변경이라 열지 않고 `OPEN-3E-OPENING-AMOUNT-AUTHORITY-GUARD`
+로 등재했다. ② D-3E-3 (a) 의 「관측 시각으로 구분한다」가 **읽기 경로에 없어** 15→12 재수집 뒤 낡은 셋을 소비자가 알 수 없었다(H-2). 「조용히 사라진다」를 막고 「조용히
+낡는다」가 남은 형태다.
+
+**하네스 개선 둘이 이 slice 에서 나왔다** — rollback 실측에 **되돌린 트리의 compile·test 확인**을 더했고(3B-2 r2 가 exit 0 이면서 컴파일 불가 트리를 남긴 자리), 공유 워킹트리
+커밋에 **경로 인자 명시**를 필수로 올렸다(문서 레인 커밋이 구현 레인의 스테이징 7 파일을 흡수한 사고 — 이력은 되쓰지 않고 계약에 사실로 선언).
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의

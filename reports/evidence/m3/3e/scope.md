@@ -65,7 +65,7 @@ rollback: |
 | 경로 | 무엇 | 왜 이 range 에 있는가 |
 | --- | --- | --- |
 | `reports/evidence/m3/3a/policy-values.md` | P-7 승인 등재 · §1.9.7 실측 대조 · §1.10 첨부 문서 키 계약(P-8) | 3A curator 문서의 후속. 3E 는 이 파일을 **읽기만** 한다(out_of_scope 에 명시) |
-| `docs/discovery/capability-map.md` | `OPEN-3B2-TARGETED-OPENING-QUERY` 닫힘 · `OPEN-3E-RESERVE-FLAG-MISMATCH`·`OPEN-3E-ROW-ORDER-STABILITY`·`OPEN-3C-ATTACHMENT-SLOT-OVERFLOW` 신설 | in_scope 에 **문서 레인 전용**으로 선언돼 있다 |
+| `docs/discovery/capability-map.md` | `OPEN-3B2-TARGETED-OPENING-QUERY` **닫힘**(실측) · 신설 넷 `OPEN-3E-RESERVE-FLAG-MISMATCH`·`OPEN-3E-ROW-ORDER-STABILITY`·`OPEN-3C-ATTACHMENT-SLOT-OVERFLOW`·**`OPEN-3E-OPENING-AMOUNT-AUTHORITY-GUARD`**(verifier r1 H-1 수정의 귀결) · `OPEN-3B2-STORAGE-ROW-KEY-COLLISION`·**`OPEN-3B2-OPENING-FACT-SLOTS`** 상태 갱신(3E 가 닫는 중) | in_scope 에 **문서 레인 전용**으로 선언돼 있다 |
 | `docs/discovery/ux-journey-research.md` | 표적조회 문면 폐기(실측) | 위 `OPEN` 닫힘의 역방향 파급 |
 | `CLAUDE.md`·`.claude/skills/evidence-pack/SKILL.md` | rollback 규격 개정 · 공유 워킹트리 커밋 규격 신설 | **하네스 레인** — 위 「하네스 레인 변경」 절이 정본 |
 
