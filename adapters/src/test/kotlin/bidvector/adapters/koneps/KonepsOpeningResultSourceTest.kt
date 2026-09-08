@@ -133,4 +133,65 @@ class KonepsOpeningResultSourceTest {
             batch.accounting.truncationCause shouldBe TruncationCause.Unclassified
         }
     }
+
+    @Test
+    fun `F-1 — 예비가격 상세 복수예가 15행이 모두 살아남는다(같은 공고, compnoRsrvtnPrceSno 1~15)`() {
+        val rows =
+            (1..15).map { sno ->
+                mapOf(
+                    "bidNtceNo" to NOTICE_ID.number.value,
+                    "bidNtceOrd" to "000",
+                    "compnoRsrvtnPrceSno" to sno.toString(),
+                    "plnprc" to (900_000_000 + sno).toString(),
+                    "drwtYn" to "N",
+                )
+            }
+        val body = KonepsEnvelopeFixtures.success(rows, totalCount = 15, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchReservePrices(fetchEvidence())
+
+            batch.items.size shouldBe 15
+            batch.accounting.received shouldBe 15
+            batch.accounting.normalized shouldBe 15
+            batch.accounting.duplicate shouldBe 0
+        }
+    }
+
+    @Test
+    fun `F-2 — 차수 없는 1건이 목록 정상 N건 사이에서 port 수준으로 drop 된다`() {
+        val items =
+            listOf(
+                mapOf("bidNtceNo" to "SYN-OPEN-0010", "bidNtceOrd" to "000", "bidwinnrNm" to "SYN-A"),
+                mapOf("bidNtceNo" to "SYN-OPEN-0011", "bidwinnrNm" to "SYN-B"),
+                mapOf("bidNtceNo" to "SYN-OPEN-0012", "bidNtceOrd" to "000", "bidwinnrNm" to "SYN-C"),
+            )
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 3, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchOpeningResults(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 2
+            batch.accounting.dropped shouldBe 1
+        }
+    }
+
+    @Test
+    fun `F-2 — 429 연속 실패 뒤 성공(bounded retry)`() {
+        val body =
+            KonepsEnvelopeFixtures.success(
+                listOf(mapOf("bidNtceNo" to "SYN-OPEN-0020", "bidNtceOrd" to "000", "bidwinnrNm" to "SYN-CORP")),
+                totalCount = 1,
+                pageNo = 1,
+                numOfRows = 100,
+            )
+        val script = listOf(MockKonepsResponse.Reply(429, ""), MockKonepsResponse.Reply(200, body))
+        MockKonepsServer.start(script).use { server ->
+            val batch =
+                newSource(server, testKonepsHttpPolicy(maxAttempts = 3))
+                    .fetchOpeningResults(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 1
+            batch.accounting.quotaExceeded shouldBe 1
+            server.requestCount shouldBe 2
+        }
+    }
 }

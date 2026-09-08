@@ -58,6 +58,7 @@ class KonepsOperationDescriptorTest {
                 requiresPeriodWindow = true,
                 requiresNoticeNumber = false,
                 requiresNoticeRound = false,
+                rowIdentifierRawKeys = emptyList(),
             )
 
         val uri = buildKonepsOperationUri(BASE, KEY, changed, 1, 100, periodWindow = "a" to "b")
@@ -73,6 +74,7 @@ class KonepsOperationDescriptorTest {
                 requiresPeriodWindow = true,
                 requiresNoticeNumber = true,
                 requiresNoticeRound = false,
+                rowIdentifierRawKeys = emptyList(),
             )
         }
     }
@@ -85,6 +87,7 @@ class KonepsOperationDescriptorTest {
                 requiresPeriodWindow = false,
                 requiresNoticeNumber = false,
                 requiresNoticeRound = true,
+                rowIdentifierRawKeys = emptyList(),
             )
         }
     }

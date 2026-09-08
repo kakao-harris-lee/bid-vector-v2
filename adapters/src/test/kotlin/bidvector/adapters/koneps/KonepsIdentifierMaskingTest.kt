@@ -4,6 +4,7 @@ import bidvector.procurement.CollectionDropReason
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.RawKey
 import bidvector.procurement.SourceEndpoint
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
@@ -37,7 +38,8 @@ class KonepsIdentifierMaskingTest {
     fun `단일 낙찰자 5성분은 업체명·투찰금액·투찰율만 남기고 사업자번호·대표자명을 버린다`() {
         val raw = item(SINGLE_WINNER_ITEM)
 
-        val outcome = mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_RESULT_LIST, OBSERVED_AT)
+        val outcome =
+            mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_RESULT_LIST, OBSERVED_AT, emptyList())
 
         val mapped = outcome.shouldBeInstanceOf<RawItemOutcome.Mapped>()
         val contract = POLICY.fieldContracts.contractFor(RawKey("opengCorpInfo"))!!
@@ -51,7 +53,8 @@ class KonepsIdentifierMaskingTest {
     fun `낙찰예정자 다수(3성분, 이름 자리가 안내문)는 위치 추측 없이 값 전체를 폐기한다`() {
         val raw = item(MULTI_WINNER_ITEM)
 
-        val outcome = mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_RESULT_LIST, OBSERVED_AT)
+        val outcome =
+            mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_RESULT_LIST, OBSERVED_AT, emptyList())
 
         val mapped = outcome.shouldBeInstanceOf<RawItemOutcome.Mapped>()
         mapped.observation.keys shouldNotContain RawKey("opengCorpInfo")
@@ -63,7 +66,8 @@ class KonepsIdentifierMaskingTest {
     fun `협상 계약(3성분, 투찰금액·투찰율 없음)도 같은 이유로 값 전체를 폐기한다`() {
         val raw = item(NEGOTIATED_CONTRACT_ITEM)
 
-        val outcome = mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_RESULT_LIST, OBSERVED_AT)
+        val outcome =
+            mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_RESULT_LIST, OBSERVED_AT, emptyList())
 
         val mapped = outcome.shouldBeInstanceOf<RawItemOutcome.Mapped>()
         mapped.observation.keys shouldNotContain RawKey("opengCorpInfo")
@@ -75,7 +79,8 @@ class KonepsIdentifierMaskingTest {
     fun `allow-list 반전 — 계약 없는 키(사업자등록번호)는 fields 와 sourceText 둘 다에 없다`() {
         val raw = item(UNREGISTERED_IDENTIFIER_ITEM)
 
-        val outcome = mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_AWARD_LIST, OBSERVED_AT)
+        val outcome =
+            mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_AWARD_LIST, OBSERVED_AT, emptyList())
 
         val mapped = outcome.shouldBeInstanceOf<RawItemOutcome.Mapped>()
         mapped.observation.keys shouldNotContain RawKey("bidwinnrBizno")
@@ -88,10 +93,23 @@ class KonepsIdentifierMaskingTest {
     fun `공고번호가 없으면 공고 축과 같은 사유로 떨어진다`() {
         val raw = item("""{"bidNtceOrd":"000","bidwinnrNm":"SYN-CORP"}""")
 
-        val outcome = mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_AWARD_LIST, OBSERVED_AT)
+        val outcome =
+            mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_AWARD_LIST, OBSERVED_AT, emptyList())
 
         val dropped = outcome.shouldBeInstanceOf<RawItemOutcome.Dropped>()
         dropped.reason shouldBe CollectionDropReason.CollectionMissingNoticeNumber
+    }
+
+    @Test
+    fun `F-5 — 외자 대문자 FnlSucsfDate 는 이제 관측에 남는다(verifier r1 PROBE2 재현)`() {
+        val json =
+            """{"bidNtceNo":"SYN-MASK-0005","bidNtceOrd":"000","sucsfbidAmt":"5000","FnlSucsfDate":"2026-09-08"}"""
+        val raw = item(json)
+
+        val outcome = mapMaskedOpeningItem(raw, POLICY, SourceEndpoint.OPENING_AWARD_LIST, OBSERVED_AT, emptyList())
+
+        val mapped = outcome.shouldBeInstanceOf<RawItemOutcome.Mapped>()
+        mapped.observation.keys shouldContain RawKey("FnlSucsfDate")
     }
 
     @Test

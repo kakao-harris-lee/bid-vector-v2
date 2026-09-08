@@ -123,4 +123,51 @@ class KonepsLicenseLimitDocumentSourceTest {
             server.requestCount shouldBe 1
         }
     }
+
+    @Test
+    fun `F-1 — 제한그룹 3행이 모두 살아남는다(같은 공고, lmtGrpNo x lmtSno 축)`() {
+        val rows =
+            (1..3).map { sno ->
+                mapOf(
+                    "bidNtceNo" to NOTICE_ID.number.value,
+                    "bidNtceOrd" to "000",
+                    "lmtGrpNo" to "1",
+                    "lmtSno" to sno.toString(),
+                    "lcnsLmtNm" to "SYN-00$sno/전기공사업",
+                )
+            }
+        val body = KonepsEnvelopeFixtures.success(rows, totalCount = 3, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchQualificationText(fetchEvidence())
+
+            batch.items.size shouldBe 3
+            batch.accounting.received shouldBe 3
+            batch.accounting.duplicate shouldBe 0
+        }
+    }
+
+    @Test
+    fun `F-2 — resultCode 22 는 quota 초과로 재시도 대상이다(bounded retry)`() {
+        val row =
+            mapOf("bidNtceNo" to NOTICE_ID.number.value, "bidNtceOrd" to "000", "lmtGrpNo" to "1", "lmtSno" to "1")
+        val successBody =
+            KonepsEnvelopeFixtures.success(
+                listOf(row),
+                totalCount = 1,
+                pageNo = 1,
+                numOfRows = 100,
+            )
+        val script =
+            listOf(
+                MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("22", "서비스 요청 제한 횟수 초과")),
+                MockKonepsResponse.Reply(200, successBody),
+            )
+        MockKonepsServer.start(script).use { server ->
+            val batch = newSource(server, testKonepsHttpPolicy(maxAttempts = 3)).fetchQualificationText(fetchEvidence())
+
+            batch.items.size shouldBe 1
+            batch.accounting.quotaExceeded shouldBe 1
+            server.requestCount shouldBe 2
+        }
+    }
 }
