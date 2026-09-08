@@ -125,3 +125,24 @@ assertion 만 정정 — unknownFieldCount/maskingFailureCount 분리)·`KonepsO
 `KonepsOpeningResultSourceTest` 12(+3 — 이전 통합 test 1개를 F-3 단독·F-8 단독으로 나누고
 F-6 test 2개를 더해 순증 3). secret 스캔·clean-tree 게이트 재확인 — 매치는 전부 자기참조
 (판독 규칙 그대로).
+
+## 수정 라운드 1 종결 확인 — 2026-09-08T08:13Z, head `a1b985c`
+
+팀리드가 F-6 코드 상태를 직접 확인해 보낸 마지막 지시(공유 키 `presentIn` 확장·강제·
+`bidNtceNm` 처리)는 이 문서의 F-6 재검토 절(head `9199fe7`)에서 **이미 전부 반영돼 있었다**
+— 보고가 교차했다. `bidNtceNm`은 계약 행이 없어(grep 실측) 지시대로 새로 만들지 않았다.
+그 사실을 확인한 뒤 하네스 레인 커밋(`a1b985c`, scope.md 「하네스 레인 변경」 절 갱신)
+위에서 acceptance 를 마지막으로 재실행했다.
+
+| id | 명령 | exit |
+| --- | --- | --- |
+| S-0 | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 (348 tasks, 348 executed) |
+| S-1 | `./gradlew --no-build-cache clean check` | 0 |
+| S-2 | `./gradlew :adapters:test --tests 'bidvector.adapters.koneps.*'` | 0 |
+| S-3 | `./gradlew :adapters:moduleDependencyGate` | 0 |
+| S-3b | `./gradlew :adapters:test --tests '*KonepsAdapterDependencyTest*'` | 0 |
+| S-3c | `./gradlew :procurement:test` | 0 |
+| S-4 | `./gradlew qualityBaseline` | 0 |
+
+`:procurement:gateExecutionGate` 재확인 — 0. secret 스캔 매치 5건 전부 자기참조(판독 규칙),
+clean-tree 게이트 출력 없음(전부 커밋됨).
