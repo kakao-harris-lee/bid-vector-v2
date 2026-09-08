@@ -103,3 +103,25 @@ F-1·F-2)·`KonepsOpeningResultSourceTest` 8(+3, F-1·F-2 ×2)·`KonepsOperation
 assertion 만 정정 — unknownFieldCount/maskingFailureCount 분리)·`KonepsOpeningResultSourceTest`
 9(+1, F-3·F-8 종단 test). secret 스캔·clean-tree 게이트 재확인(자기참조 매치만, 판독 규칙
 그대로 적용) — 실측 결과 이전 라운드와 동일.
+
+## F-6 재검토(presentIn 강제) 뒤 acceptance 전건 재실행 — 2026-09-08T08:08Z, head `9199fe7`
+
+| id | 명령 | exit |
+| --- | --- | --- |
+| S-0 | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 (348 tasks, 348 executed) |
+| S-1 | `./gradlew --no-build-cache clean check` | 0 |
+| S-2 | `./gradlew :adapters:test --tests 'bidvector.adapters.koneps.*'` | 0 |
+| S-3 | `./gradlew :adapters:moduleDependencyGate` | 0 |
+| S-3b | `./gradlew :adapters:test --tests '*KonepsAdapterDependencyTest*'` | 0 |
+| S-3c | `./gradlew :procurement:test` | 0 |
+| S-4 | `./gradlew qualityBaseline` | 0 |
+
+`:procurement:gateExecutionGate` 재확인 — 0. **최초 커밋 시도에서 종단 test 1건이 실측으로
+실패**(`F-3·F-8 —` 통합 test, expected unknownFields=1 got=2) — `opengCorpInfo`(presentIn=
+`OPENING_RESULT_LIST`뿐)를 `OPENING_AWARD_LIST` source 로 검증하고 있었다는 test 설계
+결함을 F-6 강제가 실측으로 드러냈다. test 를 올바른 endpoint(`OPENING_RESULT_LIST`)로 옮겨
+재실행해 통과(`F-8 —` 단독 test 로 분리). test 수(JUnit XML 실측, 실패·건너뜀 0):
+`CollectionPolicyTest` 19(+2, bidNtceNo/bidNtceOrd/bssamt presentIn)·
+`KonepsOpeningResultSourceTest` 12(+3 — 이전 통합 test 1개를 F-3 단독·F-8 단독으로 나누고
+F-6 test 2개를 더해 순증 3). secret 스캔·clean-tree 게이트 재확인 — 매치는 전부 자기참조
+(판독 규칙 그대로).

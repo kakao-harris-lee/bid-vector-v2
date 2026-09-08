@@ -39,7 +39,9 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
 | opengCorpInfo 「낙찰예정자 다수」(3성분, 자리 뜻 다름) → 값 전체 폐기, maskingFailureCount=1(unknownFieldCount 는 0) | 같음 | PASS |
 | opengCorpInfo 협상 계약(3성분, 투찰금액·투찰율 없음) → 값 전체 폐기, maskingFailureCount=1 | 같음 | PASS |
 | allow-list — 계약 없는 식별자 키가 fields·sourceText 둘 다에 없고 unknownFieldCount=1 로 계수(verifier r1 F-3) | 같음 | PASS |
-| **계약 밖 키 제외와 masking 실패가 SourceBatch 회계에서 서로 다른 축(`unknownFields`·`maskingFailures`)으로 나온다**(F-3·F-8 종단) | `F-3·F-8 — …` | PASS |
+| **계약 밖 키 제외와 masking 실패가 SourceBatch 회계에서 서로 다른 축(`unknownFields`·`maskingFailures`)으로 나온다**(F-3·F-8 종단, endpoint 분리 후 재정리) | `F-3 — …`·`F-8 — …` | PASS |
+| **`presentIn` 강제 — 낙찰 목록 엔드포인트로 개찰결과 전용 필드(opengCorpInfo)를 받으면 제외된다**(verifier r1 F-6 재검토) | `F-6 — 낙찰 목록 엔드포인트로 …` | PASS |
+| **`bssamt`(presentIn 확장분)가 예비가격 상세 관측에도 남는다**(F-6) | `F-6 — bssamt 는 …` | PASS |
 | `inqryDiv` 값별 URI(AWARD_LIST/RESERVE_PRICE_DETAIL/LICENSE_LIMIT_DETAIL) + 표→URI 회귀 | `KonepsOperationDescriptorTest` | PASS |
 | 서술 구성 실패(기간창+단건 동시 요구·bidNtceOrd 요구인데 bidNtceNo 없음·인자 불일치) | 같음 | PASS |
 
@@ -56,6 +58,7 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
 | (g) mapper 선택·기본값 누출(verifier r1 F-4) | `walkKonepsNoticePages`의 `itemMapper` 기본값 제거 — 세 호출부(3B `fetchNotices`·`fetchOpeningResults`·`fetchSingleKonepsNotice`) 모두 명시. 개찰 축 endpoint 로 `mapRawItem`(원문 보존)을 부르는 경로 자체는 여전히 컴파일된다 — 이 수정이 닫는 것은 「인자를 잊으면 조용히 새는」 폴백이지 「호출부가 잘못된 mapper 를 의도적으로 고르는」 실수가 아니다(장부에 남김) | 3B-2 호출부 3곳 실측(main 3·기본값 0) |
 | (h) 복수행 상세가 duplicate 로 잘못 접힘(verifier r1 F-1) | `KonepsOperationDescriptor.rowIdentifierRawKeys`(기본값 없음) + `NoticeIdentity.rowDiscriminator` | 15행·3행 회귀 test(시나리오 대응표) |
 | (i) 필드 단위 실패 두 축이 하나로 접혀 §5.3 규율 1 이 무력화(verifier r1 F-3·F-8) | `Accounting.kt` 좁은 확장(운영자 승인) — `unknownFields`는 이름 그대로 계약 밖 키만, 신설 `maskingFailures`가 masking 실패만. `dropReasons`/`dropped` 항등식 밖(필드 제외는 항목 drop 이 아니다) | `AccountingTest`·`KonepsIdentifierMaskingTest`·`KonepsOpeningResultSourceTest`(F-3·F-8 종단) |
+| (j) `presentIn`(P-9 ④ 오퍼레이션 군 구별)이 서류로만 남고 하중을 안 짐(verifier r1 F-6 재검토) | `fieldOutcomeOf`가 `contract.presentIn.contains(sourceEndpoint)`를 대조 — 불일치는 `Excluded`(F-3 축으로 계수). 전제로 `bidNtceNo`·`bidNtceOrd`·`bssamt`의 `presentIn`을 문서·실제 사용에 맞게 넓혔다(둘 다 안 넓히면 강제가 identity 필드부터 모든 개찰 축 항목을 「공고번호 없음」으로 오분류한다 — 실측으로 확인) | `CollectionPolicyTest`(bidNtceNo/bidNtceOrd/bssamt presentIn 3건) · `KonepsOpeningResultSourceTest`(`F-6 —` 2건, endpoint 불일치 제외 + bssamt 생존) |
 
 ## 우회 후보 대응표 — scope.md 「우회 후보(≥5)」
 
@@ -116,12 +119,14 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
   두 축 다 **키/성분 단위**만 세고 **어느 raw 키가 제외됐는지**(이름 목록)는 회계에 없다 —
   §5.3 규율 1 의 「무엇이 빠졌는가」는 이 축이 수를 낼 뿐, 이름까지 필요하면 `sourceText`
   (걸러진 렌더)와 원본을 대조하는 별도 감사가 필요하다(이 slice 는 「몇 개 빠졌는가」까지만).
-- **`bssamt`(기초금액)의 `presentIn`을 예비가격 상세 축까지 넓히지 않는다.** 개찰 축 allow-list
-  경로는 `presentIn`을 강제하지 않는다(값 자체는 게이트가 아니다) — **의도적**이다. 강제를 걸면
-  `RESERVE_PRICE_DETAIL` 관측에서 `bssamt`(presentIn=`NOTICE_LIST`뿐)가 조용히 탈락해 COL-03의
-  「예비가격으로 기초금액 복구」 목적이 새로 깨진다(verifier r1 실측 — 미확장 상태가 오히려 그
-  목적을 지키고 있다). F-6 검토 결과: 강제와 기존 계약 행이 충돌하므로 **강제하지 않기로
-  결정**했다 — 계약(`presentIn`)과 실제 저장(allow-list) 사이의 이 불일치는 남는다.
+- **(해소, F-6 재검토) `presentIn` 은 이제 개찰 축 allow-list 경로에서 강제된다.** 직전 라운드의
+  「강제하지 않기로 결정」은 그 강제가 깨는 것(승인 문면이 넓히라고 지시한 `bssamt`의 미확장)이
+  원인이었지 강제 자체의 문제가 아니었다(verifier r1 지적 — 근거가 순환이었다). `bssamt`·
+  `bidNtceNo`·`bidNtceOrd` 의 `presentIn`을 §1.7.1 각주·실제 사용에 맞게 넓힌 뒤(`bidNtceNo`·
+  `bidNtceOrd`는 식별자라 세 엔드포인트 모두에 실린다 — 넓히지 않으면 강제가 식별자부터
+  떨어뜨려 모든 개찰 축 항목이 「공고번호 없음」으로 오분류된다, 실측으로 확인) 강제를 걸었다.
+  강제는 `fieldOutcomeOf`에서 `presentIn` 불일치를 `Excluded`(F-3 축)로 접는다 — P-9 ④가
+  승인한 오퍼레이션 군 구별이 이제 실제로 하중을 진다.
 - **실제 KONEPS 호출·오퍼레이션 경로·파라미터 이름의 실물 일치는 검증하지 않는다**(out_of_scope,
   실제 호출 승인 뒤).
 - **낙찰 목록 검색·개찰결과 목록 검색(`…PPSSrch`) 미구현** — legacy 미소비, 판단 7번.
@@ -148,11 +153,11 @@ add+commit 분리 없음 — parallel-lane 오염 회피). 커밋 전 `git diff 
 
 ## 판정 로직 변경 커밋 — 표적 재검증 대상(evidence-pack 2026-09-04 예외)
 
-행 식별자(⑥c)·mapper 기본값 제거(위협 모델 (g))·`FnlSucsfDate` 등재(⑥)·`presentIn` 비강제
-결정(「알려진 제한」)·gate-tests 등재(완료 조건 대응표)·개찰 축 회계 두 축 분리(⑥d, 위협
-모델 (i))까지 여섯이 판정 로직·게이트 구성을 바꾼 커밋이다 — 심각도 무관 표적 재검증
-대상이다. 각 항목의 회귀 test 는 시나리오 대응표·완료 조건 대응표에 이미 등재돼 있다 —
-별도 절로 반복하지 않는다.
+행 식별자(⑥c)·mapper 기본값 제거(위협 모델 (g))·`FnlSucsfDate` 등재(⑥)·`presentIn` 강제
+결정(위협 모델 (j), 「알려진 제한」 — 직전 라운드의 비강제 결정을 뒤집었다)·gate-tests 등재
+(완료 조건 대응표)·개찰 축 회계 두 축 분리(⑥d, 위협 모델 (i))까지 여섯이 판정 로직·게이트
+구성을 바꾼 커밋이다 — 심각도 무관 표적 재검증 대상이다. 각 항목의 회귀 test 는 시나리오
+대응표·완료 조건 대응표에 이미 등재돼 있다 — 별도 절로 반복하지 않는다.
 
 ## 완료 조건
 
