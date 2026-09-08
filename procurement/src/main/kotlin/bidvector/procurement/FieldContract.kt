@@ -46,9 +46,10 @@ enum class FieldScale {
 /**
  * 이 필드가 나르는 도메인 개념 — [canonicalize]의 목적지(②).
  *
- * **P-9 ① 승인(3B-2, 2026-09-08)** — 개찰 축 토큰 아홉을 더한다(`policy-values.md` §1.7).
- * `WINNING_RATE`는 이미 있던 토큰을 그대로 쓴다 — `sucsfbidRate`(최종낙찰률)가 그 개념에
- * 정확히 들어맞아 새 토큰을 만들지 않는다(2026-09-01 규칙 「어휘를 지어내지 않는다」).
+ * **P-9 ① 승인(3B-2, 2026-09-08)** — 개찰 축 토큰을 더한다(`policy-values.md` §1.7. 낡는
+ * 수치를 KDoc 에 박지 않는다 — 실제 수는 이 enum 의 선언 목록 자체가 정본이다, verifier r1
+ * L-1). `WINNING_RATE`는 이미 있던 토큰을 그대로 쓴다 — `sucsfbidRate`(최종낙찰률)가 그
+ * 개념에 정확히 들어맞아 새 토큰을 만들지 않는다(2026-09-01 규칙 「어휘를 지어내지 않는다」).
  * `bidwinnrBizno`(사업자등록번호)·대표자명 축은 토큰을 두지 않는다 — P-10 (a) 결정으로
  * 어댑터 경계에서 치환·폐기되어 계약 레지스트리에 등재되지 않기 때문이다(어느 토큰도 그
  * 값을 가리키지 않는다).
@@ -59,6 +60,13 @@ enum class FieldConcept {
     BASE_AMOUNT,
     ESTIMATED_AMOUNT,
     ALLOCATED_BUDGET,
+
+    /**
+     * 최종낙찰률(`sucsfbidRate`, 분자는 **최종낙찰금액**) — verifier r1 L-5. 투찰률
+     * (개찰완료의 `bidprcrt`, 분자는 투찰금액)과 **다른 축**이다(§1.7.2 「두 율을 한
+     * 축으로 접지 않는다」, P-11). 개찰완료 오퍼레이션을 여는 후속 slice 는 `bidprcrt`
+     * 에 이 토큰을 재사용하지 마라 — 새 토큰(예: `BID_RATE`)이 필요하다.
+     */
     WINNING_RATE,
     FLOOR_RATE,
     BUSINESS_CATEGORY_CODE,
