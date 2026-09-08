@@ -2,6 +2,7 @@ package bidvector.procurement
 
 import bidvector.sharedkernel.AllocatedBudget
 import bidvector.sharedkernel.AwardAmount
+import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.Provenance
@@ -84,6 +85,22 @@ data class OpeningResult(
     val participantCount: Int? = null,
     /** 진행구분(`progrsDivCdNm`, §1.7.5 — 유찰/개찰완료/재입찰 3값 열거, 문서 라벨 원문 그대로). */
     val progressDivision: String? = null,
+    /**
+     * 예정가격(`plnprc`, basis YEGA) — **공고 층 슬롯**(팀리드 실측 정정 2026-09-08, §1.9.7).
+     * 예비가격 상세 응답은 행마다 이 값을 반복해 싣지만 한 공고에 하나다 — 자식 행에 두면
+     * 단수 예가(총예가건수 1, 순번 공백)일 때 자식 행이 0개가 되며 이 값도 함께 사라진다.
+     */
+    val plannedPrice: YegaAmount? = null,
+    /**
+     * 기초금액(`bssamt`) — 공고 층 슬롯, `plannedPrice`와 같은 이유(§1.9.7). Notice의
+     * `baseAmount`(공고 목록 축 관측)와 별개다 — 이 슬롯은 예비가격 상세 오퍼레이션 자신의
+     * 관측이다(수집 시점·엔드포인트가 다르다, D-3A-1 (a)와 같은 「fact를 섞지 않는다」 원칙).
+     */
+    val baseAmount: BaseAmount? = null,
+    /** 총예가건수(`totRsrvtnPrceNum`) — 실측(§1.9.7)이 `reservePrices.size`와 일치를 확인한 축. */
+    val totalReservePriceCandidateCount: Int? = null,
+    /** 실개찰일시(`rlOpengDt`) — 공고 층 슬롯(§1.9.7, `sourceZone` 미확정이라 원문 그대로). */
+    val actualOpeningAt: Instant? = null,
     /** 복수예비가격 자식 행 목록(D-3E-2 (a)) — 순번 부재 행은 여기 오르지 않는다(D-3E-1b (a)). */
     val reservePrices: List<OpeningReservePriceRow> = emptyList(),
 ) {
@@ -91,29 +108,35 @@ data class OpeningResult(
         require(participantCount == null || participantCount >= 0) {
             "participantCount는 음수일 수 없다: $participantCount"
         }
+        require(totalReservePriceCandidateCount == null || totalReservePriceCandidateCount >= 0) {
+            "totalReservePriceCandidateCount는 음수일 수 없다: $totalReservePriceCandidateCount"
+        }
     }
 }
 
 /**
- * 복수예비가격 자식 행(D-3E-2 (a), M3/3E 신설) — `OpeningResult`가 목록으로 안는다.
- * `sequenceNumber`(`compnoRsrvtnPrceSno`)가 부재·공백인 행은 이 타입으로 만들어지지 않는다
- * (D-3E-1b (a), 운영자 승인 2026-09-08 — 정체성 없는 행은 canonical 승격을 거절한다).
- * 3B-2 `rowIdentifierIndeterminate` 회계가 그 승격 불가 건수를 이미 센다(같은 부재 판정을
- * 공유한다, `KonepsRawItemMapper.rowDiscriminatorOf`).
+ * 복수예비가격 후보 자식 행(D-3E-2 (a), M3/3E 신설, §1.9.7 실측 정정으로 「후보 층」만 남는다)
+ * — `OpeningResult`가 목록으로 안는다. `sequenceNumber`(`compnoRsrvtnPrceSno`)가 부재·공백인
+ * 행은 이 타입으로 만들어지지 않는다(D-3E-1b (a), 운영자 승인 2026-09-08 — 정체성 없는 행은
+ * canonical 승격을 거절한다). 3B-2 `rowIdentifierIndeterminate` 회계가 그 승격 불가 건수를
+ * 이미 센다(같은 부재 판정을 공유한다, `KonepsRawItemMapper.rowDiscriminatorOf`). **실측
+ * (§1.9.7, 8건 23행, 2026-09-01~09-07 창)이 부재 조건을 좁혔다** — 순번 공백은 총예가건수가
+ * 1(단수 예가)일 때만 관측됐고, 그 경우 행이 하나뿐이라 애초에 정체성 모호가 없다. 15행
+ * 건(4건)은 순번이 전부 채워져 있었다 — COL-03이 요구하는 복수예비가격 축은 이 관측 범위에서
+ * 온전하다. 표본이 작아 「항상 그렇다」로 승격하지 않는다.
  */
 data class OpeningReservePriceRow(
     val sequenceNumber: String,
-    /** 예정가격(`plnprc`, basis YEGA — `policy-values.md` §1.7.1이 `YegaAmount`와 같은 축이다). */
-    val plannedPrice: YegaAmount?,
     /** 기초예정가격(`bsisPlnprc`) — basis가 문서로 미확정이라 `Money` 타입에 태우지 않는다([ReservePriceCandidateAmount]). */
     val baseReservePrice: ReservePriceCandidateAmount?,
     /** 추첨여부(`drwtYn`, 문서 `(Y/N)` 필수 — 이 행이 존재하면 항상 값이 있다고 문서가 선언한다). */
     val isDrawn: Boolean?,
-    /** 실개찰일시(`rlOpengDt`, §1.7.4 — 옵션, `sourceZone` 미확정이라 `Instant` 원문 그대로). */
-    val actualOpeningAt: Instant?,
+    /** 추첨횟수(`drwtNum`) — §1.9.1이 예비가격 상세 신설 후보로 짚은 축, 후보 자신의 값이다. */
+    val drawCount: Int? = null,
 ) {
     init {
         require(sequenceNumber.isNotBlank()) { "sequenceNumber는 빈 문자열일 수 없다" }
+        require(drawCount == null || drawCount >= 0) { "drawCount는 음수일 수 없다: $drawCount" }
     }
 }
 
