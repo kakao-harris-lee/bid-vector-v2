@@ -118,13 +118,21 @@ private data class FieldContractRow(
  * (`policy-values.md` §1.1~§1.5). 「미확정」 칸(`bssAmt`·`bssAmtPurcnstcst`·`presmptAmt`·
  * `usefulAmt`·율 밴드 둘·개찰·예비가격 17건 등)은 인스턴스화하지 않는다(§6 결정문 —
  * "그 자리는 소유 OPEN이 닫힌 뒤"). 소비되지 않는 코드·플래그·봉투 키(§1.5 잔여·§1.6)도
- * 두지 않는다 — 지금 procurement 가 실제로 읽는 개념 축만 등재한다. 모든 행의 `presentIn`
- * 은 `NOTICE_LIST` 하나다(공고목록 응답 — [FieldContractRow.presentIn] 기본값, 이 행들은
- * 재정의하지 않는다). P-9 승인(3B-2)이 더한 개찰 축 행은 [KONEPS_OPENING_FIELD_ROWS] 가
- * 따로 갖고 각자 다른 `presentIn`을 명시한다 — 이 목록과 함께 레지스트리로 합쳐진다.
+ * 두지 않는다 — 지금 procurement 가 실제로 읽는 개념 축만 등재한다. 대다수 행의 `presentIn`
+ * 은 `NOTICE_LIST` 하나다([FieldContractRow.presentIn] 기본값) — `bidNtceNo`·`bidNtceOrd`
+ * (공고 식별자, 개찰 축 세 엔드포인트에도 실려 온다)와 `bssamt`(예비가격 상세에도 실려 온다,
+ * `policy-values.md` §1.7.1 각주, verifier r1 F-6)만 명시적으로 넓혔다. P-9 승인(3B-2)이
+ * 더한 개찰 축 행은 [KONEPS_OPENING_FIELD_ROWS] 가 따로 갖고 각자 다른 `presentIn`을
+ * 명시한다 — 이 목록과 함께 레지스트리로 합쳐진다.
  */
 private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
     listOf(
+        // bidNtceNo·bidNtceOrd — verifier r1 F-6 수정(운영자 결정 2026-09-08, 재검토) — 이
+        // 둘은 공고 식별자라 3B-2 가 여는 세 개찰 축 엔드포인트에도 실제로 실려 온다(어느
+        // 응답이든 「어느 공고의 행인가」를 나르지 않는 오퍼레이션은 없다 — mapMaskedOpeningItem
+        // 자신이 이 두 필드로 식별자를 뽑는다는 사실이 그 증거다). presentIn 을 NOTICE_LIST
+        // 하나로 두면 개찰 축 allow-list 강제(F-6 아래)가 이 필드부터 떨어뜨려 모든 개찰 축
+        // 항목이 「공고번호 없음」으로 오분류된다 — 문서가 실제로 싣는 범위를 그대로 반영한다.
         FieldContractRow(
             RawKey("bidNtceNo"),
             FieldConcept.NOTICE_NUMBER,
@@ -133,6 +141,13 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             FieldNullability.REQUIRED,
             VatTreatment.UNKNOWN,
             FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn =
+                setOf(
+                    SourceEndpoint.NOTICE_LIST,
+                    SourceEndpoint.OPENING_AWARD_LIST,
+                    SourceEndpoint.OPENING_RESULT_LIST,
+                    SourceEndpoint.RESERVE_PRICE_DETAIL,
+                ),
         ),
         FieldContractRow(
             RawKey("bidNtceOrd"),
@@ -142,10 +157,20 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             FieldNullability.REQUIRED,
             VatTreatment.UNKNOWN,
             FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn =
+                setOf(
+                    SourceEndpoint.NOTICE_LIST,
+                    SourceEndpoint.OPENING_AWARD_LIST,
+                    SourceEndpoint.OPENING_RESULT_LIST,
+                    SourceEndpoint.RESERVE_PRICE_DETAIL,
+                ),
         ),
         // P-3 — 문서로 서는 기초금액 키는 `bssamt` 하나다. legacy `BASE_RESOLUTION_ORDER`의
         // `bssAmt`(미등재 키)·`bssAmtPurcnstcst`(다른 개념)는 채택하지 않는다. vatTreatment
-        // 는 UNKNOWN(과세 미확정, `OPEN-REG-05`).
+        // 는 UNKNOWN(과세 미확정, `OPEN-REG-05`). **presentIn 이 예비가격 상세까지 넓어진다**
+        // (verifier r1 F-6 재검토, `policy-values.md` §1.7.1 각주 — "§1.1 의 bssamt 행은
+        // 그대로 서고 presentIn 만 예비가격 상세 4종으로 넓어진다"의 승인 문면을 그대로
+        // 따른다. 직전 라운드의 「기존 계약 행 불변 우선」은 이 각주를 놓친 판단이었다).
         FieldContractRow(
             RawKey("bssamt"),
             FieldConcept.BASE_AMOUNT,
@@ -154,6 +179,7 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             FieldNullability.OPTIONAL,
             VatTreatment.UNKNOWN,
             FieldProvenanceTemplate.PUBLISHED,
+            presentIn = setOf(SourceEndpoint.NOTICE_LIST, SourceEndpoint.RESERVE_PRICE_DETAIL),
         ),
         FieldContractRow(
             RawKey("asignBdgtAmt"),

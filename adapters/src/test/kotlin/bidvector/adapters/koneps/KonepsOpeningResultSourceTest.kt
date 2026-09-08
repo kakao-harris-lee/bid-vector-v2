@@ -5,11 +5,13 @@ import bidvector.procurement.DetailFetchDecision
 import bidvector.procurement.DetailFetchGates
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.procurement.RawKey
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
 import bidvector.procurement.decideDetailFetch
 import bidvector.sharedkernel.NoticeRound
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.net.http.HttpClient
@@ -31,6 +33,27 @@ private fun newSource(
         listBaseUri = server.baseUri,
         listOperation = KonepsOperationPolicy.AWARD_LIST,
         listSourceEndpoint = SourceEndpoint.OPENING_AWARD_LIST,
+        reserveDetailBaseUri = server.baseUri,
+        config =
+            KonepsSourceConfig(
+                httpClient = HttpClient.newHttpClient(),
+                serviceKey = ServiceKey.of("test-service-key"),
+                httpPolicy = policy,
+                collectionPolicyProvider = ::resolvedCollectionPolicy,
+                clock = FIXED_CLOCK,
+            ),
+    )
+
+// F-6(verifier r1 재검토) — opengCorpInfo·progrsDivCdNm 는 presentIn 이 OPENING_RESULT_LIST
+// 뿐이다. presentIn 강제 뒤로는 그 엔드포인트로 구성한 source 로만 이 필드들을 검증할 수 있다.
+private fun newResultListSource(
+    server: MockKonepsServer,
+    policy: KonepsHttpPolicyData = testKonepsHttpPolicy(),
+): KonepsOpeningResultSource =
+    KonepsOpeningResultSource(
+        listBaseUri = server.baseUri,
+        listOperation = KonepsOperationPolicy.OPENING_RESULT_LIST,
+        listSourceEndpoint = SourceEndpoint.OPENING_RESULT_LIST,
         reserveDetailBaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
@@ -196,32 +219,90 @@ class KonepsOpeningResultSourceTest {
     }
 
     @Test
-    fun `F-3·F-8 — 계약 밖 키 제외와 masking 실패가 SourceBatch 회계에서 서로 다른 축으로 나온다`() {
+    fun `F-3 — 계약 밖 키(bidwinnrBizno)가 낙찰 목록에서 unknownFields 로 계수된다`() {
         val items =
             listOf(
-                // bidwinnrBizno 는 계약 밖(allow-list 제외) — unknownFields 로 계수돼야 한다.
                 mapOf(
                     "bidNtceNo" to "SYN-OPEN-0030",
                     "bidNtceOrd" to "000",
                     "bidwinnrNm" to "SYN-A",
                     "bidwinnrBizno" to "9999999999",
                 ),
-                // opengCorpInfo 3성분(협상 계약형) — masking 실패로 maskingFailures 에 계수돼야
-                // 한다. 이 항목엔 계약 밖 키가 없다.
+            )
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 1, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchOpeningResults(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 1
+            batch.accounting.unknownFields shouldBe 1
+            batch.accounting.maskingFailures shouldBe 0
+            batch.accounting.dropped shouldBe 0
+        }
+    }
+
+    @Test
+    fun `F-8 — opengCorpInfo masking 실패(협상 계약형)가 개찰결과 목록에서 maskingFailures 로 계수된다`() {
+        val items =
+            listOf(
                 mapOf(
                     "bidNtceNo" to "SYN-OPEN-0031",
                     "bidNtceOrd" to "000",
                     "opengCorpInfo" to "SYN-B^8888888888^SYN-REP",
                 ),
             )
-        val body = KonepsEnvelopeFixtures.success(items, totalCount = 2, pageNo = 1, numOfRows = 100)
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 1, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newResultListSource(server).fetchOpeningResults(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 1
+            batch.accounting.maskingFailures shouldBe 1
+            batch.accounting.unknownFields shouldBe 0
+            batch.accounting.dropped shouldBe 0
+        }
+    }
+
+    @Test
+    fun `F-6 — bssamt 는 예비가격 상세로 넓어진 presentIn 덕에 RESERVE_PRICE_DETAIL 관측에도 남는다`() {
+        val items =
+            listOf(
+                mapOf(
+                    "bidNtceNo" to NOTICE_ID.number.value,
+                    "bidNtceOrd" to "000",
+                    "bssamt" to "700000000",
+                    "plnprc" to "900000000",
+                ),
+            )
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 1, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchReservePrices(fetchEvidence())
+
+            val contract = resolvedCollectionPolicy(REFERENCE_DATE).fieldContracts.contractFor(RawKey("bssamt"))!!
+            batch.items.single().valueOf(contract) shouldBe "700000000"
+            batch.accounting.unknownFields shouldBe 0
+        }
+    }
+
+    @Test
+    fun `F-6 — 낙찰 목록 엔드포인트로 개찰결과 전용 필드(opengCorpInfo)를 받으면 presentIn 불일치로 제외된다`() {
+        val items =
+            listOf(
+                mapOf(
+                    "bidNtceNo" to "SYN-OPEN-0032",
+                    "bidNtceOrd" to "000",
+                    "bidwinnrNm" to "SYN-C",
+                    "opengCorpInfo" to "SYN-D^7777777777^SYN-REP^100^95.0",
+                ),
+            )
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 1, pageNo = 1, numOfRows = 100)
         MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
             val batch = newSource(server).fetchOpeningResults(REFERENCE_DATE, null)
 
-            batch.items.size shouldBe 2
+            batch.items.single().keys shouldNotContain RawKey("opengCorpInfo")
+            // presentIn 불일치는 Excluded 로 접혀 unknownFields 로 계수된다(F-3 과 같은 축) —
+            // 5성분(단일 낙찰자, 정상 masking 대상)인데도 masking 실패가 아니라 endpoint 불일치로
+            // 제외됐다는 것을 maskingFailures=0 로 구별한다.
             batch.accounting.unknownFields shouldBe 1
-            batch.accounting.maskingFailures shouldBe 1
-            batch.accounting.dropped shouldBe 0
+            batch.accounting.maskingFailures shouldBe 0
         }
     }
 }

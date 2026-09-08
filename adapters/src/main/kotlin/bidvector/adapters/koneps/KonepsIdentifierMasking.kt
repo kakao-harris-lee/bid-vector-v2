@@ -35,12 +35,15 @@ internal fun maskOpengCorpInfo(raw: String): String? {
 /** [fieldOutcomeOf] 한 필드 판정 — [MaskedKonepsItem.from]의 누적 루프가 `continue`/`break` 없이 소진하게 한다. */
 private sealed interface FieldMaskOutcome {
     /**
-     * allow-list 밖(계약 미등재) 또는 blank 키 — 담지 않는다. **verifier r1 F-3 수정**(운영자
-     * 승인 2026-09-08, 3A `Accounting.kt` 좁은 확장) — 이전 판은 여기서 회계를 남기지 않아
-     * §5.3 규율 1(선언에 없는 키는 미지 필드로 리포트)이 개찰 축에서 사라졌다. 이제
-     * [MaskedKonepsItem.excludedFieldCount]로 센다 — 3B `mapRawItem`의 `unknownKeysIn`
-     * 계수와 같은 목적, 다른 메커니즘(allow-list 는 필터링 자체가 계약 대조라 사후 재조회
-     * 대신 그 자리에서 센다).
+     * allow-list 밖(계약 미등재)·blank 키·**계약이 이 엔드포인트를 선언하지 않은 키**
+     * (`presentIn` 불일치, verifier r1 F-6 재검토) — 담지 않는다. **verifier r1 F-3
+     * 수정**(운영자 승인 2026-09-08, 3A `Accounting.kt` 좁은 확장) — 이전 판은 여기서
+     * 회계를 남기지 않아 §5.3 규율 1(선언에 없는 키는 미지 필드로 리포트)이 개찰 축에서
+     * 사라졌다. 이제 [MaskedKonepsItem.excludedFieldCount]로 센다 — 3B `mapRawItem`의
+     * `unknownKeysIn` 계수와 같은 목적, 다른 메커니즘(allow-list 는 필터링 자체가 계약
+     * 대조라 사후 재조회 대신 그 자리에서 센다). `presentIn` 대조(F-6)는 P-9 ④(오퍼레이션
+     * 군 구별) 승인 취지가 실제로 하중을 지게 한다 — 대조 없이는 어느 오퍼레이션의 값인지
+     * 계약이 서류로만 구별할 뿐이었다.
      */
     data object Excluded : FieldMaskOutcome
 
@@ -57,11 +60,19 @@ private fun fieldOutcomeOf(
     name: String,
     value: JsonValue,
     policy: KonepsCollectionPolicyData,
-): FieldMaskOutcome =
-    when {
+    sourceEndpoint: SourceEndpoint,
+): FieldMaskOutcome {
+    val contract = if (name.isBlank()) null else policy.fieldContracts.contractFor(RawKey(name))
+    return when {
         // allow-list 반전 — 계약이 없는 키는 담는 단계에서 제외된다(사업자등록번호·대표자명 등
         // §1.7.5 각주의 미등재 식별자가 여기서 자동으로 빠진다, P-10 (a)).
-        name.isBlank() || policy.fieldContracts.contractFor(RawKey(name)) == null -> {
+        contract == null -> {
+            FieldMaskOutcome.Excluded
+        }
+
+        // F-6(verifier r1 재검토) — 계약은 있으나 이 엔드포인트를 선언하지 않은 키는 제외한다.
+        // P-9 ④(오퍼레이션 군 구별)의 승인 취지가 실제로 강제되는 자리다.
+        !contract.presentIn.contains(sourceEndpoint) -> {
             FieldMaskOutcome.Excluded
         }
 
@@ -78,6 +89,7 @@ private fun fieldOutcomeOf(
             }
         }
     }
+}
 
 /**
  * allow-list 로 걸러 치환까지 마친 개찰 축 항목(설계 검토 게이트 ① — 「계약 등재 키만 담는다」
@@ -100,13 +112,14 @@ internal class MaskedKonepsItem private constructor(
         fun from(
             item: JsonValue.JsonObject,
             policy: KonepsCollectionPolicyData,
+            sourceEndpoint: SourceEndpoint,
         ): MaskedKonepsItem {
             val forRender = LinkedHashMap<String, JsonValue>()
             val fields = LinkedHashMap<RawKey, RawValue>()
             var excludedFieldCount = 0
             var decompositionFailures = 0
             for ((name, value) in item.fields) {
-                when (val outcome = fieldOutcomeOf(name, value, policy)) {
+                when (val outcome = fieldOutcomeOf(name, value, policy, sourceEndpoint)) {
                     FieldMaskOutcome.Excluded -> {
                         excludedFieldCount++
                     }
@@ -143,7 +156,7 @@ internal fun mapMaskedOpeningItem(
     // 기본값 없음 — 새 개찰 축 오퍼레이션이 이 값을 잊으면 컴파일이 깨진다.
     rowIdentifierRawKeys: List<String>,
 ): RawItemOutcome {
-    val masked = MaskedKonepsItem.from(item, policy)
+    val masked = MaskedKonepsItem.from(item, policy, sourceEndpoint)
     val (numberKey, roundKey) = identityRawKeys(policy)
     val numberRaw = presentText(masked.fields, numberKey)
     val roundRaw = presentText(masked.fields, roundKey)

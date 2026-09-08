@@ -97,6 +97,25 @@ class CollectionPolicyTest {
     }
 
     @Test
+    fun `bidNtceNo·bidNtceOrd 는 개찰 축 세 엔드포인트에도 실린다 — F-6, presentIn 강제의 전제`() {
+        val allEndpoints =
+            setOf(
+                SourceEndpoint.NOTICE_LIST,
+                SourceEndpoint.OPENING_AWARD_LIST,
+                SourceEndpoint.OPENING_RESULT_LIST,
+                SourceEndpoint.RESERVE_PRICE_DETAIL,
+            )
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceNo"))!!.presentIn shouldBe allEndpoints
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceOrd"))!!.presentIn shouldBe allEndpoints
+    }
+
+    @Test
+    fun `bssamt 의 presentIn 은 예비가격 상세로 넓어진다 — policy-values md 1-7-1 각주, verifier r1 F-6`() {
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bssamt"))!!.presentIn shouldBe
+            setOf(SourceEndpoint.NOTICE_LIST, SourceEndpoint.RESERVE_PRICE_DETAIL)
+    }
+
+    @Test
     fun `bidwinnrBizno 는 어떤 개찰 축 행에도 등재되지 않는다 — P-10 (a), 저장하지 않는 값은 계약을 두지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidwinnrBizno")) shouldBe null
     }
