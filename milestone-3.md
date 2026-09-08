@@ -145,6 +145,12 @@ P-8 + 정책 값 커밋).
 `COL-03` 문면의 **추첨번호**(`drwtNo1`·`drwtNo2`)와 투찰 축은 개찰완료 오퍼레이션만 주므로 이번 slice 에 없다 · 개찰 축 `sourceText` 는 계약 등재 키만
 담아 미등재 키의 원문 재해석 경로가 이 축에 없다(P-10 (a) 의 대가). 이 문단은 **문서 레인이 쓴다** — 구현 레인은 `milestone-3.md` 를 편집하지 않는다.
 
+**3B-2 종결 2026-09-08(사용자 승인) · M3 잔여 0** — verifier r3 `ready-for-review` + 장부층 low 다섯 일괄 위에서 승인(최종 head `9f0bb55`, evidence `reports/evidence/m3/3b2/checklist.md` 「사용자 승인」). **재작업 2/5.** 산출: `KonepsOpeningResultSource`(낙찰 목록·개찰결과 목록 두 군을 같은 클래스의 두 인스턴스로) · `KonepsLicenseLimitDocumentSource`(자격 원문 서브콜, `bidNtceOrd` 필수) · `KonepsOperationDescriptor`(오퍼레이션별 `inqryDiv`·필수 항목·행 식별자를 기본값 없이 선언) · `KonepsIdentifierMasking`(allow-list 반전 + `MaskedKonepsItem` 통로 타입) · 3A 좁은 확장 셋(P-9 ①②④ + D-3B2-5 술어 + `Accounting.kt` 회계 세 축). 3B 의 통신·재시도·봉투·페이지네이션·JSON 기반은 재사용하고 기존 test 는 편집하지 않았다.
+
+**검증이 드러낸 것 — 셋 다 정적 판독으로는 나오지 않았다.** ① 단건 상세가 3B 목록 dedup 을 물려받아 **복수예비가격 15행이 1건으로 접히고 완료 판정까지** 났다(F-1). 수정 뒤에도 **선언한 행 식별자가 응답에 없을 때** 같은 실패가 재현됐고(G-1 — 문서가 그 키를 옵션으로 선언한다), 부재를 `""` 로 접지 않고 항목을 살리며 `rowIdentifierIndeterminate` 축으로 드러내는 것으로 닫았다. ② P-10 게이트가 **누출을 기본값으로** 두었다(F-4 — walker 의 `itemMapper` 기본 인자가 원문 보존 mapper). 기본값 제거로 「생략 = 누출」을 컴파일에서 닫았다. ③ 문서화된 rollback 이 **exit 0 이면서 컴파일 불가 트리**를 남겼다(G-3) — 되돌린 트리의 `compileKotlin`·test 확인을 절차에 넣었다(1A 16차 계보). 또 `presentIn` 강제(F-6)는 구현 레인의 「강제하면 깨진다」가 **승인 문면 미준수가 원인인 순환 논거**임을 오케스트레이터가 짚어 뒤집었고, 공유 키 셋을 §1.7.1·§1.9.1 문면대로 넓힌 뒤 강제가 섰다(미탐 0 실측).
+
+**잔여 후속(M3 완료 조건 밖, M4 와 병행)**: 개찰완료 오퍼레이션 — `COL-03` 문면의 **추첨번호**(`drwtNo1`·`drwtNo2`)와 투찰 축(`bidprcAmt`·`bidprcrt`)을 주는 유일한 오퍼레이션이고 D-3B2-9 (a) 로 이번 slice 밖 · `OpeningResult` fact 확장 + 3D 스키마(D-3B2-8, P-10 masking 반영) · 3D V-1 · 3A 후속 셋(3B checklist) · `OPEN-3C-ATTACHMENT-FIELD-CONTRACT`(P-8) · P-7(업무구분 열거값 승인 항목화) · 3B-2 fixture case(후보 여덟, `_workspace/m3-3b2/01_curator_approval_request.md`). **OPEN 넷 신설** `capability-map.md` §14.3 — `OPEN-3B2-TARGETED-OPENING-QUERY`(문서는 공고번호 표적 개찰 조회를 선언하고 legacy 실측은 불가라 적는다 — 실제 호출 승인 뒤 닫히며 SET-02 의 소스 제약과 쿼터 계산이 걸려 있다) · `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` · `OPEN-3B2-STORAGE-ROW-KEY-COLLISION`(G-1 해결이 어댑터 층 한정 — 3D `observation_key` 가 행 식별자 부재 행을 구별하지 못한다) · `OPEN-3B2-OPENING-FACT-SLOTS`. **M3 는 이제 잔여 slice 가 없다.**
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
