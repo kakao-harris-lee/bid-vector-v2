@@ -124,6 +124,16 @@ canonical/audit/collection_run, 점유 가드 트리거 + `provenance_authority`
 4B 가 개찰 fact 를 소비하기 전까지 닫는다. 후속 소폭: 3D V-1(opening_result 라벨 가드), 3A 후속 셋(3B checklist), `OPEN-3C-ATTACHMENT-FIELD-CONTRACT`(curator 표
 P-8 + 정책 값 커밋).
 
+**3B-2 준비 완료 2026-09-08 — 승인 대기** — 선행 조건(D-3B-6)이 닫혔다. 운영자가 **낙찰정보서비스 1.1 참고자료**와 **개방표준서비스 1.2 참고자료**를 확보해
+`_workspace/m3-3b2/external/`(SHA-256 기록)에 두었고 `fixtures/manifest.yaml` `official_documents` 에 `koneps-scsbid-reference`·`pps-opnstd-reference` 로 등재했다.
+`policy-values.md` **§1.7** 이 「문서 미확보」에서 **필드 계약 13 행**(curator 레인)으로, **§1.9** 가 **오퍼레이션 계약**(23 오퍼레이션 군 · `inqryDiv` 군별 의미 ·
+공통 항목·운영 한계 · 개찰완료 오퍼레이션 · license-limit 서브콜, 세션 모델 — curator 레인 중단 뒤 이어 씀)으로 신설됐다. 계약 초안 `reports/evidence/m3/3b2/scope.md`
+(D-3B2-1~9), 승인 요청 `_workspace/m3-3b2/01_curator_approval_request.md`(**P-9~P-12**, P-10 masking 이 차단 조건). 문서 대조가 드러낸 것: legacy 소비 17 키 중 13 만
+문서에 있고 `bidOpenDt`·`ntceNm`·`prcmBsneSeCd` 는 어느 문서에도 없다 · `inqryDiv` 가 오퍼레이션 군마다 다른 축을 뜻한다 · **추첨번호·투찰률은 legacy 가 부르지 않는
+개찰완료 오퍼레이션만 준다**(D-3B2-9) · 예비가격 존재 신호가 목록 응답에 필수로 온다(COL-03 술어 입력 후보) · **문서와 legacy 실측이 표적 개찰 조회에서 충돌한다**
+(신설 `OPEN-3B2-TARGETED-OPENING-QUERY`, SET-02·ux-journey 문면에 포인터) · 페이지 크기 대 메시지 상한(신설 `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP`).
+착수는 P-9~P-12 승인 + D-3B2-1~9 결정 뒤 — base 재고정 · Phase 2.5 설계 검토 · 구현 레인(sonnet) · verifier.
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
