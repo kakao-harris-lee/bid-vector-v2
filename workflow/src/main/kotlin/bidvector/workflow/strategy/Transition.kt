@@ -26,7 +26,8 @@ fun beginSession(
         lastCommand = null,
     )
 
-private fun isTerminal(state: EditSessionState): Boolean =
+/** `internal` — [EditStrategyWorkflow.begin]도 재사용한다(verifier N-1 수정). */
+internal fun isTerminal(state: EditSessionState): Boolean =
     when (state) {
         is EditSessionState.Applied, is EditSessionState.Cancelled, EditSessionState.Expired -> true
         is EditSessionState.WaitingForValue, is EditSessionState.WaitingForConfirmation -> false

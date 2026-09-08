@@ -75,6 +75,17 @@ private class RecordingEventSink : EventSink {
     }
 }
 
+/** `begin()`이 `Started`를 낼 것으로 기대하는 호출부의 공용 unwrap(verifier N-1 — begin 이 이제 `BeginOutcome`을 낸다). */
+private fun EditStrategyWorkflow.beginStarted(
+    sessionId: EditSessionId,
+    operator: OperatorId,
+    field: EditableField,
+): EditSession {
+    val outcome = begin(sessionId, operator, field)
+    check(outcome is BeginOutcome.Started) { "Started 를 기대했으나 $outcome" }
+    return outcome.session
+}
+
 /**
  * scope.md ⑥⑦ — use case 배선. 세 ports(fake)만으로 begin→provideValue→confirm 전 과정과
  * `strategies.save`·`events.publish`가 `Applied`에서만 일어남을(⑥ 「모든 편집 경로가 이
@@ -102,7 +113,7 @@ class EditStrategyWorkflowTest {
     @Test
     fun `begin→provideValue→confirm 전 과정이 전략을 저장하고 이벤트를 정확히 한 번 발행한다`() {
         val (workflow, strategies, events) = newWorkflow()
-        val session = workflow.begin(EditSessionId("s-1"), OPERATOR, FIELD)
+        val session = workflow.beginStarted(EditSessionId("s-1"), OPERATOR, FIELD)
 
         val provided =
             workflow.provideValue(
@@ -136,7 +147,7 @@ class EditStrategyWorkflowTest {
     fun `Accepted 로 끝나는 경로는 전략을 저장하지도 이벤트를 발행하지도 않는다`() {
         val (workflow, strategies, events) = newWorkflow()
         val before = strategies.strategy
-        val session = workflow.begin(EditSessionId("s-2"), OPERATOR, FIELD)
+        val session = workflow.beginStarted(EditSessionId("s-2"), OPERATOR, FIELD)
 
         workflow.provideValue(
             EditCommand.ProvideValue(
@@ -174,7 +185,7 @@ class EditStrategyWorkflowTest {
     fun `expire 는 만료 시각을 넘긴 세션을 저장하고 Expired 상태를 낸다`() {
         val clock = FixedClock(Instant.parse("2026-09-08T00:00:00Z"))
         val (workflow, _, _) = newWorkflow(clock = clock)
-        val session = workflow.begin(EditSessionId("s-3"), OPERATOR, FIELD)
+        val session = workflow.beginStarted(EditSessionId("s-3"), OPERATOR, FIELD)
         clock.instant = session.expiresAt.plusSeconds(1)
 
         val state = workflow.expire(session.id)
@@ -187,5 +198,49 @@ class EditStrategyWorkflowTest {
         val (workflow, _, _) = newWorkflow()
 
         workflow.expire(EditSessionId("no-such-session")) shouldBe null
+    }
+
+    @Test
+    fun `begin 은 같은 id 에 이미 비종단 세션이 있으면 덮어쓰지 않고 거부한다`() {
+        val (workflow, _, _) = newWorkflow()
+        val sessionId = EditSessionId("s-4")
+        val original = workflow.beginStarted(sessionId, OPERATOR, FIELD)
+        workflow.provideValue(
+            EditCommand.ProvideValue(
+                CommandId("cmd-1"),
+                sessionId,
+                Actor.Operator(OPERATOR),
+                FIELD,
+                StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+            ),
+        )
+
+        val reopened = workflow.begin(sessionId, OPERATOR, FIELD)
+
+        reopened.shouldBeInstanceOf<BeginOutcome.Rejected>()
+        reopened.reason shouldBe RejectionReason.SessionAlreadyActive
+        reopened.existing.id shouldBe original.id
+        reopened.existing.state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
+    }
+
+    @Test
+    fun `begin 은 같은 id 의 세션이 종단이면 새로 열 수 있다`() {
+        val (workflow, _, _) = newWorkflow()
+        val sessionId = EditSessionId("s-5")
+        val original = workflow.beginStarted(sessionId, OPERATOR, FIELD)
+        val cancelCommand =
+            EditCommand.Cancel(
+                CommandId("cmd-1"),
+                sessionId,
+                Actor.Operator(OPERATOR),
+                CancellationReason.OperatorRequested,
+            )
+        workflow.cancel(cancelCommand)
+
+        val reopened = workflow.begin(sessionId, OPERATOR, FIELD)
+
+        reopened.shouldBeInstanceOf<BeginOutcome.Started>()
+        reopened.session.id shouldBe original.id
+        reopened.session.state shouldBe EditSessionState.WaitingForValue(FIELD)
     }
 }

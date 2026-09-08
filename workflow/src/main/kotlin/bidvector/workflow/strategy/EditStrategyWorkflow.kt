@@ -16,6 +16,23 @@ sealed interface CommandResult {
 }
 
 /**
+ * [EditStrategyWorkflow.begin]의 결과(verifier N-1 수정) — `apply()`의 판정 순서 밖이라
+ * [TransitionOutcome] 을 재사용하지 않는다(그 타입은 [EditCommand] 를 요구하는데 `begin`
+ * 에는 command 가 없다).
+ */
+sealed interface BeginOutcome {
+    data class Started(
+        val session: EditSession,
+    ) : BeginOutcome
+
+    /** 같은 [EditSessionId]에 이미 비종단 세션이 있어 거부됐다 — [existing]은 그 세션 그대로다. */
+    data class Rejected(
+        val existing: EditSession,
+        val reason: RejectionReason,
+    ) : BeginOutcome
+}
+
+/**
  * 채널 독립 use case(scope.md ⑦, STR-11) — 4개 command 처리 + `begin`·`expire`. 어댑터
  * (Telegram/웹)는 이 클래스 밖에 산다(D-M4-1). 모든 전략 write 는 이 클래스를 지난다(⑥) —
  * [strategies]는 `public`(설계 검토 (2) #3 실측 판정, `Ports.kt` 참고)이지만, 우회 (3)의
@@ -31,14 +48,24 @@ class EditStrategyWorkflow(
     private val strategyPolicy: Resolution.Resolved<StrategyPolicyData>,
     private val sessionPolicy: EditSessionPolicyData,
 ) {
+    /**
+     * 같은 [EditSessionId]에 이미 비종단 세션이 있으면 덮어쓰지 않고 거부한다(verifier N-1 —
+     * `sessions.load` 가드가 없으면 `WaitingForConfirmation` 을 `apply()` 밖에서 조용히
+     * `WaitingForValue` 로 되돌릴 수 있었다). 종단 세션(`Applied`/`Cancelled`/`Expired`)이
+     * 있는 id 는 새로 열 수 있다(D-4A-4 — 재개는 새 세션).
+     */
     fun begin(
         sessionId: EditSessionId,
         operator: OperatorId,
         field: EditableField,
-    ): EditSession {
+    ): BeginOutcome {
+        val existing = sessions.load(sessionId)
+        if (existing != null && !isTerminal(existing.state)) {
+            return BeginOutcome.Rejected(existing, RejectionReason.SessionAlreadyActive)
+        }
         val session = beginSession(sessionId, operator, field, clock.now(), sessionPolicy)
         sessions.save(session)
-        return session
+        return BeginOutcome.Started(session)
     }
 
     fun provideValue(command: EditCommand.ProvideValue): CommandResult = process(command)

@@ -21,4 +21,11 @@ sealed interface RejectionReason {
 
     /** 판정 순서 ④ — 전이표 밖의 (state, command) 쌍(설계 검토 (1)). */
     data object InvalidTransition : RejectionReason
+
+    /**
+     * `begin()` 전용(verifier N-1 수정) — 같은 [EditSessionId]에 이미 비종단 세션이 있으면
+     * 새로 열지 않는다. `apply()`의 판정 순서 밖이다 — `begin()`은 세션이 아직 없을 때만
+     * 서는 유일한 생성 경로라 전이표 자체가 적용되지 않는다(D-4A-4, 재개는 새 세션).
+     */
+    data object SessionAlreadyActive : RejectionReason
 }
