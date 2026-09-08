@@ -109,6 +109,23 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
 
 ## 알려진 제한
 
+- **(조사만, 3D out_of_scope) `raw_observation.observation_key`가 행 식별자 없는 복수 행을
+  구별하지 못할 수 있다** — `ObservationKeyDerivation.of`(adapters 3D,
+  `adapters/src/main/kotlin/bidvector/adapters/persistence/ObservationKeyDerivation.kt`)는
+  `sourceEndpoint.name`·`observedAt`·`canonicalPayload`(계약 등재 필드 투영, `compnoRsrvtnPrceSno`·
+  `lmtGrpNo`·`lmtSno` 포함)·`sourceText`를 이어붙여 SHA-256 으로 키를 낸다. **`observedAt`은 페이지
+  전체가 공유한다**(`KonepsPageUriBuilder.kt:238` `clock.instant()`를 페이지당 한 번만 호출해
+  `recordPage`의 모든 항목에 같은 값을 넘긴다, 실측) — 같은 페이지 안에서는 이 축이 행을
+  구별하지 못한다. 행 식별자(`compnoRsrvtnPrceSno`·`lmtGrpNo`+`lmtSno`)가 §1.7.3 처럼 **부재
+  허용**(OPTIONAL)이고 그 값이 실제로 부재이면 `presenceOf`가 `Missing`을 내 그 필드가
+  `canonicalPayload`(값 `null`은 투영에서 제외됨, `ObservationPayloadCodec.encode`)에서 통째로
+  빠진다 — 남는 구별 재료는 다른 등재 필드 값과 `sourceText`뿐이다. **그 나머지가 두 행에서
+  전부 같으면**(식별자만 다르고 내용이 우연히 겹치는 행, 또는 실제로 식별자 외 내용까지 같은
+  행) `observation_key`가 충돌해 `Sql.INSERT_RAW_OBSERVATION`의 `ON CONFLICT (observation_key)
+  DO NOTHING`이 둘째 행을 조용히 버린다 — verifier r2 G-1 이 어댑터 dedup 층에서 살린 행이
+  저장 층에서 다시 접히는 경로다. 확인만 했고 수정하지 않았다(3D out_of_scope). M3 완료 조건
+  「retry 후 canonical effect 하나」와 맞물리는 자리라 신설 OPEN 후보로 다룰 것을 권한다
+  (`OPEN-3B2-STORAGE-ROW-KEY-COLLISION` — scope.md 는 문서 레인 소유라 이 문서가 후보만 남긴다).
 - **`getOpengResultListInfoOpengCompt`(개찰완료) 미구현**(D-3B2-9 (a) 운영자 승인) — 추첨번호
   (`drwtNo1`·`drwtNo2`)와 투찰 축(`bidprcAmt`·`bidprcrt`)은 이 오퍼레이션만 준다. `COL-03` 문면의
   「추첨번호 확보」가 이 slice 로 닫히지 않는다 — 후속 slice 대상(M4 4B 착수 전).
