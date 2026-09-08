@@ -133,6 +133,22 @@ verdict는 `legacy-defect | v2-defect | intentional-redesign | insufficient-evid
 증명하지 않는다. 되돌린 뒤 확인 지점은 「in_scope 경로의 `git diff <base> -- <경로>` 가 비어 있고
 하네스 경로는 HEAD 그대로」다.
 
+**되돌린 트리가 빌드되는지까지 확인한다 (2026-09-08).** 위 세 확인(exit 0 · D/M 수 · diff 비어
+있음)은 **파일이 제자리로 갔는지만** 잰다. 코드 slice 에서는 그 셋이 다 통과하면서도 트리가
+컴파일되지 않을 수 있다 — 목록이 낡아 파일 하나가 안 돌아가면 남은 호출부가 사라진 시그니처를
+가리킨다. **실측에 두 단계를 더한다**: ④ 되돌린 트리에서 **모듈별 compile 명령이 exit 0** ⑤ 그
+트리의 **test 가 초록**. 결과를 rollback.md 에 한 줄씩 적는다.
+
+**목록은 손으로 쓰지 않는다** — `git diff --name-status <base>..HEAD` 에서 기계적으로 낸다
+(A = 삭제 대상, M = base 로 restore). **라운드마다 파일이 늘면 이 절차를 다시 돌린다**는 문장을
+rollback.md 에 남긴다 — 목록이 낡는 것이 이 결함의 실제 원인이다.
+
+근거: M3/3B-2 verifier r2 high — 수정 라운드가 파일 셋을 더 고쳤는데 restore 목록이 갱신되지
+않아, 문서의 명령을 임시 clone 에서 그대로 실행하면 **exit 0 인데 `:adapters:compileKotlin` 이
+exit 1**(`Too many arguments` · `Unresolved reference`)이고 base 대비 48줄이 남았다. 「exit 0 =
+성공」으로 적은 것이 그 라운드의 차단 사유가 됐다. M1/1A 16차 high(명령이 아예 실패)의 다음
+단계 — 이번에는 **명령이 성공하면서 결과가 미달**이다.
+
 ### codex-review-*.json
 
 codex-reviewer 에이전트만 작성한다 (`codex-review-gate` 스킬). 다른 에이전트는 이
