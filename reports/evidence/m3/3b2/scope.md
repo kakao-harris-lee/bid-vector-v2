@@ -152,5 +152,6 @@ evidence 는 되돌리지도 고치지도 않는다(감사 기록 보존). **알
 | `OPEN-COL-03`(업무구분 코드 체계) | 낙찰정보서비스 `bsnsDivCd`(1 물품 · 2 외자 · 3 공사 · 5 용역 — 개방표준 문서 문면)는 curator 표로; 3B-2 는 소비하지 않는다 |
 | `OPEN-3C-ATTACHMENT-FIELD-CONTRACT`(P-8) | 3B-2 대상 아님 — curator 표 별도 행 |
 | 신설 후보 `OPEN-3B2-OPENING-FACT-SLOTS` | D-3B2-8 (a) 시 등재: `OpeningResult` fact 확장 + 3D 스키마, P-10 뒤 |
-| 신설 후보 `OPEN-3B2-TARGETED-OPENING-QUERY` | **문서 대 실측 충돌** — 문서는 개찰결과 목록의 `inqryDiv=4`(입찰공고번호)와 개찰완료의 `bidNtceNo` 필수 단건 조회를 선언하는데, legacy 실측과 `capability-map.md` SET-02 는 「공고번호 표적조회 불가, 날짜창 스윕이 유일」이라 적는다. **실제 호출 승인 뒤에만 닫힌다.** 닫히면 SET-02 의 소스 제약 문면과 쿼터 계산이 바뀐다 |
-| 신설 후보 `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` | 문서 최대 메시지 **4000 bytes** 대 legacy 페이지 크기(목록 999) — 한 페이지가 상한을 넘으면 잘린 응답이 온다. 관측으로만 닫힌다 |
+| 신설 `OPEN-3B2-TARGETED-OPENING-QUERY`(등재됨) | **문서 대 실측 충돌** — 문서는 개찰결과 목록의 `inqryDiv=4`(입찰공고번호)와 개찰완료의 `bidNtceNo` 필수 단건 조회를 선언하는데, legacy 실측과 `capability-map.md` SET-02 는 「공고번호 표적조회 불가, 날짜창 스윕이 유일」이라 적는다. **실제 호출 승인 뒤에만 닫힌다.** 닫히면 SET-02 의 소스 제약 문면과 쿼터 계산이 바뀐다 |
+| 신설 `OPEN-3B2-STORAGE-ROW-KEY-COLLISION`(2026-09-08 등재) | **행 식별자 없는 복수 행이 저장 층에서 다시 접힐 수 있다** — verifier r2 G-1 수정으로 어댑터는 그 행들을 살리지만, 3D `observation_key` 구성상 부재 행 식별자 + 같은 나머지 값이면 키가 충돌해 둘째 행이 조용히 버려진다. 3D 는 이 slice 밖이라 **등재만**. 정본은 `capability-map.md` §14.3 |
+| 신설 `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` | 문서 최대 메시지 **4000 bytes** 대 legacy 페이지 크기(목록 999) — 한 페이지가 상한을 넘으면 잘린 응답이 온다. 관측으로만 닫힌다 |
