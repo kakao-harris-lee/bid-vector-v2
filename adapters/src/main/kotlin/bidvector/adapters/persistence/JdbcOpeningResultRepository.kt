@@ -22,7 +22,6 @@ import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
-import java.time.Instant
 import javax.sql.DataSource
 
 /**
@@ -73,7 +72,7 @@ class JdbcOpeningResultRepository(
         if (result.reservePrices.isEmpty()) return
         connection.prepareStatement(Sql.UPSERT_OPENING_RESERVE_PRICE).use { statement ->
             for (row in result.reservePrices) {
-                bindReservePriceRow(statement, result.noticeId, row, result.observedAt, observationKey)
+                bindReservePriceRow(statement, result.noticeId, row, observationKey)
                 statement.addBatch()
             }
             statement.executeBatch()
@@ -92,12 +91,10 @@ class JdbcOpeningResultRepository(
         }
 }
 
-@Suppress("LongParameterList")
 private fun bindReservePriceRow(
     statement: PreparedStatement,
     noticeId: NoticeId,
     row: OpeningReservePriceRow,
-    observedAt: Instant,
     observationKey: ObservationKey,
 ) {
     var index = 1
@@ -108,7 +105,9 @@ private fun bindReservePriceRow(
     statement.setString(index++, row.baseReservePrice?.currency?.name)
     statement.setNullableBoolean(index++, row.isDrawn)
     statement.setNullableInt(index++, row.drawCount)
-    statement.setTimestamp(index++, Timestamp.from(observedAt))
+    // verifier r1 H-2 — 행 자신의 observedAt을 싣는다(result.observedAt 대체 아님, 각
+    // 행이 자기 관측 시각을 스스로 나른다).
+    statement.setTimestamp(index++, Timestamp.from(row.observedAt))
     statement.setString(index, observationKey.value)
 }
 
@@ -125,6 +124,7 @@ private fun ResultSet.toReservePriceRow(): OpeningReservePriceRow {
         sequenceNumber = getString("reserve_price_sequence"),
         baseReservePrice = baseReservePrice,
         isDrawn = getBoolean("is_drawn").takeUnless { wasNull() },
+        observedAt = getTimestamp("observed_at").toInstant(),
         drawCount = getInt("draw_count").takeUnless { wasNull() },
     )
 }
@@ -155,14 +155,20 @@ private fun bindOpeningResult(
     )
     statement.setBigDecimal(index++, result.finalAwardAmount?.wonOf())
     statement.setString(index++, result.finalAwardAmount?.currency?.name)
+    statement.setString(index++, result.finalAwardAmount?.let { ProvenanceCodec.kindOf(it.provenance).name })
+    statement.setString(index++, result.finalAwardAmount?.let { ProvenanceCodec.detailOf(it.provenance) })
     statement.setString(index++, result.finalAwardCompanyName)
     statement.setNullableInt(index++, result.participantCount)
     statement.setString(index++, result.progressDivision)
     statement.setBigDecimal(index++, result.plannedPrice?.wonOf())
     statement.setString(index++, result.plannedPrice?.currency?.name)
+    statement.setString(index++, result.plannedPrice?.let { ProvenanceCodec.kindOf(it.provenance).name })
+    statement.setString(index++, result.plannedPrice?.let { ProvenanceCodec.detailOf(it.provenance) })
     statement.setBigDecimal(index++, result.baseAmount?.wonOf())
     statement.setString(index++, result.baseAmount?.currency?.name)
     statement.setString(index++, result.baseAmount?.vatTreatment?.name)
+    statement.setString(index++, result.baseAmount?.let { ProvenanceCodec.kindOf(it.provenance).name })
+    statement.setString(index++, result.baseAmount?.let { ProvenanceCodec.detailOf(it.provenance) })
     statement.setNullableInt(index++, result.totalReservePriceCandidateCount)
     statement.setNullableTimestamp(index++, result.actualOpeningAt)
     statement.setTimestamp(index++, Timestamp.from(result.observedAt))
@@ -176,25 +182,29 @@ private fun ResultSet.toOpeningResult(id: NoticeId): OpeningResult {
     val winningFraction = getBigDecimal("winning_rate_fraction")
     val derivedWon = getBigDecimal("derived_base_amount_won")
     val derived = derivedWon?.let { won -> toDerivedBaseAmount(won) }
-    // ①③ — 최종낙찰금액·예정가격·기초금액은 파생이 아니라 KONEPS 공식 응답에서 직접 온 값이다
-    // (D-3A-1 (a) `Notice`의 공고 목록 축과 같은 성격) — `Provenance.Published(id.round)`가
-    // 그 사실을 정확히 진술한다. 지어낸 값이 아니라 `id.round`에서 실제로 유도된다.
-    val published = Provenance.Published(id.round)
     return OpeningResult(
         noticeId = id,
         winningRate = winningFraction?.let(Rate::ofFraction),
         derivedBaseAmount = derived,
         observedAt = getTimestamp("observed_at").toInstant(),
         finalAwardAmount =
-            readWonCurrency("final_award_amount_won", "final_award_amount_currency")
-                ?.let { (won, currency) -> AwardAmount(won, currency, published) },
+            readAmountProvenance(
+                "final_award_amount_won",
+                "final_award_amount_currency",
+                "final_award_amount_provenance",
+                "final_award_amount_provenance_detail",
+            )?.let { (won, currency, provenance) -> AwardAmount(won, currency, provenance) },
         finalAwardCompanyName = getString("final_award_company_name"),
         participantCount = getInt("participant_count").takeUnless { wasNull() },
         progressDivision = getString("progress_division"),
         plannedPrice =
-            readWonCurrency("planned_price_won", "planned_price_currency")
-                ?.let { (won, currency) -> YegaAmount(won, currency, published) },
-        baseAmount = toOpeningBaseAmount(published),
+            readAmountProvenance(
+                "planned_price_won",
+                "planned_price_currency",
+                "planned_price_provenance",
+                "planned_price_provenance_detail",
+            )?.let { (won, currency, provenance) -> YegaAmount(won, currency, provenance) },
+        baseAmount = toOpeningBaseAmount(),
         totalReservePriceCandidateCount = getInt("total_reserve_price_candidate_count").takeUnless { wasNull() },
         actualOpeningAt = getTimestamp("actual_opening_at")?.toInstant(),
     )
@@ -207,19 +217,32 @@ private fun ResultSet.toDerivedBaseAmount(won: BigDecimal): ResolvedBaseAmount.D
     return ResolvedBaseAmount.DerivedFromOpeningAmount(amount)
 }
 
-/** `won`+`currency` 컬럼 짝을 읽는 공통 형태 — `AwardAmount`·`YegaAmount` 복원이 공유(중복 제거). */
-private fun ResultSet.readWonCurrency(
+/**
+ * `won`+`currency`+provenance(kind+detail) 네 컬럼을 읽는 공통 형태(verifier r1 H-1 뒤 신설)
+ * — `AwardAmount`·`YegaAmount` 복원이 공유한다(중복 제거). **저장한 provenance를 그대로
+ * 복원한다** — 상수를 씌우지 않는다(`notice` 표 관례, [ProvenanceCodec]).
+ */
+private fun ResultSet.readAmountProvenance(
     wonColumn: String,
     currencyColumn: String,
-): Pair<Long, Currency>? {
+    provenanceColumn: String,
+    detailColumn: String,
+): Triple<Long, Currency, Provenance>? {
     val won = getBigDecimal(wonColumn) ?: return null
-    return won.toLong() to Currency.valueOf(requireNotNull(getString(currencyColumn)))
+    val currency = Currency.valueOf(requireNotNull(getString(currencyColumn)))
+    val provenance = ProvenanceCodec.decode(requireNotNull(getString(provenanceColumn)), getString(detailColumn))
+    return Triple(won.toLong(), currency, provenance)
 }
 
-/** `BaseAmount`(bssamt, 예비가격 상세 축 자신의 관측)로 복원한다 — vat 축까지 있어 [readWonCurrency]를 못 쓴다. */
-private fun ResultSet.toOpeningBaseAmount(provenance: Provenance): BaseAmount? {
+/** `BaseAmount`(bssamt, 예비가격 상세 축 자신의 관측)로 복원한다 — vat 축까지 있어 [readAmountProvenance]를 못 쓴다. */
+private fun ResultSet.toOpeningBaseAmount(): BaseAmount? {
     val won = getBigDecimal("opening_base_amount_won") ?: return null
     val currency = Currency.valueOf(requireNotNull(getString("opening_base_amount_currency")))
     val vat = VatTreatment.valueOf(requireNotNull(getString("opening_base_amount_vat")))
+    val provenance =
+        ProvenanceCodec.decode(
+            requireNotNull(getString("opening_base_amount_provenance")),
+            getString("opening_base_amount_provenance_detail"),
+        )
     return BaseAmount(won.toLong(), currency, vat, provenance)
 }

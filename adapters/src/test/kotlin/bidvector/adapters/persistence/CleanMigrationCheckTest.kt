@@ -9,7 +9,8 @@ import org.junit.jupiter.api.Test
  * 다룬다(다른 일곱 축은 `CleanMigrationTest`).
  *
  * **M3/3E — 층 B·C 신규 CHECK(추가만, 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08)** —
- * `opening_result`가 5(V1)에서 11(V4)로, `opening_reserve_price`(신규 자식 표)가 6으로 는다.
+ * `opening_result`가 5(V1)에서 11(V4)·14(V5, provenance 페어 3)로, `opening_reserve_price`
+ * (신규 자식 표)가 6으로 는다.
  */
 class CleanMigrationCheckTest : PersistenceTestSupport() {
     private val expectedCheckCountByTable =
@@ -17,7 +18,7 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "collection_run" to 13,
             "notice" to 12,
             "notice_audit" to 1,
-            "opening_result" to 11,
+            "opening_result" to 14,
             "provenance_authority" to 1,
             "qualification_text" to 3,
             // F-7 운영자 결정 — payload 가 TEXT 로 바뀌며 `payload <> ''` CHECK 가 하나 늘었다.

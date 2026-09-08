@@ -151,6 +151,13 @@ class CleanMigrationTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "opening_base_amount_vat", "text", true),
             ColumnSpec("opening_result", "total_reserve_price_candidate_count", "integer", true),
             ColumnSpec("opening_result", "actual_opening_at", "timestamp with time zone", true),
+            // verifier r1 H-1 뒤(V5) — provenance 왕복(추가만).
+            ColumnSpec("opening_result", "final_award_amount_provenance", "text", true),
+            ColumnSpec("opening_result", "final_award_amount_provenance_detail", "text", true),
+            ColumnSpec("opening_result", "planned_price_provenance", "text", true),
+            ColumnSpec("opening_result", "planned_price_provenance_detail", "text", true),
+            ColumnSpec("opening_result", "opening_base_amount_provenance", "text", true),
+            ColumnSpec("opening_result", "opening_base_amount_provenance_detail", "text", true),
         )
 
     // M3/3E — 층 B 자식 표(D-3E-2 (a), 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).

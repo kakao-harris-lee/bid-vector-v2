@@ -123,6 +123,13 @@ data class OpeningResult(
  * 1(단수 예가)일 때만 관측됐고, 그 경우 행이 하나뿐이라 애초에 정체성 모호가 없다. 15행
  * 건(4건)은 순번이 전부 채워져 있었다 — COL-03이 요구하는 복수예비가격 축은 이 관측 범위에서
  * 온전하다. 표본이 작아 「항상 그렇다」로 승격하지 않는다.
+ *
+ * **`observedAt`(verifier r1 H-2 뒤 신설)** — D-3E-3 (a)가 확정한 「사라진 행을 지우지 않고
+ * 관측 시각으로 구분한다」의 읽기 경로 절반. 15→12 재수집처럼 이번 응답에 없던 행이 저장에
+ * 남을 때, 그 행의 `observedAt`이 최신 관측(부모 `OpeningResult.observedAt`)보다 이르면
+ * 「낡았다」고 소비자가 스스로 판정할 수 있다 — 낡음 자체를 저장 컬럼(파생 플래그)으로 만들지
+ * 않는다(파생은 읽는 쪽이 낸다, 3D 규율). 필수 파라미터다 — raw 관측이 이미
+ * `observedAt`을 항상 나르므로(`RawNoticeObservation`) 「모름」이 아니다.
  */
 data class OpeningReservePriceRow(
     val sequenceNumber: String,
@@ -130,6 +137,8 @@ data class OpeningReservePriceRow(
     val baseReservePrice: ReservePriceCandidateAmount?,
     /** 추첨여부(`drwtYn`, 문서 `(Y/N)` 필수 — 이 행이 존재하면 항상 값이 있다고 문서가 선언한다). */
     val isDrawn: Boolean?,
+    /** 이 행이 마지막으로 관측된 시각 — 사라진 행 판별의 유일한 근거(위 KDoc). */
+    val observedAt: Instant,
     /** 추첨횟수(`drwtNum`) — §1.9.1이 예비가격 상세 신설 후보로 짚은 축, 후보 자신의 값이다. */
     val drawCount: Int? = null,
 ) {

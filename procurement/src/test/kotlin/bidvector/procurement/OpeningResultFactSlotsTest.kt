@@ -87,17 +87,17 @@ class OpeningResultFactSlotsTest {
     @Test
     fun `OpeningReservePriceRow 는 sequenceNumber 부재를 타입으로 만들 수 없다`() {
         shouldThrow<IllegalArgumentException> {
-            OpeningReservePriceRow("", null, null)
+            OpeningReservePriceRow("", null, null, Instant.EPOCH)
         }
         shouldThrow<IllegalArgumentException> {
-            OpeningReservePriceRow("   ", null, null)
+            OpeningReservePriceRow("   ", null, null, Instant.EPOCH)
         }
     }
 
     @Test
     fun `OpeningReservePriceRow 는 drawCount 음수를 거부한다`() {
         shouldThrow<IllegalArgumentException> {
-            OpeningReservePriceRow("001", null, null, drawCount = -1)
+            OpeningReservePriceRow("001", null, null, Instant.EPOCH, drawCount = -1)
         }
     }
 
@@ -108,6 +108,7 @@ class OpeningResultFactSlotsTest {
                 sequenceNumber = "001",
                 baseReservePrice = ReservePriceCandidateAmount(500_000_000L, Currency.KRW),
                 isDrawn = false,
+                observedAt = Instant.EPOCH,
                 drawCount = 0,
             )
         val result = OpeningResult(id, null, null, Instant.EPOCH, reservePrices = listOf(row))

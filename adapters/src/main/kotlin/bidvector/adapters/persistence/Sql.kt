@@ -70,15 +70,20 @@ internal object Sql {
 
     // M3/3E ③ — §1.9.7 실측 정정으로 예정가격·기초금액·총예가건수·실개찰일시가 공고 층(부모)
     // 컬럼으로 붙는다(층 C, 추가만). final_award_amount·planned_price는 AwardAmount·
-    // YegaAmount(vatTreatment 항상 UNKNOWN 고정)라 vat 컬럼이 없다.
+    // YegaAmount(vatTreatment 항상 UNKNOWN 고정)라 vat 컬럼이 없다. verifier r1 H-1 뒤
+    // (V5) — 세 금액 축에 provenance(kind+detail) 컬럼을 더해 notice 관례를 따른다(왕복
+    // 시 값을 지어내지 않는다).
     private const val OPENING_RESULT_COLUMNS =
         """
         winning_rate_fraction, derived_base_amount_won, derived_base_amount_currency,
         derived_base_amount_vat, observed_at, revision,
         final_award_amount_won, final_award_amount_currency,
+        final_award_amount_provenance, final_award_amount_provenance_detail,
         final_award_company_name, participant_count, progress_division,
         planned_price_won, planned_price_currency,
+        planned_price_provenance, planned_price_provenance_detail,
         opening_base_amount_won, opening_base_amount_currency, opening_base_amount_vat,
+        opening_base_amount_provenance, opening_base_amount_provenance_detail,
         total_reserve_price_candidate_count, actual_opening_at
         """
 
@@ -91,18 +96,24 @@ internal object Sql {
             notice_number, notice_round, winning_rate_fraction,
             derived_base_amount_won, derived_base_amount_currency, derived_base_amount_vat,
             final_award_amount_won, final_award_amount_currency,
+            final_award_amount_provenance, final_award_amount_provenance_detail,
             final_award_company_name, participant_count, progress_division,
             planned_price_won, planned_price_currency,
+            planned_price_provenance, planned_price_provenance_detail,
             opening_base_amount_won, opening_base_amount_currency, opening_base_amount_vat,
+            opening_base_amount_provenance, opening_base_amount_provenance_detail,
             total_reserve_price_candidate_count, actual_opening_at,
             observed_at, revision, observation_key
         ) VALUES (
             ?, ?, ?,
             ?, ?, ?,
             ?, ?,
-            ?, ?, ?,
             ?, ?,
             ?, ?, ?,
+            ?, ?,
+            ?, ?,
+            ?, ?, ?,
+            ?, ?,
             ?, ?,
             ?, 1, ?
         )
@@ -123,6 +134,10 @@ internal object Sql {
                 COALESCE(EXCLUDED.final_award_amount_won, opening_result.final_award_amount_won),
             final_award_amount_currency =
                 COALESCE(EXCLUDED.final_award_amount_currency, opening_result.final_award_amount_currency),
+            final_award_amount_provenance =
+                COALESCE(EXCLUDED.final_award_amount_provenance, opening_result.final_award_amount_provenance),
+            final_award_amount_provenance_detail = COALESCE(
+                EXCLUDED.final_award_amount_provenance_detail, opening_result.final_award_amount_provenance_detail),
             final_award_company_name =
                 COALESCE(EXCLUDED.final_award_company_name, opening_result.final_award_company_name),
             participant_count = COALESCE(EXCLUDED.participant_count, opening_result.participant_count),
@@ -130,12 +145,21 @@ internal object Sql {
             planned_price_won = COALESCE(EXCLUDED.planned_price_won, opening_result.planned_price_won),
             planned_price_currency =
                 COALESCE(EXCLUDED.planned_price_currency, opening_result.planned_price_currency),
+            planned_price_provenance =
+                COALESCE(EXCLUDED.planned_price_provenance, opening_result.planned_price_provenance),
+            planned_price_provenance_detail = COALESCE(
+                EXCLUDED.planned_price_provenance_detail, opening_result.planned_price_provenance_detail),
             opening_base_amount_won =
                 COALESCE(EXCLUDED.opening_base_amount_won, opening_result.opening_base_amount_won),
             opening_base_amount_currency =
                 COALESCE(EXCLUDED.opening_base_amount_currency, opening_result.opening_base_amount_currency),
             opening_base_amount_vat =
                 COALESCE(EXCLUDED.opening_base_amount_vat, opening_result.opening_base_amount_vat),
+            opening_base_amount_provenance = COALESCE(
+                EXCLUDED.opening_base_amount_provenance, opening_result.opening_base_amount_provenance),
+            opening_base_amount_provenance_detail = COALESCE(
+                EXCLUDED.opening_base_amount_provenance_detail,
+                opening_result.opening_base_amount_provenance_detail),
             total_reserve_price_candidate_count = COALESCE(
                 EXCLUDED.total_reserve_price_candidate_count, opening_result.total_reserve_price_candidate_count),
             actual_opening_at = COALESCE(EXCLUDED.actual_opening_at, opening_result.actual_opening_at),
@@ -150,10 +174,12 @@ internal object Sql {
     // M3/3E ⑤⑥ — 복수예비가격 후보 자식 표(층 B, D-3E-2 (a)). 「최신 관측 우선」이라
     // opening_result와 같은 COALESCE 관례를 쓴다 — 부모 upsert가 자식을 조용히 덮지 않도록
     // 별도 문으로 갈랐다(한 항목 트랜잭션 안에서 반복 실행, JdbcOpeningResultRepository).
+    // verifier r1 H-2 뒤 — observed_at을 더 골라 D-3E-3 (a)의 「관측 시각으로 구분한다」가
+    // 읽기 경로에도 서게 한다(15→12 재수집 뒤 낡은 행을 소비자가 판별할 수 있어야 한다).
     const val SELECT_OPENING_RESERVE_PRICES =
         """
         SELECT reserve_price_sequence, base_reserve_price_won, base_reserve_price_currency,
-               is_drawn, draw_count
+               is_drawn, draw_count, observed_at
         FROM opening_reserve_price WHERE notice_number = ? AND notice_round = ?
         ORDER BY reserve_price_sequence
         """
