@@ -20,7 +20,7 @@ in_scope:
   - config/quality/gate-tests.properties                     # `gate.tests.adapters` 에 3B-2 test 등재(3B 가 넣은 줄 뒤에 추가만 — 공유 파일, rollback 은 3B-2 가 넣은 줄만 제거)
   - procurement/src/main/kotlin/bidvector/procurement/{FieldContract.kt,CollectionPolicy.kt,RawObservation.kt}, procurement/src/test/kotlin/bidvector/procurement/{FieldContractTest.kt,CollectionPolicyTest.kt,RawObservationTest.kt}   # **P-9 승인분 — 3A 좁은 확장(추가만)**: ① `FieldConcept` 에 개찰 축 토큰 ② `FieldScale` 에 셈(정수 건수·순번) 축 + `SCALE_UNIT_PAIRING`·`FieldUnit` 결속 유지 ④ `SourceEndpoint` 에 오퍼레이션 군 구별(`OPENING_AWARD_LIST`·`OPENING_RESULT_LIST`·`RESERVE_PRICE_DETAIL` — 기존 `OPENING_RESULT` 를 지우지 않고 옆에 세운다) + 계약 행 helper 의 `presentIn` 고정 해제. **기존 계약 행·항등식·corpus 27/27 불변이 acceptance**
   - procurement/src/main/kotlin/bidvector/procurement/{Ports.kt,DetailFetch.kt}, procurement/src/test/kotlin/bidvector/procurement/{PortsTest.kt,DetailFetchTest.kt}   # **D-3B2-5 (a) 확정** — 자격 원문 조회 가치 술어(업종제한 플래그 `N` → 서브콜 0회)를 3A 패턴(`DetailFetchDecision.Fetch` 와 같은 internal-constructor 증거 값)으로 **추가만**. 위 여섯 파일 밖의 procurement 편집 금지
-  - milestone-3.md                                           # 「Slice 3B-2」 착수 문단
+  - milestone-3.md                                           # 「Slice 3B-2」 착수 문단 — **문서 레인이 이미 썼다(2026-09-08). 구현 레인은 이 파일을 편집하지 않는다**(3B N-7 혼선 회피)
   - reports/evidence/m3/3b2/**
 out_of_scope:
   - procurement/**                                           # 위 조건부 두 파일 외 — `OpeningResult` fact 확장(예비가격 15·낙찰금액·낙찰자)은 D-3B2-8 별도 후속
@@ -83,6 +83,14 @@ evidence 는 되돌리지도 고치지도 않는다(감사 기록 보존). **알
 | ⑥ | **개찰 축 필드 계약 소비** — `policy-values.md` §1.7 의 `authoritative` 행 13 을 3A `KonepsFieldContract` 인스턴스로 옮기는 **한 커밋**(P-9 승인, 3A P-1 과 같은 절차). `sucsfbidRate` 는 `scale = PERCENT`·`unit = PERCENT` 로 선언하고 canonical fraction 변환은 계약이 지시할 때만(제수 100, P-11 의 귀결) · 밴드는 `expectedRange` 참조로 재선언하지 않는다 | P-9·P-11 · 3A §5.3 규율 1·2 |
 | ⑥b | **식별자 치환 — P-10 (a)** | `bidwinnrNm`(상호)은 계약 등재 + 원문 저장. **`bidwinnrBizno`·대표자명 축은 어댑터가 `RawNoticeObservation` 을 만들기 전에 고정 토큰으로 치환**하고 치환 사실을 회계에 남긴다 — `sourceText`(3D append 감사 통로)에도 원문이 남지 않는다. `opengCorpInfo` 는 성분 분해 뒤 상호·투찰금액·투찰율만 남기고, **분해 실패는 명시적 결과**로 회계(성분 수가 경우마다 다르다). 치환 토큰·대상 키는 정책 데이터 | P-10 (a) · `data-extract.md` §7 |
 | ⑦ | **contract mock server test** — 시나리오: 낙찰 목록 정상 N 건 + 차수 없는 1 건 drop · PreparPcDetail 단건(복수예가 15 행 + 추첨 표시) · 「제한 없음」 `00`+`totalCount=0` · `bidNtceOrd` 누락 → `08` 을 `InputError` 류로 회계(재시도 아님) · 429/`22` bounded retry · 미지 resultCode · 미지 raw 키 · 목록 오퍼레이션에 `inqryDiv=4` 를 넣은 URI 가 정책 표에서 나오는지(⑤ 회귀) | 3B ⑦ 관례 · COL-03·04 |
+
+**설계 검토 반영(Phase 2.5, `_workspace/m3-3b2/02_design-review.md` — 세션 모델 직접)**: ⑥b 의 치환은 **deny-list 가 아니라 allow-list 반전**으로 닫는다 —
+개찰 축 관측은 **계약 등재 키만** `fields` 에 담아 새 식별자 키가 자동 제외되게 하고(3B 는 원문 키 전부를 담는다 — 개찰 축은 걸러서 담는다),
+`sourceText` 는 원문 substring 이 아니라 **걸러진 JsonObject 의 `render()`**(`KonepsJson` 에 이미 있다)로 만든다. 개찰 축 mapper 는 원문 item 을 받지 않고
+**`MaskedKonepsItem`**(어댑터 `internal`, 유일한 생성 경로가 치환 함수)만 받아 호출부 우회가 컴파일되지 않게 한다. `sourceText` 를 `null` 로 두는 선택은
+**미달**이다 — 3D `raw_observation.payload` 가 `NOT NULL` 이라 재구성 책임이 3D 로 넘어가고 치환 책임이 두 자리로 갈린다. 3A 에 `retention` 슬롯을 새로
+만드는 것은 **과잉**(P-9 승인 범위 밖 — 순수 식별자 키는 계약 미등재로 이미 배제된다). `inqryDiv` 는 오퍼레이션 서술 값 객체를 **필수 생성자 인자**로 두고
+빌더에 기본값·폴백을 두지 않는다.
 
 **만들지 않는 것**: 표적조회 `getBidPblancListInfo*`+`inqryDiv=2`(D-3B2-6 (a) — 플래그·차수는 3B 목록 관측에 이미 있다) · **개찰완료 오퍼레이션**(D-3B2-9 (a) — 추첨번호 `drwtNo1`·`drwtNo2` 와 투찰 축 `bidprcAmt`·`bidprcrt` 는 이 오퍼레이션만 주고 이번 slice 밖이다, `COL-03` 추첨번호 문면 미구현을 알려진 제한으로) · `OpeningResult` fact 확장(D-3B2-8) ·
 4겹 게이트를 한 함수에(COL-03 legacy 형태) · 백오프 상태를 데이터 컬럼에 · 예정가 역산(3D 소유) · 서비스 키 variant · 실제 호출.

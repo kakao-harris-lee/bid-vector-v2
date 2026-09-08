@@ -134,6 +134,17 @@ P-8 + 정책 값 커밋).
 (신설 `OPEN-3B2-TARGETED-OPENING-QUERY`, SET-02·ux-journey 문면에 포인터) · 페이지 크기 대 메시지 상한(신설 `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP`).
 착수는 P-9~P-12 승인 + D-3B2-1~9 결정 뒤 — base 재고정 · Phase 2.5 설계 검토 · 구현 레인(sonnet) · verifier.
 
+### Slice 3B-2 — 개찰·예비가격·자격 원문 서브콜 adapter
+
+**착수 2026-09-08.** 계약 정본 `reports/evidence/m3/3b2/scope.md`(base `0e83d6e`). **운영자 승인**: **P-9 (a)** §1.7 필드 계약 13 행을 정책 데이터 초기값으로
+(+ 3A 좁은 확장 ①②④ — `FieldConcept` 개찰 축 토큰·`FieldScale` 셈 축·`SourceEndpoint` 오퍼레이션 군 구별, 추가만) · **P-10 (a)** 식별자는 **상호만 남기고
+사업자등록번호·대표자명을 어댑터 경계에서 치환**(`sourceText` 포함 — 「원문 무변환」의 명시적 예외) · **P-12 (a)** `inqryDiv` 를 오퍼레이션 군별 정책
+데이터로 + 걷는 축 초기값 **개찰일시** · **D-3B2-9 (a)** 개찰완료 오퍼레이션은 이번 slice 밖. 결정 정본은 `policy-values.md` §6b. 나머지 D-3B2-1·5·6·7·8 은
+추천안 그대로 확정. **Phase 2.5 설계 검토**(세션 모델 직접) `_workspace/m3-3b2/02_design-review.md` — 게이트 셋(치환·술어 증거 값·`inqryDiv` 표)을 열거
+대신 **allow-list 반전 + masked 통로 타입 + 기본값 제거**로 닫고, 우회 여덟을 각각 컴파일·test·fail-closed 로 배정했다. **알려진 제한(착수 시 선언)**:
+`COL-03` 문면의 **추첨번호**(`drwtNo1`·`drwtNo2`)와 투찰 축은 개찰완료 오퍼레이션만 주므로 이번 slice 에 없다 · 개찰 축 `sourceText` 는 계약 등재 키만
+담아 미등재 키의 원문 재해석 경로가 이 축에 없다(P-10 (a) 의 대가). 이 문단은 **문서 레인이 쓴다** — 구현 레인은 `milestone-3.md` 를 편집하지 않는다.
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
