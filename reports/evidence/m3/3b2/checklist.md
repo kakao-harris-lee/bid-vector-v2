@@ -130,6 +130,24 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
 - **실제 KONEPS 호출·오퍼레이션 경로·파라미터 이름의 실물 일치는 검증하지 않는다**(out_of_scope,
   실제 호출 승인 뒤).
 - **낙찰 목록 검색·개찰결과 목록 검색(`…PPSSrch`) 미구현** — legacy 미소비, 판단 7번.
+- **개찰결과 목록의 문서상 필수 키 둘이 개찰 축 계약에 없어 `presentIn` 강제로 제외·계수된다**
+  (verifier r2 L-1) — `opengDt`·`rsrvtnPrceFileExistnceYn`(§1.7.4 가 「두 선언을 한 행에 접지
+  않는다」로 공고 축 `opengDt` 행과의 병합을 금지, P-9 채택 13행에도 없다). 미탐이 아니라
+  §1.7.4 의 정상 결과다 — `unknownFields` 로 계수돼 조용히 사라지지 않는다. 예비가격 상세의
+  `totRsrvtnPrceNum`·`drwtNum`(신설 후보 필드, 문서에는 있으나 P-9 채택분 밖)도 같은 사유로
+  같은 축에 계수된다.
+- **`duplicate` 로 판정된 항목의 `unknownFields`·`maskingFailures` 는 세지 않는다**(verifier r2
+  L-2, 3B 기존 누적기 거동 — 이 slice 가 만들지 않았다) — 중복으로 접힌 둘째 이후 행의 필드
+  단위 결함은 회계에 나타나지 않는다. `normalized` 항목만 그 두 축을 낸다.
+- **(판단, verifier r2 G-2) 개찰 축 엔드포인트로 원문 보존 mapper([mapRawItem])를 명시적으로
+  부르는 호출부는 여전히 컴파일된다.** `itemMapper` 기본값 제거(F-4)가 닫은 것은 「인자를
+  잊으면 조용히 새는」 폴백이지 「호출부가 [mapMaskedOpeningItem] 대신 [mapRawItem]을 의도적으로
+  고르는」 실수가 아니다. 타입으로 막으려면 `SourceEndpoint`(공유 열거형, 3A·3B·전 procurement
+  소비처가 참조)를 두 하위 체계(마스킹 필수/불필요)로 쪼개야 하는데, 이는 in_scope 「추가만」
+  원칙을 넘는 광범위 개편이고 이 slice 가 다루는 세 호출부(`fetchNotices`·license-limit·개찰
+  목록/상세)는 이미 각자 올바른 mapper 를 쓴다(실측: 전 main 소스 grep). 위협 모델이 저자
+  실수가 아니라 우회를 방어 대상으로 삼으므로, 비용 대비 이 우회는 등재로 충분하다고 판단했다
+  — 표 (g) 행에 이미 이 경계가 적혀 있다.
 
 ## 병렬 레인 경계 확인
 
@@ -155,9 +173,12 @@ add+commit 분리 없음 — parallel-lane 오염 회피). 커밋 전 `git diff 
 
 행 식별자(⑥c)·mapper 기본값 제거(위협 모델 (g))·`FnlSucsfDate` 등재(⑥)·`presentIn` 강제
 결정(위협 모델 (j), 「알려진 제한」 — 직전 라운드의 비강제 결정을 뒤집었다)·gate-tests 등재
-(완료 조건 대응표)·개찰 축 회계 두 축 분리(⑥d, 위협 모델 (i))까지 여섯이 판정 로직·게이트
-구성을 바꾼 커밋이다 — 심각도 무관 표적 재검증 대상이다. 각 항목의 회귀 test 는 시나리오
-대응표·완료 조건 대응표에 이미 등재돼 있다 — 별도 절로 반복하지 않는다.
+(완료 조건 대응표)·개찰 축 회계 두 축 분리(⑥d, 위협 모델 (i))·**dedup 부재값 처리(verifier r2
+G-1 — `rowDiscriminatorOf`가 부재·공백을 `""`가 아니라 `null`로 내고 `identityOf`가 그 항목을
+dedup 대상에서 제외)**·**license-limit 식별자 계약 보강(verifier r2 G-4 — `bidNtceNo`·
+`bidNtceOrd` 의 `presentIn`에 `LICENSE_LIMIT_DETAIL` 추가 + `lmtGrpNo`·`lmtSno` 계약 행 신설)**
+까지 여덟이 판정 로직·게이트 구성을 바꾼 커밋이다 — 심각도 무관 표적 재검증 대상이다. 각 항목의
+회귀 test 는 시나리오 대응표·완료 조건 대응표에 이미 등재돼 있다 — 별도 절로 반복하지 않는다.
 
 ## 완료 조건
 
