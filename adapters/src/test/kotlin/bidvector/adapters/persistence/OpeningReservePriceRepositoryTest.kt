@@ -232,8 +232,51 @@ class OpeningReservePriceRepositoryTest : PersistenceTestSupport() {
 
         shouldThrow<PSQLException> { insertReservePriceSequence(null, observedAt, key) }
         shouldThrow<PSQLException> { insertReservePriceSequence("", observedAt, key) }
-        // verifier r1 M-1 — V6 이전에는 공백 한 칸이 CHECK 를 통과했다(결함 재현 + 수정 확인).
         shouldThrow<PSQLException> { insertReservePriceSequence(" ", observedAt, key) }
+    }
+
+    /**
+     * verifier r2 N-1 — DB CHECK와 Kotlin `String.isNotBlank()`가 **같은 입력 집합에 같은
+     * 답**을 낸다. Kotlin `Char.isWhitespace()`는 `Character.isWhitespace()` OR
+     * `Character.isSpaceChar()`의 합집합이라 ASCII 공백·탭·개행뿐 아니라 NBSP(U+00A0)·전각
+     * 공백(U+3000) 같은 유니코드 공백 분리자도 「공백」으로 본다 — `btrim()`(ASCII 공백만)은
+     * 그 부분집합만 막아 결함이었다(M-1). 최소 입력 집합(팀리드 지정): 앞 일곱은 거부, 뒤
+     * 둘은 허용.
+     */
+    @Test
+    fun `DB CHECK 와 Kotlin isNotBlank 는 공백 판정이 일치한다`() {
+        val repository = JdbcOpeningResultRepository(dataSource())
+        val observedAt = Instant.parse("2026-09-08T00:00:00Z")
+        val key = appendRaw(observedAt)
+        val parentOnly = OpeningResult(id, null, null, observedAt)
+        repository.persist(parentOnly, key) shouldBe PersistOutcome.Inserted
+
+        val rejected =
+            listOf(
+                "" to "빈 문자열",
+                " " to "ASCII 공백",
+                "\t" to "탭",
+                "\n" to "개행",
+                " " to "NBSP",
+                "　" to "전각 공백",
+            )
+        for ((value, label) in rejected) {
+            // DB — 직접 SQL 삽입이 거부된다. label은 아래 실패 시 어떤 입력인지 보여주는 표식이다.
+            shouldThrow<PSQLException> { insertReservePriceSequence(value, observedAt, key) }
+            // Kotlin — 같은 값으로 OpeningReservePriceRow를 만들 수 없다(같은 판정을 공유).
+            shouldThrow<IllegalArgumentException> {
+                OpeningReservePriceRow(value, null, null, observedAt)
+            }
+        }
+        shouldThrow<PSQLException> { insertReservePriceSequence(null, observedAt, key) } // NULL
+
+        val accepted = listOf("0", "001")
+        for (value in accepted) {
+            // DB — 삽입이 성공한다(각기 다른 부모-스코프 순번이라 충돌 없음).
+            insertReservePriceSequence(value, observedAt, key)
+            // Kotlin — 같은 값으로 타입이 만들어진다(거부되지 않는다).
+            OpeningReservePriceRow(value, null, null, observedAt).sequenceNumber shouldBe value
+        }
     }
 
     private fun insertReservePriceSequence(

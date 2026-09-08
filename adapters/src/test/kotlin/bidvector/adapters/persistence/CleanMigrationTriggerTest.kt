@@ -76,6 +76,35 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             "guard_notice_floor_rate" to
                 listOf("floor_rate_fraction", "floor_rate_origin_kind", "floor_rate_origin_detail"),
             "guard_notice_status" to listOf("status"),
+            // verifier r2 N-2 뒤 — V4(흡수본)가 넓힌 opening_result 가드 인자도 이 게이트가 본다.
+            "guard_opening_result_final_award_amount" to
+                listOf(
+                    "final_award_amount_won",
+                    "final_award_amount_currency",
+                    "final_award_amount_provenance",
+                    "final_award_amount_provenance_detail",
+                ),
+            "guard_opening_result_final_award_company_name" to listOf("final_award_company_name"),
+            "guard_opening_result_participant_count" to listOf("participant_count"),
+            "guard_opening_result_progress_division" to listOf("progress_division"),
+            "guard_opening_result_planned_price" to
+                listOf(
+                    "planned_price_won",
+                    "planned_price_currency",
+                    "planned_price_provenance",
+                    "planned_price_provenance_detail",
+                ),
+            "guard_opening_result_opening_base_amount" to
+                listOf(
+                    "opening_base_amount_won",
+                    "opening_base_amount_currency",
+                    "opening_base_amount_vat",
+                    "opening_base_amount_provenance",
+                    "opening_base_amount_provenance_detail",
+                ),
+            "guard_opening_result_total_reserve_price_candidate_count" to
+                listOf("total_reserve_price_candidate_count"),
+            "guard_opening_result_actual_opening_at" to listOf("actual_opening_at"),
         )
 
     @Test
@@ -86,7 +115,8 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
                 statement
                     .executeQuery(
                         "SELECT tgname, pg_get_triggerdef(oid) AS def FROM pg_trigger " +
-                            "WHERE tgrelid = 'notice'::regclass AND NOT tgisinternal " +
+                            "WHERE tgrelid = ANY(ARRAY['notice'::regclass, 'opening_result'::regclass]) " +
+                            "AND NOT tgisinternal " +
                             "AND tgname IN (${expectedGuardArguments.keys.joinToString(",") { "'$it'" }})",
                     ).use { rs ->
                         while (rs.next()) {
