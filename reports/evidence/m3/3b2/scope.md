@@ -8,6 +8,7 @@
 > 세션 모델 — curator 레인이 사용량 한도로 중단된 뒤 이어 씀). 승인 요청 표는 `_workspace/m3-3b2/01_curator_approval_request.md`.
 > **착수 조건 충족 2026-09-08**: 운영자 승인 **P-9 (a) · P-10 (a) · P-12 (a) · D-3B2-9 (a)** — 결정 정본은 `policy-values.md` **§6b**.
 > 남은 D-3B2-1·5·6·7·8 은 **추천안 그대로 오케스트레이터 확정**(승인 라운드에서 뒤집히지 않은 항목 — 뒤집으면 계약을 갱신한다).
+> **수정 라운드 1(2026-09-08) — 운영자 결정**: verifier r1 F-3·F-8(개찰 축 회계가 계약 밖 키 제외를 세지 않고 masking 실패가 이름이 반대인 슬롯에 앉음)을 **3A `Accounting.kt` 좁은 확장 하나로** 푼다(위 in_scope 행). 근거: 필드 단위 실패를 담을 자리가 현 타입에 없고(`dropReasons` 합 = `dropped` 항등식), 이름과 의미가 어긋난 슬롯을 그대로 두면 운용에서 「누가 무엇을 버렸는가」를 다시 묻게 된다.
 
 ```yaml
 milestone: m3
@@ -20,6 +21,7 @@ in_scope:
   - config/quality/gate-tests.properties                     # `gate.tests.adapters` 에 3B-2 test 등재(3B 가 넣은 줄 뒤에 추가만 — 공유 파일, rollback 은 3B-2 가 넣은 줄만 제거)
   - procurement/src/main/kotlin/bidvector/procurement/{FieldContract.kt,CollectionPolicy.kt,RawObservation.kt}, procurement/src/test/kotlin/bidvector/procurement/{FieldContractTest.kt,CollectionPolicyTest.kt,RawObservationTest.kt}   # **P-9 승인분 — 3A 좁은 확장(추가만)**: ① `FieldConcept` 에 개찰 축 토큰 ② `FieldScale` 에 셈(정수 건수·순번) 축 + `SCALE_UNIT_PAIRING`·`FieldUnit` 결속 유지 ④ `SourceEndpoint` 에 오퍼레이션 군 구별(`OPENING_AWARD_LIST`·`OPENING_RESULT_LIST`·`RESERVE_PRICE_DETAIL` — 기존 `OPENING_RESULT` 를 지우지 않고 옆에 세운다) + 계약 행 helper 의 `presentIn` 고정 해제. **기존 계약 행·항등식·corpus 27/27 불변이 acceptance**
   - procurement/src/main/kotlin/bidvector/procurement/{Ports.kt,DetailFetch.kt}, procurement/src/test/kotlin/bidvector/procurement/{PortsTest.kt,DetailFetchTest.kt}   # **D-3B2-5 (a) 확정** — 자격 원문 조회 가치 술어(업종제한 플래그 `N` → 서브콜 0회)를 3A 패턴(`DetailFetchDecision.Fetch` 와 같은 internal-constructor 증거 값)으로 **추가만**. 위 여섯 파일 밖의 procurement 편집 금지
+  - procurement/src/main/kotlin/bidvector/procurement/Accounting.kt, procurement/src/test/kotlin/bidvector/procurement/AccountingTest.kt   # **수정 라운드 1 의 scope 예외(운영자 결정 2026-09-08, verifier r1 F-3·F-8)** — 개찰 축 회계에 「계약 밖 키 제외」·「masking 실패」 두 축을 **추가만**. 기존 항등식(`dropReasons` 합 = `dropped`)·필드·사용처·3A corpus 27/27 불변이 조건이고, 판정 로직 변경이라 표적 재검증 대상. 3B 의 H-3(quota 회계 부재 → 3A 좁은 확장) 과 같은 모양의 예외다
   - milestone-3.md                                           # 「Slice 3B-2」 착수 문단 — **문서 레인이 이미 썼다(2026-09-08). 구현 레인은 이 파일을 편집하지 않는다**(3B N-7 혼선 회피)
   - reports/evidence/m3/3b2/**
 out_of_scope:
