@@ -154,3 +154,80 @@ N-1(`f11a5e1`) · M-1(`ef7a8fc`) · M-2(`7f7a638`) · M-3(`022629b`).
 - 핵심 결과: `--exclude=checklist.md` 를 새로 더했다 — 이번 라운드에서 checklist.md 가 "secret 스캔"
   이라는 절 제목 문구를 담게 돼 자기참조 오탐이 그 파일로도 번졌다(육안 확인 — 실제 비밀값
   아님). commands.md 와 같은 갈래의 자기참조라 같은 방식으로 제외했다.
+
+# 수정 라운드 2 — verifier 표적 재검증 not-ready(H-3) 반영 (2026-09-09)
+
+verifier 리포트: `_workspace/m4-4a/04_verifier_report_r2.md`. 처리: H-3/M-4(`e555b2a`) ·
+M-5/L-5(`517a7fc`) · L-6/L-7/B-5(`2bda85f`).
+
+## 2026-09-09T02:10Z — H-3 실측 (a) 커널 직몰이 저장 우회가 이제 컴파일 거부된다
+- cmd: 임시 clone(head `e555b2a` 이후)에 verifier 가 지목한 것과 같은 4줄 형태
+  (`beginSession`→`apply`→`apply`→`myRepo.save((c as TransitionOutcome.Applied).applied)`)를
+  `app/src/test/kotlin/bidvector/app/verifyprobe/H3Probe.kt` 에 심고
+  `./gradlew --no-daemon :app:compileTestKotlin`
+- exit: 1
+- 핵심 결과: `Cannot access 'fun apply(...)': it is internal in file.` · `Cannot access 'fun beginSession(...)': it is internal in file.` — 커널 두 함수 모두 `app` 에서 호출 자체가 막힘.
+
+## 2026-09-09T02:15Z — M-4 실측 (b) 세션 축 옆문(beginSession 결과를 자체 EditSessionRepository 에 직접 저장)도 거부된다
+- cmd: 같은 clone 에서 H3Probe.kt 를 지우고 `beginSession(...)` 결과를 자체 `EditSessionRepository`
+  구현에 `save()` 하는 코드를 `app/src/test/kotlin/bidvector/app/verifyprobe/M4Probe.kt` 에 심고
+  `./gradlew --no-daemon :app:compileTestKotlin`
+- exit: 1
+- 핵심 결과: `Cannot access 'fun beginSession(...)': it is internal in file.`(2곳 — 세션 생성 시도 자체가 막힘).
+
+## 2026-09-09T02:20Z — 실측 (c) 양성 대조 — 정상 배선과 corpus 다섯은 그대로 통과한다
+- cmd: 같은 clone 에서 probe 디렉터리 삭제 후 `./gradlew --no-daemon :app:compileTestKotlin :workflow:test :app:test --tests '*Conformance*'`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`(34 actionable tasks). `EditStrategyWorkflow` 경유 정상 배선·
+  `strategy-edit-001~005` corpus dispatch 전부 영향 없음.
+
+## 2026-09-09T02:30Z — 수정 라운드 2 최종 S-1~S-6·S-0 한 번에 재실행(head `2bda85f`)
+- cmd: `./gradlew --no-build-cache clean check`(S-1)
+- exit: 0 — `BUILD SUCCESSFUL in 35s`, 344 actionable tasks(320 executed·24 up-to-date).
+- cmd: `./gradlew --no-daemon :workflow:test`(S-2)
+- exit: 0
+- cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate :workflow:cpdCheck`(S-3)
+- exit: 0
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*EditSessionImportBoundaryTest*'`(S-3b)
+- exit: 0
+- cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'`(S-4)
+- exit: 0 — 74 tests(변동 없음, fixture 입력/기대값 무변경 확인 — `git log -- fixtures/{input,expected}/strategy-edit-*.json` 전부 `6101dd2` 한 커밋뿐).
+- cmd: `./gradlew --no-daemon qualityBaseline`(S-5)
+- exit: 0
+- cmd: `./gradlew --no-daemon :app:gateExecutionGate`(S-6)
+- exit: 0
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks --branch m4/2026-09-08 --single-branch /Users/harris/Development/private/bid-vector-v2-m4 "$d/repo" && (cd "$d/repo" && ./gradlew --no-build-cache clean check)`(S-0)
+- exit: 0 — `BUILD SUCCESSFUL in 51s`, 353 actionable tasks 전부 executed(캐시 없는 임시 clone, head `2bda85f`).
+- 핵심 결과: `:workflow:test` class 별 6·5·3(+2, L-7 양성/음성 대조 추가)·4·8·11(+2, M-5·L-5) = **37**, 0 failed·0 skipped.
+
+## 2026-09-09T02:35Z — rollback 재검증(목록 28 A·6 M 불변 — 이번 라운드는 기존 파일만 수정, 신규 파일 없음)
+- cmd: `git diff --name-status 9948c6e4056bbf71fa6683aa67d30c2a49fc6eae..HEAD`(head `2bda85f`)
+- exit: 0 — 28 A · 6 M(`reports/evidence/m4/4a/**` 6건 제외), 경로 34개 목록이 라운드 1 과 동일.
+- cmd: 임시 clone 에서 `git restore --source=<base> --staged --worktree -- <경로 34개 개별 인자>`
+- exit: 0 — `git status --porcelain` D 28 · M 6, 신규 디렉터리 잔여 파일 0건(`find`).
+- cmd: `git diff <base> -- <M 대상 6개 경로>`
+- exit: 0, 출력 0줄.
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :app:compileTestKotlin`
+- exit: 0 — `BUILD SUCCESSFUL`(29 actionable tasks, 13 executed·16 from cache).
+- cmd: `./gradlew --no-daemon :workflow:test :app:test --tests '*Conformance*'`
+- exit: 0 — `BUILD SUCCESSFUL`(`:workflow:test NO-SOURCE`, `:app:test` conformance 정상 축소).
+
+## 2026-09-09T02:40Z — clean-tree 게이트·secret 스캔 재확인(경로 34개, 양성 대조 포함)
+- cmd: `git status --porcelain -- <in_scope 경로 34개, 개별 인자>`
+- exit: 0, 출력 없음.
+- 양성 대조: `Transition.kt` 에 개행 한 줄 추가 후 그 경로만으로 재실행 → `M` 관측 → `git checkout --` 로 되돌리고 재확인(비어있음).
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4a/ --exclude=commands.md --exclude=checklist.md`
+- exit: 1(매치 없음).
+
+## 자기 점검 — 이번 라운드가 새로 연 것이 있는가
+훑은 자리 넷: ① `begin()` M-5 수정이 기존 「비종단 세션 있으면 거부」 분기의 나머지 경로(정상
+활성 세션·이미 종단인 세션)를 바꾸지 않는지 — 코드 추적으로 확인(`folded !== existing` 이
+아니면 save 를 안 하므로 기존 두 경로는 그대로). ② `TransitionOutcome.Applied` internal
+constructor 화가 그 타입을 파괴적으로 읽는 자리(패턴 매칭·필드 접근)를 깨지 않는지 — 전
+test suite(37건) 통과로 확인, 생성자만 좁혔고 프로퍼티는 그대로라 읽기 영향 없음. ③ corpus
+실행자 재작성이 `strategy-edit-002`(스테이지별 다른 정책)의 배선을 실제로 지키는지 — 두
+workflow 인스턴스가 `sessions`·`strategies` fake 를 공유하는지 코드로 확인 + 그 case 의
+corpus test 통과로 재확인. ④ S-3b 정규식 폭을 넓힌 것(`+`→`*`)이 옛 매치를 잃지 않는지 —
+옛 패턴(세그먼트 2개 이상)은 새 패턴(1개 이상)의 부분집합이라 구조적으로 안전, 기존 양성
+대조 test(telegram import·FQN)도 그대로 통과. **새로 연 것 없음** — M-5 는 지난 라운드가
+연 것이고 이번 라운드에서 닫혔다.

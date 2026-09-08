@@ -3,6 +3,11 @@
 > **수정 라운드 1(2026-09-08) 반영 — 목록 재산출.** verifier B-2/B-3(장부층) — 라운드가 파일을
 > 늘렸으므로(`AppliedStrategy.kt`·`EditSessionPolicyDataTest.kt` 신설) 절차를 다시 돌리고
 > 5단계 실측도 새 목록으로 재실행했다.
+>
+> **수정 라운드 2(2026-09-09) 반영 — head 만 갱신, 목록은 불변.** H-3/M-4/M-5/L-5/L-6/L-7 은
+> 전부 **기존 파일 수정**이라(`AppliedStrategy.kt`·`EditSessionPolicyDataTest.kt` 같은 신규
+> 파일이 없다) A/M 건수·경로 목록은 라운드 1 과 동일하다. head 참조만 이번 라운드의 마지막
+> 코드 커밋(`2bda85f`)으로 갱신하고, 5단계 실측을 그 head 로 다시 돌렸다.
 
 ## 되돌리는 것
 
@@ -17,7 +22,7 @@
 
 ## 목록 — 기계 산출
 
-`git diff --name-status <base>..HEAD` 에서 낸다(2026-09-08, head `022629b` — 수정 라운드 1의
+`git diff --name-status <base>..HEAD` 에서 낸다(2026-09-09, head `2bda85f` — 수정 라운드 2의
 마지막 코드 커밋. 이 evidence 커밋 자신은 셈에 넣지 않는다).
 **A(신규, 28건)**·**M(수정, 6건 — `CorpusExecutors.kt`·`SharedKernelCorpusConformanceTest.kt`·
 `gate-tests.properties`·`fixtures/manifest.yaml`·`milestone-4.md`·`workflow/build.gradle.kts`)**.
@@ -71,7 +76,7 @@ git restore --source=9948c6e4056bbf71fa6683aa67d30c2a49fc6eae --staged --worktre
 `git checkout <base> -- <경로>` 는 쓰지 않는다(base 에 없는 새 경로마다 pathspec 오류로 exit 1,
 Codex 1A 16차 high 재현 방지).
 
-## 실측 — 2026-09-08, 임시 clone(`git clone --branch m4/2026-09-08 --single-branch`, 커밋만 담음)
+## 실측 — 2026-09-09(수정 라운드 2, head `2bda85f`), 임시 clone(`git clone --branch m4/2026-09-08 --single-branch`, 커밋만 담음)
 
 1. 복원 명령 exit: **0**
 2. `git status --porcelain` — **D 28건 · M 6건**, 목록의 A/M 건수와 정확히 일치.
