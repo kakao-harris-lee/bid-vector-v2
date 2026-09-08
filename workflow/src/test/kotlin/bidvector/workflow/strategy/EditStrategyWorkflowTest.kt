@@ -13,6 +13,7 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.ThresholdField
 import bidvector.strategy.validate
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -71,6 +72,37 @@ private class RecordingEventSink : EventSink {
     val published = mutableListOf<StrategyEvent>()
 
     override fun publish(event: StrategyEvent) {
+        published += event
+    }
+}
+
+/** verifier M-3 — 저장 실패를 한 번 흉내내는 fake. */
+private class FlakyStrategyRepository(
+    private val delegate: InMemoryStrategyRepository,
+) : StrategyRepository {
+    var failNextSave = false
+
+    override fun load(): OperatorStrategy = delegate.load()
+
+    override fun save(applied: AppliedStrategy) {
+        if (failNextSave) {
+            failNextSave = false
+            error("simulated strategy save failure")
+        }
+        delegate.save(applied)
+    }
+}
+
+/** verifier M-3 — 발행 실패를 한 번 흉내내는 fake. */
+private class FlakyEventSink : EventSink {
+    val published = mutableListOf<StrategyEvent>()
+    var failNextPublish = false
+
+    override fun publish(event: StrategyEvent) {
+        if (failNextPublish) {
+            failNextPublish = false
+            error("simulated publish failure")
+        }
         published += event
     }
 }
@@ -242,5 +274,98 @@ class EditStrategyWorkflowTest {
         reopened.shouldBeInstanceOf<BeginOutcome.Started>()
         reopened.session.id shouldBe original.id
         reopened.session.state shouldBe EditSessionState.WaitingForValue(FIELD)
+    }
+
+    @Test
+    fun `M-3 전략 저장이 실패하면 세션이 전진하지 않아 재전달이 정상 재시도가 된다`() {
+        val sessions = InMemorySessionRepository()
+        val strategies = FlakyStrategyRepository(InMemoryStrategyRepository(initialStrategy()))
+        val events = RecordingEventSink()
+        val workflow =
+            EditStrategyWorkflow(
+                sessions,
+                strategies,
+                FixedClock(Instant.parse("2026-09-08T00:00:00Z")),
+                events,
+                strategyPolicy(),
+                EditSessionPolicyData(Duration.ofMinutes(15)),
+            )
+        val sessionId = EditSessionId("s-6")
+        workflow.beginStarted(sessionId, OPERATOR, FIELD)
+        workflow.provideValue(
+            EditCommand.ProvideValue(
+                CommandId("cmd-1"),
+                sessionId,
+                Actor.Operator(OPERATOR),
+                FIELD,
+                StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+            ),
+        )
+        val confirmCommand =
+            EditCommand.Confirm(
+                CommandId("cmd-2"),
+                sessionId,
+                Actor.Operator(OPERATOR),
+                StrategyRevision(1),
+            )
+
+        strategies.failNextSave = true
+        shouldThrow<IllegalStateException> { workflow.confirm(confirmCommand) }
+
+        sessions.load(sessionId)!!.state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
+        strategies.load().revision shouldBe StrategyRevision(1)
+        events.published.shouldBeEmpty()
+
+        val retried = workflow.confirm(confirmCommand)
+        retried.shouldBeInstanceOf<CommandResult.Processed>()
+        retried.outcome.shouldBeInstanceOf<TransitionOutcome.Applied>()
+        strategies.load().revision shouldBe StrategyRevision(2)
+        events.published.size shouldBe 1
+    }
+
+    @Test
+    fun `M-3 발행이 실패하면 세션은 전진하지 않지만 전략은 저장돼 재전달이 StaleRevision 으로 거부된다`() {
+        val sessions = InMemorySessionRepository()
+        val strategies = InMemoryStrategyRepository(initialStrategy())
+        val events = FlakyEventSink()
+        val workflow =
+            EditStrategyWorkflow(
+                sessions,
+                strategies,
+                FixedClock(Instant.parse("2026-09-08T00:00:00Z")),
+                events,
+                strategyPolicy(),
+                EditSessionPolicyData(Duration.ofMinutes(15)),
+            )
+        val sessionId = EditSessionId("s-7")
+        workflow.beginStarted(sessionId, OPERATOR, FIELD)
+        workflow.provideValue(
+            EditCommand.ProvideValue(
+                CommandId("cmd-1"),
+                sessionId,
+                Actor.Operator(OPERATOR),
+                FIELD,
+                StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+            ),
+        )
+        val confirmCommand =
+            EditCommand.Confirm(
+                CommandId("cmd-2"),
+                sessionId,
+                Actor.Operator(OPERATOR),
+                StrategyRevision(1),
+            )
+
+        events.failNextPublish = true
+        shouldThrow<IllegalStateException> { workflow.confirm(confirmCommand) }
+
+        strategies.strategy.revision shouldBe StrategyRevision(2)
+        sessions.load(sessionId)!!.state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
+
+        val retried = workflow.confirm(confirmCommand)
+        retried.shouldBeInstanceOf<CommandResult.Processed>()
+        val rejected = retried.outcome
+        rejected.shouldBeInstanceOf<TransitionOutcome.Rejected>()
+        rejected.reason shouldBe RejectionReason.StaleRevision
     }
 }

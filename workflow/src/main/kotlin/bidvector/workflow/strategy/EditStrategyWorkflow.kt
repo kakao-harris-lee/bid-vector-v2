@@ -84,14 +84,24 @@ class EditStrategyWorkflow(
         return expired.state
     }
 
+    /**
+     * `Applied` 는 `strategies.save` → `events.publish` → `sessions.save` 순이다(verifier
+     * M-3 수정) — 세션을 먼저 저장하면 전략 저장 실패 뒤에도 세션이 이미 `Applied` 로
+     * 굳어, 복구 뒤 같은 `Confirm` 재전달이 `Accepted`(중복)로 조용히 통과하며 전략은
+     * revision 이 오르지 않고 발행도 없이 **편집이 영구 소실**됐다. 이 순서라면 전략 저장
+     * 실패 시 세션이 전진하지 않아 재전달이 정상 재시도가 되고, 발행 실패(전략 저장은
+     * 성공한 뒤)는 다음 재전달의 `seenRevision` 대조가 잡아 `StaleRevision` 거부로 정직하게
+     * 드러난다(이중 적용이 아니다). 남는 잔여 창(발행 실패 뒤 세션 미전진)은 알려진
+     * 제한 — 원자적 저장+발행+세션전진은 4C 트랜잭션 outbox 소관.
+     */
     private fun process(command: EditCommand): CommandResult {
         val session = sessions.load(command.sessionId) ?: return CommandResult.SessionNotFound
         val outcome = apply(session, command, clock.now(), strategies.load(), strategyPolicy)
-        sessions.save(outcome.session)
         if (outcome is TransitionOutcome.Applied) {
             strategies.save(outcome.applied)
             events.publish(outcome.event)
         }
+        sessions.save(outcome.session)
         return CommandResult.Processed(outcome)
     }
 }
