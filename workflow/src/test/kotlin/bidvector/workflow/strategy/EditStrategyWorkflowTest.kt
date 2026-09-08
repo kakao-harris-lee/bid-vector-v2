@@ -368,4 +368,50 @@ class EditStrategyWorkflowTest {
         rejected.shouldBeInstanceOf<TransitionOutcome.Rejected>()
         rejected.reason shouldBe RejectionReason.StaleRevision
     }
+
+    @Test
+    fun `M-5 begin 은 시각상 만료됐지만 아직 fold 되지 않은 세션 위에서도 Started 를 낸다`() {
+        val clock = FixedClock(Instant.parse("2026-09-08T00:00:00Z"))
+        val (workflow, _, _) = newWorkflow(clock = clock)
+        val sessionId = EditSessionId("s-8")
+        val original = workflow.beginStarted(sessionId, OPERATOR, FIELD)
+        clock.instant = original.expiresAt.plusSeconds(1)
+
+        val reopened = workflow.begin(sessionId, OPERATOR, FIELD)
+
+        reopened.shouldBeInstanceOf<BeginOutcome.Started>()
+        reopened.session.id shouldBe original.id
+        reopened.session.state shouldBe EditSessionState.WaitingForValue(FIELD)
+    }
+
+    @Test
+    fun `L-5 만료 fold 는 Rejected 로 끝나는 command 처리에서도 영속된다`() {
+        val sessions = InMemorySessionRepository()
+        val clock = FixedClock(Instant.parse("2026-09-08T00:00:00Z"))
+        val (workflow, _, _) = newWorkflow(sessions = sessions, clock = clock)
+        val sessionId = EditSessionId("s-9")
+        val session = workflow.beginStarted(sessionId, OPERATOR, FIELD)
+        clock.instant = session.expiresAt.plusSeconds(1)
+
+        val result =
+            workflow.provideValue(
+                EditCommand.ProvideValue(
+                    CommandId("cmd-1"),
+                    sessionId,
+                    Actor.Operator(OPERATOR),
+                    FIELD,
+                    StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                ),
+            )
+
+        result.shouldBeInstanceOf<CommandResult.Processed>()
+        val rejected = result.outcome
+        rejected.shouldBeInstanceOf<TransitionOutcome.Rejected>()
+        rejected.reason shouldBe RejectionReason.SessionExpired
+        // process() 가 outcome.session 을 저장했는지(만료 fold 가 실제로 영속됐는지)를 독립된
+        // sessions 참조로 확인한다 — outcome.session 자체가 Expired 라는 것만으로는
+        // process() 의 저장 호출 여부를 재지 못한다(변이: sessions.save 를 조건부로 감싸도
+        // outcome 필드는 그대로 Expired 라 통과했을 것이다, verifier L-5).
+        sessions.load(sessionId)!!.state shouldBe EditSessionState.Expired
+    }
 }

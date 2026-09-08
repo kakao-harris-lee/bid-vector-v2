@@ -34,11 +34,18 @@ sealed interface BeginOutcome {
 
 /**
  * 채널 독립 use case(scope.md ⑦, STR-11) — 4개 command 처리 + `begin`·`expire`. 어댑터
- * (Telegram/웹)는 이 클래스 밖에 산다(D-M4-1). 모든 전략 write 는 이 클래스를 지난다(⑥) —
- * [strategies]는 `public`(설계 검토 (2) #3 실측 판정, `Ports.kt` 참고)이지만, 우회 (3)의
- * 차단은 [AppliedStrategy](`internal constructor`, `workflow` 밖에서 생성 불가)라는
- * **인자 타입** 근거에 의존한다 — `OperatorStrategy` 자체는 `validate()`가 public 이라
- * 누구나 얻을 수 있어 그 타입 근거는 서지 않았었다(verifier H-1 실측, `Ports.kt` KDoc 참고).
+ * (Telegram/웹)는 이 클래스 밖에 산다(D-M4-1). 모든 전략 write 는 이 클래스를 지난다(⑥).
+ *
+ * **verifier H-3 수정 — 커널 자체가 `internal`이다.** `AppliedStrategy`(통로 타입, H-1/H-2
+ * 수정)는 위조를 막았지만 **획득**은 막지 못했다 — `beginSession`·`apply`가 public top-level
+ * 함수였을 때는 `workflow` 밖에서 그 둘을 직접 몰아 호출부가 고른 `current`·`draft`로 정당한
+ * `AppliedStrategy`를 얻고, 이 use case를 거치지 않고 [strategies]에 직접 넘겨 **이벤트 없는
+ * 저장**을 실행할 수 있었다(실측: `revision=778`·`bidNowThreshold=0.99` 저장 + 발행 0). 지금은
+ * `beginSession`·`apply`·`expireIfDue`가 전부 `internal`이라 `workflow` 밖에서는 호출 자체가
+ * 컴파일되지 않는다 — `EditSession`·`TransitionOutcome`을 얻는 유일한 경로가 이 클래스가
+ * 됐다. [strategies]는 여전히 `public`(설계 검토 (2) #3 실측 판정, `Ports.kt` 참고)이지만,
+ * 이제 그 인자(`AppliedStrategy`)를 얻으려면 이 클래스를 반드시 거쳐야 하므로 우회 (3)이
+ * 실질적으로 닫힌다.
  */
 class EditStrategyWorkflow(
     private val sessions: EditSessionRepository,
@@ -53,6 +60,11 @@ class EditStrategyWorkflow(
      * `sessions.load` 가드가 없으면 `WaitingForConfirmation` 을 `apply()` 밖에서 조용히
      * `WaitingForValue` 로 되돌릴 수 있었다). 종단 세션(`Applied`/`Cancelled`/`Expired`)이
      * 있는 id 는 새로 열 수 있다(D-4A-4 — 재개는 새 세션).
+     *
+     * **가드 전에 만료를 먼저 접는다(verifier M-5 수정)** — 저장된 state 만 보면, 시각상
+     * 만료됐지만 아직 `Expired`로 fold 되지 않은 세션이 비종단으로 읽혀 `begin()`을 막는다.
+     * sweep 배선 부재(선언된 알려진 제한)와 겹치면 그 `EditSessionId`의 새 편집이 **무기한**
+     * 막힐 수 있었다. `expireIfDue`를 먼저 적용해 종단 판정하고, 접힌 결과를 저장한다.
      */
     fun begin(
         sessionId: EditSessionId,
@@ -60,8 +72,12 @@ class EditStrategyWorkflow(
         field: EditableField,
     ): BeginOutcome {
         val existing = sessions.load(sessionId)
-        if (existing != null && !isTerminal(existing.state)) {
-            return BeginOutcome.Rejected(existing, RejectionReason.SessionAlreadyActive)
+        if (existing != null) {
+            val folded = expireIfDue(existing, clock.now())
+            if (folded !== existing) sessions.save(folded)
+            if (!isTerminal(folded.state)) {
+                return BeginOutcome.Rejected(folded, RejectionReason.SessionAlreadyActive)
+            }
         }
         val session = beginSession(sessionId, operator, field, clock.now(), sessionPolicy)
         sessions.save(session)
