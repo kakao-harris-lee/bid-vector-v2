@@ -5,7 +5,6 @@ import bidvector.sharedkernel.AwardAmount
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.FloorRate
-import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.YegaAmount
@@ -146,15 +145,22 @@ data class OpeningReservePriceRow(
  * 자리에」가 된다). `shared-kernel Money`는 basis가 있는 여섯 구현으로 닫힌 `sealed
  * interface`라 procurement가 일곱째 구현을 더할 수 없고, 없는 basis를 지어내 기존 여섯 중
  * 하나로 태우지도 않는다(「모름을 지어내지 않는다」 규율) — 그래서 `Money`를 구현하지 않는
- * 평범한 값 객체로 둔다. `vatTreatment`는 §1.7.1 문면대로 `UNKNOWN`이 초기값이다(미선언 →
- * `UNKNOWN`, 다른 값을 만들 생성 경로가 없다).
+ * 평범한 값 객체로 둔다. `vatTreatment`는 `YegaAmount`·`AwardAmount`와 같은 이유로 `UNKNOWN`
+ * 고정이다(§1.7.1 문면 「미선언 → UNKNOWN」, 다른 값을 만들 생성 경로가 없다).
+ *
+ * **`provenance`를 두지 않는다**(verifier 전 자기 발견 정정, Layer B 저장 설계 중) — 이 축은
+ * `opening_result`·`opening_reserve_price`와 같은 「최신 관측 우선, 권위 계층 없음」 축이라
+ * (D-M3-7 OPEN-DIC-09) `derivedBaseAmount`도 provenance를 고정 상수(`DerivedFromOpening`)로
+ * 읽어내지 별도 컬럼에 왕복시키지 않는다. `bsisPlnprc`엔 그런 고정 상수가 없고(파생이 아니라
+ * 원문 관측이다), 그렇다고 임의 `Provenance`를 저장·복원하면 왕복 안정성이 없는 필드를 타입에
+ * 얹는 것이다 — 만들지 않는다.
  */
 data class ReservePriceCandidateAmount(
     val won: Long,
     val currency: Currency,
-    val vatTreatment: VatTreatment,
-    val provenance: Provenance,
 ) {
+    val vatTreatment: VatTreatment = VatTreatment.UNKNOWN
+
     init {
         require(won >= 0L) { "금액은 음수일 수 없다: $won" }
     }

@@ -106,13 +106,7 @@ class OpeningResultFactSlotsTest {
         val row =
             OpeningReservePriceRow(
                 sequenceNumber = "001",
-                baseReservePrice =
-                    ReservePriceCandidateAmount(
-                        500_000_000L,
-                        Currency.KRW,
-                        VatTreatment.UNKNOWN,
-                        Provenance.OperatorDeclared,
-                    ),
+                baseReservePrice = ReservePriceCandidateAmount(500_000_000L, Currency.KRW),
                 isDrawn = false,
                 drawCount = 0,
             )
@@ -151,7 +145,12 @@ class OpeningResultFactSlotsTest {
     @Test
     fun `ReservePriceCandidateAmount 는 음수 금액을 거부한다`() {
         shouldThrow<IllegalArgumentException> {
-            ReservePriceCandidateAmount(-1L, Currency.KRW, VatTreatment.UNKNOWN, Provenance.OperatorDeclared)
+            ReservePriceCandidateAmount(-1L, Currency.KRW)
         }
+    }
+
+    @Test
+    fun `ReservePriceCandidateAmount 의 vatTreatment 는 항상 UNKNOWN 이다`() {
+        ReservePriceCandidateAmount(500_000_000L, Currency.KRW).vatTreatment shouldBe VatTreatment.UNKNOWN
     }
 }
