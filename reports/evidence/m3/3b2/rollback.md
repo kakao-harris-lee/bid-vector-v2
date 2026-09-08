@@ -101,6 +101,9 @@ procurement 는 3A corpus 실행자 test 포함 전부 green. 실패·건너뜀 
 - `milestone-3.md`·`reports/evidence/m3/3a/policy-values.md`·`fixtures/**` — 다른 레인 소유,
   이 slice 가 편집하지 않았으므로 되돌릴 대상도 아니다.
 - `reports/evidence/m3/3b2/**`(이 evidence 자체) — 감사 기록은 보존한다(되돌리지도 고치지도 않는다).
+- `docs/discovery/capability-map.md`·`docs/discovery/ux-journey-research.md`(scope.md `59e4227`
+  in_scope 선언, 문서 레인 소유) — 등재된 `OPEN`은 이 slice 가 만든 지식이라 코드를 걷어도
+  남아야 한다(되돌리면 다음 착수가 같은 것을 다시 발견한다).
 
 ## 예상 복구 시간
 
