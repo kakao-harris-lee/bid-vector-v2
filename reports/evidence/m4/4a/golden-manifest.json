@@ -1,0 +1,53 @@
+{
+  "milestone": "m4",
+  "slice": "4a-strategy-edit-state-machine",
+  "manifest_source": "fixtures/manifest.yaml",
+  "verified_2026-09-08": "sha256 값은 fixtures/input/*·fixtures/expected/* 실물 재계산과 manifest.yaml entry 가 일치함을 shasum -a 256 으로 실측 대조했다.",
+  "cases": [
+    {
+      "id": "strategy-edit-001",
+      "domain": "strategy-edit",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "d1fc50936d439dce4bc7e01edd24e1ec81a2bd52df9aaf4b6f355c894e1debab",
+      "expected_sha256": "ac10fc435ad5bec6500937039cbdf13ffd8cc493698943001ebf8a7e87b3a42d",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "strategy-edit-002",
+      "domain": "strategy-edit",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "805a009bc8631f87b02574bed508b860dafc7358b77c18a8d19e690af22db993",
+      "expected_sha256": "c9002468cab26ac87a52728912c66aa0d708c1546f549fa49a4520d070683c0a",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "strategy-edit-003",
+      "domain": "strategy-edit",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "668787b89468af938c495315b5b49250580a2f344cf41fcf75a07465867453ef",
+      "expected_sha256": "328644324721608aae6add485b11c37ea5b47e5f759bb1ed020b96e66fe3f9e9",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "strategy-edit-004",
+      "domain": "strategy-edit",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "4ef1731c692a2e6d9c5d8ee47796fbabfa62212d5a5119ff2ae5d6596d4e416f",
+      "expected_sha256": "4d8cfa84a37139e27aba0ff63161e9c0ac308f29b2391711751fc3c0af085789",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "strategy-edit-005",
+      "domain": "strategy-edit",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "ab82e09307aab2968f7c76bbde69d571caa13272be4d62a480927b78f7ad82fe",
+      "expected_sha256": "212467719c7f449257d2bdc0b390d32ca8ee5941dfc2505e638a0948b6a80826",
+      "review_approved_by_user": false
+    }
+  ]
+}
