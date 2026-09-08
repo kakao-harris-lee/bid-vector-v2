@@ -2043,6 +2043,12 @@ policy 엔트리이며, 같은 축의 밴드가 둘 이상이면 그 사실 자�
     명시적 결과로 남는다.
 - **소스 제약(V2 port 계약에 문서화)**: 표적조회 불가 → 윈도 조회 후 클라이언트 매칭이
   유일한 경로다. 이는 KONEPS의 제약이지 우리 설계가 아니다(재발견 비용 제거).
+  > **2026-09-08 — 이 문면이 공식 문서와 충돌한다.** 낙찰정보서비스 참고자료 1.1
+  > (`koneps-scsbid-reference`)는 개찰결과 목록 오퍼레이션에 `inqryDiv=4`(입찰공고번호)를
+  > 선언하고, 개찰완료 목록 오퍼레이션은 `bidNtceNo` 를 **필수**로 요구하는 단건 조회다.
+  > 위 「불가」는 legacy 실측이고 문서는 가능하다고 적는다 — 어느 쪽이 맞는지는 **실제 호출
+  > 승인 뒤에만** 닫힌다. `OPEN-3B2-TARGETED-OPENING-QUERY`(§14.3)가 정본이며, 닫히는 방향에
+  > 따라 이 항목의 소스 제약과 쿼터 계산이 바뀐다. 근거 절: `policy-values.md` §1.9.2·§1.9.4.
 
 ### SET-03 · 페이퍼 투찰 정산 ("그때 이렇게 냈으면 이겼나")
 
@@ -3464,6 +3470,8 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | `OPEN-3A-ACCOUNTING-IDENTITY` (M3/3A 신설, 2026-09-07 — `m3-prep.md` §6·3A scope ⑦ 의 신설 후보를 여기 한 자리로) | COL-06 문면의 회계 항등식 `received = normalized + duplicate + dropped` 은 `duplicate` 와 `dropped` 가 **서로소**인 셈이고 **V2 는 그 문면을 그대로 채택**한다(3A ⑦ — `dropReasons` 에 `Duplicate` 없음, 생성자 불변식). legacy 의 `dropped_count` 는 중복을 **포함**해 문면과 다르다(조사 (b)·`_workspace/m345-prep/01_review_r1.md`). **정정 대상은 문면이 아니라 legacy 형태**이며, 이 문서 COL-06 「legacy 형태 처리」 절에 그 차이(legacy 셈 ≠ 문면 셈, V2 채택 = 문면)가 적혀 있지 않아 등재한다 — 개정은 문장 하나 추가 | **`capability-map.md` COL-06 을 여는 다음 문서 slice** | 운영자 | **정본**(이 행) — 3A scope ⑦ 은 포인터 |
 | `OPEN-3C-DOC-FORMATS` (M3/3C 신설, 2026-09-08) | 첨부 문서 형식 분포(PDF 텍스트 층/스캔 PDF/HWP/HWPX/텍스트)와 HWP·HWPX 파서 채택 여부 — D-3C-4 (a) 로 3C 는 플레인 텍스트 + PDF 텍스트 층(pdfbox)만, 그 밖은 `Uncertain(UnsupportedFormat)` 회계로 관측. 분포는 3B-2·운영 수집 회계가 근거 | **관측 뒤 운영자 결정**(M6 이전) | 운영자 | **정본**(3C scope OPEN 표) |
 | `OPEN-3C-ATTACHMENT-FIELD-CONTRACT` (M3/3C 신설, 2026-09-08) | 첨부 URL 필드(`ntceSpecDocUrl1` 계열)의 필드 계약이 3A 정책 값 표(`policy-values.md`)와 `KONEPS_COLLECTION_POLICY` 에 없어 `AttachmentUrl` 을 실제 수집 관측에서 만들 수 없다 — 3C test 는 등재된 계약으로 메커니즘만 증명. 처리: curator 표 추가 행(P-8) + 정책 값 한 커밋(3A 후속 소폭) | **3B-2 또는 M4 4B 착수 전** | curator → 운영자 승인 | **정본**(3C commands 알려진 제한) |
+| `OPEN-3B2-TARGETED-OPENING-QUERY` (M3/3B-2 신설, 2026-09-08) | **공고번호 표적 개찰 조회가 가능한가 — 문서와 실측이 충돌한다.** 낙찰정보서비스 참고자료 1.1 은 개찰결과 목록에 `inqryDiv=4`(입찰공고번호)를 선언하고 개찰완료 목록은 `bidNtceNo` 를 필수로 요구하는 단건 조회다. legacy 는 *"공고번호 표적조회는 불가하다(실측)"* 를 설계 제약으로 적었고 **SET-02 가 그것을 소스 제약으로 승계**했다. 근거 절 `policy-values.md` §1.9.2·§1.9.4. **닫히는 조건**: 실제 KONEPS 호출 승인 뒤 실측. 닫히면 SET-02 문면과 개찰 축 쿼터 계산(공고당 1콜 대 날짜창 스윕)이 바뀐다 | **실제 호출 승인 뒤**(3B-2 또는 M4) | 운영자(호출 승인) → 구현 레인(실측) | **정본**(이 행) — SET-02 는 포인터 |
+| `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` (M3/3B-2 신설, 2026-09-08) | **문서가 선언한 최대 메시지 크기와 legacy 페이지 크기가 맞지 않을 수 있다.** 낙찰정보서비스 23 오퍼레이션 전부가 최대 메시지 사이즈·평균 응답 시간·초당 최대 트랜잭션을 같은 값으로 문면에 적는데(값은 `policy-values.md` §1.9.3), legacy 는 목록 페이지 크기를 그보다 큰 응답이 나올 수 있는 값으로 둔다. 한 페이지가 상한을 넘으면 **잘린 응답**이 오고 그것이 parse 실패인지 부분 응답인지는 관측이 없다. 3B-2 는 페이지 크기를 정책값으로 두고 보수적 초기값을 쓴다 | **운영 관측 뒤**(M6 이전) | 운영자 | **정본**(이 행) · 3B-2 scope OPEN 표는 포인터 |
 
 ### 14.4 이월되는 비-`OPEN` 사실
 
