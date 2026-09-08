@@ -106,6 +106,11 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
 7. **개찰 축은 낙찰 목록 검색·개찰결과 목록 검색(`…PPSSrch`, §1.9.1 16~23)을 별도 `SourceEndpoint`로
    열지 않는다.** legacy 도 이 검색군을 부르지 않고(§1.9.1), 3B-2 acceptance 도 그 군을 요구하지
    않는다 — `sucsfbidAmt` 등 필드의 `presentIn`은 목록군 하나로만 좁혔다(과잉 금지).
+8. **`lmtGrpNo`·`lmtSno`는 `IDENTIFIER`로, `compnoRsrvtnPrceSno`는 `COUNT`로 등재했다**(verifier r3
+   L-3 — 근거가 「판단이 갈린 지점」에 없었다). `policy-values.md` §1.9.5(응답 항목 명세) 자신은
+   이 둘의 scale 을 반복하지 않지만, §1.5(제한그룹번호·제한순번)가 `lmtGrpNo`·`lmtSno`를 명시적으로
+   「identifier」로 적고, §1.7.3(복수예가순번)이 `compnoRsrvtnPrceSno`를 별도로 「셈(순번)」으로
+   분류한다 — 두 축이 갈린 근거는 이 레인의 임의 판단이 아니라 문서의 서로 다른 절이 이미 준 값이다.
 
 ## 알려진 제한
 
@@ -114,8 +119,8 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
   `adapters/src/main/kotlin/bidvector/adapters/persistence/ObservationKeyDerivation.kt`)는
   `sourceEndpoint.name`·`observedAt`·`canonicalPayload`(계약 등재 필드 투영, `compnoRsrvtnPrceSno`·
   `lmtGrpNo`·`lmtSno` 포함)·`sourceText`를 이어붙여 SHA-256 으로 키를 낸다. **`observedAt`은 페이지
-  전체가 공유한다**(`KonepsPageUriBuilder.kt:238` `clock.instant()`를 페이지당 한 번만 호출해
-  `recordPage`의 모든 항목에 같은 값을 넘긴다, 실측) — 같은 페이지 안에서는 이 축이 행을
+  전체가 공유한다**(`applySuccess`가 페이지당 한 번 평가한 `clock.instant()`를 그 페이지의
+  `recordPage`(모든 항목)에 그대로 넘긴다, 실측) — 같은 페이지 안에서는 이 축이 행을
   구별하지 못한다. 행 식별자(`compnoRsrvtnPrceSno`·`lmtGrpNo`+`lmtSno`)가 §1.7.3 처럼 **부재
   허용**(OPTIONAL)이고 그 값이 실제로 부재이면 `presenceOf`가 `Missing`을 내 그 필드가
   `canonicalPayload`(값 `null`은 투영에서 제외됨, `ObservationPayloadCodec.encode`)에서 통째로
@@ -126,6 +131,10 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
   저장 층에서 다시 접히는 경로다. 확인만 했고 수정하지 않았다(3D out_of_scope). M3 완료 조건
   「retry 후 canonical effect 하나」와 맞물리는 자리라 신설 OPEN 후보로 다룰 것을 권한다
   (`OPEN-3B2-STORAGE-ROW-KEY-COLLISION` — scope.md 는 문서 레인 소유라 이 문서가 후보만 남긴다).
+- **`CollectionPolicy.kt`가 정확히 500줄로 파일 크기 게이트 한도 경계에 있다**(verifier r3 L-4,
+  `2c61cda`가 CPD 중복·한도 초과를 고친 직후 실측). 지금은 초록이지만 이 파일에 계약 행을 한
+  줄이라도 더하면 게이트가 바로 떨어진다 — 다음 추가는 파일 분할(범위 밖 구조 변경이라 이
+  slice 는 하지 않았다) 또는 500줄 한도 자체의 재검토를 먼저 거쳐야 한다.
 - **`getOpengResultListInfoOpengCompt`(개찰완료) 미구현**(D-3B2-9 (a) 운영자 승인) — 추첨번호
   (`drwtNo1`·`drwtNo2`)와 투찰 축(`bidprcAmt`·`bidprcrt`)은 이 오퍼레이션만 준다. `COL-03` 문면의
   「추첨번호 확보」가 이 slice 로 닫히지 않는다 — 후속 slice 대상(M4 4B 착수 전).
@@ -162,9 +171,11 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
   고르는」 실수가 아니다. 타입으로 막으려면 `SourceEndpoint`(공유 열거형, 3A·3B·전 procurement
   소비처가 참조)를 두 하위 체계(마스킹 필수/불필요)로 쪼개야 하는데, 이는 in_scope 「추가만」
   원칙을 넘는 광범위 개편이고 이 slice 가 다루는 세 호출부(`fetchNotices`·license-limit·개찰
-  목록/상세)는 이미 각자 올바른 mapper 를 쓴다(실측: 전 main 소스 grep). 위협 모델이 저자
-  실수가 아니라 우회를 방어 대상으로 삼으므로, 비용 대비 이 우회는 등재로 충분하다고 판단했다
-  — 표 (g) 행에 이미 이 경계가 적혀 있다.
+  목록/상세)는 이미 각자 올바른 mapper 를 쓴다(실측: 전 main 소스 grep). 이 비용(광범위 개편)
+  대비 이 우회는 등재로 충분하다고 판단했다 — 표 (g) 행에 이미 이 경계가 적혀 있다(verifier r3
+  L-1 — 이전 판은 이 판단의 근거로 설계 검토 (0) 의 경계 문장을 인용했으나, 그 문장이 실제로
+  게이트 방어 대상으로 명시하는 것이 바로 「호출부의 실수」라 인용이 결론과 반대였다. 근거는
+  비용 논거 하나로 좁힌다).
 
 ## 병렬 레인 경계 확인
 
