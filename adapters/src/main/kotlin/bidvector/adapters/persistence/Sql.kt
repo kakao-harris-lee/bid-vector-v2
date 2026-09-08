@@ -68,26 +68,50 @@ internal object Sql {
         VALUES (?, ?, ?, ?, ?::jsonb)
         """
 
+    // M3/3E ③ — §1.9.7 실측 정정으로 예정가격·기초금액·총예가건수·실개찰일시가 공고 층(부모)
+    // 컬럼으로 붙는다(층 C, 추가만). final_award_amount·planned_price는 AwardAmount·
+    // YegaAmount(vatTreatment 항상 UNKNOWN 고정)라 vat 컬럼이 없다.
+    private const val OPENING_RESULT_COLUMNS =
+        """
+        winning_rate_fraction, derived_base_amount_won, derived_base_amount_currency,
+        derived_base_amount_vat, observed_at, revision,
+        final_award_amount_won, final_award_amount_currency,
+        final_award_company_name, participant_count, progress_division,
+        planned_price_won, planned_price_currency,
+        opening_base_amount_won, opening_base_amount_currency, opening_base_amount_vat,
+        total_reserve_price_candidate_count, actual_opening_at
+        """
+
     const val SELECT_OPENING_RESULT =
-        """
-        SELECT winning_rate_fraction, derived_base_amount_won, derived_base_amount_currency,
-               derived_base_amount_vat, observed_at, revision
-        FROM opening_result WHERE notice_number = ? AND notice_round = ?
-        """
+        "SELECT $OPENING_RESULT_COLUMNS FROM opening_result WHERE notice_number = ? AND notice_round = ?"
 
     const val UPSERT_OPENING_RESULT =
         """
         INSERT INTO opening_result (
             notice_number, notice_round, winning_rate_fraction,
             derived_base_amount_won, derived_base_amount_currency, derived_base_amount_vat,
+            final_award_amount_won, final_award_amount_currency,
+            final_award_company_name, participant_count, progress_division,
+            planned_price_won, planned_price_currency,
+            opening_base_amount_won, opening_base_amount_currency, opening_base_amount_vat,
+            total_reserve_price_candidate_count, actual_opening_at,
             observed_at, revision, observation_key
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ) VALUES (
+            ?, ?, ?,
+            ?, ?, ?,
+            ?, ?,
+            ?, ?, ?,
+            ?, ?,
+            ?, ?, ?,
+            ?, ?,
+            ?, 1, ?
+        )
         ON CONFLICT (notice_number, notice_round) DO UPDATE SET
             -- M-c(verifier r2) — COALESCE로 NULL 유입이 기존 값을 지우지 않게 한다(설계
             -- 검토 ④ 「비었으면 지우지 않는다」). winningRate만 실은 더 늦은 관측이 오면
             -- derivedBaseAmount 세 컬럼은 EXCLUDED에서 전부 NULL인데, COALESCE 없이 그대로
             -- SET하면 기존 값을 지워 존재 가드가 항목을 통째로 실패시켰다(부분 관측이
-            -- 정상인데도).
+            -- 정상인데도). 신규 컬럼도 같은 관례를 따른다.
             winning_rate_fraction = COALESCE(EXCLUDED.winning_rate_fraction, opening_result.winning_rate_fraction),
             derived_base_amount_won =
                 COALESCE(EXCLUDED.derived_base_amount_won, opening_result.derived_base_amount_won),
@@ -95,12 +119,64 @@ internal object Sql {
                 COALESCE(EXCLUDED.derived_base_amount_currency, opening_result.derived_base_amount_currency),
             derived_base_amount_vat =
                 COALESCE(EXCLUDED.derived_base_amount_vat, opening_result.derived_base_amount_vat),
+            final_award_amount_won =
+                COALESCE(EXCLUDED.final_award_amount_won, opening_result.final_award_amount_won),
+            final_award_amount_currency =
+                COALESCE(EXCLUDED.final_award_amount_currency, opening_result.final_award_amount_currency),
+            final_award_company_name =
+                COALESCE(EXCLUDED.final_award_company_name, opening_result.final_award_company_name),
+            participant_count = COALESCE(EXCLUDED.participant_count, opening_result.participant_count),
+            progress_division = COALESCE(EXCLUDED.progress_division, opening_result.progress_division),
+            planned_price_won = COALESCE(EXCLUDED.planned_price_won, opening_result.planned_price_won),
+            planned_price_currency =
+                COALESCE(EXCLUDED.planned_price_currency, opening_result.planned_price_currency),
+            opening_base_amount_won =
+                COALESCE(EXCLUDED.opening_base_amount_won, opening_result.opening_base_amount_won),
+            opening_base_amount_currency =
+                COALESCE(EXCLUDED.opening_base_amount_currency, opening_result.opening_base_amount_currency),
+            opening_base_amount_vat =
+                COALESCE(EXCLUDED.opening_base_amount_vat, opening_result.opening_base_amount_vat),
+            total_reserve_price_candidate_count = COALESCE(
+                EXCLUDED.total_reserve_price_candidate_count, opening_result.total_reserve_price_candidate_count),
+            actual_opening_at = COALESCE(EXCLUDED.actual_opening_at, opening_result.actual_opening_at),
             observed_at = EXCLUDED.observed_at,
             revision = opening_result.revision + 1,
             observation_key = EXCLUDED.observation_key,
             updated_at = now()
         WHERE EXCLUDED.observed_at >= opening_result.observed_at
         RETURNING (xmax = 0) AS inserted, revision
+        """
+
+    // M3/3E ⑤⑥ — 복수예비가격 후보 자식 표(층 B, D-3E-2 (a)). 「최신 관측 우선」이라
+    // opening_result와 같은 COALESCE 관례를 쓴다 — 부모 upsert가 자식을 조용히 덮지 않도록
+    // 별도 문으로 갈랐다(한 항목 트랜잭션 안에서 반복 실행, JdbcOpeningResultRepository).
+    const val SELECT_OPENING_RESERVE_PRICES =
+        """
+        SELECT reserve_price_sequence, base_reserve_price_won, base_reserve_price_currency,
+               is_drawn, draw_count
+        FROM opening_reserve_price WHERE notice_number = ? AND notice_round = ?
+        ORDER BY reserve_price_sequence
+        """
+
+    const val UPSERT_OPENING_RESERVE_PRICE =
+        """
+        INSERT INTO opening_reserve_price (
+            notice_number, notice_round, reserve_price_sequence,
+            base_reserve_price_won, base_reserve_price_currency,
+            is_drawn, draw_count, observed_at, revision, observation_key
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ON CONFLICT (notice_number, notice_round, reserve_price_sequence) DO UPDATE SET
+            base_reserve_price_won =
+                COALESCE(EXCLUDED.base_reserve_price_won, opening_reserve_price.base_reserve_price_won),
+            base_reserve_price_currency =
+                COALESCE(EXCLUDED.base_reserve_price_currency, opening_reserve_price.base_reserve_price_currency),
+            is_drawn = COALESCE(EXCLUDED.is_drawn, opening_reserve_price.is_drawn),
+            draw_count = COALESCE(EXCLUDED.draw_count, opening_reserve_price.draw_count),
+            observed_at = EXCLUDED.observed_at,
+            revision = opening_reserve_price.revision + 1,
+            observation_key = EXCLUDED.observation_key,
+            updated_at = now()
+        WHERE EXCLUDED.observed_at >= opening_reserve_price.observed_at
         """
 
     const val SELECT_QUALIFICATION_TEXT =

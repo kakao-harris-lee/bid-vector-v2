@@ -25,6 +25,19 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             "guard_opening_result_winning_rate",
             "guard_opening_result_derived_base_amount",
             "guard_qualification_text_raw_text",
+            // M3/3E — 층 C 부모 fact 슬롯 가드(추가만, 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
+            "guard_opening_result_final_award_amount",
+            "guard_opening_result_final_award_company_name",
+            "guard_opening_result_participant_count",
+            "guard_opening_result_progress_division",
+            "guard_opening_result_planned_price",
+            "guard_opening_result_opening_base_amount",
+            "guard_opening_result_total_reserve_price_candidate_count",
+            "guard_opening_result_actual_opening_at",
+            // M3/3E — 층 B 자식 표 가드.
+            "guard_opening_reserve_price_base_reserve_price",
+            "guard_opening_reserve_price_is_drawn",
+            "guard_opening_reserve_price_draw_count",
         )
 
     @Test
