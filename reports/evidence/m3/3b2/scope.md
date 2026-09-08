@@ -54,7 +54,9 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base>..HEAD -- CLAUDE.md .claude/` — 착수 시 등재. 준비 단계(2026-09-08) 커밋 여섯은 전부 문서·evidence 경로다(하네스 편집 없음).
+`git log --oneline 0e83d6e..HEAD -- CLAUDE.md .claude/` — **하네스 커밋 0**(실측, 재검증 요청 시점). 준비 단계 커밋도 전부 문서·evidence 경로였다.
+
+**range 는 slice 커밋 집합이 아니다**(2026-09-04 규격). `0e83d6e..HEAD` 열일곱 가운데 **문서 레인(세션 모델) 넷** — `e9e4928`(계약 확정)·`6edad4a`(설계 검토 반영 + `milestone-3.md` 착수 문단)·`a16ced4`(낡는 수치)·`4f5493a`(Accounting scope 예외 등재) — 은 구현 레인 소관이 아니다. slice 의 커밋 집합은 **in_scope 경로의 변경**이고 rollback 도 그 경로 한정이다. 구현 레인은 `milestone-3.md`·`scope.md`·`policy-values.md`·`fixtures/**` 를 한 번도 건드리지 않았다(경로별 `git log` 실측).
 
 ## 역방향 파급 검사 — 준비 단계 편집 (evidence-pack 2026-09-02·09-03 규격)
 
