@@ -24,14 +24,15 @@ config/quality/gate-tests.properties reports/evidence/m3/3b2/`로 확인한다.
 
 `:procurement:gateExecutionGate` 별도 재확인 — exit 0.
 
-test 수(JUnit XML 실측, 실패·건너뜀 0): koneps — 3B 기존 `KonepsOpenApiNoticeSourceTest` 20(편집
-없이 불변)·`ServiceKeyTest` 3·`KonepsAdapterDependencyTest` 1, 3B-2 신규·확장
-`KonepsOpeningResultSourceTest` 12·`KonepsIdentifierMaskingTest` 7·
-`KonepsLicenseLimitDocumentSourceTest` 7·`KonepsOperationDescriptorTest` 7. procurement —
-`CollectionPolicyTest` 19(§1.7 12행 + license-limit 2행 등재분 포함, G-4 반영)·`FieldContractTest`
-9·`DetailFetchTest` 7·`AccountingTest` 12·`DecideQualificationFetchTest` 3·`PortsTest` 2. 3A
-corpus 27/27 은 3A/3C 소관 test 가 재고(`fixtures/**`는 out_of_scope 라 이 slice 가 편집하지
-않았다) — `:procurement:test` 통과가 그 test 를 함께 재실행한다.
+test 수(JUnit XML 실측, `--no-build-cache clean check` 직후 재확인, 실패·건너뜀 0): koneps — 3B
+기존 `KonepsOpenApiNoticeSourceTest` 20(편집 없이 불변)·`ServiceKeyTest` 3·
+`KonepsAdapterDependencyTest` 1, 3B-2 신규·확장 `KonepsOpeningResultSourceTest` 15·
+`KonepsIdentifierMaskingTest` 7·`KonepsLicenseLimitDocumentSourceTest` 8·
+`KonepsOperationDescriptorTest` 7. procurement — `CollectionPolicyTest` 20(§1.7 12행 +
+license-limit 2행 등재분 포함, G-4 반영)·`FieldContractTest` 9·`DetailFetchTest` 7·
+`AccountingTest` 14(G-1 `rowIdentifierIndeterminate` 회귀분 포함)·`DecideQualificationFetchTest`
+3·`PortsTest` 2. 3A corpus 27/27 은 3A/3C 소관 test 가 재고(`fixtures/**`는 out_of_scope 라 이
+slice 가 편집하지 않았다) — `:procurement:test` 통과가 그 test 를 함께 재실행한다.
 
 ## secret 스캔(evidence-pack 리뷰 요청 조건)
 
