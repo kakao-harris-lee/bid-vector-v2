@@ -245,6 +245,18 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
  * basis **셀**만 미확정이고 행 자체는 등재 대상이다). `sucsfbidRate`의 밴드(expectedRange)도
  * 같은 이유로 두지 않는다.
  */
+private fun finalAwardDateRow(rawName: String): FieldContractRow =
+    FieldContractRow(
+        rawName = RawKey(rawName),
+        concept = FieldConcept.FINAL_AWARD_DATE,
+        basis = null,
+        scale = FieldScale.OPAQUE_TEXT,
+        nullability = FieldNullability.OPTIONAL,
+        vatTreatment = VatTreatment.UNKNOWN,
+        provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+        presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST),
+    )
+
 private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
     listOf(
         // 낙찰 목록(1~4) + 낙찰 목록 검색(16~19) — presentIn 은 legacy 가 부르는 목록군
@@ -305,21 +317,16 @@ private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
             provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
             presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST, SourceEndpoint.OPENING_RESULT_LIST),
         ),
-        // fnlSucsfDate — "일자, 시각 없음"(§1.7.4). DATETIME_NO_ZONE 은 시각 축 계약
-        // (sourceZone 필수)이라 이 필드에 강제하지 않는다 — OPAQUE_TEXT 로 원문만 보존한다
-        // (canonicalize 는 D-3B2-8 후속, 이번 slice 밖). 대문자 `FnlSucsfDate`(외자 2종)
-        // 표기 변형은 관측 전 좁히지 않는다(§1.7.4 — 「두 표기를 각각 등재하고 관측으로
-        // 좁힌다」, `insufficient-evidence`) — 소문자만 이번 slice 가 등재한다.
-        FieldContractRow(
-            rawName = RawKey("fnlSucsfDate"),
-            concept = FieldConcept.FINAL_AWARD_DATE,
-            basis = null,
-            scale = FieldScale.OPAQUE_TEXT,
-            nullability = FieldNullability.OPTIONAL,
-            vatTreatment = VatTreatment.UNKNOWN,
-            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
-            presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST),
-        ),
+        // fnlSucsfDate/`FnlSucsfDate` — "일자, 시각 없음"(§1.7.4). DATETIME_NO_ZONE 은 시각 축
+        // 계약(sourceZone 필수)이라 이 필드에 강제하지 않는다 — OPAQUE_TEXT 로 원문만 보존한다
+        // (canonicalize 는 D-3B2-8 후속, 이번 slice 밖). 대문자 변형(외자 2종 전용 표기) 은
+        // verifier r1 F-5 수정 — §1.7.4 가 "두 표기를 각각 등재하고 관측으로 좁힌다"로 **둘 다
+        // 등재**를 지시한다(대소문자 무시 조회는 §5.3 규율 1 의 미지 필드 리포트를 무력화한다).
+        // 같은 `FINAL_AWARD_DATE` 개념을 공유하는 별도 raw 키다 — `ALLOCATED_BUDGET` 이 이미
+        // `asignBdgtAmt`·`bdgtAmt` 두 키를 갖는 것과 같은 패턴(개념 하나, 키 여럿). 두 행이
+        // rawName 외 전부 같아 CPD 중복으로 잡혀(procurement:cpdCheck) helper 로 뽑았다.
+        finalAwardDateRow("fnlSucsfDate"),
+        finalAwardDateRow("FnlSucsfDate"),
         // 예비가격 상세(9~12) — plnprc·bsisPlnprc·compnoRsrvtnPrceSno·drwtYn.
         FieldContractRow(
             rawName = RawKey("plnprc"),

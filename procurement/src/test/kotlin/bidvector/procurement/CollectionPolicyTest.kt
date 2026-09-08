@@ -26,7 +26,7 @@ private val RESOLVED_POLICY: KonepsCollectionPolicyData =
  */
 class CollectionPolicyTest {
     @Test
-    fun `필드 계약은 승인된 채택분 스물세 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
+    fun `필드 계약은 승인된 채택분 스물네 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contracts
             .map { it.rawName.name }
             .toSet() shouldBe
@@ -51,6 +51,8 @@ class CollectionPolicyTest {
                 "rlOpengDt",
                 "prtcptCnum",
                 "fnlSucsfDate",
+                // 대문자 변형(외자 2종) — verifier r1 F-5 수정, §1.7.4 「두 표기를 각각 등재」.
+                "FnlSucsfDate",
                 "plnprc",
                 "bsisPlnprc",
                 "compnoRsrvtnPrceSno",
@@ -97,6 +99,15 @@ class CollectionPolicyTest {
     @Test
     fun `bidwinnrBizno 는 어떤 개찰 축 행에도 등재되지 않는다 — P-10 (a), 저장하지 않는 값은 계약을 두지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidwinnrBizno")) shouldBe null
+    }
+
+    @Test
+    fun `fnlSucsfDate 대문자 변형도 등재된다 — F-5, 두 표기가 같은 개념을 공유한다`() {
+        val lower = RESOLVED_POLICY.fieldContracts.contractFor(RawKey("fnlSucsfDate"))!!
+        val upper = RESOLVED_POLICY.fieldContracts.contractFor(RawKey("FnlSucsfDate"))!!
+
+        lower.concept shouldBe FieldConcept.FINAL_AWARD_DATE
+        upper.concept shouldBe FieldConcept.FINAL_AWARD_DATE
     }
 
     @Test
