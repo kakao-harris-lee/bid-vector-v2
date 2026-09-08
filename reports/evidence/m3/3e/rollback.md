@@ -1,10 +1,11 @@
 # M3/3E — rollback.md
 
-## 대상 경로 (기계 산출)
+## 대상 경로 (기계 산출, verifier r1 수정 라운드 반영)
 
 `git diff --name-status 9948c6e4056bbf71fa6683aa67d30c2a49fc6eae..HEAD -- <in_scope 경로>` —
-in_scope는 scope.md 그대로(procurement 3파일·adapters/persistence 전체·V4 migration·
-config/quality/gate-tests.properties, koneps는 무변경이라 목록에 없음).
+in_scope는 scope.md 그대로(procurement 3파일·adapters/persistence 전체·V4~V6 migration·
+config/quality/gate-tests.properties, koneps는 무변경이라 목록에 없음). 파일이 늘어(V5·V6
+migration 신규) 목록을 다시 기계 산출했다.
 
 | 상태 | 경로 |
 | --- | --- |
@@ -14,6 +15,8 @@ config/quality/gate-tests.properties, koneps는 무변경이라 목록에 없음
 | M | `adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt` |
 | M | `adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt` |
 | A | `adapters/src/main/resources/db/migration/V4__opening_result_rows.sql` |
+| A | `adapters/src/main/resources/db/migration/V5__opening_result_amount_provenance.sql` |
+| A | `adapters/src/main/resources/db/migration/V6__opening_reserve_price_sequence_blank_guard.sql` |
 | A | `adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt` |
 | M | `adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt` |
 | M | `adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTriggerTest.kt` |
@@ -25,8 +28,8 @@ config/quality/gate-tests.properties, koneps는 무변경이라 목록에 없음
 | A | `procurement/src/test/kotlin/bidvector/procurement/OpeningResultFactSlotsTest.kt` |
 | A | `procurement/src/test/kotlin/bidvector/procurement/RowDiscriminatorTest.kt` |
 
-A=6(삭제 대상), M=10(base로 restore 대상). **라운드마다 파일이 늘면 이 명령을 다시 돌려 목록을
-갱신한다** — 손으로 쓰지 않는다.
+A=8(삭제 대상), M=10(base로 restore 대상), 총 18경로. **라운드마다 파일이 늘면 이 명령을 다시
+돌려 목록을 갱신한다** — 손으로 쓰지 않는다(이번 갱신이 그 실례다 — V5·V6 신설로 16→18).
 
 ## 되돌리는 방법
 
@@ -38,6 +41,8 @@ git restore --source=9948c6e4056bbf71fa6683aa67d30c2a49fc6eae --staged --worktre
   adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt \
   adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt \
   adapters/src/main/resources/db/migration/V4__opening_result_rows.sql \
+  adapters/src/main/resources/db/migration/V5__opening_result_amount_provenance.sql \
+  adapters/src/main/resources/db/migration/V6__opening_reserve_price_sequence_blank_guard.sql \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTriggerTest.kt \
@@ -50,36 +55,38 @@ git restore --source=9948c6e4056bbf71fa6683aa67d30c2a49fc6eae --staged --worktre
   procurement/src/test/kotlin/bidvector/procurement/RowDiscriminatorTest.kt
 ```
 
-`--source`에 없는 경로(A 6건)는 이 명령이 삭제한다 — 별도 `git rm`이 필요 없다.
+`--source`에 없는 경로(A 8건)는 이 명령이 삭제한다 — 별도 `git rm`이 필요 없다.
 `git checkout <base> -- <경로>`는 쓰지 않는다(신규 경로마다 pathspec 오류로 exit 1).
-하네스 경로(`CLAUDE.md`·`.claude/**`)와 승인 문서(`reports/evidence/m3/3e/**`)는 **되돌리지
-않는다** — scope.md·checklist.md·commands.md·rollback.md 자체는 이 slice의 산출 기록이라
-남긴다(승인 여부와 무관하게 리뷰 대상).
+하네스 경로(`CLAUDE.md`·`.claude/**`)와 승인 문서(`reports/evidence/m3/3e/**`)·**문서 레인
+경로(`docs/discovery/capability-map.md` 등)는 되돌리지 않는다** — 이 slice의 in_scope가
+아니거나(전자) 문서 레인 소유(후자, verifier r1 L-5 뒤 명시)라 되돌림 대상에 없다. scope.md·
+checklist.md·commands.md·rollback.md 자체는 이 slice의 산출 기록이라 남긴다.
 
-## 임시 clone 실측(2026-09-08)
+## 임시 clone 실측(2026-09-09, verifier r1 수정 라운드 재실측)
 
-- `git clone --quiet . <scratchpad>/3e-rollback-<random>` → 위 `git restore` 실행 →
+- `git clone --quiet . <scratchpad>/3e-r1-rollback-<random>` → 위 `git restore` 실행 →
   **exit 0**.
-- 결과: D=6(신규 파일 삭제됨) · M=10(base 상태로 복원됨) — 기계 산출 목록과 정확히 일치.
-- `git diff 9948c6e..HEAD -- <같은 16경로>` → **0줄**(완전히 base와 같음).
+- 결과: D=8(신규 파일 삭제됨) · M=10(base 상태로 복원됨) — 기계 산출 목록과 정확히 일치.
+- `git diff 9948c6e..HEAD -- <같은 18경로>` → **0줄**(완전히 base와 같음).
 - 하네스 경로(`CLAUDE.md` `.claude/`) `git status --porcelain` → **빈 출력**(HEAD 그대로).
 
 ## 되돌린 트리 빌드·test 실측(2026-09-08 규격)
 
 - `./gradlew :adapters:compileKotlin :procurement:compileKotlin` → **exit 0**.
 - `./gradlew :adapters:test :procurement:test` → **exit 0**(Testcontainers 포함 — 되돌린
-  트리는 V4가 없으므로 컨테이너가 V1~V3만 migrate하고, `CleanMigrationTest` 등도 base
+  트리는 V4~V6이 없으므로 컨테이너가 V1~V3만 migrate하고, `CleanMigrationTest` 등도 base
   버전으로 복원돼 그 스키마와 대조한다 — 정합).
 
 임시 clone은 검증 뒤 삭제했다(`rm -rf`, 잔여 없음 확인).
 
-## `V4__opening_result_rows.sql` 삭제가 되돌림이 아닌 경우 — 적용 이력이 있는 DB
+## `V4`~`V6` 삭제가 되돌림이 아닌 경우 — 적용 이력이 있는 DB
 
-위 되돌림은 **코드·마이그레이션 파일** 롤백이다. **이미 `V4`가 migrate된 PostgreSQL 인스턴스
-(예: 로컬 개발 DB, `flyway_schema_history`에 V4 행이 있는 상태)에서는 파일 삭제만으로 스키마가
-되돌아가지 않는다** — Flyway는 적용 이력을 보고 검증하므로, 파일을 지운 채로 `flyway migrate`를
-돌리면 `flyway_schema_history`와 파일 집합이 어긋나 `validate()`가 실패한다
-(`CleanMigrationTest`의 「flyway validate가 통과한다」 test가 그 어긋남을 실제로 잡는다).
+위 되돌림은 **코드·마이그레이션 파일** 롤백이다. **이미 `V4`~`V6`가 migrate된 PostgreSQL
+인스턴스(예: 로컬 개발 DB, `flyway_schema_history`에 그 행들이 있는 상태)에서는 파일 삭제만
+으로 스키마가 되돌아가지 않는다** — Flyway는 적용 이력을 보고 검증하므로, 파일을 지운 채로
+`flyway migrate`를 돌리면 `flyway_schema_history`와 파일 집합이 어긋나 `validate()`가
+실패한다(`CleanMigrationTest`의 「flyway validate가 통과한다」 test가 그 어긋남을 실제로
+잡는다).
 
 **개발 DB 재생성 절차**(운영 DB는 out_of_scope):
 
@@ -88,8 +95,9 @@ git restore --source=9948c6e4056bbf71fa6683aa67d30c2a49fc6eae --staged --worktre
    테스트마다 이미 이렇게 한다 — 운영 코드 경로가 아니다).
 2. 위 「되돌리는 방법」으로 코드·마이그레이션 파일을 base로 되돌린 뒤 `flyway migrate`(또는
    `PersistenceTestSupport` companion의 `init` 블록과 같은 경로)를 V1부터 다시 실행한다.
-3. `V4`가 적용된 뒤 실제로 쓰인 데이터(`opening_reserve_price`·`opening_result`의 신규
-   컬럼값)는 스키마와 함께 사라진다 — 이 slice는 그 데이터의 별도 백업·이관 절차를 정하지
-   않는다(out_of_scope, backfill과 같은 경계).
+3. `V4`~`V6`가 적용된 뒤 실제로 쓰인 데이터(`opening_reserve_price`·`opening_result`의 신규
+   컬럼값, provenance 포함)는 스키마와 함께 사라진다 — 이 slice는 그 데이터의 별도 백업·이관
+   절차를 정하지 않는다(out_of_scope, backfill과 같은 경계).
 
-운영 DB(M6 6C 소관)에 이미 V4가 적용된 뒤의 롤백 절차(down-migration 등)는 이 slice의 범위 밖이다.
+운영 DB(M6 6C 소관)에 이미 V4~V6가 적용된 뒤의 롤백 절차(down-migration 등)는 이 slice의
+범위 밖이다.
