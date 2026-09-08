@@ -24,7 +24,7 @@
 | 1 | 행 구별 축을 키 재료에 안 넣음 | `RowDiscriminatorRawKeyTest`(결함 재현 + 수정 확인) | test |
 | 2 | 부재 순번을 `0`·`""`로 채움 | `RowDiscriminator.of`가 값 우선/부재 시 위치만 낸다(`0`·`""` 생성 경로 없음) + `RowDiscriminatorTest` | 타입 + test |
 | 3 | 값이 있는 행에도 ordinal을 씀 | `RowDiscriminator.of`가 값이 있으면 위치 인자를 무시(`RowDiscriminatorTest` 「위치가 무엇이든 무시」) | test |
-| 4 | 순번 부재 행을 canonical 승격 | `opening_reserve_price.reserve_price_sequence NOT NULL` + `CHECK (btrim(...) <> '')`(V6, verifier r1 M-1 뒤 — V4의 `<> ''`는 공백 한 칸을 못 막았다) — 스키마가 지어낸 값(NULL·빈 문자열·공백) 없이 삽입 자체를 거부(`OpeningReservePriceRepositoryTest` 셋 다 거부 test) | **스키마** |
+| 4 | 순번 부재 행을 canonical 승격 | `opening_reserve_price.reserve_price_sequence NOT NULL` + 유니코드 공백 전체를 겨눈 정규식 CHECK(verifier r2 N-1 뒤 — `<> ''`는 공백 한 칸을, `btrim(...) <> ''`는 ASCII 공백만 막았다. Kotlin `isNotBlank()`와 판정 성질이 이제 일치한다) — 스키마가 지어낸 값(NULL·빈 문자열·ASCII/유니코드 공백) 없이 삽입 자체를 거부(`OpeningReservePriceRepositoryTest`의 9-입력 동치 test) | **스키마** |
 | 5 | 승격 불가를 조용히 버림 | 3B-2 `rowIdentifierIndeterminate` 회계가 이미 센다(이 slice 신규 아님 — 같은 부재 판정을 공유, `KonepsRawItemMapper.rowDiscriminatorOf`) | 기존 test(3B-2, 편집 없음) |
 | 6 | 사업자등록번호 컬럼을 만들어 둠 | 스키마에 컬럼 부재 + 컬럼 부재 단언 test | 스키마 + test |
 | 7 | 사라진 행을 삭제로 처리 | D-3E-3 (a) — UPSERT만, DELETE 없음. `OpeningReservePriceRepositoryTest` 15→12 test + `OpeningReservePriceRow.observedAt`(verifier r1 H-2 뒤 신설)이 낡음을 읽기 경로에서도 드러낸다 | test |
@@ -41,6 +41,7 @@
 7. **`opening_reserve_price` → `opening_result` FK가 복합(2컬럼)** — `information_schema.key_column_usage`/`constraint_column_usage`가 제약 이름으로만 join되어 컬럼 순서 대응을 보존하지 않는 PostgreSQL 특성상, `CleanMigrationTest`의 FK 질의가 실제 2쌍이 아니라 cross product 4행을 낸다(verifier r1이 `pg_constraint`로 직접 대조해 실제 FK는 정확히 둘임을 재확인, 스키마 결함 아님) — 기대값에 그 넷을 그대로 반영했다.
 8. **`OpeningReservePriceRow.observedAt`을 필수 파라미터로 둠(기본값 없음)** — verifier r1 H-2 뒤 신설. raw 관측이 이미 `observedAt`을 항상 나르므로 「모름」이 아니고, `Instant.EPOCH` 같은 지어낸 기본값을 두면 그 자체가 「모름을 지어내지 않는다」 규율 위반이다. 쓰기 경로는 각 행의 `observedAt`을 그대로 컬럼에 싣는다(부모 `result.observedAt`을 대신 쓰지 않는다) — 자식 행이 자기 관측 시각을 스스로 나른다.
 9. **`RowDiscriminator.append` 기본값 `null` 유지(M-2)** — 제거하면 3D 소유 `F2CollisionRegressionTest.kt`·`PersistenceTestSupport.kt`의 단일 인자 호출부를 편집해야 하는데 두 파일 다 「3B·3B-2·3C·3D 기존 test 편집 금지」 대상이다. 비용이 보호 규율과 정면충돌해 기본값을 유지하고 알려진 제한으로 등재한다(아래).
+10. **`V4`·`V5`·`V6`를 `V4` 하나로 흡수(verifier r2, 운영자 결정)** — 셋 다 `origin/main`에 push된 적이 없어(적용 이력 없음, verifier 실측) 「적용된 마이그레이션을 고치지 마라」 규율의 대상이 아니었다. 흡수하지 않으면 「`V4`만 적용된 데이터 있는 DB에 `V5`(결측 provenance를 거부하는 CHECK) 적용 불가」가 영구 이력으로 남는다. **실 DB 대조로 흡수가 스키마를 바꾸지 않았음을 확인했다** — 임시 컨테이너 둘에 각각 (a) 흡수 전 `V1~V3 + 구 V4 + V5 + V6` (b) 흡수 후 `V1~V3 + 신 V4` 를 적용하고 `information_schema`·`pg_constraint`·`pg_trigger`(테이블·컬럼·타입·PK·FK·CHECK 정의·트리거·트리거 인자 전체) 를 대조했다 — **유일한 차이는 `reserve_price_sequence` CHECK 정의 하나**(N-1의 의도된 변경)였고, 나머지 251개 신호는 완전히 동일했다. 스냅샷 test 기대값(테이블·컬럼·PK·FK·CHECK 개수)은 그대로다.
 
 ## 알려진 제한
 

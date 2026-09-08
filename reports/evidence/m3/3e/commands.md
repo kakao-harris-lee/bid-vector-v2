@@ -8,14 +8,22 @@
 | --- | --- | --- | --- |
 | S-0 | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 | 격리 worktree에서 전체 clean check 통과 |
 | S-1 | `./gradlew --no-build-cache clean check` | 0 | 전 모듈 clean check 통과 |
-| S-2 | `./gradlew :adapters:test --tests 'bidvector.adapters.persistence.*'` | 0 | Testcontainers 통합 test 전부 통과(V4~V6 스키마, `OpeningReservePriceRepositoryTest` 9건 포함) |
+| S-2 | `./gradlew :adapters:test --tests 'bidvector.adapters.persistence.*'` | 0 | Testcontainers 통합 test 전부 통과(V1~V4 스키마 — V5·V6 흡수, `OpeningReservePriceRepositoryTest` 10건 포함) |
 | S-2b | `./gradlew :adapters:test --tests 'bidvector.adapters.koneps.*'` | 0 | 3B·3B-2 koneps 시나리오 test — 편집 없이 초록(koneps 파일 무편집) |
 | S-3 | `./gradlew :procurement:test` | 0 | 3A corpus 포함 procurement 전 test 통과 |
 | S-4 | `./gradlew :adapters:moduleDependencyGate` | 0 | 통과 |
 | S-5 | `./gradlew qualityBaseline` | 0 | 통과(gateExecutionGate 포함 — 등재 test 5건 실행 확인) |
 
-verifier r1(2026-09-08) not-ready 판정(H-1·H-2) 수정 뒤 위 표 전건 재실행 — 전부 exit 0(V5·V6
-신설 반영, M-1·L-7도 같은 재실행에 포함).
+verifier r1(2026-09-08) not-ready 판정(H-1·H-2) 수정 뒤 위 표 전건 재실행 — 전부 exit 0. verifier
+r2(2026-09-09) ready-for-review 뒤 정리 라운드(V4~V6 흡수·N-1·N-2) 수정 뒤 전건 재재실행 — 전부 exit 0.
+
+## 마이그레이션 흡수 — 실 DB 스키마 대조
+
+임시 컨테이너 둘(`docker run postgres:16.4`, 포트 55433/55434)에 각각 (a) 흡수 전 3파일
+(`V1~V3` + 구`V4`+`V5`+`V6`, git 이력에서 재현) (b) 흡수 후 신`V4`(`V1~V3`+신`V4`)를 `psql`로
+직접 적용(exit 0 각각) → `information_schema`+`pg_constraint`+`pg_trigger` 신호 252개 대조 →
+**차이 1건**(`reserve_price_sequence` CHECK 정의, N-1 의도된 변경) 외 전부 동일. 컨테이너
+둘 다 `docker rm -f`로 정리, 잔여 없음 확인(`docker ps -a --filter name=pg-old` 빈 결과).
 
 ## 중간 실행 — 개발 중 실측(요지만)
 
