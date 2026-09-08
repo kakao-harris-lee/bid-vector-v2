@@ -22,6 +22,16 @@
 
 Telegram DTO는 adapter에만 존재하고 domain state가 Telegram library를 import하지 않는다.
 
+**M4 착수·4A 착수 2026-09-08** — 선행 조건 충족(M1~M3 승인 — M3 잔여 0, `milestone-3.md` 「M3 완료 2026-09-08」 · 상태 전이·event/outbox ADR 0004·0005 는
+M0 승인). 준비 정본 `reports/evidence/m4/prep/m4-prep.md`(slice 지도·D-M4-1~8 추천안), 4A 계약 `reports/evidence/m4/4a/scope.md`(base `9948c6e`).
+**레인 격리** — 다른 세션이 `main` 에서 M3 후속을 진행 중이라 M4 는 별도 worktree + 브랜치 `m4/2026-09-08` 에서 산다(`main` 병합은 종결 뒤 사용자 승인 사항).
+착수 전 운영자 결정: **시작 slice 4A** · **D-M4-1 (a)** 채널 독립 use case 만 세우고 Telegram 어댑터는 `후속`(`OPEN-STR-12` 활성 유지 — 상태 기계는
+웹 편집 6A 에도 쓰이므로 채택과 독립) · **D-4A-2 (a)** 상태 기계를 `workflow`(application) 안에 순수 Kotlin 으로(도메인 게이트가 `isDomain=false` 라
+걸리지 않으므로 채널 타입 경계는 소스 스캔 test 가 진다) · **D-4A-1 (a)** `strategy-edit-*` corpus 신설(`authored-from-approved-spec`).
+Phase 2.5 설계 검토는 세션 모델이 직접 했다(`_workspace/m4-4a/02_design-review.md`) — 전이표 밖 거부·이중 적용·채널 타입 유입을 각각 소진 `when`·
+상태 종단성·allow-list 소스 스캔의 **구성형**으로 닫고, `EventSink` port 는 STR-07 이 `폐기`로 못 박은 「호출자 규율」 재현을 막기 위해 남긴다
+(발행 비원자성은 4C 가 닫을 **알려진 제한**으로 선언). 과잉으로 뺀 셋: 처리한 command id 전체 집합 · 별도 `Effect` 목록 타입 · 만료 sweep use case.
+
 ### Slice 4B — application use case
 
 - notice 수집 완료
