@@ -213,3 +213,28 @@ dedup 대상에서 제외)**·**license-limit 식별자 계약 보강(verifier r
 acceptance S-0~S-4 전부 통과(commands.md), 3A corpus 27/27 불변(`:procurement:test` 는 fixture
 corpus 를 직접 재실행하지 않지만 `fixtures/**`가 out_of_scope 라 편집되지 않았다 — corpus 자체는
 3A/3C 소관 test 가 잰다), 3B 기존 test 편집 없이 green.
+
+## 사용자 승인 — 2026-09-08, slice 3B-2 종결
+
+verifier r1 `not-ready`(F-1 blocker 상세 복수행이 1건으로 접힘 · high F-2 시나리오 셋·F-3 개찰 축
+미지 필드 회계 부재·F-4 masking 게이트의 누출 기본값·F-5 표기 변형 미등재) → 수정 라운드 1 →
+r2 `not-ready`(G-1 행 식별자 raw 키 부재 시 F-1 재현 · G-3 문서화된 rollback 뒤 컴파일 실패) →
+수정 라운드 2 → r3 `ready-for-review` + 장부층 low 다섯 일괄 `877ac41` 위에서 **사용자 승인
+2026-09-08**. **재작업 2/5.** 구현 레인이 라운드 2 중간에 사용량 한도로 교체됐고(커밋 귀속은
+scope.md 「하네스 레인 변경」 절), 교체된 레인이 이전 레인의 미검증 커밋이 만든 회귀 둘(CPD 중복 ·
+파일 500줄 한도)을 발견해 해소했다 — verifier r3 이 값·계약 행·test 불변을 재확인했다.
+
+**운영자 승인 넷(같은 세션, `policy-values.md` §6b 가 정본)**: P-9 (a) 개찰 축 필드 계약 채택
++ 3A 좁은 확장 ①②④ · P-10 (a) 상호만 남기고 사업자등록번호·대표자명을 어댑터 경계에서 치환
+(`sourceText` 포함 — 「원문 무변환」의 명시적 예외) · P-12 (a) `inqryDiv` 오퍼레이션 군별 정책
+데이터 + 걷는 축 초기값 개찰일시 · D-3B2-9 (a) 개찰완료 오퍼레이션은 이번 slice 밖. 수정 라운드
+1 에서 **`Accounting.kt` 좁은 확장 하나를 scope 예외**로 추가 승인(F-3·F-8, 3B 의 H-3 과 같은 모양).
+
+알려진 제한은 등재 유지 — 추첨번호·투찰 축 미구현(개찰완료 오퍼레이션 소관) · 표적조회 미구현 ·
+개찰 축 `sourceText` 가 계약 등재 키만 담아 미등재 키의 원문 재해석 경로가 이 축에 없음(P-10 (a)
+의 대가) · `duplicate` 항목의 두 회계 축 미계수(3B 기존 거동) · G-2 명시적 mapper 오선택 ·
+`CollectionPolicy.kt` 500줄 한도 경계 · 실제 오퍼레이션 경로·파라미터의 실물 일치 미검증.
+
+OPEN 넷은 `capability-map.md` §14.3 — `OPEN-3B2-TARGETED-OPENING-QUERY`(문서 대 실측 충돌) ·
+`OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` · `OPEN-3B2-STORAGE-ROW-KEY-COLLISION`(G-1 해결이 어댑터 층
+한정) · `OPEN-3B2-OPENING-FACT-SLOTS`(D-3B2-8 귀결). 같은 승인에서 `origin/main` push.
