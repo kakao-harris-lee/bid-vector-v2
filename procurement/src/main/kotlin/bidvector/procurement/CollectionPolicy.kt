@@ -113,6 +113,20 @@ private data class FieldContractRow(
         )
 }
 
+// bidNtceNo·bidNtceOrd 공용 presentIn — 공고 식별자라 개찰 축 세 엔드포인트(F-6)·
+// license-limit(G-4, §1.9.5)에도 실린다(어느 응답이든 「어느 공고의 행인가」 없이 오지
+// 않는다). 좁히면 개찰 축 allow-list 강제가 이 필드부터 떨어뜨려 전 항목이 「공고번호
+// 없음」으로 오분류된다. 두 행이 이 집합을 그대로 반복해 `cpdCheck`가 중복으로 잡아 값
+// 객체로 뽑았다(v2-지침서 §5 중복 금지).
+private val NOTICE_IDENTIFIER_PRESENT_IN: Set<SourceEndpoint> =
+    setOf(
+        SourceEndpoint.NOTICE_LIST,
+        SourceEndpoint.OPENING_AWARD_LIST,
+        SourceEndpoint.OPENING_RESULT_LIST,
+        SourceEndpoint.RESERVE_PRICE_DETAIL,
+        SourceEndpoint.LICENSE_LIMIT_DETAIL,
+    )
+
 /**
  * 운영 필드 계약 열 — 운영자 승인 2026-09-07(P-1)의 `authoritative` 칸만 옮긴다
  * (`policy-values.md` §1.1~§1.5). 「미확정」 칸(`bssAmt`·`bssAmtPurcnstcst`·`presmptAmt`·
@@ -120,23 +134,12 @@ private data class FieldContractRow(
  * "그 자리는 소유 OPEN이 닫힌 뒤"). 소비되지 않는 코드·플래그·봉투 키(§1.5 잔여·§1.6)도
  * 두지 않는다 — 지금 procurement 가 실제로 읽는 개념 축만 등재한다. 대다수 행의 `presentIn`
  * 은 `NOTICE_LIST` 하나다([FieldContractRow.presentIn] 기본값) — `bidNtceNo`·`bidNtceOrd`
- * (공고 식별자, 개찰 축 세 엔드포인트에도 실려 온다)와 `bssamt`(예비가격 상세에도 실려 온다,
- * `policy-values.md` §1.7.1 각주, verifier r1 F-6)만 명시적으로 넓혔다. P-9 승인(3B-2)이
- * 더한 개찰 축 행은 [KONEPS_OPENING_FIELD_ROWS] 가 따로 갖고 각자 다른 `presentIn`을
- * 명시한다 — 이 목록과 함께 레지스트리로 합쳐진다.
+ * ([NOTICE_IDENTIFIER_PRESENT_IN] 참고)와 `bssamt`(예비가격 상세에도 실려 온다,
+ * `policy-values.md` §1.7.1 각주)만 명시적으로 넓혔다. P-9 승인(3B-2)이 더한 개찰 축 행은
+ * [KONEPS_OPENING_FIELD_ROWS] 가 따로 갖고 각자 다른 `presentIn`을 명시한다.
  */
 private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
     listOf(
-        // bidNtceNo·bidNtceOrd — verifier r1 F-6 수정(운영자 결정 2026-09-08, 재검토) — 이
-        // 둘은 공고 식별자라 3B-2 가 여는 세 개찰 축 엔드포인트에도 실제로 실려 온다(어느
-        // 응답이든 「어느 공고의 행인가」를 나르지 않는 오퍼레이션은 없다 — mapMaskedOpeningItem
-        // 자신이 이 두 필드로 식별자를 뽑는다는 사실이 그 증거다). presentIn 을 NOTICE_LIST
-        // 하나로 두면 개찰 축 allow-list 강제(F-6 아래)가 이 필드부터 떨어뜨려 모든 개찰 축
-        // 항목이 「공고번호 없음」으로 오분류된다 — 문서가 실제로 싣는 범위를 그대로 반영한다.
-        // **LICENSE_LIMIT_DETAIL 도 더한다**(verifier r2 G-4) — §1.9.5 가 `bidNtceNo`(필수)·
-        // `bidNtceOrd` 를 그 응답에도 선언한다. license-limit 은 지금 mapRawItem(필터 없음)을
-        // 써서 이 계약이 강제되지 않지만, masked 경로로 옮기는 순간 식별자부터 빠지는 사고를
-        // 미리 막는다(계약 문면을 실제 사용 범위보다 넓게 서류로 맞춰 둔다).
         FieldContractRow(
             RawKey("bidNtceNo"),
             FieldConcept.NOTICE_NUMBER,
@@ -145,14 +148,7 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             FieldNullability.REQUIRED,
             VatTreatment.UNKNOWN,
             FieldProvenanceTemplate.NOT_APPLICABLE,
-            presentIn =
-                setOf(
-                    SourceEndpoint.NOTICE_LIST,
-                    SourceEndpoint.OPENING_AWARD_LIST,
-                    SourceEndpoint.OPENING_RESULT_LIST,
-                    SourceEndpoint.RESERVE_PRICE_DETAIL,
-                    SourceEndpoint.LICENSE_LIMIT_DETAIL,
-                ),
+            presentIn = NOTICE_IDENTIFIER_PRESENT_IN,
         ),
         FieldContractRow(
             RawKey("bidNtceOrd"),
@@ -162,14 +158,7 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             FieldNullability.REQUIRED,
             VatTreatment.UNKNOWN,
             FieldProvenanceTemplate.NOT_APPLICABLE,
-            presentIn =
-                setOf(
-                    SourceEndpoint.NOTICE_LIST,
-                    SourceEndpoint.OPENING_AWARD_LIST,
-                    SourceEndpoint.OPENING_RESULT_LIST,
-                    SourceEndpoint.RESERVE_PRICE_DETAIL,
-                    SourceEndpoint.LICENSE_LIMIT_DETAIL,
-                ),
+            presentIn = NOTICE_IDENTIFIER_PRESENT_IN,
         ),
         // P-3 — 문서로 서는 기초금액 키는 `bssamt` 하나다. legacy `BASE_RESOLUTION_ORDER`의
         // `bssAmt`(미등재 키)·`bssAmtPurcnstcst`(다른 개념)는 채택하지 않는다. vatTreatment
@@ -327,8 +316,7 @@ private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
             provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
             presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST),
         ),
-        // rlOpengDt·prtcptCnum 은 낙찰 목록·개찰결과 목록 양쪽에 있다(§1.7.4·§1.7.3) — 두
-        // presentIn 을 함께 싣는다.
+        // rlOpengDt·prtcptCnum 은 낙찰 목록·개찰결과 목록 양쪽에 있다(§1.7.4·§1.7.3).
         FieldContractRow(
             rawName = RawKey("rlOpengDt"),
             concept = FieldConcept.ACTUAL_OPENING_AT,
@@ -350,14 +338,10 @@ private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
             provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
             presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST, SourceEndpoint.OPENING_RESULT_LIST),
         ),
-        // fnlSucsfDate/`FnlSucsfDate` — "일자, 시각 없음"(§1.7.4). DATETIME_NO_ZONE 은 시각 축
-        // 계약(sourceZone 필수)이라 이 필드에 강제하지 않는다 — OPAQUE_TEXT 로 원문만 보존한다
-        // (canonicalize 는 D-3B2-8 후속, 이번 slice 밖). 대문자 변형(외자 2종 전용 표기) 은
-        // verifier r1 F-5 수정 — §1.7.4 가 "두 표기를 각각 등재하고 관측으로 좁힌다"로 **둘 다
-        // 등재**를 지시한다(대소문자 무시 조회는 §5.3 규율 1 의 미지 필드 리포트를 무력화한다).
-        // 같은 `FINAL_AWARD_DATE` 개념을 공유하는 별도 raw 키다 — `ALLOCATED_BUDGET` 이 이미
-        // `asignBdgtAmt`·`bdgtAmt` 두 키를 갖는 것과 같은 패턴(개념 하나, 키 여럿). 두 행이
-        // rawName 외 전부 같아 CPD 중복으로 잡혀(procurement:cpdCheck) helper 로 뽑았다.
+        // fnlSucsfDate/`FnlSucsfDate` — "일자, 시각 없음"(§1.7.4), OPAQUE_TEXT 로 원문만
+        // 보존한다(canonicalize 는 이 slice 밖). 대문자 변형(외자 전용 표기)은 §1.7.4 가
+        // "두 표기를 각각 등재"로 지시 — 대소문자 무시 조회는 §5.3 규율 1 을 무력화한다.
+        // 같은 `FINAL_AWARD_DATE` 개념의 별도 raw 키 — rawName 외 전부 같아 helper 로 뽑았다.
         finalAwardDateRow("fnlSucsfDate"),
         finalAwardDateRow("FnlSucsfDate"),
         // 예비가격 상세(9~12) — plnprc·bsisPlnprc·compnoRsrvtnPrceSno·drwtYn.
@@ -403,9 +387,8 @@ private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
             provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
             presentIn = setOf(SourceEndpoint.RESERVE_PRICE_DETAIL),
         ),
-        // 개찰결과 목록(5~8) — progrsDivCdNm·opengCorpInfo. opengCorpInfo 는 어댑터가 masking
-        // 을 거친 값만 이 계약으로 소비한다(원문 사업자번호·대표자명은 어댑터 경계에서
-        // 폐기, P-10 (a)) — 계약 자체는 masking 을 모르고 "이 키가 존재한다"만 안다.
+        // 개찰결과 목록(5~8) — progrsDivCdNm·opengCorpInfo. opengCorpInfo 는 어댑터 경계에서
+        // masking 을 거친 값만 이 계약으로 소비한다(원문 사업자번호·대표자명 폐기, P-10 (a)).
         FieldContractRow(
             rawName = RawKey("progrsDivCdNm"),
             concept = FieldConcept.PROGRESS_DIVISION,
@@ -426,12 +409,8 @@ private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
             provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
             presentIn = setOf(SourceEndpoint.OPENING_RESULT_LIST),
         ),
-        // license-limit(§1.9.5) — lmtGrpNo·lmtSno. 이 port(KonepsLicenseLimitDocumentSource)는
-        // mapRawItem(원문 보존, 계약 미등재 키도 담는다)을 쓰므로 이 행이 없어도 지금 당장은
-        // 무해하게 동작한다 — 등재하는 이유는 verifier r2 G-4: 행 식별자로 쓰는 키
-        // (rowIdentifierRawKeys)가 계약 없이 도는 상태를 없애고, 이 축이 masked 경로로 옮겨질
-        // 미래에 대비해 계약을 문서 범위만큼 미리 갖춘다. §1.9.5 문면은 이 둘의 필수 여부를
-        // 명시하지 않는다(`bidNtceNo`만 「필수」로 명시) — 그래서 OPTIONAL.
+        // license-limit(§1.9.5) — lmtGrpNo·lmtSno, 행 식별자 키가 계약 없이 도는 상태를 없앤다.
+        // 필수 여부 미명시(`bidNtceNo`만 필수) → OPTIONAL.
         FieldContractRow(
             rawName = RawKey("lmtGrpNo"),
             concept = FieldConcept.LICENSE_LIMIT_GROUP_NUMBER,
