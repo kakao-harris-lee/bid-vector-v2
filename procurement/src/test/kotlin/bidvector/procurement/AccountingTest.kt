@@ -165,4 +165,26 @@ class AccountingTest {
             accounting(received = 0, normalized = 0, duplicate = 0, dropped = 0).copy(backoffSkipped = -1)
         }
     }
+
+    // verifier r1 F-3·F-8(운영자 승인 2026-09-08, 3A Accounting.kt 좁은 확장) — 개찰 축
+    // masking 실패를 unknownFields 와 분리해 센다.
+    @Test
+    fun `maskingFailures 는 기본값 0 이고 dropReasons_dropped 항등식 밖이다`() {
+        val base = accounting(received = 3, normalized = 3, duplicate = 0, dropped = 0)
+
+        base.maskingFailures shouldBe 0
+        // dropped=0 인 채로 maskingFailures 를 올려도 COL-06 항등식(received=normalized+
+        // duplicate+dropped)은 그대로 성립한다 — 필드 단위 실패가 항목 단위 drop 축을
+        // 건드리지 않는다는 것을 생성 성공으로 증명한다.
+        val withMaskingFailures = base.copy(maskingFailures = 2)
+        withMaskingFailures.maskingFailures shouldBe 2
+        withMaskingFailures.dropped shouldBe 0
+    }
+
+    @Test
+    fun `maskingFailures 는 음수를 거부한다`() {
+        shouldThrow<IllegalArgumentException> {
+            accounting(received = 0, normalized = 0, duplicate = 0, dropped = 0).copy(maskingFailures = -1)
+        }
+    }
 }

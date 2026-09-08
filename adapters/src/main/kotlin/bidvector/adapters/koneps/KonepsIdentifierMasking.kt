@@ -34,7 +34,14 @@ internal fun maskOpengCorpInfo(raw: String): String? {
 
 /** [fieldOutcomeOf] 한 필드 판정 — [MaskedKonepsItem.from]의 누적 루프가 `continue`/`break` 없이 소진하게 한다. */
 private sealed interface FieldMaskOutcome {
-    /** allow-list 밖(계약 미등재) 또는 blank 키 — 담지 않는다, 회계도 남기지 않는다. */
+    /**
+     * allow-list 밖(계약 미등재) 또는 blank 키 — 담지 않는다. **verifier r1 F-3 수정**(운영자
+     * 승인 2026-09-08, 3A `Accounting.kt` 좁은 확장) — 이전 판은 여기서 회계를 남기지 않아
+     * §5.3 규율 1(선언에 없는 키는 미지 필드로 리포트)이 개찰 축에서 사라졌다. 이제
+     * [MaskedKonepsItem.excludedFieldCount]로 센다 — 3B `mapRawItem`의 `unknownKeysIn`
+     * 계수와 같은 목적, 다른 메커니즘(allow-list 는 필터링 자체가 계약 대조라 사후 재조회
+     * 대신 그 자리에서 센다).
+     */
     data object Excluded : FieldMaskOutcome
 
     /** `opengCorpInfo` 성분 배치가 선언과 다르다 — 값 전체 폐기, 명시적 실패로 회계한다. */
@@ -83,6 +90,10 @@ private fun fieldOutcomeOf(
 internal class MaskedKonepsItem private constructor(
     val fields: Map<RawKey, RawValue>,
     val sourceText: String,
+    // verifier r1 F-3 수정 — allow-list 가 떨어뜨린 키(계약 미등재·blank)의 수. §5.3 규율 1
+    // (미지 필드 리포트)이 개찰 축에서도 서게 한다. `decompositionFailures`(F-8, 이름이
+    // 반대인 슬롯 문제)와 서로 다른 사유라 별도 필드로 센다 — 하나로 접지 않는다.
+    val excludedFieldCount: Int,
     val decompositionFailures: Int,
 ) {
     companion object {
@@ -92,11 +103,12 @@ internal class MaskedKonepsItem private constructor(
         ): MaskedKonepsItem {
             val forRender = LinkedHashMap<String, JsonValue>()
             val fields = LinkedHashMap<RawKey, RawValue>()
+            var excludedFieldCount = 0
             var decompositionFailures = 0
             for ((name, value) in item.fields) {
                 when (val outcome = fieldOutcomeOf(name, value, policy)) {
-                    // allow-list 밖 — 담지 않는다, 회계도 남기지 않는다.
                     FieldMaskOutcome.Excluded -> {
+                        excludedFieldCount++
                     }
 
                     FieldMaskOutcome.DecompositionFailed -> {
@@ -110,7 +122,7 @@ internal class MaskedKonepsItem private constructor(
                 }
             }
             val sourceText = JsonValue.JsonObject(forRender, sourceText = "").render()
-            return MaskedKonepsItem(fields, sourceText, decompositionFailures)
+            return MaskedKonepsItem(fields, sourceText, excludedFieldCount, decompositionFailures)
         }
     }
 }
@@ -140,5 +152,8 @@ internal fun mapMaskedOpeningItem(
     }
     val observation = RawNoticeObservation.ofRawValues(masked.fields, sourceEndpoint, observedAt, masked.sourceText)
     val identity = identityOf(numberRaw, roundRaw, rowDiscriminatorOf(masked.fields, rowIdentifierRawKeys))
-    return RawItemOutcome.Mapped(observation, identity, masked.decompositionFailures)
+    // verifier r1 F-3·F-8 수정 — unknownFieldCount 는 이름 그대로 계약 밖 키 수만(F-3),
+    // masking 실패는 별도 축(F-8, maskingFailureCount)으로 낸다. 이전 판은 이 둘을 하나로
+    // 접어(unknownFieldCount 자리에 decompositionFailures 를 실어) F-3 의 손실을 만들었다.
+    return RawItemOutcome.Mapped(observation, identity, masked.excludedFieldCount, masked.decompositionFailures)
 }

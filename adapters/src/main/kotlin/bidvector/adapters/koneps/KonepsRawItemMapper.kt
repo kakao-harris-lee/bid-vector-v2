@@ -11,12 +11,22 @@ import bidvector.procurement.SourceEndpoint
 import bidvector.sharedkernel.NoticeRound
 import java.time.Instant
 
-/** JSON 항목 하나를 [RawNoticeObservation]으로 옮긴 결과. */
+/**
+ * JSON 항목 하나를 [RawNoticeObservation]으로 옮긴 결과.
+ *
+ * `maskingFailureCount`(verifier r1 F-3·F-8 수정, 운영자 승인 2026-09-08 — 3A `Accounting.kt`
+ * 좁은 확장) — 기본값 0 이라 공고 축([mapRawItem], masking 이 없다)은 항상 0 이다. 개찰 축
+ * ([mapMaskedOpeningItem])만 `opengCorpInfo` 성분 배치 불일치(값 전체 폐기) 건수를 여기 싣는다.
+ * `unknownFieldCount`는 이 축 도입 전에는 masking 실패가 얹혀 있었으나(F-8), 이제 **이름
+ * 그대로 계약 밖(미등재) 키 수만** 센다(F-3) — 두 사유가 서로 다른 이유로 항목에서 빠졌다는
+ * 사실이 이제 두 숫자로 갈린다(「구별할 수 없는 것을 하나로 접기」의 반대).
+ */
 internal sealed interface RawItemOutcome {
     data class Mapped(
         val observation: RawNoticeObservation,
         val identity: NoticeIdentity?,
         val unknownFieldCount: Int,
+        val maskingFailureCount: Int = 0,
     ) : RawItemOutcome
 
     data class Dropped(

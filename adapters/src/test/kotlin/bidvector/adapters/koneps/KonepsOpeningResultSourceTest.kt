@@ -194,4 +194,34 @@ class KonepsOpeningResultSourceTest {
             server.requestCount shouldBe 2
         }
     }
+
+    @Test
+    fun `F-3·F-8 — 계약 밖 키 제외와 masking 실패가 SourceBatch 회계에서 서로 다른 축으로 나온다`() {
+        val items =
+            listOf(
+                // bidwinnrBizno 는 계약 밖(allow-list 제외) — unknownFields 로 계수돼야 한다.
+                mapOf(
+                    "bidNtceNo" to "SYN-OPEN-0030",
+                    "bidNtceOrd" to "000",
+                    "bidwinnrNm" to "SYN-A",
+                    "bidwinnrBizno" to "9999999999",
+                ),
+                // opengCorpInfo 3성분(협상 계약형) — masking 실패로 maskingFailures 에 계수돼야
+                // 한다. 이 항목엔 계약 밖 키가 없다.
+                mapOf(
+                    "bidNtceNo" to "SYN-OPEN-0031",
+                    "bidNtceOrd" to "000",
+                    "opengCorpInfo" to "SYN-B^8888888888^SYN-REP",
+                ),
+            )
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 2, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchOpeningResults(REFERENCE_DATE, null)
+
+            batch.items.size shouldBe 2
+            batch.accounting.unknownFields shouldBe 1
+            batch.accounting.maskingFailures shouldBe 1
+            batch.accounting.dropped shouldBe 0
+        }
+    }
 }

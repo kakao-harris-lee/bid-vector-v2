@@ -91,6 +91,17 @@ sealed interface TruncationCause {
  * 2026-09-07, verifier r1 H-3) — 기본값이 있어 기존 생성자 호출처(3A corpus 실행자·
  * `AccountingTest`)는 그대로 컴파일된다. `truncated`↔`truncationCause` 결합 불변식만
  * 새로 추가한다 — 다른 기존 불변식은 손대지 않는다.
+ *
+ * **`maskingFailures`는 M3/3B-2 좁은 확장이다**(운영자 결정 2026-09-08, verifier r1 F-3·F-8) —
+ * 개찰 축이 `opengCorpInfo` 성분 배치 불일치로 값 전체를 폐기한 건수를 `unknownFields`와
+ * **분리**해 낸다. 이전 판은 이 사유를 `unknownFields`(이름 그대로면 「계약 밖 키 수」)에
+ * 얹어 그 축의 원래 의미(§5.3 규율 1의 미지 필드 리포트)를 비웠다 — 이번 확장은 그 자리를
+ * 되돌리고(`unknownFields`는 다시 계약 밖 키만 센다) masking 실패를 별도 축으로 세운다.
+ * **`dropReasons`/`dropped` 항등식 밖에 둔다** — 필드 단위 실패는 항목 단위 drop 과 다른
+ * 축이라(같은 항목 안의 일부 필드만 폐기되고 항목 자체는 살아남는다) 그 항등식에 강제로
+ * 넣으면 「항목이 몇 개 왔는가」와 「항목 안에서 무엇이 빠졌는가」가 뒤섞인다. 기본값이
+ * 있어 기존 호출처(3A corpus 실행자·`AccountingTest`·3B `mapRawItem` 경로)는 그대로
+ * 컴파일된다.
  */
 data class CollectionAccounting(
     val received: Int,
@@ -105,6 +116,7 @@ data class CollectionAccounting(
     val truncationCause: TruncationCause? = null,
     val quotaExceeded: Int = 0,
     val backoffSkipped: Int = 0,
+    val maskingFailures: Int = 0,
 ) {
     init {
         require(received >= 0 && normalized >= 0 && duplicate >= 0 && dropped >= 0) {
@@ -125,5 +137,6 @@ data class CollectionAccounting(
         }
         require(quotaExceeded >= 0) { "quotaExceeded는 음수일 수 없다" }
         require(backoffSkipped >= 0) { "backoffSkipped는 음수일 수 없다" }
+        require(maskingFailures >= 0) { "maskingFailures는 음수일 수 없다" }
     }
 }

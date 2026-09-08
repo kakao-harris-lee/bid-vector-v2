@@ -68,6 +68,11 @@ private class KonepsPageWalkAccumulator {
         private set
     var unknownFields = 0
         private set
+
+    // verifier r1 F-8 수정(운영자 승인 2026-09-08, 3A Accounting.kt 좁은 확장) — masking 실패
+    // (opengCorpInfo 성분 배치 불일치, 값 전체 폐기)를 unknownFields 와 별도로 센다.
+    var maskingFailures = 0
+        private set
     var pagesFetched = 0
         private set
     var truncated = false
@@ -111,6 +116,7 @@ private class KonepsPageWalkAccumulator {
         } else {
             items += mapped.observation
             unknownFields += mapped.unknownFieldCount
+            maskingFailures += mapped.maskingFailureCount
         }
     }
 
@@ -175,6 +181,7 @@ private class KonepsPageWalkAccumulator {
             truncationCause = truncationCause,
             quotaExceeded = counters.quotaExceeded,
             backoffSkipped = counters.backoffSkipped,
+            maskingFailures = maskingFailures,
         )
 }
 
