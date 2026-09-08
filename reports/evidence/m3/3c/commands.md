@@ -146,3 +146,11 @@ r1(F-1~F-5)·r2(N-1·N-2) finding 수정 뒤 재실행한 최종 acceptance·표
   같은 능력) `ExtractedRequirements`/`ExtractionAttempt` 를 생성하지 않으므로 fail-open
   과 무관하지만, raw LLM client 직접 호출을 막는 것은 이 slice 의 게이트가 아니라 4B 가
   그런 배선을 만들지 않는 것에 달려 있다 — 4B 리뷰 항목.
+
+## 사용자 승인 — 2026-09-08, slice 3C 종결
+
+verifier r1 `not-ready`(F-1 blocker 게이트 없는 public 경로 · F-2 high timeout 경합) → 수정 라운드 1 → r2 `ready-for-review`(public 진입점 46 전수 — 게이트 우회 0,
+S-2·S-4 12/12, 변이 사멸) + N-1·N-2·장부 일괄 `16b7748` 위에서 **사용자 승인 2026-09-08**. 재작업 1/5. 세션 모델 계약 정정(착수 시 ①~⑤: port 두 파일·게이트는
+adapters 층 D-3C-6·결과 타입 procurement·1C 변환 adapters 한 함수·prompt version D-3C-7) + 설계 검토 ④ 정정(다른 모듈에서 `internal` 호출 불가). 알려진 제한(미검증
+`Extracted` 조립·raw `HttpLlmClient` 호출은 4B 배선 리뷰 항목 · `OPEN-3C-ATTACHMENT-FIELD-CONTRACT` · `OPEN-3C-DOC-FORMATS`)은 등재 유지, OPEN 둘은 `capability-map.md`
+§14.3. 같은 승인에서 **M3 완료 선언 + 3B-2 잔여 등재**, `origin/main` push.

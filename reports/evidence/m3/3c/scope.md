@@ -1,4 +1,4 @@
-# Slice 계약 — M3 / 3C · 문서/LLM extraction adapter — **착수 2026-09-08**
+# Slice 계약 — M3 / 3C · 문서/LLM extraction adapter — **종결 2026-09-08**
 
 > **지위**: M3 착수 직후(2026-09-07) 세션 모델이 단독으로 쓴 **계약 초안**(문서 레인, 브리프 2). 구현·gradle·의존성 편집 없음.
 > 착수는 **3A 승인 → 3B → 3D 뒤**(`prep/m3-prep.md` §5 순서)이며, 그때 `base_sha` 재고정(40자), 아래 D-3C-1~4 답 수령, `milestone-3.md`
@@ -59,6 +59,9 @@ rollback: |
 두어 M4 4B 가 부른다. ④ **prompt 버전(D-3C-7, 계약 고정)**: prompt 문면은 adapters 리소스 `prompts/requirement-extraction.v1.txt`, version 은 파일명이며
 스키마 `schema/requirement-extraction.v1.json` 과 짝으로 `promptVersion`·`schemaVersion` 에 실린다. 변경은 새 version 파일 + evidence(OPEN 등재 없음 —
 `OPEN-3C-PROMPT-VERSIONING` 후보 닫힘). ⑤ `OPEN-3C-DOC-FORMATS` 는 종결 시 §14.3 등재.
+
+**종결 시점(2026-09-08, 최종 head `16b7748`)** — 하네스 커밋 없음. range 에 3D 수정·종결 커밋(`15f3325`~`3be4b5f`)이 섞임 — slice 밖(공유 파일 셋은 줄 단위). verifier r1 not-ready → r2
+ready-for-review, 재작업 1/5. `OPEN-3C-DOC-FORMATS`·`OPEN-3C-ATTACHMENT-FIELD-CONTRACT` 는 §14.3 등재(종결 커밋).
 
 **병렬 레인 경계**: 3D 수정 라운드(r4 표적)가 같은 트리에서 병행한다 — `adapters/build.gradle.kts`·`gradle/libs.versions.toml`·`config/quality/gate-tests.properties`
 는 **공유 파일**: 편집 전 `git status --porcelain -- <파일>` 로 다른 레인의 미커밋 변경이 없음을 확인하고, 있으면 그 파일 편집을 미루고 보고. 3C 는

@@ -80,6 +80,12 @@ quota 는 HTTP 429 뿐 아니라 `resultCode 22·30`(키 미인코딩) 도 신�
 참조 불가(ADR 0006 D-4)라 procurement port 가 1E 타입을 받을 수 없다 · **D-3C-7** prompt 는 adapters 리소스 파일(파일명 = version, 스키마와 짝). 1C 어휘
 (`RequirementRow`·`UncertainReason`) 변환은 adapters 한 함수, 호출은 M4 4B. Phase 2.5 필수(fail-open) — 세션 모델 직접 `_workspace/m3-3c/01_design-review.md`.
 
+**3C 종결 2026-09-08** — verifier r2 ready-for-review + 사용자 승인(`reports/evidence/m3/3c/commands.md` 「사용자 승인」, 최종 head `16b7748`). 산출: procurement
+첨부 취득·추출 port, adapters `WatchGatedExtractor`(유일 공개 진입점 — public 진입점 46 전수 분류로 게이트 우회 0)·internal 추출 엔진·생성자 주입 LLM client
+(코드 상수 0)·정책 데이터·Resilience4j 한 계층(재시도 없음)·networknt JSON Schema·pdfbox·provenance·원문 비로깅·1C 변환 한 함수, fake 서버 test 45. 검증이 드러낸
+것: 게이트 없는 public factory·port 어댑터(blocker), HttpClient 와 TimeLimiter 의 같은 시한 경합(flaky) — 시한을 정책 값 둘로 분리하고 관계 불변식. 설계 검토의
+오류 하나(procurement `internal` 을 adapters 가 호출할 수 없음)는 공개 타입 + 불변식 + 제어 흐름으로 대체하고 4B 배선 리뷰 항목으로. OPEN 둘 §14.3.
+
 ### Slice 3D — persistence adapter
 
 - Flyway migration과 Testcontainers PostgreSQL test
@@ -109,6 +115,14 @@ canonical/audit/collection_run, 점유 가드 트리거 + `provenance_authority`
 - derived fact가 authoritative fact를 덮는 mutation이 실패
 - 실제 네트워크·실제 LLM·운영 DB 없이 integration suite 통과
 - KONEPS 장애가 transaction을 반쯤 commit하지 않음
+
+**M3 완료 2026-09-08(운영자 결정) — 3B-2 잔여 등재** — 일곱 조건 전부 충족: fixture 입력 전체 정규화(3A corpus 27/27 authoritative) · malformed/partial/unknown
+오염 없음(3A 계약 레지스트리 + 3B parse 실패 값 + 3D 가드) · watch rule 탈락 case LLM 호출 0(3C S-3) · retry 후 canonical effect 하나(3B 재시도 중복 삽입 없음 +
+3D `observation_key` UNIQUE) · derived 가 authoritative 를 덮는 mutation 실패(3D 트리거, 직접 SQL 실측) · 실제 네트워크·LLM·운영 DB 없이 integration suite 통과
+(mock server·fake LLM·Testcontainers) · KONEPS 장애가 반쯤 commit 없음(3D 항목 트랜잭션, 연결 단절 실측). **잔여 slice 3B-2**(개찰·예비가격 축 —
+`OpeningResultSourcePort`·표적조회·license-limit 서브콜): ScsbidInfoService 참고자료 확보 → curator 필드 계약 추가 → 3B-2 계약 → 구현. M4 착수와 병행 가능하되
+4B 가 개찰 fact 를 소비하기 전까지 닫는다. 후속 소폭: 3D V-1(opening_result 라벨 가드), 3A 후속 셋(3B checklist), `OPEN-3C-ATTACHMENT-FIELD-CONTRACT`(curator 표
+P-8 + 정책 값 커밋).
 
 ## Codex 독립 리뷰
 
