@@ -48,6 +48,27 @@ class EditSessionImportBoundaryTest {
         disallowedQualifiedReferences(plantedFqn).shouldNotBeEmpty()
     }
 
+    /**
+     * verifier L-7 수정 — 단일 소문자 세그먼트 패키지도 이제 걸린다(강화 전에는 세그먼트
+     * 둘 이상을 요구해 이 형태가 빠져나갔다).
+     */
+    @Test
+    fun `단일 세그먼트 소문자 패키지를 심은 표본도 이 술어에 걸린다 — 양성 대조`() {
+        disallowedQualifiedReferences("    val bot: telegram.Bot? = null").shouldNotBeEmpty()
+        disallowedQualifiedReferences("    val bot: telegram_api.Bot? = null").shouldNotBeEmpty()
+    }
+
+    /**
+     * 알려진 제한(verifier L-7) — 대문자로 시작하는 단일 세그먼트 루트(`Telegram.Bot`)는
+     * 이 술어가 잡지 못한다. 잡으려면 `EditSessionState.Applied` 같은 이 패키지 자신의
+     * 정당한 sealed 하위 타입 접근까지 오탐한다(위 `QUALIFIED_REFERENCE` KDoc 참고) —
+     * 그래서 이 test 는 「걸린다」가 아니라 「걸리지 않는다(알려진 사각)」를 고정한다.
+     */
+    @Test
+    fun `대문자로 시작하는 단일 세그먼트 루트는 알려진 사각이다 — 이 술어가 잡지 못한다`() {
+        disallowedQualifiedReferences("    val bot: Telegram.Bot? = null").shouldBeEmpty()
+    }
+
     @Test
     fun `허용 루트를 쓰는 정상 소스 줄은 이 술어에 걸리지 않는다`() {
         val allowedLines =
@@ -76,8 +97,19 @@ private val ALLOWED_ROOTS =
         "bidvector.workflow",
     )
 
-/** `foo.bar.Baz` 형태 — 점으로 이어진 소문자(숫자 포함) 세그먼트 다음에 대문자로 시작하는 식별자. */
-private val QUALIFIED_REFERENCE = Regex("""\b([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+)\.[A-Z][A-Za-z0-9_]*\b""")
+/**
+ * `foo.Baz`·`foo.bar.Baz` 형태 — 점으로 이어진 소문자(숫자·언더스코어 포함) 세그먼트
+ * 하나 이상 다음에 대문자로 시작하는 식별자(verifier L-7 수정 — 이전 버전은 세그먼트
+ * **둘 이상**을 요구해 `telegram.Bot`처럼 단일 세그먼트 패키지가 빠져나갔다).
+ *
+ * **여전히 잡지 못하는 자리 — 대문자로 시작하는 단일 세그먼트 루트**(`Telegram.Bot`).
+ * 그 형태를 잡으려면 정규식이 `EditSessionState.Applied`·`TransitionOutcome.Rejected`
+ * 같은 **이 패키지 자신의 정당한 sealed 하위 타입 접근**(대문자 루트 + 대문자 타입, 실측
+ * 46건)까지 함께 잡는다 — 강화가 대량 오탐을 부르므로 하지 않는다(설계 검토 (4) 6 이
+ * 요구하는 것은 소문자 세그먼트 판별이지 대소문자 판별이 아니다). 그래서 이 사각은
+ * 술어가 아니라 **알려진 제한**으로 남는다(milestone-4.md).
+ */
+private val QUALIFIED_REFERENCE = Regex("""\b([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)\.[A-Z][A-Za-z0-9_]*\b""")
 
 private fun isAllowedRoot(qualifiedPackage: String): Boolean =
     ALLOWED_ROOTS.any { qualifiedPackage == it || qualifiedPackage.startsWith("$it.") }

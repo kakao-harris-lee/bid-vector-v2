@@ -56,11 +56,32 @@ slice 위협 모델 경계 밖, 3D/4C write 게이트 소관).
 회귀 보호 부재 — 전용 test 신설) · M-3(전략 저장 실패 시 세션이 먼저 굳어 편집이 조용히 영구 소실될 수
 있었다 — 저장 순서를 `strategies→events→sessions` 로 교정).
 
+**verifier 표적 재검증(r2, 2026-09-09) → 수정 라운드 2 반영.** r1 의 「우회 (3) 구조적 폐쇄」
+결론이 반증됐다 — `AppliedStrategy` 는 위조를 막았지만 **획득**을 막지 못했다. `beginSession`·
+`apply` 가 public top-level 함수라 `workflow` 밖에서 직접 몰아 호출부가 고른 값으로 정당한
+`AppliedStrategy` 를 얻고 `EditStrategyWorkflow` 를 거치지 않고 저장할 수 있었다(H-3, 실측:
+revision=778 저장 + 발행 0 — STR-07 이 `폐기`로 못 박은 legacy 결함 재현). 같은 뿌리로
+`beginSession` 결과를 세션 port 에 직접 넘기면 활성 세션도 덮어썼다(M-4). **수정**: `beginSession`·
+`apply`·`expireIfDue` 를 `internal` 로 내려 `workflow` 밖에서 호출 자체가 컴파일되지 않게
+했다 — `EditSession`·`TransitionOutcome` 을 얻는 유일한 경로가 `EditStrategyWorkflow` 가
+된다. app 의 corpus 실행자를 `EditStrategyWorkflow` + fake port 경유로 재작성(fixture
+input/expected 무변경). 재현 clone 에서 verifier 의 두 probe(H-3 커널 직몰이·M-4 세션
+덮어쓰기)가 이제 컴파일 거부됨을, 정상 배선·corpus 다섯은 그대로 통과함을 확인했다.
+
+**함께 닫은 것**: M-5(이번 수정이 새로 연 것 — `begin()` 가드가 저장된 state 만 봐서 시각상
+만료됐지만 fold 되지 않은 세션이 비종단으로 읽혀 같은 `EditSessionId` 의 새 편집을 무기한
+막을 수 있었다. 가드 전에 `expireIfDue` 를 적용하도록 수정) · L-5(만료 fold 의 세션 저장이
+`Rejected` 경로에서도 영속되는지 재는 test 신설) · L-6(`TransitionOutcome.Applied` 에
+`@ConsistentCopyVisibility` + `internal constructor` — 다른 통로 타입과 관례 정렬) · L-7(S-3b
+술어를 소문자 세그먼트 하나 이상으로 넓혀 `telegram.Bot`·`telegram_api.Bot` 형태를 포착).
+
 알려진 제한(갱신): 이벤트 발행·세션 전진의 원자성 부재(저장 성공 뒤 발행 실패는 다음 재전달이
 `StaleRevision` 으로 정직하게 거부되나, 세션이 그 사이 전진하지 않는 잔여 창은 남는다 — 4C 트랜잭션
 outbox 가 닫는다) · 세션 영속 실 구현 부재(4C/3D) · 만료 트리거(sweep) 배선 부재 · `System` actor 확인
-경로 미구현(D-4A-5) · Telegram 어댑터 없음(`OPEN-STR-12` 활성) · S-3b 술어가 소문자 세그먼트 둘 미만인
-단일 세그먼트 패키지 참조(예: `telegram.Bot`)를 잡지 못한다(실무 좌표는 잡힌다).
+경로 미구현(D-4A-5) · Telegram 어댑터 없음(`OPEN-STR-12` 활성) · **S-3b 술어는 대문자로 시작하는
+단일 세그먼트 루트(`Telegram.Bot`)를 여전히 잡지 못한다** — 잡으려면 `EditSessionState.Applied`
+같은 이 패키지 자신의 정당한 sealed 하위 타입 접근(실측 46건)까지 오탐해 강화하지 않기로 했다
+(소문자 세그먼트 판별은 L-7 로 이미 넓혔다).
 
 ### Slice 4B — application use case
 

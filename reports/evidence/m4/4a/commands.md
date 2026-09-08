@@ -105,7 +105,9 @@ N-1(`f11a5e1`) · M-1(`ef7a8fc`) · M-2(`7f7a638`) · M-3(`022629b`).
 ## 2026-09-08T21:50Z — N-1·M-3 회귀 확인
 - cmd: `./gradlew --no-daemon :workflow:test`(N-1 begin() 가드 test 2건, M-3 failure-injection test 2건 포함)
 - exit: 0
-- 핵심 결과: `EditStrategyWorkflowTest` 5→9건(N-1 2건 + M-3 2건 추가), 전체 33건 0 failed.
+- 핵심 결과: `EditStrategyWorkflowTest` 5→9건(N-1 2건 + M-3 2건 추가). **verifier r2 B-5 정정
+  (2026-09-09)** — 이 시점 `:workflow:test` 전체는 class 별 6·5·3·4·8·9 = **35건**이었다(「전체
+  33건」은 오산 — `EditSessionPolicyDataTest`(M-2, 4건)를 이 절이 누락하고 셌다).
 
 ## 2026-09-08T22:00Z — 수정 라운드 1 최종 S-1~S-6·S-0 한 번에 재실행(head `022629b`)
 - cmd: `./gradlew --no-build-cache clean check`(S-1)

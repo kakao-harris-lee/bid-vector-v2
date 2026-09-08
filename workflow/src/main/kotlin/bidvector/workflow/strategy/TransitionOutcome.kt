@@ -20,7 +20,14 @@ sealed interface TransitionOutcome {
         override val session: EditSession,
     ) : TransitionOutcome
 
-    data class Applied(
+    /**
+     * `@ConsistentCopyVisibility` + `internal constructor`(verifier L-6) — `AppliedStrategy`·
+     * `EditSession`과 같은 관례로 정렬한다. 이미 정당한 값 셋을 가진 자가 이 타입 자체를
+     * 조립·`copy`하는 것은(위조가 아니다) 지금은 무해하지만(외부에서 받은 `Applied`를
+     * 소비하는 자리가 없다), 자리가 생기면 이 폐쇄가 미리 막는다.
+     */
+    @ConsistentCopyVisibility
+    data class Applied internal constructor(
         override val session: EditSession,
         val applied: AppliedStrategy,
         val event: StrategyEvent.StrategyUpdated,
