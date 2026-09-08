@@ -33,10 +33,10 @@ out_of_scope:
 acceptance_commands:
   - "git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)"   # S-0
   - "./gradlew --no-build-cache clean check"                                                          # S-1
-  - "./gradlew :adapters:test --tests 'bidvector.adapters.koneps.*'"                                 # S-2 — 3B 27 + 3B-2 시나리오 전부, 네트워크 0(loopback in-process)
+  - "./gradlew :adapters:test --tests 'bidvector.adapters.koneps.*'"                                 # S-2 — 3B 기존 test + 3B-2 시나리오 전부, 네트워크 0(loopback in-process). 수치를 계약에 박지 않는다(낡는 수치)
   - "./gradlew :adapters:moduleDependencyGate"                                                        # S-3
   - "./gradlew :adapters:test --tests '*KonepsAdapterDependencyTest*'"                                # S-3b — koneps 패키지의 domain 참조는 procurement·shared-kernel 뿐
-  - "./gradlew :procurement:test"                                                                     # S-3c — D-3B2-5 (a) 시 3A 술어 test 포함, 3A corpus 27/27 불변
+  - "./gradlew :procurement:test"                                                                     # S-3c — 3A 좁은 확장(P-9 ①②④·D-3B2-5) test 포함, 3A corpus 27/27 불변
   - "./gradlew qualityBaseline"                                                                        # S-4
 rollback: |
     **정본은 `reports/evidence/m3/3b2/rollback.md`**(착수 시). 경로 한정 — 3B-2 가 **신설한** adapters 파일은 삭제, 3B 파일을 고쳤다면 base 로 restore,
