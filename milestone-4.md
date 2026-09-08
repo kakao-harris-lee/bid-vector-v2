@@ -32,6 +32,16 @@ Phase 2.5 설계 검토는 세션 모델이 직접 했다(`_workspace/m4-4a/02_d
 상태 종단성·allow-list 소스 스캔의 **구성형**으로 닫고, `EventSink` port 는 STR-07 이 `폐기`로 못 박은 「호출자 규율」 재현을 막기 위해 남긴다
 (발행 비원자성은 4C 가 닫을 **알려진 제한**으로 선언). 과잉으로 뺀 셋: 처리한 command id 전체 집합 · 별도 `Effect` 목록 타입 · 만료 sweep use case.
 
+**4A 구현 2026-09-08(구현 레인, 사용자 승인 대기)** — `workflow/src/main/kotlin/bidvector/workflow/strategy/**`(전이표·`EditSession`·`EditCommand`·
+`TransitionOutcome`·port 넷·`EditStrategyWorkflow` use case) 신설. acceptance S-0~S-6 전부 exit 0(evidence
+`reports/evidence/m4/4a/commands.md`). fixture 다섯(`strategy-edit-001~005`, `authored-from-approved-spec`,
+`review.approved_by_user: false` — 운영자 승인은 Phase 6). **설계 검토 (2) #3 실측 판정 — `StrategyRepository` port 를
+`internal` 로 닫으면 `EditStrategyWorkflow`(공개 클래스)의 생성자가 그 타입을 노출해 `:workflow:compileKotlin` 이
+컴파일 에러로 거부한다(실측 2026-09-08) — port 는 `public` 으로 남고, 우회 (3) 차단은 타입 근거(`TransitionOutcome.Applied`
+만 저장 인자를 낸다)에 의존한다. `OPEN-4A-WRITE-PATH-GATE` 신설.** 알려진 제한(착수 시 선언대로 유지): 이벤트 발행
+비원자성(4C) · 세션 영속 실 구현 부재(4C/3D) · 만료 트리거(sweep) 배선 부재 · `System` actor 확인 경로 미구현(D-4A-5) ·
+Telegram 어댑터 없음(`OPEN-STR-12` 활성).
+
 ### Slice 4B — application use case
 
 - notice 수집 완료
