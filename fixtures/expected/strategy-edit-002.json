@@ -1,0 +1,7 @@
+{
+  "state": "WaitingForValue",
+  "field": "BidNowThreshold",
+  "violations": ["ScoreOutOfRange"],
+  "isConfigured": null,
+  "watchRulesEmpty": null
+}

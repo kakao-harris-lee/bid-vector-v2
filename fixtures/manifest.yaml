@@ -8824,6 +8824,308 @@ cases:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
+  - id: strategy-edit-001
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        STR-11 관찰 ① — 검증 실패는 상태를 바꾸지 않는다. `ProvideValue`의 draft 가
+        `candidateLimit=0`(`CandidateLimitNotPositive`)이면 편집 세션은 `WaitingForValue`에
+        **같은 field**로 머문다(거부가 아니라 accepted 전이, scope.md ②).
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30) — `capability-map.md` STR-11
+          블록의 「검증 실패 시 저장된 전략이 변하지 않고 같은 항목의 입력 대기 상태가
+          유지된다」를 이 slice 가 편집 상태 기계 위에서 재확인한다(scope.md ② 승인 문면).
+    expected_reasoning: |-
+      근거는 STR-11 승인 문면 그대로다 — 「같은 항목의 입력 대기 상태가 유지된다」가
+      `state=WaitingForValue`·`field=CandidateLimit`(입력 당시 field 와 동일)로 옮겨진다.
+      위반 어휘(`CandidateLimitNotPositive`)는 1E `StrategyViolation`(scope.md D-13 승인) 그대로다.
+    input_file: fixtures/input/strategy-edit-001.json
+    expected_file: fixtures/expected/strategy-edit-001.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액 필드가 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 편집 세션·operator id 는 corpus 전용
+        합성 식별자(`corpus-operator`·`corpus-session`)다.
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: d1fc50936d439dce4bc7e01edd24e1ec81a2bd52df9aaf4b6f355c894e1debab
+    expected_sha256: ac10fc435ad5bec6500937039cbdf13ffd8cc493698943001ebf8a7e87b3a42d
+    not_covered: |-
+      **timeout·중복 command·actor** — 이 case 는 단일 `ProvideValue` 호출 하나만 재고
+      나머지 판정 순서(설계 검토 (4) 2)는 `:workflow:test`(구조 case)가 진다(scope.md D-4A-1
+      승인 구성 — 「전이·만료·중복은 값 case 가 아니라 구조 case」).
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`·`EditSessionActorAndTimeoutTest` — 전이표 전수와
+        판정 순서를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        `apply` 가 `TransitionOutcome.Accepted`로 검증 실패를 표현하고, 그 세션의
+        `state`가 `WaitingForValue(같은 field)`라는 것이 계약 안 정의다.
+      does_not_carry: |-
+        **① 위반 사유의 사람이 읽는 문장.** `violations`는 구조화 코드(`CandidateLimitNotPositive`)이지
+        메시지가 아니다 — scope.md 「만들지 않는 것」(사람이 읽는 메시지 문장).
+        **② 세션 영속·sessionVersion 의 정확한 증가량.** 이 case 는 순수 `apply` 호출 하나의
+        산출만 재고 영속 port 배선은 `EditStrategyWorkflowTest`가 진다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: strategy-edit-002
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        STR-11 관찰 ② — apply 시점에 검증이 재실행된다. `ProvideValue` 시점엔 허용 범위였던
+        `bidNowThreshold=0.7`이, `Confirmed` 시점엔 정책이 좁아져(`priorityScoreRange` 상한
+        `0.5`) `ScoreOutOfRange`가 된다 — 재검증이 **실제로 다른 정책**으로 다시 돈다는 것을
+        관측한다(설계 검토 (4) 3(b) — 거부가 아니라 `WaitingForValue`로 돌아가는 accepted 전이).
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30) — `capability-map.md` STR-11
+          블록의 「apply 시점에 검증이 재실행된다」를 이 slice 가 정책이 실제로 바뀌는
+          시나리오로 재확인한다(scope.md ① 「apply 시 재검증」 승인 문면).
+    expected_reasoning: |-
+      두 시점의 `Resolution.Resolved<StrategyPolicyData>`가 서로 다른 값(구성상 별개의 정책
+      해석)이라는 것이 corpus 입력 자체가 드는 근거다 — 재검증이 첫 번째 결과를 재사용했다면
+      `Applied`가 나야 하지만, 실제로 두 번째 정책으로 다시 계산해 `Invalid`가 난다.
+    input_file: fixtures/input/strategy-edit-002.json
+    expected_file: fixtures/expected/strategy-edit-002.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액 필드가 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 두 정책 값 모두 corpus 가 지은 합성 구성이다.
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: 805a009bc8631f87b02574bed508b860dafc7358b77c18a8d19e690af22db993
+    expected_sha256: c9002468cab26ac87a52728912c66aa0d708c1546f549fa49a4520d070683c0a
+    not_covered: |-
+      **낙관적 동시성(`StaleRevision`)** — `seenRevision`은 두 시점 모두 같은 값(1)이라 이
+      case 는 그 축을 재지 않는다. `EditSessionTransitionTableTest`가 별도 test 로 진다.
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand.Confirm, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`(「apply 시점 재검증이 Invalid 면 거부가 아니라
+        WaitingForValue 로 되돌아간다」)가 값과 무관하게 이 불변식을 고정한다.
+      carries: |-
+        `onConfirm`이 `validate`를 **호출부가 새로 주입한** policy·revision 으로 다시 부른다는
+        것 — 저장된 이전 검증 결과를 재사용하지 않는다.
+      does_not_carry: |-
+        정책이 실제로 어떻게 바뀌는지(운영자가 정책을 어떤 절차로 개정하는지)는 이 slice
+        밖이다 — corpus 는 「재검증이 다시 돈다」만 관측한다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: strategy-edit-003
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        STR-03 편집 거부 ① — `reviewThreshold`가 `bidNowThreshold`보다 크면 편집이 거부된다.
+        편집 상태 기계 위에서는 「거부」가 `TransitionOutcome.Rejected`가 아니라 세션이
+        `WaitingForValue(같은 field)`에 머무는 accepted 전이로 표현된다(scope.md ②).
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30) — `capability-map.md` STR-03
+          블록 「review 가 bidNow 보다 크면 거부된다」(`StrategyValidationTest`가 커널
+          층에서 이미 고정한 것과 같은 승인 문면을 편집 상태 기계 층에서 재확인한다).
+    expected_reasoning: |-
+      `strategy-validation-*` corpus 가 이미 커널(`validate`) 층에서 같은 문면을 계약했다
+      (money-basis-003 축과 같은 갈래 — 같은 규칙이 다른 소비 지점에서 재확인된다). 이
+      case 가 더하는 것은 그 결과가 **편집 세션 상태**로 어떻게 투영되는가다.
+    input_file: fixtures/input/strategy-edit-003.json
+    expected_file: fixtures/expected/strategy-edit-003.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액 필드가 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 점수 값 둘은 STR-03 승인 문면이 요구하는
+        「review > bidNow」관계만 만족하는 합성 값이다.
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: 668787b89468af938c495315b5b49250580a2f344cf41fcf75a07465867453ef
+    expected_sha256: 328644324721608aae6add485b11c37ea5b47e5f759bb1ed020b96e66fe3f9e9
+    not_covered: |-
+      review=bidNow(등호 통과) 경계는 `strategy-validation-*`(1E) corpus 가 이미 커널 층에서
+      진다 — 이 축을 편집 세션 층에서 다시 재지 않는다(한 case 는 한 의미만 검증한다, §7).
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand.ProvideValue, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`(「WaitingForValue 에 무효한 ValueProvided 는 같은
+        field 로 accepted 전이한다」)가 값과 무관하게 이 불변식을 고정한다.
+      carries: |-
+        위반이 `StrategyViolation.ReviewAboveBidNow`(1E 승인 어휘) 그대로 투영된다는 것.
+      does_not_carry: |-
+        검증 자체의 규칙(review<=bidNow 판정)은 1E `validate`의 계약이지 이 slice 가 새로
+        정의하지 않는다 — 이 case 는 그 결과의 **상태 기계 투영**만 잰다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: strategy-edit-004
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        STR-03 편집 거부 ② — `minBudget`이 `maxBudget`보다 크면 편집이 거부된다(WatchRuleId
+        축, review/bidNow 와 다른 필드 쌍). 편집 상태 기계는 세션을 `WaitingForValue(같은
+        field)`에 머물게 하는 accepted 전이로 표현한다(scope.md ②).
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30) — `capability-map.md` STR-03
+          블록 「min_budget 이 max_budget 보다 크면 거부된다」를 편집 상태 기계 층에서
+          재확인한다.
+    expected_reasoning: |-
+      `strategy-validation-*`(1E)가 커널 층에서 이미 계약한 문면이다. 예산 값은 D-6 요건
+      (`OperatorDeclared`·`INCLUSIVE`)을 만족해 `BudgetLimitNotComparable`이 아니라
+      `MinBudgetAboveMaxBudget` 하나만 나도록 조립했다.
+    input_file: fixtures/input/strategy-edit-004.json
+    expected_file: fixtures/expected/strategy-edit-004.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW, BASE_AMOUNT basis, OperatorDeclared·INCLUSIVE(D-6 비교 성립 요건)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 금액 두 건은 STR-03 승인 문면이 요구하는
+        「min > max」관계만 만족하는 합성 값이다.
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: 4ef1731c692a2e6d9c5d8ee47796fbabfa62212d5a5119ff2ae5d6596d4e416f
+    expected_sha256: 4d8cfa84a37139e27aba0ff63161e9c0ac308f29b2391711751fc3c0af085789
+    not_covered: |-
+      예산 비교 성립 요건(`BudgetLimitNotComparable`, D-6)은 이 case 가 값을 D-6 요건대로
+      조립해 우회했다 — 그 축은 `strategy-validation-*`(1E)가 이미 진다.
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand.ProvideValue, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`가 같은 불변식(무효 draft → 같은 field 로 accepted)을
+        review/bidNow 쌍으로 고정한다 — 이 case 는 minBudget/maxBudget 쌍으로 값을 대조한다.
+      carries: |-
+        위반이 `StrategyViolation.MinBudgetAboveMaxBudget`(1E 승인 어휘) 그대로 투영된다는 것.
+      does_not_carry: |-
+        예산 값의 basis·과세 처리 규칙 자체는 1E `validate`·shared-kernel `BaseAmount`의
+        계약이지 이 slice 가 새로 정의하지 않는다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: strategy-edit-005
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        D-15 상태 구분 — 「전략이 설정됐는가」(`isConfigured`)와 「감시 범위를 좁히는가」
+        (`watchRules.isEmpty`의 반대)는 다른 물음이다(1E `StrategyValidationTest` STR-03
+        acceptance 셋째와 같은 문면). `bidNowThreshold`만 채운 draft 는 `isConfigured=true`,
+        `watchRulesEmpty=true` 둘 다를 낸다 — 두 술어가 **다른 것을 본다**는 것을 편집 세션이
+        `WaitingForConfirmation`으로 넘어가는 시점에서 재확인한다.
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+      - "$.isConfigured"
+      - "$.watchRulesEmpty"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30·31) — `capability-map.md` STR-03
+          acceptance 셋째와 `data-dictionary.md` §2.2.6(D-15 "「설정됐는가」 술어")를
+          편집 상태 기계 층에서 재확인한다.
+    expected_reasoning: |-
+      1E `StrategyValidationTest`(`⑥ 임계치만 바꾸고 watch 필드가 비어 있으면...`)가 같은
+      문면을 커널 층에서 이미 고정했다 — 이 case 는 그 값이 편집 세션의 accepted 전이
+      (`WaitingForValue → WaitingForConfirmation`)로 투영될 때도 유지됨을 관측한다.
+    input_file: fixtures/input/strategy-edit-005.json
+    expected_file: fixtures/expected/strategy-edit-005.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액 필드가 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 점수 값은 STR-03 acceptance 셋째의 시나리오를
+        그대로 옮긴 합성 값이다(1E `StrategyValidationTest`와 같은 값).
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: ab82e09307aab2968f7c76bbde69d571caa13272be4d62a480927b78f7ad82fe
+    expected_sha256: 212467719c7f449257d2bdc0b390d32ca8ee5941dfc2505e638a0948b6a80826
+    not_covered: |-
+      `Applied` 시점의 같은 구분(confirm 뒤에도 유지되는가)은 이 case 가 재지 않는다 —
+      `confirm: false`이므로 `WaitingForConfirmation` 시점까지만 관측한다.
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand.ProvideValue, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`(「WaitingForValue 에 유효한 ValueProvided 는
+        WaitingForConfirmation 으로 accepted 전이한다」)가 상태 전이 자체를 고정하고,
+        이 case 는 그 위에 D-15 구분 값을 더한다.
+      carries: |-
+        `isConfigured`·`watchRulesEmpty`는 `TransitionOutcome`이 직접 나르는 필드가 아니라
+        — 이 investigator 실행자가 같은 draft·policy·revision 으로 `validate`를 다시 불러
+        낸 투영이다(1E `strategyValidationExecutor`와 같은 관례, `StrategyEditExecutors.kt`).
+      does_not_carry: |-
+        이 두 술어를 세션 상태 자체의 필드로 만들 것인가(구조적으로 상시 노출)는 이 slice가
+        결정하지 않는다 — 어댑터(6A)가 확인 화면에 무엇을 보여줄지의 몫으로 남겨둔다.
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
 
 # =============================================================================
 # M1 계약 대조 — 1B 가 세운 shared-kernel 타입 계약과 이 corpus 의 대조 (운영자 결정 C13)

@@ -1,0 +1,7 @@
+{
+  "state": "WaitingForValue",
+  "field": "MinBudget",
+  "violations": ["MinBudgetAboveMaxBudget"],
+  "isConfigured": null,
+  "watchRulesEmpty": null
+}

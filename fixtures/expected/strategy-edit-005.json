@@ -1,0 +1,7 @@
+{
+  "state": "WaitingForConfirmation",
+  "field": "BidNowThreshold",
+  "violations": [],
+  "isConfigured": true,
+  "watchRulesEmpty": true
+}

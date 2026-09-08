@@ -1,0 +1,7 @@
+{
+  "state": "WaitingForValue",
+  "field": "CandidateLimit",
+  "violations": ["CandidateLimitNotPositive"],
+  "isConfigured": null,
+  "watchRulesEmpty": null
+}
