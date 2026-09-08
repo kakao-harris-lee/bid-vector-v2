@@ -85,3 +85,21 @@ test 수(JUnit XML 실측, 실패·건너뜀 0): `KonepsOpenApiNoticeSourceTest`
 F-1·F-2)·`KonepsOpeningResultSourceTest` 8(+3, F-1·F-2 ×2)·`KonepsOperationDescriptorTest` 7(불변)·
 `CollectionPolicyTest` 17(+1, F-5)·`PortsTest` 2·`DecideQualificationFetchTest` 3(F-7 로 게이트
 등재). `procurement:gateExecutionGate` 재확인 — 신규 두 class 포함 green.
+
+## F-3·F-8(3A Accounting.kt 좁은 확장) 뒤 acceptance 전건 재실행 — 2026-09-08T07:58Z
+
+| id | 명령 | exit |
+| --- | --- | --- |
+| S-0 | `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` | 0 (348 tasks, 348 executed) |
+| S-1 | `./gradlew --no-build-cache clean check` | 0 |
+| S-2 | `./gradlew :adapters:test --tests 'bidvector.adapters.koneps.*'` | 0 |
+| S-3 | `./gradlew :adapters:moduleDependencyGate` | 0 |
+| S-3b | `./gradlew :adapters:test --tests '*KonepsAdapterDependencyTest*'` | 0 |
+| S-3c | `./gradlew :procurement:test` | 0 |
+| S-4 | `./gradlew qualityBaseline` | 0 |
+
+`:procurement:gateExecutionGate` 별도 재확인 — 0. test 수(JUnit XML 실측, 실패·건너뜀 0):
+`AccountingTest` 12(+2, F-3·F-8 항등식 무관·음수 거부)·`KonepsIdentifierMaskingTest` 7(불변,
+assertion 만 정정 — unknownFieldCount/maskingFailureCount 분리)·`KonepsOpeningResultSourceTest`
+9(+1, F-3·F-8 종단 test). secret 스캔·clean-tree 게이트 재확인(자기참조 매치만, 판독 규칙
+그대로 적용) — 실측 결과 이전 라운드와 동일.

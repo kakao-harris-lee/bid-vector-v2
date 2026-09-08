@@ -16,6 +16,7 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
 | ⑥ | 개찰 축 필드 계약 §1.7 authoritative 13행 채택(P-9, `bidwinnrBizno` 제외 — P-10) + 대문자 `FnlSucsfDate` 변형(verifier r1 F-5) | `CollectionPolicy.kt`(`KONEPS_OPENING_FIELD_ROWS`) | `CollectionPolicyTest`(등재 스물네 개·basis·WINNING_RATE 재사용·COUNT scale·presentIn·bidwinnrBizno 미등재·`fnlSucsfDate`/`FnlSucsfDate` 양쪽 등재) |
 | ⑥b | 식별자 치환(P-10 (a)) — `bidwinnrNm` 원문 저장, `bidwinnrBizno`·대표자명 폐기, `opengCorpInfo` 부분 masking + fail-closed | `KonepsIdentifierMasking.kt`(`MaskedKonepsItem`·`maskOpengCorpInfo`·`mapMaskedOpeningItem`) | `KonepsIdentifierMaskingTest`(7 — 단일/다수/협상 세 변형 + allow-list + 식별자 부재 + `maskOpengCorpInfo` 단위 + `FnlSucsfDate` 생존 회귀) |
 | ⑥c | 행 식별자 — 상세 오퍼레이션은 한 공고에 여러 행(verifier r1 F-1) | `KonepsOperationDescriptor.rowIdentifierRawKeys`(필수, 기본값 없음) + `NoticeIdentity.rowDiscriminator` | `F-1 — 예비가격 상세 복수예가 15행이 모두 살아남는다`·`F-1 — 제한그룹 3행이 모두 살아남는다` |
+| ⑥d | 개찰 축 회계 — 계약 밖 키 제외·masking 실패를 서로 다른 축으로(verifier r1 F-3·F-8, 운영자 승인 2026-09-08 `Accounting.kt` 좁은 확장) | `MaskedKonepsItem.excludedFieldCount`(신설)·`decompositionFailures`(기존) 분리, `RawItemOutcome.Mapped.maskingFailureCount`(신설, 기본값 0) + `CollectionAccounting.maskingFailures`(신설, 기본값 0, `dropReasons`/`dropped` 항등식 밖) | `AccountingTest`(2, 항등식 무관·음수 거부)·`KonepsIdentifierMaskingTest`(unknownFieldCount/maskingFailureCount 분리 3건)·`KonepsOpeningResultSourceTest`(`F-3·F-8 — …` 종단 test) |
 | ⑦ | contract mock server test — 세 어휘(제한 없음/03/08)·`bidNtceOrd` 필수·`inqryDiv` 회귀·복수예가 15행·차수 없는 1건 drop·429/22 bounded retry | `KonepsOpeningResultSourceTest`·`KonepsLicenseLimitDocumentSourceTest`·`KonepsOperationDescriptorTest` | 아래 시나리오 대응표 |
 
 ## 시나리오 대응표 — scope.md ⑦
@@ -34,10 +35,11 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
 | 미지 resultCode → 비재시도(3B 공통 기반 재사용 확인) | `KonepsOpeningResultSourceTest` | PASS |
 | COL-07(license-limit 미등재 응답 키) → unknownFields 계수, masking 없음 | `KonepsLicenseLimitDocumentSourceTest` | PASS |
 | 외자 대문자 `FnlSucsfDate` → 관측에 생존(verifier r1 F-5, PROBE2 재현) | `KonepsIdentifierMaskingTest` | PASS |
-| opengCorpInfo 단일 낙찰자(5성분) → masking 성공 | `KonepsIdentifierMaskingTest` | PASS |
-| opengCorpInfo 「낙찰예정자 다수」(3성분, 자리 뜻 다름) → 값 전체 폐기 | 같음 | PASS |
-| opengCorpInfo 협상 계약(3성분, 투찰금액·투찰율 없음) → 값 전체 폐기 | 같음 | PASS |
-| allow-list — 계약 없는 식별자 키가 fields·sourceText 둘 다에 없다 | 같음 | PASS |
+| opengCorpInfo 단일 낙찰자(5성분) → masking 성공, unknownFieldCount=0·maskingFailureCount=0 | `KonepsIdentifierMaskingTest` | PASS |
+| opengCorpInfo 「낙찰예정자 다수」(3성분, 자리 뜻 다름) → 값 전체 폐기, maskingFailureCount=1(unknownFieldCount 는 0) | 같음 | PASS |
+| opengCorpInfo 협상 계약(3성분, 투찰금액·투찰율 없음) → 값 전체 폐기, maskingFailureCount=1 | 같음 | PASS |
+| allow-list — 계약 없는 식별자 키가 fields·sourceText 둘 다에 없고 unknownFieldCount=1 로 계수(verifier r1 F-3) | 같음 | PASS |
+| **계약 밖 키 제외와 masking 실패가 SourceBatch 회계에서 서로 다른 축(`unknownFields`·`maskingFailures`)으로 나온다**(F-3·F-8 종단) | `F-3·F-8 — …` | PASS |
 | `inqryDiv` 값별 URI(AWARD_LIST/RESERVE_PRICE_DETAIL/LICENSE_LIMIT_DETAIL) + 표→URI 회귀 | `KonepsOperationDescriptorTest` | PASS |
 | 서술 구성 실패(기간창+단건 동시 요구·bidNtceOrd 요구인데 bidNtceNo 없음·인자 불일치) | 같음 | PASS |
 
@@ -47,12 +49,13 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
 | --- | --- | --- |
 | (a) 술어 우회 | `fetchReservePrices`·`fetchQualificationText` 서명이 internal-constructor 증거 값만 받는다(3A 기존 + D-3B2-5 신규) | `PortsTest`, `KonepsOpeningResultSourceTest`(evidence 필수) |
 | (b) `inqryDiv` 오용 | `KonepsOperationDescriptor` 필수 생성자 인자 + 기본값·폴백 없음 + 표→URI 회귀 test | `KonepsOperationDescriptorTest` |
-| (c) 사업자 식별자 유입 | allow-list 반전(`MaskedKonepsItem.from`) — 미등재 키 자동 제외 | `KonepsIdentifierMaskingTest`(allow-list test) |
+| (c) 사업자 식별자 유입 | allow-list 반전(`MaskedKonepsItem.from`) — 미등재 키 자동 제외 + `excludedFieldCount`로 계수(F-3) | `KonepsIdentifierMaskingTest`(allow-list test) |
 | (d) `08`·`03`·`00+totalCount=0` 혼동 | 3A `resultCodeCategories` 표(변경 없음, 재사용) + 세 회계 어휘 test | `KonepsOpeningResultSourceTest`·`KonepsLicenseLimitDocumentSourceTest` |
 | (e) 3B 공통 기반 회귀 | `KonepsOpenApiNoticeSourceTest`(20)·`KonepsAdapterDependencyTest`(1)·`ServiceKeyTest` 편집 없이 green | commands.md S-2 |
 | (f) 서비스 키 노출 | `ServiceKey` 재사용(3B 기존, 미변경) | 3B `ServiceKeyTest`(변경 없음) |
 | (g) mapper 선택·기본값 누출(verifier r1 F-4) | `walkKonepsNoticePages`의 `itemMapper` 기본값 제거 — 세 호출부(3B `fetchNotices`·`fetchOpeningResults`·`fetchSingleKonepsNotice`) 모두 명시. 개찰 축 endpoint 로 `mapRawItem`(원문 보존)을 부르는 경로 자체는 여전히 컴파일된다 — 이 수정이 닫는 것은 「인자를 잊으면 조용히 새는」 폴백이지 「호출부가 잘못된 mapper 를 의도적으로 고르는」 실수가 아니다(장부에 남김) | 3B-2 호출부 3곳 실측(main 3·기본값 0) |
 | (h) 복수행 상세가 duplicate 로 잘못 접힘(verifier r1 F-1) | `KonepsOperationDescriptor.rowIdentifierRawKeys`(기본값 없음) + `NoticeIdentity.rowDiscriminator` | 15행·3행 회귀 test(시나리오 대응표) |
+| (i) 필드 단위 실패 두 축이 하나로 접혀 §5.3 규율 1 이 무력화(verifier r1 F-3·F-8) | `Accounting.kt` 좁은 확장(운영자 승인) — `unknownFields`는 이름 그대로 계약 밖 키만, 신설 `maskingFailures`가 masking 실패만. `dropReasons`/`dropped` 항등식 밖(필드 제외는 항목 drop 이 아니다) | `AccountingTest`·`KonepsIdentifierMaskingTest`·`KonepsOpeningResultSourceTest`(F-3·F-8 종단) |
 
 ## 우회 후보 대응표 — scope.md 「우회 후보(≥5)」
 
@@ -76,11 +79,14 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
    등재했다.** `DATETIME_NO_ZONE`은 `sourceZone` 필수 짝을 강제하는데 이 필드는 시각 축이 아니라
    짝을 지을 자리가 없다. 새 스케일 토큰(날짜 전용 축)을 만드는 대신 원문 보존만 하는 `OPAQUE_TEXT`
    로 좁혔다(canonicalize 는 D-3B2-8 후속, 이 slice 밖).
-3. **`opengCorpInfo` masking 실패는 procurement `CollectionDropReason`을 확장하지 않고 어댑터
-   `unknownFieldCount`에 접었다.** 새 drop 사유 축을 여는 것은 procurement 편집(Accounting.kt)이
-   필요한데 이 slice 의 procurement in_scope 는 여섯 파일로 고정돼 있다(P-9·D-3B2-5 범위). 3B
-   `blankKeyCount`를 `unknownFieldCount`에 접은 기존 선례와 같은 자리를 썼다 — 후속 slice 가
-   procurement 를 다시 열면 전용 사유를 추가할 수 있다(알려진 제한).
+3. **`opengCorpInfo` masking 실패와 allow-list 제외는 `dropReasons`/`dropped` 항등식 밖에 별도
+   필드로 세운다(운영자 승인 2026-09-08, `Accounting.kt` 좁은 확장, F-3·F-8 해소).** 필드 단위
+   실패를 항목 단위 drop 사유(`CollectionDropReason`)에 억지로 넣지 않았다 — 항목은 살아남고
+   그 안의 일부 필드만 빠지는 것이라 「몇 항목이 왔는가」(`dropReasons` 합=`dropped`)와 다른
+   축이다. `unknownFields`는 이름 그대로 계약 밖 키만(F-3), 신설 `maskingFailures`가 masking
+   실패만(F-8) 센다 — 이전 판(P-9 승인 시점)은 procurement in_scope 가 여섯 파일로 고정돼
+   있어 이 둘을 어댑터 `unknownFieldCount` 한 슬롯에 접었으나, 운영자가 `Accounting.kt`·
+   `AccountingTest.kt` 를 in_scope 예외로 승인해 바른 자리로 옮겼다.
 4. **license-limit 은 masking 하지 않고 3B `mapRawItem`을 그대로 쓴다.** §1.9.5 응답 필드가 사업자·
    개인 식별자가 아니라 P-10 (a) 대상이 아니다 — 개찰 축 전용 `MaskedKonepsItem`을 이 오퍼레이션에
    억지로 씌우면 과잉이다(설계 검토 (3)).
@@ -105,12 +111,11 @@ N-6 재발 방지 — 자기참조 SHA 를 문면에 박지 않는다, 3B checkl
   「추첨번호 확보」가 이 slice 로 닫히지 않는다 — 후속 slice 대상(M4 4B 착수 전).
 - **표적조회(`getBidPblancListInfo*`+`inqryDiv=2`) 미구현**(D-3B2-6 (a)) — 자격 원문 서브콜은
   license-limit 하나로 충분하다는 판단(공고 목록 관측이 플래그·차수를 이미 나른다).
-- **`opengCorpInfo` masking 실패와 allow-list 제외(미등재 키)가 둘 다 procurement 전용 회계 사유를
-  갖지 못하고 masking 실패만 `unknownFieldCount`(이름이 반대인 슬롯)를 쓴다**(verifier r1 F-3·F-8,
-  판단 3번). 바른 해법은 `Accounting.kt`에 필드 단위 사유 슬롯을 더하는 것인데 그 파일이 이 slice
-  의 procurement in_scope(여섯 파일) 밖이라 **운영자 결정을 요청했다** — 결정 전까지 이 두 결함은
-  고치지 않고, 이번 라운드의 다른 수정도 이 축의 회계 의미를 더 흐리지 않는 방향으로만 했다(F-4·
-  F-1 수정이 `unknownFieldCount`/`Excluded` 분기 자체를 건드리지 않았음을 diff 로 확인 가능).
+- **(해소, F-3·F-8) `opengCorpInfo` masking 실패와 allow-list 제외가 이제 서로 다른 축**
+  (`CollectionAccounting.unknownFields`/`maskingFailures`)으로 나온다 — 판단 3번. 남는 제한:
+  두 축 다 **키/성분 단위**만 세고 **어느 raw 키가 제외됐는지**(이름 목록)는 회계에 없다 —
+  §5.3 규율 1 의 「무엇이 빠졌는가」는 이 축이 수를 낼 뿐, 이름까지 필요하면 `sourceText`
+  (걸러진 렌더)와 원본을 대조하는 별도 감사가 필요하다(이 slice 는 「몇 개 빠졌는가」까지만).
 - **`bssamt`(기초금액)의 `presentIn`을 예비가격 상세 축까지 넓히지 않는다.** 개찰 축 allow-list
   경로는 `presentIn`을 강제하지 않는다(값 자체는 게이트가 아니다) — **의도적**이다. 강제를 걸면
   `RESERVE_PRICE_DETAIL` 관측에서 `bssamt`(presentIn=`NOTICE_LIST`뿐)가 조용히 탈락해 COL-03의
@@ -136,17 +141,18 @@ add+commit 분리 없음 — parallel-lane 오염 회피). 커밋 전 `git diff 
 ## 역방향 파급 검사 — 이 slice 가 편집한 코드 파일
 
 `grep -rn '<파일명>:[0-9]' --include='*.md'`로 `FieldContract`·`RawObservation`·`CollectionPolicy`·
-`DetailFetch`·`Ports`·`KonepsPageUriBuilder`·`KonepsRawItemMapper`·`gate-tests.properties` 여덟
-전부를 조회 — **매치 0건**. 이 slice 가 줄을 넣은 코드 파일을 `file:line`으로 인용하는 문서가
-없다(코드 파일은 evidence·설계 문서가 보통 심볼·KDoc 앵커로 가리키지 줄 번호로 가리키지 않는다).
+`DetailFetch`·`Ports`·`KonepsPageUriBuilder`·`KonepsRawItemMapper`·`gate-tests.properties`·
+`Accounting`·`AccountingTest`(F-3·F-8 라운드 추가) 열 전부를 조회 — **매치 0건**. 이 slice 가
+줄을 넣은 코드 파일을 `file:line`으로 인용하는 문서가 없다(코드 파일은 evidence·설계 문서가
+보통 심볼·KDoc 앵커로 가리키지 줄 번호로 가리키지 않는다).
 
 ## 판정 로직 변경 커밋 — 표적 재검증 대상(evidence-pack 2026-09-04 예외)
 
 행 식별자(⑥c)·mapper 기본값 제거(위협 모델 (g))·`FnlSucsfDate` 등재(⑥)·`presentIn` 비강제
-결정(「알려진 제한」)·gate-tests 등재(완료 조건 대응표) 다섯이 판정 로직·게이트 구성을 바꾼
-커밋이다 — 심각도 무관 표적 재검증 대상이다. `opengCorpInfo`/allow-list 회계 축(「알려진 제한」)은
-`Accounting.kt` 확장이 in_scope 밖이라 운영자 결정 대기이고 이번에는 손대지 않았다. 각 항목의
-회귀 test 는 시나리오 대응표·완료 조건 대응표에 이미 등재돼 있다 — 별도 절로 반복하지 않는다.
+결정(「알려진 제한」)·gate-tests 등재(완료 조건 대응표)·개찰 축 회계 두 축 분리(⑥d, 위협
+모델 (i))까지 여섯이 판정 로직·게이트 구성을 바꾼 커밋이다 — 심각도 무관 표적 재검증
+대상이다. 각 항목의 회귀 test 는 시나리오 대응표·완료 조건 대응표에 이미 등재돼 있다 —
+별도 절로 반복하지 않는다.
 
 ## 완료 조건
 
