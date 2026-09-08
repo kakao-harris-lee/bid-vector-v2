@@ -13,6 +13,7 @@ import bidvector.strategy.StrategyValidation
 import bidvector.strategy.ThresholdField
 import bidvector.strategy.validate
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.int
 import io.kotest.property.checkAll
@@ -114,6 +115,28 @@ class EditSessionIdempotencyPropertyTest {
         val replay = apply(first.session, confirmCommand, NOW, currentStrategy(2), policyOf())
 
         replay shouldBe TransitionOutcome.Accepted(first.session)
+    }
+
+    @Test
+    fun `판정 순서는 만료가 먼저다 — accepted 로 lastCommand 가 채워진 뒤에도 만료 시각을 넘기면 재전달은 Expired 다`() {
+        // verifier M-1 — 「만료 뒤 재전달」의 기존 test 는 첫 apply 가 거부돼 lastCommand 가
+        // null 인 case 라 판정 순서(① 만료 → ② 중복)를 가르지 못했다(두 줄을 뒤집어도
+        // exit 0). 이 case 는 첫 apply 를 accepted 로 만들어 lastCommand 를 채운 뒤, 그
+        // 같은 command 를 만료 시각 이후 재전달한다 — 순서가 뒤집히면 ②(중복, lastCommand
+        // 일치)가 먼저 걸려 Accepted 로 조용히 통과한다.
+        val session = freshSession()
+        val draft = StrategyDraft(bidNowThreshold = BigDecimal("0.7"))
+        val command = EditCommand.ProvideValue(CommandId("cmd-1"), session.id, OPERATOR, FIELD, draft)
+
+        val accepted = apply(session, command, NOW, currentStrategy(), policyOf())
+        accepted.shouldBeInstanceOf<TransitionOutcome.Accepted>()
+        accepted.session.lastCommand shouldBe command
+
+        val afterExpiry = session.expiresAt.plusSeconds(1)
+        val replay = apply(accepted.session, command, afterExpiry, currentStrategy(), policyOf())
+
+        replay.shouldBeRejectedWith(RejectionReason.SessionExpired)
+        replay.session.state shouldBe EditSessionState.Expired
     }
 
     @Test
