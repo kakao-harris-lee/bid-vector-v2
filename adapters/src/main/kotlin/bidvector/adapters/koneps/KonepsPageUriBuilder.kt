@@ -19,6 +19,24 @@ internal fun interface KonepsPageUriBuilder {
     fun uriFor(pageNo: Int): java.net.URI
 }
 
+/**
+ * JSON 항목 하나 → [RawItemOutcome] 변환 전략(3B-2) — [walkKonepsNoticePages]가 걷기 로직을
+ * 재사용하면서도 축마다 다른 매핑(공고 축은 [mapRawItem] 전체 보존, 개찰 축은
+ * [mapMaskedOpeningItem] allow-list 치환)을 꽂아 넣게 한다. 기본값은 기존 공고 축 동작 그대로라
+ * (아래 [defaultKonepsItemMapper]) 이 시그니처 확장이 3B 기존 호출부·test 를 바꾸지 않는다.
+ */
+internal fun interface KonepsItemMapper {
+    operator fun invoke(
+        item: JsonValue.JsonObject,
+        policy: KonepsCollectionPolicyData,
+        observedAt: Instant,
+    ): RawItemOutcome
+}
+
+/** 기존 3B 동작(공고 목록, 계약 여부와 무관하게 전 필드 보존) — [walkKonepsNoticePages] 기본값. */
+internal val defaultKonepsItemMapper: KonepsItemMapper =
+    KonepsItemMapper { item, policy, observedAt -> mapRawItem(item, policy, SourceEndpoint.NOTICE_LIST, observedAt) }
+
 private const val START_PAGE = 1
 
 private enum class WalkStep { CONTINUE, STOP }
@@ -56,19 +74,21 @@ private class KonepsPageWalkAccumulator {
         signature: List<String>,
         observedAt: Instant,
         policy: KonepsCollectionPolicyData,
+        itemMapper: KonepsItemMapper,
     ) {
         pagesFetched++
         sourceTotal = page.totalCount ?: sourceTotal
         lastPageSignature = signature
-        for (rawItem in page.items) recordItem(rawItem, observedAt, policy)
+        for (rawItem in page.items) recordItem(rawItem, observedAt, policy, itemMapper)
     }
 
     private fun recordItem(
         rawItem: JsonValue.JsonObject,
         observedAt: Instant,
         policy: KonepsCollectionPolicyData,
+        itemMapper: KonepsItemMapper,
     ) {
-        when (val mapped = mapRawItem(rawItem, policy, SourceEndpoint.NOTICE_LIST, observedAt)) {
+        when (val mapped = itemMapper(rawItem, policy, observedAt)) {
             is RawItemOutcome.Mapped -> recordMapped(mapped)
             is RawItemOutcome.Dropped -> recordDrop(mapped.reason)
         }
@@ -179,13 +199,14 @@ private fun applySuccess(
     policy: KonepsCollectionPolicyData,
     clock: Clock,
     pageNo: Int,
+    itemMapper: KonepsItemMapper,
 ): WalkStep {
     val signature = page.items.map { it.render() }
     if (accumulator.isRepeatOf(signature)) {
         accumulator.recordRepeatedPage(pageNo)
         return WalkStep.STOP
     }
-    accumulator.recordPage(page, signature, clock.instant(), policy)
+    accumulator.recordPage(page, signature, clock.instant(), policy, itemMapper)
     return if (accumulator.currentlyComplete() || page.items.isEmpty()) WalkStep.STOP else WalkStep.CONTINUE
 }
 
@@ -195,10 +216,11 @@ private fun applyOutcome(
     policy: KonepsCollectionPolicyData,
     clock: Clock,
     pageNo: Int,
+    itemMapper: KonepsItemMapper,
 ): WalkStep =
     when (outcome) {
         is KonepsCallOutcome.Success -> {
-            applySuccess(accumulator, outcome.body, policy, clock, pageNo)
+            applySuccess(accumulator, outcome.body, policy, clock, pageNo, itemMapper)
         }
 
         KonepsCallOutcome.NoData -> {
@@ -227,6 +249,7 @@ private class KonepsWalkContext(
     val collectionPolicy: KonepsCollectionPolicyData,
     val clock: Clock,
     val counters: KonepsAttemptCounters,
+    val itemMapper: KonepsItemMapper,
 )
 
 /** 페이지 하나를 부르고 누적한다 — 반환값은 「다음 페이지로 계속할지」. */
@@ -246,7 +269,7 @@ private fun fetchNextPage(
             context.collectionPolicy,
             context.counters,
         )
-    val step = applyOutcome(accumulator, outcome, context.collectionPolicy, context.clock, pageNo)
+    val step = applyOutcome(accumulator, outcome, context.collectionPolicy, context.clock, pageNo, context.itemMapper)
     return step == WalkStep.CONTINUE
 }
 
@@ -307,11 +330,24 @@ internal fun walkKonepsNoticePages(
     collectionPolicy: KonepsCollectionPolicyData,
     clock: Clock,
     cursor: PageCursor?,
+    // 3B-2 — 축마다 다른 항목 매핑을 꽂는다. 기본값은 3B 기존 동작 그대로라 공고 축 호출부는
+    // 이 매개변수를 몰라도 된다(시그니처 확장이 3B test 를 바꾸지 않는다).
+    itemMapper: KonepsItemMapper = defaultKonepsItemMapper,
 ): SourceBatch<RawNoticeObservation> {
     val startPage = startPageOf(cursor) ?: return invalidCursorBatch()
     val counters = KonepsAttemptCounters()
     val context =
-        KonepsWalkContext(httpClient, retry, rateLimiter, uriBuilder, httpPolicy, collectionPolicy, clock, counters)
+        KonepsWalkContext(
+            httpClient,
+            retry,
+            rateLimiter,
+            uriBuilder,
+            httpPolicy,
+            collectionPolicy,
+            clock,
+            counters,
+            itemMapper,
+        )
     val accumulator = KonepsPageWalkAccumulator()
     var pageNo = startPage
     var walking = true

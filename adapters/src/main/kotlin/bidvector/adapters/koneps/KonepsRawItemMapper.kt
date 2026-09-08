@@ -39,7 +39,12 @@ internal data class NoticeIdentity(
     val round: String,
 )
 
-private fun JsonValue.toRawValue(): RawValue =
+/**
+ * `internal`(3B-2) — 개찰 축 masking 경로([mapMaskedOpeningItem], `KonepsIdentifierMasking.kt`)
+ * 가 재사용한다. 같은 원문 값 → raw 값 변환 규칙이 공고 축과 개찰 축에 다를 이유가 없어
+ * 중복 정의하지 않는다(v2-지침서 §5 중복 금지).
+ */
+internal fun JsonValue.toRawValue(): RawValue =
     when (this) {
         is JsonValue.JsonString -> RawValue.Present(value)
 
@@ -55,7 +60,8 @@ private fun JsonValue.toRawValue(): RawValue =
         is JsonValue.JsonArray, is JsonValue.JsonObject -> RawValue.Present(render())
     }
 
-private fun identityRawKeys(policy: KonepsCollectionPolicyData): Pair<RawKey?, RawKey?> {
+/** `internal`(3B-2) — [mapMaskedOpeningItem]이 같은 식별자 조립 규칙을 재사용한다. */
+internal fun identityRawKeys(policy: KonepsCollectionPolicyData): Pair<RawKey?, RawKey?> {
     val number =
         policy.fieldContracts
             .contractsFor(FieldConcept.NOTICE_NUMBER)
@@ -69,13 +75,17 @@ private fun identityRawKeys(policy: KonepsCollectionPolicyData): Pair<RawKey?, R
     return number to round
 }
 
-private fun presentText(
+/** `internal`(3B-2) — [mapMaskedOpeningItem]이 masked 값 맵에서 같은 방식으로 값을 읽는다. */
+internal fun presentText(
     fields: Map<RawKey, RawValue>,
     key: RawKey?,
 ): String? = (key?.let(fields::get) as? RawValue.Present)?.text
 
-/** dedup 식별자 조립(M-2) — 공고번호는 canonical, 차수는 형식이 맞을 때만 canonical(그 외 원문). */
-private fun identityOf(
+/**
+ * dedup 식별자 조립(M-2) — 공고번호는 canonical, 차수는 형식이 맞을 때만 canonical(그 외 원문).
+ * `internal`(3B-2) — [mapMaskedOpeningItem]이 재사용한다.
+ */
+internal fun identityOf(
     numberRaw: String,
     roundRaw: String,
 ): NoticeIdentity {
