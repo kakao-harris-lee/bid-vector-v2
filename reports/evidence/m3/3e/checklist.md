@@ -62,3 +62,38 @@
 - `OPEN-3B2-STORAGE-ROW-KEY-COLLISION` — 이 slice가 닫는다(①②). capability-map 상태 갱신은 문서 레인 소관(미확인 — 문서 레인 커밋 대기).
 - `OPEN-3B2-OPENING-FACT-SLOTS` — 이 slice가 닫는다(③④⑤, 3F 축 제외). 같은 문서 레인 갱신 대기.
 - `OPEN-3A-AGGREGATE` — D-3E-4 (a)는 D-3A-1 (a)의 연장이고 이 OPEN을 닫지 않는다(계약 명시 그대로).
+
+## 사용자 승인 — 2026-09-09, slice 3E 종결
+
+verifier r1 `not-ready`(**H-1** 읽기 경로가 세 금액의 provenance 를 `Published` 상수로 지어내 왕복만으로
+권위가 오름 · **H-2** D-3E-3 (a) 의 「관측 시각으로 구분한다」가 읽기 경로에 없어 낡은 자식 행을 소비자가
+알 수 없음 · medium 셋) → 수정 라운드 1(`V5` provenance 컬럼 + 저장값 그대로 복원 · 자식 행 `observedAt`
+필수 필드 · `V6` 공백 CHECK) → r2 `ready-for-review` + 신규 low·medium 셋 → **정리 라운드 2**(마이그레이션
+`V5`·`V6` 를 `V4` 로 흡수 · 공백 판정을 Kotlin `isNotBlank()` 와 동치로 · 가드 인자 단언을 `opening_result`
+까지) → r3 `ready-for-review` + 검증 레인 종결 동의 위에서 **사용자 승인 2026-09-09**(최종 head
+`058c903`). **재작업 2/5.**
+
+**운영자 결정 셋**: **D-3E-1b (a)** 순번 부재 행은 canonical 승격 없이 회계(정체성을 지어내지 않는다) ·
+**스키마 스냅샷 래칫의 「기대값에 추가만」 예외**(마이그레이션이 늘면 3D 의 정확 일치 대조가 반드시
+깨지고 우회 경로가 없다 — 단언 완화·기존 항목 삭제 금지, 검증 레인 표적 재검증) · **실제 조달청 API 의
+읽기 전용 호출 승인**(`OPEN-3B2-TARGETED-OPENING-QUERY` 를 닫기 위해). D-3E-1a/2/3/4 는 설계 검토
+근거로 오케스트레이터 확정, 마이그레이션 흡수는 verifier 실측(적용 이력 없음) 뒤 오케스트레이터 결정.
+
+**닫힌 `OPEN` 셋**: `OPEN-3B2-STORAGE-ROW-KEY-COLLISION`(raw 층) · `OPEN-3B2-OPENING-FACT-SLOTS` ·
+`OPEN-3B2-TARGETED-OPENING-QUERY`(실측 — 표적조회는 가능하고 legacy 의 「불가」 서술과 SET-02 의 소스
+제약을 폐기했다).
+
+**신설 `OPEN` 넷**(정본은 `capability-map.md` §14.3): `OPEN-3E-ROW-ORDER-STABILITY` ·
+`OPEN-3E-RESERVE-FLAG-MISMATCH` · `OPEN-3E-OPENING-AMOUNT-AUTHORITY-GUARD` ·
+`OPEN-3E-SCHEMA-SNAPSHOT-MAINTENANCE`. 문서 레인 부수 신설 `OPEN-3C-ATTACHMENT-SLOT-OVERFLOW`.
+
+**알려진 제한 등재 유지**: `RowDiscriminator` 는 **어댑터 층 한정** — 프로덕션 호출부가 0 이고 `append`
+기본값 `null` 이 곧 옛 충돌 거동이라 종결은 능력 수준이다(**M4 4B 가 인자를 넘겨야 완성**) · 개찰 축 금액
+provenance 는 정확히 저장·복원되지만 **그 값이 쓰기를 결정하지 않는다**(점유 가드 미적용) · 인자 게이트가
+자식 표 가드 셋은 아직 재지 않는다(거동은 실측으로 참, 회귀 방지만 부재) · 기존 canonical 행 backfill
+없음 · 키 재료 확장으로 **기존 관측 키가 전부 바뀐다** · 추첨번호·투찰 축 부재(개찰완료 오퍼레이션 소관) ·
+`progress_division` 열거 제약 없음.
+
+**검증 레인이 자기 오류를 먼저 밝혔다** — 흡수 대조의 첫 덤프 질의가 타입 모호 오류로 **제약을 통째로
+빼고** 비교해 「차이 없음」을 냈고, 그대로 뒀으면 의도된 변경조차 못 본 잘못된 통과였다. 고쳐 다시 돌린
+318 대 318(차이 = 순번 CHECK 정의 1행)이 정본이다. 같은 승인에서 `origin/main` push.
