@@ -13,7 +13,7 @@ slice: 3b2-opening-result-adapter
 base_sha: 착수 시 재고정(curator 커밋·3A 좁은 확장 커밋 뒤 HEAD)   # 초안 시점 HEAD 는 ea58f3e(M3 완료 선언)
 head_sha: 리뷰 시점의 HEAD
 in_scope:
-  - adapters/src/main/kotlin/bidvector/adapters/koneps/**   # 신규: OpeningResultSourcePort 구현(낙찰 목록 + PreparPcDetail) · DocumentSourcePort 구현(license-limit) · 오퍼레이션별 요청 정책 데이터. 3B 의 공통 기반(HttpClient·Resilience4j 한 계층·envelope·pagination·parse·회계·mapper)은 **재사용**하고 재작성하지 않는다 — 공통 기반의 시그니처 변경은 3B test 27 이 그대로 초록일 때만
+  - adapters/src/main/kotlin/bidvector/adapters/koneps/**   # 신규: OpeningResultSourcePort 구현(낙찰 목록 + PreparPcDetail) · DocumentSourcePort 구현(license-limit) · 오퍼레이션별 요청 정책 데이터. 3B 의 공통 기반(HttpClient·Resilience4j 한 계층·envelope·pagination·parse·회계·mapper)은 **재사용**하고 재작성하지 않는다 — 공통 기반의 시그니처 변경은 3B 기존 test 전부가 편집 없이 그대로 초록일 때만
   - adapters/src/test/kotlin/bidvector/adapters/koneps/**   # mock server 시나리오 test(⑦) · 기존 3B test 불변
   - config/quality/gate-tests.properties                     # `gate.tests.adapters` 에 3B-2 test 등재(3B 가 넣은 줄 뒤에 추가만 — 공유 파일, rollback 은 3B-2 가 넣은 줄만 제거)
   - procurement/src/main/kotlin/bidvector/procurement/{Ports.kt,DetailFetch.kt}, procurement/src/test/kotlin/bidvector/procurement/{PortsTest.kt,DetailFetchTest.kt}   # **조건부 · D-3B2-5 (a) 채택 시만** — 자격 원문 조회 가치 술어(업종제한 플래그 `N` → 서브콜 0회)를 3A 패턴(`DetailFetchDecision.Fetch` 와 같은 internal-constructor 증거 값)으로 **추가만**. 다른 procurement 파일 편집 금지
@@ -86,7 +86,7 @@ rollback: |
 
 ## 위협 모델 — 3B-2 고유 경계
 
-**방어한다**: (a) 술어 우회 — `fetchReservePrices`·(D-3B2-5 (a) 시) `fetchQualificationText` 가 internal-constructor 증거 값만 받는다 (b) `inqryDiv` 오용 — 오퍼레이션별 정책 표 + URI 회귀 test(⑦) (c) 사업자 식별자 유입 — P-10 전에는 계약 부재 = 미지 필드 회계, 저장 경로 없음 (d) `08`·`03`·`00+totalCount=0` 의 혼동 — 세 결과가 회계에서 서로 다른 어휘 (e) 3B 공통 기반 회귀 — 3B test 27 불변이 acceptance (f) 서비스 키 노출(D-3B-5 스캔).
+**방어한다**: (a) 술어 우회 — `fetchReservePrices`·(D-3B2-5 (a) 시) `fetchQualificationText` 가 internal-constructor 증거 값만 받는다 (b) `inqryDiv` 오용 — 오퍼레이션별 정책 표 + URI 회귀 test(⑦) (c) 사업자 식별자 유입 — P-10 전에는 계약 부재 = 미지 필드 회계, 저장 경로 없음 (d) `08`·`03`·`00+totalCount=0` 의 혼동 — 세 결과가 회계에서 서로 다른 어휘 (e) 3B 공통 기반 회귀 — 3B 기존 test 전부 편집 없이 초록이 acceptance (f) 서비스 키 노출(D-3B-5 스캔).
 **방어하지 않는다**: 실제 오퍼레이션 경로·파라미터의 실물 일치(실제 호출 승인 뒤) · 예정가 역산·기초금액 덮어쓰기 방지(3D 트리거) · 스케줄·쿼터 예산(OPS-08) · 낙찰 fact 의 canonical 저장(D-3B2-8 후속).
 
 **우회 후보(≥5)**: (1) 4B 가 `Fetch` 없이 상세를 부름 → 서명이 막는다 (2) 목록군에 `inqryDiv=2` 를 「공고번호」로 씀 → 정책 표 + ⑦ URI test (3) `bidwinnrNm` 을 `sourceText` 로 저장 → `sourceText` 는 3D 감사 기록 통로라 P-10 이 masking 을 그 층에도 적용해야 함(P-10 선택지에 명시 요청) (4) 「제한 없음」을 실패로 회계 → ③ 어휘 test (5) `08` 을 재시도 → resultCode 범주 `InputError` 는 비재시도(P-4) (6) 3B walker 시그니처를 바꿔 3B test 를 고침 → in_scope 주석「3B test 불변」+ verifier 대조.
