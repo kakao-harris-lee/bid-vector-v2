@@ -24,6 +24,8 @@ in_scope:
   - procurement/src/main/kotlin/bidvector/procurement/Accounting.kt, procurement/src/test/kotlin/bidvector/procurement/AccountingTest.kt   # **수정 라운드 1 의 scope 예외(운영자 결정 2026-09-08, verifier r1 F-3·F-8)** — 개찰 축 회계에 「계약 밖 키 제외」·「masking 실패」 두 축을 **추가만**. 기존 항등식(`dropReasons` 합 = `dropped`)·필드·사용처·3A corpus 27/27 불변이 조건이고, 판정 로직 변경이라 표적 재검증 대상. 3B 의 H-3(quota 회계 부재 → 3A 좁은 확장) 과 같은 모양의 예외다
   - milestone-3.md                                           # 「Slice 3B-2」 착수 문단 — **문서 레인이 이미 썼다(2026-09-08). 구현 레인은 이 파일을 편집하지 않는다**(3B N-7 혼선 회피)
   - reports/evidence/m3/3b2/**
+  - docs/discovery/capability-map.md                          # **문서 레인 전용**(verifier r3 L-5) — §14.3 OPEN 등재와 SET-02 포인터만. 구현 레인은 편집하지 않는다. 이 slice 가 등재한 OPEN 넷은 아래 「OPEN」 표가 가리킨다
+  - docs/discovery/ux-journey-research.md                     # **문서 레인 전용** — 표적조회 문면에 `OPEN-3B2-TARGETED-OPENING-QUERY` 포인터 한 곳
 out_of_scope:
   - procurement/**                                           # 위 조건부 두 파일 외 — `OpeningResult` fact 확장(예비가격 15·낙찰금액·낙찰자)은 D-3B2-8 별도 후속
   - reports/evidence/m3/3a/policy-values.md, fixtures/**    # curator 레인 소유 — 값이 틀리면 멈추고 보고, 고치지 않는다
