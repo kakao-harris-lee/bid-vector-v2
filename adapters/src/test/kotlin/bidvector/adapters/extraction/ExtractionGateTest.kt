@@ -1,8 +1,12 @@
 package bidvector.adapters.extraction
 
 import bidvector.procurement.FetchedDocument
+import bidvector.sharedkernel.BaseAmount
+import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.Fact
+import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.ReasonCode
+import bidvector.sharedkernel.VatTreatment
 import bidvector.strategy.BudgetBound
 import bidvector.strategy.BudgetBoundInclusivity
 import bidvector.strategy.CategoryCode
@@ -89,6 +93,43 @@ class ExtractionGateTest {
             val noRules = WatchRules.empty(BudgetBoundInclusivity.Inclusive)
             val verdict = noRules.evaluate(subject(category = "공사"))
             verdict.shouldBeInstanceOf<WatchVerdict.NoGate>()
+
+            val outcome = WatchGatedExtractor(buildExtractor(server)).extract(verdict, fetchedDocument())
+
+            outcome.shouldBeInstanceOf<GatedOutcome.Skipped>()
+            server.requestCount shouldBe 0
+        }
+    }
+
+    /** verifier r1 L-4 — `Undeterminable` 도 게이트를 지나지 못한다는 실행 증거(구조는 `when`의 `else`). */
+    @Test
+    fun `Undeterminable 도 LLM port 를 0회 부른다`() {
+        val server = FakeLlmServer.start(listOf(FakeLlmResponse.Reply(200, validExtractionResponseJson())))
+        server.use {
+            val budgetRules =
+                WatchRules(
+                    focusCategories = emptySet(),
+                    focusRegionTerms = emptyList(),
+                    excludeRegionTerms = emptyList(),
+                    requiredKeywordTerms = emptyList(),
+                    excludeKeywordTerms = emptyList(),
+                    budget =
+                        BudgetBound(
+                            min = BaseAmount(1L, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.OperatorDeclared),
+                            max = null,
+                            inclusivity = BudgetBoundInclusivity.Inclusive,
+                        ),
+                )
+            val subjectWithoutAmount =
+                WatchSubject(
+                    categories = emptySet(),
+                    keywordText = KeywordScopeText(""),
+                    fullText = FullScopeText(""),
+                    baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
+                )
+
+            val verdict = budgetRules.evaluate(subjectWithoutAmount)
+            verdict.shouldBeInstanceOf<WatchVerdict.Undeterminable>()
 
             val outcome = WatchGatedExtractor(buildExtractor(server)).extract(verdict, fetchedDocument())
 

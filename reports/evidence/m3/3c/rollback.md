@@ -21,7 +21,13 @@ adapters/src/test/kotlin/bidvector/adapters/extraction/
 
 ```
 adapters/build.gradle.kts                # qualification·strategy·resilience4j-circuitbreaker/
-                                          # timelimiter·json-schema-validator·pdfbox 의존 + 두 번째 dependencies{} 블록
+                                          # timelimiter·json-schema-validator·pdfbox 의존.
+                                          # **구조적 변경(L-3, verifier r1)**: 기존 단일
+                                          # dependencies{} 블록을 둘로 쪼갰다(M2/2A gRPC 좌표
+                                          # 여섯 줄을 두 번째 블록으로 옮김, sizeGate 의 .kts
+                                          # 람다 50줄 축 회피). 되돌릴 때는 3C 가 더한 의존
+                                          # 줄만 지우는 것이 아니라 **그 이동도 되돌려
+                                          # 단일 dependencies{} 블록으로 합쳐야** base 상태다.
 gradle/libs.versions.toml                # json-schema-validator·pdfbox 버전/좌표,
                                           # resilience4j-circuitbreaker/timelimiter 좌표
 config/quality/gate-tests.properties     # gate.tests.adapters 의 extraction.* 11개,
@@ -32,6 +38,8 @@ config/quality/gate-tests.properties     # gate.tests.adapters 의 extraction.* 
 이 세 파일은 `git restore --source=<base> ...`로 파일 전체를 되돌리면 3D 등 다른 레인이
 같은 파일에 낸 base 이후 변경도 함께 사라진다 — **파일 전체 restore 가 아니라 3C 가 추가한
 줄만 수동으로 제거**한다(위 세 파일은 병렬 레인 공유 파일, scope.md 「병렬 레인 경계」 참고).
+`adapters/build.gradle.kts`는 위 구조적 변경 때문에 단순 줄 삭제로 끝나지 않는다 — 두
+번째 `dependencies{}` 블록의 M2/2A 내용을 첫 블록으로 옮겨 합친 뒤에 3C 전용 줄을 지운다.
 
 ## 하네스 레인 변경
 
