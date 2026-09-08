@@ -50,7 +50,22 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base>..HEAD -- CLAUDE.md .claude/` — 착수 시 등재.
+`git log --oneline <base>..HEAD -- CLAUDE.md .claude/` — 착수 시 등재. 준비 단계(2026-09-08) 커밋 여섯은 전부 문서·evidence 경로다(하네스 편집 없음).
+
+## 역방향 파급 검사 — 준비 단계 편집 (evidence-pack 2026-09-02·09-03 규격)
+
+준비 단계가 줄을 더한 승인 문서는 셋이다 — `docs/discovery/capability-map.md`(SET-02 포인터 +7 · §14.3 OPEN 둘 +2) ·
+`milestone-3.md`(준비 완료 문단) · `docs/discovery/ux-journey-research.md`(포인터). `reports/evidence/m3/3a/policy-values.md` 는 §1.9·승인 대기 절이
+**§1.8 뒤·§2 앞**에 들어가 §2 이후의 줄이 밀렸다.
+
+**stem 기준 grep 실측**: `policy-values`·`ux-journey`·`milestone-3` 를 `file:line` 으로 가리키는 곳은 **없다**. `capability-map` 을 가리키는 좌표는 다섯이고
+**둘이 밀렸다** — `:2190`(SET-09 `F-7` 인용, 실제 `F-7` 은 지금 다른 줄) · `:3171`(Codex 0A3 finding 인용, 지금 다른 절). **둘 다 이 편집 전에 이미
+낡아 있었다**(`F-7` 은 인용 좌표보다 열여덟 줄 아래 — 이전 편집들이 만든 드리프트이고 이번 +7 이 더해진 것). 나머지 셋(`:164` 둘·`:1448`)은 편집 지점보다
+위여서 밀리지 않았다(줄 번호를 명령으로 확인).
+
+**밀린 둘은 이 slice 범위 밖이다** — 종결된 M0 slice 의 evidence(`reports/evidence/m0/0c/{decisions-2026-08-28,commands}.md` · `reports/evidence/m0/0a3/scope.md`)이고
+evidence 는 되돌리지도 고치지도 않는다(감사 기록 보존). **알려진 제한으로 등재**하고, 그 문서를 다시 여는 작업이 생기면 좌표를 인용문·절 제목으로 바꾼다
+(「낡는 좌표」 규격).
 
 ---
 
