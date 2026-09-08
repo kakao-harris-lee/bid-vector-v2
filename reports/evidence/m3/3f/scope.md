@@ -1,4 +1,4 @@
-# Slice 계약 — M3 / 3F · 개찰완료 축(투찰 행·추첨번호) — **초안 2026-09-09**
+# Slice 계약 — M3 / 3F · 개찰완료 축(추첨번호·개찰 1위) — **착수 2026-09-09(운영자 승인)**
 
 > **지위**: M3 의 **마지막 잔여**. 3B-2 가 **D-3B2-9 (a)** 로 밖에 둔 개찰완료 오퍼레이션
 > (`getOpengResultListInfoOpengCompt`)을 연다. 3E 가 자식 표(복수예비가격 15행)를 만들었으므로 이제
@@ -22,7 +22,7 @@ head_sha: 리뷰 시점의 HEAD
 in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/koneps/**, adapters/src/test/kotlin/bidvector/adapters/koneps/**   # 개찰완료 오퍼레이션 구현 + 치환 확장 + mock server 시나리오. 3B·3B-2 기존 test 는 편집 없이 초록
   - procurement/src/main/kotlin/bidvector/procurement/{Ports.kt,NoticeFacts.kt,DetailFetch.kt,OpeningResultRepository.kt}, procurement/src/test/kotlin/bidvector/procurement/**   # **추가만** — port 메서드 하나(D-3F-1) · 투찰 행 fact(D-3F-4) · 조회 가치 술어 재사용 판단(D-3F-2). 그 밖의 procurement 편집 금지
-  - adapters/src/main/resources/db/migration/V5__opening_bid_entries.sql   # 신규 마이그레이션 **하나**. V1~V4 를 고치지 않는다(V4 는 3E 종결과 함께 push 됐다 — 이제 되쓸 수 없다)
+  - adapters/src/main/resources/db/migration/V5__opening_complete_axis.sql   # 신규 마이그레이션 **하나** — **부모 컬럼만**(D-3F-3 해소로 투찰자별 자식 표를 만들지 않는다). V1~V4 를 고치지 않는다(**`V4` 는 3E 종결과 함께 push 됐다 — 되쓸 수 없다**)
   - adapters/src/main/kotlin/bidvector/adapters/persistence/**, adapters/src/test/kotlin/bidvector/adapters/persistence/**   # repository + Testcontainers 통합 test
   - adapters/src/test/kotlin/bidvector/adapters/persistence/{CleanMigrationTest.kt,CleanMigrationCheckTest.kt,CleanMigrationTriggerTest.kt}   # **스키마 스냅샷 래칫 — 3E 예외의 선례 적용(D-3F-6)**. 기대값에 **신규 항목을 더하는 편집만**. 완화·삭제 금지, 검증 레인 표적 재검증
   - config/quality/gate-tests.properties
@@ -66,11 +66,11 @@ rollback: |
 | # | 일 | 근거 |
 | --- | --- | --- |
 | ① | **개찰완료 오퍼레이션 구현** — `getOpengResultListInfoOpengCompt` 를 `bidNtceNo` **필수 단건**으로 호출(`inqryDiv` 가 없는 오퍼레이션군 — §1.9.2). 옵션 `bidNtceOrd`·`bidClsfcNo`·`rbidNo` 는 정책 표가 정한다 | §1.9.1·§1.9.2 · 실측 §1.9.7 |
-| ② | **투찰 행 수집·보존** — 응답이 **투찰자별 행**을 준다: `opengRank`·`prcbdrNm`·`bidprcAmt`·`bidprcrt`·`drwtNo1`·`drwtNo2`·`bidprcDt`·`rmrk`·평가점수 넷. **집계·역산을 하지 않는다**(M5·DEC 소유) | §1.9.4 · COL-03 |
+| ② | **투찰자별 행은 `raw_observation` 까지, canonical 은 셋만**(D-3F-3 해소) — 부모에 ① **개찰 1위 축**(순위 1 행) ② **관측된 추첨번호 집합** ③ 개찰결과구분명. **1위를 특정할 수 없으면**(순위 1 부재·중복) 그 축을 **비우고 명시적 회계** — 투찰금액으로 순위를 재계산하지 않는다(동값이 실재한다) | §1.9.4 · 실측 §1.9.7 · 설계 검토 (2) |
 | ③ | **P-10 (a) 를 이 축으로 확장** — `prcbdrBizno`(투찰업체사업자등록번호, **필수**)·`prcbdrCeoNm`(대표자명)은 **어댑터 경계에서 치환**하고 **상호(`prcbdrNm`)만 보존**한다. 3B-2 가 낙찰자 축에 한 것과 **같은 규칙**이며 새 정책이 아니다 | `policy-values.md` §6b P-10 (a) |
 | ④ | **추첨번호는 15행의 1-기반 인덱스로 보존** — 값을 그대로 싣고 **범위 검사만** 한다(1..총예가건수). 범위 밖·부재는 조용한 `0`/`null` 이 아니라 명시적 결과로 회계 | legacy `distribution_extraction` 조사 · 3E 자식 표의 순번이 그 인덱스의 대상 |
 | ⑤ | **조회 가치 술어** — 공고당 1콜이라 쿼터 축이다. 술어를 거치지 않은 호출이 컴파일되지 않게 한다(3A ⑪·D-3B2-5 와 같은 형태). 재사용/신설은 D-3F-2 | COL-03 「호출 예산은 OPS-08, 도메인 판단만 여기」 |
-| ⑥ | **저장** — 투찰 행 자식 표 `V5` 신설 + `OpeningResult` 에 투찰 행 목록. **3E 의 규율을 그대로 잇는다**: 사라진 행을 지우지 않고 관측 시각으로 구분 · provenance 를 지어내지 않음 · 사업자등록번호·대표자명 **컬럼 없음** | 3E ⑤⑥·D-3E-3 (a) · verifier r1 H-1·H-2 |
+| ⑥ | **저장** — `V5` 는 **부모 컬럼만** 더한다(자식 표 없음). **3E 의 규율을 그대로 잇는다**: 사라진 행을 지우지 않고 관측 시각으로 구분 · provenance 를 지어내지 않음 · 사업자등록번호·대표자명 **컬럼 없음** | 3E ⑤⑥·D-3E-3 (a) · verifier r1 H-1·H-2 |
 | ⑦ | **mock server 시나리오** — 정상 다수 행 · 단일 낙찰자 · **협상 계약(투찰금액·투찰율 없음)** · 추첨번호 부재 · 순위 동값 · 치환 세 변형 · `bidNtceNo` 누락 → `08` 비재시도 | 3B-2 ⑦ 관례 · §1.7.5 의 세 갈래 |
 
 **만들지 않는 것**: 실현 사정률·추첨 집계·예정가격 역산(M5·DEC) · 유찰·재입찰·검색군 오퍼레이션 ·
@@ -82,12 +82,16 @@ rollback: |
 
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
-| **D-3F-1** | **port 자리** — 개찰완료 호출을 어디에 두는가 | (a) **`OpeningResultSourcePort` 에 메서드 하나 추가**(3A 좁은 확장, 추가만) (b) 새 port 신설 (c) `fetchOpeningResults` 재사용 | **(a)** — 같은 개찰 축이고 `fetchReservePrices` 와 성질이 같다(공고당 1콜·증거 값 요구). (b)는 fact 하나에 port 셋이 되고 (c)는 조회 축·요청 계약이 달라 한 메서드에 접힌다 | 착수 전 |
-| **D-3F-2** | **⑤ 술어** — `DetailFetchDecision` 을 재사용하는가 | (a) **재사용**(`AlreadyHeld`·`AgeGateNotPassed`·`RecheckGateNotPassed` 가 그대로 뜻이 통한다) (b) 신설 | **(a)** — 「이미 보유 · 개찰 후 age-gate · recheck-gate」 셋이 이 축에도 같은 뜻이다. 어휘를 늘리면 같은 판단이 두 이름을 갖는다. 단 **`Fetch` 가 어느 축의 증거인지** 구별이 필요하면 그때 갈라라(설계 검토가 판정) | 착수 전 |
-| **D-3F-3** | **투찰 행의 정체성** — 자식 표의 기본키를 무엇으로 두는가. **P-10 (a) 가 자연 키를 지운다**(`prcbdrBizno` 치환) | (a) 부모 + `opengRank` (b) 부모 + 상호 (c) 부모 + 순위 + 상호 (d) **정체성이 없으면 승격 거절**(3E D-3E-1b 선례) | **설계 검토가 판정한다** — 순위는 동값·부재 가능성이 있고 상호는 유일·안정 보장이 없다. 3E 가 같은 자리에서 **지어낸 정체성을 거절**했고 그 선례가 여기서도 서는지가 물음이다 | **설계 검토 → 운영자** |
-| **D-3F-4** | **fact 깊이** — 투찰 행을 `OpeningResult` 자식으로 안는가 | (a) **부모 + 투찰 행 목록**(3E 의 복수예비가격과 같은 형태) (b) 별도 fact | **(a)** — D-3E-4 (a) 의 연장. 투찰 행은 부모 없이 뜻이 없다 | 착수 전 |
-| **D-3F-5** | **평가점수 넷**(`bidPrceEvlVal`·`techEvlVal`·`techEvlNaturVal`·`totalEvlAmtVal`, 1.1 추가분) | (a) **수집·보존**(협상 계약 판정의 입력 후보) (b) 이번 slice 밖 | **(a)** — 같은 응답에 오고 버리면 다시 부르는 값이다. **다만 해석·판정은 하지 않는다**(DEC 축) | 착수 전 |
-| **D-3F-6** | **스키마 스냅샷 래칫 예외** — 3E 예외는 「3E 에 한정」이라 다시 받아야 한다 | (a) **3E 와 같은 조건으로 적용**(기대값 추가만·완화 금지·표적 재검증) (b) 매 slice 개별 승인 유지 (c) 상시 규격으로 성문화 | **(a)** 이번 slice · 장기적으로는 (c) 또는 `OPEN-3E-SCHEMA-SNAPSHOT-MAINTENANCE` 의 구조 개선 | 착수 전 |
+| **D-3F-1** ✅ (a) 승인 2026-09-09 | **port 자리** | (a) **`OpeningResultSourcePort` 에 메서드 하나 추가**(3A 좁은 확장, 추가만) (b) 새 port (c) `fetchOpeningResults` 재사용 | **(a)** — 같은 개찰 축이고 `fetchReservePrices` 와 성질이 같다(공고당 1콜·증거 값 요구) | 승인 |
+| **D-3F-2** ✅ (a) 승인 2026-09-09 | **조회 가치 술어** | (a) **`DetailFetchDecision` 재사용** (b) 신설 | **(a)** — 「이미 보유 · 개찰 후 age-gate · recheck-gate」 셋이 이 축에도 같은 뜻이다. `Fetch` 가 어느 축의 증거인지 구별이 필요해지면 그때 가른다 | 승인 |
+| **D-3F-3** ✅ **해소 2026-09-09**(운영자 도메인 결정) | **투찰 행의 정체성** — P-10 (a) 가 자연 키(`prcbdrBizno`)를 치환해 없앤다 | (a) 부모+순위 (b) 부모+상호 (c) 부모+순위+상호 (d) 승격 거절 | **물음 자체가 사라졌다.** 운영자 결정: 실현 사정률·예정가격 재현에 **「누가 어느 번호를 골랐는가」는 필요 없고 관측된 추첨번호 집합으로 충분하다.** 따라서 **투찰자별 canonical 표를 만들지 않는다** — 정체성이 필요 없고, masking 이 지우기로 한 상호를 기본키로 굳히지도 않는다. 실측이 (a)·(c)를 이미 죽였다(`opengRank` 전 행 채워지고 유일한 건 **4/15**, 결측·중복 흔함) | 해소 |
+| **D-3F-4** ✅ (a) 승인 2026-09-09 | **fact 깊이** | (a) **부모에 싣는다** (b) 별도 fact | **(a)** — D-3F-3 해소로 자식 목록이 없어졌다. 부모가 갖는 것은 ① **개찰 1위 축**(순위 1 행의 상호·투찰금액·투찰율·평가점수) ② **관측된 추첨번호 집합** ③ 개찰결과구분명 | 승인 |
+| **D-3F-5** ✅ (a) 승인 2026-09-09 | **평가점수 넷** | (a) **수집·보존** (b) 이번 slice 밖 | **(a)** — 다만 D-3F-3 해소의 귀결로 **투찰자별 평가점수는 `raw_observation` 감사 기록까지**이고 canonical 슬롯은 **1위 행 것만**이다. 해석·판정은 하지 않는다(DEC 축) | 승인 |
+| **D-3F-6** ✅ (a) 승인 2026-09-09 | **스키마 스냅샷 래칫 예외** | (a) **3E 와 같은 조건으로 3F 에 적용** (b) 매 slice 개별 (c) 상시 규격 | **(a)** — 기대값에 **신규 항목을 더하는 편집만**, 완화·기존 항목 삭제 금지, 검증 레인 표적 재검증. 장기 구조 개선은 `OPEN-3E-SCHEMA-SNAPSHOT-MAINTENANCE` | 승인 |
+
+**D-3F-3 해소가 이 slice 를 작게 만든다** — 자식 표·정체성·상호 키 위험이 한꺼번에 사라지고 남는 것은
+부모 컬럼 하나 묶음과 어댑터다. **되돌릴 수 있다**: 투찰자별 원문이 `raw_observation` 에 온전히 남으므로,
+나중에 귀속이 필요해지면 그 감사 기록이 소급 승격의 재료가 된다(3E D-3E-1b 와 같은 성질).
 
 ---
 
@@ -107,5 +111,5 @@ rollback: |
 | `COL-03` 추첨번호 문면 | **이 slice 가 닫는 후보** — 3E 의 15행 + 3F 의 추첨번호가 함께 서면 `COL-03` acceptance 가 완성된다 |
 | `OPEN-3E-OPENING-AMOUNT-AUTHORITY-GUARD` | 이 slice 가 열지 않는다 — 투찰 금액도 같은 미결에 편입되는지 판단해 등재 |
 | `OPEN-3E-SCHEMA-SNAPSHOT-MAINTENANCE` | D-3F-6 가 그 부채를 다시 만난다 — 이 slice 의 경험을 그 행에 보탠다 |
-| 신설 후보 `OPEN-3F-BID-ENTRY-IDENTITY` | D-3F-3 이 「승격 거절」로 가면 — 투찰 행의 정체성이 masking 뒤에 남지 않는다는 사실 |
+| ~~`OPEN-3F-BID-ENTRY-IDENTITY`~~ | **신설하지 않는다** — D-3F-3 이 해소돼 정체성이 필요 없어졌다 |
 | 신설 후보 `OPEN-3F-OPENG-RANK-SEMANTICS` | 순위 동값·부재의 도메인 의미(적격심사 캐스케이드와의 관계) — 관측 필요 |
