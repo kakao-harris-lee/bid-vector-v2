@@ -43,16 +43,26 @@ config/quality/gate-tests.properties     # gate.tests.adapters 의 extraction.* 
 
 ## 하네스 레인 변경
 
-`git log --oneline <base>..HEAD -- CLAUDE.md .claude/` — 3C 작업 구간에서 없음(하네스 레인
-자체 편집 없이 착수 커밋 `9089bd4`만 milestone-3.md 문서 절이며, 이는 scope.md·evidence-pack
-규격상 slice 착수 문서로 별도 관리된다). rollback 대상이 아니다.
+`git log --oneline <base>..HEAD -- CLAUDE.md .claude/` — 3C 작업 구간에서 없음. rollback
+대상이 아니다.
+
+## in_scope 이지만 3C 커밋이 만들지 않아 되돌리지 않는 것 (L-9)
+
+`milestone-3.md`는 scope.md 의 in_scope 목록에 있으나, 그 파일에 실제로 손을 댄 것은
+착수 커밋 `9089bd4`(세션 모델, 3C 착수 문단)와 3D 레인의 종결 커밋들이지 이 문서가 다루는
+3C 구현 커밋(`8b6ea7f`..`ac470ca`, F/N/L 수정 라운드 포함) 어디에도 없다(`git log --stat
+8b6ea7f..HEAD -- milestone-3.md` 로 실측 — 3C 구현 커밋의 변경 파일 목록에 0건). 그래서
+위 두 「되돌릴」 목록 어디에도 이 파일이 없다 — 되돌릴 것이 없기 때문이다.
 
 ## 실측
 
-임시 clone 에서 procurement 두 신규 파일 + adapters extraction 디렉토리 삭제 후
-`git status --porcelain` 이 in_scope 신규 경로에 대해 비어 있음을 확인(신규 파일이므로
-`--source=<base>`에 해당 경로가 없어 삭제되는 형태로 반영됨) — 검증 명령과 결과는
-`commands.md` R-1 행.
+임시 clone 에서 위 절차(경로 restore + 공유 파일 수동 되돌림)를 그대로 실행해 확인했다:
+`adapters/build.gradle.kts`·`gradle/libs.versions.toml`은 `git diff <base>` 결과 0줄(base
+완전 복원), `config/quality/gate-tests.properties`는 3D 레인이 base 이후 같은 파일에 더한
+독립적인 두 줄(`CleanMigrationTriggerTest`·`PrecedenceLabelColumnTest`, 커밋 `15f3325`
+소유)만 남고 3C 가 더한 줄은 전부 걷혔다 — 이는 「3C 줄만 걷혔다」는 판단이 실측으로
+확인된 것이지 우연한 잔여가 아니다. 되돌린 트리에서 `./gradlew --no-build-cache clean
+check` 는 exit 0(348 actionable tasks 전부 executed) — M2/2A gRPC 배선·3D 배선 모두 생존.
 
 ## 복구 시간
 
