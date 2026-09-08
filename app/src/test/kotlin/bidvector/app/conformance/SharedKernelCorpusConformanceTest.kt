@@ -173,6 +173,8 @@ internal val TARGET_DOMAINS =
         // 2026-09-07). 21건은 `KONEPS_COLLECTION_EXECUTORS`가 dispatch 하고, 나머지 6건은
         // `KONEPS_COLLECTION_PENDING_CAPABILITY` 예외(아래 완전성 test 참고)로 명시 등재한다.
         "koneps-collection",
+        // M4/4A ⑧ — 편집 상태 기계(`bidvector.workflow.strategy`) fixture 다섯(D-4A-1 (a)).
+        "strategy-edit",
     )
 
 private const val MANIFEST_PROPERTY = "bidvector.fixtures.manifest"

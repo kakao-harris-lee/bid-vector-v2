@@ -472,7 +472,8 @@ internal val VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
         STRATEGY_EXECUTORS +
         KONEPS_COLLECTION_FIELD_EXECUTORS +
         KONEPS_COLLECTION_ACCOUNTING_EXECUTORS +
-        KONEPS_COLLECTION_DEFECT_FIX_EXECUTORS
+        KONEPS_COLLECTION_DEFECT_FIX_EXECUTORS +
+        STRATEGY_EDIT_EXECUTORS
 
 /**
  * compile-fixture 위임 case → shared-kernel `compile-fixtures` 의 fixture 번호. 실제
