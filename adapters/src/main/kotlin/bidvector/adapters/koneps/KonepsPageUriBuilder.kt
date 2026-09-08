@@ -73,6 +73,12 @@ private class KonepsPageWalkAccumulator {
     // (opengCorpInfo 성분 배치 불일치, 값 전체 폐기)를 unknownFields 와 별도로 센다.
     var maskingFailures = 0
         private set
+
+    // verifier r2 G-1 수정 — 오퍼레이션이 행 식별자를 선언했는데 그 값이 이 항목에서 부재·공백
+    // 이라 dedup 을 적용할 수 없었던 건수. 그런 항목은 identity=null 로 넘어와 항상 살아남고
+    // (never duplicate), 이 축이 그 사실을 드러낸다 — 「모름」을 0/부재로 접지 않는다.
+    var rowIdentifierIndeterminate = 0
+        private set
     var pagesFetched = 0
         private set
     var truncated = false
@@ -117,6 +123,10 @@ private class KonepsPageWalkAccumulator {
             items += mapped.observation
             unknownFields += mapped.unknownFieldCount
             maskingFailures += mapped.maskingFailureCount
+            // G-1 — identity==null 은 「행 식별자가 선언됐는데 이 항목에서 못 얻었다」의 신호다
+            // (rowDiscriminatorOf 가 그 경우에만 identity 를 null 로 낸다, 목록 오퍼레이션의
+            // 정상 emptyList() 경로는 여기 해당하지 않는다).
+            if (mapped.identity == null) rowIdentifierIndeterminate++
         }
     }
 
@@ -182,6 +192,7 @@ private class KonepsPageWalkAccumulator {
             quotaExceeded = counters.quotaExceeded,
             backoffSkipped = counters.backoffSkipped,
             maskingFailures = maskingFailures,
+            rowIdentifierIndeterminate = rowIdentifierIndeterminate,
         )
 }
 

@@ -181,6 +181,84 @@ class KonepsOpeningResultSourceTest {
     }
 
     @Test
+    fun `G-1(a) — compnoRsrvtnPrceSno 가 15행 전부에서 부재해도 15행이 모두 살아남는다`() {
+        val rows =
+            (1..15).map {
+                mapOf(
+                    "bidNtceNo" to NOTICE_ID.number.value,
+                    "bidNtceOrd" to "000",
+                    "plnprc" to "900000000",
+                    "drwtYn" to "N",
+                )
+            }
+        val body = KonepsEnvelopeFixtures.success(rows, totalCount = 15, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchReservePrices(fetchEvidence())
+
+            batch.items.size shouldBe 15
+            batch.accounting.duplicate shouldBe 0
+            batch.accounting.rowIdentifierIndeterminate shouldBe 15
+        }
+    }
+
+    @Test
+    fun `G-1(b) — 일부 행만 compnoRsrvtnPrceSno 가 부재해도 그 행들만 rowIdentifierIndeterminate 로 계수된다`() {
+        val determined =
+            (1..3).map { sno ->
+                mapOf(
+                    "bidNtceNo" to NOTICE_ID.number.value,
+                    "bidNtceOrd" to "000",
+                    "compnoRsrvtnPrceSno" to sno.toString(),
+                    "plnprc" to "900000000",
+                )
+            }
+        val indeterminate =
+            (1..2).map {
+                mapOf(
+                    "bidNtceNo" to NOTICE_ID.number.value,
+                    "bidNtceOrd" to "000",
+                    "plnprc" to "900000000",
+                )
+            }
+        val body =
+            KonepsEnvelopeFixtures.success(determined + indeterminate, totalCount = 5, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchReservePrices(fetchEvidence())
+
+            batch.items.size shouldBe 5
+            batch.accounting.duplicate shouldBe 0
+            batch.accounting.rowIdentifierIndeterminate shouldBe 2
+        }
+    }
+
+    @Test
+    fun `G-1(c) — compnoRsrvtnPrceSno 가 빈 문자열이어도 부재와 같이 취급된다`() {
+        val rows =
+            listOf(
+                mapOf(
+                    "bidNtceNo" to NOTICE_ID.number.value,
+                    "bidNtceOrd" to "000",
+                    "compnoRsrvtnPrceSno" to "",
+                    "plnprc" to "900000000",
+                ),
+                mapOf(
+                    "bidNtceNo" to NOTICE_ID.number.value,
+                    "bidNtceOrd" to "000",
+                    "compnoRsrvtnPrceSno" to "   ",
+                    "plnprc" to "900000001",
+                ),
+            )
+        val body = KonepsEnvelopeFixtures.success(rows, totalCount = 2, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchReservePrices(fetchEvidence())
+
+            batch.items.size shouldBe 2
+            batch.accounting.duplicate shouldBe 0
+            batch.accounting.rowIdentifierIndeterminate shouldBe 2
+        }
+    }
+
+    @Test
     fun `F-2 — 차수 없는 1건이 목록 정상 N건 사이에서 port 수준으로 drop 된다`() {
         val items =
             listOf(

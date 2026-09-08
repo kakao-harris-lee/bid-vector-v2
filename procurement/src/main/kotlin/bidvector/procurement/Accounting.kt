@@ -102,6 +102,16 @@ sealed interface TruncationCause {
  * 넣으면 「항목이 몇 개 왔는가」와 「항목 안에서 무엇이 빠졌는가」가 뒤섞인다. 기본값이
  * 있어 기존 호출처(3A corpus 실행자·`AccountingTest`·3B `mapRawItem` 경로)는 그대로
  * 컴파일된다.
+ *
+ * **`rowIdentifierIndeterminate`는 M3/3B-2 좁은 확장이다**(운영자 결정 2026-09-08, verifier r2
+ * G-1) — 오퍼레이션이 행 식별자(예: 예비가격 상세의 `compnoRsrvtnPrceSno`)를 선언했는데 그
+ * 값이 특정 항목에서 부재·공백이라 dedup 을 적용할 수 없었던 건수다. 그 문서 축이 **옵션**
+ * 이라(§1.7.3) 부재는 정상 응답이고, 이전 판은 부재를 `""`로 접어 같은 공고의 여러 부재 행이
+ * 서로 충돌해 F-1(복수예가 15행 소실)이 그대로 재현됐다(G-1). 그런 항목은 dedup 판정 없이
+ * 항상 살아남는다(`duplicate`로 세지 않는다, COL-03 이 15행 전부를 요구한다) — 이 축이 「dedup
+ * 을 적용하지 못했다」는 사실 자체를 드러낸다. **`dropReasons`/`dropped` 항등식 밖**이다 —
+ * dedup 불가는 항목 drop 이 아니라 항목은 살아남되 중복 판정만 못 한 것이라 다른 축이다.
+ * 기본값 0 이라 masking 없는 공고 축·3A corpus 는 그대로 컴파일된다.
  */
 data class CollectionAccounting(
     val received: Int,
@@ -117,6 +127,7 @@ data class CollectionAccounting(
     val quotaExceeded: Int = 0,
     val backoffSkipped: Int = 0,
     val maskingFailures: Int = 0,
+    val rowIdentifierIndeterminate: Int = 0,
 ) {
     init {
         require(received >= 0 && normalized >= 0 && duplicate >= 0 && dropped >= 0) {
@@ -138,5 +149,6 @@ data class CollectionAccounting(
         require(quotaExceeded >= 0) { "quotaExceeded는 음수일 수 없다" }
         require(backoffSkipped >= 0) { "backoffSkipped는 음수일 수 없다" }
         require(maskingFailures >= 0) { "maskingFailures는 음수일 수 없다" }
+        require(rowIdentifierIndeterminate >= 0) { "rowIdentifierIndeterminate는 음수일 수 없다" }
     }
 }

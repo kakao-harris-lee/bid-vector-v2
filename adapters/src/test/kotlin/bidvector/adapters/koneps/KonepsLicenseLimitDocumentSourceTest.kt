@@ -147,6 +147,26 @@ class KonepsLicenseLimitDocumentSourceTest {
     }
 
     @Test
+    fun `G-1 — lmtGrpNo·lmtSno 가 부재한 제한그룹 행도 모두 살아남고 rowIdentifierIndeterminate 로 계수된다`() {
+        val rows =
+            (1..3).map {
+                mapOf(
+                    "bidNtceNo" to NOTICE_ID.number.value,
+                    "bidNtceOrd" to "000",
+                    "lcnsLmtNm" to "SYN-업종",
+                )
+            }
+        val body = KonepsEnvelopeFixtures.success(rows, totalCount = 3, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server).fetchQualificationText(fetchEvidence())
+
+            batch.items.size shouldBe 3
+            batch.accounting.duplicate shouldBe 0
+            batch.accounting.rowIdentifierIndeterminate shouldBe 3
+        }
+    }
+
+    @Test
     fun `F-2 — resultCode 22 는 quota 초과로 재시도 대상이다(bounded retry)`() {
         val row =
             mapOf("bidNtceNo" to NOTICE_ID.number.value, "bidNtceOrd" to "000", "lmtGrpNo" to "1", "lmtSno" to "1")

@@ -103,25 +103,40 @@ internal fun presentText(
 
 /**
  * dedup 식별자 조립(M-2) — 공고번호는 canonical, 차수는 형식이 맞을 때만 canonical(그 외 원문).
- * `rowDiscriminator`는 호출부가 [KonepsOperationDescriptor.rowIdentifierRawKeys]로 이미 뽑아온
- * 원문 값이다(F-1) — 이 함수는 그 값을 그대로 싣기만 한다. `internal`(3B-2) —
- * [mapMaskedOpeningItem]이 재사용한다.
+ * `rowDiscriminator`는 호출부가 [rowDiscriminatorOf]로 이미 뽑아온 원문 값이다(F-1) — 이 함수는
+ * 그 값을 그대로 싣기만 한다. **`rowDiscriminator`가 `null`이면(verifier r2 G-1) 이 함수도
+ * `null`을 낸다** — 오퍼레이션이 행 식별자를 선언했는데 이 항목에서 그 값을 얻지 못했다는
+ * 뜻이라 dedup 자체가 불가능하다(값을 지어내지 않는다, `""` 로 접어 다른 부재 행과 충돌시키지
+ * 않는다). 호출부([mapRawItem]·[mapMaskedOpeningItem])가 `identity == null`을 「이 항목은
+ * dedup 대상에서 제외 — 항상 살린다」로 다룬다. `internal`(3B-2) — [mapMaskedOpeningItem]이
+ * 재사용한다.
  */
 internal fun identityOf(
     numberRaw: String,
     roundRaw: String,
-    rowDiscriminator: List<String>,
-): NoticeIdentity {
+    rowDiscriminator: List<String>?,
+): NoticeIdentity? {
+    if (rowDiscriminator == null) return null
     val canonicalNumber = NoticeNumber.of(numberRaw).value
     val canonicalRound = runCatching { NoticeRound.of(roundRaw).value }.getOrDefault(roundRaw)
     return NoticeIdentity(canonicalNumber, canonicalRound, rowDiscriminator)
 }
 
-/** F-1 — 오퍼레이션이 선언한 행 식별자 raw 키들의 값을 뽑는다(없으면 빈 문자열, 드롭하지 않는다). */
+/**
+ * 오퍼레이션이 선언한 행 식별자 raw 키들의 값을 뽑는다(F-1). **`rowIdentifierRawKeys`가
+ * 선언한 키 가운데 하나라도 부재·공백이면 `null`을 낸다**(verifier r2 G-1 수정) — 이전 판은
+ * 부재를 `""`로 접어 같은 공고의 여러 「부재 행」이 서로 같은 식별자로 충돌해 F-1 이 재현됐다
+ * (§1.7.3 이 `compnoRsrvtnPrceSno`를 옵션으로 선언해 부재가 정상 응답이다). 「모름」을 빈
+ * 문자열로 표현하지 않는다 — `null`이 그 모름을 그대로 나른다.
+ */
 internal fun rowDiscriminatorOf(
     fields: Map<RawKey, RawValue>,
     rowIdentifierRawKeys: List<String>,
-): List<String> = rowIdentifierRawKeys.map { key -> presentText(fields, RawKey(key)) ?: "" }
+): List<String>? {
+    if (rowIdentifierRawKeys.isEmpty()) return emptyList()
+    val values = rowIdentifierRawKeys.map { key -> presentText(fields, RawKey(key)) }
+    return if (values.any { it.isNullOrBlank() }) null else values.map { it!! }
+}
 
 /**
  * JSON 항목(⑥) → [RawNoticeObservation] — 값은 원문 그대로 옮긴다(변환·정규화 없음). 공고번호·

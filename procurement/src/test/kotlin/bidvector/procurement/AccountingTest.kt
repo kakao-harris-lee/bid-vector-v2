@@ -187,4 +187,23 @@ class AccountingTest {
             accounting(received = 0, normalized = 0, duplicate = 0, dropped = 0).copy(maskingFailures = -1)
         }
     }
+
+    // verifier r2 G-1(운영자 승인 2026-09-08, 3A Accounting.kt 좁은 확장) — 행 식별자가
+    // 선언됐는데 부재·공백이라 dedup 을 적용하지 못한 건수를 별도 축으로 낸다.
+    @Test
+    fun `rowIdentifierIndeterminate 는 기본값 0 이고 dropReasons_dropped 항등식 밖이다`() {
+        val base = accounting(received = 3, normalized = 3, duplicate = 0, dropped = 0)
+
+        base.rowIdentifierIndeterminate shouldBe 0
+        val withIndeterminate = base.copy(rowIdentifierIndeterminate = 2)
+        withIndeterminate.rowIdentifierIndeterminate shouldBe 2
+        withIndeterminate.dropped shouldBe 0
+    }
+
+    @Test
+    fun `rowIdentifierIndeterminate 는 음수를 거부한다`() {
+        shouldThrow<IllegalArgumentException> {
+            accounting(received = 0, normalized = 0, duplicate = 0, dropped = 0).copy(rowIdentifierIndeterminate = -1)
+        }
+    }
 }
