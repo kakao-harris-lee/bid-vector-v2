@@ -139,6 +139,124 @@ official_documents:
         symlink 처럼 blob id 로 고정할 수도 없다. 재취득은 `source_url` + `sha256` 대조로만 된다.
         **그래서 표 본문의 커밋된 정본을 `fixtures/input/koneps-collection-027.json` 에 두었다** — 그 파일은
         해시가 manifest 에 있고 스윕이 읽는다.
+    - id: koneps-scsbid-reference
+      title: "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 낙찰정보서비스"
+      document_version: "1.1"
+      service_id: ScsbidInfoService
+      service_version: "1.5"
+      endpoint: "apis.data.go.kr/1230000/as/ScsbidInfoService"
+      published_at: 2025-01-06
+      document_revised_at: 2026-06-30
+      path: "_workspace/m3-3b2/external/조달청_OpenAPI참고자료_나라장터_낙찰정보서비스_1.1.docx"
+      source_url: ~
+      sha256: 7f4165f67b9810e1e7084902bce67edd2a541f722210e64e352061537c1965dd
+      size_bytes: 664727
+      acquired_by: operator
+      acquired_at: 2026-09-08
+      accessed: "2026-09-08 — 오케스트레이터가 확보해 `_workspace/m3-3b2/external/` 에 두었다(그 폴더의 `SHA256SUMS`). curator 레인(M3/3B-2)이 docx 원문에서 항목 명세를 독립 추출했다."
+      version_caveat: |-
+        **`published_at` 은 문서의 「배포 일자」(= 「서비스 시작일」)이고 문서 개정일이 아니다** — 기존
+        `koneps-openapi-reference` 행과 같은 뜻으로 쓴다. 개정 이력의 마지막 변경일은 `document_revised_at` 이다.
+        **문서 version 이 `1.1` 에 머문 채 변경일이 둘이다**(2025-09-25 항목추가 · 2026-06-30 기타변경) —
+        version 문자열만으로 판을 구별할 수 없으므로 **동일성 판정의 정본은 `sha256`** 이다.
+      revision_history: |-
+        `1.0` 2025 최초 개정 · `1.1` **2025-09-25 항목추가** — 요청 메시지 `bizno`(사업자번호)가 「나라장터
+        검색조건에 의한 낙찰된 목록 현황」 4종(`…PPSSrch`)에, 응답 메시지 평가점수 4항목
+        (`bidPrceEvlVal`·`techEvlVal`·`techEvlNaturVal`·`totalEvlAmtVal`)이 「개찰결과 개찰완료 목록 조회」에
+        추가됐다 · `1.1` **2026-06-30 기타변경** — 소재지 목록 조회에 지역코드 하나 추가(이 저장소가 부르는
+        오퍼레이션 밖).
+      what_it_declares: |-
+        **23 오퍼레이션**의 요청·응답 메시지 명세 — 항목명(영문) · 항목명(국문) · 항목크기 ·
+        항목구분(필수 `1` / 옵션 `0`) · 샘플데이터 · 항목설명. `koneps-openapi-reference` 와 같은 형식이며
+        **개찰·낙찰·복수예비가격 축의 항목 명세가 이 문서에 있다** — `reports/evidence/m3/3a/policy-values.md`
+        §1.7(개찰·예비가격 필드 계약)과 §1.9(오퍼레이션 계약)가 이 문서를 인용하는 절이고, 그 두 절이 이
+        저장소 안의 인용 정본이다.
+        문서가 문면으로 주는 운영 한계는 **23 오퍼레이션 전부 동일**하다 — 최대 메시지 사이즈 · 평균 응답
+        시간 · 초당 최대 트랜잭션(값은 §1.9 가 싣는다).
+        **「OPEN API 에러코드별 조치방안」 16 코드 표가 이 문서 끝에도 있다** — `pps-openapi-guide`(2019
+        활용가이드)의 그 절과 코드 집합·순서·이름이 같다. 이것이 그 표를 **공공데이터포털 공통 절**로 보는
+        방증을 `observed`/`legacy-behavior` 에서 **조달청 참고자료 문면**으로 올린다(P-4 의 적용 범위 물음).
+      what_it_does_not_contain: |-
+        ① **조회 기간 상한을 선언하지 않는다** — `inqryBgnDt`/`inqryEndDt` 는 형식(`YYYYMMDDHHMM`)과 「조회구분이
+        1·2·3 일 경우 필수」만 적고 창의 최대 길이가 없다. (같은 조달청의 `pps-opnstd-reference` 는 자기
+        서비스에 대해 상한을 적는다 — 서비스가 다르므로 전이하지 않는다.)
+        ② **개찰 축 금액의 과세를 선언하지 않는다** — 최종낙찰금액·예정가격·기초예정가격 항목설명이 `(원화,원)`
+        만 적는다. `OPEN-REG-05` 와 같은 갈래로 열린 채 남는다.
+        ③ **일시의 출처 타임존이 없다** — 형식이 `YYYY-MM-DD HH:MM:SS` 고 항목크기가 그것을 꽉 채워 offset
+        자리가 없다. `OPEN-3A-SOURCE-TZ` 가 그대로 적용된다.
+        ④ **`resultCode` 의 범주(재시도 가능/불가·quota·입력 오류·데이터 없음)가 없다** — 위 16 코드 표는
+        사람이 읽는 조치방안이고 그 판정은 `pps-openapi-guide` 와 마찬가지로 이 문서도 하지 않는다.
+        ⑤ **업무구분 코드 전체 체계가 없다** — 업종은 오퍼레이션 이름(`…Thng`·`…Cnstwk`·`…Servc`·`…Frgcpt`)으로
+        갈리고 코드표가 실리지 않는다. `OPEN-COL-03` 은 열린 채다.
+      privacy: |-
+        **문서에 실제 사업자명 · 사업자등록번호 · 대표자명 · 담당자명 · 전화번호 · 주소 · 실제 공고번호 ·
+        문서 제공자의 성명·전화·이메일이 있다.** 어느 것도 이 저장소의 어느 파일에도 옮기지 않았다 —
+        `policy-values.md` §1.7·§1.9 가 인용하는 것은 항목명(영문/국문) · 항목크기 · 항목구분 · 항목설명
+        문면과 구조뿐이고, **식별자를 담은 샘플데이터는 인용하지 않았다.** 금액·율 샘플도 인용하지 않았다
+        (`numeric_discipline` 이 fixture 에 금지하는 축과 겹칠 수 있어 서술로만 적었다).
+        **이 문서가 선언하는 개인·사업자 식별 항목 자체가 수집 정책의 대상**이다 — 최종낙찰업체명·
+        최종낙찰업체사업자등록번호는 **항목구분 필수**이고, 개찰업체정보 한 항목이 업체명·사업자번호·
+        **대표자명**·투찰금액·투찰율을 한 문자열에 담으며 그것도 **필수**다. 그 취급은 승인 대상(P-10)이고
+        승인 전에는 계약을 등재하지 않는다.
+      not_committed: |-
+        **이 파일은 저장소에 없다** — `_workspace/` 는 `.gitignore` 대상이다. `koneps-openapi-reference`
+        처럼 legacy blob id 로 고정할 수도 없다(legacy 저장소에 없는 문서다).
+        **`source_url` 이 없다** — 운영자가 2026-09-08 공공데이터포털(data.go.kr)에서 내려받았고 원본 URL 이
+        기록에 남지 않았다. 재취득 경로는 「포털에서 같은 제목·version 의 문서를 찾아 `sha256` 대조」뿐이며,
+        `pps-openapi-guide` 의 URL 대조보다 약하다. **알려진 제한으로 등재한다.**
+    - id: pps-opnstd-reference
+      title: "조달청 공공데이터 개방 OpenAPI 참고자료 — 나라장터 공공데이터개방표준서비스"
+      document_version: "1.2"
+      service_id: PubDataOpnStdService
+      service_version: "1.0"
+      endpoint: "apis.data.go.kr/1230000/ao/PubDataOpnStdService"
+      published_at: 2025-01-06
+      document_revised_at: 2026-06
+      path: "_workspace/m3-3b2/external/조달청_OpenAPI참고자료_나라장터_공공데이터개방표준서비스_1.2.docx"
+      source_url: ~
+      sha256: 833f0e39f354e11ce6c0e7d868a73a0dfcf46d83d6bcb88d66b936f074aa9570
+      size_bytes: 129628
+      acquired_by: operator
+      acquired_at: 2026-09-08
+      accessed: "2026-09-08 — 오케스트레이터가 확보해 `_workspace/m3-3b2/external/` 에 두었다. curator 레인(M3/3B-2)이 docx 원문에서 항목 명세와 에러코드 표를 독립 추출했다."
+      distinct_from: |-
+        **기존 `pps-openapi-guide` 와 다른 문서다.** 그쪽은 같은 서비스의 **활용가이드**(2019-06)이고 이것은
+        **참고자료**(서비스 시작 2025-01-06, 문서 개정 2026-06)다. 오퍼레이션 셋은 같은 셋
+        (`getDataSetOpnStdBidPblancInfo` · `getDataSetOpnStdScsbidInfo` · `getDataSetOpnStdCntrctInfo`)이고
+        둘 다 문서 version 이 `1.2` 라 **제목·해시로만 구별된다.**
+      revision_history: |-
+        `1.0` 2025 최초 개정 · `1.1` 2025-08 항목추가(계약정보 요청에 기관구분코드·기관코드) ·
+        `1.2` 2026-04 항목변경(**계약체결일자 범위 1개월 → 1주일**) · `1.2` 2026-06 항목변경
+        (**개찰일자 범위 1주일 → 1일**).
+      what_it_declares: |-
+        3 오퍼레이션의 요청·응답 메시지 명세. 이 저장소에 걸리는 것은 둘이다.
+        ① **`opengDate`(개찰일자)** — 항목크기 10 의 **날짜**(일자, 시각 없음), 항목설명 *"조달업체가 제출한
+        입찰서를 개찰하는 일자"*. 입찰공고정보·낙찰정보 오퍼레이션에서 필수, 계약정보에서 옵션.
+        `policy-values.md` §1.7 의 「다른 서비스의 선언」 행이 이것을 인용한다.
+        ② **`bsnsDivCd`(업무구분코드)** — 낙찰정보 오퍼레이션의 **요청** 항목, 항목설명이 값을 넷 열거한다
+        (§1.9 가 싣는다). `OPEN-COL-03`(업무구분 코드 체계) 축의 문서 근거 후보이나 **legacy 가 코드→라벨
+        매핑을 적용하는 키와 다른 키**다(`policy-values.md` §5 각주).
+        ③ **조회 기간 상한을 문면으로 적는다** — 낙찰정보의 개찰일시 범위, 계약정보의 계약체결일자 범위.
+        **이 서비스에 대한 선언이며 `ScsbidInfoService` 로 전이하지 않는다.**
+        문서 끝에 **「OPEN API 에러코드별 조치방안」 16 코드 표**가 있다 — `pps-openapi-guide` 의 그 표와
+        같은 코드 집합·순서다.
+      what_it_does_not_contain: |-
+        **`prcmBsneSeCd` 가 이 문서의 항목 명세에 없다.** 문자열로는 한 번 나타나는데 그 자리는 계약정보
+        오퍼레이션의 `cntrctInfoUrl`(계약정보URL) **샘플 값 안의 질의 파라미터**다 — 항목 행이 아니다.
+        오케스트레이터 사전 대조의 「개방표준에만 있음(2)」는 **`opengDate` 하나**로 정정된다.
+        코드 → 범주 매핑도 없다(`pps-openapi-guide` 와 같다).
+      resultcode_table_diff: |-
+        **`fixtures/input/koneps-collection-027.json` 의 16 행과 이 문서·`koneps-scsbid-reference` 의 표를
+        전수 대조했다(공백 정규화 후). 코드 집합·순서·이름 16/16 일치, 문면 차이는 한 자리뿐이다** —
+        코드 `11` 의 조치방안이 활용가이드·이 참고자료에서는 「확인하시어」이고 낙찰정보서비스 참고자료에서는
+        「확인하여」다. `-027` 은 활용가이드를 인용하므로 그 case 의 축어 인용은 정확하며 **정정하지 않는다.**
+        같은 절이 판마다 한 어절씩 다르다는 사실만 여기 남긴다.
+      privacy: |-
+        문서에 실제 기관명·공고번호·계약번호와 문서 제공자의 성명·전화·이메일이 있다. **어느 것도 이 저장소로
+        옮기지 않았다** — 인용은 항목 명세 행과 형식 문면뿐이다.
+      not_committed: |-
+        **이 파일은 저장소에 없다**(`_workspace/` 는 `.gitignore` 대상). `source_url` 도 없다 —
+        `koneps-scsbid-reference` 와 같은 제한이며 재취득은 포털 재검색 + `sha256` 대조뿐이다.
 
 layout:
   note: |-
