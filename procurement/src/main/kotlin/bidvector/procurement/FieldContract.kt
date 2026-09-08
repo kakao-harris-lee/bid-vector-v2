@@ -85,6 +85,16 @@ enum class FieldConcept {
     PROGRESS_DIVISION,
     OPENING_COMPANY_INFO,
     AWARD_COMPANY_NAME,
+
+    /**
+     * 제한그룹번호(`lmtGrpNo`, license-limit §1.9.5) — verifier r2 G-4. license-limit 이 행
+     * 식별자로 쓰는 두 축 중 하나이지만 계약이 없어 「행 식별자로 쓰는 키가 계약 미등재로
+     * 돈다」는 지적을 받았다 — 계약 없이 도는 상태를 없앤다.
+     */
+    LICENSE_LIMIT_GROUP_NUMBER,
+
+    /** 제한순번(`lmtSno`, license-limit §1.9.5) — `LICENSE_LIMIT_GROUP_NUMBER`와 같은 이유. */
+    LICENSE_LIMIT_SEQUENCE_NUMBER,
 }
 
 /**

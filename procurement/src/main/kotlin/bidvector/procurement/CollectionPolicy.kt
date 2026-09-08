@@ -133,6 +133,10 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
         // 자신이 이 두 필드로 식별자를 뽑는다는 사실이 그 증거다). presentIn 을 NOTICE_LIST
         // 하나로 두면 개찰 축 allow-list 강제(F-6 아래)가 이 필드부터 떨어뜨려 모든 개찰 축
         // 항목이 「공고번호 없음」으로 오분류된다 — 문서가 실제로 싣는 범위를 그대로 반영한다.
+        // **LICENSE_LIMIT_DETAIL 도 더한다**(verifier r2 G-4) — §1.9.5 가 `bidNtceNo`(필수)·
+        // `bidNtceOrd` 를 그 응답에도 선언한다. license-limit 은 지금 mapRawItem(필터 없음)을
+        // 써서 이 계약이 강제되지 않지만, masked 경로로 옮기는 순간 식별자부터 빠지는 사고를
+        // 미리 막는다(계약 문면을 실제 사용 범위보다 넓게 서류로 맞춰 둔다).
         FieldContractRow(
             RawKey("bidNtceNo"),
             FieldConcept.NOTICE_NUMBER,
@@ -147,6 +151,7 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
                     SourceEndpoint.OPENING_AWARD_LIST,
                     SourceEndpoint.OPENING_RESULT_LIST,
                     SourceEndpoint.RESERVE_PRICE_DETAIL,
+                    SourceEndpoint.LICENSE_LIMIT_DETAIL,
                 ),
         ),
         FieldContractRow(
@@ -163,6 +168,7 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
                     SourceEndpoint.OPENING_AWARD_LIST,
                     SourceEndpoint.OPENING_RESULT_LIST,
                     SourceEndpoint.RESERVE_PRICE_DETAIL,
+                    SourceEndpoint.LICENSE_LIMIT_DETAIL,
                 ),
         ),
         // P-3 — 문서로 서는 기초금액 키는 `bssamt` 하나다. legacy `BASE_RESOLUTION_ORDER`의
@@ -263,7 +269,8 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
 
 /**
  * 개찰 축 필드 계약 열 — 운영자 승인 2026-09-08(P-9, `policy-values.md` §1.7·§6b)의
- * `authoritative` 칸 13 행 가운데 **12 행**을 옮긴다. `bidwinnrBizno`(사업자등록번호)는
+ * `authoritative` 칸 13 행 가운데 **12 행**(§1.7)에 더해 **§1.9.5(license-limit) 2 행**
+ * (`lmtGrpNo`·`lmtSno`, verifier r2 G-4)을 옮긴다. `bidwinnrBizno`(사업자등록번호)는
  * 문서로 서지만 이 열에 없다 — P-10 (a) 결정(「사업자등록번호는 저장하지 않는다」)으로
  * 어댑터 경계에서 치환·폐기되어 계약으로 등재하지 않는다(allow-list 반전 — 계약 없는
  * 키는 자동으로 제외된다, 설계 검토 Phase 2.5 게이트 ①). `bsisPlnprc`(기초예정가격)의
@@ -418,6 +425,32 @@ private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
             vatTreatment = VatTreatment.UNKNOWN,
             provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
             presentIn = setOf(SourceEndpoint.OPENING_RESULT_LIST),
+        ),
+        // license-limit(§1.9.5) — lmtGrpNo·lmtSno. 이 port(KonepsLicenseLimitDocumentSource)는
+        // mapRawItem(원문 보존, 계약 미등재 키도 담는다)을 쓰므로 이 행이 없어도 지금 당장은
+        // 무해하게 동작한다 — 등재하는 이유는 verifier r2 G-4: 행 식별자로 쓰는 키
+        // (rowIdentifierRawKeys)가 계약 없이 도는 상태를 없애고, 이 축이 masked 경로로 옮겨질
+        // 미래에 대비해 계약을 문서 범위만큼 미리 갖춘다. §1.9.5 문면은 이 둘의 필수 여부를
+        // 명시하지 않는다(`bidNtceNo`만 「필수」로 명시) — 그래서 OPTIONAL.
+        FieldContractRow(
+            rawName = RawKey("lmtGrpNo"),
+            concept = FieldConcept.LICENSE_LIMIT_GROUP_NUMBER,
+            basis = null,
+            scale = FieldScale.IDENTIFIER,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.LICENSE_LIMIT_DETAIL),
+        ),
+        FieldContractRow(
+            rawName = RawKey("lmtSno"),
+            concept = FieldConcept.LICENSE_LIMIT_SEQUENCE_NUMBER,
+            basis = null,
+            scale = FieldScale.IDENTIFIER,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.LICENSE_LIMIT_DETAIL),
         ),
     )
 

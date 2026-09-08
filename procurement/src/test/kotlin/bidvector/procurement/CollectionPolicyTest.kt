@@ -26,7 +26,7 @@ private val RESOLVED_POLICY: KonepsCollectionPolicyData =
  */
 class CollectionPolicyTest {
     @Test
-    fun `필드 계약은 승인된 채택분 스물네 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
+    fun `필드 계약은 승인된 채택분 스물여섯 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contracts
             .map { it.rawName.name }
             .toSet() shouldBe
@@ -59,6 +59,9 @@ class CollectionPolicyTest {
                 "drwtYn",
                 "progrsDivCdNm",
                 "opengCorpInfo",
+                // license-limit(§1.9.5) — verifier r2 G-4, 행 식별자로 쓰는 키를 계약에 등재.
+                "lmtGrpNo",
+                "lmtSno",
             )
     }
 
@@ -97,16 +100,25 @@ class CollectionPolicyTest {
     }
 
     @Test
-    fun `bidNtceNo·bidNtceOrd 는 개찰 축 세 엔드포인트에도 실린다 — F-6, presentIn 강제의 전제`() {
+    fun `bidNtceNo·bidNtceOrd 는 개찰 축 세 엔드포인트 + license-limit 에도 실린다 — F-6·G-4`() {
         val allEndpoints =
             setOf(
                 SourceEndpoint.NOTICE_LIST,
                 SourceEndpoint.OPENING_AWARD_LIST,
                 SourceEndpoint.OPENING_RESULT_LIST,
                 SourceEndpoint.RESERVE_PRICE_DETAIL,
+                SourceEndpoint.LICENSE_LIMIT_DETAIL,
             )
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceNo"))!!.presentIn shouldBe allEndpoints
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceOrd"))!!.presentIn shouldBe allEndpoints
+    }
+
+    @Test
+    fun `lmtGrpNo·lmtSno 는 license-limit 전용으로 등재된다 — G-4, §1-9-5`() {
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("lmtGrpNo"))!!.presentIn shouldBe
+            setOf(SourceEndpoint.LICENSE_LIMIT_DETAIL)
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("lmtSno"))!!.presentIn shouldBe
+            setOf(SourceEndpoint.LICENSE_LIMIT_DETAIL)
     }
 
     @Test
