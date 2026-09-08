@@ -92,6 +92,9 @@ private data class FieldContractRow(
     val provenanceTemplate: FieldProvenanceTemplate,
     val sourceZone: SourceZoneRuleId? = null,
     val listComponentSeparator: Char? = null,
+    // P-9 ④ 승인(3B-2) — 계약 행 helper 의 presentIn 고정 해제. 기본값(NOTICE_LIST)은 기존
+    // 행 전부(공고 목록)를 그대로 재현해 이 필드 추가가 기존 행에 영향을 주지 않는다.
+    val presentIn: Set<SourceEndpoint> = setOf(SourceEndpoint.NOTICE_LIST),
 ) {
     fun toContract(): KonepsFieldContract =
         KonepsFieldContract.of(
@@ -102,7 +105,7 @@ private data class FieldContractRow(
             nullability = nullability,
             vatTreatment = vatTreatment,
             authoritative = true,
-            presentIn = setOf(SourceEndpoint.NOTICE_LIST),
+            presentIn = presentIn,
             provenanceTemplate = provenanceTemplate,
             effectiveFrom = EffectiveFrom.Initial,
             sourceZone = sourceZone,
@@ -116,7 +119,9 @@ private data class FieldContractRow(
  * `usefulAmt`·율 밴드 둘·개찰·예비가격 17건 등)은 인스턴스화하지 않는다(§6 결정문 —
  * "그 자리는 소유 OPEN이 닫힌 뒤"). 소비되지 않는 코드·플래그·봉투 키(§1.5 잔여·§1.6)도
  * 두지 않는다 — 지금 procurement 가 실제로 읽는 개념 축만 등재한다. 모든 행의 `presentIn`
- * 은 `NOTICE_LIST` 하나다(공고목록 응답 — [FieldContractRow.toContract] 고정값).
+ * 은 `NOTICE_LIST` 하나다(공고목록 응답 — [FieldContractRow.presentIn] 기본값, 이 행들은
+ * 재정의하지 않는다). P-9 승인(3B-2)이 더한 개찰 축 행은 [KONEPS_OPENING_FIELD_ROWS] 가
+ * 따로 갖고 각자 다른 `presentIn`을 명시한다 — 이 목록과 함께 레지스트리로 합쳐진다.
  */
 private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
     listOf(
@@ -230,8 +235,161 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
         ),
     )
 
+/**
+ * 개찰 축 필드 계약 열 — 운영자 승인 2026-09-08(P-9, `policy-values.md` §1.7·§6b)의
+ * `authoritative` 칸 13 행 가운데 **12 행**을 옮긴다. `bidwinnrBizno`(사업자등록번호)는
+ * 문서로 서지만 이 열에 없다 — P-10 (a) 결정(「사업자등록번호는 저장하지 않는다」)으로
+ * 어댑터 경계에서 치환·폐기되어 계약으로 등재하지 않는다(allow-list 반전 — 계약 없는
+ * 키는 자동으로 제외된다, 설계 검토 Phase 2.5 게이트 ①). `bsisPlnprc`(기초예정가격)의
+ * `basis`는 미확정이라 `null`(P-9 결정문 「미확정 칸은 인스턴스화하지 않는다」— 이 값은
+ * basis **셀**만 미확정이고 행 자체는 등재 대상이다). `sucsfbidRate`의 밴드(expectedRange)도
+ * 같은 이유로 두지 않는다.
+ */
+private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
+    listOf(
+        // 낙찰 목록(1~4) + 낙찰 목록 검색(16~19) — presentIn 은 legacy 가 부르는 목록군
+        // 하나(OPENING_AWARD_LIST)로 좁힌다. 검색군은 legacy 미소비(§1.9.1)이고 별도
+        // SourceEndpoint 를 이 slice 가 새로 열지 않는다(과잉 금지, 설계 검토 (3)).
+        FieldContractRow(
+            rawName = RawKey("sucsfbidAmt"),
+            concept = FieldConcept.AWARD_AMOUNT,
+            basis = Basis.AWARD,
+            scale = FieldScale.WON_INTEGER,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST),
+        ),
+        FieldContractRow(
+            rawName = RawKey("sucsfbidRate"),
+            // 이미 있는 토큰을 그대로 쓴다 — "최종낙찰률"이 WINNING_RATE 개념에 들어맞아
+            // 새 토큰을 짓지 않는다(2026-09-01 규칙).
+            concept = FieldConcept.WINNING_RATE,
+            basis = null,
+            scale = FieldScale.PERCENT,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST),
+        ),
+        FieldContractRow(
+            rawName = RawKey("bidwinnrNm"),
+            concept = FieldConcept.AWARD_COMPANY_NAME,
+            basis = null,
+            scale = FieldScale.OPAQUE_TEXT,
+            nullability = FieldNullability.REQUIRED,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST),
+        ),
+        // rlOpengDt·prtcptCnum 은 낙찰 목록·개찰결과 목록 양쪽에 있다(§1.7.4·§1.7.3) — 두
+        // presentIn 을 함께 싣는다.
+        FieldContractRow(
+            rawName = RawKey("rlOpengDt"),
+            concept = FieldConcept.ACTUAL_OPENING_AT,
+            basis = null,
+            scale = FieldScale.DATETIME_NO_ZONE,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            sourceZone = SourceZoneRuleId.ASSUME_KST,
+            presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST, SourceEndpoint.RESERVE_PRICE_DETAIL),
+        ),
+        FieldContractRow(
+            rawName = RawKey("prtcptCnum"),
+            concept = FieldConcept.PARTICIPANT_COUNT,
+            basis = null,
+            scale = FieldScale.COUNT,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST, SourceEndpoint.OPENING_RESULT_LIST),
+        ),
+        // fnlSucsfDate — "일자, 시각 없음"(§1.7.4). DATETIME_NO_ZONE 은 시각 축 계약
+        // (sourceZone 필수)이라 이 필드에 강제하지 않는다 — OPAQUE_TEXT 로 원문만 보존한다
+        // (canonicalize 는 D-3B2-8 후속, 이번 slice 밖). 대문자 `FnlSucsfDate`(외자 2종)
+        // 표기 변형은 관측 전 좁히지 않는다(§1.7.4 — 「두 표기를 각각 등재하고 관측으로
+        // 좁힌다」, `insufficient-evidence`) — 소문자만 이번 slice 가 등재한다.
+        FieldContractRow(
+            rawName = RawKey("fnlSucsfDate"),
+            concept = FieldConcept.FINAL_AWARD_DATE,
+            basis = null,
+            scale = FieldScale.OPAQUE_TEXT,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.OPENING_AWARD_LIST),
+        ),
+        // 예비가격 상세(9~12) — plnprc·bsisPlnprc·compnoRsrvtnPrceSno·drwtYn.
+        FieldContractRow(
+            rawName = RawKey("plnprc"),
+            concept = FieldConcept.RESERVE_PRICE,
+            basis = Basis.YEGA,
+            scale = FieldScale.WON_INTEGER,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.RESERVE_PRICE_DETAIL),
+        ),
+        // bsisPlnprc — basis 자체가 미확정(P-9 결정문). null 로 두고 basisMismatch 대상 밖에
+        // 둔다(basis 가 없는 개념은 대상이 아니다, FieldContractTest 기존 관례와 같다).
+        FieldContractRow(
+            rawName = RawKey("bsisPlnprc"),
+            concept = FieldConcept.RESERVE_PRICE_PRELIMINARY,
+            basis = null,
+            scale = FieldScale.WON_INTEGER,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.RESERVE_PRICE_DETAIL),
+        ),
+        FieldContractRow(
+            rawName = RawKey("compnoRsrvtnPrceSno"),
+            concept = FieldConcept.RESERVE_PRICE_SEQUENCE,
+            basis = null,
+            scale = FieldScale.COUNT,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.RESERVE_PRICE_DETAIL),
+        ),
+        FieldContractRow(
+            rawName = RawKey("drwtYn"),
+            concept = FieldConcept.DRAW_FLAG,
+            basis = null,
+            scale = FieldScale.OPAQUE_TEXT,
+            nullability = FieldNullability.REQUIRED,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.RESERVE_PRICE_DETAIL),
+        ),
+        // 개찰결과 목록(5~8) — progrsDivCdNm·opengCorpInfo. opengCorpInfo 는 어댑터가 masking
+        // 을 거친 값만 이 계약으로 소비한다(원문 사업자번호·대표자명은 어댑터 경계에서
+        // 폐기, P-10 (a)) — 계약 자체는 masking 을 모르고 "이 키가 존재한다"만 안다.
+        FieldContractRow(
+            rawName = RawKey("progrsDivCdNm"),
+            concept = FieldConcept.PROGRESS_DIVISION,
+            basis = null,
+            scale = FieldScale.OPAQUE_TEXT,
+            nullability = FieldNullability.REQUIRED,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.OPENING_RESULT_LIST),
+        ),
+        FieldContractRow(
+            rawName = RawKey("opengCorpInfo"),
+            concept = FieldConcept.OPENING_COMPANY_INFO,
+            basis = null,
+            scale = FieldScale.OPAQUE_TEXT,
+            nullability = FieldNullability.REQUIRED,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            presentIn = setOf(SourceEndpoint.OPENING_RESULT_LIST),
+        ),
+    )
+
 private val KONEPS_OPERATIONAL_FIELD_CONTRACTS: List<KonepsFieldContract> =
-    KONEPS_OPERATIONAL_FIELD_ROWS.map { it.toContract() }
+    (KONEPS_OPERATIONAL_FIELD_ROWS + KONEPS_OPENING_FIELD_ROWS).map { it.toContract() }
 
 /**
  * `resultCode` → 범주(D-M3-4, `OPEN-COL-02`) — 운영자 승인 2026-09-07(P-4 ②③)의 범주

@@ -26,7 +26,7 @@ private val RESOLVED_POLICY: KonepsCollectionPolicyData =
  */
 class CollectionPolicyTest {
     @Test
-    fun `필드 계약은 승인된 채택분 열한 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
+    fun `필드 계약은 승인된 채택분 스물세 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contracts
             .map { it.rawName.name }
             .toSet() shouldBe
@@ -43,7 +43,60 @@ class CollectionPolicyTest {
                 "bsnsDivNm",
                 // v2-defect 018 수정(3A 잔여 일괄 verifier r3 전) — D-3A-8, §5.5.
                 "cnstrtnAbltyEvlAmtList",
+                // P-9 승인(3B-2, 2026-09-08) — 개찰 축 12행. `bidwinnrBizno`는 P-10 (a) 로
+                // 저장하지 않아 등재되지 않는다(13행 중 12행만 인스턴스화).
+                "sucsfbidAmt",
+                "sucsfbidRate",
+                "bidwinnrNm",
+                "rlOpengDt",
+                "prtcptCnum",
+                "fnlSucsfDate",
+                "plnprc",
+                "bsisPlnprc",
+                "compnoRsrvtnPrceSno",
+                "drwtYn",
+                "progrsDivCdNm",
+                "opengCorpInfo",
             )
+    }
+
+    @Test
+    fun `개찰 축 금액 개념은 각자 basis 를 갖는다 — sucsfbidAmt AWARD, plnprc YEGA, bsisPlnprc 는 basis 미확정(P-9)`() {
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("sucsfbidAmt"))!!.basis shouldBe Basis.AWARD
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("plnprc"))!!.basis shouldBe Basis.YEGA
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bsisPlnprc"))!!.basis shouldBe null
+    }
+
+    @Test
+    fun `sucsfbidRate 는 기존 WINNING_RATE 토큰을 재사용한다 — 새 토큰을 짓지 않는다`() {
+        val contract = RESOLVED_POLICY.fieldContracts.contractFor(RawKey("sucsfbidRate"))!!
+
+        contract.concept shouldBe FieldConcept.WINNING_RATE
+        contract.scale shouldBe FieldScale.PERCENT
+        contract.unit shouldBe FieldUnit.PERCENT
+        contract.expectedRange shouldBe null
+    }
+
+    @Test
+    fun `셈 축(참가업체수·복수예가순번)은 COUNT 스케일이고 unit 은 NONE 이다 — P-9 ②`() {
+        listOf("prtcptCnum", "compnoRsrvtnPrceSno").forEach { key ->
+            val contract = RESOLVED_POLICY.fieldContracts.contractFor(RawKey(key))!!
+            contract.scale shouldBe FieldScale.COUNT
+            contract.unit shouldBe FieldUnit.NONE
+        }
+    }
+
+    @Test
+    fun `rlOpengDt 는 낙찰 목록과 예비가격 상세 양쪽에 있다 — presentIn 이 오퍼레이션 군을 구별한다(P-9 ④)`() {
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("rlOpengDt"))!!.presentIn shouldBe
+            setOf(SourceEndpoint.OPENING_AWARD_LIST, SourceEndpoint.RESERVE_PRICE_DETAIL)
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("opengCorpInfo"))!!.presentIn shouldBe
+            setOf(SourceEndpoint.OPENING_RESULT_LIST)
+    }
+
+    @Test
+    fun `bidwinnrBizno 는 어떤 개찰 축 행에도 등재되지 않는다 — P-10 (a), 저장하지 않는 값은 계약을 두지 않는다`() {
+        RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidwinnrBizno")) shouldBe null
     }
 
     @Test

@@ -77,3 +77,44 @@ fun decideDetailFetch(
         }
     }
 }
+
+/** [QualificationFetchDecision.Skip]의 사유(D-3B2-5 (a), COL-04). */
+sealed interface QualificationFetchSkipReason {
+    /** 업종제한 플래그(`indstrytyLmtYn`)가 `N` — 서브콜 자체가 쿼터 낭비다(COL-04 acceptance 첫째). */
+    data object NoRestriction : QualificationFetchSkipReason
+}
+
+/**
+ * 「자격 원문을 조회할 가치가 있는가」라는 도메인 판단(D-3B2-5 (a) 승인, 3B-2 scope.md ④) —
+ * [DetailFetchDecision]과 같은 형태(3A ⑪). [Fetch]는 `internal constructor`다 — 유일한 생성
+ * 경로는 [decideQualificationFetch]이고, `DocumentSourcePort.fetchQualificationText`의 서명이
+ * 이 값을 인자로 요구해 술어를 거치지 않은 호출이 컴파일되지 않는다(위협 모델 방어 (a),
+ * 우회 후보 (4)).
+ */
+sealed interface QualificationFetchDecision {
+    @ConsistentCopyVisibility
+    data class Fetch internal constructor(
+        val noticeId: NoticeId,
+    ) : QualificationFetchDecision
+
+    data class Skip(
+        val reason: QualificationFetchSkipReason,
+    ) : QualificationFetchDecision
+}
+
+/**
+ * 조회 가치 술어(D-3B2-5 (a)) — 순수 함수. `industryRestricted`는 공고 목록 관측에 이미 실려
+ * 오는 `indstrytyLmtYn`(업종제한여부, §1.9.5)의 해석값이다 — 이 함수는 그 해석을 하지 않고
+ * 불리언만 받는다(해석은 호출부, M4 workflow 의 몫). 제한이 없으면(`false`) 서브콜 0회
+ * (`Skip(NoRestriction)`) — 「제한 없음」을 조회 실패가 아니라 조회 자체를 생략하는 이유로
+ * 다룬다(COL-04 「제한 없음」과 「수집 실패」의 구분과는 다른 축 — 이쪽은 호출 전 판단).
+ */
+fun decideQualificationFetch(
+    noticeId: NoticeId,
+    industryRestricted: Boolean,
+): QualificationFetchDecision =
+    if (!industryRestricted) {
+        QualificationFetchDecision.Skip(QualificationFetchSkipReason.NoRestriction)
+    } else {
+        QualificationFetchDecision.Fetch(noticeId)
+    }

@@ -82,3 +82,28 @@ class DetailFetchTest {
         }
     }
 }
+
+/** D-3B2-5 (a) — COL-04 「업종제한 플래그 N → 서브콜 0회」의 순수 술어. */
+class DecideQualificationFetchTest {
+    @Test
+    fun `업종제한이 없으면 NoRestriction 으로 조회하지 않는다`() {
+        val decision = decideQualificationFetch(NOTICE_ID, industryRestricted = false)
+
+        decision shouldBe QualificationFetchDecision.Skip(QualificationFetchSkipReason.NoRestriction)
+    }
+
+    @Test
+    fun `업종제한이 있으면 Fetch 다`() {
+        val decision = decideQualificationFetch(NOTICE_ID, industryRestricted = true)
+
+        decision shouldBe QualificationFetchDecision.Fetch(NOTICE_ID)
+    }
+
+    @Test
+    fun `Fetch 는 internal 생성자다 — 이 술어 밖에서 조립할 수 없다(컴파일 시점 확인은 procurement 모듈 밖 test 몫)`() {
+        val decision = decideQualificationFetch(NOTICE_ID, industryRestricted = true)
+
+        val fetch = decision.shouldBeInstanceOf<QualificationFetchDecision.Fetch>()
+        fetch.noticeId shouldBe NOTICE_ID
+    }
+}

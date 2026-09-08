@@ -13,6 +13,12 @@ enum class FieldScale {
     /** 원 단위 정수 문자열(콤마 포함 가능) — 금액 축. */
     WON_INTEGER,
 
+    /**
+     * 정수 건수·순번 문자열(예: 참가업체수·복수예가순번) — 금액도 비율도 아닌 셈 축(P-9 ②
+     * 승인, 3B-2 `policy-values.md` §1.7.3 — 3A 어휘에 이 축이 없었다).
+     */
+    COUNT,
+
     /** `0`~`1` fraction 문자열. */
     FRACTION,
 
@@ -37,7 +43,16 @@ enum class FieldScale {
     DELIMITED_LIST,
 }
 
-/** 이 필드가 나르는 도메인 개념 — [canonicalize]의 목적지(②). */
+/**
+ * 이 필드가 나르는 도메인 개념 — [canonicalize]의 목적지(②).
+ *
+ * **P-9 ① 승인(3B-2, 2026-09-08)** — 개찰 축 토큰 아홉을 더한다(`policy-values.md` §1.7).
+ * `WINNING_RATE`는 이미 있던 토큰을 그대로 쓴다 — `sucsfbidRate`(최종낙찰률)가 그 개념에
+ * 정확히 들어맞아 새 토큰을 만들지 않는다(2026-09-01 규칙 「어휘를 지어내지 않는다」).
+ * `bidwinnrBizno`(사업자등록번호)·대표자명 축은 토큰을 두지 않는다 — P-10 (a) 결정으로
+ * 어댑터 경계에서 치환·폐기되어 계약 레지스트리에 등재되지 않기 때문이다(어느 토큰도 그
+ * 값을 가리키지 않는다).
+ */
 enum class FieldConcept {
     NOTICE_NUMBER,
     NOTICE_ROUND,
@@ -51,6 +66,17 @@ enum class FieldConcept {
     DEADLINE_AT,
     OPENING_SCHEDULED_AT,
     CONSTRUCTION_CAPACITY_REQUIREMENT,
+    AWARD_AMOUNT,
+    RESERVE_PRICE,
+    RESERVE_PRICE_PRELIMINARY,
+    PARTICIPANT_COUNT,
+    RESERVE_PRICE_SEQUENCE,
+    ACTUAL_OPENING_AT,
+    FINAL_AWARD_DATE,
+    DRAW_FLAG,
+    PROGRESS_DIVISION,
+    OPENING_COMPANY_INFO,
+    AWARD_COMPANY_NAME,
 }
 
 /**
@@ -115,6 +141,7 @@ enum class FieldUnit {
 private val SCALE_UNIT_PAIRING: Map<FieldScale, FieldUnit> =
     mapOf(
         FieldScale.WON_INTEGER to FieldUnit.WON,
+        FieldScale.COUNT to FieldUnit.NONE,
         FieldScale.PERCENT to FieldUnit.PERCENT,
         FieldScale.FRACTION to FieldUnit.NONE,
         FieldScale.IDENTIFIER to FieldUnit.NONE,

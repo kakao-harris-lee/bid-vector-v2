@@ -58,7 +58,11 @@ interface OpeningResultSourcePort {
     fun fetchReservePrices(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
 }
 
-/** 자격 원문·게시 낙찰하한율 수집 port(①, COL-04). */
+/**
+ * 자격 원문·게시 낙찰하한율 수집 port(①, COL-04). [fetchQualificationText]의 서명이
+ * [QualificationFetchDecision.Fetch] 값을 요구한다 — 조회 가치 술어([decideQualificationFetch])
+ * 를 거치지 않은 호출은 컴파일되지 않는다(D-3B2-5 (a), 위협 모델 방어 (a), 우회 후보 (4)).
+ */
 interface DocumentSourcePort {
-    fun fetchQualificationText(noticeId: NoticeId): SourceBatch<RawNoticeObservation>
+    fun fetchQualificationText(evidence: QualificationFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
 }

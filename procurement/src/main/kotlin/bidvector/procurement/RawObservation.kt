@@ -15,12 +15,23 @@ data class RawKey(
     }
 }
 
-/** 이 관측이 어느 KONEPS 엔드포인트에서 왔는가 — 필드 계약의 `presentIn`이 참조한다. */
+/**
+ * 이 관측이 어느 KONEPS 엔드포인트에서 왔는가 — 필드 계약의 `presentIn`이 참조한다.
+ *
+ * **P-9 ④ 승인(3B-2, 2026-09-08)** — `OPENING_AWARD_LIST`(낙찰 목록)·`OPENING_RESULT_LIST`
+ * (개찰결과 목록)·`RESERVE_PRICE_DETAIL`(예비가격 상세) 셋을 더한다. 낙찰정보서비스가 부르는
+ * 세 오퍼레이션 군이 서로 다른 필드 집합을 주므로(`policy-values.md` §1.9.1) 한 토큰으로
+ * 접으면 계약의 `presentIn`이 그 구별을 나르지 못한다 — 기존 `OPENING_RESULT`는 지우지 않고
+ * (P-9 승인 문면 「옆에 세운다」) 옆에 둔다.
+ */
 enum class SourceEndpoint {
     NOTICE_LIST,
     NOTICE_DETAIL,
     LICENSE_LIMIT_DETAIL,
     OPENING_RESULT,
+    OPENING_AWARD_LIST,
+    OPENING_RESULT_LIST,
+    RESERVE_PRICE_DETAIL,
 }
 
 /**
