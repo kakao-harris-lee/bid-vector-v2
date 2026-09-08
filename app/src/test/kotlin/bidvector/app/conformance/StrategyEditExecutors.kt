@@ -11,6 +11,7 @@ import bidvector.strategy.BudgetBoundInclusivity
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.ScoreRange
 import bidvector.strategy.StrategyDraft
+import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
@@ -20,15 +21,22 @@ import bidvector.strategy.WatchRuleId
 import bidvector.strategy.isConfigured
 import bidvector.strategy.validate
 import bidvector.workflow.strategy.Actor
+import bidvector.workflow.strategy.AppliedStrategy
+import bidvector.workflow.strategy.BeginOutcome
+import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.CommandId
+import bidvector.workflow.strategy.CommandResult
 import bidvector.workflow.strategy.EditCommand
+import bidvector.workflow.strategy.EditSession
 import bidvector.workflow.strategy.EditSessionId
 import bidvector.workflow.strategy.EditSessionPolicyData
+import bidvector.workflow.strategy.EditSessionRepository
 import bidvector.workflow.strategy.EditSessionState
+import bidvector.workflow.strategy.EditStrategyWorkflow
 import bidvector.workflow.strategy.EditableField
+import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.OperatorId
-import bidvector.workflow.strategy.apply
-import bidvector.workflow.strategy.beginSession
+import bidvector.workflow.strategy.StrategyRepository
 import tools.jackson.databind.JsonNode
 import java.math.BigDecimal
 import java.time.Duration
@@ -40,6 +48,15 @@ import java.time.Instant
  * `StrategyExecutors.kt`(1E strategy-watch/strategy-validation)와 같은 관심사 분리 —
  * 이 파일은 편집 세션 축만 갖고, 다른 파일의 private helper 를 참조하지 않는다(관례).
  *
+ * **verifier H-3/M-4 수정 — `EditStrategyWorkflow` 경유.** `beginSession`·`apply`가
+ * `internal`로 내려가면서(우회 (3) 구조적 폐쇄) 이 파일이 커널을 직접 부르던 이전 형태가
+ * 컴파일되지 않게 됐다. 지금은 이 파일 안의 fake port 넷(`FakeSessionRepository`·
+ * `FakeStrategyRepository`·고정 `Clock`·`RecordingEventSink`)으로 `EditStrategyWorkflow`
+ * 를 조립해 `begin`→`provideValue`→[`confirm`]을 실제로 몰아 최종 `EditSessionState`를
+ * 읽는다 — ⑥「모든 편집 경로가 use case 를 지난다」를 corpus 자신이 밟는 형태라 이전보다
+ * 더 정직한 실행자다. `testFixtures`는 쓰지 않는다(하네스 게이트 셋을 깬다, 1B-c 선례) —
+ * fake 는 이 파일 안에 둔다.
+ *
  * 다섯 case 전부 같은 형태(ProvideValue [+ Confirm]) 라 하나의 executor 를 공유한다.
  * `violations`·`isConfigured`·`watchRulesEmpty`는 상태 기계의 산출이 아니라 — 상태 기계는
  * `TransitionOutcome`에 그 값을 싣지 않는다(설계 검토 (3), 과잉 판정 회피) — 실제로 마지막
@@ -50,6 +67,46 @@ import java.time.Instant
 private val NOW: Instant = Instant.EPOCH
 private val SESSION_POLICY = EditSessionPolicyData(Duration.ofMinutes(15))
 private val OPERATOR = Actor.Operator(OperatorId("corpus-operator"))
+
+private class FakeStrategyRepository(
+    var strategy: OperatorStrategy,
+) : StrategyRepository {
+    override fun load(): OperatorStrategy = strategy
+
+    override fun save(applied: AppliedStrategy) {
+        strategy = applied.strategy
+    }
+}
+
+private class FakeSessionRepository : EditSessionRepository {
+    private val sessions = mutableMapOf<EditSessionId, EditSession>()
+
+    override fun load(id: EditSessionId): EditSession? = sessions[id]
+
+    override fun save(session: EditSession) {
+        sessions[session.id] = session
+    }
+}
+
+private class RecordingEventSink : EventSink {
+    val published = mutableListOf<StrategyEvent>()
+
+    override fun publish(event: StrategyEvent) {
+        published += event
+    }
+}
+
+/**
+ * case 002(apply 시점 재검증)는 두 스테이지에 서로 다른 정책을 쓴다 — `strategyPolicy` 가
+ * `EditStrategyWorkflow` 생성자 필드라 스테이지마다 인스턴스를 새로 조립하되 [sessions]·
+ * [strategies]·[events]는 공유해 세션·전략 상태가 그대로 이어지게 한다.
+ */
+private fun workflowFor(
+    sessions: EditSessionRepository,
+    strategies: StrategyRepository,
+    events: EventSink,
+    policy: Resolution.Resolved<StrategyPolicyData>,
+): EditStrategyWorkflow = EditStrategyWorkflow(sessions, strategies, Clock { NOW }, events, policy, SESSION_POLICY)
 
 private fun optionalDecimal(
     node: JsonNode,
@@ -225,16 +282,31 @@ private fun strategyEditCaseFrom(input: JsonNode): StrategyEditCase {
     )
 }
 
-/** `ProvideValue` 하나(+ 선택적 `Confirm`)를 실제 [bidvector.workflow.strategy.apply]로 흘린다. */
+/**
+ * `begin` → `provideValue` → [선택적 `confirm`]을 실제 [EditStrategyWorkflow]로 몰아
+ * 최종 [EditSessionState]를 읽는다(verifier H-3/M-4 수정 — 커널 직접 호출 대신 use case
+ * 경유). 두 스테이지가 같은 [FakeSessionRepository]·[FakeStrategyRepository]를 공유한다.
+ */
 private fun runStrategyEdit(case: StrategyEditCase): EditSessionState {
-    val session = beginSession(EditSessionId("corpus-session"), OPERATOR.id, case.field, NOW, SESSION_POLICY)
-    val provideCommand = EditCommand.ProvideValue(CommandId("cmd-1"), session.id, OPERATOR, case.field, case.draft)
-    val provideOutcome = apply(session, provideCommand, NOW, case.current, case.policy)
-    if (!case.doConfirm) return provideOutcome.session.state
+    val sessions = FakeSessionRepository()
+    val strategies = FakeStrategyRepository(case.current)
+    val events = RecordingEventSink()
+    val sessionId = EditSessionId("corpus-session")
 
-    val confirmCommand = EditCommand.Confirm(CommandId("cmd-2"), session.id, OPERATOR, case.current.revision)
-    val confirmPolicy = case.confirmPolicy ?: case.policy
-    return apply(provideOutcome.session, confirmCommand, NOW, case.current, confirmPolicy).session.state
+    val provideWorkflow = workflowFor(sessions, strategies, events, case.policy)
+    val begun = provideWorkflow.begin(sessionId, OPERATOR.id, case.field)
+    check(begun is BeginOutcome.Started) { "corpus 배선 오류 — begin() 이 거부됐다: $begun" }
+
+    val provideCommand = EditCommand.ProvideValue(CommandId("cmd-1"), sessionId, OPERATOR, case.field, case.draft)
+    val provided = provideWorkflow.provideValue(provideCommand)
+    check(provided is CommandResult.Processed) { "corpus 배선 오류 — provideValue() 가 세션을 못 찾았다" }
+    if (!case.doConfirm) return provided.outcome.session.state
+
+    val confirmWorkflow = workflowFor(sessions, strategies, events, case.confirmPolicy ?: case.policy)
+    val confirmCommand = EditCommand.Confirm(CommandId("cmd-2"), sessionId, OPERATOR, case.current.revision)
+    val confirmed = confirmWorkflow.confirm(confirmCommand)
+    check(confirmed is CommandResult.Processed) { "corpus 배선 오류 — confirm() 이 세션을 못 찾았다" }
+    return confirmed.outcome.session.state
 }
 
 /**
