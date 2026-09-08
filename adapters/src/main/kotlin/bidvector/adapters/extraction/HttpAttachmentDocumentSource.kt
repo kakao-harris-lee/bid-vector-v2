@@ -27,8 +27,12 @@ private sealed interface RawFetchOutcome {
 }
 
 /**
- * 첨부문서 취득 어댑터(①) — 크기 상한은 `Content-Length` 헤더와 실제 수신 바이트 둘 다
- * 확인한다(헤더 위조·부재 방어). timeout 은 [AttachmentFetchLimits.timeout]이 정한다.
+ * 첨부문서 취득 어댑터(①, verifier r1 F-5(a) KDoc 정정) — 크기 상한은 **실제 수신 바이트
+ * 수**(`bytes.size`)만 잰다. `Content-Length` 헤더는 main 어디에서도 읽지 않는다 —
+ * `HttpResponse.BodyHandlers.ofByteArray()`가 본문을 전부 메모리에 받은 **뒤**에야
+ * 상한을 검사하므로, 헤더 사전 검사가 주려는 "본문을 다 받기 전에 거부" 이점은 없다.
+ * (알려진 제한 — 헤더 위조·과대 선언 자체를 조기 차단하지 않는다. 크기 상한 자체는
+ * 그대로 강제된다.) timeout 은 [AttachmentFetchLimits.timeout]이 정한다.
  */
 class HttpAttachmentDocumentSource(
     private val httpClient: HttpClient,

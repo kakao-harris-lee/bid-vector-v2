@@ -2,7 +2,12 @@ package bidvector.adapters.extraction
 
 import bidvector.procurement.ExtractedRequirements
 
-/** 예산 초과 축 — 어느 상한을 넘었는지 회계·provenance 에 남긴다. */
+/**
+ * 예산 초과 축 — 어느 상한을 넘었는지 회계·provenance 에 남긴다. **`TokenCount`는 아직
+ * main 에 강제 지점이 없다**(verifier r1 F-4 관측) — `maxTokensPerCall`은 LLM 요청 본문의
+ * `max_tokens`로 나갈 뿐 지역에서 실제 토큰 수를 세지 않는다. 어휘만 선언해 두고 값을
+ * 지어내지 않는다 — 강제는 실측(응답 토큰 사용량 관측) 뒤 추가한다.
+ */
 sealed interface BudgetExceededKind {
     data object ChunkCount : BudgetExceededKind
 
