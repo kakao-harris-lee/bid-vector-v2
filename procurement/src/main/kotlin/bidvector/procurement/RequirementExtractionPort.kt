@@ -39,6 +39,17 @@ data class ExtractionEvidenceSpan(
  * 만들어진다 — 검증 자체는 이 타입의 `init`이 재검사하지 않는다(외부 라이브러리 의존은
  * adapters 층의 일이다, ADR 0006 D-4·§4b). `init`이 재는 것은 이 타입 **자신의** 구조
  * 불변식(빈 이름 목록·공백 이름 금지)뿐이다.
+ *
+ * **알려진 이탈(verifier r1 F-3)** — 이 생성자는 `public`이라 스키마를 한 번도 통과하지
+ * 않은 값으로도 (adapters 뿐 아니라 이 module 을 볼 수 있는 어디서든) 조립할 수 있다
+ * (probe C, app test 에서 컴파일 성공 실측). 설계 검토 (1) 표 ④가 원래 그린 형태
+ * (`internal` + `SchemaValidatedJson` 인자 요구)는 procurement(domain, 외부 라이브러리
+ * 금지)와 adapters(networknt 소유)가 서로 다른 Gradle 모듈이라 컴파일되지 않는다
+ * ([AttachmentUrl]과 같은 이유) — 그래서 공개 `data class` + 구조 불변식으로 대체했다.
+ * adapters 안 유일한 실제 생성 경로(`HttpLlmRequirementExtractor.parseValidatedNode`)는
+ * 검증을 거치지 않고는 도달하지 않는다(변이 실험으로 확인). **이 타입을 검증 없이
+ * 조립하지 않는 것은 호출부의 규율에 달려 있다** — 4B 가 이 타입을 다루는 배선을 만들 때
+ * 그 경로가 실제로 adapters 의 검증된 생성 지점만 거치는지가 그 slice 의 리뷰 항목이다.
  */
 data class ExtractedRequirementItem(
     val groupNo: ExtractedGroupNo?,
