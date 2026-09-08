@@ -1,11 +1,13 @@
-# Slice 계약 — M3 / 3B-2 · 개찰·예비가격·자격 원문 서브콜 adapter — **초안 2026-09-08(curator 결과 반영 전)**
+# Slice 계약 — M3 / 3B-2 · 개찰·예비가격·자격 원문 서브콜 adapter — **초안 2026-09-08 · 문서 근거 반영(승인 대기)**
 
 > **지위**: M3 완료 선언(2026-09-08) 뒤 잔여 slice. 3B 의 범위 분할 ③(D-3B-6 귀결)이 넘긴 scope ⑧ 행 전체 — `OpeningResultSourcePort`
 > (개찰·낙찰 목록 + 복수예비가격 상세) · `DocumentSourcePort`(license-limit 서브콜) · 표적조회. 세션 모델 단독 작성.
 > **선행 조건 충족 2026-09-08**: 운영자가 조달청 **낙찰정보서비스 1.1** 참고자료(+ 개방표준서비스 1.2 참고자료)를 확보 —
-> `_workspace/m3-3b2/external/`, SHA-256 은 그 폴더의 `SHA256SUMS`. curator 레인이 `policy-values.md` §1.7 필드 계약 + 오퍼레이션
-> 계약 절 + 승인 요청(P-9~)을 만들고 있다 — **그 승인 뒤 이 초안의 「curator 대기」 표시를 걷고 base 를 재고정한다.**
-> 착수 조건: P-9~P-12 운영자 승인 · D-3B2-1~8 결정 · M4 4B 가 개찰 fact 를 소비하기 전(milestone-3 완료 문단).
+> `_workspace/m3-3b2/external/`, SHA-256 은 그 폴더의 `SHA256SUMS`, manifest 등재 `official_documents` 의 `koneps-scsbid-reference`·
+> `pps-opnstd-reference`. **문서 근거가 들어왔다**: `policy-values.md` §1.7(필드 계약 13 행, curator 레인) + §1.9(오퍼레이션 계약,
+> 세션 모델 — curator 레인이 사용량 한도로 중단된 뒤 이어 씀) + 같은 문서 「승인 대기 P-7~P-12」 절. 승인 요청 표는
+> `_workspace/m3-3b2/01_curator_approval_request.md`.
+> 착수 조건: **P-9~P-12 운영자 승인**(P-10 은 차단 조건) · D-3B2-1~9 결정 · M4 4B 가 개찰 fact 를 소비하기 전(milestone-3 완료 문단).
 
 ```yaml
 milestone: m3
@@ -74,13 +76,14 @@ rollback: |
 | ID | 물음 | 선택지 | 추천·근거 | 상태 |
 | --- | --- | --- | --- | --- |
 | **D-3B2-1** | **업종별 오퍼레이션 선택 자리** — 낙찰 목록·예비가격 상세가 업종(물품/공사/용역/외자)마다 오퍼레이션이 다르다 | (a) 3B 와 같이 **인스턴스당 오퍼레이션 하나**(baseUri 가 오퍼레이션 경로 포함), 업종 선택은 4B 배선 (b) 어댑터 안에 업종 → 오퍼레이션 카탈로그 정책 데이터 | **(a)** — 3B 관례와 같고 `Fetch(noticeId)` 가 업종을 나르지 않아 (b) 는 시그니처 확장을 부른다. 4B 착수 시 재검토 | 착수 전 |
-| **D-3B2-2** | **① 의 목록 오퍼레이션군** — legacy 는 `getScsbidListSttus*`(낙찰 목록, `SCSBID_AWARD`)로 창을 걷고 예비가격만 `getOpengResultListInfo*PreparPcDetail` 을 쓴다. 문서에는 `getOpengResultListInfo*`(개찰결과 개찰완료 목록 — 1.1 에서 평가점수 4 항목 추가)도 있다 | (a) legacy 와 같이 낙찰 목록군 (b) 개찰결과 목록군 (c) 둘 다(port 메서드 추가 = 3A 확장) | **(a)** 잠정 — COL-02 문면(얼마에 누구에게 = 낙찰)과 맞고 §1.7 의 13 키가 어느 군에 있는지 curator 표가 확정한다. **curator 대기** | 착수 전 |
-| **D-3B2-3** | **① 의 조회 축** — legacy `award_page_params` 는 `inqryDiv="1"` 을 「등록일시 구간」으로 주석하지만 낙찰 목록군의 문서 의미는 **1 = 공고게시일시**, 2 = 개찰일시. 개찰 결과를 「어느 날 개찰됐는가」로 모으려면 2 | (a) **개찰일시(2)** (b) legacy 그대로 1 (c) 둘을 정책값으로 두고 초기값 (a) | **(c)** 초기값 (a) — 기준일의 뜻이 `CollectionReferenceDate` KDoc(KST 캘린더 일자)와 맞아야 하고, legacy 의 주석-문서 불일치는 `insufficient-evidence` 로 등재(운영 피해 기록 없음). **curator 대기**(정확한 항목설명 문면) | 착수 전 |
+| **D-3B2-2** ✅ 문서로 해소 2026-09-08 | **① 의 목록 오퍼레이션군** — 세 군 가운데 무엇을 부르는가 | (a) 낙찰 목록군 (b) 개찰결과 목록군 (c) **둘 다** | **(c)** — 문서 대조 결과 **둘은 대안이 아니라 다른 fact 다**(§1.9.1): 낙찰 목록(1~4)이 `sucsfbidAmt`·`sucsfbidRate`·`bidwinnrNm`·`bidwinnrBizno`·`fnlSucsfDate`·`prtcptCnum`·`rlOpengDt` 를, 개찰결과 목록(5~8)이 `opengDt`·`opengCorpInfo`·`progrsDivCdNm`·`rsrvtnPrceFileExistnceYn` 를 준다. legacy 도 둘 다 부른다. **3A port 확장이 필요 없다** — D-3B2-1 (a) 의 「인스턴스당 오퍼레이션 하나」로 같은 구현 클래스를 두 인스턴스로 세우고 4B 가 배선한다 | 해소 |
+| **D-3B2-3** | **① 의 조회 축** = 승인 요청 **P-12 (2)** | (a) 정책값 + 초기값 **개찰일시** (b) legacy 등록일시 (c) 둘 다 지원(port 시그니처에 축 인자 = 3A 확장) | **(a)** — 문서가 개찰일시 축을 준다(낙찰 목록 `3`, 개찰결과 목록 `3`, 검색군 `2`). 기준일의 뜻이 `CollectionReferenceDate`(KST 캘린더 일자)와 맞는다. legacy 주석-문서 어긋남은 `insufficient-evidence` 등재 | P-12 |
 | **D-3B2-4** | **`bidwinnrNm`·`bidwinnrBizno`·`opengCorpInfo` 취급** = curator **P-10** | curator 승인 요청의 선택지 | 승인 전에는 ⑥ 대로 미지 필드 회계 — 어댑터가 값을 도메인에 들이지 않는다 | P-10 |
 | **D-3B2-5** | **④ 의 자리** — 「업종제한 플래그 `N` 이면 license-limit 0회」는 도메인 판단인데 3A `DocumentSourcePort.fetchQualificationText(noticeId)` 서명에 증거 값이 없다 | (a) **3A 좁은 확장**: `decideQualificationFetch(flags) → QualificationFetchDecision { Fetch(internal), Skip(NoRestriction) }` 순수 함수 + port 서명이 `Fetch` 를 받게(3A ⑪ 과 같은 컴파일 시점 강제, in_scope 조건부 두 파일) (b) 4B 호출부 규칙 (c) 어댑터 안 분기 | **(a)** — 3B verifier H-3 와 같은 갈래(3A 타입 부재를 좁은 추가로). (b) 는 우회 (1) 이 열리고 (c) 는 도메인 판단을 어댑터에 둔다 | 착수 전 |
 | **D-3B2-6** | **표적조회 구현 여부** — legacy 는 `getBidPblancListInfo*`+`inqryDiv=2` 로 공고 1건을 다시 읽어 플래그·차수를 얻은 뒤 license-limit 을 불렀다 | (a) **만들지 않는다** — 3B 목록 관측이 `indstrytyLmtYn` 등 플래그와 `bidNtceOrd` 를 이미 나른다(legacy `ELIGIBILITY_RAW_KEYS` 가 목록 응답 키) (b) `NoticeSourcePort` 단건 변형으로 구현 | **(a)** — 호출 1회·쿼터 절약(COL-04 「쿼터 절약」). 4B 가 목록 밖 공고의 자격을 필요로 하면 별도 slice | 착수 전 |
 | **D-3B2-7** | **fixture 자리** — 3B 는 wire envelope 골든이 없어 test 가 authoritative 필드명으로 envelope 을 직접 지었다(3B 알려진 제한) | (a) 3B 관례 유지 + curator 가 §1.7 필드 단위 authoritative case 만(3A 27 형태) (b) curator 가 문서 샘플 응답에서 **SYN 값 wire 골든**을 `fixtures/input/koneps/**` 에 만들고 `bidvector.fixtures.koneps` 배선까지(3B 후속 동시 해소) | **(a)** 이번 slice · (b) 는 curator 여력과 승인 요청의 fixture 후보 목록을 보고 결정 | curator 대기 |
 | **D-3B2-8** | **3A `OpeningResult` fact 의 슬롯 부재** — 현재 `winningRate`·`derivedBaseAmount`·`observedAt` 뿐이라 복수예비가격 15·추첨·낙찰금액·낙찰자(masked)·참가자수를 canonical 로 옮길 자리가 없다 | (a) **3B-2 밖** — 3B-2 는 raw 관측 + 회계까지, fact 확장은 P-10 승인 뒤 3A 후속 소폭(4B 착수 전, 3D `opening_result` 스키마 확장과 한 묶음) (b) 3B-2 in_scope 로 | **(a)** — 어댑터 slice 에 도메인 fact 설계를 섞지 않는다(3B 가 `Accounting.kt` 만 좁게 연 것과 같은 선). `milestone-3.md` 잔여 문단에 후속으로 등재 | 착수 전 |
+| **D-3B2-9** (신설 2026-09-08) | **개찰완료 오퍼레이션(`getOpengResultListInfoOpengCompt`)을 이번 slice 에서 부르는가** = 승인 요청 **P-12 (4)**. 그것만이 투찰자별 행을 준다 — `drwtNo1`·`drwtNo2`(**추첨번호**)·`bidprcAmt`·`bidprcrt`·`opengRank`·`prcbdrBizno`(필수). legacy 는 부르지 않는다 | (a) **이번 slice 밖**(알려진 제한 등재 + 후속 slice) (b) 포함 | **(a)** — 공고당 1콜의 쿼터 비용과 P-10 의 새 대상 하나가 붙는다. 다만 `COL-03` 문면이 추첨번호를 요구하므로 **미구현을 알려진 제한으로 명시**한다. (b) 선택 시 in/out scope 를 그 자리에서 갱신 | P-12 |
 
 ---
 
@@ -93,15 +96,21 @@ rollback: |
 
 ---
 
-## 조사 결과 — 이 slice 에 영향을 주는 것 (오케스트레이터 사전 대조 2026-09-08, curator 가 재확인)
+## 조사 결과 — 이 slice 에 영향을 주는 것 (문서 대조 2026-09-08 — 정본은 `policy-values.md` §1.7·§1.9)
 
-- **문서 커버리지**: §1.7 의 17 키 중 13 이 낙찰정보서비스 1.1 에 있고, `opengDate`·`prcmBsneSeCd` 는 개방표준서비스 1.2(다른 서비스)에만, `bidOpenDt`·`ntceNm` 은 어느 문서에도 없다(legacy 폴백 후순위 키 — 미등재로 둔다).
-- **legacy 가 부르는 오퍼레이션 13 이 전부 문서에 있다**: `getScsbidListSttus{Servc,Cnstwk,Thng,Frgcpt}` · `getOpengResultListInfo{…}` 4 · `…PreparPcDetail` 4 · `getOpengResultListInfo`(접두). 문서에만 있는 것: `…PPSSrch` 변형, `…Rebid`·`…Failing`·`…OpengCompt`.
-- **`inqryDiv` 는 오퍼레이션군마다 뜻이 다르다**(⑤·D-3B2-3). legacy `reserve_detail_params`(상세 `inqryDiv=2`+`bidNtceNo`)는 문서와 **일치**, `award_page_params` 의 「1 = 등록일시」 주석은 낙찰 목록군 문서 의미(1 = 공고게시일시)와 **어긋난다** — 판정 없이 병기.
-- **`sucsfbidRate` 는 %**(*"최종낙찰금액/예정가격 × 100"*, 샘플 두 자리 소수) — legacy 계약의 `0.5~1.0` 밴드는 재선언이라 불채택(§1.2 확정, P-11).
-- **`rlOpengDt` 형식 `YYYY-MM-DD HH:MM:SS`**(타임존 표기 없음) — 3A `dateTimePatterns`·`sourceZone` 규칙(P-2, `OPEN-3A-SOURCE-TZ`)이 그대로 적용된다.
-- **문서가 주는 운영 한계**: 최대 메시지 4000 bytes · 평균 500 ms · 30 tps(문서 문면, `authoritative`) — rate limiter 초기값의 상한 근거. 예비가격 상세 오퍼레이션의 응답에 「총예가건수·복수예가순번·기초예정가격·추첨여부·추첨횟수·실개찰일시」가 있다(COL-03 의 15 행 + 추첨).
-- **재사용**: 3B 의 `walkKonepsNoticePages`(internal)·`KonepsPageUriBuilder`·`KonepsResilientCall`·`KonepsRawItemMapper`·`MockKonepsServer` 가 그대로 쓰인다 — 단건 조회(②③)는 walker 의 1 페이지 특수화로. 새 HTTP 층·새 JSON 파서를 만들지 않는다.
+- **문서 커버리지**: legacy 소비 17 키 중 **13 이 낙찰정보서비스 1.1** 에 있고(§1.7.1~§1.7.5), `opengDate` 는 개방표준(다른 서비스)에만, `bidOpenDt`·`ntceNm`·`prcmBsneSeCd` 는 **어느 문서에도 없다**(미등재 키 — `prcmBsneSeCd` 는 개방표준 문서의 URL 샘플 안 질의 파라미터일 뿐이라는 curator 정정).
+- **오퍼레이션 23 · legacy 가 부르는 것은 세 군 12**(§1.9.1). 문서에만 있는 것: `…PPSSrch` 8 · `…OpengCompt`·`…Failing`·`…Rebid`.
+- **`inqryDiv` 는 오퍼레이션 군마다 뜻이 다르다**(⑤·D-3B2-3·P-12). 예비가격 상세는 `2`=입찰공고번호(legacy 와 **일치**), 낙찰 목록은 `2`=공고일시·`3`=개찰일시, 검색군은 `3`=입찰공고번호, 개찰완료·유찰·재입찰은 **`inqryDiv` 자체가 없고 `bidNtceNo` 필수**. legacy 의 「1 = 등록일시」 주석은 낙찰 목록군에서 맞고 개찰결과 목록군(1 = 입력일시)에서 어긋난다 — 판정 없이 병기.
+- **`sucsfbidRate` 는 %** 이고 **분자가 최종낙찰금액**이다(*"최종낙찰금액/예정가격 * 100"*). 투찰률은 개찰완료의 `bidprcrt` 로 따로 온다 — 두 율을 한 축으로 접지 않는다(P-11).
+- **`rlOpengDt` 형식 `YYYY-MM-DD HH:MM:SS`**(타임존 표기 없음, 옵션) — 3A `dateTimePatterns`·`sourceZone`(P-2, `OPEN-3A-SOURCE-TZ`)이 그대로 적용된다. **입찰공고정보의 `opengDt` 가 「집행 가능 시작일시, 실제 개찰 아님」인 반면 이것이 실제 시각**이라 age-gate 앵커 후보가 문서로 생겼다(부재 규칙 필요).
+- **예비가격 상세가 주는 것**: `plnprc`·`bssamt`·`bsisPlnprc`·`compnoRsrvtnPrceSno`·`drwtYn` + 신설 후보 `totRsrvtnPrceNum`(총예가건수)·`drwtNum`(추첨횟수)·`bssamtBssUpNum`·`compnoRsrvtnPrceMkngDt`·`PrearngPrcePurcnstcst`. **추첨번호는 여기 없다** — 개찰완료(13)만 준다(D-3B2-9).
+- **`rsrvtnPrceFileExistnceYn`**(예비가격파일존재여부, 개찰결과 목록, **필수**, `Y`/`N`) — COL-03 의 「이미 있으면 상세 호출 0회」가 저장 상태 대신 **원본 신호**로 판정될 수 있다. legacy 미소비. 3A ⑪ 술어가 이 입력을 받을지는 착수 시 결정(3A 확장 여부 포함).
+- **license-limit 의 legacy 실측이 문서로 승격**(§1.9.5): `inqryDiv=2` 에서 `bidNtceNo`·**`bidNtceOrd` 둘 다 필수**이고 샘플이 `000` 이다. `permsnIndstrytyList` 의 항목구분이 **`0..n`** 이라 「제한 없음」이 계약 위반이 아니며, 서브콜 0회 판단 입력 `indstrytyLmtYn` 은 **공고 목록 응답에 이미 있다**(D-3B2-6 (a) 의 근거).
+- **문서 대 실측 충돌 — 판정하지 않는다**: legacy 는 *"공고번호 표적조회는 불가하다(실측)"* 를 개찰 결과 수집의 제약으로 적고 `capability-map.md` SET-02 가 소스 제약으로 승계했다. 문서는 개찰결과 목록에 `inqryDiv=4`(입찰공고번호)를 선언하고 개찰완료(13)는 `bidNtceNo` 를 필수로 요구한다. 신설 `OPEN-3B2-TARGETED-OPENING-QUERY` — 실제 호출 승인 뒤에만 닫히고, 닫히면 쿼터 계산이 바뀐다.
+- **문서 운영 한계** 4000 bytes · 500 ms · 30 tps(전 23 오퍼레이션, `authoritative`) — rate limiter·페이지 크기 상한 근거. legacy 의 999 행 페이지와 대조가 필요하다(관측).
+- **문서 내부 불일치 둘**: `numOfRows`·`pageNo` 의 항목구분이 오퍼레이션마다 필수/옵션으로 갈린다(항상 보내 양쪽 만족) · 식별자 항목크기가 갈린다(`bidNtceNo` 40/11, `bidNtceOrd` 2/3 — 문자열 원문 보존으로 회피).
+- **대소문자 변형이 문서 안에 있다**: `fnlSucsfDate`/`FnlSucsfDate`(외자 2종만 대문자) · `PrearngPrcePurcnstcst`. **대소문자 무시 조회로 접지 않는다** — 미지 필드 리포트(§5.3 규율 1)가 무력해진다.
+- **재사용**: 3B 의 `walkKonepsNoticePages`(internal)·`KonepsPageUriBuilder`·`KonepsResilientCall`·`KonepsRawItemMapper`·`MockKonepsServer` 가 그대로 쓰인다 — 단건 조회(②③)는 walker 의 1 페이지 특수화로. 새 HTTP 층·새 JSON 파서를 만들지 않는다. **응답 봉투가 §1.6 과 같은 형태**라 3B 의 envelope 검증이 그대로 선다.
 
 ---
 
@@ -113,3 +122,5 @@ rollback: |
 | `OPEN-COL-03`(업무구분 코드 체계) | 낙찰정보서비스 `bsnsDivCd`(1 물품 · 2 외자 · 3 공사 · 5 용역 — 개방표준 문서 문면)는 curator 표로; 3B-2 는 소비하지 않는다 |
 | `OPEN-3C-ATTACHMENT-FIELD-CONTRACT`(P-8) | 3B-2 대상 아님 — curator 표 별도 행 |
 | 신설 후보 `OPEN-3B2-OPENING-FACT-SLOTS` | D-3B2-8 (a) 시 등재: `OpeningResult` fact 확장 + 3D 스키마, P-10 뒤 |
+| 신설 후보 `OPEN-3B2-TARGETED-OPENING-QUERY` | **문서 대 실측 충돌** — 문서는 개찰결과 목록의 `inqryDiv=4`(입찰공고번호)와 개찰완료의 `bidNtceNo` 필수 단건 조회를 선언하는데, legacy 실측과 `capability-map.md` SET-02 는 「공고번호 표적조회 불가, 날짜창 스윕이 유일」이라 적는다. **실제 호출 승인 뒤에만 닫힌다.** 닫히면 SET-02 의 소스 제약 문면과 쿼터 계산이 바뀐다 |
+| 신설 후보 `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` | 문서 최대 메시지 **4000 bytes** 대 legacy 페이지 크기(목록 999) — 한 페이지가 상한을 넘으면 잘린 응답이 온다. 관측으로만 닫힌다 |
