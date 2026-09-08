@@ -74,7 +74,12 @@ class KonepsOpeningResultSource(
             policy,
             config.clock,
             cursor,
-        ) { item, itemPolicy, observedAt -> mapMaskedOpeningItem(item, itemPolicy, listSourceEndpoint, observedAt) }
+        ) { item, itemPolicy, observedAt ->
+            // F-1(verifier r1) — 낙찰 목록·개찰결과 목록은 한 행=한 공고라 listOperation
+            // 이 선언한 rowIdentifierRawKeys 를 그대로 쓴다(AWARD_LIST·OPENING_RESULT_LIST
+            // 둘 다 emptyList()).
+            mapMaskedOpeningItem(item, itemPolicy, listSourceEndpoint, observedAt, listOperation.rowIdentifierRawKeys)
+        }
     }
 
     /**
@@ -93,6 +98,15 @@ class KonepsOpeningResultSource(
             KonepsOperationPolicy.RESERVE_PRICE_DETAIL,
             evidence.noticeId,
         ) { item, itemPolicy, observedAt ->
-            mapMaskedOpeningItem(item, itemPolicy, SourceEndpoint.RESERVE_PRICE_DETAIL, observedAt)
+            // F-1(verifier r1) — 예비가격 상세는 한 공고에 복수예가 15행까지 온다
+            // (compnoRsrvtnPrceSno 마다 반복, §1.7.1). 그 순번을 행 식별자에 더하지
+            // 않으면 14행이 duplicate 로 잘못 접힌다.
+            mapMaskedOpeningItem(
+                item,
+                itemPolicy,
+                SourceEndpoint.RESERVE_PRICE_DETAIL,
+                observedAt,
+                KonepsOperationPolicy.RESERVE_PRICE_DETAIL.rowIdentifierRawKeys,
+            )
         }
 }

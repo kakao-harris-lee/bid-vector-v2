@@ -126,6 +126,10 @@ internal fun mapMaskedOpeningItem(
     policy: KonepsCollectionPolicyData,
     sourceEndpoint: SourceEndpoint,
     observedAt: Instant,
+    // F-1(verifier r1) — 낙찰 목록·개찰결과 목록은 emptyList(), 예비가격 상세는
+    // KonepsOperationPolicy.RESERVE_PRICE_DETAIL.rowIdentifierRawKeys(compnoRsrvtnPrceSno).
+    // 기본값 없음 — 새 개찰 축 오퍼레이션이 이 값을 잊으면 컴파일이 깨진다.
+    rowIdentifierRawKeys: List<String>,
 ): RawItemOutcome {
     val masked = MaskedKonepsItem.from(item, policy)
     val (numberKey, roundKey) = identityRawKeys(policy)
@@ -135,5 +139,6 @@ internal fun mapMaskedOpeningItem(
         return RawItemOutcome.Dropped(CollectionDropReason.CollectionMissingNoticeNumber)
     }
     val observation = RawNoticeObservation.ofRawValues(masked.fields, sourceEndpoint, observedAt, masked.sourceText)
-    return RawItemOutcome.Mapped(observation, identityOf(numberRaw, roundRaw), masked.decompositionFailures)
+    val identity = identityOf(numberRaw, roundRaw, rowDiscriminatorOf(masked.fields, rowIdentifierRawKeys))
+    return RawItemOutcome.Mapped(observation, identity, masked.decompositionFailures)
 }

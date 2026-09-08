@@ -76,6 +76,18 @@ class KonepsOpenApiNoticeSource(
             KonepsPageUriBuilder { pageNo ->
                 buildListUri(baseUri, serviceKey, referenceDate, pageNo, numOfRowsPerPage)
             }
-        return walkKonepsNoticePages(httpClient, retry, rateLimiter, uriBuilder, httpPolicy, policy, clock, cursor)
+        // F-4(verifier r1, 3B-2) — itemMapper 기본값이 없어졌다. 이 port 는 항상 공고 축
+        // 원문 보존 mapper 를 쓴다(동작 불변, 이전 판의 암묵 기본값과 같은 값을 명시할 뿐).
+        return walkKonepsNoticePages(
+            httpClient,
+            retry,
+            rateLimiter,
+            uriBuilder,
+            httpPolicy,
+            policy,
+            clock,
+            cursor,
+            defaultKonepsItemMapper,
+        )
     }
 }

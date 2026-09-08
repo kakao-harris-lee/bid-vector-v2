@@ -14,12 +14,20 @@ import java.net.URI
  * (`bidNtceNo`) 는 문서상 상호배타다(날짜창 스윕 대 단건 조회, D-3B2-2·D-3B2-3) — 함께 참일
  * 근거가 없어 `init`이 거부한다. `requiresNoticeRound`(`bidNtceOrd`)는 `bidNtceNo`가 필요한
  * 오퍼레이션 안에서만 뜻이 있다(license-limit, §1.9.5 — 둘 다 필수).
+ *
+ * `rowIdentifierRawKeys`(verifier r1 F-1 수정) — (공고번호,차수) 만으로 행을 구별할 수 없는
+ * 오퍼레이션이 추가로 선언하는 raw 키. 목록 오퍼레이션(한 행=한 공고)은 `emptyList()`, 상세
+ * 오퍼레이션(한 공고=여러 행)은 그 행을 가르는 키를 적는다 — 예비가격 상세는
+ * `compnoRsrvtnPrceSno`(복수예가순번), license-limit 은 `lmtGrpNo`+`lmtSno`. **기본값이 없다**
+ * — `inqryDiv`와 같은 규율로, 새 오퍼레이션을 추가하면 이 값을 반드시 선언해야 컴파일된다.
+ * 비워 두면 같은 공고의 여러 행이 dedup 식별자 충돌로 `duplicate` 에 접혀 사라진다(F-1).
  */
 data class KonepsOperationDescriptor(
     val inquiryDivValue: String,
     val requiresPeriodWindow: Boolean,
     val requiresNoticeNumber: Boolean,
     val requiresNoticeRound: Boolean,
+    val rowIdentifierRawKeys: List<String>,
 ) {
     init {
         require(inquiryDivValue.isNotBlank()) { "inquiryDivValue는 빈 문자열일 수 없다" }
@@ -37,36 +45,45 @@ data class KonepsOperationDescriptor(
  * 개찰일시**다(P-12 (a) 결정문) — 낙찰 목록·개찰결과 목록 둘 다 개찰일시가 `3`.
  */
 internal object KonepsOperationPolicy {
-    /** 낙찰 목록(1~4) — `inqryDiv=3`(개찰일시), 기간창 필수(§1.9.2 표). */
+    /** 낙찰 목록(1~4) — `inqryDiv=3`(개찰일시), 기간창 필수(§1.9.2 표). 한 행=한 공고. */
     val AWARD_LIST =
         KonepsOperationDescriptor(
             inquiryDivValue = "3",
             requiresPeriodWindow = true,
             requiresNoticeNumber = false,
             requiresNoticeRound = false,
+            rowIdentifierRawKeys = emptyList(),
         )
 
-    /** 개찰결과 목록(5~8) — `inqryDiv=3`(개찰일시), 기간창 필수(§1.9.2 표). */
+    /** 개찰결과 목록(5~8) — `inqryDiv=3`(개찰일시), 기간창 필수(§1.9.2 표). 한 행=한 공고. */
     val OPENING_RESULT_LIST =
         KonepsOperationDescriptor(
             inquiryDivValue = "3",
             requiresPeriodWindow = true,
             requiresNoticeNumber = false,
             requiresNoticeRound = false,
+            rowIdentifierRawKeys = emptyList(),
         )
 
-    /** 예비가격 상세(9~12) — `inqryDiv=2`(입찰공고번호, legacy 와 일치 — D-3B2-2 (a)), 단건 조회. */
+    /**
+     * 예비가격 상세(9~12) — `inqryDiv=2`(입찰공고번호, legacy 와 일치 — D-3B2-2 (a)), 단건 조회.
+     * **한 공고=여러 행**(복수예비가격, §1.7.1 — "행이 compnoRsrvtnPrceSno 마다 반복") —
+     * F-1(verifier r1) 수정으로 그 순번을 행 식별자에 더한다.
+     */
     val RESERVE_PRICE_DETAIL =
         KonepsOperationDescriptor(
             inquiryDivValue = "2",
             requiresPeriodWindow = false,
             requiresNoticeNumber = true,
             requiresNoticeRound = false,
+            rowIdentifierRawKeys = listOf("compnoRsrvtnPrceSno"),
         )
 
     /**
      * license-limit(다른 서비스, 입찰공고정보서비스 오퍼레이션 15, §1.9.5) — `inqryDiv=2`
-     * (입찰공고번호), `bidNtceNo`·`bidNtceOrd` **둘 다 필수**(누락 시 resultCode `08`).
+     * (입찰공고번호), `bidNtceNo`·`bidNtceOrd` **둘 다 필수**(누락 시 resultCode `08`). **한
+     * 공고=여러 행**(제한그룹번호·제한순번 축) — F-1(verifier r1) 수정으로 그 짝을 행
+     * 식별자에 더한다.
      */
     val LICENSE_LIMIT_DETAIL =
         KonepsOperationDescriptor(
@@ -74,6 +91,7 @@ internal object KonepsOperationPolicy {
             requiresPeriodWindow = false,
             requiresNoticeNumber = true,
             requiresNoticeRound = true,
+            rowIdentifierRawKeys = listOf("lmtGrpNo", "lmtSno"),
         )
 }
 

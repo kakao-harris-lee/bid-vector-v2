@@ -33,10 +33,20 @@ internal sealed interface RawItemOutcome {
  * `NoticeRound.of`는 형식 위반에 `require`로 던지므로(원문이 3자리가 아닐 수 있는 악성·
  * 오류 응답), 실패하면 원문 그대로 남겨 dedup 경로가 예외로 흐르지 않는다(원 설계 판단의
  * 잔여 절반, checklist.md).
+ *
+ * **`rowDiscriminator`(verifier r1 F-1 수정, 3B-2) — 한 공고가 여러 행을 주는 상세
+ * 오퍼레이션의 행 축.** 목록 오퍼레이션(한 행 = 한 공고)은 이 목록이 비어 있고
+ * (공고번호,차수)만으로 식별자가 닫힌다. 상세 오퍼레이션(예비가격 상세의
+ * `compnoRsrvtnPrceSno`, license-limit 의 `lmtGrpNo`+`lmtSno`)은 [KonepsOperationDescriptor
+ * .rowIdentifierRawKeys]가 이 목록을 채운다 — **오퍼레이션 서술 값 객체가 선언하고 기본값이
+ * 없다**(`inqryDiv`와 같은 규율, 새 오퍼레이션을 추가하면 행 식별자를 반드시 선언해야
+ * 컴파일된다). 비워 두면 같은 공고의 여러 행이 첫 행만 남고 나머지가 `duplicate`로 잘못
+ * 회계된다(F-1 — 복수예비가격 15행이 1행으로 접히는 결함의 원인).
  */
 internal data class NoticeIdentity(
     val canonicalNumber: String,
     val round: String,
+    val rowDiscriminator: List<String>,
 )
 
 /**
@@ -83,16 +93,25 @@ internal fun presentText(
 
 /**
  * dedup 식별자 조립(M-2) — 공고번호는 canonical, 차수는 형식이 맞을 때만 canonical(그 외 원문).
- * `internal`(3B-2) — [mapMaskedOpeningItem]이 재사용한다.
+ * `rowDiscriminator`는 호출부가 [KonepsOperationDescriptor.rowIdentifierRawKeys]로 이미 뽑아온
+ * 원문 값이다(F-1) — 이 함수는 그 값을 그대로 싣기만 한다. `internal`(3B-2) —
+ * [mapMaskedOpeningItem]이 재사용한다.
  */
 internal fun identityOf(
     numberRaw: String,
     roundRaw: String,
+    rowDiscriminator: List<String>,
 ): NoticeIdentity {
     val canonicalNumber = NoticeNumber.of(numberRaw).value
     val canonicalRound = runCatching { NoticeRound.of(roundRaw).value }.getOrDefault(roundRaw)
-    return NoticeIdentity(canonicalNumber, canonicalRound)
+    return NoticeIdentity(canonicalNumber, canonicalRound, rowDiscriminator)
 }
+
+/** F-1 — 오퍼레이션이 선언한 행 식별자 raw 키들의 값을 뽑는다(없으면 빈 문자열, 드롭하지 않는다). */
+internal fun rowDiscriminatorOf(
+    fields: Map<RawKey, RawValue>,
+    rowIdentifierRawKeys: List<String>,
+): List<String> = rowIdentifierRawKeys.map { key -> presentText(fields, RawKey(key)) ?: "" }
 
 /**
  * JSON 항목(⑥) → [RawNoticeObservation] — 값은 원문 그대로 옮긴다(변환·정규화 없음). 공고번호·
@@ -108,6 +127,10 @@ internal fun mapRawItem(
     policy: KonepsCollectionPolicyData,
     sourceEndpoint: SourceEndpoint,
     observedAt: Instant,
+    // F-1(verifier r1) — 목록 오퍼레이션은 emptyList(), 상세 오퍼레이션(예: license-limit 의
+    // lmtGrpNo·lmtSno)은 KonepsOperationDescriptor.rowIdentifierRawKeys 를 그대로 넘긴다.
+    // 기본값을 두지 않는다 — 새 호출부가 이 값을 잊으면 컴파일이 깨진다.
+    rowIdentifierRawKeys: List<String>,
 ): RawItemOutcome {
     val rawFields = item.fields
     // L-4(verifier r1) — blank 키는 [RawKey]가 거부해 걸러야 하나, 걸러진 사실 자체가
@@ -128,5 +151,6 @@ internal fun mapRawItem(
     // 그대로다(재직렬화 없음, KonepsJson.kt). RawNoticeObservation 은 저장 전용으로만 나른다.
     val observation = RawNoticeObservation.ofRawValues(fields, sourceEndpoint, observedAt, item.sourceText)
     val unknownFieldCount = policy.fieldContracts.unknownKeysIn(observation).size + blankKeyCount
-    return RawItemOutcome.Mapped(observation, identityOf(numberRaw, roundRaw), unknownFieldCount)
+    val identity = identityOf(numberRaw, roundRaw, rowDiscriminatorOf(fields, rowIdentifierRawKeys))
+    return RawItemOutcome.Mapped(observation, identity, unknownFieldCount)
 }

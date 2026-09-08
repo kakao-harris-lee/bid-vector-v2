@@ -22,8 +22,13 @@ internal fun interface KonepsPageUriBuilder {
 /**
  * JSON 항목 하나 → [RawItemOutcome] 변환 전략(3B-2) — [walkKonepsNoticePages]가 걷기 로직을
  * 재사용하면서도 축마다 다른 매핑(공고 축은 [mapRawItem] 전체 보존, 개찰 축은
- * [mapMaskedOpeningItem] allow-list 치환)을 꽂아 넣게 한다. 기본값은 기존 공고 축 동작 그대로라
- * (아래 [defaultKonepsItemMapper]) 이 시그니처 확장이 3B 기존 호출부·test 를 바꾸지 않는다.
+ * [mapMaskedOpeningItem] allow-list 치환)을 꽂아 넣게 한다.
+ *
+ * **기본값이 없다(verifier r1 F-4 수정)** — 이전 판은 [walkKonepsNoticePages]의 `itemMapper`
+ * 매개변수가 [defaultKonepsItemMapper](원문 보존 mapper)로 기본값이 있어, 개찰 축 walker 가
+ * 이 인자를 잊으면 **누출이 조용한 폴백**이 됐다(설계 검토 게이트 ①이 막으려던 것과 반대
+ * 방향 — 실수의 기본 결과가 누출). 세 호출부([KonepsOpenApiNoticeSource.fetchNotices]·
+ * [KonepsOpeningResultSource.fetchOpeningResults]·[fetchSingleKonepsNotice])가 모두 명시한다.
  */
 internal fun interface KonepsItemMapper {
     operator fun invoke(
@@ -33,9 +38,15 @@ internal fun interface KonepsItemMapper {
     ): RawItemOutcome
 }
 
-/** 기존 3B 동작(공고 목록, 계약 여부와 무관하게 전 필드 보존) — [walkKonepsNoticePages] 기본값. */
+/**
+ * 기존 3B 동작(공고 목록, 계약 여부와 무관하게 전 필드 보존) — 낙찰 목록군 오퍼레이션(한 행=한
+ * 공고)의 행 식별자는 공고번호·차수뿐이라 `rowIdentifierRawKeys`는 `emptyList()`다. F-4 로 이
+ * 값의 기본값 지위는 없어졌다 — [KonepsOpenApiNoticeSource.fetchNotices]가 명시적으로 참조한다.
+ */
 internal val defaultKonepsItemMapper: KonepsItemMapper =
-    KonepsItemMapper { item, policy, observedAt -> mapRawItem(item, policy, SourceEndpoint.NOTICE_LIST, observedAt) }
+    KonepsItemMapper { item, policy, observedAt ->
+        mapRawItem(item, policy, SourceEndpoint.NOTICE_LIST, observedAt, rowIdentifierRawKeys = emptyList())
+    }
 
 private const val START_PAGE = 1
 
@@ -330,9 +341,9 @@ internal fun walkKonepsNoticePages(
     collectionPolicy: KonepsCollectionPolicyData,
     clock: Clock,
     cursor: PageCursor?,
-    // 3B-2 — 축마다 다른 항목 매핑을 꽂는다. 기본값은 3B 기존 동작 그대로라 공고 축 호출부는
-    // 이 매개변수를 몰라도 된다(시그니처 확장이 3B test 를 바꾸지 않는다).
-    itemMapper: KonepsItemMapper = defaultKonepsItemMapper,
+    // 3B-2 — 축마다 다른 항목 매핑을 꽂는다. **기본값 없음(verifier r1 F-4)** — 공고 축
+    // 호출부([KonepsOpenApiNoticeSource.fetchNotices])도 [defaultKonepsItemMapper]를 명시한다.
+    itemMapper: KonepsItemMapper,
 ): SourceBatch<RawNoticeObservation> {
     val startPage = startPageOf(cursor) ?: return invalidCursorBatch()
     val counters = KonepsAttemptCounters()
