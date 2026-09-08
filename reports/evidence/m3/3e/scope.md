@@ -55,6 +55,24 @@ rollback: |
 
 `git log --oneline 9948c6e..HEAD -- CLAUDE.md .claude/` — 착수 시점 **없음**(base 자신이 하네스 커밋이라 range 밖).
 
+## 문서 레인 변경 (상시 절 — verifier r1 L-6)
+
+`base..HEAD` 에는 **문서 레인(오케스트레이터) 커밋이 섞인다.** slice 의 커밋 집합은 range 가 아니라
+**in_scope 경로의 변경**이라는 정의(2026-09-04)가 그대로 적용되므로 아래는 slice 산출물이 아니다.
+리뷰 요청 시점마다 `git log --oneline <base>..HEAD -- reports/evidence/m3/3a docs/discovery milestone-3.md`
+로 갱신한다.
+
+| 경로 | 무엇 | 왜 이 range 에 있는가 |
+| --- | --- | --- |
+| `reports/evidence/m3/3a/policy-values.md` | P-7 승인 등재 · §1.9.7 실측 대조 · §1.10 첨부 문서 키 계약(P-8) | 3A curator 문서의 후속. 3E 는 이 파일을 **읽기만** 한다(out_of_scope 에 명시) |
+| `docs/discovery/capability-map.md` | `OPEN-3B2-TARGETED-OPENING-QUERY` 닫힘 · `OPEN-3E-RESERVE-FLAG-MISMATCH`·`OPEN-3E-ROW-ORDER-STABILITY`·`OPEN-3C-ATTACHMENT-SLOT-OVERFLOW` 신설 | in_scope 에 **문서 레인 전용**으로 선언돼 있다 |
+| `docs/discovery/ux-journey-research.md` | 표적조회 문면 폐기(실측) | 위 `OPEN` 닫힘의 역방향 파급 |
+| `CLAUDE.md`·`.claude/skills/evidence-pack/SKILL.md` | rollback 규격 개정 · 공유 워킹트리 커밋 규격 신설 | **하네스 레인** — 위 「하네스 레인 변경」 절이 정본 |
+
+**되돌림 대상이 아니다** — 등재된 `OPEN` 과 승인 기록은 이 slice 가 만든 **지식**이고 코드를 걷어도
+남아야 한다(되돌리면 다음 착수가 같은 것을 다시 발견한다). rollback.md 의 「되돌리지 않는 것」이
+같은 목록을 갖는다.
+
 ## 스키마 스냅샷 래칫의 예외 — 운영자 승인 2026-09-08
 
 **물음**: `opening_reserve_price` 자식 표와 `opening_result` 신규 컬럼을 더하면 3D 의
