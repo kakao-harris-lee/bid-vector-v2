@@ -38,7 +38,7 @@ commands.md 「값 획득 축 실측」 절에 실행 기록. 요약:
 | 각 단계 port 인터페이스(`WatchSubjectPort` 등) | **경계로 처리** | OPEN-3 — `NotificationRequestPort` 구현을 `app`에 심어도 이미 만들어진 `NotificationRequest`를 받기만 한다(FORGERY-3이 그 값의 자체 생성을 이미 닫았다) — 「경계 안 주체에게만 간다」 성립(4C-1 L-4 판정 형식과 동일) |
 | `CorrelationId` 값 타입 | **연다** | OPEN-1 — `app` 모듈에서 자유 생성 → 컴파일 성공(위조해도 자기 추적만 흐려진다, 부재만 필수 필드로 막는다) |
 | 전략 스냅샷(`OperatorStrategy`) | **경계로 처리(1E가 이미 닫음)** | 이 slice가 다시 닫지 않는다 — `StrategyRepository.load()`가 반환하는 값을 그대로 쓴다. `OperatorStrategy`의 생성자는 1E가 이미 `internal`로 닫아 두었다(재확인만, 새 실측 불필요) |
-| `EvaluateCandidatesUseCase`의 `judge` 위임 생성자 인자(수정 라운드 1 L-1 신설) | **연다(위험 없음)** | 밖에서 다른 `(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>) -> Verdict`를 주입할 수는 있으나, 그 함수가 낼 수 있는 유일한 정당 `Verdict`의 생성 경로는 여전히 `VerdictLadder.judge`(public, 사다리를 반드시 지난다) 하나뿐이다 — `Verdict.BidNow` 등의 생성자가 `decision` 모듈 밖에 닫혀 있어(4B-1) 이 자리를 열어도 위조 경로가 새로 생기지 않는다 |
+| `EvaluateCandidatesUseCase`의 `judge` 위임 생성자 인자(수정 라운드 1 L-1 신설) | ~~**연다(위험 없음)**~~ → **닫는다(수정 라운드 2 H-1 정정)** | **이전 판단은 틀렸다** — `private val`은 프로퍼티 읽기만 막고 생성자 매개변수는 여전히 공개 시그니처였다. verifier r2 실측: `app`에서 `judge = { _, _ -> Verdict.BidNow(...) }` 류 주입이 컴파일됐고, 정직한 배선(점수 0.01)은 `Skip`·알림 0건인데 주입 배선(임계 0 정책)은 `BidNow`·알림 2건을 냈다 — `Verdict` 생성자는 위조를 막아도(4B-1) **사다리 밖에서 정당한 값을 얻는 경로**가 있었다. `judge`를 받는 생성자 자체를 `internal`로 내려 닫았다(아래 「수정 라운드 2」) |
 
 위조 probe는 전부 `app` 모듈(다른 모듈)에서 컴파일했다(4B-1이 자기 모듈 test에 심어
 한 번 놓친 교훈 — 설계 검토 (2) 마지막 문단).
@@ -126,6 +126,9 @@ guard/commands.md:100`과 `reports/evidence/m4/4b1/checklist.md:204,234`. **둘 
 이 slice의 in_scope 밖**(닫힌 하네스 레인 evidence·4B-1 자신의 evidence)이라 고치지
 않고 알려진 제한에 등재한다(아래) — 재산출한 실제 좌표는 **3469행**(4B-1의 +1과
 이번 +5가 합쳐 총 +6 밀림, `grep -n "OPEN-2B-TEST-DISCOVERY-GUARD"` 실측).
+**정정(수정 라운드 2)**: verifier가 r1에서 "원 대상은 3463행"이라 적었던 것은
+verifier 자신의 오식별이었고, r2에서 이 slice의 **3469가 맞다**고 정정했다 — 재산출
+결과를 바꾸지 않는다.
 
 ### L-4 — `LicenseVerdict.Uncertain` 통과 근거 정정
 
@@ -195,6 +198,56 @@ D-2는 `NoticeStatus`, D-9는 `LicenseVerdict.Ineligible`)은 그대로 싣고, 
    `reports/evidence/m4/4b1/checklist.md:204,234`) 다 이 slice의 in_scope 밖(닫힌
    하네스 레인·4B-1 자신의 evidence)이라 고치지 않는다.
 
-## rollback
+## 수정 라운드 2(재작업 2/5) — H-1
+
+verifier 표적 재검증 판정 **not-ready**, 산출물층 high 1건. **이 high는 구현
+과실이 아니다** — verifier r1 L-1을 시정하려 연 자리가 production 표면이 됐다는
+지적이고, 요청받은 것(judge 계수 test)은 정확히 해냈다고 verifier 자신도 적었다.
+
+### H-1 — `judge` 주입 이음매가 조합 경로를 대체할 수 있었다
+
+**무엇이 문제였나**: `private val judge = ...`의 `private`은 **프로퍼티 읽기**만
+막는다. **생성자 매개변수는 여전히 공개 시그니처**라 `app` 모듈에서
+`EvaluateCandidatesUseCase(..., judge = { _, _ -> 임의 Verdict })`가 컴파일됐다
+(verifier r2 실측). `Verdict.BidNow`의 생성자는 위조를 막아도(4B-1) **사다리(진짜
+`VerdictLadder.judge`)를 후보와 무관한 입력·정책으로 몰아 정당한 `BidNow`를 만들어
+꽂는 경로**가 열려 있었다 — verifier 실측: 정직한 배선(점수 0.01)은 `Reached(Skip)`
+×2·알림 0건, 주입 배선(임계 0 정책)은 `Reached(BidNow)`×2·알림 2건. 무너지는 것은
+`NotificationRequest`의 `internal` 생성자가 막으려던 바로 그것 — 「판정 없이 알림을
+요청했다」가 이 이음매를 거쳐 **다른 문으로 성립**했다. 4C-1 L-4(경계로 처리 판정)
+와 다른 지점 — 그 이음매가 없으면 조합 근처 누구도 `NotificationRequest`를 만들 수
+없었다(생성자 internal, 만드는 자리는 이 use case뿐). **없던 권한이 새로 생겼다.**
+
+**시정**: `EvaluateCandidatesUseCase`의 **주 생성자를 `internal`로 내리고**(judge를
+받는 자리), **judge 없는 public 보조 생성자**를 추가했다(항상
+`VerdictLadder::judge`로 위임). 이 한 수로 H-1과 L-6(KDoc의 "호출 경로를 바꾸는
+것이 아니다" 문장, 위 실측으로 반증됐던 것)이 같이 닫힌다 — KDoc을 정정했다
+(`EvaluateCandidatesUseCase.kt` 클래스 KDoc 「주 생성자는 internal이다」 문단).
+
+**실측 (a)(b)(c)**(`app` 모듈, 다른 모듈에 probe — 커밋하지 않고 삭제):
+
+- **(a) 주입 거부**: `EvaluateCandidatesUseCase(..., judge = { _, _ -> error(...) })`
+  형태로 `app`에서 조립 — `./gradlew --no-daemon :app:compileTestKotlin` exit 1 —
+  `Cannot access 'constructor(... judge: (LadderInput, Resolution.Resolved
+  <VerdictLadderPolicyData>) -> Verdict): EvaluateCandidatesUseCase': it is internal
+  in 'bidvector.workflow.evaluation.EvaluateCandidatesUseCase'`.
+- **(b) 정상 배선 통과**: public 보조 생성자(named argument, port 여덟 + policy
+  slot + budget)로 `app`에서 조립 — exit 0(컴파일 성공, judge를 넘길 방법이 이
+  시그니처에 없다).
+- **(c) 계수 test 생존**: mutation 재실측 — `reach` 안에서 `judge`를 두 번 부르게
+  심었다 — `./gradlew --no-daemon :workflow:test --tests
+  '*EvaluateCandidatesUseCaseIsolationTest*'` exit 1 — **정확히 1건**(`사다리 호출은
+  공고당 정확히 한 번 돈다`, `expected:<1> but was:<2>`) 실패, 나머지 7건 그대로
+  초록. `internal` 주 생성자 경유(같은 `workflow` 모듈의 test fixture `useCase(...)`
+  헬퍼)로 test는 여전히 그 자리를 계수 래퍼로 바꿀 수 있다. mutation 복원 후 `diff`
+  로 byte-identical 확인.
+
+**새 public 표면 점검(2026-09-04 규정, 이번 라운드가 명시적으로 요구한 확인)**:
+`git diff a8082d2..HEAD -- EvaluateCandidatesUseCase.kt`의 추가 줄 중 선언은 정확히
+셋 — 주 생성자 앞에 `internal` 키워드 추가(공개 표면 **축소**) · `judge` 필드
+(기존에 있던 것, 위치만 이동) · **신설 public 보조 생성자 하나**(judge 없이 나머지
+열 매개변수만). 이 보조 생성자는 **이전에 이미 공개였던 매개변수 집합의 부분집합**
+(judge를 뺀 나머지)만 노출한다 — 새로 넓힌 표면이 아니라 **기존 표면에서 judge
+하나를 뺀 좁힌 버전**이다. 다른 파일(포트·값 타입 등)은 이번 라운드에서 무변경.
 
 정본은 `reports/evidence/m4/4b2/rollback.md`.

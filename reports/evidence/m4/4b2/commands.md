@@ -210,3 +210,69 @@
   exit 0. conformance = **86**(무변화, 4B-2는 fixture를 만지지 않는다). 다섯 확인
   전부 통과.
 - clone 삭제(`rm -rf`), 원 worktree엔 영향 없음.
+
+## 2026-09-10T10:00Z — 수정 라운드 2(재작업 2/5) — H-1
+- verifier 표적 재검증 판정 `not-ready`, 산출물층 high 1건
+  (`_workspace/m4-4b2/04_verifier_report_r2.md`).
+- **H-1**: `EvaluateCandidatesUseCase`의 `judge` 위임 생성자 인자가 `private val`
+  이었으나 생성자 매개변수는 공개 시그니처라 `app` 모듈에서 `judge = ...`로 사다리를
+  임의 입력·정책으로 몰아 정당한 `BidNow`를 만들어 알림 요청까지 낼 수 있었다
+  (verifier r2 실측: 정직한 배선 `Reached(Skip)`×2·알림 0건 vs 주입 배선
+  `Reached(BidNow)`×2·알림 2건).
+- **시정**: 주 생성자(judge 포함)를 `internal`로, judge 없는 public 보조 생성자
+  신설(항상 `VerdictLadder::judge`로 위임). 클래스 KDoc의 반증된 문장("호출 경로를
+  바꾸는 것이 아니다")을 정정.
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin` — exit 0(1차 시도는 클래스
+  전체를 한 단 더 들여써 line-length 위반 유발 → `internal constructor(`를 클래스명과
+  같은 줄에 두는 형태로 재작성해 해결).
+- cmd: `./gradlew --no-daemon :workflow:ktlintFormat` — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:compileTestKotlin :workflow:test` — exit 0
+  (21 tests, 0 failed — test fixture(`EvaluationTestFixtures.kt`)는 같은 모듈이라
+  `internal` 주 생성자를 그대로 부를 수 있어 무수정).
+
+### 실측 (a)(b)(c) — `app` 모듈(다른 모듈)에 probe, 커밋하지 않고 삭제
+- **(a) 주입 거부**: `EvaluateCandidatesUseCase(strategies, ..., judge = { _, _ ->
+  error(...) })`(positional 12-인자 전체 호출, judge 포함) 형태로 `app` test에 심고
+  `./gradlew --no-daemon :app:compileTestKotlin` — **exit 1** —
+  ```
+  e: .../JudgeSeamProbe.kt:33:5 Cannot access 'constructor(strategies:
+  StrategyRepository, candidateSource: CandidateSourcePort, watchSubjects:
+  WatchSubjectPort, licenseGate: LicenseGatePort, mlAnalysis: MlAnalysisPort,
+  capacity: CapacityPort, notifications: NotificationRequestPort, correlationIds:
+  CorrelationIdFactory, clock: Clock, ladderPolicySlot: LadderPolicySlot = ...,
+  analysisBudget: Int? = ..., judge: (LadderInput, Resolution.Resolved
+  <VerdictLadderPolicyData>) -> Verdict): EvaluateCandidatesUseCase': it is
+  internal in 'bidvector.workflow.evaluation.EvaluateCandidatesUseCase'.
+  ```
+- **(b) 정상 배선 통과**: 위 probe에서 (a) 함수만 제거하고 public 보조 생성자
+  (named argument, judge 없이 port 여덟 + policy slot + budget)로 조립하는 함수만
+  남긴 뒤 `./gradlew --no-daemon :app:compileTestKotlin` — **exit 0**(독립 확인 —
+  (a) 삭제 후 재실행).
+- **(c) 계수 test 생존(mutation 재실측)**: `reach` 안에서 `judge(ladderInput,
+  ladderPolicy)`를 두 번 부르게 심었다 — cmd `./gradlew --no-daemon :workflow:test
+  --tests '*EvaluateCandidatesUseCaseIsolationTest*'` — exit 1 — **정확히 1건**
+  (`사다리 호출은 공고당 정확히 한 번 돈다`, `expected:<1> but was:<2>`) 실패,
+  나머지 7건 그대로 초록. mutation 되돌림 후 `diff`로 byte-identical 확인.
+- probe 파일 삭제(`rm -rf app/src/test/kotlin/bidvector/app/verifyprobe`), 삭제 후
+  `git status --porcelain` — 공백(clean) 확인.
+
+### 새 public 표면 점검(2026-09-04 규정)
+- cmd: `git diff a8082d2..HEAD -- workflow/.../EvaluateCandidatesUseCase.kt | grep
+  "^+" | grep -v "^+++" | grep -E "class |fun |val |constructor"` — 신설 선언
+  셋: 주 생성자에 `internal` 추가(공개 표면 **축소**) · `judge` 필드(기존 위치
+  이동, 신규 아님) · **신설 public 보조 생성자 하나**(judge 없이 나머지 열 매개변수
+  만). 그 보조 생성자는 **이전에 이미 공개였던 매개변수 집합의 부분집합**(judge를
+  뺀 나머지)만 노출한다 — 새로 넓힌 표면이 아니라 기존 표면에서 judge 하나를 뺀
+  좁힌 버전이다. 다른 파일(port·값 타입 등)은 이번 라운드 무변경.
+
+## 2026-09-10T10:20Z — acceptance S-0~S-6(재실행, S-4·S-6 별도 호출)
+- cmd: `./gradlew --no-build-cache clean check`(S-1) — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test`(S-2) — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate
+  :workflow:cpdCheck`(S-3) — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*CompositionBoundaryTest*'`
+  (S-3b) — exit 0.
+- cmd: `./gradlew --no-daemon :app:test`(S-4, 별도 호출) — exit 0 —
+  `SharedKernelCorpusConformanceTest tests="86" failures="0"`(무변화).
+- cmd: `./gradlew --no-daemon qualityBaseline`(S-5) — exit 0.
+- cmd: `./gradlew --no-daemon :app:gateExecutionGate`(S-6, 별도 호출) — exit 0.

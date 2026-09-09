@@ -36,8 +36,18 @@ import bidvector.workflow.strategy.StrategyRepository
  *
  * `evaluateOne`은 각 단계가 [CandidateEvaluation.NotReached]를 내면 그 자리에서 그치는
  * guard 함수 체인(`?:` 연쇄, 4A `apply`·4B-1 `VerdictLadder.judge` 관례)으로 구성된다.
+ *
+ * **주 생성자는 `internal`이다(수정 라운드 2 H-1 시정).** `judge` 위임(아래)을 받는
+ * 자리가 처음엔 `private val`이었으나 **생성자 매개변수는 그래도 공개 시그니처라**
+ * 다른 모듈이 `judge = ...`로 넘겨 사다리를 후보와 무관한 입력·정책으로 몰 수 있었다
+ * (verifier r2 실측 — 정직한 배선은 `Skip`·알림 0건인데 주입 배선은 `BidNow`·알림
+ * 2건을 냈다). `Verdict.BidNow`는 위조를 막아도(4B-1) **정당한 값을 사다리 밖에서
+ * 얻는 경로**가 열려 있었다는 뜻이다 — 그 값이 [NotificationRequest]의 `internal`
+ * 생성자를 정직하게 지나 「판정 없이 알림을 요청했다」가 다른 문으로 성립했다. 이제
+ * `judge`를 받는 이 생성자 자체가 `internal`이라 `workflow` 밖에서는 호출할 수
+ * 없다 — 아래 public 보조 생성자만 밖에 남는다.
  */
-class EvaluateCandidatesUseCase(
+class EvaluateCandidatesUseCase internal constructor(
     private val strategies: StrategyRepository,
     private val candidateSource: CandidateSourcePort,
     private val watchSubjects: WatchSubjectPort,
@@ -57,15 +67,43 @@ class EvaluateCandidatesUseCase(
      */
     private val analysisBudget: Int? = null,
     /**
-     * 사다리 호출 위임(결정 5, verifier r1 L-1) — 기본값은 [VerdictLadder.judge] 그대로
-     * (실 배선에서 바꿀 이유가 없다). test가 얇은 위임 뒤에서 호출 횟수를 세려면 이
-     * 자리를 계수 래퍼로 바꾼다 — `VerdictLadder`가 `object`(port가 아님)라 fake로
-     * 대체할 수 없어서다. [reach] 안 정확히 한 자리에서만 불린다는 사실 자체는 이
-     * 위임이 있든 없든 같다 — 이 자리는 **셀 수 있게** 하는 것이지 호출 경로를
-     * 바꾸는 것이 아니다.
+     * 사다리 호출 위임(결정 5, verifier r1 L-1) — **`internal` 주 생성자를 통해서만
+     * 닿는다**(수정 라운드 2 H-1). 실 배선(아래 public 보조 생성자)은 이 자리를 항상
+     * [VerdictLadder.judge] 그대로 채운다 — 바꿀 수 없다. test만(같은 `workflow`
+     * 모듈) 이 생성자를 직접 불러 계수 래퍼로 바꿀 수 있다. `reach` 안 정확히 한
+     * 자리에서만 불린다는 사실은 이 위임이 있든 없든 같다 — 이 자리는 **셀 수 있게**
+     * 하는 것이지 정상 배선의 호출 경로를 바꾸는 것이 아니다.
      */
-    private val judge: (LadderInput, Resolution.Resolved<VerdictLadderPolicyData>) -> Verdict = VerdictLadder::judge,
+    private val judge: (LadderInput, Resolution.Resolved<VerdictLadderPolicyData>) -> Verdict,
 ) {
+    /** 실 배선(public) — `judge`는 항상 [VerdictLadder.judge]다(수정 라운드 2 H-1). */
+    constructor(
+        strategies: StrategyRepository,
+        candidateSource: CandidateSourcePort,
+        watchSubjects: WatchSubjectPort,
+        licenseGate: LicenseGatePort,
+        mlAnalysis: MlAnalysisPort,
+        capacity: CapacityPort,
+        notifications: NotificationRequestPort,
+        correlationIds: CorrelationIdFactory,
+        clock: Clock,
+        ladderPolicySlot: LadderPolicySlot = EVALUATION_LADDER_POLICY_SLOT,
+        analysisBudget: Int? = null,
+    ) : this(
+        strategies,
+        candidateSource,
+        watchSubjects,
+        licenseGate,
+        mlAnalysis,
+        capacity,
+        notifications,
+        correlationIds,
+        clock,
+        ladderPolicySlot,
+        analysisBudget,
+        VerdictLadder::judge,
+    )
+
     fun evaluate(): List<CandidateEvaluation> {
         val strategy = strategies.load()
         val candidates = candidateSource.openCandidates()
