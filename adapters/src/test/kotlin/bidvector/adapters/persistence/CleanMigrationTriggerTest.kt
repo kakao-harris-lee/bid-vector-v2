@@ -108,7 +108,8 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             "guard_opening_result_total_reserve_price_candidate_count" to
                 listOf("total_reserve_price_candidate_count"),
             "guard_opening_result_actual_opening_at" to listOf("actual_opening_at"),
-            // M3/3F — 개찰완료 축 부모 슬롯(추가만).
+            // M3/3F — 개찰완료 축 부모 슬롯(추가만). verifier r1 F-2 뒤 축별 관측 시각도 이
+            // 트리거 인자에 실린다(F-1 뒤 축 단위 UPSERT 와 같은 자리, Sql.kt).
             "guard_opening_result_opening_rank_one" to
                 listOf(
                     "opening_rank_one_kind",
@@ -117,8 +118,10 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
                     "opening_rank_one_bid_amount_won",
                     "opening_rank_one_bid_amount_currency",
                     "opening_rank_one_bid_rate_fraction",
+                    "opening_rank_one_observed_at",
                 ),
-            "guard_opening_result_draw_numbers" to listOf("draw_numbers_kind", "draw_numbers"),
+            "guard_opening_result_draw_numbers" to
+                listOf("draw_numbers_kind", "draw_numbers", "draw_numbers_observed_at"),
         )
 
     @Test

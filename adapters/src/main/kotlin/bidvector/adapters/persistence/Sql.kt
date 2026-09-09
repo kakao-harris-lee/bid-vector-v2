@@ -89,7 +89,8 @@ internal object Sql {
         total_reserve_price_candidate_count, actual_opening_at,
         opening_rank_one_kind, opening_rank_one_duplicate_count, opening_rank_one_bidder_name,
         opening_rank_one_bid_amount_won, opening_rank_one_bid_amount_currency, opening_rank_one_bid_rate_fraction,
-        draw_numbers_kind, draw_numbers
+        opening_rank_one_observed_at,
+        draw_numbers_kind, draw_numbers, draw_numbers_observed_at
         """
 
     const val SELECT_OPENING_RESULT =
@@ -110,7 +111,8 @@ internal object Sql {
             total_reserve_price_candidate_count, actual_opening_at,
             opening_rank_one_kind, opening_rank_one_duplicate_count, opening_rank_one_bidder_name,
             opening_rank_one_bid_amount_won, opening_rank_one_bid_amount_currency, opening_rank_one_bid_rate_fraction,
-            draw_numbers_kind, draw_numbers,
+            opening_rank_one_observed_at,
+            draw_numbers_kind, draw_numbers, draw_numbers_observed_at,
             observed_at, revision, observation_key
         ) VALUES (
             ?, ?, ?,
@@ -125,7 +127,8 @@ internal object Sql {
             ?, ?,
             ?, ?, ?,
             ?, ?, ?,
-            ?, ?,
+            ?,
+            ?, ?, ?,
             ?, 1, ?
         )
         ON CONFLICT (notice_number, notice_round) DO UPDATE SET
@@ -174,19 +177,47 @@ internal object Sql {
             total_reserve_price_candidate_count = COALESCE(
                 EXCLUDED.total_reserve_price_candidate_count, opening_result.total_reserve_price_candidate_count),
             actual_opening_at = COALESCE(EXCLUDED.actual_opening_at, opening_result.actual_opening_at),
-            opening_rank_one_kind = COALESCE(EXCLUDED.opening_rank_one_kind, opening_result.opening_rank_one_kind),
-            opening_rank_one_duplicate_count = COALESCE(
-                EXCLUDED.opening_rank_one_duplicate_count, opening_result.opening_rank_one_duplicate_count),
+            -- verifier r1 F-1 — 컬럼별 COALESCE 는 opening_rank_one 축(kind + 동반 값 다섯)의
+            -- 짝을 깨뜨린다: kind 만 새 값으로 덮이고 동반 컬럼(예: bidderName)이 옛 값으로
+            -- 남으면 V5 페어 CHECK 를 위반한다(RankMissing 인데 bidderName 이 이전 Determined
+            -- 것으로 남는 경우 등). 그래서 **축 전체를 한 CASE 조건으로 갱신**한다 —
+            -- EXCLUDED.opening_rank_one_kind 가 NULL(이 관측이 이 축을 안 실음, NotObserved)
+            -- 이면 여섯 컬럼 전부 옛 값을 보존하고, NULL 이 아니면(관측됨) 여섯 컬럼 전부
+            -- EXCLUDED 값으로 교체한다 — 컬럼 단위 부분 갱신이 없다. draw_numbers 축도 같다.
+            opening_rank_one_kind =
+                CASE WHEN EXCLUDED.opening_rank_one_kind IS NULL
+                     THEN opening_result.opening_rank_one_kind ELSE EXCLUDED.opening_rank_one_kind END,
+            opening_rank_one_duplicate_count =
+                CASE WHEN EXCLUDED.opening_rank_one_kind IS NULL
+                     THEN opening_result.opening_rank_one_duplicate_count
+                     ELSE EXCLUDED.opening_rank_one_duplicate_count END,
             opening_rank_one_bidder_name =
-                COALESCE(EXCLUDED.opening_rank_one_bidder_name, opening_result.opening_rank_one_bidder_name),
+                CASE WHEN EXCLUDED.opening_rank_one_kind IS NULL
+                     THEN opening_result.opening_rank_one_bidder_name ELSE EXCLUDED.opening_rank_one_bidder_name END,
             opening_rank_one_bid_amount_won =
-                COALESCE(EXCLUDED.opening_rank_one_bid_amount_won, opening_result.opening_rank_one_bid_amount_won),
-            opening_rank_one_bid_amount_currency = COALESCE(
-                EXCLUDED.opening_rank_one_bid_amount_currency, opening_result.opening_rank_one_bid_amount_currency),
-            opening_rank_one_bid_rate_fraction = COALESCE(
-                EXCLUDED.opening_rank_one_bid_rate_fraction, opening_result.opening_rank_one_bid_rate_fraction),
-            draw_numbers_kind = COALESCE(EXCLUDED.draw_numbers_kind, opening_result.draw_numbers_kind),
-            draw_numbers = COALESCE(EXCLUDED.draw_numbers, opening_result.draw_numbers),
+                CASE WHEN EXCLUDED.opening_rank_one_kind IS NULL
+                     THEN opening_result.opening_rank_one_bid_amount_won
+                     ELSE EXCLUDED.opening_rank_one_bid_amount_won END,
+            opening_rank_one_bid_amount_currency =
+                CASE WHEN EXCLUDED.opening_rank_one_kind IS NULL
+                     THEN opening_result.opening_rank_one_bid_amount_currency
+                     ELSE EXCLUDED.opening_rank_one_bid_amount_currency END,
+            opening_rank_one_bid_rate_fraction =
+                CASE WHEN EXCLUDED.opening_rank_one_kind IS NULL
+                     THEN opening_result.opening_rank_one_bid_rate_fraction
+                     ELSE EXCLUDED.opening_rank_one_bid_rate_fraction END,
+            opening_rank_one_observed_at =
+                CASE WHEN EXCLUDED.opening_rank_one_kind IS NULL
+                     THEN opening_result.opening_rank_one_observed_at ELSE EXCLUDED.opening_rank_one_observed_at END,
+            draw_numbers_kind =
+                CASE WHEN EXCLUDED.draw_numbers_kind IS NULL
+                     THEN opening_result.draw_numbers_kind ELSE EXCLUDED.draw_numbers_kind END,
+            draw_numbers =
+                CASE WHEN EXCLUDED.draw_numbers_kind IS NULL
+                     THEN opening_result.draw_numbers ELSE EXCLUDED.draw_numbers END,
+            draw_numbers_observed_at =
+                CASE WHEN EXCLUDED.draw_numbers_kind IS NULL
+                     THEN opening_result.draw_numbers_observed_at ELSE EXCLUDED.draw_numbers_observed_at END,
             observed_at = EXCLUDED.observed_at,
             revision = opening_result.revision + 1,
             observation_key = EXCLUDED.observation_key,

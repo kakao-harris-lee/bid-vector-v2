@@ -10,6 +10,7 @@ import java.math.BigDecimal
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Types
+import java.time.Instant
 
 /**
  * M3/3F D-3F-4 — `OpeningRankOneOutcome` ↔ `opening_rank_one_*` 컬럼 왕복(왕복 안정성 — 저장한
@@ -18,6 +19,10 @@ import java.sql.Types
  * 같은 「분산시켜 재사용」 판단). kind 문자열은 이 파일이 정하는 내부 어휘이지 KONEPS 원문
  * 라벨이 아니다 — `V5__opening_complete_axis.sql` 의 `opening_rank_one_kind_enum` CHECK 와
  * 반드시 같은 값이어야 한다.
+ *
+ * **verifier r1 F-1 뒤** — `bind`가 이 축의 일곱 컬럼을 [OpeningRankOneOutcome.observedAt]과
+ * 함께 하나로 묶어 내보낸다. `Sql.kt`의 UPSERT 술어가 `EXCLUDED.opening_rank_one_kind`가
+ * NULL 인지로 「이 축 전부 보존」 대 「이 축 전부 교체」를 가른다 — 컬럼별 갱신이 아니다.
  */
 internal object OpeningRankOneKind {
     const val RANK_MISSING = "RANK_MISSING"
@@ -27,12 +32,12 @@ internal object OpeningRankOneKind {
     private fun of(outcome: OpeningRankOneOutcome): String? =
         when (outcome) {
             OpeningRankOneOutcome.NotObserved -> null
-            OpeningRankOneOutcome.RankMissing -> RANK_MISSING
+            is OpeningRankOneOutcome.RankMissing -> RANK_MISSING
             is OpeningRankOneOutcome.RankDuplicated -> RANK_DUPLICATED
             is OpeningRankOneOutcome.Determined -> DETERMINED
         }
 
-    /** 6 컬럼(kind·중복 건수·1위 행 축 4)을 `startIndex`부터 바인딩하고 다음 free index 를 낸다. */
+    /** 7 컬럼(kind·중복 건수·1위 행 축 4·관측 시각)을 `startIndex`부터 바인딩하고 다음 free index 를 낸다. */
     fun bind(
         statement: PreparedStatement,
         startIndex: Int,
@@ -46,6 +51,7 @@ internal object OpeningRankOneKind {
         statement.setBigDecimal(index++, bid?.bidAmount?.won?.let(BigDecimal::valueOf))
         statement.setString(index++, bid?.bidAmount?.currency?.name)
         statement.setBigDecimal(index++, bid?.bidRate?.fraction)
+        statement.setNullableTimestamp(index++, outcome.observedAt)
         return index
     }
 
@@ -57,22 +63,25 @@ internal object OpeningRankOneKind {
             }
 
             RANK_MISSING -> {
-                OpeningRankOneOutcome.RankMissing
+                OpeningRankOneOutcome.RankMissing(readObservedAt(rs))
             }
 
             RANK_DUPLICATED -> {
                 val count = requireNotNull(rs.getInt("opening_rank_one_duplicate_count"))
-                OpeningRankOneOutcome.RankDuplicated(count)
+                OpeningRankOneOutcome.RankDuplicated(count, readObservedAt(rs))
             }
 
             DETERMINED -> {
-                OpeningRankOneOutcome.Determined(readBid(rs))
+                OpeningRankOneOutcome.Determined(readBid(rs), readObservedAt(rs))
             }
 
             else -> {
                 error("알 수 없는 opening_rank_one_kind: $kind")
             }
         }
+
+    private fun readObservedAt(rs: ResultSet): Instant =
+        requireNotNull(rs.getTimestamp("opening_rank_one_observed_at")?.toInstant())
 
     private fun readBid(rs: ResultSet): OpeningRankOneBid {
         val won = rs.getBigDecimal("opening_rank_one_bid_amount_won")
@@ -94,7 +103,13 @@ internal object OpeningRankOneKind {
 /**
  * M3/3F D-3F-4 — `DrawNumberObservation` ↔ `draw_numbers_*` 컬럼 왕복. `OutOfRange`의
  * `validRange`는 별도 컬럼이 없다 — 이미 부모에 있는 `total_reserve_price_candidate_count`
- * (3E 슬롯)에서 재구성한다(중복 저장 금지) — 그래서 [read]가 그 값을 인자로 받는다.
+ * (3E 슬롯)에서 재구성한다(중복 저장 금지) — 그래서 [read]가 그 값을 인자로 받는다. `V5`의
+ * `opening_result_draw_numbers_out_of_range_requires_total` CHECK(verifier r1 F-3 뒤)가
+ * `kind='OUT_OF_RANGE'`인 행엔 그 값이 항상 있음을 저장 시점에 보장한다 — 그래서 아래
+ * `requireNotNull`은 실제로 도달 불가한 방어다(DB 가 이미 막는다).
+ *
+ * **verifier r1 F-1·F-2 뒤** — `bind`가 이 축의 세 컬럼(kind·번호 배열·관측 시각)을 하나로
+ * 묶어 내보낸다. `Sql.kt`가 `EXCLUDED.draw_numbers_kind` NULL 여부로 축 전체를 보존/교체한다.
  */
 internal object DrawNumbersKind {
     const val VERIFIED = "VERIFIED"
@@ -117,7 +132,7 @@ internal object DrawNumbersKind {
             is DrawNumberObservation.RangeCheckUnavailable -> observation.numbers
         }
 
-    /** 2 컬럼(kind·번호 배열)을 `startIndex`부터 바인딩하고 다음 free index 를 낸다. */
+    /** 3 컬럼(kind·번호 배열·관측 시각)을 `startIndex`부터 바인딩하고 다음 free index 를 낸다. */
     fun bind(
         statement: PreparedStatement,
         startIndex: Int,
@@ -131,6 +146,7 @@ internal object DrawNumbersKind {
         } else {
             statement.setNull(index++, Types.ARRAY)
         }
+        statement.setNullableTimestamp(index++, observation.observedAt)
         return index
     }
 
@@ -140,18 +156,19 @@ internal object DrawNumbersKind {
     ): DrawNumberObservation {
         val kind = rs.getString("draw_numbers_kind") ?: return DrawNumberObservation.NotObserved
         val numbers = readNumberSet(rs)
+        val observedAt = requireNotNull(rs.getTimestamp("draw_numbers_observed_at")?.toInstant())
         return when (kind) {
             VERIFIED -> {
-                DrawNumberObservation.Verified(numbers)
+                DrawNumberObservation.Verified(numbers, observedAt)
             }
 
             OUT_OF_RANGE -> {
                 val total = requireNotNull(totalReservePriceCandidateCount)
-                DrawNumberObservation.OutOfRange(numbers, 1..total)
+                DrawNumberObservation.OutOfRange(numbers, 1..total, observedAt)
             }
 
             RANGE_CHECK_UNAVAILABLE -> {
-                DrawNumberObservation.RangeCheckUnavailable(numbers)
+                DrawNumberObservation.RangeCheckUnavailable(numbers, observedAt)
             }
 
             else -> {

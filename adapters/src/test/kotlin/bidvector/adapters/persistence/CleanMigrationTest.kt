@@ -165,8 +165,11 @@ class CleanMigrationTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "opening_rank_one_bid_amount_won", "numeric", true),
             ColumnSpec("opening_result", "opening_rank_one_bid_amount_currency", "text", true),
             ColumnSpec("opening_result", "opening_rank_one_bid_rate_fraction", "numeric", true),
+            // verifier r1 F-2 뒤 — 축별 관측 시각(3E OpeningReservePriceRow.observedAt 과 같은 자리).
+            ColumnSpec("opening_result", "opening_rank_one_observed_at", "timestamp with time zone", true),
             ColumnSpec("opening_result", "draw_numbers_kind", "text", true),
             ColumnSpec("opening_result", "draw_numbers", "ARRAY", true),
+            ColumnSpec("opening_result", "draw_numbers_observed_at", "timestamp with time zone", true),
         )
 
     // M3/3E — 층 B 자식 표(D-3E-2 (a), 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
