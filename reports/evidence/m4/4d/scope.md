@@ -160,3 +160,19 @@ enum 통과 → `ContractViolation` test (6) breaker open 에 옛 답 → `Circu
 | `OPEN-2B-OBJECTIVE-VALUES`·`OPEN-ML-02` | 경계 밖(5D·운영자) |
 | **`OPEN-4D-LADDER-SCORE-SOURCE`**(신설) | 위 「운영자 결정 필요」 — 착수 가정 (c) |
 | **`OPEN-4D-POLICY-VALUES`**(신설) | D-4D-7 값 — 종결 승인 시 확정 |
+
+---
+
+## 계약 갱신 — 2026-09-10 (구현 중, 팀장 등재)
+
+1. **좁은 예외 — `app/src/test/kotlin/bidvector/app/conformance/VerdictExecutors.kt`.** `MlUnavailableReason` 에 값을 더하자(④) 이 파일의 소진 `when` 이
+   컴파일되지 않아 구현 레인이 가지를 추가했다(4C-1 의 `StrategyEditExecutors.kt` 파급과 같은 클래스 — 승인된 어휘 확장의 기계적 파급, corpus 기대값
+   무변경). `in_scope` 에 **이 파일 한 개**를 추가한다. 이 파일은 4B-1 이 만든 것이고 `m4/2026-09-08` 쪽 4B-2 가 조건부 in_scope 로 갖는다 — 병합 시 줄 단위
+   충돌 축으로 등재.
+2. **`internal constructor` 이탈 — 설계 검토 (2) 표의 오류.** `Predicted`·`BidRateCandidates`·`PriceFitness`·`Uncertainty`·`ModelReleaseRef` 는 `workflow` 에
+   선언되고 `adapters` 가 만든다. Kotlin `internal` 은 Gradle 모듈 단위라 다른 모듈의 생성이 컴파일되지 않는다 — 설계 검토가 4C-1·4E(같은 모듈 안 생성)의
+   관례를 모듈 경계 너머로 잘못 옮겼다. 구현은 public 생성자(4B-2 `MlAnalysisOutcome.Analyzed` 선례)이고, 위조 경로는 값 획득 축 표에서 **「연다 — 경계로
+   처리」** 로 재분류한다. 4C-1 교훈(「경계로 처리」 행이 수정 라운드에서 결함이 됐다)에 따라 verifier 표적: 위조된 `Predicted` 가 하류에서 무엇을 살 수
+   있는가(현재 소비자 0 — 4B 후속), 그리고 `adapters` 밖에서 `Predicted` 를 만드는 정당한 사유가 있는가(test fake 뿐이어야 한다).
+3. **`adapters/build.gradle.kts` 에 `implementation(project(":decision"))`** — `MlUnavailableReason` 참조에 필요. adapters 는 domain 모듈을 의존해도
+   되는 층(ADR 0006, `ModuleDependencyGate` 통과 실측은 commands.md).
