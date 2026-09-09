@@ -59,6 +59,12 @@ class GrpcBidPredictionGateway(
                 BidPredictionOutcome.Unavailable(MlUnavailableReason.CircuitOpen)
             }
 
+            // verifier r2 G-4 — 예산 소진은 서버를 한 번도 못 불렀거나 재시도를 포기한
+            // 것이지 breaker 가 셀 transport 실패가 아니다(ResilientPredictionCall.kt).
+            PredictionCallOutcome.BudgetExhausted -> {
+                BidPredictionOutcome.Unavailable(MlUnavailableReason.DeadlineExceeded)
+            }
+
             is PredictionCallOutcome.TransportFailed -> {
                 mapTransportFailure(outcome.error)
             }

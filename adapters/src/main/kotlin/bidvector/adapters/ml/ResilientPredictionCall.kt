@@ -3,12 +3,12 @@ package bidvector.adapters.ml
 import contract.bidvector.ml.v1.CalculateOptimalBidResponse
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
-import io.grpc.Status
 import io.grpc.StatusException
 import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.util.concurrent.TimeUnit
+import kotlin.time.toKotlinDuration
 
 /**
  * breaker 설정(scope.md ⑧) — 3C `buildLlmCircuitBreaker`와 같은 배관 의도(minimumNumberOfCalls
@@ -37,9 +37,24 @@ internal sealed interface PredictionCallOutcome {
 
     data object BreakerOpen : PredictionCallOutcome
 
+    /**
+     * verifier r2 G-4(medium) — 호출부 예산 부족은 서버 건강 신호가 아니다. `TransportFailed`
+     * 와 분리된 별도 가지라 `callResilient`가 `circuitBreaker.onError`를 부르지 않는다.
+     */
+    data object BudgetExhausted : PredictionCallOutcome
+
     data class TransportFailed(
         val error: Throwable,
     ) : PredictionCallOutcome
+}
+
+/** `callWithBoundedRetry`의 내부 신호 — 예산 소진은 예외가 아니라 이 타입으로 위로 올라간다. */
+private sealed interface BoundedRetryOutcome {
+    data class Success(
+        val response: CalculateOptimalBidResponse,
+    ) : BoundedRetryOutcome
+
+    data object BudgetExhausted : BoundedRetryOutcome
 }
 
 /**
@@ -49,9 +64,12 @@ internal sealed interface PredictionCallOutcome {
  * 예외(`isRetryableTransportStatus`)와 application failure(`isRetryableApplicationFailure`)를
  * **한 loop**(`callWithBoundedRetry`)에서 함께 보고, 재시도 사이마다 `backoff`(정책 배열,
  * attempt index 로 고른다)만큼 실제로 지연한다 — resilience4j `Retry`를 쓰지 않는다(재시도
- * 계층이 둘이 되지 않는다). gRPC 실패는 [StatusException]·[StatusRuntimeException] 둘 중
- * 하나로만 온다 — 그 밖(coroutine 취소의 `CancellationException` 포함)은 여기서 잡지 않고
- * 그대로 전파한다(`RetryRules.kt`와 같은 이유, detekt `TooGenericExceptionCaught`).
+ * 계층이 둘이 되지 않는다). **예산 소진은 breaker 계수 밖이다**(verifier r2 G-4) — 서버로
+ * 나가는 호출을 한 번도 만들지 않은 채 예산이 끝나는 것은 서버 건강과 무관하므로
+ * `circuitBreaker.onError`를 부르지 않는다. gRPC 실패는 [StatusException]·
+ * [StatusRuntimeException] 둘 중 하나로만 온다 — 그 밖(coroutine 취소의
+ * `CancellationException` 포함)은 여기서 잡지 않고 그대로 전파한다(`RetryRules.kt`와 같은
+ * 이유, detekt `TooGenericExceptionCaught`).
  */
 internal suspend fun callResilient(
     circuitBreaker: CircuitBreaker,
@@ -64,9 +82,16 @@ internal suspend fun callResilient(
     val start = System.nanoTime()
     val deadlineAt = start + remainingBudget.toNanos()
     return try {
-        val response = callWithBoundedRetry(maxAttempts, backoff, deadlineAt, call)
-        circuitBreaker.onSuccess(System.nanoTime() - start, TimeUnit.NANOSECONDS)
-        PredictionCallOutcome.Responded(response)
+        when (val outcome = callWithBoundedRetry(maxAttempts, backoff, deadlineAt, call)) {
+            is BoundedRetryOutcome.Success -> {
+                circuitBreaker.onSuccess(System.nanoTime() - start, TimeUnit.NANOSECONDS)
+                PredictionCallOutcome.Responded(outcome.response)
+            }
+
+            BoundedRetryOutcome.BudgetExhausted -> {
+                PredictionCallOutcome.BudgetExhausted
+            }
+        }
     } catch (statusError: StatusException) {
         circuitBreaker.onError(System.nanoTime() - start, TimeUnit.NANOSECONDS, statusError)
         PredictionCallOutcome.TransportFailed(statusError)
@@ -81,12 +106,15 @@ private suspend fun callWithBoundedRetry(
     backoff: List<Duration>,
     deadlineAt: Long,
     call: suspend () -> CalculateOptimalBidResponse,
-): CalculateOptimalBidResponse {
+): BoundedRetryOutcome {
     for (attempt in 0 until maxAttempts) {
         val isLastAttempt = attempt == maxAttempts - 1
         val outcome = attemptOnce(call, isLastAttempt)
-        if (outcome != null) return outcome
-        if (!isLastAttempt) awaitBackoffOrDeadlineExceeded(attempt, backoff, deadlineAt)
+        if (outcome != null) return BoundedRetryOutcome.Success(outcome)
+        if (!isLastAttempt) {
+            val canContinue = awaitBackoffOrSignalExhausted(attempt, backoff, deadlineAt)
+            if (!canContinue) return BoundedRetryOutcome.BudgetExhausted
+        }
     }
     error("retry loop 이 결과 없이 끝났다")
 }
@@ -115,19 +143,20 @@ private fun isRetryableFailureResponse(response: CalculateOptimalBidResponse): B
  * verifier r1 F-1(high) — 재시도 전에 정책 `backoff`(attempt index 로 고른다, 마지막 index
  * 이후는 마지막 값을 반복)만큼 `delay`한다(ADR 0010 D-4 「RESOURCE_EXHAUSTED(백오프 필수)」,
  * 모든 재시도 가능 status 에 균일 적용). **남은 예산이 그 백오프조차 감당하지 못하면
- * 재시도하지 않고** `Status.DEADLINE_EXCEEDED`를 합성해 던진다 — `callResilient`의 catch
- * 가 그대로 받아 `TransportFailed`로 접고, `GrpcBidPredictionGateway.mapTransportFailure`
- * 가 `Unavailable(DeadlineExceeded)`로 옮긴다(재시도 폭풍 방지).
+ * 재시도하지 않는다** — `false`를 내어 `callWithBoundedRetry`가 예외 없이
+ * `BoundedRetryOutcome.BudgetExhausted`로 접게 한다(verifier r2 G-4 — 이전엔 합성
+ * `Status.DEADLINE_EXCEEDED`를 던져 breaker 가 그 실패를 서버 오류로 계수했다).
+ * `delay`는 verifier r2 G-6 — sub-millisecond `backoff`가 `toMillis()`로 0 절삭되지 않게
+ * `kotlin.time.Duration` 오버로드(나노 보존)를 쓴다.
  */
-private suspend fun awaitBackoffOrDeadlineExceeded(
+private suspend fun awaitBackoffOrSignalExhausted(
     attempt: Int,
     backoff: List<Duration>,
     deadlineAt: Long,
-) {
+): Boolean {
     val backoffDuration = backoff.getOrElse(attempt) { backoff.last() }
     val remainingNanos = deadlineAt - System.nanoTime()
-    if (remainingNanos <= backoffDuration.toNanos()) {
-        throw Status.DEADLINE_EXCEEDED.asRuntimeException()
-    }
-    delay(backoffDuration.toMillis())
+    if (remainingNanos <= backoffDuration.toNanos()) return false
+    delay(backoffDuration.toKotlinDuration())
+    return true
 }
