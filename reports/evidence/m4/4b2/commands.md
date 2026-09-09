@@ -108,3 +108,12 @@
 - cmd: `git status --porcelain` — `config/quality/gate-tests.properties`·
   `docs/discovery/capability-map.md`·`milestone-4.md`·`workflow/src/{main,test}/.../evaluation/**`·
   `reports/evidence/m4/4b2/**`만, scope.md in_scope와 정확히 일치.
+
+## 2026-09-09T14:40Z — 커밋(head `a0d254fe71006ab3b84cbd5ee825bb8a7e09e97e`) + S-0
+- cmd: `git add <in_scope 경로 6개 개별 인자> && git commit ... -- <같은 경로>` — exit 0.
+  18 files changed(1615 insertions·1 deletion).
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks --branch m4/2026-09-08
+  --single-branch . "$d/repo" && (cd "$d/repo" && git checkout --quiet a0d254f &&
+  ./gradlew --no-build-cache clean check)` — exit 0 — `BUILD SUCCESSFUL in 52s`, 353
+  actionable tasks 전부 executed(캐시 없는 임시 clone).
+- clone 삭제(`rm -rf`), 원 worktree엔 영향 없음.
