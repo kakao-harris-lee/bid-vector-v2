@@ -24,6 +24,7 @@ in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/strategy/EditStrategyWorkflow.kt   # 같은 예외 — 호출부 한 줄
   - workflow/src/test/**                                                # 위 둘의 회귀 test 포함(이미 in_scope)
   - milestone-4.md
+  - app/src/test/kotlin/bidvector/app/conformance/StrategyEditExecutors.kt   # **갱신 2026-09-09** — `EventSink` 확장의 기계적 파급(하단 사유)
   - reports/evidence/m4/4a/scope.md                                     # 계약 갱신 절 append(이미 기록됨)
   - reports/evidence/m4/4c1/**
 out_of_scope:
@@ -126,3 +127,21 @@ port 인터페이스만 public. 특히 `OutboxPort` 의 `mark*` 계열은 「상
 | `OPEN-ADR-13`(db-scheduler 실패 기본값) | **4C-2** — 4C-1 에는 스케줄러가 없다 |
 | `OPEN-ADR-12`(lease 어댑터) | 4C-2/후속 |
 | 신설 후보 `OPEN-4C1-TX-CONTRACT-UNVERIFIED` | ③ 의 「등록이 도메인 write 와 같은 트랜잭션」이 4C-1 에서는 **문면 선언일 뿐 강제되지 않는다**. 4C-2 가 실 저장으로 닫을 때까지 활성 |
+
+---
+
+## 계약 갱신 — 2026-09-09 (구현 중, 오케스트레이터 판단)
+
+**무엇**: `app/src/test/kotlin/bidvector/app/conformance/StrategyEditExecutors.kt` 를 in_scope 에 추가(+5/−1줄).
+
+**왜**: 운영자 승인 예외 `EventSink.publish(event, actor)` 를 반영하면 **그 인터페이스의 모든 구현체가 기계적으로 깨진다**. 4A 가 남긴 corpus 실행자의
+`RecordingEventSink` 가 그 구현체라 `:app:gateExecutionGate` 가 컴파일 실패했다. **시그니처만 맞췄고 corpus 산출 로직·기대값은 무변경**이다
+(실측: `:app:test --tests '*Conformance*'` 74건, 개수·값 불변).
+
+**판단**: 실질적 scope 확장이 아니라 **이미 승인된 변경의 강제 파급**이라 slice 를 멈추지 않고 계약을 갱신한다. 구현 레인이 이 파일을 in_scope 밖으로
+정직하게 신고했고(checklist §3), 그 신고가 옳았다 — 갱신은 오케스트레이터가 한다.
+
+**범위 밖 range 잡음(선언)**: 이 slice 의 `base..HEAD` 에는 **4B-1 계약 커밋 둘**(`4e07682`·`e2bfb99`, `reports/evidence/m4/4b1/**`)과
+**하네스 커밋 하나**(`de99ddb`)가 섞여 있다. 셋 다 in_scope 밖이고 이 slice 의 산출물이 아니며 **rollback 대상이 아니다**
+(slice 의 커밋 집합은 range 가 아니라 in_scope 경로의 변경이다 — 2026-09-04).
+
