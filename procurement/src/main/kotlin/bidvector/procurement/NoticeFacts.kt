@@ -102,6 +102,21 @@ data class OpeningResult(
     val actualOpeningAt: Instant? = null,
     /** 복수예비가격 자식 행 목록(D-3E-2 (a)) — 순번 부재 행은 여기 오르지 않는다(D-3E-1b (a)). */
     val reservePrices: List<OpeningReservePriceRow> = emptyList(),
+    /**
+     * M3/3F ① 개찰 1위 축(D-3F-4 (a)) — `getOpengResultListInfoOpengCompt`(개찰완료)만 준다.
+     * D-3F-3 해소로 투찰자별 canonical 표를 만들지 않는다 — 순위 1 행을 특정할 수 있을 때만
+     * [OpeningRankOneOutcome.Determined]이고, 부재·중복이면 이 축을 비우고 사유를 명시적으로
+     * 나른다(투찰금액으로 순위를 재계산하지 않는다, scope.md 설계 검토 (2)).
+     */
+    val openingRankOne: OpeningRankOneOutcome = OpeningRankOneOutcome.NotObserved,
+    /**
+     * M3/3F ② 관측된 추첨번호 집합(D-3F-4 (a), `drwtNo1`·`drwtNo2`) — 15행의 1-기반 인덱스
+     * (§1.9.4). 투찰자별 귀속은 보존하지 않는다(운영자 도메인 결정, D-3F-3) — 실현 사정률
+     * 계산(M5)은 이 집합만으로 충분하다. 범위 검사는 [totalReservePriceCandidateCount]가
+     * 있어야 성립하는데 이 오퍼레이션 응답에는 그 값이 없다(§1.9.7) — 그래서 「검사 불가」가
+     * 조용한 통과가 아니라 그 자체로 하나의 결과다([DrawNumberObservation]).
+     */
+    val drawNumbers: DrawNumberObservation = DrawNumberObservation.NotObserved,
 ) {
     init {
         require(participantCount == null || participantCount >= 0) {
@@ -172,6 +187,144 @@ data class ReservePriceCandidateAmount(
 
     init {
         require(won >= 0L) { "금액은 음수일 수 없다: $won" }
+    }
+}
+
+/**
+ * 투찰금액(`bidprcAmt`) 관측값 전용 값 객체(M3/3F) — `bidvector.sharedkernel.BidAmount`
+ * (Basis.BID)는 **기초금액×투찰율의 파생값**만 나르고 생성자가 `internal`이라 그 생성 경로가
+ * `MoneyArithmetic.kt` 하나뿐이다(shared-kernel 「유일한 생성 경로는 반올림 함수」). 이 축은
+ * KONEPS 가 준 **관측**이지 파생이 아니다 — 파생 전용 타입을 관측값으로 지어내는 것은
+ * `ReservePriceCandidateAmount`가 피한 것과 같은 우회(값은 있고 출처는 지어낸 것)라 별도
+ * 평범한 값 객체로 둔다. `vatTreatment`는 다른 개찰 축 금액과 같이 `UNKNOWN` 고정이다
+ * (§1.7.1 문면 「미선언 → UNKNOWN」).
+ */
+data class ObservedBidAmount(
+    val won: Long,
+    val currency: Currency,
+) {
+    val vatTreatment: VatTreatment = VatTreatment.UNKNOWN
+
+    init {
+        require(won >= 0L) { "금액은 음수일 수 없다: $won" }
+    }
+}
+
+/**
+ * 개찰 1위 행(M3/3F, D-3F-4 (a)) — 상호(`prcbdrNm`, masked)·투찰금액·투찰율·평가점수 넷.
+ * 투찰금액·투찰율은 협상 계약에서 부재가 정상이다(§1.9.7 실측, 3/15). 평가점수 넷은
+ * 수집·보존만 한다(D-3F-5 (a)) — 해석·판정하지 않으므로 원문 텍스트 그대로 나른다.
+ */
+data class OpeningRankOneBid(
+    val bidderName: String,
+    val bidAmount: ObservedBidAmount? = null,
+    val bidRate: Rate? = null,
+    val priceEvaluationScore: String? = null,
+    val technicalEvaluationScore: String? = null,
+    val technicalEvaluationNatureScore: String? = null,
+    val totalEvaluationAmountScore: String? = null,
+) {
+    init {
+        require(bidderName.isNotBlank()) { "bidderName은 빈 문자열일 수 없다" }
+    }
+}
+
+/**
+ * 개찰 1위 축의 결정 결과(M3/3F, D-3F-4 (a)) — [resolve]가 유일한 생성 경로는 아니지만
+ * (부모 fact 는 이 슬롯을 직접 받는다), **순위 1을 특정할 수 없으면 그 축을
+ * 비우고 사유를 명시적으로 나른다**는 요구를 sealed type 으로 고정한다. `opengRank`가
+ * 실측(§1.9.7)에서 전 행 채워지고 유일한 경우가 4/15뿐이라(결측·중복 흔함) [RankMissing]·
+ * [RankDuplicated]가 정상 관측이다 — 투찰금액으로 순위를 재계산해 채우지 않는다(동값이
+ * 실재하는 도메인, 설계 검토 (4) 「과잉 하나」).
+ */
+sealed interface OpeningRankOneOutcome {
+    /** 투찰자 행 자체가 관측되지 않았다(기본값). */
+    data object NotObserved : OpeningRankOneOutcome
+
+    /** 어느 행도 순위 1이 아니다. */
+    data object RankMissing : OpeningRankOneOutcome
+
+    /** 순위 1이 둘 이상이다 — 동값을 임의로 깨지 않는다. */
+    data class RankDuplicated(
+        val count: Int,
+    ) : OpeningRankOneOutcome {
+        init {
+            require(count >= 2) { "RankDuplicated는 2건 이상일 때만 성립한다: $count" }
+        }
+    }
+
+    /** 순위 1이 정확히 하나다. */
+    data class Determined(
+        val bid: OpeningRankOneBid,
+    ) : OpeningRankOneOutcome
+
+    companion object {
+        /**
+         * 관측된 (순위, 개찰 1위 후보) 짝 목록에서 개찰 1위 축을 결정한다. 순위 파싱·raw 텍스트
+         * 해석은 호출부 몫이다(canonicalize, M4 4B 배선) — 이 함수는 이미 파싱된 `Int?` 순위만
+         * 받는다.
+         */
+        fun resolve(candidates: List<Pair<Int?, OpeningRankOneBid>>): OpeningRankOneOutcome {
+            if (candidates.isEmpty()) return NotObserved
+            val rankOnes = candidates.filter { it.first == 1 }
+            return when (rankOnes.size) {
+                0 -> RankMissing
+                1 -> Determined(rankOnes.single().second)
+                else -> RankDuplicated(rankOnes.size)
+            }
+        }
+    }
+}
+
+/**
+ * 추첨번호(`drwtNo1`·`drwtNo2`) 관측 결과(M3/3F, D-3F-4 (a)) — 15행의 1-기반 인덱스(§1.9.4).
+ * 실현 사정률 계산(M5)은 이 슬라이스 밖이다 — 이 타입은 **범위 검사까지**만 진다. 범위 검사는
+ * `OpeningResult.totalReservePriceCandidateCount`(3E 슬롯)를 요구하는데 이 오퍼레이션 응답에는
+ * 그 값이 없다(§1.9.7 실측) — 그래서 **검사 불가**가 조용한 통과(`Verified`)가 아니라 그
+ * 자체로 하나의 결과다(위협 모델 방어 (d)).
+ */
+sealed interface DrawNumberObservation {
+    /** 관측된 번호가 없다 — 부재가 정상 형태다(협상 계약·단수 예가, §1.9.7 7/15). */
+    data object NotObserved : DrawNumberObservation
+
+    /** 1..총예가건수 범위 안 — 검사를 통과했다. */
+    data class Verified(
+        val numbers: Set<Int>,
+    ) : DrawNumberObservation
+
+    /** 범위 밖 번호가 섞여 있다 — 조용히 통과시키지 않는다. */
+    data class OutOfRange(
+        val numbers: Set<Int>,
+        val validRange: IntRange,
+    ) : DrawNumberObservation
+
+    /** 번호는 있으나 총예가건수를 몰라 범위를 검사할 수 없다(§1.9.7 — 이 오퍼레이션 응답에 없다). */
+    data class RangeCheckUnavailable(
+        val numbers: Set<Int>,
+    ) : DrawNumberObservation
+
+    companion object {
+        fun of(
+            numbers: Set<Int>,
+            totalReservePriceCandidateCount: Int?,
+        ): DrawNumberObservation =
+            when {
+                numbers.isEmpty() -> {
+                    NotObserved
+                }
+
+                totalReservePriceCandidateCount == null -> {
+                    RangeCheckUnavailable(numbers)
+                }
+
+                numbers.any { it < 1 || it > totalReservePriceCandidateCount } -> {
+                    OutOfRange(numbers, 1..totalReservePriceCandidateCount)
+                }
+
+                else -> {
+                    Verified(numbers)
+                }
+            }
     }
 }
 
