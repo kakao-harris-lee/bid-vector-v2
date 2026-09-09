@@ -266,6 +266,9 @@
   좁힌 버전이다. 다른 파일(port·값 타입 등)은 이번 라운드 무변경.
 
 ## 2026-09-10T10:20Z — acceptance S-0~S-6(재실행, S-4·S-6 별도 호출)
+- cmd: 임시 clone(`git clone --branch m4/2026-09-08 . <tmp>` → `git checkout
+  08d1743`) → `./gradlew --no-build-cache clean check`(S-0) — exit 0 —
+  `BUILD SUCCESSFUL in 52s`, `353 actionable tasks: 353 executed`.
 - cmd: `./gradlew --no-build-cache clean check`(S-1) — exit 0.
 - cmd: `./gradlew --no-daemon :workflow:test`(S-2) — exit 0.
 - cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate
@@ -276,3 +279,34 @@
   `SharedKernelCorpusConformanceTest tests="86" failures="0"`(무변화).
 - cmd: `./gradlew --no-daemon qualityBaseline`(S-5) — exit 0.
 - cmd: `./gradlew --no-daemon :app:gateExecutionGate`(S-6, 별도 호출) — exit 0.
+
+## 2026-09-10T11:00Z — rollback 재실측(수정 라운드 2, head `08d1743`)
+- cmd: `git log --oneline 401bc4d5636cd114c8282cf314d837f0d52dbc15..HEAD --
+  config/quality/gate-tests.properties docs/discovery/capability-map.md
+  milestone-4.md`(공유 파일 단독 기여 재확인) — 셋 다 이 range에서 `a0d254f`만
+  걸림, 수정 라운드 1(`76b0ec5`)·라운드 2(`08d1743`) 모두 이 셋을 건드리지
+  않음 — commit-hash 격리 불필요, `base..HEAD`로 안전.
+- cmd: 위 S-0과 같은 임시 clone(head `08d1743`)에서 세 공유 파일에
+  `git diff <base>..HEAD -- <file> | git apply -R`, 신규 파일(workflow
+  evaluation 열·reports/evidence/m4/4b2 여섯)에 `git restore
+  --source=<base> --staged --worktree -- <경로>` — 전부 exit 0.
+- cmd: `git diff <base> -- config/quality/gate-tests.properties
+  docs/discovery/capability-map.md milestone-4.md` — 출력 없음(base와
+  byte-identical, 「내 줄 사라짐」 확인).
+- cmd: `grep -n "OPEN-4B1-OFF-LADDER-DROPS\|OPEN-4B2-"
+  docs/discovery/capability-map.md` — `OPEN-4B1-OFF-LADDER-DROPS`는 미종결
+  표시로 복귀, `OPEN-4B2-*` 다섯 행 소멸(round-1 재실측과 동일 결과 — 「남의
+  줄 남음」은 이 range에 4B-2 외 기여자가 없어 해당 없음, 파일 전체가
+  byte-identical이 그 증거).
+- cmd: `ls workflow/src/main/kotlin/bidvector/workflow/evaluation
+  workflow/src/test/kotlin/bidvector/workflow/evaluation
+  reports/evidence/m4/4b2` — 셋 다 `No such file or directory`(신규 트리
+  전체 삭제 확인).
+- cmd: `./gradlew --no-daemon -q :workflow:compileKotlin
+  :workflow:compileTestKotlin :app:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon -q :workflow:test` — exit 0.
+- cmd: `./gradlew --no-daemon -q :app:test --tests '*Conformance*'`(별도
+  호출) — exit 0 — `SharedKernelCorpusConformanceTest tests="86"
+  failures="0"`(4B-2 rollback 전후 무변화 — `fixtures/manifest.yaml`은
+  이 slice가 만지지 않음).
+- 임시 clone `rm -rf`로 정리.

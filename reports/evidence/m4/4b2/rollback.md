@@ -20,6 +20,14 @@
 git apply -R`), 4B-2만 있으면 `git diff <base>..HEAD -- <파일> | git apply -R`로
 충분하다. 확인은 「내 줄 사라짐」과 **「남의 줄 남음」을 둘 다** 잰다.
 
+**재실측(수정 라운드 2, head `08d1743`)**: 세 파일 다 이 range에서 여전히
+**4B-2 자신의 커밋(`a0d254f`)만** 만졌다 — 수정 라운드 1(`76b0ec5`)·라운드
+2(`08d1743`) 모두 이 셋을 건드리지 않는다. commit-hash 격리 계속 불필요,
+`base..HEAD`로 안전. 임시 clone(head `08d1743`)에서 실행해 diff 출력 없음(base와
+byte-identical)까지 확인했다 — 「남의 줄 남음」은 이 range에 4B-2 외 기여자가
+없어 해당 없음(파일 전체가 byte-identical이 그 자체로 증거). commands.md
+「rollback 재실측(수정 라운드 2, head `08d1743`)」 참조.
+
 ## 신규 파일(A) — 전체 삭제
 
 ```
