@@ -80,9 +80,9 @@ data class KonepsCollectionPolicyData(
  * 이유는 CPD 다.[KonepsFieldContract.of]를 행마다 이름 인자로 풀어 쓰면 10 행이 서로
  * `authoritative = true, presentIn = setOf(...), effectiveFrom = ...` 같은 50토큰 넘는
  * 공통 꼬리를 그대로 반복해 `cpdCheck`가 중복으로 잡는다(실측) — 표 자체가 중복 없는
- * 유일한 정본이 되도록 이 행 하나로 좁힌다.
+ * 유일한 정본이 되도록 이 행 하나로 좁힌다. `internal`(M3/3F) — KonepsOpeningCompleteFieldContracts.kt 가 재사용한다.
  */
-private data class FieldContractRow(
+internal data class FieldContractRow(
     val rawName: RawKey,
     val concept: FieldConcept,
     val basis: Basis?,
@@ -113,11 +113,10 @@ private data class FieldContractRow(
         )
 }
 
-// bidNtceNo·bidNtceOrd 공용 presentIn — 공고 식별자라 개찰 축 세 엔드포인트(F-6)·
-// license-limit(G-4, §1.9.5)에도 실린다(어느 응답이든 「어느 공고의 행인가」 없이 오지
-// 않는다). 좁히면 개찰 축 allow-list 강제가 이 필드부터 떨어뜨려 전 항목이 「공고번호
-// 없음」으로 오분류된다. 두 행이 이 집합을 그대로 반복해 `cpdCheck`가 중복으로 잡아 값
-// 객체로 뽑았다(v2-지침서 §5 중복 금지).
+// bidNtceNo·bidNtceOrd 공용 presentIn — 공고 식별자라 개찰 축 세 엔드포인트(F-6)·license-limit
+// (G-4, §1.9.5)·개찰완료(P-13)에도 실린다(어느 응답이든 「어느 공고의 행인가」 없이 오지 않는다).
+// 좁히면 개찰 축 allow-list 강제가 이 필드부터 떨어뜨려 전 항목이 「공고번호 없음」으로 오분류된다.
+// 여러 행이 이 집합을 그대로 반복해 `cpdCheck`가 중복으로 잡아 값 객체로 뽑았다(§5 중복 금지).
 private val NOTICE_IDENTIFIER_PRESENT_IN: Set<SourceEndpoint> =
     setOf(
         SourceEndpoint.NOTICE_LIST,
@@ -125,6 +124,7 @@ private val NOTICE_IDENTIFIER_PRESENT_IN: Set<SourceEndpoint> =
         SourceEndpoint.OPENING_RESULT_LIST,
         SourceEndpoint.RESERVE_PRICE_DETAIL,
         SourceEndpoint.LICENSE_LIMIT_DETAIL,
+        SourceEndpoint.OPENING_COMPLETE,
     )
 
 /**
@@ -434,7 +434,7 @@ private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
     )
 
 private val KONEPS_OPERATIONAL_FIELD_CONTRACTS: List<KonepsFieldContract> =
-    (KONEPS_OPERATIONAL_FIELD_ROWS + KONEPS_OPENING_FIELD_ROWS).map { it.toContract() }
+    (KONEPS_OPERATIONAL_FIELD_ROWS + KONEPS_OPENING_FIELD_ROWS + KONEPS_OPENING_COMPLETE_ROWS).map { it.toContract() }
 
 /**
  * `resultCode` → 범주(D-M3-4, `OPEN-COL-02`) — 운영자 승인 2026-09-07(P-4 ②③)의 범주

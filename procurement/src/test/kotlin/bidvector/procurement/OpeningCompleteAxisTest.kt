@@ -74,22 +74,12 @@ class OpeningCompleteAxisTest {
     }
 
     @Test
-    fun `협상 계약 — 투찰금액 투찰율이 부재여도 상호와 평가점수는 값으로 남는다`() {
-        val bid =
-            OpeningRankOneBid(
-                bidderName = "SYN-NEGOTIATED",
-                bidAmount = null,
-                bidRate = null,
-                priceEvaluationScore = "95.0",
-                technicalEvaluationScore = "88.5",
-                technicalEvaluationNatureScore = "90.0",
-                totalEvaluationAmountScore = "91.2",
-            )
+    fun `협상 계약 — 투찰금액 투찰율이 부재여도 상호는 값으로 남는다`() {
+        val bid = OpeningRankOneBid(bidderName = "SYN-NEGOTIATED", bidAmount = null, bidRate = null)
 
+        bid.bidderName shouldBe "SYN-NEGOTIATED"
         bid.bidAmount shouldBe null
         bid.bidRate shouldBe null
-        bid.priceEvaluationScore shouldBe "95.0"
-        bid.totalEvaluationAmountScore shouldBe "91.2"
     }
 
     @Test

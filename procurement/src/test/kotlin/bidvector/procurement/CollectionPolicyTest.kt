@@ -26,7 +26,7 @@ private val RESOLVED_POLICY: KonepsCollectionPolicyData =
  */
 class CollectionPolicyTest {
     @Test
-    fun `필드 계약은 승인된 채택분 스물여섯 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
+    fun `필드 계약은 승인된 채택분 서른여섯 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contracts
             .map { it.rawName.name }
             .toSet() shouldBe
@@ -62,6 +62,18 @@ class CollectionPolicyTest {
                 // license-limit(§1.9.5) — verifier r2 G-4, 행 식별자로 쓰는 키를 계약에 등재.
                 "lmtGrpNo",
                 "lmtSno",
+                // M3/3F P-13 (a) 승인(2026-09-09, §1.11) — 개찰완료(투찰 행) 10행. 평가점수
+                // 넷·prcbdrBizno·prcbdrCeoNm·rmrk·cnsttyAccotBidAmtUrl 은 제외돼 등재되지 않는다.
+                "opengRsltDivNm",
+                "bidClsfcNo",
+                "rbidNo",
+                "opengRank",
+                "prcbdrNm",
+                "bidprcAmt",
+                "bidprcrt",
+                "drwtNo1",
+                "drwtNo2",
+                "bidprcDt",
             )
     }
 
@@ -100,7 +112,7 @@ class CollectionPolicyTest {
     }
 
     @Test
-    fun `bidNtceNo·bidNtceOrd 는 개찰 축 세 엔드포인트 + license-limit 에도 실린다 — F-6·G-4`() {
+    fun `bidNtceNo·bidNtceOrd 는 개찰 축 세 엔드포인트 + license-limit + 개찰완료에도 실린다 — F-6·G-4·P-13`() {
         val allEndpoints =
             setOf(
                 SourceEndpoint.NOTICE_LIST,
@@ -108,6 +120,8 @@ class CollectionPolicyTest {
                 SourceEndpoint.OPENING_RESULT_LIST,
                 SourceEndpoint.RESERVE_PRICE_DETAIL,
                 SourceEndpoint.LICENSE_LIMIT_DETAIL,
+                // M3/3F P-13 (a) 승인.
+                SourceEndpoint.OPENING_COMPLETE,
             )
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceNo"))!!.presentIn shouldBe allEndpoints
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceOrd"))!!.presentIn shouldBe allEndpoints

@@ -23,6 +23,10 @@ data class RawKey(
  * 세 오퍼레이션 군이 서로 다른 필드 집합을 주므로(`policy-values.md` §1.9.1) 한 토큰으로
  * 접으면 계약의 `presentIn`이 그 구별을 나르지 못한다 — 기존 `OPENING_RESULT`는 지우지 않고
  * (P-9 승인 문면 「옆에 세운다」) 옆에 둔다.
+ *
+ * **P-13 (a) 승인(M3/3F, 2026-09-09, §1.11)** — `OPENING_COMPLETE`(개찰완료, 투찰 행) 넷째
+ * 군을 더한다. legacy 가 부르지 않던 오퍼레이션이라 §1.7 계약이 없었고, 3F 구현 조사가
+ * 「어댑터가 계약 없이 값을 꺼낼 경로가 구조적으로 없다」는 것을 드러냈다.
  */
 enum class SourceEndpoint {
     NOTICE_LIST,
@@ -32,6 +36,7 @@ enum class SourceEndpoint {
     OPENING_AWARD_LIST,
     OPENING_RESULT_LIST,
     RESERVE_PRICE_DETAIL,
+    OPENING_COMPLETE,
 }
 
 /**

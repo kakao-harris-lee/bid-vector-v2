@@ -95,6 +95,46 @@ enum class FieldConcept {
 
     /** 제한순번(`lmtSno`, license-limit §1.9.5) — `LICENSE_LIMIT_GROUP_NUMBER`와 같은 이유. */
     LICENSE_LIMIT_SEQUENCE_NUMBER,
+
+    // M3/3F P-13 (a) 승인(§1.11) — 개찰완료 오퍼레이션(투찰 행) 축. 평가점수 넷은 scale
+    // 미확정이라 토큰을 두지 않는다(P-13 「제외」 — 어휘를 지어내지 않는다).
+
+    /** 입찰분류번호(`bidClsfcNo`, 동일 공고번호의 집행일련번호, §1.11). */
+    BID_CLASSIFICATION_NUMBER,
+
+    /** 재입찰번호(`rbidNo`, §1.11). */
+    REBID_NUMBER,
+
+    /**
+     * 개찰순위(`opengRank`, §1.11) — 실측(§1.9.7)에서 전 행 채워지고 유일한 건 4/15 뿐이다
+     * (결측·중복 흔함). 행 정체성으로 쓰지 않는다(D-3F-3 해소) — 관측값으로만 나른다.
+     */
+    OPENING_RANK,
+
+    /**
+     * 투찰업체명(`prcbdrNm`, §1.11) — `AWARD_COMPANY_NAME`(`bidwinnrNm`, 최종낙찰업체명)과
+     * 다른 축이다(투찰자 대 낙찰자, 서로 다른 오퍼레이션의 서로 다른 개념).
+     */
+    BID_COMPANY_NAME,
+
+    /**
+     * 투찰금액(`bidprcAmt`, §1.11) — `AWARD_AMOUNT`(`sucsfbidAmt`, 최종낙찰금액)와 다른 축이다.
+     * `bidvector.sharedkernel.BidAmount`(Basis.BID)는 파생 전용(`MoneyArithmetic.kt`)이라
+     * 이 관측값에 그 타입을 쓰지 않는다(procurement `ObservedBidAmount`, NoticeFacts.kt).
+     */
+    BID_AMOUNT,
+
+    /**
+     * 투찰률(`bidprcrt`, §1.11, *"투찰금액/예정가격 *100"*) — `WINNING_RATE`(분자가
+     * 최종낙찰금액)와 **다른 축**이다(P-11, `WINNING_RATE` KDoc이 이미 이 분리를 예고했다).
+     */
+    BID_RATE,
+
+    /** 추첨번호(`drwtNo1`·`drwtNo2`, §1.11, 1-기반 인덱스) — 두 raw 키가 이 개념 하나를 공유한다. */
+    DRAW_NUMBER,
+
+    /** 투찰일시(`bidprcDt`, §1.11) — zone 미확정(§1.7.4 와 같은 결, `ASSUME_KST` 초기값). */
+    BID_AT,
 }
 
 /**

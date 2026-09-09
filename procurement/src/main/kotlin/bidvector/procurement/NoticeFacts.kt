@@ -211,18 +211,20 @@ data class ObservedBidAmount(
 }
 
 /**
- * 개찰 1위 행(M3/3F, D-3F-4 (a)) — 상호(`prcbdrNm`, masked)·투찰금액·투찰율·평가점수 넷.
- * 투찰금액·투찰율은 협상 계약에서 부재가 정상이다(§1.9.7 실측, 3/15). 평가점수 넷은
- * 수집·보존만 한다(D-3F-5 (a)) — 해석·판정하지 않으므로 원문 텍스트 그대로 나른다.
+ * 개찰 1위 행(M3/3F, D-3F-4 (a)) — 상호(`prcbdrNm`, masked)·투찰금액·투찰율. 투찰금액·투찰율은
+ * 협상 계약에서 부재가 정상이다(§1.9.7 실측, 3/15).
+ *
+ * **평가점수 넷(D-3F-5 (a))은 이 슬롯에 없다** — P-13 (a) 승인(2026-09-09, `policy-values.md`
+ * §1.11)이 그 넷을 계약 등재에서 **제외**했다(scale 이 3A `FieldScale` 어휘에 없고 문서가
+ * 범위·소수 자리를 적지 않는다, 「어휘를 지어내지 않는다」). 계약이 없으면 allow-list
+ * 반전(§5.3 규율 1)이 그 값을 masking 경계에서 자동으로 걷어낸다 — `raw_observation` 에도
+ * 남지 않는다. D-3F-5 (a)의 「수집·보존」은 그래서 이 slice 에서 **평가점수 축에는 적용되지
+ * 않는다**(계약이 열리는 후속 slice 로 미룬다) — 판단이 갈린 지점, checklist.md.
  */
 data class OpeningRankOneBid(
     val bidderName: String,
     val bidAmount: ObservedBidAmount? = null,
     val bidRate: Rate? = null,
-    val priceEvaluationScore: String? = null,
-    val technicalEvaluationScore: String? = null,
-    val technicalEvaluationNatureScore: String? = null,
-    val totalEvaluationAmountScore: String? = null,
 ) {
     init {
         require(bidderName.isNotBlank()) { "bidderName은 빈 문자열일 수 없다" }
