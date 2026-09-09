@@ -20,7 +20,11 @@ in_scope:
   - config/quality/gate-tests.properties                    # `gate.tests.workflow` 확장
   - docs/discovery/data-dictionary.md                       # §2.2.5 만 — 어휘 자리를 승인된 값으로 채우고 `OPEN-OPS-10` 종결(운영자 승인 2026-09-09)
   - docs/discovery/capability-map.md                        # §14.2 의 `OPEN-OPS-10` 상태 갱신만
+  - workflow/src/main/kotlin/bidvector/workflow/strategy/Ports.kt        # **좁은 예외**(운영자 승인 2026-09-09) — `EventSink.publish(event, actor)` 한 줄
+  - workflow/src/main/kotlin/bidvector/workflow/strategy/EditStrategyWorkflow.kt   # 같은 예외 — 호출부 한 줄
+  - workflow/src/test/**                                                # 위 둘의 회귀 test 포함(이미 in_scope)
   - milestone-4.md
+  - reports/evidence/m4/4a/scope.md                                     # 계약 갱신 절 append(이미 기록됨)
   - reports/evidence/m4/4c1/**
 out_of_scope:
   - adapters/**                                             # persistence·db-scheduler·실 sender — 4C-2. **main 의 M3 후속 레인이 지금 만지는 경로다**
@@ -28,7 +32,8 @@ out_of_scope:
   - DB↔outbox 원자적 커밋·crash-after-commit·claim 경합       # 실 저장이 있어야 재는 것들 — 4C-2
   - lease port·어댑터(`OPEN-ADR-12`·ADR 0005 D-10)           # 4C-2/후속
   - 나머지 이벤트 넷의 payload 타입                            # `NoticeQualified`·`PredictionRequested`·`DecisionPrepared`·`NotificationRequested` 는 각 도메인 소유 → 4B. 봉투가 제네릭이라 그때 그대로 실린다
-  - 4A 산출물(workflow/strategy/**) 편집                      # 승인 종결됨. `EventSink` 구현을 붙일 뿐 그 인터페이스를 바꾸지 않는다 — 바꿔야 하면 멈추고 보고
+  - 4A 산출물(workflow/strategy/**) 편집 — **위 두 파일의 좁은 예외를 뺀 전부**   # 전이 커널·상태 기계·통로 타입·정책은 손대지 않는다.
+                                                              # `EventSink` actor 확장은 설계 검토가 찾아 운영자가 승인한 예외이고 4A scope.md 하단에 갱신 사유가 있다
   - strategy/**·M2·M3 경로 · 그 밖의 승인 문서
 acceptance_commands:
   - "S-0  d=$(mktemp -d) && git clone --quiet --no-hardlinks --branch m4/2026-09-08 --single-branch <repo> \"$d/repo\" && (cd \"$d/repo\" && ./gradlew --no-build-cache clean check)"

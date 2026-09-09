@@ -139,3 +139,20 @@ rollback: |
 | `OPEN-STR-04` | D-M4-2·D-4A-5 — actor 타입만, System 확인 경로 거부 |
 | `OPEN-STR-07`(해소) | 세션 소유권 검사에만 operator 식별자 |
 | 신설 후보 `OPEN-4A-WRITE-PATH-GATE` | 「모든 편집 경로가 use case 를 지난다」를 ArchUnit/의존 게이트로 표현할 수 있는지 — ADR 0005 §6 이 미확인으로 둔 것과 같은 축. 구현 레인이 실측으로 판정하고 불가하면 이 OPEN 을 등재한다 |
+
+---
+
+## 계약 갱신 — 2026-09-09 (종결 이후, 운영자 승인)
+
+**무엇**: `EventSink.publish(event: StrategyEvent)` → `publish(event: StrategyEvent, actor: Actor)` 로 **한 줄 넓힌다**(호출부 한 줄 동반).
+
+**왜**: 이 계약 ③ 은 「`Applied` 가 낳는 `StrategyUpdated` 는 이 command actor 를 **함께 넘긴다**」고 적었으나, 구현된 `EventSink` 시그니처에
+actor 가 없어 **전달 통로가 비어 있었다**(값 자체는 `TransitionOutcome.Applied.session.actor` 에 있다). M4/4C-1 설계 검토가 봉투의
+`StrategyUpdated` **actor 필수** 요구(D-M4-4 (a))를 맞추려다 이 공백을 찾았다 — 4C-1 계약의 「4A 인터페이스를 바꿔야 하면 멈추고 보고」에 걸려
+운영자 결정을 받았다.
+
+**성격**: 의미 변경이 아니라 **미완 전달의 완성**이다. ③ 의 문면·`OPEN-STR-04` 의 진단(「없던 것은 승인 게이트가 아니라 actor 기록」)이 요구한 바 그대로다.
+
+**누가·어디서**: 편집은 **M4/4C-1 slice** 가 수행하며 그 slice 의 in_scope 에 이 경로가 예외로 등재된다. 4A 의 acceptance·게이트·corpus 는
+그 slice 가 재실행해 회귀 없음을 실측한다. 이 갱신으로 4A 의 종결(2026-09-09 사용자 승인)이 무효가 되지는 않는다 — 종결 이후의 좁은 개정이다.
+
