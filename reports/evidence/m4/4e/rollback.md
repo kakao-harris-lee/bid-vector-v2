@@ -23,23 +23,25 @@ git diff --name-status f600909fcde1c08bb83abaf749cfa681539831a0..HEAD -- \
   reports/evidence/m4/4e
 ```
 
-결과(2026-09-09, 3커밋 뒤 실측): **A(신규) 20 · M(변경) 2**.
+**개수는 이 명령의 출력이 정본이다**(verifier r1 L-1 — 산문에 옮겨 적은 개수가 실물과
+어긋난 적이 있다, 이후 산문에 개수를 박지 않는다). 분류만 적는다:
 
-- A 20: `config/quality/leak-patterns.txt` · `workflow/src/main/kotlin/bidvector/workflow/notification/`의
-  12개 파일(`Channel.kt`·`DeliveryMode.kt`·`DeliveryPlan.kt`·`DeliveryRequest.kt`·
+- A(신규): `config/quality/leak-patterns.txt` · `workflow/src/main/kotlin/bidvector/workflow/notification/`
+  전 파일(`Channel.kt`·`DeliveryMode.kt`·`DeliveryPlan.kt`·`DeliveryRequest.kt`·
   `DeliveryResult.kt`·`DispatchNotification.kt`·`MaskedTarget.kt`·
   `NotificationDeliveryPolicyData.kt`·`Ports.kt`·`RenderedContent.kt`·`RouteKey.kt`·
-  `RuntimeEnvironment.kt`) · `workflow/src/test/kotlin/bidvector/workflow/notification/`의
-  7개 파일(`DeliveryPlanTableTest.kt`·`DispatchNotificationTest.kt`·`MaskedTargetTest.kt`·
+  `RuntimeEnvironment.kt`) · `workflow/src/test/kotlin/bidvector/workflow/notification/`
+  전 파일(`DeliveryPlanTableTest.kt`·`DispatchNotificationTest.kt`·`MaskedTargetTest.kt`·
   `NotificationBoundaryTest.kt`·`NotificationPolicyDataTest.kt`·`RouteKeyTest.kt`·
   `SenderContractTest.kt`) · `reports/evidence/m4/4e/`의 `commands.md`·`checklist.md`·
   `policy-values.md`·`rollback.md`(이 파일 자신 — 목록에는 잡히나 자기 자신을 되돌리는
-  명령의 대상은 아니다, 아래 「되돌리는 명령」 참고).
-- M 2: `config/quality/gate-tests.properties`(`gate.tests.workflow` 블록에 M4/4E 문단
-  + notification test 일곱 줄 추가, 순수 추가 hunk 둘) · `reports/evidence/m4/4e/scope.md`
+  명령의 대상은 아니다, 아래 「되돌리는 명령」 참고 — 그래서 아래 restore 명령의 경로
+  수는 이 A 목록보다 하나 적다).
+- M(변경): `config/quality/gate-tests.properties`(`gate.tests.workflow` 블록에 M4/4E
+  문단 + notification test 등재 줄 추가, 순수 추가 hunk 둘) · `reports/evidence/m4/4e/scope.md`
   (착수 계약 고정 — base에 있던 초안을 팀장이 잠근 것, 이 slice의 계약 문서 자신).
 
-**라운드가 더 늘어 파일이 늘면 이 절차를 다시 돌린다.**
+**라운드가 더 늘어 파일이 늘면 이 절차를 다시 돌린다** — 명령을 재실행해 목록을 다시 낸다.
 
 ## 되돌리는 명령
 
@@ -102,10 +104,11 @@ git restore --source=f600909fcde1c08bb83abaf749cfa681539831a0 --staged --worktre
 commands.md에 실행 결과를 한 줄씩 남긴다:
 
 1. 위 restore 명령들이 **임시 clone**에서 exit 0.
-2. `git status --porcelain`이 **A 20(rollback.md 제외 19 삭제 + 자기 자신 1은 그대로
-   남음) · M 2 복원**과 일치 — A 목록 19개(파일)는 완전 삭제, `gate-tests.properties`는
-   hunk 둘만 사라지고 4A/4C-1 몫(`gate.tests.workflow`의 event·strategy 줄, `gate.tests.strategy`)은
-   그대로, `scope.md`는 base의 초안 형태로 복귀.
+2. `git status --porcelain`의 `D`·`M` 줄 수가 위 「목록 산출」 명령이 낸 A·M 개수와
+   일치(`rollback.md` 자신만 A에서 빠져 `D`로 안 잡힌다) — A 목록 파일은 전부 완전
+   삭제로 잡히고, `gate-tests.properties`는 hunk 둘만 사라지고 4A/4C-1 몫
+   (`gate.tests.workflow`의 event·strategy 줄, `gate.tests.strategy`)은 그대로,
+   `scope.md`는 base의 초안 형태로 복귀.
 3. `config/quality/gate-tests.properties`·`reports/evidence/m4/4e/scope.md`의
    `git diff f600909... -- <경로>`가 빈 diff.
 4. 되돌린 트리에서 **모듈별 compile**이 exit 0 — `:workflow:compileKotlin

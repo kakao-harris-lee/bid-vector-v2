@@ -1,16 +1,20 @@
 package bidvector.workflow.notification
 
 /**
- * dispatch의 반환(scope.md ⑤) — [Suppressed]가 [Attempted]([DeliveryResult.Delivered])로
- * 바뀌는 문이 타입에 없다. [Suppressed]는 [DeliveryPlan] 전체(정책·환경 두 판정)를 실어
- * NOTI-03 「두 개의 서로 다른 값으로 구분 기록」을 위로 전달한다(설계 검토 (3)).
+ * dispatch의 반환(scope.md ⑤, 설계 검토 (2)) — [Suppressed]가 [Attempted]
+ * ([DeliveryResult.Delivered])로 바뀌는 문이 타입에 없다. [Suppressed]는 [DeliveryPlan]
+ * 전체(정책·환경 두 판정)를 실어 NOTI-03 「두 개의 서로 다른 값으로 구분 기록」을 위로
+ * 전달한다(설계 검토 (3)). `internal constructor`(+`@ConsistentCopyVisibility`) — dispatch
+ * 만 만든다(4C 소비도 같은 `workflow` 모듈이라 닫는 데 비용이 없다, verifier r1 M-1).
  */
 sealed interface DeliveryOutcome {
-    data class Suppressed(
+    @ConsistentCopyVisibility
+    data class Suppressed internal constructor(
         val plan: DeliveryPlan,
     ) : DeliveryOutcome
 
-    data class Attempted(
+    @ConsistentCopyVisibility
+    data class Attempted internal constructor(
         val result: DeliveryResult,
     ) : DeliveryOutcome
 }

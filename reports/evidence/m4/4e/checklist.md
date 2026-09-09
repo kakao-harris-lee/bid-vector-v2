@@ -3,7 +3,7 @@
 ## 리뷰 요청 조건 (evidence-pack 스킬 기준)
 
 - [x] 구현 diff가 커밋되어 base/head 고정 — `git status --porcelain -- <in_scope 경로>`
-      결과 없음(commands.md 「clean-tree 게이트」, 양성 대조 포함 예정 — 마지막 단계에서 실측).
+      결과 없음(commands.md 「clean-tree 게이트」 절 — 양성 대조 포함 실측 완료).
 - [x] scope.md의 acceptance_commands(S-0~S-6) 전부 exit 0으로 commands.md에 기록됨.
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — `clean check` 전건(ktlint·
       detekt·cpd·sizeGate·moduleDependencyGate·gateExecutionGate·qualityBaseline·
@@ -13,7 +13,13 @@
       값은 착수 placeholder 지위로 `policy-values.md`에 등재(`OPEN-4E-POLICY-VALUES`).
 - [x] 알려진 제한과 rollback 방법이 기록됨(아래 「알려진 제한」·`rollback.md`).
 - [x] 인증값 스캔 통과 — S-3·S-3c 실 매치 0(commands.md 「S-3/S-3c」 절 — 최초 실측에서
-      자기매치 2건을 발견해 한국어 서술·표본 문자열 교체로 해소한 이력 포함).
+      자기매치 2건을 발견해 한국어 서술·표본 문자열 교체로 해소한 이력 포함). **육안 확인
+      (scope.md 육안 확인 항목)**: S-3c가 패턴 스캔 대상에서 영구 제외하는 `scope.md`를
+      포함해 evidence 5파일(`scope.md`·`commands.md`·`checklist.md`·`policy-values.md`·
+      `rollback.md`) 전체를 육안으로 대조 — 실 Telegram id·메일 주소·사업자번호·인증값
+      0건. 7자 이상 숫자열 매치는 전부 git 커밋 SHA 또는 `base_sha`다(패턴 스캔이 못
+      잡는 축, evidence-pack 「Telegram id·사업자 정보는 패턴 스캔으로 못 잡으므로 육안
+      확인을 병기한다」 요구 대응).
 
 ## 이 slice 고유 확인
 
@@ -30,6 +36,20 @@
 | 7 | raw 채팅 id를 `RouteKey`로 | `RouteKey.init`이 `^[a-z][a-z0-9_-]{0,80}$` shape를 강제 | `RouteKeyTest`의 숫자 시작·콜론·대문자·골뱅이·공백·82자 거부 test 6개 + property test 2개(임의 슬러그는 항상 성공, 임의 숫자열은 항상 거부) |
 | 8 | `DeliveryPlan`의 결과를 필드와 어긋나게 손으로 조립 | `DeliveryPlan`이 `@ConsistentCopyVisibility` + `internal constructor`이고 `outcome`은 생성자 인자가 아니라 `policy`·`environment`에서 계산되는 `val`(손으로 지정할 자리 자체가 없음) | 임시 clone에서 `app` 모듈 test 소스에 `DeliveryPlan(PolicyVerdict.Allowed, EnvironmentVerdict.Allowed)` 직접 호출을 심고 `:app:compileTestKotlin` → `Cannot access '<init>': it is internal`(commands.md) |
 | 9 | Telegram/mail 라이브러리 타입을 FQN으로 참조 | `notification` 패키지는 `kotlin`·`kotlinx`·`java`·`javax`·`bidvector.sharedkernel`·`bidvector.workflow` 밖을 참조하지 않는다(S-5) | `NotificationBoundaryTest`(4A `disallowedQualifiedReferences` 술어 재사용) — allow-list 스캔 + Telegram 패키지 심은 표본 양성 대조 |
+
+### 1b. 값 획득·위조 축 표(설계 검토 (2)) — 코드에서 어떻게 섰는가
+
+| 타입 | 판정 | 근거 |
+| --- | --- | --- |
+| `RouteKey` | 연다(shape로 닫힘) | 어댑터가 설정에서 만든다. shape 밖은 생성 실패(우회 (7)) |
+| `MaskedTarget` | 닫는다 | `@ConsistentCopyVisibility` + `internal constructor`, 유일한 생성이 `mask()`(우회 (1)) |
+| `DeliveryRequest` | 닫는다 | `@ConsistentCopyVisibility` + `internal constructor`, 유일한 생성이 `planDelivery`(internal) |
+| `DeliveryPlan` | 닫는다(결과는 계산) | `@ConsistentCopyVisibility` + `internal constructor`, `resolveDeliveryPlan`(public 순수 함수)만 만든다(우회 (8)) |
+| `DeliveryResult.*` | 연다 | sender 구현(어댑터)이 만들어야 한다. 위조해도 dispatch가 `Suppressed`를 덮어쓰지 않으므로(T-5) 「미전달 → 완료」 경로는 여전히 없다 |
+| `DeliveryOutcome.*` | **닫는다**(verifier r1 M-1 시정) | ~~public이었다~~ `@ConsistentCopyVisibility` + `internal constructor`로 정정 — dispatch만 만들고 4C(같은 `workflow` 모듈)만 소비하므로 닫는 데 비용이 없었다. 임시 clone에서 `app`(다른 모듈) test 소스에 `DeliveryOutcome.Attempted(...)` 직접 생성을 심고 `:app:compileTestKotlin` → `Cannot access '<init>': it is internal`(commands.md) |
+| `RenderedContent` | 연다 | 렌더러(port 구현)가 만든다. 내용의 옳음은 비방어 |
+| `NotificationIntent` | 연다 | 4B가 만든다 |
+| `NotificationDeliveryPolicyData` | 연다(불변식으로 닫힘) | 값은 정책 슬롯. 전사상·suffix≥1 생성 불변식(우회 (6)) |
 
 ### 2. 위협 모델 방어 (a)~(i) ↔ 증거(요약)
 
