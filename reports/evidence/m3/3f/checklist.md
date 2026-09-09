@@ -17,11 +17,14 @@
 착수 뒤 구현 조사가 「`KonepsFieldContract` 생성자가 procurement `internal`이라 계약 없이
 어댑터가 값을 꺼낼 경로가 구조적으로 없다」를 드러냈다. 문서 레인이 같은 결론에 독립적으로
 도달해 P-13 (a)를 승인하고 scope.md in_scope 를 `CollectionPolicy.kt`·`FieldContract.kt`·
-`RawObservation.kt`(추가만)로 넓혔다 — 구현 레인의 1차 하드코딩 allow-list 우회안(자체
-개설한 `MaskedOpeningCompleteItem`)은 이 승인 뒤 전량 철회하고 계약 레지스트리 경로
-(`mapMaskedOpeningItem` 재사용)로 다시 썼다. 평가점수 넷은 P-13 이 「제외」로 결정해
-`OpeningRankOneBid`·V5 컬럼에서 뺐다 — D-3F-5 (a)의 「수집·보존」은 이 축에서 이 slice
-범위 밖으로 좁혀진다(계약이 열리는 후속 slice 대상).
+`RawObservation.kt`(추가만)로 넓혔다.
+
+**판단**: 어댑터 하드코딩 allow-list(자체 `MaskedOpeningCompleteItem`)를 검토했으나, 계약
+레지스트리가 allow-list·미지 필드 회계(§5.3 규율 1)의 정본이고 필드 수준 정책을 어댑터
+상수 테이블에 박지 않는다는 규율(v2-지침서 §5)에 따라 계약 등재(`mapMaskedOpeningItem`
+재사용)로 갔다(P-13 승인, in_scope 정정 `bbbae9c`). 평가점수 넷은 P-13 이 「제외」로
+결정해 `OpeningRankOneBid`·V5 컬럼에서 뺐다 — D-3F-5 (a)의 「수집·보존」은 이 축에서 이
+slice 범위 밖으로 좁혀진다(계약이 열리는 후속 slice 대상).
 
 ## 우회 여덟 — 무엇이 막는가
 
