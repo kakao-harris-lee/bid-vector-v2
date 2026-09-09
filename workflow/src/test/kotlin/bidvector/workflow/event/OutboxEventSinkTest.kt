@@ -48,7 +48,7 @@ private class InMemoryOutboxPort : OutboxPort {
         return OutboxEntryId("outbox-$nextEntryId")
     }
 
-    override fun claim(limit: Int): List<OutboxEntry> = emptyList()
+    override fun claim(limit: Int): List<ClaimedOutboxRow<*>> = emptyList()
 
     override fun markDelivered(transition: OutboxTransition.ToDelivered) {
         delivered += transition

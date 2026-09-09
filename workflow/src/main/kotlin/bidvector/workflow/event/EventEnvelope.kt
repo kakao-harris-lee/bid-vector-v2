@@ -31,16 +31,24 @@ data class EventEnvelope<out P> internal constructor(
     companion object {
         /**
          * 저장소 복원 전용(persistence 어댑터, 4C-2) — **신규 이벤트 생성에 쓰지 않는다.**
-         * `internal`이 아니라 `public`이다(설계 검토 (2) 셋째 행 — 「경계로 처리」) —
-         * 저장소 구현자는 이미 자기 store에 임의 행을 지어낼 수 있으므로 이 함수가 새로
-         * 주는 권한은 없다(4A (d)와 같은 위협 모델 경계). **신규 발행 경로([newEnvelope]·
-         * [forStrategyUpdated])와 이 함수를 같은 호출부에서 섞지 않는다** — 이름·이 KDoc이
-         * 그 경계를 못박는다. 아홉 필드를 채워 같은 private 생성자에 넘기는 몸통은
-         * [newEnvelope]와 같으므로 중복을 두지 않고 그대로 위임한다(§5 중복 금지) — 이
-         * 위임이 경계를 흐리지 않는 이유는 `newEnvelope` 자체가 `internal`이라 이 위임을
-         * 거치지 않고는 `workflow` 밖에서 여전히 부를 수 없기 때문이다.
+         *
+         * **`internal`이다(verifier H-1 시정) — 이전 판은 `public`이었다.** 「경계로
+         * 처리」(설계 검토 (2) 셋째 행 — 저장소 구현자는 이미 자기 store에 임의 행을
+         * 지어낼 수 있으므로 새 권한이 아니다)는 **persistence 어댑터에 대해서만** 참이고,
+         * `public`은 그 권한을 **아무 모듈에나** 준다 — `actor=null`인 `StrategyUpdated`
+         * 봉투를 `workflow` 밖에서 지어 `OutboxPort.register`(4C-1 자신의 port)에 넣는
+         * 위조가 컴파일됐다(verifier 실측, 4A r2 H-3과 같은 형태). 위임 대상 [newEnvelope]가
+         * `internal`이라는 사실은 이 함수 **자신**이 `public`이면 아무 의미가 없다 — 이
+         * 함수가 바로 그 「공개된 문」이었다.
+         *
+         * **`internal`로 내리는 것만으로는 4C-2에서 구멍이 되돌아온다** — persistence
+         * 어댑터가 실제로 DB 행을 봉투로 되살려야 할 때 이 함수를 다시 열어야 하기 때문이다.
+         * 그래서 [OutboxPort.claim]의 반환형을 [EventEnvelope]가 아니라 [ClaimedOutboxRow]
+         * (원시 필드)로 바꿔 **어댑터가 이 타입 자체를 다루지 않게** 한다 — 복원은
+         * `workflow` 안의 [OutboxEntry.restore]만 하고, 그 함수도 `internal`로 남는다
+         * (호출부는 어댑터가 아니라 `workflow` 안의 미래 배달 오케스트레이션 use case).
          */
-        fun <P> restore(
+        internal fun <P> restore(
             eventId: EventId,
             aggregateId: AggregateId,
             aggregateVersion: AggregateVersion,

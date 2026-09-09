@@ -110,7 +110,11 @@
 - cmd: `grep -rn "data-dictionary\.md:[0-9]\+\|data-dictionary:[0-9]\+" --include="*.md" --include="*.kt" --include="*.properties" .`
 - exit: 0 — 매치 4건(`m1/1b/scope.md:274`·`m1/1e/scope.md:72`·`m1/1c/checklist.md:148`·
   `m0/0c/commands.md:223`), 전부 §2.2.5 삽입 지점(683행 부근)보다 **아래** 줄번호(960·980·
-  1551·1554)를 가리켜 +18줄 삽입의 영향권 안이다. **그러나 넷 다 4C-1 in_scope 밖의 닫힌
+  1551·1554)를 가리켜 삽입의 영향권 안이다. **정정(verifier B-6, 2026-09-09)** — 삽입은
+  「+18줄」이 아니라 **+19줄·-4줄(순증 +15줄)**이다(재산출: `git diff --numstat
+  4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599..3752b49 -- docs/discovery/data-dictionary.md`
+  → `19  4`, 4C-1 자신의 기여만 격리해 잰다 — 이 시점 이후 4B-1 이 같은 파일에 §3.6·§13.2
+  를 더 편집해 `HEAD` 기준 diff 는 다른 값을 낸다). **그러나 넷 다 4C-1 in_scope 밖의 닫힌
   slice evidence**이고, 그중 `m1/1c/checklist.md:148` 자신이 이미 「닫힌 slice evidence
   의 좌표 셋이 낡았다」고 선언해 이 낡음을 **기존에 알려진 제한으로 인수**하고 있다 —
   4C-1이 새로 만드는 낡음이 아니다. 알려진 제한에 등재(checklist.md).
@@ -135,3 +139,63 @@
   (이 시점 클린)에 개행 한 줄 추가 → `M` 관측(exit 0, 비어있지 않음) → `head -n`으로
   추가한 줄만 절삭(4A 사고 이후 채택한 안전한 방식 — `git checkout --` 미사용) → 재확인
   (비어있음, exit 0). 실측 완료.
+
+# 수정 라운드 1 — verifier 판정 not-ready(H-1), 재작업 1/5 (2026-09-09)
+
+verifier 리포트: `_workspace/m4-4c1/03_verifier_report.md`(핀 `3752b49`). 처리: H-1/L-3
+(같은 뿌리, 배치 변경) · M-1(rollback.md 줄 단위 조항) · L-1(수렴 property 민감화) ·
+L-2(알려진 제한 등재) · B-1~B-3(장부층, 이 절 및 scope.md·rollback.md에서 정정).
+**verifier가 이미 닫혔다고 판정한 넷은 재작업하지 않았다**(B-4·B-5·B-6은 이전 라운드
+`52c94e6`·`3752b49`에서 이미 닫혔고, 이번 라운드는 B-1·B-2·B-3만 남았다).
+
+## 2026-09-09T10:58Z — RED 확인(OutboxEntry.restore)
+- cmd: `./gradlew --no-daemon :workflow:compileTestKotlin`(`OutboxEntryTest`를 먼저 쓰고
+  `ClaimedOutboxRow`·`OutboxEntry.restore`가 아직 없는 상태로 실행)
+- exit: 1 — `Unresolved reference 'ClaimedOutboxRow'` 등. RED 확정.
+
+## 2026-09-09T11:00Z — H-1/L-3 시정 구현 뒤 컴파일·test
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin`
+- exit: 0
+- cmd: `./gradlew --no-daemon :workflow:test`
+- exit: 0(전건 초록 — `OutboxEntryTest` 신설 1건 포함).
+
+## 2026-09-09T11:02Z — L-1 시정 — 수렴 property에 처리 횟수 단언 추가, 변이로 민감도 실측
+- cmd: `decideInbox`를 `InboxDecision.Process` 상수 반환으로 바꾼 변이로
+  `./gradlew --no-daemon :workflow:test --tests '*InboxDedupPropertyTest*'`
+- exit: 1 — **2건 FAILED**(수정 전에는 최종 집합만 비교해 이 변이에서도 초록이었다 —
+  verifier L-1이 지적한 그 결함이 재현됨을 먼저 확인). 처리 횟수 단언(`foldProcessedCount`
+  가 고유 key 수와 일치)을 추가한 뒤 같은 변이로 재실행 → **exit 1, 2건 FAILED**(수정된
+  test가 변이를 실제로 잡음 — `AssertionFailedError: expected:<1> but was:<2>`).
+- cmd: 변이를 `diff`로 원상 복구 확인(백업 파일과 바이트 단위 일치, `diff /tmp/InboxPort.kt.bak
+  workflow/.../InboxPort.kt` → 원본 한 줄만 다름 확인 후 복구) → 재실행 exit 0.
+
+## 2026-09-09T11:05Z — 전체 재검증(clean check, ktlint 자동정리 포함)
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 1(초기) — `OutboxEntryTest.kt` 줄바꿈(ktlint, 자동 수정 가능) 다수.
+- 수정: `:workflow:ktlintFormat`.
+- cmd: `./gradlew --no-build-cache clean check`(재실행)
+- exit: 0 — `BUILD SUCCESSFUL in 33s`, 344 actionable tasks(320 executed·24 up-to-date).
+
+## 2026-09-09T11:07Z — S-2~S-6 개별 재확인
+- cmd: `./gradlew --no-daemon :workflow:test`(S-2) — exit 0
+- cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate :workflow:cpdCheck`(S-3) — exit 0
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*EventBoundaryTest*'`(S-3b) — exit 0
+- cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'`(S-4) — exit 0, 74 tests(무변경)
+- cmd: `./gradlew --no-daemon qualityBaseline`(S-5) — exit 0
+- cmd: `./gradlew --no-daemon :app:test :app:gateExecutionGate`(S-6) — exit 0(주의: `:app:test`를
+  `--tests` 필터 없이 전건 돌려야 한다 — conformance만 필터링한 뒤 곧바로 gateExecutionGate를
+  돌리면 architecture gate test class가 "실행되지 않았다"는 거짓 실패가 난다, 이 라운드에서
+  실측으로 확인 — 필터는 테스트 러너의 선택적 실행이지 그 클래스가 게이트에서 빠졌다는 뜻이
+  아니다).
+
+## 재산출 — B-1·B-2·B-3 (verifier 지시: 「수치는 전부 명령으로 재산출」)
+- cmd: `git add -N workflow/.../ClaimedOutboxRow.kt workflow/.../OutboxEntryTest.kt && git diff
+  --name-status 4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599 -- <in_scope 12개 경로>`
+- exit: 0 — **A 21 · M 8**(라운드 1이 A에 둘 추가: `ClaimedOutboxRow.kt`·`OutboxEntryTest.kt`).
+  rollback.md의 두 수치(머리말 19/8·확인 지점 18/9 불일치, B-1)를 이 값 하나로 통일했다.
+- cmd: `git merge-base --is-ancestor de99ddb 13cf0f63da18e13f0e2befd519710a8635742004 && echo ancestor`
+- exit: 0 — `ancestor` 출력. **B-3 확인** — `de99ddb`는 `13cf0f6`의 **조상**(이전)이지 이후가
+  아니다. scope.md의 「이후」 서술을 정정했다.
+- cmd: `git log --oneline 4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599..HEAD -- CLAUDE.md .claude/`
+- exit: 0 — 1건(`de99ddb`). **B-2 확인** — rollback.md 머리말이 「0건」이라 적었던 것을
+  scope.md와 같은 값(1건)으로 통일했다.
