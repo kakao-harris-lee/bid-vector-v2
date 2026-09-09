@@ -9,7 +9,7 @@
 | ③ | P-10 (a) 확장 — `prcbdrBizno`·`prcbdrCeoNm` 미보존 | P-13 (a) 승인 뒤 계약 레지스트리 경로로 통일 — `KonepsOpeningCompleteFieldContracts.kt`(§1.11 10행)에 그 둘이 등재되지 않아 `mapMaskedOpeningItem`의 allow-list 반전이 구조적으로 제외한다(어댑터 전용 masking 함수를 새로 만들지 않는다) |
 | ④ | 추첨번호 1-기반 인덱스 + 범위 검사 | `DrawNumberObservation.of(numbers, totalReservePriceCandidateCount)` — 3E 부모 슬롯을 재사용, 별도 저장 없이 `OutOfRange.validRange` 를 읽기에서 재구성 |
 | ⑤ | 조회 가치 술어 재사용 | `fetchOpeningCompleteResults(evidence: DetailFetchDecision.Fetch)` — D-3F-2, 새 결정 타입 없음 |
-| ⑥ | 저장(V5, 부모 컬럼만) | `opening_rank_one_*` 6컬럼 + `draw_numbers_*` 2컬럼, CHECK 7, 가드 트리거 2(그룹 단위). `OpeningCompleteAxisCodec.kt` 가 bind/read 를 묶어 detekt TooManyFunctions 회피 |
+| ⑥ | 저장(V5, 부모 컬럼만) | `opening_rank_one_*` 7컬럼(관측 시각 포함) + `draw_numbers_*` 3컬럼, CHECK 10, 가드 트리거 2(그룹 단위). `OpeningCompleteAxisCodec.kt` 가 bind/read 를 묶어 detekt TooManyFunctions 회피. **verifier r1 F-1·F-2·F-3 뒤** — UPSERT 는 축 단위(컬럼별 아님) CASE 로 갱신하고, 두 축 모두 자신의 관측 시각을 나른다(§「F-1·F-2·F-3 수정」 참고) |
 | ⑦ | mock server 시나리오 | `KonepsOpeningCompleteSourceTest.kt`(sizeGate 분리) — 정상 다수 행·단일 낙찰자·협상 계약·추첨번호 부재·순위 동값·치환 세 변형(bizno·ceoName·둘 다)·`bidNtceNo` 누락 08 비재시도 |
 
 ## D-3F-7·P-13 (a) — scope.md 중간 개정 반영
@@ -28,11 +28,43 @@ P-13 (a)를 승인, scope.md in_scope 를 `CollectionPolicy.kt`·`FieldContract.
 결정해 `OpeningRankOneBid`·V5 컬럼에서 뺐다 — D-3F-5 (a)의 「수집·보존」은 이 축에서 이
 slice 범위 밖으로 좁혀진다(계약이 열리는 후속 slice 대상).
 
+## F-1·F-2·F-3 수정 — 표적 재검증(스키마·UPSERT 술어 변경)
+
+**F-1(high) — 축 단위 UPSERT.** 컬럼별 `COALESCE` 는 `opening_rank_one` 축(kind + 동반 값
+다섯)의 짝을 깨뜨린다 — kind 만 새 값으로 덮이고 동반 컬럼이 옛 값으로 남아 V5 페어 CHECK
+를 위반했다(`Determined`→`RankMissing` 등 정상 저장 경로에서 `PSQLException`). `Sql.kt` 의
+UPSERT SET 절을 `CASE WHEN EXCLUDED.<kind> IS NULL THEN <옛 값> ELSE EXCLUDED.<새 값> END`
+로 바꿔 **축 전체를 한 단위로** 보존하거나 교체한다(컬럼 단위 갱신 없음) — `draw_numbers`
+축도 같은 형태로 바꿨다. CHECK 는 느슨하게 하지 않았다. 회귀 방지: 전이 여섯
+(`OpeningCompleteAxisRepositoryTest`) 전부 정상 저장을 확인한다.
+
+**F-2(high) — 축별 관측 시각.** 3E `OpeningReservePriceRow.observedAt` 과 같은 자리 —
+`OpeningRankOneOutcome`·`DrawNumberObservation` 이 각각 `observedAt: Instant?`(NotObserved
+만 null)를 나른다. DB 에 `opening_rank_one_observed_at`·`draw_numbers_observed_at` 컬럼을
+더하고 축 단위 CASE 에 포함시켰다 — 재수집이 그 축을 안 실으면 값과 관측 시각이 함께
+보존돼, 소비자가 부모 `observed_at`(최신 관측 시각)과 비교해 스스로 낡음을 판정할 수
+있다. 파생 플래그 컬럼은 만들지 않았다. 회귀 방지: `Verified`→`NotObserved` 전이 test 가
+값·`observedAt` 둘 다 t1 그대로 보존됨을 확인한다.
+
+**F-3(medium) — 저장 시점 거부.** `OutOfRange` 의 `validRange` 재구성은 부모의
+`totalReservePriceCandidateCount` 를 요구하는데, 그 값 없이 `OutOfRange` 를 저장할 수
+있었다(읽기에서 `IllegalArgumentException`). V5 에 CHECK
+`opening_result_draw_numbers_out_of_range_requires_total`(`draw_numbers_kind <>
+'OUT_OF_RANGE' OR total_reserve_price_candidate_count IS NOT NULL`)을 더해 그 조합 자체를
+저장 시점에 거부한다 — 저장할 수 있는 상태를 읽을 수 없는 경우가 없어진다. 회귀 방지 test
+가 `PSQLException` 을 확인한다.
+
+`OpeningRankOneOutcome`·`DrawNumberObservation` 의 `RankMissing`·`RankDuplicated`·
+`Determined`·`Verified`·`OutOfRange`·`RangeCheckUnavailable` 여섯 분기 전부 `observedAt`
+(또는 파생 필드)을 필수 생성자 인자로 요구하도록 바뀌었다 — `NotObserved` 만 `data object`
+로 남고 나머지는 `data class` 다(이전 판에서 `RankMissing`·(구)무인자 분기가 `data object`
+였던 것과 시그니처가 달라졌다, procurement·adapters 양쪽 test 갱신).
+
 ## 우회 여덟 — 무엇이 막는가
 
 | # | 우회 | 막는 것 | 형태 |
 | --- | --- | --- | --- |
-| 1 | 원문 item 을 mapper 에 직접 넘김 | `mapMaskedOpeningItem`(`MaskedKonepsItem` 통로) — 원문 `JsonValue.JsonObject` 를 받지 않는다 | 컴파일 |
+| 1 | 원문 item 을 mapper 에 직접 넘김 | **정정(verifier r1 F-4)**: `mapMaskedOpeningItem` 의 시그니처는 원문 `JsonValue.JsonObject` 를 그대로 받는다 — 컴파일이 막는다는 앞선 서술은 틀렸다(원문 객체를 담은 호출이 실제로 컴파일된다). 실제 방어는 함수 **내부**에서 `MaskedKonepsItem.from` 을 거쳐 계약 미등재 키를 결과에서 제외하는 것이다(표적 2 실측: `fields`·`sourceText` 둘 다에서 사라짐) | 런타임(masking) |
 | 2 | `sourceText` 에 원문 substring | `MaskedKonepsItem.from` 이 걸러진 값의 `render()` 만 쓴다 + 문자열 검색 test(치환 세 변형) | 컴파일+test |
 | 3 | 추첨번호 부재를 0 으로 | `DrawNumberObservation.of` 가 빈 집합만 `NotObserved` 를 내고 0 을 지어내는 경로가 없다 + 부재 test | 타입+test |
 | 4 | 검사 불가를 조용한 통과로 | `RangeCheckUnavailable` 이 `Verified` 와 다른 sealed 분기 — 소비 `when` 이 소진돼야 컴파일된다 + test | 타입+test |
@@ -60,15 +92,18 @@ slice 범위 밖으로 좁혀진다(계약이 열리는 후속 slice 대상).
 4. **`bidprcDt` 의 `sourceZone`을 `ASSUME_KST`로** — §1.11 이 zone 을 미확정으로 남기지만
    3A P-2 가 이미 다른 `DATETIME_NO_ZONE` 필드(`bidClseDt`·`opengDt`·`rlOpengDt`)에 같은
    초기값을 쓴 전례를 그대로 따랐다(새 미확정을 지어내지 않는다).
-5. **`requiresNoticeRound = true`(bidNtceOrd 전송)** — §1.11 은 옵션이라 적지만, 한
-   공고번호에 차수가 여럿일 수 있어 좁혀 보내는 편이 안전하다고 판단했다(문서 밖 구현
-   판단, 대안 데이터 없음).
-6. **Sql.kt 플레이스홀더 불일치 회귀** — P-13 반영 라운드에서 `OpeningCompleteAxisCodec.kt`
-   의 bind/read 함수만 고치고 `Sql.kt`의 INSERT 컬럼·`VALUES` 플레이스홀더 수를 먼저 안
-   맞춰 `매개 변수 35 에 대해 지정된 값이 없습니다` PSQLException 이 텄다(3D·3E 기존
-   test까지 실패로 번짐). Sql.kt 를 함께 고쳐 해소 — 세 자리(바인딩·SELECT 열·INSERT 열)가
-   항상 같은 컬럼 집합을 가리켜야 한다는 교훈, 별도 test 신설은 하지 않았다(기존 Testcontainers
-   test 스위트 전체가 이미 그 불일치를 잡는다).
+5. **`requiresNoticeRound = true`(bidNtceOrd 전송) — verifier r1 F-6 뒤 정정**: §1.11 은
+   `bidNtceOrd` 를 옵션으로 적는데 구현은 항상 보낸다. **이 선택을 뒷받침하는 실측이 없다**
+   — §1.9.7 개찰완료 탐침은 `bidNtceNo` 단건으로만 동작을 확인했고 `bidNtceOrd` 를 실은
+   요청은 측정되지 않았다. 안전 우선(차수가 여럿인 공고에서 조회를 좁힌다)이라는 의도는
+   있으나 **차수가 어긋나면 응답이 0행으로 좁아질 위험**을 실측으로 배제하지 못했다 — 그
+   경우 「수집 실패」가 아니라 「행 없음」으로 보인다. 운영 배선 전 읽기 전용 호출 한 번으로
+   닫아야 하는 미결로 남긴다.
+6. **Sql.kt 세 자리(바인딩·SELECT 열·INSERT 열)는 컬럼 집합을 하나로 공유해야 한다** —
+   `OpeningCompleteAxisCodec.kt`의 bind/read 를 컬럼 추가·삭제와 함께 고칠 때마다 `Sql.kt`
+   의 INSERT 열·`VALUES` 플레이스홀더 수·`SELECT` 열을 반드시 같이 맞춘다. 별도 회귀 test
+   를 신설하지 않는다 — 기존 Testcontainers test 스위트 전체가 이미 그 불일치를 PSQLException
+   으로 잡는다(구조적 방어).
 
 ## 알려진 제한
 
