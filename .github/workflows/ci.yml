@@ -13,7 +13,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # `fetch-depth: 0` 은 `contractGate` 가 요구한다 — `buf breaking` 이
+      # `.git#tag=<승인 태그>,subdir=contracts` 를 대조 대상으로 쓰므로 **전체 이력과 태그**가
+      # 있어야 한다. 기본값(얕은 clone, 태그 없음)이면 그 검사가 대상을 찾지 못한다.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # 러너의 launcher JVM. 컴파일에 쓰이는 toolchain 은 gradle.properties 의
       # `bidvector.jvmToolchain` 이 정하고, 없으면 foojay resolver 가 내려받는다.
@@ -21,6 +26,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      # `contractGate`(bidvector.quality-baseline)가 `buf` 를 실행 파일로 부른다 —
+      # lint · breaking · 버전 대조 셋. 러너에 없으면 `check` 가
+      # `IOException: Cannot run program "buf"` 로 떨어진다(2026-09-06 이후 CI 상시 실패의 원인).
+      # 버전은 `config/quality/contract-policy.properties` 의 `tool.buf.version` 과 **같아야 한다** —
+      # 다르면 게이트가 스스로 버전 위반으로 떨어뜨리므로 드리프트가 조용히 지나가지 않는다.
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: '1.72.0'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: gradle/actions/setup-gradle@v4
 

@@ -140,6 +140,31 @@ P-8 + 정책 값 커밋).
 > fixture case 후보 여덟 · `bidNtceOrd` 실측 한 번 · 미결 `OPEN` 여섯(`OPEN-3E-*` 넷 · `OPEN-3F-*` 둘) ·
 > `OPEN-3C-ATTACHMENT-SLOT-OVERFLOW`.
 
+### 알려진 제한 — CI 가 M3 내내 붉었다 (2026-09-09 발견·수정)
+
+**M3 의 slice 여섯(3A·3B·3B-2·3C·3D·3E·3F)은 CI 가 붉은 상태에서 차례로 종결·push 됐다.** 원인은
+산출물 결함이 아니라 **CI 러너에 `buf` 실행 파일이 없다는 것**이었다 —
+`./gradlew --no-daemon check` 안의 `:contractGate` 가 `buf` 를 lint·breaking·버전 대조에 쓰는데
+러너에 없어 `java.io.IOException: Cannot run program "buf"` 로 떨어졌다. 로컬에는 설치돼 있어
+같은 명령이 통과했고(각 slice 의 acceptance 는 로컬 실측이다), **그 차이가 드러나지 않았다.**
+
+**언제부터인가**: 마지막 성공은 2026-09-06 이고 그 뒤 M2 계약 게이트가 들어오면서 깨졌다. 확인한
+실행 여덟 건(2026-09-07 3A 종결부터 2026-09-09 M3 잔여 해소까지)이 **전부 같은 줄에서 같은 이유로**
+실패했다.
+
+**수정**(2026-09-09): `.github/workflows/ci.yml` 에 두 가지를 더했다 — ① `bufbuild/buf-setup-action`
+으로 `buf` 설치, 버전은 `config/quality/contract-policy.properties` 의 `tool.buf.version` 과 같은
+값으로 고정(다르면 게이트가 **스스로 버전 위반으로 떨어뜨리므로** 드리프트가 조용히 지나가지 않는다)
+② `actions/checkout` 에 `fetch-depth: 0` — `buf breaking` 이 `.git#tag=<승인 태그>,subdir=contracts`
+를 대조 대상으로 쓰므로 **전체 이력과 태그**가 필요하다(기본값인 얕은 clone 은 태그가 없다).
+
+**이것이 남기는 교훈은 도구 설치가 아니다.** **게이트가 상시 붉으면 그 게이트는 아무것도 막지 못한다** —
+여러 slice 를 종결하는 동안 붉은 CI 가 차단으로 작동하지 않았고, 아무도 그것을 신호로 읽지 않았다.
+이 저장소는 **로컬 acceptance 실측**을 완료 조건으로 쓰고 CI 를 그 사본으로 두는데, 사본이 깨진 채로
+오래 남으면 **두 환경의 차이가 쌓인다**(이번에는 도구 부재 하나였지만 다음에는 다를 수 있다).
+**후속 후보**: slice 종결 절차에 「CI 최신 실행이 초록인가」 확인을 넣을지 — 운영자 결정 사항이고
+이 문단은 사실만 남긴다.
+
 **3B-2 준비 완료 2026-09-08 — 승인 대기** — 선행 조건(D-3B-6)이 닫혔다. 운영자가 **낙찰정보서비스 1.1 참고자료**와 **개방표준서비스 1.2 참고자료**를 확보해
 `_workspace/m3-3b2/external/`(SHA-256 기록)에 두었고 `fixtures/manifest.yaml` `official_documents` 에 `koneps-scsbid-reference`·`pps-opnstd-reference` 로 등재했다.
 `policy-values.md` **§1.7** 이 「문서 미확보」에서 **필드 계약 13 행**(curator 레인)으로, **§1.9** 가 **오퍼레이션 계약**(23 오퍼레이션 군 · `inqryDiv` 군별 의미 ·
