@@ -72,12 +72,15 @@ git restore --source=69e2afee6e9c49b9e44b9e8970408daabd6f695a --staged --worktre
 않는다 — 문서 레인 소유이거나 이 slice의 in_scope가 아니다(P-13·D-3F-7 승인 지식은 코드를
 걷어도 남아야 한다).
 
-## 임시 clone 실측(2026-09-09, verifier r1 수정 라운드 뒤 재실측 — head `500e6b2`)
+## 임시 clone 실측(2026-09-09, verifier r2 N-1 수정 뒤 재실측 — 대상 경로 불변, 23경로 그대로)
 
-- `git clone --quiet . <scratchpad>/3f-r1-rollback-<random>` → 위 `git restore` 실행 →
+N-1 수정(`draw_numbers_valid_range_max` 컬럼 추가 등)은 이미 in_scope 로 등재된 8개
+경로만 고쳤다 — 신규 경로가 없어 위 표·명령을 다시 산출할 필요가 없었다(기계 산출 재확인
+결과 23경로 그대로).
+
+- `git clone --quiet . <scratchpad>/3f-n1-rollback-<random>` → 위 `git restore` 실행 →
   **exit 0**.
-- 결과: D=6(신규 파일 삭제됨) · M=17(base 상태로 복원됨) — 기계 산출 목록과 정확히 일치
-  (verifier r1 L-1 뒤 정정 — 표·restore 명령의 23경로는 처음부터 옳았다).
+- 결과: D=6(신규 파일 삭제됨) · M=17(base 상태로 복원됨) — 기계 산출 목록과 정확히 일치.
 - `git diff 69e2afee6e9c49b9e44b9e8970408daabd6f695a -- <같은 23경로>` → **0줄**(완전히
   base와 같음, `config/quality/gate-tests.properties` 등 M 항목 포함).
 - 되돌린 트리 `./gradlew :procurement:compileKotlin :procurement:compileTestKotlin

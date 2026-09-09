@@ -7,7 +7,7 @@
 | ① | 개찰완료 오퍼레이션 구현(`inqryDiv` 없는 오퍼레이션군) | `KonepsOperationDescriptor.inquiryDivValue` nullable화 + `KonepsOperationPolicy.OPENING_COMPLETE`(`bidNtceNo`+`bidNtceOrd` 단건, rowIdentifier=`prcbdrNm`). `buildKonepsOperationUri` 는 null 이면 `inqryDiv` 파라미터 자체를 안 낸다 |
 | ② | 투찰자별 행은 raw_observation 까지, canonical 은 셋만 | `OpeningRankOneOutcome`(NotObserved·RankMissing·RankDuplicated·Determined) — `resolve()` 가 순위 1 부재·중복을 명시적으로 회계, 투찰금액 재계산 없음. `DrawNumberObservation`(NotObserved·Verified·OutOfRange·RangeCheckUnavailable) — `of()` 가 범위 검사·검사 불가를 명시적 결과로 |
 | ③ | P-10 (a) 확장 — `prcbdrBizno`·`prcbdrCeoNm` 미보존 | P-13 (a) 승인 뒤 계약 레지스트리 경로로 통일 — `KonepsOpeningCompleteFieldContracts.kt`(§1.11 10행)에 그 둘이 등재되지 않아 `mapMaskedOpeningItem`의 allow-list 반전이 구조적으로 제외한다(어댑터 전용 masking 함수를 새로 만들지 않는다) |
-| ④ | 추첨번호 1-기반 인덱스 + 범위 검사 | `DrawNumberObservation.of(numbers, totalReservePriceCandidateCount)` — 3E 부모 슬롯을 재사용, 별도 저장 없이 `OutOfRange.validRange` 를 읽기에서 재구성 |
+| ④ | 추첨번호 1-기반 인덱스 + 범위 검사 | `DrawNumberObservation.of(numbers, totalReservePriceCandidateCount)` — 3E 부모 슬롯을 판정에 재사용. **verifier r2 N-1 뒤** — 판정 결과(`OutOfRange.validRange.last`)는 `draw_numbers` 축 자신의 컬럼에 실어 왕복한다(다른 축에서 재구성하지 않는다) |
 | ⑤ | 조회 가치 술어 재사용 | `fetchOpeningCompleteResults(evidence: DetailFetchDecision.Fetch)` — D-3F-2, 새 결정 타입 없음 |
 | ⑥ | 저장(V5, 부모 컬럼만) | `opening_rank_one_*` 7컬럼(관측 시각 포함) + `draw_numbers_*` 3컬럼, CHECK 10, 가드 트리거 2(그룹 단위). `OpeningCompleteAxisCodec.kt` 가 bind/read 를 묶어 detekt TooManyFunctions 회피. **verifier r1 F-1·F-2·F-3 뒤** — UPSERT 는 축 단위(컬럼별 아님) CASE 로 갱신하고, 두 축 모두 자신의 관측 시각을 나른다(§「F-1·F-2·F-3 수정」 참고) |
 | ⑦ | mock server 시나리오 | `KonepsOpeningCompleteSourceTest.kt`(sizeGate 분리) — 정상 다수 행·단일 낙찰자·협상 계약·추첨번호 부재·순위 동값·치환 세 변형(bizno·ceoName·둘 다)·`bidNtceNo` 누락 08 비재시도 |
@@ -51,14 +51,43 @@ UPSERT SET 절을 `CASE WHEN EXCLUDED.<kind> IS NULL THEN <옛 값> ELSE EXCLUDE
 있었다(읽기에서 `IllegalArgumentException`). V5 에 CHECK
 `opening_result_draw_numbers_out_of_range_requires_total`(`draw_numbers_kind <>
 'OUT_OF_RANGE' OR total_reserve_price_candidate_count IS NOT NULL`)을 더해 그 조합 자체를
-저장 시점에 거부한다 — 저장할 수 있는 상태를 읽을 수 없는 경우가 없어진다. 회귀 방지 test
-가 `PSQLException` 을 확인한다.
+저장 시점에 거부했다. **이 CHECK 는 verifier r2 N-1(아래 절)에서 대체됐다** — 크로스 축
+참조가 `ON CONFLICT` 병합 전 tuple 만 보는 PostgreSQL 관용구와 부딪혀 정상 저장을 오검출로
+거부했기 때문이다.
 
 `OpeningRankOneOutcome`·`DrawNumberObservation` 의 `RankMissing`·`RankDuplicated`·
 `Determined`·`Verified`·`OutOfRange`·`RangeCheckUnavailable` 여섯 분기 전부 `observedAt`
 (또는 파생 필드)을 필수 생성자 인자로 요구하도록 바뀌었다 — `NotObserved` 만 `data object`
 로 남고 나머지는 `data class` 다(이전 판에서 `RankMissing`·(구)무인자 분기가 `data object`
 였던 것과 시그니처가 달라졌다, procurement·adapters 양쪽 test 갱신).
+
+## N-1·N-2 수정 — 타입·스키마로 닫는다(표적 재검증)
+
+**N-1(high) — 크로스 축 CHECK 의 `ON CONFLICT` 오검출.** F-3 의 CHECK 는 부모의
+`total_reserve_price_candidate_count`(3E 슬롯, `draw_numbers` 와는 다른 축·다른
+COALESCE)를 참조했다. PostgreSQL 의 `INSERT ... ON CONFLICT DO UPDATE` 는 CHECK 를
+**병합 뒤 최종 행이 아니라 들어오는 제안 tuple**에 건다(관용구 실측, verifier r2 재현) —
+그래서 부모가 이미 총예가건수를 갖고 있어도, 개찰완료 재수집이 그 값을 다시 안 실으면
+(§1.9.7 관례 — 관측 안 한 컬럼은 안 싣는다, 다른 모든 COALESCE 컬럼과 같은 이유) 정상
+저장이 거부됐다.
+
+뿌리는 「`OutOfRange` 가 자기 판정에 필요한 값을 저장 시점에 다른 축에서 빌리려 한 것」
+이다. `OutOfRange` 는 이미 Kotlin 생성자에서 `validRange` 를 필수로 받는다 — 그 값(`.last`
+만, `.first`는 항상 1이라 중복 저장하지 않는다)을 `draw_numbers` 축 자신의 새 컬럼
+(`draw_numbers_valid_range_max`)에 실어 tuple 을 자기 완결로 만들었다. 크로스 축 CHECK
+를 같은 자리 페어 CHECK(`opening_result_draw_numbers_valid_range_max_pair`)로
+바꿨다 — 다른 7개 기존 페어 CHECK 는 손대지 않았다. `opening_result` CHECK 총수는 24 로
+불변(대체이지 증가가 아니다).
+
+회귀 방지: (1) 부모가 총예가건수를 이미 가진 뒤 재수집이 그 값을 다시 안 싣고
+`OutOfRange` 를 실어도 저장이 성공한다 (2) 총예가건수를 한 번도 실은 적 없는 새 행에도
+`OutOfRange` 저장이 성공한다 (3) CHECK 자체는 여전히 살아있음을 직접 SQL 음성 대조로
+확인한다(Kotlin 타입이 불법 조합을 만들 수 없어 `repository.persist` 경로로는 재현 불가).
+
+**N-2(medium) — 전이 test 누락.** F-1 회귀 방지가 여섯 전이를 실었는데
+`RankMissing` 을 시작점으로 하는 둘(`RankMissing`→`Determined`, `RankMissing`→
+`RankDuplicated`)이 빠졌다. 두 test 를 더했다 — 축 단위 CASE(F-1 수정)가 `RankMissing`
+에서 출발하는 전이에도 같은 방식으로 적용됨을 확인한다.
 
 ## 우회 여덟 — 무엇이 막는가
 
