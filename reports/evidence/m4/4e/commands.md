@@ -169,3 +169,27 @@
 - cmd: `./gradlew --no-build-cache clean check`
 - exit: 0
 - 핵심 결과: M-1·M-2·L-1~L-4 반영 최종 상태에서 저장소 전체 GREEN(344 tasks). 이 상태로 일괄 커밋한다.
+
+---
+
+## 사용자 승인 2026-09-09 — slice 4E 종결 등재
+
+## 2026-09-09T14:00:00Z (등재 문서·코드 문면 갱신 뒤 컴파일 확인)
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin`
+- exit: 0
+- 핵심 결과: `NotificationDeliveryPolicyData.kt`의 `source` 문자열·KDoc을 승인 문면으로 갱신(값 무변경) — 컴파일 GREEN.
+
+## 2026-09-09T14:02:05Z (S-3c 재확인)
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m4/4e/ --exclude=scope.md`
+- exit: 1
+- 핵심 결과: 매치 0 — checklist.md·policy-values.md·scope.md 갱신 뒤에도 GREEN.
+
+## 2026-09-09T14:02:16Z (S-2 재확인)
+- cmd: `./gradlew --no-daemon :workflow:test --tests 'bidvector.workflow.notification.*'`
+- exit: 0
+- 핵심 결과: 37 tests, 0 failed, GREEN — 이번 라운드는 코드 로직 무변경(정책 값·KDoc 문면만)이라 test 수·결과 불변.
+
+## 2026-09-09T14:02:58Z (커밋 전 최종 S-1)
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0
+- 핵심 결과: 사용자 승인 등재(checklist·policy-values·scope·milestone-4·NotificationDeliveryPolicyData.kt 문면) 반영 최종 상태에서 저장소 전체 GREEN(344 tasks). 이 상태로 일괄 커밋한다.

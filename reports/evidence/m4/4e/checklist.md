@@ -1,5 +1,40 @@
 # checklist.md — M4/4E 리뷰 준비도
 
+## 사용자 승인 — 2026-09-09
+
+**slice 4E 종결 승인.** 승인 범위 다섯:
+
+1. **slice 종결** — 이 slice의 산출물(배달 경로 판정 커널 `resolveDeliveryPlan`·
+   `DispatchNotification` use case·port 셋(`RouteDirectory`·`ContentRenderer`·
+   `NotificationSender`)·값 타입 다수·`gate.tests.workflow` 등재)을 최종 형태로
+   승인한다.
+2. **D-M4-8 = (a) 확정** — 메일 라이브 송신(`OPEN-NOTI-04`)·채널 fallback
+   (`OPEN-NOTI-07`)은 4E 밖(후속) · 읽음 상태 되돌림(`OPEN-NOTI-05`)은 하지 않는다 ·
+   통지 이후 판정 확정의 재통지(`OPEN-NOTI-08`)는 기존 메시지 갱신 없이 새 항목.
+   scope.md 착수 가정(D-4E-3·D-4E-4가 참조하던 근거)이 그대로 확정 결정이 됐다.
+3. **정책 값 승인** — `Production→Live`·`Staging→DryRun`·`Development→DryRun`·
+   `Test→Blocked`·`maskedSuffixLength=4`. 착수 placeholder였던 값 자체가 이제 운영
+   정책값이다(`OPEN-4E-POLICY-VALUES` 종결). 정본은 `reports/evidence/m4/4e/
+   policy-values.md`(이 승인과 함께 갱신).
+4. **corpus 미신설 재확인** — D-4E-6 판단(② 전수 표는 `DeliveryPlanTableTest`가
+   갖고 corpus 승격은 이 slice가 하지 않는다)을 사용자가 재확인했다. `OPEN-4E-CORPUS`
+   는 닫히지 않고 `m4` 병합 뒤 curator 작업으로 유지된다.
+5. **`m4/2026-09-08` 병합은 지금 하지 않는다** — 4B-1·4C-1 종결 뒤 한 번에 병합한다
+   (scope.md 「레인 격리」 절이 예고한 절차 그대로).
+
+**승인의 근거 — verifier r1 `ready-for-review`.** 산출물층 finding은 medium
+둘(M-1 `DeliveryOutcome` 생성자 공개·M-2 출하 정책 값 무커버리지)뿐이었고, 장부층
+finding 넷(L-1~L-4)과 함께 이 승인 반영 직전 커밋 한 번으로 일괄 반영했다(SHA는
+`git log -1 --oneline`로 확인). 도메인·계약층에 미해결 finding은 없다(verifier r1
+`_workspace/m4-4e/04_verifier_report.md` §5).
+
+**재작업 카운터: 0/5**(상한 5, 여유 5) — verifier r1이 high 없이 곧바로
+`ready-for-review`를 냈고, medium 둘·장부층 넷의 일괄 반영은 운영자 채택
+2026-09-02 low/장부층 문턱과 같은 처리로 라운드에 세지 않는다(4A 관례 계승).
+
+**다음**: 브랜치 `m4-4e/2026-09-09`는 4B-1·4C-1 종결 뒤 `m4/2026-09-08`에 병합한다
+(위 승인 ⑤). 이 slice 자체의 추가 구현 작업은 없다.
+
 ## 리뷰 요청 조건 (evidence-pack 스킬 기준)
 
 - [x] 구현 diff가 커밋되어 base/head 고정 — `git status --porcelain -- <in_scope 경로>`

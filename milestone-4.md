@@ -192,6 +192,50 @@ Spring in-process event는 로컬 관찰용으로 쓸 수 있지만, 신뢰성 �
 - masking과 owner isolation
 - 동일 idempotency key의 단일 delivery effect
 
+**4E 착수 2026-09-09** — `m4/2026-09-08`에서 진행 중인 4A(사용자 승인 완료)·4B-1·4C-1과
+공유 working tree 없이 별도 worktree + 브랜치 `m4-4e/2026-09-09`에서 산다(계약 정본
+`reports/evidence/m4/4e/scope.md`, base `f600909`). 산출: 배달 경로 판정 커널
+(`resolveDeliveryPlan` — 정책·환경 두 판정을 분리해 첫 위반이 이기는 순서로 계산) ·
+`DispatchNotification` use case · port 셋(`RouteDirectory`·`ContentRenderer`·
+`NotificationSender`) · 값 타입(`RouteKey`·`MaskedTarget`·`DeliveryRequest`·
+`DeliveryResult`·`DeliveryOutcome` 등, 전부 값 획득·위조 축이 설계 검토로 먼저 닫힘) ·
+`gate.tests.workflow`(notification 패키지 7 class 등재) · `config/quality/leak-patterns.txt`
+(S-3 스캔 패턴 정책 파일 신설).
+
+**verifier r1(2026-09-09) → `ready-for-review`.** 산출물층 finding은 medium 둘뿐이었다 —
+M-1(`DeliveryOutcome.Suppressed`·`Attempted` 생성자가 설계 검토 확정과 달리 public이었다 —
+`internal constructor`+`@ConsistentCopyVisibility`로 정정, 다른 모듈 probe로 컴파일 거부
+재실측) · M-2(출하 정책 값 `NOTIFICATION_DELIVERY_POLICY`를 어떤 test도 참조하지 않아
+환경 매핑에서 값 하나를 지워도 `check` 전체가 GREEN이었다 — 그 값을 직접 `resolve`해
+전사상·suffix≥1을 단언하는 test 신설, verifier 변이 재현 뒤 즉시 실패함을 확인). 장부층
+finding 넷(L-1 rollback 파일 수 오기 · L-2 편집 대상 파일 `file:line` 인용 · L-3 낡은
+「예정」 문면 · L-4 scope.md 육안 확인 항목 누락)과 함께 커밋 한 번(`4341221`)으로
+일괄 반영했다. 도메인·계약층에 미해결 finding은 없다.
+
+**4E 종결 2026-09-09(사용자 승인) · D-M4-8 (a) 확정 · 정책 값 확정** — verifier r1
+`ready-for-review`(산출물층 blocker/high 0) 위에서 승인(evidence
+`reports/evidence/m4/4e/checklist.md` 「사용자 승인」 절). **재작업 0/5.** 승인 다섯:
+① slice 종결 ② D-M4-8 = (a)(메일 라이브·채널 fallback은 후속, 읽음 상태 되돌림은 안 함,
+재통지는 새 항목) ③ 정책 값(`Production→Live`·`Staging→DryRun`·`Development→DryRun`·
+`Test→Blocked`·`maskedSuffixLength=4`) — 착수 placeholder였던 값 자체가 확정돼
+`OPEN-4E-POLICY-VALUES` 종결(정본 `reports/evidence/m4/4e/policy-values.md` §1·§2) ④
+corpus 미신설 재확인 — `OPEN-4E-CORPUS`는 열린 채로 `m4` 병합 뒤 curator 몫으로 남는다
+⑤ `m4/2026-09-08` 병합은 지금 하지 않는다 — 4B-1·4C-1 종결 뒤 한 번에.
+
+**알려진 제한(종결 시점)**: 실 어댑터(Telegram/Email sender)의 idempotency 계약 준수는
+이 slice가 증명하지 않는다(실 어댑터 slice의 verifier 몫) · `RuntimeEnvironment`를 실행
+환경에서 읽어 채우는 배선은 app/M6 소관(커널은 그 값을 사실로 받는다) · ② 전수 표의
+corpus 승격은 `OPEN-4E-CORPUS`(병합 뒤 curator) · `RouteDirectory`·`ContentRenderer`
+구현(owner isolation의 실제 보장 포함)은 이 slice에 없다(port만) · 실 sender가 없어
+`NotificationSender` idempotency 계약은 fake로만 증명됐다(계약 KDoc이 실 어댑터에
+같은 골격의 test를 요구).
+
+**브랜치 `m4-4e/2026-09-09`는 `m4/2026-09-08`에 아직 병합되지 않았다** — 4B-1·4C-1
+종결 뒤 한 번에 병합한다(위 승인 ⑤, `reports/evidence/m4/4e/scope.md` 「레인 격리」·
+「병합 결정」 절). 병합 시 겹치는 파일은 `config/quality/gate-tests.properties`
+(`gate.tests.workflow` 블록에 줄 추가)와 이 문서(종결 문단) 둘뿐 — 소스 경로는 겹치지
+않는다.
+
 ## 완료 조건
 
 - 상태 전이 property test와 invalid transition test 통과
