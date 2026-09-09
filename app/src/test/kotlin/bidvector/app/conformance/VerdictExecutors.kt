@@ -23,9 +23,10 @@ import tools.jackson.databind.JsonNode
  * 직접 부른다. `Verdict`·reason 하위 타입 생성자가 `internal`이라도 이 실행자는 그 값을
  * 조립하지 않는다 — [VerdictLadder.judge]가 낸 값을 **읽기만** 해서 projection 을 만든다.
  *
- * `verdict-001~004`(insufficient-evidence)는 이 표에 없다 — `TARGET_DOMAINS`+
- * `classification == authoritative` 대상 밖이라 dispatch 되지 않는다(정합만 맞춘다,
- * scope.md 「이 slice 가 하는 일」⑧). 신설 `verdict-005~012`만 authoritative 다.
+ * `verdict-001~004`는 수정 라운드 1(2026-09-09, 운영자 결정 (a))에서 `authoritative`로
+ * 승격됐다 — M0 저작 시점(커널 이전)의 입력을 이 커널의 입력 계약(`$.input`/`$.policy`,
+ * `$.override`/`$.band`)으로 재구성해 이 표에 넣었다(각 case가 단언하는 규칙은 불변,
+ * manifest.yaml 의 `change_history` 참고). 열둘 전부 이제 이 표에 있다.
  */
 
 private fun optionalUnitScore(
@@ -166,6 +167,10 @@ private fun floorOverrideExecutor(input: JsonNode): Map<String, Any?> {
 
 internal val VERDICT_EXECUTORS: Map<String, (JsonNode) -> Map<String, Any?>> =
     mapOf(
+        "verdict-001" to ::verdictLadderExecutor,
+        "verdict-002" to ::verdictLadderExecutor,
+        "verdict-003" to ::verdictLadderExecutor,
+        "verdict-004" to ::floorOverrideExecutor,
         "verdict-005" to ::verdictLadderExecutor,
         "verdict-006" to ::verdictLadderExecutor,
         "verdict-007" to ::verdictLadderExecutor,

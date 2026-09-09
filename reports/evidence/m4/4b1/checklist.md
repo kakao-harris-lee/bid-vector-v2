@@ -100,6 +100,56 @@ commands.md). **남는 것**: `verdict-005`·`006`·`011`이 `CapacityHold`/`Low
 다섯의 무근거 문제)은 이번 라운드로 닫혔지만, 이 비대칭은 **다음 라운드나 팀장의 별도
 지시**(코드 승인 또는 다른 해소)로 넘긴다(알려진 제한 10번).
 
+### 3b. `verdict-001~004` 승격(수정 라운드 1 후속, 운영자 결정 2026-09-09 선택지 (a))
+
+위 §3a가 보고한 dispatch 충돌을 팀장에게 전달하자 **운영자가 (a)를 채택**했다 — 입력을
+번역 슬 없이 이 slice 커널의 입력 계약으로 **재구성**하고 승격한다. 근거: 넷은 커널이
+존재하기 전(M0, 2026-08-30)에 저작돼 `insufficient-evidence`로 한 번도 실행된 적이
+없었다 — 입력 형태는 그 시점의 추정이었을 뿐 계약이 아니었다.
+
+**지켜야 할 선(팀장 지시)과 준수 확인**:
+- 각 case가 단언하는 규칙(`verifies`)은 불변 — 001·002는 「두 보류가 문장이 아니라
+  `SkipReason`으로 구분된다」, 003은 force-bid 축, 004는 override 거부 축. 문면을
+  고치지 않았다(diff 확인).
+- `verified_paths`는 (1) 기준대로: 001·002 = `[$.verdict, $.skipReason]` · 003 =
+  `[$.verdict]` · 004 = `[$.overrideOutcome]`.
+- `approved_by_user`는 열둘 전부 `false` 유지(case 승인은 Phase 6).
+
+**입력 재구성(의미 불변을 무엇으로 확인했는가)**:
+- `verdict-001`(CapacityHold): `currentActiveBids=3 >= maxActiveBids=3` ∧
+  `priority(0.6) < capacityHoldPriorityThreshold(0.8)` → `VerdictLadder.judge`의
+  `capacityHoldOutcome` 분기(1순위)로 확정 `Skip(CapacityHold)`. 기대값은 이전과 같은
+  리터럴(`verdict: Skip`, `skipReason: CapacityHold`)이다 — **규칙과 결과가 동일**.
+- `verdict-002`(LowPriority): `currentActiveBids(1) < maxActiveBids(10)`(capacity-hold
+  회피) ∧ `priority(0.2) < bidNowThreshold`(정상 승격 회피) ∧ `probability`·`matched`를
+  **non-null**(0.1/0.1, force-bid 임계 미달)로 채워 `forceBidOutcome`이 `Review
+  (MlUnavailable)`로 새지 않고 `null`을 반환하게 함(judge의 `?:` 체인이 `forceBidOutcome`
+  까지 평가하려면 이 값들이 결측이면 안 된다 — `VerdictLadder.kt` 실측) ∧ `priority(0.2) <
+  reviewThreshold(0.45)` → 최종 `Skip(LowPriority)`. 기대값 동일.
+- `verdict-003`(force-bid): `priority(0.2) < bidNowThreshold`(정상 승격이었다면
+  승격되지 않았을 조건) ∧ `probability(0.9)`·`matched(0.85)`가 각 임계(0.8/0.7) 이상 →
+  `forceBidOutcome`이 `BidNow(ForceBidOverride(...))`로 확정. **`verifies`가 단언하는
+  것(force-bid 우회가 유지되고 결과에 노출된다)이 그대로 성립** — 다만 기대값의
+  세부 필드(`override.source`·`supersededReason` 등, M0 시점 서술형)는 커널이 내지
+  않는 필드라 `verified_paths`에서 걷었다(003은 `$.verdict`만).
+- `verdict-004`(override 거부): `override.rate=0.125`(원본의 "12.5%"를 fraction으로
+  정규화, 값 자체는 바뀌지 않았다) ∧ `band=[0.25, 0.99]`(원본 그대로) →
+  `FloorOverrideValidation.validate`가 `Rejected`. 기대값 동일(`overrideOutcome:
+  Rejected`).
+- 넷 다 실제로 `./gradlew --no-daemon :app:test --tests '*Conformance*'`(commands.md)를
+  실행해 **기대값과 실제 커널 출력이 일치함을 실측**했다 — 손으로 기대값을 맞춘 게
+  아니라 커널을 실행해서 확인했다.
+
+**게이트가 일한 사례로 남긴다**: 「`authoritative`인데 dispatch 표에 없는 case가 없다」는
+완전성 test가 없었다면 넷은 승격된 채 **조용히 실행되지 않았을 것**이다(입력 형태가
+안 맞아 executor가 그 case를 못 찾았을 것) — 그 assertion이 이 재구성 작업을 강제했다.
+
+**결과**: `verdict-001~004` 전부 `classification: authoritative`·`source.kind:
+operator-decision`, `VERDICT_EXECUTORS`(`VerdictExecutors.kt`)에 dispatch 등록,
+`./gradlew --no-daemon :app:test --tests '*Conformance*'` → **86 tests, 0 failed**
+(기존 74 + 신설 8 + 재승격 4). §3a가 남긴 「005/006/011 대 001/002 분류 비대칭」은
+**이제 해소됐다** — 열둘 전부 `authoritative`다. 알려진 제한 7·10을 갱신했다(아래).
+
 ### 4. `OPEN-DIC-03` 종결 근거와 신설 `OPEN`
 
 `data-dictionary.md` §3.6·§13.2를 D-M4-6 (a)·조사 §3.1 실측으로 채우고
@@ -144,27 +194,26 @@ evidence**이고, 이미 `reports/evidence/m1/1c/checklist.md:148`이 「닫힌 
    미정 — 4B-1은 그 축을 건드리지 않는다(out_of_scope).
 6. **`AnalysisBudgetExhausted`·`SimilarityProjectionNotReady`가 `Verdict` 안인지
    밖인지**(`OPEN-4B1-03`) — 이 slice의 `Verdict`에는 그 갈래가 없다(사다리 밖).
-7. **`verdict-001~004`는 `insufficient-evidence`로 남았다 — 승격을 시도했으나
-   되돌렸다(아래 10번).** `verdict-005`·`006`·`011`이 `CapacityHold`/`LowPriority`를
-   `authoritative`로 잠그는데 001·002는 같은 리터럴을 `insufficient-evidence`로
-   잠그는 비대칭이 남는다 — H-1의 절반(reason 이름 다섯의 무근거)은 이번 라운드로
-   닫혔지만 이 비대칭은 남는다.
+7. ~~`verdict-001~004`는 `insufficient-evidence`로 남았다~~ — **운영자 결정
+   2026-09-09 선택지 (a)(§3b)로 넷 다 `authoritative`로 승격했다.** 입력을 M0 시점
+   추정 형태에서 이 slice 커널의 입력 계약으로 재구성했고, `verifies`가 단언하는
+   규칙과 기대값의 의미는 불변임을 실행으로 확인했다(§3b). 005/006/011 대 001/002
+   분류 비대칭은 **해소됐다** — 열둘 전부 `authoritative`다.
 8. **조합 use case(4B-2)가 아직 없다** — `VerdictLadder.judge`를 실제 파이프라인에
    배선하는 코드는 이 slice 밖이다.
 9. **닫힌 slice/하네스 레인 evidence의 낡은 좌표 2건**(§5 참고, 알려진 제한으로만
    등재, 수정하지 않는다) — `m0/0c/commands.md:223`(data-dictionary.md 좌표)·
    `test-discovery-guard/commands.md:100`(capability-map.md:3457 좌표, verifier B-1).
-10. **`verdict-001~004` 승격을 시도했고 실행으로 구조적 충돌을 확인해 되돌렸다** —
-    `authoritative`+`source.kind: operator-decision`으로 편집하고 `verified_paths`를
-    맞춘 뒤 `./gradlew --no-daemon :app:test --tests '*Conformance*'`를 실제로 돌려
-    **86 tests, 5 failed**를 확인했다(`TARGET_DOMAINS`의 `"verdict"`가 즉시
-    `targetCases()`에 넷을 잡지만 그 입력 파일 형태 — `{"gateOutcome": ...}` ·
+10. ~~[블로커, 미해결] verdict-001~004 승격이 dispatch 완전성 test를 깬다~~ —
+    **해소됐다(§3b).** 1차 시도(`authoritative`+`verified_paths`만 편집, 입력은 그대로
+    둠)는 실측으로 **86 tests, 5 failed**를 냈다(`TARGET_DOMAINS`의 `"verdict"`가
+    즉시 `targetCases()`에 넷을 잡지만 M0 시점 입력 형태 — `{"gateOutcome": ...}` ·
     `{"baseVerdict": ..., "forceBid": {...}}` · `{"operatorFloorRateOverride": ...}`
-    — 가 신설 실행자의 `{"policy": ..., "input": ...}`/`{"override": ..., "band":
-    ...}` 형태와 달라 dispatch가 안 된다). 해소하려면 새 실행자·fixture 재구성이
-    필요해 **「코드는 건드리지 않는다」와 직접 충돌**한다 — 그 제약을 우선해 승격을
-    되돌렸다(팀장 보고, `_workspace` 메시지 로그 참고). 다음 라운드나 별도 지시로
-    (a) 코드 승인을 받아 실행자·fixture를 재구성하거나 (b) 다른 해소를 정한다.
+    — 가 신설 실행자 계약과 달라 dispatch가 안 됨). 운영자가 선택지 (a)(입력을 커널
+    계약으로 재구성)를 채택해 `fixtures/input`·`fixtures/expected/verdict-00{1,2,3,4}
+    .json`을 다시 쓰고 `VerdictExecutors.kt`의 `VERDICT_EXECUTORS`에 등록한 뒤
+    재실행 — **86 tests, 0 failed**(§3b). 완전성 test가 이 재구성을 강제한 게이트로
+    일한 사례다.
 11. **B-2(장부층, 등재만)** — `base(13cf0f6)..head` range에 4C-1 evidence 커밋 둘
     (`52c94e6`·`3752b49`, `reports/evidence/m4/4c1/**` 4파일 M)과 4B-1 계약 커밋 둘
     (`4e07682`·`e2bfb99`)이 섞여 있으나 「하네스 레인 변경」 절은 `ea79355` 하나만

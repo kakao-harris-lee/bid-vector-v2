@@ -1,13 +1,9 @@
 {
-  "operatorFloorRateOverride": {
-    "numeric": 12.5,
-    "declaredUnit": "percent"
+  "override": {
+    "rate": 0.125
   },
-  "plausibilityBand": {
-    "id": "SYN-BAND-published-floor-rate",
+  "band": {
     "min": 0.25,
-    "max": 0.99,
-    "inclusivity": "min-inclusive-max-inclusive",
-    "note": "SYNTHETIC — legacy B6 값이 아니다. 이 case의 기대값은 밴드 값이 아니라 「밖이면 사유와 함께 거부」 규칙에만 의존한다."
+    "max": 0.99
   }
 }

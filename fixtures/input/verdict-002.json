@@ -1,7 +1,17 @@
 {
-  "gateOutcome": "SKIP",
-  "gateId": "SYN-GATE-priority",
-  "structuredPayload": {
-    "priorityScoreBelowThreshold": true
+  "policy": {
+    "capacityHoldPriorityThreshold": 0.8,
+    "bidNowThreshold": 0.7,
+    "reviewThreshold": 0.45,
+    "forceBidProbabilityThreshold": 0.8,
+    "forceBidMatchedThreshold": 0.7,
+    "policyVersion": "legacy-behavior-2026-08-14"
+  },
+  "input": {
+    "priorityScore": 0.2,
+    "probabilityScore": 0.1,
+    "matchedScore": 0.1,
+    "currentActiveBids": 1,
+    "maxActiveBids": 10
   }
 }
