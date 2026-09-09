@@ -21,7 +21,7 @@ base_sha: 69e2afe   # 착수 2026-09-09 = 3E 종결·push 커밋. 착수 시 40�
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/koneps/**, adapters/src/test/kotlin/bidvector/adapters/koneps/**   # 개찰완료 오퍼레이션 구현 + 치환 확장 + mock server 시나리오. 3B·3B-2 기존 test 는 편집 없이 초록
-  - procurement/src/main/kotlin/bidvector/procurement/{Ports.kt,NoticeFacts.kt,DetailFetch.kt,OpeningResultRepository.kt,CollectionPolicy.kt,FieldContract.kt,RawObservation.kt}, procurement/src/test/kotlin/bidvector/procurement/**   # **추가만** — port 메서드 하나(D-3F-1) · 부모 fact 셋(D-3F-4) · 술어 재사용(D-3F-2) · **P-13 승인분**: `CollectionPolicy.kt` 에 §1.11 계약 행 열 추가 + `FieldConcept` 투찰 축 토큰(확장 ①) + `SourceEndpoint` 개찰완료 군(확장 ③). **점수 scale(확장 ②)은 열지 않는다** — 평가점수 넷은 P-13 에서 제외돼 미등재 키로 회계된다. **계약 초안이 이 셋을 빠뜨린 것을 정정한다**(구현 레인 조사 — `KonepsFieldContract` 생성자가 procurement `internal` 이라 어댑터가 계약 없이 값을 꺼낼 경로가 구조적으로 없다). 그 밖의 procurement 편집 금지, 기존 행·enum 값 삭제·의미 변경 금지
+  - procurement/src/main/kotlin/bidvector/procurement/{Ports.kt,NoticeFacts.kt,DetailFetch.kt,OpeningResultRepository.kt,CollectionPolicy.kt,FieldContract.kt,RawObservation.kt,KonepsOpeningCompleteFieldContracts.kt}, procurement/src/test/kotlin/bidvector/procurement/**   # **추가만** — port 메서드 하나(D-3F-1) · 부모 fact 셋(D-3F-4) · 술어 재사용(D-3F-2) · **P-13 승인분**: `CollectionPolicy.kt` 에 §1.11 계약 행 열 추가 + `FieldConcept` 투찰 축 토큰(확장 ①) + `SourceEndpoint` 개찰완료 군(확장 ③). **점수 scale(확장 ②)은 열지 않는다** — 평가점수 넷은 P-13 에서 제외돼 미등재 키로 회계된다. **계약 초안이 이 셋을 빠뜨린 것을 정정한다**(구현 레인 조사 — `KonepsFieldContract` 생성자가 procurement `internal` 이라 어댑터가 계약 없이 값을 꺼낼 경로가 구조적으로 없다). **신규 파일 `KonepsOpeningCompleteFieldContracts.kt` 는 목록 개정으로 편입한다**(verifier r1 medium — 분리 근거는 `CollectionPolicy.kt` 가 정확히 500줄로 크기 게이트 한도에 서 있다는 실측이고 정당하다. 없던 것은 계약의 목록 개정 기록이며 이 문장이 그것이다). 그 밖의 procurement 편집 금지, 기존 행·enum 값 삭제·의미 변경 금지
   - adapters/src/main/resources/db/migration/V5__opening_complete_axis.sql   # 신규 마이그레이션 **하나** — **부모 컬럼만**(D-3F-3 해소로 투찰자별 자식 표를 만들지 않는다). V1~V4 를 고치지 않는다(**`V4` 는 3E 종결과 함께 push 됐다 — 되쓸 수 없다**)
   - adapters/src/main/kotlin/bidvector/adapters/persistence/**, adapters/src/test/kotlin/bidvector/adapters/persistence/**   # repository + Testcontainers 통합 test
   - adapters/src/test/kotlin/bidvector/adapters/persistence/{CleanMigrationTest.kt,CleanMigrationCheckTest.kt,CleanMigrationTriggerTest.kt}   # **스키마 스냅샷 래칫 — 3E 예외의 선례 적용(D-3F-6)**. 기대값에 **신규 항목을 더하는 편집만**. 완화·삭제 금지, 검증 레인 표적 재검증
@@ -56,8 +56,18 @@ rollback: |
 
 ## 하네스 레인 변경 · 문서 레인 변경 (상시 절)
 
-`git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 와 `… -- docs/discovery milestone-3.md` 를 리뷰
-요청 시점마다 돌려 등재한다. 착수 시점 **없음**.
+`git log --oneline <base>..HEAD -- CLAUDE.md .claude/` — **하네스 커밋 0**(실측).
+
+**문서 레인 변경**(slice 산출물이 아니다 — 커밋 집합은 in_scope 경로의 변경이다, 2026-09-04):
+
+| 경로 | 무엇 |
+| --- | --- |
+| `reports/evidence/m3/3a/policy-values.md` | **§1.11 투찰 축 필드 계약 작성**(P-13) + §6b 에 P-13 승인 등재 |
+| `reports/evidence/m3/3f/scope.md` | 계약 확정(D-3F-1~6) · **P-13 승인 반영 in_scope 정정** · 이 절 |
+| `milestone-3.md` | 「Slice 3F」 착수 문단 — **구현 레인은 이 파일을 편집하지 않는다** |
+| `docs/discovery/capability-map.md` | 신설 `OPEN-3F-EVALUATION-SCORE-SCALE`·`OPEN-3F-OPENG-RANK-SEMANTICS` |
+
+**되돌림 대상이 아니다** — 등재된 `OPEN` 과 승인 기록은 이 slice 가 만든 지식이고 코드를 걷어도 남아야 한다.
 
 ---
 
