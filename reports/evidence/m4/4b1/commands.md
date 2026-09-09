@@ -365,3 +365,50 @@
   17+`ProvenanceRulesTest` 21) · conformance = **74**(승격·8신설 이전 기준). 다섯 확인
   전부 통과.
 - clone 삭제(`rm -rf`), 원 worktree엔 영향 없음.
+
+## 2026-09-09T14:00Z — 사용자 승인 반영(2026-09-09) — 4B-1 종결 + verdict 12건 case 승인
+- `fixtures/manifest.yaml`: `verdict-001`~`012`의 `review.approved_by_user`를 `true`로,
+  `claude_commit`(001~004는 M0 원본 저작 커밋 `9e1223a`, 005~012는 커널 신설 커밋
+  `381eaeb`)·`approved_at: 2026-09-09`·`approval_record`·`approval_scope`를 채웠다
+  (`strategy-edit` 다섯과 같은 형식).
+- cmd: `git diff -U0 -- fixtures/manifest.yaml | grep "^@@"` — 24개 hunk 전부 base-line
+  8011~8784 범위(승인 전 `verdict-001`~`012`의 review 블록 경계) 안임을 실측 확인 —
+  다른 도메인(`koneps-collection`·`strategy-*` 등) 무접촉.
+- cmd: `python3 -c "import yaml; yaml.safe_load(open('fixtures/manifest.yaml'))"` —
+  exit 0. `review.approved_by_user`·`approved_at`·`approval_record`·`approval_scope`
+  전부 12건에 존재함을 python으로 재확인.
+- `reports/evidence/m4/4b1/checklist.md`에 「사용자 승인」 절 신설 — 승인 범위 셋,
+  verifier r2 근거, 재작업 1/5.
+- `milestone-4.md`의 「### Slice 4B」 절에 종결 문단 신설 — 분할 이유·조사 608줄이
+  특정한 여섯 실패 형태와 뒤집기·`OPEN-DIC-03` 종결+`OPEN-4B1-OFF-LADDER-DROPS`
+  신설·corpus 12 승격·알려진 제한. `capability-map.md`의 `OPEN-4B1-OFF-LADDER-DROPS`
+  등재(4B-2 배정) 재확인 — 이미 등재돼 있어 무변경.
+- **4C-1 몫만 되돌리는 재실측(4C-1 종결 문단의 근거 수치)**: 임시 clone(`efd2d60` pin)
+  에서 4C-1의 커밋(`13cf0f6`·`7469bce`)이 넣은 hunk만 `git apply -R`로 걷고(4B-1 몫은
+  그대로), 4C-1 신규 파일(`workflow/**/event/**`·`StrategyEditExecutors.kt`·
+  `workflow/**/strategy/{Ports,EditStrategyWorkflow}.kt`·
+  `EditStrategyWorkflowTest.kt`·`reports/evidence/m4/{4c1,4a/scope.md}`)을 삭제 —
+  `./gradlew --no-daemon :workflow:compileKotlin :decision:compileKotlin
+  :app:compileTestKotlin` exit 0, `./gradlew --no-daemon :workflow:test :decision:test
+  :app:test --tests '*Conformance*'` exit 0 — conformance **86**·`decision:test`
+  **62**(`FloorShortfallKernelTest`17+`FloorOverrideValidationTest`4+
+  `VerdictLadderPolicyDataTest`4+`UnitScoreTest`3+`LadderInputTest`2+
+  `ProvenanceRulesTest`21+`VerdictLadderPropertyTest`2+`VerdictLadderTest`9=62)·
+  `workflow:test` **39**(strategy 여섯 스위트 합, event 스위트 전부 사라짐 — 4A 관례로
+  복귀). `gate.tests.decision`·`data-dictionary.md` §3.6(`SkipReason` 매치 7건) 생존
+  확인. 4B-1 몫만 되돌리는 재실측은 이전 라운드에서 이미 반복(`decision:test` 38·
+  conformance 74). clone 삭제.
+- cmd: `./gradlew --no-build-cache clean check` — exit 0 — `BUILD SUCCESSFUL in 32s`,
+  344 actionable tasks(319 executed·25 up-to-date).
+- cmd: `./gradlew --no-daemon :app:test`(별도 호출, 필터 없음) — exit 0 —
+  `tests="86" failures="0"`.
+- cmd: `git status --porcelain -- fixtures/manifest.yaml milestone-4.md
+  reports/evidence/m4/4b1/checklist.md reports/evidence/m4/4c1/checklist.md` — exit 0,
+  이 넷과 정확히 일치. 양성 대조(비파괴): `reports/evidence/m4/4b1/rollback.md`에 개행
+  한 줄 추가 → `M` 관측 → `sed -i '' -e '$ d'`로 추가한 빈 줄만 절삭(파괴적 삭제 없음)
+  → 재확인(비어있음, exit 0).
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+  fixtures/manifest.yaml milestone-4.md reports/evidence/m4/4b1/checklist.md
+  reports/evidence/m4/4c1/checklist.md` — exit 0(매치 8건, 전부 기존과 동일한
+  `token`/`token_alignment` 도메인 어휘 + 두 checklist.md의 「secret 스캔 통과」
+  자기참조 서술, `milestone-4.md`에는 매치 0건).

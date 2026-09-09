@@ -14,6 +14,27 @@
 - [x] secret 스캔 통과 — 실 매치 0(자기참조 1건은 이 문장 자신이 패턴에 걸린 것,
       commands.md 「secret 스캔」 절 참고).
 
+## 사용자 승인 — 2026-09-09
+
+**slice 4C-1 종결 승인.** base `4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599` · head
+`c54e0249814dccd5d6dcdd9f4826390ae615fa74`(재검증 r2 장부층 일괄 커밋, L-4~L-7).
+
+**승인의 근거 — verifier r2 `ready-for-review`.** 산출물층 blocker/high 0건
+(`_workspace/m4-4c1/04_verifier_report_r2.md`). r1의 H-1(`EventEnvelope.restore`가
+`public`이라 위조 봉투를 아무 모듈에서나 조립해 `register`에 주입 가능)은 배치 변경
+(`OutboxPort.claim()`이 `EventEnvelope`가 아니라 `ClaimedOutboxRow` 원시 행만 반환,
+`restore`는 `workflow` 내부 `internal` 매핑만)으로 재작업 1/5에서 닫혔고, r2가 위조
+코드가 이제 거부되고 그 재료를 소비할 경로가 없음을 재확인했다. 줄 단위 rollback도
+4B-1 보존이 되돌린 트리에서 실측됐다(conformance 82·decision 62 — 전체 복원이었다면
+74·38이었을 것). 남은 것은 장부층 L-4~L-7뿐이었고 코드 무변경으로 반영했다.
+
+**재작업 카운터: 1/5**(상한 5, 여유 4) — H-1/M-1/L-1/L-2/장부층 일괄 라운드 하나만
+카운트된다(재검증 r2와 이번 장부층 일괄은 라운드를 추가하지 않는다, 2026-09-02 low/장부층
+문턱).
+
+**다음 slice**: 4B-2(조합 use case, 계약은 팀장이 별도로 쓴다). 이 레인은
+`reports/evidence/m4/4b2/**`·`.claude/`·`CLAUDE.md`를 건드리지 않는다.
+
 ## 이 slice 고유 확인
 
 ### 1. 값 획득 축 표(설계 검토 (2))가 코드에서 어떻게 섰는가 — 행별 대응

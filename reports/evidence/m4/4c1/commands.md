@@ -297,3 +297,21 @@ L-2(알려진 제한 등재) · B-1~B-3(장부층, 이 절 및 scope.md·rollbac
 - cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
   reports/evidence/m4/4c1/ --exclude=commands.md --exclude=checklist.md` — exit 1(매치
   없음, 자기참조 파일 둘 제외 시 실 비밀값 0건, 기존 패턴과 동일).
+
+## 2026-09-09T14:00Z — 사용자 승인 반영(2026-09-09) — 4C-1 종결
+- `reports/evidence/m4/4c1/checklist.md`에 「사용자 승인」 절 신설 — base
+  `4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599`·head `c54e024`, verifier r2 근거,
+  재작업 1/5, 다음 slice 4B-2.
+- `milestone-4.md`의 「### Slice 4C」 절에 종결 문단 신설 — 4C-1/4C-2 분할 이유
+  (Flyway 버전 충돌 실측)·산출·검증이 드러낸 것(H-1: 저장소 복원 진입점이 열려
+  있어 위조 봉투 주입 가능 → `claim()`을 원시 행 반환으로 바꾸는 배치 변경)·
+  `OPEN-OPS-10` 종결+잔여 셋·알려진 제한(L-4 포함)·`OPEN-4C1-TX-CONTRACT-UNVERIFIED`
+  활성. 이 라운드에서 실제로 재측정한 rollback 수치(conformance 86·decision:test
+  62·workflow:test 39, 4C-1 몫만 되돌린 경우 — 4B-1의 verdict-001~004 승격 이후
+  최신 상태 기준)의 명령·근거는 `reports/evidence/m4/4b1/commands.md`
+  「사용자 승인 반영」 절에 함께 기록했다(공유 파일 rollback 검증이라 4B-1
+  evidence에 정본을 둔다, 중복 방지).
+- clean check·`:app:test`(별도 호출, 필터 없음)·clean-tree 게이트·secret 스캔은
+  `reports/evidence/m4/4b1/commands.md`의 같은 절에서 네 파일(`fixtures/manifest.yaml`·
+  `milestone-4.md`·양쪽 `checklist.md`)을 함께 커밋 전 확인 — exit 0/86 tests
+  0 failed 전부 그대로 참고.

@@ -13,6 +13,34 @@
 - [x] 알려진 제한과 rollback 방법이 기록됨(아래 「알려진 제한」·`rollback.md`).
 - [x] secret 스캔 통과 — commands.md 기록.
 
+## 사용자 승인 — 2026-09-09
+
+**slice 4B-1 종결 승인.** 승인 범위 셋:
+
+1. **slice 종결** — 이 slice의 산출물(`Verdict` 게이트 사다리 커널·`SkipReason` 전수·
+   force-bid 출처 노출·override 검증·corpus 실행자·gate 등재)을 최종 형태로 승인한다.
+   base `13cf0f63da18e13f0e2befd519710a8635742004` · head
+   `efd2d60dd9e4ebf354a871fac11121aa91fa45bc`(재검증 r2 장부층 M-1 재실측 커밋).
+2. **`verdict` corpus 12건 case 승인** — `verdict-001`~`012` 전건. `fixtures/manifest.yaml`의
+   `review.approved_by_user`를 `true`로, `review.claude_commit`을 실제 커밋(001~004는
+   M0 원본 저작 커밋 `9e1223a`, 005~012는 이 slice의 커널 신설 커밋 `381eaeb`)으로
+   채웠다. 승인 범위는 **`verdict` 도메인 한정**이고(manifest `review.approval_scope`
+   필드에 명시), 다른 도메인의 case는 이 결정의 대상이 아니다.
+3. **다음 slice는 4B-2**(조합 use case) — 계약은 팀장이 별도로 쓴다. 이 레인은
+   `reports/evidence/m4/4b2/**`·`.claude/`·`CLAUDE.md`를 건드리지 않는다.
+
+**승인의 근거 — verifier r2 `ready-for-review`.** 산출물층 blocker/high 0건
+(`_workspace/m4-4b1/04_verifier_report_r2.md`). r1의 H-1(신설 여덟의 `verified_paths`가
+미승인 reason 이름을 잠그고 `verdict-001`과의 분류 모순)은 `verified_paths` 좁히기와
+`verdict-001~004` 재구성-후-재승격(운영자 결정 선택지 (a), 되돌림 경로의 두 번째 사용)
+으로 재작업 1/5에서 닫혔다. 재검증 r2가 지목한 M-1(`verdict-003`이 자기 `verifies`를
+재지 못하는 문면 정직화)·L-1·L-2·하네스 레인 누락 둘은 이번 장부층 일괄로 반영했다.
+도메인·계약층에 미해결 finding은 없다.
+
+**재작업 카운터: 1/5**(상한 5, 여유 4) — H-1·M-1/L-1~L-3/B-1~B-5 반영 라운드 하나만
+카운트된다(재검증 r2와 장부층 일괄 둘은 라운드를 추가하지 않는다, 2026-09-02 low/장부층
+문턱).
+
 ## 이 slice 고유 확인
 
 ### 1. 값 획득 축 판정의 실측(설계 검토 (2)) — 4A 와 결론이 다르다

@@ -164,6 +164,71 @@ WRITE-PATH-GATE`는 종결** — 폐쇄는 Kotlin 가시성(1층) + `sourceLangu
 transaction 경계와 실패 시 상태를 명시한다. catch-all exception으로 성공처럼 계속하지
 않는다.
 
+**4B를 4B-1/4B-2로 나눈 이유(착수 2026-09-09)** — 위 「decision 후보 조립」은 **조립할
+대상이 없었다**: `decision` 모듈에 투찰 판정 `Verdict` 축이 실재하지 않았다(실측:
+provenance·floor shortfall 커널 둘뿐). `data-dictionary.md` §3.6이 어휘를 승인했으나
+§13.2가 구현을 M1에 인계했고 `milestone-1.md` 1A~1E에 게이트 사다리 slice가 없었다 —
+`capability-map.md`가 이 어긋남을 이미 **「갈림」**으로 등재해 둔 자리였다. 운영자가
+**4B-1(도메인 커널) / 4B-2(조합 use case)** 분할로 해소했다 — 도메인 커널과
+application 조합을 같은 slice에 섞지 않는다.
+
+**4B-1 구현(2026-09-09)** — 조사(`_workspace/m4-4b1/01_scout_verdict_ladder.md`, 608줄)
+가 legacy `allocation_core.py`에서 특정한 여섯 실패 형태를 각각 뒤집었다:
+
+1. **부작위 skip**(legacy의 두 `skip`이 대입이 아니라 초기값 유지 부작위) →
+   **모든 분기가 결과를 명시 반환**(`VerdictLadder.judge`의 guard 함수 체인, 소진 `?:`).
+2. **문장 사유**(두 보류가 같은 `"skip"`이고 한국어 문장으로만 구분) →
+   **`SkipReason` sealed + 값**(`CapacityHold`·`LowPriority`, 문자열 아님).
+3. **force-bid와 정상 승격이 같은 문장** → **`BidNowReason` 타입 분리**
+   (`PriorityAboveBidNowThreshold` vs `ForceBidOverride`, 둘 다 `internal constructor`) —
+   우회의 존재를 감춘 것이 결함이었지 우회 자체가 아니다(`OPEN-STR-03`).
+4. **ML 부재가 fail-open**(점수 없음이 어떤 판정으로도 새지 않고 그냥 진행) →
+   **부재를 구분하는 타입**(`ReviewReason.MlUnavailable`) — `Verdict.judge`의 타입
+   서명 자체에 「부재에서 `BidNow`로 가는 경로」가 없다(D-M4-6 (a)).
+5. **임계 두 출처**(legacy는 영속 전략 2 + settings 3에 흩어짐, DEC-12 A10) →
+   **정책 데이터 한 자리**(`VerdictLadderPolicyData`)로 모으고 각 reason이 쓴 임계·
+   실제 값을 결과에 싣는다(재현 가능성).
+6. **침묵 수리**(legacy는 `review_threshold > bid_now_threshold`가 깨지면 판정 시점에
+   조용히 `review_threshold = bid_now_threshold`로 고쳐 저장값과 판정값이 갈렸다) →
+   **생성 불변식**(`VerdictLadderPolicyData` 생성자가 `reviewThreshold <= bidNowThreshold`
+   를 강제 — 그 조합 자체를 구성 불가로 만들어 침묵 수리 자리를 없앤다).
+
+**`OPEN-DIC-03` 종결과 신설 `OPEN-4B1-OFF-LADDER-DROPS`** — 조사가 사다리 안에서 확정적
+으로 갈리는 사유가 정확히 둘(`CapacityHold`·`LowPriority`)임을 전수해 `data-dictionary.md`
+§3.6·§13.2의 `OPEN-DIC-03`을 종결했다. 사다리 **밖**에서 공고가 조용히 사라지는 지점
+열셋(조사 §3.2)은 이 어휘가 아니다 — 신설 `OPEN-4B1-OFF-LADDER-DROPS`(`capability-map.md`
+§14)로 등재하고 **4B-2**(무엇을 판정 대상으로 삼는가)에 배정했다.
+
+**corpus 12건 승격·승인과 되돌림 경로의 두 번째 사용** — `verdict-005`~`012`(신설
+authored-from-approved-spec)와 `verdict-001`~`004`(M0/2026-08-30에 커널 이전 저작돼
+`insufficient-evidence`로 강등, 한 번도 실행된 적 없음)를 전부 `authoritative`로
+승격했다. `verdict-001`~`004`는 운영자 결정(선택지 (a))으로 **입력을 이 slice 커널의
+입력 계약으로 재구성**했다 — dispatch 완전성 test가 형태 불일치를 86 tests/5 failed로
+잡은 뒤 재구성해 86/0으로 닫았다. `koneps-collection` 27건에 이은 **되돌림 경로의 두
+번째 사용**이다. 열둘 전부 사용자 승인(`approved_by_user: true`, `reports/evidence/
+m4/4b1/checklist.md` 「사용자 승인」 절) — case 승인은 slice 종결 승인과 별개 항목으로
+받았다.
+
+**4B-1 종결 2026-09-09(사용자 승인)** — verifier r2 `ready-for-review`(산출물층
+blocker/high 0) 위에서 승인(evidence `reports/evidence/m4/4b1/checklist.md` 「사용자
+승인」 절, 최종 산출물 커밋 `efd2d60dd9e4ebf354a871fac11121aa91fa45bc`). **재작업 1/5.**
+값 획득 축(설계 검토 (2)) 실측: `Verdict`·`BidNowReason`·`ReviewReason` 생성자와
+`SkipReason` 하위 타입 전부 `internal`이고 사다리를 지나지 않고 만들면 다른 모듈(`app`)
+에서 컴파일이 거부됨을 확인했다 — `VerdictLadder.judge`·`FloorOverrideValidation.validate`
+자체는 `decision`이 도메인 모듈이라 `app` conformance 실행자가 직접 부르는 것이 1C·1D
+관례이므로 public이 옳다(판정을 받는 것 자체는 권한이 아니다).
+
+**알려진 제한(종결 시점)**: 임계 다섯의 운영 값은 legacy-behavior로만 test 정책에
+쓰였다(`OPEN-4B1-LADDER-THRESHOLDS`, 운영자 승인 대상) · 용량이 네 번 세는 것의 합쳐진
+효과와 하한 override가 판정을 얼마나 바꾸는가는 이 slice가 재측정하지 않았다
+(`OPEN-4B1-05`·`OPEN-4B1-06`) · `review_required`(ML regime 신호)를 V2 어느 층이
+만드는가 미정(`OPEN-4B1-07`) · `LicenseVerdict.Ineligible`과 `Verdict`의 관계 미정
+(`OPEN-4B1-02`, out of scope) · `AnalysisBudgetExhausted`·`SimilarityProjectionNotReady`
+가 `Verdict` 안인지 밖인지 미정(`OPEN-4B1-03`) · 조합 use case(4B-2)가 아직 없다 —
+`VerdictLadder.judge`를 실제 파이프라인에 배선하는 코드는 이 slice 밖이다.
+
+**다음 slice는 4B-2**(조합 use case, 계약은 팀장이 별도 작성).
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,
@@ -175,6 +240,65 @@ transaction 경계와 실패 시 상태를 명시한다. catch-all exception으�
 
 Spring in-process event는 로컬 관찰용으로 쓸 수 있지만, 신뢰성 있는 외부 side effect의
 유일한 보장으로 사용하지 않는다.
+
+**4C를 4C-1/4C-2로 나눈 이유(착수 2026-09-09)** — 다른 세션이 `main`에서 M3 후속을
+진행 중이었고 그 브랜치가 이미 `db/migration/`에 V4·V5를 만지고 있었다(`git log
+--name-only` 실측). 이 브랜치(`m4/2026-09-08`)의 base에는 V4·V5가 없어, 4C가 outbox
+테이블을 만들면 **Flyway 버전 번호가 정면 충돌**한다. 그래서 **4C-1은 `workflow`
+모듈 한정**(충돌 0)으로 이벤트 봉투 어휘·outbox port·dedup을 세우고, **4C-2**
+(Flyway·persistence 어댑터·DB↔outbox 원자성·claim 경합)는 `main` 병합 뒤로 미뤘다
+(`reports/evidence/m4/4c1/scope.md`).
+
+**4C-1 구현·검증(2026-09-09)** — `workflow/src/main/kotlin/bidvector/workflow/event/**`
+(`EventEnvelope<P>`·`OutboxEntryState` sealed+전이표·`OutboxPort`/`InboxPort`/
+`EventIdFactory` port·dedup 순수 판단·`OutboxEventSink`, 4A `EventSink`의 첫 실구현)
+신설. acceptance S-0~S-6 전부 exit 0.
+
+**검증이 드러낸 것 — 통로 타입 하나로는 안 닫혔다.** verifier r1의 H-1: 초기 판은
+`EventEnvelope.restore`가 `public`이라 **저장소 복원 진입점 자체가 위조 재료를 내주는
+자리**였다 — 위조는 막았어도(H-2에서 이미 닫힘) **획득**이 열려 있어, 어느 모듈에서든
+`actor = null`인 봉투를 `restore`로 지어 `register`에 넘기면 배달 스트림에 주입됐다
+(4A H-3와 같은 계열 — 통로 타입의 획득 축이 위조 축과 별개로 닫혀야 한다는 교훈의
+두 번째 사례). **가시성 한 단어(`internal fun restore`)로는 부족했다** — 4C-2의 실
+persistence 어댑터가 DB 행을 봉투로 되살려야 하는 순간 그 함수를 다시 열어야 했고
+같은 구멍이 되돌아왔을 것이다. 그래서 `OutboxPort.claim()`의 **반환 타입 자체를
+바꿨다** — `EventEnvelope`가 아니라 `ClaimedOutboxRow`(완성 전 원시 필드)만 돌려주고,
+어댑터는 `EventEnvelope`를 만들지 않는다. 원시 행 → 완성 봉투 복원은 `workflow` 안의
+`internal` 매핑(`OutboxEntry.restore`)이 지고, 그 함수는 4C-2에서도 계속 `internal`일
+수 있다(호출부가 미래의 배달 오케스트레이션 use case이지 어댑터가 아니기 때문이다) —
+**4C-2에서 되열 필요가 없다.**
+
+**`OPEN-OPS-10` 종결과 잔여 셋** — D-M4-5 (a)(`Pending → Claimed → Delivered | Failed
+(final) | Isolated`)를 `data-dictionary.md` §2.2.5에 등재해 `OPEN-OPS-10`을 종결했다
+(`capability-map.md` §14.2 갱신). 잔여 셋: `OPEN-ADR-13`(db-scheduler 실패 기본값,
+4C-1에는 스케줄러가 없다) · `OPEN-ADR-12`(lease 어댑터, 4C-2/후속) ·
+`OPEN-4C1-TX-CONTRACT-UNVERIFIED`(등록이 도메인 write와 같은 트랜잭션이라는 계약은
+4C-1에서 문면 선언일 뿐 강제되지 않는다 — 4C-2가 실 저장으로 닫을 때까지 **활성**).
+
+**알려진 제한(종결 시점)**: DB↔outbox 원자성·crash-after-commit·claim 경합은 실 저장이
+있어야 잰다(4C-2, `OPEN-4C1-TX-CONTRACT-UNVERIFIED`) · `OutboxPort`·`InboxPort` 구현은
+test fake만(4C-2가 persistence 어댑터를 짓는다) · `transitionOutbox`·`OutboxEntry.restore`
+둘 다 유일한 정당한 호출부(배달 오케스트레이션 use case)가 아직 없다 · `EventIdFactory`의
+실 기제(UUIDv7 등) 미정 · **`OutboxEventSink`는 public이라 자기 `OutboxPort`·
+`EventIdFactory`·`Clock`을 조립해 밖에서 새로 지을 수 있다**(verifier r2 L-4) — 결함이
+아니라 sink의 불변식(`actor` non-null·`idempotencyKey`는 revision 파생·
+`correlationId == eventId`)이 지키는 well-formed 발행이지만, 4C-2가 배달 오케스트레이션
+use case를 지을 때 「어느 코드든 outbox에 쓸 수 있다」는 사실을 알고 시작해야 한다 ·
+NOTI-05의 등록 측 dedup은 4C-1이 지지 않는다(입력만 준비, 실 구현·검증은 4C-2).
+
+**4C-1 종결 2026-09-09(사용자 승인)** — verifier r2 `ready-for-review`(산출물층
+blocker/high 0) 위에서 승인(evidence `reports/evidence/m4/4c1/checklist.md` 「사용자
+승인」 절, 최종 산출물 커밋 `c54e0249814dccd5d6dcdd9f4826390ae615fa74`). **재작업 1/5.**
+공유 파일(`gate-tests.properties`·`data-dictionary.md`·`capability-map.md`)을 4B-1과
+함께 만졌고, **줄 단위 rollback이 서로를 지우지 않음을 이 종결 문단 작성 시점에 임시
+clone에서 직접 재실측**했다 — 4C-1 몫만 걷으면(4B-1은 그대로) conformance **86**·
+`decision:test` **62**·`workflow:test` **39**(event 테스트 열여덟 사라지고 4A의
+strategy 서른아홉만 남음)로, 4B-1 몫만 걷으면(이전 라운드에서 이미 반복 실측) conformance
+**74**·`decision:test` **38**(1D만)·`workflow:test`는 **57**(4B-1은 `workflow`를 만지지
+않아 무영향)로 각각 정확히 복귀한다 — 두 slice의 되돌림이 서로의 몫을 지우지 않는다.
+
+**다음 slice는 4B-2**(조합 use case, 계약은 팀장이 별도 작성). 4C-2(Flyway·persistence
+어댑터·DB↔outbox 원자성)는 `main` 병합 뒤 별도 slice.
 
 ### Slice 4D — ML gateway
 

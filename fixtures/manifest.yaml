@@ -8008,9 +8008,14 @@ cases:
         policy_version: |-
           해당 없음 — 분류·계약 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
     review:
-      claude_commit: pending
+      claude_commit: 9e1223a
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
   - id: verdict-002
     domain: verdict
     classification: authoritative
@@ -8090,9 +8095,14 @@ cases:
         policy_version: |-
           해당 없음 — 분류·계약 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
     review:
-      claude_commit: pending
+      claude_commit: 9e1223a
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
   - id: verdict-003
     domain: verdict
     classification: authoritative
@@ -8212,9 +8222,14 @@ cases:
         policy_version: |-
           해당 없음 — 문면 정정이고 코드·기대값·해시는 무변경이다.
     review:
-      claude_commit: pending
+      claude_commit: 9e1223a
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
   - id: verdict-004
     domain: verdict
     classification: authoritative
@@ -8295,9 +8310,14 @@ cases:
         policy_version: |-
           해당 없음 — 분류·계약 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
     review:
-      claude_commit: pending
+      claude_commit: 9e1223a
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
   - id: verdict-005
     domain: verdict
     classification: authoritative
@@ -8351,9 +8371,14 @@ cases:
         priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 381eaeb
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: verdict-006
     domain: verdict
@@ -8408,9 +8433,14 @@ cases:
         priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 381eaeb
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: verdict-007
     domain: verdict
@@ -8470,9 +8500,14 @@ cases:
         priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 381eaeb
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: verdict-008
     domain: verdict
@@ -8532,9 +8567,14 @@ cases:
         priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 381eaeb
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: verdict-009
     domain: verdict
@@ -8594,9 +8634,14 @@ cases:
         priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 381eaeb
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: verdict-010
     domain: verdict
@@ -8659,9 +8704,14 @@ cases:
         priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 381eaeb
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: verdict-011
     domain: verdict
@@ -8716,9 +8766,14 @@ cases:
         priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 381eaeb
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: verdict-012
     domain: verdict
@@ -8779,9 +8834,14 @@ cases:
         reasonCode 문자열 자체(도메인 타입은 rate·band 만 나른다) — 이 값은 corpus runner 투영이다. 실 override 파이프라인 배선(4B-2).
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 381eaeb
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
 # -----------------------------------------------------------------------------
 # strategy 축 (M1/1E 신설, 2026-09-06) — 운영자 결정 30 이 STR-01 acceptance 넷 · STR-02
