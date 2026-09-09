@@ -101,15 +101,19 @@ internal object OpeningRankOneKind {
 }
 
 /**
- * M3/3F D-3F-4 — `DrawNumberObservation` ↔ `draw_numbers_*` 컬럼 왕복. `OutOfRange`의
- * `validRange`는 별도 컬럼이 없다 — 이미 부모에 있는 `total_reserve_price_candidate_count`
- * (3E 슬롯)에서 재구성한다(중복 저장 금지) — 그래서 [read]가 그 값을 인자로 받는다. `V5`의
- * `opening_result_draw_numbers_out_of_range_requires_total` CHECK(verifier r1 F-3 뒤)가
- * `kind='OUT_OF_RANGE'`인 행엔 그 값이 항상 있음을 저장 시점에 보장한다 — 그래서 아래
- * `requireNotNull`은 실제로 도달 불가한 방어다(DB 가 이미 막는다).
+ * M3/3F D-3F-4 — `DrawNumberObservation` ↔ `draw_numbers_*` 컬럼 왕복.
  *
- * **verifier r1 F-1·F-2 뒤** — `bind`가 이 축의 세 컬럼(kind·번호 배열·관측 시각)을 하나로
- * 묶어 내보낸다. `Sql.kt`가 `EXCLUDED.draw_numbers_kind` NULL 여부로 축 전체를 보존/교체한다.
+ * **verifier r2 N-1 뒤 — `OutOfRange`의 `validRange` 는 이 축 자신의 컬럼
+ * (`draw_numbers_valid_range_max`)에 싣는다.** 이전 판(r1 F-3)은 그 값을 부모의
+ * `total_reserve_price_candidate_count`(3E 슬롯, 별도 COALESCE 축)에서 읽기 시점에
+ * 재구성했는데, `INSERT ... ON CONFLICT` 의 CHECK 가 병합 뒤 행이 아니라 들어오는 제안
+ * tuple 에 걸려(PostgreSQL 관용구) 부모가 이미 총예가건수를 가진 상태에서도 그 축을 안
+ * 실은 정상 저장이 거부됐다. `validRange.first`(항상 1, 1-기반 인덱스)는 저장하지 않는다
+ * (중복 금지) — `validRange.last`(상한)만 싣는다.
+ *
+ * **verifier r1 F-1·F-2 뒤** — `bind`가 이 축의 네 컬럼(kind·번호 배열·관측 시각·범위 상한)
+ * 을 하나로 묶어 내보낸다. `Sql.kt`가 `EXCLUDED.draw_numbers_kind` NULL 여부로 축 전체를
+ * 보존/교체한다.
  */
 internal object DrawNumbersKind {
     const val VERIFIED = "VERIFIED"
@@ -132,7 +136,7 @@ internal object DrawNumbersKind {
             is DrawNumberObservation.RangeCheckUnavailable -> observation.numbers
         }
 
-    /** 3 컬럼(kind·번호 배열·관측 시각)을 `startIndex`부터 바인딩하고 다음 free index 를 낸다. */
+    /** 4 컬럼(kind·번호 배열·관측 시각·`OutOfRange` 범위 상한)을 `startIndex`부터 바인딩하고 다음 free index 를 낸다. */
     fun bind(
         statement: PreparedStatement,
         startIndex: Int,
@@ -147,13 +151,12 @@ internal object DrawNumbersKind {
             statement.setNull(index++, Types.ARRAY)
         }
         statement.setNullableTimestamp(index++, observation.observedAt)
+        val validRangeMax = (observation as? DrawNumberObservation.OutOfRange)?.validRange?.last
+        statement.setNullableInt(index++, validRangeMax)
         return index
     }
 
-    fun read(
-        rs: ResultSet,
-        totalReservePriceCandidateCount: Int?,
-    ): DrawNumberObservation {
+    fun read(rs: ResultSet): DrawNumberObservation {
         val kind = rs.getString("draw_numbers_kind") ?: return DrawNumberObservation.NotObserved
         val numbers = readNumberSet(rs)
         val observedAt = requireNotNull(rs.getTimestamp("draw_numbers_observed_at")?.toInstant())
@@ -163,8 +166,8 @@ internal object DrawNumbersKind {
             }
 
             OUT_OF_RANGE -> {
-                val total = requireNotNull(totalReservePriceCandidateCount)
-                DrawNumberObservation.OutOfRange(numbers, 1..total, observedAt)
+                val max = requireNotNull(rs.getInt("draw_numbers_valid_range_max").takeUnless { rs.wasNull() })
+                DrawNumberObservation.OutOfRange(numbers, 1..max, observedAt)
             }
 
             RANGE_CHECK_UNAVAILABLE -> {

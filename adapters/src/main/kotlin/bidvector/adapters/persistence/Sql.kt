@@ -90,7 +90,7 @@ internal object Sql {
         opening_rank_one_kind, opening_rank_one_duplicate_count, opening_rank_one_bidder_name,
         opening_rank_one_bid_amount_won, opening_rank_one_bid_amount_currency, opening_rank_one_bid_rate_fraction,
         opening_rank_one_observed_at,
-        draw_numbers_kind, draw_numbers, draw_numbers_observed_at
+        draw_numbers_kind, draw_numbers, draw_numbers_observed_at, draw_numbers_valid_range_max
         """
 
     const val SELECT_OPENING_RESULT =
@@ -112,7 +112,7 @@ internal object Sql {
             opening_rank_one_kind, opening_rank_one_duplicate_count, opening_rank_one_bidder_name,
             opening_rank_one_bid_amount_won, opening_rank_one_bid_amount_currency, opening_rank_one_bid_rate_fraction,
             opening_rank_one_observed_at,
-            draw_numbers_kind, draw_numbers, draw_numbers_observed_at,
+            draw_numbers_kind, draw_numbers, draw_numbers_observed_at, draw_numbers_valid_range_max,
             observed_at, revision, observation_key
         ) VALUES (
             ?, ?, ?,
@@ -128,7 +128,7 @@ internal object Sql {
             ?, ?, ?,
             ?, ?, ?,
             ?,
-            ?, ?, ?,
+            ?, ?, ?, ?,
             ?, 1, ?
         )
         ON CONFLICT (notice_number, notice_round) DO UPDATE SET
@@ -218,6 +218,9 @@ internal object Sql {
             draw_numbers_observed_at =
                 CASE WHEN EXCLUDED.draw_numbers_kind IS NULL
                      THEN opening_result.draw_numbers_observed_at ELSE EXCLUDED.draw_numbers_observed_at END,
+            draw_numbers_valid_range_max =
+                CASE WHEN EXCLUDED.draw_numbers_kind IS NULL
+                     THEN opening_result.draw_numbers_valid_range_max ELSE EXCLUDED.draw_numbers_valid_range_max END,
             observed_at = EXCLUDED.observed_at,
             revision = opening_result.revision + 1,
             observation_key = EXCLUDED.observation_key,

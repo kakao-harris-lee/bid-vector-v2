@@ -20,11 +20,23 @@
 --       비교해 스스로 낡음을 판정한다(파생 플래그 컬럼을 만들지 않는다).
 --   (2) draw_numbers_* — DrawNumberObservation 을 그대로 편다. kind='RANGE_CHECK_UNAVAILABLE'
 --       은 총예가건수를 몰라 범위 검사를 못 했다는 명시적 결과다(§1.9.7 — 이 오퍼레이션
---       응답에 총예가건수가 없다). 범위(1..total_reserve_price_candidate_count) 는 이미
---       부모에 있는 값(3E 슬롯)에서 재구성하므로 별도로 저장하지 않는다(중복 금지) — 그래서
---       kind='OUT_OF_RANGE' 인 행은 그 재구성이 가능하도록 총예가건수가 함께 있어야 한다
---       (verifier r1 F-3, 아래 `opening_result_draw_numbers_out_of_range_requires_total`).
---       `draw_numbers_observed_at`(F-2) 은 위와 같은 이유의 축별 관측 시각이다.
+--       응답에 총예가건수가 없다). `draw_numbers_observed_at`(F-2) 은 축별 관측 시각이다.
+--
+--       **verifier r2 N-1 뒤 — `draw_numbers_valid_range_max`.** r1 F-3 은 `OutOfRange`
+--       의 `validRange` 를 부모의 `total_reserve_price_candidate_count`(3E 슬롯, 별도
+--       COALESCE 축)에서 읽기 시점에 재구성하고, 그 재구성이 항상 성립하도록 CHECK 로
+--       두 축을 묶었다. 그런데 `INSERT ... ON CONFLICT` 의 CHECK 는 **병합 뒤 행이 아니라
+--       들어오는 제안 tuple** 에 걸린다(PostgreSQL 관용구 실측) — 그래서 부모가 총예가건수를
+--       **이미 갖고 있어도**, 개찰완료 관측이 그 값을 다시 싣지 않으면(관례상 관측하지 않은
+--       축은 안 싣는다, 다른 모든 컬럼이 COALESCE 를 쓰는 이유와 같다) 정상 저장이 거부됐다.
+--       뿌리는 **`OutOfRange` 가 자기 판정 범위를 값으로 나르지 않았다는 것**이다 — 판정에
+--       필요한 정보(총예가건수)를 저장 시점에 다른 축에서 빌려 오려 했다. `OutOfRange` 는
+--       이미 Kotlin 타입에서 `validRange` 를 필수 생성자 인자로 받는다(그 값 없이는
+--       `OutOfRange` 자체를 만들 수 없다) — 저장도 그 값을 **이 축 자신의 컬럼**으로 그대로
+--       실어 tuple 을 자기 완결로 만든다. `validRange.first` 는 1-기반 인덱스라 항상 1이라
+--       저장하지 않는다(중복 금지) — `validRange.last`(위 상한)만 싣는다. 그러면 draw_numbers
+--       축의 다른 컬럼들과 같은 자리(같은 tuple 안)에서 페어가 성립해, 총예가건수가 이
+--       관측에 실려 왔는지 여부와 무관하게 저장이 성립한다.
 -- =============================================================================
 ALTER TABLE opening_result
     ADD COLUMN opening_rank_one_kind TEXT,
@@ -37,6 +49,7 @@ ALTER TABLE opening_result
     ADD COLUMN draw_numbers_kind TEXT,
     ADD COLUMN draw_numbers INT[],
     ADD COLUMN draw_numbers_observed_at TIMESTAMPTZ,
+    ADD COLUMN draw_numbers_valid_range_max INT,
     ADD CONSTRAINT opening_result_opening_rank_one_kind_enum
         CHECK (opening_rank_one_kind IN ('RANK_MISSING', 'RANK_DUPLICATED', 'DETERMINED')),
     -- kind='DETERMINED' 는 bidderName 이 있다는 것과 정확히 동치다(OpeningRankOneBid.bidderName
@@ -63,11 +76,11 @@ ALTER TABLE opening_result
         CHECK ((draw_numbers_kind IS NULL) = (draw_numbers IS NULL)),
     ADD CONSTRAINT opening_result_draw_numbers_observed_at_pair
         CHECK ((draw_numbers_kind IS NULL) = (draw_numbers_observed_at IS NULL)),
-    -- F-3 — OUT_OF_RANGE 는 읽기가 validRange 를 total_reserve_price_candidate_count 에서
-    -- 재구성한다(중복 저장 금지, 위 KDoc). 그 재구성이 항상 성립하도록 저장 시점에 막는다 —
-    -- 저장할 수 있는 상태를 읽을 수 없는 경우를 아예 만들지 않는다.
-    ADD CONSTRAINT opening_result_draw_numbers_out_of_range_requires_total
-        CHECK (draw_numbers_kind <> 'OUT_OF_RANGE' OR total_reserve_price_candidate_count IS NOT NULL);
+    -- verifier r2 N-1 뒤 — kind='OUT_OF_RANGE' 는 이 축 자신의 valid_range_max 컬럼이
+    -- 있다는 것과 정확히 동치다(다른 두 컬럼과 같은 자리, 다른 축을 참조하지 않는다) —
+    -- IS NOT DISTINCT FROM 으로 kind가 NULL 일 때도 이 컬럼이 NULL 이어야 함을 함께 진다.
+    ADD CONSTRAINT opening_result_draw_numbers_valid_range_max_pair
+        CHECK ((draw_numbers_kind IS NOT DISTINCT FROM 'OUT_OF_RANGE') = (draw_numbers_valid_range_max IS NOT NULL));
 
 -- verifier r1 F-1 — 컬럼별 COALESCE 는 opening_rank_one 축의 여섯 값 컬럼(kind 자신 포함)
 -- 사이의 짝을 깨뜨릴 수 있다(예: RankMissing 으로 갱신하면서 이전 Determined 의
@@ -87,4 +100,4 @@ CREATE TRIGGER guard_opening_result_opening_rank_one
 CREATE TRIGGER guard_opening_result_draw_numbers
     BEFORE UPDATE ON opening_result
     FOR EACH ROW EXECUTE FUNCTION guard_existence_and_freshness(
-        'draw_numbers_kind', 'draw_numbers', 'draw_numbers_observed_at');
+        'draw_numbers_kind', 'draw_numbers', 'draw_numbers_observed_at', 'draw_numbers_valid_range_max');

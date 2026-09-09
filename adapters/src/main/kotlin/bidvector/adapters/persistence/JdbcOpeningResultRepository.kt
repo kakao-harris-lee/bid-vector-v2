@@ -213,11 +213,10 @@ private fun ResultSet.toOpeningResult(id: NoticeId): OpeningResult {
         totalReservePriceCandidateCount = getInt("total_reserve_price_candidate_count").takeUnless { wasNull() },
         actualOpeningAt = getTimestamp("actual_opening_at")?.toInstant(),
         // M3/3F ①② — OpeningCompleteAxisCodec.kt 가 왕복을 진다(같은 회피 판단, bind 쪽 참고).
-        // DrawNumbersKind.read 는 OutOfRange 의 validRange 재구성을 위해 이미 위에서 읽은
-        // totalReservePriceCandidateCount 를 그대로 받는다(같은 컬럼 재조회 없음).
+        // verifier r2 N-1 뒤 — DrawNumbersKind.read 는 draw_numbers_valid_range_max 를 자신의
+        // 축 컬럼에서 직접 읽는다(다른 축 값을 빌리지 않는다).
         openingRankOne = OpeningRankOneKind.read(this),
-        drawNumbers =
-            DrawNumbersKind.read(this, getInt("total_reserve_price_candidate_count").takeUnless { wasNull() }),
+        drawNumbers = DrawNumbersKind.read(this),
     )
 }
 

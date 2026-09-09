@@ -121,7 +121,12 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
                     "opening_rank_one_observed_at",
                 ),
             "guard_opening_result_draw_numbers" to
-                listOf("draw_numbers_kind", "draw_numbers", "draw_numbers_observed_at"),
+                listOf(
+                    "draw_numbers_kind",
+                    "draw_numbers",
+                    "draw_numbers_observed_at",
+                    "draw_numbers_valid_range_max",
+                ),
         )
 
     @Test

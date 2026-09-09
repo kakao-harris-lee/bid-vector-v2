@@ -170,6 +170,7 @@ class CleanMigrationTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "draw_numbers_kind", "text", true),
             ColumnSpec("opening_result", "draw_numbers", "ARRAY", true),
             ColumnSpec("opening_result", "draw_numbers_observed_at", "timestamp with time zone", true),
+            ColumnSpec("opening_result", "draw_numbers_valid_range_max", "integer", true),
         )
 
     // M3/3E — 층 B 자식 표(D-3E-2 (a), 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).

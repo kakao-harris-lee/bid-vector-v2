@@ -20,6 +20,7 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import org.postgresql.util.PSQLException
 import java.math.BigDecimal
+import java.sql.Timestamp
 import java.time.Instant
 
 private val T1: Instant = Instant.parse("2026-09-09T00:00:00Z")
@@ -32,7 +33,12 @@ private val T2: Instant = Instant.parse("2026-09-09T01:00:00Z")
  * 가 이 표 전체 컬럼을 스캔해 이미 겸한다.
  *
  * **verifier r1 F-1·F-2·F-3 뒤** — 전이 test 여섯(F-1 회귀 방지, 재검증 명령 그대로) +
- * 낡음 신호 test 하나(F-2) + 저장 시점 거부 test 하나(F-3)를 더한다.
+ * 낡음 신호 test 하나(F-2) + 저장 시점 거부 test 하나(F-3, r2 뒤 아래에서 대체됨)를 더한다.
+ *
+ * **verifier r2 N-1·N-2 뒤** — F-3 의 저장 시점 거부 test 는 그 CHECK 가 다른 축을 참조해
+ * 만든 오검출(N-1)이었음이 드러나 삭제하고, 자기 축 컬럼으로 여전히 성립하는 두 시나리오와
+ * CHECK 자체의 음성 대조로 대체한다. F-1 라운드가 빠뜨린 전이 둘(RankMissing 시작점)도
+ * 더한다(N-2).
  */
 class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
     private val id = NoticeId(NoticeNumber.of("OPENG-20260909-001"), NoticeRound.of("000"))
@@ -133,11 +139,11 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * 범위 밖 — DB 는 번호 원소만 싣고 `validRange`는 이미 부모에 있는
-     * `totalReservePriceCandidateCount`(3E 슬롯)에서 재구성한다(중복 저장 금지).
+     * 범위 밖 — verifier r2 N-1 뒤 `validRange`는 `draw_numbers` 축 자신의 컬럼
+     * (`draw_numbers_valid_range_max`)에 실려 그대로 왕복된다(다른 축을 빌리지 않는다).
      */
     @Test
-    fun `OutOfRange 는 총예가건수에서 validRange 를 재구성해 왕복된다`() {
+    fun `OutOfRange 는 자신의 valid_range_max 컬럼으로 그대로 왕복된다`() {
         val repository = JdbcOpeningResultRepository(dataSource())
         val result =
             OpeningResult(
@@ -271,6 +277,28 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
         requireNotNull(repository.find(id)).openingRankOne shouldBe OpeningRankOneOutcome.RankMissing(T2)
     }
 
+    // verifier r2 N-2 — F-1 라운드가 여섯 전이 중 RankMissing 을 시작점으로 하는 둘을 빠뜨렸다.
+    @Test
+    fun `전이 — RankMissing 에서 Determined 로`() {
+        val repository = JdbcOpeningResultRepository(dataSource())
+        persistRankOne(repository, OpeningRankOneOutcome.RankMissing(T1), T1)
+
+        val theBid = bid("SYN-WINNER")
+        persistRankOne(repository, OpeningRankOneOutcome.Determined(theBid, T2), T2) shouldBe PersistOutcome.Updated(2L)
+
+        requireNotNull(repository.find(id)).openingRankOne shouldBe OpeningRankOneOutcome.Determined(theBid, T2)
+    }
+
+    @Test
+    fun `전이 — RankMissing 에서 RankDuplicated 로`() {
+        val repository = JdbcOpeningResultRepository(dataSource())
+        persistRankOne(repository, OpeningRankOneOutcome.RankMissing(T1), T1)
+
+        persistRankOne(repository, OpeningRankOneOutcome.RankDuplicated(3, T2), T2) shouldBe PersistOutcome.Updated(2L)
+
+        requireNotNull(repository.find(id)).openingRankOne shouldBe OpeningRankOneOutcome.RankDuplicated(3, T2)
+    }
+
     @Test
     fun `전이 — Verified 에서 RangeCheckUnavailable 로`() {
         val repository = JdbcOpeningResultRepository(dataSource())
@@ -323,16 +351,42 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
         verified.observedAt shouldBe T1
     }
 
-    /**
-     * F-3 — `OutOfRange` 는 `validRange` 를 총예가건수에서 재구성한다. 그 값이 없는 채로
-     * 저장되면 읽기가 `IllegalArgumentException` 을 던졌다(구멍). V5 의
-     * `opening_result_draw_numbers_out_of_range_requires_total` CHECK 가 이제 저장
-     * 시점에서 그 조합을 거부한다 — 저장할 수 있는 상태를 읽을 수 없는 경우를 아예 없앤다.
-     */
+    // =========================================================================
+    // verifier r2 N-1 — r1 F-3 의 저장 시점 거부(위 옛 test)는 부모의
+    // `total_reserve_price_candidate_count`(다른 축)를 참조하는 CHECK 로 만들어졌는데,
+    // `INSERT ... ON CONFLICT` 의 CHECK 는 병합 뒤 행이 아니라 들어오는 제안 tuple 에만
+    // 걸려(PostgreSQL 관용구), 부모가 이미 총예가건수를 가진 상태에서도 그 값을 다시 안
+    // 싣는 정상적인 개찰완료 관측(§1.9.7 관례)이 거부됐다. `validRange.last` 를
+    // `draw_numbers` 축 자신의 컬럼(`draw_numbers_valid_range_max`)에 실어 tuple 을 자기
+    // 완결로 만들면 두 시나리오 모두 성립해야 한다.
+    // =========================================================================
+
     @Test
-    fun `F-3 — 총예가건수 없이 OutOfRange 를 저장하려 하면 거부된다`() {
+    fun `N-1 — 부모가 이미 총예가건수를 가진 뒤 재수집이 그 값을 다시 싣지 않아도 OutOfRange 저장이 성공한다`() {
         val repository = JdbcOpeningResultRepository(dataSource())
-        val illegal =
+        val first = OpeningResult(id, null, null, T1, totalReservePriceCandidateCount = 15)
+        repository.persist(first, appendRaw(T1)) shouldBe PersistOutcome.Inserted
+
+        val second =
+            OpeningResult(
+                id,
+                null,
+                null,
+                T2,
+                totalReservePriceCandidateCount = null,
+                drawNumbers = DrawNumberObservation.OutOfRange(setOf(20), 1..15, T2),
+            )
+        repository.persist(second, appendRaw(T2)) shouldBe PersistOutcome.Updated(2L)
+
+        val found = requireNotNull(repository.find(id))
+        found.totalReservePriceCandidateCount shouldBe 15
+        found.drawNumbers shouldBe DrawNumberObservation.OutOfRange(setOf(20), 1..15, T2)
+    }
+
+    @Test
+    fun `N-1 — 총예가건수를 한 번도 실은 적 없는 새 부모 행에도 OutOfRange 저장이 성공한다`() {
+        val repository = JdbcOpeningResultRepository(dataSource())
+        val result =
             OpeningResult(
                 id,
                 null,
@@ -342,6 +396,39 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
                 drawNumbers = DrawNumberObservation.OutOfRange(setOf(20), 1..15, T1),
             )
 
-        shouldThrow<PSQLException> { repository.persist(illegal, appendRaw(T1)) }
+        repository.persist(result, appendRaw(T1)) shouldBe PersistOutcome.Inserted
+
+        val found = requireNotNull(repository.find(id))
+        found.totalReservePriceCandidateCount shouldBe null
+        found.drawNumbers shouldBe DrawNumberObservation.OutOfRange(setOf(20), 1..15, T1)
+    }
+
+    /**
+     * N-1 음성 대조 — Kotlin 타입은 `OutOfRange` 생성자에서 `validRange` 를 필수로 받아
+     * 이 편이 성립하지 않는 상태를 만들 수 없다(그래서 repository.persist 경로로는 이
+     * 시나리오를 재현할 수 없다). `opening_result_draw_numbers_valid_range_max_pair`
+     * CHECK 자체가 여전히 그 조합을 막고 있음을 직접 SQL 로 확인한다.
+     */
+    @Test
+    fun `N-1 음성 대조 — draw_numbers_valid_range_max 없이 OUT_OF_RANGE 를 직접 SQL로 저장하려 하면 거부된다`() {
+        val observationKey = appendRaw(T1)
+
+        shouldThrow<PSQLException> {
+            dataSource().connection.use { connection ->
+                connection
+                    .prepareStatement(
+                        "INSERT INTO opening_result (notice_number, notice_round, observed_at, revision, " +
+                            "observation_key, draw_numbers_kind, draw_numbers, draw_numbers_observed_at) " +
+                            "VALUES (?, ?, ?, 1, ?, 'OUT_OF_RANGE', ARRAY[20], ?)",
+                    ).use { statement ->
+                        statement.setString(1, id.number.value)
+                        statement.setString(2, id.round.value)
+                        statement.setTimestamp(3, Timestamp.from(T1))
+                        statement.setString(4, observationKey.value)
+                        statement.setTimestamp(5, Timestamp.from(T1))
+                        statement.executeUpdate()
+                    }
+            }
+        }
     }
 }
