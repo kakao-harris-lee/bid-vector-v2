@@ -310,3 +310,29 @@
   failures="0"`(4B-2 rollback 전후 무변화 — `fixtures/manifest.yaml`은
   이 slice가 만지지 않음).
 - 임시 clone `rm -rf`로 정리.
+
+## 2026-09-10T12:00Z — 수정 라운드 3(재작업 3/5) — L-1·L-2
+- verifier 재검증 r3 판정 `ready-for-review`(`_workspace/m4-4b2/05_verifier_report_r3.md`),
+  산출물층 blocker/high 0.
+- L-1: 알려진 제한 항목 10 등재(결함 아님, checklist.md).
+- L-2: `LadderPolicySlot.kt`에 형제 `VerdictLadderPolicyData`와 같은 `[0,1]` 범위
+  생성 불변식 셋 추가, `LadderPolicySlotTest.kt` 신설.
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin
+  :workflow:test --tests '*LadderPolicySlotTest*'` — exit 0(3 tests, 0 failed).
+- cmd: `./gradlew --no-daemon :workflow:ktlintFormat` — exit 0(1차 시도에서
+  `LadderPolicySlotTest.kt` 줄바꿈 위반, 자동 정렬로 시정).
+- **mutation 실측(L-2 회귀 보호)**: `init` 블록의 범위 `require`를 `require(true)`로
+  치환 — cmd `./gradlew --no-daemon :workflow:test --tests '*LadderPolicySlotTest*'`
+  — exit 1 — **정확히 2건**(`세 임계 중 하나라도 0 미만이면 거부된다`·`세 임계 중
+  하나라도 1 초과면 거부된다`) 실패, 경계 포함 test는 그대로 통과. mutation 되돌린
+  뒤 `diff`로 원본과 byte-identical 확인, 재실행 — exit 0.
+- cmd: `./gradlew --no-build-cache clean check` — **exit 1**(1차, ktlint 위반) →
+  ktlintFormat 뒤 재실행 exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test` — exit 0.
+- cmd: `./gradlew --no-daemon :app:test`(별도 호출) — exit 0 —
+  `SharedKernelCorpusConformanceTest tests="86" failures="0"`(무변화).
+- cmd: `./gradlew --no-daemon qualityBaseline` — exit 0.
+- cmd: `git status --porcelain` — `reports/evidence/m4/4b2/{checklist,commands}.md`·
+  `workflow/src/main/kotlin/.../LadderPolicySlot.kt`(M)·
+  `workflow/src/test/kotlin/.../LadderPolicySlotTest.kt`(신규)만, scope.md in_scope와
+  일치.

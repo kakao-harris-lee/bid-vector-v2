@@ -197,6 +197,17 @@ D-2는 `NoticeStatus`, D-9는 `LicenseVerdict.Ineligible`)은 그대로 싣고, 
    (`reports/evidence/harness/test-discovery-guard/commands.md:100`·
    `reports/evidence/m4/4b1/checklist.md:204,234`) 다 이 slice의 in_scope 밖(닫힌
    하네스 레인·4B-1 자신의 evidence)이라 고치지 않는다.
+10. **`LadderPolicySlot`을 조립 바깥에서 조작해도 `StrategyRepository` 하나만
+    조작하는 것과 같은 최종 상태에 닿는다(수정 라운드 3 L-1, 결함 아님으로 종결)** —
+    port는 설계상 배선 주체의 입력이라 슬롯 조작이 **없던 권한을 새로 주는 것이
+    아니다**(H-1과 다른 경우 — H-1은 판정 자체를 다른 값으로 대체할 수 있었다,
+    이건 판정에 들어가는 **입력값**을 누가 고르는가일 뿐). 두 경로 모두 **쓴 임계가
+    `EvaluationDropReason`/`BidNowReason`에 그대로 실린다**(`threshold=0`처럼 조작이
+    자기서술적) — 승인의 실효는 「배선을 누가 쓰는가 + 결과가 쓴 값을 나르는가」로
+    지켜지고 둘 다 성립한다. `OPEN-4B1-LADDER-THRESHOLDS`(운영 값 승인 대기, 항목 4)
+    와는 별개 축이다 — 그 OPEN은 「어떤 값이 맞는가」이고 이 항목은 「그 값이 조립
+    바깥에서 바뀔 수 있는가」다. 후자는 L-2(같은 라운드)의 생성 불변식이 범위만
+    막고 「누가 값을 고르는가」는 막지 않는다는 것도 이 항목의 범위다.
 
 ## 수정 라운드 2(재작업 2/5) — H-1
 
@@ -251,3 +262,46 @@ verifier 표적 재검증 판정 **not-ready**, 산출물층 high 1건. **이 hi
 하나를 뺀 좁힌 버전**이다. 다른 파일(포트·값 타입 등)은 이번 라운드에서 무변경.
 
 정본은 `reports/evidence/m4/4b2/rollback.md`.
+
+## 수정 라운드 3(재작업 3/5) — L-1·L-2
+
+verifier 재검증 r3 판정 `ready-for-review`(`_workspace/m4-4b2/05_verifier_report_r3.md`),
+산출물층 blocker/high 0. **H-1 폐쇄 확인** — `judge = ...` 주입은 여전히
+`it is internal`로 거부되고, 좁히면서 계수 능력을 잃지 않았다(두 번 호출 변이에
+정확히 1건 빨개짐). 표면 점검도 재확인됐다(신설 보조 생성자의 열한 매개변수가
+전부 이미 public이던 것). L-1은 위 「알려진 제한」 항목 10으로 등재(결함 아님).
+
+### L-2 — `LadderPolicySlot`만 생성 불변식이 없었다
+
+형제 `VerdictLadderPolicyData`(`decision` 모듈)는 다섯 임계 전부에 `[0,1]` 범위
+불변식과 `reviewThreshold <= bidNowThreshold` 순서 불변식을 생성 시점에 강제한다.
+`LadderPolicySlot`은 그 형제의 나머지 세 축(`capacityHoldPriorityThreshold`·
+`forceBidProbabilityThreshold`·`forceBidMatchedThreshold`)을 담는데 `require`가
+하나도 없었다 — 실패 지점이 조립부가 아니라 `VerdictLadder.judge`(판정부)로
+밀렸다.
+
+**시정**: `LadderPolicySlot`의 `init` 블록에 형제와 같은 `[0,1]` 범위 불변식
+셋을 추가했다. 순서 불변식(`reviewThreshold <= bidNowThreshold`)은 대응하지
+않는다 — 이 슬롯의 세 필드는 `VerdictLadder.judge`에서 서로 다른 입력 축
+(priority·probability·matched)과 각각 비교되고 그 셋 사이에는 순서 관계가
+없다(`VerdictLadder.kt` 분기 1 `capacityHoldOutcome`·분기 2(b)
+`forceBidOutcome` — 셋이 같은 비교식에 함께 등장하지 않는다). 형제보다 느슨하지
+않다(같은 범위 축을 그대로 옮겼을 뿐 축을 하나도 빼지 않았다) — 다만 형제에게
+있는 순서 축은 이 슬롯에 대응 필드가 없어 옮길 대상 자체가 없다.
+
+**mutation 실측**(M3/3C N-1 계보, 4B-1 M-2와 같은 처방): `init` 블록의
+`require(value >= THRESHOLD_MIN && value <= THRESHOLD_MAX) { ... }`를
+`require(true)`로 바꿔 넣고 —
+`./gradlew --no-daemon :workflow:test --tests '*LadderPolicySlotTest*'` — **exit
+1** — 정확히 2건(`세 임계 중 하나라도 0 미만이면 거부된다`·`세 임계 중 하나라도
+1 초과면 거부된다`) 실패, 경계 포함 test(`0 과 1 은 경계 포함으로 허용된다`)는
+그대로 통과(원래도 예외를 기대하지 않는 test라 mutation과 무관 — 계수의
+정확성). mutation을 되돌린 뒤 `diff`로 원본과 byte-identical 확인, 재실행
+exit 0.
+
+**신설 test**: `LadderPolicySlotTest.kt`(형제 `VerdictLadderPolicyDataTest`
+골격 재사용 — 범위 경계 셋, 하한 미만·상한 초과·경계 포함).
+
+정본은 `reports/evidence/m4/4b2/rollback.md`(파일 목록 무변화 — 이 라운드는
+기존 파일 하나 편집 + 신규 test 파일 하나, `LadderPolicySlot.kt`는 이미 rollback
+목록에 있고 `LadderPolicySlotTest.kt`는 목록을 다시 내야 한다).
