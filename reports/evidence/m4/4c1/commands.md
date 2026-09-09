@@ -199,3 +199,69 @@ L-2(알려진 제한 등재) · B-1~B-3(장부층, 이 절 및 scope.md·rollbac
 - cmd: `git log --oneline 4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599..HEAD -- CLAUDE.md .claude/`
 - exit: 0 — 1건(`de99ddb`). **B-2 확인** — rollback.md 머리말이 「0건」이라 적었던 것을
   scope.md와 같은 값(1건)으로 통일했다.
+
+## 2026-09-09T11:20Z — 커밋(H-1/L-3/M-1/L-1/L-2/B-1~B-3 시정, head `7469bce`)
+- cmd: `git add <in_scope 경로 12개 개별 인자> && git commit -m ... -- <같은 경로>`
+- exit: 0 — 12 files changed(350 insertions·62 deletions). 4B-1 경로(`decision/**`·
+  `fixtures/verdict-*`·`app/.../VerdictExecutors.kt`)는 포함하지 않았다(팀장 지시 —
+  두 slice 를 한 커밋에 섞지 않는다) — `git status --porcelain` 커밋 직후 clean, 이후
+  4B-1 흔적 0건 확인.
+
+## 2026-09-09T11:22Z — S-0(임시 clone, `7469bce`에 pin)
+- cmd: `git clone --quiet --no-hardlinks <repo> "$d/repo" && (cd "$d/repo" && git checkout
+  --quiet 7469bce) && (cd "$d/repo" && ./gradlew --no-build-cache clean check)`
+- exit: 0 — `BUILD SUCCESSFUL in 46s`, 353 actionable tasks 전부 executed(캐시 없는 임시
+  clone, `7469bce` 고정).
+
+## 2026-09-09T11:25Z — 값 획득 축 재실측(H-1 재작업) — 위조 8형태 전부 거부(restore·OutboxEntry 포함)
+- cmd: 위 clone(`7469bce`)의 `app/src/test/kotlin/bidvector/app/verifyprobe/`에 여덜
+  형태(① `EventEnvelope` 직접 생성자 ② `.copy(...)` ③ **`EventEnvelope.restore(...)`
+  (H-1 핵심 — 이번 라운드에서 internal)** ④ `newEnvelope` ⑤ `forStrategyUpdated`
+  ⑥ `transitionOutbox` ⑦ `OutboxTransition.ToDelivered` 직접 생성자 ⑧ **`OutboxEntry`
+  직접 생성자(L-3)**)를 한 파일에 심고 `./gradlew --no-daemon :app:compileTestKotlin`
+- exit: 1(여덜 형태 전부) — 핵심 결과(원문 그대로): `③ Cannot access 'fun <P>
+  restore(...)': it is internal in 'bidvector.workflow.event.EventEnvelope.Companion'`·
+  `⑧ Cannot access 'constructor(id: OutboxEntryId, envelope: EventEnvelope<*>, state:
+  OutboxEntryState): OutboxEntry': it is internal in 'bidvector.workflow.event.
+  OutboxEntry'` — 나머지 여섯도 각각 `it is internal in file`/`it is internal in
+  '...'`로 거부. **H-1이 지목한 구멍(③)이 이번엔 다섯 형태 목록에 포함돼 있고, 실제로
+  거부됨을 확인했다.**
+- 양성 대조: probe 디렉터리 삭제 뒤 `./gradlew --no-daemon :app:compileTestKotlin
+  :workflow:test :app:test --tests '*Conformance*'` — exit 0(`BUILD SUCCESSFUL`, 정상
+  배선·corpus 74 tests 무영향). probe는 커밋하지 않았다.
+
+## 2026-09-09T11:30Z — rollback 5단계 실측(같은 clone, `7469bce`) — 공유 파일 셋 줄 단위(M-1 시정 실제 적용)
+- cmd: A 항목(21개) + M 중 4C-1 전용 넷(+4a/scope.md)을 `git restore --source=4ec4e504...`
+  로 전체 복원. 공유 파일 셋(`gate-tests.properties`·`data-dictionary.md`·
+  `capability-map.md`)은 **파일 전체 restore를 쓰지 않고**, 4C-1이 넣은 블록/행만 base
+  형태로 텍스트 교체(Python 스크립트, hunk 경계가 물리적으로 분리돼 있어 안전 — rollback.md
+  §「공유 파일」 표 참고)했다.
+- exit: 0(전 단계) — ① `git status --porcelain` **D 21 · M 8**(rollback.md 목록과 일치)
+  ② 공유 파일 확인: `gate-tests.properties`의 `gate.tests.workflow`에 `event.*` 매치
+  0건(4C-1 몫 제거) + `gate.tests.decision` 8개 class **그대로**(4B-1 몫 보존) ·
+  `data-dictionary.md` §2.2.5가 「어휘 자리만 둔다」 placeholder로 복귀 + §3.6(4B-1)
+  **그대로** · `capability-map.md`의 `OPEN-OPS-10` 행이 원래 형태로 복귀 +
+  `OPEN-DIC-03` 행(4B-1) **그대로** ③ 신규 디렉터리 잔여 파일 0건 ④ `./gradlew
+  --no-daemon :workflow:compileKotlin :decision:compileKotlin :app:compileTestKotlin`
+  exit 0(`BUILD SUCCESSFUL`, 29 actionable tasks — **`:decision:compileKotlin`이 여전히
+  성공한다는 것 자체가 4B-1 무영향의 증거**) ⑤ `./gradlew --no-daemon :workflow:test
+  :decision:test :app:test --tests '*Conformance*'` exit 0(`BUILD SUCCESSFUL`, 37
+  actionable tasks — `:decision:test`도 초록).
+- clone 삭제(`rm -rf`), 되돌리지 않은 원 worktree에는 영향 없음.
+
+## 2026-09-09T11:35Z — secret 스캔 재확인
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4c1/ --exclude=commands.md --exclude=checklist.md`
+- exit: 1(매치 없음).
+
+## 2026-09-09T11:36Z — clean-tree 게이트(경로 개별 인자, 양성 대조 포함, `git checkout --` 미사용)
+- cmd: `git status --porcelain -- <in_scope 경로 12개 개별 인자>`
+- exit: 0, 출력 없음(구현 커밋 `7469bce` 대상).
+- 양성 대조: `workflow/src/main/kotlin/bidvector/workflow/event/ClaimedOutboxRow.kt`
+  (이 시점 클린)에 개행 한 줄 추가 → `M` 관측(exit 0, 비어있지 않음) → `head -n`으로
+  추가한 줄만 절삭(`git checkout --` 미사용) → 재확인(비어있음, exit 0). 실측 완료.
+
+## 2026-09-09T11:38Z — 하네스 레인 변경 재확인(수정 라운드 1 완료 시점)
+- cmd: `git log --oneline 4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599..HEAD -- CLAUDE.md .claude/`
+- exit: 0 — **2건**(`de99ddb`·`ea79355`, 1건 추가) — `scope.md`·`rollback.md` 양쪽에
+  반영해 두 문서의 건수를 통일했다(verifier B-2 재발 방지 — 매 라운드 리뷰 요청 시점에
+  이 명령을 다시 돌리고 두 문서를 함께 갱신한다).

@@ -2,8 +2,8 @@
 
 **되돌림은 range revert가 아니라 in_scope 경로 한정이다**(evidence-pack 스킬,
 2026-09-04 개정). 하네스 경로(`CLAUDE.md`·`.claude/**`)는 되돌리지 않는다 — 이 slice의
-하네스 레인 변경은 **1건**이다(`de99ddb`, `scope.md` 「하네스 레인 변경」 절 참고 —
-이전 판이 이 rollback.md에 「0건」이라 적어 그 절과 어긋났다, verifier B-2 정정).
+하네스 레인 변경은 **2건**이다(`de99ddb`·`ea79355`, `scope.md` 「하네스 레인 변경」 절
+참고 — 이전 판이 이 rollback.md에 「0건」이라 적어 그 절과 어긋났다, verifier B-2 정정).
 
 ## 신규 파일(A) — 전체 삭제로 되돌린다
 

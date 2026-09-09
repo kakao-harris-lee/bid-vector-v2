@@ -84,6 +84,11 @@ rollback: |
   신설, `reports/evidence/m4/4b1/scope.md` 만 추가)도 있으나 이건 하네스 경로가 아니라
   다음 slice 의 계약 파일이라 이 절의 대상이 아니다(별도 slice, 이 구현자가 손대지
   않았다).
+- **수정 라운드 1(구현 완료, 2026-09-09) 재확인 — 2건**(1건 추가): 위 `de99ddb`에
+  `ea79355 harness(v2-slice-pipeline): (2b) 의 「경계로 처리」 행도 실측 대상으로`
+  (`.claude/skills/v2-slice-pipeline/SKILL.md`·`CLAUDE.md`, `git show --stat` 실측)가
+  더해졌다 — 4B-1 구현·evidence 커밋 사이에 다른 세션(팀장)이 붙인 하네스 개정이다.
+  같은 이유로 slice 산출물이 아니며 in_scope 밖, rollback 대상이 아니다.
 - rollback 은 in_scope 경로 한정이라 하네스 경로를 되돌리지 않는다.
 
 ---
