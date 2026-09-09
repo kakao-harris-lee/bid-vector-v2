@@ -98,6 +98,11 @@
 - exit: 0
 - 핵심 결과: 전 모듈 통과.
 
+## S-0 (격리 worktree, HEAD 08aa4ea)
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)`
+- exit: 0
+- 핵심 결과: 353 actionable tasks 전건 실행, BUILD SUCCESSFUL. worktree 제거 확인(`git worktree remove --force`).
+
 ## rollback 실측(임시 clone) — rollback.md 참고
 - cmd: `git clone . /tmp/4d1-rollback-verify && git checkout a96c53c`
 - exit: 0
