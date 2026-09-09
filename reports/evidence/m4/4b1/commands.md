@@ -25,8 +25,10 @@
 
 ## 2026-09-09T09:45Z — clean check 1차(ktlint·detekt)
 - cmd: `./gradlew --no-build-cache clean check`
-- exit: 1 — ① `VerdictExecutors.kt:77` MaxLineLength(ktlint) ② `decision:detekt` —
-  `VerdictLadder.judge` 6 return(한도 2, `ReturnCount`).
+- exit: 1 — ① `VerdictExecutors.kt`의 `bidNowReasonProjection`(`PriorityAboveBidNowThreshold`
+  분기) MaxLineLength(ktlint, verifier B-4 정정 — 이 slice 가 만든 파일의 줄 번호는
+  낡는 좌표라 절 제목·인용문으로 가리킨다) ② `decision:detekt` — `VerdictLadder.judge`
+  6 return(한도 2, `ReturnCount`).
 - 수정: ① `:decision:ktlintFormat`·`:app:ktlintFormat` ② `judge`를 4A `apply()` 관례대로
   guard 함수 체인(`capacityHoldOutcome`·`priorityBidNowOutcome`·`forceBidOutcome`·
   `reviewBandOutcome`, `?:` 연쇄)으로 재구성 — return 2개(초기 priority 가드 + 체인)로.
@@ -130,3 +132,26 @@
 - 양성 대조: `decision/src/main/kotlin/bidvector/decision/LadderInput.kt`(이 시점 클린)에
   개행 한 줄 추가 → `M` 관측(exit 0, 비어있지 않음) → `head -n`으로 추가한 줄만 절삭(4A
   사고 이후 채택한 안전한 방식 — `git checkout --` 미사용) → 재확인(비어있음, exit 0).
+
+## 2026-09-09T11:00Z — 수정 라운드 1(corpus 분류·장부층, 코드 무변경) — manifest 편집 뒤 전건 재확인
+- `verdict-005`~`012`의 `verified_paths`를 승인된 어휘까지만 잠그도록 좁혔다(§3a).
+  `verdict-001~004` 승격은 시도했으나 dispatch 완전성 test와 충돌해 되돌렸다(§3a·
+  checklist.md 알려진 제한 7·10).
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0 — `BUILD SUCCESSFUL in 33s`, 344 actionable tasks(320 executed·24 up-to-date).
+- cmd: `./gradlew --no-daemon :app:test`(필터 없이 전건 — 필터 실행 뒤 `gateExecutionGate`가
+  거짓 실패를 내는 함정을 피한다, 4C-1 라운드에서 발견한 그 이유)
+- exit: 0 — `SharedKernelCorpusConformanceTest`: `tests="82" failures="0" errors="0"`
+  (`app/build/test-results/test/TEST-bidvector.app.conformance.SharedKernelCorpusConformanceTest.xml`
+  실측). **conformance 82 유지 확인.**
+- cmd: `./gradlew --no-daemon :app:gateExecutionGate :decision:test
+  :decision:domainApiTypeGate :decision:domainSourceReferenceGate
+  :decision:moduleDependencyGate :decision:sizeGate :decision:cpdCheck qualityBaseline`
+- exit: 0(전부 UP-TO-DATE — 위 두 명령이 이미 관련 산출물을 최신화).
+
+## 2026-09-09T11:05Z — secret 스캔 재실행(수정 라운드 반영 파일)
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+  reports/evidence/m4/4b1/ fixtures/manifest.yaml --exclude=commands.md --exclude=checklist.md`
+- exit: 0(매치 6건, 전부 `fixtures/manifest.yaml`의 `token`/`token_alignment` — M1 계약
+  결속 도메인 어휘, 이 slice가 만든 줄이 아니다·자격증명 아님, 육안 확인). 실 비밀값
+  패턴(`api_key`·`secret`·`password`·`Bearer `·PEM 헤더) 매치 0건.

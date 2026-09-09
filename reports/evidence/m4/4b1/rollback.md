@@ -71,10 +71,15 @@ commands.md에 실행 결과를 한 줄씩 남긴다:
 2. 공유 파일 4종의 diff가 4C-1 몫만 남고 이 slice 몫은 사라짐(`grep`으로 `verdict`·
    `Verdict` 관련 줄 부재 확인).
 3. 신규 파일 삭제 뒤 `git status --porcelain`이 목록과 일치.
-4. 되돌린 트리에서 **모듈별 compile**이 exit 0 — `:workflow:compileKotlin
-   :app:compileTestKotlin`(decision 모듈 자체는 4C-1 시점에 이미 있었으므로 별도
-   컴파일 확인 불필요 — 이 slice가 추가한 파일만 사라지면 된다).
-5. 되돌린 트리의 **test**가 초록 — `:workflow:test :app:test --tests '*Conformance*'`.
+4. 되돌린 트리에서 **모듈별 compile**이 exit 0 — `:decision:compileKotlin
+   :app:compileTestKotlin`. **정정(verifier B-5)** — 이전 판은 "decision 모듈 자체는
+   4C-1 시점에 이미 있었으므로 별도 컴파일 확인 불필요"라 적었으나 틀렸다: `decision`
+   모듈 **자체가 4B-1 신설**이라(4C-1 시점엔 `ProvenanceRules`·`FloorShortfallKernel`
+   뿐이었다) 이 slice가 추가한 13개 소스가 전부 삭제되는 되돌림에서 `:decision:
+   compileKotlin`이 여전히 성공하는지(남은 1D 소스만으로 모듈이 정상 컴파일되는지)를
+   반드시 실측해야 한다(M3/3B-2 교훈 — exit 0 만으로는 부족, compile까지 재야 한다).
+5. 되돌린 트리의 **test**가 초록 — `:decision:test :workflow:test :app:test --tests
+   '*Conformance*'`.
 
 ## 되돌린 뒤 남는 것
 

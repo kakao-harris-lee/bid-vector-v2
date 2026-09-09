@@ -8275,7 +8275,6 @@ cases:
         priority 가 bidNowThreshold 이상이면 BidNow(PriorityAboveBidNowThreshold) — probability·matched 부재라도 priority 단독으로 이미 확정된다.
     verified_paths:
       - "$.verdict"
-      - "$.reasons"
     source:
       kind: operator-decision
       reference: |-
@@ -8309,7 +8308,13 @@ cases:
     expected_sha256: 874a3586850df904269c3e255b84c6776e5be232d93231a23f5d23ce304b72d6
     not_covered: |-
       임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
-      legacy-behavior 값으로 구조만 잰다).
+      legacy-behavior 값으로 구조만 잰다). **reason 타입 이름과 그 payload 필드 구성(임계 수
+      포함)** — 운영자 결정 2026-09-09(verifier H-1 시정)로 `verified_paths` 에서 뺐다.
+      승인 문서·결정 기록·이 slice 계약 어디에도 `PriorityAboveBidNowThreshold`·
+      `ForceBidOverride`·`PriorityInReviewBand`·`ScoreNotProvided` 같은 구체 이름이 없다 —
+      §3.6 이 정하는 것은 `Verdict`·`SkipReason` 축뿐이다. 이 축은 `:decision:test`
+      (`VerdictLadderTest`·`VerdictLadderPropertyTest`)가 계속 진다 — corpus 가 값을
+      잠그지 않을 뿐 커버리지를 잃지 않는다.
     contract_binding:
       type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
       fixed_by: |-
@@ -8332,7 +8337,6 @@ cases:
         force-bid 우회 — priority 는 review 밴드 안이지만 probability·matched 가 각자 임계 이상이면 BidNow(ForceBidOverride). 우회의 출처가 결과에 실린다(OPEN-STR-03).
     verified_paths:
       - "$.verdict"
-      - "$.reasons"
     source:
       kind: operator-decision
       reference: |-
@@ -8366,7 +8370,13 @@ cases:
     expected_sha256: 5d9fad5d1a729809b3903435c6b02ae19caba18717ccc99077e082f9e050abc7
     not_covered: |-
       임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
-      legacy-behavior 값으로 구조만 잰다).
+      legacy-behavior 값으로 구조만 잰다). **reason 타입 이름과 그 payload 필드 구성(임계 수
+      포함)** — 운영자 결정 2026-09-09(verifier H-1 시정)로 `verified_paths` 에서 뺐다.
+      승인 문서·결정 기록·이 slice 계약 어디에도 `PriorityAboveBidNowThreshold`·
+      `ForceBidOverride`·`PriorityInReviewBand`·`ScoreNotProvided` 같은 구체 이름이 없다 —
+      §3.6 이 정하는 것은 `Verdict`·`SkipReason` 축뿐이다. 이 축은 `:decision:test`
+      (`VerdictLadderTest`·`VerdictLadderPropertyTest`)가 계속 진다 — corpus 가 값을
+      잠그지 않을 뿐 커버리지를 잃지 않는다.
     contract_binding:
       type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
       fixed_by: |-
@@ -8389,7 +8399,6 @@ cases:
         priority 가 reviewThreshold 이상 bidNowThreshold 미만이고 force-bid 가 확정적으로 거짓이면 Review(PriorityInReviewBand).
     verified_paths:
       - "$.verdict"
-      - "$.reasons"
     source:
       kind: operator-decision
       reference: |-
@@ -8423,7 +8432,13 @@ cases:
     expected_sha256: 5df94427de8edb07dde62e81c462d0602bcf0b276d59658410f01706b804a2aa
     not_covered: |-
       임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
-      legacy-behavior 값으로 구조만 잰다).
+      legacy-behavior 값으로 구조만 잰다). **reason 타입 이름과 그 payload 필드 구성(임계 수
+      포함)** — 운영자 결정 2026-09-09(verifier H-1 시정)로 `verified_paths` 에서 뺐다.
+      승인 문서·결정 기록·이 slice 계약 어디에도 `PriorityAboveBidNowThreshold`·
+      `ForceBidOverride`·`PriorityInReviewBand`·`ScoreNotProvided` 같은 구체 이름이 없다 —
+      §3.6 이 정하는 것은 `Verdict`·`SkipReason` 축뿐이다. 이 축은 `:decision:test`
+      (`VerdictLadderTest`·`VerdictLadderPropertyTest`)가 계속 진다 — corpus 가 값을
+      잠그지 않을 뿐 커버리지를 잃지 않는다.
     contract_binding:
       type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
       fixed_by: |-
@@ -8446,7 +8461,6 @@ cases:
         priorityScore 가 결측이면 probability·matched 가 force-bid 임계를 만족해도 Review(MlUnavailable) — 부재에서 BidNow 로 가는 경로가 타입에 없다(D-M4-6).
     verified_paths:
       - "$.verdict"
-      - "$.reasons"
     source:
       kind: operator-decision
       reference: |-
@@ -8480,7 +8494,16 @@ cases:
     expected_sha256: 70fc5859c55bb6f7553c7435b5f4d4476564d7aacf828330b84d293f4931bd57
     not_covered: |-
       임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
-      legacy-behavior 값으로 구조만 잰다).
+      legacy-behavior 값으로 구조만 잰다). **reason 타입 이름과 그 payload 필드 구성(임계 수
+      포함)** — 운영자 결정 2026-09-09(verifier H-1 시정)로 `verified_paths` 에서 뺐다.
+      승인 문서·결정 기록·이 slice 계약 어디에도 `PriorityAboveBidNowThreshold`·
+      `ForceBidOverride`·`PriorityInReviewBand`·`ScoreNotProvided` 같은 구체 이름이 없다 —
+      §3.6 이 정하는 것은 `Verdict`·`SkipReason` 축뿐이다. 이 축은 `:decision:test`
+      (`VerdictLadderTest`·`VerdictLadderPropertyTest`)가 계속 진다 — corpus 가 값을
+      잠그지 않을 뿐 커버리지를 잃지 않는다. **ML 부재의 두 번째 형태**(priority 는 있고
+      probability·matched 만 결측)는 이 case 가 덮지 않는다 — 이 case 는 priority 자체가
+      결측인 첫 번째 형태만 잰다. 두 번째 형태는 `VerdictLadderTest`·
+      `VerdictLadderPropertyTest`(단위 test 층)가 진다(verifier §9 표적 3).
     contract_binding:
       type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
       fixed_by: |-
@@ -8560,10 +8583,6 @@ cases:
         개연 밴드 밖 운영자 하한 override 는 버리지도 통과시키지도 않고 사유와 함께 거부된다(OPEN-DEC-04).
     verified_paths:
       - "$.overrideOutcome"
-      - "$.reasonCode"
-      - "$.silentlyDropped"
-      - "$.silentlyAccepted"
-      - "$.observableInResult"
     source:
       kind: operator-decision
       reference: |-
@@ -8597,7 +8616,14 @@ cases:
     expected_sha256: 85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9
     not_covered: |-
       임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
-      legacy-behavior 값으로 구조만 잰다).
+      legacy-behavior 값으로 구조만 잰다). **`reasonCode` 리터럴(`OverrideOutsidePlausibilityBand`)
+      과 `silentlyDropped`·`silentlyAccepted`·`observableInResult` 세 필드** — 운영자 결정
+      2026-09-09(verifier H-1·L-3 시정)로 `verified_paths` 에서 뺐다. 앞은 승인 문서·결정
+      기록 어디에도 없는 구현 리터럴이고, 뒤 셋은 이 실행자의 두 분기(Accepted/Rejected)
+      모두에서 상수라 실패할 수 없는 필드였다(verifier L-3). `overrideOutcome` 한 비트가
+      실질 검증이고 그것은 `FloorOverrideValidationTest`가 단위 test 층에서, 이 case 가
+      corpus 층에서 함께 진다. override **수용**(밴드 안) 경로는 이 case 가 덮지 않는다
+      (`:decision:test`의 `FloorOverrideValidationTest`가 진다).
     contract_binding:
       type_path: "bidvector.decision.FloorOverrideValidation.validate(BigDecimal, PlausibilityBand): FloorOverrideOutcome"
       fixed_by: |-
