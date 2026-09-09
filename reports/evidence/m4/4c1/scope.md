@@ -71,7 +71,14 @@ rollback: |
 `git log --oneline 4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599..HEAD -- CLAUDE.md .claude/`
 
 - 착수 시점: **없음**(base == HEAD). base 는 4A 종결 기록 뒤이므로 4A 범위의 하네스 커밋(`97d746d` Phase 2.5 (2b) 신설)은 이 range 밖이다.
-- 리뷰 요청 시점에 이 절을 갱신한다. rollback 은 in_scope 경로 한정이라 하네스 경로를 되돌리지 않는다.
+- **리뷰 요청 시점(구현 완료, 2026-09-09) 재확인 — 1건**: `de99ddb harness(evidence-pack):
+  양성 대조에서 git checkout -- 금지, 비파괴 절삭으로`(`.claude/skills/evidence-pack/SKILL.md`·
+  `CLAUDE.md`). 이 slice 의 산출물 커밋(`13cf0f6`) **이후**, 다른 세션(팀장)이 붙인 하네스
+  개정이다 — slice 산출물이 아니며 in_scope 밖, rollback 대상이 아니다. 같은 range 에
+  `4e07682`(4B-1 slice 계약 신설, `reports/evidence/m4/4b1/scope.md` 만 추가)도 있으나 이건
+  하네스 경로가 아니라 다음 slice 의 계약 파일이라 이 절의 대상이 아니다(별도 slice, 이
+  구현자가 손대지 않았다).
+- rollback 은 in_scope 경로 한정이라 하네스 경로를 되돌리지 않는다.
 
 ---
 

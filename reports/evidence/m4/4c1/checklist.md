@@ -11,7 +11,8 @@
       (golden-manifest.json N/A). 정책 데이터 신설도 없다(outbox timeout/재시도 예산은
       4C-1이 만들지 않는다, 계약 ⑤).
 - [x] 알려진 제한과 rollback 방법이 기록됨(아래 「알려진 제한」·`rollback.md`).
-- [x] secret 스캔 통과 — 매치 0(commands.md).
+- [x] secret 스캔 통과 — 실 매치 0(자기참조 1건은 이 문장 자신이 패턴에 걸린 것,
+      commands.md 「secret 스캔」 절 참고).
 
 ## 이 slice 고유 확인
 

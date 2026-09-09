@@ -23,7 +23,7 @@ git diff --name-status 4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599..HEAD -- \
   reports/evidence/m4/4c1
 ```
 
-결과(커밋 뒤 재실행 값, commands.md에 실측 기록): A(신규) 18 · M(변경) 9. 라운드가
+결과(head `13cf0f6`, commands.md에 실측 기록): **A(신규) 19 · M(변경) 8**. 라운드가
 늘어 파일이 늘면(4C-1이 새 라운드를 열면) 이 절차를 다시 돌린다.
 
 ## 되돌리는 명령
