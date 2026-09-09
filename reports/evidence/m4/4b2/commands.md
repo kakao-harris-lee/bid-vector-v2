@@ -336,3 +336,30 @@
   `workflow/src/main/kotlin/.../LadderPolicySlot.kt`(M)·
   `workflow/src/test/kotlin/.../LadderPolicySlotTest.kt`(신규)만, scope.md in_scope와
   일치.
+
+## 2026-09-10T12:30Z — rollback 재실측(수정 라운드 3, head `e93d7de`) — 신규 파일 추가로 재실행
+- 이 라운드가 `LadderPolicySlotTest.kt`를 신설해 파일이 늘었으므로 절차를 다시
+  돌린다(rollback.md 규정).
+- cmd: `git log --oneline 401bc4d5636cd114c8282cf314d837f0d52dbc15..HEAD --
+  config/quality/gate-tests.properties docs/discovery/capability-map.md
+  milestone-4.md` — 여전히 `a0d254f`만, 라운드 1·2·3 전부 이 셋을 건드리지 않음 —
+  commit-hash 격리 불필요.
+- cmd: `git diff --name-status 401bc4d..HEAD`(임시 clone, head `e93d7de`) —
+  `workflow/src/test/kotlin/.../LadderPolicySlotTest.kt`가 A 목록에 새로 추가됨을
+  확인.
+- cmd: 임시 clone에서 세 공유 파일 `diff|apply -R`, 신규 파일(workflow evaluation
+  main 열둘·test 열한 개·evidence 여섯, `LadderPolicySlotTest.kt` 포함)에 `git
+  restore --source=<base> --staged --worktree -- <경로>` — 전부 exit 0.
+- cmd: `git diff <base> -- config/quality/gate-tests.properties
+  docs/discovery/capability-map.md milestone-4.md` — 출력 없음(byte-identical).
+- cmd: `grep -n "OPEN-4B1-OFF-LADDER-DROPS\|OPEN-4B2-" docs/discovery/capability-map.md`
+  — `OPEN-4B1-OFF-LADDER-DROPS` 미종결 복귀, `OPEN-4B2-*` 소멸(변화 없음, 라운드 1·2
+  재측정과 동일).
+- cmd: `ls workflow/src/{main,test}/kotlin/bidvector/workflow/evaluation
+  reports/evidence/m4/4b2` — 셋 다 `No such file or directory`.
+- cmd: `./gradlew --no-daemon -q :workflow:compileKotlin :workflow:compileTestKotlin
+  :app:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon -q :workflow:test` — exit 0.
+- cmd: `./gradlew --no-daemon -q :app:test --tests '*Conformance*'`(별도 호출) —
+  exit 0 — `SharedKernelCorpusConformanceTest tests="86" failures="0"`(무변화).
+- 임시 clone `rm -rf`로 정리.

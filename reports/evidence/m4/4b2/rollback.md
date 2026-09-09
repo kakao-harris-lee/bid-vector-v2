@@ -28,6 +28,14 @@ byte-identical)까지 확인했다 — 「남의 줄 남음」은 이 range에 4
 없어 해당 없음(파일 전체가 byte-identical이 그 자체로 증거). commands.md
 「rollback 재실측(수정 라운드 2, head `08d1743`)」 참조.
 
+**재실측(수정 라운드 3, head `e93d7de`) — 신규 파일 추가로 재실행**: 이 라운드가
+`workflow/src/test/kotlin/bidvector/workflow/evaluation/LadderPolicySlotTest.kt`를
+신설해 「신규 파일(A) — 전체 삭제」 목록이 늘었다(아래 목록에 반영). 공유 파일
+셋은 여전히 `a0d254f`만 걸림 — commit-hash 격리 불필요. 임시 clone(head
+`e93d7de`)에서 늘어난 목록 그대로 실행해 byte-identical·`OPEN-4B1-OFF-LADDER-
+DROPS`/`OPEN-4B2-*` 복귀·신규 디렉터리 삭제·compile/test 초록을 전부 재확인했다.
+commands.md 「rollback 재실측(수정 라운드 3, head `e93d7de`)」 참조.
+
 ## 신규 파일(A) — 전체 삭제
 
 ```
