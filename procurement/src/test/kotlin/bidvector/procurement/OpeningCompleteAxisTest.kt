@@ -178,4 +178,21 @@ class OpeningCompleteAxisTest {
         DrawNumberObservation.of(setOf(0), 15, OBSERVED_AT) shouldBe
             DrawNumberObservation.OutOfRange(setOf(0), 1..15, OBSERVED_AT)
     }
+
+    // verifier r3 M-1 — validRange.first == 1 은 도메인 진실(예비가격 15행의 1-기반
+    // 인덱스)이고, of() 의 습관이 아니라 타입 자신이 그것을 강제해야 한다.
+    @Test
+    fun `OutOfRange — validRange 하한이 1 이 아니면 생성자가 거부한다`() {
+        shouldThrow<IllegalArgumentException> {
+            DrawNumberObservation.OutOfRange(setOf(7), 5..15, OBSERVED_AT)
+        }
+    }
+
+    @Test
+    fun `OutOfRange — of() 가 만드는 정상 경로는 하한 1 로 그대로 통과한다`() {
+        val outcome = DrawNumberObservation.of(setOf(20), 15, OBSERVED_AT)
+
+        val outOfRange = outcome.shouldBeInstanceOf<DrawNumberObservation.OutOfRange>()
+        outOfRange.validRange shouldBe 1..15
+    }
 }

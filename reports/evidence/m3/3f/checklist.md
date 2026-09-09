@@ -73,11 +73,11 @@ COALESCE)를 참조했다. PostgreSQL 의 `INSERT ... ON CONFLICT DO UPDATE` 는
 
 뿌리는 「`OutOfRange` 가 자기 판정에 필요한 값을 저장 시점에 다른 축에서 빌리려 한 것」
 이다. `OutOfRange` 는 이미 Kotlin 생성자에서 `validRange` 를 필수로 받는다 — 그 값(`.last`
-만, `.first`는 항상 1이라 중복 저장하지 않는다)을 `draw_numbers` 축 자신의 새 컬럼
-(`draw_numbers_valid_range_max`)에 실어 tuple 을 자기 완결로 만들었다. 크로스 축 CHECK
-를 같은 자리 페어 CHECK(`opening_result_draw_numbers_valid_range_max_pair`)로
-바꿨다 — 다른 7개 기존 페어 CHECK 는 손대지 않았다. `opening_result` CHECK 총수는 24 로
-불변(대체이지 증가가 아니다).
+만, `.first`는 항상 1이라 중복 저장하지 않는다 — verifier r3 M-1 뒤 이 사실 자체가 타입
+강제다, 아래 절 참고)을 `draw_numbers` 축 자신의 새 컬럼(`draw_numbers_valid_range_max`)
+에 실어 tuple 을 자기 완결로 만들었다. 크로스 축 CHECK 를 같은 자리 페어 CHECK
+(`opening_result_draw_numbers_valid_range_max_pair`)로 바꿨다 — 다른 7개 기존 페어
+CHECK 는 손대지 않았다. `opening_result` CHECK 총수는 24 로 불변(대체이지 증가가 아니다).
 
 회귀 방지: (1) 부모가 총예가건수를 이미 가진 뒤 재수집이 그 값을 다시 안 싣고
 `OutOfRange` 를 실어도 저장이 성공한다 (2) 총예가건수를 한 번도 실은 적 없는 새 행에도
@@ -88,6 +88,41 @@ COALESCE)를 참조했다. PostgreSQL 의 `INSERT ... ON CONFLICT DO UPDATE` 는
 `RankMissing` 을 시작점으로 하는 둘(`RankMissing`→`Determined`, `RankMissing`→
 `RankDuplicated`)이 빠졌다. 두 test 를 더했다 — 축 단위 CASE(F-1 수정)가 `RankMissing`
 에서 출발하는 전이에도 같은 방식으로 적용됨을 확인한다.
+
+## M-1 수정 — `validRange.first == 1` 을 타입이 강제한다
+
+**M-1(medium).** `OutOfRange` 에 `init`/`require` 가 없어 하한 1 은 `of()` 의 습관일
+뿐이었다 — 직접 생성자 호출이나 저장소 read 경로가 `5..15` 처럼 하한이 어긋난 값을
+만들 수 있었고, 실측상 그렇게 저장하면 읽기가 `1..15` 로 **조용히** 바꿔 돌려줬다. 값이
+조용히 바뀌는 것은 F-1·N-1 이 세 라운드 내내 막아 온 계열과 같다.
+
+하한 1 은 도메인 진실이다 — 추첨번호가 예비가격 15행의 1-기반 인덱스라는 사실(§1.11·
+legacy `distribution_extraction`)이지 우연한 구현 습관이 아니다. `OutOfRange.init` 에
+`require(validRange.first == 1)` 한 줄을 더해 **타입 자신이 그것을 강제**하게 했다
+(`NoticeFacts.kt`). `of()` 는 이미 1 로만 만들므로 과잉 거부 없이 정상 경로를 그대로
+통과시킨다(verifier r3 가 생성 경로를 이미 훑어 확인). 회귀 방지 test 둘 —
+하한이 1 이 아닌 `OutOfRange` 직접 생성은 `IllegalArgumentException` 으로 거부되고,
+`of()` 경로는 그대로 통과한다(`OpeningCompleteAxisTest.kt`). `V5__opening_complete_
+axis.sql`·`OpeningCompleteAxisCodec.kt` 의 「`.first`는 항상 1」 서술도 이 `require`
+를 근거로 갱신했다 — 이전 판은 강제 없이 사실로만 단언했다.
+
+## 삭제한 test — 무엇이었고 왜 정당한가
+
+verifier r2 N-1 뒤 F-3 의 저장 시점 거부 test(`F-3 — 총예가건수 없이 OutOfRange 를
+저장하려 하면 거부된다`, `총예가건수 = null` 로 `OutOfRange` 를 저장하면 `PSQLException`
+을 기대했다)를 삭제했다. 정당성 둘:
+
+1. **재구성 전제 자체가 없어졌다.** 그 test 는 「`OutOfRange` 가 부모 축에서 `validRange`
+   를 재구성한다」는 r1 F-3 설계를 전제로 했는데, N-1 이 그 설계를 대체해(자기 축 컬럼에
+   직접 싣는다) 전제가 더는 성립하지 않는다 — 다른 축을 참조하지 않으니 다른 축이
+   비어 있는 것을 이유로 거부할 근거도 없다.
+2. **시나리오가 정상 성공으로 역전됐다.** 옛 test 가 거부를 기대한 바로 그 조합(총예가건수
+   없이 `OutOfRange` 저장)이 N-1 수정 뒤에는 **정상적으로 성공해야 하는 상태**다(§1.9.7
+   관례 — 부모가 총예가건수를 모르는 공고에서도 개찰완료는 별도로 관측될 수 있다). 단언을
+   뒤집는 것이 아니라 삭제하고, 같은 조합을 성공 방향으로 검증하는 N-1 회귀 test 둘로
+   교체했다(위 「N-1·N-2 수정」참고). CHECK 자체가 죽지 않았음은 별도의 직접 SQL 음성
+   대조가 잇는다 — 「고쳐서 통과시킨」 것이 아니라 「거부해야 할 다른 조합(자기 축 컬럼
+   부재)으로 대상을 옮긴」 것이다.
 
 ## 우회 여덟 — 무엇이 막는가
 

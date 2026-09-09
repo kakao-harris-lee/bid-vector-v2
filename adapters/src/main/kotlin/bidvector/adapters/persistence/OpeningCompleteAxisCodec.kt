@@ -108,8 +108,10 @@ internal object OpeningRankOneKind {
  * `total_reserve_price_candidate_count`(3E 슬롯, 별도 COALESCE 축)에서 읽기 시점에
  * 재구성했는데, `INSERT ... ON CONFLICT` 의 CHECK 가 병합 뒤 행이 아니라 들어오는 제안
  * tuple 에 걸려(PostgreSQL 관용구) 부모가 이미 총예가건수를 가진 상태에서도 그 축을 안
- * 실은 정상 저장이 거부됐다. `validRange.first`(항상 1, 1-기반 인덱스)는 저장하지 않는다
- * (중복 금지) — `validRange.last`(상한)만 싣는다.
+ * 실은 정상 저장이 거부됐다. `validRange.first`(1-기반 인덱스라 항상 1 — `OutOfRange.init`
+ * 의 `require` 가 verifier r3 M-1 뒤 그것을 타입으로 강제한다, `NoticeFacts.kt` 참고)는
+ * 저장하지 않는다(중복 금지) — `validRange.last`(상한)만 싣는다. `read`가 재구성하는
+ * `1..max`의 하한이 그 `require` 와 항상 일치한다.
  *
  * **verifier r1 F-1·F-2 뒤** — `bind`가 이 축의 네 컬럼(kind·번호 배열·관측 시각·범위 상한)
  * 을 하나로 묶어 내보낸다. `Sql.kt`가 `EXCLUDED.draw_numbers_kind` NULL 여부로 축 전체를

@@ -323,12 +323,28 @@ sealed interface DrawNumberObservation {
         override val observedAt: Instant,
     ) : DrawNumberObservation
 
-    /** 범위 밖 번호가 섞여 있다 — 조용히 통과시키지 않는다. */
+    /**
+     * 범위 밖 번호가 섞여 있다 — 조용히 통과시키지 않는다.
+     *
+     * **verifier r3 M-1 뒤** — `validRange.first`는 예비가격 15행의 **1-기반 인덱스**라는
+     * 도메인 진실(§1.11·legacy `distribution_extraction`)이라 항상 1이어야 한다. `of()`는
+     * 이미 그렇게만 만들지만, 그 성질이 `of()`의 습관일 뿐 타입의 보장이 아니면 다른 생성
+     * 경로(직접 생성자 호출·저장소 read)가 `5..15`처럼 하한이 어긋난 값을 조용히 만들거나
+     * 읽어 들일 수 있다 — 이 slice가 세 라운드 내내 막아 온 「값이 조용히 바뀐다」와 같은
+     * 계열이다. `init`의 `require`로 하한 1을 타입 자체가 강제하게 한다.
+     */
     data class OutOfRange(
         val numbers: Set<Int>,
         val validRange: IntRange,
         override val observedAt: Instant,
-    ) : DrawNumberObservation
+    ) : DrawNumberObservation {
+        init {
+            require(validRange.first == 1) {
+                "OutOfRange.validRange 의 하한은 항상 1이어야 한다(예비가격 15행의 1-기반 " +
+                    "인덱스) — 실제: ${validRange.first}"
+            }
+        }
+    }
 
     /** 번호는 있으나 총예가건수를 몰라 범위를 검사할 수 없다(§1.9.7 — 이 오퍼레이션 응답에 없다). */
     data class RangeCheckUnavailable(
