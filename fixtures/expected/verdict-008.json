@@ -1,0 +1,12 @@
+{
+  "verdict": "BidNow",
+  "reasons": [
+    {
+      "type": "ForceBidOverride",
+      "probability": 0.85,
+      "matched": 0.75,
+      "probabilityThreshold": 0.8,
+      "matchedThreshold": 0.7
+    }
+  ]
+}

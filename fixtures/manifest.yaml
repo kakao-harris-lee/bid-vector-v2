@@ -8154,6 +8154,464 @@ cases:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
+  - id: verdict-005
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        capacity-hold 가 확정 조건이다 — 진행중 입찰이 한도에 닿고 priority 가 임계 미만이면 Skip(CapacityHold). probability·matched 부재라도 이 분기는 그 값을 요구하지 않는다.
+    verified_paths:
+      - "$.verdict"
+      - "$.skipReason"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. capacity-hold 가 확정 조건이다 — 진행중 입찰이 한도에 닿고 priority 가 임계 미만이면 Skip(CapacityHold). probability·matched 부재라도 이 분기는 그 값을 요구하지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-005.json
+    expected_file: fixtures/expected/verdict-005.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: e39547cd69b6110859a211f46926f642020bd0e0879d8632f80d917301d6104d
+    expected_sha256: a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: verdict-006
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        priority·force-bid(probability·matched 확정적으로 낮음) 둘 다 아니면 Skip(LowPriority) — 소진 when 의 마지막 갈래.
+    verified_paths:
+      - "$.verdict"
+      - "$.skipReason"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. priority·force-bid(probability·matched 확정적으로 낮음) 둘 다 아니면 Skip(LowPriority) — 소진 when 의 마지막 갈래.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-006.json
+    expected_file: fixtures/expected/verdict-006.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: 15bace848bf930658928e1756d5bbc804b4d9a00585c69d36a856a5c174d6533
+    expected_sha256: b4d73881a02835122984868cabdace0ba481b6c4b550a92c9cd68b478744dd0e
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: verdict-007
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        priority 가 bidNowThreshold 이상이면 BidNow(PriorityAboveBidNowThreshold) — probability·matched 부재라도 priority 단독으로 이미 확정된다.
+    verified_paths:
+      - "$.verdict"
+      - "$.reasons"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. priority 가 bidNowThreshold 이상이면 BidNow(PriorityAboveBidNowThreshold) — probability·matched 부재라도 priority 단독으로 이미 확정된다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-007.json
+    expected_file: fixtures/expected/verdict-007.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: 189745adf0993cd559ba99bf91630c9e0f8a905fe71a624e9f79973b044f69a3
+    expected_sha256: 874a3586850df904269c3e255b84c6776e5be232d93231a23f5d23ce304b72d6
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: verdict-008
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        force-bid 우회 — priority 는 review 밴드 안이지만 probability·matched 가 각자 임계 이상이면 BidNow(ForceBidOverride). 우회의 출처가 결과에 실린다(OPEN-STR-03).
+    verified_paths:
+      - "$.verdict"
+      - "$.reasons"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. force-bid 우회 — priority 는 review 밴드 안이지만 probability·matched 가 각자 임계 이상이면 BidNow(ForceBidOverride). 우회의 출처가 결과에 실린다(OPEN-STR-03).
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-008.json
+    expected_file: fixtures/expected/verdict-008.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: ecbc51adf43f97a5a75c81e205cea51a534cfc7456c74ff3c2c6f2bbb28beabf
+    expected_sha256: 5d9fad5d1a729809b3903435c6b02ae19caba18717ccc99077e082f9e050abc7
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: verdict-009
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        priority 가 reviewThreshold 이상 bidNowThreshold 미만이고 force-bid 가 확정적으로 거짓이면 Review(PriorityInReviewBand).
+    verified_paths:
+      - "$.verdict"
+      - "$.reasons"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. priority 가 reviewThreshold 이상 bidNowThreshold 미만이고 force-bid 가 확정적으로 거짓이면 Review(PriorityInReviewBand).
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-009.json
+    expected_file: fixtures/expected/verdict-009.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: 2bd3aeb606782587b8c3b168810ca2fe5b3b7aad61b269471d147e8755abcf8f
+    expected_sha256: 5df94427de8edb07dde62e81c462d0602bcf0b276d59658410f01706b804a2aa
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: verdict-010
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        priorityScore 가 결측이면 probability·matched 가 force-bid 임계를 만족해도 Review(MlUnavailable) — 부재에서 BidNow 로 가는 경로가 타입에 없다(D-M4-6).
+    verified_paths:
+      - "$.verdict"
+      - "$.reasons"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. priorityScore 가 결측이면 probability·matched 가 force-bid 임계를 만족해도 Review(MlUnavailable) — 부재에서 BidNow 로 가는 경로가 타입에 없다(D-M4-6).
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-010.json
+    expected_file: fixtures/expected/verdict-010.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: fd136e74dba264c48ae7e3124da1fb8c34c7abed59356429b07286f26af6ffa1
+    expected_sha256: 70fc5859c55bb6f7553c7435b5f4d4476564d7aacf828330b84d293f4931bd57
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: verdict-011
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        순서 민감도 — capacity-hold 와 force-bid 조건이 동시에 참이면 capacity-hold 가 이긴다(조사 §2.1 elif 구조, 1D ProvenanceRules 순서 민감도 관례).
+    verified_paths:
+      - "$.verdict"
+      - "$.skipReason"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. 순서 민감도 — capacity-hold 와 force-bid 조건이 동시에 참이면 capacity-hold 가 이긴다(조사 §2.1 elif 구조, 1D ProvenanceRules 순서 민감도 관례).
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-011.json
+    expected_file: fixtures/expected/verdict-011.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: fc265a38aadad4170d8f23ade1b927aeec454007c7c25852261ce81408e5bae6
+    expected_sha256: a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
+
+  - id: verdict-012
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        개연 밴드 밖 운영자 하한 override 는 버리지도 통과시키지도 않고 사유와 함께 거부된다(OPEN-DEC-04).
+    verified_paths:
+      - "$.overrideOutcome"
+      - "$.reasonCode"
+      - "$.silentlyDropped"
+      - "$.silentlyAccepted"
+      - "$.observableInResult"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      data-dictionary.md §3.6 "개연 밴드 밖 override는 버리지도 통과시키지도 않고 사유와 함께 거부한다(운영자 결정 OPEN-DEC-04). 거부가 관측 가능한 결과여야 한다". 조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §6.2)가 실측한 legacy 결함(override 가 ge=0.0 만 있고 상한이 없어 검증 없이 그대로 통과)의 반대 형태를 값으로 고정한다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-012.json
+    expected_file: fixtures/expected/verdict-012.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: 5f0e0f74c964fbb43038febdabb395048b7407628d9e7c6dfe5c4aaccacebfd1
+    expected_sha256: 85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.FloorOverrideValidation.validate(BigDecimal, PlausibilityBand): FloorOverrideOutcome"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        밴드 밖 override 가 FloorOverrideOutcome.Rejected(rate, band) 를 낸다는 것 — Accepted 도 Rejected 도 아닌 제3의 상태(조용한 드롭)가 없다.
+      does_not_carry: |-
+        reasonCode 문자열 자체(도메인 타입은 rate·band 만 나른다) — 이 값은 corpus runner 투영이다. 실 override 파이프라인 배선(4B-2).
+    change_history: []
+    review:
+      claude_commit: pending
+      codex_verdict: pending
+      approved_by_user: false
 
 # -----------------------------------------------------------------------------
 # strategy 축 (M1/1E 신설, 2026-09-06) — 운영자 결정 30 이 STR-01 acceptance 넷 · STR-02

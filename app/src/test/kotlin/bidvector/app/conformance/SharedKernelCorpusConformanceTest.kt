@@ -175,6 +175,9 @@ internal val TARGET_DOMAINS =
         "koneps-collection",
         // M4/4A ⑧ — 편집 상태 기계(`bidvector.workflow.strategy`) fixture 다섯(D-4A-1 (a)).
         "strategy-edit",
+        // M4/4B-1 ⑧ — 투찰 판정 Verdict 커널(`bidvector.decision`). verdict-001~004 는
+        // insufficient-evidence 로 남아 이 필터에 걸리지 않는다(정합만 맞춘다, scope.md).
+        "verdict",
     )
 
 private const val MANIFEST_PROPERTY = "bidvector.fixtures.manifest"

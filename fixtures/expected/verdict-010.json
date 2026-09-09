@@ -1,0 +1,9 @@
+{
+  "verdict": "Review",
+  "reasons": [
+    {
+      "type": "MlUnavailable",
+      "reason": "ScoreNotProvided"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "overrideOutcome": "Rejected",
+  "reasonCode": "OverrideOutsidePlausibilityBand",
+  "silentlyDropped": false,
+  "silentlyAccepted": false,
+  "observableInResult": true
+}

@@ -3357,7 +3357,8 @@ milestone-0.md 완료 조건은 "`OPEN` 결정이 0개이거나 사용자가 명
 | id | 요지 | 담당 | 근거 | 지목 성격 |
 | --- | --- | --- | --- | --- |
 | `OPEN-DIC-02` | 시공능력 공시 갱신 주기·시행 구간 | **M3 3B**(게시값 수집) 뒤 판정 | `data-dictionary.md` §13.4가 `cnstrtnAbltyEvlAmtList` 수집 신설을 **M1 이후**로 인계 · `milestone-3.md` 3B(OpenAPI adapter) | **유도** |
-| `OPEN-DIC-03` | `SkipReason`의 전수성 | **갈림 — M1 도메인 커널 / M4 4B** | 0C는 `data-dictionary.md` §13.2에서 *"게이트 사다리를 옮길 때 확정한다"*로 **M1**에 인계했으나 **`milestone-1.md` 1A~1E에 게이트 사다리·`Verdict` slice가 없다.** `milestone-4.md` 4B `- decision 후보 조립`이 그 자리다 | **갈림** |
+| ~~`OPEN-DIC-03`~~ | `SkipReason`의 전수성 — **종결(운영자 결정 2026-09-09, M4/4B-1)**: 사다리 안 사유는 `CapacityHold`·`LowPriority` 둘로 닫힌다(조사 `_workspace/m4-4b1/01_scout_verdict_ladder.md` §3.1 실측과 정확히 일치). 사다리 **밖** 드롭 열셋은 이 어휘가 아니다 — 신설 `OPEN-4B1-OFF-LADDER-DROPS`(아래)로 4B-2에 넘긴다 | **M4 4B-1**(닫힘) | 정본은 `data-dictionary.md` §3.6 | 닫힘 |
+| `OPEN-4B1-OFF-LADDER-DROPS`(신설) | 사다리 **밖**에서 공고가 조용히 사라지는 지점 열셋(조사 §3.2 D-1~D-13 — 감시 필터 일곱·파이프라인 여섯) 중 무엇이 `Verdict` 밖 결과 타입이고 무엇이 다른 `SkipReason`류 어휘인가 | **M4 4B-2**(조합 use case) | M4/4B-1 조사가 사다리 **안**만 확정하고 밖은 4B의 use case 경계(「무엇을 판정 대상으로 삼는가」)가 정해져야 답이 나온다고 남겼다(`OPEN-4B1-01`, 조사 §10) | **유도** |
 | `OPEN-DIC-06` | 어댑터 write 경로의 의무 | **M3 3D**(persistence adapter) | `milestone-1.md` 「구현 규칙」 *"domain은 I/O가 없는 입력→출력 함수/객체다"* 밖 · `milestone-3.md` 3D | **유도** |
 | `OPEN-DIC-07` | 전송 멱등 키의 **구성** | **M4 4C** | `milestone-4.md` 4C `- event id, aggregate version, idempotency/correlation/causation id` | **유도** |
 | `OPEN-DIC-09` | fold 순서 | **M4 4C** | 같은 자리(event/outbox의 재생 축) | **유도** — 0C 종료 규칙이 요구한 slice 지목이 §9의 이 행에 없다 |

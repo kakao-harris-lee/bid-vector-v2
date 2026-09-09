@@ -1054,7 +1054,7 @@ legacy 어휘 넷 — `applicable` / `not_applicable`(비국가기관) / `uncert
 **첫 매칭 우선 순서가 도메인 의미를 갖는다** — 두 패턴에 걸리는 기관명에서 더 구체적인
 쪽이 이긴다(`app/ai/floor_applicability.py:122-130`). 이 순서도 정책 데이터로 선언한다.
 
-### 3.6 투찰 판정 rule — `Verdict`
+### 3.6 투찰 판정 rule — `Verdict`(`SkipReason` 전수 확정 — 운영자 결정 2026-09-09, M4/4B-1)
 
 legacy는 게이트 사다리 first-match로 `action`을 정하고, **두 보류가 같은 `"skip"`이며
 한국어 문장으로만 구분된다**(`app/services/allocation_core.py:163-181`).
@@ -1063,8 +1063,17 @@ legacy는 게이트 사다리 first-match로 `action`을 정하고, **두 보류
 > `SkipReason` **필수**. 최소 두 값: `CapacityHold` · `LowPriority`.
 
 운영자 결정 `OPEN-DEC-05`가 확정한 것은 **하나의 `Skip` verdict + 필수 reason code**이며,
-금지되는 것은 한-verdict가 아니라 **문장으로만 구분되는 형태**다. 목록의 전수성은 M1에서
-게이트 사다리를 옮길 때 확정된다 → **`OPEN-DIC-03`**.
+금지되는 것은 한-verdict가 아니라 **문장으로만 구분되는 형태**다.
+
+**`SkipReason` 전수성(`OPEN-DIC-03`) — 종결.** M4/4B-1 착수 조사
+(`_workspace/m4-4b1/01_scout_verdict_ladder.md` §3, 실측)가 게이트 사다리 **안**에서
+`skip`으로 접히는 사유는 정확히 둘(`CapacityHold`·`LowPriority`)뿐임을 확인했다 — §3.6이
+이미 든 「최소 두 값」이 사다리 실측과 정확히 일치한다. **`SkipReason`은 이 둘로 닫는다.**
+사다리 **밖**에서 공고가 조용히 사라지는 지점 열셋(감시 필터 일곱·파이프라인 여섯 — 같은
+조사 §3.2)은 이 어휘가 아니다 — legacy는 그 자리에서 `Decision` 객체 자체를 만들지 않는다.
+운영자 결정 2026-09-09: 그 열셋은 신설 `OPEN`으로 `capability-map.md` §14에 등재하고
+M4/4B-2(조합 use case) 소관으로 넘긴다 — 「목록이 닫혔다」는 선언이 그 열셋을 삼키지
+않는다.
 
 **force-bid 우회는 유지하되 출처를 판정 결과에 노출한다**(운영자 결정 `OPEN-STR-03`) —
 우회의 존재를 감춘 것이 결함이었지 우회 자체가 아니다.
@@ -2089,7 +2098,8 @@ U-5로 **새로 닫는다**고 적었으나 **2026-08-26에 이미 닫혀 있었
 - §2.2의 전이표 셋은 **명시적 state/event table**로 구현한다. 표에 없는 쌍은 거부이며
   거부가 관측 가능해야 한다.
 - §5.3의 필드 계약은 **경계에서 거부하는 계약 테스트**로 승격한다(COL-07 결정).
-- **`SkipReason` 전수성**(`OPEN-DIC-03`)은 게이트 사다리를 옮길 때 확정한다.
+- **`SkipReason` 전수성**(`OPEN-DIC-03`) — **종결(M4/4B-1, 운영자 결정 2026-09-09)**.
+  게이트 사다리를 옮기며 확정됐다 — 정본은 §3.6.
 
 ### 13.3 M2 계약
 
