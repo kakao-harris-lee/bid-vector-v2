@@ -11,7 +11,8 @@
 milestone: m4
 slice: 4a-strategy-edit-state-machine
 base_sha: 9948c6e4056bbf71fa6683aa67d30c2a49fc6eae
-head_sha: 리뷰 시점의 HEAD
+head_sha: 리뷰 요청 시점의 `git rev-parse HEAD` — **값을 박지 않는다**(evidence 커밋 자신이 head 가 되어 즉시 낡는다, r1 B-3 와 같은 클래스).
+#         마지막 **산출물** 커밋은 `d567adc`(장부층 일괄)이고 그 뒤는 이 evidence 절의 커밋뿐이다.
 branch: m4/2026-09-08
 in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/strategy/**   # StrategyEditSession aggregate(상태 기계)·command·전이표·timeout 정책 슬롯·use case(begin/provideValue/confirm/cancel/expire)·port(StrategyRepository·EditSessionRepository·Clock·EventSink)
@@ -70,6 +71,8 @@ rollback: |
 `git log --oneline 9948c6e4056bbf71fa6683aa67d30c2a49fc6eae..HEAD -- CLAUDE.md .claude/`
 
 - 착수 시점: **없음**(base == HEAD).
+- 검증 완료 시점(`d567adc`): **없음** — 같은 명령을 base..HEAD 로 돌려 0건. 이 slice 는 별도 브랜치에 살고 하네스 레인(다른 세션)은 `main` 에 있어 range 에 하네스 커밋이 섞이지 않았다.
+  2026-09-02 스테이징 규율이 다루던 혼입이 이번 slice 에서는 **구조적으로 발생하지 않았다**(worktree 격리의 실측된 효과).
 - 이 slice 는 별도 브랜치에 살고 하네스 레인(다른 세션)은 `main` 에 있다 — range 에 하네스 커밋이 섞이려면 이 브랜치에서 `.claude/`·`CLAUDE.md` 를 편집해야 한다.
   편집이 생기면 리뷰 요청 시점에 이 절을 갱신하고 「slice 산출물이 아니며 in_scope 밖」을 명시한다. rollback 은 in_scope 경로 한정이라 하네스 경로를 되돌리지 않는다.
 
