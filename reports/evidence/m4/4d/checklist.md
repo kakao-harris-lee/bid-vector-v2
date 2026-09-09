@@ -47,7 +47,8 @@ KDoc에 근거를 남겼다. 위조 방어는 컴파일 층이 아니라 (a) `bi
 | 12 | 취소 미전파 | grpc-kotlin coroutine stub이 취소를 그대로 전파, 어댑터가 `CancellationException`을 잡지 않음(`RetryRules.kt`·`ResilientPredictionCall.kt`·`GrpcBidPredictionGateway.kt` 전부 `StatusException`/`StatusRuntimeException`만 개별 catch) | `DeadlineCancellationRetryTest.coroutine 취소가 predict 를 통해 servicer 의 계산 중단으로 이어진다` |
 | 13 | **재시도 폭풍 — 백오프 없이 즉시 재시도**(verifier r1 F-1 high, **닫는다**로 변경) | `ResilientPredictionCall.awaitBackoffOrDeadlineExceeded`가 attempt 마다 정책 backoff 만큼 `delay`, 남은 예산이 그조차 못 감당하면 재시도 없이 `DeadlineExceeded` | `GrpcBidPredictionGatewayTest.재시도 사이에 정책 백오프만큼 실제로 지연한다(경과시간 probe)`·`남은 예산이 백오프를 감당하지 못하면...`·`DEADLINE_EXCEEDED 도 예산이 없으면...`(F-3 겸용) |
 | 14 | **release 성분 공백 유출**(verifier r1 F-2 high, **닫는다**로 변경) | `ModelReleaseRef` 비공백 불변식 + `hasNonBlankRelease`(구조 검증 단계) + `fetchPromoted`의 공백 promoted → null 접기 + `mapSuccess`의 schema 대조 | `ResponseMappingTest`의 P4a/P4b/schema 불일치 test 3건·`GrpcBidPredictionGatewayTest`의 P4c(양쪽 공백) |
-| 15 | **값 타입 `init` 위반이 예외로 `predict` 밖까지 샘**(verifier r2 G-1 high, **닫는다**로 신설 — F-5 정정) | `BidRateCandidates.init`(conservative≤base≤aggressive)은 마지막 안전판, `hasOrderedCandidateRates`(`CandidateShapeValidation.kt`)가 같은 조건을 구조 검증층(`isAcceptableSuccessShape`)에서 먼저 걸러 `Unavailable(ContractViolation)`로 접는다(F-2 `hasNonBlankRelease`와 동형 패턴) | `GrpcBidPredictionGatewayVerifierR2Test`의 내림차순·base>aggressive test 2건(예외 0, `ContractViolation`) + 클램프-포화(세 값 동일) test 1건(정상 `Predicted`) |
+| 15 | **값 타입 `init` 위반이 예외로 `predict` 밖까지 샘**(verifier r2 G-1 high, **닫는다**로 신설 — F-5 정정) | `BidRateCandidates.init`(conservative≤base≤aggressive)은 마지막 안전판, `hasOrderedCandidateRates`(`CandidateShapeValidation.kt`)가 같은 조건을 구조 검증층(`isAcceptableSuccessShape`)에서 먼저 걸러 `Unavailable(ContractViolation)`로 접는다(F-2 `hasNonBlankRelease`와 동형 패턴) | `SuccessShapeFailClosedTest`의 내림차순·base>aggressive test 2건(예외 0, `ContractViolation`) + 클램프-포화(세 값 동일) test 1건(정상 `Predicted`) + H-6 table-driven test(8 case 전수, 아래 참고) |
+| 16 | **HALF_OPEN breaker permit 이 예산 소진 가지에서 새 회복 불가능한 OPEN 이 됨**(verifier r3 H-1 high, **닫는다**로 신설 — G-4 수정의 잔여 결함) | permit 을 얻은 뒤의 결말을 `settlePermit` 하나로 좁혀 `try/finally`로 강제 — `BudgetExhausted`는 `releasePermission()`만 부른다(onError 아님, G-4 의미 유지). 새 가지가 늘어도 `finally`가 안전망이라 permit 이 새지 않는다 | `BreakerTest.HALF_OPEN 에서 예산 소진 호출이 permit 을 반납해 이후 호출이 서버에 닿는다(H-1)` — OPEN→HALF_OPEN 전이 뒤 permit 수(기본 10)보다 많은 예산 소진 호출 15회가 전부 서버에 닿고, 그 뒤 넉넉한 예산 호출도 `CircuitOpen` 없이 서버에 닿아 `Predicted`를 받는다. RED 확인: `git stash`로 프로덕션 파일만 되돌려 재현(`expected:<DeadlineExceeded> but was:<CircuitOpen>`) |
 
 ## 값 타입 `init` ≠ 게이트 (verifier r2 G-1·G-2 — 수정 라운드 1의 회귀 원인 정정)
 
@@ -71,13 +72,26 @@ r1 F-5 수정이 `BidRateCandidates.init`(순서)·`PriceFitness.init`(부호)�
   세운다」와 「불변식을 없앤다」 둘 다 이 규칙의 합당한 해법이고, 선택은 계약 문면이 그
   값에 실제 제약을 두는지로 갈린다.
 
+**verifier r3 H-6** — 위 짝 대조가 F-2 → G-1 로 손으로 두 번 났다(같은 클래스의 결함이
+반복). `SuccessShapeFailClosedTest`의 table-driven test 하나가 값 타입마다 `init`이
+던지는 조건(`BidRateCandidates` 두 부등식·`Uncertainty.sampleSize`·`ModelReleaseRef`
+다섯 성분, `PriceFitness`는 G-2로 `init` 자체가 없어 대상 제외)을 표로 열거하고, 같은
+입력을 실 gateway 경로에 넣어 예외 없이 기대한 `Unavailable` 사유로 접히는지 대조한다
+— 새 `init` 조건이 검증층 술어 없이 추가되면(세 번째 F-5/G-1 반복) 이 test 가 떨어진다.
+
+**verifier r3 H-2** — 회귀 test 가 아무리 정확해도 `gate.tests.adapters`(`config/quality/
+gate-tests.properties`)에 등재되지 않으면 삭제·비활성화돼도 `check`가 초록이다. 신설
+`MlGateRegistrationTest`가 이 등재 완전성 자체를 test 로 잰다 — `adapters/ml` 소스
+디렉터리 스캔과 properties 파싱을 직접 대조해, 등재가 빠진 `*Test` class 를 잡는다
+(자기 자신 포함, T-10 변이로 재확인 — commands.md 참고).
+
 ## 값 획득·위조 축 표(최종)
 
 | 타입 | 판정 | 근거 |
 | --- | --- | --- |
 | `CallBudget` | 연다(불변식으로 닫힘) | 호출부(workflow 후속)가 남은 예산에서 만든다 |
 | `BidPredictionRequest`·`AgencyId`·`CompetitionSample`·`ModelReleaseSelector.Exact` | 연다(불변식으로 닫힘) | 호출부가 조립. 자유 `String` 0 |
-| `BidRateCandidates`·`PriceFitness`·`Uncertainty`·`ModelReleaseRef`·`BidPredictionOutcome.Predicted` | **공개(위 「설계 검토 대비 결정 변경」), 값 불변식은 마지막 안전판일 뿐 게이트가 아니다(verifier r1 F-5 → r2 G-1·G-2로 정정)** | `mapSuccess`(어댑터)가 유일한 실제 생성 경로. **정정(G-1·G-2)**: `init`은 절대 gateway 응답 경로에서 단독으로 걸려서는 안 된다 — 응답이 만들 수 있는 모든 `init` 위반은 구조 검증층(`isAcceptableSuccessShape`)의 술어가 먼저 잡아 `Unavailable(ContractViolation)`으로 접어야 한다(F-2 `hasNonBlankRelease` 패턴, 아래 「값 타입 `init` ≠ 게이트」). `BidRateCandidates`(conservative≤base≤aggressive)는 `hasOrderedCandidateRates`(우회 15)로 이 패턴을 따른다. `PriceFitness`는 애초에 부호 불변식의 계약 근거가 없어(proto 주석) **G-2에서 `init` 자체를 제거**했다(게이트가 아니라 불변식 삭제가 정답인 사례) — 정직한 음수 값이 그대로 `Predicted`로 통과한다. `ModelReleaseRef`는 다섯 성분 비공백(F-2, 이미 `hasNonBlankRelease` 게이트와 짝) — `PredictionValueTest`·`GrpcBidPredictionGatewayVerifierR2Test`로 회귀 방지 |
+| `BidRateCandidates`·`PriceFitness`·`Uncertainty`·`ModelReleaseRef`·`BidPredictionOutcome.Predicted` | **공개(위 「설계 검토 대비 결정 변경」), 값 불변식은 마지막 안전판일 뿐 게이트가 아니다(verifier r1 F-5 → r2 G-1·G-2로 정정)** | `mapSuccess`(어댑터)가 유일한 실제 생성 경로. **정정(G-1·G-2)**: `init`은 절대 gateway 응답 경로에서 단독으로 걸려서는 안 된다 — 응답이 만들 수 있는 모든 `init` 위반은 구조 검증층(`isAcceptableSuccessShape`)의 술어가 먼저 잡아 `Unavailable(ContractViolation)`으로 접어야 한다(F-2 `hasNonBlankRelease` 패턴, 아래 「값 타입 `init` ≠ 게이트」). `BidRateCandidates`(conservative≤base≤aggressive)는 `hasOrderedCandidateRates`(우회 15)로 이 패턴을 따른다. `PriceFitness`는 애초에 부호 불변식의 계약 근거가 없어(proto 주석) **G-2에서 `init` 자체를 제거**했다(게이트가 아니라 불변식 삭제가 정답인 사례) — 정직한 음수 값이 그대로 `Predicted`로 통과한다. `ModelReleaseRef`는 다섯 성분 비공백(F-2, 이미 `hasNonBlankRelease` 게이트와 짝) — `PredictionValueTest`·`SuccessShapeFailClosedTest`로 회귀 방지 |
 | `BidPredictionOutcome.Unmeasurable`·`Unavailable` | 연다 | 「없음」 위조는 fail-safe 방향이라 위험이 없다(design 원안 그대로) |
 | `MlUnavailableReason.*`(신설 9값) | `data object`(닫힘, decision 소유) | `ReviewReason.kt` — 4B-1 관례 계승 |
 | `MlCallPolicyData` | 연다(불변식으로 닫힘) | 값은 정책 슬롯 |

@@ -24,7 +24,8 @@ git diff --name-status d0a44a739864896d2ca894fbe8b286651d8f1156..HEAD
   `ResilientPredictionCall`·`ResponseMapping`·`RetryRules`)·
   `adapters/src/test/kotlin/bidvector/adapters/ml/`(`BreakerTest`·
   `DeadlineCancellationRetryTest`·`GrpcBidPredictionGatewayTest`·`MlAdapterDependencyTest`·
-  `MlCallPolicyDataTest`·`MlTestFixtures`·`ReleaseCheckTest`·`ResponseMappingTest`)·
+  `MlCallPolicyDataTest`·`MlGateRegistrationTest`·`MlTestFixtures`·`ReleaseCheckTest`·
+  `ResponseMappingTest`·`SuccessShapeFailClosedTest`)·
   `decision/src/test/kotlin/bidvector/decision/MlUnavailableReasonTest.kt`·
   `workflow/src/main/kotlin/bidvector/workflow/prediction/`(`BidPredictionOutcome`·
   `BidPredictionPort`·`BidPredictionRequest`·`CallBudget`)·
@@ -66,9 +67,11 @@ git restore --source=d0a44a739864896d2ca894fbe8b286651d8f1156 --staged --worktre
   adapters/src/test/kotlin/bidvector/adapters/ml/GrpcBidPredictionGatewayTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/ml/MlAdapterDependencyTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/ml/MlCallPolicyDataTest.kt \
+  adapters/src/test/kotlin/bidvector/adapters/ml/MlGateRegistrationTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/ml/MlTestFixtures.kt \
   adapters/src/test/kotlin/bidvector/adapters/ml/ReleaseCheckTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/ml/ResponseMappingTest.kt \
+  adapters/src/test/kotlin/bidvector/adapters/ml/SuccessShapeFailClosedTest.kt \
   decision/src/test/kotlin/bidvector/decision/MlUnavailableReasonTest.kt \
   workflow/src/main/kotlin/bidvector/workflow/prediction/BidPredictionOutcome.kt \
   workflow/src/main/kotlin/bidvector/workflow/prediction/BidPredictionPort.kt \
@@ -99,62 +102,51 @@ range에서 4D-1 커밋만 건드렸음을 커밋 로그로 확인했다(위 「
 `e0f4fed`·`5065cab`·`2acf37a`·`a96c53c`) — 병합 뒤 다른 slice 커밋이 같은 파일을 추가로
 만지면 ①②를 그 파일에 대해서만 다시 돌린다.
 
-**verifier r2 G-3 재확인(2026-09-10)** — 수정 라운드 커밋(`7ffb379`·`fc42988`·`2161d2e`·
-`d405d10`·`b81a723`) 각각에 대해 `git show --stat`으로 건드린 경로를 다시 대조했다: 다섯
-전부 A 목록의 `adapters/ml/**`·`workflow/prediction/**`·evidence 파일만 건드렸고 위 M
-목록(공유 가능 파일) 아홉 개 중 어느 것도 건드리지 않았다 — M 항목 대응 커밋 넷은
-갱신 대상이 아니다(기계 확인, 손으로 늘리지 않는다).
+**verifier r2 G-3 재확인** — 수정 라운드 커밋(`7ffb379`·`fc42988`·`2161d2e`·`d405d10`·
+`b81a723`) 각각에 대해 `git show --stat`으로 건드린 경로를 다시 대조했다: 다섯 전부
+A 목록의 `adapters/ml/**`·`workflow/prediction/**`·evidence 파일만 건드렸고 위 M 목록
+(공유 가능 파일) 아홉 개 중 어느 것도 건드리지 않았다.
 
-## 실측(임시 clone, 2026-09-10, HEAD=`b81a723`) — 5단계, 재검증
+**verifier r3 H-3 재확인(2026-09-10)** — 이번 라운드 커밋(`3472036`·`9bb67c3`)도 같은
+방식으로 대조했다: `3472036`(H-1)은 A 목록 파일만(`ResilientPredictionCall.kt`·
+`BreakerTest.kt`) 건드렸다. `9bb67c3`(H-2·H-4·H-6)은 A 목록 파일 둘(`SuccessShapeFail
+ClosedTest.kt`·`MlGateRegistrationTest.kt`) 외에 **M 목록의 `config/quality/
+gate-tests.properties`도 건드렸다** — 그 파일의 M 항목 hunk 커밋 목록에 `9bb67c3`를
+추가한다(대응 커밋: `a96c53c`·`9bb67c3` 둘). 나머지 M 파일 여덟은 이번 라운드 커밋
+둘 중 어느 것도 건드리지 않았다(기계 확인, 손으로 늘리지 않는다).
 
-**이전 실측(a96c53c 대상) 정정** — 재검증 중 이전 기록이 거짓 양성이었음을 발견했다:
-그 clone에서 A 항목 `git restore` 한 명령에 `reports/evidence/m4/4d/{commands,checklist,
-policy-values}.md`가 섞여 있었는데, `a96c53c` 시점에는 그 evidence 파일들이 아직
-생기기 전이라 pathspec 오류가 났다 — `git restore`는 원자적이라 **오류가 나면 어떤
-경로도 되돌리지 않는다**(`git status --porcelain` 재확인, 변경 0건). 즉 그 실측은
-「원본 그대로의 트리」를 컴파일·테스트한 것이라 통과가 rollback 을 아무것도 증명하지
-않았다. 아래는 evidence 파일이 전부 존재하는 HEAD(`b81a723`)를 대상으로 다시 잰
-결과다.
+## 실측(임시 clone, 2026-09-10, HEAD=`9bb67c3` — 이 라운드의 마지막 코드·test 커밋) — 5단계
 
-① `git clone . /tmp/4d1-rollback-verify-r2 && git checkout b81a723` — exit 0.
-② 위 A 항목 `git restore` 명령 실행 — exit 0(경로 28개 전부 매치, pathspec 오류 없음).
-③ 대상 파일 전부에 대해 `git diff d0a44a739864896d2ca894fbe8b286651d8f1156 -- <경로>`가
-   비어 있음(restore 뒤 `wc -l` → 0, 28개 전부) — **내 줄이 사라졌다** 확인.
+**절차 — verifier r3 H-3**: 목록 산출·5단계 실측은 이 라운드의 마지막 코드·test 커밋을
+만든 **뒤에 한 번만** 돈다(evidence 커밋 자신은 A/M 목록에 들지 않는다) — 코드·test
+커밋 전부 완료 → 목록 기계 산출 → 임시 clone → ①~⑤ → 이 문서에 기록 → evidence 커밋.
+아래는 그 결과다.
 
-**②만으로는 ④가 막힌다** — A 항목만 되돌리면 `PredictionContractTest.kt`(M 항목)가 이
-range에서 얻은 `import bidvector.adapters.ml.releaseSatisfiesSelector`(2acf37a, 승격 전
-private 함수를 지우고 얻은 import)가 방금 삭제한 `ReleaseCheck.kt`를 가리켜
-`:adapters:compileTestKotlin`이 `Unresolved reference` 로 죽는다(실측 확인,
-verifier r2 G-3가 지목한 것과는 다른 새 gap — A 목록 문제가 아니라 A+M 을 같이
-되돌려야 한다는 gap). **가짜 rollback 을 문서에 남기지 않으려고** M 항목 hunk 격리
-(①②, 위 「M 항목」절)를 이 범위의 M 파일 9개 전부에 대해 이어서 적용했다:
+**이전 실측(b81a723 대상) 은 이 실측으로 대체된다** — 그 뒤 커밋(`cbf769a`·`3472036`·
+`9bb67c3`)이 A 목록에 파일을 더 추가했으므로(`CandidateShapeValidation.kt`는 `cbf769a`
+시점엔 이미 A 목록에 있었으나 `SuccessShapeFailClosedTest.kt`·`MlGateRegistrationTest.kt`
+는 `9bb67c3`에서 새로 생겼다), 그 시점 실측은 그 시점 A 목록에 대해서만 유효했다. 더
+이전(a96c53c 대상) 실측이 거짓 양성이었던 사유(evidence 파일이 그 시점에 아직 없어
+`git restore`가 pathspec 오류로 원자적 무동작 — 오류가 나면 어떤 경로도 되돌리지 않는다)
+는 위 절에 남긴다(장부 정직성, 재발 방지 기록 — H-3 자체가 이 정정을 반복하지 않기 위한
+절차 처방이다).
 
-```
-for f, sha in [(adapters/build.gradle.kts, 2acf37a),
-  (adapters/src/test/.../contract/ContractFractionRules.kt, 2acf37a),
-  (adapters/src/test/.../contract/ContractRetryRules.kt, 2acf37a),
-  (adapters/src/test/.../contract/PredictionContractTest.kt, 2acf37a),
-  (app/src/test/.../VerdictExecutors.kt, e0f4fed),
-  (config/quality/gate-tests.properties, a96c53c),
-  (decision/src/main/.../ReviewReason.kt, e0f4fed),
-  (docs/discovery/capability-map.md, a96c53c),
-  (docs/discovery/data-dictionary.md, a96c53c),
-  (milestone-4.md, a96c53c)]:
-  git diff <sha>~1..<sha> -- <f> | git apply -R
-```
-
-전 10건 exit 0(hunk 충돌 없음 — 이 range에서 각 파일을 한 커밋만 건드렸기 때문, 위
-「M 항목」 절 참고).
-
+① `git clone . /tmp/4d1-rollback-verify-r3 && git checkout 9bb67c3` — exit 0.
+② 위 A 항목 `git restore` 명령 실행 — exit 0(경로 33개 전부 매치, pathspec 오류 없음).
+②' M 항목 hunk 격리 11건(`gate-tests.properties`는 두 커밋 — `9bb67c3`를 먼저, `a96c53c`를
+   나중에 역적용해야 컨텍스트가 맞는다, 최신 커밋 먼저) — 전 11건 exit 0(hunk 충돌 없음).
+③ 대상 파일 전부(A 33 + M 9)에 대해 `git diff d0a44a739864896d2ca894fbe8b286651d8f1156
+   -- <경로>`가 비어 있음(`wc -l` → 0, 42개 전부) — **내 줄이 사라졌다** 확인.
 ④ `./gradlew --no-daemon :decision:compileKotlin :workflow:compileKotlin
    :adapters:compileKotlin :app:compileKotlin` — exit 0(BUILD SUCCESSFUL).
 ⑤ `./gradlew --no-daemon :decision:test :workflow:compileTestKotlin
    :adapters:test --tests 'bidvector.adapters.contract.*' :app:compileTestKotlin` —
    exit 0(BUILD SUCCESSFUL, 2A~2D contract test 전건 포함).
 
-**결론** — A 목록만으로는 이 range의 rollback이 서지 않는다(M 항목 하나가 A 항목
-심볼을 참조하기 때문). 병합 전 실제 되돌림은 여전히 「브랜치를 버린다」로 충분하지만
+**결론(유지)** — A 목록만으로는 이 range의 rollback이 서지 않는다(M 항목
+`PredictionContractTest.kt`가 A 항목 `ReleaseCheck.kt`의 심볼을 참조하기 때문, r2 G-3
+재검증에서 처음 실측). 병합 전 실제 되돌림은 여전히 「브랜치를 버린다」로 충분하지만
 (A 항목과 M 항목이 이 range에서 함께 사라지므로 문제가 안 됨), **경로 한정 부분
 되돌림을 실제로 수행할 때는 A 목록 restore와 M 항목 hunk 격리를 항상 같이 돌려야
-한다** — 이 절이 그 순서를 성문화한다. 라운드가 더 늘어 파일이 늘면 이 5단계 전체를
-다시 잰다(다음 재검증에서 이 결론 문단이 여전히 맞는지도 함께 확인).
+한다.** 라운드가 더 늘어 파일이 늘면 **이 라운드의 마지막 코드·test 커밋에서** 이
+5단계 전체를 다시 잰다(H-3 절차 — 중간 커밋에서 재지 않는다).

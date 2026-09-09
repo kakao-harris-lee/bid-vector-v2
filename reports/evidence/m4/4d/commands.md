@@ -183,7 +183,7 @@
 - exit: 1(6개 중 4개 실패)
 - 핵심 결과: G-1 두 test 모두 `IllegalArgumentException`이 `predict` 밖(`GrpcBidPredictionGateway.
   handleSuccess`→`handleResponse`→`predict`)까지 새어 test framework 가 직접 잡음(값이 아니라
-  예외로 실패) — `BidRateCandidates.<init>(BidPredictionOutcome.kt:29)`에서 발생. G-2도 동형:
+  예외로 실패) — `BidRateCandidates.<init>`(`BidPredictionOutcome.kt`)에서 발생. G-2도 동형:
   `PriceFitness.<init>`이 `score는 음수일 수 없다`로 던짐. G-4는 `Unavailable(reason=CircuitOpen)`
   로 실패(기대 `Predicted`) — 예산 부족 두 호출이 breaker 를 실제로 열었음을 실측 확인.
   G-5·클램프-포화 test 2건은 이 시점에도 이미 GREEN(해당 조건은 F-2/기존 구조가 처리).
@@ -260,3 +260,65 @@
 
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m4/4d/ --exclude=scope.md`
 - exit: 1(매치 0)
+
+## verifier r3 수정 라운드 3 — RED 확인(H-1)
+
+- cmd: `git stash push -- adapters/src/main/kotlin/bidvector/adapters/ml/ResilientPredictionCall.kt`
+  로 프로덕션 파일만 r2 상태(`cbf769a`)로 되돌리고(신설 `BreakerTest` H-1 test 는 그대로 둔
+  채) `:adapters:test --tests 'bidvector.adapters.ml.BreakerTest'`
+- exit: 1
+- 핵심 결과: `HALF_OPEN 에서 예산 소진 호출이 permit 을 반납해 이후 호출이 서버에 닿는다(H-1)`
+  실패 — `org.opentest4j.AssertionFailedError: expected:<DeadlineExceeded> but was:<CircuitOpen>`,
+  verifier r3 실측(permit 10개 소진 뒤 11번째부터 CircuitOpen)과 동형 — RED.
+- cmd: `git stash pop` 으로 프로덕션 파일 복원
+- exit: 0, `git status --porcelain` 재확인 — 의도한 파일만 남음.
+
+## verifier r3 수정 라운드 3 — 수정 뒤 GREEN(H-1)
+
+- cmd: `:adapters:ktlintFormat :adapters:detekt :adapters:cpdCheck :adapters:sizeGate
+  :adapters:test --tests 'bidvector.adapters.ml.BreakerTest'`
+- exit: 0(BreakerTest 2건 전부 통과 — 기존 회귀 test 1 + H-1 신설 1).
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0(344 actionable tasks, H-1 커밋 `3472036` 시점).
+
+## verifier r3 수정 라운드 3 — H-2·H-4·H-6 검증
+
+- cmd: `:adapters:ktlintFormat :adapters:detekt :adapters:cpdCheck :adapters:sizeGate
+  :adapters:test --tests 'bidvector.adapters.ml.SuccessShapeFailClosedTest'
+  :adapters:test --tests 'bidvector.adapters.ml.MlGateRegistrationTest'`
+- exit: 0 — `SuccessShapeFailClosedTest` 7건(기존 6 + H-6 table-driven 1, table 내부 8 case
+  전부 대조 통과)·`MlGateRegistrationTest` 2건(완전성 술어 + 양성 대조) 전부 통과.
+- cmd: `:adapters:gateExecutionGate`
+- exit: 0 — 신설 두 class 등재·실행 확인(S-5).
+- cmd: T-10 변이 — `gate-tests.properties`의 `SuccessShapeFailClosedTest,` 를
+  `SuccessShapeFailClosedTestTYPO,` 로 바꾸고 `:adapters:gateExecutionGate`
+- exit: 1(`게이트 test class 가 실행되지 않았다 — bidvector.adapters.ml.SuccessShapeFailClosedTestTYPO`),
+  복원 후 `:adapters:gateExecutionGate :decision:gateExecutionGate :workflow:gateExecutionGate`
+  재실행 exit 0(S-5 재확인) — `git diff config/quality/gate-tests.properties` 로 typo 잔존
+  없음 확인.
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0(344 actionable tasks, H-2·H-4·H-6 커밋 `9bb67c3` = 이 라운드 마지막 코드·test
+  커밋 시점 — 이 HEAD 가 rollback H-3 재실측의 대상이다, rollback.md 참고).
+
+## rollback 재실측(H-3) — 상세는 rollback.md
+
+- cmd: 위 rollback.md 「실측(임시 clone, HEAD=`9bb67c3`)」 5단계 전체(A 33개 restore +
+  M 9개 hunk 격리 11건 + compile + test)
+- exit: 0(전 단계) — A 목록에 `MlGateRegistrationTest.kt`·`SuccessShapeFailClosedTest.kt`
+  누락(H-3 지적 자체)을 채우고, `gate-tests.properties`의 M 항목 hunk 커밋에 `9bb67c3`를
+  추가한 뒤 재측정.
+
+## 인증값 노출 재스캔(라운드 3 편집 뒤)
+
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m4/4d/ --exclude=scope.md`
+- exit: 1(매치 0)
+
+## `file:line` 좌표 재스캔(verifier r3 H-5)
+
+**이 절 자체에 원문을 옮겨 적지 않는다** — 위 인증값 노출 스캔 절과 같은 이유(자기매치
+회피, evidence-pack 규격). 매치됐던 파일·줄만 가리킨다.
+
+- cmd: `grep -rnE '\.kt:[0-9]+' reports/evidence/m4/4d/ _workspace/m4-4d/03_impl_report.md`
+- exit: 1(매치 0) — `commands.md`의 RED 확인 절(G-1 재현 기록)에 있던 `BidRateCandidates`
+  값 타입 생성자 참조 한 곳이 파일명 뒤에 줄 번호를 달고 있었다. 그 파일 안의 줄 번호를
+  빼(클래스·파일명만 남기고) 해소했다.
