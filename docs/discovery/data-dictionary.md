@@ -1081,6 +1081,30 @@ M4/4B-2(조합 use case) 소관으로 넘긴다 — 「목록이 닫혔다」는
 **운영자 하한 override**: 개연 밴드 밖 override는 **버리지도 통과시키지도 않고 사유와 함께
 거부**한다(운영자 결정 `OPEN-DEC-04`). 거부가 **관측 가능한 결과**여야 한다.
 
+**`MlUnavailableReason` 어휘(M4/4D-1 착수 시 사전 등재, ADR 0010 D-6) — 종결.** 4B-1은
+사다리가 ML 점수를 못 받았다는 사실 하나(`ScoreNotProvided`)만 알았다. M4/4D-1 착수로
+`bidvector.decision.MlUnavailableReason`(`ReviewReason.kt`)이 아홉 값을 더해 열 값으로
+넓어진다 — 값은 전부 `data object`(payload 없음, D-4D-6). 층 구분(ADR 0010 D-3)은 다음과
+같다.
+
+| 값 | 층 | 뜻 |
+| --- | --- | --- |
+| `ScoreNotProvided` | (4B-1, gateway 도입 전) | 사다리가 요구하는 점수 입력이 결측 |
+| `DeadlineExceeded` | transport | `DEADLINE_EXCEEDED`, 재시도 예산 안에서도 소진 |
+| `CircuitOpen` | 소비자 정책 | resilience4j circuit breaker open — 호출 자체를 하지 않음 |
+| `RetryBudgetExhausted` | transport | `UNAVAILABLE`·`RESOURCE_EXHAUSTED`가 재시도 상한 안에서도 지속 |
+| `TransportFailed` | transport | 재시도 불가 status(`INVALID_ARGUMENT` 등)로 첫 시도에 끝남 |
+| `ModelNotReady` | application | `ApplicationFailure{MODEL_NOT_READY}`가 재시도 뒤에도 지속 |
+| `ReleaseMismatch` | client 집행 | 응답 release 가 요청 selector 와 어긋남(제3 변환 금지, D-3) |
+| `ContractViolation` | client 집행 | 정의 밖 enum·후보 개수/순서·정규형 위반 등 계약 불변식 위반 |
+| `UnsupportedSchema` | application | `ApplicationFailure{UNSUPPORTED_SCHEMA}`(D-7, 다른 축) |
+| `UnsupportedRelease` | application | `ApplicationFailure{UNSUPPORTED_RELEASE}`(server 명시 거부) |
+| `InvalidRequest` | application | `ApplicationFailure{INVALID_REQUEST}` |
+
+사다리 점수 셋(priority·probability·matched)의 산출·매핑은 이 어휘의 대상이 아니다 —
+`CalculateOptimalBid` 계약이 그 이름의 필드를 내지 않아 `OPEN-4D-LADDER-SCORE-SOURCE`
+(`capability-map.md` §14.3)로 별도 운영자 결정에 올랐다(`reports/evidence/m4/4d/scope.md`).
+
 ---
 
 ## 4. 축 4 — 정책 version과 effective date

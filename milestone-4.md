@@ -338,6 +338,18 @@ strategy 서른아홉만 남음)로, 4B-1 몫만 걷으면(이전 라운드에�
 - release/checksum/schema provenance 보존
 - ML unavailable을 `review/unavailable`로 처리하는 fail-safe 정책
 
+**4D-1/4D-2 분할(D-4D-1, 착수 2026-09-10).** 착수 조사(`_workspace/m4-4d/01_scout_ml_gateway.md`)
+가 승인 태그 `contracts/v1-approved-2026-09-07`의 `.proto` 전체를 대조해 **`priority`·
+`probability`·`matched`(4B-1 사다리가 읽는 점수 셋)라는 이름의 필드가 0건**임을 실측했다
+— `CalculateOptimalBid`의 `Success`는 투찰율 후보 셋·`PriceFitness`·`Uncertainty`·
+`ModelRelease`만 낸다. 그래서 4D를 둘로 가른다. **4D-1**(이 문서 여섯 줄 그대로 —
+client·deadline/cancel/breaker/bounded retry·domain↔DTO 매핑·**ML response → candidate
+매핑**·provenance 보존·fail-safe)은 계약이 나르는 투찰율 후보 gateway를 세운다. **4D-2**
+(사다리 점수 경로)는 `OPEN-4D-LADDER-SCORE-SOURCE`(`capability-map.md` §14.3 — 운영자
+결정 필요, 착수 가정은 (c) 「당분간 `MlAnalysisPort`는 항상 `Unavailable`」) 결정 뒤 후속
+slice로 착수한다. 4D-1 산출물(gateway 자체)은 그 결정과 무관하게 그대로 필요하다 — 정본
+`reports/evidence/m4/4d/scope.md`.
+
 ### Slice 4E — notification adapter contract
 
 - delivery request와 rendered content 분리
