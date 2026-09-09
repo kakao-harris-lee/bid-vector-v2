@@ -155,3 +155,52 @@
 - exit: 0(매치 6건, 전부 `fixtures/manifest.yaml`의 `token`/`token_alignment` — M1 계약
   결속 도메인 어휘, 이 slice가 만든 줄이 아니다·자격증명 아님, 육안 확인). 실 비밀값
   패턴(`api_key`·`secret`·`password`·`Bearer `·PEM 헤더) 매치 0건.
+
+## 2026-09-09T11:10Z — 커밋(수정 라운드 1, head `7133ccc`) — 경로 명시
+- cmd: `git add fixtures/manifest.yaml reports/evidence/m4/4b1/{checklist,commands,rollback}.md
+  && git commit ... -- <같은 4경로>`
+- exit: 0 — 4 files changed(167 insertions·31 deletions). `decision/**`·4C-1 경로 혼입 없음
+  (`git status --porcelain -- fixtures/manifest.yaml reports/evidence/m4/4b1/*.md` 커밋
+  직전 실측이 이 4개와 정확히 일치).
+
+## 2026-09-09T11:12Z — S-0(임시 clone, `7133ccc`에 pin)
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks . "$d/repo" && (cd "$d/repo" &&
+  git checkout --quiet 7133ccc && ./gradlew --no-build-cache clean check)`
+- exit: 0 — `BUILD SUCCESSFUL in 52s`, 353 actionable tasks 전부 executed(캐시 없는
+  임시 clone).
+
+## 2026-09-09T11:20Z — M-1 재실측: 공유 파일 line-level(`git apply -R`) · 신규 파일 전체
+  삭제 (verifier r1 M-1 지정 절차, `381eaeb~1..381eaeb`가 4C-1 몫과 겹치는 파일에 한해
+  커밋 단위로 hunk 를 격리)
+- 배경(실측): `git log --oneline 13cf0f6..HEAD -- <공유파일>` 로 확인 — `gate-tests.properties`
+  는 4C-1 rework(`7469bce`)와 4B-1(`381eaeb`) 둘 다 이 range 안에서 만졌고,
+  `fixtures/manifest.yaml`은 4B-1 두 커밋(`381eaeb`·`7133ccc`)만, 나머지 4개
+  (`CorpusExecutors.kt`·`SharedKernelCorpusConformanceTest.kt`·`data-dictionary.md`·
+  `capability-map.md`)는 이 range 에서 4B-1(`381eaeb`) 만 만졌다 — 이전 판(10:45Z)의
+  「19경로 전체를 base 로 blanket restore」는 `gate-tests.properties`에서 4C-1의
+  `7469bce` 몫(`OutboxEntryTest`)까지 지웠을 것이므로 verifier M-1 이 지정한 대로
+  절차를 바꿨다.
+- cmd(같은 clone, `7133ccc`): `gate-tests.properties`는 `git diff 381eaeb~1..381eaeb --
+  config/quality/gate-tests.properties | git apply -R`(4B-1 커밋 몫만 격리) — exit 0.
+  나머지 5개 공유 파일은 `git diff 13cf0f6..HEAD -- <파일> | git apply -R`(이 range 에서
+  4B-1 만 만졌으므로 안전) — exit 0(5건 전부).
+- cmd: `git restore --source=13cf0f6 --staged --worktree -- <신규 파일 35개 개별 인자>`
+  (decision/** 12·VerdictExecutors.kt 1·fixtures/{input,expected}/verdict-0[05-12] 16·
+  reports/evidence/m4/4b1/** 6) — exit 0.
+- `git status --porcelain`: **D 35 · M 6**(rollback.md 목록과 일치).
+- ① `gate-tests.properties`: `gate.tests.decision`이 4C-1 이전 두 줄(`FloorShortfallKernelTest`·
+  `ProvenanceRulesTest`)로 복귀 / `gate.tests.workflow`는 `OutboxEntryTest` 포함 4C-1 rework
+  몫 **그대로 유지**(4C-1 몫이 살아있음을 실측 확인, blanket restore 였다면 지워졌을 것).
+- ② `fixtures/manifest.yaml`: `grep -n "id: verdict-0" fixtures/manifest.yaml` → `verdict-001~004`
+  4건만(005~012 사라짐).
+- ③④ `CorpusExecutors.kt`에 `Verdict`/`VERDICT_EXECUTORS` 매치 0건, `SharedKernelCorpusConformanceTest.kt`의
+  `TARGET_DOMAINS`에 `"verdict"` 부재(실측 grep).
+- ⑤ 신규 디렉터리 잔여 파일 0건(`decision/src/main`엔 1D 소스 7개, `decision/src/test`엔
+  1D test 2개만 남음. `reports/evidence/m4/4b1/` 디렉터리 자체가 없어짐. `fixtures`엔
+  `verdict-00{1,2,3,4}` 만 남음).
+- cmd: `./gradlew --no-daemon :decision:compileKotlin :app:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon :decision:test :workflow:test :app:test --tests '*Conformance*'`
+  — exit 0. `decision:test` = 38 tests(`ProvenanceRulesTest` 21 + `FloorShortfallKernelTest`
+  17, 4B-1 이전 1D 그대로) · conformance = **74 tests**(4B-1 이전 기준, 82-8 일치). 다섯
+  확인 전부 통과.
+- clone 삭제(`rm -rf`), 원 worktree에는 영향 없음(별도 clone).

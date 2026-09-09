@@ -51,8 +51,23 @@ git diff --name-status 13cf0f63da18e13f0e2befd519710a8635742004..HEAD -- \
 
 ## 되돌리는 명령
 
-**공유 파일(줄 단위)**: `git diff HEAD~<n> -- <공유 파일>`로 이 slice가 넣은 hunk를 확인한
-뒤 `git apply -R`로 그 hunk만 되돌린다(파일 전체 `git restore`는 4C-1의 변경까지 지운다).
+**공유 파일(줄 단위)** — 먼저 `git log --oneline <base>..HEAD -- <공유 파일>`로 이 range
+안에서 그 파일을 만진 커밋을 전부 나열해, 4C-1 커밋과 4B-1 커밋이 **같이** 나오는지
+확인한다(실측: `gate-tests.properties`는 4C-1 rework(`7469bce`)와 4B-1(`381eaeb`)이
+둘 다 나온다 — `fixtures/manifest.yaml`·`CorpusExecutors.kt`·
+`SharedKernelCorpusConformanceTest.kt`·`data-dictionary.md`·`capability-map.md`는 이
+range 에서 4B-1 커밋만 나온다).
+
+- 다른 슬라이스 커밋과 **섞여 나오는 파일**(`gate-tests.properties`): 4B-1 자신의 커밋
+  해시로 hunk 를 격리한다 — `git diff <commit>~1..<commit> -- <파일> | git apply -R`
+  (실측 커밋: `381eaeb`).
+- 이 range 에서 **4B-1 만 만진 파일**: `git diff <base>..HEAD -- <파일> | git apply -R`
+  로 충분하다(다른 슬라이스 몫이 이 range 에 없으므로 base..HEAD 전체가 이 slice 몫과
+  같다) — 단, 다음 라운드에서 그 파일에 다른 슬라이스 커밋이 새로 끼면 위 방식(커밋
+  해시 격리)으로 다시 바꾼다.
+
+파일 전체 `git restore --source=<base>`는 두 경우 모두 쓰지 않는다 — 다른 슬라이스가
+그 사이 넣은 줄까지 지운다(4C-1의 `7469bce` 실사례).
 
 **신규 파일(전체 삭제)**:
 
