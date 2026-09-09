@@ -21,7 +21,7 @@ base_sha: 69e2afe   # 착수 2026-09-09 = 3E 종결·push 커밋. 착수 시 40�
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/koneps/**, adapters/src/test/kotlin/bidvector/adapters/koneps/**   # 개찰완료 오퍼레이션 구현 + 치환 확장 + mock server 시나리오. 3B·3B-2 기존 test 는 편집 없이 초록
-  - procurement/src/main/kotlin/bidvector/procurement/{Ports.kt,NoticeFacts.kt,DetailFetch.kt,OpeningResultRepository.kt}, procurement/src/test/kotlin/bidvector/procurement/**   # **추가만** — port 메서드 하나(D-3F-1) · 투찰 행 fact(D-3F-4) · 조회 가치 술어 재사용 판단(D-3F-2). 그 밖의 procurement 편집 금지
+  - procurement/src/main/kotlin/bidvector/procurement/{Ports.kt,NoticeFacts.kt,DetailFetch.kt,OpeningResultRepository.kt,CollectionPolicy.kt,FieldContract.kt,RawObservation.kt}, procurement/src/test/kotlin/bidvector/procurement/**   # **추가만** — port 메서드 하나(D-3F-1) · 부모 fact 셋(D-3F-4) · 술어 재사용(D-3F-2) · **P-13 승인분**: `CollectionPolicy.kt` 에 §1.11 계약 행 열 추가 + `FieldConcept` 투찰 축 토큰(확장 ①) + `SourceEndpoint` 개찰완료 군(확장 ③). **점수 scale(확장 ②)은 열지 않는다** — 평가점수 넷은 P-13 에서 제외돼 미등재 키로 회계된다. **계약 초안이 이 셋을 빠뜨린 것을 정정한다**(구현 레인 조사 — `KonepsFieldContract` 생성자가 procurement `internal` 이라 어댑터가 계약 없이 값을 꺼낼 경로가 구조적으로 없다). 그 밖의 procurement 편집 금지, 기존 행·enum 값 삭제·의미 변경 금지
   - adapters/src/main/resources/db/migration/V5__opening_complete_axis.sql   # 신규 마이그레이션 **하나** — **부모 컬럼만**(D-3F-3 해소로 투찰자별 자식 표를 만들지 않는다). V1~V4 를 고치지 않는다(**`V4` 는 3E 종결과 함께 push 됐다 — 되쓸 수 없다**)
   - adapters/src/main/kotlin/bidvector/adapters/persistence/**, adapters/src/test/kotlin/bidvector/adapters/persistence/**   # repository + Testcontainers 통합 test
   - adapters/src/test/kotlin/bidvector/adapters/persistence/{CleanMigrationTest.kt,CleanMigrationCheckTest.kt,CleanMigrationTriggerTest.kt}   # **스키마 스냅샷 래칫 — 3E 예외의 선례 적용(D-3F-6)**. 기대값에 **신규 항목을 더하는 편집만**. 완화·삭제 금지, 검증 레인 표적 재검증
@@ -87,6 +87,7 @@ rollback: |
 | **D-3F-3** ✅ **해소 2026-09-09**(운영자 도메인 결정) | **투찰 행의 정체성** — P-10 (a) 가 자연 키(`prcbdrBizno`)를 치환해 없앤다 | (a) 부모+순위 (b) 부모+상호 (c) 부모+순위+상호 (d) 승격 거절 | **물음 자체가 사라졌다.** 운영자 결정: 실현 사정률·예정가격 재현에 **「누가 어느 번호를 골랐는가」는 필요 없고 관측된 추첨번호 집합으로 충분하다.** 따라서 **투찰자별 canonical 표를 만들지 않는다** — 정체성이 필요 없고, masking 이 지우기로 한 상호를 기본키로 굳히지도 않는다. 실측이 (a)·(c)를 이미 죽였다(`opengRank` 전 행 채워지고 유일한 건 **4/15**, 결측·중복 흔함) | 해소 |
 | **D-3F-4** ✅ (a) 승인 2026-09-09 | **fact 깊이** | (a) **부모에 싣는다** (b) 별도 fact | **(a)** — D-3F-3 해소로 자식 목록이 없어졌다. 부모가 갖는 것은 ① **개찰 1위 축**(순위 1 행의 상호·투찰금액·투찰율·평가점수) ② **관측된 추첨번호 집합** ③ 개찰결과구분명 | 승인 |
 | **D-3F-5** ✅ (a) 승인 2026-09-09 | **평가점수 넷** | (a) **수집·보존** (b) 이번 slice 밖 | **(a)** — 다만 D-3F-3 해소의 귀결로 **투찰자별 평가점수는 `raw_observation` 감사 기록까지**이고 canonical 슬롯은 **1위 행 것만**이다. 해석·판정은 하지 않는다(DEC 축) | 승인 |
+| **D-3F-7** ✅ **P-13 (a) 승인 2026-09-09** | **투찰 축 필드 계약이 없다** — legacy 가 개찰완료 오퍼레이션을 부르지 않아 §1.7 에 계약이 없고, `KonepsFieldContract` 생성자가 procurement `internal` 이라 어댑터가 계약 없이 값을 꺼낼 경로가 **구조적으로 없다**(구현 레인 조사, 우회가 아니라 이미 게이트된 모듈 경계) | (a) §1.11 표 채택 + 평가점수 제외 (b) 평가점수 포함 (c) 최소만 | **(a)** — 열 키 등재, 사업자등록번호·대표자명·비고·URL 미등재(P-10 (a) 와 소비자 부재), 평가점수 넷은 scale 미확정이라 제외. 3A 확장은 ①③ 둘 | 승인 |
 | **D-3F-6** ✅ (a) 승인 2026-09-09 | **스키마 스냅샷 래칫 예외** | (a) **3E 와 같은 조건으로 3F 에 적용** (b) 매 slice 개별 (c) 상시 규격 | **(a)** — 기대값에 **신규 항목을 더하는 편집만**, 완화·기존 항목 삭제 금지, 검증 레인 표적 재검증. 장기 구조 개선은 `OPEN-3E-SCHEMA-SNAPSHOT-MAINTENANCE` | 승인 |
 
 **D-3F-3 해소가 이 slice 를 작게 만든다** — 자식 표·정체성·상호 키 위험이 한꺼번에 사라지고 남는 것은
