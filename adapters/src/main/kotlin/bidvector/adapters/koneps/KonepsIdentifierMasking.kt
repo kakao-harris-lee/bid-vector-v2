@@ -160,13 +160,135 @@ internal fun mapMaskedOpeningItem(
     val (numberKey, roundKey) = identityRawKeys(policy)
     val numberRaw = presentText(masked.fields, numberKey)
     val roundRaw = presentText(masked.fields, roundKey)
-    if (numberRaw.isNullOrBlank() || roundRaw.isNullOrBlank()) {
-        return RawItemOutcome.Dropped(CollectionDropReason.CollectionMissingNoticeNumber)
-    }
-    val observation = RawNoticeObservation.ofRawValues(masked.fields, sourceEndpoint, observedAt, masked.sourceText)
-    val identity = identityOf(numberRaw, roundRaw, rowDiscriminatorOf(masked.fields, rowIdentifierRawKeys))
     // verifier r1 F-3·F-8 수정 — unknownFieldCount 는 이름 그대로 계약 밖 키 수만(F-3),
     // masking 실패는 별도 축(F-8, maskingFailureCount)으로 낸다. 이전 판은 이 둘을 하나로
     // 접어(unknownFieldCount 자리에 decompositionFailures 를 실어) F-3 의 손실을 만들었다.
-    return RawItemOutcome.Mapped(observation, identity, masked.excludedFieldCount, masked.decompositionFailures)
+    return finishMaskedOutcome(
+        masked.fields,
+        masked.sourceText,
+        numberRaw,
+        roundRaw,
+        sourceEndpoint,
+        observedAt,
+        rowIdentifierRawKeys,
+        masked.excludedFieldCount,
+        masked.decompositionFailures,
+    )
+}
+
+/**
+ * [mapMaskedOpeningItem]·[mapOpeningCompleteItem] 공통 꼬리(중복 금지, CPD 실측) — 식별자
+ * 부재 drop 판정 + [RawNoticeObservation] 조립 + dedup identity 조립은 두 축이 같은
+ * 사유(M-2 관례)로 같은 순서를 밟는다. 두 함수가 다른 것은 오직 masking **입력**(계약
+ * 레지스트리 대 하드코딩 allow-list)이다.
+ */
+private fun finishMaskedOutcome(
+    fields: Map<RawKey, RawValue>,
+    sourceText: String,
+    numberRaw: String?,
+    roundRaw: String?,
+    sourceEndpoint: SourceEndpoint,
+    observedAt: Instant,
+    rowIdentifierRawKeys: List<String>,
+    excludedFieldCount: Int,
+    maskingFailureCount: Int,
+): RawItemOutcome {
+    if (numberRaw.isNullOrBlank() || roundRaw.isNullOrBlank()) {
+        return RawItemOutcome.Dropped(CollectionDropReason.CollectionMissingNoticeNumber)
+    }
+    val observation = RawNoticeObservation.ofRawValues(fields, sourceEndpoint, observedAt, sourceText)
+    val identity = identityOf(numberRaw, roundRaw, rowDiscriminatorOf(fields, rowIdentifierRawKeys))
+    return RawItemOutcome.Mapped(observation, identity, excludedFieldCount, maskingFailureCount)
+}
+
+// =============================================================================
+// M3/3F — 개찰완료(13) 축 masking. 이 오퍼레이션의 필드는 procurement 계약 레지스트리
+// (`CollectionPolicy.kt`) 밖이다(scope.md 「procurement 는 Ports.kt·NoticeFacts.kt·
+// DetailFetch.kt·OpeningResultRepository.kt 추가만, 그 밖 편집 금지」) — D-3F-3 해소로
+// 이 slice 는 투찰자별 필드의 canonical 접근(`valueOf(contract)`)이 필요 없다(그건 M4 4B
+// 몫). allow-list 는 `opengCorpInfo` 성분 분해([maskOpengCorpInfo])와 같은 자리에서 이
+// 파일이 직접 하드코딩한다 — 계약 레지스트리 대신. `prcbdrBizno`·`prcbdrCeoNm`(투찰업체
+// 사업자등록번호·대표자명, §1.9.4 필수 항목)은 이 목록에 **의도적으로 없다**(P-10 (a),
+// allow-list 반전 — 등재 안 된 키는 담기 전에 제외된다).
+// =============================================================================
+private val OPENING_COMPLETE_ALLOWED_KEYS: Set<String> =
+    setOf(
+        "bidNtceNo",
+        "bidNtceOrd",
+        "opengRank",
+        "prcbdrNm",
+        "bidprcAmt",
+        "bidprcrt",
+        "drwtNo1",
+        "drwtNo2",
+        "bidprcDt",
+        "bidPrceEvlVal",
+        "techEvlVal",
+        "techEvlNaturVal",
+        "totalEvlAmtVal",
+        "progrsDivCdNm",
+    )
+
+private const val OPENING_COMPLETE_NOTICE_NUMBER_KEY = "bidNtceNo"
+private const val OPENING_COMPLETE_NOTICE_ROUND_KEY = "bidNtceOrd"
+
+/**
+ * 개찰완료 항목을 [OPENING_COMPLETE_ALLOWED_KEYS] 로만 거른 통로 타입 — [MaskedKonepsItem]과
+ * 같은 형태(단일 통로·`private` 생성자·[from]만 생성 경로)이지만 계약 레지스트리를 참조하지
+ * 않는다. `sourceText`도 걸러진 값의 `render()`다(원문 substring 을 나르지 않는다 — 3D 감사
+ * 통로에도 사업자등록번호·대표자명이 남지 않는다).
+ */
+internal class MaskedOpeningCompleteItem private constructor(
+    val fields: Map<RawKey, RawValue>,
+    val sourceText: String,
+    val excludedFieldCount: Int,
+) {
+    companion object {
+        fun from(item: JsonValue.JsonObject): MaskedOpeningCompleteItem {
+            val forRender = LinkedHashMap<String, JsonValue>()
+            val fields = LinkedHashMap<RawKey, RawValue>()
+            var excludedFieldCount = 0
+            for ((name, value) in item.fields) {
+                if (name.isBlank() || name !in OPENING_COMPLETE_ALLOWED_KEYS) {
+                    excludedFieldCount++
+                    continue
+                }
+                forRender[name] = value
+                fields[RawKey(name)] = value.toRawValue()
+            }
+            val sourceText = JsonValue.JsonObject(forRender, sourceText = "").render()
+            return MaskedOpeningCompleteItem(fields, sourceText, excludedFieldCount)
+        }
+    }
+}
+
+/**
+ * 개찰완료 항목(⑦, COL-03) → [RawNoticeObservation] — [mapMaskedOpeningItem]과 같은 형태이지만
+ * `policy: KonepsCollectionPolicyData` 를 받지 않는다(위 하드코딩 allow-list 사유). 공고번호·
+ * 차수 raw 키는 이 오퍼레이션에서 이름이 고정이라([OPENING_COMPLETE_NOTICE_NUMBER_KEY]·
+ * [OPENING_COMPLETE_NOTICE_ROUND_KEY]) 계약에서 조회하지 않는다. 식별자 부재는 공고 축과
+ * 같은 사유로 떨어진다(M-2 관례).
+ */
+internal fun mapOpeningCompleteItem(
+    item: JsonValue.JsonObject,
+    sourceEndpoint: SourceEndpoint,
+    observedAt: Instant,
+    // F-1 관례 재사용 — 목록 오퍼레이션은 emptyList(), 이 오퍼레이션(한 공고=투찰자별 여러
+    // 행)은 [KonepsOperationPolicy.OPENING_COMPLETE.rowIdentifierRawKeys] 를 그대로 넘긴다.
+    rowIdentifierRawKeys: List<String>,
+): RawItemOutcome {
+    val masked = MaskedOpeningCompleteItem.from(item)
+    val numberRaw = presentText(masked.fields, RawKey(OPENING_COMPLETE_NOTICE_NUMBER_KEY))
+    val roundRaw = presentText(masked.fields, RawKey(OPENING_COMPLETE_NOTICE_ROUND_KEY))
+    return finishMaskedOutcome(
+        masked.fields,
+        masked.sourceText,
+        numberRaw,
+        roundRaw,
+        sourceEndpoint,
+        observedAt,
+        rowIdentifierRawKeys,
+        masked.excludedFieldCount,
+        maskingFailureCount = 0,
+    )
 }

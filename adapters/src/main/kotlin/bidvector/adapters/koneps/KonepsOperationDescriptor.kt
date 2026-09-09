@@ -10,6 +10,11 @@ import java.net.URI
  * 기본값·폴백을 두지 않는 것이 게이트다 — 리터럴 `"inqryDiv=1"`을 쓰려면 새 인스턴스를
  * 만들어야 하므로 실수로 조용한 오조회가 나지 않는다(설계 검토 Phase 2.5 게이트 ③).
  *
+ * `inquiryDivValue`는 **nullable**이다(M3/3F, §1.9.2 — 개찰완료·유찰·재입찰 오퍼레이션 군은
+ * "`inqryDiv` 자체가 없다"). `null`은 「이 오퍼레이션 군엔 그 축이 없다」는 사실이지 "값을
+ * 안 정했다"가 아니다 — [buildKonepsOperationUri]는 `null`일 때 `inqryDiv` 쿼리 파라미터
+ * 자체를 내지 않는다(빈 문자열을 보내는 것과 다르다, `init`이 여전히 blank 문자열은 거부한다).
+ *
  * `requiresPeriodWindow`(기간 조건 — `inqryBgnDt`/`inqryEndDt`)와 `requiresNoticeNumber`
  * (`bidNtceNo`) 는 문서상 상호배타다(날짜창 스윕 대 단건 조회, D-3B2-2·D-3B2-3) — 함께 참일
  * 근거가 없어 `init`이 거부한다. `requiresNoticeRound`(`bidNtceOrd`)는 `bidNtceNo`가 필요한
@@ -23,14 +28,16 @@ import java.net.URI
  * 비워 두면 같은 공고의 여러 행이 dedup 식별자 충돌로 `duplicate` 에 접혀 사라진다(F-1).
  */
 data class KonepsOperationDescriptor(
-    val inquiryDivValue: String,
+    val inquiryDivValue: String?,
     val requiresPeriodWindow: Boolean,
     val requiresNoticeNumber: Boolean,
     val requiresNoticeRound: Boolean,
     val rowIdentifierRawKeys: List<String>,
 ) {
     init {
-        require(inquiryDivValue.isNotBlank()) { "inquiryDivValue는 빈 문자열일 수 없다" }
+        require(inquiryDivValue == null || inquiryDivValue.isNotBlank()) {
+            "inquiryDivValue는 빈 문자열일 수 없다(축이 없으면 null 을 쓴다)"
+        }
         require(!(requiresPeriodWindow && requiresNoticeNumber)) {
             "기간 조회와 단건 조회는 같은 오퍼레이션에서 동시에 요구되지 않는다(D-3B2-2·D-3B2-3)"
         }
@@ -93,6 +100,27 @@ internal object KonepsOperationPolicy {
             requiresNoticeRound = true,
             rowIdentifierRawKeys = listOf("lmtGrpNo", "lmtSno"),
         )
+
+    /**
+     * 개찰완료(13, M3/3F) — `inqryDiv` **자체가 없다**(§1.9.2 「13-15: 자체가 없다」). `bidNtceNo`
+     * 필수 단건 조회, `bidNtceOrd`는 문서상 옵션이지만 이 서술자는 **보낸다**
+     * (`requiresNoticeRound = true`) — 한 공고번호에 차수가 여럿일 때 옵션 취급으로 조회를
+     * 넓히는 것보다 좁혀 보내는 편이 안전하다는 판단(구현 레인 판단, evidence 「판단이 갈린
+     * 지점」). 투찰자별 행이 여럿이라 `rowIdentifierRawKeys`가 필요한데, `opengRank`는
+     * 실측(§1.9.7)에서 전 행 채워지고 유일한 경우가 4/15뿐이라(결측·중복 흔함) 자연 키로
+     * 못 쓴다 — 상호(`prcbdrNm`)가 표본에서 완전·유일했다(15/15). **이 raw 키는 SourceBatch
+     * 내부 dedup 회계 전용이지 canonical 정체성이 아니다**(D-3F-3 해소로 canonical 승격 자체가
+     * 없다) — 같은 이름의 두 투찰자가 실제로 있으면 뒤 행이 `duplicate` 로 잘못 접힐 수 있는
+     * 잔여 위험을 그 대가로 안는다(알려진 제한).
+     */
+    val OPENING_COMPLETE =
+        KonepsOperationDescriptor(
+            inquiryDivValue = null,
+            requiresPeriodWindow = false,
+            requiresNoticeNumber = true,
+            requiresNoticeRound = true,
+            rowIdentifierRawKeys = listOf("prcbdrNm"),
+        )
 }
 
 /**
@@ -121,8 +149,10 @@ internal fun buildKonepsOperationUri(
             "pageNo=$pageNo",
             "numOfRows=$numOfRows",
             "type=json",
-            "inqryDiv=${operation.inquiryDivValue}",
         )
+    // M3/3F — inquiryDivValue 가 null 이면 이 오퍼레이션 군엔 그 축 자체가 없다(§1.9.2,
+    // 개찰완료·유찰·재입찰). 파라미터를 아예 안 낸다 — 빈 문자열이나 지어낸 값을 보내지 않는다.
+    operation.inquiryDivValue?.let { params += "inqryDiv=$it" }
     if (periodWindow != null) {
         params += "inqryBgnDt=${periodWindow.first}"
         params += "inqryEndDt=${periodWindow.second}"
