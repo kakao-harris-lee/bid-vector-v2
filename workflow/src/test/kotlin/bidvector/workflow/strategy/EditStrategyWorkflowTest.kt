@@ -70,9 +70,14 @@ private class InMemorySessionRepository : EditSessionRepository {
 
 private class RecordingEventSink : EventSink {
     val published = mutableListOf<StrategyEvent>()
+    val publishedActors = mutableListOf<Actor>()
 
-    override fun publish(event: StrategyEvent) {
+    override fun publish(
+        event: StrategyEvent,
+        actor: Actor,
+    ) {
         published += event
+        publishedActors += actor
     }
 }
 
@@ -98,7 +103,10 @@ private class FlakyEventSink : EventSink {
     val published = mutableListOf<StrategyEvent>()
     var failNextPublish = false
 
-    override fun publish(event: StrategyEvent) {
+    override fun publish(
+        event: StrategyEvent,
+        actor: Actor,
+    ) {
         if (failNextPublish) {
             failNextPublish = false
             error("simulated publish failure")
@@ -173,6 +181,9 @@ class EditStrategyWorkflowTest {
         confirmed.outcome.shouldBeInstanceOf<TransitionOutcome.Applied>()
         strategies.strategy.revision shouldBe StrategyRevision(2)
         events.published shouldBe listOf(StrategyEvent.StrategyUpdated(StrategyRevision(2), TEST_POLICY_VERSION))
+        // 4C-1 좁은 예외(EventSink.publish(event, actor)) — 발행이 나르는 actor 는
+        // 그 세션의 소유 operator 다(session.actor), command 의 actor 재확인이 아니다.
+        events.publishedActors shouldBe listOf(Actor.Operator(OPERATOR))
     }
 
     @Test

@@ -1,0 +1,6 @@
+{
+  "milestone": "m4",
+  "slice": "4c1-event-envelope-and-outbox-vocabulary",
+  "status": "N/A",
+  "reason": "Python/V2 차이 판정 대상이 없다 — legacy(`ed4b06c`)에 DB 기반 outbox의 상태·클레임 구조는 있으나(`app/models/pipeline.py:95-127`) 상태 값 집합 자체가 어디에도 선언돼 있지 않다(`data-dictionary.md` §2.2.5 원문, `reports/evidence/m0/0c/checklist.md:130`). 봉투(EventEnvelope) 아홉 필드·idempotencyKey dedup·inbox 판정도 legacy에 대응 개념이 없는 신설 어휘다(D-M4-4/D-M4-5, scope.md 「조사 결과」 절 — 4A가 이미 확인한 「legacy에 편집 상태 기계 없음」과 같은 계열의 신설 판정). intentional-redesign이 아니라 legacy-behavior 대응 자체가 없는 「원래 없음」이라 differential 판정이 성립하지 않는다."
+}

@@ -1,0 +1,6 @@
+{
+  "milestone": "m4",
+  "slice": "4c1-event-envelope-and-outbox-vocabulary",
+  "status": "N/A",
+  "reason": "이 slice는 새 fixture corpus case를 추가하지 않는다(scope.md in_scope — 구조·어휘·port·dedup만). 기존 `strategy-edit-001~005` corpus(4A가 authoritative-from-approved-spec으로 등록, `reports/evidence/m4/4a/golden-manifest.json`이 정본)를 재사용하되 값(입력·기대값·sha256)은 무변경이다 — `app/src/test/kotlin/bidvector/app/conformance/StrategyEditExecutors.kt`의 `RecordingEventSink`는 EventSink 시그니처 확장(actor 매개변수)만 반영했고 corpus 산출 투영(state/field/violations/isConfigured/watchRulesEmpty)은 그대로다(commands.md S-4 — 74 tests, 기존과 동일 개수). 이 slice가 새로 만드는 타입(EventEnvelope·OutboxEntryState 등)의 검증은 fixture corpus가 아니라 workflow 단위/property test(OutboxTransitionTableTest·InboxDedupPropertyTest·EventEnvelopeTest·OutboxEventSinkTest)와 임시 clone 컴파일 거부 실측(commands.md 「값 획득 축 실측」)이 진다."
+}

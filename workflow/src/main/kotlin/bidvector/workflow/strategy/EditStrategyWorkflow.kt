@@ -124,7 +124,7 @@ class EditStrategyWorkflow(
         val outcome = apply(session, command, clock.now(), strategies.load(), strategyPolicy)
         if (outcome is TransitionOutcome.Applied) {
             strategies.save(outcome.applied)
-            events.publish(outcome.event)
+            events.publish(outcome.event, outcome.session.actor)
         }
         sessions.save(outcome.session)
         return CommandResult.Processed(outcome)

@@ -680,14 +680,29 @@ legacy는 `"won"/"lost"` 두 값 + `NULL = 미확정`이라 **"가격만으로 �
   구분은 0C 소관이었다 — **넷으로 나눈다.** 둘을 합치면 "언젠가 알 수 있는 것"과 "이
   방법으로는 못 정하는 것"이 같은 값이 되어 운영자의 다음 행동이 갈리지 않는다.
 
-#### 2.2.5 outbox 상태 — 어휘 자리만 둔다
+#### 2.2.5 outbox 상태 — `OutboxEntryState`(운영자 결정 2026-09-09, M4/4C-1 착수, D-M4-5 (a))
 
 legacy에 DB 기반 outbox의 상태·클레임 구조가 있으나
 (`app/models/pipeline.py:95-127`) **상태 값 집합이 어디에도 선언돼 있지 않다.**
 
-**V2의 상태 어휘와 전이는 활성 `OPEN-OPS-10`(DB 큐 계약)이 소유한다.** 이 문서는
-`OutboxEntryState`가 sealed 어휘와 명시 전이표를 가져야 한다는 **형태 요구**만 적고
-값 집합을 정하지 않는다. 브로커 없음 결정(`OPEN-OPS-05`)의 파급이 그 `OPEN`에 걸려 있다.
+**V2의 상태 어휘와 전이는 `OPEN-OPS-10`이 소유했다 — M4/4C-1 착수 시점 운영자 결정
+D-M4-5 (a)로 종결됐다(`reports/evidence/m4/4c1/scope.md`).** 이 절이 그 어휘와 전이표의
+정본이다:
+
+> `OutboxEntryState = sealed { Pending, Claimed, Delivered, Failed, Isolated }` — 전이는
+> `Pending → Claimed → Delivered | Failed | Isolated` 하나뿐이다. `Delivered`·`Failed`·
+> `Isolated`는 **종단**(이 셋에서 나가는 전이는 표에 없다 — 재시도 API 자체가 없다).
+> `Failed`는 최대 시도 소진, `Isolated`는 `Claimed`에서 워커가 죽어 격리된 것이다
+> (at-most-once, `OPEN-NOTI-02`) — 수동 검토는 앱 알림함 회수 경로가 진다(ADR 0005 D-4),
+> 이 상태 자체는 재실행 경로를 갖지 않는다. 표 밖 (state, command) 쌍은 전부 거부이고
+> 거부가 관측 가능하다(`OutboxTransitionTableTest`).
+
+M4/4C-1이 세운 것은 이 어휘·전이표와 그것을 감싸는 port(`OutboxPort`)·통로 타입
+(`OutboxTransition`)까지다 — **실 저장·claim 경합·DB↔outbox 원자성·crash-after-commit**은
+4C-2(M4 후속, `main` 병합 뒤)가 진다. 그 미측정 구간은 `OPEN-4C1-TX-CONTRACT-UNVERIFIED`로
+활성 등재돼 있다(같은 scope.md). `OPS-06`(queue topology 배포 게이트) 자신의 재정의·폐기
+판정은 이 절이 아니라 `capability-map.md` §10의 그 행이 소유한다 — 이 절의 편집은 어휘·
+전이표에 한정된다.
 
 #### 2.2.6 전략 — 어휘 자리만 둔다 (운영자 결정 2026-09-06, M1/1E 착수, decision 31)
 

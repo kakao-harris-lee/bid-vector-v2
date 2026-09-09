@@ -88,10 +88,14 @@ private class FakeSessionRepository : EditSessionRepository {
     }
 }
 
+/** M4/4C-1 좁은 예외(`EventSink.publish(event, actor)`) 배선 — corpus 는 actor 를 투영하지 않는다(범위 밖). */
 private class RecordingEventSink : EventSink {
     val published = mutableListOf<StrategyEvent>()
 
-    override fun publish(event: StrategyEvent) {
+    override fun publish(
+        event: StrategyEvent,
+        actor: Actor,
+    ) {
         published += event
     }
 }

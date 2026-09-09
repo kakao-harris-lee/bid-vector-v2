@@ -46,7 +46,20 @@ interface EditSessionRepository {
     fun save(session: EditSession)
 }
 
-/** 적용 이벤트 발행 port(scope.md ⑥) — 봉투·outbox 는 4C, 이 slice 는 payload 를 넘기는 자리까지. */
+/**
+ * 적용 이벤트 발행 port(scope.md ⑥) — 봉투·outbox 는 4C, 이 slice 는 payload 를 넘기는
+ * 자리까지.
+ *
+ * **4A 계약 갱신 2026-09-09(운영자 승인, `reports/evidence/m4/4a/scope.md` 하단) — `actor`
+ * 매개변수 추가.** ③ 은 「`Applied` 가 낳는 `StrategyUpdated` 는 이 command actor 를 함께
+ * 넘긴다」고 적었으나 원래 시그니처엔 그 통로가 없었다(값 자체는
+ * [bidvector.workflow.strategy.TransitionOutcome.Applied.session] 의 actor 에 있었다).
+ * M4/4C-1 이 봉투의 `StrategyUpdated actor` 필수 요구(D-M4-4 (a))를 맞추려다 이 공백을
+ * 찾아 좁게 넓혔다 — 의미 변경이 아니라 미완 전달의 완성이다.
+ */
 fun interface EventSink {
-    fun publish(event: StrategyEvent)
+    fun publish(
+        event: StrategyEvent,
+        actor: Actor,
+    )
 }
