@@ -56,4 +56,31 @@ class PredictionValueTest {
             intervalSource = IntervalSource.CrossValidationResidual,
         )
     }
+
+    // ---- verifier r1 F-5(low) — 결과 값 타입 불변식 공백(probe P11) ----
+
+    @Test
+    fun `BidRateCandidates 는 conservative 대비 base 대비 aggressive 순서를 강제한다`() {
+        shouldThrow<IllegalArgumentException> {
+            BidRateCandidates(
+                conservative = bidvector.sharedkernel.Rate.ofFraction(BigDecimal("0.95")),
+                base = bidvector.sharedkernel.Rate.ofFraction(BigDecimal("0.90")),
+                aggressive = bidvector.sharedkernel.Rate.ofFraction(BigDecimal("0.85")),
+            )
+        }
+    }
+
+    @Test
+    fun `BidRateCandidates 오름차순은 정상 생성된다`() {
+        BidRateCandidates(
+            conservative = bidvector.sharedkernel.Rate.ofFraction(BigDecimal("0.85")),
+            base = bidvector.sharedkernel.Rate.ofFraction(BigDecimal("0.90")),
+            aggressive = bidvector.sharedkernel.Rate.ofFraction(BigDecimal("0.95")),
+        )
+    }
+
+    @Test
+    fun `PriceFitness 는 음수를 거부한다`() {
+        shouldThrow<IllegalArgumentException> { PriceFitness(BigDecimal("-9999")) }
+    }
 }

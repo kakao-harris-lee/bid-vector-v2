@@ -2,7 +2,7 @@
 
 > D-4D-7(scope.md)이 구조만 고정했다 — 값 자체는 이 문서의 승인 없이 확정되지 않는다.
 > 4A `policy-values.md`·4E `policy-values.md`와 같은 표 형식(층·근거·범위)을 유지한다.
-> `MlCallPolicyData`(`adapters/src/main/kotlin/bidvector/adapters/ml/MlCallPolicy.kt`)의
+> `MlCallPolicyData`(`adapters/src/main/kotlin/bidvector/adapters/ml/MlCallPolicyData.kt`)의
 > `ML_CALL_POLICY.source`가 이 문서를 가리킨다.
 
 ---
@@ -45,7 +45,7 @@
 ## 4. 되돌림 경로
 
 이 값들이 재검토돼야 하면 이 표를 갱신하고 §5 `change_history`를 추가한다. `ML_CALL_POLICY`
-(`MlCallPolicy.kt`)의 값·주석은 바꾸지 않고 이 문서만 먼저 바꾸면 코드와 evidence가
+(`MlCallPolicyData.kt`)의 값·주석은 바꾸지 않고 이 문서만 먼저 바꾸면 코드와 evidence가
 어긋난다는 점에 주의(정본은 이 문서, 코드는 이 문서를 인용).
 
 **실측 갱신 경로**: `OPEN-M2-DEADLINE-VALUES`(M5 5E 실측 → M4 4D 정책 version 갱신) —

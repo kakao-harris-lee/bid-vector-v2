@@ -266,6 +266,25 @@ class GrpcBidPredictionGatewayTest {
         }
     }
 
+    // ---- verifier r1 F-3(medium) — DEADLINE_EXCEEDED 재시도 예산 술어(F-1 과 같은 메커니즘) ----
+
+    @Test
+    fun `DEADLINE_EXCEEDED 도 예산이 없으면 재시도 없이 1회 호출로 끝난다(gRPC 절대 deadline 부작용에 기대지 않는다)`() {
+        runBlocking {
+            val policy =
+                testMlCallPolicy(maxAttempts = 3, backoff = listOf(Duration.ofSeconds(10), Duration.ofSeconds(10)))
+            val calls = AtomicInteger(0)
+            val servicer = throwingServicer(calls, Status.DEADLINE_EXCEEDED)
+            val gateway = gatewayOn(servicer, policy)
+
+            val outcome = gateway.predict(testBidPredictionRequest(), CallBudget(Duration.ofMillis(200)))
+
+            outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+            outcome.reason shouldBe MlUnavailableReason.DeadlineExceeded
+            calls.get() shouldBe 1
+        }
+    }
+
     @Test
     fun `재시도는 같은 request_id 를 재사용한다(D-4 멱등)`() {
         runBlocking {

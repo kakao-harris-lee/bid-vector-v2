@@ -185,6 +185,17 @@ class GrpcBidPredictionGateway(
         return BidPredictionOutcome.Unavailable(reason)
     }
 
+    /**
+     * verifier r1 F-10(low) — `Resolution.NotApplicable` 가지의 `error(...)`는 scope.md ④
+     * 「예외가 이 클래스 밖으로 새지 않는다」의 대상이 **아니다**. 그 규율은 ML 호출의
+     * 업무 실패(transport·application·release 불일치 등)를 가리킨다 — 이 가지는 배선
+     * 자체의 설정 오류(`ML_CALL_POLICY`에 [bidvector.sharedkernel.EffectiveFrom.Initial]
+     * 항목이 없어 어떤 기준일도 못 푸는 상태)를 잡는 fail-fast 방어다. `ML_CALL_POLICY`가
+     * `Initial` 하나만 갖는 한(운영 인스턴스 실측, `MlCallPolicyDataTest`) `predict` 경로는
+     * 이 가지에 실질적으로 도달하지 않는다 — 제거하지 않는 이유는 정책이 시행일 기반
+     * 다중 entry 로 확장될 미래(`OPEN-M2-DEADLINE-VALUES` 실측 갱신)에 이 방어가 실제
+     * 배선 결함(예: 시행일이 전부 미래인 정책 배포)을 조용히 통과시키지 않게 하려는 것.
+     */
     private fun resolvePolicy(): ResolvedMlCallPolicy {
         val referenceDate = LocalDate.now(clock)
         return when (val resolution = policy.resolve(referenceDate)) {

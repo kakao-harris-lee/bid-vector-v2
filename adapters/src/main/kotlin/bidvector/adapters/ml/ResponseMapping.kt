@@ -15,7 +15,7 @@ import contract.bidvector.ml.v1.UnmeasurableReason as ProtoUnmeasurableReason
  * M4/4D-1(scope.md ④~⑦) — 계약 DTO → 도메인 [BidPredictionOutcome]. **fail-closed** — 정의
  * 밖 enum·후보 개수/순서/origin 위반·정규형 위반·`sample_size==0`은 전부
  * `Unavailable(ContractViolation)`(⑦, 우회 (5)(6)). `Unmeasurable`은 값·기본값으로 접지
- * 않는다(⑤, ADR 0010 D-3). `Success` 형태 검증·필드 파싱은 `SuccessValidation.kt`에 있다
+ * 않는다(⑤, ADR 0010 D-3). `Success` 형태 검증·필드 파싱은 `ParsedSuccessFields.kt`에 있다
  * (detekt `TooManyFunctions` — 한 파일에 열셋을 몰아두지 않는다).
  */
 internal fun mapUnmeasurable(message: Unmeasurable): BidPredictionOutcome =
