@@ -66,7 +66,8 @@ private sealed interface BoundedRetryOutcome {
  * attempt index 로 고른다)만큼 실제로 지연한다 — resilience4j `Retry`를 쓰지 않는다(재시도
  * 계층이 둘이 되지 않는다). **예산 소진은 breaker 계수 밖이다**(verifier r2 G-4) — 서버로
  * 나가는 호출을 한 번도 만들지 않은 채 예산이 끝나는 것은 서버 건강과 무관하므로
- * `circuitBreaker.onError`를 부르지 않는다. gRPC 실패는 [StatusException]·
+ * `circuitBreaker.onError`를 부르지 않는다. permit 을 얻은 뒤의 결말은 `settlePermit`
+ * 하나로 좁힌다(verifier r3 H-1, 아래 참고). gRPC 실패는 [StatusException]·
  * [StatusRuntimeException] 둘 중 하나로만 온다 — 그 밖(coroutine 취소의
  * `CancellationException` 포함)은 여기서 잡지 않고 그대로 전파한다(`RetryRules.kt`와 같은
  * 이유, detekt `TooGenericExceptionCaught`).
@@ -79,25 +80,60 @@ internal suspend fun callResilient(
     call: suspend () -> CalculateOptimalBidResponse,
 ): PredictionCallOutcome {
     if (!circuitBreaker.tryAcquirePermission()) return PredictionCallOutcome.BreakerOpen
+    return settlePermit(circuitBreaker) {
+        val deadlineAt = System.nanoTime() + remainingBudget.toNanos()
+        callWithBoundedRetry(maxAttempts, backoff, deadlineAt, call)
+    }
+}
+
+/**
+ * verifier r3 H-1(high) — permit 을 이미 얻은 뒤의 **모든** 경로를 이 함수 하나로 좁혀
+ * `try`/`finally`로 결말을 구조로 강제한다. 이전 결함: `callResilient`가 permit 을 얻은
+ * 뒤 `BudgetExhausted` 가지에서 `onSuccess`·`onError`·`releasePermission` 중 아무것도
+ * 부르지 않고 그냥 반환했다 — CLOSED 에서는 무해했으나(permit 이 무제한) HALF_OPEN 은
+ * `permittedNumberOfCallsInHalfOpenState`(기본 10)이 유한해, 예산 소진 호출이 그 permit 을
+ * 계속 먹기만 하고 반납하지 않아 breaker 가 회복 불가능한 HALF_OPEN 에 영구히 갇혔다(실측:
+ * permit 수보다 많은 예산 소진 호출 뒤 넉넉한 예산 호출도 전부 `CircuitOpen`, 서버 호출 0).
+ *
+ * 처방은 「가지마다 `releasePermission()` 한 줄」이 아니다 — 그러면 다음에 새 가지가 늘 때
+ * 같은 실수가 재발한다. 이 함수를 거치는 한 [operation]의 결과가 무엇이든(그리고 잡히지
+ * 않는 예외가 나가더라도) `finally`가 안전망으로 동작해 셋(`onSuccess`·`onError`·
+ * `releasePermission`) 중 정확히 하나가 항상 불린다 — `settled` 플래그가 그 중 하나가 이미
+ * 불렸음을 표시하고, `finally`는 그렇지 않은 경우에만 `releasePermission()`으로 닫는다.
+ * `BudgetExhausted`는 서버를 향한 호출이 실패했다는 신호가 아니므로(백오프를 감당 못 해
+ * 재시도를 포기한 것뿐) `releasePermission()`만 부른다 — `onError`가 아니다(verifier r2
+ * G-4 의 의미를 그대로 지킨다, CLOSED 에서 예산 소진이 breaker 건강에 영향을 주면 안 된다).
+ */
+private suspend fun settlePermit(
+    circuitBreaker: CircuitBreaker,
+    operation: suspend () -> BoundedRetryOutcome,
+): PredictionCallOutcome {
     val start = System.nanoTime()
-    val deadlineAt = start + remainingBudget.toNanos()
+    var settled = false
     return try {
-        when (val outcome = callWithBoundedRetry(maxAttempts, backoff, deadlineAt, call)) {
+        when (val result = operation()) {
             is BoundedRetryOutcome.Success -> {
                 circuitBreaker.onSuccess(System.nanoTime() - start, TimeUnit.NANOSECONDS)
-                PredictionCallOutcome.Responded(outcome.response)
+                settled = true
+                PredictionCallOutcome.Responded(result.response)
             }
 
             BoundedRetryOutcome.BudgetExhausted -> {
+                circuitBreaker.releasePermission()
+                settled = true
                 PredictionCallOutcome.BudgetExhausted
             }
         }
     } catch (statusError: StatusException) {
         circuitBreaker.onError(System.nanoTime() - start, TimeUnit.NANOSECONDS, statusError)
+        settled = true
         PredictionCallOutcome.TransportFailed(statusError)
     } catch (statusRuntimeError: StatusRuntimeException) {
         circuitBreaker.onError(System.nanoTime() - start, TimeUnit.NANOSECONDS, statusRuntimeError)
+        settled = true
         PredictionCallOutcome.TransportFailed(statusRuntimeError)
+    } finally {
+        if (!settled) circuitBreaker.releasePermission()
     }
 }
 
