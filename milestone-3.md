@@ -124,6 +124,22 @@ canonical/audit/collection_run, 점유 가드 트리거 + `provenance_authority`
 4B 가 개찰 fact 를 소비하기 전까지 닫는다. 후속 소폭: 3D V-1(opening_result 라벨 가드), 3A 후속 셋(3B checklist), `OPEN-3C-ATTACHMENT-FIELD-CONTRACT`(curator 표
 P-8 + 정책 값 커밋).
 
+> **잔여 해소 2026-09-09 — 이 문단의 「잔여 slice 3B-2」는 닫혔다.** 그 뒤 slice 셋이 차례로 종결·push 됐다 —
+> **3B-2**(개찰·예비가격 축 어댑터, 2026-09-08) → **3E**(개찰 fact 슬롯과 저장 행 키, 2026-09-09) →
+> **3F**(개찰완료 축, 2026-09-09). **M3 는 잔여 slice 가 없다.** 위 문단은 **2026-09-08 시점의 기록으로
+> 그대로 둔다**(이력을 되쓰지 않는다) — 지금 상태는 각 slice 의 종결 문단과 `reports/evidence/m3/*/checklist.md`
+> 의 「사용자 승인」 절이 정본이다.
+>
+> **일곱 조건 가운데 하나는 그 뒤 관측으로 범위가 좁혀졌다.** 「retry 후 canonical effect 하나」는 지금도
+> 참이지만, 3E 가 **raw 저장 층에서 행 식별자 없는 복수 행이 한 키로 접히는** 결함을 찾아 닫았다
+> (`OPEN-3B2-STORAGE-ROW-KEY-COLLISION`). **그 종결은 어댑터 층 한정**이다 — `RowDiscriminator` 에 프로덕션
+> 호출부가 없고 배선은 **M4 4B** 소관이라, 그때까지 운영 경로는 옛 거동이다(3E 알려진 제한). 조건 자체는
+> canonical 기본키가 지키므로 선언은 유효하고, **좁혀진 것은 「어느 층에서 지켜지는가」**다.
+>
+> **후속(별도 slice 아님)**: 3D V-1 · 3A 후속 셋 · **P-8**(§1.10 첨부 문서 키 계약, 표 작성 완료·채택 대기) ·
+> fixture case 후보 여덟 · `bidNtceOrd` 실측 한 번 · 미결 `OPEN` 여섯(`OPEN-3E-*` 넷 · `OPEN-3F-*` 둘) ·
+> `OPEN-3C-ATTACHMENT-SLOT-OVERFLOW`.
+
 **3B-2 준비 완료 2026-09-08 — 승인 대기** — 선행 조건(D-3B-6)이 닫혔다. 운영자가 **낙찰정보서비스 1.1 참고자료**와 **개방표준서비스 1.2 참고자료**를 확보해
 `_workspace/m3-3b2/external/`(SHA-256 기록)에 두었고 `fixtures/manifest.yaml` `official_documents` 에 `koneps-scsbid-reference`·`pps-opnstd-reference` 로 등재했다.
 `policy-values.md` **§1.7** 이 「문서 미확보」에서 **필드 계약 13 행**(curator 레인)으로, **§1.9** 가 **오퍼레이션 계약**(23 오퍼레이션 군 · `inqryDiv` 군별 의미 ·
