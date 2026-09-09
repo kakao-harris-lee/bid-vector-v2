@@ -339,3 +339,29 @@
   fixtures/manifest.yaml reports/evidence/m4/4b1/golden-manifest.json
   reports/evidence/m4/4b1/scope.md` — exit 0(매치 6건, 전부 기존과 동일한
   `token`/`token_alignment` 도메인 어휘, golden-manifest.json·scope.md에는 매치 0건).
+
+## 2026-09-09T13:05Z — 커밋(head `0aeb218`) + S-0 + M-1 재실측(커밋 해시 격리 절차)
+- cmd: `git add fixtures/manifest.yaml reports/evidence/m4/4b1/{commands,golden-manifest,scope}.md`
+  후 경로 명시 커밋 — exit 0. 4 files changed(145 insertions·8 deletions).
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks . "$d/repo" && (cd "$d/repo" &&
+  git checkout --quiet 0aeb218 && ./gradlew --no-build-cache clean check)` — exit 0 —
+  `BUILD SUCCESSFUL in 49s`, 353 actionable tasks 전부 executed.
+- 같은 clone에서 M-1 재실측: `git log --oneline 13cf0f6..HEAD -- <파일>`로 재확인 —
+  `gate-tests.properties`만 여전히 4C-1(`7469bce`)과 겹쳐 4B-1 커밋(`381eaeb`) 해시로
+  hunk 격리, 나머지(manifest.yaml·CorpusExecutors.kt·SharedKernelCorpusConformanceTest.kt·
+  data-dictionary.md·capability-map.md·M0 원본 fixture 8개)는 이 range 전체가 4B-1
+  커밋뿐이라 base..HEAD로 안전.
+- cmd: `git diff 381eaeb~1..381eaeb -- config/quality/gate-tests.properties | git apply -R`
+  — exit 0. 나머지 12개 파일 `git diff 13cf0f6..HEAD -- <파일> | git apply -R` — exit
+  0(11건), exit 128(1건, `expected-004` 빈 patch, 예상된 no-op).
+- cmd: `git restore --source=13cf0f6 --staged --worktree -- <신규 파일 35개>` — exit 0.
+- `git status --porcelain`: **D 35 · M 13**(목록과 일치).
+- ① `gate.tests.workflow`에 `OutboxEntryTest`(4C-1 몫) 유지, `gate.tests.decision` 4C-1
+  이전 두 줄로 복귀. ② `fixtures/manifest.yaml`: `verdict-001`~`004`만 남고(`insufficient-evidence`
+  로 복귀) `005`~`012` 사라짐(`grep -n "id: verdict-0"` 실측 — 정확히 넷).
+- cmd: `./gradlew --no-daemon :decision:compileKotlin :app:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon :decision:test :workflow:test :app:test --tests
+  '*Conformance*'` — exit 0. `decision:test` = 38(1D 그대로, `FloorShortfallKernelTest`
+  17+`ProvenanceRulesTest` 21) · conformance = **74**(승격·8신설 이전 기준). 다섯 확인
+  전부 통과.
+- clone 삭제(`rm -rf`), 원 worktree엔 영향 없음.
