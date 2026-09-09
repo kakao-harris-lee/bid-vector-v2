@@ -75,13 +75,25 @@ input/expected 무변경). 재현 clone 에서 verifier 의 두 probe(H-3 커널
 `@ConsistentCopyVisibility` + `internal constructor` — 다른 통로 타입과 관례 정렬) · L-7(S-3b
 술어를 소문자 세그먼트 하나 이상으로 넓혀 `telegram.Bot`·`telegram_api.Bot` 형태를 포착).
 
+**장부층 일괄(2026-09-09) — verifier r3 `ready-for-review`.** 산출물층 blocker/high 0건.
+새 라운드 없이 low 셋 + 장부층 low 둘을 한 커밋으로 처리: L-8(`TransitionOutcome.Applied.
+applied`가 use case 반환값으로 새 나가 나중에 낡은 값으로 재저장(되감기)될 수 있었다 —
+`internal val`로 내려 닫음, `:workflow:test`·`:app:compileTestKotlin` 무영향 실측) · L-9
+(`begin()`의 중간 `sessions.save(folded)`가 같은 id 경로에서 곧바로 덮이는 죽은 쓰기 —
+코드는 유지, 「fold 가 영속된다」로 읽히던 KDoc을 정정) · L-10(우회 (3) 폐쇄는 Kotlin
+가시성 1층이 아니라 **그 위에 `sourceLanguageGate`(`.java` 소스 자체를 거부)가 겹치는
+2층**임을 명시) · B-6(S-3b 강화 시 오탐 규모를 「46건」이라 적었던 것이 재현되지 않아
+직접 재산출 — 대문자 단일 세그먼트 허용형 정규식으로 총 매치 97건·고유 문자열 42종,
+판단 자체는 불변) · B-7(「닫힌 것/경계 밖」 서술에 L-8·L-10 반영).
+
 알려진 제한(갱신): 이벤트 발행·세션 전진의 원자성 부재(저장 성공 뒤 발행 실패는 다음 재전달이
 `StaleRevision` 으로 정직하게 거부되나, 세션이 그 사이 전진하지 않는 잔여 창은 남는다 — 4C 트랜잭션
 outbox 가 닫는다) · 세션 영속 실 구현 부재(4C/3D) · 만료 트리거(sweep) 배선 부재 · `System` actor 확인
 경로 미구현(D-4A-5) · Telegram 어댑터 없음(`OPEN-STR-12` 활성) · **S-3b 술어는 대문자로 시작하는
 단일 세그먼트 루트(`Telegram.Bot`)를 여전히 잡지 못한다** — 잡으려면 `EditSessionState.Applied`
-같은 이 패키지 자신의 정당한 sealed 하위 타입 접근(실측 46건)까지 오탐해 강화하지 않기로 했다
-(소문자 세그먼트 판별은 L-7 로 이미 넓혔다).
+같은 이 패키지 자신의 정당한 sealed 하위 타입 접근(재산출 총 매치 97건·고유 42종, 위 참고)까지
+오탐해 강화하지 않기로 했다(소문자 세그먼트 판별은 L-7 로 이미 넓혔다) · 우회 (3) 폐쇄는 Kotlin
+가시성 + `sourceLanguageGate` 의 2층이다(L-10, `.java` 소스 경로는 1층만으론 안 막힘).
 
 ### Slice 4B — application use case
 

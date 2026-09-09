@@ -64,7 +64,16 @@ class EditStrategyWorkflow(
      * **가드 전에 만료를 먼저 접는다(verifier M-5 수정)** — 저장된 state 만 보면, 시각상
      * 만료됐지만 아직 `Expired`로 fold 되지 않은 세션이 비종단으로 읽혀 `begin()`을 막는다.
      * sweep 배선 부재(선언된 알려진 제한)와 겹치면 그 `EditSessionId`의 새 편집이 **무기한**
-     * 막힐 수 있었다. `expireIfDue`를 먼저 적용해 종단 판정하고, 접힌 결과를 저장한다.
+     * 막힐 수 있었다. `expireIfDue`를 먼저 적용해 종단 판정한다.
+     *
+     * **`sessions.save(folded)`의 정직한 효력 범위(verifier L-9)** — fold 가 일어나면
+     * (`folded !== existing`) 아래에서 곧바로 같은 [sessionId]로 새 세션을 저장하므로, 이
+     * id-upsert 계약의 [EditSessionRepository] 위에서는 이 호출의 값이 그 새 세션 저장에
+     * **곧바로 덮인다**(죽은 쓰기 — 실측: 이 줄을 지워도 `:workflow:test` 전건 초록).
+     * 그럼에도 호출을 남기는 이유는 **종단 판정 자체**(`isTerminal(folded.state)`)가 이 값을
+     * 봐야 하고, id 가 아니라 세션 인스턴스마다 이력/버전 행을 남기는 실 저장소(4C/3D)
+     * 구현에서는 이 저장이 만료 사실 자체의 감사 기록이 되기 때문이다 — 「fold 가 영속된다」
+     * 는 이 port 계약 위에서 성립하지 않는다.
      */
     fun begin(
         sessionId: EditSessionId,

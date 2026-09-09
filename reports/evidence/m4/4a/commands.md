@@ -231,3 +231,72 @@ corpus test 통과로 재확인. ④ S-3b 정규식 폭을 넓힌 것(`+`→`*`)
 옛 패턴(세그먼트 2개 이상)은 새 패턴(1개 이상)의 부분집합이라 구조적으로 안전, 기존 양성
 대조 test(telegram import·FQN)도 그대로 통과. **새로 연 것 없음** — M-5 는 지난 라운드가
 연 것이고 이번 라운드에서 닫혔다.
+
+# 장부층 일괄 — verifier r3 ready-for-review, L-8/L-9/L-10/B-6/B-7 (2026-09-09)
+
+verifier 리포트: `_workspace/m4-4a/05_verifier_report_r3.md`. 판정 **ready-for-review**
+(산출물층 blocker/high 0) — 새 라운드를 열지 않고 low·장부층을 한 커밋으로 처리한다
+(운영자 채택 2026-09-02).
+
+## 2026-09-09T03:00Z — L-8 적용·무영향 실측
+- cmd: `TransitionOutcome.Applied` 의 `val applied` → `internal val applied` 로 수정 뒤
+  `./gradlew --no-daemon :workflow:compileKotlin`
+- exit: 0
+- cmd: `./gradlew --no-daemon :workflow:test`
+- exit: 0 — 37건 전부 초록(모듈 안 코드는 이 필드를 그대로 읽는다, internal 이라도 같은
+  모듈이라 문제 없음).
+- cmd: `./gradlew --no-daemon :app:compileTestKotlin :app:test --tests '*Conformance*'`
+- exit: 0 — `app` 의 corpus 실행자는 애초에 `.applied` 필드를 읽지 않는다(`.session.state`
+  만 읽음) — 무영향 확인.
+
+## 2026-09-09T03:05Z — B-6 재산출(직접 명령, 남의 수 인용 아님)
+- cmd: 아래 python 스니펫으로 정규식 `\b([A-Za-z][A-Za-z0-9_]*)\.[A-Z][A-Za-z0-9_]*\b`
+  (대문자 단일 세그먼트 루트까지 허용하는 최소 강화형)를
+  `workflow/src/main/kotlin/bidvector/workflow/strategy/*.kt` 전체에 적용:
+  ```
+  python3 -c "
+  import re, glob
+  pattern = re.compile(r'\\b([A-Za-z][A-Za-z0-9_]*)\\.[A-Z][A-Za-z0-9_]*\\b')
+  files = sorted(glob.glob('workflow/src/main/kotlin/bidvector/workflow/strategy/*.kt'))
+  total=lines=lines_nc=0; uniq=set()
+  for f in files:
+      for line in open(f, encoding='utf-8'):
+          s=line.strip(); is_c = s.startswith('*') or s.startswith('//') or s.startswith('/*')
+          m = pattern.findall(line)
+          if m:
+              lines+=1
+              if not is_c: lines_nc+=1
+              total+=len(m)
+              for mm in pattern.finditer(line): uniq.add(mm.group(0))
+  print(total, lines, lines_nc, len(uniq))
+  "
+  ```
+- exit: 0
+- 핵심 결과: **총 매치 97 · 매치 담은 줄 85 · 그중 주석 아닌 줄 81 · 고유 문자열 42**. 원래
+  L-7 문서에 적었던 「46건」은 어느 셈으로도 재현되지 않음(오산) — 판단(강화하지 않는다)은
+  불변, 숫자만 checklist.md·milestone-4.md·`EditSessionImportBoundaryTest.kt` KDoc 세
+  곳에서 정정.
+
+## 2026-09-09T03:10Z — L-9 문면 정정(코드 무변경 확인)
+- cmd: `begin()` 의 `if (folded !== existing) sessions.save(folded)` 를 삭제한 변이로
+  `./gradlew --no-daemon :workflow:test`
+- exit: 0(0건 FAILED, 내 실행 — verifier 실측과 일치). 변이를 `diff` 로 원상 복구 확인(백업
+  파일과 바이트 단위 일치). 코드는 유지(종단 판정 자체가 `folded` 를 봐야 하고 실 저장소의
+  이력 기록 용도), `EditStrategyWorkflow.kt` 의 KDoc 만 「fold 가 영속된다」로 읽히지 않게
+  정정.
+
+## 2026-09-09T03:15Z — L-10 문면 확인(재현 아님, verifier 실측 인용 — 코드 변경 없음)
+- 2층 폐쇄(Kotlin 가시성 + `sourceLanguageGate`) 서술을 checklist.md·milestone-4.md 에 반영.
+  `sourceLanguageGate` 가 `bidvector.kotlin-conventions.gradle.kts`(build-logic)에 등록되고
+  `check`(S-1) 의 일부임을 `grep -n "sourceLanguageGate" build-logic/src/main/kotlin/*.kts`
+  로 확인(exit 0, 3곳 매치 — task 등록·check 의존·주석).
+
+## 2026-09-09T03:20Z — 장부층 일괄 acceptance(팀장 지시 — 전건 아님)
+- cmd: `./gradlew --no-daemon :workflow:test`
+- exit: 0
+- cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'`
+- exit: 0
+- cmd: `./gradlew --no-daemon qualityBaseline`
+- exit: 0
+- cmd: `./gradlew --no-build-cache clean check`(L-8 로 코드가 바뀌므로 1회)
+- exit: 0

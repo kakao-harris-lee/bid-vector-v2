@@ -29,7 +29,7 @@ sealed interface TransitionOutcome {
     @ConsistentCopyVisibility
     data class Applied internal constructor(
         override val session: EditSession,
-        val applied: AppliedStrategy,
+        internal val applied: AppliedStrategy,
         val event: StrategyEvent.StrategyUpdated,
     ) : TransitionOutcome
 }
