@@ -310,19 +310,10 @@ class GrpcBidPredictionGatewayTest {
             seenRequestIds.toSet().size shouldBe 1
         }
     }
+
+    // ---- verifier r2 G-1·G-2·G-4·G-5 의 실 gateway 경로 test는
+    // `GrpcBidPredictionGatewayVerifierR2Test.kt`로 갈라졌다(size ratchet §5). ----
 }
-
-private fun fixedServicer(
-    calculate: CalculateOptimalBidResponse? = null,
-    metadata: GetModelMetadataResponse? = null,
-): BidPredictionServiceGrpcKt.BidPredictionServiceCoroutineImplBase =
-    object : BidPredictionServiceGrpcKt.BidPredictionServiceCoroutineImplBase() {
-        override suspend fun calculateOptimalBid(request: CalculateOptimalBidRequest): CalculateOptimalBidResponse =
-            calculate ?: error("이 test 는 CalculateOptimalBid 응답을 배선하지 않았다")
-
-        override suspend fun getModelMetadata(request: GetModelMetadataRequest): GetModelMetadataResponse =
-            metadata ?: error("이 test 는 GetModelMetadata 응답을 배선하지 않았다")
-    }
 
 private fun countingServicer(
     calls: AtomicInteger,

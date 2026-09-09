@@ -14,9 +14,14 @@ import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.prediction.BidPredictionRequest
 import bidvector.workflow.prediction.ModelReleaseSelector
 import bidvector.workflow.prediction.OptimizationObjective
+import contract.bidvector.ml.v1.BidPredictionServiceGrpcKt
 import contract.bidvector.ml.v1.BidRateOrigin
+import contract.bidvector.ml.v1.CalculateOptimalBidRequest
+import contract.bidvector.ml.v1.CalculateOptimalBidResponse
 import contract.bidvector.ml.v1.Candidate
 import contract.bidvector.ml.v1.CandidateLabel
+import contract.bidvector.ml.v1.GetModelMetadataRequest
+import contract.bidvector.ml.v1.GetModelMetadataResponse
 import contract.bidvector.ml.v1.IntervalSource
 import contract.bidvector.ml.v1.ModelRelease
 import contract.bidvector.ml.v1.PriceFitness
@@ -130,3 +135,24 @@ private fun testCandidate(
         .setWeight(Weight.newBuilder().setFraction("0.3300").build())
         .setWeightPolicyVersion("weight-policy-test")
         .build()
+
+/** `Success`를 `CalculateOptimalBidResponse.SUCCESS`로 감싸는 반복 배선(consumer test 공용). */
+internal fun protoResponse(success: Success): CalculateOptimalBidResponse =
+    CalculateOptimalBidResponse.newBuilder().setSuccess(success).build()
+
+/**
+ * 고정 응답 servicer(consumer test 공용) — `GrpcBidPredictionGatewayTest`와
+ * `GrpcBidPredictionGatewayVerifierR2Test`(verifier r2 신설) 양쪽이 같은 모양의 servicer 를
+ * 쓴다(detekt `TooManyFunctions`로 갈라낸 파일 사이의 중복 방지, size ratchet §5).
+ */
+internal fun fixedServicer(
+    calculate: CalculateOptimalBidResponse? = null,
+    metadata: GetModelMetadataResponse? = null,
+): BidPredictionServiceGrpcKt.BidPredictionServiceCoroutineImplBase =
+    object : BidPredictionServiceGrpcKt.BidPredictionServiceCoroutineImplBase() {
+        override suspend fun calculateOptimalBid(request: CalculateOptimalBidRequest): CalculateOptimalBidResponse =
+            calculate ?: error("이 test 는 CalculateOptimalBid 응답을 배선하지 않았다")
+
+        override suspend fun getModelMetadata(request: GetModelMetadataRequest): GetModelMetadataResponse =
+            metadata ?: error("이 test 는 GetModelMetadata 응답을 배선하지 않았다")
+    }

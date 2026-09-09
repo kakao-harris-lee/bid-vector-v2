@@ -47,6 +47,29 @@ KDoc에 근거를 남겼다. 위조 방어는 컴파일 층이 아니라 (a) `bi
 | 12 | 취소 미전파 | grpc-kotlin coroutine stub이 취소를 그대로 전파, 어댑터가 `CancellationException`을 잡지 않음(`RetryRules.kt`·`ResilientPredictionCall.kt`·`GrpcBidPredictionGateway.kt` 전부 `StatusException`/`StatusRuntimeException`만 개별 catch) | `DeadlineCancellationRetryTest.coroutine 취소가 predict 를 통해 servicer 의 계산 중단으로 이어진다` |
 | 13 | **재시도 폭풍 — 백오프 없이 즉시 재시도**(verifier r1 F-1 high, **닫는다**로 변경) | `ResilientPredictionCall.awaitBackoffOrDeadlineExceeded`가 attempt 마다 정책 backoff 만큼 `delay`, 남은 예산이 그조차 못 감당하면 재시도 없이 `DeadlineExceeded` | `GrpcBidPredictionGatewayTest.재시도 사이에 정책 백오프만큼 실제로 지연한다(경과시간 probe)`·`남은 예산이 백오프를 감당하지 못하면...`·`DEADLINE_EXCEEDED 도 예산이 없으면...`(F-3 겸용) |
 | 14 | **release 성분 공백 유출**(verifier r1 F-2 high, **닫는다**로 변경) | `ModelReleaseRef` 비공백 불변식 + `hasNonBlankRelease`(구조 검증 단계) + `fetchPromoted`의 공백 promoted → null 접기 + `mapSuccess`의 schema 대조 | `ResponseMappingTest`의 P4a/P4b/schema 불일치 test 3건·`GrpcBidPredictionGatewayTest`의 P4c(양쪽 공백) |
+| 15 | **값 타입 `init` 위반이 예외로 `predict` 밖까지 샘**(verifier r2 G-1 high, **닫는다**로 신설 — F-5 정정) | `BidRateCandidates.init`(conservative≤base≤aggressive)은 마지막 안전판, `hasOrderedCandidateRates`(`CandidateShapeValidation.kt`)가 같은 조건을 구조 검증층(`isAcceptableSuccessShape`)에서 먼저 걸러 `Unavailable(ContractViolation)`로 접는다(F-2 `hasNonBlankRelease`와 동형 패턴) | `GrpcBidPredictionGatewayVerifierR2Test`의 내림차순·base>aggressive test 2건(예외 0, `ContractViolation`) + 클램프-포화(세 값 동일) test 1건(정상 `Predicted`) |
+
+## 값 타입 `init` ≠ 게이트 (verifier r2 G-1·G-2 — 수정 라운드 1의 회귀 원인 정정)
+
+r1 F-5 수정이 `BidRateCandidates.init`(순서)·`PriceFitness.init`(부호)을 값 타입에
+직접 추가하면서, 짝이 되는 구조 검증층 술어를 빠뜨렸다(F-2가 `hasNonBlankRelease`로
+세운 패턴을 F-5가 따르지 않음) — 그 결과 응답이 이 조건을 어기면 `IllegalArgumentException`이
+`mapSuccess`→`handleSuccess`→`predict`를 뚫고 gateway 밖까지 샜다(r2 G-1). **규칙**: 값
+타입 `init`은 마지막 안전판이지 게이트가 아니다 — 응답이 만들 수 있는 모든 `init` 위반은
+`isAcceptableSuccessShape`(구조 검증층, `ParsedSuccessFields.kt`)의 술어가 먼저 잡아
+`Unavailable(ContractViolation)`으로 내야 한다. 매핑 단계 전체를 하나의 함수에서
+`runCatching`으로 감싸는 catch-all은 금지(CLAUDE.md) — 조건을 술어로 열거해야 한다.
+이 slice가 적용한 두 처방:
+
+- **게이트를 짝지운다(G-1)** — `BidRateCandidates`의 순서 불변식은 그대로 두고
+  `hasOrderedCandidateRates`(`CandidateShapeValidation.kt`)를 `isAcceptableSuccessShape`의
+  `checks` 목록에 추가해 응답 단계에서 먼저 걸린다. `init`은 이제 그 술어가 실패로 놓친
+  경우에만 발동하는 방어책(defense-in-depth)이다.
+- **근거 없는 불변식은 게이트가 아니라 삭제한다(G-2)** — `PriceFitness.score >= 0`은
+  proto 계약 문면(「값의 산식은 이 계약이 규정하지 않는다」)에 근거가 없었다. 게이트를
+  짝지우는 대신 `init` 자체를 없애 정직한 음수 값이 그대로 통과하게 했다 — 「게이트를
+  세운다」와 「불변식을 없앤다」 둘 다 이 규칙의 합당한 해법이고, 선택은 계약 문면이 그
+  값에 실제 제약을 두는지로 갈린다.
 
 ## 값 획득·위조 축 표(최종)
 
@@ -54,7 +77,7 @@ KDoc에 근거를 남겼다. 위조 방어는 컴파일 층이 아니라 (a) `bi
 | --- | --- | --- |
 | `CallBudget` | 연다(불변식으로 닫힘) | 호출부(workflow 후속)가 남은 예산에서 만든다 |
 | `BidPredictionRequest`·`AgencyId`·`CompetitionSample`·`ModelReleaseSelector.Exact` | 연다(불변식으로 닫힘) | 호출부가 조립. 자유 `String` 0 |
-| `BidRateCandidates`·`PriceFitness`·`Uncertainty`·`ModelReleaseRef`·`BidPredictionOutcome.Predicted` | **공개(위 「설계 검토 대비 결정 변경」), 값 불변식으로 부분 닫힘(verifier r1 F-5)** | `mapSuccess`(어댑터)가 유일한 실제 생성 경로, test 커버리지가 위조 방지를 대신함. `BidRateCandidates`는 conservative≤base≤aggressive, `PriceFitness`는 음수 거부, `ModelReleaseRef`는 다섯 성분 비공백(F-2) — `PredictionValueTest`로 회귀 방지 |
+| `BidRateCandidates`·`PriceFitness`·`Uncertainty`·`ModelReleaseRef`·`BidPredictionOutcome.Predicted` | **공개(위 「설계 검토 대비 결정 변경」), 값 불변식은 마지막 안전판일 뿐 게이트가 아니다(verifier r1 F-5 → r2 G-1·G-2로 정정)** | `mapSuccess`(어댑터)가 유일한 실제 생성 경로. **정정(G-1·G-2)**: `init`은 절대 gateway 응답 경로에서 단독으로 걸려서는 안 된다 — 응답이 만들 수 있는 모든 `init` 위반은 구조 검증층(`isAcceptableSuccessShape`)의 술어가 먼저 잡아 `Unavailable(ContractViolation)`으로 접어야 한다(F-2 `hasNonBlankRelease` 패턴, 아래 「값 타입 `init` ≠ 게이트」). `BidRateCandidates`(conservative≤base≤aggressive)는 `hasOrderedCandidateRates`(우회 15)로 이 패턴을 따른다. `PriceFitness`는 애초에 부호 불변식의 계약 근거가 없어(proto 주석) **G-2에서 `init` 자체를 제거**했다(게이트가 아니라 불변식 삭제가 정답인 사례) — 정직한 음수 값이 그대로 `Predicted`로 통과한다. `ModelReleaseRef`는 다섯 성분 비공백(F-2, 이미 `hasNonBlankRelease` 게이트와 짝) — `PredictionValueTest`·`GrpcBidPredictionGatewayVerifierR2Test`로 회귀 방지 |
 | `BidPredictionOutcome.Unmeasurable`·`Unavailable` | 연다 | 「없음」 위조는 fail-safe 방향이라 위험이 없다(design 원안 그대로) |
 | `MlUnavailableReason.*`(신설 9값) | `data object`(닫힘, decision 소유) | `ReviewReason.kt` — 4B-1 관례 계승 |
 | `MlCallPolicyData` | 연다(불변식으로 닫힘) | 값은 정책 슬롯 |
