@@ -70,6 +70,28 @@ private fun skipReasonName(reason: SkipReason): String =
 private fun mlUnavailableReasonName(reason: MlUnavailableReason): String =
     when (reason) {
         MlUnavailableReason.ScoreNotProvided -> "ScoreNotProvided"
+
+        // M4/4D-1(D-4D-6) 이 넓힌 값 아홉 — conformance harness projection 은 이름만 낸다,
+        // 이 커널 판단은 이 값들을 만들지 않는다(4D-1 gateway 만 짓는다).
+        MlUnavailableReason.DeadlineExceeded -> "DeadlineExceeded"
+
+        MlUnavailableReason.CircuitOpen -> "CircuitOpen"
+
+        MlUnavailableReason.RetryBudgetExhausted -> "RetryBudgetExhausted"
+
+        MlUnavailableReason.TransportFailed -> "TransportFailed"
+
+        MlUnavailableReason.ModelNotReady -> "ModelNotReady"
+
+        MlUnavailableReason.ReleaseMismatch -> "ReleaseMismatch"
+
+        MlUnavailableReason.ContractViolation -> "ContractViolation"
+
+        MlUnavailableReason.UnsupportedSchema -> "UnsupportedSchema"
+
+        MlUnavailableReason.UnsupportedRelease -> "UnsupportedRelease"
+
+        MlUnavailableReason.InvalidRequest -> "InvalidRequest"
     }
 
 private fun bidNowReasonProjection(reason: BidNowReason): Map<String, Any?> =
