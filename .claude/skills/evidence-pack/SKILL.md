@@ -133,6 +133,16 @@ verdict는 `legacy-defect | v2-defect | intentional-redesign | insufficient-evid
 증명하지 않는다. 되돌린 뒤 확인 지점은 「in_scope 경로의 `git diff <base> -- <경로>` 가 비어 있고
 하네스 경로는 HEAD 그대로」다.
 
+**공유 파일은 「줄 단위」로 끝나지 않는다 — 어느 커밋의 줄인지로 가른다 (2026-09-09).** 두 slice 가 같은
+파일을 만지면(예: `config/quality/gate-tests.properties`·`fixtures/manifest.yaml`·승인 문서·conformance 실행자)
+`base..HEAD` diff 를 통째로 역적용하는 것은 **다른 slice 의 줄까지 걷는다**. 절차는 셋이다:
+① `git log --oneline <base>..HEAD -- <파일>` 로 **그 파일을 만진 커밋을 먼저 나열**한다 — 자기 slice 뿐인지
+다른 slice 와 겹치는지가 여기서 갈린다. ② 겹치는 파일은 **자기 커밋 해시로 hunk 를 격리**해 역적용한다
+(`git diff <sha>~1..<sha> -- <파일> | git apply -R`). ③ 겹치지 않는 파일만 `base..HEAD` 로 되돌린다.
+확인은 「내 줄이 사라졌다」와 **「남의 줄이 남았다」를 둘 다** 실측한다 — 후자를 안 재면 이 결함이 안 보인다.
+M4 실측: 4C-1 rollback 이 공유 셋을 전체 복원으로 적어 4B-1 의 `Verdict` 커널 등재가 날아갈 상태였고,
+되돌린 트리의 **conformance 82·decision 62**(전체 복원이었다면 74·38)가 보존을 증명한 결정적 수치였다.
+
 **되돌린 트리가 빌드되는지까지 확인한다 (2026-09-08).** 위 세 확인(exit 0 · D/M 수 · diff 비어
 있음)은 **파일이 제자리로 갔는지만** 잰다. 코드 slice 에서는 그 셋이 다 통과하면서도 트리가
 컴파일되지 않을 수 있다 — 목록이 낡아 파일 하나가 안 돌아가면 남은 호출부가 사라진 시그니처를

@@ -67,9 +67,15 @@ rollback: |
 `git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/`
 
 - 착수 시점: **없음**(base == HEAD).
-- **리뷰 요청 시점(구현 완료, 2026-09-09) 재확인 — 1건**: `ea79355 harness(v2-slice-pipeline):
-  (2b) 의 「경계로 처리」 행도 실측 대상으로`(`.claude/skills/v2-slice-pipeline/SKILL.md`·
-  `CLAUDE.md`, 실측 — `git show --stat`). 이 slice 의 산출물 커밋(`381eaeb`) **이후**,
+- **리뷰 요청 시점(구현 완료, 2026-09-09) 재확인 — 2건**(`git log --oneline
+  13cf0f6..HEAD -- CLAUDE.md .claude/` 실측):
+  1. `ea79355 harness(v2-slice-pipeline): (2b) 의 「경계로 처리」 행도 실측 대상으로`
+     (`.claude/skills/v2-slice-pipeline/SKILL.md`·`CLAUDE.md`).
+  2. `d9a39cc harness(evidence-pack): 공유 파일 rollback 의 커밋 해시 hunk 격리 절차`
+     (`.claude/skills/evidence-pack/SKILL.md`·`CLAUDE.md`, `git show --stat` 실측 —
+     2파일 M, +11줄) — 이 slice의 M-1 재실측(커밋 해시로 hunk 격리)이 세운 절차를
+     팀장이 스킬 문서에 성문화한 커밋.
+  둘 다 이 slice의 산출물 커밋(`381eaeb`·`7133ccc`·`7815d3b`·`25579a7`) **이후**,
   다른 세션(팀장)이 붙인 하네스 개정이다 — slice 산출물이 아니며 in_scope 밖, rollback
   대상이 아니다.
 - rollback 은 in_scope 한정이라 하네스 경로를 되돌리지 않는다.

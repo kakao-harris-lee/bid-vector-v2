@@ -14,6 +14,27 @@
 - [x] secret 스캔 통과 — 실 매치 0(자기참조 1건은 이 문장 자신이 패턴에 걸린 것,
       commands.md 「secret 스캔」 절 참고).
 
+## 사용자 승인 — 2026-09-09
+
+**slice 4C-1 종결 승인.** base `4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599` · head
+`c54e0249814dccd5d6dcdd9f4826390ae615fa74`(재검증 r2 장부층 일괄 커밋, L-4~L-7).
+
+**승인의 근거 — verifier r2 `ready-for-review`.** 산출물층 blocker/high 0건
+(`_workspace/m4-4c1/04_verifier_report_r2.md`). r1의 H-1(`EventEnvelope.restore`가
+`public`이라 위조 봉투를 아무 모듈에서나 조립해 `register`에 주입 가능)은 배치 변경
+(`OutboxPort.claim()`이 `EventEnvelope`가 아니라 `ClaimedOutboxRow` 원시 행만 반환,
+`restore`는 `workflow` 내부 `internal` 매핑만)으로 재작업 1/5에서 닫혔고, r2가 위조
+코드가 이제 거부되고 그 재료를 소비할 경로가 없음을 재확인했다. 줄 단위 rollback도
+4B-1 보존이 되돌린 트리에서 실측됐다(conformance 82·decision 62 — 전체 복원이었다면
+74·38이었을 것). 남은 것은 장부층 L-4~L-7뿐이었고 코드 무변경으로 반영했다.
+
+**재작업 카운터: 1/5**(상한 5, 여유 4) — H-1/M-1/L-1/L-2/장부층 일괄 라운드 하나만
+카운트된다(재검증 r2와 이번 장부층 일괄은 라운드를 추가하지 않는다, 2026-09-02 low/장부층
+문턱).
+
+**다음 slice**: 4B-2(조합 use case, 계약은 팀장이 별도로 쓴다). 이 레인은
+`reports/evidence/m4/4b2/**`·`.claude/`·`CLAUDE.md`를 건드리지 않는다.
+
 ## 이 slice 고유 확인
 
 ### 1. 값 획득 축 표(설계 검토 (2))가 코드에서 어떻게 섰는가 — 행별 대응
@@ -22,7 +43,7 @@
 | --- | --- | --- |
 | `EventEnvelope` 생성자 위조 → 닫는다 | `EventEnvelope`가 `@ConsistentCopyVisibility` + `internal constructor`(`EventEnvelope.kt`) | 임시 clone에서 `EventEnvelope(...)` 직접 호출 → `Cannot access '<init>': it is internal`(commands.md 「값 획득 축 실측」) |
 | `EventEnvelope` 읽기 프로퍼티 → 연다 | 9개 필드 전부 `val`, `public`(생성자만 `internal`) | `EventEnvelopeTest`가 정상 생성 경로로 필드를 읽어 단언 — 읽기 자체는 막지 않음을 실측 |
-| 저장소 복원 경로(`restore`) → **닫는다**(수정 라운드 1, verifier H-1) | ~~`public`~~ **`internal`로 정정.** 원래 판단(「경계로 처리」)이 실은 틀렸다 — persistence 어댑터에만 참인 경계 논증을 `public`(아무 모듈)에 적용했다. `OutboxPort.claim`이 이제 `EventEnvelope`가 아니라 `ClaimedOutboxRow`(원시 행)만 돌려주고, `EventEnvelope.restore`·`OutboxEntry.restore` 모두 `internal` — 어댑터는 `EventEnvelope`를 전혀 다루지 않는다 | 임시 clone에서 `EventEnvelope.restore(...)` 직접 호출 → `Cannot access 'fun <P> restore(...)': it is internal in file`(H-1 재작업 실측, commands.md) |
+| 저장소 복원 경로(`restore`) → **닫는다**(수정 라운드 1, verifier H-1) | ~~`public`~~ **`internal`로 정정.** 원래 판단(「경계로 처리」)이 실은 틀렸다 — persistence 어댑터에만 참인 경계 논증을 `public`(아무 모듈)에 적용했다. `OutboxPort.claim`이 이제 `EventEnvelope`가 아니라 `ClaimedOutboxRow`(원시 행)만 돌려주고, `EventEnvelope.restore`·`OutboxEntry.restore` 모두 `internal` — 어댑터는 `EventEnvelope`를 **만들지 않는다**(정정, L-5 — `register`는 어댑터 자신의 메서드라 `EventEnvelope`를 인자로 **받는다**, 「전혀 다루지 않는다」는 과잉 서술이었다) | 임시 clone에서 `EventEnvelope.restore(...)` 직접 호출 → `Cannot access 'fun <P> restore(...)': it is internal in file`(H-1 재작업 실측, commands.md) |
 | `OutboxEntry` 생성자 → **닫는다**(수정 라운드 1, verifier L-3 — H-1과 같은 뿌리) | `OutboxEntry`도 `@ConsistentCopyVisibility` + `internal constructor`, 유일한 생성 경로는 `OutboxEntry.restore(row)`(`internal`) | 임시 clone에서 `OutboxEntry(id, envelope, state)` 직접 생성자 호출 → `Cannot access '<init>': it is internal`(commands.md) |
 | `ClaimedOutboxRow`(신설, H-1 시정) 생성자 → **연다** | `data class` 공개 생성자 — 어댑터(4C-2)가 DB 컬럼을 그대로 옮겨 담는 DTO. 위조해도 소비할 방법이 없다(`EventEnvelope`로 가는 유일한 경로가 `internal`) | `OutboxEntryTest`가 정상 생성 경로로 값을 채워 `OutboxEntry.restore`에 넘긴다 |
 | `OutboxPort.mark*` 인자가 `OutboxEntryState`면 → 닫는다 | `markDelivered`/`markFailed`/`markIsolated`는 `OutboxEntryState`가 아니라 `OutboxTransition`의 대응 하위 타입(`ToDelivered`/`ToFailed`/`ToIsolated`, 각 `internal constructor`)만 받는다(`OutboxPort.kt`·`OutboxEntryState.kt`) | 임시 clone에서 `OutboxTransition.ToDelivered(...)` 직접 생성자 호출 → `Cannot access '<init>': it is internal`(commands.md) |
@@ -124,6 +145,19 @@ evidence**(`m1/1b/scope.md`·`m1/1e/scope.md`·`m1/1c/checklist.md`·`m0/0c/comm
    기록을 milestone 문서에 남기지 않았다. slice 종결(사용자 승인) 시점에 팀장이 closure
    문단을 붙일 자리로 남겨 둔다 — 지금 붙이면 verifier 재검증이 끝나기 전에 「종결」로
    읽힐 수 있어 자리표시자를 만들지 않는다.
+10. **`OutboxEventSink` 는 public 이고, 자기 `OutboxPort`·`EventIdFactory`·`Clock` 을
+    조립해 밖에서 새로 지을 수 있다(verifier r2 신규 표적)** — 임시 clone에서 `app`
+    모듈(다른 모듈)에 self-supplied `OutboxPort`·`EventIdFactory`·`Clock` fake 를 심고
+    `OutboxEventSink(fake, fake, fake)`를 직접 생성했더니 **컴파일 성공**
+    (`:app:compileTestKotlin` exit 0, probe 삭제 후 `git status --porcelain` 재확인 —
+    clean). **결함이 아니다** — sink 는 불변식을 강제한다(`actor` non-null·
+    `idempotencyKey` 는 revision 파생·`correlationId == eventId`)라 이 경로로 만들 수
+    있는 것은 **위조가 아니라 well-formed 이벤트 발행**이고, 설계 검토가 이미 「연다 —
+    발행은 요구되는 것」으로 판정한 자리다(scope.md 위협 모델 (2b) — sink 자체가 이
+    slice 의 유일한 [EventSink] 실구현이자 진입점). 다만 **어느 코드든 outbox 에 쓸 수
+    있다는 사실**은 4C-2 가 배달 오케스트레이션 use case 를 지을 때 알고 시작해야 하는
+    잔여다 — 그 use case 가 유일한 정당한 호출부가 되도록 강제하는 장치(예: DI 배선을
+    단일 지점으로)는 이 slice 범위 밖이고 4C-2 가 판단한다.
 
 ## rollback
 

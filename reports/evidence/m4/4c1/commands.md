@@ -182,11 +182,12 @@ L-2(알려진 제한 등재) · B-1~B-3(장부층, 이 절 및 scope.md·rollbac
 - cmd: `./gradlew --no-daemon :workflow:test --tests '*EventBoundaryTest*'`(S-3b) — exit 0
 - cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'`(S-4) — exit 0, 74 tests(무변경)
 - cmd: `./gradlew --no-daemon qualityBaseline`(S-5) — exit 0
-- cmd: `./gradlew --no-daemon :app:test :app:gateExecutionGate`(S-6) — exit 0(주의: `:app:test`를
-  `--tests` 필터 없이 전건 돌려야 한다 — conformance만 필터링한 뒤 곧바로 gateExecutionGate를
-  돌리면 architecture gate test class가 "실행되지 않았다"는 거짓 실패가 난다, 이 라운드에서
-  실측으로 확인 — 필터는 테스트 러너의 선택적 실행이지 그 클래스가 게이트에서 빠졌다는 뜻이
-  아니다).
+- cmd: `./gradlew --no-daemon :app:test :app:gateExecutionGate`(S-6) — exit 0. **정정(L-7,
+  verifier r2)** — 이전 판이 「필터 쓰면 거짓 실패」라 적었는데 부정확하다. verifier
+  실측: 이건 게이트의 거짓 실패가 아니라 **오용**이고, 정확한 조건은 「**같은 gradle
+  호출**에 `--tests` 필터와 `gateExecutionGate`를 함께 넣으면 `ArchitectureGate*` 미실행
+  으로 exit 1」이다. `scope.md`의 S-4(`:app:test --tests '*Conformance*'`)와 S-6은
+  **별도 호출**이라 안전하다 — S-4를 지우거나 S-6과 한 호출로 합치면 안 된다.
 
 ## 재산출 — B-1·B-2·B-3 (verifier 지시: 「수치는 전부 명령으로 재산출」)
 - cmd: `git add -N workflow/.../ClaimedOutboxRow.kt workflow/.../OutboxEntryTest.kt && git diff
@@ -265,3 +266,52 @@ L-2(알려진 제한 등재) · B-1~B-3(장부층, 이 절 및 scope.md·rollbac
 - exit: 0 — **2건**(`de99ddb`·`ea79355`, 1건 추가) — `scope.md`·`rollback.md` 양쪽에
   반영해 두 문서의 건수를 통일했다(verifier B-2 재발 방지 — 매 라운드 리뷰 요청 시점에
   이 명령을 다시 돌리고 두 문서를 함께 갱신한다).
+
+## 2026-09-09T12:30Z — 장부층 일괄(재검증 r2, L-4~L-7) — 코드 무변경, 회귀만 확인
+- verifier 재검증 판정 **ready-for-review**(`_workspace/m4-4c1/04_verifier_report_r2.md`),
+  산출물층 blocker/high 0. 장부층 L-4~L-7 을 한 커밋으로 반영.
+- **L-4(신규 표적, 등재만)**: `OutboxEventSink` 자기-조립 잔여 확인 — 임시 probe(`app`
+  모듈, `workflow`와 다른 모듈)에 self-supplied `FakeOutboxPort`·`FakeEventIdFactory`·
+  `FakeClock`을 심고 `OutboxEventSink(fake, fake, fake)` 직접 생성.
+  cmd: `./gradlew --no-daemon :app:compileTestKotlin` — exit 0(컴파일 성공, 결함이 아니라
+  well-formed 발행 경로가 열려 있다는 확인). probe 삭제 후 `git status --porcelain` —
+  공백(clean). checklist.md 「알려진 제한」 10번에 등재.
+- **L-5(문면 정정)**: checklist.md의 「어댑터는 `EventEnvelope`를 전혀 다루지 않는다」를
+  「만들지 않는다」로 — `register`는 어댑터 자신의 메서드라 `EventEnvelope`를 인자로
+  받는다. (코드 KDoc `OutboxPort.kt`은 이 라운드 대상이 아니다 — 코드 무변경.)
+- **L-6(문면 정정)**: `git log -p -- config/quality/gate-tests.properties`로 재확인 —
+  `gate.tests.workflow` 키·블록은 **4A**가 만들었다(`harness(m4-4a): gate.tests.workflow
+  신설` 커밋 실측). 4C-1은 그 블록에 `event.*` 줄 여섯만 끼워 넣었다(`strategy.*` 줄
+  여섯은 무접촉). rollback.md 표의 「블록 전체(신설 축)」를 정정 — **실제 되돌림 실행
+  (line-level, `event.*` 여섯 줄만 걷기)은 이미 옳았다**, 서술만 틀렸었다.
+- **L-7(acceptance 규정 문면)**: 이전 판의 「필터 쓰면 거짓 실패」서술을 정정 — 정확한
+  조건은 「**같은 gradle 호출**에 `--tests` 필터와 `gateExecutionGate`를 함께 넣으면
+  `ArchitectureGate*` 미실행으로 exit 1」이다. `scope.md`의 S-4·S-6은 별도 호출이라
+  안전 — 뭉뚱그리면 뒤 slice가 S-4를 지울 위험이 있어 정확히 적었다.
+- cmd: `./gradlew --no-daemon :workflow:test` — exit 0.
+- cmd: `./gradlew --no-daemon :app:test`(별도 호출, 필터 없음) — exit 0 —
+  `SharedKernelCorpusConformanceTest tests="86" failures="0"`(4B-1 승격 반영, 코드
+  무변경이므로 4C-1 자체 회귀 없음 확인).
+- cmd: `./gradlew --no-daemon qualityBaseline` — exit 0.
+- S-0 전건 재실행 없음(코드 무변경, 팀장 지시).
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+  reports/evidence/m4/4c1/ --exclude=commands.md --exclude=checklist.md` — exit 1(매치
+  없음, 자기참조 파일 둘 제외 시 실 비밀값 0건, 기존 패턴과 동일).
+
+## 2026-09-09T14:00Z — 사용자 승인 반영(2026-09-09) — 4C-1 종결
+- `reports/evidence/m4/4c1/checklist.md`에 「사용자 승인」 절 신설 — base
+  `4ec4e504db28b743d2cbb0ad4df5e4dbfbc98599`·head `c54e024`, verifier r2 근거,
+  재작업 1/5, 다음 slice 4B-2.
+- `milestone-4.md`의 「### Slice 4C」 절에 종결 문단 신설 — 4C-1/4C-2 분할 이유
+  (Flyway 버전 충돌 실측)·산출·검증이 드러낸 것(H-1: 저장소 복원 진입점이 열려
+  있어 위조 봉투 주입 가능 → `claim()`을 원시 행 반환으로 바꾸는 배치 변경)·
+  `OPEN-OPS-10` 종결+잔여 셋·알려진 제한(L-4 포함)·`OPEN-4C1-TX-CONTRACT-UNVERIFIED`
+  활성. 이 라운드에서 실제로 재측정한 rollback 수치(conformance 86·decision:test
+  62·workflow:test 39, 4C-1 몫만 되돌린 경우 — 4B-1의 verdict-001~004 승격 이후
+  최신 상태 기준)의 명령·근거는 `reports/evidence/m4/4b1/commands.md`
+  「사용자 승인 반영」 절에 함께 기록했다(공유 파일 rollback 검증이라 4B-1
+  evidence에 정본을 둔다, 중복 방지).
+- clean check·`:app:test`(별도 호출, 필터 없음)·clean-tree 게이트·secret 스캔은
+  `reports/evidence/m4/4b1/commands.md`의 같은 절에서 네 파일(`fixtures/manifest.yaml`·
+  `milestone-4.md`·양쪽 `checklist.md`)을 함께 커밋 전 확인 — exit 0/86 tests
+  0 failed 전부 그대로 참고.

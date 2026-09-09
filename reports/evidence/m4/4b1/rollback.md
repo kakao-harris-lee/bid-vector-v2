@@ -12,8 +12,16 @@
 
 - `config/quality/gate-tests.properties` — `gate.tests.decision` 블록만(4C-1의
   `gate.tests.workflow` 블록은 그대로).
-- `fixtures/manifest.yaml` — `verdict-005`~`012` 8개 case 블록만(단일 hunk, 4C-1의
-  `strategy-edit`·`verdict-001~004` 무접촉).
+- `fixtures/manifest.yaml` — `verdict-001`~`012` 12개 case 블록만(4C-1의 `strategy-edit`
+  무접촉 — 001~004는 수정 라운드 1 후속(운영자 결정 2026-09-09 선택지 (a))에서 4B-1
+  **자신이** 편집했다, 4C-1 이 만진 적은 없다).
+
+## M0 원본 fixture — 전체 복원(신규 아님, base 에도 있던 파일)
+
+`fixtures/{input,expected}/verdict-00{1,2,3,4}.json`(8개)은 base(`13cf0f6`)에도
+**이미 있던** M0 저작 파일이다 — 4B-1이 그 내용을 커널 입력 계약으로 재구성했다
+(수정 라운드 1 후속). **신규 파일(A)이 아니라 M**이므로 삭제가 아니라 base 시점
+내용으로 전체 복원한다(이 range 에서 4B-1 만 만졌다 — 위 「목록 산출」로 확인).
 - `app/src/test/kotlin/bidvector/app/conformance/CorpusExecutors.kt` — `VERDICT_EXECUTORS`
   병합 줄 하나 + 주석 한 줄만.
 - `app/src/test/kotlin/bidvector/app/conformance/SharedKernelCorpusConformanceTest.kt` —
@@ -33,9 +41,13 @@ git diff --name-status 13cf0f63da18e13f0e2befd519710a8635742004..HEAD -- \
   decision/src/test/kotlin/bidvector/decision \
   config/quality/gate-tests.properties \
   fixtures/manifest.yaml \
+  fixtures/input/verdict-001.json fixtures/input/verdict-002.json fixtures/input/verdict-003.json \
+  fixtures/input/verdict-004.json \
   fixtures/input/verdict-005.json fixtures/input/verdict-006.json fixtures/input/verdict-007.json \
   fixtures/input/verdict-008.json fixtures/input/verdict-009.json fixtures/input/verdict-010.json \
   fixtures/input/verdict-011.json fixtures/input/verdict-012.json \
+  fixtures/expected/verdict-001.json fixtures/expected/verdict-002.json fixtures/expected/verdict-003.json \
+  fixtures/expected/verdict-004.json \
   fixtures/expected/verdict-005.json fixtures/expected/verdict-006.json fixtures/expected/verdict-007.json \
   fixtures/expected/verdict-008.json fixtures/expected/verdict-009.json fixtures/expected/verdict-010.json \
   fixtures/expected/verdict-011.json fixtures/expected/verdict-012.json \
@@ -78,6 +90,18 @@ git restore --source=13cf0f63da18e13f0e2befd519710a8635742004 --staged --worktre
 
 `--source`에 없는 신규 경로는 이 명령이 삭제한다.
 
+**M0 원본 fixture(전체 복원, 삭제 아님)**:
+
+```
+git diff 13cf0f63da18e13f0e2befd519710a8635742004..HEAD -- \
+  fixtures/input/verdict-001.json fixtures/input/verdict-002.json fixtures/input/verdict-003.json \
+  fixtures/input/verdict-004.json fixtures/expected/verdict-001.json fixtures/expected/verdict-002.json \
+  fixtures/expected/verdict-003.json fixtures/expected/verdict-004.json | git apply -R
+```
+
+(이 range 에서 4B-1 만 만졌으므로 base..HEAD diff 를 되돌리면 M0 원본으로 복귀한다 —
+`git restore --source=<base>`를 써도 결과는 같지만 위 procedure 를 일관되게 유지한다.)
+
 ## 확인 지점 (임시 clone에서 실제로 돌려 실측)
 
 commands.md에 실행 결과를 한 줄씩 남긴다:
@@ -85,7 +109,9 @@ commands.md에 실행 결과를 한 줄씩 남긴다:
 1. 위 명령들이 **임시 clone**에서 exit 0.
 2. 공유 파일 4종의 diff가 4C-1 몫만 남고 이 slice 몫은 사라짐(`grep`으로 `verdict`·
    `Verdict` 관련 줄 부재 확인).
-3. 신규 파일 삭제 뒤 `git status --porcelain`이 목록과 일치.
+3. 신규 파일 삭제 뒤 `git status --porcelain`이 목록과 일치. M0 원본 fixture 8개는
+   base 시점 내용(`gateOutcome`/`operatorFloorRateOverride` 등 서술형)으로 복귀했는지
+   `diff`로 확인.
 4. 되돌린 트리에서 **모듈별 compile**이 exit 0 — `:decision:compileKotlin
    :app:compileTestKotlin`. **정정(verifier B-5)** — 이전 판은 "decision 모듈 자체는
    4C-1 시점에 이미 있었으므로 별도 컴파일 확인 불필요"라 적었으나 틀렸다: `decision`

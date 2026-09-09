@@ -204,3 +204,211 @@
   17, 4B-1 이전 1D 그대로) · conformance = **74 tests**(4B-1 이전 기준, 82-8 일치). 다섯
   확인 전부 통과.
 - clone 삭제(`rm -rf`), 원 worktree에는 영향 없음(별도 clone).
+
+## 2026-09-09T11:30Z — `verdict-001~004` 승격(운영자 결정 2026-09-09 선택지 (a)) — 입력 재구성 + dispatch 등록
+- 배경: 이전 라운드(§3a, 앞선 commands.md 항목)에서 `classification`·`source.kind`·
+  `verified_paths`만 편집하고 입력을 그대로 둔 1차 시도가 **86 tests, 5 failed**를
+  실측했다(`verdict-001`~`004` dispatch 실패 4 + 완전성 test 1) — 그 실측이 이번
+  라운드의 입력 재구성을 요구한 근거다.
+
+## 2026-09-09T11:35Z — 입력 재구성 + dispatch 등록 + 재실행
+- `fixtures/input/verdict-00{1,2,3,4}.json`·`fixtures/expected/verdict-00{1,2,3,4}.json`
+  을 이 slice 커널의 입력 계약(`$.input`/`$.policy`, `$.override`/`$.band`)으로 재구성
+  (checklist.md §3b — 각 case 가 단언하는 규칙·기대 결과의 의미는 불변임을 아래 실행이
+  확인). `sha256`(001: `739da467a80a2bb8d982c6907e3a57271e4aace2062922d002334322f13f4062`
+  · 002: `f638ae7cf372541e4fcc1dbf676bb7dcf33a9c2ebdeeb677192c60d0778905b0` · 003:
+  `6b6ba9d3a0c43c270988387212e479b1cc3bfafae9ed4452a0528a09c01a7e00` · 004:
+  `73089bb29ade6006eb68e8cee838de482947c4fc3859535a9012eaf6b60481bd`)·`expected_sha256`
+  (001: `a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5` · 002:
+  `b4d73881a02835122984868cabdace0ba481b6c4b550a92c9cd68b478744dd0e` · 003:
+  `5ca813c3f2a57f76ea6377f99227c67c64986a33b1def56b5bfd853ec22b5da5` · 004: 값 우연히
+  동일 `85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9`, 밴드·거부
+  사유가 원본과 같아서다) manifest.yaml 에 갱신하고 `change_history` 항목 추가.
+  `VerdictExecutors.kt`의 `VERDICT_EXECUTORS`에 `verdict-001`→`verdictLadderExecutor`·
+  `002`→`verdictLadderExecutor`·`003`→`verdictLadderExecutor`·`004`→`floorOverrideExecutor`
+  등록.
+- cmd: `./gradlew --no-daemon :app:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'` — exit 0 —
+  `SharedKernelCorpusConformanceTest`: `tests="86" failures="0" errors="0"`. `grep -o
+  'name="verdict-0[0-9][0-9]"' app/build/test-results/test/*Conformance*.xml`로 열둘 전부
+  dynamicTest 실행 확인(`verdict-001`~`012`).
+- cmd: `./gradlew --no-build-cache clean check` — exit 0 — `BUILD SUCCESSFUL in 32s`,
+  344 actionable tasks(319 executed·25 up-to-date).
+- cmd: `./gradlew --no-daemon :app:test`(전건, 필터 없이) — exit 0 —
+  `tests="86" failures="0"`.
+- cmd: `./gradlew --no-daemon :app:gateExecutionGate`(별도 호출, `:app:test` 뒤) — exit 0.
+- cmd: `./gradlew --no-daemon qualityBaseline` — exit 0.
+
+## 2026-09-09T11:45Z — secret 스캔(승격 반영 파일)
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+  fixtures/manifest.yaml fixtures/input/verdict-00{1,2,3,4}.json
+  fixtures/expected/verdict-00{1,2,3,4}.json
+  app/src/test/kotlin/bidvector/app/conformance/VerdictExecutors.kt
+  reports/evidence/m4/4b1/{checklist,rollback}.md`
+- exit: 0(매치 6건, 전부 `fixtures/manifest.yaml`의 `token`/`token_alignment` — 기존과
+  동일한 M1 계약 결속 도메인 어휘, 자격증명 아님). `checklist.md`의 매치 1건은 "secret
+  스캔 통과" 서술 자체(체크리스트 항목 이름). 새 fixture·코드 파일에는 매치 0건.
+
+## 2026-09-09T11:50Z — 커밋(승격, head 는 아래 실측)
+- cmd: `git add fixtures/manifest.yaml fixtures/input/verdict-00{1,2,3,4}.json
+  fixtures/expected/verdict-00{1,2,3,4}.json
+  app/src/test/kotlin/bidvector/app/conformance/VerdictExecutors.kt
+  reports/evidence/m4/4b1/{checklist,commands,rollback}.md && git commit ... -- <같은
+  경로>`
+- exit: 0. `decision/**` 무접촉 확인(`git status --porcelain -- decision/` 커밋 전후
+  공백). head `7815d3b`.
+
+## 2026-09-09T11:55Z — S-0(임시 clone, `7815d3b`에 pin)
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks . "$d/repo" && (cd "$d/repo" &&
+  git checkout --quiet 7815d3b && ./gradlew --no-build-cache clean check)`
+- exit: 0 — `BUILD SUCCESSFUL in 1m 6s`, 353 actionable tasks 전부 executed(캐시 없는
+  임시 clone).
+
+## 2026-09-09T12:00Z — M-1 재실측(승격 반영, 같은 clone) — 공유 파일 line-level ·
+  M0 원본 fixture 8개 line-level · 신규 파일 전체 삭제
+- 배경: `git log --oneline 13cf0f6..HEAD -- <파일>`로 각 파일을 만진 커밋을 다시 나열 —
+  `gate-tests.properties`는 여전히 4C-1(`7469bce`)·4B-1(`381eaeb`) 둘, 나머지(manifest.yaml·
+  CorpusExecutors.kt·SharedKernelCorpusConformanceTest.kt·data-dictionary.md·
+  capability-map.md·`fixtures/{input,expected}/verdict-00{1,2,3,4}.json`·
+  `VerdictExecutors.kt`)는 이 range 전체가 4B-1 자신의 커밋만(`381eaeb`·`7133ccc`·
+  `7815d3b` 중 하나 이상)이라 base..HEAD 로 안전.
+- cmd: `git diff 381eaeb~1..381eaeb -- config/quality/gate-tests.properties | git apply -R`
+  — exit 0(4B-1 hunk 만 격리).
+- cmd: 나머지 12개 파일(공유 6 + M0 원본 fixture 8 중 실제 diff 있는 7 — `expected-004`는
+  값이 우연히 동일해 diff 가 비어 `git apply -R`가 "No valid patches" 로 no-op, 이것도
+  올바른 결과다) 각각 `git diff 13cf0f6..HEAD -- <파일> | git apply -R` — exit 0(11건),
+  exit 128(1건, `expected-004` — 빈 patch, 예상된 no-op).
+- cmd: `git restore --source=13cf0f6 --staged --worktree -- <신규 파일 35개>`(decision/**
+  12·`VerdictExecutors.kt` 1·fixtures/{input,expected}/verdict-0[05-12] 16·
+  `reports/evidence/m4/4b1/**` 6) — exit 0.
+- `git status --porcelain`: **D 35 · M 13**(6 공유 + 7 M0 원본 fixture 실변경분,
+  `expected-004`는 no-op 이라 diff 자체가 없다 — 목록과 일치).
+- ① `gate.tests.decision` 4C-1 이전 두 줄로 복귀 / `gate.tests.workflow` 는
+  `OutboxEntryTest` 포함 4C-1 rework 몫 유지(4C-1 몫 생존 확인).
+- ② `fixtures/manifest.yaml`: `verdict-001`~`004` 전부 `classification:
+  insufficient-evidence`·`source.kind: m0-derived-rule`(승격 전 원상)로 복귀,
+  `verified_paths` 필드 부재(실측 grep). `verdict-005`~`012` 사라짐.
+- ③ `fixtures/input/verdict-001.json`·`fixtures/expected/verdict-001.json` 이 M0
+  원본 서술형(`gateOutcome`/`structuredPayload`, `reasonCodeRequired` 등)으로 정확히
+  복귀(diff 로 실측 — 재구성 이전 파일과 byte-identical).
+- ④ 신규 디렉터리 잔여 파일 0건 — `decision/src/main`엔 1D 소스 7개만,
+  `app/.../conformance/`엔 `VerdictExecutors.kt` 부재, `reports/evidence/m4/4b1/`
+  디렉터리 자체가 없어짐.
+- cmd: `./gradlew --no-daemon :decision:compileKotlin :app:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon :decision:test :workflow:test :app:test --tests
+  '*Conformance*'` — exit 0. `decision:test` = 38(1D 그대로) · conformance = **74**
+  (승격·8신설 이전 기준). 다섯 확인 전부 통과.
+- clone 삭제(`rm -rf`), 원 worktree엔 영향 없음(별도 clone).
+
+## 2026-09-09T13:00Z — 재검증 r2 장부층 일괄(M-1·L-1·L-2·하네스 레인) — 코드·기대값·해시 무변경
+- verifier 재검증 판정 **ready-for-review**(`_workspace/m4-4b1/04_verifier_report_r2.md`),
+  산출물층 blocker/high 0. M-1(medium)·L-1·L-2와 하네스 레인 누락 둘을 한 커밋으로 반영.
+- **M-1(medium)**: `verdict-003`의 `verified_paths`가 `$.verdict` 하나뿐이라 정상 승격과
+  force-bid 우회를 구분 못 하는데 `verifies`는 「출처가 노출된다」고 하고 이전
+  `change_history`는 「그 규칙이 불변」이라 **기록까지** 했다 — 처분은 강등이 아니라
+  **문면 정직화**(2026-08-31 floor-shortfall 선례와 같은 처분). `verifies`를 「force-bid
+  경로가 BidNow(ForceBidOverride)를 낸다」까지로 좁히고, 「출처 노출」 축은 `not_covered`로
+  옮겨 `VerdictLadderTest`의 `② force-bid 우회 — ...BidNow(ForceBidOverride)`를 이름으로
+  짚었다. 이전 `change_history`의 「규칙 불변」 문장을 정정(결과는 불변, 노출 축은 corpus→
+  unit test로 이동)하고 새 `change_history` 항목을 추가했다.
+- **not_covered 넷 다 신설**: 001·002·004도 `not_covered`가 없었다(강등 시절 `OPEN-DIC-03`
+  줄을 지운 뒤 대체 문면을 안 넣었었다) — 신설 여덟과 같은 형식으로 001·002는 임계
+  운영값(005/006과 동일 축), 004는 `verdict-012`와 동일한 이유(reasonCode 리터럴·상수
+  필드 셋)를 적었다.
+- **L-1**: `verdict-002`의 `verifies`에 점수 주입(0.1/0.1)이 필연임을 명시 — `null`이면
+  `forceBidOutcome`이 `Review(MlUnavailable)`로 새서 `LowPriority`에 닿지 못한다. 001(capacity-hold,
+  점수 `null`로도 닿음)과의 대조를 "capacity-hold가 force-bid보다 먼저 평가된다"는 사다리
+  순서의 값 증언으로 적었다.
+- **L-2**: `golden-manifest.json`의 note가 낡아 있었다(001~004를 여전히
+  `insufficient-evidence`·「dispatch 대상 밖」이라 적음, 실제로는 86 = 74+8+4) — note를
+  정정하고 `cases` 배열에 001~004 네 항목(`sha256`·`expected_sha256`·`extraction_method`
+  전부 manifest.yaml과 일치하도록 python 스크립트로 직접 대조해 기재)을 추가했다.
+- **하네스 레인 절**: `git log --oneline 13cf0f6..HEAD -- CLAUDE.md .claude/` 재실행 →
+  **2건**(`ea79355`·`d9a39cc`, 팀장이 붙인 두 스킬 개정) — scope.md에 등재, in_scope 밖·
+  rollback 대상 아님을 명시.
+- cmd: `python3 -c "import yaml; yaml.safe_load(open('fixtures/manifest.yaml'))"` — exit 0
+  (YAML 유효성 확인).
+- cmd: `python3 -c "import json; json.load(open('reports/evidence/m4/4b1/golden-manifest.json'))"`
+  — exit 0(JSON 유효성, `cases` 12건 확인).
+- cmd: `./gradlew --no-build-cache clean check` — exit 0 — `BUILD SUCCESSFUL in 31s`,
+  344 actionable tasks(319 executed·25 up-to-date).
+- cmd: `./gradlew --no-daemon :app:test`(별도 호출, 필터 없음) — exit 0 —
+  `tests="86" failures="0"`.
+- cmd: `./gradlew --no-daemon qualityBaseline` — exit 0.
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+  fixtures/manifest.yaml reports/evidence/m4/4b1/golden-manifest.json
+  reports/evidence/m4/4b1/scope.md` — exit 0(매치 6건, 전부 기존과 동일한
+  `token`/`token_alignment` 도메인 어휘, golden-manifest.json·scope.md에는 매치 0건).
+
+## 2026-09-09T13:05Z — 커밋(head `0aeb218`) + S-0 + M-1 재실측(커밋 해시 격리 절차)
+- cmd: `git add fixtures/manifest.yaml reports/evidence/m4/4b1/{commands,golden-manifest,scope}.md`
+  후 경로 명시 커밋 — exit 0. 4 files changed(145 insertions·8 deletions).
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks . "$d/repo" && (cd "$d/repo" &&
+  git checkout --quiet 0aeb218 && ./gradlew --no-build-cache clean check)` — exit 0 —
+  `BUILD SUCCESSFUL in 49s`, 353 actionable tasks 전부 executed.
+- 같은 clone에서 M-1 재실측: `git log --oneline 13cf0f6..HEAD -- <파일>`로 재확인 —
+  `gate-tests.properties`만 여전히 4C-1(`7469bce`)과 겹쳐 4B-1 커밋(`381eaeb`) 해시로
+  hunk 격리, 나머지(manifest.yaml·CorpusExecutors.kt·SharedKernelCorpusConformanceTest.kt·
+  data-dictionary.md·capability-map.md·M0 원본 fixture 8개)는 이 range 전체가 4B-1
+  커밋뿐이라 base..HEAD로 안전.
+- cmd: `git diff 381eaeb~1..381eaeb -- config/quality/gate-tests.properties | git apply -R`
+  — exit 0. 나머지 12개 파일 `git diff 13cf0f6..HEAD -- <파일> | git apply -R` — exit
+  0(11건), exit 128(1건, `expected-004` 빈 patch, 예상된 no-op).
+- cmd: `git restore --source=13cf0f6 --staged --worktree -- <신규 파일 35개>` — exit 0.
+- `git status --porcelain`: **D 35 · M 13**(목록과 일치).
+- ① `gate.tests.workflow`에 `OutboxEntryTest`(4C-1 몫) 유지, `gate.tests.decision` 4C-1
+  이전 두 줄로 복귀. ② `fixtures/manifest.yaml`: `verdict-001`~`004`만 남고(`insufficient-evidence`
+  로 복귀) `005`~`012` 사라짐(`grep -n "id: verdict-0"` 실측 — 정확히 넷).
+- cmd: `./gradlew --no-daemon :decision:compileKotlin :app:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon :decision:test :workflow:test :app:test --tests
+  '*Conformance*'` — exit 0. `decision:test` = 38(1D 그대로, `FloorShortfallKernelTest`
+  17+`ProvenanceRulesTest` 21) · conformance = **74**(승격·8신설 이전 기준). 다섯 확인
+  전부 통과.
+- clone 삭제(`rm -rf`), 원 worktree엔 영향 없음.
+
+## 2026-09-09T14:00Z — 사용자 승인 반영(2026-09-09) — 4B-1 종결 + verdict 12건 case 승인
+- `fixtures/manifest.yaml`: `verdict-001`~`012`의 `review.approved_by_user`를 `true`로,
+  `claude_commit`(001~004는 M0 원본 저작 커밋 `9e1223a`, 005~012는 커널 신설 커밋
+  `381eaeb`)·`approved_at: 2026-09-09`·`approval_record`·`approval_scope`를 채웠다
+  (`strategy-edit` 다섯과 같은 형식).
+- cmd: `git diff -U0 -- fixtures/manifest.yaml | grep "^@@"` — 24개 hunk 전부 base-line
+  8011~8784 범위(승인 전 `verdict-001`~`012`의 review 블록 경계) 안임을 실측 확인 —
+  다른 도메인(`koneps-collection`·`strategy-*` 등) 무접촉.
+- cmd: `python3 -c "import yaml; yaml.safe_load(open('fixtures/manifest.yaml'))"` —
+  exit 0. `review.approved_by_user`·`approved_at`·`approval_record`·`approval_scope`
+  전부 12건에 존재함을 python으로 재확인.
+- `reports/evidence/m4/4b1/checklist.md`에 「사용자 승인」 절 신설 — 승인 범위 셋,
+  verifier r2 근거, 재작업 1/5.
+- `milestone-4.md`의 「### Slice 4B」 절에 종결 문단 신설 — 분할 이유·조사 608줄이
+  특정한 여섯 실패 형태와 뒤집기·`OPEN-DIC-03` 종결+`OPEN-4B1-OFF-LADDER-DROPS`
+  신설·corpus 12 승격·알려진 제한. `capability-map.md`의 `OPEN-4B1-OFF-LADDER-DROPS`
+  등재(4B-2 배정) 재확인 — 이미 등재돼 있어 무변경.
+- **4C-1 몫만 되돌리는 재실측(4C-1 종결 문단의 근거 수치)**: 임시 clone(`efd2d60` pin)
+  에서 4C-1의 커밋(`13cf0f6`·`7469bce`)이 넣은 hunk만 `git apply -R`로 걷고(4B-1 몫은
+  그대로), 4C-1 신규 파일(`workflow/**/event/**`·`StrategyEditExecutors.kt`·
+  `workflow/**/strategy/{Ports,EditStrategyWorkflow}.kt`·
+  `EditStrategyWorkflowTest.kt`·`reports/evidence/m4/{4c1,4a/scope.md}`)을 삭제 —
+  `./gradlew --no-daemon :workflow:compileKotlin :decision:compileKotlin
+  :app:compileTestKotlin` exit 0, `./gradlew --no-daemon :workflow:test :decision:test
+  :app:test --tests '*Conformance*'` exit 0 — conformance **86**·`decision:test`
+  **62**(`FloorShortfallKernelTest`17+`FloorOverrideValidationTest`4+
+  `VerdictLadderPolicyDataTest`4+`UnitScoreTest`3+`LadderInputTest`2+
+  `ProvenanceRulesTest`21+`VerdictLadderPropertyTest`2+`VerdictLadderTest`9=62)·
+  `workflow:test` **39**(strategy 여섯 스위트 합, event 스위트 전부 사라짐 — 4A 관례로
+  복귀). `gate.tests.decision`·`data-dictionary.md` §3.6(`SkipReason` 매치 7건) 생존
+  확인. 4B-1 몫만 되돌리는 재실측은 이전 라운드에서 이미 반복(`decision:test` 38·
+  conformance 74). clone 삭제.
+- cmd: `./gradlew --no-build-cache clean check` — exit 0 — `BUILD SUCCESSFUL in 32s`,
+  344 actionable tasks(319 executed·25 up-to-date).
+- cmd: `./gradlew --no-daemon :app:test`(별도 호출, 필터 없음) — exit 0 —
+  `tests="86" failures="0"`.
+- cmd: `git status --porcelain -- fixtures/manifest.yaml milestone-4.md
+  reports/evidence/m4/4b1/checklist.md reports/evidence/m4/4c1/checklist.md` — exit 0,
+  이 넷과 정확히 일치. 양성 대조(비파괴): `reports/evidence/m4/4b1/rollback.md`에 개행
+  한 줄 추가 → `M` 관측 → `sed -i '' -e '$ d'`로 추가한 빈 줄만 절삭(파괴적 삭제 없음)
+  → 재확인(비어있음, exit 0).
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+  fixtures/manifest.yaml milestone-4.md reports/evidence/m4/4b1/checklist.md
+  reports/evidence/m4/4c1/checklist.md` — exit 0(매치 8건, 전부 기존과 동일한
+  `token`/`token_alignment` 도메인 어휘 + 두 checklist.md의 「secret 스캔 통과」
+  자기참조 서술, `milestone-4.md`에는 매치 0건).

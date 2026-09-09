@@ -18,7 +18,7 @@ verifier M-1) — 그래서 이 rollback은 파일 전체 `git restore`를 쓰�
 | --- | --- | --- |
 | `docs/discovery/data-dictionary.md` | §2.2.5 블록(어휘·전이표, "어휘 자리만 둔다" → 승인된 값) | §3.6·§13.2(4B-1의 `Verdict`/`SkipReason` 편집) — 물리적으로 다른 절이라 hunk 자체가 겹치지 않는다 |
 | `docs/discovery/capability-map.md` | `OPEN-OPS-10` 행(§14.2, 닫힘 표시) | `OPEN-DIC-03` 행(4B-1이 닫음) — 다른 행 |
-| `config/quality/gate-tests.properties` | `gate.tests.workflow` 블록 전체(신설 축) | `gate.tests.decision` 블록(4B-1이 확장) — 다른 키 |
+| `config/quality/gate-tests.properties` | `gate.tests.workflow` 블록 **안**에 4C-1이 끼워 넣은 `event.*` 줄 여섯(`EventBoundaryTest`·`EventEnvelopeTest`·`InboxDedupPropertyTest`·`OutboxEntryTest`·`OutboxEventSinkTest`·`OutboxTransitionTableTest`) — **정정(L-6, verifier r2)**: 이 키·블록 자체는 4A가 만들었다(`git log -p`: 4A 커밋이 `gate.tests.workflow=\` 신설, 실측), 4C-1은 그 블록에 `strategy.*` 줄들 앞에 여섯 줄을 끼워 넣었을 뿐이다 — 「블록 전체(신설 축)」은 잘못된 서술이었다 | `strategy.*` 줄 여섯(4A 몫, 무접촉) · `gate.tests.decision` 블록(4B-1이 신설·확장) — 다른 키 |
 
 되돌리는 절차: 임시 clone에서 `git diff <base> -- <파일>`로 현재 hunk를 확인하고, 위
 표의 「되돌릴 대상」 hunk만 `git apply -R`(또는 수동 되돌림, hunk가 물리적으로 분리돼
