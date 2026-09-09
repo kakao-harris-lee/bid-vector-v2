@@ -117,10 +117,6 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
                     "opening_rank_one_bid_amount_won",
                     "opening_rank_one_bid_amount_currency",
                     "opening_rank_one_bid_rate_fraction",
-                    "opening_rank_one_price_evaluation_score",
-                    "opening_rank_one_technical_evaluation_score",
-                    "opening_rank_one_technical_evaluation_nature_score",
-                    "opening_rank_one_total_evaluation_amount_score",
                 ),
             "guard_opening_result_draw_numbers" to listOf("draw_numbers_kind", "draw_numbers"),
         )

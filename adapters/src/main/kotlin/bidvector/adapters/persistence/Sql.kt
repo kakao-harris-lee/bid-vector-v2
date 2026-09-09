@@ -89,8 +89,6 @@ internal object Sql {
         total_reserve_price_candidate_count, actual_opening_at,
         opening_rank_one_kind, opening_rank_one_duplicate_count, opening_rank_one_bidder_name,
         opening_rank_one_bid_amount_won, opening_rank_one_bid_amount_currency, opening_rank_one_bid_rate_fraction,
-        opening_rank_one_price_evaluation_score, opening_rank_one_technical_evaluation_score,
-        opening_rank_one_technical_evaluation_nature_score, opening_rank_one_total_evaluation_amount_score,
         draw_numbers_kind, draw_numbers
         """
 
@@ -112,8 +110,6 @@ internal object Sql {
             total_reserve_price_candidate_count, actual_opening_at,
             opening_rank_one_kind, opening_rank_one_duplicate_count, opening_rank_one_bidder_name,
             opening_rank_one_bid_amount_won, opening_rank_one_bid_amount_currency, opening_rank_one_bid_rate_fraction,
-            opening_rank_one_price_evaluation_score, opening_rank_one_technical_evaluation_score,
-            opening_rank_one_technical_evaluation_nature_score, opening_rank_one_total_evaluation_amount_score,
             draw_numbers_kind, draw_numbers,
             observed_at, revision, observation_key
         ) VALUES (
@@ -129,8 +125,6 @@ internal object Sql {
             ?, ?,
             ?, ?, ?,
             ?, ?, ?,
-            ?, ?,
-            ?, ?,
             ?, ?,
             ?, 1, ?
         )
@@ -191,18 +185,6 @@ internal object Sql {
                 EXCLUDED.opening_rank_one_bid_amount_currency, opening_result.opening_rank_one_bid_amount_currency),
             opening_rank_one_bid_rate_fraction = COALESCE(
                 EXCLUDED.opening_rank_one_bid_rate_fraction, opening_result.opening_rank_one_bid_rate_fraction),
-            opening_rank_one_price_evaluation_score = COALESCE(
-                EXCLUDED.opening_rank_one_price_evaluation_score,
-                opening_result.opening_rank_one_price_evaluation_score),
-            opening_rank_one_technical_evaluation_score = COALESCE(
-                EXCLUDED.opening_rank_one_technical_evaluation_score,
-                opening_result.opening_rank_one_technical_evaluation_score),
-            opening_rank_one_technical_evaluation_nature_score = COALESCE(
-                EXCLUDED.opening_rank_one_technical_evaluation_nature_score,
-                opening_result.opening_rank_one_technical_evaluation_nature_score),
-            opening_rank_one_total_evaluation_amount_score = COALESCE(
-                EXCLUDED.opening_rank_one_total_evaluation_amount_score,
-                opening_result.opening_rank_one_total_evaluation_amount_score),
             draw_numbers_kind = COALESCE(EXCLUDED.draw_numbers_kind, opening_result.draw_numbers_kind),
             draw_numbers = COALESCE(EXCLUDED.draw_numbers, opening_result.draw_numbers),
             observed_at = EXCLUDED.observed_at,

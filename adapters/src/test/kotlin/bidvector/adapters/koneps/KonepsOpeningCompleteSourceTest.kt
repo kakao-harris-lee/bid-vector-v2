@@ -69,7 +69,7 @@ private fun newOpeningCompleteSource(
 
 class KonepsOpeningCompleteSourceTest {
     @Test
-    fun `정상 다수 행 — 투찰자별 행이 모두 OPENING_RESULT sourceEndpoint 로 살아남는다`() {
+    fun `정상 다수 행 — 투찰자별 행이 모두 OPENING_COMPLETE sourceEndpoint 로 살아남는다`() {
         val rows =
             listOf(
                 mapOf(
@@ -94,7 +94,7 @@ class KonepsOpeningCompleteSourceTest {
             val batch = newOpeningCompleteSource(server).fetchOpeningCompleteResults(fetchEvidence())
 
             batch.items.size shouldBe 2
-            batch.items.map { it.sourceEndpoint }.toSet() shouldBe setOf(SourceEndpoint.OPENING_RESULT)
+            batch.items.map { it.sourceEndpoint }.toSet() shouldBe setOf(SourceEndpoint.OPENING_COMPLETE)
             batch.accounting.duplicate shouldBe 0
         }
     }

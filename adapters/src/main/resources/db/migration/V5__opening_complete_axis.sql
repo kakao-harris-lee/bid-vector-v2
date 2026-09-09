@@ -24,10 +24,6 @@ ALTER TABLE opening_result
     ADD COLUMN opening_rank_one_bid_amount_won NUMERIC(20, 0),
     ADD COLUMN opening_rank_one_bid_amount_currency TEXT,
     ADD COLUMN opening_rank_one_bid_rate_fraction NUMERIC,
-    ADD COLUMN opening_rank_one_price_evaluation_score TEXT,
-    ADD COLUMN opening_rank_one_technical_evaluation_score TEXT,
-    ADD COLUMN opening_rank_one_technical_evaluation_nature_score TEXT,
-    ADD COLUMN opening_rank_one_total_evaluation_amount_score TEXT,
     ADD COLUMN draw_numbers_kind TEXT,
     ADD COLUMN draw_numbers INT[],
     ADD CONSTRAINT opening_result_opening_rank_one_kind_enum
@@ -57,9 +53,7 @@ CREATE TRIGGER guard_opening_result_opening_rank_one
     FOR EACH ROW EXECUTE FUNCTION guard_existence_and_freshness(
         'opening_rank_one_kind', 'opening_rank_one_duplicate_count', 'opening_rank_one_bidder_name',
         'opening_rank_one_bid_amount_won', 'opening_rank_one_bid_amount_currency',
-        'opening_rank_one_bid_rate_fraction', 'opening_rank_one_price_evaluation_score',
-        'opening_rank_one_technical_evaluation_score', 'opening_rank_one_technical_evaluation_nature_score',
-        'opening_rank_one_total_evaluation_amount_score');
+        'opening_rank_one_bid_rate_fraction');
 
 CREATE TRIGGER guard_opening_result_draw_numbers
     BEFORE UPDATE ON opening_result

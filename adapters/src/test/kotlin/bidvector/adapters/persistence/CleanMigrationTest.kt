@@ -165,10 +165,6 @@ class CleanMigrationTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "opening_rank_one_bid_amount_won", "numeric", true),
             ColumnSpec("opening_result", "opening_rank_one_bid_amount_currency", "text", true),
             ColumnSpec("opening_result", "opening_rank_one_bid_rate_fraction", "numeric", true),
-            ColumnSpec("opening_result", "opening_rank_one_price_evaluation_score", "text", true),
-            ColumnSpec("opening_result", "opening_rank_one_technical_evaluation_score", "text", true),
-            ColumnSpec("opening_result", "opening_rank_one_technical_evaluation_nature_score", "text", true),
-            ColumnSpec("opening_result", "opening_rank_one_total_evaluation_amount_score", "text", true),
             ColumnSpec("opening_result", "draw_numbers_kind", "text", true),
             ColumnSpec("opening_result", "draw_numbers", "ARRAY", true),
         )

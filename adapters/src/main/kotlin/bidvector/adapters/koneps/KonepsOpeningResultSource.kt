@@ -116,12 +116,11 @@ class KonepsOpeningResultSource(
         }
 
     /**
-     * 개찰완료(D-3F-1 (a)) — 투찰자별 행을 [mapOpeningCompleteItem]으로 관측한다([SourceEndpoint
-     * .OPENING_RESULT] 재사용 — P-9 ④ 승인 문면이 이 값을 「옆에 둔다」로 남겨 뒀다, 새
-     * `SourceEndpoint` 를 열지 않는다). `mapMaskedOpeningItem`과 달리 procurement 계약
-     * 레지스트리를 쓰지 않는다 — 이 오퍼레이션의 allow-list 는 [KonepsIdentifierMasking.kt]
-     * 가 하드코딩한다(scope.md procurement 편집 제약, D-3F-3 해소로 canonical 접근이 필요
-     * 없어졌다).
+     * 개찰완료(D-3F-1 (a), P-13 (a) 승인) — 투찰자별 행을 [mapMaskedOpeningItem]으로 관측한다
+     * (계약 레지스트리 경로 — `CollectionPolicy.kt` §1.11 열, `SourceEndpoint.OPENING_COMPLETE`
+     * 신규 넷째 군). `prcbdrBizno`·`prcbdrCeoNm`은 계약 미등재로 allow-list 반전에서 자동
+     * 제외된다(P-10 (a) 가 구조적으로 선다) — 평가점수 넷도 같은 이유로 제외된다(P-13, scale
+     * 미확정).
      */
     override fun fetchOpeningCompleteResults(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation> =
         fetchSingleKonepsNotice(
@@ -131,10 +130,11 @@ class KonepsOpeningResultSource(
             openingCompleteBaseUri,
             KonepsOperationPolicy.OPENING_COMPLETE,
             evidence.noticeId,
-        ) { item, _, observedAt ->
-            mapOpeningCompleteItem(
+        ) { item, itemPolicy, observedAt ->
+            mapMaskedOpeningItem(
                 item,
-                SourceEndpoint.OPENING_RESULT,
+                itemPolicy,
+                SourceEndpoint.OPENING_COMPLETE,
                 observedAt,
                 KonepsOperationPolicy.OPENING_COMPLETE.rowIdentifierRawKeys,
             )

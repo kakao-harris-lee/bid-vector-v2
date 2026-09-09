@@ -32,7 +32,7 @@ internal object OpeningRankOneKind {
             is OpeningRankOneOutcome.Determined -> DETERMINED
         }
 
-    /** 10 컬럼(kind·중복 건수·1위 행 축 8)을 `startIndex`부터 바인딩하고 다음 free index 를 낸다. */
+    /** 6 컬럼(kind·중복 건수·1위 행 축 4)을 `startIndex`부터 바인딩하고 다음 free index 를 낸다. */
     fun bind(
         statement: PreparedStatement,
         startIndex: Int,
@@ -46,10 +46,6 @@ internal object OpeningRankOneKind {
         statement.setBigDecimal(index++, bid?.bidAmount?.won?.let(BigDecimal::valueOf))
         statement.setString(index++, bid?.bidAmount?.currency?.name)
         statement.setBigDecimal(index++, bid?.bidRate?.fraction)
-        statement.setString(index++, bid?.priceEvaluationScore)
-        statement.setString(index++, bid?.technicalEvaluationScore)
-        statement.setString(index++, bid?.technicalEvaluationNatureScore)
-        statement.setString(index++, bid?.totalEvaluationAmountScore)
         return index
     }
 
@@ -91,10 +87,6 @@ internal object OpeningRankOneKind {
             bidderName = requireNotNull(rs.getString("opening_rank_one_bidder_name")),
             bidAmount = bidAmount,
             bidRate = rs.getBigDecimal("opening_rank_one_bid_rate_fraction")?.let(Rate::ofFraction),
-            priceEvaluationScore = rs.getString("opening_rank_one_price_evaluation_score"),
-            technicalEvaluationScore = rs.getString("opening_rank_one_technical_evaluation_score"),
-            technicalEvaluationNatureScore = rs.getString("opening_rank_one_technical_evaluation_nature_score"),
-            totalEvaluationAmountScore = rs.getString("opening_rank_one_total_evaluation_amount_score"),
         )
     }
 }

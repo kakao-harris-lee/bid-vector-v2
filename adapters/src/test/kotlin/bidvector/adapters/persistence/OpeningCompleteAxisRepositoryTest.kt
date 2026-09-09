@@ -50,7 +50,7 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
     }
 
     @Test
-    fun `Determined 개찰 1위 축(투찰금액 투찰율 평가점수 넷)이 그대로 왕복된다`() {
+    fun `Determined 개찰 1위 축(투찰금액 투찰율)이 그대로 왕복된다`() {
         val repository = JdbcOpeningResultRepository(dataSource())
         val observedAt = Instant.parse("2026-09-09T00:00:00Z")
         val bid =
@@ -58,10 +58,6 @@ class OpeningCompleteAxisRepositoryTest : PersistenceTestSupport() {
                 bidderName = "SYN-WINNER",
                 bidAmount = ObservedBidAmount(950_000_000L, Currency.KRW),
                 bidRate = Rate.ofPercent(BigDecimal("87.995")),
-                priceEvaluationScore = "95.0",
-                technicalEvaluationScore = "88.5",
-                technicalEvaluationNatureScore = "90.0",
-                totalEvaluationAmountScore = "91.2",
             )
         val result = OpeningResult(id, null, null, observedAt, openingRankOne = OpeningRankOneOutcome.Determined(bid))
 
