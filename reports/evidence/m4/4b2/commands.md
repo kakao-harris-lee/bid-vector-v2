@@ -1,0 +1,110 @@
+# commands.md — M4/4B-2
+
+명령과 종료 코드만 남긴다(출력 전문 금지, evidence-pack 스킬 규격). 감사자는 명령을 다시 돌린다.
+
+## 2026-09-09T14:00Z — 구현 + RED→GREEN(컴파일 단위)
+- 값 타입·port·use case를 `workflow/src/main/kotlin/bidvector/workflow/evaluation/**`에
+  신설(`EvaluationStage`·`EvaluationDropReason`·`CandidateEvaluation`·`Ports.kt`·
+  `LadderPolicySlot`·`EvaluateCandidatesUseCase`).
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin` — exit 0(1차 시도 성공).
+- test(`EvaluateCandidatesUseCaseTest`·`EvaluateCandidatesUseCaseIsolationTest`) 14건 신설.
+- cmd: `./gradlew --no-daemon :workflow:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*EvaluateCandidatesUseCaseTest*'`
+  — exit 0(14 tests, 0 failed, 1차 시도 성공).
+
+## 2026-09-09T14:05Z — 결정 4·10 회귀 보호 mutation 실측(진짜 RED 확인)
+- `evaluate()`의 `strategies.load()`·`capacity.snapshot()`를 `mapIndexed` 루프 **안**으로
+  옮기는 mutation을 심었다(전략·용량을 후보마다 다시 읽음).
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*EvaluateCandidatesUseCaseTest*'`
+  — exit 1 — **정확히 2건 실패**(`전략은 후보가 여럿이어도 진입에서 한 번만 읽는다`:
+  expected 1 but was 3, `용량은 후보가 여럿이어도 run당 한 번만 읽는다`: expected 1 but
+  was 2). 나머지 12건은 그대로 통과 — mutation이 의도한 두 test만 정확히 잡음을 확인.
+- mutation 되돌림 — `diff`로 원본과 byte-identical 복원 확인.
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*EvaluateCandidatesUseCaseTest*'`
+  — exit 0(14 tests, 0 failed, 복원 확인).
+
+## 2026-09-09T14:08Z — S-3b(`CompositionBoundaryTest`) 신설 — RED→GREEN 실측
+- `CompositionBoundaryTest.kt` 신설(4A `EditSessionImportBoundaryTest` 골격 재사용, allow-list
+  를 이 slice가 실제로 쓰는 도메인 모듈로 확장).
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*CompositionBoundaryTest*'` — **exit 1**
+  (1건 실패) — `EvaluationDropReason.kt` KDoc의 「`strategy.MatchScore`」·「`strategy.Score`」
+  (전체 패키지 경로 없이 줄인 표기)가 술어에 걸림(`"strategy"`가 allow-list에 없는 루트로
+  판정 — allow-list는 `"bidvector.strategy"`만 허용). **진짜 RED**(문서·코드 스캔이 실제로
+  뭔가를 잡았다는 증거).
+- 수정: KDoc을 `bidvector.strategy.MatchScore`·`bidvector.strategy.Score`로 완전정규화.
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*CompositionBoundaryTest*'` — exit 0
+  (4 tests, 0 failed).
+
+## 2026-09-09T14:15Z — 값 획득 축 실측(설계 검토 (2)) — 닫는다·연다·경계로 처리 전부
+- probe는 항상 `app` 모듈(다른 모듈)에 심었다(4B-1에서 자기 모듈에 심어 한 번 놓친 교훈).
+- **FORGERY-1**(닫는다) — `CandidateEvaluation.NotReached(...)`를 `app` test에서 직접
+  생성: cmd `./gradlew --no-daemon :app:compileTestKotlin` — exit 1 —
+  `Cannot access 'constructor(...): CandidateEvaluation.NotReached': it is internal in
+  'bidvector.workflow.evaluation.CandidateEvaluation.NotReached'`.
+- **FORGERY-2**(닫는다) — `CandidateEvaluation.Reached(...)` 직접 생성: exit 1 —
+  `Cannot access 'constructor(...): CandidateEvaluation.Reached': it is internal in
+  'bidvector.workflow.evaluation.CandidateEvaluation.Reached'`.
+- **FORGERY-3**(닫는다) — `NotificationRequest(...)` 직접 생성: exit 1 —
+  `Cannot access 'constructor(...): NotificationRequest': it is internal in
+  'bidvector.workflow.evaluation.NotificationRequest'`(FORGERY-2와 같은 컴파일에서
+  둘 다 확인 — `grep "^e:"`로 두 에러 라인 모두 캡처).
+- **OPEN-1**(연다) — `CorrelationId("app-module-value")`를 `app` 모듈에서 직접 생성:
+  cmd `./gradlew --no-daemon :app:compileTestKotlin` — exit 0(컴파일 성공).
+- **OPEN-2**(연다) — `EvaluateCandidatesUseCase(...)`를 `app` 모듈에서 port 여덟 개를
+  자기 구현으로 채워 조립: exit 0. use case 자체를 얻는 것은 권한이 아님을 확인 —
+  조립된 use case가 낼 수 있는 부작용은 주입한 port 구현이 허락하는 것뿐이다.
+- **OPEN-3**(경계로 처리) — `NotificationRequestPort` 구현을 `app` 모듈에 심어 이미
+  만들어진 `NotificationRequest` 값을 **받기만** 하는 형태로 컴파일: exit 0. 그 값을
+  스스로 지어내는 경로는 FORGERY-3이 이미 닫았으므로 「경계 안 주체에게만 간다」가
+  성립함을 실측으로 확인(4C-1 L-4 판정 형식과 같음 — well-formed 소비이지 위조가 아니다).
+- probe 파일 삭제(`rm -rf app/src/test/kotlin/bidvector/app/verifyprobe`), 커밋하지
+  않음(evidence-pack 「자기 검사 하네스 금지」 — probe 자체가 산출물이 아니라 명령
+  기록이다). 삭제 후 `git status --porcelain` — 공백(clean) 재확인.
+
+## 2026-09-09T14:20Z — 파일 크기·품질 게이트 위반 시정
+- cmd: `./gradlew --no-build-cache clean check` — **exit 1**(1차) —
+  `:workflow:detekt`(`CyclomaticComplexMethod` `evaluateOne` 22>14, `ReturnCount`
+  `evaluateOne` 10>2, `MatchingDeclarationName` `EvaluationPolicyData.kt`) +
+  `:workflow:sizeGate`(`EvaluateCandidatesUseCaseTest.kt` 543줄 > 500줄 한도).
+- 수정: `evaluateOne`을 guard 함수 체인 여덟 개로 분해(4A `apply`·4B-1
+  `VerdictLadder.judge` 관례, 각 함수 ReturnCount ≤2) · `EvaluationPolicyData.kt` →
+  `LadderPolicySlot.kt`로 파일명 정정(단일 top-level 선언과 일치) · test 파일을 셋으로
+  분할(`EvaluateCandidatesUseCaseTest`·`EvaluateCandidatesUseCaseIsolationTest`·공유
+  fixture는 `EvaluationTestFixtures.kt`, 전부 `internal` 가시성).
+- cmd: `./gradlew --no-daemon :workflow:ktlintFormat` — exit 0(자동 정렬, 함수명이 너무
+  긴 test 이름 하나는 수동 축약).
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin
+  :workflow:test :workflow:ktlintCheck :workflow:detekt :workflow:cpdCheck
+  :workflow:sizeGate :workflow:moduleDependencyGate` — exit 0(전부 통과, 18 tests 0
+  failed — 분할 전과 같은 총 테스트 수).
+
+## 2026-09-09T14:30Z — acceptance S-1~S-6(S-0 제외, 커밋 전)
+- cmd: `./gradlew --no-build-cache clean check`(S-1) — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test`(S-2) — exit 0(18 tests: `CompositionBoundaryTest`
+  4·`EvaluateCandidatesUseCaseIsolationTest` 6·`EvaluateCandidatesUseCaseTest` 8, 기존
+  4A/4C-1 test 57건 무영향).
+- cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate
+  :workflow:cpdCheck`(S-3) — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*CompositionBoundaryTest*'`(S-3b)
+  — exit 0.
+- cmd: `./gradlew --no-daemon :app:test`(S-4, 필터 없이 전건 — S-6과 별도 호출, 4C-1
+  L-7) — exit 0 — `SharedKernelCorpusConformanceTest tests="86" failures="0"`(이
+  slice는 corpus를 신설하지 않아 무변화 — 4B-1 승격 상태 그대로).
+- cmd: `./gradlew --no-daemon qualityBaseline`(S-5) — exit 0.
+- cmd: `./gradlew --no-daemon :app:gateExecutionGate`(S-6, S-4와 별도 호출) — exit 0.
+
+## 2026-09-09T14:35Z — 승인 문서 편집(capability-map.md·milestone-4.md) 뒤 재확인 + secret 스캔
+- `capability-map.md`: `OPEN-4B1-OFF-LADDER-DROPS` 종결 표시 + `OPEN-4B2-1`·`-2`·`-4`·
+  `-5`·`-6` 다섯 등재(`-3`은 설계로 닫혀 등재하지 않음, checklist.md 근거).
+- `milestone-4.md` 「### Slice 4B」에 「4B-2 구현 2026-09-09」 문단 신설 — 산출·
+  `OPEN-4B1-03` 답(밖이다)·값 획득 축 요약·`OPEN-4B2-*` 등재 상황.
+- cmd: `python3 -c "import json; json.load(open('reports/evidence/m4/4b2/golden-manifest.json'));
+  json.load(open('reports/evidence/m4/4b2/differential.json'))"` — exit 0(JSON 유효성).
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+  workflow/src/main/kotlin/bidvector/workflow/evaluation/
+  workflow/src/test/kotlin/bidvector/workflow/evaluation/ reports/evidence/m4/4b2/
+  config/quality/gate-tests.properties` — exit 0(매치 1건, checklist.md의 「secret 스캔
+  통과」 서술 자기참조, 실 비밀값 0건).
+- cmd: `git status --porcelain` — `config/quality/gate-tests.properties`·
+  `docs/discovery/capability-map.md`·`milestone-4.md`·`workflow/src/{main,test}/.../evaluation/**`·
+  `reports/evidence/m4/4b2/**`만, scope.md in_scope와 정확히 일치.

@@ -1,0 +1,6 @@
+{
+  "milestone": "m4",
+  "slice": "4b2-application-composition",
+  "cases": [],
+  "note": "N/A — 이 slice는 legacy 실행 결과와 값을 대조하는 case-by-case differential이 없다. 조합 use case는 legacy의 실패 형태 여덟(조사 §5·§8) 각각을 구조적으로 뒤집는 것이 요구이고, 그 판정은 checklist.md 「조사의 여덟 실패 형태를 각각 어떻게 뒤집었는지」 표와 대응 test가 진다 — legacy 출력과의 값 비교가 아니라 legacy가 열어 둔 실패 형태가 이 구조에서 재현되지 않는다는 것을 test가 실증한다."
+}

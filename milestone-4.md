@@ -229,6 +229,35 @@ blocker/high 0) 위에서 승인(evidence `reports/evidence/m4/4b1/checklist.md`
 
 **다음 slice는 4B-2**(조합 use case, 계약은 팀장이 별도 작성).
 
+**4B-2 구현 2026-09-09(구현 레인, 검증 대기)** — 조사(`_workspace/m4-4b2/01_scout_composition.md`,
+786줄)가 실측한 legacy 실패 형태 여덟을 각각 뒤집는 조합 use case
+(`workflow/src/main/kotlin/bidvector/workflow/evaluation/**`) 신설:
+`EvaluateCandidatesUseCase`(판정은 공고당 한 번·전략/용량은 진입에서 한 번·후보 단위
+격리·catch-all 없음) · 판정 결과 어휘 `CandidateEvaluation`(`Reached`/`NotReached`,
+둘 다 값) · 탈락 사유 `EvaluationDropReason`(기존 축 `WatchVerdict`(1E)·`LicenseVerdict`
+(1C)·`NoticeStatus`(3A)를 그대로 싣고 어느 축도 소유하지 않은 넷만 최소 신설) · port
+일곱(`CandidateSourcePort`·`WatchSubjectPort`·`LicenseGatePort`·`MlAnalysisPort`·
+`CapacityPort`·`NotificationRequestPort`·`CorrelationIdFactory`). acceptance S-0~S-6
+전부 exit 0(evidence `reports/evidence/m4/4b2/commands.md`).
+
+**`OPEN-4B1-OFF-LADDER-DROPS` 종결과 `OPEN-4B1-03`의 답** — 사다리 밖 드롭 열셋(D-1~D-13)
+의 어휘 소유를 전부 정했다(`docs/discovery/capability-map.md`). 그 과정에서 4B-1이
+남긴 「`AnalysisBudgetExhausted`·`SimilarityProjectionNotReady`가 `Verdict` 안인지
+밖인지 미정」(`OPEN-4B1-03`, 위 4B-1 알려진 제한)의 답도 함께 나왔다 — **밖이다.** 둘
+다 사다리에 이르기 **전** 단계의 `EvaluationDropReason`이고 `Verdict`(4B-1이 이미
+종결한 sealed)에는 없다 — `Verdict`를 다시 여는 것이 아니라 그 앞에 새 단계를 두는
+형태로 닫힌다.
+
+**값 획득 축 실측(설계 검토 (2))** — 「닫는다」(판정 결과·알림 요청 생성자, `app`
+모듈 위조 probe 셋 전부 거부) · 「연다」(use case 클래스 자체·`correlationId` 값 타입,
+컴파일 성공) · 「경계로 처리」(port 인터페이스, 배선 주체가 이미 그 값을 받기만 하고
+스스로 지어낼 수 없음을 확인) 셋 다 실측했다(`reports/evidence/m4/4b2/checklist.md`).
+
+**조사 신설 `OPEN-4B2-*` 여섯 중 다섯을 `capability-map.md`에 등재**했다(운영 관측·실
+저장이 있어야 답할 수 있는 것 넷 + 도메인 명세 판단이 필요한 것 하나). 나머지 하나
+(`OPEN-4B2-3`, 같은 run 안 용량 선점 순서)는 이 slice의 설계(용량 스냅샷을 run당 한
+번만 읽어 모든 후보가 공유)가 구조적으로 닫아 등재하지 않았다.
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,
