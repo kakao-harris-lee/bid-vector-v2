@@ -38,9 +38,14 @@
 - exit: 0
 - 핵심 결과: `git diff <base> -- <같은 경로>` 0줄(완전 일치) · 되돌린 트리 `:procurement:compileKotlin :procurement:compileTestKotlin :adapters:compileKotlin :adapters:compileTestKotlin` exit 0 · `:procurement:test`·`:adapters:test --tests 'bidvector.adapters.koneps.*'` exit 0 · 임시 clone 삭제 확인
 
-## 알려진 제한 — S-0·S-1 미실행
-`git worktree add --detach <dir> HEAD && ./gradlew --no-build-cache clean check`(S-0)와
-`./gradlew --no-build-cache clean check`(S-1, 전 모듈 무캐시 clean)는 이 구현 레인에서 실행하지
-않았다 — 위 개별 모듈 `check`·전 모듈 `compileKotlin`·`qualityBaseline`이 강한 신호를 이미
-주고(전 모듈 컴파일 성공, 두 모듈 전 게이트 통과), 격리된 clean 재현은 verifier 레인의 정본
-확인으로 남긴다.
+## 2026-09-09T09:44Z — S-1
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0
+- 핵심 결과: 전 모듈(app·adapters·procurement·decision·qualification·strategy·settlement·shared-kernel·workflow·build-logic) 339 actionable tasks, `BUILD SUCCESSFUL`
+
+## 2026-09-09T09:46Z — S-0
+- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)` → `git worktree remove --force <dir>`
+- exit: 0
+- 핵심 결과: 격리 worktree(HEAD=`4822db6`)에서 348 actionable tasks 전건 신규 실행(캐시 재사용 0건),
+  `BUILD SUCCESSFUL` · worktree 제거 뒤 디렉터리 잔여 없음 확인(`ls` 실패로 확인) ·
+  `git worktree list` 에 3F 항목 없음 확인
