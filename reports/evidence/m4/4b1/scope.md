@@ -10,7 +10,7 @@
 ```yaml
 milestone: m4
 slice: 4b1-bid-verdict-kernel
-base_sha: de99ddbdb298859b5ed0981a13f6a877dd089804
+base_sha: 13cf0f63da18e13f0e2befd519710a8635742004   # 4C-1 첫 구현 커밋. **4C-1 종결 시 재고정**(공유 파일의 기준선을 안정시킨다)
 head_sha: 리뷰 요청 시점의 `git rev-parse HEAD` — **값을 박지 않는다**(evidence 커밋 자신이 head 가 되어 즉시 낡는다, 4A r1 B-3).
 branch: m4/2026-09-08
 in_scope:
@@ -64,9 +64,21 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline de99ddbdb298859b5ed0981a13f6a877dd089804..HEAD -- CLAUDE.md .claude/`
+`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/`
 
 - 착수 시점: **없음**(base == HEAD). 리뷰 요청 시점에 갱신한다. rollback 은 in_scope 한정이라 하네스 경로를 되돌리지 않는다.
+
+---
+
+## 4C-1 과 공유하는 파일 — 줄 단위 되돌림
+
+4C-1(이벤트 봉투·outbox)과 이 slice 는 모듈이 다르지만(`workflow` ↔ `decision`) **다음 파일을 함께 만진다**:
+`config/quality/gate-tests.properties` · `fixtures/manifest.yaml` · `docs/discovery/data-dictionary.md` · `docs/discovery/capability-map.md` ·
+`app/src/test/kotlin/bidvector/app/conformance/**` · `milestone-4.md`.
+
+**그러므로 이 slice 의 rollback 은 그 파일들에서 `git restore` 로 파일 전체를 되돌리지 않는다** — 이 slice 가 넣은 줄만 걷는다(M3 교훈: 공유 build·catalog·gate-tests 는 줄 단위).
+`rollback.md` 가 파일마다 「전체 복원」인지 「줄 단위」인지 명시하고, 줄 단위인 파일은 임시 clone 에서 되돌린 뒤 **compile·test 까지** 실측한다.
+착수 시 base 를 4C-1 종결 head 로 재고정하면 이 목록의 기준선이 안정된다.
 
 ---
 
