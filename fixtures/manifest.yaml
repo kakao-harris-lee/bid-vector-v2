@@ -7946,6 +7946,9 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 739da467a80a2bb8d982c6907e3a57271e4aace2062922d002334322f13f4062
     expected_sha256: a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다, `verdict-005`와 동일한 축).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -8013,6 +8016,12 @@ cases:
     classification: authoritative
     verifies: |-
         두 보류가 문장이 아니라 `SkipReason`으로 구분된다 (`LowPriority`). 001과 쌍 — verdict는 같고 reason code가 다르다.
+        **입력의 `probabilityScore`·`matchedScore`가 `null`이 아니라 값(0.1/0.1)인 것은 필연이다**
+        (verifier L-1) — `null`이면 `forceBidOutcome`이 `Review(MlUnavailable)`로 새서 `Skip(LowPriority)`에
+        닿지 못한다(`VerdictLadder.kt`). **001과 대조하면 값으로 증언된다** — 001(capacity-hold)은
+        점수가 `null`이어도 `CapacityHold`에 닿는데(capacity-hold가 그 값을 요구하지 않는 첫 분기라서),
+        002(default skip)는 반드시 non-null 값이 있어야 `forceBidOutcome`을 통과해 `LowPriority`에
+        닿는다 — 둘이 나란히 「capacity-hold가 force-bid보다 먼저 평가된다」는 사다리 순서를 증언한다.
     verified_paths:
       - "$.verdict"
       - "$.skipReason"
@@ -8044,6 +8053,9 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: f638ae7cf372541e4fcc1dbf676bb7dcf33a9c2ebdeeb677192c60d0778905b0
     expected_sha256: b4d73881a02835122984868cabdace0ba481b6c4b550a92c9cd68b478744dd0e
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다, `verdict-006`과 동일한 축).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -8085,7 +8097,11 @@ cases:
     domain: verdict
     classification: authoritative
     verifies: |-
-        force-bid 우회는 유지하되 출처가 판정 결과에 노출된다 — 우회의 존재를 감춘 것이 결함이었지 우회 자체가 아니다.
+        force-bid 경로(probability·matched가 각 임계 이상)는 priority가 bidNowThreshold 미만이어도
+        BidNow(ForceBidOverride)를 낸다 — priority 사다리를 우회해 승격이 확정된다는 것을 이 case가 잰다.
+        **`verified_paths`가 `$.verdict` 하나뿐이라 정상 승격(PriorityAboveBidNowThreshold)과 force-bid
+        우회(ForceBidOverride)를 구분하지 못한다** — 우회의 출처가 판정 결과에 노출되는지(reason 타입이
+        갈리는지, `OPEN-STR-03`)는 이 case가 재지 않는다. 그 축은 `:decision:test`가 진다(`not_covered`).
     verified_paths:
       - "$.verdict"
     source:
@@ -8094,7 +8110,9 @@ cases:
           운영자 결정 2026-09-09(M4/4B-1 수정 라운드 1, 선택지 (a)) · OPEN-STR-03 (운영자 결정) · data-dictionary.md §3.6
     expected_reasoning: |-
       data-dictionary.md §3.6 *"force-bid 우회는 유지하되 출처를 판정 결과에 노출한다(운영자 결정 `OPEN-STR-03`) — 우회의 존재를 감춘
-      것이 결함이었지 우회 자체가 아니다"*.
+      것이 결함이었지 우회 자체가 아니다"*가 왜 `Skip`이 아니라 `BidNow`가 기대값인지의 근거다(정책적 배경).
+      **이 case 자체가 재는 것은 `$.verdict == BidNow`뿐**이다 — 「출처 노출」 축의 검증은 `not_covered`가 가리키는
+      `:decision:test`가 진다(verifier M-1, `verified_paths` 문면과 `verifies` 문면을 일치시켰다).
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -8117,6 +8135,13 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 6b6ba9d3a0c43c270988387212e479b1cc3bfafae9ed4452a0528a09c01a7e00
     expected_sha256: 5ca813c3f2a57f76ea6377f99227c67c64986a33b1def56b5bfd853ec22b5da5
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다). **force-bid 우회의 출처가 판정 결과에 노출되는지**
+      (reason 타입이 `ForceBidOverride`로 갈려 정상 승격과 구분되는지, `OPEN-STR-03`) —
+      `verified_paths`가 `$.verdict` 하나뿐이라 이 corpus case는 그 축을 재지 못한다(verifier
+      M-1, 2026-09-09). 그 축은 `:decision:test`(`VerdictLadderTest`의 `② force-bid 우회 —
+      priority 낮아도 probability·matched 가 임계 이상이면 BidNow(ForceBidOverride)`)가 진다.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -8149,8 +8174,9 @@ cases:
           커널의 실제 출력 계약(`BidNowReason.ForceBidOverride`)에 없어 잠그지 않는다. 입력을 커널
           입력 계약(`$.input`·`$.policy`)으로 재구성하고 기대값도 커널이 실제로 내는 projection
           형태(`verdict: BidNow`, `reasons: [{type: ForceBidOverride, ...}]`)로 다시 썼다 — `sha256`·
-          `expected_sha256` 갱신. **`verifies`가 단언하는 규칙(force-bid 우회가 판정 결과에 노출된다,
-          `BidNow`로 확정된다)은 불변**이다.
+          `expected_sha256` 갱신. **결과(`$.verdict == BidNow`)는 불변**이다(정정, verifier M-1 —
+          아래 항목 참고. 최초 이 항목이 「`verifies`가 단언하는 규칙(우회가 판정 결과에 노출된다,
+          `BidNow`로 확정된다)은 불변」이라 적었던 것은 부정확했다).
         reason: |-
           **운영자 결정 2026-09-09, 선택지 (a).** 001의 `change_history` 참고. 이 case 는 축이
           force-bid 라 001·002(priority 사다리)와 다른 재구성이 필요했다 — priority 를
@@ -8163,6 +8189,28 @@ cases:
           문제를 없앤다(커널이 실제로 내는 값만 잠근다).
         policy_version: |-
           해당 없음 — 분류·계약 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+      - date: 2026-09-09
+        change: |-
+          `verifies` 를 좁혔다 — 「force-bid 경로가 `BidNow(ForceBidOverride)`를 낸다」까지만 이
+          case 가 재고, 「출처가 판정 결과에 노출된다」(reason 타입이 정상 승격과 갈리는지)는
+          `not_covered`로 옮겨 `:decision:test`(`VerdictLadderTest`) 소관으로 명시했다.
+          `expected_reasoning`도 같은 구분(정책적 배경 vs 이 case 가 재는 것)을 반영해 다시 썼다.
+          **위 2026-09-09 항목의 「`verifies`가 단언하는 규칙은 불변」이라는 문장을 정정한다** —
+          정확히는 **결과(`$.verdict`)는 불변**이고, **노출 축은 corpus 층에서 unit test 층으로
+          옮겼다.** 코드·기대값·`sha256`은 무변경이다.
+        reason: |-
+          **verifier r2 M-1(medium).** `verified_paths`가 `$.verdict` 하나뿐이라 정상 승격과
+          force-bid 우회를 구분하지 못하는데(둘 다 `BidNow`), `verifies`는 「출처가 노출된다」고
+          하고 위 change_history는 「그 규칙이 불변」이라고 **기록까지 해 두었다** — 우연한 누락이
+          아니라 기록된 주장이라 더 무겁다. M0 원본은 `overrideHidden: false`를 잠가 그 축을
+          실제로 쟀는데 재구성이 그것을 잃었다. **처분은 강등이 아니라 문면 정직화다** — 이 case
+          가 지금 실제로 재는 것(`BidNow` 확정)까지로 `verifies`를 좁히고, 못 재는 축은
+          `not_covered`에 명시해 커버리지를 어디가 지는지 분명히 한다(manifest 자신의 선례,
+          2026-08-31 floor-shortfall이 「`verifies`를 승인된 의미로 좁혀 유지」로 정한 것과 같은
+          처분 — 001 강등이 「미승인 이름을 잠갔다」였던 것과는 축이 다르다: 003은 「덜 잠그면서
+          더 주장한다」였다).
+        policy_version: |-
+          해당 없음 — 문면 정정이고 코드·기대값·해시는 무변경이다.
     review:
       claude_commit: pending
       codex_verdict: pending
@@ -8198,6 +8246,13 @@ cases:
     extraction_method: authored-from-approved-spec
     sha256: 73089bb29ade6006eb68e8cee838de482947c4fc3859535a9012eaf6b60481bd
     expected_sha256: 85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9
+    not_covered: |-
+      **`reasonCode` 리터럴(`OverrideOutsidePlausibilityBand`)과 `silentlyDropped`·
+      `silentlyAccepted`·`observableInResult` 세 필드** — `verdict-012`와 같은 이유로
+      `verified_paths`에서 뺐다(구현 리터럴이거나, 두 분기 모두에서 상수라 실패할 수 없는
+      필드). `overrideOutcome` 한 비트가 실질 검증이고 그것은 `FloorOverrideValidationTest`가
+      단위 test 층에서, 이 case가 corpus 층에서 함께 진다. override **수용**(밴드 안) 경로는
+      이 case가 덮지 않는다(`:decision:test`의 `FloorOverrideValidationTest`가 진다).
     change_history:
       - date: 2026-09-02
         change: |-

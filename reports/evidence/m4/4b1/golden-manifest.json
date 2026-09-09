@@ -2,8 +2,44 @@
   "milestone": "m4",
   "slice": "4b1-bid-verdict-kernel",
   "manifest_source": "fixtures/manifest.yaml",
-  "note": "verdict-001~004(insufficient-evidence, 4B-1 이전부터 존재)은 이 slice 가 신설한 case 가 아니다 — dispatch 대상 밖(TARGET_DOMAINS+authoritative 필터)이라 정합만 확인했다(checklist.md). 아래 목록은 이 slice 가 authored-from-approved-spec 로 신설한 verdict-005~012 여덟 건뿐이다.",
+  "note": "정정(verifier L-2, 2026-09-09) — 이전 판은 verdict-001~004가 여전히 insufficient-evidence·dispatch 대상 밖이라 적었는데 둘 다 낡았다(86 = 74 + 신설 8(005~012) + 재승격 4(001~004)). verdict-005~012 여덟은 이 slice가 커널 이전에 없던 case로 신설했고, verdict-001~004 넷은 M0(2026-08-30)에 커널 이전에 저작돼 insufficient-evidence로 강등된 뒤 한 번도 실행된 적이 없었으나, 이 slice의 수정 라운드(운영자 결정 2026-09-09 선택지 (a))에서 입력을 이 커널의 입력 계약으로 재구성하고 authoritative로 승격했다 — 되돌림 경로의 두 번째 사용(koneps-collection 27건이 첫 번째). 열둘 전부 지금 authoritative·dispatch 대상이다.",
   "cases": [
+    {
+      "id": "verdict-001",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "739da467a80a2bb8d982c6907e3a57271e4aace2062922d002334322f13f4062",
+      "expected_sha256": "a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-002",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "f638ae7cf372541e4fcc1dbf676bb7dcf33a9c2ebdeeb677192c60d0778905b0",
+      "expected_sha256": "b4d73881a02835122984868cabdace0ba481b6c4b550a92c9cd68b478744dd0e",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-003",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "6b6ba9d3a0c43c270988387212e479b1cc3bfafae9ed4452a0528a09c01a7e00",
+      "expected_sha256": "5ca813c3f2a57f76ea6377f99227c67c64986a33b1def56b5bfd853ec22b5da5",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-004",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "73089bb29ade6006eb68e8cee838de482947c4fc3859535a9012eaf6b60481bd",
+      "expected_sha256": "85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9",
+      "review_approved_by_user": false
+    },
     {
       "id": "verdict-005",
       "domain": "verdict",

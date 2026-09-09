@@ -299,3 +299,43 @@
   '*Conformance*'` — exit 0. `decision:test` = 38(1D 그대로) · conformance = **74**
   (승격·8신설 이전 기준). 다섯 확인 전부 통과.
 - clone 삭제(`rm -rf`), 원 worktree엔 영향 없음(별도 clone).
+
+## 2026-09-09T13:00Z — 재검증 r2 장부층 일괄(M-1·L-1·L-2·하네스 레인) — 코드·기대값·해시 무변경
+- verifier 재검증 판정 **ready-for-review**(`_workspace/m4-4b1/04_verifier_report_r2.md`),
+  산출물층 blocker/high 0. M-1(medium)·L-1·L-2와 하네스 레인 누락 둘을 한 커밋으로 반영.
+- **M-1(medium)**: `verdict-003`의 `verified_paths`가 `$.verdict` 하나뿐이라 정상 승격과
+  force-bid 우회를 구분 못 하는데 `verifies`는 「출처가 노출된다」고 하고 이전
+  `change_history`는 「그 규칙이 불변」이라 **기록까지** 했다 — 처분은 강등이 아니라
+  **문면 정직화**(2026-08-31 floor-shortfall 선례와 같은 처분). `verifies`를 「force-bid
+  경로가 BidNow(ForceBidOverride)를 낸다」까지로 좁히고, 「출처 노출」 축은 `not_covered`로
+  옮겨 `VerdictLadderTest`의 `② force-bid 우회 — ...BidNow(ForceBidOverride)`를 이름으로
+  짚었다. 이전 `change_history`의 「규칙 불변」 문장을 정정(결과는 불변, 노출 축은 corpus→
+  unit test로 이동)하고 새 `change_history` 항목을 추가했다.
+- **not_covered 넷 다 신설**: 001·002·004도 `not_covered`가 없었다(강등 시절 `OPEN-DIC-03`
+  줄을 지운 뒤 대체 문면을 안 넣었었다) — 신설 여덟과 같은 형식으로 001·002는 임계
+  운영값(005/006과 동일 축), 004는 `verdict-012`와 동일한 이유(reasonCode 리터럴·상수
+  필드 셋)를 적었다.
+- **L-1**: `verdict-002`의 `verifies`에 점수 주입(0.1/0.1)이 필연임을 명시 — `null`이면
+  `forceBidOutcome`이 `Review(MlUnavailable)`로 새서 `LowPriority`에 닿지 못한다. 001(capacity-hold,
+  점수 `null`로도 닿음)과의 대조를 "capacity-hold가 force-bid보다 먼저 평가된다"는 사다리
+  순서의 값 증언으로 적었다.
+- **L-2**: `golden-manifest.json`의 note가 낡아 있었다(001~004를 여전히
+  `insufficient-evidence`·「dispatch 대상 밖」이라 적음, 실제로는 86 = 74+8+4) — note를
+  정정하고 `cases` 배열에 001~004 네 항목(`sha256`·`expected_sha256`·`extraction_method`
+  전부 manifest.yaml과 일치하도록 python 스크립트로 직접 대조해 기재)을 추가했다.
+- **하네스 레인 절**: `git log --oneline 13cf0f6..HEAD -- CLAUDE.md .claude/` 재실행 →
+  **2건**(`ea79355`·`d9a39cc`, 팀장이 붙인 두 스킬 개정) — scope.md에 등재, in_scope 밖·
+  rollback 대상 아님을 명시.
+- cmd: `python3 -c "import yaml; yaml.safe_load(open('fixtures/manifest.yaml'))"` — exit 0
+  (YAML 유효성 확인).
+- cmd: `python3 -c "import json; json.load(open('reports/evidence/m4/4b1/golden-manifest.json'))"`
+  — exit 0(JSON 유효성, `cases` 12건 확인).
+- cmd: `./gradlew --no-build-cache clean check` — exit 0 — `BUILD SUCCESSFUL in 31s`,
+  344 actionable tasks(319 executed·25 up-to-date).
+- cmd: `./gradlew --no-daemon :app:test`(별도 호출, 필터 없음) — exit 0 —
+  `tests="86" failures="0"`.
+- cmd: `./gradlew --no-daemon qualityBaseline` — exit 0.
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+  fixtures/manifest.yaml reports/evidence/m4/4b1/golden-manifest.json
+  reports/evidence/m4/4b1/scope.md` — exit 0(매치 6건, 전부 기존과 동일한
+  `token`/`token_alignment` 도메인 어휘, golden-manifest.json·scope.md에는 매치 0건).
