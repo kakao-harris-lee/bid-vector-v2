@@ -158,6 +158,19 @@ class CleanMigrationTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "planned_price_provenance_detail", "text", true),
             ColumnSpec("opening_result", "opening_base_amount_provenance", "text", true),
             ColumnSpec("opening_result", "opening_base_amount_provenance_detail", "text", true),
+            // M3/3F — 개찰완료 축 부모 슬롯(추가만, 스키마 스냅샷 래칫 예외 D-3F-6).
+            ColumnSpec("opening_result", "opening_rank_one_kind", "text", true),
+            ColumnSpec("opening_result", "opening_rank_one_duplicate_count", "integer", true),
+            ColumnSpec("opening_result", "opening_rank_one_bidder_name", "text", true),
+            ColumnSpec("opening_result", "opening_rank_one_bid_amount_won", "numeric", true),
+            ColumnSpec("opening_result", "opening_rank_one_bid_amount_currency", "text", true),
+            ColumnSpec("opening_result", "opening_rank_one_bid_rate_fraction", "numeric", true),
+            ColumnSpec("opening_result", "opening_rank_one_price_evaluation_score", "text", true),
+            ColumnSpec("opening_result", "opening_rank_one_technical_evaluation_score", "text", true),
+            ColumnSpec("opening_result", "opening_rank_one_technical_evaluation_nature_score", "text", true),
+            ColumnSpec("opening_result", "opening_rank_one_total_evaluation_amount_score", "text", true),
+            ColumnSpec("opening_result", "draw_numbers_kind", "text", true),
+            ColumnSpec("opening_result", "draw_numbers", "ARRAY", true),
         )
 
     // M3/3E — 층 B 자식 표(D-3E-2 (a), 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
@@ -256,6 +269,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
                 "opening_result.planned_price_won",
                 "opening_result.opening_base_amount_won",
                 "opening_reserve_price.base_reserve_price_won",
+                // M3/3F — 개찰완료 축 부모 슬롯(추가만).
+                "opening_result.opening_rank_one_bid_amount_won",
             )
         for (qualified in wonColumns) {
             val (table, column) = qualified.split(".")
@@ -268,7 +283,13 @@ class CleanMigrationTest : PersistenceTestSupport() {
     /** floor_rate_fraction·winning_rate_fraction은 자리수 제약 없는 `NUMERIC`(재선언 없음). */
     @Test
     fun `축3 부가 — rate fraction 컬럼은 정밀도·스케일을 재선언하지 않은 NUMERIC이다`() {
-        val fractionColumns = listOf("notice.floor_rate_fraction", "opening_result.winning_rate_fraction")
+        val fractionColumns =
+            listOf(
+                "notice.floor_rate_fraction",
+                "opening_result.winning_rate_fraction",
+                // M3/3F — 개찰완료 축 부모 슬롯(추가만).
+                "opening_result.opening_rank_one_bid_rate_fraction",
+            )
         for (qualified in fractionColumns) {
             val (table, column) = qualified.split(".")
             val (precision, scale) = numericPrecisionScale(table, column)

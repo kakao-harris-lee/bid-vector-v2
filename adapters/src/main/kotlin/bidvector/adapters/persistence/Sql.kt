@@ -73,6 +73,8 @@ internal object Sql {
     // YegaAmount(vatTreatment 항상 UNKNOWN 고정)라 vat 컬럼이 없다. verifier r1 H-1 뒤
     // (V5) — 세 금액 축에 provenance(kind+detail) 컬럼을 더해 notice 관례를 따른다(왕복
     // 시 값을 지어내지 않는다).
+    // M3/3F — 개찰완료 축 부모 슬롯(층 C, 추가만). opening_rank_one_* 는 OpeningRankOneOutcome,
+    // draw_numbers_* 는 DrawNumberObservation 을 그대로 편다(D-3F-4 (a)).
     private const val OPENING_RESULT_COLUMNS =
         """
         winning_rate_fraction, derived_base_amount_won, derived_base_amount_currency,
@@ -84,7 +86,12 @@ internal object Sql {
         planned_price_provenance, planned_price_provenance_detail,
         opening_base_amount_won, opening_base_amount_currency, opening_base_amount_vat,
         opening_base_amount_provenance, opening_base_amount_provenance_detail,
-        total_reserve_price_candidate_count, actual_opening_at
+        total_reserve_price_candidate_count, actual_opening_at,
+        opening_rank_one_kind, opening_rank_one_duplicate_count, opening_rank_one_bidder_name,
+        opening_rank_one_bid_amount_won, opening_rank_one_bid_amount_currency, opening_rank_one_bid_rate_fraction,
+        opening_rank_one_price_evaluation_score, opening_rank_one_technical_evaluation_score,
+        opening_rank_one_technical_evaluation_nature_score, opening_rank_one_total_evaluation_amount_score,
+        draw_numbers_kind, draw_numbers
         """
 
     const val SELECT_OPENING_RESULT =
@@ -103,6 +110,11 @@ internal object Sql {
             opening_base_amount_won, opening_base_amount_currency, opening_base_amount_vat,
             opening_base_amount_provenance, opening_base_amount_provenance_detail,
             total_reserve_price_candidate_count, actual_opening_at,
+            opening_rank_one_kind, opening_rank_one_duplicate_count, opening_rank_one_bidder_name,
+            opening_rank_one_bid_amount_won, opening_rank_one_bid_amount_currency, opening_rank_one_bid_rate_fraction,
+            opening_rank_one_price_evaluation_score, opening_rank_one_technical_evaluation_score,
+            opening_rank_one_technical_evaluation_nature_score, opening_rank_one_total_evaluation_amount_score,
+            draw_numbers_kind, draw_numbers,
             observed_at, revision, observation_key
         ) VALUES (
             ?, ?, ?,
@@ -113,6 +125,11 @@ internal object Sql {
             ?, ?,
             ?, ?,
             ?, ?, ?,
+            ?, ?,
+            ?, ?,
+            ?, ?, ?,
+            ?, ?, ?,
+            ?, ?,
             ?, ?,
             ?, ?,
             ?, 1, ?
@@ -163,6 +180,31 @@ internal object Sql {
             total_reserve_price_candidate_count = COALESCE(
                 EXCLUDED.total_reserve_price_candidate_count, opening_result.total_reserve_price_candidate_count),
             actual_opening_at = COALESCE(EXCLUDED.actual_opening_at, opening_result.actual_opening_at),
+            opening_rank_one_kind = COALESCE(EXCLUDED.opening_rank_one_kind, opening_result.opening_rank_one_kind),
+            opening_rank_one_duplicate_count = COALESCE(
+                EXCLUDED.opening_rank_one_duplicate_count, opening_result.opening_rank_one_duplicate_count),
+            opening_rank_one_bidder_name =
+                COALESCE(EXCLUDED.opening_rank_one_bidder_name, opening_result.opening_rank_one_bidder_name),
+            opening_rank_one_bid_amount_won =
+                COALESCE(EXCLUDED.opening_rank_one_bid_amount_won, opening_result.opening_rank_one_bid_amount_won),
+            opening_rank_one_bid_amount_currency = COALESCE(
+                EXCLUDED.opening_rank_one_bid_amount_currency, opening_result.opening_rank_one_bid_amount_currency),
+            opening_rank_one_bid_rate_fraction = COALESCE(
+                EXCLUDED.opening_rank_one_bid_rate_fraction, opening_result.opening_rank_one_bid_rate_fraction),
+            opening_rank_one_price_evaluation_score = COALESCE(
+                EXCLUDED.opening_rank_one_price_evaluation_score,
+                opening_result.opening_rank_one_price_evaluation_score),
+            opening_rank_one_technical_evaluation_score = COALESCE(
+                EXCLUDED.opening_rank_one_technical_evaluation_score,
+                opening_result.opening_rank_one_technical_evaluation_score),
+            opening_rank_one_technical_evaluation_nature_score = COALESCE(
+                EXCLUDED.opening_rank_one_technical_evaluation_nature_score,
+                opening_result.opening_rank_one_technical_evaluation_nature_score),
+            opening_rank_one_total_evaluation_amount_score = COALESCE(
+                EXCLUDED.opening_rank_one_total_evaluation_amount_score,
+                opening_result.opening_rank_one_total_evaluation_amount_score),
+            draw_numbers_kind = COALESCE(EXCLUDED.draw_numbers_kind, opening_result.draw_numbers_kind),
+            draw_numbers = COALESCE(EXCLUDED.draw_numbers, opening_result.draw_numbers),
             observed_at = EXCLUDED.observed_at,
             revision = opening_result.revision + 1,
             observation_key = EXCLUDED.observation_key,

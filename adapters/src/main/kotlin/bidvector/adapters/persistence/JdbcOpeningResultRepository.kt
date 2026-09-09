@@ -171,6 +171,11 @@ private fun bindOpeningResult(
     statement.setString(index++, result.baseAmount?.let { ProvenanceCodec.detailOf(it.provenance) })
     statement.setNullableInt(index++, result.totalReservePriceCandidateCount)
     statement.setNullableTimestamp(index++, result.actualOpeningAt)
+    // M3/3F ①② — 10+2 컬럼 바인딩은 OpeningCompleteAxisCodec.kt 가 진다(detekt
+    // TooManyFunctions·CPD 중복 회피 — bindOpeningResult 가 조립을 맡고 각 축의 바인딩
+    // 자체는 그 축을 아는 codec object 에 둔다).
+    index = OpeningRankOneKind.bind(statement, index, result.openingRankOne)
+    index = DrawNumbersKind.bind(statement, index, result.drawNumbers)
     statement.setTimestamp(index++, Timestamp.from(result.observedAt))
     statement.setString(index, observationKey.value)
 }
@@ -207,6 +212,12 @@ private fun ResultSet.toOpeningResult(id: NoticeId): OpeningResult {
         baseAmount = toOpeningBaseAmount(),
         totalReservePriceCandidateCount = getInt("total_reserve_price_candidate_count").takeUnless { wasNull() },
         actualOpeningAt = getTimestamp("actual_opening_at")?.toInstant(),
+        // M3/3F ①② — OpeningCompleteAxisCodec.kt 가 왕복을 진다(같은 회피 판단, bind 쪽 참고).
+        // DrawNumbersKind.read 는 OutOfRange 의 validRange 재구성을 위해 이미 위에서 읽은
+        // totalReservePriceCandidateCount 를 그대로 받는다(같은 컬럼 재조회 없음).
+        openingRankOne = OpeningRankOneKind.read(this),
+        drawNumbers =
+            DrawNumbersKind.read(this, getInt("total_reserve_price_candidate_count").takeUnless { wasNull() }),
     )
 }
 

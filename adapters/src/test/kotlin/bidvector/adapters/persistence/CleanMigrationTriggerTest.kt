@@ -38,6 +38,9 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             "guard_opening_reserve_price_base_reserve_price",
             "guard_opening_reserve_price_is_drawn",
             "guard_opening_reserve_price_draw_count",
+            // M3/3F — 개찰완료 축 부모 슬롯 가드(추가만, 스키마 스냅샷 래칫 예외 D-3F-6).
+            "guard_opening_result_opening_rank_one",
+            "guard_opening_result_draw_numbers",
         )
 
     @Test
@@ -105,6 +108,21 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             "guard_opening_result_total_reserve_price_candidate_count" to
                 listOf("total_reserve_price_candidate_count"),
             "guard_opening_result_actual_opening_at" to listOf("actual_opening_at"),
+            // M3/3F — 개찰완료 축 부모 슬롯(추가만).
+            "guard_opening_result_opening_rank_one" to
+                listOf(
+                    "opening_rank_one_kind",
+                    "opening_rank_one_duplicate_count",
+                    "opening_rank_one_bidder_name",
+                    "opening_rank_one_bid_amount_won",
+                    "opening_rank_one_bid_amount_currency",
+                    "opening_rank_one_bid_rate_fraction",
+                    "opening_rank_one_price_evaluation_score",
+                    "opening_rank_one_technical_evaluation_score",
+                    "opening_rank_one_technical_evaluation_nature_score",
+                    "opening_rank_one_total_evaluation_amount_score",
+                ),
+            "guard_opening_result_draw_numbers" to listOf("draw_numbers_kind", "draw_numbers"),
         )
 
     @Test
