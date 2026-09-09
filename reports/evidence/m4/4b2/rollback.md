@@ -11,13 +11,14 @@
 `git log --oneline 401bc4d5636cd114c8282cf314d837f0d52dbc15..HEAD -- <파일>`로 그
 파일을 만진 커밋을 전부 나열해, 4B-2 아닌 커밋이 같이 나오는지 확인한다.
 
-착수 시점 실측(base `401bc4d`, 이 문서 작성 시점 HEAD `7e88455`): 세 파일 다 **이
-range에서 4B-2 계약 커밋(`7e88455`, `milestone-4.md`·`capability-map.md` 무접촉)
-말고는 아무도 만지지 않았다.** 구현 커밋이 실제로 이 파일들을 만지는 시점에 위
-명령을 **다시 돌려** 표를 갱신한다 — 다른 slice 커밋이 섞여 나오면 그 커밋 해시로
-hunk를 격리하고(`git diff <commit>~1..<commit> -- <파일> | git apply -R`), 이 range에
-4B-2만 있으면 `git diff <base>..HEAD -- <파일> | git apply -R`로 충분하다. 확인은
-「내 줄 사라짐」과 **「남의 줄 남음」을 둘 다** 잰다.
+**재실측(수정 라운드 1, head `76b0ec5`)**: 세 파일 다 이 range에서 **4B-2 자신의
+커밋(`a0d254f`)만** 만졌다 — 수정 라운드 1의 커밋(`76b0ec5`)은 이 셋을 건드리지
+않는다. 다른 slice 커밋이 아직 섞이지 않아 commit-hash 격리 없이 `base..HEAD`로
+안전하게 되돌렸다(임시 clone 실측, commands.md). 라운드가 더 늘거나 다른 slice가
+같은 파일을 만지면 이 절차를 다시 돌려 표를 갱신한다 — 다른 slice 커밋이 섞여
+나오면 그 커밋 해시로 hunk를 격리하고(`git diff <commit>~1..<commit> -- <파일> |
+git apply -R`), 4B-2만 있으면 `git diff <base>..HEAD -- <파일> | git apply -R`로
+충분하다. 확인은 「내 줄 사라짐」과 **「남의 줄 남음」을 둘 다** 잰다.
 
 ## 신규 파일(A) — 전체 삭제
 

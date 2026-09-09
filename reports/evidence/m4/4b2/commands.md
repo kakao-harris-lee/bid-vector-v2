@@ -188,3 +188,25 @@
 - cmd: `git status --porcelain -- <in_scope 경로 8개 개별 인자>` — exit 0, 정확히 이
   8개 파일과 일치. 양성 대조(비파괴): `EvaluationStage.kt`에 개행 추가 → `M` 관측 →
   `sed -i '' -e '$ d'`로 추가한 줄만 절삭 → 재확인(비어있음, exit 0).
+
+## 2026-09-10T09:40Z — 커밋(head `76b0ec59082e0e6903c6038f869597cbedd3cb5f`) + rollback 재실측
+- cmd: `git add <in_scope 경로 8개> && git commit ... -- <같은 경로>` — exit 0.
+  8 files changed(402 insertions·67 deletions).
+- rollback 재실측(임시 clone, `76b0ec5` pin): `git log --oneline 401bc4d..HEAD --
+  <공유 파일>`로 재확인 — `config/quality/gate-tests.properties`·
+  `docs/discovery/capability-map.md`·`milestone-4.md` 셋 다 이 range에서
+  **4B-2 자신의 커밋(`a0d254f`)만** 만졌다(이번 라운드 커밋 `76b0ec5`는 셋 다
+  무접촉) — commit-hash 격리 불필요, base..HEAD로 안전.
+- cmd: `git diff 401bc4d..HEAD -- <공유 파일 3개> | git apply -R`(각각) — exit 0(3건).
+- cmd: `git restore --source=401bc4d --staged --worktree -- <신규 파일 16개(디렉터리
+  단위)>` — exit 0.
+- `git status --porcelain`: **D 16 · M 3**(목록과 일치).
+- ① `gate.tests.workflow` 4A/4C-1 몫만 남고 `evaluation.*` 셋 사라짐. ②
+  `capability-map.md`의 `OPEN-4B1-OFF-LADDER-DROPS` 미종결(`~~` 취소선 없음)로
+  복귀, `OPEN-4B2-*` 다섯 부재. ③ 신규 디렉터리(`workflow/.../evaluation`·
+  `reports/evidence/m4/4b2`) 잔여 파일 0건.
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :app:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test :app:test --tests '*Conformance*'` —
+  exit 0. conformance = **86**(무변화, 4B-2는 fixture를 만지지 않는다). 다섯 확인
+  전부 통과.
+- clone 삭제(`rm -rf`), 원 worktree엔 영향 없음.
