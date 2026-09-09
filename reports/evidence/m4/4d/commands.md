@@ -103,6 +103,13 @@
 - exit: 0
 - 핵심 결과: 353 actionable tasks 전건 실행, BUILD SUCCESSFUL. worktree 제거 확인(`git worktree remove --force`).
 
+## clean-tree 게이트(경로 개별 인자 + 양성 대조)
+- cmd: `git status --porcelain -- <in_scope 경로 개별>`
+- exit: 0, 출력 없음(clean).
+- 양성 대조: `CallBudget.kt`에 `// probe` 한 줄을 심고 같은 명령 재실행 → 매치 확인 →
+  `git checkout HEAD -- <파일>`로 절삭 복원(이 파일의 유일한 미커밋 편집이라 안전) →
+  재확인 출력 없음.
+
 ## rollback 실측(임시 clone) — rollback.md 참고
 - cmd: `git clone . /tmp/4d1-rollback-verify && git checkout a96c53c`
 - exit: 0
