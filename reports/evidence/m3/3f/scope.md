@@ -17,7 +17,7 @@
 ```yaml
 milestone: m3
 slice: 3f-opening-complete-axis
-base_sha: 69e2afe   # 착수 2026-09-09 = 3E 종결·push 커밋. 착수 시 40자로 재고정
+base_sha: 8119a47b9a2f9c20068a5bde122cd1a2cda04ddd   # 착수 2026-09-09(40자 고정, verifier r2 L-2). 3E 종결·push 는 69e2afe 이고 그 뒤 문서 레인 커밋 하나가 이 slice 계약 초안이다
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/koneps/**, adapters/src/test/kotlin/bidvector/adapters/koneps/**   # 개찰완료 오퍼레이션 구현 + 치환 확장 + mock server 시나리오. 3B·3B-2 기존 test 는 편집 없이 초록
@@ -56,7 +56,9 @@ rollback: |
 
 ## 하네스 레인 변경 · 문서 레인 변경 (상시 절)
 
-`git log --oneline <base>..HEAD -- CLAUDE.md .claude/` — **하네스 커밋 0**(실측).
+`git log --oneline 8119a47..HEAD -- CLAUDE.md .claude/` — **하네스 커밋 0**(실측).
+
+문서 레인 목록은 `git log --oneline 8119a47..HEAD -- reports/evidence/m3/3a docs/discovery milestone-3.md reports/evidence/m3/3f/scope.md` 로 낸다(아래 표는 그 명령의 결과를 사람이 읽는 형태로 옮긴 것이고, **셈·SHA 를 표에 박지 않는다** — verifier r2 L-3).
 
 **문서 레인 변경**(slice 산출물이 아니다 — 커밋 집합은 in_scope 경로의 변경이다, 2026-09-04):
 
