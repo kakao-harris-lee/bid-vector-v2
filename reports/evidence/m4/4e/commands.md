@@ -99,3 +99,13 @@
 - cmd: 임시 clone에서 `app/src/test/.../LeakProbe.kt`(다른 모듈)에 `MaskedTarget("raw-value")`·`DeliveryPlan(PolicyVerdict.Allowed, EnvironmentVerdict.Allowed)` 직접 생성자 호출을 심고 `./gradlew --no-daemon :app:compileTestKotlin`
 - exit: 1
 - 핵심 결과: 둘 다 `Cannot access '...': it is internal in '...'`로 컴파일 거부 — 우회 (1)(8)이 컴파일 층에서 닫힘을 실측. 임시 clone은 이후 삭제.
+
+## 2026-09-09T13:14:02Z (rollback 실측 1/2 — restore + compile)
+- cmd: 임시 clone(HEAD `cd73e40`)에서 rollback.md의 restore 명령 셋(A 항목 `git restore --source=f600909...`·gate-tests.properties `git apply -R`·scope.md `git restore`) 실행 뒤 `git status --porcelain`·`git diff f600909... -- config/quality/gate-tests.properties reports/evidence/m4/4e/scope.md`·`./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin`
+- exit: 0 (전 단계)
+- 핵심 결과: restore 세 명령 전부 exit 0, `git status --porcelain` A 20 중 19 삭제(rollback.md 자신 제외)·M 2(gate-tests.properties·scope.md) 정확히 일치, 두 M 파일의 base 대비 diff 빈 값, `:workflow:compileKotlin`·`:workflow:compileTestKotlin` exit 0.
+
+## 2026-09-09T13:14:15Z (rollback 실측 2/2 — test)
+- cmd: 같은 임시 clone에서 `./gradlew --no-daemon :workflow:test`
+- exit: 0
+- 핵심 결과: notification 패키지 제거 뒤 남은 event·strategy test 전건 GREEN — 되돌린 트리가 컴파일·테스트 모두 선다. 임시 clone은 이후 삭제.
