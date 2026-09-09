@@ -256,4 +256,46 @@
   reports/evidence/m4/4b1/{checklist,commands,rollback}.md && git commit ... -- <같은
   경로>`
 - exit: 0. `decision/**` 무접촉 확인(`git status --porcelain -- decision/` 커밋 전후
-  공백).
+  공백). head `7815d3b`.
+
+## 2026-09-09T11:55Z — S-0(임시 clone, `7815d3b`에 pin)
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks . "$d/repo" && (cd "$d/repo" &&
+  git checkout --quiet 7815d3b && ./gradlew --no-build-cache clean check)`
+- exit: 0 — `BUILD SUCCESSFUL in 1m 6s`, 353 actionable tasks 전부 executed(캐시 없는
+  임시 clone).
+
+## 2026-09-09T12:00Z — M-1 재실측(승격 반영, 같은 clone) — 공유 파일 line-level ·
+  M0 원본 fixture 8개 line-level · 신규 파일 전체 삭제
+- 배경: `git log --oneline 13cf0f6..HEAD -- <파일>`로 각 파일을 만진 커밋을 다시 나열 —
+  `gate-tests.properties`는 여전히 4C-1(`7469bce`)·4B-1(`381eaeb`) 둘, 나머지(manifest.yaml·
+  CorpusExecutors.kt·SharedKernelCorpusConformanceTest.kt·data-dictionary.md·
+  capability-map.md·`fixtures/{input,expected}/verdict-00{1,2,3,4}.json`·
+  `VerdictExecutors.kt`)는 이 range 전체가 4B-1 자신의 커밋만(`381eaeb`·`7133ccc`·
+  `7815d3b` 중 하나 이상)이라 base..HEAD 로 안전.
+- cmd: `git diff 381eaeb~1..381eaeb -- config/quality/gate-tests.properties | git apply -R`
+  — exit 0(4B-1 hunk 만 격리).
+- cmd: 나머지 12개 파일(공유 6 + M0 원본 fixture 8 중 실제 diff 있는 7 — `expected-004`는
+  값이 우연히 동일해 diff 가 비어 `git apply -R`가 "No valid patches" 로 no-op, 이것도
+  올바른 결과다) 각각 `git diff 13cf0f6..HEAD -- <파일> | git apply -R` — exit 0(11건),
+  exit 128(1건, `expected-004` — 빈 patch, 예상된 no-op).
+- cmd: `git restore --source=13cf0f6 --staged --worktree -- <신규 파일 35개>`(decision/**
+  12·`VerdictExecutors.kt` 1·fixtures/{input,expected}/verdict-0[05-12] 16·
+  `reports/evidence/m4/4b1/**` 6) — exit 0.
+- `git status --porcelain`: **D 35 · M 13**(6 공유 + 7 M0 원본 fixture 실변경분,
+  `expected-004`는 no-op 이라 diff 자체가 없다 — 목록과 일치).
+- ① `gate.tests.decision` 4C-1 이전 두 줄로 복귀 / `gate.tests.workflow` 는
+  `OutboxEntryTest` 포함 4C-1 rework 몫 유지(4C-1 몫 생존 확인).
+- ② `fixtures/manifest.yaml`: `verdict-001`~`004` 전부 `classification:
+  insufficient-evidence`·`source.kind: m0-derived-rule`(승격 전 원상)로 복귀,
+  `verified_paths` 필드 부재(실측 grep). `verdict-005`~`012` 사라짐.
+- ③ `fixtures/input/verdict-001.json`·`fixtures/expected/verdict-001.json` 이 M0
+  원본 서술형(`gateOutcome`/`structuredPayload`, `reasonCodeRequired` 등)으로 정확히
+  복귀(diff 로 실측 — 재구성 이전 파일과 byte-identical).
+- ④ 신규 디렉터리 잔여 파일 0건 — `decision/src/main`엔 1D 소스 7개만,
+  `app/.../conformance/`엔 `VerdictExecutors.kt` 부재, `reports/evidence/m4/4b1/`
+  디렉터리 자체가 없어짐.
+- cmd: `./gradlew --no-daemon :decision:compileKotlin :app:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --no-daemon :decision:test :workflow:test :app:test --tests
+  '*Conformance*'` — exit 0. `decision:test` = 38(1D 그대로) · conformance = **74**
+  (승격·8신설 이전 기준). 다섯 확인 전부 통과.
+- clone 삭제(`rm -rf`), 원 worktree엔 영향 없음(별도 clone).
