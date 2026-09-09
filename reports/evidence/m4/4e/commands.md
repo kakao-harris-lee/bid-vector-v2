@@ -109,3 +109,8 @@
 - cmd: 같은 임시 clone에서 `./gradlew --no-daemon :workflow:test`
 - exit: 0
 - 핵심 결과: notification 패키지 제거 뒤 남은 event·strategy test 전건 GREEN — 되돌린 트리가 컴파일·테스트 모두 선다. 임시 clone은 이후 삭제.
+
+## 2026-09-09T13:16:00Z (clean-tree 게이트, 양성 대조 포함)
+- cmd: `git status --porcelain -- <in_scope 경로 개별 인자>`(사전) → `Channel.kt`에 빈 줄 1개 append 뒤 재확인(양성 대조) → append한 줄만 제거 뒤 재확인
+- exit: 0 / (양성 대조 중 `M` 표시로 감지) / 0
+- 핵심 결과: 사전·사후 모두 결과 없음(clean), 양성 대조에서 `Channel.kt`가 정확히 잡힘 — 술어가 늘 통과만 하는 회귀가 아님을 확인.
