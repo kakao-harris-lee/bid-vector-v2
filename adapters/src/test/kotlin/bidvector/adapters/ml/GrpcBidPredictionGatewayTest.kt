@@ -223,6 +223,49 @@ class GrpcBidPredictionGatewayTest {
         }
     }
 
+    // ---- verifier r1 F-1(high) — 백오프 미구현 회귀 방지(probe P2) ----
+
+    @Test
+    fun `재시도 사이에 정책 백오프만큼 실제로 지연한다(경과시간 probe)`() {
+        runBlocking {
+            val policy =
+                testMlCallPolicy(maxAttempts = 3, backoff = listOf(Duration.ofMillis(60), Duration.ofMillis(120)))
+            val calls = AtomicInteger(0)
+            val servicer = throwingServicer(calls, Status.RESOURCE_EXHAUSTED)
+            val gateway = gatewayOn(servicer, policy)
+
+            val start = System.nanoTime()
+            val outcome = gateway.predict(testBidPredictionRequest(), CallBudget(Duration.ofSeconds(5)))
+            val elapsedMillis = (System.nanoTime() - start) / 1_000_000
+
+            outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+            outcome.reason shouldBe MlUnavailableReason.RetryBudgetExhausted
+            calls.get() shouldBe 3
+            // 정책 배열 합(60+120=180ms) 이상 걸려야 한다 — 백오프가 지연 없이 즉시
+            // 다음 attempt 로 가면(수정 전 실측 6ms) 이 하한을 못 채운다.
+            (elapsedMillis >= 180) shouldBe true
+        }
+    }
+
+    @Test
+    fun `남은 예산이 백오프를 감당하지 못하면 재시도하지 않고 DeadlineExceeded 다`() {
+        runBlocking {
+            val policy =
+                testMlCallPolicy(maxAttempts = 3, backoff = listOf(Duration.ofSeconds(10), Duration.ofSeconds(10)))
+            val calls = AtomicInteger(0)
+            val servicer = throwingServicer(calls, Status.RESOURCE_EXHAUSTED)
+            val gateway = gatewayOn(servicer, policy)
+
+            // 예산 200ms 인데 첫 backoff 가 10초 — 재시도할 시간이 없으니 1회 시도 뒤
+            // 바로 DeadlineExceeded 로 끝나야 한다(재시도 폭풍 방지).
+            val outcome = gateway.predict(testBidPredictionRequest(), CallBudget(Duration.ofMillis(200)))
+
+            outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+            outcome.reason shouldBe MlUnavailableReason.DeadlineExceeded
+            calls.get() shouldBe 1
+        }
+    }
+
     @Test
     fun `재시도는 같은 request_id 를 재사용한다(D-4 멱등)`() {
         runBlocking {

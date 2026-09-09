@@ -50,7 +50,7 @@ class GrpcBidPredictionGateway(
         val protoRequest = mapRequest(request, requestId, resolved.data, resolved.versionLabel)
         val stubWithDeadline = stub.withDeadlineAfter(remaining.toMillis(), TimeUnit.MILLISECONDS)
         val outcome =
-            callResilient(circuitBreaker, resolved.data.maxAttempts) {
+            callResilient(circuitBreaker, resolved.data.maxAttempts, resolved.data.backoff, remaining) {
                 stubWithDeadline.calculateOptimalBid(protoRequest)
             }
 

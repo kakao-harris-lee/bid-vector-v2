@@ -3,8 +3,11 @@ package bidvector.adapters.ml
 import contract.bidvector.ml.v1.CalculateOptimalBidResponse
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
+import io.grpc.Status
 import io.grpc.StatusException
 import io.grpc.StatusRuntimeException
+import kotlinx.coroutines.delay
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 /**
@@ -40,10 +43,12 @@ internal sealed interface PredictionCallOutcome {
 }
 
 /**
- * breaker + bounded retry **한 계층**(scope.md ③, ADR 0005 D-11, ADR 0010 D-5) — deadline은
- * 호출부가 stub 에 이미 건 값을 쓴다(이 함수는 시간을 직접 재지 않는다). 재시도는 transport
+ * breaker + bounded retry **한 계층**(scope.md ③⑧, ADR 0005 D-11, ADR 0010 D-4·D-5) —
+ * deadline은 호출부가 stub 에 이미 건 값을 쓴다(이 함수는 시간을 직접 재지 않는다 — 단,
+ * `remainingBudget`으로 백오프가 예산을 넘는지는 잰다, verifier r1 F-1). 재시도는 transport
  * 예외(`isRetryableTransportStatus`)와 application failure(`isRetryableApplicationFailure`)를
- * **한 loop**(`callWithBoundedRetry`)에서 함께 본다 — resilience4j `Retry`를 쓰지 않는다(재시도
+ * **한 loop**(`callWithBoundedRetry`)에서 함께 보고, 재시도 사이마다 `backoff`(정책 배열,
+ * attempt index 로 고른다)만큼 실제로 지연한다 — resilience4j `Retry`를 쓰지 않는다(재시도
  * 계층이 둘이 되지 않는다). gRPC 실패는 [StatusException]·[StatusRuntimeException] 둘 중
  * 하나로만 온다 — 그 밖(coroutine 취소의 `CancellationException` 포함)은 여기서 잡지 않고
  * 그대로 전파한다(`RetryRules.kt`와 같은 이유, detekt `TooGenericExceptionCaught`).
@@ -51,12 +56,15 @@ internal sealed interface PredictionCallOutcome {
 internal suspend fun callResilient(
     circuitBreaker: CircuitBreaker,
     maxAttempts: Int,
+    backoff: List<Duration>,
+    remainingBudget: Duration,
     call: suspend () -> CalculateOptimalBidResponse,
 ): PredictionCallOutcome {
     if (!circuitBreaker.tryAcquirePermission()) return PredictionCallOutcome.BreakerOpen
     val start = System.nanoTime()
+    val deadlineAt = start + remainingBudget.toNanos()
     return try {
-        val response = callWithBoundedRetry(maxAttempts, call)
+        val response = callWithBoundedRetry(maxAttempts, backoff, deadlineAt, call)
         circuitBreaker.onSuccess(System.nanoTime() - start, TimeUnit.NANOSECONDS)
         PredictionCallOutcome.Responded(response)
     } catch (statusError: StatusException) {
@@ -70,11 +78,15 @@ internal suspend fun callResilient(
 
 private suspend fun callWithBoundedRetry(
     maxAttempts: Int,
+    backoff: List<Duration>,
+    deadlineAt: Long,
     call: suspend () -> CalculateOptimalBidResponse,
 ): CalculateOptimalBidResponse {
     for (attempt in 0 until maxAttempts) {
-        val outcome = attemptOnce(call, isLastAttempt = attempt == maxAttempts - 1)
+        val isLastAttempt = attempt == maxAttempts - 1
+        val outcome = attemptOnce(call, isLastAttempt)
         if (outcome != null) return outcome
+        if (!isLastAttempt) awaitBackoffOrDeadlineExceeded(attempt, backoff, deadlineAt)
     }
     error("retry loop 이 결과 없이 끝났다")
 }
@@ -98,3 +110,24 @@ private suspend fun attemptOnce(
 private fun isRetryableFailureResponse(response: CalculateOptimalBidResponse): Boolean =
     response.resultCase == CalculateOptimalBidResponse.ResultCase.FAILURE &&
         isRetryableApplicationFailure(response.failure.retryable)
+
+/**
+ * verifier r1 F-1(high) — 재시도 전에 정책 `backoff`(attempt index 로 고른다, 마지막 index
+ * 이후는 마지막 값을 반복)만큼 `delay`한다(ADR 0010 D-4 「RESOURCE_EXHAUSTED(백오프 필수)」,
+ * 모든 재시도 가능 status 에 균일 적용). **남은 예산이 그 백오프조차 감당하지 못하면
+ * 재시도하지 않고** `Status.DEADLINE_EXCEEDED`를 합성해 던진다 — `callResilient`의 catch
+ * 가 그대로 받아 `TransportFailed`로 접고, `GrpcBidPredictionGateway.mapTransportFailure`
+ * 가 `Unavailable(DeadlineExceeded)`로 옮긴다(재시도 폭풍 방지).
+ */
+private suspend fun awaitBackoffOrDeadlineExceeded(
+    attempt: Int,
+    backoff: List<Duration>,
+    deadlineAt: Long,
+) {
+    val backoffDuration = backoff.getOrElse(attempt) { backoff.last() }
+    val remainingNanos = deadlineAt - System.nanoTime()
+    if (remainingNanos <= backoffDuration.toNanos()) {
+        throw Status.DEADLINE_EXCEEDED.asRuntimeException()
+    }
+    delay(backoffDuration.toMillis())
+}

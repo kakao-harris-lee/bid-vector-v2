@@ -35,6 +35,7 @@ import contract.bidvector.ml.v1.Rate as ProtoRate
 internal fun testMlCallPolicy(
     deadlineCeiling: Duration = Duration.ofSeconds(2),
     maxAttempts: Int = 3,
+    backoff: List<Duration> = listOf(Duration.ofMillis(1), Duration.ofMillis(1)),
     breakerFailureRateThresholdPercent: Int = 50,
     breakerSlidingWindowSize: Int = 4,
     breakerWaitDurationInOpenState: Duration = Duration.ofMillis(200),
@@ -42,7 +43,7 @@ internal fun testMlCallPolicy(
     MlCallPolicyData(
         deadlineCeiling = deadlineCeiling,
         maxAttempts = maxAttempts,
-        backoff = listOf(Duration.ofMillis(1), Duration.ofMillis(1)),
+        backoff = backoff,
         breakerFailureRateThresholdPercent = breakerFailureRateThresholdPercent,
         breakerSlidingWindowSize = breakerSlidingWindowSize,
         breakerWaitDurationInOpenState = breakerWaitDurationInOpenState,
