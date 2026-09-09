@@ -66,7 +66,13 @@ rollback: |
 
 `git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/`
 
-- 착수 시점: **없음**(base == HEAD). 리뷰 요청 시점에 갱신한다. rollback 은 in_scope 한정이라 하네스 경로를 되돌리지 않는다.
+- 착수 시점: **없음**(base == HEAD).
+- **리뷰 요청 시점(구현 완료, 2026-09-09) 재확인 — 1건**: `ea79355 harness(v2-slice-pipeline):
+  (2b) 의 「경계로 처리」 행도 실측 대상으로`(`.claude/skills/v2-slice-pipeline/SKILL.md`·
+  `CLAUDE.md`, 실측 — `git show --stat`). 이 slice 의 산출물 커밋(`381eaeb`) **이후**,
+  다른 세션(팀장)이 붙인 하네스 개정이다 — slice 산출물이 아니며 in_scope 밖, rollback
+  대상이 아니다.
+- rollback 은 in_scope 한정이라 하네스 경로를 되돌리지 않는다.
 
 ---
 
