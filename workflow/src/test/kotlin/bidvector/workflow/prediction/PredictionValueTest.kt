@@ -80,7 +80,7 @@ class PredictionValueTest {
     }
 
     @Test
-    fun `PriceFitness 는 음수를 거부한다`() {
-        shouldThrow<IllegalArgumentException> { PriceFitness(BigDecimal("-9999")) }
+    fun `PriceFitness 는 계약에 부호 근거가 없어 음수도 정상 생성된다(verifier r2 G-2 — r1 F-5 되돌림)`() {
+        PriceFitness(BigDecimal("-9999")).score shouldBe BigDecimal("-9999")
     }
 }

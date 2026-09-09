@@ -39,15 +39,15 @@ data class BidRateCandidates(
  * 가격 적합도 — 확률이 아니다(ML-03, D-M2-8, scope.md ⑨). `UnitScore`·`Rate`와 상호
  * 대입되지 않는 별도 타입이다 — `OPEN-ML-03`의 「타입 분리」 후보를 Kotlin 쪽에서 실물로
  * 세운다. 생성자가 public인 이유는 [BidRateCandidates] KDoc과 같다(cross-module 어댑터 생성).
- * 음수를 거부한다(verifier r1 F-5) — "적합도"가 해석 가능한 값의 최소 하한.
+ * **부호 불변식을 두지 않는다**(verifier r2 G-2 — r1 F-5 가 넣었던 「음수 거부」를 되돌림).
+ * `prediction.proto`의 `PriceFitness` 주석이 "값의 산식은 이 계약이 규정하지 않는다"라고
+ * 명시하고, `data-dictionary.md`에도 이 축의 범위 규정이 없다 — 부호를 제약하면 계약이
+ * 허용하는 정직한 `Success`를 버리게 된다. 형태 검증은 decimal string 정규형(파싱 가능성)
+ * 만 잰다 — 어댑터 쪽 매핑(package `adapters ml`)의 구조 검증층.
  */
 data class PriceFitness(
     val score: BigDecimal,
-) {
-    init {
-        require(score.signum() >= 0) { "PriceFitness.score는 음수일 수 없다: $score" }
-    }
-}
+)
 
 /**
  * 불확실성 출처(scope.md ⑦, 2B `IntervalSource` 미러) — legacy 의 합성 `confidence` 단일

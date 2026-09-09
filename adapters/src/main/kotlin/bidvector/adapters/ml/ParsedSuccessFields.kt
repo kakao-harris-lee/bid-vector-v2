@@ -50,6 +50,7 @@ private fun isAcceptableSuccessShape(success: Success): Boolean {
             hasExactlyThreeOrderedCandidates(success),
             success.candidatesList.all { it.origin == BidRateOrigin.BID_RATE_ORIGIN_RECOMMENDED },
             hasNonBlankRelease(success),
+            hasOrderedCandidateRates(success),
         )
     return checks.all { it }
 }
@@ -86,7 +87,8 @@ private fun parsedSuccessFields(success: Success): ParsedSuccessFields? {
 
 private fun allNotNull(vararg values: Any?): Boolean = values.all { it != null }
 
-private fun String.toRateOrNull(): Rate? {
+/** `internal` — `CandidateShapeValidation.kt`(다른 파일, 같은 모듈)도 같은 파싱을 쓴다(중복 금지). */
+internal fun String.toRateOrNull(): Rate? {
     val value = toValidatedBigDecimalOrNull() ?: return null
     return if (value.signum() < 0 || value > BigDecimal.ONE) null else Rate.ofFraction(value)
 }
