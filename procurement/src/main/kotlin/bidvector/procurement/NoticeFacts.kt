@@ -240,15 +240,30 @@ data class OpeningRankOneBid(
  * 실재하는 도메인, 설계 검토 (4) 「과잉 하나」).
  */
 sealed interface OpeningRankOneOutcome {
+    /**
+     * 이 축이 마지막으로 관측된 시각(verifier r1 F-2 뒤 신설, 3E `OpeningReservePriceRow
+     * .observedAt`과 같은 자리) — 부모 `OpeningResult.observedAt`(관측 전체의 시각)과 다르다.
+     * `NotObserved`만 `null`이다(관측 자체가 없었다). 재수집이 이 축을 싣지 않으면(값이
+     * `NotObserved`로 옴) 저장은 이 축을 옛 상태 그대로 보존하고, 그 옛 상태의 `observedAt`도
+     * 함께 보존된다 — 그래서 소비자가 부모의 최신 `observedAt`과 이 값을 비교해 낡음을 스스로
+     * 판정할 수 있다(파생 플래그를 컬럼으로 만들지 않는다).
+     */
+    val observedAt: Instant?
+
     /** 투찰자 행 자체가 관측되지 않았다(기본값). */
-    data object NotObserved : OpeningRankOneOutcome
+    data object NotObserved : OpeningRankOneOutcome {
+        override val observedAt: Instant? = null
+    }
 
     /** 어느 행도 순위 1이 아니다. */
-    data object RankMissing : OpeningRankOneOutcome
+    data class RankMissing(
+        override val observedAt: Instant,
+    ) : OpeningRankOneOutcome
 
     /** 순위 1이 둘 이상이다 — 동값을 임의로 깨지 않는다. */
     data class RankDuplicated(
         val count: Int,
+        override val observedAt: Instant,
     ) : OpeningRankOneOutcome {
         init {
             require(count >= 2) { "RankDuplicated는 2건 이상일 때만 성립한다: $count" }
@@ -258,21 +273,26 @@ sealed interface OpeningRankOneOutcome {
     /** 순위 1이 정확히 하나다. */
     data class Determined(
         val bid: OpeningRankOneBid,
+        override val observedAt: Instant,
     ) : OpeningRankOneOutcome
 
     companion object {
         /**
          * 관측된 (순위, 개찰 1위 후보) 짝 목록에서 개찰 1위 축을 결정한다. 순위 파싱·raw 텍스트
          * 해석은 호출부 몫이다(canonicalize, M4 4B 배선) — 이 함수는 이미 파싱된 `Int?` 순위만
-         * 받는다.
+         * 받는다. `observedAt`은 이 목록을 낸 관측 시각이다(호출부가 안다 — 목록이 비어도
+         * `NotObserved`는 관측 자체가 없었다는 뜻이라 그 인자를 쓰지 않는다).
          */
-        fun resolve(candidates: List<Pair<Int?, OpeningRankOneBid>>): OpeningRankOneOutcome {
+        fun resolve(
+            candidates: List<Pair<Int?, OpeningRankOneBid>>,
+            observedAt: Instant,
+        ): OpeningRankOneOutcome {
             if (candidates.isEmpty()) return NotObserved
             val rankOnes = candidates.filter { it.first == 1 }
             return when (rankOnes.size) {
-                0 -> RankMissing
-                1 -> Determined(rankOnes.single().second)
-                else -> RankDuplicated(rankOnes.size)
+                0 -> RankMissing(observedAt)
+                1 -> Determined(rankOnes.single().second, observedAt)
+                else -> RankDuplicated(rankOnes.size, observedAt)
             }
         }
     }
@@ -286,29 +306,41 @@ sealed interface OpeningRankOneOutcome {
  * 자체로 하나의 결과다(위협 모델 방어 (d)).
  */
 sealed interface DrawNumberObservation {
+    /**
+     * 이 축이 마지막으로 관측된 시각(verifier r1 F-2 뒤 신설) — [OpeningRankOneOutcome
+     * .observedAt]과 같은 자리·같은 이유. `NotObserved`만 `null`이다.
+     */
+    val observedAt: Instant?
+
     /** 관측된 번호가 없다 — 부재가 정상 형태다(협상 계약·단수 예가, §1.9.7 7/15). */
-    data object NotObserved : DrawNumberObservation
+    data object NotObserved : DrawNumberObservation {
+        override val observedAt: Instant? = null
+    }
 
     /** 1..총예가건수 범위 안 — 검사를 통과했다. */
     data class Verified(
         val numbers: Set<Int>,
+        override val observedAt: Instant,
     ) : DrawNumberObservation
 
     /** 범위 밖 번호가 섞여 있다 — 조용히 통과시키지 않는다. */
     data class OutOfRange(
         val numbers: Set<Int>,
         val validRange: IntRange,
+        override val observedAt: Instant,
     ) : DrawNumberObservation
 
     /** 번호는 있으나 총예가건수를 몰라 범위를 검사할 수 없다(§1.9.7 — 이 오퍼레이션 응답에 없다). */
     data class RangeCheckUnavailable(
         val numbers: Set<Int>,
+        override val observedAt: Instant,
     ) : DrawNumberObservation
 
     companion object {
         fun of(
             numbers: Set<Int>,
             totalReservePriceCandidateCount: Int?,
+            observedAt: Instant,
         ): DrawNumberObservation =
             when {
                 numbers.isEmpty() -> {
@@ -316,15 +348,15 @@ sealed interface DrawNumberObservation {
                 }
 
                 totalReservePriceCandidateCount == null -> {
-                    RangeCheckUnavailable(numbers)
+                    RangeCheckUnavailable(numbers, observedAt)
                 }
 
                 numbers.any { it < 1 || it > totalReservePriceCandidateCount } -> {
-                    OutOfRange(numbers, 1..totalReservePriceCandidateCount)
+                    OutOfRange(numbers, 1..totalReservePriceCandidateCount, observedAt)
                 }
 
                 else -> {
-                    Verified(numbers)
+                    Verified(numbers, observedAt)
                 }
             }
     }
