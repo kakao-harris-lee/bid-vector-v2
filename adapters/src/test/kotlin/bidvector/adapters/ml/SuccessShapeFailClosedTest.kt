@@ -9,12 +9,14 @@ import contract.bidvector.ml.v1.CalculateOptimalBidRequest
 import contract.bidvector.ml.v1.CalculateOptimalBidResponse
 import contract.bidvector.ml.v1.GetModelMetadataRequest
 import contract.bidvector.ml.v1.GetModelMetadataResponse
+import contract.bidvector.ml.v1.Success
 import io.grpc.ManagedChannel
 import io.grpc.Server
 import io.grpc.Status
 import io.grpc.StatusException
 import io.grpc.inprocess.InProcessChannelBuilder
 import io.grpc.inprocess.InProcessServerBuilder
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
@@ -23,22 +25,28 @@ import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /**
- * verifier r2(`_workspace/m4-4d/05_verifier_report_r2.md`) G-1·G-2·G-4·G-5 재현·회귀 방지 —
- * `GrpcBidPredictionGatewayTest`에서 size ratchet(v2-지침서 §5, 500줄)으로 갈라낸 파일이다
- * (`CandidateShapeValidation.kt`를 `ParsedSuccessFields.kt`에서 가른 것과 같은 사유).
+ * 검증층을 통과하지 못한 `Success` 는 예외가 아니라 `Unavailable`로 접힌다 — 값 타입
+ * `init`은 마지막 안전판이지 게이트가 아니다(`isAcceptableSuccessShape`가 게이트,
+ * verifier r2 G-1·F-2 `hasNonBlankRelease`와 동형 패턴). `GrpcBidPredictionGatewayTest`
+ * 에서 size ratchet(v2-지침서 §5, 500줄)으로 갈라낸 파일이다(`CandidateShapeValidation.kt`
+ * 를 `ParsedSuccessFields.kt`에서 가른 것과 같은 사유). 이 파일이 증명하는 것 넷:
  *
- * **G-1(high)** — `BidRateCandidates.init`(conservative≤base≤aggressive) 위반이 예외로
- * `predict` 밖까지 새면 안 된다. `isAcceptableSuccessShape`(구조 검증층)가 먼저 잡아
- * `Unavailable(ContractViolation)`을 내야 한다(F-2 `hasNonBlankRelease`와 동형 패턴).
- * **G-2(high)** — `PriceFitness` 부호는 계약 근거가 없다(proto 주석 「값의 산식은 이
- * 계약이 규정하지 않는다」) — 정직한 음수 적합도가 값으로 접히지 않고 `Predicted`로
- * 통과해야 한다. **G-4(medium)** — 호출부 예산 부족(합성 DeadlineExceeded)은 breaker
- * 계수 밖이어야 한다. **G-5(low)** — release 불일치와 schema 불일치가 동시에 있으면
- * `releaseSatisfiesSelector`가 `mapSuccess`보다 먼저 걸려 `ReleaseMismatch`가 이긴다.
+ * - 후보 순서(conservative≤base≤aggressive) 위반은 `BidRateCandidates.init`이 아니라
+ *   구조 검증층이 먼저 잡아 `Unavailable(ContractViolation)`을 낸다(r2 G-1).
+ * - `PriceFitness` 부호는 계약 근거가 없다(proto 주석 「값의 산식은 이 계약이 규정하지
+ *   않는다」) — 정직한 음수 적합도가 값으로 접히지 않고 `Predicted`로 통과한다(r2 G-2).
+ * - 호출부 예산 부족(합성 DeadlineExceeded)은 breaker 계수 밖이다 — 서버는 건강한데
+ *   예산만 짧은 호출을 반복해도 breaker 가 열리지 않고, 뒤이은 넉넉한 예산 호출이
+ *   서버에 닿는다(r2 G-4 — HALF_OPEN 의 permit 계수는 `BreakerTest`가 잰다).
+ * - release 불일치와 schema 불일치가 동시에 있으면 `releaseSatisfiesSelector`가
+ *   `mapSuccess`보다 먼저 걸려 `ReleaseMismatch`가 이긴다(r2 G-5).
+ * - 값 타입마다 `init`이 던지는 조건과 검증층 술어가 짝을 이룬다 — table-driven 으로
+ *   전수 대조한다(r3 H-6, 짝 없는 조건이 생기면 이 test 가 떨어진다).
  */
-class GrpcBidPredictionGatewayVerifierR2Test {
+class SuccessShapeFailClosedTest {
     private var server: Server? = null
     private var channel: ManagedChannel? = null
 
@@ -240,4 +248,100 @@ class GrpcBidPredictionGatewayVerifierR2Test {
             healthyOutcome.shouldBeInstanceOf<BidPredictionOutcome.Predicted>()
         }
     }
+
+    // ---- verifier r3 H-6(low) — init 조건 ↔ 검증층 술어 짝을 손대조가 아니라 구조 test 로
+    // 고정한다. 값 타입마다 init 이 던지는 조건을 표(입력 → 기대)로 열거하고, 같은 입력을
+    // 실 gateway 경로에 넣어 예외 없이 기대한 Unavailable 사유로 접히는지 대조한다 — 새
+    // init 조건이 검증층 술어 없이 추가되면(F-5→G-1 이 두 번째로 난 그 클래스) 이 test 가
+    // 떨어진다. PriceFitness 는 G-2 로 init 자체가 없어져 이 표의 대상이 아니다. ----
+
+    @Test
+    fun `init 이 던지는 조건마다 검증층이 먼저 걸려 예외 없이 접힌다(H-6, table-driven)`() {
+        runBlocking {
+            val currentResponse = AtomicReference<CalculateOptimalBidResponse>()
+            val servicer =
+                object : BidPredictionServiceGrpcKt.BidPredictionServiceCoroutineImplBase() {
+                    override suspend fun calculateOptimalBid(
+                        request: CalculateOptimalBidRequest,
+                    ): CalculateOptimalBidResponse = currentResponse.get() ?: error("이 test 는 매 case 마다 응답을 미리 심는다")
+
+                    override suspend fun getModelMetadata(request: GetModelMetadataRequest): GetModelMetadataResponse =
+                        error("이 test 는 GetModelMetadata 를 부르지 않는다")
+                }
+            val gateway = gatewayOn(servicer)
+
+            shapeInvariantCases.forEach { case ->
+                val mutated = testSuccessResponse().toBuilder().also(case.mutate).build()
+                currentResponse.set(protoResponse(mutated))
+
+                val outcome =
+                    gateway.predict(
+                        testBidPredictionRequest(releaseSelector = exactSelector),
+                        CallBudget(Duration.ofSeconds(1)),
+                    )
+
+                withClue(case.description) {
+                    outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+                    outcome.reason shouldBe case.expectedReason
+                }
+            }
+        }
+    }
 }
+
+private data class ShapeInvariantCase(
+    val description: String,
+    val mutate: (Success.Builder) -> Unit,
+    val expectedReason: MlUnavailableReason,
+)
+
+/**
+ * r3 verifier §3 의 「init 조건 ↔ 검증층 짝 대조」표를 그대로 옮긴 것 — `BidRateCandidates`
+ * 두 부등식(각각 단독 위반)·`Uncertainty.sampleSize`·`ModelReleaseRef` 다섯 성분. release
+ * 성분 중 `releaseId`·`artifactChecksum`은 `exact_release` 대조가 `mapSuccess`보다 먼저
+ * 걸려(G-5 의 순서) `ContractViolation`이 아니라 `ReleaseMismatch`다 — 둘 다 `Unavailable`
+ * 이고 예외가 아니므로 짝이 없는 것은 아니다(검증층이 다른 사유로 먼저 접었을 뿐).
+ */
+private val shapeInvariantCases =
+    listOf(
+        ShapeInvariantCase(
+            "BidRateCandidates: conservative > base(첫 쌍만 역전)",
+            { b -> b.getCandidatesBuilder(0).bidRateBuilder.fraction = "0.9300" },
+            MlUnavailableReason.ContractViolation,
+        ),
+        ShapeInvariantCase(
+            "BidRateCandidates: base > aggressive(끝 쌍만 역전)",
+            { b -> b.getCandidatesBuilder(2).bidRateBuilder.fraction = "0.9000" },
+            MlUnavailableReason.ContractViolation,
+        ),
+        ShapeInvariantCase(
+            "Uncertainty: sampleSize=0",
+            { b -> b.uncertaintyBuilder.sampleSize = 0 },
+            MlUnavailableReason.ContractViolation,
+        ),
+        ShapeInvariantCase(
+            "ModelReleaseRef: releaseId 공백(exact_release 대조가 먼저 걸린다)",
+            { b -> b.releaseBuilder.releaseId = "" },
+            MlUnavailableReason.ReleaseMismatch,
+        ),
+        ShapeInvariantCase(
+            "ModelReleaseRef: artifactChecksum 공백(exact_release 대조가 먼저 걸린다)",
+            { b -> b.releaseBuilder.artifactChecksum = "" },
+            MlUnavailableReason.ReleaseMismatch,
+        ),
+        ShapeInvariantCase(
+            "ModelReleaseRef: featureSchemaVersion 공백",
+            { b -> b.releaseBuilder.featureSchemaVersion = "" },
+            MlUnavailableReason.ContractViolation,
+        ),
+        ShapeInvariantCase(
+            "ModelReleaseRef: codeVersion 공백",
+            { b -> b.releaseBuilder.codeVersion = "" },
+            MlUnavailableReason.ContractViolation,
+        ),
+        ShapeInvariantCase(
+            "ModelReleaseRef: datasetId 공백",
+            { b -> b.releaseBuilder.datasetId = "" },
+            MlUnavailableReason.ContractViolation,
+        ),
+    )
