@@ -117,3 +117,74 @@
   ./gradlew --no-build-cache clean check)` — exit 0 — `BUILD SUCCESSFUL in 52s`, 353
   actionable tasks 전부 executed(캐시 없는 임시 clone).
 - clone 삭제(`rm -rf`), 원 worktree엔 영향 없음.
+
+## 2026-09-10T09:00Z — 수정 라운드 1(재작업 1/5) — M-1·M-2·L-1·L-2·L-3·L-4
+- verifier 판정 `ready-for-review`(`_workspace/m4-4b2/03_verifier_report.md`), 산출물층
+  blocker/high 0.
+- **M-1**(운영자 결정 2026-09-10): `EvaluateCandidatesUseCase`의 `watchGateDrop`에서
+  `WatchVerdict.NoGate`를 `NotReached(WatchGate, WatchGateNotConfigured)`로 되돌림
+  (`EvaluationDropReason.WatchGateNotConfigured` 신설). 함수당 50줄 한도 초과
+  (`watchGateDrop` 56줄) → `watchVerdictDrop`을 top-level 함수로 분리.
+- **M-2**: `MlAnalysisPort.analyze(notice: Notice)` →
+  `analyze(notice: Notice, correlationId: CorrelationId)`.
+- **L-1**: `EvaluateCandidatesUseCase`에 `judge` 위임 생성자 인자(기본값
+  `VerdictLadder::judge`) 신설. test는 `CountingJudge`(얇은 래퍼)로 대체해 호출
+  횟수를 센다.
+- fixture 정정: `testStrategy()` 기본 draft에 `focusCategories = listOf
+  (DEFAULT_FOCUS_CATEGORY)` 추가(M-1로 `NoGate`가 더 이상 통과가 아니라, 다른 단계를
+  재는 test가 감시 게이트를 먼저 지나야 한다) + `MATCHING_SUBJECT` 신설
+  (`EvaluationTestFixtures.kt`). 영향받은 기존 test 셋(`사다리 임계가 미설정이면...`·
+  `적합도가 운영자 최소치 미만이면...`·`한 후보의 실패가...`)의 전략/subject
+  구성만 조정 — 그 test들이 재는 stage/reason 기대값은 무변경.
+- 신설 test 셋: `감시 규칙이 미설정이면 WatchGate 에서 멈추고 NoGate 를 그대로 싣는다`
+  (M-1)·`사다리 호출은 공고당 정확히 한 번 돈다`(L-1)·`correlationId 는 ML 분석
+  port 에도 실린다`(M-2). 기존 `판정은 공고당 정확히 한 번 돈다`는
+  `ML 분석은 공고당 정확히 한 번 불린다`로 이름 정정(그 test가 실제로 재는 것은 ML
+  분석 호출 횟수이지 사다리 호출 횟수가 아니었다).
+
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin` — exit 0(M-1/M-2/L-1 반영 직후).
+- cmd: `./gradlew --no-daemon :workflow:compileTestKotlin` — exit 1(1차) →
+  `FakeMlAnalysisPort`가 새 `analyze` 시그니처를 구현하지 않음. 수정(correlationId 파라미터
+  추가 + `correlationIdSeenFor` 기록) 후 exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test` — exit 1(1차, 10 tests 실패) — `testStrategy()`
+  기본 draft가 watch 미설정이라 M-1 반영 후 기존 test 다수가 (의도와 다르게) WatchGate에서
+  멈춤. fixture 수정(`focusCategories`+`MATCHING_SUBJECT`) 후 재실행 — exit 1(3 tests,
+  `테스트가 직접 만든 미설정 draft` 케이스들) → 그 test들에 `focusCategories`를 개별
+  추가해 감시 게이트를 통과시킨 뒤 exit 0(75 tests, 0 failed).
+- **L-1 mutation 실측**: `reach` 안에서 `judge(...)`를 두 번 부르게 심었다 —
+  cmd `./gradlew --no-daemon :workflow:test --tests '*EvaluateCandidatesUseCaseIsolationTest*'`
+  — exit 1 — **정확히 1건**(`사다리 호출은 공고당 정확히 한 번 돈다`,
+  `expected:<1> but was:<2>`) 실패, 나머지 7건(ML 분석 계수 test 포함)은 그대로
+  초록 — verifier가 지적한 사각(judge 이중 호출을 ML 분석 계수로는 못 잡음)이 이제
+  닫혔음을 실측 확인. mutation 되돌림 — `diff`로 원본과 byte-identical 확인.
+- cmd: `./gradlew --no-daemon :workflow:ktlintFormat` — exit 0.
+- cmd: `./gradlew --no-build-cache clean check` — **exit 1**(1차) — `:workflow:sizeGate`
+  (`watchGateDrop` 56줄 > 50줄 한도). 수정: `watchVerdictDrop`을 별도 함수로 분리(클래스
+  메서드로 추가하면 detekt `TooManyFunctions`(11 초과)에 걸려 `notReached`·
+  `watchVerdictDrop` 둘 다 top-level 함수로 뺐다 — 인스턴스 상태가 필요 없어서다).
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin
+  :workflow:test :workflow:sizeGate :workflow:detekt :workflow:cpdCheck
+  :workflow:ktlintCheck :workflow:moduleDependencyGate` — exit 0(21 tests: `Composition
+  BoundaryTest` 4·`EvaluateCandidatesUseCaseIsolationTest` 8·`EvaluateCandidatesUseCaseTest`
+  9, 기존 4A/4C-1 test 57건 무영향).
+
+## 2026-09-10T09:20Z — acceptance S-1~S-6(재실행, S-4·S-6 별도 호출)
+- cmd: `./gradlew --no-build-cache clean check`(S-1) — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test`(S-2) — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate
+  :workflow:cpdCheck`(S-3) — exit 0.
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*CompositionBoundaryTest*'`(S-3b)
+  — exit 0.
+- cmd: `./gradlew --no-daemon :app:test`(S-4, 별도 호출) — exit 0 —
+  `SharedKernelCorpusConformanceTest tests="86" failures="0"`(무변화).
+- cmd: `./gradlew --no-daemon qualityBaseline`(S-5) — exit 0.
+- cmd: `./gradlew --no-daemon :app:gateExecutionGate`(S-6, 별도 호출) — exit 0.
+
+## 2026-09-10T09:30Z — secret 스캔 · clean-tree 게이트
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"
+  workflow/src/main/kotlin/bidvector/workflow/evaluation/
+  workflow/src/test/kotlin/bidvector/workflow/evaluation/ reports/evidence/m4/4b2/`
+  — exit 0(매치 4건, 전부 이 라운드의 secret 스캔 자기참조 서술, 실 비밀값 0건).
+- cmd: `git status --porcelain -- <in_scope 경로 8개 개별 인자>` — exit 0, 정확히 이
+  8개 파일과 일치. 양성 대조(비파괴): `EvaluationStage.kt`에 개행 추가 → `M` 관측 →
+  `sed -i '' -e '$ d'`로 추가한 줄만 절삭 → 재확인(비어있음, exit 0).

@@ -60,9 +60,20 @@ sealed interface MlAnalysisOutcome {
     data object SimilarityProjectionNotReady : MlAnalysisOutcome
 }
 
-/** ML 분석 port(scope.md ⑦) — 실 ML 호출·gRPC·deadline·breaker는 4D. */
+/**
+ * ML 분석 port(scope.md ⑦) — 실 ML 호출·gRPC·deadline·breaker는 4D.
+ *
+ * **`correlationId`를 받는다(수정 라운드 1 M-2, 운영자 결정).** M4 완료 조건 「trace/
+ * correlation id가 수집→판정→**ML**→알림 요청까지 유지」가 이 port 계약에도 걸린다 —
+ * 4D가 남의 port를 고쳐야 하는 상황을 만들지 않기 위해 지금 닫는다. 이 slice의 실
+ * 구현(fake)은 그 값을 쓰지 않아도 되지만, 시그니처에 있어야 4D의 실 어댑터가 ML
+ * 호출 로그·헤더에 그 값을 실을 수 있다.
+ */
 fun interface MlAnalysisPort {
-    fun analyze(notice: Notice): MlAnalysisOutcome
+    fun analyze(
+        notice: Notice,
+        correlationId: CorrelationId,
+    ): MlAnalysisOutcome
 }
 
 /**

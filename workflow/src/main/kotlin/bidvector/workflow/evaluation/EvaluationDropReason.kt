@@ -8,15 +8,31 @@ import java.math.BigDecimal
 /**
  * 판정에 이르지 못한 사유(scope.md ⑥, 설계 검토 (4) 2) — **탈락 사유는 기존 축이
  * 소유한다.** `WatchVerdict`(1E)·`LicenseVerdict`(1C)·`NoticeStatus`(3A)를 그대로
- * 싣는다 — 새 어휘로 복제하지 않는다. 어느 축도 소유하지 않은 것(D-10~D-13, D-1의
- * 조사가 조사가 낸 목록에서 「어느 축도 없음」으로 판정한 넷)만 이 sealed가 최소로
- * 신설한다(조사가 낸 목록 — `_workspace/m4-4b1/01_scout_verdict_ladder.md` §3.3
- * 「`Skip`이 아닐 것 같은 것」 참고).
+ * 싣는다 — 새 어휘로 복제하지 않는다.
+ *
+ * **어느 축도 소유하지 않은 것은 여섯이다(verifier r1 L-2 정정 — 이전 판은 「넷」이라
+ * 적었으나 재산출하니 여섯이었다)**: [WatchSubjectUnavailable]·
+ * [ActionThresholdsNotConfigured]·[AnalysisBudgetExhausted]·
+ * [SimilarityProjectionNotReady]·[BelowMinimumMatchScore]·
+ * [BelowMinimumProbabilityScore]. [WatchGateNotConfigured]는 여섯에 들지 않는다 —
+ * `WatchVerdict.NoGate`(1E)를 그대로 싣는다(D-1, 수정 라운드 1 M-1).
  */
 sealed interface EvaluationDropReason {
     /** 공고가 입찰 가능 상태가 아니다(3A `NoticeStatus` — D-2). */
     data class NoticeNotBiddable(
         val status: NoticeStatus,
+    ) : EvaluationDropReason
+
+    /**
+     * 감시 규칙이 하나도 설정돼 있지 않다(1E `WatchVerdict.NoGate` 그대로 — D-1,
+     * 수정 라운드 1 M-1). **운영자 결정 2026-09-10** — 이전 판은 `NoGate`를 통과로
+     * 재해석했으나 되돌린다. legacy는 이 상태에서 스캔 자체를 하지 않았다
+     * (`_has_configured_watch_rules` 게이트, `_workspace/m4-4b2/01_scout_composition.md`
+     * §2.2 단계 8). 결과는 legacy와 같다(후보 0) — 다른 점은 탈락이 값으로
+     * 남는다는 것뿐이다(이 slice ⑥의 목적).
+     */
+    data class WatchGateNotConfigured(
+        val noGate: WatchVerdict.NoGate,
     ) : EvaluationDropReason
 
     /** 감시 필드 거절(1E `WatchVerdict.Rejected` 그대로 — D-3~D-8). */

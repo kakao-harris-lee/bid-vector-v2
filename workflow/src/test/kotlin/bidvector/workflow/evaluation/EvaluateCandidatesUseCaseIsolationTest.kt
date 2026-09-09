@@ -2,6 +2,7 @@ package bidvector.workflow.evaluation
 
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
+import bidvector.decision.VerdictLadder
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -55,7 +56,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                         if (notice.id == failing.id) {
                             WatchSubjectOutcome.Unavailable
                         } else {
-                            WatchSubjectOutcome.Found(EMPTY_SUBJECT)
+                            WatchSubjectOutcome.Found(MATCHING_SUBJECT)
                         }
                     },
                 mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
@@ -69,9 +70,9 @@ class EvaluateCandidatesUseCaseIsolationTest {
         results[1].shouldBeInstanceOf<CandidateEvaluation.Reached>()
     }
 
-    // 결정 5 — 판정은 공고당 정확히 한 번(사다리 호출 횟수를 fake 계수로 단언).
+    // 결정 5(ML 분석 호출 축) — ML 분석은 공고당 정확히 한 번(fake 계수).
     @Test
-    fun `판정은 공고당 정확히 한 번 돈다`() {
+    fun `ML 분석은 공고당 정확히 한 번 불린다`() {
         val notice = testNotice()
         val mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() }
         val useCase =
@@ -84,6 +85,27 @@ class EvaluateCandidatesUseCaseIsolationTest {
         useCase.evaluate()
 
         mlAnalysis.callCountFor.getValue(notice.id).get() shouldBe 1
+    }
+
+    // 결정 5(사다리 호출 축, verifier r1 L-1) — `VerdictLadder.judge`는 공고당 정확히
+    // 한 번만 불린다. `judge`가 object라 fake로 못 세므로 얇은 위임(CountingJudge)
+    // 뒤에서 센다 — ML 분석 호출 횟수(위 test)와는 **다른 축**이라 따로 재야 한다
+    // (verifier 실측: judge를 두 번 부르는 변이에 ML 분석 계수만으로는 전건 초록이었다).
+    @Test
+    fun `사다리 호출은 공고당 정확히 한 번 돈다`() {
+        val notice = testNotice()
+        val counter = CountingJudge()
+        val useCase =
+            useCase(
+                strategyRepository = FakeStrategyRepository(testStrategy()),
+                candidateSource = FakeCandidateSource(listOf(notice)),
+                mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
+                judge = counter.wrap(notice, VerdictLadder::judge),
+            )
+
+        useCase.evaluate()
+
+        counter.callCountFor.getValue(notice.id).get() shouldBe 1
     }
 
     // 결정 4 — 전략은 use case 진입에서 정확히 한 번만 읽는다(후보 수와 무관).
@@ -150,5 +172,23 @@ class EvaluateCandidatesUseCaseIsolationTest {
 
         result.verdict.shouldBeInstanceOf<Verdict.Skip>()
         notifications.requested.shouldBeEmpty()
+    }
+
+    // 결정 4(M4 완료 조건, 수정 라운드 1 M-2) — trace가 ML 구간도 넘는다: 판정에
+    // 실린 correlationId와 MlAnalysisPort가 받은 correlationId가 같다.
+    @Test
+    fun `correlationId 는 ML 분석 port 에도 실린다`() {
+        val notice = testNotice()
+        val mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() }
+        val useCase =
+            useCase(
+                strategyRepository = FakeStrategyRepository(testStrategy()),
+                candidateSource = FakeCandidateSource(listOf(notice)),
+                mlAnalysis = mlAnalysis,
+            )
+
+        val result = useCase.evaluate().single() as CandidateEvaluation.Reached
+
+        mlAnalysis.correlationIdSeenFor.getValue(notice.id) shouldBe result.correlationId
     }
 }

@@ -56,6 +56,15 @@ class EvaluateCandidatesUseCase(
      * [CandidateSourcePort.openCandidates]가 낸 목록 순서 그대로다.
      */
     private val analysisBudget: Int? = null,
+    /**
+     * 사다리 호출 위임(결정 5, verifier r1 L-1) — 기본값은 [VerdictLadder.judge] 그대로
+     * (실 배선에서 바꿀 이유가 없다). test가 얇은 위임 뒤에서 호출 횟수를 세려면 이
+     * 자리를 계수 래퍼로 바꾼다 — `VerdictLadder`가 `object`(port가 아님)라 fake로
+     * 대체할 수 없어서다. [reach] 안 정확히 한 자리에서만 불린다는 사실 자체는 이
+     * 위임이 있든 없든 같다 — 이 자리는 **셀 수 있게** 하는 것이지 호출 경로를
+     * 바꾸는 것이 아니다.
+     */
+    private val judge: (LadderInput, Resolution.Resolved<VerdictLadderPolicyData>) -> Verdict = VerdictLadder::judge,
 ) {
     fun evaluate(): List<CandidateEvaluation> {
         val strategy = strategies.load()
@@ -134,30 +143,7 @@ class EvaluateCandidatesUseCase(
                     outcome.subject
                 }
             }
-        return when (val verdict = strategy.watchRules.evaluate(subject)) {
-            is WatchVerdict.Rejected -> {
-                notReached(
-                    notice,
-                    correlationId,
-                    EvaluationStage.WatchGate,
-                    EvaluationDropReason.WatchGateRejected(verdict),
-                )
-            }
-
-            is WatchVerdict.Undeterminable -> {
-                notReached(
-                    notice,
-                    correlationId,
-                    EvaluationStage.WatchGate,
-                    EvaluationDropReason.WatchGateUndeterminable(verdict),
-                )
-            }
-
-            // NoGate(규칙 없음)·Passed는 둘 다 통과다 — 감시 게이트가 이 후보를 막지 않는다.
-            is WatchVerdict.NoGate, is WatchVerdict.Passed -> {
-                null
-            }
-        }
+        return watchVerdictDrop(strategy.watchRules.evaluate(subject), notice, correlationId)
     }
 
     private fun licenseGateDrop(
@@ -205,7 +191,7 @@ class EvaluateCandidatesUseCase(
     ): CandidateEvaluation {
         val bidNowThreshold = requireNotNull(strategy.actionThresholds.bidNowThreshold)
         val reviewThreshold = requireNotNull(strategy.actionThresholds.reviewThreshold)
-        return when (val outcome = mlAnalysis.analyze(notice)) {
+        return when (val outcome = mlAnalysis.analyze(notice, correlationId)) {
             is MlAnalysisOutcome.SimilarityProjectionNotReady -> {
                 notReached(
                     notice,
@@ -286,17 +272,63 @@ class EvaluateCandidatesUseCase(
                 ),
                 PolicyVersion(EffectiveFrom.Initial, "m4-4b2-legacy-behavior-2026-09-09"),
             )
-        val verdict = VerdictLadder.judge(ladderInput, ladderPolicy)
+        val verdict = judge(ladderInput, ladderPolicy)
         if (verdict is Verdict.BidNow) {
             notifications.request(NotificationRequest(notice.id, correlationId, verdict))
         }
         return CandidateEvaluation.Reached(notice.id, correlationId, verdict)
     }
-
-    private fun notReached(
-        notice: Notice,
-        correlationId: CorrelationId,
-        stage: EvaluationStage,
-        reason: EvaluationDropReason,
-    ): CandidateEvaluation.NotReached = CandidateEvaluation.NotReached(notice.id, correlationId, stage, reason)
 }
+
+private fun notReached(
+    notice: Notice,
+    correlationId: CorrelationId,
+    stage: EvaluationStage,
+    reason: EvaluationDropReason,
+): CandidateEvaluation.NotReached = CandidateEvaluation.NotReached(notice.id, correlationId, stage, reason)
+
+/**
+ * [WatchVerdict]가 통과가 아닌 갈래를 [CandidateEvaluation.NotReached]로 옮긴다
+ * (`EvaluateCandidatesUseCase.watchGateDrop`에서 분리 — 클래스당 함수 11개 한도,
+ * v2-지침서 §5, detekt `TooManyFunctions`). 인스턴스 상태가 필요 없어 top-level로 뺐다.
+ * **운영자 결정 2026-09-10(수정 라운드 1 M-1) — `NoGate`는 이제 통과가 아니다.**
+ * legacy는 이 상태에서 스캔 자체를 하지 않았다(`_has_configured_watch_rules`
+ * 게이트) — 결과(후보 0)를 그대로 두고 탈락만 값으로 남긴다.
+ */
+private fun watchVerdictDrop(
+    verdict: WatchVerdict,
+    notice: Notice,
+    correlationId: CorrelationId,
+): CandidateEvaluation.NotReached? =
+    when (verdict) {
+        is WatchVerdict.Rejected -> {
+            notReached(
+                notice,
+                correlationId,
+                EvaluationStage.WatchGate,
+                EvaluationDropReason.WatchGateRejected(verdict),
+            )
+        }
+
+        is WatchVerdict.Undeterminable -> {
+            notReached(
+                notice,
+                correlationId,
+                EvaluationStage.WatchGate,
+                EvaluationDropReason.WatchGateUndeterminable(verdict),
+            )
+        }
+
+        is WatchVerdict.NoGate -> {
+            notReached(
+                notice,
+                correlationId,
+                EvaluationStage.WatchGate,
+                EvaluationDropReason.WatchGateNotConfigured(verdict),
+            )
+        }
+
+        is WatchVerdict.Passed -> {
+            null
+        }
+    }
