@@ -14,6 +14,34 @@
 > 등재 후 한 커밋 일괄)에 따라 L-8·L-9·L-10·B-6·B-7 을 이 한 커밋으로 처리한다
 > (`_workspace/m4-4a/05_verifier_report_r3.md`).
 
+## 사용자 승인 — 2026-09-09
+
+**slice 4A 종결 승인.** 승인 범위 셋:
+
+1. **slice 종결** — 이 slice 의 산출물(전이 커널·use case·port 넷·통로 타입 둘·corpus
+   실행자·gate 등재)을 최종 형태로 승인한다.
+2. **fixture 다섯 승인** — `strategy-edit-001`~`005` 전건. `fixtures/manifest.yaml` 의
+   `review.approved_by_user` 를 `true` 로, `review.claude_commit` 을 실제 커밋(fixture
+   최초 등재 커밋 `6101dd2`)으로 채웠다. 승인 범위는 **`strategy-edit` 도메인 한정**이고
+   (manifest `review.approval_scope` 필드에 명시), 다른 도메인의 case 는 이 결정의 대상이
+   아니다.
+3. **D-4A-3 timeout = 15분 확정** — 착수 시 placeholder였던 `EditSessionPolicyData` 의
+   `Duration.ofMinutes(15)` 가 이제 운영 정책값이다. 정본은 `reports/evidence/m4/4a/
+   policy-values.md` §1(3A `KONEPS_COLLECTION_POLICY` 관례를 따른 신설 문서) — 코드의
+   `EDIT_SESSION_POLICY` 는 그 문서를 `source` 로 가리킨다.
+
+**승인의 근거 — verifier r3 `ready-for-review`.** 산출물층 blocker/high 0건, 남은 것은
+low 셋(L-8·L-9·L-10)과 장부층 low 둘(B-6·B-7)뿐이었고 위 장부층 일괄 커밋으로 전부
+반영했다. 도메인·계약층에 미해결 finding 은 없다(verifier r3 §6).
+
+**재작업 카운터: 2/5**(상한 5, 여유 3) — 라운드 1(H-1·H-2)·라운드 2(H-3·M-4·M-5) 둘만
+카운트된다. r3 의 ready-for-review 와 이번 장부층 일괄은 라운드를 추가하지 않는다
+(운영자 채택 2026-09-02, low/장부층 문턱).
+
+**다음 slice**: 4C(계약은 팀장이 별도로 쓴다). 하네스 개선(Phase 2.5 「값 획득 축」
+체크리스트 항목)은 팀장이 직접 반영하며 이 레인은 `.claude/`·`CLAUDE.md` 를 건드리지
+않는다.
+
 - [x] 구현 diff 가 커밋되어 base/head 고정 — base `9948c6e4056bbf71fa6683aa67d30c2a49fc6eae`,
       head = 이 장부층 일괄 커밋 자신(`L-8` 코드 변경을 포함하므로 evidence 전용 커밋이
       아니다 — SHA 는 `git log -1 --oneline` 로 확인).
@@ -31,7 +59,9 @@
 - [x] 변경된 fixture 와 정책 version 의 근거 기록 — golden-manifest.json(5 case, sha256 실측
       대조) · **fixture input/expected 는 라운드 1·2·장부층 일괄 전부에서 무변경**(`git log --
       fixtures/{input,expected}/strategy-edit-*.json` 전 파일이 최초 등재 커밋 `6101dd2`
-      하나뿐) · `EDIT_SESSION_POLICY`/`STRATEGY_POLICY` 는 값 미확정 placeholder.
+      하나뿐) · `EDIT_SESSION_POLICY`(D-4A-3 timeout=15분)는 **사용자 승인 2026-09-09 로
+      확정**(정본 `policy-values.md` §1, 아래 「사용자 승인」 절) · `STRATEGY_POLICY`(1E
+      점수 범위)는 이 slice 밖이라 여전히 값 미확정 placeholder(변경 없음).
 - [x] 알려진 제한과 rollback 방법이 기록됨 — milestone-4.md 4A 구현 기록 문단(이 일괄 반영) ·
       rollback.md(목록 34개 불변 — 이 커밋도 신규 파일이 없다).
 - [x] secret 스캔 통과 — commands.md, 자기참조 오탐(commands.md·checklist.md 자신의 절
@@ -100,9 +130,10 @@ Processed(outcome).applied`가 public 이라 `workflow` 밖에서 `AppliedStrate
 | (10) 만료된 세션이 fold 안 돼 `begin()` 을 무기한 막음(M-5) | 가드 전에 `expireIfDue` 적용 | `EditStrategyWorkflowTest`(재현 test) |
 | (11, 신설) use case 반환값의 통로 토큰을 나중에 재사용(L-8) | `TransitionOutcome.Applied.applied` `internal` | 컴파일 |
 
-- [x] **fixture 다섯의 case id 와 `review.approved_by_user: false` 사실** — `strategy-edit-001~005`,
-      golden-manifest.json 에 전건 `review_approved_by_user: false`. 운영자 승인은 Phase 6.
-      **입력/기대값은 이 일괄 커밋에서도 무변경.**
+- [x] **fixture 다섯의 case id 와 승인 상태** — `strategy-edit-001~005`, **사용자 승인
+      2026-09-09 로 `review.approved_by_user: true`**(위 「사용자 승인」 절). `fixtures/
+      manifest.yaml` 각 case 와 `golden-manifest.json` 모두 반영했다(`claude_commit: 6101dd2`·
+      `approved_at: 2026-09-09`). **입력/기대값은 이 일괄 커밋에서도 무변경.**
 
 ## M-1~M-5 + L-5~L-10 + B-5~B-7 — 산출물층 미달이 아닌 medium/low 반영
 

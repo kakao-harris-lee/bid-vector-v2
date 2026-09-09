@@ -300,3 +300,49 @@ verifier 리포트: `_workspace/m4-4a/05_verifier_report_r3.md`. 판정 **ready-
 - exit: 0
 - cmd: `./gradlew --no-build-cache clean check`(L-8 로 코드가 바뀌므로 1회)
 - exit: 0
+
+# 사용자 승인 반영 (2026-09-09) — 코드 변경 없음, 장부·manifest·주석만
+
+사용자 승인 넷: slice 4A 종결 + fixture 다섯 승인 + D-4A-3 timeout=15분 확정 + 다음 slice 4C.
+
+## 2026-09-09T04:00Z — manifest.yaml 갱신 범위 확인
+- cmd: `git diff fixtures/manifest.yaml | grep "^@@"`
+- exit: 0
+- 핵심 결과: 5개 hunk, 전부 `strategy-edit-001~005`(줄 8827~9128) 범위 안 — 다른 도메인 case
+  무영향 확인.
+
+## 2026-09-09T04:05Z — YAML 유효성·승인 필드 확인
+- cmd: `python3 -c "import yaml; d=yaml.safe_load(open('fixtures/manifest.yaml')); print([c['review'] for c in d['cases'] if c['domain']=='strategy-edit'])"`
+- exit: 0 — 5 건 전부 `approved_by_user: True`·`claude_commit: '6101dd2'`·`approved_at: 2026-09-09`.
+
+## 2026-09-09T04:10Z — 하네스 레인 변경 재확인(승인 반영 시점)
+- cmd: `git log --oneline 9948c6e4056bbf71fa6683aa67d30c2a49fc6eae..HEAD -- CLAUDE.md .claude/`
+- exit: 0
+- 핵심 결과: 1건(`97d746d harness(v2-slice-pipeline): Phase 2.5 에 (2b) 값 획득 축 신설`) —
+  종결 승인(`d567adc`) **이후** 다른 세션이 붙인 하네스 개선. `scope.md` 「하네스 레인 변경」
+  절에 이미 선언됨(`167d88e`, 이 세션 밖 커밋). in_scope 밖, rollback 대상 아님. 착수~검증·
+  종결 기간(`base..d567adc`) 자체는 0건이었다(같은 절 실측).
+
+## 2026-09-09T04:15Z — compile·test 무영향 확인(코드 변경은 KDoc/주석뿐)
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :workflow:test`
+- exit: 0 — 37건 전부 초록.
+- cmd: `./gradlew --no-build-cache clean check`(manifest 변경을 conformance 가 읽으므로 1회)
+- exit: 0
+
+## 2026-09-09T04:25Z — EditSessionPolicyData.kt 최종 상태 재검증(내용 확정 후 강제 재실행)
+- cmd: `git diff -- workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionPolicyData.kt`
+- exit: 0 — 두 KDoc(클래스 상단·`EDIT_SESSION_POLICY`)만 승인-값 문면으로 바뀌고 나머지는
+  base 와 동일함을 hunk 로 확인(로직 무변경).
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :workflow:test --rerun-tasks`
+- exit: 0 — 강제 재실행(캐시 우회), 이 파일의 확정 내용 기준으로 컴파일·테스트 재확인.
+
+## 2026-09-09T04:30Z — clean-tree 게이트 재확인(경로 34개, 양성 대조 포함 — `checkout --` 미사용)
+- cmd: `git status --porcelain -- <in_scope 경로 34개, 개별 인자>`
+- exit: 0, 출력 없음(`policy-values.md` 는 `??`로 별도 확인).
+- 양성 대조: `EditSessionPolicyData.kt` 끝에 개행 한 줄 추가(`wc -l` 40→41) 후 그 경로만으로
+  재실행 → `M` 관측(exit 0, 비어있지 않음) → **`head -n 40`으로 추가한 줄만 절삭**(파일 전체를
+  base 로 되돌리는 `git checkout --`는 미사용 — 이전 시도에서 그 명령이 이 파일의 미커밋
+  KDoc 편집 두 곳까지 함께 지운 사고가 있었다: `git checkout --`는 마지막 커밋 상태 전체로
+  되돌리므로 대상 파일에 다른 미커밋 변경이 있으면 그것도 사라진다는 것을 실측으로 확인,
+  두 KDoc 편집을 Edit 로 재적용한 뒤 이 절의 최종 검증을 다시 돌렸다) → `wc -l` 40 복귀 ·
+  `git diff` 마지막 hunk 에 잉여 줄 없음 확인(비어있지 않던 진단이 이제 비어 있음, exit 0).

@@ -6,7 +6,9 @@ import java.time.Duration
 
 /**
  * 편집 세션 timeout 정책(D-4A-3) — 값은 정책 데이터 슬롯이고 legacy 값이 없다(조사
- * 결과 — TTL 슬롯 0건). 상한은 우회 (4) 차단(생성 불변식) — 값 자체는 운영자 승인 대상.
+ * 결과 — TTL 슬롯 0건). 상한(24시간)은 우회 (4) 차단용 생성 불변식이고 값 자체가 승인
+ * 대상은 아니다 — `EDIT_SESSION_POLICY` 가 담는 timeout 값(15분)은 사용자 승인
+ * 2026-09-09 로 확정됐다(`policy-values.md` §1).
  */
 data class EditSessionPolicyData(
     val timeoutWindow: Duration,
@@ -26,11 +28,13 @@ data class EditSessionPolicyData(
 }
 
 /**
- * placeholder 값(`STRATEGY_POLICY` 관례와 동형) — 4A 는 구조만 정한다. 값 자체는 운영자
- * 승인 대상이라 이 상수를 근거로 삼지 않는다.
+ * **사용자 승인 2026-09-09 — 15분.** 착수 시(2026-09-08)에는 구조 검증용 placeholder였으나
+ * (legacy 에 대응 TTL 슬롯 0건이라 재활용할 값이 없었다), slice 4A 종결 승인과 함께 이 값
+ * 자체가 승인됐다. 정본은 `reports/evidence/m4/4a/policy-values.md` §1 — 값을 바꾸려면
+ * 그 문서를 먼저 갱신한다(정본이 코드가 아니라 문서다, 3A `KONEPS_COLLECTION_POLICY` 관례).
  */
 val EDIT_SESSION_POLICY: EffectiveDatedPolicy<EditSessionPolicyData> =
     EffectiveDatedPolicy(
-        source = "reports/evidence/m4/4a/scope.md D-4A-3 — timeout 값 미확정, 구조만(2026-09-08)",
+        source = "reports/evidence/m4/4a/policy-values.md §1 — 사용자 승인 2026-09-09, D-4A-3 timeout=15분",
         entries = listOf(EffectiveFrom.Initial to EditSessionPolicyData(Duration.ofMinutes(15))),
     )

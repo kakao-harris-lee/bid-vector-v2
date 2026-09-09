@@ -95,6 +95,63 @@ outbox 가 닫는다) · 세션 영속 실 구현 부재(4C/3D) · 만료 트리
 오탐해 강화하지 않기로 했다(소문자 세그먼트 판별은 L-7 로 이미 넓혔다) · 우회 (3) 폐쇄는 Kotlin
 가시성 + `sourceLanguageGate` 의 2층이다(L-10, `.java` 소스 경로는 1층만으론 안 막힘).
 
+**4A 종결 2026-09-09(사용자 승인) · fixture 다섯 승인 · D-4A-3 timeout=15분 확정** — verifier r3
+`ready-for-review`(산출물층 blocker/high 0) 위에서 승인(evidence `reports/evidence/m4/4a/
+checklist.md` 「사용자 승인」 절, 최종 산출물 커밋은 장부층 일괄 `d567adc` — 이 승인 반영
+자체는 뒤따르는 문서·manifest 전용 커밋이다, SHA 는 `git log`로 확인). **재작업 2/5.** 산출:
+전이 커널(`apply`·`beginSession`·`expireIfDue`, 전부 `internal`) · `EditStrategyWorkflow`
+use case(begin/provideValue/confirm/requestEdit/cancel/expire) · port 넷(`StrategyRepository`·
+`EditSessionRepository`·`Clock`·`EventSink`) · 통로 타입 둘(`AppliedStrategy`·
+`TransitionOutcome.Applied`, 둘 다 `internal constructor`) · corpus `strategy-edit-001~005`
+(`EditStrategyWorkflow` + fake port 경유로 실행) · `gate.tests.workflow`(6 class, 37 test).
+`strategy-edit-*` fixture 다섯의 `review.approved_by_user` 를 `true` 로 올렸다(manifest·
+golden-manifest.json 반영, 입력/기대값은 착수 이후 전 라운드 무변경). D-4A-3 timeout 값은
+착수 시 placeholder(구조만)였다가 이 승인으로 **15분**이 정책값으로 확정됐다(정본
+`reports/evidence/m4/4a/policy-values.md` §1, 3A `KONEPS_COLLECTION_POLICY` 관례).
+
+**검증이 드러낸 것 — 셋 다 정적 판독으로는 나오지 않았다.** ① 「저장 인자를 내는 유일한 자리가
+`TransitionOutcome.Applied`」라는 착수 시 타입 근거가 **거짓**이었다(`validate()`가 public 이라
+그 결과 `OperatorStrategy`는 어느 모듈에서든 얻을 수 있다 — r1 verifier가 `app` test에 그 우회를
+컴파일까지 실증). ② 그 자리를 메운 통로 타입(`AppliedStrategy`, H-1/H-2)은 **위조**만 막고
+**획득**은 막지 못했다 — `beginSession`·`apply`가 public이라 커널을 직접 몰아 이벤트 발행 없이
+저장을 실행하는 STR-07 결함 형태가 그대로 재현됐다(H-3, r2 verifier 실측: revision=778 저장 +
+발행 0). 커널 자체를 `internal`로 내려서야 실질적으로 닫혔다. ③ H-3/M-4를 닫은 N-1 계열 수정
+(`begin()` 가드)이 **그 자신의 새 결함**(M-5 — 만료된 세션이 fold 되지 않으면 같은 id의 새 편집을
+무기한 막을 수 있었다)을 열었고, 표적 재검증이 그것을 잡았다.
+
+**반복이 발산이 아니라 수렴이었다는 판정(verifier r3 §5).** 세 라운드가 같은 계열(「use case가
+막지만 타입이 열어 둔다」)이었으나 우회에 필요한 권한은 라운드마다 좁혀졌다 — r1: *아무
+모듈이나* `validate()` 결과로 저장 인자를 만들 수 있었음 → r2: *커널 두 함수를 부를 수 있는
+모듈*로 좁혀짐 → r3 이후 남은 잔여(L-8, 반환값 재사용)는 *use case를 정상 호출해 결과를 받은
+주체가 그 값을 재사용하는 것*뿐이고, 이는 정의상 port 구현자가 이미 가진 권한과 같아져 더 좁힐
+실익이 없다(그 이상은 4A가 저장소 구현까지 소유해야 하는 4C/3D의 몫). r3가 지목한 재발 방지책 —
+**「이 slice가 새로 public으로 내놓는 타입·함수·반환값을 열거하고 각각이 그 값을 쥔 자에게 무엇을
+허락하는지 적는다」**(Phase 2.5의 「값 위조 축」에 빠져 있던 「값 획득 축」) — 는 팀장이 하네스에
+직접 반영한다.
+
+**worktree 격리의 실측 효과.** `git log --oneline 9948c6e4056bbf71fa6683aa67d30c2a49fc6eae..HEAD
+-- CLAUDE.md .claude/` 는 착수부터 검증·종결 승인(`d567adc`)까지 **0건**이었다(`reports/evidence/
+m4/4a/scope.md` 「하네스 레인 변경」 절 실측) — 다른 세션이 `main`에서 진행한 M3 후속과 공유
+working tree 없이 별도 브랜치·worktree(`m4/2026-09-08`)에 살아, 2026-09-02 스테이징 규율이
+다루던 레인 혼입이 slice 진행 기간 내내 **구조적으로 발생하지 않았다**(비교: M1/1A는 같은
+문제를 사후 감사로 발견). **종결 승인 이후(2026-09-09) 같은 브랜치에 하네스 커밋 1건**
+(`harness(v2-slice-pipeline): Phase 2.5 에 (2b) 값 획득 축 신설` — 이 slice의 r2·r3 실측이
+근거)이 붙었다 — slice 산출물이 아니고 검증·승인이 끝난 뒤라 판정 대상이 아니며, scope.md
+「하네스 레인 변경」 절에 선언돼 있다. `main`과 아직 병합 전이라 그 개선은 병합 시점에 전파된다.
+
+**알려진 제한 일곱(종결 시점)**: ①이벤트 발행·세션 전진의 원자성 부재(저장 성공 뒤 발행 실패는
+`StaleRevision`으로 정직하게 거부되나 그 사이 세션 미전진 잔여 창은 남음 — 4C 트랜잭션 outbox
+소관) ②세션 영속 실 구현 부재 + `sessionVersion` 낙관적 동시성 미검증(port+fake까지가 이 slice
+경계, 4C/3D) ③만료 트리거(sweep) 배선 부재(`expireIfDue`/`expire()`는 순수 함수로 존재, 스케줄러
+없음 — 단 `begin()` 자체는 M-5로 sweep 없이도 안전) ④`System` actor 확인 경로 미구현(D-4A-5,
+STR-15 `후속`) ⑤Telegram 어댑터 없음(`OPEN-STR-12` 활성 유지) ⑥S-3b 술어가 대문자 단일 세그먼트
+루트(`Telegram.Bot`)는 못 잡음(강화 시 이 패키지 자신의 sealed 하위 타입 접근 다수를 오탐) ⑦4A
+port를 거치지 않는 자체 persistence는 4A 코드로 막을 수 없음(3D/4C 명시 인계). **`OPEN-4A-
+WRITE-PATH-GATE`는 종결** — 폐쇄는 Kotlin 가시성(1층) + `sourceLanguageGate`(2층)이고, 그 밖은
+위 ⑦로 3D/4C에 넘긴다.
+
+**다음 slice는 4C**(계약은 팀장이 별도 작성).
+
 ### Slice 4B — application use case
 
 - notice 수집 완료

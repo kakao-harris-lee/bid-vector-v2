@@ -8882,9 +8882,14 @@ cases:
         산출만 재고 영속 port 배선은 `EditStrategyWorkflowTest`가 진다.
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 6101dd2
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: strategy-edit-002
     domain: strategy-edit
@@ -8941,9 +8946,14 @@ cases:
         밖이다 — corpus 는 「재검증이 다시 돈다」만 관측한다.
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 6101dd2
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: strategy-edit-003
     domain: strategy-edit
@@ -8999,9 +9009,14 @@ cases:
         정의하지 않는다 — 이 case 는 그 결과의 **상태 기계 투영**만 잰다.
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 6101dd2
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: strategy-edit-004
     domain: strategy-edit
@@ -9057,9 +9072,14 @@ cases:
         계약이지 이 slice 가 새로 정의하지 않는다.
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 6101dd2
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
   - id: strategy-edit-005
     domain: strategy-edit
@@ -9122,9 +9142,14 @@ cases:
         결정하지 않는다 — 어댑터(6A)가 확인 화면에 무엇을 보여줄지의 몫으로 남겨둔다.
     change_history: []
     review:
-      claude_commit: pending
+      claude_commit: 6101dd2
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
 
 # =============================================================================
