@@ -43,10 +43,16 @@ internal fun validatedSuccessFields(success: Success): ParsedSuccessFields? {
     return parsedSuccessFields(success)
 }
 
-private fun isAcceptableSuccessShape(success: Success): Boolean =
-    success.uncertainty.sampleSize >= 1 &&
-        hasExactlyThreeOrderedCandidates(success) &&
-        success.candidatesList.all { it.origin == BidRateOrigin.BID_RATE_ORIGIN_RECOMMENDED }
+private fun isAcceptableSuccessShape(success: Success): Boolean {
+    val checks =
+        listOf(
+            success.uncertainty.sampleSize >= 1,
+            hasExactlyThreeOrderedCandidates(success),
+            success.candidatesList.all { it.origin == BidRateOrigin.BID_RATE_ORIGIN_RECOMMENDED },
+            hasNonBlankRelease(success),
+        )
+    return checks.all { it }
+}
 
 private fun hasExactlyThreeOrderedCandidates(success: Success): Boolean {
     val labels = success.candidatesList.map(Candidate::getLabel)

@@ -104,6 +104,30 @@ class GrpcBidPredictionGatewayTest {
     }
 
     @Test
+    fun `latest_promoted 인데 응답 release 와 promoted 가 둘 다 공백이면 통과가 아니라 ReleaseMismatch 다(F-2 P4c)`() {
+        runBlocking {
+            val blankRelease =
+                contract.bidvector.ml.v1.ModelRelease
+                    .getDefaultInstance()
+            val servicer =
+                fixedServicer(
+                    calculate = successResponse(blankRelease),
+                    metadata = metadataResponse(blankRelease),
+                )
+            val gateway = gatewayOn(servicer)
+
+            val outcome =
+                gateway.predict(
+                    testBidPredictionRequest(releaseSelector = ModelReleaseSelector.LatestPromoted),
+                    CallBudget(Duration.ofSeconds(1)),
+                )
+
+            outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+            outcome.reason shouldBe MlUnavailableReason.ReleaseMismatch
+        }
+    }
+
+    @Test
     fun `exact_release 요청은 GetModelMetadata 를 부르지 않는다`() {
         runBlocking {
             val release = testModelRelease(releaseId = "r1", artifactChecksum = "c1")

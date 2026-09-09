@@ -59,7 +59,12 @@ data class Uncertainty(
 /**
  * 모델 release 식별(scope.md ⑥, 2B `ModelRelease` 미러) — 다섯 성분 전부 non-null 이라
  * provenance 가 탈락할 수 없다(우회 (10)). 생성자가 public인 이유는 [BidRateCandidates]
- * KDoc과 같다(cross-module 어댑터 생성).
+ * KDoc과 같다(cross-module 어댑터 생성). **다섯 성분 전부 비공백을 생성 시점에 강제한다**
+ * (verifier r1 F-2 — proto3 기본값 `""`이 「non-null이라 탈락할 수 없다」는 문면을 뚫어
+ * 공백 release가 `Predicted`로 샜었다). 어댑터 쪽 매핑(package `adapters ml`)이 이
+ * 불변식을 fail-closed 검사로 먼저 걸러 예외가 새지 않게 한다 — 이 `init`은
+ * 방어의 마지막 층(2B `ModelRelease` KDoc "여기 넷[+식별자 하나]은 release를 지목하는 데
+ * 필요한 성분과 식별자다" — 다섯 전부가 지목에 필요하다).
  */
 data class ModelReleaseRef(
     val releaseId: String,
@@ -67,7 +72,15 @@ data class ModelReleaseRef(
     val featureSchemaVersion: String,
     val codeVersion: String,
     val datasetId: String,
-)
+) {
+    init {
+        require(releaseId.isNotBlank()) { "ModelReleaseRef.releaseId는 빈 문자열일 수 없다" }
+        require(artifactChecksum.isNotBlank()) { "ModelReleaseRef.artifactChecksum은 빈 문자열일 수 없다" }
+        require(featureSchemaVersion.isNotBlank()) { "ModelReleaseRef.featureSchemaVersion은 빈 문자열일 수 없다" }
+        require(codeVersion.isNotBlank()) { "ModelReleaseRef.codeVersion은 빈 문자열일 수 없다" }
+        require(datasetId.isNotBlank()) { "ModelReleaseRef.datasetId는 빈 문자열일 수 없다" }
+    }
+}
 
 /**
  * 「측정 불가」 사유(scope.md ⑤, 2B `UnmeasurableReason` 미러) — 성공한 호출의 정직한 답

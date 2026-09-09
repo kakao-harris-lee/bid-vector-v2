@@ -70,6 +70,7 @@ class GrpcBidPredictionGateway(
                     stubWithDeadline,
                     requestId,
                     request.correlationId.value,
+                    resolved.data.featureSchemaVersion,
                 )
             }
         }
@@ -81,10 +82,11 @@ class GrpcBidPredictionGateway(
         stub: PredictionStub,
         requestId: String,
         correlationId: String,
+        expectedFeatureSchemaVersion: String,
     ): BidPredictionOutcome =
         when (response.resultCase) {
             CalculateOptimalBidResponse.ResultCase.SUCCESS -> {
-                handleSuccess(response.success, selector, stub, requestId, correlationId)
+                handleSuccess(response.success, selector, stub, requestId, correlationId, expectedFeatureSchemaVersion)
             }
 
             CalculateOptimalBidResponse.ResultCase.UNMEASURABLE -> {
@@ -111,6 +113,7 @@ class GrpcBidPredictionGateway(
         stub: PredictionStub,
         requestId: String,
         correlationId: String,
+        expectedFeatureSchemaVersion: String,
     ): BidPredictionOutcome {
         val promoted: ModelRelease? =
             if (selector is DomainModelReleaseSelector.LatestPromoted) {
@@ -121,7 +124,7 @@ class GrpcBidPredictionGateway(
         if (!releaseSatisfiesSelector(selector.toProto(), success.release, promoted)) {
             return BidPredictionOutcome.Unavailable(MlUnavailableReason.ReleaseMismatch)
         }
-        return mapSuccess(success)
+        return mapSuccess(success, expectedFeatureSchemaVersion)
     }
 
     private suspend fun fetchPromoted(
@@ -130,10 +133,16 @@ class GrpcBidPredictionGateway(
         correlationId: String,
     ): ModelRelease? {
         val response = getMetadataOrNull(stub, requestId, correlationId) ?: return null
-        return when (response.resultCase) {
-            GetModelMetadataResponse.ResultCase.METADATA -> response.metadata.promoted
-            else -> null
-        }
+        val promoted =
+            when (response.resultCase) {
+                GetModelMetadataResponse.ResultCase.METADATA -> response.metadata.promoted
+                else -> null
+            }
+        // verifier r1 F-2(high) (d) — promoted 가 공백(release_id·artifact_checksum 공백)이면
+        // 「조회 성공」이 아니라 「대조 불가」로 접는다. 그래야 응답 release 도 공백일 때
+        // `releaseSatisfiesSelector` 가 `""==""` 로 통과하는 경로가 막힌다(양쪽 공백이
+        // ReleaseMismatch 대신 Predicted 로 새던 반례).
+        return promoted?.takeIf { it.releaseId.isNotBlank() && it.artifactChecksum.isNotBlank() }
     }
 
     // metadata 조회 실패(status 무관)는 별도 Unavailable 사유가 아니라 「대조 불가」로 접는다

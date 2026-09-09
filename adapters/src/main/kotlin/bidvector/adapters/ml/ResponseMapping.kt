@@ -63,17 +63,31 @@ internal fun mapApplicationFailure(failure: ApplicationFailure): BidPredictionOu
     )
 
 /**
- * release 대조는 호출부(`GrpcBidPredictionGateway`)가 이 함수 호출 전에 마친다(D-4D-4) —
- * 이 함수는 이미 release 가 요청과 맞다고 확인된 `Success`만 받는다.
+ * release **대조**(selector 일치)는 호출부(`GrpcBidPredictionGateway`)가 이 함수 호출 전에
+ * 마친다(D-4D-4) — 이 함수는 이미 selector 와 맞다고 확인된 `Success`만 받는다.
+ *
+ * 검사 순서: 구조 검증(형태·정규형·후보·**release 다섯 성분 비공백**, `ContractViolation`)이
+ * **먼저**다 — 공백 release 는 그 자체로 계약 위반이라 「어떤 schema 냐」를 묻기 전에
+ * 걸러진다. 구조가 유효한 뒤에야 **release schema 축의 client 집행**(ADR 0010 D-7 「다른
+ * 축」)을 한다 — 응답 `feature_schema_version` 이 이 호출이 실제로 보낸 요청의
+ * 값(`expectedFeatureSchemaVersion`)과 다르면 `Unavailable(UnsupportedSchema)`다(verifier
+ * r1 F-2 (c)).
  */
-internal fun mapSuccess(success: Success): BidPredictionOutcome {
+internal fun mapSuccess(
+    success: Success,
+    expectedFeatureSchemaVersion: String,
+): BidPredictionOutcome {
     val fields = validatedSuccessFields(success) ?: return contractViolation()
-    return BidPredictionOutcome.Predicted(
-        candidates = fields.toCandidates(),
-        fitness = fields.toFitness(),
-        uncertainty = fields.toUncertainty(success),
-        release = success.release.toDomain(),
-    )
+    return if (success.release.featureSchemaVersion != expectedFeatureSchemaVersion) {
+        BidPredictionOutcome.Unavailable(MlUnavailableReason.UnsupportedSchema)
+    } else {
+        BidPredictionOutcome.Predicted(
+            candidates = fields.toCandidates(),
+            fitness = fields.toFitness(),
+            uncertainty = fields.toUncertainty(success),
+            release = success.release.toDomain(),
+        )
+    }
 }
 
 internal fun contractViolation(): BidPredictionOutcome.Unavailable =

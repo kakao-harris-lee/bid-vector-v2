@@ -60,13 +60,14 @@ class ResponseMappingTest {
 
     @Test
     fun `정상 Success 는 Predicted 로 매핑된다`() {
-        val outcome = mapSuccess(testSuccessResponse())
+        val outcome = mapSuccess(testSuccessResponse(), expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
         outcome.shouldBeInstanceOf<BidPredictionOutcome.Predicted>()
     }
 
     @Test
     fun `sample_size 0 은 Predicted 가 아니라 ContractViolation 이다(우회 3)`() {
-        val outcome = mapSuccess(testSuccessResponse(sampleSize = 0))
+        val outcome =
+            mapSuccess(testSuccessResponse(sampleSize = 0), expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
         outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
         outcome.reason shouldBe MlUnavailableReason.ContractViolation
     }
@@ -74,7 +75,7 @@ class ResponseMappingTest {
     @Test
     fun `후보가 2개면 ContractViolation 이다(우회 6)`() {
         val mutated = testSuccessResponse().toBuilder().also { it.removeCandidates(2) }.build()
-        val outcome = mapSuccess(mutated)
+        val outcome = mapSuccess(mutated, expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
         outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
     }
 
@@ -85,7 +86,10 @@ class ResponseMappingTest {
                 .toBuilder()
                 .also { it.getCandidatesBuilder(0).label = CandidateLabel.CANDIDATE_LABEL_AGGRESSIVE }
                 .build()
-        mapSuccess(mutated).shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        mapSuccess(
+            mutated,
+            expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION,
+        ).shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
     }
 
     @Test
@@ -95,7 +99,10 @@ class ResponseMappingTest {
                 .toBuilder()
                 .also { it.getCandidatesBuilder(0).origin = BidRateOrigin.BID_RATE_ORIGIN_OBSERVED }
                 .build()
-        mapSuccess(mutated).shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        mapSuccess(
+            mutated,
+            expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION,
+        ).shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
     }
 
     @Test
@@ -105,9 +112,64 @@ class ResponseMappingTest {
                 .toBuilder()
                 .also { it.getCandidatesBuilder(0).bidRateBuilder.fraction = "9.2E-1" }
                 .build()
-        mapSuccess(mutated).shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        mapSuccess(
+            mutated,
+            expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION,
+        ).shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+    }
+
+    // ---- verifier r1 F-2(high) — release provenance 공백 유출 회귀 방지(probe P4) ----
+
+    @Test
+    fun `release 성분 셋(schema code_version dataset_id)이 공백이면 ContractViolation 이다(F-2 P4a)`() {
+        val mutated =
+            testSuccessResponse()
+                .toBuilder()
+                .also {
+                    it.releaseBuilder.featureSchemaVersion = ""
+                    it.releaseBuilder.codeVersion = ""
+                    it.releaseBuilder.datasetId = ""
+                }.build()
+
+        val outcome = mapSuccess(mutated, expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
+
+        outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        outcome.reason shouldBe MlUnavailableReason.ContractViolation
+    }
+
+    @Test
+    fun `release 전 성분이 공백(default instance)이면 ContractViolation 이다(F-2 P4b)`() {
+        val mutated =
+            testSuccessResponse()
+                .toBuilder()
+                .also {
+                    it.release =
+                        contract.bidvector.ml.v1.ModelRelease
+                            .getDefaultInstance()
+                }.build()
+
+        val outcome = mapSuccess(mutated, expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
+
+        outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        outcome.reason shouldBe MlUnavailableReason.ContractViolation
+    }
+
+    @Test
+    fun `응답 feature_schema_version 이 요청과 다르면 UnsupportedSchema 다(D-7)`() {
+        val mutated =
+            testSuccessResponse()
+                .toBuilder()
+                .also { it.releaseBuilder.featureSchemaVersion = "bidvector.ml.v2-unexpected" }
+                .build()
+
+        val outcome = mapSuccess(mutated, expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
+
+        outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        outcome.reason shouldBe MlUnavailableReason.UnsupportedSchema
     }
 }
+
+private const val TEST_SCHEMA_VERSION = "bidvector.ml.v1-test"
 
 private fun unmeasurableOf(reason: ProtoUnmeasurableReason): Unmeasurable =
     Unmeasurable.newBuilder().setReason(reason).build()
