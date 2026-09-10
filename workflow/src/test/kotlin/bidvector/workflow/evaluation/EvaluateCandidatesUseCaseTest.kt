@@ -224,6 +224,43 @@ class EvaluateCandidatesUseCaseTest {
         reason.actual shouldBe BigDecimal("0.2")
     }
 
+    // verifier r1 L-1 회귀 — LadderInput 조립(용량 불변식 require 포함)은 scoreThresholdDrop
+    // 판정 **뒤**에만 일어나야 한다. 음수 CapacitySnapshot(현재 CapacityPort 실 구현이 없어
+    // 구조적으로 막히지 않는 값)에서도 최소치 미달 후보는 예외 없이 드롭돼야 한다 — 조립이
+    // 드롭보다 앞서면 LadderInput.init의 require(currentActiveBids >= 0)이 이 후보에서 먼저
+    // 터진다(드롭되지 않았어야 할 이유가 없는데도).
+    @Test
+    fun `최소치 미달이면 용량 스냅샷이 음수여도 예외 없이 ScoreThreshold 에서 멈춘다`() {
+        val notice = testNotice()
+        val strategyWithMinMatch =
+            testStrategy(
+                StrategyDraft(
+                    focusCategories = listOf(DEFAULT_FOCUS_CATEGORY),
+                    bidNowThreshold = BigDecimal("0.7"),
+                    reviewThreshold = BigDecimal("0.45"),
+                    minimumMatchScore = BigDecimal("0.5"),
+                ),
+            )
+        val useCase =
+            useCase(
+                strategyRepository = FakeStrategyRepository(strategyWithMinMatch),
+                candidateSource = FakeCandidateSource(listOf(notice)),
+                mlAnalysis =
+                    FakeMlAnalysisPort {
+                        MlAnalysisOutcome.Analyzed(
+                            priorityScore = UnitScore(BigDecimal("0.9")),
+                            probabilityScore = null,
+                            matchedScore = UnitScore(BigDecimal("0.2")),
+                        )
+                    },
+                capacity = FakeCapacityPort(CapacitySnapshot(currentActiveBids = -1, maxActiveBids = 10)),
+            )
+
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.NotReached
+
+        result.stage shouldBe EvaluationStage.ScoreThreshold
+    }
+
     // M4/4B-3 scope.md ③, 설계 검토 (4) 우회 1·3 — Unavailable 은 scoreThresholdDrop 을
     // 거치지 않고 reach 로 직행한다(최소치가 설정돼 있어도 무관), 알림은 0건이다.
     @Test

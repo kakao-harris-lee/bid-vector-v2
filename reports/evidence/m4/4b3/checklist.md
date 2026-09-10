@@ -40,9 +40,12 @@
 
 ## 알려진 제한
 
-1. **실 점수 provider 부재(2E·M5 진행 중)** — `UnavailableMlAnalysis`가 유일한 실 배선이다.
-   `OPEN-4D-LADDER-SCORE-SOURCE` 결정 (a)의 임시 상태 (c)를 실물화한 것으로, 2E·M5·4D-2가
-   실 gateway로 교체한다(scope.md OPEN 절).
+1. **실 점수 provider 부재(2E·M5 진행 중)** — `UnavailableMlAnalysis`가 provider 부재 기간에
+   앱이 배선해야 할 `MlAnalysisPort`의 유일한 production 구현이다(verifier r1 L-2 정정 —
+   「유일한 실 배선」이 「앱이 이미 이 경로로 돈다」로 읽히지 않도록 문면을 좁혔다. 조립
+   루트(`EvaluateCandidatesUseCase`에 실제로 꽂는 자리)는 이 slice 범위 밖 — M6/`app`
+   소관). `OPEN-4D-LADDER-SCORE-SOURCE` 결정 (a)의 임시 상태 (c)를 실물화한 것으로,
+   2E·M5·4D-2가 실 gateway로 교체한다(scope.md OPEN 절).
 2. **후보 순회는 순차(sequential)다** — `evaluate()`의 `mapIndexed`는 병렬화하지 않는다.
    4B-2가 이미 내린 결정을 그대로 유지(scope.md out_of_scope).
 3. **예산(`CallBudget`) 인자 없음** — `MlAnalysisPort.analyze`는 `correlationId`만 받는다.

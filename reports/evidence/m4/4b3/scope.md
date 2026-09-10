@@ -27,7 +27,7 @@ in_scope:
   - decision/src/test/kotlin/bidvector/decision/**                                      # 사유 전달 표 test
   - adapters/src/main/kotlin/bidvector/adapters/ml/UnavailableMlAnalysis.kt             # 항상-미가용 port 구현(유일한 실 배선, provider 부재 기간)
   - adapters/src/test/kotlin/bidvector/adapters/ml/UnavailableMlAnalysisTest.kt
-  - config/quality/gate-tests.properties                                                # 세 키 등재만
+  - config/quality/gate-tests.properties                                                # gate.tests.adapters 한 키에 UnavailableMlAnalysisTest 등재(verifier r1 L-4 정정 — decision·workflow 키의 class 는 base 에 이미 등재, 이 slice는 기존 class 에 case 를 더했을 뿐 신설 class 가 없다)
   - milestone-4.md                                                                      # 4B 절 종결 문단(승인 시점)
   - reports/evidence/m4/4b3/**
 out_of_scope:

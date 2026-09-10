@@ -25,6 +25,29 @@ private fun legacyPolicy(): Resolution.Resolved<VerdictLadderPolicyData> =
 
 private fun score(value: String): UnitScore = UnitScore(BigDecimal(value))
 
+/**
+ * 소진 `when`(else 없음, verifier r1 L-6 시정) — `④ ML 부재 — mlUnavailableReason 슬롯 값이
+ * 사다리까지 그대로 전달된다`의 `allReasons`는 손으로 나열한 11값이라, `MlUnavailableReason`
+ * 에 12번째 값이 추가돼도 그 목록만으로는 test가 계속 통과한다(새 값이 목록에 없으니 안
+ * 걸린다). 이 함수는 같은 11값을 소진 `when`으로 다시 세워 — 새 sealed 하위 타입이 추가되면
+ * 이 `when`이 비소진이 되어 **컴파일이 깨진다**. 반환값은 항등(입력을 그대로 돌려줌) —
+ * 목적은 실행이 아니라 컴파일 시점 방어다.
+ */
+private fun requireKnownReason(reason: MlUnavailableReason): MlUnavailableReason =
+    when (reason) {
+        MlUnavailableReason.ScoreNotProvided -> reason
+        MlUnavailableReason.DeadlineExceeded -> reason
+        MlUnavailableReason.CircuitOpen -> reason
+        MlUnavailableReason.RetryBudgetExhausted -> reason
+        MlUnavailableReason.TransportFailed -> reason
+        MlUnavailableReason.ModelNotReady -> reason
+        MlUnavailableReason.ReleaseMismatch -> reason
+        MlUnavailableReason.ContractViolation -> reason
+        MlUnavailableReason.UnsupportedSchema -> reason
+        MlUnavailableReason.UnsupportedRelease -> reason
+        MlUnavailableReason.InvalidRequest -> reason
+    }
+
 private fun inputOf(
     priority: String?,
     probability: String? = null,
@@ -175,7 +198,7 @@ class VerdictLadderTest {
                 MlUnavailableReason.UnsupportedRelease,
                 MlUnavailableReason.InvalidRequest,
             )
-        allReasons.forEach { reason ->
+        allReasons.map(::requireKnownReason).forEach { reason ->
             val input =
                 LadderInput(
                     priorityScore = null,

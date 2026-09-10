@@ -81,7 +81,9 @@ git diff <sha>~1..<sha> -- config/quality/gate-tests.properties | git apply -R
 절차 — 코드·test·gate 등재 커밋 전부 완료 → 목록 기계 산출 → 임시 clone → ①~⑤ → 이
 문서에 기록 → evidence 커밋. 아래는 그 결과다.
 
-① `git clone . /tmp/4b3-rollback-verify && cd /tmp/4b3-rollback-verify && git checkout eb1a1fc` — exit 0.
+① `git clone --no-hardlinks . /tmp/4b3-rollback-verify && cd /tmp/4b3-rollback-verify && git checkout eb1a1fc`
+   (verifier r1 L-3 정정 — 이 저장소는 연결 worktree라 `--no-hardlinks` 없이 clone하면
+   `.git` 포인터가 원본 index를 오염시킬 수 있다) — exit 0.
 ② 위 A 항목 `git restore` 명령 실행 — exit 0(경로 6개 전부 매치, pathspec 오류 없음).
 ②' M 항목(이 range 전용 8개) `git restore` 명령 실행 — exit 0.
 ②'' `config/quality/gate-tests.properties` hunk 격리 역적용(커밋 1건) — exit 0.

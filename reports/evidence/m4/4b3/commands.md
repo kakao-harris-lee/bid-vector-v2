@@ -80,6 +80,37 @@
 - cmd: `git worktree remove --force /tmp/4b3-s0-worktree`
 - exit: 0
 
+## verifier r1 L-1 회귀 — RED
+- cmd: `./gradlew --no-daemon :workflow:test --tests 'bidvector.workflow.evaluation.EvaluateCandidatesUseCaseTest'`
+- exit: 1
+- 핵심 결과: 신설 test(`최소치 미달이면 용량 스냅샷이 음수여도 예외 없이 ScoreThreshold 에서 멈춘다`) — `IllegalArgumentException: currentActiveBids는 음수일 수 없다: -1`(`LadderInput.<init>` → `ladderInputFor` → `analyzeAndJudge`), 수정 전 조립 순서를 재현.
+
+## 수정 — `ladderInputFor` 호출을 `?:` 우변에 인라인(지연 평가)
+- 핵심 결과: `Analyzed` 가지의 `LadderInput` 조립이 `scoreThresholdDrop`이 드롭을 내지 않을 때만 일어나도록 순서 복원(base `reach` 안 조립과 동일 시점). `Unavailable` 가지도 같은 스타일로 정리(드롭이 없어 동작은 무변경).
+
+## verifier r1 L-1 회귀 — GREEN
+- cmd: `./gradlew --no-daemon :workflow:test --tests 'bidvector.workflow.evaluation.EvaluateCandidatesUseCaseTest' --tests 'bidvector.workflow.evaluation.EvaluateCandidatesUseCaseIsolationTest'`
+- exit: 0
+
+## verifier r1 L-6 — `MlUnavailableReason` 소진 `when` 보강(decision)
+- cmd: `./gradlew --no-daemon :decision:test`
+- exit: 0
+- 핵심 결과: `requireKnownReason`(11 분기, else 없음) 신설 — `allReasons` 손 목록에 새 값이
+  누락돼도 이 `when`이 비소진이 되면 컴파일이 깨진다.
+
+## S-1 (4차, verifier r1 low 일괄 수정 반영, HEAD=`<이 커밋의 SHA — 커밋 직후 기입>`)
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL, 344 actionable tasks(320 executed).
+
+## S-2a~c 재확인 (verifier r1 low 일괄 수정 반영)
+- cmd: `./gradlew --no-daemon :workflow:test --tests 'bidvector.workflow.evaluation.*' :decision:test :adapters:test --tests 'bidvector.adapters.ml.UnavailableMlAnalysisTest'`
+- exit: 0
+
+## S-4 재확인 (verifier r1 low 일괄 수정 반영)
+- cmd: `./gradlew --no-daemon :workflow:gateExecutionGate :decision:gateExecutionGate :adapters:gateExecutionGate`
+- exit: 0
+
 ## 인증값 노출 스캔
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m4/4b3/ --exclude=scope.md`
-- exit: 1(매치 0)
+- exit: 1(매치 0, verifier r1 low 일괄 수정 반영 뒤 재확인 포함)

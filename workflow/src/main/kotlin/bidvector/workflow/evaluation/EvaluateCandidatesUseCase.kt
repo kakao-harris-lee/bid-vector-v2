@@ -234,6 +234,13 @@ class EvaluateCandidatesUseCase internal constructor(
      * `reach`로 직행한다(점수가 없으니 최소치 비교가 성립하지 않는다, 설계 검토 (3)).
      * `LadderInput`의 점수 셋은 전부 null, `mlUnavailableReason`에는 어댑터가 실은 사유를
      * 그대로 싣는다(설계 검토 (4) 우회 2 차단 — `ScoreNotProvided`로 접지 않는다).
+     *
+     * **`Analyzed` 가지의 `ladderInputFor(...)`는 `?:`의 우변에 인라인된다(verifier r1
+     * L-1 시정).** Kotlin의 `?:`는 우변을 좌변이 `null`일 때만 평가한다 — `scoreThresholdDrop`
+     * 이 드롭을 내면 `ladderInputFor`가 아예 불리지 않는다. base(4B-2)의 `reach` 안 조립과
+     * 같은 시점을 회복한다 — 드롭될 후보에서 `LadderInput.init`의 용량 `require`가 먼저
+     * 터지는 일이 없다(`CapacitySnapshot`은 자체 불변식이 없어, 드롭 전 조립은 실 음수
+     * `CapacityPort` 구현이 붙는 순간 관측 가능한 결함이었다).
      */
     private suspend fun analyzeAndJudge(
         notice: Notice,
@@ -254,20 +261,29 @@ class EvaluateCandidatesUseCase internal constructor(
             }
 
             is MlAnalysisOutcome.Unavailable -> {
-                val ladderInput = ladderInputFor(capacitySnapshot, mlUnavailableReason = outcome.reason)
-                reach(notice, correlationId, bidNowThreshold, reviewThreshold, ladderInput)
+                reach(
+                    notice,
+                    correlationId,
+                    bidNowThreshold,
+                    reviewThreshold,
+                    ladderInputFor(capacitySnapshot, mlUnavailableReason = outcome.reason),
+                )
             }
 
             is MlAnalysisOutcome.Analyzed -> {
-                val ladderInput =
-                    ladderInputFor(
-                        capacitySnapshot,
-                        priorityScore = outcome.priorityScore,
-                        probabilityScore = outcome.probabilityScore,
-                        matchedScore = outcome.matchedScore,
-                    )
                 scoreThresholdDrop(strategy, outcome, notice, correlationId)
-                    ?: reach(notice, correlationId, bidNowThreshold, reviewThreshold, ladderInput)
+                    ?: reach(
+                        notice,
+                        correlationId,
+                        bidNowThreshold,
+                        reviewThreshold,
+                        ladderInputFor(
+                            capacitySnapshot,
+                            priorityScore = outcome.priorityScore,
+                            probabilityScore = outcome.probabilityScore,
+                            matchedScore = outcome.matchedScore,
+                        ),
+                    )
             }
         }
     }
