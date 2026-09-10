@@ -1,5 +1,35 @@
 # M4/4B-4 체크리스트 — 우회 ↔ 코드 ↔ 실측
 
+## 사용자 승인 — 2026-09-10
+
+**slice 4B-4 종결 승인.** 승인 셋:
+
+1. **slice 종결** — 이 slice의 산출물(`bidvector.decision.priority` 패키지 —
+   `Component`·`ScoreFact`·`PriorityInputs`·`PriorityPolicyData`+`PRIORITY_POLICY`·
+   `composePriority`+`PriorityOutcome`·`UnitVector`·`SemanticMatch`+`MatchOutcome`,
+   `gate.tests.decision` 등재)을 최종 형태로 승인한다.
+2. **정책 값 승인(D-4B4-4, `OPEN-4B4-POLICY-VALUES` 종결)** — 재정규화 가중치 다섯
+   (`Match 0.3834`·`Urgency 0.2333`·`Competitiveness 0.1333`·`BudgetCapture 0.1000`·
+   `ExpectedMargin 0.1500`)·load penalty(`ratioWeight 0.18`·`workloadWeight 0.12`)·
+   complexity penalty(`threshold 0.55`·`slope 0.18`·`cap 0.12`)·categoryOffset
+   (`±0.20`)·`normEpsilon 0.0001`. 착수 placeholder였던 값 자체가 이제 운영 정책값이다.
+   정본은 `reports/evidence/m4/4b4/policy-values.md`(이 승인과 함께 갱신).
+3. **병합 진행** — 병합은 팀장이 이 등재 커밋 뒤에 실행한다(대상 `m4/2026-09-08`,
+   `scope.md` 「병합 결정」 절). 이 slice(구현 레인)는 병합·push를 하지 않는다.
+
+**승인의 근거 — verifier r1 `ready-for-review`.** blocker/high 0, medium 2(F-1·F-2)·
+low 5(F-3~F-7, 장부층 3 포함)를 한 커밋(`658e693`)으로 일괄 반영하고 재검증 rollback
+①~⑤·S-0을 최종 head에서 재실측했다(`658e693`·`b595f61`, `_workspace/m4-4b4/
+05_verifier_fix_report.md`).
+
+**재작업 카운터: 0/5 확정**(상한 5, 여유 5) — medium·low 일괄 반영 커밋과 이 종결
+등재 커밋은 라운드로 세지 않는다(2026-09-02 운영자 채택 「장부층·low는 등재만 하고
+라운드를 막지 않는다」).
+
+**다음**: 브랜치 `m4-4b4/2026-09-10`은 `m4/2026-09-08`에 팀장이 병합한다(`scope.md`
+「병합 결정」 절). 성분 산출·port·workflow 조합 배선은 4B-5, corpus 승격은
+`OPEN-4B4-CORPUS`(병합 뒤 curator)로 이어진다.
+
 ## 1. 위협 모델 대응표 (scope.md 「위협 모델 — 4B-4 고유 경계」)
 
 ### 방어한다 (a)~(g)
@@ -88,5 +118,7 @@ modifier 는 읽지 않는다). `UnitVector`는 좌표 타입을 `List<BigDecima
 
 ## 7. 사용자 승인
 
-**미승인 — 사용자 승인 대기.** 이 slice는 verifier ready-for-review 판정 뒤 사용자
-승인으로 종결된다(CLAUDE.md 운영자 지시 2026-09-04, Codex 심판 제외).
+**승인 2026-09-10 — 정본은 파일 맨 위 「사용자 승인 — 2026-09-10」 절.** 이 절은
+verifier ready-for-review 판정 뒤 사용자 승인으로 slice가 종결됐다는 사실만 가리킨다
+(CLAUDE.md 운영자 지시 2026-09-04, Codex 심판 제외 — 코드 slice는 verifier
+ready-for-review + 사용자 승인으로 완료 조건을 읽는다).

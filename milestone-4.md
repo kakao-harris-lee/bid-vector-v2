@@ -366,6 +366,30 @@ placeholder — 승인 대기(`OPEN-4B4-POLICY-VALUES`) · `similarity`는 성�
 (legacy priority 가중합에 없다, D-4B4-5) · 조합·코사인 전수 표의 corpus 승격은 병합
 뒤 curator 소관(`OPEN-4B4-CORPUS`) · 성분 값의 산출·port·workflow 배선은 4B-5.
 
+**verifier r1** — `ready-for-review`(산출물층 blocker/high 0, medium 둘 F-1·F-2·low
+다섯 F-3~F-7). F-1(출하 `PRIORITY_POLICY` 가중치가 test로 고정되지 않음)·F-2(음수
+`loadRatio`가 penalty를 가산점으로 뒤집음)를 한 커밋으로 일괄 반영했다 — `loadRatio`를
+`ScoreFact<BigDecimal>`에서 `ScoreFact<UnitScore>`([0,1])로 좁혀 타입으로 닫고, 출하
+가중치를 legacy 재정규화 산식으로 독립 재계산해 대조하는 test를 추가했다. F-3~F-7은
+성분 부분집합 16 전수 대조·offset 하한 test·장부층 정정. rollback ①~⑤·S-0을 수정
+커밋 뒤 최종 head에서 재실측했다(`_workspace/m4-4b4/05_verifier_fix_report.md`).
+
+**4B-4 종결 2026-09-10(사용자 승인)** — 위 verifier r1 `ready-for-review` 위에서
+승인 셋: ① slice 종결 ② 정책 값 승인(`OPEN-4B4-POLICY-VALUES` 종결 — 재정규화 가중치
+다섯·load/complexity penalty·categoryOffset ±0.20·`normEpsilon`, 정본
+`reports/evidence/m4/4b4/policy-values.md`) ③ 병합 진행(대상 `m4/2026-09-08`, 팀장
+실행). **재작업 0/5**(medium·low 일괄 반영 커밋은 라운드로 세지 않는다, evidence
+`reports/evidence/m4/4b4/checklist.md` 「사용자 승인」 절).
+
+**알려진 제한(종결 시점)**: 성분 값의 산출(마감→urgency 등)·port·workflow 조합 배선은
+4B-5 소관 · `similarity`는 성분이 아니다(legacy priority 가중합에 없다, D-4B4-5) ·
+조합·코사인 전수 표의 corpus 승격은 병합 뒤 curator 소관(`OPEN-4B4-CORPUS`) ·
+`UnitVector.init`은 판정층 짝이 없다(의도적 — 입력 검증 자리이지 판정 함수의 출력이
+아니다, verifier r1 T-4) — 4B-5가 provider 벡터를 이 생성자에 그대로 넣을지, sealed
+결과(`UnitVector.of(...): VectorOutcome`)로 감쌀지는 4B-5 계약의 결정 항목이다.
+
+**다음은 4B-5**(port·조합기·텍스트 합성 규약, 계약은 팀장이 별도 작성).
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,

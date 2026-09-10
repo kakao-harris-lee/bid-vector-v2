@@ -1,9 +1,15 @@
-# 4B-4 정책 데이터 값 표 — **착수 시 placeholder, 승인 대기 `OPEN-4B4-POLICY-VALUES`**
+# 4B-4 정책 데이터 값 표 — **사용자 승인 2026-09-10**
 
-> **미승인.** 이 표의 값은 구현 레인이 legacy 산식을 재정규화해 채운 착수 placeholder다
-> (scope.md D-4B4-4 「초기값은 legacy 재정규화 — 승인 대상」). `PriorityPolicyData.kt`의
-> `PRIORITY_POLICY.source`가 이 문서를 가리킨다. 종결 승인 전까지는 값을 바꾸려면 이
-> 문서를 먼저 갱신한다(3A `KONEPS_COLLECTION_POLICY`·4D-1 `ML_CALL_POLICY` 관례).
+> **승인일: 2026-09-10.** 승인은 slice 4B-4 종결 승인과 같은 결정에 실렸다 — 정본은
+> `reports/evidence/m4/4b4/checklist.md` 「사용자 승인」 절이다. 4D-1
+> `policy-values.md`·4E `policy-values.md`와 같은 표 형식(층·근거·범위)을 유지한다.
+> `PriorityPolicyData.kt`의 `PRIORITY_POLICY.source`가 이 문서를 가리킨다.
+>
+> **착수 시(2026-09-10)에는 scope.md D-4B4-4가 구조만 고정한 착수 placeholder였다.**
+> 이 승인으로 값 자체가 운영 정책값이 됐다(`OPEN-4B4-POLICY-VALUES` 종결) — 4D-1
+> `MlCallPolicyData`·4E `NotificationDeliveryPolicyData`가 착수 placeholder에서 종결
+> 승인으로 확정된 것과 같은 절차. 값을 바꾸려면 이 문서를 먼저 갱신한다(3A
+> `KONEPS_COLLECTION_POLICY` 관례).
 
 ---
 
@@ -13,7 +19,7 @@
 | --- | --- | --- |
 | `legacy-behavior` | 기존 Python이 실제로 하는 값 | §1(가중치)·§2(penalty)·§3(categoryOffset) — `bid-vector@ed4b06c`(symlink) `allocation.py`·`operator_strategy_tuning.py` |
 | 엔지니어링 판단(새 축) | legacy에 대응이 없는 값 | §4(`normEpsilon`) — 2E `embedding.proto` L2 벡터 계약 자체는 새로 생겼고 legacy에는 vector norm 개념이 없다 |
-| 운영자 승인 | 값 자체를 운영자가 정함 | **미확정 — `OPEN-4B4-POLICY-VALUES`** |
+| 운영자 승인 | 값 자체를 운영자가 정함 | **§1~§4 전체 — 사용자 승인 2026-09-10**(slice 4B-4 종결 승인과 같은 결정, `checklist.md` 「사용자 승인」 절) |
 
 ---
 
@@ -73,13 +79,20 @@ clamp 전 거부한다(이 slice는 clamp 대신 `MatchOutcome.OffsetOutOfRange`
 이 slice에서 처음 소비되고, legacy Python에는 vector norm 불변식 개념 자체가 없다
 (`project_similarity.py`가 코사인을 직접 계산할 뿐 정규화를 값으로 검증하지 않는다).
 엔지니어링 판단값 — float32 임베딩을 L2 정규화한 뒤 합연산 반올림으로 흔히 발생하는
-`1e-6`~`1e-4` 수준의 오차를 통과시키는 보수적 상한. 관측 데이터(M5 provider) 없이는
-정확한 값을 주장할 수 없다 — `OPEN-4B4-POLICY-VALUES`에 포함해 승인 대상으로 남긴다.
+`1e-6`~`1e-4` 수준의 오차를 통과시키는 보수적 상한. 사용자 승인 2026-09-10으로 값의
+**존재**가 확정됐다 — 관측 데이터(M5 provider)에 따른 값의 **옳음** 재검토는 별도
+실측 경로가 열리면(4B-5 이후) 그 결과로 이 문서의 정책 version을 갱신한다.
+
+**실측 갱신 경로.** 4B-5·M5 provider가 임베딩 오차 분포를 실측하면 그 결과로 §4 값을
+갱신하고 이 문서의 정책 version을 올린다(ADR 0010 D-1 「보수적 상한 + 측정 의무」와
+같은 규율) — 이 승인은 「값이 존재해도 되는가」를 확정한 것이지 「값이 옳은가」를
+실측한 것이 아니다.
 
 ---
 
-## 5. 승인 이력
+## 5. `change_history`
 
-| 일자 | 결정 | 근거 |
-| --- | --- | --- |
-| 2026-09-10 | 착수 placeholder로 위 §1~§4 값 확정(승인 대기) | 구현 레인, scope.md D-4B4-4 |
+- **2026-09-10 최초 등재** — 구현 레인이 §1~§4 값을 구조 검증용 착수 placeholder로 심음.
+- **2026-09-10 사용자 승인** — slice 4B-4 종결 승인과 같은 결정으로 §1~§4 값 자체가
+  확정됐다(`OPEN-4B4-POLICY-VALUES` 종결). 값은 착수 시점에서 변경 없음. 임베딩 오차
+  실측에 따른 §4(`normEpsilon`) 갱신 경로는 4B-5 이후로 활성 유지.

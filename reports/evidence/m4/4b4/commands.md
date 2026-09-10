@@ -185,3 +185,20 @@ rollback ①~⑤ — 수정 커밋 뒤 임시 clone에서 재실측(팀장 지�
   `- cmd:` 인용 자신(commands.md가 스캔 명령 문자열을 담고 있어 스캔이 자기 자신을
   잡는 상시 false-positive 바닥, verifier r1 「누출 스캔」 항목과 같은 판독). developer
   구간(실제 코드·정책 값) 매치 0.
+
+## 사용자 승인 2026-09-10 — 종결 등재
+
+- cmd: `./gradlew --no-daemon :decision:compileKotlin`
+- exit: 0
+- 핵심 결과: `PriorityPolicyData.kt`의 KDoc·`PRIORITY_POLICY.source` 문면 변경(값
+  무변경)이 컴파일에 영향 없음을 확인.
+- cmd: `./gradlew --no-daemon :decision:test --tests 'bidvector.decision.priority.*'`
+- exit: 0
+- 핵심 결과: S-2, 47 tests, 0 failed — 문면 변경 뒤에도 값 자체가 그대로임을 재확인.
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4b4/ decision/src/main/kotlin/bidvector/decision/priority/PriorityPolicyData.kt milestone-4.md`
+- exit: 0, 매치 2건 — 둘 다 이 파일 자신의 스캔 명령 인용(위와 같은 판독). developer
+  구간 매치 0.
+- cmd(좌표 역방향 파급 검사 — `scope.md`·`milestone-4.md`에 줄을 넣었으므로): `grep -rn "4b4/scope\.md:[0-9]\|milestone-4\.md:[0-9]\|4b4/checklist\.md:[0-9]\|4b4/policy-values\.md:[0-9]\|4b4/commands\.md:[0-9]" --include='*.md' --include='*.kt' .`
+- exit: 1(매치 없음)
+- 핵심 결과: 이 slice의 evidence·계약 문서를 `file:line`으로 인용하는 다른 문서 0건 —
+  역방향 파급 없음.

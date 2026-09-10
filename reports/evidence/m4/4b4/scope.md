@@ -78,8 +78,8 @@ rollback: |
 | --- | --- | --- | --- |
 | **D-4B4-1** | 부재 성분은 재정규화(가중치 합으로 나눔). 성분이 `match` 하나뿐이면 priority = match 이고 그 사실을 `droppedComponents` 가 나른다 | §6.3 sentinel 금지 · 조사 §7 5 | 계약 고정 |
 | **D-4B4-2** | `match` 부재는 `Unavailable` — 임베딩 없이는 priority 를 만들지 않는다(fail-safe 방향) | 4B-3 경로 · ADR 0010 D-6 | 계약 고정 |
-| **D-4B4-3** | 벡터 산술은 `Double`(계약이 float, 정밀도 요구 없음) — `UnitScore` 로 나갈 때 `BigDecimal` 변환, scale 은 정책 값. 1B 금액 규율(`double` 금지)과 축이 다름을 KDoc 에 | api-type-policy 가 domain 공개 API 의 부동소수 저장을 막는지 **착수 시 실측** — 막으면 `UnitVector` 를 `internal` + `List<BigDecimal>` 입력으로 | 착수 가정 — 게이트 실측 뒤 확정 |
-| **D-4B4-4** | 가중치·penalty·offset 초기값은 legacy 재정규화 — 승인 대상 | ADR 0010 D-1 「보수적 + 측정 의무」 | 착수 가정 |
+| **D-4B4-3** | 벡터 산술은 `Double`(계약이 float, 정밀도 요구 없음) — `UnitScore` 로 나갈 때 `BigDecimal` 변환, scale 은 정책 값. 1B 금액 규율(`double` 금지)과 축이 다름을 KDoc 에 | api-type-policy 가 domain 공개 API 의 부동소수 저장을 막는지 실측: **막는다**, 그리고 `internal`/`private constructor` 로도 우회되지 않는다(`DomainApiTypeGateTask`가 주 생성자를 항상 클래스 자신의 가시성으로 판정). `UnitVector` 좌표 타입을 `List<BigDecimal>`로 확정(생성자는 public 유지) | **확정** — `clean check` 실측(commands.md), verifier r1 T-5 변이(C)로 재확인 |
+| **D-4B4-4** | 가중치·penalty·offset·`normEpsilon` 초기값은 legacy 재정규화 — 승인 대상 | ADR 0010 D-1 「보수적 + 측정 의무」 | **확정 — 사용자 승인 2026-09-10**(`OPEN-4B4-POLICY-VALUES` 종결, 정본 `policy-values.md`) |
 | **D-4B4-5** | `similarity` 는 성분이 아니다 — legacy `priority` 가중합 여섯 항에 없다(probability blend 안에만 있었다). 4B-5 가 필요하면 정책 version 으로 성분을 더한다(enum 값 추가 = 소진 `when` 갱신) | 조사 §1.1·§1.2 | 계약 고정 |
 
 ---
@@ -102,6 +102,13 @@ rollback: |
 | OPEN | 처리 |
 | --- | --- |
 | `OPEN-4D-LADDER-SCORE-SOURCE`(결정 (a), 분해) | 이 slice 가 Kotlin 조합 커널 몫 — 4B-5(port·합성 규약)·M5 provider·4D-2 가 잔여 |
-| **`OPEN-4B4-POLICY-VALUES`**(신설) | ② 값 — 종결 승인 시 확정 |
-| **`OPEN-4B4-CORPUS`**(신설) | 조합·코사인 전수 표의 corpus 승격 — 병합 뒤 curator |
+| **`OPEN-4B4-POLICY-VALUES`**(신설) | ~~② 값 — 종결 승인 시 확정~~ **종결(사용자 승인 2026-09-10)** — 정본 `reports/evidence/m4/4b4/policy-values.md` |
+| **`OPEN-4B4-CORPUS`**(신설) | 조합·코사인 전수 표의 corpus 승격 — 병합 뒤 curator. **활성 유지** |
 | `OPEN-ML-02`·`OPEN-4B1-LADDER-THRESHOLDS` | 경계 밖 |
+
+---
+
+## 병합 결정 (사용자 승인 2026-09-10 ③)
+
+병합 대상은 `m4/2026-09-08`. 팀장이 이 종결 등재 커밋 뒤에 병합을 실행한다 — 이
+slice(구현 레인)는 병합·push 를 하지 않는다.

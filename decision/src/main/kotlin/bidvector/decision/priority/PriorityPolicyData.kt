@@ -40,7 +40,7 @@ data class ComplexityPenaltyPolicy(
  * 「빠진 축 = 생성 실패」 규율, 부동소수 반올림 잔차를 흡수하는 재정규화 값이라 정확한
  * 4자리 비교로 잰다). 확률 축을 뺀 legacy 가중치(조사 §1.1 `allocation.py:38-43`)를
  * 재정규화한 값이다(D-4B4-1·D-4B4-4) — 값 자체는 `policy-values.md`(legacy-behavior 층,
- * `OPEN-4B4-POLICY-VALUES` 승인 대기).
+ * 사용자 승인 2026-09-10 으로 `OPEN-4B4-POLICY-VALUES` 종결).
  *
  * [categoryOffsetMin]·[categoryOffsetMax] 는 카테고리 offset 의 허용 범위(조사 §1.2
  * `operator_strategy_tuning.py:16-17` `[-0.2, 0.2]`) — 범위 밖은 [SemanticMatch.of] 가
@@ -78,18 +78,22 @@ data class PriorityPolicyData(
 }
 
 /**
- * 운영 정책 인스턴스(D-4B4-4) — **착수 시 placeholder**(legacy-behavior 재정규화 값,
- * 승인 대기 `OPEN-4B4-POLICY-VALUES`). 정본은
- * `reports/evidence/m4/4b4/policy-values.md` — 값을 바꾸려면 그 문서를 먼저 갱신한다
- * (3A `KONEPS_COLLECTION_POLICY`·4D-1 `ML_CALL_POLICY` 관례). 가중치 0.3834/0.2333/
- * 0.1333/0.1000/0.1500 의 유도는 `policy-values.md` §1 참고 — legacy 0.23/0.14/0.08/
- * 0.06/0.09 를 0.60 으로 나눈 값을 scale 4 로 반올림한 뒤(0.3833/0.2333/0.1333/0.1000/
- * 0.1500, 합 0.9999) 잔차 0.0001 을 최대 가중치(`Match`)에 흡수해 합을 정확히 1.0000
- * 으로 고정했다.
+ * 운영 정책 인스턴스(D-4B4-4) — **사용자 승인 2026-09-10으로 확정됐다**(`policy-values.md`
+ * §1~§4). 착수 시(2026-09-10)에는 구조 검증용 placeholder였으나(근거는 실측이 아니라
+ * legacy 재정규화 값, ADR 0010 D-1 「보수적 상한 + 측정 의무」), slice 4B-4 종결 승인과
+ * 함께 이 값 자체가 승인됐다(`OPEN-4B4-POLICY-VALUES` 종결). 정본은
+ * `reports/evidence/m4/4b4/policy-values.md §1~§4` — 값을 바꾸려면 그 문서를 먼저
+ * 갱신한다(정본이 코드가 아니라 문서다, 3A `KONEPS_COLLECTION_POLICY`·4D-1
+ * `ML_CALL_POLICY` 관례). 가중치 0.3834/0.2333/0.1333/0.1000/0.1500 의 유도는
+ * `policy-values.md` §1 참고 — legacy 0.23/0.14/0.08/0.06/0.09 를 0.60 으로 나눈 값을
+ * scale 4 로 반올림한 뒤(0.3833/0.2333/0.1333/0.1000/0.1500, 합 0.9999) 잔차 0.0001 을
+ * 최대 가중치(`Match`)에 흡수해 합을 정확히 1.0000 으로 고정했다. `normEpsilon` 의
+ * 실측 갱신 경로는 4B-5 이후로 **활성 유지**(이 승인은 값의 존재를 확정했을 뿐
+ * 옳음을 실측한 것이 아니다, `policy-values.md` §4).
  */
 val PRIORITY_POLICY: EffectiveDatedPolicy<PriorityPolicyData> =
     EffectiveDatedPolicy(
-        source = "reports/evidence/m4/4b4/policy-values.md §1~§4 — 착수 placeholder, 승인 대기 OPEN-4B4-POLICY-VALUES",
+        source = "reports/evidence/m4/4b4/policy-values.md §1~§4 — 사용자 승인 2026-09-10",
         entries =
             listOf(
                 EffectiveFrom.Initial to
