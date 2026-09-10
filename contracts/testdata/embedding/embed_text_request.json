@@ -1,0 +1,18 @@
+{
+  "envelope": {
+    "base": {
+      "requestId": "req-2e-01",
+      "correlationId": "corr-2e-01"
+    },
+    "featureSchemaVersion": "text-synthesis-v1",
+    "modelReleaseSelector": {
+      "exactRelease": {
+        "releaseId": "release-2026-09-01",
+        "artifactChecksum": "sha256:1f2e3d4c5b6a79881f2e3d4c5b6a7988"
+      }
+    },
+    "deadlinePolicyVersion": "ml-deadline-v1"
+  },
+  "text": "정보시스템 유지보수 용역 — 서울특별시 종로구, 소프트웨어 개발업, 전자입찰",
+  "kind": "TEXT_KIND_NOTICE"
+}

@@ -223,6 +223,17 @@ assert_expected_tsv_complete() {
 COMMON="proto/bidvector/ml/v1/common.proto"
 PREDICTION="proto/bidvector/ml/v1/prediction.proto"
 TRAINING="proto/bidvector/ml/v1/training.proto"
+# M2/2E — 신설 파일을 스윕에 넣는다(scope.md 「이 slice 가 하는 일」, 조사 §5). `buf
+# breaking`은 **승인 태그에 없는 파일**을 비교 기준으로 못 삼는다 — `embedding.proto`는
+# 승인 태그(`contracts/v1-approved-2026-09-07`) 시점에 존재하지 않았으므로, 그 파일 자체의
+# 필드·enum·rpc 삭제는 "원래 없던 것의 형태가 바뀜"이라 breaking으로 잡히지 않는다(11종이
+# 전부 기존 파일을 대상으로 삼는 이유). 유일하게 **전건 대상**인 mutation은
+# `package-rename`이다 — 패키지 일치는 모듈 안 파일 전체에 걸리는 규칙
+# (`FILE_SAME_PACKAGE`)이라, 이 파일을 아래 for 문에서 빼면 mutation 적용 뒤 이 파일만
+# 옛 패키지에 남아 **패키지 불일치로 컴파일 자체가 깨지는** 별도 오류가 나
+# (`has_compile_error`가 잡음) 원래 증명하려던 breaking 규칙이 가려진다(설계 검토 (5) 5,
+# 「신설 파일 포함 스윕」의 실제 근거).
+EMBEDDING="proto/bidvector/ml/v1/embedding.proto"
 
 apply_mutation() {
     local scratch="$1" mutation="$2"
@@ -258,7 +269,8 @@ apply_mutation() {
         ;;
     package-rename)
         for f in "$c" "$scratch/contracts/proto/bidvector/ml/v1/error.proto" \
-            "$scratch/contracts/proto/bidvector/ml/v1/features.proto" "$p" "$t"; do
+            "$scratch/contracts/proto/bidvector/ml/v1/features.proto" "$p" "$t" \
+            "$scratch/contracts/$EMBEDDING"; do
             sed_inplace 's/package bidvector.ml.v1;/package bidvector.ml.v2;/' "$f"
         done
         ;;
