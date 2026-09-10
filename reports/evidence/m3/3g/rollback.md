@@ -46,9 +46,11 @@ git restore --source=6e3aea4 --staged --worktree -- \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt
 ```
 
-## M(2, 공유 문서) — 커밋 해시 hunk 격리(둘, **최신부터**)
+## M(2, 공유 문서) — 커밋 해시 hunk 격리(**셋**, 최신부터)
 
 ```
+git diff 162f5f6~1..162f5f6 -- milestone-3.md | git apply -R
+git diff 162f5f6~1..162f5f6 -- docs/discovery/capability-map.md | git apply -R
 git diff f78bd40~1..f78bd40 -- milestone-3.md | git apply -R
 git diff f78bd40~1..f78bd40 -- docs/discovery/capability-map.md | git apply -R
 git diff e6a6200~1..e6a6200 -- milestone-3.md | git apply -R
@@ -114,3 +116,14 @@ outbox·inbox 개별 test가 되살아난다. `OPEN-3D-GRANT-PUBLIC-BLINDSPOT`�
 돌아간다(capability-map.md 행이 사라짐). `milestone-3.md` Slice 3G 절이 사라지고 3F 종결
 문단이 다시 M3의 마지막 문단이 된다. **마이그레이션은 이 slice가 손대지 않았으므로 DB
 schema·GRANT 값에는 애초에 영향이 없다** — 되돌림이 필요해도 V7 무력화 절차가 필요 없다.
+
+## 종결 등재 반영 — 2026-09-10
+
+종결 승인 커밋 `162f5f6`(`milestone-3.md`·`capability-map.md`·`checklist.md`)이 공유 문서 둘을
+다시 만졌으므로 위 목록의 **최신 자리**에 넣었다. **이 갱신 커밋은 evidence 경로만 만진다** —
+공유 파일을 건드리면 목록이 자기만큼 다시 낡는다(2026-09-10 성문화, M4/4C-2 r3 M-5 의 뿌리).
+
+**실측 범위를 정확히 적는다**: 위 「확인 지점」의 넷(`f78bd40`→`e6a6200`)은 head `f78bd40` 에서
+compile·test 까지 끝까지 실행한 결과다. **`162f5f6` 두 hunk 의 역적용은 이 문단 작성 시점에
+임시 clone 에서 별도로 실행**해 exit 0 과 conflict 0 을 확인했다(compile·test 는 다시 돌리지
+않았다 — 문서 전용 커밋이라 트리의 코드가 같다).
