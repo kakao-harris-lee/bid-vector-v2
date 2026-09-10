@@ -84,7 +84,7 @@ rollback: |
 | --- | --- | --- | --- |
 | **D-4B5-1** | legacy sentinel(중립 0.5·capacity 0·예산 대체)은 `Absent(reason)` — 4B-4 재정규화가 흡수. 부재 사유는 `MlUnavailableReason` 이 아니라 **별도 sealed `DerivationAbsence`**(ML 미가용이 아니라 fact 부재) | §6.3 · 4B-4 D-4B4-1 | 계약 고정 |
 | **D-4B5-2** | 「마감 미공시」는 부재가 아니라 값(0.3 둘) — legacy 별도 상수(`URGENCY_SCORE_UNKNOWN`·`_DEADLINE_MISSING_COMPLEXITY_SIGNAL`)의 의도된 점수. 정책값·승인 대상 | `allocation.py:47-48`·`score_tables.py` | 착수 가정 |
-| **D-4B5-3** | 시간 밴드는 `Duration` 비교, 상한 포함(`≤`) — 시 단위 정수 변환 없음(legacy 는 정수 시간; 경계 의미는 같다) | 조사 | 계약 고정 |
+| **D-4B5-3** | 시간 밴드는 `Duration` 비교, 상한 포함(`≤`) — 시 단위 정수 변환 없음. **경계 의미는 legacy 와 같지 않다**(verifier r1 F-8 정정): legacy 는 `deadline_hours_remaining` 을 정수로 잘라 6시간 1분도 `6 ≤ 6` 으로 1.0 밴드에 넣지만, V2 는 `PT6H1M > PT6H` 라 다음 밴드(0.8)다. 잘림을 재현하지 않는다 — 잘림은 sentinel 과 같은 정보 손실이고, 밴드 값 자체가 승인 대상 정책이라 경계 정의도 그 안에서 확정한다(`intentional-redesign`) | 조사 · verifier r1 F-8 | 계약 고정 — 문면 정정 2026-09-10 |
 | **D-4B5-4** | 금액 비교·비율은 shared-kernel 산술만(`BidAmount.bidRateAgainst(BaseAmount)`·`Money` 비교) — `double`/`BigDecimal` 직접 나눗셈 금지(1B 교차 대입 방지) | 1B · api-type-policy | 계약 고정 |
 | **D-4B5-5** | ④ keyword 14개 목록은 **4B-6**(문자열 매칭 소유)의 정책 데이터 — 이 slice 는 `KeywordHits(count ≥ 0)` 만 | 층 분리 | 계약 고정 |
 | **D-4B5-6** | ④ 는 부분 부재를 재정규화(4B-4 규칙)하고 ③ 은 전부 필수(부재면 4B-6 이 `Absent(PredictionMissing)`) — legacy ③ 은 predictor 부재 시 각 항을 0 으로 접었으나 그것은 sentinel | §6.3 | 계약 고정 |
