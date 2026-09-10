@@ -1,0 +1,6 @@
+{
+  "milestone": "m4",
+  "slice": "4c2-outbox-persistence-and-atomicity",
+  "status": "N/A",
+  "reason": "이 slice는 새 fixture corpus case를 추가하지 않는다(scope.md in_scope — outbox·inbox 영속과 원자성만). 실측은 실 PostgreSQL(Testcontainers, ADR 0004 D-1)과 raw_observation·StrategyEvent.StrategyUpdated 같은 test 내부 합성 값으로 이뤄진다 — authoritative/observed/legacy-behavior corpus를 참조하지 않는다. 4A가 등록한 strategy-edit corpus(`reports/evidence/m4/4a/golden-manifest.json`)는 이 slice가 손대지 않았다(무접촉, commands.md `:app:test` 그린 유지가 그 증거)."
+}

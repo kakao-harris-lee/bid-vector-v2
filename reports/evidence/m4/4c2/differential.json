@@ -1,0 +1,6 @@
+{
+  "milestone": "m4",
+  "slice": "4c2-outbox-persistence-and-atomicity",
+  "status": "N/A",
+  "reason": "Python/V2 차이 판정 대상이 없다 — legacy(`ed4b06c`)의 DB 기반 outbox·큐 구조는 상태 값 집합 자체가 어디에도 선언돼 있지 않다(4C-1 differential.json과 같은 근거, `data-dictionary.md` §2.2.5 원문). 트랜잭션 경계(TransactionBoundary/ConnectionSource)·claim SKIP LOCKED 경합·mark* 전이 SQL은 이 slice가 신설하는 저장 층 구조이지 legacy 대응 동작의 이식이 아니다(D-4C2-1~3, scope.md 「이 slice가 하는 일」). intentional-redesign이 아니라 legacy-behavior 대응 자체가 없는 「원래 없음」이라 differential 판정이 성립하지 않는다."
+}
