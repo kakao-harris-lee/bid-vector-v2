@@ -311,7 +311,7 @@
   이 slice가 만지지 않음).
 - 임시 clone `rm -rf`로 정리.
 
-## 2026-09-10T12:00Z — 수정 라운드 3(재작업 3/5) — L-1·L-2
+## 2026-09-10T12:00Z — 수정 라운드 3(재작업 2/5 — low 일괄, 카운터 불변) — L-1·L-2
 - verifier 재검증 r3 판정 `ready-for-review`(`_workspace/m4-4b2/05_verifier_report_r3.md`),
   산출물층 blocker/high 0.
 - L-1: 알려진 제한 항목 10 등재(결함 아님, checklist.md).
@@ -363,3 +363,29 @@
 - cmd: `./gradlew --no-daemon -q :app:test --tests '*Conformance*'`(별도 호출) —
   exit 0 — `SharedKernelCorpusConformanceTest tests="86" failures="0"`(무변화).
 - 임시 clone `rm -rf`로 정리.
+
+## 2026-09-10T13:00Z — 사용자 승인 반영 + 카운터 정정(재작업 2/5)
+- 재작업 카운터 표기 정정: 「수정 라운드 3(재작업 3/5)」 → 「수정 라운드 3(재작업
+  2/5 — low 일괄, 카운터 불변)」. 근거 — v2-slice-pipeline Phase 4 차단 문턱은
+  not-ready·request_changes만 카운트하고 low 일괄은 올리지 않는다. 그 라운드의
+  verifier 판정은 `ready-for-review`(low만) 그대로였다.
+- `checklist.md`에 「사용자 승인 — 2026-09-10」 절 신설(승인일·범위·verifier r3
+  근거·재작업 2/5·다음 slice).
+- `scope.md` 「하네스 레인 변경」 절에 하네스 커밋 둘(`a70a04f`·`0034288`) 등재 —
+  둘 다 오케스트레이터 커밋, in_scope 밖·rollback 대상 아님 명시.
+- `milestone-4.md`에 「4B-2 종결 2026-09-10(사용자 승인)」 문단 신설 — M4 완료
+  조건 둘, legacy 실패 형태 여덟 요약, 검증이 드러낸 것 둘(NoGate 재해석·H-1
+  계보), 알려진 제한, 다음 slice(main 병합 후 4C-2).
+- cmd: `grep -c "OPEN-4B2-" docs/discovery/capability-map.md` — 5(이미 등재된
+  그대로, 이 라운드는 그 파일을 만지지 않음 — `clean check` 재실행 불필요,
+  문서만 편집).
+- cmd: `grep -rn "milestone-4\.md:[0-9]" --include='*.md' --include='*.kt'
+  --include='*.properties' .`(reverse-ripple, milestone-4.md 편집분) — 자기
+  참조 제외 매치 0건(이 파일을 줄 번호로 인용하는 다른 문서 없음).
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN
+  (RSA|EC|OPENSSH))" milestone-4.md reports/evidence/m4/4b2/{checklist,commands,
+  scope}.md` — exit 0(매치는 이 라운드의 secret 스캔 자기참조 서술뿐, 실
+  비밀값 0건).
+- cmd: `git status --porcelain -- reports/evidence/m4/4b2/{checklist,commands,
+  scope}.md milestone-4.md`(clean-tree 게이트 양성 대조) — 넷 다 M로 잡힘(커밋
+  전 확인).

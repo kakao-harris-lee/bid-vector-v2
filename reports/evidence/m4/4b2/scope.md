@@ -56,6 +56,12 @@ rollback: |
 
 `git log --oneline 401bc4d5636cd114c8282cf314d837f0d52dbc15..HEAD -- CLAUDE.md .claude/` — 착수 시점 **없음**(base == HEAD). 리뷰 요청 시점에 갱신한다. rollback 대상 아님.
 
+**갱신(2026-09-10, 종결 시점)**: 같은 range에 하네스 레인 커밋 둘이 붙었다 —
+`a70a04f`(`harness(v2-slice-pipeline): (2b) 표를 수정 라운드마다 갱신`) ·
+`0034288`(`harness(v2-slice-pipeline): (2b)에 「object 커널 계수」 고정 항목`).
+둘 다 오케스트레이터(team-lead)가 붙였고 **slice 산출물이 아니며 in_scope 밖,
+rollback 대상 아님**이다.
+
 ---
 
 ## 이 slice 가 하는 일 — legacy 의 실패 형태를 뒤집는다

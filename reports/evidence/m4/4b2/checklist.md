@@ -15,6 +15,29 @@
 - [x] 알려진 제한과 rollback 방법이 기록됨(아래 「알려진 제한」·`rollback.md`).
 - [x] secret 스캔 통과(commands.md 기록 예정 — 커밋 직전).
 
+## 사용자 승인 — 2026-09-10
+
+**slice 4B-2 종결 승인.** 승인 범위:
+
+1. **slice 종결** — 이 slice의 산출물(조합 use case `EvaluateCandidatesUseCase`·
+   판정 결과 어휘 `CandidateEvaluation`/`EvaluationDropReason`/`EvaluationStage`·
+   port 여덟·`LadderPolicySlot`·`CompositionBoundaryTest`)을 최종 형태로 승인한다.
+   base `401bc4d5636cd114c8282cf314d837f0d52dbc15` · head
+   `6d50bdfb16f3f9d9a424bdbaa16419a2d2063c58`(수정 라운드 3 rollback 재실측 커밋).
+2. **다음은 `main` 병합 후 4C-2**(병합은 오케스트레이터가 한다) — 이 레인은
+   브랜치를 건드리지 않는다.
+
+**승인의 근거 — verifier r3 `ready-for-review`.** 산출물층 blocker/high 0건
+(`_workspace/m4-4b2/05_verifier_report_r3.md`). 도메인·계약층 미해결 finding
+없음. r1의 M-1(`NoGate` 되돌림, 운영자 결정)·M-2(`correlationId` 전파, 팀장
+결정)·L-1~L-4, r2의 H-1(`judge` 이음매를 `internal` 생성자로 닫음), r3의
+L-1(알려진 제한 등재)·L-2(`LadderPolicySlot` 생성 불변식) 전부 반영·재검증됨.
+
+**재작업 카운터: 2/5**(상한 5, 여유 3) — 라운드 1(medium·low 일괄)이 1로, 라운드
+2(H-1, high)가 2로 올렸다. 라운드 3은 **low 일괄**(verifier 판정 `ready-for-review`
+유지)이라 카운터를 올리지 않는다(v2-slice-pipeline Phase 4 차단 문턱 — low/장부층
+전용 라운드는 미가산).
+
 ## 만든 타입과 각각이 지는 계약 항목
 
 | 타입 | 파일 | 계약 항목(scope.md ①~⑧) |
@@ -263,7 +286,7 @@ verifier 표적 재검증 판정 **not-ready**, 산출물층 high 1건. **이 hi
 
 정본은 `reports/evidence/m4/4b2/rollback.md`.
 
-## 수정 라운드 3(재작업 3/5) — L-1·L-2
+## 수정 라운드 3(재작업 2/5 — low 일괄, 카운터 불변) — L-1·L-2
 
 verifier 재검증 r3 판정 `ready-for-review`(`_workspace/m4-4b2/05_verifier_report_r3.md`),
 산출물층 blocker/high 0. **H-1 폐쇄 확인** — `judge = ...` 주입은 여전히
