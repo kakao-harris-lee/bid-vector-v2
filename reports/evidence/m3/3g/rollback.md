@@ -57,17 +57,30 @@ rm -f reports/evidence/m3/3g/commands.md reports/evidence/m3/3g/rollback.md
 커밋으로 올린다(공유 문서 커밋 `e6a6200`과 분리) — 그래서 위 hunk 목록(`e6a6200` 하나)이
 이 문서 자신의 커밋으로 낡지 않는다.
 
-## 확인 지점 — 임시 clone에서 실제로 실행
+## 확인 지점 — 임시 clone에서 실제로 실행(실측, 2026-09-10T10:2x Z, head `5499e9f`)
 
-1. `git clone .` (HEAD가 evidence 커밋 이상)
-2. M(1) restore, M(2) hunk 역적용 둘 — 셋 다 exit 0(clean, conflict 없음 — 인접 구간
-   재확인 필요).
-3. evidence 자기 파일 삭제.
-4. `git status --porcelain -- adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt milestone-3.md docs/discovery/capability-map.md reports/evidence/m3/3g` — 출력 없음(`reports/evidence/m3/3g/scope.md`는 base에 이미 있었으므로 삭제 대상 아님, 그대로 남아야 함).
-5. 되돌린 트리 **compile** — `:adapters:compileTestKotlin` exit 0.
-6. 되돌린 트리 **test** — `:adapters:test --tests "bidvector.adapters.persistence.CleanMigrationTest"`
-   exit 0(base 판, 9개 test — provenance_authority·notice_audit 술어 test와 outbox·inbox
-   개별 test가 다시 나타난다).
+1. `git clone .` (HEAD `5499e9f` — evidence 커밋 포함) — exit 0.
+2. M(1) restore(`CleanMigrationTest.kt`) exit 0 · M(2) hunk 역적용 둘
+   (`milestone-3.md`·`capability-map.md`) 각 exit 0 — **conflict marker 없음**(인접
+   구간 재확인 결과, `--3way` 불필요).
+3. evidence 자기 파일 삭제(`rm -f`) — exit 0.
+4. `git status --porcelain -- <in_scope 4경로>` — `CleanMigrationTest.kt`(M, staged)·
+   `milestone-3.md`(M)·`docs/discovery/capability-map.md`(M)·`commands.md`(D)·
+   `rollback.md`(D) 다섯 줄, `reports/evidence/m3/3g/scope.md`는 목록에 없음(삭제되지
+   않고 그대로 남음 — 확인됨).
+   내 줄 사라짐: `grep -c "Slice 3G" milestone-3.md` → 0,
+   `grep -c "OPEN-3D-GRANT-PUBLIC-BLINDSPOT" docs/discovery/capability-map.md` → 0.
+   남의 줄 남음: `grep -c "Slice 3F" milestone-3.md` → 1,
+   `grep -c "OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP" docs/discovery/capability-map.md` → 1.
+   `wc -l CleanMigrationTest.kt` → 296(base 원본과 일치).
+5. 되돌린 트리 **compile** — `:adapters:compileTestKotlin --no-daemon` exit 0
+   (32 actionable tasks, BUILD SUCCESSFUL).
+6. 되돌린 트리 **test** — `:adapters:test --tests "bidvector.adapters.persistence.CleanMigrationTest" --no-daemon --rerun-tasks`
+   exit 0 — **9 tests, 0 failed**(base 판 — `provenance_authority`·`notice_audit` 술어
+   test 둘과 outbox·inbox 개별 유효 권한 test 둘이 되살아난 것을 test 수로 확인, 6에서
+   9로 복귀).
+
+임시 clone은 확인 뒤 `rm -rf`로 제거했다.
 
 ## 되돌린 뒤 남는 것
 
