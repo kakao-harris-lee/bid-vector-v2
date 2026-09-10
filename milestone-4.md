@@ -501,6 +501,9 @@ verifier `not-ready`(H-1·H-2 미해결) 상태였다 — 이 라운드가 그 �
 되돌리지 않는다(세 worktree와 다른 세션이 그 커밋을 참조 중이라 공유 이력을 되쓰는
 비용이 더 크다). `config/quality/gate-tests.properties`·이 문서는 그 병합 이후 진짜
 공유 파일이 됐다 — rollback은 커밋 해시로 hunk를 격리한다(`reports/evidence/m4/4c2/rollback.md`).
+**r2 시정 뒤 M2/2E 레인이 `4ec52db`를 자기 브랜치에 병합했고 그 커밋 `20f7ad0`으로
+브랜치가 다시 이동했다(clean merge). 이력은 되쓰지 않는다** — 같은 이유로 같은 처리다
+(재발 방지가 하네스에 성문화됨, `f3f034f`).
 
 ### Slice 4D — ML gateway
 
@@ -639,3 +642,54 @@ corpus 승격은 `OPEN-4E-CORPUS`(병합 뒤 curator) · `RouteDirectory`·`Cont
 - 실제 broker/Telegram/email
 - Python ML 계산 구현
 - public API/UI
+
+**4C-2 verifier r2·r3(2026-09-10) → `ready-for-review`.** r2는 r1의 high 둘이 실측으로
+닫혔음을 확인했다 — `ConnectionSource`를 `sealed`로 내리자 `adapters` 밖에서 얻을 수 있는
+구현이 `TransactionBoundary` 하나뿐이 되어 **다른 모듈의 모든 `register`는 어떤 트랜잭션
+안이거나 던진다**(교차 모듈 probe 컴파일 거부로 실측). 대신 새 medium 둘이 나왔고 둘 다
+같은 형태였다 — **게이트가 초록인데 성질은 깨진다**: M-3(`GRANT DELETE ... TO PUBLIC` 한
+줄에 GRANT 게이트가 전건 초록인데 app 역할이 실제로 지운다) · M-4(컴파일 probe가 봉투
+획득 경로 여섯 중 넷만 덮어, `forStrategyUpdated`를 한 단어 public으로 바꾸면 probe는
+초록이고 다른 모듈이 진짜 봉투를 얻는다). **차단 문턱 아래였으나 운영자 결정으로 닫고
+종결한다** — 코드 slice는 Codex를 타지 않아 「등재 후 심판이 본다」의 심판이 없다.
+r3은 M-3(유효 권한 술어 `has_table_privilege` 축 일곱)과 M-4(fixture 둘 추가로 여섯 전부)를
+verifier가 mutation 넷·여섯으로 직접 재실측해 닫힘을 확인했다 — **초과(`GRANT TRUNCATE`
+하나만)와 부족(UPDATE 제거) 둘 다 잡히고**, fixture 여섯이 각각 자기 축만 낙제한다.
+M-5(rollback의 `milestone-4.md` hunk 목록이 evidence 커밋 하나만큼 낡아 문서대로 실행하면
+`exit 1`)도 닫았다 — 뿌리는 **rollback.md를 쓰는 커밋이 공유 파일도 함께 만졌다**는
+자기 재생산이라, 시정 커밋은 evidence 경로만 만졌다. **재작업 카운터 1/5**(r1 한 번만
+`not-ready`, r2·r3의 medium 시정은 자발적 강화라 세지 않는다).
+
+**4C-2 종결 2026-09-10(사용자 승인) — `OPEN-4C1-TX-CONTRACT-UNVERIFIED` 종결.** 승인 둘:
+① **slice 종결** — V6 스키마·`TransactionBoundary`/`ConnectionSource`·`bidvector.adapters.event`
+(JDBC `OutboxPort`·`InboxPort`·`EventIdFactory`)·`JdbcRawObservationStore` 참여 개조와
+게이트 셋(GRANT 유효 권한·`state` CHECK 본문·봉투 폐쇄 컴파일 probe)을 최종 형태로 승인.
+② **`OPEN-3D-GRANT-PUBLIC-BLINDSPOT` 후속 slice** — 3D의 기존 권한 test 둘
+(`provenance_authority`·`notice_audit`)이 M-3과 같은 PUBLIC 경유 사각을 그대로 갖는다
+(`information_schema.role_table_grants` 기반). 4C-2의 in_scope 밖이라 손대지 않았고,
+4C-2가 만든 유효 권한 술어와 mutation 절차를 그대로 옮기는 작은 후속 slice로 처리한다.
+
+**이 slice가 실제로 바꾼 것.** 4C-1은 「등록이 도메인 write와 같은 트랜잭션」을 **문면으로만
+선언**하고 `OPEN-4C1-TX-CONTRACT-UNVERIFIED`로 남겼다. 4C-2는 그 선언을 실 DB로 강제한다 —
+경계 안에서 `raw_observation` append와 outbox 등록이 **함께 커밋되거나 함께 사라지고**
+(양방향 실측: 실패 주입 시 0/0, 정상 커밋 시 1/1), 경계 밖 `register`는 던진다. 도중에
+**문면이 실제보다 강했던 자리 둘**(H-2 「경계 밖 등록은 성공할 수 없다」·L-11 `sealed`가
+구현을 「둘로 고정」)이 드러나 **닫을 수 있는 것은 닫고 나머지는 정직하게 내렸다.**
+
+**알려진 제한(종결 시점)**: 3D의 다른 네 repository는 `ConnectionSource` 참여에 개조되지
+않았다 — 지금 outbox와 한 트랜잭션에 묶을 수 있는 도메인 write는 `raw_observation` 하나다
+(D-4C2-1 갈래 b, 전략 영속은 후속) · `markDelivered`/`markFailed`/`markIsolated`는 production
+호출부가 없다(`OPEN-4C2-MARK-UNEXERCISED` — 전이 SQL의 효과·거부는 DB 층에서 증명했고,
+**통로를 열어 해결하지 않았다**: 그것이 legacy C-4「실패한 전송을 completed로 닫는다」를 이
+층에 재현하는 문이다) · claim 커밋 뒤 죽은 워커의 `Claimed` 잔존 회수(sweep)는 범위 밖 ·
+crash-after-commit의 「재기동」은 새 `TransactionBoundary` 인스턴스로 대역 · `adapters`
+모듈 **안**에서 `DataSourceConnectionSource`를 손으로 조립하는 것은 타입으로 막히지 않는다
+(`DataSource` 보유자 권한 이하라 새 권한이 아니다) · `data-dictionary.md` §2.2.5가 아직
+`OPEN-4C1-TX-CONTRACT-UNVERIFIED`를 활성으로 말한다(in_scope 밖, 후속 인계).
+
+**4C 축의 마지막 slice다 — M4 전체의 마지막은 아니다.** 종결: 4A·4B(1·2·3)·4C(1·2)·4D-1·4E.
+**남은 M4 slice 셋**: `OPEN-4D-LADDER-SCORE-SOURCE` = (a) 결정이 2E 착수 조사(D-2E-1 — 모델
+의존 성분의 실물이 점수가 아니라 **텍스트→벡터**)로 네 조각으로 분해되면서 신설됐다 —
+**4B-4**(`priority`·`match` 조합 커널, `decision` 순수 — 병렬 레인이 2026-09-10 착수) ·
+**4B-5**(workflow 조합기 + 임베딩 port + 텍스트 합성 규약) · **4D-2**(실 client 배선).
+그러므로 **M4 완료 조건 대조와 마일스톤 종결 판정은 그 셋이 끝난 뒤**다.

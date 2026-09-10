@@ -194,12 +194,132 @@ r1 수정 중 HEAD가 `a3822c4`에서 `8b50461`(4B-3 레인이 `a3822c4`를 자�
   트리) — exit 0.
 - cmd: `./gradlew --no-daemon :adapters:test`(되돌린 트리) — exit 0.
 
+## verifier r2(2026-09-10) — ready-for-review(산출물 high 0) → M-3·M-4·L-7·L-11 시정
+
+전제: HEAD `f3f034f`(라운드 착수 시점, base `ff210c1` 그대로). 보고서
+`_workspace/m4-4c2/04_verifier_report_r2.md`. r1의 high 둘(H-1·H-2)은 verifier가 실측으로
+닫힘 확인 — 이 라운드는 medium 둘·low 다섯만 처리한다.
+
+### H-2 양성 대조 재확인(verifier가 이미 함, 자체 재실측은 생략) — sealed가 옆으로 옮기지
+않았음을 verifier가 `PROBE-2a`~`PROBE-2c`로 확인(경계를 여는 것 자체는 sealed 이전에도
+가능했던 성질, 새 우회 아님).
+
+### M-3 — GRANT 게이트를 유효 권한 술어로 교체(mutation 실측)
+
+- cmd: `./gradlew --no-daemon :adapters:test --tests "…CleanMigrationTest"`(정상 GRANT,
+  `has_table_privilege` 술어로 재작성 뒤)
+- exit: 0
+- V6 GRANT 두 줄을 `GRANT ALL PRIVILEGES ON {outbox,inbox} TO bidvector_app;`로 변경
+- cmd: 재실행 — exit: 1 — 둘 다 실패(delete=true 등 예상 필드 불일치)
+- V6 원복(`cp` 백업) 뒤 빈 diff 확인
+- V6 끝에 `GRANT DELETE ON outbox TO PUBLIC;` 한 줄 추가(verifier가 지적한 PUBLIC 경유
+  미탐 축)
+- cmd: 재실행 — exit: 1 — `outbox`: `delete: expected:<false> but was:<true>`(PUBLIC
+  경유가 유효 권한에 정확히 반영됨)
+- V6 원복 뒤 빈 diff 확인
+
+### M-4 — 봉투 획득 경로 여섯 전부 컴파일 probe(mutation 실측)
+
+- cmd: `./gradlew --no-daemon :adapters:test --tests
+  "bidvector.adapters.event.EventInternalClosureCompileTest"`(fixture 5·6 추가 뒤)
+- exit: 0 — 6 tests, 0 failed
+- `workflow`의 `internal fun forStrategyUpdated(` → `fun forStrategyUpdated(`(한 단어)
+- cmd: 재실행 — exit: 1 — `forStrategyUpdated 는 workflow 밖에서 internal 이다` 단독 실패
+- 원복(`cp` 백업) 뒤 빈 diff 확인
+- `internal fun <P> newEnvelope(` → `fun <P> newEnvelope(`(한 단어)
+- cmd: 재실행 — exit: 1 — `newEnvelope 는 workflow 밖에서 internal 이다` 단독 실패
+- 원복 뒤 빈 diff 확인
+
+### L-7·L-11 — scope.md in_scope 추가, ConnectionSource KDoc 정정(mutation 불필요, 문면)
+
+### (2b) 라운드별 새 public 표면 — r1·r2 둘 다 기록(verifier r2 L-9 시정 — 이전엔 evidence에 없었다)
+
+**r1 라운드(H-1·H-2·M-1·M-2·L-1~L-6)**:
+
+| 변경 | public 표면 | 판정 |
+| --- | --- | --- |
+| `ConnectionSource` → `sealed` | 기존 타입이 **좁아짐** | 축소 — 새 권한 없음 |
+| `EventInternalClosureCompileTest` + fixture 5 | test 소스. 헬퍼 전부 `private` | 없음 |
+| `CleanMigrationTest`·`CleanMigrationCheckTest` 새 test 넷 | test method + `private` 헬퍼 | 없음 |
+| `TransactionBoundary`·`JdbcOutboxPort`·`OutboxPayloadCodec` | KDoc·본문만(소진 `when`) | 없음 |
+
+→ **신설 0 · 축소 1**.
+
+**r2 라운드(M-3·M-4·L-7·L-11, 이번 라운드)**:
+
+| 변경 | public 표면 | 판정 |
+| --- | --- | --- |
+| `CleanMigrationTest` — `has_table_privilege` 재작성 | `private TablePrivileges`·`private effectivePrivileges` | 없음 |
+| `EventInternalClosureCompileTest` + fixture 5·6 | test 소스만 | 없음 |
+| `ConnectionSource` KDoc 정정 | 없음(문면만) | 없음 |
+| `scope.md` in_scope 추가 | 코드 아님 | 없음 |
+
+→ **신설 0 · 축소 0**. 계수 목적 주입 없음(관측 지점은 여전히 DB SQL과 컴파일러 종료 코드).
+
+## 레인 혼입 — 두 번째 발생(2026-09-10, r2 시정 도중 실측)
+
+r2(M-3·M-4·L-7·L-11) 커밋 완료 직후 HEAD가 `4ec52db`에서 `20f7ad0`(M2/2E 레인이
+`4ec52db`를 자기 브랜치에 병합한 커밋, clean merge)으로 이동했다. 팀장에게 즉시
+보고하고 확인받은 뒤 그 위에서 계속했다(milestone-4.md·rollback.md 「레인 혼입」
+문단 — 이력은 되쓰지 않는다).
+
+- cmd: `git log --oneline ff210c187bb7885da7639de0434d815e59e7f32a..20f7ad0 -- CLAUDE.md .claude/`
+- 결과: `f3f034f` 1건뿐(재확인, L-4 절차 재실행) — 이 라운드도 하네스 레인 변경 없음.
+- 파일 무결성: `gate-tests.properties`의 `gate.tests.adapters` 키 1개(중복 없음), 4C-2·
+  4B-3·2E 세 레인의 등재 전부 공존(grep 확인).
+
+## r2 최종 acceptance 전건 재실행(HEAD `20f7ad0` — 레인 혼입 뒤 최종 head, S-0 우연 일치 아님)
+
+- S-0: `d=$(mktemp -d) && git clone --quiet --no-hardlinks --branch m4/2026-09-08
+  --single-branch . "$d/repo" && (cd "$d/repo" && git rev-parse HEAD && ./gradlew
+  --no-daemon --no-build-cache clean check)` — clone HEAD 확인 `20f7ad0` 일치, exit 0
+  (354 actionable tasks, 전부 executed).
+- S-1: `./gradlew --no-daemon --no-build-cache clean check`(로컬, HEAD `20f7ad0`) —
+  exit 0(345 actionable tasks).
+- S-2·S-3: `./gradlew --no-daemon :adapters:test :adapters:moduleDependencyGate
+  :adapters:sizeGate :adapters:cpdCheck` — exit 0.
+- S-4(별도 호출): `./gradlew --no-daemon :app:test` — exit 0.
+- S-5: `./gradlew --no-daemon qualityBaseline` — exit 0.
+- S-6(별도 호출): `./gradlew --no-daemon :app:gateExecutionGate` — exit 0.
+
+**verifier r3 L-12 시정 — 위 표의 기준 head를 명시한다.** 위 S-0~S-6은 `20f7ad0`에서
+돈 것이다(docs(m4-4c2) 커밋 `673cbd5`가 이 표 자체를 포함해 `milestone-4.md`·
+`commands.md`·`rollback.md` 셋만 델타로 더했다 — 코드·게이트는 무변경). **행운을
+근거로 쓰지 않는다** — 현재 HEAD `673cbd5`에서 내가 직접 재실행해 별도로 확인했다:
+`./gradlew --no-daemon --no-build-cache clean check`(S-1) exit 0(345 actionable
+tasks) · `./gradlew --no-daemon :app:test`(S-4, 별도 호출) exit 0 ·
+`./gradlew --no-daemon :app:gateExecutionGate`(S-6, 별도 호출) exit 0. verifier r3도
+독립적으로 `673cbd5`에서 S-1을 돌려 exit 0을 확인했다(`_workspace/m4-4c2
+/05_verifier_report_r3.md` §acceptance).
+
+## rollback 재실측(r2, 임시 clone, dry-run 아님) — 공유 파일 판정을 파일마다 재계산
+
+`git log --oneline <base>..HEAD -- <파일>`을 in_scope 파일마다 다시 돌려 4C-2·4B-3·2E
+세 레인의 귀속을 갈랐다(rollback.md 본문 참고). A 33·M 5(단독) restore 각각 exit 0.
+`gate-tests.properties` hunk 역적용 — `70cbcdb` exit 0(clean), `28733bc` **conflict**
+(r1과 같은 함정 재현: 4C-2·4B-3 주석 블록이 같은 삽입 지점에 인접) → 수동 해소(「M4/4B-3
+문단 보존, M4/4C-2 문단 제거」) → `git add`. `capability-map.md`·`milestone-4.md` hunk
+역적용 — 전부 exit 0(conflict 없음, 4C-2·2E/4B-3의 편집 위치가 물리적으로 분리).
+`git status --porcelain` 41건(D 33 + M 5 + M 3) 일치. 「내 줄 사라짐」·「남의 줄 남음」
+(이번엔 4B-3·2E 둘 다) 전부 grep으로 실측. 되돌린 트리 `:adapters:compileKotlin
+:adapters:compileTestKotlin` exit 0, `:adapters:test :app:test` exit 0(4B-3·2E
+산출물이 여전히 남아 있는 트리이므로 app도 함께 확인).
+
+## secret 스캔(r2 재실측)
+
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4c2/`
+- 매치 4건, 전부 이 파일의 「secret 스캔」 절 자기 인용(2026-09-02 판독 규칙, 실제
+  비밀값 없음).
+
 ## 알려진 제한
 
 - 3D의 다른 네 repository(`JdbcNoticeRepository`·`JdbcOpeningResultRepository`·
   `JdbcQualificationTextRepository`·`JdbcCollectionRunStore`)는 `ConnectionSource`
   참여에 개조되지 않았다 — 지금 outbox와 한 트랜잭션에 묶을 수 있는 도메인 write는
   `raw_observation` append 하나뿐이다(D-4C2-1 갈래 b).
+- 3D의 기존 두 권한 test(`provenance_authority`·`notice_audit`, `CleanMigrationTest`)는
+  M-3와 같은 PUBLIC 경유 공백을 여전히 갖는다(`information_schema.role_table_grants`
+  기반) — 이 slice의 in_scope 밖이라 손대지 않았다. 인계.
 - `OutboxPort.markDelivered`/`markFailed`/`markIsolated`는 production 호출부가
   없다(`OPEN-4C2-MARK-UNEXERCISED`, 배달 오케스트레이션 인계) — 전이 SQL의 효과·거부는
   DB 층에서(`OutboxTransitionSqlTest`) 증명했지 port 메서드 자체를 실행한 test는 아니다.
@@ -214,3 +334,43 @@ r1 수정 중 HEAD가 `a3822c4`에서 `8b50461`(4B-3 레인이 `a3822c4`를 자�
 - `data-dictionary.md` §2.2.5가 `OPEN-4C1-TX-CONTRACT-UNVERIFIED`를 여전히 활성으로
   말한다(verifier r1 L-3) — capability-map.md는 이 slice가 닫힘으로 갱신했지만
   data-dictionary.md는 in_scope 밖이라 고치지 않았다. 후속 slice 인계.
+
+## verifier r3(2026-09-10) — ready-for-review(산출물 high 0) → M-5·L-12 시정(마지막 라운드)
+
+전제: HEAD `673cbd5`(라운드 착수 시점, base `ff210c1` 그대로). 보고서
+`_workspace/m4-4c2/05_verifier_report_r3.md`. M-3·M-4는 verifier가 mutation 넷·여섯으로
+직접 재실측해 닫힘 확인(양방향 모두 — 초과·부족 둘 다 잡힘, fixture 여섯이 각자 자기
+축만 낙제). 이 라운드는 M-5·L-12만 처리한다. **이 수정 커밋은
+`reports/evidence/m4/4c2/**`만 바꾼다** — `milestone-4.md`·`gate-tests.properties`·
+`capability-map.md`·`scope.md`는 한 줄도 건드리지 않았다(아래 뿌리 참고, 자기 재생산
+방지).
+
+### M-5 — rollback.md의 milestone-4.md hunk 목록에 `673cbd5`가 빠져 있었다
+
+verifier가 문서 그대로 실행해 재현: `97af8bb` 역적용이 conflict(문서는 「conflict
+없음」이라 틀렸다), 이어 `abf6b06` 역적용이 「인덱스에 없습니다」로 시퀀스 자체가
+끊겼다(1A 16차와 같은 「명령이 실패」 계열). 뿌리 — `673cbd5`(rollback.md 자신을
+담은 evidence 커밋)가 `milestone-4.md`의 레인 혼입 문단도 함께 만졌는데, 그 사실이
+목록에 반영되지 않았다. r2 때(`8f8e1e1`)는 그 커밋이 `milestone-4.md`를 안 건드려
+둘짜리 목록이 우연히 맞았을 뿐이다.
+
+시정: rollback.md의 milestone-4.md hunk 목록에 `673cbd5`를 최신 자리로 추가(셋:
+`673cbd5`→`97af8bb`→`abf6b06`) + 항구 규칙 명시(rollback.md를 갱신하는 커밋이 공유
+파일도 함께 바꾸면 그 커밋 해시를 그 공유 파일의 hunk 목록 최신 자리에 반드시
+추가한다).
+
+- cmd: 임시 clone(HEAD `673cbd5` 이상, 시정된 rollback.md 반영 뒤)에서 A(33)·M(5) restore
+  — 둘 다 exit 0.
+- cmd: `config/quality/gate-tests.properties` hunk 역적용 `70cbcdb`(exit 0, clean) →
+  `28733bc`(conflict, 문서의 수동 해소 절차) → `git add`.
+- cmd: `docs/discovery/capability-map.md` hunk 역적용 `abf6b06` — exit 0(conflict 없음).
+- cmd: `milestone-4.md` hunk 역적용 **셋, 최신 순** `673cbd5` → `97af8bb` → `abf6b06`
+  — **전부 exit 0**(conflict 없음, M-5 시정 확인).
+- 확인: `git status --porcelain` 41건(D 33 + M 8) — rollback.md 수치와 일치. 「내 줄
+  사라짐」(`4C-2 구현`·`4C-2 verifier` grep 0) · 「남의 줄 남음」(4B-3 착수/종결 문단
+  grep 2, capability-map.md의 2E `OPEN-2E-*` 행 grep 2) 둘 다 확인.
+- cmd: 되돌린 트리 `./gradlew --no-daemon :adapters:compileKotlin
+  :adapters:compileTestKotlin` — exit 0.
+- cmd: 되돌린 트리 `./gradlew --no-daemon :adapters:test :app:test` — exit 0.
+
+### L-12 — acceptance 기준 head 명시(위 「r2 최종 acceptance」 절에 반영)
