@@ -10,13 +10,17 @@
 ```yaml
 milestone: m4
 slice: 4c2-outbox-persistence-and-atomicity
-base_sha: edd57fb   # 리뷰 요청 시점에 40자로 재확인한다(병합 커밋)
+base_sha: ff210c187bb7885da7639de0434d815e59e7f32a   # 착수 시점 재고정 — `m4/2026-09-08` = `m4-4d/2026-09-10` 의 HEAD(4D-1·4E 가 들어온 뒤).
+                                                     # 계약 작성 시점의 `edd57fb` 는 4D-1 종결 병합으로 낡았다(값을 그대로 두면 rollback 목록이 남의 slice 를 되돌린다)
 head_sha: 리뷰 요청 시점의 `git rev-parse HEAD` — **값을 박지 않는다**(evidence 커밋 자신이 head 가 되어 즉시 낡는다, 4A r1 B-3).
 branch: m4/2026-09-08
 in_scope:
   - adapters/src/main/resources/db/migration/V6__outbox_inbox.sql   # outbox·inbox 테이블
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/**       # JDBC OutboxPort·InboxPort 구현(3D 관례)
-  - adapters/src/test/kotlin/bidvector/adapters/persistence/**       # Testcontainers 통합 test(원자성·crash-after-commit·claim 경합·중복·순서)
+  - adapters/src/main/kotlin/bidvector/adapters/persistence/**       # 트랜잭션 경계 + `JdbcRawObservationStore` 참여 개조(D-4C2-1 (b)) — 3D 의 다른 넷은 만지지 않는다
+  - adapters/src/main/kotlin/bidvector/adapters/event/**             # **신규 패키지**(설계 검토 (4)-①) — JDBC `OutboxPort`·`InboxPort`·`EventIdFactory` 구현. `persistence` 에 둘 수 없다:
+                                                                     # `PersistenceAdapterDependencyTest`(게이트 등재)가 그 패키지의 `bidvector.workflow`·`bidvector.strategy` import 를 막는다. 3D allow-list 를 넓히지 않는다
+  - adapters/src/test/kotlin/bidvector/adapters/event/**             # 위의 통합 test + 자기 dependency test + 등재 완전성 test(ml 관례)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/**       # 원자성 실측 + 3D 스냅샷 래칫 기대표 갱신(D-4C2-2, 추가만) + `PersistenceTestSupport` truncate 목록
   - workflow/src/main/kotlin/bidvector/workflow/event/**             # **조건부·최소** — 트랜잭션 경계 port 가 필요하면 그것만. 어휘·전이표·봉투는 손대지 않는다
   - workflow/src/test/**                                             # 위 변경의 회귀
   - config/quality/gate-tests.properties                             # `gate.tests.adapters` 확장
@@ -108,3 +112,26 @@ rollback: |
 | `OPEN-4B2-2`·`-4`·`-6`(run item 영속·중복 계수·`running` 잔존) | **후속** — 이 slice 는 run 영속을 하지 않는다. 다만 ④ 가 `running` 잔존의 **기제**를 바꾸므로 그 관계를 evidence 에 적는다 |
 | `OPEN-4B2-5`(배달 outbox drain 운영 설정) | 후속(운영 관측) |
 | 4C-1 알려진 제한 「공개 sink 자기-조립」 | 이 slice 가 바꾸지 않는다 — 등재 유지 |
+
+---
+
+## 계약 갱신 — 2026-09-10 (Phase 2.5 설계 검토 귀결 · 운영자 결정)
+
+설계 검토(`_workspace/m4-4c2/02_design-review.md`)가 착수 전에 계약을 강제로 바꾸는 사실 셋을
+냈다. 검토가 승인 문면을 축소한 것이 아니라, **계약이 전제한 자리가 저장소에 없음**을 실측한
+결과다.
+
+| ID | 결정 | 귀결 |
+| --- | --- | --- |
+| **D-4C2-1** | **② 의 「도메인 write」 = `raw_observation` append** (갈래 b) | 계약 ② 는 실 production 쌍(`strategies.save` + `events.publish`)을 겨눴지만 **그 저장 쪽이 없다** — 4A 가 `StrategyRepository` 를 port 로만 두고 인계했고(4A KDoc 「원자적 저장+발행+세션전진은 4C 트랜잭션 outbox 소관」), 3D repository 다섯은 각자 `dataSource.connection` 을 잡아 **두 port 를 한 트랜잭션에 묶을 자리 자체가 없다**(실측). 트랜잭션 경계를 세우고 `JdbcRawObservationStore` **하나**를 additive 하게 참여시켜(주 생성자 `ConnectionSource`, 기존 `DataSource` 생성자는 보조로 위임 — 호출부·경계 밖 거동 무변경) 실 도메인 write 와의 원자성을 실측한다. **전략 영속(갈래 a)은 만들지 않는다** — 정책 version drift 판정이라는 새 도메인 물음을 이 slice 에 끌어들이지 않는다(후속 slice) |
+| **D-4C2-2** | **3D 스키마 스냅샷 래칫 「추가만」 예외 승인** | `CleanMigrationCheckTest.expectedCheckCountByTable` 은 전체 public 테이블의 **정확 일치 map** 이고 `CleanMigrationTest` 도 같은 성격이라, V6 가 테이블을 더하면 반드시 기대표가 는다. 3E(2026-09-08)·3F(D-3F-6)와 같은 처분 — **기존 테이블의 값은 한 자리도 바꾸지 않고 신규 행만 더한다**는 것을 evidence 가 실측한다. 게이트 술어 자체는 바꾸지 않는다 |
+| **D-4C2-3** | **어댑터 패키지 분리** — `bidvector.adapters.event` 신설 | `PersistenceAdapterDependencyTest`(게이트 등재)가 `persistence` 패키지의 `bidvector.workflow`·`bidvector.strategy` import 를 막는다. outbox 어댑터는 둘 다 봐야 하므로 koneps·ml·extraction 관례대로 **자기 dependency test 를 가진 새 패키지**에 둔다. **3D allow-list 를 넓히지 않는다**(게이트를 여는 수정) |
+
+**base_sha 재고정** — 계약 작성 시점 `edd57fb` 는 4D-1 종결 병합(`ff210c1`)으로 낡았다. 위 YAML
+의 값이 정본이다.
+
+### 신설 OPEN
+
+| OPEN | 내용 |
+| --- | --- |
+| `OPEN-4C2-MARK-UNEXERCISED` | `markDelivered`/`markFailed`/`markIsolated` 는 이 slice 에서 **port 수준으로 실행되지 않는다** — 배달자가 없고(경계), `adapters` test 도 인자를 만들 수 없다(`OutboxTransition` 하위 타입이 `workflow` 의 `internal constructor`). 전이 UPDATE 의 효과와 `WHERE state` 거부는 DB 층에서 실측하고, **통로를 열어 해결하지 않는다** — 그것이 legacy C-4(「실패한 전송을 `completed` 로 닫는다」)를 이 층에 재현하는 문이다. 배달 오케스트레이션 slice 로 인계 |
