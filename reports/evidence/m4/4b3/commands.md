@@ -114,3 +114,20 @@
 ## 인증값 노출 스캔
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m4/4b3/ --exclude=scope.md`
 - exit: 1(매치 0, verifier r1 low 일괄 수정 반영 뒤 재확인 포함)
+
+## 사용자 승인 등재 — :workflow:compileKotlin
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin`
+- exit: 0
+
+## 사용자 승인 등재 — S-2a
+- cmd: `./gradlew --no-daemon :workflow:test --tests 'bidvector.workflow.evaluation.*'`
+- exit: 0
+
+## 사용자 승인 등재 — 인증값 노출 스캔 (재확인)
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m4/4b3/ --exclude=scope.md`
+- exit: 1(매치 0)
+
+## 사용자 승인 등재 — 좌표 스캔(역방향 파급 검사, evidence-pack 규격)
+- cmd: `grep -rn "milestone-4\.md:[0-9]\|milestone-4:[0-9]" --include='*.md' --include='*.kt' --include='*.properties' . | grep -v "/build/"`
+- exit: 1(매치 0) — milestone-4.md에 4B-3 종결 문단을 삽입했으나 그 파일을 `file:line`으로
+  인용하는 다른 문서가 없어 밀릴 좌표 자체가 없다.

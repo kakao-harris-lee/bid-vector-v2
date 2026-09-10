@@ -57,7 +57,17 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline ff210c187bb7885da7639de0434d815e59e7f32a..HEAD -- CLAUDE.md .claude/` — 착수 시 **없음**.
+`git log --oneline ff210c187bb7885da7639de0434d815e59e7f32a..HEAD -- CLAUDE.md .claude/` — 착수 시 **없음**,
+종결(사용자 승인) 재실행에서도 **없음**(0건 — 같은 명령 재확인).
+
+---
+
+## 병합 결정 (사용자 승인 2026-09-10 ②)
+
+병합 대상은 `m4/2026-09-08`(종결 등재 시점 HEAD `a3822c4`, 4C-2 evidence 커밋 — 이 slice
+착수 시점의 base `ff210c187bb7885da7639de0434d815e59e7f32a`에서 그 사이 움직였다, 4D-1과
+같은 관측). 팀장이 이 종결 등재 커밋 뒤에 병합을 실행한다 — 이 slice(구현 레인)는
+병합·push를 하지 않는다.
 
 ---
 

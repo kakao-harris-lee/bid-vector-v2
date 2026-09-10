@@ -299,6 +299,42 @@ run당 한 번, 모든 후보가 공유).
 
 **다음은 `main` 병합 후 4C-2**(병합은 오케스트레이터, 계약은 팀장이 별도 작성).
 
+**4B-3 착수 2026-09-10** — `OPEN-4D-LADDER-SCORE-SOURCE` 결정 (a)가 실물을 내기 전까지
+4B-2 조합 use case가 ML 미가용 경로를 실제로 밟도록 배선했다(정본
+`reports/evidence/m4/4b3/scope.md`). **왜 필요했나(4D-1 착수 조사 실측)** — 4B-2의
+`MlAnalysisOutcome`은 `Analyzed`(priorityScore non-null)와 `SimilarityProjectionNotReady`
+둘뿐이라 use case 경로에서 `Verdict.Review(MlUnavailable)`에 닿는 배선이 없었다 — M4
+완료 조건 「ML 장애가 fail-open 하지 않는다」의 사다리 쪽 실물이 비어 있었다.
+
+`MlAnalysisOutcome.Unavailable(reason)` 신설(`Analyzed`는 무변경) · `LadderInput.
+mlUnavailableReason`(기본값 `ScoreNotProvided`) 슬롯 + `VerdictLadder.judge`의
+`priorityScore == null` 분기가 그 값을 싣도록 · use case의 `Unavailable` 가지가
+`scoreThresholdDrop`을 거치지 않고 `reach`로 직행(점수 셋 전부 null + 사유, 알림 0) ·
+`MlAnalysisPort.analyze`·`EvaluateCandidatesUseCase.evaluate` suspend 화(ADR 0010
+D-2 취소 전파) · `adapters/ml/UnavailableMlAnalysis` — 실 점수 provider 부재 기간에
+앱이 배선해야 할 `MlAnalysisPort`의 유일한 production 구현(조립 루트는 M6/`app`
+소관), 2E·M5·4D-2가 실 provider로 갈아끼운다.
+
+**verifier r1 `ready-for-review`**(산출물층 blocker/high 0, low 여섯 — 산출물 둘
+(`LadderInput` 조립 시점이 드롭 판정보다 앞서 있었던 것·「유일한 실 배선」 문면의
+오독 가능성) + 장부층 넷) — low 전부 한 커밋으로 일괄 반영했다(재작업 카운터에 안
+셈, 2026-09-02 운영자 채택 「장부층·low는 등재만 하고 라운드를 막지 않는다」).
+
+**4B-3 종결 2026-09-10(사용자 승인)** — 위 `ready-for-review` 위에서 승인(evidence
+`reports/evidence/m4/4b3/checklist.md` 「사용자 승인」 절). **재작업 0/5**(request_changes
+라운드 없이 low만 일괄 처리). 병합은 팀장이 이 종결 등재 뒤 `m4/2026-09-08` 대상으로
+실행 — 이 slice(구현 레인)는 병합·push를 하지 않는다.
+
+**알려진 제한(종결 시점)**: 실 점수 provider 부재(2E·M5 진행 중, `UnavailableMlAnalysis`
+가 그 기간 앱이 배선해야 할 유일한 production 구현) · 후보 순회는 순차(4B-2 결정
+유지) · `MlAnalysisPort.analyze`에 예산 인자 없음(4D-2가 port 시그니처를 다시 정할
+때 결정) · 클래스 함수 수가 detekt `TooManyFunctions` 기본 한도(11)에 닿아 다음
+확장은 파일 분리부터 검토해야 한다.
+
+**다음** — 사다리 점수(priority·probability·matched) 실 gateway는 4D-1 종결 결정대로
+M2 후속 slice + M5 provider slice가 이어받는다. 이 milestone 문서의 4B 절은 4B-3으로
+종결되고, 사다리 점수 실 배선은 별도 slice 번호로 이어진다.
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,

@@ -1,5 +1,21 @@
 # checklist.md — M4/4B-3 리뷰 준비도
 
+## 사용자 승인 — 2026-09-10
+
+**slice 4B-3 종결 승인.** 승인 둘:
+
+1. **slice 종결** — 이 slice의 산출물(`MlAnalysisOutcome.Unavailable`·`LadderInput.
+   mlUnavailableReason`·use case `Unavailable` 가지·`MlAnalysisPort`/`evaluate` suspend
+   화·`adapters/ml/UnavailableMlAnalysis`·`gate.tests.adapters` 등재)을 최종 형태로
+   승인한다. 근거는 verifier r1 `ready-for-review`(산출물층 blocker/high 0, low 여섯 —
+   전부 한 커밋으로 일괄 반영, 아래 「알려진 제한」과 rollback.md 참고).
+2. **병합 진행** — 병합은 팀장이 이 등재 커밋 뒤에 실행한다(대상 `m4/2026-09-08`).
+   이 slice(구현 레인)는 병합·push를 하지 않는다.
+
+**재작업 카운터: 0/5 확정** — verifier r1이 `ready-for-review`를 직접 냈고
+(`request_changes` 라운드 0), low 여섯을 한 커밋으로 처리한 것은 라운드로 세지 않는다
+(운영자 채택 2026-09-02 「장부층·low는 등재만 하고 라운드를 막지 않는다」).
+
 ## 리뷰 요청 조건 (evidence-pack 스킬 기준)
 
 - [x] 구현 diff가 커밋되어 base/head 고정 — `git status --porcelain -- <in_scope 경로>` 결과 없음(커밋 뒤 확인, clean-tree 게이트).
@@ -56,7 +72,7 @@
 
 ## milestone-4.md 종결 문단
 
-착수 계약은 scope.md에 반영했다(운영자 결정 2026-09-10 D-2(c)·D-6(b) 인용). **4B 절 종결
-문단은 사용자 승인 시점에 추가한다**(scope.md in_scope 목록의 「4B 절 종결 문단(승인
-시점)」 — 4D-1·4E 관례와 동일, 아직 사용자 승인 전이라 이 slice(구현 레인)에서는
-작성하지 않는다).
+착수 계약은 scope.md에 반영했다(운영자 결정 2026-09-10 D-2(c)·D-6(b) 인용). **사용자
+승인이 났으므로 4B 절 끝(4B-2 종결 문단 뒤)에 4B-3 종결 문단을 추가했다** — 계약 정본
+경로·왜 필요했나·verifier r1 ready-for-review(low 6 일괄)·사용자 승인·알려진 제한
+넷을 담는다(4D-1·4E 관례와 동일 형식). `file:line` 좌표는 쓰지 않았다.
