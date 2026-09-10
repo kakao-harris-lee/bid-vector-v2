@@ -335,6 +335,37 @@ D-2 취소 전파) · `adapters/ml/UnavailableMlAnalysis` — 실 점수 provide
 M2 후속 slice + M5 provider slice가 이어받는다. 이 milestone 문서의 4B 절은 4B-3으로
 종결되고, 사다리 점수 실 배선은 별도 slice 번호로 이어진다.
 
+**4B-4 착수 2026-09-10(운영자 결정 E-1 (c)·E-2 (c)·E-3 (a)·E-4 (a))** — `priority`·
+`match` 조합 커널(`decision` 순수, 정본 `reports/evidence/m4/4b4/scope.md`).
+`priorityScore`·`matchedScore`가 **어디서 오는가**(사다리 입력 자체는 4B-1이 이미
+소유)의 Kotlin 몫만 이 slice가 만든다 — 성분 산출(마감→urgency 등)·port·workflow 조합
+배선은 4B-5, 실 client는 4D-2로 분리했다(4D-1이 client·정책·매핑·release 대조를 한
+slice에 섞어 verifier 4라운드를 쓴 것과 같은 되풀이를 막기 위한 결정).
+
+**구현(구현 레인, 검증 대기)** — `bidvector.decision.priority` 패키지 신설:
+`Component`(enum 다섯, 조사 §1.1 legacy 여섯 가중합에서 확률 축 제외) · `ScoreFact`
+(`Present`/`Absent`, §6.3 sentinel 금지 — 사유는 `MlUnavailableReason` 재사용) ·
+`PriorityInputs`(성분 다섯 + penalty 입력 셋) · `PriorityPolicyData` + `PRIORITY_POLICY`
+(가중치·load/complexity penalty·categoryOffset 범위·normEpsilon, 값은 legacy-behavior
+재정규화 placeholder) · `composePriority`(순수 — `match` 부재는 즉시 `Unavailable`,
+나머지 부재는 재정규화, penalty는 입력이 있는 항만) · `UnitVector`·`SemanticMatch.of`
+(코사인 + offset, 판정은 sealed `MatchOutcome` — `require` 아님, 4D-1 G-1). `strategy`
+`ProbabilityScore` KDoc을 「P(낙찰) 아님」으로 정정(scope.md ⑤).
+
+**D-4B4-3 실측** — `UnitVector`의 좌표를 `DoubleArray`가 아니라 `List<BigDecimal>`로
+뒀다. `DomainApiTypeGateTask`가 주 생성자의 타입 표면을 **클래스 자신의 가시성으로만**
+판정하고 생성자 자신의 `internal`/`private` 표기는 보지 않는다(`PublicApiTypes.
+classOrObjectTargets`) — public 클래스에 `DoubleArray` 주 생성자를 두면 어떤 가시성
+수식어로도 `domainApiTypeGate`를 피할 수 없다는 뜻이라, 좌표 타입 자체를 바꿨다(코사인
+계산은 `internal val doubles: DoubleArray`에서만, 본문 프로퍼티라 실제 가시성 그대로
+게이트 표면 밖). `./gradlew --no-build-cache clean check` 로 실측 확인(evidence
+`reports/evidence/m4/4b4/commands.md`).
+
+**알려진 제한(착수 시점)**: 가중치·penalty·offset 값은 legacy-behavior 재정규화
+placeholder — 승인 대기(`OPEN-4B4-POLICY-VALUES`) · `similarity`는 성분이 아니다
+(legacy priority 가중합에 없다, D-4B4-5) · 조합·코사인 전수 표의 corpus 승격은 병합
+뒤 curator 소관(`OPEN-4B4-CORPUS`) · 성분 값의 산출·port·workflow 배선은 4B-5.
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,
