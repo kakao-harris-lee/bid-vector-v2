@@ -446,6 +446,9 @@ verifier `not-ready`(H-1·H-2 미해결) 상태였다 — 이 라운드가 그 �
 되돌리지 않는다(세 worktree와 다른 세션이 그 커밋을 참조 중이라 공유 이력을 되쓰는
 비용이 더 크다). `config/quality/gate-tests.properties`·이 문서는 그 병합 이후 진짜
 공유 파일이 됐다 — rollback은 커밋 해시로 hunk를 격리한다(`reports/evidence/m4/4c2/rollback.md`).
+**r2 시정 뒤 M2/2E 레인이 `4ec52db`를 자기 브랜치에 병합했고 그 커밋 `20f7ad0`으로
+브랜치가 다시 이동했다(clean merge). 이력은 되쓰지 않는다** — 같은 이유로 같은 처리다
+(재발 방지가 하네스에 성문화됨, `f3f034f`).
 
 ### Slice 4D — ML gateway
 
