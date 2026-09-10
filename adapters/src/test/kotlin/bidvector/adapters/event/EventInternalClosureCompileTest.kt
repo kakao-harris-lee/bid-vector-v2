@@ -17,10 +17,15 @@ import java.nio.file.Files
  * 돌린다). `adapters`가 이미 `workflow` 밖의 실제 소비 모듈이므로 별도 fixture 모듈을 짓지
  * 않는다 — 이 test worker의 classpath 자체가 「workflow 밖에서 컴파일」이다.
  *
- * 네 access point(verifier가 수동으로 확인한 것과 동일): [bidvector.workflow.event.EventEnvelope]
- * 생성자·`transitionOutbox`·`OutboxTransition.ToDelivered` 생성자·`OutboxEntry.restore`.
- * 양성 대조는 하나를 공유한다 — `ClaimedOutboxRow`(공개 생성자)가 정상 컴파일돼 harness
- * 자체가 항상 실패만 내는 고장이 아님을 확인한다(1B 관례의 sanity 목적과 같다).
+ * 여섯 access point(verifier r1이 수동으로 확인한 넷 + **verifier r2 M-4 시정**으로
+ * 더한 둘): [bidvector.workflow.event.EventEnvelope] 생성자·`transitionOutbox`·
+ * `OutboxTransition.ToDelivered` 생성자·`OutboxEntry.restore`(폐기 축)와
+ * `newEnvelope`·`forStrategyUpdated`(**획득 축** — 둘 다 완성된 봉투를 돌려주는
+ * `internal` 팩토리라, r1의 probe 넷만으로는 이 두 함수가 `internal`→`public`으로
+ * 한 단어 바뀌어도 이 test가 초록이었다: `app`이 `forStrategyUpdated`를 통해 진짜
+ * 봉투를 조립할 수 있었다, verifier r2 실측). 양성 대조는 하나를 공유한다 —
+ * `ClaimedOutboxRow`(공개 생성자)가 정상 컴파일돼 harness 자체가 항상 실패만 내는
+ * 고장이 아님을 확인한다(1B 관례의 sanity 목적과 같다).
  */
 class EventInternalClosureCompileTest {
     @Test
@@ -44,6 +49,18 @@ class EventInternalClosureCompileTest {
     @Test
     fun `OutboxEntry restore 는 workflow 밖에서 internal 이다`() {
         assertNegativeFails("4-outbox-entry-restore")
+        assertPositiveCompiles()
+    }
+
+    @Test
+    fun `newEnvelope 는 workflow 밖에서 internal 이다`() {
+        assertNegativeFails("5-new-envelope")
+        assertPositiveCompiles()
+    }
+
+    @Test
+    fun `forStrategyUpdated 는 workflow 밖에서 internal 이다`() {
+        assertNegativeFails("6-for-strategy-updated")
         assertPositiveCompiles()
     }
 }
