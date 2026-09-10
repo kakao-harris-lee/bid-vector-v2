@@ -131,3 +131,6 @@ rollback: |
 3. **② `budgetCapture` 의 `RoundingPolicy` 파라미터** — `BidAmount.bidRateAgainst(BaseAmount, origin, Resolution<RoundingPolicy>)` 시그니처에 맞춰 `DerivationPolicyData.budgetCaptureRounding`
    필드를 둔다(1D `FloorShortfallPolicyData.criticalRateRounding` 선례). 값은 policy-values.md 등재·승인 대상.
 4. **`DerivationAbsence.MoneyArithmeticUnmeasurable(reason)`** — shared-kernel `Measurement.Unmeasurable` 의 잔여 사유(VAT 불일치 등)를 접지 않고 나르는 가지 하나. 허용.
+5. **`docs/discovery/capability-map.md` 를 in_scope 에 추가(§14 `OPEN-4B5-COMPETITIVENESS` 행 등재만).** 갱신 1 이 「이 slice 는 등재만」이라 적었으면서 in_scope 목록에 파일을
+   넣지 않았다(계약 문서의 자기모순). 구현 레인이 verifier 진행 중에 별도 커밋 `0085d44` 로 그 행을 등재했다 — 지시 없는 커밋이나 내용은 갱신 1 과 일치하고 다른 줄
+   무편집. 사실로 등재하고 in_scope 를 맞춘다. 그 커밋은 verifier r1 의 대조 범위에 **포함**한다(HEAD 이동을 verifier 에 통지).
