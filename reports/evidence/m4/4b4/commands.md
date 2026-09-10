@@ -152,6 +152,29 @@ S-1/S-2/S-3/S-5/S-7 재실행(수정 반영 뒤):
 - cmd: `./gradlew --no-daemon :decision:gateExecutionGate`
 - exit: 0 — S-5, `gate.tests.decision`에 `PriorityCompositionExhaustiveTest` 추가 등재 확인
 
+F-6 — 수정 커밋(`658e693`) 뒤 최종 head에서 S-0 재실행:
+
+- cmd: `git worktree add --detach <tmp-dir> HEAD && (cd <tmp-dir> && ./gradlew --no-build-cache clean check)`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL in 54s`, 354 actionable tasks(354 executed) — head
+  `658e6932582a1175b1f697169cc1e6f1840e6d83`에서 독립 재현. worktree는
+  `git worktree remove --force`로 정리.
+
+rollback ①~⑤ — 수정 커밋 뒤 임시 clone에서 재실측(팀장 지시 「마지막 코드 커밋 뒤」):
+
+- cmd: `git diff --name-status 20f7ad0041de5e167c49bd00d9fdc00220711b56..HEAD`
+- exit: 0
+- 핵심 결과: 24행 — `rollback.md` 「대상 파일 목록」과 정확히 일치(① 목록 재산출).
+- cmd: `git restore --source=20f7ad0041de5e167c49bd00d9fdc00220711b56 --staged --worktree -- config/quality/gate-tests.properties decision/src/main/kotlin/bidvector/decision/priority decision/src/test/kotlin/bidvector/decision/priority milestone-4.md reports/evidence/m4/4b4 strategy/src/main/kotlin/bidvector/strategy/Score.kt`
+- exit: 0 — ②
+- 핵심 결과: `git status --porcelain` D 21 / M 3(③, `rollback.md` F-5 정정값과 일치).
+- cmd: `git diff 20f7ad0041de5e167c49bd00d9fdc00220711b56 -- <같은 경로들>`
+- exit: 0
+- 핵심 결과: 0줄(④) — base 와 완전 일치, 신설 패키지 디렉터리 자체 소멸(`ls`
+  `No such file or directory`).
+- cmd: `./gradlew --no-daemon :decision:compileKotlin :strategy:compileKotlin :decision:test :strategy:test :decision:gateExecutionGate`(되돌린 트리)
+- exit: 0(⑤) — `BUILD SUCCESSFUL`, 23 actionable tasks. 임시 clone은 실측 뒤 삭제.
+
 ## secret 스캔
 
 - cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4b4/ decision/src/main/kotlin/bidvector/decision/priority decision/src/test/kotlin/bidvector/decision/priority strategy/src/main/kotlin/bidvector/strategy/Score.kt config/quality/gate-tests.properties milestone-4.md`
