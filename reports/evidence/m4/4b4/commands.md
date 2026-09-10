@@ -82,6 +82,19 @@ base_sha: `20f7ad0041de5e167c49bd00d9fdc00220711b56`
 - 양성 대조: `Score.kt`에 한 줄 추가 → `git status --porcelain` 이 `M` 출력 확인 →
   `git checkout -- Score.kt`로 원복 → 재확인 결과 없음.
 
+## rollback 실측 — 임시 clone
+
+- cmd: `git clone --no-hardlinks . <tmp-dir> && cd <tmp-dir> && git checkout m4-4b4/2026-09-10 && git restore --source=20f7ad0041de5e167c49bd00d9fdc00220711b56 --staged --worktree -- config/quality/gate-tests.properties decision/src/main/kotlin/bidvector/decision/priority decision/src/test/kotlin/bidvector/decision/priority milestone-4.md reports/evidence/m4/4b4 strategy/src/main/kotlin/bidvector/strategy/Score.kt`
+- exit: 0
+- 핵심 결과: `git status --porcelain` — D 19(main 8·test 7·evidence 4, `scope.md` 포함) +
+  M 3(`gate-tests.properties`·`milestone-4.md`·`Score.kt`). `git diff <base> -- <같은
+  경로들>` 결과 0줄(base 와 완전 일치) — 신설 패키지 디렉터리 자체도 사라짐(`ls`
+  `No such file or directory`).
+- cmd: `./gradlew --no-daemon :decision:compileKotlin :strategy:compileKotlin :decision:test :strategy:test`(되돌린 트리)
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL` — 되돌린 트리가 컴파일되고 기존 test 전부 통과. 임시
+  clone 은 실측 뒤 삭제.
+
 ## 하네스 레인 변경 확인
 
 - cmd: `git log --oneline 20f7ad0041de5e167c49bd00d9fdc00220711b56..HEAD -- CLAUDE.md .claude/`

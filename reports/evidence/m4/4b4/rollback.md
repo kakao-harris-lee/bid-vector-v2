@@ -78,10 +78,8 @@ git restore --source=20f7ad0041de5e167c49bd00d9fdc00220711b56 --staged --worktre
 
 ## 임시 clone 실측
 
-```
-[executed]
-```
-
-아래 「실행 기록」참고 — 임시 clone에서 위 명령을 실제로 실행해 exit 0·삭제/복원
-파일 수·되돌린 트리의 `:decision:compileKotlin`·`:strategy:compileKotlin` 컴파일·
-`:decision:test`·`:strategy:test` 를 확인했다.
+`commands.md` 「rollback 실측 — 임시 clone」 절 — `git clone --no-hardlinks`로 만든
+임시 clone에서 위 restore 명령을 실제로 실행해 exit 0·D 19/M 3·`git diff <base>`
+0줄(신설 패키지 디렉터리 자체도 삭제 확인)을 실측하고, 되돌린 트리에서
+`:decision:compileKotlin`·`:strategy:compileKotlin`·`:decision:test`·`:strategy:test`
+가 `BUILD SUCCESSFUL`임을 확인했다. 임시 clone은 실측 뒤 삭제.
