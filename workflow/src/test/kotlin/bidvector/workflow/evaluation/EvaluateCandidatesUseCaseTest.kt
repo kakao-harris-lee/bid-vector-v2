@@ -1,5 +1,7 @@
 package bidvector.workflow.evaluation
 
+import bidvector.decision.MlUnavailableReason
+import bidvector.decision.ReviewReason
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
 import bidvector.procurement.NoticeStatus
@@ -7,8 +9,10 @@ import bidvector.qualification.LicenseVerdict
 import bidvector.qualification.RequirementGroupId
 import bidvector.strategy.StrategyDraft
 import bidvector.strategy.WatchRuleId
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
@@ -32,7 +36,7 @@ class EvaluateCandidatesUseCaseTest {
                 notifications = notifications,
             )
 
-        val results = useCase.evaluate()
+        val results = runBlocking { useCase.evaluate() }
 
         results.size shouldBe 1
         val reached = results.single().shouldBeInstanceOf<CandidateEvaluation.Reached>()
@@ -55,7 +59,7 @@ class EvaluateCandidatesUseCaseTest {
                 notifications = notifications,
             )
 
-        val results = useCase.evaluate()
+        val results = runBlocking { useCase.evaluate() }
 
         val reached = results.single() as CandidateEvaluation.Reached
         notifications.requested.single().correlationId shouldBe reached.correlationId
@@ -72,7 +76,7 @@ class EvaluateCandidatesUseCaseTest {
                 mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
             )
 
-        val result = useCase.evaluate().single() as CandidateEvaluation.NotReached
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.NotReached
 
         result.stage shouldBe EvaluationStage.NoticeLifecycle
         result.reason.shouldBeInstanceOf<EvaluationDropReason.NoticeNotBiddable>()
@@ -94,7 +98,7 @@ class EvaluateCandidatesUseCaseTest {
                 mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
             )
 
-        val result = useCase.evaluate().single() as CandidateEvaluation.NotReached
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.NotReached
 
         result.stage shouldBe EvaluationStage.WatchGate
         val reason = result.reason.shouldBeInstanceOf<EvaluationDropReason.WatchGateNotConfigured>()
@@ -122,7 +126,7 @@ class EvaluateCandidatesUseCaseTest {
                 mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
             )
 
-        val result = useCase.evaluate().single() as CandidateEvaluation.NotReached
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.NotReached
 
         result.stage shouldBe EvaluationStage.WatchGate
         val reason = result.reason.shouldBeInstanceOf<EvaluationDropReason.WatchGateRejected>()
@@ -142,7 +146,7 @@ class EvaluateCandidatesUseCaseTest {
                 mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
             )
 
-        val result = useCase.evaluate().single() as CandidateEvaluation.NotReached
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.NotReached
 
         result.stage shouldBe EvaluationStage.LicenseGate
         (result.reason as EvaluationDropReason.LicenseIneligible).verdict shouldBe ineligible
@@ -162,7 +166,7 @@ class EvaluateCandidatesUseCaseTest {
                 mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
             )
 
-        val result = useCase.evaluate().single() as CandidateEvaluation.NotReached
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.NotReached
 
         result.stage shouldBe EvaluationStage.ThresholdConfiguration
         result.reason shouldBe EvaluationDropReason.ActionThresholdsNotConfigured
@@ -179,7 +183,7 @@ class EvaluateCandidatesUseCaseTest {
                 mlAnalysis = FakeMlAnalysisPort { MlAnalysisOutcome.SimilarityProjectionNotReady },
             )
 
-        val result = useCase.evaluate().single() as CandidateEvaluation.NotReached
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.NotReached
 
         result.stage shouldBe EvaluationStage.MlAvailability
         result.reason shouldBe EvaluationDropReason.SimilarityProjectionNotReady
@@ -212,11 +216,61 @@ class EvaluateCandidatesUseCaseTest {
                     },
             )
 
-        val result = useCase.evaluate().single() as CandidateEvaluation.NotReached
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.NotReached
 
         result.stage shouldBe EvaluationStage.ScoreThreshold
         val reason = result.reason.shouldBeInstanceOf<EvaluationDropReason.BelowMinimumMatchScore>()
         reason.threshold shouldBe BigDecimal("0.5")
         reason.actual shouldBe BigDecimal("0.2")
+    }
+
+    // M4/4B-3 scope.md ③, 설계 검토 (4) 우회 1·3 — Unavailable 은 scoreThresholdDrop 을
+    // 거치지 않고 reach 로 직행한다(최소치가 설정돼 있어도 무관), 알림은 0건이다.
+    @Test
+    fun `ML 미가용이면 최소치 설정과 무관하게 Reached(Review(MlUnavailable)) 로 남고 알림은 0건이다`() {
+        val notice = testNotice()
+        val notifications = FakeNotificationRequestPort()
+        val strategyWithMinimums =
+            testStrategy(
+                StrategyDraft(
+                    focusCategories = listOf(DEFAULT_FOCUS_CATEGORY),
+                    bidNowThreshold = BigDecimal("0.7"),
+                    reviewThreshold = BigDecimal("0.45"),
+                    minimumMatchScore = BigDecimal("0.5"),
+                    minimumProbabilityScore = BigDecimal("0.5"),
+                ),
+            )
+        val useCase =
+            useCase(
+                strategyRepository = FakeStrategyRepository(strategyWithMinimums),
+                candidateSource = FakeCandidateSource(listOf(notice)),
+                mlAnalysis = FakeMlAnalysisPort { unavailableAnalysis() },
+                notifications = notifications,
+            )
+
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.Reached
+
+        val verdict = result.verdict.shouldBeInstanceOf<Verdict.Review>()
+        verdict.reasons.single().shouldBeInstanceOf<ReviewReason.MlUnavailable>()
+        notifications.requested.shouldBeEmpty()
+    }
+
+    // 설계 검토 (4) 우회 2 — 어댑터가 실은 사유가 ScoreNotProvided 로 접히지 않고
+    // Review(MlUnavailable(reason))에 그대로 실린다.
+    @Test
+    fun `ML 미가용 사유는 어댑터가 실은 값 그대로 사다리까지 전달된다`() {
+        val notice = testNotice()
+        val useCase =
+            useCase(
+                strategyRepository = FakeStrategyRepository(testStrategy()),
+                candidateSource = FakeCandidateSource(listOf(notice)),
+                mlAnalysis = FakeMlAnalysisPort { unavailableAnalysis(MlUnavailableReason.DeadlineExceeded) },
+            )
+
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.Reached
+
+        val verdict = result.verdict.shouldBeInstanceOf<Verdict.Review>()
+        val reason = verdict.reasons.single().shouldBeInstanceOf<ReviewReason.MlUnavailable>()
+        reason.reason shouldBe MlUnavailableReason.DeadlineExceeded
     }
 }

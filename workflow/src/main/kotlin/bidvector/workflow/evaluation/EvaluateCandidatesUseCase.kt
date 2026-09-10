@@ -1,6 +1,8 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.LadderInput
+import bidvector.decision.MlUnavailableReason
+import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
 import bidvector.decision.VerdictLadder
 import bidvector.decision.VerdictLadderPolicyData
@@ -104,7 +106,12 @@ class EvaluateCandidatesUseCase internal constructor(
         VerdictLadder::judge,
     )
 
-    fun evaluate(): List<CandidateEvaluation> {
+    /**
+     * `suspend`다(M4/4B-3 scope.md ④, ADR 0010 D-2) — [mlAnalysis].`analyze`가 suspend라
+     * 이 자리부터 그래야 취소 전파가 끊기지 않는다. 후보 순회는 여전히 순차다(`mapIndexed`,
+     * 병렬화는 이 slice 밖).
+     */
+    suspend fun evaluate(): List<CandidateEvaluation> {
         val strategy = strategies.load()
         val candidates = candidateSource.openCandidates()
         val capacitySnapshot = capacity.snapshot()
@@ -113,7 +120,7 @@ class EvaluateCandidatesUseCase internal constructor(
         }
     }
 
-    private fun evaluateOne(
+    private suspend fun evaluateOne(
         index: Int,
         notice: Notice,
         strategy: OperatorStrategy,
@@ -220,8 +227,15 @@ class EvaluateCandidatesUseCase internal constructor(
             )
         }
 
-    /** [thresholdConfigurationDrop]이 이미 둘 다 non-null임을 확인한 뒤에만 불린다. */
-    private fun analyzeAndJudge(
+    /**
+     * [thresholdConfigurationDrop]이 이미 둘 다 non-null임을 확인한 뒤에만 불린다.
+     *
+     * **`Unavailable` 가지(M4/4B-3 scope.md ③)** — `scoreThresholdDrop`을 거치지 않고
+     * `reach`로 직행한다(점수가 없으니 최소치 비교가 성립하지 않는다, 설계 검토 (3)).
+     * `LadderInput`의 점수 셋은 전부 null, `mlUnavailableReason`에는 어댑터가 실은 사유를
+     * 그대로 싣는다(설계 검토 (4) 우회 2 차단 — `ScoreNotProvided`로 접지 않는다).
+     */
+    private suspend fun analyzeAndJudge(
         notice: Notice,
         strategy: OperatorStrategy,
         capacitySnapshot: CapacitySnapshot,
@@ -239,12 +253,44 @@ class EvaluateCandidatesUseCase internal constructor(
                 )
             }
 
+            is MlAnalysisOutcome.Unavailable -> {
+                val ladderInput = ladderInputFor(capacitySnapshot, mlUnavailableReason = outcome.reason)
+                reach(notice, correlationId, bidNowThreshold, reviewThreshold, ladderInput)
+            }
+
             is MlAnalysisOutcome.Analyzed -> {
+                val ladderInput =
+                    ladderInputFor(
+                        capacitySnapshot,
+                        priorityScore = outcome.priorityScore,
+                        probabilityScore = outcome.probabilityScore,
+                        matchedScore = outcome.matchedScore,
+                    )
                 scoreThresholdDrop(strategy, outcome, notice, correlationId)
-                    ?: reach(notice, capacitySnapshot, correlationId, bidNowThreshold, reviewThreshold, outcome)
+                    ?: reach(notice, correlationId, bidNowThreshold, reviewThreshold, ladderInput)
             }
         }
     }
+
+    /**
+     * [analyzeAndJudge]의 두 가지(`Analyzed`·`Unavailable`)가 공유하는 `LadderInput`
+     * 조립 — 함수 50줄 한도(v2-지침서 §5) 회피 겸 중복 제거.
+     */
+    private fun ladderInputFor(
+        capacitySnapshot: CapacitySnapshot,
+        priorityScore: UnitScore? = null,
+        probabilityScore: UnitScore? = null,
+        matchedScore: UnitScore? = null,
+        mlUnavailableReason: MlUnavailableReason = MlUnavailableReason.ScoreNotProvided,
+    ): LadderInput =
+        LadderInput(
+            priorityScore = priorityScore,
+            probabilityScore = probabilityScore,
+            matchedScore = matchedScore,
+            currentActiveBids = capacitySnapshot.currentActiveBids,
+            maxActiveBids = capacitySnapshot.maxActiveBids,
+            mlUnavailableReason = mlUnavailableReason,
+        )
 
     private fun scoreThresholdDrop(
         strategy: OperatorStrategy,
@@ -282,23 +328,18 @@ class EvaluateCandidatesUseCase internal constructor(
         }
     }
 
-    /** 판정은 정확히 이 한 자리에서만 돈다(결정 5) — 두 번째 호출 경로가 이 클래스에 없다. */
+    /**
+     * 판정은 정확히 이 한 자리에서만 돈다(결정 5) — 두 번째 호출 경로가 이 클래스에 없다.
+     * `ladderInput`은 호출자가 조립한다(M4/4B-3 — `Analyzed`·`Unavailable` 두 가지가
+     * 서로 다른 `LadderInput`을 낳으므로 이 함수는 그 차이를 모른다).
+     */
     private fun reach(
         notice: Notice,
-        capacitySnapshot: CapacitySnapshot,
         correlationId: CorrelationId,
         bidNowThreshold: PriorityScore,
         reviewThreshold: PriorityScore,
-        analysis: MlAnalysisOutcome.Analyzed,
+        ladderInput: LadderInput,
     ): CandidateEvaluation.Reached {
-        val ladderInput =
-            LadderInput(
-                priorityScore = analysis.priorityScore,
-                probabilityScore = analysis.probabilityScore,
-                matchedScore = analysis.matchedScore,
-                currentActiveBids = capacitySnapshot.currentActiveBids,
-                maxActiveBids = capacitySnapshot.maxActiveBids,
-            )
         val ladderPolicy =
             Resolution.Resolved(
                 VerdictLadderPolicyData(

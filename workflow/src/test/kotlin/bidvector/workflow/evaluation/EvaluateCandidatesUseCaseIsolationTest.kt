@@ -7,6 +7,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
@@ -31,7 +32,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                 analysisBudget = 1,
             )
 
-        val results = useCase.evaluate()
+        val results = runBlocking { useCase.evaluate() }
 
         results shouldHaveSize 2
         results[0].shouldBeInstanceOf<CandidateEvaluation.Reached>()
@@ -62,7 +63,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                 mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
             )
 
-        val results = useCase.evaluate()
+        val results = runBlocking { useCase.evaluate() }
 
         results shouldHaveSize 2
         val first = results[0] as CandidateEvaluation.NotReached
@@ -82,7 +83,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                 mlAnalysis = mlAnalysis,
             )
 
-        useCase.evaluate()
+        runBlocking { useCase.evaluate() }
 
         mlAnalysis.callCountFor.getValue(notice.id).get() shouldBe 1
     }
@@ -103,7 +104,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                 judge = counter.wrap(notice, VerdictLadder::judge),
             )
 
-        useCase.evaluate()
+        runBlocking { useCase.evaluate() }
 
         counter.callCountFor.getValue(notice.id).get() shouldBe 1
     }
@@ -120,7 +121,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                 mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
             )
 
-        useCase.evaluate()
+        runBlocking { useCase.evaluate() }
 
         strategyRepository.loadCount shouldBe 1
     }
@@ -138,7 +139,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                 capacity = capacity,
             )
 
-        val results = useCase.evaluate()
+        val results = runBlocking { useCase.evaluate() }
 
         capacity.callCount shouldBe 1
         // capacity 가 가득 찼고 priority(0.9) < capacityHoldPriorityThreshold(0.8, policy slot) 는 거짓이라
@@ -168,7 +169,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                 notifications = notifications,
             )
 
-        val result = useCase.evaluate().single() as CandidateEvaluation.Reached
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.Reached
 
         result.verdict.shouldBeInstanceOf<Verdict.Skip>()
         notifications.requested.shouldBeEmpty()
@@ -187,7 +188,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                 mlAnalysis = mlAnalysis,
             )
 
-        val result = useCase.evaluate().single() as CandidateEvaluation.Reached
+        val result = runBlocking { useCase.evaluate() }.single() as CandidateEvaluation.Reached
 
         mlAnalysis.correlationIdSeenFor.getValue(notice.id) shouldBe result.correlationId
     }

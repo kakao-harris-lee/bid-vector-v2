@@ -1,6 +1,7 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.LadderInput
+import bidvector.decision.MlUnavailableReason
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
 import bidvector.decision.VerdictLadder
@@ -195,7 +196,7 @@ internal class FakeMlAnalysisPort(
     val callCountFor = mutableMapOf<NoticeId, AtomicInteger>()
     val correlationIdSeenFor = mutableMapOf<NoticeId, CorrelationId>()
 
-    override fun analyze(
+    override suspend fun analyze(
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome {
@@ -241,6 +242,11 @@ internal fun bidNowAnalysis(): MlAnalysisOutcome =
         probabilityScore = null,
         matchedScore = null,
     )
+
+/** M4/4B-3 scope.md ① — ML 미가용 값(기본 사유 `ScoreNotProvided`, 항상-미가용 배선 관례). */
+internal fun unavailableAnalysis(
+    reason: MlUnavailableReason = MlUnavailableReason.ScoreNotProvided,
+): MlAnalysisOutcome = MlAnalysisOutcome.Unavailable(reason)
 
 /**
  * [EvaluateCandidatesUseCase]의 `judge` 위임을 감싸 호출 횟수를 센다(verifier r1 L-1

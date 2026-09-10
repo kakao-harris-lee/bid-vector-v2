@@ -1,5 +1,6 @@
 package bidvector.workflow.evaluation
 
+import bidvector.decision.MlUnavailableReason
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
 import bidvector.procurement.Notice
@@ -49,6 +50,13 @@ fun interface LicenseGatePort {
  * 진다(4B-1 `LadderInput` 관례, `Verdict.judge`가 그 결측을 `Review(MlUnavailable)`로
  * 옮긴다 — 이 port가 접지 않는다). [SimilarityProjectionNotReady]는 점수 산출 **이전**
  * 단계의 일시적 부재라 다른 신호다(D-11).
+ *
+ * **[Unavailable](M4/4B-3 scope.md ①, ADR 0010 D-6 「미가용의 이름은 하나」)** — ML 호출
+ * 자체가 되지 않은 상태(transport·breaker·application 실패 등, 사유는
+ * `bidvector.decision.MlUnavailableReason`). `Analyzed`는 무변경이다 — 「분석됐는데
+ * priority가 없다」는 상태는 없다. 이 상태의 소비(`Review(MlUnavailable)`로 이르는 길)는
+ * [EvaluateCandidatesUseCase]가 진다 — `ReviewReason.MlUnavailable`의 생성자가
+ * `decision` 안에서 `internal`이라 이 port는 그 값을 직접 만들 수 없다.
  */
 sealed interface MlAnalysisOutcome {
     data class Analyzed(
@@ -58,6 +66,10 @@ sealed interface MlAnalysisOutcome {
     ) : MlAnalysisOutcome
 
     data object SimilarityProjectionNotReady : MlAnalysisOutcome
+
+    data class Unavailable(
+        val reason: MlUnavailableReason,
+    ) : MlAnalysisOutcome
 }
 
 /**
@@ -68,9 +80,13 @@ sealed interface MlAnalysisOutcome {
  * 4D가 남의 port를 고쳐야 하는 상황을 만들지 않기 위해 지금 닫는다. 이 slice의 실
  * 구현(fake)은 그 값을 쓰지 않아도 되지만, 시그니처에 있어야 4D의 실 어댑터가 ML
  * 호출 로그·헤더에 그 값을 실을 수 있다.
+ *
+ * **`suspend`다(M4/4B-3 scope.md ④, ADR 0010 D-2).** coroutine 취소가 gRPC cancel로
+ * 전파되려면 이 자리부터 suspend 여야 한다 — 동기 port + 어댑터 내부 `runBlocking`은
+ * 그 전파를 끊는다(설계 검토 (1) 「동기 port 로 되돌아감」 우회의 차단).
  */
 fun interface MlAnalysisPort {
-    fun analyze(
+    suspend fun analyze(
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome
