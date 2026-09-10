@@ -291,6 +291,34 @@ procurement `internal` 이라 어댑터가 계약 없이 값을 꺼낼 경로가
 **M3 는 이제 잔여 slice 가 없다.** 후속(별도 slice 아님): 3D V-1 · 3A 후속 셋 · **P-8**(§1.10 첨부 문서 키 계약, 표는 작성됐고 채택 대기) · fixture case(후보 여덟) ·
 `bidNtceOrd` 실측 한 번 · `OPEN-3E-*` 넷과 `OPEN-3F-*` 둘.
 
+### Slice 3G — 애플리케이션 역할 권한 래칫(`OPEN-3D-GRANT-PUBLIC-BLINDSPOT` 후속)
+
+**착수 2026-09-10 — M4/4C-2 verifier r2 M-3 이 연 후속.** 3D 가 세운 GRANT 값은 이미 옳지만, 3D 의 권한
+test 둘(`provenance_authority`·`notice_audit`)은 `information_schema.role_table_grants`(역할 **직접**
+부여만)를 술어로 써서 `GRANT ... TO PUBLIC` 경유 초과 권한을 못 본다 — 4C-2 가 `outbox`·`inbox` 에만
+먼저 적용한 `has_table_privilege`(직접·PUBLIC·상속을 모두 해소) 술어를 **전 테이블로 전수화**했다.
+마이그레이션은 한 줄도 고치지 않았다(권한 값은 이미 옳다 — 이 slice 는 게이트만 올린다).
+
+**산출**: `CleanMigrationTest.kt`(`adapters/src/test/kotlin/bidvector/adapters/persistence/`)에 유효
+권한 행렬 test 하나(축 9) — `public` 의 **BASE TABLE 전체를 DB 에서 발견**해 기대 행렬(테이블 열두 개,
+`flyway_schema_history` 포함 — 값은 실측)과 **키 집합·행 값을 둘 다 정확히 일치**시킨다. 3D 의 옛 술어
+test 둘은 지우고 그 근거(F-6 등)는 행렬 KDoc 으로 옮겼다 — 단언은 약해지지 않는다(행렬이 그 두 테이블을
+행으로 포함). 4C-2 가 `outbox`·`inbox` 에 따로 두던 유효 권한 test 둘도 행렬에 흡수되어 지웠다(축은
+KDoc 으로 유지, 중복 제거 — cpdCheck).
+
+**mutation 넷을 실측했다**(임시 probe, 커밋에는 없다 — 확인 뒤 제거): ⓐ `GRANT DELETE ... TO PUBLIC`
+(outbox) → 행렬 test 가 `outbox` 키에서 낙제(DELETE 축) ⓑ 역할 직접 `GRANT TRUNCATE`(notice, 초과) →
+`notice` 키에서 낙제(TRUNCATE 축) ⓒ `REVOKE UPDATE`(notice, 부족) → `notice` 키에서 낙제(UPDATE 축)
+ⓓ 신규 테이블(`zzz_mutation_probe`, 기대 행렬 미선언) → 키 집합 불일치로 낙제(발견 축). 넷 다 원복 뒤
+`--rerun-tasks` 로 강제 재실행해 깨끗한 6개 test 가 그대로 통과함을 확인했다(디스크 상태가 아니라 실
+컨테이너 재기동으로 확인 — 잔존 GRANT/REVOKE 없음).
+
+**`OPEN-3D-GRANT-PUBLIC-BLINDSPOT` 종결** — `docs/discovery/capability-map.md` §14.3 에 신설·닫힘으로
+등재(4C-2 가 열었을 때 그 표에 실제로는 등재되지 않았던 것도 이번에 바로잡았다).
+
+**현재 상태**: 구현·acceptance S-1~S-6 완료(`reports/evidence/m3/3g/commands.md`). **verifier 검증과
+사용자 승인 대기** — 이 절은 구현 레인이 쓴 것이고 종결을 스스로 선언하지 않는다.
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
