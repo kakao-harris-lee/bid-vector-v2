@@ -59,9 +59,12 @@ abstract class PersistenceTestSupport {
     fun truncateAllTables() {
         adminDataSource.connection.use { connection ->
             connection.createStatement().use { statement ->
+                // M4/4C-2 — outbox·inbox 도 매 test 전 비운다(설계 검토 (4)-⑥) — 빠뜨리면
+                // claim/dedup 결과가 실행 순서에 의존하는 조용한 실패가 된다.
                 statement.execute(
                     "TRUNCATE TABLE rejected_write, notice_audit, notice, opening_result, " +
-                        "qualification_text, collection_run, raw_observation RESTART IDENTITY CASCADE",
+                        "qualification_text, collection_run, raw_observation, outbox, inbox " +
+                        "RESTART IDENTITY CASCADE",
                 )
             }
         }

@@ -24,6 +24,11 @@ import org.junit.jupiter.api.Test
  * `total_reserve_price_candidate_count`(다른 축, `ON CONFLICT` 에서 병합 전 tuple 만 보여
  * 오검출)에서 `draw_numbers` 축 자신의 `draw_numbers_valid_range_max` 로 바뀌었을 뿐 총
  * 개수는 그대로 24다).
+ *
+ * **M4/4C-2 — outbox·inbox 신규(스키마 스냅샷 래칫 예외 D-4C2-2, 추가만).** `outbox`는
+ * 존재 가드 아홉(빈 문자열 여섯 + `aggregate_version >= 0` + `state` enum + `payload` 빈
+ * 문자열)에 actor 짝 CHECK 둘(`actor_kind`↔`actor_detail` 짝, `actor_kind` enum)을 더해
+ * 11. `inbox`는 `idempotency_key <> ''` 하나뿐이라 1(V6__outbox_inbox.sql).
  */
 class CleanMigrationCheckTest : PersistenceTestSupport() {
     private val expectedCheckCountByTable =
@@ -38,6 +43,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "raw_observation" to 4,
             "rejected_write" to 1,
             "opening_reserve_price" to 6,
+            // M4/4C-2 — 신규(추가만, D-4C2-2).
+            "outbox" to 11,
+            "inbox" to 1,
         )
 
     @Test
