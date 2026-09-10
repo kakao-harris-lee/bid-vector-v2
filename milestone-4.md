@@ -632,6 +632,9 @@ crash-after-commit의 「재기동」은 새 `TransactionBoundary` 인스턴스�
 (`DataSource` 보유자 권한 이하라 새 권한이 아니다) · `data-dictionary.md` §2.2.5가 아직
 `OPEN-4C1-TX-CONTRACT-UNVERIFIED`를 활성으로 말한다(in_scope 밖, 후속 인계).
 
-**M4의 마지막 계획 slice였다** — 4A·4B(1·2·3)·4C(1·2)·4D-1·4E 종결. 4D-2(사다리 점수 경로)는
-M2 후속 + M5 provider slice로 나갔다(`OPEN-4D-LADDER-SCORE-SOURCE` = (a)). 완료 조건 대조와
-마일스톤 종결 판정은 별도로 한다.
+**4C 축의 마지막 slice다 — M4 전체의 마지막은 아니다.** 종결: 4A·4B(1·2·3)·4C(1·2)·4D-1·4E.
+**남은 M4 slice 셋**: `OPEN-4D-LADDER-SCORE-SOURCE` = (a) 결정이 2E 착수 조사(D-2E-1 — 모델
+의존 성분의 실물이 점수가 아니라 **텍스트→벡터**)로 네 조각으로 분해되면서 신설됐다 —
+**4B-4**(`priority`·`match` 조합 커널, `decision` 순수 — 병렬 레인이 2026-09-10 착수) ·
+**4B-5**(workflow 조합기 + 임베딩 port + 텍스트 합성 규약) · **4D-2**(실 client 배선).
+그러므로 **M4 완료 조건 대조와 마일스톤 종결 판정은 그 셋이 끝난 뒤**다.
