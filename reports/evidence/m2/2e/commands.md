@@ -177,3 +177,67 @@ base `8b50461016232386e456be532fab4eed4299fcfb`, head는 리뷰 시점의 HEAD �
 - 핵심 결과: `M contracts/proto/.../embedding.proto` 잡힘(게이트가 실제로 매치함을 확인) —
   추가한 줄은 즉시 제거(파일이 이미 깨끗한 커밋 상태였으므로 `git checkout --`로 안전하게
   절삭, 다른 미커밋 편집 없음을 사전 확인).
+
+## 수정 라운드 1(verifier r1 F-1·F-2·F-3) — 변이 실측
+
+### F-1(b) — `EmbeddingTestdataCanonicalTest` 가 필드·enum 값·필드 번호 변경을 잡는가
+
+- cmd: (contracts/testdata/embedding, bash) `TEXT_KIND_OPERATOR_PROFILE = 2;` 삭제 후
+  `buf convert ../.. --type ...GetEmbeddingMetadataResponse --from <json> --to
+  -#format=binpb | cmp - <committed .binpb>`
+- exit: 1(differ, char 2 line 2) — 바이트 표류 확인.
+- cmd: 같은 mutation 을 실제 worktree `embedding.proto`에 적용 후
+  `./gradlew --offline :adapters:test --tests '*EmbeddingTestdataCanonicalTest*'`
+- exit: 1 — `AssertionFailedError: Element differ at index: [1, 129, 131, 132]`.
+- cmd: 원복(`cp` 백업본으로 덮어쓰기) 후 같은 명령
+- exit: 0 — `git status --porcelain`도 빈 출력(잔여 없음).
+- 핵심 결과: 필드 삭제(`uint32 dimension = 2;`)·필드 번호 재사용(`values = 1` → `= 7`)도
+  같은 방식으로 바이트 표류 확인(bash, cmp differ). `rpc GetEmbeddingMetadata` 삭제는
+  **바이트 동일**(cmp MATCH) — 이 test 가 못 잡는 것으로 예상대로 확인(checklist 알려진
+  제한 8 KDoc과 일치).
+
+### F-2 — 가드 제거 시 새 dimension test 가 실패하는가(양쪽 언어)
+
+- cmd: Kotlin `isAcceptableEmbedding`의 `dimensionMatches` 를 `true`(리터럴)로 임시 교체 후
+  `./gradlew --offline :adapters:test --tests '*EmbeddingContractTest*'`
+- exit: 1 — `values 개수가 dimension 과 다르면...` FAILED(`expected:<false> but was:<true>`).
+- cmd: 원복 후 같은 명령
+- exit: 0 — 21/21.
+- cmd: Python `_is_acceptable_embedding`의 `if len(values) != dimension:` 를
+  `if False:`(임시)로 교체 후 `pytest tests/test_embedding_contract.py -q`
+- exit: 1 — `test_dimension_mismatch_violates_the_contract_invariant` FAILED.
+- cmd: 원복(백업본 `cp`) 후 같은 명령
+- exit: 0 — 30/30.
+
+### F-3 — release 성분별 가드 제거 시 그 성분 case 만 떨어지는가(양쪽 언어)
+
+- cmd: Kotlin `isModelReleaseNonBlank`에서 `codeVersion.isNotBlank() &&` 한 줄 삭제 후
+  같은 test 실행
+- exit: 1 — **정확히** `codeVersion 공백` case 만 FAILED(`withClue` 라벨로 특정).
+- cmd: 원복 후 재확인 — exit 0, 21/21.
+- cmd: Python `_is_model_release_non_blank`에서 `and release.code_version.strip()` 한 줄
+  삭제 후 같은 test 실행
+- exit: 1 — **정확히** `test_..._invariant[code_version]` FAILED.
+- cmd: 원복 후 재확인 — exit 0, 30/30.
+
+## 수정 라운드 1 재실행 — S-1·S-3·S-4·S-5
+
+- cmd: `./gradlew --no-build-cache clean check`(1차, ktlint 정리 전)
+- exit: 1 — `:adapters:ktlintTestSourceSetCheck` FAILED(체인 호출 줄바꿈,
+  `EmbeddingTestdataCanonicalTest.kt` 신설로 재발). `ktlintTestSourceSetFormat` 자동 교정.
+- cmd: `./gradlew --no-build-cache clean check`(2차)
+- exit: 0 — 344 tasks(319 executed). `:contractGate`·`:adapters:check` 포함.
+- cmd: `(cd contracts && ./tools/breaking-mutations.sh)`
+- exit: 0 — 11/11(expected.tsv 무변경, `--update` 불필요).
+- cmd: `./gradlew --no-daemon :adapters:test --tests '*Embedding*Contract*' --tests '*MultiServiceContractTest*'`
+- exit: 0.
+- cmd: `(cd ml-engine && .venv/bin/python -m pytest tests/test_embedding_contract.py tests/test_contract_roundtrip.py -q)`
+- exit: 0 — 39/39.
+- **비고**: `:adapters:gateExecutionGate`를 `clean check`와 동시(백그라운드) 실행했다가
+  `adapters/build`를 공유해 `NoSuchFileException`/`EOFException`(인프라 경합, 실제 결함
+  아님)을 겪었다 — 순차 실행으로 재확인해 위 결과를 얻었다.
+
+## 수정 라운드 1 — secret 스캔·누출 스캔
+
+- cmd: `git diff -- adapters/src/test ml-engine/tests config/quality reports/evidence/m2/2e/checklist.md reports/evidence/m2/2e/scope.md | grep -niE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"`
+- exit: 1(매치 0) — 수정 라운드 diff 안에 매치 없음.

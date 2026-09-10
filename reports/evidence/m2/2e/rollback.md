@@ -16,6 +16,8 @@
   - `contracts/proto/bidvector/ml/v1/embedding.proto`
   - `contracts/testdata/embedding/**`(binpb 5 + json 5)
   - `adapters/src/test/kotlin/bidvector/adapters/contract/EmbeddingContractTest.kt`
+  - `adapters/src/test/kotlin/bidvector/adapters/contract/EmbeddingTestdataCanonicalTest.kt`
+    (verifier r1 F-1 수정 라운드 신설)
   - `ml-engine/tests/test_embedding_contract.py`
 - 편집 파일(`--source=<base>`가 있음 → 4B-3 병합 상태로 복원):
   - `adapters/src/test/kotlin/bidvector/adapters/contract/MultiServiceContractTest.kt`
@@ -37,6 +39,7 @@ git restore --source="$BASE" --staged --worktree -- \
   contracts/proto/bidvector/ml/v1/embedding.proto \
   contracts/testdata/embedding \
   adapters/src/test/kotlin/bidvector/adapters/contract/EmbeddingContractTest.kt \
+  adapters/src/test/kotlin/bidvector/adapters/contract/EmbeddingTestdataCanonicalTest.kt \
   ml-engine/tests/test_embedding_contract.py \
   adapters/src/test/kotlin/bidvector/adapters/contract/MultiServiceContractTest.kt \
   config/quality/contract-policy.properties \
@@ -51,7 +54,7 @@ git restore --source="$BASE" --staged --worktree -- \
 
 ## 확인 지점
 
-1. `git status --porcelain -- <위 10개 경로>`는 **빈 출력이 아니다**(staged 상태로 D/M이
+1. `git status --porcelain -- <위 11개 경로>`는 **빈 출력이 아니다**(staged 상태로 D/M이
    남는다, 2B rollback.md verifier r1 F-5와 같은 사실) — 복원 확인은 아래 2~5로 한다.
 2. `git diff "$BASE" -- <편집 파일 6개>`가 빈 출력(작업 트리 내용이 base와 완전히 같음).
 3. `(cd contracts && buf lint && buf build)` exit 0 — `embedding.proto` 없이도 계약 자족

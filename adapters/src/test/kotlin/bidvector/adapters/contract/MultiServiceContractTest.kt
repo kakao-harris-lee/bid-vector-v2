@@ -32,9 +32,11 @@ import java.nio.file.Path
  * `PredictionContractTest`·`TrainingContractTest`·`EmbeddingContractTest`가 이미 상세히
  * 지킨다.
  *
- * **M2/2E — 넷째 서비스(`EmbeddingService`)를 더한다**(설계 검토 (4) 우회 (8) — 이 test 가
- * 넷째를 안 넣으면 stub 이름 충돌이 안 잡힌다). D-2E-2(별도 서비스, release 축·readiness가
- * `BidPredictionService`와 다르다)의 배선 가능성 증명이기도 하다.
+ * **M2/2E — 셋째 서비스(`EmbeddingService`)를 더한다**(verifier r1 F-5 — 이전 판은
+ * 「넷째」로 잘못 셌다. 이 test 가 공존시키는 서비스는 `BidPredictionService`·
+ * `TrainingJobService`·`EmbeddingService` 셋뿐이다). 설계 검토 (4) 우회 (8) — 이 test 가
+ * `EmbeddingService`를 안 넣으면 stub 이름 충돌이 안 잡힌다. D-2E-2(별도 서비스, release
+ * 축·readiness가 `BidPredictionService`와 다르다)의 배선 가능성 증명이기도 하다.
  */
 class MultiServiceContractTest {
     private val predictionTestdataRoot: Path = contractTestdataRoot("prediction")
