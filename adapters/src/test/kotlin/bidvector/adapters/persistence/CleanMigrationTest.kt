@@ -30,6 +30,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "qualification_text",
             "collection_run",
             "flyway_schema_history",
+            // M3/3E — 스키마 스냅샷 래칫 예외(운영자 승인 2026-09-08, scope.md), 추가만.
+            "opening_reserve_price",
         )
 
     @Test
@@ -136,6 +138,56 @@ class CleanMigrationTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "observation_key", "text", false),
             ColumnSpec("opening_result", "created_at", "timestamp with time zone", false),
             ColumnSpec("opening_result", "updated_at", "timestamp with time zone", false),
+            // M3/3E — 층 C fact 슬롯(추가만, 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
+            ColumnSpec("opening_result", "final_award_amount_won", "numeric", true),
+            ColumnSpec("opening_result", "final_award_amount_currency", "text", true),
+            ColumnSpec("opening_result", "final_award_company_name", "text", true),
+            ColumnSpec("opening_result", "participant_count", "integer", true),
+            ColumnSpec("opening_result", "progress_division", "text", true),
+            ColumnSpec("opening_result", "planned_price_won", "numeric", true),
+            ColumnSpec("opening_result", "planned_price_currency", "text", true),
+            ColumnSpec("opening_result", "opening_base_amount_won", "numeric", true),
+            ColumnSpec("opening_result", "opening_base_amount_currency", "text", true),
+            ColumnSpec("opening_result", "opening_base_amount_vat", "text", true),
+            ColumnSpec("opening_result", "total_reserve_price_candidate_count", "integer", true),
+            ColumnSpec("opening_result", "actual_opening_at", "timestamp with time zone", true),
+            // verifier r1 H-1 뒤(V5) — provenance 왕복(추가만).
+            ColumnSpec("opening_result", "final_award_amount_provenance", "text", true),
+            ColumnSpec("opening_result", "final_award_amount_provenance_detail", "text", true),
+            ColumnSpec("opening_result", "planned_price_provenance", "text", true),
+            ColumnSpec("opening_result", "planned_price_provenance_detail", "text", true),
+            ColumnSpec("opening_result", "opening_base_amount_provenance", "text", true),
+            ColumnSpec("opening_result", "opening_base_amount_provenance_detail", "text", true),
+            // M3/3F — 개찰완료 축 부모 슬롯(추가만, 스키마 스냅샷 래칫 예외 D-3F-6).
+            ColumnSpec("opening_result", "opening_rank_one_kind", "text", true),
+            ColumnSpec("opening_result", "opening_rank_one_duplicate_count", "integer", true),
+            ColumnSpec("opening_result", "opening_rank_one_bidder_name", "text", true),
+            ColumnSpec("opening_result", "opening_rank_one_bid_amount_won", "numeric", true),
+            ColumnSpec("opening_result", "opening_rank_one_bid_amount_currency", "text", true),
+            ColumnSpec("opening_result", "opening_rank_one_bid_rate_fraction", "numeric", true),
+            // verifier r1 F-2 뒤 — 축별 관측 시각(3E OpeningReservePriceRow.observedAt 과 같은 자리).
+            ColumnSpec("opening_result", "opening_rank_one_observed_at", "timestamp with time zone", true),
+            ColumnSpec("opening_result", "draw_numbers_kind", "text", true),
+            ColumnSpec("opening_result", "draw_numbers", "ARRAY", true),
+            ColumnSpec("opening_result", "draw_numbers_observed_at", "timestamp with time zone", true),
+            ColumnSpec("opening_result", "draw_numbers_valid_range_max", "integer", true),
+        )
+
+    // M3/3E — 층 B 자식 표(D-3E-2 (a), 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
+    private val openingReservePriceColumns =
+        listOf(
+            ColumnSpec("opening_reserve_price", "notice_number", "text", false),
+            ColumnSpec("opening_reserve_price", "notice_round", "text", false),
+            ColumnSpec("opening_reserve_price", "reserve_price_sequence", "text", false),
+            ColumnSpec("opening_reserve_price", "base_reserve_price_won", "numeric", true),
+            ColumnSpec("opening_reserve_price", "base_reserve_price_currency", "text", true),
+            ColumnSpec("opening_reserve_price", "is_drawn", "boolean", true),
+            ColumnSpec("opening_reserve_price", "draw_count", "integer", true),
+            ColumnSpec("opening_reserve_price", "observed_at", "timestamp with time zone", false),
+            ColumnSpec("opening_reserve_price", "revision", "bigint", false),
+            ColumnSpec("opening_reserve_price", "observation_key", "text", false),
+            ColumnSpec("opening_reserve_price", "created_at", "timestamp with time zone", false),
+            ColumnSpec("opening_reserve_price", "updated_at", "timestamp with time zone", false),
         )
 
     private val qualificationTextColumns =
@@ -174,7 +226,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
 
     private val expectedColumns =
         rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
-            rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns
+            rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
+            openingReservePriceColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {
@@ -211,6 +264,13 @@ class CleanMigrationTest : PersistenceTestSupport() {
                 "notice.estimated_amount_won",
                 "notice.allocated_budget_won",
                 "opening_result.derived_base_amount_won",
+                // M3/3E — 층 B·C 신규 won 컬럼(추가만).
+                "opening_result.final_award_amount_won",
+                "opening_result.planned_price_won",
+                "opening_result.opening_base_amount_won",
+                "opening_reserve_price.base_reserve_price_won",
+                // M3/3F — 개찰완료 축 부모 슬롯(추가만).
+                "opening_result.opening_rank_one_bid_amount_won",
             )
         for (qualified in wonColumns) {
             val (table, column) = qualified.split(".")
@@ -223,7 +283,13 @@ class CleanMigrationTest : PersistenceTestSupport() {
     /** floor_rate_fraction·winning_rate_fraction은 자리수 제약 없는 `NUMERIC`(재선언 없음). */
     @Test
     fun `축3 부가 — rate fraction 컬럼은 정밀도·스케일을 재선언하지 않은 NUMERIC이다`() {
-        val fractionColumns = listOf("notice.floor_rate_fraction", "opening_result.winning_rate_fraction")
+        val fractionColumns =
+            listOf(
+                "notice.floor_rate_fraction",
+                "opening_result.winning_rate_fraction",
+                // M3/3F — 개찰완료 축 부모 슬롯(추가만).
+                "opening_result.opening_rank_one_bid_rate_fraction",
+            )
         for (qualified in fractionColumns) {
             val (table, column) = qualified.split(".")
             val (precision, scale) = numericPrecisionScale(table, column)
@@ -279,6 +345,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "opening_result" to setOf("notice_number", "notice_round"),
             "qualification_text" to setOf("notice_number", "notice_round"),
             "collection_run" to setOf("id"),
+            // M3/3E — 층 B 자식 표(추가만).
+            "opening_reserve_price" to setOf("notice_number", "notice_round", "reserve_price_sequence"),
         )
 
     @Test
@@ -319,6 +387,14 @@ class CleanMigrationTest : PersistenceTestSupport() {
             FkSpec("notice", "observation_key", "raw_observation", "observation_key"),
             FkSpec("opening_result", "observation_key", "raw_observation", "observation_key"),
             FkSpec("qualification_text", "observation_key", "raw_observation", "observation_key"),
+            // M3/3E — 층 B 자식 표(추가만).
+            FkSpec("opening_reserve_price", "observation_key", "raw_observation", "observation_key"),
+            // 복합(2컬럼) FK는 이 질의(constraint_name join만, 컬럼 순서 미보존)에서 cross
+            // product 4행으로 관측된다(실측, PostgreSQL 알려진 특성 — 스키마 결함이 아니다).
+            FkSpec("opening_reserve_price", "notice_number", "opening_result", "notice_number"),
+            FkSpec("opening_reserve_price", "notice_number", "opening_result", "notice_round"),
+            FkSpec("opening_reserve_price", "notice_round", "opening_result", "notice_number"),
+            FkSpec("opening_reserve_price", "notice_round", "opening_result", "notice_round"),
         )
 
     @Test
@@ -352,65 +428,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
         actual shouldContainExactlyInAnyOrder expectedForeignKeys
     }
 
-    // 축 7(트리거)은 `CleanMigrationTriggerTest`로 분리했다(sizeGate 500줄).
-
-    // =========================================================================
-    // 축 8 — CHECK(테이블별 개수 + verifier가 실측한 세 CHECK의 본문 부분 문자열)
-    // =========================================================================
-    private val expectedCheckCountByTable =
-        mapOf(
-            "collection_run" to 13,
-            "notice" to 12,
-            "notice_audit" to 1,
-            "opening_result" to 5,
-            "provenance_authority" to 1,
-            "qualification_text" to 3,
-            // F-7 운영자 결정 — payload 가 TEXT 로 바뀌며 `payload <> ''` CHECK 가 하나 늘었다.
-            "raw_observation" to 4,
-            "rejected_write" to 1,
-        )
-
-    @Test
-    fun `축8 CHECK 개수가 테이블별로 기대와 같다`() {
-        val actual = mutableMapOf<String, Int>()
-        dataSource().connection.use { connection ->
-            connection.createStatement().use { statement ->
-                statement
-                    .executeQuery(
-                        "SELECT conrelid::regclass::text AS table_name, count(*) AS n " +
-                            "FROM pg_constraint WHERE contype='c' AND connamespace = 'public'::regnamespace " +
-                            "GROUP BY conrelid::regclass::text",
-                    ).use { rs ->
-                        while (rs.next()) actual[rs.getString("table_name")] = rs.getInt("n")
-                    }
-            }
-        }
-        actual shouldBe expectedCheckCountByTable
-    }
-
-    @Test
-    fun `축8 부가 — COL-06 항등식·H-3 결합식·notice_round 형식 CHECK 가 본문에 살아 있다`() {
-        val checkBodies = queryCheckBodies()
-        checkBodies.any { it.contains("received = ((normalized + duplicate) + dropped))") } shouldBe true
-        checkBodies.any { it.contains("truncated = (truncation_cause IS NOT NULL))") } shouldBe true
-        checkBodies.any { it.contains("notice_round ~ '^[0-9]{3}\$'") } shouldBe true
-    }
-
-    private fun queryCheckBodies(): List<String> {
-        val bodies = mutableListOf<String>()
-        dataSource().connection.use { connection ->
-            connection.createStatement().use { statement ->
-                statement
-                    .executeQuery(
-                        "SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint " +
-                            "WHERE contype='c' AND connamespace = 'public'::regnamespace",
-                    ).use { rs ->
-                        while (rs.next()) bodies += rs.getString("def")
-                    }
-            }
-        }
-        return bodies
-    }
+    // 축 7(트리거)은 `CleanMigrationTriggerTest`로, 축 8(CHECK)은 `CleanMigrationCheckTest`로
+    // 분리했다(sizeGate 500줄, M3/3E에서 재분리).
 
     @Test
     fun `flyway validate 가 통과한다 — migration 이력과 파일이 어긋나지 않는다`() {

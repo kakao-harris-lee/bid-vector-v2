@@ -45,9 +45,9 @@ interface NoticeSourcePort {
 }
 
 /**
- * 개찰 결과 수집 port(①, COL-02·COL-03). [fetchReservePrices]의 서명이
- * [DetailFetchDecision.Fetch] 값을 요구한다 — 조회 가치 술어([decideDetailFetch])를 거치지
- * 않은 호출은 컴파일되지 않는다(위협 모델 방어 (h), 우회 후보 (7)(8)).
+ * 개찰 결과 수집 port(①, COL-02·COL-03). [fetchReservePrices]·[fetchOpeningCompleteResults]의
+ * 서명이 [DetailFetchDecision.Fetch] 값을 요구한다 — 조회 가치 술어([decideDetailFetch])를
+ * 거치지 않은 호출은 컴파일되지 않는다(위협 모델 방어 (h), 우회 후보 (7)(8)).
  */
 interface OpeningResultSourcePort {
     fun fetchOpeningResults(
@@ -56,6 +56,14 @@ interface OpeningResultSourcePort {
     ): SourceBatch<RawNoticeObservation>
 
     fun fetchReservePrices(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
+
+    /**
+     * M3/3F D-3F-1 (a) — 개찰완료(`getOpengResultListInfoOpengCompt`) 단건 조회. [fetchReservePrices]
+     * 와 같은 성질(공고당 1콜·증거 값 요구, D-3F-2 — [DetailFetchDecision] 재사용)이라 새 결정
+     * 타입을 만들지 않는다. 투찰자별 행은 raw_observation 감사 기록까지만 나른다(D-3F-3 해소 —
+     * canonical 승격은 이 port 의 몫이 아니다).
+     */
+    fun fetchOpeningCompleteResults(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
 }
 
 /**

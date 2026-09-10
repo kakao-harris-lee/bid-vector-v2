@@ -36,12 +36,17 @@ private fun openingDayWindow(referenceDate: CollectionReferenceDate): Pair<Strin
  * 개찰 축 항목은 [mapMaskedOpeningItem]으로만 관측이 된다(allow-list + `opengCorpInfo` masking,
  * P-10 (a)) — 3B `walkKonepsNoticePages`의 HTTP·Resilience4j·envelope·pagination·회계는 그대로
  * 재사용하고 항목 매핑만 다른 전략을 꽂는다.
+ *
+ * `openingCompleteBaseUri`(M3/3F) — 개찰완료(`getOpengResultListInfoOpengCompt`) 전용 엔드포인트.
+ * [fetchOpeningCompleteResults]가 이 값을 쓴다 — 예비가격 상세와도 다른 오퍼레이션이라 baseUri
+ * 가 셋이다.
  */
 class KonepsOpeningResultSource(
     private val listBaseUri: URI,
     private val listOperation: KonepsOperationDescriptor,
     private val listSourceEndpoint: SourceEndpoint,
     private val reserveDetailBaseUri: URI,
+    private val openingCompleteBaseUri: URI,
     private val config: KonepsSourceConfig,
 ) : OpeningResultSourcePort {
     private val retryName = "koneps-opening-${listSourceEndpoint.name.lowercase()}"
@@ -107,6 +112,31 @@ class KonepsOpeningResultSource(
                 SourceEndpoint.RESERVE_PRICE_DETAIL,
                 observedAt,
                 KonepsOperationPolicy.RESERVE_PRICE_DETAIL.rowIdentifierRawKeys,
+            )
+        }
+
+    /**
+     * 개찰완료(D-3F-1 (a), P-13 (a) 승인) — 투찰자별 행을 [mapMaskedOpeningItem]으로 관측한다
+     * (계약 레지스트리 경로 — `CollectionPolicy.kt` §1.11 열, `SourceEndpoint.OPENING_COMPLETE`
+     * 신규 넷째 군). `prcbdrBizno`·`prcbdrCeoNm`은 계약 미등재로 allow-list 반전에서 자동
+     * 제외된다(P-10 (a) 가 구조적으로 선다) — 평가점수 넷도 같은 이유로 제외된다(P-13, scale
+     * 미확정).
+     */
+    override fun fetchOpeningCompleteResults(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation> =
+        fetchSingleKonepsNotice(
+            config,
+            retry,
+            rateLimiter,
+            openingCompleteBaseUri,
+            KonepsOperationPolicy.OPENING_COMPLETE,
+            evidence.noticeId,
+        ) { item, itemPolicy, observedAt ->
+            mapMaskedOpeningItem(
+                item,
+                itemPolicy,
+                SourceEndpoint.OPENING_COMPLETE,
+                observedAt,
+                KonepsOperationPolicy.OPENING_COMPLETE.rowIdentifierRawKeys,
             )
         }
 }

@@ -2,6 +2,7 @@ package bidvector.adapters.persistence
 
 import bidvector.procurement.ObservationKey
 import bidvector.procurement.RawNoticeObservation
+import bidvector.procurement.RowDiscriminator
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
@@ -27,10 +28,17 @@ internal object ObservationKeyDerivation {
      * 운영자 결정)도 재료에 더한다 — 등재분이 같아도 원문이 다르면(예: 미등재 필드만 바뀜)
      * 다른 관측으로 본다. 원문이 없으면 빈 문자열로 접는다(등재분만으로 유도하던 기존
      * 동작과 하위호환).
+     *
+     * `rowDiscriminator`(M3/3E 신설, D-3E-1a (a)) — 값이 있으면 그 값, 부재·공백이면 응답 안
+     * 위치가 재료 마지막 칸에 더해진다(`OPEN-3B2-STORAGE-ROW-KEY-COLLISION`). `null`(기본값,
+     * 행 구별이 필요 없는 오퍼레이션)이면 이 칸은 빈 문자열이라 **기존 키 유도와 동치**다 —
+     * 목록 오퍼레이션의 기존 raw 행 키는 이 확장으로 바뀌지 않는다(상대적 동등/비동등만
+     * test가 보므로 절대 해시 값 자체가 바뀌는 것은 무해하다).
      */
     fun of(
         observation: RawNoticeObservation,
         canonicalPayload: String,
+        rowDiscriminator: RowDiscriminator? = null,
     ): ObservationKey {
         val material =
             listOf(
@@ -38,10 +46,23 @@ internal object ObservationKeyDerivation {
                 observation.observedAt.toString(),
                 canonicalPayload,
                 observation.sourceText ?: "",
+                rowDiscriminator.materialToken(),
             ).joinToString(separator = SEPARATOR)
         val digest = MessageDigest.getInstance("SHA-256").digest(material.toByteArray(StandardCharsets.UTF_8))
         return ObservationKey(digest.toHexString())
     }
+
+    /**
+     * `Identified`/`Positional`을 서로 다른 접두로 갈라 재료에 싣는다 — 접두가 없으면
+     * `Identified("5")`와 `Positional(5)`가 우연히 같은 문자열이 되어 서로 다른 두 사유(값
+     * 대 위치)가 재료 층에서 다시 접힌다.
+     */
+    private fun RowDiscriminator?.materialToken(): String =
+        when (this) {
+            null -> ""
+            is RowDiscriminator.Identified -> "id:$value"
+            is RowDiscriminator.Positional -> "pos:$ordinal"
+        }
 
     private fun ByteArray.toHexString(): String {
         val chars = CharArray(size * HEX_CHARS_PER_BYTE)

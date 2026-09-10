@@ -4,6 +4,7 @@ import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.sharedkernel.NoticeRound
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
@@ -96,6 +97,52 @@ class KonepsOperationDescriptorTest {
     fun `기간창을 요구하는 오퍼레이션에 noticeId 만 주면 구성 전에 실패한다`() {
         shouldThrow<IllegalArgumentException> {
             buildKonepsOperationUri(BASE, KEY, KonepsOperationPolicy.AWARD_LIST, 1, 100, noticeId = NOTICE_ID)
+        }
+    }
+
+    // M3/3F — §1.9.2 「13-15: inqryDiv 자체가 없다」. OPENING_COMPLETE 는 그 사실을
+    // inquiryDivValue = null 로 나른다.
+    @Test
+    fun `OPENING_COMPLETE 는 inqryDiv 파라미터 자체를 내지 않는다`() {
+        val operation = KonepsOperationPolicy.OPENING_COMPLETE
+        val uri = buildKonepsOperationUri(BASE, KEY, operation, 1, 100, noticeId = NOTICE_ID)
+
+        uri.toString() shouldNotContain "inqryDiv"
+    }
+
+    @Test
+    fun `OPENING_COMPLETE 는 bidNtceNo bidNtceOrd 둘 다 싣는다`() {
+        val operation = KonepsOperationPolicy.OPENING_COMPLETE
+        val uri = buildKonepsOperationUri(BASE, KEY, operation, 1, 100, noticeId = NOTICE_ID)
+
+        uri.toString() shouldContain "bidNtceNo=20260908001"
+        uri.toString() shouldContain "bidNtceOrd=000"
+    }
+
+    @Test
+    fun `inquiryDivValue 가 null 인 서술은 구성 자체가 성립한다`() {
+        val operation =
+            KonepsOperationDescriptor(
+                inquiryDivValue = null,
+                requiresPeriodWindow = false,
+                requiresNoticeNumber = true,
+                requiresNoticeRound = false,
+                rowIdentifierRawKeys = emptyList(),
+            )
+
+        operation.inquiryDivValue shouldBe null
+    }
+
+    @Test
+    fun `빈 문자열 inquiryDivValue 는 축이 없으면 null 을 쓰라는 사유로 거부된다`() {
+        shouldThrow<IllegalArgumentException> {
+            KonepsOperationDescriptor(
+                inquiryDivValue = "",
+                requiresPeriodWindow = false,
+                requiresNoticeNumber = true,
+                requiresNoticeRound = false,
+                rowIdentifierRawKeys = emptyList(),
+            )
         }
     }
 }
