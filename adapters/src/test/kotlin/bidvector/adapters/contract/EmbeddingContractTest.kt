@@ -158,7 +158,12 @@ class EmbeddingContractTest {
 
     @Test
     fun `TextKind 정의 밖 정수는 거부된다`() {
-        val request = EmbedTextRequest.parseFrom(requestBytes).toBuilder().setKindValue(99).build()
+        val request =
+            EmbedTextRequest
+                .parseFrom(requestBytes)
+                .toBuilder()
+                .setKindValue(99)
+                .build()
         request.kind shouldBe TextKind.UNRECOGNIZED
         isAcceptableTextKind(request.kind) shouldBe false
     }
