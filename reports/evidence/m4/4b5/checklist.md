@@ -61,7 +61,7 @@ in_scope 밖이라(scope.md) 이 레인이 직접 편집하지 않는다.
 
 | finding | 처분 |
 | --- | --- |
-| **F-1 (high)** ③ 가 상한 없는 `Rate` 를 clamp 하지 않아 `floor>1`에서 headroom 이 뒤집힘 | 채택 (a) — `MarginInputs.init` 에서 `recommendedRate`·`floorRate`·`predictedRate` 를 `≤ 1`로 닫는다(`DerivationInputs.kt`). 판정층 짝은 상류(2B `D-2B-8`·4D-1 `ContractViolation`). `ExpectedMarginDerivationTest` 경계(1.0 통과·1.0000001 거부) + 우회 재현(floor 1.2 거부) + 회귀(rec 0.7·floor 0.9 legacy 일치, 0.445) 다섯 |
+| **F-1 (high)** ③ 가 상한 없는 `Rate` 를 clamp 하지 않아 `floor>1`에서 headroom 이 뒤집힘 | 채택 (a) — `MarginInputs.init` 에서 `recommendedRate`·`floorRate`·`predictedRate` 를 `≤ 1`로 닫는다(`DerivationInputs.kt`). 판정층 짝 주장은 verifier r2 G-1 이 축별로 갈라 정정(아래) — `ExpectedMarginDerivationTest` 경계(1.0 통과·1.0000001 거부) + 우회 재현(floor 1.2 거부) + 회귀(rec 0.7·floor 0.9 legacy 일치, 0.445) 다섯 |
 | **F-2 (medium)** 출하 `budgetCaptureRounding` 대조 test 없음(6→2 변이 생존) | `DerivationPolicyDataTest`에 출하 인스턴스 `scaleDigits`·`mode` 직접 대조 test 추가 + `BudgetCaptureDerivationTest`에 정밀도 민감 표본(333,333,000/1,000,000,000 = 0.333333, scale 2 면 0.33 으로 달라짐) 추가 |
 | **F-3 (medium)** `floorHeadroomOf` KDoc 「legacy 와 사실상 같다」가 사실과 다름 | KDoc 정정(`MarginDerivation.kt`) — 실측 차(0.7225 대 0.5325) 명시, 「거동은 scope.md ③ 의 의도된 선택」으로 재서술. `policy-values.md` §3 「의도된 갈림」에도 등재 |
 | **F-4 (medium, 장부)** rollback.md 목록·계수 낡음, capability-map.md 누락 | rollback.md 「대상 파일 목록」·restore 명령에 `docs/discovery/capability-map.md` 추가, `git diff --name-status` 재산출(D/M 갱신) |
@@ -70,6 +70,24 @@ in_scope 밖이라(scope.md) 이 레인이 직접 편집하지 않는다.
 | **F-7 (low)** legacy 2자리 반올림 미재현 | `policy-values.md` §3 「의도된 갈림」에 등재(의도된 재설계, 값 손실 미실측) |
 | **F-8 (low, 계약)** D-4B5-3 「경계 의미는 같다」 부정확 | scope.md 는 팀장(세션 모델) 소유라 이 레인이 수정하지 않는다 — **팀장이 커밋 `9817dda`로 직접 정정, 닫힘** |
 
+## verifier r2 반영(ready-for-review, 재작업 1/5 확정) — G-1(medium)
+
+r1 의 F-1 수정이 「판정층 짝은 상류(2B `D-2B-8`·4D-1 `ContractViolation`)」라고 세 자리
+(KDoc·policy-values.md·checklist)에 같은 문장을 적었는데, verifier r2 실측: 그 주장은
+`recommendedRate`·`predictedRate` 에서는 **참**(`ParsedSuccessFields.toRateOrNull` 이
+`>1` 을 `null` 로 접어 `Unavailable(ContractViolation)` — `PredictionContractTest` 확인)
+이지만 `floorRate` 에서는 **거짓**이다 — 상류가 4D-1 gRPC 가 아니라 `Notice.floorRate`
+이고, `FloorRate`(`init` 없음)·`Canonicalize.kt`(`ofPercent`, 상한 검사 없음)·
+`NoticeReconstruction.kt`(`ofFraction`, DB 열 그대로) 어디에도 `≤ 1` 이 없다(shared-kernel·
+procurement·adapters 전수 grep 0건). 즉 `floorRate` 축에서는 `MarginInputs.init` 이
+「마지막 안전판」이 아니라 **유일한 관문**이다.
+
+**처분(verifier r2 권고 (1) 채택)**: `DerivationInputs.kt` KDoc 을 축별로 갈라 정정 —
+rec·pred 는 「이미 있는 관문의 마지막 안전판」, floor 는 「이 `init` 이 유일한 관문」.
+`DerivationAbsence.FloorRateOutOfRange` 신설(사유 어휘만, 4B-6 이 `Notice.floorRate > 1`
+을 `MarginInputs` 생성 **전에** 걸러 이 사유로 내야 한다 — D-4B6-4 로 인계, 코드 로직
+변경 없음·기존 test 무변경). 아래 「알려진 제한」·`init ↔ 판정층 짝` 표에 등재.
+
 ## `init` ↔ 판정층 짝 (설계 검토 대응)
 
 | 값 타입 `init` | 판정층 짝 |
@@ -77,22 +95,27 @@ in_scope 밖이라(scope.md) 이 레인이 직접 편집하지 않는다.
 | `Band`(값 자체는 제약 없음, 순서는 `Ladder` 가 짊어짐) | `Ladder.init`(단조)이 밴드 조합 자체를 판정 — 타입 쌍이 같은 파일 안에서 닫힌다 |
 | `KeywordHits.count >= 0` | 문자열 매칭(카운트 산출)은 4B-6 — 그 카운터가 이 하한을 지키는지는 4B-6 책임(`checklist` 알려진 제한으로 아래 명시) |
 | `DerivationPolicyData`(가중치 합·범위·단조) | `DERIVATION_POLICY.resolve(...)` 출하 인스턴스 자신이 이 `init`을 통과해야 컴파일·런타임 둘 다 서므로 짝이 같은 파일(`DerivationPolicyDataTest`)에 있다 |
+| `MarginInputs`(`recommendedRate`·`floorRate`·`predictedRate` `≤ 1`, verifier r1 F-1·r2 G-1) | **축별로 다르다**(r2 실측) — `recommendedRate`·`predictedRate` 는 상류 4D-1 `ParsedSuccessFields.toRateOrNull`(+`PredictionContractTest`)이 이미 강제하는 값의 마지막 안전판. `floorRate` 는 상류 관문이 **없다**(`Notice.floorRate`·`Canonicalize`·`NoticeReconstruction` 전수 grep 0건) — 이 `init` 이 유일한 관문이고, 짝은 **4B-6 이 `MarginInputs` 생성 전에 두는 필터**(`Absent(FloorRateOutOfRange)`, D-4B6-4)로 인계한다 |
 
 ## 알려진 제한
 
 - **⑤ `deriveCompetitiveness` 미구현**(위 계약 갱신 #1) — `OPEN-4B5-COMPETITIVENESS`(scope.md
-  신설, capability-map §14 등재는 팀장 소관). 시장 평균 fact 의 정의·수집(M3 후속 —
-  개찰 결과 집계 축)이 먼저 있어야 이 함수가 의미를 갖는다.
+  신설, `docs/discovery/capability-map.md` §14 등재 완료 — 커밋 `0085d44`, 팀장 지시로
+  이 레인이 등재). 시장 평균 fact 의 정의·수집(M3 후속 — 개찰 결과 집계 축)이 먼저
+  있어야 이 함수가 의미를 갖는다.
 - **fact 획득·`Clock`·문자열 매칭·workload 집계·추천가 산출은 4B-6 소관** — 이 slice는
   이미 계산된 값(`Duration?`·`Money?`·`UnitScore?`·`KeywordHits`)만 받는다.
 - **`KeywordHits.count` 하한만 이 slice가 검증**한다 — 실제 카운트 산식(키워드 14개
   목록)은 4B-6 이 짓고, 그 카운터가 이 `init` 을 지키는지는 4B-6 evidence 가 확인한다.
 - **corpus 없음** — `OPEN-4B5-CORPUS`(밴드·합성 전수 표의 corpus 승격, 병합 뒤 curator).
-- **정책 값 승인 대기** — `OPEN-4B5-POLICY-VALUES`(`policy-values.md`), §4
-  `budgetCaptureRounding` 은 legacy 값이 아니라 구조적 placeholder(정밀도 민감도
-  실측 없음).
-- **`budgetCaptureRounding` 스케일(6)의 근거가 실측이 아니다** — 위와 같음, 승인
-  대상.
+- **`floorRate` 상류 관문 부재 — 4B-6 인계**(verifier r2 G-1) — `Notice.floorRate > 1`
+  인 공고가 오면 `MarginInputs.init` 이 `IllegalArgumentException` 으로 막는다(값은
+  옳게 막지만 실패 형태가 이 slice 어휘 밖이다). **4B-6 조합기가 `MarginInputs` 생성
+  전에 이 값을 걸러 `Absent(FloorRateOutOfRange)` 로 내야 한다**(D-4B6-4) — 사유
+  어휘(`DerivationAbsence.FloorRateOutOfRange`)만 이 slice가 신설했다.
+- **`budgetCaptureRounding`(scale 6) 은 legacy 값이 아니라 구조적 placeholder** —
+  사용자 승인 2026-09-10 으로 값 자체는 확정됐으나, 정밀도 민감도(그 자리수가
+  결과를 얼마나 바꾸는가)는 실측하지 않았다.
 - **`renormalizedWeightedSum`(`MarginDerivation.kt`)과 4B-4 `weightedScoreOf`
   (`PriorityComposition.kt`)가 구조적으로 중복**(verifier r1 F-6) — 같은 알고리즘,
   `cpdCheck` 는 토큰 문턱 아래라 통과한다. 4B-4 파일 편집 금지가 이 slice의 계약이라
@@ -107,8 +130,21 @@ in_scope 밖이라(scope.md) 이 레인이 직접 편집하지 않는다.
 
 ## 재작업
 
-1/5(verifier r1 not-ready → 수정 반영).
+1/5(verifier r1 not-ready → 수정 반영. verifier r2 ready-for-review — G-1 은 등재 후
+일괄 처리 대상이라 새 라운드로 세지 않는다).
 
-## 사용자 승인
+## 사용자 승인 2026-09-10
 
-(대기)
+verifier r2 `ready-for-review`(산출물 blocker/high 0, G-1·F-6·F-7 은 등재 후 일괄 대상)
+위에서 승인 셋:
+
+① **slice 4B-5 종결.**
+② **정책 값 승인** — `OPEN-4B5-POLICY-VALUES` 종결. 밴드 넷(urgency·complexity-deadline·
+complexity-budget)·가중치 둘(margin·complexity)·상수 다섯·`budgetCaptureRounding`(scale
+6) 전부, 그리고 「의도된 갈림」 셋(`Rate ≤ 1` 거부·`floor=1` legacy 이탈·2자리 반올림
+미재현, `policy-values.md` §3)을 포함해서다. 정본은 `reports/evidence/m4/4b5/policy-values.md`.
+③ **병합 진행**(팀장 실행, 대상 `m4/2026-09-08`).
+
+**재작업 1/5**(medium·low 일괄 반영 커밋은 라운드로 세지 않는다). G-1(medium)은 이
+커밋에서 코드 어휘(`DerivationAbsence.FloorRateOutOfRange`)만 신설하고, 실제 필터링은
+D-4B6-4 로 4B-6 에 인계한다 — 4B-6 착수 계약이 그 의무를 받는다.

@@ -408,8 +408,42 @@ placeholder — 승인 대기(`OPEN-4B4-POLICY-VALUES`) · `similarity`는 성�
 없다는 것**(legacy는 예산을 sentinel로 썼다)이다. 처분은 ⑦과 같은 축의 상수
 `competitivenessNotCollected(): DerivationOutcome<UnitScore> = Absent(MarketAverageMissing)`
 하나 — `DerivationPolicyData`에도 competitiveness 필드를 두지 않는다(소비자 없는 필드
-금지). `OPEN-4B5-COMPETITIVENESS`(시장 평균 fact의 정의·수집·shared-kernel basis 결정)의
-capability-map §14 등재는 팀장(세션 모델) 소관 — 그 문서는 이 slice의 in_scope 밖이다.
+금지). `OPEN-4B5-COMPETITIVENESS`(시장 평균 fact의 정의·수집·shared-kernel basis 결정)를
+capability-map §14에 등재했다(커밋 `0085d44`, 계약 갱신 5로 그 문서가 in_scope에 편입된
+뒤 팀장 지시로 이 레인이 등재).
+
+**4B-5 verifier r1 not-ready → r2 ready-for-review** — r1이 high 하나를 냈다: ③
+`deriveExpectedMargin`이 상한 없는 `Rate`(shared-kernel ADR 0002 D-4, 의도된 설계)를
+clamp하지 않아 `floor>1`에서 headroom이 legacy보다 낙관적으로(0.715 대 0.515) 뒤집혔다
+(F-1). `MarginInputs.init`에 `recommendedRate`·`floorRate`·`predictedRate ≤ 1` 불변식을
+추가해 닫았다 — legacy의 `max(0,min(1,·))` 조용한 클램프 대신 D-4B5-1 방향(값을 자르지
+않고 거부)을 따랐다. medium 셋(출하 `budgetCaptureRounding` 대조 test 부재·KDoc 부정확
+주장·rollback 장부 낡음)과 low 셋(SHA 낡음·4B-4 구조 중복·legacy 반올림 미재현)도 같은
+라운드에서 반영했다. r2가 「판정층 짝은 상류(4D-1)」 주장을 축별로 재검증해
+`recommendedRate`·`predictedRate`는 참(4D-1 `ParsedSuccessFields.toRateOrNull`이 이미
+강제)이나 `floorRate`는 상류 관문이 전혀 없음을 발견했다(G-1, medium) — `Notice.floorRate`
+·`Canonicalize`·`NoticeReconstruction` 어디에도 `≤1` 검사가 없다. 사유 어휘
+`DerivationAbsence.FloorRateOutOfRange`만 이 slice가 신설하고, 실 필터링(`MarginInputs`
+생성 전에 `floorRate>1`을 걸러 `Absent`로 냄)은 **D-4B6-4로 4B-6에 인계**했다.
+
+**4B-5 종결 2026-09-10(사용자 승인)** — verifier r2 `ready-for-review`(산출물 blocker/
+high 0) 위에서 승인 셋: ① slice 종결 ② 정책 값 승인(`OPEN-4B5-POLICY-VALUES` 종결 —
+밴드 넷·가중치 둘·상수 다섯·`budgetCaptureRounding`(scale 6)·「의도된 갈림」 셋 전부,
+정본 `reports/evidence/m4/4b5/policy-values.md`) ③ 병합 진행(대상 `m4/2026-09-08`,
+팀장 실행). **재작업 1/5**(medium·low 일괄 반영은 라운드로 세지 않는다, evidence
+`reports/evidence/m4/4b5/checklist.md` 「사용자 승인」 절).
+
+**알려진 제한(종결 시점)**: ⑤ `deriveCompetitiveness` 미구현(`OPEN-4B5-COMPETITIVENESS`,
+시장 평균 fact 정의·수집이 M3 후속) · `floorRate` 상류 관문 부재 — 4B-6이
+`Absent(FloorRateOutOfRange)`로 필터링해야 한다(G-1 인계, D-4B6-4) · corpus 없음
+(`OPEN-4B5-CORPUS`, 병합 뒤 curator) · `renormalizedWeightedSum`과 4B-4
+`weightedScoreOf`가 구조적으로 중복(F-6, 4B-4 파일 편집 금지라 이 slice에서 합치지
+않음 — 4B-6 소관) · legacy와의 「의도된 갈림」 셋(`Rate≤1` 거부·`floor=1`에서 legacy
+이탈·2자리 반올림 미재현, `policy-values.md` §3) · `KeywordHits` 하한만 검증(실제
+카운트 산식은 4B-6).
+
+**다음은 4B-6**(조합기 `OpportunityAnalysis`·port 셋·텍스트 합성 규약, 계약은 팀장이
+별도 작성).
 
 ### Slice 4C — event/outbox
 

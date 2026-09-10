@@ -179,3 +179,17 @@ evidence로 반영했다(`_workspace/m4-4b5/04_verifier_report.md`).
 - exit: 0 — `BUILD SUCCESSFUL`. 임시 clone·worktree 전부 실측 뒤 삭제.
 - cmd: `git status --porcelain -- <in_scope 6경로>`
 - exit: 0, 출력 없음 — clean-tree 최종 확인.
+
+## 사용자 승인 2026-09-10 — 종결 등재(verifier r2 G-1 반영, D-4B6-4 인계)
+
+- cmd: `./gradlew --no-daemon :decision:compileKotlin :decision:test --tests 'bidvector.decision.priority.derive.*'`
+- exit: 0 — `DerivationAbsence.FloorRateOutOfRange` 신설·`DerivationInputs.kt` KDoc 축별
+  정정·`DerivationPolicyData.kt` 승인 문면 갱신 뒤에도 71 tests 무변경 GREEN(코드 로직
+  변경 없음, 값·분기 동일).
+- cmd: `git log --oneline 9eddf7525b74f89ce279acbb3adf4948f05c25f1..HEAD -- CLAUDE.md .claude/`
+- exit: 0(출력 없음) — 하네스 레인 변경 재확인.
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4b5/ decision/src/main/kotlin/bidvector/decision/priority/derive decision/src/test/kotlin/bidvector/decision/priority/derive milestone-4.md`
+- exit 1(매치 없음, 이 절 자체를 아직 커밋하기 전 실행이라 자기 인용도 없음) — secret 스캔.
+- cmd: `grep -rn "4b5/scope\.md:[0-9]\|milestone-4\.md:[0-9]\|4b5/checklist\.md:[0-9]\|4b5/policy-values\.md:[0-9]\|4b5/commands\.md:[0-9]\|4b5/rollback\.md:[0-9]" --include='*.md' --include='*.kt' .`
+- exit: 1(매치 없음) — 좌표 역방향 파급 없음(scope.md·checklist.md·policy-values.md·
+  milestone-4.md 전부 편집했으나 `file:line` 인용으로 이 문서들을 가리키는 곳은 0건).

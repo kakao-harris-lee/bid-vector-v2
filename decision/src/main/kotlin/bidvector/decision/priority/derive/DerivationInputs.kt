@@ -16,12 +16,25 @@ import java.time.Duration
  * 여기 두지 않는다」). 1 을 넘는 율이 이 타입을 통과하면 `floorHeadroomOf`(분모 `1 − floor`)
  * 가 부호를 두 번 뒤집어 legacy 보다 **낙관적인**(높은) 마진으로 새는 결함이 있었다
  * (실측: `rec=0.9, floor=1.2` → V2 `0.715` vs legacy `0.515`). 이 `init` 이 그 값을 「불가능한
- * 상태」로 닫는다 — **판정층 짝은 상류(4D-1)에 있다**: `Rate` 가 `≤ 1` 을 보장하는 계약
- * 경계는 2B `D-2B-8`(*"`Rate.fraction` 이 `1` 초과면 계약 위반(`INVALID_REQUEST`)"*)이고,
- * gRPC 응답이 그 경계를 어기면 4D-1 이 `BidPredictionOutcome.Unavailable(ContractViolation)`
- * 로 접는다 — 이 `init` 은 그 계약이 이미 강제하는 값의 **마지막 안전판**이지 새 정책이
- * 아니다. legacy 의 `max(0, min(1, ·))` 클램프는 **재현하지 않는다**(D-4B5-1 방향 — 값을
- * 조용히 자르는 대신 거부한다, `policy-values.md` §3).
+ * 상태」로 닫는다.
+ *
+ * **판정층 짝은 축마다 다르다(verifier r2 G-1 정정 — r1 의 「상류에 있다」는 한 축에만
+ * 맞았다)**:
+ * - `recommendedRate`·`predictedRate` — 상류에 **이미 있는 관문**의 마지막 안전판이다.
+ *   2B `D-2B-8`(*"`Rate.fraction` 이 `1` 초과면 계약 위반(`INVALID_REQUEST`)"*)이 계약을
+ *   걸고, `bidvector.adapters.ml.ParsedSuccessFields.toRateOrNull()` 이 `> 1` 이면 `null`
+ *   을 내 `BidPredictionOutcome.Unavailable(ContractViolation)` 으로 접는다(`PredictionContractTest`
+ *   가 `1.0000` 통과·`1.0001` 거부를 고정).
+ * - `floorRate` — **이 `init` 이 유일한 관문이다.** 상류는 4D-1 gRPC 가 아니라
+ *   `Notice.floorRate`(`FloorRate`)이고, `FloorRate`(`init` 없음)·`Canonicalize.kt`
+ *   (`Rate.ofPercent` 변환만, 상한 검사 없음)·`NoticeReconstruction.kt`(DB 열을
+ *   `Rate.ofFraction` 으로 그대로 감쌈) 어디에도 `≤ 1` 이 없다(shared-kernel·procurement·
+ *   adapters 전수 grep 0건). **4B-6 인계**(checklist 「알려진 제한」) — `MarginInputs`
+ *   생성 전에 `Notice.floorRate > 1` 을 걸러 [DerivationAbsence.FloorRateOutOfRange] 로
+ *   내야 한다. 이 `init` 은 그 관문이 배선되기 전까지의 마지막 방어선이다.
+ *
+ * legacy 의 `max(0, min(1, ·))` 클램프는 **재현하지 않는다**(D-4B5-1 방향 — 값을 조용히
+ * 자르는 대신 거부한다, `policy-values.md` §3).
  */
 data class MarginInputs(
     val recommendedRate: Rate,

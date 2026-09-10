@@ -57,7 +57,7 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline 9eddf7525b74f89ce279acbb3adf4948f05c25f1..HEAD -- CLAUDE.md .claude/` — 착수 시 **없음**.
+`git log --oneline 9eddf7525b74f89ce279acbb3adf4948f05c25f1..HEAD -- CLAUDE.md .claude/` — 착수 시 **없음**. **사용자 승인 시점(2026-09-10) 재실행 — 여전히 없음**(출력 0줄, evidence `reports/evidence/m4/4b5/commands.md`).
 
 ---
 
@@ -83,7 +83,7 @@ rollback: |
 | ID | 판단 | 근거 | 상태 |
 | --- | --- | --- | --- |
 | **D-4B5-1** | legacy sentinel(중립 0.5·capacity 0·예산 대체)은 `Absent(reason)` — 4B-4 재정규화가 흡수. 부재 사유는 `MlUnavailableReason` 이 아니라 **별도 sealed `DerivationAbsence`**(ML 미가용이 아니라 fact 부재) | §6.3 · 4B-4 D-4B4-1 | 계약 고정 |
-| **D-4B5-2** | 「마감 미공시」는 부재가 아니라 값(0.3 둘) — legacy 별도 상수(`URGENCY_SCORE_UNKNOWN`·`_DEADLINE_MISSING_COMPLEXITY_SIGNAL`)의 의도된 점수. 정책값·승인 대상 | `allocation.py:47-48`·`score_tables.py` | 착수 가정 |
+| **D-4B5-2** | 「마감 미공시」는 부재가 아니라 값(0.3 둘) — legacy 별도 상수(`URGENCY_SCORE_UNKNOWN`·`_DEADLINE_MISSING_COMPLEXITY_SIGNAL`)의 의도된 점수. 정책값 | `allocation.py:47-48`·`score_tables.py` | **확정 — 사용자 승인 2026-09-10**(`OPEN-4B5-POLICY-VALUES` 종결과 함께) |
 | **D-4B5-3** | 시간 밴드는 `Duration` 비교, 상한 포함(`≤`) — 시 단위 정수 변환 없음. **경계 의미는 legacy 와 같지 않다**(verifier r1 F-8 정정): legacy 는 `deadline_hours_remaining` 을 정수로 잘라 6시간 1분도 `6 ≤ 6` 으로 1.0 밴드에 넣지만, V2 는 `PT6H1M > PT6H` 라 다음 밴드(0.8)다. 잘림을 재현하지 않는다 — 잘림은 sentinel 과 같은 정보 손실이고, 밴드 값 자체가 승인 대상 정책이라 경계 정의도 그 안에서 확정한다(`intentional-redesign`) | 조사 · verifier r1 F-8 | 계약 고정 — 문면 정정 2026-09-10 |
 | **D-4B5-4** | 금액 비교·비율은 shared-kernel 산술만(`BidAmount.bidRateAgainst(BaseAmount)`·`Money` 비교) — `double`/`BigDecimal` 직접 나눗셈 금지(1B 교차 대입 방지) | 1B · api-type-policy | 계약 고정 |
 | **D-4B5-5** | ④ keyword 14개 목록은 **4B-6**(문자열 매칭 소유)의 정책 데이터 — 이 slice 는 `KeywordHits(count ≥ 0)` 만 | 층 분리 | 계약 고정 |
@@ -109,10 +109,19 @@ rollback: |
 | OPEN | 처리 |
 | --- | --- |
 | `OPEN-4D-LADDER-SCORE-SOURCE`(결정 (a), 분해) | 4B-5 = Kotlin 성분 파생 — 잔여 4B-6(조합기·port·합성)·M5 provider·4D-2 |
-| **`OPEN-4B5-POLICY-VALUES`**(신설) | ⑧ 값 — 종결 승인 시 확정 |
+| ~~`OPEN-4B5-POLICY-VALUES`~~(신설) | **종결 — 사용자 승인 2026-09-10.** ⑧ 값(밴드 넷·가중치 둘·상수 다섯·`budgetCaptureRounding` scale 6) + 「의도된 갈림」 셋(`policy-values.md` §3) 전부 확정. 정본 `reports/evidence/m4/4b5/policy-values.md` |
 | **`OPEN-4B5-CORPUS`**(신설) | 밴드·합성 전수 표의 corpus 승격 — 병합 뒤 curator |
 | STR-05 | `후속` 그대로 — 슬롯도 만들지 않는다 |
-| **`OPEN-4B5-COMPETITIVENESS`**(신설, 계약 갱신 1) | ⑤ 는 이 slice 에서 **구현하지 않는다** — 상수 `Absent(MarketAverageMissing)` 만 |
+| **`OPEN-4B5-COMPETITIVENESS`**(신설, 계약 갱신 1) | ⑤ 는 이 slice 에서 **구현하지 않는다** — 상수 `Absent(MarketAverageMissing)` 만. `capability-map.md` §14 등재 완료(커밋 `0085d44`) |
+| **G-1**(verifier r2 신설, medium) | `MarginInputs.floorRate` 에는 상류 판정층 짝이 없다 — `DerivationAbsence.FloorRateOutOfRange` 사유 어휘만 이 slice가 신설, 실제 필터링은 **D-4B6-4 로 4B-6 인계** |
+
+## 병합 결정
+
+**사용자 승인 2026-09-10** — verifier r2 `ready-for-review`(산출물 blocker/high 0) 위에서
+① slice 종결 ② 정책 값 승인(위 `OPEN-4B5-POLICY-VALUES` 종결) ③ **병합 진행**(대상
+`m4/2026-09-08`, 팀장 실행). 이 레인은 push·병합을 실행하지 않는다 — 팀장이 진행한다.
+**재작업 1/5**(medium·low 일괄 반영 커밋은 라운드로 세지 않는다, evidence
+`reports/evidence/m4/4b5/checklist.md` 「사용자 승인 2026-09-10」 절).
 
 ---
 

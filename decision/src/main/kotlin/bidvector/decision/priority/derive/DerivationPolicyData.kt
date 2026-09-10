@@ -87,14 +87,19 @@ private fun <K> requireFullWeightMap(
 }
 
 /**
- * 운영 정책 인스턴스 — **착수 시(2026-09-10) placeholder, 승인 대기**(`OPEN-4B5-POLICY-VALUES`).
- * 값은 legacy 산식 상수 그대로다(D-4B5-2 예외 외에는 4B-4 와 달리 확률 축을 빼는 재정규화가
- * 없다 — 이 축들은 legacy 에서부터 이미 독립 가중합이었다). 근거는
- * `reports/evidence/m4/4b5/policy-values.md`(legacy 좌표 대조).
+ * 운영 정책 인스턴스 — **사용자 승인 2026-09-10으로 확정됐다**(`OPEN-4B5-POLICY-VALUES` 종결).
+ * 착수 시(2026-09-10)에는 구조 검증용 placeholder였으나(근거는 실측이 아니라 legacy 값
+ * 그대로, ADR 0010 D-1 「보수적 상한 + 측정 의무」), slice 4B-5 종결 승인과 함께 이 값
+ * 자체가 승인됐다 — 밴드 넷·가중치 둘·상수 다섯·`budgetCaptureRounding`(scale 6) 전부,
+ * 「의도된 갈림」 셋(`Rate ≤ 1` 거부·`floor=1` legacy 이탈·2자리 반올림 미재현)을 포함한다.
+ * 값은 legacy 산식 상수 그대로다(D-4B5-2 예외 외에는 4B-4 와 달리 확률 축을 빼는
+ * 재정규화가 없다 — 이 축들은 legacy 에서부터 이미 독립 가중합이었다). 정본은
+ * `reports/evidence/m4/4b5/policy-values.md` — 값을 바꾸려면 그 문서를 먼저 갱신한다
+ * (3A `KONEPS_COLLECTION_POLICY`·4B-4 `PRIORITY_POLICY` 관례).
  */
 val DERIVATION_POLICY: EffectiveDatedPolicy<DerivationPolicyData> =
     EffectiveDatedPolicy(
-        source = "reports/evidence/m4/4b5/policy-values.md — 착수 placeholder, 승인 대기 OPEN-4B5-POLICY-VALUES",
+        source = "reports/evidence/m4/4b5/policy-values.md — 사용자 승인 2026-09-10",
         entries =
             listOf(
                 EffectiveFrom.Initial to
