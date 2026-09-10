@@ -269,11 +269,47 @@ def test_success_testdata_embedding_is_acceptable(embedding_pb2):
 
 
 def test_dimension_mismatch_violates_the_contract_invariant(embedding_pb2):
+    # verifier r1 F-2(high) — 이전 판은 `del values[0]`로 원소를 "떼기만" 했다. 그러면
+    # `dimension`(4)은 그대로인데 남은 3원소의 norm 도 함께 무너져(0.866) **norm 항에서
+    # 먼저 걸리고 dimension 항은 확인력이 0**이었다(가드를 지워도 전건 통과 — 실측). 여기서는
+    # `dimension` 필드는 testdata 원본 그대로(4) 두고 `values`만 L2 정규화된 **3원소**
+    # (1/√3 씩, norm=1)로 바꿔 norm 항은 통과·dimension 항만 단독으로 걸리게 한다.
     response = embedding_pb2.EmbedTextResponse()
     response.ParseFromString(_read("embed_text_response_success.binpb"))
-    del response.success.values[0]
+    normalized_three_elements = [float(Decimal(1) / Decimal(3).sqrt())] * 3
+    del response.success.values[:]
+    response.success.values.extend(normalized_three_elements)
     epsilon = Decimal(_policy_value("embedding.norm.epsilon"))
+
+    # 자기 검증 — 이 3원소 자체가 정규화가 맞다는 것을 dimension 을 3으로 맞춘 사본으로
+    # 먼저 확인한다(norm 항이 실제로 통과함을 증명해야 아래 단언이 dimension 항 단독의
+    # 결과임을 믿을 수 있다).
+    dimension_corrected = embedding_pb2.Embedding()
+    dimension_corrected.CopyFrom(response.success)
+    dimension_corrected.dimension = 3
+    assert _is_acceptable_embedding(dimension_corrected, epsilon)
+
     assert not _is_acceptable_embedding(response.success, epsilon)
+
+
+def test_embed_text_dimension_matches_metadata_dimension(embedding_pb2):
+    # 설계 검토 (1)·scope.md ② — 「차원은 응답이 나르고 client 는
+    # GetEmbeddingMetadata.dimension 과 대조(불일치 = 계약 위반)」의 실제 대응 test
+    # (verifier r1 F-2 미구현 지적 반영, 이전 판에는 이 대조가 없었다).
+    embed_response = embedding_pb2.EmbedTextResponse()
+    embed_response.ParseFromString(_read("embed_text_response_success.binpb"))
+    metadata_response = embedding_pb2.GetEmbeddingMetadataResponse()
+    metadata_response.ParseFromString(_read("get_embedding_metadata_response.binpb"))
+    assert _embedding_dimension_matches_metadata(embed_response.success, metadata_response.metadata)
+
+
+def test_metadata_dimension_mismatch_must_be_rejected_by_client(embedding_pb2):
+    embed_response = embedding_pb2.EmbedTextResponse()
+    embed_response.ParseFromString(_read("embed_text_response_success.binpb"))
+    metadata_response = embedding_pb2.GetEmbeddingMetadataResponse()
+    metadata_response.ParseFromString(_read("get_embedding_metadata_response.binpb"))
+    metadata_response.metadata.dimension = embed_response.success.dimension + 1
+    assert not _embedding_dimension_matches_metadata(embed_response.success, metadata_response.metadata)
 
 
 def test_unnormalized_vector_violates_the_contract_invariant(embedding_pb2):
@@ -326,10 +362,17 @@ def test_success_testdata_release_is_non_blank(embedding_pb2):
     assert _is_model_release_non_blank(response.success.release)
 
 
-def test_release_with_blank_component_violates_the_contract_invariant(embedding_pb2):
+@pytest.mark.parametrize(
+    "component",
+    ["release_id", "artifact_checksum", "feature_schema_version", "code_version", "dataset_id"],
+)
+def test_release_with_blank_component_violates_the_contract_invariant(embedding_pb2, component):
+    # verifier r1 F-3(medium) — 이전 판은 `dataset_id` 하나만 변이했다. 4D-1
+    # `SuccessShapeFailClosedTest`(Kotlin main)의 같은 규칙은 다섯 성분을 각각 덮는다 —
+    # 이 slice도 같은 커버리지로 맞춘다(파라미터화, 성분당 1건).
     response = embedding_pb2.EmbedTextResponse()
     response.ParseFromString(_read("embed_text_response_success.binpb"))
-    response.success.release.dataset_id = ""
+    setattr(response.success.release, component, "")
     assert not _is_model_release_non_blank(response.success.release)
 
 
@@ -413,3 +456,9 @@ def _is_model_release_non_blank(release) -> bool:
         and release.code_version.strip()
         and release.dataset_id.strip()
     )
+
+
+def _embedding_dimension_matches_metadata(embedding, metadata) -> bool:
+    """scope.md ②·설계 검토 (1) — `EmbedText` 응답 dimension 과 `GetEmbeddingMetadata`
+    dimension 의 client 대조 규칙(Kotlin `embeddingDimensionMatchesMetadata`와 대칭)."""
+    return embedding.dimension == metadata.dimension

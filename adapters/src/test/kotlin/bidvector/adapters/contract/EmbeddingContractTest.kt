@@ -3,6 +3,7 @@ package bidvector.adapters.contract
 import contract.bidvector.ml.v1.EmbedTextRequest
 import contract.bidvector.ml.v1.EmbedTextResponse
 import contract.bidvector.ml.v1.Embedding
+import contract.bidvector.ml.v1.EmbeddingMetadata
 import contract.bidvector.ml.v1.EmbeddingServiceGrpcKt
 import contract.bidvector.ml.v1.GetEmbeddingMetadataRequest
 import contract.bidvector.ml.v1.GetEmbeddingMetadataResponse
@@ -13,6 +14,7 @@ import io.grpc.ManagedChannel
 import io.grpc.Server
 import io.grpc.inprocess.InProcessChannelBuilder
 import io.grpc.inprocess.InProcessServerBuilder
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
@@ -119,19 +121,33 @@ class EmbeddingContractTest {
     }
 
     @Test
-    fun `values 개수가 dimension 과 다르면 계약 불변식 위반이다`() {
-        // 반복 스칼라 필드(`float`)는 protoc-gen-java 가 `removeXxx(index)` 를 생성하지
-        // 않는다(메시지 타입 반복 필드에만 생성 — 2B `removeCandidates`와의 차이,
-        // 실측). `clearValues` + `addAllValues(축소된 목록)`로 우회한다.
+    fun `values 개수가 dimension 과 다르면 계약 불변식 위반이다(norm 은 1 로 유지)`() {
+        // verifier r1 F-2(high) — 이전 판은 `valuesList.drop(1)`로 원소를 "떼기만" 했다.
+        // 그러면 dimension(4)은 그대로인데 남은 3원소의 norm 도 0.866으로 같이 무너져
+        // **norm 항에서 먼저 걸리고 dimension 항은 확인력이 0**이었다(가드를 지워도
+        // 43개 test 전건이 그대로 통과 — 실측). 여기서는 `dimension` 필드는 testdata
+        // 원본 그대로(4) 두고 `values`만 L2 정규화된 **3원소**(1/√3 씩, norm=1)로 바꿔
+        // norm 항은 통과·dimension 항만 단독으로 걸리게 한다.
+        val normalizedThreeElements = List(3) { (1.0 / Math.sqrt(3.0)).toFloat() }
         val response = EmbedTextResponse.parseFrom(successBytes)
         val mutated =
             response
                 .toBuilder()
                 .also { builder ->
-                    val truncated = builder.successBuilder.valuesList.drop(1)
                     builder.successBuilder.clearValues()
-                    builder.successBuilder.addAllValues(truncated)
+                    builder.successBuilder.addAllValues(normalizedThreeElements)
                 }.build()
+
+        // 자기 검증 — 이 3원소 자체는 정규화가 맞다는 것을 dimension 을 3으로 맞춘
+        // 사본으로 먼저 확인한다(이 변이가 "norm 항은 실제로 통과"함을 증명, 그래야
+        // 아래 단언이 dimension 항 단독의 결과임을 믿을 수 있다).
+        val dimensionCorrected =
+            mutated.success
+                .toBuilder()
+                .setDimension(3)
+                .build()
+        isAcceptableEmbedding(dimensionCorrected, normEpsilon) shouldBe true
+
         isAcceptableEmbedding(mutated.success, normEpsilon) shouldBe false
     }
 
@@ -147,6 +163,25 @@ class EmbeddingContractTest {
                     builder.successBuilder.addAllValues(scaled)
                 }.build()
         isAcceptableEmbedding(mutated.success, normEpsilon) shouldBe false
+    }
+
+    // ---- metadata.dimension 대조(설계 검토 (1), verifier r1 F-2 미구현 지적) ----
+    // 「차원은 응답이 나르고 client 는 GetEmbeddingMetadata.dimension 과 대조(불일치 =
+    // 계약 위반)」(scope.md ②)의 실제 대응 test — 이전 판은 이 대조 자체가 없었다.
+
+    @Test
+    fun `testdata 의 EmbedText 응답 dimension 은 GetEmbeddingMetadata 의 dimension 과 같다`() {
+        val embedding = EmbedTextResponse.parseFrom(successBytes).success
+        val metadata = GetEmbeddingMetadataResponse.parseFrom(metadataBytes).metadata
+        embeddingDimensionMatchesMetadata(embedding, metadata) shouldBe true
+    }
+
+    @Test
+    fun `GetEmbeddingMetadata 의 dimension 이 다르면 client 가 거부해야 한다`() {
+        val embedding = EmbedTextResponse.parseFrom(successBytes).success
+        val metadata = GetEmbeddingMetadataResponse.parseFrom(metadataBytes).metadata
+        val mismatched = metadata.toBuilder().setDimension(embedding.dimension + 1).build()
+        embeddingDimensionMatchesMetadata(embedding, mismatched) shouldBe false
     }
 
     // ---- UNSPECIFIED·정의 밖 enum 정수 거부(fail-closed, ④) ----
@@ -200,15 +235,38 @@ class EmbeddingContractTest {
         isModelReleaseNonBlank(success.release) shouldBe true
     }
 
+    // verifier r1 F-3(medium) — 이전 판은 `datasetId` 하나만 변이했다. 4D-1
+    // `SuccessShapeFailClosedTest`(main)의 같은 규칙은 다섯 성분을 **각각** 덮는다
+    // (§「ModelReleaseRef」 표) — 이 slice도 같은 커버리지로 맞춘다. 성분 하나의 절을
+    // `isModelReleaseNonBlank`에서 지워도(`&&` 한 항 삭제) 다섯 case 중 그 성분 case만
+    // 놓치지 않고 걸린다.
+    private data class ReleaseBlankCase(
+        val label: String,
+        val blank: (EmbedTextResponse.Builder) -> Unit,
+    )
+
+    private val releaseBlankCases =
+        listOf(
+            ReleaseBlankCase("releaseId 공백") { it.successBuilder.releaseBuilder.releaseId = "" },
+            ReleaseBlankCase("artifactChecksum 공백") { it.successBuilder.releaseBuilder.artifactChecksum = "" },
+            ReleaseBlankCase("featureSchemaVersion 공백") { it.successBuilder.releaseBuilder.featureSchemaVersion = "" },
+            ReleaseBlankCase("codeVersion 공백") { it.successBuilder.releaseBuilder.codeVersion = "" },
+            ReleaseBlankCase("datasetId 공백") { it.successBuilder.releaseBuilder.datasetId = "" },
+        )
+
     @Test
-    fun `release 성분 하나라도 공백이면 계약 불변식 위반이다`() {
-        val response = EmbedTextResponse.parseFrom(successBytes)
-        val mutated =
-            response
-                .toBuilder()
-                .also { it.successBuilder.releaseBuilder.datasetId = "" }
-                .build()
-        isModelReleaseNonBlank(mutated.success.release) shouldBe false
+    fun `release 다섯 성분 중 하나라도 공백이면 계약 불변식 위반이다(성분별)`() {
+        releaseBlankCases.forEach { case ->
+            val mutated =
+                EmbedTextResponse
+                    .parseFrom(successBytes)
+                    .toBuilder()
+                    .also(case.blank)
+                    .build()
+            withClue(case.label) {
+                isModelReleaseNonBlank(mutated.success.release) shouldBe false
+            }
+        }
     }
 
     // ---- 실패 표본 — UNSUPPORTED_SCHEMA · INVALID_REQUEST(빈 텍스트) ----
@@ -291,4 +349,9 @@ class EmbeddingContractTest {
                 codeVersion.isNotBlank() &&
                 datasetId.isNotBlank()
         }
+
+    private fun embeddingDimensionMatchesMetadata(
+        embedding: Embedding,
+        metadata: EmbeddingMetadata,
+    ): Boolean = embedding.dimension == metadata.dimension
 }
