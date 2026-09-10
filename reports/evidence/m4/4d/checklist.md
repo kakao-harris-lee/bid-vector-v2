@@ -1,5 +1,41 @@
 # checklist.md — M4/4D-1 리뷰 준비도
 
+## 사용자 승인 — 2026-09-10
+
+**slice 4D-1 종결 승인.** 승인 넷:
+
+1. **slice 종결** — 이 slice의 산출물(`GrpcBidPredictionGateway`·`workflow.prediction` 값
+   타입 다수·`ResilientPredictionCall`(breaker+bounded retry)·`ReleaseCheck`·
+   `gate.tests.adapters`/`gate.tests.decision`/`gate.tests.workflow` 등재)을 최종 형태로
+   승인한다.
+2. **`OPEN-4D-LADDER-SCORE-SOURCE` = (a) 확정** — M2 계약을 `v1` 안에서 additive 확장(새
+   RPC)하고 M5 provider 를 동반한다. 귀결은 `scope.md` 「운영자 결정 필요」 절·
+   `capability-map.md` §14.3·`milestone-4.md` 4D 절에 반영(정본은 `scope.md`).
+3. **정책 값 승인(D-4D-7)** — `deadlineCeiling=5s`·`maxAttempts=3`·backoff `200ms/800ms`·
+   breaker `50%/10/30s`. 착수 placeholder였던 값 자체가 이제 운영 정책값이다
+   (`OPEN-4D-POLICY-VALUES` 종결). `OPEN-M2-DEADLINE-VALUES`는 5E 실측 뒤 정책 version
+   갱신 경로로 **활성 유지**(값의 옳음 자체는 이 승인의 대상이 아니다). 정본은
+   `reports/evidence/m4/4d/policy-values.md`(이 승인과 함께 갱신).
+4. **병합 진행** — 병합은 팀장이 이 등재 커밋 뒤에 실행한다. 이 slice(구현 레인)는
+   병합·push 를 하지 않는다.
+
+**승인의 근거 — verifier r4 `ready-for-review`.** r1~r3 세 라운드가 not-ready(F-1~F-10·
+G-1~G-6·H-1~H-6)였고, 되풀이의 뿌리는 「수정이 기존 골격의 계약을 모른 채 가지를
+하나 더하는」 형태였다(F-5→G-1 값 타입 `init`이 검증층 술어 없이 게이트를 뚫음,
+G-4→H-1 breaker permit 결말 가지 하나가 반납을 빠뜨림) — r3 는 술어 대신 함수 구조
+(`isAcceptableSuccessShape`·`settlePermit`의 `try`/`finally`)로 처방해 재발을 끊었다.
+r4 는 H-1~H-5 를 전부 실측으로 닫았고 잔여는 low 셋(I-1·I-2·I-3, 산출물 blocker/high
+없음)뿐이라 문서 등재만으로 종결했다(운영자 채택 2026-09-02 「장부층·low 는 등재만
+하고 라운드를 막지 않는다」).
+
+**재작업 카운터: 3/5 확정**(상한 5, 여유 2) — r4의 low 등재 커밋과 이 종결 등재
+커밋은 라운드로 세지 않는다(값 타입·검증층을 다시 만지지 않는 문서 전용 커밋, 위와
+같은 처리).
+
+**다음**: 브랜치 `m4-4d/2026-09-10`는 `m4/2026-09-08`(현재 `main`과 동일 커밋)에
+팀장이 병합한다(`scope.md` 「병합 결정」 절). 사다리 점수 경로(4D-2 에 해당)는 M2
+후속 slice + M5 provider slice로 별도 착수한다.
+
 ## 리뷰 요청 조건 (evidence-pack 스킬 기준)
 
 - [x] 구현 diff가 커밋되어 base/head 고정 — 커밋 뒤 `git status --porcelain -- <in_scope 경로>` 결과 없음(clean-tree 게이트, 양성 대조 포함).

@@ -350,6 +350,43 @@ client·deadline/cancel/breaker/bounded retry·domain↔DTO 매핑·**ML respons
 slice로 착수한다. 4D-1 산출물(gateway 자체)은 그 결정과 무관하게 그대로 필요하다 — 정본
 `reports/evidence/m4/4d/scope.md`.
 
+**verifier r1~r4(2026-09-10) → `ready-for-review`.** 세 라운드(r1~r3)가 `not-ready`였다
+— r1 F-1~F-10(백오프 미구현·release provenance 공백 유출 등, high 둘) · r2 G-1~G-6(F-5
+수정이 값 타입 `init` 위반을 예외로 새게 한 새 high 둘·rollback 목록 누락) · r3
+H-1~H-6(G-4 수정이 breaker HALF_OPEN permit 을 반납하지 않아 회복 불가능한 OPEN 을
+만든 새 high 하나·rollback 목록 3회차 누락). **되풀이의 뿌리**는 수정이 기존 골격의
+계약을 모른 채 가지를 하나 더하는 형태(F-5→G-1, G-4→H-1)였다 — r3 는 술어·가지 추가
+대신 구조로 처방했다(`isAcceptableSuccessShape` 구조 검증층이 값 타입 `init`보다 먼저
+걸리게, `settlePermit`의 `try`/`finally`가 breaker permit 결말을 강제하게) — 이후
+새 결함이 재발하지 않았다. r4는 H-1~H-5를 전부 닫고 잔여 low 셋(I-1·I-2·I-3, 산출물
+blocker/high 없음)만 남겨 `ready-for-review`를 냈다. **재작업 카운터 3/5**(상한 5) —
+r1·r2·r3 세 라운드만 셈, r4의 low 등재와 이 종결 등재는 문서 전용 커밋이라 세지 않는다
+(운영자 채택 2026-09-02 「장부층·low는 등재만 하고 라운드를 막지 않는다」).
+
+**4D-1 종결 2026-09-10(사용자 승인) · `OPEN-4D-LADDER-SCORE-SOURCE` = (a) 확정 ·
+정책 값 확정** — verifier r4 `ready-for-review`(산출물층 blocker/high 0) 위에서 승인
+(evidence `reports/evidence/m4/4d/checklist.md` 「사용자 승인」 절). 승인 넷: ① slice
+종결 ② `OPEN-4D-LADDER-SCORE-SOURCE` = (a) M2 계약을 `v1` 안에서 additive 확장 + M5
+provider(사다리 점수 경로는 M2 후속 slice + M5 provider slice로 착수, 그때까지 4B-2
+`MlAnalysisPort`는 착수 가정 (c) 유지) ③ 정책 값(`deadlineCeiling=5s`·`maxAttempts=3`·
+backoff `200ms/800ms`·breaker `50%/10/30s`) — 착수 placeholder였던 값 자체가 확정돼
+`OPEN-4D-POLICY-VALUES` 종결(정본 `reports/evidence/m4/4d/policy-values.md`),
+`OPEN-M2-DEADLINE-VALUES`는 5E 실측 뒤 정책 version 갱신 경로로 활성 유지 ④ 병합은
+팀장이 이 종결 등재 뒤 실행 — `m4/2026-09-08`(현재 `main`과 동일 커밋) 대상.
+
+**알려진 제한(종결 시점)**: 실 servicer 부재(M5 5E 미착수, fake servicer로만 증명) ·
+요청 조립·경쟁 표본 정제는 4B 후속(`BidPredictionRequest`를 실제로 만드는 호출부 없음) ·
+정책 값 실측은 5E(`OPEN-M2-DEADLINE-VALUES`) · `ManagedChannel` 생성·TLS·인증은 M6 ·
+`init`↔검증층 짝 대조 table은 손 유지라 새 `init` 조건은 못 잡는다(verifier r4 I-1,
+현재 짝 없는 조건 0) · 게이트 완전성 test는 파일명으로 discover한다(verifier r4 I-2,
+파일당 class 하나 관례에 의존).
+
+**4D-2 예고** — 사다리 점수(priority·probability·matched) 경로는 이 승인으로 M2 후속
+slice(opportunity-analysis RPC를 2A~2D 절차로 additive 확장) + M5 provider slice로
+착수한다. 4B-2 `MlAnalysisPort`의 미가용 값 표현·`analyze`의 suspend 전환은 그 후속
+slice 계약에서 다룬다 — 이 milestone 문서의 4D 절은 4D-1로 종결되고, 사다리 점수
+경로는 별도 slice 번호로 이어진다.
+
 ### Slice 4E — notification adapter contract
 
 - delivery request와 rendered content 분리

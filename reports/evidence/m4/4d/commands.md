@@ -338,3 +338,15 @@
 - exit: 1(매치 0)
 - cmd: `grep -rnE '\.kt:[0-9]+' reports/evidence/m4/4d/ _workspace/m4-4d/03_impl_report.md`
 - exit: 1(매치 0)
+
+## 사용자 승인 2026-09-10 — 종결 등재(코드 로직 무변경, source 문면·문서만)
+
+- cmd: `:adapters:compileKotlin` (`MlCallPolicyData.kt`의 `ML_CALL_POLICY.source`·KDoc
+  갱신 뒤 — 값 자체는 무변경)
+- exit: 0
+- cmd: `:adapters:test --tests 'bidvector.adapters.ml.*'`(S-2a)
+- exit: 0 — `MlCallPolicyDataTest`의 출하 값 단언(§1·§2·§3 그대로) 포함 전건 통과.
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m4/4d/ --exclude=scope.md`
+- exit: 1(매치 0)
+- cmd: `grep -rnE '\.kt:[0-9]+' reports/evidence/m4/4d/ _workspace/m4-4d/03_impl_report.md docs/discovery/capability-map.md milestone-4.md`
+- exit: 1(매치 0)

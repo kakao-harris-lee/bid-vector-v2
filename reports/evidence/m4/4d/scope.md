@@ -79,6 +79,13 @@ rollback: |
 
 ## 운영자 결정 필요 — `OPEN-4D-LADDER-SCORE-SOURCE` (착수 가정 (c), 확정은 종결 승인 시)
 
+**확정 2026-09-10 (a).** 사용자 승인으로 M2 계약을 `v1` 안에서 additive 확장(새 RPC — opportunity
+analysis)하고 M5 provider 를 동반하는 경로로 정했다. **귀결**: 사다리 점수 경로는 **M2 후속
+slice**(opportunity-analysis RPC 를 2A~2D 절차로 추가) **+ M5 provider slice** 로 착수한다.
+4B-2 `MlAnalysisPort` 의 미가용 값·`analyze` 의 suspend 전환은 **그 후속 slice 의 계약**에서
+다룬다(이 slice 가 손대지 않는다). **그때까지는 착수 가정 (c)** — `MlAnalysisPort` 는 항상
+`Unavailable` 로 남는다(4B-2 lane 에 이미 전달한 배선 조언, 아래 문단 그대로 유효).
+
 **물음**: 4B-1 사다리가 읽는 `priorityScore`·`probabilityScore`·`matchedScore` 는 V2 에서 누가 만드는가.
 
 | 선택지 | 뜻 | 비용·귀결 |
@@ -158,8 +165,16 @@ enum 통과 → `ContractViolation` test (6) breaker open 에 옛 답 → `Circu
 | `OPEN-M2-DEADLINE-VALUES` | ⑧ placeholder + 승인 등재, 실측은 5E — **활성 유지** |
 | `OPEN-ML-03` | ⑨ 가 타입 분리 실물을 세운다 — 종결은 운영자(등재만) |
 | `OPEN-2B-OBJECTIVE-VALUES`·`OPEN-ML-02` | 경계 밖(5D·운영자) |
-| **`OPEN-4D-LADDER-SCORE-SOURCE`**(신설) | 위 「운영자 결정 필요」 — 착수 가정 (c) |
-| **`OPEN-4D-POLICY-VALUES`**(신설) | D-4D-7 값 — 종결 승인 시 확정 |
+| **`OPEN-4D-LADDER-SCORE-SOURCE`**(신설) | **결정 (a), 2026-09-10 — 소유 M2 후속 slice + M5 provider slice**. 그때까지 착수 가정 (c) 유지 |
+| **`OPEN-4D-POLICY-VALUES`**(신설) | ~~D-4D-7 값 — 종결 승인 시 확정~~ **종결(사용자 승인 2026-09-10)** — 정본 `reports/evidence/m4/4d/policy-values.md` |
+
+---
+
+## 병합 결정 (사용자 승인 2026-09-10 ④)
+
+병합 대상은 `m4/2026-09-08`(현재 `main`과 동일 커밋 `edd57fb`, r3 검증 관찰 §7 — 병합 축이
+슬라이스 시작 시점 이후 움직였음을 verifier가 실측했다). 팀장이 이 종결 등재 커밋 뒤에
+병합을 실행한다 — 이 slice(구현 레인)는 병합·push 를 하지 않는다.
 
 ---
 
