@@ -271,3 +271,37 @@ clone에서 처음부터 재실행했다.
 - exit: 0 — 353 tasks(353 executed, 캐시 없이 전건), `BUILD SUCCESSFUL in 58s`.
 - cmd(정리): `git worktree remove --force <dir>`
 - exit: 0 — `git worktree list`에 잔여 없음, 디렉터리 자체도 삭제 확인.
+
+## 사용자 승인 2026-09-10 — 종결 등재(`approved.tag` 갱신·정책 값 승인)
+
+`contract-policy.properties`의 `approved.tag`를 `contracts/v1-approved-2026-09-10`으로
+옮기고 `policy.version`을 3으로 올렸다. **태그 자체는 이 커밋 SHA에 팀장이 찍는다 —
+이 커밋 시점에는 아직 존재하지 않는다.** 그래서 `buf breaking --against <태그>`
+(=`contractGate`, root `check`가 의존)를 이 커밋에서는 돌리지 않는다 — 돌리면
+`git rev-parse <태그>` 실패로 exit 2(도구 오류)가 난다. **태그는 팀장이 이 커밋 SHA에
+찍고 그 뒤 `contractGate`(또는 `./gradlew check`)를 재실행한다** — 그 결과가 「승인
+태그 갱신 자체가 breaking 0」의 정본 증거다.
+
+이 커밋에서 안전하게 재실행 가능한 것(root `check`를 거치지 않는 module-scoped 명령,
+`approved.tag`를 안 읽는 경로만):
+
+- cmd: `(cd contracts && buf lint && buf build)` — S-2
+- exit: 0(둘 다) — `approved.tag`를 안 읽는 경로(승인 기준선 비교 없이 형태만 검사).
+- cmd: `./gradlew --offline :adapters:test --tests '*Embedding*Contract*' --tests '*MultiServiceContractTest*'` — S-4
+- exit: 0.
+- cmd: `(cd ml-engine && .venv/bin/python -m pytest tests/test_embedding_contract.py tests/test_contract_roundtrip.py -q)` — S-5
+- exit: 0 — 39/39.
+- cmd: `./gradlew --offline :adapters:gateExecutionGate` — S-7
+- exit: 0 — module-scoped task, root `contractGate`에 안 걸림(로그에 `:contractGate` 없음
+  확인).
+
+**S-3(`breaking-mutations.sh`)·S-1/S-0(root `clean check`)는 이 커밋에서 돌리지 않는다**
+— 셋 다 `approved.tag`를 직접 읽어(breaking-mutations.sh는 `require_policy_value
+"approved.tag"` → `git rev-parse`) 같은 이유로 실패한다. 태그 신설 뒤 팀장이 전건
+재확인한다.
+
+## clean-tree 게이트(종결 등재 커밋 전)
+
+- cmd: `git status --porcelain`
+- exit: 0
+- 핵심 결과: (커밋 직전 실행 — 결과는 이 커밋 자체가 증거)

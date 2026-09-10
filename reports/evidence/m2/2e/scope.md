@@ -68,7 +68,7 @@ ML-03·ML-09·`OPEN-ML-02` · `data-dictionary.md` §6.1 · 조사 노트 `_work
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline 8b50461016232386e456be532fab4eed4299fcfb..HEAD -- CLAUDE.md .claude/` — 착수 시 **없음**.
+`git log --oneline 8b50461016232386e456be532fab4eed4299fcfb..HEAD -- CLAUDE.md .claude/` — 착수 시 **없음**, 종결 승인 재실행(2026-09-10)도 **없음**(빈 출력).
 
 ---
 
@@ -91,7 +91,7 @@ ML-03·ML-09·`OPEN-ML-02` · `data-dictionary.md` §6.1 · 조사 노트 `_work
 
 | ID | 판단 | 근거 | 상태 |
 | --- | --- | --- | --- |
-| **D-2E-1** | 계약은 `EmbedText`(벡터) — 점수 RPC 가 아니다 | 머리 「왜 임베딩 RPC 인가」 | **착수 가정, 종결 승인 시 운영자 재확인** |
+| **D-2E-1** | 계약은 `EmbedText`(벡터) — 점수 RPC 가 아니다 | 머리 「왜 임베딩 RPC 인가」 | **확정 2026-09-10**(사용자 승인, checklist.md 「사용자 승인」 절) |
 | **D-2E-2** | 별도 서비스 `EmbeddingService`(운영자 결정 D-3 (a)) — `BidPredictionService` 와 release 축·readiness 가 다르다 | 운영자 결정 2026-09-10 | 계약 고정 |
 | **D-2E-3** | 벡터는 `repeated float` + `dimension` + 정규화 enum — bytes 아님(사람이 읽는 testdata JSON, 언어 간 표현 일치, 2B decimal string 관례의 정신) | 2B ⑤ | 계약 고정 |
 | **D-2E-4** | `probability` 이름은 어디에도 없다 · `strategy/Score.kt` `ProbabilityScore` KDoc 「낙찰 확률 추정」은 4B-4 가 정정(E-3 (a) — 파일 소유가 strategy 라 2E 밖) | ML-03·D-M2-8 | 계약 고정 |
@@ -130,4 +130,12 @@ consumer test) (7) `text` 상한 리터럴 → 정책 파일.
 | `OPEN-4D-LADDER-SCORE-SOURCE`(결정 (a)) | 2E(계약)·4B-4(Kotlin 조합·코사인·합성 규약)·M5 provider slice(신설 예정)·4D-2(client) 로 분해 — 이 slice 는 계약 |
 | `OPEN-ML-02` | 경계 밖 유지 |
 | **`OPEN-2E-TEXT-SYNTHESIS`**(신설) | 임베딩 텍스트 합성 규약의 version·내용·개인정보 배제 — 4B-4 착수 계약이 정한다 |
-| **`OPEN-2E-TEXT-MAX`**(신설) | `embedding.text.max-chars`·norm ε 초기값 — 정책 데이터, 종결 승인 시 확정 |
+| ~~`OPEN-2E-TEXT-MAX`~~ **닫힘(2026-09-10)** | `embedding.text.max-chars=4000`·`embedding.norm.epsilon=0.0005` 사용자 승인(`policy-values.md` §3 `change_history`) |
+
+## 병합 결정 (2026-09-10)
+
+사용자 승인 다섯(checklist.md 「사용자 승인」 절) — 2E 종결·D-2E-1 확정·정책 값 승인·
+승인 태그 `contracts/v1-approved-2026-09-10` 신설(이 승인 기록 커밋 SHA에 팀장이 찍는다)·
+병합 진행(팀장). 태그가 찍히기 전 이 커밋에서는 `contractGate`(`buf breaking --against
+<태그>`)를 돌리지 않는다 — 태그가 아직 없어 실패한다(commands.md). 태그 신설 뒤
+`contractGate`를 재실행해 승인 태그 갱신 자체가 breaking 0임을 확인하는 것은 팀장 몫이다.

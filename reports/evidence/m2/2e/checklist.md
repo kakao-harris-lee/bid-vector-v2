@@ -127,7 +127,9 @@ kNN·코사인의 옳음(4B-4·adapters) · 텍스트에 개인정보가 섞이�
 
 **Phase 3 구현**(base `8b50461`) — 순서대로: `4f96c77`(`embedding.proto`·testdata 5쌍·
 breaking-mutations.sh 신설 파일 포함·contract-policy.properties 정책 값) · `8785068`
-(`EmbeddingContractTest` 19건 + `MultiServiceContractTest` 넷째 서비스) · `bb4ed94`
+(`EmbeddingContractTest` 19건 + `MultiServiceContractTest` 셋째 서비스 등록 — 원 커밋
+메시지는 「넷째」, verifier r2 잔여 low로 이 문서에서 정정, `ddf3514`가 코드 쪽 표기도
+정정) · `bb4ed94`
 (`test_embedding_contract.py` 24건 + crosslang smoke 서비스 등록) · `94ef756`(detekt
 ReturnCount 교정) · `c43fd9e`(ktlint 체인 줄바꿈 교정) · `3abddbc`(gate 등재·capability-map
 OPEN 분해·commands.md·policy-values.md) · `2db1063`(checklist·rollback·S-0/S-1 실측).
@@ -149,7 +151,36 @@ ReleaseBlankCase` 매치됨). 코드 내용 자체는 올바르고 완전하다(
 것이 아니라 오케스트레이터가 착수 시 이미 커밋해 둔 것이다(scope.md·milestone-2.md 「Slice
 2E」 절).
 
-## 사용자 승인 대기
+## 사용자 승인 — 2026-09-10, slice 2E 종결
 
-verifier 검증 전. 운영자 지시(CLAUDE.md 2026-09-04)에 따라 이 slice는 코드 slice이므로
-Codex 리뷰 대상이 아니다 — 완료 조건은 **verifier ready-for-review + 사용자 승인**이다.
+다섯 항목 승인:
+
+1. **2E 종결** — verifier r1 not-ready(산출물 high 2: F-1 breaking 사각·F-2 차원 가드
+   확인력 0) → 수정 라운드 1(재작업 **1/5**) → r2 ready-for-review 위에서 승인.
+2. **D-2E-1(임베딩 RPC) 확정** — 계약은 `EmbedText`(벡터)이지 점수 RPC가 아니라는 착수
+   가정이 최종 판단으로 확정됐다(scope.md D-2E-1 「착수 가정, 종결 승인 시 운영자
+   재확인」 → 「확정」).
+3. **정책 값 승인** — `embedding.text.max-chars=4000`·`embedding.norm.epsilon=0.0005`
+   (`OPEN-2E-TEXT-MAX` 종결, `policy-values.md`).
+4. **승인 태그 신설** — `contracts/v1-approved-2026-09-10`(팀장이 이 승인 기록 커밋
+   SHA에 찍는다). `embedding.proto`가 이 태그의 기준선에 포함돼 verifier r1 F-1의
+   구조적 사각(신설 파일은 다음 태그 전까지 breaking 무방비)이 정본으로 닫힌다 —
+   `EmbeddingTestdataCanonicalTest`(임시 대응)는 계속 남지만 이제 `contractGate`가
+   1차 방어선이다.
+5. **병합 진행** — 팀장이 처리.
+
+head는 승인 시점 `git rev-parse HEAD`(이 문서에 값을 박지 않는다 — 2A verifier r1 F-1
+관례). 재작업 카운터 **1/5**(verifier r1 한 라운드)로 확정.
+
+## 잔여 — verifier r2 low(등재 후 이 커밋에서 정정)
+
+- 「넷째 서비스」 잔존 두 곳 — `rollback.md`(MultiServiceContractTest 편집 파일 설명)·
+  이 문서 「커밋 목록」의 `8785068` 인용(원 커밋 메시지 자체는 정정하지 않음, 역사적
+  인용이라는 점만 명시) — 둘 다 이 커밋에서 「셋째」로 정정.
+
+## 알려진 제한(종결 승인 시점 최종)
+
+승인 태그 신설 뒤에도 남는 것: **`rpc` 삭제는 `EmbeddingTestdataCanonicalTest`도
+`buf breaking`도 못 잡는다**(메시지 wire 형식과 무관, 알려진 제한 8 KDoc) · **실
+servicer는 M5**(알려진 제한 2) · **텍스트 합성 규약은 4B-4**(알려진 제한 3,
+`OPEN-2E-TEXT-SYNTHESIS`).

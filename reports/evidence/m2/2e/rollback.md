@@ -21,8 +21,9 @@
   - `ml-engine/tests/test_embedding_contract.py`
 - 편집 파일(`--source=<base>`가 있음 → 4B-3 병합 상태로 복원):
   - `adapters/src/test/kotlin/bidvector/adapters/contract/MultiServiceContractTest.kt`
-    (넷째 서비스 등록 제거 → 2B/2C 두 서비스 상태)
-  - `config/quality/contract-policy.properties`(`embedding.*` 키 둘·`policy.version` 2→1)
+    (셋째 서비스 등록 제거 → 2B/2C 두 서비스 상태, verifier r2 잔여 low — 「넷째」 잔존 정정)
+  - `config/quality/contract-policy.properties`(`embedding.*` 키 둘·`approved.tag`
+    `2026-09-10`→`2026-09-07`·`policy.version` 3→1, 사용자 승인 2026-09-10 반영 후 갱신)
   - `config/quality/gate-tests.properties`(`gate.tests.adapters`에서 `EmbeddingContractTest`
     행 제거)
   - `contracts/tools/breaking-mutations.sh`(`EMBEDDING` 변수·package-rename for-loop 추가분
