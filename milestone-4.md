@@ -445,6 +445,22 @@ high 0) 위에서 승인 셋: ① slice 종결 ② 정책 값 승인(`OPEN-4B5-P
 **다음은 4B-6**(조합기 `OpportunityAnalysis`·port 셋·텍스트 합성 규약, 계약은 팀장이
 별도 작성).
 
+**4B-6a 착수 2026-09-11(운영자 결정 2026-09-11 「추천 (a)」)** — 4B-6을 둘로 갈랐다.
+**임베딩과 무관한 앞쪽**(텍스트 합성 규약·정책 키워드 매칭·프로필/workload port)을 이
+slice가 먼저 하고, 조합기 `OpportunityAnalysis : MlAnalysisPort`(4B-6b)는 4D-2의
+`EmbedTextPort` 병합 뒤로 미룬다. `OPEN-2E-TEXT-SYNTHESIS`를 fact allow-list 시그니처로
+닫는다(D-4B6A-1) — `synthesizeNoticeText(WatchSubject, policy)`는 카테고리·키워드
+텍스트·전문 세 조각만 쓰고 금액·마감·공고 id는 인자에 없으며, `synthesizeProfileText
+(ProfileFacts, policy)`는 `ProfileFacts(businessTypes, licenses, regionTerms)` 세
+필드가 allow-list 자체라 사업자번호·대표자·연락처가 구조적으로 못 들어온다.
+`SynthesizedText`는 `internal constructor`(문자열 직접 주입 차단), 빈 입력은 예외가
+아니라 `SynthesisOutcome.Empty`. `KeywordHitsCounter.count`는 4B-5 `KeywordHits`를
+정책 키워드 14(legacy `EXECUTION_COMPLEXITY_KEYWORDS`)로 채운다(소문자 부분 문자열,
+중복 출현 1회). `OperatorProfilePort`·`WorkloadPort`는 port만(구현은 M6/후속).
+`OpportunityPolicyData.textMaxChars`는 2E `contract-policy.properties`의
+`embedding.text.max-chars`와 test가 직접 대조한다(D-4B6A-4). 정본은
+`reports/evidence/m4/4b6a/scope.md`.
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,
