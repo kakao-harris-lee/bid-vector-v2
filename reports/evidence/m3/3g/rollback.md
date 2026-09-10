@@ -1,7 +1,21 @@
 # rollback.md — M3 / 3G
 
 **되돌림은 range revert가 아니라 in_scope 경로 한정이다**(evidence-pack 스킬, 2026-09-04 개정).
-base `6e3aea4`(scope.md 계약값 그대로). 이 문서 작성 시점 head `e6a6200`.
+
+**base 진술 — verifier r1 L-2 시정.** 이 문서는 실측·복원 기준으로 `6e3aea4`를 쓴다.
+scope.md의 계약값 `base_sha`는 `471dd34a38e66e3b4cf5c15219bb3881b13591d1`이고 `6e3aea4`는
+그 바로 **다음 커밋**(계약 자신 — `docs(m3-3g): slice 계약 고정`, `A
+reports/evidence/m3/3g/scope.md` 한 줄뿐)이다. 두 값은 **다르다** — 값을 슬쩍 맞추지
+않는다. 둘의 차이는 `scope.md` 파일 하나뿐이고, 그 파일은 위 「evidence 자기 파일」 절에서
+어차피 되돌림 대상이 아니므로(계약 문서 예외) **어느 base 를 기준으로 restore 해도 결과는
+같다** — verifier r1 이 임시 clone에서 실행해 확인했다(검증 보고 §11).
+
+이 문서 작성 시점 head `e6a6200`(아래 확인 절은 `5499e9f`에서 실행 — **verifier r1 L-3
+시정**: 이 커밋 뒤 `6718740`(rollback.md 자기 갱신)이 더 있어 이 문서의 실측 head가
+현재 head보다 뒤처져 있었다. verifier r1이 최종 head `6718740`에서 S-0~S-6과 rollback
+전 단계를 직접 재실행해 전부 exit 0을 얻어 이 낙차를 메웠다(검증 보고 §10·§11) — 문서의
+실측 시점 자체는 정정하지 않는다(이력을 되쓰지 않는다), 뒤처짐이 있었다는 사실과 그것을
+메운 재실행을 여기 남긴다.
 
 ## 목록 산출(기계적)
 

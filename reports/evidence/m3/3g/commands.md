@@ -3,6 +3,12 @@
 worktree `/Users/harris/Development/private/bid-vector-v2-m4`, branch `m4/2026-09-08`.
 base `6e3aea4`, head(이 문서 시점) `e6a6200`(코드 커밋 `be9daa4` + 문서 커밋 `e6a6200`).
 
+**verifier r1 L-3 시정** — 이 문서의 실측 head `e6a6200`는 이후 커밋(`5499e9f`·`6718740`,
+evidence 경로만 추가)보다 뒤처져 있다. verifier r1이 최종 head `6718740`에서 S-0~S-6
+전건을 직접 재실행해 전부 exit 0을 얻었다(검증 보고 `_workspace/m3-3g/03_verifier_report.md`
+§10). 이 문서의 실측 시점 서술 자체는 정정하지 않는다(이력을 되쓰지 않는다) — 뒤처짐이
+있었다는 사실과 그것을 메운 독립 재실행을 여기 남긴다.
+
 ## 2026-09-10T10:15:33Z
 - cmd: `./gradlew :adapters:test --tests "bidvector.adapters.persistence.CleanMigrationTest" --no-daemon`
 - exit: 0

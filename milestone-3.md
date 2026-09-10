@@ -289,7 +289,9 @@ procurement `internal` 이라 어댑터가 계약 없이 값을 꺼낼 경로가
 받았다. **어댑터 하드코딩 allow-list 우회는 채택하지 않았다** — 계약 레지스트리가 allow-list·미지 필드 회계의 정본이고, 정책을 코드에 박으면 같은 사실이 두 자리에 산다.
 
 **M3 는 이제 잔여 slice 가 없다.** 후속(별도 slice 아님): 3D V-1 · 3A 후속 셋 · **P-8**(§1.10 첨부 문서 키 계약, 표는 작성됐고 채택 대기) · fixture case(후보 여덟) ·
-`bidNtceOrd` 실측 한 번 · `OPEN-3E-*` 넷과 `OPEN-3F-*` 둘.
+`bidNtceOrd` 실측 한 번 · `OPEN-3E-*` 넷과 `OPEN-3F-*` 둘. **위 문단은 2026-09-09 3F 종결 시점의 기록으로 그대로 둔다**(이력을 되쓰지 않는다) —
+`OPEN-3D-GRANT-PUBLIC-BLINDSPOT`(M4/4C-2 verifier r2 M-3, 2026-09-10 신설)이 그 뒤 M3 로 **후속 slice 3G 를 새로 열었다**. 아래 절이 그 현재
+상태이고, 승인 전까지는 3G 도 M3 의 잔여 slice 다.
 
 ### Slice 3G — 애플리케이션 역할 권한 래칫(`OPEN-3D-GRANT-PUBLIC-BLINDSPOT` 후속)
 
