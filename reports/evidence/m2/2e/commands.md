@@ -241,3 +241,23 @@ base `8b50461016232386e456be532fab4eed4299fcfb`, head는 리뷰 시점의 HEAD �
 
 - cmd: `git diff -- adapters/src/test ml-engine/tests config/quality reports/evidence/m2/2e/checklist.md reports/evidence/m2/2e/scope.md | grep -niE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"`
 - exit: 1(매치 0) — 수정 라운드 diff 안에 매치 없음.
+
+## 수정 라운드 1 — rollback 재산출(마지막 코드 커밋 `ddf3514` 뒤 한 번, 임시 clone 실측)
+
+`git diff --name-status "$BASE"..HEAD`로 목록을 다시 낸 결과 신규 파일이 1건 늘었다
+(`EmbeddingTestdataCanonicalTest.kt`, F-1 수정 라운드 신설) — 편집 파일 6개는 그대로.
+rollback.md 복원 목록·명령을 11경로로 갱신하고 새 `git clone --no-hardlinks` 임시
+clone에서 처음부터 재실행했다.
+
+- cmd: `git restore --source=8b50461... --staged --worktree -- <rollback.md 11경로>`
+- exit: 0
+- 핵심 결과: `git status --porcelain` — D 9(신규 파일·개별)·M 6(편집 파일), 11경로 전부 반영.
+- cmd: `git diff 8b50461... -- <편집 파일 6개>` (파이프 `wc -l`)
+- exit: 0
+- 핵심 결과: 0줄.
+- cmd: `(cd contracts && buf lint && buf build)`
+- exit: 0(둘 다) — `embedding.proto` 삭제 확인(5개 파일만).
+- cmd: `./gradlew --offline :adapters:compileTestKotlin`
+- exit: 0.
+- cmd: `./gradlew --offline :adapters:test --tests '*MultiServiceContractTest*'`
+- exit: 0 — 2B/2C 두 서비스로 축소된 test 통과.
