@@ -266,15 +266,16 @@ class EmbeddingContractTest {
         embedding: Embedding,
         epsilon: BigDecimal,
     ): Boolean {
-        if (embedding.valuesCount != embedding.dimension) return false
-        if (!isAcceptableVectorNormalization(embedding.normalization)) return false
+        val dimensionMatches = embedding.valuesCount == embedding.dimension
+        val normalizationAcceptable = isAcceptableVectorNormalization(embedding.normalization)
         val sumOfSquares =
             embedding.valuesList.fold(BigDecimal.ZERO) { acc, value ->
                 val component = BigDecimal(value.toDouble(), MathContext.DECIMAL64)
                 acc.add(component.multiply(component))
             }
         val norm = sumOfSquares.sqrt(MathContext.DECIMAL64)
-        return (norm.subtract(BigDecimal.ONE)).abs() <= epsilon
+        val normWithinEpsilon = norm.subtract(BigDecimal.ONE).abs() <= epsilon
+        return dimensionMatches && normalizationAcceptable && normWithinEpsilon
     }
 
     private fun isModelReleaseNonBlank(release: ModelRelease): Boolean =
