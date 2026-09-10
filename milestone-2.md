@@ -111,6 +111,25 @@ field·enum, `max_message_bytes` 경계 쌍(양쪽 수용·양쪽 거부), deadl
 `OPEN-2A-INCLUDED-BUILD` 는 `contractGate` 가 지키는 상태로 갱신(`capability-map.md` §14.3), `ml-contract` included build 는
 `ADR 0006` D-6 에 M2 결정으로 기록. 아래 「완료 조건」 일곱 전부 충족 — **M2 완료**.
 
+### Slice 2E — 임베딩 RPC (M2 완료 뒤 후속, additive)
+
+`EmbeddingService` 를 `bidvector.ml.v1` 안에 **additive** 로 더한다 — 승인 태그 `contracts/v1-approved-2026-09-07` 대비 breaking 0.
+
+- `EmbedText`
+  - 입력: 텍스트 + 종류(`NOTICE` / `OPERATOR_PROFILE`), `PredictionEnvelope`(release 선택자·schema version 재사용)
+  - 출력: L2 정규화 벡터(`values`·`dimension`·`normalization`) + `ModelRelease`, 또는 `ApplicationFailure`
+- `GetEmbeddingMetadata`
+  - 승격 release, 차원, 지원 텍스트 종류, readiness
+
+점수(`match`·`similarity`·`priority`)·판정·kNN·프로필 임베딩 저장은 메시지에 넣지 않는다 — Kotlin(M4 4B-4·adapters) 소유.
+
+**2E 착수 2026-09-10** — 운영자 결정 2026-09-10: `OPEN-4D-LADDER-SCORE-SOURCE` (a)(M2 계약 v1 additive 확장 + M5 provider) ·
+E-1 (c)(계약은 모델 의존 성분만, `priority` 는 Kotlin 조합) · E-3 (a) · E-4 (a). 계약 정본 `reports/evidence/m2/2e/scope.md`.
+착수 조사(`_workspace/m2-2e/01_scout_opportunity_scoring.md`)가 legacy 사다리 점수 셋 가운데 모델 의존 부분이 **텍스트 → 벡터 하나**
+(분류기 8축 중 `semantic_similarity` 한 축 — 그것도 Kotlin 소유 fact 를 문장으로 합성한 임베딩의 코사인 — 과 pgvector kNN)임을 실측해,
+점수 RPC 가 아니라 **임베딩 RPC** 로 좁혔다(D-2E-1, 종결 승인 시 운영자 재확인). 확률 축은 `OPEN-ML-02` 결정 뒤 `calibrated_win_rate` 로
+예약(E-2 (c)). 사다리 점수 경로는 2E(계약) → 4B-4(Kotlin 코사인·조합 커널·합성 규약) → M5 provider slice → 4D-2(client) 로 분해된다.
+
 ## 설계 규칙
 
 - `oneof`로 success/unmeasurable/application failure를 구분한다.
