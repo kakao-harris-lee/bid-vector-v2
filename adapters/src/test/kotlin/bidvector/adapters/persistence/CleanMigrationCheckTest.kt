@@ -84,9 +84,10 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
     @Test
     fun `축8 부가 — outbox_state_check 본문이 다섯 어휘로 정확히 고정된다(D-M4-5 (a))`() {
         val body = queryConstraintDef("outbox_state_check")
-        body shouldBe
+        val expected =
             "CHECK ((state = ANY (ARRAY['PENDING'::text, 'CLAIMED'::text, 'DELIVERED'::text, " +
                 "'FAILED'::text, 'ISOLATED'::text])))"
+        body shouldBe expected
     }
 
     private fun queryConstraintDef(constraintName: String): String =
