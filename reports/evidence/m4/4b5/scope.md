@@ -4,8 +4,9 @@
 >
 > **자리.** 4B-4 는 `PriorityInputs`(성분 다섯 + penalty 입력 셋, 각 `ScoreFact<UnitScore>`)를 **값으로** 받는다. 그 값을 도메인 fact(마감·금액·4D-1 `Predicted`·용량·
 > 텍스트 키워드 수)에서 만드는 **순수 파생 함수**가 4B-5 다. 여전히 `decision` 안 — port·시각(`Clock`)·텍스트 합성·임베딩 호출은 없다. 그것들은 4B-6(workflow
-> 조합기 `OpportunityAnalysis : MlAnalysisPort` + 임베딩 port + 텍스트 합성 규약 `OPEN-2E-TEXT-SYNTHESIS` + 시장 평균·workload port)이 한다. 4D-1 교훈(한 slice 에 층을
-> 섞지 않는다) 그대로.
+> 조합기 `OpportunityAnalysis : MlAnalysisPort` + 텍스트 합성 규약 `OPEN-2E-TEXT-SYNTHESIS` + 프로필·workload port)이 하고, **임베딩 port·값 타입·gateway 는 4D-2 가
+> 소유한다**(운영자 승인 2026-09-10 계획 변경, 정본 `reports/evidence/m4/4d2/scope.md` D-4D2-1 — 4B-6 은 그 port 를 소비만 한다; 이 문단의 이전 판 「임베딩 port 는
+> 4B-6」은 그 결정으로 대체됐다). 4D-1 교훈(한 slice 에 층을 섞지 않는다) 그대로.
 >
 > **legacy 산식의 처리(E-4 (a)).** 밴드 표·가중치 표·상수의 **값**은 legacy-behavior 층으로 재활용(`allocation.py:47-54`·`:495-532`, `allocation_core.py:104-`,
 > `opportunity_analysis/score_tables.py`, `scoring.py:255-357`, `ai/bid_recommendation.py:44-49,111-124`, `opportunity_analysis/base.py:73-88` — 확정된 legacy 파일이라 좌표
