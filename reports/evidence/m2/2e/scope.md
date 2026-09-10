@@ -30,7 +30,7 @@ in_scope:
   - contracts/testdata/embedding/**                        # canonical 바이트 + JSON 원본(2B 관례)
   - contracts/tools/breaking-mutations.sh                  # 신설 파일을 mutation 스윕 대상에 추가(2D 스크립트가 파일 목록을 하드코딩 — 조사 §5)
   - adapters/src/test/kotlin/bidvector/adapters/contract/EmbeddingContractTest.kt   # consumer test — in-process fake servicer(2B `PredictionContractTest` 골격)
-  - adapters/src/test/kotlin/bidvector/adapters/contract/MultiServiceContractTest.kt # 세 서비스 공존 실측에 넷째 추가
+  - adapters/src/test/kotlin/bidvector/adapters/contract/MultiServiceContractTest.kt # 셋째 서비스(EmbeddingService) 추가, 세 서비스 공존 실측(verifier r1 F-5 — 착수 문면의 「넷째」는 계수 오류)
   - ml-engine/tests/test_embedding_contract.py             # provider 쪽 계약 test — fake servicer 가 fail-closed·oneof·차원 불변식을 지키는지(2B 관례)
   - ml-engine/tests/crosslang_smoke_server.py              # 조건부 — 교차언어 스모크에 새 서비스 등록
   - config/quality/contract-policy.properties              # `embedding.text.max-chars` 정책 값 신설(매직넘버 금지)
@@ -102,13 +102,24 @@ ML-03·ML-09·`OPEN-ML-02` · `data-dictionary.md` §6.1 · 조사 노트 `_work
 
 ## 위협 모델 — 2E 고유 경계
 
-**방어한다**: (a) 벡터 차원·정규화 불일치의 조용한 통과(④) (b) 빈/초과 텍스트(④) (c) release 미지목·공백 응답(②) (d) breaking 변경(⑥·S-3) (e) 점수·판정 필드의 계약
-유입(D-2E-1 — `Embedding` 에 점수 필드 0) (f) 세 서비스 공존 시 stub 충돌(⑤). **방어하지 않는다**: 임베딩 품질 · 실 servicer(M5) · kNN·코사인의 옳음(4B-4·adapters) ·
-텍스트에 개인정보가 섞이는 것(합성 규약 소유 4B-4 — S-3 상당 스캔은 그 slice) · 승인 태그를 옮기는 행위 · 생성 도구 결함.
+**방어한다**: (a) 벡터 차원·정규화 불일치의 조용한 통과(④) (b) 빈/초과 텍스트(④) (c) release 미지목·공백 응답(②) (d) 점수·판정 필드의 계약
+유입(D-2E-1 — `Embedding` 에 점수 필드 0) (e) 세 서비스 공존 시 stub 충돌(⑤). **방어하지 않는다**: 임베딩 품질 · 실 servicer(M5) · kNN·코사인의 옳음(4B-4·adapters) ·
+텍스트에 개인정보가 섞이는 것(합성 규약 소유 4B-4 — S-3 상당 스캔은 그 slice) · 승인 태그를 옮기는 행위 · 생성 도구 결함 ·
+**신설 `embedding.proto` 자체의 breaking 변경**(verifier r1 F-1(high), 착수 문면 정정 — 승인 태그
+`contracts/v1-approved-2026-09-07` 에 이 파일이 없어 `buf breaking`·`contractGate`·S-3 스윕
+어느 것도 이 파일 **내부**의 필드·enum 값·필드 번호 변경을 못 본다(실측: enum 값 삭제가
+전 게이트를 완전 통과). 다음 승인 태그가 이 파일을 포함하기 전까지 구조적 사각이다 — 정본
+방어는 **종결 승인 시 새 승인 태그(`contracts/v1-approved-<date>`) 신설**(운영자, 태그
+이동은 이 slice 가 하지 않는다). `EmbeddingTestdataCanonicalTest`(JSON→binpb 왕복)가
+필드·enum 값·필드 번호 변경 셋은 부분적으로 잡지만 `rpc` 삭제는 못 잡는 임시 안전망이다.
 
 **우회 후보(≥5)**: (1) `values` 개수 ≠ `dimension` → consumer 거부 test (2) 정규화 안 된 벡터(norm≠1±ε) → consumer 거부 (3) `TextKind` 정의 밖 정수 → fail-closed
-(4) 승인 태그 대비 필드 번호 재사용·enum 값 삭제 → breaking 스윕(신설 파일 포함) (5) `Unmeasurable` 가지 몰래 추가 → 스키마 리뷰·testdata 부재 (6) release 공백 →
-4D-1 `hasNonBlankRelease` 재사용(consumer test) (7) `text` 상한 리터럴 → 정책 파일.
+(4) 승인 태그 대비 필드 번호 재사용·enum 값 삭제 → **막지 못한다**(위 「방어하지 않는다」
+참고 — `breaking-mutations.sh`의 `embedding.proto` 등록은 `package-rename` mutation 하나에만
+참여한다, 나머지 10종은 기존 5파일만 대상. `EmbeddingTestdataCanonicalTest`가 필드·enum
+값·필드 번호 변경 셋을 잡는 임시 대응) (5) `Unmeasurable` 가지 몰래 추가 → 스키마 리뷰·
+testdata 부재 (6) release 공백 → 4D-1 `hasNonBlankRelease` 와 같은 규칙(로컬 순수 함수,
+consumer test) (7) `text` 상한 리터럴 → 정책 파일.
 
 ---
 
