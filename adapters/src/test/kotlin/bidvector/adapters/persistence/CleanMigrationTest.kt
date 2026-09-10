@@ -197,6 +197,33 @@ class CleanMigrationTest : PersistenceTestSupport() {
         grantedPrivileges shouldContainExactlyInAnyOrder setOf("SELECT")
     }
 
+    /**
+     * verifier r1 H-1 시정 — 설계 검토 (2b) 「V6 테이블 자체 | GRANT 목록을 test 가 대조」의
+     * 실측이 없었다. 값 자체는 V6와 같지만(`SELECT, INSERT, UPDATE`), 이 test가 없으면
+     * `GRANT ALL PRIVILEGES`(= 커밋됐지만 아직 배달 안 된 항목을 지울 수 있는
+     * DELETE·TRUNCATE 획득, 위협 모델 방어 (b))로 되돌려도 `:adapters:test`가 전건
+     * 초록이었다(mutation 실측, `reports/evidence/m4/4c2/commands.md`).
+     */
+    @Test
+    fun `애플리케이션 역할 bidvector_app 은 outbox 를 SELECT INSERT UPDATE 만 할 수 있다`() {
+        val grantedPrivileges =
+            queryStrings(
+                "SELECT privilege_type FROM information_schema.role_table_grants " +
+                    "WHERE grantee = 'bidvector_app' AND table_name = 'outbox'",
+            )
+        grantedPrivileges shouldContainExactlyInAnyOrder setOf("SELECT", "INSERT", "UPDATE")
+    }
+
+    @Test
+    fun `애플리케이션 역할 bidvector_app 은 inbox 를 SELECT INSERT 만 할 수 있다`() {
+        val grantedPrivileges =
+            queryStrings(
+                "SELECT privilege_type FROM information_schema.role_table_grants " +
+                    "WHERE grantee = 'bidvector_app' AND table_name = 'inbox'",
+            )
+        grantedPrivileges shouldContainExactlyInAnyOrder setOf("SELECT", "INSERT")
+    }
+
     private fun queryStrings(sql: String): Set<String> {
         val actual = mutableSetOf<String>()
         dataSource().connection.use { connection ->
