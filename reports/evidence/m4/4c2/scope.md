@@ -27,6 +27,8 @@ in_scope:
   - docs/discovery/capability-map.md                                 # `OPEN-4C1-TX-CONTRACT-UNVERIFIED` 처리 표시만
   - milestone-4.md
   - reports/evidence/m4/4c2/**
+  - adapters/build.gradle.kts                                       # verifier r2 L-7 시정 — kotlin-compilerEmbeddable testImplementation 한 줄(M-2 하네스 의존)
+  - adapters/src/test/resources/compile-fixtures/**                 # verifier r2 L-7 시정 — M-2 컴파일 실패 probe fixture
 out_of_scope:
   - db-scheduler 배선·워커 루프·`onFailure`/`onDeadExecution`      # `OPEN-ADR-13` 은 **열어 둔다**(운영자 결정 2026-09-10) — 스케줄러를 실제 배선할 때 닫는다
   - lease port·어댑터(`OPEN-ADR-12`)                                 # 후속
@@ -66,7 +68,12 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — **없음**(verifier r1 재검증 시점 실측, L-4 시정 — 착수 시점 문장이 리뷰 요청 시점까지 그대로 남아 있었다). rollback 대상 아님.
+`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — **1건**(verifier r2 재검증
+시점 실측): `f3f034f harness: 진행 중 slice 의 검증 전 병합 금지 + hunk 역적용 --3way
+충돌 함정`(`.claude/skills/evidence-pack/SKILL.md`·`.claude/skills/v2-slice-pipeline
+/SKILL.md`·`CLAUDE.md`). 이 slice의 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은
+range에 있다 — 근거는 이 slice의 r1 실측(레인 혼입·hunk 역적용 conflict) 둘 다다.
+rollback 대상 아님.
 
 ---
 
@@ -135,3 +142,12 @@ rollback: |
 | OPEN | 내용 |
 | --- | --- |
 | `OPEN-4C2-MARK-UNEXERCISED` | `markDelivered`/`markFailed`/`markIsolated` 는 이 slice 에서 **port 수준으로 실행되지 않는다** — 배달자가 없고(경계), `adapters` test 도 인자를 만들 수 없다(`OutboxTransition` 하위 타입이 `workflow` 의 `internal constructor`). 전이 UPDATE 의 효과와 `WHERE state` 거부는 DB 층에서 실측하고, **통로를 열어 해결하지 않는다** — 그것이 legacy C-4(「실패한 전송을 `completed` 로 닫는다」)를 이 층에 재현하는 문이다. 배달 오케스트레이션 slice 로 인계 |
+
+## 계약 갱신 — 2026-09-10 verifier r2 L-7
+
+r1 수정이 만든 `adapters/build.gradle.kts`(1줄)·`adapters/src/test/resources/
+compile-fixtures/**`(M-2 하네스 fixture)가 in_scope 목록에 없어 clean-tree 게이트가
+그 둘의 변경을 못 본다는 것을 verifier가 실측했다(두 경로에 한 줄씩 심어도 선언된
+in_scope 경로만 `git status --porcelain`에 넘기면 출력이 없음). 위 YAML의 in_scope에
+두 경로를 추가한다 — rollback.md·commands.md에는 이미 있었으므로 실 동작 변화는 없고
+clean-tree 게이트의 가시 범위만 정합화한다.
