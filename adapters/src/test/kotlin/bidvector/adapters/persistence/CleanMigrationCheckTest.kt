@@ -74,6 +74,35 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
         checkBodies.any { it.contains("notice_round ~ '^[0-9]{3}\$'") } shouldBe true
     }
 
+    /**
+     * verifier r1 M-1 시정 — `outbox_state_check` CHECK **개수**만 보면(위 테스트) IN 목록에
+     * 값을 하나 더해도(예: `'RETRYING'`) 개수는 그대로라 잡히지 않는다. D-M4-5 (a)의
+     * at-most-once 종단 다섯 어휘는 넓어지는 것 자체가 재시도 문이므로, 본문을 **정확히**
+     * 대조한다(3D COL-06/H-3 관례와 달리 `contains`가 아니라 `shouldBe` — 다섯 값이 늘거나
+     * 줄면 본문 문자열 자체가 달라진다).
+     */
+    @Test
+    fun `축8 부가 — outbox_state_check 본문이 다섯 어휘로 정확히 고정된다(D-M4-5 (a))`() {
+        val body = queryConstraintDef("outbox_state_check")
+        body shouldBe
+            "CHECK ((state = ANY (ARRAY['PENDING'::text, 'CLAIMED'::text, 'DELIVERED'::text, " +
+                "'FAILED'::text, 'ISOLATED'::text])))"
+    }
+
+    private fun queryConstraintDef(constraintName: String): String =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = ?",
+                ).use { statement ->
+                    statement.setString(1, constraintName)
+                    statement.executeQuery().use { rs ->
+                        rs.next()
+                        rs.getString("def")
+                    }
+                }
+        }
+
     private fun queryCheckBodies(): List<String> {
         val bodies = mutableListOf<String>()
         dataSource().connection.use { connection ->
