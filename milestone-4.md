@@ -406,6 +406,25 @@ strategy 서른아홉만 남음)로, 4B-1 몫만 걷으면(이전 라운드에�
 **다음 slice는 4B-2**(조합 use case, 계약은 팀장이 별도 작성). 4C-2(Flyway·persistence
 어댑터·DB↔outbox 원자성)는 `main` 병합 뒤 별도 slice.
 
+**4C-2 구현(2026-09-10, verifier 검증 대기)** — outbox·inbox 영속과 원자적 커밋
+(`reports/evidence/m4/4c2/scope.md`). 설계 검토 귀결 D-4C2-1(② 의 도메인 write 상대를
+`raw_observation` append 하나로 좁힌다, 전략 영속은 후속) · D-4C2-2(3D 스키마 스냅샷
+래칫 「추가만」 예외) · D-4C2-3(신규 패키지 `bidvector.adapters.event`)을 그대로
+따랐다. `TransactionBoundary`(경계 밖 접근은 예외, ambient가 연 스레드를 기록)가
+`JdbcRawObservationStore`(개조 — 주 생성자 `ConnectionSource`, 기존 `DataSource`
+생성자는 보조 생성자로 위임)와 `JdbcOutboxPort`의 유일한 커넥션 경로다. `claim`은
+`SELECT ... FOR UPDATE SKIP LOCKED` + 같은 트랜잭션 커밋(at-most-once, D-M4-5) —
+경합·워커 사망(롤백 시 Pending 잔존)을 래치 기반 test로 실측했다. **`OPEN-4C1-TX-CONTRACT
+-UNVERIFIED`를 이 slice가 닫는다** — raw append+outbox 등록의 같은 트랜잭션 커밋/롤백,
+경계 밖 호출 예외, crash-after-commit(새 커넥션에서 커밋된 행 확인+재claim)을 실 DB로
+증명했다(`OutboxTransactionAtomicityTest`). `markDelivered`/`markFailed`/`markIsolated`는
+이 slice에서 production 호출부가 없다(`OPEN-4C2-MARK-UNEXERCISED` 신설, 배달 오케스트레이션
+인계) — 전이 SQL 상수를 production과 공유해 효과·`WHERE state` 거부는 DB 층에서 증명했다.
+참여하지 않는 3D repository 넷(`JdbcNoticeRepository`·`JdbcOpeningResultRepository`·
+`JdbcQualificationTextRepository`·`JdbcCollectionRunStore`)은 알려진 제한으로 남는다.
+acceptance S-0~S-6 전건 통과(`--no-build-cache clean check` 포함). 종결(verifier
+ready-for-review + 사용자 승인)은 별도.
+
 ### Slice 4D — ML gateway
 
 - M2 generated coroutine gRPC client
