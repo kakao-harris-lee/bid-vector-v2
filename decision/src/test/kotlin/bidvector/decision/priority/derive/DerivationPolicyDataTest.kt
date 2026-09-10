@@ -149,6 +149,14 @@ class DerivationPolicyDataTest {
         policy.alignmentTolerance shouldBe BigDecimal("0.12")
     }
 
+    @Test
+    fun `DERIVATION_POLICY 출하 budgetCaptureRounding 은 scaleDigits 6·HALF_UP 이다(verifier r1 F-2)`() {
+        val policy = DERIVATION_POLICY.resolve(LocalDate.of(2026, 9, 10)).shouldBeResolved()
+
+        policy.budgetCaptureRounding.scaleDigits shouldBe 6
+        policy.budgetCaptureRounding.mode shouldBe RoundingMode.HALF_UP
+    }
+
     private fun Resolution<DerivationPolicyData>.shouldBeResolved(): DerivationPolicyData {
         check(this is Resolution.Resolved<DerivationPolicyData>) {
             "test 설정 오류 — Initial 은 항상 Resolved 다"

@@ -2,6 +2,7 @@ package bidvector.decision.priority.derive
 
 import bidvector.decision.UnitScore
 import bidvector.decision.priority.closeTo
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
@@ -111,5 +112,73 @@ class ExpectedMarginDerivationTest {
         // score = .99*.35 + .99*.20 + 0*.20 + 0*.15 + 0*.10 = .3465+.198 = .5445
         val score = deriveExpectedMargin(inputs, policy)
         score.value.compareTo(BigDecimal("0.5445")) shouldBe 0
+    }
+
+    // ---- verifier r1 F-1 — Rate 상한(≤1) 생성 불변식 ----
+
+    @Test
+    fun `F-1 — recommendedRate 가 1 을 넘으면 생성 실패`() {
+        shouldThrow<IllegalArgumentException> {
+            MarginInputs(
+                recommendedRate = rateOf("1.0000001"),
+                floorRate = null,
+                predictedRate = rateOf("0.90"),
+                priceFitness = UnitScore(BigDecimal.ZERO),
+                capacity = UnitScore(BigDecimal.ZERO),
+            )
+        }
+    }
+
+    @Test
+    fun `F-1 — recommendedRate 가 정확히 1 이면 생성된다(경계 양성 대조)`() {
+        MarginInputs(
+            recommendedRate = rateOf("1.0"),
+            floorRate = null,
+            predictedRate = rateOf("1.0"),
+            priceFitness = UnitScore(BigDecimal.ZERO),
+            capacity = UnitScore(BigDecimal.ZERO),
+        )
+    }
+
+    @Test
+    fun `F-1 — floorRate 가 1 을 넘으면 생성 실패(우회 재현 — rec 0_9 floor 1_2)`() {
+        shouldThrow<IllegalArgumentException> {
+            MarginInputs(
+                recommendedRate = rateOf("0.9"),
+                floorRate = rateOf("1.2"),
+                predictedRate = rateOf("0.9"),
+                priceFitness = UnitScore(BigDecimal.ZERO),
+                capacity = UnitScore(BigDecimal.ZERO),
+            )
+        }
+    }
+
+    @Test
+    fun `F-1 — predictedRate 가 1 을 넘으면 생성 실패`() {
+        shouldThrow<IllegalArgumentException> {
+            MarginInputs(
+                recommendedRate = rateOf("0.9"),
+                floorRate = null,
+                predictedRate = rateOf("1.5"),
+                priceFitness = UnitScore(BigDecimal.ZERO),
+                capacity = UnitScore(BigDecimal.ZERO),
+            )
+        }
+    }
+
+    @Test
+    fun `F-1 회귀 — 정상 범위(rec 0_7, floor 0_9)는 legacy 와 일치한다`() {
+        val inputs =
+            MarginInputs(
+                recommendedRate = rateOf("0.7"),
+                floorRate = rateOf("0.9"),
+                predictedRate = rateOf("0.7"),
+                priceFitness = UnitScore(BigDecimal.ZERO),
+                capacity = UnitScore(BigDecimal.ZERO),
+            )
+        // floorHeadroom = clamp01((0.7-0.9)/(1-0.9)) = clamp01(-2) = 0 · alignment = 1.0(완전 정렬)
+        // score = .7*.35 + 0*.20 + 1.0*.20 + 0*.15 + 0*.10 = .245+.20 = .445(verifier r1 F-1 표와 일치)
+        val score = deriveExpectedMargin(inputs, policy)
+        score.value.compareTo(BigDecimal("0.445")) shouldBe 0
     }
 }

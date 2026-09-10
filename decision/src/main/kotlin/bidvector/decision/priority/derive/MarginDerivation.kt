@@ -51,8 +51,16 @@ fun deriveExpectedMargin(
 /**
  * floor 가 없거나 0 이면 `recommended`(legacy `if floor_bid_rate > 0` 의 else 분기) —
  * floor = 1 이면 분모(`1 - floor`)가 0 이라 같은 값으로 되돌린다(설계 검토 우회 (6)).
- * legacy 의 `max(1e-6, ...)` 엡실론 분모 대신 명시 분기로 닫는다 — 결과 값은 legacy 와
- * 사실상 같다(엡실론 분모는 실질적으로 rec 자신에 수렴한다).
+ * `[MarginInputs]` 의 `init`(verifier r1 F-1)이 `floor ≤ 1` 을 이미 보장하므로 이 분기
+ * 밖(`else`)에 오는 값은 항상 `0 < floor < 1` 이다.
+ *
+ * **legacy 와 값이 사실상 같다는 주장은 부정확하다(verifier r1 F-3, 정정)** — legacy 는
+ * `floor = 1` 에서 분모를 `max(1e-6, 1-floor)` 로 두어 `(rec-1)/1e-6` → 큰 음수 →
+ * `clamp01` → **0** 을 낸다(하한이 100% 라 여유 없음). 이 함수는 같은 입력에서
+ * `recommended` 를 낸다 — 실측 차 `rec=0.95, floor=1.0` → V2 `0.7225` vs legacy `0.5325`.
+ * **거동 자체는 scope.md ③ 이 명시 고정한 결정**(「floor = 1 이면 `rec`」)이라 계약
+ * 위반이 아니다 — legacy 의 엡실론 분모(사실상 0 으로 접는 것)를 의도적으로 재현하지
+ * 않고 `recommended` 로 둔 것이 이 slice 의 선택이다(`policy-values.md` §3 참고).
  */
 private fun floorHeadroomOf(
     recommended: BigDecimal,

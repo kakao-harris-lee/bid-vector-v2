@@ -82,4 +82,13 @@ class BudgetCaptureDerivationTest {
         outcome shouldBe
             DerivationOutcome.Absent(DerivationAbsence.MoneyArithmeticUnmeasurable(ReasonCode.UNDECLARED_PROVENANCE))
     }
+
+    @Test
+    fun `budgetCaptureRounding 정밀도가 결과를 바꾼다(verifier r1 F-2 — scaleDigits 6 대조)`() {
+        // 333_333_000 / 1_000_000_000 = 0.333333(6자리에서 정확히 끝난다) — scaleDigits 가
+        // 2 로 퇴화하면 0.33 이 되어 이 test 가 떨어진다(F-2 재현 그대로).
+        val outcome = deriveBudgetCapture(testBidAmount(333_333_000L), testBaseAmount(1_000_000_000L), policy)
+        val present = outcome.shouldBeInstanceOf<DerivationOutcome.Present<UnitScore>>()
+        present.value.value.compareTo(BigDecimal("0.333333")) shouldBe 0
+    }
 }
