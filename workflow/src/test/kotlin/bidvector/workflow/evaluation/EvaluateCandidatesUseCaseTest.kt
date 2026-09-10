@@ -78,6 +78,29 @@ class EvaluateCandidatesUseCaseTest {
         result.reason.shouldBeInstanceOf<EvaluationDropReason.NoticeNotBiddable>()
     }
 
+    // D-1 — 감시 규칙 미설정은 이제 통과가 아니다(수정 라운드 1 M-1, 운영자 결정
+    // 2026-09-10). legacy는 이 상태에서 스캔 자체를 하지 않았다 — 결과(후보 0)는
+    // legacy와 같고, 탈락이 값으로 남는다는 것만 다르다.
+    @Test
+    fun `감시 규칙이 미설정이면 WatchGate 에서 멈추고 NoGate 를 그대로 싣는다`() {
+        val notice = testNotice()
+        val unconfigured =
+            testStrategy(StrategyDraft(bidNowThreshold = BigDecimal("0.7"), reviewThreshold = BigDecimal("0.45")))
+        val useCase =
+            useCase(
+                strategyRepository = FakeStrategyRepository(unconfigured),
+                candidateSource = FakeCandidateSource(listOf(notice)),
+                watchSubjects = FakeWatchSubjectPort { WatchSubjectOutcome.Found(EMPTY_SUBJECT) },
+                mlAnalysis = FakeMlAnalysisPort { bidNowAnalysis() },
+            )
+
+        val result = useCase.evaluate().single() as CandidateEvaluation.NotReached
+
+        result.stage shouldBe EvaluationStage.WatchGate
+        val reason = result.reason.shouldBeInstanceOf<EvaluationDropReason.WatchGateNotConfigured>()
+        reason.noGate shouldBe bidvector.strategy.WatchVerdict.NoGate
+    }
+
     // D-3~D-8 — 감시 필드 거절은 WatchVerdict.Rejected 를 그대로 싣는다(복제하지 않는다).
     @Test
     fun `감시 필드가 거절하면 WatchVerdict Rejected 를 그대로 싣는다`() {
@@ -125,11 +148,13 @@ class EvaluateCandidatesUseCaseTest {
         (result.reason as EvaluationDropReason.LicenseIneligible).verdict shouldBe ineligible
     }
 
-    // 신설 — 임계 미설정 전략은 사다리를 돌릴 입력이 없다.
+    // 신설 — 임계 미설정 전략은 사다리를 돌릴 입력이 없다(감시 게이트는 통과시켜 이
+    // 단계 자체를 재도록 focusCategories 를 둔다 — NoGate 는 수정 라운드 1 M-1로
+    // 이제 통과가 아니라서, 감시까지 미설정이면 그 자리에서 먼저 멈춘다).
     @Test
     fun `사다리 임계가 미설정이면 ThresholdConfiguration 에서 멈춘다`() {
         val notice = testNotice()
-        val unconfigured = testStrategy(StrategyDraft())
+        val unconfigured = testStrategy(StrategyDraft(focusCategories = listOf(DEFAULT_FOCUS_CATEGORY)))
         val useCase =
             useCase(
                 strategyRepository = FakeStrategyRepository(unconfigured),
@@ -167,6 +192,7 @@ class EvaluateCandidatesUseCaseTest {
         val strategyWithMinMatch =
             testStrategy(
                 StrategyDraft(
+                    focusCategories = listOf(DEFAULT_FOCUS_CATEGORY),
                     bidNowThreshold = BigDecimal("0.7"),
                     reviewThreshold = BigDecimal("0.45"),
                     minimumMatchScore = BigDecimal("0.5"),

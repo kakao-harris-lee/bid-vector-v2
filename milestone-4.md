@@ -258,6 +258,47 @@ blocker/high 0) 위에서 승인(evidence `reports/evidence/m4/4b1/checklist.md`
 (`OPEN-4B2-3`, 같은 run 안 용량 선점 순서)는 이 slice의 설계(용량 스냅샷을 run당 한
 번만 읽어 모든 후보가 공유)가 구조적으로 닫아 등재하지 않았다.
 
+**4B-2 종결 2026-09-10(사용자 승인)** — verifier r3 `ready-for-review`(산출물층
+blocker/high 0) 위에서 승인(evidence `reports/evidence/m4/4b2/checklist.md` 「사용자
+승인」 절, 최종 산출물 커밋 `6d50bdfb16f3f9d9a424bdbaa16419a2d2063c58`). **재작업 2/5.**
+**M4 완료 조건 둘이 이 slice에서 섰다** — trace 관통(`correlationId`가 수집→판정→
+**ML**→알림 요청까지 실리고, 각 산출물에 값으로 **도달까지 단언**된다) · 「한
+application 함수에 수집·DB·ML·알림이 함께 들어가지 않는다」(port 분리 +
+`CompositionBoundaryTest`의 소스 스캔 강제).
+
+조사(`_workspace/m4-4b2/01_scout_composition.md`, 786줄)가 특정한 legacy 실패 형태
+여덟을 각각 뒤집었다: **판정 이중 계산**(공고당 판정 1회, `judge` 위임을 얇게 감싸
+계수) · **부분 실패의 전역 전멸**(후보 단위 격리, 공유 rollback 없음) · **성공처럼
+계속하는 자리**(port 계약이 결과 갈래, `try` 쓸 자리 자체가 없다) · **trace 0건**
+(`correlationId` 필수 필드) · **run 중 전략 재읽기**(진입에서 한 번, 후보 전체 공유) ·
+**조용한 드롭 열셋**(`NotReached(stage, reason)`이 값으로 남음, D-1 포함) · **한 함수가
+전부**(port 뒤로 가르고 `CompositionBoundaryTest`가 강제) · **용량 중복 계수**(스냅샷을
+run당 한 번, 모든 후보가 공유).
+
+**검증이 드러낸 것 둘**: ① `WatchVerdict.NoGate`를 통과로 재해석한 최초 판이 STR-01이
+이름 붙인 **「알림 홍수」를 기본값으로** 만들 뻔했다(STR-01 실측 — 열린 공고
+5,382건 중 watch 통과 43건, 통과 처리는 미설정 운영자에게 **125배** 후보를 보낸다).
+운영자 결정(2026-09-10)으로 되돌려 legacy 결과(감시 미설정 = 후보 0)는 지키되 탈락을
+관측 가능한 값(`WatchGateNotConfigured`)으로 남겼다. ② **low를 닫은 커밋이 high를
+낳았다** — 「판정 1회 계수 불가」(L-1)를 닫으려 판정 함수(`judge`)를 생성자 인자로
+뽑았더니 `private val`은 프로퍼티 읽기만 막고 **생성자 매개변수는 여전히 공개
+시그니처**라 `app` 모듈에서 사다리를 후보와 무관한 입력으로 몰아 정당한 `BidNow`를
+얻고 그걸 통해 `NotificationRequest`(생성자 `internal`)를 합법적으로 통과시킬 수
+있었다(verifier 실측 — 정직한 배선은 알림 0건, 주입 배선은 2건). 주 생성자를
+`internal`로 내리고 judge 없는 public 보조 생성자를 추가해 닫았다. 이 계보가 하네스
+규칙 둘(`a70a04f`·`0034288`, scope.md 「하네스 레인 변경」 절)을 낳았다 — 「생성자
+매개변수 가시성 ≠ 프로퍼티 가시성」과 「`object` 커널을 계수하려 여는 이음매는 처음부터
+`internal`로 좁혀 연다」.
+
+**알려진 제한(종결 시점, 상세는 checklist.md)**: `LadderPolicySlot`의 세 값은 여전히
+운영자 승인 대기(`OPEN-4B1-LADDER-THRESHOLDS`) · 슬롯을 조립 바깥에서 조작해도
+`StrategyRepository` 하나만 조작하는 것과 같은 최종 상태에 닿는다(없던 권한이 아님,
+결함 아님으로 종결) · 실 후보 원천·감시·면허·용량 조회는 이 slice 밖(3A/3B/1C/4C-2/3D
+소관) · 알림 요청은 배달을 주장하지 않는다(`Requested`는 접수일 뿐) · run 단위
+식별자(legacy `monitor_run_id` 대응)는 이 slice 밖(4C-2/후속 소관).
+
+**다음은 `main` 병합 후 4C-2**(병합은 오케스트레이터, 계약은 팀장이 별도 작성).
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,

@@ -170,3 +170,7 @@ internal fun mapMaskedOpeningItem(
     // 접어(unknownFieldCount 자리에 decompositionFailures 를 실어) F-3 의 손실을 만들었다.
     return RawItemOutcome.Mapped(observation, identity, masked.excludedFieldCount, masked.decompositionFailures)
 }
+
+// M3/3F — 개찰완료(13) 축도 [mapMaskedOpeningItem]을 그대로 쓴다(계약 레지스트리 경로,
+// P-13 (a) 승인). `prcbdrBizno`·`prcbdrCeoNm`은 계약 미등재로 allow-list 반전에서 자동
+// 제외된다 — 이 축 전용 masking 함수를 새로 만들지 않는다(중복 금지).

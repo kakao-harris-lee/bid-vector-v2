@@ -34,6 +34,7 @@ private fun newSource(
         listOperation = KonepsOperationPolicy.AWARD_LIST,
         listSourceEndpoint = SourceEndpoint.OPENING_AWARD_LIST,
         reserveDetailBaseUri = server.baseUri,
+        openingCompleteBaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
                 httpClient = HttpClient.newHttpClient(),
@@ -55,6 +56,7 @@ private fun newResultListSource(
         listOperation = KonepsOperationPolicy.OPENING_RESULT_LIST,
         listSourceEndpoint = SourceEndpoint.OPENING_RESULT_LIST,
         reserveDetailBaseUri = server.baseUri,
+        openingCompleteBaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
                 httpClient = HttpClient.newHttpClient(),

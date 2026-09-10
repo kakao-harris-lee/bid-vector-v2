@@ -1,6 +1,10 @@
 package bidvector.workflow.evaluation
 
+import bidvector.decision.LadderInput
 import bidvector.decision.UnitScore
+import bidvector.decision.Verdict
+import bidvector.decision.VerdictLadder
+import bidvector.decision.VerdictLadderPolicyData
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeEvent
@@ -57,9 +61,19 @@ internal fun strategyPolicy(): Resolution.Resolved<StrategyPolicyData> =
         TEST_STRATEGY_POLICY_VERSION,
     )
 
-/** watch 필드 없음 · 사다리 임계만 설정된 기본 전략 — 개별 test가 draft를 바꿔 재구성한다. */
+/**
+ * 감시 카테고리 하나 + 사다리 임계만 설정된 기본 전략 — 개별 test가 draft를 바꿔
+ * 재구성한다. **감시 규칙을 반드시 하나 둔다**(수정 라운드 1 M-1 — `NoGate`가 이제
+ * 통과가 아니므로, 다른 단계를 재는 test는 감시 게이트를 먼저 통과해야 한다).
+ * `MATCHING_SUBJECT`가 이 카테고리와 일치해 `Passed`를 낸다.
+ */
 internal fun testStrategy(
-    draft: StrategyDraft = StrategyDraft(bidNowThreshold = BigDecimal("0.7"), reviewThreshold = BigDecimal("0.45")),
+    draft: StrategyDraft =
+        StrategyDraft(
+            focusCategories = listOf(DEFAULT_FOCUS_CATEGORY),
+            bidNowThreshold = BigDecimal("0.7"),
+            reviewThreshold = BigDecimal("0.45"),
+        ),
 ): OperatorStrategy {
     val result = validate(draft, StrategyRevision(1), strategyPolicy())
     return (result as StrategyValidation.Valid).strategy
@@ -133,7 +147,7 @@ internal class FakeCandidateSource(
     override fun openCandidates(): List<Notice> = notices
 }
 
-/** 기본은 규칙이 없는 감시 subject — 감시 게이트가 항상 NoGate로 통과한다. */
+/** 규칙이 하나도 없는 감시 subject — `testStrategy()`의 기본 draft가 아닌, 감시 미설정 자체를 재는 test용. */
 internal val EMPTY_SUBJECT =
     WatchSubject(
         categories = emptySet(),
@@ -142,8 +156,19 @@ internal val EMPTY_SUBJECT =
         baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
     )
 
+internal const val DEFAULT_FOCUS_CATEGORY = "SYN-CAT-001"
+
+/** `testStrategy()`의 기본 `focusCategories`와 일치해 감시 게이트를 `Passed`로 통과하는 subject. */
+internal val MATCHING_SUBJECT =
+    WatchSubject(
+        categories = setOf(bidvector.strategy.CategoryCode(DEFAULT_FOCUS_CATEGORY)),
+        keywordText = KeywordScopeText(""),
+        fullText = FullScopeText(""),
+        baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
+    )
+
 internal class FakeWatchSubjectPort(
-    val outcomeFor: (Notice) -> WatchSubjectOutcome = { WatchSubjectOutcome.Found(EMPTY_SUBJECT) },
+    val outcomeFor: (Notice) -> WatchSubjectOutcome = { WatchSubjectOutcome.Found(MATCHING_SUBJECT) },
 ) : WatchSubjectPort {
     val calledFor = mutableListOf<NoticeId>()
 
@@ -168,9 +193,14 @@ internal class FakeMlAnalysisPort(
     val outcomeFor: (Notice) -> MlAnalysisOutcome,
 ) : MlAnalysisPort {
     val callCountFor = mutableMapOf<NoticeId, AtomicInteger>()
+    val correlationIdSeenFor = mutableMapOf<NoticeId, CorrelationId>()
 
-    override fun analyze(notice: Notice): MlAnalysisOutcome {
+    override fun analyze(
+        notice: Notice,
+        correlationId: CorrelationId,
+    ): MlAnalysisOutcome {
         callCountFor.getOrPut(notice.id) { AtomicInteger(0) }.incrementAndGet()
+        correlationIdSeenFor[notice.id] = correlationId
         return outcomeFor(notice)
     }
 }
@@ -212,6 +242,23 @@ internal fun bidNowAnalysis(): MlAnalysisOutcome =
         matchedScore = null,
     )
 
+/**
+ * [EvaluateCandidatesUseCase]의 `judge` 위임을 감싸 호출 횟수를 센다(verifier r1 L-1
+ * — `VerdictLadder`는 `object`라 fake로 대체할 수 없어 얇은 위임 뒤에서 센다).
+ */
+internal class CountingJudge {
+    val callCountFor = mutableMapOf<NoticeId, AtomicInteger>()
+
+    fun wrap(
+        notice: Notice,
+        delegate: (LadderInput, Resolution.Resolved<VerdictLadderPolicyData>) -> Verdict,
+    ): (LadderInput, Resolution.Resolved<VerdictLadderPolicyData>) -> Verdict =
+        { input, policy ->
+            callCountFor.getOrPut(notice.id) { AtomicInteger(0) }.incrementAndGet()
+            delegate(input, policy)
+        }
+}
+
 internal fun useCase(
     strategyRepository: FakeStrategyRepository,
     candidateSource: FakeCandidateSource,
@@ -222,6 +269,7 @@ internal fun useCase(
     notifications: FakeNotificationRequestPort = FakeNotificationRequestPort(),
     correlationIds: SequentialCorrelationIdFactory = SequentialCorrelationIdFactory(),
     analysisBudget: Int? = null,
+    judge: (LadderInput, Resolution.Resolved<VerdictLadderPolicyData>) -> Verdict = VerdictLadder::judge,
 ): EvaluateCandidatesUseCase =
     EvaluateCandidatesUseCase(
         strategies = strategyRepository,
@@ -234,4 +282,5 @@ internal fun useCase(
         correlationIds = correlationIds,
         clock = FixedClock(),
         analysisBudget = analysisBudget,
+        judge = judge,
     )
