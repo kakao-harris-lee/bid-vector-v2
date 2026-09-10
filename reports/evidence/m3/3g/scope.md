@@ -41,6 +41,11 @@ rollback: |
 
 작성: 2026-09-10, 세션 모델 단독. 근거: `reports/evidence/m4/4c2/` verifier r2 M-3 · `V2__provenance_guard.sql`·`V3__append_only.sql`·`V4`·`V6` 의 GRANT/REVOKE · `milestone-3.md` 3D.
 
+## 하네스 레인 변경 (상시 절)
+
+`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — **없음**(verifier r1 재검증 시점
+실측, 0건).
+
 ---
 
 ## 이 slice 가 하는 일
@@ -74,3 +79,4 @@ rollback: |
 | --- | --- |
 | `OPEN-3D-GRANT-PUBLIC-BLINDSPOT` | **종결 목표** — ①②가 닫는다. 못 닫으면 근거와 함께 활성 유지 |
 | `OPEN-3G-PERSISTENCE-GATE-REGISTRATION`(신설) | `adapters/persistence` 에는 `MlGateRegistrationTest`·`EventGateRegistrationTest` 같은 **등재 완전성 test 가 없다** — 새 test class 를 만들고 `gate-tests.properties` 에 안 적어도 아무도 못 잡는다(4C-2 verifier r3 「범위 밖 참고」). 이 slice 는 신규 class 를 만들지 않아 당장은 영향이 없다. 후속 |
+| `OPEN-3G-NONTABLE-PRIVILEGE-SURFACES`(신설, verifier r1 L-5·L-6) | **유효 권한 행렬은 `information_schema.tables` 의 `table_type='BASE TABLE'` 만 발견한다.** ① 시퀀스 — `public` 에 시퀀스 **셋**이 있고(`collection_run_id_seq`·`notice_audit_id_seq`·`rejected_write_id_seq`, V1/V2 의 `BIGSERIAL` 유래) `bidvector_app` 이 USAGE·SELECT 를 갖는다(V2 `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public`) — 이 slice 의 제외는 **승인된 경계**(설계 검토 (5) 과잉)이나 근거 문장이 「V6 이 시퀀스를 안 만들었다」로 적혀 사실과 다르다(시퀀스는 있고, 이 slice 가 **재지 않을 뿐**이다). ② VIEW·MATERIALIZED VIEW — 발견 필터가 `BASE TABLE` 만 보므로 그 위 GRANT 는 이 행렬을 지나간다(**오늘은 손실 0** — `public` 에 VIEW·MATERIALIZED VIEW·파티션·외래표가 0개다, verifier r1 실측). 이 slice 가 닫은 PUBLIC 경유 사각과 **같은 갈래**(발견/술어가 한 경로를 안 본다) — 시퀀스 권한 축을 열거나 VIEW 가 0개임을 상시 단언하면 닫힌다 | 후속 |
