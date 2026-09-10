@@ -106,6 +106,8 @@ gate-tests.properties`)에 등재되지 않으면 삭제·비활성화돼도 `ch
 6. **`Predicted` 등 다섯 타입의 컴파일 층 폐쇄 불가** — 위 「설계 검토 대비 결정 변경」. 이것은 의도적 완화이지 누락이 아니다(근거·대안 방어 기록됨).
 7. **`GetModelMetadata` 조회 실패의 사유 세분화 없음** — `fetchPromoted`가 status 무관하게 `null`(대조 불가)로 접어 `ReleaseMismatch`로 수렴한다. transport 실패와 진짜 불일치가 같은 `MlUnavailableReason`을 받는다(구현 결정, 별도 사유 신설은 과설계로 판단).
 8. **`resolvePolicy`의 설정 오류 fail-fast(verifier r1 F-10)** — `ML_CALL_POLICY`가 기준일을 못 푸는 가지는 `error(...)`를 던진다. `ML_CALL_POLICY`가 `Initial` 항목 하나뿐인 한(`MlCallPolicyDataTest` 실측) `predict` 경로에서 실질 도달 불가 — 제거하지 않고 KDoc 근거만 남겼다(`GrpcBidPredictionGateway.resolvePolicy`).
+9. **`init` ↔ 검증층 짝 대조 table 은 손 유지라 새 `init` 조건은 못 잡는다(verifier r4 I-1, low)** — `SuccessShapeFailClosedTest`의 table-driven test(H-6)는 **현재 여덟 조건**만 고정한다. 변이 실측: `Uncertainty`에 짝 없는 조건 하나(`require(dispersion.signum() >= 0)`)를 추가하면 표에 그 행이 없어 test 전부 exit 0(아무도 못 잡음)인 채 `dispersion = "-0.0500"`인 응답이 `IllegalArgumentException`으로 다시 샌다 — F-2→G-1이 닫으려던 재발 클래스가 완전히는 안 닫혔다. **현재 HEAD에는 짝 없는 조건이 없다**(r3 §3·r4 §1 대조 8/8 유효, live 결함 아님). **규율**: 값 타입 `init` 조건을 늘리는 커밋은 같은 커밋에서 검증층 술어와 table 행을 함께 늘린다(`BidPredictionOutcome.kt` KDoc에도 이 규율을 못 박았다). 근본 처방(표 대신 구조 유도)은 다음 코드 slice 몫이다.
+10. **`MlGateRegistrationTest`는 파일명으로 test class를 발견한다(verifier r4 I-2, low)** — `discoverAdaptersMlTestClasses`는 `*Test.kt` **파일**을 세고 클래스 선언을 읽지 않는다. 기존 파일(예: `ReleaseCheckTest.kt`) 안에 둘째 class를 심으면 완전성 test도 `gateExecutionGate`도 그 class를 못 잡는다(변이 실측 확인, 새 파일을 만드는 경우는 잡히므로 구멍은 좁다). 이 패키지는 **파일당 class 하나** 관례를 지킨다 — 그 관례가 깨지면 이 제한이 실효된다.
 
 ## milestone-4.md 종결 문단
 

@@ -5,6 +5,13 @@ import bidvector.sharedkernel.Rate
 import java.math.BigDecimal
 
 /**
+ * **파일 규율(verifier r3 G-1·r4 I-1)** — 이 파일의 값 타입 `init` 불변식은 마지막
+ * 안전판이지 게이트가 아니다. `bidvector.adapters.ml.isAcceptableSuccessShape`(구조
+ * 검증층)가 응답 단계에서 먼저 걸러야 `predict` 밖으로 예외가 새지 않는다(r1 F-5 수정이
+ * 이 짝을 빠뜨려 r2 G-1이 났고, `SuccessShapeFailClosedTest`의 table-driven test는 손으로
+ * 유지돼 새 조건은 못 잡는다 — r4 I-1). **값 타입 `init` 조건을 늘리는 커밋은 같은
+ * 커밋에서 검증층 술어와 `SuccessShapeFailClosedTest`의 table 행을 함께 늘린다.**
+ *
  * 후보 셋 — 정확히 셋, 리스트가 아니다(scope.md ①·⑦, 2B ③ 라벨 순서 고정). 생성자는
  * public이다 — `internal`은 **Kotlin 컴파일 모듈**(Gradle 프로젝트) 단위라 이 결과를
  * 실제로 짓는 어댑터(`adapters` 모듈, 다른 Gradle 프로젝트)에서 `internal` 생성자를 애초에

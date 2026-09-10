@@ -95,6 +95,13 @@ git log --oneline d0a44a739864896d2ca894fbe8b286651d8f1156..HEAD -- <파일>   #
 git diff <sha>~1..<sha> -- <파일> | git apply -R                              # ② 자기 커밋만 역적용
 ```
 
+**한 파일을 두 커밋 이상이 만졌으면 ②를 최신 커밋부터 과거 순으로 돌린다**(verifier r4
+I-3 — 실측: `gate-tests.properties`처럼 같은 파일에 커밋이 둘이면 과거→최신 순으로
+역적용할 때 나중 커밋의 hunk 컨텍스트가 먼저 커밋의 원문과 안 맞아 `apply -R` 자체가
+`error: patch failed`로 죽는다. 최신 커밋을 먼저 역적용하면 그 다음 커밋의 hunk 가
+기대하는 컨텍스트로 되돌아가 있어 순서대로 적용된다 — ①의 `git log` 출력이 이미 최신이
+위인 순서이므로 **그 출력 순서 그대로 위에서부터** 돌리면 된다).
+
 `adapters/build.gradle.kts`·`app/.../VerdictExecutors.kt`·`decision/.../ReviewReason.kt`·
 `docs/discovery/{capability-map,data-dictionary}.md`·`milestone-4.md`·`adapters/src/test/
 .../contract/{ContractFractionRules,ContractRetryRules,PredictionContractTest}.kt`는 이

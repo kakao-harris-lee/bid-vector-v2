@@ -322,3 +322,19 @@
 - exit: 1(매치 0) — `commands.md`의 RED 확인 절(G-1 재현 기록)에 있던 `BidRateCandidates`
   값 타입 생성자 참조 한 곳이 파일명 뒤에 줄 번호를 달고 있었다. 그 파일 안의 줄 번호를
   빼(클래스·파일명만 남기고) 해소했다.
+
+## verifier r4 — low I-1~I-3 등재(코드 로직 무변경, 주석만)
+
+- cmd: `BidPredictionOutcome.kt`에 I-1 규율(값 타입 `init` 조건을 늘리는 커밋은 같은
+  커밋에서 검증층 술어와 `SuccessShapeFailClosedTest`의 table 행을 함께 늘린다)을
+  `BidRateCandidates` KDoc 머리에 추가한 뒤 `:workflow:ktlintFormat :workflow:detekt
+  :workflow:compileKotlin`
+- exit: 0 — 최초 시도(독립된 dangling 최상위 KDoc)는 ktlint가 거부
+  (`A dangling toplevel KDoc is not allowed`·`a KDoc may not be preceded by a KDoc`,
+  자동 교정 불가) — `BidRateCandidates`의 기존 KDoc 안으로 병합해 해소.
+- cmd: `:adapters:compileKotlin`
+- exit: 0 — 주석만 바뀌었고 하위 모듈 컴파일에 영향 없음을 실측 확인.
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m4/4d/ --exclude=scope.md`
+- exit: 1(매치 0)
+- cmd: `grep -rnE '\.kt:[0-9]+' reports/evidence/m4/4d/ _workspace/m4-4d/03_impl_report.md`
+- exit: 1(매치 0)
