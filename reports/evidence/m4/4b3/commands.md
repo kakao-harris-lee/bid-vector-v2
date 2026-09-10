@@ -98,7 +98,7 @@
 - 핵심 결과: `requireKnownReason`(11 분기, else 없음) 신설 — `allReasons` 손 목록에 새 값이
   누락돼도 이 `when`이 비소진이 되면 컴파일이 깨진다.
 
-## S-1 (4차, verifier r1 low 일괄 수정 반영, HEAD=`<이 커밋의 SHA — 커밋 직후 기입>`)
+## S-1 (4차, verifier r1 low 일괄 수정 반영, HEAD=`cf8c9c4`)
 - cmd: `./gradlew --no-build-cache clean check`
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL, 344 actionable tasks(320 executed).
