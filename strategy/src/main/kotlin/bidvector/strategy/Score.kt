@@ -74,7 +74,12 @@ data class MatchScore(
     val score: Score,
 )
 
-/** 확률 점수 축(D-13) — 낙찰 확률 추정. */
+/**
+ * 가격 적합도(추정) 축(D-13) — **P(낙찰)이 아니다**(M4/4B-4 scope.md ⑤, ML-03·D-M2-8).
+ * 이름이 「확률」이라 낙찰 확률로 읽히기 쉽지만 2E 계약(`embedding.proto` 등)에 확률
+ * 축이 없어 이 타입의 **현재 소비자가 없다**(조사 §7 7(c)) — `calibrated_win_rate` 결정
+ * (`OPEN-ML-02`) 뒤에 그 축이 서면 이 타입이나 후속 타입이 맡는다.
+ */
 data class ProbabilityScore(
     val score: Score,
 )
