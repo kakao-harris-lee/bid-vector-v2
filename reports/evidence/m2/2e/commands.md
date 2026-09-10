@@ -261,3 +261,13 @@ clone에서 처음부터 재실행했다.
 - exit: 0.
 - cmd: `./gradlew --offline :adapters:test --tests '*MultiServiceContractTest*'`
 - exit: 0 — 2B/2C 두 서비스로 축소된 test 통과.
+
+## 수정 라운드 1 — S-0·S-8 최종 재확인(HEAD `deb8348`)
+
+- cmd: `./gradlew --no-daemon qualityBaseline`
+- exit: 0.
+- cmd: `git worktree add --detach <scratchpad>/s0-worktree-r1 HEAD(=deb8348) && (cd <dir> &&
+  ./gradlew --no-build-cache --no-daemon clean check)`
+- exit: 0 — 353 tasks(353 executed, 캐시 없이 전건), `BUILD SUCCESSFUL in 58s`.
+- cmd(정리): `git worktree remove --force <dir>`
+- exit: 0 — `git worktree list`에 잔여 없음, 디렉터리 자체도 삭제 확인.
