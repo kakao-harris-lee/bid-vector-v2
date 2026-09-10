@@ -129,9 +129,10 @@ conflict 없음(내 편집은 `OPEN-OPS-10` 행 한 줄 치환, 2E는 `OPEN-4D-L
 행과 신규 두 행 — 물리적으로 다른 행이라 겹치지 않는다). 확인: 「4C-2 처리」 문구
 grep 0건, 2E가 넣은 `OPEN-2E-TEXT-SYNTHESIS`·`OPEN-2E-TEXT-MAX` 행 grep 존재.
 
-**`milestone-4.md`**(4C-2·4B-3) — 4C-2 커밋 **셋**, 최신 것부터:
+**`milestone-4.md`**(4C-2·4B-3) — 4C-2 커밋 **넷**, 최신 것부터:
 
 ```
+git diff ef25a11~1..ef25a11 -- milestone-4.md | git apply -R --3way
 git diff 673cbd5~1..673cbd5 -- milestone-4.md | git apply -R --3way
 git diff 97af8bb~1..97af8bb -- milestone-4.md | git apply -R --3way
 git diff abf6b06~1..abf6b06 -- milestone-4.md | git apply -R --3way
@@ -148,6 +149,12 @@ git diff abf6b06~1..abf6b06 -- milestone-4.md | git apply -R --3way
 **뿌리** — 「이 rollback.md를 쓰는 evidence 커밋이 공유 파일도 함께 만졌다」는 사실을
 그 커밋 자신의 hunk 목록에 반영하는 절차가 없었다. r2 때(`8f8e1e1`)는 그 커밋이
 `milestone-4.md`를 안 건드려 둘짜리 목록이 우연히 맞았을 뿐이다(verifier r3 진단).
+
+**종결 등재도 같은 함정을 지난다 — 그래서 두 커밋으로 나눴다.** 종결 승인 문단은
+`milestone-4.md`(공유 파일)를 만지므로 이 목록에 들어가야 하는데, 자기 해시는 커밋 전에
+알 수 없다. 그래서 ① 종결 문단 + `checklist.md`를 한 커밋(`ef25a11`)으로 올리고 ② 이
+목록에 그 해시를 더하는 커밋은 **`reports/evidence/m4/4c2/**`만** 만진다. ②가 공유 파일을
+건드리면 목록이 또 자기만큼 낡는다(M-5의 자기 재생산).
 **항구 규칙**: rollback.md를 갱신하는 커밋을 만들 때, 그 커밋이 공유 파일도 함께
 바꾸면 **그 커밋 해시를 그 공유 파일의 hunk 목록 최신 자리에 반드시 추가**한다 — 다음
 라운드의 evidence 커밋이 공유 파일을 다시 건드리지 않는 한(이번 M-5 시정 커밋은
@@ -171,7 +178,7 @@ exit 1, 1A/4A/4C-1 선례).
 2. `config/quality/gate-tests.properties` hunk 역적용 — `70cbcdb` exit 0(clean),
    `28733bc` conflict → 위 수동 해소 → `git add`.
 3. `docs/discovery/capability-map.md` hunk 역적용 — exit 0(conflict 없음).
-4. `milestone-4.md` hunk 역적용 **셋(`673cbd5`→`97af8bb`→`abf6b06`, 최신 순)** — 전부
+4. `milestone-4.md` hunk 역적용 **넷(`ef25a11`→`673cbd5`→`97af8bb`→`abf6b06`, 최신 순)** — 전부
    exit 0(conflict 없음, M-5 시정).
 5. `git status --porcelain` — **41건**(D 33 + M 5 + M 3).
 6. 되돌린 트리 **모듈별 compile** — `:adapters:compileKotlin :adapters:compileTestKotlin`
