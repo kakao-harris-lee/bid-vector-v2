@@ -43,6 +43,13 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
     implementation(libs.postgresql.driver)
+
+    // M4/4C-2 verifier r1 M-2 — 1B `CompileFailureHarnessTest` 관례(strategy/shared-kernel
+    // 이 이미 쓰는 좌표, gradle/libs.versions.toml 주석 그대로). event 패키지의 값 획득 축
+    // 폐쇄(EventEnvelope 생성자·transitionOutbox·OutboxTransition.ToDelivered 생성자·
+    // OutboxEntry.restore 가 workflow 밖에서 internal)를 상시 probe 로 저장소에 남긴다 —
+    // 손으로 확인한 폐쇄는 `internal`→`public` 한 줄 되돌림을 어떤 게이트도 못 잡는다.
+    testImplementation(libs.kotlin.compilerEmbeddable)
 }
 
 // M3/3C — sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties). 위
