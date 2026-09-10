@@ -129,15 +129,33 @@ conflict 없음(내 편집은 `OPEN-OPS-10` 행 한 줄 치환, 2E는 `OPEN-4D-L
 행과 신규 두 행 — 물리적으로 다른 행이라 겹치지 않는다). 확인: 「4C-2 처리」 문구
 grep 0건, 2E가 넣은 `OPEN-2E-TEXT-SYNTHESIS`·`OPEN-2E-TEXT-MAX` 행 grep 존재.
 
-**`milestone-4.md`**(4C-2·4B-3) — 4C-2 커밋 둘, 최신 것부터:
+**`milestone-4.md`**(4C-2·4B-3) — 4C-2 커밋 **셋**, 최신 것부터:
 
 ```
+git diff 673cbd5~1..673cbd5 -- milestone-4.md | git apply -R --3way
 git diff 97af8bb~1..97af8bb -- milestone-4.md | git apply -R --3way
 git diff abf6b06~1..abf6b06 -- milestone-4.md | git apply -R --3way
 ```
 
-둘 다 conflict 없음(두 slice 문단이 파일의 다른 절 — 4B 절 끝 vs Slice 4C 절). 확인:
-「4C-2 구현」·「4C-2 verifier」 문단 grep 0건, 「4B-3 종결 2026-09-10」 문단 grep 존재.
+**verifier r3 M-5 시정 — `673cbd5`를 목록 최신 자리에 추가했다.** 이전 판(둘만 등재)은
+`673cbd5`(이 rollback.md 자신을 담은 evidence 커밋)가 `milestone-4.md`의 레인 혼입
+문단도 함께 만졌다는 사실을 놓쳤다 — 그 결과 문서대로 실행하면 `97af8bb` 역적용이
+**conflict**(문서는 「conflict 없음」이라 적어 틀렸다)로 걸리고, 이어지는 `abf6b06`
+역적용은 「인덱스에 없습니다」로 **시퀀스 자체가 끊겼다**(verifier r3 실측, 1A 16차와
+같은 「명령이 실패」 계열). 셋을 최신 순으로 두면 셋 다 exit 0·marker 0으로 깨끗하다
+(verifier r3가 실행 확인).
+
+**뿌리** — 「이 rollback.md를 쓰는 evidence 커밋이 공유 파일도 함께 만졌다」는 사실을
+그 커밋 자신의 hunk 목록에 반영하는 절차가 없었다. r2 때(`8f8e1e1`)는 그 커밋이
+`milestone-4.md`를 안 건드려 둘짜리 목록이 우연히 맞았을 뿐이다(verifier r3 진단).
+**항구 규칙**: rollback.md를 갱신하는 커밋을 만들 때, 그 커밋이 공유 파일도 함께
+바꾸면 **그 커밋 해시를 그 공유 파일의 hunk 목록 최신 자리에 반드시 추가**한다 — 다음
+라운드의 evidence 커밋이 공유 파일을 다시 건드리지 않는 한(이번 M-5 시정 커밋은
+`reports/evidence/m4/4c2/**`만 바꾼다, 공유 파일 무접촉) 이 목록은 최종적이다.
+
+셋 다 conflict 없음(문서 커밋의 레인 혼입 문장 추가는 4B-3 문단과 물리적으로 분리된
+자리). 확인: 「4C-2 구현」·「4C-2 verifier」 문단 grep 0건, 「4B-3 종결 2026-09-10」
+문단 grep 존재.
 
 ## 마이그레이션
 
@@ -147,17 +165,18 @@ git diff abf6b06~1..abf6b06 -- milestone-4.md | git apply -R --3way
 `git checkout <base> -- <경로>`는 쓰지 않는다(base에 없는 신규 경로마다 pathspec 오류로
 exit 1, 1A/4A/4C-1 선례).
 
-## 확인 지점 — 임시 clone에서 실제로 실행(dry-run 아님, r2 최종 라운드에서 재실측)
+## 확인 지점 — 임시 clone에서 실제로 실행(dry-run 아님, r3 시정 뒤 재실측)
 
-1. 임시 clone(`git clone .`, HEAD `20f7ad0`)에서 A(33)·M(5, 단독) restore — 둘 다 exit 0.
+1. 임시 clone(`git clone .`, HEAD `673cbd5` 이상)에서 A(33)·M(5, 단독) restore — 둘 다 exit 0.
 2. `config/quality/gate-tests.properties` hunk 역적용 — `70cbcdb` exit 0(clean),
    `28733bc` conflict → 위 수동 해소 → `git add`.
-3. `docs/discovery/capability-map.md`·`milestone-4.md` hunk 역적용 — 전부 exit 0
-   (conflict 없음).
-4. `git status --porcelain` — **41건**(D 33 + M 5 + M 3).
-5. 되돌린 트리 **모듈별 compile** — `:adapters:compileKotlin :adapters:compileTestKotlin`
+3. `docs/discovery/capability-map.md` hunk 역적용 — exit 0(conflict 없음).
+4. `milestone-4.md` hunk 역적용 **셋(`673cbd5`→`97af8bb`→`abf6b06`, 최신 순)** — 전부
+   exit 0(conflict 없음, M-5 시정).
+5. `git status --porcelain` — **41건**(D 33 + M 5 + M 3).
+6. 되돌린 트리 **모듈별 compile** — `:adapters:compileKotlin :adapters:compileTestKotlin`
    exit 0.
-6. 되돌린 트리 **test** — `:adapters:test :app:test`(이번엔 4B-3·2E 산출물이 여전히
+7. 되돌린 트리 **test** — `:adapters:test :app:test`(이번엔 4B-3·2E 산출물이 여전히
    남아 있으므로 app 도 함께 확인) exit 0.
 
 ## 되돌린 뒤 남는 것

@@ -282,6 +282,16 @@ r2(M-3·M-4·L-7·L-11) 커밋 완료 직후 HEAD가 `4ec52db`에서 `20f7ad0`(M
 - S-5: `./gradlew --no-daemon qualityBaseline` — exit 0.
 - S-6(별도 호출): `./gradlew --no-daemon :app:gateExecutionGate` — exit 0.
 
+**verifier r3 L-12 시정 — 위 표의 기준 head를 명시한다.** 위 S-0~S-6은 `20f7ad0`에서
+돈 것이다(docs(m4-4c2) 커밋 `673cbd5`가 이 표 자체를 포함해 `milestone-4.md`·
+`commands.md`·`rollback.md` 셋만 델타로 더했다 — 코드·게이트는 무변경). **행운을
+근거로 쓰지 않는다** — 현재 HEAD `673cbd5`에서 내가 직접 재실행해 별도로 확인했다:
+`./gradlew --no-daemon --no-build-cache clean check`(S-1) exit 0(345 actionable
+tasks) · `./gradlew --no-daemon :app:test`(S-4, 별도 호출) exit 0 ·
+`./gradlew --no-daemon :app:gateExecutionGate`(S-6, 별도 호출) exit 0. verifier r3도
+독립적으로 `673cbd5`에서 S-1을 돌려 exit 0을 확인했다(`_workspace/m4-4c2
+/05_verifier_report_r3.md` §acceptance).
+
 ## rollback 재실측(r2, 임시 clone, dry-run 아님) — 공유 파일 판정을 파일마다 재계산
 
 `git log --oneline <base>..HEAD -- <파일>`을 in_scope 파일마다 다시 돌려 4C-2·4B-3·2E
@@ -324,3 +334,43 @@ r2(M-3·M-4·L-7·L-11) 커밋 완료 직후 HEAD가 `4ec52db`에서 `20f7ad0`(M
 - `data-dictionary.md` §2.2.5가 `OPEN-4C1-TX-CONTRACT-UNVERIFIED`를 여전히 활성으로
   말한다(verifier r1 L-3) — capability-map.md는 이 slice가 닫힘으로 갱신했지만
   data-dictionary.md는 in_scope 밖이라 고치지 않았다. 후속 slice 인계.
+
+## verifier r3(2026-09-10) — ready-for-review(산출물 high 0) → M-5·L-12 시정(마지막 라운드)
+
+전제: HEAD `673cbd5`(라운드 착수 시점, base `ff210c1` 그대로). 보고서
+`_workspace/m4-4c2/05_verifier_report_r3.md`. M-3·M-4는 verifier가 mutation 넷·여섯으로
+직접 재실측해 닫힘 확인(양방향 모두 — 초과·부족 둘 다 잡힘, fixture 여섯이 각자 자기
+축만 낙제). 이 라운드는 M-5·L-12만 처리한다. **이 수정 커밋은
+`reports/evidence/m4/4c2/**`만 바꾼다** — `milestone-4.md`·`gate-tests.properties`·
+`capability-map.md`·`scope.md`는 한 줄도 건드리지 않았다(아래 뿌리 참고, 자기 재생산
+방지).
+
+### M-5 — rollback.md의 milestone-4.md hunk 목록에 `673cbd5`가 빠져 있었다
+
+verifier가 문서 그대로 실행해 재현: `97af8bb` 역적용이 conflict(문서는 「conflict
+없음」이라 틀렸다), 이어 `abf6b06` 역적용이 「인덱스에 없습니다」로 시퀀스 자체가
+끊겼다(1A 16차와 같은 「명령이 실패」 계열). 뿌리 — `673cbd5`(rollback.md 자신을
+담은 evidence 커밋)가 `milestone-4.md`의 레인 혼입 문단도 함께 만졌는데, 그 사실이
+목록에 반영되지 않았다. r2 때(`8f8e1e1`)는 그 커밋이 `milestone-4.md`를 안 건드려
+둘짜리 목록이 우연히 맞았을 뿐이다.
+
+시정: rollback.md의 milestone-4.md hunk 목록에 `673cbd5`를 최신 자리로 추가(셋:
+`673cbd5`→`97af8bb`→`abf6b06`) + 항구 규칙 명시(rollback.md를 갱신하는 커밋이 공유
+파일도 함께 바꾸면 그 커밋 해시를 그 공유 파일의 hunk 목록 최신 자리에 반드시
+추가한다).
+
+- cmd: 임시 clone(HEAD `673cbd5` 이상, 시정된 rollback.md 반영 뒤)에서 A(33)·M(5) restore
+  — 둘 다 exit 0.
+- cmd: `config/quality/gate-tests.properties` hunk 역적용 `70cbcdb`(exit 0, clean) →
+  `28733bc`(conflict, 문서의 수동 해소 절차) → `git add`.
+- cmd: `docs/discovery/capability-map.md` hunk 역적용 `abf6b06` — exit 0(conflict 없음).
+- cmd: `milestone-4.md` hunk 역적용 **셋, 최신 순** `673cbd5` → `97af8bb` → `abf6b06`
+  — **전부 exit 0**(conflict 없음, M-5 시정 확인).
+- 확인: `git status --porcelain` 41건(D 33 + M 8) — rollback.md 수치와 일치. 「내 줄
+  사라짐」(`4C-2 구현`·`4C-2 verifier` grep 0) · 「남의 줄 남음」(4B-3 착수/종결 문단
+  grep 2, capability-map.md의 2E `OPEN-2E-*` 행 grep 2) 둘 다 확인.
+- cmd: 되돌린 트리 `./gradlew --no-daemon :adapters:compileKotlin
+  :adapters:compileTestKotlin` — exit 0.
+- cmd: 되돌린 트리 `./gradlew --no-daemon :adapters:test :app:test` — exit 0.
+
+### L-12 — acceptance 기준 head 명시(위 「r2 최종 acceptance」 절에 반영)
