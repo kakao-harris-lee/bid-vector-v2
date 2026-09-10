@@ -57,15 +57,6 @@ val ML_CALL_POLICY: EffectiveDatedPolicy<MlCallPolicyData> =
         source = "reports/evidence/m4/4d/policy-values.md §1·§2·§3 — 사용자 승인 2026-09-10",
         entries =
             listOf(
-                EffectiveFrom.Initial to
-                    MlCallPolicyData(
-                        deadlineCeiling = Duration.ofSeconds(5),
-                        maxAttempts = 3,
-                        backoff = listOf(Duration.ofMillis(200), Duration.ofMillis(800)),
-                        breakerFailureRateThresholdPercent = 50,
-                        breakerSlidingWindowSize = 10,
-                        breakerWaitDurationInOpenState = Duration.ofSeconds(30),
-                        featureSchemaVersion = "bidvector.ml.v1",
-                    ),
+                EffectiveFrom.Initial to placeholderMlCallPolicy(featureSchemaVersion = "bidvector.ml.v1"),
             ),
     )
