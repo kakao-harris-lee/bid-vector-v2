@@ -36,6 +36,12 @@ data class LadderInput(
     val matchedScore: UnitScore?,
     val currentActiveBids: Int,
     val maxActiveBids: Int,
+    /**
+     * M4/4B-3(scope.md ②) — `priorityScore`가 결측일 때 [VerdictLadder.judge]가
+     * `Review(MlUnavailable)`에 실을 세부 사유. 기본값 `ScoreNotProvided`는 4B-1 관례를
+     * 그대로 보존한다 — 이 슬롯을 넘기지 않는 기존 호출부(test·corpus 실행자)는 무변경.
+     */
+    val mlUnavailableReason: MlUnavailableReason = MlUnavailableReason.ScoreNotProvided,
 ) {
     init {
         require(currentActiveBids >= 0) { "currentActiveBids는 음수일 수 없다: $currentActiveBids" }

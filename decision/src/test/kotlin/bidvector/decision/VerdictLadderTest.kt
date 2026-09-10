@@ -153,4 +153,76 @@ class VerdictLadderTest {
         verdict.shouldBeInstanceOf<Verdict.BidNow>()
         verdict.reasons.single().shouldBeInstanceOf<BidNowReason.PriorityAboveBidNowThreshold>()
     }
+
+    // M4/4B-3 scope.md ② — LadderInput.mlUnavailableReason 슬롯이 priorityScore==null
+    // 분기의 Review(MlUnavailable)에 그대로 실린다(사유가 ScoreNotProvided 로 접히지 않는다,
+    // 설계 검토 (4) 우회 2). MlUnavailableReason 열 값 전부를 표로 확인한다.
+    @Test
+    fun `④ ML 부재 — mlUnavailableReason 슬롯 값이 사다리까지 그대로 전달된다`() {
+        // `MlUnavailableReasonTest`(4D-1)가 이 sealed 의 소진 when 회귀를 따로 지킨다
+        // (gate.tests.decision 등재) — 여기서는 그 열 값을 손으로 나열해 전달 경로만 잰다.
+        val allReasons =
+            listOf(
+                MlUnavailableReason.ScoreNotProvided,
+                MlUnavailableReason.DeadlineExceeded,
+                MlUnavailableReason.CircuitOpen,
+                MlUnavailableReason.RetryBudgetExhausted,
+                MlUnavailableReason.TransportFailed,
+                MlUnavailableReason.ModelNotReady,
+                MlUnavailableReason.ReleaseMismatch,
+                MlUnavailableReason.ContractViolation,
+                MlUnavailableReason.UnsupportedSchema,
+                MlUnavailableReason.UnsupportedRelease,
+                MlUnavailableReason.InvalidRequest,
+            )
+        allReasons.forEach { reason ->
+            val input =
+                LadderInput(
+                    priorityScore = null,
+                    probabilityScore = null,
+                    matchedScore = null,
+                    currentActiveBids = 0,
+                    maxActiveBids = 10,
+                    mlUnavailableReason = reason,
+                )
+
+            val verdict = VerdictLadder.judge(input, legacyPolicy())
+
+            verdict.shouldBeInstanceOf<Verdict.Review>()
+            val ladderReason = verdict.reasons.single().shouldBeInstanceOf<ReviewReason.MlUnavailable>()
+            ladderReason.reason shouldBe reason
+        }
+    }
+
+    // 슬롯의 기본값은 4B-1 관례(ScoreNotProvided)를 그대로 보존한다 — 슬롯을 넘기지
+    // 않는 기존 호출부(test·corpus 실행자)는 이 test 로 무변경임을 고정한다.
+    @Test
+    fun `mlUnavailableReason 슬롯 기본값은 ScoreNotProvided 다`() {
+        val input = inputOf(priority = null)
+
+        val verdict = VerdictLadder.judge(input, legacyPolicy())
+
+        val reason = verdict.shouldBeInstanceOf<Verdict.Review>().reasons.single() as ReviewReason.MlUnavailable
+        reason.reason shouldBe MlUnavailableReason.ScoreNotProvided
+    }
+
+    // forceBidOutcome 분기는 scope.md ②에 따라 무변경 — probability·matched 결측은
+    // 슬롯 값과 무관하게 항상 ScoreNotProvided 다.
+    @Test
+    fun `④ force-bid 분기의 ML 부재는 슬롯 값과 무관하게 항상 ScoreNotProvided 다`() {
+        val input =
+            LadderInput(
+                priorityScore = UnitScore(BigDecimal("0.5")),
+                probabilityScore = null,
+                matchedScore = null,
+                currentActiveBids = 0,
+                maxActiveBids = 10,
+                mlUnavailableReason = MlUnavailableReason.DeadlineExceeded,
+            )
+
+        val verdict = VerdictLadder.judge(input, legacyPolicy())
+
+        val reason = verdict.shouldBeInstanceOf<Verdict.Review>().reasons.single() as ReviewReason.MlUnavailable
+        reason.reason shouldBe MlUnavailableReason.ScoreNotProvided
+    }
 }
