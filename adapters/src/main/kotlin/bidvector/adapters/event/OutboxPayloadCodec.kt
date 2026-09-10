@@ -50,8 +50,14 @@ internal object OutboxPayloadCodec {
         error("알 수 없는 outbox payload 타입이다: ${payload?.let { it::class.qualifiedName }}")
 
     private fun encodeStrategyUpdated(event: StrategyEvent.StrategyUpdated): String {
-        val effectiveFrom = event.policyVersion.effectiveFrom
-        val effectiveFromField = if (effectiveFrom is EffectiveFrom.On) effectiveFrom.date.toString() else ""
+        // verifier r1 L-2 시정 — `if (… is On) … else ""`는 `EffectiveFrom`에 셋째 하위
+        // 타입이 생겨도 조용히 `Initial`처럼 인코딩한다(복원 쪽 fail-closed 규율의 반대
+        // 방향). 소진 `when`으로 바꿔 새 하위 타입이 생기면 컴파일이 깨지게 한다.
+        val effectiveFromField =
+            when (val effectiveFrom = event.policyVersion.effectiveFrom) {
+                EffectiveFrom.Initial -> ""
+                is EffectiveFrom.On -> effectiveFrom.date.toString()
+            }
         return listOf(event.revision.value.toString(), effectiveFromField, event.policyVersion.source)
             .joinToString(FIELD_SEPARATOR.toString(), transform = ::escape)
     }

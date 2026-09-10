@@ -197,6 +197,91 @@ class CleanMigrationTest : PersistenceTestSupport() {
         grantedPrivileges shouldContainExactlyInAnyOrder setOf("SELECT")
     }
 
+    /**
+     * verifier r1 H-1 시정, **r2 M-3 시정으로 술어 교체** — 설계 검토 (2b) 「V6 테이블
+     * 자체 | GRANT 목록을 test 가 대조」의 실측이 없었다(r1). r1 이 쓴
+     * `information_schema.role_table_grants WHERE grantee = 'bidvector_app'`은 **역할에
+     * 직접 부여된 것만** 본다 — `GRANT DELETE ON outbox TO PUBLIC;` 한 줄이면 이 술어는
+     * 못 보는데 `bidvector_app`은 `PUBLIC` 경유로 실제 DELETE를 행사할 수 있었다(verifier
+     * r2 실측, `PROBE-PUB … OK rows=1`). [effectivePrivileges]는
+     * `has_table_privilege(role, table, priv)`로 **역할 직접 부여 + PUBLIC 부여 + 역할
+     * 상속**을 전부 해소한 유효 권한을 축 일곱 전부(SELECT/INSERT/UPDATE/DELETE/
+     * TRUNCATE/REFERENCES/TRIGGER) true/false로 못 박는다 — 「있어야 할 것이 있다」와
+     * 「없어야 할 것이 없다」를 둘 다 이 형태로도 유지한다. **3D의 기존 두 권한 test**
+     * (provenance_authority·notice_audit, 위)는 이 slice의 in_scope 밖이라 손대지 않는다
+     * — 같은 PUBLIC 경유 공백이 거기도 있다는 것은 알려진 제한/인계로만 남긴다
+     * (`reports/evidence/m4/4c2/commands.md`).
+     */
+    @Test
+    fun `애플리케이션 역할 bidvector_app 은 outbox 에 SELECT INSERT UPDATE 유효 권한만 갖는다 — PUBLIC 경유 포함`() {
+        val privileges = effectivePrivileges("outbox")
+        privileges shouldBe
+            TablePrivileges(
+                select = true,
+                insert = true,
+                update = true,
+                delete = false,
+                truncate = false,
+                references = false,
+                trigger = false,
+            )
+    }
+
+    @Test
+    fun `애플리케이션 역할 bidvector_app 은 inbox 에 SELECT INSERT 유효 권한만 갖는다 — PUBLIC 경유 포함`() {
+        val privileges = effectivePrivileges("inbox")
+        privileges shouldBe
+            TablePrivileges(
+                select = true,
+                insert = true,
+                update = false,
+                delete = false,
+                truncate = false,
+                references = false,
+                trigger = false,
+            )
+    }
+
+    /** 축 일곱 전부를 `has_table_privilege`로 해소한 유효 권한 — 직접 부여·PUBLIC 부여·역할 상속을 모두 본다(verifier r2 M-3). */
+    private data class TablePrivileges(
+        val select: Boolean,
+        val insert: Boolean,
+        val update: Boolean,
+        val delete: Boolean,
+        val truncate: Boolean,
+        val references: Boolean,
+        val trigger: Boolean,
+    )
+
+    private fun effectivePrivileges(table: String): TablePrivileges =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "SELECT " +
+                        "has_table_privilege('bidvector_app', ?, 'SELECT') AS p_select, " +
+                        "has_table_privilege('bidvector_app', ?, 'INSERT') AS p_insert, " +
+                        "has_table_privilege('bidvector_app', ?, 'UPDATE') AS p_update, " +
+                        "has_table_privilege('bidvector_app', ?, 'DELETE') AS p_delete, " +
+                        "has_table_privilege('bidvector_app', ?, 'TRUNCATE') AS p_truncate, " +
+                        "has_table_privilege('bidvector_app', ?, 'REFERENCES') AS p_references, " +
+                        "has_table_privilege('bidvector_app', ?, 'TRIGGER') AS p_trigger",
+                ).use { statement ->
+                    for (index in 1..7) statement.setString(index, table)
+                    statement.executeQuery().use { rs ->
+                        rs.next()
+                        TablePrivileges(
+                            select = rs.getBoolean("p_select"),
+                            insert = rs.getBoolean("p_insert"),
+                            update = rs.getBoolean("p_update"),
+                            delete = rs.getBoolean("p_delete"),
+                            truncate = rs.getBoolean("p_truncate"),
+                            references = rs.getBoolean("p_references"),
+                            trigger = rs.getBoolean("p_trigger"),
+                        )
+                    }
+                }
+        }
+
     private fun queryStrings(sql: String): Set<String> {
         val actual = mutableSetOf<String>()
         dataSource().connection.use { connection ->

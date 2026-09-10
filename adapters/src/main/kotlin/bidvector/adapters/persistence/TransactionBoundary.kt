@@ -14,10 +14,13 @@ import javax.sql.DataSource
  * 닫는 형태」) — 경계를 거치지 않은 등록은 컴파일은 되지만 **실행 시점에 항상 실패**한다.
  *
  * ambient는 스레드 하나마다 독립이다([ThreadLocal]) — 서로 다른 스레드의 동시 `inTransaction`
- * 호출은 서로의 트랜잭션을 보지 못한다(claim 경합 test가 바로 이 성질에 기댄다). 그 안에서
- * 한 겹 더 — [Ambient]가 **연 스레드를 기록**하고(설계 검토 (4)-⑤), 그 참조가 다른
- * 스레드로 넘어가(코루틴 디스패처 이동 등) [withConnection]이 불리면 「경계 밖」이 아니라
- * **「남의 스레드」**라는 더 정확한 사유로 던진다.
+ * 호출은 서로의 트랜잭션을 보지 못한다(claim 경합 test가 바로 이 성질에 기댄다). [Ambient]는
+ * 그 위에 **연 스레드도 기록**한다(설계 검토 (4)-⑤) — 다만 **verifier r1 L-1 실측**:
+ * `ThreadLocal.get()`은 다른 스레드에서 이미 항상 `null`이라(경계 자체를 못 봄) 그 앞의
+ * `error("트랜잭션 경계 밖에서 커넥션에 접근했다")`에서 먼저 끝나고, owner 비교 `check`는
+ * 오늘의 저장 방식으로는 **도달하지 않는 분기**다. 거동은 안전하다(어느 경로든 던진다) —
+ * owner 기록·비교는 ambient 저장 방식이 스레드 격리가 아닌 형태로 바뀔 경우를 대비한
+ * 방어적 이중화로 남긴다.
  */
 class TransactionBoundary(
     private val dataSource: DataSource,

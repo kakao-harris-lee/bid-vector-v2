@@ -412,7 +412,9 @@ strategy 서른아홉만 남음)로, 4B-1 몫만 걷으면(이전 라운드에�
 래칫 「추가만」 예외) · D-4C2-3(신규 패키지 `bidvector.adapters.event`)을 그대로
 따랐다. `TransactionBoundary`(경계 밖 접근은 예외, ambient가 연 스레드를 기록)가
 `JdbcRawObservationStore`(개조 — 주 생성자 `ConnectionSource`, 기존 `DataSource`
-생성자는 보조 생성자로 위임)와 `JdbcOutboxPort`의 유일한 커넥션 경로다. `claim`은
+생성자는 보조 생성자로 위임)와 `JdbcOutboxPort`가 받는 `ConnectionSource`의 유일한
+경계 구현이다(`ConnectionSource` 자체는 `sealed` — verifier r1 H-2 시정, 아래
+참고). `claim`은
 `SELECT ... FOR UPDATE SKIP LOCKED` + 같은 트랜잭션 커밋(at-most-once, D-M4-5) —
 경합·워커 사망(롤백 시 Pending 잔존)을 래치 기반 test로 실측했다. **`OPEN-4C1-TX-CONTRACT
 -UNVERIFIED`를 이 slice가 닫는다** — raw append+outbox 등록의 같은 트랜잭션 커밋/롤백,
@@ -424,6 +426,26 @@ strategy 서른아홉만 남음)로, 4B-1 몫만 걷으면(이전 라운드에�
 `JdbcQualificationTextRepository`·`JdbcCollectionRunStore`)은 알려진 제한으로 남는다.
 acceptance S-0~S-6 전건 통과(`--no-build-cache clean check` 포함). 종결(verifier
 ready-for-review + 사용자 승인)은 별도.
+
+**4C-2 verifier r1(2026-09-10) → not-ready(high 둘) → 시정.** H-1(V6 GRANT 값은
+설계대로였으나 그것을 지키는 게이트가 없어 `GRANT ALL PRIVILEGES`로 되돌려도
+`:adapters:test`가 전건 초록이었다 — outbox·inbox 권한 대조 test를 더하고 mutation으로
+실제 낙제를 확인) · H-2(`ConnectionSource`가 평범한 `public interface`라 다른 모듈이
+경계 아닌 커넥션 공급자를 구현해 트랜잭션 없이 outbox에 등록할 수 있었다 — 문면 셋
+(`JdbcOutboxPort` KDoc·설계 검토·이 문단)이 닫힘을 사실로 진술했지만 실제로는 배선
+관례였다. `sealed interface`로 구조를 닫아(교차 모듈 컴파일 거부 양성 대조 실측) 문면과
+구현을 일치시켰다) 둘 다 닫았다. M-1(state 어휘 다섯이 CHECK 개수만으로는 안 지켜져
+`'RETRYING'` 추가가 안 잡혔다 — 본문 정확 대조로 래칫) · M-2(4C-1 폐쇄 probe가 저장소에
+없어 손 검증에만 의존했다 — 1B 컴파일 실패 하네스 관례로 상시화)도 같은 라운드에서
+처리했다. L-1~L-6(문면 정확성·장부)은 별도 서술 없이 해당 커밋에 반영.
+
+**레인 혼입 — 이력을 되쓰지 않고 사실로 선언한다(2026-09-02 규율).** r1 수정 진행 중
+다른 레인이 이 slice의 진행분(`a3822c4`)을 자기 브랜치(4B-3, 이미 사용자 승인·종결)에
+병합했고, 그 병합 커밋으로 `m4/2026-09-08`과 `main`이 함께 이동했다. 그 시점 4C-2는
+verifier `not-ready`(H-1·H-2 미해결) 상태였다 — 이 라운드가 그 둘을 닫는다. 병합 자체는
+되돌리지 않는다(세 worktree와 다른 세션이 그 커밋을 참조 중이라 공유 이력을 되쓰는
+비용이 더 크다). `config/quality/gate-tests.properties`·이 문서는 그 병합 이후 진짜
+공유 파일이 됐다 — rollback은 커밋 해시로 hunk를 격리한다(`reports/evidence/m4/4c2/rollback.md`).
 
 ### Slice 4D — ML gateway
 
