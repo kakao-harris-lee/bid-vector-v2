@@ -21,7 +21,6 @@ import io.grpc.StatusRuntimeException
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 import bidvector.workflow.prediction.ModelReleaseSelector as DomainModelReleaseSelector
 
 private typealias PredictionStub = BidPredictionServiceGrpcKt.BidPredictionServiceCoroutineStub
@@ -38,7 +37,7 @@ class GrpcBidPredictionGateway(
     private val clock: Clock,
 ) : BidPredictionPort {
     private val stub: PredictionStub = BidPredictionServiceGrpcKt.BidPredictionServiceCoroutineStub(channel)
-    private val circuitBreaker = buildPredictionCircuitBreaker("ml-bid-prediction", resolvePolicy().data)
+    private val circuitBreaker = buildMlCircuitBreaker("ml-bid-prediction", resolvePolicy().data)
 
     override suspend fun predict(
         request: BidPredictionRequest,
@@ -48,28 +47,32 @@ class GrpcBidPredictionGateway(
         val remaining = minOf(budget.remaining, resolved.data.deadlineCeiling)
         val requestId = UUID.randomUUID().toString()
         val protoRequest = mapRequest(request, requestId, resolved.data, resolved.versionLabel)
-        val stubWithDeadline = stub.withDeadlineAfter(remaining.toMillis(), TimeUnit.MILLISECONDS)
-        val outcome =
-            callResilient(circuitBreaker, resolved.data.maxAttempts, resolved.data.backoff, remaining) {
-                stubWithDeadline.calculateOptimalBid(protoRequest)
-            }
+        val (stubWithDeadline, outcome) =
+            callMlRpc(
+                stub,
+                protoRequest,
+                circuitBreaker,
+                resolved.data,
+                remaining,
+                ::isRetryableFailureResponse,
+            ) { s, req -> s.calculateOptimalBid(req) }
 
         return when (outcome) {
-            PredictionCallOutcome.BreakerOpen -> {
+            MlCallOutcome.BreakerOpen -> {
                 BidPredictionOutcome.Unavailable(MlUnavailableReason.CircuitOpen)
             }
 
             // verifier r2 G-4 — 예산 소진은 서버를 한 번도 못 불렀거나 재시도를 포기한
             // 것이지 breaker 가 셀 transport 실패가 아니다(ResilientPredictionCall.kt).
-            PredictionCallOutcome.BudgetExhausted -> {
+            MlCallOutcome.BudgetExhausted -> {
                 BidPredictionOutcome.Unavailable(MlUnavailableReason.DeadlineExceeded)
             }
 
-            is PredictionCallOutcome.TransportFailed -> {
+            is MlCallOutcome.TransportFailed -> {
                 mapTransportFailure(outcome.error)
             }
 
-            is PredictionCallOutcome.Responded -> {
+            is MlCallOutcome.Responded -> {
                 handleResponse(
                     outcome.response,
                     request.releaseSelector,
@@ -221,3 +224,13 @@ private data class ResolvedMlCallPolicy(
     val data: MlCallPolicyData,
     val versionLabel: String,
 )
+
+/**
+ * D-4D2-4 처방 2 — 응답 타입에 의존하는 재시도 판정 술어는 `ResilientPredictionCall.kt`가
+ * 아니라 호출부가 갖는다(4D-1 에서 이 파일로 이동, 순수 위치 이동 — 판정 로직 자체는
+ * 한 글자도 바뀌지 않았다). 임베딩 쪽 대응은 `GrpcEmbeddingGateway.kt`의
+ * `isRetryableEmbedFailure`다.
+ */
+private fun isRetryableFailureResponse(response: CalculateOptimalBidResponse): Boolean =
+    response.resultCase == CalculateOptimalBidResponse.ResultCase.FAILURE &&
+        isRetryableApplicationFailure(response.failure.retryable)
