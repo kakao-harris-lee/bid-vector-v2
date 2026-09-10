@@ -124,12 +124,56 @@ base `8b50461016232386e456be532fab4eed4299fcfb`, head는 리뷰 시점의 HEAD �
 
 ## S-0 — 격리 worktree 전건(clean check)
 
-- cmd: `git worktree add --detach <dir> HEAD && (cd <dir> && ./gradlew --no-build-cache clean check)`
+- cmd: `git worktree add --detach <scratchpad>/s0-worktree HEAD(=3abddbc) && (cd <dir> &&
+  ./gradlew --no-build-cache --no-daemon clean check)`
 - exit: 0
-- 핵심 결과: (실행 후 기록 — S-1 3차 통과 확인 뒤 HEAD 고정 후 실행)
+- 핵심 결과: 353 tasks(353 executed, 캐시 없이 전건), `BUILD SUCCESSFUL in 1m 17s`.
+- cmd(정리): `git worktree remove --force <dir>`
+- exit: 0
+- 핵심 결과: `git worktree list`에 잔여 없음, 디렉터리 자체도 삭제 확인(§4b 「worktree 제거
+  뒤 잔여 디렉터리 확인」 절차).
 
 ## secret 스캔
 
 - cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m2/2e/`
-- exit: (실행 후 기록)
-- 핵심 결과: (실행 후 기록)
+- exit: 0
+- 핵심 결과: 매치 2건은 이 명령 자신의 인용문 줄(판독 규칙 — 2A CLAUDE.md 이력 오탐과 같은
+  계열, 실제 secret 아님).
+
+- cmd: `git diff <base>..HEAD -- adapters/src/test ml-engine/tests contracts config/quality docs/discovery | grep -niE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))"`
+- exit: 1(매치 0)
+- 핵심 결과: 실제 diff 안에는 매치 없음.
+
+## rollback 실측(임시 clone)
+
+- cmd: `git clone --no-hardlinks <repo> <scratch>/rollback-test-clone && cd <clone> &&
+  git checkout m2-2e/2026-09-10 && git restore --source=8b50461... --staged --worktree --
+  <rollback.md 10경로>`
+- exit: 0
+- 핵심 결과: `git status --porcelain`에 D 8행(신규 파일·디렉터리)·M 6행(편집 파일) — 10경로
+  전부 반영.
+- cmd: `git diff 8b50461... -- <편집 파일 6개>` (파이프 `wc -l`)
+- exit: 0
+- 핵심 결과: 0줄(작업 트리가 base와 바이트 단위로 동일).
+- cmd: `(cd contracts && buf lint && buf build)`
+- exit: 0(둘 다)
+- 핵심 결과: `embedding.proto` 삭제 확인(`ls proto/bidvector/ml/v1/` 5개 파일만), 계약 자족.
+- cmd: `./gradlew --offline :adapters:compileTestKotlin`
+- exit: 0
+- 핵심 결과: `EmbeddingContractTest.kt` 삭제·`MultiServiceContractTest.kt` 축소 상태로
+  컴파일 성공(참조 불일치 없음).
+- cmd: `./gradlew --offline :adapters:test --tests '*MultiServiceContractTest*'`
+- exit: 0
+- 핵심 결과: 2B/2C 두 서비스로 축소된 `MultiServiceContractTest` 통과.
+
+## clean-tree 게이트 — in_scope 경로 개별 인자
+
+- cmd: `git status --porcelain -- <in_scope 13경로 개별 인자>`
+- exit: 0
+- 핵심 결과: evidence 파일(commands.md 편집분·checklist.md·rollback.md 신설, 커밋 전)만
+  나타남 — 나머지 12경로는 이미 커밋됨.
+- cmd(양성 대조): `embedding.proto`에 한 줄 추가 후 같은 명령
+- exit: 0
+- 핵심 결과: `M contracts/proto/.../embedding.proto` 잡힘(게이트가 실제로 매치함을 확인) —
+  추가한 줄은 즉시 제거(파일이 이미 깨끗한 커밋 상태였으므로 `git checkout --`로 안전하게
+  절삭, 다른 미커밋 편집 없음을 사전 확인).
