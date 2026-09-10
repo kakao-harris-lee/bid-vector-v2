@@ -112,3 +112,22 @@ rollback: |
 | **`OPEN-4B5-POLICY-VALUES`**(신설) | ⑧ 값 — 종결 승인 시 확정 |
 | **`OPEN-4B5-CORPUS`**(신설) | 밴드·합성 전수 표의 corpus 승격 — 병합 뒤 curator |
 | STR-05 | `후속` 그대로 — 슬롯도 만들지 않는다 |
+| **`OPEN-4B5-COMPETITIVENESS`**(신설, 계약 갱신 1) | ⑤ 는 이 slice 에서 **구현하지 않는다** — 상수 `Absent(MarketAverageMissing)` 만 |
+
+---
+
+## 계약 갱신 — 2026-09-10 (구현 중, 팀장 등재)
+
+1. **⑤ `deriveCompetitiveness` 제외 — `OPEN-4B5-COMPETITIVENESS` 신설.** 구현 레인이 D-4B5-4 「없으면 멈추고 보고」대로 멈췄다. 실측: (i) shared-kernel `Basis` 에 「시장 평균」
+   축이 없어 `marketAverage` 를 `Money` 로 타입화할 생성 경로가 없다 (ii) `Money` 스케일 연산은 `BaseAmount × BidRate` 하나뿐이라 `avg × 0.8`·`avg × 1.2` 를 만들 수단이
+   없다 (iii) `compareKnownVat` 는 같은 타입 쌍만 비교한다. 뿌리는 더 깊다 — **V2 는 「투찰 시장 평균」을 수집·정의한 적이 없다**(capability-map 에 그 축이 없고, legacy 는
+   `market_data.get("average_bid", budget)` 로 예산을 sentinel 로 썼다). 따라서 이것은 산술의 부재가 아니라 **fact 의 부재**다. 처분: ⑤ 는 `workloadNotCollected` 와 같은
+   상수 함수 `competitivenessNotCollected(): ScoreFact<UnitScore> = Absent(MarketAverageMissing)` 만 두고, `DerivationPolicyData` 에 competitiveness 필드를 **만들지 않는다**
+   (소비자 없는 죽은 필드 금지). 4B-4 재정규화가 그 성분을 흡수하므로 priority 는 나머지 넷으로 선다. `OPEN-4B5-COMPETITIVENESS` 는 「시장 평균 fact 의 정의·수집(M3
+   후속 — 개찰 결과 집계 축)·shared-kernel basis 결정」을 묻는 운영자 항목으로 capability-map §14 에 등재(이 slice 는 등재만).
+2. **④ budget 밴드 비교의 산술 — 허용 범위 명시.** 정책 임계(5억·2억·1억)와 `BaseAmount` 의 비교는 basis 를 섞는 산술이 아니라 **같은 basis(기초금액) 안의 크기 비교**다.
+   허용: 임계를 `BaseAmount`(또는 원 단위 `Long`)로 정책 데이터에 두고 `BaseAmount.export().won` 크기 비교. 금지(D-4B5-4 그대로): `BigDecimal` 나눗셈·basis 교차·`double`.
+   checklist 에 근거 등재.
+3. **② `budgetCapture` 의 `RoundingPolicy` 파라미터** — `BidAmount.bidRateAgainst(BaseAmount, origin, Resolution<RoundingPolicy>)` 시그니처에 맞춰 `DerivationPolicyData.budgetCaptureRounding`
+   필드를 둔다(1D `FloorShortfallPolicyData.criticalRateRounding` 선례). 값은 policy-values.md 등재·승인 대상.
+4. **`DerivationAbsence.MoneyArithmeticUnmeasurable(reason)`** — shared-kernel `Measurement.Unmeasurable` 의 잔여 사유(VAT 불일치 등)를 접지 않고 나르는 가지 하나. 허용.
