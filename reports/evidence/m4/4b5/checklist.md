@@ -12,7 +12,7 @@ head_sha: (리뷰 요청 시점의 `git rev-parse HEAD`)
 | 3 | 합 ≠ 1 표 | `DerivationPolicyData.init`의 `requireFullWeightMap`(scale 4 비교) | `DerivationPolicyDataTest`(marginWeights·complexityWeights 각 합≠1 생성 실패) |
 | 4 | 밴드 역순·중복 상한 정책 | `Ladder.Ascending`/`Descending.init`의 `requireStrictlyOrdered`(엄격 단조) | `BandTest`(역순·중복 생성 실패) |
 | 5 | `hits` 음수 | `KeywordHits.init`(`count >= 0`) | `ExecutionComplexityDerivationTest`(hits=20 상한 test — 음수 자체는 타입 `init`으로 생성 단계 차단, 별도 test 불필요·`KeywordHits` 값 타입 자체가 우회를 없앤다) |
-| 6 | `floor = 1` 분모 0 | `MarginDerivation.floorHeadroomOf`의 `floor.compareTo(ONE) == 0 -> recommended` 분기 | `ExpectedMarginDerivationTest`("floor 1 이면 분모 0 이라 headroom 을 rec 로 되돌린다") |
+| 6 | `floor = 1` 분모 0 | `MarginDerivation.floorHeadroomOf`의 `floor.compareTo(ONE) == 0 -> recommended` 분기 — `MarginInputs.init`(verifier r1 F-1)이 `floor ≤ 1`을 보장해 이 분기 밖은 항상 `0 < floor < 1`이다 | `ExpectedMarginDerivationTest`("floor 1 이면 분모 0 이라 headroom 을 rec 로 되돌린다", F-1 경계·회귀 test 다섯) |
 | 7 | `alignmentTolerance` 등 리터럴 | 전부 `DerivationPolicyData` 필드(main 에 숫자 리터럴 없음 — `verifier grep` 대상) | `DerivationPolicyDataTest`(constant range 위반 생성 실패 다섯) |
 | 8 | ④ 전 항 부재 | `ComplexityInputs.keywordHits`·`remaining`·`loadRatio` 는 non-null(타입이 「전부 부재」를 구성 불가로 닫는다) | `ExecutionComplexityDerivationTest`("budget match capacity 셋 다 부재하면 keyword deadline loadRatio 셋만") — 그 셋조차 항상 present 임을 보인다 |
 | 9 | `Money` 를 `BigDecimal` 로 꺼내 나눔 | `deriveBudgetCapture`는 `bidRateAgainst`(1B)만 쓴다 — main 에 `Money` 타입에 대한 직접 나눗셈 없음(④ budget 은 `.export().won`을 밴드 **비교**에만 쓰고 나눗셈하지 않는다, 아래 「값 획득 축」 참고) | `BudgetCaptureDerivationTest`(1B 산술 왕복·VAT 불일치·미선언 출처 — `bidRateAgainst` 내부 전건이 그대로 도달함을 확인) |
@@ -57,6 +57,19 @@ competitiveness 밴드·비율 필드를 두지 않는다(소비자 없는 필�
 §14 등재는 팀장(세션 모델) 소관 — `docs/discovery/capability-map.md` 는 이 slice의
 in_scope 밖이라(scope.md) 이 레인이 직접 편집하지 않는다.
 
+## verifier r1 반영(not-ready → 수정 라운드 1, 재작업 1/5)
+
+| finding | 처분 |
+| --- | --- |
+| **F-1 (high)** ③ 가 상한 없는 `Rate` 를 clamp 하지 않아 `floor>1`에서 headroom 이 뒤집힘 | 채택 (a) — `MarginInputs.init` 에서 `recommendedRate`·`floorRate`·`predictedRate` 를 `≤ 1`로 닫는다(`DerivationInputs.kt`). 판정층 짝은 상류(2B `D-2B-8`·4D-1 `ContractViolation`). `ExpectedMarginDerivationTest` 경계(1.0 통과·1.0000001 거부) + 우회 재현(floor 1.2 거부) + 회귀(rec 0.7·floor 0.9 legacy 일치, 0.445) 다섯 |
+| **F-2 (medium)** 출하 `budgetCaptureRounding` 대조 test 없음(6→2 변이 생존) | `DerivationPolicyDataTest`에 출하 인스턴스 `scaleDigits`·`mode` 직접 대조 test 추가 + `BudgetCaptureDerivationTest`에 정밀도 민감 표본(333,333,000/1,000,000,000 = 0.333333, scale 2 면 0.33 으로 달라짐) 추가 |
+| **F-3 (medium)** `floorHeadroomOf` KDoc 「legacy 와 사실상 같다」가 사실과 다름 | KDoc 정정(`MarginDerivation.kt`) — 실측 차(0.7225 대 0.5325) 명시, 「거동은 scope.md ③ 의 의도된 선택」으로 재서술. `policy-values.md` §3 「의도된 갈림」에도 등재 |
+| **F-4 (medium, 장부)** rollback.md 목록·계수 낡음, capability-map.md 누락 | rollback.md 「대상 파일 목록」·restore 명령에 `docs/discovery/capability-map.md` 추가, `git diff --name-status` 재산출(D/M 갱신) |
+| **F-5 (low, 장부)** commands.md 의 S-0 선언 head 가 도달 불가(rebase 뒤 amend) | commands.md 의 해당 절을 실제 조상 SHA(`e47370e`, 이번 라운드 head)로 정정 |
+| **F-6 (low)** `renormalizedWeightedSum`↔4B-4 `weightedScoreOf` 구조 중복 | 이번 라운드 수정 대상 아님(4B-4 파일 편집 금지) — 알려진 제한에 등재, 4B-6 소관 |
+| **F-7 (low)** legacy 2자리 반올림 미재현 | `policy-values.md` §3 「의도된 갈림」에 등재(의도된 재설계, 값 손실 미실측) |
+| **F-8 (low, 계약)** D-4B5-3 「경계 의미는 같다」 부정확 | scope.md 는 팀장(세션 모델) 소유라 이 레인이 수정하지 않는다 — **팀장이 커밋 `9817dda`로 직접 정정, 닫힘** |
+
 ## `init` ↔ 판정층 짝 (설계 검토 대응)
 
 | 값 타입 `init` | 판정층 짝 |
@@ -80,10 +93,21 @@ in_scope 밖이라(scope.md) 이 레인이 직접 편집하지 않는다.
   실측 없음).
 - **`budgetCaptureRounding` 스케일(6)의 근거가 실측이 아니다** — 위와 같음, 승인
   대상.
+- **`renormalizedWeightedSum`(`MarginDerivation.kt`)과 4B-4 `weightedScoreOf`
+  (`PriorityComposition.kt`)가 구조적으로 중복**(verifier r1 F-6) — 같은 알고리즘,
+  `cpdCheck` 는 토큰 문턱 아래라 통과한다. 4B-4 파일 편집 금지가 이 slice의 계약이라
+  이번 라운드에서 합치지 않는다 — 4B-6 이 공용 커널로 올리거나 4B-4 함수를 `internal`
+  승격할 때 처리(계약 갱신 필요).
+- **D-4B5-3(「시간 밴드 경계 의미는 같다」) 문면이 부정확했다**(verifier r1 F-8) — legacy
+  는 `deadline_hours_remaining: int` (정수 절사) 를 받아 6.9h 가 `6` → `≤6` 밴드로
+  들어가지만, V2 `Duration` 은 6.9h 그대로 비교해 `>6h` 밴드로 떨어진다. **팀장이
+  `scope.md` D-4B5-3 을 직접 정정했다**(커밋 `9817dda`, 문면 소유가 세션 모델이라 이
+  레인은 수정하지 않았다) — 「경계 의미는 legacy 와 같지 않다 · 잘림을 재현하지 않는다
+  (intentional-redesign)」로 갱신. **닫힘.**
 
 ## 재작업
 
-0/5.
+1/5(verifier r1 not-ready → 수정 반영).
 
 ## 사용자 승인
 

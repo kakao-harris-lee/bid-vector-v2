@@ -85,13 +85,20 @@ main 코드로 먼저 API 를 확정한 뒤(§ 아래 「main 작성」) test �
 - cmd: `./gradlew --no-build-cache clean check`
 - exit: 0 — gate-tests 등재·milestone 문단 추가 뒤에도 `BUILD SUCCESSFUL`
 
-## S-0 — 격리 worktree 재현(1차 HEAD `efeff5f`, 계약 갱신 반영 뒤 최종 HEAD `c4f1871`)
+## S-0 — 격리 worktree 재현(1차 HEAD `efeff5f`, 계약 갱신 반영 뒤 2차 HEAD)
+
+**verifier r1 F-5 정정** — 이 절이 이전에 2차 head 로 적었던 `c4f1871` 은 그 뒤
+evidence 커밋 amend 로 궤도를 벗어나 **HEAD 의 조상이 아니다**(`git merge-base
+--is-ancestor c4f1871 HEAD` 실패, 「낡는 좌표」 클래스). 2차 실행은 실제로는 rebase
+직후의 head(당시 `173230a`, 이후 amend·capability-map 커밋으로 대체됨)에서였다 —
+아래는 그 사실만 남기고 도달 불가능한 SHA 를 지운다.
 
 - cmd: `git worktree add --detach <tmp-dir> HEAD && (cd <tmp-dir> && ./gradlew --no-build-cache clean check)`
 - exit: 0(1차, `efeff5f`) — `BUILD SUCCESSFUL in 1m 1s`, 354 actionable tasks(354 executed).
-- exit: 0(2차, 팀장 계약 갱신 #1~#4 반영 뒤 rebase 최종 HEAD `c4f1871`) — `BUILD SUCCESSFUL
-  in 56s`, 354 actionable tasks(354 executed). worktree는 매번 `git worktree remove
-  --force`로 정리, `git worktree prune`로 잔여 확인.
+- exit: 0(2차, 팀장 계약 갱신 #1~#4 반영 뒤 rebase 직후) — `BUILD SUCCESSFUL in 56s`, 354
+  actionable tasks(354 executed). worktree는 매번 `git worktree remove --force`로
+  정리, `git worktree prune`로 잔여 확인.
+- exit: 0(3차, verifier r1 반영 뒤 최종 head — 아래 「verifier r1 반영」절) — S-0 재실행 결과 동일.
 
 ## clean-tree 게이트 — 경로 개별 인자 + 양성 대조
 
@@ -132,3 +139,43 @@ main 코드로 먼저 API 를 확정한 뒤(§ 아래 「main 작성」) test �
 - exit: 0, 출력 없음 — clean.
 - 양성 대조: `Band.kt`에 한 줄 추가 → `git status --porcelain` 이 `M` 출력 확인 →
   `git checkout --` 로 원복 → 재확인 결과 없음.
+
+## verifier r1 반영(not-ready → 수정 라운드 1, base head `e47370e`)
+
+F-1(high)·F-2·F-3(medium, 같은 함수·정책 파일)을 코드+test로, F-4~F-8(장부·low·계약)을
+evidence로 반영했다(`_workspace/m4-4b5/04_verifier_report.md`).
+
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0 — `BUILD SUCCESSFUL`, 345 actionable tasks(321 executed). F-1 `MarginInputs.init`
+  추가·F-3 KDoc 정정 뒤에도 GREEN.
+- cmd: `./gradlew --no-daemon :decision:test --tests 'bidvector.decision.priority.derive.*'`
+- exit: 0 — 71 tests(F-1 다섯·F-2 둘 추가로 64→71).
+- cmd: `./gradlew --no-daemon :decision:test`
+- exit: 0 — S-3, 4B-1·4B-3·4B-4 무변경.
+- cmd: `./gradlew --no-daemon :decision:gateExecutionGate`
+- exit: 0 — S-4.
+
+**F-1 경계 probe(우회 재현 → 차단 확인)** — `MarginInputs.init`(F-1)을 일시 제거하고
+`ExpectedMarginDerivationTest`만 재실행:
+- exit: 1 — F-1 신설 test 셋(`recommendedRate`·`floorRate`·`predictedRate` 상한) 전부
+  `Expected exception ... but no exception was thrown`로 실패(11 중 3 failed) — 우회가
+  다시 열리면 test가 잡는다는 것을 실측. `init` 복원 후 재실행 exit 0(원복 확인,
+  `git diff --stat` 원본과 동일).
+
+**F-2 변이 probe(scaleDigits 6→2)** — 출하 `DERIVATION_POLICY.budgetCaptureRounding`
+의 `scaleDigits`를 `6`→`2`로 바꾸고 `DerivationPolicyDataTest`만 재실행:
+- exit: 1 — 신설 test `expected:<6> but was:<2>`로 실패(16 중 1 failed, F-2 재현 그대로
+  잡힘). 값 복원 후 재실행 exit 0(원복 확인).
+
+**최종 head(`17d517b`) 재확인** — F-4~F-8 커밋(evidence 장부, D-4B5-3 정정 커밋
+`9817dda` 반영 포함) 뒤:
+- cmd: `git worktree add --detach <tmp-dir> HEAD && (cd <tmp-dir> && ./gradlew --no-build-cache clean check)`
+- exit: 0 — S-0, `BUILD SUCCESSFUL in 1m 6s`, 354 actionable tasks(354 executed). worktree
+  는 `git worktree remove --force` + `git worktree prune`로 정리.
+- cmd: `git clone --no-hardlinks . <tmp-dir> && cd <tmp-dir> && git checkout m4-4b5/2026-09-10 && git restore --source=9eddf7525b74f89ce279acbb3adf4948f05c25f1 --staged --worktree -- config/quality/gate-tests.properties decision/src/main/kotlin/bidvector/decision/priority/derive decision/src/test/kotlin/bidvector/decision/priority/derive docs/discovery/capability-map.md milestone-4.md reports/evidence/m4/4b5`
+- exit: 0 — `git status --porcelain` D 21/M 3(rollback.md 선언과 정확히 일치), `git diff
+  <base> -- <같은 경로들>` 0줄, `derive` 디렉터리 소멸.
+- cmd: `./gradlew --no-daemon :decision:compileKotlin :decision:test :decision:gateExecutionGate`(되돌린 트리)
+- exit: 0 — `BUILD SUCCESSFUL`. 임시 clone·worktree 전부 실측 뒤 삭제.
+- cmd: `git status --porcelain -- <in_scope 6경로>`
+- exit: 0, 출력 없음 — clean-tree 최종 확인.
