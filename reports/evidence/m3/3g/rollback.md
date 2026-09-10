@@ -10,12 +10,11 @@ reports/evidence/m3/3g/scope.md` 한 줄뿐)이다. 두 값은 **다르다** —
 어차피 되돌림 대상이 아니므로(계약 문서 예외) **어느 base 를 기준으로 restore 해도 결과는
 같다** — verifier r1 이 임시 clone에서 실행해 확인했다(검증 보고 §11).
 
-이 문서 작성 시점 head `e6a6200`(아래 확인 절은 `5499e9f`에서 실행 — **verifier r1 L-3
-시정**: 이 커밋 뒤 `6718740`(rollback.md 자기 갱신)이 더 있어 이 문서의 실측 head가
-현재 head보다 뒤처져 있었다. verifier r1이 최종 head `6718740`에서 S-0~S-6과 rollback
-전 단계를 직접 재실행해 전부 exit 0을 얻어 이 낙차를 메웠다(검증 보고 §10·§11) — 문서의
-실측 시점 자체는 정정하지 않는다(이력을 되쓰지 않는다), 뒤처짐이 있었다는 사실과 그것을
-메운 재실행을 여기 남긴다.
+**이 문단은 verifier r1 착수 시점(head `e6a6200`, 확인 절 실행 시점 `5499e9f`)의 낙차를
+그대로 기록한 것이다(이력을 되쓰지 않는다) — verifier r1이 최종 head `6718740`에서
+S-0~S-6과 rollback 전 단계를 직접 재실행해 전부 exit 0을 얻어 그 낙차를 메웠다(검증
+보고 §10·§11). 이 L-1~L-7 시정 라운드의 「확인 지점」 절은 head `f78bd40`(이 라운드
+자신의 커밋)에서 새로 실행한 것이라 낙차가 없다.**
 
 ## 목록 산출(기계적)
 
@@ -27,14 +26,18 @@ git diff --name-status 6e3aea4..HEAD
 (+ 이 문서를 담을 다음 커밋에서 `A reports/evidence/m3/3g/commands.md` ·
 `A reports/evidence/m3/3g/rollback.md`가 추가된다 — 아래 「evidence 자기 파일」 절).
 
-## 귀속 확인 — `git log --oneline 6e3aea4..HEAD` = `be9daa4`·`e6a6200` 둘뿐
+## 귀속 확인 — `git log --oneline 6e3aea4..HEAD` = `be9daa4`·`e6a6200`·`5499e9f`·`6718740`·`f78bd40` 전부 3G
 
-이 range 안에서 세 파일 전부 **3G 단독**이다(다른 레인의 커밋이 이 range에 없다,
+이 range 안에서 파일 전부 **3G 단독**이다(다른 레인의 커밋이 이 range에 없다,
 `git log --oneline 6e3aea4..HEAD` 실측). 그래도 `milestone-3.md`·
 `docs/discovery/capability-map.md`는 성격상 여러 slice가 공유하는 문서이므로
 **커밋 해시 hunk 격리**로 되돌린다(전체 `base` restore가 아니라) — 이 rollback.md가
 쓰인 뒤 다른 레인이 같은 파일에 커밋을 얹을 수 있기 때문이다. `CleanMigrationTest.kt`는
 이 range 안에서 3G만 만졌으므로 전체 restore로 충분하다.
+
+**verifier r1 시정 커밋 `f78bd40`(L-1~L-7 일괄)도 `milestone-3.md`·`capability-map.md`를
+다시 만졌다** — hunk 목록이 이제 파일마다 **둘**이다(최신 `f78bd40` 먼저, 그다음
+`e6a6200`). 아래 M(2)를 갱신했다.
 
 ## M(1, 3G 단독) — 전체 복원
 
@@ -43,15 +46,21 @@ git restore --source=6e3aea4 --staged --worktree -- \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt
 ```
 
-## M(2, 공유 문서) — 커밋 해시 hunk 격리
+## M(2, 공유 문서) — 커밋 해시 hunk 격리(둘, **최신부터**)
 
 ```
+git diff f78bd40~1..f78bd40 -- milestone-3.md | git apply -R
+git diff f78bd40~1..f78bd40 -- docs/discovery/capability-map.md | git apply -R
 git diff e6a6200~1..e6a6200 -- milestone-3.md | git apply -R
 git diff e6a6200~1..e6a6200 -- docs/discovery/capability-map.md | git apply -R
 ```
 
-확인(둘 다 실측) — 「내 줄 사라짐」: `Slice 3G` · `OPEN-3D-GRANT-PUBLIC-BLINDSPOT` (신설·닫힘
-행) grep **0건**. 「남의 줄 남음」: `milestone-3.md`의 `### Slice 3F` 절 · `capability-map.md`의
+넷 다 **conflict 없음**(실측 — `f78bd40`의 편집이 `e6a6200`이 만든 구간 안/바로 옆이라
+먼저 역적용해 그 구간을 `e6a6200` 상태로 되돌린 뒤에야 `e6a6200` 자신의 hunk가 원래
+계산된 트리 상태와 일치한다 — 순서를 바꾸면 두 번째 역적용이 낡은 base를 기대해 실패한다).
+
+확인(둘 다 실측) — 「내 줄 사라짐」: `Slice 3G` · `OPEN-3D-GRANT-PUBLIC-BLINDSPOT` grep **0건**.
+「남의 줄 남음」: `milestone-3.md`의 `### Slice 3F` 절 · `capability-map.md`의
 `OPEN-3B2-PAGE-SIZE-VS-MESSAGE-CAP` 행 grep **전부 존재**(3G 바로 앞뒤 이웃 — 인접 삽입이라
 가장 걸리기 쉬운 자리).
 
@@ -68,15 +77,17 @@ rm -f reports/evidence/m3/3g/commands.md reports/evidence/m3/3g/rollback.md
 ## 목록이 자기를 담은 커밋을 가리키지 않게 나눈 것
 
 이 문서(rollback.md)와 `commands.md`는 **`reports/evidence/m3/3g/**`만** 만지는 별도
-커밋으로 올린다(공유 문서 커밋 `e6a6200`과 분리) — 그래서 위 hunk 목록(`e6a6200` 하나)이
-이 문서 자신의 커밋으로 낡지 않는다.
+커밋으로 올린다(공유 문서 커밋과 분리) — 그래서 위 hunk 목록이 이 문서 자신의 커밋으로
+낡지 않는다. **이 절 자체를 갱신하는 지금 커밋(rollback.md만 만짐)이 그 규율의 두 번째
+적용이다** — `f78bd40`(공유 문서를 만진 L-1~L-7 커밋)의 해시를 이 문서에 추가하는 커밋은
+`reports/evidence/m3/3g/rollback.md` 하나만 바꾼다.
 
-## 확인 지점 — 임시 clone에서 실제로 실행(실측, 2026-09-10T10:2x Z, head `5499e9f`)
+## 확인 지점 — 임시 clone에서 실제로 실행(실측, 2026-09-10, head `f78bd40`)
 
-1. `git clone .` (HEAD `5499e9f` — evidence 커밋 포함) — exit 0.
-2. M(1) restore(`CleanMigrationTest.kt`) exit 0 · M(2) hunk 역적용 둘
-   (`milestone-3.md`·`capability-map.md`) 각 exit 0 — **conflict marker 없음**(인접
-   구간 재확인 결과, `--3way` 불필요).
+1. `git clone .` (HEAD `f78bd40`) — exit 0.
+2. M(1) restore(`CleanMigrationTest.kt`) exit 0 · M(2) hunk 역적용 **넷**
+   (`f78bd40`→`e6a6200`, `milestone-3.md`·`capability-map.md` 각 둘) 전부 exit 0 —
+   **conflict marker 없음**.
 3. evidence 자기 파일 삭제(`rm -f`) — exit 0.
 4. `git status --porcelain -- <in_scope 4경로>` — `CleanMigrationTest.kt`(M, staged)·
    `milestone-3.md`(M)·`docs/discovery/capability-map.md`(M)·`commands.md`(D)·
