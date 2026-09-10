@@ -40,7 +40,7 @@ acceptance_commands:
   - "S-1  ./gradlew --no-build-cache clean check"
   - "S-2  ./gradlew :adapters:test"
   - "S-3  ./gradlew :workflow:test"
-  - "S-4  ./gradlew :adapters:moduleDependencyGate :adapters:sizeGate :adapters:cpdCheck :adapters:contractGate"
+  - "S-4  ./gradlew :adapters:moduleDependencyGate :adapters:sizeGate :adapters:cpdCheck && ./gradlew contractGate"   # `contractGate` 는 **root task** 다(M2/2D·2E 계약과 같은 표기) — `:adapters:contractGate` 는 존재하지 않는다
   - "S-5  ./gradlew :app:test"                # 필터 없이 전건
   - "S-6  ./gradlew qualityBaseline"
   - "S-7  ./gradlew :app:gateExecutionGate"   # S-5 와 **별도 호출**
@@ -179,3 +179,13 @@ else 없음)와 client 측 fail-closed(구조검증·release 대조·breaker·de
 | --- | --- | --- |
 | **D-4D2-1 확정** | **임베딩 port 와 값 타입은 4D-2 가 소유한다**(운영자 승인 2026-09-10) | 4D-1 이 `workflow/prediction` 을 소유한 전례 그대로다. **4B-6 은 임베딩 port 를 만들지 않고 소비한다** — 4B-5 계약의 괄호 서술(「4B-6 이 임베딩 port」)은 이 결정으로 대체된다. 그 레인에 전달은 운영자가 한다 |
 | **D-4D2-4**(신설) | **`callResilient` 을 제네릭화한다** — 「4D-1 산출물 동작 변경 금지」는 **동작** 불변을 뜻하지 타입 매개변수 추출까지 막는 것이 아니다 | 착수 조사 실측: `ResilientPredictionCall.kt` 의 `callResilient`·`PredictionCallOutcome.Responded`·`BoundedRetryOutcome.Success`·`attemptOnce`·`isRetryableFailureResponse` 가 전부 `CalculateOptimalBidResponse` 에 **하드코딩**돼 있어 그대로는 임베딩에 못 쓴다. 사본을 만들면 (ⅰ) cpdCheck 가 잡고 (ⅱ) verifier r1 F-1·r2 G-4·r3 H-1 이 어렵게 세운 로직을 **두 벌 유지**하게 된다. 그래서 응답 타입을 타입 매개변수로, 「재시도 가능한 application failure 인가」를 술어 인자로 뽑는다. **`internal` 이므로 (2b) 공개 표면은 늘지 않는다** — 4B-2 가 걸린 함정(주입 인자가 공개 시그니처가 됨)과 다른 자리다. **동작 불변의 증거는 4D-1 의 기존 test 전건 무변경 초록**이다(`BreakerTest`·`DeadlineCancellationRetryTest`·`SuccessShapeFailClosedTest` 등) — 그 test 들을 **고쳐야 한다면 동작이 바뀐 것**이니 멈추고 보고한다 |
+
+---
+
+## 계약 정정 — 2026-09-11 (S-4 의 존재하지 않는 task)
+
+착수 계약이 S-4 에 **`:adapters:contractGate`** 를 적었으나 그런 task 는 없다 — `contractGate` 는 **root task** 다
+(M2/2D·2E 계약의 표기가 정본이다: `./gradlew contractGate`). 구현 레인이 실행 단계에서 발견해 교정 형태로 돌려
+통과를 확인하고 **scope.md 원문은 고치지 않은 채 보고**했다(기획 문서는 세션 모델 소관) — 옳은 처리다.
+위 YAML 을 정정했다. **이 계열은 1A 16차 high 와 같다** — 「명령이 아예 실패하는 acceptance 를 계약이 적어 둔 것」.
+`contractGate` 자체는 `check` 안에 있어 S-0·S-1 이 이미 덮었으므로 검증 공백은 없었다.
