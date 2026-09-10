@@ -76,12 +76,12 @@ git diff <sha>~1..<sha> -- config/quality/gate-tests.properties | git apply -R
 문제는 없다 — 커밋이 둘 이상으로 늘면 최신→과거 순으로 역적용한다(4D-1 verifier r4 I-3
 선례).
 
-## 실측(임시 clone, HEAD=`43619ce` — 이 slice의 마지막 evidence 커밋) — 5단계
+## 실측(임시 clone, HEAD=`eb1a1fc` — 이 slice의 마지막 evidence 커밋) — 5단계
 
 절차 — 코드·test·gate 등재 커밋 전부 완료 → 목록 기계 산출 → 임시 clone → ①~⑤ → 이
 문서에 기록 → evidence 커밋. 아래는 그 결과다.
 
-① `git clone . /tmp/4b3-rollback-verify && cd /tmp/4b3-rollback-verify && git checkout 43619ce` — exit 0.
+① `git clone . /tmp/4b3-rollback-verify && cd /tmp/4b3-rollback-verify && git checkout eb1a1fc` — exit 0.
 ② 위 A 항목 `git restore` 명령 실행 — exit 0(경로 6개 전부 매치, pathspec 오류 없음).
 ②' M 항목(이 range 전용 8개) `git restore` 명령 실행 — exit 0.
 ②'' `config/quality/gate-tests.properties` hunk 격리 역적용(커밋 1건) — exit 0.

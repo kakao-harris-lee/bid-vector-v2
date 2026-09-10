@@ -68,12 +68,15 @@
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL, 344 actionable tasks(320 executed). `shared-kernel:cpdCheckObserved` 관측 경고는 이 slice가 만지지 않은 모듈의 기존 baseline 잡음(관측 전용, `cpdCheck` 자체는 통과).
 
-## S-0 (isolated worktree, HEAD=`<3번째 커밋 SHA — 아래 기입>`)
+## S-0 (isolated worktree, HEAD=`eb1a1fc`)
 - cmd: `git worktree add --detach /tmp/4b3-s0-worktree HEAD`
 - exit: 0
 - cmd: `./gradlew --no-build-cache clean check` (worktree 안)
 - exit: 0
-- 핵심 결과: BUILD SUCCESSFUL — `gate.tests.adapters` 등재 커밋 포함 HEAD 로 재실행해 `MlGateRegistrationTest` 통과 확인(1차 시도는 등재 전 HEAD 라 실패, 아래 「알려진 제한」 아님 — 순서 문제였을 뿐).
+- 핵심 결과: BUILD SUCCESSFUL, 353 actionable tasks(전건 실행). `gate.tests.adapters` 등재
+  커밋(`eb1a1fc`) 포함 HEAD 로 재실행해 `MlGateRegistrationTest` 통과 확인(gate 등재 전
+  중간 HEAD(`2254911`)에서의 1차 시도는 의도적으로 실패 — 등재 커밋 전이라 당연한 결과였고
+  결함이 아니다).
 - cmd: `git worktree remove --force /tmp/4b3-s0-worktree`
 - exit: 0
 
