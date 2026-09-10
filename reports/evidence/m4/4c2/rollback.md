@@ -129,9 +129,10 @@ conflict 없음(내 편집은 `OPEN-OPS-10` 행 한 줄 치환, 2E는 `OPEN-4D-L
 행과 신규 두 행 — 물리적으로 다른 행이라 겹치지 않는다). 확인: 「4C-2 처리」 문구
 grep 0건, 2E가 넣은 `OPEN-2E-TEXT-SYNTHESIS`·`OPEN-2E-TEXT-MAX` 행 grep 존재.
 
-**`milestone-4.md`**(4C-2·4B-3) — 4C-2 커밋 **넷**, 최신 것부터:
+**`milestone-4.md`**(4C-2·4B-3) — 4C-2 커밋 **다섯**, 최신 것부터:
 
 ```
+git diff 3af06ad~1..3af06ad -- milestone-4.md | git apply -R --3way
 git diff ef25a11~1..ef25a11 -- milestone-4.md | git apply -R --3way
 git diff 673cbd5~1..673cbd5 -- milestone-4.md | git apply -R --3way
 git diff 97af8bb~1..97af8bb -- milestone-4.md | git apply -R --3way
@@ -178,7 +179,7 @@ exit 1, 1A/4A/4C-1 선례).
 2. `config/quality/gate-tests.properties` hunk 역적용 — `70cbcdb` exit 0(clean),
    `28733bc` conflict → 위 수동 해소 → `git add`.
 3. `docs/discovery/capability-map.md` hunk 역적용 — exit 0(conflict 없음).
-4. `milestone-4.md` hunk 역적용 **넷(`ef25a11`→`673cbd5`→`97af8bb`→`abf6b06`, 최신 순)** — 전부
+4. `milestone-4.md` hunk 역적용 **다섯(`3af06ad`→`ef25a11`→`673cbd5`→`97af8bb`→`abf6b06`, 최신 순)** — 전부
    exit 0(conflict 없음, M-5 시정).
 5. `git status --porcelain` — **41건**(D 33 + M 5 + M 3).
 6. 되돌린 트리 **모듈별 compile** — `:adapters:compileKotlin :adapters:compileTestKotlin`
