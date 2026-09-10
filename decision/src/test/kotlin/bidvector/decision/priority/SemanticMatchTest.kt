@@ -80,6 +80,16 @@ class SemanticMatchTest {
     }
 
     @Test
+    fun `offset 하한 -0_21 도 OffsetOutOfRange 다(F-4, 하한 분기 실측)`() {
+        val notice = vector("1.0", "0.0")
+        val profile = vector("1.0", "0.0")
+
+        val outcome = SemanticMatch.of(notice, profile, BigDecimal("-0.21"), TEST_PRIORITY_POLICY)
+
+        outcome shouldBe MatchOutcome.OffsetOutOfRange
+    }
+
+    @Test
     fun `offset 경계값 ±0_20 은 범위 안이다(포함 경계)`() {
         val notice = vector("1.0", "0.0")
         val profile = vector("1.0", "0.0")

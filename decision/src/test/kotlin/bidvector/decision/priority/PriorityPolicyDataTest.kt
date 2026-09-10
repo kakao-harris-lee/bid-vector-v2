@@ -2,13 +2,48 @@ package bidvector.decision.priority
 
 import bidvector.sharedkernel.Resolution
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 
 private fun weightsOf(vararg overrides: Pair<Component, BigDecimal>): Map<Component, BigDecimal> =
     (TEST_PRIORITY_POLICY.weights + overrides.toMap())
+
+// ---- F-1(verifier r1 medium) — 출하 값을 재정규화 산식으로 독립 재구성(리터럴 복제 아님) ----
+
+private val LEGACY_PROBABILITY_WEIGHT = BigDecimal("0.40")
+
+/** legacy 여섯 가중합(조사 §1.1 `allocation.py:38-43`)에서 확률 축을 뺀 다섯. */
+private val LEGACY_COMPONENT_WEIGHTS: Map<Component, BigDecimal> =
+    mapOf(
+        Component.Match to BigDecimal("0.23"),
+        Component.Urgency to BigDecimal("0.14"),
+        Component.Competitiveness to BigDecimal("0.08"),
+        Component.BudgetCapture to BigDecimal("0.06"),
+        Component.ExpectedMargin to BigDecimal("0.09"),
+    )
+
+private const val WEIGHT_RENORMALIZATION_SCALE = 4
+
+/**
+ * `policy-values.md` §1 의 유도(÷(1-확률가중치) → scale 4 반올림 → 잔차를 `Match` 에
+ * 흡수)를 이 test 가 독립적으로 재계산한다 — `PRIORITY_POLICY` 리터럴을 그대로 베끼지
+ * 않는다. 값이 바뀌면(예: verifier r1 재현 — `Match` 를 0.3834→0.5834) 이 산식과 어긋나
+ * F-1 이 다시 열린다.
+ */
+private fun renormalizedLegacyWeights(): Map<Component, BigDecimal> {
+    val divisor = BigDecimal.ONE - LEGACY_PROBABILITY_WEIGHT
+    val rounded =
+        LEGACY_COMPONENT_WEIGHTS.mapValues { (_, weight) ->
+            weight.divide(divisor, WEIGHT_RENORMALIZATION_SCALE, RoundingMode.HALF_UP)
+        }
+    val target = BigDecimal.ONE.setScale(WEIGHT_RENORMALIZATION_SCALE)
+    val residual = target - rounded.values.fold(BigDecimal.ZERO, BigDecimal::add)
+    return rounded + (Component.Match to rounded.getValue(Component.Match) + residual)
+}
 
 /** `PriorityPolicyData`·`PRIORITY_POLICY` 불변식(scope.md ②, 위협 모델 (2)). */
 class PriorityPolicyDataTest {
@@ -106,6 +141,18 @@ class PriorityPolicyDataTest {
         val policy = resolution.shouldBeResolved()
         policy.weights.keys shouldBe Component.entries.toSet()
         policy.weights.values.fold(BigDecimal.ZERO, BigDecimal::add) shouldBe BigDecimal("1.0000")
+    }
+
+    @Test
+    fun `PRIORITY_POLICY 출하 가중치는 legacy 재정규화 산식과 값까지 일치한다(F-1)`() {
+        val policy = PRIORITY_POLICY.resolve(LocalDate.of(2026, 9, 10)).shouldBeResolved()
+        val expected = renormalizedLegacyWeights()
+
+        Component.entries.forEach { component ->
+            withClue("$component: 출하=${policy.weights.getValue(component)} 기대=${expected.getValue(component)}") {
+                policy.weights.getValue(component).compareTo(expected.getValue(component)) shouldBe 0
+            }
+        }
     }
 
     private fun Resolution<PriorityPolicyData>.shouldBeResolved(): PriorityPolicyData {

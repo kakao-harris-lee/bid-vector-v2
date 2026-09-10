@@ -18,11 +18,11 @@
 
 | # | 우회 | 차단 | 실측 test |
 | --- | --- | --- | --- |
-| 1 | Absent → 0 | 타입(`ScoreFact` sealed) | `PriorityCompositionTest` 「표본2」 — 재정규화 결과(0.682705)가 0 대입 계산(0.591700)과 다름을 단언, `PriorityCompositionPropertyTest` 「전부 Present 면 재정규화가 항등」 |
+| 1 | Absent → 0 | 타입(`ScoreFact` sealed) | `PriorityCompositionTest` 「표본2」 — 재정규화 결과(0.682705)가 0 대입 계산(0.591700)과 다름을 단언, `PriorityCompositionPropertyTest` 「전부 Present 면 재정규화가 항등」, `PriorityCompositionExhaustiveTest`(F-3 — 부분집합 16 전수 손계산 대조) |
 | 2 | 합 1.0001·0.9999 정책 | `PriorityPolicyData.init` | `PriorityPolicyDataTest`(둘 다 `shouldThrow`) |
 | 3 | `Component.Probability` 추가 | 소진 `when`(`PriorityInputs.factFor`) 컴파일 실패 | 컴파일 자체(정적) + `ComponentExhaustiveTest`(값 고정) |
 | 4 | 차원 다른 벡터 | `SemanticMatch.of` sealed | `SemanticMatchTest`(2차원 vs 3차원 → `DimensionMismatch`) |
-| 5 | offset 0.5(범위 밖) | `SemanticMatch.of` sealed | `SemanticMatchTest`(0.21 → `OffsetOutOfRange`) |
+| 5 | offset 0.5(범위 밖) | `SemanticMatch.of` sealed | `SemanticMatchTest`(0.21 → `OffsetOutOfRange`, F-4 — `-0.21` 하한도 `OffsetOutOfRange`) |
 | 6 | 전부 Absent | `match` 필수 → `Unavailable`(0 아님) | `PriorityCompositionTest`(「전부 Absent 면 match 부재만으로 Unavailable」) |
 | 7 | 가중치 순회 순서 의존 | property(셔플) — `Component.entries` 기반 순회, `weights` 맵 순회 아님 | `PriorityCompositionPropertyTest`(가중치 맵 셔플 1M seed, `checkAll`) |
 | 8 | penalty 부재를 0 penalty 로 | `appliedPenalties`는 `Present` 인 항만 키를 갖는다 | `PriorityCompositionTest`(「loadRatio 만 Absent」·「penalty 입력 전부 Absent → 빈 맵」) |
@@ -44,6 +44,7 @@
 | `UnitVector.init`(차원>0·norm 1±ε) | **짝이 없다 — 의도적.** `UnitVector`는 `PriorityInputs`·`SemanticMatch.of`의 입력이지 두 함수의 **출력**이 아니다. 호출부(4B-5·adapters)가 임베딩을 이 생성자에 그대로 넣으므로 「판정층이 먼저 거른다」구도가 성립하지 않는다 — 이 값의 유효성은 호출부 책임이고, 그 사실 자체가 D-4B4-3에서 `require`를 값 타입 init 에 남긴 근거다(스코프 「require 는 값 타입 init 에만(정책·UnitVector·UnitScore)」) | 해당 없음 — 설계상 짝이 없는 자리임을 이 표가 값으로 남긴다 |
 | `PriorityPolicyData.init`(전사상·합=1 등) | 정책 인스턴스는 배선 시점에 한 번만 만들어진다(`PRIORITY_POLICY`) — `composePriority`는 이미 만들어진 정책을 받기만 하고 정책을 새로 짓지 않는다 | `PriorityPolicyDataTest`(출하 인스턴스 직접 읽기) |
 | `LoadPenaltyPolicy`·`ComplexityPenaltyPolicy.init` | 위와 같음 — `PriorityPolicyData`의 구성 요소, `composePriority`가 짓지 않는다 | `PriorityPolicyDataTest` |
+| `UnitScore`(`loadRatio` 경로, F-2 신설) | `loadRatio`가 `ScoreFact<BigDecimal>`(하한 없음)에서 `ScoreFact<UnitScore>`로 좁혀져, `penaltiesOf`가 읽는 시점에 이미 `[0,1]` 이 보장된다 — `composePriority`가 `loadRatio` 값을 만들지 않고 호출부(`PriorityInputs` 생성자)가 이미 `UnitScore.init`을 통과한 값만 넘긴다. 음수·>1 은 **`composePriority` 호출 전, `PriorityInputs` 구성 시점**에 거부된다(판정 함수 안이 아니라 입력 조립 시점의 짝) | `PriorityCompositionTest`(F-2 — 음수·>1 각각 `shouldThrow`) |
 
 **결론**: 4D-1 G-1 이 방어한 패턴("판정 함수가 값 타입 init 의 예외를 그대로 새게 둔다")은
 `UnitScore`·정책 값 타입 넷에서 재현 경로가 없다(정적 코드 검토 — `composePriority`·
@@ -73,7 +74,19 @@ modifier 는 읽지 않는다). `UnitVector`는 좌표 타입을 `List<BigDecima
   epsilon(1e-6) 비교다(`closeTo`) — `MathContext(20)` 실제 정밀도보다 훨씬 느슨하지만
   산식 오류(가중치 누락·재정규화 생략 등)는 충분히 잡는다.
 
-## 6. 사용자 승인
+## 6. verifier r1 finding 반영 (`_workspace/m4-4b4/04_verifier_report.md`, 재작업 카운터 0/5 유지)
+
+| finding | severity | 반영 |
+| --- | --- | --- |
+| F-1 | medium | `PriorityPolicyDataTest`에 출하 `PRIORITY_POLICY` 가중치를 legacy 재정규화 산식(÷(1-확률가중치) → scale4 반올림 → 잔차를 `Match`에 흡수)으로 **독립 재계산**해 대조하는 test 추가(`renormalizedLegacyWeights()`, 리터럴 복제 아님). verifier 변이(`Match` 0.3834→0.5834·`Urgency` 0.2333→0.0333)를 재현해 이제 `AssertionFailedError`로 떨어짐을 `commands.md`에 기록 |
+| F-2 | medium | `PriorityInputs.loadRatio`를 `ScoreFact<BigDecimal>`(하한 없음)에서 `ScoreFact<UnitScore>`([0,1])로 좁힘. `penaltiesOf`의 `loadRatio` 항을 `it.value * ratioWeight`로 갱신. 음수·>1 `loadRatio`가 `PriorityInputs` 구성 시점에 `IllegalArgumentException`으로 거부됨을 test 로 고정(위 §3 표 신설 행) |
+| F-3 | low | `PriorityCompositionExhaustiveTest` 신설 — `match` 상시 Present, 나머지 넷의 **부분집합 16개 전부**를 순회해 재정규화 결과를 독립 손계산과 대조. `PriorityCompositionPropertyTest`의 「결과 ∈[0,1]」 생성기를 `Arb.list`+`getOrNull` 접미사 패턴에서 `Arb.subsequence(optionalComponents)`로 교체해 16 부분집합을 고르게 뽑는다 |
+| F-4 | low | `SemanticMatchTest`에 offset 하한(`-0.21` → `OffsetOutOfRange`) test 추가 |
+| F-5 | low | `rollback.md`의 대상 파일 수를 재계산해 `A 21(main 8·test 8·evidence 5)`로 정정(F-1~F-4 반영으로 test 파일이 7→8로 늘어 — `PriorityCompositionExhaustiveTest.kt` 신설) — 목록은 `git diff --name-status`로 기계 재산출 |
+| F-6 | low | `commands.md`의 S-0을 이번 라운드의 최종 head에서 재실행하고 기록 |
+| F-7 | low | `commands.md`의 `PriorityCompositionPropertyTest.kt:96:9` 인용을 컴파일러 진단 문구 자체(따옴표 인용)로 교체 — 그 줄은 이미 다른 내용이라 좌표가 낡아 있었다 |
+
+## 7. 사용자 승인
 
 **미승인 — 사용자 승인 대기.** 이 slice는 verifier ready-for-review 판정 뒤 사용자
 승인으로 종결된다(CLAUDE.md 운영자 지시 2026-09-04, Codex 심판 제외).

@@ -36,11 +36,6 @@ internal fun presentUnit(value: String): ScoreFact<UnitScore> = ScoreFact.Presen
 internal fun absentUnit(reason: MlUnavailableReason = MlUnavailableReason.ScoreNotProvided): ScoreFact<UnitScore> =
     ScoreFact.Absent(reason)
 
-internal fun presentRatio(value: String): ScoreFact<BigDecimal> = ScoreFact.Present(BigDecimal(value))
-
-internal fun absentRatio(reason: MlUnavailableReason = MlUnavailableReason.ScoreNotProvided): ScoreFact<BigDecimal> =
-    ScoreFact.Absent(reason)
-
 /**
  * 조사 §1.1 손계산 표본의 공통 뼈대 — 기본값은 「표본1」(다섯 성분 Present, penalty
  * 입력 셋은 Absent). 각 test 는 필요한 축만 override 한다.
@@ -61,7 +56,7 @@ internal fun fullInputs(
         competitiveness = competitiveness?.let(::presentUnit) ?: absentUnit(),
         budgetCapture = budgetCapture?.let(::presentUnit) ?: absentUnit(),
         expectedMargin = expectedMargin?.let(::presentUnit) ?: absentUnit(),
-        loadRatio = loadRatio?.let(::presentRatio) ?: absentRatio(),
+        loadRatio = loadRatio?.let(::presentUnit) ?: absentUnit(),
         workload = workload?.let(::presentUnit) ?: absentUnit(),
         complexity = complexity?.let(::presentUnit) ?: absentUnit(),
     )

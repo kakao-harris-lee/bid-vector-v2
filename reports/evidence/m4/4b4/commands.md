@@ -6,7 +6,8 @@ base_sha: `20f7ad0041de5e167c49bd00d9fdc00220711b56`
 
 - cmd: `./gradlew --no-daemon :decision:test --tests 'bidvector.decision.priority.*'`
 - exit: 1
-- 핵심 결과: `PriorityCompositionPropertyTest.kt:96:9 Name contains illegal characters: []` —
+- 핵심 결과: 컴파일러 진단 `Name contains illegal characters: []`(F-7 — 이전 판은
+  이 줄을 `file:line`으로 인용했으나 그 좌표는 이후 편집으로 이미 낡았다) —
   test 함수명에 대괄호를 쓴 실수. 수정 후 재실행.
 
 ## 재실행 1 — 첫 GREEN 시도, 손계산 표본 오류·norm 경계 부동소수 발견
@@ -101,9 +102,63 @@ base_sha: `20f7ad0041de5e167c49bd00d9fdc00220711b56`
 - exit: 0
 - 핵심 결과: 출력 없음 — 하네스 레인 변경 없음(scope.md 「하네스 레인 변경」 절과 일치)
 
+## verifier r1 finding 반영 (`_workspace/m4-4b4/04_verifier_report.md`, medium 2 · low 5)
+
+RED — F-1~F-4 신설 test를 main 수정 전에 실행:
+
+- cmd: `./gradlew --no-daemon :decision:test --tests 'bidvector.decision.priority.*'`
+- exit: 1
+- 핵심 결과: `PriorityCompositionPropertyTest.kt` `Cannot infer type for type parameter 'T'`·
+  `Unresolved reference 'long'`(import 정리 중 `Arb.long` import를 실수로 뺌). import
+  복구 후 재실행.
+
+GREEN:
+
+- cmd: `./gradlew --no-daemon :decision:test --tests 'bidvector.decision.priority.*'`
+- exit: 0
+- 핵심 결과: 47 tests, 0 failed(F-1~F-4 신설 5개 포함, 42→47)
+
+M-1 재현 — verifier r1 F-1 변이(`PRIORITY_POLICY`의 `Match` 0.3834→0.5834·`Urgency`
+0.2333→0.0333, 합은 1.0000 유지)를 `PriorityPolicyData.kt`에 임시 적용:
+
+- cmd: `./gradlew --no-daemon :decision:test --tests 'bidvector.decision.priority.PriorityPolicyDataTest'`
+- exit: 1
+- 핵심 결과: `PRIORITY_POLICY 출하 가중치는 legacy 재정규화 산식과 값까지 일치한다(F-1)`
+  실패 — `Match: 출하=0.5834 기대=0.3834`. F-1 신설 test가 이 변이를 잡는다. 변이는
+  즉시 원복(`cp` 백업 복원), `git diff` 결과 없음으로 원복 확인.
+
+M-2 재현 — verifier r1 F-2의 정확한 재현 파라미터(`match="0.50", loadRatio="-1.0"`)로
+`fullInputs`를 호출하는 임시 test:
+
+- cmd: `./gradlew --no-daemon :decision:test --tests 'bidvector.decision.priority.M2ReproTest'`
+- exit: 0(test 자체는 `shouldThrow<IllegalArgumentException>`이 성공 — 즉 그 파라미터가
+  이제 **생성 단계에서 예외**를 던진다는 뜻)
+- 핵심 결과: F-2 이전에는 이 파라미터가 정상 생성되어 `appliedPenalties[LoadRatio]`가
+  음수였다(verifier r1 재현). `loadRatio`를 `UnitScore`로 좁힌 뒤에는 `PriorityInputs`
+  구성 자체가 `IllegalArgumentException`으로 실패한다 — 임시 test 파일은 확인 뒤 삭제.
+
+S-1/S-2/S-3/S-5/S-7 재실행(수정 반영 뒤):
+
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 1(1차) → `decision:ktlintTestSourceSetCheck` — `PriorityCompositionPropertyTest.kt`
+  4-인자 람다 줄바꿈 스타일 위반 5건. `Arb.bind`를 다중 줄 인자 + 별도 데이터 클래스
+  (`SubsetCase`)로 재구성해 해결.
+- cmd: `./gradlew --no-build-cache clean check`
+- exit: 0(2차) — `BUILD SUCCESSFUL`, 345 actionable tasks(321 executed). S-1·S-7 동시 충족.
+- cmd: `./gradlew --no-daemon :decision:test --tests 'bidvector.decision.priority.*'`
+- exit: 0 — S-2, 47 tests
+- cmd: `./gradlew --no-daemon :decision:test`
+- exit: 0 — S-3, 기존 test(4B-1·4B-3) 무변경 확인
+- cmd: `./gradlew --no-daemon :decision:gateExecutionGate`
+- exit: 0 — S-5, `gate.tests.decision`에 `PriorityCompositionExhaustiveTest` 추가 등재 확인
+
 ## secret 스캔
 
 - cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4b4/ decision/src/main/kotlin/bidvector/decision/priority decision/src/test/kotlin/bidvector/decision/priority strategy/src/main/kotlin/bidvector/strategy/Score.kt config/quality/gate-tests.properties milestone-4.md`
 - exit: 1 (매치 없음 = 통과)
 - 핵심 결과: 매치 0건. Telegram id·사업자 정보 육안 확인 — 해당 없음(이 slice는 순수
   도메인 커널이라 그런 값을 다루지 않는다).
+- verifier r1 finding 반영 뒤 재실행: exit 0, 매치 2건 — 둘 다 이 절의 `cmd:` 줄과
+  `- cmd:` 인용 자신(commands.md가 스캔 명령 문자열을 담고 있어 스캔이 자기 자신을
+  잡는 상시 false-positive 바닥, verifier r1 「누출 스캔」 항목과 같은 판독). developer
+  구간(실제 코드·정책 값) 매치 0.

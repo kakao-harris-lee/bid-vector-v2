@@ -83,7 +83,7 @@ private fun penaltiesOf(
     policy: PriorityPolicyData,
 ): Map<PenaltyKind, BigDecimal> =
     listOfNotNull(
-        presentValue(inputs.loadRatio)?.let { PenaltyKind.LoadRatio to it * policy.loadPenalty.ratioWeight },
+        presentValue(inputs.loadRatio)?.let { PenaltyKind.LoadRatio to it.value * policy.loadPenalty.ratioWeight },
         presentValue(inputs.workload)?.let { PenaltyKind.Workload to it.value * policy.loadPenalty.workloadWeight },
         presentValue(inputs.complexity)?.let {
             PenaltyKind.Complexity to complexityPenaltyOf(it.value, policy.complexityPenalty)

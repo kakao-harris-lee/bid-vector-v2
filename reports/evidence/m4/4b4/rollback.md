@@ -30,6 +30,7 @@ A  decision/src/main/kotlin/bidvector/decision/priority/ScoreFact.kt
 A  decision/src/main/kotlin/bidvector/decision/priority/SemanticMatch.kt
 A  decision/src/main/kotlin/bidvector/decision/priority/UnitVector.kt
 A  decision/src/test/kotlin/bidvector/decision/priority/ComponentExhaustiveTest.kt
+A  decision/src/test/kotlin/bidvector/decision/priority/PriorityCompositionExhaustiveTest.kt
 A  decision/src/test/kotlin/bidvector/decision/priority/PriorityCompositionPropertyTest.kt
 A  decision/src/test/kotlin/bidvector/decision/priority/PriorityCompositionTest.kt
 A  decision/src/test/kotlin/bidvector/decision/priority/PriorityPolicyDataTest.kt
@@ -79,7 +80,12 @@ git restore --source=20f7ad0041de5e167c49bd00d9fdc00220711b56 --staged --worktre
 ## 임시 clone 실측
 
 `commands.md` 「rollback 실측 — 임시 clone」 절 — `git clone --no-hardlinks`로 만든
-임시 clone에서 위 restore 명령을 실제로 실행해 exit 0·D 19/M 3·`git diff <base>`
-0줄(신설 패키지 디렉터리 자체도 삭제 확인)을 실측하고, 되돌린 트리에서
-`:decision:compileKotlin`·`:strategy:compileKotlin`·`:decision:test`·`:strategy:test`
-가 `BUILD SUCCESSFUL`임을 확인했다. 임시 clone은 실측 뒤 삭제.
+임시 clone에서 위 restore 명령을 실제로 실행해 exit 0·D 21(main 8·test 8·evidence 5)
+/M 3·`git diff <base>` 0줄(신설 패키지 디렉터리 자체도 삭제 확인)을 실측하고, 되돌린
+트리에서 `:decision:compileKotlin`·`:strategy:compileKotlin`·`:decision:test`·
+`:strategy:test`가 `BUILD SUCCESSFUL`임을 확인했다. 임시 clone은 실측 뒤 삭제.
+
+**verifier r1 F-5(low)** — 이전 판은 이 수를 손으로 적으며 evidence 파일 하나(정확히는
+당시 test 7개, 이번 라운드에 `PriorityCompositionExhaustiveTest.kt`가 늘어 8개)를
+빠뜨렸다. 이번 판은 위 「대상 파일 목록」을 `git diff --name-status`로 다시 낸 뒤 그
+행 수를 그대로 옮겼다 — 손으로 다시 세지 않는다.

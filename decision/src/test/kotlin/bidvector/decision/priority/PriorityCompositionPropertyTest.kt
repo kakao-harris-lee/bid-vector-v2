@@ -5,8 +5,9 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.bigDecimal
-import io.kotest.property.arbitrary.list
+import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.long
+import io.kotest.property.arbitrary.subsequence
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
@@ -15,7 +16,13 @@ import kotlin.random.Random
 
 private val unitFraction: Arb<BigDecimal> = Arb.bigDecimal(BigDecimal.ZERO, BigDecimal.ONE)
 private val nonNegativeDelta: Arb<BigDecimal> = Arb.bigDecimal(BigDecimal.ZERO, BigDecimal("0.5"))
-private val loadRatioRange: Arb<BigDecimal> = Arb.bigDecimal(BigDecimal.ZERO, BigDecimal("2.0"))
+
+/** F-2 — `loadRatio`가 `UnitScore`로 좁혀져 penalty 입력 셋 전부 `[0,1]`이다. */
+private val unitFractionRatio: Arb<BigDecimal> = unitFraction
+
+/** F-3 — `Arb.list`+`getOrNull` 접미사 패턴 대신 부분집합을 고르게 뽑는다(16 개 전부 도달 가능). */
+private val optionalComponents =
+    listOf(Component.Urgency, Component.Competitiveness, Component.BudgetCapture, Component.ExpectedMargin)
 
 private fun composed(inputs: PriorityInputs): PriorityOutcome.Composed {
     val outcome = composePriority(inputs, TEST_PRIORITY_POLICY)
@@ -93,17 +100,17 @@ class PriorityCompositionPropertyTest {
     }
 
     @Test
-    fun `Composed 결과의 priority 는 항상 0 이상 1 이하다`() {
+    fun `Composed 결과의 priority 는 항상 0 이상 1 이하다(F-3 — 부분집합 16 을 고르게 뽑는다)`() {
         runBlocking {
-            checkAll(unitFraction, Arb.list(unitFraction, 0..4), loadRatioRange) { match, others, loadRatio ->
+            checkAll(subsetCases) { case ->
                 val inputs =
                     fullInputs(
-                        match = match.toPlainString(),
-                        urgency = others.getOrNull(0)?.toPlainString(),
-                        competitiveness = others.getOrNull(1)?.toPlainString(),
-                        budgetCapture = others.getOrNull(2)?.toPlainString(),
-                        expectedMargin = others.getOrNull(3)?.toPlainString(),
-                        loadRatio = loadRatio.toPlainString(),
+                        match = case.match.toPlainString(),
+                        urgency = valueIfPresent(Component.Urgency, case.present, case.values),
+                        competitiveness = valueIfPresent(Component.Competitiveness, case.present, case.values),
+                        budgetCapture = valueIfPresent(Component.BudgetCapture, case.present, case.values),
+                        expectedMargin = valueIfPresent(Component.ExpectedMargin, case.present, case.values),
+                        loadRatio = case.loadRatio.toPlainString(),
                     )
 
                 val outcome = composed(inputs)
@@ -113,3 +120,37 @@ class PriorityCompositionPropertyTest {
         }
     }
 }
+
+/** F-3 — 성분 넷의 임의 값 조합(부분집합 판단은 [subsetCases]가 [SubsetCase.present]로 갖는다). */
+private data class SubsetCase(
+    val match: BigDecimal,
+    val present: Set<Component>,
+    val values: Map<Component, BigDecimal>,
+    val loadRatio: BigDecimal,
+)
+
+private val optionalValues: Arb<Map<Component, BigDecimal>> =
+    Arb.bind(unitFraction, unitFraction, unitFraction, unitFraction) { u, c, b, e ->
+        mapOf(
+            Component.Urgency to u,
+            Component.Competitiveness to c,
+            Component.BudgetCapture to b,
+            Component.ExpectedMargin to e,
+        )
+    }
+
+private val subsetCases: Arb<SubsetCase> =
+    Arb.bind(
+        unitFraction,
+        Arb.subsequence(optionalComponents),
+        optionalValues,
+        unitFractionRatio,
+    ) { match, present, values, loadRatio ->
+        SubsetCase(match, present.toSet(), values, loadRatio)
+    }
+
+private fun valueIfPresent(
+    component: Component,
+    present: Set<Component>,
+    values: Map<Component, BigDecimal>,
+): String? = if (component in present) values.getValue(component).toPlainString() else null

@@ -1,6 +1,7 @@
 package bidvector.decision.priority
 
 import bidvector.decision.MlUnavailableReason
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -131,13 +132,31 @@ class PriorityCompositionTest {
                 competitiveness = null,
                 budgetCapture = null,
                 expectedMargin = null,
-                loadRatio = "5.0",
+                loadRatio = "1.0",
+                workload = "1.0",
+                complexity = "1.0",
             )
 
         val outcome = composePriority(inputs, TEST_PRIORITY_POLICY)
 
         outcome.shouldBeInstanceOf<PriorityOutcome.Composed>()
         outcome.priority.value shouldBe BigDecimal.ZERO
+    }
+
+    // ---- F-2 — loadRatio 는 UnitScore 라 음수·>1 이 생성 단계에서 거부된다 ----
+
+    @Test
+    fun `loadRatio 가 음수면 PriorityInputs 를 만들 수 없다(F-2)`() {
+        shouldThrow<IllegalArgumentException> {
+            fullInputs(loadRatio = "-1.0")
+        }
+    }
+
+    @Test
+    fun `loadRatio 가 1 을 넘으면 PriorityInputs 를 만들 수 없다(F-2)`() {
+        shouldThrow<IllegalArgumentException> {
+            fullInputs(loadRatio = "1.01")
+        }
     }
 
     @Test
