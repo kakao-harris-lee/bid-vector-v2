@@ -70,7 +70,67 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시점 **없음**. 리뷰 요청 시점에 갱신한다. rollback 대상 아님.
+`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시점 **없음**. 리뷰 요청 시점(2026-09-10, 구현 완료 시점)에 재확인: **없음**(0건). rollback 대상 아님.
+
+---
+
+## 구현 완료 보고 — 2026-09-10 (운영자 확인 필요)
+
+**acceptance S-0~S-7 전건 exit 0** — commands.md 참고. cpd 중복 0(cpd 블록 3건 전부
+공용 함수 추출로 닫음)·detekt issue 0. 4D-1 test 13파일(팀장이 지목한 7파일의
+상위집합) byte-for-byte 무편집. rollback을 임시 clone에서 실제 실행해 compile·test
+초록까지 확인(rollback.md).
+
+### cpd 3블록 처리
+
+| 블록 | 위치 | 처방 |
+| --- | --- | --- |
+| ① envelope 조립(16줄/65토큰) | `RequestMapping.kt` ↔ `EmbeddingRequestMapping.kt` | 공용 `internal fun buildPredictionEnvelope(...)`(`PredictionEnvelopeMapping.kt` 신설)로 추출, 두 mapper가 호출 |
+| ② 정책 리터럴(12줄/64토큰) | `MlCallPolicyData.kt`(`ML_CALL_POLICY`) ↔ `EmbeddingCallPolicy.kt`(`EMBEDDING_CALL_POLICY`) | 공용 `internal fun placeholderMlCallPolicy(featureSchemaVersion)`(`MlCallPolicyPlaceholder.kt` 신설)로 추출. 레지스트리는 여전히 둘 — D-4D2-2 유지 |
+| ③ gateway 호출 골격(9줄/52토큰) | `GrpcBidPredictionGateway.kt` ↔ `GrpcEmbeddingGateway.kt` | 공용 `internal suspend fun <S : AbstractStub<S>, Req, Resp> callMlRpc(...)`(`ResilientPredictionCall.kt`에 추가)로 추출. `settlePermit`의 try/finally·breaker 분기는 한 줄도 변경 없음 |
+
+### (2b) 표 — 신설 public 표면 전수
+
+| 표면 | 모듈 | 허용 범위 | 판정 |
+| --- | --- | --- | --- |
+| `EmbedTextPort`(fun interface) | workflow | `embed(request, budget)` 호출만, budget 필수(무기한 호출 없음) | 닫힘 |
+| `EmbedTextRequest`(data class) | workflow | init이 blank text 거부 | 닫힘 |
+| `EmbeddingOutcome`(sealed, Embedded/Unavailable) | workflow | 점수 생성 경로 없음(D-4D2-3) | 닫힘 |
+| `EmbeddingUnavailableReason`(sealed, 10값) | workflow | 새 사유 추가 불가(모듈 밖) | 닫힘 |
+| `EmbeddingVector`(data class, **생성자 공개**) | workflow | init이 비어있지 않음·norm≈1(거친 epsilon) 강제하나, 공개 생성자라 호출자가 임의 값으로 지어 주입하는 경로 자체는 타입만으로 안 막힘 | **알려진 제한**(아래) |
+| `TextKind`(enum, 2값) | workflow | 값 추가만 가능 | 닫힘 |
+| `GrpcEmbeddingGateway`(class) | adapters | 생성자가 `ManagedChannel`·정책·`Clock`만 받음, 내부 매핑·검증·`callMlRpc`는 전부 internal | 닫힘 |
+| `EMBEDDING_CALL_POLICY`(val) | adapters | 조회만(불변 `EffectiveDatedPolicy`), 쓰기 경로 없음(4D-1 `ML_CALL_POLICY` 관례) | 닫힘 |
+| `callMlRpc`·`buildPredictionEnvelope`·`placeholderMlCallPolicy` | adapters | `internal` | 대상 아님 |
+| `object` 커널 계수(임베딩 호출 횟수) | test | in-process fake servicer 카운터로 관측, 프로덕션에 계수용 인터페이스 미주입 | 닫힘 |
+
+### `Unavailable` 사유 목록 (`EmbeddingUnavailableReason`, 10값)
+
+`CircuitOpen`·`DeadlineExceeded`·`RetryBudgetExhausted`·`TransportFailed`·
+`ReleaseMismatch`·`ContractViolation`·`UnsupportedSchema`·`UnsupportedRelease`·
+`InvalidRequest`·`ModelNotReady` — `embedding.proto`의 `FailureCode` 전수(when 소진,
+else 없음)와 client 측 fail-closed(구조검증·release 대조·breaker·deadline)를 합친 것이다.
+`UNSUPPORTED_TRAINING_SPEC`·`IDEMPOTENCY_CONFLICT`·`JOB_NOT_FOUND`(training 전용
+코드)는 `ContractViolation`으로 접는다(`EmbeddingResponseMapping.kt`).
+
+### 알려진 제한
+
+1. **`EmbeddingVector` 생성자가 public이다**(설계 검토는 `internal`을 제안했으나 `internal`
+   은 Gradle 모듈 단위라 값을 실제로 짓는 `adapters` 모듈에서 호출 불가 — 4D-1
+   `BidRateCandidates`·`ModelReleaseRef`·`Uncertainty`와 같은 실측 근거로 결정 변경, 코드
+   KDoc에 이미 기록). 위조 방어는 `init`(형태 하한)과 어댑터 쪽 유일 생성 경로 관례·code
+   review·test 커버리지가 진다.
+2. **S-4 acceptance command 오타** — scope.md의 `./gradlew :adapters:moduleDependencyGate
+   :adapters:sizeGate :adapters:cpdCheck :adapters:contractGate`에서 `:adapters:contractGate`
+   는 존재하지 않는 task다(`contractGate`는 root 레벨). 교정된 형태
+   `contractGate`(prefix 없이)로 실행해 통과를 확인했다(commands.md). scope.md 자체의
+   수정은 세션 모델 소관이라 이 구현 레인은 하지 않았다 — 다음 리뷰 요청 시 교정을
+   요청한다.
+3. **`OPEN-4D2-POLICY-VALUES`·`OPEN-M2-DEADLINE-VALUES` 잔존** — `EMBEDDING_CALL_POLICY`는
+   5E 실측 전 placeholder다(`ML_CALL_POLICY`와 값을 공유하는 `placeholderMlCallPolicy`를
+   통해). 실측 갱신은 M5 5E 소관.
+4. **`milestone-4.md` 4D-2 종결 문단 미기재** — 사용자 승인 전이라 착수 기록만 있고 종결은
+   승인 후 별도 커밋으로 등재한다(3B-2 관례, 공유 파일 아님 — 이 slice에서 아직 안 만졌다).
 
 ---
 
