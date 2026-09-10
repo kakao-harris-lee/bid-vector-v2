@@ -390,6 +390,27 @@ placeholder — 승인 대기(`OPEN-4B4-POLICY-VALUES`) · `similarity`는 성�
 
 **다음은 4B-5**(port·조합기·텍스트 합성 규약, 계약은 팀장이 별도 작성).
 
+**4B-5 착수 2026-09-10(운영자 결정 2026-09-10 E-1 (c)·E-4 (a))** — 위 예고와 달리 실제
+계약은 **성분 파생 함수**(`decision` 순수 — `PriorityInputs`를 fact 값에서 만든다)로
+좁혀졌다: port·`Clock`·텍스트 합성은 신설 **4B-6**(조합기 + port + 합성 규약)으로 다시
+갈렸다(`OPEN-4D-LADDER-SCORE-SOURCE` 분해, 4D-1 교훈 — 한 slice에 층을 섞지 않는다).
+`bidvector.decision.priority.derive` 패키지에 ①urgency ②budgetCapture ③expectedMargin
+④executionComplexity ⑥loadRatio ⑦workloadNotCollected(상수) ⑧`DerivationPolicyData`를
+구현했다(⑤ competitivenessNotCollected 상수는 아래 계약 갱신 문단) — legacy sentinel(「base 없으면 중립 0.5」등)을 `DerivationAbsence`로 뒤집고
+(D-4B5-1), 밴드는 제네릭 `Band`/`Ladder`(오름 `≤`·내림 `≥`) 하나로, 재정규화 가중합은
+`derive` 패키지 전용 함수(4B-4 `weightedScoreOf` 비복제)로 닫았다.
+
+**⑤ `deriveCompetitiveness`는 만들지 않는다 — 계약 갱신 2026-09-10 #1(`OPEN-4B5-COMPETITIVENESS`
+신설, 팀장).** 구현 레인의 shared-kernel 실측(`Basis` enum에 시장평균 축이 없고, `Money`
+스케일 곱 연산은 `BaseAmount.times(BidRate)` 하나뿐이라 `marketAverage`를 정책 비율로
+스케일할 수 없고, `compareKnownVat`도 같은 타입 쌍만 비교)을 팀장이 계약으로 확정했다 —
+뿌리는 산술의 부재가 아니라 **V2가 「투찰 시장 평균」 fact 자체를 수집·정의한 적이
+없다는 것**(legacy는 예산을 sentinel로 썼다)이다. 처분은 ⑦과 같은 축의 상수
+`competitivenessNotCollected(): DerivationOutcome<UnitScore> = Absent(MarketAverageMissing)`
+하나 — `DerivationPolicyData`에도 competitiveness 필드를 두지 않는다(소비자 없는 필드
+금지). `OPEN-4B5-COMPETITIVENESS`(시장 평균 fact의 정의·수집·shared-kernel basis 결정)의
+capability-map §14 등재는 팀장(세션 모델) 소관 — 그 문서는 이 slice의 in_scope 밖이다.
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,
