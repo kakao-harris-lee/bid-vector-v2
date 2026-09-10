@@ -66,7 +66,7 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시점 **없음**(base == HEAD). 리뷰 요청 시점에 갱신. rollback 대상 아님.
+`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — **없음**(verifier r1 재검증 시점 실측, L-4 시정 — 착수 시점 문장이 리뷰 요청 시점까지 그대로 남아 있었다). rollback 대상 아님.
 
 ---
 
