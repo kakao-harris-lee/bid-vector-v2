@@ -318,8 +318,26 @@ KDoc 으로 유지, 중복 제거 — cpdCheck).
 **`OPEN-3D-GRANT-PUBLIC-BLINDSPOT` 종결** — `docs/discovery/capability-map.md` §14.3 에 신설·닫힘으로
 등재(4C-2 가 열었을 때 그 표에 실제로는 등재되지 않았던 것도 이번에 바로잡았다).
 
-**현재 상태**: 구현·acceptance S-1~S-6 완료(`reports/evidence/m3/3g/commands.md`). **verifier 검증과
-사용자 승인 대기** — 이 절은 구현 레인이 쓴 것이고 종결을 스스로 선언하지 않는다.
+**verifier r1(2026-09-10) → `ready-for-review`.** 산출물 blocker/high **0**, **재작업 카운터 0/5**(한
+라운드도 막히지 않았다). verifier 가 S-0~S-6 전건을 직접 재실행해 exit 0 을 확인하고, **mutation 여섯**으로
+게이트를 독립 재현했다 — 구현 레인의 넷에 더해 ⓕ「기대 행렬에만 있는 테이블」(반대 방향)을 재고, ⓓ를
+런타임 `CREATE TABLE` 이 아니라 **실 마이그레이션 `V7`** 로 재현했다(「마이그레이션이 권한 선언을
+빠뜨린다」는 진짜 시나리오). 기대 행렬 열두 행도 verifier 가 DB 에서 **독립 재구성**해 한 자리도 다르지
+않음을 확인했다. finding 일곱은 전부 low 였고 한 커밋으로 일괄 시정했다.
+
+**3G 종결 2026-09-10(사용자 승인) — `OPEN-3D-GRANT-PUBLIC-BLINDSPOT` 종결.** 이 slice 가 바꾼 것은
+**게이트의 시야**다: 「역할에 직접 부여된 것」만 보던 술어가 **유효 권한**(직접·PUBLIC 경유·역할 상속)이
+됐고, 대상이 테이블 둘에서 **열둘 전수**가 됐으며, 목록을 DB 에서 발견해 **새 테이블이 권한 선언 없이
+들어오면 실패**한다. 권한 **값**은 한 줄도 바꾸지 않았다 — 마이그레이션 무편집이 계약이었고 지켜졌다
+(`git diff --stat <base>..HEAD -- adapters/src/main/resources/db/migration config/quality/gate-tests.properties`
+빈 결과).
+
+**알려진 제한(종결 시점)**: 행렬은 `BASE TABLE` 만 잰다 — **시퀀스 셋**(`bidvector_app` 이 USAGE·SELECT 를
+갖는다)·VIEW·구체화뷰·외래표는 래칫 밖이다(`OPEN-3G-NONTABLE-PRIVILEGE-SURFACES`, 오늘 손실 0 — 뷰 0개
+실측이지만 PUBLIC 사각과 **같은 갈래**다) · `adapters/persistence` 에는 `ml`·`event` 와 달리 게이트 등재
+완전성 test 가 없다(`OPEN-3G-PERSISTENCE-GATE-REGISTRATION` — 이 slice 는 신규 test class 를 만들지 않아
+당장 영향이 없고, 그것이 신규 class 를 만들지 않은 이유이기도 하다) · admin 역할·RLS·컬럼 단위 권한은
+경계 밖(3D 위협 모델).
 
 ## Codex 독립 리뷰
 
