@@ -177,28 +177,12 @@ class CleanMigrationTest : PersistenceTestSupport() {
         true shouldBe true
     }
 
-    @Test
-    fun `애플리케이션 역할 bidvector_app 은 provenance_authority 를 SELECT 만 할 수 있다`() {
-        val grantedPrivileges =
-            queryStrings(
-                "SELECT privilege_type FROM information_schema.role_table_grants " +
-                    "WHERE grantee = 'bidvector_app' AND table_name = 'provenance_authority'",
-            )
-        grantedPrivileges shouldContainExactlyInAnyOrder setOf("SELECT")
-    }
-
-    @Test
-    fun `애플리케이션 역할 bidvector_app 은 notice_audit 에 INSERT 권한이 없다 — F-6`() {
-        val grantedPrivileges =
-            queryStrings(
-                "SELECT privilege_type FROM information_schema.role_table_grants " +
-                    "WHERE grantee = 'bidvector_app' AND table_name = 'notice_audit'",
-            )
-        grantedPrivileges shouldContainExactlyInAnyOrder setOf("SELECT")
-    }
+    // =========================================================================
+    // 축 9 — 유효 권한 행렬(GRANT ratchet, M3/3G 2026-09-10)
+    // =========================================================================
 
     /**
-     * verifier r1 H-1 시정, **r2 M-3 시정으로 술어 교체** — 설계 검토 (2b) 「V6 테이블
+     * **verifier r1 H-1 뒤, r2 M-3 시정으로 술어 교체**(4C-2) — 설계 검토 (2b) 「V6 테이블
      * 자체 | GRANT 목록을 test 가 대조」의 실측이 없었다(r1). r1 이 쓴
      * `information_schema.role_table_grants WHERE grantee = 'bidvector_app'`은 **역할에
      * 직접 부여된 것만** 본다 — `GRANT DELETE ON outbox TO PUBLIC;` 한 줄이면 이 술어는
@@ -206,40 +190,162 @@ class CleanMigrationTest : PersistenceTestSupport() {
      * r2 실측, `PROBE-PUB … OK rows=1`). [effectivePrivileges]는
      * `has_table_privilege(role, table, priv)`로 **역할 직접 부여 + PUBLIC 부여 + 역할
      * 상속**을 전부 해소한 유효 권한을 축 일곱 전부(SELECT/INSERT/UPDATE/DELETE/
-     * TRUNCATE/REFERENCES/TRIGGER) true/false로 못 박는다 — 「있어야 할 것이 있다」와
-     * 「없어야 할 것이 없다」를 둘 다 이 형태로도 유지한다. **3D의 기존 두 권한 test**
-     * (provenance_authority·notice_audit, 위)는 이 slice의 in_scope 밖이라 손대지 않는다
-     * — 같은 PUBLIC 경유 공백이 거기도 있다는 것은 알려진 제한/인계로만 남긴다
-     * (`reports/evidence/m4/4c2/commands.md`).
+     * TRUNCATE/REFERENCES/TRIGGER) true/false로 못 박는다.
+     *
+     * **M3/3G — 전 테이블로 전수화.** 4C-2는 이 술어를 `outbox`·`inbox` 둘에만 적용했다.
+     * 3D의 기존 권한 test 둘(`provenance_authority` SELECT만·`notice_audit` INSERT없음,
+     * `role_table_grants` 술어)이 같은 PUBLIC 경유 사각을 그대로 갖고 있어
+     * (`OPEN-3D-GRANT-PUBLIC-BLINDSPOT`, 4C-2 verifier r2 M-3이 열었다) 이 slice가 그 둘을
+     * 아래 행렬로 흡수하고 **테이블 목록을 DB에서 발견**해 전 테이블로 넓힌다 — 기대
+     * 행렬에 없는 테이블이 나오면(새 마이그레이션이 권한 선언을 빠뜨리면) 이 test가
+     * 떨어진다(래칫의 본체).
+     *
+     * **`provenance_authority`는 SELECT만**(V2 GRANT + V3 REVOKE 방어 심층).
+     * **`notice_audit`는 SELECT만, INSERT 없음(F-6)** — 감사 행은
+     * `notice_audit_insert()`(V2, SECURITY DEFINER)가 대신 쓴다. app 역할이 직접 INSERT로
+     * 위조 이력을 넣는 경로를 막는다. 두 근거는 이 행렬의 해당 행이 나른다 — 옛 술어
+     * test 둘은 지웠다(단언은 약해지지 않는다, 행렬이 그 둘을 행으로 포함한다).
+     *
+     * **`flyway_schema_history`는 실측값**이다(설계 검토 (2) — Flyway 이력 표도 발견에
+     * 잡히므로 제외하지 않고 명시적으로 못 박는다. `bidvector_app`에 대한 GRANT가 어느
+     * 마이그레이션에도 없어 축 일곱이 전부 false — 컨테이너에서 질의해 확인한 값이다,
+     * 추측이 아니다).
      */
-    @Test
-    fun `애플리케이션 역할 bidvector_app 은 outbox 에 SELECT INSERT UPDATE 유효 권한만 갖는다 — PUBLIC 경유 포함`() {
-        val privileges = effectivePrivileges("outbox")
-        privileges shouldBe
-            TablePrivileges(
-                select = true,
-                insert = true,
-                update = true,
-                delete = false,
-                truncate = false,
-                references = false,
-                trigger = false,
-            )
-    }
+    private val expectedPrivilegeMatrix: Map<String, TablePrivileges> =
+        mapOf(
+            "raw_observation" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "provenance_authority" to
+                TablePrivileges(
+                    select = true,
+                    insert = false,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "notice" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "notice_audit" to
+                TablePrivileges(
+                    select = true,
+                    insert = false,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "rejected_write" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "opening_result" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "qualification_text" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "collection_run" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "opening_reserve_price" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "outbox" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "inbox" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "flyway_schema_history" to
+                TablePrivileges(
+                    select = false,
+                    insert = false,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+        )
 
     @Test
-    fun `애플리케이션 역할 bidvector_app 은 inbox 에 SELECT INSERT 유효 권한만 갖는다 — PUBLIC 경유 포함`() {
-        val privileges = effectivePrivileges("inbox")
-        privileges shouldBe
-            TablePrivileges(
-                select = true,
-                insert = true,
-                update = false,
-                delete = false,
-                truncate = false,
-                references = false,
-                trigger = false,
+    fun `축9 유효 권한 행렬 — bidvector_app 이 public 의 전 BASE TABLE 에 대해 갖는 권한이 기대와 정확히 일치한다`() {
+        val discoveredTables =
+            queryStrings(
+                "SELECT table_name FROM information_schema.tables " +
+                    "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'",
             )
+        discoveredTables shouldContainExactlyInAnyOrder expectedPrivilegeMatrix.keys
+
+        val actualPrivileges = discoveredTables.associateWith { effectivePrivileges(it) }
+        actualPrivileges shouldBe expectedPrivilegeMatrix
     }
 
     /** 축 일곱 전부를 `has_table_privilege`로 해소한 유효 권한 — 직접 부여·PUBLIC 부여·역할 상속을 모두 본다(verifier r2 M-3). */
