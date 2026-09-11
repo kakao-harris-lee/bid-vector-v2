@@ -69,7 +69,7 @@
 | OPEN | 상태 | 처리 |
 | --- | --- | --- |
 | `OPEN-5A-MYPY-ALLOWLIST` | **초기 — 0건**. 5A 시점 `[[tool.mypy.overrides]]`는 `bidvector.*`(생성 stub 재수출 구조적 예외) 하나뿐, 이식 모듈 strict 예외는 없다 | prep 조사(01_scout_ml_package §a-5)가 `settlement_maturity`(K7)를 1건 후보로 지목했다 — **5D 가 K7 을 이식할 때 갱신**(사유·해소 slice 명시, `test_mypy_allowlist.py`가 주석 강제) |
-| `OPEN-5A-PY-CI` | CI job 신설(이 slice) | 러너 실행 확인은 push 뒤(범위 밖) |
+| `OPEN-5A-PY-CI` | **닫힘 2026-09-12** — PR #6 첫 러너 실행에서 `ml-engine` job pass(20s)·Kotlin `check` pass(3m25s), run `34600268539` | 러너 실측으로 종결 |
 | `OPEN-5A-SERVING-GRPC-EXCEPTION` | 신설 | 5E 가 `serving/grpc.py` 를 만들 때 `ignore_imports` 한 줄 추가 |
 | `OPEN-5A-WHEEL-BUILD-HOOK` | 신설(verifier r2 N-1) | 5E 가 servicer 를 세우기 전에 빌드 훅(D-5A-0 (a) 형태 — 패키지 빌드 시 생성물을 wheel 안 `ml_engine/contracts/`로 넣되 소스 트리에는 두지 않음)이 필요. 소유 후보 5E 또는 6C |
 
