@@ -59,4 +59,22 @@ class KeywordHitsCounterTest {
 
         hits.count shouldBe 1
     }
+
+    @Test
+    fun `verifier F-3 — 단어 내부에 나타나도 매치된다(단어 경계를 보지 않는다)`() {
+        val policy = TEST_POLICY.copy(keywords = listOf("보안"))
+
+        val hits = KeywordHitsCounter.count(FullScopeText("정보안내 시스템"), policy)
+
+        hits.count shouldBe 1
+    }
+
+    @Test
+    fun `verifier F-3 — 글자 사이에 공백이 끼면 매치되지 않는다`() {
+        val policy = TEST_POLICY.copy(keywords = listOf("보안"))
+
+        val hits = KeywordHitsCounter.count(FullScopeText("보 안 시스템"), policy)
+
+        hits.count shouldBe 0
+    }
 }

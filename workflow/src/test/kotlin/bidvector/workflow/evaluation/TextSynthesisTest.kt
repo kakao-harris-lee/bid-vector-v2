@@ -113,6 +113,33 @@ class TextSynthesisTest {
     }
 
     @Test
+    fun `verifier F-1 — NOTICE 절단 뒤 공백만 남으면 Synthesized 가 아니라 Empty`() {
+        val shippedPolicy = OPPORTUNITY_POLICY.entries.single().second
+        val subject =
+            WatchSubject(
+                categories = emptySet(),
+                keywordText = KeywordScopeText(""),
+                fullText = FullScopeText(" ".repeat(shippedPolicy.textMaxChars) + "x"),
+                baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
+            )
+
+        synthesizeNoticeText(subject, shippedPolicy) shouldBe SynthesisOutcome.Empty
+    }
+
+    @Test
+    fun `verifier F-1 — PROFILE 절단 뒤 공백만 남으면 Synthesized 가 아니라 Empty`() {
+        val shippedPolicy = OPPORTUNITY_POLICY.entries.single().second
+        val profile =
+            ProfileFacts(
+                businessTypes = emptySet(),
+                licenses = OperatorLicenses.NotDeclared,
+                regionTerms = listOf(" ".repeat(shippedPolicy.textMaxChars) + "x"),
+            )
+
+        synthesizeProfileText(profile, shippedPolicy) shouldBe SynthesisOutcome.Empty
+    }
+
+    @Test
     fun `상한 초과 텍스트는 뒤를 자른다`() {
         val subject =
             WatchSubject(

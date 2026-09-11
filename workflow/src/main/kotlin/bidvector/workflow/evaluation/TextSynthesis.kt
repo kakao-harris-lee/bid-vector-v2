@@ -105,15 +105,24 @@ fun synthesizeProfileText(
     return synthesize(parts, TextKind.OPERATOR_PROFILE, policy)
 }
 
+/**
+ * verifier r1 F-1(medium) — 절단은 코드포인트 수만 보고 자르므로, 첫 비공백 조각의 앞
+ * `textMaxChars`개가 전부 공백이면(전각 공백·탭 등) 절단 결과가 다시 공백뿐일 수 있다.
+ * `SynthesisOutcome` KDoc·설계 검토 (8)의 불변식(「빈 텍스트를 만들지 않는다」)을 지키려면
+ * 절단 **뒤**에도 blank 재검사가 필요하다 — 절단 전 검사만으로는 이 경로를 못 막는다.
+ */
 private fun synthesize(
     parts: List<String>,
     kind: TextKind,
     policy: OpportunityPolicyData,
 ): SynthesisOutcome {
     val combined = parts.filter { it.isNotBlank() }.joinToString(SEPARATOR)
-    if (combined.isBlank()) return SynthesisOutcome.Empty
-    val truncated = truncateToPolicy(combined, policy.textMaxChars)
-    return SynthesisOutcome.Synthesized(SynthesizedText(truncated, kind, policy.synthesisVersion))
+    val truncated = if (combined.isBlank()) null else truncateToPolicy(combined, policy.textMaxChars)
+    return if (truncated.isNullOrBlank()) {
+        SynthesisOutcome.Empty
+    } else {
+        SynthesisOutcome.Synthesized(SynthesizedText(truncated, kind, policy.synthesisVersion))
+    }
 }
 
 /**
