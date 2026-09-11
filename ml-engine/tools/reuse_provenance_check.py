@@ -77,19 +77,30 @@ def parse_reuse_table(text: str) -> dict[str, tuple[str, str]]:
 
 
 def check(repo_root: Path, evidence_paths: list[Path]) -> list[str]:
-    """`{docstring 포인터} ↔ {evidence 기록}` 대조 위반 설명 목록(빈 목록 = 위반 0)."""
+    """`{docstring 포인터} ↔ {evidence 기록}` 양방향 대조(verifier r1 F-3 — 이전 판은
+    docstring 이 있는 모듈만 대조해, evidence 행만 있고 docstring 포인터가 없는(또는 지워진)
+    이식본을 놓쳤다. 이제 두 집합의 합집합을 돈다). 위반 설명 목록(빈 목록 = 위반 0)."""
     pointers = find_reuse_pointers(repo_root)
     evidence: dict[str, tuple[str, str]] = {}
     for evidence_path in evidence_paths:
         evidence.update(parse_reuse_table(evidence_path.read_text(encoding="utf-8")))
 
     violations: list[str] = []
-    for module_id, (path, commit) in sorted(pointers.items()):
-        if module_id not in evidence:
+    for module_id in sorted(set(pointers) | set(evidence)):
+        has_pointer = module_id in pointers
+        has_evidence = module_id in evidence
+        if has_pointer and not has_evidence:
+            path, commit = pointers[module_id]
             violations.append(
                 f"{module_id}: evidence 에 기록 없음(docstring 은 {path}@{commit})"
             )
             continue
+        if has_evidence and not has_pointer:
+            violations.append(
+                f"{module_id}: evidence 에는 있으나 모듈 docstring 에 Reuse 포인터가 없다"
+            )
+            continue
+        path, commit = pointers[module_id]
         evidence_path, evidence_commit = evidence[module_id]
         if (evidence_path, evidence_commit) != (path, commit):
             violations.append(

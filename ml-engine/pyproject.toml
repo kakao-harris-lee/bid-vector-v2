@@ -57,13 +57,21 @@ target-version = "py312"
 # `src/ml_engine/contracts/_generated` 항목은 뺐다(D-5A-0 (b) 정정 — 생성 위치가 패키지 트리
 # 밖 `.contracts-generated/`로 옮겨져 이 경로가 더는 존재하지 않는다, 죽은 exclude 항목이었다).
 #
-# `tests/*.py`(직계 — `tests/gates/**`는 대상 아님): 2A~2E 가 만든 기존 계약 test 다섯 +
-# `conftest.py`·`crosslang_smoke_server.py`는 편집 금지(회귀 0)인데 `ruff format`이 요구하는
-# 폭·줄바꿈으로 이미 작성되지 않았다(실측 — `ruff format --check`가 6개를 재포맷 대상으로
-# 잡는다). `ruff`는 lint·format 이 같은 `exclude`를 공유해 format 만 빼는 옵션이 없으므로,
-# 이 파일들을 고치지 않고 양쪽 다 제외한다(`ruff check`는 어차피 이미 0 위반이었다 — 잃는
-# 것은 이 파일들에 대한 향후 자동 재검사뿐).
-extend-exclude = ["tests/*.py"]
+# verifier r1 F-4 — `"tests/*.py"`(glob)는 `tests/` **직계 전부**를 뺐다(게이트 test 13개·
+# fixtures 도 포함, 실측 — 「직계만」이라는 원래 의도와 어긋났다). 2A~2E 가 만든 기존 계약
+# test 다섯 + `crosslang_smoke_server.py`는 편집 금지(회귀 0)인데 `ruff format`이 요구하는
+# 폭·줄바꿈으로 이미 작성되지 않았다(실측). `conftest.py`는 5A 가 편집하며 이미 `ruff
+# format`에 맞춰 다시 썼으므로 뺄 필요가 없다(제외하면 향후 재검사를 잃기만 한다 — 실측
+# 확인 후 여섯만 남긴다). `ruff`는 lint·format 이 같은 `exclude`를 공유해 format 만 빼는
+# 옵션이 없으므로, **파일명을 정확히 나열**한다(`tests/gates/**`는 대상에서 빠지지 않는다).
+extend-exclude = [
+    "tests/crosslang_smoke_server.py",
+    "tests/test_contract_resilience.py",
+    "tests/test_contract_roundtrip.py",
+    "tests/test_embedding_contract.py",
+    "tests/test_prediction_contract.py",
+    "tests/test_training_contract.py",
+]
 
 [tool.ruff.lint]
 # `N`(pep8-naming) 포함 — 2A~2E 기존 test 의 gRPC 생성 servicer 메서드(`CalculateOptimalBid`

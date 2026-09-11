@@ -92,14 +92,17 @@ jobs:
       - uses: actions/checkout@v5
 
       # `.python-version`(3.12, D-5A-1)을 읽어 버전을 고정한다 — 워크플로에 숫자를 적지
-      # 않는다(`buf` 버전과 같은 이유, install buf 주석 참고).
-      - uses: actions/setup-python@v5
+      # 않는다(`buf` 버전과 같은 이유, install buf 주석 참고). v6 부터 Node 24(`using: node24`
+      # 실측, v5 는 node20) — 위 job 들과 같은 원칙(Node 24 를 만족하는 가장 낮은 major),
+      # v5 는 아니다(verifier r1 F-5).
+      - uses: actions/setup-python@v6
         with:
           python-version-file: ml-engine/.python-version
 
       # 재현성(D-5A-4) — 로컬 실측 버전과 같은 값으로 고정. uv 자체는 lock 대상이 아니라
-      # (lock 파일이 검증하는 것은 Python 의존성 그래프뿐) 여기서 직접 핀한다.
-      - uses: astral-sh/setup-uv@v6
+      # (lock 파일이 검증하는 것은 Python 의존성 그래프뿐) 여기서 직접 핀한다. v7 부터 Node 24
+      # (실측 — v6 이하는 node20), v6 는 아니다(verifier r1 F-5, 같은 원칙).
+      - uses: astral-sh/setup-uv@v7
         with:
           version: "0.9.22"
 

@@ -23,4 +23,6 @@ def test_reexport_names_match_proto_file_list() -> None:
 
 def test_every_exported_name_is_actually_importable() -> None:
     for name in ml_engine.contracts.__all__:
-        assert hasattr(ml_engine.contracts, name), f"{name} 이 ml_engine.contracts 에 없다"
+        assert hasattr(ml_engine.contracts, name), (
+            f"{name} 이 ml_engine.contracts 에 없다"
+        )
