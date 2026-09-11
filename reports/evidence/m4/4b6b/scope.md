@@ -118,3 +118,12 @@ rollback: |
 | `OPEN-4B6-PROFILE-SOURCE` | 수령 유지(M6 — port 소비만) |
 | 4B-6a F-2(절단 단위 코드포인트 vs 2E 판정) | 이 slice test 로 고정: `EmbedTextRequest.text` 의 상한 판정 단위(4D-2 gateway·2E `max-chars`)와 4B-6a 절단 단위 대조, 어긋나면 알려진 제한 |
 | `UnavailableMlAnalysis` 삭제 | 6A(app 배선)로 인계 |
+
+---
+
+## 계약 갱신 이력
+
+| 일자 | 갱신 | 사유 |
+| --- | --- | --- |
+| 2026-09-12 (구현 뒤, 팀장 등재) | **in_scope 추가**: `workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisPipeline.kt`(순수 파이프라인 변환)·`PredictionFacts.kt`(예측·마진 파생) — 조합기를 port I/O(class)/순수 변환/예측 파생 셋으로 나눔. **D-4B6B-5 슬롯 추가**: `recommendedAmountRounding: RoundingPolicy`(scale 0·HALF_UP, 코드베이스 관례) — `baseAmount × BidRate → BidAmount` 가 `MoneyArithmetic.roundedWith` 의 반올림 정책을 요구하고, 4B-5 `budgetCaptureRounding`(scale 6)은 다른 용도라 재사용하지 않음. 값은 `policy-values.md` §4, `OPEN-4B6B-POLICY-VALUES` 에 포함 | detekt `TooManyFunctions`(11/파일) 게이트가 단일 파일을 거부(commands.md S-1 라운드) · shared-kernel 금액 연산 API 의 필수 인자. 둘 다 새 public 표면이 아니라 파일 분할·정책 슬롯(verifier 표적: (2b) 표 재확인) |
+| 2026-09-12 (구현 뒤) | OPEN 신설 `OPEN-4B6B-BASE-AMOUNT-PROVENANCE` — `Notice` 가 `BaseAmountProvenance` 축을 나르지 않아 `BidPredictionRequest.baseAmountProvenanceLabel` 을 `Unknown` 고정. 해소는 procurement 가 provenance 를 fact 로 나르는 slice | 구현 실측(digest §9 `Notice` 필드) |
