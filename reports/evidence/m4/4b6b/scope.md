@@ -101,7 +101,7 @@ rollback: |
 | `OpportunityAnalysis` 주 생성자 | internal | 닫는다(판정 함수·정책 주입 불가) |
 | `OpportunityAnalysis` 보조 생성자(port 여섯·Clock) | public | 연다 — port 주입은 없던 권한이 아니다(use case 가 이미 port 를 받는다) |
 | `EmbeddingBridge` 함수 셋 | internal | 닫는다 |
-| `OpportunityPolicyData` 새 슬롯 | public data | 연다(정책 입력) — `init` 이 예산 > 0·offset 범위 강제 |
+| `OpportunityPolicyData` 새 슬롯 | public data | 연다(정책 입력) — `init` 이 예산 > 0 강제. offset 범위는 `init` 이 아니라 `SemanticMatch.of` 가 `OffsetOutOfRange` 로 fail-closed(verifier r1 F-5 정정) |
 | `WorkflowGateRegistrationTest` | test | — |
 
 수정 라운드마다 이 표를 갱신한다(「이번 수정이 새 public 표면을 만들었는가」).
@@ -126,4 +126,5 @@ rollback: |
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-12 (구현 뒤, 팀장 등재) | **in_scope 추가**: `workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisPipeline.kt`(순수 파이프라인 변환)·`PredictionFacts.kt`(예측·마진 파생) — 조합기를 port I/O(class)/순수 변환/예측 파생 셋으로 나눔. **D-4B6B-5 슬롯 추가**: `recommendedAmountRounding: RoundingPolicy`(scale 0·HALF_UP, 코드베이스 관례) — `baseAmount × BidRate → BidAmount` 가 `MoneyArithmetic.roundedWith` 의 반올림 정책을 요구하고, 4B-5 `budgetCaptureRounding`(scale 6)은 다른 용도라 재사용하지 않음. 값은 `policy-values.md` §4, `OPEN-4B6B-POLICY-VALUES` 에 포함 | detekt `TooManyFunctions`(11/파일) 게이트가 단일 파일을 거부(commands.md S-1 라운드) · shared-kernel 금액 연산 API 의 필수 인자. 둘 다 새 public 표면이 아니라 파일 분할·정책 슬롯(verifier 표적: (2b) 표 재확인) |
+| 2026-09-12 (verifier r1 뒤) | **in_scope 추가** `workflow/build.gradle.kts` — `test` task 의 입력에 `config/quality/gate-tests.properties` 를 선언(F-2: 선언이 없어 파일만 바뀌면 task 가 UP-TO-DATE 로 건너뛰어 등재 완전성 test 가 거짓 초록). **F-1 관문 확장**: `MarginInputs.init` 의 세 술어(recommendedRate·predictedRate·floorRate ≤ 1) 전부를 `PredictionFacts` 가 호출 전에 판정 — 후보율 > 1 은 계약 위반이라 두 성분 `Absent(ContractViolation)`, 예외 0. **rollback base 는 slice base `571059a`**(계약 커밋 `9787329`·`b902097` 은 팀장 문서 레인 — 목록 제외 선언) | verifier r1 F-1(high)·F-2(medium)·F-3(low) |
 | 2026-09-12 (구현 뒤) | OPEN 신설 `OPEN-4B6B-BASE-AMOUNT-PROVENANCE` — `Notice` 가 `BaseAmountProvenance` 축을 나르지 않아 `BidPredictionRequest.baseAmountProvenanceLabel` 을 `Unknown` 고정. 해소는 procurement 가 provenance 를 fact 로 나르는 slice | 구현 실측(digest §9 `Notice` 필드) |
