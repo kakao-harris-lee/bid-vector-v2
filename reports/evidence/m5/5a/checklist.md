@@ -72,3 +72,10 @@
 | `OPEN-5A-PY-CI` | CI job 신설(이 slice) | 러너 실행 확인은 push 뒤(범위 밖) |
 | `OPEN-5A-SERVING-GRPC-EXCEPTION` | 신설 | 5E 가 `serving/grpc.py` 를 만들 때 `ignore_imports` 한 줄 추가 |
 | `OPEN-5A-WHEEL-BUILD-HOOK` | 신설(verifier r2 N-1) | 5E 가 servicer 를 세우기 전에 빌드 훅(D-5A-0 (a) 형태 — 패키지 빌드 시 생성물을 wheel 안 `ml_engine/contracts/`로 넣되 소스 트리에는 두지 않음)이 필요. 소유 후보 5E 또는 6C |
+
+## 사용자 승인
+
+**2026-09-11 — slice 5A 종결 승인.** verifier r1 not-ready(high 2·medium 3·low 3) → 수정 커밋 5 → r2 ready-for-review(여덟 전부
+닫힘, 회귀 0, 새 발견 N-1 등재·N-2 계약 문면 정정). 재작업 1회. 함께 결정: 병합은 `origin/main`(PR #4·#5) 흡수 → 전체 `clean check`
+→ 로컬 `main` ff → 브랜치 push + `main` PR(운영자 (a)). OPEN 넷(`MYPY-ALLOWLIST`·`PY-CI`·`SERVING-GRPC-EXCEPTION`·`WHEEL-BUILD-HOOK`)은
+5D·5E·6C 로 인계. verifier 리포트 `_workspace/m5-5a/04_verifier_report.md`·`05_verifier_report_r2.md`.

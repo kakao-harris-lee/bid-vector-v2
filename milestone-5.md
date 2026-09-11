@@ -43,6 +43,16 @@ import 허용. CI 에 Python job 신설(Kotlin job 무편집). 위협 모델 경
 `reports/evidence/m5/5a/scope.md`·`_workspace/m5-5a/02_design-review.md`. 레인 `m5-5a/2026-09-11`,
 Kotlin lane 과 소스 겹침 0.
 
+**5A 종결 2026-09-11(사용자 승인)** — verifier r1 `not-ready`(high 2: forbidden 계약이 승인 통로의
+간접 연쇄까지 막아 패키지가 비었을 때만 초록 · 생성 stub 이 패키지 트리 안이라 우회 import 경로가
+존재) → 직접 import 만 금지 + 승인 통로 양성 fixture, 생성 위치를 패키지 트리 밖
+`ml-engine/.contracts-generated/`로 옮겨 경로 자체를 제거(D-5A-0 (b) 문면 갱신) → r2
+`ready-for-review`(허용 층 경유 간접 유입 셋 전부 붉음, 게이트 test 는 fixture 별 lint 거동 단언).
+S-1~S-9 exit 0, pytest 156(기존 125 회귀 0), CI Python job 신설. **알려진 제한·OPEN**: wheel 설치본에서
+`ml_engine.contracts` 재수출 불성립 → `OPEN-5A-WHEEL-BUILD-HOOK`(5E 전 빌드 훅, 5E/6C) ·
+`OPEN-5A-SERVING-GRPC-EXCEPTION`(5E) · `OPEN-5A-MYPY-ALLOWLIST`(초기 0건, 5D) · `OPEN-5A-PY-CI`(러너
+실행은 push 뒤). 정본 `reports/evidence/m5/5a/checklist.md`. **다음은 5B**(feature schema).
+
 ### Slice 5B — feature schema
 
 - versioned feature name/order/type/range
