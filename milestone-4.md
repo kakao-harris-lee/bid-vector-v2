@@ -563,6 +563,18 @@ slice(opportunity-analysis RPC를 2A~2D 절차로 additive 확장) + M5 provider
 slice 계약에서 다룬다 — 이 milestone 문서의 4D 절은 4D-1로 종결되고, 사다리 점수
 경로는 별도 slice 번호로 이어진다.
 
+**4D-2 착수 2026-09-10(임베딩 gateway, 정본 `reports/evidence/m4/4d2/scope.md`)** —
+**D-4D2-1**: 임베딩 port 와 값 타입(`EmbedTextPort`·`EmbeddingOutcome`·`EmbeddingVector`
+등, `workflow/embedding/**`)은 **4D-2가 소유한다** — 4D-1이 `workflow/prediction`을
+소유한 전례 그대로다. 이 결정으로 위 「**다음은 4B-5**(port·조합기·텍스트 합성 규약)」·
+「4B-5(workflow 조합기 + 임베딩 port + 텍스트 합성 규약)」 문구는 **대체된다** — **4B-5는
+port를 만들지 않고 소비한다**(조합기·텍스트 합성 규약만 남는다). `GrpcEmbeddingGateway`
+(`adapters/ml`)가 `EmbeddingService.EmbedText`를 배선하고, resilience 골격(breaker·
+bounded retry)은 4D-1 `ResilientPredictionCall`을 제네릭화(D-4D2-4)해 재사용한다 —
+정책 값은 예측과 분리한 별도 슬롯(D-4D2-2, 착수 값은 4D-1과 같고 `OPEN-4D2-POLICY-VALUES`
+로 실측을 연다). 구현·verifier 1차 완료, 수정 라운드 진행 중(재작업 카운터 활성) —
+종결 등재는 사용자 승인 뒤.
+
 ### Slice 4E — notification adapter contract
 
 - delivery request와 rendered content 분리
