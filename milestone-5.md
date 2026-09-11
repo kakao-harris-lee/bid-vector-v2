@@ -33,6 +33,16 @@ LightGBM/KDE 관련 수학과 모델 생명주기를 독립 Python package로 �
 - `serving`의 DB/HTTP 수집/business module import 금지 gate
 - 모듈별 재활용 출처(원본 파일 경로, 기준 commit)와 이식 중 수정 내역 기록
 
+**5A 착수 2026-09-11(운영자 결정 2026-09-11 「추천안 대로 진행」 — D-M5-1~4·6 (a), D-5A-0 (b))** —
+base 는 4B-6a 병합 뒤 `main`(`d281329`, 2A~2E 골격 포함). `uv`(lock + extras 분리)·mypy strict(이식
+모듈만 allowlist, 사유·해소 slice 명시)·legacy 래칫 이식(함수 50/파일 500/`dict[str, Any]` 경계 0,
+baseline 완화 없음)·import-linter layers+forbidden(`serving.grpc` 만 grpcio 허용)·정책 값 33 분류 표
+승인(정책 23·환경 6·미분류 4 — 값은 5C·5D 가 옮긴다, 정본 `reports/evidence/m5/5a/policy-values.md`)·
+생성 stub 은 `ml_engine/contracts/_generated/`(VCS 밖)에 두고 `ml_engine.contracts` 재수출 하나만
+import 허용. CI 에 Python job 신설(Kotlin job 무편집). 위협 모델 경계·우회 (1)~(8)·설계 검토는
+`reports/evidence/m5/5a/scope.md`·`_workspace/m5-5a/02_design-review.md`. 레인 `m5-5a/2026-09-11`,
+Kotlin lane 과 소스 겹침 0.
+
 ### Slice 5B — feature schema
 
 - versioned feature name/order/type/range
