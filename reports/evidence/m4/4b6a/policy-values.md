@@ -1,6 +1,6 @@
 # M4/4B-6a 정책 값 — `OPEN-4B6A-POLICY-VALUES`
 
-> **지위: 승인 대기.** 값은 legacy-behavior(키워드)와 2E 기존 승인 값(상한) 그대로다 —
+> **지위: 사용자 승인 2026-09-11 — `OPEN-4B6A-POLICY-VALUES` 종결.** 값은 legacy-behavior(키워드)와 2E 기존 승인 값(상한) 그대로다 —
 > 이 slice가 새로 지어낸 수치는 없다. 정본은 이 문서 — 값을 바꾸려면 이 문서를 먼저
 > 갱신한다.
 
@@ -30,11 +30,17 @@ project_text)`(4B-5 D-4B5-5가 인계한 산식) |
 
 ## 승인 대상
 
-이 문서 §1~§3 값 전부(`OPEN-4B6A-POLICY-VALUES`) — slice 종결 시 팀장이 사용자 승인
-기록을 이 문서에 추가한다.
+이 문서 §1~§3 값 전부(`OPEN-4B6A-POLICY-VALUES`).
+
+## 사용자 승인
+
+**2026-09-11 — `OPEN-4B6A-POLICY-VALUES` 종결.** slice 4B-6a 종결 승인과 함께 받았다
+(§1 version `v1` · §2 키워드 14 · §3 상한 4000). 정본은 이 문서 — evidence
+`reports/evidence/m4/4b6a/checklist.md` 「사용자 승인」 절.
 
 ## change_history
 
 | 일자 | 변경 | 근거 |
 | --- | --- | --- |
 | 2026-09-11 착수 | §1~§3 값 등재, 승인 대기 | 구현 레인 — legacy 실측(`EXECUTION_COMPLEXITY_KEYWORDS`)·2E 기존 값 대조 |
+| 2026-09-11 종결 | §1~§3 사용자 승인 | 4B-6a 종결 승인과 동시(운영자 「추천안 대로 진행」) |

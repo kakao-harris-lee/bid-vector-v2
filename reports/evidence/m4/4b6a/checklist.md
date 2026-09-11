@@ -73,4 +73,9 @@ evidence 커밋은 자기 자신을 가리키지 않는다)
 
 ## 사용자 승인
 
-(대기 — verifier 검증 뒤 팀장이 기록)
+**2026-09-11 — slice 4B-6a 종결 승인.** verifier r1 ready-for-review(medium 1·low 2) →
+일괄 시정 `8c0a9df`·`472ca76` → r2 ready-for-review(새 결함 0). 함께 승인: `OPEN-4B6A-POLICY-VALUES`
+(정본 `policy-values.md`) · 병합은 `main`으로 fast-forward(`m4/2026-09-08`은 4D-2 진행분이
+앞서 ff 불가, 다른 레인이 `main`을 흡수). 범위 밖 부채(`gate.tests.workflow` 등재 완전성
+test)는 4B-6b in_scope로(운영자 결정 (a)). verifier 리포트 `_workspace/m4-4b6a/04_verifier_report.md`·
+`05_verifier_report_r2.md`.
