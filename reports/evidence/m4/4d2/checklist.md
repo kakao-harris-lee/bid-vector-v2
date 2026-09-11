@@ -55,9 +55,13 @@ acceptance S-0~S-7 전건 exit 0(기준 head 는 `commands.md` 가 명시한다)
 | `leak-patterns.txt` 가 **gradle 에 배선돼 있지 않음**(아무도 안 돌리는 게이트) | `privacy-gate` | `LeakPatternGateTask` 신설, 루트 `check` 배선. 스캔 범위는 `reports/evidence/` |
 
 **`exact_release` 경로의 잔여** — `latest_promoted` 가 아닌 선택자에서는 metadata 를 조회하지
-않으므로 dimension 대조가 **구조적으로 적용되지 않는다**. 근거는 `release_id`+`checksum` 이
-아티팩트를 못 박아 같은 checksum 이 다른 `dimension` 을 낼 수 없다는 것이고, 4D-1 이 같은
-관례를 쓴다. 지금까지 이 판단이 **KDoc 에만** 있고 evidence 에 없었다(`contract-keeper` 권고) —
+않으므로 dimension 대조가 **적용되지 않고, 그것을 메우는 다른 검사도 없다**. **정정
+(Codex 2차 medium, 2026-09-11)**: 이 문단의 앞선 판은 근거를 「`release_id`+`checksum` 이
+아티팩트를 못 박아 같은 checksum 이 다른 `dimension` 을 낼 수 없다」로 적었으나 **구현이
+집행하지 않는 보장이었다** — `exact_release` 분기는 문자열만 비교하고, Codex 가 반례를 만들었다
+(release·schema 를 유지한 채 `dimension` 4 → 1 로 바꾼 응답이 현재 release·shape·schema 검증을
+전부 통과한다). 남는 방어는 `values.size == dimension`(자기정합성)뿐이다. 4D-1 이 같은
+관례를 쓴다 — **관례를 이어받은 알려진 제한**이지 보장이 아니다. 지금까지 이 판단이 **KDoc 에만** 있고 evidence 에 없었다(`contract-keeper` 권고) —
 여기에 등재한다. **새로 생긴 표면이 아니라 4D-1 부터 있던 설계를 이어받은 것**이다.
 
 **알려진 제한 추가**: leak-pattern 게이트는 **`reports/evidence/` 만** 스캔한다 — 저장소 전체
