@@ -1,0 +1,12 @@
+# S-4 양성 대조 — 「생성 stub 은 contracts 재수출로만」 forbidden 계약의 양성 대조.
+# `ml_engine/features/__init__.py`가 `bidvector`를 직접 import 하면 exit 0 이 아니어야 한다
+# (설계 검토 (2) 우회 (7)).
+[tool.importlinter]
+root_packages = ["ml_engine"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "features 는 bidvector 를 직접 못 본다(양성 대조)"
+type = "forbidden"
+source_modules = ["ml_engine.features"]
+forbidden_modules = ["bidvector"]
