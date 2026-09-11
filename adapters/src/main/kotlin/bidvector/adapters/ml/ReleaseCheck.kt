@@ -41,32 +41,46 @@ internal fun releaseSatisfiesSelector(
  * `GrpcEmbeddingGateway.fetchPromoted`+`getEmbeddingMetadataOrNull`이 함수 이름과 빈 줄
  * 하나만 다른 채 37줄을 그대로 복제하고 있었다(cpd 미검출 — 식별자만 다름). 두 RPC
  * (`GetModelMetadata`/`GetEmbeddingMetadata`)의 요청·응답 타입이 다르므로 그 차이만
- * [invoke]·[promotedOf] 인자로 뽑고 나머지(envelope 조립, 조회 실패 처리, promoted 공백
+ * [invoke]·[extract] 인자로 뽑고 나머지(envelope 조립, 조회 실패 처리, promoted 공백
  * 거부)는 여기 하나로 합쳤다. metadata 조회 실패(status 무관)는 별도 사유가 아니라
  * 「대조 불가」로 접는다 — `releaseSatisfiesSelector(promoted=null)`이 그대로
  * `ReleaseMismatch`를 낸다. coroutine 취소(`CancellationException`)는 이 둘 중 어느
  * 타입도 아니라 그대로 전파된다(잡지 않는다, `RetryRules.kt`와 같은 이유).
+ *
+ * **PR #5 게이트 시정(D-2E ② 미구현, contract-keeper 차단)** — 반환 타입을 `ModelRelease?`
+ * 에서 제네릭 [T]로 넓혔다. `GrpcBidPredictionGateway`는 `T = ModelRelease`(대조 대상이
+ * release 하나뿐)로, `GrpcEmbeddingGateway`는 `T = EmbeddingMetadata`(release **와**
+ * `dimension`을 함께 실어야 한다 — 이전 판은 `promotedOf`가 `response.metadata.promoted`만
+ * 뽑아 `dimension`을 그 자리에서 버렸고, `GetEmbeddingMetadata`를 두 번 부르는 것은
+ * (동일 embed 호출 안에서 값이 갈릴 여지가 생겨) 피한다)로 쓴다. [releaseOf]는 공백 거부
+ * 규칙(다음 줄)이 여전히 release 성분만 보게 하는 어댑터다.
  */
-internal suspend fun <S, Resp> fetchPromotedRelease(
+internal suspend fun <S, Resp, T> fetchPromoted(
     stub: S,
     requestId: String,
     correlationId: String,
     invoke: suspend (S, RequestEnvelope) -> Resp,
-    promotedOf: (Resp) -> ModelRelease?,
-): ModelRelease? {
+    extract: (Resp) -> T?,
+    releaseOf: (T) -> ModelRelease,
+): T? {
     val envelope =
         RequestEnvelope
             .newBuilder()
             .setRequestId(requestId)
             .setCorrelationId(correlationId)
             .build()
-    val response = metadataOrNull(stub, envelope, invoke) ?: return null
-    val promoted = promotedOf(response)
     // verifier r1 F-2(high) (d) — promoted 가 공백(release_id·artifact_checksum 공백)이면
     // 「조회 성공」이 아니라 「대조 불가」로 접는다. 그래야 응답 release 도 공백일 때
     // `releaseSatisfiesSelector` 가 `""==""` 로 통과하는 경로가 막힌다(양쪽 공백이
     // ReleaseMismatch 대신 Predicted/Embedded 로 새던 반례).
-    return promoted?.takeIf { it.releaseId.isNotBlank() && it.artifactChecksum.isNotBlank() }
+    // detekt ReturnCount(≤2) — 조기 반환 둘 대신 nullable chain 하나로 접는다(PR #5
+    // 게이트 시정 리뷰에서 발견, 회귀 없음 — 조건은 그대로).
+    return metadataOrNull(stub, envelope, invoke)
+        ?.let(extract)
+        ?.takeIf { extracted ->
+            val release = releaseOf(extracted)
+            release.releaseId.isNotBlank() && release.artifactChecksum.isNotBlank()
+        }
 }
 
 private suspend fun <S, Resp> metadataOrNull(

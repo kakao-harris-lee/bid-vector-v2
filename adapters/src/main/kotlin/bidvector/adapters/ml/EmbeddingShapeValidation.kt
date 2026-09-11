@@ -1,6 +1,7 @@
 package bidvector.adapters.ml
 
 import contract.bidvector.ml.v1.Embedding
+import contract.bidvector.ml.v1.EmbeddingMetadata
 import contract.bidvector.ml.v1.VectorNormalization
 import java.math.BigDecimal
 import java.math.MathContext
@@ -14,9 +15,13 @@ import java.math.MathContext
  * 축 — **우회 (6)이 아니다, 리뷰 F-D 정정**: (6)은 이 slice가 열어 둔 값 타입 위조
  * 축이다, `OPEN-4D2-VECTOR-FORGERY-AT-WIRING`)을 모두 통과해야 `EmbeddingVector`·
  * `ModelReleaseRef`를 짓는다. `dimension`은 계약이 수치를 정하지 않는다(모델이 바뀌면
- * 값이 바뀐다) — `GetEmbeddingMetadata.dimension`과의 대조는 하지 않는다(알려진 제한,
- * `exact_release`요청은 metadata 를 부르지 않는 4D-1 관례를 깨지 않기 위해서다 — evidence
- * 에 근거를 남긴다).
+ * 값이 바뀐다) — **PR #5 게이트 시정(D-2E ② 미구현, contract-keeper 차단)**: `GetEmbeddingMetadata`
+ * `.dimension`과의 대조는 [embeddingDimensionMatchesMetadata]로 한다. 대조는
+ * `latest_promoted` 경로 안에서만 일어난다(`GrpcEmbeddingGateway.handleSuccess`) —
+ * `exact_release` 요청은 metadata 를 부르지 않는 4D-1 관례를 그대로 유지하므로(추가 RPC를
+ * 새로 만들지 않는다) 이 경로에는 대조 자체가 구조적으로 적용되지 않는다(selector 축의
+ * 설계이지 알려진 제한이 아니다 — exact_release는 release 자체를 이미 명시했으므로
+ * 승격 metadata 조회가 애초에 무의미하다).
  *
  * **verifier F-1(high) — 비유한 값이 예외로 새던 것을 구조로 닫는다.** `BigDecimal(Double)`
  * 은 NaN·Infinity에 `NumberFormatException`을 던진다. 이전 형태(`listOf(...).all { it }`)는
@@ -34,6 +39,17 @@ internal fun isAcceptableEmbeddingShape(embedding: Embedding): Boolean =
         embedding.valuesList.all { it.isFinite() } &&
         isL2Normalized(embedding.valuesList) &&
         hasNonBlankRelease(embedding.release)
+
+/**
+ * D-2E ② — `EmbedText` 응답의 `dimension`을 승격 `GetEmbeddingMetadata.dimension`과
+ * 대조한다(불일치 = 계약 위반, 호출부는 `Unavailable`로 접는다). `EmbeddingContractTest`
+ * (test)가 이 규칙을 순수 함수로 먼저 고정했던 판을 main 으로 승격한 실물 — `releaseSatisfiesSelector`
+ * 를 M2/2B `PredictionContractTest`에서 main 으로 승격한 것과 같은 관례(`ReleaseCheck.kt`).
+ */
+internal fun embeddingDimensionMatchesMetadata(
+    embedding: Embedding,
+    metadata: EmbeddingMetadata,
+): Boolean = embedding.dimension == metadata.dimension
 
 /** 호출 시점에는 [isAcceptableEmbeddingShape]의 유한성 관문을 이미 통과한 값만 들어온다. */
 private fun isL2Normalized(values: List<Float>): Boolean {

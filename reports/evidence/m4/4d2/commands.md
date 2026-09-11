@@ -218,3 +218,39 @@ F-B~F-E 컴파일·테스트:
 acceptance를 재실행해 exit 0을 확인했다(각 레인의 판정 문서가 정본 — verifier r3
 `ready-for-review`, 코드 리뷰 r2 `approve`). 코드가 바뀌지 않았으므로 이 구현 레인은
 `0a32273`에서 다시 돌리지 않았다.
+
+## 2026-09-11 — PR #5 게이트 시정 (contract-keeper 차단, D-2E ②)
+
+**전제**: worktree `bid-vector-v2-m4`, base `80e86bc`(PR #5 HEAD 당시). contract-keeper
+가 `latest_promoted` 경로에서 `GrpcEmbeddingGateway`가 이미 부른 `GetEmbeddingMetadata`
+의 `dimension`을 버리고 release 신원만 대조함을 지적(D-2E ② 미구현) — 순수 함수
+`embeddingDimensionMatchesMetadata`는 `EmbeddingContractTest`에만 있었고 production
+호출부가 0이었다.
+
+- 시정 커밋: `2ae44ee`(구현)·`88026e5`(리팩터로 나온 detekt ReturnCount 위반 시정).
+- `ReleaseCheck.kt`의 `fetchPromotedRelease(-> ModelRelease?)`를
+  `fetchPromoted<S, Resp, T>`로 넓혀 `GrpcEmbeddingGateway`가 release와 dimension을
+  **같은** `GetEmbeddingMetadata` 호출 하나로 함께 받는다(팀장 지시 — 추가 RPC 금지).
+- `embeddingDimensionMatchesMetadata`를 `EmbeddingContractTest`(test)에서
+  `EmbeddingShapeValidation.kt`(main)로 승격 — `PredictionContractTest` →
+  `releaseSatisfiesSelector` 승격(M4/4D-1)과 같은 관례. test 는 이제 그 함수를
+  import 해서 쓴다(사본 없음).
+- 불일치는 기존 사유 `EmbeddingUnavailableReason.ReleaseMismatch`를 재사용한다(새
+  사유 미신설 — 소비처 전수 확인, 분기하는 곳이 없다).
+- `EmbeddingShapeValidation.kt`의 「dimension 대조는 하지 않는다(알려진 제한)」 KDoc을
+  실제 동작으로 정정.
+- 회귀 test: `GrpcEmbeddingGatewayTest.kt`에 `latest_promoted 인데 GetEmbeddingMetadata
+  의 dimension 이 응답과 다르면 ReleaseMismatch 다` 신설 — **변이 확인**: 처방(dimension
+  대조 두 줄)을 지우고 이 test 하나만 재실행 → `Embedded`를 냄을 실측(FAILED,
+  `outcome` 타입 불일치), 처방 복구 후 재통과 확인(비파괴 — 로컬 diff 되돌림, 커밋
+  이력 불변). `embeddingMetadataResponse` fixture에 `dimension: Int = 4`(기본값,
+  `testEmbeddingSuccess()`의 기본 차원과 일치) 인자를 더해 기존 latest_promoted test
+  들이 새 검사로 우연히 깨지지 않게 했다.
+- cmd: `./gradlew --offline --no-daemon :adapters:compileKotlin :adapters:compileTestKotlin :workflow:compileKotlin :workflow:compileTestKotlin` — exit 0
+- cmd: `./gradlew --offline --no-daemon :adapters:test :workflow:test` — exit 0(finding 시정 직후 1차)
+- cmd: `./gradlew --offline --no-daemon --rerun-tasks :adapters:test --tests "bidvector.adapters.ml.GrpcEmbeddingGatewayTest"`(dimension 대조 삭제 변이 상태) — FAILED, 신설 test 1건만 실패(`Embedded` vs 기대 `Unavailable`) — 변이 확인 성립
+- cmd: `./gradlew --offline --no-daemon --rerun-tasks :adapters:test :workflow:test`(처방 복구 후) — exit 0
+- cmd: `./gradlew --offline --no-build-cache clean check`(88026e5 시점, ②③ 커밋 포함 전체 트리) — exit 0(355 tasks, 336 executed)
+- cmd: `./gradlew --offline --no-daemon :adapters:test :workflow:test`(같은 시점 재확인) — exit 0
+- secret 스캔: 신설 `leakPatternGate`(아래 「PR #5 게이트 시정 — leak-patterns.txt 배선」
+  참고)가 `reports/evidence/m4/4d2/` 를 포함한 전체 evidence 트리를 이제 상시 스캔한다.

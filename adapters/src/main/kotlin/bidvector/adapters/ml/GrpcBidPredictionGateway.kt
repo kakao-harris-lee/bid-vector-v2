@@ -120,19 +120,23 @@ class GrpcBidPredictionGateway(
     ): BidPredictionOutcome {
         val promoted: ModelRelease? =
             if (selector is DomainModelReleaseSelector.LatestPromoted) {
-                fetchPromotedRelease(
+                fetchPromoted(
                     stub,
                     requestId,
                     correlationId,
                     invoke = { s, envelope ->
                         s.getModelMetadata(GetModelMetadataRequest.newBuilder().setEnvelope(envelope).build())
                     },
-                    promotedOf = { response ->
+                    extract = { response ->
                         when (response.resultCase) {
                             GetModelMetadataResponse.ResultCase.METADATA -> response.metadata.promoted
                             else -> null
                         }
                     },
+                    // PR #5 게이트 시정 — `fetchPromotedRelease`가 `fetchPromoted<S, Resp, T>`로
+                    // 넓어졌다(ReleaseCheck.kt). 여기서는 T = ModelRelease 라 공백 거부 대상이
+                    // 곧 반환값 자신이다.
+                    releaseOf = { it },
                 )
             } else {
                 null

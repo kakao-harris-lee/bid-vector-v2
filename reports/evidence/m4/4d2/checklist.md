@@ -42,3 +42,26 @@ acceptance S-0~S-7 전건 exit 0(기준 head 는 `commands.md` 가 명시한다)
 | `OPEN-4D2-VECTOR-PERSISTENCE`(벡터 저장·kNN) | persistence 후속 |
 | 실 servicer | **M5 provider slice** |
 | `ManagedChannel`·TLS·인증 | **M6** |
+
+## PR #5 게이트 시정 — 2026-09-11 (종결 뒤 추가)
+
+이 slice 는 2026-09-11 에 종결됐으나, 같은 날 PR #5 의 게이트 셋이 세 건을 냈고 **같은
+브랜치에서 시정**했다(PR 이 아직 안 닫혀 병합 전이다).
+
+| 지적 | 낸 곳 | 처리 |
+| --- | --- | --- |
+| **차단** — 2E 승인 문면 **D-2E ②**(응답 `dimension` 을 `GetEmbeddingMetadata` 와 대조)가 production 에 미배선. 규칙은 test 안 순수 함수로만 있고 호출부 0 | `contract-keeper` | `latest_promoted` 경로에서 **실제로 대조**하게 배선(추가 RPC 없이 기존 metadata 호출 하나로 release·dimension 을 함께 받는다). 순수 함수를 test → main 승격. 불일치는 `Unavailable(ReleaseMismatch)`. 게이트가 변이로 재확인 → **통과** |
+| RouteKey 검증 실패 예외가 **거부된 원문을 메시지에 실음** | `privacy-gate` | `length=` 만 남긴다. 회귀 test 셋(채팅id·봇비밀값·메일주소 모양) |
+| `leak-patterns.txt` 가 **gradle 에 배선돼 있지 않음**(아무도 안 돌리는 게이트) | `privacy-gate` | `LeakPatternGateTask` 신설, 루트 `check` 배선. 스캔 범위는 `reports/evidence/` |
+
+**`exact_release` 경로의 잔여** — `latest_promoted` 가 아닌 선택자에서는 metadata 를 조회하지
+않으므로 dimension 대조가 **구조적으로 적용되지 않는다**. 근거는 `release_id`+`checksum` 이
+아티팩트를 못 박아 같은 checksum 이 다른 `dimension` 을 낼 수 없다는 것이고, 4D-1 이 같은
+관례를 쓴다. 지금까지 이 판단이 **KDoc 에만** 있고 evidence 에 없었다(`contract-keeper` 권고) —
+여기에 등재한다. **새로 생긴 표면이 아니라 4D-1 부터 있던 설계를 이어받은 것**이다.
+
+**알려진 제한 추가**: leak-pattern 게이트는 **`reports/evidence/` 만** 스캔한다 — 저장소 전체
+소스로 넓히면 정당한 `Bearer` 헤더 생성·`KtTokens.PRIVATE_KEYWORD` 같은 자기매치와 광범위하게
+겹쳐 게이트가 무의미해진다는 실측 때문이다. **그 귀결로 소스 코드의 유출은 이 게이트가 보지
+않는다.** 그리고 배선 시점의 기존 매치 286건을 baseline 으로 grandfather 했다 — 그 목록의
+실유출 여부는 `privacy-gate` 의 독립 판정에 맡겼다.

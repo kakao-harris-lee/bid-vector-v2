@@ -193,3 +193,92 @@
 - cmd: `./gradlew --no-build-cache clean check`
 - exit: 0
 - 핵심 결과: 사용자 승인 등재(checklist·policy-values·scope·milestone-4·NotificationDeliveryPolicyData.kt 문면) 반영 최종 상태에서 저장소 전체 GREEN(344 tasks). 이 상태로 일괄 커밋한다.
+
+## 2026-09-11 — PR #5 게이트 시정 (privacy-gate 수정 필요 ②③)
+
+**전제**: worktree `bid-vector-v2-m4`, base `80e86bc`(PR #5 HEAD 당시).
+
+### ② `RouteKey` 거부 메시지가 원문을 실었다
+
+privacy-gate 지적 — `RouteKey.kt`의 KDoc은 「원문 식별자(채팅id·봇비밀값·메일주소)는
+이 shape를 통과하지 못한다」고 방어를 선언하는데 `require(...) { "…: $value" }`가 그
+거부된 원문을 예외 메시지에 그대로 실었다 — 방어가 예외 경로에서 무효화됨.
+
+- 시정 커밋: `4b8858d`.
+- 메시지를 길이만 남기게 바꿨다(`length=${value.length}`) — 형태 위반 사실은 그대로
+  드러나되 원문 복원은 불가.
+- 회귀 test 셋(`RouteKeyTest.kt`) — 채팅id 모양(숫자 시작)·봇비밀값 모양(콜론 포함)·
+  메일주소 모양(골뱅이 포함) 세 가지 원문 각각에 대해 `exception.message`가 그 원문을
+  **담지 않음**을 단언(kotest `shouldNotContain`).
+- **변이 확인**: 메시지를 원래 코드(`"...: $value"`)로 되돌려 재실행 → 신설 test 3건
+  전부 FAILED(메시지에 원문이 그대로 찍힘 — `AssertionFailedError` 로그에 원문 노출
+  확인)하는 것을 실측. 처방 복구 후 재통과 확인(비파괴 — 로컬 diff 되돌림, 커밋 이력
+  불변).
+- cmd: `./gradlew --offline --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin :workflow:test --tests "bidvector.workflow.notification.RouteKeyTest"` — exit 0
+- cmd: `./gradlew --offline --no-daemon --rerun-tasks :workflow:test --tests "bidvector.workflow.notification.RouteKeyTest"`(원문 유출 변이 상태) — FAILED, 신설 test 3건 전부(메시지에 원문 노출 확인) — 변이 확인 성립
+- cmd: `./gradlew --offline --no-daemon --rerun-tasks :workflow:test --tests "bidvector.workflow.notification.RouteKeyTest"`(처방 복구 후) — exit 0
+
+### ③ `leak-patterns.txt`가 어느 게이트에도 안 걸려 있었다
+
+privacy-gate 지적 — 4E가 신설한 `config/quality/leak-patterns.txt`가 gradle task 어디
+에도 배선돼 있지 않아 slice마다 손으로 grep을 돌리는 관행(바로 위 S-3c 절 다수가 그
+증거)이었다.
+
+**기록 위치에 대한 판단**: 이 finding은 4E가 만든 정책 파일(`leak-patterns.txt`)이
+대상이라 이 evidence에 적는다. 구현은 `build-logic`(신설 `LeakPatternGateTask`)과
+루트 `bidvector.quality-baseline.gradle.kts` 배선이라 하네스 축에 걸치지만, 4E 관례
+(S-3c — 이 slice의 반복 스캔 관행)를 게이트로 승격한 것이지 임의의 새 정책이 아니므로
+새 slice를 열지 않고 여기 등재한다.
+
+- 시정 커밋: `6222497`.
+- 스캔 대상은 `reports/evidence/`(4E가 실제로 반복해 온 대상, 이 문서의 S-3c 절 참고) —
+  저장소 전체 Kotlin 소스로 넓히면(실측) `maxTokensPerCall`·`KtTokens.PRIVATE_KEYWORD`·
+  `LlmClient.kt`의 정당한 `Authorization: Bearer` 헤더 생성·`ServiceKeyTest`(4E 자신의
+  D-3B-5 test, `gate.tests.adapters` 등재분)처럼 도메인 어휘·유출 방어 test 자체가
+  광범위하게 겹쳐 게이트가 무의미해진다(자기매치 60건 이상 확인).
+- 자기매치 함정: (1) 정책 파일 자신은 `config/`라 스캔 대상 밖. (2) evidence 문서가
+  스캔 명령을 인용하거나 판독 서술에 어휘가 등장하는 것은 `config/quality/leak-
+  pattern-baseline.txt`(신설, 281건 — 4E 관례 이전 slice 전부 포함)로 접는다. 281건
+  전수 육안 확인 결과 실제 유출 없음(BEGIN RSA·JWT·bot-token 모양 없음). `scope.md`는
+  이 slice의 S-3c 관례 그대로 스캔에서 제외.
+- 게이트는 baseline 밖 새 매치만 실패시킨다(회귀만 차단, 기존 evidence 소급 편집 없음
+  — codex 리뷰 JSON은 append-only).
+- **양성 대조 실측**: `reports/evidence/_leak-gate-smoke/smoke.md`에 `Bearer sk-
+  plantedLeakForGateSmokeTest12345`를 심어 `:leakPatternGate` FAILED 확인, 비파괴로
+  제거(신규 미추적 파일 삭제 — git 이력 영향 없음) 후 재통과 확인.
+- cmd: `./gradlew --offline --no-daemon :leakPatternGate`(baseline 비어있는 부트스트랩 1차) — FAILED, matches=281
+- cmd: `./gradlew --offline --no-daemon --rerun-tasks :leakPatternGate`(baseline 291줄 채운 뒤) — exit 0
+- cmd: (양성 대조) `reports/evidence/_leak-gate-smoke/smoke.md` 심음 → `./gradlew --offline --no-daemon --rerun-tasks :leakPatternGate` — FAILED(`reports/evidence/_leak-gate-smoke/smoke.md:1`) → 파일 삭제 → 재실행 exit 0
+- cmd: `./gradlew --offline --no-daemon :build-logic:compileKotlin :build-logic:test` — exit 0
+- cmd: `./gradlew --offline --no-build-cache clean check`(leakPatternGate·detekt·ktlint 포함 전체) — exit 0(355 tasks, 336 executed) — 이 실행이 ②③ 모두를 포함한 최종 확인이다
+
+**정정(PR #5 후속, `LeakPatternGateChecksTest` 신설 라운드)** — 시정 커밋
+`6222497`의 커밋 메시지가 「`gate-tests.properties` 검토 결과: 그 파일은 JUnit gate test
+class 등재부라 이 task는 대상이 아니다 — `contractGate`·`memberEffectGate` 등 기존
+Task-기반 게이트도 거기 없다」고 적었는데 **후반절이 틀렸다**. 실제 관례는 정반대다 —
+`contractGate`(Task)는 그 판정 로직을 검증하는 `ContractGateChecksTest`가
+`gate.tests.build-logic`에 등재돼 있고, `memberEffectGate`(Task)도
+`MemberEffectClassificationTest`·`MemberEffectDerivationTest` 둘이 등재돼 있다.
+「Task 자신은 미등재, 그 Task 의 판정 로직을 검증하는 test 는 등재」가 관례이지 「Task
+기반이라 미등재」가 아니다 — `LeakPatternGateTask` 는 신설 당시 그 test 가 아예 없어서
+등재할 대상이 없었을 뿐이다. (커밋 메시지는 append-only 이력이라 고쳐 쓰지 않는다 — 이
+문서가 정정 정본이다.) 이 공백은 `privacy-gate` 지적으로 이번 라운드에 닫혔다 — 판정
+로직을 `LeakPatternGateChecks.kt`(순수 함수, `ContractGateChecks.kt`와 같은 분리)로 뽑고
+`LeakPatternGateChecksTest`(패턴 매치 경계·baseline diff 방향·stale baseline 처리·좌표
+판독 14 test)를 신설해 `gate.tests.build-logic`에 등재했다. 변이 확인:
+`newLeakMatches`의 `(matches - baseline)`을 `(baseline - matches)`로 반전 →
+`baseline 밖의 새 매치만 실패 대상으로 남는다`·`baseline 에만 있고 지금 매치에는 없는
+항목은 새 매치가 아니다`·`stale 항목만 있을 때는 게이트 위반이 없다` 세 test FAILED,
+원복 후 재통과 확인. `LeakPatternGateTask`의 동작 자체는 바꾸지 않았다(순수 추출).
+- cmd: `./gradlew --offline --no-daemon :build-logic:compileKotlin :build-logic:compileTestKotlin :build-logic:test --tests "bidvector.buildlogic.LeakPatternGateChecksTest"` — exit 0, 14 tests, 0 failed
+- cmd: (변이) `newLeakMatches`의 diff 연산 반전 → `./gradlew --offline --no-daemon --rerun-tasks :build-logic:test --tests "bidvector.buildlogic.LeakPatternGateChecksTest"` — FAILED, 14 중 3 실패(위 세 test) → 원복 → 재통과
+- cmd: `./gradlew --offline --no-daemon --rerun-tasks :build-logic:test`(build-logic 전 test 스위트) — exit 0
+- cmd: `./gradlew --offline --no-daemon --rerun-tasks :build-logic:detekt :build-logic:ktlintMainSourceSetCheck :build-logic:ktlintTestSourceSetCheck` — exit 0
+- **알려진 제한**: `./gradlew --offline --no-build-cache clean check`(전건)는 이 라운드에서
+  `leakPatternGate` 가 FAILED 한다 — `reports/evidence/m4/4d2/checklist.md:64`·
+  `reports/evidence/m4/pr5/codex-review-20260911T101524Z.preflight.json:27`(둘 다 이
+  구현 레인이 만들지 않은 다른 병행 레인의 evidence, `Bearer`/토큰 어휘의 정당한 서술)가
+  baseline 밖 새 매치다. **이 레인이 만든 변화가 원인이 아님을 실측했다** — 이 레인의
+  diff 를 `git stash` 로 걷어낸 상태(HEAD 만)에서도 `:leakPatternGate` 가 같은 두 좌표로
+  동일하게 FAILED. baseline 등재는 이 evidence 문서·baseline 파일 자체가 이 라운드
+  in_scope 밖(지시: 「baseline 파일 내용을 건드리지 마라」)이라 여기서 처리하지 않는다.

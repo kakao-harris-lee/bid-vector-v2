@@ -1,6 +1,7 @@
 import bidvector.buildlogic.ContractGateTask
 import bidvector.buildlogic.ConventionCoverageGateTask
 import bidvector.buildlogic.GateExecutionGateTask
+import bidvector.buildlogic.LeakPatternGateTask
 import bidvector.buildlogic.MemberEffectGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
@@ -131,6 +132,24 @@ val memberEffectGate =
         report = layout.buildDirectory.file("reports/member-effects/derived.properties")
     }
 
+// PR #5 게이트 시정(privacy-gate) — `leak-patterns.txt`(M4/4E 신설)가 어느 task 에도
+// 배선돼 있지 않아 slice 마다 손으로 돌리는 관행이었다(gate-tests.properties 에도 부재).
+// 스캔 대상은 `reports/evidence/`(4E 의 실제 관행을 승격 — `LeakPatternGateTask` KDoc의
+// 근거). 모듈에도 source set 에도 속하지 않으므로(evidence 는 어느 Kotlin 모듈도 아니다)
+// `contractGate`·`memberEffectGate`처럼 루트에 둔다.
+val leakPatternGate =
+    tasks.register<LeakPatternGateTask>("leakPatternGate") {
+        group = "verification"
+        description = "evidence 문서에 비밀값·raw 식별자 어휘가 baseline 밖에서 새로 나타나는지 잰다"
+        patternsFile = layout.settingsDirectory.file("config/quality/leak-patterns.txt")
+        baselineFile = layout.settingsDirectory.file("config/quality/leak-pattern-baseline.txt")
+        scanRoot.from(layout.settingsDirectory.dir("reports/evidence"))
+        // 4E 관례(scope.md S-3c) — `scope.md` 는 계약 문서라 육안 리뷰 대상, 자동 스캔에서 뺀다.
+        excludedFileNames.set(setOf("scope.md"))
+        repoRoot = layout.settingsDirectory
+        report = layout.buildDirectory.file("reports/leak-pattern-gate/matches.txt")
+    }
+
 // 루트와 included build 의 `*.gradle.kts` — 모듈에도 source set 에도 속하지 않아 다른 어느
 // 게이트의 입력에도 없다. 이름을 열거하면 새 스크립트가 조용히 빠지므로 두 디렉터리를
 // **훑어서**(재귀 아님) 낸다.
@@ -179,6 +198,7 @@ tasks.register("check") {
         conventionCoverageGate,
         memberEffectGate,
         contractGate,
+        leakPatternGate,
     )
     dependsOn(gradle.includedBuild("build-logic").task(":check"))
 }
