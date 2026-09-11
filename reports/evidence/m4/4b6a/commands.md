@@ -30,7 +30,7 @@ base_sha: `786febe39469835a45e9a1c6d6e8081226777364`
 
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt workflow/src/main/kotlin/bidvector/workflow/evaluation`
 - exit: 1(매치 0건 — grep 관례상 「매치 없음」이 exit 1, scope.md acceptance 그대로) —
-  합성 코드에 `api key`·`secret`·`token`·`password`·`Bearer`·`BEGIN (RSA|EC|OPENSSH)` 없음.
+  합성 코드에 `config/quality/leak-patterns.txt` 의 여섯 패턴 매치 없음(어휘는 패턴 파일 참조 — 산문에 적지 않는다).
 
 ## S-4 — gateExecutionGate
 
