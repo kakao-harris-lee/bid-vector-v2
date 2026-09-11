@@ -24,15 +24,14 @@ ml-engine/src/*.egg-info/
 ml-engine/.ruff_cache/
 ml-engine/.mypy_cache/
 
-# M5/5A — 계약 재수출(D-5A-0 (b)). `grpc_tools.protoc` 생성 stub 은 `ml_engine/contracts/`
-# 안(정적 import 경로 고정을 위해)에 두되 VCS 밖 — `tests/gates/test_generated_not_tracked.py`
-# 가 `git ls-files`로(`.gitkeep` 제외) 빈 것을 단언한다. 디렉터리 자체는 `.gitkeep`으로
-# 항상 존재해야 한다 — 실측: 디렉터리가 아예 없으면(fresh checkout, 생성 전) `lint-imports`
-# (import-linter/grimp)가 `ml_engine.contracts.__init__`의 `._generated` 재수출 import 를
-# 정적 분석하다 **세그폴트**한다(exit 139, 빈 디렉터리만 있으면 정상 exit). `.gitkeep`이
-# 그 크래시를 막는다.
-ml-engine/src/ml_engine/contracts/_generated/*
-!ml-engine/src/ml_engine/contracts/_generated/.gitkeep
+# M5/5A — 계약 재수출(D-5A-0 (b), verifier r1 F-2 뒤 위치 정정). `grpc_tools.protoc` 생성
+# stub 은 `ml_engine` 패키지 트리 **밖**, `ml-engine/.contracts-generated/`에 둔다 — 트리
+# 안에 두면 `ml_engine.contracts._generated`라는 Python import 경로가 생겨 forbidden 계약의
+# 열거를 우회할 수 있었다(F-2, 재현 확인). 트리 밖이면 그 경로 자체가 없다. 디렉터리
+# 통째로 VCS 밖 — `.gitkeep` 불필요(이전 판이 적었던 「디렉터리 부재 시 세그폴트」는 옛 상대
+# import 코드 기준이었고 현재 코드로는 재현되지 않는다, `tests/gates/test_generated_not_tracked.py`
+# 가 `git ls-files`로 빈 것을 단언한다).
+ml-engine/.contracts-generated/
 
 # 전역 gitignore(~/.gitignore_global)가 CLAUDE.md를 제외하지만,
 # 이 프로젝트에서는 역할별 진입점 문서라 커밋 대상이다 (README '문서 읽는 순서')

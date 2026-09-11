@@ -13,7 +13,9 @@ import pytest
 from tools import design_ratchet
 
 _ML_ENGINE_ROOT = Path(__file__).resolve().parents[2]
-_FIXTURE_FILE = Path(__file__).resolve().parent / "fixtures" / "ratchet_violations" / "sample.py"
+_FIXTURE_FILE = (
+    Path(__file__).resolve().parent / "fixtures" / "ratchet_violations" / "sample.py"
+)
 
 
 def test_approved_limits_match_ml_11_2() -> None:
@@ -62,7 +64,8 @@ def test_fixture_directory_is_outside_target_dirs() -> None:
     """양성 대조 표본이 실제 S-6 스캔에는 안 걸림을 확인(`tests/`는 target_dirs 밖)."""
     config = design_ratchet.load_config()
     assert not any(
-        _FIXTURE_FILE.is_relative_to(_ML_ENGINE_ROOT / target) for target in config.target_dirs
+        _FIXTURE_FILE.is_relative_to(_ML_ENGINE_ROOT / target)
+        for target in config.target_dirs
     )
 
 

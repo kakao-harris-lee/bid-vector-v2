@@ -38,7 +38,9 @@ def test_every_mypy_override_has_reason_and_resolve_comments() -> None:
     text = _PYPROJECT_PATH.read_text(encoding="utf-8")
     blocks = _override_blocks(text)
     assert blocks, "pyproject.toml 에 [[tool.mypy.overrides]] 가 없다"
-    missing = [block.splitlines()[1] for block in blocks if not has_reason_and_resolve(block)]
+    missing = [
+        block.splitlines()[1] for block in blocks if not has_reason_and_resolve(block)
+    ]
     assert not missing, f"reason/resolve 주석이 없는 override: {missing}"
 
 

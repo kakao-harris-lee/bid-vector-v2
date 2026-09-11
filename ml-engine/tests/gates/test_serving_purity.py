@@ -30,5 +30,9 @@ def test_ml_engine_training_and_adapters_not_pulled_in_by_serving() -> None:
     """serving 은 `training`·`adapters`도 모른다(pyproject.toml forbidden 계약과 같은 대상,
     여기서는 실행 시점으로 재확인)."""
     _import_every_serving_module()
-    leaked = [name for name in ("ml_engine.training", "ml_engine.adapters") if name in sys.modules]
+    leaked = [
+        name
+        for name in ("ml_engine.training", "ml_engine.adapters")
+        if name in sys.modules
+    ]
     assert not leaked, f"serving import 가 금지 패키지를 끌어들였다: {leaked}"

@@ -54,8 +54,8 @@ pythonpath = ["."]
 
 [tool.ruff]
 target-version = "py312"
-# 생성 stub 은 VCS 밖(D-5A-0 (b))이라 저장소에 없을 수도, 세션 중 생겼다 사라질 수도 있다 —
-# 존재해도 lint 대상이 아니다(설계 검토 「미달로 채택」).
+# `src/ml_engine/contracts/_generated` 항목은 뺐다(D-5A-0 (b) 정정 — 생성 위치가 패키지 트리
+# 밖 `.contracts-generated/`로 옮겨져 이 경로가 더는 존재하지 않는다, 죽은 exclude 항목이었다).
 #
 # `tests/*.py`(직계 — `tests/gates/**`는 대상 아님): 2A~2E 가 만든 기존 계약 test 다섯 +
 # `conftest.py`·`crosslang_smoke_server.py`는 편집 금지(회귀 0)인데 `ruff format`이 요구하는
@@ -63,7 +63,7 @@ target-version = "py312"
 # 잡는다). `ruff`는 lint·format 이 같은 `exclude`를 공유해 format 만 빼는 옵션이 없으므로,
 # 이 파일들을 고치지 않고 양쪽 다 제외한다(`ruff check`는 어차피 이미 0 위반이었다 — 잃는
 # 것은 이 파일들에 대한 향후 자동 재검사뿐).
-extend-exclude = ["src/ml_engine/contracts/_generated", "tests/*.py"]
+extend-exclude = ["tests/*.py"]
 
 [tool.ruff.lint]
 # `N`(pep8-naming) 포함 — 2A~2E 기존 test 의 gRPC 생성 servicer 메서드(`CalculateOptimalBid`
@@ -75,17 +75,18 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM", "RUF", "PGH", "N"]
 python_version = "3.12"
 strict = true
 warn_unused_configs = true
-# 생성 stub 은 VCS 밖이라 정적 검사 시점에 디스크에 없을 수 있다 — 타입 검사 대상에서 뺀다.
-exclude = ["^src/ml_engine/contracts/_generated/"]
+# verifier r1 F-2 뒤 D-5A-0 (b) 정정 — 생성 stub 이 `ml-engine/.contracts-generated/`(패키지
+# 트리 밖)로 옮겨져 `src/ml_engine` 스캔 범위 안에 더는 없다 — `exclude` 항목 자체가 죽은
+# 설정이라 지웠다(F-8 과 같은 갈래: 안 쓰는 설정을 남기지 않는다).
 
 [[tool.mypy.overrides]]
 module = "bidvector.*"
 ignore_missing_imports = true
-# reason: `ml_engine.contracts.__init__`가 `contracts/_generated/`를 sys.path 에 얹고
-#   `bidvector.ml.v1.*_pb2` 를 절대 import 한다(protoc 생성 코드가 형제 proto 를 항상 절대
-#   import 로 참조하므로 상대 nesting 이 불가능 — contracts/__init__.py 구현 노트 참고).
-#   생성 stub 은 VCS 밖(D-5A-0 (b))이라 `mypy --strict`(S-3) 단독 실행 시점엔 디스크에 없을
-#   수 있다 — 재수출 import 하나를 위한 구조적 예외.
+# reason: `ml_engine.contracts.__init__`가 `.contracts-generated/`(D-5A-0 (b), 패키지 트리
+#   밖)를 sys.path 에 얹고 `bidvector.ml.v1.*_pb2` 를 절대 import 한다(protoc 생성 코드가
+#   형제 proto 를 항상 절대 import 로 참조하므로 상대 nesting 이 불가능 — contracts/__init__.py
+#   구현 노트 참고). 생성 stub 은 VCS 밖이라 `mypy --strict`(S-3) 단독 실행 시점엔 디스크에
+#   없을 수 있다 — 재수출 import 하나를 위한 구조적 예외.
 # resolve: 해소 없음 — 생성물이 VCS 밖인 한 계속 필요하다(설계 검토 (1) 「생성물 유출」 방어와
 #   같은 경계, allowlist 대상이 아니라 재수출 경계 자체의 성질).
 
@@ -148,7 +149,7 @@ forbidden_modules = [
 # 이 줄을 추가**하라 — `OPEN-5A-SERVING-GRPC-EXCEPTION`(checklist.md).
 
 [[tool.importlinter.contracts]]
-name = "생성 stub·계약 내부는 contracts 재수출로만 — 다른 패키지는 직접 못 본다"
+name = "bidvector 직접 import 금지 — contracts 재수출(간접)은 허용"
 type = "forbidden"
 source_modules = [
     "ml_engine.features",
@@ -159,7 +160,18 @@ source_modules = [
     "ml_engine.serving",
     "ml_engine.adapters",
 ]
-forbidden_modules = ["bidvector", "ml_engine.contracts._generated"]
+forbidden_modules = ["bidvector"]
+# verifier r1 F-1 — 기본값(간접 포함)은 승인 통로(`from ml_engine.contracts import
+# common_pb2`)의 간접 연쇄(`X -> ml_engine.contracts -> bidvector`)까지 BROKEN 을 냈다(5A 가
+# 초록인 건 패키지 일곱이 비어서였다 — 5B 의 첫 import 에서 S-4 가 붉어질 뻔했다, M1/1A
+# 「빈 도메인에서만 초록」 계열). `allow_indirect_imports = true`로 **직접 import 만** 막는다
+# — `tests/gates/fixtures/good_serving/`(양성) 이 그 간접 경로가 실제로 열림을,
+# `bad_contracts_bypass/`(양성, 반대 방향) 가 직접 import 는 계속 막힘을 증명한다.
+allow_indirect_imports = true
+# `ml_engine.contracts._generated` 항목은 뺐다(verifier r1 F-2) — D-5A-0 (b) 정정으로 생성
+# stub 이 `ml-engine/.contracts-generated/`(패키지 트리 밖)로 옮겨져 그 이름의 Python import
+# 경로 자체가 더는 존재하지 않는다(열거로 막는 대신 경로를 없앴다) —
+# `tests/gates/test_import_contracts.py`가 `ModuleNotFoundError`로 구조적 폐쇄를 단언한다.
 
 [tool.design-ratchet]
 # ML-11.2 승인값 — 바꾸려면 이 값과 `tests/gates/test_design_ratchet.py` 단언을 함께
