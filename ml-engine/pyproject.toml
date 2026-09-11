@@ -186,8 +186,13 @@ allow_indirect_imports = true
 # 고쳐야 해서 diff 에 드러난다(설계 검토 (2) 우회 (10) 방어).
 function_soft_limit_lines = 50
 file_loc_soft_limit = 500
+# verifier r1 F-8 — `allowlist = []`(inline 배열)를 남겨 둔 채 이 주석이 안내하는
+# `[[tool.design-ratchet.allowlist]]`(array-of-tables)를 더하면 TOML 타입 충돌로
+# `duplicate key`(실측: `uv run` 자체가 `pyproject.toml` 파싱에 실패해 exit 2 — 이 스크립트
+# 뿐 아니라 ruff·mypy·pytest 등 `uv run` 전체가 깨진다). D-5A-3 — baseline(증가만 차단) 이
+# 아니라 위반 0 또는 명시 allowlist. 5A 시점 **항목 0**(설계 검토 (1)) — 키를 아예 선언하지
+# 않는다(`design_ratchet.load_config`가 부재 시 빈 목록으로 읽는다, `test_allowlist_is_empty_
+# at_5a`가 확인). allowlist 가 필요해지면 `[[tool.design-ratchet.allowlist]]`
+# array-of-tables **하나만** 쓴다(`allowlist = []`를 지우고) — 경로는 정확히 일치해야 하고
+# 와일드카드는 스크립트가 거부한다(설계 검토 (2) 우회 (3)).
 target_dirs = ["src/ml_engine", "tools"]
-# D-5A-3 — baseline(증가만 차단) 이 아니라 위반 0 또는 명시 allowlist. 5A 시점 비어 있어야
-# 한다(설계 검토 (1)). 항목은 `[[tool.design-ratchet.allowlist]]` 표 — 경로는 정확히 일치해야
-# 하고 와일드카드는 스크립트가 거부한다(설계 검토 (2) 우회 (3)).
-allowlist = []
