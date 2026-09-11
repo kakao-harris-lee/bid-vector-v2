@@ -1,0 +1,14 @@
+# S-4 양성 대조 — 「bidvector 직접 import 금지」forbidden 계약의 양성 대조(직접 import 는
+# `allow_indirect_imports = true` 아래서도 계속 막혀야 한다 — F-1 수정이 F-2 를 다시 열지
+# 않는지 확인). `ml_engine/features/__init__.py`가 `bidvector`를 직접 import 하면 exit 0 이
+# 아니어야 한다(설계 검토 (2) 우회 (7)).
+[tool.importlinter]
+root_packages = ["ml_engine"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "features 는 bidvector 를 직접 못 본다(양성 대조)"
+type = "forbidden"
+source_modules = ["ml_engine.features"]
+forbidden_modules = ["bidvector"]
+allow_indirect_imports = true

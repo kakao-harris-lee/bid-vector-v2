@@ -33,6 +33,26 @@ LightGBM/KDE 관련 수학과 모델 생명주기를 독립 Python package로 �
 - `serving`의 DB/HTTP 수집/business module import 금지 gate
 - 모듈별 재활용 출처(원본 파일 경로, 기준 commit)와 이식 중 수정 내역 기록
 
+**5A 착수 2026-09-11(운영자 결정 2026-09-11 「추천안 대로 진행」 — D-M5-1~4·6 (a), D-5A-0 (b))** —
+base 는 4B-6a 병합 뒤 `main`(`d281329`, 2A~2E 골격 포함). `uv`(lock + extras 분리)·mypy strict(이식
+모듈만 allowlist, 사유·해소 slice 명시)·legacy 래칫 이식(함수 50/파일 500/`dict[str, Any]` 경계 0,
+baseline 완화 없음)·import-linter layers+forbidden(`serving.grpc` 만 grpcio 허용)·정책 값 33 분류 표
+승인(정책 23·환경 6·미분류 4 — 값은 5C·5D 가 옮긴다, 정본 `reports/evidence/m5/5a/policy-values.md`)·
+생성 stub 은 `ml_engine/contracts/_generated/`(VCS 밖)에 두고 `ml_engine.contracts` 재수출 하나만
+import 허용. CI 에 Python job 신설(Kotlin job 무편집). 위협 모델 경계·우회 (1)~(8)·설계 검토는
+`reports/evidence/m5/5a/scope.md`·`_workspace/m5-5a/02_design-review.md`. 레인 `m5-5a/2026-09-11`,
+Kotlin lane 과 소스 겹침 0.
+
+**5A 종결 2026-09-11(사용자 승인)** — verifier r1 `not-ready`(high 2: forbidden 계약이 승인 통로의
+간접 연쇄까지 막아 패키지가 비었을 때만 초록 · 생성 stub 이 패키지 트리 안이라 우회 import 경로가
+존재) → 직접 import 만 금지 + 승인 통로 양성 fixture, 생성 위치를 패키지 트리 밖
+`ml-engine/.contracts-generated/`로 옮겨 경로 자체를 제거(D-5A-0 (b) 문면 갱신) → r2
+`ready-for-review`(허용 층 경유 간접 유입 셋 전부 붉음, 게이트 test 는 fixture 별 lint 거동 단언).
+S-1~S-9 exit 0, pytest 156(기존 125 회귀 0), CI Python job 신설. **알려진 제한·OPEN**: wheel 설치본에서
+`ml_engine.contracts` 재수출 불성립 → `OPEN-5A-WHEEL-BUILD-HOOK`(5E 전 빌드 훅, 5E/6C) ·
+`OPEN-5A-SERVING-GRPC-EXCEPTION`(5E) · `OPEN-5A-MYPY-ALLOWLIST`(초기 0건, 5D) · `OPEN-5A-PY-CI`(러너
+실행은 push 뒤). 정본 `reports/evidence/m5/5a/checklist.md`. **다음은 5B**(feature schema).
+
 ### Slice 5B — feature schema
 
 - versioned feature name/order/type/range

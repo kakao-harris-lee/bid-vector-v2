@@ -1,8 +1,8 @@
 [project]
 name = "ml-engine"
 version = "0.1.0"
-description = "bid-vector V2 ML engine — M2/2A 최소 골격(계약 round-trip). 패키지 구조·import 경계는 M5 5A 가 완성한다 (m2-prep.md D-M2-3)."
-requires-python = ">=3.12"
+description = "bid-vector V2 ML engine — 패키지 경계·import boundary·래칫·재활용 출처 검사(M5/5A, v2-지침서.md §3.2·§5)."
+requires-python = ">=3.12,<3.13"
 dependencies = [
     # 버전 근거: _workspace/m2-prep/02_grpc_stack_compat.md(PyPI 메타데이터 curl 실측) —
     # Kotlin 쪽 grpc-java 1.84.0/grpc-kotlin 1.5.0 과 wire format(proto3)에서만 호환,
@@ -12,20 +12,187 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 생성·test 전용 — 실제 serving(5A)은 grpcio-tools 를 런타임에 필요로 하지 않는다.
-# M2/2D — grpcio-testing 은 승인됨(pip 네트워크 허용, 그 밖 네트워크 없음). 실측(2026-09-07,
-# test_contract_resilience.py 상단 docstring): `grpc_testing` 모듈은 `grpc.aio`를 지원하지
-# 않는다(`OPEN-2D-AIO-INPROCESS` 닫힘) — 그래도 정책 데이터 대조 test(도구 버전)가 이
-# 패키지의 실제 설치를 전제하므로 dev 의존에 남긴다.
+# M5/5A D-5A-0(b)·조사 02 — serving 런타임: numpy/lightgbm 만(SQLAlchemy·DB driver·requests
+# 없음, S-1b 가 lock 그래프에서 실측). scipy 는 lightgbm 의 강제 전이 의존이라 직접 선언하지
+# 않는다(조사 02 §1).
+serving = [
+    "numpy==2.5.2",
+    "lightgbm==4.7.0",
+]
+# training 은 5C 가 storage adapter 의존을 더할 때까지 serving 과 같다(설계 검토 (5)-1).
+training = [
+    "numpy==2.5.2",
+    "lightgbm==4.7.0",
+]
 dev = [
     "grpcio-tools==1.83.1",
     "grpcio-testing==1.83.1",
     "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "hypothesis==6.167.1",
+    "import-linter==2.15",
+    "ruff==0.16.6",
+    "mypy==2.3.1",
+    "pyyaml==6.0.3",
+    "types-pyyaml==6.0.12.20250915",
 ]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+# `tests/conftest.py`가 `tools/generate_contracts.py`(`ml-engine/` 아래, `src/` 밖)를 import
+# 한다 — rootdir(`.` = `ml-engine/`, 이 ini 파일 기준)를 sys.path 에 추가해 `tools` 를
+# namespace package 로 찾게 한다(pytest 7+ 내장 옵션, 추가 플러그인 불필요).
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py312"
+# `src/ml_engine/contracts/_generated` 항목은 뺐다(D-5A-0 (b) 정정 — 생성 위치가 패키지 트리
+# 밖 `.contracts-generated/`로 옮겨져 이 경로가 더는 존재하지 않는다, 죽은 exclude 항목이었다).
+#
+# verifier r1 F-4 — `"tests/*.py"`(glob)는 `tests/` **직계 전부**를 뺐다(게이트 test 13개·
+# fixtures 도 포함, 실측 — 「직계만」이라는 원래 의도와 어긋났다). 2A~2E 가 만든 기존 계약
+# test 다섯 + `crosslang_smoke_server.py`는 편집 금지(회귀 0)인데 `ruff format`이 요구하는
+# 폭·줄바꿈으로 이미 작성되지 않았다(실측). `conftest.py`는 5A 가 편집하며 이미 `ruff
+# format`에 맞춰 다시 썼으므로 뺄 필요가 없다(제외하면 향후 재검사를 잃기만 한다 — 실측
+# 확인 후 여섯만 남긴다). `ruff`는 lint·format 이 같은 `exclude`를 공유해 format 만 빼는
+# 옵션이 없으므로, **파일명을 정확히 나열**한다(`tests/gates/**`는 대상에서 빠지지 않는다).
+extend-exclude = [
+    "tests/crosslang_smoke_server.py",
+    "tests/test_contract_resilience.py",
+    "tests/test_contract_roundtrip.py",
+    "tests/test_embedding_contract.py",
+    "tests/test_prediction_contract.py",
+    "tests/test_training_contract.py",
+]
+
+[tool.ruff.lint]
+# `N`(pep8-naming) 포함 — 2A~2E 기존 test 의 gRPC 생성 servicer 메서드(`CalculateOptimalBid`
+# 등, PascalCase 는 생성 시그니처 요구)가 `# noqa: N802`를 쓴다. 끄면 그 noqa 가
+# "미사용"(RUF100)이 되어 편집 금지인 기존 test 파일이 새로 위반을 낸다.
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM", "RUF", "PGH", "N"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+# verifier r1 F-2 뒤 D-5A-0 (b) 정정 — 생성 stub 이 `ml-engine/.contracts-generated/`(패키지
+# 트리 밖)로 옮겨져 `src/ml_engine` 스캔 범위 안에 더는 없다 — `exclude` 항목 자체가 죽은
+# 설정이라 지웠다(F-8 과 같은 갈래: 안 쓰는 설정을 남기지 않는다).
+
+[[tool.mypy.overrides]]
+module = "bidvector.*"
+ignore_missing_imports = true
+# reason: `ml_engine.contracts.__init__`가 `.contracts-generated/`(D-5A-0 (b), 패키지 트리
+#   밖)를 sys.path 에 얹고 `bidvector.ml.v1.*_pb2` 를 절대 import 한다(protoc 생성 코드가
+#   형제 proto 를 항상 절대 import 로 참조하므로 상대 nesting 이 불가능 — contracts/__init__.py
+#   구현 노트 참고). 생성 stub 은 VCS 밖이라 `mypy --strict`(S-3) 단독 실행 시점엔 디스크에
+#   없을 수 있다 — 재수출 import 하나를 위한 구조적 예외.
+# resolve: 해소 없음 — 생성물이 VCS 밖인 한 계속 필요하다(설계 검토 (1) 「생성물 유출」 방어와
+#   같은 경계, allowlist 대상이 아니라 재수출 경계 자체의 성질).
+
+[tool.importlinter]
+root_packages = ["ml_engine"]
+# forbidden 계약이 저장소 밖 패키지(sqlalchemy·grpc·bidvector 등)를 겨눈다 — import-linter
+# 는 그런 "external forbidden modules"가 있으면 이 플래그를 명시하도록 요구한다(실측).
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "serving/inference 층 — features·contracts 위로만 의존"
+type = "layers"
+layers = [
+    "ml_engine.serving",
+    "ml_engine.inference",
+    "ml_engine.features",
+    "ml_engine.contracts",
+]
+
+[[tool.importlinter.contracts]]
+name = "training/evaluation 층 — features·contracts 위로만 의존"
+type = "layers"
+layers = [
+    "ml_engine.training",
+    "ml_engine.evaluation",
+    "ml_engine.features",
+    "ml_engine.contracts",
+]
+
+[[tool.importlinter.contracts]]
+name = "registry 는 features·contracts 만"
+type = "forbidden"
+source_modules = ["ml_engine.registry"]
+forbidden_modules = [
+    "ml_engine.serving",
+    "ml_engine.training",
+    "ml_engine.inference",
+    "ml_engine.evaluation",
+    "ml_engine.adapters",
+]
+
+[[tool.importlinter.contracts]]
+name = "serving/inference 는 DB·HTTP·업무 모듈·grpc 진입점 밖 grpc 를 모른다"
+type = "forbidden"
+source_modules = ["ml_engine.serving", "ml_engine.inference"]
+forbidden_modules = [
+    "sqlalchemy",
+    "psycopg",
+    "requests",
+    "httpx",
+    "celery",
+    "ml_engine.training",
+    "ml_engine.adapters",
+    "grpc",
+]
+# 우회 후보 — 설계 검토 (2b)·scope.md ③: gRPC 진입점(`serving.grpc`)만 `grpc` 허용 예정.
+# **5A 시점엔 넣지 않는다** — `ml_engine.serving.grpc`가 아직 없어(5E 가 만든다)
+# `ignore_imports`에 존재하지 않는 import edge 를 적으면 import-linter 가 "No matches for
+# ignored import"로 설정 오류 취급해 exit 1 한다(실측). **5E 가 `serving/grpc.py`를 만들 때
+# 이 줄을 추가**하라 — `OPEN-5A-SERVING-GRPC-EXCEPTION`(checklist.md).
+
+[[tool.importlinter.contracts]]
+name = "bidvector 직접 import 금지 — contracts 재수출(간접)은 허용"
+type = "forbidden"
+source_modules = [
+    "ml_engine.features",
+    "ml_engine.training",
+    "ml_engine.evaluation",
+    "ml_engine.inference",
+    "ml_engine.registry",
+    "ml_engine.serving",
+    "ml_engine.adapters",
+]
+forbidden_modules = ["bidvector"]
+# verifier r1 F-1 — 기본값(간접 포함)은 승인 통로(`from ml_engine.contracts import
+# common_pb2`)의 간접 연쇄(`X -> ml_engine.contracts -> bidvector`)까지 BROKEN 을 냈다(5A 가
+# 초록인 건 패키지 일곱이 비어서였다 — 5B 의 첫 import 에서 S-4 가 붉어질 뻔했다, M1/1A
+# 「빈 도메인에서만 초록」 계열). `allow_indirect_imports = true`로 **직접 import 만** 막는다
+# — `tests/gates/fixtures/good_serving/`(양성) 이 그 간접 경로가 실제로 열림을,
+# `bad_contracts_bypass/`(양성, 반대 방향) 가 직접 import 는 계속 막힘을 증명한다.
+allow_indirect_imports = true
+# `ml_engine.contracts._generated` 항목은 뺐다(verifier r1 F-2) — D-5A-0 (b) 정정으로 생성
+# stub 이 `ml-engine/.contracts-generated/`(패키지 트리 밖)로 옮겨져 그 이름의 Python import
+# 경로 자체가 더는 존재하지 않는다(열거로 막는 대신 경로를 없앴다) —
+# `tests/gates/test_import_contracts.py`가 `ModuleNotFoundError`로 구조적 폐쇄를 단언한다.
+
+[tool.design-ratchet]
+# ML-11.2 승인값 — 바꾸려면 이 값과 `tests/gates/test_design_ratchet.py` 단언을 함께
+# 고쳐야 해서 diff 에 드러난다(설계 검토 (2) 우회 (10) 방어).
+function_soft_limit_lines = 50
+file_loc_soft_limit = 500
+# verifier r1 F-8 — `allowlist = []`(inline 배열)를 남겨 둔 채 이 주석이 안내하는
+# `[[tool.design-ratchet.allowlist]]`(array-of-tables)를 더하면 TOML 타입 충돌로
+# `duplicate key`(실측: `uv run` 자체가 `pyproject.toml` 파싱에 실패해 exit 2 — 이 스크립트
+# 뿐 아니라 ruff·mypy·pytest 등 `uv run` 전체가 깨진다). D-5A-3 — baseline(증가만 차단) 이
+# 아니라 위반 0 또는 명시 allowlist. 5A 시점 **항목 0**(설계 검토 (1)) — 키를 아예 선언하지
+# 않는다(`design_ratchet.load_config`가 부재 시 빈 목록으로 읽는다, `test_allowlist_is_empty_
+# at_5a`가 확인). allowlist 가 필요해지면 `[[tool.design-ratchet.allowlist]]`
+# array-of-tables **하나만** 쓴다(`allowlist = []`를 지우고) — 경로는 정확히 일치해야 하고
+# 와일드카드는 스크립트가 거부한다(설계 검토 (2) 우회 (3)).
+target_dirs = ["src/ml_engine", "tools"]

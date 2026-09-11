@@ -1,0 +1,13 @@
+# S-4 양성 대조 — 실제 `ml-engine/pyproject.toml`의 forbidden 계약과 같은 형태를 이
+# 독립 미니 프로젝트(자기 `ml_engine` 트리)에 적용한다. `ml_engine/serving/__init__.py`가
+# 의도적으로 `sqlalchemy`를 import 해서 `lint-imports --config`가 이 파일을 가리키면
+# exit 0 이 아니어야 한다(`tests/gates/test_import_contracts.py`).
+[tool.importlinter]
+root_packages = ["ml_engine"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "serving 은 DB 모듈을 모른다(양성 대조)"
+type = "forbidden"
+source_modules = ["ml_engine.serving"]
+forbidden_modules = ["sqlalchemy"]

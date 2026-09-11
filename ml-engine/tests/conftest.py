@@ -1,9 +1,16 @@
-"""M2/2A — Python 쪽 생성 stub 을 pytest 세션마다 임시 디렉터리에 만든다(VCS 밖, D-M2-3 (a)).
+"""M5/5A — `tools/generate_contracts.py`(conftest 와 CLI 가 공유하는 생성 함수, D-5A-0 (b))로
+두 가지를 한다.
 
-단일 출처는 저장소 루트 `contracts/proto`다(Kotlin 쪽 `ml-contract` 와 같은 소스, ADR 0003 D-1
-`.proto` 가 계약의 단일 출처). 여기서 만드는 것은 이 pytest 세션이 쓰는 임시 사본뿐이고
-(`grpc_tools.protoc` — S-6, Gradle check 밖), 5A 가 `ml-engine` 패키지 구조를 완성할 때 이
-생성 배선을 이어받는다(m2-prep.md D-M2-3).
+(1) module 레벨에서 **즉시**(pytest collection 이전) `ml-engine/.contracts-generated/`
+(패키지 트리 **밖**, VCS 밖 — verifier r1 F-2 뒤 정정, gitignore)에 `contracts/proto`
+전체(6개)를 생성한다 — `ml_engine.contracts` 재수출(`src/ml_engine/contracts/__init__.py`)이
+이 자리를 `sys.path`에 얹고 절대 import하므로, 어느 test 파일이든 module 최상단에서
+`ml_engine.contracts`를 import할 수 있고 pytest 는 conftest.py 를 그 형제 test 파일들보다
+항상 먼저 로드하므로 여기서 미리 채운다.
+
+(2) M2/2A 가 쓰던 session fixture(`common_pb2`·`error_pb2`, 임시 디렉터리 + `sys.path` 삽입)는
+그대로 남긴다 — 생성 로직만 공유 함수로 바꿨을 뿐 동작은 같다. 2B~2E 는 각자 독립 module-scope
+fixture로 생성하므로(이 파일을 건드리지 않는다) 회귀 없음.
 """
 
 from __future__ import annotations
@@ -14,32 +21,30 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from grpc_tools import protoc
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-_PROTO_ROOT = _REPO_ROOT / "contracts" / "proto"
-_PROTO_FILES = (
+from tools.generate_contracts import generate
+
+_ML_ENGINE_ROOT = Path(__file__).resolve().parents[1]
+# 패키지 트리 밖(D-5A-0 (b) 정정, verifier r1 F-2) — `src/ml_engine/contracts/` 안이 아니라
+# `ml-engine/` 바로 아래라 `ml_engine.contracts.<하위>` 라는 Python import 경로 자체가 없다.
+_CONTRACTS_GENERATED_DIR = _ML_ENGINE_ROOT / ".contracts-generated"
+_PROTO_FILES_2A = (
     "bidvector/ml/v1/common.proto",
     "bidvector/ml/v1/error.proto",
 )
 
+_CONTRACTS_GENERATED_DIR.mkdir(parents=True, exist_ok=True)
+generate(_CONTRACTS_GENERATED_DIR)
+
 
 @pytest.fixture(scope="session")
 def generated_stub_path() -> Iterator[Path]:
-    """`grpc_tools.protoc`로 `contracts/proto`를 임시 디렉터리에 생성하고 `sys.path`에 얹는다.
-    생성물은 세션 종료 시 디렉터리째 삭제된다 — VCS 에도 리포지터리 안에도 남지 않는다."""
+    """`common.proto`·`error.proto`만 임시 디렉터리에 생성하고 `sys.path`에 얹는다(2A 관례
+    그대로 — 이 fixture 를 쓰는 round-trip test 는 `.contracts-generated`가 아니라 이 임시
+    사본을 쓴다). 생성물은 세션 종료 시 디렉터리째 삭제된다."""
     with tempfile.TemporaryDirectory(prefix="bidvector-ml-contract-py-") as tmp:
         out_dir = Path(tmp)
-        args = [
-            "grpc_tools.protoc",
-            f"--proto_path={_PROTO_ROOT}",
-            f"--python_out={out_dir}",
-            *(str(_PROTO_ROOT / proto_file) for proto_file in _PROTO_FILES),
-        ]
-        exit_code = protoc.main(args)
-        if exit_code != 0:
-            raise RuntimeError(f"grpc_tools.protoc 생성 실패(exit={exit_code}) — args={args}")
-
+        generate(out_dir, proto_files=_PROTO_FILES_2A)
         sys.path.insert(0, str(out_dir))
         try:
             yield out_dir

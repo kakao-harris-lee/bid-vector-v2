@@ -445,6 +445,36 @@ high 0) 위에서 승인 셋: ① slice 종결 ② 정책 값 승인(`OPEN-4B5-P
 **다음은 4B-6**(조합기 `OpportunityAnalysis`·port 셋·텍스트 합성 규약, 계약은 팀장이
 별도 작성).
 
+**4B-6a 착수 2026-09-11(운영자 결정 2026-09-11 「추천 (a)」)** — 4B-6을 둘로 갈랐다.
+**임베딩과 무관한 앞쪽**(텍스트 합성 규약·정책 키워드 매칭·프로필/workload port)을 이
+slice가 먼저 하고, 조합기 `OpportunityAnalysis : MlAnalysisPort`(4B-6b)는 4D-2의
+`EmbedTextPort` 병합 뒤로 미룬다. `OPEN-2E-TEXT-SYNTHESIS`를 fact allow-list 시그니처로
+닫는다(D-4B6A-1) — `synthesizeNoticeText(WatchSubject, policy)`는 카테고리·키워드
+텍스트·전문 세 조각만 쓰고 금액·마감·공고 id는 인자에 없으며, `synthesizeProfileText
+(ProfileFacts, policy)`는 `ProfileFacts(businessTypes, licenses, regionTerms)` 세
+필드가 allow-list 자체라 사업자번호·대표자·연락처가 구조적으로 못 들어온다.
+`SynthesizedText`는 `internal constructor`(문자열 직접 주입 차단), 빈 입력은 예외가
+아니라 `SynthesisOutcome.Empty`. `KeywordHitsCounter.count`는 4B-5 `KeywordHits`를
+정책 키워드 14(legacy `EXECUTION_COMPLEXITY_KEYWORDS`)로 채운다(소문자 부분 문자열,
+중복 출현 1회). `OperatorProfilePort`·`WorkloadPort`는 port만(구현은 M6/후속).
+`OpportunityPolicyData.textMaxChars`는 2E `contract-policy.properties`의
+`embedding.text.max-chars`와 test가 직접 대조한다(D-4B6A-4). 정본은
+`reports/evidence/m4/4b6a/scope.md`.
+
+**4B-6a 종결 2026-09-11(사용자 승인)** — verifier r1 `ready-for-review`(산출물 blocker/
+high 0, medium 1·low 2) → 일괄 시정 커밋 `8c0a9df`(코드)·`472ca76`(evidence) → r2
+`ready-for-review`(새 결함 0, 새 public 표면 0). 재작업 1회. 닫힌 것: 모듈 밖에서
+`SynthesizedText` 생성·`copy` 컴파일 거부 실측 · 절단 4000/4001/서로게이트 미분할 ·
+정책 파일 실제 읽기(값을 3999로 바꾸면 대조 test가 붉어짐) · golden 민감도 · `ProfileFacts`
+필드 정확히 셋 · proto·grpc·`workflow.embedding` 참조 0. medium 1은 절단 **뒤** 공백만
+남은 텍스트가 `Synthesized`로 나오던 불변식 위반 — 절단 뒤 재검사로 `Empty`, 기존 출력은
+바이트 동일이라 규약 version `v1` 유지. `OPEN-4B6A-POLICY-VALUES` 승인(v1·키워드 14·상한
+4000, 정본 `reports/evidence/m4/4b6a/policy-values.md`). **알려진 제한**: 절단 단위가
+코드포인트라 2E 쪽 `max-chars` 판정 단위와의 일치는 **4D-2 병합 시 확인 항목** ·
+`OperatorProfilePort`·`WorkloadPort`는 port만 · `gate.tests.workflow` 등재 완전성 test
+부재는 범위 밖 기존 부채로 **4B-6b in_scope에 포함**(운영자 결정 2026-09-11 (a)).
+**다음은 4B-6b**(조합기, 4D-2 병합 뒤)와 M5 5A(병행).
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,

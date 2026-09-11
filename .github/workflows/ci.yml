@@ -79,3 +79,77 @@ jobs:
             build/reports/quality-baseline/
             */build/reports/
           retention-days: 14
+
+  # M5/5A — Python ML engine CI(2D D-2D-4 (a) · ADR 0009 D-6 「CI 가 확인한다」). Kotlin `check`
+  # job 과 독립(소스 겹침 0, 위 job 은 무편집). `ml-engine/` 이 최초로 CI 에 얹는 Python job이다
+  # (조사 02 §4 — 이전까지 없었음).
+  ml-engine:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ml-engine
+    steps:
+      - uses: actions/checkout@v5
+
+      # `.python-version`(3.12, D-5A-1)을 읽어 버전을 고정한다 — 워크플로에 숫자를 적지
+      # 않는다(`buf` 버전과 같은 이유, install buf 주석 참고). v6 부터 Node 24(`using: node24`
+      # 실측, v5 는 node20) — 위 job 들과 같은 원칙(Node 24 를 만족하는 가장 낮은 major),
+      # v5 는 아니다(verifier r1 F-5).
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: ml-engine/.python-version
+
+      # 재현성(D-5A-4) — 로컬 실측 버전과 같은 값으로 고정. uv 자체는 lock 대상이 아니라
+      # (lock 파일이 검증하는 것은 Python 의존성 그래프뿐) 여기서 직접 핀한다. v7 부터 Node 24
+      # (실측 — v6 이하는 node20), v6 는 아니다(verifier r1 F-5, 같은 원칙).
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.22"
+
+      - name: install (S-1)
+        run: uv sync --frozen --all-extras
+
+      # extras 분리(D-5A-0 (b) ②) — serving 전용 설치에 SQLAlchemy·DB driver·requests·httpx·
+      # celery 가 전혀 없음을 lock 그래프로 실측한 뒤 dev 를 복구한다(S-1b).
+      - name: serving extras 분리 확인 (S-1b)
+        run: |
+          set -euo pipefail
+          uv sync --frozen --extra serving --no-dev
+          for m in sqlalchemy psycopg requests httpx celery; do
+            if uv run --no-sync python -c "import $m" >/dev/null 2>&1; then
+              echo "금지 패키지 $m 이 serving extras 에 설치됐다" >&2
+              exit 1
+            fi
+          done
+          uv sync --frozen --all-extras
+
+      - name: ruff (S-2)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: mypy --strict (S-3)
+        run: uv run mypy --strict src/ml_engine
+
+      - name: import-linter (S-4)
+        run: uv run lint-imports
+
+      - name: pytest — 게이트 test 포함, test 수는 이 step 출력에 남는다 (S-5)
+        run: uv run python -m pytest tests -q
+
+      - name: 설계 래칫 — 함수 50/파일 500/dict[str,Any] 경계 0 (S-6)
+        run: uv run python tools/design_ratchet.py --check
+
+      # ADR 0009 D-6 — 이식 모듈 docstring 포인터와 reuse.md 두 자리 대조 + 양성 대조.
+      - name: 재활용 출처 두 자리 대조 (S-7)
+        run: |
+          set -euo pipefail
+          uv run python tools/reuse_provenance_check.py
+          if uv run python tools/reuse_provenance_check.py --evidence tests/gates/fixtures/reuse-mismatch.md; then
+            echo "양성 대조(어긋난 evidence)가 실패해야 하는데 통과했다" >&2
+            exit 1
+          fi
+
+      - name: Python 버전 두 자리 대조 (S-9)
+        run: |
+          uv run python -c "import tomllib,pathlib; p=tomllib.load(open('pyproject.toml','rb')); v=pathlib.Path('.python-version').read_text().strip(); assert v.startswith('3.12') and '3.12' in p['project']['requires-python'], (v, p['project']['requires-python'])"
