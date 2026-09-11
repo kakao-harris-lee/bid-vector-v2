@@ -150,7 +150,12 @@ class EmbeddingShapeFailClosedTest {
     @Test
     fun `values 빈 리스트이고 dimension 0 이면 예외 없이 ContractViolation 이다`() {
         runBlocking {
-            val mutated = testEmbeddingSuccess().toBuilder().clearValues().setDimension(0).build()
+            val mutated =
+                testEmbeddingSuccess()
+                    .toBuilder()
+                    .clearValues()
+                    .setDimension(0)
+                    .build()
             val gateway = gatewayOn(fixedEmbeddingServicer(embedText = protoEmbedResponse(mutated)))
 
             val outcome =

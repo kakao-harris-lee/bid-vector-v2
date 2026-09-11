@@ -216,15 +216,27 @@ class GrpcEmbeddingGatewayTest {
     @Test
     fun `응답 feature_schema_version 이 요청 값과 다르면 UnsupportedSchema 다(client 집행)`() {
         runBlocking {
-            val mismatchedRelease = testEmbeddingModelRelease().toBuilder().setFeatureSchemaVersion("other-schema").build()
+            val mismatchedRelease =
+                testEmbeddingModelRelease()
+                    .toBuilder()
+                    .setFeatureSchemaVersion(
+                        "other-schema",
+                    ).build()
             val servicer =
                 fixedEmbeddingServicer(
-                    embedText = protoEmbedResponse(testEmbeddingSuccess().toBuilder().setRelease(mismatchedRelease).build()),
+                    embedText =
+                        protoEmbedResponse(
+                            testEmbeddingSuccess().toBuilder().setRelease(mismatchedRelease).build(),
+                        ),
                 )
             val gateway = gatewayOn(servicer)
             val selector = ModelReleaseSelector.Exact("release-2026-09-01", "sha256:test")
 
-            val outcome = gateway.embed(testEmbedTextRequest(releaseSelector = selector), CallBudget(Duration.ofSeconds(1)))
+            val outcome =
+                gateway.embed(
+                    testEmbedTextRequest(releaseSelector = selector),
+                    CallBudget(Duration.ofSeconds(1)),
+                )
 
             outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
             outcome.reason shouldBe EmbeddingUnavailableReason.UnsupportedSchema
