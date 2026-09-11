@@ -28,5 +28,10 @@ val EMBEDDING_CALL_POLICY: EffectiveDatedPolicy<MlCallPolicyData> =
  * L2 norm 을 대조한다. 값을 바꾸려면 그 정책 파일을 먼저 갱신한다(정본이 코드가 아니라
  * 그 파일이다, `MlCallPolicyData` KDoc과 같은 관례). `EmbeddingVector.init`의 거친
  * 안전판(`COARSE_NORM_EPSILON`)과 다른 axis다 — 이쪽이 정밀 임계다.
+ *
+ * **verifier F-3(medium)** — 이 리터럴이 정책 파일을 「미러」한다는 진술을 이전엔 아무
+ * test 도 대조하지 않았다. `EmbeddingCallPolicyTest`의 값 고정 test(`ContractPolicySupport`
+ * 의 `contractPolicyValue` 경유)가 이제 두 값을 직접 비교한다 — 어느 한쪽만 바뀌면 그
+ * test 가 실패한다.
  */
 internal val EMBEDDING_NORM_EPSILON: BigDecimal = BigDecimal("0.0005")

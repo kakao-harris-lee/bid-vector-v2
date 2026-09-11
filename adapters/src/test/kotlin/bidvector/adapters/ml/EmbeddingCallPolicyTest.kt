@@ -1,10 +1,12 @@
 package bidvector.adapters.ml
 
+import bidvector.adapters.contract.contractPolicyValue
 import bidvector.sharedkernel.Resolution
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
 import java.time.Duration
 import java.time.LocalDate
 
@@ -38,5 +40,17 @@ class EmbeddingCallPolicyTest {
         predictionSchema.shouldBeInstanceOf<Resolution.Resolved<MlCallPolicyData>>()
 
         (embeddingSchema.value.featureSchemaVersion == predictionSchema.value.featureSchemaVersion) shouldBe false
+    }
+
+    /**
+     * verifier F-3(medium) — `EMBEDDING_NORM_EPSILON`(`EmbeddingCallPolicy.kt`) KDoc 은
+     * `config/quality/contract-policy.properties`의 `embedding.norm.epsilon`을 미러한다고
+     * 적지만 그 어긋남을 잡는 test 가 없었다. `ContractPolicySupport.kt`(2D)가 이미 여는
+     * 유일 판독 지점(`contractPolicyValue`)으로 두 값을 직접 대조한다 — 어느 한쪽만 바뀌면
+     * 이 test 가 빨개진다.
+     */
+    @Test
+    fun `EMBEDDING_NORM_EPSILON 은 contract-policy_properties 의 embedding_norm_epsilon 과 일치한다`() {
+        EMBEDDING_NORM_EPSILON shouldBe BigDecimal(contractPolicyValue("embedding.norm.epsilon"))
     }
 }
