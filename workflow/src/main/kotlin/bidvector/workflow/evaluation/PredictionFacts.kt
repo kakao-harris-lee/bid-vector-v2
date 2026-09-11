@@ -58,18 +58,22 @@ internal fun predictedFacts(
     policies: ResolvedPolicies,
     capacityScore: UnitScore,
 ): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> {
-    val fitnessValue = predicted.fitness.score
-    if (fitnessValue < BigDecimal.ZERO || fitnessValue > BigDecimal.ONE) {
+    if (predictionUntrustworthy(predicted)) {
         return absentPair(MlUnavailableReason.ContractViolation)
     }
-    if (predicted.candidates.base.fraction > BigDecimal.ONE) {
-        return absentPair(MlUnavailableReason.ContractViolation)
-    }
-    val priceFitness = UnitScore(fitnessValue)
+    val priceFitness = UnitScore(predicted.fitness.score)
     val budgetCapture = budgetCaptureFact(baseAmount, predicted.candidates.base, policies)
     val expectedMargin =
         expectedMarginFact(notice, predicted.candidates.base, priceFitness, capacityScore, policies)
     return budgetCapture to expectedMargin
+}
+
+/** fitness 범위 위반 또는 `candidates.base > 1`(`MarginInputs.init`의 두 술어) — 둘 다 같은 취급. */
+private fun predictionUntrustworthy(predicted: BidPredictionOutcome.Predicted): Boolean {
+    val fitnessValue = predicted.fitness.score
+    val fitnessOutOfRange = fitnessValue < BigDecimal.ZERO || fitnessValue > BigDecimal.ONE
+    val rateOutOfRange = predicted.candidates.base.fraction > BigDecimal.ONE
+    return fitnessOutOfRange || rateOutOfRange
 }
 
 private fun budgetCaptureFact(
