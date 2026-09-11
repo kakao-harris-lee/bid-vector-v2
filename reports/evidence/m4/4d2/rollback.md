@@ -21,6 +21,12 @@ base_sha: `caee26c`. 목록은 `git diff --name-status caee26c..HEAD`(commands.m
 | `181892b` | F-5 — `milestone-4.md` 4D-2 착수 문단 신설 | **예 — M4 공유 승인 문서(전 slice 공용)** |
 | `cce5850` | F-6·표적1 — `reports/evidence/m4/4d2/scope.md` 정정(evidence 경로, restore 대상 아님) | 아니오 |
 | `6fa9f2d` | ktlint 포맷 — `EmbeddingShapeFailClosedTest.kt`·`GrpcEmbeddingGatewayTest.kt` MaxLineLength 정리 | 아니오 |
+| `7b5ca69` | 코드 리뷰 F-A — `EmbeddingBreakerTest.kt` 결정적 재작성 + `EmbeddingTestFixtures.kt`(공용 fixture 이동) + `GrpcEmbeddingGatewayTest.kt`(중복 제거) | 아니오 |
+| `1bc8cca` | 코드 리뷰 F-B+F-C — `EmbeddingCallPolicy.kt`·`EmbeddingCallPolicyTest.kt`·`EmbeddingVector.kt` | 아니오 |
+| `af8fc11` | 코드 리뷰 F-D — `EmbeddingResponseMapping.kt`·`EmbeddingShapeValidation.kt`·`EmbeddingShapeFailClosedTest.kt`·`EmbedTextPort.kt` 인용 정정 | 아니오 |
+| `204e86c` | 코드 리뷰 F-E — `GrpcBidPredictionGateway.kt`·`GrpcEmbeddingGateway.kt`·`MlCallPolicyData.kt`·`ReleaseCheck.kt`·`RetryRules.kt`(RPC/정책 해석 중복 제거) | 아니오 |
+| `23f8ab7` | 코드 리뷰 F-E — `ParsedSuccessFields.kt`·`ReleaseShapeValidation.kt` 수정 + `EmbeddingReleaseShapeValidation.kt` 삭제(`hasNonBlankRelease` 통합) | 아니오 |
+| `50a4719` | 코드 리뷰 finding 등재 — `reports/evidence/m4/4d2/scope.md`(evidence 경로, restore 대상 아님) | 아니오 |
 
 ## 되돌리는 것
 
@@ -30,14 +36,16 @@ DB write·외부 호출·flag 전환 대상이 없다.
 ## ① in_scope 비공유 경로 — 파일 단위 restore
 
 `GrpcBidPredictionGateway.kt`·`MlCallPolicyData.kt`·`RequestMapping.kt`·
-`ResilientPredictionCall.kt`는 **4D-1 산출물이지만 이 slice가 고친 파일**이므로 대상이다
-(4D-1 test 13파일은 무편집 — 위 4개는 전부 production 파일). 나머지는 이 slice의 신설
-파일이다.
+`ResilientPredictionCall.kt`·`ParsedSuccessFields.kt`·`ReleaseCheck.kt`·`RetryRules.kt`는
+**4D-1 산출물이지만 이 slice가 고친 파일**이므로 대상이다(뒤 셋은 코드 리뷰 F-E
+추출로 이번 라운드에 추가됨 — 4D-1 test 13파일은 여전히 무편집). 나머지는 이 slice의
+신설 파일이다. `EmbeddingReleaseShapeValidation.kt`는 신설됐다가 F-E로 이번 라운드에
+삭제돼(`hasNonBlankRelease` 통합) `caee26c..HEAD` net diff에 더 이상 나타나지 않는다
+— 이미 없는 경로라 목록에서 뺐다(restore 대상 없음).
 
 ```bash
 git restore --source=caee26c --staged --worktree -- \
   adapters/src/main/kotlin/bidvector/adapters/ml/EmbeddingCallPolicy.kt \
-  adapters/src/main/kotlin/bidvector/adapters/ml/EmbeddingReleaseShapeValidation.kt \
   adapters/src/main/kotlin/bidvector/adapters/ml/EmbeddingRequestMapping.kt \
   adapters/src/main/kotlin/bidvector/adapters/ml/EmbeddingResponseMapping.kt \
   adapters/src/main/kotlin/bidvector/adapters/ml/EmbeddingShapeValidation.kt \
@@ -45,9 +53,13 @@ git restore --source=caee26c --staged --worktree -- \
   adapters/src/main/kotlin/bidvector/adapters/ml/GrpcEmbeddingGateway.kt \
   adapters/src/main/kotlin/bidvector/adapters/ml/MlCallPolicyData.kt \
   adapters/src/main/kotlin/bidvector/adapters/ml/MlCallPolicyPlaceholder.kt \
+  adapters/src/main/kotlin/bidvector/adapters/ml/ParsedSuccessFields.kt \
   adapters/src/main/kotlin/bidvector/adapters/ml/PredictionEnvelopeMapping.kt \
+  adapters/src/main/kotlin/bidvector/adapters/ml/ReleaseCheck.kt \
+  adapters/src/main/kotlin/bidvector/adapters/ml/ReleaseShapeValidation.kt \
   adapters/src/main/kotlin/bidvector/adapters/ml/RequestMapping.kt \
   adapters/src/main/kotlin/bidvector/adapters/ml/ResilientPredictionCall.kt \
+  adapters/src/main/kotlin/bidvector/adapters/ml/RetryRules.kt \
   adapters/src/test/kotlin/bidvector/adapters/ml/EmbeddingBreakerTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/ml/EmbeddingCallPolicyTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/ml/EmbeddingDeadlineCancellationRetryTest.kt \
@@ -58,7 +70,7 @@ git restore --source=caee26c --staged --worktree -- \
   workflow/src/test/kotlin/bidvector/workflow/embedding
 ```
 
-`--source`에 없는 경로(신설 파일 15개)는 삭제된다 — 별도 `git rm` 불필요. `git checkout
+`--source`에 없는 경로(신설 파일)는 삭제된다 — 별도 `git rm` 불필요. `git checkout
 caee26c -- <경로>`는 **쓰지 않는다**(base에 없는 신규 경로마다 pathspec 오류로 exit 1,
 1A 16차 관례).
 
@@ -91,7 +103,7 @@ git diff 181892b~1..181892b -- milestone-4.md | git apply -R
 않는다. 확인은 「내 문단(4D-2 착수) 사라짐」과 **「다른 slice 문단(4D-1 종결·4B-4 착수 등)
 그대로 남음」을 둘 다** 잰다(아래 ③).
 
-## ③ 확인 — 임시 clone에서 실측(2026-09-11, 수정 라운드 1 반영 후 재실행)
+## ③ 확인 — 임시 clone에서 실측(2026-09-11, 코드 리뷰 수정 라운드 반영 후 재실행)
 
 | 확인 | 명령 | 결과 |
 | --- | --- | --- |
@@ -100,7 +112,7 @@ git diff 181892b~1..181892b -- milestone-4.md | git apply -R
 | **남의 문단(4D-1 종결·4B-4 착수 등) 남음** | `grep -c "4D-1 종결\|4B-4 착수" milestone-4.md` | 3(되돌리기 전과 동일) |
 | 하네스 경로 그대로 | `git diff --stat HEAD -- CLAUDE.md .claude/` | 출력 0줄(변경 없음) |
 | 되돌린 트리 컴파일 | `./gradlew --offline --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin :adapters:compileKotlin :adapters:compileTestKotlin` | exit 0 |
-| 되돌린 트리 테스트 | `./gradlew --offline --no-daemon :workflow:test :adapters:test` | exit 0, workflow 134 / adapters 449 tests(1차 rollback 실측과 동일 — 4D-2 전체 증분만큼 감소, 4D-1 골격 보존) |
+| 되돌린 트리 테스트 | `./gradlew --offline --no-daemon :workflow:test :adapters:test` | exit 0, workflow 134 / adapters 449 tests(1차·2차 rollback 실측과 완전히 동일한 수치 — F-E로 4D-1 production 파일 셋(`ParsedSuccessFields.kt`·`ReleaseCheck.kt`·`RetryRules.kt`)이 새로 restore 목록에 들어왔지만 4D-1 test 13파일은 여전히 무편집이라 골격 보존이 재확인된다) |
 
 **목록은 자기를 담은 커밋을 가리킬 수 없다** — `scope.md`·`commands.md`·`rollback.md` 갱신
 커밋은 `reports/evidence/m4/4d2/**`만 만지고 `config/quality/gate-tests.properties`·

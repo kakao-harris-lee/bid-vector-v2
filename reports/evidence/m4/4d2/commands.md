@@ -139,3 +139,71 @@ F-1(high) 처방 뒤 재컴파일·재테스트:
 - 핵심 결과: 파일 목록 불변(수정 라운드가 **기존 파일만** 고쳤다 — 신규 경로 0,
   `milestone-4.md`가 새로 공유 파일 집합에 들어온 것만 차이). rollback.md ①·② 갱신
   (milestone-4.md 커밋 해시 hunk 격리 절 추가).
+
+## 2026-09-11T01:30:00Z — 독립 코드 리뷰 request_changes(F-A high, F-B~F-E medium, F-F~F-H low) 수정
+
+F-A(high) 처방 뒤 결정성 실측:
+- cmd: `./gradlew --offline --no-daemon --rerun-tasks :adapters:test --tests "bidvector.adapters.ml.EmbeddingBreakerTest"` ×3 (수정 직후)
+- exit: 0 / 0 / 0 — `tests=2 failures=0` 3연속(개별 timestamp는 test-results XML)
+- cmd: 같은 명령 ×3 (F-B~F-E 전부 반영한 최종 head 에서 재확인)
+- exit: 0 / 0 / 0 — `tests=2 failures=0` 3연속, 총 6/6
+
+F-B~F-E 컴파일·테스트:
+- cmd: `./gradlew --offline --no-daemon :adapters:compileTestKotlin :workflow:compileKotlin :workflow:compileTestKotlin`
+- exit: 0(1차 시도는 `EmbeddingCallPolicy.kt` KDoc의 중첩 주석 문법 오류로 실패 → 문구 수정 후 재시도 exit 0)
+- cmd: `./gradlew --offline --no-daemon :adapters:test :workflow:test`
+- exit: 0
+- cmd: `./gradlew --offline --no-daemon --rerun-tasks :adapters:test :workflow:test`
+- exit: 0 — workflow 146 / adapters 483 tests, 실패·오류·skip 0(32/32 task 강제 재실행,
+  UP-TO-DATE 없음)
+
+4D-1 test 무편집 재확인(F-E가 4D-1 production 파일 셋을 추가로 건드린 뒤):
+- cmd: `git diff --stat caee26c..HEAD -- <4D-1 test 13파일>`
+- exit: 0, 출력 0줄
+
+## 2026-09-11T01:40:00Z — S-1 재실행(코드 리뷰 수정 반영, 임시 clone 아님 — 워킹트리, 이후 S-0 로 독립 재확인)
+- cmd: `./gradlew --offline --no-daemon --no-build-cache clean check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL, cpd 중복 0 · detekt issue 0 · workflow 146 / adapters 483 /
+  app 129 tests, 실패·오류·skip 0(fresh XML 집계)
+
+## 2026-09-11T01:46:00Z — rollback 재실측(임시 clone, 코드 리뷰 수정 반영)
+- cmd: `git restore --source=caee26c --staged --worktree -- <in_scope 비공유 경로 21파일 + 2디렉터리 = 인자 23개>`
+  (F-E로 `ParsedSuccessFields.kt`·`ReleaseCheck.kt`·`RetryRules.kt` 3개가 추가되고
+  `EmbeddingReleaseShapeValidation.kt`는 신설+삭제로 net diff에서 빠져 순감소 없이 +3)
+- exit: 0
+- cmd: `git diff 6371f28~1..6371f28 -- config/quality/gate-tests.properties | git apply -R` / `git diff 181892b~1..181892b -- milestone-4.md | git apply -R`
+- exit: 0 / 0
+- cmd: `grep -c "4D-2 착수 2026-09-10(임베딩 gateway" milestone-4.md` (내 문단 사라짐) / `grep -c "4D-1 종결\|4B-4 착수" milestone-4.md` (남의 문단 남음)
+- 결과: 0 / 3(둘 다 이전 라운드와 동일)
+- cmd: `git diff caee26c -- <in_scope 코드 경로 전체>` (되돌린 뒤)
+- exit: 0, 출력 0줄
+- cmd: `./gradlew --offline --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin :adapters:compileKotlin :adapters:compileTestKotlin :workflow:test :adapters:test`
+- exit: 0
+- 핵심 결과: workflow 134 / adapters 449 tests — 1차·2차 rollback 실측과 완전히 동일
+  수치(4D-1 골격 보존 재확인)
+
+## 2026-09-11T02:00:00Z — 최종 acceptance S-0~S-7(최종 head, 독립 임시 clone)
+
+- cmd: `git clone . <scratch>/s0-r2-final && cd <scratch>/s0-r2-final && ./gradlew --offline --no-daemon --no-build-cache clean check`(S-0·S-1)
+- exit: 0 — BUILD SUCCESSFUL, **354 tasks 전건 executed**(fresh clone, UP-TO-DATE 0).
+  cpd 중복 0 · detekt issue 0 · workflow 146 / adapters 483 / app 129 tests, 실패·오류·
+  skip 0(fresh XML 집계)
+- 같은 clone 에서 `EmbeddingBreakerTest`만 필터해 `--rerun-tasks` 3연속 재확인 —
+  exit 0/0/0, `tests=2 failures=0` 3연속(F-A 최종 확증, 오늘 세 번째 clone에서 총 9/9)
+- cmd: `./gradlew --offline --no-daemon :adapters:test` (S-2) — exit 0
+- cmd: `./gradlew --offline --no-daemon :workflow:test` (S-3) — exit 0
+- cmd: `./gradlew --offline --no-daemon :adapters:moduleDependencyGate :adapters:sizeGate :adapters:cpdCheck contractGate` (S-4, `contractGate`는 root task) — exit 0
+- cmd: `./gradlew --offline --no-daemon :app:test` (S-5, `:app:test`와 별도 호출) — exit 0
+- cmd: `./gradlew --offline --no-daemon qualityBaseline` (S-6) — exit 0
+- cmd: `./gradlew --offline --no-daemon :app:gateExecutionGate` (S-7, S-5와 별도 호출) — exit 0
+- **측정 정직성**: S-2·S-3·S-5·S-6·S-7은 S-0 직후 같은 clone에서 돌려 UP-TO-DATE였다 —
+  그 개별 재실행 자체는 「이미 실행됨」의 재확인이고, 진짜 신선 실행 근거는 S-0의
+  354/354 executed다. `--tests` 필터(F-A 3연속 확인)는 별도 단일 task 호출로만 걸어
+  다른 acceptance task와 섞이지 않았다.
+- `MlGateRegistrationTest`: 이 라운드는 신규 test class 를 추가하지 않았다(기존 파일
+  수정·삭제만) — 등재 완전성 재검증 대상이 아니다. S-0의 fresh adapters 483 tests
+  0 failures 안에 이 test 도 포함돼 통과가 확인된다(개별 XML은 이후 필터 실행으로
+  덮어써져 이 문서 작성 시점엔 남아 있지 않다 — 알려진 문서 한계, evidence 크기
+  때문에 재실행하지 않는다).
+- secret 스캔: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4d2/` — 매치는 이 문서 자신의 스캔 명령 인용뿐(육안 확인, 위와 같은 자기 인용 패턴)
