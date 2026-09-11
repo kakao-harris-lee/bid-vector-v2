@@ -19,6 +19,7 @@ base_sha: `caee26c`. 목록은 `git diff --name-status caee26c..HEAD`(commands.m
 | `fdf2257` | F-2 — `EmbeddingValueTest.kt` KDoc 정정 + 비유한 값 test | 아니오 |
 | `6cb843d` | F-3 — `EmbeddingCallPolicy.kt`·`EmbeddingCallPolicyTest.kt` 값 고정 test | 아니오 |
 | `181892b` | F-5 — `milestone-4.md` 4D-2 착수 문단 신설 | **예 — M4 공유 승인 문서(전 slice 공용)** |
+| `fdeb76a` | 사용자 승인 2026-09-11 — 4D-2 종결 문단(+`checklist.md` 신설) | **예 — 같은 공유 문서** |
 | `cce5850` | F-6·표적1 — `reports/evidence/m4/4d2/scope.md` 정정(evidence 경로, restore 대상 아님) | 아니오 |
 | `6fa9f2d` | ktlint 포맷 — `EmbeddingShapeFailClosedTest.kt`·`GrpcEmbeddingGatewayTest.kt` MaxLineLength 정리 | 아니오 |
 | `7b5ca69` | 코드 리뷰 F-A — `EmbeddingBreakerTest.kt` 결정적 재작성 + `EmbeddingTestFixtures.kt`(공용 fixture 이동) + `GrpcEmbeddingGatewayTest.kt`(중복 제거) | 아니오 |
@@ -91,10 +92,11 @@ git diff 6371f28~1..6371f28 -- config/quality/gate-tests.properties | git apply 
 지점과 겹치지 않는 자리에 7줄을 추가했을 뿐이다).
 
 **`milestone-4.md`**(F-5 신설, 이 문서를 만지는 slice가 이 branch 안에서는 이 slice
-하나뿐이다 — `git log --oneline caee26c..HEAD -- milestone-4.md` = `181892b` 단독)도
+둘이다 — `git log --oneline caee26c..HEAD -- milestone-4.md` = `fdeb76a`·`181892b`)도
 같은 방식이다:
 
 ```bash
+git diff fdeb76a~1..fdeb76a -- milestone-4.md | git apply -R
 git diff 181892b~1..181892b -- milestone-4.md | git apply -R
 ```
 
@@ -121,3 +123,14 @@ git diff 181892b~1..181892b -- milestone-4.md | git apply -R
 
 **라운드마다 파일이 늘면 `git diff --name-status caee26c..HEAD`를 다시 돌려 ①의 목록을
 갱신한다.**
+
+## 종결 등재 반영 — 2026-09-11
+
+종결 승인 커밋 `fdeb76a` 가 공유 승인 문서 `milestone-4.md` 를 다시 만졌으므로 위 hunk 목록의
+**최신 자리**에 넣었다(`checklist.md` 는 이 slice 전용 evidence 라 A 목록이 덮는다).
+**이 갱신 커밋은 evidence 경로만 만진다** — 공유 파일을 건드리면 목록이 자기만큼 다시 낡는다
+(2026-09-10 성문화, M4/4C-2 r3 M-5 의 뿌리).
+
+실측 범위를 정확히 적는다: 앞선 「확인 지점」의 실행은 `6d43271`·`0a32273` 시점의 것이다.
+`fdeb76a` hunk 의 역적용은 이 문단 작성 시점에 **임시 clone 에서 별도로 실행**해 exit 0 과
+conflict 0 을 확인했다(compile·test 는 다시 돌리지 않았다 — 문서 전용 커밋이라 코드 트리가 같다).
