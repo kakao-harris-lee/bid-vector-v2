@@ -89,6 +89,15 @@ rollback: |
 | ② 정책 리터럴(12줄/64토큰) | `MlCallPolicyData.kt`(`ML_CALL_POLICY`) ↔ `EmbeddingCallPolicy.kt`(`EMBEDDING_CALL_POLICY`) | 공용 `internal fun placeholderMlCallPolicy(featureSchemaVersion)`(`MlCallPolicyPlaceholder.kt` 신설)로 추출. 레지스트리는 여전히 둘 — D-4D2-2 유지 |
 | ③ gateway 호출 골격(9줄/52토큰) | `GrpcBidPredictionGateway.kt` ↔ `GrpcEmbeddingGateway.kt` | 공용 `internal suspend fun <S : AbstractStub<S>, Req, Resp> callMlRpc(...)`(`ResilientPredictionCall.kt`에 추가)로 추출. `settlePermit`의 try/finally·breaker 분기는 한 줄도 변경 없음 |
 
+### 코드 리뷰 F-E(medium) — cpd 미검출 구조적 중복(약 70줄) 처리
+
+| 블록 | 위치 | 처방 |
+| --- | --- | --- |
+| `fetchPromoted`+metadata 조회(37줄) | `GrpcBidPredictionGateway.kt` ↔ `GrpcEmbeddingGateway.kt` | 공용 `internal suspend fun <S, Resp> fetchPromotedRelease(...)`(`ReleaseCheck.kt`에 추가)로 추출 — RPC별 차이(요청 타입·resultCase 분기)만 `invoke`·`promotedOf` 람다로 뽑는다 |
+| `mapTransportFailure`(16줄) | 〃 | 공용 `internal fun classifyTransportFailure(error): TransportFailureClass`(`RetryRules.kt`에 추가) — status 분류만 공유하고, 각 gateway는 자기 sealed 사유 타입(`MlUnavailableReason`/`EmbeddingUnavailableReason`)으로 매핑만 한다(결과 타입은 D-4D2-1의 모듈 경계 때문에 합치지 않는다) |
+| `resolvePolicy`+`Resolved*CallPolicy`(17줄) | 〃 | 공용 `internal fun resolveMlCallPolicy(...)` + `internal data class ResolvedMlCallPolicy`(`MlCallPolicyData.kt`에 추가) |
+| `hasNonBlankRelease(Success)`/`hasNonBlankRelease(Embedding)`(8줄) | `ReleaseShapeValidation.kt` ↔ `EmbeddingReleaseShapeValidation.kt` | 피연산자가 같은 `ModelRelease` 타입이라 시그니처를 `hasNonBlankRelease(release: ModelRelease)` 하나로 합치고 `EmbeddingReleaseShapeValidation.kt` 파일을 없앴다. 호출부는 `success.release`/`embedding.release`로 필드를 먼저 꺼내 넘긴다(동작 변화 없음) |
+
 ### (2b) 표 — 신설 public 표면 전수
 
 | 표면 | 모듈 | 허용 범위 | 판정 |
@@ -101,7 +110,8 @@ rollback: |
 | `TextKind`(enum, 2값) | workflow | 값 추가만 가능 | 닫힘 |
 | `GrpcEmbeddingGateway`(class) | adapters | 생성자가 `ManagedChannel`·정책·`Clock`만 받음, 내부 매핑·검증·`callMlRpc`는 전부 internal | 닫힘 |
 | `EMBEDDING_CALL_POLICY`(val) | adapters | 조회만(불변 `EffectiveDatedPolicy`), 쓰기 경로 없음(4D-1 `ML_CALL_POLICY` 관례) | 닫힘 |
-| `callMlRpc`·`buildPredictionEnvelope`·`placeholderMlCallPolicy` | adapters | `internal` | 대상 아님 |
+| `EmbeddingVector.COARSE_NORM_EPSILON`(companion const, **코드 리뷰 F-C로 신규 public**) | workflow | 숫자 상수 하나(`0.01`), 쓰기 경로 없음. `internal`은 모듈 경계 때문에 `adapters` test 에서 못 재 `public`으로 뒀다(생성자와 같은 이유) — 목적은 가시성 확대가 아니라 「검증층 epsilon이 이 값보다 좁다」는 불변식을 `EmbeddingCallPolicyTest`가 기계로 재게 하는 것 | 닫힘(값 자체는 상수, 쓰기 경로 없음) |
+| `callMlRpc`·`buildPredictionEnvelope`·`placeholderMlCallPolicy`·`fetchPromotedRelease`·`classifyTransportFailure`·`resolveMlCallPolicy`·`ResolvedMlCallPolicy`(코드 리뷰 F-E 추출) | adapters | `internal` | 대상 아님 |
 | `object` 커널 계수(임베딩 호출 횟수) | test | in-process fake servicer 카운터로 관측, 프로덕션에 계수용 인터페이스 미주입 | 닫힘 |
 
 ### `Unavailable` 사유 목록 (`EmbeddingUnavailableReason`, 10값)
@@ -127,11 +137,22 @@ else 없음)와 client 측 fail-closed(구조검증·release 대조·breaker·de
    지금 구조를 바꾸지 않는다 — 소비자를 배선하는 slice(4B-6)가 그 순간 타입만으로는
    위조를 가를 수 없다는 것을 알고 처리하도록 `OPEN-4D2-VECTOR-FORGERY-AT-WIRING`(신설,
    아래 OPEN 표)으로 넘긴다.
-2. **`OPEN-4D2-POLICY-VALUES`·`OPEN-M2-DEADLINE-VALUES` 잔존** — `EMBEDDING_CALL_POLICY`는
-   5E 실측 전 placeholder다(`ML_CALL_POLICY`와 값을 공유하는 `placeholderMlCallPolicy`를
-   통해). 실측 갱신은 M5 5E 소관.
+2. **`OPEN-4D2-POLICY-VALUES`·`OPEN-M2-DEADLINE-VALUES` 잔존** — `EMBEDDING_CALL_POLICY`의
+   deadline·재시도·backoff·breaker 넷은 5E 실측 전 placeholder다(`ML_CALL_POLICY`와 값을
+   공유하는 `placeholderMlCallPolicy`를 통해). 실측 갱신은 M5 5E 소관.
+   **`featureSchemaVersion`은 이 OPEN 대상이 아니다** — 코드 리뷰 F-B(medium)로 별도 축임이
+   드러나 2E 승인 testdata 값(`text-synthesis-v1`)으로 정정했고 `EmbeddingCallPolicyTest`가
+   그 testdata와 직접 대조한다(`OPEN-2E-TEXT-SYNTHESIS`, 4B-6이 텍스트 합성 규약을 바꾸면
+   이 값도 함께 옮긴다).
 3. **`milestone-4.md` 4D-2 착수 문단은 있으나 종결 문단은 없다** — 사용자 승인 전이라
    착수 기록만 있고 종결은 승인 후 별도 커밋으로 등재한다(3B-2 관례).
+4. **`EmbedTextRequest.init`이 2E ④의 요청 상한(`embedding.text.max-chars`=4000, 사용자
+   승인 2026-09-10)을 강제하지 않는다**(코드 리뷰 F-G, low) — 공백 거부만 client가 지고
+   상한 초과는 서버의 `INVALID_REQUEST`(→`Unavailable(InvalidRequest)`)에 맡긴다.
+   fail-closed 방향이라 안전 결함은 아니다.
+5. **metadata 조회 실패가 전부 `ReleaseMismatch`로 접힌다**(코드 리뷰 F-H, low) — 「승격
+   불일치」와 「예산 부족으로 대조 자체를 못 함」을 같은 사유로 본다. 4D-1이 정한 관례를
+   그대로 계승한 것이라 이 slice의 회귀가 아니다(바꾸면 4D-1 거동 변경 경계에 닿는다).
 
 ---
 
