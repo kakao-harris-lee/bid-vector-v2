@@ -648,6 +648,18 @@ slice(opportunity-analysis RPC를 2A~2D 절차로 additive 확장) + M5 provider
 slice 계약에서 다룬다 — 이 milestone 문서의 4D 절은 4D-1로 종결되고, 사다리 점수
 경로는 별도 slice 번호로 이어진다.
 
+**4D-2 착수 2026-09-10(임베딩 gateway, 정본 `reports/evidence/m4/4d2/scope.md`)** —
+**D-4D2-1**: 임베딩 port 와 값 타입(`EmbedTextPort`·`EmbeddingOutcome`·`EmbeddingVector`
+등, `workflow/embedding/**`)은 **4D-2가 소유한다** — 4D-1이 `workflow/prediction`을
+소유한 전례 그대로다. 이 결정으로 위 「**다음은 4B-5**(port·조합기·텍스트 합성 규약)」·
+「4B-5(workflow 조합기 + 임베딩 port + 텍스트 합성 규약)」 문구는 **대체된다** — **4B-5는
+port를 만들지 않고 소비한다**(조합기·텍스트 합성 규약만 남는다). `GrpcEmbeddingGateway`
+(`adapters/ml`)가 `EmbeddingService.EmbedText`를 배선하고, resilience 골격(breaker·
+bounded retry)은 4D-1 `ResilientPredictionCall`을 제네릭화(D-4D2-4)해 재사용한다 —
+정책 값은 예측과 분리한 별도 슬롯(D-4D2-2, 착수 값은 4D-1과 같고 `OPEN-4D2-POLICY-VALUES`
+로 실측을 연다). 구현·verifier 1차 완료, 수정 라운드 진행 중(재작업 카운터 활성) —
+종결 등재는 사용자 승인 뒤.
+
 ### Slice 4E — notification adapter contract
 
 - delivery request와 rendered content 분리
@@ -778,3 +790,45 @@ crash-after-commit의 「재기동」은 새 `TransactionBoundary` 인스턴스�
 **4B-4**(`priority`·`match` 조합 커널, `decision` 순수 — 병렬 레인이 2026-09-10 착수) ·
 **4B-5**(workflow 조합기 + 임베딩 port + 텍스트 합성 규약) · **4D-2**(실 client 배선).
 그러므로 **M4 완료 조건 대조와 마일스톤 종결 판정은 그 셋이 끝난 뒤**다.
+
+**4D-2 verifier r1~r3 + 독립 코드 리뷰 r1~r2(2026-09-10~11) → 종결.** 이 slice 는 **레인 셋**을
+썼다 — 구현·검증에 더해 **독립 코드 리뷰**(운영자 지시 2026-09-11)를 세 번째 패스로 돌렸고, 그
+셋째 레인이 **두 레인이 초록으로 본 것을 빨갛게** 만들었다. verifier r1 이 `not-ready`(F-1 high —
+`BigDecimal(Double)` 이 NaN·Infinity 에 던져 **예외가 port 밖으로 샜다**; proto3 `repeated float`
+는 그 값을 정상 wire 값으로 나른다), 시정 뒤 r2 `ready-for-review`. 그런데 **코드 리뷰 r1 이
+`request_changes`** 를 냈다 — `EmbeddingBreakerTest` 가 **차가운 JVM 에서 결정적으로 깨졌다**(임시
+clone 5/5 실패, 팀장 독립 재현 3/3). 두 레인이 초록을 본 이유는 **데몬 온도**였고, **CI 러너는 항상
+차갑다**. 더 나쁜 것은 초록일 때조차 의도한 경로를 지나지 않았다는 점이다 — servicer 가 성공 응답을
+주어 백오프 구간에 들어가지 않으니 **permit 반납이 시험되지 않았다**. 시정은 시계 경쟁을 **내용 기반
+재시도 분기**로 바꾼 것이고(판정이 `remaining ≤ 1s < backoff 10s` 라 **경과 시간과 무관하게 참**),
+`delay 0ms`·`1500ms` 두 극단이 같은 결론으로 수렴함을 실측했다. **재작업 카운터 2/5.**
+
+**4D-2 종결 2026-09-11(사용자 승인).** 산출물: `workflow/embedding/**`(port `EmbedTextPort`·결과
+갈래 `EmbeddingOutcome`·값 타입·미가용 사유 10값) · `adapters/ml` 의 `GrpcEmbeddingGateway` 와 임베딩
+매핑·구조 검증층 · 4D-1 골격의 **제네릭화**(`callResilient<R>`·`callMlRpc`·`fetchPromotedRelease`·
+`classifyTransportFailure`·`resolveMlCallPolicy`·`hasNonBlankRelease` 통합).
+
+**D-4D2-4 「동작 불변」이 어떻게 섰는가 — 이 slice 의 방법론 산출물.** 제네릭화가 4D-1 production
+파일 **여덟**을 만졌다(`ResilientPredictionCall`·`MlCallPolicyData`·`RequestMapping`·
+`GrpcBidPredictionGateway`·`ParsedSuccessFields`·`ReleaseCheck`·`RetryRules`·`ReleaseShapeValidation`).
+「4D-1 test 13파일 무편집」만으로는 **불충분하다고 verifier 가 판정**했고, 정적 판독(식별자·rename
+정규화 후 본문 기계 비교)과 **differential 실행**(base/head 두 clone 에 같은 probe 를 넣고 대조)을
+병행했다. 그 결과 **예측 축 release 대조 8 시나리오 중 셋(metadata RPC `UNAVAILABLE`·`INTERNAL`·
+failure 봉투)이 4D-1 test 의 사각**임이 드러났고 — `try`/`catch` 가 파일을 옮긴 이번 변경에서 가장
+깨지기 쉬운 자리였다 — 거기서 base 와 같음을 실측했다. **「test 무편집」은 증거의 절반이다.**
+
+**알려진 제한(종결 시점)**: `isL2Normalized` 가 **부분 함수**로 남아 있다(비유한 입력에 던진다) —
+유한성 관문이 앞에 서서 도달하지 않고 **관문을 뒤로 옮기는 변이로 회귀 test 가 RED** 임을 확인했으나,
+전제가 KDoc 한 줄과 test 순서에 기댄다(verifier r2 L-2 · r3 L-1) · 형제 test 훑음의 근거 문면이
+`coroutine 취소` test(2초 전파 창)를 덮지 못한다(r3 L-2, 결론 자체는 옳다) · **벡터 값 타입의 생성자가
+public** 이라 위조가 타입으로 닫히지 않는다 — 오늘은 소비자 부재로 도달 불가이나 **구조상 불가는
+아니다**(`OPEN-4D2-VECTOR-FORGERY-AT-WIRING`, 4B-6 인계) · `featureSchemaVersion` 은 `OPEN-2E-TEXT-SYNTHESIS`
+(4B-6) 소유 축이며 이 slice 는 **2E 승인 golden 값을 채용**만 했다(`binpb` 를 파싱해 대조하는 test 가
+어긋남을 잡는다) — 다만 같은 값이 `ml-engine` fake servicer 에도 있어 **세 자리 중 둘만 기계로
+묶였다** · 요청 텍스트 상한 미강제(r1 F-G) · metadata 조회 실패가 `ReleaseMismatch` 로 뭉개짐(4D-1
+계승, r1 F-H) · 두 ε 이 **같은 십진값이어도** strict `<` 가 통과한다(`BigDecimal(double)` 생성자) ·
+실 servicer 는 M5, `ManagedChannel`·TLS·인증은 M6.
+
+**남은 M4 slice**: 4B-5(성분 파생, 병렬 레인 진행 중) · 4B-6(workflow 조합기 + 텍스트 합성 규약 +
+시장 평균·workload port — `OPEN-4D2-VECTOR-FORGERY-AT-WIRING` 과 `OPEN-2E-TEXT-SYNTHESIS` 를 함께
+받는다). 완료 조건 대조와 마일스톤 종결 판정은 그 둘 뒤다.
