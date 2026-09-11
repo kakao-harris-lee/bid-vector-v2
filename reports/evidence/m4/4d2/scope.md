@@ -16,7 +16,7 @@
 ```yaml
 milestone: m4
 slice: 4d2-embedding-gateway
-base_sha: 7785bbd   # 리뷰 요청 시점에 40자로 재확인한다 — 3G 종결·4B-4 병합 커밋(main == m4/2026-09-08)
+base_sha: caee26ceeef52afeb237bdaa1f73495541e7301f   # verifier F-6(low) 정정 2026-09-11 — 원문 `7785bbd`는 착수 시점(3G 종결·4B-4 병합) 값이었고, 그 뒤 이 slice 자신의 계약 문서 커밋 둘(`baacd09`·`caee26c`)이 붙어 실제 base가 밀렸다. commands.md·rollback.md·구현·verifier가 실측한 base는 처음부터 `caee26c`였다 — 40자로 재확인해 이 필드만 그 실측에 맞춘다
 head_sha: 리뷰 요청 시점의 `git rev-parse HEAD` — **값을 박지 않는다**(evidence 커밋 자신이 head 가 되어 즉시 낡는다, 4A r1 B-3)
 branch: m4/2026-09-08   # worktree /Users/harris/Development/private/bid-vector-v2-m4
 in_scope:
@@ -97,7 +97,7 @@ rollback: |
 | `EmbedTextRequest`(data class) | workflow | init이 blank text 거부 | 닫힘 |
 | `EmbeddingOutcome`(sealed, Embedded/Unavailable) | workflow | 점수 생성 경로 없음(D-4D2-3) | 닫힘 |
 | `EmbeddingUnavailableReason`(sealed, 10값) | workflow | 새 사유 추가 불가(모듈 밖) | 닫힘 |
-| `EmbeddingVector`(data class, **생성자 공개**) | workflow | init이 비어있지 않음·norm≈1(거친 epsilon) 강제하나, 공개 생성자라 호출자가 임의 값으로 지어 주입하는 경로 자체는 타입만으로 안 막힘 | **알려진 제한**(아래) |
+| `EmbeddingVector`(data class, **생성자 공개**) | workflow | init이 비어있지 않음·norm≈1(거친 epsilon)·유한(NaN/Infinity 거부) 강제하나, 정규화된 임의 방향 벡터는 통과한다 — 형태 하한이지 위조 방어가 아니다 | **연다 — 경계 안, 소비자 부재로 오늘 도달 불가**(아래·`OPEN-4D2-VECTOR-FORGERY-AT-WIRING`) |
 | `TextKind`(enum, 2값) | workflow | 값 추가만 가능 | 닫힘 |
 | `GrpcEmbeddingGateway`(class) | adapters | 생성자가 `ManagedChannel`·정책·`Clock`만 받음, 내부 매핑·검증·`callMlRpc`는 전부 internal | 닫힘 |
 | `EMBEDDING_CALL_POLICY`(val) | adapters | 조회만(불변 `EffectiveDatedPolicy`), 쓰기 경로 없음(4D-1 `ML_CALL_POLICY` 관례) | 닫힘 |
@@ -115,22 +115,23 @@ else 없음)와 client 측 fail-closed(구조검증·release 대조·breaker·de
 
 ### 알려진 제한
 
-1. **`EmbeddingVector` 생성자가 public이다**(설계 검토는 `internal`을 제안했으나 `internal`
-   은 Gradle 모듈 단위라 값을 실제로 짓는 `adapters` 모듈에서 호출 불가 — 4D-1
-   `BidRateCandidates`·`ModelReleaseRef`·`Uncertainty`와 같은 실측 근거로 결정 변경, 코드
-   KDoc에 이미 기록). 위조 방어는 `init`(형태 하한)과 어댑터 쪽 유일 생성 경로 관례·code
-   review·test 커버리지가 진다.
-2. **S-4 acceptance command 오타** — scope.md의 `./gradlew :adapters:moduleDependencyGate
-   :adapters:sizeGate :adapters:cpdCheck :adapters:contractGate`에서 `:adapters:contractGate`
-   는 존재하지 않는 task다(`contractGate`는 root 레벨). 교정된 형태
-   `contractGate`(prefix 없이)로 실행해 통과를 확인했다(commands.md). scope.md 자체의
-   수정은 세션 모델 소관이라 이 구현 레인은 하지 않았다 — 다음 리뷰 요청 시 교정을
-   요청한다.
-3. **`OPEN-4D2-POLICY-VALUES`·`OPEN-M2-DEADLINE-VALUES` 잔존** — `EMBEDDING_CALL_POLICY`는
+1. **`EmbeddingVector` 생성자가 public이고, 위조가 오늘 도달 불가일 뿐 구조상 불가는
+   아니다**(verifier 표적 1 판정). `internal`은 Gradle 모듈 단위라 값을 실제로 짓는
+   `adapters` 모듈에서 호출 불가해 public으로 결정 변경했다(4D-1 `BidRateCandidates`·
+   `ModelReleaseRef`·`Uncertainty`와 같은 근거). `init`은 형태 하한(빈 리스트·norm 밖·
+   비유한 거부)만 강제하고, `EmbedTextPort`를 배선하는 제3 모듈이 `EmbeddingVector`를
+   직접 짓고 가짜 port로 임의 `Embedded`를 낼 수 있음이 `app` 모듈에서 컴파일·실행으로
+   실측됐다(verifier probe). 4C-1의 `ClaimedOutboxRow`+`internal` 복원자 배치는 구조적으로
+   가능하나 위조를 **닫지 않고 옮긴다**(그 복원자를 감싸는 배선도 public이어야 하므로) —
+   `EmbeddingVector`는 권한을 나르는 값이 아니라 숫자라 `EventEnvelope`와 다른 등급이다.
+   지금 구조를 바꾸지 않는다 — 소비자를 배선하는 slice(4B-6)가 그 순간 타입만으로는
+   위조를 가를 수 없다는 것을 알고 처리하도록 `OPEN-4D2-VECTOR-FORGERY-AT-WIRING`(신설,
+   아래 OPEN 표)으로 넘긴다.
+2. **`OPEN-4D2-POLICY-VALUES`·`OPEN-M2-DEADLINE-VALUES` 잔존** — `EMBEDDING_CALL_POLICY`는
    5E 실측 전 placeholder다(`ML_CALL_POLICY`와 값을 공유하는 `placeholderMlCallPolicy`를
    통해). 실측 갱신은 M5 5E 소관.
-4. **`milestone-4.md` 4D-2 종결 문단 미기재** — 사용자 승인 전이라 착수 기록만 있고 종결은
-   승인 후 별도 커밋으로 등재한다(3B-2 관례, 공유 파일 아님 — 이 slice에서 아직 안 만졌다).
+3. **`milestone-4.md` 4D-2 착수 문단은 있으나 종결 문단은 없다** — 사용자 승인 전이라
+   착수 기록만 있고 종결은 승인 후 별도 커밋으로 등재한다(3B-2 관례).
 
 ---
 
@@ -170,6 +171,7 @@ else 없음)와 client 측 fail-closed(구조검증·release 대조·breaker·de
 | `OPEN-4D2-POLICY-VALUES`(신설) | 임베딩 호출 정책 값(deadline·재시도·backoff·breaker)의 실측 근거 — 착수 값은 4D-1 과 같게 두고 **5E 실측**으로 갱신(`OPEN-M2-DEADLINE-VALUES` 와 같은 경로) |
 | `OPEN-2E-TEXT-SYNTHESIS` | **이 slice 가 닫지 않는다** — 텍스트를 **받아서** 보낼 뿐이다. 4B-6 소관 |
 | `OPEN-4D2-VECTOR-PERSISTENCE`(신설) | 벡터를 어디에 저장하고 kNN 을 어떻게 도는가(pgvector 여부·차원 고정·재계산 정책) — 이 slice 는 벡터를 돌려주기만 한다. persistence 후속 |
+| `OPEN-4D2-VECTOR-FORGERY-AT-WIRING`(신설, verifier 표적 1) | `EmbeddingVector` 생성자가 public이라 `EmbedTextPort`를 배선하는 제3 모듈이 값을 직접 지어 가짜 `Embedded`를 낼 수 있다(오늘은 소비자가 없어 도달 불가, 구조상 불가는 아님 — `app` 모듈 컴파일·실행 probe로 실측). **4B-6(소비자 배선 slice)이 닫는다** — 그 slice가 port를 배선하는 순간 타입만으로는 위조와 진짜를 가를 수 없으므로, 배선 지점(DI 조립 루트)을 좁히는 별도 방어(예: 배선 권한을 가진 모듈만 port 구현을 등록하게 하는 구조)를 그때 설계한다 |
 
 ---
 
