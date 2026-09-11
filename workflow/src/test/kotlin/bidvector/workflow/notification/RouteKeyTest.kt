@@ -2,6 +2,7 @@ package bidvector.workflow.notification
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
@@ -80,5 +81,31 @@ class RouteKeyTest {
                 shouldThrow<IllegalArgumentException> { RouteKey(digits) }
             }
         }
+    }
+
+    // ---- PR #5 게이트 시정(privacy-gate) — 거부 메시지가 원문을 싣지 않는다 ----
+    // 이 타입의 KDoc 은 「원문 식별자(채팅id·봇비밀값·메일주소)는 이 shape 를 통과하지
+    // 못한다」고 방어를 선언한다 — 그 값이 거부 경로의 예외 메시지로 새면 그 선언이
+    // 무효가 된다. 아래는 그 세 가지 원문 모양 각각으로 실제 유출이 없음을 단언한다.
+
+    @Test
+    fun `숫자로 시작하는 원문(채팅id 모양)은 예외 메시지에 나타나지 않는다`() {
+        val chatId = "820394857123"
+        val exception = shouldThrow<IllegalArgumentException> { RouteKey(chatId) }
+        exception.message.orEmpty() shouldNotContain chatId
+    }
+
+    @Test
+    fun `콜론을 담은 원문(봇 비밀값 모양)은 예외 메시지에 나타나지 않는다`() {
+        val botSecret = "bot:AAHx9secretTokenValue12345"
+        val exception = shouldThrow<IllegalArgumentException> { RouteKey(botSecret) }
+        exception.message.orEmpty() shouldNotContain botSecret
+    }
+
+    @Test
+    fun `골뱅이를 담은 원문(메일 주소 모양)은 예외 메시지에 나타나지 않는다`() {
+        val email = "ops-lead@example.com"
+        val exception = shouldThrow<IllegalArgumentException> { RouteKey(email) }
+        exception.message.orEmpty() shouldNotContain email
     }
 }
