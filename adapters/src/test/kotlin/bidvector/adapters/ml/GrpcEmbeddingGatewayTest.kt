@@ -211,6 +211,121 @@ class GrpcEmbeddingGatewayTest {
         }
     }
 
+    // ---- verifier F-4(medium) — probe 로만 확인됐던 경로를 test 로 고정한다 ----
+
+    @Test
+    fun `응답 feature_schema_version 이 요청 값과 다르면 UnsupportedSchema 다(client 집행)`() {
+        runBlocking {
+            val mismatchedRelease = testEmbeddingModelRelease().toBuilder().setFeatureSchemaVersion("other-schema").build()
+            val servicer =
+                fixedEmbeddingServicer(
+                    embedText = protoEmbedResponse(testEmbeddingSuccess().toBuilder().setRelease(mismatchedRelease).build()),
+                )
+            val gateway = gatewayOn(servicer)
+            val selector = ModelReleaseSelector.Exact("release-2026-09-01", "sha256:test")
+
+            val outcome = gateway.embed(testEmbedTextRequest(releaseSelector = selector), CallBudget(Duration.ofSeconds(1)))
+
+            outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+            outcome.reason shouldBe EmbeddingUnavailableReason.UnsupportedSchema
+        }
+    }
+
+    @Test
+    fun `서버 UNSUPPORTED_SCHEMA 실패는 UnsupportedSchema 다`() {
+        runBlocking {
+            val servicer =
+                countingEmbeddingServicer(
+                    AtomicInteger(0),
+                    embeddingFailureResponse(FailureCode.FAILURE_CODE_UNSUPPORTED_SCHEMA, retryable = false),
+                )
+            val gateway = gatewayOn(servicer)
+
+            val outcome = gateway.embed(testEmbedTextRequest(), CallBudget(Duration.ofSeconds(1)))
+
+            outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+            outcome.reason shouldBe EmbeddingUnavailableReason.UnsupportedSchema
+        }
+    }
+
+    @Test
+    fun `서버 UNSUPPORTED_RELEASE 실패는 UnsupportedRelease 다`() {
+        runBlocking {
+            val servicer =
+                countingEmbeddingServicer(
+                    AtomicInteger(0),
+                    embeddingFailureResponse(FailureCode.FAILURE_CODE_UNSUPPORTED_RELEASE, retryable = false),
+                )
+            val gateway = gatewayOn(servicer)
+
+            val outcome = gateway.embed(testEmbedTextRequest(), CallBudget(Duration.ofSeconds(1)))
+
+            outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+            outcome.reason shouldBe EmbeddingUnavailableReason.UnsupportedRelease
+        }
+    }
+
+    @Test
+    fun `RESULT_NOT_SET 응답은 예외 없이 ContractViolation 이다`() {
+        runBlocking {
+            val servicer = countingEmbeddingServicer(AtomicInteger(0), EmbedTextResponse.getDefaultInstance())
+            val gateway = gatewayOn(servicer)
+
+            val outcome = gateway.embed(testEmbedTextRequest(), CallBudget(Duration.ofSeconds(1)))
+
+            outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+            outcome.reason shouldBe EmbeddingUnavailableReason.ContractViolation
+        }
+    }
+
+    @Test
+    fun `training 전용 FailureCode(embedding proto 미표현)는 전부 ContractViolation 이다(table-driven)`() {
+        runBlocking {
+            val trainingOnlyCodes =
+                listOf(
+                    FailureCode.FAILURE_CODE_UNSUPPORTED_TRAINING_SPEC,
+                    FailureCode.FAILURE_CODE_IDEMPOTENCY_CONFLICT,
+                    FailureCode.FAILURE_CODE_JOB_NOT_FOUND,
+                )
+            trainingOnlyCodes.forEach { code ->
+                val servicer =
+                    countingEmbeddingServicer(AtomicInteger(0), embeddingFailureResponse(code, retryable = false))
+                val gateway = gatewayOn(servicer)
+
+                val outcome = gateway.embed(testEmbedTextRequest(), CallBudget(Duration.ofSeconds(1)))
+
+                outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+                outcome.reason shouldBe EmbeddingUnavailableReason.ContractViolation
+            }
+        }
+    }
+
+    @Test
+    fun `latest_promoted 인데 GetEmbeddingMetadata 가 예외를 던지면 예외 없이 ReleaseMismatch 다`() {
+        runBlocking {
+            val release = testEmbeddingModelRelease(releaseId = "r1", artifactChecksum = "c1")
+            val servicer =
+                object : EmbeddingServiceGrpcKt.EmbeddingServiceCoroutineImplBase() {
+                    override suspend fun embedText(request: ProtoEmbedTextRequest): EmbedTextResponse =
+                        protoEmbedResponse(testEmbeddingSuccess().toBuilder().setRelease(release).build())
+
+                    override suspend fun getEmbeddingMetadata(
+                        request: GetEmbeddingMetadataRequest,
+                    ): GetEmbeddingMetadataResponse = throw StatusException(Status.UNAVAILABLE)
+                }
+            val gateway = gatewayOn(servicer)
+
+            val outcome =
+                gateway.embed(
+                    testEmbedTextRequest(releaseSelector = ModelReleaseSelector.LatestPromoted),
+                    CallBudget(Duration.ofSeconds(1)),
+                )
+
+            outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+            outcome.reason shouldBe EmbeddingUnavailableReason.ReleaseMismatch
+        }
+    }
+
     @Test
     fun `text 는 요청 그대로 servicer 에 전달된다(제3 변환 금지)`() {
         runBlocking {
