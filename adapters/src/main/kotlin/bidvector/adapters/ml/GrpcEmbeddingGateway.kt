@@ -8,6 +8,7 @@ import bidvector.workflow.embedding.EmbeddingUnavailableReason
 import bidvector.workflow.prediction.CallBudget
 import contract.bidvector.ml.v1.EmbedTextResponse
 import contract.bidvector.ml.v1.Embedding
+import contract.bidvector.ml.v1.EmbeddingMetadata
 import contract.bidvector.ml.v1.EmbeddingServiceGrpcKt
 import contract.bidvector.ml.v1.GetEmbeddingMetadataRequest
 import contract.bidvector.ml.v1.GetEmbeddingMetadataResponse
@@ -109,6 +110,20 @@ class GrpcEmbeddingGateway(
      * `latest_promoted`면 **같은 embed 호출 안에서** `GetEmbeddingMetadata`를 부른다. 대조에
      * 실패(불일치·조회 불가)하면 `Embedded`로 가지 않고 `ReleaseMismatch`다(제3 변환 금지,
      * ADR 0010 D-3).
+     *
+     * **PR #5 게이트 시정(D-2E ② 미구현, contract-keeper 차단)** — `latest_promoted`
+     * 경로에서 이미 불러온 metadata 의 `dimension`을 [embeddingDimensionMatchesMetadata]로
+     * 대조한다(scope.md D-2E ② 「client 가 `EmbedText` 응답 `dimension`을
+     * `GetEmbeddingMetadata.dimension`과 대조 — 불일치 = 계약 위반」). 불일치는 별도
+     * `Unavailable` 사유를 새로 만들지 않고 `ReleaseMismatch`를 재사용한다 — 둘 다 같은
+     * 사실("이미 불러온 승격 metadata가 지금 온 응답과 어긋난다")의 다른 성분일 뿐이고,
+     * 호출부(운영)가 이 둘을 다르게 다뤄야 할 근거가 없다(`EmbeddingUnavailableReason`
+     * 소비처 전수 확인 — 현재 이 값을 분기하는 곳이 없다). `GetEmbeddingMetadata`를 이
+     * 대조 때문에 두 번째로 부르지 않는다(팀장 지시 — 추가 RPC 금지) — [fetchPromoted]가
+     * 반환하는 `EmbeddingMetadata`(release **와** dimension 을 함께 나른다, `ReleaseCheck.kt`)
+     * 를 그대로 재사용한다. `exact_release` 요청은 metadata 를 아예 안 부르므로
+     * (`promotedMetadata == null`) 이 검사가 구조적으로 적용되지 않는다 — 이는 selector
+     * 축의 설계다(`EmbeddingShapeValidation.kt` KDoc).
      */
     private suspend fun handleSuccess(
         success: Embedding,
@@ -118,26 +133,31 @@ class GrpcEmbeddingGateway(
         correlationId: String,
         expectedFeatureSchemaVersion: String,
     ): EmbeddingOutcome {
-        val promoted: ModelRelease? =
+        val promotedMetadata: EmbeddingMetadata? =
             if (selector is DomainModelReleaseSelector.LatestPromoted) {
-                fetchPromotedRelease(
+                fetchPromoted(
                     stub,
                     requestId,
                     correlationId,
                     invoke = { s, envelope ->
                         s.getEmbeddingMetadata(GetEmbeddingMetadataRequest.newBuilder().setEnvelope(envelope).build())
                     },
-                    promotedOf = { response ->
+                    extract = { response ->
                         when (response.resultCase) {
-                            GetEmbeddingMetadataResponse.ResultCase.METADATA -> response.metadata.promoted
+                            GetEmbeddingMetadataResponse.ResultCase.METADATA -> response.metadata
                             else -> null
                         }
                     },
+                    releaseOf = { it.promoted },
                 )
             } else {
                 null
             }
+        val promoted: ModelRelease? = promotedMetadata?.promoted
         if (!releaseSatisfiesSelector(selector.toProto(), success.release, promoted)) {
+            return EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.ReleaseMismatch)
+        }
+        if (promotedMetadata != null && !embeddingDimensionMatchesMetadata(success, promotedMetadata)) {
             return EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.ReleaseMismatch)
         }
         return mapEmbedSuccess(success, expectedFeatureSchemaVersion)

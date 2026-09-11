@@ -103,6 +103,36 @@ class GrpcEmbeddingGatewayTest {
         }
     }
 
+    // ---- PR #5 게이트 시정(D-2E ② 미구현, contract-keeper 차단) — dimension 대조를 실
+    // gateway 경로로 고정한다. 변이 — 처방 전 코드로 되돌리면(`promotedMetadata.dimension`
+    // 대조를 지우면) 이 test 가 유일하게 잡는다: release 는 일치하지만 metadata 의
+    // dimension 만 응답과 다른 fixture라 `releaseSatisfiesSelector`는 통과하고
+    // dimension 대조만 단독으로 걸린다.
+    @Test
+    fun `latest_promoted 인데 GetEmbeddingMetadata 의 dimension 이 응답과 다르면 ReleaseMismatch 다`() {
+        runBlocking {
+            val release = testEmbeddingModelRelease(releaseId = "r1", artifactChecksum = "c1")
+            val servicer =
+                fixedEmbeddingServicer(
+                    // 응답 Embedding 은 testEmbeddingSuccess() 기본값(dimension=4, values 4개,
+                    // release 일치)이라 release 대조·구조 검증 모두 통과한다.
+                    embedText = protoEmbedResponse(testEmbeddingSuccess().toBuilder().setRelease(release).build()),
+                    // metadata 는 release 는 같지만 dimension 만 5(응답의 4와 다르다)를 낸다.
+                    metadata = embeddingMetadataResponse(release, dimension = 5),
+                )
+            val gateway = gatewayOn(servicer)
+
+            val outcome =
+                gateway.embed(
+                    testEmbedTextRequest(releaseSelector = ModelReleaseSelector.LatestPromoted),
+                    CallBudget(Duration.ofSeconds(1)),
+                )
+
+            outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+            outcome.reason shouldBe EmbeddingUnavailableReason.ReleaseMismatch
+        }
+    }
+
     @Test
     fun `exact_release 요청은 GetEmbeddingMetadata 를 부르지 않는다`() {
         runBlocking {
