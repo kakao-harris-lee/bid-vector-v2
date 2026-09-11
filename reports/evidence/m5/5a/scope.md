@@ -60,7 +60,12 @@ M2 `2a/scope.md`(골격)·`2d/scope.md` D-2D-4 · 조사 노트 02.
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시.
+`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시 없음. 리뷰 요청 시점(2026-09-11) 재실행: 하네스 경로 커밋 **없음**.
+
+**range 에 섞인 slice 밖 커밋(사실 선언)**: `bfcc100` `reports/evidence/m4/4b6a/commands.md` 한 줄 — 종결된 4B-6a 의 evidence 산문이 누출 어휘
+여섯을 인용해, `origin/main` PR #5 가 배선한 `leakPatternGate`(`reports/evidence/` 스캔, baseline 밖 새 매치 = 실패)에 잡혔다(버릴 clone
+병합 대조 실측 `reports/evidence/m4/4b6a/commands.md:33`). baseline(줄 번호 기반 — 낡는 좌표) 등재 대신 문장을 패턴 파일 참조로 고쳤다.
+5A in_scope 밖이며 rollback 대상이 아니다. 로컬 `main` 이 push 전이라 5A 브랜치에 얹었다.
 
 ---
 
