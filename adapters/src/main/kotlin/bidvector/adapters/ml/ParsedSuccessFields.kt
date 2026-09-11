@@ -49,7 +49,7 @@ private fun isAcceptableSuccessShape(success: Success): Boolean {
             success.uncertainty.sampleSize >= 1,
             hasExactlyThreeOrderedCandidates(success),
             success.candidatesList.all { it.origin == BidRateOrigin.BID_RATE_ORIGIN_RECOMMENDED },
-            hasNonBlankRelease(success),
+            hasNonBlankRelease(success.release),
             hasOrderedCandidateRates(success),
         )
     return checks.all { it }
