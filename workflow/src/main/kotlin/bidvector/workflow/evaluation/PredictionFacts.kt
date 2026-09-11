@@ -43,7 +43,14 @@ internal fun predictionRequestFor(
         correlationId = correlationId,
     )
 
-/** fitness 가 [0,1] 밖이면 예측 응답 전체를 못 믿는 것으로 보고 두 성분 다 drop 한다. */
+/**
+ * fitness 가 [0,1] 밖이거나 `candidates.base`(D-4B6B-6 로 `recommendedRate`·`predictedRate`
+ * 둘 다 이 값이다)가 `MarginInputs.init`의 `≤ 1` 술어를 못 만족하면 예측 응답 전체를 못
+ * 믿는 것으로 보고 두 성분 다 drop 한다(verifier r1 F-1) — `MarginInputs`를 짓기 **전에**
+ * 그 생성자의 세 술어(recommendedRate·predictedRate·floorRate 각 `fraction ≤ 1`) 중
+ * `candidates.base`에서 오는 둘을 여기서 막는다. `floorRate`는 `Notice`가 주는 별도 축이라
+ * [expectedMarginFact]가 그 관문을 진다(D-4B6B-4 — floorRate 문제는 margin 만 drop).
+ */
 internal fun predictedFacts(
     predicted: BidPredictionOutcome.Predicted,
     baseAmount: BaseAmount,
@@ -53,6 +60,9 @@ internal fun predictedFacts(
 ): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> {
     val fitnessValue = predicted.fitness.score
     if (fitnessValue < BigDecimal.ZERO || fitnessValue > BigDecimal.ONE) {
+        return absentPair(MlUnavailableReason.ContractViolation)
+    }
+    if (predicted.candidates.base.fraction > BigDecimal.ONE) {
         return absentPair(MlUnavailableReason.ContractViolation)
     }
     val priceFitness = UnitScore(fitnessValue)
