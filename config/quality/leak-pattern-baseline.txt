@@ -294,3 +294,15 @@ reports/evidence/m4/4e/commands.md:235
 reports/evidence/m4/4e/commands.md:236
 reports/evidence/m4/4e/commands.md:242
 reports/evidence/m4/4e/commands.md:246
+
+# --- 2026-09-11 추가(PR #5, 게이트 배선 직후 라운드) ---
+# 셋 다 **이 게이트 자신을 서술하다 걸린 자기참조**다. 실제 값이 아니라, 무엇이 탐지
+# 대상인지를 설명하는 산문·판별 규칙 서술이다. 육안 확인 완료:
+#  - 4d2/checklist.md:64  — 스캔 범위를 좁힌 근거를 적으며 정당한 인증 헤더 생성 자리를
+#    예로 든 문장(세션 모델 작성)
+#  - 4e/commands.md:280   — 「게이트가 이 두 좌표에서 FAILED 했다」는 보고 문장 자신
+#  - pr5/codex-*.preflight.json:27 — codex 방출 계수의 CLI echo 판별 규칙 서술
+# M0 가 겪은 「스캐너가 자기 출력을 스캔한다」와 같은 재귀이고, baseline 이 그 처분 자리다.
+reports/evidence/m4/4d2/checklist.md:64
+reports/evidence/m4/4e/commands.md:280
+reports/evidence/m4/pr5/codex-review-20260911T101524Z.preflight.json:27
