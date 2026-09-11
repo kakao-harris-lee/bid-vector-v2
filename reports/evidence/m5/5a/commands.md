@@ -1,52 +1,72 @@
 # M5/5A — commands.md
 
-base `d281329bed7f095a3d98eaaa5eecb06afd0d5969` · 계약 커밋 `b00e9299bb9dec48ea9604ac8b53ef1084c1c701`
-(scope.md 착수판). 로컬: `uv 0.9.22`(Homebrew), pyenv `3.12.2`(`uv python pin 3.12`가 선택,
-`.python-version` 요구는 `3.12` 두 자리 일치면 충분 — S-9). 아래는 2026-09-11 실측 재실행
-(모든 명령 `cd ml-engine &&` 생략, 실제로는 그 안에서 실행).
+base `d281329bed7f095a3d98eaaa5eecb06afd0d5969` · 계약(착수+r1 뒤 갱신) 최신 `18ddc1d`
+· 수정 라운드 1 최종 코드 커밋 `fdb1d52e4b6b510ee34e75f4e5e95c59abbb3814`. 로컬:
+`uv 0.9.22`(Homebrew), pyenv `3.12.2`(`.python-version` 요구는 `3.12` 두 자리 일치면
+충분 — S-9). 아래는 **2026-09-11 verifier r1 수정 라운드 뒤 실측 재실행**(모든 명령
+`cd ml-engine &&` 생략, 실제로는 그 안에서 실행). 이전 판(F-6·F-7)의 부정확한 서술은
+아래 「r1 에서 정정된 것」에서 사실만 남긴다 — 옛 raw 출력을 다시 베끼지 않는다.
 
 ## S-1 ~ S-9 (scope.md acceptance_commands 순서)
 
 | # | 명령(요약) | exit | 핵심 한 줄 |
 | --- | --- | --- | --- |
-| S-1 | `uv sync --frozen --all-extras` | 0 | 32개 패키지 설치(재실행 시 `Audited` — 변경 없음) |
+| S-1 | `uv sync --frozen --all-extras` | 0 | `Audited 33 packages`(변경 없음, 재실행) |
 | S-1b | `uv sync --frozen --extra serving --no-dev` + 5개 import 실패 확인 + S-1 복구 | 0 | sqlalchemy·psycopg·requests·httpx·celery 전부 `ModuleNotFoundError`(부재 확인) |
-| S-2a | `uv run ruff check .` | 0 | All checks passed! |
-| S-2b | `uv run ruff format --check .` | 0 | 15 files already formatted |
+| S-2a | `uv run ruff check .` | 0 | All checks passed!(`tests/gates/**` 포함 34개 파일 스캔 대상 — F-4 수정 뒤 `--show-files` 로 확인) |
+| S-2b | `uv run ruff format --check .` | 0 | `34 files already formatted` |
 | S-3 | `uv run mypy --strict src/ml_engine` | 0 | Success: no issues found in 10 source files |
-| S-4 | `uv run lint-imports` | 0 | Contracts: 5 kept, 0 broken |
-| S-5 | `uv run python -m pytest tests -q` | 0 | 152 passed in 3.00s(2A~2E 125 + 게이트 27, 회귀 0) |
+| S-4 | `uv run lint-imports` | 0 | Contracts: 5 kept, 0 broken(「bidvector 직접 import 금지 — contracts 재수출(간접)은 허용」 계약 포함) |
+| S-5 | `uv run python -m pytest tests -q` | 0 | **156 passed**(2A~2E 125 + 게이트 31, 회귀 0 — `--collect-only`로 156 재확인) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 0 | 설계 래칫 위반 없음 (대상 0개 파일 중 allowlist 밖 위반 0) |
-| S-7 | `reuse_provenance_check.py` (+ `--evidence tests/gates/fixtures/reuse-mismatch.md` 양성 대조) | 0 | 1차: 「재활용 출처 두 자리 일치 — 위반 0」 · 2차(양성 대조): 「불일치 1건」 exit 1 → `!`로 성공 |
-| S-8 | `./gradlew --no-build-cache --no-daemon clean check`(저장소 루트) | 0 | BUILD SUCCESSFUL in 46s, 345 actionable tasks — Kotlin 무영향 |
+| S-7 | `reuse_provenance_check.py` + 양성 대조 둘(`reuse-mismatch.md`·`reuse-claims-fake-pointer.md`) | 0 | 정상: 위반 0 · 값 어긋남 양성: exit 1(`docstring(...) != evidence(...)`) · 포인터 없음 양성(F-3 신규): exit 1(`evidence 에는 있으나 모듈 docstring 에 Reuse 포인터가 없다`) |
+| S-8 | `./gradlew --no-build-cache --no-daemon clean check`(저장소 루트) | 0 | BUILD SUCCESSFUL in 52s, 345 actionable tasks — Kotlin 무영향 |
 | S-9 | python 버전 두 자리 대조(`.python-version` vs `requires-python`) | 0 | assert 통과(출력 없음) |
 
-## 알려진 함정 실측 — 설계 문면과 어긋난 지점 (구현 중 발견, 코드로 흡수함)
+## verifier r1 finding 별 재현 명령·결과
 
-- **grimp 세그폴트**: `ml_engine/contracts/_generated/`가 디스크에 **전혀 없으면**(fresh
-  checkout) `uv run lint-imports`가 exit 139(SIGSEGV)로 죽는다. 빈 디렉터리만 있으면
-  정상 동작(exit 0/1). `.gitkeep`으로 디렉터리 자체를 항상 존재시켜 해소
-  (`.gitignore`·`ml-engine/src/ml_engine/contracts/_generated/.gitkeep`).
-- **protoc 절대 import**: D-5A-0(b) 원문의 `from ._generated.bidvector.ml.v1 import …`(상대
-  import)는 `ModuleNotFoundError: No module named 'bidvector'`로 깨진다 — protoc 생성
-  코드가 형제 proto 를 항상 절대 import(`from bidvector.ml.v1 import …`)로 참조하기
-  때문(예: `embedding_pb2.py`가 `common_pb2`를 그렇게 부른다). `contracts/__init__.py`는
-  2A~2E 와 같은 관례(생성 디렉터리를 `sys.path`에 얹고 절대 import)로 바꿨다 — 생성
-  위치·gitignore 경계·재수출 하나만 허용이라는 결정의 **의도**는 그대로다(파일 상단
-  구현 노트에 근거 기록).
-- **import-linter 옵션 둘 신규 발견**: `include_external_packages = true`(external
-  forbidden module 이 있으면 필수) · `ignore_imports`는 실제 import edge 가 있어야
-  한다(`ml_engine.serving.grpc`가 5A 시점엔 없어 넣으면 exit 1 — 5E 가 만들 때 추가하도록
-  `pyproject.toml` 주석·`checklist.md` OPEN 에 남김).
-- **ruff select 확장의 부작용**: `N`(pep8-naming) 없이는 2A~2E 의 `# noqa: N802`가
-  "미사용"(RUF100)이 되어 편집 금지 파일이 위반한다 — `N`을 select 에 추가해 해소.
-  반대로 `PLC0415`를 추가하면 2A~2E 의 다른 지연 import 17곳이 새로 위반해 **추가하지
-  않았다**(대신 `ruff format`이 그 파일들에 요구하는 폭이 기존 서식과 달라 `tests/*.py`
-  직계만 `extend-exclude`로 뺐다 — `ruff check`는 이미 0 위반이었다).
-- **mypy 캐시 staleness**: `.mypy_cache`가 남아 있으면 `_generated` 존재 여부가 바뀐
-  뒤에도 이전 결과가 재사용돼 혼란스러운 에러가 난다 — evidence 재실행은 항상
-  `rm -rf .mypy_cache` 뒤에 했다(`.gitignore`로 이미 제외됨, CI 는 매번 새 러너라 해당 없음).
+- **F-1(high)**: `printf 'from ml_engine.contracts import common_pb2\n' >
+  src/ml_engine/serving/_probe.py && uv run lint-imports` → **수정 전 exit 1**(BROKEN,
+  간접 연쇄까지 닫힘) → **수정 후 exit 0**(`Contracts: 5 kept, 0 broken`,
+  `allow_indirect_imports = true`). 양성 대조: `tests/gates/fixtures/good_serving/`
+  (KEPT) · `tests/gates/fixtures/bad_contracts_bypass/`(직접 import 는 계속 BROKEN —
+  F-1 수정이 F-2 방어를 안 되돌림을 확인).
+- **F-2(high)**: `printf 'from ml_engine.contracts._generated.bidvector.ml.v1 import
+  common_pb2\n' > src/ml_engine/serving/_probe.py && uv run python -c "import
+  ml_engine.serving._probe"` → **수정 전**: 성공(런타임 import 도 됨) → **수정 후**:
+  `ModuleNotFoundError: No module named 'ml_engine.contracts._generated'`(`.contracts-
+  generated/`가 패키지 트리 밖으로 옮겨져 그 경로 자체가 없다). `lint-imports` 도 5
+  kept 0 broken 불변(문제였던 정적 우회 자체가 구조적으로 사라짐).
+- **F-3(medium)**: `uv run python tools/reuse_provenance_check.py --evidence
+  tests/gates/fixtures/reuse-claims-fake-pointer.md` → **수정 전 exit 0**(포인터 없는
+  이식본을 못 봄) → **수정 후 exit 1**(`evidence 에는 있으나 모듈 docstring 에 Reuse
+  포인터가 없다` — 양방향 대조).
+- **F-4(medium)**: `uv run ruff check --show-files . | grep tests/gates` → **수정
+  전**: 0줄(전부 제외) → **수정 후**: 19줄(게이트 test·fixtures 전부 스캔 대상).
+- **F-5(medium)**: `actions/setup-python@v6`(v5=node20→v6=node24)·
+  `astral-sh/setup-uv@v7`(v6=node20→v7=node24) — GitHub API 로 각 액션의
+  `action.yml`(`using:`) 실측, Node24 를 만족하는 가장 낮은 major로 고정.
+- **F-8(low)**: `[[tool.design-ratchet.allowlist]]` 블록을 `allowlist = []`(inline)와
+  같이 두고 `uv run python tools/design_ratchet.py --check` → **수정 전**: `TOML parse
+  error ... duplicate key`, exit 2(`uv` 자체가 `pyproject.toml` 파싱에 실패 —
+  `ruff`·`mypy`·`pytest` 등 `uv run` 전체가 깨짐) → **수정**: `allowlist = []` 제거,
+  `[[tool.design-ratchet.allowlist]]` array-of-tables 만 쓰도록 주석 정정(항목 0 은
+  키 부재로 표현, `test_allowlist_is_empty_at_5a` 불변으로 재확인).
+
+## r1 에서 정정된 것 (F-6·F-7 — 이전 판 evidence 자체의 오류)
+
+- **F-6 — 「`_generated/` 없으면 세그폴트」 서술은 틀렸다.** 그 관찰은 **옛 상대 import
+  코드**(`from ._generated.bidvector.ml.v1 import …`, D-5A-0 (b) 원문 그대로 첫 시도)
+  기준이었다. F-1/F-2 수정으로 `contracts/__init__.py`가 `sys.path` 삽입 + 절대
+  import(`from bidvector.ml.v1 import …`)로 바뀌었고, 생성 위치도 패키지 트리 밖으로
+  옮겨졌다 — 현재 코드는 `.contracts-generated/`가 **아예 없어도** `lint-imports`가
+  정상 exit(0 또는 1, 세그폴트 없음). `.gitignore`·`checklist.md`·이 파일의 해당
+  서술을 삭제했다(`.gitkeep`도 필요 없어져 제거).
+- **F-7 — 이전 판의 수치 둘이 실측과 달랐다.** 「15 files」(당시 게이트 test 가
+  `extend-exclude`에 가려 스캔 밖이라 더 적게 잡혔다) → 이번 판은 34(F-4 수정 뒤)
+  · 「32개 패키지」→ 실측은 처음부터 `uv sync` 출력이 `Audited 33 packages`(설치
+  33개, 텍스트 오기). 이번 판은 재실행 원문을 그대로 옮겼다.
 
 ## rollback 실측
 
-`reports/evidence/m5/5a/rollback.md` 정본.
+`reports/evidence/m5/5a/rollback.md` 정본(이번 라운드 코드 커밋 4개 목록으로 재산출).
