@@ -9,6 +9,7 @@ import bidvector.workflow.prediction.ModelReleaseSelector
 import contract.bidvector.ml.v1.EmbedTextResponse
 import contract.bidvector.ml.v1.Embedding
 import contract.bidvector.ml.v1.EmbeddingServiceGrpcKt
+import contract.bidvector.ml.v1.FailureCode
 import contract.bidvector.ml.v1.GetEmbeddingMetadataRequest
 import contract.bidvector.ml.v1.GetEmbeddingMetadataResponse
 import contract.bidvector.ml.v1.ModelRelease
@@ -104,6 +105,18 @@ internal fun fixedEmbeddingServicer(
         override suspend fun getEmbeddingMetadata(request: GetEmbeddingMetadataRequest): GetEmbeddingMetadataResponse =
             metadata ?: error("이 test 는 GetEmbeddingMetadata 응답을 배선하지 않았다")
     }
+
+/** application failure 응답 배선(consumer test 공용, `GrpcEmbeddingGatewayTest`·`EmbeddingBreakerTest` 공유). */
+internal fun embeddingFailureResponse(
+    code: FailureCode,
+    retryable: Boolean,
+): EmbedTextResponse =
+    EmbedTextResponse
+        .newBuilder()
+        .also {
+            it.failureBuilder.code = code
+            it.failureBuilder.retryable = retryable
+        }.build()
 
 internal fun embeddingMetadataResponse(promoted: ModelRelease): GetEmbeddingMetadataResponse =
     GetEmbeddingMetadataResponse

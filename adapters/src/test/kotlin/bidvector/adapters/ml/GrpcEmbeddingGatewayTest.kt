@@ -394,14 +394,3 @@ private fun throwingEmbeddingServicer(
         override suspend fun getEmbeddingMetadata(request: GetEmbeddingMetadataRequest): GetEmbeddingMetadataResponse =
             error("이 test 는 GetEmbeddingMetadata 를 부르지 않는다")
     }
-
-private fun embeddingFailureResponse(
-    code: FailureCode,
-    retryable: Boolean,
-): EmbedTextResponse =
-    EmbedTextResponse
-        .newBuilder()
-        .also {
-            it.failureBuilder.code = code
-            it.failureBuilder.retryable = retryable
-        }.build()
