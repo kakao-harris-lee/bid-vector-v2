@@ -68,19 +68,12 @@ abstract class LeakPatternGateTask : DefaultTask() {
 
     @TaskAction
     fun gate() {
-        val patterns =
-            patternsFile
-                .get()
-                .asFile
-                .readLines()
-                .map(String::trim)
-                .filter { it.isNotEmpty() && !it.startsWith("#") }
-                .map { Regex(it, RegexOption.IGNORE_CASE) }
+        val patterns = parseLeakPatterns(patternsFile.get().asFile.readLines())
         if (patterns.isEmpty()) {
             throw GradleException("leak-patterns.txt 에 패턴이 하나도 없다 — 게이트가 공허하게 통과한다")
         }
 
-        val baseline = readLineSet(baselineFile.get().asFile)
+        val baseline = parseLeakBaseline(baselineFile.get().asFile.readLines())
         val excluded = excludedFileNames.get()
         val root = repoRoot.get().asFile
 
@@ -92,69 +85,20 @@ abstract class LeakPatternGateTask : DefaultTask() {
 
         val matches =
             files
-                .flatMap { file -> matchesIn(file, root, patterns) }
-                .toSortedSet()
+                .flatMap { file ->
+                    val relative = file.relativeTo(root).path.replace(File.separatorChar, '/')
+                    leakMatchesInFile(relative, file.readLines(), patterns)
+                }.toSortedSet()
 
-        val newMatches = (matches - baseline).sorted()
-        val staleBaseline = (baseline - matches).sorted()
+        val newMatches = newLeakMatches(matches, baseline)
+        val staleBaseline = staleLeakBaselineEntries(matches, baseline)
 
-        writeReport(patterns.size, baseline.size, matches.size, newMatches, staleBaseline)
-        failOn(newMatches)
-    }
-
-    private fun matchesIn(
-        file: File,
-        root: File,
-        patterns: List<Regex>,
-    ): List<String> {
-        val relative = file.relativeTo(root).path.replace(File.separatorChar, '/')
-        return file
-            .readLines()
-            .withIndex()
-            .filter { (_, line) -> patterns.any { it.containsMatchIn(line) } }
-            .map { (index, _) -> "$relative:${index + 1}" }
-    }
-
-    private fun readLineSet(file: File): Set<String> =
-        file
-            .readLines()
-            .map(String::trim)
-            .filter { it.isNotEmpty() && !it.startsWith("#") }
-            .toSet()
-
-    private fun failOn(newMatches: List<String>) {
-        if (newMatches.isEmpty()) return
-        throw GradleException(
-            newMatches.joinToString(
-                prefix =
-                    "leak-patterns.txt 매치가 baseline 밖에서 새로 나타났다 — 실제 유출이면 값을 제거하고, " +
-                        "검토된 오탐(패턴 어휘 인용 등)이면 config/quality/leak-pattern-baseline.txt 에 등재하라:\n  ",
-                separator = "\n  ",
-            ),
-        )
-    }
-
-    private fun writeReport(
-        patternCount: Int,
-        baselineCount: Int,
-        matchCount: Int,
-        newMatches: List<String>,
-        staleBaseline: List<String>,
-    ) {
-        val lines =
-            listOf(
-                "patterns=$patternCount",
-                "baseline=$baselineCount",
-                "matches=$matchCount",
-                "new=${newMatches.size}",
-            ) + newMatches.map { "new: $it" } +
-                listOf("stale_baseline=${staleBaseline.size}") +
-                staleBaseline.map { "stale: $it" }
-        val text = lines.joinToString(separator = "\n", postfix = "\n")
         report
             .get()
             .asFile
             .apply { parentFile.mkdirs() }
-            .writeText(text)
+            .writeText(leakGateReportText(patterns.size, baseline.size, matches.size, newMatches, staleBaseline))
+
+        leakGateViolation(newMatches)?.let { throw GradleException(it) }
     }
 }
