@@ -14,18 +14,20 @@ git log --oneline 786febe39469835a45e9a1c6d6e8081226777364..HEAD -- \
   config/quality/gate-tests.properties milestone-4.md
 ```
 
-결과 — 이 브랜치의 커밋(`40997a1` 하나)만 나온다. 따라서 hunk 단위 격리 없이 **전체
-restore로 충분하다**(4B-5 rollback.md와 같은 판단 근거).
+결과 — 이 브랜치의 커밋(`40997a1`·`8c0a9df` 둘, verifier r1 F-1/F-3 반영분 포함)만
+나온다. 따라서 hunk 단위 격리 없이 **전체 restore로 충분하다**(4B-5 rollback.md와 같은
+판단 근거).
 
 ## 하네스 레인 변경 확인
 
 `git log --oneline 786febe39469835a45e9a1c6d6e8081226777364..HEAD -- CLAUDE.md .claude/`
 — **없음**(scope.md 「하네스 레인 변경」 절과 일치).
 
-## 대상 파일 목록(기계적으로 냄)
+## 대상 파일 목록(기계적으로 냄, verifier r1 F-1/F-3 반영 커밋 `8c0a9df` 뒤 재산출)
 
-`git diff --name-status 786febe39469835a45e9a1c6d6e8081226777364..HEAD` 출력(evidence
-커밋 포함 최종 상태 기준):
+`git diff --name-status 786febe39469835a45e9a1c6d6e8081226777364..8c0a9df8f29c79664278cf54aab37824ef3237f4`
+출력(F-1/F-3 반영 커밋까지 기준 — 이 문서를 갱신하는 evidence 커밋 자신은 아직
+포함하지 않는다):
 
 ```
 M  config/quality/gate-tests.properties
@@ -45,9 +47,10 @@ A  workflow/src/test/kotlin/bidvector/workflow/evaluation/ProfilePortsTest.kt
 A  workflow/src/test/kotlin/bidvector/workflow/evaluation/TextSynthesisTest.kt
 ```
 
-`A` 12 · `M` 2. `reports/evidence/m4/4b6a/scope.md`는 팀장이 착수 계약으로 먼저 커밋한
-파일이라(이 레인이 작성하지 않음) 목록에 있지만, 코드만 되돌리고 계약은 유지하려면
-아래 명령에서 그 파일 하나만 빼면 된다.
+`A` 12 · `M` 2 — **F-1/F-3 반영 전(3fb22e4 기준)과 파일 수 불변**(F-1/F-3 수정은 기존
+파일 넷의 내용만 바꿨고 새 경로를 만들지 않았다). `reports/evidence/m4/4b6a/scope.md`는
+팀장이 착수 계약으로 먼저 커밋한 파일이라(이 레인이 작성하지 않음) 목록에 있지만,
+코드만 되돌리고 계약은 유지하려면 아래 명령에서 그 파일 하나만 빼면 된다.
 
 ## 되돌리는 방법
 
@@ -83,16 +86,18 @@ out_of_scope, 4B-6b·4D-2도 마찬가지로 건드리지 않음).
 
 수 분(명령 1회, 신설 파일 열두 개 삭제뿐 — 공유 파일 hunk 충돌 없음).
 
-## 임시 clone 실측(마지막 코드 커밋 뒤, 이 문서 커밋 직전 상태로 재확인)
+## 임시 clone 실측(verifier r1 F-1/F-3 반영 커밋 `8c0a9df` 뒤 재실측)
 
 - `git clone --no-hardlinks . <tmp-dir> && cd <tmp-dir> && git checkout m4-4b6a/2026-09-11`
-- 위 restore 명령 실행(디렉터리 경로 버전) → `git status --porcelain` `D` 12(main 4·test
-  4·evidence 4, `scope.md`는 팀장 파일이라 유지)/`M` 2(`gate-tests.properties`·
-  `milestone-4.md`) — 위 「대상 파일 목록」과 일치(디렉터리 대신 evidence 넷을 개별
-  나열한 버전으로 재현, `scope.md` 보존 확인).
+  → HEAD `8c0a9df8f29c79664278cf54aab37824ef3237f4` 확인.
+- 위 restore 명령 실행(evidence 넷 개별 나열 버전) → `git status --porcelain` `D`
+  12(main 4·test 4·evidence 4, `scope.md`는 팀장 파일이라 유지)/`M` 2
+  (`gate-tests.properties`·`milestone-4.md`) — 위 「대상 파일 목록」과 일치, F-1/F-3
+  반영 전 실측과 개수 동일.
 - `git diff 786febe39469835a45e9a1c6d6e8081226777364 -- <같은 경로들>` — 0줄(base와
   완전 일치, `scope.md` 제외 경로에서).
 - 되돌린 트리에서 `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin
   :workflow:test :workflow:gateExecutionGate` — `BUILD SUCCESSFUL`, 기존 evaluation
-  패키지 test(4B-1·4B-2·4B-3 관련) 전부 통과, 신설 25 test 소멸(`No tests found`가 아니라
-  파일 자체가 없어 대상에서 빠짐을 컴파일 성공으로 확인). 임시 clone은 실측 뒤 삭제.
+  패키지 test(4B-1·4B-2·4B-3 관련) 전부 통과, 신설 29 test(F-1 둘·F-3 둘 포함) 소멸
+  (`No tests found`가 아니라 파일 자체가 없어 대상에서 빠짐을 컴파일 성공으로 확인).
+  임시 clone은 실측 뒤 삭제.

@@ -63,11 +63,38 @@ base_sha: `786febe39469835a45e9a1c6d6e8081226777364`
 - cmd: `git worktree remove --force <scratchpad>/s0-worktree`
 - exit: 0 — worktree 제거 확인, `git worktree list`에 잔여 없음.
 
+## verifier r1 반영(F-1 medium·F-3 low) — 커밋 `8c0a9df` 뒤 재검증
+
+- cmd: `./gradlew --no-daemon :workflow:test --tests 'bidvector.workflow.evaluation.*'`
+- exit: 0 — 신설 F-1 test 둘(NOTICE·PROFILE) + F-3 test 둘(단어 내부 매치·공백 삽입
+  불일치) 포함 전건 GREEN.
+- cmd: `./gradlew --no-build-cache --no-daemon clean check` (1차, F-1/F-3 반영 직후)
+- exit: 1 — `detekt`가 `synthesize`의 `return` 3개(`ReturnCount` 한도 2 초과)를 잡음.
+  `truncated: String?` 중간값 + `isNullOrBlank()` 단일 `return`으로 재구성(로직 동일).
+- cmd: `./gradlew --no-build-cache --no-daemon clean check` (2차, 재구성 뒤)
+- exit: 0 — `BUILD SUCCESSFUL in 59s`, 345 actionable tasks(321 executed).
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt workflow/src/main/kotlin/bidvector/workflow/evaluation; test $? -eq 1`
+- exit: 0(매치 0건) — F-1/F-3 반영분에도 비밀값 단어 없음.
+
+## rollback 재실측(`8c0a9df` 기준, 임시 clone)
+
+- cmd: `git clone --no-hardlinks . <tmp> && cd <tmp> && git checkout m4-4b6a/2026-09-11`
+- exit: 0 — HEAD `8c0a9df8f29c79664278cf54aab37824ef3237f4` 확인.
+- cmd: rollback.md의 `git restore --source=786febe3… --staged --worktree -- <14경로>`
+- exit: 0 — `git status --porcelain` `D` 12 / `M` 2(F-1/F-3 반영 전과 파일 수 동일).
+- cmd: `git diff 786febe39469835a45e9a1c6d6e8081226777364 -- <같은 경로들>`
+- exit: 0, 출력 0줄(base와 완전 일치).
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin :workflow:test :workflow:gateExecutionGate`
+- exit: 0 — `BUILD SUCCESSFUL`(되돌린 트리에서 기존 evaluation test 전부 통과, 신설
+  29 test는 파일 소멸로 대상에서 빠짐). 임시 clone 삭제 확인.
+
 ## 커밋
 
 - `f8177fd` — main 넷 + test 넷(feat).
 - `40997a1` — `gate-tests.properties`(4줄)·`milestone-4.md`(4B-6a 착수 문단, docs).
-- (이 커밋) — evidence 넷.
+- `3fb22e4` — evidence 넷(checklist·commands·policy-values·rollback).
+- `8c0a9df` — verifier r1 F-1(medium)/F-3(low) 반영(fix, 코드+test).
+- (이 커밋) — evidence 갱신(checklist head_sha·F-1/F-2/F-3 등재, rollback 재산출).
 
 경로 명시 `git add`/`git commit -- <경로들>`로 커밋(전체 add 금지) — 각 커밋 직후
 `git diff --cached --name-status`로 스테이징 대조.
