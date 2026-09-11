@@ -124,6 +124,84 @@ class EmbeddingShapeFailClosedTest {
         }
     }
 
+    // ---- verifier F-4(medium) — values 개수 경계(probe 로만 확인됐던 두 case) ----
+
+    @Test
+    fun `values 개수가 dimension 보다 많으면 예외 없이 ContractViolation 이다`() {
+        runBlocking {
+            val mutated =
+                testEmbeddingSuccess()
+                    .toBuilder()
+                    .also {
+                        it.clearValues()
+                        it.addAllValues(testUnitVector(5))
+                    } // dimension 은 4 그대로(원본 testUnitVector(4) 기준) — valuesCount(5) > dimension(4)
+                    .build()
+            val gateway = gatewayOn(fixedEmbeddingServicer(embedText = protoEmbedResponse(mutated)))
+
+            val outcome =
+                gateway.embed(testEmbedTextRequest(releaseSelector = exactSelector), CallBudget(Duration.ofSeconds(1)))
+
+            outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+            outcome.reason shouldBe EmbeddingUnavailableReason.ContractViolation
+        }
+    }
+
+    @Test
+    fun `values 빈 리스트이고 dimension 0 이면 예외 없이 ContractViolation 이다`() {
+        runBlocking {
+            val mutated = testEmbeddingSuccess().toBuilder().clearValues().setDimension(0).build()
+            val gateway = gatewayOn(fixedEmbeddingServicer(embedText = protoEmbedResponse(mutated)))
+
+            val outcome =
+                gateway.embed(testEmbedTextRequest(releaseSelector = exactSelector), CallBudget(Duration.ofSeconds(1)))
+
+            outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+            outcome.reason shouldBe EmbeddingUnavailableReason.ContractViolation
+        }
+    }
+
+    // ---- verifier F-1(high) — 비유한 float(NaN·±Infinity)이 예외가 아니라 Unavailable 이다 ----
+
+    @Test
+    fun `비유한 float(NaN 양의무한 음의무한)이 섞이면 예외 없이 ContractViolation 이다(table-driven)`() {
+        runBlocking {
+            val nonFiniteCases =
+                listOf(
+                    "NaN 단독" to listOf(Float.NaN, 0f, 0f, 0f),
+                    "양의 Infinity 단독" to listOf(Float.POSITIVE_INFINITY, 0f, 0f, 0f),
+                    "음의 Infinity 단독" to listOf(Float.NEGATIVE_INFINITY, 0f, 0f, 0f),
+                    "NaN + 정상 정규화 성분" to listOf(Float.NaN) + testUnitVector(3),
+                )
+            val currentResponse = AtomicReference<EmbedTextResponse>()
+            val servicer =
+                object : EmbeddingServiceGrpcKt.EmbeddingServiceCoroutineImplBase() {
+                    override suspend fun embedText(request: ProtoEmbedTextRequest): EmbedTextResponse =
+                        currentResponse.get() ?: error("이 test 는 매 case 마다 응답을 미리 심는다")
+
+                    override suspend fun getEmbeddingMetadata(
+                        request: GetEmbeddingMetadataRequest,
+                    ): GetEmbeddingMetadataResponse = error("이 test 는 GetEmbeddingMetadata 를 부르지 않는다")
+                }
+            val gateway = gatewayOn(servicer)
+
+            nonFiniteCases.forEach { (description, values) ->
+                currentResponse.set(protoEmbedResponse(testEmbeddingSuccess(values = values)))
+
+                val outcome =
+                    gateway.embed(
+                        testEmbedTextRequest(releaseSelector = exactSelector),
+                        CallBudget(Duration.ofSeconds(1)),
+                    )
+
+                withClue(description) {
+                    outcome.shouldBeInstanceOf<EmbeddingOutcome.Unavailable>()
+                    outcome.reason shouldBe EmbeddingUnavailableReason.ContractViolation
+                }
+            }
+        }
+    }
+
     @Test
     fun `정확히 L2 정규화된 응답은 정상 Embedded 다(대비 표본)`() {
         runBlocking {
