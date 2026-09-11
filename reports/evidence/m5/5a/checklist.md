@@ -50,6 +50,19 @@
 4. **`tools/design_ratchet.py`가 legacy 의 일부만 이식** — clone 탐지·`json` 직접 호출·
    `ENVIRONMENT` sniff·Celery 미검증 payload 지표는 드롭했다(`reuse.md` 사유). ml-engine 에
    해당 정책·의존이 아직 없어 5B~5E 가 그 축을 만나면 재검토가 필요할 수 있다.
+5. **비-editable 설치에서 `ml_engine.contracts` 재수출이 성립하지 않는다**(verifier r2
+   N-1) — 생성 위치를 패키지 트리 밖 `.contracts-generated/`로 옮긴 결과(F-2), 그 경로는
+   `contracts/__init__.py`가 자기 파일 위치 기준 상대 경로로 찾는다. editable install(5A
+   acceptance 가 쓰는 유일한 설치 형태, `uv sync`)에서는 소스 트리 그대로라 문제 없지만,
+   **`uv build --wheel`**로 만든 wheel 에는 생성 stub 이 0개 실린다(`ml_engine/contracts/
+   __init__.py` 하나뿐, 실측: `zipfile.ZipFile(...).namelist()`에서 `contracts` 관련 항목
+   1개). 그 wheel 을 별도 venv(pyenv 3.12.2)에 설치해 `import ml_engine.contracts`를 하면
+   `_GENERATED_DIR`이 `.../lib/python3.12/.contracts-generated`로 풀려(site-packages 의
+   부모, 소스 트리가 아니다) `ModuleNotFoundError: No module named 'bidvector'`(실측
+   재현). 5A acceptance(S-1~S-9)는 전부 editable 설치만 쓰므로 이 축이 안 드러난다 — 배포
+   형태(wheel/Docker 이미지)는 6C 범위 밖. **5E 가 servicer 를 세우기 전에** 빌드 훅
+   (D-5A-0 (a) 가 제시했던 형태 — 패키지 빌드 시 생성물을 wheel 안 `ml_engine/contracts/`
+   로 넣되 소스 트리(`src/`)에는 두지 않음)이 필요하다 — `OPEN-5A-WHEEL-BUILD-HOOK`.
 
 ## OPEN
 
@@ -58,3 +71,4 @@
 | `OPEN-5A-MYPY-ALLOWLIST` | **초기 — 0건**. 5A 시점 `[[tool.mypy.overrides]]`는 `bidvector.*`(생성 stub 재수출 구조적 예외) 하나뿐, 이식 모듈 strict 예외는 없다 | prep 조사(01_scout_ml_package §a-5)가 `settlement_maturity`(K7)를 1건 후보로 지목했다 — **5D 가 K7 을 이식할 때 갱신**(사유·해소 slice 명시, `test_mypy_allowlist.py`가 주석 강제) |
 | `OPEN-5A-PY-CI` | CI job 신설(이 slice) | 러너 실행 확인은 push 뒤(범위 밖) |
 | `OPEN-5A-SERVING-GRPC-EXCEPTION` | 신설 | 5E 가 `serving/grpc.py` 를 만들 때 `ignore_imports` 한 줄 추가 |
+| `OPEN-5A-WHEEL-BUILD-HOOK` | 신설(verifier r2 N-1) | 5E 가 servicer 를 세우기 전에 빌드 훅(D-5A-0 (a) 형태 — 패키지 빌드 시 생성물을 wheel 안 `ml_engine/contracts/`로 넣되 소스 트리에는 두지 않음)이 필요. 소유 후보 5E 또는 6C |
