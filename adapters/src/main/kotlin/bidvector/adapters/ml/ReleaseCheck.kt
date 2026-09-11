@@ -69,14 +69,18 @@ internal suspend fun <S, Resp, T> fetchPromoted(
             .setRequestId(requestId)
             .setCorrelationId(correlationId)
             .build()
-    val response = metadataOrNull(stub, envelope, invoke) ?: return null
-    val extracted = extract(response) ?: return null
     // verifier r1 F-2(high) (d) — promoted 가 공백(release_id·artifact_checksum 공백)이면
     // 「조회 성공」이 아니라 「대조 불가」로 접는다. 그래야 응답 release 도 공백일 때
     // `releaseSatisfiesSelector` 가 `""==""` 로 통과하는 경로가 막힌다(양쪽 공백이
     // ReleaseMismatch 대신 Predicted/Embedded 로 새던 반례).
-    val release = releaseOf(extracted)
-    return extracted.takeIf { release.releaseId.isNotBlank() && release.artifactChecksum.isNotBlank() }
+    // detekt ReturnCount(≤2) — 조기 반환 둘 대신 nullable chain 하나로 접는다(PR #5
+    // 게이트 시정 리뷰에서 발견, 회귀 없음 — 조건은 그대로).
+    return metadataOrNull(stub, envelope, invoke)
+        ?.let(extract)
+        ?.takeIf { extracted ->
+            val release = releaseOf(extracted)
+            release.releaseId.isNotBlank() && release.artifactChecksum.isNotBlank()
+        }
 }
 
 private suspend fun <S, Resp> metadataOrNull(

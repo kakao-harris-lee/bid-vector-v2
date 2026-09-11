@@ -154,13 +154,21 @@ class GrpcEmbeddingGateway(
                 null
             }
         val promoted: ModelRelease? = promotedMetadata?.promoted
-        if (!releaseSatisfiesSelector(selector.toProto(), success.release, promoted)) {
-            return EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.ReleaseMismatch)
+        // detekt ReturnCount(≤2) — 조기 반환 셋을 단일 when 으로 접는다(PR #5 게이트 시정
+        // 리뷰에서 발견, 검사 순서·값 모두 그대로 — release 대조가 여전히 dimension 대조보다 먼저다).
+        return when {
+            !releaseSatisfiesSelector(selector.toProto(), success.release, promoted) -> {
+                EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.ReleaseMismatch)
+            }
+
+            promotedMetadata != null && !embeddingDimensionMatchesMetadata(success, promotedMetadata) -> {
+                EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.ReleaseMismatch)
+            }
+
+            else -> {
+                mapEmbedSuccess(success, expectedFeatureSchemaVersion)
+            }
         }
-        if (promotedMetadata != null && !embeddingDimensionMatchesMetadata(success, promotedMetadata)) {
-            return EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.ReleaseMismatch)
-        }
-        return mapEmbedSuccess(success, expectedFeatureSchemaVersion)
     }
 
     /** 리뷰 F-E(medium) 처방 — 분류 로직은 `classifyTransportFailure`(`RetryRules.kt`, 예측과 공유), 도메인 사유 매핑만 여기서 한다. */
