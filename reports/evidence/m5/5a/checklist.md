@@ -73,6 +73,12 @@
 | `OPEN-5A-SERVING-GRPC-EXCEPTION` | 신설 | 5E 가 `serving/grpc.py` 를 만들 때 `ignore_imports` 한 줄 추가 |
 | `OPEN-5A-WHEEL-BUILD-HOOK` | 신설(verifier r2 N-1) | 5E 가 servicer 를 세우기 전에 빌드 훅(D-5A-0 (a) 형태 — 패키지 빌드 시 생성물을 wheel 안 `ml_engine/contracts/`로 넣되 소스 트리에는 두지 않음)이 필요. 소유 후보 5E 또는 6C |
 
+6. **conftest 임시 생성의 격리가 `sys.modules` 캐시에 밀린다**(PR #6 리뷰 레인 LOW, 2026-09-12) — 세션 fixture
+   `common_pb2`/`error_pb2` 는 임시 디렉터리에 생성해 `sys.path` 에 얹지만, 게이트 test 가 먼저 `ml_engine.contracts`
+   를 import 해 같은 이름을 `sys.modules` 에 캐시해 두면 fixture 는 `.contracts-generated` 사본을 돌려받는다. 두 생성물은
+   같은 proto 소스라 내용이 같아 결과에 영향은 없다(리뷰어 정적 판독, 수집 순서 실측은 미확정). 해소 후보: fixture 가
+   재수출 패키지를 그대로 쓰도록 conftest 를 단일 생성 경로로 접기 — 5B 가 conftest 를 만질 때.
+
 ## 사용자 승인
 
 **2026-09-11 — slice 5A 종결 승인.** verifier r1 not-ready(high 2·medium 3·low 3) → 수정 커밋 5 → r2 ready-for-review(여덟 전부
