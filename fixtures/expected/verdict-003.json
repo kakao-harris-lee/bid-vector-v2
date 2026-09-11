@@ -1,10 +1,12 @@
 {
   "verdict": "BidNow",
-  "override": {
-    "applied": true,
-    "source": "OPERATOR_STRATEGY_FLAG",
-    "supersededVerdict": "Skip",
-    "supersededReason": "LowPriority"
-  },
-  "overrideHidden": false
+  "reasons": [
+    {
+      "type": "ForceBidOverride",
+      "probability": 0.9,
+      "matched": 0.85,
+      "probabilityThreshold": 0.8,
+      "matchedThreshold": 0.7
+    }
+  ]
 }

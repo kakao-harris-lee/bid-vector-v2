@@ -1,0 +1,4 @@
+{
+  "status": "N/A",
+  "reason": "legacy Python 저장소에 편집 상태 기계 대응물이 없다(조사 노트 _workspace/m4-prep/01_scout_workflow.md — TTL 슬롯 0건·(상태,이벤트) 전이표 0건·invalid transition 개념 자체 부재). 4A 는 이식이 아니라 신설이라 python_result 를 낼 legacy 산출이 없다(data-dictionary.md §2.2.6 「legacy 에 편집 상태 기계는 없다」)."
+}

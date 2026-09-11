@@ -1,0 +1,13 @@
+{
+  "policy": {
+    "matchScoreRange": { "min": 0, "max": 1 },
+    "probabilityScoreRange": { "min": 0, "max": 1 },
+    "priorityScoreRange": { "min": 0, "max": 1 },
+    "budgetBoundInclusivity": "Inclusive",
+    "policyVersion": "test-strategy-edit-policy"
+  },
+  "currentRevision": 1,
+  "field": { "kind": "CandidateLimit" },
+  "draft": { "candidateLimit": 0 },
+  "confirm": false
+}

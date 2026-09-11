@@ -1,0 +1,6 @@
+{
+  "milestone": "m4",
+  "slice": "4b2-application-composition",
+  "manifest_source": "N/A",
+  "note": "N/A — 이 slice는 fixtures/manifest.yaml에 corpus case를 신설하지 않았다. 조합 use case는 fake port로 격리한 단위/속성 test(workflow:test)로 검증하고, S-4(app:test)는 4B-1이 이미 승격한 verdict 12건(86 tests)이 이 slice의 코드 변경으로 무영향임을 재확인하는 회귀 확인일 뿐이다."
+}

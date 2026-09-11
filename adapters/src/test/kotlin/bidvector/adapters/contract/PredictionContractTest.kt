@@ -1,5 +1,6 @@
 package bidvector.adapters.contract
 
+import bidvector.adapters.ml.releaseSatisfiesSelector
 import contract.bidvector.ml.v1.AgencyIdFact
 import contract.bidvector.ml.v1.BaseAmountFact
 import contract.bidvector.ml.v1.BaseAmountProvenanceLabelFact
@@ -422,27 +423,8 @@ class PredictionContractTest {
             )
     }
 
-    private fun releaseSatisfiesSelector(
-        selector: ModelReleaseSelector,
-        responseRelease: ModelRelease,
-        promoted: ModelRelease?,
-    ): Boolean =
-        when (selector.selectorCase) {
-            ModelReleaseSelector.SelectorCase.EXACT_RELEASE -> {
-                responseRelease.releaseId == selector.exactRelease.releaseId &&
-                    responseRelease.artifactChecksum == selector.exactRelease.artifactChecksum
-            }
-
-            ModelReleaseSelector.SelectorCase.LATEST_PROMOTED -> {
-                promoted != null &&
-                    responseRelease.releaseId == promoted.releaseId &&
-                    responseRelease.artifactChecksum == promoted.artifactChecksum
-            }
-
-            ModelReleaseSelector.SelectorCase.SELECTOR_NOT_SET, null -> {
-                false
-            }
-        }
+    // `releaseSatisfiesSelector`는 M4/4D-1(D-4D-3)로 `bidvector.adapters.ml`(main)에
+    // 승격됐다 — 위 import 가 그 실 배선 함수를 그대로 쓴다(단언·case 무변경, scope.md S-3).
 
     private fun isAcceptableObjective(objective: OptimizationObjective): Boolean =
         objective != OptimizationObjective.OPTIMIZATION_OBJECTIVE_UNSPECIFIED &&

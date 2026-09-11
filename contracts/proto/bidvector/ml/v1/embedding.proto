@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+// M2/2E — 임베딩 RPC 계약(M2 완료 뒤 후속, `bidvector.ml.v1` 안 additive). 정본은
+// `reports/evidence/m2/2e/scope.md` D-2E-1~6·위협 모델과 `ADR 0010` D-3(결과 셋과 상태의
+// 분리). `EmbeddingService`는 텍스트를 벡터로 바꾸는 것만 계약한다 — 코사인·kNN·
+// `priority`/`match`/`similarity` 조합은 Kotlin(4B-4·adapters/persistence) 소유다
+// (D-2E-1: 「모델 의존 성분」의 최소 단위는 점수가 아니라 벡터).
+//
+// **`feature_schema_version`의 뜻**(⑥) — 다른 RPC(`prediction.proto`)에서는 모델 학습이
+// 소비한 feature 집합의 version이지만, 여기서는 **텍스트 합성 규약의 version**이다(어느
+// Kotlin 소유 fact를 어떤 순서로 문장에 넣는가 — `OPEN-2E-TEXT-SYNTHESIS`, 4B-4 소유).
+// 이름은 `PredictionEnvelope` 재사용을 위해 그대로 두고 이 주석이 뜻을 고정한다.
+package bidvector.ml.v1;
+
+import "bidvector/ml/v1/common.proto";
+import "bidvector/ml/v1/error.proto";
+import "bidvector/ml/v1/prediction.proto";
+
+option java_package = "contract.bidvector.ml.v1";
+option java_multiple_files = true;
+
+// 임베딩 대상 텍스트의 출처 축 — 공고 원문 합성 텍스트인가 사업자 프로필 합성 텍스트인가
+// (합성 규약 자체는 Kotlin 소유, D-2E-5). `TEXT_KIND_UNSPECIFIED`는 거부한다(⑥).
+enum TextKind {
+  TEXT_KIND_UNSPECIFIED = 0;
+  TEXT_KIND_NOTICE = 1;
+  TEXT_KIND_OPERATOR_PROFILE = 2;
+}
+
+// 벡터 정규화 방식 — 지금은 L2 하나뿐(코사인 = 내적, scope.md ②). 값을 늘리려면 additive
+// enum 값 추가(D-2E 범위 밖의 후속 결정)로 한다. `VECTOR_NORMALIZATION_UNSPECIFIED`는
+// 거부한다(⑥).
+enum VectorNormalization {
+  VECTOR_NORMALIZATION_UNSPECIFIED = 0;
+  VECTOR_NORMALIZATION_L2 = 1;
+}
+
+// `EmbedText` 요청 — 텍스트 하나 + 종류 + `PredictionEnvelope`(release 선택자 재사용,
+// common.proto). 배치(`repeated text`)는 두지 않는다(설계 검토 (3) — 측정된 필요 없음,
+// 후보 순회는 4B-3처럼 순차다).
+message EmbedTextRequest {
+  PredictionEnvelope envelope = 1;
+  string text = 2;
+  TextKind kind = 3;
+}
+
+// 임베딩 결과 — `values`는 정확히 `dimension`개(D-2E-1, 위협 모델 우회 (1)). `dimension`
+// 수치 자체는 계약이 정하지 않는다(모델이 바뀌면 값만 바뀐다) — client가 `values.size`와
+// 대조한다. `release`는 다섯 성분 모두 비공백이어야 한다(4D-1 `hasNonBlankRelease`와 같은
+// 규칙, 우회 (6)). 점수·판정 필드는 여기 없다(D-2E-1, 위협 모델 방어 (e)).
+message Embedding {
+  repeated float values = 1;
+  uint32 dimension = 2;
+  VectorNormalization normalization = 3;
+  ModelRelease release = 4;
+}
+
+// `EmbedText` 응답 — 결과 봉투 둘뿐(`Unmeasurable` 가지가 없다, scope.md ① — 임베딩에는
+// "측정 불가"인 도메인 결과가 없다. `GetModelMetadata`와 같은 판단). 빈/공백 텍스트·상한
+// 초과·`TextKind`/`ModelReleaseSelector` 위반은 `ApplicationFailure(INVALID_REQUEST)`,
+// 미지 `feature_schema_version`은 `ApplicationFailure(UNSUPPORTED_SCHEMA)`다(④).
+message EmbedTextResponse {
+  oneof result {
+    Embedding success = 1;
+    ApplicationFailure failure = 2;
+  }
+}
+
+// `GetEmbeddingMetadata` 요청 — 선택자가 없다(`GetModelMetadataRequest`와 같은 이유,
+// prediction.proto ⑧ — 이 RPC 자체가 "지금 승격된 release가 무엇인가"를 알아내는 자리).
+message GetEmbeddingMetadataRequest {
+  RequestEnvelope envelope = 1;
+}
+
+// 승격 release · 차원 · 지원 텍스트 종류 · 서빙 준비 상태. `EmbedTextResponse.success.release`가
+// `latest_promoted` 선택자로 왔을 때 client가 이 메시지의 `promoted`와 대조한다
+// (`releaseSatisfiesSelector`, `OPEN-2A-RELEASE-CHECK-4D`와 같은 규칙을 4D-2가 재사용).
+message EmbeddingMetadata {
+  ModelRelease promoted = 1;
+  uint32 dimension = 2;
+  repeated TextKind supported_text_kinds = 3;
+  Readiness readiness = 4;
+}
+
+// `GetEmbeddingMetadata` 응답 — `GetModelMetadataResponse`와 같은 결과 봉투 패턴
+// (`Unmeasurable` 가지 없음).
+message GetEmbeddingMetadataResponse {
+  oneof result {
+    EmbeddingMetadata metadata = 1;
+    ApplicationFailure failure = 2;
+  }
+}
+
+// D-2E-2 — `BidPredictionService`와 별도 서비스다(release 축·readiness가 다르다,
+// 운영자 결정 2026-09-10). `bidvector.ml.v1` 패키지 안 additive라 승인 태그
+// `contracts/v1-approved-2026-09-07` 대비 breaking 0(S-3).
+service EmbeddingService {
+  rpc EmbedText(EmbedTextRequest) returns (EmbedTextResponse);
+  rpc GetEmbeddingMetadata(GetEmbeddingMetadataRequest) returns (GetEmbeddingMetadataResponse);
+}

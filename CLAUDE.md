@@ -2,19 +2,23 @@
 
 이 저장소에서 애플리케이션 코드는 Claude가 구현한다. Codex는 독립 리뷰어다.
 
-## 운영자 지시 2026-09-04 — 아래 모든 절보다 우선
+## 운영자 지시 2026-09-04 (2026-09-11 갱신) — 아래 모든 절보다 우선
 
-- **Codex 심판에서 코드 부분을 제외한다.** 코드 slice 의 diff·구현 결과는 Codex 로 보내지
-  않는다. 코드 리뷰는 Claude 측 `verifier`(저작 레인과 다른 패스)가 본다. milestone 계약의
-  「Codex approve + 사용자 승인」은 코드 slice 에서 **「verifier ready-for-review + 사용자
-  승인」** 으로 읽는다. 이유: 외부 유료 호출이 너무 잦아져 비용·시간이 늘었다(1A 에서
-  Codex 16라운드).
+- **Codex 심판의 코드 범위는 되돌리기 어려운 경로로 한정한다(2026-09-11 — 아래 2026-09-04
+  전면 제외를 대체).** 인증·인가, 암호화·비밀값 취급, DB 마이그레이션, 데이터 파기처럼 사고가
+  나면 복구가 없거나 비싼 slice 는 운영자가 범위·비용을 승인하면 Codex 심판에 올린다. 그 밖의
+  코드 slice diff·구현 결과는 Codex 로 보내지 않고 Claude 측 `verifier`(저작 레인과 다른 패스)가
+  본다. milestone 계약의 「Codex approve + 사용자 승인」은 Codex 범위 밖 코드 slice 에서
+  **「verifier ready-for-review + 사용자 승인」** 으로 읽는다. 이유: 2026-09-04 에 전면 제외한
+  까닭은 외부 유료 호출 빈도였고(1A 에서 Codex 16라운드), 그 비용은 금지가 아니라 범위 한정으로
+  잡는다.
 - **목표·마일스톤·로드맵·스팩(명세·ADR·discovery·slice 계약)은 세션 모델(Opus 5 [1m]
   또는 Fable 5.1 [1m]) 하나가 단독으로 쓴다.** `spec-writer`·`deep-reasoner`·legacy-scout
   팬아웃 같은 다단계 기획 파이프라인과 Codex 검토를 붙이지 않는다. 세션 모델이 저장소를
   직접 읽고 문서를 직접 쓴다. 이유: 스팩 하나에 몇 시간이 걸렸다.
-- Codex 레인은 운영자가 명시 요청할 때만 탄다 — 기획 문서의 계획 검토는 운영자가 필요할 때
-  요청하면 걸고, 코드 slice 는 대상이 아니다.
+- Codex 레인은 운영자가 명시 요청하고 범위·비용을 승인할 때만 탄다 — 기획 문서의 계획 검토와
+  위의 되돌리기 어려운 경로 slice 가 대상이고, 그 밖의 코드 slice 는 대상이 아니다. 전역 규약은
+  `~/.claude/review-lane.md`.
 
 ## 시작 전 필수 읽기
 
@@ -61,6 +65,7 @@ Codex가 `request_changes`를 반환하면 같은 scope에서 Claude가 수정�
 |------|----------|------|------|
 | 2026-08-22 | 초기 구성 (에이전트 7종, 스킬 3종) | 전체 | - |
 | 2026-09-04 | **Codex 심판에서 코드 제외** — Phase 5 를 코드 slice 에서 건너뛰고 완료 조건을 verifier+사용자 승인으로 · **기획 문서(명세·ADR·slice 계약) 단독 저작** — 세션 모델(Opus 5 [1m]/Fable 5.1 [1m])이 spec-writer·deep-reasoner 없이 직접 작성 | CLAUDE.md, codex-reviewer, spec-writer, codex-review-gate, v2-slice-pipeline, milestone-0~6, agent-workflow | 운영자 지시 — 외부 유료 호출 과다(1A Codex 16라운드)와 스팩 저작 지연 |
+| 2026-09-11 | **Codex 코드 범위 재개방(한정)** — 인증·인가·암호화·DB 마이그레이션·데이터 파기처럼 되돌리기 어려운 slice 는 운영자가 범위·비용을 승인하면 Codex 심판 대상, 그 밖의 코드 slice 는 계속 `verifier` 몫 · 2026-09-04 전면 제외를 대체 | CLAUDE.md, codex-reviewer | 전면 제외 뒤 코드에 대한 교차 모델 심판이 0건이 됐다 — 비용은 금지가 아니라 범위 한정으로 잡는다 |
 | 2026-08-22 | 재활용 우선 방침 반영 — Python ML 재활용, 라이브러리 조사 선행, 재작성 목적(유지보수·회귀 감소) 명시 | ml-implementer, kotlin-implementer, legacy-scout, v2-slice-pipeline | 운영자 지시 |
 | 2026-08-22 | 두 갈래 전략 확정 — service만 Kotlin 재작성, ML은 재활용+튜닝 (지침서 greenfield 서술 개정과 동기화) | ml-implementer, v2-slice-pipeline | 운영자 지시로 지침서 개정 |
 | 2026-08-22 | 독립 감사 반영 — Codex 리뷰를 저장소 밖 clean worktree로 격리, .gitignore 추가, clean-tree 게이트 단일 정의(in_scope 한정), 커밋 단계·안전 규칙·재작업 상한(총 4회)·OPEN 에스컬레이션·secret 스캔 추가, M0 문서 slice N/A 규칙, verdict JSON schema 번들 | 전 에이전트, 전 스킬, .gitignore | 하네스 독립 감사 blocker 3건·high 9건 수정 |
@@ -106,4 +111,13 @@ Codex가 `request_changes`를 반환하면 같은 scope에서 Claude가 수정�
 | 2026-09-09 | 액션 넷을 **Node 24 진입 major** 로(`checkout@v5`·`setup-java@v5`·`setup-gradle@v5`·`upload-artifact@v6`) · `buf` 설치를 **아카이브된 액션에서 릴리스 바이너리 직접 설치**로 교체하고 **버전을 `contract-policy.properties` 에서 읽게** 함 | `.github/workflows/ci.yml` | Node 20 지원 종료 경고(액션 다섯 전부). `bufbuild/buf-setup-action` 은 **2025-08 아카이브**라 갈아탈 판이 없어 액션 자체를 걷어냈고, 그 김에 워크플로에 박혀 있던 버전 숫자를 지워 정책 파일과 어긋날 자리를 없앴다. **상위 major 는 올리지 않는다** — 여기서의 유일한 사유가 런타임 지원 종료다. `setup-gradle@v6` 은 캐싱을 상용 컴포넌트로 분리해 **Gradle 이용약관 동의를 요구**하므로 Node 24 를 이미 만족하는 v5 에서 멈췄다 |
 | 2026-09-08 | 공유 워킹트리에서 **커밋 명령에 경로를 명시**(`git commit -m … -- <경로들>`) — `add && commit` 묶음만으로는 인덱스 전체가 실리는 것을 못 막는다 | evidence-pack | M3/3E — 문서 레인이 `policy-values.md` 를 커밋하는 순간 구현 레인이 스테이징해 둔 7 파일이 함께 실렸다(`facc9b1`, 메시지는 「P-7 승인」인데 내용 대부분이 3E 코드). 양쪽 다 기존 규율(단일 add+commit)을 지켰고 원인은 `git commit` 의 기본 동작이 **인덱스 전체**라는 것이다 — M1/1A(미커밋 편집 잔존)와 원인이 다르다 |
 | 2026-09-08 | rollback 실측에 **되돌린 트리의 compile·test 확인** 두 단계 추가 + 목록을 `git diff --name-status` 로 **기계 산출**·라운드마다 재실행 명시 | evidence-pack | M3/3B-2 verifier r2 high — 수정 라운드가 늘린 파일 셋이 restore 목록에서 빠져, 문서의 명령이 **exit 0 인데 `:adapters:compileKotlin` exit 1** (base 대비 48줄 잔존). 기존 규격의 확인 셋(exit 0·D/M 수·diff 비어 있음)은 「파일이 제자리로 갔는가」만 재고 「그 트리가 서는가」를 안 잰다. 1A 16차(명령이 실패)의 다음 단계 — **명령이 성공하면서 결과가 미달** |
+| 2026-09-09 | Phase 2.5 에 **(2b) 값 획득 축** 신설 — 새로 public 으로 내놓는 타입·최상위 함수·프로퍼티·use case 반환값을 전수하고 각각이 밖에 허락하는 것을 등재 | v2-slice-pipeline | M4/4A 실측 — 설계 검토의 우회 후보 일곱이 **전부 위조 축**이라, 통로 타입으로 위조를 닫자 **획득** 경로가 남아 이벤트 0 인 write 가 실행됐고(STR-07 이 `폐기`로 못 박은 형태), 다음 라운드엔 use case 반환값으로 같은 토큰이 샜다. 세 라운드가 「use case 가 막지만 타입이 열어 둔다」 한 계열 — 이 표가 있었으면 설계 단계에서 한 번에 나왔다. 운영자 채택 2026-09-09 |
+| 2026-09-09 | clean-tree **양성 대조에서 `git checkout --` 금지** — 심은 줄만 비파괴 절삭으로 되돌린다 | evidence-pack | M4/4A 실측 — 구현 레인이 종결 반영 중 양성 대조로 `checkout --` 을 돌려 같은 파일의 **미커밋 KDoc 편집 둘이 소실**됐다(즉시 복구). 검증 절차가 산출물을 파괴하는 형태였고, 공유 트리에 다른 레인의 미커밋 편집이 있으면 그것까지 지운다 |
+| 2026-09-09 | (2b) 값 획득 축에 **「경계로 처리」 행도 실측 대상**임을 명시 — 경계 논증은 주체를 한정할 때만 서고 가시성이 그 한정을 강제해야 한다 | v2-slice-pipeline | M4/4C-1 실측 — 표의 여섯 행 중 「닫는다」 다섯은 착수 전에 닫혔는데 **유일한 「경계로 처리」 행**(저장소 복원 진입점)만 실측 목록에서 빠졌고 거기서 high. public 복원 함수가 「persistence 어댑터의 권한」이 아니라 아무 모듈에나 위조 이벤트 주입을 허락했다 |
+| 2026-09-09 | 공유 파일 rollback 에 **커밋 해시 hunk 격리** 절차 명시 — 만진 커밋을 먼저 나열하고, 겹치는 파일만 `git diff <sha>~1..<sha> \| git apply -R` 로 자기 몫만 걷는다. 확인은 「내 줄 사라짐」과 **「남의 줄 남음」을 둘 다** | evidence-pack | M4 실측 — 4C-1 rollback 이 공유 셋을 전체 복원으로 적어 4B-1 산출물이 날아갈 상태였다. 「줄 단위」라는 규정만 있고 **두 slice 가 같은 파일을 만졌을 때 어떻게 가르는지**가 없어 한 라운드가 들었다 |
+| 2026-09-10 | (2b) 표를 **수정 라운드마다 갱신** — 「이번 수정이 새 public 표면을 만들었는가」를 보고 항목으로, verifier 표적으로 | v2-slice-pipeline | M4/4B-2 실측 — 「판정 1회 회귀 보호 없음」(low) 시정이 판정 함수를 **생성자 인자**로 뽑았고, `private val` 이 프로퍼티만 막아 매개변수가 공개 시그니처로 남았다. 다른 모듈이 자기 함수를 꽂아 알림 요청을 낳을 수 있게 됐다(알림 0건 → 2건 실측). **low 를 닫은 커밋이 high 를 낳았다** — 축이 착수 시점에만 걸리면 이 경로가 항상 열린다 |
+| 2026-09-10 | (2b) 표에 고정 항목 **「`object` 커널을 세야 할 때 무엇을 주입하는가」** — 주입 자리가 곧 공개 표면이라는 충돌을 설계 단계에서 처분. 판정 기준(없던 권한인가 / 결과가 쓴 값을 나르는가)도 성문화 | v2-slice-pipeline | M4/4B-2 — low(계수 불가) 시정이 high(함수 대체로 알림 생성)를 낳고 `internal` 주 생성자 + public 보조 생성자로 닫히기까지 **세 라운드**. 설계 단계 한 줄이면 끝났다. 같은 축이 4D·4C-2 에서 재발 예정 |
 | 2026-09-03 | 역방향 파급 grep 을 **축약형 포함(stem 기준)** 으로 · 「아래쪽 편집이라 안 밀림」 판단은 두 줄 번호를 명령으로 낸 뒤에만 | evidence-pack | 1A verifier r12 L-1 — ADR 0007 을 `docs/adr/0007:186` 으로 인용한 5건을 전체 파일명 grep 이 0건으로 놓쳤고, 문서 머리 +22줄 삽입에 「밀리지 않는다」로 적힘 |
+| 2026-09-10 | **진행 중 slice 의 브랜치는 종결 뒤에만 병합한다** — 병합 전 대조는 버릴 clone/worktree 에서 | v2-slice-pipeline | M4/4C-2 실측 — verifier high 둘로 `not-ready` 인 동안 다른 레인이 그 진행분을 자기 브랜치에 병합했고, 그 커밋으로 마일스톤 브랜치와 `main` 이 함께 이동했다. **검증 안 된 코드와 아직 참이 아닌 문면이 승인 없이 공유 브랜치에 실렸다** — 오케스트레이터가 박아 둔 핀(85a3835)이 무효화됐다. 이력은 되쓰지 않고 evidence 에 사실로 선언했다(2026-09-02 혼입 규율) |
+| 2026-09-10 | 공유 파일 rollback 에 **`--3way` 도 자동 해소에 실패함**을 명기 — 수동 해소 절차를 rollback.md 에 미리 적고 임시 clone 에서 끝까지 실행 | evidence-pack | M4/4C-2 실측 — `gate-tests.properties` 에서 4C-2 와 4B-3 의 주석 블록이 **같은 삽입 지점에 인접**해 `git apply -R --3way` 가 conflict marker 를 냈다. 2026-09-09 의 hunk 격리 규정은 명령만 주고 「그 명령이 실패할 때」를 안 줬다 |
+| 2026-09-10 | rollback 목록은 **자기를 담은 커밋을 가리킬 수 없다** — 공유 파일을 만지는 문서 커밋과 목록 갱신 커밋을 나누고, 후자는 evidence 경로만 만진다 | evidence-pack | M4/4C-2 verifier r3 M-5 — `milestone-4.md` hunk 목록이 evidence 커밋 하나만큼 낡아 **문서대로 실행하면 exit 1**(앞 hunk conflict → 다음 명령 「인덱스에 없습니다」로 시퀀스 단절). 앞 라운드에서는 그 커밋이 우연히 공유 파일을 안 건드려 맞았을 뿐이다. 종결 등재도 같은 함정을 지난다 |

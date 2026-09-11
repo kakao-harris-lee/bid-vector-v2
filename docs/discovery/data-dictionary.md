@@ -680,14 +680,29 @@ legacy는 `"won"/"lost"` 두 값 + `NULL = 미확정`이라 **"가격만으로 �
   구분은 0C 소관이었다 — **넷으로 나눈다.** 둘을 합치면 "언젠가 알 수 있는 것"과 "이
   방법으로는 못 정하는 것"이 같은 값이 되어 운영자의 다음 행동이 갈리지 않는다.
 
-#### 2.2.5 outbox 상태 — 어휘 자리만 둔다
+#### 2.2.5 outbox 상태 — `OutboxEntryState`(운영자 결정 2026-09-09, M4/4C-1 착수, D-M4-5 (a))
 
 legacy에 DB 기반 outbox의 상태·클레임 구조가 있으나
 (`app/models/pipeline.py:95-127`) **상태 값 집합이 어디에도 선언돼 있지 않다.**
 
-**V2의 상태 어휘와 전이는 활성 `OPEN-OPS-10`(DB 큐 계약)이 소유한다.** 이 문서는
-`OutboxEntryState`가 sealed 어휘와 명시 전이표를 가져야 한다는 **형태 요구**만 적고
-값 집합을 정하지 않는다. 브로커 없음 결정(`OPEN-OPS-05`)의 파급이 그 `OPEN`에 걸려 있다.
+**V2의 상태 어휘와 전이는 `OPEN-OPS-10`이 소유했다 — M4/4C-1 착수 시점 운영자 결정
+D-M4-5 (a)로 종결됐다(`reports/evidence/m4/4c1/scope.md`).** 이 절이 그 어휘와 전이표의
+정본이다:
+
+> `OutboxEntryState = sealed { Pending, Claimed, Delivered, Failed, Isolated }` — 전이는
+> `Pending → Claimed → Delivered | Failed | Isolated` 하나뿐이다. `Delivered`·`Failed`·
+> `Isolated`는 **종단**(이 셋에서 나가는 전이는 표에 없다 — 재시도 API 자체가 없다).
+> `Failed`는 최대 시도 소진, `Isolated`는 `Claimed`에서 워커가 죽어 격리된 것이다
+> (at-most-once, `OPEN-NOTI-02`) — 수동 검토는 앱 알림함 회수 경로가 진다(ADR 0005 D-4),
+> 이 상태 자체는 재실행 경로를 갖지 않는다. 표 밖 (state, command) 쌍은 전부 거부이고
+> 거부가 관측 가능하다(`OutboxTransitionTableTest`).
+
+M4/4C-1이 세운 것은 이 어휘·전이표와 그것을 감싸는 port(`OutboxPort`)·통로 타입
+(`OutboxTransition`)까지다 — **실 저장·claim 경합·DB↔outbox 원자성·crash-after-commit**은
+4C-2(M4 후속, `main` 병합 뒤)가 진다. 그 미측정 구간은 `OPEN-4C1-TX-CONTRACT-UNVERIFIED`로
+활성 등재돼 있다(같은 scope.md). `OPS-06`(queue topology 배포 게이트) 자신의 재정의·폐기
+판정은 이 절이 아니라 `capability-map.md` §10의 그 행이 소유한다 — 이 절의 편집은 어휘·
+전이표에 한정된다.
 
 #### 2.2.6 전략 — 어휘 자리만 둔다 (운영자 결정 2026-09-06, M1/1E 착수, decision 31)
 
@@ -1039,7 +1054,7 @@ legacy 어휘 넷 — `applicable` / `not_applicable`(비국가기관) / `uncert
 **첫 매칭 우선 순서가 도메인 의미를 갖는다** — 두 패턴에 걸리는 기관명에서 더 구체적인
 쪽이 이긴다(`app/ai/floor_applicability.py:122-130`). 이 순서도 정책 데이터로 선언한다.
 
-### 3.6 투찰 판정 rule — `Verdict`
+### 3.6 투찰 판정 rule — `Verdict`(`SkipReason` 전수 확정 — 운영자 결정 2026-09-09, M4/4B-1)
 
 legacy는 게이트 사다리 first-match로 `action`을 정하고, **두 보류가 같은 `"skip"`이며
 한국어 문장으로만 구분된다**(`app/services/allocation_core.py:163-181`).
@@ -1048,14 +1063,47 @@ legacy는 게이트 사다리 first-match로 `action`을 정하고, **두 보류
 > `SkipReason` **필수**. 최소 두 값: `CapacityHold` · `LowPriority`.
 
 운영자 결정 `OPEN-DEC-05`가 확정한 것은 **하나의 `Skip` verdict + 필수 reason code**이며,
-금지되는 것은 한-verdict가 아니라 **문장으로만 구분되는 형태**다. 목록의 전수성은 M1에서
-게이트 사다리를 옮길 때 확정된다 → **`OPEN-DIC-03`**.
+금지되는 것은 한-verdict가 아니라 **문장으로만 구분되는 형태**다.
+
+**`SkipReason` 전수성(`OPEN-DIC-03`) — 종결.** M4/4B-1 착수 조사
+(`_workspace/m4-4b1/01_scout_verdict_ladder.md` §3, 실측)가 게이트 사다리 **안**에서
+`skip`으로 접히는 사유는 정확히 둘(`CapacityHold`·`LowPriority`)뿐임을 확인했다 — §3.6이
+이미 든 「최소 두 값」이 사다리 실측과 정확히 일치한다. **`SkipReason`은 이 둘로 닫는다.**
+사다리 **밖**에서 공고가 조용히 사라지는 지점 열셋(감시 필터 일곱·파이프라인 여섯 — 같은
+조사 §3.2)은 이 어휘가 아니다 — legacy는 그 자리에서 `Decision` 객체 자체를 만들지 않는다.
+운영자 결정 2026-09-09: 그 열셋은 신설 `OPEN`으로 `capability-map.md` §14에 등재하고
+M4/4B-2(조합 use case) 소관으로 넘긴다 — 「목록이 닫혔다」는 선언이 그 열셋을 삼키지
+않는다.
 
 **force-bid 우회는 유지하되 출처를 판정 결과에 노출한다**(운영자 결정 `OPEN-STR-03`) —
 우회의 존재를 감춘 것이 결함이었지 우회 자체가 아니다.
 
 **운영자 하한 override**: 개연 밴드 밖 override는 **버리지도 통과시키지도 않고 사유와 함께
 거부**한다(운영자 결정 `OPEN-DEC-04`). 거부가 **관측 가능한 결과**여야 한다.
+
+**`MlUnavailableReason` 어휘(M4/4D-1 착수 시 사전 등재, ADR 0010 D-6) — 종결.** 4B-1은
+사다리가 ML 점수를 못 받았다는 사실 하나(`ScoreNotProvided`)만 알았다. M4/4D-1 착수로
+`bidvector.decision.MlUnavailableReason`(`ReviewReason.kt`)이 아홉 값을 더해 열 값으로
+넓어진다 — 값은 전부 `data object`(payload 없음, D-4D-6). 층 구분(ADR 0010 D-3)은 다음과
+같다.
+
+| 값 | 층 | 뜻 |
+| --- | --- | --- |
+| `ScoreNotProvided` | (4B-1, gateway 도입 전) | 사다리가 요구하는 점수 입력이 결측 |
+| `DeadlineExceeded` | transport | `DEADLINE_EXCEEDED`, 재시도 예산 안에서도 소진 |
+| `CircuitOpen` | 소비자 정책 | resilience4j circuit breaker open — 호출 자체를 하지 않음 |
+| `RetryBudgetExhausted` | transport | `UNAVAILABLE`·`RESOURCE_EXHAUSTED`가 재시도 상한 안에서도 지속 |
+| `TransportFailed` | transport | 재시도 불가 status(`INVALID_ARGUMENT` 등)로 첫 시도에 끝남 |
+| `ModelNotReady` | application | `ApplicationFailure{MODEL_NOT_READY}`가 재시도 뒤에도 지속 |
+| `ReleaseMismatch` | client 집행 | 응답 release 가 요청 selector 와 어긋남(제3 변환 금지, D-3) |
+| `ContractViolation` | client 집행 | 정의 밖 enum·후보 개수/순서·정규형 위반 등 계약 불변식 위반 |
+| `UnsupportedSchema` | application | `ApplicationFailure{UNSUPPORTED_SCHEMA}`(D-7, 다른 축) |
+| `UnsupportedRelease` | application | `ApplicationFailure{UNSUPPORTED_RELEASE}`(server 명시 거부) |
+| `InvalidRequest` | application | `ApplicationFailure{INVALID_REQUEST}` |
+
+사다리 점수 셋(priority·probability·matched)의 산출·매핑은 이 어휘의 대상이 아니다 —
+`CalculateOptimalBid` 계약이 그 이름의 필드를 내지 않아 `OPEN-4D-LADDER-SCORE-SOURCE`
+(`capability-map.md` §14.3)로 별도 운영자 결정에 올랐다(`reports/evidence/m4/4d/scope.md`).
 
 ---
 
@@ -2074,7 +2122,8 @@ U-5로 **새로 닫는다**고 적었으나 **2026-08-26에 이미 닫혀 있었
 - §2.2의 전이표 셋은 **명시적 state/event table**로 구현한다. 표에 없는 쌍은 거부이며
   거부가 관측 가능해야 한다.
 - §5.3의 필드 계약은 **경계에서 거부하는 계약 테스트**로 승격한다(COL-07 결정).
-- **`SkipReason` 전수성**(`OPEN-DIC-03`)은 게이트 사다리를 옮길 때 확정한다.
+- **`SkipReason` 전수성**(`OPEN-DIC-03`) — **종결(M4/4B-1, 운영자 결정 2026-09-09)**.
+  게이트 사다리를 옮기며 확정됐다 — 정본은 §3.6.
 
 ### 13.3 M2 계약
 

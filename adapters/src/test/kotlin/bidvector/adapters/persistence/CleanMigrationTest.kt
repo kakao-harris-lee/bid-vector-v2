@@ -14,6 +14,10 @@ import org.junit.jupiter.api.Test
  * 실측한 변이(COL-06 항등식 CHECK 삭제·`NUMERIC(20,0)`→`NUMERIC(20,4)`·`notice_round` 형식
  * CHECK 삭제)가 각각 이 test들 중 하나 이상을 FAIL시킨다(수치·정밀도·CHECK 개수·CHECK
  * 본문 부분 문자열까지 본다).
+ *
+ * 축 2·3·4(컬럼)는 `CleanMigrationColumnTest`로, 축 7(트리거)은 `CleanMigrationTriggerTest`로,
+ * 축 8(CHECK)은 `CleanMigrationCheckTest`로 분리했다(sizeGate 500줄 — M3/3E에서 축7·8을,
+ * M4/4C-2에서 축2·3·4를 분리).
  */
 class CleanMigrationTest : PersistenceTestSupport() {
     // =========================================================================
@@ -32,6 +36,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "flyway_schema_history",
             // M3/3E — 스키마 스냅샷 래칫 예외(운영자 승인 2026-09-08, scope.md), 추가만.
             "opening_reserve_price",
+            // M4/4C-2 — 스키마 스냅샷 래칫 예외(D-4C2-2, 추가만). V6__outbox_inbox.sql.
+            "outbox",
+            "inbox",
         )
 
     @Test
@@ -39,285 +46,6 @@ class CleanMigrationTest : PersistenceTestSupport() {
         val actual = queryStrings("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
         actual shouldContainExactlyInAnyOrder expectedTables
     }
-
-    // =========================================================================
-    // 축 2·3·4 — 컬럼 존재·타입·NOT NULL(information_schema.columns 한 질의로 셋을 함께 본다)
-    // =========================================================================
-    private data class ColumnSpec(
-        val table: String,
-        val column: String,
-        val dataType: String,
-        val nullable: Boolean,
-    )
-
-    // sizeGate(함수 50줄)는 본문 있는 선언만 잰다 — 「값을 담을 뿐인 프로퍼티 초기화식」은
-    // 그 축이 아니다(size-policy.properties). buildList{} 람다 하나로 몰지 않고 테이블별
-    // 평범한 리스트 초기화 + `+` 연결로 나눈 것은 그 예외를 그대로 쓴 것이다(함수 아님).
-    private val rawObservationColumns =
-        listOf(
-            ColumnSpec("raw_observation", "observation_key", "text", false),
-            ColumnSpec("raw_observation", "source_endpoint", "text", false),
-            // F-7 운영자 결정 — 원문 전체는 TEXT(재직렬화 없이), 등재분 투영은 별도 JSONB.
-            ColumnSpec("raw_observation", "payload", "text", false),
-            ColumnSpec("raw_observation", "payload_fields", "jsonb", false),
-            ColumnSpec("raw_observation", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("raw_observation", "release_sha", "text", false),
-            ColumnSpec("raw_observation", "inserted_at", "timestamp with time zone", false),
-        )
-
-    private val provenanceAuthorityColumns =
-        listOf(
-            ColumnSpec("provenance_authority", "provenance", "text", false),
-            ColumnSpec("provenance_authority", "authoritative", "boolean", false),
-        )
-
-    private val noticeColumns =
-        listOf(
-            ColumnSpec("notice", "notice_number", "text", false),
-            ColumnSpec("notice", "notice_round", "text", false),
-            ColumnSpec("notice", "status", "text", false),
-            ColumnSpec("notice", "business_category_code", "text", true),
-            ColumnSpec("notice", "business_category_label", "text", true),
-            ColumnSpec("notice", "base_amount_won", "numeric", true),
-            ColumnSpec("notice", "base_amount_currency", "text", true),
-            ColumnSpec("notice", "base_amount_vat", "text", true),
-            ColumnSpec("notice", "base_amount_provenance", "text", true),
-            ColumnSpec("notice", "base_amount_provenance_detail", "text", true),
-            ColumnSpec("notice", "estimated_amount_won", "numeric", true),
-            ColumnSpec("notice", "estimated_amount_currency", "text", true),
-            ColumnSpec("notice", "estimated_amount_vat", "text", true),
-            ColumnSpec("notice", "estimated_amount_provenance", "text", true),
-            ColumnSpec("notice", "estimated_amount_provenance_detail", "text", true),
-            ColumnSpec("notice", "estimated_amount_source_key", "text", true),
-            ColumnSpec("notice", "allocated_budget_won", "numeric", true),
-            ColumnSpec("notice", "allocated_budget_provenance", "text", true),
-            ColumnSpec("notice", "allocated_budget_provenance_detail", "text", true),
-            ColumnSpec("notice", "floor_rate_fraction", "numeric", true),
-            ColumnSpec("notice", "floor_rate_origin_kind", "text", true),
-            ColumnSpec("notice", "floor_rate_origin_detail", "text", true),
-            ColumnSpec("notice", "deadline_at", "timestamp with time zone", true),
-            ColumnSpec("notice", "revision", "bigint", false),
-            ColumnSpec("notice", "observation_key", "text", false),
-            ColumnSpec("notice", "created_at", "timestamp with time zone", false),
-            ColumnSpec("notice", "updated_at", "timestamp with time zone", false),
-        )
-
-    private val noticeAuditColumns =
-        listOf(
-            ColumnSpec("notice_audit", "id", "bigint", false),
-            ColumnSpec("notice_audit", "notice_number", "text", false),
-            ColumnSpec("notice_audit", "notice_round", "text", false),
-            ColumnSpec("notice_audit", "revision", "bigint", false),
-            ColumnSpec("notice_audit", "observation_key", "text", false),
-            ColumnSpec("notice_audit", "reason", "text", false),
-            ColumnSpec("notice_audit", "previous_row", "jsonb", false),
-            ColumnSpec("notice_audit", "recorded_at", "timestamp with time zone", false),
-        )
-
-    private val rejectedWriteColumns =
-        listOf(
-            ColumnSpec("rejected_write", "id", "bigint", false),
-            ColumnSpec("rejected_write", "notice_number", "text", false),
-            ColumnSpec("rejected_write", "notice_round", "text", false),
-            ColumnSpec("rejected_write", "observation_key", "text", false),
-            ColumnSpec("rejected_write", "reason", "text", false),
-            ColumnSpec("rejected_write", "attempted_value", "jsonb", true),
-            ColumnSpec("rejected_write", "recorded_at", "timestamp with time zone", false),
-        )
-
-    private val openingResultColumns =
-        listOf(
-            ColumnSpec("opening_result", "notice_number", "text", false),
-            ColumnSpec("opening_result", "notice_round", "text", false),
-            ColumnSpec("opening_result", "winning_rate_fraction", "numeric", true),
-            ColumnSpec("opening_result", "derived_base_amount_won", "numeric", true),
-            ColumnSpec("opening_result", "derived_base_amount_currency", "text", true),
-            ColumnSpec("opening_result", "derived_base_amount_vat", "text", true),
-            ColumnSpec("opening_result", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("opening_result", "revision", "bigint", false),
-            ColumnSpec("opening_result", "observation_key", "text", false),
-            ColumnSpec("opening_result", "created_at", "timestamp with time zone", false),
-            ColumnSpec("opening_result", "updated_at", "timestamp with time zone", false),
-            // M3/3E — 층 C fact 슬롯(추가만, 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
-            ColumnSpec("opening_result", "final_award_amount_won", "numeric", true),
-            ColumnSpec("opening_result", "final_award_amount_currency", "text", true),
-            ColumnSpec("opening_result", "final_award_company_name", "text", true),
-            ColumnSpec("opening_result", "participant_count", "integer", true),
-            ColumnSpec("opening_result", "progress_division", "text", true),
-            ColumnSpec("opening_result", "planned_price_won", "numeric", true),
-            ColumnSpec("opening_result", "planned_price_currency", "text", true),
-            ColumnSpec("opening_result", "opening_base_amount_won", "numeric", true),
-            ColumnSpec("opening_result", "opening_base_amount_currency", "text", true),
-            ColumnSpec("opening_result", "opening_base_amount_vat", "text", true),
-            ColumnSpec("opening_result", "total_reserve_price_candidate_count", "integer", true),
-            ColumnSpec("opening_result", "actual_opening_at", "timestamp with time zone", true),
-            // verifier r1 H-1 뒤(V5) — provenance 왕복(추가만).
-            ColumnSpec("opening_result", "final_award_amount_provenance", "text", true),
-            ColumnSpec("opening_result", "final_award_amount_provenance_detail", "text", true),
-            ColumnSpec("opening_result", "planned_price_provenance", "text", true),
-            ColumnSpec("opening_result", "planned_price_provenance_detail", "text", true),
-            ColumnSpec("opening_result", "opening_base_amount_provenance", "text", true),
-            ColumnSpec("opening_result", "opening_base_amount_provenance_detail", "text", true),
-            // M3/3F — 개찰완료 축 부모 슬롯(추가만, 스키마 스냅샷 래칫 예외 D-3F-6).
-            ColumnSpec("opening_result", "opening_rank_one_kind", "text", true),
-            ColumnSpec("opening_result", "opening_rank_one_duplicate_count", "integer", true),
-            ColumnSpec("opening_result", "opening_rank_one_bidder_name", "text", true),
-            ColumnSpec("opening_result", "opening_rank_one_bid_amount_won", "numeric", true),
-            ColumnSpec("opening_result", "opening_rank_one_bid_amount_currency", "text", true),
-            ColumnSpec("opening_result", "opening_rank_one_bid_rate_fraction", "numeric", true),
-            // verifier r1 F-2 뒤 — 축별 관측 시각(3E OpeningReservePriceRow.observedAt 과 같은 자리).
-            ColumnSpec("opening_result", "opening_rank_one_observed_at", "timestamp with time zone", true),
-            ColumnSpec("opening_result", "draw_numbers_kind", "text", true),
-            ColumnSpec("opening_result", "draw_numbers", "ARRAY", true),
-            ColumnSpec("opening_result", "draw_numbers_observed_at", "timestamp with time zone", true),
-            ColumnSpec("opening_result", "draw_numbers_valid_range_max", "integer", true),
-        )
-
-    // M3/3E — 층 B 자식 표(D-3E-2 (a), 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
-    private val openingReservePriceColumns =
-        listOf(
-            ColumnSpec("opening_reserve_price", "notice_number", "text", false),
-            ColumnSpec("opening_reserve_price", "notice_round", "text", false),
-            ColumnSpec("opening_reserve_price", "reserve_price_sequence", "text", false),
-            ColumnSpec("opening_reserve_price", "base_reserve_price_won", "numeric", true),
-            ColumnSpec("opening_reserve_price", "base_reserve_price_currency", "text", true),
-            ColumnSpec("opening_reserve_price", "is_drawn", "boolean", true),
-            ColumnSpec("opening_reserve_price", "draw_count", "integer", true),
-            ColumnSpec("opening_reserve_price", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("opening_reserve_price", "revision", "bigint", false),
-            ColumnSpec("opening_reserve_price", "observation_key", "text", false),
-            ColumnSpec("opening_reserve_price", "created_at", "timestamp with time zone", false),
-            ColumnSpec("opening_reserve_price", "updated_at", "timestamp with time zone", false),
-        )
-
-    private val qualificationTextColumns =
-        listOf(
-            ColumnSpec("qualification_text", "notice_number", "text", false),
-            ColumnSpec("qualification_text", "notice_round", "text", false),
-            ColumnSpec("qualification_text", "raw_text", "text", false),
-            ColumnSpec("qualification_text", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("qualification_text", "revision", "bigint", false),
-            ColumnSpec("qualification_text", "observation_key", "text", false),
-            ColumnSpec("qualification_text", "created_at", "timestamp with time zone", false),
-            ColumnSpec("qualification_text", "updated_at", "timestamp with time zone", false),
-        )
-
-    private val collectionRunColumns =
-        listOf(
-            ColumnSpec("collection_run", "id", "bigint", false),
-            ColumnSpec("collection_run", "reference_date", "date", false),
-            ColumnSpec("collection_run", "source_endpoint", "text", false),
-            ColumnSpec("collection_run", "started_at", "timestamp with time zone", false),
-            ColumnSpec("collection_run", "finished_at", "timestamp with time zone", false),
-            ColumnSpec("collection_run", "received", "integer", false),
-            ColumnSpec("collection_run", "normalized", "integer", false),
-            ColumnSpec("collection_run", "duplicate", "integer", false),
-            ColumnSpec("collection_run", "dropped", "integer", false),
-            ColumnSpec("collection_run", "drop_reasons", "jsonb", false),
-            ColumnSpec("collection_run", "source_total", "integer", true),
-            ColumnSpec("collection_run", "pages_fetched", "integer", false),
-            ColumnSpec("collection_run", "truncated", "boolean", false),
-            ColumnSpec("collection_run", "unknown_fields", "integer", false),
-            ColumnSpec("collection_run", "truncation_cause", "text", true),
-            ColumnSpec("collection_run", "quota_exceeded", "integer", false),
-            ColumnSpec("collection_run", "backoff_skipped", "integer", false),
-            ColumnSpec("collection_run", "inserted_at", "timestamp with time zone", false),
-        )
-
-    private val expectedColumns =
-        rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
-            rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
-            openingReservePriceColumns
-
-    @Test
-    fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {
-        val actual = mutableListOf<ColumnSpec>()
-        dataSource().connection.use { connection ->
-            connection.createStatement().use { statement ->
-                statement
-                    .executeQuery(
-                        "SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns " +
-                            "WHERE table_schema = 'public' AND table_name <> 'flyway_schema_history'",
-                    ).use { rs ->
-                        while (rs.next()) {
-                            actual +=
-                                ColumnSpec(
-                                    rs.getString("table_name"),
-                                    rs.getString("column_name"),
-                                    rs.getString("data_type"),
-                                    rs.getString("is_nullable") == "YES",
-                                )
-                        }
-                    }
-            }
-        }
-
-        actual shouldContainExactlyInAnyOrder expectedColumns
-    }
-
-    /** D-3D-5(정수 원) — 금액 `_won` 컬럼은 정확히 `NUMERIC(20,0)`. verifier B②(20,4로 확대)를 여기서 잡는다. */
-    @Test
-    fun `축3 부가 — 금액 won 컬럼은 정확히 NUMERIC(20,0)이다`() {
-        val wonColumns =
-            listOf(
-                "notice.base_amount_won",
-                "notice.estimated_amount_won",
-                "notice.allocated_budget_won",
-                "opening_result.derived_base_amount_won",
-                // M3/3E — 층 B·C 신규 won 컬럼(추가만).
-                "opening_result.final_award_amount_won",
-                "opening_result.planned_price_won",
-                "opening_result.opening_base_amount_won",
-                "opening_reserve_price.base_reserve_price_won",
-                // M3/3F — 개찰완료 축 부모 슬롯(추가만).
-                "opening_result.opening_rank_one_bid_amount_won",
-            )
-        for (qualified in wonColumns) {
-            val (table, column) = qualified.split(".")
-            val (precision, scale) = numericPrecisionScale(table, column)
-            precision shouldBe 20
-            scale shouldBe 0
-        }
-    }
-
-    /** floor_rate_fraction·winning_rate_fraction은 자리수 제약 없는 `NUMERIC`(재선언 없음). */
-    @Test
-    fun `축3 부가 — rate fraction 컬럼은 정밀도·스케일을 재선언하지 않은 NUMERIC이다`() {
-        val fractionColumns =
-            listOf(
-                "notice.floor_rate_fraction",
-                "opening_result.winning_rate_fraction",
-                // M3/3F — 개찰완료 축 부모 슬롯(추가만).
-                "opening_result.opening_rank_one_bid_rate_fraction",
-            )
-        for (qualified in fractionColumns) {
-            val (table, column) = qualified.split(".")
-            val (precision, scale) = numericPrecisionScale(table, column)
-            precision shouldBe null
-            scale shouldBe null
-        }
-    }
-
-    private fun numericPrecisionScale(
-        table: String,
-        column: String,
-    ): Pair<Int?, Int?> =
-        dataSource().connection.use { connection ->
-            connection
-                .prepareStatement(
-                    "SELECT numeric_precision, numeric_scale FROM information_schema.columns " +
-                        "WHERE table_schema='public' AND table_name = ? AND column_name = ?",
-                ).use { statement ->
-                    statement.setString(1, table)
-                    statement.setString(2, column)
-                    statement.executeQuery().use { rs ->
-                        rs.next()
-                        val precision = rs.getInt("numeric_precision").takeUnless { rs.wasNull() }
-                        val scale = rs.getInt("numeric_scale").takeUnless { rs.wasNull() }
-                        precision to scale
-                    }
-                }
-        }
 
     // =========================================================================
     // 축 5 — UNIQUE(PK 밖의 별도 UNIQUE는 없다 — 전부 PK 하나로 유일성을 진다)
@@ -347,6 +75,10 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "collection_run" to setOf("id"),
             // M3/3E — 층 B 자식 표(추가만).
             "opening_reserve_price" to setOf("notice_number", "notice_round", "reserve_price_sequence"),
+            // M4/4C-2 — 애플리케이션이 발급하는 TEXT PK(추가만, D-4C2-2 — 시퀀스를 만들지
+            // 않는다, V6__outbox_inbox.sql).
+            "outbox" to setOf("entry_id"),
+            "inbox" to setOf("idempotency_key"),
         )
 
     @Test
@@ -445,25 +177,216 @@ class CleanMigrationTest : PersistenceTestSupport() {
         true shouldBe true
     }
 
-    @Test
-    fun `애플리케이션 역할 bidvector_app 은 provenance_authority 를 SELECT 만 할 수 있다`() {
-        val grantedPrivileges =
-            queryStrings(
-                "SELECT privilege_type FROM information_schema.role_table_grants " +
-                    "WHERE grantee = 'bidvector_app' AND table_name = 'provenance_authority'",
-            )
-        grantedPrivileges shouldContainExactlyInAnyOrder setOf("SELECT")
-    }
+    // =========================================================================
+    // 축 9 — 유효 권한 행렬(GRANT ratchet, M3/3G 2026-09-10)
+    // =========================================================================
+
+    /**
+     * **verifier r1 H-1 뒤, r2 M-3 시정으로 술어 교체**(4C-2) — 설계 검토 (2b) 「V6 테이블
+     * 자체 | GRANT 목록을 test 가 대조」의 실측이 없었다(r1). r1 이 쓴
+     * `information_schema.role_table_grants WHERE grantee = 'bidvector_app'`은 **역할에
+     * 직접 부여된 것만** 본다 — `GRANT DELETE ON outbox TO PUBLIC;` 한 줄이면 이 술어는
+     * 못 보는데 `bidvector_app`은 `PUBLIC` 경유로 실제 DELETE를 행사할 수 있었다(verifier
+     * r2 실측, `PROBE-PUB … OK rows=1`). [effectivePrivileges]는
+     * `has_table_privilege(role, table, priv)`로 **역할 직접 부여 + PUBLIC 부여 + 역할
+     * 상속**을 전부 해소한 유효 권한을 축 일곱 전부(SELECT/INSERT/UPDATE/DELETE/
+     * TRUNCATE/REFERENCES/TRIGGER) true/false로 못 박는다.
+     *
+     * **M3/3G — 전 테이블로 전수화.** 4C-2는 이 술어를 `outbox`·`inbox` 둘에만 적용했다.
+     * 3D의 기존 권한 test 둘(`provenance_authority` SELECT만·`notice_audit` INSERT없음,
+     * `role_table_grants` 술어)이 같은 PUBLIC 경유 사각을 그대로 갖고 있어
+     * (`OPEN-3D-GRANT-PUBLIC-BLINDSPOT`, 4C-2 verifier r2 M-3이 열었다) 이 slice가 그 둘을
+     * 아래 행렬로 흡수하고 **테이블 목록을 DB에서 발견**해 전 테이블로 넓힌다 — 기대
+     * 행렬에 없는 테이블이 나오면(새 마이그레이션이 권한 선언을 빠뜨리면) 이 test가
+     * 떨어진다(래칫의 본체).
+     *
+     * **`provenance_authority`는 SELECT만**(V2 GRANT + V3 REVOKE 방어 심층).
+     * **`notice_audit`는 SELECT만, INSERT 없음(F-6)** — 감사 행은
+     * `notice_audit_insert()`(V2, SECURITY DEFINER)가 대신 쓴다. app 역할이 직접 INSERT로
+     * 위조 이력을 넣는 경로를 막는다. 두 근거는 이 행렬의 해당 행이 나른다 — 옛 술어
+     * test 둘은 지웠다(단언은 약해지지 않는다, 행렬이 그 둘을 행으로 포함한다).
+     *
+     * **`flyway_schema_history`는 실측값**이다(설계 검토 (2) — Flyway 이력 표도 발견에
+     * 잡히므로 제외하지 않고 명시적으로 못 박는다. `bidvector_app`에 대한 GRANT가 어느
+     * 마이그레이션에도 없어 축 일곱이 전부 false — 컨테이너에서 질의해 확인한 값이다,
+     * 추측이 아니다).
+     */
+    private val expectedPrivilegeMatrix: Map<String, TablePrivileges> =
+        mapOf(
+            "raw_observation" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "provenance_authority" to
+                TablePrivileges(
+                    select = true,
+                    insert = false,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "notice" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "notice_audit" to
+                TablePrivileges(
+                    select = true,
+                    insert = false,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "rejected_write" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "opening_result" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "qualification_text" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "collection_run" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "opening_reserve_price" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "outbox" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "inbox" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "flyway_schema_history" to
+                TablePrivileges(
+                    select = false,
+                    insert = false,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+        )
 
     @Test
-    fun `애플리케이션 역할 bidvector_app 은 notice_audit 에 INSERT 권한이 없다 — F-6`() {
-        val grantedPrivileges =
+    fun `축9 유효 권한 행렬 — bidvector_app 이 public 의 전 BASE TABLE 에 대해 갖는 권한이 기대와 정확히 일치한다`() {
+        val discoveredTables =
             queryStrings(
-                "SELECT privilege_type FROM information_schema.role_table_grants " +
-                    "WHERE grantee = 'bidvector_app' AND table_name = 'notice_audit'",
+                "SELECT table_name FROM information_schema.tables " +
+                    "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'",
             )
-        grantedPrivileges shouldContainExactlyInAnyOrder setOf("SELECT")
+        discoveredTables shouldContainExactlyInAnyOrder expectedPrivilegeMatrix.keys
+
+        val actualPrivileges = discoveredTables.associateWith { effectivePrivileges(it) }
+        actualPrivileges shouldBe expectedPrivilegeMatrix
     }
+
+    /** 축 일곱 전부를 `has_table_privilege`로 해소한 유효 권한 — 직접 부여·PUBLIC 부여·역할 상속을 모두 본다(verifier r2 M-3). */
+    private data class TablePrivileges(
+        val select: Boolean,
+        val insert: Boolean,
+        val update: Boolean,
+        val delete: Boolean,
+        val truncate: Boolean,
+        val references: Boolean,
+        val trigger: Boolean,
+    )
+
+    private fun effectivePrivileges(table: String): TablePrivileges =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "SELECT " +
+                        "has_table_privilege('bidvector_app', ?, 'SELECT') AS p_select, " +
+                        "has_table_privilege('bidvector_app', ?, 'INSERT') AS p_insert, " +
+                        "has_table_privilege('bidvector_app', ?, 'UPDATE') AS p_update, " +
+                        "has_table_privilege('bidvector_app', ?, 'DELETE') AS p_delete, " +
+                        "has_table_privilege('bidvector_app', ?, 'TRUNCATE') AS p_truncate, " +
+                        "has_table_privilege('bidvector_app', ?, 'REFERENCES') AS p_references, " +
+                        "has_table_privilege('bidvector_app', ?, 'TRIGGER') AS p_trigger",
+                ).use { statement ->
+                    for (index in 1..7) statement.setString(index, table)
+                    statement.executeQuery().use { rs ->
+                        rs.next()
+                        TablePrivileges(
+                            select = rs.getBoolean("p_select"),
+                            insert = rs.getBoolean("p_insert"),
+                            update = rs.getBoolean("p_update"),
+                            delete = rs.getBoolean("p_delete"),
+                            truncate = rs.getBoolean("p_truncate"),
+                            references = rs.getBoolean("p_references"),
+                            trigger = rs.getBoolean("p_trigger"),
+                        )
+                    }
+                }
+        }
 
     private fun queryStrings(sql: String): Set<String> {
         val actual = mutableSetOf<String>()

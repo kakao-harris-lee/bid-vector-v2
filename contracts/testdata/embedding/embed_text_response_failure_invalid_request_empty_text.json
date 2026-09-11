@@ -1,0 +1,7 @@
+{
+  "failure": {
+    "code": "FAILURE_CODE_INVALID_REQUEST",
+    "retryable": false,
+    "detailCode": "TEXT_EMPTY"
+  }
+}

@@ -1,0 +1,348 @@
+# commands.md — M4/4A
+
+명령과 종료 코드만 남긴다(출력 전문 금지, evidence-pack 스킬 규격). 감사자는 명령을 다시 돌린다.
+
+## 2026-09-08T13:40Z
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin`
+- exit: 0
+- 핵심 결과: `StrategyRepository` internal 시도 → 공개 `EditStrategyWorkflow` 생성자가 노출해 컴파일 에러(실측, 설계 검토 (2) #3) — public 으로 되돌린 뒤 성공.
+
+## 2026-09-08T13:55Z
+- cmd: `./gradlew --no-daemon :workflow:test`
+- exit: 0
+- 핵심 결과: EditSessionTransitionTableTest 8 · EditSessionActorAndTimeoutTest 6 · EditSessionIdempotencyPropertyTest 4 · EditSessionImportBoundaryTest 3 · EditStrategyWorkflowTest 5, 합계 26 tests, 0 failed.
+
+## 2026-09-08T13:56Z
+- cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate :workflow:cpdCheck`
+- exit: 0
+
+## 2026-09-08T14:00Z
+- cmd: `./gradlew --no-daemon :workflow:ktlintCheck :workflow:detekt`
+- exit: 1 (초기) → 0 (재실행)
+- 핵심 결과: ktlint brace 일관성 1건·detekt `MatchingDeclarationName`(파일명 불일치)·`ReturnCount`(`expireIfDue` 3·`apply` 6, 한도 2) 4건·`MaxLineLength` 3건 — `ktlintFormat` + `expireIfDue`/`apply` 를 guard 함수 조합(`expiryRejection`·`duplicateOutcome`·`actorRejection`)으로 재구성해 해소.
+
+## 2026-09-08T14:05Z
+- cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'`
+- exit: 1(초기, 숫자 fixture 필드가 quoted string 이라 `decimalValue()` 코어스 실패 5건) → 0(재실행)
+- 핵심 결과: 74 tests, 0 failed(기존 69 + strategy-edit 5). fixture 입력의 `min`/`max`/`bidNowThreshold` 등 숫자 필드를 quoted string 에서 JSON 숫자 리터럴로 정정(기존 strategy-validation-001 관례와 정합) + sha256 재계산.
+
+## 2026-09-08T14:08Z
+- cmd: `./gradlew --no-build-cache clean check`(S-1, 저장소 루트)
+- exit: 1(초기, `app` 소스의 ktlint MaxLineLength) → 1(2차, `app:sizeGate` 함수 50줄 초과 — `strategyEditExecutor` 55줄) → 0(3차)
+- 핵심 결과: `strategyEditExecutor` 를 `strategyEditCaseFrom`·`runStrategyEdit`·`projectionOf` 로 분해해 해소. 3차 `BUILD SUCCESSFUL`(344 actionable tasks).
+
+## 2026-09-08T14:12Z
+- cmd: `./gradlew --no-daemon :workflow:test`(S-2)
+- exit: 0
+
+## 2026-09-08T14:12Z
+- cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate :workflow:cpdCheck`(S-3)
+- exit: 0
+
+## 2026-09-08T14:13Z
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*EditSessionImportBoundaryTest*'`(S-3b)
+- exit: 0
+
+## 2026-09-08T14:13Z
+- cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'`(S-4)
+- exit: 0
+
+## 2026-09-08T14:14Z
+- cmd: `./gradlew --no-daemon qualityBaseline`(S-5)
+- exit: 0
+
+## 2026-09-08T14:14Z
+- cmd: `./gradlew --no-daemon :app:gateExecutionGate`(S-6)
+- exit: 0
+
+## 2026-09-08T14:25Z
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks --branch m4/2026-09-08 --single-branch <repo> "$d/repo" && (cd "$d/repo" && ./gradlew --no-build-cache clean check)`(S-0)
+- exit: 0
+- 핵심 결과: 임시 clone(커밋만 담음)에서 root `clean check` 전건 통과 — S-1 재현.
+
+## 2026-09-08T14:28Z — secret 스캔 (리뷰 요청 조건)
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4a/ --exclude=commands.md`
+- exit: 1(매치 없음)
+- 핵심 결과: 매치 0건. `--exclude=commands.md` 없이 돌리면 이 파일 자신이 위 grep 명령 텍스트를 담고 있어 `token`·`secret`·`password` 패턴에 자기 인용으로 걸린다(2건, 전부 developer 구간 밖 — 명령 원문 인용) — 실제 값이 아니라 이 절 자체를 재스캔한 자기참조 오탐이라 별도 실행으로 판독했다. Telegram id·사업자 정보 없음(육안 확인 — fixture 는 corpus 합성 식별자 `corpus-operator`/`corpus-session` 뿐).
+
+## 2026-09-08T14:29Z — clean-tree 게이트 (양성 대조 포함)
+- cmd: `git status --porcelain -- <in_scope 경로 27개, 개별 인자>`
+- exit: 0, 출력 없음
+- 양성 대조: `Transition.kt` 에 개행 한 줄을 추가한 뒤 같은 명령을 그 경로 하나로 재실행 → `M workflow/.../Transition.kt` 관측(exit 0, 비어있지 않음) → `git checkout -- Transition.kt` 로 되돌리고 재확인(비어있음). 경로를 변수 하나에 담지 않고 개별 인자로 넘겼다(2026-09-03 pathspec 함정 회피).
+
+## 2026-09-08T14:30Z — S-0 확인 재실행
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks --branch m4/2026-09-08 --single-branch /Users/harris/Development/private/bid-vector-v2-m4 "$d/repo" && (cd "$d/repo" && ./gradlew --no-build-cache clean check)`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL in 50s`, 353 actionable tasks 전부 executed(캐시 없는 임시 clone).
+
+# 수정 라운드 1 — verifier not-ready(H-1·H-2) 반영 (2026-09-08~09)
+
+verifier 리포트: `_workspace/m4-4a/03_verifier_report.md`. 처리: H-1/H-2(`33c7f97`) ·
+N-1(`f11a5e1`) · M-1(`ef7a8fc`) · M-2(`7f7a638`) · M-3(`022629b`).
+
+## 2026-09-08T21:10Z — H-1/H-2 실측 (a) 우회가 이제 컴파일되지 않는다
+- cmd: 임시 clone(`33c7f97` 포함 head)에 `app/src/test/kotlin/bidvector/app/verifyprobe/BypassProbe.kt`
+  (verifier 가 지목한 것과 같은 형태 — `StrategyRepository` 구현 + `validate()` 결과를
+  `AppliedStrategy(...)` 로 감싸 `save()` 에 전달) 심고 `./gradlew --no-daemon :app:compileTestKotlin`
+- exit: 1
+- 핵심 결과: `Cannot access 'constructor(strategy: OperatorStrategy): AppliedStrategy': it is internal in 'bidvector.workflow.strategy.AppliedStrategy'` — 우회 지점 정확히 그 줄에서 거부.
+
+## 2026-09-08T21:15Z — H-1/H-2 실측 (b) 양성 대조 — 정상 배선은 그대로 선다
+- cmd: 같은 clone 에서 probe 삭제 뒤 `./gradlew --no-daemon :app:compileTestKotlin :workflow:test :app:test --tests '*Conformance*'`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`(34 actionable tasks). `EditStrategyWorkflow` 경유 정상 경로는 영향 없음. worktree 는 건드리지 않음(임시 clone 전용).
+
+## 2026-09-08T21:30Z — M-1 변이 실측 — 판정 순서(만료→중복) 판별 case
+- cmd: `Transition.kt` 의 `expiryRejection(...) ?: duplicateOutcome(...)` 를 `duplicateOutcome(...) ?: expiryRejection(...)` 로 교환 후 `./gradlew --no-daemon :workflow:test`
+- exit: 1
+- 핵심 결과: 새 판별 case(`판정 순서는 만료가 먼저다 — accepted 로 lastCommand 가 채워진 뒤에도...`) 1건만 FAILED(29건 중), 나머지 28건 초록. 변이 원상 복구 후 재실행 exit 0(26→29건 전부 초록, `git diff` 로 원복 확인).
+
+## 2026-09-08T21:40Z — M-2 변이 실측 — 정책 생성 불변식
+- cmd: `EditSessionPolicyData` 의 두 `require`(양수·상한)를 `require(true)` 로 교환 후 `./gradlew --no-daemon :workflow:test`
+- exit: 1
+- 핵심 결과: `EditSessionPolicyDataTest` 3건(0/음수/상한 초과) FAILED, 나머지 30건 초록. 변이 원상 복구 후 재실행 exit 0(원복 확인).
+
+## 2026-09-08T21:50Z — N-1·M-3 회귀 확인
+- cmd: `./gradlew --no-daemon :workflow:test`(N-1 begin() 가드 test 2건, M-3 failure-injection test 2건 포함)
+- exit: 0
+- 핵심 결과: `EditStrategyWorkflowTest` 5→9건(N-1 2건 + M-3 2건 추가). **verifier r2 B-5 정정
+  (2026-09-09)** — 이 시점 `:workflow:test` 전체는 class 별 6·5·3·4·8·9 = **35건**이었다(「전체
+  33건」은 오산 — `EditSessionPolicyDataTest`(M-2, 4건)를 이 절이 누락하고 셌다).
+
+## 2026-09-08T22:00Z — 수정 라운드 1 최종 S-1~S-6·S-0 한 번에 재실행(head `022629b`)
+- cmd: `./gradlew --no-build-cache clean check`(S-1)
+- exit: 0 — `BUILD SUCCESSFUL in 35s`, 344 actionable tasks(321 executed·23 up-to-date).
+- cmd: `./gradlew --no-daemon :workflow:test`(S-2)
+- exit: 0
+- cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate :workflow:cpdCheck`(S-3)
+- exit: 0
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*EditSessionImportBoundaryTest*'`(S-3b)
+- exit: 0
+- cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'`(S-4)
+- exit: 0 — 74 tests(기존과 동일, 이번 라운드는 fixture 무변경).
+- cmd: `./gradlew --no-daemon qualityBaseline`(S-5)
+- exit: 0
+- cmd: `./gradlew --no-daemon :app:gateExecutionGate`(S-6)
+- exit: 0
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks --branch m4/2026-09-08 --single-branch /Users/harris/Development/private/bid-vector-v2-m4 "$d/repo" && (cd "$d/repo" && ./gradlew --no-build-cache clean check)`(S-0)
+- exit: 0 — `BUILD SUCCESSFUL in 1m 13s`, 353 actionable tasks 전부 executed(캐시 없는 임시 clone, head `022629b`).
+
+## 2026-09-08T22:10Z — rollback 재검증(목록 28 A·6 M 으로 갱신, `AppliedStrategy.kt`·`EditSessionPolicyDataTest.kt` 신설 반영)
+- cmd: `git diff --name-status 9948c6e4056bbf71fa6683aa67d30c2a49fc6eae..HEAD`(목록 기계 산출, head `022629b`)
+- exit: 0 — 28 A · 6 M(`reports/evidence/m4/4a/**` 6건 제외).
+- cmd: 임시 clone 에서 `git restore --source=<base> --staged --worktree -- <경로 34개 개별 인자>`
+- exit: 0 — `git status --porcelain` D 28 · M 6(목록과 일치), 신규 디렉터리 잔여 파일 0건(`find`).
+- cmd: `git diff <base> -- <M 대상 6개 경로>`
+- exit: 0, 출력 0줄(빈 diff).
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :app:compileTestKotlin`
+- exit: 0 — `BUILD SUCCESSFUL`(29 actionable tasks, 13 executed·16 from cache).
+- cmd: `./gradlew --no-daemon :workflow:test :app:test --tests '*Conformance*'`
+- exit: 0 — `BUILD SUCCESSFUL`(`:workflow:test NO-SOURCE`, `:app:test` conformance 정상 축소).
+
+## 2026-09-08T22:15Z — clean-tree 게이트 재확인(수정 라운드 1 최종 경로 34개, 양성 대조 포함)
+- cmd: `git status --porcelain -- <in_scope 경로 34개, 개별 인자>`
+- exit: 0 — 이 시점엔 `milestone-4.md`·`checklist.md`·`rollback.md` 세 파일이 아직 미커밋이라
+  `M milestone-4.md` 한 줄이 정직하게 찍혔다(장부층 커밋 전 — 아래 커밋 뒤 재확인에서 빈 값
+  으로 닫힌다).
+- 양성 대조: `Transition.kt`(이 시점엔 클린)에 개행 한 줄 추가 후 그 경로만으로 재실행 →
+  `M workflow/.../Transition.kt` 관측(비어있지 않음) → `git checkout -- Transition.kt` 로
+  되돌리고 재확인(비어있음, exit 0).
+
+## 2026-09-08T22:20Z — secret 스캔 재확인
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4a/ --exclude=commands.md --exclude=checklist.md`
+- exit: 1(매치 없음)
+- 핵심 결과: `--exclude=checklist.md` 를 새로 더했다 — 이번 라운드에서 checklist.md 가 "secret 스캔"
+  이라는 절 제목 문구를 담게 돼 자기참조 오탐이 그 파일로도 번졌다(육안 확인 — 실제 비밀값
+  아님). commands.md 와 같은 갈래의 자기참조라 같은 방식으로 제외했다.
+
+# 수정 라운드 2 — verifier 표적 재검증 not-ready(H-3) 반영 (2026-09-09)
+
+verifier 리포트: `_workspace/m4-4a/04_verifier_report_r2.md`. 처리: H-3/M-4(`e555b2a`) ·
+M-5/L-5(`517a7fc`) · L-6/L-7/B-5(`2bda85f`).
+
+## 2026-09-09T02:10Z — H-3 실측 (a) 커널 직몰이 저장 우회가 이제 컴파일 거부된다
+- cmd: 임시 clone(head `e555b2a` 이후)에 verifier 가 지목한 것과 같은 4줄 형태
+  (`beginSession`→`apply`→`apply`→`myRepo.save((c as TransitionOutcome.Applied).applied)`)를
+  `app/src/test/kotlin/bidvector/app/verifyprobe/H3Probe.kt` 에 심고
+  `./gradlew --no-daemon :app:compileTestKotlin`
+- exit: 1
+- 핵심 결과: `Cannot access 'fun apply(...)': it is internal in file.` · `Cannot access 'fun beginSession(...)': it is internal in file.` — 커널 두 함수 모두 `app` 에서 호출 자체가 막힘.
+
+## 2026-09-09T02:15Z — M-4 실측 (b) 세션 축 옆문(beginSession 결과를 자체 EditSessionRepository 에 직접 저장)도 거부된다
+- cmd: 같은 clone 에서 H3Probe.kt 를 지우고 `beginSession(...)` 결과를 자체 `EditSessionRepository`
+  구현에 `save()` 하는 코드를 `app/src/test/kotlin/bidvector/app/verifyprobe/M4Probe.kt` 에 심고
+  `./gradlew --no-daemon :app:compileTestKotlin`
+- exit: 1
+- 핵심 결과: `Cannot access 'fun beginSession(...)': it is internal in file.`(2곳 — 세션 생성 시도 자체가 막힘).
+
+## 2026-09-09T02:20Z — 실측 (c) 양성 대조 — 정상 배선과 corpus 다섯은 그대로 통과한다
+- cmd: 같은 clone 에서 probe 디렉터리 삭제 후 `./gradlew --no-daemon :app:compileTestKotlin :workflow:test :app:test --tests '*Conformance*'`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`(34 actionable tasks). `EditStrategyWorkflow` 경유 정상 배선·
+  `strategy-edit-001~005` corpus dispatch 전부 영향 없음.
+
+## 2026-09-09T02:30Z — 수정 라운드 2 최종 S-1~S-6·S-0 한 번에 재실행(head `2bda85f`)
+- cmd: `./gradlew --no-build-cache clean check`(S-1)
+- exit: 0 — `BUILD SUCCESSFUL in 35s`, 344 actionable tasks(320 executed·24 up-to-date).
+- cmd: `./gradlew --no-daemon :workflow:test`(S-2)
+- exit: 0
+- cmd: `./gradlew --no-daemon :workflow:moduleDependencyGate :workflow:sizeGate :workflow:cpdCheck`(S-3)
+- exit: 0
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*EditSessionImportBoundaryTest*'`(S-3b)
+- exit: 0
+- cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'`(S-4)
+- exit: 0 — 74 tests(변동 없음, fixture 입력/기대값 무변경 확인 — `git log -- fixtures/{input,expected}/strategy-edit-*.json` 전부 `6101dd2` 한 커밋뿐).
+- cmd: `./gradlew --no-daemon qualityBaseline`(S-5)
+- exit: 0
+- cmd: `./gradlew --no-daemon :app:gateExecutionGate`(S-6)
+- exit: 0
+- cmd: `d=$(mktemp -d) && git clone --quiet --no-hardlinks --branch m4/2026-09-08 --single-branch /Users/harris/Development/private/bid-vector-v2-m4 "$d/repo" && (cd "$d/repo" && ./gradlew --no-build-cache clean check)`(S-0)
+- exit: 0 — `BUILD SUCCESSFUL in 51s`, 353 actionable tasks 전부 executed(캐시 없는 임시 clone, head `2bda85f`).
+- 핵심 결과: `:workflow:test` class 별 6·5·3(+2, L-7 양성/음성 대조 추가)·4·8·11(+2, M-5·L-5) = **37**, 0 failed·0 skipped.
+
+## 2026-09-09T02:35Z — rollback 재검증(목록 28 A·6 M 불변 — 이번 라운드는 기존 파일만 수정, 신규 파일 없음)
+- cmd: `git diff --name-status 9948c6e4056bbf71fa6683aa67d30c2a49fc6eae..HEAD`(head `2bda85f`)
+- exit: 0 — 28 A · 6 M(`reports/evidence/m4/4a/**` 6건 제외), 경로 34개 목록이 라운드 1 과 동일.
+- cmd: 임시 clone 에서 `git restore --source=<base> --staged --worktree -- <경로 34개 개별 인자>`
+- exit: 0 — `git status --porcelain` D 28 · M 6, 신규 디렉터리 잔여 파일 0건(`find`).
+- cmd: `git diff <base> -- <M 대상 6개 경로>`
+- exit: 0, 출력 0줄.
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :app:compileTestKotlin`
+- exit: 0 — `BUILD SUCCESSFUL`(29 actionable tasks, 13 executed·16 from cache).
+- cmd: `./gradlew --no-daemon :workflow:test :app:test --tests '*Conformance*'`
+- exit: 0 — `BUILD SUCCESSFUL`(`:workflow:test NO-SOURCE`, `:app:test` conformance 정상 축소).
+
+## 2026-09-09T02:40Z — clean-tree 게이트·secret 스캔 재확인(경로 34개, 양성 대조 포함)
+- cmd: `git status --porcelain -- <in_scope 경로 34개, 개별 인자>`
+- exit: 0, 출력 없음.
+- 양성 대조: `Transition.kt` 에 개행 한 줄 추가 후 그 경로만으로 재실행 → `M` 관측 → `git checkout --` 로 되돌리고 재확인(비어있음).
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4a/ --exclude=commands.md --exclude=checklist.md`
+- exit: 1(매치 없음).
+
+## 자기 점검 — 이번 라운드가 새로 연 것이 있는가
+훑은 자리 넷: ① `begin()` M-5 수정이 기존 「비종단 세션 있으면 거부」 분기의 나머지 경로(정상
+활성 세션·이미 종단인 세션)를 바꾸지 않는지 — 코드 추적으로 확인(`folded !== existing` 이
+아니면 save 를 안 하므로 기존 두 경로는 그대로). ② `TransitionOutcome.Applied` internal
+constructor 화가 그 타입을 파괴적으로 읽는 자리(패턴 매칭·필드 접근)를 깨지 않는지 — 전
+test suite(37건) 통과로 확인, 생성자만 좁혔고 프로퍼티는 그대로라 읽기 영향 없음. ③ corpus
+실행자 재작성이 `strategy-edit-002`(스테이지별 다른 정책)의 배선을 실제로 지키는지 — 두
+workflow 인스턴스가 `sessions`·`strategies` fake 를 공유하는지 코드로 확인 + 그 case 의
+corpus test 통과로 재확인. ④ S-3b 정규식 폭을 넓힌 것(`+`→`*`)이 옛 매치를 잃지 않는지 —
+옛 패턴(세그먼트 2개 이상)은 새 패턴(1개 이상)의 부분집합이라 구조적으로 안전, 기존 양성
+대조 test(telegram import·FQN)도 그대로 통과. **새로 연 것 없음** — M-5 는 지난 라운드가
+연 것이고 이번 라운드에서 닫혔다.
+
+# 장부층 일괄 — verifier r3 ready-for-review, L-8/L-9/L-10/B-6/B-7 (2026-09-09)
+
+verifier 리포트: `_workspace/m4-4a/05_verifier_report_r3.md`. 판정 **ready-for-review**
+(산출물층 blocker/high 0) — 새 라운드를 열지 않고 low·장부층을 한 커밋으로 처리한다
+(운영자 채택 2026-09-02).
+
+## 2026-09-09T03:00Z — L-8 적용·무영향 실측
+- cmd: `TransitionOutcome.Applied` 의 `val applied` → `internal val applied` 로 수정 뒤
+  `./gradlew --no-daemon :workflow:compileKotlin`
+- exit: 0
+- cmd: `./gradlew --no-daemon :workflow:test`
+- exit: 0 — 37건 전부 초록(모듈 안 코드는 이 필드를 그대로 읽는다, internal 이라도 같은
+  모듈이라 문제 없음).
+- cmd: `./gradlew --no-daemon :app:compileTestKotlin :app:test --tests '*Conformance*'`
+- exit: 0 — `app` 의 corpus 실행자는 애초에 `.applied` 필드를 읽지 않는다(`.session.state`
+  만 읽음) — 무영향 확인.
+
+## 2026-09-09T03:05Z — B-6 재산출(직접 명령, 남의 수 인용 아님)
+- cmd: 아래 python 스니펫으로 정규식 `\b([A-Za-z][A-Za-z0-9_]*)\.[A-Z][A-Za-z0-9_]*\b`
+  (대문자 단일 세그먼트 루트까지 허용하는 최소 강화형)를
+  `workflow/src/main/kotlin/bidvector/workflow/strategy/*.kt` 전체에 적용:
+  ```
+  python3 -c "
+  import re, glob
+  pattern = re.compile(r'\\b([A-Za-z][A-Za-z0-9_]*)\\.[A-Z][A-Za-z0-9_]*\\b')
+  files = sorted(glob.glob('workflow/src/main/kotlin/bidvector/workflow/strategy/*.kt'))
+  total=lines=lines_nc=0; uniq=set()
+  for f in files:
+      for line in open(f, encoding='utf-8'):
+          s=line.strip(); is_c = s.startswith('*') or s.startswith('//') or s.startswith('/*')
+          m = pattern.findall(line)
+          if m:
+              lines+=1
+              if not is_c: lines_nc+=1
+              total+=len(m)
+              for mm in pattern.finditer(line): uniq.add(mm.group(0))
+  print(total, lines, lines_nc, len(uniq))
+  "
+  ```
+- exit: 0
+- 핵심 결과: **총 매치 97 · 매치 담은 줄 85 · 그중 주석 아닌 줄 81 · 고유 문자열 42**. 원래
+  L-7 문서에 적었던 「46건」은 어느 셈으로도 재현되지 않음(오산) — 판단(강화하지 않는다)은
+  불변, 숫자만 checklist.md·milestone-4.md·`EditSessionImportBoundaryTest.kt` KDoc 세
+  곳에서 정정.
+
+## 2026-09-09T03:10Z — L-9 문면 정정(코드 무변경 확인)
+- cmd: `begin()` 의 `if (folded !== existing) sessions.save(folded)` 를 삭제한 변이로
+  `./gradlew --no-daemon :workflow:test`
+- exit: 0(0건 FAILED, 내 실행 — verifier 실측과 일치). 변이를 `diff` 로 원상 복구 확인(백업
+  파일과 바이트 단위 일치). 코드는 유지(종단 판정 자체가 `folded` 를 봐야 하고 실 저장소의
+  이력 기록 용도), `EditStrategyWorkflow.kt` 의 KDoc 만 「fold 가 영속된다」로 읽히지 않게
+  정정.
+
+## 2026-09-09T03:15Z — L-10 문면 확인(재현 아님, verifier 실측 인용 — 코드 변경 없음)
+- 2층 폐쇄(Kotlin 가시성 + `sourceLanguageGate`) 서술을 checklist.md·milestone-4.md 에 반영.
+  `sourceLanguageGate` 가 `bidvector.kotlin-conventions.gradle.kts`(build-logic)에 등록되고
+  `check`(S-1) 의 일부임을 `grep -n "sourceLanguageGate" build-logic/src/main/kotlin/*.kts`
+  로 확인(exit 0, 3곳 매치 — task 등록·check 의존·주석).
+
+## 2026-09-09T03:20Z — 장부층 일괄 acceptance(팀장 지시 — 전건 아님)
+- cmd: `./gradlew --no-daemon :workflow:test`
+- exit: 0
+- cmd: `./gradlew --no-daemon :app:test --tests '*Conformance*'`
+- exit: 0
+- cmd: `./gradlew --no-daemon qualityBaseline`
+- exit: 0
+- cmd: `./gradlew --no-build-cache clean check`(L-8 로 코드가 바뀌므로 1회)
+- exit: 0
+
+# 사용자 승인 반영 (2026-09-09) — 코드 변경 없음, 장부·manifest·주석만
+
+사용자 승인 넷: slice 4A 종결 + fixture 다섯 승인 + D-4A-3 timeout=15분 확정 + 다음 slice 4C.
+
+## 2026-09-09T04:00Z — manifest.yaml 갱신 범위 확인
+- cmd: `git diff fixtures/manifest.yaml | grep "^@@"`
+- exit: 0
+- 핵심 결과: 5개 hunk, 전부 `strategy-edit-001~005`(줄 8827~9128) 범위 안 — 다른 도메인 case
+  무영향 확인.
+
+## 2026-09-09T04:05Z — YAML 유효성·승인 필드 확인
+- cmd: `python3 -c "import yaml; d=yaml.safe_load(open('fixtures/manifest.yaml')); print([c['review'] for c in d['cases'] if c['domain']=='strategy-edit'])"`
+- exit: 0 — 5 건 전부 `approved_by_user: True`·`claude_commit: '6101dd2'`·`approved_at: 2026-09-09`.
+
+## 2026-09-09T04:10Z — 하네스 레인 변경 재확인(승인 반영 시점)
+- cmd: `git log --oneline 9948c6e4056bbf71fa6683aa67d30c2a49fc6eae..HEAD -- CLAUDE.md .claude/`
+- exit: 0
+- 핵심 결과: 1건(`97d746d harness(v2-slice-pipeline): Phase 2.5 에 (2b) 값 획득 축 신설`) —
+  종결 승인(`d567adc`) **이후** 다른 세션이 붙인 하네스 개선. `scope.md` 「하네스 레인 변경」
+  절에 이미 선언됨(`167d88e`, 이 세션 밖 커밋). in_scope 밖, rollback 대상 아님. 착수~검증·
+  종결 기간(`base..d567adc`) 자체는 0건이었다(같은 절 실측).
+
+## 2026-09-09T04:15Z — compile·test 무영향 확인(코드 변경은 KDoc/주석뿐)
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :workflow:test`
+- exit: 0 — 37건 전부 초록.
+- cmd: `./gradlew --no-build-cache clean check`(manifest 변경을 conformance 가 읽으므로 1회)
+- exit: 0
+
+## 2026-09-09T04:25Z — EditSessionPolicyData.kt 최종 상태 재검증(내용 확정 후 강제 재실행)
+- cmd: `git diff -- workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionPolicyData.kt`
+- exit: 0 — 두 KDoc(클래스 상단·`EDIT_SESSION_POLICY`)만 승인-값 문면으로 바뀌고 나머지는
+  base 와 동일함을 hunk 로 확인(로직 무변경).
+- cmd: `./gradlew --no-daemon :workflow:compileKotlin :workflow:test --rerun-tasks`
+- exit: 0 — 강제 재실행(캐시 우회), 이 파일의 확정 내용 기준으로 컴파일·테스트 재확인.
+
+## 2026-09-09T04:30Z — clean-tree 게이트 재확인(경로 34개, 양성 대조 포함 — `checkout --` 미사용)
+- cmd: `git status --porcelain -- <in_scope 경로 34개, 개별 인자>`
+- exit: 0, 출력 없음(`policy-values.md` 는 `??`로 별도 확인).
+- 양성 대조: `EditSessionPolicyData.kt` 끝에 개행 한 줄 추가(`wc -l` 40→41) 후 그 경로만으로
+  재실행 → `M` 관측(exit 0, 비어있지 않음) → **`head -n 40`으로 추가한 줄만 절삭**(파일 전체를
+  base 로 되돌리는 `git checkout --`는 미사용 — 이전 시도에서 그 명령이 이 파일의 미커밋
+  KDoc 편집 두 곳까지 함께 지운 사고가 있었다: `git checkout --`는 마지막 커밋 상태 전체로
+  되돌리므로 대상 파일에 다른 미커밋 변경이 있으면 그것도 사라진다는 것을 실측으로 확인,
+  두 KDoc 편집을 Edit 로 재적용한 뒤 이 절의 최종 검증을 다시 돌렸다) → `wc -l` 40 복귀 ·
+  `git diff` 마지막 hunk 에 잉여 줄 없음 확인(비어있지 않던 진단이 이제 비어 있음, exit 0).

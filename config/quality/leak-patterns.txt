@@ -1,0 +1,6 @@
+api[_-]?key
+secret
+token
+password
+Bearer
+BEGIN (RSA|EC|OPENSSH)

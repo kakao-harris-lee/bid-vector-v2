@@ -1,0 +1,116 @@
+{
+  "milestone": "m4",
+  "slice": "4b1-bid-verdict-kernel",
+  "manifest_source": "fixtures/manifest.yaml",
+  "note": "정정(verifier L-2, 2026-09-09) — 이전 판은 verdict-001~004가 여전히 insufficient-evidence·dispatch 대상 밖이라 적었는데 둘 다 낡았다(86 = 74 + 신설 8(005~012) + 재승격 4(001~004)). verdict-005~012 여덟은 이 slice가 커널 이전에 없던 case로 신설했고, verdict-001~004 넷은 M0(2026-08-30)에 커널 이전에 저작돼 insufficient-evidence로 강등된 뒤 한 번도 실행된 적이 없었으나, 이 slice의 수정 라운드(운영자 결정 2026-09-09 선택지 (a))에서 입력을 이 커널의 입력 계약으로 재구성하고 authoritative로 승격했다 — 되돌림 경로의 두 번째 사용(koneps-collection 27건이 첫 번째). 열둘 전부 지금 authoritative·dispatch 대상이다.",
+  "cases": [
+    {
+      "id": "verdict-001",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "739da467a80a2bb8d982c6907e3a57271e4aace2062922d002334322f13f4062",
+      "expected_sha256": "a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-002",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "f638ae7cf372541e4fcc1dbf676bb7dcf33a9c2ebdeeb677192c60d0778905b0",
+      "expected_sha256": "b4d73881a02835122984868cabdace0ba481b6c4b550a92c9cd68b478744dd0e",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-003",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "6b6ba9d3a0c43c270988387212e479b1cc3bfafae9ed4452a0528a09c01a7e00",
+      "expected_sha256": "5ca813c3f2a57f76ea6377f99227c67c64986a33b1def56b5bfd853ec22b5da5",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-004",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "73089bb29ade6006eb68e8cee838de482947c4fc3859535a9012eaf6b60481bd",
+      "expected_sha256": "85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-005",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "e39547cd69b6110859a211f46926f642020bd0e0879d8632f80d917301d6104d",
+      "expected_sha256": "a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-006",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "15bace848bf930658928e1756d5bbc804b4d9a00585c69d36a856a5c174d6533",
+      "expected_sha256": "b4d73881a02835122984868cabdace0ba481b6c4b550a92c9cd68b478744dd0e",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-007",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "189745adf0993cd559ba99bf91630c9e0f8a905fe71a624e9f79973b044f69a3",
+      "expected_sha256": "874a3586850df904269c3e255b84c6776e5be232d93231a23f5d23ce304b72d6",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-008",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "ecbc51adf43f97a5a75c81e205cea51a534cfc7456c74ff3c2c6f2bbb28beabf",
+      "expected_sha256": "5d9fad5d1a729809b3903435c6b02ae19caba18717ccc99077e082f9e050abc7",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-009",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "2bd3aeb606782587b8c3b168810ca2fe5b3b7aad61b269471d147e8755abcf8f",
+      "expected_sha256": "5df94427de8edb07dde62e81c462d0602bcf0b276d59658410f01706b804a2aa",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-010",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "fd136e74dba264c48ae7e3124da1fb8c34c7abed59356429b07286f26af6ffa1",
+      "expected_sha256": "70fc5859c55bb6f7553c7435b5f4d4476564d7aacf828330b84d293f4931bd57",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-011",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "fc265a38aadad4170d8f23ade1b927aeec454007c7c25852261ce81408e5bae6",
+      "expected_sha256": "a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5",
+      "review_approved_by_user": false
+    },
+    {
+      "id": "verdict-012",
+      "domain": "verdict",
+      "classification": "authoritative",
+      "extraction_method": "authored-from-approved-spec",
+      "sha256": "5f0e0f74c964fbb43038febdabb395048b7407628d9e7c6dfe5c4aaccacebfd1",
+      "expected_sha256": "85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9",
+      "review_approved_by_user": false
+    }
+  ]
+}

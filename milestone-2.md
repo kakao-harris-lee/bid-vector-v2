@@ -111,6 +111,38 @@ field·enum, `max_message_bytes` 경계 쌍(양쪽 수용·양쪽 거부), deadl
 `OPEN-2A-INCLUDED-BUILD` 는 `contractGate` 가 지키는 상태로 갱신(`capability-map.md` §14.3), `ml-contract` included build 는
 `ADR 0006` D-6 에 M2 결정으로 기록. 아래 「완료 조건」 일곱 전부 충족 — **M2 완료**.
 
+### Slice 2E — 임베딩 RPC (M2 완료 뒤 후속, additive)
+
+`EmbeddingService` 를 `bidvector.ml.v1` 안에 **additive** 로 더한다 — 착수 시 승인 태그 `contracts/v1-approved-2026-09-07` 대비 breaking 0(종결 승인으로 태그가 `contracts/v1-approved-2026-09-10` 로 갱신, 아래 종결 문단).
+
+- `EmbedText`
+  - 입력: 텍스트 + 종류(`NOTICE` / `OPERATOR_PROFILE`), `PredictionEnvelope`(release 선택자·schema version 재사용)
+  - 출력: L2 정규화 벡터(`values`·`dimension`·`normalization`) + `ModelRelease`, 또는 `ApplicationFailure`
+- `GetEmbeddingMetadata`
+  - 승격 release, 차원, 지원 텍스트 종류, readiness
+
+점수(`match`·`similarity`·`priority`)·판정·kNN·프로필 임베딩 저장은 메시지에 넣지 않는다 — Kotlin(M4 4B-4·adapters) 소유.
+
+**2E 착수 2026-09-10** — 운영자 결정 2026-09-10: `OPEN-4D-LADDER-SCORE-SOURCE` (a)(M2 계약 v1 additive 확장 + M5 provider) ·
+E-1 (c)(계약은 모델 의존 성분만, `priority` 는 Kotlin 조합) · E-3 (a) · E-4 (a). 계약 정본 `reports/evidence/m2/2e/scope.md`.
+착수 조사(`_workspace/m2-2e/01_scout_opportunity_scoring.md`)가 legacy 사다리 점수 셋 가운데 모델 의존 부분이 **텍스트 → 벡터 하나**
+(분류기 8축 중 `semantic_similarity` 한 축 — 그것도 Kotlin 소유 fact 를 문장으로 합성한 임베딩의 코사인 — 과 pgvector kNN)임을 실측해,
+점수 RPC 가 아니라 **임베딩 RPC** 로 좁혔다(D-2E-1, 종결 승인 시 운영자 재확인). 확률 축은 `OPEN-ML-02` 결정 뒤 `calibrated_win_rate` 로
+예약(E-2 (c)). 사다리 점수 경로는 2E(계약) → 4B-4(Kotlin 코사인·조합 커널·합성 규약) → M5 provider slice → 4D-2(client) 로 분해된다.
+
+**2E 종결 2026-09-10** — verifier r1 not-ready(산출물 high 2: (i) 신설 `embedding.proto`
+가 승인 태그에 없어 필드·enum 값·필드 번호 변경을 `buf breaking`·`contractGate`·breaking
+스윕 어느 것도 못 잡음(enum 값 삭제가 전 게이트 완전 통과) (ii) 차원 불변식 test 가 원소를
+"떼기만" 해 norm 항에 먼저 걸려 dimension 항의 확인력이 0) → 수정 라운드 1(재작업 1/5,
+`EmbeddingTestdataCanonicalTest` 신설로 (i) 임시 대응 + dimension 변이 재설계로 (ii) 교정
++ `metadata.dimension` 대조 신설 + release 성분별 커버리지) → verifier r2 ready-for-review
+위에서 **사용자 승인 2026-09-10**(다섯 항목: 2E 종결·D-2E-1 확정·정책 값
+`embedding.text.max-chars=4000`·`embedding.norm.epsilon=0.0005` 승인(`OPEN-2E-TEXT-MAX`
+종결)·승인 태그 `contracts/v1-approved-2026-09-10` 신설·병합 진행). 알려진 제한(승인
+태그 신설 뒤에도 남음): `rpc` 삭제는 `EmbeddingTestdataCanonicalTest`도 못 잡는다(메시지
+wire 형식과 무관) · 실 servicer 는 M5 · 텍스트 합성 규약은 4B-4(`OPEN-2E-TEXT-SYNTHESIS`,
+활성 유지). 정본: `reports/evidence/m2/2e/checklist.md` 「사용자 승인」 절.
+
 ## 설계 규칙
 
 - `oneof`로 success/unmeasurable/application failure를 구분한다.

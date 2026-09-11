@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "promoted": {
+      "releaseId": "release-2026-09-01",
+      "artifactChecksum": "sha256:1f2e3d4c5b6a79881f2e3d4c5b6a7988",
+      "featureSchemaVersion": "text-synthesis-v1",
+      "codeVersion": "ml-engine-0.1.0",
+      "datasetId": "dataset-2026-08-corpus"
+    },
+    "dimension": 4,
+    "supportedTextKinds": ["TEXT_KIND_NOTICE", "TEXT_KIND_OPERATOR_PROFILE"],
+    "readiness": "READINESS_READY"
+  }
+}

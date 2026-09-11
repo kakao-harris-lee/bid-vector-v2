@@ -1,0 +1,11 @@
+{
+  "verdict": "Review",
+  "reasons": [
+    {
+      "type": "PriorityInReviewBand",
+      "priority": 0.5,
+      "reviewThreshold": 0.45,
+      "bidNowThreshold": 0.7
+    }
+  ]
+}

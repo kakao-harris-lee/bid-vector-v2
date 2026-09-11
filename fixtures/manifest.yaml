@@ -7910,13 +7910,16 @@ cases:
       approved_by_user: false
   - id: verdict-001
     domain: verdict
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         두 보류가 문장이 아니라 `SkipReason`으로 구분된다 (`CapacityHold`). 002와 쌍.
+    verified_paths:
+      - "$.verdict"
+      - "$.skipReason"
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
-          OPEN-DEC-05 (운영자 결정) · data-dictionary.md §3.6 · §3.1
+          운영자 결정 2026-09-09(M4/4B-1 수정 라운드 1, 선택지 (a)) · OPEN-DEC-05 · data-dictionary.md §3.6 · §3.1
     expected_reasoning: |-
       data-dictionary.md §3.6 `Verdict = sealed { BidNow, Review, Skip(reason: SkipReason) }`,
       *"`SkipReason` **필수**. 최소 두 값: `CapacityHold` · `LowPriority`"* + 운영자 결정 `OPEN-DEC-05` — *"금지되는
@@ -7941,10 +7944,11 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: abdae836b88d395282804842547619460ed707f3a0b169d2f90a71d6c0f43550
-    expected_sha256: 3c65444020710f62c670d9d6c133a36b66adab2bf81894087de3063b2e543e49
+    sha256: 739da467a80a2bb8d982c6907e3a57271e4aace2062922d002334322f13f4062
+    expected_sha256: a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5
     not_covered: |-
-      `SkipReason` 어휘의 **전수성** — `OPEN-DIC-03`(M1에서 게이트 사다리를 옮길 때 확정)
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다, `verdict-005`와 동일한 축).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -7974,19 +7978,62 @@ cases:
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-09
+        change: |-
+          `classification` 을 `insufficient-evidence` → **`authoritative`** 로 되돌리고 `source.kind` 를
+          `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verified_paths`(`$.verdict`·`$.skipReason`)를
+          달았다. `not_covered`(`OPEN-DIC-03`)를 제거했다 — 이 slice ③이 그 OPEN 을 종결했다(운영자 결정
+          2026-09-09, `SkipReason` 을 사다리 실측대로 둘로 닫음, `data-dictionary.md` §3.6·§13.2 갱신).
+          **입력을 M0 저작 시점(커널 이전)의 추정 형태에서 이 slice 의 실제 커널 입력 계약
+          (`$.input`·`$.policy`)으로 재구성했다** — `sha256`·`expected_sha256` 갱신. `verifies`가 단언하는
+          규칙(「두 보류가 문장이 아니라 `SkipReason`으로 구분된다 — `CapacityHold`」)과 기대값
+          (`verdict: Skip`·`skipReason: CapacityHold`)은 **불변**이다.
+        reason: |-
+          **운영자 결정 2026-09-09, 선택지 (a) 채택.** 001·002·003·004 는 커널(`VerdictLadder`)이
+          존재하기 전(M0, 2026-08-30)에 저작돼 `insufficient-evidence` 로 강등된 뒤 **한 번도 실행된
+          적이 없었다** — 입력 형태(`gateOutcome`/`structuredPayload` 등)는 그 시점의 추정이었다.
+          이 slice(4B-1) 가 실제 커널과 실행자(`VerdictExecutors.kt`)를 세운 뒤 승격을 시도하자
+          **dispatch 완전성 test**(`SharedKernelCorpusConformanceTest`의 「dispatch 표 밖의
+          authoritative case 가 없다」)가 실측으로 잡았다 — `TARGET_DOMAINS`에 `"verdict"`가 있고
+          네 case 가 `authoritative`가 되는 순간 `targetCases()`에 들지만 입력 형태가 실행자 계약과
+          달라 대응할 수 없었다(`./gradlew --no-daemon :app:test --tests '*Conformance*'` 실측:
+          **86 tests, 5 failed** — dispatch 실패 4 + 완전성 test 1).
+          운영자는 「번역 슬(입력 형태 그대로 두고 변환 계층 추가)」을 물리치고 **입력 자체를 커널
+          언어로 재구성**하는 쪽을 택했다 — 그 슬은 커널이 절대 내지 않는 형태를 corpus 가 검증하게
+          만들어 더 나쁘다는 판단. 이 case 가 재는 규칙(capacity-hold)과 기대 결과(Skip/CapacityHold)의
+          **의미는 재구성 전후로 같다** — `VerdictLadder.judge`로 직접 실행해 확인(commands.md).
+          **되돌림 경로가 두 번째로 쓰였다**(`koneps-collection` 27건이 첫 번째) — 이번엔 승격
+          자체가 아니라 「승격 시도 → 게이트가 형태 불일치를 잡음 → 입력 재구성 → 재승격」이라는
+          한 단계 더 깊은 형태.
+        policy_version: |-
+          해당 없음 — 분류·계약 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
     review:
-      claude_commit: pending
+      claude_commit: 9e1223a
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
   - id: verdict-002
     domain: verdict
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         두 보류가 문장이 아니라 `SkipReason`으로 구분된다 (`LowPriority`). 001과 쌍 — verdict는 같고 reason code가 다르다.
+        **입력의 `probabilityScore`·`matchedScore`가 `null`이 아니라 값(0.1/0.1)인 것은 필연이다**
+        (verifier L-1) — `null`이면 `forceBidOutcome`이 `Review(MlUnavailable)`로 새서 `Skip(LowPriority)`에
+        닿지 못한다(`VerdictLadder.kt`). **001과 대조하면 값으로 증언된다** — 001(capacity-hold)은
+        점수가 `null`이어도 `CapacityHold`에 닿는데(capacity-hold가 그 값을 요구하지 않는 첫 분기라서),
+        002(default skip)는 반드시 non-null 값이 있어야 `forceBidOutcome`을 통과해 `LowPriority`에
+        닿는다 — 둘이 나란히 「capacity-hold가 force-bid보다 먼저 평가된다」는 사다리 순서를 증언한다.
+    verified_paths:
+      - "$.verdict"
+      - "$.skipReason"
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
-          OPEN-DEC-05 · data-dictionary.md §3.6 · §3.1
+          운영자 결정 2026-09-09(M4/4B-1 수정 라운드 1, 선택지 (a)) · OPEN-DEC-05 · data-dictionary.md §3.6 · §3.1
     expected_reasoning: |-
       001과 같다.
     legacy_reference:
@@ -8009,10 +8056,11 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: 2a4fc1bcd2bb6caf0178ec2a06e4f009ce00cb27832fb2a97ab9f292a14a1e78
-    expected_sha256: c1a30beac648f399b26934b05fbc7102e5fff4d12af99a338ee3dfc33ecb9a42
+    sha256: f638ae7cf372541e4fcc1dbf676bb7dcf33a9c2ebdeeb677192c60d0778905b0
+    expected_sha256: b4d73881a02835122984868cabdace0ba481b6c4b550a92c9cd68b478744dd0e
     not_covered: |-
-      `SkipReason` 어휘의 **전수성** — `OPEN-DIC-03`
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다, `verdict-006`과 동일한 축).
     change_history:
       - date: 2026-08-31
         change: |-
@@ -8028,22 +8076,53 @@ cases:
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-09
+        change: |-
+          `classification` 을 `insufficient-evidence` → **`authoritative`** 로 되돌리고 `source.kind` 를
+          `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verified_paths`(`$.verdict`·`$.skipReason`)를
+          달았다. `not_covered`(`OPEN-DIC-03`)를 제거했다 — 이 slice ③이 그 OPEN 을 종결했다.
+          입력을 이 slice 커널의 입력 계약(`$.input`·`$.policy`)으로 재구성했다 — `sha256`·
+          `expected_sha256` 갱신. `verifies`(「두 보류가 문장이 아니라 `SkipReason`으로 구분된다 —
+          `LowPriority`」)와 기대값(`verdict: Skip`·`skipReason: LowPriority`)은 **불변**이다. 001과
+          쌍이라 함께 승격했다(001의 `change_history` 가 배경 전부를 적는다).
+        reason: |-
+          **`verdict-001` 과 같다 — 운영자 결정 2026-09-09, 선택지 (a).** 근거는 001의
+          `change_history` 를 참고. 이 case 는 001과 쌍(같은 사다리, 다른 종점)이라 재구성도
+          같은 방식(currentActiveBids < maxActiveBids로 capacity-hold 를 피하고, priority 를
+          reviewThreshold 아래로 두어 default `Skip(LowPriority)`에 닿게 함 — probability·matched 를
+          non-null 로 채워 force-bid 게이트가 `Review(MlUnavailable)`로 새지 않게 함, 조사
+          `_workspace/m4-4b1/01_scout_verdict_ladder.md` §2.2 분기 순서와 일치)로 했다.
+        policy_version: |-
+          해당 없음 — 분류·계약 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
     review:
-      claude_commit: pending
+      claude_commit: 9e1223a
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
   - id: verdict-003
     domain: verdict
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
-        force-bid 우회는 유지하되 출처가 판정 결과에 노출된다 — 우회의 존재를 감춘 것이 결함이었지 우회 자체가 아니다.
+        force-bid 경로(probability·matched가 각 임계 이상)는 priority가 bidNowThreshold 미만이어도
+        BidNow(ForceBidOverride)를 낸다 — priority 사다리를 우회해 승격이 확정된다는 것을 이 case가 잰다.
+        **`verified_paths`가 `$.verdict` 하나뿐이라 정상 승격(PriorityAboveBidNowThreshold)과 force-bid
+        우회(ForceBidOverride)를 구분하지 못한다** — 우회의 출처가 판정 결과에 노출되는지(reason 타입이
+        갈리는지, `OPEN-STR-03`)는 이 case가 재지 않는다. 그 축은 `:decision:test`가 진다(`not_covered`).
+    verified_paths:
+      - "$.verdict"
     source:
-      kind: m0-derived-rule
+      kind: operator-decision
       reference: |-
-          OPEN-STR-03 (운영자 결정) · data-dictionary.md §3.6
+          운영자 결정 2026-09-09(M4/4B-1 수정 라운드 1, 선택지 (a)) · OPEN-STR-03 (운영자 결정) · data-dictionary.md §3.6
     expected_reasoning: |-
       data-dictionary.md §3.6 *"force-bid 우회는 유지하되 출처를 판정 결과에 노출한다(운영자 결정 `OPEN-STR-03`) — 우회의 존재를 감춘
-      것이 결함이었지 우회 자체가 아니다"*.
+      것이 결함이었지 우회 자체가 아니다"*가 왜 `Skip`이 아니라 `BidNow`가 기대값인지의 근거다(정책적 배경).
+      **이 case 자체가 재는 것은 `$.verdict == BidNow`뿐**이다 — 「출처 노출」 축의 검증은 `not_covered`가 가리키는
+      `:decision:test`가 진다(verifier M-1, `verified_paths` 문면과 `verifies` 문면을 일치시켰다).
     legacy_reference:
       repo_sha: ed4b06c
       files:
@@ -8064,8 +8143,15 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: a7ed33985f34360f1c6a21c89183d85877aeaafce8f4b9a0b723feb8ac7fe57c
-    expected_sha256: 501a04622e9e450f69fb958d1b4d5efda6ae55a0918ca9e64286cd8dbe603667
+    sha256: 6b6ba9d3a0c43c270988387212e479b1cc3bfafae9ed4452a0528a09c01a7e00
+    expected_sha256: 5ca813c3f2a57f76ea6377f99227c67c64986a33b1def56b5bfd853ec22b5da5
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다). **force-bid 우회의 출처가 판정 결과에 노출되는지**
+      (reason 타입이 `ForceBidOverride`로 갈려 정상 승격과 구분되는지, `OPEN-STR-03`) —
+      `verified_paths`가 `$.verdict` 하나뿐이라 이 corpus case는 그 축을 재지 못한다(verifier
+      M-1, 2026-09-09). 그 축은 `:decision:test`(`VerdictLadderTest`의 `② force-bid 우회 —
+      priority 낮아도 probability·matched 가 임계 이상이면 BidNow(ForceBidOverride)`)가 진다.
     change_history:
       - date: 2026-08-31
         change: |-
@@ -8090,19 +8176,71 @@ cases:
         policy_version: |-
           해당 없음 — 출처 분류와 case 분류의 변경이고 기대값이 정책 데이터에 의존하지 않는다.
           입력·기대값이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다.
+      - date: 2026-09-09
+        change: |-
+          `classification` 을 `insufficient-evidence` → **`authoritative`** 로 되돌리고 `source.kind` 를
+          `m0-derived-rule` → **`operator-decision`** 으로 올렸다. `verified_paths` 를 **`$.verdict`
+          하나로**만 달았다 — `override.source`·`supersededReason` 같은 M0 시점의 서술 필드는 이
+          커널의 실제 출력 계약(`BidNowReason.ForceBidOverride`)에 없어 잠그지 않는다. 입력을 커널
+          입력 계약(`$.input`·`$.policy`)으로 재구성하고 기대값도 커널이 실제로 내는 projection
+          형태(`verdict: BidNow`, `reasons: [{type: ForceBidOverride, ...}]`)로 다시 썼다 — `sha256`·
+          `expected_sha256` 갱신. **결과(`$.verdict == BidNow`)는 불변**이다(정정, verifier M-1 —
+          아래 항목 참고. 최초 이 항목이 「`verifies`가 단언하는 규칙(우회가 판정 결과에 노출된다,
+          `BidNow`로 확정된다)은 불변」이라 적었던 것은 부정확했다).
+        reason: |-
+          **운영자 결정 2026-09-09, 선택지 (a).** 001의 `change_history` 참고. 이 case 는 축이
+          force-bid 라 001·002(priority 사다리)와 다른 재구성이 필요했다 — priority 를
+          bidNowThreshold 아래로 두어 「force-bid 가 아니었으면 승격되지 않았을 것」을 실측으로
+          보장하고, probability·matched 를 forceBidProbabilityThreshold·forceBidMatchedThreshold
+          이상으로 채워 `BidNowReason.ForceBidOverride` 분기를 확정으로 태웠다(`VerdictLadder.kt`
+          `forceBidOutcome`, 조사 §5.1). 옛 기대값의 `override.source: OPERATOR_STRATEGY_FLAG` ·
+          `supersededReason: LowPriority` 는 커널이 내지 않는 필드라 `verified_paths` 에서 걷었다 —
+          그 리터럴이 근거 없었다는 0E 라운드 5 의 진단(위)은 여전히 유효하고, 이번 재구성이 그
+          문제를 없앤다(커널이 실제로 내는 값만 잠근다).
+        policy_version: |-
+          해당 없음 — 분류·계약 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
+      - date: 2026-09-09
+        change: |-
+          `verifies` 를 좁혔다 — 「force-bid 경로가 `BidNow(ForceBidOverride)`를 낸다」까지만 이
+          case 가 재고, 「출처가 판정 결과에 노출된다」(reason 타입이 정상 승격과 갈리는지)는
+          `not_covered`로 옮겨 `:decision:test`(`VerdictLadderTest`) 소관으로 명시했다.
+          `expected_reasoning`도 같은 구분(정책적 배경 vs 이 case 가 재는 것)을 반영해 다시 썼다.
+          **위 2026-09-09 항목의 「`verifies`가 단언하는 규칙은 불변」이라는 문장을 정정한다** —
+          정확히는 **결과(`$.verdict`)는 불변**이고, **노출 축은 corpus 층에서 unit test 층으로
+          옮겼다.** 코드·기대값·`sha256`은 무변경이다.
+        reason: |-
+          **verifier r2 M-1(medium).** `verified_paths`가 `$.verdict` 하나뿐이라 정상 승격과
+          force-bid 우회를 구분하지 못하는데(둘 다 `BidNow`), `verifies`는 「출처가 노출된다」고
+          하고 위 change_history는 「그 규칙이 불변」이라고 **기록까지 해 두었다** — 우연한 누락이
+          아니라 기록된 주장이라 더 무겁다. M0 원본은 `overrideHidden: false`를 잠가 그 축을
+          실제로 쟀는데 재구성이 그것을 잃었다. **처분은 강등이 아니라 문면 정직화다** — 이 case
+          가 지금 실제로 재는 것(`BidNow` 확정)까지로 `verifies`를 좁히고, 못 재는 축은
+          `not_covered`에 명시해 커버리지를 어디가 지는지 분명히 한다(manifest 자신의 선례,
+          2026-08-31 floor-shortfall이 「`verifies`를 승인된 의미로 좁혀 유지」로 정한 것과 같은
+          처분 — 001 강등이 「미승인 이름을 잠갔다」였던 것과는 축이 다르다: 003은 「덜 잠그면서
+          더 주장한다」였다).
+        policy_version: |-
+          해당 없음 — 문면 정정이고 코드·기대값·해시는 무변경이다.
     review:
-      claude_commit: pending
+      claude_commit: 9e1223a
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
   - id: verdict-004
     domain: verdict
-    classification: insufficient-evidence
+    classification: authoritative
     verifies: |-
         개연 밴드 밖 운영자 하한 override는 버리지도 통과시키지도 않고 사유와 함께 거부되며, 그 거부가 관측 가능하다. 밴드는 **synthetic 정책 입력**이다.
+    verified_paths:
+      - "$.overrideOutcome"
     source:
       kind: operator-decision
       reference: |-
-          OPEN-DEC-04 (운영자 결정) · data-dictionary.md §3.6
+          운영자 결정 2026-09-09(M4/4B-1 수정 라운드 1, 선택지 (a)) · OPEN-DEC-04 (운영자 결정) · data-dictionary.md §3.6
     expected_reasoning: |-
       data-dictionary.md §3.6 *"개연 밴드 밖 override는 **버리지도 통과시키지도 않고 사유와 함께 거부**한다(운영자 결정
       `OPEN-DEC-04`). 거부가 **관측 가능한 결과**여야 한다"*. 밴드 값은 synthetic이며 기대값은 그 값이 아니라 「밖이면 사유와 함께 거부」 규칙에
@@ -8121,16 +8259,15 @@ cases:
       note: "운영 DB·API·로그에서 가져온 값이 없다. 식별자는 전부 `SYN-` 접두의 안정적 합성 id 다."
     extracted_at: 2026-08-30
     extraction_method: authored-from-approved-spec
-    sha256: c2403d85701a9911037ddc868b4dc750c263b8b834f93062471bea4f25a261ef
+    sha256: 73089bb29ade6006eb68e8cee838de482947c4fc3859535a9012eaf6b60481bd
     expected_sha256: 85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9
     not_covered: |-
-      개연 밴드의 **값** — data-dictionary.md §1.4.3 B6은 `legacy-behavior`
-      **이 case 의 `verifies` 를 계약이 기계로 지키지 못한다** — 확장 적대 집합(2026-09-02)에서
-      위반 변이체가 통과했다: $.overrideOutcome (a) verifies 주장 필드 삭제 · $.reasonCode (a) verifies 주장 필드 삭제. 동결된 술어 어휘
-      (`verified_paths` 정확 비교 · `verified_projections` 의 `not-equals`+`normalize`)로는 그 주장을
-      표현할 수 없고, **이 slice 는 새 술어를 만들지 않는다**(`schema.extensions` 의 동결).
-      그래서 **근거의 층이 아니라 계약 가능성**으로 내려간다 — 되돌림은 `uncovered_axes` 의
-      「계약 술어 부재로 authoritative 를 유지하지 못한 축」이 지목한다.
+      **`reasonCode` 리터럴(`OverrideOutsidePlausibilityBand`)과 `silentlyDropped`·
+      `silentlyAccepted`·`observableInResult` 세 필드** — `verdict-012`와 같은 이유로
+      `verified_paths`에서 뺐다(구현 리터럴이거나, 두 분기 모두에서 상수라 실패할 수 없는
+      필드). `overrideOutcome` 한 비트가 실질 검증이고 그것은 `FloorOverrideValidationTest`가
+      단위 test 층에서, 이 case가 corpus 층에서 함께 진다. override **수용**(밴드 안) 경로는
+      이 case가 덮지 않는다(`:decision:test`의 `FloorOverrideValidationTest`가 진다).
     change_history:
       - date: 2026-09-02
         change: |-
@@ -8150,10 +8287,561 @@ cases:
         policy_version: |-
           해당 없음 — 분류와 계약의 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
           입력·기대값 파일이 그대로이므로 `sha256`·`expected_sha256` 도 그대로다(그래서 `previous_*` 항목이 없다).
+      - date: 2026-09-09
+        change: |-
+          `classification` 을 `insufficient-evidence` → **`authoritative`** 로 되돌렸다(`source.kind`
+          는 이미 `operator-decision`이었다 — 001~003 과 달리 근거 층 강등이 아니었다). `verified_paths`
+          를 **`$.overrideOutcome` 하나로** 달았다(`verdict-012`와 같은 폭 — 이 라운드에서 `$.reasonCode`
+          와 상수 필드 셋을 `verdict-012`에서도 같은 이유로 걷었다). `not_covered` 를 제거했다. 입력을
+          이 slice 커널의 입력 계약(`$.override.rate`·`$.band`)으로 재구성했다 — `sha256` 갱신
+          (`expected_sha256`는 값이 우연히 그대로라 불변). `verifies`(밴드 밖 override 는 사유와 함께
+          거부되고 그 거부가 관측 가능하다)와 기대값(`overrideOutcome: Rejected`)은 **불변**이다.
+        reason: |-
+          **운영자 결정 2026-09-09, 선택지 (a).** 이 case 의 2026-09-02 강등은 001~003(미승인
+          어휘)과 **다른 층**이었다 — B9 이 잡은 것은 「필드 삭제 변이체가 옛 계약(`$.overrideOutcome`
+          +`$.reasonCode`+상수 셋)을 뚫는다」였다. 이 라운드의 H-1 시정에서 `verdict-012`가 정확히
+          같은 문제로 `$.overrideOutcome` 하나로 좁혀졌고 그 좁힌 계약은 이 slice의 새
+          `FloorOverrideValidation`·`floorOverrideExecutor`(mutation-tested, commands.md H-1/L-3)로
+          뒷받침된다 — 옛 corpus 하네스가 아니라 **이 slice가 세운 새 실행자·assertPathEquals**가
+          이 case 도 검증한다. 강등의 원인(계약 술어 부재)이 이 slice 에서 함께 해소됐으므로
+          `insufficient-evidence` 로 둘 이유가 없어졌다. 승격 자체는 001~003 과 같은 라운드·같은
+          선택지 (a)로 처리했다(입력 형태 재구성이 필요했던 것도 같다 — `operatorFloorRateOverride`
+          (percent 단위)+`plausibilityBand` 서술형에서 `$.override.rate`(fraction)+`$.band`로).
+        policy_version: |-
+          해당 없음 — 분류·계약 변경이고 기대값이 effective-dated 정책에 의존하지 않는다.
     review:
-      claude_commit: pending
+      claude_commit: 9e1223a
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+  - id: verdict-005
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        capacity-hold 가 확정 조건이다 — 진행중 입찰이 한도에 닿고 priority 가 임계 미만이면 Skip(CapacityHold). probability·matched 부재라도 이 분기는 그 값을 요구하지 않는다.
+    verified_paths:
+      - "$.verdict"
+      - "$.skipReason"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. capacity-hold 가 확정 조건이다 — 진행중 입찰이 한도에 닿고 priority 가 임계 미만이면 Skip(CapacityHold). probability·matched 부재라도 이 분기는 그 값을 요구하지 않는다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-005.json
+    expected_file: fixtures/expected/verdict-005.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: e39547cd69b6110859a211f46926f642020bd0e0879d8632f80d917301d6104d
+    expected_sha256: a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: 381eaeb
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: verdict-006
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        priority·force-bid(probability·matched 확정적으로 낮음) 둘 다 아니면 Skip(LowPriority) — 소진 when 의 마지막 갈래.
+    verified_paths:
+      - "$.verdict"
+      - "$.skipReason"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. priority·force-bid(probability·matched 확정적으로 낮음) 둘 다 아니면 Skip(LowPriority) — 소진 when 의 마지막 갈래.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-006.json
+    expected_file: fixtures/expected/verdict-006.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: 15bace848bf930658928e1756d5bbc804b4d9a00585c69d36a856a5c174d6533
+    expected_sha256: b4d73881a02835122984868cabdace0ba481b6c4b550a92c9cd68b478744dd0e
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: 381eaeb
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: verdict-007
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        priority 가 bidNowThreshold 이상이면 BidNow(PriorityAboveBidNowThreshold) — probability·matched 부재라도 priority 단독으로 이미 확정된다.
+    verified_paths:
+      - "$.verdict"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. priority 가 bidNowThreshold 이상이면 BidNow(PriorityAboveBidNowThreshold) — probability·matched 부재라도 priority 단독으로 이미 확정된다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-007.json
+    expected_file: fixtures/expected/verdict-007.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: 189745adf0993cd559ba99bf91630c9e0f8a905fe71a624e9f79973b044f69a3
+    expected_sha256: 874a3586850df904269c3e255b84c6776e5be232d93231a23f5d23ce304b72d6
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다). **reason 타입 이름과 그 payload 필드 구성(임계 수
+      포함)** — 운영자 결정 2026-09-09(verifier H-1 시정)로 `verified_paths` 에서 뺐다.
+      승인 문서·결정 기록·이 slice 계약 어디에도 `PriorityAboveBidNowThreshold`·
+      `ForceBidOverride`·`PriorityInReviewBand`·`ScoreNotProvided` 같은 구체 이름이 없다 —
+      §3.6 이 정하는 것은 `Verdict`·`SkipReason` 축뿐이다. 이 축은 `:decision:test`
+      (`VerdictLadderTest`·`VerdictLadderPropertyTest`)가 계속 진다 — corpus 가 값을
+      잠그지 않을 뿐 커버리지를 잃지 않는다.
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: 381eaeb
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: verdict-008
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        force-bid 우회 — priority 는 review 밴드 안이지만 probability·matched 가 각자 임계 이상이면 BidNow(ForceBidOverride). 우회의 출처가 결과에 실린다(OPEN-STR-03).
+    verified_paths:
+      - "$.verdict"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. force-bid 우회 — priority 는 review 밴드 안이지만 probability·matched 가 각자 임계 이상이면 BidNow(ForceBidOverride). 우회의 출처가 결과에 실린다(OPEN-STR-03).
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-008.json
+    expected_file: fixtures/expected/verdict-008.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: ecbc51adf43f97a5a75c81e205cea51a534cfc7456c74ff3c2c6f2bbb28beabf
+    expected_sha256: 5d9fad5d1a729809b3903435c6b02ae19caba18717ccc99077e082f9e050abc7
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다). **reason 타입 이름과 그 payload 필드 구성(임계 수
+      포함)** — 운영자 결정 2026-09-09(verifier H-1 시정)로 `verified_paths` 에서 뺐다.
+      승인 문서·결정 기록·이 slice 계약 어디에도 `PriorityAboveBidNowThreshold`·
+      `ForceBidOverride`·`PriorityInReviewBand`·`ScoreNotProvided` 같은 구체 이름이 없다 —
+      §3.6 이 정하는 것은 `Verdict`·`SkipReason` 축뿐이다. 이 축은 `:decision:test`
+      (`VerdictLadderTest`·`VerdictLadderPropertyTest`)가 계속 진다 — corpus 가 값을
+      잠그지 않을 뿐 커버리지를 잃지 않는다.
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: 381eaeb
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: verdict-009
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        priority 가 reviewThreshold 이상 bidNowThreshold 미만이고 force-bid 가 확정적으로 거짓이면 Review(PriorityInReviewBand).
+    verified_paths:
+      - "$.verdict"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. priority 가 reviewThreshold 이상 bidNowThreshold 미만이고 force-bid 가 확정적으로 거짓이면 Review(PriorityInReviewBand).
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-009.json
+    expected_file: fixtures/expected/verdict-009.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: 2bd3aeb606782587b8c3b168810ca2fe5b3b7aad61b269471d147e8755abcf8f
+    expected_sha256: 5df94427de8edb07dde62e81c462d0602bcf0b276d59658410f01706b804a2aa
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다). **reason 타입 이름과 그 payload 필드 구성(임계 수
+      포함)** — 운영자 결정 2026-09-09(verifier H-1 시정)로 `verified_paths` 에서 뺐다.
+      승인 문서·결정 기록·이 slice 계약 어디에도 `PriorityAboveBidNowThreshold`·
+      `ForceBidOverride`·`PriorityInReviewBand`·`ScoreNotProvided` 같은 구체 이름이 없다 —
+      §3.6 이 정하는 것은 `Verdict`·`SkipReason` 축뿐이다. 이 축은 `:decision:test`
+      (`VerdictLadderTest`·`VerdictLadderPropertyTest`)가 계속 진다 — corpus 가 값을
+      잠그지 않을 뿐 커버리지를 잃지 않는다.
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: 381eaeb
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: verdict-010
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        priorityScore 가 결측이면 probability·matched 가 force-bid 임계를 만족해도 Review(MlUnavailable) — 부재에서 BidNow 로 가는 경로가 타입에 없다(D-M4-6).
+    verified_paths:
+      - "$.verdict"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. priorityScore 가 결측이면 probability·matched 가 force-bid 임계를 만족해도 Review(MlUnavailable) — 부재에서 BidNow 로 가는 경로가 타입에 없다(D-M4-6).
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-010.json
+    expected_file: fixtures/expected/verdict-010.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: fd136e74dba264c48ae7e3124da1fb8c34c7abed59356429b07286f26af6ffa1
+    expected_sha256: 70fc5859c55bb6f7553c7435b5f4d4476564d7aacf828330b84d293f4931bd57
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다). **reason 타입 이름과 그 payload 필드 구성(임계 수
+      포함)** — 운영자 결정 2026-09-09(verifier H-1 시정)로 `verified_paths` 에서 뺐다.
+      승인 문서·결정 기록·이 slice 계약 어디에도 `PriorityAboveBidNowThreshold`·
+      `ForceBidOverride`·`PriorityInReviewBand`·`ScoreNotProvided` 같은 구체 이름이 없다 —
+      §3.6 이 정하는 것은 `Verdict`·`SkipReason` 축뿐이다. 이 축은 `:decision:test`
+      (`VerdictLadderTest`·`VerdictLadderPropertyTest`)가 계속 진다 — corpus 가 값을
+      잠그지 않을 뿐 커버리지를 잃지 않는다. **ML 부재의 두 번째 형태**(priority 는 있고
+      probability·matched 만 결측)는 이 case 가 덮지 않는다 — 이 case 는 priority 자체가
+      결측인 첫 번째 형태만 잰다. 두 번째 형태는 `VerdictLadderTest`·
+      `VerdictLadderPropertyTest`(단위 test 층)가 진다(verifier §9 표적 3).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: 381eaeb
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: verdict-011
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        순서 민감도 — capacity-hold 와 force-bid 조건이 동시에 참이면 capacity-hold 가 이긴다(조사 §2.1 elif 구조, 1D ProvenanceRules 순서 민감도 관례).
+    verified_paths:
+      - "$.verdict"
+      - "$.skipReason"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §2.2) 분기 전수와 data-dictionary.md §3.6 "Verdict = sealed { BidNow(reasons), Review(reasons), Skip(reason: SkipReason) }" 가 근거다. 순서 민감도 — capacity-hold 와 force-bid 조건이 동시에 참이면 capacity-hold 가 이긴다(조사 §2.1 elif 구조, 1D ProvenanceRules 순서 민감도 관례).
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-011.json
+    expected_file: fixtures/expected/verdict-011.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: fc265a38aadad4170d8f23ade1b927aeec454007c7c25852261ce81408e5bae6
+    expected_sha256: a8d27d43f55468b9d32877422f8c36a6e8bfde38a7a6db1aed2ed35728e8bcf5
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다).
+    contract_binding:
+      type_path: "bidvector.decision.VerdictLadder.judge(LadderInput, Resolution.Resolved<VerdictLadderPolicyData>): Verdict"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        네 분기 first-match 순서(capacity-hold → priority-bidNow/force-bid → review → skip)와 각 reason 이 나르는 실제 임계·값(DEC-12 A10 재현 가능성).
+      does_not_carry: |-
+        priority·probability·matched 산출 자체(M5/4B-2 소관) · 사람이 읽는 문장(§3.1) · 사다리 밖 드롭 지점(신설 OPEN, 4B-2 배정).
+    change_history: []
+    review:
+      claude_commit: 381eaeb
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: verdict-012
+    domain: verdict
+    classification: authoritative
+    verifies: |-
+        개연 밴드 밖 운영자 하한 override 는 버리지도 통과시키지도 않고 사유와 함께 거부된다(OPEN-DEC-04).
+    verified_paths:
+      - "$.overrideOutcome"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 결정 2026-09-09(M4/4B-1 착수) — data-dictionary.md §3.6·`OPEN-DIC-03`
+          종결(SkipReason 둘)·`OPEN-STR-03`·`OPEN-DEC-04`·D-M4-6 (a).
+    expected_reasoning: |-
+      data-dictionary.md §3.6 "개연 밴드 밖 override는 버리지도 통과시키지도 않고 사유와 함께 거부한다(운영자 결정 OPEN-DEC-04). 거부가 관측 가능한 결과여야 한다". 조사(_workspace/m4-4b1/01_scout_verdict_ladder.md §6.2)가 실측한 legacy 결함(override 가 ge=0.0 만 있고 상한이 없어 검증 없이 그대로 통과)의 반대 형태를 값으로 고정한다.
+    legacy_reference:
+      repo_sha: ed4b06c
+      files:
+        - app/services/allocation_core.py
+        - app/services/bid_base.py
+      role: |-
+        조사(_workspace/m4-4b1/01_scout_verdict_ladder.md)가 실측한 게이트 사다리·force-bid
+        우회·하한 override 검증 부재의 출처. 기대값의 근거는 승인 문면이지 legacy 출력이 아니다.
+    input_file: fixtures/input/verdict-012.json
+    expected_file: fixtures/expected/verdict-012.json
+    normalization:
+      rate_unit: "fraction"
+      money_unit: "해당 없음 — 이 case 는 점수·비율만 다룬다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: "운영 DB·API·로그에서 가져온 값이 없다. 임계값은 legacy-behavior(조사 §2.4 실측치)이고 운영 값이 아니다."
+    extracted_at: 2026-09-09
+    extraction_method: authored-from-approved-spec
+    sha256: 5f0e0f74c964fbb43038febdabb395048b7407628d9e7c6dfe5c4aaccacebfd1
+    expected_sha256: 85977abb95f0c1842e742e18472345b42b33bd0eeb828fa22ed41efba5c3faa9
+    not_covered: |-
+      임계 다섯의 **운영 값** — `OPEN-4B1-LADDER-THRESHOLDS`(값은 운영자 승인 대상, 이 case 는
+      legacy-behavior 값으로 구조만 잰다). **`reasonCode` 리터럴(`OverrideOutsidePlausibilityBand`)
+      과 `silentlyDropped`·`silentlyAccepted`·`observableInResult` 세 필드** — 운영자 결정
+      2026-09-09(verifier H-1·L-3 시정)로 `verified_paths` 에서 뺐다. 앞은 승인 문서·결정
+      기록 어디에도 없는 구현 리터럴이고, 뒤 셋은 이 실행자의 두 분기(Accepted/Rejected)
+      모두에서 상수라 실패할 수 없는 필드였다(verifier L-3). `overrideOutcome` 한 비트가
+      실질 검증이고 그것은 `FloorOverrideValidationTest`가 단위 test 층에서, 이 case 가
+      corpus 층에서 함께 진다. override **수용**(밴드 안) 경로는 이 case 가 덮지 않는다
+      (`:decision:test`의 `FloorOverrideValidationTest`가 진다).
+    contract_binding:
+      type_path: "bidvector.decision.FloorOverrideValidation.validate(BigDecimal, PlausibilityBand): FloorOverrideOutcome"
+      fixed_by: |-
+        `VerdictLadderTest`·`VerdictLadderPropertyTest` — 전이·순서 민감도·ML 부재 negative
+        property 를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        밴드 밖 override 가 FloorOverrideOutcome.Rejected(rate, band) 를 낸다는 것 — Accepted 도 Rejected 도 아닌 제3의 상태(조용한 드롭)가 없다.
+      does_not_carry: |-
+        reasonCode 문자열 자체(도메인 타입은 rate·band 만 나른다) — 이 값은 corpus runner 투영이다. 실 override 파이프라인 배선(4B-2).
+    change_history: []
+    review:
+      claude_commit: 381eaeb
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4b1/checklist.md` 「사용자 승인」 절 — slice 4B-1 종결 + verdict corpus 12건 승인(2026-09-09)"
+      approval_scope: |-
+        **`verdict` 도메인 한정이다.** 이 승인은 M4/4B-1 slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
 
 # -----------------------------------------------------------------------------
 # strategy 축 (M1/1E 신설, 2026-09-06) — 운영자 결정 30 이 STR-01 acceptance 넷 · STR-02
@@ -8824,6 +9512,333 @@ cases:
       claude_commit: pending
       codex_verdict: pending
       approved_by_user: false
+  - id: strategy-edit-001
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        STR-11 관찰 ① — 검증 실패는 상태를 바꾸지 않는다. `ProvideValue`의 draft 가
+        `candidateLimit=0`(`CandidateLimitNotPositive`)이면 편집 세션은 `WaitingForValue`에
+        **같은 field**로 머문다(거부가 아니라 accepted 전이, scope.md ②).
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30) — `capability-map.md` STR-11
+          블록의 「검증 실패 시 저장된 전략이 변하지 않고 같은 항목의 입력 대기 상태가
+          유지된다」를 이 slice 가 편집 상태 기계 위에서 재확인한다(scope.md ② 승인 문면).
+    expected_reasoning: |-
+      근거는 STR-11 승인 문면 그대로다 — 「같은 항목의 입력 대기 상태가 유지된다」가
+      `state=WaitingForValue`·`field=CandidateLimit`(입력 당시 field 와 동일)로 옮겨진다.
+      위반 어휘(`CandidateLimitNotPositive`)는 1E `StrategyViolation`(scope.md D-13 승인) 그대로다.
+    input_file: fixtures/input/strategy-edit-001.json
+    expected_file: fixtures/expected/strategy-edit-001.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액 필드가 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 편집 세션·operator id 는 corpus 전용
+        합성 식별자(`corpus-operator`·`corpus-session`)다.
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: d1fc50936d439dce4bc7e01edd24e1ec81a2bd52df9aaf4b6f355c894e1debab
+    expected_sha256: ac10fc435ad5bec6500937039cbdf13ffd8cc493698943001ebf8a7e87b3a42d
+    not_covered: |-
+      **timeout·중복 command·actor** — 이 case 는 단일 `ProvideValue` 호출 하나만 재고
+      나머지 판정 순서(설계 검토 (4) 2)는 `:workflow:test`(구조 case)가 진다(scope.md D-4A-1
+      승인 구성 — 「전이·만료·중복은 값 case 가 아니라 구조 case」).
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`·`EditSessionActorAndTimeoutTest` — 전이표 전수와
+        판정 순서를 값과 무관하게 고정한다. corpus 대조는 app conformance runner 가 진다.
+      carries: |-
+        `apply` 가 `TransitionOutcome.Accepted`로 검증 실패를 표현하고, 그 세션의
+        `state`가 `WaitingForValue(같은 field)`라는 것이 계약 안 정의다.
+      does_not_carry: |-
+        **① 위반 사유의 사람이 읽는 문장.** `violations`는 구조화 코드(`CandidateLimitNotPositive`)이지
+        메시지가 아니다 — scope.md 「만들지 않는 것」(사람이 읽는 메시지 문장).
+        **② 세션 영속·sessionVersion 의 정확한 증가량.** 이 case 는 순수 `apply` 호출 하나의
+        산출만 재고 영속 port 배선은 `EditStrategyWorkflowTest`가 진다.
+    change_history: []
+    review:
+      claude_commit: 6101dd2
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: strategy-edit-002
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        STR-11 관찰 ② — apply 시점에 검증이 재실행된다. `ProvideValue` 시점엔 허용 범위였던
+        `bidNowThreshold=0.7`이, `Confirmed` 시점엔 정책이 좁아져(`priorityScoreRange` 상한
+        `0.5`) `ScoreOutOfRange`가 된다 — 재검증이 **실제로 다른 정책**으로 다시 돈다는 것을
+        관측한다(설계 검토 (4) 3(b) — 거부가 아니라 `WaitingForValue`로 돌아가는 accepted 전이).
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30) — `capability-map.md` STR-11
+          블록의 「apply 시점에 검증이 재실행된다」를 이 slice 가 정책이 실제로 바뀌는
+          시나리오로 재확인한다(scope.md ① 「apply 시 재검증」 승인 문면).
+    expected_reasoning: |-
+      두 시점의 `Resolution.Resolved<StrategyPolicyData>`가 서로 다른 값(구성상 별개의 정책
+      해석)이라는 것이 corpus 입력 자체가 드는 근거다 — 재검증이 첫 번째 결과를 재사용했다면
+      `Applied`가 나야 하지만, 실제로 두 번째 정책으로 다시 계산해 `Invalid`가 난다.
+    input_file: fixtures/input/strategy-edit-002.json
+    expected_file: fixtures/expected/strategy-edit-002.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액 필드가 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 두 정책 값 모두 corpus 가 지은 합성 구성이다.
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: 805a009bc8631f87b02574bed508b860dafc7358b77c18a8d19e690af22db993
+    expected_sha256: c9002468cab26ac87a52728912c66aa0d708c1546f549fa49a4520d070683c0a
+    not_covered: |-
+      **낙관적 동시성(`StaleRevision`)** — `seenRevision`은 두 시점 모두 같은 값(1)이라 이
+      case 는 그 축을 재지 않는다. `EditSessionTransitionTableTest`가 별도 test 로 진다.
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand.Confirm, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`(「apply 시점 재검증이 Invalid 면 거부가 아니라
+        WaitingForValue 로 되돌아간다」)가 값과 무관하게 이 불변식을 고정한다.
+      carries: |-
+        `onConfirm`이 `validate`를 **호출부가 새로 주입한** policy·revision 으로 다시 부른다는
+        것 — 저장된 이전 검증 결과를 재사용하지 않는다.
+      does_not_carry: |-
+        정책이 실제로 어떻게 바뀌는지(운영자가 정책을 어떤 절차로 개정하는지)는 이 slice
+        밖이다 — corpus 는 「재검증이 다시 돈다」만 관측한다.
+    change_history: []
+    review:
+      claude_commit: 6101dd2
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: strategy-edit-003
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        STR-03 편집 거부 ① — `reviewThreshold`가 `bidNowThreshold`보다 크면 편집이 거부된다.
+        편집 상태 기계 위에서는 「거부」가 `TransitionOutcome.Rejected`가 아니라 세션이
+        `WaitingForValue(같은 field)`에 머무는 accepted 전이로 표현된다(scope.md ②).
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30) — `capability-map.md` STR-03
+          블록 「review 가 bidNow 보다 크면 거부된다」(`StrategyValidationTest`가 커널
+          층에서 이미 고정한 것과 같은 승인 문면을 편집 상태 기계 층에서 재확인한다).
+    expected_reasoning: |-
+      `strategy-validation-*` corpus 가 이미 커널(`validate`) 층에서 같은 문면을 계약했다
+      (money-basis-003 축과 같은 갈래 — 같은 규칙이 다른 소비 지점에서 재확인된다). 이
+      case 가 더하는 것은 그 결과가 **편집 세션 상태**로 어떻게 투영되는가다.
+    input_file: fixtures/input/strategy-edit-003.json
+    expected_file: fixtures/expected/strategy-edit-003.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액 필드가 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 점수 값 둘은 STR-03 승인 문면이 요구하는
+        「review > bidNow」관계만 만족하는 합성 값이다.
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: 668787b89468af938c495315b5b49250580a2f344cf41fcf75a07465867453ef
+    expected_sha256: 328644324721608aae6add485b11c37ea5b47e5f759bb1ed020b96e66fe3f9e9
+    not_covered: |-
+      review=bidNow(등호 통과) 경계는 `strategy-validation-*`(1E) corpus 가 이미 커널 층에서
+      진다 — 이 축을 편집 세션 층에서 다시 재지 않는다(한 case 는 한 의미만 검증한다, §7).
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand.ProvideValue, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`(「WaitingForValue 에 무효한 ValueProvided 는 같은
+        field 로 accepted 전이한다」)가 값과 무관하게 이 불변식을 고정한다.
+      carries: |-
+        위반이 `StrategyViolation.ReviewAboveBidNow`(1E 승인 어휘) 그대로 투영된다는 것.
+      does_not_carry: |-
+        검증 자체의 규칙(review<=bidNow 판정)은 1E `validate`의 계약이지 이 slice 가 새로
+        정의하지 않는다 — 이 case 는 그 결과의 **상태 기계 투영**만 잰다.
+    change_history: []
+    review:
+      claude_commit: 6101dd2
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: strategy-edit-004
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        STR-03 편집 거부 ② — `minBudget`이 `maxBudget`보다 크면 편집이 거부된다(WatchRuleId
+        축, review/bidNow 와 다른 필드 쌍). 편집 상태 기계는 세션을 `WaitingForValue(같은
+        field)`에 머물게 하는 accepted 전이로 표현한다(scope.md ②).
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30) — `capability-map.md` STR-03
+          블록 「min_budget 이 max_budget 보다 크면 거부된다」를 편집 상태 기계 층에서
+          재확인한다.
+    expected_reasoning: |-
+      `strategy-validation-*`(1E)가 커널 층에서 이미 계약한 문면이다. 예산 값은 D-6 요건
+      (`OperatorDeclared`·`INCLUSIVE`)을 만족해 `BudgetLimitNotComparable`이 아니라
+      `MinBudgetAboveMaxBudget` 하나만 나도록 조립했다.
+    input_file: fixtures/input/strategy-edit-004.json
+    expected_file: fixtures/expected/strategy-edit-004.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "KRW, BASE_AMOUNT basis, OperatorDeclared·INCLUSIVE(D-6 비교 성립 요건)"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 금액 두 건은 STR-03 승인 문면이 요구하는
+        「min > max」관계만 만족하는 합성 값이다.
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: 4ef1731c692a2e6d9c5d8ee47796fbabfa62212d5a5119ff2ae5d6596d4e416f
+    expected_sha256: 4d8cfa84a37139e27aba0ff63161e9c0ac308f29b2391711751fc3c0af085789
+    not_covered: |-
+      예산 비교 성립 요건(`BudgetLimitNotComparable`, D-6)은 이 case 가 값을 D-6 요건대로
+      조립해 우회했다 — 그 축은 `strategy-validation-*`(1E)가 이미 진다.
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand.ProvideValue, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`가 같은 불변식(무효 draft → 같은 field 로 accepted)을
+        review/bidNow 쌍으로 고정한다 — 이 case 는 minBudget/maxBudget 쌍으로 값을 대조한다.
+      carries: |-
+        위반이 `StrategyViolation.MinBudgetAboveMaxBudget`(1E 승인 어휘) 그대로 투영된다는 것.
+      does_not_carry: |-
+        예산 값의 basis·과세 처리 규칙 자체는 1E `validate`·shared-kernel `BaseAmount`의
+        계약이지 이 slice 가 새로 정의하지 않는다.
+    change_history: []
+    review:
+      claude_commit: 6101dd2
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
+  - id: strategy-edit-005
+    domain: strategy-edit
+    classification: authoritative
+    verifies: |-
+        D-15 상태 구분 — 「전략이 설정됐는가」(`isConfigured`)와 「감시 범위를 좁히는가」
+        (`watchRules.isEmpty`의 반대)는 다른 물음이다(1E `StrategyValidationTest` STR-03
+        acceptance 셋째와 같은 문면). `bidNowThreshold`만 채운 draft 는 `isConfigured=true`,
+        `watchRulesEmpty=true` 둘 다를 낸다 — 두 술어가 **다른 것을 본다**는 것을 편집 세션이
+        `WaitingForConfirmation`으로 넘어가는 시점에서 재확인한다.
+    verified_paths:
+      - "$.state"
+      - "$.field"
+      - "$.violations"
+      - "$.isConfigured"
+      - "$.watchRulesEmpty"
+    source:
+      kind: operator-decision
+      reference: |-
+          운영자 승인 2026-09-06(M1/1E 착수, decision 30·31) — `capability-map.md` STR-03
+          acceptance 셋째와 `data-dictionary.md` §2.2.6(D-15 "「설정됐는가」 술어")를
+          편집 상태 기계 층에서 재확인한다.
+    expected_reasoning: |-
+      1E `StrategyValidationTest`(`⑥ 임계치만 바꾸고 watch 필드가 비어 있으면...`)가 같은
+      문면을 커널 층에서 이미 고정했다 — 이 case 는 그 값이 편집 세션의 accepted 전이
+      (`WaitingForValue → WaitingForConfirmation`)로 투영될 때도 유지됨을 관측한다.
+    input_file: fixtures/input/strategy-edit-005.json
+    expected_file: fixtures/expected/strategy-edit-005.json
+    normalization:
+      rate_unit: "해당 없음"
+      money_unit: "해당 없음 — 이 case 의 draft 에 금액 필드가 없다"
+      timezone: "Asia/Seoul"
+      source_form: "authored-canonical"
+    privacy:
+      contains_personal_data: false
+      synthetic: true
+      method: not-applicable-synthetic
+      note: |-
+        운영 DB·API·로그에서 가져온 값이 없다. 점수 값은 STR-03 acceptance 셋째의 시나리오를
+        그대로 옮긴 합성 값이다(1E `StrategyValidationTest`와 같은 값).
+    extracted_at: 2026-09-08
+    extraction_method: authored-from-approved-spec
+    sha256: ab82e09307aab2968f7c76bbde69d571caa13272be4d62a480927b78f7ad82fe
+    expected_sha256: 212467719c7f449257d2bdc0b390d32ca8ee5941dfc2505e638a0948b6a80826
+    not_covered: |-
+      `Applied` 시점의 같은 구분(confirm 뒤에도 유지되는가)은 이 case 가 재지 않는다 —
+      `confirm: false`이므로 `WaitingForConfirmation` 시점까지만 관측한다.
+    contract_binding:
+      type_path: "bidvector.workflow.strategy.apply(EditSession, EditCommand.ProvideValue, Instant, OperatorStrategy, Resolution.Resolved<StrategyPolicyData>): TransitionOutcome"
+      fixed_by: |-
+        `EditSessionTransitionTableTest`(「WaitingForValue 에 유효한 ValueProvided 는
+        WaitingForConfirmation 으로 accepted 전이한다」)가 상태 전이 자체를 고정하고,
+        이 case 는 그 위에 D-15 구분 값을 더한다.
+      carries: |-
+        `isConfigured`·`watchRulesEmpty`는 `TransitionOutcome`이 직접 나르는 필드가 아니라
+        — 이 investigator 실행자가 같은 draft·policy·revision 으로 `validate`를 다시 불러
+        낸 투영이다(1E `strategyValidationExecutor`와 같은 관례, `StrategyEditExecutors.kt`).
+      does_not_carry: |-
+        이 두 술어를 세션 상태 자체의 필드로 만들 것인가(구조적으로 상시 노출)는 이 slice가
+        결정하지 않는다 — 어댑터(6A)가 확인 화면에 무엇을 보여줄지의 몫으로 남겨둔다.
+    change_history: []
+    review:
+      claude_commit: 6101dd2
+      codex_verdict: pending
+      approved_by_user: true
+      approved_at: 2026-09-09
+      approval_record: "`reports/evidence/m4/4a/checklist.md` 「사용자 승인」 절 — slice 4A 종결 + fixture 다섯 승인(2026-09-09)"
+      approval_scope: |-
+        **`strategy-edit` 도메인 한정이다.** 이 승인은 M4/4A slice 종결 승인(2026-09-09)에
+        대한 답이고 다른 도메인의 case 는 대상이 아니다 — 그쪽은 여전히 기존 값 그대로다.
+
 
 # =============================================================================
 # M1 계약 대조 — 1B 가 세운 shared-kernel 타입 계약과 이 corpus 의 대조 (운영자 결정 C13)

@@ -1,0 +1,21 @@
+import bidvector.workflow.event.AggregateId
+import bidvector.workflow.event.AggregateVersion
+import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.event.EventId
+import bidvector.workflow.event.IdempotencyKey
+import bidvector.workflow.event.newEnvelope
+import java.time.Instant
+
+fun probe() {
+    newEnvelope(
+        eventId = EventId("e"),
+        aggregateId = AggregateId("a"),
+        aggregateVersion = AggregateVersion(1),
+        occurredAt = Instant.EPOCH,
+        correlationId = CorrelationId("c"),
+        causationId = null,
+        idempotencyKey = IdempotencyKey("k"),
+        actor = null,
+        payload = "irrelevant",
+    )
+}

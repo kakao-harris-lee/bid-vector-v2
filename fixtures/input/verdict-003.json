@@ -1,9 +1,17 @@
 {
-  "baseVerdict": "Skip",
-  "baseSkipReason": "LowPriority",
-  "forceBid": {
-    "applied": true,
-    "source": "OPERATOR_STRATEGY_FLAG",
-    "declaredBy": "SYN-OPERATOR-0001"
+  "policy": {
+    "capacityHoldPriorityThreshold": 0.8,
+    "bidNowThreshold": 0.7,
+    "reviewThreshold": 0.45,
+    "forceBidProbabilityThreshold": 0.8,
+    "forceBidMatchedThreshold": 0.7,
+    "policyVersion": "legacy-behavior-2026-08-14"
+  },
+  "input": {
+    "priorityScore": 0.2,
+    "probabilityScore": 0.9,
+    "matchedScore": 0.85,
+    "currentActiveBids": 0,
+    "maxActiveBids": 10
   }
 }

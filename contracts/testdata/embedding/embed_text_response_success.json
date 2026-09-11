@@ -1,0 +1,14 @@
+{
+  "success": {
+    "values": [0.5, 0.5, 0.5, 0.5],
+    "dimension": 4,
+    "normalization": "VECTOR_NORMALIZATION_L2",
+    "release": {
+      "releaseId": "release-2026-09-01",
+      "artifactChecksum": "sha256:1f2e3d4c5b6a79881f2e3d4c5b6a7988",
+      "featureSchemaVersion": "text-synthesis-v1",
+      "codeVersion": "ml-engine-0.1.0",
+      "datasetId": "dataset-2026-08-corpus"
+    }
+  }
+}

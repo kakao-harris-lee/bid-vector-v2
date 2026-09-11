@@ -1,0 +1,6 @@
+import bidvector.workflow.event.OutboxEntryId
+import bidvector.workflow.event.OutboxTransition
+
+fun probe() {
+    OutboxTransition.ToDelivered(OutboxEntryId("e"))
+}

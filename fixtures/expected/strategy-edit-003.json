@@ -1,0 +1,7 @@
+{
+  "state": "WaitingForValue",
+  "field": "ReviewThreshold",
+  "violations": ["ReviewAboveBidNow"],
+  "isConfigured": null,
+  "watchRulesEmpty": null
+}

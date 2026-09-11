@@ -1,0 +1,6 @@
+{
+  "milestone": "m4",
+  "slice": "4b1-bid-verdict-kernel",
+  "status": "N/A",
+  "reason": "Python/V2 차이 판정 대상이 없다 — `Verdict` sealed 어휘(BidNow/Review/Skip + 구조화 reason code)와 `SkipReason`·`BidNowReason`·`ReviewReason`·`MlUnavailableReason`은 legacy 에 대응이 없는 신설 타입이다(legacy 는 문자열 action `\"bid_now\"/\"review\"/\"skip\"` + 한국어 문장 reasons 였다, 조사 §2.2·§3.1). 옮긴 것은 값이 아니라 순수 규칙(분기 조건·first-match 순서, 조사 §9.1)이고, 옮기지 않은 형태(N-1~N-12, 조사 §9.2 — 문장 사유·부작위 skip·같은 문장을 공유하는 두 경로·부재의 0 치환 등)는 intentional-redesign이지 legacy 출력과의 값 대조 대상이 아니다. `VerdictLadderPolicyData`의 임계 다섯은 legacy-behavior 값(조사 §2.4 실측치, `app/core/config.py`·`app/core/single_user.py`)을 test 정책에만 재사용했을 뿐 domain 코드로 옮기지 않았다(`OPEN-4B1-LADDER-THRESHOLDS`, 운영 값은 별도 승인 대상)."
+}

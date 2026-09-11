@@ -1,0 +1,8 @@
+import bidvector.workflow.event.OutboxCommand
+import bidvector.workflow.event.OutboxEntryId
+import bidvector.workflow.event.OutboxEntryState
+import bidvector.workflow.event.transitionOutbox
+
+fun probe() {
+    transitionOutbox(OutboxEntryId("e"), OutboxEntryState.Pending, OutboxCommand.Claim)
+}

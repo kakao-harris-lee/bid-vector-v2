@@ -289,7 +289,55 @@ procurement `internal` 이라 어댑터가 계약 없이 값을 꺼낼 경로가
 받았다. **어댑터 하드코딩 allow-list 우회는 채택하지 않았다** — 계약 레지스트리가 allow-list·미지 필드 회계의 정본이고, 정책을 코드에 박으면 같은 사실이 두 자리에 산다.
 
 **M3 는 이제 잔여 slice 가 없다.** 후속(별도 slice 아님): 3D V-1 · 3A 후속 셋 · **P-8**(§1.10 첨부 문서 키 계약, 표는 작성됐고 채택 대기) · fixture case(후보 여덟) ·
-`bidNtceOrd` 실측 한 번 · `OPEN-3E-*` 넷과 `OPEN-3F-*` 둘.
+`bidNtceOrd` 실측 한 번 · `OPEN-3E-*` 넷과 `OPEN-3F-*` 둘. **위 문단은 2026-09-09 3F 종결 시점의 기록으로 그대로 둔다**(이력을 되쓰지 않는다) —
+`OPEN-3D-GRANT-PUBLIC-BLINDSPOT`(M4/4C-2 verifier r2 M-3, 2026-09-10 신설)이 그 뒤 M3 로 **후속 slice 3G 를 새로 열었다**. 아래 절이 그 현재
+상태이고, 승인 전까지는 3G 도 M3 의 잔여 slice 다.
+
+### Slice 3G — 애플리케이션 역할 권한 래칫(`OPEN-3D-GRANT-PUBLIC-BLINDSPOT` 후속)
+
+**착수 2026-09-10 — M4/4C-2 verifier r2 M-3 이 연 후속.** 3D 가 세운 GRANT 값은 이미 옳지만, 3D 의 권한
+test 둘(`provenance_authority`·`notice_audit`)은 `information_schema.role_table_grants`(역할 **직접**
+부여만)를 술어로 써서 `GRANT ... TO PUBLIC` 경유 초과 권한을 못 본다 — 4C-2 가 `outbox`·`inbox` 에만
+먼저 적용한 `has_table_privilege`(직접·PUBLIC·상속을 모두 해소) 술어를 **전 테이블로 전수화**했다.
+마이그레이션은 한 줄도 고치지 않았다(권한 값은 이미 옳다 — 이 slice 는 게이트만 올린다).
+
+**산출**: `CleanMigrationTest.kt`(`adapters/src/test/kotlin/bidvector/adapters/persistence/`)에 유효
+권한 행렬 test 하나(축 9) — `public` 의 **BASE TABLE 전체를 DB 에서 발견**해 기대 행렬(테이블 열두 개,
+`flyway_schema_history` 포함 — 값은 실측)과 **키 집합·행 값을 둘 다 정확히 일치**시킨다. 3D 의 옛 술어
+test 둘은 지우고 그 근거(F-6 등)는 행렬 KDoc 으로 옮겼다 — 단언은 약해지지 않는다(행렬이 그 두 테이블을
+행으로 포함). 4C-2 가 `outbox`·`inbox` 에 따로 두던 유효 권한 test 둘도 행렬에 흡수되어 지웠다(축은
+KDoc 으로 유지, 중복 제거 — cpdCheck).
+
+**mutation 넷을 실측했다**(임시 probe, 커밋에는 없다 — 확인 뒤 제거): ⓐ `GRANT DELETE ... TO PUBLIC`
+(outbox) → 행렬 test 가 `outbox` 키에서 낙제(DELETE 축) ⓑ 역할 직접 `GRANT TRUNCATE`(notice, 초과) →
+`notice` 키에서 낙제(TRUNCATE 축) ⓒ `REVOKE UPDATE`(notice, 부족) → `notice` 키에서 낙제(UPDATE 축)
+ⓓ 신규 테이블(`zzz_mutation_probe`, 기대 행렬 미선언) → 키 집합 불일치로 낙제(발견 축). 넷 다 원복 뒤
+`--rerun-tasks` 로 강제 재실행해 깨끗한 6개 test 가 그대로 통과함을 확인했다(디스크 상태가 아니라 실
+컨테이너 재기동으로 확인 — 잔존 GRANT/REVOKE 없음).
+
+**`OPEN-3D-GRANT-PUBLIC-BLINDSPOT` 종결** — `docs/discovery/capability-map.md` §14.3 에 신설·닫힘으로
+등재(4C-2 가 열었을 때 그 표에 실제로는 등재되지 않았던 것도 이번에 바로잡았다).
+
+**verifier r1(2026-09-10) → `ready-for-review`.** 산출물 blocker/high **0**, **재작업 카운터 0/5**(한
+라운드도 막히지 않았다). verifier 가 S-0~S-6 전건을 직접 재실행해 exit 0 을 확인하고, **mutation 여섯**으로
+게이트를 독립 재현했다 — 구현 레인의 넷에 더해 ⓕ「기대 행렬에만 있는 테이블」(반대 방향)을 재고, ⓓ를
+런타임 `CREATE TABLE` 이 아니라 **실 마이그레이션 `V7`** 로 재현했다(「마이그레이션이 권한 선언을
+빠뜨린다」는 진짜 시나리오). 기대 행렬 열두 행도 verifier 가 DB 에서 **독립 재구성**해 한 자리도 다르지
+않음을 확인했다. finding 일곱은 전부 low 였고 한 커밋으로 일괄 시정했다.
+
+**3G 종결 2026-09-10(사용자 승인) — `OPEN-3D-GRANT-PUBLIC-BLINDSPOT` 종결.** 이 slice 가 바꾼 것은
+**게이트의 시야**다: 「역할에 직접 부여된 것」만 보던 술어가 **유효 권한**(직접·PUBLIC 경유·역할 상속)이
+됐고, 대상이 테이블 둘에서 **열둘 전수**가 됐으며, 목록을 DB 에서 발견해 **새 테이블이 권한 선언 없이
+들어오면 실패**한다. 권한 **값**은 한 줄도 바꾸지 않았다 — 마이그레이션 무편집이 계약이었고 지켜졌다
+(`git diff --stat <base>..HEAD -- adapters/src/main/resources/db/migration config/quality/gate-tests.properties`
+빈 결과).
+
+**알려진 제한(종결 시점)**: 행렬은 `BASE TABLE` 만 잰다 — **시퀀스 셋**(`bidvector_app` 이 USAGE·SELECT 를
+갖는다)·VIEW·구체화뷰·외래표는 래칫 밖이다(`OPEN-3G-NONTABLE-PRIVILEGE-SURFACES`, 오늘 손실 0 — 뷰 0개
+실측이지만 PUBLIC 사각과 **같은 갈래**다) · `adapters/persistence` 에는 `ml`·`event` 와 달리 게이트 등재
+완전성 test 가 없다(`OPEN-3G-PERSISTENCE-GATE-REGISTRATION` — 이 slice 는 신규 test class 를 만들지 않아
+당장 영향이 없고, 그것이 신규 class 를 만들지 않은 이유이기도 하다) · admin 역할·RLS·컬럼 단위 권한은
+경계 밖(3D 위협 모델).
 
 ## Codex 독립 리뷰
 

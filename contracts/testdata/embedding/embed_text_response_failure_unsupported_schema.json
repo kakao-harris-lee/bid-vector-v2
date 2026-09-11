@@ -1,0 +1,7 @@
+{
+  "failure": {
+    "code": "FAILURE_CODE_UNSUPPORTED_SCHEMA",
+    "retryable": false,
+    "detailCode": "FEATURE_SCHEMA_VERSION_NOT_SUPPORTED"
+  }
+}

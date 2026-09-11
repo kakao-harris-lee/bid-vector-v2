@@ -24,6 +24,11 @@ import org.junit.jupiter.api.Test
  * `total_reserve_price_candidate_count`(다른 축, `ON CONFLICT` 에서 병합 전 tuple 만 보여
  * 오검출)에서 `draw_numbers` 축 자신의 `draw_numbers_valid_range_max` 로 바뀌었을 뿐 총
  * 개수는 그대로 24다).
+ *
+ * **M4/4C-2 — outbox·inbox 신규(스키마 스냅샷 래칫 예외 D-4C2-2, 추가만).** `outbox`는
+ * 존재 가드 아홉(빈 문자열 여섯 + `aggregate_version >= 0` + `state` enum + `payload` 빈
+ * 문자열)에 actor 짝 CHECK 둘(`actor_kind`↔`actor_detail` 짝, `actor_kind` enum)을 더해
+ * 11. `inbox`는 `idempotency_key <> ''` 하나뿐이라 1(V6__outbox_inbox.sql).
  */
 class CleanMigrationCheckTest : PersistenceTestSupport() {
     private val expectedCheckCountByTable =
@@ -38,6 +43,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "raw_observation" to 4,
             "rejected_write" to 1,
             "opening_reserve_price" to 6,
+            // M4/4C-2 — 신규(추가만, D-4C2-2).
+            "outbox" to 11,
+            "inbox" to 1,
         )
 
     @Test
@@ -65,6 +73,36 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
         checkBodies.any { it.contains("truncated = (truncation_cause IS NOT NULL))") } shouldBe true
         checkBodies.any { it.contains("notice_round ~ '^[0-9]{3}\$'") } shouldBe true
     }
+
+    /**
+     * verifier r1 M-1 시정 — `outbox_state_check` CHECK **개수**만 보면(위 테스트) IN 목록에
+     * 값을 하나 더해도(예: `'RETRYING'`) 개수는 그대로라 잡히지 않는다. D-M4-5 (a)의
+     * at-most-once 종단 다섯 어휘는 넓어지는 것 자체가 재시도 문이므로, 본문을 **정확히**
+     * 대조한다(3D COL-06/H-3 관례와 달리 `contains`가 아니라 `shouldBe` — 다섯 값이 늘거나
+     * 줄면 본문 문자열 자체가 달라진다).
+     */
+    @Test
+    fun `축8 부가 — outbox_state_check 본문이 다섯 어휘로 정확히 고정된다(D-M4-5 (a))`() {
+        val body = queryConstraintDef("outbox_state_check")
+        val expected =
+            "CHECK ((state = ANY (ARRAY['PENDING'::text, 'CLAIMED'::text, 'DELIVERED'::text, " +
+                "'FAILED'::text, 'ISOLATED'::text])))"
+        body shouldBe expected
+    }
+
+    private fun queryConstraintDef(constraintName: String): String =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = ?",
+                ).use { statement ->
+                    statement.setString(1, constraintName)
+                    statement.executeQuery().use { rs ->
+                        rs.next()
+                        rs.getString("def")
+                    }
+                }
+        }
 
     private fun queryCheckBodies(): List<String> {
         val bodies = mutableListOf<String>()

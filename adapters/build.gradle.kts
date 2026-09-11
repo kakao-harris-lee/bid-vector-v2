@@ -16,6 +16,12 @@ dependencies {
     // adapters 는 domain 층이 아니라 이 둘을 함께 참조할 수 있다(ModuleDependencyGate S-5).
     implementation(project(":qualification"))
     implementation(project(":strategy"))
+    // M4/4D-1 — `GrpcBidPredictionGateway`가 `BidPredictionOutcome.Unavailable`을 짓는 데
+    // `bidvector.decision.MlUnavailableReason`을 직접 참조한다(D-4D-6). `workflow`는 이 좌표를
+    // `implementation`으로만 선언해 하위 소비자(이 모듈)의 컴파일 classpath 에 전이되지
+    // 않는다 — adapters 는 그 자신이 domain 층 아래(모듈 의존 방향 D-3)이므로 이 project 를
+    // 직접 선언하는 것이 허용 범위 안이다(architecture-policy.properties layer.domain).
+    implementation(project(":decision"))
     // M3/3B ② — quota·bounded retry/backoff·rate limiter Resilience4j **한 계층**(ADR 0005
     // D-11). `resilience4j-kotlin`은 카탈로그에만 두고 여기서 끌어오지 않는다(D-3B-2,
     // gradle/libs.versions.toml 주석 — Java API로 충분해 불필요한 결합을 늘리지 않는다).
@@ -37,6 +43,13 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
     implementation(libs.postgresql.driver)
+
+    // M4/4C-2 verifier r1 M-2 — 1B `CompileFailureHarnessTest` 관례(strategy/shared-kernel
+    // 이 이미 쓰는 좌표, gradle/libs.versions.toml 주석 그대로). event 패키지의 값 획득 축
+    // 폐쇄(EventEnvelope 생성자·transitionOutbox·OutboxTransition.ToDelivered 생성자·
+    // OutboxEntry.restore 가 workflow 밖에서 internal)를 상시 probe 로 저장소에 남긴다 —
+    // 손으로 확인한 폐쇄는 `internal`→`public` 한 줄 되돌림을 어떤 게이트도 못 잡는다.
+    testImplementation(libs.kotlin.compilerEmbeddable)
 }
 
 // M3/3C — sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties). 위
@@ -45,19 +58,24 @@ dependencies {
 // 받아 누적 적용한다(내용 변경 없음, 크기 축 회피만).
 dependencies {
     // M2/2A — round-trip test 가 ml-contract 의 생성 stub 을 본다. composite 치환(같은
-    // 좌표를 `settings.gradle.kts`의 `includeBuild("ml-contract")`가 잇는다) — main 의존은
-    // M4 4D(도메인 ↔ 계약 매핑·client 배선)까지 미룬다.
-    testImplementation("bidvector:ml-contract")
-    testImplementation(platform(libs.grpc.bom))
-    testImplementation(libs.grpc.kotlin.stub)
-    testImplementation(libs.grpc.stub)
-    testImplementation(libs.kotlinx.coroutines.core)
+    // 좌표를 `settings.gradle.kts`의 `includeBuild("ml-contract")`가 잇는다). M4/4D-1 —
+    // main 의존을 연다(`GrpcBidPredictionGateway`가 실 coroutine stub 을 배선한다, 2A
+    // 주석이 예고했던 「도메인 ↔ 계약 매핑·client 배선」 시점). `platform(libs.grpc.bom)`도
+    // `implementation`으로 옮겨 main 컴파일 classpath 의 `io.grpc:*` 좌표를 정렬한다 —
+    // `testImplementation`은 `implementation`을 상속하므로(Gradle Java 플러그인 기본) test
+    // 쪽에 다시 적을 필요가 없다(중복 금지).
+    implementation("bidvector:ml-contract")
+    implementation(platform(libs.grpc.bom))
+    implementation(libs.grpc.kotlin.stub)
+    implementation(libs.grpc.stub)
+    implementation(libs.grpc.core)
+    implementation(libs.kotlinx.coroutines.core)
     // §4b 런타임 스모크(GrpcKotlinStackSmokeTest) 전용 — in-process 채널/서버 구성에
-    // `io.grpc:grpc-core`가 필요하다(`grpc-stub`/`grpc-kotlin-stub`은 그것을 끌어오지 않고,
-    // `grpc-testing`도 전이하지 않음을 실측). 조사 노트 02 가 권고한 in-process 대역
-    // (2D 의 fake servicer consumer/provider test 도 재사용할 후보).
+    // `io.grpc:grpc-inprocess`가 필요하다(`grpc-stub`/`grpc-kotlin-stub`은 그것을 끌어오지
+    // 않고, `grpc-testing`도 전이하지 않음을 실측). 조사 노트 02 가 권고한 in-process 대역
+    // (2D 의 fake servicer consumer/provider test 도 재사용할 후보 — M4/4D-1 `adapters.ml`
+    // test 도 같은 대역을 쓴다).
     testImplementation(libs.grpc.testing)
-    testImplementation(libs.grpc.core)
     testImplementation(libs.grpc.inprocess)
     // M2/2D ⑤ — `ContractMaxPayloadTest` 전용. in-process 전송은 메시지를 marshaling 없이
     // 참조로 넘겨 `maxInboundMessageSize`를 강제하지 않는다(실측) — 경계 쌍(D-2D-6)의 실제
