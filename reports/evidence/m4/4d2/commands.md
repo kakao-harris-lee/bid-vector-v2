@@ -193,8 +193,9 @@ F-B~F-E 컴파일·테스트:
   exit 0/0/0, `tests=2 failures=0` 3연속(F-A 최종 확증, 오늘 세 번째 clone에서 총 9/9)
 - cmd: `./gradlew --offline --no-daemon :adapters:test` (S-2) — exit 0
 - cmd: `./gradlew --offline --no-daemon :workflow:test` (S-3) — exit 0
-- cmd: `./gradlew --offline --no-daemon :adapters:moduleDependencyGate :adapters:sizeGate :adapters:cpdCheck contractGate` (S-4, `contractGate`는 root task) — exit 0
-- cmd: `./gradlew --offline --no-daemon :app:test` (S-5, `:app:test`와 별도 호출) — exit 0
+- cmd: `./gradlew --offline --no-daemon :adapters:moduleDependencyGate :adapters:sizeGate :adapters:cpdCheck` (S-4 1차 호출) — exit 0
+- cmd: `./gradlew --offline --no-daemon contractGate` (S-4 2차 호출 — scope.md 계약은 `&&`로 나뉜 두 `./gradlew` 호출이다, `contractGate`는 root task) — exit 0
+- cmd: `./gradlew --offline --no-daemon :app:test` (S-5) — exit 0
 - cmd: `./gradlew --offline --no-daemon qualityBaseline` (S-6) — exit 0
 - cmd: `./gradlew --offline --no-daemon :app:gateExecutionGate` (S-7, S-5와 별도 호출) — exit 0
 - **측정 정직성**: S-2·S-3·S-5·S-6·S-7은 S-0 직후 같은 clone에서 돌려 UP-TO-DATE였다 —
@@ -207,3 +208,13 @@ F-B~F-E 컴파일·테스트:
   덮어써져 이 문서 작성 시점엔 남아 있지 않다 — 알려진 문서 한계, evidence 크기
   때문에 재실행하지 않는다).
 - secret 스캔: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/4d2/` — 매치는 이 문서 자신의 스캔 명령 인용뿐(육안 확인, 위와 같은 자기 인용 패턴)
+
+## 2026-09-11 — head `0a32273` 기준 (장부 정정, L-4)
+
+위 최종 acceptance 기록은 `6d43271` 시점이다. `0a32273`은 `6d43271`에서
+`reports/evidence/m4/4d2/scope.md` **1파일만** 다르고(F-F, 위협 모델 우회 (6) 문면
+정정 — 문서 전용) 코드 트리는 `6d43271`과 동일하다(`git diff 6d43271..0a32273 --stat`
+= `scope.md` 한 줄). verifier r3와 독립 코드 리뷰 r2가 `0a32273`에서 각각 전건
+acceptance를 재실행해 exit 0을 확인했다(각 레인의 판정 문서가 정본 — verifier r3
+`ready-for-review`, 코드 리뷰 r2 `approve`). 코드가 바뀌지 않았으므로 이 구현 레인은
+`0a32273`에서 다시 돌리지 않았다.
