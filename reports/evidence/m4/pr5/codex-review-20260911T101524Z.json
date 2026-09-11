@@ -1,0 +1,32 @@
+{
+  "verdict": "approve",
+  "reviewed_base": "fcbaa5536ede9271ed8a8118a6b0f88cf12b2376",
+  "reviewed_head": "80e86bc3939022d8860726ad0a311391af19cc6a",
+  "findings": [],
+  "commands_run": [
+    "git status --short",
+    "git rev-parse HEAD",
+    "git cat-file -t fcbaa5536ede9271ed8a8118a6b0f88cf12b2376",
+    "git cat-file -t 80e86bc3939022d8860726ad0a311391af19cc6a",
+    "git merge-base fcbaa5536ede9271ed8a8118a6b0f88cf12b2376 80e86bc3939022d8860726ad0a311391af19cc6a",
+    "git tag -l 'contracts/*'",
+    "git diff fcbaa5536ede9271ed8a8118a6b0f88cf12b2376...80e86bc3939022d8860726ad0a311391af19cc6a -- adapters/src/main/resources/db/migration/V6__outbox_inbox.sql contracts/proto/bidvector/ml/v1/embedding.proto config/quality/contract-policy.properties",
+    "git diff contracts/v1-approved-2026-09-10..80e86bc3939022d8860726ad0a311391af19cc6a -- contracts/proto config/quality/contract-policy.properties",
+    "cd contracts && buf --version",
+    "cd contracts && buf lint",
+    "cd contracts && buf breaking --against '../.git#tag=contracts/v1-approved-2026-09-10,subdir=contracts'",
+    "cd contracts && buf breaking --against '../.git#tag=contracts/v1-approved-2026-09-07,subdir=contracts'",
+    "cd contracts && buf build -o /dev/null",
+    "python3 -B - (stdin 스크립트: buf convert로 embedding golden 5개의 JSON/binpb 바이트 일치 및 schema·release·dimension·L2 검증)",
+    "git diff --check fcbaa5536ede9271ed8a8118a6b0f88cf12b2376...80e86bc3939022d8860726ad0a311391af19cc6a -- adapters/src/main/resources/db/migration/V6__outbox_inbox.sql contracts/proto/bidvector/ml/v1/embedding.proto config/quality/contract-policy.properties",
+    "git status --porcelain=v1 --untracked-files=all"
+  ],
+  "residual_risks": [
+    "DB·Gradle 실행은 환경 제약에 따라 수행하지 않았다. 마이그레이션·권한·JDBC 배선은 SQL과 테스트 소스로 대조했으며, 실제 잠금·동시성 동작은 재실측하지 않았다.",
+    "실 ML provider는 M5 범위다. 이번 검증은 현재 소비자 구현·provider fixture·golden 정합성까지이며, 외부 호출이나 배포 승인을 포함하지 않는다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.154.0",
+    "model": "gpt-6-astra (reasoning effort: high)"
+  }
+}

@@ -63,3 +63,26 @@ internal fun grpcStatusOf(error: Throwable): Status? =
         is StatusRuntimeException -> error.status
         else -> null
     }
+
+/**
+ * 리뷰 F-E(medium) 처방 — `GrpcBidPredictionGateway.mapTransportFailure`와
+ * `GrpcEmbeddingGateway.mapEmbedTransportFailure`가 같은 3분기 status 표를 각자
+ * `MlUnavailableReason`·`EmbeddingUnavailableReason`(서로 다른 sealed 타입)으로 옮겨
+ * 적던 16줄 중복(cpd 미검출)을 여기서 닫는다 — 분류 로직 자체는 이 함수 하나가 갖고,
+ * 각 gateway 는 이 결과를 자기 도메인 사유 타입으로 매핑만 한다(그 매핑까지 하나로
+ * 합치면 sealed 타입 둘을 억지로 엮게 된다 — `EmbeddingUnavailableReason`이
+ * `MlUnavailableReason`을 복제한 것은 모듈 경계(D-4D2-1)가 강제한 것이라 결과 타입은
+ * 합치지 않는다).
+ */
+internal enum class TransportFailureClass {
+    DEADLINE_EXCEEDED,
+    RETRY_BUDGET_EXHAUSTED,
+    OTHER,
+}
+
+internal fun classifyTransportFailure(error: Throwable): TransportFailureClass =
+    when (grpcStatusOf(error)?.code) {
+        Status.Code.DEADLINE_EXCEEDED -> TransportFailureClass.DEADLINE_EXCEEDED
+        Status.Code.UNAVAILABLE, Status.Code.RESOURCE_EXHAUSTED -> TransportFailureClass.RETRY_BUDGET_EXHAUSTED
+        else -> TransportFailureClass.OTHER
+    }

@@ -19,8 +19,6 @@ import contract.bidvector.ml.v1.FeatureInputs
 import contract.bidvector.ml.v1.LatestPromoted
 import contract.bidvector.ml.v1.MissingReason
 import contract.bidvector.ml.v1.ModelReleaseSelector
-import contract.bidvector.ml.v1.PredictionEnvelope
-import contract.bidvector.ml.v1.RequestEnvelope
 import bidvector.workflow.prediction.ModelReleaseSelector as DomainModelReleaseSelector
 import contract.bidvector.ml.v1.CompetitionSample as ProtoCompetitionSample
 import contract.bidvector.ml.v1.OptimizationObjective as ProtoOptimizationObjective
@@ -40,18 +38,13 @@ internal fun mapRequest(
     deadlinePolicyVersion: String,
 ): CalculateOptimalBidRequest {
     val envelope =
-        PredictionEnvelope
-            .newBuilder()
-            .setBase(
-                RequestEnvelope
-                    .newBuilder()
-                    .setRequestId(requestId)
-                    .setCorrelationId(request.correlationId.value)
-                    .build(),
-            ).setFeatureSchemaVersion(policy.featureSchemaVersion)
-            .setModelReleaseSelector(request.releaseSelector.toProto())
-            .setDeadlinePolicyVersion(deadlinePolicyVersion)
-            .build()
+        buildPredictionEnvelope(
+            requestId = requestId,
+            correlationId = request.correlationId.value,
+            releaseSelector = request.releaseSelector,
+            featureSchemaVersion = policy.featureSchemaVersion,
+            deadlinePolicyVersion = deadlinePolicyVersion,
+        )
 
     return CalculateOptimalBidRequest
         .newBuilder()

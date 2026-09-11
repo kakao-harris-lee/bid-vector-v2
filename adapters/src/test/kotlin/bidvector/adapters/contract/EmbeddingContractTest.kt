@@ -1,9 +1,9 @@
 package bidvector.adapters.contract
 
+import bidvector.adapters.ml.embeddingDimensionMatchesMetadata
 import contract.bidvector.ml.v1.EmbedTextRequest
 import contract.bidvector.ml.v1.EmbedTextResponse
 import contract.bidvector.ml.v1.Embedding
-import contract.bidvector.ml.v1.EmbeddingMetadata
 import contract.bidvector.ml.v1.EmbeddingServiceGrpcKt
 import contract.bidvector.ml.v1.GetEmbeddingMetadataRequest
 import contract.bidvector.ml.v1.GetEmbeddingMetadataResponse
@@ -350,8 +350,8 @@ class EmbeddingContractTest {
                 datasetId.isNotBlank()
         }
 
-    private fun embeddingDimensionMatchesMetadata(
-        embedding: Embedding,
-        metadata: EmbeddingMetadata,
-    ): Boolean = embedding.dimension == metadata.dimension
+    // `embeddingDimensionMatchesMetadata`는 main 으로 승격됐다(PR #5 게이트 시정, D-2E ②
+    // 미구현 — `bidvector.adapters.ml.EmbeddingShapeValidation.kt`). `releaseSatisfiesSelector`
+    // 를 M2/2B `PredictionContractTest`에서 승격한 것과 같은 관례 — 사본을 남기지 않고
+    // import 해서 쓴다(위 import 문).
 }
