@@ -57,9 +57,13 @@ base_sha: `caee26c` · head_sha: 이 문서 작성 시점의 `git rev-parse HEAD
 ## 2026-09-10T23:29:00Z — S-0 (임시 clone, 신선 실행)
 - cmd: `git clone . <scratch>/s0-clone && cd <scratch>/s0-clone && ./gradlew --offline --no-build-cache clean check`
 - exit: 0
-- 핵심 결과: BUILD SUCCESSFUL, 354 tasks **전건 executed**(UP-TO-DATE 없음). cpd 중복 0 ·
-  detekt issue 0 · workflow 145 / adapters 471 / app 129 tests, 실패·오류·skip 0 (fresh
-  test-results XML 집계, S-1 2차와 동일 수치 — 독립 clone 재현으로 신선 실행 근거를 보강)
+- 핵심 결과: BUILD SUCCESSFUL, 354 tasks(이 실행에서는 354 executed·0 up-to-date였다 —
+  **verifier F-7(low) 정정**: 이 재현 수치는 로컬 `~/.gradle` 캐시 상태에 따라 갈린다.
+  verifier 는 격리된 `GRADLE_USER_HOME`에서 같은 명령을 돌려 `320 executed·34 up-to-date`
+  를 얻었다 — 「전건 executed」는 이 실행 하나의 관측이지 보장된 불변량이 아니다. 결론
+  자체(cpd·detekt·in_scope 관련 게이트가 신선 실행됐다는 것)는 두 실행 모두에서 cpd
+  중복 0·detekt issue 0·test 수치 동일로 선다). workflow 145 / adapters 471 / app 129
+  tests, 실패·오류·skip 0 (fresh test-results XML 집계, S-1 2차와 동일 수치)
 
 ## 2026-09-10T23:33:00Z — 4D-1 test 무편집 확인
 - cmd: `git diff --stat caee26c..HEAD -- <4D-1 test 13파일>` (BreakerTest·
@@ -83,14 +87,55 @@ base_sha: `caee26c` · head_sha: 이 문서 작성 시점의 `git rev-parse HEAD
 - cmd: `cat adapters/build/test-results/test/TEST-bidvector.adapters.ml.MlGateRegistrationTest.xml`
 - 핵심 결과: `tests="2" failures="0" errors="0"` — 신규 test class 7건 등재 완전성 확인
 
-## 2026-09-10T23:40:00Z — rollback 실측(임시 clone)
-- cmd: `git restore --source=caee26c --staged --worktree -- <in_scope 비공유 경로 18개>`
+## 2026-09-10T23:40:00Z — rollback 실측(임시 clone, 1차)
+- cmd: `git restore --source=caee26c --staged --worktree -- <in_scope 비공유 경로 18파일 + 2디렉터리 = 인자 20개>`
+  (**verifier F-8(a) 정정** — 이전 표기 「18개」는 파일만 센 것이고 디렉터리 인자 둘을
+  빠뜨렸다. rollback.md ①의 명령이 실제 정본이며 인자 수는 20이다)
 - exit: 0
 - cmd: `git diff <이 slice의 gate-tests.properties 커밋>~1..<같은 커밋> -- config/quality/gate-tests.properties | git apply -R`
 - exit: 0
-- cmd: `git diff caee26c -- <in_scope 전 경로>` (되돌린 뒤)
-- exit: 0, 출력 0줄
+- cmd: `git diff caee26c -- <in_scope 코드 경로 한정, evidence 제외>` (되돌린 뒤)
+- exit: 0, 출력 0줄 (**verifier F-8(b) 정정** — evidence 경로까지 포함해 돌리면 0줄이
+  아니다(의도적으로 되돌리지 않는다). 「코드 경로 한정」임을 명시한다)
 - cmd: `./gradlew --offline :workflow:compileKotlin :workflow:compileTestKotlin :adapters:compileKotlin :adapters:compileTestKotlin :workflow:test :adapters:test`
 - exit: 0
 - 핵심 결과: 되돌린 트리 컴파일·테스트 초록(workflow 134 / adapters 449 tests, 4D-2 추가분만큼
   감소 — 4D-1 골격은 그대로 살아 있음을 확인)
+
+## 2026-09-11T00:30:00Z — verifier not-ready 수정 라운드 1(F-1~F-8)
+
+F-1(high) 처방 뒤 재컴파일·재테스트:
+- cmd: `./gradlew --offline --no-daemon :adapters:compileTestKotlin :workflow:compileTestKotlin`
+- exit: 0
+- cmd: `./gradlew --offline --no-daemon :adapters:test :workflow:test`
+- exit: 0
+- 핵심 결과: workflow 146(+1) / adapters 481(+10) tests, 실패·오류·skip 0(fresh XML 집계) —
+  F-1 실 gateway 회귀(NaN·+Inf·-Inf·혼합 4 case)·F-2 EmbeddingVector 비유한 값 test·F-3
+  EMBEDDING_NORM_EPSILON 값 고정 test·F-4 회귀 8건(개수 경계 2 + gateway 6) 전부 통과
+  포함(개별 testcase 이름은 XML에서 확인)
+
+## 2026-09-11T00:45:00Z — S-0 재실행 1차(수정 라운드 1 반영, 임시 clone) — 실패
+- cmd: `git clone . <scratch>/s0-clone-r2 && cd <scratch>/s0-clone-r2 && ./gradlew --offline --no-daemon --no-build-cache clean check`
+- exit: 1 (FAILED)
+- 핵심 결과: `:adapters:detekt` FAILED — `MaxLineLength` 3건, 전부 F-4 회귀로 추가한
+  `GrpcEmbeddingGatewayTest.kt`의 새 줄(schema mismatch·GetEmbeddingMetadata 예외 test).
+  compile+test만 재확인하고 `check`(ktlint+detekt 포함) 전건을 다시 안 돌린 것이 원인 —
+  이후 acceptance는 매번 `check` 전건으로 재확인한다.
+
+## 2026-09-11T00:50:00Z — 포맷 수정
+- cmd: `./gradlew --offline --no-daemon :adapters:ktlintFormat`
+- exit: 0
+- 핵심 결과: 긴 줄 자동 개행(로직 변경 없음)
+
+## 2026-09-11T00:52:00Z — S-1 재실행(워킹트리, 포맷 수정 반영)
+- cmd: `./gradlew --offline --no-daemon --no-build-cache clean check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL, cpd 중복 0 · detekt issue 0 · workflow 146 / adapters 481 /
+  app 129 tests, 실패·오류·skip 0(fresh XML 집계) — `EmbeddingShapeFailClosedTest` 5→8 ·
+  `GrpcEmbeddingGatewayTest` 9→15 · `EmbeddingCallPolicyTest` 3→4(팀장 재확인 수치와 일치)
+
+## 2026-09-11T00:55:00Z — rollback 목록 재산출(수정 라운드 1 반영)
+- cmd: `git diff --name-status caee26c..HEAD`
+- 핵심 결과: 파일 목록 불변(수정 라운드가 **기존 파일만** 고쳤다 — 신규 경로 0,
+  `milestone-4.md`가 새로 공유 파일 집합에 들어온 것만 차이). rollback.md ①·② 갱신
+  (milestone-4.md 커밋 해시 hunk 격리 절 추가).

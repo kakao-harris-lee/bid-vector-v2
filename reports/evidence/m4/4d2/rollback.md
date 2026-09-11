@@ -13,6 +13,14 @@ base_sha: `caee26c`. 목록은 `git diff --name-status caee26c..HEAD`(commands.m
 | `52ce865` | `EmbeddingCallPolicy.kt`·`MlCallPolicyPlaceholder.kt` 신설 + `MlCallPolicyData.kt` 수정 | 아니오 |
 | `7ac588f` | `adapters/src/test/.../Embedding*Test.kt`·`GrpcEmbeddingGatewayTest.kt` 신설 | 아니오 |
 | `6371f28` | `config/quality/gate-tests.properties` 등재 7줄 | **예 — 4B-5(`m4-4b5/2026-09-10`)와 공유** |
+| `8fe8d81` | F-1 — `EmbeddingShapeValidation.kt` 구조 수정(단락 평가 + 유한성 관문) | 아니오 |
+| `e58e1e3` | F-1·F-4 회귀 — `EmbeddingShapeFailClosedTest.kt` 확장 | 아니오 |
+| `3b606a3` | F-4 회귀 — `GrpcEmbeddingGatewayTest.kt` 확장 | 아니오 |
+| `fdf2257` | F-2 — `EmbeddingValueTest.kt` KDoc 정정 + 비유한 값 test | 아니오 |
+| `6cb843d` | F-3 — `EmbeddingCallPolicy.kt`·`EmbeddingCallPolicyTest.kt` 값 고정 test | 아니오 |
+| `181892b` | F-5 — `milestone-4.md` 4D-2 착수 문단 신설 | **예 — M4 공유 승인 문서(전 slice 공용)** |
+| `cce5850` | F-6·표적1 — `reports/evidence/m4/4d2/scope.md` 정정(evidence 경로, restore 대상 아님) | 아니오 |
+| `6fa9f2d` | ktlint 포맷 — `EmbeddingShapeFailClosedTest.kt`·`GrpcEmbeddingGatewayTest.kt` MaxLineLength 정리 | 아니오 |
 
 ## 되돌리는 것
 
@@ -70,18 +78,34 @@ git diff 6371f28~1..6371f28 -- config/quality/gate-tests.properties | git apply 
 `--3way`가 필요할 정도의 인접 삽입은 없었다(수동 해소 절차 불필요 — 다른 slice의 삽입
 지점과 겹치지 않는 자리에 7줄을 추가했을 뿐이다).
 
-## ③ 확인 — 임시 clone에서 실측(2026-09-10)
+**`milestone-4.md`**(F-5 신설, 이 문서를 만지는 slice가 이 branch 안에서는 이 slice
+하나뿐이다 — `git log --oneline caee26c..HEAD -- milestone-4.md` = `181892b` 단독)도
+같은 방식이다:
+
+```bash
+git diff 181892b~1..181892b -- milestone-4.md | git apply -R
+```
+
+이 파일은 4A·4B·4C·4D-1 등 **다른 여러 slice의 이미 승인된 문단을 base 시점부터 담고
+있다** — 그 문단들은 `caee26c` 이전에 커밋됐으므로 이 diff 범위 밖이라 위 명령이 건드리지
+않는다. 확인은 「내 문단(4D-2 착수) 사라짐」과 **「다른 slice 문단(4D-1 종결·4B-4 착수 등)
+그대로 남음」을 둘 다** 잰다(아래 ③).
+
+## ③ 확인 — 임시 clone에서 실측(2026-09-11, 수정 라운드 1 반영 후 재실행)
 
 | 확인 | 명령 | 결과 |
 | --- | --- | --- |
-| in_scope 경로가 base와 동일 | `git diff caee26c -- <in_scope 전 경로>` | 출력 0줄 |
+| in_scope 코드 경로가 base와 동일 | `git diff caee26c -- <in_scope 코드 경로(gate-tests.properties·milestone-4.md 포함, evidence 제외)>` | 출력 0줄 |
+| 내 문단(4D-2 착수) 사라짐 | `grep -c "4D-2 착수 2026-09-10(임베딩 gateway" milestone-4.md` | 0 |
+| **남의 문단(4D-1 종결·4B-4 착수 등) 남음** | `grep -c "4D-1 종결\|4B-4 착수" milestone-4.md` | 3(되돌리기 전과 동일) |
 | 하네스 경로 그대로 | `git diff --stat HEAD -- CLAUDE.md .claude/` | 출력 0줄(변경 없음) |
-| 되돌린 트리 컴파일 | `./gradlew --offline :workflow:compileKotlin :workflow:compileTestKotlin :adapters:compileKotlin :adapters:compileTestKotlin` | exit 0 |
-| 되돌린 트리 테스트 | `./gradlew --offline :workflow:test :adapters:test` | exit 0, workflow 134 / adapters 449 tests(4D-2 추가분만큼 감소, 4D-1 골격 보존) |
+| 되돌린 트리 컴파일 | `./gradlew --offline --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin :adapters:compileKotlin :adapters:compileTestKotlin` | exit 0 |
+| 되돌린 트리 테스트 | `./gradlew --offline --no-daemon :workflow:test :adapters:test` | exit 0, workflow 134 / adapters 449 tests(1차 rollback 실측과 동일 — 4D-2 전체 증분만큼 감소, 4D-1 골격 보존) |
 
 **목록은 자기를 담은 커밋을 가리킬 수 없다** — `scope.md`·`commands.md`·`rollback.md` 갱신
-커밋은 `reports/evidence/m4/4d2/**`만 만지고 `config/quality/gate-tests.properties`를
-건드리지 않는다(위 목록의 `6371f28`는 이 evidence 커밋보다 먼저다).
+커밋은 `reports/evidence/m4/4d2/**`만 만지고 `config/quality/gate-tests.properties`·
+`milestone-4.md`를 건드리지 않는다(위 목록의 `6371f28`·`181892b`는 이 evidence 커밋보다
+먼저다).
 
 **라운드마다 파일이 늘면 `git diff --name-status caee26c..HEAD`를 다시 돌려 ①의 목록을
 갱신한다.**
