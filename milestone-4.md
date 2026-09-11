@@ -475,6 +475,18 @@ high 0, medium 1·low 2) → 일괄 시정 커밋 `8c0a9df`(코드)·`472ca76`(e
 부재는 범위 밖 기존 부채로 **4B-6b in_scope에 포함**(운영자 결정 2026-09-11 (a)).
 **다음은 4B-6b**(조합기, 4D-2 병합 뒤)와 M5 5A(병행).
 
+**4B-6b 착수 2026-09-12(운영자 결정 2026-09-11 「추천 방식으로 진행」)** — 조합기
+`OpportunityAnalysis : MlAnalysisPort`(workflow evaluation). 4D-2 `EmbedTextPort`·4D-1
+`BidPredictionPort`·4B-6a port 둘·`WatchSubjectPort`·`CapacityPort`·`Clock` 을 받아 fact 를
+값으로 바꾸고 4B-4 `composePriority`·4B-5 파생 함수를 부른다. 경로: subject → profile → 합성
+둘 → 임베딩 둘(순차, release 동일성 → `ReleaseMismatch`) → 재정규화 → `SemanticMatch` → 예측(부재는
+**성분 부재**, 사다리 미가용 아님 — D-4B6B-4) → 파생 → `Analyzed(priority, null, matched)`.
+`TextKind` 는 4D-2 판 하나로(4B-6a 판 삭제, D-4B6B-1). 예산은 정책 슬롯(`embeddingBudget`·
+`predictionBudget`, D-4B6B-5, 값 승인 대기). `predictedRate = recommendedRate = base 후보율`
+(M2 가 예측 낙찰율을 안 나름 — `OPEN-4B6B-PREDICTED-RATE`). `gate.tests.workflow` 등재 완전성
+test(양방향)를 이 slice 에 포함(운영자 (a)). `UnavailableMlAnalysis` 는 배선이 없어 6A 로 인계.
+정본 `reports/evidence/m4/4b6b/scope.md`, 설계 검토 `_workspace/m4-4b6b/02_design-review.md`.
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,
