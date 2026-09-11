@@ -303,6 +303,13 @@ reports/evidence/m4/4e/commands.md:246
 #  - 4e/commands.md:280   — 「게이트가 이 두 좌표에서 FAILED 했다」는 보고 문장 자신
 #  - pr5/codex-*.preflight.json:27 — codex 방출 계수의 CLI echo 판별 규칙 서술
 # M0 가 겪은 「스캐너가 자기 출력을 스캔한다」와 같은 재귀이고, baseline 이 그 처분 자리다.
-reports/evidence/m4/4d2/checklist.md:64
+#
+# 2026-09-12 (PR #7) — **이 목록의 키가 `파일:줄`이라 위쪽 편집에 밀린다.** `4d2/checklist.md`
+# 의 `Bearer` 인용이 그 위 4줄 삽입으로 :64 → :68 로 옮겨, 게이트는 :68 을 「새 매치」로 막고
+# :64 는 아무것도 안 가리키는 죽은 항목이 됐다(`stale_baseline` 으로 보고된다). 하네스가 네 번
+# 겪은 「낡는 좌표」 클래스가 이 게이트의 키 설계로 상설화된 것이다 — 처분은
+# `OPEN-LEAK-BASELINE-COORD`(후속 slice).
+reports/evidence/m4/4d2/checklist.md:68
 reports/evidence/m4/4e/commands.md:280
 reports/evidence/m4/pr5/codex-review-20260911T101524Z.preflight.json:27
+reports/evidence/m4/pr5/codex-review-20260911T124049Z.preflight.json:29
