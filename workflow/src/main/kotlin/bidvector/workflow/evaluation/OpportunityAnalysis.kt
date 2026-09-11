@@ -134,12 +134,19 @@ class OpportunityAnalysis internal constructor(
     private fun findProfile(): Step<ProfileFacts> =
         profile.current()?.let(::ok) ?: halt(MlUnavailableReason.ScoreNotProvided)
 
+    /**
+     * scope.md ②(4) — notice 를 먼저 부르고, 그 응답이 이미 `Unavailable` 이면 profile 은
+     * 부르지 않는다(verifier r1 F-4 — 실패가 확정된 뒤 원격 호출·예산을 더 쓰지 않는다).
+     */
     private suspend fun embedPairStep(
         texts: SynthesizedTexts,
         policies: ResolvedPolicies,
         correlationId: CorrelationId,
     ): Step<EmbeddedVectors> {
         val noticeOutcome = embedOne(texts.notice, policies.opportunity, correlationId)
+        if (noticeOutcome is EmbeddingOutcome.Unavailable) {
+            return halt(bridgeEmbeddingReason(noticeOutcome.reason))
+        }
         val profileOutcome = embedOne(texts.profile, policies.opportunity, correlationId)
         return combineEmbeddings(noticeOutcome, profileOutcome, policies.priority.normEpsilon)
     }

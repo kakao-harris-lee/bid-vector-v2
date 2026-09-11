@@ -126,6 +126,23 @@ class OpportunityAnalysisTest {
     }
 
     @Test
+    fun `notice 임베딩이 이미 Unavailable 이면 profile 은 호출하지 않는다(verifier r1 F-4)`() {
+        val embed =
+            FakeEmbedTextPort { request ->
+                when (request.kind) {
+                    TextKind.NOTICE -> EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.DeadlineExceeded)
+                    TextKind.OPERATOR_PROFILE -> embedded()
+                }
+            }
+
+        val outcome = analyzeNotice(analysis(embed = embed))
+
+        outcome shouldBe MlAnalysisOutcome.Unavailable(MlUnavailableReason.DeadlineExceeded)
+        embed.requestsSeen.size shouldBe 1
+        embed.requestsSeen.single().kind shouldBe TextKind.NOTICE
+    }
+
+    @Test
     fun `notice profile release 불일치는 ReleaseMismatch`() {
         val embed =
             FakeEmbedTextPort { request ->
