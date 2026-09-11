@@ -12,7 +12,9 @@ import contract.bidvector.ml.v1.ModelRelease
 /**
  * M4/4D-2(scope.md ③~⑤) — 계약 DTO → 도메인 [EmbeddingOutcome]. **fail-closed** —
  * `isAcceptableEmbeddingShape`를 통과하지 못한 `Embedding`은 전부
- * `Unavailable(ContractViolation)`(우회 (1)(2)(6)). `embedding.proto`에 나타나지 않는
+ * `Unavailable(ContractViolation)`(우회 (1) 차원 불일치·(2) UNSPECIFIED 정규화·(3)
+ * release 공백 — **(6)이 아니다, 리뷰 F-D 정정**: (6)은 이 slice가 열어 둔 값 타입 위조
+ * 축이다). `embedding.proto`에 나타나지 않는
  * training 전용 코드(`UNSUPPORTED_TRAINING_SPEC`·`IDEMPOTENCY_CONFLICT`·`JOB_NOT_FOUND`)는
  * 이 RPC 맥락에서 계약 위반으로 접는다(else 없음, `when` 전수 — `ResponseMapping.kt`의
  * `mapApplicationFailure`와 동형).
@@ -39,7 +41,8 @@ internal fun mapEmbedApplicationFailure(failure: ApplicationFailure): EmbeddingO
 
 /**
  * release **대조**(selector 일치)는 호출부(`GrpcEmbeddingGateway`)가 이 함수 호출 전에
- * 마친다(D-4D2-4, 4D-1 `mapSuccess`와 같은 순서) — 이 함수는 이미 selector 와 맞다고
+ * 마친다(**D-4D-4**, 4D-1 `mapSuccess`와 같은 순서 — 리뷰 F-D 정정: 이전엔 D-4D2-4
+ * (`callResilient` 제네릭화 결정, 무관한 ID)로 잘못 인용했다) — 이 함수는 이미 selector 와 맞다고
  * 확인된 `Embedding`만 받는다. 검사 순서: 구조 검증(`isAcceptableEmbeddingShape` — 형태·
  * 정규형·release 다섯 성분 비공백, `ContractViolation`)이 **먼저**다. 구조가 유효한
  * 뒤에야 schema 축의 client 집행(ADR 0010 D-7 「다른 축」)을 한다 — 응답
