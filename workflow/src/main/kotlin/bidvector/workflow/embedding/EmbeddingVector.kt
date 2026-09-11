@@ -31,7 +31,19 @@ data class EmbeddingVector(
         }
     }
 
-    private companion object {
+    companion object {
+        /**
+         * 리뷰 F-C(medium) — 「검증층(정밀 임계, `EMBEDDING_NORM_EPSILON`)이 이 거친 안전판
+         * 보다 먼저 걸린다」는 불변식이 실제로 서는 유일한 이유는 두 epsilon 의 대소
+         * 관계(정밀 < 거침)뿐인데, 그 관계를 강제하는 장치가 없었다 — 정책 파일의
+         * `embedding.norm.epsilon` 이 이 값보다 커지면 검증층을 통과한 벡터가 여기서
+         * `IllegalArgumentException` 을 던져 F-1 과 같은 클래스로 `embed` 밖으로 샌다.
+         * `internal` 은 Kotlin 컴파일 모듈(Gradle 프로젝트) 단위라 대소를 재는 `adapters`
+         * 모듈 test 에서 보이지 않는다(`EmbeddingVector` 생성자가 public 인 것과 같은
+         * 이유) — 가시성을 넓히는 목적이 아니라 **잴 수 있게** 하려고 `public` 으로 둔다.
+         * 대소 관계 자체는 `EmbeddingCallPolicyTest`(adapters, `EMBEDDING_NORM_EPSILON` 소유
+         * 모듈)가 test 로 강제한다.
+         */
         const val COARSE_NORM_EPSILON = 0.01
     }
 }
