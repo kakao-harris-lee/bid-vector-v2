@@ -2,29 +2,31 @@
 
 이 저장소에서 애플리케이션 코드는 Claude가 구현한다. Codex는 독립 리뷰어다.
 
-## 운영자 지시 2026-09-04 — 아래 모든 절보다 우선
+## 운영자 지시 2026-09-04 (2026-09-11 갱신) — 아래 모든 절보다 우선
 
-- **Codex 심판에서 코드 부분을 제외한다.** ~~코드 slice 의 diff·구현 결과는 Codex 로 보내지
-  않는다.~~ 코드 리뷰는 Claude 측 `verifier`(저작 레인과 다른 패스)가 본다. milestone 계약의
-  「Codex approve + 사용자 승인」은 코드 slice 에서 **「verifier ready-for-review + 사용자
-  승인」** 으로 읽는다. 이유: 외부 유료 호출이 너무 잦아져 비용·시간이 늘었다(1A 에서
-  Codex 16라운드).
-  **← 전면 제외는 2026-09-11 전역 규약(`~/.claude/review-lane.md` §4)으로 대체됐다.** 지금
-  Codex 심사 대상은 둘뿐이다: ① **되돌리기 어려운 경로의 코드**(결제·실주문·인증/인가·암호화·
-  비밀번호/토큰·**DB 마이그레이션**·데이터 파기) ② **코드 외 산출물**(기획 문서·**계약 파일**).
-  그 밖의 코드 diff·PR 은 여전히 Codex 로 보내지 않는다. 어느 쪽이든 **유료 외부 호출이므로
-  범위와 비용을 제시하고 사용자 확인을 받은 뒤에만** 디스패치한다 — 「리뷰해줘」는 승인이 아니라
-  레인 선택이다. 완료 조건의 읽기 규칙(「verifier ready-for-review + 사용자 승인」)은 그대로다.
+- **Codex 심판의 코드 범위는 되돌리기 어려운 경로로 한정한다(2026-09-11 — 아래 2026-09-04
+  전면 제외를 대체).** 인증·인가, 암호화·비밀값 취급, DB 마이그레이션, 데이터 파기처럼 사고가
+  나면 복구가 없거나 비싼 slice 는 운영자가 범위·비용을 승인하면 Codex 심판에 올린다. 그 밖의
+  코드 slice diff·구현 결과는 Codex 로 보내지 않고 Claude 측 `verifier`(저작 레인과 다른 패스)가
+  본다. milestone 계약의 「Codex approve + 사용자 승인」은 Codex 범위 밖 코드 slice 에서
+  **「verifier ready-for-review + 사용자 승인」** 으로 읽는다. 이유: 2026-09-04 에 전면 제외한
+  까닭은 외부 유료 호출 빈도였고(1A 에서 Codex 16라운드), 그 비용은 금지가 아니라 범위 한정으로
+  잡는다.
 - **리뷰 판정은 PR 에 남긴다**(전역 규약 §2). PR 을 만드는 변경이면 머지 전에 판정을 PR
   코멘트로 남긴다 — 지적이 0건이어도 남긴다. **세션 안에만 있는 리뷰는 남에게는 없는 리뷰다.**
   게이트(`privacy-gate`·`contract-keeper`·`migration-reviewer`)를 돌렸으면 그 판정도 같은
-  자리에 붙인다. 이 저장소의 PR #1~#3 은 전부 `reviewDecision` 이 빈 채 병합됐다(2026-09-11 실측).
+  자리에 붙이고, 수정한 뒤에는 **조치 코멘트를 새로** 단다(기존 코멘트를 덮어쓰지 않는다).
+  이 저장소의 PR #1~#3 은 전부 `reviewDecision` 이 빈 채 병합됐다(2026-09-11 실측).
+- **계약 파일도 Codex 심사 대상이다**(전역 규약 §4 ② 「코드 외 산출물 — 기획 문서·계약 파일」).
+  `contracts/**` 의 proto·승인 태그 정책이 바뀌는 변경은 위 되돌리기 어려운 경로와 같은 절차를
+  탄다 — 범위·비용 제시 후 사용자 확인. PR #5 가 그 첫 적용이다(`V6` 마이그레이션 + `embedding.proto`).
 - **목표·마일스톤·로드맵·스팩(명세·ADR·discovery·slice 계약)은 세션 모델(Opus 5 [1m]
   또는 Fable 5.1 [1m]) 하나가 단독으로 쓴다.** `spec-writer`·`deep-reasoner`·legacy-scout
   팬아웃 같은 다단계 기획 파이프라인과 Codex 검토를 붙이지 않는다. 세션 모델이 저장소를
   직접 읽고 문서를 직접 쓴다. 이유: 스팩 하나에 몇 시간이 걸렸다.
-- Codex 레인은 운영자가 명시 요청할 때만 탄다 — 기획 문서의 계획 검토는 운영자가 필요할 때
-  요청하면 걸고, 코드 slice 는 대상이 아니다.
+- Codex 레인은 운영자가 명시 요청하고 범위·비용을 승인할 때만 탄다 — 기획 문서의 계획 검토와
+  위의 되돌리기 어려운 경로 slice 가 대상이고, 그 밖의 코드 slice 는 대상이 아니다. 전역 규약은
+  `~/.claude/review-lane.md`.
 
 ## 시작 전 필수 읽기
 
@@ -71,6 +73,7 @@ Codex가 `request_changes`를 반환하면 같은 scope에서 Claude가 수정�
 |------|----------|------|------|
 | 2026-08-22 | 초기 구성 (에이전트 7종, 스킬 3종) | 전체 | - |
 | 2026-09-04 | **Codex 심판에서 코드 제외** — Phase 5 를 코드 slice 에서 건너뛰고 완료 조건을 verifier+사용자 승인으로 · **기획 문서(명세·ADR·slice 계약) 단독 저작** — 세션 모델(Opus 5 [1m]/Fable 5.1 [1m])이 spec-writer·deep-reasoner 없이 직접 작성 | CLAUDE.md, codex-reviewer, spec-writer, codex-review-gate, v2-slice-pipeline, milestone-0~6, agent-workflow | 운영자 지시 — 외부 유료 호출 과다(1A Codex 16라운드)와 스팩 저작 지연 |
+| 2026-09-11 | **Codex 코드 범위 재개방(한정)** — 인증·인가·암호화·DB 마이그레이션·데이터 파기처럼 되돌리기 어려운 slice 는 운영자가 범위·비용을 승인하면 Codex 심판 대상, 그 밖의 코드 slice 는 계속 `verifier` 몫 · 2026-09-04 전면 제외를 대체 | CLAUDE.md, codex-reviewer | 전면 제외 뒤 코드에 대한 교차 모델 심판이 0건이 됐다 — 비용은 금지가 아니라 범위 한정으로 잡는다 |
 | 2026-08-22 | 재활용 우선 방침 반영 — Python ML 재활용, 라이브러리 조사 선행, 재작성 목적(유지보수·회귀 감소) 명시 | ml-implementer, kotlin-implementer, legacy-scout, v2-slice-pipeline | 운영자 지시 |
 | 2026-08-22 | 두 갈래 전략 확정 — service만 Kotlin 재작성, ML은 재활용+튜닝 (지침서 greenfield 서술 개정과 동기화) | ml-implementer, v2-slice-pipeline | 운영자 지시로 지침서 개정 |
 | 2026-08-22 | 독립 감사 반영 — Codex 리뷰를 저장소 밖 clean worktree로 격리, .gitignore 추가, clean-tree 게이트 단일 정의(in_scope 한정), 커밋 단계·안전 규칙·재작업 상한(총 4회)·OPEN 에스컬레이션·secret 스캔 추가, M0 문서 slice N/A 규칙, verdict JSON schema 번들 | 전 에이전트, 전 스킬, .gitignore | 하네스 독립 감사 blocker 3건·high 9건 수정 |
