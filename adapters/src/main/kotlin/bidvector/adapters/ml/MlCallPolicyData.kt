@@ -2,7 +2,10 @@ package bidvector.adapters.ml
 
 import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.EffectiveFrom
+import bidvector.sharedkernel.Resolution
+import java.time.Clock
 import java.time.Duration
+import java.time.LocalDate
 
 /**
  * ML 호출 정책 값(scope.md ⑧, ADR 0010 D-1) — deadline·재시도·backoff·breaker 임계는
@@ -60,3 +63,37 @@ val ML_CALL_POLICY: EffectiveDatedPolicy<MlCallPolicyData> =
                 EffectiveFrom.Initial to placeholderMlCallPolicy(featureSchemaVersion = "bidvector.ml.v1"),
             ),
     )
+
+/**
+ * 두 gateway(`GrpcBidPredictionGateway`·`GrpcEmbeddingGateway`)의 `resolvePolicy()`가
+ * 공유하는 결과 운반체 — 리뷰 F-E(medium) 처방으로 `ResolvedMlCallPolicy`/
+ * `ResolvedEmbeddingCallPolicy` 두 벌(형태 완전 동일, 이름만 다름)을 하나로 합쳤다.
+ */
+internal data class ResolvedMlCallPolicy(
+    val data: MlCallPolicyData,
+    val versionLabel: String,
+)
+
+/**
+ * 리뷰 F-E(medium) 처방 — 두 gateway의 `resolvePolicy()`가 각자 갖던 17줄(정책 이름
+ * 문자열만 다름)을 여기 하나로 합쳤다. `Resolution.NotApplicable` 가지의 `error(...)`는
+ * scope.md ④ 「예외가 이 클래스 밖으로 새지 않는다」의 대상이 아니다(verifier r1
+ * F-10(low) 관례 — 배선 설정 오류의 fail-fast 방어이지 ML 호출의 업무 실패가 아니다).
+ */
+internal fun resolveMlCallPolicy(
+    policy: EffectiveDatedPolicy<MlCallPolicyData>,
+    clock: Clock,
+    policyName: String,
+): ResolvedMlCallPolicy {
+    val referenceDate = LocalDate.now(clock)
+    return when (val resolution = policy.resolve(referenceDate)) {
+        is Resolution.Resolved -> {
+            val versionLabel = "${resolution.version.source} @ $referenceDate"
+            ResolvedMlCallPolicy(resolution.value, versionLabel)
+        }
+
+        is Resolution.NotApplicable -> {
+            error("$policyName 가 $referenceDate 에 적용되지 않는다: ${resolution.reason}")
+        }
+    }
+}

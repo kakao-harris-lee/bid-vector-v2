@@ -2,7 +2,6 @@ package bidvector.adapters.ml
 
 import bidvector.decision.MlUnavailableReason
 import bidvector.sharedkernel.EffectiveDatedPolicy
-import bidvector.sharedkernel.Resolution
 import bidvector.workflow.prediction.BidPredictionOutcome
 import bidvector.workflow.prediction.BidPredictionPort
 import bidvector.workflow.prediction.BidPredictionRequest
@@ -12,14 +11,9 @@ import contract.bidvector.ml.v1.CalculateOptimalBidResponse
 import contract.bidvector.ml.v1.GetModelMetadataRequest
 import contract.bidvector.ml.v1.GetModelMetadataResponse
 import contract.bidvector.ml.v1.ModelRelease
-import contract.bidvector.ml.v1.RequestEnvelope
 import contract.bidvector.ml.v1.Success
 import io.grpc.ManagedChannel
-import io.grpc.Status
-import io.grpc.StatusException
-import io.grpc.StatusRuntimeException
 import java.time.Clock
-import java.time.LocalDate
 import java.util.UUID
 import bidvector.workflow.prediction.ModelReleaseSelector as DomainModelReleaseSelector
 
@@ -126,7 +120,20 @@ class GrpcBidPredictionGateway(
     ): BidPredictionOutcome {
         val promoted: ModelRelease? =
             if (selector is DomainModelReleaseSelector.LatestPromoted) {
-                fetchPromoted(stub, requestId, correlationId)
+                fetchPromotedRelease(
+                    stub,
+                    requestId,
+                    correlationId,
+                    invoke = { s, envelope ->
+                        s.getModelMetadata(GetModelMetadataRequest.newBuilder().setEnvelope(envelope).build())
+                    },
+                    promotedOf = { response ->
+                        when (response.resultCase) {
+                            GetModelMetadataResponse.ResultCase.METADATA -> response.metadata.promoted
+                            else -> null
+                        }
+                    },
+                )
             } else {
                 null
             }
@@ -136,63 +143,15 @@ class GrpcBidPredictionGateway(
         return mapSuccess(success, expectedFeatureSchemaVersion)
     }
 
-    private suspend fun fetchPromoted(
-        stub: PredictionStub,
-        requestId: String,
-        correlationId: String,
-    ): ModelRelease? {
-        val response = getMetadataOrNull(stub, requestId, correlationId) ?: return null
-        val promoted =
-            when (response.resultCase) {
-                GetModelMetadataResponse.ResultCase.METADATA -> response.metadata.promoted
-                else -> null
-            }
-        // verifier r1 F-2(high) (d) — promoted 가 공백(release_id·artifact_checksum 공백)이면
-        // 「조회 성공」이 아니라 「대조 불가」로 접는다. 그래야 응답 release 도 공백일 때
-        // `releaseSatisfiesSelector` 가 `""==""` 로 통과하는 경로가 막힌다(양쪽 공백이
-        // ReleaseMismatch 대신 Predicted 로 새던 반례).
-        return promoted?.takeIf { it.releaseId.isNotBlank() && it.artifactChecksum.isNotBlank() }
-    }
-
-    // metadata 조회 실패(status 무관)는 별도 Unavailable 사유가 아니라 「대조 불가」로 접는다
-    // — releaseSatisfiesSelector(promoted=null)이 그대로 ReleaseMismatch를 낸다. coroutine
-    // 취소(`CancellationException`)는 이 둘 중 어느 타입도 아니라 그대로 전파된다(잡지
-    // 않는다, `RetryRules.kt`와 같은 이유).
-    private suspend fun getMetadataOrNull(
-        stub: PredictionStub,
-        requestId: String,
-        correlationId: String,
-    ): GetModelMetadataResponse? {
-        val envelope =
-            RequestEnvelope
-                .newBuilder()
-                .setRequestId(requestId)
-                .setCorrelationId(correlationId)
-                .build()
-        val metadataRequest = GetModelMetadataRequest.newBuilder().setEnvelope(envelope).build()
-        return try {
-            stub.getModelMetadata(metadataRequest)
-        } catch (
-            @Suppress("SwallowedException") statusError: StatusException,
-        ) {
-            null
-        } catch (
-            @Suppress("SwallowedException") statusRuntimeError: StatusRuntimeException,
-        ) {
-            null
-        }
-    }
-
-    private fun mapTransportFailure(error: Throwable): BidPredictionOutcome.Unavailable {
-        val status = grpcStatusOf(error)
-        val reason =
-            when (status?.code) {
-                Status.Code.DEADLINE_EXCEEDED -> MlUnavailableReason.DeadlineExceeded
-                Status.Code.UNAVAILABLE, Status.Code.RESOURCE_EXHAUSTED -> MlUnavailableReason.RetryBudgetExhausted
-                else -> MlUnavailableReason.TransportFailed
-            }
-        return BidPredictionOutcome.Unavailable(reason)
-    }
+    /** 리뷰 F-E(medium) 처방 — 분류 로직은 `classifyTransportFailure`(`RetryRules.kt`, 임베딩과 공유), 도메인 사유 매핑만 여기서 한다. */
+    private fun mapTransportFailure(error: Throwable): BidPredictionOutcome.Unavailable =
+        BidPredictionOutcome.Unavailable(
+            when (classifyTransportFailure(error)) {
+                TransportFailureClass.DEADLINE_EXCEEDED -> MlUnavailableReason.DeadlineExceeded
+                TransportFailureClass.RETRY_BUDGET_EXHAUSTED -> MlUnavailableReason.RetryBudgetExhausted
+                TransportFailureClass.OTHER -> MlUnavailableReason.TransportFailed
+            },
+        )
 
     /**
      * verifier r1 F-10(low) — `Resolution.NotApplicable` 가지의 `error(...)`는 scope.md ④
@@ -204,26 +163,11 @@ class GrpcBidPredictionGateway(
      * 이 가지에 실질적으로 도달하지 않는다 — 제거하지 않는 이유는 정책이 시행일 기반
      * 다중 entry 로 확장될 미래(`OPEN-M2-DEADLINE-VALUES` 실측 갱신)에 이 방어가 실제
      * 배선 결함(예: 시행일이 전부 미래인 정책 배포)을 조용히 통과시키지 않게 하려는 것.
+     * 리뷰 F-E(medium) 처방 — 본문은 `resolveMlCallPolicy`(`MlCallPolicyData.kt`)로
+     * 옮겼다(임베딩과 17줄 중복이었다, 정책 이름 문자열만 다름).
      */
-    private fun resolvePolicy(): ResolvedMlCallPolicy {
-        val referenceDate = LocalDate.now(clock)
-        return when (val resolution = policy.resolve(referenceDate)) {
-            is Resolution.Resolved -> {
-                val versionLabel = "${resolution.version.source} @ $referenceDate"
-                ResolvedMlCallPolicy(resolution.value, versionLabel)
-            }
-
-            is Resolution.NotApplicable -> {
-                error("ML_CALL_POLICY 가 $referenceDate 에 적용되지 않는다: ${resolution.reason}")
-            }
-        }
-    }
+    private fun resolvePolicy(): ResolvedMlCallPolicy = resolveMlCallPolicy(policy, clock, "ML_CALL_POLICY")
 }
-
-private data class ResolvedMlCallPolicy(
-    val data: MlCallPolicyData,
-    val versionLabel: String,
-)
 
 /**
  * D-4D2-4 처방 2 — 응답 타입에 의존하는 재시도 판정 술어는 `ResilientPredictionCall.kt`가
