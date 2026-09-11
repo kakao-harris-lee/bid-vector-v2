@@ -14,8 +14,8 @@ git log --oneline 786febe39469835a45e9a1c6d6e8081226777364..HEAD -- \
   config/quality/gate-tests.properties milestone-4.md
 ```
 
-결과 — 이 브랜치의 커밋(`40997a1`·`8c0a9df` 둘, verifier r1 F-1/F-3 반영분 포함)만
-나온다. 따라서 hunk 단위 격리 없이 **전체 restore로 충분하다**(4B-5 rollback.md와 같은
+결과 — 이 브랜치의 커밋(`40997a1`·`8c0a9df`·종결 등재 `9d45441` 셋 — 마지막은
+`milestone-4.md` 종결 문단만)만 나온다. 따라서 hunk 단위 격리 없이 **전체 restore로 충분하다**(4B-5 rollback.md와 같은
 판단 근거).
 
 ## 하네스 레인 변경 확인
@@ -47,7 +47,8 @@ A  workflow/src/test/kotlin/bidvector/workflow/evaluation/ProfilePortsTest.kt
 A  workflow/src/test/kotlin/bidvector/workflow/evaluation/TextSynthesisTest.kt
 ```
 
-`A` 12 · `M` 2 — **F-1/F-3 반영 전(3fb22e4 기준)과 파일 수 불변**(F-1/F-3 수정은 기존
+`A` 13 · `M` 2(목록 그대로 — 아래 「evidence 넷 개별 나열」 restore 판은 `scope.md`를
+보존하므로 실측 `D`는 12) — **F-1/F-3 반영 전(3fb22e4 기준)과 파일 수 불변**(F-1/F-3 수정은 기존
 파일 넷의 내용만 바꿨고 새 경로를 만들지 않았다). `reports/evidence/m4/4b6a/scope.md`는
 팀장이 착수 계약으로 먼저 커밋한 파일이라(이 레인이 작성하지 않음) 목록에 있지만,
 코드만 되돌리고 계약은 유지하려면 아래 명령에서 그 파일 하나만 빼면 된다.
