@@ -261,8 +261,10 @@ def test_ml_kernel_008_reserve_draw_singular_inputs_never_fold_or_raise() -> Non
             assert exp_probe["measurable"] is False
             assert exp_probe["valueEmitted"] is False
             assert exp_probe["reasonPresent"] is True
-            assert result.reason.value == exp_probe["reason"]
-            assert result.detail.value == exp_probe["detail"]
+            # 경계별 reason·detail 토큰 배정은 verified_paths 밖(승인 문면 없음,
+            # fixtures/manifest.yaml ml-kernel-008 not_covered) — 그 값 자체는
+            # tests/inference/test_reserve_draw.py 의 일반 test(정책 무관, golden
+            # 파일 미참조)가 경계 일곱 전부에 대해 이미 고정한다.
         else:
             any_value_emitted = True
             mean_value, _std = result
@@ -318,18 +320,17 @@ def test_ml_kernel_009_deterministic_scenario_candidates_are_thread_count_invari
         ):
             assert candidate.label.value == exp_candidate["label"]
             assert str(candidate.bid_rate) == exp_candidate["bidRate"]["fraction"]
-            assert str(candidate.weight) == exp_candidate["weight"]["fraction"]
-            assert (
-                candidate.weight_policy_version == exp_candidate["weightPolicyVersion"]
-            )
+            # `weight`·`weight_policy_version`·weightSum 은 verified_paths 밖(출하
+            # 정책 값은 OPEN-5D-POLICY-VALUES 소유, fixtures/manifest.yaml
+            # ml-kernel-009 not_covered) — tests/inference/test_scenario.py 의
+            # `test_weight_is_decimal_without_quantize`(정책 주입, golden 파일 미참조)와
+            # tests/inference/test_policy.py 의 합계 불변식 test 가 이미 고정한다.
 
     assert labels_seen == exp["candidateOrder"]
     assert exp["fractionStringsIdenticalAcrossRuns"] is True
     assert exp["comparedAsDecimalString"] is True
     assert exp["scaleDigits"] == policy.scenario_bid_rate_digits
     assert exp["clampApplied"] is False
-    weight_sum = sum(policy.scenario_weights, start=Decimal("0"))
-    assert weight_sum == Decimal(exp["weightSum"]["fraction"])
 
 
 def test_ml_kernel_010_non_clean_provenance_never_reaches_aggregation() -> None:

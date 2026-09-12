@@ -5,9 +5,10 @@ base `f5020aa982e6c5ade01f1660c0568dcd75c2fa7e`(PR #10 머지 = origin/main, 5A�
 반영 지시, F-1~F-4) · 코드 커밋 `2a1bae7`(최초) → `145847c`(verifier r1 M-1/M-2/M-4·L-1/
 L-2/L-3 수정) → `4ad2de7`(verifier r2 F-1 — `rounding.py` 신설, `policy.py` quantize 뒤
 `clamp_min>0` 불변식) → `3a40bc3`(golden 통합 M-3 — `ml-kernel-001~014` 소비 + K6
-degenerate-variance 발견 수정) → 이 커밋(golden 어댑터 식별자 개명 — 아래 「golden 식별자
-개명」 참고, 게이트 술어 변경 아님). golden corpus 는 curator 병행 레인이 승인·병합
-(`5ef6eb8`). 로컬: `uv`(pyenv `3.12.2`, `.python-version` 3.12 과 `requires-python`
+degenerate-variance 발견 수정) → `ea4542c`(golden 어댑터 식별자 개명 — 아래 「golden 식별자
+개명」 참고, 게이트 술어 변경 아님) → 이 커밋(verifier r3 low — golden test 의
+verified_paths 밖 단언 제거, 아래 「verifier r3」 참고, 판정 로직 변경 없음 — test 축소).
+golden corpus 는 curator 병행 레인이 승인·병합(`5ef6eb8`). 로컬: `uv`(pyenv `3.12.2`, `.python-version` 3.12 과 `requires-python`
 두 자리 일치 — S-9). 전건 재실행(부분 게이트 없음) — M-3 은 게이트 술어(K6 admission
 기준) 변경이라 표 전체를 다시 돌렸다.
 
@@ -38,8 +39,8 @@ degenerate-variance 발견 수정) → 이 커밋(golden 어댑터 식별자 개
 | `ml-kernel-005` | passed | `_verify_checksum`(private, 알려진 제한 13) — intact 는 `_VerifiedBytes`, 1바이트 변조는 `ArtifactRejected`. 두 probe 의 바이트 길이 동일·차이 1바이트 직접 계산해 대조 |
 | `ml-kernel-006` | passed | `verify_feature_names` — 재배열(`NameMismatch`)·진부분집합(`NameMismatch`) 모두 거부, 원순서만 accepted |
 | `ml-kernel-007` | passed | `require_declared`+`resolve_schema` — 지원/미지원/미선언 세 probe 모두 판정 일치 |
-| `ml-kernel-008` | passed | K6 경계 7 종 전부 `Unmeasurable`, 예외 0, 값 미방출 0 — **degenerate-variance probe 가 코드 수정을 유발**(아래 참고) |
-| `ml-kernel-009` | passed | `build_scenario_candidates`(synthetic z=1.25·클램프 0.6/1.3·digits 4) 두 번(스레드 수 1·4 대응, 순수 함수라 자명하게 동일) → `"0.8700"`/`"0.9200"`/`"0.9700"` 문자열 완전 일치 |
+| `ml-kernel-008` | passed | K6 경계 7 종 전부 `Unmeasurable`, 예외 0, 값 미방출 0 — **degenerate-variance probe 가 코드 수정을 유발**(아래 참고). verifier r3 이후 `reason`·`detail` 토큰 값 단언은 golden test 에서 제거(verified_paths 밖, 아래 「verifier r3」 참고) |
+| `ml-kernel-009` | passed | `build_scenario_candidates`(synthetic z=1.25·클램프 0.6/1.3·digits 4) 두 번(스레드 수 1·4 대응, 순수 함수라 자명하게 동일) → `"0.8700"`/`"0.9200"`/`"0.9700"` 문자열 완전 일치. verifier r3 이후 `weight`·`weight_policy_version`·`weightSum` 단언은 golden test 에서 제거(verified_paths 밖, 아래 참고) |
 | `ml-kernel-010` | passed | `admit_clean`(6 표본 중 3 비-CLEAN 제외) → `aggregate_level_observation`의 mean `quantize_bid_rate(mean,4) == Decimal("1.0100")` |
 | `ml-kernel-011` | **skipped**(명시) | `reason="OPEN-5D-DISTRIBUTION-ENGINE — 5D-2 가 소비"` — 팀장 지시대로 부분 단언 없이 skip |
 | `ml-kernel-012` | passed | `build_weekly_maturity` — 03-16 주(개찰 0) 는 표에 없음(`NoObservation`), 03-09 주(0/2) 는 `Observed(ratio=0.0)`로 값·표 등재가 갈림 |
@@ -65,6 +66,30 @@ provenance 라벨 변환 함수, `test_kernel_golden.py`의 예비가격 리터�
 `sign_marker_to_int`·`provenance_from_label`·`_reserve_price_literal`로 개명했다. 재확인:
 `grep -rniE -f config/quality/leak-patterns.txt ml-engine/tests/inference` → exit 1(매치
 0). pytest `tests/inference/golden` 13 passed·1 skipped(개명 뒤 회귀 없음).
+
+## verifier r3(low, golden test 의 verified_paths 밖 단언 제거)
+
+`ml-kernel-009`(`candidate.weight`·`candidate.weight_policy_version`·`weightSum.fraction`)
+· `ml-kernel-008`(각 probe 의 `result.reason.value`·`result.detail.value`) — 두 case 모두
+fixtures/manifest.yaml 의 `not_covered`가 그 값을 명시적으로 「잠그지 않는다」고 적어 두었고,
+`verified_paths`에도 없다. 골든 test 에서 해당 5개 단언(009 셋 + 008 둘)을 제거했다 — 대체
+일반 test 신설은 없음: 이미 정책 주입 test(`test_scenario.py::test_weight_is_decimal_
+without_quantize`)와 로더 불변식 test(`test_policy.py::test_weights_not_summing_to_one_
+is_rejected`), K6 경계 7종 개별 test(`test_reserve_draw.py`)가 golden 파일 참조 없이 같은
+값을 고정하고 있었다(각 test 이름은 checklist.md verifier r3 절 참고).
+
+재실행(S-1~S-9, 전건):
+
+| # | 명령(요약) | exit | 핵심 한 줄 |
+| --- | --- | --- | --- |
+| S-2 | `ruff check .` + `ruff format --check .` | 0 | `All checks passed!` · `71 files already formatted`(파일 수 불변 — 신규 파일 없음, 편집만) |
+| S-3 | `mypy --strict src/ml_engine` | 0 | `Success: no issues found in 27 source files`(불변 — golden test 는 `tests/`라 스캔 범위 밖) |
+| S-4 | `lint-imports` | 0 | `Contracts: 5 kept, 0 broken` |
+| S-5(판정 기준) | `pytest tests -q -m "not legacy_parity"` | 0 | **347 passed, 1 skipped, 4 deselected**(변동 없음 — 단언 제거이지 test 함수 삭제가 아니다) |
+| S-8(관측 전용) | `pytest tests -q -m legacy_parity` | 0 | **4 passed**(무변경) |
+| S-6 | `design_ratchet.py --check` | 0 | 위반 0 |
+| S-7 | `reuse_provenance_check.py` | 0 | 위반 0 |
+| golden 단독 | `pytest tests/inference/golden -q` | 0 | **13 passed, 1 skipped**(`ml-kernel-011`) |
 
 ## verifier r2 재검증 세부(F-1·F-2, 회귀 없음 재확인)
 

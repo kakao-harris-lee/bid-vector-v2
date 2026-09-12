@@ -42,6 +42,27 @@ golden case 가 milestone-5.md 5D 항목이 이름 든 "singular input" 처리�
 읽어 `reserve_draw.py`에 이 검사를 추가했다(`n == draw_count`는 조합이 하나뿐이라 예외 —
 legacy 조기 반환 그대로 계승). 신규 D-5D-11 로 등재.
 
+## verifier r3 반영(2026-09-12, 코드+evidence 커밋 — 이 커밋 자신)
+
+**low(장부)** — golden test 가 case 의 `verified_paths` 밖 값을 단언했다: `ml-kernel-009`의
+`candidate.weight`·`candidate.weight_policy_version`·`weightSum.fraction`(정책 표 값은
+`OPEN-5D-POLICY-VALUES` 소유, fixtures/manifest.yaml 해당 case `not_covered`가 명시),
+`ml-kernel-008` 각 probe 의 `result.reason.value`·`result.detail.value`(경계별 사유·세부
+토큰 배정은 승인 문면 없음, 같은 case `not_covered`가 명시). curator 규약(목록 밖 단언은
+비권위)에 따라 두 case 의 golden test 에서 해당 단언을 제거했다. 그 거동은 이미 일반
+test 가 golden 파일 참조 없이 정책 주입으로 고정하고 있었다 — 새로 추가한 test는 없다:
+`test_scenario.py::test_weight_is_decimal_without_quantize`(weight·weight_policy_version),
+`test_policy.py::test_weights_not_summing_to_one_is_rejected`(가중치 합 불변식, weightSum
+축을 로더 단계에서 대신 잠금), `test_reserve_draw.py`의 경계 일곱 개별 test(`test_
+draw_count_below_one_is_unmeasurable`·`test_all_same_values_is_degenerate_variance_when_
+n_not_equal_k`·`test_empty_values_is_unmeasurable`·`test_fewer_values_than_draw_count_is_
+unmeasurable`·`test_non_finite_or_non_positive_value_is_unmeasurable`(NaN·Inf·음수 3종
+parametrize))가 `ml-kernel-008`의 probe 일곱 전부(분산 0·NaN·Infinity·음수·표본 부족·빈
+입력·추첨 수 0)를 이미 개별적으로 덮는다. golden test 는 이제 `verified_paths`가 잠근
+값(measurable·exceptionRaised·valueEmitted·reasonPresent·label·bidRate.fraction·
+candidateOrder 등)만 단언한다. 전체 pytest 는 347 passed·1 skipped(변동 없음 — test 축소이지
+결과 변화가 아니다).
+
 ## D-5D-1~11 충족 근거
 
 | ID | 결정 | 충족 근거 |
