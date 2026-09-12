@@ -2,7 +2,7 @@
 milestone: M4
 slice: leak-baseline-coord
 base_sha: a6ab6a8dc4c5304ce91f5ae5b591eb0e4c0a0b95
-head_sha: 2684e088c195a5aa0c2a108a0256d04d33522265
+head_sha: 3627890e00d5a8a77faf397159372a5e1440fadc   # acceptance 를 실측한 head (아래 주 참조)
 in_scope:
   - build-logic/src/main/kotlin/bidvector/buildlogic/LeakPatternGateChecks.kt
   - build-logic/src/main/kotlin/bidvector/buildlogic/LeakPatternGateTask.kt
@@ -88,6 +88,21 @@ new 0** — 정확히 동기라 변환이 무손실이다. 변환 결과는 **26
 | S-6 | 그 줄의 글자가 바뀌면 다시 본다 | 승인된 줄의 어휘를 유지한 채 다른 글자로 수정 → new 로 잡힘 |
 | S-7 | 기존 test 14 가 새 규격으로 갱신되고 전부 통과 | `:build-logic:test` |
 | S-8 | 전건 통과 | `./gradlew --no-daemon check` (2026-09-12 규칙 ① — job 단위로만 줄인다) |
+
+## `head_sha` 의 정의 — 세 번 낡은 뒤 고친다
+
+이 slice 에서 `head_sha` 가 **세 번** 낡았다(verifier L-1 · N-3 두 차례). 값을 세 번 고치는
+대신 **정의를 고친다**: `head_sha` 는 「이 문서를 담은 커밋」이 아니라 **「acceptance 를 실측한
+head」**다. 자기 해시를 커밋 전에 아는 방법은 없으므로 전자는 원리적으로 기입 불가능하고,
+그것을 요구하는 문면이 반복 실패의 원인이었다.
+
+그러므로 이 값을 기입하는 커밋(과 그 뒤 따라오는 문면 정정 커밋)은 **`head_sha` 가 가리키는
+지점보다 뒤에 있는 것이 정상**이다. 낡은 것이 아니다 — **acceptance 를 실측한 자리를 가리키는
+좌표**다. 이 커밋 이후로 in_scope **코드·게이트·baseline** 가 움직이면 그때는 실제로 낡은
+것이므로 재실측하고 갱신한다.
+
+실측 지점 `3627890`: `:build-logic:test` exit 0(30 tests, 0 failed) · `leakPatternGate` exit 0
+(`patterns=6 baseline=276 matches=299 keys=276 new=0 stale_baseline=0`) · `--no-daemon check` exit 0.
 
 ## 하네스 레인 변경
 
