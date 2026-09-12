@@ -105,10 +105,25 @@ Python 가시성 2줄 우회 둘 · `std == 0` 통과 · 실 booster 결정성(`
 
 - 기존 LightGBM training pipeline 이식과 hyperparameter 튜닝
 - 시간 누수 없는 split, rolling/group holdout
-- 기존 calibration 로직 이식, worst-segment report
+- ~~기존 calibration 로직 이식~~ → **GBM OOF 잔차 std(후보 폭) 이식**, worst-segment report — **D-5C-1 개정(운영자 확인 대기 2026-09-12)**: legacy 의
+  calibration 모듈 둘은 B 계보(ensemble) 의 Platt 확률 보정·group 통계이고 낙찰률 GBM 과 무관하다. Platt 는 자격 라벨을 요구하는데 D-M2-11 (a) 가 그 라벨을
+  계약에서 뺐으므로 ml-engine 경계 안에 학습 입력이 없다(`OPEN-ML-02` 남은 물음 그대로 이월). 임의 축소가 아니라 상위 결정의 하류
 - deterministic seed와 reproducible environment
 - artifact manifest, metric, schema/code/dataset version
 - promotion은 측정 결과를 만들 뿐 자동 운영 배포하지 않음
+
+**5C 분할·5C-1 착수 2026-09-12(운영자 결정 대기: D-5C-0·1·2·4·7·9)** — base 는 PR #10 머지 커밋 `f5020aa`(5A·5B 실물, 5D 미포함). 레인
+worktree `bid-vector-v2-m5c`·브랜치 `m5-5c/2026-09-12`, 5D(`m5-5d/2026-09-12`)와 병행 — 소스 겹침은 `pyproject.toml`·`tests/conftest.py`·이 문서 셋뿐이고
+격리 규칙은 `reports/evidence/m5/5c/scope.md` 「레인 격리」. 조사 실측(legacy `ed4b06c`): 학습 경로가 **둘**(A 낙찰률 GBM / B ensemble)이고 Celery 트리거는 B 에만
+있어 **GBM 에는 프로덕션 학습 트리거가 없다** · agency encoding 은 **OOF(학습 행렬)와 전 구간(artifact 표) 둘 다** 쓴다 · 폴드는 무작위(시간 누수는 cutoff·창이
+막는다는 legacy 선언) · 5A 표가 5C 로 배정한 정책 값 넷은 A 계보 학습 경로에서 **소비 0** · 재현성은 선언만 있고 「같은 입력 → 같은 artifact」 test 가 없다 ·
+평가 계통이 셋인데 승격 게이트는 가장 미성숙한 B 를 읽고, `guardrail/fallback None → 검사 스킵` fail-open 축 둘과 `--skip-promotion-gate` 무조건 우회가 있다.
+**결정**: 5C 를 **5C-1**(학습 커널 — dataset 입구·corpus 승인·OOF·booster port·artifact writer·`TrainingSpec`·`policy/training-v1.yaml`)과 **5C-2**(평가·홀드아웃·
+승격 측정·evaluation report·`policy/evaluation-v1.yaml`)로 가른다(D-5C-0) · A 계보만 이식(D-5C-1) · 하이퍼파라미터는 코드 선언 `TrainingSpec` + checksum 을
+artifact 에(D-5C-2) · OOF 폴드 무작위 유지(D-5C-4, `OPEN-5C-OOF-TIME-DIRECTION`) · 행 거부·라벨 [0,1] 은 회계 + 거부(D-5C-5, `OPEN-5B-OBSERVATION-DOMAIN`
+해소) · `min_training_rows 500`(D-5C-7, legacy-declared 미소비) · artifact 바이트 안에 자기 checksum 없음(D-5C-9 — **5D read model 과 조정 필요**,
+`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`) · import-linter forbidden 을 `features`·`training`·`evaluation`·`registry` 로 확장(`OPEN-5B-FEATURES-FORBIDDEN` 해소).
+acceptance 는 CI `ml-engine` job 전건. 설계 검토 `_workspace/m5-5c/03_design-review.md`. 정책 값 `reports/evidence/m5/5c/policy-values.md`.
 
 ### Slice 5D — inference kernels
 
