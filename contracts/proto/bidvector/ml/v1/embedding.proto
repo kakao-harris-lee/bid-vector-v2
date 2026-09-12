@@ -47,12 +47,19 @@ message EmbedTextRequest {
 // 임베딩 결과 — `values`는 정확히 `dimension`개(D-2E-1, 위협 모델 우회 (1)). `dimension`
 // 수치 자체는 계약이 정하지 않는다(모델이 바뀌면 값만 바뀐다) — client가 `values.size`와
 // 대조한다. **그리고 `latest_promoted` 선택자로 요청한 경우 client 는 `dimension` 을
-// `GetEmbeddingMetadata.promoted` 의 `dimension` 과도 대조한다 — 불일치는 계약 위반이다**
+// `GetEmbeddingMetadataResponse.metadata` 의 `dimension` 과도 대조한다 — 불일치는 계약
+// 위반이다**(그 `dimension` 은 `promoted` **안이 아니라 형제 필드**다, 아래 `EmbeddingMetadata`)
 // (D-2E ②, `reports/evidence/m2/2e/scope.md` 가 정본. 이 주석은 2026-09-11 까지 그 대조를
 // 빠뜨려 실제 보장을 **과소서술**하고 있었다 — PR #5 contract-keeper 지적으로 정정).
-// `exact_release` 선택자에서는 metadata 를 조회하지 않으므로 이 대조가 구조적으로 적용되지
-// 않는다 — release_id+checksum 이 아티팩트를 못 박아 같은 checksum 이 다른 `dimension` 을
-// 낼 수 없다는 것이 그 근거다(4D-1 관례와 동일). `release`는 다섯 성분 모두 비공백이어야
+// **`exact_release` 선택자에서는 이 대조가 없다 — 그리고 그것을 메우는 다른 검사도 없다.**
+// metadata 를 조회하지 않으므로 기대 차원을 알 방법이 client 에 없고, `exact_release` 분기는
+// `release_id`·`artifact_checksum` **문자열만** 비교한다. 즉 **같은 release·checksum 을 달고
+// 다른 `dimension` 을 보내는 응답을 client 가 걸러내지 못한다**(Codex PR #5 2차 실측 반례:
+// release·schema 를 유지한 채 `dimension` 4 → 1 로 바꾼 응답이 현재 release·shape·schema
+// 검증을 전부 통과한다). 남는 방어는 `values.size == dimension`(자기정합성)뿐이다.
+// 이것은 4D-1 관례를 그대로 이어받은 **알려진 제한**이지 checksum 이 주는 보장이 아니다 —
+// 앞선 판(2026-09-11)이 「checksum 이 아티팩트를 못 박아 같은 checksum 이 다른 `dimension`
+// 을 낼 수 없다」고 적었으나 **구현이 집행하지 않는 보장이었다**(Codex 2차 medium). `release`는 다섯 성분 모두 비공백이어야
 // 한다(4D-1 `hasNonBlankRelease`와 같은 규칙). 점수·판정 필드는 여기 없다(D-2E-1, 위협
 // 모델 방어 (e)).
 message Embedding {
