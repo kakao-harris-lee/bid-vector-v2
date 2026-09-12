@@ -57,7 +57,14 @@ commands.md "secret 스캔" 항목 — 문서 작성 전엔 매치 없음, 작�
   파일 안에서 그 문자열은 위치·횟수 무관하게 영구 허용된다.
 - **옛 형식 검출은 정규 형태(`경로:숫자`)에만 걸린다** — 행말 주석(`경로:26  # 주석`)·
   범위 표기(`경로:26-30`)·경로만 있는 항목은 legacy 위반으로 안 잡히고 조용히 stale 로
-  죽는다(verifier F-4). 현재 baseline 276 항목은 전수 정규 형태라 실해는 없다.
+  죽는다(verifier F-4). **정정(verifier N-2)**: 앞 문면은 「현재 baseline 276 항목은
+  전수 정규 형태라 실해는 없다」였는데 이는 앞 라운드 F-4 의 *base* baseline(290, 전부
+  `경로:숫자`) 서술을 head 로 잘못 옮겨 적은 것이다 — head 의 baseline 은 이미 신형식
+  (`경로#해시`)으로 마이그레이션됐다. `grep -vE '^\s*(#|$)' config/quality/leak-pattern-baseline.txt
+  | grep -cE '^.+:[0-9]+$'` 로 실측하면 276 항목 중 옛 형식(`경로:숫자`)에 매치하는 것은
+  **0** 이다. 결론(실해 없음)은 참이지만 이유가 다르다 — 「전부 정규 형태라서」가 아니라
+  **legacy 형식 항목이 head baseline 에 하나도 없어서**다(위 행말 주석·범위 표기 같은
+  edge case 가 적용될 legacy 항목 자체가 없다).
 - **crafted 해시 선등재가 게이트를 연다** — 아직 없는 줄의 정규화 내용 해시를 손으로
   계산해 baseline 에 미리 넣으면, 그 줄이 실제로 삽입되는 순간 stale 흔적이 사라지고
   조용히 통과한다(verifier F-5·U-2). 회귀는 아니다 — 옛 체계도 좌표 선등재로 그 자리에
@@ -82,6 +89,20 @@ commands.md "secret 스캔" 항목 — 문서 작성 전엔 매치 없음, 작�
   slice 의 evidence 디렉터리 자체가 base 에 없어 legacy baseline 에 대응 항목이 없기
   때문이다(재현: rollback.md "알려진 제한" 절, 첫 evidence 커밋부터 재현됨). 이 slice 가
   닫지 않는다.
+- **호출자가 `newKeys` 를 좌표 맵과 다른 출처로 계산하면 빈 `()` 좌표 열화가 여전히
+  가능하다**(verifier 표적 재검증 R-2, low N-6) — F-6 시정(`LeakPatternGateTask.gate()`
+  가 `coordinatesByKey` 를 한 번 계산해 `leakGateViolation`·`leakGateReportText` 양쪽에
+  같은 맵을 넘김)은 **두 함수가 각자 재계산해 어긋나는** 경로를 닫았을 뿐이다.
+  변이 M-E(호출자가 `newKeys` 를 `coordinatesByKey.keys` 가 아닌 별도 키 함수로 계산)는
+  단위 test 를 지나면서도(Task 배선을 거치지 않으므로) 게이트 보고서의 `()` 를 299행
+  전부 비운다 — 실측됨. 지금 결함도 회귀도 아니다: 현재 `LeakPatternGateTask` 는
+  `newKeys` 를 `coordinatesByKey.keys` 에서 직접 뽑아 구성상 두 값이 갈라질 길이 없다.
+  **구조적 처분(이 slice 가 하지 않은 것)**: `leakGateReportText`/`leakGateViolation`
+  이 `newKeys` 를 인자로 받는 대신 `coordinatesByKey` 와 baseline 에서 **스스로** 다시
+  좁혀 계산하면(예: `coordinatesByKey.keys - baselineKeys`) 호출자가 다른 출처의
+  `newKeys` 를 들여올 표면 자체가 사라져 이 불일치는 타입/시그니처 수준에서 표현
+  불가능해진다. `OPEN-LEAK-REPORT-KEY-CONSISTENCY` — 이 slice 는 그것을 하지 않고
+  현재 배선(구성상 안전, 시그니처상 아직 열림)으로 남긴다.
 
 ## N/A
 

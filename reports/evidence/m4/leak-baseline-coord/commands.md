@@ -1,7 +1,12 @@
 # commands.md — leak-baseline-coord
 
 base_sha: a6ab6a8dc4c5304ce91f5ae5b591eb0e4c0a0b95
-head_sha: 37de8bb8624882f05f948bd2accf926774e3ba5a
+head_sha: aa22262387528d27c5d5bbc02e63083d3a8d0e42
+
+`head_sha` 는 이 정정 라운드 착수 시점(2026-09-12) `git rev-parse HEAD` 실측값이다
+(verifier N-3 — 3회차 재발). 이 값을 담는 커밋 자신의 해시는 커밋 전에는 원리적으로
+알 수 없다(evidence-pack "목록은 자기를 담은 커밋을 가리킬 수 없다"와 같은 갈래) —
+다음 라운드가 있다면 그 착수 시점에 다시 `git rev-parse HEAD` 로 갱신한다.
 
 ## RED — 새 API 로 갱신한 test 가 기존 프로덕션 코드에서 컴파일 실패
 
@@ -165,8 +170,23 @@ commands.md 를 채우는 서술 자체가 "secret 스캔"·"cmd: `grep ...`" �
 - cmd: `./gradlew :build-logic:compileTestKotlin --no-daemon`
 - exit: 0
 - cmd: `./gradlew :build-logic:test --tests '*LeakPatternGateChecksTest*' leakPatternGate --no-daemon`
+- exit: 0 (**정정 2026-09-12, verifier N-1** — 원 기록은 이 정본을 고치지 않은 채 `rollback.md`
+  만 바로잡았다. 축어 재실행 실측치는 아래 참조)
+
+## 2026-09-12 (N-1 재정정) — 위 exit 0 은 부정확했다, 임시 clone 재실행
+- cmd: `git restore --source=a6ab6a8 --staged --worktree -- <in_scope 4>` (별도 임시 clone)
+- exit: 0 — `git diff --name-status a6ab6a8 -- <4>` 무출력(완전 일치)
+- cmd: `./gradlew :build-logic:compileTestKotlin --no-daemon`
 - exit: 0
-- 핵심 결과: 되돌린 트리에서 옛(좌표 키) 코드 + 옛 baseline 조합으로 compile·test·게이트 전부 정상 통과 — rollback 이 실제로 서는 상태로 되돌림을 확인. clone 삭제로 뒷정리.
+- cmd: `./gradlew :build-logic:test --tests '*LeakPatternGateChecksTest*' leakPatternGate --no-daemon`
+- exit: **1** — `:build-logic:test` 는 통과, `:leakPatternGate` 가 FAILED. 위반 메시지에
+  이 slice 자신의 `checklist.md`·`commands.md` 9줄이 `new` 로 나열됨(직접 재현·확인).
+  되돌린 트리는 옛 baseline 을 쓰는데 이 slice 의 evidence 문서 자체가 base 에 없어
+  대응 legacy 항목이 없기 때문 — rollback.md "알려진 제한" 절과 같은 원인.
+- cmd: 보완 조건 — 위 상태에서 `rm -rf reports/evidence/m4/leak-baseline-coord` 후
+  `./gradlew leakPatternGate --no-daemon` (직접 재현)
+- exit: 0 — 보고서 `patterns=6 baseline=290 matches=290 new=0 stale_baseline=0`(직접 실측).
+  clone 삭제로 뒷정리.
 
 ## F-6 시정 — 위반 메시지·보고서가 좌표를 각자 다시 계산하던 것을 한 곳으로 모음
 
@@ -212,3 +232,23 @@ commands.md 를 채우는 서술 자체가 "secret 스캔"·"cmd: `grep ...`" �
 - 핵심 결과: in_scope 3개 코드 파일 + evidence 3개 문서(checklist·commands·rollback, 전부
   이미 존재하는 M)만 잡힘 — `config/quality/leak-pattern-baseline.txt` 는 이 라운드에서
   건드리지 않아 M 목록에 없다(자기매치 신규분 없음).
+
+## 2026-09-12 (장부층 일괄 N-1~N-4·N-6 정정, `aa22262` 이후) — acceptance 재확인
+직전 02:09Z 기록은 `ca4c8d4` 시점이었고 이후 `aa22262` 가 `checklist.md`·`rollback.md`
+를 더 고쳤다(둘 다 게이트 스캔 대상). 이번 라운드도 `checklist.md`·`commands.md` 를
+고치므로(N-1~N-4·N-6) 커밋 전 실제 HEAD 트리에서 재확인한다(verifier N-4).
+
+- cmd: `./gradlew leakPatternGate --no-daemon`
+- exit: 0
+- 핵심 결과: `patterns=6 baseline=276 matches=299 keys=276 new=0 stale_baseline=0` — 이번
+  라운드 편집(N-1~N-4·N-6, checklist.md·commands.md)이 새 자기매치를 내지 않았다(직접
+  실측, 패턴 어휘 직접 인용 회피).
+- cmd: `./gradlew :build-logic:test --tests '*LeakPatternGateChecksTest*' --no-daemon`
+- exit: 0
+- cmd: `./gradlew --no-daemon check`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL` — 전 모듈 + build-logic included build 전건, `:leakPatternGate`
+  UP-TO-DATE(위 재실행 반영)·`:build-logic:test` UP-TO-DATE·`:contractGate` 실행 확인.
+- cmd: `git status --porcelain`
+- 핵심 결과: `checklist.md`·`commands.md` 만 M — baseline 은 이번 라운드도 건드리지 않았다
+  (자기매치 신규분 없음, 위 재확인과 일치).
