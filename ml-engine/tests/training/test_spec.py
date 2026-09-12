@@ -16,8 +16,10 @@ from ml_engine.training.spec import (
 
 
 def test_shipped_spec_matches_policy_values_md() -> None:
-    """`reports/evidence/m5/5c/policy-values.md` §2 표와 값 대조(legacy `ed4b06c`
-    `award_rate_gbm.py:93-115` 이식, D-5C-2)."""
+    """verifier r1 L-7 — 이 test 는 `policy-values.md` §2 표를 파싱하지 않는다. 표 값을
+    이 파일에 하드코딩해 대조한다(사람이 표와 눈으로 대조 확인) — 이름이 시사하는 것보다
+    약한 대조다(5A/5B 와 같은 관행). legacy `ed4b06c` `award_rate_gbm.py:93-115` 이식,
+    D-5C-2."""
     spec = resolve_training_spec("award-rate-gbm-training-v1")
     assert isinstance(spec, TrainingSpec)
     hyperparameters = spec.hyperparameters

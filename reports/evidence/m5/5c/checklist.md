@@ -5,7 +5,7 @@
 | ID | 결정 | 충족 근거 |
 | --- | --- | --- |
 | D-5C-0 | 5C 를 5C-1(학습 커널)·5C-2(평가)로 분리 | 이 slice 자체가 5C-1 — `training/**`만 만들고 `evaluation/**`는 무편집(scope out_of_scope). **운영자 확인 대기 항목**(scope.md 표) — 착수 시 추천안대로 진행 |
-| D-5C-1 | A 계보만 이식, B 계보(Platt·group 통계·ensemble·`ml_release`) 범위 밖 | `training/**` 전체에 `calibration`·`Platt`·`sigmoid`·`ml_release` 참조 0(grep 확인). `residual.py`가 유일한 "불확실성 폭" 산출 — OOF 잔차 std. **milestone-5.md 5C 문면 개정은 팀장 문서 레인**(구현 레인 편집 금지 지시) — 이 slice 는 개정하지 않았다, 팀장 반영 필요(아래 「인계」) |
+| D-5C-1 | A 계보만 이식, B 계보(Platt·group 통계·ensemble·`ml_release`) 범위 밖 | `training/**` 전체에 `calibration`·`Platt`·`sigmoid`·`ml_release` 참조 0(grep 확인). `residual.py`가 유일한 "불확실성 폭" 산출 — OOF 잔차 std. milestone-5.md 5C 문면 개정은 팀장 문서 레인 소관(구현 레인 편집 금지 지시) — `2e9f100`이 이미 개정 완료(취소선 + D-5C-1 개정문, `git diff f5020aa..HEAD -- milestone-5.md` 확인, verifier r1 L-2) |
 | D-5C-2 | 하이퍼파라미터는 코드 선언 `TrainingSpec` + checksum | `spec.py::TrainingSpec`·`TRAINING_SPECS`(frozen `MappingProxyType`)·`spec_checksum`(canonical JSON sha256) · `test_spec.py::test_shipped_spec_matches_policy_values_md`(legacy 13+4값 전건 대조) |
 | D-5C-3 | 정책(도메인 값)과 spec(모델 정의) 파일 분리 | `policy/training-v1.yaml`은 `min_training_rows` 하나만(`policy.py::_KNOWN_KEYS`) — 하이퍼파라미터는 여기 없다 |
 | D-5C-4 | OOF 폴드는 무작위, 시간 방향 요구 없음 | `folds.py::fold_indices`(legacy rng 계약 그대로) · `test_folds.py::test_legacy_parity_rng_contract_seed_20260812_n13_folds5`. **학습 구간 내부 시간 방향은 알려진 제한**(아래) |
@@ -75,9 +75,9 @@ proto 를 건드리지 않았다.
    만 `UNREADABLE`로 잡는다(부분 파일 방어).
 5. **5D `ArtifactManifestV1`와의 필드 어긋남 둘** — (a) 이 slice 의 `release`는 `artifact_checksum`을
    담지 않는다(D-5C-9) — 5D read model 이 그 키를 필수로 읽으면 왕복이 깨진다.
-   (b) 이 slice 는 5D 기본 필드 밖에 6개(`training_spec_version`·`training_spec_checksum`·
-   `training_policy_version`·`feed_origin_only`·`categories`·`denominator_sources`) +
-   `agency_encoding`(5D 밖 신규 형태, 아래 6 참조) + `rejected_rows`를 더 싣는다 — 5D read model 이
+   (b) 이 slice 는 5D 기본 필드 밖에 8개(`training_spec_version`·`training_spec_checksum`·
+   `training_policy_version`·`feed_origin_only`·`categories`·`denominator_sources`·
+   `agency_encoding`(5D 밖 신규 형태, 아래 6 참조)·`rejected_rows`)를 더 싣는다 — 5D read model 이
    미지 키를 거부하면 이 slice 의 artifact 를 읽지 못한다. **`OPEN-5C-ARTIFACT-ROUNDTRIP`**(5D 레인
    병합 뒤 왕복 test 필요) · **`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`**(5D 즉시 통지 대상).
 6. **`agency_encoding` 필드는 5B `FeatureManifest`를 통째로 embed** — legacy `PersistedAwardRateGbmArtifact`의
@@ -136,8 +136,7 @@ proto 를 건드리지 않았다.
 
 ## 인계(팀장/타 레인)
 
-- **milestone-5.md 5C 문면 개정(D-5C-1)** — 구현 레인은 편집 금지. 팀장이 "calibration 로직 이식"을
-  "GBM OOF 잔차 std(후보 폭) 이식"으로 개정해야 한다(scope.md 근거 그대로).
+- ~~milestone-5.md 5C 문면 개정~~ — `2e9f100`이 이미 완료했다(verifier r1 L-2, 낡은 인계 제거).
 - **`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`** — 5D 레인에 즉시 통지. 5D `registry/artifact.py`의
   `ArtifactManifestV1` read model 이 `release.artifact_checksum`을 필수로 읽으면 이 slice 산출물과
   왕복이 깨진다.

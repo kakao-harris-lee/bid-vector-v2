@@ -19,6 +19,9 @@ _SHIPPED_YAML = Path(__file__).resolve().parents[2] / "policy" / "training-v1.ya
 
 
 def test_shipped_policy_file_matches_policy_values_md() -> None:
+    """verifier r1 L-7 — 이 test 는 `policy-values.md`를 파싱하지 않는다. 그 표 §1 의 값을
+    이 파일에 하드코딩해 실제 `policy/training-v1.yaml`과 대조한다(사람이 표와 눈으로
+    대조 확인) — 이름이 시사하는 것보다 약한 대조다(5A/5B 와 같은 관행)."""
     result = load_training_policy(_SHIPPED_YAML)
     assert isinstance(result, TrainingPolicy)
     assert result.version == SHIPPED_TRAINING_POLICY_VERSION
