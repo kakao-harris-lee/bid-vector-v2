@@ -2,7 +2,7 @@
 milestone: M4
 slice: leak-baseline-coord
 base_sha: a6ab6a8dc4c5304ce91f5ae5b591eb0e4c0a0b95
-head_sha: <리뷰 요청 시점에 기입>
+head_sha: 1ef5d73a024c25a95555a0f210cfe21c0bea9606
 in_scope:
   - build-logic/src/main/kotlin/bidvector/buildlogic/LeakPatternGateChecks.kt
   - build-logic/src/test/kotlin/bidvector/buildlogic/LeakPatternGateChecksTest.kt
