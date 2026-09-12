@@ -68,8 +68,13 @@ r1 L-1 — `test_rows.py`의 `_assert_observed_values_within_schema_range`가 `O
 7. **`FeatureColumn.range`는 rows.py 안에서 재검증하지 않는다** — `_categorical_column`·
    `_agency_columns`는 범위를 참조하지 않고 산식으로만 값을 낸다. test가 결과값이
    schema 의 range 안에 있음을 사후 단언할 뿐, `build_row`가 범위를 벗어난 값을 능동적으로
-   거부하지는 않는다(수학적으로 벗어날 수 없는 값들이라 거부 로직 자체가 불필요하다는
-   판단 — `log1p`/`log10`/수축 평균 모두 정의상 그 range 안에 떨어진다).
+   거부하지는 않는다. `log_amount`(`log10`)·`agency_sample_count`(`log1p`)는 입력이
+   `facts.py`에서 이미 양수로 검증돼(D-5B-4) 치역이 항상 `[0, ∞)`다. **`agency_encoding`은
+   다르다** — 수축 평균은 관측값들의 볼록결합(가중 평균)이므로 그 결과가 `[0, 1]` 안에
+   있으려면 **입력 관측값 자체가 `[0, 1]` 안이어야 하는데, `AwardRateObservation.value:
+   float`에는 그 검증이 없다**(verifier r2 probe — 관측 `1.2`를 넣으면 수축 평균이 range
+   밖으로 나간다, 실측 확인). 관측값의 도메인(낙찰률은 비율이라 `[0, 1]`)을 검증하는 것은
+   이 slice가 아니라 **코퍼스를 조립하는 5C의 인수**다(`OPEN-5B-OBSERVATION-DOMAIN`).
 
 ## OPEN 갱신
 
@@ -85,3 +90,10 @@ r1 L-1 — `test_rows.py`의 `_assert_observed_values_within_schema_range`가 `O
   5 kept 0 broken). `pyproject.toml`은 5A 소유 파일이라 5B out_of_scope — **5C 착수 계약이
   `features`·`training`·`evaluation`을 그 forbidden 계약의 `source_modules`에 추가**해야
   한다. 해소 조건: 5C 착수 계약에 이 OPEN을 인수 항목으로 명시.
+- **`OPEN-5B-OBSERVATION-DOMAIN`(신설, verifier r2 low)**: `AwardRateObservation.value: float`
+  에 도메인 검증이 없다 — 관측값이 `[0, 1]`(낙찰률 축) 밖이면 `build_agency_target_encoding`
+  의 수축 평균(`agency_encoding`)도 `FeatureColumn.range`가 선언한 `[0, 1]`을 벗어날 수
+  있다(실측: 관측 `1.2` 주입 → range 밖 값). `features/encoding.py`는 신뢰할 수 있는
+  코퍼스가 이미 주어졌다고 가정하는 순수 변환이라 5B out_of_scope — **코퍼스를 조립하는
+  5C 착수 계약이 관측값 도메인 검증(또는 그 근거)을 인수**해야 한다. 해소 조건: 5C 착수
+  계약에 이 OPEN을 인수 항목으로 명시.
