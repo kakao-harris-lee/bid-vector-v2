@@ -27,7 +27,7 @@ _REPO_ROOT = _ML_ENGINE_ROOT.parent
 _MANIFEST_PATH = _REPO_ROOT / "fixtures" / "manifest.yaml"
 _SHIPPED_POLICY_PATH = _ML_ENGINE_ROOT / "policy" / "inference-v1.yaml"
 
-_SIGN_TOKENS: dict[str, int] = {"NEGATIVE": -1, "NEUTRAL": 0, "POSITIVE": 1}
+_SIGN_MARKERS: dict[str, int] = {"NEGATIVE": -1, "NEUTRAL": 0, "POSITIVE": 1}
 
 
 def load_ml_kernel_cases() -> dict[str, dict[str, Any]]:
@@ -62,18 +62,18 @@ def policy_with(base: InferencePolicy, **overrides: Any) -> InferencePolicy:
     return dataclasses.replace(base, **overrides)
 
 
-def sign_token_to_int(token: str) -> int:
-    """`"NEGATIVE"`/`"NEUTRAL"`/`"POSITIVE"` → `-1`/`0`/`1`(curator 부호 토큰, `-1.0` 리터럴
+def sign_marker_to_int(marker: str) -> int:
+    """`"NEGATIVE"`/`"NEUTRAL"`/`"POSITIVE"` → `-1`/`0`/`1`(curator 부호 표기, `-1.0` 리터럴
     회피 — `data-dictionary.md` §12.1)."""
-    return _SIGN_TOKENS[token]
+    return _SIGN_MARKERS[marker]
 
 
-def provenance_from_token(token: str) -> AssessmentProvenance:
+def provenance_from_label(label: str) -> AssessmentProvenance:
     """case 가 나르는 provenance 라벨은 승인 어휘가 아니다(5d-golden not_covered) — 이
     커널이 실제로 가르는 축은 `CLEAN`이냐 아니냐 하나뿐이므로, `CLEAN`만 그대로 매핑하고
     나머지는 전부 `UNKNOWN`(닫힌 5값 enum 안의 임의의 비-CLEAN 대표값)으로 접는다."""
     return (
-        AssessmentProvenance.CLEAN if token == "CLEAN" else AssessmentProvenance.UNKNOWN
+        AssessmentProvenance.CLEAN if label == "CLEAN" else AssessmentProvenance.UNKNOWN
     )
 
 

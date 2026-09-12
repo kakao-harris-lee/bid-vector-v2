@@ -24,9 +24,9 @@ from _adapter import (
     load_ml_kernel_cases,
     parse_instant,
     policy_with,
-    provenance_from_token,
+    provenance_from_label,
     shipped_policy,
-    sign_token_to_int,
+    sign_marker_to_int,
 )
 
 from ml_engine.features import (
@@ -238,7 +238,7 @@ def test_ml_kernel_007_feature_schema_version_gate() -> None:
     assert exp["defaultVersionAssumedWhenUndeclared"] is False
 
 
-def _reserve_price_token(value: object) -> float:
+def _reserve_price_literal(value: object) -> float:
     if value == "NaN":
         return math.nan
     if value == "Infinity":
@@ -255,7 +255,7 @@ def test_ml_kernel_008_reserve_draw_singular_inputs_never_fold_or_raise() -> Non
     any_value_emitted = False
     any_folded_to_zero = False
     for probe, exp_probe in zip(inp["probes"], exp["probes"], strict=True):
-        values = [_reserve_price_token(v) for v in probe["reservePriceValues"]]
+        values = [_reserve_price_literal(v) for v in probe["reservePriceValues"]]
         result = draw_mean_moments(values, probe["drawCount"])
         if isinstance(result, Unmeasurable):
             assert exp_probe["measurable"] is False
@@ -298,7 +298,7 @@ def test_ml_kernel_009_deterministic_scenario_candidates_are_thread_count_invari
         scenario_clamp_max=Decimal(str(scenario_cfg["clampMax"])),
         scenario_bid_rate_digits=scenario_cfg["bidRateDigits"],
         scenario_weights=tuple(Decimal(str(c["weight"])) for c in ordered),
-        scenario_z_signs=tuple(sign_token_to_int(c["zSign"]) for c in ordered),
+        scenario_z_signs=tuple(sign_marker_to_int(c["zSign"]) for c in ordered),
     )
     center = float(fraction(inp["centerBidRate"]))
     std = float(fraction(inp["residualStd"]))
@@ -341,7 +341,7 @@ def test_ml_kernel_010_non_clean_provenance_never_reaches_aggregation() -> None:
     samples = [
         AssessmentSample(
             center=float(fraction(s["assessmentRate"])),
-            provenance=provenance_from_token(s["provenance"]),
+            provenance=provenance_from_label(s["provenance"]),
         )
         for s in inp["samples"]
     ]

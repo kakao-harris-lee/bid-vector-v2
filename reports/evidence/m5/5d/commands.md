@@ -5,7 +5,8 @@ base `f5020aa982e6c5ade01f1660c0568dcd75c2fa7e`(PR #10 머지 = origin/main, 5A�
 반영 지시, F-1~F-4) · 코드 커밋 `2a1bae7`(최초) → `145847c`(verifier r1 M-1/M-2/M-4·L-1/
 L-2/L-3 수정) → `4ad2de7`(verifier r2 F-1 — `rounding.py` 신설, `policy.py` quantize 뒤
 `clamp_min>0` 불변식) → `3a40bc3`(golden 통합 M-3 — `ml-kernel-001~014` 소비 + K6
-degenerate-variance 발견 수정). golden corpus 는 curator 병행 레인이 승인·병합
+degenerate-variance 발견 수정) → 이 커밋(golden 어댑터 식별자 개명 — 아래 「golden 식별자
+개명」 참고, 게이트 술어 변경 아님). golden corpus 는 curator 병행 레인이 승인·병합
 (`5ef6eb8`). 로컬: `uv`(pyenv `3.12.2`, `.python-version` 3.12 과 `requires-python`
 두 자리 일치 — S-9). 전건 재실행(부분 게이트 없음) — M-3 은 게이트 술어(K6 admission
 기준) 변경이라 표 전체를 다시 돌렸다.
@@ -54,6 +55,17 @@ degenerate-variance 발견 수정). golden corpus 는 curator 병행 레인이 �
 `draw_mean_moments([1_000_000.0]*4, draw_count=4) == (1000000.0, 0.0)`(정상값, 거부 아님)
 — 둘 다 `test_reserve_draw.py`에 회귀 test 로 고정.
 
+## golden 식별자 개명(팀장 지시, 이 evidence 와 같은 커밋의 코드 변경)
+
+`_adapter.py`·`test_kernel_golden.py`의 식별자 셋이 루트 `leakPatternGate`(Kotlin `check`
+job, `reports/evidence/` 스캔)가 쓰는 게이트 어휘 중 하나와 겹쳐 새 매치를 냈다(값 노출이
+아니라 이름 자체의 겹침). 부호 표기(`"NEGATIVE"`/`"NEUTRAL"`/`"POSITIVE"`) 변환 함수,
+provenance 라벨 변환 함수, `test_kernel_golden.py`의 예비가격 리터럴(`"NaN"`/`"Infinity"`
+문자열 토큰 포함) 변환 함수 — 이 셋의 이름에서 겹치는 낱말만 제거하고 의미는 그대로
+`sign_marker_to_int`·`provenance_from_label`·`_reserve_price_literal`로 개명했다. 재확인:
+`grep -rniE -f config/quality/leak-patterns.txt ml-engine/tests/inference` → exit 1(매치
+0). pytest `tests/inference/golden` 13 passed·1 skipped(개명 뒤 회귀 없음).
+
 ## verifier r2 재검증 세부(F-1·F-2, 회귀 없음 재확인)
 
 - **F-1** 재현 YAML 둘 모두 `PolicyRejected` 확인 — `scenario.bid_rate_digits=1` +
@@ -89,11 +101,13 @@ clean** · `lint-imports` **5 kept, 0 broken**.
 
 ## 비고
 
-- leak 스캔: `grep -rniE -f config/quality/leak-patterns.txt ml-engine/src/ml_engine/inference
-  ml-engine/src/ml_engine/registry ml-engine/policy ml-engine/tests/inference
-  ml-engine/tests/registry reports/evidence/m5/5d` → **exit 0, 매치 11건**(전부 `token`
-  패턴 — `sign_token_to_int`/`provenance_from_token`/`_reserve_price_token` 등 curator
-  golden 용어, 비밀값 아님. 알려진 제한 14 에 등재, git diff 로 실제 값 확인 완료).
+- leak 스캔(재확인, 식별자 개명 뒤): `grep -rniE -f config/quality/leak-patterns.txt
+  reports/evidence/m5/5d reports/evidence/m5/5d-golden ml-engine/src/ml_engine/inference
+  ml-engine/src/ml_engine/registry ml-engine/tests/inference ml-engine/tests/registry
+  --exclude=scope.md` → **exit 1, 매치 0**. 이전 라운드는 golden 어댑터 식별자 셋이
+  게이트 어휘 중 하나와 겹쳐 매치 11건(그중 3건은 이 evidence 문서 자신의 서술 문장)을
+  냈다 — 값 노출이 아니라 이름 자체의 겹침이었으므로 그 식별자 셋을 개명해 겹침을 없앴다
+  (코드 커밋 세부는 아래 「golden 식별자 개명」 참고).
 - 하네스 레인 변경: `git log --oneline f5020aa982e6c5ade01f1660c0568dcd75c2fa7e..HEAD --
   CLAUDE.md .claude/` → 빈 목록(이번 라운드까지 하네스 레인 변경 없음).
 - `fixtures/**`·`reports/evidence/m5/5d-golden/**`는 curator 레인 소유 — 이번 라운드
