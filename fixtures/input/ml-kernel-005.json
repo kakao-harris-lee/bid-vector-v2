@@ -1,0 +1,18 @@
+{
+  "axis": "artifact-checksum-mismatch",
+  "expectedRelease": {
+    "releaseId": "SYN-REL-0001",
+    "artifactChecksum": "cd8629948ef2bbf4b991655d11cd58e07f5c46e1378f64b9f77c1b2a463ebd87"
+  },
+  "checksumAlgorithm": "sha256-hex-lowercase",
+  "probes": [
+    {
+      "label": "intact",
+      "artifactBytesUtf8": "{\"manifestSchemaVersion\":1,\"release\":{\"releaseId\":\"SYN-REL-0001\"},\"featureSchemaVersion\":\"award-rate-features-v2\",\"trainingRowCount\":24}"
+    },
+    {
+      "label": "tampered-one-byte",
+      "artifactBytesUtf8": "{\"manifestSchemaVersion\":1,\"release\":{\"releaseId\":\"SYN-REL-0002\"},\"featureSchemaVersion\":\"award-rate-features-v2\",\"trainingRowCount\":24}"
+    }
+  ]
+}

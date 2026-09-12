@@ -1,0 +1,52 @@
+{
+  "axis": "deterministic-reproducible-result",
+  "policy": {
+    "version": "syn-inference-v0",
+    "scenario": {
+      "z": 1.25,
+      "clampMin": 0.6,
+      "clampMax": 1.3,
+      "bidRateDigits": 4,
+      "candidates": [
+        {
+          "label": "CONSERVATIVE",
+          "zSign": "NEGATIVE",
+          "weight": 0.25
+        },
+        {
+          "label": "BASE",
+          "zSign": "NEUTRAL",
+          "weight": 0.46
+        },
+        {
+          "label": "AGGRESSIVE",
+          "zSign": "POSITIVE",
+          "weight": 0.29
+        }
+      ]
+    }
+  },
+  "signComment": "부호를 토큰으로 싣는다 — `-1.0` 은 data-dictionary §12.1 이 legacy-behavior 로 등재한 리터럴(미지 범주 피처 코드)이라 corpus 에 넣지 않는다",
+  "centerBidRate": {
+    "fraction": "0.9200"
+  },
+  "residualStd": {
+    "fraction": "0.0400"
+  },
+  "scale": 1,
+  "artifact": {
+    "releaseId": "SYN-REL-0001",
+    "reproducibility": {
+      "seed": 20260912,
+      "deterministic": true
+    }
+  },
+  "runs": [
+    {
+      "numThreads": 1
+    },
+    {
+      "numThreads": 4
+    }
+  ]
+}

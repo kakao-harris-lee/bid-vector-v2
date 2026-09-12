@@ -1,0 +1,23 @@
+{
+  "declaredChecksum": "cd8629948ef2bbf4b991655d11cd58e07f5c46e1378f64b9f77c1b2a463ebd87",
+  "probes": [
+    {
+      "label": "intact",
+      "computedChecksum": "cd8629948ef2bbf4b991655d11cd58e07f5c46e1378f64b9f77c1b2a463ebd87",
+      "checksumMatches": true,
+      "loadedArtifactCreated": true,
+      "rejected": false,
+      "differingByteCount": 0
+    },
+    {
+      "label": "tampered-one-byte",
+      "computedChecksum": "068ef1a95c0f1174ca4b734e41f5560d77cf3074d47fd509e273d17934789e75",
+      "checksumMatches": false,
+      "loadedArtifactCreated": false,
+      "rejected": true,
+      "differingByteCount": 1,
+      "sameByteLength": true
+    }
+  ],
+  "rejectionHappensBeforeObjectConstruction": true
+}

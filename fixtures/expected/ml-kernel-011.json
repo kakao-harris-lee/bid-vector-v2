@@ -1,0 +1,41 @@
+{
+  "diagnostics": {
+    "segmentSupport": "DIRECT",
+    "agencySampleCount": 5,
+    "agencySampleBelowThreshold": true,
+    "shrinkageWeight": {
+      "fraction": "0.25"
+    },
+    "shrinkageWeightCarriedInResponse": true
+  },
+  "levelWeights": {
+    "agency": {
+      "fraction": "0.25"
+    },
+    "category": {
+      "fraction": "0.1875"
+    },
+    "global": {
+      "fraction": "0.5625"
+    }
+  },
+  "levelWeightSum": {
+    "fraction": "1"
+  },
+  "posteriorMean": {
+    "fraction": "1.01375"
+  },
+  "effectiveSampleCount": "284.375",
+  "posteriorStd": {
+    "fraction": "0.04"
+  },
+  "derivation": [
+    "w_category = n/(n+k) = 10/(10+30) = 0.25",
+    "categoryShrunkMean = 1.02*0.25 + 1.00*(1-0.25) = 0.2550 + 0.7500 = 1.0050",
+    "w_agency = 5/(5+15) = 0.25",
+    "posteriorMean = 1.04*0.25 + 1.0050*(1-0.25) = 0.2600 + 0.75375 = 1.01375",
+    "levelWeights = (0.25, (1-0.25)*0.25, (1-0.25)*(1-0.25)) = (0.25, 0.1875, 0.5625)",
+    "effectiveSampleCount = 0.25*5 + 0.1875*10 + 0.5625*500 = 1.25 + 1.875 + 281.25 = 284.375",
+    "predictiveVariance = 0.25*0.0016 + 0.1875*0.0016 + 0.5625*0.0016 = 0.0016; std = 0.04 > minPredictiveStd"
+  ]
+}

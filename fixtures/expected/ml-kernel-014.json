@@ -1,0 +1,37 @@
+{
+  "assignments": [
+    {
+      "noticeId": "SYN-NTC-0101",
+      "instantKst": "2026-03-08T23:59:59+09:00",
+      "assignedWeekStartKst": "2026-03-02T00:00:00+09:00",
+      "assignedWeekStartUtc": "2026-03-01T15:00:00Z",
+      "assignedToLaterWeek": false
+    },
+    {
+      "noticeId": "SYN-NTC-0102",
+      "instantKst": "2026-03-09T00:00:00+09:00",
+      "assignedWeekStartKst": "2026-03-09T00:00:00+09:00",
+      "assignedWeekStartUtc": "2026-03-08T15:00:00Z",
+      "assignedToLaterWeek": true
+    },
+    {
+      "noticeId": "SYN-NTC-0103",
+      "instantKst": "2026-03-09T01:00:00+09:00",
+      "assignedWeekStartKst": "2026-03-09T00:00:00+09:00",
+      "assignedWeekStartUtc": "2026-03-08T15:00:00Z",
+      "assignedToLaterWeek": true
+    },
+    {
+      "noticeId": "SYN-NTC-0104",
+      "instantKst": "2026-03-08T23:59:59+09:00",
+      "assignedWeekStartKst": "2026-03-02T00:00:00+09:00",
+      "assignedWeekStartUtc": "2026-03-01T15:00:00Z",
+      "assignedToLaterWeek": false
+    }
+  ],
+  "weekStartInstantAssignedToStartingWeek": true,
+  "weekEndInstantAssignedToPreviousWeek": true,
+  "adjacentWindowsOverlap": false,
+  "zoneUsedForWeekPartition": "Asia/Seoul",
+  "partitionedInUtcCalendarDays": false
+}
