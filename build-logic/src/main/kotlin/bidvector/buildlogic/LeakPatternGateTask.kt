@@ -93,16 +93,27 @@ abstract class LeakPatternGateTask : DefaultTask() {
                 leakMatchesInFile(relative, file.readLines(), patterns)
             }
 
-        val matchKeys = matches.map { leakBaselineKey(it.path, it.content) }.toSet()
-        val newKeys = newLeakBaselineKeys(matchKeys, baseline)
-        val staleBaseline = staleLeakBaselineEntries(matchKeys, baseline)
+        // 위반 메시지와 보고서가 이 그룹핑을 각자 다시 계산하면 어긋날 수 있어 여기서 한 번만
+        // 묶어 두 함수에 그대로 넘긴다.
+        val coordinatesByKey = matches.groupBy { leakBaselineKey(it.path, it.content) }
+        val newKeys = newLeakBaselineKeys(coordinatesByKey.keys, baseline)
+        val staleBaseline = staleLeakBaselineEntries(coordinatesByKey.keys, baseline)
 
         report
             .get()
             .asFile
             .apply { parentFile.mkdirs() }
-            .writeText(leakGateReportText(patterns.size, baseline.size, matches, newKeys, staleBaseline))
+            .writeText(
+                leakGateReportText(
+                    patterns.size,
+                    baseline.size,
+                    matches.size,
+                    coordinatesByKey,
+                    newKeys,
+                    staleBaseline,
+                ),
+            )
 
-        (legacyFormatViolation ?: leakGateViolation(newKeys, matches))?.let { throw GradleException(it) }
+        (legacyFormatViolation ?: leakGateViolation(newKeys, coordinatesByKey))?.let { throw GradleException(it) }
     }
 }

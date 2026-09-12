@@ -1,7 +1,7 @@
 # commands.md — leak-baseline-coord
 
 base_sha: a6ab6a8dc4c5304ce91f5ae5b591eb0e4c0a0b95
-head_sha: 1ef5d73a024c25a95555a0f210cfe21c0bea9606
+head_sha: 37de8bb8624882f05f948bd2accf926774e3ba5a
 
 ## RED — 새 API 로 갱신한 test 가 기존 프로덕션 코드에서 컴파일 실패
 
@@ -167,3 +167,48 @@ commands.md 를 채우는 서술 자체가 "secret 스캔"·"cmd: `grep ...`" �
 - cmd: `./gradlew :build-logic:test --tests '*LeakPatternGateChecksTest*' leakPatternGate --no-daemon`
 - exit: 0
 - 핵심 결과: 되돌린 트리에서 옛(좌표 키) 코드 + 옛 baseline 조합으로 compile·test·게이트 전부 정상 통과 — rollback 이 실제로 서는 상태로 되돌림을 확인. clone 삭제로 뒷정리.
+
+## F-6 시정 — 위반 메시지·보고서가 좌표를 각자 다시 계산하던 것을 한 곳으로 모음
+
+`leakGateViolation`·`leakGateReportText` 가 각자 `matches.groupBy { leakBaselineKey(...) }` 를
+다시 계산해, 둘이 어긋나면(예: 한쪽만 배선이 바뀌면) 위반 메시지의 좌표가 조용히 빈 `()` 로
+열화하던 결함(verifier F-6). `LeakPatternGateTask.gate()` 에서 그룹핑을 한 번만 계산해
+`coordinatesByKey: Map<String, List<LeakMatch>>` 로 두 함수에 그대로 넘기도록 고쳤다 — 실패
+술어(`newLeakBaselineKeys`·`staleLeakBaselineEntries`)의 로직은 그대로다. 단위 test 에도
+같은 맵을 두 함수에 넘기면 좌표가 일치함을 고정하는 회귀 test 1건을 추가했다
+(`LeakPatternGateChecksTest.kt`).
+
+## 2026-09-12T02:05Z — 표적 확인 ① 실제 게이트 재실행
+- cmd: `./gradlew leakPatternGate --no-daemon`
+- exit: 0
+- 핵심 결과: `patterns=6 baseline=276 matches=299 keys=276 new=0 stale_baseline=0` — 시정 전과
+  동일 수치, 회귀 없음.
+
+## 2026-09-12T02:06Z — 표적 확인 ② 새 매치를 심어 위반 메시지의 좌표 확인
+- cmd: `reports/evidence/harness/f6-probe/probe.md` 신규 생성(패턴 어휘를 담은 한 줄) 후
+  `./gradlew leakPatternGate --no-daemon`
+- exit: 1
+- 핵심 결과: 위반 메시지에 `reports/evidence/harness/f6-probe/probe.md#bcc16ac5…  (reports/evidence/harness/f6-probe/probe.md:1)` —
+  키와 함께 실제 좌표가 찍힘(시정 전 변이 상태에서 관측된 빈 `()` 열화가 재현되지 않음).
+  확인 후 `reports/evidence/harness/f6-probe/` 디렉터리를 삭제(신규 파일이라 `git status
+  --porcelain` 이 다시 clean 으로 돌아옴 — `checkout --` 불필요).
+
+## 2026-09-12T02:07Z — detekt/ktlint 재확인 (함수 수 예산 불변 확인)
+- cmd: `./gradlew :build-logic:test --tests '*LeakPatternGateChecksTest*' :build-logic:detekt :build-logic:ktlintMainSourceSetCheck :build-logic:ktlintTestSourceSetCheck --no-daemon`
+- exit: 0
+- 핵심 결과: 30 tests 0 failed, detekt/ktlint 통과 — `coordinatesByKey` 를 매개변수로 옮기고
+  Task 쪽 계산을 인라인으로 처리해 `LeakPatternGateChecks.kt` 최상위 함수 수(11)를 늘리지
+  않았다(TooManyFunctions 예산 그대로).
+
+## 2026-09-12T02:09Z — 최종 acceptance 재확인 (장부층 정정 포함, 이 라운드 종결)
+- cmd: `./gradlew leakPatternGate --no-daemon`
+- exit: 0
+- 핵심 결과: `patterns=6 baseline=276 matches=299 keys=276 new=0 stale_baseline=0` — checklist.md·
+  commands.md 갱신 서술 자체가 새 자기매치를 내지 않았다(패턴 어휘 직접 인용을 피함).
+- cmd: `./gradlew --no-daemon check`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL` — 전 모듈 + build-logic included build 전건 통과.
+- cmd: `git status --porcelain`(라운드 편집 중)
+- 핵심 결과: in_scope 3개 코드 파일 + evidence 3개 문서(checklist·commands·rollback, 전부
+  이미 존재하는 M)만 잡힘 — `config/quality/leak-pattern-baseline.txt` 는 이 라운드에서
+  건드리지 않아 M 목록에 없다(자기매치 신규분 없음).

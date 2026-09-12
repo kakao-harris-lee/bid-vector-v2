@@ -202,13 +202,13 @@ class LeakPatternGateChecksTest {
 
     @Test
     fun `새 키가 없으면 위반이 없다`() {
-        assertNull(leakGateViolation(emptyList(), emptyList()))
+        assertNull(leakGateViolation(emptyList(), emptyMap()))
     }
 
     @Test
     fun `새 키가 있으면 키와 현재 좌표를 함께 낸다`() {
         val match = leakMatchesInFile("a.md", listOf("has a secret"), patterns).single()
-        val violation = leakGateViolation(listOf(match.key()), listOf(match))
+        val violation = leakGateViolation(listOf(match.key()), listOf(match).groupBy { it.key() })
         assertNotNull(violation)
         assertTrue(violation.contains(match.key()))
         assertTrue(violation.contains("a.md:1"))
@@ -220,12 +220,14 @@ class LeakPatternGateChecksTest {
     fun `같은 파일 안에서 같은 글자가 두 줄에 나타나면 매치는 둘 키는 하나로 보고된다`() {
         val matches = leakMatchesInFile("a.md", listOf("has a secret", "has a secret"), patterns)
         assertEquals(2, matches.size)
+        val coordinatesByKey = matches.groupBy { it.key() }
         val report =
             leakGateReportText(
                 patternCount = patterns.size,
                 baselineCount = 0,
-                matches = matches,
-                newKeys = matches.map { it.key() }.distinct(),
+                matchCount = matches.size,
+                coordinatesByKey = coordinatesByKey,
+                newKeys = coordinatesByKey.keys.toList(),
                 staleBaseline = emptyList(),
             )
         assertTrue(report.contains("matches=2"))
@@ -239,7 +241,8 @@ class LeakPatternGateChecksTest {
             leakGateReportText(
                 patternCount = patterns.size,
                 baselineCount = 0,
-                matches = listOf(match),
+                matchCount = 1,
+                coordinatesByKey = listOf(match).groupBy { it.key() },
                 newKeys = listOf(match.key()),
                 staleBaseline = emptyList(),
             )
@@ -253,10 +256,34 @@ class LeakPatternGateChecksTest {
             leakGateReportText(
                 patternCount = patterns.size,
                 baselineCount = 1,
-                matches = emptyList(),
+                matchCount = 0,
+                coordinatesByKey = emptyMap(),
                 newKeys = emptyList(),
                 staleBaseline = listOf("removed.md#${"9".repeat(64)}"),
             )
         assertTrue(report.contains("stale: removed.md#${"9".repeat(64)}"))
+    }
+
+    // ---- 좌표 산출은 Task 가 한 번만 계산한 그룹핑을 그대로 받는다 ----
+
+    @Test
+    fun `위반 메시지와 보고서는 같은 coordinatesByKey 를 받으면 같은 좌표를 낸다`() {
+        // F-6 재현 — 두 함수가 각자 groupBy 를 다시 계산하던 시절엔 어긋날 길이 있었다.
+        // 이제는 호출자가 넘긴 같은 맵을 그대로 조회하므로 구조적으로 어긋날 수 없다.
+        val match = leakMatchesInFile("a.md", listOf("has a secret"), patterns).single()
+        val coordinatesByKey = listOf(match).groupBy { it.key() }
+        val violation = leakGateViolation(listOf(match.key()), coordinatesByKey)
+        val report =
+            leakGateReportText(
+                patternCount = patterns.size,
+                baselineCount = 0,
+                matchCount = 1,
+                coordinatesByKey = coordinatesByKey,
+                newKeys = listOf(match.key()),
+                staleBaseline = emptyList(),
+            )
+        assertNotNull(violation)
+        assertTrue(violation.contains("(a.md:1)"))
+        assertTrue(report.contains("(a.md:1)"))
     }
 }

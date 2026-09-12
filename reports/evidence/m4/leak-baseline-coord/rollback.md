@@ -2,24 +2,36 @@
 
 ## 대상 (기계 산출)
 
-`git diff --name-status a6ab6a8..HEAD` (2026-09-12T01:23Z 실행):
+`git diff --name-status a6ab6a8..HEAD` (2026-09-12T02:10Z 재실행 — verifier L-2, 이전
+기록은 신규 evidence 문서 3개가 늘어난 라운드를 반영하지 못했다):
 
 ```
 M	build-logic/src/main/kotlin/bidvector/buildlogic/LeakPatternGateChecks.kt
 M	build-logic/src/main/kotlin/bidvector/buildlogic/LeakPatternGateTask.kt
 M	build-logic/src/test/kotlin/bidvector/buildlogic/LeakPatternGateChecksTest.kt
-A	reports/evidence/m4/leak-baseline-coord/scope.md
 M	config/quality/leak-pattern-baseline.txt
+A	reports/evidence/m4/leak-baseline-coord/checklist.md
+A	reports/evidence/m4/leak-baseline-coord/commands.md
+A	reports/evidence/m4/leak-baseline-coord/rollback.md
+A	reports/evidence/m4/leak-baseline-coord/scope.md
 ```
 
-`reports/evidence/m4/leak-baseline-coord/scope.md`(A)와 이 evidence 디렉터리는 되돌리지
+`reports/evidence/m4/leak-baseline-coord/` 아래 4개 evidence 문서(전부 A)는 되돌리지
 않는다 — 계약·증적 문서이지 이 slice 가 되돌려야 할 "신규 wiring"이 아니다. 대상은
-in_scope 4개 파일(전부 M — base 에 이미 존재)뿐이다.
+in_scope 4개 파일(전부 M — base 에 이미 존재)뿐이다. **복원 명령 자체는 이전 기록과
+동일하게 유효**하다(파일 전체 복원이라 그 파일이 몇 개 커밋에 걸쳐 움직였는지와 무관) —
+낡은 것은 목록이지 명령이 아니었다.
+
+`config/quality/leak-pattern-baseline.txt` 는 이 range 안에서 **두 커밋**(`1ef5d73` 키
+형식 전환, `2684e08` evidence 자기매치 등재)에 걸쳐 움직였다(이전 기록은 "단일 커밋
+`1ef5d73`"으로 적어 낡아 있었다 — verifier L-2). 이 slice 를 마무리하는 현재 라운드는
+자기매치 신규분이 없어 baseline 파일을 추가로 건드리지 않았다(`git diff --name-status
+a6ab6a8 -- config/quality/leak-pattern-baseline.txt` 는 여전히 M 하나).
 
 이 range 에 **하네스 레인 커밋 없음**(`git log --oneline a6ab6a8..HEAD -- CLAUDE.md
 .claude/` 결과 없음, 2026-09-12 확인 — scope.md 「하네스 레인 변경: 없음」과 일치).
-공유 파일(다른 slice 와 겹치는 파일) 없음 — 4개 파일 모두 이 slice 단독 커밋
-(`1ef5d73`) 하나에서만 움직였다. hunk 격리 절차 불필요.
+공유 파일(다른 slice 와 겹치는 파일) 없음 — in_scope 4개 파일 모두 이 slice 의 커밋들
+(`1ef5d73`·`2684e08`·이번 라운드 커밋)에서만 움직였다. hunk 격리 절차 불필요.
 
 ## 되돌리는 방법
 
@@ -64,6 +76,8 @@ git diff --name-status a6ab6a8 -- <위 4개 경로>   # 결과 없음 = base 와
 
 ## 라운드 증가 시 재실행
 
-이 slice 는 커밋을 더 늘리지 않았다(단일 구현 커밋 `1ef5d73`). 수정 라운드가 생겨
-in_scope 파일이 늘면, 위 `git diff --name-status a6ab6a8..HEAD` 를 다시 실행해 목록을
-갱신하고 이 절차를 다시 밟는다.
+이 slice 는 구현 이후 두 라운드(`2684e08` evidence 자기매치 baseline 등재, 이번 라운드의
+F-6 코드 시정 + 장부층 정정)를 더 거쳤다 — 그때마다 이 절의 목록이 한 라운드씩 낡았다
+(verifier L-2). in_scope 파일 집합 자체는 구현 착수 이후 늘지 않았으므로(항상 같은 4개
+파일), 다음 라운드에서도 위 `git diff --name-status a6ab6a8..HEAD` 를 다시 실행해 evidence
+문서 개수만 확인하고 이 절차를 다시 밟는다.

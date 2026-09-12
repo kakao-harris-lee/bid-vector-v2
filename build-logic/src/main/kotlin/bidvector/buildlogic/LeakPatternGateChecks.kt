@@ -106,13 +106,16 @@ internal fun staleLeakBaselineEntries(
     baseline: Set<String>,
 ): List<String> = (baseline - matchKeys).sorted()
 
-/** 게이트 실패 메시지 — 새 키가 있을 때만, 저장 가능한 키와 현재 좌표를 함께 낸다(D-LBC-3). */
+/**
+ * 게이트 실패 메시지 — 새 키가 있을 때만, 저장 가능한 키와 현재 좌표를 함께 낸다(D-LBC-3).
+ * `coordinatesByKey`는 호출자(Task)가 한 번만 묶어 넘긴다 — 이 함수가 다시 groupBy 하면
+ * `leakGateReportText`가 계산한 것과 어긋날 수 있고, 어긋나면 좌표가 조용히 빈 채로 나간다.
+ */
 internal fun leakGateViolation(
     newKeys: List<String>,
-    matches: List<LeakMatch>,
+    coordinatesByKey: Map<String, List<LeakMatch>>,
 ): String? {
     if (newKeys.isEmpty()) return null
-    val coordinatesByKey = matches.groupBy { leakBaselineKey(it.path, it.content) }
     return newKeys.joinToString(
         prefix =
             "leak-patterns.txt 매치가 baseline 밖에서 새로 나타났다 — 실제 유출이면 값을 제거하고, " +
@@ -129,20 +132,23 @@ internal fun leakGateViolation(
     }
 }
 
-/** 보고서 본문 — 매치 줄 수(`matches`)와 접힌 키 수(`keys`)를 따로 싣고, new·stale 항목을 나열한다. */
+/**
+ * 보고서 본문 — 매치 줄 수(`matches`)와 접힌 키 수(`keys`)를 따로 싣고, new·stale 항목을
+ * 나열한다. `coordinatesByKey`는 [leakGateViolation]과 같은 이유로 호출자가 한 번만 묶어 넘긴다.
+ */
 internal fun leakGateReportText(
     patternCount: Int,
     baselineCount: Int,
-    matches: List<LeakMatch>,
+    matchCount: Int,
+    coordinatesByKey: Map<String, List<LeakMatch>>,
     newKeys: List<String>,
     staleBaseline: List<String>,
 ): String {
-    val coordinatesByKey = matches.groupBy { leakBaselineKey(it.path, it.content) }
     val lines =
         listOf(
             "patterns=$patternCount",
             "baseline=$baselineCount",
-            "matches=${matches.size}",
+            "matches=$matchCount",
             "keys=${coordinatesByKey.size}",
             "new=${newKeys.size}",
         ) +
