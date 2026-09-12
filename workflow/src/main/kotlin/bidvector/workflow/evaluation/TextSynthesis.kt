@@ -2,16 +2,7 @@ package bidvector.workflow.evaluation
 
 import bidvector.qualification.OperatorLicenses
 import bidvector.strategy.WatchSubject
-
-/**
- * 합성 텍스트의 출처 축(D-4B6A-2) — 2E `embedding.proto` `TextKind`의 workflow 자체 미러다.
- * `workflow`는 proto를 모른다(ADR 0006, `CompositionBoundaryTest`) — 4D-2 gateway가 proto
- * 쪽 대응 열거형으로 매핑한다(패키지 경로는 이 파일이 참조하지 않는다).
- */
-enum class TextKind {
-    NOTICE,
-    OPERATOR_PROFILE,
-}
+import bidvector.workflow.embedding.TextKind
 
 /**
  * 합성 규약 version(scope.md ①) — 4D-2 임베딩 port의 `feature_schema_version` 인자로

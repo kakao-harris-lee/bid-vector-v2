@@ -4,12 +4,19 @@ import bidvector.qualification.LicenseName
 import bidvector.qualification.OperatorLicenses
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.ReasonCode
+import bidvector.sharedkernel.RoundingPolicy
 import bidvector.strategy.CategoryCode
 import bidvector.strategy.FullScopeText
 import bidvector.strategy.KeywordScopeText
 import bidvector.strategy.WatchSubject
+import bidvector.workflow.embedding.TextKind
+import bidvector.workflow.prediction.ModelReleaseSelector
+import bidvector.workflow.prediction.OptimizationObjective
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.time.Duration
 
 /**
  * 텍스트 합성 규약 v1(scope.md D-4B6A-1~4, 설계 검토 (5) 1) — golden 텍스트·상한 절단·
@@ -163,4 +170,10 @@ internal val TEST_POLICY =
         synthesisVersion = SynthesisVersion("test-v1"),
         keywords = listOf("보안", "클라우드"),
         textMaxChars = 4000,
+        embeddingBudget = Duration.ofSeconds(2),
+        predictionBudget = Duration.ofSeconds(3),
+        releaseSelector = ModelReleaseSelector.LatestPromoted,
+        objective = OptimizationObjective.SCENARIO_TRIPLE,
+        categoryOffset = BigDecimal.ZERO,
+        recommendedAmountRounding = RoundingPolicy(scaleDigits = 0, mode = RoundingMode.HALF_UP),
     )
