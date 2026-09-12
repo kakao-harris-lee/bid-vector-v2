@@ -61,6 +61,15 @@ def test_good_serving_fixture_approved_indirect_path_passes() -> None:
     assert "KEPT" in result.stdout
 
 
+def test_bad_features_db_fixture_is_broken_by_lint_imports() -> None:
+    """M5/5C-1 ⑫(D-5C-13) — `ml_engine.features`가 `sqlalchemy`를 import하면 실패해야
+    한다(`OPEN-5B-FEATURES-FORBIDDEN` 해소 증거)."""
+    result = _run_lint_imports(_FIXTURES_ROOT / "bad_features_db")
+    assert result.returncode != 0
+    assert "BROKEN" in result.stdout
+    assert "sqlalchemy" in result.stdout
+
+
 def test_forbidden_contract_forbids_bidvector_with_indirect_imports_allowed() -> None:
     data = tomllib.loads(
         (_ML_ENGINE_ROOT / "pyproject.toml").read_text(encoding="utf-8")
