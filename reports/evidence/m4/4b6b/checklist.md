@@ -109,3 +109,13 @@ F-4(notice 실패 시 profile 미호출)는 둘 다 `private`/기존 `internal` 
   port 접근(class)·순수 파이프라인 변환·예측 파생 셋으로 나눴다(commands.md
   S-1 3~4차 참고). 기계적 분할이 아니라 이미 코드 안에 있던 책임 경계(port I/O
   대 순수 변환)를 파일 경계로 옮긴 것이다.
+
+## 사용자 승인
+
+**2026-09-12 — slice 4B-6b 종결 승인.** verifier r1 not-ready(high 1: 예측 후보율 > 1 이 `MarginInputs.init` 예외로 새어 배치 소실 ·
+medium 1: 등재 완전성 test 의 Gradle 입력 미선언 · low 3) → 수정 커밋 5(`2f9fab9`~`f9068a8`) → r2 ready-for-review(전부 닫힘, 새 결함 0) →
+장부 low 둘 정리 `d077d39`. 재작업 1회. 함께 결정: `OPEN-4B6B-POLICY-VALUES` 승인(정본 `policy-values.md`) · **D-4B6B-6 (a)**(`predictedRate =
+recommendedRate = base 후보율`, `OPEN-4B6B-PREDICTED-RATE` 인계) · 병합은 `origin/main` 흡수 → 전체 check → push → PR + 리뷰 판정 코멘트(머지는 별도 승인).
+인계 OPEN: `OPEN-4B6B-PREDICTED-RATE`(전략 시나리오 선택 또는 M2 additive) · `OPEN-4B6B-BASE-AMOUNT-PROVENANCE`(procurement provenance fact) ·
+adapters 등재 test 의 Gradle 입력 사각·`UnavailableMlAnalysis` 처분(6A 배선). verifier 리포트 `_workspace/m4-4b6b/04_verifier_report.md`·`05_verifier_report_r2.md`.
+다음 slice: M5 5B(feature schema, 운영자 결정 2026-09-12 (a)).

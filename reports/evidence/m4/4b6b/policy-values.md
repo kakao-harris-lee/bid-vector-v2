@@ -1,4 +1,4 @@
-# M4/4B-6b 정책 값 — OPEN-4B6B-POLICY-VALUES(승인 대기)
+# M4/4B-6b 정책 값 — OPEN-4B6B-POLICY-VALUES(**사용자 승인 2026-09-12 — 종결**)
 
 정본은 이 문서다 — `OpportunityPolicyData`의 4B-6b 신규 슬롯 값을 바꾸려면 이 문서를
 먼저 갱신한다(3A `KONEPS_COLLECTION_POLICY`·4B-4/4B-5 관례).
@@ -36,3 +36,9 @@
 착수 문서가 예견하지 못한 기술적 필수값이라 별도 결정 — HALF_UP·scale 0 조합은
 바뀔 여지가 낮다(구조적 사실 + 코드베이스 전역 관례)고 판단해 승인 대기에 포함은
 하되 우선순위는 낮다.
+
+## 사용자 승인
+
+**2026-09-12 — `OPEN-4B6B-POLICY-VALUES` 종결.** slice 4B-6b 종결 승인과 함께 받았다(§1 예산 2s/3s · §2 `LatestPromoted`·`SCENARIO_TRIPLE` ·
+§3 offset 0 · §4 반올림 scale 0 HALF_UP). 예산 둘은 초기 추정치로 4D-1·4D-2 운영 실측 뒤 갱신 대상(활성 유지). 정본은 이 문서 —
+evidence `reports/evidence/m4/4b6b/checklist.md` 「사용자 승인」 절.
