@@ -83,6 +83,16 @@ wire 3값 미러 + `detail_code` 닫힌 enum(D-5D-2). `ArtifactManifestV1` 읽�
 golden 은 curator 병행 레인(worktree `bid-vector-v2-m5cur`, `OPEN-5D-GOLDEN`). 정본 `reports/evidence/m5/5d/scope.md`,
 설계 검토 `_workspace/m5-5d/02_design-review.md`.
 
+**5D 종결 2026-09-13(사용자 승인)** — verifier r1 `ready-for-review`(medium 4: `LoadedArtifact` 직접 생성·`clamp_min ≤ 0`
+정책의 커널 예외 누출·golden 무검증 초록·mypy 죽은 코드) → `_VerifiedBytes` 필수 인자·로더 불변식 확장·`JsonValue`
+파싱 + `warn_unreachable`·`ROUND_HALF_UP`(D-5D-10) → r2 `ready`(medium 1: quantize 뒤 0 이 되는 `clamp_min` → `quantize_bid_rate`
+단일 출처) → golden 14 case(curator, `ml-kernel-001~014`, 승인) 병합·통합 13 passed·011 skip(분포 엔진) — **golden 008 이
+K6 분산 0 접힘을 잡아 `DEGENERATE_VARIANCE` 로 수정**(D-5D-11 `n == draw_count` 예외) → r3 `ready`(low 1). 재작업 2회.
+351 tests(마커 분리 347+4), mypy strict + `warn_unreachable`, ruff `BLE`. **범위 판정**: 분포 엔진 조립(K5·K6 → 후보 3)은
+5D in_scope 밖 — `OPEN-5D-DISTRIBUTION-ENGINE` → **5D-2**(운영자 결정 2026-09-13 (b) 분포 단독). **알려진 제한·OPEN**:
+Python 가시성 2줄 우회 둘 · `std == 0` 통과 · 실 booster 결정성(`OPEN-5D-REAL-BOOSTER`, 5C) · `ArtifactManifestV1` writer(5C) ·
+`OPEN-5D-DIAGNOSTICS-WIRE`(2F). 정본 `reports/evidence/m5/5d/checklist.md`.
+
 ### Slice 5B — feature schema
 
 - versioned feature name/order/type/range

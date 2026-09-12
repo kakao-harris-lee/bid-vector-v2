@@ -115,3 +115,11 @@ candidateOrder 등)만 단언한다. 전체 pytest 는 347 passed·1 skipped(변
 - `OPEN-5D-REAL-BOOSTER`: 변경 없음(5C artifact 도착 후).
 - `OPEN-5D-DISTRIBUTION-ENGINE`(신설, 팀장 범위 판정 2026-09-12): K5·K6·K7 → 후보 3 을 잇는 분포 엔진 조립(legacy `distribution.py`)은 5D in_scope 에 없다 — ML-04 둘째 acceptance(수축 가중치가 응답 근거에)·golden 011(명시 skip, M-3 반영)·`segment_support` 폴백은 그 조립 slice 가 만족시킨다(알려진 제한 8·9·6). 처분은 운영자 결정 대기.
 - `OPEN-5B-OBSERVATION-DOMAIN`·`OPEN-5B-FEATURES-FORBIDDEN`: 수령 유지, 5D 는 `features` 소비만(무변경).
+
+## 사용자 승인
+
+**2026-09-13 — slice 5D 종결 승인.** verifier r1 ready(medium 4·low 4) → 시정 `145847c`·`bf59998`·`e316a2d` → r2 ready(medium 1·low 3) → 시정 `4ad2de7`·`0e8b96f`
+→ golden 14 case 승인·병합 `5ef6eb8` → 통합 `3a40bc3`(K6 분산 0 접힘 수정 — golden 008 이 잡음)·`1753785` → 누출 어휘 정리 `ea4542c` → r3 ready(low 1) → `f985c83`.
+재작업 2회. 정책 값 `inference-v1` 은 착수 시 승인. 병합은 push → PR + 리뷰 판정 코멘트 → 머지 별도 승인(관례). golden 브랜치는 이 브랜치에 병합돼 같은 PR.
+인계: `OPEN-5D-DISTRIBUTION-ENGINE` → **5D-2**(운영자 결정 2026-09-13: 분포 단독 (b), 착수) · `OPEN-5D-DIAGNOSTICS-WIRE`(2F) · `OPEN-5D-REAL-BOOSTER`(5C) ·
+`ArtifactManifestV1` writer(5C) · Python 가시성 2줄 우회 둘(5E verifier 표적). verifier 리포트 `_workspace/m5-5d/04_verifier_report.md`·`05_…_r2.md`·`06_…_r3.md`.
