@@ -72,3 +72,9 @@ golden test 입력으로만 쓰이며 「승인된 authoritative corpus 통과�
 **남의 줄이 남았는가**: 공유 파일 둘은 `f138280` 의 hunk만 역적용했고 그 커밋 밖의 줄은 손대지 않았다.
 이 브랜치에는 이 레인의 커밋만 있어 겹치는 slice 가 현재는 없다 — 다른 레인이 같은 파일을 만진 뒤
 rollback 할 때를 위한 수동 해소 절차를 `rollback.md` 가 미리 적어 둔다.
+
+## 6. 사용자 승인
+
+**2026-09-12 — `ml-kernel-001`~`014` 14 case authoritative 승인**(운영자 「모두 추천으로 진행」). `fixtures/manifest.yaml` 의
+`review.approved_by_user: true`·`claude_commit: f138280` 등재. curator 가 지시와 다르게 처리한 둘(평면 경로·정책 값 synthetic)도 승인.
+이 브랜치는 5D 브랜치(`m5-5d/2026-09-12`)에 병합되어 golden test 가 `verified_paths` 만 단언하는 형태로 통합된다(`OPEN-5D-GOLDEN` 해소).

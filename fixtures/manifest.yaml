@@ -9905,11 +9905,13 @@ cases:
     not_covered: |-
       `UnmeasurableDetail` 토큰의 **이름**(승인 문면 없음 — D-5D-2) · 임계 값 `24` 가 출하 정책이라는 주장
       (`OPEN-5D-POLICY-VALUES` 소유. 여기서 `24` 는 입력이 선언한 synthetic 정책이고 기대값은 비교 규칙에만 의존한다).
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-002
     domain: ml-kernel
     classification: authoritative
@@ -9957,11 +9959,13 @@ cases:
     expected_sha256: 660e9c73b597bb35f96c98bc8f84a15614c19031e012e4925f7019b22848690c
     not_covered: |-
       `UnmeasurableDetail` 토큰의 이름 · 출하 정책 임계 값(`OPEN-5D-POLICY-VALUES`).
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-003
     domain: ml-kernel
     classification: authoritative
@@ -10004,11 +10008,13 @@ cases:
     not_covered: |-
       게이트를 **통과한 뒤** 무엇이 산출되는가(후보·불확실성) — 그 자리는 `ml-kernel-009` 가 진다.
       출하 정책 임계 값(`OPEN-5D-POLICY-VALUES`).
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-004
     domain: ml-kernel
     classification: authoritative
@@ -10050,11 +10056,13 @@ cases:
     not_covered: |-
       **음수 임계**(`-1` 등)는 덮지 않는다 — `-1.0` 이 `data-dictionary.md` §12.1 등재 리터럴이라
       corpus 에 넣지 않았다. 그 자리는 구현 레인의 property test 가 진다(`max(1, ·)` 불변식).
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-005
     domain: ml-kernel
     classification: authoritative
@@ -10102,11 +10110,13 @@ cases:
     not_covered: |-
       실 LightGBM booster 바이트 · `feature_manifest_checksum` 축(5B `compute_checksum` 소유) ·
       아티팩트 **writer** 쪽 계약(5C).
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-006
     domain: ml-kernel
     classification: authoritative
@@ -10154,11 +10164,13 @@ cases:
     not_covered: |-
       **거부 결과 타입의 이름**(5B `NameMismatch`) — 구현된 이름이지 승인 문면의 어휘가 아니라 잠그지 않는다.
       **초집합**(스키마에 없는 열이 아티팩트에 더 있는 경우)도 덮지 않는다 — 정확 일치 판정에 포섭되나 이 case 가 재지는 않는다.
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-007
     domain: ml-kernel
     classification: authoritative
@@ -10205,11 +10217,13 @@ cases:
     not_covered: |-
       거부 결과 타입의 이름(5B `UnsupportedSchema`) · version 문자열의 **정렬·비교 규칙**(「더 높은 version」의 정의) —
       승인 문면이 없다.
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-008
     domain: ml-kernel
     classification: authoritative
@@ -10280,11 +10294,13 @@ cases:
       경계별 `reason`·`detail` **토큰 배정**(5D 착수 계약 ⑤·D-5D-2 — 승인 문면 없음) ·
       KDE 커널의 singular 입력 — `data-extract.md` §4 가 이름 든 「KDE singular」는 **반사 보정 KDE** 축이고
       그 커널은 D-M5-9 (a) 로 5D 이식 목록 밖이다. 여기서 덮는 singular 는 추첨 평균 커널(K6)의 분산 0 이다.
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-009
     domain: ml-kernel
     classification: authoritative
@@ -10343,11 +10359,13 @@ cases:
       「같음의 판정 규약」(문자열 동일·scale 4)과 후보 산식이고, 실 booster 가 그 규약을 만족하는지는 재지 않는다.
       가중치·`weight_policy_version` 도 잠그지 않는다 — 출하 정책 값은 `OPEN-5D-POLICY-VALUES` 소유다.
       클램프가 **실제로 자르는** 자리(밴드 밖 중심율)도 덮지 않는다.
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-010
     domain: ml-kernel
     classification: authoritative
@@ -10395,11 +10413,13 @@ cases:
       **관측 밴드 밖 행의 제외**(5D 착수 계약 ⑤) — 이 case 의 여섯 행은 전부 밴드 안이고, 배제 축이 provenance 하나여야
       평균이 배제의 증거로 선다. 밴드 축은 별도 case 가 필요하며 지금 덮이지 않는다.
       비-CLEAN provenance **토큰의 이름**(`DERIVED_VAT` 등)도 잠그지 않는다 — 입력이 나르는 라벨이고 승인 어휘가 아니다.
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-011
     domain: ml-kernel
     classification: authoritative
@@ -10448,11 +10468,13 @@ cases:
       **분산 상속 사다리** — 세 계층 분산을 일부러 같게 두어 결합이 항등이 되게 했다(그래야 표준편차가 십진에서 정확히 떨어진다).
       계층별 분산이 다를 때의 결합과 `min_predictive_std` 바닥은 이 case 가 재지 않으며 `posteriorStd` 는 잠그지 않았다.
       **계층이 비었을 때 가중치가 정확히 0** 인 경로도 덮지 않는다. 임계 값(`10`)은 입력이 선언한 synthetic 정책이다.
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-012
     domain: ml-kernel
     classification: authoritative
@@ -10513,11 +10535,13 @@ cases:
       **주 경계 귀속**은 이 case 가 재지 않는다 — `ml-kernel-014` 가 진다.
       성숙도 **임계 미달 구간의 평가 제외**와 그 사유는 §6.4 귀속 표가 Kotlin 판정으로 두므로 이 corpus 밖이다.
       임계 값은 `OPEN-SET-06` 소유이며 이 case 는 값을 쓰지 않는다.
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-013
     domain: ml-kernel
     classification: authoritative
@@ -10570,11 +10594,13 @@ cases:
     not_covered: |-
       `n == k`(전부 추첨) 조기 반환 · 분위수·중심구간·누적확률 등 분포 객체의 나머지 연산 ·
       `4`·`15` 가 **출하 정책 값**이라는 주장(`OPEN-5D-POLICY-VALUES`. 여기서는 입력이 선언한 표본 형상이다).
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
   - id: ml-kernel-014
     domain: ml-kernel
     classification: authoritative
@@ -10635,11 +10661,13 @@ cases:
       **일광절약시간 전이**는 덮지 않는다 — 대한민국 표준시에 현행 DST 가 없어 이 축이 서지 않는다.
       시간축 provenance(어느 시각 종류에서 왔는가)는 §6.4 가 수집 어댑터에 배정하므로 이 case 밖이다.
       구간 길이가 `7` 일이라는 것은 입력이 선언한 synthetic 정책이다.
-    change_history: []
+    change_history:
+      - date: 2026-09-12
+        change: 사용자 승인 — authoritative 확정(팀장 등재)
     review:
-      claude_commit: pending
+      claude_commit: f138280
       codex_verdict: pending
-      approved_by_user: false
+      approved_by_user: true  # 2026-09-12 운영자 승인(5D golden, 「모두 추천으로 진행」)
 
 
 # =============================================================================
