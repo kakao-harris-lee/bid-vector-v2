@@ -1,0 +1,6 @@
+# M5/5C-1 학습 정책 값(D-5C-7) — 승인: reports/evidence/m5/5c/policy-values.md §1.
+# `min_training_rows`는 legacy `PRICE_PREDICTION_AWARD_RATE_GBM_MIN_TRAINING_ROWS` 기본값
+# 그대로이나, legacy 에서는 한 번도 소비되지 않은 값이었다(legacy-declared, 미소비 —
+# 조사 01 §8-2). 이 slice 가 처음으로 이 값을 실제로 건다.
+version: training-v1
+min_training_rows: 500
