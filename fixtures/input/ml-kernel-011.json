@@ -1,0 +1,31 @@
+{
+  "axis": "hierarchical-shrinkage-weight-in-response",
+  "kernel": "assessment-posterior",
+  "policy": {
+    "version": "syn-inference-v0",
+    "assessment": {
+      "agencyPriorStrength": 15,
+      "categoryPriorStrength": 30,
+      "minPredictiveStd": 0.004,
+      "minSamplesForVariance": 2,
+      "agencySampleThreshold": 10
+    }
+  },
+  "levels": {
+    "agency": {
+      "sampleCount": 5,
+      "mean": 1.04,
+      "variance": 0.0016
+    },
+    "category": {
+      "sampleCount": 10,
+      "mean": 1.02,
+      "variance": 0.0016
+    },
+    "global": {
+      "sampleCount": 500,
+      "mean": 1.0,
+      "variance": 0.0016
+    }
+  }
+}

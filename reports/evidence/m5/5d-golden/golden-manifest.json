@@ -1,0 +1,388 @@
+{
+  "milestone": "m5",
+  "slice": "5d-golden",
+  "role": "fixture-curator",
+  "lane": "커널 golden corpus 신설 — 코드 0, fixture·manifest·evidence 만",
+  "generated_at": "2026-09-12",
+  "base_sha": "f5020aa982e6c5ade01f1660c0568dcd75c2fa7e",
+  "head_sha": "pending — 이 파일을 담은 커밋이 자기 SHA 를 담을 수 없다",
+  "operator_decisions": [
+    "D-M5-7 (a) (2026-09-12) — 커널 golden 은 curator 가 authored-from-approved-spec 으로 신설, 5D 와 병행 레인",
+    "D-M5-9 (a) (2026-09-12) — 반사 KDE·곡선 빌더는 5D 이식 목록 밖 (ml-kernel-008 의 not_covered 근거)"
+  ],
+  "purpose": "ml-kernel 14 case 의 출처·해시·축 대응. 분류의 정본은 fixtures/manifest.yaml 이고 이 파일은 그 투영이다.",
+  "summary": {
+    "cases_added": 14,
+    "classification_authoritative": 14,
+    "classification_insufficient_evidence": 0,
+    "files_added": 28,
+    "legacy_python_executed": false,
+    "db_api_llm_access": false,
+    "manifest_cases_total": 119,
+    "manifest_authoritative_total": 99,
+    "adversarial_mutants_for_ml_kernel": 180,
+    "adversarial_passes_for_ml_kernel": 0,
+    "legacy_number_hits_in_ml_kernel": 0,
+    "leak_pattern_hits_in_ml_kernel": 0
+  },
+  "numeric_discipline": {
+    "rule": "data-dictionary.md §12.1 이 legacy-behavior 로 등재한 수를 input·expected 어느 쪽에도 쓰지 않는다.",
+    "how": "모든 정책 값을 입력이 선언하는 synthetic 값으로 받고 기대값은 규칙에만 의존하게 설계했다.",
+    "synthetic_vs_legacy": [
+      {
+        "key": "gbm.minCategoryRows",
+        "synthetic": 24,
+        "legacy_candidate": 40
+      },
+      {
+        "key": "assessment.agencyPriorStrength",
+        "synthetic": 15,
+        "legacy_candidate": 12
+      },
+      {
+        "key": "assessment.categoryPriorStrength",
+        "synthetic": 30,
+        "legacy_candidate": 40
+      },
+      {
+        "key": "assessment.minPredictiveStd",
+        "synthetic": 0.004,
+        "legacy_candidate": 0.002
+      },
+      {
+        "key": "assessment.agencySampleThreshold",
+        "synthetic": 10,
+        "legacy_candidate": "없음 — 임계 자체가 미승인"
+      },
+      {
+        "key": "scenario.z",
+        "synthetic": 1.25,
+        "legacy_candidate": 1.2816
+      },
+      {
+        "key": "scenario.weights",
+        "synthetic": [
+          0.25,
+          0.46,
+          0.29
+        ],
+        "legacy_candidate": [
+          0.24,
+          0.52,
+          0.24
+        ]
+      },
+      {
+        "key": "scenario.clamp",
+        "synthetic": [
+          0.6,
+          1.3
+        ],
+        "legacy_candidate": [
+          0.7,
+          1.4
+        ],
+        "note": "legacy 값 둘 다 §12.1 등재"
+      },
+      {
+        "key": "scenario.zSign",
+        "synthetic": [
+          "NEGATIVE",
+          "NEUTRAL",
+          "POSITIVE"
+        ],
+        "legacy_candidate": [
+          -1,
+          0,
+          1
+        ],
+        "note": "-1.0 이 §12.1 등재 리터럴(미지 범주 피처 코드)이라 토큰으로 싣는다"
+      }
+    ],
+    "not_asserted": "출하 정책 값은 이 corpus 가 하나도 주장하지 않는다 — OPEN-5D-POLICY-VALUES 소유."
+  },
+  "locked_vocabulary": {
+    "exact_compare": [
+      "INSUFFICIENT_SAMPLES",
+      "UNTRAINED_SEGMENT",
+      "FEATURE_ABSENT",
+      "CONSERVATIVE",
+      "BASE",
+      "AGGRESSIVE",
+      "DIRECT",
+      "Observed",
+      "NoObservation"
+    ],
+    "source": "M2 계약(error.proto · prediction.proto)과 data-dictionary.md §6.4 인용 블록",
+    "not_locked": [
+      "UnmeasurableDetail 전 토큰 (5D 착수 계약 D-5D-2 신설 — 승인 문면 없음)",
+      "5B 결과 타입 이름 (NameMismatch · UnsupportedSchema — 구현된 이름이지 승인 어휘가 아니다)",
+      "provenance 라벨 (DERIVED_VAT 등 — 입력이 나르는 라벨)"
+    ],
+    "projection_used": "ml-kernel-001↔002 의 $.detail 에 differs-from-case — 「두 사유가 서로 다르다」만 계약"
+  },
+  "hand_derivations": {
+    "ml-kernel-009": "clamp(center + sign·z·std) = 0.9200 − 1.25×0.0400 = 0.8700 / 0.9200 / 0.9700 (클램프 밴드 안)",
+    "ml-kernel-010": "(0.9800 + 1.0100 + 1.0400)/3 = 1.0100 — 비-CLEAN 세 행이 섞이면 이 값이 아니다",
+    "ml-kernel-011": "w=n/(n+k); 10/40=0.25, 5/20=0.25; 전개 (0.25, 0.1875, 0.5625) 합 1; 사후평균 1.01375; 유효표본 284.375",
+    "ml-kernel-013": "σ²=84000/15=5600; Var(x̄_4)=(5600/4)·(11/14)=1100; C(15,4)=1365 완전 열거와 유리수로 동일",
+    "ml-kernel-014": "KST=UTC+9 이므로 주 시작 KST 월 00:00 = 전주 일 15:00Z"
+  },
+  "insufficient_evidence": [],
+  "not_covered": [
+    "LightGBM 런타임 오류의 결과 형태 — 승인 문면 없음 + 실 아티팩트는 5C 뒤 (OPEN-5D-REAL-BOOSTER)",
+    "반사 보정 KDE 의 singular 입력 — 그 커널은 D-M5-9 (a) 로 5D 이식 목록 밖",
+    "출하 정책 값 자체 (OPEN-5D-POLICY-VALUES)",
+    "실 LightGBM booster 의 결정성 (OPEN-5D-REAL-BOOSTER) — ml-kernel-009 는 판정 규약만 고정",
+    "불확실성 성분의 산식 — data-dictionary.md §6.5 가 「사전에 올리지 않는다」로 두고 계수가 §12.1 미등재",
+    "관측 밴드(사정률·투찰비) 밖 행의 제외 계수 — 밴드 경계가 §12.1 등재 legacy 수라 case 를 세우지 않았다",
+    "K5 분산 상속 사다리 · 계층 부재 시 가중치 정확히 0 — ml-kernel-011 은 분산을 일부러 같게 뒀다",
+    "반올림 모드 (OPEN-DIC-10) — 기대값이 반올림에 의존하지 않게 설계했다"
+  ],
+  "known_limits": [
+    "review.approved_by_user 는 14 case 전부 false — 승인은 팀장이 사용자에게 받는다.",
+    "review.claude_commit 은 pending — 이 파일을 담은 커밋이 자기 SHA 를 담을 수 없다.",
+    "check_legacy_numbers.py 는 base_sha 에서 이미 exit 1 이다(적중 81, 전부 verdict-*·strategy-edit-* 의 이월 부채). 이 레인의 ml-kernel-* 적중은 0 이고 수치를 늘리지 않았다.",
+    "mutation_sweep_adversarial.py 도 base_sha 에서 이미 exit 1 이다(verdict-004 강등). 이 레인이 더한 변이체 180 은 전부 caught 이고 강등 목록을 늘리지 않았다."
+  ],
+  "cases": [
+    {
+      "id": "ml-kernel-001",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "cold start와 최소 표본",
+      "verifies": "학습 행 0 → 측정 불가, 사유가 「학습된 적 없음」",
+      "source_kind": "approved-spec",
+      "source_reference": "capability-map.md ML-02 acceptance ①② · error.proto UnmeasurableReason",
+      "input_file": "fixtures/input/ml-kernel-001.json",
+      "expected_file": "fixtures/expected/ml-kernel-001.json",
+      "sha256": "fed7562d1d1e93bb25beae1e6f4640bb08ca97502e44d0c01b4170879fc81d0b",
+      "expected_sha256": "16ba6e3c7d46ebecbcdd1101aa46bbd9b0075ada22f4bf46d758a6bc71f7c499",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-002",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "cold start와 최소 표본",
+      "verifies": "학습 행 임계 바로 아래 → 측정 불가, 사유가 「표본 얕음」",
+      "source_kind": "approved-spec",
+      "source_reference": "capability-map.md ML-02 acceptance ①② · error.proto UnmeasurableReason",
+      "input_file": "fixtures/input/ml-kernel-002.json",
+      "expected_file": "fixtures/expected/ml-kernel-002.json",
+      "sha256": "f8ffd554ee3a42e554192eddde1a780744d3b5d3213fc35a8315c86ac000d178",
+      "expected_sha256": "660e9c73b597bb35f96c98bc8f84a15614c19031e012e4925f7019b22848690c",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-003",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "cold start와 최소 표본",
+      "verifies": "학습 행 == 임계 → 게이트 통과 (경계는 `>=`)",
+      "source_kind": "approved-spec",
+      "source_reference": "capability-map.md ML-02 분류 근거 (rows >= minimum) · acceptance ②",
+      "input_file": "fixtures/input/ml-kernel-003.json",
+      "expected_file": "fixtures/expected/ml-kernel-003.json",
+      "sha256": "b7ce5c1560c211e4a276e03aaf12322955e7f06a58053f1b41949a69a9dba592",
+      "expected_sha256": "beee8fbb44275d73aa8f19c5495bc850c0bd4a39b149a358e61638042d507625",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-004",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "cold start와 최소 표본",
+      "verifies": "정책 임계 0 → 하한 1 클램프, 설정으로 가드 비활성화 불가",
+      "source_kind": "approved-spec",
+      "source_reference": "capability-map.md ML-02 acceptance ③ · 분류 근거 max(1, ·)",
+      "input_file": "fixtures/input/ml-kernel-004.json",
+      "expected_file": "fixtures/expected/ml-kernel-004.json",
+      "sha256": "2337538deccf27fa8a482b3f710a5d96b8dadc433e9487ef6372323e2dcdcf38",
+      "expected_sha256": "bef75ac53f8be2d10b69c4d0335c499088b21c62889443f80d4da761e85b121a",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-005",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "artifact checksum 불일치",
+      "verifies": "checksum 불일치 아티팩트는 로드 거부 + 객체 미생성",
+      "source_kind": "approved-spec",
+      "source_reference": "milestone-5.md 완료 조건 (checksum fail-closed) · capability-map.md ML-05",
+      "input_file": "fixtures/input/ml-kernel-005.json",
+      "expected_file": "fixtures/expected/ml-kernel-005.json",
+      "sha256": "137d3a28172234aec4d097615eb64e70d3d8120c08a3eb46ef224b19c85d095f",
+      "expected_sha256": "1a443241d103501f547b1a8e1b44a0fa8b9cf17da361f81dd986dbd91c621b79",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-006",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "feature schema의 정상/누락/미지원 version",
+      "verifies": "피처 이름은 순서까지 정확 일치 — 재배열·부분집합 거부",
+      "source_kind": "approved-spec",
+      "source_reference": "capability-map.md ML-05 acceptance ① · milestone-5.md 완료 조건 (동일 transform)",
+      "input_file": "fixtures/input/ml-kernel-006.json",
+      "expected_file": "fixtures/expected/ml-kernel-006.json",
+      "sha256": "78574490528a0dfc79848115320aa6014b627fa788e3391b97563edc6725faf1",
+      "expected_sha256": "cc72df52fc237ffdc6e03bf8695552912df679671de4deeb6e00f2b1a0c190f4",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-007",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "feature schema의 정상/누락/미지원 version",
+      "verifies": "미지원 feature schema version 거부 — 대체·기본값 없음",
+      "source_kind": "approved-spec",
+      "source_reference": "data-extract.md §4 ML · capability-map.md ML-05 acceptance ① · data-dictionary.md §1.3",
+      "input_file": "fixtures/input/ml-kernel-007.json",
+      "expected_file": "fixtures/expected/ml-kernel-007.json",
+      "sha256": "ae86974a5fe5e4dbbb90fd823dd619d22acb240c31717b07d257579151b64518",
+      "expected_sha256": "37d604d37c8e72390c17b5a400fa02840cee5daa364311aac2e5df60f67cefda",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-008",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "LightGBM 오류와 KDE singular input (K6 축)",
+      "verifies": "추첨 평균 커널 경계 일곱은 예외도 값도 아닌 사유 있는 측정 불가",
+      "source_kind": "approved-spec",
+      "source_reference": "milestone-5.md 5D·완료 조건 · capability-map.md ML-03 무조건 ① · data-dictionary.md §1.3",
+      "input_file": "fixtures/input/ml-kernel-008.json",
+      "expected_file": "fixtures/expected/ml-kernel-008.json",
+      "sha256": "72eaa921808c8b19e55f46de71b0d8e5478aec8696e90feb5c828c12b7b9cd88",
+      "expected_sha256": "39a7c06b7991e564bc5a195ace19fc8f00df06490fcf3d458960c074dd438390",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-009",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "deterministic seed에서 재현 가능한 결과",
+      "verifies": "스레드 수만 다른 두 실행이 후보 3 율을 같은 십진 문자열로 낸다",
+      "source_kind": "approved-spec",
+      "source_reference": "capability-map.md ML-05 acceptance ② · ML-01 acceptance ① · common.proto Rate · prediction.proto CandidateLabel",
+      "input_file": "fixtures/input/ml-kernel-009.json",
+      "expected_file": "fixtures/expected/ml-kernel-009.json",
+      "sha256": "45dad1f7b40a4064113ea3d1d05b26491f7ed046a7bcf31681da0620307d7213",
+      "expected_sha256": "36be0c57ed074e13db045da1cafb37e2c8b8c23bdfa806c24a713cee3aee93bd",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-010",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "ML-04 provenance 게이트",
+      "verifies": "비-CLEAN provenance 행은 추정 입력에 못 들어가고 제외 수가 계수된다",
+      "source_kind": "approved-spec",
+      "source_reference": "capability-map.md ML-04 acceptance ① (축어) · v2-지침서.md §4.4 · data-dictionary.md §1.3",
+      "input_file": "fixtures/input/ml-kernel-010.json",
+      "expected_file": "fixtures/expected/ml-kernel-010.json",
+      "sha256": "1cb68339c7e3501aefc264dfd233d2c9f8d6931ca8dceedd3e1ba639f70207b9",
+      "expected_sha256": "f29a08276c9951ab18351ed286e14faad2ceee8a017195d738dc54699cd6fa90",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-011",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "ML-04 provenance 게이트",
+      "verifies": "기관 표본 임계 미만이면 수축 가중치가 응답 근거에 실린다",
+      "source_kind": "approved-spec",
+      "source_reference": "capability-map.md ML-04 acceptance ② (축어) · 분류 근거 (3계층 수축) · prediction.proto SegmentSupport",
+      "input_file": "fixtures/input/ml-kernel-011.json",
+      "expected_file": "fixtures/expected/ml-kernel-011.json",
+      "sha256": "7cca25a39dde413664cd9e1076da250ff6955ced310efab8325c2745824a9fdc",
+      "expected_sha256": "921062533661b8abc26009c50e5aa6e10910d1630113318e25f16457377b1eba",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-012",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "성숙도 0/0",
+      "verifies": "개찰 0 인 주는 비율 0.0 이 아니라 NoObservation 이고 표에 없다",
+      "source_kind": "approved-spec",
+      "source_reference": "data-dictionary.md §6.4 인용 블록 (축어) · 같은 절 귀속 표",
+      "input_file": "fixtures/input/ml-kernel-012.json",
+      "expected_file": "fixtures/expected/ml-kernel-012.json",
+      "sha256": "a83fcf2035e88a59a92f9f0a99d737dae09ea9ab013fb27cfda0673f133d3bbe",
+      "expected_sha256": "6546bda7dd1ee30ffae36daa83bed2db51164e08ec0b54a873162f9cb185b3ee",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-013",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "training/serving 동일 transform — 수학 보존",
+      "verifies": "추첨 평균의 완전 열거와 유한모집단 보정 닫힌식이 정확히 같다",
+      "source_kind": "approved-spec",
+      "source_reference": "ADR 0001 §4.1 이식 목록 · capability-map.md ML-04 분류 근거 · milestone-5.md 5D",
+      "input_file": "fixtures/input/ml-kernel-013.json",
+      "expected_file": "fixtures/expected/ml-kernel-013.json",
+      "sha256": "f424c2770e4d8c5fe169af74b59bb22032ce04190ad508a8b3b3fa5a89fe232c",
+      "expected_sha256": "57bfdb71af294f754cb50cb4749bd51f1830db6f0b26eaa0ab84f95432b2ca97",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    },
+    {
+      "id": "ml-kernel-014",
+      "domain": "ml-kernel",
+      "classification": "authoritative",
+      "data_extract_axis": "성숙도 주 경계",
+      "verifies": "주 경계는 KST 월요일 00:00 이고 구간은 반개구간 [start, end)",
+      "source_kind": "approved-spec",
+      "source_reference": "data-dictionary.md §6.4 귀속 표 (축어)",
+      "input_file": "fixtures/input/ml-kernel-014.json",
+      "expected_file": "fixtures/expected/ml-kernel-014.json",
+      "sha256": "c3b023248d0e72ac25411bec5dc291c3957a66d10f7545634e2bc1b6cfbeb08c",
+      "expected_sha256": "f5f30900fddc1445b957ae9f36f6a20320ac300d24ea7e956d3e3b256f5b74a5",
+      "extraction_method": "authored-from-approved-spec",
+      "synthetic": true,
+      "contains_personal_data": false,
+      "approved_by_user": false
+    }
+  ]
+}

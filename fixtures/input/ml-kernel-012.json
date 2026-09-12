@@ -1,0 +1,71 @@
+{
+  "axis": "zero-over-zero-is-not-a-ratio",
+  "kernel": "settlement-maturity",
+  "timezone": "Asia/Seoul",
+  "weekStartsOn": "MONDAY",
+  "windowBoundary": "[start, end) — 시작 포함, 끝 제외",
+  "policy": {
+    "version": "syn-inference-v0",
+    "maturity": {
+      "windowDays": 7
+    }
+  },
+  "observations": [
+    {
+      "noticeId": "SYN-NTC-0001",
+      "openedAt": "2026-03-02T09:00:00+09:00",
+      "settled": true
+    },
+    {
+      "noticeId": "SYN-NTC-0002",
+      "openedAt": "2026-03-04T14:00:00+09:00",
+      "settled": false
+    },
+    {
+      "noticeId": "SYN-NTC-0003",
+      "openedAt": "2026-03-06T11:00:00+09:00",
+      "settled": false
+    },
+    {
+      "noticeId": "SYN-NTC-0004",
+      "openedAt": "2026-03-08T23:59:59+09:00",
+      "settled": false
+    },
+    {
+      "noticeId": "SYN-NTC-0005",
+      "openedAt": "2026-03-09T00:00:00+09:00",
+      "settled": false
+    },
+    {
+      "noticeId": "SYN-NTC-0006",
+      "openedAt": "2026-03-08T16:00:00Z",
+      "settled": false
+    },
+    {
+      "noticeId": "SYN-NTC-0007",
+      "openedAt": "2026-03-23T10:00:00+09:00",
+      "settled": true
+    },
+    {
+      "noticeId": "SYN-NTC-0008",
+      "openedAt": "2026-03-25T10:00:00+09:00",
+      "settled": true
+    },
+    {
+      "noticeId": "SYN-NTC-0009",
+      "openedAt": "2026-03-27T10:00:00+09:00",
+      "settled": false
+    },
+    {
+      "noticeId": "SYN-NTC-0010",
+      "openedAt": "2026-03-29T10:00:00+09:00",
+      "settled": true
+    }
+  ],
+  "requestedWeekStartsKst": [
+    "2026-03-02T00:00:00+09:00",
+    "2026-03-09T00:00:00+09:00",
+    "2026-03-16T00:00:00+09:00",
+    "2026-03-23T00:00:00+09:00"
+  ]
+}

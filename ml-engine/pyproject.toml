@@ -51,6 +51,13 @@ addopts = "--strict-markers"
 # 한다 — rootdir(`.` = `ml-engine/`, 이 ini 파일 기준)를 sys.path 에 추가해 `tools` 를
 # namespace package 로 찾게 한다(pytest 7+ 내장 옵션, 추가 플러그인 불필요).
 pythonpath = ["."]
+markers = [
+    # M5/5D(D-5D-6 구현 지시) — legacy 산식과의 재현 대조 라벨. `--strict-markers`가
+    # 미등록 마커를 거부하므로 여기서 등록한다. **판정 근거가 아니다**(CLAUDE.md 운영자
+    # 지시 — 기존 Python 출력 재현은 acceptance 가 아니다) — 이식이 legacy 산식과 같음을
+    # 확인하는 회귀 관측 라벨일 뿐, 기대값은 승인된 도메인 명세·corpus 에서만 온다.
+    "legacy_parity: legacy 산식과의 재현 대조(회귀 관측 — 정답 판정 아님)",
+]
 
 [tool.ruff]
 target-version = "py312"
@@ -77,12 +84,21 @@ extend-exclude = [
 # `N`(pep8-naming) 포함 — 2A~2E 기존 test 의 gRPC 생성 servicer 메서드(`CalculateOptimalBid`
 # 등, PascalCase 는 생성 시그니처 요구)가 `# noqa: N802`를 쓴다. 끄면 그 noqa 가
 # "미사용"(RUF100)이 되어 편집 금지인 기존 test 파일이 새로 위반을 낸다.
-select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM", "RUF", "PGH", "N"]
+# `BLE`(D-5D-6, M5/5D) 추가 — `except Exception`(blind except) 을 거부해 위협 모델 (a)
+# 「실패의 폴백 접힘」 방어(결과 타입 + 예외로 실패를 나르지 않는다)를 린트가 강제한다.
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM", "RUF", "PGH", "N", "BLE"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 warn_unused_configs = true
+# M5/5D verifier r1 M-4(계약 갱신 2026-09-12) — `dict[str, JsonScalar]`(중첩 컨테이너
+# 배제)가 `feature_names`/`release`/`reproducibility` 같은 실제로는 list/dict 인 필드의
+# isinstance 분기를 mypy 관점에서 도달 불가로 만들었다(값 타입이 애초에 list/dict일 수
+# 없다고 선언했으므로). `warn_unreachable`을 켜 이런 죽은 코드를 게이트가 잡게 한다 —
+# `registry/artifact.py`는 `JsonValue`(재귀 유니온, list/dict 포함)로 갈아 죽은 구간을
+# 없앴다(S-3 재확인 완료). 5A/5B 코드에 새 unreachable 이 없음을 5D 재검증 시 확인했다.
+warn_unreachable = true
 # verifier r1 F-2 뒤 D-5A-0 (b) 정정 — 생성 stub 이 `ml-engine/.contracts-generated/`(패키지
 # 트리 밖)로 옮겨져 `src/ml_engine` 스캔 범위 안에 더는 없다 — `exclude` 항목 자체가 죽은
 # 설정이라 지웠다(F-8 과 같은 갈래: 안 쓰는 설정을 남기지 않는다).

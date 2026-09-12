@@ -1,0 +1,86 @@
+{
+  "candidateOrder": [
+    "CONSERVATIVE",
+    "BASE",
+    "AGGRESSIVE"
+  ],
+  "runs": [
+    {
+      "numThreads": 1,
+      "candidates": [
+        {
+          "label": "CONSERVATIVE",
+          "bidRate": {
+            "fraction": "0.8700"
+          },
+          "weight": {
+            "fraction": "0.25"
+          },
+          "weightPolicyVersion": "syn-inference-v0"
+        },
+        {
+          "label": "BASE",
+          "bidRate": {
+            "fraction": "0.9200"
+          },
+          "weight": {
+            "fraction": "0.46"
+          },
+          "weightPolicyVersion": "syn-inference-v0"
+        },
+        {
+          "label": "AGGRESSIVE",
+          "bidRate": {
+            "fraction": "0.9700"
+          },
+          "weight": {
+            "fraction": "0.29"
+          },
+          "weightPolicyVersion": "syn-inference-v0"
+        }
+      ]
+    },
+    {
+      "numThreads": 4,
+      "candidates": [
+        {
+          "label": "CONSERVATIVE",
+          "bidRate": {
+            "fraction": "0.8700"
+          },
+          "weight": {
+            "fraction": "0.25"
+          },
+          "weightPolicyVersion": "syn-inference-v0"
+        },
+        {
+          "label": "BASE",
+          "bidRate": {
+            "fraction": "0.9200"
+          },
+          "weight": {
+            "fraction": "0.46"
+          },
+          "weightPolicyVersion": "syn-inference-v0"
+        },
+        {
+          "label": "AGGRESSIVE",
+          "bidRate": {
+            "fraction": "0.9700"
+          },
+          "weight": {
+            "fraction": "0.29"
+          },
+          "weightPolicyVersion": "syn-inference-v0"
+        }
+      ]
+    }
+  ],
+  "fractionStringsIdenticalAcrossRuns": true,
+  "comparedAsDecimalString": true,
+  "scaleDigits": 4,
+  "clampApplied": false,
+  "weightSum": {
+    "fraction": "1.00"
+  }
+}

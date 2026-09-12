@@ -1,0 +1,29 @@
+{
+  "axis": "kst-week-boundary-is-half-open",
+  "kernel": "settlement-maturity",
+  "timezone": "Asia/Seoul",
+  "weekStartsOn": "MONDAY",
+  "windowBoundary": "[start, end) — 시작 포함, 끝 제외",
+  "observations": [
+    {
+      "noticeId": "SYN-NTC-0101",
+      "openedAt": "2026-03-08T23:59:59+09:00",
+      "settled": false
+    },
+    {
+      "noticeId": "SYN-NTC-0102",
+      "openedAt": "2026-03-09T00:00:00+09:00",
+      "settled": false
+    },
+    {
+      "noticeId": "SYN-NTC-0103",
+      "openedAt": "2026-03-08T16:00:00Z",
+      "settled": false
+    },
+    {
+      "noticeId": "SYN-NTC-0104",
+      "openedAt": "2026-03-08T14:59:59Z",
+      "settled": false
+    }
+  ]
+}

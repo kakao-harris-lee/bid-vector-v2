@@ -1,0 +1,42 @@
+{
+  "axis": "feature-schema-mismatch",
+  "schemaVersion": "award-rate-features-v2",
+  "schemaColumnOrder": [
+    "category",
+    "log_amount",
+    "agency_encoding",
+    "agency_sample_count",
+    "denominator_source"
+  ],
+  "probes": [
+    {
+      "label": "same-order",
+      "artifactFeatureNames": [
+        "category",
+        "log_amount",
+        "agency_encoding",
+        "agency_sample_count",
+        "denominator_source"
+      ]
+    },
+    {
+      "label": "reordered",
+      "artifactFeatureNames": [
+        "log_amount",
+        "category",
+        "agency_encoding",
+        "agency_sample_count",
+        "denominator_source"
+      ]
+    },
+    {
+      "label": "proper-subset",
+      "artifactFeatureNames": [
+        "category",
+        "log_amount",
+        "agency_encoding",
+        "agency_sample_count"
+      ]
+    }
+  ]
+}

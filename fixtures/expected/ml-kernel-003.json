@@ -1,0 +1,10 @@
+{
+  "measurable": true,
+  "reason": null,
+  "detail": null,
+  "declaredMinimumRows": 24,
+  "effectiveMinimumRows": 24,
+  "segmentTrainingRowCount": 24,
+  "gatePassedAtExactThreshold": true,
+  "gateAndPredictShareOneDecision": true
+}
