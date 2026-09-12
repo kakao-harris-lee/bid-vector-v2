@@ -74,6 +74,10 @@ abstract class LeakPatternGateTask : DefaultTask() {
         }
 
         val baseline = parseLeakBaseline(baselineFile.get().asFile.readLines())
+        // D-LBC-2 — 옛 형식(경로:줄번호) 항목은 조용히 stale 로 죽지 않고 명시적으로 게이트를 실패시킨다.
+        // throw 는 아래 한 곳으로 모은다(ThrowsCount 래칫 — leakGateViolation 과 우선순위만 다르다).
+        val legacyFormatViolation = leakBaselineLegacyFormatViolation(baseline)
+
         val excluded = excludedFileNames.get()
         val root = repoRoot.get().asFile
 
@@ -84,21 +88,32 @@ abstract class LeakPatternGateTask : DefaultTask() {
                 .sortedBy(File::getPath)
 
         val matches =
-            files
-                .flatMap { file ->
-                    val relative = file.relativeTo(root).path.replace(File.separatorChar, '/')
-                    leakMatchesInFile(relative, file.readLines(), patterns)
-                }.toSortedSet()
+            files.flatMap { file ->
+                val relative = file.relativeTo(root).path.replace(File.separatorChar, '/')
+                leakMatchesInFile(relative, file.readLines(), patterns)
+            }
 
-        val newMatches = newLeakMatches(matches, baseline)
-        val staleBaseline = staleLeakBaselineEntries(matches, baseline)
+        // 위반 메시지와 보고서가 이 그룹핑을 각자 다시 계산하면 어긋날 수 있어 여기서 한 번만
+        // 묶어 두 함수에 그대로 넘긴다.
+        val coordinatesByKey = matches.groupBy { leakBaselineKey(it.path, it.content) }
+        val newKeys = newLeakBaselineKeys(coordinatesByKey.keys, baseline)
+        val staleBaseline = staleLeakBaselineEntries(coordinatesByKey.keys, baseline)
 
         report
             .get()
             .asFile
             .apply { parentFile.mkdirs() }
-            .writeText(leakGateReportText(patterns.size, baseline.size, matches.size, newMatches, staleBaseline))
+            .writeText(
+                leakGateReportText(
+                    patterns.size,
+                    baseline.size,
+                    matches.size,
+                    coordinatesByKey,
+                    newKeys,
+                    staleBaseline,
+                ),
+            )
 
-        leakGateViolation(newMatches)?.let { throw GradleException(it) }
+        (legacyFormatViolation ?: leakGateViolation(newKeys, coordinatesByKey))?.let { throw GradleException(it) }
     }
 }
