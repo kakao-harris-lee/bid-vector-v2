@@ -1,0 +1,124 @@
+"""RED — `ml_engine.training.spec`(D-5C-2). 값 무변경 이식 대조, 등록표 조회, checksum
+결정성, 불변식(폴드≥2·라운드≥1·threads≥1·min_residual_std>0)."""
+
+from __future__ import annotations
+
+import pytest
+
+from ml_engine.training.spec import (
+    TRAINING_SPECS,
+    LightGbmHyperparameters,
+    TrainingSpec,
+    UnsupportedTrainingSpec,
+    resolve_training_spec,
+    spec_checksum,
+)
+
+
+def test_shipped_spec_matches_policy_values_md() -> None:
+    """`reports/evidence/m5/5c/policy-values.md` §2 표와 값 대조(legacy `ed4b06c`
+    `award_rate_gbm.py:93-115` 이식, D-5C-2)."""
+    spec = resolve_training_spec("award-rate-gbm-training-v1")
+    assert isinstance(spec, TrainingSpec)
+    hyperparameters = spec.hyperparameters
+    assert hyperparameters.objective == "regression"
+    assert hyperparameters.metric == "rmse"
+    assert hyperparameters.learning_rate == 0.05
+    assert hyperparameters.num_leaves == 31
+    assert hyperparameters.min_data_in_leaf == 40
+    assert hyperparameters.feature_fraction == 0.9
+    assert hyperparameters.bagging_fraction == 0.9
+    assert hyperparameters.bagging_freq == 1
+    assert hyperparameters.lambda_l2 == 1.0
+    assert hyperparameters.verbosity == -1
+    assert hyperparameters.deterministic is True
+    assert hyperparameters.force_row_wise is True
+    assert hyperparameters.num_threads == 4
+    assert spec.num_boost_round == 400
+    assert spec.encoding_folds == 5
+    assert spec.seed == 20260812
+    assert spec.min_residual_std == 0.002
+
+
+def test_resolve_training_spec_unknown_version_is_result_type_not_exception() -> None:
+    result = resolve_training_spec("does-not-exist")
+    assert isinstance(result, UnsupportedTrainingSpec)
+    assert result.version == "does-not-exist"
+
+
+def test_training_specs_registry_is_frozen_mapping() -> None:
+    with pytest.raises(TypeError):
+        TRAINING_SPECS["x"] = TRAINING_SPECS["award-rate-gbm-training-v1"]  # type: ignore[index]
+
+
+def _hyperparameters(**overrides: object) -> LightGbmHyperparameters:
+    base = dict(
+        objective="regression",
+        metric="rmse",
+        learning_rate=0.05,
+        num_leaves=31,
+        min_data_in_leaf=40,
+        feature_fraction=0.9,
+        bagging_fraction=0.9,
+        bagging_freq=1,
+        lambda_l2=1.0,
+        verbosity=-1,
+        deterministic=True,
+        force_row_wise=True,
+        num_threads=4,
+    )
+    base.update(overrides)
+    return LightGbmHyperparameters(**base)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"encoding_folds": 1},
+        {"num_boost_round": 0},
+        {"min_residual_std": 0.0},
+        {"min_residual_std": -0.1},
+    ],
+)
+def test_training_spec_rejects_invalid_invariants(kwargs: dict[str, object]) -> None:
+    base = dict(
+        version="x",
+        hyperparameters=_hyperparameters(),
+        num_boost_round=400,
+        encoding_folds=5,
+        seed=1,
+        min_residual_std=0.002,
+    )
+    base.update(kwargs)
+    with pytest.raises(ValueError):
+        TrainingSpec(**base)  # type: ignore[arg-type]
+
+
+def test_training_spec_rejects_zero_threads() -> None:
+    with pytest.raises(ValueError):
+        TrainingSpec(
+            version="x",
+            hyperparameters=_hyperparameters(num_threads=0),
+            num_boost_round=400,
+            encoding_folds=5,
+            seed=1,
+            min_residual_std=0.002,
+        )
+
+
+def test_spec_checksum_is_deterministic_and_sensitive_to_values() -> None:
+    spec = resolve_training_spec("award-rate-gbm-training-v1")
+    assert isinstance(spec, TrainingSpec)
+    checksum_a = spec_checksum(spec)
+    checksum_b = spec_checksum(spec)
+    assert checksum_a == checksum_b
+    assert len(checksum_a) == 64
+    changed = TrainingSpec(
+        version=spec.version,
+        hyperparameters=spec.hyperparameters,
+        num_boost_round=spec.num_boost_round + 1,
+        encoding_folds=spec.encoding_folds,
+        seed=spec.seed,
+        min_residual_std=spec.min_residual_std,
+    )
+    assert spec_checksum(changed) != checksum_a
