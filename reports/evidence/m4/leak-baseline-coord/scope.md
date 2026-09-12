@@ -107,4 +107,10 @@ head」**다. 자기 해시를 커밋 전에 아는 방법은 없으므로 전�
 ## 하네스 레인 변경
 
 리뷰 요청 시점에 `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 로 등재한다.
-현재: 없음.
+
+| 커밋 | 경로 | 목적 |
+| --- | --- | --- |
+| `b6bc13f` | `CLAUDE.md` · `.claude/skills/evidence-pack/SKILL.md` | rollback 실측에 **⑥ 게이트 단계** 추가 — 이 slice 가 실측으로 드러낸 규격 공백(④ compile ⑤ test 만 요구해 「게이트는 붉은데 rollback 은 초록」이 통과했다) |
+
+**이 커밋은 slice 산출물이 아니며 in_scope 밖이다.** 운영자 승인 2026-09-12 하에 같은 range 에
+있고, **rollback 대상이 아니다**(하네스 경로는 되돌리지 않는다).

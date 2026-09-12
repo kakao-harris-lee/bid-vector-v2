@@ -110,3 +110,38 @@ commands.md "secret 스캔" 항목 — 문서 작성 전엔 매치 없음, 작�
   메커니즘 변경). N/A.
 - golden-manifest.json — fixture 를 사용하지 않는다(baseline 자체가 실제 저장소
   `reports/evidence/` 매치에서 기계 산출됨, commands.md "D-LBC-4"). N/A.
+
+## 사용자 승인 2026-09-12 — slice 종결
+
+`OPEN-LEAK-BASELINE-COORD` 종결. 승인 셋:
+
+1. **slice 종결** — verifier 2라운드 모두 `ready-for-review`(산출물 blocker 0 · high 0),
+   **재작업 0/5**(not-ready 0회).
+2. **`OPEN-LEAK-REPORT-KEY-CONSISTENCY` 는 열어 둔다** — low 이고 현재 결함이 아니다(호출부가
+   `coordinatesByKey.keys` 에서 직접 뽑는다). 구조적 처분은 이 문서의 알려진 제한에 적혀 있고,
+   다음에 게이트 코드를 만지는 slice 가 함께 닫는다. **지금 닫으면 게이트 술어 인접 변경이라
+   표적 재검증 한 라운드가 더 든다** — 그 비용이 얻는 것보다 크다는 판정이다.
+3. **하네스 규칙 ⑥ 게이트 단계 등재** — `b6bc13f`(scope.md 「하네스 레인 변경」 절).
+
+### 종결 시점 실측
+
+| 축 | 값 |
+| --- | --- |
+| 전건 `check` | exit 0 |
+| `leakPatternGate` | exit 0 — `patterns=6 baseline=276 matches=299 keys=276 new=0 stale_baseline=0` |
+| `:build-logic:test` | exit 0 — 30 tests, 0 failed |
+| 마이그레이션 | 좌표 290 → 키 276 (기계 산출), 손실 0 |
+| S-1 매치 불변 | base 290 = head 공통 파일 290 (`diff` exit 0, verifier 2회 독립 확인) |
+
+### 이 slice 가 남긴 OPEN
+
+- `OPEN-LEAK-REPORT-KEY-CONSISTENCY` — 위 ②.
+- `OPEN-LEAK-GATE-REPORT-DURABILITY` — 게이트 보고서가 `build/`(gitignore) 라 `matches`/`keys`
+  드리프트가 리뷰·CI 어디에도 남지 않는다.
+
+### 닫지 않은 것 (알려진 제한 절이 정본)
+
+경로도 좌표다(rename 시 stale) · 옛 형식 검출이 정규 형태에만 걸린다 · crafted 해시 선등재 ·
+`경로#해시` 항목의 리뷰 표면 축소 · rollback 이 게이트까지는 복원하지 못한다 · evidence 자기매치의
+재귀 · **승인의 의미가 「그 좌표 1회」에서 「그 경로의 그 내용, 위치·횟수 무관」으로 넓어졌다**
+(scope.md 가 정본 — 설계가 의도한 것이되 baseline 등재가 더 무거운 결정이 됐다).
