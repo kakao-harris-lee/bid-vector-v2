@@ -9,10 +9,12 @@ prep·5a/5d policy-values·scope.md, 같은 range 안에 섞여 있음)까지 �
 `rollback.md`(이 파일 자신)는 자기 자신을 담은 커밋을 가리킬 수 없다는 규율(2026-09-10)
 — 목록에서 제외. `reuse.md`만 코드 레인 소유 evidence 라 대상에 포함(단일 파일 경로).
 
-base = `f5020aa982e6c5ade01f1660c0568dcd75c2fa7e`, 코드 마지막 커밋 = `2a1bae7292fa27e83b3ecb4cd5d13b2300d5e027`.
+base = `f5020aa982e6c5ade01f1660c0568dcd75c2fa7e`, 코드 마지막 커밋 =
+`145847ca8ccc24f43264ec797dccf192b591e40b`(verifier r1 수정 라운드 반영 — 착수 커밋
+`2a1bae7`와 파일 **집합**은 동일하다, 이번 라운드는 기존 파일 내용만 바꿨다).
 
 ```
-$ git diff --name-status f5020aa982e6c5ade01f1660c0568dcd75c2fa7e..2a1bae7292fa27e83b3ecb4cd5d13b2300d5e027 \
+$ git diff --name-status f5020aa982e6c5ade01f1660c0568dcd75c2fa7e..145847ca8ccc24f43264ec797dccf192b591e40b \
     -- ml-engine/src/ml_engine/inference ml-engine/src/ml_engine/registry/artifact.py \
        ml-engine/policy ml-engine/tests/inference ml-engine/tests/registry ml-engine/pyproject.toml
 A	ml-engine/policy/inference-v1.yaml
@@ -41,8 +43,10 @@ A	ml-engine/tests/registry/test_artifact.py
 ## 되돌리기 명령(신설 경로 삭제 + 편집 파일 복원, 경로 개별 인자)
 
 `ml-engine/pyproject.toml`은 5A 소유 공유 파일이라 hunk 격리(`git apply -R`) — 전체
-복원이 아니다. `ml-engine/src/ml_engine/inference/__init__.py`는 5D 착수 전 원본이
-docstring 뿐이었으므로(base 존재) `git restore`로 전체 복원해도 안전하다.
+복원이 아니다. 이번 라운드가 그 파일에 더한 hunk(`warn_unreachable = true`)도 base부터
+head까지의 diff 안에 포함되므로 같은 명령 한 번으로 두 라운드 편집이 함께 걷힌다.
+`ml-engine/src/ml_engine/inference/__init__.py`는 5D 착수 전 원본이 docstring 뿐이었으므로
+(base 존재) `git restore`로 전체 복원해도 안전하다.
 
 ```bash
 rm -f ml-engine/policy/inference-v1.yaml \
@@ -63,22 +67,24 @@ git diff f5020aa982e6c5ade01f1660c0568dcd75c2fa7e -- ml-engine/pyproject.toml \
     | git apply -R
 ```
 
-## 임시 clone 실측(2026-09-12, `git clone --no-hardlinks`)
+## 임시 clone 실측(2026-09-12, verifier r1 수정 뒤 재실측 — `git clone --no-hardlinks`)
 
-1. `/tmp/5d-rollback-check`에 `git clone --no-hardlinks`(현재 브랜치 HEAD, 코드
-   마지막 커밋 `2a1bae7` 포함).
+1. `/tmp/5d-rollback-check2`에 `git clone --no-hardlinks`(현재 브랜치 HEAD, 코드 마지막
+   커밋 `145847c` 포함, evidence 커밋 `bf59998`까지).
 2. 위 되돌리기 명령 실행 → `git status --short`가 신설 10개 삭제(정책 YAML 1 +
-   inference 8 + registry/artifact.py 1) + `tests/inference`·`tests/registry`
-   디렉터리 삭제(11 파일) + `reuse.md` 삭제 + `__init__.py`·`pyproject.toml` 수정만
-   보임.
+   inference 8 + registry/artifact.py 1) + `tests/inference`·`tests/registry` 디렉터리
+   삭제(11 파일) + `reuse.md` 삭제 + `__init__.py`·`pyproject.toml` 수정만 보임(2회
+   라운드 편집이 한 번에 걷힘).
 3. `git diff f5020aa982e6c5ade01f1660c0568dcd75c2fa7e -- ml-engine/src/ml_engine/inference
    ml-engine/src/ml_engine/registry/artifact.py ml-engine/policy ml-engine/tests/inference
    ml-engine/tests/registry ml-engine/pyproject.toml reports/evidence/m5/5d/reuse.md
-   | wc -l`(작업트리 diff, `--cached` 없음) → **0**(in_scope 전체 원복 확인).
+   | wc -l`(작업트리 diff, `--cached` 없음) → **0**(in_scope 전체 원복 확인, 2 라운드
+   누적 편집 포함).
 4. `cd ml-engine && uv sync --frozen --all-extras && uv run python -m pytest tests -q`
    → **233 passed**(5A 156 + 5B 77, 5D 전부가 사라져 base 상태로 정확히 복귀 — 회귀 0).
 5. `uv run mypy --strict src/ml_engine` → `Success: no issues found in 18 source files`
-   (5D 이전 5A+5B 파일 수와 일치).
+   (5D 이전 5A+5B 파일 수와 일치 — `warn_unreachable=true`도 함께 걷혔으므로 5A/5B 만의
+   strict 결과가 재현된다).
 6. `uv run lint-imports` → `Contracts: 5 kept, 0 broken`(되돌린 트리가 5A+5B 게이트
    그대로 선다).
 
@@ -90,4 +96,5 @@ git diff f5020aa982e6c5ade01f1660c0568dcd75c2fa7e -- ml-engine/pyproject.toml \
 목록은 자기 자신을 담은 커밋을 가리킬 수 없다). `pyproject.toml`의 되돌리기는
 `git apply -R`(hunk 단위)라 이 slice 가 만든 hunk 가 base 시점과 동일할 때만 깨끗하게
 적용된다 — 5A 소유 파일에 다른 동시 편집이 있었다면 수동 3-way 해소가 필요할 수 있다
-(M4 실측과 같은 갈래, 여기서는 발생하지 않았다: 임시 clone 재현이 exit 0 확인).
+(M4 실측과 같은 갈래, 여기서는 발생하지 않았다: 임시 clone 재현이 exit 0 확인, 2라운드
+누적 hunk 도 한 번에 걷힘을 이번 재실측이 추가로 확인했다).
