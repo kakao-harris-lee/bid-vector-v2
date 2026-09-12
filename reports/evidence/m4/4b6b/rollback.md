@@ -19,8 +19,13 @@ b902097 docs(m4-4b6b): 계약 갱신 — 파일 셋 분할(detekt)·recommendedA
 
 ## 변경 파일 목록(기계 산출, 위 문서 레인 제외)
 
+`reports/evidence/m4/4b6b/scope.md`는 팀장 문서 레인이라(위 선언) pathspec 에서
+직접 제외한다 — 제외하지 않으면 디렉터리 전체 pathspec 이 그 파일도 잡아 명령
+출력과 이 목록이 어긋난다(verifier r2 실측). `milestone-4.md`는 이 디렉터리
+바깥이라 애초에 이 pathspec 에 안 걸린다(제외 불필요, 참고로만 남긴다).
+
 ```
-$ git diff --name-status 571059ab5ada307126a9dd35bc33b846dd4ae63f..d21cb21 -- workflow/ config/quality/gate-tests.properties reports/evidence/m4/4b6b/
+$ git diff --name-status 571059ab5ada307126a9dd35bc33b846dd4ae63f..d21cb21 -- workflow/ config/quality/gate-tests.properties reports/evidence/m4/4b6b/ ':!reports/evidence/m4/4b6b/scope.md'
 M	config/quality/gate-tests.properties
 A	reports/evidence/m4/4b6b/checklist.md
 A	reports/evidence/m4/4b6b/commands.md
@@ -42,10 +47,10 @@ A	workflow/src/test/kotlin/bidvector/workflow/evaluation/PredictionFactsTest.kt
 M	workflow/src/test/kotlin/bidvector/workflow/evaluation/TextSynthesisTest.kt
 ```
 
-(`reports/evidence/m4/4b6b/scope.md` 는 위 선언대로 팀장 문서 레인이라 이 파일 목록에서
-의도적으로 제외했다 — pathspec `reports/evidence/m4/4b6b/`를 걸었지만 scope.md 만 별도로
-빼는 대신, 실제 rollback 절차는 evidence 네 파일(checklist·commands·policy-values·
-rollback)만 개별 인자로 지정해 scope.md 를 건드리지 않는다.)
+명령을 실제로 돌려 위 13줄과 정확히 일치함을 확인했다(verifier r2 재실측, 2026-09-12).
+Rollback 절차 자체는 evidence 네 파일(checklist·commands·policy-values·rollback)을
+개별 인자로 지정해 `scope.md`를 건드리지 않는다 — 목록 명령의 pathspec 제외와 별개로
+실행 절차도 이중으로 안전하다.
 
 ## 공유 파일 확인 — `config/quality/gate-tests.properties`
 

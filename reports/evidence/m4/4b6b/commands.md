@@ -36,8 +36,12 @@ head_sha(코드 마지막 커밋, verifier r1 수정 라운드 포함): `d21cb21
 - 1차 exit: 1 — 양방향 차집합이 기존 미등재 `LadderPolicySlotTest`(4B-2 신설, 당시
   등재 누락)를 실측으로 찾음. `gate-tests.properties`에 등록해 해소.
 - 2차 exit: 0 — 3 tests(등재 완전성 1 + 양성 대조 누락/잉여 각 1), 0 failed.
-- 양성 대조(등재 한 줄 삭제 → 붉음): test 자체가 가짜 discovered/registered 집합으로
-  차집합 술어를 실측하는 별도 test 둘로 대체 실행(운영 파일을 건드리지 않고 확인).
+- **실제 양성 대조(운영 파일 `gate-tests.properties` 직접 조작)는 verifier r1 F-2
+  수정 뒤에야 성립한다** — 당시엔 `:workflow:test`가 그 파일을 입력으로 몰라
+  등재를 지우고 재실행해도 UP-TO-DATE 로 건너뛰어 붉어지지 않았다(F-2, 이전 판의
+  "가짜 집합 test 둘로 대체" 서술은 이 사각을 가리는 잘못된 설명이었다 — 걷는다).
+  실제 조작 → 붉음 → 원복 → 초록의 전 과정 실측은 아래 「verifier r1 수정
+  라운드」 절의 F-2 항목 참고.
 
 ## S-4 — gateExecutionGate
 

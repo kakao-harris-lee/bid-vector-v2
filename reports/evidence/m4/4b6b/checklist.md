@@ -78,6 +78,14 @@ F-4(notice 실패 시 profile 미호출)는 둘 다 `private`/기존 `internal` 
    `*GateRegistrationTest`류가 같은 거짓 초록 사각을 가질 수 있다. 이 slice는
    `adapters`를 편집하지 않는다(scope out_of_scope) — 해소는 그 모듈을 만지는
    후속 slice 또는 운영자 결정.
+7. **`MarginInputs.init` 술어와 조합기 관문의 짝은 test 열거로만 묶여 있다**
+   (verifier r2) — `predictionUntrustworthy`(candidates.base)·`expectedMarginFact`의
+   `floorRate` 검사·`PredictionFactsTest`의 경계 test 는 지금 존재하는 세 술어를
+   손으로 나열한 것이지, `MarginInputs.init`이 이 관문들의 원천이라는 구조적 결속은
+   아니다 — `init`에 네 번째 `require`가 생겨도 이 짝이 자동으로 드러나지 않는다
+   (같은 파일 안에 있지 않아 컴파일도 안 잡는다). 해소하려면 `MarginInputs` 생성을
+   감싸는 공용 팩토리(성공/실패 열거)를 4B-5 쪽에 두거나, 그 술어 개수를 이 slice가
+   회귀 test 로 고정해야 한다 — 이 slice 범위 밖(4B-5 소유 타입의 구조 변경).
 
 ## verifier r1 대응 요약
 
