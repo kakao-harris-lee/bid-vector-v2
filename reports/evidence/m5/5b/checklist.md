@@ -97,3 +97,12 @@ r1 L-1 — `test_rows.py`의 `_assert_observed_values_within_schema_range`가 `O
   코퍼스가 이미 주어졌다고 가정하는 순수 변환이라 5B out_of_scope — **코퍼스를 조립하는
   5C 착수 계약이 관측값 도메인 검증(또는 그 근거)을 인수**해야 한다. 해소 조건: 5C 착수
   계약에 이 OPEN을 인수 항목으로 명시.
+
+## 사용자 승인
+
+**2026-09-12 — slice 5B 종결 승인.** verifier r1 ready-for-review(산출물 high 0·medium 2·장부 medium 1·low 3) → 일괄 시정
+`2685fe5`(코드: manifest 정렬 불변식·`EncodingOutcome`·range 단언)·`ae6320a`(evidence) → r2 ready-for-review(여섯 닫힘, 신규 장부 low 1 →
+`e4f2ef9`). 재작업 1회. 정책 값 κ(12.0·40.0)는 착수 시 승인, 출하 상수 test 대조. 병합은 push → PR + 리뷰 판정 코멘트 → 머지 별도 승인(관례).
+인계 OPEN: `OPEN-5B-FEATURES-FORBIDDEN`(5C 착수 계약에서 import-linter source_modules 확장) · `OPEN-5B-OBSERVATION-DOMAIN`(관측값 [0,1]
+검증, 5C) · `OPEN-5B-FIXTURE-REEVAL`(curator) · Python 가시성 한계(`AgencyTargetEncoding` 직접 생성 — 5C·5D verifier 표적).
+다음 slice: **5D inference kernels**(운영자 결정 2026-09-12 (a)). verifier 리포트 `_workspace/m5-5b/04_verifier_report.md`·`05_verifier_report_r2.md`.

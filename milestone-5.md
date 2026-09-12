@@ -65,6 +65,15 @@ sha256(canonical JSON)(D-5B-5) · 수축 원시 연산은 최하층 `features` �
 CI `ml-engine` job 전건(하네스 2026-09-12 규율). 정본 `reports/evidence/m5/5b/scope.md`, 설계 검토
 `_workspace/m5-5b/02_design-review.md`. fixtures `ml-boundary-003/004` 재평가는 `OPEN-5B-FIXTURE-REEVAL`(curator).
 
+**5B 종결 2026-09-12(사용자 승인)** — verifier r1 `ready-for-review`(medium: manifest 가 배열 순서에 따라 다른
+checksum · 관측 0 인코딩이 `global_mean 0.0` 으로 접힘 · rollback 확인 명령 오기) → 생성 시점 정렬 불변식, `EncodingOutcome =
+Built | NoObservations` 결과 타입, `FeatureColumn.range` 를 rows test 가 단언 → r2 `ready-for-review`(규칙표 9행 비트 동일
+재현, 226 passed). 재작업 1회. 산출물: `ml_engine.features` 8 모듈(이식 4 — normalize·shrinkage·encoding·rows / 신규 4 —
+schema·facts·vocabulary·manifest), sentinel 셋 제거. **알려진 제한·OPEN**: Python 가시성 한계(직접 생성 우회 — 5C·5D verifier
+표적) · 어휘 전환으로 재학습 필요 · `OPEN-5B-FEATURES-FORBIDDEN`(`features` 에 DB/HTTP forbidden 미적용 → 5C 착수 계약) ·
+`OPEN-5B-OBSERVATION-DOMAIN`(관측값 [0,1] 검증 → 5C) · `OPEN-5B-FIXTURE-REEVAL`(curator). **다음은 5D**(inference kernels —
+운영자 결정 2026-09-12 (a); 착수 전건 D-M5-7 (a) golden curator 병행·D-M5-8 (a)·D-M5-9 확정).
+
 ### Slice 5B — feature schema
 
 - versioned feature name/order/type/range
