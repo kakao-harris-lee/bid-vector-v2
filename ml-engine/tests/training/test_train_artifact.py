@@ -16,7 +16,7 @@ from ml_engine.training.artifact_writer import ArtifactBytes, write_artifact
 from ml_engine.training.booster import LightGbmTrainer, TrainerFailed
 from ml_engine.training.dataset import DatasetManifestV1, LoadedDataset, RawTrainingRow
 from ml_engine.training.policy import TrainingPolicy
-from ml_engine.training.release import ReleaseInputs
+from ml_engine.training.release import derive_release_id
 from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
 from ml_engine.training.train import (
     CodeVersion,
@@ -176,14 +176,7 @@ def _train_and_write(n: int = 40, min_training_rows: int = 5) -> ArtifactBytes:
         dataset, _small_spec(), policy, LightGbmTrainer(), CodeVersion("sha-abc123")
     )
     assert isinstance(trained, TrainedArtifact)
-    release_inputs = ReleaseInputs(
-        dataset_id=trained.dataset_id,
-        training_spec_version=trained.training_spec_version,
-        training_spec_checksum=trained.training_spec_checksum,
-        seed=trained.reproducibility.seed,
-        code_version=trained.code_version,
-    )
-    written = write_artifact(trained, release_inputs)
+    written = write_artifact(trained)
     assert isinstance(written, ArtifactBytes)
     return written
 
@@ -232,7 +225,7 @@ _EXPECTED_REPRODUCIBILITY_FIELDS = ("seed", "num_threads", "deterministic")
 
 
 def test_write_artifact_field_set_matches_5d_scope_plus_5c1_additions() -> None:
-    """5D scope ⑦ `ArtifactManifestV1` 필드 집합(문자열 tuple 고정) + 5C-1 추가 여섯 —
+    """5D scope ⑦ `ArtifactManifestV1` 필드 집합(문자열 tuple 고정) + 5C-1 추가 여덟 —
     D-5C-9(release 에 `artifact_checksum` 없음)."""
     written = _train_and_write()
     payload = json.loads(written.bytes)
@@ -277,15 +270,32 @@ def test_write_artifact_rejects_feature_name_mismatch() -> None:
         reproducibility=trained.reproducibility,
         rejected_rows=trained.rejected_rows,
     )
-    release_inputs = ReleaseInputs(
-        dataset_id=tampered.dataset_id,
-        training_spec_version=tampered.training_spec_version,
-        training_spec_checksum=tampered.training_spec_checksum,
-        seed=tampered.reproducibility.seed,
-        code_version=tampered.code_version,
-    )
-    result = write_artifact(tampered, release_inputs)
+    result = write_artifact(tampered)
     assert isinstance(result, NameMismatch)
+
+
+def test_write_artifact_release_derives_entirely_from_trained() -> None:
+    """verifier r1 H-1 — 우회 (12) 폐쇄 확인. `write_artifact` 는 `trained` 하나만 받으므로
+    호출자가 다른 `dataset_id`/`code_version`/`seed`를 실을 경로가 없다(시그니처 차원의
+    닫힘). `release_id`가 `trained` 자신의 다섯 값에서 재파생한 값과 같음도 확인한다."""
+    import inspect
+
+    signature = inspect.signature(write_artifact)
+    assert list(signature.parameters) == ["trained"]
+
+    written = _train_and_write()
+    payload = json.loads(written.bytes)
+    assert payload["release"]["dataset_id"] == "ds-repro"
+    assert payload["release"]["code_version"] == "sha-abc123"
+
+    recomputed_release_id = derive_release_id(
+        dataset_id=payload["release"]["dataset_id"],
+        training_spec_version=payload["training_spec_version"],
+        training_spec_checksum=payload["training_spec_checksum"],
+        seed=payload["reproducibility"]["seed"],
+        code_version=payload["release"]["code_version"],
+    )
+    assert payload["release"]["release_id"] == recomputed_release_id
 
 
 def test_code_version_rejects_blank() -> None:

@@ -1,12 +1,14 @@
 """RED — `ml_engine.training.residual`·`ml_engine.training.release`(scope ⑦⑨,
-D-5C-10)."""
+D-5C-10). verifier r1 H-1 뒤 — `ReleaseInputs` 타입은 삭제됐다. `derive_release_id`는
+다섯 값을 키워드 인자로 직접 받는다(값의 유효성은 각 값의 원 출처 타입이 강제 —
+이 모듈은 더 이상 검증하지 않는다)."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from ml_engine.training.release import ReleaseIdentity, ReleaseInputs, derive_release_id
+from ml_engine.training.release import ReleaseIdentity, derive_release_id
 from ml_engine.training.residual import residual_std
 
 
@@ -26,7 +28,7 @@ def test_residual_std_never_below_floor() -> None:
     assert residual_std(tiny, floor=0.002) == 0.002
 
 
-def _inputs(**overrides: object) -> ReleaseInputs:
+def _kwargs(**overrides: object) -> dict[str, object]:
     base: dict[str, object] = dict(
         dataset_id="ds-1",
         training_spec_version="award-rate-gbm-training-v1",
@@ -35,41 +37,29 @@ def _inputs(**overrides: object) -> ReleaseInputs:
         code_version="abc123",
     )
     base.update(overrides)
-    return ReleaseInputs(**base)  # type: ignore[arg-type]
+    return base
 
 
 def test_derive_release_id_is_deterministic() -> None:
-    assert derive_release_id(_inputs()) == derive_release_id(_inputs())
+    assert derive_release_id(**_kwargs()) == derive_release_id(**_kwargs())  # type: ignore[arg-type]
 
 
 def test_derive_release_id_changes_when_any_input_changes() -> None:
-    baseline = derive_release_id(_inputs())
-    assert derive_release_id(_inputs(dataset_id="ds-2")) != baseline
-    assert derive_release_id(_inputs(training_spec_version="v2")) != baseline
-    assert derive_release_id(_inputs(training_spec_checksum="b" * 64)) != baseline
-    assert derive_release_id(_inputs(seed=1)) != baseline
-    assert derive_release_id(_inputs(code_version="def456")) != baseline
+    baseline = derive_release_id(**_kwargs())  # type: ignore[arg-type]
+    assert derive_release_id(**_kwargs(dataset_id="ds-2")) != baseline  # type: ignore[arg-type]
+    assert derive_release_id(**_kwargs(training_spec_version="v2")) != baseline  # type: ignore[arg-type]
+    assert (
+        derive_release_id(**_kwargs(training_spec_checksum="b" * 64))  # type: ignore[arg-type]
+        != baseline
+    )
+    assert derive_release_id(**_kwargs(seed=1)) != baseline  # type: ignore[arg-type]
+    assert derive_release_id(**_kwargs(code_version="def456")) != baseline  # type: ignore[arg-type]
 
 
 def test_derive_release_id_is_16_hex_chars() -> None:
-    release_id = derive_release_id(_inputs())
+    release_id = derive_release_id(**_kwargs())  # type: ignore[arg-type]
     assert len(release_id) == 16
     int(release_id, 16)  # raises if not hex
-
-
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        {"dataset_id": ""},
-        {"training_spec_version": ""},
-        {"training_spec_checksum": ""},
-        {"code_version": ""},
-        {"code_version": "   "},
-    ],
-)
-def test_release_inputs_rejects_blank_fields(overrides: dict[str, object]) -> None:
-    with pytest.raises(ValueError):
-        _inputs(**overrides)
 
 
 def test_release_identity_has_no_artifact_checksum_field() -> None:

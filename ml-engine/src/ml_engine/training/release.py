@@ -4,34 +4,17 @@
 `ReleaseIdentity`는 2B `ModelRelease`(다섯 성분: release_id·artifact_checksum·
 feature_schema_version·code_version·dataset_id)에서 **`artifact_checksum`을 뺀 넷만**
 갖는다(D-5C-9 — 아티팩트 바이트 안에 자기 checksum 을 넣지 않는다. checksum 은
-`ArtifactBytes.sha256`이 낸다, `artifact_writer.py`)."""
+`ArtifactBytes.sha256`이 낸다, `artifact_writer.py`).
+
+verifier r1 H-1 — 이 모듈은 더 이상 호출자가 넘기는 `ReleaseInputs` 를 받지 않는다.
+`derive_release_id`의 다섯 입력은 전부 `TrainedArtifact`(호출부는 `artifact_writer.py`)에서만
+읽힌다 — 계약 우회 후보 (12)(「`release.dataset_id` 를 요청과 다르게」)가 시그니처 차원에서
+성립하지 않는다."""
 
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class ReleaseInputs:
-    """`derive_release_id`의 입력 다섯. `code_version`은 호출자가 문자열로 준다 — 이
-    모듈은 git 을 호출하지 않는다(D-5C-2 인계, 「만들지 않는 것」)."""
-
-    dataset_id: str
-    training_spec_version: str
-    training_spec_checksum: str
-    seed: int
-    code_version: str
-
-    def __post_init__(self) -> None:
-        if not self.dataset_id:
-            raise ValueError("dataset_id 는 비어 있을 수 없습니다.")
-        if not self.training_spec_version:
-            raise ValueError("training_spec_version 은 비어 있을 수 없습니다.")
-        if not self.training_spec_checksum:
-            raise ValueError("training_spec_checksum 은 비어 있을 수 없습니다.")
-        if not self.code_version or not self.code_version.strip():
-            raise ValueError("code_version 은 비어 있거나 공백일 수 없습니다.")
 
 
 @dataclass(frozen=True)
@@ -44,15 +27,25 @@ class ReleaseIdentity:
     dataset_id: str
 
 
-def derive_release_id(inputs: ReleaseInputs) -> str:
-    """sha256 앞 16 hex — 다섯 입력 중 하나만 바뀌어도 다른 id(결정적, D-5C-10)."""
+def derive_release_id(
+    *,
+    dataset_id: str,
+    training_spec_version: str,
+    training_spec_checksum: str,
+    seed: int,
+    code_version: str,
+) -> str:
+    """sha256 앞 16 hex — 다섯 입력 중 하나만 바뀌어도 다른 id(결정적, D-5C-10). 값 자체의
+    유효성(비어있음 등)은 각 값의 원 출처 타입이 이미 강제한다 — `dataset_id`는
+    `DatasetManifestV1.__post_init__`, `code_version`은 `CodeVersion.__post_init__`,
+    `training_spec_version`/`training_spec_checksum`은 유효한 `TrainingSpec`에서만 나온다."""
     payload = "\0".join(
         (
-            inputs.dataset_id,
-            inputs.training_spec_version,
-            inputs.training_spec_checksum,
-            str(inputs.seed),
-            inputs.code_version,
+            dataset_id,
+            training_spec_version,
+            training_spec_checksum,
+            str(seed),
+            code_version,
         )
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]

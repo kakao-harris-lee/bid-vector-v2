@@ -50,7 +50,7 @@ from ml_engine.training.policy import (
     TrainingPolicy,
     load_training_policy,
 )
-from ml_engine.training.release import ReleaseIdentity, ReleaseInputs, derive_release_id
+from ml_engine.training.release import ReleaseIdentity, derive_release_id
 from ml_engine.training.residual import residual_std
 from ml_engine.training.spec import (
     TRAINING_SPECS,
@@ -96,7 +96,6 @@ __all__ = [
     "RawTrainingRow",
     "RejectedRowAccounting",
     "ReleaseIdentity",
-    "ReleaseInputs",
     "ReproducibilityInfo",
     "TrainedArtifact",
     "TrainerFailed",
