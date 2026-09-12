@@ -1,6 +1,6 @@
-# M5/5C-1 정책 값 — `OPEN-5C-POLICY-VALUES`(**승인 대기 2026-09-12, 착수 시**)
+# M5/5C-1 정책 값 — `OPEN-5C-POLICY-VALUES`(**사용자 승인 2026-09-13 — 「승인 push, pr 진행」, D-5C-7 확정**)
 
-> **지위: 승인 대기.** 실물은 `ml-engine/policy/training-v1.yaml`(평탄 키, `PolicyScalar` 제약), 로더 `load_training_policy` 가 `known_keys` 전수·값 불변식으로
+> **지위: 승인.** 실물은 `ml-engine/policy/training-v1.yaml`(평탄 키, `PolicyScalar` 제약), 로더 `load_training_policy` 가 `known_keys` 전수·값 불변식으로
 > 대조하고 test 가 이 표와 YAML 을 대조한다. 값을 바꾸려면 이 문서 → YAML → test 순. 하이퍼파라미터는 여기 없다 — D-5C-2 로 코드 선언 `TrainingSpec`(아래 §2, 변경은 새 version).
 
 ## §1 정책 값(YAML)

@@ -125,6 +125,18 @@ artifact 에(D-5C-2) · OOF 폴드 무작위 유지(D-5C-4, `OPEN-5C-OOF-TIME-DI
 `OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`) · import-linter forbidden 을 `features`·`training`·`evaluation`·`registry` 로 확장(`OPEN-5B-FEATURES-FORBIDDEN` 해소).
 acceptance 는 CI `ml-engine` job 전건. 설계 검토 `_workspace/m5-5c/03_design-review.md`. 정책 값 `reports/evidence/m5/5c/policy-values.md`.
 
+**5C-1 종결 2026-09-13(사용자 승인 「승인 push, pr 진행」 — D-5C-0·1·2·4·7·9 추천안 확정, `OPEN-5C-POLICY-VALUES` 종결)** — verifier r1 `not-ready`(high 3:
+`write_artifact` 가 release 신원을 호출자 인자에서 읽어 학습 dataset 과 다른 `dataset_id` 선언 artifact 가 나옴 · OOF 누수 test 가 「모든 행」 단언을 빼 30행 중 6행 누수를 통과시킴 ·
+신설 import-linter 계약 블록을 지워도 test 전부 초록) → 단일 인자 `write_artifact(trained)`·legacy 두 단언 복원·양성 대조가 실제 `pyproject.toml` 을 읽도록 → r2
+`ready-for-review`(세 high 전부 **변이 주입**으로 물음 확인 · `__all__` 54 → 51 추가 0). 재작업 1회. S-1~S-9 전건 exit 0, pytest 233 → 325(skip 0 — 실 LightGBM 재현성
+test 실행), 재현성은 `OMP_NUM_THREADS` 네 값에서 sha256 동일. 산출물: `ml_engine.training` 11 모듈(이식 8 — spec·folds·residual·encoding_oof·booster·train·artifact_writer·
+release / 신규 3 — corpus·dataset·policy) + `adapters/dataset_files.py`(`file://` 만) + `policy/training-v1.yaml` + import-linter forbidden 확장(`OPEN-5B-FEATURES-FORBIDDEN`
+해소) + 라벨 [0,1] 회계(`OPEN-5B-OBSERVATION-DOMAIN` 해소). **알려진 제한·OPEN**: OOF 학습 구간 내부 시간 방향 없음(`OPEN-5C-OOF-TIME-DIRECTION`) · 호스트 간 스레드 수가 다르면
+바이트 동일 미보장(D-5C-12) · Python 가시성(`TrainedArtifact` 직접 위조 — 단 신원이 본문과 어긋나는 artifact 는 못 만든다) · 중복 행은 dataset 생성 측 몫 ·
+`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`(5D read model 조정 — 5D 세션에 미전달, 운영자 전달) · `OPEN-5C-ARTIFACT-ROUNDTRIP` · `OPEN-5C-5A-TABLE-REASSIGN`(5D 병합 뒤) ·
+`OPEN-5C-MATURITY-SOURCE`·`OPEN-5C-CORPUS`(5C-2·curator) · CI(Linux) 그린은 PR 에서 확인. 정본 `reports/evidence/m5/5c/checklist.md`. **다음은 5C-2**(평가·홀드아웃·승격 측정·
+evaluation report·`policy/evaluation-v1.yaml` — 조사 노트 02 의 ML-07 보강이 입력).
+
 ### Slice 5D — inference kernels
 
 - model predict adapter
