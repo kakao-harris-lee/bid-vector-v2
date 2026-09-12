@@ -1,0 +1,22 @@
+{
+  "admittedSampleIds": [
+    "SYN-ASMT-01",
+    "SYN-ASMT-03",
+    "SYN-ASMT-05"
+  ],
+  "admittedCount": 3,
+  "excludedSampleIds": [
+    "SYN-ASMT-02",
+    "SYN-ASMT-04",
+    "SYN-ASMT-06"
+  ],
+  "excludedObservations": 3,
+  "nonCleanAdmittedCount": 0,
+  "silentlyDropped": false,
+  "admittedBecauseValueLooksNumeric": false,
+  "levelObservationMean": {
+    "fraction": "1.0100"
+  },
+  "levelObservationSampleCount": 3,
+  "derivation": "(0.9800 + 1.0100 + 1.0400) / 3 = 3.0300 / 3 = 1.0100 — 비-CLEAN 세 행이 들어왔다면 평균이 이 값이 아니다"
+}

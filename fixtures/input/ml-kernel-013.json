@@ -1,0 +1,25 @@
+{
+  "axis": "closed-form-equals-full-enumeration",
+  "kernel": "reserve-draw-mean",
+  "moneyUnit": "KRW 원 단위 정수",
+  "reservePriceValues": [
+    999870,
+    999890,
+    999920,
+    999940,
+    999950,
+    999980,
+    999990,
+    1000000,
+    1000010,
+    1000020,
+    1000050,
+    1000060,
+    1000080,
+    1000110,
+    1000130
+  ],
+  "expectedPriceCount": 15,
+  "drawCount": 4,
+  "comparisonPrecisionSignificantDigits": 12
+}

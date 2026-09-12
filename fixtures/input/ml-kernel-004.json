@@ -1,0 +1,29 @@
+{
+  "axis": "cold-start-and-minimum-samples",
+  "policy": {
+    "version": "syn-inference-v0",
+    "gbm": {
+      "minCategoryRows": 0
+    }
+  },
+  "segment": {
+    "categoryCode": "SYN-CAT-A",
+    "agencyId": "SYN-AGENCY-01"
+  },
+  "probes": [
+    {
+      "label": "zero-rows",
+      "artifact": {
+        "releaseId": "SYN-REL-0001",
+        "segmentTrainingRowCount": 0
+      }
+    },
+    {
+      "label": "one-row",
+      "artifact": {
+        "releaseId": "SYN-REL-0001",
+        "segmentTrainingRowCount": 1
+      }
+    }
+  ]
+}

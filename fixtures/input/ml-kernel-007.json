@@ -1,0 +1,20 @@
+{
+  "axis": "feature-schema-version",
+  "supportedFeatureSchemaVersions": [
+    "award-rate-features-v2"
+  ],
+  "probes": [
+    {
+      "label": "supported",
+      "artifactFeatureSchemaVersion": "award-rate-features-v2"
+    },
+    {
+      "label": "unsupported-newer",
+      "artifactFeatureSchemaVersion": "award-rate-features-v3"
+    },
+    {
+      "label": "undeclared",
+      "artifactFeatureSchemaVersion": null
+    }
+  ]
+}

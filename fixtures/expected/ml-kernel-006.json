@@ -1,0 +1,27 @@
+{
+  "acceptanceIsExactSequenceEquality": true,
+  "probes": [
+    {
+      "label": "same-order",
+      "sameMultiset": true,
+      "sameOrder": true,
+      "accepted": true,
+      "inferenceRejected": false
+    },
+    {
+      "label": "reordered",
+      "sameMultiset": true,
+      "sameOrder": false,
+      "accepted": false,
+      "inferenceRejected": true
+    },
+    {
+      "label": "proper-subset",
+      "sameMultiset": false,
+      "sameOrder": false,
+      "accepted": false,
+      "inferenceRejected": true
+    }
+  ],
+  "subsetAcceptedAnywhere": false
+}

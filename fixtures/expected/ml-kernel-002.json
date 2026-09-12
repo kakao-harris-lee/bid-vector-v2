@@ -1,0 +1,11 @@
+{
+  "measurable": false,
+  "reason": "INSUFFICIENT_SAMPLES",
+  "detail": "SHALLOW_SEGMENT",
+  "declaredMinimumRows": 24,
+  "effectiveMinimumRows": 24,
+  "segmentTrainingRowCount": 23,
+  "candidateCount": 0,
+  "scoreEmitted": false,
+  "gateAndPredictShareOneDecision": true
+}
