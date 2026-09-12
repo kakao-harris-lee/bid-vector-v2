@@ -53,6 +53,18 @@ S-1~S-9 exit 0, pytest 156(기존 125 회귀 0), CI Python job 신설. **알려�
 `OPEN-5A-SERVING-GRPC-EXCEPTION`(5E) · `OPEN-5A-MYPY-ALLOWLIST`(초기 0건, 5D) · `OPEN-5A-PY-CI`(러너
 실행은 push 뒤). 정본 `reports/evidence/m5/5a/checklist.md`. **다음은 5B**(feature schema).
 
+**5B 착수 2026-09-12(운영자 결정 2026-09-12 — D-5B-2 (a)·D-5B-7 legacy 값)** — base 는 PR #9 머지 커밋
+`cc90f70`. 조사 실측: legacy 에 feature schema version·manifest·checksum 이 **없고**, skew 방지는 「같은 모듈
+import + `feature_names` 정확 대조」 둘, 결측 다섯 축은 전부 조용한 접힘, unit/basis 검증 없음 → 5B 는
+**대부분 신규 작성**이고 이식은 변환 산식·2단 수축·fail-closed 대조·`sample_scope` 기본값 금지 규율.
+결정: 스키마 version `award-rate-features-v2` 신설(D-5B-1) · `denominator_source` 어휘 = wire
+`BaseAmountProvenanceLabel` 5값, legacy 4값 enum 이식 없음(D-5B-2, 재학습 동반 — D-M2-10) · 결측·미지는
+NaN + provenance, 기초금액·분모 결측은 행 거부(D-5B-3) · `Money` 다섯 성분 검증(D-5B-4) · feature manifest
+sha256(canonical JSON)(D-5B-5) · 수축 원시 연산은 최하층 `features` 에 두어 5D 가 재사용(D-5B-6) · κ 둘은
+`EncodingPolicy` 인자, 값 12.0·40.0 승인(D-5B-7) · fail-closed 대조·기본값 금지 이식(D-5B-8). acceptance 는
+CI `ml-engine` job 전건(하네스 2026-09-12 규율). 정본 `reports/evidence/m5/5b/scope.md`, 설계 검토
+`_workspace/m5-5b/02_design-review.md`. fixtures `ml-boundary-003/004` 재평가는 `OPEN-5B-FIXTURE-REEVAL`(curator).
+
 ### Slice 5B — feature schema
 
 - versioned feature name/order/type/range
