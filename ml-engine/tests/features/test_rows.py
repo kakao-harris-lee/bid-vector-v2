@@ -2,7 +2,8 @@
 
 규칙표: 범주 OOV→NaN+OOV, 금액 결측→RowRejected, 분모 결측→RowRejected,
 agency Missing→NaN NaN, 미관측→category 평균 0.0(Observed), 관측→log1p(n)(Observed).
-NaN 위치 ≡ provenance 위치. `inspect.signature` 고정(시각 인자 없음).
+NaN 위치 ≡ provenance 위치. `inspect.signature` 고정(시각 인자 없음). `Observed` 값은
+`FEATURE_SCHEMA_V2`가 선언한 열별 `range` 안에 있어야 한다(verifier r1 L-1).
 """
 
 from __future__ import annotations
@@ -15,7 +16,9 @@ from hypothesis import strategies as st
 
 from ml_engine.contracts import common_pb2, features_pb2
 from ml_engine.features.encoding import (
+    AgencyTargetEncoding,
     AwardRateObservation,
+    Built,
     EncodingPolicy,
     build_agency_target_encoding,
 )
@@ -27,15 +30,27 @@ from ml_engine.features.rows import (
     Observed,
     RowRejected,
 )
+from ml_engine.features.schema import FEATURE_SCHEMA_V2
 from ml_engine.features.vocabulary import OutOfVocabulary, Vocabulary
 
 _POLICY = EncodingPolicy(agency_prior_strength=12.0, category_prior_strength=40.0)
+
+_EMPTY_ENCODING = AgencyTargetEncoding(
+    agency_means={}, category_means={}, global_mean=0.0
+)
 
 
 def _feature_space(observations: list[AwardRateObservation] | None = None):
     from ml_engine.features.rows import AwardRateFeatureSpace
 
-    encoding = build_agency_target_encoding(observations or [], policy=_POLICY)
+    if observations:
+        outcome = build_agency_target_encoding(observations, policy=_POLICY)
+        assert isinstance(outcome, Built)
+        encoding = outcome.encoding
+    else:
+        # 관측 0 은 `NoObservations`(verifier r1 M-2) — 행 조립 test 는 여기서 그 가드를
+        # 다시 재판정하지 않고, 빈 encoding 표를 직접 만들어 build_row 규칙만 확인한다.
+        encoding = _EMPTY_ENCODING
     return AwardRateFeatureSpace(
         categories=Vocabulary(("civil", "electrical")),
         denominator_sources=Vocabulary(
@@ -43,6 +58,18 @@ def _feature_space(observations: list[AwardRateObservation] | None = None):
         ),
         agency_encoding=encoding,
     )
+
+
+def _assert_observed_values_within_schema_range(row: FeatureRow) -> None:
+    """verifier r1 L-1 — `Observed` 값은 `FEATURE_SCHEMA_V2`가 선언한 범위 안에 있어야 한다."""
+    for value, provenance, column in zip(
+        row.values, row.provenance.columns, FEATURE_SCHEMA_V2.columns, strict=True
+    ):
+        if isinstance(provenance, Observed) and column.range is not None:
+            assert column.range.minimum <= value <= column.range.maximum, (
+                column.name,
+                value,
+            )
 
 
 def _valid_money() -> common_pb2.Money:
@@ -109,6 +136,7 @@ def test_build_row_normal_case_all_observed() -> None:
     assert row.values[0] == 0.0  # "civil" 은 vocab 위치 0
     assert row.values[1] == math.log10(500_000_000)
     assert row.values[4] == 0.0  # "CLEAN" 은 denominator vocab 위치 0
+    _assert_observed_values_within_schema_range(row)
 
 
 def test_build_row_missing_base_amount_rejects_whole_row() -> None:
@@ -172,6 +200,7 @@ def test_build_row_unobserved_agency_sample_count_is_zero_not_missing() -> None:
     assert row.provenance.columns[3] == Observed()
     assert not math.isnan(row.values[2])
     assert row.provenance.columns[2] == Observed()
+    _assert_observed_values_within_schema_range(row)
 
 
 def test_nan_position_equals_provenance_missing_or_oov_position() -> None:
@@ -205,3 +234,4 @@ def test_build_row_property_five_columns_and_finite_or_nan_only(
     assert len(row.values) == 5
     for value in row.values:
         assert math.isfinite(value) or math.isnan(value)
+    _assert_observed_values_within_schema_range(row)

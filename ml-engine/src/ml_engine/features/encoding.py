@@ -15,7 +15,14 @@
 키 자체를 만들 수 없어 전역 평균으로 직행해야 하는데, legacy는 이 경우를 `normalize_
 feature_key(None) == ""`로 접어 `category_means.get("", ...)`가 우연히 폴백되게
 했다(falsy→빈 문자열 접힘, V2에서 폐기 대상). `category=None`을 타입으로 받아 그 접힘
-없이 같은 폴백 결과를 낸다.
+없이 같은 폴백 결과를 낸다. (4) verifier r1 M-2 — `build_agency_target_encoding`은
+관측이 비면 legacy처럼 `global_mean=0.0`인 `AgencyTargetEncoding`을 조용히 내지 않고
+**결과 타입 `EncodingOutcome = Built(encoding) | NoObservations`**를 낸다. 관측 0으로
+만든 표를 그대로 쓰면 「낙찰률 0%로 수축」과 「학습 데이터가 아예 없다」가 값(`0.0`)과
+provenance(`Observed`) 둘 다에서 구별되지 않는다(위협 모델 (a) 「0 대입」의 잔여 갈래) —
+5C의 빈 코퍼스 가드가 `NoObservations`를 명시적으로 소비해 그 경우를 거부하게 한다.
+`AwardRateFeatureSpace.build_row`는 이미 만들어진 `AgencyTargetEncoding`을 인자로 받으므로
+이 변경에 영향받지 않는다.
 """
 
 from __future__ import annotations
@@ -157,23 +164,44 @@ def _shrunk_agency_means(
     }
 
 
+@dataclass(frozen=True)
+class Built:
+    """관측이 1건 이상이라 인코딩 표를 실제로 만들었다."""
+
+    encoding: AgencyTargetEncoding
+
+
+@dataclass(frozen=True)
+class NoObservations:
+    """관측이 0건 — `global_mean=0.0`인 표를 조용히 내지 않는다(legacy 접힘 제거,
+    verifier r1 M-2). 호출부(5C)가 빈 코퍼스 가드로 이 상태를 명시적으로 거부해야 한다."""
+
+
+type EncodingOutcome = Built | NoObservations
+
+
 def build_agency_target_encoding(
     observations: Iterable[AwardRateObservation],
     *,
     policy: EncodingPolicy,
-) -> AgencyTargetEncoding:
+) -> EncodingOutcome:
     """관측 집합에서 계층 수축 인코딩 표를 만든다(순수). 시간 누수는 호출부 책임 — 이
-    커널은 시각을 보지 않는다(legacy 그대로)."""
-    totals = _collect_totals(observations)
+    커널은 시각을 보지 않는다(legacy 그대로). 관측이 비면 `NoObservations`."""
+    materialized = list(observations)
+    if not materialized:
+        return NoObservations()
+    totals = _collect_totals(materialized)
     category_means = _shrunk_category_means(
         totals, prior_strength=policy.category_prior_strength
     )
-    return AgencyTargetEncoding(
-        agency_means=_shrunk_agency_means(
-            totals, category_means, prior_strength=policy.agency_prior_strength
-        ),
-        category_means=category_means,
-        global_mean=totals.global_mean,
+    return Built(
+        AgencyTargetEncoding(
+            agency_means=_shrunk_agency_means(
+                totals, category_means, prior_strength=policy.agency_prior_strength
+            ),
+            category_means=category_means,
+            global_mean=totals.global_mean,
+        )
     )
 
 

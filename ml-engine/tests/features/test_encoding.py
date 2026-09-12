@@ -1,5 +1,6 @@
 """RED — `ml_engine.features.encoding`(D-5B-6·D-5B-7). 2단 pseudo-count 수축,
-`MappingProxyType` 봉인, `category_sample_count` 유도, κ 필수 인자(기본값 없음)."""
+`MappingProxyType` 봉인, `category_sample_count` 유도, κ 필수 인자(기본값 없음),
+관측 0 은 결과 타입 `NoObservations`(verifier r1 M-2)."""
 
 from __future__ import annotations
 
@@ -9,12 +10,22 @@ import pytest
 
 from ml_engine.features.encoding import (
     SHIPPED_ENCODING_POLICY,
+    AgencyTargetEncoding,
     AwardRateObservation,
+    Built,
     EncodingPolicy,
+    NoObservations,
     build_agency_target_encoding,
 )
 
 _POLICY = EncodingPolicy(agency_prior_strength=12.0, category_prior_strength=40.0)
+
+
+def _built(observations: list[AwardRateObservation]) -> AgencyTargetEncoding:
+    """관측이 1건 이상인 호출에서 `Built`를 풀어 `AgencyTargetEncoding`을 낸다(test 헬퍼)."""
+    outcome = build_agency_target_encoding(observations, policy=_POLICY)
+    assert isinstance(outcome, Built)
+    return outcome.encoding
 
 
 def test_encoding_policy_requires_both_kappas_no_defaults() -> None:
@@ -42,7 +53,7 @@ def test_build_agency_target_encoding_requires_policy_kwarg() -> None:
 
 def test_build_agency_target_encoding_seals_tables_read_only() -> None:
     observations = [AwardRateObservation(agency="a1", category="civil", value=0.8)]
-    encoding = build_agency_target_encoding(observations, policy=_POLICY)
+    encoding = _built(observations)
     assert isinstance(encoding.agency_means, MappingProxyType)
     assert isinstance(encoding.category_means, MappingProxyType)
 
@@ -52,7 +63,7 @@ def test_encode_observed_agency_returns_own_shrunk_mean_and_count() -> None:
         AwardRateObservation(agency="a1", category="civil", value=0.9),
         AwardRateObservation(agency="a1", category="civil", value=0.9),
     ]
-    encoding = build_agency_target_encoding(observations, policy=_POLICY)
+    encoding = _built(observations)
     mean, count = encoding.encode(agency="a1", category="civil")
     assert count == 2
     # 표본이 얕아 전역 평균(=0.9)으로 수축돼도 값은 그 근방.
@@ -64,7 +75,7 @@ def test_encode_unobserved_agency_falls_back_to_category_mean_with_zero_count() 
         AwardRateObservation(agency="a1", category="civil", value=0.7),
         AwardRateObservation(agency="a2", category="civil", value=0.9),
     ]
-    encoding = build_agency_target_encoding(observations, policy=_POLICY)
+    encoding = _built(observations)
     mean, count = encoding.encode(agency="never-seen-agency", category="civil")
     assert count == 0
     assert mean == encoding.category_means["civil"]
@@ -74,7 +85,7 @@ def test_encode_unobserved_agency_and_category_falls_back_to_global_mean() -> No
     observations = [
         AwardRateObservation(agency="a1", category="civil", value=0.7),
     ]
-    encoding = build_agency_target_encoding(observations, policy=_POLICY)
+    encoding = _built(observations)
     mean, count = encoding.encode(
         agency="never-seen-agency", category="never-seen-category"
     )
@@ -89,7 +100,7 @@ def test_encode_category_none_bypasses_category_means_straight_to_global_mean() 
         AwardRateObservation(agency="a1", category="civil", value=0.7),
         AwardRateObservation(agency="a2", category="electrical", value=0.3),
     ]
-    encoding = build_agency_target_encoding(observations, policy=_POLICY)
+    encoding = _built(observations)
     mean, count = encoding.encode(agency="a1", category=None)
     assert count == 0
     assert mean == encoding.global_mean
@@ -101,24 +112,30 @@ def test_category_sample_count_sums_across_agencies() -> None:
         AwardRateObservation(agency="a2", category="civil", value=0.8),
         AwardRateObservation(agency="a3", category="electrical", value=0.2),
     ]
-    encoding = build_agency_target_encoding(observations, policy=_POLICY)
+    encoding = _built(observations)
     assert encoding.category_sample_count("civil") == 2
     assert encoding.category_sample_count("electrical") == 1
     assert encoding.category_sample_count("never-seen") == 0
 
 
-def test_build_agency_target_encoding_empty_observations_yields_zero_global_mean() -> (
+def test_build_agency_target_encoding_empty_observations_is_no_observations_result() -> (
     None
 ):
-    encoding = build_agency_target_encoding([], policy=_POLICY)
-    assert encoding.global_mean == 0.0
-    assert dict(encoding.agency_means) == {}
-    assert dict(encoding.category_means) == {}
+    """verifier r1 M-2 — 관측 0 은 `global_mean=0.0`인 표를 조용히 내지 않고 결과 타입으로
+    구별한다(「낙찰률 0%」와 「학습 데이터 없음」을 갈라야 한다)."""
+    outcome = build_agency_target_encoding([], policy=_POLICY)
+    assert outcome == NoObservations()
+    assert not isinstance(outcome, Built)
+
+
+def test_build_agency_target_encoding_nonempty_observations_is_built_result() -> None:
+    outcome = build_agency_target_encoding(
+        [AwardRateObservation(agency="a1", category="civil", value=0.5)], policy=_POLICY
+    )
+    assert isinstance(outcome, Built)
 
 
 def test_agency_target_encoding_is_frozen() -> None:
-    encoding = build_agency_target_encoding(
-        [AwardRateObservation(agency="a1", category="civil", value=0.5)], policy=_POLICY
-    )
+    encoding = _built([AwardRateObservation(agency="a1", category="civil", value=0.5)])
     with pytest.raises((AttributeError, TypeError)):
         encoding.global_mean = 0.0  # type: ignore[misc]

@@ -37,7 +37,14 @@ class ManifestCategoryMean:
 @dataclass(frozen=True)
 class FeatureManifest:
     """feature manifest 내용 — 전부 canonical_json 이 직렬화할 수 있는 원시 구조만 담는다
-    (dict 키에 tuple을 쓰지 않는다, JSON 은 그런 키를 표현할 수 없다)."""
+    (dict 키에 tuple을 쓰지 않는다, JSON 은 그런 키를 표현할 수 없다).
+
+    verifier r1 M-1 — `categories`·`denominator_sources`·`agency_means`·`category_means`는
+    생성 시점에 **키 기준으로 정렬**한다(`Vocabulary`와 같은 불변식). 정렬하지 않으면
+    같은 내용을 다른 순서로 들고 온 두 manifest가 다른 checksum을 낸다 — 5C가 dict
+    삽입 순서대로 이 필드를 채우면 같은 학습 결과가 실행마다 다른 checksum을 내게 된다.
+    `columns`는 정렬하지 않는다 — 그 순서 자체가 feature schema 의 열 순서라는 의미를
+    나른다(임의 순서가 아니다)."""
 
     schema_version: str
     columns: tuple[ManifestColumn, ...]
@@ -48,6 +55,26 @@ class FeatureManifest:
     global_mean: float
     agency_prior_strength: float
     category_prior_strength: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "categories", tuple(sorted(self.categories)))
+        object.__setattr__(
+            self, "denominator_sources", tuple(sorted(self.denominator_sources))
+        )
+        object.__setattr__(
+            self,
+            "agency_means",
+            tuple(
+                sorted(
+                    self.agency_means, key=lambda entry: (entry.agency, entry.category)
+                )
+            ),
+        )
+        object.__setattr__(
+            self,
+            "category_means",
+            tuple(sorted(self.category_means, key=lambda entry: entry.category)),
+        )
 
 
 def canonical_json(manifest: FeatureManifest) -> bytes:
