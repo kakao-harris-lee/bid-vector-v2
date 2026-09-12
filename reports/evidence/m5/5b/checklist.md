@@ -110,6 +110,13 @@ r1 L-1 — `test_rows.py`의 `_assert_observed_values_within_schema_range`가 `O
   만들지는 않는다(그 경로는 PR #10 리뷰 MEDIUM 이 `CanonicalizationRejected`로 이미
   닫았다, checklist 알려진 제한 #8). 해소 조건: 5C 착수 계약에 이 OPEN을 인수 항목으로 명시.
 
+9. **예외 0 은 「타입 준수 입력에서」다**(verifier r3 L-5) — `_first_non_finite_path` 는 선언된 float 자리만 본다. `ManifestAgencyMean.count: int`
+   자리에 float NaN 을 넣으면 `json.dumps` 의 `ValueError` 가 새지만, `mypy --strict` 가 그 호출을 `[arg-type]` 으로 거부하므로 타입 준수 호출부에서는
+   도달 불가(「예외는 프로그래밍 오류만」의 같은 갈래).
+10. **hypothesis `ci` 프로파일은 프로세스 전역이다**(verifier r3 L-6) — `tests/features/conftest.py` 의 `settings.load_profile` 은 스위트 전체에 걸린다.
+   지금은 `tests/features` 밖 hypothesis 사용이 0 건이라 무해. **5C 인수**: features 밖에 hypothesis test 를 더하면 이 프로파일을 물려받으므로
+   5C 착수 계약에서 프로파일 위치(루트 conftest 승격 또는 명시 opt-in)를 정한다.
+
 ## 사용자 승인
 
 **2026-09-12 — slice 5B 종결 승인.** verifier r1 ready-for-review(산출물 high 0·medium 2·장부 medium 1·low 3) → 일괄 시정
