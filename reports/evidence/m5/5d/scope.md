@@ -148,3 +148,12 @@ rollback: |
 | `OPEN-ML-03` | `PriceFitness` NewType 분리로 승계(확률 자리에 대입 불가) |
 | `OPEN-ML-05`·`OPEN-ML-06`·`OPEN-SET-06` | D-M5-6·8 확정 반영 · 성숙도 값·판정은 Kotlin |
 | ADR 0001 §4.1 · milestone-5 5D 문면 | D-M5-9 (a) 개정 — 착수 커밋 |
+
+---
+
+## 계약 갱신 이력
+
+| 일자 | 갱신 | 사유 |
+| --- | --- | --- |
+| 2026-09-12 (verifier r1 뒤) | **⑦ 보강** — `LoadedArtifact` 생성은 `VerifiedBytes`(모듈 private) 를 **필수 인자**로 받아 manifest 만으로는 생성이 타입 오류(mypy strict 가 거부). **⑧ 보강** — `PolicyRejected` 불변식에 `clamp_min > 0`·`weight ≥ 0`·`min_predictive_std > 0`·`plausible_min < plausible_max` 추가(커널이 예외를 던질 정책 값은 로더가 거부). **D-5D-10 신설** — 경계 `Decimal` quantize 는 `ROUND_HALF_UP`(scale 4); legacy float `round()` 와 어긋나는 예(center 0.87465 → V2 0.8747) 는 **의도된 갈림**(legacy 출력은 정답이 아님) — checklist 알려진 제한. **③ 보강** — `UnmeasurableDetail` 에 `NO_GLOBAL_SAMPLES`(K5 global 표본 0) 추가, 추첨 detail 재사용 금지. **⑦ 보강** — manifest `residual_std`·수치 필드 비유한 → `ArtifactRejected`. **⑨ 보강** — golden test 는 case 마다 `verified_paths` 를 **단언**(`assert cases` 만은 무검증 초록), case 파일은 **평면 경로** `fixtures/expected/ml-kernel-NNN.json`(curator 관례). **acceptance 갱신** — S-5 는 `-m "not legacy_parity"` 로 판정, `legacy_parity` 는 별도 S-8(관측, exit 무관·기록만). **`pyproject.toml` mypy 에 `warn_unreachable = true`**(5A 소유 파일 hunk — `dict[str, JsonScalar]` 가 죽은 코드를 만든 것을 게이트가 잡도록), artifact.py 는 TypedDict/dataclass 파싱으로 죽은 구간 제거 | verifier r1 M-1(직접 생성 checksum 0회)·M-2(clamp_min ≤ 0 → 커널 ValueError 누출)·M-3(golden 무검증 초록)·M-4(mypy 죽은 코드 — `verify_feature_names` 호출이 unreachable)·L-1~L-4 |
+| 2026-09-12 (범위 판정) | **`OPEN-5D-DISTRIBUTION-ENGINE` 신설** — K5·K6·K7 → 후보 3 을 잇는 분포 엔진 조립(legacy `distribution.py`)은 5D in_scope 에 없다(verifier 판정: 계약 미충족이 아니라 범위 공백). ML-04 둘째 acceptance(수축 가중치가 응답 근거에)·golden 011·`segment_support` 폴백은 그 조립 slice 가 만족시킨다. 처분은 운영자 결정(추천: 5E 전 소형 slice 5D-2, predictor 선택 축 `PREFERRED_PREDICTOR` 포함) | verifier r1 범위 판정 · 구현 보고 #8·#9 |
