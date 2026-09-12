@@ -42,7 +42,6 @@ from ml_engine.training.encoding_oof import (
     out_of_fold_matrix_and_residuals,
 )
 from ml_engine.training.folds import fold_indices
-from ml_engine.training.matrix import TrainingMatrix, build_training_matrix
 from ml_engine.training.policy import (
     SHIPPED_TRAINING_POLICY_VERSION,
     PolicyRejected,
@@ -100,7 +99,6 @@ __all__ = [
     "TrainedArtifact",
     "TrainerFailed",
     "TrainerLike",
-    "TrainingMatrix",
     "TrainingPolicy",
     "TrainingRejected",
     "TrainingRejectionReason",
@@ -110,7 +108,6 @@ __all__ = [
     "admit_corpus",
     "admit_label",
     "booster_to_text",
-    "build_training_matrix",
     "derive_release_id",
     "fold_indices",
     "full_corpus_feature_space",

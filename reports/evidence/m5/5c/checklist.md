@@ -53,7 +53,7 @@ proto 를 건드리지 않았다.
 | `write_artifact(trained) -> ArtifactBytes \| NameMismatch \| CanonicalizationRejected`(verifier r1 H-1 뒤 — 인자 하나) | 연다 — 유일 조립 지점. `release`(`release_id`·`code_version`·`dataset_id`)는 전부 `trained` 자신의 필드에서만 파생된다(호출자 인자 경로 없음 — 우회 (12) 시그니처 차원 폐쇄). `TrainedArtifact(...)` 직접 생성(`booster` 필드에 임의 `BoosterLike` 주입, 또는 `dataset_id`/`code_version` 필드에 임의 값)으로 `feature_name()` 검증만 통과하면 임의 값을 실을 수 있다(알려진 제한 ①·②, 5B 「booster 텍스트는 자기서술」과 같은 갈래 — Python 가시성 한계는 여전하다, 다만 **write_artifact 의 별도 인자로 우회하는 경로는 없다**) |
 | `derive_release_id(*, dataset_id, training_spec_version, training_spec_checksum, seed, code_version) -> str`(verifier r1 H-1 뒤 — `ReleaseInputs` 타입 삭제) | 연다 — 순수 함수. 값 자체의 유효성(비어있음 등)은 각 값의 원 출처 타입이 이미 강제한다(`DatasetManifestV1`·`CodeVersion`·`TrainingSpec`) — 이 함수 자신은 재검증하지 않는다 |
 | `RejectedRowAccounting`·`with_missing_fact_rejections` | 연다 — 회계 필드 직접 조작으로 임의 계수를 `TrainedArtifact.rejected_rows`에 실을 수 있다(관례로만 방어, 알려진 제한 ①) |
-| 함수 전부(`load_dataset`·`admit_corpus`·`build_training_matrix`·`out_of_fold_matrix_and_residuals`·`full_corpus_feature_space`·`train_award_rate_gbm`·`write_artifact`·`derive_release_id`·`residual_std`·`fold_indices`) | 순수·결과 타입 반환 — 예외는 프로그래밍 오류(`TypeError`)와 `LightGbmTrainer.train` 안의 `lightgbm.basic.LightGBMError`(→ `TrainerFailed`)만 |
+| 함수 전부(`load_dataset`·`admit_corpus`·`out_of_fold_matrix_and_residuals`·`full_corpus_feature_space`·`train_award_rate_gbm`·`write_artifact`·`derive_release_id`·`residual_std`·`fold_indices`) | 순수·결과 타입 반환 — 예외는 프로그래밍 오류(`TypeError`)와 `LightGbmTrainer.train` 안의 `lightgbm.basic.LightGBMError`(→ `TrainerFailed`)만. `build_training_matrix`는 verifier r1 M-1 뒤 삭제(아래) |
 
 **「object 커널을 세야 할 때 무엇을 주입하는가」**(v2-slice-pipeline 고정 항목) — 이 slice 에
 `object`류 커널은 없다(카운터 상태 없음, 모든 학습은 무상태 순수 함수 + `TrainerLike` 주입).
@@ -118,6 +118,21 @@ proto 를 건드리지 않았다.
 - pytest 마커 `legacy_parity` 등록.
 - hypothesis `ci` 프로파일이 `tests/conftest.py`(루트)로 승격 — 스위트 전체가 이제 이 프로파일을
   물려받는다(5B 인수 해소, 부작용 없음 확인 — S-5 전건 통과).
+
+## verifier r1 수정 라운드가 만든/지운 public 표면
+
+- **지웠다** — `ml_engine.training.matrix`(`build_training_matrix`·`TrainingMatrix`, M-1).
+  `src/` 안 production 호출부가 없었고(`encoding_oof.py`가 자체 로직으로 학습 행렬을
+  조립한다), 전 구간 인코딩 공간을 넘기면 누수 행렬을 그대로 내는 위험한 public 경로였다.
+  `training/__init__.py` `__all__`에서도 제거.
+- **지웠다** — `ml_engine.training.release.ReleaseInputs`(H-1). `derive_release_id`는 이제
+  다섯 값을 키워드 인자로 직접 받는다(래핑 타입 없음).
+- **좁혔다** — `write_artifact(trained, release_inputs)` → `write_artifact(trained)`(H-1).
+  `release` 신원의 다섯 입력이 전부 `trained` 자신에서만 파생되도록 시그니처 자체가 바뀌었다
+  — 호출자가 별도로 `dataset_id`/`code_version`/`seed`를 실어 보낼 경로가 사라졌다.
+- **강화했다** — ⑫ import-linter forbidden 계약의 존재를 `tests/gates/test_import_contracts.py`가
+  이제 실제 `pyproject.toml`을 tomllib 로 읽어 직접 검증한다(H-3). `bad_features_db/` fixture는
+  더 이상 자기 계약을 갖지 않고 실제 계약을 임시 사본에 복사해 실행한다.
 
 ## 인계(팀장/타 레인)
 
