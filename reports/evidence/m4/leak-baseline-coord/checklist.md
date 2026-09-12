@@ -37,7 +37,10 @@ TooManyFunctions(11)·ThrowsCount(2) 기존 래칫을 낮추거나 예외 처리
 
 ## secret 스캔
 
-commands.md "secret 스캔" 항목 — evidence 디렉토리 매치 없음, 육안 확인 병기.
+commands.md "secret 스캔" 항목 — 문서 작성 전엔 매치 없음, 작성 후엔 이 문서 자신의
+스캔 명령·절 제목 인용으로 4건 매치(카테고리 a/b, 실유출 아님) — 검토 후
+`leak-pattern-baseline.txt` 에 등재해 `leakPatternGate` 를 `new=0` 으로 복귀시켰다.
+육안 확인 병기(telegram id·사업자 정보 없음).
 
 ## 알려진 제한
 

@@ -112,10 +112,49 @@ head_sha: 1ef5d73a024c25a95555a0f210cfe21c0bea9606
 
 ## secret 스캔 — evidence 디렉토리
 
-## 2026-09-12T01:23Z
+## 2026-09-12T01:23Z (commands.md/checklist.md/rollback.md 작성 전)
 - cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/leak-baseline-coord/`
 - exit: 1 (grep 관례상 매치 없음일 때 1)
-- 핵심 결과: 매치 없음 — 통과. 육안 확인: 본 문서는 SHA-256 hex(공개 알고리즘 출력물)와 파일 경로만 담고, telegram id·사업자 정보 없음.
+- 핵심 결과: 이 시점엔 디렉터리에 `scope.md` 뿐이라 매치 없음.
+
+## 2026-09-12T01:26Z (commands.md/checklist.md 작성 후 — 이 절 자신이 스캔 명령·"secret 스캔" 절 제목을 인용해 재매치)
+- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m4/leak-baseline-coord/`
+- exit: 0
+- 핵심 결과: 4건 매치 — 전부 이 문서 자신이 스캔 명령을 인용하거나("cmd: \`grep ...\`") 절 제목으로 "secret"을 담은 것(카테고리 a/b, baseline 머리말 참조). 실제 비밀값 아님. `leakPatternGate` 도 같은 4건을 새 매치로 잡았고, 검토 후 baseline 에 등재해 재실행 시 `new=0` 복귀시켰다(아래 항목). 육안 확인: telegram id·사업자 정보 없음.
+
+## leakPatternGate 재실행 — 자기 인용 baseline 등재 뒤
+
+## 2026-09-12T01:26Z
+- cmd: `./gradlew leakPatternGate --no-daemon` (baseline 에 위 4건 키 추가 전)
+- exit: 1
+- 핵심 결과: 새 evidence 문서 자신의 "secret 스캔" 절 제목·명령 인용 4건이 `new:`로 잡힘(예상된 자기매치 — `LeakPatternGateTask` KDoc의 "자기매치 함정 (2)"과 동일 성격).
+- cmd: 위 4개 키를 `config/quality/leak-pattern-baseline.txt` 에 등재 후 `./gradlew leakPatternGate --no-daemon`
+- exit: 0
+- 핵심 결과: `patterns=6 baseline=272 matches=294 keys=272 new=0 stale_baseline=0`.
+- cmd: `./gradlew --no-daemon check`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL` — evidence 커밋 포함 최종 상태에서 전건 재확인.
+
+## 두 번째 자기매치 라운드 — 위 절 자체를 쓰면서 새로 생긴 인용 4건
+
+commands.md 를 채우는 서술 자체가 "secret 스캔"·"cmd: `grep ...`" 같은 어휘를 담아 매
+편집마다 `leakPatternGate` 가 새 키를 잡는다(이 문서가 자기 자신을 다루는 한 원리적으로
+끝나지 않는 루프 — 그래서 이 라운드를 마지막으로 하고 이후 새 서술을 덧붙이지 않는다).
+
+## 2026-09-12T01:27Z
+- cmd: `./gradlew leakPatternGate --no-daemon` (위 블록 편집 직후)
+- exit: 1
+- 핵심 결과: 신규 4건 `new:`(편집한 줄의 내용이 바뀌어 새 키 발생 — S-6 과 같은 성질).
+- cmd: 4개 신규 키를 baseline 에 추가 후 재실행
+- exit: 0
+- 핵심 결과: `new=0`, `stale_baseline=1`(이전 라운드에서 등재한 키 하나가 편집으로 내용이
+  바뀌어 죽음 — 같은 slice 안에서 즉시 발생한 stale 이라 정리).
+- cmd: 그 죽은 stale 키 한 줄을 baseline 에서 제거 후 재실행
+- exit: 0
+- 핵심 결과: `patterns=6 baseline=275 matches=298 keys=275 new=0 stale_baseline=0`.
+- cmd: `./gradlew --no-daemon check`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`(최종 확정 상태).
 
 ## rollback 검증 — 임시 clone
 
