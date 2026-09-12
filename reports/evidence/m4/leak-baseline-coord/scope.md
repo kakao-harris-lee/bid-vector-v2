@@ -2,16 +2,17 @@
 milestone: M4
 slice: leak-baseline-coord
 base_sha: a6ab6a8dc4c5304ce91f5ae5b591eb0e4c0a0b95
-head_sha: 1ef5d73a024c25a95555a0f210cfe21c0bea9606
+head_sha: 2684e088c195a5aa0c2a108a0256d04d33522265
 in_scope:
   - build-logic/src/main/kotlin/bidvector/buildlogic/LeakPatternGateChecks.kt
+  - build-logic/src/main/kotlin/bidvector/buildlogic/LeakPatternGateTask.kt
   - build-logic/src/test/kotlin/bidvector/buildlogic/LeakPatternGateChecksTest.kt
   - config/quality/leak-pattern-baseline.txt
   - reports/evidence/m4/leak-baseline-coord/
 out_of_scope:
   - config/quality/leak-patterns.txt          # 패턴 어휘 불변
-  - build-logic/.../LeakPatternGateTask.kt    # 스캔 대상·제외 목록 불변 (키 산출 위임만 허용)
   - reports/evidence/ 아래 다른 slice 문서     # 매치 대상 문서를 고쳐서 통과시키지 않는다
+  - 게이트 배선(.gradle.kts)                   # 스캔 대상·제외 목록 불변
 acceptance_commands:
   - ./gradlew :build-logic:test --tests '*LeakPatternGateChecksTest*'
   - ./gradlew leakPatternGate --no-daemon
@@ -26,8 +27,24 @@ rollback: config/quality/leak-pattern-baseline.txt 와 LeakPatternGateChecks.kt 
 **바꾸는 것 하나**: baseline 이 승인된 매치를 식별하는 **키**. `경로:줄번호` → `경로` + `정규화한
 줄 내용의 해시`.
 
-**바꾸지 않는 것**: 어떤 줄이 매치인가(패턴·스캔 대상·제외 목록), 무엇이 게이트를 실패시키는가
-(baseline 밖의 새 매치만), stale 항목의 처분(보고만 하고 실패시키지 않음).
+**바꾸지 않는 것**: 어떤 줄이 매치인가(패턴·스캔 대상·제외 목록), 실패 **규칙**(baseline 밖의
+새 키만), stale 항목의 처분(보고만 하고 실패시키지 않음).
+
+**바뀌는 것 하나 더 — 승인의 의미가 넓어진다(정정 2026-09-12, verifier T-5 ①).** 이 계약의 첫
+판은 「무엇이 게이트를 실패시키는가를 바꾸지 않는다」고 적었는데 **거짓이다.** 키가 좌표에서
+내용으로 옮기면 승인의 단위도 함께 옮긴다 —
+
+| | 옛 키 | 새 키 |
+| --- | --- | --- |
+| 승인 단위 | **그 경로의 그 줄 번호 1회** | **그 경로의 그 내용, 위치·횟수 무관** |
+| 승인된 줄을 같은 파일에 복제 | 새 좌표라 **막힌다** | 같은 키라 **통과한다** |
+| 승인된 줄을 지웠다 다른 위치에 부활 | 새 좌표라 **막힌다** | 같은 키라 **통과한다**(stale 도 안 뜬다) |
+
+verifier 가 base/head 두 트리에서 실행으로 대조했다(복제: base exit 1 / head exit 0).
+**이것은 설계가 의도한 것이다**(설계 검토 우회 ②: 「같은 글자는 같은 판단이다」) — 고칠 것은
+설계가 아니라 이 문장이었다. 다만 **대가를 명시한다**: 오탐 하나를 승인하면 그 파일 안에서
+그 문자열은 영구·무제한으로 허용된다. 실유출을 잘못 승인했다면 그 복제도 함께 허용된다 —
+**baseline 등재는 이제 더 무거운 결정**이고, 그 판정은 여전히 `privacy-gate` 몫이다.
 
 ### D-LBC-1 — 키는 `경로` + `정규화 줄 내용 해시`
 
@@ -63,7 +80,7 @@ new 0** — 정확히 동기라 변환이 무손실이다. 변환 결과는 **26
 
 | # | 기준 | 어떻게 잰다 |
 | --- | --- | --- |
-| S-1 | **매치 집합 불변** — 매치한 줄 290 이 변경 전후 동일 | base 와 head 두 트리에서 매치 줄 목록을 내어 대조 |
+| S-1 | **매치 집합 불변** — **두 트리에 공통으로 존재하는 파일**에 대해 매치한 줄 집합이 동일(base 290 = head 에서 이 slice 신규 evidence 를 뺀 290) | base 와 head 두 트리에서 매치 줄 목록을 내어 공통 파일 한정 대조 |
 | S-2 | 변환 뒤 `leakPatternGate` 가 new 0 · stale 0 | 보고서 실측 |
 | S-3 | 위쪽 줄 삽입이 승인을 무효화하지 않는다 | baseline 에 있는 매치 줄 **위에** 줄을 넣고 게이트 재실행 → 여전히 통과 (PR #7 재현 시나리오) |
 | S-4 | 다른 파일에 같은 글자를 넣으면 막힌다 | 승인된 줄을 다른 evidence 파일에 복사 → new 로 잡힘 |
