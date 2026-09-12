@@ -7,12 +7,12 @@
 레인 소유 evidence 라 대상에 포함, 경로는 디렉터리가 아니라 **단일 파일**로 명시한다 —
 디렉터리로 넓히면 위 제외 대상(scope.md 등)까지 걸려 들어온다).
 
-base = `cc90f7060c3df2a002450420d1fc3de952d9b612`, 코드 마지막 커밋 = `2685fe5`(verifier r1
-M-1/M-2/L-1 수정 포함 — 파일 집합은 최초 코드 커밋 `abf5951` 때와 동일, 기존 파일 수정만
-추가됐다).
+base = `cc90f7060c3df2a002450420d1fc3de952d9b612`, 코드 마지막 커밋 = `7d30f3e`(PR #10 리뷰
+MEDIUM/LOW 수정 포함 — `ml-engine/tests/features/conftest.py` 신설 한 파일만 늘었고
+나머지 파일 집합은 최초 코드 커밋 `abf5951` 때와 동일, 기존 파일 수정만 추가됐다).
 
 ```
-$ git diff --name-status cc90f7060c3df2a002450420d1fc3de952d9b612..2685fe5 \
+$ git diff --name-status cc90f7060c3df2a002450420d1fc3de952d9b612..7d30f3e \
     -- ml-engine/src/ml_engine/features ml-engine/tests/features reports/evidence/m5/5b/reuse.md
 M       ml-engine/src/ml_engine/features/__init__.py
 A       ml-engine/src/ml_engine/features/encoding.py
@@ -23,6 +23,7 @@ A       ml-engine/src/ml_engine/features/rows.py
 A       ml-engine/src/ml_engine/features/schema.py
 A       ml-engine/src/ml_engine/features/shrinkage.py
 A       ml-engine/src/ml_engine/features/vocabulary.py
+A       ml-engine/tests/features/conftest.py
 A       ml-engine/tests/features/test_encoding.py
 A       ml-engine/tests/features/test_facts.py
 A       ml-engine/tests/features/test_manifest.py
@@ -54,7 +55,24 @@ git restore --source=cc90f7060c3df2a002450420d1fc3de952d9b612 --staged --worktre
 `pyproject.toml`은 이 slice에서 편집하지 않았다(S-9 대조 외 변경 없음) — 공유 파일 hunk
 격리 대상 아님.
 
-## 임시 clone 실측(2026-09-12 재실측 — verifier r1 M-3 수정 뒤, `git clone --no-hardlinks`)
+## 임시 clone 재실측(2026-09-12, PR #10 리뷰 MEDIUM/LOW 수정 뒤 — `git clone --no-hardlinks`)
+
+`ml-engine/tests/features/conftest.py`(hypothesis CI 프로파일, LOW 수정 신설)가 늘었지만
+되돌리기 명령은 그대로다 — `rm -rf ml-engine/tests/features`가 디렉터리째 지우므로 새
+파일도 자동으로 걸린다(개별 `rm -f` 목록 갱신 불필요).
+
+1. `/tmp/5b-rollback-check3`에 `git clone --no-hardlinks`(HEAD `7d30f3e`).
+2. 되돌리기 명령 실행 → `git status --short`가 신설 9(conftest.py 포함)+8+1=18개 삭제
+   + `__init__.py` 수정만 보임.
+3. `git diff cc90f7060c3df2a002450420d1fc3de952d9b612 -- ml-engine/src/ml_engine/features
+   ml-engine/tests/features reports/evidence/m5/5b/reuse.md | wc -l`(작업트리 diff,
+   `--cached` 없음) → **0**.
+4. `cd ml-engine && uv sync --frozen --all-extras && uv run python -m pytest tests -q` →
+   **156 passed**(5A 원래 카운트로 정확히 복귀).
+5. `uv run mypy --strict src/ml_engine` → `Success: no issues found in 10 source files`.
+6. `uv run lint-imports` → `Contracts: 5 kept, 0 broken`.
+
+## 임시 clone 실측(2026-09-12 — verifier r1 M-3 수정 뒤, `git clone --no-hardlinks`)
 
 **verifier r1 M-3**: 이전 판의 확인 명령이 `git diff --cached <base> -- <경로>`였다 —
 `rm`은 삭제를 스테이징하지 않으므로(`git add`를 부르지 않는 한) 그 명령은 항상 **작업

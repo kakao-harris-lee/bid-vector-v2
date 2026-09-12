@@ -8,7 +8,7 @@
 | D-5B-2 | `denominator_source` 어휘 = wire `BaseAmountProvenanceLabel` 5값(UNSPECIFIED 제외), legacy 4값 미이식 | `vocabulary.py::denominator_source_vocabulary`(enum `.keys()`에서 직접 도출, 리터럴 나열 없음) · `test_vocabulary.py::test_denominator_source_vocabulary_derived_from_enum_not_literal`(구조 대조) |
 | D-5B-3 | 결측·미지 = NaN + provenance, 기초금액·분모 결측 = 행 거부, `agency` 결측≠미관측 구별 | `rows.py::AwardRateFeatureSpace.build_row`(`_categorical_column`·`_agency_columns`) · `test_rows.py`(규칙표 전건 + `test_nan_position_equals_provenance_missing_or_oov_position` + `test_build_row_unobserved_agency_sample_count_is_zero_not_missing`) |
 | D-5B-4 | `Money` 5성분 검증(currency KRW·basis BASE_AMOUNT·provenance≠UNSPECIFIED·amount_won>0) | `facts.py::_resolve_base_amount` · `test_facts.py`(basis/currency/provenance/amount 각각 개별 거부 test 4개 + legacy clamp 제거 확인) |
-| D-5B-5 | checksum = sha256(canonical JSON) hex 소문자 64, canonical = 키 정렬·구분자 고정·float repr, **입력 순서 무관**(verifier r1 M-1) | `manifest.py::canonical_json`·`compute_checksum`·`FeatureManifest.__post_init__`(`categories`·`denominator_sources`·`agency_means`·`category_means`를 키 기준 정렬) · `test_manifest.py`(결정성·키 순서 무관·float 민감·hex 64 소문자 + `test_manifest_sorts_agency_and_category_means_regardless_of_input_order`·`test_manifest_post_init_stores_sorted_tuples`·`test_manifest_different_content_still_yields_different_checksum` 3개 신규) |
+| D-5B-5 | checksum = sha256(canonical JSON) hex 소문자 64, canonical = 키 정렬·구분자 고정·float repr, **입력 순서 무관**(verifier r1 M-1), **NaN/Infinity fail-closed**(PR #10 리뷰 MEDIUM) | `manifest.py::canonical_json`·`compute_checksum`·`FeatureManifest.__post_init__`(`categories`·`denominator_sources`·`agency_means`·`category_means`를 키 기준 정렬) · `_first_non_finite_path` + `json.dumps(..., allow_nan=False)` → `CanonicalizationRejected(NonFiniteValue(path))`(비표준 JSON 리터럴을 예외가 아니라 결과 타입으로 막는다) · `test_manifest.py`(결정성·키 순서 무관·float 민감·hex 64 소문자 + 정렬 불변식 3개 + NaN/Infinity 거부 6개(`global_mean`·`agency_means[].mean`·`category_means[].mean`·`agency_prior_strength`·`compute_checksum`/`verify_manifest` 전파 2개) + 정상 경로 무영향 확인 1개) |
 | D-5B-6 | 수축 원시 연산(`pseudo_count_weight`·`shrink_toward`)은 `features/shrinkage.py`(최하층, 5D 재사용 대상) | `shrinkage.py`(legacy `assessment_shrinkage.py` 원시 연산 2개만 이식) · `encoding.py`가 그 모듈을 import(중복 없음, layers 게이트가 `features`끼리의 내부 import는 제한하지 않음 — `contracts`만 금지 대상) |
 | D-5B-7 | κ 둘은 `EncodingPolicy` 필수 인자(기본값 없음), 출하값은 legacy-behavior 승인값 | `encoding.py::EncodingPolicy`(dataclass, 기본값 없음) · `SHIPPED_ENCODING_POLICY = EncodingPolicy(12.0, 40.0)` · `test_encoding.py::test_encoding_policy_requires_both_kappas_no_defaults`(`inspect.signature` 로 기본값 부재 확인) · `policy-values.md` §1 값과 일치(`test_shipped_encoding_policy_matches_policy_values_md`) |
 | D-5B-8 | `verify_feature_names`(fail-closed 대조) · `require_declared`(`sample_scope` 기본값 금지) | `schema.py::verify_feature_names` → `Verified \| NameMismatch` · `require_declared` → `T \| Undeclared` · `test_schema.py`(양방향 대조 3개) · `test_require_declared.py`(None/값/falsy 0 구분 3개) |
@@ -25,6 +25,7 @@
 | `Vocabulary` | `__post_init__` 불변식(정렬·중복 없음) — **닫는다** |
 | `FeatureManifest`·`ManifestColumn`·`ManifestAgencyMean`·`ManifestCategoryMean` | 연다(원시 데이터 구조 직접 생성 자체는 막지 않는다) — 다만 `__post_init__`이 `categories`·`denominator_sources`·`agency_means`·`category_means`를 강제 정렬해 **입력 순서와 무관하게 같은 checksum**을 내도록 닫는다(verifier r1 M-1, `Vocabulary`와 같은 갈래). `canonical_json`이 유일한 직렬화 진입점 |
 | **`EncodingOutcome`(`Built`\|`NoObservations`, 신규 — verifier r1 M-2)** | `build_agency_target_encoding`의 반환이 여는 표면 — 연다(호출부가 `Built`를 풀지 않고 `AgencyTargetEncoding(agency_means={}, category_means={}, global_mean=0.0)`을 직접 만들면 `NoObservations` 가드를 그대로 우회할 수 있다, ①과 같은 Python 가시성 한계). 5C의 빈 코퍼스 가드가 이 결과 타입을 실제로 분기하는지는 5C verifier 대상 |
+| **`CanonicalizationRejected`(`NonFiniteValue`, 신규 — PR #10 리뷰 MEDIUM)** | `canonical_json`/`compute_checksum`/`verify_manifest`의 반환이 여는 표면 — 연다(순수 결과 타입, 강제할 대상 없음). `FeatureManifest`를 직접 만들어 `NaN`/`Infinity`를 담아도 이 결과 타입이 항상 걸러낸다는 점에서 ①·`EncodingOutcome`과 달리 **우회 경로가 없다** — 값 자체(`math.isfinite`)만 보므로 누가 어떻게 만들었는지와 무관하다 |
 | 함수 전부(`build_row`·`from_proto`·`build_agency_target_encoding`·`canonical_json`·`verify_manifest`·`verify_feature_names`·`require_declared`) | 순수·결과 타입 반환 — 예외는 프로그래밍 오류(잘못된 타입 전달 시 `TypeError`)만, 표 안의 도메인 오류는 전부 결과 타입 |
 
 **새로 여는 것 중 별도 게이트가 없는 자리**: `FeatureFacts`·`FeatureRow`·`AwardRateFeatureSpace`
@@ -74,7 +75,16 @@ r1 L-1 — `test_rows.py`의 `_assert_observed_values_within_schema_range`가 `O
    있으려면 **입력 관측값 자체가 `[0, 1]` 안이어야 하는데, `AwardRateObservation.value:
    float`에는 그 검증이 없다**(verifier r2 probe — 관측 `1.2`를 넣으면 수축 평균이 range
    밖으로 나간다, 실측 확인). 관측값의 도메인(낙찰률은 비율이라 `[0, 1]`)을 검증하는 것은
-   이 slice가 아니라 **코퍼스를 조립하는 5C의 인수**다(`OPEN-5B-OBSERVATION-DOMAIN`).
+   이 slice가 아니라 **코퍼스를 조립하는 5C의 인수**다(`OPEN-5B-OBSERVATION-DOMAIN`). 이
+   범위 밖 값은 여전히 **유한한 float**다 — `1.2`가 checksum 을 오염시키거나 비표준 JSON
+   리터럴을 만들지는 않는다(#8 참조, PR #10 리뷰 MEDIUM 이 막는 것은 `NaN`/`Infinity`뿐).
+8. **`canonical_json`의 fail-closed 는 `math.isfinite` 검사에 한정된다**(PR #10 리뷰
+   MEDIUM) — `NaN`/`Infinity`가 `global_mean`·`agency_means[].mean`·`category_means[].mean`·
+   두 κ 에 들어오면 `CanonicalizationRejected(NonFiniteValue(path))`로 거부해 비표준 JSON
+   리터럴이 checksum 뒤로 조용히 새는 것을 막는다. 그러나 **범위를 벗어났지만 유한한 값**
+   (예: 관측값 `1.2`가 만드는 수축 평균 `1.2`)은 이 검사를 통과한다 — #7의 관측값 도메인
+   문제와는 다른 층이다(하나는 「값이 유효한 비트열인가」, 하나는 「값이 도메인 안인가」).
+   두 문제를 섞어 「NaN 검사가 도메인 검증까지 겸한다」고 읽지 않는다.
 
 ## OPEN 갱신
 
@@ -93,10 +103,12 @@ r1 L-1 — `test_rows.py`의 `_assert_observed_values_within_schema_range`가 `O
 - **`OPEN-5B-OBSERVATION-DOMAIN`(신설, verifier r2 low)**: `AwardRateObservation.value: float`
   에 도메인 검증이 없다 — 관측값이 `[0, 1]`(낙찰률 축) 밖이면 `build_agency_target_encoding`
   의 수축 평균(`agency_encoding`)도 `FeatureColumn.range`가 선언한 `[0, 1]`을 벗어날 수
-  있다(실측: 관측 `1.2` 주입 → range 밖 값). `features/encoding.py`는 신뢰할 수 있는
-  코퍼스가 이미 주어졌다고 가정하는 순수 변환이라 5B out_of_scope — **코퍼스를 조립하는
-  5C 착수 계약이 관측값 도메인 검증(또는 그 근거)을 인수**해야 한다. 해소 조건: 5C 착수
-  계약에 이 OPEN을 인수 항목으로 명시.
+  있다(실측: 관측 `1.2` 주입 → range 밖이지만 **유한한** 값 `1.2`). `features/encoding.py`는
+  신뢰할 수 있는 코퍼스가 이미 주어졌다고 가정하는 순수 변환이라 5B out_of_scope —
+  **코퍼스를 조립하는 5C 착수 계약이 관측값 도메인 검증(또는 그 근거)을 인수**해야 한다.
+  이 OPEN은 checksum·JSON 형식과는 무관하다 — 범위를 벗어난 값이 비표준 JSON 리터럴을
+  만들지는 않는다(그 경로는 PR #10 리뷰 MEDIUM 이 `CanonicalizationRejected`로 이미
+  닫았다, checklist 알려진 제한 #8). 해소 조건: 5C 착수 계약에 이 OPEN을 인수 항목으로 명시.
 
 ## 사용자 승인
 
