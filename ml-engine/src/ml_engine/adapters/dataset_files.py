@@ -1,0 +1,61 @@
+"""`ml_engine.adapters.dataset_files` — dataset 파일 읽기(D-5C-8, scope ①). `file://`
+경로만 지원한다 — 네트워크 0, `import-linter` forbidden 계약이 이 패키지에서 DB/HTTP
+를 막는다(⑫는 `training`만 겨눈다 — `adapters`는 그 forbidden 밖이지만 이 모듈 자체가
+파일시스템만 만진다). dataset 은 디렉터리 하나(`manifest.json` + `rows.jsonl`).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import StrEnum
+from pathlib import Path
+from urllib.parse import urlparse
+
+
+@dataclass(frozen=True)
+class DatasetFiles:
+    manifest_bytes: bytes
+    rows_bytes: bytes
+
+
+class DatasetUnreadableReason(StrEnum):
+    UNSUPPORTED_SCHEME = "UNSUPPORTED_SCHEME"
+    NOT_FOUND = "NOT_FOUND"
+    NOT_A_DIRECTORY = "NOT_A_DIRECTORY"
+
+
+@dataclass(frozen=True)
+class DatasetUnreadable:
+    reason: DatasetUnreadableReason
+    detail: str
+
+
+def read_dataset_files(uri: str) -> DatasetFiles | DatasetUnreadable:
+    """`file://<dir>`의 `manifest.json`·`rows.jsonl` 두 파일을 읽는다. 다른 scheme 은
+    fail-closed(D-5C-8 — scheme 확정은 `OPEN-2C-DATASET-URI-SCHEME`, 이 slice 는
+    `file://`만). 경로 탈출(`..`)은 `resolve()` 뒤 scheme 검사만 한다 — 권한 검증은
+    M6 소관(scope out_of_scope)."""
+    parsed = urlparse(uri)
+    if parsed.scheme != "file":
+        return DatasetUnreadable(
+            DatasetUnreadableReason.UNSUPPORTED_SCHEME, parsed.scheme
+        )
+
+    directory = Path(parsed.path).resolve()
+    if not directory.exists():
+        return DatasetUnreadable(DatasetUnreadableReason.NOT_FOUND, str(directory))
+    if not directory.is_dir():
+        return DatasetUnreadable(
+            DatasetUnreadableReason.NOT_A_DIRECTORY, str(directory)
+        )
+
+    manifest_path = directory / "manifest.json"
+    rows_path = directory / "rows.jsonl"
+    if not manifest_path.is_file():
+        return DatasetUnreadable(DatasetUnreadableReason.NOT_FOUND, str(manifest_path))
+    if not rows_path.is_file():
+        return DatasetUnreadable(DatasetUnreadableReason.NOT_FOUND, str(rows_path))
+
+    return DatasetFiles(
+        manifest_bytes=manifest_path.read_bytes(), rows_bytes=rows_path.read_bytes()
+    )
