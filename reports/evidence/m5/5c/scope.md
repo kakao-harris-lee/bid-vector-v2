@@ -31,7 +31,8 @@ in_scope:
   - ml-engine/tests/adapters/**
   - ml-engine/tests/gates/fixtures/bad_features_db/**       # 양성 대조 — `features` 가 sqlalchemy 를 import 하면 lint-imports 가 붉어짐(OPEN-5B-FEATURES-FORBIDDEN 해소 증거)
   - ml-engine/tests/gates/test_import_contracts.py          # 위 fixture 를 도는 test 1 추가(기존 test 무편집)
-  - ml-engine/tests/conftest.py                             # hypothesis `ci` 프로파일을 루트로 승격(5B 인수 — `tests/features/conftest.py` 는 삭제) — 5A 소유 파일, hunk 격리 대상
+  - ml-engine/tests/conftest.py                             # hypothesis `ci` 프로파일을 루트로 승격(5B 인수) — 5A 소유 파일, hunk 격리 대상
+  - ml-engine/tests/features/conftest.py                    # 삭제(D) — 프로파일이 루트로 올라가며 비어지는 5B 파일(verifier r2 L-8: 독립 항목으로 등재)
   - ml-engine/uv.lock                                       # (b) 의 결과 — `pyyaml` 이 training extras 로 들어가며 lock 이 바뀐다(verifier r1 M-3: 착수판 미선언)
   - ml-engine/pyproject.toml                                # (a) import-linter forbidden 계약 신설 「features·training·evaluation·registry 는 DB·HTTP·celery 를 모른다」(OPEN-5B-FEATURES-FORBIDDEN) (b) `training` extras 에 `pyyaml` (c) pytest 마커 `legacy_parity` 등록 — **`[tool.ruff.lint] select` 무편집**(5D 가 `BLE` 를 더한다 — 「레인 격리」) · 래칫 한도·allowlist 무편집
   - milestone-5.md                                          # 5C 절 착수 문단 + 5C 문면 개정(D-5C-1, 운영자 확인 대기 표기)
