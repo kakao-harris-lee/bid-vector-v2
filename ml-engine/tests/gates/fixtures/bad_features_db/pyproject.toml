@@ -1,13 +1,8 @@
-# M5/5C-1 ⑫ 양성 대조 — 실제 `ml-engine/pyproject.toml`의 신설 forbidden 계약(D-5C-13)과
-# 같은 형태를 독립 미니 프로젝트에 적용한다. `ml_engine/features/__init__.py`가 의도적으로
-# `sqlalchemy`를 import 해서 `lint-imports --config`가 이 파일을 가리키면 exit 0 이 아니어야
-# 한다(`tests/gates/test_import_contracts.py`).
+# M5/5C-1 ⑫ 양성 대조(verifier r1 H-3 뒤) — 이 fixture 는 **자기 forbidden 계약을 갖지
+# 않는다**. `test_import_contracts.py::test_bad_features_db_fixture_is_broken_by_lint_imports`
+# 가 실제 `ml-engine/pyproject.toml`에서 계약을 읽어 이 파일의 **임시 사본**에 덧쓴 뒤
+# 실행한다 — 실제 계약이 지워지면 이 fixture 도 「계약 없음」이 되어 그 test 가 먼저
+# 붉어진다(계약의 존재 자체를 실제 파일에 의존시킨다).
 [tool.importlinter]
 root_packages = ["ml_engine"]
 include_external_packages = true
-
-[[tool.importlinter.contracts]]
-name = "features 는 DB 모듈을 모른다(양성 대조)"
-type = "forbidden"
-source_modules = ["ml_engine.features"]
-forbidden_modules = ["sqlalchemy"]
