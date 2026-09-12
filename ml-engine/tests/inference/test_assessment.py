@@ -81,7 +81,8 @@ def test_global_level_sample_count_below_one_is_unmeasurable(
     )
     assert isinstance(result, Unmeasurable)
     assert result.reason is UnmeasurableReason.INSUFFICIENT_SAMPLES
-    assert result.detail is UnmeasurableDetail.TOO_FEW_DRAWS
+    # verifier r1 L-2 — K5 global 표본 0 은 K6 추첨 축과 다른 detail(재사용 금지).
+    assert result.detail is UnmeasurableDetail.NO_GLOBAL_SAMPLES
 
 
 @pytest.mark.legacy_parity
@@ -100,6 +101,8 @@ def test_missing_levels_fall_through_with_zero_weight(policy: InferencePolicy) -
 
 @pytest.mark.legacy_parity
 def test_three_level_shrinkage_weights_sum_to_one(policy: InferencePolicy) -> None:
+    """legacy-behavior — 3계층 수축의 자기 가중치 합은 정확히 1(회귀 관측, 판정 근거
+    아님 — S-8 관측 전용, verifier r1 L-4)."""
     global_level = LevelObservation(sample_count=1000, mean=1.0, variance=0.02)
     category_level = LevelObservation(sample_count=50, mean=1.02, variance=0.015)
     agency_level = LevelObservation(sample_count=9, mean=1.05, variance=0.01)

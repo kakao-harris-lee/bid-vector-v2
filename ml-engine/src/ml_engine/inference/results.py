@@ -45,6 +45,9 @@ class UnmeasurableDetail(StrEnum):
     DEGENERATE_VARIANCE = "DEGENERATE_VARIANCE"
     TOO_FEW_DRAWS = "TOO_FEW_DRAWS"
     ROW_REJECTED = "ROW_REJECTED"
+    # verifier r1 L-2 — K5 global 표본 0 은 추첨(K6) 축의 `TOO_FEW_DRAWS`와 다른 사유다
+    # (위협 모델 (b) 「두 사유 합침」의 약한 형태였다 — 재사용하지 않는다).
+    NO_GLOBAL_SAMPLES = "NO_GLOBAL_SAMPLES"
 
 
 @dataclass(frozen=True)

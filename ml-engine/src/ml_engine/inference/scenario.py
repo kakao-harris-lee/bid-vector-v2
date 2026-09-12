@@ -15,7 +15,7 @@ DEGENERATE_VARIANCE)`다(margin 을 지어내지 않는다) — 이 판단은 `r
 
 from __future__ import annotations
 
-from decimal import ROUND_HALF_EVEN, Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from math import isfinite
 
 from ml_engine.inference.policy import InferencePolicy
@@ -37,10 +37,14 @@ _LABELS: tuple[CandidateLabel, CandidateLabel, CandidateLabel] = (
 
 
 def _quantize_bid_rate(value: float, digits: int) -> Decimal:
-    """`Decimal(str(x))`(D-5D-1) 뒤 정책 자릿수로 quantize — legacy `round(rate, 4)`와
-    같은 반올림 규칙(`ROUND_HALF_EVEN`, Python `round()`의 기본 규칙과 일치)."""
+    """`Decimal(str(x))`(D-5D-1) 뒤 정책 자릿수로 `ROUND_HALF_UP`(D-5D-10) — legacy
+    `round(rate, 4)`는 Python 기본 규칙(banker's rounding, `ROUND_HALF_EVEN`)이라 정확히
+    0.5 인 자리에서 갈릴 수 있다(예: center `0.87465` → legacy `0.8747`, 여기 `0.8746`
+    이전 판). **의도된 갈림**이다(D-5D-10, verifier r1 L-1) — legacy 출력은 정답이 아니고
+    (CLAUDE.md 운영자 지시), `ROUND_HALF_UP`이 사람이 기대하는 「절반은 올림」 규칙과
+    일치해 golden corpus 기대값 생성 규약과도 맞춘다."""
     quantum = Decimal(1).scaleb(-digits)
-    return Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_EVEN)
+    return Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP)
 
 
 def build_scenario_candidates(

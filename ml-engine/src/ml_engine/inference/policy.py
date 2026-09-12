@@ -168,7 +168,13 @@ def _coerce_values(
 
 
 def _validate_bands(raw: InferencePolicy) -> str | None:
-    """밴드 하한 < 상한 불변식(D-5D-8) — 위반 시 사유 문자열, 통과 시 `None`."""
+    """밴드 하한 < 상한 불변식(D-5D-8) + `clamp_min > 0`(verifier r1 M-2) — 위반 시
+    사유 문자열, 통과 시 `None`. `clamp_min > 0` 이 없으면 `clamp_min <= 0` 인 정책이
+    `scenario.py::build_scenario_candidates`의 클램프를 통과해 `Candidate.bid_rate <= 0`
+    인 후보를 만들 수 있었다(재현: `clamp_min -1.0`, `center -0.5` → 커널이 `ValueError`
+    로 예외를 던짐 — 결과 타입 경계 밖으로 새는 위협 (a) 위반)."""
+    if not raw.scenario_clamp_min > 0:
+        return f"scenario.clamp_min 은 0보다 커야 한다: {raw.scenario_clamp_min}"
     if not raw.scenario_clamp_min < raw.scenario_clamp_max:
         return (
             f"scenario.clamp_min({raw.scenario_clamp_min}) 은 "
@@ -208,12 +214,20 @@ def _validate_thresholds(raw: InferencePolicy) -> str | None:
 
 
 def _validate_invariants(raw: InferencePolicy) -> str | None:
-    """z>0·가중치 합 1·밴드 하한<상한·임계≥1(D-5D-8) — 위반 시 사유, 통과 시 `None`."""
+    """z>0·가중치 합 1·가중치 각각 ≥0·`min_predictive_std>0`·밴드 하한<상한(clamp_min>0
+    포함)·임계≥1(D-5D-8, verifier r1 M-2 보강) — 위반 시 사유, 통과 시 `None`."""
     if raw.scenario_z <= 0:
         return f"scenario.z 는 0보다 커야 한다: {raw.scenario_z}"
+    if any(weight < 0 for weight in raw.scenario_weights):
+        return f"scenario 가중치는 음수일 수 없다: {raw.scenario_weights}"
     weight_sum = sum(raw.scenario_weights, start=Decimal("0"))
     if weight_sum != Decimal("1"):
         return f"scenario 가중치 합은 정확히 1 이어야 한다: {weight_sum}"
+    if raw.assessment_min_predictive_std <= 0:
+        return (
+            "assessment.min_predictive_std 는 0보다 커야 한다: "
+            f"{raw.assessment_min_predictive_std}"
+        )
     return _validate_bands(raw) or _validate_thresholds(raw)
 
 

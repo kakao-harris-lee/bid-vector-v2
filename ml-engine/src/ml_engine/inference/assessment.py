@@ -131,10 +131,12 @@ def resolve_assessment_posterior(
     policy: InferencePolicy,
 ) -> AssessmentPosterior | Unmeasurable:
     """legacy 3계층 순차 수축(전역→공종→기관) 그대로 — `global_level.sample_count < 1`은
-    legacy `ValueError`를 결과 타입으로 치환(위협 모델 (a))."""
+    legacy `ValueError`를 결과 타입으로 치환(위협 모델 (a)). detail 은 `NO_GLOBAL_SAMPLES`
+    — K6 추첨 축의 `TOO_FEW_DRAWS`와 사유가 다르다(verifier r1 L-2)."""
     if global_level is None or global_level.sample_count < 1:
         return Unmeasurable(
-            UnmeasurableReason.INSUFFICIENT_SAMPLES, UnmeasurableDetail.TOO_FEW_DRAWS
+            UnmeasurableReason.INSUFFICIENT_SAMPLES,
+            UnmeasurableDetail.NO_GLOBAL_SAMPLES,
         )
 
     category_observed = (

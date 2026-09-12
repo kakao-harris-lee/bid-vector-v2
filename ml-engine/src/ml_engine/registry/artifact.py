@@ -10,11 +10,24 @@ legacy에는 checksum 검증이 없었다(digest §2 「checksum 대조 없음�
 축, 기본값을 주면 미학습 공종 가드가 조용히 열린다)와 같은 근거다 — 빈 문자열도
 `__post_init__`에서 거부한다(설계 검토 (15)).
 
-**구현 노트(설계 래칫)**: JSON 페이로드 필드를 검증하는 함수는 `Any`/`dict[str, Any]`/
-`object` 매개변수(래칫이 막는 「약한 경계」)를 쓰지 않는다 — 값 타입을 `JsonScalar`(닫힌
-스칼라 유니온)로 좁혀 `dict[str, JsonScalar]`로 받는다. 래칫은 `dict`/`Mapping`의 **값**
-타입만 재귀 검사하므로(키 타입은 보지 않는다) 이 시그니처는 약한 경계로 잡히지 않는다 —
-동시에 실제로 `Any`보다 좁다(중첩 컨테이너를 배제한 진짜 스칼라 유니온).
+**verifier r1 M-1 반영**: `LoadedArtifact`는 `manifest`뿐 아니라 `_VerifiedBytes`(모듈
+private)도 **필수 인자**로 받는다 — `LoadedArtifact(manifest)` 한 인자만으로는 mypy strict
+가 인자 누락으로 거부한다. checksum 대조를 거치지 않은 manifest 로 `LoadedArtifact`를
+직접 조립하는 경로가 성립하지 않도록 타입 시그니처 자체가 막는다((2b) 「이 함수만
+만든다」의 실제 강제).
+
+**구현 노트(설계 래칫 + `warn_unreachable`)**: JSON 페이로드 필드를 검증하는 함수는
+`Any`/`dict[str, Any]`/`object` 매개변수(래칫이 막는 「약한 경계」)를 쓰지 않는다 — 값
+타입을 `JsonValue`(재귀적 JSON 값 유니온: 스칼라 + `list[JsonValue]` + `dict[str,
+JsonValue]`)로 표현해 `dict[str, JsonValue]`로 받는다. 이전 판(`JsonScalar`, 중첩 컨테이너
+배제)은 `feature_names`/`release`/`reproducibility` 같은 중첩 필드가 사실은 list/dict를
+담는데도 그 가능성을 타입에서 지워버려, `isinstance(x, list)` 분기가 mypy 관점에서
+**도달 불가**(값 타입이 애초에 list일 수 없다고 선언했으므로)가 됐다(verifier r1 M-4,
+`--warn-unreachable` 실측 — `feature_names` 목록 검사·`verify_feature_names` 호출부가
+죽은 코드). `JsonValue`는 실제 JSON 값의 형태를 정직하게 나타내므로(진짜 JSON 값 전체
+— `Any`처럼 아무 타입이나 넣을 수 있다는 뜻이 아니라 JSON 이 표현 가능한 값만이라는 뜻)
+이 문제가 없다. 래칫은 `dict`/`Mapping`의 **값** 타입 이름만 보므로(`JsonValue`는 그 이름
+목록에 없다) 약한 경계로도 잡히지 않는다.
 """
 
 from __future__ import annotations
@@ -22,6 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any
 
 from ml_engine.features import (
@@ -31,7 +45,9 @@ from ml_engine.features import (
     verify_feature_names,
 )
 
-type JsonScalar = str | int | float | bool | None
+type JsonValue = (
+    str | int | float | bool | list[JsonValue] | dict[str, JsonValue] | None
+)
 
 
 @dataclass(frozen=True)
@@ -85,13 +101,6 @@ class ArtifactManifestV1:
 
 
 @dataclass(frozen=True)
-class LoadedArtifact:
-    """`load_artifact`만 만든다 — 검증을 통과한 manifest 를 나른다."""
-
-    manifest: ArtifactManifestV1
-
-
-@dataclass(frozen=True)
 class ArtifactRejected:
     """artifact 로드 실패 — 예외가 아니라 결과 타입, 사유 문자열 하나."""
 
@@ -111,6 +120,16 @@ class _VerifiedBytes:
     raw: bytes
 
 
+@dataclass(frozen=True)
+class LoadedArtifact:
+    """`load_artifact`만 만든다 — 검증을 통과한 manifest 를 나른다. `verified`(checksum
+    대조 증거)를 필수 인자로 받아 `LoadedArtifact(manifest)` 한 인자 생성을 mypy strict
+    가 거부하게 한다(verifier r1 M-1)."""
+
+    manifest: ArtifactManifestV1
+    verified: _VerifiedBytes
+
+
 def _verify_checksum(
     raw: bytes, expected_checksum: str
 ) -> _VerifiedBytes | ArtifactRejected:
@@ -123,7 +142,7 @@ def _verify_checksum(
 
 
 def _parse_feature_fields(
-    payload: dict[str, JsonScalar], expected: ModelReleaseRef
+    payload: dict[str, JsonValue], expected: ModelReleaseRef
 ) -> tuple[str, tuple[str, ...]] | ArtifactRejected:
     """`manifest_schema_version`·`feature_names`·`feature_manifest_checksum` 검증 —
     통과하면 `(manifest_schema_version, feature_names)`."""
@@ -139,10 +158,11 @@ def _parse_feature_fields(
             f"미지원 feature_schema_version: {expected.feature_schema_version!r}"
         )
 
-    feature_names = payload.get("feature_names")
-    if not isinstance(feature_names, list) or not all(
-        isinstance(name, str) for name in feature_names
-    ):
+    feature_names_raw = payload.get("feature_names")
+    if not isinstance(feature_names_raw, list):
+        return ArtifactRejected("feature_names 는 문자열 목록이어야 한다")
+    feature_names = [name for name in feature_names_raw if isinstance(name, str)]
+    if len(feature_names) != len(feature_names_raw):
         return ArtifactRejected("feature_names 는 문자열 목록이어야 한다")
     name_check = verify_feature_names(feature_names, feature_schema)
     if isinstance(name_check, NameMismatch):
@@ -161,7 +181,7 @@ def _parse_feature_fields(
 
 
 def _parse_release(
-    payload: dict[str, JsonScalar], expected: ModelReleaseRef
+    payload: dict[str, JsonValue], expected: ModelReleaseRef
 ) -> ReleaseInfo | ArtifactRejected:
     """release 하위 객체 다섯 필드 — 전부 비어 있지 않은 문자열. `artifact_checksum`은
     자기서술 필드라 `expected`와의 등가성은 요구하지 않는다(raw bytes 전체 sha256 대조가
@@ -188,7 +208,7 @@ def _parse_release(
 
 
 def _parse_reproducibility(
-    payload: dict[str, JsonScalar],
+    payload: dict[str, JsonValue],
 ) -> Reproducibility | ArtifactRejected:
     seed = payload.get("seed")
     num_threads = payload.get("num_threads")
@@ -205,10 +225,10 @@ def _parse_reproducibility(
 
 
 def _parse_scalars(
-    payload: dict[str, JsonScalar],
+    payload: dict[str, JsonValue],
 ) -> tuple[str, float, int, str] | ArtifactRejected:
-    """`sample_scope`(빈 문자열도 거부)·`residual_std`·`training_row_count`·
-    `booster_model` — 통과하면 그 넷의 튜플."""
+    """`sample_scope`(빈 문자열도 거부)·`residual_std`(유한값만, verifier r1 L-3)·
+    `training_row_count`·`booster_model` — 통과하면 그 넷의 튜플."""
     sample_scope = payload.get("sample_scope")
     if not isinstance(sample_scope, str) or not sample_scope:
         return ArtifactRejected(
@@ -219,6 +239,12 @@ def _parse_scalars(
     booster_model = payload.get("booster_model")
     if not isinstance(residual_std, int | float) or isinstance(residual_std, bool):
         return ArtifactRejected("residual_std 는 숫자여야 한다")
+    if not isfinite(residual_std):
+        # JSON 표준 리터럴 밖(`NaN`/`Infinity`) — Python `json.loads`는 기본으로 이를
+        # 허용하지만(허용 확장), 망가진 artifact 를 결측 입력과 같은 사유로 접으면 안
+        # 된다(verifier r1 L-3 — 이전 판은 이 값이 그대로 `predict.py`까지 흘러
+        # `NON_FINITE_INPUT`으로 늦게 잡혔다. 여기서 즉시 거부한다).
+        return ArtifactRejected(f"residual_std 는 유한해야 한다: {residual_std!r}")
     if not isinstance(training_row_count, int) or isinstance(training_row_count, bool):
         return ArtifactRejected("training_row_count 는 정수여야 한다")
     if not isinstance(booster_model, str) or not booster_model:
@@ -283,11 +309,11 @@ def load_artifact(
 ) -> LoadedArtifact | ArtifactRejected:
     """checksum 대조(fail-closed, 실패 시 객체 미생성) → schema version·feature_names·
     feature_manifest_checksum·sample_scope·reproducibility 검증 → `LoadedArtifact`. 이
-    함수만 `LoadedArtifact`를 만든다."""
+    함수만 `LoadedArtifact`를 만든다(검증 증거 `_VerifiedBytes`를 필수 인자로 전달)."""
     verified = _verify_checksum(raw, expected.artifact_checksum)
     if isinstance(verified, ArtifactRejected):
         return verified
     manifest = _parse_manifest(verified, expected)
     if isinstance(manifest, ArtifactRejected):
         return manifest
-    return LoadedArtifact(manifest)
+    return LoadedArtifact(manifest, verified)

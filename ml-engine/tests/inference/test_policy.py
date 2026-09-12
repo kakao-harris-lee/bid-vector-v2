@@ -150,3 +150,60 @@ def test_gbm_min_category_rows_negative_is_rejected(tmp_path: Path) -> None:
     values["gbm.min_category_rows"] = -1
     result = load_inference_policy(_write(tmp_path, values))
     assert isinstance(result, PolicyRejected)
+
+
+def test_clamp_min_non_positive_is_rejected(tmp_path: Path) -> None:
+    """verifier r1 M-2 — `clamp_min <= 0`은 하한<상한 검사만으로는 걸리지 않는다(예:
+    -1.0 < 1.4). 이 값이 통과하면 `build_scenario_candidates`가 `bid_rate <= 0`인 후보를
+    만들어 `Candidate.__post_init__`의 `ValueError`가 결과 타입 경계 밖으로 샌다."""
+    values = _base_values()
+    values["scenario.clamp_min"] = -1.0
+    result = load_inference_policy(_write(tmp_path, values))
+    assert isinstance(result, PolicyRejected)
+    assert "clamp_min" in result.reason
+
+
+def test_clamp_min_zero_is_rejected(tmp_path: Path) -> None:
+    values = _base_values()
+    values["scenario.clamp_min"] = 0.0
+    result = load_inference_policy(_write(tmp_path, values))
+    assert isinstance(result, PolicyRejected)
+
+
+@pytest.mark.parametrize(
+    "weight_key",
+    [
+        "scenario.conservative.weight",
+        "scenario.base.weight",
+        "scenario.aggressive.weight",
+    ],
+)
+def test_negative_weight_is_rejected_even_when_sum_is_one(
+    tmp_path: Path, weight_key: str
+) -> None:
+    """verifier r1 M-2 — 가중치 셋이 합 1 을 유지해도 개별 값이 음수면 거부한다."""
+    values = _base_values()
+    values[weight_key] = -0.10
+    other_keys = [
+        key
+        for key in (
+            "scenario.conservative.weight",
+            "scenario.base.weight",
+            "scenario.aggressive.weight",
+        )
+        if key != weight_key
+    ]
+    # 합을 정확히 1로 유지 — 나머지 둘에 0.10을 절반씩 보탠다.
+    values[other_keys[0]] = float(values[other_keys[0]]) + 0.05
+    values[other_keys[1]] = float(values[other_keys[1]]) + 0.05
+    result = load_inference_policy(_write(tmp_path, values))
+    assert isinstance(result, PolicyRejected)
+    assert "가중치" in result.reason
+
+
+def test_min_predictive_std_non_positive_is_rejected(tmp_path: Path) -> None:
+    values = _base_values()
+    values["assessment.min_predictive_std"] = 0.0
+    result = load_inference_policy(_write(tmp_path, values))
+    assert isinstance(result, PolicyRejected)
+    assert "min_predictive_std" in result.reason

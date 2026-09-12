@@ -158,3 +158,31 @@ def test_missing_reproducibility_is_rejected() -> None:
     result = load_artifact(raw, expected)
     assert isinstance(result, ArtifactRejected)
     assert "reproducibility" in result.reason
+
+
+def test_loaded_artifact_requires_verified_bytes_argument() -> None:
+    """verifier r1 M-1 — `manifest` 한 인자만으로는 `LoadedArtifact` 생성이 불가하다
+    (mypy strict 는 `LoadedArtifact(some_manifest)`를 인자 누락으로 정적 거부한다 —
+    여기서는 같은 성질을 런타임 `TypeError`로 확인한다)."""
+    payload = _manifest_payload()
+    raw = _raw_bytes(payload)
+    expected = _expected_ref(raw, payload)
+    result = load_artifact(raw, expected)
+    assert isinstance(result, LoadedArtifact)
+    with pytest.raises(TypeError):
+        LoadedArtifact(result.manifest)  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize(
+    "bad_residual_std", [float("nan"), float("inf"), float("-inf")]
+)
+def test_non_finite_residual_std_is_rejected(bad_residual_std: float) -> None:
+    """verifier r1 L-3 — 망가진 artifact(`residual_std` NaN/Inf)는 즉시 거부된다(하류의
+    `predict.py`가 「피처 없음」으로 늦게 접기 전에 registry 층에서 fail-closed)."""
+    payload = _manifest_payload()
+    payload["residual_std"] = bad_residual_std
+    raw = _raw_bytes(payload)
+    expected = _expected_ref(raw, payload)
+    result = load_artifact(raw, expected)
+    assert isinstance(result, ArtifactRejected)
+    assert "residual_std" in result.reason
