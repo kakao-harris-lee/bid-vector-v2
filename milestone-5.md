@@ -93,6 +93,16 @@ K6 분산 0 접힘을 잡아 `DEGENERATE_VARIANCE` 로 수정**(D-5D-11 `n == dr
 Python 가시성 2줄 우회 둘 · `std == 0` 통과 · 실 booster 결정성(`OPEN-5D-REAL-BOOSTER`, 5C) · `ArtifactManifestV1` writer(5C) ·
 `OPEN-5D-DIAGNOSTICS-WIRE`(2F). 정본 `reports/evidence/m5/5d/checklist.md`.
 
+**5D-2 착수 2026-09-13(운영자 결정 — D-5D2-1 (b) 분포 단독 · D-5D2-2~8 · 임계 값은 (c) OPEN)** — `OPEN-5D-DISTRIBUTION-ENGINE`
+을 닫는 소형 slice. base 는 5D 종결 head `cefb19c`. wire `CompetitionSample` → 관문·밴드 정제(결과 타입, 사유별 계수) →
+5D `admit_clean` → K6 추첨 분포 → 3계층 → K5 수축 → `predictive_std` → `bid_ratio = median(observed_bid_rate/center)`(legacy
+환산 계수 미이식, D-5D2-6) → 후보 3. 가용성 임계(#28·#29)는 조립기와 **같은 함수**(legacy 「직접 호출은 표본 1건도 통과」 결함
+제거). 서빙 엔진은 분포 하나 — legacy 실제 기본 경로 `historical` 은 V2 계약에 입력이 없고, M2 가 `CompetitionSample`·
+`ReserveDrawObservation` 을 넣은 유일한 사유가 분포 predictor(D-2B-3); GBM 은 5D 이식물 그대로 두되 연결하지 않음(ML-05
+게이트 미통과). `Diagnostics.shrinkage_weight`(ML-04 ②)·`agency_sample_count`·`agency_sample_below_threshold`, `IntervalSource.
+POSTERIOR_PREDICTIVE`·`DistributionRelease` 는 내부 타입(wire 매핑 `OPEN-5D2-INTERVAL-SOURCE-WIRE`·`OPEN-5D2-RELEASE-FOR-DISTRIBUTION`,
+2F/5E). golden 011 skip 해제가 종결 조건. 정본 `reports/evidence/m5/5d2/scope.md`, 설계 검토 `_workspace/m5-5d2/02_design-review.md`.
+
 ### Slice 5B — feature schema
 
 - versioned feature name/order/type/range

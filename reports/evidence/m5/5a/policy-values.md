@@ -34,7 +34,7 @@
 | 24 | `PRICE_PREDICTION_PREFERRED_PREDICTOR` | `"historical"` | 환경 | 5E |
 | 25 | `PRICE_PREDICTION_ENABLE_EXPERIMENTAL_PREDICTORS` | `False` | 환경 | 5E |
 | 26 | `PRICE_PREDICTION_ENSEMBLE_MODEL_PATH` | `""` | 환경(경로) | 5E |
-| 27 | `PRICE_PREDICTION_ENSEMBLE_MIN_SAMPLES` | `32` | 정책(최소 표본) | 5D |
+| 27 | `PRICE_PREDICTION_ENSEMBLE_MIN_SAMPLES` | `32` | 정책(최소 표본) | 미이식(ensemble 은 V2 이식 대상 밖 — 5D-2 D-5D2-2) |
 | 28 | `PRICE_PREDICTION_DISTRIBUTION_MIN_RESERVE_RECORDS` | `8` | 정책(최소 표본) | 5D |
 | 29 | `PRICE_PREDICTION_DISTRIBUTION_MIN_BID_RATIO_SAMPLES` | `3` | 정책(최소 표본) | 5D |
 | 30 | `PRICE_PREDICTION_AWARD_RATE_GBM_MODEL_PATH` | `""` | 환경(경로) | 5E |
@@ -54,3 +54,4 @@
 | --- | --- | --- |
 | 2026-09-11 착수 | 표 등재(조사 b-1 그대로), 분류 승인 | 운영자 D-M5-6 (a) |
 | 2026-09-12 | 「소비 예정」 배정 정정 — guardrail·가격 15행은 Kotlin, #31 은 5C·5D | 5D 착수 D-5D-9 |
+| 2026-09-13 | #27 배정 「5D」→「미이식」 | 5D-2 착수 D-5D2-2 |
