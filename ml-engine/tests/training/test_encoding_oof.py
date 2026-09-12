@@ -124,9 +124,13 @@ def test_out_of_fold_matrix_and_residuals_builds_for_enough_rows() -> None:
     assert len(result.admitted_rows) == 20
 
 
-def test_out_of_fold_encoding_differs_from_full_corpus_encoding() -> None:
-    """legacy OOF 불변식 이식 — 학습 행렬의 agency_encoding 열은 전 구간 인코딩과 달라야
-    한다(적어도 한 행에서, target leakage 차단 증거)."""
+def test_out_of_fold_encoding_differs_from_full_corpus_encoding_for_every_row() -> None:
+    """legacy OOF 불변식 이식(verifier r1 H-2) — 학습 행렬의 `agency_encoding` 열은 전 구간
+    인코딩과 **모든 행**에서 달라야 한다. legacy 원본
+    (`bid-vector/tests/test_award_rate_gbm_training.py::
+    test_training_matrix_encoding_differs_from_the_self_including_encoding`)이 정확히
+    이 두 단언을 갖는다 — 「일부가 아니라 모든 행이 달라야 한다. 한 폴드라도 전체
+    인코딩을 쓰면 그 폴드의 행들이 여기서 같아진다」."""
     rows = _rows(30)
     oof_result = out_of_fold_matrix_and_residuals(
         rows,
@@ -149,6 +153,30 @@ def test_out_of_fold_encoding_differs_from_full_corpus_encoding() -> None:
     )
     oof_encoding_column = oof_result.matrix[:, 2]
     assert not np.allclose(oof_encoding_column, full_encoding_column)
+    assert np.count_nonzero(
+        np.abs(oof_encoding_column - full_encoding_column) > 1e-12
+    ) == len(oof_result.admitted_rows)
+
+
+def test_all_rows_assertion_catches_partial_leak_that_not_allclose_misses() -> None:
+    """RED 먼저 재현(verifier r1 H-2) — 검증 레인이 재현한 반례(폴드 하나가 전 구간
+    인코딩을 그대로 써서 30행 중 6행이 누수)를 합성 배열로 직접 만든다. `not np.allclose`
+    단독은 이 반례를 통과시키지만(24행이 여전히 다르므로 전체 배열은 "가깝지 않다"),
+    legacy 의 두 번째 단언(「모든 행이 달라야 한다」)은 이 반례를 정확히 잡아야 한다 —
+    이 test 로 그 판별력 자체를 확인한 뒤, 위 test 가 실제 구현에 대해 그 강한 단언을
+    통과시킴을 보인다(GREEN)."""
+    # 24행은 정말 다르고(누수 없음), 6행은 "폴드 하나가 전 구간 인코딩을 그대로 써서"
+    # oof 값과 full 값이 정확히 같다고 가정한 합성 반례.
+    oof_column = np.concatenate([np.full(24, 0.11), np.full(6, 0.5)])
+    full_column = np.concatenate([np.full(24, 0.20), np.full(6, 0.5)])
+
+    # 약한 단언(현행 배송본이 실제로 썼던 것) — 반례를 통과시킨다(거짓 안전).
+    assert not np.allclose(oof_column, full_column)
+
+    # legacy 강도 단언 — 반례를 잡는다(6행이 전 구간과 완전히 같다).
+    differing_rows = np.count_nonzero(np.abs(oof_column - full_column) > 1e-12)
+    assert differing_rows == 24
+    assert differing_rows != len(oof_column)
 
 
 def test_out_of_fold_no_observations_when_fit_subset_has_no_valid_agency_category() -> (
