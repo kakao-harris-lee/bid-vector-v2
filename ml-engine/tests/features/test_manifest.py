@@ -1,17 +1,22 @@
 """RED — `ml_engine.features.manifest`(D-5B-5). canonical 결정성·키 순서 무관·float repr
 민감·sha256 hex 64 소문자·`verify_manifest` 불일치·**입력 순서 무관 정렬 불변식**(verifier
-r1 M-1 — 같은 내용을 다른 배열 순서로 들고 온 두 manifest 는 같은 checksum 을 내야 한다)."""
+r1 M-1 — 같은 내용을 다른 배열 순서로 들고 온 두 manifest 는 같은 checksum 을 내야 한다)·
+**NaN/Infinity fail-closed**(PR #10 리뷰 MEDIUM — 비표준 JSON 리터럴로 조용히 새지 않고
+`CanonicalizationRejected`)."""
 
 from __future__ import annotations
 
 import hashlib
+import math
 
 from ml_engine.features.manifest import (
+    CanonicalizationRejected,
     ChecksumMismatch,
     FeatureManifest,
     ManifestAgencyMean,
     ManifestCategoryMean,
     ManifestColumn,
+    NonFiniteValue,
     Verified,
     canonical_json,
     compute_checksum,
@@ -137,3 +142,86 @@ def test_manifest_different_content_still_yields_different_checksum() -> None:
     baseline = _manifest()
     changed = _manifest(global_mean=0.99)
     assert compute_checksum(baseline) != compute_checksum(changed)
+
+
+def test_canonical_json_rejects_nan_global_mean() -> None:
+    """PR #10 리뷰 MEDIUM — NaN 이 비표준 JSON 리터럴로 조용히 새지 않는다."""
+    manifest = _manifest(global_mean=math.nan)
+    result = canonical_json(manifest)
+    assert result == CanonicalizationRejected(NonFiniteValue("global_mean"))
+
+
+def test_canonical_json_rejects_infinity_in_agency_means() -> None:
+    manifest = FeatureManifest(
+        schema_version="award-rate-features-v2",
+        columns=(ManifestColumn("category", "CATEGORICAL"),),
+        categories=("civil",),
+        denominator_sources=("CLEAN",),
+        agency_means=(
+            ManifestAgencyMean(agency="a1", category="civil", mean=math.inf, count=3),
+        ),
+        category_means=(ManifestCategoryMean(category="civil", mean=0.5),),
+        global_mean=0.5,
+        agency_prior_strength=12.0,
+        category_prior_strength=40.0,
+    )
+    result = canonical_json(manifest)
+    assert result == CanonicalizationRejected(
+        NonFiniteValue("agency_means[a1,civil].mean")
+    )
+
+
+def test_canonical_json_rejects_negative_infinity_in_category_means() -> None:
+    manifest = FeatureManifest(
+        schema_version="award-rate-features-v2",
+        columns=(ManifestColumn("category", "CATEGORICAL"),),
+        categories=("civil",),
+        denominator_sources=("CLEAN",),
+        agency_means=(),
+        category_means=(ManifestCategoryMean(category="civil", mean=-math.inf),),
+        global_mean=0.5,
+        agency_prior_strength=12.0,
+        category_prior_strength=40.0,
+    )
+    result = canonical_json(manifest)
+    assert result == CanonicalizationRejected(
+        NonFiniteValue("category_means[civil].mean")
+    )
+
+
+def test_canonical_json_rejects_non_finite_prior_strengths() -> None:
+    nan_agency_kappa = _manifest()
+    manifest = FeatureManifest(
+        schema_version=nan_agency_kappa.schema_version,
+        columns=nan_agency_kappa.columns,
+        categories=nan_agency_kappa.categories,
+        denominator_sources=nan_agency_kappa.denominator_sources,
+        agency_means=nan_agency_kappa.agency_means,
+        category_means=nan_agency_kappa.category_means,
+        global_mean=nan_agency_kappa.global_mean,
+        agency_prior_strength=math.nan,
+        category_prior_strength=40.0,
+    )
+    result = canonical_json(manifest)
+    assert result == CanonicalizationRejected(NonFiniteValue("agency_prior_strength"))
+
+
+def test_compute_checksum_propagates_canonicalization_rejected() -> None:
+    manifest = _manifest(global_mean=math.inf)
+    assert compute_checksum(manifest) == CanonicalizationRejected(
+        NonFiniteValue("global_mean")
+    )
+
+
+def test_verify_manifest_propagates_canonicalization_rejected() -> None:
+    manifest = _manifest(global_mean=math.nan)
+    assert verify_manifest(manifest, "0" * 64) == CanonicalizationRejected(
+        NonFiniteValue("global_mean")
+    )
+
+
+def test_canonical_json_normal_manifest_unaffected_by_fail_closed_check() -> None:
+    """유한값만 있는 정상 manifest는 여전히 `bytes`를 낸다 — 새 검사가 기존 경로를
+    건드리지 않는다."""
+    payload = canonical_json(_manifest())
+    assert isinstance(payload, bytes)
