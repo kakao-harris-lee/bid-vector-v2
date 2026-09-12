@@ -30,6 +30,28 @@ def test_draw_count_below_one_is_unmeasurable() -> None:
     assert result.detail is UnmeasurableDetail.TOO_FEW_DRAWS
 
 
+def test_all_same_values_is_degenerate_variance_when_n_not_equal_k() -> None:
+    """golden M-3(`ml-kernel-008` degenerate-variance probe) — 표본 전부 같은 값(모분산
+    0)이고 `n != draw_count`이면 `(mean, 0.0)`으로 조용히 값을 내지 않고
+    `Unmeasurable(INSUFFICIENT_SAMPLES, DEGENERATE_VARIANCE)`다."""
+    result = draw_mean_moments([1_000_000.0] * 5, draw_count=4)
+    assert isinstance(result, Unmeasurable)
+    assert result.reason is UnmeasurableReason.INSUFFICIENT_SAMPLES
+    assert result.detail is UnmeasurableDetail.DEGENERATE_VARIANCE
+
+    exact_result = exact_draw_mean_distribution([1_000_000.0] * 5, draw_count=4)
+    assert isinstance(exact_result, Unmeasurable)
+    assert exact_result.detail is UnmeasurableDetail.DEGENERATE_VARIANCE
+
+
+def test_all_same_values_with_n_equals_k_is_not_degenerate() -> None:
+    """`n == draw_count`는 예외다 — 조합이 하나뿐이라 분산 0 이 구조적으로 항상 참이고,
+    「이 표본으로 잴 수 없다」는 singular 사유가 아니다(legacy 조기 반환 그대로 계승)."""
+    mean, std = draw_mean_moments([1_000_000.0] * 4, draw_count=4)
+    assert mean == 1_000_000.0
+    assert std == 0.0
+
+
 def test_empty_values_is_unmeasurable() -> None:
     result = draw_mean_moments([], draw_count=4)
     assert isinstance(result, Unmeasurable)
@@ -99,7 +121,16 @@ def test_exact_distribution_reuses_unmeasurable_for_bad_input() -> None:
     )
 )
 def test_draw_mean_moments_mean_is_within_value_range(values: list[float]) -> None:
-    mean, std = draw_mean_moments(values, draw_count=4)
+    """M-3 golden 반영 — 모분산 0(전부 같은 값, `n != draw_count`)은 `Unmeasurable`
+    (DEGENERATE_VARIANCE)이라 그 경우는 이 속성 밖이다(hypothesis 가 그 입력도 낼 수
+    있어 명시적으로 갈라 확인한다)."""
+    result = draw_mean_moments(values, draw_count=4)
+    if len(set(values)) == 1:
+        assert isinstance(result, Unmeasurable)
+        assert result.detail is UnmeasurableDetail.DEGENERATE_VARIANCE
+        return
+    assert not isinstance(result, Unmeasurable)
+    mean, std = result
     assert min(values) - 1e-6 <= mean <= max(values) + 1e-6
     assert std >= 0.0
 
