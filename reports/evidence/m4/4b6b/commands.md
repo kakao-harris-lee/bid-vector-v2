@@ -1,7 +1,9 @@
 # M4/4B-6b 실행 명령 로그
 
-base_sha: `9787329712188c0a606b4afd90c1dcb33c1b9264`
-head_sha: `74d9cebc9c82d1f2f78ad46c436937fce5246fdc`
+base_sha: `571059ab5ada307126a9dd35bc33b846dd4ae63f`(slice base, scope.md 정본 — verifier r1
+F-3 정정. 이전 판은 계약 커밋 `9787329`를 잘못 base 로 적었다)
+head_sha(코드 마지막 커밋, verifier r1 수정 라운드 포함): `d21cb21`(evidence 갱신 커밋은
+목록을 만들 뿐 자기 자신을 가리키지 않는다)
 
 ## RED — main 없이 test 컴파일 실패 확인
 
@@ -85,6 +87,60 @@ head_sha: `74d9cebc9c82d1f2f78ad46c436937fce5246fdc`
 - exit: 0 — 355 tasks, 355 executed(0 up-to-date, 완전 격리 트리에서 재현). 종료 뒤
   `git worktree remove --force` 로 제거 확인(`git worktree list` 에 잔존 없음).
 
+## verifier r1 수정 라운드(1/5) — F-1(high)·F-2(medium)·F-4(low)
+
+### F-1 재현·수정 확인
+
+- 재현(수정 전): `predictedFacts`에 `predicted(conservative=1.00, base=Rate.ofFraction(BigDecimal("1.05")), aggressive=1.10)`를
+  넣으면 `MarginInputs.init`(`recommendedRate ≤ 1`)이 `IllegalArgumentException`을
+  던져 `analyze()` 밖으로 새고 use case 배치 전체가 소실됨(verifier 보고 실측 그대로).
+- 수정: `predictionUntrustworthy`(fitness 범위 밖 **또는** `candidates.base > 1`)를
+  `MarginInputs` 생성 **전**에 판정 — 참이면 `absentPair(ContractViolation)`.
+- 수정 뒤: `PredictionFactsTest`(신설, 2 tests) —
+  `candidates.base 1.0 은 통과하고 1.0000001 은 두 성분 Absent(ContractViolation) 이며
+  예외가 없다`·`floorRate 1.0 은 margin 통과, 1.0000001 은 margin 만 Absent`. 둘 다
+  `shouldNotThrowAny` 로 감싸 예외 자체가 없음을 단언.
+- cmd: `./gradlew --no-daemon :workflow:test --tests '*PredictionFactsTest*'` → exit 0.
+- 부작용 수정: `predictedFacts`가 두 조건을 각각 `if(...)return`으로 둬
+  detekt `ReturnCount`(3>2)에 걸림 → `predictionUntrustworthy(Boolean)`로 뽑아
+  1회 early-return + 1회 최종 return으로 정리(커밋 `d21cb21`).
+
+### F-2 재현·수정 확인(양성 대조, 실측 뒤 원복)
+
+- 재현(수정 전, verifier 보고 그대로): `gate.tests.workflow`에서
+  `WorkflowGateRegistrationTest` 등재 한 줄을 지우고
+  `./gradlew --no-daemon :workflow:test --tests '*WorkflowGateRegistrationTest*'`
+  (`--rerun-tasks` 없이) → task `UP-TO-DATE` 로 건너뛰어 exit 0(거짓 초록).
+- 수정: `workflow/build.gradle.kts`의 `tasks.withType<Test>`에
+  `inputs.file(rootProject.file("config/quality/gate-tests.properties"))
+  .withPathSensitivity(PathSensitivity.RELATIVE)` 추가.
+- 수정 뒤 재현: 같은 조작(등재 한 줄 삭제, `--rerun-tasks` 없이 같은 명령) →
+  task 가 실제로 재실행되어 **FAILED**(`expected:<[]> but was:<["bidvector.workflow.WorkflowGateRegistrationTest"]>`).
+  즉시 `config/quality/gate-tests.properties` 원복 → 같은 명령 재실행 → `BUILD SUCCESSFUL`.
+  (조작·원복 전 과정 실측, 운영 파일은 최종적으로 등록된 상태로 남음 — `git status`로 확인.)
+
+### F-4 재현·수정 확인
+
+- 재현(수정 전): notice 임베딩이 `Unavailable`이어도 `embedPairStep`이 profile
+  임베딩까지 호출(`embed.requestsSeen.size == 2`).
+- 수정: `embedPairStep`이 notice 응답을 먼저 검사해 `Unavailable`이면 즉시
+  `halt`, profile 은 호출하지 않는다.
+- 수정 뒤: 신설 test("notice 임베딩이 이미 Unavailable 이면 profile 은 호출하지
+  않는다") — `embed.requestsSeen.size shouldBe 1`. cmd:
+  `./gradlew --no-daemon :workflow:test --tests '*OpportunityAnalysisTest*'` → exit 0.
+
+### 재검증 — 전체 재실행(수정 라운드 뒤)
+
+- cmd: `./gradlew --no-daemon :workflow:test --tests 'bidvector.workflow.evaluation.*' --tests '*WorkflowGateRegistrationTest*'`
+  → exit 0.
+- cmd: `./gradlew --no-build-cache --no-daemon clean check` → exit 0(346 tasks, 321
+  executed) — S-1 전건 재확인.
+- cmd: `git worktree add --detach /tmp/bv-4b6b-s0-r1 HEAD && (cd /tmp/bv-4b6b-s0-r1 &&
+  ./gradlew --no-build-cache --no-daemon clean check)` → exit 0(355 tasks, 355
+  executed) — S-0 재확인, worktree 제거 확인.
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt workflow/src/main/kotlin/bidvector/workflow/evaluation`
+  → exit 1(매치 0) — S-7 재확인.
+
 ## 알려진 제한(하드코드 아님, checklist.md 「알려진 제한」 참고)
 
 - F-2 인계(4B-6a): `EmbedTextRequest.text` 상한 단위 — `GrpcEmbeddingGateway`/
@@ -94,3 +150,6 @@ head_sha: `74d9cebc9c82d1f2f78ad46c436937fce5246fdc`
   .textMaxChars`(4000)와 계약 값이 이미 같은 것으로 기존 4B-6a 테스트가 고정돼
   있어, 실질적 위험은 서로게이트 쌍(BMP 밖 문자)이 낀 텍스트뿐 — checklist.md
   참고.
+- `adapters` 모듈도 verifier r1 F-2 와 같은 사각(`gate-tests.properties` 미선언
+  입력)을 가질 수 있으나 이 slice 는 `adapters` 를 편집하지 않는다(out_of_scope) —
+  checklist.md 「알려진 제한」 6 참고.

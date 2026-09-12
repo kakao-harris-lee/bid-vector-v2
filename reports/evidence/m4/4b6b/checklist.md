@@ -7,7 +7,7 @@
 | D-4B6B-1 | `TextKind` 단일화(4D-2 판) | `TextSynthesis.kt`에서 `evaluation.TextKind` 삭제, `SynthesizedText.kind: bidvector.workflow.embedding.TextKind`로 교체. `TextSynthesisTest`(9 tests, golden 텍스트 불변) |
 | D-4B6B-2 | 재정규화 포함 벡터 변환 | `EmbeddingBridge.kt`의 `EmbeddingVector.toUnitVector(normEpsilon)` — L2 norm 재계산 뒤 나눔. `EmbeddingBridgeTest`(ε 0.009·다차원 케이스로 재정규화 뒤 ε 0.0001 안에 듦을 실측) |
 | D-4B6B-3 | release 불일치 → ReleaseMismatch | `OpportunityAnalysisPipeline.combineEmbeddings`가 `notice.release != profile.release`를 즉시 검사. `OpportunityAnalysisTest`("notice profile release 불일치는 ReleaseMismatch") |
-| D-4B6B-4 | 가격예측 미가용 ≠ 사다리 미가용 | `PredictionFacts.predictionFacts`가 baseAmount null·predict Unavailable/Unmeasurable 셋 다 budgetCapture·expectedMargin **두 성분만** Absent — 조합기는 계속 `Analyzed`로 간다. test 셋(baseAmount null·예측 Unavailable·예측 Unmeasurable) 모두 `shouldBeAnalyzed()` 단언 |
+| D-4B6B-4 | 가격예측 미가용 ≠ 사다리 미가용 | `PredictionFacts.predictionFacts`가 baseAmount null·predict Unavailable/Unmeasurable·`predictionUntrustworthy`(fitness 범위 밖 또는 `candidates.base > 1`, verifier r1 F-1) 전부 budgetCapture·expectedMargin **두 성분만** Absent — 조합기는 계속 `Analyzed`로 간다. test 셋(baseAmount null·예측 Unavailable·예측 Unmeasurable·fitness 범위 밖·`PredictionFactsTest` candidates.base 경계) 모두 예외 없이 `Analyzed`/`Absent` 확인 |
 | D-4B6B-5 | 정책 슬롯 여섯(예산 둘·selector·objective·offset·반올림) | `OpportunityPolicyData.kt` 신설 슬롯 + `init`(예산 > 0). `OpportunityPolicyDataTest`(13 tests, 슬롯별 불변식 + 출하값 대조) |
 | D-4B6B-6 | `predictedRate = recommendedRate = candidates.base`(alignment 상수 1) | `PredictionFacts.predictedFacts`가 `predicted.candidates.base`를 두 자리에 그대로 씀. 값을 지어내지 않고 계약 공백(M2가 예측 낙찰율을 안 나름)을 그대로 반영 — `OPEN-4B6B-PREDICTED-RATE`로 남긴다(알려진 제한 참고) |
 | D-4B6B-7 | `capacity = 1 − loadRatio` | `OpportunityAnalysis.finalizeAnalysis`의 `capacityScore = UnitScore(BigDecimal.ONE.subtract(loadRatio.value))`. `CapacitySnapshot(max=0)` 케이스로 0 나눗셈 없음 실측(`deriveLoadRatio`가 `maxOf(1,max)` 처리, 4B-5 소유) |
@@ -24,8 +24,11 @@
 | `ResolvedPolicies`·`SynthesizedTexts`·`EmbeddedVectors`(신설) | `internal data class` | 닫는다 | 패키지 내부 파이프라인 전용 캐리어 — 외부(공개) API에 노출 안 됨 |
 | `WorkflowGateRegistrationTest` | test | — | 자기 자신도 `gate.tests.workflow`에 등재 |
 
-**수정 라운드 없음** — 이 slice는 단일 착수→구현→검증 라운드로 끝나 "이번 수정이
-새 public 표면을 만들었는가" 갱신 대상 라운드가 없다. 위 표가 착수 시점 그대로다.
+**수정 라운드 1(verifier r1) — 새 public 표면 없음.** F-1(`predictionUntrustworthy`)·
+F-4(notice 실패 시 profile 미호출)는 둘 다 `private`/기존 `internal` 함수 안 로직
+변경이다. `PredictionFactsTest`(신설)는 test class — 표면 아님. `workflow/build.gradle.kts`
+의 `tasks.withType<Test>` 입력 선언(F-2)은 빌드 설정이라 (2b) 축 자체가 아니다.
+위 표는 착수 시점 그대로 유효하다.
 
 ## 위협 모델 대응표 — 설계 검토 우회 후보 (1)~(12)
 
@@ -54,7 +57,7 @@
    `alignmentOf`가 항상 `1`(완전 정렬)을 낸다. margin weight의 20%가 상수로 고정되는
    셈 — 전략이 시나리오(conservative/aggressive)를 고르는 후속 slice 또는 M2
    additive 확장에서 해소.
-3. **F-2 인계(4B-6a 절단 단위 vs gateway 상한 단위)** — `GrpcEmbeddingGateway`·
+3. **4B-6a 인계 F-2(절단 단위 vs gateway 상한 단위 — 이 slice verifier r1 F-2 와 다른 항목)** — `GrpcEmbeddingGateway`·
    `EmbeddingRequestMapping`을 읽었으나(편집 안 함) 클라이언트 쪽에 텍스트 길이
    검사가 없다(값을 그대로 proto에 싣는다). 서버가 실제로 어느 단위(코드포인트 vs
    UTF-16)로 `embedding.text.max-chars`를 재는지는 이 slice가 확인할 수 없다 —
@@ -70,6 +73,21 @@
    필요해 범위 밖으로 남긴다. `OPEN-4B6B-BASE-AMOUNT-PROVENANCE`로 등재.
 5. **`AgencyId`** — `Notice`에 발주기관 식별자 필드가 없어(`OPEN-2B-AGENCY-ID`,
    4D-1 scope 승계) `BidPredictionRequest.agencyId = null` 고정.
+6. **`adapters` 모듈의 같은 사각(verifier r1 F-2 인접)** — `adapters/build.gradle.kts`의
+   `:adapters:test`도 `gate-tests.properties`를 입력으로 선언하지 않아, 그 모듈의
+   `*GateRegistrationTest`류가 같은 거짓 초록 사각을 가질 수 있다. 이 slice는
+   `adapters`를 편집하지 않는다(scope out_of_scope) — 해소는 그 모듈을 만지는
+   후속 slice 또는 운영자 결정.
+
+## verifier r1 대응 요약
+
+| Finding | 심각도 | 처리 | 커밋 |
+| --- | --- | --- | --- |
+| F-1 | high | 해소 — `predictionUntrustworthy`가 fitness·`candidates.base > 1` 둘 다 `MarginInputs` 생성 전에 판정, 예외 0 | `2f9fab9`(+ ReturnCount 정리 `d21cb21`) |
+| F-2 | medium | 해소 — `workflow/build.gradle.kts`에 `gate-tests.properties` 입력 선언, 양성 대조로 재현·원복 실측 | `203d09c` |
+| F-3 | low | 해소 — 이 문서·`rollback.md`·`commands.md`의 base 를 slice base `571059a`로 정정, 목록 재산출(팀장 문서 커밋 `9787329`·`b902097`·`434a6e6` 는 문서 레인으로 목록 제외) | 이 evidence 갱신 커밋 |
+| F-4 | low | 해소 — notice 임베딩 실패 시 profile 미호출, 호출 횟수 test 추가 | `b6b018c` |
+| F-5 | low | 해소 — scope.md (2b) 문면을 팀장이 정정(offset 은 `SemanticMatch.of` fail-closed), checklist 는 갱신 전부터 정확했음(재확인만) | 문서(팀장 `434a6e6`) |
 
 ## 계약 범위 확장 — 사용자 승인 필요 항목
 

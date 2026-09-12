@@ -1,13 +1,32 @@
 # M4/4B-6b Rollback
 
-base_sha: `9787329712188c0a606b4afd90c1dcb33c1b9264`
-head_sha: `74d9cebc9c82d1f2f78ad46c436937fce5246fdc`
+base_sha: `571059ab5ada307126a9dd35bc33b846dd4ae63f`(slice base, scope.md 정본 — verifier r1
+F-3 정정. 이전 판은 계약 커밋 `9787329`를 base 로 잘못 적어 `milestone-4.md`(+12줄)를
+목록에서 놓쳤다)
+head_sha(코드 마지막 커밋): `d21cb21`(이 문서를 갱신하는 커밋 자신은 목록에 없다)
 
-## 변경 파일 목록(기계 산출)
+## 팀장 문서 레인 — 목록 제외 선언
+
+다음 커밋은 `scope.md`·`milestone-4.md`(계약 문서)만 만진 팀장 문서 레인이다 —
+구현 레인의 in_scope 산출물이 아니라 이 rollback 목록에서 제외한다:
 
 ```
-$ git diff --name-status 9787329712188c0a606b4afd90c1dcb33c1b9264..HEAD
+$ git log --oneline 571059ab5ada307126a9dd35bc33b846dd4ae63f..d21cb21 -- milestone-4.md reports/evidence/m4/4b6b/scope.md
+434a6e6 docs(m4-4b6b): 계약 갱신 — verifier r1 반영(...)
+b902097 docs(m4-4b6b): 계약 갱신 — 파일 셋 분할(detekt)·recommendedAmountRounding 슬롯·OPEN-4B6B-BASE-AMOUNT-PROVENANCE 등재
+9787329 docs(m4-4b6b): 착수 계약 고정 2026-09-12 — 조합기 OpportunityAnalysis(...)
+```
+
+## 변경 파일 목록(기계 산출, 위 문서 레인 제외)
+
+```
+$ git diff --name-status 571059ab5ada307126a9dd35bc33b846dd4ae63f..d21cb21 -- workflow/ config/quality/gate-tests.properties reports/evidence/m4/4b6b/
 M	config/quality/gate-tests.properties
+A	reports/evidence/m4/4b6b/checklist.md
+A	reports/evidence/m4/4b6b/commands.md
+A	reports/evidence/m4/4b6b/policy-values.md
+A	reports/evidence/m4/4b6b/rollback.md
+M	workflow/build.gradle.kts
 A	workflow/src/main/kotlin/bidvector/workflow/evaluation/EmbeddingBridge.kt
 A	workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityAnalysis.kt
 A	workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisPipeline.kt
@@ -19,22 +38,26 @@ A	workflow/src/test/kotlin/bidvector/workflow/evaluation/EmbeddingBridgeTest.kt
 A	workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisFixtures.kt
 A	workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisTest.kt
 M	workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityPolicyDataTest.kt
+A	workflow/src/test/kotlin/bidvector/workflow/evaluation/PredictionFactsTest.kt
 M	workflow/src/test/kotlin/bidvector/workflow/evaluation/TextSynthesisTest.kt
 ```
 
+(`reports/evidence/m4/4b6b/scope.md` 는 위 선언대로 팀장 문서 레인이라 이 파일 목록에서
+의도적으로 제외했다 — pathspec `reports/evidence/m4/4b6b/`를 걸었지만 scope.md 만 별도로
+빼는 대신, 실제 rollback 절차는 evidence 네 파일(checklist·commands·policy-values·
+rollback)만 개별 인자로 지정해 scope.md 를 건드리지 않는다.)
+
 ## 공유 파일 확인 — `config/quality/gate-tests.properties`
 
-이 range 안에서 이 파일을 만진 커밋은 이 slice의 `74d9ceb` 하나뿐이다(같은 시각
-다른 코드 레인 없음, scope.md 명시):
+이 range 안에서 이 파일을 만진 커밋은 전부 이 slice의 구현 레인이다(같은 시각 다른
+코드 레인 없음, scope.md 명시) — 다른 레인과 섞이지 않아 hunk 격리 대신 파일 전체를
+base 로 restore 해도 안전하다:
 
 ```
-$ git log --oneline 9787329712188c0a606b4afd90c1dcb33c1b9264..HEAD -- config/quality/gate-tests.properties
+$ git log --oneline 571059ab5ada307126a9dd35bc33b846dd4ae63f..d21cb21 -- config/quality/gate-tests.properties
+2f9fab9 fix(m4-4b6b): F-1(high) — MarginInputs 세 술어 전부를 호출 전에 판정
 74d9ceb test(m4-4b6b): WorkflowGateRegistrationTest — workflow 게이트 등재 완전성(운영자 결정 2026-09-11 a)
 ```
-
-다른 레인의 변경과 섞이지 않았으므로 **hunk 격리가 아니라 파일 전체를 base로
-restore**해도 안전하다(2026-09-08 하네스 레율 — 겹치는 파일이 있을 때만 hunk
-격리가 필요).
 
 ## Rollback 절차
 
@@ -48,10 +71,16 @@ rm -f \
   workflow/src/test/kotlin/bidvector/workflow/WorkflowGateRegistrationTest.kt \
   workflow/src/test/kotlin/bidvector/workflow/evaluation/EmbeddingBridgeTest.kt \
   workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisFixtures.kt \
-  workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisTest.kt
+  workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisTest.kt \
+  workflow/src/test/kotlin/bidvector/workflow/evaluation/PredictionFactsTest.kt \
+  reports/evidence/m4/4b6b/checklist.md \
+  reports/evidence/m4/4b6b/commands.md \
+  reports/evidence/m4/4b6b/policy-values.md \
+  reports/evidence/m4/4b6b/rollback.md
 
 # 2) in_scope 편집 파일 + 공유 파일을 base 로 restore(경로 개별 인자)
-git restore --source=9787329712188c0a606b4afd90c1dcb33c1b9264 --staged --worktree -- \
+git restore --source=571059ab5ada307126a9dd35bc33b846dd4ae63f --staged --worktree -- \
+  workflow/build.gradle.kts \
   workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityPolicyData.kt \
   workflow/src/main/kotlin/bidvector/workflow/evaluation/TextSynthesis.kt \
   workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityPolicyDataTest.kt \
@@ -60,20 +89,23 @@ git restore --source=9787329712188c0a606b4afd90c1dcb33c1b9264 --staged --worktre
 
 # 3) 삭제도 인덱스에 반영
 git add -A -- workflow/src/main/kotlin/bidvector/workflow/evaluation \
-  workflow/src/test/kotlin/bidvector/workflow config/quality/gate-tests.properties
+  workflow/src/test/kotlin/bidvector/workflow \
+  workflow/build.gradle.kts \
+  config/quality/gate-tests.properties \
+  reports/evidence/m4/4b6b
 ```
 
 ## 확인(2026-09-08/09-09 규율 — 목록·diff 0·compile·test 전부)
 
-- 목록 산출: `git diff --name-status <base>..HEAD`(위 블록, 라운드마다 재실행)
-- diff 0: `git diff --name-status 9787329712188c0a606b4afd90c1dcb33c1b9264 -- workflow/ config/quality/gate-tests.properties` → 빈 출력(실측)
+- 목록 산출: `git diff --name-status <base>..<코드 마지막 커밋>`(위 블록, 라운드마다 재실행)
+- diff 0: `git diff --name-status 571059ab5ada307126a9dd35bc33b846dd4ae63f -- workflow/ config/quality/gate-tests.properties reports/evidence/m4/4b6b/checklist.md reports/evidence/m4/4b6b/commands.md reports/evidence/m4/4b6b/policy-values.md reports/evidence/m4/4b6b/rollback.md` → 빈 출력(실측)
 - compile+test: `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin :workflow:test :workflow:gateExecutionGate` → **exit 0**(실측)
 
 ## 실측 — 임시 clone
 
-`git clone --no-hardlinks . /tmp/bv-4b6b-rollback-check` → head 커밋으로 checkout →
-위 절차 그대로 실행 → `git diff --name-status <base> -- <in_scope 경로>` 빈 출력 확인
-→ `:workflow:compileKotlin :workflow:compileTestKotlin :workflow:test
+`git clone --no-hardlinks . /tmp/bv-4b6b-rollback-check-r1` → head 커밋(`d21cb21`)으로
+checkout → 위 절차 그대로 실행 → `git diff --name-status <base> -- <in_scope 경로>` 빈
+출력 확인 → `:workflow:compileKotlin :workflow:compileTestKotlin :workflow:test
 :workflow:gateExecutionGate` **BUILD SUCCESSFUL** 확인 → clone 삭제. `cp -r` 미사용
 (연결 worktree 오염 회피, m4d/4D-1 교훈).
 
@@ -82,9 +114,12 @@ git add -A -- workflow/src/main/kotlin/bidvector/workflow/evaluation \
 - `MlAnalysisPort`의 유일한 실 구현이 사라져 `EvaluateCandidatesUseCase`는 다시
   test fake(`FakeMlAnalysisPort`)로만 배선 가능한 상태로 돌아간다(6A 배선 slice
   전 단계와 동일) — 이 slice 도입 전과 완전히 같은 상태.
-- `gate.tests.workflow`에서 신설 다섯(`WorkflowGateRegistrationTest`·
-  `EmbeddingBridgeTest`·`OpportunityAnalysisTest`)과 이 slice가 실측으로 찾아
-  등록한 기존 미등재 `LadderPolicySlotTest`도 함께 빠진다 — `LadderPolicySlotTest`
-  재등록은 이 slice가 아니라 그 test를 신설한 slice(4B-2)의 몫으로 넘어간다(알려진
-  회귀 — 롤백이 이 slice 이전에 이미 있던 미등재 상태로 정확히 되돌린다는 뜻이지
-  새 결함이 아니다).
+- `gate.tests.workflow`에서 신설 여섯(`WorkflowGateRegistrationTest`·
+  `EmbeddingBridgeTest`·`OpportunityAnalysisTest`·`PredictionFactsTest`)과 이
+  slice가 실측으로 찾아 등록한 기존 미등재 `LadderPolicySlotTest`도 함께 빠진다 —
+  `LadderPolicySlotTest` 재등록은 이 slice가 아니라 그 test를 신설한 slice(4B-2)의
+  몫으로 넘어간다(알려진 회귀 — 롤백이 이 slice 이전에 이미 있던 미등재 상태로
+  정확히 되돌린다는 뜻이지 새 결함이 아니다).
+- `workflow/build.gradle.kts`의 `gate-tests.properties` 입력 선언(F-2 수정)도
+  함께 빠진다 — `:workflow:test`가 다시 그 파일 변경을 입력으로 못 본다(이 slice
+  도입 전과 같은 상태로, 새 결함이 아니다).
