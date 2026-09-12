@@ -41,3 +41,4 @@
 | 일자 | 변경 | 근거 |
 | --- | --- | --- |
 | 2026-09-12 착수 | 표 등재(승인 대기) | D-5C-7 · D-5C-2 |
+| 2026-09-12 구현 확인 | `policy/training-v1.yaml`(§1)·`TrainingSpec` 등록표 `award-rate-gbm-training-v1`(§2, `spec.py`)가 이 표 값과 일치함을 `test_policy.py::test_shipped_policy_file_matches_policy_values_md`·`test_spec.py::test_shipped_spec_matches_policy_values_md`로 test 고정. §3 5A 표 대조는 값 변경 없음(정정 제안만, `OPEN-5C-5A-TABLE-REASSIGN`) | 구현 evidence — `reports/evidence/m5/5c/checklist.md` |
