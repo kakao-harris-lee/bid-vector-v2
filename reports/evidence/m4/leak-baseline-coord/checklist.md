@@ -77,6 +77,11 @@ commands.md "secret 스캔" 항목 — 문서 작성 전엔 매치 없음, 작�
   패턴 어휘를 인용해 새 자기매치를 낳고, baseline 에 등재해야 끝난다(이 slice 안에서
   누적 여러 건 — commands.md 참조). M0 의 「스캐너가 자기 출력을 스캔한다」와 같은
   갈래이고, 이 slice 가 닫지 않는다.
+- **rollback 은 게이트까지 복원하지 못한다** — in_scope 4개 파일만 base 로 되돌리면
+  compile·단위 test 는 서지만 `leakPatternGate`(따라서 `check`)는 그대로 붉다 — 이
+  slice 의 evidence 디렉터리 자체가 base 에 없어 legacy baseline 에 대응 항목이 없기
+  때문이다(재현: rollback.md "알려진 제한" 절, 첫 evidence 커밋부터 재현됨). 이 slice 가
+  닫지 않는다.
 
 ## N/A
 
