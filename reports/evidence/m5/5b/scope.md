@@ -117,3 +117,11 @@ ADR 0001(skew 방지 구조 유지)·0003(schema/code/dataset/checksum)·0009 D-
 | `OPEN-5B-FIXTURE-REEVAL` | `ml-boundary-003/004`(insufficient-evidence, `not_covered` 「M2 피처 계약 없음」) — 2B 계약이 났으므로 curator 재평가 대상. 5B test 가 같은 명제(결측 사유 provenance·누수 차단 시그니처)를 코드로 고정 |
 | `OPEN-ML-05` | 수령 유지 — 5B 는 κ 만 정책 인자로, 33 값은 5C·5D |
 | prep D-M5-5 문면 | 「`award_rate_features`(5B, `reliable_base` enum 만 들어올림)」 → 「enum 이식 없음, 어휘 = wire 라벨」 — 착수 커밋에서 팀장이 `prep/m5-prep.md` 갱신 |
+
+---
+
+## 계약 갱신 이력
+
+| 일자 | 갱신 | 사유 |
+| --- | --- | --- |
+| 2026-09-12 (verifier r1 뒤) | **⑤ 보강** — `FeatureManifest` 는 `agency_means`·`category_means` 를 **`__post_init__` 에서 정렬(키 기준)** 해 같은 내용이면 배열 순서와 무관하게 같은 canonical bytes·checksum 을 낸다(`Vocabulary` 와 같은 불변식). **④ 보강** — `build_agency_target_encoding` 은 관측 0 이면 `global_mean = 0.0` 을 내지 않고 **결과 타입 `EncodingOutcome = Built(encoding) \| NoObservations`** 를 낸다(위협 모델 (a) 「0 대입」의 잔여 갈래 — legacy 접힘 제거, 5C 빈 코퍼스 가드는 이 결과 타입을 소비). **① 보강** — `FeatureColumn.range` 는 선언만 두지 않고 `build_row` 결과의 `Observed` 값이 그 범위 안임을 **rows 규칙 test 가 열마다 단언**(범위는 정책 값이 아니라 스키마 사실: `log_amount ≥ 0`·`agency_encoding ∈ [0,1]`·`agency_sample_count ≥ 0`, 범주 열 None — checklist 에 근거). **OPEN 신설 `OPEN-5B-FEATURES-FORBIDDEN`** — import-linter 의 DB/HTTP forbidden 이 `serving`·`inference` 만 겨눠 `features` 에 sqlalchemy/requests/lightgbm 을 심어도 통과(verifier 실측) → 5A 소유 `pyproject.toml` 편집이라 5B out_of_scope, **5C 착수 계약에서 `features`·`training`·`evaluation` 을 source_modules 에 추가** | verifier r1 M-1(같은 내용·다른 순서 → 다른 checksum, fail-closed 방향이나 5C 가 삽입 순서로 쌓으면 실행마다 checksum 이 달라짐) · M-2(관측 0 이 「낙찰률 0%」와 값·provenance 둘 다 안 갈림) · L-1(range 미검증) · L-3(범위 밖 사각) |
