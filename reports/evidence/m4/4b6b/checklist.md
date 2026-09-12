@@ -110,6 +110,11 @@ F-4(notice 실패 시 profile 미호출)는 둘 다 `private`/기존 `internal` 
   S-1 3~4차 참고). 기계적 분할이 아니라 이미 코드 안에 있던 책임 경계(port I/O
   대 순수 변환)를 파일 경계로 옮긴 것이다.
 
+8. **죽은 분기 하나**(PR #9 리뷰 레인 LOW, 2026-09-12) — `OpportunityAnalysisPipeline.combineEmbeddings` 의
+   「notice 임베딩 Unavailable」 분기는 유일 호출부(`OpportunityAnalysis`)가 F-4 단락으로 이미 그 경우를 걸러
+   넘기므로 도달 불가. 타입은 소진 `when` 이라 안전하고 거동 영향 없음. 정리는 다음에 그 파일을 만지는 slice(6A
+   배선 또는 후속 정리)에서 — 이 PR 에서 코드 변경 없음.
+
 ## 사용자 승인
 
 **2026-09-12 — slice 4B-6b 종결 승인.** verifier r1 not-ready(high 1: 예측 후보율 > 1 이 `MarginInputs.init` 예외로 새어 배치 소실 ·
