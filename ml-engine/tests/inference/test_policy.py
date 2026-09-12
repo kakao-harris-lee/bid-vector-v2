@@ -170,6 +170,35 @@ def test_clamp_min_zero_is_rejected(tmp_path: Path) -> None:
     assert isinstance(result, PolicyRejected)
 
 
+def test_clamp_min_quantizes_to_zero_is_rejected_digits_1(tmp_path: Path) -> None:
+    """verifier r2 F-1 재현 1 — `clamp_min > 0`(quantize **전**) 만으로는 부족하다.
+    `bid_rate_digits=1`에서 `quantize_bid_rate(0.04, 1)`은 `0.0`(0.04 는 한 자리로
+    반올림하면 0)이라, 이전 판은 이 정책을 통과시켜 `build_scenario_candidates`가
+    `Candidate.__post_init__`의 `ValueError`를 던지게 했다."""
+    values = _base_values()
+    values["scenario.bid_rate_digits"] = 1
+    values["scenario.clamp_min"] = 0.04
+    result = load_inference_policy(_write(tmp_path, values))
+    assert isinstance(result, PolicyRejected)
+    assert "clamp_min" in result.reason
+
+
+def test_clamp_min_quantizes_to_zero_is_rejected_digits_4(tmp_path: Path) -> None:
+    """verifier r2 F-1 재현 2 — `bid_rate_digits=4`(출하 기본)에서도
+    `clamp_min=0.00001`(1e-05)은 quantize 뒤 `0.0000`이 된다."""
+    values = _base_values()
+    values["scenario.clamp_min"] = 0.00001
+    result = load_inference_policy(_write(tmp_path, values))
+    assert isinstance(result, PolicyRejected)
+    assert "clamp_min" in result.reason
+
+
+def test_shipped_clamp_min_survives_quantize_check(tmp_path: Path) -> None:
+    """출하 정책(clamp_min 0.7, digits 4)은 F-1 불변식에 영향받지 않는다 — 회귀 없음."""
+    policy = load_inference_policy(_POLICY_PATH)
+    assert isinstance(policy, InferencePolicy)
+
+
 @pytest.mark.parametrize(
     "weight_key",
     [

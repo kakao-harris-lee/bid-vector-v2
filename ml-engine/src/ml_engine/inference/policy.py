@@ -18,6 +18,7 @@ from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from ml_engine.inference.rounding import quantize_bid_rate
 from ml_engine.registry.policy import Policy, PolicyError, PolicyScalar, load_policy
 
 SHIPPED_INFERENCE_POLICY_VERSION = "inference-v1"
@@ -168,13 +169,26 @@ def _coerce_values(
 
 
 def _validate_bands(raw: InferencePolicy) -> str | None:
-    """밴드 하한 < 상한 불변식(D-5D-8) + `clamp_min > 0`(verifier r1 M-2) — 위반 시
-    사유 문자열, 통과 시 `None`. `clamp_min > 0` 이 없으면 `clamp_min <= 0` 인 정책이
-    `scenario.py::build_scenario_candidates`의 클램프를 통과해 `Candidate.bid_rate <= 0`
-    인 후보를 만들 수 있었다(재현: `clamp_min -1.0`, `center -0.5` → 커널이 `ValueError`
-    로 예외를 던짐 — 결과 타입 경계 밖으로 새는 위협 (a) 위반)."""
+    """밴드 하한 < 상한 불변식(D-5D-8) + `clamp_min > 0`(verifier r1 M-2) + `quantize(
+    clamp_min, bid_rate_digits) > 0`(verifier r2 F-1) — 위반 시 사유 문자열, 통과 시
+    `None`. `clamp_min > 0` 만으로는 부족했다 — `scenario.py::build_scenario_candidates`
+    는 클램프 **뒤**에 정책 `bid_rate_digits`로 quantize 하므로, quantize 전에는 양수여도
+    quantize 뒤 0 이 되는 조합(예: `bid_rate_digits 1`+`clamp_min 0.04` → `quantize`
+    결과 `0.0`)이 `Candidate.bid_rate <= 0`인 후보를 만들어 `Candidate.__post_init__`의
+    `ValueError`가 결과 타입 경계 밖으로 샌다. 그래서 이 검사는 `scenario.py`와 **같은**
+    `quantize_bid_rate`(`rounding.py`, 단일 출처)로 판정한다 — 두 곳이 각자 quantize를
+    구현하면 정책이 통과시킨 값과 커널이 실제로 내는 값의 반올림 규칙이 갈릴 수 있다."""
     if not raw.scenario_clamp_min > 0:
         return f"scenario.clamp_min 은 0보다 커야 한다: {raw.scenario_clamp_min}"
+    quantized_clamp_min = quantize_bid_rate(
+        raw.scenario_clamp_min, raw.scenario_bid_rate_digits
+    )
+    if not quantized_clamp_min > 0:
+        return (
+            f"scenario.clamp_min({raw.scenario_clamp_min})은 scenario.bid_rate_digits"
+            f"({raw.scenario_bid_rate_digits}) 자리로 quantize 한 뒤에도 0보다 커야 한다: "
+            f"quantize 결과 {quantized_clamp_min}"
+        )
     if not raw.scenario_clamp_min < raw.scenario_clamp_max:
         return (
             f"scenario.clamp_min({raw.scenario_clamp_min}) 은 "
