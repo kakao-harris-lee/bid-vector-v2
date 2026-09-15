@@ -40,6 +40,14 @@ def read_dataset_files(uri: str) -> DatasetFiles | DatasetUnreadable:
         return DatasetUnreadable(
             DatasetUnreadableReason.UNSUPPORTED_SCHEME, parsed.scheme
         )
+    if parsed.netloc:
+        # code-reviewer PR #13 MEDIUM-2 — `file://<host>/path`(비표준 file URI, host
+        # 부분이 있음)는 host 를 조용히 무시하고 `path`만 읽어버릴 위험이 있다.
+        # `file:///abs/path`(host 없음)만 허용한다 — 이 slice 는 `file://` 지원을
+        # 이 형태로 문서화했다(D-5C-8).
+        return DatasetUnreadable(
+            DatasetUnreadableReason.UNSUPPORTED_SCHEME, f"file://{parsed.netloc}/…"
+        )
 
     directory = Path(parsed.path).resolve()
     if not directory.exists():
