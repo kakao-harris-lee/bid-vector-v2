@@ -1,0 +1,23 @@
+version: evaluation-v1
+# 값 근거·legacy 좌표는 reports/evidence/m5/5c2/policy-values.md §1 — 전부 legacy
+# 코드 상수(ed4b06c)의 무변경 이식(D-5C2-3). 이 파일만 편집해서 임계를 바꾸지 않는다 —
+# 정책 값 갱신 절차는 policy-values.md → 이 파일 → test 순(같은 문서 §0).
+paired_t_threshold: 2.58
+gate_baseline: category_x_band
+gate_model: gbm_all_strata
+gate_stratum: clean-base
+maturity_threshold: 0.70
+min_evaluation_rows: 100
+max_origins: 5
+agency_baseline_min_count: 10
+stability_seeds.0: 20260812
+stability_seeds.1: 1
+stability_seeds.2: 7
+stability_seeds.3: 42
+stability_seeds.4: 2026
+amount_band_edges.0: 100000000
+amount_band_edges.1: 500000000
+amount_band_edges.2: 1000000000
+amount_band_edges.3: 5000000000
+segment_axes.0: category
+segment_axes.1: amount_band

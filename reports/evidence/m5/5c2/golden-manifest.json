@@ -1,0 +1,4 @@
+{
+  "status": "N/A",
+  "reason": "5C-2 test 는 전부 합성 코퍼스(규칙·불변식 판정)로 구성했다 — 실코퍼스 evaluation fixture 는 fixture-curator 몫(scope.md OPEN-5C-CORPUS 승계). 사용한 authoritative/observed/legacy-behavior fixture 가 없어 fixtures/manifest.yaml 대조 대상이 없다."
+}

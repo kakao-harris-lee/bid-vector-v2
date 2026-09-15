@@ -1,6 +1,145 @@
-"""ml_engine.evaluation — calibration·worst-segment report·promotion 측정(5C). 측정만
-만든다 — 운영 배포를 결정하지 않는다(milestone-5.md 「promotion은 측정 결과를 만들 뿐
-자동 운영 배포하지 않음」).
-"""
+"""ml_engine.evaluation — 낙찰률 GBM 홀드아웃 평가 커널(M5/5C-2). 공개 표면 재수출
+((2b) 값 획득 축 표가 전수) — 다른 패키지는 이 최상위 이름만 보고 하위 모듈을 직접
+import 하지 않는다. 순수 커널(채점·베이스라인·세그먼트·진단·창 정책·판정·report 타입·
+정책)만 여기 있다 — 창마다 학습을 부르는 실행기는 `ml_engine.training.holdout`(층
+경계, import-linter `training > evaluation > features`)."""
 
 from __future__ import annotations
+
+from ml_engine.evaluation.baselines import (
+    GATE_BASELINE_TABLE_NAMES,
+    BaselineSpec,
+    amount_band_key,
+    baseline_specs,
+    group_mean_predictions,
+)
+from ml_engine.evaluation.diagnostics import (
+    COVERAGE_COVERED,
+    COVERAGE_FALLBACK,
+    CategoryCount,
+    CoverageSplit,
+    StabilitySummary,
+    StabilityTrial,
+    UnlearnedCell,
+    category_counts,
+    coverage_splits,
+    minimum_detectable_improvement,
+    required_row_count,
+    summarize_stability,
+    unlearned_cells,
+)
+from ml_engine.evaluation.policy import (
+    SHIPPED_EVALUATION_POLICY_VERSION,
+    EvaluationPolicy,
+    PolicyRejected,
+    PolicyRejectionReason,
+    load_evaluation_policy,
+    policy_checksum,
+)
+from ml_engine.evaluation.report import (
+    EvaluationReportV1,
+    ModelScore,
+    NotPromotable,
+    Promotable,
+    Promotion,
+    PromotionNotEvaluable,
+    StratumCount,
+    WindowResult,
+    canonical_report_bytes,
+    derive_promotion,
+    report_checksum,
+)
+from ml_engine.evaluation.scoring import improvement_ratio, paired_t, rmse_bias_std
+from ml_engine.evaluation.segments import (
+    SegmentScore,
+    SegmentSpec,
+    regressed_segments,
+    segment_scores,
+    segment_specs,
+)
+from ml_engine.evaluation.verdict import (
+    Failed,
+    GateOutcome,
+    NotEvaluable,
+    NotEvaluableReason,
+    Passed,
+    gate_outcome,
+    passes_gate,
+)
+from ml_engine.evaluation.windows import (
+    DroppedRowCount,
+    HoldoutOverlap,
+    InvalidMaturityInput,
+    StratifiedRow,
+    WeekMaturity,
+    WindowExclusion,
+    WindowExclusionReason,
+    WindowPlan,
+    holdout_overlaps,
+    indices_in_window,
+    plan_evaluation_windows,
+)
+
+__all__ = [
+    "COVERAGE_COVERED",
+    "COVERAGE_FALLBACK",
+    "GATE_BASELINE_TABLE_NAMES",
+    "SHIPPED_EVALUATION_POLICY_VERSION",
+    "BaselineSpec",
+    "CategoryCount",
+    "CoverageSplit",
+    "DroppedRowCount",
+    "EvaluationPolicy",
+    "EvaluationReportV1",
+    "Failed",
+    "GateOutcome",
+    "HoldoutOverlap",
+    "InvalidMaturityInput",
+    "ModelScore",
+    "NotEvaluable",
+    "NotEvaluableReason",
+    "NotPromotable",
+    "Passed",
+    "PolicyRejected",
+    "PolicyRejectionReason",
+    "Promotable",
+    "Promotion",
+    "PromotionNotEvaluable",
+    "SegmentScore",
+    "SegmentSpec",
+    "StabilitySummary",
+    "StabilityTrial",
+    "StratifiedRow",
+    "StratumCount",
+    "UnlearnedCell",
+    "WeekMaturity",
+    "WindowExclusion",
+    "WindowExclusionReason",
+    "WindowPlan",
+    "WindowResult",
+    "amount_band_key",
+    "baseline_specs",
+    "canonical_report_bytes",
+    "category_counts",
+    "coverage_splits",
+    "derive_promotion",
+    "gate_outcome",
+    "group_mean_predictions",
+    "holdout_overlaps",
+    "improvement_ratio",
+    "indices_in_window",
+    "load_evaluation_policy",
+    "minimum_detectable_improvement",
+    "paired_t",
+    "passes_gate",
+    "plan_evaluation_windows",
+    "policy_checksum",
+    "regressed_segments",
+    "report_checksum",
+    "required_row_count",
+    "rmse_bias_std",
+    "segment_scores",
+    "segment_specs",
+    "summarize_stability",
+    "unlearned_cells",
+]

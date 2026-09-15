@@ -159,6 +159,24 @@ release / 신규 3 — corpus·dataset·policy) + `adapters/dataset_files.py`(`f
 `OPEN-5C-MATURITY-SOURCE`·`OPEN-5C-CORPUS`(5C-2·curator) · CI(Linux) 그린은 PR 에서 확인. 정본 `reports/evidence/m5/5c/checklist.md`. **다음은 5C-2**(평가·홀드아웃·승격 측정·
 evaluation report·`policy/evaluation-v1.yaml` — 조사 노트 02 의 ML-07 보강이 입력).
 
+**5C-1 병합 2026-09-15 — PR #13(`e4abc90`, 사용자 「병합 진행」)** — 5D 병합(PR #12) 뒤 `d4727fc` 로 두 번 rebase(D-5C-9b: 바이트 안 `release.artifact_checksum` 은
+blank-canonical sha256 — 5D read model 이 비어 있지 않은 문자열을 요구·등가성은 안 봄, 5D `load_artifact` 왕복 test 6 으로 `OPEN-5C-ARTIFACT-ROUNDTRIP` 종결) → verifier
+r3 `not-ready`(high 1: 파생 값 셋 재계산 test 0 — 변이가 조용히 통과) → r4 `ready` → **PR code-reviewer(sonnet) 머지 불가(high 2: 최소 표본 게이트가 `build_row`
+탈락 뒤를 재게이트 안 함 — 494/500 결측에서 6행 성공 artifact · 정책 로더가 `yaml.YAMLError` 를 예외로 흘림)** → 시정 → verifier r5 `ready`. 재작업 3회. CI 두 job 초록
+(첫 실행은 evidence 의 패턴 어휘 축어 인용으로 `leakPatternGate` 붉음 → 파일 참조로 정정, 계약 S-10). 최종 456→466 passed 1 skipped. 리뷰 판정 셋이 PR 코멘트에.
+**추가 OPEN**: `OPEN-5C-REJECT-ACCOUNTING`(재게이트 거부의 사유별 분해 — 5C-2·5E) · `OPEN-5C-YAML-ERROR-5D`(5D `inference/policy.py` 동일 구멍).
+
+**5C-2 착수 2026-09-15(사용자 지시 「5C-2 착수」 · 운영자 확인 대기: D-5C2-1·3·7·9)** — base 는 PR #14 머지 커밋 `c669a71`(5C-1·5D·5D-2 실물). 레인 worktree
+`bid-vector-v2-m5c2`·브랜치 `m5-5c2/2026-09-15`, 병행 레인 없음. 조사(02 §1-5·§2-6·§2-7): ML-07 판정식은 한 줄(`model_rmse < baseline_rmse ∧ paired_t < −2.58`, 비교 대상
+`category_x_band`) · 임계는 **코드 상수 100%**(`settings` import 0 — 「CLI 를 두지 않는 이유」 성문화) · 유일한 실질 완화 경로는 `WindowPolicy` 주입(세 필드 public) + `--no-stability`·`--seed`
+조합 · 「못 쟀다」는 별도 어휘가 아니라 bool 셋 조합 · 가장 성숙한 평가(A 계보)의 판정 소비자가 CLI 콘솔뿐. **결정**: 순수 커널은 `evaluation/`, 창마다 학습을 부르는 실행기만
+`training/holdout.py`(layers `training > evaluation`, 둘 다 `inference` 금지 — D-5C2-1) · 성숙도는 **입력** `WeekMaturity(start, end, opened, settled)`(K7 계산은 5D, D-5C2-2) ·
+임계 전부 `policy/evaluation-v1.yaml`(legacy 값 무변경, 낱개 인자·CLI·env 없음 — D-5C2-3) · 판정 3값 `Passed | Failed | NotEvaluable(reason, required_rows)` + `UNDERPOWERED`·
+`SEED_UNSTABLE` 결과 승격(D-5C2-4) · seed 안정성 끌 수 없음(D-5C2-5) · 승격 측정은 latest-window 하나(D-5C2-6) · 홀드아웃 예측은 booster 직접(서빙 경로 동일성은
+`OPEN-5C2-SERVING-PATH-PARITY`, D-5C2-7) · 경계 동시각은 평가측(D-5C2-8) · 세그먼트 축 `category`·`amount_band`, `published_floor` 없음(D-5C2-9) · 비율 분할 API 없음.
+acceptance 는 CI `ml-engine` job 전건 + evidence 라운드 Kotlin `check`. 정본 `reports/evidence/m5/5c2/scope.md`, 설계 검토 `_workspace/m5-5c2/03_design-review.md`,
+정책 값 `reports/evidence/m5/5c2/policy-values.md`.
+
 ### Slice 5D — inference kernels
 
 - model predict adapter
