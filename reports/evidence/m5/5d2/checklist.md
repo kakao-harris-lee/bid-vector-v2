@@ -165,6 +165,9 @@ rollback.md 갱신(별도 커밋). F-8은 알려진 제한 1에 한 줄 보강(�
 `reports/evidence/m5/5d2/commands.md` S-1~S-9 전건. 결과: 전부 exit 0, 402 passed
 (4 deselected legacy_parity), golden 14/14 skip 0.
 
+12. **`excluded_observations` 는 총계만**(PR #14 리뷰 LOW, 2026-09-15) — 사유별 breakdown 은 wire `Diagnostics` 에 자리가 없어 총계만 나른다.
+    `SampleRejected` 값이 사유를 담고 있어 호출부가 `Counter` 로 즉시 파생 가능. 사유별 필드가 필요하면 2F 이후 additive 후보.
+
 ## 사용자 승인
 
 **2026-09-15 — slice 5D-2 종결 승인**(운영자 「추천 방식으로 진행」). verifier r1 not-ready(high 1: wire `Rate.fraction` 파싱 예외 탈출 · medium 1: `reserve_prices` Money
