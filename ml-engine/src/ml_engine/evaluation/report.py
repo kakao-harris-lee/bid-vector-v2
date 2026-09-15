@@ -17,6 +17,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass
+from typing import assert_never
 
 from ml_engine.evaluation.diagnostics import (
     CategoryCount,
@@ -27,6 +28,7 @@ from ml_engine.evaluation.diagnostics import (
 )
 from ml_engine.evaluation.segments import SegmentScore
 from ml_engine.evaluation.verdict import (
+    Failed,
     GateOutcome,
     NotEvaluable,
     NotEvaluableReason,
@@ -132,16 +134,25 @@ def derive_promotion(
     latest: GateOutcome | None, *, window_start: str | None
 ) -> Promotion:
     """latest-window 하나의 `GateOutcome`에서 승격 측정을 파생한다(D-5C2-6). `latest`가
-    `None`이면(성숙 창이 하나도 없었다) `NO_EVALUABLE_WINDOW`."""
+    `None`이면(성숙 창이 하나도 없었다) `NO_EVALUABLE_WINDOW`.
+
+    code-reviewer MEDIUM — `isinstance` 연쇄 + 암묵적 최종 `else`(`Failed`)는
+    `GateOutcome`에 네 번째 변형이 추가돼도 mypy 가 경고하지 않는다. `match`로
+    세 값을 전부 명시해 exhaustiveness 를 타입 검사기가 보장하게 한다(새 변형이
+    생기면 `mypy --strict`가 이 함수에서 반환 누락으로 떨어진다)."""
     if latest is None:
         return PromotionNotEvaluable(NotEvaluableReason.NO_EVALUABLE_WINDOW)
-    if isinstance(latest, NotEvaluable):
-        return PromotionNotEvaluable(latest.reason)
-    if isinstance(latest, Passed):
-        if window_start is None:
-            raise ValueError("Passed 판정에는 window_start 가 있어야 합니다.")
-        return Promotable(window_start=window_start)
-    return NotPromotable(reasons=("gate_failed",))
+    match latest:
+        case NotEvaluable(reason=reason):
+            return PromotionNotEvaluable(reason)
+        case Passed():
+            if window_start is None:
+                raise ValueError("Passed 판정에는 window_start 가 있어야 합니다.")
+            return Promotable(window_start=window_start)
+        case Failed():
+            return NotPromotable(reasons=("gate_failed",))
+        case _:
+            assert_never(latest)
 
 
 @dataclass(frozen=True)
@@ -175,14 +186,7 @@ class EvaluationReportV1:
     promotion: Promotion
 
 
-def _gate_outcome_json(outcome: GateOutcome) -> _JsonValue:
-    if isinstance(outcome, NotEvaluable):
-        return {
-            "kind": "not_evaluable",
-            "reason": outcome.reason.value,
-            "required_row_count": outcome.required_row_count,
-        }
-    kind = "passed" if isinstance(outcome, Passed) else "failed"
+def _scored_outcome_json(kind: str, outcome: Passed | Failed) -> _JsonValue:
     return {
         "kind": kind,
         "baseline_rmse": outcome.baseline_rmse,
@@ -192,6 +196,24 @@ def _gate_outcome_json(outcome: GateOutcome) -> _JsonValue:
         "min_detectable_improvement": outcome.min_detectable_improvement,
         "required_row_count": outcome.required_row_count,
     }
+
+
+def _gate_outcome_json(outcome: GateOutcome) -> _JsonValue:
+    """code-reviewer MEDIUM — `isinstance` 연쇄 + 암묵적 `"failed"` 최종 분기 대신
+    `match`로 세 변형을 전부 명시한다(`derive_promotion`과 같은 근거)."""
+    match outcome:
+        case NotEvaluable(reason=reason, required_row_count=required):
+            return {
+                "kind": "not_evaluable",
+                "reason": reason.value,
+                "required_row_count": required,
+            }
+        case Passed():
+            return _scored_outcome_json("passed", outcome)
+        case Failed():
+            return _scored_outcome_json("failed", outcome)
+        case _:
+            assert_never(outcome)
 
 
 def _promotion_json(promotion: Promotion) -> _JsonValue:
