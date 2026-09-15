@@ -22,6 +22,13 @@ from ml_engine.evaluation.policy import (
     policy_checksum,
 )
 from ml_engine.evaluation.scoring import improvement_ratio, paired_t, rmse_bias_std
+from ml_engine.evaluation.segments import (
+    SegmentScore,
+    SegmentSpec,
+    regressed_segments,
+    segment_scores,
+    segment_specs,
+)
 
 __all__ = [
     "GATE_BASELINE_TABLE_NAMES",
@@ -30,6 +37,8 @@ __all__ = [
     "EvaluationPolicy",
     "PolicyRejected",
     "PolicyRejectionReason",
+    "SegmentScore",
+    "SegmentSpec",
     "amount_band_key",
     "baseline_specs",
     "group_mean_predictions",
@@ -37,5 +46,8 @@ __all__ = [
     "load_evaluation_policy",
     "paired_t",
     "policy_checksum",
+    "regressed_segments",
     "rmse_bias_std",
+    "segment_scores",
+    "segment_specs",
 ]
