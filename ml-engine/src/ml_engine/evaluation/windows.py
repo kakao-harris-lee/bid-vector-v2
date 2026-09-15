@@ -201,7 +201,8 @@ def plan_evaluation_windows(
                 )
             )
 
-    keep = survivors[-policy.max_origins :] if policy.max_origins > 0 else []
+    # code-reviewer LOW — max_origins>=1 은 __post_init__ 이 강제(죽은 else [] 제거).
+    keep = survivors[-policy.max_origins :]
     dropped = survivors[: len(survivors) - len(keep)]
     excluded.extend(
         WindowExclusion(
