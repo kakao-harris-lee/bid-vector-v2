@@ -29,8 +29,10 @@ in_scope:
   - ml-engine/src/ml_engine/training/dataset.py             # 5C-1 파일 — DatasetManifestV1 에 `settlements_checksum` 필수 필드 추가 + rows 와 같은 검증(D-5E-4, hunk 격리) 
   - ml-engine/src/ml_engine/adapters/dataset_files.py       # 5C-1 파일 — `settlements.jsonl` 세 번째 파일 읽기(D-5E-4, hunk 격리)
   - ml-engine/src/ml_engine/adapters/artifact_files.py      # 신규 — write_artifact_files(dir, artifact_bytes, report_bytes) -> ArtifactRefs(file:// uri 둘 + checksum) · 쓰기 전 디렉터리 존재·비어 있음 검증(덮어쓰기 금지)
+  - ml-engine/src/ml_engine/adapters/__init__.py           # `write_artifact_files`·`ArtifactRefs` 재수출 한 줄. 계약 갱신 (3)
   - ml-engine/policy/serving-v1.yaml                        # 정책 값 실물(D-5E-6, OPEN-5E-POLICY-VALUES)
   - ml-engine/pyproject.toml                                # (a) import-linter forbidden 계약(serving/inference 는 grpc 금지)에 `ignore_imports = ["ml_engine.serving.grpc -> grpc", "ml_engine.training.jobs.servicer -> grpc"]` (b) `[project.scripts]` 또는 `-m` 진입 문서 (c) wheel 빌드 훅 설정(D-5E-8 — 생성 stub 을 wheel 의 **별도 top-level 패키지 `bidvector/`** 로, 소스 트리·`ml_engine` 패키지 안엔 두지 않음) (d) serving extras 에 `grpcio` 는 이미 base 의존 — 변경 0 확인 · dev extras 에 `grpc-stubs`(D-5E-9) · `[tool.ruff]`·래칫·layers 무편집
+  - ml-engine/uv.lock                                      # D-5E-9 `grpc-stubs`·(c) `grpcio-tools` build-system 갱신분(D-5E-9 산문에만 있던 것을 목록에). 계약 갱신 (3)
   - ml-engine/tools/build_hook.py                           # D-5E-8 — setuptools `build_py` 서브클래스: `generate_contracts.generate(<build_lib>)` 로 `<build_lib>/bidvector/ml/v1/*_pb2*.py` 생성(5A `tools/generate_contracts.py` 재사용) · `contracts/__init__.py` 무편집(설치본에선 절대 import 가 sys.path 조작 없이 성립 — S-11 실측)
   - ml-engine/setup.py                                     # D-5E-8 배선 — `cmdclass={"build_py": ContractsBuildPy}` 만(PEP 517 훅은 pyproject 만으로 cmdclass 를 못 건다). 계약 갱신 2026-09-16 (2): 구현 실측으로 추가
   - ml-engine/tests/serving/**                              # RED 먼저 — in-process grpc(grpc_testing 또는 insecure 포트 0) 로 세 servicer test · readiness 규칙표 · 전이표 property · idempotency · deadline/cancel(자원 해제 카운터) · concurrency 상한(동시 N+1 번째 RESOURCE_EXHAUSTED) · shutdown 순서 · status 매핑 전수 · 2C 조합 불변식
@@ -182,3 +184,4 @@ rollback: |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — 5E 분할(D-5E-0), 결정 11 | 사용자 「5E 착수」 · 착수 조사 |
 | 2026-09-16 (2) verifier r1 요청 전 | in_scope 에 `ml-engine/setup.py`·`config/quality/leak-pattern-baseline.txt` 추가 · 「하네스 레인 변경」 절 신설(없음) | 구현 실측 — setuptools 훅 배선에 `setup.py` 필요(pyproject 만으로 cmdclass 불가), `CancelToken` 식별자 오탐 baseline 등재. 절 누락은 evidence-pack 규격 위반(팀장 레인 초판 누락) |
+| 2026-09-16 (3) verifier r1 뒤 | in_scope 에 `ml-engine/uv.lock`·`ml-engine/src/ml_engine/adapters/__init__.py` 추가 | verifier r1 L-1 — 둘 다 변경됐는데 목록 밖(전자는 D-5E-9 산문에만). 수정 라운드 1 과 병행, 산출물 무접촉 |
