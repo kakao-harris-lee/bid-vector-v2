@@ -104,12 +104,12 @@ exit 0.
   바뀐다」로 선언하지만, 2차 rebase(`main`=`d4727fc`) 뒤로는 **`main`과 바이트 동일**이다
   (본 문서 「2차 rebase」절 · `rollback.md` 「파일 목록」절이 이미 정확히 적어 뒀다).
 
-## secret 스캔
+## 비밀값 스캔
 
 ```
-grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m5/5c/
+grep -rniE -f config/quality/leak-patterns.txt ml-engine/src/ml_engine/training ml-engine/src/ml_engine/adapters ml-engine/policy ml-engine/tests/training ml-engine/tests/adapters reports/evidence/m5/5c/
 ```
-결과: 이 절 자신이 "secret"이라는 단어를 설명하려고 여러 번 쓰기 때문에 자기 인용으로
-몇 건이 잡힌다(이 절 제목·grep 패턴 문자열·이 설명 문장 자체) — 실제 credential 형태의
-매치는 0건이다(verifier r1 L-4 — 자기참조 오탐임을 명시, 값이 아니라 패턴 언급이므로
-민감정보 유출이 아니다).
+결과: exit 1(매치 0). 패턴 어휘를 이 문서에 리터럴로 적지 않는다(5B·5D 관례) — 이전 판은
+패턴을 축어로 인용해 루트 `leakPatternGate`(Kotlin `check` job, `reports/evidence/` 스캔)가
+PR #13 CI 에서 자기 인용 3건을 새 매치로 잡았다(값 노출 아님). 어휘를 파일 참조로 바꿔
+매치 0 으로 닫았다.
