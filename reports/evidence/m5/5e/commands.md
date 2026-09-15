@@ -91,6 +91,16 @@
   `NOT_READY`(D-5E-2·D-5E-3, 변화 없음)이지만 `StartTraining` 은 `MODEL_NOT_READY`(gate 가
   `NOT_READY`)가 되어 「ACCEPTED」 경로를 이 시점 출하 정책만으로는 보일 수 없다.
 
+## S-13 (verifier r1 M-4 — source 경로 비밀값 스캔, evidence 문서가 아니라 코드 자체)
+
+## 2026-09-16T00:00Z
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt <이 slice 가 만지거나 새로 낸
+  ml-engine/src·ml-engine/tests 파일 목록(`git diff --name-only d78e162..HEAD` 로 산출)>`
+- exit: 0(매치 있음 — grep 규약상 매치 존재 시 0, 없으면 1)
+- 핵심 결과: 65줄 매치, 전부 그 취소 토큰 클래스/매개변수 이름 하나의 어휘에서만
+  나왔다(참조형 스캔 — 목록의 다른 다섯 어휘 항목은 매치 0줄, 어휘 자체나 매치
+  목록은 여기 옮기지 않는다, 2026-09-16 하네스 규율). 실유출 없음.
+
 ## evidence 편집 라운드 — leakPatternGate(장부층)
 
 ## 2026-09-15T21:44Z
