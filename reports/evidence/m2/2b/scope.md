@@ -120,3 +120,11 @@ checklist 알려진 제한 7 · 위협 (a) 「oneof + test」가 여기서 성�
 | `OPEN-DIC-03` | `SkipReason` — Kotlin 소유, 계약 무관 |
 | 신설 후보 `OPEN-2B-OBJECTIVE-VALUES` | `OptimizationObjective` 의 M5 지원 집합 — 5D 가 확정 |
 | 신설 후보 `OPEN-2B-AGENCY-ID` | `agency_id` 의 정본(불투명 식별자의 발급·안정성) — M3 수집 축 |
+
+---
+
+## 갱신 이력
+
+| 날짜 | 변경 | 사유 |
+| --- | --- | --- |
+| 2026-09-15 | **D-2B-8 축 한정**(M2/2F D-2F-4) — 위 표의 「`Rate.fraction`이 `1` 초과면 계약 위반」은 **대상 공고 요청·응답의 후보율 축**(`FeatureInputs`가 나르는 값·`prediction.proto` `Candidate.bid_rate`)에 한정된다. `features.proto` `CompetitionSample.observed_bid_rate`(과거 표본의 **관측값** 축)는 이 한정 밖이다 — 100% 초과 투찰이 실존하므로 `> 1`을 허용하고 엔진 정책 밴드(5D `bid_ratio.plausible`)가 정제한다. D-2B-8 원문이 모든 율 필드에 걸리는지 모호했던 것을 2F가 명시적으로 갈랐다 | `reports/evidence/m2/2f/scope.md` ⑤·D-2F-4·`OPEN-5D2-BID-RATE-UPPER` 닫음 |
