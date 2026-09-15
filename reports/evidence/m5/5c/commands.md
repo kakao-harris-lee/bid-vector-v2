@@ -5,7 +5,7 @@
 
 | # | 명령 | exit | 핵심 결과 |
 | --- | --- | --- | --- |
-| S-1 | `uv sync --frozen --all-extras` | 0 | 33 packages audited(`pyyaml`을 training extras 에 더함, `uv.lock` 갱신 2줄) |
+| S-1 | `uv sync --frozen --all-extras` | 0 | 2번째 rebase(`main`=`d4727fc`) 뒤 재실측 — 빌드+재설치 1건("Uninstalled 1 package / Installed 1 package")뿐, 새 패키지 없음(5D PR #12 가 `pyyaml`을 serving/training extras 에 이미 넣어 5C-1 의 동일 추가와 병합 시 단일화됨, 아래 「2차 rebase」 절) |
 | S-1b | `uv sync --frozen --extra serving --no-dev` + 5개 import 시도 전부 실패 확인 + `uv sync --frozen --all-extras` 복귀 | 0 | sqlalchemy·psycopg·requests·httpx·celery 전부 import 실패("no leaks") — serving extras 에 학습 의존 없음 |
 | S-2 | `uv run ruff check . && uv run ruff format --check .` | 0 | "All checks passed!" · 전 파일 포맷 일치 |
 | S-3 | `uv run mypy --strict src/ml_engine` | 0 | "Success: no issues found in 39 source files"(rebase 뒤 재실측 — 5D 소스가 합류해 30 → 39. `[[tool.mypy.overrides]]` 추가 0(대신 `dataset.py`의 `google.protobuf` import 줄에 인라인 `# type: ignore[import-untyped]` 1곳, `booster.py`의 `BoosterLike.predict`는 위치 전용 매개변수(`/`)로 프로토콜 이름 불일치를 정정, `lgb.Booster` 반환을 `cast(BoosterLike, booster)` 1곳으로 좁힘) |
@@ -38,7 +38,11 @@ HIGH 3(H-1 `write_artifact` 시그니처를 `trained` 하나로 좁힘·H-2 OOF 
    `tests/training/test_policy.py`와 basename 충돌(둘 다 rootless 패키지) → pytest
    `import file mismatch`로 S-5 수집 자체 실패. `test_training_policy.py`로 개명해 해소
    (함수명·내용 무변경, `policy-values.md` 인용 갱신). BLE(ruff)·`warn_unreachable`(mypy)·
-   `legacy_parity` 마커 중복은 재확인 결과 이미 정합(추가 수정 불필요).
+   `legacy_parity` 마커 중복은 재확인 결과 이미 정합(추가 수정 불필요). **팀장 지시로 전수
+   확인** — `tests/{training,inference,registry,adapters,features}/*.py`의 basename 을
+   `comm -12`로 교차 대조, `test_*.py` 계열 겹침은 `test_policy.py`(training↔inference,
+   이미 해소) 하나뿐임을 확인(`conftest.py`는 세 디렉터리에 공존하지만 pytest 가 경로
+   기준 importlib 로 개별 로드해 basename 충돌 대상이 아님 — 452 passed 전건 통과가 실증).
 2. **D-5C-9b** — `write_artifact`가 바이트 안 `release.artifact_checksum`을 블랭크
    canonical bytes 의 sha256 으로 채우도록 변경. payload 조립을 `write_artifact` 밖으로
    뽑으며 설계 래칫 함수 길이 위반을 해소했고, 그 과정에서 새로 생긴 함수 경계에
@@ -49,6 +53,22 @@ HIGH 3(H-1 `write_artifact` 시그니처를 `trained` 하나로 좁힘·H-2 OOF 
 
 S-1~S-9 rebase 뒤 재실측(commit `07f6024` 시점, 이 문서 갱신 커밋 직전) — 전건 exit 0,
 표는 위 최신 수치로 갱신 완료.
+
+## 2차 rebase — `main` 이 `d4727fc`(PR #12 병합)로 이동
+
+팀장 지시(2026-09-15) — 5D 가 PR #12 로 origin `main`에 병합돼 `main`=`d4727fc`(`cefb19c` +
+`0310b1a` 「pyyaml 을 serving/training extras 로」 + 머지 커밋). `git rebase d4727fc` 실행,
+28개 커밋 중 **`ml-engine/uv.lock` 한 파일에서만 충돌**(`ml-engine/pyproject.toml`은
+git 3-way 병합이 자동으로 정리 — 양쪽이 `training` extras 에 같은 줄 `"pyyaml==6.0.3",`을
+동일 위치에 추가해 identical-content 병합으로 충돌 없이 단일화됐다).
+
+`uv.lock`의 `requires-dist` 배열에서 5D 쪽(`extra == 'serving'`)과 5C-1 쪽(`extra ==
+'training'`) 두 `pyyaml` 항목이 서로 다른 줄이라 conflict marker 로 남았다 — 둘 다 유지(삭제
+대상 아님, 서로 다른 extra 를 가리키므로 중복이 아니다)하는 방향으로 수동 해소한 뒤
+`uv lock`으로 전체 재생성 — **재생성 결과가 수동 해소와 바이트 동일**(diff 0)임을 확인했다.
+
+재실측(base `d4727fc`, HEAD `44f0950`) — S-1~S-9 전건 exit 0, S-5 **452 passed, 1 skipped**
+(rebase 전과 동일 — 이 rebase 는 dependency 선언만 건드렸고 코드는 무변경).
 
 ## secret 스캔
 
