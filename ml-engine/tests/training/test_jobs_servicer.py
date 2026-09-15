@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import threading
 import time
+from datetime import UTC, datetime
 
 from ml_engine.contracts import error_pb2, training_pb2
 from ml_engine.training.jobs.pipeline import (
@@ -16,7 +17,8 @@ from ml_engine.training.jobs.pipeline import (
 )
 from ml_engine.training.jobs.runner import JobRunner
 from ml_engine.training.jobs.servicer import TrainingJobServicer
-from ml_engine.training.jobs.store import InMemoryJobStore
+from ml_engine.training.jobs.state import JobEvent, JobRecord, JobState
+from ml_engine.training.jobs.store import InMemoryJobStore, Started
 from ml_engine.training.spec import TRAINING_SPECS
 
 _KNOWN_SPEC_VERSION = next(iter(TRAINING_SPECS))
@@ -420,4 +422,70 @@ def test_runner_finishes_before_cancel_request_returns_succeeded_idempotent() ->
     record = store.get(job_id)
     assert record is not None
     assert record.state.value == "SUCCEEDED"
+    runner.shutdown(wait=True)
+
+
+def test_cancel_wins_race_before_runner_start_transition_start_training_does_not_crash() -> (
+    None
+):
+    """verifier r2 R2-1 — 새 우회. `_accept_or_reuse`가 `start_or_reuse`로 job 을
+    ACCEPTED 로 만든 뒤 `runner.submit`을 부르는데, `submit` 내부의 START 전이보다
+    **먼저** CancelTrainingJob 의 CANCEL 전이가 커밋되면(경합에서 Cancel 이 이김)
+    `submit`이 `ValueError`를 그대로 던져 그 StartTraining 호출 자체가 gRPC UNKNOWN
+    으로 죽었다 — 상태 오염은 없었다(store 는 CANCELLED 로 남는다).
+
+    실 `TrainingJobServicer`+실 `JobRunner`+실 `InMemoryJobStore`로 재현한다.
+    `pipeline_factory`가 호출되는 시점(`start_or_reuse`가 ACCEPTED 를 만든 **직후**,
+    `runner.submit`이 START 전이를 시도하기 **직전**)에 동시 도착한 Cancel 을
+    흉내 내 결정론적으로 순서를 강제한다(threading 경합에 기대지 않는다)."""
+    store = InMemoryJobStore()
+    runner = JobRunner(store, max_workers=2)
+
+    captured_job_id: dict[str, str] = {}
+    original_start_or_reuse = store.start_or_reuse
+
+    def _capturing_start_or_reuse(
+        idempotency_key: str, dataset_id: str, *, accepted_at: datetime
+    ) -> object:
+        outcome = original_start_or_reuse(
+            idempotency_key, dataset_id, accepted_at=accepted_at
+        )
+        if isinstance(outcome, Started):
+            captured_job_id["job_id"] = outcome.record.job_id
+        return outcome
+
+    store.start_or_reuse = _capturing_start_or_reuse  # type: ignore[method-assign]
+
+    def _factory_that_wins_the_cancel_race(
+        spec: object,
+    ) -> _InstantSucceedingPipeline:
+        job_id = captured_job_id["job_id"]
+        result = store.apply_transition(job_id, JobEvent.CANCEL, at=datetime.now(UTC))
+        assert isinstance(result, JobRecord)
+        assert result.state is JobState.CANCELLED
+        return _InstantSucceedingPipeline()
+
+    servicer = TrainingJobServicer(
+        store=store,
+        runner=runner,
+        is_ready=lambda: True,
+        pipeline_factory=_factory_that_wins_the_cancel_race,  # type: ignore[arg-type]
+        dataset_uri_schemes=frozenset({"file"}),
+        idempotency_key_max_chars=256,
+    )
+
+    response = servicer.StartTraining(
+        _valid_request(idempotency_key="idem-race"), context=None
+    )  # 예외를 던지면 이 줄에서 실패한다(수정 전에는 ValueError 로 죽었다)
+
+    assert response.WhichOneof("result") == "handle"
+    job_id = captured_job_id["job_id"]
+    assert response.handle.job_id == job_id
+    # 최신 상태(CANCELLED)를 응답한다 — start_or_reuse 가 반환한 스냅샷(ACCEPTED)을
+    # 그대로 쓰지 않는다.
+    assert response.handle.state == training_pb2.JOB_STATE_CANCELLED
+
+    record = store.get(job_id)
+    assert record is not None
+    assert record.state is JobState.CANCELLED  # 상태 오염 없음(verifier 확인 사항)
     runner.shutdown(wait=True)

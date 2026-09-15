@@ -31,6 +31,7 @@ from ml_engine.training.jobs.state import (
     JobEvent,
     JobFailure,
     JobFailureCode,
+    JobRecord,
     TransitionRejected,
 )
 from ml_engine.training.jobs.store import InMemoryJobStore
@@ -52,15 +53,30 @@ class JobRunner:
 
     def submit(
         self, job_id: str, dataset_ref: DatasetRefInput, pipeline: TrainingPipeline
-    ) -> None:
-        """`job_id`를 `RUNNING`으로 전이하고 파이프라인을 스레드 풀에 제출한다."""
+    ) -> JobRecord | TransitionRejected:
+        """`job_id`를 `RUNNING`으로 전이하고 파이프라인을 스레드 풀에 제출한다.
+
+        verifier r2 R2-1 — `_accept_or_reuse`가 `start_or_reuse`로 job 을 ACCEPTED
+        로 만든 뒤 이 메서드를 호출하는 사이, 다른 writer(`CancelTrainingJob`)가
+        먼저 CANCEL 을 커밋할 수 있다(경합에서 Cancel 이 이긴다). 이전에는 START
+        전이 거부를 `ValueError`로 던져 그 StartTraining 호출 자체가 처리되지 않은
+        예외로 gRPC `UNKNOWN`이 됐다 — **예외로 알리지 않는다.** 거부되면 파이프라인을
+        전혀 제출하지 않고 `TransitionRejected`를 돌려준다(호출자가 최신 상태를
+        다시 읽어 정직하게 응답한다)."""
         started = self._store.apply_transition(
             job_id, JobEvent.START, at=datetime.now(UTC)
         )
         if started is None:
-            raise KeyError(f"알 수 없는 job_id: {job_id}")
+            raise KeyError(
+                f"알 수 없는 job_id: {job_id}"
+            )  # 구조적으로 불가능(방금 생성)
         if isinstance(started, TransitionRejected):
-            raise ValueError(f"START 전이 거부: {job_id} ({started.from_state})")
+            _logger.info(
+                "job_id=%s START 전이 거부(이미 다른 writer 가 종료 상태로 옮김) — %s",
+                job_id,
+                started,
+            )
+            return started
 
         token = CancelToken()
         with self._lock_tokens_guard:
@@ -74,6 +90,7 @@ class JobRunner:
             self._on_done(job_id, done)
 
         future.add_done_callback(_callback)
+        return started
 
     def cancel(self, job_id: str) -> None:
         """진행 중인 job 의 `CancelToken`을 세운다 — job 이 실행 중이 아니면 no-op

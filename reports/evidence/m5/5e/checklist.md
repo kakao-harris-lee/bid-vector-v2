@@ -85,7 +85,8 @@ scope.md 표 그대로 승인. 실측 대상 「경계로 처리」 행(servicer
 | `ml_engine.training.jobs.InMemoryJobStore`·`JobRunner` | job 저장·실행 — 둘 다 `app.server`만 구성한다. 외부에서 `store.replace()`로 임의 `JobRecord`를 넣을 수 있지만 `JobRecord` 생성자 불변식이 여전히 막는다(조합·시각 불변식) |
 | `ml_engine.training.jobs.transition` | 유일 전이 진입점 — 표 밖 전이는 여전히 `TransitionRejected` |
 | `InMemoryJobStore.apply_transition`(이번 라운드 신설, H-2) | 읽기·`transition()` 계산·쓰기를 한 잠금 아래 원자적으로 — 새 권한 아님(`transition`이 이미 public, 종전엔 호출자가 get+transition+replace 세 호출로 직접 합성해 경합이 났다). 표 밖 전이를 열지 않는다(`transition()`과 같은 결과 타입) |
-| `JobRunner.cancel_all`(이번 라운드 신설, M-3) | 인자 없이 그 시점 진행 중인 job 전부의 취소 토큰을 세운다 — 종전엔 `TrainingJobServicer.CancelTrainingJob`으로 job 하나씩만 취소할 수 있었으므로 이건 새 권한(일괄 취소)이다. 호출자는 `app.server`의 SIGTERM 경로 하나뿐(조립 근 밖에서 부를 이유 없음, 다른 행과 같은 신뢰 판단) |
+| `JobRunner.cancel_all`(fix round 1 신설, M-3) | 인자 없이 그 시점 진행 중인 job 전부의 취소 토큰을 세운다 — 종전엔 `TrainingJobServicer.CancelTrainingJob`으로 job 하나씩만 취소할 수 있었으므로 이건 새 권한(일괄 취소)이다. 호출자는 `app.server`의 SIGTERM 경로 하나뿐(조립 근 밖에서 부를 이유 없음, 다른 행과 같은 신뢰 판단) |
+| `JobRunner.submit` 반환값(fix round 2, `None` → `JobRecord \| TransitionRejected`, R2-1) | 새 권한 아님 — 이미 public 이던 메서드가 종전엔 아무 값도 안 주다가(호출자가 성공 여부를 알 방법이 없었다) 이제 결과를 준다. 유일 호출자는 `TrainingJobServicer._accept_or_reuse`(같은 신뢰 경계 안) — 밖으로 새는 표면이 아니다. `TransitionRejected`를 무시해도(구 코드) 예외가 아니라 조용히 버려질 뿐이라 하위 호환(호출자를 안 고치면 동작이 이전과 다르지 않다) |
 | `ml_engine.adapters.write_artifact_files` | `file://`만, 존재하는 디렉터리에는 못 쓴다(덮어쓰기 불가) |
 | `ml_engine.app.pipeline_factory`·`build_training_pipeline` | training/evaluation 정책·trainer·code_version·출력 디렉터리를 고정한 뒤 `TrainingSpec → TrainingPipeline`만 남긴다 — dataset 내용에 대한 권한은 여전히 `load_dataset`(5C-1)이 검증 |
 | `ml_engine.app.server.ServerConfig.from_env`·`run`·`main` | 환경 7 개를 읽어 서버를 하나 만든다 — 조립 근 밖에서 부를 이유 없음(진입점) |

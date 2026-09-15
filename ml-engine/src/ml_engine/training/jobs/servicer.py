@@ -179,9 +179,20 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
                 manifest_checksum=request.dataset.manifest_checksum,
                 dataset_id=request.dataset.dataset_id,
             )
-            self._runner.submit(
+            submit_result = self._runner.submit(
                 outcome.record.job_id, dataset_ref, self._pipeline_factory(spec)
             )
+            if isinstance(submit_result, TransitionRejected):
+                # verifier r2 R2-1 — CancelTrainingJob 이 이 START 전이보다 먼저
+                # 커밋된 경합(다른 writer 가 이미 종료 상태로 옮김). outcome.record
+                # 는 start_or_reuse 시점의 스냅샷(ACCEPTED)이라 그대로 쓰면 거짓
+                # 응답이 된다 — store 를 다시 읽어 실제 최신 상태로 응답한다.
+                current = self._store.get(outcome.record.job_id)
+                response.handle.job_id = outcome.record.job_id
+                response.handle.state = _job_state_to_proto(
+                    current.state if current is not None else outcome.record.state
+                )
+                return response
         response.handle.job_id = outcome.record.job_id
         response.handle.state = _job_state_to_proto(outcome.record.state)
         return response
