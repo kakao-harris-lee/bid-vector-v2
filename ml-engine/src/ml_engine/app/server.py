@@ -1,6 +1,7 @@
 """`ml_engine.app.server` — 서버 진입점(D-5E-7). `python -m ml_engine.app.server`로
-띄운다(`[project.scripts]` 없음 — `-m` 진입으로 충분, pyproject.toml (b)). 환경 6 개를
-읽어 설정 객체를 만들고(기본값 없음 — 빈 env = 부팅 거부), 정책 넷을 preload 해
+띄운다(`[project.scripts]` 없음 — `-m` 진입으로 충분, pyproject.toml (b)). 환경 7 개를
+읽어 설정 객체를 만들고(기본값 없음 — 빈 env = 부팅 거부, verifier r1 L-3 — 이전 판은
+`code_version`을 빠뜨리고 6 개로 셌다), 정책 넷을 preload 해
 readiness 를 정하고, 세 servicer 를 등록한 뒤 serve 한다. `SIGTERM` 은 readiness
 `NOT_READY` → `server.stop(grace)` 순서로 종료한다(설계 검토 (1))."""
 
