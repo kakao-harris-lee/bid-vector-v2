@@ -1,0 +1,78 @@
+{
+  "probes": [
+    {
+      "label": "degenerate-variance",
+      "measurable": false,
+      "exceptionRaised": false,
+      "valueEmitted": false,
+      "foldedToZero": false,
+      "reasonPresent": true,
+      "reason": "INSUFFICIENT_SAMPLES",
+      "detail": "DEGENERATE_VARIANCE"
+    },
+    {
+      "label": "non-finite-nan",
+      "measurable": false,
+      "exceptionRaised": false,
+      "valueEmitted": false,
+      "foldedToZero": false,
+      "reasonPresent": true,
+      "reason": "FEATURE_ABSENT",
+      "detail": "NON_FINITE_INPUT"
+    },
+    {
+      "label": "non-finite-infinity",
+      "measurable": false,
+      "exceptionRaised": false,
+      "valueEmitted": false,
+      "foldedToZero": false,
+      "reasonPresent": true,
+      "reason": "FEATURE_ABSENT",
+      "detail": "NON_FINITE_INPUT"
+    },
+    {
+      "label": "non-positive-value",
+      "measurable": false,
+      "exceptionRaised": false,
+      "valueEmitted": false,
+      "foldedToZero": false,
+      "reasonPresent": true,
+      "reason": "FEATURE_ABSENT",
+      "detail": "NON_FINITE_INPUT"
+    },
+    {
+      "label": "fewer-values-than-draws",
+      "measurable": false,
+      "exceptionRaised": false,
+      "valueEmitted": false,
+      "foldedToZero": false,
+      "reasonPresent": true,
+      "reason": "INSUFFICIENT_SAMPLES",
+      "detail": "TOO_FEW_DRAWS"
+    },
+    {
+      "label": "empty-support",
+      "measurable": false,
+      "exceptionRaised": false,
+      "valueEmitted": false,
+      "foldedToZero": false,
+      "reasonPresent": true,
+      "reason": "INSUFFICIENT_SAMPLES",
+      "detail": "TOO_FEW_DRAWS"
+    },
+    {
+      "label": "draw-count-below-one",
+      "measurable": false,
+      "exceptionRaised": false,
+      "valueEmitted": false,
+      "foldedToZero": false,
+      "reasonPresent": true,
+      "reason": "INSUFFICIENT_SAMPLES",
+      "detail": "TOO_FEW_DRAWS"
+    }
+  ],
+  "exceptionRaisedAnywhere": false,
+  "everyProbeCarriesReason": true,
+  "anyProbeFoldedToZero": false,
+  "anyProbeEmittedValue": false
+}

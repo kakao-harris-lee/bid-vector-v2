@@ -1,0 +1,19 @@
+{
+  "declaredMinimumRows": 0,
+  "effectiveMinimumRows": 1,
+  "guardDisabledByPolicy": false,
+  "probes": [
+    {
+      "label": "zero-rows",
+      "measurable": false,
+      "reason": "UNTRAINED_SEGMENT",
+      "detail": "NEVER_TRAINED"
+    },
+    {
+      "label": "one-row",
+      "measurable": true,
+      "reason": null,
+      "detail": null
+    }
+  ]
+}

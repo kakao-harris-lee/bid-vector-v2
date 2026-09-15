@@ -1,0 +1,50 @@
+{
+  "windows": [
+    {
+      "weekStartKst": "2026-03-02T00:00:00+09:00",
+      "weekStartUtc": "2026-03-01T15:00:00Z",
+      "openedCount": 4,
+      "settledCount": 1,
+      "state": "Observed",
+      "ratio": {
+        "fraction": "0.25"
+      },
+      "presentInTable": true
+    },
+    {
+      "weekStartKst": "2026-03-09T00:00:00+09:00",
+      "weekStartUtc": "2026-03-08T15:00:00Z",
+      "openedCount": 2,
+      "settledCount": 0,
+      "state": "Observed",
+      "ratio": {
+        "fraction": "0"
+      },
+      "presentInTable": true
+    },
+    {
+      "weekStartKst": "2026-03-16T00:00:00+09:00",
+      "weekStartUtc": "2026-03-15T15:00:00Z",
+      "openedCount": 0,
+      "settledCount": 0,
+      "state": "NoObservation",
+      "ratio": null,
+      "presentInTable": false
+    },
+    {
+      "weekStartKst": "2026-03-23T00:00:00+09:00",
+      "weekStartUtc": "2026-03-22T15:00:00Z",
+      "openedCount": 4,
+      "settledCount": 3,
+      "state": "Observed",
+      "ratio": {
+        "fraction": "0.75"
+      },
+      "presentInTable": true
+    }
+  ],
+  "zeroOpenedRatioFoldedToZero": false,
+  "zeroOpenedDistinctFromZeroSettled": true,
+  "weeksWithoutObservationsPresentInTable": false,
+  "weekPartitionAxisCoveredBy": "ml-kernel-014"
+}

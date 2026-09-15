@@ -206,6 +206,12 @@ allowlist 절차는 **ADR 0007**이 소유한다.
 | 정산 성숙도 커널 | `app/domain/settlement_maturity.py` |
 | 곡선 빌더 | `app/domain/award_landing_curve_builders.py` |
 
+> **개정 2026-09-12(운영자 결정 D-M5-9 (a), M5 prep)** — 이 표는 **소유(어느 runtime)** 를 적고 그대로 유효하다. M5 **이식 시점**은
+> 둘로 갈린다: `award_rate_features`(5B 종결)·`assessment_shrinkage`·`reserve_draw_distribution`·`settlement_maturity`(5D)는 **지금**,
+> 반사 KDE `award_margin_distribution`·곡선 빌더 `award_landing_curve_builders` 는 **win-proxy 체인 안에서만 소비**되므로(M5 조사 실측
+> 1,296/2,166줄) win-proxy 둘(`OPEN-ML-06`, D-M5-8 (a))과 같은 조건 — **도달 경로(capability)가 생길 때**. 소비자 없는 코드를 래칫 아래
+> 두지 않는다(§7). `milestone-5.md` 5D 문면의 「KDE density/optimization 커널 이식」 항목은 같은 결정으로 같은 조건이 됐다.
+
 > **이 표는 `OPEN-ML-01` 결정의 하류 서술을 옮긴 것이지 새 판정이 아니다.**
 > `decisions.md`의 그 절이 *"M5 이식 대상 목록이 8개로 확정된다"*를 하류로 적었다.
 > **그리고 활성 `OPEN-ML-06`이 win-proxy 커널(`award_landing_curve.py` ·

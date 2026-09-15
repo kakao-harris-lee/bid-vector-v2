@@ -1,0 +1,35 @@
+# M5/5D 정책 값 — 정본 `reports/evidence/m5/5d/policy-values.md`(사용자 승인 2026-09-12).
+# 값을 바꾸려면 그 문서 → 이 파일 → test 순으로 갱신한다(load_inference_policy 가
+# known_keys 전수·값 불변식으로 대조하고, tests/inference/test_policy.py 가 이 표와
+# 대조한다). 전부 legacy-behavior(ed4b06c) — 5D 가 지어낸 수치 없음.
+version: inference-v1
+
+scenario.z: 1.2816
+scenario.conservative.weight: 0.24
+scenario.base.weight: 0.52
+scenario.aggressive.weight: 0.24
+scenario.conservative.z_sign: -1
+scenario.base.z_sign: 0
+scenario.aggressive.z_sign: 1
+scenario.clamp_min: 0.7
+scenario.clamp_max: 1.4
+scenario.bid_rate_digits: 4
+
+assessment.agency_prior_strength: 12.0
+assessment.category_prior_strength: 40.0
+assessment.min_predictive_std: 0.002
+assessment.min_samples_for_variance: 2
+assessment.plausible_min: 0.8
+assessment.plausible_max: 1.2
+
+reserve.draw_count: 4
+reserve.expected_price_count: 15
+reserve.min_reserve_records: 8
+
+bid_ratio.min_samples: 3
+bid_ratio.plausible_min: 0.5
+bid_ratio.plausible_max: 1.5
+
+gbm.min_category_rows: 40
+
+maturity.window_days: 7

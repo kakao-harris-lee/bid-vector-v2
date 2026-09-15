@@ -1,0 +1,49 @@
+{
+  "axis": "assessment-provenance-gate",
+  "kernel": "assessment-level-observation",
+  "rateUnit": "fraction",
+  "samples": [
+    {
+      "sampleId": "SYN-ASMT-01",
+      "provenance": "CLEAN",
+      "assessmentRate": {
+        "fraction": "0.9800"
+      }
+    },
+    {
+      "sampleId": "SYN-ASMT-02",
+      "provenance": "DERIVED_VAT",
+      "assessmentRate": {
+        "fraction": "0.9900"
+      }
+    },
+    {
+      "sampleId": "SYN-ASMT-03",
+      "provenance": "CLEAN",
+      "assessmentRate": {
+        "fraction": "1.0100"
+      }
+    },
+    {
+      "sampleId": "SYN-ASMT-04",
+      "provenance": "UNKNOWN",
+      "assessmentRate": {
+        "fraction": "1.0000"
+      }
+    },
+    {
+      "sampleId": "SYN-ASMT-05",
+      "provenance": "CLEAN",
+      "assessmentRate": {
+        "fraction": "1.0400"
+      }
+    },
+    {
+      "sampleId": "SYN-ASMT-06",
+      "provenance": "FALLBACK_FROM_BUDGET",
+      "assessmentRate": {
+        "fraction": "1.0300"
+      }
+    }
+  ]
+}

@@ -8,29 +8,29 @@
 
 | # | 이름 | legacy 기본값 | 분류 | 소비 예정 |
 |---|---|---|---|---|
-| 1 | `PREDICTION_DEFAULT_MINIMUM_BID_RATE` | `0.0` | 정책 | 5D |
-| 2 | `PREDICTION_CATEGORY_MINIMUM_BID_RATES` | 5키 dict | 정책 | 5D |
-| 3 | `PREDICTION_DEFAULT_MAXIMUM_BID_RATE` | `1.0` | 정책 | 5D |
-| 4 | `PREDICTION_CATEGORY_MAXIMUM_BID_RATES` | 5키 dict | 정책 | 5D |
-| 5 | `PREDICTION_FLOOR_SAFETY_MARGIN_RATE` | `0.001` | 정책 | 5D |
-| 6 | `PREDICTION_CONSTRUCTION_SCENARIO_FLOOR_OFFSETS` | 3키 dict | 정책(근거 있음 — n=2,051 백분위) | 5D |
+| 1 | `PREDICTION_DEFAULT_MINIMUM_BID_RATE` | `0.0` | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 2 | `PREDICTION_CATEGORY_MINIMUM_BID_RATES` | 5키 dict | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 3 | `PREDICTION_DEFAULT_MAXIMUM_BID_RATE` | `1.0` | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 4 | `PREDICTION_CATEGORY_MAXIMUM_BID_RATES` | 5키 dict | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 5 | `PREDICTION_FLOOR_SAFETY_MARGIN_RATE` | `0.001` | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 6 | `PREDICTION_CONSTRUCTION_SCENARIO_FLOOR_OFFSETS` | 3키 dict | 정책(근거 있음 — n=2,051 백분위) | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
 | 7 | `BUSINESS_GROUP_CODE_PREFIXES` | 3키 dict | 정책(분류표) | 5B |
 | 8 | `BUSINESS_GROUP_CALIBRATION_ENABLED` | `True` | 환경(토글) | 5C |
-| 9 | `PREDICTION_GROUP_MINIMUM_BID_RATES` | 3키 dict | 정책 | 5D |
-| 10 | `PREDICTION_GROUP_MAXIMUM_BID_RATES` | 3키 dict | 정책 | 5D |
-| 11 | `PREDICTION_AGENCY_MINIMUM_BID_RATES` | 1키 dict | 정책(기관 고유) | 5D |
-| 12 | `PREDICTION_AGENCY_MAXIMUM_BID_RATES` | 1키 dict | 정책(기관 고유) | 5D |
-| 13 | `PREDICTION_AGENCY_BAND_ASSESSMENT_RATES` | 1키 dict | 정책(기관 고유, basis 결합 경고 동반) | 5D |
-| 14 | `PREDICTION_DEFAULT_BAND_ASSESSMENT_RATE` | `1.0` | 정책 | 5D |
+| 9 | `PREDICTION_GROUP_MINIMUM_BID_RATES` | 3키 dict | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 10 | `PREDICTION_GROUP_MAXIMUM_BID_RATES` | 3키 dict | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 11 | `PREDICTION_AGENCY_MINIMUM_BID_RATES` | 1키 dict | 정책(기관 고유) | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 12 | `PREDICTION_AGENCY_MAXIMUM_BID_RATES` | 1키 dict | 정책(기관 고유) | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 13 | `PREDICTION_AGENCY_BAND_ASSESSMENT_RATES` | 1키 dict | 정책(기관 고유, basis 결합 경고 동반) | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 14 | `PREDICTION_DEFAULT_BAND_ASSESSMENT_RATE` | `1.0` | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
 | 15 | `PREDICTION_RESERVE_PRIOR_WEIGHT` | `0.2` | **미분류**(근거 주석 없음) | 5D 재판정 |
 | 16 | `PREDICTION_RESERVE_PRIOR_FULL_CONFIDENCE_SAMPLES` | `8` | **미분류** | 5D 재판정 |
 | 17 | `PREDICTION_HIGH_RATE_TAIL_ADJUSTMENT_ENABLED` | `True` | 환경(토글) | 5D |
 | 18 | `PREDICTION_SMALL_BUDGET_HIGH_RATE_BUDGET_MAX` | `50_000_000.0` | 정책(금액 임계) | 5D |
 | 19 | `PREDICTION_SMALL_BUDGET_HIGH_RATE_TARGET` | `0.93` | **미분류** | 5D 재판정 |
 | 20 | `PREDICTION_SMALL_BUDGET_HIGH_RATE_MIN_RATE` | `0.925` | **미분류** | 5D 재판정 |
-| 21 | `PREDICTION_BID_PRICE_GRANULARITY` | `10` | 정책(반올림 규칙) | 5D |
-| 22 | `PREDICTION_BID_PRICE_GRANULARITY_MIN_BUDGET` | `1_000_000.0` | 정책 | 5D |
-| 23 | `PREDICTION_BID_PRICE_ROUNDING_MODE` | `"floor"` | 정책 | 5D |
+| 21 | `PREDICTION_BID_PRICE_GRANULARITY` | `10` | 정책(반올림 규칙) | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 22 | `PREDICTION_BID_PRICE_GRANULARITY_MIN_BUDGET` | `1_000_000.0` | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
+| 23 | `PREDICTION_BID_PRICE_ROUNDING_MODE` | `"floor"` | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
 | 24 | `PRICE_PREDICTION_PREFERRED_PREDICTOR` | `"historical"` | 환경 | 5E |
 | 25 | `PRICE_PREDICTION_ENABLE_EXPERIMENTAL_PREDICTORS` | `False` | 환경 | 5E |
 | 26 | `PRICE_PREDICTION_ENSEMBLE_MODEL_PATH` | `""` | 환경(경로) | 5E |
@@ -38,7 +38,7 @@
 | 28 | `PRICE_PREDICTION_DISTRIBUTION_MIN_RESERVE_RECORDS` | `8` | 정책(최소 표본) | 5D |
 | 29 | `PRICE_PREDICTION_DISTRIBUTION_MIN_BID_RATIO_SAMPLES` | `3` | 정책(최소 표본) | 5D |
 | 30 | `PRICE_PREDICTION_AWARD_RATE_GBM_MODEL_PATH` | `""` | 환경(경로) | 5E |
-| 31 | `PRICE_PREDICTION_AWARD_RATE_GBM_MIN_CATEGORY_ROWS` | `40` | 정책(미학습 가드 — 끌 수 없음) | 5C |
+| 31 | `PRICE_PREDICTION_AWARD_RATE_GBM_MIN_CATEGORY_ROWS` | `40` | 정책(미학습 가드 — 끌 수 없음) | 5C·5D(5D 미학습 가드 임계, D-5D-9) |
 | 32 | `PRICE_PREDICTION_BACKTEST_MIN_TRAINING_SAMPLES` | `5` | 정책 | 5C |
 | 33 | `PRICE_PREDICTION_BACKTEST_HOLDOUT_SIZE` | `5` | 정책 | 5C |
 
@@ -53,3 +53,4 @@
 | 일자 | 변경 | 근거 |
 | --- | --- | --- |
 | 2026-09-11 착수 | 표 등재(조사 b-1 그대로), 분류 승인 | 운영자 D-M5-6 (a) |
+| 2026-09-12 | 「소비 예정」 배정 정정 — guardrail·가격 15행은 Kotlin, #31 은 5C·5D | 5D 착수 D-5D-9 |

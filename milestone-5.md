@@ -74,6 +74,25 @@ schema·facts·vocabulary·manifest), sentinel 셋 제거. **알려진 제한·O
 `OPEN-5B-OBSERVATION-DOMAIN`(관측값 [0,1] 검증 → 5C) · `OPEN-5B-FIXTURE-REEVAL`(curator). **다음은 5D**(inference kernels —
 운영자 결정 2026-09-12 (a); 착수 전건 D-M5-7 (a) golden curator 병행·D-M5-8 (a)·D-M5-9 확정).
 
+**5D 착수 2026-09-12(운영자 승인 — D-M5-7 (a)·D-M5-8 (a)·D-M5-9 (a)·D-5D-5~9)** — base 는 PR #10 머지 커밋
+`f5020aa`. 초안과 실측이 어긋난 일곱을 처분: 이식 대상 파일에 50줄 초과 함수 없음(분해 대상 0) · K5 에
+ML-04 provenance 게이트 신설(`CleanAssessmentSample` 타입, D-5D-5) · ruff `BLE` 추가(D-5D-6) ·
+`Diagnostics.shrinkage_weight`·`excluded_observations` 는 Python 결과 타입에만(wire 는 `OPEN-5D-DIAGNOSTICS-WIRE`,
+D-5D-7) · 정책 값 실물 `inference-v1.yaml`(legacy 값, D-5D-8) · 5A 정책 표 배정 정정(D-5D-9) · `UnmeasurableReason`
+wire 3값 미러 + `detail_code` 닫힌 enum(D-5D-2). `ArtifactManifestV1` 읽기 모델은 5D 소유, 5C 가 그 형태로 쓴다.
+golden 은 curator 병행 레인(worktree `bid-vector-v2-m5cur`, `OPEN-5D-GOLDEN`). 정본 `reports/evidence/m5/5d/scope.md`,
+설계 검토 `_workspace/m5-5d/02_design-review.md`.
+
+**5D 종결 2026-09-13(사용자 승인)** — verifier r1 `ready-for-review`(medium 4: `LoadedArtifact` 직접 생성·`clamp_min ≤ 0`
+정책의 커널 예외 누출·golden 무검증 초록·mypy 죽은 코드) → `_VerifiedBytes` 필수 인자·로더 불변식 확장·`JsonValue`
+파싱 + `warn_unreachable`·`ROUND_HALF_UP`(D-5D-10) → r2 `ready`(medium 1: quantize 뒤 0 이 되는 `clamp_min` → `quantize_bid_rate`
+단일 출처) → golden 14 case(curator, `ml-kernel-001~014`, 승인) 병합·통합 13 passed·011 skip(분포 엔진) — **golden 008 이
+K6 분산 0 접힘을 잡아 `DEGENERATE_VARIANCE` 로 수정**(D-5D-11 `n == draw_count` 예외) → r3 `ready`(low 1). 재작업 2회.
+351 tests(마커 분리 347+4), mypy strict + `warn_unreachable`, ruff `BLE`. **범위 판정**: 분포 엔진 조립(K5·K6 → 후보 3)은
+5D in_scope 밖 — `OPEN-5D-DISTRIBUTION-ENGINE` → **5D-2**(운영자 결정 2026-09-13 (b) 분포 단독). **알려진 제한·OPEN**:
+Python 가시성 2줄 우회 둘 · `std == 0` 통과 · 실 booster 결정성(`OPEN-5D-REAL-BOOSTER`, 5C) · `ArtifactManifestV1` writer(5C) ·
+`OPEN-5D-DIAGNOSTICS-WIRE`(2F). 정본 `reports/evidence/m5/5d/checklist.md`.
+
 ### Slice 5B — feature schema
 
 - versioned feature name/order/type/range
@@ -94,7 +113,8 @@ schema·facts·vocabulary·manifest), sentinel 셋 제거. **알려진 제한·O
 ### Slice 5D — inference kernels
 
 - model predict adapter
-- 기존 KDE density/optimization 커널 이식 (수학은 유지, 결합만 제거)
+- 기존 순수 커널 이식 — 추첨 분포·계층 수축·정산 성숙도 (수학은 유지, 결합만 제거). **반사 KDE·곡선
+  빌더는 D-M5-9 (a)(2026-09-12)로 win-proxy 둘(D-M5-8 (a))과 같은 조건 — 도달 경로가 생길 때 이식**(ADR 0001 §4.1 개정 주석)
 - 최소 표본, singular input, NaN/Infinity 처리
 - optimization objective별 후보와 diagnostics
 - 업무 법정 하한/자격/최종 결정은 구현하지 않음

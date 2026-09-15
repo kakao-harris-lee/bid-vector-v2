@@ -332,6 +332,59 @@ ASSERTED = {
         "$.codes[1].prescribedActionPresent",        # 08 — legacy 가 대상 서비스에서 관측한 코드
         "$.codes[2].prescribedActionPresent",        # 22 — quota 축이 resultCode 에도 있다
     ],
+    # M5/5D — curator 판단(2026-09-12). `ml-kernel-*` 은 **미승인 토큰을 한 글자도 담지 않는
+    #   경로만** 든다 — M2 계약(`error.proto`·`prediction.proto`)과 `data-dictionary.md` §6.4 가
+    #   문면으로 세운 이름, 그리고 불리언·셈·십진 문자열이다. 5D 착수 계약이 신설한
+    #   `UnmeasurableDetail` 토큰은 여기 들지 않고 `verified_projections` 의 `differs-from-case` 가 진다.
+    "ml-kernel-001": ["$.measurable", "$.reason", "$.scoreEmitted",
+                      "$.gateAndPredictShareOneDecision"],            # ML-02 ①② — 0행의 사유와 같은 판정
+    "ml-kernel-002": ["$.measurable", "$.reason", "$.scoreEmitted",
+                      "$.gateAndPredictShareOneDecision"],            # 같은 게이트의 얕은 표본 쪽
+    "ml-kernel-003": ["$.measurable", "$.gatePassedAtExactThreshold",
+                      "$.gateAndPredictShareOneDecision"],            # 경계가 `>=` 라는 주장
+    "ml-kernel-004": ["$.guardDisabledByPolicy", "$.probes[0].measurable",
+                      "$.probes[0].reason", "$.probes[1].measurable"],  # ML-02 ③ — 끌 수 없다
+    "ml-kernel-005": ["$.declaredChecksum", "$.probes[0].checksumMatches",
+                      "$.probes[0].loadedArtifactCreated", "$.probes[1].computedChecksum",
+                      "$.probes[1].checksumMatches", "$.probes[1].loadedArtifactCreated",
+                      "$.probes[1].rejected",
+                      "$.rejectionHappensBeforeObjectConstruction"],  # 객체 미생성까지가 주장
+    "ml-kernel-006": ["$.acceptanceIsExactSequenceEquality", "$.subsetAcceptedAnywhere",
+                      "$.probes[1].sameOrder", "$.probes[1].accepted",
+                      "$.probes[1].inferenceRejected", "$.probes[2].accepted"],  # 순서까지 일치
+    "ml-kernel-007": ["$.probes[1].accepted", "$.probes[1].loadedArtifactCreated",
+                      "$.probes[2].accepted", "$.nearestSupportedVersionSubstituted",
+                      "$.defaultVersionAssumedWhenUndeclared"],       # 대체·기본값 금지가 주장의 절반
+    "ml-kernel-008": ["$.exceptionRaisedAnywhere", "$.everyProbeCarriesReason",
+                      "$.anyProbeFoldedToZero", "$.anyProbeEmittedValue",
+                      "$.probes[0].measurable", "$.probes[1].measurable",
+                      "$.probes[4].measurable", "$.probes[5].measurable",
+                      "$.probes[6].measurable"],                      # 「0점/성공으로 변환되지 않음」
+    "ml-kernel-009": ["$.fractionStringsIdenticalAcrossRuns", "$.comparedAsDecimalString",
+                      "$.clampApplied", "$.runs[0].candidates[0].bidRate.fraction",
+                      "$.runs[1].candidates[0].bidRate.fraction",
+                      "$.runs[0].candidates[1].label"],               # scale 보존 문자열 동일
+    "ml-kernel-010": ["$.silentlyDropped", "$.admittedBecauseValueLooksNumeric",
+                      "$.levelObservationMean.fraction"],             # ML-04 ① — 평균이 배제의 증거
+    "ml-kernel-011": ["$.diagnostics.shrinkageWeightCarriedInResponse",
+                      "$.diagnostics.agencySampleBelowThreshold",
+                      "$.diagnostics.segmentSupport",
+                      "$.diagnostics.shrinkageWeight.fraction",
+                      "$.posteriorMean.fraction", "$.effectiveSampleCount"],  # ML-04 ②
+    "ml-kernel-012": ["$.zeroOpenedRatioFoldedToZero",
+                      "$.zeroOpenedDistinctFromZeroSettled",
+                      "$.weeksWithoutObservationsPresentInTable",
+                      "$.windows[1].state", "$.windows[1].presentInTable",
+                      "$.windows[2].state", "$.windows[2].presentInTable"],   # §6.4 0/0
+    "ml-kernel-013": ["$.exactlyEqualAsRationals", "$.agreeWithinDeclaredPrecision",
+                      "$.drawMeanVarianceFromEnumeration",
+                      "$.drawMeanVarianceFromClosedForm", "$.drawMeanStd"],   # 「수학은 유지」
+    "ml-kernel-014": ["$.weekStartInstantAssignedToStartingWeek",
+                      "$.weekEndInstantAssignedToPreviousWeek",
+                      "$.adjacentWindowsOverlap", "$.partitionedInUtcCalendarDays",
+                      "$.assignments[1].assignedWeekStartKst",
+                      "$.assignments[2].assignedWeekStartKst",
+                      "$.assignments[3].assignedWeekStartKst"],       # 반개구간 + KST 구획
 }
 
 # (c) 갈래가 쓰는 대체 토큰. 목록에 없는 피연산자는 `Other` 로 친다.
@@ -358,7 +411,13 @@ ADVERSARIAL_VALUE = {"Accepted": "Rejected", "Rejected": "Accepted",
                      # 요구는 그대로 만족한다.
                      "Passed": "Rejected", "NoGate": "Passed",
                      # `StrategyValidation`(decision 31) 상태 토큰.
-                     "Valid": "Invalid", "Invalid": "Valid"}
+                     "Valid": "Invalid", "Invalid": "Valid",
+                     # M5/5D — `Maturity` sealed(§6.4)와 `UnmeasurableReason`(M2 `error.proto`).
+                     # 둘 다 적대값이 **그 축의 반대 상태**라 `Other` 보다 강하다: 0/0 접힘과
+                     # 「학습된 적 없음 ↔ 표본 얕음」 혼동이 정확히 이 corpus 가 막는 것이다.
+                     "Observed": "NoObservation", "NoObservation": "Observed",
+                     "UNTRAINED_SEGMENT": "INSUFFICIENT_SAMPLES",
+                     "INSUFFICIENT_SAMPLES": "UNTRAINED_SEGMENT"}
 
 # (d) 기대값이 **`null`** 인데 `verifies` 가 그 **부재**를 주장하는 경로 — 사람의 판단이다.
 #     Codex B14 high 의 진단: 적대 집합이 null 기대값을 한 번도 변이하지 않아 「강등 대상 0」이
@@ -374,6 +433,11 @@ NULL_ASSERTED = {
     #   `$.matched` 가 **부재**(`null`)라는 사실 자체가 주장이다(`Passed(emptySet())`와
     #   달리 `NoGate`는 matched 자리가 없다) — non-null 로 채워지면 그 구분이 사라진다.
     "strategy-watch-004": ["$.matched"],
+    # M5/5D — 「측정 불가가 아닌 응답은 사유를 나르지 않는다」(003)와 「개찰 0 인 주에는 비율이
+    #   **없다**」(012)는 둘 다 **부재가 주장**이라 non-null 치환이 곧 위반이다.
+    "ml-kernel-003": ["$.reason", "$.detail"],
+    "ml-kernel-004": ["$.probes[1].reason"],
+    "ml-kernel-012": ["$.windows[2].ratio"],
 }
 NULL_REPLACEMENTS = [0.0, {"numerator": 0, "denominator": 149}, 0,
                      {"numerator": 0, "denominator": 0}, "0%"]

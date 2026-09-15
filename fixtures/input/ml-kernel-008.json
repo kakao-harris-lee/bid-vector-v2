@@ -1,0 +1,77 @@
+{
+  "axis": "singular-and-non-finite-input",
+  "kernel": "reserve-draw-mean",
+  "moneyUnit": "KRW 원 단위 정수",
+  "nonFiniteEncoding": "문자열 토큰 — JSON 이 NaN·Infinity 리터럴을 표현하지 못한다",
+  "probes": [
+    {
+      "label": "degenerate-variance",
+      "reservePriceValues": [
+        1000000,
+        1000000,
+        1000000,
+        1000000,
+        1000000
+      ],
+      "drawCount": 4
+    },
+    {
+      "label": "non-finite-nan",
+      "reservePriceValues": [
+        1000000,
+        1000100,
+        "NaN",
+        1000300,
+        1000400
+      ],
+      "drawCount": 4
+    },
+    {
+      "label": "non-finite-infinity",
+      "reservePriceValues": [
+        1000000,
+        "Infinity",
+        1000200,
+        1000300,
+        1000400
+      ],
+      "drawCount": 4
+    },
+    {
+      "label": "non-positive-value",
+      "reservePriceValues": [
+        1000000,
+        -1000,
+        1000200,
+        1000300,
+        1000400
+      ],
+      "drawCount": 4
+    },
+    {
+      "label": "fewer-values-than-draws",
+      "reservePriceValues": [
+        1000000,
+        1000100,
+        1000200
+      ],
+      "drawCount": 4
+    },
+    {
+      "label": "empty-support",
+      "reservePriceValues": [],
+      "drawCount": 4
+    },
+    {
+      "label": "draw-count-below-one",
+      "reservePriceValues": [
+        1000000,
+        1000100,
+        1000200,
+        1000300,
+        1000400
+      ],
+      "drawCount": 0
+    }
+  ]
+}

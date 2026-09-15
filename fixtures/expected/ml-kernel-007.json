@@ -1,0 +1,24 @@
+{
+  "probes": [
+    {
+      "label": "supported",
+      "declaredInSupportedList": true,
+      "accepted": true,
+      "loadedArtifactCreated": true
+    },
+    {
+      "label": "unsupported-newer",
+      "declaredInSupportedList": false,
+      "accepted": false,
+      "loadedArtifactCreated": false
+    },
+    {
+      "label": "undeclared",
+      "declaredInSupportedList": false,
+      "accepted": false,
+      "loadedArtifactCreated": false
+    }
+  ],
+  "nearestSupportedVersionSubstituted": false,
+  "defaultVersionAssumedWhenUndeclared": false
+}

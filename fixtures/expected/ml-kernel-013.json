@@ -1,0 +1,23 @@
+{
+  "sourceCount": 15,
+  "drawCount": 4,
+  "supportSize": 1365,
+  "populationMean": "1000000",
+  "populationVariance": "5600",
+  "drawMeanFromEnumeration": "1000000",
+  "drawMeanFromClosedForm": "1000000",
+  "drawMeanVarianceFromEnumeration": "1100",
+  "drawMeanVarianceFromClosedForm": "1100",
+  "exactlyEqualAsRationals": true,
+  "agreeWithinDeclaredPrecision": true,
+  "drawMeanStd": "33.16624790355399849114932736670686683927",
+  "supportMin": "999905",
+  "supportMax": "1000095",
+  "derivation": [
+    "populationMean = sum(values)/15 = 15000000/15 = 1000000",
+    "populationVariance = sum((x-mean)^2)/15 = 84000/15 = 5600",
+    "Var(xbar_k) = (sigma^2/k)*((n-k)/(n-1)) = (5600/4)*(11/14) = 1400*11/14 = 1100",
+    "enumeration over C(15,4) = 1365 draw means gives the same mean and the same variance exactly",
+    "std = sqrt(1100), irrational — 위 십진은 유효자리 40 까지이고 비교 정밀도는 유효자리 12 다"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "measurable": false,
+  "reason": "UNTRAINED_SEGMENT",
+  "detail": "NEVER_TRAINED",
+  "declaredMinimumRows": 24,
+  "effectiveMinimumRows": 24,
+  "segmentTrainingRowCount": 0,
+  "candidateCount": 0,
+  "scoreEmitted": false,
+  "gateAndPredictShareOneDecision": true
+}
