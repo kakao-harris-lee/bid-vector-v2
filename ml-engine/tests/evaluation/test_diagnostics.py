@@ -4,6 +4,7 @@ award_rate_diagnostics.py@ed4b06c`). 「못 이겼다」와 「못 쟀다」를 
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from ml_engine.evaluation.baselines import BaselineSpec
 from ml_engine.evaluation.diagnostics import (
@@ -68,6 +69,18 @@ def test_minimum_detectable_improvement_is_non_negative_for_realistic_case() -> 
         model, baseline, targets, threshold=_THRESHOLD
     )
     assert result >= 0.0
+
+
+def test_minimum_detectable_improvement_exact_value_for_hand_computed_inputs() -> None:
+    """verifier r1 H-2 변이 #8 재현 — 기존 test 는 경계(0.0)·부호(>=0.0)만 확인해
+    `x1.33`·`x0.5` 같은 배수 변이가 조용히 통과했다. 손으로 미리 계산한 값과
+    정확히 대조한다(baseline_mse=4.0, deviation≈4.6188, gap≈5.9583 →
+    detectable_mse=0.0 으로 클램프 → MDE=improvement_ratio(2.0, 0.0)=1.0)."""
+    targets = np.array([0.0, 0.0, 0.0, 0.0])
+    baseline = np.array([2.0, 2.0, 2.0, 2.0])
+    model = np.array([1.0, 1.0, 3.0, 3.0])
+    result = minimum_detectable_improvement(model, baseline, targets, threshold=2.58)
+    assert result == pytest.approx(1.0)
 
 
 def test_coverage_splits_separates_covered_and_fallback() -> None:

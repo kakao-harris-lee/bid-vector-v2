@@ -220,3 +220,15 @@ def test_passes_gate_is_the_single_predicate_definition() -> None:
     assert isinstance(outcome, Passed) == passes_gate(
         baseline_rmse, model_rmse, statistic, _POLICY
     )
+
+
+def test_passes_gate_requires_both_rmse_and_statistic_conditions() -> None:
+    """verifier r1 H-2 변이 #6 재현 — 안정성 sweep 의 인라인 재구현이 `and
+    statistic < -threshold` 조건을 빠뜨려도 `pytest tests -q`가 630 passed 였다.
+    두 조건이 **각각** 필요함을 직접 확인한다(단일 조건만으로는 통과하지 않는다)."""
+    # rmse 는 개선됐지만 통계량이 유의 수준(2.58)에 못 미친다 → 통과하면 안 된다.
+    assert not passes_gate(0.1, 0.05, -1.0, _POLICY)
+    # 통계량은 임계를 넘지만 rmse 자체는 개선되지 않았다(model >= baseline) → 통과하면 안 된다.
+    assert not passes_gate(0.1, 0.1, -3.0, _POLICY)
+    # 둘 다 충족하면 통과한다.
+    assert passes_gate(0.1, 0.05, -3.0, _POLICY)

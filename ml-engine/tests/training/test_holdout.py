@@ -12,7 +12,9 @@ from ml_engine.contracts import common_pb2, features_pb2
 from ml_engine.evaluation import EvaluationPolicy, Failed, NotEvaluable, Passed
 from ml_engine.evaluation.report import PromotionNotEvaluable
 from ml_engine.evaluation.windows import WeekMaturity, WindowExclusionReason
+from ml_engine.training._holdout_fit import WindowSkip, build_split
 from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFailed
+from ml_engine.training.corpus import AdmittedCorpus, admit_corpus
 from ml_engine.training.dataset import DatasetManifestV1, LoadedDataset, RawTrainingRow
 from ml_engine.training.holdout import (
     HoldoutRejected,
@@ -296,6 +298,55 @@ def test_run_holdout_evaluates_selected_window_and_produces_gate_outcome() -> No
     assert len(window_result.stability.trials) == len(_policy().stability_seeds)
     # 헤드라인 seed 가 목록 선두
     assert window_result.stability.trials[0].seed == _spec().seed
+
+
+def test_stability_trials_headline_seed_first_even_when_not_first_in_policy() -> None:
+    """verifier r1 H-2 변이 #7 재현 — 기존 test 는 헤드라인 seed 가 정책 목록에서도
+    이미 첫 자리였다(20260812, 1). `stability_seed_order`가 `tuple(policy.
+    stability_seeds)`로 퇴화해도 그 test 는 우연히 통과한다 — 헤드라인이 목록
+    **끝**에 있는 정책으로 재조립이 실제로 일어나는지 확인한다."""
+    dataset, window = _selected_window_scenario()
+    policy = _policy(stability_seeds=(1, 7, 20260812))  # 헤드라인(20260812)이 끝
+    result = run_holdout(
+        dataset,
+        [window],
+        _spec(),  # seed=20260812
+        _training_policy(),
+        policy,
+        _DeterministicTrainer(base=0.6, slope=0.0),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    trials = result.windows[0].stability.trials
+    assert len(trials) == 3
+    assert trials[0].seed == _spec().seed
+
+
+def test_build_split_boundary_row_at_window_start_excluded_from_training() -> None:
+    """verifier r1 H-2 변이 #1 재현 — `_structural_rows`의 `opened_at < window.start`
+    를 `<= window.start`로 바꾸면 경계 동시각 행이 학습측에도 새어 든다(D-5C2-8,
+    누수는 크기가 아니라 비대칭). 경계 행은 평가측에만 있어야 한다."""
+    window_start_day = 30
+    train_part = _many_rows(20, start_day=0)
+    boundary_row = _raw_row(window_start_day, category="civil", agency="a1", label=0.6)
+    # window 는 [day30, day37) — day30(경계)+day31~36(6일) = 7행이 안에 들어간다.
+    eval_rest = _many_rows(6, start_day=window_start_day + 1)
+    rows = (*train_part, boundary_row, *eval_rest)
+    dataset = _dataset(rows)
+    admitted = admit_corpus(dataset.raw_rows)
+    assert isinstance(admitted, AdmittedCorpus)
+    ordered = tuple(sorted(admitted.rows, key=lambda row: row.opened_at))
+    window = WeekMaturity(
+        start=_EPOCH + timedelta(days=window_start_day),
+        end=_EPOCH + timedelta(days=window_start_day + 7),
+        opened_count=7,
+        settled_count=6,
+    )
+    split = build_split(window, ordered, dataset, _policy(min_evaluation_rows=2))
+    assert not isinstance(split, WindowSkip)
+    # 경계 행(day30)은 평가측 7행에 들어가고, 학습측(day0~19, 20행)에는 없어야 한다.
+    assert len(split.usable_test_rows) == 7
+    assert len(split.gate_train) == 20
 
 
 def _mixed_buildability_window_scenario(
