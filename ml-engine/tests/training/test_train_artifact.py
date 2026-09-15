@@ -57,6 +57,58 @@ def _feature_inputs(*, category: str, agency: str) -> features_pb2.FeatureInputs
     return inputs
 
 
+def _feature_inputs_missing_base_amount(
+    *, category: str, agency: str
+) -> features_pb2.FeatureInputs:
+    """PR #13 code-reviewer HIGH-1 재현 — `base_amount`가 wire `Missing`(구조적으로
+    유효 — `admit_corpus`는 이것을 거부 사유로 보지 않는다). `build_row`(scope ⑤)만
+    이 행을 `RowRejected(BASE_AMOUNT)`로 떨어뜨린다."""
+    inputs = features_pb2.FeatureInputs()
+    inputs.base_amount.missing = common_pb2.MISSING_REASON_NOT_COLLECTED_YET
+    inputs.category_code.value = category
+    inputs.agency_id.value = agency
+    inputs.base_amount_provenance_label.value = (
+        common_pb2.BASE_AMOUNT_PROVENANCE_LABEL_CLEAN
+    )
+    return inputs
+
+
+def _dataset_with_missing_base_amount(*, present: int, missing: int) -> LoadedDataset:
+    """`present`행은 `_feature_inputs`(base_amount Present), `missing`행은
+    `_feature_inputs_missing_base_amount`(wire Missing) — 둘 다 `admit_corpus`를
+    통과하지만 후자만 `build_row`에서 떨어진다."""
+    total = present + missing
+    manifest = DatasetManifestV1(
+        dataset_id="ds-encoding-dropout",
+        sample_scope="feed-origin-only",
+        feed_origin_only=True,
+        row_count=total,
+        rows_checksum="0" * 64,
+        opened_at_first=datetime(2026, 1, 1, tzinfo=UTC),
+        opened_at_last=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=total),
+        feature_schema_version="award-rate-features-v2",
+    )
+    rows = []
+    for i in range(total):
+        category = "civil" if i % 2 == 0 else "it"
+        agency = f"agency-{i % 4}"
+        label = 0.5 + 0.001 * (i % 10)
+        feature_inputs = (
+            _feature_inputs(category=category, agency=agency)
+            if i < present
+            else _feature_inputs_missing_base_amount(category=category, agency=agency)
+        )
+        rows.append(
+            RawTrainingRow(
+                feature_inputs=feature_inputs,
+                label_value=label,
+                opened_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=i),
+                stratum="clean-base",
+            )
+        )
+    return LoadedDataset(manifest=manifest, raw_rows=tuple(rows))
+
+
 def _synthetic_rows(n: int) -> tuple[RawTrainingRow, ...]:
     rows = []
     for i in range(n):
@@ -211,6 +263,29 @@ def test_train_award_rate_gbm_insufficient_training_rows() -> None:
     )
     assert isinstance(result, TrainingRejected)
     assert result.reason == TrainingRejectionReason.INSUFFICIENT_TRAINING_ROWS
+
+
+def test_train_award_rate_gbm_insufficient_training_rows_after_encoding_dropout() -> (
+    None
+):
+    """code-reviewer PR #13 HIGH-1 — `admit_corpus` 직후 게이트만 있으면 이 사례를
+    놓친다: 50행 전부 구조적으로 유효(admission 통과, `min_training_rows=50` 첫 게이트
+    통과)하지만 44행이 `base_amount` wire Missing 이라 `build_row`에서 떨어져 실제
+    학습 행렬에는 6행만 남는다. 시정 전에는 `TrainedArtifact(training_row_count=6)`
+    가 성공 반환됐다(M5 완료 조건 「최소 표본이 성공으로 변환되지 않음」 위반) — 시정
+    후에는 재게이트가 이 행 수 부족을 잡는다."""
+    dataset = _dataset_with_missing_base_amount(present=6, missing=44)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=50)
+    result = train_award_rate_gbm(
+        dataset,
+        _small_spec(encoding_folds=2),
+        policy,
+        LightGbmTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert isinstance(result, TrainingRejected)
+    assert result.reason == TrainingRejectionReason.INSUFFICIENT_TRAINING_ROWS
+    assert result.detail == "admitted=6 required=50"
 
 
 def test_train_award_rate_gbm_trainer_failure_propagates() -> None:
