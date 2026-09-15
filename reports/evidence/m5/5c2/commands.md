@@ -105,8 +105,25 @@ ml-engine/src/ml_engine/training/_holdout_window.py`로 확인한다.
 - cmd: `./gradlew --no-daemon check` — S-10(evidence 편집 라운드)
 - exit: 0 — 핵심 결과: BUILD SUCCESSFUL in 6s, 337 actionable tasks(32 executed, 305 up-to-date)
 ## 2026-09-15T16:32Z
-- cmd: `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/m5/5c2/`
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m5/5c2/`
 - exit: 1 — 핵심 결과: 매치 없음(통과)
+
+## 수정 라운드 2 — BLOCKER B-1 정정(verifier r2) — 이 커밋 HEAD 에서 S-10 재실측
+
+verifier r2 B-1: 위 2026-09-15T16:32Z 기록이 비밀값 스캔 명령을 패턴 나열형으로
+인라인해(`grep -rniE "(api[_-]?key|secret|...)"`) 그 줄 자신이
+`config/quality/leak-patterns.txt` 매치가 되어 `:leakPatternGate` 를 실제로
+붉혔다(`8ba3fd9`부터). 위 명령을 65행과 같은 참조형(`-f
+config/quality/leak-patterns.txt`)으로 정정하고, 이 커밋 HEAD 에서 즉시 재실측한다
+(이력 되쓰기 아님 — 새 커밋, 절대 규칙: evidence 를 고친 커밋마다 그 커밋에서 S-10
+을 다시 돌려 적는다).
+
+## 2026-09-15T16:53:27Z
+- cmd: `./gradlew --no-daemon :leakPatternGate`
+- exit: 0 — 핵심 결과: BUILD SUCCESSFUL(매치 0, 위 정정된 줄 포함 전체 스캔)
+## 2026-09-15T16:53:27Z
+- cmd: `./gradlew --no-daemon check` — S-10, 이 커밋(B-1 정정) HEAD 에서
+- exit: 0 — 핵심 결과: BUILD SUCCESSFUL in 5s, 337 actionable tasks(31 executed, 306 up-to-date)
 
 ## clean-tree 게이트(verifier r1 M-3 ②) — 개별 경로 인자 + 양성 대조 1회
 
