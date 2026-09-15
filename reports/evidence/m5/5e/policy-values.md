@@ -41,3 +41,4 @@
 | 일자 | 변경 | 근거 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 표 등재(승인 대기) | D-5E-6·D-5E-7 |
+| 2026-09-15 구현 | `ml-engine/policy/serving-v1.yaml` 실물 작성(표 값 그대로) — `embedding_text_max_chars=4000`이 Kotlin `config/quality/contract-policy.properties`의 `embedding.text.max-chars=4000`과 일치함을 `tests/serving/test_policy_kotlin_parity.py`로 실측(D-2D-6 경계 쌍). `load_serving_policy`가 §4 불변식 전부(≥1 넷·`dataset_uri_schemes` 비어 있지 않음·중복 없음·소문자)를 강제하는 것을 `tests/serving/test_serving_policy.py`로 확인 | D-5E-6 구현 완료, 값은 여전히 보수적 초기값(측정 의무 유지) |
