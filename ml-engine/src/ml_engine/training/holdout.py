@@ -55,6 +55,10 @@ class HoldoutRejectionReason(StrEnum):
 
     EMPTY_SIDE = "EMPTY_SIDE"
     INVALID_MATURITY_INPUT = "INVALID_MATURITY_INPUT"
+    ACCOUNTING_MISMATCH = "ACCOUNTING_MISMATCH"
+    """verifier r2 H-2r — `_unaccounted_row_count`가 음수로 나오면(회계 결함,
+    도달해서는 안 되는 상태) `max(…, 0)`으로 접어 감추는 대신 실행 자체를 거부한다
+    (결과 타입, raw 예외 아님)."""
 
 
 @dataclass(frozen=True)
@@ -89,6 +93,11 @@ def _corpus_profile(
 class _WindowsOutcome:
     results: tuple[WindowResult, ...]
     excluded: tuple[WindowExclusion, ...]
+    succeeded_windows: tuple[WeekMaturity, ...]
+    """verifier r2 H-2r — `results`(`WindowResult`)는 원 `WeekMaturity`를 담지
+    않아 회계 계산에 못 쓴다. 성공한 창 자체를 `results`와 같은 순서로 별도 보관해,
+    `_unaccounted_row_count`가 `plan_selected`(skip 뒤에도 그대로인 계획 통과분)
+    대신 이 **서로소** 집합을 쓰게 한다."""
 
 
 def _evaluate_windows(
@@ -103,8 +112,11 @@ def _evaluate_windows(
     code_version: CodeVersion,
 ) -> _WindowsOutcome:
     """선택된 창마다 `evaluate_one_window`를 불러 성공/실패를 가른다 — 실패는 창
-    제외 목록(`TRAINING_REJECTED`)으로 흡수한다(design review (1))."""
+    제외 목록(`TRAINING_REJECTED`)으로 흡수한다(design review (1)). 창 하나는
+    `results`(성공) 아니면 `excluded`(실패) **정확히 한쪽에만** 들어간다 —
+    `_unaccounted_row_count`가 이 서로소 성질에 기댄다(H-2r)."""
     results: list[WindowResult] = []
+    succeeded_windows: list[WeekMaturity] = []
     excluded: list[WindowExclusion] = list(plan_excluded)
     for window in plan_selected:
         outcome_or_skip = evaluate_one_window(
@@ -131,33 +143,70 @@ def _evaluate_windows(
             )
             continue
         results.append(outcome_or_skip.result)
+        succeeded_windows.append(window)
     excluded.sort(key=lambda item: item.window.start)
-    return _WindowsOutcome(results=tuple(results), excluded=tuple(excluded))
+    return _WindowsOutcome(
+        results=tuple(results),
+        excluded=tuple(excluded),
+        succeeded_windows=tuple(succeeded_windows),
+    )
 
 
 def _unaccounted_row_count(
     ordered_rows: tuple[TrainingRow, ...],
-    plan_selected: tuple[WeekMaturity, ...],
-    plan_excluded: tuple[WindowExclusion, ...],
+    succeeded_windows: tuple[WeekMaturity, ...],
+    excluded: tuple[WindowExclusion, ...],
     gate_stratum: str,
     window_results: tuple[WindowResult, ...],
 ) -> int:
-    """회계 불변식의 계측기 — 선택+제외 창의 합집합 밖 게이트 층 행 수(legacy
+    """회계 불변식의 계측기 — 성공한 창 + 제외된 창(계획 단계·실행 단계 skip 전부,
+    `excluded`가 이미 합쳐 담는다)의 합집합 밖 게이트 층 행 수(legacy
     `_unaccounted_row_count`와 같은 정의) **더하기** buildability 로 버려진 행
-    (verifier r1 H-1 회계식 정정). 창 소속(구조적 멤버십)만으로 「회계됨」을
-    선언하지 않는다 — 창에 속했지만 채점되지 못한 행은 `WindowResult.dropped_rows`
-    로 개별 공시되는 동시에 이 합계에도 반영돼야, 「이 report 가 놓친 행」이라는
-    이 필드의 원래 취지가 지켜진다. 피드 출처 모드에서 dropped 가 0 이면 legacy 와
-    같은 값(0)이 나온다."""
+    (verifier r1 H-1 회계식). 창 소속(구조적 멤버십)만으로 「회계됨」을 선언하지
+    않는다 — 창에 속했지만 채점되지 못한 행은 `WindowResult.dropped_rows`로 개별
+    공시되는 동시에 이 합계에도 반영돼야, 「이 report 가 놓친 행」이라는 이 필드의
+    원래 취지가 지켜진다.
+
+    verifier r2 H-2r — 이전 시그니처는 `plan_selected`(계획 통과분, **실행 단계에서
+    skip 된 창도 그대로 남아있음**)를 받아, 그 창이 `excluded`에도 다시 잡혀
+    이중 계수되고 결과가 음수가 되면 `max(…, 0)`이 조용히 0 으로 접었다.
+    `succeeded_windows`(성공한 창만, `excluded`와 서로소)로 바꿔 이중 계수 자체를
+    없앤다 — 그래도 음수가 나오면 그것은 clamp 로 감출 값이 아니라
+    `HoldoutRejected(ACCOUNTING_MISMATCH)`로 실행을 거부해야 할 신호다(clamp
+    제거, 호출부가 부호를 검사한다)."""
     accounted = sum(
         len(indices_in_window(ordered_rows, window, stratum=gate_stratum))
-        for window in (*plan_selected, *(item.window for item in plan_excluded))
+        for window in (*succeeded_windows, *(item.window for item in excluded))
     )
     stratum_row_count = sum(1 for row in ordered_rows if row.stratum == gate_stratum)
     dropped_total = sum(
         item.row_count for result in window_results for item in result.dropped_rows
     )
-    return max(stratum_row_count - accounted + dropped_total, 0)
+    return stratum_row_count - accounted + dropped_total
+
+
+def _unaccounted_or_reject(
+    ordered_rows: tuple[TrainingRow, ...],
+    evaluation_policy: EvaluationPolicy,
+    windows_outcome: _WindowsOutcome,
+) -> int | HoldoutRejected:
+    """verifier r2 H-2r — `unaccounted_row_count`가 음수면(회계 결함, 서로소 집합
+    정정 뒤에도 도달해서는 안 되는 상태) `HoldoutRejected`를 낸다(`max(…, 0)`
+    제거의 짝 — clamp 대신 결과 타입). `_assemble_report`를 50줄 안에 두려고
+    분리한 헬퍼(design ratchet)."""
+    unaccounted = _unaccounted_row_count(
+        ordered_rows,
+        windows_outcome.succeeded_windows,
+        windows_outcome.excluded,
+        evaluation_policy.gate_stratum,
+        windows_outcome.results,
+    )
+    if unaccounted < 0:
+        return HoldoutRejected(
+            HoldoutRejectionReason.ACCOUNTING_MISMATCH,
+            f"unaccounted_row_count 가 음수입니다: {unaccounted}",
+        )
+    return unaccounted
 
 
 def _assemble_report(
@@ -167,7 +216,13 @@ def _assemble_report(
     ordered_rows: tuple[TrainingRow, ...],
     plan_selected: tuple[WeekMaturity, ...],
     windows_outcome: _WindowsOutcome,
-) -> EvaluationReportV1:
+) -> EvaluationReportV1 | HoldoutRejected:
+    unaccounted_or_reject = _unaccounted_or_reject(
+        ordered_rows, evaluation_policy, windows_outcome
+    )
+    if isinstance(unaccounted_or_reject, HoldoutRejected):
+        return unaccounted_or_reject
+    unaccounted = unaccounted_or_reject
     opened_first, opened_last, strata, categories = _corpus_profile(ordered_rows)
     latest = windows_outcome.results[-1] if windows_outcome.results else None
     latest_outcome: GateOutcome | None = latest.outcome if latest is not None else None
@@ -195,13 +250,7 @@ def _assemble_report(
                 ordered_rows, plan_selected, stratum=evaluation_policy.gate_stratum
             )
         ),
-        unaccounted_row_count=_unaccounted_row_count(
-            ordered_rows,
-            plan_selected,
-            windows_outcome.excluded,
-            evaluation_policy.gate_stratum,
-            windows_outcome.results,
-        ),
+        unaccounted_row_count=unaccounted,
         stability_seed_count=len(evaluation_policy.stability_seeds),
         promotion=promotion,
     )

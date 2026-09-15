@@ -17,7 +17,11 @@ from ml_engine.evaluation import (
     derive_promotion,
 )
 from ml_engine.evaluation.report import PromotionNotEvaluable
-from ml_engine.evaluation.windows import WeekMaturity, WindowExclusionReason
+from ml_engine.evaluation.windows import (
+    WeekMaturity,
+    WindowExclusion,
+    WindowExclusionReason,
+)
 from ml_engine.training._holdout_fit import WindowSkip, build_split
 from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFailed
 from ml_engine.training.corpus import AdmittedCorpus, admit_corpus
@@ -25,6 +29,8 @@ from ml_engine.training.dataset import DatasetManifestV1, LoadedDataset, RawTrai
 from ml_engine.training.holdout import (
     HoldoutRejected,
     HoldoutRejectionReason,
+    _unaccounted_or_reject,
+    _WindowsOutcome,
     run_holdout,
 )
 from ml_engine.training.policy import TrainingPolicy
@@ -488,6 +494,97 @@ def test_unaccounted_row_count_adds_dropped_rows_not_just_window_membership() ->
     assert dropped_total == 5
     # train_part 20행은 이 단일 창 밖(구조적 unaccounted) + 버려진 5행이 더해진다.
     assert result.unaccounted_row_count == 20 + 5
+
+
+def test_unaccounted_row_count_does_not_double_count_execution_stage_skip() -> None:
+    """verifier r2 HIGH H-2r 재현 — 창이 **계획 단계**(구조적 행 수 120 ≥ 하한 100)는
+    통과하고 **실행 단계**(H-A 의 buildable 재대조, 30 < 100)에서 skip 되면,
+    `plan.selected`(계획 통과분, skip 뒤에도 그대로 남음)와
+    `windows_outcome.excluded`(skip 이 추가한 같은 창)에 그 창이 **둘 다** 잡혀
+    이중 계수되고, `160 - 240 + 0 = -80`이 `max(…, 0)`에 걸려 0 이 된다(수정 전
+    재현값). 창 밖 40행이 실제로 남아있으므로 정답은 40 이다."""
+    outside = _many_rows(40, start_day=0)
+    window_start_day = 100
+    buildable = tuple(
+        _raw_row(
+            window_start_day + 1,
+            category="civil" if i % 2 == 0 else "it",
+            agency=f"agency-{i % 3}",
+            label=0.6 + 0.001 * (i % 5),
+        )
+        for i in range(30)
+    )
+    missing = tuple(
+        _raw_row_missing_base_amount(
+            window_start_day + 1, category="civil", agency=f"agency-{i % 3}", label=0.6
+        )
+        for i in range(90)
+    )
+    rows = outside + buildable + missing
+    dataset = _dataset(rows)
+    window = WeekMaturity(
+        start=_EPOCH + timedelta(days=window_start_day),
+        end=_EPOCH + timedelta(days=window_start_day + 7),
+        opened_count=120,
+        settled_count=119,
+    )
+    result = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=100),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    # 전제 확인 — 창이 실행 단계에서 skip 됐다는 것(계획 단계는 통과, 즉 이중 계수가
+    # 실제로 발생할 조건이라는 것).
+    assert result.windows == ()
+    assert len(result.excluded_windows) == 1
+    assert (
+        result.excluded_windows[0].reason
+        == WindowExclusionReason.INSUFFICIENT_EVALUATION_ROWS
+    )
+    assert result.unaccounted_row_count == 40
+
+
+def test_unaccounted_or_reject_returns_accounting_mismatch_for_negative_result() -> (
+    None
+):
+    """verifier r2 H-2r — `max(…, 0)` clamp 를 지운 자리를 그냥 두면 회계 결함이
+    조용히 음수로 새거나(치명적이진 않지만 report 필드가 거짓), clamp 를 되살리면
+    변이 저항이 없어진다(§5 표 「max 복원 → test 붉음」). `_unaccounted_or_reject`
+    를 직접 호출해(white-box, `build_split`/`WindowSkip`과 같은 관행) **서로소가
+    깨진** 상태(같은 창이 `succeeded_windows`와 `excluded` 양쪽에 있음, `_evaluate_
+    windows`가 정상적으로는 절대 만들지 않는 인위적 구성)를 주입하면
+    `HoldoutRejected(ACCOUNTING_MISMATCH)`가 나오는지 — clamp 로 감춘 0 이 아니라
+    결과 타입 거부인지를 직접 확인한다."""
+    rows = _many_rows(10, start_day=0)
+    admitted = admit_corpus(rows)
+    assert isinstance(admitted, AdmittedCorpus)
+    ordered = tuple(sorted(admitted.rows, key=lambda row: row.opened_at))
+    window = WeekMaturity(
+        start=_EPOCH, end=_EPOCH + timedelta(days=7), opened_count=5, settled_count=4
+    )
+    # 인위적 구성 — 같은 창이 succeeded_windows 와 excluded 양쪽에 잡히게 해
+    # 이중 계수(음수)를 직접 유발한다.
+    windows_outcome = _WindowsOutcome(
+        results=(),
+        excluded=(
+            WindowExclusion(
+                window=window,
+                reason=WindowExclusionReason.TRAINING_REJECTED,
+                evaluation_row_count=10,
+            ),
+        ),
+        succeeded_windows=(window,),
+    )
+    result = _unaccounted_or_reject(
+        ordered, _policy(min_evaluation_rows=2), windows_outcome
+    )
+    assert isinstance(result, HoldoutRejected)
+    assert result.reason == HoldoutRejectionReason.ACCOUNTING_MISMATCH
 
 
 def test_run_holdout_accounting_invariant_unaccounted_is_zero_for_feed_origin_only() -> (
