@@ -106,8 +106,15 @@ private fun ModelRelease.toDomain(): ModelReleaseRef =
  */
 private fun ProtoReleaseKind.toDomain(): DomainReleaseKind =
     when (this) {
-        ProtoReleaseKind.RELEASE_KIND_ARTIFACT -> DomainReleaseKind.Artifact
-        ProtoReleaseKind.RELEASE_KIND_DERIVED -> DomainReleaseKind.Derived
-        ProtoReleaseKind.RELEASE_KIND_UNSPECIFIED, ProtoReleaseKind.UNRECOGNIZED ->
+        ProtoReleaseKind.RELEASE_KIND_ARTIFACT -> {
+            DomainReleaseKind.Artifact
+        }
+
+        ProtoReleaseKind.RELEASE_KIND_DERIVED -> {
+            DomainReleaseKind.Derived
+        }
+
+        ProtoReleaseKind.RELEASE_KIND_UNSPECIFIED, ProtoReleaseKind.UNRECOGNIZED -> {
             error("hasValidReleaseShape 불변식 위반 — release_kind 가 검증층을 통과했는데 $this 다")
+        }
     }

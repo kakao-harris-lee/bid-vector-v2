@@ -42,15 +42,19 @@ internal fun hasNonBlankRelease(release: ModelRelease): Boolean =
 internal fun hasValidReleaseShape(release: ModelRelease): Boolean =
     with(release) {
         when (releaseKind) {
-            ReleaseKind.RELEASE_KIND_ARTIFACT ->
+            ReleaseKind.RELEASE_KIND_ARTIFACT -> {
                 allNotBlank(releaseId, artifactChecksum, featureSchemaVersion, codeVersion, datasetId) &&
                     !releaseId.startsWith(DISTRIBUTION_RELEASE_ID_PREFIX)
+            }
 
-            ReleaseKind.RELEASE_KIND_DERIVED ->
+            ReleaseKind.RELEASE_KIND_DERIVED -> {
                 allNotBlank(releaseId, artifactChecksum, featureSchemaVersion, codeVersion) &&
                     releaseId.startsWith(DISTRIBUTION_RELEASE_ID_PREFIX)
+            }
 
-            ReleaseKind.RELEASE_KIND_UNSPECIFIED, ReleaseKind.UNRECOGNIZED -> false
+            ReleaseKind.RELEASE_KIND_UNSPECIFIED, ReleaseKind.UNRECOGNIZED -> {
+                false
+            }
         }
     }
 
