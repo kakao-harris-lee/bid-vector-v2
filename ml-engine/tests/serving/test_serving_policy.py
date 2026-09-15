@@ -117,3 +117,34 @@ def test_missing_required_key_is_rejected(tmp_path: Path) -> None:
     ]
     result = load_serving_policy(_write(tmp_path, "\n".join(lines)))
     assert isinstance(result, PolicyRejected)
+
+
+def test_malformed_yaml_syntax_is_rejected_not_raised(tmp_path: Path) -> None:
+    """verifier r1 H-1 — 문법이 깨진 YAML(닫히지 않은 flow sequence)은 `yaml.YAMLError`
+    를 새지 않고 `PolicyRejected`여야 한다(세 번째 재발 — training/policy.py PR #13
+    HIGH-2·evaluation/policy.py 가 이미 같은 구멍을 막았다)."""
+    path = _write(tmp_path, "max_workers: [unclosed\n")
+    result = load_serving_policy(path)
+    assert isinstance(result, PolicyRejected)
+
+
+def test_app_server_boots_not_ready_not_crashes_on_malformed_serving_yaml(
+    tmp_path: Path,
+) -> None:
+    """`load_serving_policy`가 정직하게 거부해야 `app.server.run()`이 처리되지 않은
+    예외로 죽지 않고 `ConfigError`로 정직하게 부팅을 거부한다(scope ②)."""
+    from ml_engine.app.server import ConfigError, ServerConfig, run
+
+    malformed = _write(tmp_path, "max_workers: [unclosed\n")
+    env = {
+        "ML_ENGINE_BIND": "127.0.0.1:0",
+        "ML_ENGINE_INFERENCE_POLICY": str(tmp_path / "does-not-matter.yaml"),
+        "ML_ENGINE_TRAINING_POLICY": str(tmp_path / "does-not-matter.yaml"),
+        "ML_ENGINE_EVALUATION_POLICY": str(tmp_path / "does-not-matter.yaml"),
+        "ML_ENGINE_SERVING_POLICY": str(malformed),
+        "ML_ENGINE_ARTIFACT_OUT_DIR": str(tmp_path / "artifacts"),
+        "ML_ENGINE_CODE_VERSION": "sha-test",
+    }
+    config = ServerConfig.from_env(env)
+    with pytest.raises(ConfigError):
+        run(config)
