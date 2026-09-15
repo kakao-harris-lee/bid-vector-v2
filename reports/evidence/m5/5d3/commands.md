@@ -59,5 +59,5 @@ test_kernel_golden.py`·`reports/evidence/m5/5d3/`(scope.md 제외 — 자기 �
 
 ## evidence 편집 커밋 뒤 Kotlin `check` 재실행 (2026-09-16 규칙)
 
-루트에서 `./gradlew --no-build-cache --no-daemon :leakPatternGate`(evidence 커밋 HEAD에서)
-— 결과는 아래에 append.
+루트에서 `./gradlew --no-build-cache --no-daemon :leakPatternGate`(evidence 커밋 `ae4417d`
+HEAD에서) — exit 0(`BUILD SUCCESSFUL`).
