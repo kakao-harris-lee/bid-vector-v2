@@ -9,7 +9,13 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 
 from ml_engine.contracts import common_pb2, features_pb2
-from ml_engine.evaluation import EvaluationPolicy, Failed, NotEvaluable, Passed
+from ml_engine.evaluation import (
+    EvaluationPolicy,
+    Failed,
+    NotEvaluable,
+    Passed,
+    derive_promotion,
+)
 from ml_engine.evaluation.report import PromotionNotEvaluable
 from ml_engine.evaluation.windows import WeekMaturity, WindowExclusionReason
 from ml_engine.training._holdout_fit import WindowSkip, build_split
@@ -607,6 +613,75 @@ def test_run_holdout_window_with_training_rejected_is_excluded() -> None:
     assert any(
         item.reason == WindowExclusionReason.TRAINING_REJECTED
         for item in result.excluded_windows
+    )
+
+
+def test_run_holdout_promotion_uses_latest_evaluable_window_not_latest_calendar_window() -> (
+    None
+):
+    """code-reviewer 「확인 불가」 처분(2026-09-16, 팀장 지시) — 시간상 가장 늦은
+    선택 창이 제외되고(이 test 는 `INSUFFICIENT_EVALUATION_ROWS` 경로로 유도, H-A)
+    더 이른 창만 성공했을 때, `_assemble_report`의 `latest = windows_outcome.results[-1]`
+    은 **성숙·평가 가능했던 가장 최근 창**(=성공한 것 중 최신)을 승격 판정에 쓴다 —
+    "달력상 가장 최근 창"이 아니다. 이것은 의도된 완화다: 계산이 아니라 결과가 있는
+    창에서만 판정을 뽑는다(설계 검토 (1) 「창 실패는 창 제외로 흡수, report 는 여전히
+    성공 반환」과 같은 원칙 — 실패한 최신 창이 존재한다고 승격 자체를 막지 않는다).
+    scope.md/설계 검토 문면에는 이 경계가 없었다(code-reviewer 지적) — 이 test 와
+    checklist.md 「알려진 제한」 등재로 문면화한다."""
+    train_part = _many_rows(20, start_day=0)
+    window1_start = 40  # 더 이른 창 — buildable, 성공해야 한다.
+    window2_start = 80  # 달력상 더 늦은 창 — buildable 미달로 제외돼야 한다.
+    window1_rows = _many_rows(10, start_day=window1_start + 1)
+    window2_buildable = _many_rows(1, start_day=window2_start + 1)
+    window2_missing = tuple(
+        _raw_row_missing_base_amount(
+            window2_start + 1, category="civil", agency="a1", label=0.6
+        )
+        for _ in range(9)
+    )
+    rows = train_part + window1_rows + window2_buildable + window2_missing
+    dataset = _dataset(rows)
+    window1 = WeekMaturity(
+        start=_EPOCH + timedelta(days=window1_start),
+        end=_EPOCH + timedelta(days=window1_start + 7),
+        opened_count=10,
+        settled_count=9,
+    )
+    window2 = WeekMaturity(
+        start=_EPOCH + timedelta(days=window2_start),
+        end=_EPOCH + timedelta(days=window2_start + 7),
+        opened_count=10,
+        settled_count=9,
+    )
+    assert window1.start < window2.start  # 전제 확인 — window2 가 달력상 더 늦다.
+    result = run_holdout(
+        dataset,
+        [window1, window2],
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=5),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    # window2(달력상 최신)가 제외되고 window1(더 이른 창)만 성공해야 이 test 가
+    # 실제로 그 경계를 재는 것이다.
+    assert len(result.windows) == 1
+    assert result.windows[0].window_start == window1.start.isoformat()
+    assert len(result.excluded_windows) == 1
+    assert result.excluded_windows[0].window.start == window2.start
+    assert (
+        result.excluded_windows[0].reason
+        == WindowExclusionReason.INSUFFICIENT_EVALUATION_ROWS
+    )
+    # 승격 판정은 「성숙·평가 가능했던 최신」(window1) 결과에서 나온다 — NotEvaluable
+    # 로 떨어지지 않는다(제외된 window2 를 승격 대상에서 조용히 빼는 것도 아니다).
+    assert not isinstance(result.promotion, PromotionNotEvaluable)
+    assert (
+        derive_promotion(
+            result.windows[0].outcome, window_start=result.windows[0].window_start
+        )
+        == result.promotion
     )
 
 
