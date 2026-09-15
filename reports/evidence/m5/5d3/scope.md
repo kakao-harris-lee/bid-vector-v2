@@ -18,6 +18,9 @@ in_scope:
   - ml-engine/src/ml_engine/features/facts.py                 # ① 텍스트 fact 판독기 공개 승격(D-5D3-6) — 정규화·EMPTY_KEY·UNSPECIFIED 거부는 그대로, 허용 결측 사유 집합을 인자로
   - ml-engine/src/ml_engine/inference/distribution.py         # ② SampleSegment 를 FactValue[str] 둘로(D-5D3-6) · from_proto 가 표본 축 둘을 채움(D-5D3-2) · 집계: 요청 축과 정규화 문자열 동일 매칭으로 agency/category LevelObservation 구성(D-5D3-1·3) · _resolve_diagnostics 실분기 · agency_sample_count = 매칭 CLEAN 표본 수 · shrinkage_weight = level_weights.agency 실값
   - ml-engine/src/ml_engine/inference/__init__.py             # `SegmentMissing` 재수출 제거(D-5D3-6) — 외부 사용처는 test 뿐(착수 전 grep 실측)
+  - ml-engine/src/ml_engine/features/__init__.py              # 공개 승격한 판독기·허용 사유 집합 재수출(D-5D3-6) — verifier r1 F-1 로 등재(갱신 이력 2026-09-16)
+  - ml-engine/tests/inference/_sample_support.py              # 표본 축을 실을 수 있는 합성 표본 헬퍼 확장(D-5D3-7 재사용) — verifier r1 F-1
+  - ml-engine/tests/inference/golden/test_kernel_golden.py    # 011 「서빙 경로 도달 불가」 문면 제거(D-5D3-7, test 본문 불변) — verifier r1 F-1
   - ml-engine/src/ml_engine/inference/observations.py         # ③ SampleRejectionReason 값 하나(SEGMENT_REASON_NOT_ALLOWED) — 표본 축 결측 사유가 NOT_COLLECTED_YET 이 아니면 표본 거부(D-5D3-2)
   - ml-engine/tests/inference/test_distribution.py            # 규칙표 test(D-5D3-1~5) · 회귀(표본 축 전부 missing → 5D-2 결과와 동일)
   - ml-engine/tests/inference/test_observations.py            # 사유 수 8→9 · 표본 축 사유 거부
@@ -31,7 +34,7 @@ out_of_scope:
   - 표본 중복 제거(D-2B-3 식별자 없음) · 어휘(OOV) 검증(5B `Vocabulary` 는 GBM 축 — 분포 엔진은 문자열 동일 매칭만) · 별칭·계층 사전
   - golden corpus 편집(`fixtures/**` 무변경 — 011 은 커널 test 로 유지, 서빙 경로 검증은 test_engine.py 가 011 의 수치를 읽어 조립)
   - K5·K6 산식 · `results.py`(Diagnostics 필드는 5D-2 가 이미 둠 — 변경 없음 목표)
-acceptance: 5D-2 와 동일 — CI `ml-engine` job 전건(S-1 uv sync --frozen · S-2 ruff · S-3 mypy strict · S-4 import-linter · S-5 pytest 전건, golden 14/14 · S-6 design ratchet 50/500/dict[str,Any] 0 · S-7 reuse provenance 양방향 · S-8 leak 0 · S-9 contract stub roundtrip) + Kotlin `check` job 은 소스 비중첩(ml-engine/** 만) 이라 축 밖 — 단 evidence 커밋마다 루트 `leakPatternGate` 가 `reports/evidence/` 를 스캔하므로 evidence 편집 커밋의 HEAD 에서 Kotlin `check` 재실측(2026-09-16 규칙).
+acceptance: 5D-2 와 동일 — CI `ml-engine` job 전건(S-1 uv sync --frozen · S-2 ruff · S-3 mypy strict · S-4 import-linter · S-5 pytest 전건, golden 14/14 · S-6 design ratchet 50/500/dict[str,Any] 0 · S-7 reuse provenance 양방향 · S-9 Python 버전 두 자리 대조 — 번호는 `.github/workflows/ci.yml` step 이름 그대로, S-1b(serving extras 분리) 포함; S-8 은 CI step 이 아니라 commands.md 의 `legacy_parity` 실행 기록이고 누출 검사는 루트 `leakPatternGate` 몫 — verifier r1 F-7 정정) + Kotlin `check` job 은 소스 비중첩(ml-engine/** 만) 이라 축 밖 — 단 evidence 커밋마다 루트 `leakPatternGate` 가 `reports/evidence/` 를 스캔하므로 evidence 편집 커밋의 HEAD 에서 Kotlin `check` 재실측(2026-09-16 규칙).
 rollback: in_scope 경로 한정. distribution.py·observations.py·facts.py 는 5D-2/5B 소유 파일 → 이 slice 자기 이력만 착수 경계 기준 단일 역적용(`git diff <base> -- <파일> | git apply -R`, 2026-09-16 규칙), tests 신설 삭제·기존 test 파일은 같은 역적용, evidence 는 남김. 임시 clone(`git clone --no-hardlinks`) 에서 실측 ①~⑥(⑥ = 되돌린 트리에서 ml-engine job 전건 + 루트 leakPatternGate). 되돌리면 5D-2 종결 상태(global-only) 로 복귀 — 5D-2 알려진 제한 1·8 이 다시 유효.
 ```
 
@@ -58,6 +61,7 @@ rollback: in_scope 경로 한정. distribution.py·observations.py·facts.py 는
 | --- | --- |
 | `SampleSegment` 필드 타입 변경(`str` → `FactValue[str]`), `SegmentMissing` **삭제**(`inference/__init__.py` 재수출 포함) | 공개 표면 축소 — 착수 전 grep: src 사용처는 `distribution.py`·`inference/__init__.py` 재수출뿐, 나머지는 `test_distribution.py` |
 | `facts.py` 공개 판독기 | 새 public 함수 하나 — 허락하는 것: 임의 `*Fact` 를 정규화된 `Present`/`Missing`/`FactRejected` 로. 값을 지어내지 않음(입력 그대로 정규화) |
+| `facts.py` `ALL_MISSING_REASONS`(읽기 전용 `frozenset`, `features.__all__`) + `FactRejectionReason.MISSING_REASON_NOT_ALLOWED` | 기존 기본 동작에 이름을 붙인 상수 — 없던 권한 아님·값을 나르지 않음(verifier r1 F-5 등재) |
 | `SampleRejectionReason` 값 +1 | 열거 확장, 계수 축만 |
 | `DistributionRequest.from_proto` | 유일 생성 경로 유지, 이제 표본 축을 실제로 채움 — `agency`/`category` 요청 축은 이미 소비 대상 |
 | 「경계로 처리」 행 | 없음 — 매칭·집계는 전부 `distribution.py` 내부(private) |
@@ -71,3 +75,6 @@ D-5D3-7 test 초록(ML-04 ② 서빙 경로) · D-5D3-5 회귀 test 초록 · S-
 ## 계약 갱신 이력
 | 날짜 | 변경 | 사유 |
 | --- | --- | --- |
+| 2026-09-16 (verifier r1 F-1, HIGH) | `in_scope` 에 실제 변경 3경로 추가 — `features/__init__.py`(재수출)·`tests/inference/_sample_support.py`(헬퍼)·`tests/inference/golden/test_kernel_golden.py`(문면). 셋 다 D-5D3-6·7 이 허가한 편집이나 목록에 없어 clean-tree 게이트(`git status --porcelain -- <in_scope>`)가 그 경로의 미커밋 편집에 초록을 냈다(false-clean 재현). 시정은 목록뿐, 코드 무변경 | 게이트 정의가 변경 집합보다 좁았다 — 계약 작성 시 「재사용 헬퍼·재수출·문면 제거」를 경로로 적지 않은 팀장 누락 |
+| 2026-09-16 (팀장 표적 11 — 게이트 술어 변경) | **D-5D3-6 보정**: 요청 축(`FeatureFacts.from_proto`) 결측 사유 허용 집합을 「`UNSPECIFIED` 만 거부(enum 밖 정수는 `Missing(raw)` 로 수용)」에서 **「선언된 `MissingReason` 값 셋(`UNKNOWN`·`NOT_APPLICABLE`·`NOT_COLLECTED_YET`)만 수용, 그 밖(`UNSPECIFIED`·enum 밖 정수)은 `FactRejected(MISSING_REASON_NOT_ALLOWED)`」** 로 좁힌다. 구현(`ALL_MISSING_REASONS`)이 계약 문면 「기존 집합 유지」보다 엄격해진 것을 팀장이 채택 — 방향이 fail-closed(2A ⑥)이고 enum 밖 정수를 결측 사유로 수용할 근거가 5B 에 없다. verifier r2 가 base 대비 `missing = 99` 거동 차이를 실측해 등재한다 | 구현 이탈을 계약이 흡수 — 대안(구현 되돌림)은 「알 수 없는 사유를 값 없음으로 접는」 미탐을 남긴다 |
+| 2026-09-16 (verifier r1 F-7) | `acceptance` 의 S-8·S-9 이름을 CI step 과 일치시킴 — 문서 정정만 | 팀장 오기 |
