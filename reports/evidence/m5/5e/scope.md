@@ -32,12 +32,14 @@ in_scope:
   - ml-engine/policy/serving-v1.yaml                        # 정책 값 실물(D-5E-6, OPEN-5E-POLICY-VALUES)
   - ml-engine/pyproject.toml                                # (a) import-linter forbidden 계약(serving/inference 는 grpc 금지)에 `ignore_imports = ["ml_engine.serving.grpc -> grpc", "ml_engine.training.jobs.servicer -> grpc"]` (b) `[project.scripts]` 또는 `-m` 진입 문서 (c) wheel 빌드 훅 설정(D-5E-8 — 생성 stub 을 wheel 의 **별도 top-level 패키지 `bidvector/`** 로, 소스 트리·`ml_engine` 패키지 안엔 두지 않음) (d) serving extras 에 `grpcio` 는 이미 base 의존 — 변경 0 확인 · dev extras 에 `grpc-stubs`(D-5E-9) · `[tool.ruff]`·래칫·layers 무편집
   - ml-engine/tools/build_hook.py                           # D-5E-8 — setuptools `build_py` 서브클래스: `generate_contracts.generate(<build_lib>)` 로 `<build_lib>/bidvector/ml/v1/*_pb2*.py` 생성(5A `tools/generate_contracts.py` 재사용) · `contracts/__init__.py` 무편집(설치본에선 절대 import 가 sys.path 조작 없이 성립 — S-11 실측)
+  - ml-engine/setup.py                                     # D-5E-8 배선 — `cmdclass={"build_py": ContractsBuildPy}` 만(PEP 517 훅은 pyproject 만으로 cmdclass 를 못 건다). 계약 갱신 2026-09-16 (2): 구현 실측으로 추가
   - ml-engine/tests/serving/**                              # RED 먼저 — in-process grpc(grpc_testing 또는 insecure 포트 0) 로 세 servicer test · readiness 규칙표 · 전이표 property · idempotency · deadline/cancel(자원 해제 카운터) · concurrency 상한(동시 N+1 번째 RESOURCE_EXHAUSTED) · shutdown 순서 · status 매핑 전수 · 2C 조합 불변식
   - ml-engine/tests/training/test_jobs_*.py
   - ml-engine/tests/app/**                                  # pipeline 통합(fake trainer + 실 LightGBM 1건: dataset 디렉터리 → artifact·report 파일 → refs checksum 재계산) · server 부팅·종료
   - ml-engine/tests/gates/test_serving_purity.py            # 기존 test 무편집 + `ml_engine.app` 은 대상 아님을 명시하는 test 1(app 이 training 을 끌어와도 serving 패키지 자체는 안 끌어옴)
   - ml-engine/tests/gates/test_wheel_reexport.py            # S-11 — `uv build` → 임시 venv 설치 → `import ml_engine.contracts` + servicer import 성립(OPEN-5A-WHEEL-BUILD-HOOK 종결 증거)
   - .github/workflows/ci.yml                                # ml-engine job 에 S-11 step 추가(Python job hunk 만, Kotlin job 무편집)
+  - config/quality/leak-pattern-baseline.txt              # 내용 해시 키 항목 추가만 — **진짜 식별자**(클래스 이름 등)의 오탐에 한정, evidence 가 스캔 어휘를 인용해 생긴 자기매치를 baseline 으로 덮지 않는다(하네스 규칙 2026-09-16). 계약 갱신 (2)
   - milestone-5.md                                          # 5E 절 착수 문단 + 5E-1/5E-2 분할
   - reports/evidence/m5/5e/**
 out_of_scope:
@@ -150,6 +152,12 @@ rollback: |
 
 ---
 
+## 하네스 레인 변경(리뷰 요청 시점마다 갱신 — `git log --oneline d78e162..HEAD -- CLAUDE.md .claude/`)
+
+없음(2026-09-16 verifier r1 요청 시점). 등재되는 커밋은 slice 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은 range 에 있다.
+
+---
+
 ## OPEN — 수령·신설
 
 | OPEN | 처리 |
@@ -173,3 +181,4 @@ rollback: |
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — 5E 분할(D-5E-0), 결정 11 | 사용자 「5E 착수」 · 착수 조사 |
+| 2026-09-16 (2) verifier r1 요청 전 | in_scope 에 `ml-engine/setup.py`·`config/quality/leak-pattern-baseline.txt` 추가 · 「하네스 레인 변경」 절 신설(없음) | 구현 실측 — setuptools 훅 배선에 `setup.py` 필요(pyproject 만으로 cmdclass 불가), `CancelToken` 식별자 오탐 baseline 등재. 절 누락은 evidence-pack 규격 위반(팀장 레인 초판 누락) |
