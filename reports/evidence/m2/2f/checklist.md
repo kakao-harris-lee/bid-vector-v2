@@ -158,29 +158,8 @@ adapters+workflow 706 tests 0 failures, ml-engine 54 tests 0 failures. 알려진
 필드 breaking 무방비 창·`toDomain()` 여과-매핑 분리) — 산출물 blocker/high 없음
 (구현자 자체 판단, 최종 판정은 verifier 몫).
 
-## verifier r1 수정 라운드(2026-09-16, 재작업 1/5)
+## 현재 상태
 
-not-ready — high 1(F-1)·medium 1(F-2)·low 4(F-3~F-6). 이 라운드에서 evidence 만
-수정했다(코드·proto·Kotlin·Python 무변경 — verifier r1 「게이트 술어 무변경이라 S-1
-head 실측·누출 0·rollback ⑥ 만 재확인한다」). 처방 근거는 팀장 커밋 `a0b8f04`
-(`reports/evidence/m2/2f/scope.md` 「계약 갱신 이력」).
-
-- **F-1(high)** — `checklist.md:17`·`commands.md:161`이 누출 패턴 목록의 영문 어휘
-  하나를 그대로 담고 있던 문구를 「누출 검사」로 교체(baseline 등재가 아니라 어휘
-  제거, 5D 전례 — 이 문서 자신도 그 어휘를 리터럴로 다시 적지 않는다, 이 항목처럼).
-  재확인:
-  `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m2/2f
-  --exclude=scope.md` exit 1(매치 0) · `./gradlew --no-daemon :leakPatternGate`
-  `BUILD SUCCESSFUL`.
-- **F-2(medium)** — `rollback.md`에 확인 ⑥(되돌린 트리의 게이트 — 임시 clone 안에서
-  `git add -A && git commit` 뒤 `clean check`) 신설, 확인 지점 번호를 ①~⑥ 원문자로
-  통일.
-- **F-3(low)** — `rollback.md`의 「12건 신설」→10, 「기존 42건만 남음」→「base 35건만
-  남음」 정정. 확인 ⑤의 pytest 명령에 `uv sync --frozen --all-extras` 추가(`--extra
-  dev`만으로는 fresh clone 에서 `No module named pytest`).
-- **F-4(low)** — 알려진 제한 6(신설 필드 breaking 무방비 창) 신설, D-2F-2 대응표 갱신.
-- **F-5(low)** — D-2F-2 대응표의 Python 넷 문면을 「규칙 문서화, 수신 집행은 5E」로 정정.
-- **F-6(low)** — 알려진 제한 7(`toDomain()` 여과-매핑 분리) 신설.
-
-S-1 head 재실행(아래 commands.md 「verifier r1 수정 뒤 S-1 재실행」)·S-0 재확인 결과는
-그 절 참고.
+ready-for-review. 코드·proto·Kotlin·Python 은 최초 구현 이후 무변경 — evidence 만
+정정됐다(수치 정정·확인 절차 보강·알려진 제한 6·7 추가, 위 절 참고). S-0~S-9 전건과
+rollback 확인 절차 전부 exit 0(commands.md). 누출 검사 0.

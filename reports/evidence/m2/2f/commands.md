@@ -138,6 +138,9 @@ base `c669a71affabed165c1afbd8b11c8245b81a3a5a`, head는 리뷰 시점의 `git r
   :contractGate :adapters:sizeGate` — 둘 다 `BUILD SUCCESSFUL`, `:adapters:sizeGate
   UP-TO-DATE`·`:contractGate` 실행). ktlint·detekt·ArchUnit·cpdCheck·kover 포함 전 모듈
   `:check` 통과.
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`(현재 HEAD 재확인)
+- exit: 0 — `BUILD SUCCESSFUL in 37s`, 346 actionable tasks(317 executed, 29 up-to-date).
+  `:leakPatternGate` 포함.
 
 ## S-0 — 격리 worktree 전건(clean check)
 
@@ -151,6 +154,11 @@ base `c669a71affabed165c1afbd8b11c8245b81a3a5a`, head는 리뷰 시점의 `git r
 - exit: 0
 - 핵심 결과: `git worktree list`에 잔여 없음, 디렉터리 자체도 삭제 확인(`ls` exit 1 —
   「No such file or directory」).
+- cmd: 같은 절차를 현재 HEAD 에 재실행(`git worktree add --detach <scratchpad>/…
+  <head SHA> && (cd <dir> && ./gradlew --no-build-cache --no-daemon clean check)`,
+  정리까지)
+- exit: 0 — `BUILD SUCCESSFUL in 1m 6s`, 355 actionable tasks(355 executed, 캐시 없이
+  전건). worktree 제거·디렉터리 삭제 재확인.
 
 ## 누출 검사
 
@@ -163,6 +171,8 @@ base `c669a71affabed165c1afbd8b11c8245b81a3a5a`, head는 리뷰 시점의 `git r
   `ResponseMapping.kt`·`BidPredictionOutcome.kt`·`BidPredictionRequest.kt`·
   `PredictionContractTest.kt`·`PredictionAdditiveContractTest.kt`·`MlTestFixtures.kt`·
   `test_prediction_contract.py`) 자체에는 매치 0.
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m2/2f --exclude=scope.md`(evidence 산문 자체, 현재 HEAD)
+- exit: 1(매치 0) · `./gradlew --no-daemon :leakPatternGate --rerun-tasks` exit 0.
 
 ## clean-tree 게이트 — in_scope 경로 개별 인자
 
@@ -188,41 +198,22 @@ base `c669a71affabed165c1afbd8b11c8245b81a3a5a`, head는 리뷰 시점의 `git r
 - exit: 0.
 - cmd: `./gradlew --no-daemon :adapters:test :workflow:test`
 - exit: 0(BUILD SUCCESSFUL).
-- cmd: `(cd ml-engine && uv sync --extra dev && uv run python -m pytest
+- cmd: `(cd ml-engine && uv sync --frozen --all-extras && uv run python -m pytest
   tests/test_prediction_contract.py -q)`
 - exit: 0 — **35 passed**(2F 신설 10건 없이 base 상태로 정확히 축소 — 위 S-5 「실측
-  대조」의 근거).
-
-## verifier r1 수정 뒤 재실행(2026-09-16, head `5c9ce0a`)
-
-처방 근거 팀장 커밋 `a0b8f04`. F-1~F-6 수정은 `03e3c3b`·`5c9ce0a`(evidence 만, 코드·
-proto·Kotlin·Python 무변경). `5c9ce0a`는 `03e3c3b`의 「verifier r1 수정 라운드」
-서술 절이 구 어휘를 인용 부호로 다시 적어 `:leakPatternGate`를 재차 붉힌 것을
-잡은 2차 교정(재현: `./gradlew --no-daemon clean check` → `checklist.md:168` 신규
-매치 → 인용 없이 서술로 교체 → 재확인).
-
-- cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m2/2f
-  --exclude=scope.md`
-- exit: 1(매치 0) — head `5c9ce0a`.
-- cmd: `./gradlew --no-daemon :leakPatternGate`
-- exit: 0(`BUILD SUCCESSFUL`).
-- cmd: `./gradlew --no-build-cache --no-daemon clean check`(S-1, head `5c9ce0a`)
-- exit: 0 — `BUILD SUCCESSFUL in 37s`, 346 actionable tasks(317 executed, 29
-  up-to-date). F-1 이 지목한 head 실측 공백(구 기록은 `693bc5a` 것이었다)이 이제
-  head 자체를 덮는다.
-- cmd: `git worktree add --detach <scratchpad>/s0-2f-r1-worktree 5c9ce0a...` →
-  `(cd <dir> && ./gradlew --no-build-cache --no-daemon clean check)`(S-0)
-- exit: 0 — `BUILD SUCCESSFUL in 1m 6s`, 355 actionable tasks(355 executed, 캐시
-  없이 전건).
-- cmd(정리): `git worktree remove --force <scratchpad>/s0-2f-r1-worktree`
-- exit: 0 — `git worktree list`에 잔여 없음, 디렉터리 삭제 확인(`ls` exit 1).
-- cmd: rollback ⑥ 재실측(신규 `git clone --no-hardlinks` → checkout → 23경로 restore
-  → **`git add -A && git commit -m "rollback probe"`(임시 clone 안)** → `./gradlew
-  --no-build-cache --no-daemon clean check`)
+  대조」의 근거. `uv sync --frozen --all-extras`가 dev 의존을 정상 설치한다 —
+  `--extra dev`만으로는 fresh clone 에서 `No module named pytest`).
+- cmd: 확인 ⑥(되돌린 트리의 게이트) — 위 임시 clone 에서 `git add -A && git commit
+  -m "rollback probe"` 뒤 `./gradlew --no-build-cache --no-daemon clean check`
 - exit: 0 — `BUILD SUCCESSFUL in 1m 29s`, 355 actionable tasks(355 executed).
-  `contractGate`·`leakPatternGate` 모두 절차 잔여 없이 통과(F-2 처방 확인).
-- cmd: rollback ⑥ Python 재확인 — `(cd ml-engine && uv sync --frozen --all-extras &&
-  uv run python -m pytest tests/test_prediction_contract.py -q)`(같은 임시 clone)
-- exit: 0 — **35 passed**(F-3 정정 수치와 일치, `uv sync --frozen --all-extras`로
-  dev 의존 정상 설치 — `--extra dev`만으로는 이전 라운드에서 `No module named
-  pytest`).
+  `contractGate`·`leakPatternGate` 모두 절차 잔여 없이 통과.
+
+## 크기 게이트 재실측(verifier r2 L-1)
+
+- cmd: `git diff --numstat c669a71affabed165c1afbd8b11c8245b81a3a5a -- reports/evidence/m2/2f/`
+- 결과: checklist.md 165 · commands.md 209 · rollback.md 122 · scope.md 119(무편집,
+  팀장 소유) = **615**(round-history 절 삭제 전 655에서 40 감소, 여전히 595 초과 20줄).
+  부푼 곳: checklist.md 알려진 제한 6·7(verifier r1 F-4·F-6, 필수 신설 항목) 약 35줄 +
+  rollback.md 확인 ⑥ 절차(verifier r1 F-2, 필수 신설 항목) 약 14줄 + commands.md 의
+  S-0·S-1·rollback ⑥ 재확인 라인 약 15줄 — 전부 verifier r1 이 직접 요구한 신설
+  내용이고 round-history 서술이 아니다. 추가 삭감은 팀장 판단.
