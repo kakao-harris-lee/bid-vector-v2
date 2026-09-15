@@ -109,3 +109,11 @@ rollback: |
 | `OPEN-2F-DICT-INTERVAL-SOURCE` | `data-dictionary.md` §6.5 에 `interval_source` 정의 없음 — discovery 문서 갱신(후속, 문서 소유) |
 | `OPEN-2F-DIAGNOSTICS-DOMAIN` | Kotlin gateway 가 `Diagnostics` 를 도메인으로 소비하지 않음(읽는 코드 0) — 4D-1 후속 |
 | `OPEN-2B-AGENCY-ID` | 수령 유지 — 표본 축도 같은 정본 |
+
+---
+
+## 계약 갱신 이력
+
+| 일자 | 갱신 | 사유 |
+| --- | --- | --- |
+| 2026-09-16 (verifier r1 뒤) | **알려진 제한 등재** — 신설 필드·enum 값(8·9 / 3~6 / `IntervalSource` 3 / `release_kind` 6)은 **승인 태그 재발행 전까지 breaking 게이트에 안 보인다**(현 태그 대비 실측: 타입 변경·번호 변경 exit 0, 기준선 필드 삭제는 exit 100). 2E F-1 과 같은 성질(파일이 아니라 필드 단위). 완화: testdata 왕복 test(신설 1쌍 포함)가 형태를 고정하고, 종결 승인 커밋의 태그 신설로 닫힌다 — 「2E F-1 은 2F 에 없다」 문면을 「파일 단위로는 없고 필드 단위로는 같은 창이 태그까지 열려 있다」로 정정. **rollback 확인 ⑥ 명시** — `git restore --source=<base> --staged --worktree` 뒤 `git status` 가 staged D/M 을 남기므로 되돌린 트리 게이트는 **staged 를 커밋하거나 `git stash` 없이 `git add -A && git commit`(임시 clone 안) 한 뒤** `clean check` — 그렇지 않으면 `contractGate`(clean-tree 전제)·`leakPatternGate` 가 절차 잔여로 붉다. **evidence 산문의 누출 어휘 금지 재확인** — baseline 등재가 아니라 어휘를 지운다(5D 전례) | verifier r1 F-1(high: evidence 자신의 어휘 둘이 `leakPatternGate` 를 붉힘 — S-1 기록이 head 를 안 덮음)·F-2(rollback ⑥ 부재)·F-3·F-4 |
