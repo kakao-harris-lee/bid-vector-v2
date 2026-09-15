@@ -2,17 +2,19 @@
 
 정본. 목록은 `git diff --name-status <base>..<코드 마지막 커밋> -- <in_scope 경로>`로
 기계 산출(경로를 개별 인자로). **`reports/evidence/m5/5d2/{scope.md,policy-values.md}`는
-팀장 문서 레인 소유**(착수 계약 `9466347`·계약 갱신 `623baa1`) — 이 목록에서 제외한다.
+팀장 문서 레인 소유**(착수 계약 `9466347`·계약 갱신 `623baa1`·`fb4e001`·`64972ba`·
+`fde9b2c`, verifier r1·r2 뒤 계약 정정 — N-4) — 이 목록에서 제외한다.
 `commands.md`·`checklist.md`·`rollback.md`(이 파일 자신)는 자기 자신을 담은 커밋을
 가리킬 수 없다는 규율(2026-09-10) — 목록에서 제외. `reuse.md`만 코드 레인 소유 evidence
 라 대상에 포함.
 
 base = `cefb19c9269ac3b29d0246175fb04d71c04aa3d4`(5D 종결), 코드 마지막 커밋 =
-`72ee887d910b43fcfc1a7f735c8920113425551e`(evidence — verifier r1 F-1~F-8 반영. 구현
-코드 자체는 `de518ba`, F-1 이전 최초 구현은 `b9cfe77`).
+`c195793f3422b3593dcc7505e84e6c0740903e6c`(evidence — verifier r2 N-1~N-4 반영 +
+`parse_rate` docstring 한 줄, 팀장 지시로 evidence 커밋에 동봉 허용). 구현 코드 자체는
+verifier r1 F-1·F-2 반영 `de518ba`, F-1 이전 최초 구현은 `b9cfe77`.
 
 ```
-$ git diff --name-status cefb19c9269ac3b29d0246175fb04d71c04aa3d4..72ee887d910b43fcfc1a7f735c8920113425551e \
+$ git diff --name-status cefb19c9269ac3b29d0246175fb04d71c04aa3d4..c195793 \
     -- ml-engine/src/ml_engine/inference ml-engine/tests/inference ml-engine/policy \
        reports/evidence/m5/5d2
 M	ml-engine/src/ml_engine/inference/__init__.py
@@ -45,9 +47,10 @@ A	reports/evidence/m5/5d2/scope.md           ← 팀장 문서 레인(제외)
 에 신설 키를 넣지 않는다). `M` 표시된 5D 소유 파일 9개(`__init__.py`·`policy.py`·
 `predict.py`·`results.py`·golden 어댑터/test·`test_assessment.py`·`test_policy.py`·
 `test_predict.py`·`test_results.py`·`test_scenario.py`)는 이 range 안에서 **이 slice
-외 다른 레인이 손대지 않았다**(위 diff 가 base 대비 전체 변경분이고, 팀장 커밋 둘(`9466347`·
-`623baa1`)은 `milestone-5.md`·`reports/evidence/m5/{5a,5d2}/*.md`만 건드려 겹치지 않는다)
-— hunk 격리 없이 `git restore --source=<base>`전체 복원이 안전하다.
+외 다른 레인이 손대지 않았다**(위 diff 가 base 대비 전체 변경분이고, 팀장 문서 레인
+커밋 다섯(`9466347`·`623baa1`·`fb4e001`·`64972ba`·`fde9b2c`, verifier r2 N-4)은 전부
+`milestone-5.md`·`reports/evidence/m5/{5a,5d2}/{scope.md,policy-values.md}`만 건드려
+겹치지 않는다) — hunk 격리 없이 `git restore --source=<base>`전체 복원이 안전하다.
 
 ## 되돌리기 명령(신설 경로 삭제 + 편집 파일 전체 복원, 경로 개별 인자)
 
@@ -112,6 +115,16 @@ git restore --source=cefb19c9269ac3b29d0246175fb04d71c04aa3d4 --staged --worktre
    (`All checks passed!` · `71 files already formatted`).
 8. `uv run python tools/design_ratchet.py --check`(S-6) → **exit 0**(위반 없음).
 9. `uv run python tools/reuse_provenance_check.py`(S-7) → **exit 0**(위반 없음).
+
+## verifier r2 뒤 갱신(2026-09-15, N-4 — 임시 clone 재실측 없음)
+
+HEAD `72ee887` → `c195793`(N-1~N-4 반영: checklist·commands·reuse 문서 + `parse_rate`
+docstring 한 줄). **파일 집합이 2차와 완전히 동일**(위 `git diff --name-status` 재실행
+확인, 신설/삭제 0 — 기존 5파일의 내용만 바뀌었다)하고 N-1~N-4 는 관문 술어를 바꾸지
+않는다(팀장 지시 「커밋 SHA 만 보고, 재검증 없음」) — 그래서 이번 라운드는 새 임시
+clone 을 만들지 않는다. 되돌리기 명령·목록은 2차와 동일하게 유효하며, 위 `git diff
+--name-status cefb19c9269ac3b29d0246175fb04d71c04aa3d4..c195793f3422b3593dcc7505e84e6c0740903e6c`
+재실행으로 파일 집합 불변만 별도 확인했다(2026-09-15, 본문 상단 코드 블록이 그 결과).
 
 ## 알려진 제한
 
