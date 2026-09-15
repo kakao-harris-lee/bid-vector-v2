@@ -100,6 +100,47 @@
     `evaluate_award_rate_holdout` 전체(두 GBM 변형)를 seed 마다 재실행하지만, 이
     구현은 판정에 쓰이는 `gbm_all_strata`만 재학습한다(비용 절감, 보수 변형은 애초에
     판정에 쓰이지 않으므로 정보 손실 없음).
+11. **`WeekMaturity.__post_init__`이 결과 타입이 아니라 `ValueError`를 던진다**
+    (verifier r1 L-1, 2026-09-16 등재) — 설계 검토 (13)은 겹침·구조 위반 전부를
+    `HoldoutRejected(INVALID_MATURITY_INPUT)`로 계획했으나, 실제로는 성숙도 구간
+    **겹침**만 그 결과 타입으로 흡수되고(`plan_evaluation_windows` →
+    `InvalidMaturityInput`), 개별 `WeekMaturity`의 생성자 불변식(`end > start`,
+    음수 카운트 금지)은 `ValueError`로 막는다. 5C-1 `AwardRateLabel`과 같은
+    컨벤션이라 코드는 바꾸지 않는다(`test_week_maturity_rejects_end_not_after_start`/
+    `test_week_maturity_rejects_negative_counts`가 이 동작을 고정) — 문면 정정으로
+    처분.
+12. **`summarize_stability([])`이 "중립"이 아니라 "일관"값을 낸다** (verifier r1
+    L-2, 2026-09-16 등재) — docstring 의도(trials 없으면 중립)와 달리
+    `sign_consistent=True`·`verdict_consistent=True`를 반환해 게이트의 안정성
+    전제를 우연히 충족시킨다(`gate_outcome(..., stability=summarize_stability(()))`
+    → `Passed` 실측 가능). 프로덕션 경로에서는 `evaluation_policy.stability_seeds`가
+    항상 비지 않아(정책 불변식) trials 가 빈 상태로 도달하지 않는다
+    (`test_diagnostics.py`의 `summarize_stability([])` 관련 test 가 이 값 자체를
+    고정) — 등재로 처분, 코드 변경 없음.
+13. **`_fit_baselines`/`matrix_for`의 방어적 `assert`가 `python -O` 아래에서
+    사라진다** (verifier r1 L-3, 2026-09-16 등재) — `EvaluationPolicy.__post_init__`
+    불변식이 그 입력을 앞에서 이미 막아 현재 코드 경로로는 도달 불가하지만, `-O`
+    실행 시 이 방어선 자체가 사라진다는 사실은 남는다. 이 slice 의 acceptance
+    명령(S-1~S-10, `commands.md`)은 전부 `-O` 없이 실행됨을 확인 — 등재로 처분,
+    코드 변경 없음.
+14. **`derive_promotion`이 `Passed`+`window_start=None` 조합에 `ValueError`를
+    던진다** (verifier r1 L-4, 2026-09-16 등재) — 결과 타입 원칙(예외로 새지 않음)의
+    의도적 내부 불변식 예외다. `_assemble_report`가 항상 `latest.window_start`를
+    `latest`와 짝으로 넘기므로 프로덕션 경로에서 도달 불가
+    (`test_derive_promotion_passed_without_window_start_raises`가 고정) — 등재로
+    처분, 코드 변경 없음.
+15. **latest-window 승격 의미론 — "성숙·평가 가능했던 최신 창"이지 "달력상 최신
+    창"이 아니다** (code-reviewer 「확인 불가」, 팀장 지시로 2026-09-16 **의도로
+    확정**) — 시간상 가장 늦은 선택 창이 (`TRAINING_REJECTED`·
+    `INSUFFICIENT_EVALUATION_ROWS` 등으로) 제외되고 더 이른 창만 성공하면,
+    `_assemble_report`의 `latest = windows_outcome.results[-1]`이 그 이른 창을
+    승격 판정에 쓴다. 실패한 최신 창의 존재가 승격 자체를 막지 않는다는 것이
+    의도다(설계 검토 (1) 「창 실패는 창 제외로 흡수, report 는 여전히 성공
+    반환」과 같은 원칙 — job 계약과 도메인 계약을 섞지 않는다). 결과가 이른 창
+    기준으로 오래됐을 수 있다는 것을 소비자(5E)가 알아야 한다 — 「latest」는
+    달력이 아니라 평가 가능성 기준이라는 뜻.
+    `test_run_holdout_promotion_uses_latest_evaluable_window_not_latest_calendar_window`
+    (`tests/training/test_holdout.py`)가 이 경계를 고정한다.
 
 ## `HoldoutRejected`/`NotEvaluable` → 2C `JobFailureCode` 매핑 표(D-5C2-12)
 
@@ -128,7 +169,7 @@
 | `OPEN-5C-MATURITY-SOURCE` | D-5C2-2 로 종결(입력) |
 | `OPEN-5C-BUDGET-BAND-SOURCE` | scope ② 로 종결(정책 데이터) |
 | `OPEN-5C-SEGMENT-PUBLISHED-FLOOR` | D-5C2-9 로 종결(축 없음) |
-| `OPEN-5C-REJECT-ACCOUNTING`(5C-1 L-8) | 미해소 유지(5E 전) — `TrainedArtifact.rejected_rows`를 창별 report 에 공시하는 추가 필드는 5C-1 파일 편집이라 이번 slice 범위 밖 |
+| `OPEN-5C-REJECT-ACCOUNTING`(5C-1 L-8) | **2026-09-16 정정(verifier r1 M-4)** — 이 slice 가 실제로 새로 공시하는 것은 창 안 buildability 로 걸러진 행의 `WindowResult.dropped_rows`(H-A, `MissingFact` 사유별)뿐이다. 코퍼스 admission 단계의 `AdmittedCorpus.rejected`/`TrainedArtifact.rejected_rows`(성공 경로, 5C-1 `RejectedRowAccounting`)는 이 report 에 여전히 없다 — 그 필드 추가는 5C-1 파일(`train.py`/`artifact_writer.py`) 편집이라 범위 밖, 미해소 유지(5E 전) |
 | `OPEN-5C-CORPUS` | 승계 — 5C-2 test 는 전부 합성 코퍼스, 실코퍼스 evaluation fixture 는 curator 몫 |
 
 ## 계약과 어긋나 판단이 필요했던 자리
@@ -146,3 +187,21 @@
   로 비공개임을 표시했다. **팀장 검토 대상**: allowlist 편집이 더 나은 선택이었다면
   롤백 없이 `pyproject.toml`에 항목을 추가하고 세 파일을 다시 합치는 것도 가능
   (rollback.md 의 in_scope 목록에 세 파일이 모두 등재돼 있어 되돌리기 쉽다).
+  **2026-09-16 verifier r1 L-5 추가 판정** — 순환 없음(`holdout.py` →
+  `_holdout_window.py` → `_holdout_fit.py`), public seam 파일당 하나, 셋 다
+  500줄 아래(래칫 양성 대조로 500줄 한도 실효성 확인)라는 근거로 **3파일 분리가
+  「줄 수만 맞추기 위한 분할」이 아니라고 결론**(verifier: "allowlist 편집 대안을
+  택할 근거는 약하다"). 다만 `_holdout_window.py`가 `_holdout_fit.py`의 public
+  이름 11개 중 10개를 참조해 두 파일이 완전히 독립적으로 읽히지는 않는다 — 정리
+  여지로 `stability_seed_order`/`sub_dataset`(안정성 sweep 전용)과
+  `WindowSuccess`/`WindowSkip`(세 파일이 공유하는 결과 어휘)의 위치가 지목됐다.
+  실제로 옮기려 하면 `sub_dataset`/`stability_seed_order`는 `_holdout_fit.py`
+  자신의 `fit_models`/`_fit_conservative_variant`(:281·:311)도 그 함수를 쓰므로
+  `_holdout_window.py`로 온전히 옮기면 `_holdout_fit.py → _holdout_window.py`
+  역방향 import 가 생겨 지금의 무순환 경계(`_holdout_fit`은 `_holdout_window`를
+  모른다)를 깬다 — **allowlist 편집이 이 정리보다 더 나쁜 대안이라는 verifier
+  결론에는 동의하되, 이 정리 자체는 지금 구조에서 무비용이 아니다.** 그래서 이번
+  라운드는 코드를 옮기지 않고 이 자리에 등재만 한다 — 실행하려면 공유 어휘
+  (`WindowSuccess`/`WindowSkip`)만 별도 파일(예: `_holdout_types.py`)로 뽑아
+  셋이 그 파일만 보게 하는 재구조화가 필요하고, 이는 새 계약 갱신 없이 팀장 검토
+  대상.
