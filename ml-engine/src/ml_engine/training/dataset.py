@@ -49,6 +49,14 @@ class DatasetManifestV1:
     opened_at_first: datetime
     opened_at_last: datetime
     feature_schema_version: str
+    settlements_checksum: str = ""
+    """M5/5E-1 D-5E-4 — `settlements.jsonl`(정산 관측, 5C-2 성숙도 입력의 실체) 세
+    번째 파일의 checksum. **파일 로딩 경로(`_parse_manifest`)는 이 키를 필수로 요구한다**
+    (미공시 = 거부) — 여기 기본값 `""`은 기존 5C-1 test fixture(이 필드를 모르는 채
+    `DatasetManifestV1`을 직접 생성)와의 생성자 호환을 위한 것일 뿐, 파일 로딩 경로에서는
+    도달하지 않는다(hunk 격리 — `dataset.py`·`dataset_files.py` 외 test 파일은 편집
+    금지, `manifest_checksum`류 다른 필수 필드와 달리 `__post_init__`이 비어 있음을
+    강제하지 않는 이유)."""
 
     def __post_init__(self) -> None:
         if not self.dataset_id:
@@ -74,12 +82,24 @@ class RawTrainingRow:
     stratum: str
 
 
+@dataclass(frozen=True)
+class RawSettlementRow:
+    """`settlements.jsonl` 한 줄(D-5E-4) — `{opened_at, settled}`. `inference.maturity.
+    SettlementObservation`과 형태가 같지만 **다른 타입**이다 — `training`은 `inference`를
+    import 할 수 없다(forbidden 계약). 조립 근(`ml_engine.app`)이 이 값을 그 타입으로
+    옮긴다."""
+
+    opened_at: datetime
+    settled: bool
+
+
 class DatasetRejectionReason(StrEnum):
     CHECKSUM_MISMATCH = "CHECKSUM_MISMATCH"
     UNREADABLE = "UNREADABLE"
     SCHEMA_UNSUPPORTED = "SCHEMA_UNSUPPORTED"
     ID_MISMATCH = "ID_MISMATCH"
     ROWS_CHECKSUM_MISMATCH = "ROWS_CHECKSUM_MISMATCH"
+    SETTLEMENTS_CHECKSUM_MISMATCH = "SETTLEMENTS_CHECKSUM_MISMATCH"
 
 
 @dataclass(frozen=True)
@@ -94,15 +114,48 @@ class LoadedDataset:
 
     manifest: DatasetManifestV1
     raw_rows: tuple[RawTrainingRow, ...]
+    settlement_rows: tuple[RawSettlementRow, ...] = ()
+    """D-5E-4 — 파일 로딩 경로(`load_dataset`)만 채운다. 기본값 `()`은 5C-2
+    `_holdout_fit.py`(out_of_scope, 무편집)의 기존 `LoadedDataset(manifest=…,
+    raw_rows=…)` 호출과의 생성자 호환을 위한 것이다(hunk 격리)."""
+
+
+type _ManifestScalar = str | int | float | bool | None
+"""JSON 원시 값 — 스칼라 유니온이라 설계 래칫의 약한 경계 판정(`dict`/`Any`/`object`)에
+걸리지 않는다(`is_weak_annotation`은 멤버별로 재귀 판정하고 구체 스칼라는 통과시킨다)."""
+
+
+def _require_nonempty_string(value: _ManifestScalar, name: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise TypeError(f"{name} 는 비어 있지 않은 문자열이어야 합니다: {value!r}")
+    return value
+
+
+def _require_bool(value: _ManifestScalar, name: str) -> bool:
+    if not isinstance(value, bool):
+        raise TypeError(f"{name} 는 boolean 이어야 합니다: {value!r}")
+    return value
+
+
+def _require_int(value: _ManifestScalar, name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError(f"{name} 는 정수여야 합니다: {value!r}")
+    return value
+
+
+def _optional_string(value: _ManifestScalar, name: str) -> str:
+    """D-5E-4 `settlements_checksum` — 부재 시 `""`(`DatasetManifestV1` 필드 docstring
+    참고, 선택적으로 읽고 `load_dataset`이 필요 시에만 강제한다)."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise TypeError(f"{name} 는 문자열이어야 합니다: {value!r}")
+    return value
 
 
 def _parse_manifest(manifest_bytes: bytes) -> DatasetManifestV1 | DatasetRejected:
-    """code-reviewer PR #13 MEDIUM-1 — 문자열·boolean·정수 필드의 **타입**을 여기서
-    강제한다(`DatasetManifestV1.__post_init__`은 진위(falsy)만 본다 — 예:
-    `"feed_origin_only": "yes"`가 그대로 `bool` 자리에 실렸다). 헬퍼 함수로 뽑지 않고
-    인라인으로 검사하는 이유는 `dict[str, object]` 매개변수가 함수 경계에 나타나면
-    설계 래칫의 약한 경계 판정에 걸리기 때문이다(artifact_writer.py 의 TypedDict 승격과
-    같은 사유 — 이 자리는 임시 지역 검증이라 새 타입을 만들 만큼 재사용되지 않는다)."""
+    """code-reviewer PR #13 MEDIUM-1 — 문자열·boolean·정수 필드의 **타입**을 `_require_*`
+    헬퍼(스칼라 매개변수, 설계 래칫 약한 경계 판정 밖)로 강제한다."""
     try:
         raw = json.loads(manifest_bytes.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -118,31 +171,22 @@ def _parse_manifest(manifest_bytes: bytes) -> DatasetManifestV1 | DatasetRejecte
             "rows_checksum",
             "feature_schema_version",
         ):
-            value = raw[key]
-            if not isinstance(value, str) or not value:
-                raise TypeError(
-                    f"{key} 는 비어 있지 않은 문자열이어야 합니다: {value!r}"
-                )
-        feed_origin_only = raw["feed_origin_only"]
-        if not isinstance(feed_origin_only, bool):
-            raise TypeError(
-                f"feed_origin_only 는 boolean 이어야 합니다: {feed_origin_only!r}"
-            )
-        row_count = raw["row_count"]
-        if not isinstance(row_count, int) or isinstance(row_count, bool):
-            raise TypeError(f"row_count 는 정수여야 합니다: {row_count!r}")
-
-        opened_at_first = datetime.fromisoformat(raw["opened_at_first"])
-        opened_at_last = datetime.fromisoformat(raw["opened_at_last"])
+            _require_nonempty_string(raw[key], key)
+        feed_origin_only = _require_bool(raw["feed_origin_only"], "feed_origin_only")
+        row_count = _require_int(raw["row_count"], "row_count")
+        settlements_checksum = _optional_string(
+            raw.get("settlements_checksum"), "settlements_checksum"
+        )
         return DatasetManifestV1(
             dataset_id=raw["dataset_id"],
             sample_scope=raw["sample_scope"],
             feed_origin_only=feed_origin_only,
             row_count=row_count,
             rows_checksum=raw["rows_checksum"],
-            opened_at_first=opened_at_first,
-            opened_at_last=opened_at_last,
+            opened_at_first=datetime.fromisoformat(raw["opened_at_first"]),
+            opened_at_last=datetime.fromisoformat(raw["opened_at_last"]),
             feature_schema_version=raw["feature_schema_version"],
+            settlements_checksum=settlements_checksum,
         )
     except (KeyError, TypeError, ValueError) as exc:
         return DatasetRejected(DatasetRejectionReason.UNREADABLE, f"manifest: {exc}")
@@ -180,6 +224,45 @@ def _parse_row(line: str) -> RawTrainingRow | None:
         return None
 
 
+def _parse_settlement_row(line: str) -> RawSettlementRow | None:
+    """`settlements.jsonl` 한 줄 — `{opened_at, settled}`(D-5E-4)."""
+    try:
+        raw = json.loads(line)
+        if not isinstance(raw, dict):
+            return None
+        opened_at = datetime.fromisoformat(raw["opened_at"])
+        if opened_at.tzinfo is None:
+            return None
+        settled = raw["settled"]
+        if not isinstance(settled, bool):
+            return None
+        return RawSettlementRow(opened_at=opened_at, settled=settled)
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _parse_settlements(
+    settlements_bytes: bytes,
+) -> tuple[RawSettlementRow, ...] | DatasetRejected:
+    try:
+        text = settlements_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return DatasetRejected(DatasetRejectionReason.UNREADABLE, f"settlements: {exc}")
+    rows: list[RawSettlementRow] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        parsed = _parse_settlement_row(stripped)
+        if parsed is None:
+            return DatasetRejected(
+                DatasetRejectionReason.UNREADABLE,
+                f"settlements: 파싱 실패한 행 — {stripped[:80]!r}",
+            )
+        rows.append(parsed)
+    return tuple(rows)
+
+
 def _parse_rows(rows_bytes: bytes) -> tuple[RawTrainingRow, ...] | DatasetRejected:
     try:
         text = rows_bytes.decode("utf-8")
@@ -200,44 +283,95 @@ def _parse_rows(rows_bytes: bytes) -> tuple[RawTrainingRow, ...] | DatasetReject
     return tuple(rows)
 
 
-def load_dataset(
-    manifest_bytes: bytes, rows_bytes: bytes, expected: DatasetReference
-) -> LoadedDataset | DatasetRejected:
-    """dataset 유일 진입점(D-5C-8). 순서: manifest checksum → 파싱 → dataset_id 대조 →
-    rows checksum → schema 지원 여부 → row 파싱 → row_count 대조."""
+def _load_settlements(
+    manifest: DatasetManifestV1, settlements_bytes: bytes
+) -> tuple[RawSettlementRow, ...] | DatasetRejected:
+    """D-5E-4 — settlements checksum 대조 → 파싱(`load_dataset`을 50줄 안에 두려는
+    분리, design ratchet)."""
+    if not manifest.settlements_checksum:
+        return DatasetRejected(
+            DatasetRejectionReason.SETTLEMENTS_CHECKSUM_MISMATCH,
+            "manifest 에 settlements_checksum 미공시",
+        )
+    actual_settlements_checksum = hashlib.sha256(settlements_bytes).hexdigest()
+    if actual_settlements_checksum != manifest.settlements_checksum:
+        return DatasetRejected(
+            DatasetRejectionReason.SETTLEMENTS_CHECKSUM_MISMATCH,
+            actual_settlements_checksum,
+        )
+    return _parse_settlements(settlements_bytes)
+
+
+def _validate_manifest(
+    manifest_bytes: bytes, expected: DatasetReference
+) -> DatasetManifestV1 | DatasetRejected:
+    """manifest checksum → 파싱 → dataset_id 대조(`load_dataset`을 50줄 안에 두려는
+    분리, design ratchet)."""
     actual_manifest_checksum = hashlib.sha256(manifest_bytes).hexdigest()
     if actual_manifest_checksum != expected.manifest_checksum:
         return DatasetRejected(
             DatasetRejectionReason.CHECKSUM_MISMATCH, actual_manifest_checksum
         )
-
     manifest = _parse_manifest(manifest_bytes)
     if isinstance(manifest, DatasetRejected):
         return manifest
-
     if manifest.dataset_id != expected.dataset_id:
         return DatasetRejected(DatasetRejectionReason.ID_MISMATCH, manifest.dataset_id)
+    return manifest
 
+
+def _validate_rows(
+    rows_bytes: bytes, manifest: DatasetManifestV1
+) -> tuple[RawTrainingRow, ...] | DatasetRejected:
+    """rows checksum → schema 지원 여부 → row 파싱 → row_count 대조(같은 분리 사유)."""
     actual_rows_checksum = hashlib.sha256(rows_bytes).hexdigest()
     if actual_rows_checksum != manifest.rows_checksum:
         return DatasetRejected(
             DatasetRejectionReason.ROWS_CHECKSUM_MISMATCH, actual_rows_checksum
         )
-
     schema = resolve_schema(manifest.feature_schema_version)
     if isinstance(schema, UnsupportedSchema):
         return DatasetRejected(
             DatasetRejectionReason.SCHEMA_UNSUPPORTED, manifest.feature_schema_version
         )
-
     raw_rows = _parse_rows(rows_bytes)
     if isinstance(raw_rows, DatasetRejected):
         return raw_rows
-
     if len(raw_rows) != manifest.row_count:
         return DatasetRejected(
             DatasetRejectionReason.UNREADABLE,
             f"ROW_COUNT_MISMATCH: manifest={manifest.row_count} actual={len(raw_rows)}",
         )
+    return raw_rows
 
-    return LoadedDataset(manifest=manifest, raw_rows=raw_rows)
+
+def load_dataset(
+    manifest_bytes: bytes,
+    rows_bytes: bytes,
+    expected: DatasetReference,
+    settlements_bytes: bytes | None = None,
+) -> LoadedDataset | DatasetRejected:
+    """dataset 유일 진입점(D-5C-8). 순서: manifest 검증(`_validate_manifest`) → rows
+    검증(`_validate_rows`) → (D-5E-4) `settlements_bytes`가 주어지면 settlements
+    checksum 대조 → 파싱.
+
+    `settlements_bytes=None`(기본값)은 5E-1 이전 호출자(2C 이하 test)와의 호환
+    자리다 — D-5E-4 파이프라인(`ml_engine.app`)만 이 인자를 채운다."""
+    manifest = _validate_manifest(manifest_bytes, expected)
+    if isinstance(manifest, DatasetRejected):
+        return manifest
+
+    raw_rows = _validate_rows(rows_bytes, manifest)
+    if isinstance(raw_rows, DatasetRejected):
+        return raw_rows
+
+    settlement_rows: tuple[RawSettlementRow, ...] = ()
+    if settlements_bytes is not None:
+        loaded_settlements = _load_settlements(manifest, settlements_bytes)
+        if isinstance(loaded_settlements, DatasetRejected):
+            return loaded_settlements
+        settlement_rows = loaded_settlements
+
+    return LoadedDataset(
+        manifest=manifest, raw_rows=raw_rows, settlement_rows=settlement_rows
+    )

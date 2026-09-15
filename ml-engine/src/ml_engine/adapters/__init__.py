@@ -4,6 +4,11 @@
 
 from __future__ import annotations
 
+from ml_engine.adapters.artifact_files import (
+    ArtifactFileRefs,
+    ArtifactWriteRejected,
+    write_artifact_files,
+)
 from ml_engine.adapters.dataset_files import (
     DatasetFiles,
     DatasetUnreadable,
@@ -12,8 +17,11 @@ from ml_engine.adapters.dataset_files import (
 )
 
 __all__ = [
+    "ArtifactFileRefs",
+    "ArtifactWriteRejected",
     "DatasetFiles",
     "DatasetUnreadable",
     "DatasetUnreadableReason",
     "read_dataset_files",
+    "write_artifact_files",
 ]
