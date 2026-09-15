@@ -243,6 +243,7 @@ def _assemble_window_result(
         segments=diagnostics.segments,
         coverage=diagnostics.coverage,
         unlearned_baseline_cells=diagnostics.unlearned,
+        dropped_rows=split.dropped_rows,
         outcome=outcome,
         stability=stability,
         release_id=release_id,
@@ -296,7 +297,7 @@ def evaluate_one_window(
 ) -> WindowSuccess | WindowSkip:
     """`holdout.py`가 창마다 부르는 유일 진입점(모듈 경계 안에서는 비공개, 형제
     파일에는 공개 — leading underscore 없음)."""
-    split = build_split(window, ordered_rows, dataset, evaluation_policy.gate_stratum)
+    split = build_split(window, ordered_rows, dataset, evaluation_policy)
     if isinstance(split, WindowSkip):
         return split
 

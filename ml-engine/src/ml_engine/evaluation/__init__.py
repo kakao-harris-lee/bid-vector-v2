@@ -37,6 +37,7 @@ from ml_engine.evaluation.policy import (
     policy_checksum,
 )
 from ml_engine.evaluation.report import (
+    DroppedRowCount,
     EvaluationReportV1,
     ModelScore,
     NotPromotable,
@@ -87,6 +88,7 @@ __all__ = [
     "BaselineSpec",
     "CategoryCount",
     "CoverageSplit",
+    "DroppedRowCount",
     "EvaluationPolicy",
     "EvaluationReportV1",
     "Failed",

@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ml_engine.evaluation import (
+    DroppedRowCount,
     EvaluationPolicy,
     ModelScore,
     WeekMaturity,
@@ -33,6 +34,8 @@ from ml_engine.features import (
     AwardRateFeatureSpace,
     FeatureFacts,
     FeatureManifest,
+    Missing,
+    MissingFact,
     Present,
     RowRejected,
     Vocabulary,
@@ -76,6 +79,14 @@ def is_buildable(facts: FeatureFacts) -> bool:
     return isinstance(facts.base_amount, Present) and isinstance(
         facts.denominator_source, Present
     )
+
+
+def _dropped_reason(facts: FeatureFacts) -> MissingFact:
+    """`is_buildable`이 거부한 행의 사유 하나 — 5B `build_row`와 같은 우선순위로
+    `base_amount`를 먼저 본다(둘 다 결측이면 `BASE_AMOUNT`)."""
+    if isinstance(facts.base_amount, Missing):
+        return MissingFact.BASE_AMOUNT
+    return MissingFact.DENOMINATOR_SOURCE
 
 
 def matrix_for(space: AwardRateFeatureSpace, rows: Sequence[TrainingRow]) -> np.ndarray:
@@ -129,6 +140,8 @@ class Split:
     gate_train: list[TrainingRow]
     train_rows_all: list[TrainingRow]
     usable_test_rows: list[TrainingRow]
+    dropped_rows: tuple[DroppedRowCount, ...]
+    """verifier r1 H-1 — 창 안 구조적 행 중 `is_buildable`이 거부한 행의 사유별 계수."""
     gate_train_raw: tuple[RawTrainingRow, ...]
     train_rows_raw: tuple[RawTrainingRow, ...]
     targets: np.ndarray
@@ -138,14 +151,47 @@ class Split:
     gate_train_mean: float
 
 
-def build_split(
-    window: WeekMaturity,
-    ordered_rows: tuple[TrainingRow, ...],
-    dataset: LoadedDataset,
-    gate_stratum: str,
-) -> Split | WindowSkip:
-    """`_split_at_window`(legacy) — 경계 동시각은 평가측(`indices_in_window`가 이미
-    `[start, end)` 반개구간을 지킨다), 학습은 `opened_at < window.start`."""
+@dataclass(frozen=True)
+class _BuildabilityFilter:
+    usable_test_rows: list[TrainingRow]
+    dropped_rows: tuple[DroppedRowCount, ...]
+
+
+def _filter_buildable(gate_test_all: list[TrainingRow]) -> _BuildabilityFilter:
+    """`gate_test_all`을 `is_buildable`로 갈라 사용 가능한 행과 사유별 버림 계수를
+    낸다(verifier r1 H-1 — 이 필터가 정책 하한 재대조의 입력이다)."""
+    usable_test_rows: list[TrainingRow] = []
+    dropped_counts: dict[MissingFact, int] = {}
+    for row in gate_test_all:
+        if is_buildable(row.facts):
+            usable_test_rows.append(row)
+        else:
+            reason = _dropped_reason(row.facts)
+            dropped_counts[reason] = dropped_counts.get(reason, 0) + 1
+    dropped_rows = tuple(
+        DroppedRowCount(reason=reason, row_count=count)
+        for reason, count in sorted(
+            dropped_counts.items(), key=lambda item: item[0].value
+        )
+    )
+    return _BuildabilityFilter(
+        usable_test_rows=usable_test_rows, dropped_rows=dropped_rows
+    )
+
+
+@dataclass(frozen=True)
+class _StructuralRows:
+    """`is_buildable` 필터 이전의 구조적(층·시간창) 분할 — legacy `_HoldoutSplit`의
+    세 범위 그대로."""
+
+    gate_test_all: list[TrainingRow]
+    gate_train: list[TrainingRow]
+    train_rows_all: list[TrainingRow]
+
+
+def _structural_rows(
+    window: WeekMaturity, ordered_rows: tuple[TrainingRow, ...], gate_stratum: str
+) -> _StructuralRows:
     gate_test_all = [
         ordered_rows[index]
         for index in indices_in_window(ordered_rows, window, stratum=gate_stratum)
@@ -156,23 +202,47 @@ def build_split(
         if row.stratum == gate_stratum and row.opened_at < window.start
     ]
     train_rows_all = [row for row in ordered_rows if row.opened_at < window.start]
-    if not gate_train or not gate_test_all:
+    return _StructuralRows(
+        gate_test_all=gate_test_all,
+        gate_train=gate_train,
+        train_rows_all=train_rows_all,
+    )
+
+
+def build_split(
+    window: WeekMaturity,
+    ordered_rows: tuple[TrainingRow, ...],
+    dataset: LoadedDataset,
+    evaluation_policy: EvaluationPolicy,
+) -> Split | WindowSkip:
+    """`_split_at_window`(legacy) — 경계 동시각은 평가측, 학습은 `opened_at <
+    window.start`. verifier r1 H-1 — 창 계획의 `INSUFFICIENT_EVALUATION_ROWS` 선검사는
+    구조적 행 수만 보므로, `is_buildable`이 더 거른 뒤의 표본 수를 정책 하한에
+    재대조한다(안 하면 하한이 buildable 비율에 따라 무력화된다)."""
+    gate_stratum = evaluation_policy.gate_stratum
+    structural = _structural_rows(window, ordered_rows, gate_stratum)
+    if not structural.gate_train or not structural.gate_test_all:
         # 창 정책이 이미 NO_TRAINING_ROWS·INSUFFICIENT_EVALUATION_ROWS 로 걸렀어야
         # 하므로 도달은 방어선이다(조용한 0건 평가 금지, 이중 방어).
         return WindowSkip(WindowExclusionReason.TRAINING_REJECTED, "EMPTY_SIDE")
 
-    usable_test_rows = [row for row in gate_test_all if is_buildable(row.facts)]
-    if not usable_test_rows:
+    filtered = _filter_buildable(structural.gate_test_all)
+    usable_test_rows = filtered.usable_test_rows
+    if len(usable_test_rows) < evaluation_policy.min_evaluation_rows:
         return WindowSkip(
-            WindowExclusionReason.TRAINING_REJECTED,
-            "평가 행렬을 만들 수 있는 행이 없음",
+            WindowExclusionReason.INSUFFICIENT_EVALUATION_ROWS,
+            f"buildable={len(usable_test_rows)} "
+            f"required={evaluation_policy.min_evaluation_rows} "
+            f"structural={len(structural.gate_test_all)}",
         )
 
+    gate_train = structural.gate_train
     gate_train_labels = np.array([row.label.value for row in gate_train])
     return Split(
         gate_train=gate_train,
-        train_rows_all=train_rows_all,
+        train_rows_all=structural.train_rows_all,
         usable_test_rows=usable_test_rows,
+        dropped_rows=filtered.dropped_rows,
         gate_train_raw=tuple(
             row
             for row in dataset.raw_rows

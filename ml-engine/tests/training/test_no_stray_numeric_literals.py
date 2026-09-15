@@ -27,6 +27,8 @@ _ALLOWED: frozenset[tuple[str, float]] = frozenset(
         ("encoding_oof.py", 1),  # count + 1 증가
         ("holdout.py", 0),  # 카운터 기본값(dict.get)·max(x, 0) 회계 불변식 하한
         ("holdout.py", 1),  # count + 1 증가
+        ("_holdout_fit.py", 0),  # dropped_counts dict.get 기본값
+        ("_holdout_fit.py", 1),  # count + 1 증가
         (
             "_holdout_window.py",
             0.0,

@@ -33,7 +33,7 @@ from ml_engine.evaluation.verdict import (
     Passed,
 )
 from ml_engine.evaluation.windows import HoldoutOverlap, WindowExclusion
-from ml_engine.features import CanonicalizationRejected, NonFiniteValue
+from ml_engine.features import CanonicalizationRejected, MissingFact, NonFiniteValue
 
 type _JsonValue = (
     str | int | float | bool | list[_JsonValue] | dict[str, _JsonValue] | None
@@ -62,6 +62,17 @@ class StratumCount:
 
 
 @dataclass(frozen=True)
+class DroppedRowCount:
+    """verifier r1 H-1 — 창 안 구조적 행 중 `build_row`가 만들 수 없어(base_amount·
+    denominator_source 가 wire `Missing`) 채점에서 빠진 행의 사유별 계수. `reason`은
+    5B `MissingFact`(evaluation 이 이미 `features` 층을 아는 것과 같은 경계 — training
+    층의 `RejectedRowAccounting`을 직접 담지 않는다, layers)."""
+
+    reason: MissingFact
+    row_count: int
+
+
+@dataclass(frozen=True)
 class WindowResult:
     """한 평가 창에서의 전체 비교 + 게이트 판정(legacy `AwardRateHoldoutReport`).
     창별 `release_id`를 싣는다 — 5C-1 결정적 파생이라 재현성 확인에 쓰인다."""
@@ -86,6 +97,9 @@ class WindowResult:
     segments: tuple[SegmentScore, ...]
     coverage: tuple[CoverageSplit, ...]
     unlearned_baseline_cells: tuple[UnlearnedCell, ...]
+    dropped_rows: tuple[DroppedRowCount, ...]
+    """창 안 구조적 행 중 buildability 로 버려진 행(verifier r1 H-1) —
+    `gate_test_row_count`(채점된 행)와 합치면 창의 구조적 행 수가 된다."""
     outcome: GateOutcome
     stability: StabilitySummary
     release_id: str
@@ -254,6 +268,10 @@ def _unlearned_cell_json(cell: UnlearnedCell) -> _JsonValue:
     return {"key": cell.key, "row_count": cell.row_count}
 
 
+def _dropped_row_count_json(item: DroppedRowCount) -> _JsonValue:
+    return {"reason": item.reason.value, "row_count": item.row_count}
+
+
 def _window_result_json(window: WindowResult) -> _JsonValue:
     return {
         "window_start": window.window_start,
@@ -277,6 +295,7 @@ def _window_result_json(window: WindowResult) -> _JsonValue:
         "unlearned_baseline_cells": [
             _unlearned_cell_json(item) for item in window.unlearned_baseline_cells
         ],
+        "dropped_rows": [_dropped_row_count_json(item) for item in window.dropped_rows],
         "outcome": _gate_outcome_json(window.outcome),
         "stability": _stability_json(window.stability),
         "release_id": window.release_id,

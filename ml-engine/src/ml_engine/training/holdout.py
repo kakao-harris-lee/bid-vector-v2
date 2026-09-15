@@ -140,15 +140,24 @@ def _unaccounted_row_count(
     plan_selected: tuple[WeekMaturity, ...],
     plan_excluded: tuple[WindowExclusion, ...],
     gate_stratum: str,
+    window_results: tuple[WindowResult, ...],
 ) -> int:
     """회계 불변식의 계측기 — 선택+제외 창의 합집합 밖 게이트 층 행 수(legacy
-    `_unaccounted_row_count`와 같은 정의). 피드 출처 모드에서는 0 이어야 한다."""
+    `_unaccounted_row_count`와 같은 정의) **더하기** buildability 로 버려진 행
+    (verifier r1 H-1 회계식 정정). 창 소속(구조적 멤버십)만으로 「회계됨」을
+    선언하지 않는다 — 창에 속했지만 채점되지 못한 행은 `WindowResult.dropped_rows`
+    로 개별 공시되는 동시에 이 합계에도 반영돼야, 「이 report 가 놓친 행」이라는
+    이 필드의 원래 취지가 지켜진다. 피드 출처 모드에서 dropped 가 0 이면 legacy 와
+    같은 값(0)이 나온다."""
     accounted = sum(
         len(indices_in_window(ordered_rows, window, stratum=gate_stratum))
         for window in (*plan_selected, *(item.window for item in plan_excluded))
     )
     stratum_row_count = sum(1 for row in ordered_rows if row.stratum == gate_stratum)
-    return max(stratum_row_count - accounted, 0)
+    dropped_total = sum(
+        item.row_count for result in window_results for item in result.dropped_rows
+    )
+    return max(stratum_row_count - accounted + dropped_total, 0)
 
 
 def _assemble_report(
@@ -191,6 +200,7 @@ def _assemble_report(
             plan_selected,
             windows_outcome.excluded,
             evaluation_policy.gate_stratum,
+            windows_outcome.results,
         ),
         stability_seed_count=len(evaluation_policy.stability_seeds),
         promotion=promotion,

@@ -88,11 +88,40 @@ def _feature_inputs(*, category: str, agency: str) -> features_pb2.FeatureInputs
     return inputs
 
 
+def _feature_inputs_missing_base_amount(
+    *, category: str, agency: str
+) -> features_pb2.FeatureInputs:
+    """verifier H-1 재현 — `base_amount`가 wire `Missing`(구조적으로 유효, `admit_corpus`
+    는 거부하지 않는다). `is_buildable`/`build_row`만 이 행을 걸러낸다(5C-1
+    `test_train_artifact.py::_feature_inputs_missing_base_amount`와 같은 패턴)."""
+    inputs = features_pb2.FeatureInputs()
+    inputs.base_amount.missing = common_pb2.MISSING_REASON_NOT_COLLECTED_YET
+    inputs.category_code.value = category
+    inputs.agency_id.value = agency
+    inputs.base_amount_provenance_label.value = (
+        common_pb2.BASE_AMOUNT_PROVENANCE_LABEL_CLEAN
+    )
+    return inputs
+
+
 def _raw_row(
     day: int, *, category: str, agency: str, label: float, stratum: str = "clean-base"
 ) -> RawTrainingRow:
     return RawTrainingRow(
         feature_inputs=_feature_inputs(category=category, agency=agency),
+        label_value=label,
+        opened_at=_EPOCH + timedelta(days=day),
+        stratum=stratum,
+    )
+
+
+def _raw_row_missing_base_amount(
+    day: int, *, category: str, agency: str, label: float, stratum: str = "clean-base"
+) -> RawTrainingRow:
+    return RawTrainingRow(
+        feature_inputs=_feature_inputs_missing_base_amount(
+            category=category, agency=agency
+        ),
         label_value=label,
         opened_at=_EPOCH + timedelta(days=day),
         stratum=stratum,
@@ -267,6 +296,141 @@ def test_run_holdout_evaluates_selected_window_and_produces_gate_outcome() -> No
     assert len(window_result.stability.trials) == len(_policy().stability_seeds)
     # 헤드라인 seed 가 목록 선두
     assert window_result.stability.trials[0].seed == _spec().seed
+
+
+def _mixed_buildability_window_scenario(
+    *, buildable_count: int, missing_count: int
+) -> tuple[LoadedDataset, WeekMaturity]:
+    """verifier r1 H-1 재현 — 창 안 구조적 행(opened_at·stratum 만 봄)과 실제로
+    채점 가능한(buildable) 행 수가 다르다. `missing_count`행은 `base_amount`가 wire
+    `Missing`이라 `admit_corpus`는 통과하지만 `is_buildable`은 걸러낸다."""
+    train_part = _many_rows(20, start_day=0)
+    window_start_day = 100
+    buildable_rows = tuple(
+        _raw_row(
+            window_start_day + 1,
+            category="civil" if i % 2 == 0 else "it",
+            agency=f"agency-{i % 3}",
+            label=0.6 + 0.001 * (i % 5),
+        )
+        for i in range(buildable_count)
+    )
+    missing_rows = tuple(
+        _raw_row_missing_base_amount(
+            window_start_day + 1,
+            category="civil",
+            agency=f"agency-{i % 3}",
+            label=0.6 + 0.001 * (i % 5),
+        )
+        for i in range(missing_count)
+    )
+    rows = train_part + buildable_rows + missing_rows
+    dataset = _dataset(rows)
+    total = buildable_count + missing_count
+    window = WeekMaturity(
+        start=_EPOCH + timedelta(days=window_start_day),
+        end=_EPOCH + timedelta(days=window_start_day + 7),
+        opened_count=total,
+        settled_count=max(total - 1, 1),
+    )
+    return dataset, window
+
+
+def test_run_holdout_excludes_window_when_buildable_rows_below_min_evaluation_rows() -> (
+    None
+):
+    """verifier r1 H-1 / code-reviewer HIGH — `min_evaluation_rows` 하한은 구조적
+    행 수가 아니라 **실제로 채점되는(buildable) 행 수**에 재대조돼야 한다. 창 안
+    120행 중 30행만 buildable, 정책 하한 100 → 창이 `INSUFFICIENT_EVALUATION_ROWS`
+    로 제외돼야 한다(수정 전에는 `Passed`+`Promotable`까지 통과했다)."""
+    dataset, window = _mixed_buildability_window_scenario(
+        buildable_count=30, missing_count=90
+    )
+    result = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=100),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert result.windows == ()
+    assert len(result.excluded_windows) == 1
+    assert (
+        result.excluded_windows[0].reason
+        == WindowExclusionReason.INSUFFICIENT_EVALUATION_ROWS
+    )
+
+
+def test_window_result_reports_dropped_rows_for_unbuildable_facts() -> None:
+    """H-A — buildability 로 버려진 행은 `WindowResult.dropped_rows`(사유별 계수)로
+    공시된다. 하한(100)을 채우고도 남는 20행이 buildable 하지 않은 시나리오."""
+    dataset, window = _mixed_buildability_window_scenario(
+        buildable_count=100, missing_count=20
+    )
+    result = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=100),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert len(result.windows) == 1
+    window_result = result.windows[0]
+    assert window_result.gate_test_row_count == 100
+    dropped_total = sum(item.row_count for item in window_result.dropped_rows)
+    assert dropped_total == 20
+
+
+def test_unaccounted_row_count_adds_dropped_rows_not_just_window_membership() -> None:
+    """H-A 회계식 정정 — `unaccounted_row_count`가 창 소속 여부만으로 「회계됨」을
+    선언하지 않는다. train_part(20행, 이 단일 창 밖) + 버려진 5행이 함께 실린다."""
+    train_part = _many_rows(20, start_day=0)
+    window_start_day = 30
+    buildable = tuple(
+        _raw_row(
+            window_start_day + 1,
+            category="civil",
+            agency="a1",
+            label=0.6 + 0.001 * i,
+        )
+        for i in range(10)
+    )
+    missing = tuple(
+        _raw_row_missing_base_amount(
+            window_start_day + 1, category="civil", agency="a1", label=0.6
+        )
+        for _ in range(5)
+    )
+    rows = train_part + buildable + missing
+    dataset = _dataset(rows)
+    window = WeekMaturity(
+        start=_EPOCH + timedelta(days=window_start_day),
+        end=_EPOCH + timedelta(days=window_start_day + 7),
+        opened_count=15,
+        settled_count=14,
+    )
+    result = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(),
+        _policy(min_evaluation_rows=2),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert len(result.windows) == 1
+    assert result.windows[0].gate_test_row_count == 10
+    dropped_total = sum(item.row_count for item in result.windows[0].dropped_rows)
+    assert dropped_total == 5
+    # train_part 20행은 이 단일 창 밖(구조적 unaccounted) + 버려진 5행이 더해진다.
+    assert result.unaccounted_row_count == 20 + 5
 
 
 def test_run_holdout_accounting_invariant_unaccounted_is_zero_for_feed_origin_only() -> (
