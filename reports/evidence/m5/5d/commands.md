@@ -139,3 +139,31 @@ clean** · `lint-imports` **5 kept, 0 broken**.
   무편집(읽기만). `pyproject.toml`도 이번 라운드 무편집.
 - 설계 래칫 — golden 어댑터·test 추가로도 함수 50줄·파일 500줄 한도 안(각 case 별 test
   함수로 분리했다) — allowlist 편집 없음.
+
+## PR #12 리뷰 MEDIUM 시정(2026-09-15, 코드+evidence 커밋)
+
+임시 worktree(`m5-5d/2026-09-12` 분기, HEAD `cefb19c`)에서 작업. `pyyaml==6.0.3`을
+`pyproject.toml`의 `serving`·`training` extras 에 추가 → `uv lock`(`Resolved 34 packages`) →
+전면 실측:
+
+| # | 명령(요약) | exit | 핵심 한 줄 |
+| --- | --- | --- | --- |
+| 1 | `uv sync --frozen --extra serving --no-dev` | 0 | `pyyaml==6.0.3` 설치됨(9 packages, sqlalchemy 등 부재) |
+| 2 | (all-extras 세션에서 선행) `uv run python tools/generate_contracts.py .contracts-generated` | 0 | `.contracts-generated`(VCS 밖, 세션 재사용) 생성 — `python -c` 단발 스크립트는 pytest conftest 의 session fixture 를 안 타 별도 생성 필요 |
+| 3 | `uv sync --frozen --extra serving --no-dev` 뒤 `uv run --no-sync python -c "import yaml; from ml_engine.inference import load_inference_policy"` | 0 | `OK` — 수정 전에는 `ModuleNotFoundError: No module named 'yaml'`(pyyaml 미설치, 실측 재현 후 수정) |
+| 4 | S-1b 금지 다섯 import 개별 재확인(serving-only) | 0(전부 실패) | `sqlalchemy`·`psycopg`·`requests`·`httpx`·`celery` 전부 `ModuleNotFoundError` — 회귀 없음 |
+| 5 | `uv sync --frozen --all-extras` | 0 | 복구 |
+| 6 | S-2 `uv run ruff check .` + `uv run ruff format --check .` | 0 | `All checks passed!` · `71 files already formatted` |
+| 7 | S-3 `uv run mypy --strict src/ml_engine` | 0 | `Success: no issues found in 27 source files` |
+| 8 | S-4 `uv run lint-imports` | 0 | `Contracts: 5 kept, 0 broken` |
+| 9 | S-5 `uv run python -m pytest tests -q` | 0 | **351 passed, 1 skipped**(5D 종결 시점과 동일, 무변동) |
+| 10 | S-5(판정 기준) `-m "not legacy_parity"` | 0 | **347 passed, 1 skipped, 4 deselected** |
+| 11 | S-8 `-m legacy_parity` | 0 | **4 passed** |
+| 12 | S-6 `uv run python tools/design_ratchet.py --check` | 0 | 위반 없음(allowlist 편집 없음) |
+| 13 | S-7 `uv run python tools/reuse_provenance_check.py` | 0 | 위반 0 |
+| 14 | S-9 `uv run --no-sync python --version` vs `.python-version` | 0 | `3.12.2` vs `3.12` 두 자리 일치 |
+| 15 | leak 스캔 `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m5/5d ml-engine/pyproject.toml ml-engine/uv.lock --exclude=scope.md` | 1 | 매치 0 |
+
+리뷰 LOW(`assessment.py::LevelObservation.variance`·`_trusted_variance`, 음수·비유한 방어
+부재)는 코드 변경 없이 checklist.md 알려진 제한 14로 등재(위 그대로 리뷰 판단 수용 — 실질
+위험 낮음). push 하지 않음.

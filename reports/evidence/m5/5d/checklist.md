@@ -106,6 +106,28 @@ candidateOrder 등)만 단언한다. 전체 pytest 는 347 passed·1 skipped(변
 11. **(해소, M-3 통합 2026-09-12)** ~~golden test skip 기준이 verified_paths 미단언~~ — 13/14 case 가 case 별 `verified_paths`를 실제로 단언하는 test 로 교체됐다. `ml-kernel-011` 만 명시 skip(제한 8·9와 같은 사유) — 그 case 는 대응 불가로 남는다.
 12. **`LoadedArtifact`도 `_VerifiedBytes` 모듈 밖 import 로 우회된다**(Python 가시성 한계, #1·#10 과 같은 갈래 — verifier r2 F-2) — `load_artifact(raw, expected)`만이 **정상 공개 API 경로**로는 유일한 생성 지점이다(`test_loaded_artifact_requires_verified_bytes_argument`가 1 인자 생성 실패를 확인). 그러나 `_VerifiedBytes`는 단일 밑줄 관례일 뿐이라, `from ml_engine.registry.artifact import _VerifiedBytes`로 직접 import 해 `LoadedArtifact(manifest, _VerifiedBytes(b"anything"))`처럼 2줄을 쓰면 checksum 검증 없이도 mypy clean·런타임 성공한다(verifier r2 실측). 강제는 「비공개 이름을 import 하지 않는다」는 관례와 코드 리뷰뿐이다.
 13. **`ml-kernel-005` golden test 가 `_verify_checksum`·`_VerifiedBytes`(모듈 private)를 직접 import 한다** — curator 의 합성 아티팩트 바이트가 `ArtifactManifestV1` 전체 스키마(모든 필수 필드)를 만족하지 않아(case `not_covered`가 명시), 공개 `load_artifact()`를 그대로 호출하면 checksum 통과 여부와 무관하게 매니페스트 파싱 단계에서 항상 거부돼 case 가 겨누는 「checksum 게이트 단계」자체를 검증할 수 없다. white-box test 로 판단해 private 이름을 직접 가져왔다 — production 표면 확장은 아니다(#12 의 우회 통로가 test 안에서 의도적으로 쓰인 유일한 자리).
+14. **`LevelObservation.variance`·`_trusted_variance`가 음수·비유한 값에 방어가 없다**(PR #12 리뷰 LOW, 2026-09-15) — `pvariance`가 정상 입력에서 음수를 내지 않고 클래스 안 통제된 값만 흐르므로 실질 위험은 낮다. 코드 변경 없이 등재 — 필요해지면 `_trusted_variance`나 `LevelObservation.__post_init__`에 검사를 추가하는 별도 라운드로.
+
+## PR #12 리뷰 반영(2026-09-15, 코드+evidence 커밋 — 이 커밋 자신)
+
+**MEDIUM(시정)** — `ml-engine/pyproject.toml`의 `pyyaml`(6.0.3)이 `dev` extras 에만
+있었다(5A 잔여). `inference/policy.py::load_inference_policy` → `registry/policy.py::
+load_policy` → `yaml.safe_load` 이므로 정책 로더가 serving 경로에 있는데, 5D 가 이 경로의
+첫 실질 소비자라 serving-only 설치(`uv sync --frozen --extra serving --no-dev`)에서
+`ModuleNotFoundError`가 드러났다. `pyyaml==6.0.3`을 `serving`·`training` extras 에
+추가(`dev`는 그대로, `types-pyyaml`도 dev 유지)하고 `uv lock`으로 lockfile 갱신. 실측:
+serving-only 설치에서 `import yaml; from ml_engine.inference import load_inference_policy`
+exit 0 확인(`.contracts-generated/`는 all-extras 세션에서 먼저 생성 — pytest 밖 단발
+스크립트라 conftest 의 session fixture 를 안 타 별도 생성이 필요했다), S-1b 의 금지 다섯
+import(sqlalchemy·psycopg·requests·httpx·celery) 는 그대로 실패 확인, all-extras 복구 후
+S-2~S-9 재실행 전부 통과(pytest 351 passed·1 skipped — 5D 종결 시점과 동일, 변동 없음).
+
+**LOW(코드 변경 없이 등재)** — `assessment.py::LevelObservation.variance`(83·88행)와
+`_trusted_variance`(244행)가 음수·비유한(`NaN`/`Inf`) `variance` 값에 방어가 없다.
+`pvariance`(표준 라이브러리)가 정상 입력에서 음수를 내지 않고, 클래스 안 통제된 값만
+경계를 넘으므로 실질 위험은 낮다(리뷰 판단과 동일). 별도 게이트 test 없이 알려진 제한
+14로 등재 — 필요해지면 `_trusted_variance`나 `LevelObservation.__post_init__`에 유한·
+비음수 검사를 추가하는 별도 라운드로 다룬다.
 
 ## OPEN 갱신
 
