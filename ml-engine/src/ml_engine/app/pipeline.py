@@ -116,7 +116,7 @@ class _ConcreteTrainingPipeline:
         if cancel_token.is_cancelled():
             return PipelineCancelled()
 
-        return self._evaluate_and_finalize(dataset, artifact)
+        return self._evaluate_and_finalize(dataset, artifact, cancel_token)
 
     def _load(self, dataset_ref: DatasetRefInput) -> LoadedDataset | PipelineFailed:
         files = read_dataset_files(dataset_ref.uri)
@@ -216,11 +216,21 @@ class _ConcreteTrainingPipeline:
         )
 
     def _evaluate_and_finalize(
-        self, dataset: LoadedDataset, artifact: ArtifactBytes
-    ) -> PipelineOutcome | PipelineFailed:
+        self,
+        dataset: LoadedDataset,
+        artifact: ArtifactBytes,
+        cancel_token: CancelToken,
+    ) -> PipelineOutcome | PipelineFailed | PipelineCancelled:
         report = self._run_holdout(dataset)
         if isinstance(report, PipelineFailed):
             return report
+        if cancel_token.is_cancelled():
+            # M-2(verifier r1) — 모듈 docstring 이 넷(load 뒤·train 뒤·artifact 뒤·
+            # holdout 뒤)이라고 적었는데 코드는 셋뿐이었다. holdout 은 이미 완료된
+            # 계산을 버리지 않지만(결과는 폐기해도 자원은 이미 다 썼다), 그 뒤
+            # `write_artifact_files`가 디스크에 산출물을 남기는 것만은 막을 수 있다
+            # (취소된 job 이 고아 디렉터리를 남기지 않는다).
+            return PipelineCancelled()
         return self._write_outcome(artifact, report)
 
 

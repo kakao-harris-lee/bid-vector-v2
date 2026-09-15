@@ -10,6 +10,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
 from google.protobuf import json_format
 
 from ml_engine.app.pipeline import build_training_pipeline
@@ -278,3 +279,194 @@ def test_pipeline_with_real_lightgbm_trainer(tmp_path: Path) -> None:
     assert isinstance(outcome, PipelineOutcome), outcome
     artifact_path = Path(outcome.artifact.uri.removeprefix("file://"))
     assert artifact_path.is_file()
+
+
+# ---- M-2(verifier r1) — 취소 경계 넷을 각각 독립적으로 확인한다. 셋 중 하나를
+# 지워도(또는 넷 중 하나를 지워도) 정확히 그 경계에 대응하는 아래 test 가 붉어져야
+# 한다(이전에는 하나만 살아도 전체가 초록이었다 — 변이 생존 실측). ----
+
+
+class _CancelAfterNChecks:
+    """`is_cancelled()`가 N+1 번째 호출부터 True 를 낸다 — 그 앞의 경계는 전부
+    통과시키고 정확히 경계 N+1 에서 취소가 걸리는 것처럼 흉내 낸다."""
+
+    def __init__(self, trigger_after: int) -> None:
+        self._count = 0
+        self._trigger_after = trigger_after
+
+    def is_cancelled(self) -> bool:
+        self._count += 1
+        return self._count > self._trigger_after
+
+    def cancel(self) -> None:  # pragma: no cover — 인터페이스 호환용, 이 test 는 안 씀
+        self._trigger_after = 0
+
+
+def _pipeline_with_counters(
+    monkeypatch: pytest.MonkeyPatch, out_dir: Path, trainer: object
+):  # type: ignore[no-untyped-def]
+    """`ml_engine.app.pipeline`이 지역 이름으로 import 한 네 함수(`train_award_rate_gbm`·
+    `write_artifact`·`run_holdout`·`write_artifact_files`)를 호출 횟수 세는 wrapper 로
+    바꿔치기한다 — 어느 경계까지 실제로 진행됐는지 부작용(호출 여부)으로 관측한다."""
+    import ml_engine.app.pipeline as pipeline_module
+
+    calls = {
+        "train": 0,
+        "write_artifact": 0,
+        "run_holdout": 0,
+        "write_artifact_files": 0,
+    }
+
+    original_train = pipeline_module.train_award_rate_gbm
+
+    def counting_train(*args: object, **kwargs: object) -> object:
+        calls["train"] += 1
+        return original_train(*args, **kwargs)  # type: ignore[misc]
+
+    original_write_artifact = pipeline_module.write_artifact
+
+    def counting_write_artifact(*args: object, **kwargs: object) -> object:
+        calls["write_artifact"] += 1
+        return original_write_artifact(*args, **kwargs)  # type: ignore[misc]
+
+    original_run_holdout = pipeline_module.run_holdout
+
+    def counting_run_holdout(*args: object, **kwargs: object) -> object:
+        calls["run_holdout"] += 1
+        return original_run_holdout(*args, **kwargs)  # type: ignore[misc]
+
+    original_write_artifact_files = pipeline_module.write_artifact_files
+
+    def counting_write_artifact_files(*args: object, **kwargs: object) -> object:
+        calls["write_artifact_files"] += 1
+        return original_write_artifact_files(*args, **kwargs)  # type: ignore[misc]
+
+    monkeypatch.setattr(pipeline_module, "train_award_rate_gbm", counting_train)  # type: ignore[attr-defined]
+    monkeypatch.setattr(pipeline_module, "write_artifact", counting_write_artifact)  # type: ignore[attr-defined]
+    monkeypatch.setattr(pipeline_module, "run_holdout", counting_run_holdout)  # type: ignore[attr-defined]
+    monkeypatch.setattr(  # type: ignore[attr-defined]
+        pipeline_module, "write_artifact_files", counting_write_artifact_files
+    )
+
+    pipeline = build_training_pipeline(
+        _spec(),
+        training_policy=_training_policy(),
+        evaluation_policy=_evaluation_policy(),
+        maturity_window_days=7,
+        trainer=trainer,
+        code_version=CodeVersion("sha-boundary-test"),
+        artifact_out_dir=out_dir,
+    )
+    return pipeline, calls
+
+
+def test_cancel_boundary_1_after_load_prevents_training(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+    pipeline, calls = _pipeline_with_counters(monkeypatch, out_dir, _FakeTrainer())
+
+    outcome = pipeline.run(
+        _dataset_ref(dataset_dir), _CancelAfterNChecks(trigger_after=0)
+    )  # type: ignore[arg-type]
+
+    assert isinstance(outcome, PipelineCancelled)
+    assert calls == {
+        "train": 0,
+        "write_artifact": 0,
+        "run_holdout": 0,
+        "write_artifact_files": 0,
+    }
+    assert list(out_dir.iterdir()) == []
+
+
+def test_cancel_boundary_2_after_train_prevents_artifact_write(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+    pipeline, calls = _pipeline_with_counters(monkeypatch, out_dir, _FakeTrainer())
+
+    outcome = pipeline.run(
+        _dataset_ref(dataset_dir), _CancelAfterNChecks(trigger_after=1)
+    )  # type: ignore[arg-type]
+
+    assert isinstance(outcome, PipelineCancelled)
+    assert calls["train"] == 1
+    assert calls["write_artifact"] == 0
+    assert calls["run_holdout"] == 0
+    assert calls["write_artifact_files"] == 0
+    assert list(out_dir.iterdir()) == []
+
+
+def test_cancel_boundary_3_after_artifact_write_prevents_holdout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+    pipeline, calls = _pipeline_with_counters(monkeypatch, out_dir, _FakeTrainer())
+
+    outcome = pipeline.run(
+        _dataset_ref(dataset_dir), _CancelAfterNChecks(trigger_after=2)
+    )  # type: ignore[arg-type]
+
+    assert isinstance(outcome, PipelineCancelled)
+    assert calls["write_artifact"] == 1
+    assert calls["run_holdout"] == 0
+    assert calls["write_artifact_files"] == 0
+    assert list(out_dir.iterdir()) == []
+
+
+def test_cancel_boundary_4_after_holdout_prevents_file_write(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """M-2 — 신설 네 번째 경계(holdout 뒤·`write_artifact_files` 앞). 도입 전에는
+    이 경계가 없어 holdout 이 끝나면 취소와 무관하게 파일이 항상 쓰였다."""
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+    pipeline, calls = _pipeline_with_counters(monkeypatch, out_dir, _FakeTrainer())
+
+    outcome = pipeline.run(
+        _dataset_ref(dataset_dir), _CancelAfterNChecks(trigger_after=3)
+    )  # type: ignore[arg-type]
+
+    assert isinstance(outcome, PipelineCancelled)
+    assert calls["run_holdout"] == 1
+    assert calls["write_artifact_files"] == 0
+    assert list(out_dir.iterdir()) == []
+
+
+def test_never_cancelled_reaches_all_four_stages_and_writes_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """대조군 — 취소가 전혀 없으면 넷 다 정확히 1회씩 불리고 파일이 쓰인다."""
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+    pipeline, calls = _pipeline_with_counters(monkeypatch, out_dir, _FakeTrainer())
+
+    outcome = pipeline.run(_dataset_ref(dataset_dir), CancelToken())
+
+    assert isinstance(outcome, PipelineOutcome), outcome
+    assert calls == {
+        "train": 1,
+        "write_artifact": 1,
+        "run_holdout": 1,
+        "write_artifact_files": 1,
+    }
+    assert len(list(out_dir.iterdir())) == 1
