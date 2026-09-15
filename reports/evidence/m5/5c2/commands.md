@@ -191,3 +191,41 @@ leak-patterns.txt`)으로 정정하고, 이 커밋 HEAD 에서 즉시 재실측�
 실증했다 — evidence 문서를 고치는 커밋은 자기 자신이 다음 게이트 실패의 원인이
 될 수 있고, 그것은 파일을 다 쓴 **뒤** 실제로 게이트를 돌려야만 잡힌다(적어
 두기만 한 「매치 없음」은 증거가 아니다).
+
+## 수정 라운드 3(verifier r3) — M-1r·L-2r 코드 커밋 뒤 S-1~S-10 재실행(HEAD `8d7281c`)
+
+## 2026-09-15T17:41Z
+- cmd: `(cd ml-engine && uv sync --frozen --all-extras)` — S-1
+- exit: 0
+## 2026-09-15T17:41Z
+- cmd: S-1b(serving extra 순수성 5종 ImportError) — S-1b
+- exit: 0 — 핵심 결과: 5개 전부 ImportError 확인, all-extras 복원
+## 2026-09-15T17:41Z
+- cmd: `(cd ml-engine && uv run ruff check . && uv run ruff format --check .)` — S-2
+- exit: 0 — 핵심 결과: All checks passed! / 135 files already formatted
+## 2026-09-15T17:41Z
+- cmd: `(cd ml-engine && uv run mypy --strict src/ml_engine)` — S-3
+- exit: 0 — 핵심 결과: Success: no issues found in 54 source files
+## 2026-09-15T17:41Z
+- cmd: `(cd ml-engine && uv run lint-imports)` — S-4
+- exit: 0 — 핵심 결과: 계약 6 KEPT
+## 2026-09-15T17:41Z
+- cmd: `(cd ml-engine && uv run python -m pytest tests -q)` — S-5
+- exit: 0 — 핵심 결과: **658 passed**(수정 라운드 2 종결 657 대비 +1 — M-1r
+  checksum 대조 test 신설, L-2r 은 기존 test 에 단언 추가라 별도 계수 없음)
+## 2026-09-15T17:41Z
+- cmd: `(cd ml-engine && uv run python tools/design_ratchet.py --check)` — S-6
+- exit: 0 — 핵심 결과: 위반 0
+## 2026-09-15T17:41Z
+- cmd: S-7(재활용 출처 양성 + 음성 대조) — S-7
+- exit: 0 — 핵심 결과: 위반 0 / mismatch fixture 는 예상대로 불일치 검출(음성 대조 성립)
+## 2026-09-15T17:41Z
+- cmd: python 3.12 assertion — S-9
+- exit: 0
+## 2026-09-15T17:41:44Z
+- cmd: `./gradlew --no-daemon check` — S-10, 이 커밋(M-1r·L-2r) HEAD 에서
+- exit: 0 — 핵심 결과: BUILD SUCCESSFUL in 5s, 337 actionable tasks(32 executed, 305 up-to-date)
+
+비밀값 스캔(참조형 명령, 65행과 같은 형태로): `grep -rniE -f config/quality/
+leak-patterns.txt reports/evidence/m5/5c2/` — exit 1(매치 없음, 통과). 이 절
+자신도 어휘를 리터럴로 담지 않는다(B-1/L-1r 재발 방지 관행 준수).

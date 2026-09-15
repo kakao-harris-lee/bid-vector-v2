@@ -301,6 +301,37 @@ git -C /tmp/5c2-rollback-head3 diff --name-status c669a71 -- <in_scope 전 경�
 - 임시 worktree 둘(`5c2-rollback-head3`·`5c2-base-check3`) 제거 + `worktree prune`
   확인, slice worktree 는 이 실측 뒤 HEAD `9ca68a2`에서 clean 상태로 복귀.
 
+### 2026-09-16 재실측(verifier r3 승인 전 종결 — HEAD `8d7281c`, M-1r·L-2r 코드 커밋 뒤)
+
+verifier r3 §7 이 확인한 절차(단일 역적용)를 그대로 재실행한다. 파일 목록은
+불변(이번 라운드가 새 파일을 만들지 않음, `git diff --name-status 5358c16..
+8d7281c`로 확인 — 수정 셋: `report.py`·`holdout.py`·`test_holdout.py`, 전부
+`rm`/`git restore` 기존 목록 안).
+
+```
+git worktree add --detach /tmp/5c2-rollback-head4 8d7281c   # exit 0
+# rm 23개 + git restore 3개 + scope.md 단일 역적용(30b42d6 기준)
+git -C /tmp/5c2-rollback-head4 diff 30b42d6 -- reports/evidence/m5/5c2/scope.md
+# → 빈 출력
+```
+
+**실측 결과**(2026-09-16, `/tmp/5c2-rollback-head4`, HEAD `8d7281c`):
+
+- `rm` 23개 + `git restore` 3개 + `scope.md` 단일 역적용: 전부 exit 0, conflict 0
+- `git diff 30b42d6 -- scope.md`: **빈 출력**(착수 문면 보존)
+- in_scope 나머지 전 경로 `git diff --name-status c669a71`: **빈 출력**
+- `scope.md`만 `A`로 잔존(예고된 상태)
+- `main`(c669a71) 직접 pytest 계수: **521 passed**(별도 worktree `/tmp/5c2-base-check4`)
+- 되돌린 트리 `uv run python -m pytest tests -q`: **521 passed**(동일 — 회귀 없음,
+  이번 라운드가 늘린 test 1개 전부 이 slice 소속 재확인)
+- 되돌린 트리 `ruff check .`·`mypy --strict src/ml_engine`·`lint-imports`·
+  `design_ratchet.py --check`·`reuse_provenance_check.py`·python 버전 assertion:
+  전부 exit 0
+- 되돌린 트리 `./gradlew --no-daemon check`: **BUILD SUCCESSFUL**(evidence
+  디렉터리 전체가 rm 대상이라 leak 게이트 대조 대상 자체가 없다)
+- 임시 worktree 둘(`5c2-rollback-head4`·`5c2-base-check4`) 제거 + `worktree
+  prune` 확인, slice worktree 는 이 실측 뒤 HEAD `8d7281c`에서 clean 상태로 복귀.
+
 ## 복구 시간
 
 되돌리기: 명령 실행 수 초. 재적용(rollback 취소, 즉 이 slice 를 다시 살리기)은

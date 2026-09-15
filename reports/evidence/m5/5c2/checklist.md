@@ -89,6 +89,16 @@
 - **제거**: `ml_engine.evaluation.trial_outcome`(r1 H-3) — `_trial_outcome`으로
   비공개 전환. 안정성 없이 `Promotable`을 만들 수 있던 in-repo 우회 표면이었다.
 
+**2026-09-16 확인(verifier r3 — M-1r·L-2r 은 새 public 표면을 만들지 않음)**:
+r3 의 두 수정은 위에 이미 등재된 표면(`WindowExclusion.buildable_row_count`/
+`.dropped_rows`, r2 M-1r)의 **직렬화 공백을 메운 것**(canonical JSON/checksum
+경로에 같은 값이 실리게 함, `_window_exclusion_json`)과 `holdout.py` **내부**
+호출부 정리(`_assemble_report`가 안 쓰던 `plan_selected` 매개변수 제거 —
+private 함수, `run_holdout`/`HoldoutRejected` 공개 표면은 불변)뿐이다. 새 타입·
+새 함수·새 필드·새 열거값 없음(`git diff 9853ae9..HEAD -- ml-engine/src/
+ml_engine/evaluation/__init__.py ml-engine/src/ml_engine/training/__init__.py`
+로 재확인 가능 — r2 이후 diff 없음).
+
 ## 알려진 제한
 
 1. **K7 성숙도 비율 3줄 중복** — `evaluation/windows.py::WeekMaturity.maturity_ratio`가
