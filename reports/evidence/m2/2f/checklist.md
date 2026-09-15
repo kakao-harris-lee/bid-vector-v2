@@ -14,14 +14,14 @@
       5쌍 갱신 + 신설 1쌍(DERIVED+POSTERIOR_PREDICTIVE), 재현 절차는 commands.md.
       정책 값 변경 없음(`contract-policy.properties`는 종결 승인 커밋에서만 팀장이 편집).
 - [x] 알려진 제한과 rollback 기록 — 아래 「알려진 제한」·`rollback.md`.
-- [x] secret 스캔 통과 — commands.md 「누출 검사」.
+- [x] 누출 검사 통과 — commands.md 「누출 검사」.
 
 ## D-2F-1~7 대응표 — scope.md 「계약 고정 결정」과 그것을 증명하는 게이트/테스트
 
 | ID | 판단 | 증명 |
 | --- | --- | --- |
 | D-2F-1 | 표본 축 = `AgencyIdFact`/`CategoryCodeFact` 재사용, 허용 사유 `NOT_COLLECTED_YET` 하나 | `features.proto` `CompetitionSample.agency_id`(8)·`category_code`(9) 주석 + `RequestMapping.kt`의 `toSampleAgencyIdFact()`/`toSampleCategoryCodeFact()`가 `NOT_COLLECTED_YET` 하나만 냄 + `PredictionAdditiveContractTest`「요청 표본의 agency_id category_code fact 는...」(값 1·missing 1) + Python `test_competition_samples_carry_agency_id_and_category_code_facts` |
-| D-2F-2 | `ModelRelease.release_kind` enum additive + DERIVED 규약 | `prediction.proto` `ReleaseKind`+필드 6 + `ReleaseShapeValidation.hasValidReleaseShape`(kind 분기, `release_id` 접두 `distribution/` ↔ kind 일치 검사) + Kotlin/Python 양쪽 ARTIFACT/DERIVED 통과·UNSPECIFIED 거부·접두 불일치 거부 test(각 4건) |
+| D-2F-2 | `ModelRelease.release_kind` enum additive + DERIVED 규약 | `prediction.proto` `ReleaseKind`+필드 6 + `ReleaseShapeValidation.hasValidReleaseShape`(kind 분기, `release_id` 접두 `distribution/` ↔ kind 일치 검사, **수신 집행 — Kotlin main**) + Kotlin 쪽 ARTIFACT/DERIVED 통과·UNSPECIFIED 거부·접두 불일치 거부 test 4건 + Python 쪽 대칭 test 4건(verifier r1 F-5 — Python 넷은 `test_prediction_contract.py` 안의 `_is_valid_release_shape`가 규칙을 **문서화**하는 순수 함수 단언이지 수신 경로 **집행**이 아니다, 그 docstring이 「실 validation 구현은 5E 몫」이라 자백) |
 | D-2F-3 | 도메인 `IntervalSource.PosteriorPredictive` 추가, `null` 로 접지 않음 | `BidPredictionOutcome.kt` enum 값 추가 + `ParsedSuccessFields.toDomainOrNull()` 소진 `when`(컴파일 깨짐 자리, 값 추가로 갱신) + `PredictionAdditiveContractTest`·Python 양쪽 POSTERIOR_PREDICTIVE 파싱 test |
 | D-2F-4 | D-2B-8 을 요청·응답 후보율 축에 한정, 표본 관측값은 `> 1` 허용 | `features.proto` `observed_bid_rate` 주석·`prediction.proto` `Candidate.bid_rate` 주석 + `reports/evidence/m2/2b/scope.md` 갱신 이력(2026-09-15) |
 | D-2F-5 | `Weight` KDoc 을 「[0,1] fraction 가중치 일반」으로 확장, `shrinkage_weight` 재사용 | `prediction.proto` `Weight` 주석 갱신 + `Diagnostics.shrinkage_weight` 필드가 같은 타입 재사용(신 메시지 없음) |
@@ -85,6 +85,26 @@
    `EmbeddingShapeFailClosedTest`가 깨진다(실측: 초기 구현에서 이 경로로 706개 test 중
    embedding 관련이 실패할 뻔함 — 설계와 다른 결정으로 `hasValidReleaseShape`를 **신규
    함수**로 추가하고 `hasNonBlankRelease`는 무변경 유지). 「판단이 갈린 지점」에 재등재.
+6. **신설 필드·enum 값은 승인 태그 재발행 전까지 breaking 게이트에 안 보인다**(verifier
+   r1 F-4) — 현 승인 태그(`contracts/v1-approved-2026-09-10`)는 `features.proto`·
+   `prediction.proto` **파일**을 기준선에 담지만, 이번에 새로 연 **필드 자리**
+   (`agency_id=8`·`category_code=9`·`Diagnostics` 3~6·`IntervalSource` 값 3→4·
+   `release_kind` 6→7)는 아직 그 기준선에 없다. 실측: 그 필드들의 타입·번호를 바꿔도
+   `buf breaking`(S-9)은 exit 0(통과)다 — 기준선에 있는 기존 필드(`dataset_id=5`)를
+   지우면 exit 100(잡힘)과 대조된다. 「2E F-1(2E 는 신설 파일 전체가 무방비)이 2F 에
+   없다」는 **파일 단위**로는 맞지만 **신설 필드 단위**로는 같은 창이 종결 승인 태그
+   재발행까지 열려 있다(scope.md 「계약 갱신 이력」 2026-09-16 행이 정본). 보상 통제:
+   testdata 7쌍(신설 1쌍 포함)의 `buf convert` 왕복 test 가 현재 형태를 고정하고, 종결
+   승인 커밋의 태그 재발행이 이 창을 닫는다.
+7. **`ResponseMapping.toDomain()`의 `error()`는 `mapSuccess` 경유로 도달 불가함을 실측
+   확인했다**(verifier r1 F-6, production 경로 재현: `UNSPECIFIED` 입력은 throw 없이
+   `Unavailable(ContractViolation)`으로 접힌다 — `hasValidReleaseShape`가 `mapSuccess`
+   보다 먼저 그 값을 거부하기 때문). 그래도 같은 `ProtoReleaseKind`enum 위에서 fail-closed
+   여과(`hasValidReleaseShape`)와 매핑(`toDomain()`)이 **두 개의 별도 함수**로 갈려
+   있어, "여과를 통과한 값만 매핑에 도달한다"는 불변식이 타입으로 표현되지 않고
+   `error()` 방어문으로만 남는다(표현 가능한 불가능 상태, `close-impossible-states-with-types`
+   관례). 통합 후보(예: 여과가 `ReleaseKind`를 직접 반환해 `toDomain()`을 없애는 리팩터)는
+   이 slice 범위 밖 — 후속 결정.
 
 ## 판단이 갈린 지점(설계와 다른 결정)
 
@@ -133,6 +153,32 @@ test_` 35개) → HEAD(45개)로 **정확히 10건** 증가했다(diagnostics 1�
 ## 구현 레인 not-ready 판정 없음
 
 이 slice 는 verifier·Codex 독립 리뷰 이전 구현 레인 단계다. S-0~S-9 전건 exit 0,
-adapters+workflow 706 tests 0 failures, ml-engine 54 tests 0 failures. 알려진 제한 다섯 건
-전부 등재(도메인 소비·문서 정의·배포 순서·checksum 계산·공유 함수 판단 변경) — 산출물
-blocker/high 없음(구현자 자체 판단, 최종 판정은 verifier 몫).
+adapters+workflow 706 tests 0 failures, ml-engine 54 tests 0 failures. 알려진 제한 일곱
+건 전부 등재(도메인 소비·문서 정의·배포 순서·checksum 계산·공유 함수 판단 변경·신설
+필드 breaking 무방비 창·`toDomain()` 여과-매핑 분리) — 산출물 blocker/high 없음
+(구현자 자체 판단, 최종 판정은 verifier 몫).
+
+## verifier r1 수정 라운드(2026-09-16, 재작업 1/5)
+
+not-ready — high 1(F-1)·medium 1(F-2)·low 4(F-3~F-6). 이 라운드에서 evidence 만
+수정했다(코드·proto·Kotlin·Python 무변경 — verifier r1 「게이트 술어 무변경이라 S-1
+head 실측·누출 0·rollback ⑥ 만 재확인한다」). 처방 근거는 팀장 커밋 `a0b8f04`
+(`reports/evidence/m2/2f/scope.md` 「계약 갱신 이력」).
+
+- **F-1(high)** — `checklist.md:17`·`commands.md:161`의 「secret 스캔」 어휘를 「누출
+  검사」로 교체(baseline 등재가 아니라 어휘 제거, 5D 전례). 재확인:
+  `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m2/2f
+  --exclude=scope.md` exit 1(매치 0) · `./gradlew --no-daemon :leakPatternGate`
+  `BUILD SUCCESSFUL`.
+- **F-2(medium)** — `rollback.md`에 확인 ⑥(되돌린 트리의 게이트 — 임시 clone 안에서
+  `git add -A && git commit` 뒤 `clean check`) 신설, 확인 지점 번호를 ①~⑥ 원문자로
+  통일.
+- **F-3(low)** — `rollback.md`의 「12건 신설」→10, 「기존 42건만 남음」→「base 35건만
+  남음」 정정. 확인 ⑤의 pytest 명령에 `uv sync --frozen --all-extras` 추가(`--extra
+  dev`만으로는 fresh clone 에서 `No module named pytest`).
+- **F-4(low)** — 알려진 제한 6(신설 필드 breaking 무방비 창) 신설, D-2F-2 대응표 갱신.
+- **F-5(low)** — D-2F-2 대응표의 Python 넷 문면을 「규칙 문서화, 수신 집행은 5E」로 정정.
+- **F-6(low)** — 알려진 제한 7(`toDomain()` 여과-매핑 분리) 신설.
+
+S-1 head 재실행(아래 commands.md 「verifier r1 수정 뒤 S-1 재실행」)·S-0 재확인 결과는
+그 절 참고.

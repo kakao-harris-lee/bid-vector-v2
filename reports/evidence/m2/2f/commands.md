@@ -158,7 +158,7 @@ base `c669a71affabed165c1afbd8b11c8245b81a3a5a`, head는 리뷰 시점의 `git r
 - exit: 0(매치 있음 — 판독)
 - 핵심 결과: 매치 전부 이 slice 의 diff 밖(koneps `ServiceKeyTest`·extraction LLM 토큰
   test·persistence 테스트 컨테이너 비밀번호·notification `RouteKeyTest` — 다른 slice 가
-  만든 기존 secret-스캔 test fixture, developer 구간 무매치). in_scope 파일(proto·
+  만든 기존 누출-스캔 test fixture, developer 구간 무매치). in_scope 파일(proto·
   testdata·`RequestMapping.kt`·`ParsedSuccessFields.kt`·`ReleaseShapeValidation.kt`·
   `ResponseMapping.kt`·`BidPredictionOutcome.kt`·`BidPredictionRequest.kt`·
   `PredictionContractTest.kt`·`PredictionAdditiveContractTest.kt`·`MlTestFixtures.kt`·
