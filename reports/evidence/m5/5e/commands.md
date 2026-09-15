@@ -104,6 +104,15 @@
 - exit: 0
 - 핵심 결과: `BUILD SUCCESSFUL`, `leakPatternGate` 포함 337 task 전부 통과
 
+## 2026-09-15T21:44Z (rollback.md·golden-manifest.json 커밋 전 재실측)
+- cmd: `./gradlew --no-daemon check`
+- exit: 1(최초) → `leakPatternGate FAILED` — 바로 위 두 문단이 그 취소 토큰 클래스
+  이름을 다시 인용해(이 문서 자기 자신의 판독 서술) 새 매치 2건 발생(같은 오탐 갈래,
+  다른 줄)
+- 조치: 두 키를 `config/quality/leak-pattern-baseline.txt`에 추가 등재
+- cmd: `./gradlew --no-daemon check`(재실측)
+- exit: 0 — `BUILD SUCCESSFUL`, 337 task
+
 ## 실패 이력
 없음 — mypy strict subclass-of-generated-base 오류(초판, `contracts/__init__.py`와 같은
 구조적 사정) 는 `type: ignore[misc]` 로 해소했고, `tests/training/conftest.py`(5C-1,
