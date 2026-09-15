@@ -554,6 +554,11 @@ def test_window_exclusion_reports_buildable_row_count_and_dropped_rows() -> None
     assert excluded_json["buildable_row_count"] == 30
     assert sum(item["row_count"] for item in excluded_json["dropped_rows"]) == 90
     assert excluded_json["evaluation_row_count"] == 120
+    # verifier r3 표적 정정 — _window_exclusion_json 이 실제로 키 둘을
+    # "추가"했는지(대체·누락 없이)를 정확한 키 수로 고정한다: window_start·
+    # window_end·window_opened_count·window_settled_count·reason·
+    # evaluation_row_count(기존 6) + buildable_row_count·dropped_rows(신규 2) = 8.
+    assert len(excluded_json) == 8
 
 
 def _excluded_window_scenario_with_fixed_composition(
