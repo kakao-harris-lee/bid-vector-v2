@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 
 from ml_engine.contracts import common_pb2, features_pb2
+from ml_engine.features import CanonicalizationRejected, compute_checksum
 from ml_engine.registry.artifact import (
     ArtifactRejected,
     LoadedArtifact,
@@ -148,7 +149,9 @@ class _ConstantTrainer:
         return _ConstantBooster(0.5, tuple(feature_names))  # type: ignore[arg-type]
 
 
-def _train_and_write(*, trainer: TrainerLike, n: int = 40) -> ArtifactBytes:
+def _train_and_write(
+    *, trainer: TrainerLike, n: int = 40
+) -> tuple[TrainedArtifact, ArtifactBytes]:
     dataset = _dataset(n)
     policy = TrainingPolicy(version="test-v1", min_training_rows=5)
     trained = train_award_rate_gbm(
@@ -157,44 +160,50 @@ def _train_and_write(*, trainer: TrainerLike, n: int = 40) -> ArtifactBytes:
     assert isinstance(trained, TrainedArtifact)
     written = write_artifact(trained)
     assert isinstance(written, ArtifactBytes)
-    return written
+    return trained, written
 
 
-def _expected_ref(written: ArtifactBytes) -> ModelReleaseRef:
-    payload = json.loads(written.bytes)
+def _expected_ref(trained: TrainedArtifact, written: ArtifactBytes) -> ModelReleaseRef:
+    """H-1 시정 — `feature_manifest_checksum`을 검사 대상 payload 자신이 아니라 5B
+    `compute_checksum(trained.feature_manifest)`으로 **독립 재계산**한다(verifier r3
+    H-1 (2) — 이전 판은 `payload["feature_manifest_checksum"]`을 그대로 기대값으로
+    써 5D 의 대조가 동어반복이었다). `artifact_checksum`은 원래도 `written.sha256`
+    (bytes 재해시)로 독립적이었다(변경 없음)."""
+    independent_checksum = compute_checksum(trained.feature_manifest)
+    assert not isinstance(independent_checksum, CanonicalizationRejected)
     return ModelReleaseRef(
         release_id=written.release.release_id,
         artifact_checksum=written.sha256,
         feature_schema_version=written.release.feature_schema_version,
-        feature_manifest_checksum=payload["feature_manifest_checksum"],
+        feature_manifest_checksum=independent_checksum,
     )
 
 
 def test_write_artifact_roundtrips_through_5d_load_artifact_with_fake_trainer() -> None:
-    written = _train_and_write(trainer=_ConstantTrainer())
-    result = load_artifact(written.bytes, _expected_ref(written))
+    trained, written = _train_and_write(trainer=_ConstantTrainer())
+    result = load_artifact(written.bytes, _expected_ref(trained, written))
     assert isinstance(result, LoadedArtifact)
 
 
 def test_write_artifact_roundtrips_through_5d_load_artifact_with_real_lightgbm() -> (
     None
 ):
-    written = _train_and_write(trainer=LightGbmTrainer())
-    result = load_artifact(written.bytes, _expected_ref(written))
+    trained, written = _train_and_write(trainer=LightGbmTrainer())
+    result = load_artifact(written.bytes, _expected_ref(trained, written))
     assert isinstance(result, LoadedArtifact)
 
 
 def test_tampered_artifact_bytes_are_rejected_by_5d_load_artifact() -> None:
-    written = _train_and_write(trainer=_ConstantTrainer())
-    expected = _expected_ref(written)
+    trained, written = _train_and_write(trainer=_ConstantTrainer())
+    expected = _expected_ref(trained, written)
     tampered = written.bytes + b" "  # 1바이트 변조
     result = load_artifact(tampered, expected)
     assert isinstance(result, ArtifactRejected)
 
 
 def test_release_id_mismatch_is_rejected_by_5d_load_artifact() -> None:
-    written = _train_and_write(trainer=_ConstantTrainer())
-    expected = _expected_ref(written)
+    trained, written = _train_and_write(trainer=_ConstantTrainer())
+    expected = _expected_ref(trained, written)
     wrong_release_id = ModelReleaseRef(
         release_id="not-" + expected.release_id,
         artifact_checksum=expected.artifact_checksum,
@@ -209,8 +218,8 @@ def test_5c1_additional_fields_are_not_rejected_by_5d_read_model() -> None:
     """5C-1 이 5D scope ⑦ 기본 필드 밖에 여덟(`training_spec_version` 등, checklist.md
     알려진 제한 5(b))을 더 싣는다 — read model 이 알 수 없는 top-level 키를 거부하지
     않아야 이 slice 산출물을 읽을 수 있다."""
-    written = _train_and_write(trainer=_ConstantTrainer())
-    result = load_artifact(written.bytes, _expected_ref(written))
+    trained, written = _train_and_write(trainer=_ConstantTrainer())
+    result = load_artifact(written.bytes, _expected_ref(trained, written))
     assert isinstance(result, LoadedArtifact)
     payload = json.loads(written.bytes)
     for extra_field in _EXTRA_5C1_FIELDS:
@@ -220,8 +229,8 @@ def test_5c1_additional_fields_are_not_rejected_by_5d_read_model() -> None:
 def test_loaded_artifact_carries_5c1_manifest_fields_correctly() -> None:
     """`feature_manifest_checksum`·`feature_names`·`sample_scope`·`reproducibility`가
     read model 을 통과해 그대로 나른다."""
-    written = _train_and_write(trainer=_ConstantTrainer())
-    result = load_artifact(written.bytes, _expected_ref(written))
+    trained, written = _train_and_write(trainer=_ConstantTrainer())
+    result = load_artifact(written.bytes, _expected_ref(trained, written))
     assert isinstance(result, LoadedArtifact)
     payload = json.loads(written.bytes)
     manifest = result.manifest
