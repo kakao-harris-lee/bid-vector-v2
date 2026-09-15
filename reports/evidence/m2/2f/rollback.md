@@ -6,11 +6,12 @@
 
 **`milestone-2.md`·`reports/evidence/m2/2f/scope.md`는 되돌리지 않는다** — 2E 전례와 같은
 경계(rollback은 기능 산출물을 대상으로 하고, 착수 계약·설계 문서는 「이 slice가 시도됐다」
-기록으로 남긴다). 둘 다 팀장의 착수 계약 고정 커밋(`7b4a9ef`)만 건드렸다(`git show --stat
-7b4a9ef` — 이 두 파일뿐, 구현 레인 커밋과 겹침 없음). base..HEAD 안에서 아래 23경로는
+기록으로 남긴다). `milestone-2.md`는 팀장의 착수 계약 고정 커밋(`7b4a9ef`)만 건드렸고
+`reports/evidence/m2/2f/scope.md`는 그 커밋과 팀장의 계약 갱신 커밋(`a0b8f04`, verifier
+r1 처방 근거) 둘만 건드렸다(구현 레인 커밋과 겹침 없음). base..HEAD 안에서 아래 23경로는
 **이 slice만 만졌다**(단일 레인 브랜치, 동시 병행 레인 없음 — 확인: `git log
---oneline c669a71..HEAD`가 팀장 착수 커밋 1 + 구현 레인 커밋 6뿐). 그래서 hunk 격리 없이
-base 상태로 직접 복원해도 안전하다.
+--oneline c669a71..HEAD`가 팀장 커밋 2(`7b4a9ef`·`a0b8f04`) + 구현 레인 커밋 9뿐). 그래서
+hunk 격리 없이 base 상태로 직접 복원해도 안전하다.
 
 ## 되돌리는 것
 
