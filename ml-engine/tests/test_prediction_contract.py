@@ -209,6 +209,93 @@ def test_unmeasurable_reasons_differ(prediction_pb2, error_pb2):
     assert untrained.unmeasurable.reason != insufficient.unmeasurable.reason
 
 
+# ---- M2/2F additive: diagnostics 넷 보존(proto 레벨, 도메인 미소비) ----
+
+
+def test_diagnostics_fields_are_preserved_after_parsing(prediction_pb2):
+    response = prediction_pb2.CalculateOptimalBidResponse()
+    response.ParseFromString(_read("calculate_optimal_bid_response_success.binpb"))
+    diagnostics = response.success.diagnostics
+    assert diagnostics.shrinkage_weight.fraction == "0.1500"
+    assert diagnostics.excluded_observations == 12
+    assert diagnostics.agency_sample_count == 38
+    assert diagnostics.agency_sample_below_threshold is False
+
+
+# ---- M2/2F additive: IntervalSource.POSTERIOR_PREDICTIVE ----
+
+
+def test_posterior_predictive_testdata_has_that_interval_source(prediction_pb2):
+    response = prediction_pb2.CalculateOptimalBidResponse()
+    response.ParseFromString(_read("calculate_optimal_bid_response_success_posterior_predictive.binpb"))
+    assert response.success.uncertainty.interval_source == prediction_pb2.INTERVAL_SOURCE_POSTERIOR_PREDICTIVE
+
+
+# ---- M2/2F additive: DERIVED release ⇒ training_row_count == 0(D-2B-6, 설계 검토 (10)) ----
+
+
+def test_derived_release_has_zero_training_row_count(prediction_pb2):
+    response = prediction_pb2.CalculateOptimalBidResponse()
+    response.ParseFromString(_read("calculate_optimal_bid_response_success_posterior_predictive.binpb"))
+    assert response.success.release.release_kind == prediction_pb2.RELEASE_KIND_DERIVED
+    assert response.success.diagnostics.training_row_count == 0
+
+
+# ---- M2/2F additive: 표본 축(agency_id/category_code) — 값 표본 1·missing 표본 1 ----
+
+
+def test_competition_samples_carry_agency_id_and_category_code_facts(prediction_pb2, common_pb2):
+    request = prediction_pb2.CalculateOptimalBidRequest()
+    request.ParseFromString(_read("calculate_optimal_bid_request.binpb"))
+    samples = request.competition_samples
+
+    assert samples[0].agency_id.WhichOneof("fact") == "value"
+    assert samples[0].agency_id.value == "agency-opaque-771"
+    assert samples[0].category_code.WhichOneof("fact") == "value"
+    assert samples[0].category_code.value == "CAT-0821"
+
+    assert samples[1].agency_id.WhichOneof("fact") == "missing"
+    assert samples[1].agency_id.missing == common_pb2.MISSING_REASON_NOT_COLLECTED_YET
+    assert samples[1].category_code.WhichOneof("fact") == "missing"
+    assert samples[1].category_code.missing == common_pb2.MISSING_REASON_NOT_COLLECTED_YET
+
+
+# ---- M2/2F additive: release_kind — ARTIFACT/DERIVED 통과, UNSPECIFIED 거부, kind ↔
+# release_id 접두 `distribution/` 불일치 거부(Kotlin `hasValidReleaseShape`와 대칭) ----
+
+
+def test_artifact_release_is_a_valid_shape(prediction_pb2):
+    release = _success_release(prediction_pb2, "calculate_optimal_bid_response_success.binpb")
+    assert release.release_kind == prediction_pb2.RELEASE_KIND_ARTIFACT
+    assert _is_valid_release_shape(prediction_pb2, release)
+
+
+def test_derived_release_with_blank_dataset_id_is_a_valid_shape(prediction_pb2):
+    release = _success_release(prediction_pb2, "calculate_optimal_bid_response_success_posterior_predictive.binpb")
+    assert release.release_kind == prediction_pb2.RELEASE_KIND_DERIVED
+    assert release.dataset_id == ""
+    assert _is_valid_release_shape(prediction_pb2, release)
+
+
+def test_release_kind_unspecified_is_rejected(prediction_pb2):
+    release = _success_release(prediction_pb2, "calculate_optimal_bid_response_success.binpb")
+    release.ClearField("release_kind")
+    assert release.release_kind == prediction_pb2.RELEASE_KIND_UNSPECIFIED
+    assert not _is_valid_release_shape(prediction_pb2, release)
+
+
+def test_derived_release_without_distribution_prefix_is_rejected(prediction_pb2):
+    release = _success_release(prediction_pb2, "calculate_optimal_bid_response_success_posterior_predictive.binpb")
+    release.release_id = "release-2026-09-01"
+    assert not _is_valid_release_shape(prediction_pb2, release)
+
+
+def test_artifact_release_with_distribution_prefix_is_rejected(prediction_pb2):
+    release = _success_release(prediction_pb2, "calculate_optimal_bid_response_success.binpb")
+    release.release_id = "distribution/reserve-draw-distribution-v1"
+    assert not _is_valid_release_shape(prediction_pb2, release)
+
+
 def test_application_failure_testdata_is_unsupported_schema_and_not_retryable(prediction_pb2, error_pb2):
     response = prediction_pb2.CalculateOptimalBidResponse()
     response.ParseFromString(_read("calculate_optimal_bid_response_failure_unsupported_schema.binpb"))
@@ -445,6 +532,13 @@ def test_calculate_optimal_bid_response_failure_round_trips(prediction_pb2):
     assert response.SerializeToString(deterministic=True) == original
 
 
+def test_calculate_optimal_bid_response_success_posterior_predictive_round_trips(prediction_pb2):
+    original = _read("calculate_optimal_bid_response_success_posterior_predictive.binpb")
+    response = prediction_pb2.CalculateOptimalBidResponse()
+    response.ParseFromString(original)
+    assert response.SerializeToString(deterministic=True) == original
+
+
 def test_get_model_metadata_response_round_trips(prediction_pb2):
     original = _read("get_model_metadata_response.binpb")
     response = prediction_pb2.GetModelMetadataResponse()
@@ -522,6 +616,49 @@ def _is_valid_bid_rate_fraction(fraction: str) -> bool:
 
 def _is_acceptable_success(success) -> bool:
     return success.uncertainty.sample_size >= 1
+
+
+def _success_release(prediction_pb2, testdata_name: str):
+    """M2/2F additive 헬퍼 — `Success.release`를 뽑는다(release_kind 계약 test 공용)."""
+    response = prediction_pb2.CalculateOptimalBidResponse()
+    response.ParseFromString(_read(testdata_name))
+    release = prediction_pb2.ModelRelease()
+    release.CopyFrom(response.success.release)
+    return release
+
+
+def _is_valid_release_shape(prediction_pb2, release) -> bool:
+    """Kotlin `bidvector.adapters.ml.hasValidReleaseShape`(D-2F-2)와 대칭인 순수 함수 —
+    실제 Python validation 구현은 5E 몫이고, 여기서는 test 가 규칙을 문서화·고정한다."""
+    distribution_prefix = "distribution/"
+    if release.release_kind == prediction_pb2.RELEASE_KIND_ARTIFACT:
+        return (
+            all(
+                value
+                for value in (
+                    release.release_id,
+                    release.artifact_checksum,
+                    release.feature_schema_version,
+                    release.code_version,
+                    release.dataset_id,
+                )
+            )
+            and not release.release_id.startswith(distribution_prefix)
+        )
+    if release.release_kind == prediction_pb2.RELEASE_KIND_DERIVED:
+        return (
+            all(
+                value
+                for value in (
+                    release.release_id,
+                    release.artifact_checksum,
+                    release.feature_schema_version,
+                    release.code_version,
+                )
+            )
+            and release.release_id.startswith(distribution_prefix)
+        )
+    return False
 
 
 def _is_acceptable_feature_inputs(features) -> bool:
