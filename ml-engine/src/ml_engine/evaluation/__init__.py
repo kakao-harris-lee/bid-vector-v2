@@ -37,6 +37,15 @@ from ml_engine.evaluation.policy import (
     policy_checksum,
 )
 from ml_engine.evaluation.scoring import improvement_ratio, paired_t, rmse_bias_std
+from ml_engine.evaluation.verdict import (
+    Failed,
+    GateOutcome,
+    NotEvaluable,
+    NotEvaluableReason,
+    Passed,
+    gate_outcome,
+    trial_outcome,
+)
 from ml_engine.evaluation.windows import (
     HoldoutOverlap,
     InvalidMaturityInput,
@@ -66,8 +75,13 @@ __all__ = [
     "CategoryCount",
     "CoverageSplit",
     "EvaluationPolicy",
+    "Failed",
+    "GateOutcome",
     "HoldoutOverlap",
     "InvalidMaturityInput",
+    "NotEvaluable",
+    "NotEvaluableReason",
+    "Passed",
     "PolicyRejected",
     "PolicyRejectionReason",
     "SegmentScore",
@@ -84,6 +98,7 @@ __all__ = [
     "baseline_specs",
     "category_counts",
     "coverage_splits",
+    "gate_outcome",
     "group_mean_predictions",
     "holdout_overlaps",
     "improvement_ratio",
@@ -99,5 +114,6 @@ __all__ = [
     "segment_scores",
     "segment_specs",
     "summarize_stability",
+    "trial_outcome",
     "unlearned_cells",
 ]
