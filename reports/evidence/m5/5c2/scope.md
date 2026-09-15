@@ -21,6 +21,8 @@ in_scope:
   - ml-engine/src/ml_engine/evaluation/verdict.py           # GateOutcome = Passed | Failed | NotEvaluable(reason, required_rows) — 판정식 한 줄(model_rmse < baseline_rmse ∧ paired_t < −threshold), 임계는 policy 에서만
   - ml-engine/src/ml_engine/evaluation/report.py            # EvaluationReportV1(frozen, 창별 결과·진단·안정성·코퍼스 프로필·policy version+checksum·training spec version·창별 release_id) · PromotionMeasurement = Promotable | NotPromotable(reasons) | NotEvaluable · canonical JSON(5B 규칙) + sha256 → 2C EvaluationReportReference 값
   - ml-engine/src/ml_engine/training/holdout.py             # K-H 이식: run_holdout(dataset: LoadedDataset, maturities, spec, training_policy, evaluation_policy, trainer, code_version) -> EvaluationReportV1 | HoldoutRejected — 창마다 5C-1 train_award_rate_gbm 호출(층: training → evaluation 허용, 역방향 금지) · _split_at_window(학습 < start, 평가 [start,end), 경계 동시각은 평가측) · 두 층(gate_train clean-base / train_rows 전층) · seed 재채점(헤드라인 seed 선두, 끄기 없음)
+  - ml-engine/src/ml_engine/training/_holdout_fit.py        # 구현 중 분리(2026-09-16) — 창 분할 + 창별 GBM 학습(파일 500줄 래칫: allowlist 편집 대신 분리, 「줄 수만 맞추기 위한 분할」 여부는 verifier 표적)
+  - ml-engine/src/ml_engine/training/_holdout_window.py     # 구현 중 분리 — 창 채점 + WindowResult 조립. 공개 진입점은 holdout.py 의 run_holdout 하나
   - ml-engine/src/ml_engine/training/__init__.py            # run_holdout·HoldoutRejected 재수출
   - ml-engine/policy/evaluation-v1.yaml                     # 정책 값 실물(D-5C2-3, OPEN-5C2-POLICY-VALUES)
   - ml-engine/tests/evaluation/**                           # RED 먼저 — 산식 항등식·규칙표·property·legacy_parity(관측)·정책 위반 규칙표·완화 경로 부재 test
