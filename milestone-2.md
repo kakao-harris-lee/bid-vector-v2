@@ -167,6 +167,16 @@ wire 형식과 무관) · 실 servicer 는 M5 · 텍스트 합성 규약은 4B-4
 `release_kind` 필수 — 수신 fail-closed). 승인 태그는 종결 승인 커밋에 `contracts/v1-approved-<date>`, `policy.version` 3→4.
 정본 `reports/evidence/m2/2f/scope.md`, 설계 검토 `_workspace/m2-2f/02_design-review.md`.
 
+**2F 종결 2026-09-16(사용자 승인)** — verifier r1 `not-ready`(high 1: evidence 산문의 누출 어휘가 `leakPatternGate` 를
+붉힘 — baseline 등재 대신 어휘 제거) → r2 `ready-for-review`(코드 diff 0; DERIVED 위장·UNSPECIFIED·접두 불일치 4/4 거부,
+게이트 술어 mutation 3/3 검출, 도메인 기본값 `Artifact` 가 UNSPECIFIED 를 접는 경로 없음, testdata 7쌍 왕복, 현 태그 대비
+breaking 0, rollback ⑥ 초록). 재작업 1회. **승인 태그 `contracts/v1-approved-2026-09-16`**(종결 승인 커밋, `policy.version` 4).
+구현 판단: 공유 `hasNonBlankRelease` 는 embedding 이 계속 쓰므로 무변경, prediction 은 신설 `hasValidReleaseShape`(kind 분기)만.
+**알려진 제한·OPEN**: `Diagnostics` 도메인 미소비(`OPEN-2F-DIAGNOSTICS-DOMAIN`) · §6.5 `POSTERIOR_PREDICTIVE` 정의 없음
+(`OPEN-2F-DICT-INTERVAL-SOURCE`) · 배포 순서(제공자 먼저) 문서 의존 · Python 계약 test 넷은 규칙 문서화(집행 5E) ·
+evidence 크기 게이트 30줄 초과(계약 slice 구조적). wire 측 해소: `OPEN-5D2-SAMPLE-SEGMENT`·`OPEN-5D-DIAGNOSTICS-WIRE`·
+`OPEN-5D2-INTERVAL-SOURCE-WIRE`·`OPEN-5D2-RELEASE-FOR-DISTRIBUTION`·`OPEN-5D2-BID-RATE-UPPER`. **다음은 5D-3**(3계층 소비 라운드) → 5E.
+
 ## 완료 조건
 
 - 계약 lint와 breaking-change test 통과

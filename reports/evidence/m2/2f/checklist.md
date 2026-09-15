@@ -163,3 +163,11 @@ adapters+workflow 706 tests 0 failures, ml-engine 54 tests 0 failures. 알려진
 ready-for-review. 코드·proto·Kotlin·Python 은 최초 구현 이후 무변경 — evidence 만
 정정됐다(수치 정정·확인 절차 보강·알려진 제한 6·7 추가, 위 절 참고). S-0~S-9 전건과
 rollback 확인 절차 전부 exit 0(commands.md). 누출 검사 0.
+
+## 사용자 승인
+
+**2026-09-16 — slice 2F 종결 승인**(운영자 「모두 추천으로 진행」). verifier r1 not-ready(high 1: evidence 어휘가 `leakPatternGate` 를 붉힘 — 산출물 결함 아님)
+→ evidence 시정 `03e3c3b`·`5c9ce0a`·`6a5a7ed` → r2 ready-for-review(코드 diff 0, 우회 4/4·mutation 3/3·breaking 0·rollback ⑥ 초록) → 장부 정리 `de2ee0f`.
+재작업 1회. **승인 태그 `contracts/v1-approved-2026-09-16`** 을 이 커밋에 찍고 `approved.tag`·`policy.version 4` 갱신(D-2F-7) — 태그 뒤 `contractGate` 재실행 결과는 commands.md.
+**크기 게이트 초과(알려진 제한)**: evidence 625 > 산출물 595 — 부푼 자리는 verifier 가 요구한 알려진 제한 6·7·rollback ⑥·재확인 기록이라 추가 삭감하지 않음(계약 slice 는 산출물이 작아 구조적).
+병합은 push(브랜치+태그) → PR + 리뷰 판정 코멘트 → 머지 별도 승인. 인계 OPEN: `OPEN-2F-DIAGNOSTICS-DOMAIN`(4D-1 후속)·`OPEN-2F-DICT-INTERVAL-SOURCE`(discovery). 다음 slice: **5D-3**(운영자 (a)).
