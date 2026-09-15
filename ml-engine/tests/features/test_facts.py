@@ -10,6 +10,7 @@ from ml_engine.features.facts import (
     FeatureFacts,
     Missing,
     Present,
+    resolve_text_fact,
 )
 
 
@@ -152,3 +153,63 @@ def test_from_proto_category_and_agency_missing_are_independent() -> None:
     assert isinstance(facts, FeatureFacts)
     assert facts.category_code == Missing(common_pb2.MISSING_REASON_UNKNOWN)
     assert facts.agency_id == Missing(common_pb2.MISSING_REASON_NOT_APPLICABLE)
+
+
+# ---- M5/5D-3(D-5D3-6) — `resolve_text_fact` 공개 승격, 허용 결측 사유 집합 인자화 ----
+
+
+def test_resolve_text_fact_default_allows_any_non_unspecified_reason() -> None:
+    """기본 허용 집합 — `FeatureFacts.from_proto`(요청 축)와 같은 동작(회귀 0)."""
+    fact = features_pb2.AgencyIdFact(missing=common_pb2.MISSING_REASON_NOT_APPLICABLE)
+    result = resolve_text_fact(fact, field="agency_id")
+    assert result == Missing(common_pb2.MISSING_REASON_NOT_APPLICABLE)
+
+
+def test_resolve_text_fact_default_still_rejects_unspecified() -> None:
+    fact = features_pb2.AgencyIdFact(missing=common_pb2.MISSING_REASON_UNSPECIFIED)
+    result = resolve_text_fact(fact, field="agency_id")
+    assert result == FactRejected(FactRejectionReason.MALFORMED, "agency_id")
+
+
+def test_resolve_text_fact_default_still_normalizes_and_rejects_empty() -> None:
+    fact = features_pb2.CategoryCodeFact(value="  Civil Works  ")
+    assert resolve_text_fact(fact, field="category_code") == Present("civil works")
+    empty = features_pb2.CategoryCodeFact(value="   ")
+    result = resolve_text_fact(empty, field="category_code")
+    assert result == FactRejected(FactRejectionReason.EMPTY_KEY, "category_code")
+
+
+def test_resolve_text_fact_narrow_allowed_set_accepts_only_that_reason() -> None:
+    """표본 축(D-5D3-2)이 쓰는 형태 — 허용 집합 밖 사유는 `FactRejected`."""
+    allowed = frozenset({common_pb2.MISSING_REASON_NOT_COLLECTED_YET})
+    ok = features_pb2.AgencyIdFact(missing=common_pb2.MISSING_REASON_NOT_COLLECTED_YET)
+    assert resolve_text_fact(
+        ok, field="agency_id", allowed_missing_reasons=allowed
+    ) == Missing(common_pb2.MISSING_REASON_NOT_COLLECTED_YET)
+
+
+def test_resolve_text_fact_narrow_allowed_set_rejects_reason_outside_set() -> None:
+    allowed = frozenset({common_pb2.MISSING_REASON_NOT_COLLECTED_YET})
+    fact = features_pb2.AgencyIdFact(missing=common_pb2.MISSING_REASON_UNKNOWN)
+    result = resolve_text_fact(fact, field="agency_id", allowed_missing_reasons=allowed)
+    assert result == FactRejected(
+        FactRejectionReason.MISSING_REASON_NOT_ALLOWED, "agency_id"
+    )
+
+
+def test_resolve_text_fact_narrow_allowed_set_still_rejects_unspecified() -> None:
+    """`UNSPECIFIED`는 어떤 허용 집합에도 없다 — 좁힌 집합에서도 `MALFORMED`(허용
+    집합 밖 사유와는 다른 사유)로 남는다."""
+    allowed = frozenset({common_pb2.MISSING_REASON_NOT_COLLECTED_YET})
+    fact = features_pb2.AgencyIdFact(missing=common_pb2.MISSING_REASON_UNSPECIFIED)
+    result = resolve_text_fact(fact, field="agency_id", allowed_missing_reasons=allowed)
+    assert result == FactRejected(FactRejectionReason.MALFORMED, "agency_id")
+
+
+def test_resolve_text_fact_oneof_unset_is_malformed_regardless_of_allowed_set() -> None:
+    allowed = frozenset({common_pb2.MISSING_REASON_NOT_COLLECTED_YET})
+    fact = features_pb2.CategoryCodeFact()
+    result = resolve_text_fact(
+        fact, field="category_code", allowed_missing_reasons=allowed
+    )
+    assert result == FactRejected(FactRejectionReason.MALFORMED, "category_code")
