@@ -48,6 +48,12 @@ class UnmeasurableDetail(StrEnum):
     # verifier r1 L-2 — K5 global 표본 0 은 추첨(K6) 축의 `TOO_FEW_DRAWS`와 다른 사유다
     # (위협 모델 (b) 「두 사유 합침」의 약한 형태였다 — 재사용하지 않는다).
     NO_GLOBAL_SAMPLES = "NO_GLOBAL_SAMPLES"
+    # M5/5D-2 — `distribution_availability`(D-5D2-7) 전용 세분 사유 둘. GBM 축의
+    # `SHALLOW_SEGMENT`(공종 학습 행 부족)와는 다른 축(공고 관측 행 수·비율 표본 수)이라
+    # 재사용하지 않는다 — 사유가 섞이면 "왜 측정 불가인가"가 응답만으로 구별되지 않는다
+    # (scope.md ③).
+    TOO_FEW_OBSERVATIONS = "TOO_FEW_OBSERVATIONS"
+    TOO_FEW_RATIO_SAMPLES = "TOO_FEW_RATIO_SAMPLES"
 
 
 @dataclass(frozen=True)
@@ -83,10 +89,15 @@ PriceFitness = NewType("PriceFitness", Decimal)
 
 
 class IntervalSource(StrEnum):
-    """불확실성 폭의 출처(§6.5, wire `IntervalSource` 미러)."""
+    """불확실성 폭의 출처(§6.5, wire `IntervalSource` 미러). `POSTERIOR_PREDICTIVE`는
+    분포 엔진 전용 내부 값이다(D-5D2-8) — GBM 축 잔차 기반 두 값(`CROSS_VALIDATION_
+    RESIDUAL`·`TIME_HOLDOUT_RESIDUAL`) 중 어느 것도 사후예측분산 기반 불확실성의 출처를
+    정확히 나타내지 않는다. wire `IntervalSource`에는 아직 대응 값이 없다(값을 지어내
+    wire 값으로 위장하지 않는다, `OPEN-5D2-INTERVAL-SOURCE-WIRE` — 2F/5E 매핑 대기)."""
 
     CROSS_VALIDATION_RESIDUAL = "CROSS_VALIDATION_RESIDUAL"
     TIME_HOLDOUT_RESIDUAL = "TIME_HOLDOUT_RESIDUAL"
+    POSTERIOR_PREDICTIVE = "POSTERIOR_PREDICTIVE"
 
 
 @dataclass(frozen=True)
@@ -116,12 +127,18 @@ class SegmentSupport(StrEnum):
 @dataclass(frozen=True)
 class Diagnostics:
     """진단 — `shrinkage_weight`·`excluded_observations`는 Python 결과 타입에만 실린다
-    (wire 에 없음, `OPEN-5D-DIAGNOSTICS-WIRE`)."""
+    (wire 에 없음, `OPEN-5D-DIAGNOSTICS-WIRE`). `agency_sample_count`·
+    `agency_sample_below_threshold`는 M5/5D-2 추가(golden `ml-kernel-011`, ML-04 ②) —
+    기관 표본이 `policy.assessment_agency_sample_threshold` 미만이면 수축 가중치가
+    응답 근거에 실린다는 acceptance 를 구조화 값으로 나른다. GBM 경로(`predict.py`)는
+    기관 표본 축을 쓰지 않아 항상 `0`/`False`다(알려진 제한, checklist.md)."""
 
     training_row_count: int
     segment_support: SegmentSupport
     shrinkage_weight: Decimal
     excluded_observations: int
+    agency_sample_count: int
+    agency_sample_below_threshold: bool
 
     def __post_init__(self) -> None:
         if not isinstance(self.shrinkage_weight, Decimal):
@@ -153,3 +170,16 @@ class Success:
 
 
 type KernelResult = Success | Unmeasurable
+
+
+@dataclass(frozen=True)
+class DistributionRelease:
+    """분포 엔진 전용 내부 release 식별(D-5D2-5) — 아티팩트 없는 엔진이라 wire
+    `ModelRelease`(release_id·artifact_checksum·dataset_id 필수)를 채울 값이 없다.
+    이 타입은 `Success.release`에 대응하지 않는다(wire 매핑 없음, `OPEN-5D2-RELEASE-
+    FOR-DISTRIBUTION` — 5E/2F 가 wire `ModelRelease`로 어떻게 옮길지 결정한다). `method`는
+    항상 `"reserve-draw-distribution"`(자유 문자열 상수, enum 아님 — wire 축 없음)."""
+
+    policy_version: str
+    code_version: str
+    method: str

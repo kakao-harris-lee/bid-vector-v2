@@ -9,6 +9,13 @@
 1 클램프는 이 모듈이 아니라 **소비 지점의 코드 불변식**(`predict.py::segment_availability`
 의 `max(1, ·)`)이 두 번째 겹으로 보장한다. 이 모듈은 그 값이 음수가 아님만 확인한다 —
 "정책 파일이 0 을 줘도 1"이 성립하려면 0 자체를 거부하지 않아야 하기 때문이다.
+
+`assessment.agency_sample_threshold`(M5/5D-2, D-5D2-3)는 `_KNOWN_KEYS`의 다른 필수 키와
+같은 「미선언 → `PolicyRejected`」 규칙을 그대로 받는다 — **값을 지어내 출하
+`inference-v1.yaml`에 채우지 않는다**(`OPEN-5D2-POLICY-VALUES`, 운영자 결정 2026-09-13
+(c) — 5C 재학습 지표가 나온 뒤 값을 정한다). 그래서 출하 정책 파일은 이 키 신설 이후
+**로드에 실패하는 것이 의도된 상태**다 — 서빙(5E)이 켜지려면 값 승인이 선행돼야 함이
+로더에서 드러난다.
 """
 
 from __future__ import annotations
@@ -41,6 +48,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
         "assessment.min_samples_for_variance",
         "assessment.plausible_min",
         "assessment.plausible_max",
+        "assessment.agency_sample_threshold",
         "reserve.draw_count",
         "reserve.expected_price_count",
         "reserve.min_reserve_records",
@@ -57,6 +65,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
 _POSITIVE_THRESHOLD_KEYS: tuple[str, ...] = (
     "scenario.bid_rate_digits",
     "assessment.min_samples_for_variance",
+    "assessment.agency_sample_threshold",
     "reserve.draw_count",
     "reserve.expected_price_count",
     "reserve.min_reserve_records",
@@ -91,6 +100,7 @@ class InferencePolicy:
     assessment_min_samples_for_variance: int
     assessment_plausible_min: Decimal
     assessment_plausible_max: Decimal
+    assessment_agency_sample_threshold: int
     reserve_draw_count: int
     reserve_expected_price_count: int
     reserve_min_reserve_records: int
@@ -117,25 +127,36 @@ def _to_int(value: PolicyScalar) -> int:
     return int(value)
 
 
+def _scenario_tuples(
+    values: Mapping[str, PolicyScalar],
+) -> tuple[tuple[Decimal, Decimal, Decimal], tuple[int, int, int]]:
+    """`scenario.{conservative,base,aggressive}.{weight,z_sign}` 여섯 키 → 두 튜플
+    (설계 래칫 함수 50줄 완화 — M5/5D-2 신설 키로 `_coerce_values`가 한계를 넘어 분리)."""
+    weights = (
+        _to_decimal(values["scenario.conservative.weight"]),
+        _to_decimal(values["scenario.base.weight"]),
+        _to_decimal(values["scenario.aggressive.weight"]),
+    )
+    z_signs = (
+        _to_int(values["scenario.conservative.z_sign"]),
+        _to_int(values["scenario.base.z_sign"]),
+        _to_int(values["scenario.aggressive.z_sign"]),
+    )
+    return weights, z_signs
+
+
 def _coerce_values(
     values: Mapping[str, PolicyScalar],
 ) -> InferencePolicy | PolicyRejected:
     """평탄 키 → 타입 값(`Decimal`/`int`)만 담당한다 — `version`은 빈 문자열로 두고
     호출부가 채운다(값 불변식 검증은 `_validate_invariants`가 별도로 한다)."""
     try:
+        scenario_weights, scenario_z_signs = _scenario_tuples(values)
         return InferencePolicy(
             version="",
             scenario_z=_to_decimal(values["scenario.z"]),
-            scenario_weights=(
-                _to_decimal(values["scenario.conservative.weight"]),
-                _to_decimal(values["scenario.base.weight"]),
-                _to_decimal(values["scenario.aggressive.weight"]),
-            ),
-            scenario_z_signs=(
-                _to_int(values["scenario.conservative.z_sign"]),
-                _to_int(values["scenario.base.z_sign"]),
-                _to_int(values["scenario.aggressive.z_sign"]),
-            ),
+            scenario_weights=scenario_weights,
+            scenario_z_signs=scenario_z_signs,
             scenario_clamp_min=_to_decimal(values["scenario.clamp_min"]),
             scenario_clamp_max=_to_decimal(values["scenario.clamp_max"]),
             scenario_bid_rate_digits=_to_int(values["scenario.bid_rate_digits"]),
@@ -153,6 +174,9 @@ def _coerce_values(
             ),
             assessment_plausible_min=_to_decimal(values["assessment.plausible_min"]),
             assessment_plausible_max=_to_decimal(values["assessment.plausible_max"]),
+            assessment_agency_sample_threshold=_to_int(
+                values["assessment.agency_sample_threshold"]
+            ),
             reserve_draw_count=_to_int(values["reserve.draw_count"]),
             reserve_expected_price_count=_to_int(
                 values["reserve.expected_price_count"]
@@ -213,6 +237,7 @@ def _validate_thresholds(raw: InferencePolicy) -> str | None:
     threshold_values = {
         "scenario.bid_rate_digits": raw.scenario_bid_rate_digits,
         "assessment.min_samples_for_variance": raw.assessment_min_samples_for_variance,
+        "assessment.agency_sample_threshold": raw.assessment_agency_sample_threshold,
         "reserve.draw_count": raw.reserve_draw_count,
         "reserve.expected_price_count": raw.reserve_expected_price_count,
         "reserve.min_reserve_records": raw.reserve_min_reserve_records,

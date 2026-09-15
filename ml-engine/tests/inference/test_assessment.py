@@ -5,9 +5,8 @@ D-5D-5, 설계 검토 구현 지시 4). `admit_clean`이 유일한 `CleanAssessm
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
+from _policy_support import shipped_inference_policy_for_test
 
 from ml_engine.inference.assessment import (
     AssessmentProvenance,
@@ -18,21 +17,17 @@ from ml_engine.inference.assessment import (
     aggregate_level_observation,
     resolve_assessment_posterior,
 )
-from ml_engine.inference.policy import InferencePolicy, load_inference_policy
+from ml_engine.inference.policy import InferencePolicy
 from ml_engine.inference.results import (
     Unmeasurable,
     UnmeasurableDetail,
     UnmeasurableReason,
 )
 
-_POLICY_PATH = Path(__file__).resolve().parents[2] / "policy" / "inference-v1.yaml"
-
 
 @pytest.fixture(scope="module")
 def policy() -> InferencePolicy:
-    loaded = load_inference_policy(_POLICY_PATH)
-    assert isinstance(loaded, InferencePolicy)
-    return loaded
+    return shipped_inference_policy_for_test()
 
 
 def test_admit_clean_only_passes_clean_provenance() -> None:

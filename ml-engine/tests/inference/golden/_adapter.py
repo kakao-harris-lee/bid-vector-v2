@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import tempfile
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -28,6 +29,13 @@ _MANIFEST_PATH = _REPO_ROOT / "fixtures" / "manifest.yaml"
 _SHIPPED_POLICY_PATH = _ML_ENGINE_ROOT / "policy" / "inference-v1.yaml"
 
 _SIGN_MARKERS: dict[str, int] = {"NEGATIVE": -1, "NEUTRAL": 0, "POSITIVE": 1}
+
+# M5/5D-2 — `assessment.agency_sample_threshold`는 출하 `inference-v1.yaml`에 없다
+# (D-5D2-3, `OPEN-5D2-POLICY-VALUES` 값 미정, 운영자 결정 2026-09-13 (c)). `shipped_policy()`
+# 는 그 값을 지어 출하 YAML 에 채우는 대신(편집 금지), 이 test 전용 placeholder(가장 관대한
+# 값 `1`이라 011 을 제외한 어떤 case 의 단언에도 영향을 주지 않는다)로 메운 임시 파일에서
+# 읽는다. `ml-kernel-011`만 자신의 synthetic 값(10)으로 `policy_with`가 덮어쓴다.
+_SHIPPED_POLICY_TEST_PLACEHOLDER = {"assessment.agency_sample_threshold": 1}
 
 
 def load_ml_kernel_cases() -> dict[str, dict[str, Any]]:
@@ -49,8 +57,18 @@ def load_ml_kernel_cases() -> dict[str, dict[str, Any]]:
 
 
 def shipped_policy() -> InferencePolicy:
-    """출하 `inference-v1.yaml` — case 가 선언하지 않은 필드의 기본값 공급원."""
-    policy = load_inference_policy(_SHIPPED_POLICY_PATH)
+    """출하 `inference-v1.yaml` — case 가 선언하지 않은 필드의 기본값 공급원. 출하
+    파일 자체는 `assessment.agency_sample_threshold` 미선언으로 이제 항상
+    `PolicyRejected`다(`tests/inference/test_policy.py::
+    test_shipped_policy_file_is_rejected_missing_agency_sample_threshold`가 그 자체를
+    고정한다) — 이 helper 는 출하 파일을 **편집하지 않고** placeholder 를 얹은 임시
+    사본에서 읽는다."""
+    raw_values = dict(yaml.safe_load(_SHIPPED_POLICY_PATH.read_text(encoding="utf-8")))
+    raw_values.update(_SHIPPED_POLICY_TEST_PLACEHOLDER)
+    with tempfile.TemporaryDirectory(prefix="bidvector-inference-policy-") as tmp:
+        temp_path = Path(tmp) / "inference-v1.yaml"
+        temp_path.write_text(yaml.safe_dump(raw_values), encoding="utf-8")
+        policy = load_inference_policy(temp_path)
     assert isinstance(policy, InferencePolicy), f"출하 정책 로드 실패: {policy!r}"
     return policy
 

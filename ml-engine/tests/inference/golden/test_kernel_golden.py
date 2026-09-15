@@ -1,14 +1,13 @@
-"""M5/5D — golden 통합(scope.md ⑨, D-M5-7 (a), 팀장 통합 라운드 M-3). curator 가 승인
-받아 병합한 `ml-kernel-001~014`(authoritative, `fixtures/manifest.yaml`)를 production
-타입으로 소비한다 — 대응 규칙은 `_adapter.py`에만 있다(production 코드에 golden 전용
-표면 없음).
+"""M5/5D·5D-2 — golden 통합(scope.md ⑨, D-M5-7 (a), 팀장 통합 라운드 M-3). curator 가
+승인 받아 병합한 `ml-kernel-001~014`(authoritative, `fixtures/manifest.yaml`)를
+production 타입으로 소비한다 — 대응 규칙은 `_adapter.py`에만 있다(production 코드에
+golden 전용 표면 없음).
 
 `ml-kernel-011`(계층 수축 가중치가 `Diagnostics.shrinkage_weight`로 응답에 실리는 것을
-요구)은 명시 skip 한다 — GBM 예측 경로(`predict.py`)는 K5 를 쓰지 않고, 그 값을 잇는
-분포 엔진 조립은 `OPEN-5D-DISTRIBUTION-ENGINE`(5D-2 몫, checklist.md 알려진 제한 8·9)
-이다. 부분 단언(예: `resolve_assessment_posterior`만 따로 확인)은 금지 — case 의
-`verified_paths`가 요구하는 전체(진단 객체에 실제로 실리는 값)를 만족하지 못하면서
-초록을 내는 것은 조용한 통과이기 때문이다(팀장 지시).
+요구)은 M5/5D-2 가 `OPEN-5D-DISTRIBUTION-ENGINE`을 닫으며 skip 을 해제한다 — K5
+(`resolve_assessment_posterior`) + 5D-2 조립기의 `distribution._resolve_diagnostics`를
+그대로 호출해 `verified_paths` 전체(진단·levelWeights·posteriorMean·
+effectiveSampleCount)를 한 test 안에서 잰다(부분 단언 금지, 팀장 지시).
 """
 
 from __future__ import annotations
@@ -40,8 +39,13 @@ from ml_engine.features import (
 from ml_engine.inference.assessment import (
     AssessmentProvenance,
     AssessmentSample,
+    LevelObservation,
     admit_clean,
     aggregate_level_observation,
+    resolve_assessment_posterior,
+)
+from ml_engine.inference.distribution import (
+    _resolve_diagnostics as distribution_resolve_diagnostics,
 )
 from ml_engine.inference.maturity import (
     NoObservation,
@@ -371,13 +375,88 @@ def test_ml_kernel_010_non_clean_provenance_never_reaches_aggregation() -> None:
     )
 
 
-@pytest.mark.skip(reason="OPEN-5D-DISTRIBUTION-ENGINE — 5D-2 가 소비")
 def test_ml_kernel_011_shrinkage_weight_carried_in_response() -> None:
-    """대응 불가 — 부분 단언(예: `resolve_assessment_posterior`만 확인) 금지 지시에 따라
-    구현하지 않는다. case 의 `verified_paths`는 `Diagnostics.shrinkageWeight`가 **응답에
-    실리는 것**까지 요구하고, GBM 예측 경로(`predict.py`)는 K5 를 쓰지 않아 그 값의
-    생산자가 없다(항상 `Decimal("0")`, checklist.md 알려진 제한 8·9). 분포 엔진 조립은
-    `OPEN-5D-DISTRIBUTION-ENGINE`(5D-2 몫)이 만족시킨다."""
+    """M5/5D-2 가 `OPEN-5D-DISTRIBUTION-ENGINE`을 닫는다 — `resolve_assessment_
+    posterior`(K5) + `distribution._resolve_diagnostics`(5D-2 조립기의 진단 조립 함수,
+    골든 전용 표면을 새로 만들지 않고 production 함수를 그대로 호출)로 `verified_paths`
+    전부를 검증한다. 부분 단언(예: posterior 만 확인) 금지 지시에 따라 diagnostics·
+    levelWeights·posteriorMean·effectiveSampleCount 를 한 case 안에서 함께 잰다."""
+    case = _CASES["ml-kernel-011"]
+    inp, exp = case["input"], case["expected"]
+    policy_cfg = inp["policy"]["assessment"]
+    base = shipped_policy()
+    policy = policy_with(
+        base,
+        version=inp["policy"]["version"],
+        assessment_agency_prior_strength=Decimal(
+            str(policy_cfg["agencyPriorStrength"])
+        ),
+        assessment_category_prior_strength=Decimal(
+            str(policy_cfg["categoryPriorStrength"])
+        ),
+        assessment_min_predictive_std=Decimal(str(policy_cfg["minPredictiveStd"])),
+        assessment_min_samples_for_variance=policy_cfg["minSamplesForVariance"],
+        assessment_agency_sample_threshold=policy_cfg["agencySampleThreshold"],
+    )
+
+    def _level(key: str) -> LevelObservation:
+        raw = inp["levels"][key]
+        return LevelObservation(
+            sample_count=raw["sampleCount"], mean=raw["mean"], variance=raw["variance"]
+        )
+
+    agency, category, global_level = (
+        _level("agency"),
+        _level("category"),
+        _level("global"),
+    )
+    posterior = resolve_assessment_posterior(
+        agency=agency, category=category, global_level=global_level, policy=policy
+    )
+    assert not isinstance(posterior, Unmeasurable)
+
+    diagnostics = distribution_resolve_diagnostics(
+        agency=agency,
+        category=category,
+        posterior_shrinkage_weight=posterior.level_weights.agency,
+        excluded_observations=0,
+        policy=policy,
+    )
+
+    assert diagnostics.segment_support.value == exp["diagnostics"]["segmentSupport"]
+    assert diagnostics.agency_sample_count == exp["diagnostics"]["agencySampleCount"]
+    assert (
+        diagnostics.agency_sample_below_threshold
+        == exp["diagnostics"]["agencySampleBelowThreshold"]
+    )
+    assert diagnostics.shrinkage_weight == Decimal(
+        exp["diagnostics"]["shrinkageWeight"]["fraction"]
+    )
+    # `shrinkageWeightCarriedInResponse` — diagnostics 가 구성됐다는 사실 자체가 그 값이
+    # 응답 자리(Diagnostics.shrinkage_weight)에 실렸다는 뜻이다(golden case 의 표지 필드,
+    # production 타입에는 대응 필드가 없다 — 다른 golden case 의 boolean 표지와 같은 관례).
+    assert exp["diagnostics"]["shrinkageWeightCarriedInResponse"] is True
+
+    assert Decimal(str(posterior.level_weights.agency)) == Decimal(
+        exp["levelWeights"]["agency"]["fraction"]
+    )
+    assert Decimal(str(posterior.level_weights.category)) == Decimal(
+        exp["levelWeights"]["category"]["fraction"]
+    )
+    assert Decimal(str(posterior.level_weights.global_)) == Decimal(
+        exp["levelWeights"]["global"]["fraction"]
+    )
+    weight_sum = (
+        Decimal(str(posterior.level_weights.agency))
+        + Decimal(str(posterior.level_weights.category))
+        + Decimal(str(posterior.level_weights.global_))
+    )
+    assert weight_sum == Decimal(exp["levelWeightSum"]["fraction"])
+
+    assert Decimal(str(posterior.mean)) == Decimal(exp["posteriorMean"]["fraction"])
+    assert Decimal(str(posterior.effective_sample_count)) == Decimal(
+        exp["effectiveSampleCount"]
+    )
 
 
 def test_ml_kernel_012_zero_opened_is_no_observation_not_a_zero_ratio() -> None:

@@ -137,10 +137,14 @@ def predict_bid_rates(
 
 def _direct_diagnostics(artifact: LoadedArtifact) -> Diagnostics:
     """5D 는 direct(공종 자체 표본)만 계산한다 — parent/global 폴백 판정은 5C 인수
-    (알려진 제한, checklist.md)."""
+    (알려진 제한, checklist.md). `agency_sample_count`·`agency_sample_below_threshold`는
+    M5/5D-2 가 추가한 분포 엔진 전용 축(K5 기관 계층)이라 GBM 경로는 그 축을 쓰지
+    않는다 — 항상 `0`/`False`(알려진 제한, checklist.md)."""
     return Diagnostics(
         training_row_count=artifact.manifest.training_row_count,
         segment_support=SegmentSupport.DIRECT,
         shrinkage_weight=Decimal("0"),
         excluded_observations=0,
+        agency_sample_count=0,
+        agency_sample_below_threshold=False,
     )
