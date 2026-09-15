@@ -61,7 +61,7 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시 없음. **2026-09-16 재실행: 1건** — `7f11038` `harness(evidence-pack): 비밀값 스캔 어휘를 evidence 에 축어로 적지 않는다 + evidence 편집 커밋마다 Kotlin check 재실측`(경로 `.claude/skills/evidence-pack/SKILL.md`·`CLAUDE.md`, 목적: verifier r2 BLOCKER 의 재발 방지 규율 성문화). slice 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은 range 에 있다. rollback 목록에서 제외(in_scope 한정). **2건째** — `eb327da` `harness(evidence-pack): 같은 slice 의 자기 이력은 착수 경계 기준 단일 역적용`(같은 경로 둘, 목적: verifier r3 표적 ⑥ 판정의 규격 반영). 리뷰 요청 시점 재실행.
+`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시 없음. **2026-09-16 재실행: 1건** — `7f11038` `harness(evidence-pack): 비밀값 스캔 어휘를 evidence 에 축어로 적지 않는다 + evidence 편집 커밋마다 Kotlin check 재실측`(경로 `.claude/skills/evidence-pack/SKILL.md`·`CLAUDE.md`, 목적: verifier r2 BLOCKER 의 재발 방지 규율 성문화). slice 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은 range 에 있다. rollback 목록에서 제외(in_scope 한정). **2건째** — `eb327da` `harness(evidence-pack): 같은 slice 의 자기 이력은 착수 경계 기준 단일 역적용`(같은 경로 둘, 목적: verifier r3 표적 ⑥ 판정의 규격 반영). **3건째** — `3df08f3` `harness(evidence-pack): 단일 역적용 뒤 하네스 레인 절 재등재 단계 명시`(같은 경로 둘, 목적: r3 §11 LOW — 단일 역적용이 이 절을 지우는 것의 보정). 셋 다 in_scope 밖·rollback 제외. 리뷰 요청 시점 재실행.
 
 ---
 
