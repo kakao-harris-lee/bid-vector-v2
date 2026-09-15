@@ -90,9 +90,10 @@ diff 에 안 보인다. `test_policy.py`는 base 에 없었으므로 `test_train
 
 ## `scope.md` — 유일한 rollback 제외 대상(구현 레인 커밋 0건, 격리할 hunk 자체가 없다)
 
-`git log d4727fc..HEAD -- reports/evidence/m5/5c/scope.md` → `8683f29`·`df4d3c7`·
-`2d87dc7`·`265b77e`·`452e9d8` 전부 팀장 문서 레인 커밋(메시지 접두 `docs(m5-5c1)`,
-내용 전부 계약 고정·갱신·`base_sha` 정정) — 구현 레인이 이 파일을 만진 적이 없다.
+판정은 SHA 열거가 아니라 명령으로(verifier r4 L-7 — 열거는 문서 커밋마다 낡는다):
+`git log --format=%s d4727fc..HEAD -- reports/evidence/m5/5c/scope.md | grep -cvE '^docs\('` → **`0`**
+이면 그 파일을 만진 커밋 전부가 문서 레인(`docs(` 접두)이고 구현 레인 커밋이 없다는 뜻이다.
+리뷰 시점(HEAD 이 문서 커밋의 부모) 실측 0. 구현 레인이 이 파일을 만진 적이 없다.
 「hunk 격리」는 되돌릴 구현 레인 hunk 가 있을 때 의미가 있는 절차이고, 이 파일은 그
 전제 자체가 성립하지 않는다 — 「제외」가 아니라 「대상 없음」이 정확한 서술이다.
 
