@@ -33,3 +33,4 @@
 | 일자 | 변경 | 근거 |
 | --- | --- | --- |
 | 2026-09-15 착수 | 표 등재(승인 대기) | D-5C2-3 · 조사 02 §2-6 |
+| 2026-09-15 구현 | `policy/evaluation-v1.yaml` 실물 작성·로더(`evaluation/policy.py`) 구현 완료 — 값 §1 표와 완전 일치, 재학습·튜닝 근거로 인한 값 변경 0건 | `test_evaluation_policy.py::test_shipped_policy_file_matches_policy_values_md`(값 11개 하드코딩 대조) |
