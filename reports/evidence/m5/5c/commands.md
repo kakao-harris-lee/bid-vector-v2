@@ -104,6 +104,37 @@ exit 0.
   바뀐다」로 선언하지만, 2차 rebase(`main`=`d4727fc`) 뒤로는 **`main`과 바이트 동일**이다
   (본 문서 「2차 rebase」절 · `rollback.md` 「파일 목록」절이 이미 정확히 적어 뒀다).
 
+## PR #13 code-reviewer 수정(HIGH 2·MEDIUM 2·LOW 1)
+
+전문 `_workspace/m5-5c/11_code_review_pr13.md`. 커밋 5개, finding 별(H-1·H-2·M-1·M-2·
+L-1). 각 finding 은 RED 먼저(리뷰어의 재현 조건을 test 로 옮긴 뒤 프로덕션 코드를
+임시로 되돌려 그 test 가 실패함을 확인 → 원복) — 커밋 메시지에 재현·확인 내용을
+서술했다.
+
+| finding | 대상 | 시정 | RED 재현 |
+| --- | --- | --- | --- |
+| H-1 | `train.py` | `_build_oof_and_space`에서 `oof_outcome.admitted_rows` 기준 재게이트 | 50행(6 Present+44 Missing base_amount) → 시정 전 `TrainedArtifact(training_row_count=6)` 성공, 시정 후 `TrainingRejected(INSUFFICIENT_TRAINING_ROWS, "admitted=6 required=50")` |
+| H-2 | `policy.py` | `except`에 `yaml.YAMLError` 추가(기존 `MALFORMED`로 매핑) | 닫히지 않은 flow sequence YAML → 시정 전 `yaml.parser.ParserError` 전파, 시정 후 `PolicyRejected(MALFORMED)` |
+| M-1 | `dataset.py` | `_parse_manifest`에 문자열·boolean·정수 타입 검사 인라인 추가 | `feed_origin_only`/`row_count`/`dataset_id` 타입 오류 6종 중 3종이 시정 전 통과·다른 사유로 거부, 시정 후 전부 `UNREADABLE` |
+| M-2 | `dataset_files.py` | `parsed.netloc` 비어있지 않으면 `UNSUPPORTED_SCHEME` | `file://some-host<path>` → 시정 전 `DatasetFiles` 성공(host 무시), 시정 후 `DatasetUnreadable(UNSUPPORTED_SCHEME)` |
+| L-1 | `test_spec.py` | `spec_checksum` 13필드 전수 민감도 test 신설(코드 변경 없음) | `spec.py`에서 `num_leaves` 줄 임시 제거 → 정확히 그 필드에서 실패 확인 |
+
+재실측(HEAD `239a67d`) — S-1~S-9 전건:
+
+| # | exit | 핵심 결과 |
+| --- | --- | --- |
+| S-2 | 0 | ruff check + format |
+| S-3 | 0 | mypy --strict, 39 source files |
+| S-4 | 0 | Contracts: 6 kept, 0 broken |
+| S-5 | 0 | **466 passed, 1 skipped**(458 + H-1 1·H-2 1·M-1 6(parametrize)·M-2 1·L-1 1) |
+| S-6 | 0 | 설계 래칫 위반 없음(H-1·M-1 구현 중 함수 길이·약한 경계 위반이 각각 한 번 났고 즉시 구조로 해소 — `_oof_error` 분리·`dict[str, object]` 인라인화, allowlist 등재 없음) |
+| S-7 | 0 | reuse 출처 일치, 대조 fixture 실패 유지 |
+| S-9 | 0 | 3.12 / >=3.12,<3.13 |
+
+rollback.md — in_scope 파일 **경로** 변화 없음(기존 파일 내용만 수정, 새 경로 0)을
+`git diff --name-status d4727fc..HEAD -- <in_scope>`로 재확인해 이전 문서의 48행과
+완전히 일치 — 재산출 불필요(팀장 지시 조건).
+
 ## 비밀값 스캔
 
 ```

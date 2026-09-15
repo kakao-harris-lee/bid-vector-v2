@@ -182,6 +182,29 @@ import 하는 것은 test 파일 안에서만이고(위 파일 docstring), produ
 인자 → `trained, written` 두 인자)은 `test_artifact_roundtrip.py` 자기 자신의 모듈
 private 헬퍼라 외부 계약이 아니다.
 
+## PR #13 code-reviewer 수정(HIGH 2·MEDIUM 2·LOW 1)이 만든 public 표면 — 새 enum 값 0
+
+**새 enum 값을 만들지 않았다** — H-2(`policy.py`)는 `yaml.YAMLError`를 기존
+`PolicyRejectionReason.MALFORMED`로 매핑했고, M-2(`dataset_files.py`)는 host 있는
+`file://` URI를 기존 `DatasetUnreadableReason.UNSUPPORTED_SCHEME`으로 매핑했다(둘 다
+"파일을 정상적으로 못 읽는다"는 의미가 이미 그 값과 같다 — 새 값을 만들 만큼 다른
+사유가 아니라고 판단, checklist 인계 절 참고).
+
+`train.py`의 새 함수(`_required_rows`·`_oof_error`)는 모듈 밑줄 접두이고
+`training/__init__.py` 재수출 목록에 없다(`grep -rn "_oof_error\|_required_rows"
+src/ml_engine tests/` 실측 — `train.py` 밖 매치 0). `_build_oof_and_space`가
+`TrainingPolicy` 인자를 하나 더 받게 됐지만 이 함수 자체가 모듈 밑줄 접두라 외부
+계약이 아니다. `dataset.py`의 `_parse_manifest`는 시그니처 무변경(내부 검증만 강화).
+공개 결과 타입(`PolicyRejected`·`DatasetRejected`·`DatasetUnreadable`·
+`TrainingRejected`)의 필드 집합도 무변경 — 값의 원인(`reason`)이 늘었을 뿐 타입
+자체는 그대로다.
+
+## PR #13 인계 — `OPEN-5C-YAML-ERROR-5D`
+
+5D `inference/policy.py::load_inference_policy`도 같은 5A `registry.policy.load_policy`
+를 거치므로 H-2 와 같은 구멍(`yaml.YAMLError` 미포착)을 가질 가능성이 높다 — **5D
+코드는 편집하지 않는다**(5C 경계 밖). 5D 레인 또는 팀장이 확인·시정할 대상으로 등재.
+
 ## verifier r1 수정 라운드가 만든/지운 public 표면
 
 - **지웠다** — `ml_engine.training.matrix`(`build_training_matrix`·`TrainingMatrix`, M-1).
