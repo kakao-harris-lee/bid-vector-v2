@@ -51,8 +51,11 @@ HIGH 3(H-1 `write_artifact` 시그니처를 `trained` 하나로 좁힘·H-2 OOF 
    밑줄 접두, 외부 참조 0 — checklist.md 「rebase 뒤 수정이 만든 public 표면」).
 3. **`test_artifact_roundtrip.py`(신설)** — `OPEN-5C-ARTIFACT-ROUNDTRIP` 종결.
 
-S-1~S-9 rebase 뒤 재실측(commit `07f6024` 시점, 이 문서 갱신 커밋 직전) — 전건 exit 0,
-표는 위 최신 수치로 갱신 완료.
+S-1~S-9 rebase 뒤 재실측(D-5C-9b 구현 + 왕복 test 신설 직후, 이 절을 처음 쓴 시점) — 전건
+exit 0, 표는 위 최신 수치로 갱신 완료. **verifier r3 L-3 정정** — 이 절이 처음엔 그 시점의
+head SHA(`07f6024`)를 박아 뒀으나 그 뒤 두 차례 rebase 로 조상에서 떨어져 낡는 좌표가 됐다
+(`git merge-base --is-ancestor 07f6024 HEAD` 실패) — 이후로는 SHA 대신 **작업 내용**으로
+가리킨다(다음 rebase 에도 낡지 않는다).
 
 ## 2차 rebase — `main` 이 `d4727fc`(PR #12 병합)로 이동
 
@@ -69,6 +72,37 @@ git 3-way 병합이 자동으로 정리 — 양쪽이 `training` extras 에 같�
 
 재실측(base `d4727fc`, HEAD `44f0950`) — S-1~S-9 전건 exit 0, S-5 **452 passed, 1 skipped**
 (rebase 전과 동일 — 이 rebase 는 dependency 선언만 건드렸고 코드는 무변경).
+
+## verifier r3 H-1 — artifact 파생 값 셋 독립 재계산 test + 변이 실측
+
+3개 파생 값(`feature_manifest_checksum`·`training_spec_checksum`·`residual_std` 하한)이
+재계산 대조 test 0건이라 변이가 452 test 전건을 조용히 통과하던 문제(verifier r3 §「H-1」).
+독립 재계산 test 넷 신설(`test_train_artifact.py` ①②③+대조군) + 왕복 test 의
+`_expected_ref` 동어반복 제거(`test_artifact_roundtrip.py`) 뒤, 세 변이를 실제로 심어
+FAILED 를 확인하고 원복했다(임시 `sed` 변이, 검증 뒤 `git diff --stat` 0 확인):
+
+| 변이 | 대상 | 원복 전 결과 |
+| --- | --- | --- |
+| 1b | `artifact_writer.py` — `feature_manifest_checksum` 뒤에 `.upper()` | **5 FAILED**(전용 test 1 + 왕복 test 4 — `_expected_ref` 정정 효과로 여기서도 검출됨) |
+| 4 | `train.py` — `training_spec_checksum=spec_checksum(spec)` 뒤에 `.upper()` | **1 FAILED** |
+| 6 | `train.py` — `floor=spec.min_residual_std` → `floor=float()` | **1 FAILED**(`0.0 == 0.002` 단언 실패로 바닥 우회가 값으로 드러남) |
+
+세 변이 모두 원복 뒤 **456 passed, 1 skipped**(452 + 신규 4)로 복귀. S-1~S-9 전건 재실측
+exit 0.
+
+## verifier r3 L-4·L-5 — scope.md 정정 필요(인계, 팀장 몫)
+
+**이 slice 의 `reports/evidence/m5/5c/scope.md`는 구현 레인 커밋이 0건**(전 5커밋이
+`docs(m5-5c…)` 문서 레인 — rollback.md 「`scope.md` — 유일한 rollback 제외 대상」 절의
+근거와 같다). 구현 레인이 그 파일을 직접 고치면 이 근거가 깨지므로, 정정할 사실만 여기
+적고 실제 편집은 팀장 몫으로 남긴다.
+
+- **L-4**: `scope.md` 「하네스 레인 변경 (상시 절)」이 「착수 시 없음. 리뷰 요청 시점
+  재실행」에 머물러 있다. 실측(`git log --oneline main..HEAD -- CLAUDE.md .claude/`) —
+  **0행**(하네스 레인 변경 없음, 이번 rebase 두 차례 동안도 계속 0).
+- **L-5**: `scope.md` in_scope 목록이 `ml-engine/uv.lock`을 「(b) 의 결과 — lock 이
+  바뀐다」로 선언하지만, 2차 rebase(`main`=`d4727fc`) 뒤로는 **`main`과 바이트 동일**이다
+  (본 문서 「2차 rebase」절 · `rollback.md` 「파일 목록」절이 이미 정확히 적어 뒀다).
 
 ## secret 스캔
 

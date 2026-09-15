@@ -57,6 +57,13 @@ proto 를 건드리지 않았다.
 `test_release_artifact_checksum_differs_from_artifact_bytes_sha256`가 이 불일치를 매 학습마다
 실측 확인한다(우연히 같아지는 경우가 없음을 재확인하는 회귀 방지).
 
+**verifier r3 L-1** — 바이트 안 값(둘째 행)은 **어떤 층도 재계산 대조하지 않는다.** 5D
+`_parse_release`는 「비어 있지 않은 문자열」만 확인하고 `expected`와의 등가성은 보지
+않는다(5D 문면 그대로, 자기서술 필드) — 실측: 그 자리에 `x` 한 글자를 심어도
+`load_artifact`가 `LoadedArtifact`를 낸다. **결함이 아니다**(5D 설계 그대로) — 다만 이
+자리의 무결성을 어느 층도 보증하지 않는다는 사실 자체가 등재 밖에 있었다. 정합은
+`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`(위 표) 몫으로 그대로 둔다.
+
 ## (2b) 값 획득 축 — 5C-1 이 여는 public 표면
 
 | 표면 | 판정 |
@@ -154,6 +161,26 @@ tests/ src/ml_engine` 실측 — 매치 전부가 `artifact_writer.py` 파일 �
 `ml_engine.registry.artifact`를
 import 하는 것은 test 파일 안에서만이고(위 파일 docstring), production 코드의 import
 그래프는 무변경.
+
+**verifier r3 L-2** — 설계 래칫(`tools/design_ratchet.py`)의 약한 경계 판정은 **함수
+시그니처**(매개변수·반환 annotation)만 보고 **클래스 본문 annotation은 보지 않는다**
+(`is_weak_annotation`이 `ast.FunctionDef`/`ast.AsyncFunctionDef` 노드에서만 호출됨,
+실측: `TypedDict` 본문에 `dict[str, object]` 를 하나 더 심어도 `--check` exit 0). 이
+사각 안에 `_ArtifactPayload`의 `reproducibility`·`rejected_rows` 두 필드가 그 형태로
+남아 있다 — **5C-1 결함이 아니다**(도구의 선언된 범위 안, 5A 소유). 두 값은
+`dataclasses.asdict` → `json.dumps` 로만 흘러 타입 있는 소비자가 없어 실질 위험은
+낮지만, 사각 자체를 등재한다.
+
+## verifier r3 H-1 수정이 만든 public 표면 — 예상 0, 실측 0
+
+프로덕션 코드(`src/ml_engine/**`)는 이번 라운드(verifier r3 인수 시점 `7e16a23` 이후)에서
+**무변경** — 변이 주입·원복만 있었고 커밋된 diff 는 test 파일 둘뿐(`git diff --stat
+7e16a23..HEAD -- ml-engine/src/` 실측: 빈 출력). 새로 도입한 이름
+(`_ConstantPredictionBooster`·`_ConstantPredictionTrainer`·
+`_labeled_dataset`)은 `test_train_artifact.py` 안의 모듈 밑줄 접두 test fixture 뿐이고
+(`grep -rn` 실측 — 그 파일 밖 매치 0), `_expected_ref`의 시그니처 변경(`written` 한
+인자 → `trained, written` 두 인자)은 `test_artifact_roundtrip.py` 자기 자신의 모듈
+private 헬퍼라 외부 계약이 아니다.
 
 ## verifier r1 수정 라운드가 만든/지운 public 표면
 

@@ -23,8 +23,12 @@ git diff --name-status d4727fc..HEAD -- \
   ml-engine/pyproject.toml ml-engine/uv.lock reports/evidence/m5/5c
 ```
 
-출력(base `d4727fc`, HEAD 이 문서 갱신 커밋 직전 `452e9d8` — 팀장의 `scope.md` `base_sha`
-갱신 커밋 포함, 그 커밋은 `scope.md` 한 파일만 만져 아래 목록에 영향 없음):
+출력(base `d4727fc`, 목록 산출 시점 head 는 아래 「실측 결과」 절이 그 시점의 HEAD 를
+명시한다 — **verifier r3 L-6 정정**: 이 head 값은 파일이 갱신될 때마다 앞서가므로 여기
+본문에는 고정 SHA 를 적지 않는다. 목록 내용은 `test_train_artifact.py`·
+`test_artifact_roundtrip.py` 만 만지는 후속 커밋에는 **영향받지 않는다**(파일 경로 신설·
+삭제가 없으면 이 목록은 그대로 유효 — 새 파일이 생기거나 없던 파일이 지워질 때만 재산출
+필요, 위 v2-slice-pipeline 규율)):
 
 ```
 A	ml-engine/policy/training-v1.yaml
@@ -138,7 +142,14 @@ git diff a89f133~1..a89f133 -- reports/evidence/m5/5c/policy-values.md | git app
 # scope.md 는 손대지 않는다(구현 레인 커밋 0건, 위 절)
 ```
 
-## 실측 결과(2026-09-15, `git worktree add --detach`, base `d4727fc`, HEAD `452e9d8`)
+## 실측 결과(2026-09-15, `git worktree add --detach`, base `d4727fc`, 실행 시점 HEAD `452e9d8`)
+
+**verifier r3 L-6 정정** — 이 절의 HEAD 값은 실행 **당시**의 스냅샷이라 고치지 않는다(사실
+기록이지 현재를 가리키는 좌표가 아니다). 그 뒤 `test_train_artifact.py`·
+`test_artifact_roundtrip.py` 만 만진 후속 커밋들(verifier r3 H-1 시정)은 **파일 경로를
+신설·삭제하지 않았다** — 위 「파일 목록」·「공유 파일」·「rollback 절차」 세 절은 현재
+HEAD 에서도 그대로 유효하다(재실행 없이 재확인: `git diff --name-status d4727fc..HEAD --
+<in_scope>` 가 아래 목록과 여전히 완전히 일치, 48행).
 
 - **`main`(=`d4727fc`) 자체에서 직접 pytest 를 세어 기대치를 확정**(팀장 지시) —
   `/Users/harris/Development/private/bid-vector-v2`(root worktree, `main`, `d4727fc`)에서
