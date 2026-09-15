@@ -24,6 +24,28 @@ provenance·amount_won, 함수 하나 공유로 중복 금지)로 확장했다. 
 F-3·F-5·F-6은 등재 확인만(코드 변경 없음, 아래 알려진 제한·reuse.md 참고). F-7은
 rollback.md 갱신(별도 커밋). F-8은 알려진 제한 1에 한 줄 보강(아래).
 
+## verifier r2 반영 (2026-09-15, `ready-for-review`, 계약 정정 `64972ba`·`fde9b2c`)
+
+**N-1(medium, 승인 문서 충돌 — 팀장 계약 오류, 코드 변경 없음)** `fb4e001`이 적은
+「`> 1`은 D-2B-8(wire `Rate` 상한)에 따라 거부」 문면이 checklist.md의 「상한을 두 곳에서
+따로 재정의하지 않는다」(F-1 항목, 위)와 정면 충돌했다. **코드(`parse_rate`)는 애초에
+`> 1`을 독립 거부 사유로 두지 않았다** — checklist 문면이 맞았다. 팀장이 계약 문면을
+정정(`64972ba`)하고, D-2B-8과 표본 밴드 상한 1.5의 근본 충돌을 `OPEN-5D2-BID-RATE-UPPER`
+로 등재(`fde9b2c` — 정본 결정은 2F/5E). 아래 OPEN 표에 반영.
+
+**N-2(low, 등재)** `award_rate`(optional) 파싱 실패가 `observed_bid_rate`와 같은
+`BID_RATE_UNPARSEABLE`을 재사용한다 — 어느 필드가 문제였는지 사유만으로 구별되지 않는다
+(둘 다 `excluded_observations`로만 계수). 아래 알려진 제한 9.
+
+**N-3(low, 등재 + docstring 보강)** `Decimal()`은 앞뒤 공백·개행·자릿수 구분 `_`·선행
+`+`에 관용적이다(`parse_rate` docstring에 예시 추가). 업무적으로 말이 안 되는 값은
+밴드 판정이 잡아 fail-closed는 유지된다. 아래 알려진 제한 10.
+
+**N-4(low, 등재)** reuse.md의 「5B `Money` 다섯 성분」 서술 — `Money`는 `amount_won`·
+`currency`·`basis`·`vat_treatment`·`provenance` 다섯 필드지만 검증 규칙은 `vat_treatment`
+를 보지 않는 **성분 넷**(amount>0·currency·basis·provenance)이다. reuse.md 문구를
+「4성분」/「성분 넷」으로 정정.
+
 ## 계약 고정 결정 근거 (D-5D2-1~8)
 
 | ID | 근거(코드 위치) |
@@ -72,6 +94,12 @@ rollback.md 갱신(별도 커밋). F-8은 알려진 제한 1에 한 줄 보강(�
 | (12) | agency/category 정규화 | OPEN-5D2-SAMPLE-SEGMENT 로 wire 축 자체가 없어 이 slice 에서 적용 대상이 없음(알려진 제한) |
 | (13) | `center_i` 0 → 나눗셈 폭발 | `CENTER_OUT_OF_BAND`가 밴드(0.8~1.2)로 0 을 선차단 — `bid_ratio` 계산 전에 이미 거부됨 |
 
+## OPEN 표 (scope.md 문면 인용, verifier r2 N-1)
+
+| OPEN | 계약 문면(scope.md) |
+| --- | --- |
+| `OPEN-5D2-BID-RATE-UPPER` | 「D-2B-8(`fraction > 1` 위반, 축 한정 없음) vs 표본 밴드 상한 1.5 — 2F 가 D-2B-8 문면을 축 한정으로 개정하거나 5C 코퍼스 실측으로 밴드를 1.0 으로. 5D-2 는 밴드만」(`fde9b2c`) |
+
 ## 알려진 제한
 
 1. **`OPEN-5D2-SAMPLE-SEGMENT`(계약 갱신 `623baa1`, 2026-09-15)** — M2 wire `CompetitionSample`
@@ -114,6 +142,23 @@ rollback.md 갱신(별도 커밋). F-8은 알려진 제한 1에 한 줄 보강(�
    statistics`·`predict_distribution`의 `resolve_assessment_posterior` 호출부)을 직접
    바꿔야 3계층이 켜진다 — 알려진 제한 1의 「소비를 시작할 자리」는 **배선 지점**이지
    **동작하는 기능**이 아니다.
+9. **`award_rate` 파싱 실패가 `observed_bid_rate`와 같은 사유를 재사용한다**(verifier r2
+   N-2) — `award_rate`(optional, 조립기가 소비하지 않는 필드)가 비수치·비유한이면
+   `SampleRejected(BID_RATE_UNPARSEABLE)`을 내는데, 이 사유는 `observed_bid_rate` 파싱
+   실패와 **같은 값**이라 `excluded_observations` 총계 이상으로는 어느 필드가 문제였는지
+   구별되지 않는다. `award_rate`를 실제로 소비하는 2F 후속 라운드에서 `AWARD_RATE_
+   UNPARSEABLE`(별도 사유)로 분리하는 것이 자연스럽다 — 이 slice 는 그 축을 열지 않는다
+   (award_rate 자체가 아직 아무 계산에도 쓰이지 않아 분리의 실익이 없다).
+10. **`Decimal()`의 관용적 파싱**(verifier r2 N-3) — 앞뒤 공백·개행, 자릿수 구분 `_`,
+    선행 `+`를 허용한다(`parse_rate` docstring에 실측 예시 기록). 예: `"  1_000.5  "`은
+    `Decimal("1000.5")`로 파싱되고 밴드(0.5~1.5) 판정에서 `BID_RATE_OUT_OF_BAND`로
+    거부된다 — 파싱 관문과 밴드 관문 중 어느 하나가 반드시 이런 입력을 잡아 fail-closed
+    는 유지되지만, "이상하게 생긴 문자열이 조용히 숫자로 읽힌다"는 사실 자체는 남는다.
+11. **`OPEN-5D2-BID-RATE-UPPER`**(verifier r2 N-1 뒤 팀장 계약 정정 `fde9b2c`) — D-2B-8
+    원문(「`Rate.fraction > 1`은 계약 위반」)은 축 한정이 없는데, legacy 표본 투찰비 밴드
+    상한은 0.5~**1.5**(5D 승인, data-dictionary B5)다. 이 slice 는 표본 관문에서 밴드
+    하나만 보고 `> 1`을 별도 상한으로 두지 않는다(교집합만 통과해 fail-closed는 유지).
+    정본 결정(D-2B-8을 축 한정으로 개정할지, 밴드 상한을 1.0으로 낮출지)은 2F/5E 몫.
 
 ## 재검증 명령
 

@@ -9,7 +9,8 @@
 않는다). 이 모듈은 그 둘을 **분리된 사유**로 낸다(조용한 drop 금지, 위협 모델 (b))(D-5D-2
 「사유가 섞이면 구별 안 됨」과 같은 원칙).
 
-8 사유(`SampleRejectionReason`): `BASE_AMOUNT_INVALID`(5성분 검증, 5B `features/facts.py`
+8 사유(`SampleRejectionReason`): `BASE_AMOUNT_INVALID`(4성분 검증 — verifier r2 N-4,
+`Money` 다섯 필드 중 `vat_treatment`는 5B 도 판정하지 않는다 — 5B `features/facts.py`
 `_resolve_base_amount`와 같은 규칙 — `CompetitionSample.base_amount`는 oneof/Fact 래퍼가
 아닌 바로 `Money`라 그 함수를 그대로 재사용할 수 없어 규칙만 재현한다, 5B 파일은 편집하지
 않는다) · `NO_RESERVE_DRAW`(optional 미설정) · `PRICE_COUNT_MISMATCH`(!= `policy.
@@ -124,7 +125,13 @@ def parse_rate(fraction: str) -> Decimal | None:
     """wire `Rate.fraction` 파싱 관문(verifier r1 F-1) — 빈 문자열·비수치·비유한
     (`NaN`·`Infinity`)을 걸러 유한 `Decimal`만 반환한다. 업무적 타당성(밴드)은 호출부가
     별도로 본다 — 이 함수는 「파싱 가능한가」만 판정한다. 저장소에서 wire `Rate`를
-    파싱하는 유일한 자리(5B 에 대응 함수 없음, grep 확인)."""
+    파싱하는 유일한 자리(5B 에 대응 함수 없음, grep 확인).
+
+    `Decimal()`의 관용(verifier r2 N-3) — 앞뒤 공백·개행, 자릿수 구분 `_`, 선행 `+`를
+    허용해 값을 만든다(예: `"  1_000.5  "` → `Decimal("1000.5")`). 이 함수는 그 관용을
+    막지 않는다 — 그렇게 파싱된 값이 업무적으로 말이 안 되면(사정률 축 밴드 밖) 호출부의
+    `policy.bid_ratio_plausible_*` 밴드가 어차피 `BID_RATE_OUT_OF_BAND`로 거부한다
+    (fail-closed 결과는 두 관문 중 하나가 반드시 잡는다)."""
     try:
         value = Decimal(fraction)
     except InvalidOperation:

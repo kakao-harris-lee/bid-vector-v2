@@ -5,8 +5,12 @@ base `cefb19c9269ac3b29d0246175fb04d71c04aa3d4`(5D 종결) · 계약 `9466347`(�
 (observations·availability·distribution·engine 신설 + policy.py/results.py 확장 +
 cascading test 갱신) → `fe836db`(evidence — reuse.md) → verifier r1 `not-ready`(high 1·
 medium 1·low 6) → 계약 갱신 `fb4e001`(Rate 파싱·reserve_prices Money 성분 관문, ③⑥
-문면 정정) → 재작업 1/5 코드 커밋(F-1·F-2·F-4 반영, 아래). 로컬: `uv`(pyenv `3.12.2`).
-전건 재실행(부분 게이트 없음) — 관문 술어 변경(F-1·F-2)이라 표적 재검증도 함께.
+문면 정정) → 재작업 1/5 코드 커밋(F-1·F-2·F-4 반영, 아래) → verifier r2 `ready-for-
+review`(medium 1(N-1, 팀장 계약 문면 오류 — 코드는 정확했다) + low 3(N-2~N-4)) → 계약
+정정 `64972ba`·`fde9b2c`(`> 1` 문면 삭제, `OPEN-5D2-BID-RATE-UPPER` 신설) → evidence
+전용 커밋(N-2·N-3·N-4 등재, `parse_rate` docstring 관용 범위 한 줄, 아래). 로컬:
+`uv`(pyenv `3.12.2`). 전건 재실행(부분 게이트 없음) — N-1~N-4 는 문서·docstring 뿐이라
+관문 술어 변경 없음, 회귀 없음을 재확인.
 
 ## S-1 ~ S-9 (scope.md acceptance_commands 순서, verifier r1 반영 뒤 재실행)
 
@@ -54,6 +58,11 @@ production 대응 필드 없음 — 상수 확인)·`levelWeights.{agency,catego
 `test_engine_module_does_not_have_predict_in_sys_modules_dependency`(런타임) — 둘 다
 `ml_engine.inference.predict`·`ml_engine.registry` 미참조 확인(D-5D2-1 (b), 위협 모델
 우회 후보 (4)).
+
+## verifier r2 뒤 재실행 (N-1~N-4, docstring·evidence 뿐 — 관문 술어 변경 없음)
+
+S-1~S-9 전건 재실행 → **전부 exit 0**, S-5 **402 passed, 4 deselected**(N-2~N-4 는 코드
+동작을 바꾸지 않아 test 수 불변), golden 14/14 skip 0. S-3 `31 source files` 무결.
 
 ## 누출 검사
 
