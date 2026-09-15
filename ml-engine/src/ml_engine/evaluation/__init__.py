@@ -37,7 +37,6 @@ from ml_engine.evaluation.policy import (
     policy_checksum,
 )
 from ml_engine.evaluation.report import (
-    DroppedRowCount,
     EvaluationReportV1,
     ModelScore,
     NotPromotable,
@@ -68,6 +67,7 @@ from ml_engine.evaluation.verdict import (
     passes_gate,
 )
 from ml_engine.evaluation.windows import (
+    DroppedRowCount,
     HoldoutOverlap,
     InvalidMaturityInput,
     StratifiedRow,

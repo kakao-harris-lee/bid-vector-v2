@@ -427,6 +427,66 @@ def test_run_holdout_excludes_window_when_buildable_rows_below_min_evaluation_ro
     )
 
 
+def test_window_exclusion_reports_buildable_row_count_and_dropped_rows() -> None:
+    """verifier r2 MEDIUM M-1r 재현 — 제외된 창(`INSUFFICIENT_EVALUATION_ROWS`)의
+    문면은 `evaluation_row_count=120`(구조적 행 수)과 하한 100 을 나란히 실어
+    **자기모순**(120 ≥ 100 인데 「행 부족」)이었다. `build_split`이 이미 계산한
+    `buildable=30`·`dropped=[(base_amount, 90)]`(`WindowSkip.detail` 문자열에만
+    있었다)를 `WindowExclusion`의 구조화 필드로 공시해 그 모순을 없앤다."""
+    dataset, window = _mixed_buildability_window_scenario(
+        buildable_count=30, missing_count=90
+    )
+    result = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=100),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert len(result.excluded_windows) == 1
+    excluded = result.excluded_windows[0]
+    assert excluded.evaluation_row_count == 120
+    assert excluded.buildable_row_count == 30
+    dropped_total = sum(item.row_count for item in excluded.dropped_rows)
+    assert dropped_total == 90
+    # 자기모순 해소 확인 — buildable(30) < 하한(100) 이 실제 제외 사유임이 문면
+    # 자체에서 산술로 성립한다(구조적 행 수 120 만으로는 알 수 없던 사실).
+    assert excluded.buildable_row_count < 100 <= excluded.evaluation_row_count
+
+
+def test_window_exclusion_leaves_buildable_fields_unset_for_planning_stage_exclusion() -> (
+    None
+):
+    """계획 단계 제외(`IMMATURE`·`NO_TRAINING_ROWS`·`BEYOND_MAX_ORIGINS`)는
+    buildability 재대조 자체가 실행되지 않는 자리다 — 실행 단계 필드를 임의의
+    기본값으로 채우지 않는다(`None`/빈 tuple, 「몰라서 0」과 「실제로 0」을 구별)."""
+    dataset = _dataset(_many_rows(5, start_day=0))
+    immature_window = WeekMaturity(
+        start=_EPOCH + timedelta(days=100),
+        end=_EPOCH + timedelta(days=107),
+        opened_count=1,
+        settled_count=0,
+    )
+    result = run_holdout(
+        dataset,
+        [immature_window],
+        _spec(),
+        _training_policy(),
+        _policy(min_evaluation_rows=2),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert len(result.excluded_windows) == 1
+    excluded = result.excluded_windows[0]
+    assert excluded.reason == WindowExclusionReason.IMMATURE
+    assert excluded.buildable_row_count is None
+    assert excluded.dropped_rows == ()
+
+
 def test_window_result_reports_dropped_rows_for_unbuildable_facts() -> None:
     """H-A — buildability 로 버려진 행은 `WindowResult.dropped_rows`(사유별 계수)로
     공시된다. 하한(100)을 채우고도 남는 20행이 buildable 하지 않은 시나리오."""

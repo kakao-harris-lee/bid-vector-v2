@@ -129,8 +129,15 @@ class WindowSuccess:
 
 @dataclass(frozen=True)
 class WindowSkip:
+    """verifier r2 M-1r — `buildable_row_count`/`dropped_rows`는 buildability
+    재대조가 실제로 도는 경로(`build_split`의 `INSUFFICIENT_EVALUATION_ROWS`)만
+    채운다. `detail` 문자열은 사람이 읽는 요약으로 남기고, `WindowExclusion`이
+    싣는 구조화 필드는 여기서 나른다(잃지 않는다)."""
+
     reason: WindowExclusionReason
     detail: str
+    buildable_row_count: int | None = None
+    dropped_rows: tuple[DroppedRowCount, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -234,6 +241,8 @@ def build_split(
             f"buildable={len(usable_test_rows)} "
             f"required={evaluation_policy.min_evaluation_rows} "
             f"structural={len(structural.gate_test_all)}",
+            buildable_row_count=len(usable_test_rows),
+            dropped_rows=filtered.dropped_rows,
         )
 
     gate_train = structural.gate_train

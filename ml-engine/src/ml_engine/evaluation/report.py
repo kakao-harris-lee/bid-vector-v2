@@ -34,8 +34,12 @@ from ml_engine.evaluation.verdict import (
     NotEvaluableReason,
     Passed,
 )
-from ml_engine.evaluation.windows import HoldoutOverlap, WindowExclusion
-from ml_engine.features import CanonicalizationRejected, MissingFact, NonFiniteValue
+from ml_engine.evaluation.windows import (
+    DroppedRowCount,
+    HoldoutOverlap,
+    WindowExclusion,
+)
+from ml_engine.features import CanonicalizationRejected, NonFiniteValue
 
 type _JsonValue = (
     str | int | float | bool | list[_JsonValue] | dict[str, _JsonValue] | None
@@ -60,17 +64,6 @@ class ModelScore:
 @dataclass(frozen=True)
 class StratumCount:
     stratum: str
-    row_count: int
-
-
-@dataclass(frozen=True)
-class DroppedRowCount:
-    """verifier r1 H-1 — 창 안 구조적 행 중 `build_row`가 만들 수 없어(base_amount·
-    denominator_source 가 wire `Missing`) 채점에서 빠진 행의 사유별 계수. `reason`은
-    5B `MissingFact`(evaluation 이 이미 `features` 층을 아는 것과 같은 경계 — training
-    층의 `RejectedRowAccounting`을 직접 담지 않는다, layers)."""
-
-    reason: MissingFact
     row_count: int
 
 

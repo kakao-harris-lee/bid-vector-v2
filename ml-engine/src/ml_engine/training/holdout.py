@@ -100,6 +100,26 @@ class _WindowsOutcome:
     대신 이 **서로소** 집합을 쓰게 한다."""
 
 
+def _exclusion_from_skip(
+    window: WeekMaturity,
+    skip: WindowSkip,
+    ordered_rows: tuple[TrainingRow, ...],
+    gate_stratum: str,
+) -> WindowExclusion:
+    """verifier r2 M-1r — `WindowSkip`의 구조화 필드(`build_split`이 이미 계산한
+    buildable 수·dropped 사유별 계수)를 `WindowExclusion`으로 옮긴다(`_evaluate_
+    windows`를 50줄 안에 두려는 분리, design ratchet)."""
+    return WindowExclusion(
+        window=window,
+        reason=skip.reason,
+        evaluation_row_count=len(
+            indices_in_window(ordered_rows, window, stratum=gate_stratum)
+        ),
+        buildable_row_count=skip.buildable_row_count,
+        dropped_rows=skip.dropped_rows,
+    )
+
+
 def _evaluate_windows(
     plan_selected: tuple[WeekMaturity, ...],
     plan_excluded: tuple[WindowExclusion, ...],
@@ -131,14 +151,11 @@ def _evaluate_windows(
         )
         if isinstance(outcome_or_skip, WindowSkip):
             excluded.append(
-                WindowExclusion(
-                    window=window,
-                    reason=outcome_or_skip.reason,
-                    evaluation_row_count=len(
-                        indices_in_window(
-                            ordered_rows, window, stratum=evaluation_policy.gate_stratum
-                        )
-                    ),
+                _exclusion_from_skip(
+                    window,
+                    outcome_or_skip,
+                    ordered_rows,
+                    evaluation_policy.gate_stratum,
                 )
             )
             continue
