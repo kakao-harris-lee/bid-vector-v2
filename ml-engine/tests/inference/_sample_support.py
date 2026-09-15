@@ -48,8 +48,10 @@ def competition_sample(
     base_amount_overrides: dict[str, object] | None = None,
     reserve_price_ratios: tuple[float, ...] | None = VALID_RATIOS,
     reserve_price_overrides: dict[int, int] | None = None,
+    reserve_price_money_overrides: dict[int, dict[str, object]] | None = None,
     selected_numbers: tuple[int, ...] = (),
     observed_bid_rate: str = "0.95",
+    award_rate: str | None = None,
     provenance: int = common_pb2.BASE_AMOUNT_PROVENANCE_LABEL_CLEAN,
     with_reserve_draw: bool = True,
 ) -> features_pb2.CompetitionSample:
@@ -60,13 +62,18 @@ def competition_sample(
         base_amount_provenance_label=provenance,
         opened_on="2026-01-01",
     )
+    if award_rate is not None:
+        sample.award_rate.fraction = award_rate
     if with_reserve_draw:
         prices = [
             round(ratio * base_amount_won) for ratio in (reserve_price_ratios or ())
         ]
         for index, override_won in (reserve_price_overrides or {}).items():
             prices[index] = override_won
-        for price_won in prices:
-            sample.reserve_draw.reserve_prices.append(money(price_won))
+        money_overrides = reserve_price_money_overrides or {}
+        for index, price_won in enumerate(prices):
+            sample.reserve_draw.reserve_prices.append(
+                money(price_won, **money_overrides.get(index, {}))
+            )
         sample.reserve_draw.selected_numbers.extend(selected_numbers)
     return sample

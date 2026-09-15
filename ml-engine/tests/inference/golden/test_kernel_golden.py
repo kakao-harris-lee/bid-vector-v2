@@ -380,7 +380,14 @@ def test_ml_kernel_011_shrinkage_weight_carried_in_response() -> None:
     posterior`(K5) + `distribution._resolve_diagnostics`(5D-2 조립기의 진단 조립 함수,
     골든 전용 표면을 새로 만들지 않고 production 함수를 그대로 호출)로 `verified_paths`
     전부를 검증한다. 부분 단언(예: posterior 만 확인) 금지 지시에 따라 diagnostics·
-    levelWeights·posteriorMean·effectiveSampleCount 를 한 case 안에서 함께 잰다."""
+    levelWeights·posteriorMean·effectiveSampleCount 를 한 case 안에서 함께 잰다.
+
+    **이 test 는 서빙 경로(`engine.serve_bid_rates`/`distribution.predict_distribution`)
+    를 거치지 않는다** — `resolve_assessment_posterior`·`_resolve_diagnostics`를
+    agency/category 를 채워 직접 호출한다(K5·조립기의 진단 조립 함수 단위 검증). 서빙
+    경로는 `OPEN-5D2-SAMPLE-SEGMENT`(scope.md 계약 갱신 이력)로 agency/category 가
+    항상 `None`이라 이 갈래(`segment_support == DIRECT`)에 도달하지 않는다(알려진 제한
+    1, checklist.md) — 계약 갱신 ③(2026-09-15)이 요구한 문면 명시(verifier r1 F-4)."""
     case = _CASES["ml-kernel-011"]
     inp, exp = case["input"], case["expected"]
     policy_cfg = inp["policy"]["assessment"]
