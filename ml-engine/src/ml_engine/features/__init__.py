@@ -18,12 +18,14 @@ from ml_engine.features.encoding import (
     build_agency_target_encoding,
 )
 from ml_engine.features.facts import (
+    ALL_MISSING_REASONS,
     FactRejected,
     FactRejectionReason,
     FactValue,
     FeatureFacts,
     Missing,
     Present,
+    resolve_text_fact,
 )
 from ml_engine.features.manifest import (
     CanonicalizationRejected,
@@ -78,6 +80,7 @@ from ml_engine.features.vocabulary import (
 )
 
 __all__ = [
+    "ALL_MISSING_REASONS",
     "FEATURE_SCHEMA_V2",
     "SHIPPED_ENCODING_POLICY",
     "SUPPORTED_FEATURE_SCHEMAS",
@@ -129,6 +132,7 @@ __all__ = [
     "pseudo_count_weight",
     "require_declared",
     "resolve_schema",
+    "resolve_text_fact",
     "shrink_toward",
     "verify_feature_names",
     "verify_manifest",
