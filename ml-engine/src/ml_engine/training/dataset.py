@@ -97,6 +97,12 @@ class LoadedDataset:
 
 
 def _parse_manifest(manifest_bytes: bytes) -> DatasetManifestV1 | DatasetRejected:
+    """code-reviewer PR #13 MEDIUM-1 — 문자열·boolean·정수 필드의 **타입**을 여기서
+    강제한다(`DatasetManifestV1.__post_init__`은 진위(falsy)만 본다 — 예:
+    `"feed_origin_only": "yes"`가 그대로 `bool` 자리에 실렸다). 헬퍼 함수로 뽑지 않고
+    인라인으로 검사하는 이유는 `dict[str, object]` 매개변수가 함수 경계에 나타나면
+    설계 래칫의 약한 경계 판정에 걸리기 때문이다(artifact_writer.py 의 TypedDict 승격과
+    같은 사유 — 이 자리는 임시 지역 검증이라 새 타입을 만들 만큼 재사용되지 않는다)."""
     try:
         raw = json.loads(manifest_bytes.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -106,13 +112,33 @@ def _parse_manifest(manifest_bytes: bytes) -> DatasetManifestV1 | DatasetRejecte
             DatasetRejectionReason.UNREADABLE, "manifest: 최상위는 객체여야 합니다"
         )
     try:
+        for key in (
+            "dataset_id",
+            "sample_scope",
+            "rows_checksum",
+            "feature_schema_version",
+        ):
+            value = raw[key]
+            if not isinstance(value, str) or not value:
+                raise TypeError(
+                    f"{key} 는 비어 있지 않은 문자열이어야 합니다: {value!r}"
+                )
+        feed_origin_only = raw["feed_origin_only"]
+        if not isinstance(feed_origin_only, bool):
+            raise TypeError(
+                f"feed_origin_only 는 boolean 이어야 합니다: {feed_origin_only!r}"
+            )
+        row_count = raw["row_count"]
+        if not isinstance(row_count, int) or isinstance(row_count, bool):
+            raise TypeError(f"row_count 는 정수여야 합니다: {row_count!r}")
+
         opened_at_first = datetime.fromisoformat(raw["opened_at_first"])
         opened_at_last = datetime.fromisoformat(raw["opened_at_last"])
         return DatasetManifestV1(
             dataset_id=raw["dataset_id"],
             sample_scope=raw["sample_scope"],
-            feed_origin_only=raw["feed_origin_only"],
-            row_count=raw["row_count"],
+            feed_origin_only=feed_origin_only,
+            row_count=row_count,
             rows_checksum=raw["rows_checksum"],
             opened_at_first=opened_at_first,
             opened_at_last=opened_at_last,

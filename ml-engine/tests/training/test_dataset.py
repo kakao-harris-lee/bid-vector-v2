@@ -158,3 +158,32 @@ def test_load_dataset_row_missing_required_field_is_unreadable(field: str) -> No
     result = load_dataset(manifest_bytes, rows_bytes, _reference(manifest_bytes))
     assert isinstance(result, DatasetRejected)
     assert result.reason == DatasetRejectionReason.UNREADABLE
+
+
+@pytest.mark.parametrize(
+    "field,bad_value",
+    [
+        ("feed_origin_only", "yes"),
+        ("feed_origin_only", 1),
+        ("row_count", "2"),
+        ("row_count", True),
+        ("dataset_id", 123),
+        ("sample_scope", ""),
+    ],
+)
+def test_load_dataset_manifest_field_type_mismatch_is_unreadable(
+    field: str, bad_value: object
+) -> None:
+    """code-reviewer PR #13 MEDIUM-1 — `_parse_manifest`가 `raw[...]`를 그대로 읽고
+    `__post_init__`은 진위(falsy)만 보므로, `"feed_origin_only": "yes"`(문자열) 같은
+    타입 오류가 이전에는 거부되지 않고 `LoadedDataset.manifest.feed_origin_only`에
+    문자열이 그대로 실렸다. 이제는 필드마다 타입을 강제한다."""
+    rows_bytes = b""
+    manifest = dict(_MANIFEST_DICT)
+    manifest["row_count"] = 0
+    manifest["rows_checksum"] = hashlib.sha256(rows_bytes).hexdigest()
+    manifest[field] = bad_value  # 대상 필드를 마지막에 덮어써 위 기본값을 무효화한다
+    manifest_bytes = json.dumps(manifest).encode("utf-8")
+    result = load_dataset(manifest_bytes, rows_bytes, _reference(manifest_bytes))
+    assert isinstance(result, DatasetRejected)
+    assert result.reason == DatasetRejectionReason.UNREADABLE
