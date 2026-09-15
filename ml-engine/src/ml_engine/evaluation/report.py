@@ -318,6 +318,11 @@ def _window_result_json(window: WindowResult) -> _JsonValue:
 
 
 def _window_exclusion_json(exclusion: WindowExclusion) -> _JsonValue:
+    """verifier r3 MEDIUM M-1r(잔존) — `buildable_row_count`/`dropped_rows`가
+    dataclass 에는 있었으나 여기서 직렬화되지 않아 canonical JSON/checksum 에서
+    공시가 사라졌었다(서로 다른 buildable 수의 실행이 같은 checksum 을 냄).
+    계획 단계 제외는 두 값이 `None`/`()` 그대로 실려 「몰라서 비었다」가 JSON 에서도
+    구별된다."""
     window = exclusion.window
     return {
         "window_start": window.start.isoformat(),
@@ -326,6 +331,10 @@ def _window_exclusion_json(exclusion: WindowExclusion) -> _JsonValue:
         "window_settled_count": window.settled_count,
         "reason": exclusion.reason.value,
         "evaluation_row_count": exclusion.evaluation_row_count,
+        "buildable_row_count": exclusion.buildable_row_count,
+        "dropped_rows": [
+            _dropped_row_count_json(item) for item in exclusion.dropped_rows
+        ],
     }
 
 

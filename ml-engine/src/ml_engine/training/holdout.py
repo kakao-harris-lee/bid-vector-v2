@@ -231,9 +231,12 @@ def _assemble_report(
     spec: TrainingSpec,
     evaluation_policy: EvaluationPolicy,
     ordered_rows: tuple[TrainingRow, ...],
-    plan_selected: tuple[WeekMaturity, ...],
     windows_outcome: _WindowsOutcome,
 ) -> EvaluationReportV1 | HoldoutRejected:
+    """verifier r3 LOW L-2r — `holdout_overlaps` 는 `windows_outcome.
+    succeeded_windows`(서로소 집합)만 본다. 예전에는 `plan_selected`(계획
+    통과분, 실행 단계 skip 된 창도 그대로 남음)를 받아 H-2r 이 정정한 회계와
+    다른 창 집합을 겹침 측정에 썼다 — `plan_selected` 인자 자체를 없앴다."""
     unaccounted_or_reject = _unaccounted_or_reject(
         ordered_rows, evaluation_policy, windows_outcome
     )
@@ -264,7 +267,9 @@ def _assemble_report(
         excluded_windows=windows_outcome.excluded,
         holdout_overlaps=tuple(
             holdout_overlaps(
-                ordered_rows, plan_selected, stratum=evaluation_policy.gate_stratum
+                ordered_rows,
+                windows_outcome.succeeded_windows,
+                stratum=evaluation_policy.gate_stratum,
             )
         ),
         unaccounted_row_count=unaccounted,
@@ -309,5 +314,5 @@ def run_holdout(
         code_version,
     )
     return _assemble_report(
-        dataset, spec, evaluation_policy, ordered_rows, plan.selected, windows_outcome
+        dataset, spec, evaluation_policy, ordered_rows, windows_outcome
     )

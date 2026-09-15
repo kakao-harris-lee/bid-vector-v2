@@ -4,6 +4,7 @@ award_rate_holdout.py@ed4b06c`). `run_holdout`유일 실행 진입점 — 합성
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
@@ -12,6 +13,7 @@ from ml_engine.contracts import common_pb2, features_pb2
 from ml_engine.evaluation import (
     BaselineSpec,
     EvaluationPolicy,
+    EvaluationReportV1,
     Failed,
     ModelScore,
     NotEvaluable,
@@ -496,14 +498,11 @@ def test_run_holdout_excludes_window_when_buildable_rows_below_min_evaluation_ro
     )
 
 
-def test_window_exclusion_reports_buildable_row_count_and_dropped_rows() -> None:
-    """verifier r2 MEDIUM M-1r 재현 — 제외된 창(`INSUFFICIENT_EVALUATION_ROWS`)의
-    문면은 `evaluation_row_count=120`(구조적 행 수)과 하한 100 을 나란히 실어
-    **자기모순**(120 ≥ 100 인데 「행 부족」)이었다. `build_split`이 이미 계산한
-    `buildable=30`·`dropped=[(base_amount, 90)]`(`WindowSkip.detail` 문자열에만
-    있었다)를 `WindowExclusion`의 구조화 필드로 공시해 그 모순을 없앤다."""
+def _run_holdout_with_mixed_buildability_exclusion(
+    *, buildable_count: int, missing_count: int
+) -> EvaluationReportV1:
     dataset, window = _mixed_buildability_window_scenario(
-        buildable_count=30, missing_count=90
+        buildable_count=buildable_count, missing_count=missing_count
     )
     result = run_holdout(
         dataset,
@@ -515,6 +514,25 @@ def test_window_exclusion_reports_buildable_row_count_and_dropped_rows() -> None
         CodeVersion("sha-1"),
     )
     assert not isinstance(result, HoldoutRejected)
+    return result
+
+
+def test_window_exclusion_reports_buildable_row_count_and_dropped_rows() -> None:
+    """verifier r2 MEDIUM M-1r 재현 — 제외된 창(`INSUFFICIENT_EVALUATION_ROWS`)의
+    문면은 `evaluation_row_count=120`(구조적 행 수)과 하한 100 을 나란히 실어
+    **자기모순**(120 ≥ 100 인데 「행 부족」)이었다. `build_split`이 이미 계산한
+    `buildable=30`·`dropped=[(base_amount, 90)]`(`WindowSkip.detail` 문자열에만
+    있었다)를 `WindowExclusion`의 구조화 필드로 공시해 그 모순을 없앤다.
+
+    verifier r3 MEDIUM M-1r(잔존) — 수정 전 이 단언은 전부 dataclass 필드였고
+    `canonical_report_bytes`를 한 번도 지나지 않았다. `_window_exclusion_json`이
+    두 필드를 직렬화하지 않아, 서명·저장되는 형태(canonical JSON/checksum)에서는
+    공시가 사라지고 buildable 30 과 50 이 같은 checksum 을 냈다 — 이 test 를
+    canonical bytes 를 파싱해 그 값을 보도록 바꾸고, 별도 test 로 checksum 이
+    실제로 달라짐을 확인한다."""
+    result = _run_holdout_with_mixed_buildability_exclusion(
+        buildable_count=30, missing_count=90
+    )
     assert len(result.excluded_windows) == 1
     excluded = result.excluded_windows[0]
     assert excluded.evaluation_row_count == 120
@@ -524,6 +542,106 @@ def test_window_exclusion_reports_buildable_row_count_and_dropped_rows() -> None
     # 자기모순 해소 확인 — buildable(30) < 하한(100) 이 실제 제외 사유임이 문면
     # 자체에서 산술로 성립한다(구조적 행 수 120 만으로는 알 수 없던 사실).
     assert excluded.buildable_row_count < 100 <= excluded.evaluation_row_count
+
+    from ml_engine.evaluation.report import canonical_report_bytes
+
+    canonical = canonical_report_bytes(result)
+    assert isinstance(canonical, bytes)
+    payload = json.loads(canonical)
+    excluded_json = payload["excluded_windows"][0]
+    # canonical JSON 에서도 같은 값이 나와야 한다 — dataclass 단언만으로는
+    # 최종 산출물(서명·저장 대상)의 공백을 못 잡는다(r3 가 지적한 바로 그 층).
+    assert excluded_json["buildable_row_count"] == 30
+    assert sum(item["row_count"] for item in excluded_json["dropped_rows"]) == 90
+    assert excluded_json["evaluation_row_count"] == 120
+
+
+def _excluded_window_scenario_with_fixed_composition(
+    *, missing_indices: frozenset[int]
+) -> tuple[LoadedDataset, WeekMaturity]:
+    """`test_window_exclusion_checksum_differs_by_buildable_row_count` 전용 —
+    120개 창 행 각각의 category(짝/홀 인덱스)·agency·label 은 **인덱스 하나로만
+    결정**되고 missing/buildable 여부와 무관하다. 그래서 어느 인덱스 집합을
+    missing 으로 고르든 코퍼스 전체의 `category_counts`(civil 60·it 60)·
+    `corpus_row_count`·`unaccounted_row_count` 등 **다른 report 필드는 전부
+    동일**하게 유지되고, `buildable_row_count`/`dropped_rows`만 실제로 달라진다
+    — checksum 차이의 원인을 그 두 필드로 좁힌다(`_mixed_buildability_window_
+    scenario`는 missing 행을 전부 `category="civil"`로 고정해 이 목적에 안 맞음)."""
+    train_part = _many_rows(20, start_day=0)
+    window_start_day = 200
+    rows = []
+    for i in range(120):
+        category = "civil" if i % 2 == 0 else "it"
+        agency = f"agency-{i % 3}"
+        label = 0.6 + 0.001 * (i % 5)
+        if i in missing_indices:
+            rows.append(
+                _raw_row_missing_base_amount(
+                    window_start_day + 1, category=category, agency=agency, label=label
+                )
+            )
+        else:
+            rows.append(
+                _raw_row(
+                    window_start_day + 1, category=category, agency=agency, label=label
+                )
+            )
+    dataset = _dataset(train_part + tuple(rows))
+    window = WeekMaturity(
+        start=_EPOCH + timedelta(days=window_start_day),
+        end=_EPOCH + timedelta(days=window_start_day + 7),
+        opened_count=120,
+        settled_count=119,
+    )
+    return dataset, window
+
+
+def test_window_exclusion_checksum_differs_by_buildable_row_count() -> None:
+    """verifier r3 MEDIUM M-1r(잔존) 재현 — buildable 30(dropped 90)과 buildable
+    50(dropped 70)은 둘 다 하한 100 미달로 같은 사유(`INSUFFICIENT_EVALUATION_
+    ROWS`)·같은 구조적 행 수(120)로 제외되지만, 실제로 버려진 행 수는 다르다.
+    `_window_exclusion_json`이 그 필드를 직렬화하지 않으면 두 실행이 **같은
+    checksum**을 낸다(수정 전 재현값) — 서로 다른 실행이 같은 서명을 갖는 것은
+    서명의 존재 이유(어떤 실행 결과인지 식별)를 무너뜨린다. 두 시나리오의 코퍼스
+    구성(category·agency·label 분포, 총 행 수)은 인덱스 기반으로 고정해
+    `buildable_row_count`/`dropped_rows` 외의 어떤 report 필드도 달라지지 않게
+    한다(전제 확인 포함)."""
+    from ml_engine.evaluation.report import report_checksum
+
+    def _run(missing_indices: frozenset[int]) -> EvaluationReportV1:
+        dataset, window = _excluded_window_scenario_with_fixed_composition(
+            missing_indices=missing_indices
+        )
+        result = run_holdout(
+            dataset,
+            [window],
+            _spec(),
+            _training_policy(min_training_rows=5),
+            _policy(min_evaluation_rows=100),
+            _DeterministicTrainer(),
+            CodeVersion("sha-1"),
+        )
+        assert not isinstance(result, HoldoutRejected)
+        return result
+
+    result_30 = _run(frozenset(range(90)))  # buildable 30(90..119), dropped 90
+    result_50 = _run(frozenset(range(70)))  # buildable 50(70..119), dropped 70
+
+    # 전제 확인 — 정말로 buildable_row_count/dropped_rows 만 다르다는 것.
+    assert result_30.corpus_row_count == result_50.corpus_row_count
+    assert result_30.corpus_categories == result_50.corpus_categories
+    assert result_30.unaccounted_row_count == result_50.unaccounted_row_count
+    excluded_30 = result_30.excluded_windows[0]
+    excluded_50 = result_50.excluded_windows[0]
+    assert excluded_30.buildable_row_count == 30
+    assert excluded_50.buildable_row_count == 50
+    assert excluded_30.evaluation_row_count == excluded_50.evaluation_row_count == 120
+
+    checksum_30 = report_checksum(result_30)
+    checksum_50 = report_checksum(result_50)
+    assert isinstance(checksum_30, str)
+    assert isinstance(checksum_50, str)
+    assert checksum_30 != checksum_50
 
 
 def test_window_exclusion_leaves_buildable_fields_unset_for_planning_stage_exclusion() -> (
@@ -909,6 +1027,13 @@ def test_run_holdout_promotion_uses_latest_evaluable_window_not_latest_calendar_
         )
         == result.promotion
     )
+    # verifier r3 LOW L-2r 재현 — holdout_overlaps 가 plan_selected(skip 된 창도
+    # 그대로 포함) 대신 succeeded_windows(서로소 집합)를 써야 회계(H-2r)와
+    # 일관된다. window2 는 skip 됐으므로 겹침 측정 대상은 window1 하나뿐이고,
+    # 창이 하나면 쌍이 없어 holdout_overlaps 자체가 빈 tuple 이어야 한다 —
+    # plan_selected 를 그대로 썼다면 (window1, window2) 쌍 하나가 (겹치지 않는
+    # 시간 구간이라 row_count=0 이더라도) 측정 대상으로 잡혔을 것이다.
+    assert result.holdout_overlaps == ()
 
 
 def test_run_holdout_reproducible_with_real_lightgbm() -> None:
