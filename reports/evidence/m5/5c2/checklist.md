@@ -63,6 +63,32 @@
   sweep 세부에 접근할 수 있다(Python 가시성 한계, 관례 위반). 정상 소비자는 `holdout.py`
   최상위 이름만 본다.
 
+**2026-09-16 갱신(verifier r2 M-3r — 수정 라운드 1·2가 만든 표면, 이전 판은 초판
+그대로였다)**:
+
+- `ml_engine.evaluation.passes_gate(baseline_rmse, model_rmse, statistic, policy)
+  -> bool`(r1 H-2/H-3) — 판정식 유일 공개 정의. `gate_outcome`과 안정성 sweep
+  둘 다 **같은 함수 객체**를 부른다(`verdict.passes_gate is _holdout_window.
+  passes_gate`, verifier r2 실측). `bool`만 내므로 `Passed`/`Promotable`을 직접
+  만들 수 없다 — 없던 권한이 아니다.
+- `ml_engine.evaluation.DroppedRowCount`(r1 H-1, **2026-09-16 소속 이동** —
+  `report.py`에서 `windows.py`로, M-1r 이 `WindowExclusion`도 이 타입을 쓰게 되며
+  `report.py → windows.py` 순환 import 를 피하려고 옮겼다. import 경로는
+  `ml_engine.evaluation`을 통해서는 변화 없음) · `WindowResult.dropped_rows` —
+  창 안 buildability 로 버려진 행의 사유별 계수(읽기 전용 공시).
+- `ml_engine.evaluation.WindowExclusion.buildable_row_count`/`.dropped_rows`
+  (r2 M-1r, 신규 필드) — 실행 단계에서 제외된 창(`INSUFFICIENT_EVALUATION_ROWS`)
+  에만 채워진다(계획 단계 제외는 `None`/빈 tuple). 기존 `evaluation_row_count`
+  (구조적 행 수)와 나란히 둬야 「행 부족」 사유의 자기모순이 없어진다 — 읽기 전용
+  공시, 새 권한 아니다.
+- `ml_engine.training.holdout.HoldoutRejectionReason.ACCOUNTING_MISMATCH`
+  (r2 H-2r, 신규 열거값) — `unaccounted_row_count`가 음수(회계 결함, 구조적으로
+  도달 불가능해야 할 상태)일 때만 나온다. 기존 두 값(`EMPTY_SIDE`·
+  `INVALID_MATURITY_INPUT`)과 같은 자리(실행 자체의 거부), 창 단위 실패
+  (`WindowExclusionReason.TRAINING_REJECTED`)와는 다른 어휘.
+- **제거**: `ml_engine.evaluation.trial_outcome`(r1 H-3) — `_trial_outcome`으로
+  비공개 전환. 안정성 없이 `Promotable`을 만들 수 있던 in-repo 우회 표면이었다.
+
 ## 알려진 제한
 
 1. **K7 성숙도 비율 3줄 중복** — `evaluation/windows.py::WeekMaturity.maturity_ratio`가
