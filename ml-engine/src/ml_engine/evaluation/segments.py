@@ -44,12 +44,16 @@ class SegmentScore:
     model_bias: float
     model_residual_std: float
     improvement_ratio: float
-    """(베이스라인 − 모델) ÷ 베이스라인. **음수면 이 세그먼트에서 모델이 더 나쁘다.**"""
+    """(베이스라인 - 모델) ÷ 베이스라인. **음수면 이 세그먼트에서 모델이 더 나쁘다.**"""
     paired_t: float
 
 
 def _category_key(facts: FeatureFacts) -> str:
-    return facts.category_code.value if isinstance(facts.category_code, Present) else "unknown"
+    return (
+        facts.category_code.value
+        if isinstance(facts.category_code, Present)
+        else "unknown"
+    )
 
 
 _AXIS_KEY_BUILDERS: dict[str, Callable[[FeatureFacts, EvaluationPolicy], str]] = {
@@ -60,10 +64,17 @@ _AXIS_KEY_BUILDERS: dict[str, Callable[[FeatureFacts, EvaluationPolicy], str]] =
 }
 
 
+def _axis_key(axis: str, policy: EvaluationPolicy) -> Callable[[FeatureFacts], str]:
+    def key(facts: FeatureFacts) -> str:
+        return _AXIS_KEY_BUILDERS[axis](facts, policy)
+
+    return key
+
+
 def segment_specs(policy: EvaluationPolicy) -> tuple[SegmentSpec, ...]:
     """정책 `segment_axes`가 선언한 축만 — 새 축은 코드 분기가 아니라 정책 값 한 줄."""
     return tuple(
-        SegmentSpec(axis=axis, key=lambda facts, a=axis: _AXIS_KEY_BUILDERS[a](facts, policy))
+        SegmentSpec(axis=axis, key=_axis_key(axis, policy))
         for axis in policy.segment_axes
     )
 
@@ -132,6 +143,10 @@ def regressed_segments(scores: Sequence[SegmentScore]) -> list[SegmentScore]:
     """`improvement_ratio < 0 ∧ row_count > 1`(1행 세그먼트는 대응 t 가 성립하지 않아
     제외 — 진짜 신호를 희석한다), 행 수 내림차순."""
     return sorted(
-        (score for score in scores if score.improvement_ratio < 0 and score.row_count > 1),
+        (
+            score
+            for score in scores
+            if score.improvement_ratio < 0 and score.row_count > 1
+        ),
         key=lambda score: -score.row_count,
     )

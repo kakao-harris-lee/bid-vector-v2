@@ -17,9 +17,7 @@ from ml_engine.evaluation.policy import (
     policy_checksum,
 )
 
-_SHIPPED_YAML = (
-    Path(__file__).resolve().parents[2] / "policy" / "evaluation-v1.yaml"
-)
+_SHIPPED_YAML = Path(__file__).resolve().parents[2] / "policy" / "evaluation-v1.yaml"
 
 
 def test_shipped_policy_file_matches_policy_values_md() -> None:
@@ -73,9 +71,7 @@ def test_load_evaluation_policy_missing_file_is_rejected(tmp_path: Path) -> None
 
 def test_load_evaluation_policy_unknown_key_is_rejected(tmp_path: Path) -> None:
     path = tmp_path / "policy.yaml"
-    path.write_text(
-        "version: evaluation-v1\npaired_t_threshold: 2.58\nextra_key: 1\n"
-    )
+    path.write_text("version: evaluation-v1\npaired_t_threshold: 2.58\nextra_key: 1\n")
     result = load_evaluation_policy(path)
     assert isinstance(result, PolicyRejected)
 

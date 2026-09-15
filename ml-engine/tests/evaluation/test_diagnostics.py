@@ -53,7 +53,9 @@ def test_minimum_detectable_improvement_zero_when_baseline_mse_non_positive() ->
     targets = np.array([1.0, 1.0, 1.0])
     baseline = targets  # 완벽 -> mse == 0
     model = np.array([0.9, 0.95, 0.8])
-    result = minimum_detectable_improvement(model, baseline, targets, threshold=_THRESHOLD)
+    result = minimum_detectable_improvement(
+        model, baseline, targets, threshold=_THRESHOLD
+    )
     assert result == 0.0
 
 
@@ -62,7 +64,9 @@ def test_minimum_detectable_improvement_is_non_negative_for_realistic_case() -> 
     targets = rng.normal(loc=0.7, scale=0.05, size=50)
     baseline = targets + rng.normal(scale=0.03, size=50)
     model = targets + rng.normal(scale=0.02, size=50)
-    result = minimum_detectable_improvement(model, baseline, targets, threshold=_THRESHOLD)
+    result = minimum_detectable_improvement(
+        model, baseline, targets, threshold=_THRESHOLD
+    )
     assert result >= 0.0
 
 
@@ -91,9 +95,11 @@ def test_coverage_splits_skips_empty_slice() -> None:
 def test_unlearned_cells_lists_cells_missing_from_training() -> None:
     spec = BaselineSpec(
         name="category",
-        key=lambda facts: facts.category_code.value
-        if isinstance(facts.category_code, Present)
-        else "unknown",
+        key=lambda facts: (
+            facts.category_code.value
+            if isinstance(facts.category_code, Present)
+            else "unknown"
+        ),
     )
     train_facts = [_facts("civil"), _facts("civil")]
     test_facts = [_facts("civil"), _facts("electrical"), _facts("electrical")]
@@ -106,12 +112,15 @@ def test_unlearned_cells_lists_cells_missing_from_training() -> None:
 def test_unlearned_cells_respects_min_count() -> None:
     spec = BaselineSpec(
         name="agency",
-        key=lambda facts: facts.agency_id.value
-        if isinstance(facts.agency_id, Present)
-        else "unknown",
+        key=lambda facts: (
+            facts.agency_id.value if isinstance(facts.agency_id, Present) else "unknown"
+        ),
         min_count=3,
     )
-    train_facts = [_facts(), _facts()]  # 2건 < min_count(3) -> 학습이 못 배운 것으로 취급
+    train_facts = [
+        _facts(),
+        _facts(),
+    ]  # 2건 < min_count(3) -> 학습이 못 배운 것으로 취급
     test_facts = [_facts()]
     result = unlearned_cells(spec, train_facts, test_facts)
     assert len(result) == 1

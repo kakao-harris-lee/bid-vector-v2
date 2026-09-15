@@ -20,8 +20,17 @@ from ml_engine.evaluation.report import (
     derive_promotion,
     report_checksum,
 )
-from ml_engine.evaluation.verdict import Failed, NotEvaluable, NotEvaluableReason, Passed
-from ml_engine.evaluation.windows import HoldoutOverlap, WindowExclusion, WindowExclusionReason
+from ml_engine.evaluation.verdict import (
+    Failed,
+    NotEvaluable,
+    NotEvaluableReason,
+    Passed,
+)
+from ml_engine.evaluation.windows import (
+    HoldoutOverlap,
+    WindowExclusion,
+    WindowExclusionReason,
+)
 from ml_engine.features import CanonicalizationRejected
 
 _STABILITY = StabilitySummary(
@@ -62,9 +71,17 @@ def _window_result(*, outcome: object = _PASSED) -> WindowResult:
         train_categories=(CategoryCount(category="civil", row_count=300),),
         test_categories=(CategoryCount(category="civil", row_count=100),),
         baselines=(
-            ModelScore(name="category_x_band", rmse=0.1, bias=0.01, residual_std=0.09, coverage=0.9),
+            ModelScore(
+                name="category_x_band",
+                rmse=0.1,
+                bias=0.01,
+                residual_std=0.09,
+                coverage=0.9,
+            ),
         ),
-        models=(ModelScore(name="gbm_all_strata", rmse=0.05, bias=0.0, residual_std=0.05),),
+        models=(
+            ModelScore(name="gbm_all_strata", rmse=0.05, bias=0.0, residual_std=0.05),
+        ),
         segments=(),
         coverage=(),
         unlearned_baseline_cells=(),
@@ -193,8 +210,9 @@ def test_canonical_report_bytes_rejects_non_finite_metric() -> None:
 
 
 def test_report_includes_excluded_windows_and_overlaps() -> None:
-    from ml_engine.evaluation.windows import WeekMaturity
     from datetime import UTC, datetime
+
+    from ml_engine.evaluation.windows import WeekMaturity
 
     window = WeekMaturity(
         start=datetime(2026, 6, 1, tzinfo=UTC),

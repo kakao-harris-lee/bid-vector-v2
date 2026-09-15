@@ -121,9 +121,7 @@ def test_regressed_segments_excludes_single_row_segments() -> None:
     assert category_regressed == []
 
 
-def test_regressed_segments_includes_multi_row_regression_sorted_by_row_count() -> (
-    None
-):
+def test_regressed_segments_includes_multi_row_regression_sorted_by_row_count() -> None:
     facts = [
         _facts(category="civil"),
         _facts(category="civil"),

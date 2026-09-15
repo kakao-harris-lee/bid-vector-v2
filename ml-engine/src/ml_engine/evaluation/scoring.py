@@ -27,7 +27,7 @@ def rmse_bias_std(
 
 
 def paired_t(a: np.ndarray, b: np.ndarray, targets: np.ndarray) -> float:
-    """제곱오차 차이(a − b)의 대응 t. 음수면 a 가 낫다. 차이 표준편차가 0(또는 n<=1)이면
+    """제곱오차 차이(a - b)의 대응 t. 음수면 a 가 낫다. 차이 표준편차가 0(또는 n<=1)이면
     0."""
     differences = ((a - targets) ** 2) - ((b - targets) ** 2)
     deviation = float(np.std(differences, ddof=1)) if differences.size > 1 else 0.0
@@ -37,7 +37,7 @@ def paired_t(a: np.ndarray, b: np.ndarray, targets: np.ndarray) -> float:
 
 
 def improvement_ratio(baseline_rmse: float, model_rmse: float) -> float:
-    """(베이스라인 − 모델) ÷ 베이스라인 — 개선률의 단일 정의. 양수면 모델이 낫다.
+    """(베이스라인 - 모델) ÷ 베이스라인 — 개선률의 단일 정의. 양수면 모델이 낫다.
     베이스라인이 0 이하면 0(legacy `:198-202`)."""
     if baseline_rmse <= 0:
         return 0.0

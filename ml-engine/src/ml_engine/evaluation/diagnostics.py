@@ -18,7 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ml_engine.evaluation.baselines import BaselineSpec
-from ml_engine.evaluation.scoring import improvement_ratio, rmse_bias_std, paired_t
+from ml_engine.evaluation.scoring import improvement_ratio, paired_t, rmse_bias_std
 from ml_engine.features import FeatureFacts, Present
 
 COVERAGE_COVERED = "baseline-covered"
@@ -168,7 +168,11 @@ def unlearned_cells(
 
 
 def _category_key(facts: FeatureFacts) -> str:
-    return facts.category_code.value if isinstance(facts.category_code, Present) else "unknown"
+    return (
+        facts.category_code.value
+        if isinstance(facts.category_code, Present)
+        else "unknown"
+    )
 
 
 def category_counts(facts_seq: Sequence[FeatureFacts]) -> list[CategoryCount]:
@@ -179,7 +183,9 @@ def category_counts(facts_seq: Sequence[FeatureFacts]) -> list[CategoryCount]:
         totals[key] = totals.get(key, 0) + 1
     return [
         CategoryCount(category=category, row_count=count)
-        for category, count in sorted(totals.items(), key=lambda item: (-item[1], item[0]))
+        for category, count in sorted(
+            totals.items(), key=lambda item: (-item[1], item[0])
+        )
     ]
 
 

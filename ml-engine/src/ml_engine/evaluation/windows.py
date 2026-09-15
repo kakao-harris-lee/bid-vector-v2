@@ -20,6 +20,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from itertools import pairwise
 from typing import Protocol, runtime_checkable
 
 from ml_engine.evaluation.policy import EvaluationPolicy
@@ -50,11 +51,15 @@ class WeekMaturity:
 
     def __post_init__(self) -> None:
         if self.end <= self.start:
-            raise ValueError(f"end 는 start 보다 뒤여야 합니다: {self.start} ~ {self.end}")
+            raise ValueError(
+                f"end 는 start 보다 뒤여야 합니다: {self.start} ~ {self.end}"
+            )
         if self.opened_count < 0:
             raise ValueError(f"opened_count 는 음수일 수 없습니다: {self.opened_count}")
         if self.settled_count < 0:
-            raise ValueError(f"settled_count 는 음수일 수 없습니다: {self.settled_count}")
+            raise ValueError(
+                f"settled_count 는 음수일 수 없습니다: {self.settled_count}"
+            )
 
     def contains(self, value: datetime) -> bool:
         return self.start <= value < self.end
@@ -129,12 +134,16 @@ def indices_in_window(
     ]
 
 
-def _train_row_count(rows: Sequence[StratifiedRow], window: WeekMaturity, *, stratum: str) -> int:
-    return sum(1 for row in rows if row.stratum == stratum and row.opened_at < window.start)
+def _train_row_count(
+    rows: Sequence[StratifiedRow], window: WeekMaturity, *, stratum: str
+) -> int:
+    return sum(
+        1 for row in rows if row.stratum == stratum and row.opened_at < window.start
+    )
 
 
 def _overlapping(ordered: Sequence[WeekMaturity]) -> bool:
-    return any(b.start < a.end for a, b in zip(ordered, ordered[1:]))
+    return any(b.start < a.end for a, b in pairwise(ordered))
 
 
 @dataclass(frozen=True)
@@ -144,7 +153,9 @@ class _WindowFacts:
     train_row_count: int
 
 
-def _exclusion_reason(facts: _WindowFacts, policy: EvaluationPolicy) -> WindowExclusionReason | None:
+def _exclusion_reason(
+    facts: _WindowFacts, policy: EvaluationPolicy
+) -> WindowExclusionReason | None:
     """규칙 표 순서대로 — 먼저 걸리는 사유가 기록된다."""
     ratio = facts.window.maturity_ratio
     if ratio is None or ratio < policy.maturity_threshold:
@@ -184,7 +195,9 @@ def plan_evaluation_windows(
         else:
             excluded.append(
                 WindowExclusion(
-                    window=window, reason=reason, evaluation_row_count=facts.evaluation_row_count
+                    window=window,
+                    reason=reason,
+                    evaluation_row_count=facts.evaluation_row_count,
                 )
             )
 
@@ -209,7 +222,9 @@ def holdout_overlaps(
 ) -> list[HoldoutOverlap]:
     """창 쌍마다 홀드아웃이 공유하는 행 수 — 겹침이 **측정된 사실**이 되게 한다(값이
     아니라 인덱스 동일성으로, 설계상 0이어야 함을 주장이 아니라 측정으로)."""
-    selections = [set(indices_in_window(rows, window, stratum=stratum)) for window in windows]
+    selections = [
+        set(indices_in_window(rows, window, stratum=stratum)) for window in windows
+    ]
     return [
         HoldoutOverlap(
             first_start=windows[first].start,

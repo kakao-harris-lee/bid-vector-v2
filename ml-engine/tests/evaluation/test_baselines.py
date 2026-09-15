@@ -40,7 +40,13 @@ def _facts(
 def test_baseline_specs_has_five_declared_baselines() -> None:
     specs = baseline_specs(_POLICY)
     names = [spec.name for spec in specs]
-    assert names == ["global_mean", "category", "amount_band", "category_x_band", "agency"]
+    assert names == [
+        "global_mean",
+        "category",
+        "amount_band",
+        "category_x_band",
+        "agency",
+    ]
 
 
 def test_baseline_specs_gate_baseline_name_is_present_in_table() -> None:
@@ -135,7 +141,7 @@ def test_coverage_mask_reflects_per_row_fallback() -> None:
         _facts(category="civil"),
         _facts(category="never-seen"),
     ]
-    predictions, covered = group_mean_predictions(
+    _predictions, covered = group_mean_predictions(
         spec, train_facts, train_labels, test_facts, global_mean=0.5
     )
     assert list(covered) == [True, True, False]

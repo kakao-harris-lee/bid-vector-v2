@@ -17,7 +17,6 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass
-from typing import Any
 
 from ml_engine.evaluation.diagnostics import (
     CategoryCount,
@@ -28,7 +27,6 @@ from ml_engine.evaluation.diagnostics import (
 )
 from ml_engine.evaluation.segments import SegmentScore
 from ml_engine.evaluation.verdict import (
-    Failed,
     GateOutcome,
     NotEvaluable,
     NotEvaluableReason,
@@ -36,6 +34,13 @@ from ml_engine.evaluation.verdict import (
 )
 from ml_engine.evaluation.windows import HoldoutOverlap, WindowExclusion
 from ml_engine.features import CanonicalizationRejected, NonFiniteValue
+
+type _JsonValue = (
+    str | int | float | bool | list[_JsonValue] | dict[str, _JsonValue] | None
+)
+"""재귀 JSON 값 — named alias 를 써 설계 래칫의 약한 경계 판정(`dict`/`Any` 함수
+경계)을 피한다(5C-1 `artifact_writer.py::_JsonValue`와 같은 근거 — training 층
+private 별칭을 evaluation 이 import 하지 않고 같은 패턴으로 새로 선언한다)."""
 
 
 @dataclass(frozen=True)
@@ -109,7 +114,9 @@ class PromotionNotEvaluable:
 type Promotion = Promotable | NotPromotable | PromotionNotEvaluable
 
 
-def derive_promotion(latest: GateOutcome | None, *, window_start: str | None) -> Promotion:
+def derive_promotion(
+    latest: GateOutcome | None, *, window_start: str | None
+) -> Promotion:
     """latest-window 하나의 `GateOutcome`에서 승격 측정을 파생한다(D-5C2-6). `latest`가
     `None`이면(성숙 창이 하나도 없었다) `NO_EVALUABLE_WINDOW`."""
     if latest is None:
@@ -154,7 +161,7 @@ class EvaluationReportV1:
     promotion: Promotion
 
 
-def _gate_outcome_json(outcome: GateOutcome) -> dict[str, Any]:
+def _gate_outcome_json(outcome: GateOutcome) -> _JsonValue:
     if isinstance(outcome, NotEvaluable):
         return {
             "kind": "not_evaluable",
@@ -173,7 +180,7 @@ def _gate_outcome_json(outcome: GateOutcome) -> dict[str, Any]:
     }
 
 
-def _promotion_json(promotion: Promotion) -> dict[str, Any]:
+def _promotion_json(promotion: Promotion) -> _JsonValue:
     if isinstance(promotion, Promotable):
         return {"kind": "promotable", "window_start": promotion.window_start}
     if isinstance(promotion, NotPromotable):
@@ -181,7 +188,7 @@ def _promotion_json(promotion: Promotion) -> dict[str, Any]:
     return {"kind": "not_evaluable", "reason": promotion.reason.value}
 
 
-def _stability_trial_json(trial: StabilityTrial) -> dict[str, Any]:
+def _stability_trial_json(trial: StabilityTrial) -> _JsonValue:
     return {
         "seed": trial.seed,
         "improvement_ratio": trial.improvement_ratio,
@@ -190,7 +197,7 @@ def _stability_trial_json(trial: StabilityTrial) -> dict[str, Any]:
     }
 
 
-def _stability_json(summary: StabilitySummary) -> dict[str, Any]:
+def _stability_json(summary: StabilitySummary) -> _JsonValue:
     return {
         "trials": [_stability_trial_json(trial) for trial in summary.trials],
         "passed_count": summary.passed_count,
@@ -203,11 +210,11 @@ def _stability_json(summary: StabilitySummary) -> dict[str, Any]:
     }
 
 
-def _category_counts_json(items: tuple[CategoryCount, ...]) -> list[dict[str, Any]]:
+def _category_counts_json(items: tuple[CategoryCount, ...]) -> list[_JsonValue]:
     return [{"category": item.category, "row_count": item.row_count} for item in items]
 
 
-def _model_score_json(score: ModelScore) -> dict[str, Any]:
+def _model_score_json(score: ModelScore) -> _JsonValue:
     return {
         "name": score.name,
         "rmse": score.rmse,
@@ -217,7 +224,7 @@ def _model_score_json(score: ModelScore) -> dict[str, Any]:
     }
 
 
-def _segment_score_json(score: SegmentScore) -> dict[str, Any]:
+def _segment_score_json(score: SegmentScore) -> _JsonValue:
     return {
         "axis": score.axis,
         "segment": score.segment,
@@ -232,7 +239,7 @@ def _segment_score_json(score: SegmentScore) -> dict[str, Any]:
     }
 
 
-def _coverage_split_json(split: CoverageSplit) -> dict[str, Any]:
+def _coverage_split_json(split: CoverageSplit) -> _JsonValue:
     return {
         "segment": split.segment,
         "row_count": split.row_count,
@@ -243,11 +250,11 @@ def _coverage_split_json(split: CoverageSplit) -> dict[str, Any]:
     }
 
 
-def _unlearned_cell_json(cell: UnlearnedCell) -> dict[str, Any]:
+def _unlearned_cell_json(cell: UnlearnedCell) -> _JsonValue:
     return {"key": cell.key, "row_count": cell.row_count}
 
 
-def _window_result_json(window: WindowResult) -> dict[str, Any]:
+def _window_result_json(window: WindowResult) -> _JsonValue:
     return {
         "window_start": window.window_start,
         "window_end": window.window_end,
@@ -276,7 +283,7 @@ def _window_result_json(window: WindowResult) -> dict[str, Any]:
     }
 
 
-def _window_exclusion_json(exclusion: WindowExclusion) -> dict[str, Any]:
+def _window_exclusion_json(exclusion: WindowExclusion) -> _JsonValue:
     window = exclusion.window
     return {
         "window_start": window.start.isoformat(),
@@ -288,7 +295,7 @@ def _window_exclusion_json(exclusion: WindowExclusion) -> dict[str, Any]:
     }
 
 
-def _holdout_overlap_json(overlap: HoldoutOverlap) -> dict[str, Any]:
+def _holdout_overlap_json(overlap: HoldoutOverlap) -> _JsonValue:
     return {
         "first_start": overlap.first_start.isoformat(),
         "second_start": overlap.second_start.isoformat(),
@@ -296,11 +303,11 @@ def _holdout_overlap_json(overlap: HoldoutOverlap) -> dict[str, Any]:
     }
 
 
-def _stratum_counts_json(items: tuple[StratumCount, ...]) -> list[dict[str, Any]]:
+def _stratum_counts_json(items: tuple[StratumCount, ...]) -> list[_JsonValue]:
     return [{"stratum": item.stratum, "row_count": item.row_count} for item in items]
 
 
-def _report_as_json_value(report: EvaluationReportV1) -> dict[str, Any]:
+def _report_as_json_value(report: EvaluationReportV1) -> _JsonValue:
     return {
         "report_schema_version": report.report_schema_version,
         "policy_version": report.policy_version,
@@ -328,7 +335,7 @@ def _report_as_json_value(report: EvaluationReportV1) -> dict[str, Any]:
     }
 
 
-def _first_non_finite_path(value: Any, path: str) -> str | None:  # noqa: ANN401
+def _first_non_finite_path(value: _JsonValue, path: str) -> str | None:
     """직렬화 전 유한성 선검사(5B `manifest.py::_first_non_finite_path`와 같은 방식) —
     `json.dumps(allow_nan=False)`의 `ValueError`는 어느 필드인지 말하지 않는다."""
     if isinstance(value, float):

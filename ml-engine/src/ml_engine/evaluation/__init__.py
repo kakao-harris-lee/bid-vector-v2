@@ -36,7 +36,27 @@ from ml_engine.evaluation.policy import (
     load_evaluation_policy,
     policy_checksum,
 )
+from ml_engine.evaluation.report import (
+    EvaluationReportV1,
+    ModelScore,
+    NotPromotable,
+    Promotable,
+    Promotion,
+    PromotionNotEvaluable,
+    StratumCount,
+    WindowResult,
+    canonical_report_bytes,
+    derive_promotion,
+    report_checksum,
+)
 from ml_engine.evaluation.scoring import improvement_ratio, paired_t, rmse_bias_std
+from ml_engine.evaluation.segments import (
+    SegmentScore,
+    SegmentSpec,
+    regressed_segments,
+    segment_scores,
+    segment_specs,
+)
 from ml_engine.evaluation.verdict import (
     Failed,
     GateOutcome,
@@ -57,26 +77,6 @@ from ml_engine.evaluation.windows import (
     holdout_overlaps,
     indices_in_window,
     plan_evaluation_windows,
-)
-from ml_engine.evaluation.segments import (
-    SegmentScore,
-    SegmentSpec,
-    regressed_segments,
-    segment_scores,
-    segment_specs,
-)
-from ml_engine.evaluation.report import (
-    EvaluationReportV1,
-    ModelScore,
-    NotPromotable,
-    Promotable,
-    Promotion,
-    PromotionNotEvaluable,
-    StratumCount,
-    WindowResult,
-    canonical_report_bytes,
-    derive_promotion,
-    report_checksum,
 )
 
 __all__ = [

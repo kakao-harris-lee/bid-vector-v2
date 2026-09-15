@@ -42,7 +42,11 @@ class BaselineSpec:
 
 
 def _category_key(facts: FeatureFacts) -> str:
-    return facts.category_code.value if isinstance(facts.category_code, Present) else "unknown"
+    return (
+        facts.category_code.value
+        if isinstance(facts.category_code, Present)
+        else "unknown"
+    )
 
 
 def _agency_key(facts: FeatureFacts) -> str:

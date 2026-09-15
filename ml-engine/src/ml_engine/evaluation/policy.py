@@ -21,7 +21,7 @@ import json
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 import yaml
 
@@ -85,6 +85,10 @@ class EvaluationPolicy:
     segment_axes: tuple[str, ...]
 
     def __post_init__(self) -> None:
+        self._validate_scalars()
+        self._validate_collections()
+
+    def _validate_scalars(self) -> None:
         if self.paired_t_threshold <= 0:
             raise ValueError(
                 f"paired_t_threshold 는 양수여야 합니다: {self.paired_t_threshold}"
@@ -111,10 +115,14 @@ class EvaluationPolicy:
             raise ValueError(
                 f"gate_baseline 은 베이스라인 표 이름이어야 합니다: {self.gate_baseline!r}"
             )
+
+    def _validate_collections(self) -> None:
         if not self.stability_seeds:
             raise ValueError("stability_seeds 는 비어 있을 수 없습니다.")
         if len(set(self.stability_seeds)) != len(self.stability_seeds):
-            raise ValueError(f"stability_seeds 에 중복이 있습니다: {self.stability_seeds!r}")
+            raise ValueError(
+                f"stability_seeds 에 중복이 있습니다: {self.stability_seeds!r}"
+            )
         if not self.amount_band_edges:
             raise ValueError("amount_band_edges 는 비어 있을 수 없습니다.")
         if any(edge <= 0 for edge in self.amount_band_edges):
@@ -195,15 +203,17 @@ def _int_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[int, ...] | None:
         return None
     if any(isinstance(item, bool) or not isinstance(item, int) for item in raw):
         return None
-    return tuple(int(item) for item in raw)  # type: ignore[arg-type]
+    return tuple(int(item) for item in raw)
 
 
 def _float_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[float, ...] | None:
     if raw is None:
         return None
-    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in raw):
+    if any(
+        isinstance(item, bool) or not isinstance(item, (int, float)) for item in raw
+    ):
         return None
-    return tuple(float(item) for item in raw)  # type: ignore[arg-type]
+    return tuple(float(item) for item in raw)
 
 
 def _str_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[str, ...] | None:
@@ -214,6 +224,90 @@ def _str_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[str, ...] | None:
     return tuple(str(item) for item in raw)
 
 
+@dataclass(frozen=True)
+class _ParsedFields:
+    """형 검사를 통과한 원시 필드 한 벌 — `EvaluationPolicy.__post_init__`의 값
+    불변식은 아직 거치지 않았다."""
+
+    paired_t_threshold: float
+    gate_baseline: str
+    gate_model: str
+    gate_stratum: str
+    maturity_threshold: float
+    min_evaluation_rows: int
+    max_origins: int
+    agency_baseline_min_count: int
+    stability_seeds: tuple[int, ...]
+    amount_band_edges: tuple[float, ...]
+    segment_axes: tuple[str, ...]
+
+
+def _parse_fields(values: dict[str, PolicyScalar]) -> _ParsedFields | None:
+    """평탄 인덱스 목록 조립 + 스칼라 형 검사 — 형이 맞지 않으면 `None`(설계 래칫
+    함수 길이 한도로 `load_evaluation_policy`에서 분리, verifier r1 L-5 형식)."""
+    fields = (
+        _require_number(values, "paired_t_threshold"),
+        _require_str(values, "gate_baseline"),
+        _require_str(values, "gate_model"),
+        _require_str(values, "gate_stratum"),
+        _require_number(values, "maturity_threshold"),
+        _require_int(values, "min_evaluation_rows"),
+        _require_int(values, "max_origins"),
+        _require_int(values, "agency_baseline_min_count"),
+        _int_tuple(_collect_indexed_list(values, "stability_seeds")),
+        _float_tuple(_collect_indexed_list(values, "amount_band_edges")),
+        _str_tuple(_collect_indexed_list(values, "segment_axes")),
+    )
+    if any(field is None for field in fields):
+        return None
+    return _assemble_parsed_fields(fields)
+
+
+def _assemble_parsed_fields(
+    fields: tuple[
+        float | None,
+        str | None,
+        str | None,
+        str | None,
+        float | None,
+        int | None,
+        int | None,
+        int | None,
+        tuple[int, ...] | None,
+        tuple[float, ...] | None,
+        tuple[str, ...] | None,
+    ],
+) -> _ParsedFields:
+    """`_parse_fields`가 `None` 없음을 확인한 뒤에만 부른다 — `cast`는 그 불변식을
+    타입에 반영할 뿐 재검증하지 않는다(설계 래칫 함수 길이 한도로 분리)."""
+    (
+        paired_t_threshold,
+        gate_baseline,
+        gate_model,
+        gate_stratum,
+        maturity_threshold,
+        min_evaluation_rows,
+        max_origins,
+        agency_baseline_min_count,
+        stability_seeds,
+        amount_band_edges,
+        segment_axes,
+    ) = fields
+    return _ParsedFields(
+        paired_t_threshold=cast(float, paired_t_threshold),
+        gate_baseline=cast(str, gate_baseline),
+        gate_model=cast(str, gate_model),
+        gate_stratum=cast(str, gate_stratum),
+        maturity_threshold=cast(float, maturity_threshold),
+        min_evaluation_rows=cast(int, min_evaluation_rows),
+        max_origins=cast(int, max_origins),
+        agency_baseline_min_count=cast(int, agency_baseline_min_count),
+        stability_seeds=cast("tuple[int, ...]", stability_seeds),
+        amount_band_edges=cast("tuple[float, ...]", amount_band_edges),
+        segment_axes=cast("tuple[str, ...]", segment_axes),
+    )
+
+
 def load_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:
     """`path` 의 YAML 을 읽어 `EvaluationPolicy` 로 검증한다. 미지 키·값 불변식 위반은
     전부 `PolicyRejected`(예외로 새지 않는다, v2-지침서.md §5)."""
@@ -222,35 +316,8 @@ def load_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:
     except (PolicyError, OSError, yaml.YAMLError) as exc:
         return PolicyRejected(PolicyRejectionReason.MALFORMED, str(exc))
 
-    paired_t_threshold = _require_number(raw.values, "paired_t_threshold")
-    gate_baseline = _require_str(raw.values, "gate_baseline")
-    gate_model = _require_str(raw.values, "gate_model")
-    gate_stratum = _require_str(raw.values, "gate_stratum")
-    maturity_threshold = _require_number(raw.values, "maturity_threshold")
-    min_evaluation_rows = _require_int(raw.values, "min_evaluation_rows")
-    max_origins = _require_int(raw.values, "max_origins")
-    agency_baseline_min_count = _require_int(raw.values, "agency_baseline_min_count")
-    stability_seeds = _int_tuple(
-        _collect_indexed_list(raw.values, "stability_seeds")
-    )
-    amount_band_edges = _float_tuple(
-        _collect_indexed_list(raw.values, "amount_band_edges")
-    )
-    segment_axes = _str_tuple(_collect_indexed_list(raw.values, "segment_axes"))
-
-    if (
-        paired_t_threshold is None
-        or gate_baseline is None
-        or gate_model is None
-        or gate_stratum is None
-        or maturity_threshold is None
-        or min_evaluation_rows is None
-        or max_origins is None
-        or agency_baseline_min_count is None
-        or stability_seeds is None
-        or amount_band_edges is None
-        or segment_axes is None
-    ):
+    parsed = _parse_fields(raw.values)
+    if parsed is None:
         return PolicyRejected(
             PolicyRejectionReason.INVALID_VALUE, f"malformed values: {raw.values!r}"
         )
@@ -258,17 +325,17 @@ def load_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:
     try:
         return EvaluationPolicy(
             version=raw.version,
-            paired_t_threshold=paired_t_threshold,
-            gate_baseline=gate_baseline,
-            gate_model=gate_model,
-            gate_stratum=gate_stratum,
-            maturity_threshold=maturity_threshold,
-            min_evaluation_rows=min_evaluation_rows,
-            max_origins=max_origins,
-            agency_baseline_min_count=agency_baseline_min_count,
-            stability_seeds=stability_seeds,
-            amount_band_edges=amount_band_edges,
-            segment_axes=segment_axes,
+            paired_t_threshold=parsed.paired_t_threshold,
+            gate_baseline=parsed.gate_baseline,
+            gate_model=parsed.gate_model,
+            gate_stratum=parsed.gate_stratum,
+            maturity_threshold=parsed.maturity_threshold,
+            min_evaluation_rows=parsed.min_evaluation_rows,
+            max_origins=parsed.max_origins,
+            agency_baseline_min_count=parsed.agency_baseline_min_count,
+            stability_seeds=parsed.stability_seeds,
+            amount_band_edges=parsed.amount_band_edges,
+            segment_axes=parsed.segment_axes,
         )
     except ValueError as exc:
         return PolicyRejected(PolicyRejectionReason.INVALID_VALUE, str(exc))

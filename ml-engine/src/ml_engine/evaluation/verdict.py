@@ -65,7 +65,7 @@ class Failed(_Scored):
 
 @dataclass(frozen=True)
 class NotEvaluable:
-    """"못 쟀다" — `Passed`가 될 수 없다(타입, bool 쌍 아님)."""
+    """ "못 쟀다" — `Passed`가 될 수 없다(타입, bool 쌍 아님)."""
 
     reason: NotEvaluableReason
     required_row_count: int | None = None
@@ -74,8 +74,40 @@ class NotEvaluable:
 type GateOutcome = Passed | Failed | NotEvaluable
 
 
-def _passes(baseline_rmse: float, model_rmse: float, statistic: float, policy: EvaluationPolicy) -> bool:
+def _passes(
+    baseline_rmse: float, model_rmse: float, statistic: float, policy: EvaluationPolicy
+) -> bool:
     return model_rmse < baseline_rmse and statistic < -policy.paired_t_threshold
+
+
+def _scored_outcome(
+    *,
+    passed: bool,
+    baseline_rmse: float,
+    model_rmse: float,
+    improvement: float,
+    statistic: float,
+    mde: float,
+    required: int | None,
+) -> Passed | Failed:
+    """`Passed`/`Failed` 조립 — 두 필드 집합이 완전히 같아 한 곳에서만 짓는다."""
+    if passed:
+        return Passed(
+            baseline_rmse=baseline_rmse,
+            model_rmse=model_rmse,
+            improvement_ratio=improvement,
+            paired_t=statistic,
+            min_detectable_improvement=mde,
+            required_row_count=required,
+        )
+    return Failed(
+        baseline_rmse=baseline_rmse,
+        model_rmse=model_rmse,
+        improvement_ratio=improvement,
+        paired_t=statistic,
+        min_detectable_improvement=mde,
+        required_row_count=required,
+    )
 
 
 def trial_outcome(
@@ -96,20 +128,23 @@ def trial_outcome(
     statistic = paired_t(model_predictions, baseline_predictions, targets)
     improvement = improvement_ratio(baseline_rmse, model_rmse)
     mde = minimum_detectable_improvement(
-        model_predictions, baseline_predictions, targets, threshold=policy.paired_t_threshold
+        model_predictions,
+        baseline_predictions,
+        targets,
+        threshold=policy.paired_t_threshold,
     )
     required = required_row_count(statistic, n, threshold=policy.paired_t_threshold)
     if improvement >= 0.0 and improvement < mde:
         return NotEvaluable(NotEvaluableReason.UNDERPOWERED, required)
-    scored = dict(
+    return _scored_outcome(
+        passed=_passes(baseline_rmse, model_rmse, statistic, policy),
         baseline_rmse=baseline_rmse,
         model_rmse=model_rmse,
-        improvement_ratio=improvement,
-        paired_t=statistic,
-        min_detectable_improvement=mde,
-        required_row_count=required,
+        improvement=improvement,
+        statistic=statistic,
+        mde=mde,
+        required=required,
     )
-    return Passed(**scored) if _passes(baseline_rmse, model_rmse, statistic, policy) else Failed(**scored)
 
 
 def gate_outcome(
@@ -130,19 +165,22 @@ def gate_outcome(
     statistic = paired_t(model_predictions, baseline_predictions, targets)
     improvement = improvement_ratio(baseline_rmse, model_rmse)
     mde = minimum_detectable_improvement(
-        model_predictions, baseline_predictions, targets, threshold=policy.paired_t_threshold
+        model_predictions,
+        baseline_predictions,
+        targets,
+        threshold=policy.paired_t_threshold,
     )
     required = required_row_count(statistic, n, threshold=policy.paired_t_threshold)
     if not (stability.sign_consistent and stability.verdict_consistent):
         return NotEvaluable(NotEvaluableReason.SEED_UNSTABLE, required)
     if improvement >= 0.0 and improvement < mde:
         return NotEvaluable(NotEvaluableReason.UNDERPOWERED, required)
-    scored = dict(
+    return _scored_outcome(
+        passed=_passes(baseline_rmse, model_rmse, statistic, policy),
         baseline_rmse=baseline_rmse,
         model_rmse=model_rmse,
-        improvement_ratio=improvement,
-        paired_t=statistic,
-        min_detectable_improvement=mde,
-        required_row_count=required,
+        improvement=improvement,
+        statistic=statistic,
+        mde=mde,
+        required=required,
     )
-    return Passed(**scored) if _passes(baseline_rmse, model_rmse, statistic, policy) else Failed(**scored)

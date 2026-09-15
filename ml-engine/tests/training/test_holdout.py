@@ -1,0 +1,441 @@
+"""RED — `ml_engine.training.holdout`(scope ⑦, `Reuse:
+award_rate_holdout.py@ed4b06c`). `run_holdout`유일 실행 진입점 — 합성 코퍼스로 창
+분할·경계 동시각·양쪽 비어 있음·seed 안정성·report 왕복을 확인한다."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+import numpy as np
+
+from ml_engine.contracts import common_pb2, features_pb2
+from ml_engine.evaluation import EvaluationPolicy, Failed, NotEvaluable, Passed
+from ml_engine.evaluation.report import PromotionNotEvaluable
+from ml_engine.evaluation.windows import WeekMaturity, WindowExclusionReason
+from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFailed
+from ml_engine.training.dataset import DatasetManifestV1, LoadedDataset, RawTrainingRow
+from ml_engine.training.holdout import (
+    HoldoutRejected,
+    HoldoutRejectionReason,
+    run_holdout,
+)
+from ml_engine.training.policy import TrainingPolicy
+from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
+from ml_engine.training.train import CodeVersion
+
+_HYPERPARAMETERS = LightGbmHyperparameters(
+    objective="regression",
+    metric="rmse",
+    learning_rate=0.3,
+    num_leaves=7,
+    min_data_in_leaf=1,
+    feature_fraction=1.0,
+    bagging_fraction=1.0,
+    bagging_freq=0,
+    lambda_l2=0.0,
+    verbosity=-1,
+    deterministic=True,
+    force_row_wise=True,
+    num_threads=1,
+)
+
+_EPOCH = datetime(2026, 1, 1, tzinfo=UTC)
+
+
+def _spec(**overrides: object) -> TrainingSpec:
+    base: dict[str, object] = dict(
+        version="test-holdout-v1",
+        hyperparameters=_HYPERPARAMETERS,
+        num_boost_round=3,
+        encoding_folds=2,
+        seed=20260812,
+        min_residual_std=0.002,
+    )
+    base.update(overrides)
+    return TrainingSpec(**base)  # type: ignore[arg-type]
+
+
+def _policy(**overrides: object) -> EvaluationPolicy:
+    base: dict[str, object] = dict(
+        version="test",
+        paired_t_threshold=2.58,
+        gate_baseline="category_x_band",
+        gate_model="gbm_all_strata",
+        gate_stratum="clean-base",
+        maturity_threshold=0.70,
+        min_evaluation_rows=2,
+        max_origins=5,
+        agency_baseline_min_count=2,
+        stability_seeds=(20260812, 1),
+        amount_band_edges=(1e8, 5e8, 1e9, 5e9),
+        segment_axes=("category", "amount_band"),
+    )
+    base.update(overrides)
+    return EvaluationPolicy(**base)  # type: ignore[arg-type]
+
+
+def _feature_inputs(*, category: str, agency: str) -> features_pb2.FeatureInputs:
+    inputs = features_pb2.FeatureInputs()
+    inputs.base_amount.value.amount_won = 200_000_000
+    inputs.base_amount.value.currency = common_pb2.CURRENCY_KRW
+    inputs.base_amount.value.basis = common_pb2.BASIS_BASE_AMOUNT
+    inputs.base_amount.value.provenance = common_pb2.AMOUNT_PROVENANCE_KIND_PUBLISHED
+    inputs.category_code.value = category
+    inputs.agency_id.value = agency
+    inputs.base_amount_provenance_label.value = (
+        common_pb2.BASE_AMOUNT_PROVENANCE_LABEL_CLEAN
+    )
+    return inputs
+
+
+def _raw_row(
+    day: int, *, category: str, agency: str, label: float, stratum: str = "clean-base"
+) -> RawTrainingRow:
+    return RawTrainingRow(
+        feature_inputs=_feature_inputs(category=category, agency=agency),
+        label_value=label,
+        opened_at=_EPOCH + timedelta(days=day),
+        stratum=stratum,
+    )
+
+
+def _dataset(
+    rows: tuple[RawTrainingRow, ...], *, dataset_id: str = "ds-holdout"
+) -> LoadedDataset:
+    manifest = DatasetManifestV1(
+        dataset_id=dataset_id,
+        sample_scope="feed-origin-only",
+        feed_origin_only=True,
+        row_count=len(rows),
+        rows_checksum="0" * 64,
+        opened_at_first=rows[0].opened_at if rows else _EPOCH,
+        opened_at_last=rows[-1].opened_at if rows else _EPOCH,
+        feature_schema_version="award-rate-features-v2",
+    )
+    return LoadedDataset(manifest=manifest, raw_rows=rows)
+
+
+class _DeterministicBooster:
+    """행렬 첫 열(공종 코드)로 예측하는 결정적 부스터 — LightGBM 없이도 재현성·판정
+    구조를 검증할 수 있게 한다."""
+
+    def __init__(self, base: float, slope: float) -> None:
+        self._base = base
+        self._slope = slope
+
+    def predict(self, matrix: np.ndarray) -> np.ndarray:
+        return self._base + self._slope * matrix[:, 0]
+
+    def model_to_string(self) -> str:
+        return "fake"
+
+    def feature_name(self) -> list[str]:
+        return ["category", "log_amount", "agency_encoding", "agency_sample", "denom"]
+
+
+class _DeterministicTrainer:
+    def __init__(self, base: float = 0.7, slope: float = 0.0) -> None:
+        self._base = base
+        self._slope = slope
+
+    def train(
+        self, matrix, labels, feature_names, categorical_indices, params, seed, rounds
+    ) -> BoosterLike | TrainerFailed:
+        if matrix.shape[0] == 0:
+            return TrainerFailed("empty matrix")
+        return _DeterministicBooster(self._base, self._slope)
+
+
+def _training_policy(min_training_rows: int = 5) -> TrainingPolicy:
+    return TrainingPolicy(version="test-v1", min_training_rows=min_training_rows)
+
+
+def _many_rows(
+    n: int, *, start_day: int = 0, stratum: str = "clean-base"
+) -> tuple[RawTrainingRow, ...]:
+    return tuple(
+        _raw_row(
+            start_day + i,
+            category="civil" if i % 2 == 0 else "it",
+            agency=f"agency-{i % 3}",
+            label=0.6 + 0.001 * (i % 5),
+            stratum=stratum,
+        )
+        for i in range(n)
+    )
+
+
+def test_run_holdout_rejects_empty_dataset() -> None:
+    dataset = _dataset(())
+    result = run_holdout(
+        dataset,
+        [],
+        _spec(),
+        _training_policy(),
+        _policy(),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert isinstance(result, HoldoutRejected)
+    assert result.reason == HoldoutRejectionReason.EMPTY_SIDE
+
+
+def test_run_holdout_rejects_overlapping_maturity_windows() -> None:
+    rows = _many_rows(10)
+    dataset = _dataset(rows)
+    week1 = WeekMaturity(
+        start=_EPOCH, end=_EPOCH + timedelta(days=7), opened_count=5, settled_count=4
+    )
+    overlapping = WeekMaturity(
+        start=_EPOCH + timedelta(days=3),
+        end=_EPOCH + timedelta(days=10),
+        opened_count=5,
+        settled_count=4,
+    )
+    result = run_holdout(
+        dataset,
+        [week1, overlapping],
+        _spec(),
+        _training_policy(),
+        _policy(),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert isinstance(result, HoldoutRejected)
+    assert result.reason == HoldoutRejectionReason.INVALID_MATURITY_INPUT
+
+
+def test_run_holdout_with_no_evaluable_windows_still_produces_report() -> None:
+    rows = _many_rows(10)
+    dataset = _dataset(rows)
+    immature = WeekMaturity(
+        start=_EPOCH + timedelta(days=8),
+        end=_EPOCH + timedelta(days=15),
+        opened_count=10,
+        settled_count=1,
+    )
+    result = run_holdout(
+        dataset,
+        [immature],
+        _spec(),
+        _training_policy(),
+        _policy(),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert result.windows == ()
+    assert len(result.excluded_windows) == 1
+    assert result.excluded_windows[0].reason == WindowExclusionReason.IMMATURE
+    assert isinstance(result.promotion, PromotionNotEvaluable)
+
+
+def _selected_window_scenario(
+    min_training_rows: int = 5,
+) -> tuple[LoadedDataset, WeekMaturity]:
+    """학습측 20행 + 평가 창 안 10행(성숙도 0.9, min_evaluation_rows=2 충족)."""
+    train_part = _many_rows(20, start_day=0)
+    window_start_day = 30
+    eval_part = _many_rows(10, start_day=window_start_day)
+    rows = train_part + eval_part
+    dataset = _dataset(rows)
+    window = WeekMaturity(
+        start=_EPOCH + timedelta(days=window_start_day),
+        end=_EPOCH + timedelta(days=window_start_day + 7),
+        opened_count=10,
+        settled_count=9,
+    )
+    return dataset, window
+
+
+def test_run_holdout_evaluates_selected_window_and_produces_gate_outcome() -> None:
+    dataset, window = _selected_window_scenario()
+    result = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(),
+        _policy(),
+        _DeterministicTrainer(base=0.6, slope=0.0),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert len(result.windows) == 1
+    window_result = result.windows[0]
+    assert isinstance(window_result.outcome, (Passed, Failed, NotEvaluable))
+    assert window_result.release_id
+    assert len(window_result.stability.trials) == len(_policy().stability_seeds)
+    # 헤드라인 seed 가 목록 선두
+    assert window_result.stability.trials[0].seed == _spec().seed
+
+
+def test_run_holdout_accounting_invariant_unaccounted_is_zero_for_feed_origin_only() -> (
+    None
+):
+    """회계 불변식은 **주어진 성숙도 창이 전 구간을 덮을 때만** 0 이 된다(legacy와
+    같은 정의 — `unaccounted_row_count`는 선택+제외 창의 합집합 밖 행 수). 실제 운영은
+    K7 `build_weekly_maturity`가 전 구간 주간표를 주므로 이 불변식이 항상 성립한다."""
+    train_part = _many_rows(20, start_day=0)
+    eval_part = _many_rows(10, start_day=30)
+    dataset = _dataset(train_part + eval_part)
+
+    def _immature(start_day: int) -> WeekMaturity:
+        return WeekMaturity(
+            start=_EPOCH + timedelta(days=start_day),
+            end=_EPOCH + timedelta(days=start_day + 7),
+            opened_count=1,
+            settled_count=0,
+        )
+
+    selected_window = WeekMaturity(
+        start=_EPOCH + timedelta(days=35),
+        end=_EPOCH + timedelta(days=42),
+        opened_count=5,
+        settled_count=4,
+    )
+    maturities = [_immature(day) for day in (0, 7, 14, 21, 28)] + [selected_window]
+    result = run_holdout(
+        dataset,
+        maturities,
+        _spec(),
+        _training_policy(),
+        _policy(),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert result.unaccounted_row_count == 0
+    assert len(result.windows) == 1
+
+
+def test_run_holdout_is_reproducible_with_fake_trainer() -> None:
+    dataset, window = _selected_window_scenario()
+    first = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(),
+        _policy(),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    second = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(),
+        _policy(),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(first, HoldoutRejected)
+    assert not isinstance(second, HoldoutRejected)
+    from ml_engine.evaluation.report import canonical_report_bytes
+
+    first_bytes = canonical_report_bytes(first)
+    second_bytes = canonical_report_bytes(second)
+    assert isinstance(first_bytes, bytes)
+    assert first_bytes == second_bytes
+    assert first.windows[0].release_id == second.windows[0].release_id
+
+
+def test_run_holdout_two_windows_have_distinct_release_ids() -> None:
+    train_part = _many_rows(30, start_day=0)
+    window1_start = 40
+    window2_start = 50
+    eval1 = _many_rows(5, start_day=window1_start)
+    eval2 = _many_rows(5, start_day=window2_start)
+    rows = train_part + eval1 + eval2
+    dataset = _dataset(rows)
+    window1 = WeekMaturity(
+        start=_EPOCH + timedelta(days=window1_start),
+        end=_EPOCH + timedelta(days=window1_start + 7),
+        opened_count=5,
+        settled_count=4,
+    )
+    window2 = WeekMaturity(
+        start=_EPOCH + timedelta(days=window2_start),
+        end=_EPOCH + timedelta(days=window2_start + 7),
+        opened_count=5,
+        settled_count=4,
+    )
+    result = run_holdout(
+        dataset,
+        [window1, window2],
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=2, max_origins=5),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert len(result.windows) == 2
+    assert result.windows[0].release_id != result.windows[1].release_id
+    assert result.holdout_overlaps  # 두 창 쌍에 대해 겹침이 측정된다
+    assert all(overlap.row_count == 0 for overlap in result.holdout_overlaps)
+
+
+def test_run_holdout_window_with_training_rejected_is_excluded() -> None:
+    """min_training_rows 를 창의 학습 행 수보다 크게 잡아 TrainingRejected 를 유도."""
+    dataset, window = _selected_window_scenario()
+    result = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(min_training_rows=10_000),
+        _policy(),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert result.windows == ()
+    assert any(
+        item.reason == WindowExclusionReason.TRAINING_REJECTED
+        for item in result.excluded_windows
+    )
+
+
+def test_run_holdout_reproducible_with_real_lightgbm() -> None:
+    """설계 검토 (5)-9 — fake + **실 LightGBM 1건**. 창당 학습 행이 5C-1
+    `min_training_rows`(training-v1, 500)를 넘어야 하므로 test 용 `TrainingPolicy`를
+    직접 구성해 낮춘다(컨벤션 허용, 5C-1 관행)."""
+    dataset, window = _selected_window_scenario(min_training_rows=5)
+    trainer = LightGbmTrainer()
+    small_policy = _policy(stability_seeds=(20260812,))  # seed 1개 — 실행 비용 절감
+
+    first = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(min_training_rows=5),
+        small_policy,
+        trainer,
+        CodeVersion("sha-1"),
+    )
+    second = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(min_training_rows=5),
+        small_policy,
+        trainer,
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(first, HoldoutRejected)
+    assert not isinstance(second, HoldoutRejected)
+
+    from ml_engine.evaluation.report import canonical_report_bytes
+
+    first_bytes = canonical_report_bytes(first)
+    second_bytes = canonical_report_bytes(second)
+    assert isinstance(first_bytes, bytes)
+    assert first_bytes == second_bytes
+
+
+def test_no_bare_threshold_seed_or_layer_parameter_on_run_holdout() -> None:
+    """설계 검토 (1) 첫 행 — 임계·seed 목록·층 이름을 낱개 인자로 받지 않는다."""
+    import inspect
+
+    signature = inspect.signature(run_holdout)
+    forbidden = {"threshold", "seeds", "stratum", "max_origins", "paired_t_threshold"}
+    assert forbidden.isdisjoint(signature.parameters)

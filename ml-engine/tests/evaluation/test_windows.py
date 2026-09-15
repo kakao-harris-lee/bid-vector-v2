@@ -47,7 +47,10 @@ def _dt(day: int) -> datetime:
 
 def _week(start_day: int, *, opened: int, settled: int) -> WeekMaturity:
     return WeekMaturity(
-        start=_dt(start_day), end=_dt(start_day + 7), opened_count=opened, settled_count=settled
+        start=_dt(start_day),
+        end=_dt(start_day + 7),
+        opened_count=opened,
+        settled_count=settled,
     )
 
 
@@ -93,7 +96,9 @@ def test_plan_evaluation_windows_zero_opened_count_is_immature() -> None:
 def test_plan_evaluation_windows_excludes_insufficient_rows() -> None:
     rows = [
         _Row(opened_at=_dt(0), stratum="clean-base"),  # 학습측 (opened_at < start)
-        _Row(opened_at=_dt(2), stratum="clean-base"),  # 창 안 1건 < min_evaluation_rows(2)
+        _Row(
+            opened_at=_dt(2), stratum="clean-base"
+        ),  # 창 안 1건 < min_evaluation_rows(2)
     ]
     mature_but_thin = _week(1, opened=10, settled=9)
     plan = plan_evaluation_windows(rows, [mature_but_thin], _POLICY)
@@ -161,7 +166,9 @@ def test_plan_evaluation_windows_beyond_max_origins_drops_oldest() -> None:
     plan = plan_evaluation_windows(rows, [week1, week2], policy)
     assert not isinstance(plan, InvalidMaturityInput)
     assert plan.selected == (week2,)
-    beyond = [e for e in plan.excluded if e.reason == WindowExclusionReason.BEYOND_MAX_ORIGINS]
+    beyond = [
+        e for e in plan.excluded if e.reason == WindowExclusionReason.BEYOND_MAX_ORIGINS
+    ]
     assert len(beyond) == 1
     assert beyond[0].window == week1
 
