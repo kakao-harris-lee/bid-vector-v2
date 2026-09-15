@@ -8,11 +8,11 @@
 라 대상에 포함.
 
 base = `cefb19c9269ac3b29d0246175fb04d71c04aa3d4`(5D 종결), 코드 마지막 커밋 =
-`fe836db20fe2a83aa6806966457384a267096d6c`(evidence — reuse.md. 구현 코드 자체는
-`b9cfe77`).
+`72ee887d910b43fcfc1a7f735c8920113425551e`(evidence — verifier r1 F-1~F-8 반영. 구현
+코드 자체는 `de518ba`, F-1 이전 최초 구현은 `b9cfe77`).
 
 ```
-$ git diff --name-status cefb19c9269ac3b29d0246175fb04d71c04aa3d4..fe836db20fe2a83aa6806966457384a267096d6c \
+$ git diff --name-status cefb19c9269ac3b29d0246175fb04d71c04aa3d4..72ee887d910b43fcfc1a7f735c8920113425551e \
     -- ml-engine/src/ml_engine/inference ml-engine/tests/inference ml-engine/policy \
        reports/evidence/m5/5d2
 M	ml-engine/src/ml_engine/inference/__init__.py
@@ -77,23 +77,41 @@ git restore --source=cefb19c9269ac3b29d0246175fb04d71c04aa3d4 --staged --worktre
       ml-engine/tests/inference/test_scenario.py
 ```
 
-## 임시 clone 실측(2026-09-15, `git clone --no-hardlinks`)
+## 임시 clone 실측 1차(2026-09-15, `git clone --no-hardlinks`, HEAD `fe836db`)
 
-1. `/…/scratchpad/5d2-rollback-check`에 현재 브랜치 HEAD(`fe836db`)를 `git clone
+1. `/…/scratchpad/5d2-rollback-check`에 당시 브랜치 HEAD(`fe836db`)를 `git clone
    --no-hardlinks`로 복제.
-2. 위 되돌리기 명령 실행 → `git status --short`가 신설 10개 삭제(inference 4 +
-   test 지원 2 + test 4) + `reuse.md` 삭제 + 편집 파일 9개(M) 만 보임 — `scope.md`·
+2. 되돌리기 명령 실행 → `git status --short`가 신설 10개 삭제(inference 4 + test 지원
+   2 + test 4) + `reuse.md` 삭제 + 편집 파일 9개(M) 만 보임 — `scope.md`·
    `policy-values.md`는 목록 밖이라 그대로 남음(확인).
+3. 작업트리 diff `wc -l` → **0**.
+4. `pytest -q -m "not legacy_parity"` → **347 passed, 1 skipped, 4 deselected**.
+5. `mypy --strict` → `Success: no issues found in 27 source files`.
+6. `lint-imports` → `Contracts: 5 kept, 0 broken`(45 files, 125 dependencies).
+
+## 임시 clone 실측 2차(2026-09-15, verifier r1 F-1·F-2 반영 뒤 재산출, HEAD `72ee887`)
+
+파일 집합이 F-1·F-2 이전과 **동일**(수정된 4파일의 내용만 바뀌었다 — 신설/삭제 없음)이라
+되돌리기 명령 자체는 안 바뀐다. F-7(rollback.md 규격 ⑥ — 닿은 게이트 종료 코드 기록
+누락) 반영으로 이번 실측은 S-2·S-6·S-7 도 함께 기록한다.
+
+1. `/…/scratchpad/5d2-rollback-check2`에 HEAD(`72ee887`)를 `git clone --no-hardlinks`
+   로 복제.
+2. 되돌리기 명령 실행 → 1차와 같은 파일 집합(신설 10 삭제 + `reuse.md` 삭제 + 편집 9).
 3. `git diff cefb19c9269ac3b29d0246175fb04d71c04aa3d4 -- ml-engine/src/ml_engine/inference
    ml-engine/tests/inference ml-engine/policy reports/evidence/m5/5d2/reuse.md | wc -l`
-   (작업트리 diff) → **0**(in_scope 코드·evidence 전체 원복 확인).
+   → **0**.
 4. `cd ml-engine && uv sync --frozen --all-extras && uv run python -m pytest tests -q
-   -m "not legacy_parity"` → **347 passed, 1 skipped, 4 deselected**(5D 종결 시점과
-   정확히 같은 수 — `ml-kernel-011` skip 복귀, 5D-2 테스트 전부 소멸).
-5. `uv run mypy --strict src/ml_engine` → `Success: no issues found in 27 source files`
-   (5D-2 신설 4파일 소멸 — 27 = 5D 종결 시점 파일 수).
-6. `uv run lint-imports` → `Contracts: 5 kept, 0 broken`(45 files, 125 dependencies —
-   5D 종결 시점과 동일).
+   -m "not legacy_parity"`(S-5) → **347 passed, 1 skipped, 4 deselected**(5D 종결
+   시점과 정확히 같은 수 — F-1·F-2 가 늘린 test 12개도 전부 소멸).
+5. `uv run mypy --strict src/ml_engine`(S-3) → `Success: no issues found in 27 source
+   files`.
+6. `uv run lint-imports`(S-4) → `Contracts: 5 kept, 0 broken`(45 files, 125
+   dependencies).
+7. `uv run ruff check . && uv run ruff format --check .`(S-2) → **exit 0**
+   (`All checks passed!` · `71 files already formatted`).
+8. `uv run python tools/design_ratchet.py --check`(S-6) → **exit 0**(위반 없음).
+9. `uv run python tools/reuse_provenance_check.py`(S-7) → **exit 0**(위반 없음).
 
 ## 알려진 제한
 
