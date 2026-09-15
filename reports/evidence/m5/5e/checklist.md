@@ -139,12 +139,16 @@ scope.md 표 그대로 승인. 실측 대상 「경계로 처리」 행(servicer
 
 ## 열린 항목(이 라운드가 새로 낸 것)
 
-- `OPEN-5E-YAML-LOADER-INFERENCE` — H-1과 같은 결함 계열(`yaml.YAMLError`를
-  `PolicyRejected`로 감싸지 않음)이 `inference/policy.py`에도 있다(팀장 지시로
-  이번 라운드 범위 밖, serving만 고쳤다). training/evaluation/serving 세 곳은 이미
-  같은 버그가 반복돼(PR#13 HIGH-2·evaluation·이번 serving) 왔으므로, `inference`
-  까지 넷을 한 번에 공유 로더로 통합할지 이 파일만 개별 수정할지는 다음 라운드
-  또는 5E-2 착수 계약에서 결정한다.
+- `OPEN-5E-YAML-LOADER-INFERENCE` — **부팅 경로는 fix round 2 로 닫혔다.** 원인은
+  H-1과 같은 결함 계열(`yaml.YAMLError`를 `PolicyRejected`로 감싸지 않음)이
+  `inference/policy.py`에도 있던 것이었고, verifier r2 가 실측한 잔존 증상(`app.
+  server.run()`이 문법 깨진 inference YAML 에서 처리되지 않은 예외로 죽는다)은
+  `app/server.py::_load_inference_policy_safe`(호출부, in_scope)가 `yaml.YAMLError`
+  를 잡아 `InferencePolicyRejected`로 정규화해 없앴다 — `inference/policy.py`
+  자체는 여전히 무방비다(팀장 지시로 범위 밖). 남은 것은 **로더 자체 정정**뿐이다
+  — training/evaluation/serving 세 곳은 이미 같은 버그가 반복돼(PR#13 HIGH-2·
+  evaluation·5E-1 fix round 1 serving) 왔으므로, `inference`까지 넷을 공유 로더로
+  통합할지 이 파일만 개별 수정할지는 다음 라운드 또는 5E-2 착수 계약에서 결정한다.
 - `OPEN-5E-JOB-QUEUE-BOUND` — 위 10항.
 
 ## 계약과 어긋나 판단이 필요했던 자리
