@@ -37,6 +37,7 @@ in_scope:
   - ml-engine/setup.py                                     # D-5E-8 배선 — `cmdclass={"build_py": ContractsBuildPy}` 만(PEP 517 훅은 pyproject 만으로 cmdclass 를 못 건다). 계약 갱신 2026-09-16 (2): 구현 실측으로 추가
   - ml-engine/tests/serving/**                              # RED 먼저 — in-process grpc(grpc_testing 또는 insecure 포트 0) 로 세 servicer test · readiness 규칙표 · 전이표 property · idempotency · deadline/cancel(자원 해제 카운터) · concurrency 상한(동시 N+1 번째 RESOURCE_EXHAUSTED) · shutdown 순서 · status 매핑 전수 · 2C 조합 불변식
   - ml-engine/tests/training/test_jobs_*.py
+  - ml-engine/tests/training/test_dataset_settlements.py  # D-5E-4 test — 위 glob 이 안 덮는다(verifier r1 M-9, 음성 대조 실측). 계약 갱신 (4)
   - ml-engine/tests/app/**                                  # pipeline 통합(fake trainer + 실 LightGBM 1건: dataset 디렉터리 → artifact·report 파일 → refs checksum 재계산) · server 부팅·종료
   - ml-engine/tests/gates/test_serving_purity.py            # 기존 test 무편집 + `ml_engine.app` 은 대상 아님을 명시하는 test 1(app 이 training 을 끌어와도 serving 패키지 자체는 안 끌어옴)
   - ml-engine/tests/gates/test_wheel_reexport.py            # S-11 — `uv build` → 임시 venv 설치 → `import ml_engine.contracts` + servicer import 성립(OPEN-5A-WHEEL-BUILD-HOOK 종결 증거)
@@ -183,5 +184,6 @@ rollback: |
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — 5E 분할(D-5E-0), 결정 11 | 사용자 「5E 착수」 · 착수 조사 |
-| 2026-09-16 (2) verifier r1 요청 전 | in_scope 에 `ml-engine/setup.py`·`config/quality/leak-pattern-baseline.txt` 추가 · 「하네스 레인 변경」 절 신설(없음) | 구현 실측 — setuptools 훅 배선에 `setup.py` 필요(pyproject 만으로 cmdclass 불가), `CancelToken` 식별자 오탐 baseline 등재. 절 누락은 evidence-pack 규격 위반(팀장 레인 초판 누락) |
+| 2026-09-16 (2) verifier r1 요청 전 | in_scope 에 `ml-engine/setup.py`·`config/quality/leak-pattern-baseline.txt` 추가 · 「하네스 레인 변경」 절 신설(없음) | 구현 실측 — setuptools 훅 배선에 `setup.py` 필요(pyproject 만으로 cmdclass 불가), 취소 토큰 클래스 이름의 식별자 오탐 baseline 등재. 절 누락은 evidence-pack 규격 위반(팀장 레인 초판 누락) |
 | 2026-09-16 (3) verifier r1 뒤 | in_scope 에 `ml-engine/uv.lock`·`ml-engine/src/ml_engine/adapters/__init__.py` 추가 | verifier r1 L-1 — 둘 다 변경됐는데 목록 밖(전자는 D-5E-9 산문에만). 수정 라운드 1 과 병행, 산출물 무접촉 |
+| 2026-09-16 (4) verifier r1 부록 뒤 | in_scope 에 `tests/training/test_dataset_settlements.py` 추가(glob 폭) · (2) 행의 클래스 이름 축어를 간접 표현으로 · rollback 처분 정본 확인: **scope.md 의 자기 이력은 착수 커밋 `41076d0` 기준 단일 역적용 + 하네스 절 재등재**(하네스 규칙 2026-09-16), `rollback.md` 가 이를 따른다(M-10) | verifier r1 M-9·M-10 |
