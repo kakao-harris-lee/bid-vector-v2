@@ -1,0 +1,5 @@
+{
+  "status": "N/A",
+  "reason": "fixture 소비 없음(OPEN-5C-CORPUS) — 이 slice 의 test 는 코드가 만든 합성 코퍼스만 쓴다. 판정 근거는 승인된 규칙표·불변식이지 authoritative fixture 대조가 아니다. 학습 dataset fixture(manifest.json+rows.jsonl, authored-from-approved-spec)는 curator 소관으로 이월된다.",
+  "open": "OPEN-5C-CORPUS"
+}

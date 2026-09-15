@@ -1,0 +1,33 @@
+# M5/5C-1 — 재활용 출처 (ADR 0009 D-6 오른쪽 자리)
+
+> 왼쪽 자리(모듈 옆 최소 포인터)는 각 모듈 docstring 첫 줄 `Reuse: <원본 경로>@<commit>`.
+> 이 표는 그 이식이 **수행한 수정 내역**을 담는다(D-6.1 #3). 조인 키는 `module`(저장소
+> 루트 기준 POSIX 경로) — `ml-engine/tools/reuse_provenance_check.py`(S-7)가 이 표와
+> docstring 포인터를 대조한다. `dataset.py`·`corpus.py`·`policy.py`·`release.py`는 신규
+> 작성(포인터 없음 — legacy 에 dataset manifest·라벨 도메인·정책 로더·release 식별 대응물이
+> 없다, 조사 01 §2-5·§5-4·§8-2)이라 이 표에 행이 없다(S-7 은 포인터가 있는 모듈만 대상).
+>
+> **설계 검토 (4) 대비 편차**: 설계 검토는 「reuse.md 행 7」(`spec.py` 제외)을 계획했다.
+> 실제 구현에서는 `spec.py`의 `TrainingSpec`/`LightGbmHyperparameters` 값(13+4개)이
+> legacy `LIGHTGBM_PARAMS`·`BOOSTING_ROUNDS`·`DEFAULT_ENCODING_FOLDS`·`DEFAULT_TRAINING_SEED`·
+> `MIN_RESIDUAL_STD`를 **무변경으로** 담고 있어 `Reuse:` 포인터를 다는 것이 더 정직한
+> 표기라고 판단했다(값 자체가 이식이지, 그 값을 담는 타입 — `dict[str, Any]` →
+> `LightGbmHyperparameters` 승격 — 은 새 구조다, 5B `schema.py`가 반대로 값은 새로 선언하되
+> 이름 튜플만 legacy 를 잇고 포인터를 달지 않은 것과 대비된다).
+>
+> **verifier r1 M-1 뒤 — `matrix.py` 행 삭제**: `build_training_matrix`(legacy `_feature_matrix`
+> 이식)는 `src/` 안 production 호출부가 없었고(`encoding_oof.py`가 자체 내부 로직으로
+> 학습 행렬을 조립한다), 전 구간 인코딩 공간을 넘기면 누수 행렬을 그대로 내는 public 경로였다
+> (checklist.md M-1 참조). 미사용 + 위험 경로라 모듈 자체를 삭제했다(`git rm`) — 이식이
+> 철회된 것이지 결함이 남아 있는 것이 아니다. 그래서 **7행**이다(spec.py 추가 −
+> matrix.py 삭제 = 애초 계획과 같은 수, 구성은 다르다).
+
+| module | original_path | commit | 수행한 수정·튜닝 |
+| --- | --- | --- | --- |
+| ml-engine/src/ml_engine/training/spec.py | bid-vector/app/services/ml_training/award_rate_gbm.py | ed4b06c | `LIGHTGBM_PARAMS`(13키, `dict[str, Any]`)·`BOOSTING_ROUNDS`·`DEFAULT_ENCODING_FOLDS`·`DEFAULT_TRAINING_SEED`·`MIN_RESIDUAL_STD`를 값 무변경 이식(D-5C-2). 약한 타입 경계를 없애려 `dict[str, Any]`를 `LightGbmHyperparameters`(frozen dataclass, 필드 13개 고정)로 승격했다. `seed`는 하이퍼파라미터에서 분리해 `TrainerLike.train`의 별도 인자로(legacy `{**LIGHTGBM_PARAMS, "seed": seed}` 조립 관례 반영). `TrainingSpec`(version·folds·seed·min_residual_std 묶음)과 `resolve_training_spec`/`spec_checksum`(D-5C-2 코드 선언 + canonical checksum)은 신규 — legacy 에 version 개념·checksum 이 없었다(조사 01 §8-4). |
+| ml-engine/src/ml_engine/training/folds.py | bid-vector/app/services/ml_training/award_rate_gbm.py | ed4b06c | `_fold_indices`(`:214-217`)를 그대로 이식 — `np.random.default_rng(seed).permutation(row_count)` → `array_split`, 빈 조각 제거. rng 계약(seed·순서)을 한 글자도 바꾸지 않았다(D-5C-4, `legacy_parity` test 로 고정). 반환 타입만 `list[np.ndarray]` → `tuple[np.ndarray, ...]`(불변 계약). |
+| ml-engine/src/ml_engine/training/residual.py | bid-vector/app/services/ml_training/award_rate_gbm.py | ed4b06c | `_residual_std`(`:300-304`)를 그대로 이식 — `n<=1`이면 하한, 아니면 `max(std(ddof=1), floor)`. `MIN_RESIDUAL_STD` 모듈 상수를 `floor` 인자로 외부화(매직넘버 금지, 값 자체는 `spec.py`의 `TrainingSpec.min_residual_std`가 legacy 값 그대로 나른다). |
+| ml-engine/src/ml_engine/training/encoding_oof.py | bid-vector/app/services/ml_training/award_rate_gbm.py | ed4b06c | `_out_of_fold_matrix_and_residuals`(`:248-282`)의 구조(폴드 순회 한 번으로 OOF 행렬+잔차)와 `build_feature_space(rows)`(`:167-183`, encoding 인자 없음 → 전 구간)를 이었다. 수정: (1) `_feature_matrix`(원시 `list[float]`)를 5B `build_row`(`FeatureRow \| RowRejected`) 소비로 재작성 — `RowRejected`는 사유별 회계(`missing_fact_rejections`)로, 조용히 버리지 않는다(legacy 에 대응 상태 없음). (2) `_encoding_for`(관측 필터 없음)를 `_observations_for`로 — `agency_id`·`category_code`가 둘 다 `Present`인 행만 관측으로 쓴다(legacy 원시 행은 이 결측 상태가 없었다). (3) fold 처리를 `_fit_fold`/`_predict_held_out`/`_run_fold` 세 함수로 분해(설계 래칫 함수 50줄 한도). (4) `NoObservations`(5B 결과 타입) 전파를 `OutOfFoldNoObservations(fold_index)`로, trainer 실패·비유한 예측을 `OutOfFoldTrainerFailed`로 — legacy 에는 이 실패 상태들이 없었다(암묵적으로 성공만 가정). |
+| ml-engine/src/ml_engine/training/booster.py | bid-vector/app/services/ml_training/award_rate_gbm.py | ed4b06c | `_train_booster`(`:228-245`)를 이었다 — `lightgbm` 지연 import 는 이 모듈 안(경계 유지, legacy `:232` 사유 계승). 수정: (1) 지연 import → **모듈 한정** import(함수 밖에서는 여전히 `lightgbm`을 몰라도 되지만, 이식 대상이 이 모듈 하나로 좁혀졌다). (2) `_categorical_indices()`(legacy 상수 집합 `CATEGORICAL_AWARD_RATE_FEATURES`)를 없애고 범주 인덱스는 호출부(`encoding_oof.py`/`train.py`)가 `FEATURE_SCHEMA_V2`의 `FeatureKind.CATEGORICAL`에서 산출한다. (3) `TrainerLike`/`BoosterLike` Protocol 신규(test fake 주입 자리, legacy 에 없음) — `lgb.train`/`lgb.Dataset` 호출은 `LightGbmTrainer.train` 안으로, `lightgbm.basic.LightGBMError`만 잡아 `TrainerFailed`로(legacy 는 예외를 잡지 않고 그대로 전파했다). (4) `booster_to_text`(legacy `str(booster.model_to_string())`, `:328`)는 값 그대로. |
+| ml-engine/src/ml_engine/training/train.py | bid-vector/app/services/ml_training/award_rate_gbm.py | ed4b06c | `train_award_rate_gbm`(`:334-383`)의 진입점 역할을 이었다 — 유일 학습 진입점이라는 계약은 그대로. 수정: (1) **최소 표본 게이트를 새로 넣었다**(legacy 는 `if not rows: raise`뿐이었고, docstring 이 "최소 표본 게이트(운영값)는 호출부가 건다"고 적었는데 그 호출부가 저장소 전체에 없었다 — 조사 01 §8-2, 이 함수가 처음 건다). (2) 반환이 `dict[str, JsonValue]`(pydantic 모델 직렬화)가 아니라 `TrainedArtifact \| TrainingRejected` — 검증된 모델 객체를 넘기지 않는 legacy 사유(`:341-350`, in-memory 경로에서 fail-closed 검증이 死코드가 되는 것을 막는다)는 유지하되, 실패 사유가 결과 타입으로 명시됐다(legacy 는 없음). (3) `_assemble_artifact`(`:307-331`)의 계약 조립은 `artifact_writer.py`로 이관 — `train.py`는 학습만, 아티팩트 바이트 조립은 별도 모듈(단일 책임 분리, 설계 검토 (5) 순서 10). (4) 함수를 `_admit_and_gate`·`_build_oof_and_space`·`_build_feature_manifest` 세 헬퍼로 분해(설계 래칫). |
+| ml-engine/src/ml_engine/training/artifact_writer.py | bid-vector/app/services/ml_training/award_rate_gbm.py | ed4b06c | `_assemble_artifact`(`:307-331`)의 조립 책임을 이었다 — "학습 산출물을 아티팩트 계약으로, 계약 위반은 여기서 예외가 된다"는 legacy 의도를 결과 타입(`NameMismatch`·`CanonicalizationRejected`)으로 옮겼다. 수정: (1) 계약 모델이 pydantic(`PersistedAwardRateGbmArtifact`) → canonical JSON dict(5B `canonical_json` 규칙 재사용, `dataclasses.asdict` 로 조립). (2) `feature_names` 검증(legacy 로더 쪽 `award_rate_gbm.py:200-206`의 `ValueError`)을 **writer 쪽에서** `verify_feature_names` 결과 타입으로 선제 수행(우회 후보 (7) — fake trainer 가 다른 이름을 낼 수 있다는 전제). (3) `release`에 `artifact_checksum`을 넣지 않는다(D-5C-9, legacy `sample_scope` 강제 필드 규율은 계승하되 자기참조 필드는 제거). (4) 5C-1 전용 필드(`training_spec_version`·`training_spec_checksum`·`training_policy_version`·`feed_origin_only`·`categories`·`denominator_sources`·`agency_encoding`·`rejected_rows`) 추가 — 5D `ArtifactManifestV1` 밖(D-5C-9 통지 대상). |

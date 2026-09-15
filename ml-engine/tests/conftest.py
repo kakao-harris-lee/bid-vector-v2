@@ -11,18 +11,29 @@
 (2) M2/2A 가 쓰던 session fixture(`common_pb2`·`error_pb2`, 임시 디렉터리 + `sys.path` 삽입)는
 그대로 남긴다 — 생성 로직만 공유 함수로 바꿨을 뿐 동작은 같다. 2B~2E 는 각자 독립 module-scope
 fixture로 생성하므로(이 파일을 건드리지 않는다) 회귀 없음.
+
+(3) M5/5C-1 인수 — hypothesis `ci` 프로파일을 루트로 승격(5B `policy-values.md` §「hypothesis
+`ci` 프로파일은 프로세스 전역이다」 인수). `tests/features/conftest.py`는 삭제한다 — 이제
+`training/**`의 hypothesis test 도 같은 프로파일을 물려받아야 하고, 하위 디렉터리 conftest
+는 그 필요를 덮지 못한다(스위트 전체 스코프가 필요). `deadline=None`은 CI 러너의 비결정적
+처리 시간 변동이 `DeadlineExceeded`로 test 를 실패시키는 것을 막는다.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from hypothesis import settings
 
 from tools.generate_contracts import generate
+
+settings.register_profile("ci", deadline=None, max_examples=50)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ci"))
 
 _ML_ENGINE_ROOT = Path(__file__).resolve().parents[1]
 # 패키지 트리 밖(D-5A-0 (b) 정정, verifier r1 F-2) — `src/ml_engine/contracts/` 안이 아니라

@@ -3,3 +3,17 @@
 """
 
 from __future__ import annotations
+
+from ml_engine.adapters.dataset_files import (
+    DatasetFiles,
+    DatasetUnreadable,
+    DatasetUnreadableReason,
+    read_dataset_files,
+)
+
+__all__ = [
+    "DatasetFiles",
+    "DatasetUnreadable",
+    "DatasetUnreadableReason",
+    "read_dataset_files",
+]

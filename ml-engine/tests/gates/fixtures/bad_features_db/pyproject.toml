@@ -1,0 +1,8 @@
+# M5/5C-1 ⑫ 양성 대조(verifier r1 H-3 뒤) — 이 fixture 는 **자기 forbidden 계약을 갖지
+# 않는다**. `test_import_contracts.py::test_bad_features_db_fixture_is_broken_by_lint_imports`
+# 가 실제 `ml-engine/pyproject.toml`에서 계약을 읽어 이 파일의 **임시 사본**에 덧쓴 뒤
+# 실행한다 — 실제 계약이 지워지면 이 fixture 도 「계약 없음」이 되어 그 test 가 먼저
+# 붉어진다(계약의 존재 자체를 실제 파일에 의존시킨다).
+[tool.importlinter]
+root_packages = ["ml_engine"]
+include_external_packages = true

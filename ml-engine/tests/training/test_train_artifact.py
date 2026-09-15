@@ -1,0 +1,546 @@
+"""RED — `ml_engine.training.train`·`ml_engine.training.artifact_writer`(scope ⑥⑧⑨⑩).
+`TrainingPolicy`·`TrainingSpec`는 이 test 에서 직접 구성한다(컨벤션상 허용 — 정책 YAML을
+test 용으로 낮추지 않는다). 실 LightGBM 재현성 test 1건 포함(`num_threads=1` 고정,
+`libomp` 로컬 확인 — commands.md 참조)."""
+
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from ml_engine.contracts import common_pb2, features_pb2
+from ml_engine.features import CanonicalizationRejected, NameMismatch, compute_checksum
+from ml_engine.training.artifact_writer import ArtifactBytes, write_artifact
+from ml_engine.training.booster import LightGbmTrainer, TrainerFailed
+from ml_engine.training.dataset import DatasetManifestV1, LoadedDataset, RawTrainingRow
+from ml_engine.training.policy import TrainingPolicy
+from ml_engine.training.release import derive_release_id
+from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec, spec_checksum
+from ml_engine.training.train import (
+    CodeVersion,
+    TrainedArtifact,
+    TrainingRejected,
+    TrainingRejectionReason,
+    train_award_rate_gbm,
+)
+
+_REAL_HYPERPARAMETERS = LightGbmHyperparameters(
+    objective="regression",
+    metric="rmse",
+    learning_rate=0.3,
+    num_leaves=7,
+    min_data_in_leaf=1,
+    feature_fraction=1.0,
+    bagging_fraction=1.0,
+    bagging_freq=0,
+    lambda_l2=0.0,
+    verbosity=-1,
+    deterministic=True,
+    force_row_wise=True,
+    num_threads=1,
+)
+
+
+def _feature_inputs(*, category: str, agency: str) -> features_pb2.FeatureInputs:
+    inputs = features_pb2.FeatureInputs()
+    inputs.base_amount.value.amount_won = 100_000_000
+    inputs.base_amount.value.currency = common_pb2.CURRENCY_KRW
+    inputs.base_amount.value.basis = common_pb2.BASIS_BASE_AMOUNT
+    inputs.base_amount.value.provenance = common_pb2.AMOUNT_PROVENANCE_KIND_PUBLISHED
+    inputs.category_code.value = category
+    inputs.agency_id.value = agency
+    inputs.base_amount_provenance_label.value = (
+        common_pb2.BASE_AMOUNT_PROVENANCE_LABEL_CLEAN
+    )
+    return inputs
+
+
+def _feature_inputs_missing_base_amount(
+    *, category: str, agency: str
+) -> features_pb2.FeatureInputs:
+    """PR #13 code-reviewer HIGH-1 재현 — `base_amount`가 wire `Missing`(구조적으로
+    유효 — `admit_corpus`는 이것을 거부 사유로 보지 않는다). `build_row`(scope ⑤)만
+    이 행을 `RowRejected(BASE_AMOUNT)`로 떨어뜨린다."""
+    inputs = features_pb2.FeatureInputs()
+    inputs.base_amount.missing = common_pb2.MISSING_REASON_NOT_COLLECTED_YET
+    inputs.category_code.value = category
+    inputs.agency_id.value = agency
+    inputs.base_amount_provenance_label.value = (
+        common_pb2.BASE_AMOUNT_PROVENANCE_LABEL_CLEAN
+    )
+    return inputs
+
+
+def _dataset_with_missing_base_amount(*, present: int, missing: int) -> LoadedDataset:
+    """`present`행은 `_feature_inputs`(base_amount Present), `missing`행은
+    `_feature_inputs_missing_base_amount`(wire Missing) — 둘 다 `admit_corpus`를
+    통과하지만 후자만 `build_row`에서 떨어진다."""
+    total = present + missing
+    manifest = DatasetManifestV1(
+        dataset_id="ds-encoding-dropout",
+        sample_scope="feed-origin-only",
+        feed_origin_only=True,
+        row_count=total,
+        rows_checksum="0" * 64,
+        opened_at_first=datetime(2026, 1, 1, tzinfo=UTC),
+        opened_at_last=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=total),
+        feature_schema_version="award-rate-features-v2",
+    )
+    rows = []
+    for i in range(total):
+        category = "civil" if i % 2 == 0 else "it"
+        agency = f"agency-{i % 4}"
+        label = 0.5 + 0.001 * (i % 10)
+        feature_inputs = (
+            _feature_inputs(category=category, agency=agency)
+            if i < present
+            else _feature_inputs_missing_base_amount(category=category, agency=agency)
+        )
+        rows.append(
+            RawTrainingRow(
+                feature_inputs=feature_inputs,
+                label_value=label,
+                opened_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=i),
+                stratum="clean-base",
+            )
+        )
+    return LoadedDataset(manifest=manifest, raw_rows=tuple(rows))
+
+
+def _synthetic_rows(n: int) -> tuple[RawTrainingRow, ...]:
+    rows = []
+    for i in range(n):
+        category = "civil" if i % 2 == 0 else "it"
+        agency = f"agency-{i % 4}"
+        label = 0.5 + 0.001 * (i % 10)
+        rows.append(
+            RawTrainingRow(
+                feature_inputs=_feature_inputs(category=category, agency=agency),
+                label_value=label,
+                opened_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=i),
+                stratum="clean-base",
+            )
+        )
+    return tuple(rows)
+
+
+def _dataset(n: int) -> LoadedDataset:
+    manifest = DatasetManifestV1(
+        dataset_id="ds-repro",
+        sample_scope="feed-origin-only",
+        feed_origin_only=True,
+        row_count=n,
+        rows_checksum="0" * 64,
+        opened_at_first=datetime(2026, 1, 1, tzinfo=UTC),
+        opened_at_last=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=n),
+        feature_schema_version="award-rate-features-v2",
+    )
+    return LoadedDataset(manifest=manifest, raw_rows=_synthetic_rows(n))
+
+
+def _labeled_dataset(n: int, label_for) -> LoadedDataset:
+    """H-1 ③ — `_dataset`과 같은 구조(dataset_id 만 다름)이지만 라벨을 `label_for(i)`
+    로 자유롭게 준다. floor 대조(상수 라벨·상수 예측 vs 넓게 퍼진 라벨)에 쓴다."""
+    manifest = DatasetManifestV1(
+        dataset_id="ds-residual",
+        sample_scope="feed-origin-only",
+        feed_origin_only=True,
+        row_count=n,
+        rows_checksum="0" * 64,
+        opened_at_first=datetime(2026, 1, 1, tzinfo=UTC),
+        opened_at_last=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=n),
+        feature_schema_version="award-rate-features-v2",
+    )
+    rows = []
+    for i in range(n):
+        category = "civil" if i % 2 == 0 else "it"
+        agency = f"agency-{i % 4}"
+        rows.append(
+            RawTrainingRow(
+                feature_inputs=_feature_inputs(category=category, agency=agency),
+                label_value=label_for(i),
+                opened_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=i),
+                stratum="clean-base",
+            )
+        )
+    return LoadedDataset(manifest=manifest, raw_rows=tuple(rows))
+
+
+class _ConstantPredictionBooster:
+    """test fake — 항상 같은 값을 예측한다(잔차를 직접 통제하기 위한 것 —
+    `_ConstantTrainer`류와 달리 학습 라벨과 무관하게 고정)."""
+
+    def __init__(self, value: float, feature_names: tuple[str, ...]) -> None:
+        self._value = value
+        self._feature_names = feature_names
+
+    def predict(self, matrix):
+        import numpy as np
+
+        return np.full(matrix.shape[0], self._value)
+
+    def model_to_string(self) -> str:
+        return "constant-prediction-booster"
+
+    def feature_name(self) -> list[str]:
+        return list(self._feature_names)
+
+
+class _ConstantPredictionTrainer:
+    def __init__(self, value: float) -> None:
+        self._value = value
+
+    def train(
+        self, matrix, labels, feature_names, categorical_indices, params, seed, rounds
+    ):
+        return _ConstantPredictionBooster(self._value, tuple(feature_names))
+
+
+def _small_spec(**overrides: object) -> TrainingSpec:
+    base: dict[str, object] = dict(
+        version="test-train-v1",
+        hyperparameters=_REAL_HYPERPARAMETERS,
+        num_boost_round=5,
+        encoding_folds=3,
+        seed=42,
+        min_residual_std=0.002,
+    )
+    base.update(overrides)
+    return TrainingSpec(**base)  # type: ignore[arg-type]
+
+
+class _WrongNameBooster:
+    def predict(self, matrix):
+        import numpy as np
+
+        return np.zeros(matrix.shape[0])
+
+    def model_to_string(self) -> str:
+        return "wrong-name-booster"
+
+    def feature_name(self) -> list[str]:
+        return ["not", "the", "right", "names", "!"]
+
+
+class _WrongNameTrainer:
+    def train(
+        self, matrix, labels, feature_names, categorical_indices, params, seed, rounds
+    ):
+        return _WrongNameBooster()
+
+
+class _AlwaysFailingTrainer:
+    def train(
+        self, matrix, labels, feature_names, categorical_indices, params, seed, rounds
+    ):
+        return TrainerFailed("always fails")
+
+
+def test_train_award_rate_gbm_rejects_empty_dataset_as_all_rows_rejected() -> None:
+    dataset = LoadedDataset(
+        manifest=_dataset(1).manifest,
+        raw_rows=(),
+    )
+    policy = TrainingPolicy(version="test-v1", min_training_rows=1)
+    result = train_award_rate_gbm(
+        dataset, _small_spec(), policy, LightGbmTrainer(), CodeVersion("sha-1")
+    )
+    assert isinstance(result, TrainingRejected)
+    assert result.reason == TrainingRejectionReason.ALL_ROWS_REJECTED
+
+
+def test_train_award_rate_gbm_insufficient_training_rows() -> None:
+    dataset = _dataset(5)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=500)
+    result = train_award_rate_gbm(
+        dataset,
+        _small_spec(encoding_folds=2),
+        policy,
+        LightGbmTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert isinstance(result, TrainingRejected)
+    assert result.reason == TrainingRejectionReason.INSUFFICIENT_TRAINING_ROWS
+
+
+def test_train_award_rate_gbm_insufficient_training_rows_after_encoding_dropout() -> (
+    None
+):
+    """code-reviewer PR #13 HIGH-1 — `admit_corpus` 직후 게이트만 있으면 이 사례를
+    놓친다: 50행 전부 구조적으로 유효(admission 통과, `min_training_rows=50` 첫 게이트
+    통과)하지만 44행이 `base_amount` wire Missing 이라 `build_row`에서 떨어져 실제
+    학습 행렬에는 6행만 남는다. 시정 전에는 `TrainedArtifact(training_row_count=6)`
+    가 성공 반환됐다(M5 완료 조건 「최소 표본이 성공으로 변환되지 않음」 위반) — 시정
+    후에는 재게이트가 이 행 수 부족을 잡는다."""
+    dataset = _dataset_with_missing_base_amount(present=6, missing=44)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=50)
+    result = train_award_rate_gbm(
+        dataset,
+        _small_spec(encoding_folds=2),
+        policy,
+        LightGbmTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert isinstance(result, TrainingRejected)
+    assert result.reason == TrainingRejectionReason.INSUFFICIENT_TRAINING_ROWS
+    assert result.detail == "admitted=6 required=50"
+
+
+def test_train_award_rate_gbm_trainer_failure_propagates() -> None:
+    dataset = _dataset(20)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    result = train_award_rate_gbm(
+        dataset,
+        _small_spec(encoding_folds=2),
+        policy,
+        _AlwaysFailingTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert isinstance(result, TrainingRejected)
+    assert result.reason == TrainingRejectionReason.TRAINER_ERROR
+
+
+def _train_and_write(n: int = 40, min_training_rows: int = 5) -> ArtifactBytes:
+    dataset = _dataset(n)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=min_training_rows)
+    trained = train_award_rate_gbm(
+        dataset, _small_spec(), policy, LightGbmTrainer(), CodeVersion("sha-abc123")
+    )
+    assert isinstance(trained, TrainedArtifact)
+    written = write_artifact(trained)
+    assert isinstance(written, ArtifactBytes)
+    return written
+
+
+def test_train_and_write_artifact_succeeds_with_real_lightgbm() -> None:
+    written = _train_and_write()
+    assert written.sha256
+    payload = json.loads(written.bytes)
+    assert payload["training_row_count"] == 40
+
+
+def test_train_and_write_artifact_reproducible_bytes() -> None:
+    """M5 완료 조건 「같은 manifest/seed 입력이 재현 가능한 artifact」·D-5C-12 (a)."""
+    first = _train_and_write()
+    second = _train_and_write()
+    assert first.bytes == second.bytes
+    assert first.sha256 == second.sha256
+
+
+_EXPECTED_TOP_LEVEL_FIELDS = (
+    "manifest_schema_version",
+    "release",
+    "feature_manifest_checksum",
+    "feature_names",
+    "sample_scope",
+    "residual_std",
+    "training_row_count",
+    "booster_model",
+    "reproducibility",
+    "training_spec_version",
+    "training_spec_checksum",
+    "training_policy_version",
+    "feed_origin_only",
+    "categories",
+    "denominator_sources",
+    "agency_encoding",
+    "rejected_rows",
+)
+_EXPECTED_RELEASE_FIELDS = (
+    "release_id",
+    "artifact_checksum",
+    "feature_schema_version",
+    "code_version",
+    "dataset_id",
+)
+_EXPECTED_REPRODUCIBILITY_FIELDS = ("seed", "num_threads", "deterministic")
+
+
+def test_write_artifact_field_set_matches_5d_scope_plus_5c1_additions() -> None:
+    """5D scope ⑦ `ArtifactManifestV1` 필드 집합(문자열 tuple 고정) + 5C-1 추가 여덟.
+
+    D-5C-9b(계약 갱신 이력 2026-09-13) — 5D read model `_parse_release`가
+    `release.artifact_checksum`을 비어 있지 않은 문자열로 **요구**하므로(등가성은
+    보지 않는다), D-5C-9 착수판의 「부재」 단언을 「존재」로 뒤집는다. 값 자체의
+    정의(블랭크 canonical bytes 의 sha256)는
+    `test_release_artifact_checksum_is_blank_canonical_bytes_sha256`이 검증한다."""
+    written = _train_and_write()
+    payload = json.loads(written.bytes)
+    assert set(payload.keys()) == set(_EXPECTED_TOP_LEVEL_FIELDS)
+    assert set(payload["release"].keys()) == set(_EXPECTED_RELEASE_FIELDS)
+    assert isinstance(payload["release"]["artifact_checksum"], str)
+    assert payload["release"]["artifact_checksum"] != ""
+    assert set(payload["reproducibility"].keys()) == set(
+        _EXPECTED_REPRODUCIBILITY_FIELDS
+    )
+
+
+def test_release_artifact_checksum_is_blank_canonical_bytes_sha256() -> None:
+    """D-5C-9b — `release.artifact_checksum`은 최종 bytes 의 sha256(`ArtifactBytes.sha256`)
+    이 아니라, 그 필드를 빈 문자열로 둔 canonical bytes 의 sha256(두 단계 직렬화,
+    legacy manifest `payload_sha256`과 같은 형태)이다. 재계산과 일치해야 한다."""
+    written = _train_and_write()
+    payload = json.loads(written.bytes)
+    blank_payload = json.loads(written.bytes)
+    blank_payload["release"]["artifact_checksum"] = ""
+    blank_bytes = json.dumps(
+        blank_payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    import hashlib
+
+    expected = hashlib.sha256(blank_bytes).hexdigest()
+    assert payload["release"]["artifact_checksum"] == expected
+
+
+def test_release_artifact_checksum_differs_from_artifact_bytes_sha256() -> None:
+    """같은 이름·다른 정의(`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`) — wire
+    `ArtifactReference.release.artifact_checksum`(= `ArtifactBytes.sha256`, 최종 bytes
+    전체의 sha256)과 바이트 안 `release.artifact_checksum`(블랭크 canonical bytes 의
+    sha256)은 이름은 같지만 값이 다르다."""
+    written = _train_and_write()
+    payload = json.loads(written.bytes)
+    assert payload["release"]["artifact_checksum"] != written.sha256
+
+
+def test_write_artifact_reproducible_bytes_include_release_artifact_checksum() -> None:
+    """D-5C-12 (a) 재현성이 새 필드에도 유지된다 — 같은 입력 두 번 → 같은
+    `release.artifact_checksum`(바이트 동일 test 의 부분집합이지만 새 필드를 명시적으로
+    표적한다)."""
+    first = json.loads(_train_and_write().bytes)
+    second = json.loads(_train_and_write().bytes)
+    assert (
+        first["release"]["artifact_checksum"] == second["release"]["artifact_checksum"]
+    )
+
+
+def test_write_artifact_sha256_matches_recomputed_hash() -> None:
+    import hashlib
+
+    written = _train_and_write()
+    assert hashlib.sha256(written.bytes).hexdigest() == written.sha256
+
+
+def test_write_artifact_feature_manifest_checksum_matches_independent_compute() -> None:
+    """verifier r3 H-1 ① — `payload["feature_manifest_checksum"]`이 5B
+    `compute_checksum(trained.feature_manifest)`의 **독립 재계산**과 일치해야 한다.
+    이전에는 이 값을 재계산 대조하는 test 가 없어 `.hexdigest().upper()` 같은 변이가
+    452 test 전건을 조용히 통과했다(리포트 §「H-1」 변이 1b)."""
+    dataset = _dataset(40)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    trained = train_award_rate_gbm(
+        dataset, _small_spec(), policy, LightGbmTrainer(), CodeVersion("sha-abc123")
+    )
+    assert isinstance(trained, TrainedArtifact)
+    written = write_artifact(trained)
+    assert isinstance(written, ArtifactBytes)
+    independent = compute_checksum(trained.feature_manifest)
+    assert not isinstance(independent, CanonicalizationRejected)
+    payload = json.loads(written.bytes)
+    assert payload["feature_manifest_checksum"] == independent
+
+
+def test_write_artifact_training_spec_checksum_matches_independent_compute() -> None:
+    """verifier r3 H-1 ② — `payload["training_spec_checksum"]`이 `spec_checksum(spec)`
+    의 독립 재계산과 일치해야 한다(변이 4, `.upper()`)."""
+    dataset = _dataset(40)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    spec = _small_spec()
+    trained = train_award_rate_gbm(
+        dataset, spec, policy, LightGbmTrainer(), CodeVersion("sha-abc123")
+    )
+    assert isinstance(trained, TrainedArtifact)
+    written = write_artifact(trained)
+    assert isinstance(written, ArtifactBytes)
+    payload = json.loads(written.bytes)
+    assert payload["training_spec_checksum"] == spec_checksum(spec)
+
+
+def test_residual_std_hits_floor_when_predictions_match_labels_exactly() -> None:
+    """verifier r3 H-1 ③ — 예측이 라벨과 정확히 같아 OOF 잔차가 전부 0 인 코퍼스는
+    `spec.min_residual_std` 바닥에 걸린다. `residual.py` 단위 test(하한 자체)와 달리
+    이것은 `train_award_rate_gbm`의 **배선**을 표적한다 — floor 인자가 어딘가에서
+    빠지거나 무시되면(변이 6, `floor=float()`) 여기서 잡힌다."""
+    dataset = _labeled_dataset(40, lambda _: 0.5)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    spec = _small_spec()
+    trained = train_award_rate_gbm(
+        dataset, spec, policy, _ConstantPredictionTrainer(0.5), CodeVersion("sha-1")
+    )
+    assert isinstance(trained, TrainedArtifact)
+    assert trained.residual_std == spec.min_residual_std
+
+
+def test_residual_std_exceeds_floor_when_predictions_disagree_with_labels() -> None:
+    """대조군 — 위 test 가 우연히 항상 같은 값을 내는 것이 아님을 보인다. 라벨이 넓게
+    퍼져 있고 예측이 고정이면 OOF 잔차 표준편차가 바닥을 넘는다."""
+    dataset = _labeled_dataset(40, lambda i: 0.1 + 0.05 * (i % 10))
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    spec = _small_spec()
+    trained = train_award_rate_gbm(
+        dataset, spec, policy, _ConstantPredictionTrainer(0.1), CodeVersion("sha-1")
+    )
+    assert isinstance(trained, TrainedArtifact)
+    assert trained.residual_std > spec.min_residual_std
+
+
+def test_write_artifact_rejects_feature_name_mismatch() -> None:
+    dataset = _dataset(20)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    trained = train_award_rate_gbm(
+        dataset,
+        _small_spec(encoding_folds=2),
+        policy,
+        LightGbmTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert isinstance(trained, TrainedArtifact)
+    tampered = TrainedArtifact(
+        booster=_WrongNameBooster(),
+        feature_manifest=trained.feature_manifest,
+        residual_std=trained.residual_std,
+        training_row_count=trained.training_row_count,
+        sample_scope=trained.sample_scope,
+        feed_origin_only=trained.feed_origin_only,
+        dataset_id=trained.dataset_id,
+        code_version=trained.code_version,
+        training_spec_version=trained.training_spec_version,
+        training_spec_checksum=trained.training_spec_checksum,
+        training_policy_version=trained.training_policy_version,
+        reproducibility=trained.reproducibility,
+        rejected_rows=trained.rejected_rows,
+    )
+    result = write_artifact(tampered)
+    assert isinstance(result, NameMismatch)
+
+
+def test_write_artifact_release_derives_entirely_from_trained() -> None:
+    """verifier r1 H-1 — 우회 (12) 폐쇄 확인. `write_artifact` 는 `trained` 하나만 받으므로
+    호출자가 다른 `dataset_id`/`code_version`/`seed`를 실을 경로가 없다(시그니처 차원의
+    닫힘). `release_id`가 `trained` 자신의 다섯 값에서 재파생한 값과 같음도 확인한다."""
+    import inspect
+
+    signature = inspect.signature(write_artifact)
+    assert list(signature.parameters) == ["trained"]
+
+    written = _train_and_write()
+    payload = json.loads(written.bytes)
+    assert payload["release"]["dataset_id"] == "ds-repro"
+    assert payload["release"]["code_version"] == "sha-abc123"
+
+    recomputed_release_id = derive_release_id(
+        dataset_id=payload["release"]["dataset_id"],
+        training_spec_version=payload["training_spec_version"],
+        training_spec_checksum=payload["training_spec_checksum"],
+        seed=payload["reproducibility"]["seed"],
+        code_version=payload["release"]["code_version"],
+    )
+    assert payload["release"]["release_id"] == recomputed_release_id
+
+
+def test_code_version_rejects_blank() -> None:
+    with pytest.raises(ValueError):
+        CodeVersion("   ")
+    with pytest.raises(ValueError):
+        CodeVersion("")
