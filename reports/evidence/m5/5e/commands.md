@@ -95,21 +95,26 @@
 
 ## 2026-09-15T21:44Z
 - cmd: `./gradlew --no-daemon check`(evidence 커밋 전 재실측)
-- exit: 1(최초) → `leakPatternGate FAILED` — `checklist.md:12`의 `CancelToken`(클래스
-  이름) 이 `leak-patterns.txt`의 `token` 패턴과 매치(오탐, 실유출 아님)
-- 조치: `config/quality/leak-pattern-baseline.txt`에 게이트가 보고한 정확한 키
-  (`reports/evidence/m5/5e/checklist.md#9eac0e220e27ce987378f4202e6003e29ecfa28448343ae521e13321693bbe2a`)
-  등재 — 2026-09-12 leak-baseline-coord 관례(내용 해시 키, 줄 번호 아님)
+- exit: 1(최초) → `leakPatternGate FAILED` — checklist.md 가 그 취소 토큰 클래스의
+  **식별자 이름**을 그대로 적어 `leak-patterns.txt` 어휘 하나와 매치(오탐, 실유출
+  아님) — 코드에 실제로 있는 이름을 가리키는 것이라 baseline 등재 대상(내용 해시
+  키, 게이트가 보고한 값 그대로)
+- 조치: `config/quality/leak-pattern-baseline.txt`에 그 키 1건 등재(2026-09-12
+  leak-baseline-coord 관례)
 - cmd: `./gradlew --no-daemon check`(재실측)
 - exit: 0
 - 핵심 결과: `BUILD SUCCESSFUL`, `leakPatternGate` 포함 337 task 전부 통과
 
-## 2026-09-15T21:44Z (rollback.md·golden-manifest.json 커밋 전 재실측)
+## 2026-09-15T21:44Z (rollback.md·golden-manifest.json 커밋 전 재실측 — verifier r1 M-7 로
+사후 정정)
 - cmd: `./gradlew --no-daemon check`
-- exit: 1(최초) → `leakPatternGate FAILED` — 바로 위 두 문단이 그 취소 토큰 클래스
-  이름을 다시 인용해(이 문서 자기 자신의 판독 서술) 새 매치 2건 발생(같은 오탐 갈래,
-  다른 줄)
-- 조치: 두 키를 `config/quality/leak-pattern-baseline.txt`에 추가 등재
+- exit: 1(최초) → `leakPatternGate FAILED` — 이 evidence 문서 **자기 자신의 판독
+  서술**이 그 식별자 이름을 다시 축어로 인용해 새 매치 2건을 냈다(코드 자체를
+  가리키는 게 아니라 이전 판독을 설명하는 산문이 스캔 어휘를 그대로 옮긴 것 —
+  하네스 규율 2026-09-16 「비밀값 스캔 어휘를 evidence 문서에 축어로 적지 않는다」
+  위반). baseline 등재 대상이 아니다 — 어휘 인용 자체를 없애야 한다.
+- 조치: 두 문단을 간접 표현(「그 취소 토큰 클래스」)으로 다시 쓰고, baseline 에
+  잘못 등재했던 두 키를 제거했다(위 한 건만 남는다)
 - cmd: `./gradlew --no-daemon check`(재실측)
 - exit: 0 — `BUILD SUCCESSFUL`, 337 task
 
