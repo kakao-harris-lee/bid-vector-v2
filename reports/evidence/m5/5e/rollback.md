@@ -1,17 +1,24 @@
 # M5/5E-1 — rollback.md
 
-base = `d78e162`(PR #15 머지 = origin/main). 이 slice 의 커밋 전부(`003c695`~`0780f86`)는
-**단일 레인**(이 구현자)이 만들었다 — base 이후 이 브랜치를 만진 다른 레인이 없어 hunk
-격리 없이 파일 단위로 되돌릴 수 있다(M3/M4 의 다중 레인 공유 파일 hunk 분리와 다른
-사정). 유일한 예외는 `reports/evidence/m5/5e/policy-values.md`·`milestone-5.md`·
+base = `d78e162`(PR #15 머지 = origin/main). 이 slice 의 커밋 전부는 **단일 레인**(이
+구현자)이 만들었다(fix round 1 포함) — base 이후 이 브랜치를 만진 다른 레인이 없어
+hunk 격리 없이 파일 단위로 되돌릴 수 있다(M3/M4 의 다중 레인 공유 파일 hunk 분리와
+다른 사정). 유일한 예외는 `reports/evidence/m5/5e/policy-values.md`·`milestone-5.md`·
 `reports/evidence/m5/5e/scope.md` — 이 셋은 **하네스 레인**(팀장, 착수 계약 커밋
 `41076d0`)이 만들었고, `policy-values.md`만 이 구현자가 change_history 한 줄을 더했다
-(그 한 줄만 역적용, 파일 자체는 하네스 소유이므로 되돌리지 않는다).
+(그 한 줄만 역적용, 파일 자체는 하네스 소유이므로 되돌리지 않는다). fix round 1
+(2026-09-16, H-1~M-8·L 일괄)은 이 셋 중 어느 것도 만지지 않았다 — 새 하네스 레인
+변경 없음.
 
-## 기계 산출 diff(`git diff --name-status d78e162..HEAD`, in_scope 경로만)
+## 기계 산출 diff(`git diff --name-status d78e162..HEAD`, in_scope 경로만 — 아래에서
+하네스 소유 `milestone-5.md`·`scope.md`는 제외했다, `policy-values.md`는 하네스가
+만들었지만 이 구현자가 한 줄을 더해 포함한다)
 
 ```
+M  .github/workflows/ci.yml
+M  config/quality/leak-pattern-baseline.txt
 A  ml-engine/policy/serving-v1.yaml
+M  ml-engine/pyproject.toml
 A  ml-engine/setup.py
 M  ml-engine/src/ml_engine/adapters/__init__.py
 A  ml-engine/src/ml_engine/adapters/artifact_files.py
@@ -33,6 +40,7 @@ A  ml-engine/src/ml_engine/training/jobs/runner.py
 A  ml-engine/src/ml_engine/training/jobs/servicer.py
 A  ml-engine/src/ml_engine/training/jobs/state.py
 A  ml-engine/src/ml_engine/training/jobs/store.py
+A  ml-engine/tests/adapters/test_artifact_files.py
 A  ml-engine/tests/app/test_pipeline.py
 A  ml-engine/tests/app/test_server.py
 M  ml-engine/tests/gates/test_serving_purity.py
@@ -51,20 +59,32 @@ A  ml-engine/tests/training/test_jobs_state.py
 A  ml-engine/tests/training/test_jobs_store.py
 A  ml-engine/tools/build_hook.py
 M  ml-engine/uv.lock
-M  ml-engine/pyproject.toml
-M  .github/workflows/ci.yml
-M  config/quality/leak-pattern-baseline.txt
 A  reports/evidence/m5/5e/checklist.md
 A  reports/evidence/m5/5e/commands.md
+A  reports/evidence/m5/5e/golden-manifest.json
+A  reports/evidence/m5/5e/policy-values.md   # 하네스 소유 파일 — 내 hunk 만 역적용
 A  reports/evidence/m5/5e/reuse.md
-M  reports/evidence/m5/5e/policy-values.md   # 하네스 소유 파일 — 내 hunk 만 역적용
+A  reports/evidence/m5/5e/rollback.md
 ```
+
+**직전 판(`77476c7`) 대비 정정**: `policy-values.md`를 그때는 `M`으로 적었으나, 실제
+`git diff --name-status d78e162..HEAD` 산출은 `A`다(base 에 그 파일 자체가 없었다 —
+`41076d0`이 새로 만들었다). 소유·역적용 처분은 그대로다(하네스가 만든 파일, 이
+구현자는 한 줄만 더했다) — 상태 문자만 기계 산출과 어긋났던 것을 바로잡았다.
+
+**fix round 1(2026-09-16)이 이전 판(`77476c7`) 대비 새로 추가한 경로**:
+`ml-engine/tests/adapters/test_artifact_files.py`(M-6 신설 test 파일)·
+`ml-engine/src/ml_engine/app/server.py`는 이미 있었으나 내용이 바뀜(M-3·L-3)·
+`reports/evidence/m5/5e/golden-manifest.json`은 이전 판에도 있었다(N/A 선언, 착오
+정정 아님, 목록에는 이번에 처음 반영). 그 밖의 실질 코드 변경(H-1~M-8)은 전부 기존
+파일의 내용 수정이라 파일 목록 자체는 늘지 않았다.
 
 **하네스 레인 변경**(`41076d0` — 팀장, 이 slice 착수 계약): `milestone-5.md`·
 `reports/evidence/m5/5e/scope.md`·`reports/evidence/m5/5e/policy-values.md`(최초 등재).
-같은 range 안에 있으나 **이 구현자의 rollback 대상이 아니다**(2026-09-04 규율).
+같은 range 안에 있으나 **이 구현자의 rollback 대상이 아니다**(2026-09-04 규율). fix
+round 1 은 이 셋을 만지지 않았다 — 팀장이 별도로 처분한다(L-1, `scope.md`).
 
-## 롤백 명령(실측 완료 — 아래 「임시 worktree 실측」 참고)
+## 롤백 명령(실측 완료 — 아래 「임시 clone 실측」 참고)
 
 ```bash
 NEW_FILES=(
@@ -81,6 +101,7 @@ NEW_FILES=(
   ml-engine/src/ml_engine/training/jobs/servicer.py
   ml-engine/src/ml_engine/training/jobs/state.py
   ml-engine/src/ml_engine/training/jobs/store.py
+  ml-engine/tests/adapters/test_artifact_files.py
   ml-engine/tests/app/test_pipeline.py ml-engine/tests/app/test_server.py
   ml-engine/tests/gates/test_wheel_reexport.py
   ml-engine/tests/serving/test_embedding.py ml-engine/tests/serving/test_grpc.py
@@ -95,7 +116,7 @@ NEW_FILES=(
   ml-engine/tests/training/test_jobs_store.py
   ml-engine/tools/build_hook.py
   reports/evidence/m5/5e/checklist.md reports/evidence/m5/5e/commands.md
-  reports/evidence/m5/5e/reuse.md
+  reports/evidence/m5/5e/golden-manifest.json reports/evidence/m5/5e/reuse.md
 )
 RESTORE_FILES=(
   ml-engine/pyproject.toml ml-engine/uv.lock
@@ -114,33 +135,43 @@ git diff 0780f86~1..0780f86 -- reports/evidence/m5/5e/policy-values.md | git app
 rmdir ml-engine/src/ml_engine/app ml-engine/src/ml_engine/training/jobs 2>/dev/null || true
 ```
 
+`rollback.md` 자신은 `NEW_FILES`에 넣지 않았다 — base 이후 이 문서가 존재하지 않는
+것은 사실이지만(그래서 위 기계 산출 diff 에는 `A`로 잡힌다), 절차서 자신을 절차
+실행 중에 지우면 감사 기록이 남지 않는다. 이전 판(`77476c7`)도 같은 이유로 스스로를
+빼고 썼다 — 이번에 그 관례를 명시로 못 박았다.
+
 `git checkout <base> --`가 아니라 `git restore --source=<base> --staged --worktree --`를
 쓴다(2026-09-04 규율 — 신규 경로에서 `checkout`은 pathspec 오류로 exit 1). 신규 경로는
 `git rm`으로(복원할 base 내용이 없다).
 
-## 임시 worktree 실측(2026-09-15, 완료)
+## 임시 clone 실측(2026-09-16, fix round 1 종결 재검증 — 완료)
 
 ```bash
-git worktree add --detach <tmp>/rollback-check HEAD   # HEAD=0780f86
-cd <tmp>/rollback-check
+git clone . <tmp>/rollback-check-r2   # HEAD = 762fe94(S-1~S-12 최종 재실행 커밋)
+cd <tmp>/rollback-check-r2
 # (위 롤백 명령 실행)
 ```
 
-- `git status --short` — 위 `NEW_FILES` 전부 `D`, `RESTORE_FILES` 전부 `M`, `policy-values.md`
-  만 `M`(내 한 줄) — 정확히 예상한 파일 집합.
-- `git diff d78e162 -- "${RESTORE_FILES[@]}"` → **빈 출력**(RESTORE_FILES 는 base 와 완전히
-  같아졌다).
+- `git status --short` — 위 `NEW_FILES` 전부 `D`, `RESTORE_FILES` 전부 `M`,
+  `policy-values.md`만 `M`(내 한 줄) — 정확히 예상한 파일 집합. `rollback.md`는
+  건드리지 않아 clone 그대로 남았다(의도된 상태).
+- `git diff d78e162 -- "${RESTORE_FILES[@]}"` → **빈 출력**(RESTORE_FILES 는 base 와
+  완전히 같아졌다).
 - `git status --short milestone-5.md reports/evidence/m5/5e/scope.md` → **빈 출력**(하네스
-  파일은 손대지 않았다 — `git diff d78e162 -- <이 둘>`이 여전히 내용을 보이는 것은 하네스
-  커밋 `41076d0`이 그대로 남아 있기 때문이고, 이것이 올바른 상태다).
+  파일은 손대지 않았다).
 - `(cd ml-engine && uv sync --frozen --all-extras && uv run python -m pytest tests -q)` →
-  **658 passed** — base(`d78e162`) 임시 worktree 직접 계수(commands.md)와 **정확히 일치**.
+  **658 passed** — base(`d78e162`) 직접 계수와 **정확히 일치**(fix round 1 이 늘린
+  145 개는 전부 되돌린 코드에 있었다).
 - `(cd ml-engine && uv run ruff check . && uv run mypy --strict src/ml_engine && uv run lint-imports)`
   → 전부 초록, `mypy`: **54 source files**(base 와 일치), `lint-imports`: **Contracts: 6
-  kept**(5E-1 이 더한 `app 은 DB·HTTP·업무 모듈을 모른다` 계약과 ignore_imports 둘이
-  사라져 base 의 6개 계약으로 정확히 돌아갔다).
-- `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**(346 tasks, 211 executed/135 cached).
-- 임시 worktree 는 `git worktree remove --force`로 정리했다.
+  kept**(base 계약 수와 일치, `app` 계약·grpc ignore_imports 둘 다 사라짐).
+- `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**(⑥ 게이트 단계, 2026-09-12 규율)
+  — `leakPatternGate` 포함 base 시절 task 구성으로 전부 통과. 되돌리지 않은
+  `config/quality/leak-pattern-baseline.txt`는 `git restore --source=d78e162`로
+  base 내용 그대로 복원되므로(이 slice 가 등재한 항목은 사라진다) 이 브랜치 밖의
+  다른 baseline 항목과 충돌하지 않는다(이 브랜치는 단일 레인이라 전제 성립 확인).
+- 임시 clone 은 절차 확인 뒤 완전히 삭제했다(`rm -rf`, worktree 잔여물이 아니라 독립
+  clone 이라 `git worktree remove` 대상 아님).
 
 ## 알려진 제한
 
@@ -150,3 +181,6 @@ cd <tmp>/rollback-check
   (다른 slice 의 기존 291줄은 무손상 — `git restore --source=d78e162`가 파일 전체를
   base 상태로 정확히 되돌리므로, base 이후 **이 브랜치에서** 그 파일을 만진 다른 커밋이
   없다는 전제가 성립할 때만 안전하다. 이 브랜치는 단일 레인이라 성립을 확인했다).
+- `rollback.md` 자신은 위에서 설명한 이유로 롤백 대상 목록에 없다 — 완전한 base
+  상태 재현이 필요하면 이 파일도 별도로 `git rm`해야 한다(감사 기록 보존과 완전
+  복원은 상충하므로 운영자가 필요에 따라 선택).
