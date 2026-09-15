@@ -106,3 +106,11 @@ rollback: |
 | `OPEN-5D2-INTERVAL-SOURCE-WIRE` | `POSTERIOR_PREDICTIVE` wire 추가 — 2F additive |
 | `OPEN-5D-DIAGNOSTICS-WIRE`·`OPEN-5D-DISTRIBUTION-ENGINE` | 전자 수령(필드 둘 더 늘어남: `agency_sample_count`·`agency_sample_below_threshold`), 후자 **이 slice 종결로 해소** |
 | 5A 표 #27 | 「미이식(ensemble 밖)」 정정 — 착수 커밋 |
+
+---
+
+## 계약 갱신 이력
+
+| 일자 | 갱신 | 사유 |
+| --- | --- | --- |
+| 2026-09-15 (구현 중 발견) | **`OPEN-5D2-SAMPLE-SEGMENT` 신설** — wire `CompetitionSample`(`features.proto` 7 필드)에 표본별 기관·공종 축이 **없어** 3계층(발주기관/공종/전역) 수축을 서빙 경로에서 만들 수 없다(legacy 는 관측 행에 `agency_name`·`category` 가 있었다). 처분: ① 5D-2 는 **global-only** — `ReserveDrawSample` 에서 `agency`/`category` 제거, 조립기는 전 표본을 global 집계, agency/category 레벨 `None`, `segment_support = GLOBAL`, `agency_sample_count = 0`·`agency_sample_below_threshold = true`(사실대로 — 요청의 `FeatureInputs.agency_id` 로 표본을 같은 기관이라 가정하지 않음) ② `DistributionRequest` 표본에 `segment: SampleSegment \| Missing` 슬롯을 지금 두되 `from_proto` 는 항상 `Missing`(후속이 wire 에서 채움 — 조립기 시그니처 불변) ③ **ML-04 ② 는 서빙 경로에서 도달 불가** — 5D-2 종결 조건에서 제외, golden 011 은 K5 직접 호출 검증(test 문면 명시) ④ M2 2F additive: `CompetitionSample.agency_id`·`category_code`(`optional`, 불투명 문자열, `AgencyIdFact`/`CategoryCodeFact` 형태) 추가 → 후속 소비 라운드가 3계층 연결. ① 표의 `ReserveDrawSample(… agency, category)` 문면은 이 결정으로 정정 | 구현 레인 발견 2026-09-15 · D-2B-3(식별자 없음 원칙은 유지 — 기관·공종은 식별자가 아니라 fact) · ML-04 「3계층 수축」 |
