@@ -212,3 +212,41 @@ def test_cancel_training_job_via_servicer_style_transition_then_runner_ignores_l
     assert record is not None
     assert record.state is JobState.CANCELLED
     runner.shutdown(wait=True)
+
+
+def test_cancel_all_signals_every_in_flight_cancel_token() -> None:
+    """M-3(verifier r1) — SIGTERM 경로가 진행 중 job 전부에 취소를 요청할 때 쓴다."""
+    store = InMemoryJobStore()
+    runner = JobRunner(store, max_workers=4)
+    release_event = threading.Event()
+
+    class _BlockingPipeline:
+        def __init__(self) -> None:
+            self.saw_cancelled = threading.Event()
+
+        def run(
+            self, dataset_ref: DatasetRefInput, cancel_token: CancelToken
+        ) -> PipelineCancelled:
+            release_event.wait(timeout=2.0)
+            if cancel_token.is_cancelled():
+                self.saw_cancelled.set()
+            return PipelineCancelled()
+
+    pipelines = [_BlockingPipeline() for _ in range(3)]
+    job_ids = [_new_job(store, key=f"key-{i}") for i in range(3)]
+    for job_id, pipeline in zip(job_ids, pipelines, strict=True):
+        runner.submit(job_id, _DATASET_REF, pipeline)
+
+    runner.cancel_all()
+    release_event.set()
+
+    for pipeline in pipelines:
+        assert pipeline.saw_cancelled.wait(timeout=2.0)
+    runner.shutdown(wait=True)
+
+
+def test_cancel_all_with_no_in_flight_jobs_is_a_no_op() -> None:
+    store = InMemoryJobStore()
+    runner = JobRunner(store, max_workers=1)
+    runner.cancel_all()  # 예외 없이 조용히 지나간다
+    runner.shutdown(wait=True)

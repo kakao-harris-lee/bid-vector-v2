@@ -83,6 +83,15 @@ class JobRunner:
         if token is not None:
             token.cancel()
 
+    def cancel_all(self) -> None:
+        """진행 중인 job 전부의 `CancelToken`을 세운다(M-3, `app.server` 의 SIGTERM
+        경로). 각 파이프라인이 다음 단계 경계에서 이를 확인해 스스로 멈춘다 — 스레드를
+        강제 중단하지는 않는다(fork 없음과 같은 이유로 강제 종료 API 가 없다)."""
+        with self._lock_tokens_guard:
+            tokens = tuple(self._cancel_tokens.values())
+        for token in tokens:
+            token.cancel()
+
     def _on_done(
         self,
         job_id: str,

@@ -16,6 +16,8 @@ from pathlib import Path
 from types import FrameType
 from typing import NoReturn
 
+import grpc
+
 from ml_engine.app.pipeline import pipeline_factory
 from ml_engine.evaluation.policy import EvaluationPolicy, load_evaluation_policy
 from ml_engine.evaluation.policy import PolicyRejected as EvaluationPolicyRejected
@@ -171,7 +173,7 @@ def _build_servicers(
     serving_policy: ServingPolicy,
     preloaded: _Preloaded,
     config: ServerConfig,
-) -> Servicers:
+) -> tuple[Servicers, JobRunner]:
     store = InMemoryJobStore()
     runner = JobRunner(store, max_workers=serving_policy.job_workers)
     training_job_servicer = TrainingJobServicer(
@@ -188,18 +190,25 @@ def _build_servicers(
     embedding_servicer = EmbeddingServicer(
         gate, text_max_chars=serving_policy.embedding_text_max_chars
     )
-    return Servicers(
+    servicers = Servicers(
         prediction=prediction_servicer,
         embedding=embedding_servicer,
         training_job=training_job_servicer,
     )
+    return servicers, runner
 
 
 def run(config: ServerConfig) -> None:
     """preload → readiness → servicer 등록 → serve → `SIGTERM` → graceful shutdown.
     serving 정책 자체가 깨지면(예: `max_workers` 를 모른다) 서버를 세울 방법이 없어
     부팅을 거부한다(`ConfigError`) — 그 밖 셋(inference·training·evaluation)의
-    실패는 서버는 뜨되 `NOT_READY`로 반영된다(scope.md ②)."""
+    실패는 서버는 뜨되 `NOT_READY`로 반영된다(scope.md ②).
+
+    verifier r1 M-3 — SIGTERM 은 gRPC 서버만 멈추고 `JobRunner`를 종료하지 않아
+    진행 중 job 이 유예와 무관하게 계속 돌았다. 순서: readiness `NOT_READY` →
+    `server.stop(grace)`(진행 중 RPC 가 끝나거나 취소될 시간) → **그 뒤에** 진행 중
+    job 전부에 취소를 요청하고 `JobRunner`를 닫는다(완료를 기다리지 않는다 —
+    `wait=False`, 스레드 강제 중단 API 는 없다: fork 없음과 같은 이유)."""
     preloaded = _preload(config)
     gate = ReadinessGate.from_preload(_preload_outcomes(preloaded))
     if not isinstance(preloaded.serving, ServingPolicy):
@@ -207,7 +216,7 @@ def run(config: ServerConfig) -> None:
         raise ConfigError(f"serving 정책 로드 실패: {preloaded.serving}")
     serving_policy = preloaded.serving
 
-    servicers = _build_servicers(gate, serving_policy, preloaded, config)
+    servicers, runner = _build_servicers(gate, serving_policy, preloaded, config)
     server = build_server(serving_policy, servicers)
     server.add_insecure_port(config.bind)
     server.start()
@@ -217,12 +226,29 @@ def run(config: ServerConfig) -> None:
 
     def _handle_sigterm(signum: int, frame: FrameType | None) -> None:
         _logger.info("SIGTERM 수신 — graceful shutdown 시작")
-        serving_shutdown(
-            gate, server, grace_seconds=serving_policy.shutdown_grace_seconds
+        _graceful_shutdown_sequence(
+            gate, server, runner, grace_seconds=serving_policy.shutdown_grace_seconds
         )
 
     signal.signal(signal.SIGTERM, _handle_sigterm)
     server.wait_for_termination()
+
+
+def _graceful_shutdown_sequence(
+    gate: ReadinessGate, server: grpc.Server, runner: JobRunner, *, grace_seconds: float
+) -> None:
+    """M-3 — 종료 순서를 한 자리로 모은다(단위 test 가 fake 로 호출 순서를 관측할 수
+    있게): readiness `NOT_READY` → `server.stop(grace)` → **그 뒤에** 진행 중 job
+    전부에 취소 요청 → `JobRunner.shutdown(wait=False)`(완료를 기다리지 않는다).
+
+    `server`를 `grpc.Server`로 타입 짓지만(design ratchet 약한 경계 회피 — `object`
+    를 쓰지 않는다) `app`은 `grpc` 진입점 예외 목록(5A ③)에 없어도 무방하다 — DB·
+    HTTP 만 forbidden 대상이고 `grpc` 는 아니다(pyproject.toml `app 은 DB·HTTP·업무
+    모듈을 모른다` 계약 확인)."""
+    serving_shutdown(gate, server, grace_seconds=grace_seconds)
+    _logger.info("gRPC 서버 정지 완료 — 진행 중 job 취소 요청")
+    runner.cancel_all()
+    runner.shutdown(wait=False)
 
 
 def main() -> int:

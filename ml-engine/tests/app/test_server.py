@@ -47,3 +47,44 @@ def test_from_env_defaults_to_empty_mapping_when_none_given(
     monkeypatch.delenv("ML_ENGINE_BIND", raising=False)
     with pytest.raises(ConfigError):
         ServerConfig.from_env({})
+
+
+# ---- M-3(verifier r1) — SIGTERM 이 gRPC 서버뿐 아니라 JobRunner 도 닫는다 ----
+
+
+def test_graceful_shutdown_sequence_stops_grpc_before_cancelling_jobs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """순서: `serving_shutdown`(readiness NOT_READY → server.stop) → `runner.
+    cancel_all()` → `runner.shutdown(wait=False)`. `JobRunner.shutdown`이 production
+    호출자가 0이었던 것(verifier M-3)의 회귀 test."""
+    from ml_engine.app import server as server_module
+
+    calls: list[str] = []
+
+    def fake_serving_shutdown(
+        gate: object, server: object, *, grace_seconds: float
+    ) -> None:
+        calls.append(f"serving_shutdown(grace={grace_seconds})")
+
+    monkeypatch.setattr(server_module, "serving_shutdown", fake_serving_shutdown)
+
+    class _FakeRunner:
+        def cancel_all(self) -> None:
+            calls.append("cancel_all")
+
+        def shutdown(self, *, wait: bool) -> None:
+            calls.append(f"shutdown(wait={wait})")
+
+    server_module._graceful_shutdown_sequence(
+        gate=object(),  # type: ignore[arg-type]
+        server=object(),  # type: ignore[arg-type]
+        runner=_FakeRunner(),  # type: ignore[arg-type]
+        grace_seconds=7.0,
+    )
+
+    assert calls == [
+        "serving_shutdown(grace=7.0)",
+        "cancel_all",
+        "shutdown(wait=False)",
+    ]
