@@ -10,8 +10,10 @@ import numpy as np
 
 from ml_engine.contracts import common_pb2, features_pb2
 from ml_engine.evaluation import (
+    BaselineSpec,
     EvaluationPolicy,
     Failed,
+    ModelScore,
     NotEvaluable,
     Passed,
     derive_promotion,
@@ -22,7 +24,8 @@ from ml_engine.evaluation.windows import (
     WindowExclusion,
     WindowExclusionReason,
 )
-from ml_engine.training._holdout_fit import WindowSkip, build_split
+from ml_engine.training._holdout_fit import ModelFit, Split, WindowSkip, build_split
+from ml_engine.training._holdout_window import _BaselineFit, _run_stability
 from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFailed
 from ml_engine.training.corpus import AdmittedCorpus, admit_corpus
 from ml_engine.training.dataset import DatasetManifestV1, LoadedDataset, RawTrainingRow
@@ -332,6 +335,72 @@ def test_stability_trials_headline_seed_first_even_when_not_first_in_policy() ->
     trials = result.windows[0].stability.trials
     assert len(trials) == 3
     assert trials[0].seed == _spec().seed
+
+
+def test_run_stability_trial_passed_reflects_significance_not_rmse_alone() -> None:
+    """verifier r2 MEDIUM M-2r 재현 — 변이 ⑥(`_run_stability`의 `passed`에서
+    `paired_t_threshold` 조건 삭제)이 652 passed 로 통과했다. 기존
+    `test_passes_gate_is_the_single_predicate_definition`은 `gate_outcome`의
+    결과만 보고 안정성 sweep 의 **호출 지점**은 보지 않는다. 이 test 는
+    `_run_stability`를 white-box 로 직접 불러(`build_split`과 같은 관행)
+    RMSE 는 이기지만(`trial_rmse=9.987… < baseline_rmse=10.0`) 유의하지
+    않은(`|t|=0.0256 ≪ threshold 2.58`) trial 을 headline seed 자체로
+    구성한다 — `passed`가 RMSE 만으로 판정했다면 `True`, `passes_gate`의
+    두 조건을 다 쓰면 `False`다."""
+    targets = np.array([0.0, 0.0, 0.0, 0.0])
+    baseline_predictions = np.array([10.0, 10.0, 10.0, 10.0])
+    # 손 계산 확인(스크립트 실측): baseline_rmse=10.0, trial_rmse≈9.9875(개선),
+    # paired_t≈-0.0256(2.58 문턱에 한참 못 미침) — RMSE 조건만 True, 유의성 조건 False.
+    trial_predictions = np.array(
+        [9.486832980505138, 9.486832980505138, 9.486832980505138, 11.357816691600547]
+    )
+    split = Split(
+        gate_train=[],
+        train_rows_all=[],
+        usable_test_rows=[],
+        dropped_rows=(),
+        gate_train_raw=(),
+        train_rows_raw=(),
+        targets=targets,
+        usable_facts=[],
+        gate_train_facts=[],
+        gate_train_labels=np.array([0.0]),
+        gate_train_mean=0.0,
+    )
+    baselines = _BaselineFit(
+        scores=(),
+        gate_predictions=baseline_predictions,
+        gate_covered=np.array([True, True, True, True]),
+        gate_rmse=10.0,
+        gate_spec=BaselineSpec(name="test", key=lambda facts: ""),
+    )
+    fit = ModelFit(
+        trained_all=None,  # type: ignore[arg-type]  # _run_stability 의 headline 경로는 안 씀
+        predictions_all=trial_predictions,
+        model_score=ModelScore(
+            name="gbm_all_strata", rmse=9.987492177719089, bias=0.0, residual_std=0.0
+        ),
+        conservative_score=None,
+    )
+    spec = _spec()
+    policy = _policy(stability_seeds=(spec.seed,))  # 헤드라인 하나뿐 — 재학습 없음
+    summary = _run_stability(
+        _dataset(()),
+        split,
+        spec,
+        _training_policy(),
+        policy,
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+        fit,
+        baselines,
+    )
+    assert not isinstance(summary, WindowSkip)
+    assert len(summary.trials) == 1
+    trial = summary.trials[0]
+    assert trial.improvement_ratio > 0  # RMSE 는 실제로 개선됐다(전제 확인).
+    assert abs(trial.paired_t) < policy.paired_t_threshold  # 유의하지 않다(전제 확인).
+    assert trial.passed is False
 
 
 def test_build_split_boundary_row_at_window_start_excluded_from_training() -> None:
