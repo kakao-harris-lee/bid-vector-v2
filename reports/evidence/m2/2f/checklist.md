@@ -165,8 +165,10 @@ not-ready — high 1(F-1)·medium 1(F-2)·low 4(F-3~F-6). 이 라운드에서 ev
 head 실측·누출 0·rollback ⑥ 만 재확인한다」). 처방 근거는 팀장 커밋 `a0b8f04`
 (`reports/evidence/m2/2f/scope.md` 「계약 갱신 이력」).
 
-- **F-1(high)** — `checklist.md:17`·`commands.md:161`의 「secret 스캔」 어휘를 「누출
-  검사」로 교체(baseline 등재가 아니라 어휘 제거, 5D 전례). 재확인:
+- **F-1(high)** — `checklist.md:17`·`commands.md:161`이 누출 패턴 목록의 영문 어휘
+  하나를 그대로 담고 있던 문구를 「누출 검사」로 교체(baseline 등재가 아니라 어휘
+  제거, 5D 전례 — 이 문서 자신도 그 어휘를 리터럴로 다시 적지 않는다, 이 항목처럼).
+  재확인:
   `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m2/2f
   --exclude=scope.md` exit 1(매치 0) · `./gradlew --no-daemon :leakPatternGate`
   `BUILD SUCCESSFUL`.
