@@ -158,22 +158,36 @@ git diff <구현 레인이 policy-values.md 를 만진 커밋 해시>~1..<같은
 끝) — `30b42d6`(팀장, §1~§3)과 삽입 지점이 겹치지 않아 격리 적용은 충돌 없이
 성립한다(5C-1 policy-values.md 와 같은 구조).
 
-## 공유 파일 hunk 격리 — `scope.md`(**필수**, 위 「되돌리는 것」 rm 목록에 없음)
+## 공유 파일 되돌리기 — `scope.md`(**필수**, 위 「되돌리는 것」 rm 목록에 없음)
 
-`scope.md`를 만진 구현 레인 커밋은 셋(`git log --oneline c669a71..HEAD --
-reports/evidence/m5/5c2/scope.md`로 재확인)이고, 팀장 착수 커밋(`30b42d6`)의
-in_scope 원안·§1 표와 같은 파일에 있다. 전체 삭제는 팀장 결정을 지우므로, 구현
-레인 커밋 셋만 **최신 → 과거 순**으로 hunk 격리 역적용한다:
+**2026-09-16 정정(verifier r2 L-4r 재실측 중 발견)** — 이전 판은 `scope.md`를
+만진 커밋이 셋(`9853ae9`·`975d4d8`·`b6e0049`)뿐이라고 전제하고 그 셋만 최신→과거
+순 hunk 격리로 역적용했다. 그 사이 팀장이 같은 파일에 두 커밋을 더 냈다
+(`91599da`·`5d70754` — verifier r2 리뷰를 반영한 (2b) 표·⑨ 불변식·OPEN 표 갱신,
+이 라운드 착수 지시 자체가 "HEAD `91599da`(팀장 scope (2b)·⑨ 갱신 포함)"라고
+명시한 커밋). 이 둘이 **같은 줄**(⑨ 행, `OPEN-5C-REJECT-ACCOUNTING` 행, 계약
+갱신 이력 표)을 만져 다섯 커밋 순서를 hunk 단위로 개별 역적용하면 셋째(`b6e0049`)
+·넷째(`975d4d8`) 단계에서 컨텍스트가 어긋나 `git apply -R`이 실패한다(2026-09-10
+「인접 삽입 지점 자동 해소 실패」와 같은 계열 — 이번엔 순서상 나중 커밋이 아니라
+**팀장의 후속 편집**이 원인).
+
+더 근본적으로, `91599da`/`5d70754`도 **이 slice 의 수정 라운드가 실제로 한 일을
+기록**한 문면이다(팀장 착수 결정 그 자체가 아니라 구현 결과에 대한 사후 서술) —
+`scope.md`를 되돌려 그 구현이 없던 것으로 만들면서 그 구현을 설명하는 문면만
+남기면 그것이 바로 「낡는 좌표」다. 그래서 **보존 경계는 `9853ae9`가 아니라
+`30b42d6`(진짜 착수 커밋, D-5C2-1~12·in/out scope 원안·acceptance 고정) 하나뿐**
+이고, 그 뒤 다섯 커밋(누가 만들었든) 전부를 **한 번에** 되돌린다 — 개별 hunk
+격리 대신 단일 역적용:
 
 ```bash
-for sha in b6e0049 975d4d8 9853ae9; do
-  git diff ${sha}~1..${sha} -- reports/evidence/m5/5c2/scope.md | git apply -R
-done
+git diff 30b42d6 -- reports/evidence/m5/5c2/scope.md | git apply -R
 ```
 
 확인: `git diff 30b42d6 -- reports/evidence/m5/5c2/scope.md`가 **빈 출력**이어야
 한다(팀장 착수 시점 내용과 완전히 같아짐 — 2026-09-16 임시 worktree 실측으로
-확인, 아래).
+확인, 아래). 개별 hunk 격리는 다섯 커밋이 서로 겹치지 않을 때만 성립하는
+가정이었고, 그 가정이 이 라운드에서 깨졌다 — **라운드마다 파일이 늘면 이
+경계(현재 `30b42d6`)와 명령을 다시 확인한다.**
 
 ## 임시 worktree 실측
 
@@ -247,6 +261,45 @@ git -C /tmp/5c2-rollback-head2 diff --name-status c669a71 -- <in_scope 전 경�
 - 임시 worktree 둘(`5c2-rollback-head2`·`5c2-base-check2`) 제거 + `worktree prune`
   확인, slice worktree 는 이 실측 뒤 HEAD `8ba3fd9`에서 clean 상태로 복귀(실측은
   전부 별도 worktree 안에서 수행, 이 worktree 자체는 건드리지 않았다).
+
+### 2026-09-16 재실측(verifier r2 L-4r — 수정 라운드 2 종결 시점, HEAD 갱신 + scope.md 절차 정정)
+
+바로 위 실측(HEAD `8ba3fd9`)의 `scope.md` hunk 격리 for 루프가 **이번엔 그대로
+성립하지 않는다** — 팀장이 그 뒤 `91599da`·`5d70754` 두 커밋을 같은 파일 같은
+줄에 더 냈다(§「공유 파일 되돌리기 — scope.md」 정정 참고). 위 절차 정정에 따라
+단일 역적용(`git diff 30b42d6 | git apply -R`)으로 재실행한다.
+
+```
+git worktree add --detach /tmp/5c2-rollback-head3 HEAD   # exit 0, HEAD 9ca68a2
+# 신규 파일 rm(test_evaluation_no_stray_numeric_literals.py 포함, 목록 불변) +
+# git restore 3파일 + scope.md 단일 역적용(30b42d6 기준)
+git -C /tmp/5c2-rollback-head3 diff 30b42d6 -- reports/evidence/m5/5c2/scope.md
+# → 빈 출력
+git -C /tmp/5c2-rollback-head3 diff --name-status c669a71 -- <in_scope 전 경로 + scope.md>
+# → scope.md 만 "A"(예상된 잔존) · 나머지 전부 빈 출력
+```
+
+**실측 결과**(2026-09-16, `/tmp/5c2-rollback-head3`, HEAD `9ca68a2`):
+
+- `rm` 23개 + `git restore` 3개: exit 0
+- `scope.md` **단일** 역적용(`git diff 30b42d6 | git apply -R`): exit 0(개별
+  hunk 격리 3단계 방식은 `b6e0049`·`975d4d8` 단계에서 컨텍스트 불일치로 exit 1 —
+  이번 재실측에서 실제로 재현·확인했다)
+- `git diff 30b42d6 -- scope.md`: **빈 출력**(팀장 착수 내용과 정확히 일치,
+  「남의 줄 남음」 실측)
+- in_scope `git diff --name-status c669a71` 나머지 전 경로: **빈 출력**(diff 0,
+  「내 줄 사라짐」 실측)
+- `main`(c669a71) 직접 pytest 계수: **521 passed**(별도 worktree `/tmp/5c2-base-check3`)
+- 되돌린 트리 `uv run python -m pytest tests -q`: **521 passed**(동일 — 회귀 없음,
+  이번 라운드가 늘린 5 test 전부 이 slice 소속 재확인)
+- 되돌린 트리 `ruff check .`·`mypy --strict src/ml_engine`·`lint-imports`·
+  `design_ratchet.py --check`·`reuse_provenance_check.py`·python 버전 assertion:
+  전부 exit 0
+- 되돌린 트리 `./gradlew --no-daemon check`: **BUILD SUCCESSFUL**(evidence 디렉터리
+  전체가 rm 대상이라 `leakPatternGate` 대조 대상 자체가 없다 — `scope.md` 하나만
+  남고 그 내용은 착수 시점부터 매치 0)
+- 임시 worktree 둘(`5c2-rollback-head3`·`5c2-base-check3`) 제거 + `worktree prune`
+  확인, slice worktree 는 이 실측 뒤 HEAD `9ca68a2`에서 clean 상태로 복귀.
 
 ## 복구 시간
 
