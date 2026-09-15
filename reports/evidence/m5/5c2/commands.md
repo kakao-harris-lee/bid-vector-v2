@@ -70,3 +70,19 @@ RED 확인·수정 라운드 이력은 커밋 로그에 있다(evidence-pack 「
 모듈별 커밋은 `git log --oneline <base_sha>..HEAD -- ml-engine/src/ml_engine/evaluation
 ml-engine/src/ml_engine/training/holdout.py ml-engine/src/ml_engine/training/_holdout_fit.py
 ml-engine/src/ml_engine/training/_holdout_window.py`로 확인한다.
+
+## clean-tree 게이트(verifier r1 M-3 ②) — 개별 경로 인자 + 양성 대조 1회
+
+## 2026-09-15T16:28Z
+- cmd: `git status --porcelain -- <in_scope 전 경로를 개별 인자로>`(변수 미사용,
+  scope.md `in_scope` 목록을 그대로 나열 — `ml-engine/tests/evaluation/**`는
+  디렉터리 안 파일 9개를 개별 나열, `tests/training/test_holdout*.py`는
+  `test_holdout.py` 단일 파일로 전개)
+- exit: 0
+- 핵심 결과: 출력 없음(더러운 트리 아님)
+- 양성 대조: `ml-engine/src/ml_engine/evaluation/windows.py`에 주석 한 줄을
+  `>>`로 append 후 같은 `git status --porcelain -- <그 파일>` 재실행 →
+  `M ml-engine/src/ml_engine/evaluation/windows.py` 잡힘(게이트가 실제로
+  감지함을 확인) → `head -n 237 <파일> > tmp && mv tmp <파일>`로 **비파괴
+  절삭 복원**(`git checkout --` 미사용, evidence-pack 규격) → 같은 명령 재실행
+  결과 다시 빈 출력, `git diff --stat -- <그 파일>` 도 빈 출력(원상 확인)
