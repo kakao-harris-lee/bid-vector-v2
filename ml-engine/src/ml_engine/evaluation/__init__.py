@@ -6,6 +6,13 @@ import 하지 않는다. 순수 커널(채점·베이스라인·세그먼트·�
 
 from __future__ import annotations
 
+from ml_engine.evaluation.baselines import (
+    GATE_BASELINE_TABLE_NAMES,
+    BaselineSpec,
+    amount_band_key,
+    baseline_specs,
+    group_mean_predictions,
+)
 from ml_engine.evaluation.policy import (
     SHIPPED_EVALUATION_POLICY_VERSION,
     EvaluationPolicy,
@@ -14,12 +21,21 @@ from ml_engine.evaluation.policy import (
     load_evaluation_policy,
     policy_checksum,
 )
+from ml_engine.evaluation.scoring import improvement_ratio, paired_t, rmse_bias_std
 
 __all__ = [
+    "GATE_BASELINE_TABLE_NAMES",
     "SHIPPED_EVALUATION_POLICY_VERSION",
+    "BaselineSpec",
     "EvaluationPolicy",
     "PolicyRejected",
     "PolicyRejectionReason",
+    "amount_band_key",
+    "baseline_specs",
+    "group_mean_predictions",
+    "improvement_ratio",
     "load_evaluation_policy",
+    "paired_t",
     "policy_checksum",
+    "rmse_bias_std",
 ]
