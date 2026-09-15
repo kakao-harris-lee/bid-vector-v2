@@ -217,3 +217,7 @@ base `c669a71affabed165c1afbd8b11c8245b81a3a5a`, head는 리뷰 시점의 `git r
   rollback.md 확인 ⑥ 절차(verifier r1 F-2, 필수 신설 항목) 약 14줄 + commands.md 의
   S-0·S-1·rollback ⑥ 재확인 라인 약 15줄 — 전부 verifier r1 이 직접 요구한 신설
   내용이고 round-history 서술이 아니다. 추가 삭감은 팀장 판단.
+
+## 2026-09-16 종결 승인 커밋 뒤 (팀장)
+- cmd: `git tag -a contracts/v1-approved-2026-09-16 75706de` 뒤 `./gradlew --no-daemon :contractGate`
+- exit: 0 — 핵심 결과: 승인 태그 갱신 자체가 breaking 0(BUILD SUCCESSFUL, 태그 기준선 = 이 커밋)
