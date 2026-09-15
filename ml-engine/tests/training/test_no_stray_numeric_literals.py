@@ -25,6 +25,18 @@ _ALLOWED: frozenset[tuple[str, float]] = frozenset(
         ("dataset.py", 80),  # 오류 메시지 미리보기 길이(stripped[:80])
         ("encoding_oof.py", 0),  # np.zeros((0, ...))·range 시작·dict.get 기본값
         ("encoding_oof.py", 1),  # count + 1 증가
+        ("holdout.py", 0),  # 카운터 기본값(dict.get)·max(x, 0) 회계 불변식 하한
+        ("holdout.py", 1),  # count + 1 증가
+        ("_holdout_fit.py", 0),  # dropped_counts dict.get 기본값
+        ("_holdout_fit.py", 1),  # count + 1 증가
+        (
+            "_holdout_window.py",
+            0.0,
+        ),  # 빈 배열 대비 fallback(coverage·test_mean·gate_rmse 초기값)
+        (
+            "_holdout_window.py",
+            1,
+        ),  # targets.size > 1(ddof=1 하한, residual.py 와 같은 상수)
         ("policy.py", 1),  # min_training_rows ≥ 1 불변식
         ("release.py", 16),  # release_id 를 sha256 앞 16 hex 로 자르는 길이
         ("residual.py", 1),  # residuals.size <= 1 하한

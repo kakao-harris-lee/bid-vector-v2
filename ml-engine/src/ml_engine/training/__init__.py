@@ -42,6 +42,7 @@ from ml_engine.training.encoding_oof import (
     out_of_fold_matrix_and_residuals,
 )
 from ml_engine.training.folds import fold_indices
+from ml_engine.training.holdout import HoldoutRejected, run_holdout
 from ml_engine.training.policy import (
     SHIPPED_TRAINING_POLICY_VERSION,
     PolicyRejected,
@@ -81,6 +82,7 @@ __all__ = [
     "DatasetReference",
     "DatasetRejected",
     "DatasetRejectionReason",
+    "HoldoutRejected",
     "LabelRejected",
     "LabelRejectionReason",
     "LightGbmHyperparameters",
@@ -116,6 +118,7 @@ __all__ = [
     "out_of_fold_matrix_and_residuals",
     "residual_std",
     "resolve_training_spec",
+    "run_holdout",
     "spec_checksum",
     "train_award_rate_gbm",
     "with_missing_fact_rejections",

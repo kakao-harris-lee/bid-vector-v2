@@ -1,0 +1,243 @@
+# M5/5C-2 — checklist.md
+
+## M5 완료 조건 중 5C-2 담당 근거
+
+- 「시간 누수 없는 split, rolling/group holdout」 — `evaluation/windows.py::plan_evaluation_windows`
+  (embargo + 표본 하한 + 최근 N) · `_holdout_fit.py::build_split`(경계 동시각은 평가측,
+  `_split_at_window` legacy 이식) · `holdout_overlaps`(측정, 설계상 0).
+- 「worst-segment report」 — `evaluation/segments.py::segment_scores`/`regressed_segments`
+  (축 `category`·`amount_band`, D-5C2-9).
+- 「metric」 — `evaluation/scoring.py`(rmse·bias·std·paired_t·improvement_ratio) +
+  `evaluation/diagnostics.py`(MDE·required_row_count·coverage_splits·unlearned_cells).
+- 「promotion 은 측정만」 — `evaluation/report.py::Promotion`(`Promotable`은
+  `derive_promotion`이 `Passed`에서만 생성) + `training/holdout.py::run_holdout`은
+  report 를 반환할 뿐 배포·rollout 을 호출하지 않는다(코드 전수 grep: `deploy`·`rollout`
+  참조 0).
+- 완료 조건 「승인된 ML metric threshold 충족 또는 `not-promotable`로 명시」 —
+  `GateOutcome = Passed | Failed | NotEvaluable`(3값, bool 쌍 아님) + `Promotion`이
+  그대로 옮긴다.
+- 완료 조건 「재현 가능한 metric」 — `test_run_holdout_is_reproducible_with_fake_trainer`
+  (canonical bytes 동일) · `test_run_holdout_reproducible_with_real_lightgbm`(실 LightGBM,
+  `num_threads=1`).
+
+## D-5C2-1~12 이행
+
+| ID | 결정 | 충족 근거 |
+| --- | --- | --- |
+| D-5C2-1 | 순수 커널은 `evaluation/`, 실행기는 `training/holdout.py`(+`_holdout_fit.py`/`_holdout_window.py`) | import-linter 계약 `training/evaluation 층 — features·contracts 위로만 의존`(S-4 KEPT) · evaluation 어떤 파일도 `ml_engine.training` import 없음(grep 확인) |
+| D-5C2-2 | 성숙도는 입력(`WeekMaturity`) | `evaluation/windows.py::WeekMaturity(start,end,opened_count,settled_count)` · `run_holdout`의 `maturities: Sequence[WeekMaturity]` 인자, 5D `inference.maturity` import 0 |
+| D-5C2-3 | 임계는 전부 `policy/evaluation-v1.yaml` | `evaluation/policy.py::load_evaluation_policy` · `test_evaluation_policy.py::test_shipped_policy_file_matches_policy_values_md`(값 11개 하드코딩 대조) |
+| D-5C2-4 | 판정 3값 `Passed \| Failed \| NotEvaluable(reason)` | `evaluation/verdict.py` · `NotEvaluableReason`(3값: `NO_EVALUABLE_WINDOW`·`UNDERPOWERED`·`SEED_UNSTABLE`) |
+| D-5C2-5 | seed 재채점 끌 수 없음, 헤드라인 선두 | `_holdout_fit.py::stability_seed_order`(헤드라인 우선, 목록 조립 시 고정) · `run_holdout`/`_evaluate_one_window`에 안정성 비활성 플래그 없음(시그니처 확인, `test_no_bare_threshold_seed_or_layer_parameter_on_run_holdout`) |
+| D-5C2-6 | 승격은 latest-window 하나 | `evaluation/report.py::derive_promotion(latest: GateOutcome \| None, ...)` — `windows[-1]`만 본다, `all_origins`는 진단 필드로만 존재(`WindowResult` 개별 항목, `EvaluationReportV1`에 all_origins bool 없음) |
+| D-5C2-7 | 홀드아웃 예측은 `booster.predict` 직접 + `build_row` | `_holdout_fit.py::feature_space_from_manifest`(재구성) → `matrix_for` → `booster.predict` · `OPEN-5C2-SERVING-PATH-PARITY`(아래 OPEN 절) |
+| D-5C2-8 | 경계 동시각은 평가측 | `_holdout_fit.py::build_split`의 `gate_test_all`(`indices_in_window`가 `[start,end)`) vs `gate_train`(`opened_at < window.start`) — 반개구간 겹침 없음 |
+| D-5C2-9 | 세그먼트 축 `category`·`amount_band`, `published_floor` 없음 | `evaluation/segments.py`에 `published_floor`/`floor` 문자열 0(grep 확인) — `_AXIS_KEY_BUILDERS`가 두 축만 |
+| D-5C2-10 | 완화 경로 폐쇄 표 | `test_public_signatures.py::test_no_evaluation_public_function_takes_bare_threshold_or_seed_parameters`(게이트 진입점 3개 `policy` 하나만) · `EvaluationPolicy`는 `load_evaluation_policy`만 값을 채운다(로더 관례, Python 가시성 한계는 알려진 제한) |
+| D-5C2-11 | 이식 출처 5 모듈 포인터 | `reports/evidence/m5/5c2/reuse.md`(S-7 대조 통과) |
+| D-5C2-12 | `HoldoutRejected`/`NotEvaluable` → `JobFailureCode` 매핑 | 아래 매핑 표 |
+
+## (2b) 값 획득 축 — 실측
+
+| 표면 | 판정 | 실측 |
+| --- | --- | --- |
+| `EvaluationPolicy`(frozen)·`load_evaluation_policy` | 연다 — 로더만 생성(관례) | `EvaluationPolicy(...)` 직접 생성으로 임의 임계 가능(Python 한계, 알려진 제한). `test_evaluation_policy_direct_construction_enforces_invariants`가 명백한 위반(0 이하 등)은 막는다는 것만 확인 |
+| `gate_outcome`/`passes_gate` | 연다 — 유일 판정 진입점(+ 판정식 자체), `policy` 하나만 | `test_gate_outcome_and_passes_gate_require_policy_parameter`. **2026-09-16 정정(verifier r1 H-2·H-3)** — `trial_outcome`은 안정성 없이 `Passed`를 낼 수 있어 public 이면 위협 모델 (f)의 우회 표면이었다. `_trial_outcome`(비공개)으로 내리고, 판정식 자체를 `passes_gate`(public)로 승격해 안정성 sweep(`_run_stability`)이 그 함수만 쓰게 했다(이중 구현 금지) |
+| `plan_evaluation_windows` | 연다 — `policy` 하나만, 낱개 임계 없음 | `test_public_signatures.py` 전수 |
+| `run_holdout` | 연다 — 유일 실행 진입점. `trainer: TrainerLike` 주입은 5C-1 과 같은 자리(모델 실물만, 판정·임계 주입 없음) | `test_no_bare_threshold_seed_or_layer_parameter_on_run_holdout` |
+| `EvaluationReportV1`·`WindowResult` 등 결과 타입 | 연다 — 읽기·직접 생성 가능(관례로만 방어) | 5C-1 과 같은 알려진 제한(①) |
+| 「경계로 처리」 행 — 성숙도 입력(`WeekMaturity`) | 위조 입력이 report 에 그대로 공시(값을 숨기지 않는다) | `WindowResult.window_opened_count`/`window_settled_count`가 입력 그대로 실린다(`_holdout_window.py::_assemble_window_result`) — 위조하면 report 자체가 그 위조를 드러낸다 |
+| 「경계로 처리」 행 — dataset cutoff(`opened_at`) | 공시만, 방어 없음 | `EvaluationReportV1.corpus_opened_at_first/last`가 코퍼스 실제 범위를 싣는다 |
+| 이번 구현이 만든 새 public 표면 | — | 아래 절 |
+
+## 이번 구현이 만든 새 public 표면과 밖에 허락하는 것
+
+- `ml_engine.evaluation.*`(정책·채점·베이스라인·세그먼트·진단·창·판정·report 전체) —
+  training 층(및 장래 5E/6C)에게 순수 평가 커널을 연다. 업무 판정(embargo 적용 여부,
+  실제 승격 실행)은 열지 않는다 — `GateOutcome`/`Promotion`은 값일 뿐 부수효과가 없다.
+- `ml_engine.training.holdout.run_holdout`/`HoldoutRejected`/`HoldoutRejectionReason` —
+  5E(job worker)가 부를 유일 진입점. dataset·정책·spec·trainer 를 받아 report 또는
+  거부를 낸다 — DB 쓰기·아티팩트 저장은 하지 않는다(5E 소관).
+- `ml_engine.training._holdout_fit`/`_holdout_window`(leading underscore, 비공개) —
+  `holdout.py`가 아니라 이 두 파일에서 직접 import 하면 창 분할·GBM 학습 세부·안정성
+  sweep 세부에 접근할 수 있다(Python 가시성 한계, 관례 위반). 정상 소비자는 `holdout.py`
+  최상위 이름만 본다.
+
+**2026-09-16 갱신(verifier r2 M-3r — 수정 라운드 1·2가 만든 표면, 이전 판은 초판
+그대로였다)**:
+
+- `ml_engine.evaluation.passes_gate(baseline_rmse, model_rmse, statistic, policy)
+  -> bool`(r1 H-2/H-3) — 판정식 유일 공개 정의. `gate_outcome`과 안정성 sweep
+  둘 다 **같은 함수 객체**를 부른다(`verdict.passes_gate is _holdout_window.
+  passes_gate`, verifier r2 실측). `bool`만 내므로 `Passed`/`Promotable`을 직접
+  만들 수 없다 — 없던 권한이 아니다.
+- `ml_engine.evaluation.DroppedRowCount`(r1 H-1, **2026-09-16 소속 이동** —
+  `report.py`에서 `windows.py`로, M-1r 이 `WindowExclusion`도 이 타입을 쓰게 되며
+  `report.py → windows.py` 순환 import 를 피하려고 옮겼다. import 경로는
+  `ml_engine.evaluation`을 통해서는 변화 없음) · `WindowResult.dropped_rows` —
+  창 안 buildability 로 버려진 행의 사유별 계수(읽기 전용 공시).
+- `ml_engine.evaluation.WindowExclusion.buildable_row_count`/`.dropped_rows`
+  (r2 M-1r, 신규 필드) — 실행 단계에서 제외된 창(`INSUFFICIENT_EVALUATION_ROWS`)
+  에만 채워진다(계획 단계 제외는 `None`/빈 tuple). 기존 `evaluation_row_count`
+  (구조적 행 수)와 나란히 둬야 「행 부족」 사유의 자기모순이 없어진다 — 읽기 전용
+  공시, 새 권한 아니다.
+- `ml_engine.training.holdout.HoldoutRejectionReason.ACCOUNTING_MISMATCH`
+  (r2 H-2r, 신규 열거값) — `unaccounted_row_count`가 음수(회계 결함, 구조적으로
+  도달 불가능해야 할 상태)일 때만 나온다. 기존 두 값(`EMPTY_SIDE`·
+  `INVALID_MATURITY_INPUT`)과 같은 자리(실행 자체의 거부), 창 단위 실패
+  (`WindowExclusionReason.TRAINING_REJECTED`)와는 다른 어휘.
+- **제거**: `ml_engine.evaluation.trial_outcome`(r1 H-3) — `_trial_outcome`으로
+  비공개 전환. 안정성 없이 `Promotable`을 만들 수 있던 in-repo 우회 표면이었다.
+
+**2026-09-16 확인(verifier r3 — M-1r·L-2r 은 새 public 표면을 만들지 않음)**:
+r3 의 두 수정은 위에 이미 등재된 표면(`WindowExclusion.buildable_row_count`/
+`.dropped_rows`, r2 M-1r)의 **직렬화 공백을 메운 것**(canonical JSON/checksum
+경로에 같은 값이 실리게 함, `_window_exclusion_json`)과 `holdout.py` **내부**
+호출부 정리(`_assemble_report`가 안 쓰던 `plan_selected` 매개변수 제거 —
+private 함수, `run_holdout`/`HoldoutRejected` 공개 표면은 불변)뿐이다. 새 타입·
+새 함수·새 필드·새 열거값 없음(`git diff 9853ae9..HEAD -- ml-engine/src/
+ml_engine/evaluation/__init__.py ml-engine/src/ml_engine/training/__init__.py`
+로 재확인 가능 — r2 이후 diff 없음).
+
+## 알려진 제한
+
+1. **K7 성숙도 비율 3줄 중복** — `evaluation/windows.py::WeekMaturity.maturity_ratio`가
+   `settled_count / opened_count`를 계산한다. 5D K7 `inference.maturity.Observed.ratio`와
+   동일 식이지만 import 는 layers 위반이라 재사용하지 않는다(D-5C2-2, `OPEN-5C-MATURITY-SOURCE`
+   종결 — 대안은 K7 을 `features` 층으로 이전하는 2F/5E 후보).
+2. **서빙 경로 불일치(`OPEN-5C2-SERVING-PATH-PARITY`)** — 홀드아웃 예측이
+   `TrainedArtifact.feature_manifest`에서 재구성한 `AwardRateFeatureSpace`로 직접
+   `booster.predict`를 부른다(D-5C2-7). legacy 의 "아티팩트 → predictor 로더 →
+   `predict_rates`" 직렬화 왕복 경로와 수치가 같다는 것은 **증명되지 않았다** — 5E 가
+   같은 창의 두 경로 중심값을 대조하는 통합 test 로 확인해야 한다.
+3. **서빙 미학습 공종 가드 미적용(`OPEN-5C2-UNLEARNED-GUARD`)** — 홀드아웃 예측 경로가
+   5D `segment_availability`를 지나지 않는다(legacy 도 우회). 미학습 공종 행이 홀드아웃
+   수치에 그대로 들어간다 — `unlearned_baseline_cells`가 베이스라인 쪽만 공시하고
+   모델 쪽 미학습은 별도 공시가 없다.
+4. **성숙도 입력 신뢰** — `WeekMaturity(opened_count, settled_count)`의 정확성을 이
+   slice 는 검증하지 않는다(D-5C2-2, 호출자 신뢰). 위조 입력은 report 에 그대로
+   공시되므로 사후 감사는 가능하나 사전 차단은 없다.
+5. **Python 가시성 한계** — `EvaluationPolicy`·결과 타입 전부 직접 생성으로 불변식을
+   부분적으로 우회할 수 있다(관례로만 방어, 5B/5C-1 과 같은 한계).
+6. **`max_origins` 상한 없음** — 정책 값을 아주 크게 잡으면 성숙 창 전부를 평가한다
+   (비용 문제, 정확성 문제 아님). 방어하지 않기로 스코프에서 등재됨(우회 후보 (19)).
+7. **`min_training_rows`(5C-1 training-v1 정책)가 창마다 적용된다** — 창의 `train_rows`
+   서브셋이 5C-1 `train_award_rate_gbm`을 지날 때마다 500행 하한을 거친다. 합성 test
+   코퍼스는 창당 500행 이상을 만들거나(비쌈) `TrainingPolicy(min_training_rows=...)`를
+   test 전용으로 낮춰 구성한다(5C-1 컨벤션 허용, `test_holdout.py`가 이 방식 사용,
+   docstring 명시 없음 — 함수명 `_training_policy(min_training_rows=5)`로 자명).
+8. **`published_floor` 세그먼트 축 없음** — D-5C2-9 로 종결(축 자체가 존재하지 않음,
+   기능 누락이 아니라 설계 결정).
+9. **conservative 변형(`gbm_gate_stratum_only`) 학습 실패 시 생략** — 게이트 모델
+   (`gbm_all_strata`)이 성공하고 보수 변형만 실패하면 창은 정상 평가되고 `models`
+   tuple 에 보수 변형 항목만 빠진다(신규 회복 경로, legacy 에 이 실패 상태가 없어
+   대응 동작이 없었다).
+10. **stability sweep 이 게이트 모델만 재학습** — legacy `_one_window_stability`는
+    `evaluate_award_rate_holdout` 전체(두 GBM 변형)를 seed 마다 재실행하지만, 이
+    구현은 판정에 쓰이는 `gbm_all_strata`만 재학습한다(비용 절감, 보수 변형은 애초에
+    판정에 쓰이지 않으므로 정보 손실 없음).
+11. **`WeekMaturity.__post_init__`이 결과 타입이 아니라 `ValueError`를 던진다**
+    (verifier r1 L-1, 2026-09-16 등재) — 설계 검토 (13)은 겹침·구조 위반 전부를
+    `HoldoutRejected(INVALID_MATURITY_INPUT)`로 계획했으나, 실제로는 성숙도 구간
+    **겹침**만 그 결과 타입으로 흡수되고(`plan_evaluation_windows` →
+    `InvalidMaturityInput`), 개별 `WeekMaturity`의 생성자 불변식(`end > start`,
+    음수 카운트 금지)은 `ValueError`로 막는다. 5C-1 `AwardRateLabel`과 같은
+    컨벤션이라 코드는 바꾸지 않는다(`test_week_maturity_rejects_end_not_after_start`/
+    `test_week_maturity_rejects_negative_counts`가 이 동작을 고정) — 문면 정정으로
+    처분.
+12. **`summarize_stability([])`이 "중립"이 아니라 "일관"값을 낸다** (verifier r1
+    L-2, 2026-09-16 등재) — docstring 의도(trials 없으면 중립)와 달리
+    `sign_consistent=True`·`verdict_consistent=True`를 반환해 게이트의 안정성
+    전제를 우연히 충족시킨다(`gate_outcome(..., stability=summarize_stability(()))`
+    → `Passed` 실측 가능). 프로덕션 경로에서는 `evaluation_policy.stability_seeds`가
+    항상 비지 않아(정책 불변식) trials 가 빈 상태로 도달하지 않는다
+    (`test_diagnostics.py`의 `summarize_stability([])` 관련 test 가 이 값 자체를
+    고정) — 등재로 처분, 코드 변경 없음.
+13. **`_fit_baselines`/`matrix_for`의 방어적 `assert`가 `python -O` 아래에서
+    사라진다** (verifier r1 L-3, 2026-09-16 등재) — `EvaluationPolicy.__post_init__`
+    불변식이 그 입력을 앞에서 이미 막아 현재 코드 경로로는 도달 불가하지만, `-O`
+    실행 시 이 방어선 자체가 사라진다는 사실은 남는다. 이 slice 의 acceptance
+    명령(S-1~S-10, `commands.md`)은 전부 `-O` 없이 실행됨을 확인 — 등재로 처분,
+    코드 변경 없음.
+14. **`derive_promotion`이 `Passed`+`window_start=None` 조합에 `ValueError`를
+    던진다** (verifier r1 L-4, 2026-09-16 등재) — 결과 타입 원칙(예외로 새지 않음)의
+    의도적 내부 불변식 예외다. `_assemble_report`가 항상 `latest.window_start`를
+    `latest`와 짝으로 넘기므로 프로덕션 경로에서 도달 불가
+    (`test_derive_promotion_passed_without_window_start_raises`가 고정) — 등재로
+    처분, 코드 변경 없음.
+15. **latest-window 승격 의미론 — "성숙·평가 가능했던 최신 창"이지 "달력상 최신
+    창"이 아니다** (code-reviewer 「확인 불가」, 팀장 지시로 2026-09-16 **의도로
+    확정**) — 시간상 가장 늦은 선택 창이 (`TRAINING_REJECTED`·
+    `INSUFFICIENT_EVALUATION_ROWS` 등으로) 제외되고 더 이른 창만 성공하면,
+    `_assemble_report`의 `latest = windows_outcome.results[-1]`이 그 이른 창을
+    승격 판정에 쓴다. 실패한 최신 창의 존재가 승격 자체를 막지 않는다는 것이
+    의도다(설계 검토 (1) 「창 실패는 창 제외로 흡수, report 는 여전히 성공
+    반환」과 같은 원칙 — job 계약과 도메인 계약을 섞지 않는다). 결과가 이른 창
+    기준으로 오래됐을 수 있다는 것을 소비자(5E)가 알아야 한다 — 「latest」는
+    달력이 아니라 평가 가능성 기준이라는 뜻.
+    `test_run_holdout_promotion_uses_latest_evaluable_window_not_latest_calendar_window`
+    (`tests/training/test_holdout.py`)가 이 경계를 고정한다.
+
+## `HoldoutRejected`/`NotEvaluable` → 2C `JobFailureCode` 매핑 표(D-5C2-12)
+
+5C-1 D-5C-11 과 같은 형식. 2C `JobFailureCode`(6값)에 없는 사유는 `TRAINING_ERROR`가
+아니라 **`EVALUATION_ERROR`** + `detail_code`로 나른다(evaluation 단계 실패이므로 5C-1
+학습 실패와 어휘를 가른다). proto 무편집.
+
+| 이 slice 의 결과 타입 | `reason` | `JobFailureCode` | `detail_code` |
+| --- | --- | --- | --- |
+| `HoldoutRejected` | `EMPTY_SIDE` | `EVALUATION_ERROR` | `HOLDOUT_EMPTY_SIDE` |
+| `HoldoutRejected` | `INVALID_MATURITY_INPUT` | `EVALUATION_ERROR` | `INVALID_MATURITY_INPUT` |
+| 창 제외(`WindowExclusion.reason`, report 필드일 뿐 job 실패 아님) | `TRAINING_REJECTED` | — (report 는 여전히 성공 반환, `excluded_windows`에 기록) | — |
+| `GateOutcome.NotEvaluable`(report 필드, job 실패 아님) | `NO_EVALUABLE_WINDOW`/`UNDERPOWERED`/`SEED_UNSTABLE` | — (report 성공, `promotion=PromotionNotEvaluable`) | — |
+
+「창 제외」와 「`NotEvaluable`」은 **job 실패가 아니다** — `run_holdout`은 정상적으로
+`EvaluationReportV1`을 반환하고, 그 report 안에 측정 불가 사실이 값으로 실린다(D-5C2-4
+「못 쟀다는 별도 어휘」 취지 — job 계약과 도메인 계약을 섞지 않는다). `JobFailureCode`
+매핑 대상은 `HoldoutRejected`(실행 자체의 실패) 하나뿐이다.
+
+## OPEN
+
+| OPEN | 처리 |
+| --- | --- |
+| `OPEN-5C2-SERVING-PATH-PARITY` | 알려진 제한 2 — 5E 통합 test 이월 |
+| `OPEN-5C2-UNLEARNED-GUARD` | 알려진 제한 3 — 5E 가 정책 값으로 공시 여부 결정 |
+| `OPEN-5C-MATURITY-SOURCE` | D-5C2-2 로 종결(입력) |
+| `OPEN-5C-BUDGET-BAND-SOURCE` | scope ② 로 종결(정책 데이터) |
+| `OPEN-5C-SEGMENT-PUBLISHED-FLOOR` | D-5C2-9 로 종결(축 없음) |
+| `OPEN-5C-REJECT-ACCOUNTING`(5C-1 L-8) | **2026-09-16 정정(verifier r1 M-4)** — 이 slice 가 실제로 새로 공시하는 것은 창 안 buildability 로 걸러진 행의 `WindowResult.dropped_rows`(H-A, `MissingFact` 사유별)뿐이다. 코퍼스 admission 단계의 `AdmittedCorpus.rejected`/`TrainedArtifact.rejected_rows`(성공 경로, 5C-1 `RejectedRowAccounting`)는 이 report 에 여전히 없다 — 그 필드 추가는 5C-1 파일(`train.py`/`artifact_writer.py`) 편집이라 범위 밖, 미해소 유지(5E 전) |
+| `OPEN-5C-CORPUS` | 승계 — 5C-2 test 는 전부 합성 코퍼스, 실코퍼스 evaluation fixture 는 curator 몫 |
+
+## 계약과 어긋나 판단이 필요했던 자리
+
+- **`training/holdout.py` 단일 파일 계획 → 3파일 분리.** scope.md·설계 검토 둘 다
+  `training/holdout.py` 하나를 계획했다. 구현 결과 창 단위 오케스트레이션(분할·GBM
+  두 변형 학습·베이스라인·진단·안정성 sweep·report 조립)이 설계 래칫
+  `file_loc_soft_limit`(500줄)을 넘겼고, 완화 경로는 둘뿐이었다: (a)
+  `pyproject.toml` `[tool.design-ratchet]` allowlist 에 항목 추가(팀장 소관 파일,
+  「편집 필요가 생기면 멈추고 보고」 지시 대상) (b) 파일을 나눈다. 계약을 바꾸지
+  않고 (b)를 택했다 — `holdout.py`(public 진입점, 218줄)·`_holdout_fit.py`(창 분할
+  + GBM 학습, 272줄)·`_holdout_window.py`(베이스라인·진단·안정성·조립, 336줄) 셋
+  다 500줄 아래다. public 표면(`run_holdout`·`HoldoutRejected`·
+  `HoldoutRejectionReason`)은 `holdout.py`에만 있고 나머지 둘은 leading underscore
+  로 비공개임을 표시했다. **팀장 검토 대상**: allowlist 편집이 더 나은 선택이었다면
+  롤백 없이 `pyproject.toml`에 항목을 추가하고 세 파일을 다시 합치는 것도 가능
+  (rollback.md 의 in_scope 목록에 세 파일이 모두 등재돼 있어 되돌리기 쉽다).
+  **2026-09-16 verifier r1 L-5 추가 판정** — 순환 없음(`holdout.py` →
+  `_holdout_window.py` → `_holdout_fit.py`), public seam 파일당 하나, 셋 다
+  500줄 아래(래칫 양성 대조로 500줄 한도 실효성 확인)라는 근거로 **3파일 분리가
+  「줄 수만 맞추기 위한 분할」이 아니라고 결론**(verifier: "allowlist 편집 대안을
+  택할 근거는 약하다"). 다만 `_holdout_window.py`가 `_holdout_fit.py`의 public
+  이름 11개 중 10개를 참조해 두 파일이 완전히 독립적으로 읽히지는 않는다 — 정리
+  여지로 `stability_seed_order`/`sub_dataset`(안정성 sweep 전용)과
+  `WindowSuccess`/`WindowSkip`(세 파일이 공유하는 결과 어휘)의 위치가 지목됐다.
+  실제로 옮기려 하면 `sub_dataset`/`stability_seed_order`는 `_holdout_fit.py`
+  자신의 `fit_models`/`_fit_conservative_variant`(:281·:311)도 그 함수를 쓰므로
+  `_holdout_window.py`로 온전히 옮기면 `_holdout_fit.py → _holdout_window.py`
+  역방향 import 가 생겨 지금의 무순환 경계(`_holdout_fit`은 `_holdout_window`를
+  모른다)를 깬다 — **allowlist 편집이 이 정리보다 더 나쁜 대안이라는 verifier
+  결론에는 동의하되, 이 정리 자체는 지금 구조에서 무비용이 아니다.** 그래서 이번
+  라운드는 코드를 옮기지 않고 이 자리에 등재만 한다 — 실행하려면 공유 어휘
+  (`WindowSuccess`/`WindowSkip`)만 별도 파일(예: `_holdout_types.py`)로 뽑아
+  셋이 그 파일만 보게 하는 재구조화가 필요하고, 이는 새 계약 갱신 없이 팀장 검토
+  대상.
