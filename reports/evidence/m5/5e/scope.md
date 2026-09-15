@@ -25,7 +25,7 @@ in_scope:
   - ml-engine/src/ml_engine/training/jobs/servicer.py       # TrainingJobServicer — StartTraining(envelope·idempotency_key 비어 있지 않음·training_spec_version → resolve_training_spec 미지 = UNSUPPORTED_TRAINING_SPEC·dataset.uri scheme ∈ policy·manifest_checksum 형식 sha256 hex 64) → ACCEPTED 즉시 반환 · GetTrainingJob(미지 = JOB_NOT_FOUND) · CancelTrainingJob(전이표)
   - ml-engine/src/ml_engine/app/__init__.py                 # **조립 근(composition root, 새 최상위 패키지 — layers 계약 밖, D-5E-1)** — serving·training.jobs·inference·adapters 를 여기서만 잇는다
   - ml-engine/src/ml_engine/app/pipeline.py                 # build_training_pipeline(spec, policies, trainer, code_version) -> TrainingPipeline: read_dataset_files(5C-1) → load_dataset → train_award_rate_gbm → write_artifact → settlements → build_weekly_maturity(5D K7) → run_holdout(5C-2) → report canonical bytes → refs(file:// 산출 디렉터리, D-5E-4·D-5E-5)
-  - ml-engine/src/ml_engine/app/server.py                   # `python -m ml_engine.app.server` — 환경 6(5A 표 #24~#26·#30 + port·policy 경로·artifact 출력 디렉터리)을 env 로 읽는 설정 객체(D-5E-7) · preload(정책 셋) → readiness → 세 servicer 등록 → serve · SIGTERM 핸들러
+  - ml-engine/src/ml_engine/app/server.py                   # `python -m ml_engine.app.server` — 환경 7(5A 표 #24~#26·#30 + port·policy 경로·artifact 출력 디렉터리)을 env 로 읽는 설정 객체(D-5E-7) · preload(정책 셋) → readiness → 세 servicer 등록 → serve · SIGTERM 핸들러
   - ml-engine/src/ml_engine/training/dataset.py             # 5C-1 파일 — DatasetManifestV1 에 `settlements_checksum` 필수 필드 추가 + rows 와 같은 검증(D-5E-4, hunk 격리) 
   - ml-engine/src/ml_engine/adapters/dataset_files.py       # 5C-1 파일 — `settlements.jsonl` 세 번째 파일 읽기(D-5E-4, hunk 격리)
   - ml-engine/src/ml_engine/adapters/artifact_files.py      # 신규 — write_artifact_files(dir, artifact_bytes, report_bytes) -> ArtifactRefs(file:// uri 둘 + checksum) · 쓰기 전 디렉터리 존재·비어 있음 검증(덮어쓰기 금지)
@@ -38,6 +38,7 @@ in_scope:
   - ml-engine/tests/serving/**                              # RED 먼저 — in-process grpc(grpc_testing 또는 insecure 포트 0) 로 세 servicer test · readiness 규칙표 · 전이표 property · idempotency · deadline/cancel(자원 해제 카운터) · concurrency 상한(동시 N+1 번째 RESOURCE_EXHAUSTED) · shutdown 순서 · status 매핑 전수 · 2C 조합 불변식
   - ml-engine/tests/training/test_jobs_*.py
   - ml-engine/tests/training/test_dataset_settlements.py  # D-5E-4 test — 위 glob 이 안 덮는다(verifier r1 M-9, 음성 대조 실측). 계약 갱신 (4)
+  - ml-engine/tests/adapters/test_artifact_files.py       # M-6 수정이 만든 직접 test(verifier r2 R2-2 — 수정 라운드가 만드는 test 파일은 라운드마다 이 목록과 대조). 계약 갱신 (5)
   - ml-engine/tests/app/**                                  # pipeline 통합(fake trainer + 실 LightGBM 1건: dataset 디렉터리 → artifact·report 파일 → refs checksum 재계산) · server 부팅·종료
   - ml-engine/tests/gates/test_serving_purity.py            # 기존 test 무편집 + `ml_engine.app` 은 대상 아님을 명시하는 test 1(app 이 training 을 끌어와도 serving 패키지 자체는 안 끌어옴)
   - ml-engine/tests/gates/test_wheel_reexport.py            # S-11 — `uv build` → 임시 venv 설치 → `import ml_engine.contracts` + servicer import 성립(OPEN-5A-WHEEL-BUILD-HOOK 종결 증거)
@@ -187,3 +188,4 @@ rollback: |
 | 2026-09-16 (2) verifier r1 요청 전 | in_scope 에 `ml-engine/setup.py`·`config/quality/leak-pattern-baseline.txt` 추가 · 「하네스 레인 변경」 절 신설(없음) | 구현 실측 — setuptools 훅 배선에 `setup.py` 필요(pyproject 만으로 cmdclass 불가), 취소 토큰 클래스 이름의 식별자 오탐 baseline 등재. 절 누락은 evidence-pack 규격 위반(팀장 레인 초판 누락) |
 | 2026-09-16 (3) verifier r1 뒤 | in_scope 에 `ml-engine/uv.lock`·`ml-engine/src/ml_engine/adapters/__init__.py` 추가 | verifier r1 L-1 — 둘 다 변경됐는데 목록 밖(전자는 D-5E-9 산문에만). 수정 라운드 1 과 병행, 산출물 무접촉 |
 | 2026-09-16 (4) verifier r1 부록 뒤 | in_scope 에 `tests/training/test_dataset_settlements.py` 추가(glob 폭) · (2) 행의 클래스 이름 축어를 간접 표현으로 · rollback 처분 정본 확인: **scope.md 의 자기 이력은 착수 커밋 `41076d0` 기준 단일 역적용 + 하네스 절 재등재**(하네스 규칙 2026-09-16), `rollback.md` 가 이를 따른다(M-10) | verifier r1 M-9·M-10 |
+| 2026-09-16 (5) verifier r2 뒤 | in_scope 에 `tests/adapters/test_artifact_files.py` 추가 · `app/server.py` 주석 「환경 6」→「환경 7」(`policy-values.md` §2 와 일치) | verifier r2 R2-2·R2-5. 수정 라운드가 새 test 파일을 만들면 in_scope 와 대조하는 항목을 라운드 보고에 둔다 |
