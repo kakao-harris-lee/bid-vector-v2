@@ -164,3 +164,12 @@ rollback.md 갱신(별도 커밋). F-8은 알려진 제한 1에 한 줄 보강(�
 
 `reports/evidence/m5/5d2/commands.md` S-1~S-9 전건. 결과: 전부 exit 0, 402 passed
 (4 deselected legacy_parity), golden 14/14 skip 0.
+
+## 사용자 승인
+
+**2026-09-15 — slice 5D-2 종결 승인**(운영자 「추천 방식으로 진행」). verifier r1 not-ready(high 1: wire `Rate.fraction` 파싱 예외 탈출 · medium 1: `reserve_prices` Money
+성분 미검증) → 시정 `de518ba`·`72ee887`·`f4ca61d` → r2 ready-for-review(F-1 27 입력 예외 0·F-2 5B 규칙 7/7 일치, 회귀 0, 402 passed, golden 14/14) → 계약
+문면 정정 `64972ba`·`fde9b2c`(`OPEN-5D2-BID-RATE-UPPER`) → evidence `c195793`·`ea6803e`. 재작업 1회. 병합은 push → PR + 리뷰 판정 코멘트 → 머지 별도 승인(관례).
+인계 OPEN(2F M2 additive 묶음): `OPEN-5D2-SAMPLE-SEGMENT`(표본 기관·공종 축) · `OPEN-5D-DIAGNOSTICS-WIRE` · `OPEN-5D2-INTERVAL-SOURCE-WIRE` ·
+`OPEN-5D2-RELEASE-FOR-DISTRIBUTION` · `OPEN-5D2-BID-RATE-UPPER`(D-2B-8 vs 밴드 1.5). `OPEN-5D2-POLICY-VALUES`(임계 값, 5C 뒤). `OPEN-5D-DISTRIBUTION-ENGINE` **해소**.
+verifier 리포트 `_workspace/m5-5d2/04_verifier_report.md`·`05_verifier_report_r2.md`.
