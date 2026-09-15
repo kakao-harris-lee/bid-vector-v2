@@ -11,13 +11,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from ml_engine.contracts import common_pb2, features_pb2
-from ml_engine.features import NameMismatch
+from ml_engine.features import CanonicalizationRejected, NameMismatch, compute_checksum
 from ml_engine.training.artifact_writer import ArtifactBytes, write_artifact
 from ml_engine.training.booster import LightGbmTrainer, TrainerFailed
 from ml_engine.training.dataset import DatasetManifestV1, LoadedDataset, RawTrainingRow
 from ml_engine.training.policy import TrainingPolicy
 from ml_engine.training.release import derive_release_id
-from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
+from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec, spec_checksum
 from ml_engine.training.train import (
     CodeVersion,
     TrainedArtifact,
@@ -86,6 +86,64 @@ def _dataset(n: int) -> LoadedDataset:
         feature_schema_version="award-rate-features-v2",
     )
     return LoadedDataset(manifest=manifest, raw_rows=_synthetic_rows(n))
+
+
+def _labeled_dataset(n: int, label_for) -> LoadedDataset:
+    """H-1 ③ — `_dataset`과 같은 구조(dataset_id 만 다름)이지만 라벨을 `label_for(i)`
+    로 자유롭게 준다. floor 대조(상수 라벨·상수 예측 vs 넓게 퍼진 라벨)에 쓴다."""
+    manifest = DatasetManifestV1(
+        dataset_id="ds-residual",
+        sample_scope="feed-origin-only",
+        feed_origin_only=True,
+        row_count=n,
+        rows_checksum="0" * 64,
+        opened_at_first=datetime(2026, 1, 1, tzinfo=UTC),
+        opened_at_last=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=n),
+        feature_schema_version="award-rate-features-v2",
+    )
+    rows = []
+    for i in range(n):
+        category = "civil" if i % 2 == 0 else "it"
+        agency = f"agency-{i % 4}"
+        rows.append(
+            RawTrainingRow(
+                feature_inputs=_feature_inputs(category=category, agency=agency),
+                label_value=label_for(i),
+                opened_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=i),
+                stratum="clean-base",
+            )
+        )
+    return LoadedDataset(manifest=manifest, raw_rows=tuple(rows))
+
+
+class _ConstantPredictionBooster:
+    """test fake — 항상 같은 값을 예측한다(잔차를 직접 통제하기 위한 것 —
+    `_ConstantTrainer`류와 달리 학습 라벨과 무관하게 고정)."""
+
+    def __init__(self, value: float, feature_names: tuple[str, ...]) -> None:
+        self._value = value
+        self._feature_names = feature_names
+
+    def predict(self, matrix):
+        import numpy as np
+
+        return np.full(matrix.shape[0], self._value)
+
+    def model_to_string(self) -> str:
+        return "constant-prediction-booster"
+
+    def feature_name(self) -> list[str]:
+        return list(self._feature_names)
+
+
+class _ConstantPredictionTrainer:
+    def __init__(self, value: float) -> None:
+        self._value = value
+
+    def train(
+        self, matrix, labels, feature_names, categorical_indices, params, seed, rounds
+    ):
+        return _ConstantPredictionBooster(self._value, tuple(feature_names))
 
 
 def _small_spec(**overrides: object) -> TrainingSpec:
@@ -287,6 +345,69 @@ def test_write_artifact_sha256_matches_recomputed_hash() -> None:
 
     written = _train_and_write()
     assert hashlib.sha256(written.bytes).hexdigest() == written.sha256
+
+
+def test_write_artifact_feature_manifest_checksum_matches_independent_compute() -> None:
+    """verifier r3 H-1 ① — `payload["feature_manifest_checksum"]`이 5B
+    `compute_checksum(trained.feature_manifest)`의 **독립 재계산**과 일치해야 한다.
+    이전에는 이 값을 재계산 대조하는 test 가 없어 `.hexdigest().upper()` 같은 변이가
+    452 test 전건을 조용히 통과했다(리포트 §「H-1」 변이 1b)."""
+    dataset = _dataset(40)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    trained = train_award_rate_gbm(
+        dataset, _small_spec(), policy, LightGbmTrainer(), CodeVersion("sha-abc123")
+    )
+    assert isinstance(trained, TrainedArtifact)
+    written = write_artifact(trained)
+    assert isinstance(written, ArtifactBytes)
+    independent = compute_checksum(trained.feature_manifest)
+    assert not isinstance(independent, CanonicalizationRejected)
+    payload = json.loads(written.bytes)
+    assert payload["feature_manifest_checksum"] == independent
+
+
+def test_write_artifact_training_spec_checksum_matches_independent_compute() -> None:
+    """verifier r3 H-1 ② — `payload["training_spec_checksum"]`이 `spec_checksum(spec)`
+    의 독립 재계산과 일치해야 한다(변이 4, `.upper()`)."""
+    dataset = _dataset(40)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    spec = _small_spec()
+    trained = train_award_rate_gbm(
+        dataset, spec, policy, LightGbmTrainer(), CodeVersion("sha-abc123")
+    )
+    assert isinstance(trained, TrainedArtifact)
+    written = write_artifact(trained)
+    assert isinstance(written, ArtifactBytes)
+    payload = json.loads(written.bytes)
+    assert payload["training_spec_checksum"] == spec_checksum(spec)
+
+
+def test_residual_std_hits_floor_when_predictions_match_labels_exactly() -> None:
+    """verifier r3 H-1 ③ — 예측이 라벨과 정확히 같아 OOF 잔차가 전부 0 인 코퍼스는
+    `spec.min_residual_std` 바닥에 걸린다. `residual.py` 단위 test(하한 자체)와 달리
+    이것은 `train_award_rate_gbm`의 **배선**을 표적한다 — floor 인자가 어딘가에서
+    빠지거나 무시되면(변이 6, `floor=float()`) 여기서 잡힌다."""
+    dataset = _labeled_dataset(40, lambda _: 0.5)
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    spec = _small_spec()
+    trained = train_award_rate_gbm(
+        dataset, spec, policy, _ConstantPredictionTrainer(0.5), CodeVersion("sha-1")
+    )
+    assert isinstance(trained, TrainedArtifact)
+    assert trained.residual_std == spec.min_residual_std
+
+
+def test_residual_std_exceeds_floor_when_predictions_disagree_with_labels() -> None:
+    """대조군 — 위 test 가 우연히 항상 같은 값을 내는 것이 아님을 보인다. 라벨이 넓게
+    퍼져 있고 예측이 고정이면 OOF 잔차 표준편차가 바닥을 넘는다."""
+    dataset = _labeled_dataset(40, lambda i: 0.1 + 0.05 * (i % 10))
+    policy = TrainingPolicy(version="test-v1", min_training_rows=5)
+    spec = _small_spec()
+    trained = train_award_rate_gbm(
+        dataset, spec, policy, _ConstantPredictionTrainer(0.1), CodeVersion("sha-1")
+    )
+    assert isinstance(trained, TrainedArtifact)
+    assert trained.residual_std > spec.min_residual_std
 
 
 def test_write_artifact_rejects_feature_name_mismatch() -> None:
