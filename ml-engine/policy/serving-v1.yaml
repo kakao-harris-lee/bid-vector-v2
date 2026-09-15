@@ -1,0 +1,10 @@
+# M5/5E-1 서빙 정책 값(D-5E-6) — 승인 대기: reports/evidence/m5/5e/policy-values.md §1.
+# legacy 근거 0(legacy 는 FastAPI+Celery) — 전부 보수적 초기값 + 측정 의무(ADR 0010 D-1).
+version: serving-v1
+max_workers: 8
+max_concurrent_rpcs: 32
+shutdown_grace_seconds: 10
+job_workers: 1
+idempotency_key_max_chars: 256
+embedding_text_max_chars: 4000
+dataset_uri_schemes.0: file
