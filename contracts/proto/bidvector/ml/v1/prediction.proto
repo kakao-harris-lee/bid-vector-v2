@@ -33,6 +33,11 @@ enum IntervalSource {
   INTERVAL_SOURCE_UNSPECIFIED = 0;
   INTERVAL_SOURCE_CROSS_VALIDATION_RESIDUAL = 1;
   INTERVAL_SOURCE_TIME_HOLDOUT_RESIDUAL = 2;
+  // 사후예측분산 기반(분포 엔진, M2/2F additive) — 잔차 기반 두 값과 다른 축이다.
+  // `docs/discovery/data-dictionary.md` §6.5는 아직 이 값을 정의하지 않는다
+  // (`OPEN-2F-DICT-INTERVAL-SOURCE`, discovery 문서 소유 — 후속). **제공자 먼저 배포**
+  // (ADR 0010 D-7 — enum 값 추가도 수신 fail-closed 규칙 때문에 배포 순서가 필요하다).
+  INTERVAL_SOURCE_POSTERIOR_PREDICTIVE = 3;
 }
 
 // diagnostics의 세그먼트 지지 근거 — "그 추정이 무엇으로 지지되는가" 하나의 축(H-8 회피 —
@@ -54,9 +59,11 @@ enum Readiness {
 
 // 후보 셋의 가중치 — decimal string(`Rate`와 같은 표현 형태: scale 보존, 지수 표기 없음).
 // `Rate`를 그대로 재사용하지 않는 이유는 이름이 나르는 축이 다르기 때문이다(common.proto
-// "율의 축은 필드·메시지 이름이 나른다") — `Weight`는 투찰율 축이 아니라 시나리오 혼합
-// 계수 축이라 별도 타입으로 구분한다(교차 대입 방지, 조사 01 (b-1) — legacy는 경로마다
-// 0.24/0.52/0.24와 0.22/0.56/0.22가 같은 필드 이름 밑에서 갈렸다).
+// "율의 축은 필드·메시지 이름이 나른다") — `Weight`는 투찰율 축이 아니라 **[0,1] 구간의
+// fraction 가중치 일반**을 나른다(D-2F-5, M2/2F 가 「시나리오 혼합 계수 축」에서 확장 —
+// `Diagnostics.shrinkage_weight`가 형태를 재사용한다, 5D `Decimal` 가중치와 형태 일치).
+// 어느 축인지는 그 필드가 속한 메시지·필드 이름이 나른다(교차 대입 방지, 조사 01 (b-1) —
+// legacy는 경로마다 0.24/0.52/0.24와 0.22/0.56/0.22가 같은 필드 이름 밑에서 갈렸다).
 message Weight {
   string fraction = 1;
 }
@@ -66,6 +73,9 @@ message Weight {
 // (조사 01 (b-1) 반례 시정 — 가중치 값이 어느 정책판에서 왔는지 응답만으로 알 수 있다).
 message Candidate {
   CandidateLabel label = 1;
+  // 대상 공고 후보율 축 — `Rate.fraction > 1`은 계약 위반이다(D-2B-8). `features.proto`
+  // `CompetitionSample.observed_bid_rate`(과거 표본의 관측값 축)와는 다른 축이다
+  // (D-2F-4, M2/2F 축 한정 — 그 필드는 `> 1`을 허용한다).
   Rate bid_rate = 2;
   // 항상 `BID_RATE_ORIGIN_RECOMMENDED`(common.proto D-2A-7).
   BidRateOrigin origin = 3;
@@ -93,6 +103,18 @@ message Uncertainty {
   IntervalSource interval_source = 4;
 }
 
+// release 의 종류(M2/2F additive, D-2F-2) — 아티팩트가 있는 release(`ARTIFACT`, GBM 등)와
+// 아티팩트 없이 정책·코드만으로 서빙하는 release(`DERIVED`, 분포 엔진)를 값 위장 없이
+// 1급으로 가른다(5D-2 위협 (h) — 값 지어내기 금지). `UNSPECIFIED`는 수신 거부(fail-closed,
+// 2A ⑥) — **과도기 규칙**: 기존 표본은 이 필드가 없어 0(`UNSPECIFIED`)이 되므로, 수신자는
+// 이 값을 **제공자 배포 뒤**에만 거부를 켠다(ADR 0010 D-7 제공자 먼저). M2/2F 는 testdata
+// 5쌍 전부에 명시값을 실어 그 배포를 미리 증명한다.
+enum ReleaseKind {
+  RELEASE_KIND_UNSPECIFIED = 0;
+  RELEASE_KIND_ARTIFACT = 1;
+  RELEASE_KIND_DERIVED = 2;
+}
+
 // 모델 release 식별 — 구조화(조사 01 H-9, `v2-지침서.md` §5). legacy는 다섯을 문자열
 // 하나(`model_version`)에 접었다(조사 01 (b-4)). `metric`은 artifact manifest 소유라
 // 응답에 없다(scope.md ⑥) — 여기 넷은 release를 **지목**하는 데 필요한 성분과 식별자다.
@@ -102,13 +124,34 @@ message ModelRelease {
   string feature_schema_version = 3;
   string code_version = 4;
   string dataset_id = 5;
+  // release 종류(M2/2F additive, D-2F-2). **채움 규약**(`RELEASE_KIND_ARTIFACT`) — 다섯
+  // 전부 비공백(기존 규칙 유지). **채움 규약**(`RELEASE_KIND_DERIVED`, 아티팩트 없는
+  // release) — `release_id = "distribution/<inference policy version>"`·
+  // `artifact_checksum = "sha256:" + sha256(정규화된 정책 YAML bytes)`·
+  // `feature_schema_version` = 요청 envelope 값의 에코·`code_version` = ml-engine 패키지
+  // version·`dataset_id = ""`(DERIVED 에서만 빈 문자열이 허용된다 — D-2B-6 "아티팩트 학습
+  // 행 수" 문면과 충돌하지 않는다, 아티팩트 자체가 없으므로 학습 dataset 도 없다).
+  ReleaseKind release_kind = 6;
 }
 
 // 진단 — 타입 있는 필드만(조사 01 (b-3) 반례 시정 — legacy는 `dict[str, Any]` 아홉 개와
 // 자유 문자열이었다). 사람이 읽는 `explanation`은 없다 — 렌더링은 Kotlin 표현 계층 소관.
 message Diagnostics {
+  // `training_row_count`는 아티팩트 학습 행 수다(D-2B-6) — `release_kind = DERIVED`(아티팩트
+  // 없는 엔진)에서는 항상 `0`이다.
   uint32 training_row_count = 1;
   SegmentSupport segment_support = 2;
+  // 기관 표본이 임계 미만일 때 응답 근거에 실리는 수축 가중치(M2/2F additive,
+  // `OPEN-5D-DIAGNOSTICS-WIRE`, `capability-map.md` ML-04 「수축 가중치가 응답 근거에」).
+  // `Weight`(D-2F-5로 확장된 [0,1] fraction 가중치 일반)를 재사용한다.
+  Weight shrinkage_weight = 3;
+  // 임계 미달로 제외된 표본 총계(M2/2F additive, `OPEN-5D-DIAGNOSTICS-WIRE`).
+  uint32 excluded_observations = 4;
+  // 이 예측에 쓰인 기관 표본 수(M2/2F additive, `OPEN-5D2-SAMPLE-SEGMENT`).
+  uint32 agency_sample_count = 5;
+  // 기관 표본이 임계 미만인지(M2/2F additive, `OPEN-5D2-SAMPLE-SEGMENT`) — 수축 가중치가
+  // 적용됐는지를 읽는 쪽이 직접 판정하지 않고 엔진이 명시한다.
+  bool agency_sample_below_threshold = 6;
 }
 
 // `CalculateOptimalBid`의 성공 답 — 후보 정확히 3(라벨 순서 `CONSERVATIVE`·`BASE`·
