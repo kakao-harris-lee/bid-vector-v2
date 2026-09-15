@@ -42,3 +42,4 @@
 | --- | --- | --- |
 | 2026-09-12 착수 | 표 등재(승인 대기) | D-5C-7 · D-5C-2 |
 | 2026-09-12 구현 확인 | `policy/training-v1.yaml`(§1)·`TrainingSpec` 등록표 `award-rate-gbm-training-v1`(§2, `spec.py`)가 이 표 값과 일치함을 `test_policy.py::test_shipped_policy_file_matches_policy_values_md`·`test_spec.py::test_shipped_spec_matches_policy_values_md`로 test 고정. §3 5A 표 대조는 값 변경 없음(정정 제안만, `OPEN-5C-5A-TABLE-REASSIGN`) | 구현 evidence — `reports/evidence/m5/5c/checklist.md` |
+| 2026-09-13 rebase 뒤 | `test_policy.py` → `test_training_policy.py` 개명(파일명만, 함수명 무변경) — 5D `tests/inference/test_policy.py`(rebase 로 새로 유입)와 basename 충돌로 pytest 가 `import file mismatch`(양쪽 다 `__init__.py` 없는 rootless 패키지)를 내 S-5 수집 자체가 실패했다. 위 인용도 `test_training_policy.py::test_shipped_policy_file_matches_policy_values_md`로 갱신 | rebase 뒤 baseline 확인(팀장 지시 1) |
