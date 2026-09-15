@@ -110,13 +110,16 @@ ml-engine/src/ml_engine/training/_holdout_window.py`로 확인한다.
 
 ## 수정 라운드 2 — BLOCKER B-1 정정(verifier r2) — 이 커밋 HEAD 에서 S-10 재실측
 
-verifier r2 B-1: 위 2026-09-15T16:32Z 기록이 비밀값 스캔 명령을 패턴 나열형으로
-인라인해(`grep -rniE "(api[_-]?key|secret|...)"`) 그 줄 자신이
-`config/quality/leak-patterns.txt` 매치가 되어 `:leakPatternGate` 를 실제로
-붉혔다(`8ba3fd9`부터). 위 명령을 65행과 같은 참조형(`-f
-config/quality/leak-patterns.txt`)으로 정정하고, 이 커밋 HEAD 에서 즉시 재실측한다
-(이력 되쓰기 아님 — 새 커밋, 절대 규칙: evidence 를 고친 커밋마다 그 커밋에서 S-10
-을 다시 돌려 적는다).
+verifier r2 B-1: 위 2026-09-15T16:32Z 기록이 비밀값 스캔 명령을 `config/quality/
+leak-patterns.txt`의 다섯 어휘를 정규식 나열로 그대로 옮겨 적어(65행처럼 `-f`
+참조형이 아니라) 그 줄 자신이 같은 패턴 파일에 매치되어 `:leakPatternGate`를
+실제로 붉혔다(`8ba3fd9`부터). 위 명령을 65행과 같은 참조형(`-f config/quality/
+leak-patterns.txt`)으로 정정하고, 이 커밋 HEAD 에서 즉시 재실측한다(이력 되쓰기
+아님 — 새 커밋, 절대 규칙: evidence 를 고친 커밋마다 그 커밋에서 S-10 을 다시
+돌려 적는다). **이 설명 문단 자신도 그 다섯 어휘 중 하나를 리터럴로 인용하면
+같은 방식으로 게이트를 다시 붉힌다** — 그래서 여기서도 어휘를 직접 쓰지 않고
+「패턴 파일의 어휘」로 가리킨다(자기 지시적 오탐 계열, evidence-pack 누출 검사
+판독 규칙과 같은 함정).
 
 ## 2026-09-15T16:53:27Z
 - cmd: `./gradlew --no-daemon :leakPatternGate`
@@ -140,3 +143,51 @@ config/quality/leak-patterns.txt`)으로 정정하고, 이 커밋 HEAD 에서 �
   감지함을 확인) → `head -n 237 <파일> > tmp && mv tmp <파일>`로 **비파괴
   절삭 복원**(`git checkout --` 미사용, evidence-pack 규격) → 같은 명령 재실행
   결과 다시 빈 출력, `git diff --stat -- <그 파일>` 도 빈 출력(원상 확인)
+
+## 수정 라운드 2 종결 — S-1~S-10 전건 재실행(HEAD `c63fd27`)
+
+## 2026-09-15T17:15Z
+- cmd: `(cd ml-engine && uv sync --frozen --all-extras)` — S-1
+- exit: 0
+## 2026-09-15T17:15Z
+- cmd: S-1b(serving extra 순수성 5종 ImportError) — S-1b
+- exit: 0 — 핵심 결과: 5개 전부 ImportError 확인, all-extras 복원
+## 2026-09-15T17:15Z
+- cmd: `(cd ml-engine && uv run ruff check . && uv run ruff format --check .)` — S-2
+- exit: 0 — 핵심 결과: All checks passed! / 135 files already formatted
+## 2026-09-15T17:15Z
+- cmd: `(cd ml-engine && uv run mypy --strict src/ml_engine)` — S-3
+- exit: 0 — 핵심 결과: Success: no issues found in 54 source files
+## 2026-09-15T17:15Z
+- cmd: `(cd ml-engine && uv run lint-imports)` — S-4
+- exit: 0 — 핵심 결과: 계약 6 KEPT
+## 2026-09-15T17:15Z
+- cmd: `(cd ml-engine && uv run python -m pytest tests -q)` — S-5
+- exit: 0 — 핵심 결과: **657 passed**(수정 라운드 1 종결 652 대비 +5 — H-2r
+  이중 계수 test 2 · M-1r 공시 test 2 · M-2r 안정성 호출 지점 test 1)
+## 2026-09-15T17:15Z
+- cmd: `(cd ml-engine && uv run python tools/design_ratchet.py --check)` — S-6
+- exit: 0 — 핵심 결과: 위반 0
+## 2026-09-15T17:15Z
+- cmd: S-7(재활용 출처 양성 + 음성 대조) — S-7
+- exit: 0 — 핵심 결과: 위반 0 / mismatch fixture 는 예상대로 29건 불일치 검출(음성 대조 성립)
+## 2026-09-15T17:15Z
+- cmd: python 3.12 assertion — S-9
+- exit: 0
+## 2026-09-15T17:15:18Z
+- cmd: `./gradlew --no-daemon :leakPatternGate`(단독 확인)
+- exit: **1**(FAILED) — 핵심 결과: 이 라운드의 B-1 정정 설명 문단(위 절) 자신이
+  패턴 파일 어휘 하나를 리터럴 인용으로 담아 게이트를 다시 붉혔다 — B-1 이 지적한
+  것과 **같은 클래스의 자기 지시적 오탐**이 이 라운드 안에서 한 번 더 재현됐다.
+  즉시 그 문단을 어휘를 직접 인용하지 않는 서술로 정정(위 절 갱신)한 뒤 재실측.
+## 2026-09-15T17:16Z
+- cmd: `./gradlew --no-daemon :leakPatternGate`(정정 뒤 재확인)
+- exit: 0 — 핵심 결과: BUILD SUCCESSFUL
+## 2026-09-15T17:16Z
+- cmd: `./gradlew --no-daemon check` — S-10, 정정 뒤 전건
+- exit: 0 — 핵심 결과: BUILD SUCCESSFUL in 5s, 337 actionable tasks(31 executed, 306 up-to-date)
+
+**절대 규칙 재확인 근거**: 이 라운드 자체가 그 규칙이 왜 필요한지를 한 번 더
+실증했다 — evidence 문서를 고치는 커밋은 자기 자신이 다음 게이트 실패의 원인이
+될 수 있고, 그것은 파일을 다 쓴 **뒤** 실제로 게이트를 돌려야만 잡힌다(적어
+두기만 한 「매치 없음」은 증거가 아니다).
