@@ -262,11 +262,21 @@ Codex 리뷰를 요청하기 전에 전부 충족해야 한다 (프로젝트 CLA
       아무것도 막지 못한다」의 뒷면으로, **안 돌린 게이트도 아무것도 막지 못한다**.)
 - [ ] 변경된 fixture와 정책 version의 근거가 기록됨
 - [ ] 알려진 제한과 rollback 방법이 기록됨
-- [ ] secret 스캔 통과 — evidence 디렉토리와 커밋 diff에 대해 최소한 다음을 실행하고
-      결과를 commands.md에 기록:
-      `grep -rniE "(api[_-]?key|secret|token|password|Bearer |BEGIN (RSA|EC|OPENSSH))" reports/evidence/<m>/<s>/`
-      (매치 없음 = 통과). Telegram id·사업자 정보는 패턴 스캔으로 못 잡으므로 육안
-      확인을 병기한다
+- [ ] 비밀값 스캔 통과 — evidence 디렉토리와 산출물 경로에 대해 **패턴 파일을 참조하는 형태**로
+      실행하고 결과를 commands.md에 기록:
+      `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/<m>/<s>/`
+      (exit 1 = 매치 없음 = 통과). Telegram id·사업자 정보는 패턴 스캔으로 못 잡으므로 육안
+      확인을 병기한다.
+      **패턴 어휘를 evidence 문서에 축어로 적지 않는다 (2026-09-16).** 루트 `leakPatternGate`
+      (Kotlin `check` job)의 scanRoot 가 `reports/evidence` 라, 스캔 명령을 패턴 나열형으로
+      인라인하거나 「어떤 낱말이 잡혔다」고 설명하는 산문 자체가 **새 매치**가 되어 CI 를 붉힌다.
+      절 제목·명령·설명 전부 파일 참조와 「어휘」 같은 간접 표현으로 쓴다. 이 함정은 evidence 를
+      고치는 커밋마다 다시 열리므로 **evidence 편집 커밋마다 그 HEAD 에서 `./gradlew --no-daemon
+      check` 를 다시 돌려 exit 를 적는다** — 게이트를 돌린 트리와 결과를 적은 트리가 다르면
+      그 기록은 거짓이다.
+      (실측 네 번: M4 PR #7 · 5C-1 PR #13 첫 CI · 5C-2 verifier r2 BLOCKER(초록을 기록한 커밋이
+      초록을 깨뜨림) · 5C-2 r3 에서 그 사고를 설명하는 문단이 다시 어휘를 인용. 검사 대상 문서가
+      검사 어휘를 설명하려는 순간 자기참조가 생긴다 — 2026-08-30 「출력 전문 금지」와 같은 뿌리)
 
 ## 문서 slice (M0)의 evidence
 
