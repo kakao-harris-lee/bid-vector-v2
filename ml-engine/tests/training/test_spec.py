@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from ml_engine.training.spec import (
@@ -124,3 +126,44 @@ def test_spec_checksum_is_deterministic_and_sensitive_to_values() -> None:
         min_residual_std=spec.min_residual_std,
     )
     assert spec_checksum(changed) != checksum_a
+
+
+def _mutate_hyperparameter_value(value: object) -> object:
+    if isinstance(value, bool):
+        return not value
+    if isinstance(value, int):
+        return value + 1
+    if isinstance(value, float):
+        return value + 1.0
+    if isinstance(value, str):
+        return value + "-mutated"
+    raise TypeError(f"알 수 없는 하이퍼파라미터 값 타입: {type(value)!r}")
+
+
+def test_spec_checksum_is_sensitive_to_every_hyperparameter_field() -> None:
+    """code-reviewer PR #13 LOW-1 — 기존 test(위)는 `num_boost_round` 변경 하나만
+    확인했다. `LightGbmHyperparameters` 13필드를 `dataclasses.fields`로 전수 순회해
+    필드마다 값을 하나 바꾸면 checksum 이 달라짐을 확인한다 — `spec_checksum`의 손
+    나열 payload 가 실제 필드 집합과 어긋나면(향후 필드 추가 뒤 갱신 누락 등) 이
+    test 가 그 필드에서 정확히 실패한다."""
+    spec = resolve_training_spec("award-rate-gbm-training-v1")
+    assert isinstance(spec, TrainingSpec)
+    baseline = spec_checksum(spec)
+
+    for field in dataclasses.fields(LightGbmHyperparameters):
+        original = getattr(spec.hyperparameters, field.name)
+        mutated_hyperparameters = dataclasses.replace(
+            spec.hyperparameters,
+            **{field.name: _mutate_hyperparameter_value(original)},
+        )
+        mutated_spec = TrainingSpec(
+            version=spec.version,
+            hyperparameters=mutated_hyperparameters,
+            num_boost_round=spec.num_boost_round,
+            encoding_folds=spec.encoding_folds,
+            seed=spec.seed,
+            min_residual_std=spec.min_residual_std,
+        )
+        assert spec_checksum(mutated_spec) != baseline, (
+            f"필드 {field.name!r} 변경이 spec_checksum 에 반영되지 않음"
+        )
