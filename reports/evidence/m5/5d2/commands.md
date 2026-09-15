@@ -3,23 +3,35 @@
 base `cefb19c9269ac3b29d0246175fb04d71c04aa3d4`(5D 종결) · 계약 `9466347`(착수 계약 고정)
 → `623baa1`(계약 갱신 — `OPEN-5D2-SAMPLE-SEGMENT`, 구현 레인 발견) · 코드 커밋 `b9cfe77`
 (observations·availability·distribution·engine 신설 + policy.py/results.py 확장 +
-cascading test 갱신) → `fe836db`(evidence — reuse.md). 로컬: `uv`(pyenv `3.12.2`).
-전건 재실행(부분 게이트 없음).
+cascading test 갱신) → `fe836db`(evidence — reuse.md) → verifier r1 `not-ready`(high 1·
+medium 1·low 6) → 계약 갱신 `fb4e001`(Rate 파싱·reserve_prices Money 성분 관문, ③⑥
+문면 정정) → 재작업 1/5 코드 커밋(F-1·F-2·F-4 반영, 아래). 로컬: `uv`(pyenv `3.12.2`).
+전건 재실행(부분 게이트 없음) — 관문 술어 변경(F-1·F-2)이라 표적 재검증도 함께.
 
-## S-1 ~ S-9 (scope.md acceptance_commands 순서)
+## S-1 ~ S-9 (scope.md acceptance_commands 순서, verifier r1 반영 뒤 재실행)
 
 | # | 명령(요약) | exit | 핵심 한 줄 |
 | --- | --- | --- | --- |
 | S-1 | `uv sync --frozen --all-extras` | 0 | `Audited 33 packages`(변경 없음) |
 | S-1b | `uv sync --frozen --extra serving --no-dev` + 5개 import 실패 확인 + 복구 | 0 | sqlalchemy·psycopg·requests·httpx·celery 전부 부재 확인, 복구 후 all-extras 정상 |
 | S-2 | `uv run ruff check .` + `uv run ruff format --check .` | 0 | `All checks passed!` · `81 files already formatted` |
-| S-3 | `uv run mypy --strict src/ml_engine` | 0 | `Success: no issues found in 31 source files`(5D 27 + 신규 4: observations·availability·distribution·engine) |
-| S-4 | `uv run lint-imports` | 0 | `Contracts: 5 kept, 0 broken`(49 files, 161 dependencies) |
-| S-5 | `uv run python -m pytest tests -q -m "not legacy_parity"` | 0 | **390 passed, 4 deselected**(5D 347+1 base − 011 skip 해제 +1 − 알려진-제한 중복 없음 + 신규 5D-2 test 다수, golden 14/14 skip 0) |
-| S-6 | `uv run python tools/design_ratchet.py --check` | 0 | 설계 래칫 위반 없음(함수 50줄 초과 2건을 헬퍼 분리로 해소 — `policy._coerce_values`→`_scenario_tuples`, `distribution.predict_distribution`→`_prepare_estimation_inputs`/`_assemble_success`) |
-| S-7 | `reuse_provenance_check.py` + 양성 대조(`reuse-mismatch.md`) | 0 | 정상: 위반 0(observations·availability·distribution 세 모듈 reuse.md 대조) · 양성: exit 1(회귀 없음) |
-| S-8 | `uv run python -m pytest tests -q -m legacy_parity` | 0 | **4 passed**(5D 그대로, 5D-2 는 legacy_parity 마커 test 를 신설하지 않았다 — 관측 축 변경 없음) |
+| S-3 | `uv run mypy --strict src/ml_engine` | 0 | `Success: no issues found in 31 source files`(파일 수 불변 — 신규 함수·사유만 추가) |
+| S-4 | `uv run lint-imports` | 0 | `Contracts: 5 kept, 0 broken`(49 files, 162 dependencies) |
+| S-5 | `uv run python -m pytest tests -q -m "not legacy_parity"` | 0 | **402 passed, 4 deselected**(390 + F-1 test 7(빈/`"abc"`/NaN/Infinity/-Infinity/음수/award_rate 무효)·F-2 test 3(basis/currency/provenance)·F-1 award_rate 정상 test 2, golden 14/14 skip 0) |
+| S-6 | `uv run python tools/design_ratchet.py --check` | 0 | 설계 래칫 위반 없음(관문 함수 추가에도 헬퍼 분리로 50줄 유지 — `_validated_reserve_price_amounts`·`_resolve_observed_bid_rate` 신설) |
+| S-7 | `reuse_provenance_check.py` + 양성 대조(`reuse-mismatch.md`) | 0 | 정상: 위반 0(observations·availability·distribution 세 모듈 reuse.md 대조, F-1·F-2 수정 내역 반영) · 양성: exit 1(회귀 없음) |
+| S-8 | `uv run python -m pytest tests -q -m legacy_parity` | 0 | **4 passed, 402 deselected**(5D 그대로, 5D-2 는 legacy_parity 마커 test 를 신설하지 않았다 — 관측 축 변경 없음) |
 | S-9 | python 버전 두 자리 대조 | 0 | assert 통과(출력 없음) |
+
+## verifier r1 표적 재검증 (F-1·F-2 재현 둘)
+
+- `observe_sample()`에 `ClearField("observed_bid_rate")`(빈 문자열) → `SampleRejected(BID_RATE_UNPARSEABLE)`, 예외 없음(수정 전: `decimal.InvalidOperation` 탈출).
+- `observed_bid_rate="abc"` → `SampleRejected(BID_RATE_UNPARSEABLE)`, 예외 없음.
+- `NaN`·`Infinity`·`-Infinity` 문자열 3종 → 전부 `BID_RATE_UNPARSEABLE`(비유한 거부).
+- `observed_bid_rate="-0.5"`(파싱 가능한 유한값) → `BID_RATE_OUT_OF_BAND`(`UNPARSEABLE`이 아님 — 파싱과 밴드 판정이 분리됨을 구별).
+- `award_rate="not-a-number"`(optional, 소비되지 않는 필드) → `SampleRejected(BID_RATE_UNPARSEABLE)`. `award_rate` 부재·정상값은 admission 에 영향 없음.
+- `reserve_prices[i].basis=BASIS_ESTIMATED`/`currency=UNSPECIFIED`/`provenance=UNSPECIFIED` 각각 → `SampleRejected(RESERVE_PRICE_INVALID)`(수정 전: `amount_won>0`만 보고 통과).
+- `SampleRejectionReason` 총 8종(`test_rejection_reasons_are_eight`), 8정상+거부 조합에서 `excluded_observations` 계수 정확(`test_distribution.py` 기존 test 재확인).
 
 ## golden 011 해소 (scope.md ⑥)
 
