@@ -31,7 +31,6 @@ from ml_engine.training.jobs.state import (
     JobRecord,
     JobState,
     TransitionRejected,
-    transition,
 )
 from ml_engine.training.jobs.store import Conflict, InMemoryJobStore, Started
 from ml_engine.training.spec import (
@@ -193,6 +192,16 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
         context: grpc.ServicerContext,
     ) -> training_pb2.GetTrainingJobResponse:
         response = training_pb2.GetTrainingJobResponse()
+        violation = self._validate_get_or_cancel(request.envelope, request.job_id)
+        if violation is not None:
+            _fill_failure(
+                response.failure,
+                code=error_pb2.FAILURE_CODE_INVALID_REQUEST,
+                retryable=False,
+                detail_code=violation,
+            )
+            return response
+
         record = self._store.get(request.job_id)
         if record is None:
             response.failure.code = error_pb2.FAILURE_CODE_JOB_NOT_FOUND
@@ -202,29 +211,58 @@ class TrainingJobServicer(training_pb2_grpc.TrainingJobServiceServicer):  # type
         response.job.CopyFrom(_to_proto_job(record))
         return response
 
+    @staticmethod
+    def _validate_get_or_cancel(
+        envelope: training_pb2.RequestEnvelope, job_id: str
+    ) -> _ValidationDetailCode | None:
+        """verifier r1 H-3 — `GetTrainingJob`·`CancelTrainingJob`도 `RequestEnvelope`
+        를 검증한다(`common.proto` 「모든 RPC의 필수 봉투」, 설계 검토 (5) 7). 빈
+        `job_id`는 구조적으로 무효한 요청이라 `JOB_NOT_FOUND`가 아니라
+        `INVALID_REQUEST(JOB_ID_EMPTY)`다 — 미지 job_id(유효한 형식이지만 없음)와
+        구분한다."""
+        violation = _envelope_violation(envelope.request_id, envelope.correlation_id)
+        if violation is not None:
+            return violation
+        if not job_id.strip():
+            return _ValidationDetailCode.JOB_ID_EMPTY
+        return None
+
     def CancelTrainingJob(  # noqa: N802
         self,
         request: training_pb2.CancelTrainingJobRequest,
         context: grpc.ServicerContext,
     ) -> training_pb2.CancelTrainingJobResponse:
         response = training_pb2.CancelTrainingJobResponse()
-        record = self._store.get(request.job_id)
-        if record is None:
+        violation = self._validate_get_or_cancel(request.envelope, request.job_id)
+        if violation is not None:
+            _fill_failure(
+                response.failure,
+                code=error_pb2.FAILURE_CODE_INVALID_REQUEST,
+                retryable=False,
+                detail_code=violation,
+            )
+            return response
+
+        # H-2 — `get()`→`transition()`→`replace()`를 따로 부르지 않는다. `apply_
+        # transition`이 한 잠금 아래 원자적으로 수행해, 파이프라인 종료 전이(runner)
+        # 와 경합해도 실제로 나중에 실행되는 쪽이 최신 상태를 보고 계산한다(stale
+        # record 로 인한 CANCELLED→SUCCEEDED 역행 방지).
+        result = self._store.apply_transition(
+            request.job_id, JobEvent.CANCEL, at=datetime.now(UTC)
+        )
+        if result is None:
             response.failure.code = error_pb2.FAILURE_CODE_JOB_NOT_FOUND
             response.failure.retryable = False
             response.failure.detail_code = "JOB_NOT_FOUND"
             return response
-
-        cancelled = transition(record, JobEvent.CANCEL, at=datetime.now(UTC))
-        if isinstance(cancelled, TransitionRejected):  # pragma: no cover — 표가 CANCEL
-            # 을 모든 상태에 정의하므로 도달 불가(state.py `_TRANSITIONS`).
+        if isinstance(result, TransitionRejected):  # pragma: no cover — 표가 CANCEL 을
+            # 모든 상태에 정의하므로 도달 불가(state.py `_TRANSITIONS`).
             response.failure.code = error_pb2.FAILURE_CODE_JOB_NOT_FOUND
             response.failure.retryable = False
             response.failure.detail_code = "TRANSITION_REJECTED"
             return response
-        self._store.replace(cancelled)
         self._runner.cancel(request.job_id)
-        response.job.CopyFrom(_to_proto_job(cancelled))
+        response.job.CopyFrom(_to_proto_job(result))
         return response
 
 

@@ -31,9 +31,7 @@ from ml_engine.training.jobs.state import (
     JobEvent,
     JobFailure,
     JobFailureCode,
-    JobRecord,
     TransitionRejected,
-    transition,
 )
 from ml_engine.training.jobs.store import InMemoryJobStore
 
@@ -56,13 +54,13 @@ class JobRunner:
         self, job_id: str, dataset_ref: DatasetRefInput, pipeline: TrainingPipeline
     ) -> None:
         """`job_id`를 `RUNNING`으로 전이하고 파이프라인을 스레드 풀에 제출한다."""
-        record = self._store.get(job_id)
-        if record is None:
+        started = self._store.apply_transition(
+            job_id, JobEvent.START, at=datetime.now(UTC)
+        )
+        if started is None:
             raise KeyError(f"알 수 없는 job_id: {job_id}")
-        started = transition(record, JobEvent.START, at=datetime.now(UTC))
         if isinstance(started, TransitionRejected):
-            raise ValueError(f"START 전이 거부: {job_id} ({record.state})")
-        self._store.replace(started)
+            raise ValueError(f"START 전이 거부: {job_id} ({started.from_state})")
 
         token = CancelToken()
         with self._lock_tokens_guard:
@@ -93,14 +91,14 @@ class JobRunner:
         with self._lock_tokens_guard:
             self._cancel_tokens.pop(job_id, None)
 
-        record = self._store.get(job_id)
-        if record is None:
+        if self._store.get(job_id) is None:
             _logger.error("job_id=%s 완료 콜백 도달 — 저장소에 없음", job_id)
             return
-        if record.state.value == "CANCELLED":
-            # CancelTrainingJob 이 이미 전이표로 CANCELLED 를 확정했다 — 파이프라인
-            # 결과와 무관하게 재전이하지 않는다(멱등, 종료 상태 유지).
-            return
+        # H-2 — 여기서 "이미 CANCELLED 면 반환"이라는 별도 조기 검사를 하지 않는다.
+        # `apply_transition`이 읽기·전이 계산·쓰기를 한 잠금 아래 수행하므로, 실제로
+        # 이미 CANCELLED(또는 다른 종료 상태)라면 아래 `_transition_*` 호출이 그
+        # **최신** 상태를 보고 전이표대로 거부(멱등 no-op 또는 `TransitionRejected`)
+        # 한다 — 별도 조기 검사가 오히려 그 자체로 stale read 가 될 수 있었다.
 
         # `future.exception()`은 콜백 안에서 이미 완료된 future 에 대해 즉시 반환한다
         # (블로킹 없음) — 콜러블이 던진 예외를 **재발생 없이** 조회하는 표준 API 라
@@ -131,9 +129,6 @@ class JobRunner:
             self._transition_succeeded(job_id, outcome)
 
     def _transition_succeeded(self, job_id: str, outcome: PipelineOutcome) -> None:
-        record = self._store.get(job_id)
-        if record is None:
-            return
         artifact = ArtifactReference(
             uri=outcome.artifact.uri,
             release_id=outcome.artifact.release_id,
@@ -148,36 +143,41 @@ class JobRunner:
             checksum=outcome.evaluation.checksum,
             report_schema_version=outcome.evaluation.report_schema_version,
         )
-        succeeded = transition(
-            record,
+        result = self._store.apply_transition(
+            job_id,
             JobEvent.SUCCEED,
             at=datetime.now(UTC),
             artifact=artifact,
             evaluation=evaluation,
         )
-        if isinstance(succeeded, JobRecord):
-            self._store.replace(succeeded)
+        if isinstance(result, TransitionRejected):
+            _logger.info(
+                "job_id=%s SUCCEED 전이 거부(이미 다른 writer 가 종료 상태로 옮김) — %s",
+                job_id,
+                result,
+            )
 
     def _transition_failed(
         self, job_id: str, code: JobFailureCode, detail_code: DetailCode
     ) -> None:
-        record = self._store.get(job_id)
-        if record is None:
-            return
         failure = JobFailure(code=code, retryable=False, detail_code=detail_code.value)
-        failed = transition(
-            record, JobEvent.FAIL, at=datetime.now(UTC), failure=failure
+        result = self._store.apply_transition(
+            job_id, JobEvent.FAIL, at=datetime.now(UTC), failure=failure
         )
-        if isinstance(failed, JobRecord):
-            self._store.replace(failed)
+        if isinstance(result, TransitionRejected):
+            _logger.info(
+                "job_id=%s FAIL 전이 거부(이미 다른 writer 가 종료 상태로 옮김) — %s",
+                job_id,
+                result,
+            )
 
     def _transition_cancelled(self, job_id: str) -> None:
-        record = self._store.get(job_id)
-        if record is None:
-            return
-        cancelled = transition(record, JobEvent.CANCEL, at=datetime.now(UTC))
-        if isinstance(cancelled, JobRecord):
-            self._store.replace(cancelled)
+        result = self._store.apply_transition(
+            job_id, JobEvent.CANCEL, at=datetime.now(UTC)
+        )
+        if isinstance(result, TransitionRejected):  # pragma: no cover — CANCEL 은 표에
+            # 모든 상태에 정의돼 있어(종료 상태는 멱등 no-op) 도달 불가.
+            _logger.error("job_id=%s CANCEL 전이 거부 — %s", job_id, result)
 
     def shutdown(self, *, wait: bool) -> None:
         self._executor.shutdown(wait=wait, cancel_futures=not wait)
