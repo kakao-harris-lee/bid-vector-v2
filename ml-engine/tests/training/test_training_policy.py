@@ -55,3 +55,17 @@ def test_load_training_policy_invalid_min_training_rows_is_rejected(
 def test_training_policy_direct_construction_enforces_invariant() -> None:
     with pytest.raises(ValueError):
         TrainingPolicy(version="x", min_training_rows=0)
+
+
+def test_load_training_policy_malformed_yaml_syntax_is_rejected(
+    tmp_path: Path,
+) -> None:
+    """code-reviewer PR #13 HIGH-2 — 문법이 깨진 YAML(닫히지 않은 flow sequence)은
+    5A `load_policy`의 `yaml.safe_load`가 `yaml.YAMLError`를 던지는데, 이전에는
+    `except (PolicyError, OSError)`가 그것을 잡지 못해 예외가 그대로 전파됐다(계약
+    위반 — "실패는 결과 타입, 예외 아님"). 지금은 결과 타입으로 옮겨진다."""
+    path = tmp_path / "policy.yaml"
+    path.write_text("version: training-v1\nmin_training_rows: [1, 2\n")
+    result = load_training_policy(path)
+    assert isinstance(result, PolicyRejected)
+    assert result.reason == PolicyRejectionReason.MALFORMED
