@@ -5,85 +5,91 @@
 실제로 작동했다는 증거다 — 개별 모듈 RED→GREEN 이력은 커밋 로그가 이미 갖는다
 (evidence-pack 「라운드 이력 절 금지」).
 
-## S-1 ~ S-12 (2026-09-15T21:44Z 재실행 확인)
+## S-1 ~ S-12 (fix round 1 종결 — 2026-09-15T23:15Z, 마지막 evidence 커밋 뒤 재실행,
+이 결과가 정본이고 그 이전 판(782 passed·166 files 등)은 대체됐다)
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv sync --frozen --all-extras)`
 - exit: 0
 - 핵심 결과: Audited 34 packages(grpc-stubs 포함, D-5E-9)
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv sync --frozen --extra serving --no-dev && for m in sqlalchemy psycopg requests httpx celery; do ! uv run --no-sync python -c "import $m" || exit 1; done && uv sync --frozen --all-extras)`
 - exit: 0
 - 핵심 결과: 5개 DB/HTTP 모듈 전부 ImportError → all-extras 복원
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv sync --frozen --extra serving --no-dev && uv run --no-sync python -c "import ml_engine.serving, ml_engine.serving.grpc" && uv sync --frozen --all-extras)`
 - exit: 0
 - 핵심 결과: serving extras 만으로 `ml_engine.serving`·`ml_engine.serving.grpc` import 성립(S-1c)
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv run ruff check . && uv run ruff format --check .)`
 - exit: 0
-- 핵심 결과: All checks passed! / 166 files already formatted
+- 핵심 결과: All checks passed! / 169 files already formatted(fix round 1 이 낸 새 test
+  파일 3개 포함, verifier r1 L-2)
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv run mypy --strict src/ml_engine)`
 - exit: 0
 - 핵심 결과: Success: no issues found in 70 source files
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv run lint-imports)`
 - exit: 0
 - 핵심 결과: Contracts: 7 kept, 0 broken(ignored import 2: `serving.grpc -> grpc`, `training.jobs.servicer -> grpc`)
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv run python -m pytest tests -q)`
 - exit: 0
-- 핵심 결과: 782 passed(base `d78e162` 임시 worktree 직접 계수 658 → +124, evidence-pack 규율)
+- 핵심 결과: 803 passed(fix round 1 착수 시점 782 → +21 — H-1·H-2·H-3·M-2·M-3·M-6 RED
+  test 신설분, verifier r1 L-2)
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv run python tools/design_ratchet.py --check)`
 - exit: 0
 - 핵심 결과: 설계 래칫 위반 없음(대상 0개 파일)
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv run python tools/reuse_provenance_check.py && ! uv run python tools/reuse_provenance_check.py --evidence tests/gates/fixtures/reuse-mismatch.md)`
 - exit: 0
 - 핵심 결과: 재활용 출처 두 자리 일치 — 위반 0(5E-1 은 이식 없음, reuse.md 참고) / 양성 대조(어긋난 evidence) 는 29건 불일치를 내며 의도대로 실패
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `(cd ml-engine && uv run python -c "import tomllib,pathlib; p=tomllib.load(open('pyproject.toml','rb')); v=pathlib.Path('.python-version').read_text().strip(); assert v.startswith('3.12') and '3.12' in p['project']['requires-python']")`
 - exit: 0
 
-## 2026-09-15T21:44Z (Kotlin, `./gradlew --no-daemon check`)
-- cmd: `./gradlew --no-daemon check`
+## 2026-09-15T23:15Z (Kotlin, `./gradlew --no-daemon check --rerun-tasks`)
+- cmd: `./gradlew --no-daemon check --rerun-tasks`
 - exit: 0
-- 핵심 결과: BUILD SUCCESSFUL in 36s, 346 actionable tasks(211 executed, 135 from cache)
+- 핵심 결과: BUILD SUCCESSFUL, 337 actionable tasks(337 executed — 캐시 없이 전건 강제
+  재실행, `leakPatternGate` 포함)
 
-## 2026-09-15T21:44Z
-- cmd: `(cd ml-engine && uv build --wheel -o /tmp/ml-engine-wheel && uv run python -m pytest tests/gates/test_wheel_reexport.py -q)`
+## 2026-09-15T23:15Z
+- cmd: `(cd ml-engine && uv build --wheel -o <임시 디렉터리> && uv run python -m pytest tests/gates/test_wheel_reexport.py -q)`
 - exit: 0
 - 핵심 결과: wheel 빌드 성공 + 저장소 밖 임시 venv 설치본에서 `ml_engine.contracts`·
   `bidvector.ml.v1.prediction_pb2_grpc`·`ml_engine.serving.prediction`·
   `ml_engine.training.jobs.servicer` import 성립(`sys.path` 에 저장소 경로 없음 확인) —
   `OPEN-5A-WHEEL-BUILD-HOOK` 종결(S-11)
 
-## 2026-09-15T21:44Z
+## 2026-09-15T23:15Z
 - cmd: `./tools/contract-crosslang-smoke.sh`
 - exit: 0
 - 핵심 결과: `== 교차 언어 socket 스모크 통과 ==`(D-2D-3 (a), fake 서버 — D-5E-10 무편집)
 
-## 2026-09-15T21:44Z (S-12b, 로컬 1회 — 커밋 대상 스크립트 아님)
-- cmd: `python -m ml_engine.app.server`(env 6 — `serving-v1.yaml`·`training-v1.yaml`·
+## 2026-09-15T23:15Z (S-12b, 로컬 1회 재실행 — M-3 가 SIGTERM 순서를 바꿔 재검증 대상,
+커밋 대상 스크립트 아님)
+- cmd: `python -m ml_engine.app.server`(env 7 — `serving-v1.yaml`·`training-v1.yaml`·
   `evaluation-v1.yaml`·`inference-v1.yaml`+`assessment.agency_sample_threshold` placeholder
-  사본, 별도 프로세스) 로 실 서버 기동 → 실 gRPC client 로 `GetModelMetadata`·
-  `GetEmbeddingMetadata`·`StartTraining` 호출
+  사본, 별도 프로세스, verifier r1 L-3 로 6→7 정정) 로 실 서버 기동 → 실 gRPC client 로
+  `GetModelMetadata`·`GetEmbeddingMetadata`·`StartTraining` 호출 → `SIGTERM`
 - exit: 0
 - 핵심 결과: 세 서비스 등록 확인(소켓 응답) · `GetModelMetadata.readiness == READINESS_NOT_READY`(D-5E-3) ·
   `GetEmbeddingMetadata.readiness == READINESS_NOT_READY`(D-5E-2) ·
   `StartTraining` → `handle.state == JOB_STATE_ACCEPTED`(정책 넷 READY 일 때) ·
-  `SIGTERM` → graceful shutdown 로그 확인(readiness NOT_READY 선행 순서)
+  `SIGTERM` → 프로세스가 행 없이 정상 종료, 로그가 M-3 이후의 새 순서(서버 정지 완료
+  →진행 중 job 취소 요청)를 그대로 보였다(재실행으로 M-3 배선을 실서버에서 확인).
 - 알려진 제한: 출하 `policy/inference-v1.yaml` 은 `assessment.agency_sample_threshold`
   미공시로 그 자체는 로드 실패가 의도된 상태다(5D-2 운영자 결정) — 이 스모크는 배선
   확인을 위해 그 키만 채운 임시 사본을 썼다(실물 정책값 결정 아님, `OPEN-5D2-POLICY-VALUES`
@@ -127,6 +133,16 @@
   잘못 등재했던 두 키를 제거했다(위 한 건만 남는다)
 - cmd: `./gradlew --no-daemon check`(재실측)
 - exit: 0 — `BUILD SUCCESSFUL`, 337 task
+
+## 2026-09-16T00:30Z (LOW 일괄 편집 뒤 재실측)
+- cmd: `./gradlew --no-daemon check`
+- exit: 1(최초) → `leakPatternGate FAILED` — 위 한 건이 가리키는 `checklist.md`
+  줄의 **내용**을 이번 라운드 편집(M-8·M-5 checklist 매핑 정정)이 바꿔, 같은 자리를
+  가리키는 새 내용 해시가 필요해졌다(자기참조 오탐이 아니라 정상적인 내용-해시
+  갱신, 2026-09-12 leak-baseline-coord 관례 그대로).
+- 조치: baseline 의 그 한 줄을 새 해시로 교체(항목 수 1 유지)
+- cmd: `./gradlew --no-daemon check --rerun-tasks`(재실측, 강제 전건)
+- exit: 0 — `BUILD SUCCESSFUL`, 337/337 task 실행
 
 ## 실패 이력
 없음 — mypy strict subclass-of-generated-base 오류(초판, `contracts/__init__.py`와 같은
