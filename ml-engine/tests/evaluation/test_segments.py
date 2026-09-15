@@ -103,10 +103,15 @@ def test_segment_score_improvement_ratio_negative_means_model_worse() -> None:
 
 
 def test_regressed_segments_excludes_single_row_segments() -> None:
+    """verifier r1 M-2 재현 — 수정 전 test 는 베이스라인이 완벽(`baseline_rmse == 0`)
+    이라 `improvement_ratio(0, x) == 0.0`(음수 아님) 자체로 회귀 목록이 비었다.
+    `and score.row_count > 1`을 지워도 630 passed 였던 이유가 그것이다. 베이스라인을
+    불완전하게 만들어 `improvement_ratio`가 **실제로 음수**인 1행 세그먼트가 그래도
+    1행 규칙으로 제외되는지를 확인한다."""
     facts = [_facts(category="civil"), _facts(category="electrical")]
-    targets = np.array([1.0, 1.0])
-    baseline_predictions = np.array([1.0, 1.0])
-    model_predictions = np.array([0.5, 0.5])
+    targets = np.array([1.0, 0.8])
+    baseline_predictions = np.array([0.9, 0.75])  # 불완전한 베이스라인(rmse > 0)
+    model_predictions = np.array([0.5, 0.3])  # 모델이 훨씬 나쁨 → improvement_ratio < 0
     specs = segment_specs(_POLICY)
     scores = segment_scores(
         facts,
@@ -115,8 +120,12 @@ def test_regressed_segments_excludes_single_row_segments() -> None:
         model_predictions=model_predictions,
         specs=specs,
     )
+    category_scores = [s for s in scores if s.axis == "category"]
+    # 전제 확인 — 이 test 가 실제로 「1행이라서 제외」를 재는지: 개선률이 음수인데도
+    # row_count 규칙만으로 제외돼야 한다(음수가 아니면 애초에 이 test 가 무의미하다).
+    assert all(s.row_count == 1 for s in category_scores)
+    assert all(s.improvement_ratio < 0 for s in category_scores)
     regressed = regressed_segments(scores)
-    # 두 세그먼트 다 row_count == 1 이므로 (1행 제외 규칙) 회귀 목록은 비어야 한다.
     category_regressed = [s for s in regressed if s.axis == "category"]
     assert category_regressed == []
 
