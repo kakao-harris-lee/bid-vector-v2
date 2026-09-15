@@ -49,7 +49,7 @@ private fun isAcceptableSuccessShape(success: Success): Boolean {
             success.uncertainty.sampleSize >= 1,
             hasExactlyThreeOrderedCandidates(success),
             success.candidatesList.all { it.origin == BidRateOrigin.BID_RATE_ORIGIN_RECOMMENDED },
-            hasNonBlankRelease(success.release),
+            hasValidReleaseShape(success.release),
             hasOrderedCandidateRates(success),
         )
     return checks.all { it }
@@ -100,5 +100,6 @@ private fun ProtoIntervalSource.toDomainOrNull(): DomainIntervalSource? =
     when (this) {
         ProtoIntervalSource.INTERVAL_SOURCE_CROSS_VALIDATION_RESIDUAL -> DomainIntervalSource.CrossValidationResidual
         ProtoIntervalSource.INTERVAL_SOURCE_TIME_HOLDOUT_RESIDUAL -> DomainIntervalSource.TimeHoldoutResidual
+        ProtoIntervalSource.INTERVAL_SOURCE_POSTERIOR_PREDICTIVE -> DomainIntervalSource.PosteriorPredictive
         ProtoIntervalSource.INTERVAL_SOURCE_UNSPECIFIED, ProtoIntervalSource.UNRECOGNIZED -> null
     }

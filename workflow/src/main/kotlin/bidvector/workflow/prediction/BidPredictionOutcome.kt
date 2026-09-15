@@ -59,10 +59,28 @@ data class PriceFitness(
 /**
  * 불확실성 출처(scope.md ⑦, 2B `IntervalSource` 미러) — legacy 의 합성 `confidence` 단일
  * 값과 달리 성분+출처로 구조화된다(`docs/discovery/data-dictionary.md` §6.5).
+ *
+ * `PosteriorPredictive`(M2/2F additive, D-2F-3) — 사후예측분산 기반(분포 엔진). 잔차 기반
+ * 두 값과 다른 축이라 `null`로 접지 않는다(2A ⑥ 제3 변환 금지의 정신 — 엔진이 정직하게
+ * 낸 답을 client 가 버리지 않는다). `docs/discovery/data-dictionary.md` §6.5 는 아직 이
+ * 값을 정의하지 않는다(`OPEN-2F-DICT-INTERVAL-SOURCE`, 문서 소유 — 후속).
  */
 enum class IntervalSource {
     CrossValidationResidual,
     TimeHoldoutResidual,
+    PosteriorPredictive,
+}
+
+/**
+ * release 의 종류(scope.md ⑥, M2/2F additive, D-2F-2) — 아티팩트가 있는 release(`Artifact`,
+ * GBM 등)와 아티팩트 없이 정책·코드만으로 서빙하는 release(`Derived`, 분포 엔진)를 값 위장
+ * 없이 1급으로 가른다(5D-2 위협 (h)). 계약의 `RELEASE_KIND_UNSPECIFIED`/`UNRECOGNIZED`는
+ * 이 타입에 값이 없다 — 어댑터 검증층(`hasValidReleaseShape`)이 그 값을 가진 응답을
+ * `ModelReleaseRef`가 지어지기 전에 거부한다(fail-closed, D-2F-6).
+ */
+enum class ReleaseKind {
+    Artifact,
+    Derived,
 }
 
 /**
@@ -90,6 +108,13 @@ data class Uncertainty(
  * 불변식을 fail-closed 검사로 먼저 걸러 예외가 새지 않게 한다 — 이 `init`은
  * 방어의 마지막 층(2B `ModelRelease` KDoc "여기 넷[+식별자 하나]은 release를 지목하는 데
  * 필요한 성분과 식별자다" — 다섯 전부가 지목에 필요하다).
+ *
+ * `kind`(M2/2F additive, D-2F-2) — 기본값 [ReleaseKind.Artifact]다. 이 타입은
+ * `adapters.ml`(prediction)뿐 아니라 `adapters.ml`(embedding, `EmbeddingResponseMapping.kt`)
+ * 도 같이 짓는다 — embedding 쪽은 release_kind 축을 아직 나르지 않으므로(2F out_of_scope)
+ * 기본값을 명시하지 않는 기존 호출부가 그대로 컴파일된다. `datasetId` 공백 허용은
+ * `kind == Derived`일 때만이다(아티팩트 없는 release, D-2B-6과 충돌하지 않는다 — 학습
+ * dataset 자체가 없다).
  */
 data class ModelReleaseRef(
     val releaseId: String,
@@ -97,13 +122,16 @@ data class ModelReleaseRef(
     val featureSchemaVersion: String,
     val codeVersion: String,
     val datasetId: String,
+    val kind: ReleaseKind = ReleaseKind.Artifact,
 ) {
     init {
         require(releaseId.isNotBlank()) { "ModelReleaseRef.releaseId는 빈 문자열일 수 없다" }
         require(artifactChecksum.isNotBlank()) { "ModelReleaseRef.artifactChecksum은 빈 문자열일 수 없다" }
         require(featureSchemaVersion.isNotBlank()) { "ModelReleaseRef.featureSchemaVersion은 빈 문자열일 수 없다" }
         require(codeVersion.isNotBlank()) { "ModelReleaseRef.codeVersion은 빈 문자열일 수 없다" }
-        require(datasetId.isNotBlank()) { "ModelReleaseRef.datasetId는 빈 문자열일 수 없다" }
+        require(kind == ReleaseKind.Derived || datasetId.isNotBlank()) {
+            "ModelReleaseRef.datasetId는 kind=Derived가 아니면 빈 문자열일 수 없다"
+        }
     }
 }
 

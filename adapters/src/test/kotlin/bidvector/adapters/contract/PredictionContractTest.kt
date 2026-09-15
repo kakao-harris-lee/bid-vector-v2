@@ -15,7 +15,6 @@ import contract.bidvector.ml.v1.FeatureInputs
 import contract.bidvector.ml.v1.GetModelMetadataRequest
 import contract.bidvector.ml.v1.GetModelMetadataResponse
 import contract.bidvector.ml.v1.LatestPromoted
-import contract.bidvector.ml.v1.ModelRelease
 import contract.bidvector.ml.v1.ModelReleaseSelector
 import contract.bidvector.ml.v1.OptimizationObjective
 import contract.bidvector.ml.v1.Success
@@ -375,6 +374,11 @@ class PredictionContractTest {
         missing.baseAmountProvenanceLabel.factCase shouldBe BaseAmountProvenanceLabelFact.FactCase.FACT_NOT_SET
         isAcceptableFeatureInputs(missing) shouldBe false
     }
+
+    // M2/2F additive 단언(diagnostics·POSTERIOR_PREDICTIVE·표본 축·release_kind)은
+    // `PredictionAdditiveContractTest.kt`(같은 패키지)로 갈라냈다 — size ratchet(v2-지침서
+    // §5, 파일당 500줄)이 이 파일을 500줄 초과로 밀었다(`EmbeddingTestdataCanonicalTest`를
+    // `EmbeddingContractTest`에서 가른 것과 같은 사유).
 
     // ---- round-trip(testdata 바이트 ↔ 생성 타입) ----
 

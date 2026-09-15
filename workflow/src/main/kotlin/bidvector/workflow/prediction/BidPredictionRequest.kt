@@ -1,6 +1,7 @@
 package bidvector.workflow.prediction
 
 import bidvector.procurement.BusinessCategory
+import bidvector.procurement.CategoryCode
 import bidvector.procurement.ResolvedBaseAmount
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.BaseAmountProvenance
@@ -54,6 +55,11 @@ sealed interface ModelReleaseSelector {
  * 값은 항상 관측(`BID_RATE_ORIGIN_OBSERVED`)이라 어댑터가 상수로 채운다(common.proto
  * D-2A-7). 예비가격 추첨 관측(`ReserveDrawObservation`)은 이 slice가 나르지 않는다(알려진
  * 제한 — distribution predictor 입력은 4B 후속).
+ *
+ * `agencyId`·`categoryCode`(M2/2F additive, D-2F-1) — 표본의 발주기관·업종 fact. **식별자가
+ * 아니다**(D-2B-3 유지 — 표본 식별·중복 제거는 여전히 불가). 값의 정본은 [AgencyId]와
+ * 같다(`OPEN-2B-AGENCY-ID`, 정본 M3). 어댑터가 `null`을 `MISSING_REASON_NOT_COLLECTED_YET`
+ * 하나로만 나른다(`RequestMapping.kt` — 사유를 지어내지 않는다).
  */
 data class CompetitionSample(
     val observedBidRate: Rate,
@@ -61,6 +67,8 @@ data class CompetitionSample(
     val baseAmountProvenanceLabel: BaseAmountProvenance,
     val openedOn: LocalDate,
     val awardRate: Rate? = null,
+    val agencyId: AgencyId? = null,
+    val categoryCode: CategoryCode? = null,
 )
 
 /**
