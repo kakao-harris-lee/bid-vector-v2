@@ -9,9 +9,13 @@
 판정식 — seed 가 불안정하면 개별 시행의 형식적 통과·실패보다 "이 창이 애초에 방향조차
 재지 못했다"는 사실이 우선한다.
 
-`trial_outcome`은 seed 안정성 없이 단일 시행을 낸다(안정성 sweep 의 각 seed 가 부르는
-자리, legacy `StabilityTrial.passed`와 같은 순수 불리언 판정식을 필요로 한다).
-`gate_outcome`은 `trial_outcome` 위에 안정성 요약을 얹어 최종 판정을 낸다.
+`_trial_outcome`(비공개)은 seed 안정성 없이 단일 시행을 낸다 — 이 모듈 자신의
+문서화·재현용이고, 안정성 sweep(`training._holdout_window._run_stability`)은 이
+함수가 아니라 아래 `passes_gate`(순수 판정식, public)를 직접 부른다(verifier r1
+H-3 — `trial_outcome`이 안정성 없이도 `Passed`/`Promotable`을 만들 수 있어 public
+이면 위협 모델 (f) 「seed 로 통과 만들기」의 우회 표면이 된다). `gate_outcome`은
+`passes_gate` 위에 안정성 요약을 얹어 최종 판정을 낸다 — **판정식은 `passes_gate`
+하나뿐**이고 안정성 sweep 도 그것을 재사용한다(이중 구현 금지, verifier r1 H-2).
 
 **`UNDERPOWERED`의 경계** — legacy 콘솔 `_underpowered_windows`는 부호를 보지 않고
 `improvement_ratio < mde` 만 본다(진단 전용이라 무해했다). 이 결과 타입은 **판정**이므로
@@ -74,9 +78,12 @@ class NotEvaluable:
 type GateOutcome = Passed | Failed | NotEvaluable
 
 
-def _passes(
+def passes_gate(
     baseline_rmse: float, model_rmse: float, statistic: float, policy: EvaluationPolicy
 ) -> bool:
+    """판정식 그 자체 — 유일 정의(verifier r1 H-2). `gate_outcome`·`_trial_outcome`·
+    안정성 sweep(`training._holdout_window._run_stability`)이 전부 이 함수만 쓴다.
+    임계는 `policy.paired_t_threshold`에서만 온다."""
     return model_rmse < baseline_rmse and statistic < -policy.paired_t_threshold
 
 
@@ -110,7 +117,7 @@ def _scored_outcome(
     )
 
 
-def trial_outcome(
+def _trial_outcome(
     *,
     baseline_rmse: float,
     model_rmse: float,
@@ -120,8 +127,8 @@ def trial_outcome(
     policy: EvaluationPolicy,
 ) -> GateOutcome:
     """seed 안정성을 보지 않는 단일 시행 판정 — 순서: 창 없음(n<2) → underpowered →
-    판정식. 안정성 sweep 의 각 trial(`StabilityTrial.passed`)이 이 함수의 판정식
-    부분(`_passes`)만 쓰고, 헤드라인 최종 판정은 `gate_outcome`이 낸다."""
+    판정식. 비공개(verifier r1 H-3) — 안정성 sweep 은 이 함수가 아니라 `passes_gate`
+    를 직접 호출한다(이중 구현 금지, H-2). 헤드라인 최종 판정은 `gate_outcome`이 낸다."""
     n = int(targets.size)
     if n < 2:
         return NotEvaluable(NotEvaluableReason.NO_EVALUABLE_WINDOW)
@@ -137,7 +144,7 @@ def trial_outcome(
     if improvement >= 0.0 and improvement < mde:
         return NotEvaluable(NotEvaluableReason.UNDERPOWERED, required)
     return _scored_outcome(
-        passed=_passes(baseline_rmse, model_rmse, statistic, policy),
+        passed=passes_gate(baseline_rmse, model_rmse, statistic, policy),
         baseline_rmse=baseline_rmse,
         model_rmse=model_rmse,
         improvement=improvement,
@@ -176,7 +183,7 @@ def gate_outcome(
     if improvement >= 0.0 and improvement < mde:
         return NotEvaluable(NotEvaluableReason.UNDERPOWERED, required)
     return _scored_outcome(
-        passed=_passes(baseline_rmse, model_rmse, statistic, policy),
+        passed=passes_gate(baseline_rmse, model_rmse, statistic, policy),
         baseline_rmse=baseline_rmse,
         model_rmse=model_rmse,
         improvement=improvement,

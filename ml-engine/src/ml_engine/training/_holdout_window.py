@@ -32,6 +32,7 @@ from ml_engine.evaluation import (
     group_mean_predictions,
     improvement_ratio,
     paired_t,
+    passes_gate,
     rmse_bias_std,
     segment_scores,
     segment_specs,
@@ -150,9 +151,10 @@ def _run_stability(
                 seed=seed,
                 improvement_ratio=improvement_ratio(baselines.gate_rmse, trial_rmse),
                 paired_t=trial_statistic,
-                passed=(
-                    trial_rmse < baselines.gate_rmse
-                    and trial_statistic < -evaluation_policy.paired_t_threshold
+                # verifier r1 H-2 — 판정식을 여기서 다시 쓰지 않는다. 유일 정의는
+                # `verdict.passes_gate`(gate_outcome 도 같은 함수를 쓴다).
+                passed=passes_gate(
+                    baselines.gate_rmse, trial_rmse, trial_statistic, evaluation_policy
                 ),
             )
         )

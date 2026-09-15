@@ -65,7 +65,7 @@ from ml_engine.evaluation.verdict import (
     NotEvaluableReason,
     Passed,
     gate_outcome,
-    trial_outcome,
+    passes_gate,
 )
 from ml_engine.evaluation.windows import (
     HoldoutOverlap,
@@ -131,6 +131,7 @@ __all__ = [
     "load_evaluation_policy",
     "minimum_detectable_improvement",
     "paired_t",
+    "passes_gate",
     "plan_evaluation_windows",
     "policy_checksum",
     "regressed_segments",
@@ -140,6 +141,5 @@ __all__ = [
     "segment_scores",
     "segment_specs",
     "summarize_stability",
-    "trial_outcome",
     "unlearned_cells",
 ]

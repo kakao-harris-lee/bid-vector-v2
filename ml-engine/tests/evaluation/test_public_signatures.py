@@ -26,10 +26,12 @@ _FORBIDDEN_PARAMETER_NAMES = frozenset(
 )
 
 # 순수 산식·구조 유틸리티 — 정책을 모른 채(policy 매개변수 없이) 값을 그대로 받는다.
-# 완화 표면이 아니다: 게이트 진입점(`gate_outcome`·`trial_outcome`·
+# 완화 표면이 아니다: 게이트 진입점(`gate_outcome`·`passes_gate`·
 # `plan_evaluation_windows`)은 전부 `policy` 하나만 받고, 이 함수들은 그 진입점이
 # `policy.*`에서 풀어 넘기는 하위 계산일 뿐 별도 CLI/env 노출이 없다(설계 검토 (1)
 # 첫 행의 대상은 "임계 완화가 가능한 게이트 진입점"이지 모든 산식 함수가 아니다).
+# `trial_outcome`은 verifier r1 H-3 뒤 `_trial_outcome`(비공개)로 내려가 이 표면
+# 전수 대상에 없다 — `evaluation.__all__`에 등재되지 않는다.
 _POLICY_UNAWARE_UTILITIES = frozenset(
     {
         "holdout_overlaps",  # stratum: 순수 인덱스 계산, 정책 자체를 모른다
@@ -74,9 +76,15 @@ def test_no_evaluation_public_function_takes_bare_threshold_or_seed_parameters()
     )
 
 
-def test_gate_outcome_and_trial_outcome_require_policy_parameter() -> None:
-    for func in (evaluation_module.gate_outcome, evaluation_module.trial_outcome):
+def test_gate_outcome_and_passes_gate_require_policy_parameter() -> None:
+    for func in (evaluation_module.gate_outcome, evaluation_module.passes_gate):
         assert "policy" in inspect.signature(func).parameters
+
+
+def test_trial_outcome_not_in_public_surface() -> None:
+    """verifier r1 H-3 — 안정성 없이 `Passed`를 낼 수 있는 함수는 public 이 아니다."""
+    assert "trial_outcome" not in evaluation_module.__all__
+    assert not hasattr(evaluation_module, "trial_outcome")
 
 
 def test_policy_unaware_utilities_allowlist_has_no_stale_entries() -> None:

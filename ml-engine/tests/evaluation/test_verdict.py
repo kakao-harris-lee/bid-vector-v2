@@ -12,8 +12,9 @@ from ml_engine.evaluation.verdict import (
     NotEvaluable,
     NotEvaluableReason,
     Passed,
+    _trial_outcome,
     gate_outcome,
-    trial_outcome,
+    passes_gate,
 )
 
 _POLICY = EvaluationPolicy(
@@ -52,8 +53,8 @@ def _strong_win() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return model, baseline, targets
 
 
-def test_trial_outcome_no_evaluable_window_when_n_below_two() -> None:
-    outcome = trial_outcome(
+def test__trial_outcome_no_evaluable_window_when_n_below_two() -> None:
+    outcome = _trial_outcome(
         baseline_rmse=0.1,
         model_rmse=0.05,
         model_predictions=np.array([0.5]),
@@ -65,11 +66,11 @@ def test_trial_outcome_no_evaluable_window_when_n_below_two() -> None:
     assert outcome.reason == NotEvaluableReason.NO_EVALUABLE_WINDOW
 
 
-def test_trial_outcome_underpowered_when_improvement_below_mde() -> None:
+def test__trial_outcome_underpowered_when_improvement_below_mde() -> None:
     targets = np.array([0.7, 0.71, 0.69, 0.70, 0.705])
     baseline = targets + np.array([0.01, -0.01, 0.02, -0.02, 0.01])
     model = targets + np.array([0.009, -0.011, 0.021, -0.019, 0.011])  # 거의 동일
-    outcome = trial_outcome(
+    outcome = _trial_outcome(
         baseline_rmse=0.1,
         model_rmse=0.099,
         model_predictions=model,
@@ -81,13 +82,13 @@ def test_trial_outcome_underpowered_when_improvement_below_mde() -> None:
     assert outcome.reason == NotEvaluableReason.UNDERPOWERED
 
 
-def test_trial_outcome_passed_when_model_clearly_better() -> None:
+def test__trial_outcome_passed_when_model_clearly_better() -> None:
     model, baseline, targets = _strong_win()
     from ml_engine.evaluation.scoring import rmse_bias_std
 
     baseline_rmse, _, _ = rmse_bias_std(baseline, targets)
     model_rmse, _, _ = rmse_bias_std(model, targets)
-    outcome = trial_outcome(
+    outcome = _trial_outcome(
         baseline_rmse=baseline_rmse,
         model_rmse=model_rmse,
         model_predictions=model,
@@ -98,14 +99,14 @@ def test_trial_outcome_passed_when_model_clearly_better() -> None:
     assert isinstance(outcome, Passed)
 
 
-def test_trial_outcome_failed_when_model_worse_but_evaluable() -> None:
+def test__trial_outcome_failed_when_model_worse_but_evaluable() -> None:
     model, baseline, targets = _strong_win()
     from ml_engine.evaluation.scoring import rmse_bias_std
 
     # 모델과 베이스라인을 맞바꿔 모델이 지게 만든다.
     baseline_rmse, _, _ = rmse_bias_std(model, targets)
     model_rmse, _, _ = rmse_bias_std(baseline, targets)
-    outcome = trial_outcome(
+    outcome = _trial_outcome(
         baseline_rmse=baseline_rmse,
         model_rmse=model_rmse,
         model_predictions=baseline,
@@ -181,7 +182,41 @@ def test_no_bare_threshold_parameter_on_public_entry_points() -> None:
     """설계 검토 (1) 첫 행 — 임계를 낱개 인자로 받는 public 함수가 없다."""
     import inspect
 
-    for func in (trial_outcome, gate_outcome):
+    for func in (gate_outcome, passes_gate):
         signature = inspect.signature(func)
         assert "threshold" not in signature.parameters
         assert "policy" in signature.parameters
+
+
+def test_trial_outcome_is_not_public() -> None:
+    """verifier r1 H-3 — `trial_outcome`은 안정성 없이 `Passed`(→ `Promotable`)를
+    만들 수 있어 public 이면 위협 모델 (f)의 우회 표면이었다. 모듈 안에서는 여전히
+    `_trial_outcome`으로 존재하지만(이 파일 자신의 판정식 검증용) evaluation
+    패키지의 public 표면(`__all__`)에는 없다."""
+    import ml_engine.evaluation as evaluation_module
+
+    assert "trial_outcome" not in evaluation_module.__all__
+    assert not hasattr(evaluation_module, "trial_outcome")
+
+
+def test_passes_gate_is_the_single_predicate_definition() -> None:
+    """verifier r1 H-2 — `gate_outcome`·`_trial_outcome`이 내는 판정이 `passes_gate`
+    하나로 설명된다(별도 판정식이 없다는 것을 값으로 확인)."""
+    model, baseline, targets = _strong_win()
+    from ml_engine.evaluation.scoring import paired_t, rmse_bias_std
+
+    baseline_rmse, _, _ = rmse_bias_std(baseline, targets)
+    model_rmse, _, _ = rmse_bias_std(model, targets)
+    statistic = paired_t(model, baseline, targets)
+    outcome = gate_outcome(
+        baseline_rmse=baseline_rmse,
+        model_rmse=model_rmse,
+        model_predictions=model,
+        baseline_predictions=baseline,
+        targets=targets,
+        policy=_POLICY,
+        stability=_STABLE,
+    )
+    assert isinstance(outcome, Passed) == passes_gate(
+        baseline_rmse, model_rmse, statistic, _POLICY
+    )

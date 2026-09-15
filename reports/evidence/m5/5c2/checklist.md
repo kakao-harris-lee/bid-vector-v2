@@ -42,7 +42,7 @@
 | 표면 | 판정 | 실측 |
 | --- | --- | --- |
 | `EvaluationPolicy`(frozen)·`load_evaluation_policy` | 연다 — 로더만 생성(관례) | `EvaluationPolicy(...)` 직접 생성으로 임의 임계 가능(Python 한계, 알려진 제한). `test_evaluation_policy_direct_construction_enforces_invariants`가 명백한 위반(0 이하 등)은 막는다는 것만 확인 |
-| `gate_outcome`/`trial_outcome` | 연다 — 유일 판정 진입점, `policy` 하나만 | `test_gate_outcome_and_trial_outcome_require_policy_parameter` |
+| `gate_outcome`/`passes_gate` | 연다 — 유일 판정 진입점(+ 판정식 자체), `policy` 하나만 | `test_gate_outcome_and_passes_gate_require_policy_parameter`. **2026-09-16 정정(verifier r1 H-2·H-3)** — `trial_outcome`은 안정성 없이 `Passed`를 낼 수 있어 public 이면 위협 모델 (f)의 우회 표면이었다. `_trial_outcome`(비공개)으로 내리고, 판정식 자체를 `passes_gate`(public)로 승격해 안정성 sweep(`_run_stability`)이 그 함수만 쓰게 했다(이중 구현 금지) |
 | `plan_evaluation_windows` | 연다 — `policy` 하나만, 낱개 임계 없음 | `test_public_signatures.py` 전수 |
 | `run_holdout` | 연다 — 유일 실행 진입점. `trainer: TrainerLike` 주입은 5C-1 과 같은 자리(모델 실물만, 판정·임계 주입 없음) | `test_no_bare_threshold_seed_or_layer_parameter_on_run_holdout` |
 | `EvaluationReportV1`·`WindowResult` 등 결과 타입 | 연다 — 읽기·직접 생성 가능(관례로만 방어) | 5C-1 과 같은 알려진 제한(①) |
