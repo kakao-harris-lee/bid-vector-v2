@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+import subprocess
 import sys
 
 import ml_engine.serving
@@ -36,3 +37,27 @@ def test_ml_engine_training_and_adapters_not_pulled_in_by_serving() -> None:
         if name in sys.modules
     ]
     assert not leaked, f"serving import 가 금지 패키지를 끌어들였다: {leaked}"
+
+
+def test_ml_engine_app_is_not_a_serving_purity_target() -> None:
+    """M5/5E-1 — `ml_engine.app`(조립 근, training 을 끌어와도 되는 유일한 자리)은
+    이 게이트의 대상이 **아니다**. `ml_engine.serving`을 import 하는 것만으로
+    `ml_engine.app`이 끌려오지 않음을 확인한다 — `sys.modules`는 프로세스 전역이라
+    같은 세션의 다른 test(`tests/app/**`)가 이미 `ml_engine.app`을 import 했을 수
+    있으므로, 이 확인은 **격리된 서브프로세스**에서 한다(설계 검토 (0) 위협 모델
+    경계 — `app`은 이 게이트가 방어하는 범위 밖임을 실측으로 못 박는다)."""
+    script = (
+        "import sys\n"
+        "import ml_engine.serving\n"
+        "import importlib, pkgutil\n"
+        "prefix = ml_engine.serving.__name__ + '.'\n"
+        "for m in pkgutil.walk_packages(ml_engine.serving.__path__, prefix):\n"
+        "    importlib.import_module(m.name)\n"
+        "assert 'ml_engine.app' not in sys.modules, sorted(sys.modules)\n"
+        "print('OK')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "OK" in result.stdout

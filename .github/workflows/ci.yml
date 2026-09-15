@@ -153,3 +153,11 @@ jobs:
       - name: Python 버전 두 자리 대조 (S-9)
         run: |
           uv run python -c "import tomllib,pathlib; p=tomllib.load(open('pyproject.toml','rb')); v=pathlib.Path('.python-version').read_text().strip(); assert v.startswith('3.12') and '3.12' in p['project']['requires-python'], (v, p['project']['requires-python'])"
+
+      # M5/5E-1 D-5E-8 — `OPEN-5A-WHEEL-BUILD-HOOK` 종결 증거. wheel 을 만들어 설치본에서
+      # `ml_engine.contracts` 재수출 + servicer import 가 `sys.path` 조작 없이 성립하는지
+      # 확인한다(test 자체가 저장소 밖 임시 venv 를 만들어 검증한다, 설계 검토 우회 (21)).
+      - name: wheel 빌드 + 설치본 재수출 확인 (S-11)
+        run: |
+          uv build --wheel -o /tmp/ml-engine-wheel
+          uv run python -m pytest tests/gates/test_wheel_reexport.py -q
