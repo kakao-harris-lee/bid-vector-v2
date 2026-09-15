@@ -15,14 +15,22 @@ dependencies = [
 # M5/5A D-5A-0(b)·조사 02 — serving 런타임: numpy/lightgbm 만(SQLAlchemy·DB driver·requests
 # 없음, S-1b 가 lock 그래프에서 실측). scipy 는 lightgbm 의 강제 전이 의존이라 직접 선언하지
 # 않는다(조사 02 §1).
+#
+# PR #12 리뷰 MEDIUM — 5D `inference/policy.py::load_inference_policy` → 5A
+# `registry/policy.py::load_policy` → `yaml.safe_load` 이므로 정책 로더가 serving 경로에
+# 있다. `pyyaml` 이 `dev` extras 에만 있어 serving-only 설치(`--extra serving --no-dev`)에서
+# `ModuleNotFoundError` 였다(5A 가 만든 잔여, 5D 가 첫 실질 소비자). serving/training 에도
+# 추가한다.
 serving = [
     "numpy==2.5.2",
     "lightgbm==4.7.0",
+    "pyyaml==6.0.3",
 ]
 # training 은 5C 가 storage adapter 의존을 더할 때까지 serving 과 같다(설계 검토 (5)-1).
 training = [
     "numpy==2.5.2",
     "lightgbm==4.7.0",
+    "pyyaml==6.0.3",
 ]
 dev = [
     "grpcio-tools==1.83.1",
