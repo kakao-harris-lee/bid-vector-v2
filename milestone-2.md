@@ -152,6 +152,31 @@ wire 형식과 무관) · 실 servicer 는 M5 · 텍스트 합성 규약은 4B-4
 - 생성된 코드는 수동 편집하지 않는다.
 - Kotlin/Python 양쪽에 같은 rule을 재구현하지 않는다.
 
+### Slice 2F — v1 additive 묶음 (5D·5D-2 wire 인수, M2 완료 뒤 두 번째 후속)
+
+**2F 착수 2026-09-15(운영자 결정 — D-2F-1 (a)·D-2F-2 (b)·D-2F-3 (i)·D-2F-4 (a))** — base 는 PR #14 머지 커밋
+`c669a71`. 5D·5D-2 가 wire 에 없어 내부 타입으로 둔 다섯을 `bidvector.ml.v1` 안에서 **추가만**(ADR 0010 D-7)으로:
+① `CompetitionSample.agency_id`·`category_code` — 기존 `AgencyIdFact`·`CategoryCodeFact`(`oneof value/missing`) 재사용,
+식별자 아님(D-2B-3 유지), 허용 사유 `NOT_COLLECTED_YET` 하나 ② `Diagnostics` 넷(`shrinkage_weight: Weight`·
+`excluded_observations`·`agency_sample_count`·`agency_sample_below_threshold`) ③ `IntervalSource.POSTERIOR_PREDICTIVE`
+④ `ModelRelease.release_kind`(`ARTIFACT | DERIVED` — 아티팩트 없는 분포 엔진의 release 를 1급으로; DERIVED 규약: `release_id
+= distribution/<정책 version>`·checksum = 정책 YAML sha256·schema version 은 요청 값 에코·`dataset_id` 공백은 DERIVED 만)
+⑤ D-2B-8 을 **대상 공고 요청·응답 후보율 축**으로 한정(과거 표본 `observed_bid_rate` 는 관측값이라 > 1 허용, 엔진 밴드가 정제).
+조사 실측: 네 additive 동시 투입에도 `buf breaking`(FILE) finding 0. Kotlin 에서 깨지는 자리는 `IntervalSource` 소진 `when`
+하나 — 도메인 enum 확장으로 정직하게 읽는다(`null` 로 접지 않음). **배포 순서: 제공자(ml-engine) 먼저**(enum 값 추가·
+`release_kind` 필수 — 수신 fail-closed). 승인 태그는 종결 승인 커밋에 `contracts/v1-approved-<date>`, `policy.version` 3→4.
+정본 `reports/evidence/m2/2f/scope.md`, 설계 검토 `_workspace/m2-2f/02_design-review.md`.
+
+**2F 종결 2026-09-16(사용자 승인)** — verifier r1 `not-ready`(high 1: evidence 산문의 누출 어휘가 `leakPatternGate` 를
+붉힘 — baseline 등재 대신 어휘 제거) → r2 `ready-for-review`(코드 diff 0; DERIVED 위장·UNSPECIFIED·접두 불일치 4/4 거부,
+게이트 술어 mutation 3/3 검출, 도메인 기본값 `Artifact` 가 UNSPECIFIED 를 접는 경로 없음, testdata 7쌍 왕복, 현 태그 대비
+breaking 0, rollback ⑥ 초록). 재작업 1회. **승인 태그 `contracts/v1-approved-2026-09-16`**(종결 승인 커밋, `policy.version` 4).
+구현 판단: 공유 `hasNonBlankRelease` 는 embedding 이 계속 쓰므로 무변경, prediction 은 신설 `hasValidReleaseShape`(kind 분기)만.
+**알려진 제한·OPEN**: `Diagnostics` 도메인 미소비(`OPEN-2F-DIAGNOSTICS-DOMAIN`) · §6.5 `POSTERIOR_PREDICTIVE` 정의 없음
+(`OPEN-2F-DICT-INTERVAL-SOURCE`) · 배포 순서(제공자 먼저) 문서 의존 · Python 계약 test 넷은 규칙 문서화(집행 5E) ·
+evidence 크기 게이트 30줄 초과(계약 slice 구조적). wire 측 해소: `OPEN-5D2-SAMPLE-SEGMENT`·`OPEN-5D-DIAGNOSTICS-WIRE`·
+`OPEN-5D2-INTERVAL-SOURCE-WIRE`·`OPEN-5D2-RELEASE-FOR-DISTRIBUTION`·`OPEN-5D2-BID-RATE-UPPER`. **다음은 5D-3**(3계층 소비 라운드) → 5E.
+
 ## 완료 조건
 
 - 계약 lint와 breaking-change test 통과

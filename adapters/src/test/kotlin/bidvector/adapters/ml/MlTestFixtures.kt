@@ -25,6 +25,7 @@ import contract.bidvector.ml.v1.GetModelMetadataResponse
 import contract.bidvector.ml.v1.IntervalSource
 import contract.bidvector.ml.v1.ModelRelease
 import contract.bidvector.ml.v1.PriceFitness
+import contract.bidvector.ml.v1.ReleaseKind
 import contract.bidvector.ml.v1.Success
 import contract.bidvector.ml.v1.Uncertainty
 import contract.bidvector.ml.v1.Weight
@@ -110,9 +111,16 @@ internal fun testSuccessResponse(
         ).setRelease(testModelRelease(releaseId, artifactChecksum))
         .build()
 
+/**
+ * M2/2F(D-2F-2) — `releaseKind`는 기본 `RELEASE_KIND_ARTIFACT`다. 이 fixture 는 4D-1 부터
+ * 쓰여 온 공용 헬퍼라 기본값을 바꾸면 이 파일을 쓰는 모든 기존 test(`ReleaseCheckTest`·
+ * `SuccessShapeFailClosedTest`·`GrpcBidPredictionGatewayTest` 등)가 `hasValidReleaseShape`
+ * 의 `UNSPECIFIED` 거부에 걸려 의도와 다른 이유로 깨진다 — 명시 인자를 받는 이유다.
+ */
 internal fun testModelRelease(
     releaseId: String = "release-2026-09-01",
     artifactChecksum: String = "sha256:test",
+    releaseKind: ReleaseKind = ReleaseKind.RELEASE_KIND_ARTIFACT,
 ): ModelRelease =
     ModelRelease
         .newBuilder()
@@ -121,6 +129,7 @@ internal fun testModelRelease(
         .setFeatureSchemaVersion("bidvector.ml.v1-test")
         .setCodeVersion("v-test")
         .setDatasetId("dataset-test")
+        .setReleaseKind(releaseKind)
         .build()
 
 private fun testCandidate(

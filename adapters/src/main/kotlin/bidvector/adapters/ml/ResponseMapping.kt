@@ -8,7 +8,9 @@ import contract.bidvector.ml.v1.FailureCode
 import contract.bidvector.ml.v1.ModelRelease
 import contract.bidvector.ml.v1.Success
 import contract.bidvector.ml.v1.Unmeasurable
+import bidvector.workflow.prediction.ReleaseKind as DomainReleaseKind
 import bidvector.workflow.prediction.UnmeasurableReason as DomainUnmeasurableReason
+import contract.bidvector.ml.v1.ReleaseKind as ProtoReleaseKind
 import contract.bidvector.ml.v1.UnmeasurableReason as ProtoUnmeasurableReason
 
 /**
@@ -94,4 +96,25 @@ internal fun contractViolation(): BidPredictionOutcome.Unavailable =
     BidPredictionOutcome.Unavailable(MlUnavailableReason.ContractViolation)
 
 private fun ModelRelease.toDomain(): ModelReleaseRef =
-    ModelReleaseRef(releaseId, artifactChecksum, featureSchemaVersion, codeVersion, datasetId)
+    ModelReleaseRef(releaseId, artifactChecksum, featureSchemaVersion, codeVersion, datasetId, releaseKind.toDomain())
+
+/**
+ * M2/2F(D-2F-2) — 이 함수 호출 시점에는 [hasValidReleaseShape]가 이미 `UNSPECIFIED`·
+ * `UNRECOGNIZED`를 거부했으므로(검증층이 먼저 걸린다, `ParsedSuccessFields.kt`) 그 두 값은
+ * 여기 도달하지 않는다. `error()`는 그 불변식이 깨졌을 때만 실행되는 방어적 마지막 줄
+ * (`ParsedSuccessFields.kt`의 `checkNotNull` 관례와 같다) — 정상 흐름의 예외가 아니다.
+ */
+private fun ProtoReleaseKind.toDomain(): DomainReleaseKind =
+    when (this) {
+        ProtoReleaseKind.RELEASE_KIND_ARTIFACT -> {
+            DomainReleaseKind.Artifact
+        }
+
+        ProtoReleaseKind.RELEASE_KIND_DERIVED -> {
+            DomainReleaseKind.Derived
+        }
+
+        ProtoReleaseKind.RELEASE_KIND_UNSPECIFIED, ProtoReleaseKind.UNRECOGNIZED -> {
+            error("hasValidReleaseShape 불변식 위반 — release_kind 가 검증층을 통과했는데 $this 다")
+        }
+    }

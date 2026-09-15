@@ -4,7 +4,7 @@
       {
         "label": "CANDIDATE_LABEL_CONSERVATIVE",
         "bidRate": {
-          "fraction": "0.8620"
+          "fraction": "0.8500"
         },
         "origin": "BID_RATE_ORIGIN_RECOMMENDED",
         "weight": {
@@ -15,7 +15,7 @@
       {
         "label": "CANDIDATE_LABEL_BASE",
         "bidRate": {
-          "fraction": "0.8870"
+          "fraction": "0.8750"
         },
         "origin": "BID_RATE_ORIGIN_RECOMMENDED",
         "weight": {
@@ -26,7 +26,7 @@
       {
         "label": "CANDIDATE_LABEL_AGGRESSIVE",
         "bidRate": {
-          "fraction": "0.9120"
+          "fraction": "0.9000"
         },
         "origin": "BID_RATE_ORIGIN_RECOMMENDED",
         "weight": {
@@ -36,30 +36,30 @@
       }
     ],
     "fitness": {
-      "score": "0.7340"
+      "score": "0.6900"
     },
     "uncertainty": {
-      "sampleSize": 58,
-      "dispersion": "0.0410",
-      "estimateMargin": "0.0125",
-      "intervalSource": "INTERVAL_SOURCE_CROSS_VALIDATION_RESIDUAL"
+      "sampleSize": 15,
+      "dispersion": "0.0380",
+      "estimateMargin": "0.0210",
+      "intervalSource": "INTERVAL_SOURCE_POSTERIOR_PREDICTIVE"
     },
     "release": {
-      "releaseId": "release-2026-09-01",
-      "artifactChecksum": "sha256:1f2e3d4c5b6a79881f2e3d4c5b6a7988",
+      "releaseId": "distribution/reserve-draw-distribution-v1",
+      "artifactChecksum": "sha256:9c7a4e2d18b3f6015c9d2ab74e0f3a6b1d8c5e7f2a4b6c8d0e2f4a6b8c0d2e4f",
       "featureSchemaVersion": "award-rate-v1",
       "codeVersion": "ml-engine-0.1.0",
-      "datasetId": "dataset-2026-08-corpus",
-      "releaseKind": "RELEASE_KIND_ARTIFACT"
+      "datasetId": "",
+      "releaseKind": "RELEASE_KIND_DERIVED"
     },
     "diagnostics": {
-      "trainingRowCount": 4120,
-      "segmentSupport": "SEGMENT_SUPPORT_DIRECT",
+      "trainingRowCount": 0,
+      "segmentSupport": "SEGMENT_SUPPORT_GLOBAL",
       "shrinkageWeight": {
-        "fraction": "0.1500"
+        "fraction": "0.0000"
       },
-      "excludedObservations": 12,
-      "agencySampleCount": 38,
+      "excludedObservations": 0,
+      "agencySampleCount": 0,
       "agencySampleBelowThreshold": false
     }
   }

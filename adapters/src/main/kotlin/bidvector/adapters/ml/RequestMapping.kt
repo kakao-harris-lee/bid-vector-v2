@@ -1,6 +1,7 @@
 package bidvector.adapters.ml
 
 import bidvector.procurement.BusinessCategory
+import bidvector.procurement.CategoryCode
 import bidvector.sharedkernel.BaseAmountProvenance
 import bidvector.sharedkernel.Rate
 import bidvector.workflow.prediction.AgencyId
@@ -88,9 +89,32 @@ private fun CompetitionSample.toProto(): ProtoCompetitionSample {
             .setBaseAmount(baseAmount.toProtoMoney())
             .setBaseAmountProvenanceLabel(baseAmountProvenanceLabel.toProto())
             .setOpenedOn(openedOn.toString())
+            .setAgencyId(agencyId.toSampleAgencyIdFact())
+            .setCategoryCode(categoryCode.toSampleCategoryCodeFact())
     awardRate?.let { builder.setAwardRate(it.toProtoRate()) }
     return builder.build()
 }
+
+/**
+ * M2/2F(scope.md ①, D-2F-1) — `CompetitionSample`(표본) 축의 결측 사유는
+ * `NOT_COLLECTED_YET` 하나뿐이다. `FeatureInputs`(대상 공고) 축의 `toAgencyIdFact()`(위,
+ * `UNKNOWN`)와 사유가 다르다 — 사유를 지어내지 않는다는 규약(2B 위협 우회 (5))이 두 축을
+ * 갈랐으므로 확장 함수를 공유하지 않는다.
+ */
+private fun AgencyId?.toSampleAgencyIdFact(): AgencyIdFact =
+    if (this == null) {
+        AgencyIdFact.newBuilder().setMissing(MissingReason.MISSING_REASON_NOT_COLLECTED_YET).build()
+    } else {
+        AgencyIdFact.newBuilder().setValue(value).build()
+    }
+
+/** 위 [toSampleAgencyIdFact]와 같은 규약 — `CategoryCode`(procurement, 표본 축)를 나른다. */
+private fun CategoryCode?.toSampleCategoryCodeFact(): CategoryCodeFact =
+    if (this == null) {
+        CategoryCodeFact.newBuilder().setMissing(MissingReason.MISSING_REASON_NOT_COLLECTED_YET).build()
+    } else {
+        CategoryCodeFact.newBuilder().setValue(value).build()
+    }
 
 /**
  * `internal` — 요청 매핑(`mapRequest`)뿐 아니라 `GrpcBidPredictionGateway`의 release 대조

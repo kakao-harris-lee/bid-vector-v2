@@ -165,6 +165,12 @@
           9,
           13
         ]
+      },
+      "agencyId": {
+        "value": "agency-opaque-771"
+      },
+      "categoryCode": {
+        "value": "CAT-0821"
       }
     },
     {
@@ -180,7 +186,13 @@
         "provenance": "AMOUNT_PROVENANCE_KIND_DERIVED_FROM_OPENING"
       },
       "baseAmountProvenanceLabel": "BASE_AMOUNT_PROVENANCE_LABEL_DERIVED_YEGA",
-      "openedOn": "2025-11-03"
+      "openedOn": "2025-11-03",
+      "agencyId": {
+        "missing": "MISSING_REASON_NOT_COLLECTED_YET"
+      },
+      "categoryCode": {
+        "missing": "MISSING_REASON_NOT_COLLECTED_YET"
+      }
     }
   ],
   "objective": "OPTIMIZATION_OBJECTIVE_SCENARIO_TRIPLE"

@@ -5,7 +5,8 @@
       "artifactChecksum": "sha256:1f2e3d4c5b6a79881f2e3d4c5b6a7988",
       "featureSchemaVersion": "award-rate-v1",
       "codeVersion": "ml-engine-0.1.0",
-      "datasetId": "dataset-2026-08-corpus"
+      "datasetId": "dataset-2026-08-corpus",
+      "releaseKind": "RELEASE_KIND_ARTIFACT"
     },
     "supportedFeatureSchemaVersions": [
       "award-rate-v1"
