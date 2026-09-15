@@ -27,6 +27,7 @@ in_scope:
   - ml-engine/policy/evaluation-v1.yaml                     # 정책 값 실물(D-5C2-3, OPEN-5C2-POLICY-VALUES)
   - ml-engine/tests/evaluation/**                           # RED 먼저 — 산식 항등식·규칙표·property·legacy_parity(관측)·정책 위반 규칙표·완화 경로 부재 test
   - ml-engine/tests/training/test_holdout*.py               # 합성 코퍼스로 창 분할·경계 동시각·양쪽 비어 있음·seed 안정성·report 왕복(canonical bytes 재현·checksum 재계산)
+  - ml-engine/tests/training/test_no_stray_numeric_literals.py  # 5C-1 게이트 확장 — _holdout_fit.py/_holdout_window.py/holdout.py allowlist 항목 추가(verifier r1 M-3 ① — 이 slice 가 실제로 변경했으나 in_scope 목록에 없었다)
   - milestone-5.md                                          # 5C-2 착수 문단 + 5C-1 PR #13 병합 등재
   - reports/evidence/m5/5c2/**
 out_of_scope:
@@ -136,7 +137,7 @@ rollback: |
 | `OPEN-5C-MATURITY-SOURCE` | D-5C2-2 로 **종결**(입력) — K7 `features` 이전은 2F/5E 후보로 등재 |
 | `OPEN-5C-BUDGET-BAND-SOURCE` | ② 로 **종결**(정책 데이터 `amount_band_edges`) |
 | `OPEN-5C-SEGMENT-PUBLISHED-FLOOR` | D-5C2-9 로 **종결**(축 없음) |
-| `OPEN-5C-REJECT-ACCOUNTING`(5C-1 L-8) | 5C-2 는 `TrainedArtifact.rejected_rows`(성공 경로)를 창별 report 에 공시 — `TrainingRejected` 의 회계 필드 추가는 5C-1 파일 편집이라 **미해소 유지**(5E 전) |
+| `OPEN-5C-REJECT-ACCOUNTING`(5C-1 L-8) | **2026-09-16 정정(verifier r1 M-4)** — 실제로 공시하는 것은 창 안 buildability 필터의 `WindowResult.dropped_rows`(H-A)뿐이다. 코퍼스 admission 단계의 `AdmittedCorpus.rejected`/`TrainedArtifact.rejected_rows`(성공 경로, 5C-1 회계)는 이 report 에 없다 — 그 필드 추가는 5C-1 파일(`train.py`/`artifact_writer.py`) 편집이라 **미해소 유지**(5E 전) |
 | `OPEN-5C-CORPUS` | 승계 — 5C-2 test 는 합성 코퍼스(규칙·불변식 판정), 실코퍼스 evaluation fixture 는 curator |
 | `OPEN-5D2-POLICY-VALUES`(`agency_sample_threshold`, 5C 재학습 지표 뒤) | 5C-2 report 가 낼 지표로 값 근거를 만들 수 있게 됨 — 결정은 운영자, 5E 전 |
 | `OPEN-5D2-BID-RATE-UPPER`(표본 밴드 1.5 vs D-2B-8) | 5C-2 코퍼스 실측(라벨 분포 최댓값)을 report 코퍼스 프로필에 실어 근거 제공 — 결정은 2F |
@@ -148,5 +149,6 @@ rollback: |
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-16 (수정 라운드 1 완료 뒤) | **M-3 장부 정정** — in_scope 에 `ml-engine/tests/training/test_no_stray_numeric_literals.py` 등재(실제 변경됐으나 누락). **M-4 정정** — `OPEN-5C-REJECT-ACCOUNTING` 처분에서 「`rejected_rows` 공시」 문구를 걷어냈다(실제로는 `dropped_rows`만 공시, `rejected_rows`는 여전히 미해소) — 아래 OPEN 표가 정본. **reviewer MEDIUM(match+assert_never)·LOW(죽은 분기)** 코드 수정. **code-reviewer 「확인 불가」** — latest-window 승격 의미론을 의도로 확정(checklist.md 알려진 제한 15, test 신설). **verifier LOW L-1~L-5** — 문면 등재로 처분(코드 변경 없음, checklist.md). commands.md 에 clean-tree 게이트 기록(개별 인자 + 양성 대조) 추가, rollback.md 현재 HEAD 재실측 | verifier r1 L-1~5·M-3·M-4 · code-reviewer MEDIUM 1·LOW·확인 불가 |
 | 2026-09-16 (verifier r1 · code-reviewer 뒤) | **⑤ 문면 재확인** — `min_evaluation_rows` 하한은 창 안 행 수가 아니라 **`build_row` 를 통과해 실제로 채점되는 행 수**(paired_t 의 n)에 건다(창 계획 단계의 선검사는 조기 제외로 남기되 buildability 필터 뒤 **재대조가 필수** — 5C-1 ③ 과 같은 계열). 버려진 행은 창별 `WindowResult.dropped_rows`(사유별 계수, `RejectedRowAccounting` 재사용)로 공시하고 `unaccounted_row_count` 회계에서 「회계됨」으로 접지 않는다. **⑥ 문면 재확인** — 판정 술어는 `verdict.py` 하나(`_passes`), 안정성 sweep 도 그 함수를 호출(이중 구현 금지). `trial_outcome` 은 **public 아님**(`_trial_outcome`, 안정성 sweep 내부 전용) — `Promotable` 은 `gate_outcome` 결과에서만. (2b) 표 갱신. **⑨ 보강** — 정책 로더는 `.nan`/`.inf`·비유한 값을 `PolicyRejected` 로(불변식 비교 전 유한성 검사), `policy_checksum` 은 로더 통과 값만 받는다. **게이트 보강** — 숫자 리터럴 slice test 를 `evaluation/**` 도 덮게(설계 검토 (5)-10), 설계 검토 (1) 표의 「닫는다」 기제 아홉에 각각 변이를 붉히는 test(경계 `<`·`contains`·인덱스 겹침·`unaccounted` 계측·정책 참조·헤드라인 seed 선두·MDE 배수·임계 리터럴). in_scope 추가: `ml-engine/tests/training/test_no_stray_numeric_literals.py`(기존 5C-1 test 확장) 또는 `tests/evaluation/test_no_stray_numeric_literals.py`. `OPEN-5C-REJECT-ACCOUNTING` 처분 통일: 5C-2 는 **성공 경로의 `rejected_rows` 와 창별 `dropped_rows` 를 report 에 공시**, `TrainingRejected` 의 회계 필드는 5C-1 파일이라 미해소 유지 | verifier r1 H-1·H-2·H-3·M-1·M-2·M-4 · code-reviewer H-1·M-1·M-2 |
 | 2026-09-15 착수 | 초판 — 결정 12, 5C-1 인수 OPEN 처분 | 사용자 「5C-2 착수」 · 조사 노트 01·02 |
