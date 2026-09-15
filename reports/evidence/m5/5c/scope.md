@@ -33,7 +33,7 @@ in_scope:
   - ml-engine/tests/gates/test_import_contracts.py          # 위 fixture 를 도는 test 1 추가(기존 test 무편집)
   - ml-engine/tests/conftest.py                             # hypothesis `ci` 프로파일을 루트로 승격(5B 인수) — 5A 소유 파일, hunk 격리 대상
   - ml-engine/tests/features/conftest.py                    # 삭제(D) — 프로파일이 루트로 올라가며 비어지는 5B 파일(verifier r2 L-8: 독립 항목으로 등재)
-  - ml-engine/uv.lock                                       # (b) 의 결과 — `pyyaml` 이 training extras 로 들어가며 lock 이 바뀐다(verifier r1 M-3: 착수판 미선언)
+  - ml-engine/uv.lock                                       # (b) 의 결과로 착수 base(f5020aa) 대비 바뀌었으나, 5D PR #12(`0310b1a`)가 pyyaml 을 양쪽 extras 에 넣어 **base d4727fc 대비 diff 0**(rebase 뒤 바이트 동일, verifier r3 L-5). in_scope 선언은 유지(계약 (b) 의 소유 경로) — rollback 목록에는 없다
   - ml-engine/pyproject.toml                                # (a) import-linter forbidden 계약 신설 「features·training·evaluation·registry 는 DB·HTTP·celery 를 모른다」(OPEN-5B-FEATURES-FORBIDDEN) (b) `training` extras 에 `pyyaml` (c) pytest 마커 `legacy_parity` 등록 — **`[tool.ruff.lint] select` 무편집**(5D 가 `BLE` 를 더한다 — 「레인 격리」) · 래칫 한도·allowlist 무편집
   - milestone-5.md                                          # 5C 절 착수 문단 + 5C 문면 개정(D-5C-1, 운영자 확인 대기 표기)
   - reports/evidence/m5/5c/**                               # scope·commands·checklist·reuse·policy-values·rollback·golden-manifest(N/A 사유)
@@ -68,7 +68,7 @@ rollback: |
 
 ## 하네스 레인 변경 (상시 절)
 
-`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시 없음. 리뷰 요청 시점 재실행.
+`git log --oneline <base_sha>..HEAD -- CLAUDE.md .claude/` — 착수 시 없음. **리뷰 요청 시점(2026-09-15, base d4727fc, HEAD bae7fb0) 재실행: 없음(0행)** — 이 slice range 에 하네스 레인 커밋이 없다(verifier r3 L-4 로 등재).
 
 ---
 
