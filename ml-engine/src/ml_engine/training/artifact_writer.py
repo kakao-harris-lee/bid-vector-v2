@@ -2,9 +2,19 @@
 
 `ml_engine.training.artifact_writer` — `TrainedArtifact` → 최종 canonical JSON 바이트
 (scope ⑧). legacy `_assemble_artifact`(pydantic 계약 조립)를 이어받되, 계약 모델이
-V2 결과 타입으로 바뀌었다. **D-5C-9** — `release` 안에 `artifact_checksum`을 두지
-않는다(자기참조 금지). checksum 은 이 함수가 낸 `ArtifactBytes.sha256`이다(2C
-`ArtifactReference.release.artifact_checksum`으로 호출자가 옮긴다).
+V2 결과 타입으로 바뀌었다. **D-5C-9** — Python 타입 `ReleaseIdentity`(4필드)는
+`artifact_checksum`을 갖지 않는다(자기참조 금지). wire `ArtifactReference.release.
+artifact_checksum`(= 이 함수가 낸 `ArtifactBytes.sha256`, 최종 bytes 전체의 sha256)은
+호출자가 별도로 나른다.
+
+**D-5C-9b(계약 갱신 이력 2026-09-13)** — 그러나 바이트 **안**의 JSON `release.
+artifact_checksum` 자리는 비워두지 않는다. 5D read model(`registry/artifact.py`
+`_parse_release`)이 그 키를 **비어 있지 않은 문자열**로 요구하기 때문이다(등가성은
+보지 않는 자기서술 필드, 5D 문면). 그래서 이 자리에는 **「그 필드를 빈 문자열 `""`로
+둔 canonical bytes 의 sha256」**(두 단계 직렬화 — legacy manifest `payload_sha256`과
+같은 형태, 결정적)을 채운다. 이 값은 `ArtifactBytes.sha256`(최종 bytes 전체의
+sha256)과 **다르다** — 같은 이름·다른 정의(`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`,
+`checklist.md` 참고).
 
 필드 집합은 5D scope ⑦ `ArtifactManifestV1` 그대로(`manifest_schema_version`·`release`·
 `feature_manifest_checksum`·`feature_names`·`sample_scope`·`residual_std`·
@@ -28,6 +38,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass
+from typing import TypedDict
 
 from ml_engine.features import (
     FEATURE_SCHEMA_V2,
@@ -43,6 +54,49 @@ from ml_engine.training.release import ReleaseIdentity, derive_release_id
 from ml_engine.training.train import TrainedArtifact
 
 _MANIFEST_SCHEMA_VERSION = "artifact-manifest-v1"
+
+type _JsonValue = (
+    str | int | float | bool | list[_JsonValue] | dict[str, _JsonValue] | None
+)
+"""`json.loads`가 낸 재귀 JSON 값 — `object` 대신 named alias 를 써 설계 래칫의 약한
+경계 판정을 피한다(registry/artifact.py `JsonValue`와 같은 근거, import 는 하지 않는다
+— training → registry 의존은 scope 밖)."""
+
+
+class _ReleasePayload(TypedDict):
+    """바이트 안 `release` 하위 객체 — D-5C-9b `artifact_checksum`(블랭크 canonical
+    bytes 의 sha256)을 포함한 다섯 필드. named TypedDict 로 두어 함수 경계에
+    `dict[str, Any]`(설계 래칫이 막는 약한 경계)가 나타나지 않게 한다."""
+
+    release_id: str
+    artifact_checksum: str
+    feature_schema_version: str
+    code_version: str
+    dataset_id: str
+
+
+class _ArtifactPayload(TypedDict):
+    """`write_artifact`의 canonical JSON payload 전체 — 함수 경계(파라미터·반환)에
+    구조화된 이름을 두어 `dict[str, object]` 약한 경계를 피한다(같은 근거는
+    `registry/artifact.py`의 `JsonValue`)."""
+
+    manifest_schema_version: str
+    release: _ReleasePayload
+    feature_manifest_checksum: str
+    feature_names: list[str]
+    sample_scope: str
+    residual_std: float
+    training_row_count: int
+    booster_model: str
+    reproducibility: dict[str, object]
+    training_spec_version: str
+    training_spec_checksum: str
+    training_policy_version: str
+    feed_origin_only: bool
+    categories: list[str]
+    denominator_sources: list[str]
+    agency_encoding: _JsonValue
+    rejected_rows: dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -91,6 +145,56 @@ def _release_for(trained: TrainedArtifact) -> ReleaseIdentity:
     )
 
 
+def _canonical_bytes(payload: _ArtifactPayload) -> bytes:
+    return json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+
+
+def _assemble_payload(
+    trained: TrainedArtifact,
+    release: ReleaseIdentity,
+    feature_manifest_checksum: str,
+    agency_encoding_embedded: _JsonValue,
+    rejected_rows: _RejectedRowsJson,
+) -> _ArtifactPayload:
+    """`release.artifact_checksum` 자리를 빈 문자열로 채운 payload(D-5C-9b 1단계) —
+    `_fill_self_described_artifact_checksum`이 채운다."""
+    release_payload: _ReleasePayload = {
+        "release_id": release.release_id,
+        "artifact_checksum": "",
+        "feature_schema_version": release.feature_schema_version,
+        "code_version": release.code_version,
+        "dataset_id": release.dataset_id,
+    }
+    return {
+        "manifest_schema_version": _MANIFEST_SCHEMA_VERSION,
+        "release": release_payload,
+        "feature_manifest_checksum": feature_manifest_checksum,
+        "feature_names": list(trained.booster.feature_name()),
+        "sample_scope": trained.sample_scope,
+        "residual_std": trained.residual_std,
+        "training_row_count": trained.training_row_count,
+        "booster_model": booster_to_text(trained.booster),
+        "reproducibility": dataclasses.asdict(trained.reproducibility),
+        "training_spec_version": trained.training_spec_version,
+        "training_spec_checksum": trained.training_spec_checksum,
+        "training_policy_version": trained.training_policy_version,
+        "feed_origin_only": trained.feed_origin_only,
+        "categories": list(trained.feature_manifest.categories),
+        "denominator_sources": list(trained.feature_manifest.denominator_sources),
+        "agency_encoding": agency_encoding_embedded,
+        "rejected_rows": dataclasses.asdict(rejected_rows),
+    }
+
+
+def _fill_self_described_artifact_checksum(payload: _ArtifactPayload) -> None:
+    """D-5C-9b 2단계 — `release.artifact_checksum`을 블랭크 canonical bytes 의 sha256
+    으로 채운다(`payload["release"]`를 in-place 로 수정, 자기참조 회피)."""
+    blank_bytes = _canonical_bytes(payload)
+    payload["release"]["artifact_checksum"] = hashlib.sha256(blank_bytes).hexdigest()
+
+
 def write_artifact(
     trained: TrainedArtifact,
 ) -> ArtifactBytes | NameMismatch | CanonicalizationRejected:
@@ -111,29 +215,15 @@ def write_artifact(
     agency_encoding_embedded = json.loads(canonical_feature_manifest)
 
     release = _release_for(trained)
-    rejected_rows = _serialize_rejected_rows(trained.rejected_rows)
+    payload = _assemble_payload(
+        trained,
+        release,
+        feature_manifest_checksum,
+        agency_encoding_embedded,
+        _serialize_rejected_rows(trained.rejected_rows),
+    )
+    _fill_self_described_artifact_checksum(payload)
 
-    payload = {
-        "manifest_schema_version": _MANIFEST_SCHEMA_VERSION,
-        "release": dataclasses.asdict(release),
-        "feature_manifest_checksum": feature_manifest_checksum,
-        "feature_names": list(trained.booster.feature_name()),
-        "sample_scope": trained.sample_scope,
-        "residual_std": trained.residual_std,
-        "training_row_count": trained.training_row_count,
-        "booster_model": booster_to_text(trained.booster),
-        "reproducibility": dataclasses.asdict(trained.reproducibility),
-        "training_spec_version": trained.training_spec_version,
-        "training_spec_checksum": trained.training_spec_checksum,
-        "training_policy_version": trained.training_policy_version,
-        "feed_origin_only": trained.feed_origin_only,
-        "categories": list(trained.feature_manifest.categories),
-        "denominator_sources": list(trained.feature_manifest.denominator_sources),
-        "agency_encoding": agency_encoding_embedded,
-        "rejected_rows": dataclasses.asdict(rejected_rows),
-    }
-    raw_bytes = json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
-    ).encode("utf-8")
+    raw_bytes = _canonical_bytes(payload)
     sha256 = hashlib.sha256(raw_bytes).hexdigest()
     return ArtifactBytes(bytes=raw_bytes, sha256=sha256, release=release)

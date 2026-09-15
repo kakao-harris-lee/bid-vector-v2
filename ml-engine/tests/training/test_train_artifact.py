@@ -217,6 +217,7 @@ _EXPECTED_TOP_LEVEL_FIELDS = (
 )
 _EXPECTED_RELEASE_FIELDS = (
     "release_id",
+    "artifact_checksum",
     "feature_schema_version",
     "code_version",
     "dataset_id",
@@ -225,15 +226,59 @@ _EXPECTED_REPRODUCIBILITY_FIELDS = ("seed", "num_threads", "deterministic")
 
 
 def test_write_artifact_field_set_matches_5d_scope_plus_5c1_additions() -> None:
-    """5D scope ⑦ `ArtifactManifestV1` 필드 집합(문자열 tuple 고정) + 5C-1 추가 여덟 —
-    D-5C-9(release 에 `artifact_checksum` 없음)."""
+    """5D scope ⑦ `ArtifactManifestV1` 필드 집합(문자열 tuple 고정) + 5C-1 추가 여덟.
+
+    D-5C-9b(계약 갱신 이력 2026-09-13) — 5D read model `_parse_release`가
+    `release.artifact_checksum`을 비어 있지 않은 문자열로 **요구**하므로(등가성은
+    보지 않는다), D-5C-9 착수판의 「부재」 단언을 「존재」로 뒤집는다. 값 자체의
+    정의(블랭크 canonical bytes 의 sha256)는
+    `test_release_artifact_checksum_is_blank_canonical_bytes_sha256`이 검증한다."""
     written = _train_and_write()
     payload = json.loads(written.bytes)
     assert set(payload.keys()) == set(_EXPECTED_TOP_LEVEL_FIELDS)
     assert set(payload["release"].keys()) == set(_EXPECTED_RELEASE_FIELDS)
-    assert "artifact_checksum" not in payload["release"]
+    assert isinstance(payload["release"]["artifact_checksum"], str)
+    assert payload["release"]["artifact_checksum"] != ""
     assert set(payload["reproducibility"].keys()) == set(
         _EXPECTED_REPRODUCIBILITY_FIELDS
+    )
+
+
+def test_release_artifact_checksum_is_blank_canonical_bytes_sha256() -> None:
+    """D-5C-9b — `release.artifact_checksum`은 최종 bytes 의 sha256(`ArtifactBytes.sha256`)
+    이 아니라, 그 필드를 빈 문자열로 둔 canonical bytes 의 sha256(두 단계 직렬화,
+    legacy manifest `payload_sha256`과 같은 형태)이다. 재계산과 일치해야 한다."""
+    written = _train_and_write()
+    payload = json.loads(written.bytes)
+    blank_payload = json.loads(written.bytes)
+    blank_payload["release"]["artifact_checksum"] = ""
+    blank_bytes = json.dumps(
+        blank_payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    import hashlib
+
+    expected = hashlib.sha256(blank_bytes).hexdigest()
+    assert payload["release"]["artifact_checksum"] == expected
+
+
+def test_release_artifact_checksum_differs_from_artifact_bytes_sha256() -> None:
+    """같은 이름·다른 정의(`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`) — wire
+    `ArtifactReference.release.artifact_checksum`(= `ArtifactBytes.sha256`, 최종 bytes
+    전체의 sha256)과 바이트 안 `release.artifact_checksum`(블랭크 canonical bytes 의
+    sha256)은 이름은 같지만 값이 다르다."""
+    written = _train_and_write()
+    payload = json.loads(written.bytes)
+    assert payload["release"]["artifact_checksum"] != written.sha256
+
+
+def test_write_artifact_reproducible_bytes_include_release_artifact_checksum() -> None:
+    """D-5C-12 (a) 재현성이 새 필드에도 유지된다 — 같은 입력 두 번 → 같은
+    `release.artifact_checksum`(바이트 동일 test 의 부분집합이지만 새 필드를 명시적으로
+    표적한다)."""
+    first = json.loads(_train_and_write().bytes)
+    second = json.loads(_train_and_write().bytes)
+    assert (
+        first["release"]["artifact_checksum"] == second["release"]["artifact_checksum"]
     )
 
 
