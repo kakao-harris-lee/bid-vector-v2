@@ -8,7 +8,7 @@
 ```yaml
 milestone: m5
 slice: 5c1-training-kernel
-base_sha: f5020aa982e6c5ade01f1660c0568dcd75c2fa7e   # PR #10 머지 커밋 = origin/main(5A·5B 실물 포함, 5D 미포함)
+base_sha: d4727fc753f3003877a05abeb464a61a6ede6185   # 2026-09-15 갱신(단축 d4727fc) — PR #12(5D) 머지 커밋 = origin/main. 착수 시 base 는 f5020aa982e6c5ade01f1660c0568dcd75c2fa7e(PR #10, 5D 미포함)였고 5D 병합 뒤 두 번 rebase(cefb19c → d4727fc). 40자: `git -C . rev-parse d4727fc`
 head_sha: 리뷰 시점의 HEAD
 in_scope:
   - ml-engine/src/ml_engine/training/__init__.py            # 공개 표면 재수출(아래 (2b) 표가 전수)
