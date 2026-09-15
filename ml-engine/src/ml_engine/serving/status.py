@@ -13,7 +13,13 @@ from typing import Protocol
 
 class ValidationDetailCode(StrEnum):
     """envelope·요청 필드 검증 실패의 닫힌 어휘(`ApplicationFailure.detail_code`) —
-    자유 문자열 금지."""
+    자유 문자열 금지.
+
+    verifier r1 L-5 — `MODEL_RELEASE_SELECTOR_UNSPECIFIED`·
+    `FEATURE_SCHEMA_VERSION_UNSUPPORTED`는 5E-1 의 어느 servicer 도 내지 않아(선언만
+    되고 생산 경로가 없었다) 지웠다. 이 값들은 `CalculateOptimalBid`(`model_release_
+    selector`·`feature_schema_version` 검증이 실제로 필요한 자리)가 채워지는 5E-2 에서
+    다시 필요해지면 그때 되살린다 — 선언만 있고 호출자가 없는 어휘를 남기지 않는다."""
 
     REQUEST_ID_EMPTY = "REQUEST_ID_EMPTY"
     CORRELATION_ID_EMPTY = "CORRELATION_ID_EMPTY"
@@ -25,16 +31,15 @@ class ValidationDetailCode(StrEnum):
     TEXT_EMPTY = "TEXT_EMPTY"
     TEXT_TOO_LONG = "TEXT_TOO_LONG"
     TEXT_KIND_UNSPECIFIED = "TEXT_KIND_UNSPECIFIED"
-    MODEL_RELEASE_SELECTOR_UNSPECIFIED = "MODEL_RELEASE_SELECTOR_UNSPECIFIED"
-    FEATURE_SCHEMA_VERSION_UNSUPPORTED = "FEATURE_SCHEMA_VERSION_UNSUPPORTED"
 
 
 class ReadinessDetailCode(StrEnum):
-    """`MODEL_NOT_READY` 응답의 닫힌 어휘 — 이 slice 는 실물이 없는 두 경로에서만 쓴다
-    (D-5E-2·D-5E-3)."""
+    """`MODEL_NOT_READY` 응답의 닫힌 어휘 — 이 slice 는 실물이 없는 경로에서만 쓴다
+    (D-5E-2). verifier r1 L-5 — `PREDICTION_UNIMPLEMENTED`는 어디서도 생산되지 않아
+    (`GetModelMetadata`는 `readiness` enum 값만 채우고 `detail_code`를 나르는 자리가
+    없다, D-5E-3) 지웠다."""
 
     EMBEDDING_MODEL_ABSENT = "EMBEDDING_MODEL_ABSENT"
-    PREDICTION_UNIMPLEMENTED = "PREDICTION_UNIMPLEMENTED"
 
 
 class _ApplicationFailureLike(Protocol):

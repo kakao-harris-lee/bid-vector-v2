@@ -44,8 +44,11 @@ class PreloadOutcome:
 
 class ReadinessGate:
     """정책 preload 결과로 상태를 정한다(설계 검토 (1) 「정책 없이 못 뜸」). 전이는
-    `mark_ready`·`mark_not_ready`·`begin_shutdown`뿐 — 상태 직접 대입 경로가 없다
-    ((2b) 표)."""
+    `from_preload`·`mark_not_ready`·`begin_shutdown`뿐 — 상태 직접 대입 경로가 없다
+    ((2b) 표). verifier r1 M-5 — `mark_ready()`(인자 없이 READY 로 만드는 메서드)는
+    production 호출자가 0이라 지웠다: preload 가 성공하면 `from_preload`가 이미
+    READY 로 만들고, 그 뒤 READY 로 "되돌릴" 합당한 경로가 없다(정책은 재로드하지
+    않는다 — 재시작만 preload 를 다시 돈다)."""
 
     def __init__(self, snapshot: ReadinessSnapshot) -> None:
         self._lock = threading.Lock()
@@ -64,10 +67,6 @@ class ReadinessGate:
     def snapshot(self) -> ReadinessSnapshot:
         with self._lock:
             return self._snapshot
-
-    def mark_ready(self) -> None:
-        with self._lock:
-            self._snapshot = ReadinessSnapshot(state=Readiness.READY, reasons=())
 
     def mark_not_ready(self, reason: str) -> None:
         if not reason:

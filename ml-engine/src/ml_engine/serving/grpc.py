@@ -6,7 +6,15 @@ readiness `NOT_READY`가 `server.stop`보다 **먼저**(설계 검토 (1) 「종
 `training_pb2_grpc.TrainingJobServiceServicer`(생성 base class, `ml_engine.contracts`
 재수출)만 타입으로 받는다 — `ml_engine.training.jobs.servicer` 의 **구체 구현은 import
 하지 않는다**(forbidden 계약 — `serving`은 `training`을 모른다). 실 인스턴스는 조립 근
-(`ml_engine.app`)이 만들어 넘긴다."""
+(`ml_engine.app`)이 만들어 넘긴다.
+
+verifier r1 M-8 — `is_deadline_active(context.is_active())`(ADR 0010 D-2 「긴 계산
+앞에서 deadline 확인」)를 이 slice에서는 지웠다. 5E-1 의 세 servicer 는 이 확인이
+붙을 자리가 없다: `GetModelMetadata`·`GetEmbeddingMetadata`·`EmbedText`(검증 실패 또는
+`MODEL_NOT_READY`)는 O(1) 이고, `StartTraining`은 검증 뒤 즉시 `ACCEPTED`를 반환하며
+실제 학습은 백그라운드 스레드에서 돈다(그 안의 취소 확인은 `CancelToken`이 다른
+경로로 이미 한다, D-2D-7). 실 계산(`CalculateOptimalBid`)이 생기는 5E-2 에서 다시
+필요해지면 그때 배선한다 — 선언만 있고 호출자가 없는 상태로 남겨두지 않는다."""
 
 from __future__ import annotations
 
@@ -52,11 +60,6 @@ def build_server(policy: ServingPolicy, servicers: Servicers) -> grpc.Server:
         servicers.training_job, server
     )
     return server
-
-
-def is_deadline_active(context: grpc.ServicerContext) -> bool:
-    """긴 계산 앞에서 deadline 확인(ADR 0010 D-2) — 취소된 요청에 계산하지 않는다."""
-    return context.is_active()
 
 
 def shutdown(gate: ReadinessGate, server: grpc.Server, *, grace_seconds: float) -> None:

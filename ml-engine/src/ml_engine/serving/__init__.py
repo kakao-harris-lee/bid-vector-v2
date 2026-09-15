@@ -9,7 +9,7 @@ pyproject.toml import-linter forbidden 계약이 CI 에서 강제). `serving.grp
 from __future__ import annotations
 
 from ml_engine.serving.embedding import EmbeddingServicer
-from ml_engine.serving.grpc import Servicers, build_server, is_deadline_active, shutdown
+from ml_engine.serving.grpc import Servicers, build_server, shutdown
 from ml_engine.serving.policy import (
     SHIPPED_SERVING_POLICY_VERSION,
     PolicyRejected,
@@ -48,7 +48,6 @@ __all__ = [
     "build_server",
     "envelope_violation",
     "fill_application_failure",
-    "is_deadline_active",
     "load_serving_policy",
     "shutdown",
 ]

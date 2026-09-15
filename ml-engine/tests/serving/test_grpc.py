@@ -18,7 +18,7 @@ from ml_engine.contracts import (
     training_pb2_grpc,
 )
 from ml_engine.serving.embedding import EmbeddingServicer
-from ml_engine.serving.grpc import Servicers, build_server, is_deadline_active, shutdown
+from ml_engine.serving.grpc import Servicers, build_server, shutdown
 from ml_engine.serving.policy import ServingPolicy
 from ml_engine.serving.prediction import BidPredictionServicer
 from ml_engine.serving.readiness import PreloadOutcome, ReadinessGate
@@ -192,16 +192,3 @@ def test_shutdown_calls_begin_shutdown_before_stop() -> None:
     shutdown(gate, server, grace_seconds=3.0)  # type: ignore[arg-type]
     assert gate.calls == ["begin_shutdown"]
     assert server.calls == ["stop(3.0)"]
-
-
-class _FakeContext:
-    def __init__(self, active: bool) -> None:
-        self._active = active
-
-    def is_active(self) -> bool:
-        return self._active
-
-
-def test_is_deadline_active_reflects_context() -> None:
-    assert is_deadline_active(_FakeContext(True)) is True  # type: ignore[arg-type]
-    assert is_deadline_active(_FakeContext(False)) is False  # type: ignore[arg-type]
