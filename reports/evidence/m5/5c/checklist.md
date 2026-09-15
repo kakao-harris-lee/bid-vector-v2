@@ -13,7 +13,8 @@
 | D-5C-6 | 성숙도·KST 창은 5C-1 이 만지지 않는다 | `training/**`·`adapters/**`에 `settlement_maturity`·`WeekMaturity`·KST 참조 0(grep 확인) — 5C-2 인계 |
 | D-5C-7 | 정책 값 `min_training_rows: 500`(legacy-declared, 미소비) | `policy/training-v1.yaml` · `policy-values.md` §1. **운영자 확인 대기**(scope.md 표) |
 | D-5C-8 | dataset = 디렉터리(`manifest.json`+`rows.jsonl`), `file://`만 | `dataset.py::load_dataset` · `adapters/dataset_files.py::read_dataset_files`(scheme≠file → `UNSUPPORTED_SCHEME`) · `test_dataset_files.py` |
-| D-5C-9 | `release`에 자기 checksum 없음(자기참조 금지) | `release.py::ReleaseIdentity`(4필드: `release_id`·`feature_schema_version`·`code_version`·`dataset_id`) · `test_release_identity_has_no_artifact_checksum_field` · checksum 은 `ArtifactBytes.sha256`(재계산 대조 test 존재). **`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT` — 5D 레인 통지 필요**(아래 「인계」, 5D scope ⑦ 의 `release.artifact_checksum` 이 이 slice 산출물에 없다) |
+| D-5C-9 | `release`에 자기 checksum 없음(자기참조 금지) — **Python 타입** 차원 | `release.py::ReleaseIdentity`(4필드: `release_id`·`feature_schema_version`·`code_version`·`dataset_id`) · `test_release_identity_has_no_artifact_checksum_field` · `ArtifactBytes.sha256`(최종 bytes 전체의 sha256, wire `ArtifactReference.release.artifact_checksum`)은 재계산 대조 test 존재. **D-5C-9b(2026-09-13, 계약 갱신 이력)로 바이트 안 값은 갱신** — 아래 D-5C-9b 행·「같은 이름·다른 정의」 표 참고 |
+| D-5C-9b | 5D read model 이 `release.artifact_checksum`을 비어 있지 않은 문자열로 요구(등가성은 안 봄) → writer 가 「그 필드를 빈 문자열로 둔 canonical bytes 의 sha256」(두 단계 직렬화)을 채운다 | `artifact_writer.py::_fill_self_described_artifact_checksum`(`_assemble_payload`가 블랭크 payload 를 만들고, 이 함수가 그 canonical bytes 의 sha256 을 `release.artifact_checksum`에 채운다) · `test_train_artifact.py::test_write_artifact_field_set_matches_5d_scope_plus_5c1_additions`(존재 단언으로 뒤집음)·`test_release_artifact_checksum_is_blank_canonical_bytes_sha256`(재계산 일치)·`test_release_artifact_checksum_differs_from_artifact_bytes_sha256`(최종 bytes sha256 과 다름)·`test_write_artifact_reproducible_bytes_include_release_artifact_checksum`(재현성) · **5D read model 통과 실증**은 `test_artifact_roundtrip.py`(아래) |
 | D-5C-10 | `release_id`는 결정적 해시, UUID 아님 | `release.py::derive_release_id` · `test_derive_release_id_is_deterministic`·`test_derive_release_id_changes_when_any_input_changes`(5축 각각) |
 | D-5C-11 | `TrainingRejected`/`DatasetRejected` → `JobFailureCode` 매핑 | 아래 표. `contracts/**` 무편집 — 매핑은 이 문서에만, proto 값 추가는 `OPEN-2C-FAILURE-CODES`(2F) |
 | D-5C-12 | 재현성 = 같은 호스트·같은 `num_threads`에서 바이트 동일 | `test_train_artifact.py::test_train_and_write_artifact_reproducible_bytes`(실 LightGBM, `num_threads=1`, 두 번 학습 → `ArtifactBytes.bytes` 동일) |
@@ -41,6 +42,20 @@
 
 전 항목이 `additive` 필요분은 `OPEN-2C-FAILURE-CODES`(2F, Codex 심사 대상)로 이월 — 이 slice 는
 proto 를 건드리지 않았다.
+
+## 같은 이름·다른 정의 — `artifact_checksum`(D-5C-9b)
+
+두 자리가 **이름은 같지만 값의 정의가 다르다**. `OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`는 이
+정합(둘을 하나로 합칠지, 이름을 가를지)이 아직 없어 **열린 채로 둔다** — 정합은 2F/5E 나 5D
+후속 변경 몫.
+
+| 자리 | 정의 | 계산 | 값이 바뀌는 조건 |
+| --- | --- | --- | --- |
+| wire `ArtifactReference.release.artifact_checksum`(2C, registry/승격 소비) | `ArtifactBytes.sha256` — **최종 bytes 전체**의 sha256 | writer 가 실제 채운 값으로 두 번째 직렬화를 끝낸 뒤 그 bytes 를 해시 | payload 의 **어떤** 필드든 바뀌면 바뀐다(자기 자신 포함하지 않음 — 자기참조 아님) |
+| 바이트 안 JSON `release.artifact_checksum`(5D read model `_parse_release`가 읽는 값) | 그 필드를 빈 문자열 `""`로 둔 **canonical bytes**(1단계 직렬화)의 sha256 | `_assemble_payload`가 블랭크 payload 를 만들고 `_fill_self_described_artifact_checksum`이 그 bytes 를 해시해 같은 자리를 채운다(두 단계 직렬화, 자기참조 회피) | payload 의 **자기 자신을 제외한** 다른 필드가 바뀌면 바뀐다 — 최종 `ArtifactBytes.sha256`과 값이 **항상 다르다**(블랭크 문자열이 채워진 뒤와 전의 바이트가 다르므로) |
+
+`test_release_artifact_checksum_differs_from_artifact_bytes_sha256`가 이 불일치를 매 학습마다
+실측 확인한다(우연히 같아지는 경우가 없음을 재확인하는 회귀 방지).
 
 ## (2b) 값 획득 축 — 5C-1 이 여는 public 표면
 
@@ -73,13 +88,19 @@ proto 를 건드리지 않았다.
 4. **중복 행 미검출** — `rows.jsonl`에 같은 공고가 두 번 있어도 `admit_corpus`는 둘 다 승인한다
    (dataset 생성 측 책임, legacy 도 막지 않았다 — 우회 후보 (13)). `manifest.row_count ≠ 실제 행 수`
    만 `UNREADABLE`로 잡는다(부분 파일 방어).
-5. **5D `ArtifactManifestV1`와의 필드 어긋남 둘** — (a) 이 slice 의 `release`는 `artifact_checksum`을
-   담지 않는다(D-5C-9) — 5D read model 이 그 키를 필수로 읽으면 왕복이 깨진다.
+5. **5D `ArtifactManifestV1`와의 필드 어긋남 — (a)는 D-5C-9b(2026-09-13)로 해소, (b)는 실증 완료.**
+   (a) ~~이 slice 의 `release`는 `artifact_checksum`을 담지 않는다~~ — D-5C-9b 로 채워졌다(위
+   「같은 이름·다른 정의」 표). Python 타입 `ReleaseIdentity`(4필드)는 여전히 그 필드가 없지만,
+   바이트 안 JSON `release.artifact_checksum`은 블랭크 canonical bytes 의 sha256 으로 채워
+   5D read model 의 「비어 있지 않은 문자열」 요구를 만족한다.
    (b) 이 slice 는 5D 기본 필드 밖에 8개(`training_spec_version`·`training_spec_checksum`·
    `training_policy_version`·`feed_origin_only`·`categories`·`denominator_sources`·
-   `agency_encoding`(5D 밖 신규 형태, 아래 6 참조)·`rejected_rows`)를 더 싣는다 — 5D read model 이
-   미지 키를 거부하면 이 slice 의 artifact 를 읽지 못한다. **`OPEN-5C-ARTIFACT-ROUNDTRIP`**(5D 레인
-   병합 뒤 왕복 test 필요) · **`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`**(5D 즉시 통지 대상).
+   `agency_encoding`(5D 밖 신규 형태, 아래 6 참조)·`rejected_rows`)를 더 싣는다 — `test_artifact_roundtrip.py::
+   test_5c1_additional_fields_are_not_rejected_by_5d_read_model`이 5D read model 이 미지
+   top-level 키를 거부하지 **않음**을 실측했다(read model 은 `payload.get(key)`로만 읽고 키
+   집합 전체를 대조하지 않는다). **`OPEN-5C-ARTIFACT-ROUNDTRIP`은 이 rebase 에서 닫혔다**
+   (`test_artifact_roundtrip.py`, 아래 「닫힌 OPEN」) · **`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`는
+   이름·값 정의가 여전히 둘이라 열린 채로 남는다**(위 표, 정합은 2F/5E/5D 후속 몫).
 6. **`agency_encoding` 필드는 5B `FeatureManifest`를 통째로 embed** — legacy `PersistedAwardRateGbmArtifact`의
    `agency_encoding`(리스트 하나)과 이름은 같지만 형태가 다르다(schema_version·columns·
    categories·denominator_sources·agency_means·category_means·global_mean·두 κ 를 전부 담는
@@ -119,6 +140,21 @@ proto 를 건드리지 않았다.
 - hypothesis `ci` 프로파일이 `tests/conftest.py`(루트)로 승격 — 스위트 전체가 이제 이 프로파일을
   물려받는다(5B 인수 해소, 부작용 없음 확인 — S-5 전건 통과).
 
+## rebase 뒤 수정(D-5C-9b·왕복 test)이 만든 public 표면 — 예상 0, 실측 0
+
+`write_artifact`의 wire 출력에 필드 값 하나(`release.artifact_checksum`)가 추가됐지만
+**필드 집합 자체는 5D scope ⑦이 처음부터 요구한 대로**(계약 갱신 이력 2026-09-13)라 새
+public **Python 심볼**은 아니다. 이번 라운드에서 새로 도입한 이름(`_ArtifactPayload`·
+`_ReleasePayload`·`_JsonValue`·`_canonical_bytes`·`_assemble_payload`·
+`_fill_self_described_artifact_checksum`)은 전부 모듈 밑줄 접두(`training/__init__.py`
+재수출 목록·`__all__`에 없음) — 외부에서 import 하는 경로가 없다(`grep -rn
+"_ArtifactPayload\|_ReleasePayload\|_JsonValue\|_assemble_payload\|_fill_self_described"
+tests/ src/ml_engine` 실측 — 매치 전부가 `artifact_writer.py` 파일 자신 안에만 있고,
+그 파일 밖(`test_train_artifact.py` 포함) 매치는 0). `test_artifact_roundtrip.py`가
+`ml_engine.registry.artifact`를
+import 하는 것은 test 파일 안에서만이고(위 파일 docstring), production 코드의 import
+그래프는 무변경.
+
 ## verifier r1 수정 라운드가 만든/지운 public 표면
 
 - **지웠다** — `ml_engine.training.matrix`(`build_training_matrix`·`TrainingMatrix`, M-1).
@@ -134,14 +170,21 @@ proto 를 건드리지 않았다.
   이제 실제 `pyproject.toml`을 tomllib 로 읽어 직접 검증한다(H-3). `bad_features_db/` fixture는
   더 이상 자기 계약을 갖지 않고 실제 계약을 임시 사본에 복사해 실행한다.
 
-## 인계(팀장/타 레인)
+## 닫힌 OPEN(이 rebase, 2026-09-13 계약 갱신 이력)
+
+- ~~**`OPEN-5C-ARTIFACT-ROUNDTRIP`**~~ — 닫힘. 5D 가 `main`에 먼저 병합됐으므로(계약 갱신
+  이력 「나중 병합 쪽 규칙」) 이 slice 가 `test_artifact_roundtrip.py`로 `write_artifact` →
+  5D `load_artifact` 왕복(fake trainer 1·실 LightGBM 1·변조·release_id 불일치·5C-1 추가
+  필드 여덟·manifest 필드 전달)을 실측 확인했다.
+
+## 인계(팀장/타 레인) — 남은 것
 
 - ~~milestone-5.md 5C 문면 개정~~ — `2e9f100`이 이미 완료했다(verifier r1 L-2, 낡은 인계 제거).
-- **`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`** — 5D 레인에 즉시 통지. 5D `registry/artifact.py`의
-  `ArtifactManifestV1` read model 이 `release.artifact_checksum`을 필수로 읽으면 이 slice 산출물과
-  왕복이 깨진다.
-- **`OPEN-5C-ARTIFACT-ROUNDTRIP`** — 5D 가 `main`에 병합된 뒤 `write_artifact` → 5D `load_artifact`
-  왕복 test 필요(어느 쪽이 나중에 병합하든 그 레인이 추가).
+- **`OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`** — **여전히 열려 있다.** D-5C-9b 로 왕복 실패는
+  해소됐으나(위 「같은 이름·다른 정의」 표), 같은 이름의 두 값(wire `ArtifactReference.release.
+  artifact_checksum` = 최종 bytes sha256 vs 바이트 안 `release.artifact_checksum` = 블랭크
+  canonical bytes sha256)을 하나로 합칠지 이름을 가를지는 이 slice 가 정하지 않는다 — 정합은
+  2F(계약 additive)·5E(승격 registry 소비 측)·5D 후속 변경 중 어디서 할지 팀장 결정 대상.
 - **`OPEN-5C-5A-TABLE-REASSIGN`** — 5A `policy-values.md` #8·#31·#32·#33 재배정(scope.md §3 표) —
   이 slice 의 `policy-values.md` §3에 이미 기록, 5A 표 자체는 5D 병합 뒤 팀장이 정정.
 

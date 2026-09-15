@@ -8,9 +8,9 @@
 | S-1 | `uv sync --frozen --all-extras` | 0 | 33 packages audited(`pyyaml`을 training extras 에 더함, `uv.lock` 갱신 2줄) |
 | S-1b | `uv sync --frozen --extra serving --no-dev` + 5개 import 시도 전부 실패 확인 + `uv sync --frozen --all-extras` 복귀 | 0 | sqlalchemy·psycopg·requests·httpx·celery 전부 import 실패("no leaks") — serving extras 에 학습 의존 없음 |
 | S-2 | `uv run ruff check . && uv run ruff format --check .` | 0 | "All checks passed!" · 전 파일 포맷 일치 |
-| S-3 | `uv run mypy --strict src/ml_engine` | 0 | "Success: no issues found in 30 source files" — `[[tool.mypy.overrides]]` 추가 0(대신 `dataset.py`의 `google.protobuf` import 줄에 인라인 `# type: ignore[import-untyped]` 1곳, `booster.py`의 `BoosterLike.predict`는 위치 전용 매개변수(`/`)로 프로토콜 이름 불일치를 정정, `lgb.Booster` 반환을 `cast(BoosterLike, booster)` 1곳으로 좁힘) |
+| S-3 | `uv run mypy --strict src/ml_engine` | 0 | "Success: no issues found in 39 source files"(rebase 뒤 재실측 — 5D 소스가 합류해 30 → 39. `[[tool.mypy.overrides]]` 추가 0(대신 `dataset.py`의 `google.protobuf` import 줄에 인라인 `# type: ignore[import-untyped]` 1곳, `booster.py`의 `BoosterLike.predict`는 위치 전용 매개변수(`/`)로 프로토콜 이름 불일치를 정정, `lgb.Booster` 반환을 `cast(BoosterLike, booster)` 1곳으로 좁힘) |
 | S-4 | `uv run lint-imports` | 0 | "Contracts: 6 kept, 0 broken" — 신설 forbidden 계약(`features/training/evaluation/registry 는 DB·HTTP·업무 모듈·grpc 진입점을 모른다`) 포함. 계약 존재 자체는 `test_import_contracts.py::test_real_pyproject_has_features_forbidden_contract`가 tomllib 로 직접 단언(verifier r1 H-3) |
-| S-5 | `uv run python -m pytest tests -q` | 0 | **325 passed**(5A+5B 233 + 5C-1 신규 92) |
+| S-5 | `uv run python -m pytest tests -q` | 0 | **452 passed, 1 skipped**(rebase 뒤 재실측 — 5D 합류 + D-5C-9b test 4건 + `test_artifact_roundtrip.py` 6건이 verifier r1 시점 325 위에 더해짐. skip 1건은 5D 소유, 이 slice 무관) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 0 | "설계 래칫 위반 없음" |
 | S-7 | `uv run python tools/reuse_provenance_check.py && ! uv run python tools/reuse_provenance_check.py --evidence tests/gates/fixtures/reuse-mismatch.md` | 0 | "재활용 출처 두 자리 일치 — 위반 0"(reuse.md 7행) · 대조 fixture 는 여전히 불일치로 실패(양성 대조 유지 확인) |
 | S-9 | python-version/requires-python 대조 | 0 | `3.12` / `>=3.12,<3.13` 일치 |
@@ -31,6 +31,24 @@ HIGH 3(H-1 `write_artifact` 시그니처를 `trained` 하나로 좁힘·H-2 OOF 
 「모든 행」 단언 복원·H-3 ⑫ 양성 대조가 실제 `pyproject.toml` 계약에 의존하게) · MEDIUM 1(M-1
 `build_training_matrix` 삭제, M-2·M-3 은 장부/무조치) · LOW 7 일괄. 상세 근거는 `checklist.md`
 「verifier r1 수정 라운드가 만든/지운 public 표면」과 각 수정 커밋 메시지.
+
+## rebase 뒤(2026-09-13 계약 갱신 이력) 수정 요약
+
+1. **baseline 정합** — 5D rebase 로 `tests/inference/test_policy.py`가 새로 유입되며
+   `tests/training/test_policy.py`와 basename 충돌(둘 다 rootless 패키지) → pytest
+   `import file mismatch`로 S-5 수집 자체 실패. `test_training_policy.py`로 개명해 해소
+   (함수명·내용 무변경, `policy-values.md` 인용 갱신). BLE(ruff)·`warn_unreachable`(mypy)·
+   `legacy_parity` 마커 중복은 재확인 결과 이미 정합(추가 수정 불필요).
+2. **D-5C-9b** — `write_artifact`가 바이트 안 `release.artifact_checksum`을 블랭크
+   canonical bytes 의 sha256 으로 채우도록 변경. payload 조립을 `write_artifact` 밖으로
+   뽑으며 설계 래칫 함수 길이 위반을 해소했고, 그 과정에서 새로 생긴 함수 경계에
+   `dict[str, object]`/`object`(설계 래칫 약한 경계)가 나타나지 않도록 `_ArtifactPayload`·
+   `_ReleasePayload` TypedDict 와 로컬 `_JsonValue` 재귀 별칭을 도입했다(전부 모듈
+   밑줄 접두, 외부 참조 0 — checklist.md 「rebase 뒤 수정이 만든 public 표면」).
+3. **`test_artifact_roundtrip.py`(신설)** — `OPEN-5C-ARTIFACT-ROUNDTRIP` 종결.
+
+S-1~S-9 rebase 뒤 재실측(commit `07f6024` 시점, 이 문서 갱신 커밋 직전) — 전건 exit 0,
+표는 위 최신 수치로 갱신 완료.
 
 ## secret 스캔
 
