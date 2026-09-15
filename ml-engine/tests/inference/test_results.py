@@ -13,6 +13,7 @@ from ml_engine.inference.results import (
     Candidate,
     CandidateLabel,
     Diagnostics,
+    DistributionRelease,
     IntervalSource,
     PriceFitness,
     SegmentSupport,
@@ -78,6 +79,8 @@ def test_success_candidates_must_be_exactly_three() -> None:
                 segment_support=SegmentSupport.DIRECT,
                 shrinkage_weight=Decimal("0"),
                 excluded_observations=0,
+                agency_sample_count=0,
+                agency_sample_below_threshold=False,
             ),
         )
 
@@ -102,6 +105,8 @@ def test_success_candidate_order_is_fixed() -> None:
                 segment_support=SegmentSupport.DIRECT,
                 shrinkage_weight=Decimal("0"),
                 excluded_observations=0,
+                agency_sample_count=0,
+                agency_sample_below_threshold=False,
             ),
         )
 
@@ -125,6 +130,8 @@ def test_success_with_correct_order_constructs() -> None:
             segment_support=SegmentSupport.DIRECT,
             shrinkage_weight=Decimal("0"),
             excluded_observations=0,
+            agency_sample_count=0,
+            agency_sample_below_threshold=False,
         ),
     )
     assert success.candidates[1].label is CandidateLabel.BASE
@@ -147,6 +154,8 @@ def test_diagnostics_shrinkage_weight_must_be_decimal() -> None:
             segment_support=SegmentSupport.DIRECT,
             shrinkage_weight=0.0,  # type: ignore[arg-type]
             excluded_observations=0,
+            agency_sample_count=0,
+            agency_sample_below_threshold=False,
         )
 
 
@@ -171,3 +180,42 @@ def test_no_float_fields_in_candidate_or_uncertainty_or_diagnostics() -> None:
             assert type_hints[field_name] in ("Decimal", Decimal), (
                 f"{cls.__name__}.{field_name} 는 Decimal 이어야 한다: {type_hints[field_name]!r}"
             )
+
+
+def test_diagnostics_carries_agency_sample_fields() -> None:
+    """M5/5D-2 — golden `ml-kernel-011`(ML-04 ②)이 요구하는 구조화 필드 둘."""
+    diagnostics = Diagnostics(
+        training_row_count=0,
+        segment_support=SegmentSupport.DIRECT,
+        shrinkage_weight=Decimal("0.25"),
+        excluded_observations=0,
+        agency_sample_count=5,
+        agency_sample_below_threshold=True,
+    )
+    assert diagnostics.agency_sample_count == 5
+    assert diagnostics.agency_sample_below_threshold is True
+
+
+def test_interval_source_has_posterior_predictive_value() -> None:
+    """D-5D2-8 — 분포 엔진 전용 내부 값. wire 매핑은 이 slice 밖(`OPEN-5D2-INTERVAL-
+    SOURCE-WIRE`)."""
+    assert IntervalSource.POSTERIOR_PREDICTIVE.value == "POSTERIOR_PREDICTIVE"
+
+
+def test_unmeasurable_detail_has_distribution_availability_reasons() -> None:
+    """D-5D2-7 — `distribution_availability` 전용 세분 사유 둘, GBM `SHALLOW_SEGMENT`와
+    분리."""
+    assert UnmeasurableDetail.TOO_FEW_OBSERVATIONS.value == "TOO_FEW_OBSERVATIONS"
+    assert UnmeasurableDetail.TOO_FEW_RATIO_SAMPLES.value == "TOO_FEW_RATIO_SAMPLES"
+
+
+def test_distribution_release_is_frozen_and_has_no_wire_mapping() -> None:
+    """D-5D2-5 — 내부 타입, `Success.release`(wire `ModelRelease`)에 대응하지 않는다
+    (`OPEN-5D2-RELEASE-FOR-DISTRIBUTION`). 이 test 는 그 타입이 구성 가능함만 고정한다."""
+    release = DistributionRelease(
+        policy_version="inference-v1",
+        code_version="0.1.0",
+        method="reserve-draw-distribution",
+    )
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        release.method = "changed"  # type: ignore[misc]

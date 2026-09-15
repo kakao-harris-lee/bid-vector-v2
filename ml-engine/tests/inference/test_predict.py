@@ -9,9 +9,9 @@ import hashlib
 import json
 import math
 from collections.abc import Sequence
-from pathlib import Path
 
 import pytest
+from _policy_support import shipped_inference_policy_for_test
 
 from ml_engine.features import (
     FEATURE_SCHEMA_V2,
@@ -23,7 +23,7 @@ from ml_engine.features import (
     Present,
     Vocabulary,
 )
-from ml_engine.inference.policy import InferencePolicy, load_inference_policy
+from ml_engine.inference.policy import InferencePolicy
 from ml_engine.inference.predict import (
     Available,
     predict_bid_rates,
@@ -37,15 +37,12 @@ from ml_engine.inference.results import (
 )
 from ml_engine.registry.artifact import LoadedArtifact, ModelReleaseRef, load_artifact
 
-_POLICY_PATH = Path(__file__).resolve().parents[2] / "policy" / "inference-v1.yaml"
 _FEATURE_NAMES = [column.name for column in FEATURE_SCHEMA_V2.columns]
 
 
 @pytest.fixture(scope="module")
 def policy() -> InferencePolicy:
-    loaded = load_inference_policy(_POLICY_PATH)
-    assert isinstance(loaded, InferencePolicy)
-    return loaded
+    return shipped_inference_policy_for_test()
 
 
 class _FakeBooster:
@@ -152,8 +149,7 @@ def test_predict_bid_rates_uses_same_availability_gate(policy: InferencePolicy) 
 
 
 def test_predict_bid_rates_success() -> None:
-    policy = load_inference_policy(_POLICY_PATH)
-    assert isinstance(policy, InferencePolicy)
+    policy = shipped_inference_policy_for_test()
     result = predict_bid_rates(
         facts=_facts(),
         feature_space=_feature_space(),

@@ -19,6 +19,15 @@ from ml_engine.inference.assessment import (
     aggregate_level_observation,
     resolve_assessment_posterior,
 )
+from ml_engine.inference.availability import distribution_availability
+from ml_engine.inference.distribution import (
+    DistributionRequest,
+    SampleSegment,
+    SegmentedSample,
+    SegmentMissing,
+    predict_distribution,
+)
+from ml_engine.inference.engine import ENGINE, serve_bid_rates
 from ml_engine.inference.maturity import (
     MaturityWindow,
     NoObservation,
@@ -27,6 +36,12 @@ from ml_engine.inference.maturity import (
     build_weekly_maturity,
     resolve_maturity,
     week_start_utc,
+)
+from ml_engine.inference.observations import (
+    ReserveDrawSample,
+    SampleRejected,
+    SampleRejectionReason,
+    observe_sample,
 )
 from ml_engine.inference.policy import (
     SHIPPED_INFERENCE_POLICY_VERSION,
@@ -49,6 +64,7 @@ from ml_engine.inference.results import (
     Candidate,
     CandidateLabel,
     Diagnostics,
+    DistributionRelease,
     IntervalSource,
     PriceFitness,
     SegmentSupport,
@@ -61,6 +77,7 @@ from ml_engine.inference.results import (
 from ml_engine.inference.scenario import build_scenario_candidates, resolve_uncertainty
 
 __all__ = [
+    "ENGINE",
     "SHIPPED_INFERENCE_POLICY_VERSION",
     "AssessmentPosterior",
     "AssessmentProvenance",
@@ -71,6 +88,8 @@ __all__ = [
     "CandidateLabel",
     "CleanAssessmentSample",
     "Diagnostics",
+    "DistributionRelease",
+    "DistributionRequest",
     "DrawMeanDistribution",
     "InferencePolicy",
     "IntervalSource",
@@ -81,7 +100,13 @@ __all__ = [
     "Observed",
     "PolicyRejected",
     "PriceFitness",
+    "ReserveDrawSample",
+    "SampleRejected",
+    "SampleRejectionReason",
+    "SampleSegment",
+    "SegmentMissing",
     "SegmentSupport",
+    "SegmentedSample",
     "SettlementObservation",
     "Success",
     "Uncertainty",
@@ -92,13 +117,17 @@ __all__ = [
     "aggregate_level_observation",
     "build_scenario_candidates",
     "build_weekly_maturity",
+    "distribution_availability",
     "draw_mean_moments",
     "exact_draw_mean_distribution",
     "load_inference_policy",
+    "observe_sample",
     "predict_bid_rates",
+    "predict_distribution",
     "resolve_assessment_posterior",
     "resolve_maturity",
     "resolve_uncertainty",
     "segment_availability",
+    "serve_bid_rates",
     "week_start_utc",
 ]

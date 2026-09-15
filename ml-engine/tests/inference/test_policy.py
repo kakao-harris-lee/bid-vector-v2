@@ -18,9 +18,18 @@ from ml_engine.inference.policy import (
 
 _POLICY_PATH = Path(__file__).resolve().parents[2] / "policy" / "inference-v1.yaml"
 
+# M5/5D-2 — `assessment.agency_sample_threshold`는 출하 `inference-v1.yaml`에 없다
+# (D-5D2-3, `OPEN-5D2-POLICY-VALUES` 값 미정, 운영자 결정 2026-09-13 (c)). 이 test 파일의
+# 다른 모든 test 는 이 키와 무관한 동작(다른 필드의 불변식)을 검증하므로, `_base_values()`가
+# 실제 출하 값 위에 이 키만 synthetic 으로 채워 넣는다 — 값 자체(`1`, 가장 관대해 다른
+# 어떤 test 의 단언에도 영향을 주지 않는다)는 `OPEN-5D2-POLICY-VALUES`의 답이 아니다.
+_SYNTHETIC_AGENCY_SAMPLE_THRESHOLD = 1
+
 
 def _base_values() -> dict[str, object]:
-    return dict(yaml.safe_load(_POLICY_PATH.read_text(encoding="utf-8")))
+    values = dict(yaml.safe_load(_POLICY_PATH.read_text(encoding="utf-8")))
+    values["assessment.agency_sample_threshold"] = _SYNTHETIC_AGENCY_SAMPLE_THRESHOLD
+    return values
 
 
 def _write(tmp_path: Path, values: dict[str, object]) -> Path:
@@ -29,8 +38,21 @@ def _write(tmp_path: Path, values: dict[str, object]) -> Path:
     return path
 
 
-def test_shipped_policy_file_loads_successfully() -> None:
-    policy = load_inference_policy(_POLICY_PATH)
+def test_shipped_policy_file_is_rejected_missing_agency_sample_threshold() -> None:
+    """D-5D2-3 — `assessment.agency_sample_threshold` 키 신설 이후, 그 값이 아직
+    승인되지 않아(`OPEN-5D2-POLICY-VALUES`) 출하 파일에 없다. 이 로드 실패가
+    의도된 상태다: 서빙(5E)이 켜지려면 값 승인이 선행돼야 함이 로더에서 드러난다."""
+    result = load_inference_policy(_POLICY_PATH)
+    assert isinstance(result, PolicyRejected)
+    assert "agency_sample_threshold" in result.reason
+
+
+def test_shipped_values_with_agency_sample_threshold_declared_load_successfully(
+    tmp_path: Path,
+) -> None:
+    """출하 값 스물셋 + synthetic `agency_sample_threshold` 하나가 전부 올바르게
+    타입 변환·불변식 통과되는지 — 이 키 신설이 기존 스물세 값의 로드를 깨지 않는다."""
+    policy = load_inference_policy(_write(tmp_path, _base_values()))
     assert isinstance(policy, InferencePolicy)
     assert policy.version == "inference-v1"
     assert policy.scenario_z == Decimal("1.2816")
@@ -49,6 +71,7 @@ def test_shipped_policy_file_loads_successfully() -> None:
     assert policy.assessment_min_samples_for_variance == 2
     assert policy.assessment_plausible_min == Decimal("0.8")
     assert policy.assessment_plausible_max == Decimal("1.2")
+    assert policy.assessment_agency_sample_threshold == 1
     assert policy.reserve_draw_count == 4
     assert policy.reserve_expected_price_count == 15
     assert policy.reserve_min_reserve_records == 8
@@ -124,6 +147,7 @@ def test_bid_ratio_band_inverted_is_rejected(tmp_path: Path) -> None:
         "reserve.min_reserve_records",
         "bid_ratio.min_samples",
         "assessment.min_samples_for_variance",
+        "assessment.agency_sample_threshold",
         "maturity.window_days",
         "scenario.bid_rate_digits",
     ],
@@ -194,9 +218,13 @@ def test_clamp_min_quantizes_to_zero_is_rejected_digits_4(tmp_path: Path) -> Non
 
 
 def test_shipped_clamp_min_survives_quantize_check(tmp_path: Path) -> None:
-    """출하 정책(clamp_min 0.7, digits 4)은 F-1 불변식에 영향받지 않는다 — 회귀 없음."""
-    policy = load_inference_policy(_POLICY_PATH)
+    """출하 정책(clamp_min 0.7, digits 4)은 F-1 불변식에 영향받지 않는다 — 회귀 없음.
+    `_base_values()`를 거쳐 로드한다(M5/5D-2 — 출하 파일 자체는 `agency_sample_threshold`
+    미선언으로 이제 항상 거부되므로, `agency_sample_threshold` 를 제외한 다른 값의 회귀
+    여부는 synthetic 주입 경로로 확인한다)."""
+    policy = load_inference_policy(_write(tmp_path, _base_values()))
     assert isinstance(policy, InferencePolicy)
+    assert policy.scenario_clamp_min == Decimal("0.7")
 
 
 @pytest.mark.parametrize(

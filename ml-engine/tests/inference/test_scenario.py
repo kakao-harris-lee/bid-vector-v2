@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import math
 from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Decimal
-from pathlib import Path
 
 import pytest
+from _policy_support import shipped_inference_policy_for_test
 
-from ml_engine.inference.policy import InferencePolicy, load_inference_policy
+from ml_engine.inference.policy import InferencePolicy
 from ml_engine.inference.results import (
     Candidate,
     CandidateLabel,
@@ -22,14 +22,10 @@ from ml_engine.inference.results import (
 )
 from ml_engine.inference.scenario import build_scenario_candidates, resolve_uncertainty
 
-_POLICY_PATH = Path(__file__).resolve().parents[2] / "policy" / "inference-v1.yaml"
-
 
 @pytest.fixture(scope="module")
 def policy() -> InferencePolicy:
-    loaded = load_inference_policy(_POLICY_PATH)
-    assert isinstance(loaded, InferencePolicy)
-    return loaded
+    return shipped_inference_policy_for_test()
 
 
 def test_candidates_have_fixed_order_and_labels(policy: InferencePolicy) -> None:
