@@ -44,10 +44,20 @@ dev = [
     "mypy==2.3.1",
     "pyyaml==6.0.3",
     "types-pyyaml==6.0.12.20250915",
+    # M5/5E-1 D-5E-9 — mypy strict 가 `grpc`(serving.grpc·training.jobs.servicer 그 밖
+    # 진입점)를 타입 검사하려면 stub 이 필요하다. `[[tool.mypy.overrides]]`로
+    # `ignore_missing_imports` 하지 않는다(5A 규율 — override 는 사유·해소가 필수인데
+    # 여기는 stub 이 있어 예외가 불필요하다).
+    "grpc-stubs==1.53.0.6",
 ]
 
 [build-system]
-requires = ["setuptools>=68"]
+# M5/5E-1 D-5E-8 — `setup.py`가 `tools/build_hook.py`(→ `tools/generate_contracts.py`)를
+# import 해야 `cmdclass`를 등록할 수 있는데, setuptools 는 어떤 질의(메타데이터 조회
+# 포함)든 `setup.py` 전체를 실행한다(실측 — `get_requires_for_build_wheel` 단계에서부터
+# `ModuleNotFoundError: grpc_tools`). `grpcio-tools`(버전은 `[project.optional-dependencies]
+# .dev`와 동일 고정)를 격리 빌드 환경에도 넣는다.
+requires = ["setuptools>=68", "grpcio-tools==1.83.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -176,11 +186,11 @@ forbidden_modules = [
     "ml_engine.adapters",
     "grpc",
 ]
-# 우회 후보 — 설계 검토 (2b)·scope.md ③: gRPC 진입점(`serving.grpc`)만 `grpc` 허용 예정.
-# **5A 시점엔 넣지 않는다** — `ml_engine.serving.grpc`가 아직 없어(5E 가 만든다)
-# `ignore_imports`에 존재하지 않는 import edge 를 적으면 import-linter 가 "No matches for
-# ignored import"로 설정 오류 취급해 exit 1 한다(실측). **5E 가 `serving/grpc.py`를 만들 때
-# 이 줄을 추가**하라 — `OPEN-5A-SERVING-GRPC-EXCEPTION`(checklist.md).
+# M5/5E-1 — `OPEN-5A-SERVING-GRPC-EXCEPTION` 종결. `ml_engine.serving.grpc`가 유일 진입점
+# (build_server·shutdown·is_deadline_active, scope.md ①) — 그 밖 serving/inference 모듈은
+# 여전히 `grpc`를 직접 import 하지 않는다(`test_serving_purity.py`가 실행 시점으로도
+# 재확인).
+ignore_imports = ["ml_engine.serving.grpc -> grpc"]
 
 [[tool.importlinter.contracts]]
 name = "bidvector 직접 import 금지 — contracts 재수출(간접)은 허용"
@@ -193,6 +203,7 @@ source_modules = [
     "ml_engine.registry",
     "ml_engine.serving",
     "ml_engine.adapters",
+    "ml_engine.app",
 ]
 forbidden_modules = ["bidvector"]
 # verifier r1 F-1 — 기본값(간접 포함)은 승인 통로(`from ml_engine.contracts import
@@ -227,7 +238,21 @@ forbidden_modules = [
     "celery",
     "ml_engine.inference",
     "ml_engine.serving",
+    "grpc",
 ]
+# M5/5E-1 — `training.jobs.servicer`가 grpc 진입점 둘 중 하나다(5A ③, 위 계약의
+# `serving.grpc`와 대칭). 그 밖 `features`·`training`(jobs 제외)·`evaluation`·`registry`는
+# 여전히 `grpc`를 모른다.
+ignore_imports = ["ml_engine.training.jobs.servicer -> grpc"]
+
+[[tool.importlinter.contracts]]
+# M5/5E-1 우회 (11) — `ml_engine.app`(조립 근, layers 계약 밖)은 serving·training·
+# inference·adapters 를 전부 잇지만, DB·HTTP·업무 모듈은 여전히 몰라야 한다(serving 순수성
+# 이 조립 근을 거쳐 새는 것을 막는다).
+name = "app 은 DB·HTTP·업무 모듈을 모른다"
+type = "forbidden"
+source_modules = ["ml_engine.app"]
+forbidden_modules = ["sqlalchemy", "psycopg", "requests", "httpx", "celery"]
 
 [tool.design-ratchet]
 # ML-11.2 승인값 — 바꾸려면 이 값과 `tests/gates/test_design_ratchet.py` 단언을 함께
