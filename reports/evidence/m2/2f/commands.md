@@ -221,3 +221,16 @@ base `c669a71affabed165c1afbd8b11c8245b81a3a5a`, head는 리뷰 시점의 `git r
 ## 2026-09-16 종결 승인 커밋 뒤 (팀장)
 - cmd: `git tag -a contracts/v1-approved-2026-09-16 75706de` 뒤 `./gradlew --no-daemon :contractGate`
 - exit: 0 — 핵심 결과: 승인 태그 갱신 자체가 breaking 0(BUILD SUCCESSFUL, 태그 기준선 = 이 커밋)
+
+## PR #16 리뷰 LOW 시정 — DERIVED + dataset_id 비공백 회귀 test (2026-09-15)
+
+- 지적: `hasValidReleaseShape`(DERIVED)에 `dataset_id` 비공백 입력의 단언 test 부재
+  (구현은 통과시킴, KDoc "공백을 허용한다"와 모순 아님).
+- 조치: `PredictionAdditiveContractTest.kt`에 `DERIVED release 는 dataset_id 가
+  비공백이어도 hasValidReleaseShape 를 통과한다` test 1건 추가(기존 `distribution/`
+  접두 표본 + `setDatasetId` 합성값, 통과 단언). 구현(`ReleaseShapeValidation.kt`)
+  무변경.
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`
+- exit: 0 — BUILD SUCCESSFUL in 48s, 346 actionable tasks(320 executed, 26
+  up-to-date). 신설 test 는 `PredictionAdditiveContractTest` 10건 중 하나로 통과
+  확인(테스트 리포트 XML, failures=0).

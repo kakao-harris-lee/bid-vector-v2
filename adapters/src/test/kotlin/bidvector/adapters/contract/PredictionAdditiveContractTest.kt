@@ -92,6 +92,20 @@ class PredictionAdditiveContractTest {
     }
 
     @Test
+    fun `DERIVED release 는 dataset_id 가 비공백이어도 hasValidReleaseShape 를 통과한다`() {
+        val release =
+            CalculateOptimalBidResponse
+                .parseFrom(derivedPosteriorPredictiveBytes)
+                .success
+                .release
+                .toBuilder()
+                .setDatasetId("dataset-2026-09-15")
+                .build()
+        release.releaseKind shouldBe ReleaseKind.RELEASE_KIND_DERIVED
+        hasValidReleaseShape(release) shouldBe true
+    }
+
+    @Test
     fun `release_kind UNSPECIFIED 는 hasValidReleaseShape 가 거부한다`() {
         val release =
             CalculateOptimalBidResponse
