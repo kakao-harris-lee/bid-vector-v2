@@ -196,6 +196,76 @@ def test_load_evaluation_policy_rejects_duplicate_segment_axis(
     assert isinstance(result, PolicyRejected)
 
 
+@pytest.mark.parametrize(
+    "override_line",
+    [
+        "paired_t_threshold: .nan",
+        "paired_t_threshold: .inf",
+        "maturity_threshold: .nan",
+        "amount_band_edges.3: .inf",
+    ],
+)
+def test_load_evaluation_policy_rejects_non_finite_values(
+    tmp_path: Path, override_line: str
+) -> None:
+    """verifier r1 M-1 재현 — `paired_t_threshold: .nan`은 `<= 0` 비교가 NaN 에서
+    항상 거짓이라 그 불변식을 통과했고(재현: 수정 전 `EvaluationPolicy` 생성 성공,
+    `policy_checksum`에서 `ValueError: Out of range float values are not JSON
+    compliant`로 나중에 터짐), `amount_band_edges.3: .inf`도 「양수·오름차순」을
+    통과했다. 로더가 값 불변식 비교 **전에** 유한성을 검사해 `PolicyRejected`로
+    막아야 한다."""
+    key, _, _ = override_line.partition(":")
+    key = key.strip()
+    values: dict[str, object] = {
+        "version": "evaluation-v1",
+        "paired_t_threshold": 2.58,
+        "gate_baseline": "category_x_band",
+        "gate_model": "gbm_all_strata",
+        "gate_stratum": "clean-base",
+        "maturity_threshold": 0.70,
+        "min_evaluation_rows": 100,
+        "max_origins": 5,
+        "agency_baseline_min_count": 10,
+        "stability_seeds.0": 20260812,
+        "stability_seeds.1": 1,
+        "amount_band_edges.0": 100000000,
+        "amount_band_edges.1": 500000000,
+        "amount_band_edges.2": 1000000000,
+        "amount_band_edges.3": 5000000000,
+        "segment_axes.0": "category",
+    }
+    values.pop(key, None)
+    lines = [f"{k}: {v!r}" for k, v in values.items()]
+    lines.append(override_line)
+    path = tmp_path / "policy.yaml"
+    path.write_text("\n".join(lines) + "\n")
+    result = load_evaluation_policy(path)
+    assert isinstance(result, PolicyRejected), override_line
+
+
+def test_policy_checksum_never_raises_because_non_finite_cannot_be_constructed() -> (
+    None
+):
+    """verifier r1 M-1 — `policy_checksum`의 docstring 전제(「값이 전부 정책 불변식을
+    통과한 유한값」)가 실제로 강제된다는 것을 `EvaluationPolicy` 직접 생성에서도
+    확인한다(로더 경유 없이도 비유한 값은 생성 자체가 막힌다)."""
+    with pytest.raises(ValueError):
+        EvaluationPolicy(
+            version="x",
+            paired_t_threshold=float("nan"),
+            gate_baseline="category_x_band",
+            gate_model="gbm_all_strata",
+            gate_stratum="clean-base",
+            maturity_threshold=0.7,
+            min_evaluation_rows=2,
+            max_origins=5,
+            agency_baseline_min_count=2,
+            stability_seeds=(1,),
+            amount_band_edges=(1.0, 2.0),
+            segment_axes=("category",),
+        )
+
+
 def test_evaluation_policy_direct_construction_enforces_invariants() -> None:
     """직접 생성도 방어선 — Python 가시성 한계는 여전하나 명백한 위반은 막는다."""
     with pytest.raises(ValueError):

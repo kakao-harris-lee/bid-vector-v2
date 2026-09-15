@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -89,6 +90,16 @@ class EvaluationPolicy:
         self._validate_collections()
 
     def _validate_scalars(self) -> None:
+        # verifier r1 M-1 — NaN/Infinity 비교는 부호 있는 범위 검사를 조용히
+        # 통과한다(`nan <= 0`은 항상 거짓). 범위 검사보다 먼저 유한성을 강제한다.
+        if not math.isfinite(self.paired_t_threshold):
+            raise ValueError(
+                f"paired_t_threshold 는 유한값이어야 합니다: {self.paired_t_threshold}"
+            )
+        if not math.isfinite(self.maturity_threshold):
+            raise ValueError(
+                f"maturity_threshold 는 유한값이어야 합니다: {self.maturity_threshold}"
+            )
         if self.paired_t_threshold <= 0:
             raise ValueError(
                 f"paired_t_threshold 는 양수여야 합니다: {self.paired_t_threshold}"
@@ -125,6 +136,10 @@ class EvaluationPolicy:
             )
         if not self.amount_band_edges:
             raise ValueError("amount_band_edges 는 비어 있을 수 없습니다.")
+        if any(not math.isfinite(edge) for edge in self.amount_band_edges):
+            raise ValueError(
+                f"amount_band_edges 는 전부 유한값이어야 합니다: {self.amount_band_edges!r}"
+            )
         if any(edge <= 0 for edge in self.amount_band_edges):
             raise ValueError(
                 f"amount_band_edges 는 전부 양수여야 합니다: {self.amount_band_edges!r}"
