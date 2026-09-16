@@ -14,7 +14,6 @@ import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.prediction.CompetitionSample
-import bidvector.workflow.prediction.ReserveDrawObservation
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
@@ -141,22 +140,24 @@ fun judgeEligibility(
     val check =
         rankOneBidRateCheck(opening.openingRankOne).andThen { bidRate ->
             reservePriceCountCheck(opening, eligibilityPolicy).andThen {
-                reservePriceAmountsCheck(notice, opening.reservePrices).andThen { reservePrices ->
-                    drawNumberCheck(opening.drawNumbers).andThen { selectedNumbers ->
-                        baseAmountCheck(notice).andThen { resolvedBaseAmount ->
-                            openedOnCheck(opening).andThen { openedOn ->
-                                passed(
-                                    sampleOf(
-                                        notice,
-                                        opening,
-                                        provenancePolicy,
-                                        bidRate,
-                                        resolvedBaseAmount.amount,
-                                        openedOn,
-                                        reservePrices,
-                                        selectedNumbers,
-                                    ),
-                                )
+                reservePriceSequenceCheck(opening.reservePrices, eligibilityPolicy).andThen {
+                    reservePriceAmountsCheck(notice, opening.reservePrices).andThen { reservePrices ->
+                        drawNumberCheck(opening.drawNumbers).andThen { selectedNumbers ->
+                            baseAmountCheck(notice).andThen { resolvedBaseAmount ->
+                                openedOnCheck(opening).andThen { openedOn ->
+                                    passed(
+                                        sampleOf(
+                                            notice,
+                                            opening,
+                                            provenancePolicy,
+                                            bidRate,
+                                            resolvedBaseAmount.amount,
+                                            openedOn,
+                                            reservePrices,
+                                            selectedNumbers,
+                                        ),
+                                    )
+                                }
                             }
                         }
                     }
@@ -168,28 +169,6 @@ fun judgeEligibility(
         is Check.Failed -> SampleEligibilityOutcome.Excluded(check.reason)
     }
 }
-
-@Suppress("LongParameterList")
-private fun sampleOf(
-    notice: Notice,
-    opening: OpeningResult,
-    provenancePolicy: Resolution.Resolved<ProvenancePolicyData>,
-    bidRate: Rate,
-    baseAmount: BaseAmount,
-    openedOn: LocalDate,
-    reservePrices: List<BaseAmount>,
-    selectedNumbers: Set<Int>,
-): CompetitionSample =
-    CompetitionSample(
-        observedBidRate = bidRate,
-        baseAmount = baseAmount,
-        baseAmountProvenanceLabel = provenanceLabelFor(notice, opening, baseAmount, provenancePolicy),
-        openedOn = openedOn,
-        awardRate = opening.winningRate,
-        agencyId = null,
-        categoryCode = notice.businessCategory?.code,
-        reserveDraw = ReserveDrawObservation(reservePrices, selectedNumbers),
-    )
 
 /** D-4B7-2 ② — `Determined`가 아니거나 `bidRate`가 없으면(협상 계약 등) 자격이 없다. */
 private fun rankOneBidRateCheck(outcome: OpeningRankOneOutcome): Check<Rate> {
@@ -207,6 +186,25 @@ private fun reservePriceCountCheck(
     } else {
         failed(SampleExclusionReason.RESERVE_PRICE_COUNT_MISMATCH)
     }
+
+/**
+ * D-4B7-2 ③ 확장(verifier r1 F-4) — 엔진이 `selected_numbers`를 wire `reserve_prices`
+ * 리스트의 1-기반 인덱스로 소비하므로, 행 수가 맞아도 `sequenceNumber` 집합이 정확히
+ * `1..expectedReservePriceCount`가 아니면(중복·결측·범위 밖) 위치가 번호와 어긋난다 —
+ * `reservePriceCountCheck`(건수)와 다른 축이다.
+ */
+private fun reservePriceSequenceCheck(
+    rows: List<OpeningReservePriceRow>,
+    policy: SampleEligibilityPolicyData,
+): Check<Unit> {
+    val expected = (1..policy.expectedReservePriceCount).toSet()
+    val parsed = rows.mapNotNull { it.sequenceNumber.toIntOrNull() }
+    return if (parsed.size == rows.size && parsed.toSet() == expected) {
+        passed(Unit)
+    } else {
+        failed(SampleExclusionReason.RESERVE_PRICE_SEQUENCE_INVALID)
+    }
+}
 
 private fun reservePriceAmountsCheck(
     notice: Notice,

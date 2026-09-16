@@ -33,8 +33,11 @@ internal fun predictionRequestFor(
     policies: ResolvedPolicies,
     correlationId: CorrelationId,
     // M4/4B-7(D-4B7-9) — 표본 공급은 OpportunityAnalysis가 CompetitionSamplePort로 얻어 넘긴다.
-    // 이 파일은 port를 읽지 않는다(scope.md ③ KDoc) — 값만 조립한다.
-    competitionSamples: List<CompetitionSample> = emptyList(),
+    // 이 파일은 port를 읽지 않는다(scope.md ③ KDoc) — 값만 조립한다. 기본값을 두지 않는다
+    // (verifier r1 F-11) — 호출부가 이 인자를 빠뜨리면 컴파일이 실패해야 한다. 표본
+    // 0건은 호출부가 명시적으로 `emptyList()`를 넘겨야만 나오는 값이지, 조용히 새는
+    // 기본값이 아니다.
+    competitionSamples: List<CompetitionSample>,
 ): BidPredictionRequest =
     BidPredictionRequest(
         baseAmount = resolvedBaseAmount,

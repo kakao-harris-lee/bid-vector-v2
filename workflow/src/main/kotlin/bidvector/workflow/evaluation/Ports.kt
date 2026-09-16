@@ -151,17 +151,29 @@ data class CompetitionSampleQuery(
 
 /**
  * 표본 자격 판정이 후보를 제외한 사유(M4/4B-7, D-4B7-2) — 조용한 drop 대신 사유별로 센다.
- * 「개찰 결과 존재」(D-4B7-2 ①)는 여기 없다 — 어댑터의 조인이 이미 그 존재를 보장하므로
- * (`JdbcCompetitionSampleSource`) 후보 쌍 자체가 만들어지지 않는 경우라 판정 함수에 도달하는
- * 입력이 아니다.
+ *
+ * **`CANDIDATE_VANISHED`(verifier r1 F-3 뒤 신설)** — 「개찰 결과 존재」(D-4B7-2 ①)는
+ * 어댑터의 SQL 조인이 스캔 시점에는 보장하지만, 복원은 그 뒤 별도 단건 `find(id)`
+ * 두 번(`JdbcCompetitionSampleSource.candidatePair`)이라 스캔과 복원 사이에 행이
+ * 사라지면(원칙상 이 저장소에 삭제 경로는 없지만 「조인이 이미 보장한다」는 더 이상
+ * 정확한 서술이 아니다) 후보가 계수 없이 증발할 수 있었다 — 이 사유가 그 자리를
+ * 채운다(합계 불변식: `samples.size + excluded.values.sum() == 후보 수`).
+ *
+ * **`RESERVE_PRICE_SEQUENCE_INVALID`(verifier r1 F-4 뒤 신설)** — 엔진이 `selected_numbers`
+ * 를 wire `reserve_prices` 리스트의 1-기반 인덱스로 소비하므로, 행 수가
+ * `expectedReservePriceCount`와 같아도 `sequenceNumber` 집합이 정확히 `1..N`이 아니면
+ * (예: `002`~`016`) 위치와 번호가 어긋난다 — 건수만 보는 `RESERVE_PRICE_COUNT_MISMATCH`와
+ * 다른 사유다.
  */
 enum class SampleExclusionReason {
     RANK_ONE_RATE_MISSING,
     RESERVE_PRICE_COUNT_MISMATCH,
+    RESERVE_PRICE_SEQUENCE_INVALID,
     RESERVE_PRICE_MISSING,
     DRAW_NUMBERS_OUT_OF_RANGE,
     BASE_AMOUNT_MISSING,
     OPENING_DATE_MISSING,
+    CANDIDATE_VANISHED,
 }
 
 /** [CompetitionSamplePort]의 결과(D-4B7-9) — 조회 실패는 예외가 아니라 이 값이 진다. */

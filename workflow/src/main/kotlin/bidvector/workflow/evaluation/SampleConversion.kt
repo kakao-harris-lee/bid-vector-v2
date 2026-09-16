@@ -11,29 +11,56 @@ import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.BaseAmountProvenance
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.Provenance
+import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.ReasonCode
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.export
+import bidvector.workflow.prediction.CompetitionSample
+import bidvector.workflow.prediction.ReserveDrawObservation
 import java.math.BigDecimal
+import java.time.LocalDate
 
 /**
  * `SampleEligibility.kt`에서 갈라낸 파일이다(detekt `TooManyFunctions` — 한 파일에 열넷을
  * 몰아두지 않는다, `MoneyMapping.kt`와 같은 판단). `internal` — 같은 모듈 안 `judgeEligibility`
  * (`SampleEligibility.kt`, 같은 패키지)가 그대로 쓴다.
  *
+ * `sortedBy { ... }`(inline `compareBy` 경유)는 합성 클래스의 `SourceFile` 디버그 속성이
+ * stdlib `Comparisons.kt`로 남아 `jarContentGate`(ADR 0006 §6)가 「게이트를 통과한 소스가
+ * 아니다」로 거부한다(실측, `ObservationPayloadCodec.kt`와 같은 함정) — [RESERVE_PRICE_SEQUENCE_ORDER]
+ * 처럼 이름 있는 [Comparator]로 둔다(`reservePriceAmounts`가 쓴다).
+ */
+private val RESERVE_PRICE_SEQUENCE_ORDER =
+    Comparator<OpeningReservePriceRow> { left, right ->
+        val leftSequence = left.sequenceNumber.toIntOrNull() ?: Int.MAX_VALUE
+        val rightSequence = right.sequenceNumber.toIntOrNull() ?: Int.MAX_VALUE
+        leftSequence.compareTo(rightSequence)
+    }
+
+/**
  * D-4B7-1 (a) — `bsisPlnprc`(기초예정가격, basis 미확정 값 객체)를 기초금액 축 원문
  * 관측값으로 옮긴다: `basis = BASE_AMOUNT`, `currency` 그대로, `vatTreatment = UNKNOWN`,
  * `provenance = Published(표본 공고 자기 회차)`(우회 (18) — 대상 공고 회차를 빌리지 않는다).
  * 행 하나라도 `baseReservePrice`가 없으면(D-4B7-2 ④) 전체를 실격시킨다.
+ *
+ * **[RESERVE_PRICE_SEQUENCE_ORDER]로 정렬한다(verifier r1 F-4 뒤).** 엔진은
+ * `selected_numbers`를 결과 리스트의 1-기반 인덱스로 소비한다 — 그래서 출력 위치
+ * i(0-기반)는 항상 순번 i+1의 예비가격이어야 한다. 이전 판은 `rows`의 입력 순서를 그대로
+ * 썼는데(production 유일한 공급자인 `SELECT_OPENING_RESERVE_PRICES … ORDER BY
+ * reserve_price_sequence`가 우연히 정렬해 주었을 뿐), 그 결합이 암묵적이고 무측정이었다.
+ * `SampleEligibility.judgeEligibility`의 `reservePriceSequenceCheck`가 이 함수를 부르기
+ * 전에 순번 집합이 정확히 `1..expectedReservePriceCount`임을 이미 보증하므로, 여기서는
+ * 그 정렬만 하면 된다(`toIntOrNull()`이 `null`을 낼 일은 그 검사를 통과한 입력에서는 없다).
  */
 internal fun reservePriceAmounts(
     notice: Notice,
     rows: List<OpeningReservePriceRow>,
 ): List<BaseAmount>? {
     val published = Provenance.Published(notice.id.round)
+    val sorted = rows.sortedWith(RESERVE_PRICE_SEQUENCE_ORDER)
     val amounts = mutableListOf<BaseAmount>()
-    for (row in rows) {
+    for (row in sorted) {
         val candidate = row.baseReservePrice ?: return null
         amounts += BaseAmount(candidate.won, candidate.currency, VatTreatment.UNKNOWN, published)
     }
@@ -85,3 +112,30 @@ internal fun provenanceLabelFor(
     val recoveryEstimate = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE)
     return ProvenanceRules.judgeRow(original, row, recoveryEstimate, policy).classification
 }
+
+/**
+ * `SampleEligibility.judgeEligibility`의 guard 체인이 전부 통과한 뒤 값을 조립한다
+ * (`SampleEligibility.kt`에서 갈라낸 함수 — detekt `TooManyFunctions`, verifier r1
+ * 뒤 12개로 늘어나 한계를 넘었다). `internal` — 같은 패키지의 `judgeEligibility`만 쓴다.
+ */
+@Suppress("LongParameterList")
+internal fun sampleOf(
+    notice: Notice,
+    opening: OpeningResult,
+    provenancePolicy: Resolution.Resolved<ProvenancePolicyData>,
+    bidRate: Rate,
+    baseAmount: BaseAmount,
+    openedOn: LocalDate,
+    reservePrices: List<BaseAmount>,
+    selectedNumbers: Set<Int>,
+): CompetitionSample =
+    CompetitionSample(
+        observedBidRate = bidRate,
+        baseAmount = baseAmount,
+        baseAmountProvenanceLabel = provenanceLabelFor(notice, opening, baseAmount, provenancePolicy),
+        openedOn = openedOn,
+        awardRate = opening.winningRate,
+        agencyId = null,
+        categoryCode = notice.businessCategory?.code,
+        reserveDraw = ReserveDrawObservation(reservePrices, selectedNumbers),
+    )

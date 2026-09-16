@@ -16,6 +16,7 @@ import bidvector.workflow.evaluation.CompetitionSampleSupply
 import bidvector.workflow.evaluation.SAMPLE_ELIGIBILITY_POLICY
 import bidvector.workflow.evaluation.SAMPLE_PROVENANCE_POLICY
 import bidvector.workflow.evaluation.SampleEligibilityOutcome
+import bidvector.workflow.evaluation.SampleEligibilityPolicyData
 import bidvector.workflow.evaluation.SampleExclusionReason
 import bidvector.workflow.evaluation.judgeEligibility
 import bidvector.workflow.prediction.CompetitionSample
@@ -74,31 +75,74 @@ class JdbcCompetitionSampleSource(
             CompetitionSampleSupply.Unavailable(MlUnavailableReason.TransportFailed)
         }
 
+    /**
+     * verifier r1 F-3 — `candidatePair`가 `null`이면(스캔과 복원 사이 행 소실, KDoc
+     * 참고) `continue`로 조용히 건너뛰지 않고 `CANDIDATE_VANISHED`로 계수한다. 합계
+     * 불변식 `samples.size + excluded.values.sum() == ids.size`가 이 함수 밖에서 항상
+     * 성립한다(`JdbcCompetitionSampleSourceTest` 실측).
+     */
     private fun aggregate(ids: List<NoticeId>): CompetitionSampleSupply {
-        val eligibilityPolicy = SAMPLE_ELIGIBILITY_POLICY.entries.single().second
-        val provenancePolicy = resolveProvenancePolicy()
+        val referenceDate = LocalDate.now(clock)
+        val eligibilityPolicy = resolveEligibilityPolicy(referenceDate)
+        val provenancePolicy = resolveProvenancePolicy(referenceDate)
         val samples = mutableListOf<CompetitionSample>()
         val excluded = mutableMapOf<SampleExclusionReason, Int>()
         for (id in ids) {
-            val pair = candidatePair(id) ?: continue
-            when (val outcome = judgeEligibility(pair.first, pair.second, eligibilityPolicy, provenancePolicy)) {
-                is SampleEligibilityOutcome.Eligible -> samples += outcome.sample
-                is SampleEligibilityOutcome.Excluded -> excluded.merge(outcome.reason, 1, Int::plus)
+            when (val pair = candidatePair(id)) {
+                null -> {
+                    excluded.merge(SampleExclusionReason.CANDIDATE_VANISHED, 1, Int::plus)
+                }
+
+                else -> {
+                    val outcome = judgeEligibility(pair.first, pair.second, eligibilityPolicy, provenancePolicy)
+                    recordOutcome(outcome, samples, excluded)
+                }
             }
         }
         return CompetitionSampleSupply.Supplied(samples, excluded)
     }
 
-    /** notice·opening 둘 다 있어야 판정 대상이다(둘 다 기존 repository `find` 재사용). */
+    private fun recordOutcome(
+        outcome: SampleEligibilityOutcome,
+        samples: MutableList<CompetitionSample>,
+        excluded: MutableMap<SampleExclusionReason, Int>,
+    ) {
+        when (outcome) {
+            is SampleEligibilityOutcome.Eligible -> samples += outcome.sample
+            is SampleEligibilityOutcome.Excluded -> excluded.merge(outcome.reason, 1, Int::plus)
+        }
+    }
+
+    /**
+     * notice·opening 둘 다 있어야 판정 대상이다(둘 다 기존 repository `find` 재사용).
+     * `null`은 스캔(SQL)과 이 복원 사이에 행이 사라졌다는 뜻이다 — `CANDIDATE_VANISHED`로
+     * 계수된다(verifier r1 F-3, `aggregate` KDoc).
+     */
     private fun candidatePair(id: NoticeId): Pair<Notice, OpeningResult>? =
         noticeRepository.find(id)?.let { notice ->
             openingResultRepository.find(id)?.let { opening -> notice to opening }
         }
 
+    /**
+     * `Initial` 한 entry뿐이라 항상 resolve되지만, `resolve(referenceDate)`를 쓴다(verifier
+     * r1 F-2) — `.single()`은 entry가 하나 더 붙는 순간(policy-values.md가 예고한 5C/5E
+     * 갱신) `IllegalArgumentException`을 던지고 `catch(SQLException)`가 못 잡는다.
+     * `error()`는 배선 방어다.
+     */
+    private fun resolveEligibilityPolicy(referenceDate: LocalDate): SampleEligibilityPolicyData =
+        when (val resolution = SAMPLE_ELIGIBILITY_POLICY.resolve(referenceDate)) {
+            is Resolution.Resolved -> {
+                resolution.value
+            }
+
+            is Resolution.NotApplicable -> {
+                error("SAMPLE_ELIGIBILITY_POLICY 가 $referenceDate 에 적용되지 않는다: ${resolution.reason}")
+            }
+        }
+
     /** `SAMPLE_PROVENANCE_POLICY`는 `Initial` 한 entry뿐이라 항상 resolve된다 — `error()`는 배선 방어다. */
-    private fun resolveProvenancePolicy(): Resolution.Resolved<ProvenancePolicyData> {
-        val referenceDate = LocalDate.now(clock)
-        return when (val resolution = SAMPLE_PROVENANCE_POLICY.resolve(referenceDate)) {
+    private fun resolveProvenancePolicy(referenceDate: LocalDate): Resolution.Resolved<ProvenancePolicyData> =
+        when (val resolution = SAMPLE_PROVENANCE_POLICY.resolve(referenceDate)) {
             is Resolution.Resolved -> {
                 resolution
             }
@@ -107,7 +151,6 @@ class JdbcCompetitionSampleSource(
                 error("SAMPLE_PROVENANCE_POLICY 가 $referenceDate 에 적용되지 않는다: ${resolution.reason}")
             }
         }
-    }
 
     private fun candidateIds(query: CompetitionSampleQuery): List<NoticeId> =
         dataSource.connection.use { connection ->
