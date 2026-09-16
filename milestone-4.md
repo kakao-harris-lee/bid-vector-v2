@@ -770,6 +770,20 @@ base `44721cf`(PR #27 병합 뒤), Python 레인과 소스 겹침 0. **계약 �
 인용한 `ArchitectureGateTest` Locale 축은 `layer.domain` 에만 걸려 `workflow`(application) 에 무효 — verifier r1 V-1(high) 실측으로
 소스 경계 test 로 교체.
 
+**4D-4 종결 2026-09-16(사용자 승인 — 「(A) 캐리어 + 문구 합성」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1
+`not-ready`(high 1: 우회 (7) 의 닫힘 기제 부재 — `Locale`+`String.format` 을 심어도 전건 exit 0 · medium 1: `Unavailable`·
+`Unmeasurable` 가지 evidence 단언 없음) → 계약 갱신 2 + 수정 라운드 → r2 `ready-for-review`(**게이트 술어 변경 표적 재검증**:
+verifier 가 변이 세 종 — `Locale`+`String.format` / `.format(` 단독 / `DecimalFormat` — 을 직접 심어 `EvidenceLinesBoundaryTest`
+붉음 확인, 우회 (1)·(4) 변이 컴파일 거부, rollback ①~⑥ 임시 clone 재현, 전건 1694 tests 0 failed). **재작업 1회**. 산출물:
+`PredictionEvidence`·`PredictionComponents`(internal)·`Analyzed.evidence`·`NotificationRequest.evidence`·`evidenceLinesFor`·
+`EvidenceLinesBoundaryTest`, `@Test` +13(골든·전수·경계·V-2). `OPEN-4D3-DIAGNOSTICS-RENDER` 닫힘 — ML-04 ② 「기관 표본이 임계
+미만이면 수축 가중치가 응답 근거에 실린다」의 Kotlin 착지가 wire(2F) → 도메인(4D-3) → 요청 표본(4B-7) → **판정 근거 캐리어·
+문구(4D-4)** 까지 이어졌고, D-4B7-9(표본 제외 사유가 `Analyzed` 까지 나름)도 실효. **알려진 제한**: 채널 본문 착지는 6A 렌더러
+구현이 `evidenceLinesFor` 를 호출할 때 완성(오늘 닿는 표면은 알림 본문 하나, 리뷰 화면은 NOTI-10/6A) · `EvidenceLinesBoundaryTest`
+는 파일 하나만 스캔(문구 합성을 두 파일로 나누면 자동으로 덮이지 않음 — `OPEN-4D4-CONTENT-REF` 부수 등재) · 근거의 참됨은 port
+구현 층(4B-3·4D-3 위협 모델 승계). **신설 OPEN(Phase 6 에스컬레이션, 둘 다 6A 소유)**: `OPEN-4D4-CONTENT-REF`(근거를 `ContentRef`
+로 어떻게 참조할지) · `OPEN-4D4-REVIEW-EVIDENCE`(Review 판정·알림함 기록의 근거 동반). 정본 `reports/evidence/m4/4d4/checklist.md`.
+
 ### Slice 4E — notification adapter contract
 
 - delivery request와 rendered content 분리
