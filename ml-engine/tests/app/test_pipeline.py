@@ -17,6 +17,7 @@ from ml_engine.app.pipeline import build_training_pipeline
 from ml_engine.contracts import common_pb2, features_pb2
 from ml_engine.evaluation import EvaluationPolicy
 from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFailed
+from ml_engine.training.holdout import HoldoutCancelled
 from ml_engine.training.jobs.pipeline import (
     CancelToken,
     DatasetRefInput,
@@ -470,3 +471,90 @@ def test_never_cancelled_reaches_all_four_stages_and_writes_files(
         "write_artifact_files": 1,
     }
     assert len(list(out_dir.iterdir())) == 1
+
+
+# ---- M5/5E-3 D-5E3-4 — `HoldoutCancelled`(창 루프 도중 취소, D-5E3-3)를
+# `PipelineCancelled`로만 옮긴다. 창 루프 내부 정밀도(학습 전 확인·완료 창 수)는
+# `tests/training/test_holdout.py`가 mutation 검증까지 마쳤다 — 여기서는 pipeline
+# 층의 배선(같은 `cancel_token.is_cancelled`가 `should_stop`으로 전달되는가)과
+# 매핑(우회 (4): `PipelineFailed`로 위장하지 않는가)만 정밀하게 확인한다. ----
+
+
+def test_run_holdout_receives_cancel_tokens_is_cancelled_as_should_stop(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`_run_holdout`이 `run_holdout`을 부를 때 `should_stop=`이 **그 실행에 쓰인
+    같은 `cancel_token`**의 `is_cancelled`여야 한다 — 다른 토큰이나 항상-거짓
+    스텁을 넘기면 창 루프 도중 취소가 전달되지 않는다."""
+    import ml_engine.app.pipeline as pipeline_module
+
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+
+    captured_kwargs: dict[str, object] = {}
+    original_run_holdout = pipeline_module.run_holdout
+
+    def capturing_run_holdout(*args: object, **kwargs: object) -> object:
+        captured_kwargs.update(kwargs)
+        return original_run_holdout(*args, **kwargs)  # type: ignore[misc]
+
+    monkeypatch.setattr(pipeline_module, "run_holdout", capturing_run_holdout)  # type: ignore[attr-defined]
+
+    pipeline = build_training_pipeline(
+        _spec(),
+        training_policy=_training_policy(),
+        evaluation_policy=_evaluation_policy(),
+        maturity_window_days=7,
+        trainer=_FakeTrainer(),
+        code_version=CodeVersion("sha-test-1"),
+        artifact_out_dir=out_dir,
+    )
+    token = CancelToken()
+    outcome = pipeline.run(_dataset_ref(dataset_dir), token)
+    assert isinstance(outcome, PipelineOutcome), outcome
+
+    assert "should_stop" in captured_kwargs
+    should_stop = captured_kwargs["should_stop"]
+    assert callable(should_stop)
+    assert should_stop() is False  # type: ignore[operator]
+    token.cancel()
+    assert should_stop() is True  # type: ignore[operator]  # 같은 토큰에 바인딩됐다
+
+
+def test_holdout_cancelled_mid_windows_maps_to_pipeline_cancelled_with_no_artifact_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """D-5E3-4 — `run_holdout`이 창 루프 도중 `HoldoutCancelled`를 내면(2 창 중 1
+    창만 완료) pipeline 은 `PipelineFailed`로 위장하지 않고 `PipelineCancelled`만
+    낸다(우회 (4)). artifact 디렉터리에는 아무 파일도 쓰이지 않는다(부분 결과
+    없음, D-2D-7)."""
+    import ml_engine.app.pipeline as pipeline_module
+
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+
+    def fake_run_holdout(*args: object, **kwargs: object) -> HoldoutCancelled:
+        assert "should_stop" in kwargs  # 배선 자체는 다른 test 가 이미 확인
+        return HoldoutCancelled(completed_windows=1)
+
+    monkeypatch.setattr(pipeline_module, "run_holdout", fake_run_holdout)  # type: ignore[attr-defined]
+
+    pipeline = build_training_pipeline(
+        _spec(),
+        training_policy=_training_policy(),
+        evaluation_policy=_evaluation_policy(),
+        maturity_window_days=7,
+        trainer=_FakeTrainer(),
+        code_version=CodeVersion("sha-test-1"),
+        artifact_out_dir=out_dir,
+    )
+    outcome = pipeline.run(_dataset_ref(dataset_dir), CancelToken())
+
+    assert isinstance(outcome, PipelineCancelled)
+    assert list(out_dir.iterdir()) == []

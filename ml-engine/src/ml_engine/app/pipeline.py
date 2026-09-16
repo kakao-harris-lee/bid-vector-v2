@@ -32,7 +32,7 @@ from ml_engine.training.artifact_writer import ArtifactBytes, write_artifact
 from ml_engine.training.booster import TrainerLike
 from ml_engine.training.dataset import DatasetReference, DatasetRejected, LoadedDataset
 from ml_engine.training.dataset import load_dataset as _load_dataset
-from ml_engine.training.holdout import HoldoutRejected, run_holdout
+from ml_engine.training.holdout import HoldoutCancelled, HoldoutRejected, run_holdout
 from ml_engine.training.jobs.pipeline import (
     ArtifactRefValue,
     CancelToken,
@@ -153,8 +153,12 @@ class _ConcreteTrainingPipeline:
         return trained
 
     def _run_holdout(
-        self, dataset: LoadedDataset
-    ) -> EvaluationReportV1 | PipelineFailed:
+        self, dataset: LoadedDataset, cancel_token: CancelToken
+    ) -> EvaluationReportV1 | PipelineFailed | PipelineCancelled:
+        """M5/5E-3 D-5E3-4 — 같은 `cancel_token`의 `is_cancelled`를 `should_stop`
+        으로 넘긴다(D-5E3-3). `HoldoutCancelled`(창 루프 도중 취소)는
+        `PipelineFailed`로 위장하지 않고 `PipelineCancelled`로만 옮긴다(우회
+        (4))."""
         observations = tuple(
             SettlementObservation(opened_at=row.opened_at, settled=row.settled)
             for row in dataset.settlement_rows
@@ -172,10 +176,13 @@ class _ConcreteTrainingPipeline:
             self._deps.evaluation_policy,
             self._deps.trainer,
             self._deps.code_version,
+            should_stop=cancel_token.is_cancelled,
         )
         if isinstance(report, HoldoutRejected):
             code, detail = map_holdout_rejected(report.reason)
             return PipelineFailed(code, detail)
+        if isinstance(report, HoldoutCancelled):
+            return PipelineCancelled()
         return report
 
     def _write_outcome(
@@ -221,8 +228,10 @@ class _ConcreteTrainingPipeline:
         artifact: ArtifactBytes,
         cancel_token: CancelToken,
     ) -> PipelineOutcome | PipelineFailed | PipelineCancelled:
-        report = self._run_holdout(dataset)
+        report = self._run_holdout(dataset, cancel_token)
         if isinstance(report, PipelineFailed):
+            return report
+        if isinstance(report, PipelineCancelled):
             return report
         if cancel_token.is_cancelled():
             # M-2(verifier r1) — 모듈 docstring 이 넷(load 뒤·train 뒤·artifact 뒤·
