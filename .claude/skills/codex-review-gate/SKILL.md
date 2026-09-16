@@ -66,12 +66,14 @@ worktree를 작업 루트로, 명령 재실행(테스트 등)을 위해 workspac
 ```bash
 CODEX_BIN=/Users/harris/.nvm/versions/node/v22.21.1/bin/codex   # 심판 바이너리 고정 — PATH 에 맡기지 않는다
 CODEX_PIN="0.154.0"                   # 심판 버전 고정 — 바꾸려면 이 스킬을 고친다(2026-09-11 갱신, 아래 참고)
+CODEX_MODEL_PIN="gpt-5.5"             # 심판 모델 고정(운영자 결정 2026-09-17) — `~/.codex/config.toml` 의 model 에 맡기지 않는다
 "$CODEX_BIN" --version | grep -qF "$CODEX_PIN" || {
   echo "codex 버전 불일치: $("$CODEX_BIN" --version) ≠ $CODEX_PIN — preflight 미충족, 리뷰 중단"
   exit 1
 }
 "$CODEX_BIN" --version   # 기록용 — 리뷰 메타데이터의 값은 여전히 raw-output 머리글이 정본
 "$CODEX_BIN" exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
+  -c model="$CODEX_MODEL_PIN" \
   -c model_reasoning_effort="high" \
   --disable memories --ignore-rules \
   --output-schema .claude/skills/codex-review-gate/references/codex-output.strict.schema.json \
@@ -113,6 +115,13 @@ PATH 전환이고 이 갱신은 기록된 명시 결정이다. **진행 중인 s
 아니라 여기 기록된 명시적 결정이며, B6 판정을 읽을 때 이 사실을 함께 읽는다. nvm 경로는
 node 버전을 품고 있어 node 업그레이드 시 경로가 사라진다 — 그때는 실행이 시끄럽게
 실패하므로 핀 갱신 결정을 새로 받으면 된다.
+
+**모델도 핀한다(운영자 결정 2026-09-17, `CODEX_MODEL_PIN`).** 바이너리·effort 핀은 모델을 고정하지 않았고, 그 사이
+`~/.codex/config.toml` 의 `model` 이 바뀌어 PR #5 라운드는 `gpt-6-astra`, M3/3H-1 라운드는 `gpt-5.5` 로 돌았다(3H-1
+preflight 실측) — 같은 CLI 버전 아래 엔진이 조용히 바뀐 것이라 2026-09-01 바이너리 핀이 막으려던 것과 같은 갈래다.
+그래서 모델은 config 에 맡기지 않고 `exec -c model="$CODEX_MODEL_PIN"` 으로 명시 전달한다. 핀 값은 `gpt-5.5`(마지막
+라운드가 실제로 돈 모델). raw-output 머리글의 `model:` 이 핀과 다르면 그 라운드는 preflight 미충족이다. 갱신은 버전 핀과
+같은 규율 — 명시 결정 + 하네스 변경 이력, 진행 중 slice 의 라운드 도중에는 바꾸지 않는다.
 
 **`--disable memories --ignore-rules`는 반드시 붙인다.** worktree 격리는 **프롬프트 주입을
 막지 못한다.** 두 표면이 있고 **둘은 서로 다른 플래그로 닫힌다.**
