@@ -5,6 +5,8 @@
 정책 값 표 둘의 승인 문면이 비어 있다(§3 ④⑤). 다섯이 처분되면 M5 는 무조건 종결이고, 처분 전까지는
 「구현 완료·운영 미가용」 상태다. 5E-3(결정 불요 후속 둘)은 병행 진행 중이며 이 문서의 「5E-3 조건부」 행은 그 병합 뒤 확정한다.
 
+> **갱신 2026-09-16(같은 날, 위 문단은 작성 시점 기록으로 둔다)** — ① 5E-3 이 PR #21(`845e29b`)로 병합돼 §2.3 셋은 **종결 확정**. ② 운영자가 §3 다섯을 전부 결정했다(「승인」·선택지 답변: ① (a) · ② (a) · ③ (a) · ④⑤ 「둘 다 승인」). ④⑤ 는 문서 한 줄이라 **이 slice 가 실행**했다(`5c2/policy-values.md`·`5e/policy-values.md` 표제 — 계약 갱신 (2)). ①③ 은 정책 slice **5F-1**(`inference-v1.yaml` 두 값 + 5D/5D-2 승인 값 갱신 + 5E-2 test), ② 는 Kotlin slice **5F-2**(`MlCallPolicyData.kt` 한 줄 + 4D policy-values §3)로 착수한다. **판정은 「종결(결정 완료)」** — 잔여는 실행 slice 둘의 병합뿐이고, 그 둘이 닫히면 §2.4 는 비고 M5 는 무조건 종결이다.
+
 입력: `open-inventory.md`(읽기 전용 재고, 문면 기준 47건). 판정 규칙: 상태는 문서 문면으로만 잡고, 이 문서가 새로
 닫는 항목은 **닫는 근거를 코드·evidence 경로로** 적는다. 앞 slice 문서는 편집하지 않는다.
 
@@ -55,6 +57,8 @@
 
 ### 2.3 5E-3 조건부 종결 — 3 (`m5-5e3/2026-09-16` 병합 시 확정, 병합 뒤 이 절 아래 한 줄 추가)
 
+**확정 2026-09-16 — PR #21(`845e29b`) 병합, 셋 전부 종결.** verifier r3 ready-for-review(MEDIUM-1 닫힘 실측) + code-reviewer r1·r2 머지 가능 + 사용자 「승인」. 잔여 MEDIUM-2(예외 모듈 안 yaml 이중 별칭 import)는 5E-3 알려진 제한 8 + 후속 소폭(죽은 `except` 절 제거) — 이 표의 이월 §2.5 「후속 소폭」에 더한다.
+
 | 식별자 | 5E-3 이 닫는 방식 |
 | --- | --- |
 | `OPEN-5E-YAML-LOADER-INFERENCE` | 네 로더가 공유하는 `registry/policy.py::load_policy` 에서 `yaml.YAMLError → PolicyError`(뿌리 처방) + 로더 기계 수집 게이트 test + 5E-1 호출부 래퍼 제거 |
@@ -64,6 +68,8 @@
 ### 2.4 운영자 결정 대기 — 5 (종결 차단, §3)
 
 `OPEN-5E2-CANDIDATE-RATE-UPPER` · `OPEN-5E2-FEATURE-SCHEMA-PARITY` · `OPEN-5D2-POLICY-VALUES` · `OPEN-5C2-POLICY-VALUES` · `OPEN-5E-POLICY-VALUES`.
+
+**갱신 2026-09-16 — 다섯 전부 결정됨(§3 결정 열).** `OPEN-5C2-POLICY-VALUES`·`OPEN-5E-POLICY-VALUES` 는 이 slice 의 표제 갱신으로 **종결**. `OPEN-5E2-CANDIDATE-RATE-UPPER`·`OPEN-5D2-POLICY-VALUES` 는 정책 slice 5F-1, `OPEN-5E2-FEATURE-SCHEMA-PARITY` 는 Kotlin slice 5F-2 병합 시 종결 — 그때까지 「결정 완료·실행 대기」.
 
 ### 2.5 이월 — 14 (받는 자리를 명시; M5 종결을 막지 않는다)
 
@@ -91,9 +97,12 @@
 다섯이 전부 처분되면: §2.4 가 비고 M5 는 **무조건 종결**(잔여는 이월 14 뿐). 「M5 는 서빙 골격까지, 운영 가용은 M6」로 읽고
 결정을 M6 착수 계약에 넘기는 것도 가능하다 — 그 경우 이 문서의 판정은 「조건부 종결」로 남고 M6 착수 계약이 다섯을 승계한다.
 
+**운영자 결정 2026-09-16(선택지 답변, 전부 추천안)**: ① (a) `clamp_max ≤ 1.0` · ② (a) Kotlin 값 → `award-rate-features-v2` · ③ (a) 잠정값 지정(잠정·재학습 뒤 재승인 명기) · ④⑤ 「둘 다 승인」(5C-2 승인, 5E 잠정 승인 — 6C/6E 실측이 재승인 조건). 실행: ④⑤ 이 slice(표제 한 줄씩) · ①③ 정책 slice **5F-1**(같은 정책 파일·같은 커밋 가능, 5D·5D-2 policy-values 승인 값 갱신 + 5E-2 「출하 정책으로 NOT_READY」 test 를 READY 로 뒤집음) · ② Kotlin slice **5F-2**(`MlCallPolicyData.kt` 한 줄 + 4D policy-values §3, Kotlin `check`). 5F-1·5F-2 는 서로 독립(파일 겹침 0)이라 병렬.
+
 ## §4 사실 선언
 
-- 5E-3 은 이 문서 작성 시점에 병행 진행 중(base 같은 `8799e05`). `milestone-5.md` 는 두 브랜치가 다른 절에 문단을 더한다(5E-3 은 5E 절 끝, 이 slice 는 「## 완료 조건」 아래).
+- 5E-3 은 이 문서 작성 시점에 병행 진행 중(base 같은 `8799e05`). `milestone-5.md` 는 두 브랜치가 다른 절에 문단을 더한다(5E-3 은 5E 절 끝, 이 slice 는 「## 완료 조건」 아래). **갱신**: 5E-3 이 PR #21 로 먼저 병합돼 이 브랜치를 `845e29b` 위로 rebase 했다(충돌 0). rebase 로 커밋 해시가 바뀌었다 — 아래 S-10 행의 `a2dcf19`·`e3c61d4` 는 rebase 전 해시이고 같은 내용이 `7d587df`·`9bb51bf` 다. 최종 HEAD 의 S-10 은 PR 코멘트(조치)에 남긴다.
+- 앞 slice 문서 무편집 원칙의 예외 둘: `5a/policy-values.md` 4행(5C-1 인계 「팀장이 정정」의 이행)과 `5c2/policy-values.md`·`5e/policy-values.md` 표제(운영자 승인 등재 — 승인 문면의 정본 자리가 그 표제라 다른 자리에 적으면 두 문서가 다른 말을 한다). 둘 다 값·분류 무변경, 문면만.
 - `_workspace/` 는 gitignore 대상이라 재고 원문은 `open-inventory.md` 로 evidence 안에 복사했다(사본임을 머리에 표시).
 - 이 slice 는 코드·계약·정책 YAML 을 편집하지 않는다. S-10 은 evidence 편집 커밋의 leak 스캔 자기참조 확인용이다.
 - S-10 실측: `./gradlew --no-daemon check` @ `a2dcf19` exit 0(저작 레인) · verifier r1 이 같은 HEAD 에서 재실측 exit 0, `:leakPatternGate --rerun` exit 0. 마지막 evidence 커밋은 자기 post-state 를 스스로 적지 못하므로 그 HEAD 의 S-10 은 PR 코멘트(조치)에 남긴다.

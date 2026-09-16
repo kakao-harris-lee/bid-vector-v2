@@ -8,6 +8,8 @@ head_sha: <PR 요청 시점에 기입>
 in_scope:
   - reports/evidence/m5/closure/**          # 이 계약 · checklist(종결 판정 정본) · open-inventory(입력 사본)
   - reports/evidence/m5/5a/policy-values.md  # OPEN-5C-5A-TABLE-REASSIGN 처분 — #8·#31·#32·#33 「소비 예정」 4행 + change_history 1행
+  - reports/evidence/m5/5c2/policy-values.md # 표제 「승인 대기」→「승인」 한 줄 — 운영자 결정 ④ 등재(계약 갱신 (2)), OPEN-5C2-POLICY-VALUES 종결
+  - reports/evidence/m5/5e/policy-values.md  # 표제 「승인 대기」→「잠정 승인(6C/6E 실측 재승인)」 한 줄 — 운영자 결정 ⑤ 등재(계약 갱신 (2)), OPEN-5E-POLICY-VALUES 종결
   - milestone-5.md                           # 「## 완료 조건」 아래 종결 판정 문단
 out_of_scope:
   - ml-engine/**, adapters/**, contracts/**  # 코드·계약 무편집 — 종결 판정은 문서다
@@ -39,3 +41,4 @@ rollback: N/A — 문서 산출물은 git revert 로 복구. 5a/policy-values.md
 ## 계약 갱신 이력
 
 - 2026-09-16 착수: 초판.
+- 2026-09-16 (2) 5E-3 병합(PR #21) 뒤: base 를 `845e29b` 위로 rebase(충돌 0, 커밋 해시 변경 — checklist §4 선언) · 운영자 결정 다섯 수령 · ④⑤ 실행을 이 slice 에 포함(in_scope 에 `5c2/policy-values.md`·`5e/policy-values.md` 표제 한 줄씩 — 승인 문면의 정본 자리가 그 표제라 여기서 적는다) · ①③ → 5F-1, ② → 5F-2 별도 slice · 판정 「조건부 종결」→「종결(결정 완료·실행 slice 둘 대기)」. verifier r1 ready-for-review 뒤 장부층 일괄은 `9bb51bf`(rebase 전 `e3c61d4`).

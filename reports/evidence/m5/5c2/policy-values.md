@@ -1,6 +1,6 @@
 # M5/5C-2 정책 값 — `OPEN-5C2-POLICY-VALUES`(**승인 대기 2026-09-15, 착수 시**)
 
-> **지위: 승인 대기.** 실물은 `ml-engine/policy/evaluation-v1.yaml`(평탄 키, `PolicyScalar` 제약 — 목록은 쉼표 구분 문자열이 아니라 **YAML 시퀀스**를 5A 로더가 거부하므로, 목록 값 둘은 `stability_seeds`·`amount_band_edges` 를 **평탄 인덱스 키**(`stability_seeds.0 …`) 로 둔다 — 로더가 접두로 모아 tuple 로 조립), 로더 `load_evaluation_policy` 가 `known_keys` 전수·값 불변식으로 대조하고 test 가 이 표와 YAML 을 대조한다. 값을 바꾸려면 이 문서 → YAML → test 순. **전부 legacy 코드 상수(`ed4b06c`)의 무변경 이식 — 5C-2 가 지어낸 수치 0.** ML-07 acceptance ③ 「임계는 정책 산출물에 존재하고 코드 리터럴로 존재하지 않는다」의 이행.
+> **지위: 승인(2026-09-16, 운영자 「둘 다 승인」 — M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ④, `OPEN-5C2-POLICY-VALUES` 종결). 값 근거는 legacy-behavior, 재조정은 실 코퍼스 재학습 slice.** 실물은 `ml-engine/policy/evaluation-v1.yaml`(평탄 키, `PolicyScalar` 제약 — 목록은 쉼표 구분 문자열이 아니라 **YAML 시퀀스**를 5A 로더가 거부하므로, 목록 값 둘은 `stability_seeds`·`amount_band_edges` 를 **평탄 인덱스 키**(`stability_seeds.0 …`) 로 둔다 — 로더가 접두로 모아 tuple 로 조립), 로더 `load_evaluation_policy` 가 `known_keys` 전수·값 불변식으로 대조하고 test 가 이 표와 YAML 을 대조한다. 값을 바꾸려면 이 문서 → YAML → test 순. **전부 legacy 코드 상수(`ed4b06c`)의 무변경 이식 — 5C-2 가 지어낸 수치 0.** ML-07 acceptance ③ 「임계는 정책 산출물에 존재하고 코드 리터럴로 존재하지 않는다」의 이행.
 
 ## §1 정책 값(YAML)
 

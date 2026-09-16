@@ -1,6 +1,6 @@
 # M5/5E-1 정책 값 — `OPEN-5E-POLICY-VALUES`(**승인 대기 2026-09-16, 착수 시**)
 
-> **지위: 승인 대기.** 실물은 `ml-engine/policy/serving-v1.yaml`(평탄 키, `PolicyScalar` 제약, 목록은 평탄 인덱스 키 — 5C-2 관례), 로더 `load_serving_policy` 가 `known_keys` 전수·값 불변식으로 대조하고 test 가 이 표와 YAML 을 대조한다. **legacy 근거 0** — legacy 런타임은 FastAPI+Celery 라 gRPC 동시성·종료 유예에 대응물이 없다. 전부 **보수적 초기값 + 측정 의무**(ADR 0010 D-1) 층이며, M6 6C/6E 실측 뒤 갱신한다.
+> **지위: 잠정 승인(2026-09-16, 운영자 「둘 다 승인」 — M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ⑤, `OPEN-5E-POLICY-VALUES` 종결). 재승인 조건 = M6 6C/6E 실측.** 실물은 `ml-engine/policy/serving-v1.yaml`(평탄 키, `PolicyScalar` 제약, 목록은 평탄 인덱스 키 — 5C-2 관례), 로더 `load_serving_policy` 가 `known_keys` 전수·값 불변식으로 대조하고 test 가 이 표와 YAML 을 대조한다. **legacy 근거 0** — legacy 런타임은 FastAPI+Celery 라 gRPC 동시성·종료 유예에 대응물이 없다. 전부 **보수적 초기값 + 측정 의무**(ADR 0010 D-1) 층이며, M6 6C/6E 실측 뒤 갱신한다.
 
 ## §1 정책 값(YAML)
 
