@@ -70,6 +70,23 @@ jobs:
       # OPEN-ADR-06 의 입력. 게이트가 아니라 측정이라 실패시키지 않는다.
       - run: ./gradlew --no-daemon qualityBaseline
 
+      # R2-2(D-6C-10 ④, verifier r2 HIGH) — one-command-check.sh(완료 조건 1)를 CI 에서
+      # 직접 잰다. `container` job(그 전제가 없다 — buf 미설치·얕은 checkout)이 아니라
+      # **이 job**에 둔다: 이 스크립트의 첫 명령이 `./gradlew --no-daemon check`이고 그
+      # 안의 `contractGate`가 `buf`와 전체 이력·태그를 요구하는데, 그 둘을 이미 갖춘 job이
+      # 여기뿐이다(verifier r2 실측 — 다른 job 에 그대로 두면 S-20 이 반드시 실패하고,
+      # step 순서상 뒤따르는 6C 게이트 축 전체가 CI 에서 한 번도 실행되지 않았다).
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: ml-engine/.python-version
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.22"
+
+      - name: one-command-check.sh — 완료 조건 1 (S-20)
+        run: ./tools/one-command-check.sh
+
       # v5 는 Node 24 를 예비 지원만 하고 기본은 여전히 Node 20 이라 v6 이 최소선이다.
       - uses: actions/upload-artifact@v6
         if: always()
@@ -187,25 +204,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      # ml-engine job 과 같은 버전(uv 0.9.22, `.python-version`=3.12) — one-command-check.sh
-      # 가 Kotlin 뿐 아니라 ml-engine 의 uv 명령도 돌린다.
-      - uses: actions/setup-python@v6
-        with:
-          python-version-file: ml-engine/.python-version
-
-      - uses: astral-sh/setup-uv@v7
-        with:
-          version: "0.9.22"
-
       - name: DB 접속 값 생성(이 job 전용 일회성, 파일에 리터럴로 두지 않는다)
         run: echo "BIDVECTOR_PG_PASSWORD=$(openssl rand -hex 20)" >> "$GITHUB_ENV"
 
-      # F-6(D-6C-9, verifier r1 MEDIUM) — 「one-command-check.sh 를 부르는 CI job 이
-      # 없다」의 시정. 완료 조건 1(한 명령으로 Kotlin+Python 전건)을 CI 에서도 직접 잰다 —
-      # 로컬에서만 도는 명령은 이탈이 생겨도 잡는 것이 없다(하네스 2026-09-12).
-      - name: one-command-check.sh — 완료 조건 1 (S-20)
-        run: ./tools/one-command-check.sh
-
+      # R2-2(D-6C-10 ④) — S-20 은 `check` job 으로 옮겼다(그 전제인 buf·전체 이력을
+      # 이미 갖춘 자리, 위 참고). 이 job 은 컨테이너 축(S-21~S-25)만 진다 — python/uv
+      # 툴체인도 여기서는 필요 없어졌다(R2-8 중복 비용도 함께 준다).
       - name: 이미지 빌드 (S-21)
         run: docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .
 

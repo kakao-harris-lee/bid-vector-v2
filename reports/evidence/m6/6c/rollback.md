@@ -76,7 +76,11 @@ git restore --source=f3ac571 --staged --worktree -- \
 - ⑥ `./gradlew --no-daemon check` — `exit 0`(이 slice 가 닿은 게이트는 `check` 전체와
   `gateExecutionGate`뿐이고, 되돌린 트리에는 이 slice 의 변경이 전혀 없어 f3ac571 시점의
   통과 상태 그대로다).
-- 잔여(`git status --porcelain`): `M milestone-6.md`·`A reports/evidence/m6/6c/scope.md` —
+- 잔여(`git diff --name-status f3ac571` — **R2-6 정정, verifier r2 LOW**: 직전 판은 이 명령을
+  `git status --porcelain`으로 잘못 적었다. 그 명령은 이 worktree 에서 15행(삭제 8·staged
+  M 3·D 8 등 조작 자체를 그대로 보여준다)을 내고, 아래 두 행을 내는 것은 `git diff
+  --name-status f3ac571`다 — 관측 자체는 맞았고 명령 이름만 틀렸다):
+  `M milestone-6.md`·`A reports/evidence/m6/6c/scope.md` —
   「범위」절이 비대상으로 선언한 둘과 정확히 일치(팀장 계약 레인 산출물이라 이 절차가
   건드리지 않는다).
 

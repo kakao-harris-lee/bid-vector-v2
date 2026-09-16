@@ -20,6 +20,10 @@ services:
       ML_ENGINE_SERVING_POLICY: /app/policy/serving-v1.yaml
       ML_ENGINE_ARTIFACT_OUT_DIR: /app/artifacts
       ML_ENGINE_CODE_VERSION: "6c-local"
+    # R2-3(D-6C-10 ③) — 위생 게이트와 같은 능력 차단. setuid/setgid 상승이 구성상
+    # 불가능해진다 — 점 표집(프로브·게이트)에 기대지 않고 로컬 환경도 같은 보장을 받는다.
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "50051:50051"
     healthcheck:
