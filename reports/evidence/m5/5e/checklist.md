@@ -165,6 +165,25 @@ scope.md 표 그대로 승인. 실측 대상 「경계로 처리」 행(servicer
   이력은 되쓰지 않는다(evidence-pack 규율) — fix round 2 는 H-1 잔존·R2-1·R2-4
   전부 finding 당 커밋 하나를 지켰다.
 
+## verifier r2 관찰 — test 격리 부작용(수정 완료)
+
+- **`tests/gates/test_serving_purity.py`의 두 test 가 세션 전역 `sys.modules` 오염에
+  취약했다** — 이 파일 세 test 중 하나(`ml_engine.app` 확인)만 서브프로세스로
+  격리돼 있었고, 나머지 둘(금지 모듈·`training`/`adapters` 확인)은 in-process 로
+  `sys.modules`를 봤다. `tests/training/conftest.py`의 정리 hook 은 그 디렉터리가
+  collection 에 실릴 때만 발동하므로, `tests/app/test_server.py`(top-level
+  `ml_engine.app.server` import 가 `training`을 전이 import)와 이 파일만 골라
+  돌리면(`tests/training/**` 없이) 무관한 오염을 "serving 이 끌어들인 것"으로
+  오판했다 — 실측으로 재현(`uv run pytest tests/app/test_server.py tests/gates/
+  test_serving_purity.py` 만 돌리면 `test_ml_engine_training_and_adapters_not_
+  pulled_in_by_serving` 실패). **재현이 fix round 2 착수 시점(`f1f060b`)에도
+  그대로 있었다** — 이번 라운드가 새로 만든 결함이 아니라 기존 gap 이 이번에
+  드러난 것이다(CI 의 S-5 는 `pytest tests -q` 전건 한 번에 돌아 `tests/training`
+  이 항상 같이 실리므로 그 게이트 자체는 계속 초록이었다).
+- 수정: 세 test 모두 이미 있던 서브프로세스 격리 패턴으로 통일했다 — 어떤 test 가
+  먼저 돌았든, 이 파일 안 test 는 항상 새 프로세스에서 `ml_engine.serving`만
+  import 해 판단한다. test 수 변화 없음(기존 3개 재구성).
+
 ## 계약과 어긋나 판단이 필요했던 자리
 
 - **pyproject.toml `ignore_imports`를 두 계약에 나눠 추가**했다 — scope.md 원문은
