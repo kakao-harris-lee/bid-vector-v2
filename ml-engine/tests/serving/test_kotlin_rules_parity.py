@@ -213,12 +213,31 @@ def _to_rate_or_none(value: str) -> Decimal | None:
     return parsed
 
 
+_VALID_WIRE_INTERVAL_SOURCES = frozenset(
+    {
+        prediction_pb2.INTERVAL_SOURCE_CROSS_VALIDATION_RESIDUAL,
+        prediction_pb2.INTERVAL_SOURCE_TIME_HOLDOUT_RESIDUAL,
+        prediction_pb2.INTERVAL_SOURCE_POSTERIOR_PREDICTIVE,
+    }
+)
+
+
+def _is_recognized_interval_source(value: int) -> bool:
+    """`ParsedSuccessFields.kt::ProtoIntervalSource.toDomainOrNull` 미러 —
+    verifier r2 N-3. `INTERVAL_SOURCE_UNSPECIFIED`(그리고 열거 밖 정수, Kotlin
+    `UNRECOGNIZED`에 대응)는 `null`(거부)이다."""
+    return value in _VALID_WIRE_INTERVAL_SOURCES
+
+
 def _parsed_success_fields_or_none(
     success: prediction_pb2.Success,
 ) -> tuple[Decimal, ...] | None:
     """`ParsedSuccessFields.kt::parsedSuccessFields` 미러 — 후보 3건의 `bid_rate`
-    (범위 포함) + `fitness`·`dispersion`·`estimate_margin` 전부가 파싱돼야 한다.
-    하나라도 `None`이면 전체가 `None`(`allNotNull`, 부분 성공 불인정)."""
+    (범위 포함) + `fitness`·`dispersion`·`estimate_margin` + `intervalSource`
+    (verifier r2 N-3 — 이전엔 빠져 있었다) 전부가 파싱돼야 한다. 하나라도
+    `None`이면 전체가 `None`(`allNotNull`, 부분 성공 불인정)."""
+    if not _is_recognized_interval_source(success.uncertainty.interval_source):
+        return None
     parsed_candidates = [
         _to_rate_or_none(candidate.bid_rate.fraction)
         for candidate in success.candidates
@@ -317,6 +336,20 @@ def test_response_is_fully_accepted_by_kotlin() -> None:
     servicer, _runtime = _servicer_and_runtime()
     response = servicer.CalculateOptimalBid(_success_request(), _ActiveContext())
     assert _is_response_accepted_by_kotlin(response.success)
+
+
+def test_unrecognized_interval_source_is_rejected_by_parsed_success_fields() -> None:
+    """verifier r2 N-3 — `parsedSuccessFields`의 `intervalSource` 성분이 미러에서
+    빠져 있었다(`ParsedSuccessFields.kt::ProtoIntervalSource.toDomainOrNull`이
+    `UNSPECIFIED`를 거부하는 것과 달리, 이전 미러는 그 필드를 아예 보지 않아
+    "완전한 대체 판정"이라는 docstring 이 과장이었다). 실 응답을 변조해 확인한다."""
+    servicer, _runtime = _servicer_and_runtime()
+    response = servicer.CalculateOptimalBid(_success_request(), _ActiveContext())
+    assert _is_response_accepted_by_kotlin(response.success)
+    response.success.uncertainty.interval_source = (
+        prediction_pb2.INTERVAL_SOURCE_UNSPECIFIED
+    )
+    assert not _is_response_accepted_by_kotlin(response.success)
 
 
 def test_candidate_rate_above_one_fails_closed_end_to_end() -> None:

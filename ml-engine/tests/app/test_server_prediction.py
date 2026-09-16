@@ -17,17 +17,24 @@ from __future__ import annotations
 from pathlib import Path
 
 import grpc
+import pytest
 import yaml
 
 from ml_engine.app.server import (
     ServerConfig,
     ServingPolicy,
     _build_servicers,
+    _prediction_runtime,
     _preload,
     _preload_outcomes,
 )
 from ml_engine.contracts import error_pb2, prediction_pb2, prediction_pb2_grpc
-from ml_engine.serving import Readiness, ReadinessGate, build_server
+from ml_engine.serving import (
+    BidPredictionServicer,
+    Readiness,
+    ReadinessGate,
+    build_server,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _ML_ENGINE_ROOT = Path(__file__).resolve().parents[2]
@@ -187,3 +194,70 @@ def test_shipped_policy_without_agency_sample_threshold_stays_not_ready(
         assert calc_response.failure.detail_code == "SERVER_NOT_READY"
     finally:
         running.close()
+
+
+# ---- (N-2, verifier r2) 정책 넷 중 하나만 깨져도 조립 근 가드가 gate 와 같이 떨어진다 ----
+
+
+class _ActiveContext:
+    def is_active(self) -> bool:
+        return True
+
+
+_MALFORMED_YAML = "scenario.z: [unclosed\n"
+
+
+@pytest.mark.parametrize(
+    "broken_policy", ["inference", "training", "evaluation", "serving"]
+)
+def test_single_broken_policy_makes_runtime_none_and_both_rpcs_not_ready(
+    tmp_path: Path, broken_policy: str
+) -> None:
+    """verifier r2 N-2 — `app/server.py::_prediction_runtime`의 `_preload_outcomes`
+    가드(R-H1) 자체는 r1 라운드에 test 가 없었다(변이로 가드를 지워도 930 전부
+    초록이었다 — `_validate`의 gate 확인이 사용자 가시 거동을 이미 가리기 때문).
+    정책 넷을 하나씩만 깨뜨려 그 가드가 실제로 `None`을 내는지, 그리고 두 RPC
+    (`GetModelMetadata`·`CalculateOptimalBid`)가 동시에 미준비로 답하는지 직접
+    확인한다(실 socket 이 아니라 servicer 직접 호출 — 이 test 의 관심은 배선
+    로직이지 wire 형식이 아니다)."""
+    broken_path = tmp_path / f"{broken_policy}-broken.yaml"
+    broken_path.write_text(_MALFORMED_YAML)
+    paths = {
+        "inference": _completed_case_inference_policy_path(tmp_path),
+        "training": _TRAINING_POLICY,
+        "evaluation": _EVALUATION_POLICY,
+        "serving": _SERVING_POLICY,
+    }
+    paths[broken_policy] = broken_path
+
+    config = ServerConfig(
+        bind="127.0.0.1:0",
+        inference_policy_path=paths["inference"],
+        training_policy_path=paths["training"],
+        evaluation_policy_path=paths["evaluation"],
+        serving_policy_path=paths["serving"],
+        artifact_out_dir=tmp_path / "artifacts-n2",
+        code_version="sha-n2-test",
+    )
+    preloaded = _preload(config)
+    outcomes = _preload_outcomes(preloaded)
+    assert sum(1 for outcome in outcomes if not outcome.ok) == 1
+
+    gate = ReadinessGate.from_preload(outcomes)
+    assert gate.snapshot().state is Readiness.NOT_READY
+
+    runtime = _prediction_runtime(preloaded, config)
+    assert runtime is None
+
+    servicer = BidPredictionServicer(gate, ("award-rate-features-v2",), runtime)
+
+    metadata_response = servicer.GetModelMetadata(_metadata_request(), context=None)
+    assert metadata_response.metadata.readiness == prediction_pb2.READINESS_NOT_READY
+    assert not metadata_response.metadata.HasField("promoted")
+
+    calc_response = servicer.CalculateOptimalBid(
+        _success_calc_request(), _ActiveContext()
+    )
+    assert calc_response.WhichOneof("result") == "failure"
+    assert calc_response.failure.code == error_pb2.FAILURE_CODE_MODEL_NOT_READY
+    assert calc_response.failure.detail_code == "SERVER_NOT_READY"

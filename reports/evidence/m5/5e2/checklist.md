@@ -75,6 +75,7 @@ out_of_range`(H-1 신설)는 전부 밑줄 접두 모듈 내부 함수이고 `se
 4. **GBM/ARTIFACT release 서빙 경로 없음** — `OPEN-5C2-SERVING-PATH-PARITY`·`OPEN-5C2-UNLEARNED-GUARD`는 대상 부재로 이 slice 에서 처분하지 못한다(5D-2 운영자 결정 (b) 「분포 단독」 승계) — GBM 서빙 slice 가 생기면 그때 다시 연다.
 5. **교차 언어 실서버 통합 부재** — `OPEN-5E2-CROSSLANG-REAL-SERVER`(6C). 이 slice 는 Kotlin 규칙의 Python 미러(`test_kotlin_rules_parity.py`)까지다.
 6. **`derived_release_checksum`와 5C-2 `policy_checksum`이 같은 규칙을 각자 구현** — 공용 헬퍼로 뽑지 않았다(layers 계약상 `serving`이 `evaluation`을 import 할 수 없다, `reuse.md` 참고). 규칙이 갈리면(예: 한쪽만 고쳐지면) 두 checksum 계보가 어긋날 수 있다 — 다음에 이 규칙을 또 복제할 slice 가 생기면 `registry`나 `features`처럼 두 layer 아래 공용 자리를 만드는 것을 검토해야 한다.
+7. **verifier r2 N-4 — 출하 clamp 상한에서 적법한 입력이 `INTERNAL`을 받는다.** H-1(D-2B-8·D-2F-4 후보율 `(0,1]` 불변식)이 fail-closed 로 막은 뒤, `assessment.agency_sample_threshold`가 채워지고(값 승인 이후) `scenario.clamp_max`가 지금처럼 `1.4`인 채로 배포되면, **엔진에 잘못이 없는 입력에서도** 클램프 상한이 1 을 넘어 후보가 계약 위반이 되고 `CalculateOptimalBid`가 gRPC `INTERNAL`을 낸다(`Unmeasurable`이 아니라 예외 — 클라이언트는 "값이 부족해서"가 아니라 "서버 결함"으로 본다). 이 slice 는 값을 지어내지 않기 위해 이 사실을 감추지 않고 그대로 낸다 — 처분은 `OPEN-5E2-CANDIDATE-RATE-UPPER`(scope.md OPEN 표·아래 OPEN 처분 표, 선택지 셋)의 운영자 결정 대기다. `OPEN-5D2-POLICY-VALUES`(알려진 제한 2)가 먼저 풀려야 이 조건 자체가 도달 가능해진다는 점에서 두 OPEN 이 순서로 엮여 있다.
 
 ## OPEN 처분
 

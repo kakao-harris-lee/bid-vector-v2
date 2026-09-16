@@ -495,20 +495,28 @@ def test_calculate_optimal_bid_logs_rejection_with_request_id(
     `CalculateOptimalBid`도 거부 경로에서 같은 관례를 따른다."""
     servicer = _servicer(runtime=_runtime())
     request = _valid_calc_request(
-        request_id="req-log-reject", feature_schema_version="bidvector.ml.v1"
+        request_id="req-log-reject",
+        correlation_id="corr-log-reject",
+        feature_schema_version="bidvector.ml.v1",
     )
     with caplog.at_level(logging.WARNING, logger="ml_engine.serving.prediction"):
         servicer.CalculateOptimalBid(request, _ActiveContext())
     assert "req-log-reject" in caplog.text
+    # verifier r2 N-6 — `correlation_id`도 실제로 실리지만 단언이 없었다.
+    assert "corr-log-reject" in caplog.text
     assert "FEATURE_SCHEMA_VERSION_UNSUPPORTED" in caplog.text
 
 
 def test_calculate_optimal_bid_logs_before_raising_on_mapping_rejected(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """D-5E2-6 예외 직전에 `request_id`를 남긴다 — 예외 메시지 자체엔 없다."""
+    """D-5E2-6 예외 직전에 `request_id`·`correlation_id`를 남긴다 — 예외 메시지
+    자체엔 없다."""
     servicer = _servicer(runtime=_runtime())
-    request = _valid_calc_request(request_id="req-log-mapping-rejected")
+    request = _valid_calc_request(
+        request_id="req-log-mapping-rejected",
+        correlation_id="corr-log-mapping-rejected",
+    )
     broken = _success()
     object.__setattr__(broken.uncertainty, "sample_size", 0)
     monkeypatch.setattr(
@@ -521,6 +529,8 @@ def test_calculate_optimal_bid_logs_before_raising_on_mapping_rejected(
     ):
         servicer.CalculateOptimalBid(request, _ActiveContext())
     assert "req-log-mapping-rejected" in caplog.text
+    # verifier r2 N-6
+    assert "corr-log-mapping-rejected" in caplog.text
 
 
 def test_nan_candidate_rate_is_controlled_exception_with_log(
@@ -554,7 +564,9 @@ def test_calculate_optimal_bid_logs_completion_with_request_id(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     servicer = _servicer(runtime=_runtime())
-    request = _valid_calc_request(request_id="req-log-success")
+    request = _valid_calc_request(
+        request_id="req-log-success", correlation_id="corr-log-success"
+    )
     monkeypatch.setattr(
         "ml_engine.serving.prediction.serve_bid_rates",
         lambda req, policy: _success(),
@@ -562,3 +574,5 @@ def test_calculate_optimal_bid_logs_completion_with_request_id(
     with caplog.at_level(logging.INFO, logger="ml_engine.serving.prediction"):
         servicer.CalculateOptimalBid(request, _ActiveContext())
     assert "req-log-success" in caplog.text
+    # verifier r2 N-6
+    assert "corr-log-success" in caplog.text
