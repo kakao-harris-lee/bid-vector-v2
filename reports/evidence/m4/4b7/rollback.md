@@ -34,6 +34,7 @@ git diff --name-status 8799e0594496593521691a24a29551ee51b6f147..HEAD -- workflo
 | M | `workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisFixtures.kt` |
 | M | `workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisTest.kt` |
 | M | `workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityPolicyDataTest.kt` |
+| M | `workflow/src/test/kotlin/bidvector/workflow/evaluation/PredictionFactsTest.kt`(verifier r2 N-2로 신규 등장) |
 | A | `workflow/src/test/kotlin/bidvector/workflow/evaluation/SampleEligibilityTest.kt` |
 | M | `workflow/src/test/kotlin/bidvector/workflow/evaluation/TextSynthesisTest.kt` |
 | M | `workflow/src/test/kotlin/bidvector/workflow/prediction/PredictionValueTest.kt` |
@@ -69,19 +70,20 @@ git diff --name-status <base> -- $(cat /tmp/4b7-rollback-files.txt)
 ./gradlew --no-build-cache --no-daemon clean check
 ```
 
-## 실측 결과(2026-09-16, 임시 clone `--no-hardlinks`, verifier r1 수정 라운드 뒤 HEAD `295d850`)
+## 실측 결과(2026-09-16, 임시 clone `--no-hardlinks`, verifier r2 수정 라운드 뒤 HEAD `54c4954`)
 
 | 단계 | 명령 | exit |
 | --- | --- | --- |
-| ① 목록 추출 | 위 명령 | 0(19줄 — verifier r1 수정 라운드로 기존 파일 다섯이 더 바뀌었으나 신규 파일은 없어 목록 불변) |
+| ① 목록 추출 | 위 명령 | 0(**20줄** — verifier r2 N-2 test가 `PredictionFactsTest.kt`를 처음 건드려 +1) |
 | ② 역적용 | `xargs git restore --source=<base> --staged --worktree --` | 0 |
 | ③ 대조 | `git diff --name-status <base> -- <목록>` | 0(출력 없음) |
 | ④ compile | 4모듈 compileKotlin·compileTestKotlin | 0(BUILD SUCCESSFUL) |
-| ⑥ 게이트 전건 | `clean check` | 0(BUILD SUCCESSFUL, 355 tasks) |
+| ⑥ 게이트 전건 | `clean check` | 0(BUILD SUCCESSFUL) |
 
-이전 실측(HEAD `c943fc7`, F-1~F-4·F-11 수정 전)도 같은 ①~⑥ 전부 exit 0이었다 — 두
-HEAD 모두에서 역적용이 동일하게 선다(목록이 바뀌지 않았으므로 당연한 결과지만, 수정
-라운드가 rollback 경계를 흔들지 않았다는 것 자체를 실측으로 남긴다).
+이전 실측 둘(HEAD `c943fc7`·`295d850`, 목록 19줄)도 같은 ①~⑥ 전부 exit 0이었다 —
+세 HEAD 모두에서 역적용이 동일하게 선다. 이번 라운드에서 목록이 19→20으로 는 것은
+N-2 test(`PredictionFactsTest.kt`)가 처음으로 이 slice 소유가 됐기 때문이다(N-1은
+production 코드 변경이 없어 목록에 새 파일을 추가하지 않았다).
 
 **verifier r1 F-10 — 되돌리지 않는 공유 승인 문서.** 팀장이 `scope.md`(계약 갱신 커밋
 `f93abde`·`3475434`)·`milestone-4.md`·`docs/discovery/capability-map.md`·3A

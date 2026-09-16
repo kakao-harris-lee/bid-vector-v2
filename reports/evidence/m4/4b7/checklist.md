@@ -151,6 +151,29 @@ enum이라 값 추가는 새 권한이 아니다(같은 enum을 소비하는 `wh
   scope.md 소유라 이 레인이 판단하지 않는다(verifier 리포트도 "구현 쪽이 더 정직하다"로
   적었다) — 팀장이 scope.md를 갱신 중이므로 이 레인은 손대지 않는다.
 
+## verifier r2 수정 라운드(N-1·N-2) — 무엇을 어떻게 닫았는가
+
+- **N-1(HIGH, 게이트 술어)** — r1 F-4가 신설한 `RESERVE_PRICE_SEQUENCE_ORDER` 정렬이
+  **무측정**이었다(모든 test 픽스처가 zero-pad라 이미 정렬된 입력이었다 — 정렬을 지워도
+  761 test 전부 초록). `SampleEligibilityTest`에 `lexicographicOrderRows()`(DB 사전순
+  — `"1","10","11",…,"15","2",…,"9"`, 실제 저장 형태는 zero-pad 없음, `reserve_price_sequence`
+  가 `TEXT`)를 신설하고 「정상」과 별도로 이 순서를 잰다. `sorted → rows`(정렬 제거)
+  변이 실측: `Element differ at index: [1, 2, …, 14]` — `expected:<[…001, …002, …003…]>
+  but was:<[…001, …010, …011, …, …015, …002, …003, …]>`로 정확히 사전순 오정렬을
+  재현하며 실패, 원복 뒤 재통과 확인(commands.md). `RequestMappingTest`에도 인접
+  위험(매핑 층이 이미 정렬된 리스트를 다시 섞지 않는가)을 재는 test를 별도로 추가했다
+  (도메인 정렬과 wire 순서 보존은 서로 다른 관문이라 둘 다 잰다).
+- **N-2(LOW)** — D-4B7-9의 "사유를 `ScoreNotProvided`로 뭉개지 않고 `supply.reason`을
+  그대로 옮긴다"는 계약 문면을 `absentPairForUnavailableSupply`(`PredictionFacts.kt`
+  신설, `OpportunityAnalysis.predictionFacts`가 호출)로 명시화하고 test 둘을 추가했다.
+  **`OpportunityAnalysisTest`가 아니라 `PredictionFactsTest`에 뒀다** — `analyze()`를
+  거치면 `MlAnalysisOutcome.Analyzed`가 budgetCapture·expectedMargin 성분(과 그 드롭
+  사유)을 노출하지 않아 통합 층에서는 `TransportFailed`와 `ScoreNotProvided`를 수 하나
+  (`priorityScore`)로는 구별할 수 없다(`composePriority`는 사유가 아니라 존재/부재만
+  본다) — `PredictionFactsTest.kt` 헤더 KDoc이 r1 F-1에서 이미 같은 이유로 같은 관례를
+  세웠다("`internal` 함수를 같은 패키지 test가 직접 부른다"). 팀장 지시(「OpportunityAnalysisTest
+  에 단언」)에서 이관한 것이라 명시로 남긴다.
+
 ## 알려진 제한
 
 - `OPEN-4B7-QUERY-INDEX` — 인덱스 없음(D-4B7-6). `JdbcCompetitionSampleSource`가 후보마다

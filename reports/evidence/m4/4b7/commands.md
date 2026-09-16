@@ -60,3 +60,35 @@ Kotlin `check` 전건이 정본이다.
 - exit: 0
 - 핵심 결과: 전 모듈 `check` 통과. `adapters` 515 tests(0 failed, +4) · `workflow` 246
   tests(0 failed, +3).
+
+## verifier r2 수정 라운드 — N-1 변이 실측(2026-09-16)
+
+- cmd: `sed -i '' 's/val sorted = rows.sortedWith(RESERVE_PRICE_SEQUENCE_ORDER)/val sorted = rows/' workflow/src/main/kotlin/bidvector/workflow/evaluation/SampleConversion.kt && ./gradlew --no-daemon --no-build-cache :workflow:test :adapters:test`
+- exit: 1(예상된 실패 — 변이 실측)
+- 핵심 결과: `SampleEligibilityTest`「예비가격은 DB 사전순 입력이어도 순번 1 부터 15
+  순으로 정렬돼 나간다」 1건만 `Element differ at index: [1, 2, …, 14]` —
+  `expected:<[…001, …002, …003, …]> but was:<[…001, …010, …011, …, …015, …002, …003,
+  …]>`(사전순 오정렬 그대로 재현)로 실패, 나머지 248 tests 통과 — N-1이 실제로 정렬을
+  잰다는 증거.
+- cmd: 위 `sed` 를 원복한 뒤 같은 명령 재실행
+- exit: 0
+- 핵심 결과: 전부 통과(원복 확인) — `git diff`로 `SampleConversion.kt`가 편집 전과
+  바이트 동일함을 확인.
+
+## verifier r2 수정 라운드 — 전건 재실측
+
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`(N-1·N-2 반영 — ktlint
+  MaxLineLength 1회 실패 → 수정 → 본 실행)
+- exit: 0
+- 핵심 결과: 전 모듈 `check` 통과. `adapters` 516 tests(0 failed, +1) · `workflow`
+  249 tests(0 failed, +3).
+
+## N-5 — 기록이 실린 커밋 자체에서의 재실측은 구조상 항상 한 커밋 뒤처진다
+
+verifier r2 N-5가 지적한 대로, 「이 문서에 적힌 `clean check` 결과」와 「이 문서를 담은
+커밋에서 돌린 `clean check`」는 이 문서가 자기 자신의 커밋 해시를 커밋 전에 알 수 없어
+항상 한 칸 어긋난다(2026-09-16 규약의 구조적 한계). 이번 라운드는 이 문서를 담는 evidence
+커밋 직전 HEAD(`54c4954`, N-1·N-2 구현+test 커밋 뒤)에서 전건을 돌려 exit 0을 확인했다
+(바로 위 항목) — evidence 커밋 자체에서의 재실측은 **다음 라운드**가 있다면 그때 이
+문서를 다시 열어 확인한다(다음 라운드가 없으면 이 한계는 등재로 남는다, F-10/N-5와 같은
+성격).
