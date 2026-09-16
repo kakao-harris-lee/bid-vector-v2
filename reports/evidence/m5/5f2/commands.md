@@ -47,3 +47,9 @@
 - cmd: `./gradlew --no-daemon check`
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL, 346 tasks — 되돌린 트리도 게이트 전건 통과
+
+## evidence 커밋(`c170035`) HEAD 재실측 — 자기참조 방지 (2026-09-16)
+- cmd: `./gradlew --no-daemon check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(`leakPatternGate` 포함) — evidence 문서가 스캔 어휘를 축어로
+  담지 않고 파일 참조·간접 표현만 쓴다는 것을 이 커밋 HEAD 에서 직접 확인
