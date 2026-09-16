@@ -136,6 +136,63 @@ data class ModelReleaseRef(
 }
 
 /**
+ * [0,1] 구간의 fraction 가중치 일반(scope.md D-4D3-1, wire `Weight` 미러) —
+ * `PredictionDiagnostics.shrinkageWeight`가 이 범위를 나른다. [bidvector.decision.UnitScore]를
+ * 재사용하지 않는다(설계 검토 (1)) — 점수와 가중치를 한 타입으로 두면 사다리가 가중치를
+ * 점수로 오인해 받을 수 있다. 생성자가 public인 이유는 [BidRateCandidates] KDoc과 같다
+ * (cross-module 어댑터 생성).
+ */
+data class Weight(
+    val value: BigDecimal,
+) {
+    init {
+        require(value.signum() >= 0 && value <= BigDecimal.ONE) {
+            "Weight.value는 [0,1] 구간이어야 한다: $value"
+        }
+    }
+}
+
+/**
+ * 진단의 세그먼트 지지 근거(scope.md D-4D3-1, wire `SegmentSupport` 미러) — "그 추정이
+ * 무엇으로 지지되는가" 하나의 축(2F H-8 회피 — legacy `historical_sample_size`는 엔진마다
+ * 다른 모수를 같은 이름으로 날랐다).
+ */
+enum class SegmentSupport {
+    Direct,
+    ParentCategory,
+    Global,
+}
+
+/**
+ * 예측 진단 여섯 성분(scope.md D-4D3-1, wire `Diagnostics` 미러) — 진단은 사다리 점수를
+ * 바꾸지 않는다(D-4D3-3 — 수축은 엔진이 이미 반영했고, Kotlin 은 임계를 재판정하지
+ * 않는다). `agencySampleBelowThreshold`가 `true`인데 `agencySampleCount`가 큰 조합도
+ * 그대로 나른다 — Kotlin 은 임계를 모른다(알려진 제한, 우회 (9)). 음수 성분은 계약
+ * 위반이라 `init`이 방어적으로 다시 막는다 — [BidPredictionOutcome] 파일 규율(검증층이
+ * 먼저 걸러야 한다) 대상이다.
+ */
+data class PredictionDiagnostics(
+    val trainingRowCount: Int,
+    val segmentSupport: SegmentSupport,
+    val shrinkageWeight: Weight,
+    val excludedObservations: Int,
+    val agencySampleCount: Int,
+    val agencySampleBelowThreshold: Boolean,
+) {
+    init {
+        require(trainingRowCount >= 0) {
+            "PredictionDiagnostics.trainingRowCount는 0 이상이어야 한다: $trainingRowCount"
+        }
+        require(excludedObservations >= 0) {
+            "PredictionDiagnostics.excludedObservations는 0 이상이어야 한다: $excludedObservations"
+        }
+        require(agencySampleCount >= 0) {
+            "PredictionDiagnostics.agencySampleCount는 0 이상이어야 한다: $agencySampleCount"
+        }
+    }
+}
+
+/**
  * 「측정 불가」 사유(scope.md ⑤, 2B `UnmeasurableReason` 미러) — 성공한 호출의 정직한 답
  * 셋이고 서로 다른 사유다(ADR 0010 D-3, `OPEN-2A-RELEASE-CHECK-4D`와 다른 축).
  */
@@ -160,6 +217,9 @@ sealed interface BidPredictionOutcome {
         val fitness: PriceFitness,
         val uncertainty: Uncertainty,
         val release: ModelReleaseRef,
+        // M4/4D-3(scope.md D-4D3-1) — 필수 인자, 기본값 없음. 진단 없는 Predicted 를
+        // 표현 불가능하게 한다(불가능한 상태는 타입으로 닫는다).
+        val diagnostics: PredictionDiagnostics,
     ) : BidPredictionOutcome
 
     data class Unmeasurable(

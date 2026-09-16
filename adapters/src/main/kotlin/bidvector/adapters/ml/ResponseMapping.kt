@@ -88,6 +88,7 @@ internal fun mapSuccess(
             fitness = fields.toFitness(),
             uncertainty = fields.toUncertainty(success),
             release = success.release.toDomain(),
+            diagnostics = fields.toDiagnostics(),
         )
     }
 }
