@@ -686,6 +686,20 @@ bounded retry)은 4D-1 `ResilientPredictionCall`을 제네릭화(D-4D2-4)해 재
 로 실측을 연다). 구현·verifier 1차 완료, 수정 라운드 진행 중(재작업 카운터 활성) —
 종결 등재는 사용자 승인 뒤.
 
+**4D-3 착수 2026-09-16(운영자 결정 「추천 방식으로 진행」 — 5D-3 다음 (a), 정본 `reports/evidence/m4/4d3/scope.md`)** —
+`OPEN-2F-DIAGNOSTICS-DOMAIN` 을 닫는 소형 Kotlin slice. 2F 가 wire 에 올린 `Diagnostics` 여섯 성분(`training_row_count`·
+`segment_support`·`shrinkage_weight`·`excluded_observations`·`agency_sample_count`·`agency_sample_below_threshold`)을
+4D-1 gateway 가 **읽지 않는다**(`mapSuccess` 미참조, 계약 test 의 proto 보존 단언뿐). 결정 D-4D3-1~6: 도메인 값 타입
+`Weight`([0,1], `decision.UnitScore` 와 분리 — 점수와 가중치 혼용 금지)·`SegmentSupport`·`PredictionDiagnostics` 신설,
+`Predicted.diagnostics` **필수 인자** · 검증층(`isAcceptableSuccessShape`)에 `init` 짝 술어 넷(범위·미지 enum·`uint32`
+오버플로·DERIVED ⇒ 학습 행 0) + H-6 table 행 동반(4D-1 알려진 제한 9 규율) · 사다리 점수 불변(수축은 엔진이 이미 반영,
+Kotlin 은 임계를 재판정하지 않는다) · 요청 조립 무변경. **착수 조사 실측**: Kotlin 요청은 표본 0건·`agencyId = null` 로
+나가고(`predictionRequestFor`), `Notice` 에 기관 fact 가 없으며(`OPEN-2B-AGENCY-ID`), 기관/공종별 과거 표본 조회 port 가
+없다 — 분포 엔진(5D-2/5D-3)을 Kotlin 이 구동하려면 별도 slice 가 필요 → **`OPEN-4D3-SAMPLE-SUPPLY`**(운영자 결정
+대기). ML-04 ② 의 사용자 가시 착지(근거 문구)는 렌더러가 없어 **`OPEN-4D3-DIAGNOSTICS-RENDER`**(4E 알림 본문 규약과 묶음).
+`data-dictionary.md` §6.5 `intervalSource`·`Diagnostics` 성분 표는 팀장이 써 `OPEN-2F-DICT-INTERVAL-SOURCE` 를 닫는다.
+레인 `bid-vector-v2-m4e`/`m4-4d3/2026-09-16`, base `4b9fa21`(PR #18 5E-1 병합 뒤), 다른 레인(5E-2, Python)과 소스 겹침 0.
+
 ### Slice 4E — notification adapter contract
 
 - delivery request와 rendered content 분리
