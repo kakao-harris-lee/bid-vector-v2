@@ -90,5 +90,5 @@ test_kernel_golden.py`·`reports/evidence/m5/5d3/`·`milestone-5.md`·`scope.md`
 정본은 루트 `./gradlew --no-build-cache --no-daemon check` **전건**이다(evidence 커밋이
 `reports/evidence/`를 만지므로 부분 게이트 `:leakPatternGate` 단독으로는 「전건 요구」를
 충족하지 못한다 — verifier r1 F-3). 이전 등재(`01eecf2` HEAD)는 verifier r2 N-1·N-3 시정
-커밋으로 트리가 바뀌어 낡았다 — N-1·N-3 일괄 커밋 HEAD에서 재실행한 결과는 아래에 별도
-커밋으로 append한다(기록 트리와 게이트를 돌린 트리를 맞춘다).
+커밋으로 트리가 바뀌어 낡았다. N-1·N-3 일괄 커밋 `77ce399` HEAD에서 실행 — exit 0
+(`BUILD SUCCESSFUL`, `leakPatternGate` 포함 전 모듈 `check`).
