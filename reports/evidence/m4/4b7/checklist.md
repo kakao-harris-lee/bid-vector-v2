@@ -5,21 +5,21 @@
 | 결정 | 구현 | test |
 | --- | --- | --- |
 | D-4B7-1 (a) — `bsisPlnprc`를 기초금액 축 원문 관측값으로, `Published(표본 자기 회차)` | `reservePriceAmounts`(`SampleConversion.kt`) | `SampleEligibilityTest`「정상 — 자격을 모두 만족하면 Eligible, 필드가 전수 변환된다」의 `reserveDraw.reservePrices.first().provenance` 대조(회차 `"001"` — 대상 아님) |
-| D-4B7-2 — 자격 규칙표 ②~⑦(+ verifier r1 신설 둘: `CANDIDATE_VANISHED`·`RESERVE_PRICE_SEQUENCE_INVALID`, 사유 8종) | `judgeEligibility`+`Check<T>` guard 체인(`SampleEligibility.kt`), `JdbcCompetitionSampleSource.aggregate`(`CANDIDATE_VANISHED`) | `SampleEligibilityTest`의 사유별 test(아래 대응표) + `JdbcCompetitionSampleSourceTest`「합계 불변식」 |
+| D-4B7-2 — 자격 규칙표 ②~⑦ + `CANDIDATE_VANISHED`(스캔-복원 사이 소실)·`RESERVE_PRICE_SEQUENCE_INVALID`(순번 집합이 1..N 아님), 사유 8종 | `judgeEligibility`+`Check<T>` guard 체인(`SampleEligibility.kt`), `JdbcCompetitionSampleSource.aggregate`(`CANDIDATE_VANISHED`), `resolveEligibilityPolicy`가 정책을 `resolve(referenceDate)`로 조회(entry 추가에도 안전) | `SampleEligibilityTest`의 사유별 test(아래 대응표) + `JdbcCompetitionSampleSourceTest`「합계 불변식 — samples 와 excluded 의 합은 후보 수와 같다」(`VanishingNoticeRepository` fake로 스캔-복원 소실을 흉내 낸다) |
 | D-4B7-3 — 조회 축(공종·대상 제외·개찰일 창·최신 순·상한) | `CompetitionSampleQuery`(`Ports.kt`), `Sql.SELECT_COMPETITION_SAMPLE_CANDIDATES`, `OpportunityPolicyData.sampleWindowDays`·`maxSamples` | `JdbcCompetitionSampleSourceTest`(창·상한·최신순·대상제외·공종일치·결측포함), `OpportunityAnalysisTest`「businessCategory 있으면 categoryCode 를 실은 query 로 port 를 부른다」 |
 | D-4B7-4 — 어댑터는 조인만, 판정은 workflow | `JdbcCompetitionSampleSource.aggregate`가 `judgeEligibility` 호출, SQL은 자격 조건 없음(`Sql.kt` 주석) | 컴파일 시점 구조(어댑터에 자격 predicate 없음) + `JdbcCompetitionSampleSourceTest`「개찰일 결측 후보는 초과 집합으로 포함되고...」(SQL이 거르지 않음을 실증) |
 | D-4B7-5 — `ReserveDrawObservation`·`CompetitionSample.reserveDraw`·`toProto()` 7번 필드 | `BidPredictionRequest.kt`, `RequestMapping.kt`→`MoneyMapping.kt`의 `toProtoReserveDraw()` | `PredictionValueTest`(init 넷) + `RequestMappingTest`(왕복 셋 — 15가격/4번호, null 미채움, 빈 집합) |
 | D-4B7-6 — 마이그레이션 없음 | `db/migration/` 무변경(git status) | 해당 없음(migration-reviewer 불요) |
 | D-4B7-7 — `actual_opening_at` → `Asia/Seoul` 날짜, 결측 제외 | `OPENING_DATE_ZONE`, `openedOnCheck`(`SampleEligibility.kt`) | `SampleEligibilityTest`「정상」 test의 `openedOn` 경계값 대조(UTC 15:30 → KST 다음날 00:30) + 「OPENING_DATE_MISSING」 test |
 | D-4B7-8 — provenance 라벨(`ProvenanceRules.judgeRow` 첫 production 호출) | `provenanceLabelFor`(`SampleConversion.kt`), `budgetEstimate = notice.estimatedAmount` | `SampleEligibilityTest`「라벨 — ... Clean」·「라벨 — ... SuspectRatio」 |
-| D-4B7-9 — `analyze`가 표본 조회 → `predictionRequestFor` 인자, `Unavailable` → `Absent(ScoreNotProvided)` 계열 | `OpportunityAnalysis.competitionSampleSupplyFor`+`predictionFacts` | `OpportunityAnalysisTest`의 4B-7 절 넷(query 실림·무공종 접힘·Supplied 전달·Unavailable 시 `prediction.callCount == 0`) |
+| D-4B7-9 — `analyze`가 표본 조회 → `predictionRequestFor` 인자, `Unavailable(reason)` → `absentPairForUnavailableSupply`가 그 `reason`을 그대로 옮긴다(`ScoreNotProvided`로 뭉개지 않는다) | `OpportunityAnalysis.competitionSampleSupplyFor`+`predictionFacts`, `PredictionFacts.absentPairForUnavailableSupply` | `OpportunityAnalysisTest`의 4B-7 절 넷(query 실림·무공종 접힘·Supplied 전달·`prediction.callCount == 0`) + `PredictionFactsTest`가 헬퍼를 직접 호출해 사유 보존을 잰다 — `predictionFacts` 호출부 자체를 다른 사유로 바꾸는 편집은 통합 층에서 무측정이다(구조적 이유는 「알려진 제한」) |
 
 ## 우회 (1)~(18) 대응표
 
 | 우회 | 방어 | 실측 |
 | --- | --- | --- |
 | (1) 미래 표본 누출 | `Sql` WHERE의 `actual_opening_at < asOf` + 대상 자기 제외 | `JdbcCompetitionSampleSourceTest`「개찰일이 미래거나 창 밖이면 후보에서 빠진다」 |
-| (2) 14행을 15로 채움 | `RESERVE_PRICE_COUNT_MISMATCH`(정확 일치) | `SampleEligibilityTest`「RESERVE_PRICE_COUNT_MISMATCH — 14행」 |
+| (2) 14행을 15로 채움 / 순번이 1..15 집합이 아님 / 위치-번호 결합이 어긋남 | 건수 `RESERVE_PRICE_COUNT_MISMATCH`(정확 일치) + 순번 집합 `RESERVE_PRICE_SEQUENCE_INVALID`(1..N과 정확히 일치해야 함) + `reservePriceAmounts`가 이름 있는 `Comparator`(`RESERVE_PRICE_SEQUENCE_ORDER`)로 순번 정렬(입력 리스트 순서에 의존하지 않는다) | `SampleEligibilityTest`「RESERVE_PRICE_COUNT_MISMATCH — 14행(미만)·16행(초과)」·「RESERVE_PRICE_SEQUENCE_INVALID — 순번 002~016·비정수」·「예비가격은 DB 사전순 입력이어도 순번 1 부터 15 순으로 정렬돼 나간다」(입력을 DB 사전순 `"1","10","11",…,"9"`로 주고 출력이 순번 순인지 대조 — 정렬 제거 변이는 `Element differ at index: [1, 2, …, 14]`로 사전순 오정렬을 그대로 재현하며 실패, 원복 확인) + `RequestMappingTest`「입력 List 순서를 그대로 옮긴다」(wire 매핑 층이 이미 정렬된 리스트를 다시 섞지 않는지 별도로 잰다) |
 | (3) 추첨 번호 범위 밖 | `OutOfRange` → `DRAW_NUMBERS_OUT_OF_RANGE` | `SampleEligibilityTest`「DRAW_NUMBERS_OUT_OF_RANGE」 |
 | (4) 협상 계약 낙찰율 없음 | `Determined`인데 `bidRate == null` → `RANK_ONE_RATE_MISSING` | `SampleEligibilityTest`「... Determined 이지만 bidRate 없음」 |
 | (5) 오염 표본이 CLEAN으로 | 공급 측 CLEAN 필터 없음 — 라벨만 붙이고 엔진 `admit_clean`이 거른다(`provenanceLabelFor`에 필터 분기 없음, `sampleOf`가 라벨을 그대로 싣는다) | 코드 검토(필터 코드 부재가 곧 증거) — SuspectRatio 라벨이 달려도 표본이 나간다는 것은 `SampleEligibilityTest`「라벨 — ... SuspectRatio」가 `Eligible`을 반환함으로 확인 |
@@ -27,7 +27,7 @@
 | (7) SQL에 판정 로직 | `Sql.SELECT_COMPETITION_SAMPLE_CANDIDATES`는 공종·대상 제외·(NULL-safe) 개찰일 창만 — 자격 predicate(①~⑦) 0건 | SQL 문 자체(코드 검토) + (4)의 결측 포함 test가 SQL이 자격을 안 거른다는 것을 간접 실증 |
 | (8) DB 예외가 analyze 를 죽임 | `samplesFor`가 `SQLException`을 잡아 `Unavailable(TransportFailed)` 값으로 접는다 | `JdbcCompetitionSampleSourceTest`「DB 접속 실패는 예외 대신 Unavailable 값으로 접힌다」(닫힌 포트로 실측, Testcontainers 컨테이너 불사용) |
 | (9) 공종 정규화 불일치 | Kotlin 측은 `CategoryCode` 값 동일 비교(정규화 없음) — 아래 「우회 (16) 실측」 참고 | `JdbcCompetitionSampleSourceTest`「공종이 다르면 후보에서 빠진다」(정확 일치 확인) |
-| (10)(13) `maxSamples` 초과 시 오래된 표본 잘림 | `ORDER BY actual_opening_at DESC NULLS LAST LIMIT` | `JdbcCompetitionSampleSourceTest`「상한을 넘는 후보는 최신 순으로 잘리고 결측일 후보가 상한을 먼저 먹지 않는다」(verifier r1 F-1 뒤 개정 — 서로 다른 날짜 3개 + 결측 1개로 정렬을 실제로 구별한다). **변이 실측**: `ORDER BY … DESC` → `ASC`로 바꾸면 이 test가 `expected:<[2026-09-15, 2026-09-14]> but was:<[2026-09-13, 2026-09-14]>`로 실패하고, 되돌리면 다시 통과한다(원복 확인 완료) — commands.md에 명령·exit 기록 |
+| (10)(13) `maxSamples` 초과 시 오래된 표본 잘림 | `ORDER BY actual_opening_at DESC NULLS LAST LIMIT` | `JdbcCompetitionSampleSourceTest`「상한을 넘는 후보는 최신 순으로 잘리고 결측일 후보가 상한을 먼저 먹지 않는다」 — 서로 다른 날짜 3개 + 결측 1개를 심어 상한 2로 좁히고 `openedOn` 집합을 대조해 정렬을 실제로 구별한다. **변이 실측**: `ORDER BY … DESC` → `ASC`로 바꾸면 이 test가 `expected:<[2026-09-15, 2026-09-14]> but was:<[2026-09-13, 2026-09-14]>`로 실패하고, 되돌리면 다시 통과한다(원복 확인 완료) — commands.md에 명령·exit 기록 |
 | (11) `selected_numbers` 중복/0 | `Set<Int>` + `ReserveDrawObservation.init`(전부 ≥1) | `PredictionValueTest`「selectedNumbers 에 1 미만 값이 있으면 거부한다」 |
 | (12)(18) `Published(round)` 위조 | 변환 입력이 표본 `Notice` 자체(`notice.id.round`) — 대상 공고 회차를 빌리지 않는다 | `SampleEligibilityTest`「정상」 test(round `"001"` 로 판정, 대상과 다름을 대조) |
 | (14) 재관측 행의 최신성 | 이 slice는 읽기만(`find` 재사용) — 저장 층 UPSERT가 이미 축 단위 최신 우선(M3/3E·3F 종결 사항) | 범위 밖(기존 persistence test suite가 커버, 재검증 안 함) |
@@ -49,7 +49,7 @@ TRIM/정규화를 추가하지 않았다** — 정확 일치(`n.business_categor
 
 | 표면 | 실측 생성부 |
 | --- | --- |
-| `CompetitionSample(` | `BidPredictionRequest.kt:86`(타입 선언) · `SampleConversion.kt`의 `sampleOf`(유일한 production 생성부 — verifier r1 뒤 `SampleEligibility.kt`에서 이관, TooManyFunctions) · test 셋(`OpportunityAnalysisTest`·`RequestMappingTest`·`MlTestFixtures`) |
+| `CompetitionSample(` | `BidPredictionRequest.kt:86`(타입 선언) · `SampleConversion.kt`의 `sampleOf`(유일한 production 생성부 — detekt `TooManyFunctions`(11/file) 한도로 `SampleEligibility.kt`가 아닌 이 파일에 둔다) · test 셋(`OpportunityAnalysisTest`·`RequestMappingTest`·`MlTestFixtures`) |
 | `OpportunityAnalysis(` | test만(`OpportunityAnalysisTest`) — production 조립 근(`app/`)은 M6 |
 | `judgeEligibility(` | `JdbcCompetitionSampleSource.aggregate`(유일한 production 호출부) · `SampleEligibilityTest`(직접 호출) |
 | `CompetitionSamplePort`·`CompetitionSampleQuery`·`CompetitionSampleSupply` | 정의(`Ports.kt`) · 구현체는 `JdbcCompetitionSampleSource` 하나 · test fake `FakeCompetitionSamplePort`(workflow 쪽) |
@@ -62,12 +62,13 @@ TRIM/정규화를 추가하지 않았다** — 정확 일치(`n.business_categor
 기존 `BidPredictionPort` 관례와 같은 자리(없던 권한 아님), `Supply`는 도메인 쌍에서만
 값을 만든다(지어내지 않음).
 
-**verifier r1 수정 라운드 뒤 재확인(2026-09-16)** — 새로 연 public 표면 0. 신설 함수
-(`resolveEligibilityPolicy`·`recordOutcome`·`reservePriceSequenceCheck`)는 전부
-`private`(`JdbcCompetitionSampleSource`·`SampleEligibility.kt` 각각 파일 스코프)이고,
-`sampleOf`는 `public`→`internal`로 이관됐을 뿐 가시성이 더 넓어지지 않았다. `SampleExclusionReason`
-에 값 둘(`CANDIDATE_VANISHED`·`RESERVE_PRICE_SEQUENCE_INVALID`)이 늘었으나 이미 `public`
-enum이라 값 추가는 새 권한이 아니다(같은 enum을 소비하는 `when`은 소진적이라 컴파일이
+**새로 연 public 표면 0.** 신설 함수(`resolveEligibilityPolicy`·`recordOutcome`·
+`reservePriceSequenceCheck`는 `private` — `JdbcCompetitionSampleSource`·
+`SampleEligibility.kt` 각각 파일 스코프, `absentPairForUnavailableSupply`는 `internal`
+— `PredictionFacts.kt`)는 새 권한을 열지 않는다. `sampleOf`는 `public`→`internal`로
+이관됐을 뿐 가시성이 더 넓어지지 않았다. `SampleExclusionReason`에 값 둘
+(`CANDIDATE_VANISHED`·`RESERVE_PRICE_SEQUENCE_INVALID`)이 늘었으나 이미 `public` enum
+이라 값 추가는 새 권한이 아니다(같은 enum을 소비하는 `when`은 소진적이라 컴파일이
 빠짐을 막는다).
 
 ## 설계 이탈 — 팀장 보고 사항 둘
@@ -108,71 +109,12 @@ enum이라 값 추가는 새 권한이 아니다(같은 enum을 소비하는 `wh
    구현체를 그대로 생성해 주입한다 — 재사용 자체가 사라진 것이 아니라 **주입 경계가
    test/조립 근으로 옮겨졌다**.
 4. **`reservePriceAmounts`의 정렬에 `sortedBy { ... }`(inline `compareBy` 경유)를 쓰지
-   않는다** — F-4 수정 중 실측: 그 형태는 합성 클래스의 `SourceFile` 디버그 속성이 stdlib
+   않는다** — 그 형태는 합성 클래스의 `SourceFile` 디버그 속성이 stdlib
    `Comparisons.kt`로 남아 `workflow:jarContentGate`(ADR 0006 §6)가 「게이트를 통과한
    소스가 아니다」로 거부한다. `adapters/persistence/ObservationPayloadCodec.kt`가 이미
    문서화한 같은 함정(`CONTRACT_RAW_NAME_ORDER`)이라 같은 처방(이름 있는 `Comparator`,
    `RESERVE_PRICE_SEQUENCE_ORDER`)을 그대로 썼다. 새 이탈이 아니라 기존에 등재된 규율의
    재적용이다.
-
-## verifier r1 수정 라운드(F-1~F-4·F-11) — 무엇을 어떻게 닫았는가
-
-- **F-1(HIGH)** — `JdbcCompetitionSampleSourceTest`「상한을 넘는 후보는 최신 순으로
-  잘리고 결측일 후보가 상한을 먼저 먹지 않는다」로 개정: 후보 넷(1·2·3일 전 + 결측)을
-  심고 상한 2로 좁혀 `openedOn` 집합을 대조한다. `ORDER BY … DESC` → `ASC` 변이 실측
-  결과 `expected:<[2026-09-15, 2026-09-14]> but was:<[2026-09-13, 2026-09-14]>`로
-  실패, 원복 뒤 재통과 확인(commands.md).
-- **F-2(MEDIUM)** — `JdbcCompetitionSampleSource.resolveEligibilityPolicy`가
-  `SAMPLE_ELIGIBILITY_POLICY.resolve(referenceDate)`를 쓴다(`.entries.single()` 제거) —
-  형제 `resolveProvenancePolicy`와 같은 형태로 통일. entry가 하나 더 붙어도 `IllegalArgumentException`
-  대신 정상 resolve된다.
-- **F-3(MEDIUM)** — `candidatePair`의 `null`을 `SampleExclusionReason.CANDIDATE_VANISHED`
-  로 계수(`aggregate`의 `recordOutcome` 분기). `JdbcCompetitionSampleSourceTest`「합계
-  불변식」이 `VanishingNoticeRepository`(fake, `find`가 특정 id에 `null`을 내는 wrapper)
-  로 스캔-복원 사이 소실을 흉내 내 `samples.size + excluded.values.sum() == 3`을 잰다.
-  `Ports.kt`의 `SampleExclusionReason` KDoc도 「조인이 이미 보장」 서술을 정정했다.
-- **F-4(MEDIUM, 게이트 술어)** — `SampleEligibility.reservePriceSequenceCheck`(신설) —
-  `sequenceNumber` 집합이 정확히 `1..expectedReservePriceCount`가 아니면
-  `RESERVE_PRICE_SEQUENCE_INVALID`로 실격. `reservePriceAmounts`도 입력 순서 대신
-  `RESERVE_PRICE_SEQUENCE_ORDER`로 정렬해 위치-번호 결합을 명시적으로 만든다.
-  `SampleEligibilityTest`에 순번 `002~016`(재현 케이스 그대로)·비정수 순번 두 test 추가.
-- **F-11** — `predictionRequestFor`의 `competitionSamples` 기본값 `emptyList()` 제거 —
-  호출부가 인자를 빠뜨리면 컴파일이 실패한다(유일한 호출부 `OpportunityAnalysis.predictionFacts`
-  는 이미 `supply.samples`를 명시).
-- **F-5~F-7(LOW, 등재분 일괄)** — `SampleEligibilityTest`에 16행(초과) case ·
-  `JdbcCompetitionSampleSourceTest`에 `actual_opening_at == asOf`(제외)·창 하한 경계
-  (포함) 두 test · `RequestMappingTest`에 예비가 `Money` 4성분(basis·currency·
-  provenance·vat) 왕복 test 추가.
-- **F-8·F-9·F-10(LOW, 장부)** — scope.md in_scope에 `MoneyMapping.kt`·`SampleConversion.kt`
-  갱신 이력 반영은 팀장 소관 문서라 이 레인이 직접 편집하지 않는다(팀장이 in_scope 목록에
-  이미 두 파일을 추가함, `git log` 확인). commands.md·rollback.md의 HEAD 재실측 행은
-  이 라운드의 최종 commit에서 갱신한다(아래).
-- **F-11 관련 참고** — D-4B7-9 문면과 구현(`absentPair(supply.reason)`)의 사유 정합은
-  scope.md 소유라 이 레인이 판단하지 않는다(verifier 리포트도 "구현 쪽이 더 정직하다"로
-  적었다) — 팀장이 scope.md를 갱신 중이므로 이 레인은 손대지 않는다.
-
-## verifier r2 수정 라운드(N-1·N-2) — 무엇을 어떻게 닫았는가
-
-- **N-1(HIGH, 게이트 술어)** — r1 F-4가 신설한 `RESERVE_PRICE_SEQUENCE_ORDER` 정렬이
-  **무측정**이었다(모든 test 픽스처가 zero-pad라 이미 정렬된 입력이었다 — 정렬을 지워도
-  761 test 전부 초록). `SampleEligibilityTest`에 `lexicographicOrderRows()`(DB 사전순
-  — `"1","10","11",…,"15","2",…,"9"`, 실제 저장 형태는 zero-pad 없음, `reserve_price_sequence`
-  가 `TEXT`)를 신설하고 「정상」과 별도로 이 순서를 잰다. `sorted → rows`(정렬 제거)
-  변이 실측: `Element differ at index: [1, 2, …, 14]` — `expected:<[…001, …002, …003…]>
-  but was:<[…001, …010, …011, …, …015, …002, …003, …]>`로 정확히 사전순 오정렬을
-  재현하며 실패, 원복 뒤 재통과 확인(commands.md). `RequestMappingTest`에도 인접
-  위험(매핑 층이 이미 정렬된 리스트를 다시 섞지 않는가)을 재는 test를 별도로 추가했다
-  (도메인 정렬과 wire 순서 보존은 서로 다른 관문이라 둘 다 잰다).
-- **N-2(LOW)** — D-4B7-9의 "사유를 `ScoreNotProvided`로 뭉개지 않고 `supply.reason`을
-  그대로 옮긴다"는 계약 문면을 `absentPairForUnavailableSupply`(`PredictionFacts.kt`
-  신설, `OpportunityAnalysis.predictionFacts`가 호출)로 명시화하고 test 둘을 추가했다.
-  **`OpportunityAnalysisTest`가 아니라 `PredictionFactsTest`에 뒀다** — `analyze()`를
-  거치면 `MlAnalysisOutcome.Analyzed`가 budgetCapture·expectedMargin 성분(과 그 드롭
-  사유)을 노출하지 않아 통합 층에서는 `TransportFailed`와 `ScoreNotProvided`를 수 하나
-  (`priorityScore`)로는 구별할 수 없다(`composePriority`는 사유가 아니라 존재/부재만
-  본다) — `PredictionFactsTest.kt` 헤더 KDoc이 r1 F-1에서 이미 같은 이유로 같은 관례를
-  세웠다("`internal` 함수를 같은 패키지 test가 직접 부른다"). 팀장 지시(「OpportunityAnalysisTest
-  에 단언」)에서 이관한 것이라 명시로 남긴다.
 
 ## 알려진 제한
 
@@ -192,6 +134,15 @@ enum이라 값 추가는 새 권한이 아니다(같은 enum을 소비하는 `wh
 - `SampleEligibilityTest`의 라벨 test 둘(Clean·SuspectRatio)만 `provenanceLabelFor`를
   재는데, `DerivedYega`·`DerivedVat`·`Unknown` 경로는 `ProvenanceRulesTest`(1D, 커널
   자체)가 이미 규칙표 전수를 재므로 이 slice에서 다시 재지 않았다(중복 금지).
+- `OpportunityAnalysis.predictionFacts`의 `absentPairForUnavailableSupply(supply)` 호출부
+  한 줄은 현재 구조에서 측정 불가다 — 그 줄을 다른 `absentPair(...)` 호출로 바꾸는 편집도
+  전건 초록을 지난다. `MlAnalysisOutcome.Analyzed`가 `priorityScore`·`probabilityScore`·
+  `matchedScore` 셋만 나르고 드롭 사유 필드가 없으며, `composePriority`는 `match`가 `Absent`
+  일 때만 사유를 올리고 `budgetCapture`·`expectedMargin`의 `Absent`는 사유를 버린 채 성분만
+  빠지기 때문이다. 그러므로 D-4B7-9의 "사유를 `ScoreNotProvided`로 뭉개지 않고 그대로 옮긴다"는
+  계약은 `absentPairForUnavailableSupply` 함수 자신에게는 성립(`PredictionFactsTest`가 변이로
+  확인)하지만, 그 함수를 부르는 호출부 자체의 효과는 오늘 어디에서도 관측되지 않는다 — 실제
+  드러나는 것은 근거 문구 렌더러(`OPEN-4D3-DIAGNOSTICS-RENDER`)가 생긴 뒤다.
 
 ## Codex 범위
 
