@@ -1574,8 +1574,24 @@ legacy의 `confidence`는 근거 없는 계수 아홉의 아핀 결합이고 클
 | `sampleSize` | 건수 | 그 추정에 쓰인 과거 표본 수 | `sample_size` |
 | `dispersion` | fraction | **투찰율 축**(투찰가 ÷ 기초금액) 표본의 **표준편차** | `std_rate` — `std_bid_rate`에서 온다 |
 | `estimateMargin` | fraction | 같은 축. **평균 투찰율 신뢰구간의 반폭** | `margin` |
+| `intervalSource` (M2/2F · M4/4D-3, 2026-09-16 추가) | 열거 | **위 두 fraction 성분이 어디서 왔는가** — `CrossValidationResidual`(교차검증 잔차, 아티팩트 엔진) · `TimeHoldoutResidual`(시간 홀드아웃 잔차, 아티팩트 엔진) · `PosteriorPredictive`(M5/5D-2 분포 엔진 — 예정가 추첨 분포의 **사후예측 분산**에서 `dispersion`·`estimateMargin`을 낸다, 잔차가 아니다). 미지정은 계약 위반(fail-closed, 4D-1 `ParsedSuccessFields`). `OPEN-2F-DICT-INTERVAL-SOURCE` 해소 | 없음(legacy 는 출처를 나르지 않았다 — 같은 이름 `margin` 이 엔진마다 다른 산식이었다) |
 
-**세 성분의 provenance는 같다** — 과거 투찰율 표본 집합에서 계산한 파생값이다.
+**세 성분의 provenance는 같다** — 과거 투찰율 표본 집합에서 계산한 파생값이다(`intervalSource`가 그 계산의 출처를 명시한다).
+
+#### 6.5.1 `diagnostics` — 추정의 지지 근거(M2/2B·2F wire, M4/4D-3 도메인 소비, 2026-09-16)
+
+`confidence`와 같은 취지다 — 합성 점수를 두지 않고 **관측 가능한 근거 성분**을 그대로 노출한다.
+Kotlin 도메인은 `PredictionDiagnostics`(`workflow.prediction`)로 보존하고 **점수를 다시 조정하지 않는다** —
+수축은 엔진이 이미 반영했고 임계는 엔진 정책이라 소비자가 재판정하지 않는다(4D-3 D-4D3-3).
+
+| 성분 | 단위 | basis / 축 | 출처 |
+| --- | --- | --- | --- |
+| `segmentSupport` | 열거 | 추정이 무엇으로 지지되는가 — `Direct`(발주기관 표본) · `ParentCategory`(공종 표본) · `Global`(전역). 미지정은 계약 위반 | 엔진(3계층 수축, M5/5D-3) |
+| `shrinkageWeight` | fraction [0,1] (`Weight`) | 발주기관 계층에 준 수축 가중치 `n/(n+k)` — **ML-04 ②** 「기관 표본이 임계 미만이면 수축 가중치가 응답 근거에」. 투찰율 축이 아니다(`decision.UnitScore`와도 다른 타입) | 엔진(K5) |
+| `agencySampleCount` | 건수 | 발주기관 계층에 든 CLEAN 표본 수 | 엔진 |
+| `agencySampleBelowThreshold` | 진위 | 그 수가 엔진 정책 임계 미만인가 — **엔진이 명시**, 소비자는 재판정하지 않는다 | 엔진 정책(`assessment.agency_sample_threshold`) |
+| `excludedObservations` | 건수 | 관문·provenance 게이트가 걸러낸 표본 총계(사유별 분해 없음 — 5D-2 알려진 제한 12) | 엔진 |
+| `trainingRowCount` | 건수 | 아티팩트 학습 행 수(D-2B-6) — `release.kind = Derived`(아티팩트 없는 분포 엔진)이면 **항상 0**(수신자가 검증) | 아티팩트 manifest / 분포 엔진은 0 |
 **세 값을 만드는 산식은 `app/ai/predictors/historical/__init__.py:294-308`**이고, 셋이 함께
 `estimate_historical_confidence`로 들어가는 자리는 같은 파일
 `app/ai/predictors/historical/__init__.py:371-375`다.
