@@ -26,7 +26,7 @@ private val RESOLVED_POLICY: KonepsCollectionPolicyData =
  */
 class CollectionPolicyTest {
     @Test
-    fun `필드 계약은 승인된 채택분 서른여섯 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
+    fun `필드 계약은 승인된 채택분 마흔 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contracts
             .map { it.rawName.name }
             .toSet() shouldBe
@@ -41,6 +41,12 @@ class CollectionPolicyTest {
                 "bidClseDt",
                 "opengDt",
                 "bsnsDivNm",
+                // M3/3H-1 D-3H-1 — 발주기관 넷(참고자료 응답 항목 표, P-14). 담당자 키는
+                // 등재하지 않는다(scope.md 우회 (4)).
+                "dminsttCd",
+                "dminsttNm",
+                "ntceInsttCd",
+                "ntceInsttNm",
                 // v2-defect 018 수정(3A 잔여 일괄 verifier r3 전) — D-3A-8, §5.5.
                 "cnstrtnAbltyEvlAmtList",
                 // P-9 승인(3B-2, 2026-09-08) — 개찰 축 12행. `bidwinnrBizno`는 P-10 (a) 로

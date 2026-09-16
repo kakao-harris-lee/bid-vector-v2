@@ -242,6 +242,47 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             VatTreatment.UNKNOWN,
             FieldProvenanceTemplate.NOT_APPLICABLE,
         ),
+        // M3/3H-1 D-3H-1 — 발주기관 넷(참고자료 응답 항목 표, P-14). 담당자 키(*Ofcl*)는
+        // 등재하지 않는다(scope.md 우회 (4), 개인정보). 코드 둘은 IDENTIFIER(제로패딩 보존,
+        // R-QUAL-05 — int 변환 금지) — CategoryCode 와 같은 정규화 함수가 [Agency.kt]
+        // 조립부에서 이 문자열을 다시 정규화한다(§6.3.1). presentIn 은 기본값(NOTICE_LIST) —
+        // 참고자료 표가 공고 목록 응답 항목이다.
+        FieldContractRow(
+            RawKey("dminsttCd"),
+            FieldConcept.DEMAND_AGENCY_CODE,
+            null,
+            FieldScale.IDENTIFIER,
+            FieldNullability.OPTIONAL,
+            VatTreatment.UNKNOWN,
+            FieldProvenanceTemplate.NOT_APPLICABLE,
+        ),
+        FieldContractRow(
+            RawKey("dminsttNm"),
+            FieldConcept.DEMAND_AGENCY_NAME,
+            null,
+            FieldScale.OPAQUE_TEXT,
+            FieldNullability.OPTIONAL,
+            VatTreatment.UNKNOWN,
+            FieldProvenanceTemplate.NOT_APPLICABLE,
+        ),
+        FieldContractRow(
+            RawKey("ntceInsttCd"),
+            FieldConcept.NOTICE_AGENCY_CODE,
+            null,
+            FieldScale.IDENTIFIER,
+            FieldNullability.OPTIONAL,
+            VatTreatment.UNKNOWN,
+            FieldProvenanceTemplate.NOT_APPLICABLE,
+        ),
+        FieldContractRow(
+            RawKey("ntceInsttNm"),
+            FieldConcept.NOTICE_AGENCY_NAME,
+            null,
+            FieldScale.OPAQUE_TEXT,
+            FieldNullability.REQUIRED,
+            VatTreatment.UNKNOWN,
+            FieldProvenanceTemplate.NOT_APPLICABLE,
+        ),
         // D-3A-8·§5.5 — 시공능력평가금액목록. 형식(`^` 구분, `[...]` 레코드)만 authoritative
         // (policy-values.md §1.5) — 단위·과세는 미확정(OPEN-QUAL-10)이라 수집 형태만 연다.
         FieldContractRow(

@@ -26,6 +26,14 @@ data class NoticeCollected(
     val deadlineAt: Instant?,
     val openingScheduledAt: Instant?,
     val raw: RawNoticeObservation,
+    /**
+     * 수요기관(D-3H-3, M3/3H-1) — 기본값 `null`이라 이 slice 밖 호출부(workflow·ml 어댑터
+     * test 등)는 수정 없이 그대로 컴파일된다(scope.md 우회 (6) — `agencyId = null` 두 자리
+     * 불변).
+     */
+    val demandAgency: Agency? = null,
+    /** 공고기관(D-3H-3, M3/3H-1) — [demandAgency]와 다른 축, 기본값 `null`(위와 같은 이유). */
+    val noticeAgency: Agency? = null,
 )
 
 /** 추정가격도 기초금액과 같은 형태 규율(파생이 원본을 덮지 않는다)을 받는다 — `Published`만 직접값이다. */
@@ -120,6 +128,35 @@ private fun businessCategoryFrom(
         }
 
 /**
+ * 발주기관 조립(D-3H-3, M3/3H-1) — [businessCategoryFrom]과 같은 관례로 `registry
+ * .contractsFor(concept)` 경유만 읽는다(scope.md 우회 (1)). [codeConcept]·[nameConcept]는
+ * 호출부가 역할별로 고정해 넘긴다 — 이 함수 자신은 "수요"·"공고" 어느 쪽인지 모른다(그래서
+ * 폴백이 구조적으로 불가능하다, 우회 (3)). 코드·이름이 둘 다 없으면 fact 자체가 없다(`null`).
+ */
+private fun agencyFrom(
+    observation: RawNoticeObservation,
+    registry: KonepsFieldContractRegistry,
+    codeConcept: FieldConcept,
+    nameConcept: FieldConcept,
+): Agency? {
+    val code = registry.contractsFor(codeConcept).firstOrNull()?.let(observation::valueOf)?.let(AgencyCode::of)
+    val name = registry.contractsFor(nameConcept).firstOrNull()?.let(observation::valueOf)?.let(AgencyName::of)
+    return if (code == null && name == null) null else Agency(code, name)
+}
+
+/** 수요기관(`dminsttCd`·`dminsttNm`) — 엔진 `agency_id` 정본 축(D-3H-2). */
+private fun demandAgencyFrom(
+    observation: RawNoticeObservation,
+    registry: KonepsFieldContractRegistry,
+): Agency? = agencyFrom(observation, registry, FieldConcept.DEMAND_AGENCY_CODE, FieldConcept.DEMAND_AGENCY_NAME)
+
+/** 공고기관(`ntceInsttCd`·`ntceInsttNm`) — [demandAgencyFrom]과 다른 축(자기 필드만). */
+private fun noticeAgencyFrom(
+    observation: RawNoticeObservation,
+    registry: KonepsFieldContractRegistry,
+): Agency? = agencyFrom(observation, registry, FieldConcept.NOTICE_AGENCY_CODE, FieldConcept.NOTICE_AGENCY_NAME)
+
+/**
  * 배정예산(F-5) — `FilledFromBudgetKey` 폴백과는 **다른 자리**다. 자기 개념(`ALLOCATED_BUDGET`)
  * 필드에 값이 있으면 그 자체로 게시값이라 `Provenance.Published`를 받는다(폴백에 쓰였는지
  * 여부와 무관 — 축이 다르다, §5.2).
@@ -210,6 +247,8 @@ private fun normalizedCommand(
                     deadlineAt = instantOrNull(deadlineResolution),
                     openingScheduledAt = instantOrNull(openingResolution),
                     raw = observation,
+                    demandAgency = demandAgencyFrom(observation, policy.fieldContracts),
+                    noticeAgency = noticeAgencyFrom(observation, policy.fieldContracts),
                 ),
                 unknownFieldCount,
             )
