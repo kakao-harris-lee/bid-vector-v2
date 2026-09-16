@@ -523,6 +523,33 @@ def test_calculate_optimal_bid_logs_before_raising_on_mapping_rejected(
     assert "req-log-mapping-rejected" in caplog.text
 
 
+def test_nan_candidate_rate_is_controlled_exception_with_log(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """code-reviewer HIGH/verifier r2 N-1 — `wire.py`의 비유한 검사가 범위 검사보다
+    앞으로 옮겨진 뒤에도 end-to-end 로 통제된 예외(D-5E2-6 문구)와 ERROR 로그
+    (request_id·correlation_id 둘 다)가 나오는지 확인한다. 시정 전에는
+    `decimal.InvalidOperation`이 그대로 새 나가 이 test 가 `RuntimeError`를 못 잡고
+    실패했다(재현 확인)."""
+    servicer = _servicer(runtime=_runtime())
+    request = _valid_calc_request(
+        request_id="req-log-nan", correlation_id="corr-log-nan"
+    )
+    broken = _success()
+    object.__setattr__(broken.candidates[0], "bid_rate", Decimal("NaN"))
+    monkeypatch.setattr(
+        "ml_engine.serving.prediction.serve_bid_rates",
+        lambda req, policy: broken,
+    )
+    with (
+        caplog.at_level(logging.ERROR, logger="ml_engine.serving.prediction"),
+        pytest.raises(RuntimeError, match="D-5E2-6"),
+    ):
+        servicer.CalculateOptimalBid(request, _ActiveContext())
+    assert "req-log-nan" in caplog.text
+    assert "corr-log-nan" in caplog.text
+
+
 def test_calculate_optimal_bid_logs_completion_with_request_id(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:

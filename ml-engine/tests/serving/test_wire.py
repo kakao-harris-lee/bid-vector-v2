@@ -207,6 +207,29 @@ def test_non_finite_decimal_is_mapping_rejected() -> None:
     assert isinstance(mapped, MappingRejected)
 
 
+def test_nan_candidate_rate_is_mapping_rejected_not_raised() -> None:
+    """code-reviewer HIGH/verifier r2 N-1 — `Decimal("NaN")`은 순서 비교에서
+    `decimal.InvalidOperation`을 던진다. 비유한 검사가 범위 검사보다 먼저 돌아야
+    `map_kernel_result`가 그 예외를 그대로 흘리지 않고 통제된 `MappingRejected`를
+    낸다(D-5E2-6). 사유는 「비유한」이어야 한다(verifier r2 N-7 — 「(0,1] 구간」이
+    아니다, 비교 자체가 성립하지 않았으므로)."""
+    success = _success()
+    object.__setattr__(success.candidates[0], "bid_rate", Decimal("NaN"))
+    mapped = map_kernel_result(success, _release(), "award-rate-features-v2")
+    assert isinstance(mapped, MappingRejected)
+    assert "비유한" in mapped.reason
+
+
+def test_infinite_candidate_rate_is_mapping_rejected_with_non_finite_reason() -> None:
+    """verifier r2 N-7 — `Infinity`는 순서 비교 자체는 성립하지만(범위 밖) 사유는
+    여전히 「비유한」이어야 한다(비유한 검사가 먼저 돈다)."""
+    success = _success()
+    object.__setattr__(success.candidates[0], "bid_rate", Decimal("Infinity"))
+    mapped = map_kernel_result(success, _release(), "award-rate-features-v2")
+    assert isinstance(mapped, MappingRejected)
+    assert "비유한" in mapped.reason
+
+
 def test_candidate_count_not_three_is_mapping_rejected() -> None:
     success = _success()
     object.__setattr__(success, "candidates", success.candidates[:2])

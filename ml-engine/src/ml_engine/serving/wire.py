@@ -110,15 +110,23 @@ def _check_invariants(success: Success) -> MappingRejected | None:
             "training_row_count 는 DERIVED release 에서 0이어야 한다: "
             f"{success.diagnostics.training_row_count}"
         )
+    # code-reviewer HIGH/verifier r2 N-1 — 비유한 검사가 범위 검사보다 **앞**이어야
+    # 한다. `Decimal(0) < candidate.bid_rate <= 1`(범위 검사)은 `bid_rate`가
+    # `Decimal("NaN")`이면 순서 비교 자체가 `decimal.InvalidOperation`을 던진다 —
+    # `MappingRejected`를 거치지 않고 그 예외가 그대로 `map_kernel_result` 밖으로
+    # 샌다(D-5E2-6의 「불변식 위반은 결과 타입」이 깨지고, `_compute_and_map`의
+    # ERROR 로그도 이 경로에선 안 찍힌다, R-M2 커버리지 밖). 비유한 검사를 먼저 두면
+    # NaN·Infinity 후보율 둘 다 "비유한 Decimal 값"으로 통제된 `MappingRejected`가
+    # 된다 — 범위 검사는 유한값에만 도달한다(비교가 다시는 예외를 던지지 않는다).
+    non_finite = _first_non_finite_decimal(success)
+    if non_finite is not None:
+        return MappingRejected(f"비유한 Decimal 값: {non_finite!r}")
     out_of_range_candidate = _first_candidate_rate_out_of_range(candidates)
     if out_of_range_candidate is not None:
         return MappingRejected(
             "Candidate.bid_rate 는 (0, 1] 구간이어야 한다(D-2B-8·D-2F-4 응답 후보율 축): "
             f"{out_of_range_candidate.bid_rate!r}"
         )
-    non_finite = _first_non_finite_decimal(success)
-    if non_finite is not None:
-        return MappingRejected(f"비유한 Decimal 값: {non_finite!r}")
     return None
 
 
