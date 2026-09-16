@@ -34,10 +34,23 @@
    로 재배치(구현 중 발견 → 정지·보고 → 팀장 결정 D-6C-8).** 기존 게이트 둘
    (`MlGateRegistrationTest`: `ml` 패키지의 모든 `*Test.kt`는 `gate-tests.properties` 등재
    필수 / `gateExecutionGate`: 등재된 클래스는 기본 `check`에서 skip 0 필수)이 환경
-   조건부로 항상 건너뛸 수 있어야 하는 test(D-6C-4)와 동시에 만족될 수 없었다. 게이트
-   술어를 약화시키는 두 안(조건부 허용 키 신설, 등재 예외 목록)은 검토했으나 채택하지
-   않았다 — 채택안은 scope.md·`OPEN-6C-CONDITIONAL-GATE-TEST` 참고. 이 파일은 구현 레인이
-   직접 결정하지 않고 팀장에게 보고해 계약 갱신으로 받았다.
+   조건부로 항상 건너뛸 수 있어야 하는 test(D-6C-4)와 동시에 만족될 수 없었다. 구현
+   레인이 제시한 선택지 셋(A. 게이트에 조건부 허용 키 신설 B. 등재 요구 예외 목록 신설
+   C. 패키지 재배치) 중 팀장은 **C 를 채택하고 A·B 를 명시적으로 거부**했다 — A·B 는
+   둘 다 게이트 술어에 "조건부 허용" 문을 만드는데, 그 문이 한 번 열리면 **어떤 test 든
+   자기를 조건부로 선언해 영원히 안 돌 수 있게 된다**(오탐을 닫으려다 미탐을 여는
+   방향, 하네스 2026-09-04 게이트 술어 조항과 상충). 이 slice 자체가 "게이트 술어는
+   문자열이 아니라 구조로"를 세우는 자리라 그 술어를 여기서 약화시키면 앞뒤가 맞지
+   않는다는 것이 거부 근거다. C 는 회피가 아니라 올바른 재분류다 — `CrossLangSmokeTest`
+   (교차 언어 스모크)가 이미 같은 이유로 `adapters.contract`에 있고, 이 test 는 그
+   컨테이너 판이다. `build-logic`·`gate-tests.properties`·`MlGateRegistrationTest` 는
+   전부 무편집(팀장 지시대로 확인, `git diff f3ac571 -- config/quality/gate-tests.properties`
+   빈 결과). 이 결정은 구현 레인이 직접 하지 않고 팀장에게 보고해 계약 갱신
+   (scope.md D-6C-8·`OPEN-6C-CONDITIONAL-GATE-TEST`)으로 받았다.
+
+판단 1·2 는 이후 팀장의 계약 갱신 (3)이 scope.md in_scope 목록에 명시 반영했다
+(`image-hygiene-policy.properties` 추가, dockerignore 파일명 정정) — 구현 레인의 판단이
+그대로 계약에 채택됐다.
 6. **`manySampleBidPredictionRequest`/`reserveDrawObservation` 신설(실 서버가 처음으로 겪는
    입력 형태).** 기존 fake servicer consumer test 의 공용 fixture(`testBidPredictionRequest()`,
    표본 1건, `reserveDraw` 없음)를 그대로 실 서버에 보내면 `Unmeasurable(InsufficientSamples)`
