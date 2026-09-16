@@ -1554,8 +1554,20 @@ Python 정본은 `ml_engine.features.normalize.normalize_feature_key`(요청 축
 둘 다 절삭)에서는 결과가 같다(4B-8 verifier r1 교차 대조 26 입력 중 22 동일). **갈리는 입력 넷은 알려진 제한이다**(같은 대조):
 절삭 축 — U+0085(NEL)를 Kotlin `trim()` 은 남기고 Python `str.strip()` 은 제거한다 · 소문자화 축 — `İ`(U+0130)·종단 시그마·보충면
 문자(U+10400)에서 JVM 문자 단위 `Char.lowercaseChar()` 와 Python `str.lower()` 가 다르다. 그래서 「Python 재정규화가 멱등」은 그 넷에서
-거짓이다 — 실무 영향은 없다(공종 코드는 ASCII). 정본은 4B-8 checklist 의 대조 표. 정규화 전 저장 행은 `OPEN-4B8-CATEGORY-BACKFILL`. 발주기관 키의 Kotlin 정본은 기관 fact 가 생길 때
-(`OPEN-2B-AGENCY-ID`) 같은 함수로 둔다.
+거짓이다 — 실무 영향은 없다(공종 코드는 ASCII). 정본은 4B-8 checklist 의 대조 표. 정규화 전 저장 행은 `OPEN-4B8-CATEGORY-BACKFILL`. **발주기관 키의 Kotlin 정본은 `procurement.AgencyCode.of(raw)`**(M3/3H-1, 2026-09-17 —
+`CategoryCode.of` 와 같은 정규화 함수 하나를 부른다, 생성이 곧 정규화). 기관 전 저장 행은 `OPEN-3H-AGENCY-BACKFILL`.
+
+#### 6.3.2 발주기관 fact — 역할 둘, 키는 수요기관코드(M3/3H-1 P-14 · D-3H-1~3, 2026-09-17)
+
+| 자리 | 정의 |
+| --- | --- |
+| **원천** | 입찰공고정보서비스 응답 항목 넷(`authoritative`, 3A policy-values §1.3 P-14): `dminsttCd` 수요기관코드(항목크기 7, 옵션) · `dminsttNm` 수요기관명(400, 옵션) · `ntceInsttCd` 공고기관코드(7, 옵션) · `ntceInsttNm` 공고기관명(400, **필수**). 코드는 「행자부코드가 있으면 행자부코드, 없으면 조달청 부여 코드」— 불투명 식별자(DB id 아님) |
+| **도메인** | `Notice.demandAgency: Agency?` · `Notice.noticeAgency: Agency?` — **역할별 자기 필드**. `Agency(code: AgencyCode?, name: AgencyName?)`(둘 다 null 인 fact 는 없다). `AgencyCode.of` = 정규화 키, `AgencyName.of` = trim 만(표시·감사용, 키 아님) |
+| **엔진 키** | `FeatureInputs.agency_id` = **수요기관코드**의 정규화값. **역할 간 폴백 없음** — 수요기관코드가 없으면 공고기관코드로 채우지 않는다(legacy 의 「개찰수요 > 수요 > 공고」 폴백은 legacy 자신이 누수로 명시했다). 이름은 키가 아니다. 별칭·계층 사전 없음(§6.3.1) |
+| **저장** | `notice.demand_agency_code`·`demand_agency_name`·`notice_agency_code`·`notice_agency_name`(V7, nullable TEXT, 제약·인덱스 없음). DB 는 재정규화하지 않는다 |
+| **결측** | 요청 축 `UNKNOWN`(3H-2 에서 채움), 표본 축은 오늘 `NOT_COLLECTED_YET` — 수집 뒤에는 「수집했으나 원천에 없음」이 되어 그 사유가 거짓이 된다. 엔진 표본 축 허용 집합 `{NOT_COLLECTED_YET}` 의 확장은 `OPEN-3H-SAMPLE-MISSING-REASON`(M5 레인) |
+| **등재하지 않는 것** | 같은 응답의 담당자 이름·전화·이메일(`ntceInsttOfcl*`·`dminsttOfcl*`) — 개인정보, P-10 과 같은 축 |
+| **잔여** | 3H-2(요청·표본 축 조립, `segment_support = DIRECT` 첫 도달) · 코드 채움률 실측(read-only 실호출 1회, D-3H-8) |
 
 ### 6.4 성숙도 — 계산과 판정의 분리 (`OPEN-ML-01` 잔여 확인)
 
