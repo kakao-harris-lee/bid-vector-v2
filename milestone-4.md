@@ -534,6 +534,15 @@ NORMALIZATION` — `CategoryCode` 를 private 생성자 + `of(raw)`(strip + lowe
 표본·조회가 같은 키를 쓰게 한다(SQL 은 정확 일치 유지, 두 번째 규칙 금지). 결정 D-4B8-1~5. 정규화 전 저장 행은 `OPEN-4B8-CATEGORY-
 BACKFILL`(운영 데이터 없음, M6). 레인 `bid-vector-v2-m4e`/`m4-4b8/2026-09-16`, base `845e29b`(PR #21 5E-3 병합 뒤 — Kotlin 변경 0).
 
+**4B-8 종결 2026-09-16(사용자 승인 — 「추천 A 진행」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1 `ready-for-review`(산출물
+blocker/high 0 — 변이 6종 전부 붉음: `copy`·직접 생성 컴파일 거부, trim/소문자화 제거 각 4 test, 라벨 상수 복귀 1; 장부층 MEDIUM 2·LOW 4 는
+팀장 `2ae102b` + 구현 레인 `86ba432` 로 등재 처리). **재작업 0회**. test +13(총 1071). `Char.lowercaseChar()` 는 우회가 아니라 강제된
+처방(`String.lowercase()` 는 `Locale.ROOT` 참조로 도메인 아키텍처 게이트에 걸림 — 실측). `OPEN-4B7-TARGET-LABEL`·`OPEN-4B7-CATEGORY-
+NORMALIZATION` 닫힘. **알려진 제한·OPEN**: `OPEN-4B8-DEAD-DERIVED-RULES`(4B 분류기에서 `DerivedYega`·`DerivedVat` 도달 불가 — `won` 정수
+성질, `decision` 후속) · `OPEN-4B8-CATEGORY-BACKFILL` · Kotlin/Python 정규화가 갈리는 입력 넷(U+0085 절삭, `İ`·종단 시그마·U+10400 소문자화
+— 공종 코드는 ASCII 라 실무 영향 0) · 복원 경로 정규화 test 부재(구조적 관측 불가) · 크기 게이트 초과(소형 slice 의 규칙표 구조적).
+정본 `reports/evidence/m4/4b8/checklist.md`.
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,

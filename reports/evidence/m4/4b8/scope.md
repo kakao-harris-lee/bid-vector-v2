@@ -23,6 +23,7 @@
 milestone: m4
 slice: 4b8-target-label-and-category-key
 base_sha: 845e29b
+head_sha: 5246705   # 리뷰 요청 시점(verifier r1 ready + 장부 처분 완료) — 종결 등재 커밋은 이 뒤에 붙는다
 in_scope:
   - procurement/src/main/kotlin/bidvector/procurement/BusinessCategory.kt          # ① CategoryCode: private 생성자(@ConsistentCopyVisibility) + `of(raw)` 팩토리(strip+lower, 빈 키는 기존과 같이 require 거부) + `normalizeCategoryKey(raw): String` 단일 함수 — D-4B8-3
   - procurement/src/main/kotlin/bidvector/procurement/Canonicalize.kt              # 수집 경로 `CategoryCode.of(code)` — D-4B8-4
