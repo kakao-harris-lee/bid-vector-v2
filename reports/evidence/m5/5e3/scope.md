@@ -20,6 +20,7 @@ in_scope:
   - ml-engine/tests/app/test_server.py                       # (a) 래퍼 제거 뒤 malformed 4 case parametrize 가 그대로 초록(수정 0 목표)
   - ml-engine/tests/training/test_holdout.py                 # (b) should_stop 이 N 창 뒤 참 → HoldoutCancelled, trainer 호출 수 == N(변이: 확인 지점 제거 시 붉어짐) · 기본 인자면 기존 test 무변경
   - ml-engine/tests/app/test_pipeline.py                     # (b) 창 중간 취소 → PipelineCancelled, artifact 파일 0, 기존 경계 test 무변경
+  - ml-engine/pyproject.toml                                 # (a) import-linter forbidden 계약 한 블록 — `yaml` 은 `ml_engine.registry.policy` 만 import(ignore_imports 한 줄), 나머지 ml_engine 전부 금지. D-5E3-6, 계약 갱신 (3). 다른 블록·의존성 무편집
   - ml-engine/tests/registry/__init__.py                     # (a) 빈 패키지 마커 — tests/registry/test_policy.py 가 tests/inference/test_policy.py 와 basename 충돌(rootless test 트리, 5C-1 rebase 때와 같은 함정)해 collection 오류. 계약 갱신 (2)
   - milestone-5.md                                           # 5E 절 5E-3 착수 문단
   - reports/evidence/m5/5e3/**
@@ -28,12 +29,14 @@ out_of_scope:
   - job 영속·큐 상한·임베딩 실물·GBM 서빙 경로(각 OPEN 유지)
 acceptance_commands:
   - "(cd ml-engine && uv sync --frozen --all-extras)"                                                                  # S-0
+  - "(cd ml-engine && set -euo pipefail && uv sync --frozen --extra serving --no-dev && for m in sqlalchemy psycopg requests httpx celery; do if uv run --no-sync python -c \"import $m\" >/dev/null 2>&1; then echo \"금지 패키지 $m 이 serving extras 에 설치됐다\" >&2; exit 1; fi; done && uv sync --frozen --all-extras)"   # S-1b — CI step 「serving extras 분리 확인」 run 블록과 동일(계약 갱신 (3))
   - "(cd ml-engine && uv run ruff check . && uv run ruff format --check .)"                                           # S-2
   - "(cd ml-engine && uv run mypy --strict src/ml_engine)"                                                             # S-3
   - "(cd ml-engine && uv run lint-imports)"                                                                            # S-4
   - "(cd ml-engine && uv run python -m pytest tests -q)"                                                               # S-5
   - "(cd ml-engine && uv run python tools/design_ratchet.py --check)"                                                  # S-6
-  - "(cd ml-engine && uv run python tools/reuse_provenance_check.py)"                                                  # S-7
+  - "(cd ml-engine && set -euo pipefail && uv run python tools/reuse_provenance_check.py && if uv run python tools/reuse_provenance_check.py --evidence tests/gates/fixtures/reuse-mismatch.md; then echo \"양성 대조(어긋난 evidence)가 실패해야 하는데 통과했다\" >&2; exit 1; fi)"   # S-7 — CI step 「재활용 출처 두 자리 대조」 run 블록과 동일(양성 대조 포함, 계약 갱신 (3))
+  - "(cd ml-engine && uv run python -c \"import tomllib,pathlib; p=tomllib.load(open('pyproject.toml','rb')); v=pathlib.Path('.python-version').read_text().strip(); assert v.startswith('3.12') and '3.12' in p['project']['requires-python'], (v, p['project']['requires-python'])\")"   # S-9 — CI step 「Python 버전 두 자리 대조」 그대로(계약 갱신 (3))
   - "./gradlew --no-daemon check"                                                                                      # S-10 — evidence 커밋마다 그 HEAD 에서
   - "(cd ml-engine && uv build --wheel -o /tmp/ml-engine-wheel && uv run python -m pytest tests/gates/test_wheel_reexport.py -q)"   # S-11 승계
   - "./tools/contract-crosslang-smoke.sh"                                                                              # S-12 승계
@@ -52,6 +55,7 @@ rollback: |
 | **D-5E3-3** | `run_holdout` 은 `should_stop: Callable[[], bool]` 을 **키워드 기본 인자**로 받는다(기본 항상 거짓). 창마다 학습 **전**에 확인, 참이면 `HoldoutCancelled(completed_windows: int)` 반환(결과 타입 — 예외 아님, 부분 보고서 조립 없음). `training.holdout` 은 `training.jobs` 를 import 하지 않는다(콜러블 주입) | 층 결합 회피 · 5C-2 시그니처 하위 호환(기존 호출자·test 무변경) | 계약 고정 |
 | **D-5E3-4** | `app/pipeline.py` 는 `HoldoutCancelled` 를 `PipelineCancelled` 로, 부분 결과·artifact 파일 0. 기존 경계 넷 유지(다섯째가 창 루프 안) — 경계별 변이 test 관례(5E-1 M-2) 그대로 | 5E-1 D-2D-7 | 계약 고정 |
 | **D-5E3-5** | 5C-2 파일(`holdout.py`) 편집은 **추가만**(새 인자·새 결과 타입·루프 앞 한 줄) — 산식·창 계획·보고서 조립 무변경, 5C-2 golden·mutation test 전부 무편집 통과 | 5C-2 종결 산출물 보호 | 계약 고정 |
+| **D-5E3-6** (계약 갱신 (3), verifier r1 HIGH-1) | 「yaml 을 부르는 곳은 `registry/policy.py` 하나」를 **텍스트 스캔이 아니라 구조로** 닫는다: ① import-linter `forbidden` 계약 — `ml_engine` 전부에 `yaml` 금지, `ignore_imports = ["ml_engine.registry.policy -> yaml"]` 한 줄(S-4 가 CI 에서 강제, 별칭 import·from-import·`full_load`·`safe_load_all` 전부 import 단계에서 잡힘) ② 게이트 test 의 로더 수집은 반환 주석 문자열이 아니라 **모듈 규약**으로 — `ml_engine.*.policy` 서브모듈 전부를 열거하고 각 모듈의 `load_` 접두 public 함수 전부를 대상으로 삼되, **정책 모듈마다 로더 ≥1** 과 **수집 집합 == 열거 집합** 을 단언(하한 `>= 4` 폐지) ③ 기존 텍스트 스캔 test 는 AST 기반(`yaml` 이름을 참조하는 모듈 집합 == {`registry.policy`})으로 바꾸거나 ① 이 대체하면 삭제 — 둘 중 하나, 두 겹 유지는 값 없음 | verifier r1 이 심은 다섯째 로더(타입 별칭 주석 + yaml 별칭 import)가 게이트 넷을 초록인 채 통과해 raw 파서 예외를 누출 — 우회 (1)·(5) 미폐쇄. 문자열에 기대는 술어는 스타일 하나로 열린다 | 계약 고정 — 수정 라운드 1 |
 
 ## 위협 모델 — 5E-3 고유 경계
 **방어한다**: (a) 어떤 정책 로더도 문법 오류를 예외로 새지 않는다(뿌리 + 게이트) (b) 취소된 job 이 남은 창을 학습하지 않는다(창 단위) (c) 취소가 부분 보고서를 「성공」으로 위장하지 않는다(`HoldoutCancelled` 는 결과 타입, artifact 0).
@@ -82,3 +86,4 @@ rollback: |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-5E3-1~5 | 사용자 「M5 남은 작업 계속 진행」 · 결정 불요 미결 둘 |
 | 2026-09-16 리뷰 요청(2) | in_scope 에 `ml-engine/tests/registry/__init__.py` 추가(구현 레인 보고 「새 파일 ↔ in_scope 대조 1건 미등재」) · **D-5E3-5 해석 등재**: 「추가만」은 산식·창 계획·보고서 조립의 불변을 뜻하고, design ratchet(함수 50줄)을 지키기 위한 `_evaluate_windows` → `_record_window_outcome` 순수 이동은 그 안에서 허용한다(5C-2 test 22 case 무편집 통과가 불변의 증거 — verifier 표적) | 팀장 — 구현 완료 보고 `80629cd` 대조. 하네스 레인 절 재확인(없음) |
+| 2026-09-16 수정 라운드 1(3) | **D-5E3-6 신설**(게이트 술어를 구조로 — import-linter forbidden `yaml` + 모듈 규약 수집 + 텍스트 스캔 대체) · in_scope 에 `ml-engine/pyproject.toml`(import-linter 블록 한 개) 추가 · acceptance 에 CI `ml-engine` job 의 **S-1b·S-7 양성 대조·S-9** 를 run 블록 그대로 추가(verifier r1 LOW ② — 초판이 CI job 을 통째로 복사하지 않았다, 5E-2 와 같은 팀장 오류) | verifier r1 not-ready(HIGH-1 게이트 술어 우회 — 표적 재검증 대상) |
