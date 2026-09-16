@@ -52,6 +52,9 @@
 - exit: 0 — BUILD SUCCESSFUL, 337 task(35 executed, 302 up-to-date)
 - cmd: `./gradlew --no-daemon check`(HEAD `4d2c1d8`, evidence 패키지 커밋 뒤 재실측)
 - exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
+- cmd: `./gradlew --no-daemon check`(HEAD `f671fe9`, 이 줄을 적기 직전의 최종 재실측 —
+  이 커밋 자체는 본문 두 줄만 추가하는 텍스트 편집이라 이 행 이후 추가 재실측 없음)
+- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
 
 ## S-11
 - cmd: `(cd ml-engine && uv build --wheel -o /tmp/ml-engine-wheel-5e3 && uv run python -m pytest tests/gates/test_wheel_reexport.py -q)`
