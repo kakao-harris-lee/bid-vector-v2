@@ -20,6 +20,8 @@ private val TEST_RELEASE_SELECTOR = ModelReleaseSelector.LatestPromoted
 private val TEST_OBJECTIVE = OptimizationObjective.SCENARIO_TRIPLE
 private val TEST_CATEGORY_OFFSET: BigDecimal = BigDecimal.ZERO
 private val TEST_ROUNDING_POLICY = RoundingPolicy(scaleDigits = 0, mode = RoundingMode.HALF_UP)
+private const val TEST_SAMPLE_WINDOW_DAYS = 365
+private const val TEST_MAX_SAMPLES = 500
 
 /**
  * [OpportunityPolicyData] 불변식(4B-6a scope.md ⑥ + 4B-6b D-4B6B-5) + 출하 `OPPORTUNITY_POLICY`
@@ -39,6 +41,8 @@ class OpportunityPolicyDataTest {
         objective: OptimizationObjective = TEST_OBJECTIVE,
         categoryOffset: BigDecimal = TEST_CATEGORY_OFFSET,
         recommendedAmountRounding: RoundingPolicy = TEST_ROUNDING_POLICY,
+        sampleWindowDays: Int = TEST_SAMPLE_WINDOW_DAYS,
+        maxSamples: Int = TEST_MAX_SAMPLES,
     ): OpportunityPolicyData =
         OpportunityPolicyData(
             synthesisVersion = synthesisVersion,
@@ -50,6 +54,8 @@ class OpportunityPolicyDataTest {
             objective = objective,
             categoryOffset = categoryOffset,
             recommendedAmountRounding = recommendedAmountRounding,
+            sampleWindowDays = sampleWindowDays,
+            maxSamples = maxSamples,
         )
 
     @Test
@@ -157,6 +163,35 @@ class OpportunityPolicyDataTest {
         policy.objective shouldBe OptimizationObjective.SCENARIO_TRIPLE
         policy.categoryOffset shouldBe BigDecimal.ZERO
         policy.recommendedAmountRounding shouldBe RoundingPolicy(scaleDigits = 0, mode = RoundingMode.HALF_UP)
+    }
+
+    // ---- M4/4B-7(D-4B7-3) — sampleWindowDays·maxSamples ----
+
+    @Test
+    fun `sampleWindowDays 가 0 이하면 생성 실패`() {
+        shouldThrow<IllegalArgumentException> { policy(sampleWindowDays = 0) }
+        shouldThrow<IllegalArgumentException> { policy(sampleWindowDays = -1) }
+    }
+
+    @Test
+    fun `maxSamples 가 0 이하면 생성 실패`() {
+        shouldThrow<IllegalArgumentException> { policy(maxSamples = 0) }
+        shouldThrow<IllegalArgumentException> { policy(maxSamples = -1) }
+    }
+
+    @Test
+    fun `sampleWindowDays maxSamples 가 양수면 생성 성공`() {
+        val data = policy(sampleWindowDays = 30, maxSamples = 10)
+        data.sampleWindowDays shouldBe 30
+        data.maxSamples shouldBe 10
+    }
+
+    @Test
+    fun `출하 값 — sampleWindowDays 365 maxSamples 500(D-4B7-3, 승인 대기)`() {
+        val policy = OPPORTUNITY_POLICY.resolve(LocalDate.of(2026, 9, 16)).shouldBeResolved()
+
+        policy.sampleWindowDays shouldBe 365
+        policy.maxSamples shouldBe 500
     }
 
     private fun <T> Resolution<T>.shouldBeResolved(): T {

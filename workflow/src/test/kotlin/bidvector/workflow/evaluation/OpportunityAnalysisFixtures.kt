@@ -123,6 +123,20 @@ internal class FakeEmbedTextPort(
     }
 }
 
+/** M4/4B-7 — `CompetitionSamplePort` fake. 기본값은 표본 0건(빈 supply). */
+internal class FakeCompetitionSamplePort(
+    val outcomeFor: (CompetitionSampleQuery) -> CompetitionSampleSupply = {
+        CompetitionSampleSupply.Supplied(samples = emptyList(), excluded = emptyMap())
+    },
+) : CompetitionSamplePort {
+    val queriesSeen = mutableListOf<CompetitionSampleQuery>()
+
+    override fun samplesFor(query: CompetitionSampleQuery): CompetitionSampleSupply {
+        queriesSeen += query
+        return outcomeFor(query)
+    }
+}
+
 internal class FakeBidPredictionPort(
     val outcomeFor: (BidPredictionRequest) -> BidPredictionOutcome,
 ) : BidPredictionPort {
@@ -173,6 +187,8 @@ internal fun testNoticeWithMoney(
     won: Long = 1_000_000_000L,
     floorRate: FloorRate? = null,
     deadlineAt: Instant? = FUTURE_DEADLINE,
+    // M4/4B-7(D-4B7-9) — 경쟁 표본 조회 축(categoryCode) test 용. 기본값은 기존 fixture와 바이트 동일.
+    businessCategory: bidvector.procurement.BusinessCategory? = null,
 ): Notice {
     val observation =
         RawNoticeObservation.of(
@@ -190,7 +206,7 @@ internal fun testNoticeWithMoney(
     return Notice.collected(
         NoticeCollected(
             id = NoticeId(NoticeNumber.of(number), NoticeRound.of("000")),
-            businessCategory = null,
+            businessCategory = businessCategory,
             baseAmount = resolvedBaseAmount,
             estimatedAmount = null,
             allocatedBudget = null,
