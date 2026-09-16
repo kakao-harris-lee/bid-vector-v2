@@ -92,3 +92,8 @@ test_kernel_golden.py`·`reports/evidence/m5/5d3/`·`milestone-5.md`·`scope.md`
 충족하지 못한다 — verifier r1 F-3). 이전 등재(`01eecf2` HEAD)는 verifier r2 N-1·N-3 시정
 커밋으로 트리가 바뀌어 낡았다. N-1·N-3 일괄 커밋 `77ce399` HEAD에서 실행 — exit 0
 (`BUILD SUCCESSFUL`, `leakPatternGate` 포함 전 모듈 `check`).
+
+## 2026-09-16 종결 커밋 HEAD 재실측 (팀장)
+- cmd: `./gradlew --no-build-cache --no-daemon clean check` (HEAD `9cfc9a5` — milestone-5 종결 문단·checklist 승인 절)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL, 346 tasks. `origin/main` 은 base `d096663` 그대로 — 흡수 병합 없음.
