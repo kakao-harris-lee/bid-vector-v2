@@ -1,0 +1,6 @@
+{
+  "milestone": "m5",
+  "slice": "5e3-policy-loader-root-and-holdout-cancel",
+  "status": "N/A",
+  "reason": "이 slice는 새 authoritative/observed/legacy-behavior fixture corpus case를 추가하지 않는다. (a) 정책 YAML 문법 오류 정규화는 합성 malformed YAML 텍스트(tests/registry/test_policy.py·tests/gates/test_policy_loaders_fail_closed.py 안에서 인라인 생성)로 검증하고, (b) 창 루프 취소 정밀도는 tests/training/test_holdout.py의 기존 합성 코퍼스 생성 헬퍼(_many_rows·_dataset)를 그대로 재사용해 만든 3창 시나리오로 검증한다. fixtures/manifest.yaml을 편집하지 않았다(git diff로 확인, git diff --name-status 8799e05..HEAD 에 fixtures/ 경로 없음)."
+}
