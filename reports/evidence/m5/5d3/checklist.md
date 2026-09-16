@@ -87,3 +87,10 @@ ml-engine/src ml-engine/tests`(구현 전, 설계 검토 구현 지시 1). src �
 ## 재검증 명령
 
 `reports/evidence/m5/5d3/commands.md` S-1~S-9 전건.
+
+## 사용자 승인
+
+2026-09-16 — 운영자 지시 「PR #16 머지 승인. 5D-3 추천으로 진행」 하에 착수·구현·검증·종결·PR 까지 진행
+(머지는 별도 승인). verifier r2 `ready-for-review`(`_workspace/m5-5d3/04_verifier_report_r2.md`), 재작업 1회.
+verifier r2 N-1·N-2·N-3 은 `7dec149`(계약)·`77ce399`(rollback 재실측·N-3 test) 로 일괄 처리, 재검증 없이 종결
+(차단 문턱 밖 — 리뷰 레인이 본다).

@@ -123,6 +123,16 @@ POSTERIOR_PREDICTIVE`·`DistributionRelease` 는 내부 타입(wire 매핑 `OPEN
 비트 동일 · golden corpus 무편집(011 수치를 `test_engine.py` 가 wire 요청으로 조립해 대조). base = PR #16 병합 커밋, 브랜치
 `m5-5d3/2026-09-16`, `ml-engine/**` 만. 정본 `reports/evidence/m5/5d3/scope.md`, 설계 검토 `_workspace/m5-5d3/02_design-review.md`.
 
+**5D-3 종결 2026-09-16(사용자 승인 — 「5D-3 추천으로 진행」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1 `not-ready`
+(HIGH 2: ① 계약 `in_scope` 가 실제 변경 3경로를 빠뜨려 clean-tree 게이트 false-clean ② 요청 축(`FeatureInputs`) 결측 사유
+판정이 「`UNSPECIFIED` 만 거부」에서 닫힌 열거로 좁아짐 — 팀장이 계약으로 흡수하려 했으나 verifier 가 뒤집음: 요청 축 `Missing(raw)`
+는 권한 0 인데 거부는 **요청 전체**를 죽이고, enum 값 추가는 breaking 이 아니라 다음 additive 라운드에서 구버전 엔진이 전 요청을
+거부) → 계약 정정 + 되돌림(test 로 잠금) → r2 `ready`(base 동등성 네 축 여섯 값 · 011 wire 경유 일치 + 변이 · 비트 동일 diff 0 ·
+rollback ①~⑥ 전건 초록). 재작업 1회. pytest 661 → 680, golden 14/14. **ML-04 ② 서빙 경로 충족**, `OPEN-5D2-SAMPLE-SEGMENT`
+닫힘(5D-2 알려진 제한 1·8 해소). **신규 OPEN**: `OPEN-5D3-SENDER-PRECONDITION`(표본 축 oneof 미설정 송신자는 전 표본 거부 —
+현행 송신자 `RequestMapping.kt` 는 항상 설정, 5E-2 전제). 승계: `OPEN-5D2-POLICY-VALUES` · `OPEN-2B-AGENCY-ID` · 미인식
+`BaseAmountProvenanceLabel` 의 `ValueError`(base 동일, 5B/5E 후속). 다음은 5E-2(다른 레인, 2F 병합 완료로 전건 충족).
+
 ### Slice 5B — feature schema
 
 - versioned feature name/order/type/range
