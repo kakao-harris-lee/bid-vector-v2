@@ -71,5 +71,9 @@ exit 0(BUILD SUCCESSFUL, 355 tasks) — 되돌린 트리가 4B-7 종결 시점�
 
 ## evidence 커밋 HEAD 재실측(패턴 어휘 자기참조 방지, 2026-09-16 규약)
 
-- cmd: `./gradlew --no-daemon --no-build-cache clean check`(evidence 문서 다섯 커밋 뒤 HEAD)
-- exit: 0(예정 — 이 문서를 담는 커밋 직후 재실행해 기록. 결과가 다르면 이 절을 갱신한다)
+- cmd: `./gradlew --no-daemon --no-build-cache clean check`(evidence 문서 다섯 커밋
+  `d457040` HEAD)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — evidence 문서 다섯 커밋 뒤에도 전 모듈 `check` 그대로
+  통과, 이 문서들이 비밀값 스캔 게이트를 스스로 깨지 않는다. N-5(4B-7 commands.md와 같은
+  성격) — 이 결과를 적는 커밋 자체의 재실측은 다음 라운드가 있으면 그때 확인한다.
