@@ -60,7 +60,7 @@ val ML_CALL_POLICY: EffectiveDatedPolicy<MlCallPolicyData> =
         source = "reports/evidence/m4/4d/policy-values.md §1·§2·§3 — 사용자 승인 2026-09-10",
         entries =
             listOf(
-                EffectiveFrom.Initial to placeholderMlCallPolicy(featureSchemaVersion = "bidvector.ml.v1"),
+                EffectiveFrom.Initial to placeholderMlCallPolicy(featureSchemaVersion = "award-rate-features-v2"),
             ),
     )
 

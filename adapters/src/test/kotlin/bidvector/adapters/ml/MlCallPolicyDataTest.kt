@@ -93,6 +93,19 @@ class MlCallPolicyDataTest {
         data.breakerFailureRateThresholdPercent shouldBe 50
         data.breakerSlidingWindowSize shouldBe 10
         data.breakerWaitDurationInOpenState shouldBe Duration.ofSeconds(30)
-        data.featureSchemaVersion shouldBe "bidvector.ml.v1"
+        data.featureSchemaVersion shouldBe "award-rate-features-v2"
+    }
+
+    // ---- D-5F2-2 — Python SUPPORTED_FEATURE_SCHEMAS 와의 동일성은 문서 대조로 잠근다 ----
+    // (교차 언어 실 대조는 6C `OPEN-5E2-CROSSLANG-REAL-SERVER`). 리터럴은 `ML_CALL_POLICY`
+    // 한 자리(MlCallPolicyData.kt)에만 두고, 이 test 는 그 인스턴스를 resolve 해 대조한다
+    // (정책 데이터 두 자리 금지).
+
+    @Test
+    fun `featureSchemaVersion 은 5B가 신설한 award-rate-features-v2 와 같다(D-5B-1, Python SUPPORTED_FEATURE_SCHEMAS 정본)`() {
+        val resolution = ML_CALL_POLICY.resolve(LocalDate.now())
+        resolution.shouldBeInstanceOf<Resolution.Resolved<MlCallPolicyData>>()
+
+        resolution.value.featureSchemaVersion shouldBe "award-rate-features-v2"
     }
 }
