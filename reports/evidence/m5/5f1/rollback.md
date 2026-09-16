@@ -7,10 +7,10 @@
 커밋을 가리킬 수 없다는 규율(2026-09-10) — 목록에서 제외.
 
 base = `845e29b`(PR #21 5E-3 병합 = main), 코드+evidence 마지막 커밋 =
-`6a06b84`(commands.md S-10 최종 재실측 한 줄).
+`eceb488`(commands.md S-10 최종 재실측 한 줄).
 
 ```
-$ git diff --name-status 845e29b..6a06b84 -- \
+$ git diff --name-status 845e29b..eceb488 -- \
     ml-engine/policy/inference-v1.yaml \
     reports/evidence/m5/5d/policy-values.md \
     reports/evidence/m5/5d2/policy-values.md \
@@ -41,7 +41,7 @@ A	reports/evidence/m5/5f1/scope.md          # 팀장 소유 — 제외
 `test_server_prediction.py`쪽에 후보율 확인을 넣기로 판단해 이 파일은 무편집으로
 끝났다, checklist.md 참고). `ml-engine/tests/inference/test_scenario.py`는 계약 갱신
 (2)(팀장 확인 `e4ba6a4`)로 in_scope 에 편입돼 `M` 상태다 — 다른 slice 와 겹치는 줄이
-없다(`git log --oneline 845e29b..6a06b84 -- ml-engine/tests/inference/test_scenario.py`
+없다(`git log --oneline 845e29b..eceb488 -- ml-engine/tests/inference/test_scenario.py`
 가 이 slice 커밋 하나(`1aac701`)만 반환). 마찬가지로 `reports/evidence/m5/5d/
 policy-values.md`·`reports/evidence/m5/5d2/policy-values.md`도 이 slice 커밋
 (`b687bbc`) 하나뿐 — hunk 격리 없이 `base..HEAD` 통째 되돌림으로 충분하다.
@@ -79,21 +79,24 @@ git rm reports/evidence/m5/5f1/reuse.md reports/evidence/m5/5f1/golden-manifest.
    `leakPatternGate`·전건 `check` 가 초록임을 확인(이 slice 는 Kotlin/`adapters` src
    를 건드리지 않으므로 게이트가 닿는 지점은 `reports/evidence` 스캔뿐).
 
-## 임시 clone 실측(2026-09-16, `test_scenario.py` 편입 뒤 재실측)
+## 임시 clone 실측(2026-09-16, D-5F1-5 test 강화 뒤 최종 재실측)
 
-`git clone -q <worktree> <scratch>`(HEAD `6a06b84`) 뒤 위 ①~⑥ 을 그대로 실행:
+`git clone -q <worktree> <scratch>`(HEAD `eceb488`) 뒤 위 ①~⑥ 을 그대로 실행:
 - ① `git restore`·`git rm` exit 0
 - ② `git diff 845e29b -- <M 경로 여덟>` 0줄
 - ③ `uv sync --frozen --all-extras` exit 0
 - ④ `uv run python -m pytest tests -q` exit 0, **952 passed**(`test_scenario.py`
   포함 — 되돌린 두 test 의 `center=1.0`이 base clamp_max 1.4 에서 다시 안전함을
-  재확인, 신설 D-5F1-5 test 는 base 에 없으므로 카운트에서 사라짐)
+  재확인, 신설 D-5F1-5 test 는 base 에 없으므로 카운트에서 사라짐. 이 slice 의
+  최종 954 passed 와의 차이 2 는 D-5F1-5 test 가 parametrize 로 2 건이기 때문)
 - ⑤ ④ 겸함
 - ⑥ `./gradlew --no-daemon check` exit 0, BUILD SUCCESSFUL(346 tasks, 211 executed,
   135 from cache — Gradle 캐시 상태에 따라 executed/from-cache 분배는 실행마다
   달라질 수 있다, 합계와 BUILD SUCCESSFUL이 판정 기준)
 
-이 문서의 명령은 문서로만 존재하는 것이 아니라 실행 가능성이 확인됐다.
+이 문서의 명령은 문서로만 존재하는 것이 아니라 실행 가능성이 확인됐다(2026-09-16
+두 차례 — 계약 갱신 (2) 직후 1회, D-5F1-5 test 강화 뒤 1회 — 목록·exit·수치 전부
+재현됨).
 
 ## 하네스 레인 변경
 
