@@ -103,3 +103,9 @@
 - exit: 0
 - 핵심 결과: `== 교차 언어 socket 스모크 통과 ==`. `git status --porcelain` 결과 없음(clean)
 
+## evidence 커밋(`a8b0a4a`) HEAD 재실측 — 자기참조 방지 (2026-09-16)
+- cmd: `./gradlew --no-daemon check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(`leakPatternGate` 포함) — 이번 라운드가 더한 evidence 문서도
+  스캔 어휘를 축어로 담지 않는다는 것을 이 커밋 HEAD 에서 직접 확인
+
