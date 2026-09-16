@@ -69,15 +69,21 @@
 - exit: 0
 - 핵심 결과: Contracts: 8 kept, 0 broken(ignored import 2)
 
-## S-5(전체 pytest — **미완, scope 확장 대기**)
+## S-5(전체 pytest — 계약 갱신 (2) 반영 전, 파급 범위 확인용)
 
 - cmd: `(cd ml-engine && uv run python -m pytest tests -q)`
 - exit: 1
 - 핵심 결과: 2 failed(`tests/inference/test_scenario.py::test_candidates_have_fixed_
-  order_and_labels`·`test_matches_legacy_scenario_bid_rates_formula`, scope 밖), 950
-  passed. 이 파일을 제외한 나머지 전부(952건 중 950 + 이 slice 가 새로 늘리거나
-  반전한 test 전부)는 초록 — checklist.md 판단 4·알려진 제한 2 참고. 팀장이
-  scope 확장을 승인하면 이 항목을 재실측한다.
+  order_and_labels`·`test_matches_legacy_scenario_bid_rates_formula`, 당시 scope 밖),
+  950 passed. checklist.md 판단 4(해소 기록) 참고 — 팀장 계약 갱신(커밋 `e4ba6a4`)
+  뒤 `test_scenario.py`를 in_scope 로 편입하고 아래에서 재실측했다.
+
+## S-5(계약 갱신 (2) 반영 뒤, 최종)
+
+- cmd: `(cd ml-engine && uv run python -m pytest tests -q)`
+- exit: 0
+- 핵심 결과: 953 passed(base 952 + 신설 `test_center_at_clamp_max_folds_base_and_
+  aggressive_but_keeps_three_candidates` 1) — 전체 스위트 초록, 커밋 `1aac701`
 
 ## S-5(golden 서브셋, scope.md out_of_scope 「영향 0」 실측)
 
@@ -128,21 +134,28 @@
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL(29 tasks) / "교차 언어 socket 스모크 통과"
 
-## 경계 확인
+## 경계 확인(계약 갱신 (2) 반영 뒤 재실측)
 
 - cmd: `git log --oneline 845e29b..HEAD -- CLAUDE.md .claude/`
 - exit: 0(무출력 = 하네스 레인 변경 없음)
 - cmd: `git diff --name-status 845e29b..HEAD -- ml-engine/src`
-- exit: 0(무출력 = D-5F1-1 준수, `src/**` 무편집)
+- exit: 0(무출력 = D-5F1-1 준수, `src/**` 무편집 — `test_scenario.py` 편입 뒤도 유지)
 - cmd: `git diff --name-status 845e29b..HEAD -- reports/evidence/m5/5e2`
 - exit: 0(무출력 = D-5F1-4 준수, 5E-2 evidence 무편집)
 
-## clean-tree 게이트(in_scope 경로)
+## S-3·S-4 재확인(계약 갱신 (2) 반영 뒤)
 
-- cmd: `git status --porcelain -- ml-engine/policy/inference-v1.yaml reports/evidence/m5/5d/policy-values.md reports/evidence/m5/5d2/policy-values.md ml-engine/tests/inference/test_policy.py ml-engine/tests/inference/_policy_support.py ml-engine/tests/app/test_server_prediction.py ml-engine/tests/serving/test_kotlin_rules_parity.py ml-engine/tests/serving/test_wire.py reports/evidence/m5/5f1`
-- exit: 0(무출력 = 깨끗함, 커밋 `b5ebd3d` 기준)
+- cmd: `(cd ml-engine && uv run mypy --strict src/ml_engine)`
+- exit: 0 — Success: no issues found in 72 source files
+- cmd: `(cd ml-engine && uv run lint-imports)`
+- exit: 0 — Contracts: 8 kept, 0 broken
 
-## 비밀값 스캔
+## clean-tree 게이트(in_scope 경로, `test_scenario.py` 포함, 커밋 `1aac701` 기준)
 
-- cmd: `grep -rniE -f config/quality/leak-patterns.txt ml-engine/policy/inference-v1.yaml reports/evidence/m5/5d/policy-values.md reports/evidence/m5/5d2/policy-values.md ml-engine/tests/inference/test_policy.py ml-engine/tests/inference/_policy_support.py ml-engine/tests/app/test_server_prediction.py ml-engine/tests/serving/test_kotlin_rules_parity.py reports/evidence/m5/5f1/`
+- cmd: `git status --porcelain -- ml-engine/policy/inference-v1.yaml reports/evidence/m5/5d/policy-values.md reports/evidence/m5/5d2/policy-values.md ml-engine/tests/inference/test_policy.py ml-engine/tests/inference/_policy_support.py ml-engine/tests/inference/test_scenario.py ml-engine/tests/app/test_server_prediction.py ml-engine/tests/serving/test_kotlin_rules_parity.py ml-engine/tests/serving/test_wire.py reports/evidence/m5/5f1`
+- exit: 0(무출력 = 깨끗함)
+
+## 비밀값 스캔(`test_scenario.py` 포함)
+
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt ml-engine/policy/inference-v1.yaml reports/evidence/m5/5d/policy-values.md reports/evidence/m5/5d2/policy-values.md ml-engine/tests/inference/test_policy.py ml-engine/tests/inference/_policy_support.py ml-engine/tests/inference/test_scenario.py ml-engine/tests/app/test_server_prediction.py ml-engine/tests/serving/test_kotlin_rules_parity.py reports/evidence/m5/5f1/`
 - exit: 1(매치 없음 = 통과)
