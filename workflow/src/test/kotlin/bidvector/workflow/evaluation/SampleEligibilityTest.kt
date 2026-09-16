@@ -21,6 +21,7 @@ import bidvector.procurement.ResolvedEstimatedAmount
 import bidvector.procurement.SourceEndpoint
 import bidvector.sharedkernel.AwardAmount
 import bidvector.sharedkernel.BaseAmountProvenance
+import bidvector.sharedkernel.Basis
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EstimatedAmount
 import bidvector.sharedkernel.NoticeRound
@@ -28,6 +29,7 @@ import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
+import bidvector.sharedkernel.export
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
@@ -154,8 +156,16 @@ class SampleEligibilityTest {
         val reserveDraw = requireNotNull(outcome.sample.reserveDraw)
         reserveDraw.reservePrices.size shouldBe 15
         reserveDraw.selectedNumbers shouldBe setOf(1, 5, 9, 14)
+        // verifier r1 F-7 — Money 4성분 전수(basis·currency·vat·provenance), amountWon 하나만이 아니다.
+        val firstPrice = reserveDraw.reservePrices.first()
+        firstPrice.basis shouldBe Basis.BASE_AMOUNT
+        firstPrice.currency shouldBe Currency.KRW
+        firstPrice.vatTreatment shouldBe VatTreatment.UNKNOWN
+        // verifier r1 F-4 — 순번 "001"이 위치 0(=selected_numbers 의 번호 1)과 일치한다.
+        firstPrice shouldBe reserveDraw.reservePrices[0]
+        (firstPrice.export().won) shouldBe 900_000_001L
         // 우회 (18) — Published 의 회차는 표본 공고 자기 회차("001")다. 대상 공고 회차를 빌리지 않는다.
-        reserveDraw.reservePrices.first().provenance shouldBe Provenance.Published(NoticeRound.of("001"))
+        firstPrice.provenance shouldBe Provenance.Published(NoticeRound.of("001"))
     }
 
     @Test
@@ -212,12 +222,43 @@ class SampleEligibilityTest {
     }
 
     @Test
-    fun `RESERVE_PRICE_COUNT_MISMATCH — 14행`() {
+    fun `RESERVE_PRICE_COUNT_MISMATCH — 14행(미만)`() {
         val notice = testNotice()
         val opening = testOpening(notice.id, reservePrices = fifteenRows().dropLast(1))
 
         judge(notice, opening) shouldBe
             SampleEligibilityOutcome.Excluded(SampleExclusionReason.RESERVE_PRICE_COUNT_MISMATCH)
+    }
+
+    @Test
+    fun `RESERVE_PRICE_COUNT_MISMATCH — 16행(초과)`() {
+        val notice = testNotice()
+        val sixteenRows = fifteenRows() + reserveRow("016", won = 900_000_016L)
+        val opening = testOpening(notice.id, reservePrices = sixteenRows)
+
+        judge(notice, opening) shouldBe
+            SampleEligibilityOutcome.Excluded(SampleExclusionReason.RESERVE_PRICE_COUNT_MISMATCH)
+    }
+
+    @Test
+    fun `RESERVE_PRICE_SEQUENCE_INVALID — 건수는 15 지만 순번이 002 부터 016 까지다`() {
+        val notice = testNotice()
+        val shiftedRows = (2..16).map { n -> reserveRow(n.toString().padStart(3, '0'), 900_000_000L + n) }
+        val opening = testOpening(notice.id, reservePrices = shiftedRows)
+
+        judge(notice, opening) shouldBe
+            SampleEligibilityOutcome.Excluded(SampleExclusionReason.RESERVE_PRICE_SEQUENCE_INVALID)
+    }
+
+    @Test
+    fun `RESERVE_PRICE_SEQUENCE_INVALID — 순번이 정수로 파싱되지 않는다`() {
+        val notice = testNotice()
+        val rows = fifteenRows().toMutableList()
+        rows[0] = reserveRow("XYZ")
+        val opening = testOpening(notice.id, reservePrices = rows)
+
+        judge(notice, opening) shouldBe
+            SampleEligibilityOutcome.Excluded(SampleExclusionReason.RESERVE_PRICE_SEQUENCE_INVALID)
     }
 
     @Test

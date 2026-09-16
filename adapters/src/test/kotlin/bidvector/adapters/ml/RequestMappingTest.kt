@@ -10,10 +10,14 @@ import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.export
 import bidvector.workflow.prediction.CompetitionSample
 import bidvector.workflow.prediction.ReserveDrawObservation
+import contract.bidvector.ml.v1.AmountProvenanceKind
+import contract.bidvector.ml.v1.Basis
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.LocalDate
+import contract.bidvector.ml.v1.Currency as ProtoCurrency
+import contract.bidvector.ml.v1.VatTreatment as ProtoVatTreatment
 
 /**
  * M4/4B-7(D-4B7-5) — `reserve_draw`(features.proto 7번 필드) 왕복. `mapRequest`가 조립하는
@@ -65,6 +69,23 @@ class RequestMappingTest {
         proto.reserveDraw.reservePricesCount shouldBe 15
         proto.reserveDraw.reservePricesList.map { it.amountWon } shouldBe draw.reservePrices.map { it.export().won }
         proto.reserveDraw.selectedNumbersList.toSet() shouldBe setOf(1, 5, 9, 14)
+    }
+
+    /**
+     * verifier r1 F-7 — 예비가 `Money`의 basis·currency·provenance·vat 넷이 전부 왕복한다.
+     * 기존 test는 `amountWon`만 대조했다 — basis를 `YEGA`로, vat을 `INCLUSIVE`로 바꿔도
+     * 전부 초록이었다(D-4B7-1 문면이 못 박은 `BASE_AMOUNT`·`UNKNOWN`을 무측정으로 방치).
+     */
+    @Test
+    fun `reserveDraw 예비가 Money 는 basis currency provenance vat 넷이 왕복한다`() {
+        val draw = reserveDraw(priceCount = 1, numbers = setOf(1))
+
+        val price = mapped(sampleWith(draw)).getCompetitionSamples(0).reserveDraw.getReservePrices(0)
+
+        price.basis shouldBe Basis.BASIS_BASE_AMOUNT
+        price.currency shouldBe ProtoCurrency.CURRENCY_KRW
+        price.vatTreatment shouldBe ProtoVatTreatment.VAT_TREATMENT_UNKNOWN
+        price.provenance shouldBe AmountProvenanceKind.AMOUNT_PROVENANCE_KIND_PUBLISHED
     }
 
     @Test

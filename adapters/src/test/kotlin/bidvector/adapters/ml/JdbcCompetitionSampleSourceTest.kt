@@ -8,9 +8,11 @@ import bidvector.procurement.BusinessCategory
 import bidvector.procurement.CategoryCode
 import bidvector.procurement.CategoryLabel
 import bidvector.procurement.DrawNumberObservation
+import bidvector.procurement.Notice
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.procurement.NoticeRepository
 import bidvector.procurement.ObservationKey
 import bidvector.procurement.OpeningRankOneBid
 import bidvector.procurement.OpeningRankOneOutcome
@@ -178,6 +180,30 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
         supply.excluded shouldBe emptyMap()
     }
 
+    /** verifier r1 F-6 — 술어는 `<`(엄격 미만)다. `actual_opening_at == asOf`는 제외돼야 한다. */
+    @Test
+    fun `개찰일이 asOf 와 정확히 같으면 제외된다 — 경계값`() {
+        seedCandidate("SAMPLE-BOUNDARY-EQ-001", actualOpeningAt = asOf)
+
+        val supply = source().samplesFor(query()) as CompetitionSampleSupply.Supplied
+
+        supply.samples shouldBe emptyList()
+        supply.excluded shouldBe emptyMap()
+    }
+
+    /** verifier r1 F-6 — 창 하한 술어는 `>=`(포함)다. `actual_opening_at == asOf - windowDays`는 포함돼야 한다. */
+    @Test
+    fun `개찰일이 창 하한과 정확히 같으면 포함된다 — 경계값`() {
+        val windowDays = 30
+        val lowerBound = asOf.minusSeconds(windowDays * 86_400L)
+        seedCandidate("SAMPLE-BOUNDARY-WINDOW-001", actualOpeningAt = lowerBound)
+
+        val supply = source().samplesFor(query(windowDays = windowDays)) as CompetitionSampleSupply.Supplied
+
+        supply.samples.size shouldBe 1
+        supply.samples.single().openedOn shouldBe lowerBound.atZone(OPENING_DATE_ZONE).toLocalDate()
+    }
+
     @Test
     fun `창 안 후보는 자격을 만족하면 Eligible 로 포함된다`() {
         val id = seedCandidate("SAMPLE-WITHIN-001", actualOpeningAt = asOf.minusSeconds(3600))
@@ -192,17 +218,32 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
         id shouldBe id
     }
 
+    /**
+     * verifier r1 F-1 — 이전 판은 두 후보를 같은 Asia/Seoul 날짜(같은 시각대의 `-3600s`·
+     * `-7200s`)로 심어 `openedOn`(유일하게 식별 가능한 축) 으로 정렬을 구별할 수 없었다
+     * (`ORDER BY … DESC` → `ASC` 변이가 살아남았다, 리포트 「변이 실측」). 후보 셋을 **서로
+     * 다른 날짜**(1·2·3일 전)로 심고, `NULLS LAST` 후보(개찰일 결측)도 함께 심어 상한을
+     * 먼저 먹지 않는지 대조한다 — 상한 2에 유효 날짜 후보 3 + 결측 1이면, DESC 정렬은
+     * 가장 최근 둘(1일 전·2일 전)만 낸다.
+     */
     @Test
-    fun `상한을 넘는 후보는 최신 순으로 잘린다`() {
-        val older = asOf.minusSeconds(7200)
-        val newer = asOf.minusSeconds(3600)
-        seedCandidate("SAMPLE-ORDER-OLD-001", actualOpeningAt = older)
-        seedCandidate("SAMPLE-ORDER-NEW-001", actualOpeningAt = newer)
+    fun `상한을 넘는 후보는 최신 순으로 잘리고 결측일 후보가 상한을 먼저 먹지 않는다`() {
+        val oldest = asOf.minusSeconds(3 * 86_400L)
+        val middle = asOf.minusSeconds(2 * 86_400L)
+        val newest = asOf.minusSeconds(1 * 86_400L)
+        seedCandidate("SAMPLE-ORDER-OLDEST-001", actualOpeningAt = oldest)
+        seedCandidate("SAMPLE-ORDER-MIDDLE-001", actualOpeningAt = middle)
+        seedCandidate("SAMPLE-ORDER-NEWEST-001", actualOpeningAt = newest)
+        seedCandidate("SAMPLE-ORDER-NODATE-001", actualOpeningAt = null)
 
-        val supply = source().samplesFor(query(limit = 1)) as CompetitionSampleSupply.Supplied
+        val supply = source().samplesFor(query(limit = 2)) as CompetitionSampleSupply.Supplied
 
-        supply.samples.size shouldBe 1
-        supply.samples.single().openedOn shouldBe newer.atZone(OPENING_DATE_ZONE).toLocalDate()
+        supply.samples.size shouldBe 2
+        supply.samples.map { it.openedOn }.toSet() shouldBe
+            setOf(
+                newest.atZone(OPENING_DATE_ZONE).toLocalDate(),
+                middle.atZone(OPENING_DATE_ZONE).toLocalDate(),
+            )
     }
 
     @Test
@@ -213,6 +254,51 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
 
         supply.samples shouldBe emptyList()
         supply.excluded shouldBe mapOf(SampleExclusionReason.OPENING_DATE_MISSING to 1)
+    }
+
+    /**
+     * verifier r1 F-3 — 합계 불변식 `samples.size + excluded.values.sum() == 후보 수`.
+     * `VanishingNoticeRepository`로 스캔(SQL)과 복원(`find`) 사이에 행 하나가 사라지는
+     * 상황을 흉내 낸다 — 실제 삭제 경로는 이 저장소에 없지만, `candidatePair`의 `null`
+     * 분기가 조용히 사라지지 않고 `CANDIDATE_VANISHED`로 계수되는지는 이렇게만 잴 수 있다.
+     */
+    @Test
+    fun `합계 불변식 — samples 와 excluded 의 합은 후보 수와 같다(CANDIDATE_VANISHED 포함)`() {
+        seedCandidate("SAMPLE-SUM-ELIGIBLE-001", actualOpeningAt = asOf.minusSeconds(3600))
+        val vanishedId = seedCandidate("SAMPLE-SUM-VANISHED-001", actualOpeningAt = asOf.minusSeconds(3600))
+        seedCandidate("SAMPLE-SUM-EXCLUDED-001", actualOpeningAt = null) // OPENING_DATE_MISSING
+
+        val vanishingRepo = VanishingNoticeRepository(JdbcNoticeRepository(dataSource()), vanishedId)
+        val src =
+            JdbcCompetitionSampleSource(
+                dataSource(),
+                vanishingRepo,
+                JdbcOpeningResultRepository(dataSource()),
+                Clock.fixed(asOf, ZoneOffset.UTC),
+            )
+
+        val supply = src.samplesFor(query()) as CompetitionSampleSupply.Supplied
+
+        (supply.samples.size + supply.excluded.values.sum()) shouldBe 3
+        supply.samples.size shouldBe 1
+        supply.excluded shouldBe
+            mapOf(
+                SampleExclusionReason.CANDIDATE_VANISHED to 1,
+                SampleExclusionReason.OPENING_DATE_MISSING to 1,
+            )
+    }
+
+    /** [candidatePair]가 `null`을 내는 경로(스캔 뒤 복원 시점에 행이 사라짐)를 흉내 내는 fake — 위 test 전용. */
+    private class VanishingNoticeRepository(
+        private val delegate: NoticeRepository,
+        private val vanishedId: NoticeId,
+    ) : NoticeRepository {
+        override fun persist(
+            command: NoticeCollected,
+            observationKey: ObservationKey,
+        ): PersistOutcome = delegate.persist(command, observationKey)
+
+        override fun find(id: NoticeId): Notice? = if (id == vanishedId) null else delegate.find(id)
     }
 
     /**
