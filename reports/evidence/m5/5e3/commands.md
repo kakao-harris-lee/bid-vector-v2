@@ -4,6 +4,15 @@
 커밋마다 그 HEAD 에서 재실측) + (2b) 호출자 실측. 명령·exit·핵심 결과 한 줄만 —
 출력 전문·라운드 이력 절은 남기지 않는다(evidence-pack 규율).
 
+## 수정 라운드 1 종결 시점(HEAD `7df311e`) 전건 재실측 — 2026-09-16
+
+S-0·S-2~S-7·S-11·S-12 전부 exit 0(값 요약: S-4 Contracts 8 kept 0 broken · S-5
+951 passed · S-6 위반 0 · S-7 위반 0 · S-11 wheel 빌드+재수출 test 1 passed ·
+S-12 socket 스모크 통과). S-1b·S-7 양성 대조·S-9·S-10·HIGH-1 probe 양성 대조는
+아래 「수정 라운드 1」 절에 개별 기록. 이 절 아래 나머지는 초판 구현 종결 시점
+(HEAD `b78082d`) 실측 원문이다 — 각 명령의 최신 값은 위 요약과 아래 「수정 라운드
+1」 절을 정본으로 삼는다.
+
 ## 구현 종결 시점(HEAD `b78082d`) 전건 실측 — 2026-09-16T05:06Z
 
 ## S-0
@@ -105,8 +114,16 @@ verifier r1 LOW-2 — 초판 acceptance_commands 가 CI `ml-engine` job 의 세 
 - exit: 0 — BUILD SUCCESSFUL, 337 task(35 executed, 302 up-to-date)
 - cmd: `./gradlew --no-daemon check`(HEAD `4d2c1d8`, evidence 패키지 커밋 뒤 재실측)
 - exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
-- cmd: `./gradlew --no-daemon check`(HEAD `f671fe9`, 이 줄을 적기 직전의 최종 재실측 —
-  이 커밋 자체는 본문 두 줄만 추가하는 텍스트 편집이라 이 행 이후 추가 재실측 없음)
+- cmd: `./gradlew --no-daemon check`(HEAD `f671fe9`·`80629cd`, 최초 리뷰 요청 시점의
+  마지막 재실측 — 이 라운드에서 팀장·verifier·code-reviewer 판정이 이어져 갱신됨)
+- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
+- cmd: `./gradlew --no-daemon check`(HEAD `014752d`, 수정 라운드 1 HIGH-1 코드
+  커밋 뒤 재실측 — D-5E3-6 import-linter 계약 추가가 Kotlin 쪽에 영향 없음을 확인)
+- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
+- cmd: `./gradlew --no-daemon check`(HEAD `fe76d50`, LOW 일괄 evidence+코드 커밋 뒤)
+- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
+- cmd: `./gradlew --no-daemon check`(HEAD `7df311e`, rollback.md 갱신 커밋 뒤 —
+  이 줄을 적기 직전의 최종 재실측)
 - exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
 
 ## S-11
