@@ -23,6 +23,7 @@ from ml_engine.serving.readiness import (
     ReadinessGate,
     ReadinessSnapshot,
 )
+from ml_engine.serving.runtime import PredictionRuntime, build_derived_release
 from ml_engine.serving.status import (
     ReadinessDetailCode,
     ServicerContext,
@@ -36,6 +37,7 @@ __all__ = [
     "BidPredictionServicer",
     "EmbeddingServicer",
     "PolicyRejected",
+    "PredictionRuntime",
     "PreloadOutcome",
     "Readiness",
     "ReadinessDetailCode",
@@ -45,6 +47,7 @@ __all__ = [
     "Servicers",
     "ServingPolicy",
     "ValidationDetailCode",
+    "build_derived_release",
     "build_server",
     "envelope_violation",
     "fill_application_failure",

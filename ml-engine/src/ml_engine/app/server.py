@@ -29,11 +29,13 @@ from ml_engine.inference.policy import PolicyRejected as InferencePolicyRejected
 from ml_engine.serving import (
     BidPredictionServicer,
     EmbeddingServicer,
+    PredictionRuntime,
     PreloadOutcome,
     Readiness,
     ReadinessGate,
     Servicers,
     ServingPolicy,
+    build_derived_release,
     build_server,
     load_serving_policy,
 )
@@ -187,6 +189,22 @@ def _training_pipeline_factory(
     )
 
 
+def _prediction_runtime(
+    preloaded: _Preloaded, config: ServerConfig
+) -> PredictionRuntime | None:
+    """M5/5E-2(D-5E2-1) — inference 정책 preload 가 성공했을 때만 `PredictionRuntime`을
+    한 번 만든다. 실패면 `None`(`BidPredictionServicer`가 `MODEL_NOT_READY`로 답한다) —
+    `build_derived_release`를 요청마다 부르지 않는다(런타임 상수, 결정적)."""
+    if not isinstance(preloaded.inference, InferencePolicy):
+        return None
+    release = build_derived_release(preloaded.inference, config.code_version)
+    return PredictionRuntime(
+        policy=preloaded.inference,
+        release=release,
+        supported_feature_schema_versions=tuple(SUPPORTED_FEATURE_SCHEMAS.keys()),
+    )
+
+
 def _build_servicers(
     gate: ReadinessGate,
     serving_policy: ServingPolicy,
@@ -204,7 +222,9 @@ def _build_servicers(
         idempotency_key_max_chars=serving_policy.idempotency_key_max_chars,
     )
     prediction_servicer = BidPredictionServicer(
-        gate, tuple(SUPPORTED_FEATURE_SCHEMAS.keys())
+        gate,
+        tuple(SUPPORTED_FEATURE_SCHEMAS.keys()),
+        _prediction_runtime(preloaded, config),
     )
     embedding_servicer = EmbeddingServicer(
         gate, text_max_chars=serving_policy.embedding_text_max_chars
