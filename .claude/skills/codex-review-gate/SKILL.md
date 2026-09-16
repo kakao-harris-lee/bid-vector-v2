@@ -100,7 +100,7 @@ strict structured output은 모든 property가 required여야 하므로, `line`�
 판정 차이가 finding 때문인지 엔진 때문인지 가를 수 없다. 그래서 경로는 `CODEX_BIN` 으로
 박고 버전은 실행 전 assertion 으로 대조하며, **불일치는 그 라운드의 preflight 미충족이다**
 (다른 바이너리로 대체 실행하지 않는다). 업그레이드는 이 스킬의 핀 값을 고치는 명시적
-결정으로만 하고 `CLAUDE.md` 변경 이력에 남긴다. 기록용 버전 값의 출처는 여전히
+결정으로만 하고 하네스 변경 이력(`docs/harness/change-history.md`)에 남긴다. 기록용 버전 값의 출처는 여전히
 `codex.raw-output.txt` 머리글이지 기억이 아니다.
 
 핀은 **0.154.0**(nvm 쪽, 사용 중인 최신)이다 — **2026-09-11 갱신**. 최초 핀 0.151.0 은 운영자 지정(2026-09-01)이었고 그 규칙이 값을 **「사용 중인 최신」**으로 정의했다. 2026-09-10 패키지 갱신으로 이 머신의
@@ -135,8 +135,8 @@ node 버전을 품고 있어 node 업그레이드 시 경로가 사라진다 —
 | `bid_vector_db` | 1 | – | **0** |
 | `kis_unified_sts` | 4 | – | **0** |
 
-**판독 규칙 — 숫자만 읽지 마라.** 리뷰 range 의 diff 가 이 스킬 파일이나 `CLAUDE.md`
-변경 이력을 담는 라운드에서는 위 패턴 표 자신이 diff 로 codex 앞에 놓이므로, raw-output
+**판독 규칙 — 숫자만 읽지 마라.** 리뷰 range 의 diff 가 이 스킬 파일이나 하네스 변경 이력
+(`docs/harness/change-history.md`)을 담는 라운드에서는 위 패턴 표 자신이 diff 로 codex 앞에 놓이므로, raw-output
 grep 에 **상시 false-positive 바닥**이 생긴다. 매치의 위치를 갈라 읽는다 — **developer
 메시지 구간(머리글 부근)의 매치만 주입**이고, codex 가 뜬 텍스트(diff hunk·파일 읽기
 출력·변경 이력)의 매치는 리뷰 대상이다. **「diff 시작 전 = developer 구간」이 아니다** —

@@ -166,7 +166,7 @@ Codex `approve`와 사용자 승인이 있어야 M1로 진행한다.
 - 0A의 유일한 `approve`는 head `6c6b3a2a`의 **effort=medium 부수 실행**
   (`0a/codex-review-20260825T235414Z.json`)이고, **같은 head의 effort=high 실행은
   `request_changes`**다. **0A 자신의 evidence가 high 쪽을 「3차 정본」으로 지정**한다
-  (`reports/evidence/m0/0a/checklist.md:197`). `CLAUDE.md` 변경 이력의 2026-08-26 행이 같은
+  (`reports/evidence/m0/0a/checklist.md:197`). 하네스 변경 이력(`docs/harness/change-history.md`)의 2026-08-26 행이 같은
   사건을 *"리뷰 재현성 결여"*로 적고 그 뒤로 `model_reasoning_effort=high`를 고정했다.
 - 그 `request_changes`에 대응해 **라운드 4·5·6이 돌았고** `capability-map.md`를 다시 고쳤다.
   그 라운드들의 head **`cd5a456`**(`0a/scope.md`의 선언 `head_sha`)는 **0A에 4차 리뷰가 없고**
