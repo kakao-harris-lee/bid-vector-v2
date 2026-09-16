@@ -34,6 +34,7 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/ml/{ResponseMappingTest,SuccessShapeFailClosedTest}.kt   # 우회 (1)~(9) + table 행 +N(4D-1 규율)
   - adapters/src/test/kotlin/bidvector/adapters/contract/PredictionAdditiveContractTest.kt              # 필요 시 도메인 경유 단언 추가(proto 보존 단언은 유지)
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/*Test.kt · adapters/src/test/kotlin/bidvector/adapters/ml/*Test.kt   # Predicted 생성자 호출부 갱신(값만, 판정 무변경)
+  - adapters/src/test/kotlin/bidvector/adapters/ml/MlTestFixtures.kt · workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisFixtures.kt   # test fixture 의 Predicted/CompetitionSample 생성부(위 와일드카드 `*Test.kt` 가 못 덮는 경로 — 5D-3 F-1 재발 방지, 갱신 이력 2026-09-16)
   - config/quality/gate-tests.properties                                              # 신설 test 파일이 있을 때만(MlGateRegistrationTest 완전성)
   - docs/discovery/data-dictionary.md                                                 # §6.5 에 intervalSource 성분 행(PosteriorPredictive 정의) + Diagnostics 성분 표(D-4D3-5) — 팀장
   - docs/discovery/capability-map.md                                                  # OPEN 표: OPEN-2F-DIAGNOSTICS-DOMAIN·OPEN-2F-DICT-INTERVAL-SOURCE 해소, OPEN-4D3-SAMPLE-SUPPLY·OPEN-4D3-DIAGNOSTICS-RENDER 신설 — 팀장
@@ -77,3 +78,4 @@ rollback: in_scope 경로 한정. 공유 파일(`BidPredictionOutcome.kt`·`Pars
 ## 계약 갱신 이력
 | 날짜 | 변경 | 사유 |
 | --- | --- | --- |
+| 2026-09-16 (verifier 전 팀장 대조) | `in_scope` 에 test fixture 두 파일 명시(`MlTestFixtures.kt`·`OpportunityAnalysisFixtures.kt`) — `git diff --name-status <base>..HEAD` 13경로 대조에서 `*Test.kt` 와일드카드가 못 덮는 둘을 발견. 코드 무변경 | 5D-3 verifier r1 F-1(in_scope 누락 → clean-tree false-clean)과 같은 클래스 — 이번에는 verifier 전에 팀장이 기계 대조로 잡음 |
