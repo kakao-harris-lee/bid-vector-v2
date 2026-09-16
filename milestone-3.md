@@ -357,6 +357,21 @@ Codex 1 라운드 · 채움률 read-only 실호출 1회 · 3H-1/3H-2 분할). �
 첫 도달). 백필은 운영 데이터 0 → `OPEN-3H-AGENCY-BACKFILL`. 레인 `bid-vector-v2-m4e`/`m3-3h/2026-09-16`, base `0ad8e59`
 (PR #29 병합 뒤), M3 후속은 `main` 병행(3G 선례).
 
+**3H-1 종결 2026-09-17(사용자 승인 — 「추천대로」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1 `ready-for-review`
+(산출물 blocker/high 0 · medium 1 = 새 컬럼 넷의 병합 보존 규칙 무잠금 → 3단계 왕복 test + 존재 가드 삭제 변이 RED 로 닫음 ·
+low 3·장부층 6 일괄; 우회 (1)~(8) 직접 실측 — private 생성자·`copy()` 변이 컴파일 거부, 담당자 키 등재 변이 붉음, 컬럼 행렬
+변이 붉음, 3G 권한 행렬 초록, 역할 폴백 코드 0, `AgencyCode.of`/`CategoryCode.of` 동일 함수, rollback ①~⑥ 격리 clone 에서
+V7 제거 뒤 전건 초록). **재작업 0회**. **migration-reviewer 통과**(BLOCKER 0 · HIGH 0 · MEDIUM 0 · LOW 1 — nullable ADD COLUMN 만,
+메타데이터 전용, `SELECT *` 0 으로 구버전 공존, 테이블 단위 GRANT 라 재GRANT 불요, Testcontainers 실적용 초록). 계약 갱신 셋
+(운영자 결정 등재 · `AgencyName.of` 대칭 · in_scope 에 persistence bind·병합 파일과 sizeGate 분리 파일). 산출물: `FieldConcept`
+토큰 넷 + 레지스트리 행 넷(P-14), `Agency`·`AgencyCode.of`·`AgencyName.of`, `Notice.demandAgency`/`noticeAgency`, `Canonicalize`
+역할별 조립(폴백 0), **V7** 컬럼 넷, persistence 다섯 파일, test(AgencyTest·AgencyFieldContractTest·AgencyCanonicalizeTest·
+왕복·병합 보존·컬럼 행렬). **알려진 제한**: `OPEN-2B-AGENCY-ID` 는 반 닫힘(3H-2 조립 대기) · 코드 채움률 미실측(D-3H-8, 3H-2 전
+read-only 실호출 1회) · `OPEN-3H-SAMPLE-MISSING-REASON`(M5 레인 — 표본 축 허용 결측 사유 확장, 3H-2 착수 전) ·
+`OPEN-3H-AGENCY-BACKFILL`(운영 데이터 0) · `OPEN-3H-MERGE-GUARD-TESTS`(기존 축의 병합 보존 무잠금 — 상속 부채) · 기관명·코드의
+개인정보 판정은 PR 의 privacy-gate 코멘트 · **Codex 심판**(마이그레이션, 운영자 범위·비용 승인)은 PR 에서. 정본
+`reports/evidence/m3/3h/checklist.md`.
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의

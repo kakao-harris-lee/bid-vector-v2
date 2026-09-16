@@ -87,7 +87,9 @@ rollback: in_scope 경로 한정 restore(rollback.md). V7 은 파일 삭제로 �
 | `Notice.demandAgency`·`noticeAgency` 프로퍼티 | 읽기 | 아니오 | 아니오 | — |
 | `FieldConcept` 토큰 넷 | 레지스트리 조회 | 아니오(정책 데이터) | 아니오 | — |
 | `object` 커널 주입 자리 | 해당 없음 | — | — | — |
-수정 라운드마다 갱신.
+| `KONEPS_AGENCY_FIELD_ROWS`(`KonepsAgencyFieldContracts.kt`, `internal val`) — 갱신 3 분리로 생긴 모듈 내 표면 | 같은 모듈에서 계약 행 넷 읽기 | 아니오(불변 `val`, `procurement` 밖으로 안 나간다) | 아니오 | — (verifier r1 F-3 등재) |
+| `NOTICE_IDENTIFIER_PRESENT_IN`(`KonepsPresentInSets.kt`) — `private` → `internal` 로 가시성 확대 | 같은 모듈에서 presentIn 집합 읽기 | 아니오(불변 `val`, 내용 이동 — verifier 가 집합·순서 동일 실측) | 아니오 | — (F-3) |
+수정 라운드마다 갱신. — r1 수정 라운드(M-1 test·장부층·F-2 test): 새 public 표면 0(test 만).
 
 ## 종결 조건
 P-14 승인 등재(policy-values §1.3 행 넷 + P 표) · `FieldContractTest`(토큰 넷·담당자 0) · `CanonicalizeTest`(역할별 조립·폴백 없음·정규화) · `AgencyTest`(`of` 정규화 = `CategoryCode.of`, 빈 값 거부) · JDBC 왕복(컬럼 넷 저장·복원, 원문 보존) · `CleanMigration*Test` 행렬 · 우회 (1)~(8) 실측 · 전건 `check` · verifier `ready-for-review` · migration-reviewer 판정 · Codex approve(운영자 승인 범위) · 사용자 승인. `OPEN-2B-AGENCY-ID` 는 3H-2 종결 시 닫힘(3H-1 뒤 상태 「수집·저장 완료, 조립 대기」로 갱신), `OPEN-3H-AGENCY-BACKFILL`·`OPEN-3H-SAMPLE-MISSING-REASON` 등재.
