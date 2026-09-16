@@ -24,6 +24,12 @@ _step() {
 _step "Kotlin — ./gradlew --no-daemon check"
 ./gradlew --no-daemon check
 
+# F-6(D-6C-9, verifier r1 MEDIUM) — ci.yml 의 `check` job 은 이 step 도 돈다(OPEN-ADR-06
+# 측정 입력). 머리 주석의 "CI 전용 step 만 뺀다"는 체크아웃·툴체인 설치·아티팩트 업로드
+# 셋을 가리키고 이 step 은 그 셋이 아니다 — 뺐던 것이 축어 불일치였다.
+_step "Kotlin — ./gradlew --no-daemon qualityBaseline"
+./gradlew --no-daemon qualityBaseline
+
 # ---- Python(ml-engine job, working-directory: ml-engine) ----
 cd "$REPO_ROOT/ml-engine"
 
@@ -67,7 +73,12 @@ _step "Python — 버전 두 자리 대조 (S-9)"
 uv run python -c "import tomllib,pathlib; p=tomllib.load(open('pyproject.toml','rb')); v=pathlib.Path('.python-version').read_text().strip(); assert v.startswith('3.12') and '3.12' in p['project']['requires-python'], (v, p['project']['requires-python'])"
 
 _step "Python — wheel 빌드 + 설치본 재수출 확인 (S-11)"
-uv build --wheel -o /tmp/ml-engine-wheel-one-command-check
+# reviewer LOW — 산출물이 스크립트 종료 후 `/tmp` 에 남아 로컬 반복 실행마다 쌓였다.
+# 이 스크립트 안에서만 쓰는 임시 디렉터리라 종료 시(성공·실패 무관) 지운다 — CI
+# `ml-engine` job 의 `/tmp/ml-engine-wheel`(이 diff 밖, 러너가 매 실행 폐기)과는 다른 자리.
+ONE_COMMAND_WHEEL_DIR="$(mktemp -d /tmp/ml-engine-wheel-one-command-check.XXXXXX)"
+trap 'rm -rf "$ONE_COMMAND_WHEEL_DIR"' EXIT
+uv build --wheel -o "$ONE_COMMAND_WHEEL_DIR"
 uv run python -m pytest tests/gates/test_wheel_reexport.py -q
 
 _step "완료 — Kotlin 전건 + Python 전건 통과"

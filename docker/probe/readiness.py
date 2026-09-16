@@ -26,6 +26,8 @@ from __future__ import annotations
 import os
 import sys
 import uuid
+from dataclasses import dataclass
+from enum import StrEnum
 
 import grpc
 
@@ -38,6 +40,25 @@ _RPC_TIMEOUT_SECONDS = 3.0
 _READY = prediction_pb2.READINESS_READY
 
 
+class _ReadinessResultKind(StrEnum):
+    """verifier r1 F-7(LOW) — 이전 판은 transport 실패와 `NOT_READY`가 종료 코드(1)
+    뿐 아니라 **문면까지** 같아 운영자가 서버가 죽었는지 그냥 미준비인지 로그만으로
+    가르지 못했다. 종료 코드 계약(모듈 docstring)은 그대로 두고 — 그 계약은
+    `NOT_READY`·`failure`·transport 실패를 전부 1로 묶는다 — **문면만** 사유별로
+    가른다."""
+
+    READY = "READY"
+    TRANSPORT_FAILED = "TRANSPORT_FAILED"
+    ENVELOPE_REJECTED = "ENVELOPE_REJECTED"
+    NOT_READY = "NOT_READY"
+
+
+@dataclass(frozen=True)
+class _ReadinessResult:
+    kind: _ReadinessResultKind
+    detail: str | None = None
+
+
 def _target_address() -> str:
     bind = os.environ.get("ML_ENGINE_BIND")
     if not bind:
@@ -46,7 +67,7 @@ def _target_address() -> str:
     return f"127.0.0.1:{port}"
 
 
-def check_readiness(address: str) -> bool:
+def check_readiness(address: str) -> _ReadinessResult:
     request = prediction_pb2.GetModelMetadataRequest()
     request.envelope.request_id = str(uuid.uuid4())
     request.envelope.correlation_id = "readiness-probe"
@@ -54,11 +75,15 @@ def check_readiness(address: str) -> bool:
         with grpc.insecure_channel(address) as channel:
             stub = prediction_pb2_grpc.BidPredictionServiceStub(channel)
             response = stub.GetModelMetadata(request, timeout=_RPC_TIMEOUT_SECONDS)
-    except grpc.RpcError:
-        return False
+    except grpc.RpcError as exc:
+        return _ReadinessResult(_ReadinessResultKind.TRANSPORT_FAILED, str(exc.code()))
     if response.WhichOneof("result") != "metadata":
-        return False
-    return bool(response.metadata.readiness == _READY)
+        return _ReadinessResult(_ReadinessResultKind.ENVELOPE_REJECTED)
+    if response.metadata.readiness != _READY:
+        return _ReadinessResult(
+            _ReadinessResultKind.NOT_READY, str(response.metadata.readiness)
+        )
+    return _ReadinessResult(_ReadinessResultKind.READY)
 
 
 def main() -> int:
@@ -67,12 +92,20 @@ def main() -> int:
     except SystemExit as exc:
         print(exc, file=sys.stderr)
         return 2
-    ready = check_readiness(address)
-    if not ready:
-        print(f"readiness 실패 — {address} 가 READY 가 아니다", file=sys.stderr)
-        return 1
-    print(f"readiness OK — {address}")
-    return 0
+    result = check_readiness(address)
+    if result.kind is _ReadinessResultKind.READY:
+        print(f"readiness OK — {address}")
+        return 0
+    if result.kind is _ReadinessResultKind.TRANSPORT_FAILED:
+        print(f"readiness 실패 — {address} 에 연결할 수 없다({result.detail})", file=sys.stderr)
+    elif result.kind is _ReadinessResultKind.ENVELOPE_REJECTED:
+        print(f"readiness 실패 — {address} 가 envelope 을 거부했다(failure)", file=sys.stderr)
+    else:
+        print(
+            f"readiness 실패 — {address} 가 응답했지만 READY 가 아니다(state={result.detail})",
+            file=sys.stderr,
+        )
+    return 1
 
 
 if __name__ == "__main__":

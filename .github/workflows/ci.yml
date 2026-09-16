@@ -172,9 +172,10 @@ jobs:
       # compose 의 postgres 서비스 전용 — 이 job 안에서만 뜨는 일회성 컨테이너의
       # 자격증명이다(6B 스키마도 얹기 전, 저장 데이터 없음). scope.md (2b) 「경계로
       # 처리」— compose.yaml 파일 자체에는 이 값이 없고 `${VAR:?...}` 참조만 있다
-      # (D-6C-7과 같은 규율, 리터럴 0을 게이트로 실측).
+      # (D-6C-7과 같은 규율, 리터럴 0을 게이트로 실측). 사용자·DB 이름은 식별자일 뿐이라
+      # 여기 둔다 — 값은 다음 step 이 실행 시점에 만들어 `$GITHUB_ENV` 에 채운다(F-4,
+      # D-6C-9 — 파일에 리터럴 값을 남기지 않는다).
       BIDVECTOR_PG_USER: bidvector_ci
-      BIDVECTOR_PG_PASSWORD: bidvector_ci_ephemeral
       BIDVECTOR_PG_DB: bidvector_ci
     steps:
       - uses: actions/checkout@v5
@@ -185,6 +186,25 @@ jobs:
           java-version: '21'
 
       - uses: gradle/actions/setup-gradle@v5
+
+      # ml-engine job 과 같은 버전(uv 0.9.22, `.python-version`=3.12) — one-command-check.sh
+      # 가 Kotlin 뿐 아니라 ml-engine 의 uv 명령도 돌린다.
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: ml-engine/.python-version
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.22"
+
+      - name: DB 접속 값 생성(이 job 전용 일회성, 파일에 리터럴로 두지 않는다)
+        run: echo "BIDVECTOR_PG_PASSWORD=$(openssl rand -hex 20)" >> "$GITHUB_ENV"
+
+      # F-6(D-6C-9, verifier r1 MEDIUM) — 「one-command-check.sh 를 부르는 CI job 이
+      # 없다」의 시정. 완료 조건 1(한 명령으로 Kotlin+Python 전건)을 CI 에서도 직접 잰다 —
+      # 로컬에서만 도는 명령은 이탈이 생겨도 잡는 것이 없다(하네스 2026-09-12).
+      - name: one-command-check.sh — 완료 조건 1 (S-20)
+        run: ./tools/one-command-check.sh
 
       - name: 이미지 빌드 (S-21)
         run: docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .
