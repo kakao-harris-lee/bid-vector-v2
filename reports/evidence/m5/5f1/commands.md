@@ -112,6 +112,9 @@
 - cmd: `./gradlew --no-daemon check`(HEAD `90ceb8c`, evidence 커밋 `90ceb8c`, commands.md
   자기 자신 등재 직후)
 - exit: 0 — BUILD SUCCESSFUL, 337 tasks(32 executed, 305 up-to-date)
+- cmd: `./gradlew --no-daemon check`(HEAD `19d6122`, evidence 커밋 `19d6122`, rollback.md
+  등재 직후 — 이 slice 의 마지막 evidence 편집)
+- exit: 0 — BUILD SUCCESSFUL, 337 tasks(32 executed, 305 up-to-date)
 
 ## S-11
 
