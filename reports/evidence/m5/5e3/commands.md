@@ -115,7 +115,7 @@ cmd 는 매번 `./gradlew --no-daemon check` — 전부 exit 0(BUILD SUCCESSFUL)
 | `014752d` | 수정 라운드 1 HIGH-1 코드 커밋 뒤 |
 | `fe76d50` | 수정 라운드 1 LOW 일괄 커밋 뒤 |
 | `7df311e`·`1c410d0` | 수정 라운드 1 종결 시점 |
-| (아래 「승인 전 일괄」 절에 이어짐) | |
+| `930891d` | 승인 전 일괄 커밋 뒤 — 이 줄을 적기 직전의 최종 재실측 |
 
 ## 승인 전 일괄(verifier r2 MEDIUM-1 + LOW 1·2) — 최종 HEAD 재실측
 
