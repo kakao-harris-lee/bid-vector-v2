@@ -32,6 +32,7 @@ from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFail
 from ml_engine.training.corpus import AdmittedCorpus, admit_corpus
 from ml_engine.training.dataset import DatasetManifestV1, LoadedDataset, RawTrainingRow
 from ml_engine.training.holdout import (
+    HoldoutCancelled,
     HoldoutRejected,
     HoldoutRejectionReason,
     _unaccounted_or_reject,
@@ -1085,3 +1086,130 @@ def test_no_bare_threshold_seed_or_layer_parameter_on_run_holdout() -> None:
     signature = inspect.signature(run_holdout)
     forbidden = {"threshold", "seeds", "stratum", "max_origins", "paired_t_threshold"}
     assert forbidden.isdisjoint(signature.parameters)
+
+
+# ---- M5/5E-3 D-5E3-3 — `should_stop` 창 루프 취소 정밀도 ----
+# `OPEN-5E-CANCEL-GRANULARITY` 종결: 창마다 학습 **전**에 확인하고, 멈추면
+# `HoldoutCancelled(completed_windows=…)`(결과 타입, 부분 보고서 조립 없음)를
+# 낸다.
+
+
+class _CountingTrainer:
+    """`_DeterministicTrainer`를 감싸 `.train()` 호출 수를 센다 — 창이 몇 번
+    학습됐는지를 부작용(호출 수)으로 관측한다."""
+
+    def __init__(self) -> None:
+        self.call_count = 0
+        self._inner = _DeterministicTrainer()
+
+    def train(
+        self, matrix, labels, feature_names, categorical_indices, params, seed, rounds
+    ) -> BoosterLike | TrainerFailed:
+        self.call_count += 1
+        return self._inner.train(
+            matrix, labels, feature_names, categorical_indices, params, seed, rounds
+        )
+
+
+def _stop_after(n: int):  # type: ignore[no-untyped-def]
+    """`n`번째 호출까지 거짓, `n+1`번째 호출부터 참을 내는 `should_stop` 콜러블."""
+    count = 0
+
+    def _should_stop() -> bool:
+        nonlocal count
+        count += 1
+        return count > n
+
+    return _should_stop
+
+
+def _three_window_scenario() -> tuple[LoadedDataset, list[WeekMaturity]]:
+    train_part = _many_rows(30, start_day=0)
+    window_starts = (40, 55, 70)
+    eval_rows = tuple(
+        row for start in window_starts for row in _many_rows(5, start_day=start)
+    )
+    dataset = _dataset(train_part + eval_rows)
+    windows = [
+        WeekMaturity(
+            start=_EPOCH + timedelta(days=start),
+            end=_EPOCH + timedelta(days=start + 7),
+            opened_count=5,
+            settled_count=4,
+        )
+        for start in window_starts
+    ]
+    return dataset, windows
+
+
+def test_run_holdout_default_should_stop_never_cancels() -> None:
+    """기본 인자(`should_stop` 미지정)면 기존 호출자·test 와 동일하게 항상 완주한다
+    (D-5E3-3 하위 호환)."""
+    dataset, windows = _three_window_scenario()
+    result = run_holdout(
+        dataset,
+        windows,
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=2, max_origins=5),
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, (HoldoutRejected, HoldoutCancelled))
+    assert len(result.windows) == 3
+
+
+def test_run_holdout_should_stop_halts_before_training_next_window() -> None:
+    """`should_stop`이 2 창 처리 뒤 참이 되면 `HoldoutCancelled(completed_windows=2)`를
+    내고, 세 번째 창은 학습되지 않는다 — 학습된 창 2개만 놓고 독립적으로 돌린 결과와
+    trainer 호출 수가 정확히 같아야 한다(변이: 확인을 학습 뒤로 옮기면 세 번째 창의
+    학습이 시작돼 호출 수가 baseline 을 넘어서 이 test 가 붉어진다)."""
+    dataset, windows = _three_window_scenario()
+
+    baseline_trainer = _CountingTrainer()
+    baseline = run_holdout(
+        dataset,
+        windows[:2],
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=2, max_origins=5),
+        baseline_trainer,
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(baseline, (HoldoutRejected, HoldoutCancelled))
+
+    cancel_trainer = _CountingTrainer()
+    result = run_holdout(
+        dataset,
+        windows,
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=2, max_origins=5),
+        cancel_trainer,
+        CodeVersion("sha-1"),
+        should_stop=_stop_after(2),
+    )
+
+    assert isinstance(result, HoldoutCancelled)
+    assert result.completed_windows == 2
+    assert cancel_trainer.call_count == baseline_trainer.call_count
+
+
+def test_run_holdout_should_stop_checked_before_first_window_too() -> None:
+    """`should_stop`이 첫 호출부터 참이면 창을 하나도 학습하지 않고
+    `HoldoutCancelled(completed_windows=0)`를 낸다."""
+    dataset, windows = _three_window_scenario()
+    trainer = _CountingTrainer()
+    result = run_holdout(
+        dataset,
+        windows,
+        _spec(),
+        _training_policy(min_training_rows=5),
+        _policy(min_evaluation_rows=2, max_origins=5),
+        trainer,
+        CodeVersion("sha-1"),
+        should_stop=_stop_after(0),
+    )
+    assert isinstance(result, HoldoutCancelled)
+    assert result.completed_windows == 0
+    assert trainer.call_count == 0

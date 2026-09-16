@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -39,7 +39,7 @@ from ml_engine.evaluation import (
     policy_checksum as evaluation_policy_checksum,
 )
 from ml_engine.evaluation.windows import InvalidMaturityInput
-from ml_engine.training._holdout_fit import WindowSkip
+from ml_engine.training._holdout_fit import WindowSkip, WindowSuccess
 from ml_engine.training._holdout_window import evaluate_one_window
 from ml_engine.training.booster import TrainerLike
 from ml_engine.training.corpus import CorpusRejected, TrainingRow, admit_corpus
@@ -65,6 +65,20 @@ class HoldoutRejectionReason(StrEnum):
 class HoldoutRejected:
     reason: HoldoutRejectionReason
     detail: str
+
+
+@dataclass(frozen=True)
+class HoldoutCancelled:
+    """M5/5E-3 D-5E3-3 — `should_stop`이 창 처리 중 참이 되어 실행이 중단됐다(결과
+    타입, 예외 아님). `completed_windows`는 중단 전에 **학습까지 끝난** 창 수다 —
+    부분 보고서를 조립하지 않는다(우회 후보 (4): 이 타입을 `PipelineFailed`로
+    매핑하면 FAILED 로 위장하는 것이므로 호출부는 `PipelineCancelled`로만 옮긴다)."""
+
+    completed_windows: int
+
+
+def _never_stop() -> bool:
+    return False
 
 
 def _corpus_profile(
@@ -120,6 +134,27 @@ def _exclusion_from_skip(
     )
 
 
+def _record_window_outcome(
+    window: WeekMaturity,
+    outcome_or_skip: WindowSuccess | WindowSkip,
+    ordered_rows: tuple[TrainingRow, ...],
+    gate_stratum: str,
+    results: list[WindowResult],
+    succeeded_windows: list[WeekMaturity],
+    excluded: list[WindowExclusion],
+) -> None:
+    """창 하나의 처리 결과를 `results`/`excluded` 중 정확히 한쪽에 담는다 —
+    `_evaluate_windows`를 design ratchet(50줄) 안에 두려는 분리(D-5E3-3 신설
+    `should_stop` 확인이 그 여유를 다 썼다)."""
+    if isinstance(outcome_or_skip, WindowSkip):
+        excluded.append(
+            _exclusion_from_skip(window, outcome_or_skip, ordered_rows, gate_stratum)
+        )
+        return
+    results.append(outcome_or_skip.result)
+    succeeded_windows.append(window)
+
+
 def _evaluate_windows(
     plan_selected: tuple[WeekMaturity, ...],
     plan_excluded: tuple[WindowExclusion, ...],
@@ -130,15 +165,18 @@ def _evaluate_windows(
     evaluation_policy: EvaluationPolicy,
     trainer: TrainerLike,
     code_version: CodeVersion,
-) -> _WindowsOutcome:
-    """선택된 창마다 `evaluate_one_window`를 불러 성공/실패를 가른다 — 실패는 창
-    제외 목록(`TRAINING_REJECTED`)으로 흡수한다(design review (1)). 창 하나는
-    `results`(성공) 아니면 `excluded`(실패) **정확히 한쪽에만** 들어간다 —
-    `_unaccounted_row_count`가 이 서로소 성질에 기댄다(H-2r)."""
+    should_stop: Callable[[], bool],
+) -> _WindowsOutcome | HoldoutCancelled:
+    """창마다 `evaluate_one_window`를 불러 성공/실패를 가른다(실패는
+    `TRAINING_REJECTED`로 흡수, design review (1)) — `results`/`excluded` 는
+    서로소(H-2r). D-5E3-3: 학습 전 `should_stop()`을 확인해 참이면 `HoldoutCancelled`
+    를 즉시 반환한다(부분 조립 없음, 우회 (3))."""
     results: list[WindowResult] = []
     succeeded_windows: list[WeekMaturity] = []
     excluded: list[WindowExclusion] = list(plan_excluded)
-    for window in plan_selected:
+    for completed, window in enumerate(plan_selected):
+        if should_stop():
+            return HoldoutCancelled(completed_windows=completed)
         outcome_or_skip = evaluate_one_window(
             window,
             ordered_rows,
@@ -149,18 +187,15 @@ def _evaluate_windows(
             trainer,
             code_version,
         )
-        if isinstance(outcome_or_skip, WindowSkip):
-            excluded.append(
-                _exclusion_from_skip(
-                    window,
-                    outcome_or_skip,
-                    ordered_rows,
-                    evaluation_policy.gate_stratum,
-                )
-            )
-            continue
-        results.append(outcome_or_skip.result)
-        succeeded_windows.append(window)
+        _record_window_outcome(
+            window,
+            outcome_or_skip,
+            ordered_rows,
+            evaluation_policy.gate_stratum,
+            results,
+            succeeded_windows,
+            excluded,
+        )
     excluded.sort(key=lambda item: item.window.start)
     return _WindowsOutcome(
         results=tuple(results),
@@ -286,10 +321,18 @@ def run_holdout(
     evaluation_policy: EvaluationPolicy,
     trainer: TrainerLike,
     code_version: CodeVersion,
-) -> EvaluationReportV1 | HoldoutRejected:
+    *,
+    should_stop: Callable[[], bool] = _never_stop,
+) -> EvaluationReportV1 | HoldoutRejected | HoldoutCancelled:
     """유일 실행 진입점(scope ⑦, (2b) 표) — 창마다 5C-1 `train_award_rate_gbm`을 불러
     `EvaluationReportV1`을 조립한다. 임계·seed 목록·창 수를 낱개 인자로 받지 않는다 —
-    전부 `evaluation_policy`/`spec`/`training_policy`에서만 온다."""
+    전부 `evaluation_policy`/`spec`/`training_policy`에서만 온다.
+
+    M5/5E-3 D-5E3-3 — `should_stop`(기본: 항상 거짓, 기존 호출자·test 무변경)이
+    참이 되면 창 루프가 남은 창을 학습하지 않고 `HoldoutCancelled`를 낸다(창 단위
+    취소 — 창 하나 안의 LightGBM 학습 자체를 중단하지는 않는다, 알려진 제한).
+    `training.jobs`는 여기서 import 하지 않는다 — 취소 확인 함수는 호출부가
+    콜러블로 주입한다(층 결합 회피)."""
     admitted = admit_corpus(dataset.raw_rows)
     if isinstance(admitted, CorpusRejected) or not admitted.rows:
         return HoldoutRejected(HoldoutRejectionReason.EMPTY_SIDE, "빈 코퍼스")
@@ -312,7 +355,10 @@ def run_holdout(
         evaluation_policy,
         trainer,
         code_version,
+        should_stop,
     )
+    if isinstance(windows_outcome, HoldoutCancelled):
+        return windows_outcome
     return _assemble_report(
         dataset, spec, evaluation_policy, ordered_rows, windows_outcome
     )

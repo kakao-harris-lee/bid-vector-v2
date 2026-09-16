@@ -42,7 +42,7 @@ from ml_engine.training.encoding_oof import (
     out_of_fold_matrix_and_residuals,
 )
 from ml_engine.training.folds import fold_indices
-from ml_engine.training.holdout import HoldoutRejected, run_holdout
+from ml_engine.training.holdout import HoldoutCancelled, HoldoutRejected, run_holdout
 from ml_engine.training.policy import (
     SHIPPED_TRAINING_POLICY_VERSION,
     PolicyRejected,
@@ -82,6 +82,7 @@ __all__ = [
     "DatasetReference",
     "DatasetRejected",
     "DatasetRejectionReason",
+    "HoldoutCancelled",
     "HoldoutRejected",
     "LabelRejected",
     "LabelRejectionReason",
