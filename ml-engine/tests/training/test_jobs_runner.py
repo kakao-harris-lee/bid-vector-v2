@@ -20,7 +20,7 @@ from ml_engine.training.jobs.pipeline import (
     PipelineOutcome,
 )
 from ml_engine.training.jobs.runner import JobRunner
-from ml_engine.training.jobs.state import JobEvent, JobRecord, JobState, transition
+from ml_engine.training.jobs.state import JobEvent, JobRecord, JobState
 from ml_engine.training.jobs.store import InMemoryJobStore, Started
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -200,11 +200,11 @@ def test_cancel_training_job_via_servicer_style_transition_then_runner_ignores_l
 
     runner.submit(job_id, _DATASET_REF, _SlowSucceedingPipeline())
 
-    record = store.get(job_id)
-    assert record is not None
-    cancelled = transition(record, JobEvent.CANCEL, at=datetime.now(UTC))
+    # verifier r2 R2-4 — InMemoryJobStore.replace 는 production 호출자가 없어
+    # 제거됐다. 여기서도 두 단계(transition() 수동 계산 + replace())가 아니라
+    # apply_transition 한 번으로 같은 결과(원자적 읽기·계산·쓰기)를 얻는다.
+    cancelled = store.apply_transition(job_id, JobEvent.CANCEL, at=datetime.now(UTC))
     assert isinstance(cancelled, JobRecord)
-    store.replace(cancelled)
 
     release_event.set()
     time.sleep(0.2)

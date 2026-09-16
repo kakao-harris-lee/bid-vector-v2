@@ -2,12 +2,15 @@
 `job_id`는 `uuid4`(불투명 문자열). idempotency 는 `start_or_reuse` 결과 타입 셋으로
 표현한다(설계 검토 (1) 「멱등」) — dict 직접 조회를 흩뿌리지 않는다.
 
-**verifier r1 H-2** — `get()`과 `replace()`를 따로 호출해 전이를 쓰면 그 사이가
-원자적이지 않다: 두 writer(job 실행 종료·`CancelTrainingJob`)가 각자 읽은 stale
-record 로 전이를 계산해, client 에 `CANCELLED`를 응답한 뒤 저장소가 `SUCCEEDED`로
-역행할 수 있다(전이표 자체는 우회되지 않지만 저장소 계층에서 종료 상태 불변식이
-깨진다). `apply_transition`이 읽기·전이 계산·쓰기를 **한 잠금 아래** 수행해 이
-경합을 구조적으로 없앤다 — `replace()`를 직접 쓰는 대신 이 메서드로 전이를 적용한다.
+**verifier r1 H-2** — 예전에는 `get()`과 (이제는 제거된) `replace()`를 따로
+호출해 전이를 썼는데, 그 사이가 원자적이지 않았다: 두 writer(job 실행 종료·
+`CancelTrainingJob`)가 각자 읽은 stale record 로 전이를 계산해, client 에
+`CANCELLED`를 응답한 뒤 저장소가 `SUCCEEDED`로 역행할 수 있었다(전이표 자체는
+우회되지 않지만 저장소 계층에서 종료 상태 불변식이 깨진다). `apply_transition`
+이 읽기·전이 계산·쓰기를 **한 잠금 아래** 수행해 이 경합을 구조적으로 없앤다 —
+**유일** 쓰기 진입점이다(verifier r2 R2-4 — `replace()`는 production 호출자가
+0이 된 뒤 완전히 제거했다. `get()` 뒤 별도로 쓰면 원자성이 깨지는 그 우회
+자체를 없앤다).
 
 job 영속화는 하지 않는다(`OPEN-5E-JOB-PERSISTENCE`, 프로세스 재시작 시 소실 — M6 6B).
 """
@@ -56,7 +59,9 @@ class Conflict:
 
 
 class InMemoryJobStore:
-    """프로세스 로컬 dict + 잠금. 유일 진입점은 `start_or_reuse`·`get`·`replace`."""
+    """프로세스 로컬 dict + 잠금. 유일 진입점은 `start_or_reuse`·`get`·
+    `apply_transition`(verifier r2 R2-4 — `replace`는 production 호출자가
+    0이 되어 제거했다)."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -91,16 +96,6 @@ class InMemoryJobStore:
     def get(self, job_id: str) -> JobRecord | None:
         with self._lock:
             return self._job_by_id.get(job_id)
-
-    def replace(self, record: JobRecord) -> None:
-        """전이 결과를 저장한다 — 호출자(`runner.py`)가 이미 `transition()`으로 만든
-        새 `JobRecord`를 넣는다(이 저장소는 전이 규칙을 모른다).
-
-        **동시 writer 가 있는 전이에는 이 메서드를 쓰지 않는다** — `get()` 뒤 별도로
-        호출하면 그 사이가 원자적이지 않다(H-2). `apply_transition`을 대신 쓴다. 이
-        메서드는 `start_or_reuse`가 만든 최초 레코드처럼 경합이 없는 자리에만 쓴다."""
-        with self._lock:
-            self._job_by_id[record.job_id] = record
 
     def apply_transition(
         self,

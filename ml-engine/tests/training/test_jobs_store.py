@@ -6,7 +6,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from ml_engine.training.jobs.state import JobRecord, JobState
+from ml_engine.training.jobs.state import JobEvent, JobRecord, JobState
 from ml_engine.training.jobs.store import Conflict, InMemoryJobStore, Reused, Started
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -62,19 +62,17 @@ def test_get_returns_stored_record() -> None:
     assert store.get(started.record.job_id) == started.record
 
 
-def test_replace_reflects_transition() -> None:
+def test_apply_transition_persists_running_state() -> None:
+    """verifier r2 R2-4 — `replace()`는 production 호출자가 0이 되어 제거됐다
+    (H-2 가 이미 모든 전이를 `apply_transition`으로 옮겼다). 원자적 읽기·계산·
+    쓰기 한 번으로 같은 결과(전이가 store 에 반영됨)를 확인한다."""
     store = InMemoryJobStore()
     started = store.start_or_reuse("key-1", "ds-1", accepted_at=_NOW)
     assert isinstance(started, Started)
-    running = JobRecord(
-        job_id=started.record.job_id,
-        state=JobState.RUNNING,
-        dataset_id="ds-1",
-        accepted_at=_NOW,
-        started_at=_NOW,
-    )
-    store.replace(running)
-    assert store.get(started.record.job_id) == running
+    result = store.apply_transition(started.record.job_id, JobEvent.START, at=_NOW)
+    assert isinstance(result, JobRecord)
+    assert result.state is JobState.RUNNING
+    assert store.get(started.record.job_id) == result
 
 
 def test_same_key_after_terminal_reuses_job_id_not_new() -> None:
@@ -83,14 +81,8 @@ def test_same_key_after_terminal_reuses_job_id_not_new() -> None:
     store = InMemoryJobStore()
     started = store.start_or_reuse("key-1", "ds-1", accepted_at=_NOW)
     assert isinstance(started, Started)
-    cancelled = JobRecord(
-        job_id=started.record.job_id,
-        state=JobState.CANCELLED,
-        dataset_id="ds-1",
-        accepted_at=_NOW,
-        finished_at=_NOW,
-    )
-    store.replace(cancelled)
+    cancelled = store.apply_transition(started.record.job_id, JobEvent.CANCEL, at=_NOW)
+    assert isinstance(cancelled, JobRecord)
     reused = store.start_or_reuse("key-1", "ds-1", accepted_at=_NOW)
     assert isinstance(reused, Reused)
     assert reused.record.job_id == started.record.job_id

@@ -58,8 +58,9 @@ scope.md 표 그대로 승인. 실측 대상 「경계로 처리」 행(servicer
 - 위조 store 실측: `tests/serving/test_grpc.py::_BlockingStore`가 `InMemoryJobStore`가
   아닌 임의 객체를 `TrainingJobServicer(store=...)`에 주입해도 servicer 생성자가 타입을
   강제하지 않음을 실측했다(구조적 타이핑, `store` 프로토콜은 `.get`·`.start_or_reuse`·
-  `.replace` 세 메서드만 — 조립 근 밖에서 부를 이유가 없어 이 경계는 신뢰 영역으로 남긴다,
-  scope.md (2b) 표와 동일 판단).
+  `.apply_transition` 세 메서드만 — servicer 는 `.replace`를 애초에 부르지 않았고,
+  그 메서드는 fix round 2 로 완전히 제거됐다(R2-4). 조립 근 밖에서 부를 이유가
+  없어 이 경계는 신뢰 영역으로 남긴다, scope.md (2b) 표와 동일 판단).
 - `training/jobs/pipeline.py::TrainingPipeline` Protocol 도 같은 성질 — `app/pipeline.py`
   가 만든 실물 외의 구현이 주입돼도 결과 타입(`PipelineOutcome`/`PipelineFailed`/
   `PipelineCancelled`) 셋 밖의 값을 반환하면 `runner.py::_on_done`이 무엇을 하는지는
@@ -82,7 +83,7 @@ scope.md 표 그대로 승인. 실측 대상 「경계로 처리」 행(servicer
 | --- | --- |
 | `ml_engine.serving.build_server`·`Servicers` | 이미 만들어진 servicer 인스턴스 셋으로 grpc 서버를 만든다 — servicer 실물 생성 권한은 안 준다 |
 | `ml_engine.serving.ReadinessGate`(`from_preload`·`mark_not_ready`·`begin_shutdown`) | 상태 전이만(직접 대입 없음) — 호출자가 임의 `ReadinessSnapshot`을 주입할 순 없다. `mark_ready()`는 verifier r1 M-5 로 제거했다(생성자 없이 인자 없이 READY 로 만드는 경로 — production 호출자 0, READY 도달은 `from_preload` 하나뿐) |
-| `ml_engine.training.jobs.InMemoryJobStore`·`JobRunner` | job 저장·실행 — 둘 다 `app.server`만 구성한다. 외부에서 `store.replace()`로 임의 `JobRecord`를 넣을 수 있지만 `JobRecord` 생성자 불변식이 여전히 막는다(조합·시각 불변식) |
+| `ml_engine.training.jobs.InMemoryJobStore`·`JobRunner` | job 저장·실행 — 둘 다 `app.server`만 구성한다. 쓰기 진입점은 `start_or_reuse`·`apply_transition` 뿐이다(verifier r2 R2-4 — `store.replace()`로 전이표 밖 임의 `JobRecord`를 넣을 수 있던 경로는 production 호출자 0 확인 뒤 제거했다). `JobRecord` 생성자 불변식(조합·시각)은 여전히 남는 경로도 막는다 |
 | `ml_engine.training.jobs.transition` | 유일 전이 진입점 — 표 밖 전이는 여전히 `TransitionRejected` |
 | `InMemoryJobStore.apply_transition`(이번 라운드 신설, H-2) | 읽기·`transition()` 계산·쓰기를 한 잠금 아래 원자적으로 — 새 권한 아님(`transition`이 이미 public, 종전엔 호출자가 get+transition+replace 세 호출로 직접 합성해 경합이 났다). 표 밖 전이를 열지 않는다(`transition()`과 같은 결과 타입) |
 | `JobRunner.cancel_all`(fix round 1 신설, M-3) | 인자 없이 그 시점 진행 중인 job 전부의 취소 토큰을 세운다 — 종전엔 `TrainingJobServicer.CancelTrainingJob`으로 job 하나씩만 취소할 수 있었으므로 이건 새 권한(일괄 취소)이다. 호출자는 `app.server`의 SIGTERM 경로 하나뿐(조립 근 밖에서 부를 이유 없음, 다른 행과 같은 신뢰 판단) |
@@ -151,6 +152,18 @@ scope.md 표 그대로 승인. 실측 대상 「경계로 처리」 행(servicer
   evaluation·5E-1 fix round 1 serving) 왔으므로, `inference`까지 넷을 공유 로더로
   통합할지 이 파일만 개별 수정할지는 다음 라운드 또는 5E-2 착수 계약에서 결정한다.
 - `OPEN-5E-JOB-QUEUE-BOUND` — 위 10항.
+
+## 프로세스 이탈(사실 선언, verifier r2 R2-3)
+
+- **fix round 1 에서 H-2 와 H-3 가 커밋 하나(`2ad2a15`)에 같이 들어갔다.** 지시는
+  "HIGH 는 finding 당 커밋 하나"였다. H-1(`ae3e3e9`)은 지켰으나, H-2(store 원자성)
+  를 고치며 `training/jobs/servicer.py`의 `CancelTrainingJob`을 이미 만지고
+  있었고 H-3(envelope 검증)도 같은 메서드 더하기 `GetTrainingJob`을 만지는
+  자리라 구현 중간에 합쳐졌다 — 그 시점에 "finding 당 커밋" 규율을 놓쳤다. 두
+  finding 다 RED→GREEN 은 갖췄고(각각의 재현 test 존재, `2ad2a15` 커밋 메시지에
+  둘 다 서술됨) 기능적으로는 문제없이 닫혔다 — 커밋 경계만 지시와 다르다. 이
+  이력은 되쓰지 않는다(evidence-pack 규율) — fix round 2 는 H-1 잔존·R2-1·R2-4
+  전부 finding 당 커밋 하나를 지켰다.
 
 ## 계약과 어긋나 판단이 필요했던 자리
 
