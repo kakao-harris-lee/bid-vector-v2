@@ -5,6 +5,12 @@
 축을 섞지 않는다). 값 범위 불변식(z>0·가중치 합 1·밴드 하한<상한·표본 임계 ≥1)도 여기서
 검증하고 위반은 전부 `PolicyRejected`다(scope.md D-5D-8).
 
+M5/5E-3 D-5E3-1 — `load_policy`는 이제 뿌리에서 `yaml.YAMLError`도 `PolicyError`로
+정규화한다. 이 모듈은 여전히 `PolicyError`(문법 오류 포함)·`OSError`만 잡으면 되고,
+`yaml.YAMLError`를 별도로 잡을 필요가 없다(뿌리가 이미 잡아 이 지점에는 도달하지
+않는다) — `app/server.py::_load_inference_policy_safe` 래퍼가 제거된 것도 같은
+이유다.
+
 `gbm.min_category_rows`만 예외다 — 정책 파일이 `0`을 줘도 거부하지 않는다(D-5D-3): 하한
 1 클램프는 이 모듈이 아니라 **소비 지점의 코드 불변식**(`predict.py::segment_availability`
 의 `max(1, ·)`)이 두 번째 겹으로 보장한다. 이 모듈은 그 값이 음수가 아님만 확인한다 —

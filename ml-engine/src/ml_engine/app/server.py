@@ -18,7 +18,6 @@ from types import FrameType
 from typing import NoReturn
 
 import grpc
-import yaml
 
 from ml_engine.app.pipeline import pipeline_factory
 from ml_engine.evaluation.policy import EvaluationPolicy, load_evaluation_policy
@@ -98,29 +97,18 @@ class _Preloaded:
 
 
 def _preload(config: ServerConfig) -> _Preloaded:
+    """M5/5E-3 D-5E3-2 — `_load_inference_policy_safe` 래퍼를 제거했다.
+    `load_inference_policy`가 부르는 5A `registry.policy.load_policy`가 이제
+    뿌리에서 `yaml.YAMLError`를 `PolicyError`로 정규화하므로(D-5E3-1), 호출부의
+    별도 정규화가 더 필요 없다 — 「호출부 한 곳 정규화」는 임시 방편이었다(verifier
+    r3 등재: 다른 호출자가 생기면 재발). 문법이 깨진 inference 정책은 여전히
+    `NOT_READY`(다른 세 로더와 같은 결과 축)로 이어진다."""
     return _Preloaded(
-        inference=_load_inference_policy_safe(config.inference_policy_path),
+        inference=load_inference_policy(config.inference_policy_path),
         training=load_training_policy(config.training_policy_path),
         evaluation=load_evaluation_policy(config.evaluation_policy_path),
         serving=load_serving_policy(config.serving_policy_path),
     )
-
-
-def _load_inference_policy_safe(
-    path: Path,
-) -> InferencePolicy | InferencePolicyRejected:
-    """verifier r2 H-1(잔존) — `load_inference_policy`(`inference/policy.py`, out_of_
-    scope)는 `PolicyError`·`OSError`만 잡고 `yaml.YAMLError`는 잡지 않는다. training·
-    evaluation·serving 세 로더는 이미 이 예외를 잡아 `PolicyRejected`로 돌려주지만
-    (각각 PR#13 HIGH-2·evaluation 자체 수정·이번 라운드 serving), inference 로더는
-    아직 고쳐지지 않았다 — 로더 자체 정정은 범위 밖(`OPEN-5E-YAML-LOADER-INFERENCE`)
-    이므로, in_scope 인 이 호출부에서 정규화한다. 문법이 깨진 inference 정책은
-    `NOT_READY`(다른 세 로더와 같은 결과 축)로 이어지고, `run()`은 부팅을 거부하지
-    않는다(inference 는 `ConfigError` 대상이 아니다 — serving 만 그렇다)."""
-    try:
-        return load_inference_policy(path)
-    except yaml.YAMLError as exc:
-        return InferencePolicyRejected(f"정책 파일 문법 오류: {exc}")
 
 
 def _outcome(name: str, ok: bool, reason: str | None) -> PreloadOutcome:
