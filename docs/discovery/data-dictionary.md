@@ -1532,6 +1532,17 @@ ADR 명문화는 0D 소관이다.
 `authoritative` 승격 후보로 올려 두었고 승격은 사용자 승인 사항이므로 이 문서가 임의로
 승격하지 않는다** — 자리와 형태만 정의한다.
 
+#### 6.3.1 공종·발주기관 키의 정규화 — 한 규칙, 두 언어(M5/5B D-5B-9 · M5/5D-3 D-5D3-1 · M4/4B-8 D-4B8-3, 2026-09-16)
+
+피처 키(`category_code`·`agency_id`)의 동일성은 **`strip` + 소문자화** 하나로 정하고 **별칭·계층 사전은 두지 않는다**
+(legacy `normalize_lookup_key` 의 별칭 해소를 걷어냈다 — 별칭 표는 학습 어휘에 없는 철자를 조용히 다른 값으로 접는다).
+Python 정본은 `ml_engine.features.normalize.normalize_feature_key`(요청 축·표본 축 모두 이 함수), Kotlin 정본은
+`procurement.CategoryCode.of(raw)`(생성이 곧 정규화 — 정규화 안 된 `CategoryCode` 는 표현 불가, 수집·복원·요청·표본·표본
+조회가 같은 값). **wire 에는 Kotlin 이 정규화한 값이 실리고 Python 이 다시 정규화한다(멱등)** — 두 규칙이 아니라 한 규칙의
+두 구현이며, 갈릴 수 있는 자리(JVM `lowercase()` 대 Python `lower()` 의 유니코드 경계·전각 공백)는 4B-8 알려진 제한으로
+등재한다. 정규화 전 저장 행은 `OPEN-4B8-CATEGORY-BACKFILL`. 발주기관 키의 Kotlin 정본은 기관 fact 가 생길 때
+(`OPEN-2B-AGENCY-ID`) 같은 함수로 둔다.
+
 ### 6.4 성숙도 — 계산과 판정의 분리 (`OPEN-ML-01` 잔여 확인)
 
 운영자 결정이 **0C에 확인을 위임했다** — *"SET-06 acceptance가 「성숙도 계산」과 「성숙도

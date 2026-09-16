@@ -65,3 +65,4 @@ rollback: in_scope 경로 한정 단일 역적용(2026-09-16 규칙), 임시 clo
 ## 계약 갱신 이력
 | 날짜 | 변경 | 사유 |
 | --- | --- | --- |
+| 2026-09-16 (팀장 문서) | `data-dictionary.md` §6.3.1 「공종·발주기관 키의 정규화 — 한 규칙, 두 언어」 신설(+11줄, 삽입 지점 §6.3 끝). 역방향 파급: 그 파일을 `파일:줄` 로 인용하는 곳 중 삽입 지점 아래는 `reports/evidence/m0/0c/commands.md`·`reports/evidence/m4/4b1/checklist.md` 의 `data-dictionary.md:1551,1554` 둘 — 둘 다 **종결된 slice 의 evidence** 로 4B-1 이 이미 「범위 밖 낡은 좌표」로 등재한 자리라 고치지 않고 알려진 제한 승계(4B-8 checklist 에 등재) | evidence-pack 역방향 파급 규격 |
