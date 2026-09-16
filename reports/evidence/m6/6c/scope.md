@@ -10,7 +10,8 @@ in_scope:
   - docker/compose.yaml                             # ml-serving + postgres(+ 필요한 경우에만 그 둘) — broker 는 소비자가 없어 세우지 않는다
   - docker/probe/readiness.py                       # readiness 프로브 — GetModelMetadata.readiness 가 READY 인지(gate 실물). liveness 와 다른 종료 코드 의미
   - docker/probe/liveness.py                        # liveness 프로브 — 서버가 RPC 를 받는지(readiness 무관, NOT_READY 여도 살아 있음)
-  - docker/.dockerignore                            # 빌드 컨텍스트에서 .venv·build·reports·_workspace·bid-vector symlink 제외
+  - docker/ml-serving.Dockerfile.dockerignore        # 빌드 컨텍스트에서 .venv·build·reports·_workspace·bid-vector symlink 제외. **파일명은 `<Dockerfile>.dockerignore`**(계약 갱신 (3) — docker 가 `-f` 로 지정한 Dockerfile 의 형제 파일을 읽는다, 구현 레인 실측)
+  - config/quality/image-hygiene-policy.properties   # 위생 게이트의 정책 값(허용 베이스 다이제스트·금지 패키지 목록·크기 상한) — 매직넘버를 스크립트에 박지 않는다(v2-지침서 §5). 계약 갱신 (3)
   - tools/one-command-check.sh                      # 완료 조건 1 — 새 checkout 에서 Kotlin check + Python 전건을 한 명령으로(내부는 CI job 명령 그대로)
   - tools/image-hygiene-check.sh                    # non-root·고정 태그·금지 패키지 부재·크기 상한을 만든 이미지에 대해 실측(6C 게이트)
   - adapters/src/test/kotlin/bidvector/adapters/contract/RealServerIntegrationTest.kt   # OPEN-5E2-CROSSLANG-REAL-SERVER — 컨테이너의 실 Python 서버에 실 Kotlin gateway 로 붙는다(조건부 실행, 기본 check 에서 skip). **패키지는 `adapters.contract`**(계약 갱신 (2), D-6C-8) — 같은 축의 기존 전례 `CrossLangSmokeTest` 와 한자리
@@ -132,4 +133,5 @@ root 로 돌지 않는다 (c) 버전이 떠 있지 않다(`:latest`·미고정 0
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-6C-1~7 | 사용자 「M6 착수」 + 착수 slice 6C 선택 · M6 입력 재고 |
+| 2026-09-16 리뷰 요청(3) | in_scope 에 `config/quality/image-hygiene-policy.properties`(위생 게이트 정책 값 외부화 — 스크립트에 매직넘버 금지) 추가 · `.dockerignore` 파일명을 실제 동작하는 `docker/ml-serving.Dockerfile.dockerignore` 로 정정 | 구현 완료 보고 `50c108a` 의 새 파일 대조 — 둘 다 계약 초판에 없었다. 값의 자리를 스크립트 밖으로 뺀 것은 규율에 맞고, 파일명은 docker 의 실제 해석 규칙이다 |
 | 2026-09-16 구현 중(2) | **D-6C-8 신설** — 실 서버 통합 test 패키지를 `adapters.ml` → `adapters.contract`(같은 축 기존 전례와 한자리), in_scope 경로 갱신 · `OPEN-6C-CONDITIONAL-GATE-TEST` 신설 | 구현 레인 정지·보고: 기존 게이트 둘이 환경 조건부 test 에 동시 만족 불가. 게이트 술어를 약화시키는 두 안을 거부하고 패키지 분리 |
