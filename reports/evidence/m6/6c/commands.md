@@ -40,6 +40,43 @@
 - exit: 0
 - 핵심 결과: `transferring context: 6.69kB` — `.venv`·`build`·`reports`·`_workspace`·`bid-vector` 등이 컨텍스트에 실리지 않음(전체 저장소 대비 무시할 수 있는 크기). 임시 이미지 삭제 완료.
 
+## 수정 라운드 1 — D-6C-9 게이트 술어 표적 재검증(verifier r1 F-1·F-2·F-3)
+
+## 2026-09-17T00:00:00Z — F-1 재현(시정 전 형태로 취약함을 먼저 확인)
+- cmd: `USER mlserving`은 유지한 채 setuid root 실행 파일(작은 C 바이너리, `setuid(0)`+`execvp`)을 추가하고 그 바이너리를 ENTRYPOINT 로 삼은 임시 이미지를 빌드 → `docker run --rm --entrypoint id <이미지> -u`(구판 술어 시뮬레이션) vs `docker run --rm --entrypoint <suid 바이너리> <이미지> id`(실제 도는 프로세스)
+- exit: 구판 시뮬레이션 값 `10001`(통과로 보임) / 실제 프로세스 `uid=0(root)`(진짜로는 위반)
+- 핵심 결과: 구판 술어(`--entrypoint id`)가 이 격차를 못 본다는 것을 먼저 실측으로 확인.
+
+## 2026-09-17T00:02:00Z — F-1 시정 확인(같은 이미지에 새 게이트)
+- cmd: `./tools/image-hygiene-check.sh bidvector/mut-f1:v1`
+- exit: 1
+- 핵심 결과: `컨테이너의 실 pid 1 이 uid 0(root)으로 돈다` 검출(`docker top -eo pid,uid,comm`으로 실제 pid 1 을 잰 결과). 임시 이미지 삭제 완료.
+
+## 2026-09-17T00:05:00Z — F-1 시정이 출하 이미지는 여전히 통과시키는지
+- cmd: `./tools/image-hygiene-check.sh bidvector/ml-serving:local`
+- exit: 0
+- 핵심 결과: 실 pid 1 uid=10001. 출하 이미지 자체는 안전했다(verifier 완화 사실과 일치) — 게이트만 못 잡고 있었다.
+
+## 2026-09-17T00:08:00Z — F-2 재현+시정(FROM 은 떠 있는 태그, 라벨은 고정 다이제스트 그대로)
+- cmd: 런타임 stage `FROM`을 `python:3.12-slim`(다이제스트 없음)으로 바꾸고 `LABEL org.bidvector.baseimage`는 원래 고정 다이제스트 문자열 그대로 둔 임시 Dockerfile 빌드 → `./tools/image-hygiene-check.sh bidvector/mut-f2:v1`
+- exit: 1
+- 핵심 결과: `이미지의 앞 4 layer 가 정책의 고정 베이스 layer 체인과 다르다` 검출 — 라벨은 여전히 고정 다이제스트를 주장하는데도(보조 정보로 강등돼 판정에 영향 없음) layer 체인 대조가 잡았다. 임시 이미지 삭제 완료.
+
+## 2026-09-17T00:10:00Z — F-2 시정이 출하 이미지는 여전히 통과시키는지
+- cmd: `./tools/image-hygiene-check.sh bidvector/ml-serving:local`
+- exit: 0
+- 핵심 결과: `base-layer-접두-일치=true`(이미지 앞 4 layer가 정책의 `base.image.layers`와 순서까지 일치).
+
+## 2026-09-17T00:12:00Z — F-3 재현+시정(정책 파일 끝에 같은 키 중복)
+- cmd: `size.cap.bytes` 값을 파일 끝에 하나 더 붙인 정책 사본을 가리키게 한 스크립트 사본 실행
+- exit: 2
+- 핵심 결과: `정책 키 size.cap.bytes 가 ... 2번 선언됐다(정책 오류)` — 이전 판은 `tail -1`이라 뒤 값(`99999999999`)이 조용히 이겼다. 임시 파일 삭제 완료.
+
+## 2026-09-17T00:15:00Z — 기존 네 변이 재확인(구조가 바뀐 (1)(2) 절과 함께 여전히 잡히는지)
+- cmd: non-root 제거 · 금지 패키지(requests) 주입 · 이미지 자신의 태그 `:latest` · 세 변이를 새 스크립트로 재실행
+- exit: 전부 1
+- 핵심 결과: 셋 다 그대로 검출(각각 `Config.User`+실pid1 uid 0 둘 다 / 금지 패키지 import 성립 / `:latest` 태그) — 술어 재작성이 기존 방어를 깨지 않았다.
+
 ## 로컬 환경(compose)
 
 ## 2026-09-16T13:45:00Z
@@ -116,14 +153,45 @@
 - 핵심 결과: 첫 단계에서 즉시 비-0 종료, 이후 Python 단계(uv sync 등)가 전혀 실행되지 않음(`set -euo pipefail`
   이 즉시 중단시킴 확인). 임시 사본 삭제 완료.
 
+## F-6 시정(D-6C-9, verifier r1 MEDIUM) — one-command 와 CI 의 축어 일치 + CI 호출자 신설
+
+## 2026-09-17T00:20:00Z
+- cmd: `./tools/one-command-check.sh`(`qualityBaseline` 추가, wheel 임시 디렉터리 `mktemp` 화 뒤)
+- exit: 0
+- 핵심 결과: `qualityBaseline` step 이 스크립트 안에서 실제로 돎(로그에 `Task :qualityBaseline`
+  확인). 종료 뒤 `/tmp/ml-engine-wheel-one-command-check.*` 디렉터리가 남지 않음(`ls` 매치 0,
+  reviewer LOW 시정 확인).
+
+## 2026-09-17T00:22:00Z — 실패 전파 재확인(qualityBaseline 삽입 + trap 신설로 시퀀스가 바뀌어 재실측)
+- cmd: 원본을 `/tmp`에 백업한 뒤 그 자리에서 세 지점을 각각 mutate — ① S-1(`uv sync`) 줄을 `false`로
+  ② 금지 패키지 루프의 `if` 조건을 무조건 참으로 ③ S-11 마지막 재수출 test 줄을 `false`로. 매번 실행 뒤
+  백업에서 원복, `git diff --stat`으로 원복 확인.
+- exit: 전부 1
+- 핵심 결과: 셋 다 그대로 스크립트 실패로 이어짐(`set -euo pipefail` 유지 확인). ③(trap 있는 자리
+  바로 다음 줄)에서도 실패 시 `ONE_COMMAND_WHEEL_DIR`이 정리됨을 확인(`ls`로 부재 확인) — trap 이
+  실패 종료 경로에서도 작동한다.
+
+## 2026-09-17T00:25:00Z — CI job 이 one-command-check.sh 를 실제로 부르는지(YAML 검증)
+- cmd: `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml')); print('YAML OK')"`
+- exit: 0
+- 핵심 결과: `container` job 에 `./tools/one-command-check.sh`(S-20) step 신설 확인(YAML 구문 유효,
+  `container` job 안 매치 1건 — 이전엔 0건이었다, verifier r1 F-6 「어떤 CI job 도 부르지 않는다」 시정).
+
 ## 비밀값 스캔
 
-## 2026-09-16T14:35:00Z
-- cmd: `grep -rniE -f config/quality/leak-patterns.txt docker tools/image-hygiene-check.sh tools/one-command-check.sh adapters/src/test/kotlin/bidvector/adapters/ml/RealServerIntegrationTest.kt config/quality/image-hygiene-policy.properties reports/evidence/m6/6c/`
-- exit: 0(매치 2건, 둘 다 이 grep 명령 문자열 자신과 `docker/compose.yaml`의 DB 접속 값 환경변수 **이름**
-  참조 — 육안 확인, 값 리터럴이 아니다, D-6C-7·(2b) 표와 같은 규율)
-- 핵심 결과: 파일에 리터럴 비밀값 0건. (하네스 2026-09-16 「어휘를 evidence 에 축어로 적지 않는다」에 따라
-  매치 낱말 자체는 이 문서에 인용하지 않는다.)
+## 2026-09-16T14:35:00Z (수정 라운드 1, F-4 시정 뒤 재실측 — 아래 항목이 정본)
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt docker tools/image-hygiene-check.sh tools/one-command-check.sh adapters/src/test/kotlin/bidvector/adapters/contract/RealServerIntegrationTest.kt config/quality/image-hygiene-policy.properties .github/workflows/ci.yml reports/evidence/m6/6c/`
+- exit: 0(매치 2건 — `docker/compose.yaml`과 `.github/workflows/ci.yml` 각 1건, 둘 다 DB
+  접속 값 환경변수 **이름** 참조— 육안 확인, 값 리터럴이 아니다, D-6C-7·(2b) 표와 같은
+  규율)
+- 핵심 결과: 파일에 리터럴 비밀값 0건. `ci.yml`은 in_scope 경로인데 이전 스캔 목록에서
+  빠져 있었고(verifier r1 F-4), 값도 이전엔 파일에 고정 문자열로 있었다 — 이번 라운드에서
+  실행 시점에 `openssl rand`로 만들어 `$GITHUB_ENV`에 채우는 방식으로 바꿔 파일에는 변수
+  **이름**만 남는다(commands.md의 CI job 절 참고). 스캔 대상 경로도 D-6C-8 재배치 후
+  최종 경로(`adapters/contract/RealServerIntegrationTest.kt`)로 정정했다 — 이전 판의
+  옛 경로(`adapters/ml/...`)를 그대로 재실행하면 매치 대상 없음 오류가 난다(reviewer
+  MEDIUM). (하네스 2026-09-16 「어휘를 evidence 에 축어로 적지 않는다」에 따라 매치
+  낱말 자체는 이 문서에 인용하지 않는다.)
 
 ## 2026-09-16T14:50:00Z — S-5 승계(ml-engine 무편집 확인, 단독 실행)
 - cmd: `(cd ml-engine && uv sync --frozen --all-extras && uv run python -m pytest tests -q)`

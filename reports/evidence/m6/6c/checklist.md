@@ -60,6 +60,30 @@
    새로 짰다 — 값 계산 축이고 이 slice 가 잡는 소비자 규칙 축이 아니라서 도메인 규칙을
    바꾸지 않는다(엔진 코드 무편집, `ml-engine/src/**` out_of_scope 유지).
 
+## 수정 라운드 1 — verifier r1 · code-reviewer 처분
+
+verifier r1 not-ready(HIGH 2·MEDIUM 4·LOW 6) · code-reviewer 머지 가능(MEDIUM 1·LOW 2).
+HIGH 둘은 D-6C-9(scope.md 계약 갱신 (4))로 처방이 계약에 이미 고정됐다 — 여기는 처리
+여부와 표적 재검증 결과만 정리한다.
+
+| ID | 출처 | severity | 처분 | 근거 |
+| --- | --- | --- | --- | --- |
+| F-1 | verifier | HIGH | **수정** — pid 1 실측(`docker top`)으로 교체 | D-6C-9, commands.md 변이 재현+시정 |
+| F-2 | verifier | HIGH | **수정** — layer 접두 대조로 교체, 라벨은 보조 | D-6C-9, commands.md 변이 재현+시정 |
+| F-3 | verifier | MEDIUM | **수정** — 중복 키 매치 수 검사(1 아니면 exit 2) | 같은 커밋(게이트 술어 자리라 표적 재검증 대상) |
+| F-4 | verifier(+reviewer MEDIUM 같은 자리) | MEDIUM | **수정** — 스캔 경로에 `ci.yml` 추가·최종 test 경로로 정정·DB 접속 값을 파일 리터럴 대신 실행 시점 생성으로 | commands.md·ci.yml |
+| F-5 | verifier | MEDIUM | **수정** — rollback.md 시작 트리를 HEAD 기준으로 재작성(아래 rollback.md 참고) | 이 라운드 마지막에 최종 HEAD 로 재작성·재실측 |
+| F-6 | verifier | MEDIUM | **수정** — `qualityBaseline` 단계 추가(CI 축어 일치) + `container` job 에 S-20 step 신설 | one-command-check.sh·ci.yml |
+| F-7 | verifier | LOW | **수정** — transport 실패·envelope 거부·`NOT_READY` 셋을 서로 다른 문면으로(종료 코드 계약은 그대로 1) | docker/probe/readiness.py, 실측 셋(READY·transport·NOT_READY) |
+| F-8 | verifier | LOW | **등재**(알려진 제한) — 다른 이름 벤더링은 다섯 이름 열거를 비껴간다, 기존 CI S-1b 승계 한계 | 알려진 제한 절 |
+| F-9 | verifier | LOW | **등재**(알려진 제한) — 로컬 단독 반복 실행 시 낡은 이미지, CI 경로는 S-21 선행이라 무해 | 알려진 제한 절 |
+| F-10 | verifier | LOW | **등재**(알려진 제한) — 도메인 계약만 증명, 서버 내부 경로 결합은 하지 않음(verifier 가 이미 직접 RPC 로 확정) | 알려진 제한 절 |
+| F-11 | verifier | LOW(장부) | **처리 없음** — 동결 핀 지연은 팀장 하네스 후보 메모(m6-lane-map) 소관, 산출물 무관 | verifier 리포트 자체가 최종 정본 |
+| F-12 | verifier | LOW(호스트) | **처리 없음** — 다른 레인이 지운 이미지, verifier 가 재빌드해 재측정 완료 | verifier 리포트 |
+| reviewer MEDIUM | reviewer | MEDIUM | **수정** — F-4 와 같은 자리(위 F-4 처분과 동일) | commands.md |
+| reviewer LOW(죽은 COPY) | reviewer | LOW | **수정** — builder stage `COPY ml-engine/policy` 제거(uv build 무참조, grep 확인) | docker/ml-serving.Dockerfile |
+| reviewer LOW(임시 wheel 정리) | reviewer | LOW | **수정** — `mktemp -d` + `trap ... EXIT` 로 스크립트 종료 시 항상 정리 | tools/one-command-check.sh, 실패 종료 포함 실측 |
+
 ## (2b) 새 public 표면 여부
 
 - `docker/probe/liveness.py`·`readiness.py` — 조회 전용 RPC(`GetModelMetadata`) 둘만 호출.
@@ -87,9 +111,31 @@
   드물게 다른 job 과 충돌할 수 있다(이 slice 의 CI job 은 그 포트를 다른 무엇도 쓰지 않아
   이번 실행에서는 문제가 없었다). 충돌이 관측되면 host publish 를 완전히 빼는 쪽으로 정리한다.
 - 이미지 base·postgres 이미지 다이제스트는 2026-09-16 pull 시점 값으로 고정했다(재현성) —
-  상류가 그 태그를 재빌드하면 다이제스트가 바뀌어 위생 게이트의 라벨 대조가 실패할 수 있다
-  (그 경우 Dockerfile 의 다이제스트를 재실측해 갱신하는 것이 정상 대응이지 게이트 결함이
-  아니다).
+  상류가 그 태그를 재빌드하면 다이제스트가 바뀐다. **수정 라운드 1 이후**: 위생 게이트의
+  구속력 있는 판정은 라벨이 아니라 `base.image.layers`(정책 데이터)다 — `FROM`의 다이제스트를
+  바꾸면 `docker buildx imagetools inspect`로 새 layer 체인을 다시 뽑아 그 값과 Dockerfile의
+  라벨을 함께 갱신한다(라벨은 보조지만 사람이 리뷰에서 둘의 일치를 확인한다).
+- (수정 라운드 1 신설, F-8 승계) 금지 패키지 판정은 다섯 **이름**을 실제 import 해 잡는다
+  (우회 (2) 닫힘 — 같은 이름의 dist-info 없는 사본도 잡는다, verifier r1 MUT-C1 재확인).
+  **다른 이름으로 벤더링한 사본**(예: `sqlalchemy`를 `_vendored_sqlalchemy`로 복사)은 이
+  다섯 이름 열거를 비껴간다 — 기존 CI S-1b(`ml-engine` job)도 같은 다섯 이름을 쓰는 승계된
+  한계라 이 slice 가 새로 만든 구멍이 아니다. 열거를 벗어나는 임의 벤더링까지 잡으려면
+  런타임 site-packages 전체 스캔이 필요한데 그 정책 설계는 6C 범위 밖이다.
+- (수정 라운드 1 신설, F-9 승계) `RealServerIntegrationTest`의 컨테이너 자기 확인은
+  요청한 이미지 태그(`bidvector/ml-serving:local`)만 단언한다 — Testcontainers 의 기본
+  pull 정책이 로컬에 이미 있는 같은 태그를 그대로 쓰므로, 로컬에서 이미지 재빌드 없이
+  이 test 만 반복 실행하면 낡은 이미지로 통과할 수 있다. CI `container` job 은 항상
+  S-21(빌드)이 이 test(S-24)보다 먼저 돌아 매 실행마다 이미지가 최신이므로 CI 경로는
+  무해하다 — 로컬 단독 실행 시의 트레이드오프로 등재한다.
+- (수정 라운드 1 신설, F-10 승계) 옛 `featureSchemaVersion` 음성 대조 test 는
+  `MlUnavailableReason.UnsupportedSchema`라는 **결과값**만 단언한다 — 그 값은 서버의
+  `FAILURE_CODE_UNSUPPORTED_SCHEMA` 거부와 `ResponseMapping.mapSuccess`의 클라이언트
+  집행 분기 둘 다에서 나올 수 있어 test 만으로는 어느 경로인지 안 갈린다. verifier r1가
+  직접 RPC(스키마 필드만 다른 요청 한 쌍)로 확인한 결과 **서버 쪽 거부가 표본 처리보다
+  먼저** 일어난다(`serving/prediction.py`의 `_validate` 순서와 일치). 이 test 는 도메인
+  계약("옛 스키마는 거부된다")만 증명하면 충분하다고 보고 어느 내부 경로인지 노출하는
+  추가 단언은 더하지 않는다 — 서버 내부 구현(out_of_scope, `ml-engine/src/**`)에 test 를
+  결합시키는 쪽이 더 나쁘다고 판단했다.
 
 ## OPEN 처분 확인 (scope.md 대비)
 
