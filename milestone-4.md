@@ -760,12 +760,15 @@ Kotlin 은 임계를 재판정하지 않는다) · 요청 조립 무변경. **�
 의존해 진단을 `Verdict` 에 태울 수 없다. 4E 는 port 뿐이라(렌더러·`NotificationRequestPort` 구현 0, `ContentRef` 불투명 문자열,
 본문 골든 0) 채널 본문 착지는 6A. data-dictionary §3.1 「판정은 enum + 구조화 payload, 문장은 렌더링 시점 생성·비영속」.
 결정 D-4D4-1~8: sealed `PredictionEvidence`(`Diagnosed(diagnostics, release, excludedSamples)` | `NotPredicted(reason)`)를
-`Analyzed`·`NotificationRequest` 의 **필수 인자**로(누락 = 컴파일 거부, `decision` 우회) · `workflow.notification` 에 순수
+`Analyzed`·`NotificationRequest` 의 **필수 인자**로(누락 = 컴파일 거부, `decision` 우회) · `workflow.evaluation` 에 순수
 `evidenceLinesFor(verdict: BidNow, evidence): List<String>`(채널 무관·한국어·비영속, 골든 「기관 표본 n건(임계 미만) · 수축
-가중치 w」, `toPlainString` 고정 — Locale 게이트) · 4E port·타입·`ContentRef` 무변경(근거의 `ContentRef` 참조 방식은 6A →
+가중치 w」, `toPlainString` 고정 — 잠금은 소스 경계 test `EvidenceLinesBoundaryTest`) · 4E port·타입·`ContentRef` 무변경(근거의 `ContentRef` 참조 방식은 6A →
 `OPEN-4D4-CONTENT-REF`) · 정책 슬롯 신설 0(임계는 엔진 정책, 노출 조건은 `agencySampleBelowThreshold` 하나) · D-4B7-9 실효 ·
 `Reached` 무변경(Review 판정·알림함 기록의 근거 동반 → `OPEN-4D4-REVIEW-EVIDENCE`). 레인 `bid-vector-v2-m4e`/`m4-4d4/2026-09-16`,
-base `44721cf`(PR #27 병합 뒤), Python 레인과 소스 겹침 0.
+base `44721cf`(PR #27 병합 뒤), Python 레인과 소스 겹침 0. **계약 갱신 둘**(정본 scope.md 「계약 갱신 이력」): ① 원안의
+`workflow.notification` 배치는 4E S-5 `NotificationBoundaryTest` 가 `decision` 참조를 거부해 `workflow.evaluation` 으로 ② 원안이
+인용한 `ArchitectureGateTest` Locale 축은 `layer.domain` 에만 걸려 `workflow`(application) 에 무효 — verifier r1 V-1(high) 실측으로
+소스 경계 test 로 교체.
 
 ### Slice 4E — notification adapter contract
 
