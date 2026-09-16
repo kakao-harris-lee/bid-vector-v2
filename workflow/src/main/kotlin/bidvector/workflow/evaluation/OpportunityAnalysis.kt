@@ -208,7 +208,7 @@ class OpportunityAnalysis internal constructor(
         policies: ResolvedPolicies,
         correlationId: CorrelationId,
     ): Step<MlAnalysisOutcome> {
-        val (budgetCapture, expectedMargin) = predictionFacts(notice, policies, capacityScore, correlationId)
+        val components = predictionFacts(notice, policies, capacityScore, correlationId)
         val complexityInputs =
             ComplexityInputs(
                 budget = notice.baseAmount?.amount,
@@ -224,13 +224,13 @@ class OpportunityAnalysis internal constructor(
                 match = ScoreFact.Present(matchScore),
                 urgency = deriveUrgency(remaining, policies.derivation).toScoreFact(),
                 competitiveness = competitivenessNotCollected().toScoreFact(),
-                budgetCapture = budgetCapture,
-                expectedMargin = expectedMargin,
+                budgetCapture = components.budgetCapture,
+                expectedMargin = components.expectedMargin,
                 loadRatio = ScoreFact.Present(loadRatio),
                 workload = workload.current().toScoreFact(),
                 complexity = ScoreFact.Present(complexityOutcome.score),
             )
-        return ok(finalOutcomeOf(composePriority(priorityInputs, policies.priority), matchScore))
+        return ok(finalOutcomeOf(composePriority(priorityInputs, policies.priority), matchScore, components.evidence))
     }
 
     /** scope.md ⑥ — `notice.baseAmount`가 없으면 예측 자체를 생략한다(D-4B6B-4). */
@@ -239,7 +239,7 @@ class OpportunityAnalysis internal constructor(
         policies: ResolvedPolicies,
         capacityScore: UnitScore,
         correlationId: CorrelationId,
-    ): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> {
+    ): PredictionComponents {
         val resolvedBaseAmount = notice.baseAmount ?: return absentPair(MlUnavailableReason.ScoreNotProvided)
         // detekt ReturnCount(≤2) — 표본 공급 Unavailable 분기를 예측 호출 분기와 같은 when 안에
         // 스마트캐스트로 접는다(M4/4B-7, 두 번째이자 마지막 return).
@@ -263,7 +263,7 @@ class OpportunityAnalysis internal constructor(
                     }
 
                     is BidPredictionOutcome.Predicted -> {
-                        predictedFacts(outcome, baseAmount, notice, policies, capacityScore)
+                        predictedFacts(outcome, baseAmount, notice, policies, capacityScore, supply.excluded)
                     }
                 }
             }

@@ -205,10 +205,12 @@ class OpportunityAnalysisTest {
     }
 
     @Test
-    fun `baseAmount null 이면 두 성분 Absent 이지만 Analyzed 유지`() {
+    fun `baseAmount null 이면 두 성분 Absent 이지만 Analyzed 유지 — evidence 는 NotPredicted(D-4D4-7)`() {
         val notice = testNotice(number = "20260101003")
 
-        analyzeNotice(analysis(), notice).shouldBeAnalyzed()
+        val analyzed = analyzeNotice(analysis(), notice).shouldBeAnalyzed()
+
+        analyzed.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided)
     }
 
     @Test
@@ -367,7 +369,7 @@ class OpportunityAnalysisTest {
     }
 
     @Test
-    fun `Unavailable 표본 공급은 Analyzed 를 유지하되 예측 성분만 Absent`() {
+    fun `Unavailable 표본 공급은 Analyzed 를 유지하되 예측 성분만 Absent — evidence 는 supply reason 의 NotPredicted(D-4D4-7)`() {
         val category =
             bidvector.procurement.BusinessCategory(
                 bidvector.procurement.CategoryCode.of("A01"),
@@ -378,11 +380,39 @@ class OpportunityAnalysisTest {
             FakeCompetitionSamplePort { CompetitionSampleSupply.Unavailable(MlUnavailableReason.TransportFailed) }
         val prediction = FakeBidPredictionPort { predicted() }
 
-        analyzeNotice(analysis(prediction = prediction, samples = samples), notice).shouldBeAnalyzed()
+        val analyzed = analyzeNotice(analysis(prediction = prediction, samples = samples), notice).shouldBeAnalyzed()
 
         // 표본 공급 Unavailable 은 predictionFacts 를 halt 시킨다 — prediction.predict 는 불리지 않는다
         // (absentPair 로 두 성분만 drop, analyze() 자체는 Analyzed 유지).
         prediction.callCount shouldBe 0
+        analyzed.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.TransportFailed)
+    }
+
+    // ---- M4/4D-4(D-4D4-7) — Analyzed.evidence 가 Predicted.diagnostics·release·Supplied.excluded 와 등가 ----
+
+    @Test
+    fun `Supplied 예측 성공 경로에서 Analyzed evidence 는 Predicted diagnostics release 와 Supplied excluded 를 그대로 옮긴다(D-4D4-7)`() {
+        val category =
+            bidvector.procurement.BusinessCategory(
+                bidvector.procurement.CategoryCode.of("A01"),
+                null,
+            )
+        val notice = testNoticeWithMoney(number = "20260101010", businessCategory = category)
+        val excludedSamples = mapOf(SampleExclusionReason.BASE_AMOUNT_MISSING to 2)
+        val samples =
+            FakeCompetitionSamplePort {
+                CompetitionSampleSupply.Supplied(samples = emptyList(), excluded = excludedSamples)
+            }
+        val predictedOutcome = predicted()
+        val prediction = FakeBidPredictionPort { predictedOutcome }
+
+        val analyzed = analyzeNotice(analysis(prediction = prediction, samples = samples), notice).shouldBeAnalyzed()
+
+        val evidence = analyzed.evidence
+        check(evidence is PredictionEvidence.Diagnosed) { "Diagnosed 가 아니다: $evidence" }
+        evidence.diagnostics shouldBe predictedOutcome.diagnostics
+        evidence.release shouldBe predictedOutcome.release
+        evidence.excludedSamples shouldBe excludedSamples
     }
 
     @Test

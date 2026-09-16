@@ -1,5 +1,6 @@
 package bidvector.workflow.evaluation
 
+import bidvector.decision.MlUnavailableReason
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
 import bidvector.decision.VerdictLadder
@@ -164,6 +165,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
                             priorityScore = UnitScore(BigDecimal("0.1")),
                             probabilityScore = UnitScore(BigDecimal("0.1")),
                             matchedScore = UnitScore(BigDecimal("0.1")),
+                            evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
                         )
                     },
                 notifications = notifications,

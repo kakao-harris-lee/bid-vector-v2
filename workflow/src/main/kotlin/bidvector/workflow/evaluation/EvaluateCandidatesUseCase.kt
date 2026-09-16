@@ -267,6 +267,7 @@ class EvaluateCandidatesUseCase internal constructor(
                     bidNowThreshold,
                     reviewThreshold,
                     ladderInputFor(capacitySnapshot, mlUnavailableReason = outcome.reason),
+                    PredictionEvidence.NotPredicted(outcome.reason),
                 )
             }
 
@@ -283,6 +284,7 @@ class EvaluateCandidatesUseCase internal constructor(
                             probabilityScore = outcome.probabilityScore,
                             matchedScore = outcome.matchedScore,
                         ),
+                        outcome.evidence,
                     )
             }
         }
@@ -348,6 +350,10 @@ class EvaluateCandidatesUseCase internal constructor(
      * 판정은 정확히 이 한 자리에서만 돈다(결정 5) — 두 번째 호출 경로가 이 클래스에 없다.
      * `ladderInput`은 호출자가 조립한다(M4/4B-3 — `Analyzed`·`Unavailable` 두 가지가
      * 서로 다른 `LadderInput`을 낳으므로 이 함수는 그 차이를 모른다).
+     *
+     * `evidence`(M4/4D-4, D-4D4-3) — 호출자가 건넨 값을 그대로 [NotificationRequest]에
+     * 싣는다. 이 함수 자신이 `Analyzed`인지 `Unavailable`인지 모르므로 근거도 스스로
+     * 짓지 않는다 — [analyzeAndJudge]의 두 가지가 이미 만든 값을 옮길 뿐이다.
      */
     private fun reach(
         notice: Notice,
@@ -355,6 +361,7 @@ class EvaluateCandidatesUseCase internal constructor(
         bidNowThreshold: PriorityScore,
         reviewThreshold: PriorityScore,
         ladderInput: LadderInput,
+        evidence: PredictionEvidence,
     ): CandidateEvaluation.Reached {
         val ladderPolicy =
             Resolution.Resolved(
@@ -369,7 +376,7 @@ class EvaluateCandidatesUseCase internal constructor(
             )
         val verdict = judge(ladderInput, ladderPolicy)
         if (verdict is Verdict.BidNow) {
-            notifications.request(NotificationRequest(notice.id, correlationId, verdict))
+            notifications.request(NotificationRequest(notice.id, correlationId, verdict, evidence))
         }
         return CandidateEvaluation.Reached(notice.id, correlationId, verdict)
     }

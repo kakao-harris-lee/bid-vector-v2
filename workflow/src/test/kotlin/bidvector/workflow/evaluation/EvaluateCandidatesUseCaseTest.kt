@@ -212,6 +212,7 @@ class EvaluateCandidatesUseCaseTest {
                             priorityScore = UnitScore(BigDecimal("0.9")),
                             probabilityScore = null,
                             matchedScore = UnitScore(BigDecimal("0.2")),
+                            evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
                         )
                     },
             )
@@ -251,6 +252,7 @@ class EvaluateCandidatesUseCaseTest {
                             priorityScore = UnitScore(BigDecimal("0.9")),
                             probabilityScore = null,
                             matchedScore = UnitScore(BigDecimal("0.2")),
+                            evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
                         )
                     },
                 capacity = FakeCapacityPort(CapacitySnapshot(currentActiveBids = -1, maxActiveBids = 10)),

@@ -59,12 +59,28 @@ internal fun predictionRequestFor(
     )
 
 /**
+ * 세 함수(`predictedFacts`·`absentPair`·`absentPairForUnavailableSupply`)가 공유하는
+ * 성분 묶음(M4/4D-4, D-4D4-2) — 예전 `Pair<ScoreFact, ScoreFact>`에 [evidence]를
+ * 더한다. `internal`인 이유는 `PredictionFactsTest` 헤더 KDoc과 같다 — `analyze()`
+ * 전체를 거치면 `MlAnalysisOutcome.Analyzed`가 이 성분을 그대로 노출하지 않는다.
+ */
+internal data class PredictionComponents(
+    val budgetCapture: ScoreFact<UnitScore>,
+    val expectedMargin: ScoreFact<UnitScore>,
+    val evidence: PredictionEvidence,
+)
+
+/**
  * fitness 가 [0,1] 밖이거나 `candidates.base`(D-4B6B-6 로 `recommendedRate`·`predictedRate`
  * 둘 다 이 값이다)가 `MarginInputs.init`의 `≤ 1` 술어를 못 만족하면 예측 응답 전체를 못
  * 믿는 것으로 보고 두 성분 다 drop 한다(verifier r1 F-1) — `MarginInputs`를 짓기 **전에**
  * 그 생성자의 세 술어(recommendedRate·predictedRate·floorRate 각 `fraction ≤ 1`) 중
  * `candidates.base`에서 오는 둘을 여기서 막는다. `floorRate`는 `Notice`가 주는 별도 축이라
  * [expectedMarginFact]가 그 관문을 진다(D-4B6B-4 — floorRate 문제는 margin 만 drop).
+ *
+ * [excludedSamples]는 M4/4D-4(D-4D4-7) — 호출자(`OpportunityAnalysis.predictionFacts`)가
+ * `CompetitionSampleSupply.Supplied.excluded`를 그대로 넘긴다. 이 함수는 그 계수를 다시
+ * 세지 않고 [PredictionEvidence.Diagnosed]로 옮겨 싣기만 한다.
  */
 internal fun predictedFacts(
     predicted: BidPredictionOutcome.Predicted,
@@ -72,7 +88,8 @@ internal fun predictedFacts(
     notice: Notice,
     policies: ResolvedPolicies,
     capacityScore: UnitScore,
-): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> {
+    excludedSamples: Map<SampleExclusionReason, Int>,
+): PredictionComponents {
     if (predictionUntrustworthy(predicted)) {
         return absentPair(MlUnavailableReason.ContractViolation)
     }
@@ -80,7 +97,8 @@ internal fun predictedFacts(
     val budgetCapture = budgetCaptureFact(baseAmount, predicted.candidates.base, policies)
     val expectedMargin =
         expectedMarginFact(notice, predicted.candidates.base, priceFitness, capacityScore, policies)
-    return budgetCapture to expectedMargin
+    val evidence = PredictionEvidence.Diagnosed(predicted.diagnostics, predicted.release, excludedSamples)
+    return PredictionComponents(budgetCapture, expectedMargin, evidence)
 }
 
 /** fitness 범위 위반 또는 `candidates.base > 1`(`MarginInputs.init`의 두 술어) — 둘 다 같은 취급. */
@@ -133,8 +151,9 @@ private fun expectedMarginFact(
     return ScoreFact.Present(deriveExpectedMargin(marginInputs, policies.derivation))
 }
 
-internal fun absentPair(reason: MlUnavailableReason): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> =
-    ScoreFact.Absent(reason) to ScoreFact.Absent(reason)
+/** M4/4D-4(D-4D4-1) — 예측을 시도하지 않았거나 실패로 끝난 경우는 전부 `NotPredicted`다. */
+internal fun absentPair(reason: MlUnavailableReason): PredictionComponents =
+    PredictionComponents(ScoreFact.Absent(reason), ScoreFact.Absent(reason), PredictionEvidence.NotPredicted(reason))
 
 /**
  * D-4B7-9(verifier r2 N-2) — 표본 공급 실패(`CompetitionSampleSupply.Unavailable`) 사유를
@@ -147,4 +166,4 @@ internal fun absentPair(reason: MlUnavailableReason): Pair<ScoreFact<UnitScore>,
  */
 internal fun absentPairForUnavailableSupply(
     supply: CompetitionSampleSupply.Unavailable,
-): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> = absentPair(supply.reason)
+): PredictionComponents = absentPair(supply.reason)

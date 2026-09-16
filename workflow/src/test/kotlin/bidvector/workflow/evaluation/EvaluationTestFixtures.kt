@@ -235,12 +235,17 @@ internal class SequentialCorrelationIdFactory : CorrelationIdFactory {
     }
 }
 
-/** 항상 확정 BidNow를 내는 ML 분석 — priority가 bidNowThreshold(0.7) 이상. */
+/**
+ * 항상 확정 BidNow를 내는 ML 분석 — priority가 bidNowThreshold(0.7) 이상. `evidence`는
+ * M4/4D-4(D-4D4-2) — 이 fixture는 예측 자체를 재지 않는 test가 쓰므로 `NotPredicted`
+ * 고정값을 싣는다(예측 경로 test는 `OpportunityAnalysisFixtures.predicted()`를 쓴다).
+ */
 internal fun bidNowAnalysis(): MlAnalysisOutcome =
     MlAnalysisOutcome.Analyzed(
         priorityScore = UnitScore(BigDecimal("0.9")),
         probabilityScore = null,
         matchedScore = null,
+        evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
     )
 
 /** M4/4B-3 scope.md ① — ML 미가용 값(기본 사유 `ScoreNotProvided`, 항상-미가용 배선 관례). */
