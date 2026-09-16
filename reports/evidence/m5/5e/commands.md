@@ -8,6 +8,12 @@
 ## S-1 ~ S-12 (fix round 2 종결 — 2026-09-16T00:04Z, 마지막 evidence 커밋 뒤 재실행,
 이 결과가 정본이고 그 이전 판(fix round 1 의 803 passed·169 files 등)은 대체됐다)
 
+**2026-09-16T00:21Z 재확인**(팀장 관찰 — `tests/gates/test_serving_purity.py` 격리
+수정 뒤): 아래 수치는 이 재확인에서도 그대로 재현됐다 — pytest 808 passed(변화
+없음, 기존 3 test 재구성일 뿐 순증 없음), ruff/mypy/lint-imports/design_ratchet
+전부 동일 결과, `./gradlew --no-daemon check --rerun-tasks` 337/337 재실행 exit 0.
+S-13(source 비밀값 스캔)도 65줄 매치로 변화 없음(전부 취소 토큰 계열 식별자).
+
 ## 2026-09-16T00:04Z
 - cmd: `(cd ml-engine && uv sync --frozen --all-extras)`
 - exit: 0
