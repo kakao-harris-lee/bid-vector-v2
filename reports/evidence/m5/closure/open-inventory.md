@@ -127,37 +127,6 @@
 
 ---
 
-# 표 2 — 완료 조건 10 ↔ 근거
+# 표 2 · 종결 판정에 걸리는 것 — 축약
 
-`milestone-5.md` 「## 완료 조건」 열 항목 순서 그대로.
-
-| # | 완료 조건 | 담당 근거로 등재한 자리 | 근거 한 줄 | 조건부 OPEN |
-| --- | --- | --- | --- | --- |
-| 1 | training/serving 이 동일 feature transform 과 schema 를 사용 | `reports/evidence/m5/5b/scope.md`(작성 근거 줄이 완료 조건 문면을 인용 — 「training/serving 동일 transform·schema」) · 같은 문서 ⑤·위협 모델 (g) · `reports/evidence/m5/5c/scope.md` ⑤ | 변환 진입점은 `AwardRateFeatureSpace.build_row` 하나이고 5C·5D 가 같은 모듈에서 import 하도록 import-linter layers 가 강제한다(5B 위협 (g)). 5C-1 ⑤ 는 「학습 행렬은 5B `build_row` 결과만」 | 없음. 단 **서빙 경로는 GBM 이 아니라 분포 엔진 단독**(5D-2 D-5D2-1 (b))이라, 5B 피처 벡터를 쓰는 서빙 경로가 실제로는 없다 — `5e2/scope.md` D-5E2-8 은 `feature_schema_version` 을 「wire 의 `FeatureInputs` 해석 규약을 나르는 축」으로만 유지한다고 적는다 |
-| 2 | clean environment 에서 동일 manifest/seed 입력이 재현 가능한 artifact/metric 생성 | artifact: `reports/evidence/m5/5c/scope.md` ⑩ + `5c/checklist.md` D-5C-12 행 · metric: `reports/evidence/m5/5c2/scope.md` ⑩ + `5c2/checklist.md` 「완료 조건 「재현 가능한 metric」」 | 같은 입력 두 번 학습 → `ArtifactBytes.bytes` 바이트 동일(실 LightGBM 1건, `num_threads=1`) · 같은 입력 두 번 → report canonical bytes 동일(`test_run_holdout_reproducible_with_real_lightgbm`) | `OPEN-5C-REPRO-SCOPE`(→ D-5C-12: 같은 호스트·같은 스레드 수 한정) · `5c/checklist.md` 알려진 제한 3(호스트 간 미보장) · `OPEN-5C-CORPUS`(실 코퍼스 부재 — 합성 코퍼스로만 확인) |
-| 3 | serving image/package 에 DB driver 와 service ORM 이 없음 | `reports/evidence/m5/5a/scope.md` ②(완료 조건 문면 인용) + S-1b · `reports/evidence/m5/5e/checklist.md` 「serving 패키지에 DB driver·ORM 없음」 행 | serving extras 만 설치한 환경에서 금지 패키지 다섯을 **각각** import 해 전부 실패함을 실측(S-1b) + 실행 시점 `tests/gates/test_serving_purity.py`(5E-1 이 서브프로세스 격리로 통일) | 없음. `5e/checklist.md` 「verifier r2 관찰」이 기록한 순수성 게이트의 collection 의존 gap 은 같은 라운드에 닫혔다 |
-| 4 | 금지 import mutation 이 CI 에서 실패 | `reports/evidence/m5/5a/scope.md` ③(완료 조건 문면 인용) · `reports/evidence/m5/5c/scope.md` ⑫ + `5c/checklist.md` D-5C-13 행 | layers+forbidden 계약 + 양성 대조 fixture(`bad_features_db/`)가 `lint-imports` 를 붉히는 것을 test 가 단언하고, 계약 블록의 존재 자체를 `test_import_contracts.py` 가 실제 `pyproject.toml` 에서 읽어 확인(5C-1 verifier r1 H-3) | 없음 |
-| 5 | artifact checksum 불일치 시 readiness/inference fail-closed | inference: `reports/evidence/m5/5d/scope.md` ⑦ + `5d/checklist.md` D-5D-4 행 · dataset: `reports/evidence/m5/5c/scope.md` ① · readiness: `reports/evidence/m5/5e/checklist.md` 「checksum 불일치 시 readiness fail-closed」 행 | `load_artifact` 는 sha256·schema·feature_names·manifest checksum·`sample_scope` 중 하나라도 어긋나면 **객체를 만들지 않는다**(변조 11건 test). dataset 쪽은 `load_dataset` 의 다섯 거부 사유 | **문면 대체 있음** — `5e/checklist.md` 가 「dataset checksum 불일치는 job 안에서 `FAILED`, **정책 자체의 로드 실패는 `ReadinessGate` 가 `NOT_READY`**」로 읽고, `5e/scope.md` ②는 「artifact 없는 분포 엔진에서는 **정책 checksum 이 그 자리**」라고 적는다. 즉 **artifact checksum 이 readiness 를 좌우하는 경로는 서빙에 존재하지 않는다**(GBM 미서빙). 관련 미결: `OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`(같은 이름 두 정의, 어느 층도 재계산 대조 안 함) |
-| 6 | M2 Kotlin consumer 와 provider contract 통과 | `reports/evidence/m5/5e/checklist.md` 「M2 consumer/provider contract 통과」 행(S-12 + S-12b) · `reports/evidence/m5/5e2/checklist.md` 「Kotlin 소비자 규칙과의 정합」 행 | S-12 는 2D fake 서버 스모크(무편집 통과 = 계약 표면 무변경 증명), S-12b 는 실 servicer socket 스모크(5E-2 가 `tests/app/test_server_prediction.py` 로 자동화). Kotlin 규칙 다섯은 `test_kotlin_rules_parity.py` 가 Python 에서 미러 | `OPEN-5E2-CROSSLANG-REAL-SERVER`(실 Kotlin ↔ 실 Python 통합 부재 — 6C) · `OPEN-5E2-FEATURE-SCHEMA-PARITY`(**현 Kotlin 송신값으로는 실서빙 전량 `UNSUPPORTED_SCHEMA`**) · `OPEN-5E2-CANDIDATE-RATE-UPPER`(적법 입력이 `INTERNAL` 을 받을 수 있다) |
-| 7 | 오류·최소 표본이 0점/성공으로 변환되지 않음 | `reports/evidence/m5/5b/scope.md`(작성 근거 줄이 완료 조건 문면 인용) ③ · `reports/evidence/m5/5c/scope.md` ③(문면 인용) · `reports/evidence/m5/5d/scope.md` ②④⑤ · `reports/evidence/m5/5c2/scope.md` ⑥(3값 판정) · `reports/evidence/m5/5e2/checklist.md` D-5E2-6 행 | 결측·미지는 NaN+provenance 또는 행 거부(5B) · 표본 미달은 `TrainingRejected`(5C-1) · 커널은 `Unmeasurable(reason, detail)`(5D) · 평가는 `NotEvaluable(UNDERPOWERED/SEED_UNSTABLE)`(5C-2) · 매핑 불변식 위반은 `MappingRejected`→INTERNAL 로 올리고 `Unmeasurable` 로 위장하지 않는다(5E-2) | `OPEN-5C-REJECT-ACCOUNTING`(거부의 **사유별 분해**는 여전히 없음 — 총계만) · `5d/checklist.md` 알려진 제한 2(`std == 0` 은 통과) |
-| 8 | 승인된 ML metric threshold 충족 또는 `not-promotable` 로 명시 | `reports/evidence/m5/5c2/scope.md`(작성 근거 줄이 완료 조건 문면 인용) ⑥⑧·D-5C2-3·D-5C2-6 · `reports/evidence/m5/5c2/checklist.md` 「완료 조건 「승인된 ML metric threshold 충족 또는 `not-promotable` 로 명시」」 | 임계는 `evaluation-v1.yaml` 에만 있고 낱개 인자·CLI·env 가 없다(`test_public_signatures.py`) · 판정은 `Passed | Failed | NotEvaluable` 3값이고 `Promotable` 은 `Passed` 에서만 파생(`derive_promotion`) | **「충족」 쪽은 미측정** — `OPEN-5C-CORPUS`(실 코퍼스 없음, 전부 합성) · `OPEN-5C2-POLICY-VALUES`(임계 값 승인 문면이 「승인 대기」) · `OPEN-5C-OOF-TIME-DIRECTION`(5C-2 수치 뒤 재판단 미이행) |
-| 9 | 이식한 모듈마다 출처(파일·commit)와 수정·튜닝 내역이 기록됨 | `reports/evidence/m5/5a/scope.md` ⑦(규약 + 두 자리 대조 검사 S-7) · 각 slice `reuse.md`(`5a`·`5b`·`5c`·`5c2`·`5d`·`5d2`·`5d3`·`5e`·`5e2`) | `tools/reuse_provenance_check.py` 가 모듈 docstring `Reuse: <경로>@<commit>` ↔ `reuse.md` 행을 **양방향**으로 대조하고(5A verifier r1 F-3), 양성 표본 둘이 어긋남·포인터 없음을 각각 붉힌다. S-7 은 CI `ml-engine` job 안 | 없음. 단 **완료 조건 문면 자체를 인용한 담당 등재는 없다** — 근거는 §3.2·ADR 0009 D-6 인용으로 걸려 있다 |
-| 10 | 이식한 코드가 신규 코드와 동일한 lint/typecheck/import boundary/래칫을 통과 | `reports/evidence/m5/5a/scope.md` ④(품질 도구)·D-5A-2·D-5A-3 · 모든 slice 의 `acceptance_commands` S-2·S-3·S-4·S-6 | 래칫은 「위반 0 또는 명시 allowlist」이고 baseline 완화를 채택하지 않았다(D-5A-3 — `tools/design_ratchet.py` 에 baseline 비교 로직 자체가 없다). mypy strict override 는 이식 모듈 0건 유지(`test_mypy_allowlist.py` 가 사유 주석 강제) | `OPEN-5A-MYPY-ALLOWLIST`(초기 0건, 소유 5D 가 갱신 없이 종결 — **미배정 상태**) · `5c/checklist.md` verifier r3 L-2(래칫의 약한 경계 판정이 **클래스 본문 annotation 을 보지 않는다** — 사각 등재, 5A 소유) · `5c2/checklist.md` 「계약과 어긋나 판단이 필요했던 자리」(500줄 한도를 allowlist 대신 3파일 분리로 지켰다) |
-
-## 「근거 없음」 항목
-
-**0 건** — 열 항목 전부 어느 slice 의 `scope.md` 또는 `checklist.md` 에 담당 근거가 등재돼 있다.
-다만 **9·10 은 완료 조건 문면을 인용한 등재가 없고**(각각 §3.2·ADR 0009, §5 인용으로 걸려 있다),
-**5 는 문면이 대체 해석돼 있다**(artifact checksum → 정책 checksum, 서빙에 artifact 경로가 없어서).
-
----
-
-## 종결 판정에 걸리는 것 — 문면 기준 정리
-
-1. **운영자 결정 없이는 서빙이 서지 않는 둘** — `OPEN-5D2-POLICY-VALUES`(임계 값 미정 → 출하 정책으로 영구 NOT_READY, `5e2` test 가 그 사실을 고정)와 `OPEN-5E2-FEATURE-SCHEMA-PARITY`(Kotlin 송신값 불일치 → 실서빙 전량 `UNSUPPORTED_SCHEMA`). 전자가 풀리면 `OPEN-5E2-CANDIDATE-RATE-UPPER`(clamp 1.4 vs 계약 1)가 도달 가능해진다 — 셋이 순서로 엮여 있다.
-2. **승인 문면이 비어 있는 정책 값 둘** — `OPEN-5C2-POLICY-VALUES`·`OPEN-5E-POLICY-VALUES` 는 `policy-values.md` 표제가 아직 「승인 대기」인데 `milestone-5.md` 병합 문단의 「남는 OPEN」 목록에도 없다. 승인했는지 남았는지 문면으로 판정할 수 없다.
-3. **소유 slice 가 지나갔는데 갱신이 없는 셋** — `OPEN-5A-MYPY-ALLOWLIST`(소유 5D) · `OPEN-5D-REAL-BOOSTER`(소유 5C) · `OPEN-5D3-SENDER-PRECONDITION`(소유 5E). 해당 slice evidence 에 식별자 언급이 0 건이다.
-4. **문면 정정만 남은 둘** — `OPEN-5D2-BID-RATE-UPPER`(2F 가 닫았는데 M5 문서 셋이 「2F/5E 몫」으로 낡음) · `OPEN-5D-GOLDEN`(5D-2 가 011 을 해소했는데 「닫힘」 한 줄이 없음).
-5. **5A 정책 표 정정 미반영** — `OPEN-5C-5A-TABLE-REASSIGN`: `5a/policy-values.md` 의 #8·#31·#32·#33 이 여전히 5C 배정으로 남아 있다.
-6. **GBM 서빙 경로 부재로 대상이 사라진 둘** — `OPEN-5C2-SERVING-PATH-PARITY`·`OPEN-5C2-UNLEARNED-GUARD` 는 5E-2 가 「대상 부재」로 이월했다. 받을 slice 가 아직 정의되지 않았다.
-7. **M6 로 명시 이월** — `OPEN-5E-JOB-PERSISTENCE`(6B) · `OPEN-5E-JOB-QUEUE-BOUND`(6B) · `OPEN-5E2-CROSSLANG-REAL-SERVER`(6C) · `OPEN-5E-EMBEDDING-MODEL`(5F 또는 6C) · `OPEN-5E-CANCEL-GRANULARITY`(후속) · `OPEN-5B-FIXTURE-REEVAL`·`OPEN-5C-CORPUS`(curator) · `OPEN-5C-YAML-ERROR-5D`/`OPEN-5E-YAML-LOADER-INFERENCE`(같은 결함 계열 네 번째) · `OPEN-5C-ARTIFACT-CHECKSUM-PLACEMENT`(팀장 결정) · `OPEN-5C-REJECT-ACCOUNTING` · `OPEN-5B-POLICY-VALUES`·`OPEN-5C-OOF-TIME-DIRECTION`(재학습 지표 뒤).
+재고 원문의 표 2(완료 조건 10 ↔ 근거)와 말미 정리 절은 `checklist.md` §1·§3 이 판정 정본으로 흡수했으므로 여기서는 두지 않는다(verifier r1 의견 — 표 1 은 §2.1 의 16건 근거를 유일하게 보관하므로 사본으로 남긴다).
