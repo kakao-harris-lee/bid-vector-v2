@@ -67,3 +67,9 @@
 - cmd: `git diff --name-status 0ad8e597ff08e4fb4e23d422659fb33a116b5ab1..HEAD -- workflow/ adapters/src/main/kotlin/bidvector/adapters/ml/ adapters/src/test/kotlin/bidvector/adapters/ml/ fixtures/ app/src/test/kotlin/bidvector/app/conformance/ | wc -l`
 - exit: 0
 - 핵심 결과: `0` — 5개 out_of_scope 경로 전부 diff 없음. `agencyId` 조립(3H-2 몫)은 이 slice에서 손대지 않았다.
+
+## evidence 커밋(`e15ddce`) 뒤 재실측
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 1m 2s). evidence 문서 편집이
+  코드 게이트에 영향 없음을 확인.
