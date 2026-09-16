@@ -17,6 +17,7 @@
 | 4E 는 port 만 세웠다 — `ContentRenderer.render(contentRef, channel): RenderedContent` 구현 0, `NotificationRequestPort` 구현 0, `NotificationRequest → NotificationIntent` 다리 0, `ContentRef(value: String)` 는 불투명 문자열, 본문 골든 0, 본문 `body` 단언 test 0 | `workflow/notification/*` · 4E scope D-4E-1·5 | 채널 본문 착지는 6A — 이 slice 는 6A 렌더러가 **호출할 순수 함수**까지(D-4D4-4·5) |
 | enum → 문구 매핑이 저장소에 0. 규율: 「판정은 `ReasonCode` enum + 구조화 payload, 사람이 읽는 문장은 렌더링 시점에 생성하고 영속하지 않는다, 문장으로만 구분되는 판정을 만들지 않는다」 | `docs/discovery/data-dictionary.md` §3.1 | 캐리어(구조)가 정본, 문구는 파생(D-4D4-4) — 영속 편집 0 |
 | ML-04 ② 문면: 「기관 표본이 임계 미만이면 수축 가중치가 응답 근거에 실린다」 · OPEN 행 문면: 「리뷰·알림 문구에 『기관 표본 n건 < 임계, 수축 가중치 w』」 | `docs/discovery/capability-map.md` §ML-04 · OPEN 표 | 종결 조건의 골든 두 줄(D-4D4-4) |
+| 4D-3 out_of_scope 가 허락한 표면은 「4E 알림·리뷰 텍스트」 둘이고 「`Diagnostics` 를 이벤트/persistence 에 싣는 것」은 명시 배제. 리뷰 화면(NOTI-10 앱 알림함)은 M6/6A 라 M4 에 코드가 없다 — 오늘 닿는 표면은 알림 본문 하나 | `reports/evidence/m4/4d3/scope.md` out_of_scope | 문구 함수는 알림 본문용 순수 함수 하나, 이벤트·persistence 편집 0(우회 (8)) |
 | 4E 정책 슬롯은 `environmentModes`·`maskedSuffixLength` 둘, 4B 슬롯(`OpportunityPolicyData`)에도 문구·노출 슬롯 없음 | `workflow/notification/NotificationDeliveryPolicyData.kt` · `workflow/evaluation/OpportunityPolicyData.kt` | 정책 슬롯 신설 0(D-4D4-6) — 임계값은 엔진 정책이라 문구에 숫자로 넣지 않는다 |
 | `Analyzed(` 생성 자리: main 1(`OpportunityAnalysisPipeline.finalOutcomeOf`), test 3 파일(`EvaluateCandidatesUseCaseTest`·`EvaluateCandidatesUseCaseIsolationTest`·`EvaluationTestFixtures`) · `NotificationRequest(` 생성 자리: main 1(`EvaluateCandidatesUseCase.reach`) | `git grep` | 필수 인자 추가의 파급 전수 |
 
