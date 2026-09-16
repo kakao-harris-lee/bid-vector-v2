@@ -23,7 +23,7 @@
 milestone: M3
 slice: 3h1-agency-fact-collection-persistence
 base_sha: 0ad8e597ff08e4fb4e23d422659fb33a116b5ab1
-head_sha: <리뷰 요청 시점에 기입>
+head_sha: ec03ddb1d5b31ebc36d2ed6fcc7ad1bb71351121
 in_scope:
   - procurement/src/main/kotlin/bidvector/procurement/FieldContract.kt                 # FieldConcept 토큰 넷(DEMAND_AGENCY_CODE·DEMAND_AGENCY_NAME·NOTICE_AGENCY_CODE·NOTICE_AGENCY_NAME)
   - procurement/src/main/kotlin/bidvector/procurement/CollectionPolicy.kt              # 레지스트리 초기값 행 넷(문서 문면 — 크기·nullability)
