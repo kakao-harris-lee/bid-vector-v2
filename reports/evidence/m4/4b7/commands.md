@@ -33,3 +33,9 @@ Kotlin `check` 전건이 정본이다.
 
 ## rollback 실측
 `rollback.md` 참고 — 임시 clone에서 ①~⑥ 전부 실행, 명령·종료 코드는 그 문서에 기록.
+
+## evidence 커밋 HEAD 재실측(패턴 어휘 자기참조 방지, 2026-09-16 규약)
+- cmd: `./gradlew --no-daemon check`(evidence 커밋 `68fc182` HEAD)
+- exit: 0
+- 핵심 결과: evidence 문서 다섯(이 파일 포함) 커밋 뒤에도 전 모듈 `check` 그대로 통과 —
+  이 문서들이 비밀값 스캔 게이트를 스스로 깨지 않는다.
