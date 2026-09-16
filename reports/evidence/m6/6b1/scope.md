@@ -7,6 +7,10 @@ base_sha: c4d09cc   # PR #31(6C) 머지 커밋 = main
 head_sha: 리뷰 요청 시점의 `git rev-parse HEAD`(값을 박지 않는다)
 in_scope:
   - adapters/src/main/resources/db/migration/V8__edit_session.sql     # 세션 영속 표 신설 — id PK · state · expires_at · session_version · actor · last_command · 감사 열. 낙관적 동시성은 session_version 전제조건으로(트리거가 값을 정하지 않는다 — V2 의 revision 과 다른 축, D-6B1-3)
+  - workflow/src/main/kotlin/bidvector/workflow/strategy/Ports.kt        # 계약 갱신 (2)·D-6B1-7: `load` 반환을 **원시 스냅숏**으로(`save` 시그니처 무편집). M4/4C-1 의 `OutboxPort.claim() -> ClaimedOutboxRow` 패턴 재사용
+  - workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionSnapshot.kt   # 계약 갱신 (2): 원시 필드만 담는 공개 스냅숏 타입(도메인 불변식 없음) + **`internal` 복원 함수**(미지·불량 값 거부). 어댑터는 이것만 만든다
+  - workflow/src/main/kotlin/bidvector/workflow/strategy/EditStrategyWorkflow.kt  # 계약 갱신 (2): `sessions.load` 호출부가 스냅숏 → 복원을 지난다(로직 무변경)
+  - workflow/src/test/kotlin/bidvector/workflow/strategy/**              # 계약 갱신 (2): `EditSessionRepository` fake 넷의 `load` 반환 타입만(단언·시나리오 무편집)
   - adapters/src/main/kotlin/bidvector/adapters/persistence/JdbcEditSessionRepository.kt   # `EditSessionRepository` 실 구현(M4/4B 알려진 제한 ② 「세션 영속 실 구현 부재」 인계)
   - adapters/src/main/kotlin/bidvector/adapters/persistence/EditSessionRow.kt              # 행 ↔ 도메인 매핑. `EditSession` 은 `internal constructor`(M4 가 위조를 닫았다)이므로 복원 진입점의 가시성을 넓히지 않는 방법을 설계 검토에서 정한다
   - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                         # 세션 SQL 문자열 추가만(기존 문장 무편집)
@@ -19,7 +23,7 @@ out_of_scope:
   - backup/restore·migration rollback 정책과 rehearsal   # **6B-2** — 완료 조건 7 의 자리. 운영 절차·덤프·복원 리허설은 스키마 축과 독립이다(D-6B1-1)
   - raw/canonical/audit/outbox 데이터 수명·마스킹          # **6B-3** — 보존·파기는 privacy-gate 대상 축이고 승인된 보존 기간이 아직 없다(D-6B1-1)
   - ML job 영속·큐 상한(`OPEN-5E-JOB-PERSISTENCE`·`OPEN-5E-JOB-QUEUE-BOUND`) # **6B-4** — Python·파일 계열이고 저장소가 Postgres 가 아니다. 큐 정책(거부·대기·백프레셔) 결정이 선행한다(D-6B1-2)
-  - `EditSessionRepository` port 시그니처 변경             # 충돌을 결과 타입으로 나르려면 workflow(M4 종결 산출물)와 그 호출부·fake 전부가 바뀐다 — D-6B1-4 로 이 slice 는 **실패를 큰 소리로** 내고, 결과 타입화는 두 번째 writer 가 생길 때(`OPEN-6B1-SAVE-OUTCOME`)
+  - `EditSessionRepository.save` 시그니처 변경             # 충돌을 결과 타입으로 나르려면 workflow 호출부·fake 전부가 바뀐다 — D-6B1-4 로 이 slice 는 **실패를 큰 소리로** 내고, 결과 타입화는 두 번째 writer 가 생길 때(`OPEN-6B1-SAVE-OUTCOME`). **`load` 반환은 계약 갱신 (2)·D-6B1-7 로 좁게 재개방**했다(원시 스냅숏) — 그 문구의 취지는 저장 쪽 충돌 통로였고 읽기 축은 별 문제였다
   - 인덱스 신설·제약 강화 자체                            # 이 slice 는 **실측과 공백 등재**까지(카탈로그 대조). 실제 추가는 소비 질의가 있는 slice 가 근거와 함께(D-6B1-5)
   - app 배선·HTTP 진입점                                  # 6A
 acceptance_commands:
@@ -55,6 +59,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 | **D-6B1-2** | ML job 영속·큐 상한(M5 이월 둘)은 **6B-4** — 이 slice 밖 | Python·파일 계열이고 Postgres 가 아니다. 큐 정책(거부·대기·백프레셔)이 먼저 결정돼야 하며 `WORKER_RESOURCE_EXHAUSTED` 는 계약에 있으나 생산 경로가 없다 |
 | **D-6B1-3** | 세션 표의 `session_version` 은 **애플리케이션이 싣고 DB 가 전제조건으로 검사**한다 — V2 의 `revision`(트리거가 정하는 값)과 다른 축이다 | 낙관적 동시성은 「내가 읽은 값이 아직 그 값인가」를 묻는 것이고, 트리거가 값을 정하면 그 질문이 사라진다. 두 메커니즘을 한 표에 섞지 않는다 |
 | **D-6B1-4** | 충돌은 port 시그니처를 바꾸지 않고 **큰 소리로 실패**한다(구체 예외) — 결과 타입화는 `OPEN-6B1-SAVE-OUTCOME` | `save(session): Unit` 에 충돌 통로가 없다. 결과 타입으로 나르려면 M4 종결 산출물(workflow)과 호출부·fake 가 전부 바뀌고 「충돌 시 무엇을 하는가」는 workflow 도메인 결정이다. **조용한 덮어쓰기만은 허용하지 않는다** — 그것이 이 축의 요점이다 |
+| **D-6B1-7** (계약 갱신 (2), 구현 레인 정지·보고) | `EditSessionRepository.load` 는 **원시 스냅숏**을 반환하고 `EditSession` 복원은 **workflow 안 `internal` 함수**가 진다 — 어댑터는 `EditSession` 을 만들지 않는다. `save` 시그니처는 불변(D-6B1-4). 스냅숏 타입은 **원시 필드만**(도메인 불변식 0)이고 복원은 **미지·불량 값을 거부**한다(지어내지 않는다) | 구현 레인 실측: `EditSession` 은 `internal constructor` + `@ConsistentCopyVisibility` 이고 저장소에 `friendPaths`·`associate` 설정이 0 이라 `adapters` 에서 생성자 호출이 **컴파일 불가**다. 통로 타입은 쓰기 주체만 가르고 **읽기·복원 문제를 풀지 않는다**. 같은 계열을 M4/4C-1 이 이미 겪었고(공개 복원 진입점이 위조 재료를 내준다 — verifier H-1) 해법이 **port 반환을 원시 행으로**(`OutboxPort.claim() -> ClaimedOutboxRow`, 복원은 workflow `internal`)였다. 대안 둘은 거부: 새 public 복원 팩토리는 D-6B1-6 이 막은 바로 그 자리를 다시 열고, 세션 축을 이 slice 에서 빼면 M4/4B 인계가 무기한 미결로 남는다 |
 | **D-6B1-5** | 인덱스·제약의 **추가**는 소비 질의를 가진 slice 가 근거와 함께. 이 slice 는 실측·공백 등재까지 | 근거 없는 인덱스는 쓰기 비용만 늘린다. 공백을 보이게 만드는 것이 이 slice 의 값이다 |
 | **D-6B1-6** | `EditSession` 의 복원은 **가시성을 넓히지 않는다** — M4 가 `internal constructor` 로 위조를 닫았다. 복원 진입점의 형태는 설계 검토에서 정하고(같은 모듈 내 팩토리 · 전용 통로 타입 중) 새 public 표면 0 을 실측한다 | M4/4C-1 의 high 가 정확히 「public 복원 진입점이 아무 모듈에나 위조를 허락한다」였다. 같은 자리를 다시 열지 않는다 |
 
@@ -94,4 +99,5 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 구현 전(2) | **D-6B1-7 신설** — `load` 반환만 원시 스냅숏으로 좁게 재개방(`save` 불변), in_scope 에 workflow 네 자리 추가(Ports·스냅숏 타입·호출부·test fake 반환 타입) · out_of_scope 문구를 `save` 한정으로 정정 · 충돌 ②(트리거) **차단 아님**으로 확정(기존 트리거 25 개가 세 표군에만 붙어 있고 신설 표는 대상 아님 — 실측), 충돌 ③ 은 구현 순서 3 에서 확정 · 인덱스 감사 완료(표 11·인덱스 14·제약 93·트리거 25, **소비 질의 없는 FK 인덱스 공백 4** → `OPEN-6B1-INDEX-GAPS` 등재, 추가 없음) | 구현 레인 정지·보고(앞 레인이 네트워크 오류로 죽으며 유실한 「충돌 셋」의 내용). 선례가 가리키는 해법이 계약이 막아 둔 항목과 **이름만 같았다** |
 | 2026-09-17 착수 | 초판 — D-6B1-1~6 | 6C 병합 뒤 기록된 착수 순서(6C → 6B) · M6 입력 재고 §3 · M4/4B 인계 |
