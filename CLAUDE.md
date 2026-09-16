@@ -3,7 +3,8 @@
 이 저장소에서 애플리케이션 코드는 Claude 가 구현한다. Codex 는 되돌리기 어려운 경로와 계약 파일에 한정된
 독립 심판이다. 이 문서는 **현행 규율만** 담는다 — 규율이 생긴 사유와 실측 이력은
 `docs/harness/change-history.md`(2026-09-16 에 이 문서에서 분리, append-only)에 있고, 각 규율의 정본은
-「대상」 열이 가리키는 스킬·에이전트 파일(`.claude/skills/*`, `.claude/agents/*`)이다.
+「대상」 열이 가리키는 스킬·에이전트 파일(`.claude/skills/*`, `.claude/agents/*`)이다 — **예외는 아래 하네스
+절 끝의 ※ 다섯**으로, 그것들은 스킬 파일에 아직 문장이 없어 이 문서의 요약이 정본이다.
 
 ## 운영자 지시 (2026-09-04, 2026-09-11 갱신) — 아래 모든 절보다 우선
 
@@ -138,4 +139,7 @@ Codex 가 `request_changes` 를 반환하면 같은 scope 에서 Claude 가 수�
 「HEAD 초록」이 아니라 트리 동일성(되돌린 트리의 파일 SHA 가 이미 실측한 트리와 같음)으로만」 · 「collection 선택에
 따라 답이 갈리는 게이트는 서브프로세스 격리」 · 「수정 라운드가 만든 새 파일 ↔ in_scope 대조를 보고 항목으로」 ·
 「code-reviewer(sonnet)를 verifier 와 병렬로」(전역 규약 §1 유래). 다음 하네스 편집에서 해당 스킬(v2-slice-pipeline
-Phase 3·4, evidence-pack rollback 절)로 옮긴다. 이력은 `docs/harness/change-history.md` 와 M5 evidence.
+Phase 3·4, evidence-pack rollback 절)로 옮긴다. **근거의 자리**: 뒤 넷은 M5 evidence·`milestone-5.md` 에
+실측이 있고(5E-1 순수성 게이트 · 5E-3·5F-2 rollback · 각 slice checklist), 「레인 동결 + 판정 대상 SHA
+고정」은 **이 문서가 유일한 근거**다(2026-09-16 M5/5F-1 에서 구현 완료 보고와 팀장 지시가 엇갈려 검증 중
+HEAD 가 다섯 커밋 이동한 실측 — 그 사건은 PR #24 조치 코멘트에 있고 이력 행은 다음 하네스 편집에서 세운다).
