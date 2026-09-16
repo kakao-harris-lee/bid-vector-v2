@@ -4,14 +4,8 @@
 커밋마다 그 HEAD 에서 재실측) + (2b) 호출자 실측. 명령·exit·핵심 결과 한 줄만 —
 출력 전문·라운드 이력 절은 남기지 않는다(evidence-pack 규율).
 
-## 수정 라운드 1 종결 시점(HEAD `7df311e`) 전건 재실측 — 2026-09-16
-
-S-0·S-2~S-7·S-11·S-12 전부 exit 0(값 요약: S-4 Contracts 8 kept 0 broken · S-5
-951 passed · S-6 위반 0 · S-7 위반 0 · S-11 wheel 빌드+재수출 test 1 passed ·
-S-12 socket 스모크 통과). S-1b·S-7 양성 대조·S-9·S-10·HIGH-1 probe 양성 대조는
-아래 「수정 라운드 1」 절에 개별 기록. 이 절 아래 나머지는 초판 구현 종결 시점
-(HEAD `b78082d`) 실측 원문이다 — 각 명령의 최신 값은 위 요약과 아래 「수정 라운드
-1」 절을 정본으로 삼는다.
+각 명령의 최신 값은 가장 아래(최신) 절을 정본으로 삼는다 — 「구현 종결」→「수정
+라운드 1」→「승인 전 일괄」 순으로 갱신됐다.
 
 ## 구현 종결 시점(HEAD `b78082d`) 전건 실측 — 2026-09-16T05:06Z
 
@@ -110,21 +104,38 @@ verifier r1 LOW-2 — 초판 acceptance_commands 가 CI `ml-engine` job 의 세 
   `uv run lint-imports` exit 0(8 kept)
 
 ## S-10 (Kotlin `check`, evidence 커밋마다 그 HEAD 에서 재실측)
-- cmd: `./gradlew --no-daemon check`(HEAD `b78082d`, 구현 종결)
-- exit: 0 — BUILD SUCCESSFUL, 337 task(35 executed, 302 up-to-date)
-- cmd: `./gradlew --no-daemon check`(HEAD `4d2c1d8`, evidence 패키지 커밋 뒤 재실측)
-- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
-- cmd: `./gradlew --no-daemon check`(HEAD `f671fe9`·`80629cd`, 최초 리뷰 요청 시점의
-  마지막 재실측 — 이 라운드에서 팀장·verifier·code-reviewer 판정이 이어져 갱신됨)
-- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
-- cmd: `./gradlew --no-daemon check`(HEAD `014752d`, 수정 라운드 1 HIGH-1 코드
-  커밋 뒤 재실측 — D-5E3-6 import-linter 계약 추가가 Kotlin 쪽에 영향 없음을 확인)
-- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
-- cmd: `./gradlew --no-daemon check`(HEAD `fe76d50`, LOW 일괄 evidence+코드 커밋 뒤)
-- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
-- cmd: `./gradlew --no-daemon check`(HEAD `7df311e`, rollback.md 갱신 커밋 뒤 —
-  이 줄을 적기 직전의 최종 재실측)
-- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
+
+cmd 는 매번 `./gradlew --no-daemon check` — 전부 exit 0(BUILD SUCCESSFUL).
+
+| HEAD | 시점 |
+| --- | --- |
+| `b78082d` | 구현 종결 |
+| `4d2c1d8` | evidence 패키지 커밋 뒤 |
+| `f671fe9`·`80629cd` | 첫 리뷰 요청 시점 마지막 재실측 |
+| `014752d` | 수정 라운드 1 HIGH-1 코드 커밋 뒤 |
+| `fe76d50` | 수정 라운드 1 LOW 일괄 커밋 뒤 |
+| `7df311e`·`1c410d0` | 수정 라운드 1 종결 시점 |
+| (아래 「승인 전 일괄」 절에 이어짐) | |
+
+## 승인 전 일괄(verifier r2 MEDIUM-1 + LOW 1·2) — 최종 HEAD 재실측
+
+MEDIUM-1 신설 test `test_exception_modules_reference_only_yaml_yamlerror`
+(D-5E3-6 ④) — `pyproject.toml`을 직접 읽어 뽑은 예외 세 모듈을 AST 로 전수 스캔.
+
+- cmd: `(cd ml-engine && uv run python -m pytest tests/gates/test_policy_loaders_fail_closed.py -v)`
+- exit: 0 — 5 passed(신설 1 포함)
+- 변이 1(`training/policy.py`에 `yaml.safe_load("a: 1")` 호출 추가) — exit 1,
+  1 failed(`YAMLError 외 yaml 속성을 참조한다: ['YAMLError', 'safe_load']`). 원복
+  뒤 재실행 exit 0(5 passed)
+- 변이 2(verifier r2 MEDIUM-1 재현 probe — `training/policy.py`에 `load_` 접두가
+  아닌 `read_training_policy_v2`로 `yaml.safe_load` 직접 호출) — exit 1, 1
+  failed(같은 assertion, 이름 규약과 무관하게 잡음). `lint-imports`는 이 변이에서
+  여전히 exit 0(import 계약은 이름을 보지 않으므로 무관 — 새 test 가 이 자리를
+  독립적으로 닫는다는 것이 핵심). 원복 뒤 재실행 exit 0(5 passed), `git diff
+  --stat src/ml_engine/training/policy.py` 빈 diff
+- S-4(재확인, 이번 라운드는 계약 자체를 안 바꿨다) — exit 0, Contracts: 8 kept,
+  0 broken(변동 없음)
+- S-5(전체) — exit 0, **952 passed**(951 → +1, 신설 test 하나)
 
 ## S-11
 - cmd: `(cd ml-engine && uv build --wheel -o /tmp/ml-engine-wheel-5e3 && uv run python -m pytest tests/gates/test_wheel_reexport.py -q)`

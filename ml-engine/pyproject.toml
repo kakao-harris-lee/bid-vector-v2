@@ -272,9 +272,18 @@ forbidden_modules = ["yaml"]
 # `yaml.YAMLError` 타입만 참조 — code-reviewer LOW, 낡은 코드지만 파싱 경로는
 # 여전히 `registry.policy.load_policy` 하나를 거친다). 이 세 파일의 import 는
 # 무해 참조라 예외 처리하고, 그 밖 `ml_engine` 의 모든 새 모듈에는 계약이 그대로
-# 걸린다 — 세 파일에 새 `yaml.safe_load` 호출이 추가되는 회귀는
-# `tests/gates/test_policy_loaders_fail_closed.py`(각 로더의 malformed YAML 행동
-# 실측, import 구조와 독립적인 둘째 겹)가 잡는다.
+# 걸린다.
+#
+# D-5E3-6 ④(verifier r2 MEDIUM-1) — 이 예외 셋과 게이트의 `load_` 접두 이름 규약이
+# **교집합**을 연다: 이 세 파일 중 하나에 `load_` 로 시작하지 않는 이름(예:
+# `read_training_policy_v2`)의 함수를 더해 `yaml.safe_load`를 직접 부르면, 그 함수는
+# 게이트의 수집 대상도 아니고(이름 규약 밖) 이 import 계약도 막지 못한다(이미
+# `yaml` import 가 허용된 파일이라 새 호출이 import 단계에서 걸리지 않는다) — raw
+# 파서 예외가 그대로 샌다(verifier r2 실측). 이 교집합은
+# `tests/gates/test_policy_loaders_fail_closed.py::
+# test_exception_modules_reference_only_yaml_yamlerror`(이름 규약이 아니라 AST 로
+# 이 세 파일의 `yaml` 참조가 `YAMLError` 속성 하나뿐이고 호출·`from-import`가 0 임을
+# 단언 — 새 `safe_load` 호출이 추가되면 이름과 무관하게 붉어진다)가 닫는다.
 ignore_imports = [
     "ml_engine.registry.policy -> yaml",
     "ml_engine.training.policy -> yaml",

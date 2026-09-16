@@ -25,8 +25,10 @@ verifier r1 이 반환 주석을 타입 별칭으로 적은 다섯째 로더로 
 
 from __future__ import annotations
 
+import ast
 import inspect
 import pkgutil
+import tomllib
 from importlib import import_module
 from pathlib import Path
 from types import ModuleType
@@ -37,6 +39,8 @@ _ROOT_LOADER_MODULE = "ml_engine.registry.policy"
 _ROOT_LOADER_FUNC = "load_policy"
 
 _MALFORMED_YAML = "scenario.z: [unclosed\n"
+
+_YAML_IMPORT_CONTRACT_FORBIDDEN_MODULE = "yaml"
 
 
 def _iter_policy_modules() -> list[ModuleType]:
@@ -162,4 +166,95 @@ def test_every_collected_loader_rejects_malformed_yaml_without_raising(
             failures.append(
                 f"{qualified_name} 가 Rejected 류가 아닌 값을 돌려줬다: {result!r}"
             )
+    assert not failures, "\n".join(failures)
+
+
+def _pyproject_toml_path() -> Path:
+    """`ml_engine` 패키지에서 세 단계 위 — `ml-engine/pyproject.toml`."""
+    return Path(ml_engine.__file__).resolve().parents[2] / "pyproject.toml"
+
+
+def _yaml_ignore_import_source_modules() -> list[str]:
+    """`pyproject.toml`을 **직접 읽어** import-linter 계약 중 `forbidden_modules`
+    에 `yaml`이 있는 것을 찾고, 그 `ignore_imports`에서 `-> yaml`로 끝나는 항목의
+    소스 모듈을 뽑는다(손 목록 아님, D-5E3-6 ④). 계약 자체가 바뀌면(예외가
+    늘거나 줄면) 이 함수도 같이 바뀐다 — pyproject.toml 과 다른 말을 할 수 없다."""
+    data = tomllib.loads(_pyproject_toml_path().read_text(encoding="utf-8"))
+    contracts = data.get("tool", {}).get("importlinter", {}).get("contracts", [])
+    modules: list[str] = []
+    for contract in contracts:
+        if _YAML_IMPORT_CONTRACT_FORBIDDEN_MODULE not in contract.get(
+            "forbidden_modules", []
+        ):
+            continue
+        for entry in contract.get("ignore_imports", []):
+            source, _, target = entry.partition("->")
+            if target.strip() == _YAML_IMPORT_CONTRACT_FORBIDDEN_MODULE:
+                modules.append(source.strip())
+    return modules
+
+
+def _yaml_exception_modules_besides_root() -> list[str]:
+    """예외 모듈 중 뿌리(`registry.policy`, 실제 파싱 지점)를 뺀 나머지 —
+    out_of_scope 가 강제하는 「자기 `except yaml.YAMLError` 절만 가진」 셋."""
+    return [
+        name
+        for name in _yaml_ignore_import_source_modules()
+        if name != _ROOT_LOADER_MODULE
+    ]
+
+
+def _yaml_reference_summary(module_name: str) -> tuple[set[str], set[str], bool]:
+    """모듈 소스를 AST 로 읽어 (1) `yaml.<attr>` 속성 접근 이름 집합 (2)
+    `yaml.<attr>(...)` 형태로 **호출된** 속성 이름 집합 (3) `from yaml import ...`
+    존재 여부를 낸다. 이름 규약(`load_` 접두)과 무관하게 모듈 전체를 훑으므로
+    verifier r2 MEDIUM-1(비-`load_` 이름의 새 로더)이 여기서는 통하지 않는다."""
+    module = import_module(module_name)
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    attrs: set[str] = set()
+    called_attrs: set[str] = set()
+    has_from_import = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "yaml":
+            has_from_import = True
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "yaml"
+        ):
+            attrs.add(node.attr)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "yaml"
+        ):
+            called_attrs.add(node.func.attr)
+    return attrs, called_attrs, has_from_import
+
+
+def test_exception_modules_reference_only_yaml_yamlerror() -> None:
+    """D-5E3-6 ④(verifier r2 MEDIUM-1) — `pyproject.toml`의 `ignore_imports` 예외
+    모듈(뿌리 제외) 은 `yaml.YAMLError` 타입 참조 **하나만** 허용한다. `yaml.
+    safe_load` 같은 파싱 호출이나 `from yaml import ...` 는 이름이 `load_` 접두가
+    아니어도(예: `read_training_policy_v2`) 이 test 가 이름 규약과 무관하게
+    잡는다 — `_load_prefixed_functions`(이름 규약 기반 수집)와 이 test(AST 기반
+    전수 스캔)는 서로 다른 방어선이다."""
+    modules = _yaml_exception_modules_besides_root()
+    assert modules, "예외 모듈이 없다 — pyproject.toml 의 ignore_imports 를 점검하라"
+
+    failures: list[str] = []
+    for module_name in modules:
+        attrs, called_attrs, has_from_import = _yaml_reference_summary(module_name)
+        if attrs - {"YAMLError"}:
+            failures.append(
+                f"{module_name} 가 YAMLError 외 yaml 속성을 참조한다: {sorted(attrs)}"
+            )
+        if called_attrs:
+            failures.append(
+                f"{module_name} 가 yaml.<속성>(...) 형태로 호출한다: "
+                f"{sorted(called_attrs)}"
+            )
+        if has_from_import:
+            failures.append(f"{module_name} 가 `from yaml import ...` 를 쓴다")
     assert not failures, "\n".join(failures)

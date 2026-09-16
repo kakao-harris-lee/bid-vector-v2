@@ -112,3 +112,11 @@ policy.py::load_policy`가 문법 오류를 raw 예외로 전파, `run_holdout`�
 --no-daemon check` `BUILD SUCCESSFUL`. 임시 clone 은 확인 뒤 삭제했다. exit 코드와
 핵심 결과는 `commands.md`에 옮기지 않는다(evidence-pack 규율 — rollback 실측은 이
 문서 자체가 정본).
+
+**승인 전 일괄(verifier r2 MEDIUM-1+LOW) — 파일 목록 불변, 재실행 exit 0.**
+`git diff --name-status 8799e05..HEAD`가 위 목록과 항목 수(19) 그대로다(이번
+라운드는 기존 두 파일 — `pyproject.toml`·게이트 test — 만 더 고쳤다). 새 임시
+clone 에서 ①~⑤ 재실행: ①②③ exit 0(diff 0), ④ 938 passed, ⑤ `Success: no
+issues found in 72 source files`. **⑥은 S-10이 같은 최종 HEAD에서 이미 초록임
+(commands.md 「S-10」)으로 갈음** — 되돌린 트리의 `lint-imports`(7 kept, D-5E3-6
+④ test 도 파일째 삭제되어 대상 없음)만 별도 확인, exit 0.
