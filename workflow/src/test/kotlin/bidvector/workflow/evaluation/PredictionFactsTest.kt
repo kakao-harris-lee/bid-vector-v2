@@ -141,8 +141,10 @@ class PredictionFactsTest {
                     ),
             )
 
-        val fromLowShrinkage = predictedFacts(lowShrinkage, baseAmount, notice, testPolicies, testCapacity, emptyMap())
-        val fromHighShrinkage = predictedFacts(highShrinkage, baseAmount, notice, testPolicies, testCapacity, emptyMap())
+        val fromLowShrinkage =
+            predictedFacts(lowShrinkage, baseAmount, notice, testPolicies, testCapacity, emptyMap())
+        val fromHighShrinkage =
+            predictedFacts(highShrinkage, baseAmount, notice, testPolicies, testCapacity, emptyMap())
 
         // M4/4D-4(D-4D4-2) — 진단은 사다리 점수(ScoreFact 쌍)를 바꾸지 않는다. evidence는
         // 그 정의상 진단을 그대로 옮기므로 둘은 여기서 갈린다(아래가 그 사실을 직접 잰다).

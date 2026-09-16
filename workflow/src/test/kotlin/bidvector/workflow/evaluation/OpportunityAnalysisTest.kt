@@ -391,7 +391,7 @@ class OpportunityAnalysisTest {
     // ---- M4/4D-4(D-4D4-7) — Analyzed.evidence 가 Predicted.diagnostics·release·Supplied.excluded 와 등가 ----
 
     @Test
-    fun `Supplied 예측 성공 경로에서 Analyzed evidence 는 Predicted diagnostics release 와 Supplied excluded 를 그대로 옮긴다(D-4D4-7)`() {
+    fun `Supplied 예측 성공 경로 Analyzed evidence 는 Predicted diagnostics release Supplied excluded 를 옮긴다(D-4D4-7)`() {
         val category =
             bidvector.procurement.BusinessCategory(
                 bidvector.procurement.CategoryCode.of("A01"),

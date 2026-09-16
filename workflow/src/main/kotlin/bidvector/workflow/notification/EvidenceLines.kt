@@ -31,12 +31,14 @@ fun evidenceLinesFor(
 
 private fun bidNowReasonLine(reason: BidNowReason): String =
     when (reason) {
-        is BidNowReason.PriorityAboveBidNowThreshold ->
+        is BidNowReason.PriorityAboveBidNowThreshold -> {
             "우선순위 ${reason.priority.toPlainString()} 이 기준 ${reason.threshold.toPlainString()} 이상"
+        }
 
-        is BidNowReason.ForceBidOverride ->
+        is BidNowReason.ForceBidOverride -> {
             "확률 ${reason.probability.toPlainString()}(기준 ${reason.probabilityThreshold.toPlainString()}) · " +
                 "적합도 ${reason.matched.toPlainString()}(기준 ${reason.matchedThreshold.toPlainString()}) 강제 승격"
+        }
     }
 
 private fun predictionLines(evidence: PredictionEvidence): List<String> =
@@ -59,11 +61,11 @@ private fun diagnosedLines(diagnosed: PredictionEvidence.Diagnosed): List<String
     val base =
         listOf(
             "구간 지지 근거: ${segmentSupportLabel(diagnostics.segmentSupport)}",
-            "학습 표본 ${diagnostics.trainingRowCount.toString()}건",
+            "학습 표본 ${diagnostics.trainingRowCount}건",
             golden,
         )
     return if (diagnostics.excludedObservations > 0) {
-        base + "엔진 제외 관측 ${diagnostics.excludedObservations.toString()}건"
+        base + "엔진 제외 관측 ${diagnostics.excludedObservations}건"
     } else {
         base
     }
@@ -97,8 +99,9 @@ private fun mlUnavailableReasonLabel(reason: MlUnavailableReason): String =
 /** enum 선언 순서로 고정 — map 순회 순서(구현 정의)에 기대지 않는다. */
 private fun excludedSampleLines(excludedSamples: Map<SampleExclusionReason, Int>): List<String> =
     SampleExclusionReason.entries
-        .mapNotNull { reason -> excludedSamples[reason]?.takeIf { count -> count > 0 }?.let { count -> reason to count } }
-        .map { (reason, count) -> "표본 제외 ${count.toString()}건: ${sampleExclusionReasonLabel(reason)}" }
+        .mapNotNull { reason ->
+            excludedSamples[reason]?.takeIf { count -> count > 0 }?.let { count -> reason to count }
+        }.map { (reason, count) -> "표본 제외 ${count}건: ${sampleExclusionReasonLabel(reason)}" }
 
 private fun sampleExclusionReasonLabel(reason: SampleExclusionReason): String =
     when (reason) {

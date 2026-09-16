@@ -164,6 +164,5 @@ internal fun absentPair(reason: MlUnavailableReason): PredictionComponents =
  * 그대로 옮기는지를 `OpportunityAnalysisTest`(통합 층)에서는 잴 수 없다 — 같은 패키지
  * test가 이 함수를 직접 불러 잰다(verifier r1 F-1이 세운 같은 관례).
  */
-internal fun absentPairForUnavailableSupply(
-    supply: CompetitionSampleSupply.Unavailable,
-): PredictionComponents = absentPair(supply.reason)
+internal fun absentPairForUnavailableSupply(supply: CompetitionSampleSupply.Unavailable): PredictionComponents =
+    absentPair(supply.reason)
