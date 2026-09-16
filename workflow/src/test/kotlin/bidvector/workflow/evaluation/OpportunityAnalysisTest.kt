@@ -45,8 +45,10 @@ class OpportunityAnalysisTest {
         workload: FakeWorkloadPort = FakeWorkloadPort(),
         watchSubjects: FakeWatchSubjectPort = FakeWatchSubjectPort(),
         capacity: FakeCapacityPort = FakeCapacityPort(CapacitySnapshot(currentActiveBids = 2, maxActiveBids = 10)),
+        samples: FakeCompetitionSamplePort = FakeCompetitionSamplePort(),
         clock: FixedClock = FixedClock(),
-    ): OpportunityAnalysis = OpportunityAnalysis(embed, prediction, profile, workload, watchSubjects, capacity, clock)
+    ): OpportunityAnalysis =
+        OpportunityAnalysis(embed, prediction, profile, workload, watchSubjects, capacity, samples, clock)
 
     private fun analyzeNotice(
         instance: OpportunityAnalysis,
@@ -190,6 +192,7 @@ class OpportunityAnalysisTest {
                 workload = FakeWorkloadPort(),
                 watchSubjects = FakeWatchSubjectPort(),
                 capacity = FakeCapacityPort(CapacitySnapshot(2, 10)),
+                samples = FakeCompetitionSamplePort(),
                 clock = FixedClock(),
                 opportunityPolicyTable = opportunityPolicyTable,
                 derivationPolicyTable = DERIVATION_POLICY,
@@ -298,6 +301,88 @@ class OpportunityAnalysisTest {
         val second = analyzeNotice(instance, notice)
 
         first shouldBe second
+    }
+
+    // ---- M4/4B-7(D-4B7-9) — 경쟁 표본 조회·요청 축 ----
+
+    @Test
+    fun `businessCategory 있으면 categoryCode 를 실은 query 로 port 를 부른다`() {
+        val category =
+            bidvector.procurement.BusinessCategory(
+                bidvector.procurement.CategoryCode("A01"),
+                null,
+            )
+        val notice = testNoticeWithMoney(number = "20260101006", businessCategory = category)
+        val samples = FakeCompetitionSamplePort()
+
+        analyzeNotice(analysis(samples = samples), notice).shouldBeAnalyzed()
+
+        val query = samples.queriesSeen.single()
+        query.categoryCode shouldBe category.code
+        query.excludeNoticeId shouldBe notice.id
+    }
+
+    @Test
+    fun `businessCategory 없으면 port 를 부르지 않고 표본 0건으로 접는다`() {
+        val notice = testNoticeWithMoney(number = "20260101007")
+        val samples = FakeCompetitionSamplePort()
+
+        val prediction = FakeBidPredictionPort { predicted() }
+        analyzeNotice(analysis(prediction = prediction, samples = samples), notice).shouldBeAnalyzed()
+
+        samples.queriesSeen shouldBe emptyList()
+        prediction.requestsSeen.single().competitionSamples shouldBe emptyList()
+    }
+
+    @Test
+    fun `Supplied 표본이 예측 요청에 그대로 실린다`() {
+        val category =
+            bidvector.procurement.BusinessCategory(
+                bidvector.procurement.CategoryCode("A01"),
+                null,
+            )
+        val notice = testNoticeWithMoney(number = "20260101008", businessCategory = category)
+        val sample =
+            bidvector.workflow.prediction.CompetitionSample(
+                observedBidRate = Rate.ofFraction(BigDecimal("0.9")),
+                baseAmount =
+                    bidvector.sharedkernel.BaseAmount(
+                        1_000_000L,
+                        bidvector.sharedkernel.Currency.KRW,
+                        bidvector.sharedkernel.VatTreatment.UNKNOWN,
+                        bidvector.sharedkernel.Provenance.Undeclared,
+                    ),
+                baseAmountProvenanceLabel = bidvector.sharedkernel.BaseAmountProvenance.Clean,
+                openedOn = java.time.LocalDate.of(2026, 1, 1),
+            )
+        val samples =
+            FakeCompetitionSamplePort {
+                CompetitionSampleSupply.Supplied(samples = listOf(sample), excluded = emptyMap())
+            }
+        val prediction = FakeBidPredictionPort { predicted() }
+
+        analyzeNotice(analysis(prediction = prediction, samples = samples), notice).shouldBeAnalyzed()
+
+        prediction.requestsSeen.single().competitionSamples shouldBe listOf(sample)
+    }
+
+    @Test
+    fun `Unavailable 표본 공급은 Analyzed 를 유지하되 예측 성분만 Absent`() {
+        val category =
+            bidvector.procurement.BusinessCategory(
+                bidvector.procurement.CategoryCode("A01"),
+                null,
+            )
+        val notice = testNoticeWithMoney(number = "20260101009", businessCategory = category)
+        val samples =
+            FakeCompetitionSamplePort { CompetitionSampleSupply.Unavailable(MlUnavailableReason.TransportFailed) }
+        val prediction = FakeBidPredictionPort { predicted() }
+
+        analyzeNotice(analysis(prediction = prediction, samples = samples), notice).shouldBeAnalyzed()
+
+        // 표본 공급 Unavailable 은 predictionFacts 를 halt 시킨다 — prediction.predict 는 불리지 않는다
+        // (absentPair 로 두 성분만 drop, analyze() 자체는 Analyzed 유지).
+        prediction.callCount shouldBe 0
     }
 
     @Test

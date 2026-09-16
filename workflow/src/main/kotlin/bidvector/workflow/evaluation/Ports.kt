@@ -3,11 +3,14 @@ package bidvector.workflow.evaluation
 import bidvector.decision.MlUnavailableReason
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
+import bidvector.procurement.CategoryCode
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseVerdict
 import bidvector.strategy.WatchSubject
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.prediction.CompetitionSample
+import java.time.Instant
 
 /**
  * 후보 원천 port(scope.md ⑦, ADR 0005 D-9) — 열린 공고 목록을 낸다. 실 조회(3A repository
@@ -130,6 +133,68 @@ sealed interface NotificationRequestOutcome {
 /** 알림 요청 port(scope.md) — 실 발송·렌더링은 4E. */
 fun interface NotificationRequestPort {
     fun request(notification: NotificationRequest): NotificationRequestOutcome
+}
+
+/**
+ * 경쟁 표본 조회 축(M4/4B-7, D-4B7-3) — 같은 [CategoryCode]·과거 개찰 결과 창. `excludeNoticeId`
+ * 는 대상 공고 자신을 표본에서 제외한다(설계 검토 우회 (1)). `asOf`는 미래 표본 누출을 막는
+ * 기준 시각(호출부의 [bidvector.workflow.strategy.Clock]), `windowDays`·`limit`은
+ * [OpportunityPolicyData]의 정책 슬롯에서 온다.
+ */
+data class CompetitionSampleQuery(
+    val categoryCode: CategoryCode,
+    val excludeNoticeId: NoticeId,
+    val asOf: Instant,
+    val windowDays: Int,
+    val limit: Int,
+)
+
+/**
+ * 표본 자격 판정이 후보를 제외한 사유(M4/4B-7, D-4B7-2) — 조용한 drop 대신 사유별로 센다.
+ *
+ * **`CANDIDATE_VANISHED`(verifier r1 F-3 뒤 신설)** — 「개찰 결과 존재」(D-4B7-2 ①)는
+ * 어댑터의 SQL 조인이 스캔 시점에는 보장하지만, 복원은 그 뒤 별도 단건 `find(id)`
+ * 두 번(`JdbcCompetitionSampleSource.candidatePair`)이라 스캔과 복원 사이에 행이
+ * 사라지면(원칙상 이 저장소에 삭제 경로는 없지만 「조인이 이미 보장한다」는 더 이상
+ * 정확한 서술이 아니다) 후보가 계수 없이 증발할 수 있었다 — 이 사유가 그 자리를
+ * 채운다(합계 불변식: `samples.size + excluded.values.sum() == 후보 수`).
+ *
+ * **`RESERVE_PRICE_SEQUENCE_INVALID`(verifier r1 F-4 뒤 신설)** — 엔진이 `selected_numbers`
+ * 를 wire `reserve_prices` 리스트의 1-기반 인덱스로 소비하므로, 행 수가
+ * `expectedReservePriceCount`와 같아도 `sequenceNumber` 집합이 정확히 `1..N`이 아니면
+ * (예: `002`~`016`) 위치와 번호가 어긋난다 — 건수만 보는 `RESERVE_PRICE_COUNT_MISMATCH`와
+ * 다른 사유다.
+ */
+enum class SampleExclusionReason {
+    RANK_ONE_RATE_MISSING,
+    RESERVE_PRICE_COUNT_MISMATCH,
+    RESERVE_PRICE_SEQUENCE_INVALID,
+    RESERVE_PRICE_MISSING,
+    DRAW_NUMBERS_OUT_OF_RANGE,
+    BASE_AMOUNT_MISSING,
+    OPENING_DATE_MISSING,
+    CANDIDATE_VANISHED,
+}
+
+/** [CompetitionSamplePort]의 결과(D-4B7-9) — 조회 실패는 예외가 아니라 이 값이 진다. */
+sealed interface CompetitionSampleSupply {
+    data class Supplied(
+        val samples: List<CompetitionSample>,
+        val excluded: Map<SampleExclusionReason, Int>,
+    ) : CompetitionSampleSupply
+
+    data class Unavailable(
+        val reason: MlUnavailableReason,
+    ) : CompetitionSampleSupply
+}
+
+/**
+ * 경쟁 표본 조회 port(M4/4B-7, D-4B7-4) — 구현(어댑터)은 조인·창·상한만 진다(RO, 쓰기 0,
+ * 트랜잭션 없음). 자격·라벨·변환은 workflow 순수 함수(`SampleEligibility.kt`)가 진다 —
+ * 판정을 SQL에 두지 않는다.
+ */
+fun interface CompetitionSamplePort {
+    fun samplesFor(query: CompetitionSampleQuery): CompetitionSampleSupply
 }
 
 /**

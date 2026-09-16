@@ -57,6 +57,8 @@ class OpportunityAnalysis internal constructor(
     private val workload: WorkloadPort,
     private val watchSubjects: WatchSubjectPort,
     private val capacity: CapacityPort,
+    // M4/4B-7(D-4B7-9) — 경쟁 표본 조회 port. 표본 조회는 예측 요청 조립의 일부다(predictionFacts).
+    private val samples: CompetitionSamplePort,
     private val clock: Clock,
     private val opportunityPolicyTable: EffectiveDatedPolicy<OpportunityPolicyData>,
     private val derivationPolicyTable: EffectiveDatedPolicy<DerivationPolicyData>,
@@ -69,6 +71,7 @@ class OpportunityAnalysis internal constructor(
         workload: WorkloadPort,
         watchSubjects: WatchSubjectPort,
         capacity: CapacityPort,
+        samples: CompetitionSamplePort,
         clock: Clock,
     ) : this(
         embed,
@@ -77,6 +80,7 @@ class OpportunityAnalysis internal constructor(
         workload,
         watchSubjects,
         capacity,
+        samples,
         clock,
         OPPORTUNITY_POLICY,
         DERIVATION_POLICY,
@@ -223,14 +227,57 @@ class OpportunityAnalysis internal constructor(
         correlationId: CorrelationId,
     ): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> {
         val resolvedBaseAmount = notice.baseAmount ?: return absentPair(MlUnavailableReason.ScoreNotProvided)
-        val baseAmount = resolvedBaseAmount.amount
-        val request = predictionRequestFor(resolvedBaseAmount, notice, policies, correlationId)
-        val budget = CallBudget(policies.opportunity.predictionBudget)
-        return when (val outcome = prediction.predict(request, budget)) {
-            is BidPredictionOutcome.Unavailable -> absentPair(outcome.reason)
-            is BidPredictionOutcome.Unmeasurable -> absentPair(MlUnavailableReason.ScoreNotProvided)
-            is BidPredictionOutcome.Predicted -> predictedFacts(outcome, baseAmount, notice, policies, capacityScore)
+        // detekt ReturnCount(≤2) — 표본 공급 Unavailable 분기를 예측 호출 분기와 같은 when 안에
+        // 스마트캐스트로 접는다(M4/4B-7, 두 번째이자 마지막 return).
+        return when (val supply = competitionSampleSupplyFor(notice, policies)) {
+            is CompetitionSampleSupply.Unavailable -> {
+                absentPairForUnavailableSupply(supply)
+            }
+
+            is CompetitionSampleSupply.Supplied -> {
+                val baseAmount = resolvedBaseAmount.amount
+                val request =
+                    predictionRequestFor(resolvedBaseAmount, notice, policies, correlationId, supply.samples)
+                val budget = CallBudget(policies.opportunity.predictionBudget)
+                when (val outcome = prediction.predict(request, budget)) {
+                    is BidPredictionOutcome.Unavailable -> {
+                        absentPair(outcome.reason)
+                    }
+
+                    is BidPredictionOutcome.Unmeasurable -> {
+                        absentPair(MlUnavailableReason.ScoreNotProvided)
+                    }
+
+                    is BidPredictionOutcome.Predicted -> {
+                        predictedFacts(outcome, baseAmount, notice, policies, capacityScore)
+                    }
+                }
+            }
         }
+    }
+
+    /**
+     * M4/4B-7(D-4B7-3·9) — 대상 공고에 공종이 없으면 조회 자체를 하지 않고 표본 0건으로
+     * 접는다(값을 지어내지 않는다 — 조회 축[CompetitionSampleQuery.categoryCode]이 필수라
+     * 지을 값이 없다). 공종이 있으면 port로 넘긴다 — 자격 판정은 port 구현(어댑터)이
+     * `SampleEligibility`를 불러 진다(D-4B7-4).
+     */
+    private fun competitionSampleSupplyFor(
+        notice: Notice,
+        policies: ResolvedPolicies,
+    ): CompetitionSampleSupply {
+        val categoryCode =
+            notice.businessCategory?.code
+                ?: return CompetitionSampleSupply.Supplied(samples = emptyList(), excluded = emptyMap())
+        val query =
+            CompetitionSampleQuery(
+                categoryCode = categoryCode,
+                excludeNoticeId = notice.id,
+                asOf = clock.now(),
+                windowDays = policies.opportunity.sampleWindowDays,
+                limit = policies.opportunity.maxSamples,
+            )
+        return samples.samplesFor(query)
     }
 }
 

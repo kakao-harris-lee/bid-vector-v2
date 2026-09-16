@@ -42,6 +42,13 @@ data class OpportunityPolicyData(
      * 쓰인다(조사 실측) — 재사용하면 의미가 어긋난다.
      */
     val recommendedAmountRounding: RoundingPolicy,
+    /**
+     * M4/4B-7 신설(D-4B7-3) — 경쟁 표본 조회 창(일) + 상한(건). 착수 값 365일·500건은
+     * `reports/evidence/m4/4b7/policy-values.md`가 정본이고 `OPEN-4B7-POLICY-VALUES`로
+     * 승인 대기다(5C/5E 실측 뒤 갱신).
+     */
+    val sampleWindowDays: Int,
+    val maxSamples: Int,
 ) {
     init {
         require(keywords.isNotEmpty()) { "keywords는 비어 있을 수 없다" }
@@ -55,6 +62,8 @@ data class OpportunityPolicyData(
         require(!predictionBudget.isNegative && !predictionBudget.isZero) {
             "predictionBudget는 0보다 커야 한다: $predictionBudget"
         }
+        require(sampleWindowDays > 0) { "sampleWindowDays는 양수여야 한다: $sampleWindowDays" }
+        require(maxSamples > 0) { "maxSamples는 양수여야 한다: $maxSamples" }
     }
 }
 
@@ -101,6 +110,12 @@ val OPPORTUNITY_POLICY: EffectiveDatedPolicy<OpportunityPolicyData> =
                         objective = OptimizationObjective.SCENARIO_TRIPLE,
                         categoryOffset = BigDecimal.ZERO,
                         recommendedAmountRounding = RoundingPolicy(scaleDigits = 0, mode = RoundingMode.HALF_UP),
+                        sampleWindowDays = SAMPLE_WINDOW_DAYS_PLACEHOLDER,
+                        maxSamples = MAX_SAMPLES_PLACEHOLDER,
                     ),
             ),
     )
+
+/** M4/4B-7 착수 값(승인 대기, `OPEN-4B7-POLICY-VALUES`) — `reports/evidence/m4/4b7/policy-values.md`. */
+private const val SAMPLE_WINDOW_DAYS_PLACEHOLDER = 365
+private const val MAX_SAMPLES_PLACEHOLDER = 500

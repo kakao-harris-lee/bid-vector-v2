@@ -119,6 +119,51 @@ class PredictionValueTest {
         diagnostics.excludedObservations shouldBe 0
         diagnostics.agencySampleCount shouldBe 0
     }
+
+    // ---- M4/4B-7(D-4B7-5) — ReserveDrawObservation 불변식 ----
+
+    private fun testBaseAmount(won: Long) =
+        bidvector.sharedkernel.BaseAmount(
+            won,
+            bidvector.sharedkernel.Currency.KRW,
+            bidvector.sharedkernel.VatTreatment.UNKNOWN,
+            bidvector.sharedkernel.Provenance.Published(bidvector.sharedkernel.NoticeRound.of("000")),
+        )
+
+    @Test
+    fun `ReserveDrawObservation 은 reservePrices 가 비어 있으면 거부한다`() {
+        shouldThrow<IllegalArgumentException> {
+            ReserveDrawObservation(reservePrices = emptyList(), selectedNumbers = setOf(1))
+        }
+    }
+
+    @Test
+    fun `ReserveDrawObservation 은 selectedNumbers 에 1 미만 값이 있으면 거부한다`() {
+        shouldThrow<IllegalArgumentException> {
+            ReserveDrawObservation(reservePrices = listOf(testBaseAmount(1_000_000L)), selectedNumbers = setOf(0))
+        }
+        shouldThrow<IllegalArgumentException> {
+            ReserveDrawObservation(reservePrices = listOf(testBaseAmount(1_000_000L)), selectedNumbers = setOf(-1))
+        }
+    }
+
+    @Test
+    fun `ReserveDrawObservation 은 selectedNumbers 가 빈 집합이면 정상 생성된다 — NotObserved`() {
+        val observation =
+            ReserveDrawObservation(reservePrices = listOf(testBaseAmount(1_000_000L)), selectedNumbers = emptySet())
+
+        observation.selectedNumbers shouldBe emptySet()
+    }
+
+    @Test
+    fun `ReserveDrawObservation 은 비어 있지 않은 reservePrices 와 1 이상 selectedNumbers 로 정상 생성된다`() {
+        val prices = (1..15).map { testBaseAmount(900_000_000L + it) }
+
+        val observation = ReserveDrawObservation(reservePrices = prices, selectedNumbers = setOf(1, 5, 9, 14))
+
+        observation.reservePrices shouldBe prices
+        observation.selectedNumbers shouldBe setOf(1, 5, 9, 14)
+    }
 }
 
 private fun testDiagnostics(

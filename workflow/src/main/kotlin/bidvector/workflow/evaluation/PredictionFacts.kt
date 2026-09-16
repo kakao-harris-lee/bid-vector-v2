@@ -19,6 +19,7 @@ import bidvector.sharedkernel.times
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.prediction.BidPredictionOutcome
 import bidvector.workflow.prediction.BidPredictionRequest
+import bidvector.workflow.prediction.CompetitionSample
 import java.math.BigDecimal
 
 /**
@@ -31,13 +32,19 @@ internal fun predictionRequestFor(
     notice: Notice,
     policies: ResolvedPolicies,
     correlationId: CorrelationId,
+    // M4/4B-7(D-4B7-9) — 표본 공급은 OpportunityAnalysis가 CompetitionSamplePort로 얻어 넘긴다.
+    // 이 파일은 port를 읽지 않는다(scope.md ③ KDoc) — 값만 조립한다. 기본값을 두지 않는다
+    // (verifier r1 F-11) — 호출부가 이 인자를 빠뜨리면 컴파일이 실패해야 한다. 표본
+    // 0건은 호출부가 명시적으로 `emptyList()`를 넘겨야만 나오는 값이지, 조용히 새는
+    // 기본값이 아니다.
+    competitionSamples: List<CompetitionSample>,
 ): BidPredictionRequest =
     BidPredictionRequest(
         baseAmount = resolvedBaseAmount,
         businessCategory = notice.businessCategory,
         agencyId = null,
         baseAmountProvenanceLabel = BaseAmountProvenance.Unknown,
-        competitionSamples = emptyList(),
+        competitionSamples = competitionSamples,
         objective = policies.opportunity.objective,
         releaseSelector = policies.opportunity.releaseSelector,
         correlationId = correlationId,
@@ -120,3 +127,16 @@ private fun expectedMarginFact(
 
 internal fun absentPair(reason: MlUnavailableReason): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> =
     ScoreFact.Absent(reason) to ScoreFact.Absent(reason)
+
+/**
+ * D-4B7-9(verifier r2 N-2) — 표본 공급 실패(`CompetitionSampleSupply.Unavailable`) 사유를
+ * 그대로 예측 성분 드롭 사유로 옮긴다(예측 자체를 시도하지 않는다). `internal`로 뽑은
+ * 이유는 `PredictionFactsTest.kt` 헤더 KDoc과 같다 — `analyze()` 전체를 거치면
+ * `MlAnalysisOutcome.Analyzed`가 budgetCapture·expectedMargin 성분(과 그 드롭 사유)을
+ * 노출하지 않아 D-4B7-9가 실제로 `ScoreNotProvided`로 뭉개지 않고 `supply.reason`을
+ * 그대로 옮기는지를 `OpportunityAnalysisTest`(통합 층)에서는 잴 수 없다 — 같은 패키지
+ * test가 이 함수를 직접 불러 잰다(verifier r1 F-1이 세운 같은 관례).
+ */
+internal fun absentPairForUnavailableSupply(
+    supply: CompetitionSampleSupply.Unavailable,
+): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> = absentPair(supply.reason)

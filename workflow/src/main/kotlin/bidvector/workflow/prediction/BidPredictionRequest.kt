@@ -50,16 +50,38 @@ sealed interface ModelReleaseSelector {
 }
 
 /**
+ * 예비가격 추첨 관측(M4/4B-7, D-4B7-5) — 표본 공고의 예비가격 원문 관측값(기초금액 축,
+ * D-4B7-1 (a))과 추첨된 번호 집합을 함께 나른다. `reservePrices`는 비어 있을 수 없다 —
+ * 이 타입이 만들어지면 그 값이 있다는 뜻이다(`null`인 [CompetitionSample.reserveDraw]가
+ * "이 축 자체가 관측되지 않았다"를 진다, 엔진이 `NO_RESERVE_DRAW`로 계수). `selectedNumbers`는
+ * 비어 있을 수 있다(`DrawNumberObservation.NotObserved` → 빈 집합, 엔진은 거부하지 않는다) —
+ * 대신 값이 있으면 전부 1-기반 인덱스(1 이상)여야 한다.
+ */
+data class ReserveDrawObservation(
+    val reservePrices: List<BaseAmount>,
+    val selectedNumbers: Set<Int>,
+) {
+    init {
+        require(reservePrices.isNotEmpty()) { "reservePrices는 비어 있을 수 없다" }
+        require(selectedNumbers.all { it >= 1 }) {
+            "selectedNumbers는 모두 1 이상이어야 한다(1-기반 인덱스): $selectedNumbers"
+        }
+    }
+}
+
+/**
  * 경쟁 표본 한 건(scope.md ①, 2B `CompetitionSample` 형태 미러) — 정제(어느 행을 보낼지)는
  * 호출부(4B 후속) 소관이고 이 타입은 형태만 정한다. `origin`은 나르지 않는다 — 이 축의
  * 값은 항상 관측(`BID_RATE_ORIGIN_OBSERVED`)이라 어댑터가 상수로 채운다(common.proto
- * D-2A-7). 예비가격 추첨 관측(`ReserveDrawObservation`)은 이 slice가 나르지 않는다(알려진
- * 제한 — distribution predictor 입력은 4B 후속).
+ * D-2A-7).
  *
  * `agencyId`·`categoryCode`(M2/2F additive, D-2F-1) — 표본의 발주기관·업종 fact. **식별자가
  * 아니다**(D-2B-3 유지 — 표본 식별·중복 제거는 여전히 불가). 값의 정본은 [AgencyId]와
  * 같다(`OPEN-2B-AGENCY-ID`, 정본 M3). 어댑터가 `null`을 `MISSING_REASON_NOT_COLLECTED_YET`
  * 하나로만 나른다(`RequestMapping.kt` — 사유를 지어내지 않는다).
+ *
+ * `reserveDraw`(M4/4B-7, D-4B7-5) — `null`이면 이 축이 관측되지 않았다. 4D-1 알려진
+ * 제한 2(distribution predictor 입력 부재)를 이 slice가 채운다.
  */
 data class CompetitionSample(
     val observedBidRate: Rate,
@@ -69,6 +91,7 @@ data class CompetitionSample(
     val awardRate: Rate? = null,
     val agencyId: AgencyId? = null,
     val categoryCode: CategoryCode? = null,
+    val reserveDraw: ReserveDrawObservation? = null,
 )
 
 /**

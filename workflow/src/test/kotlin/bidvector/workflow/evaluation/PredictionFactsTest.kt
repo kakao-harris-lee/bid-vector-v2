@@ -136,4 +136,30 @@ class PredictionFactsTest {
     private fun ScoreFact<UnitScore>.shouldBePresent() {
         check(this is ScoreFact.Present) { "Present 가 아니다: $this" }
     }
+
+    /**
+     * verifier r2 N-2 — D-4B7-9는 표본 공급 실패 사유를 `ScoreNotProvided`로 뭉개지 않고
+     * `supply.reason`을 그대로 옮긴다고 못 박는다. `absentPairForUnavailableSupply`가
+     * 그 배선의 유일한 지점이다.
+     */
+    @Test
+    fun `absentPairForUnavailableSupply 는 supply 의 사유를 그대로 옮긴다(D-4B7-9)`() {
+        val supply = CompetitionSampleSupply.Unavailable(MlUnavailableReason.TransportFailed)
+
+        val (budgetCapture, expectedMargin) = absentPairForUnavailableSupply(supply)
+
+        budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.TransportFailed)
+        expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.TransportFailed)
+    }
+
+    @Test
+    fun `absentPairForUnavailableSupply 는 ScoreNotProvided 로 뭉개지 않는다 — 다른 사유와 구별된다`() {
+        val supply = CompetitionSampleSupply.Unavailable(MlUnavailableReason.CircuitOpen)
+
+        val (budgetCapture, expectedMargin) = absentPairForUnavailableSupply(supply)
+
+        budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.CircuitOpen)
+        expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.CircuitOpen)
+        (budgetCapture == ScoreFact.Absent(MlUnavailableReason.ScoreNotProvided)) shouldBe false
+    }
 }

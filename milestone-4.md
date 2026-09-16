@@ -501,6 +501,30 @@ alignment 성분 상수 1(`OPEN-4B6B-PREDICTED-RATE`) · `BaseAmountProvenance` 
 미확증 · adapters 등재 test 도 같은 Gradle 입력 사각 가능 · init 술어 추가는 자동 감지 안 됨.
 `UnavailableMlAnalysis` 처분과 app 배선은 6A. **4B 축은 이것으로 닫힌다**(4B-1~4B-6b).
 
+**4B-7 착수 2026-09-16(운영자 결정 — `OPEN-4D3-SAMPLE-SUPPLY` (a) + D-4B7-1 (a), 정본 `reports/evidence/m4/4b7/scope.md`)** —
+과거 경쟁 표본 공급. 4D-3 착수 조사가 실측한 「Kotlin 요청은 표본 0건·기관 없음이라 분포 엔진을 구동하지 못한다」를 닫는다:
+① `CompetitionSamplePort`(같은 공종·개찰일 창·상한, RO 조회 — `JdbcCompetitionSampleSource`) ② `(Notice, OpeningResult)` →
+`CompetitionSample` 순수 변환(`SampleEligibility` — 자격 사유 7 계수, 라벨은 기존 `ProvenanceRules` 분류기, CLEAN 강제 없음 — 엔진이
+거른다) ③ 도메인 `CompetitionSample.reserveDraw`(예비가격 15·추첨 번호) + `toProto()` 7번 필드 ④ `OpportunityAnalysis` 가 표본과
+공종 축을 요청에 싣는다(기관 축은 `NOT_COLLECTED_YET` — 공종/전역 2계층부터, 기관 계층은 `OPEN-2B-AGENCY-ID` 뒤). **D-4B7-1**:
+복수예비가격 후보(`bsisPlnprc`)의 basis 를 `BASE_AMOUNT`(legacy-behavior — 15 후보 순회 축 + 엔진 중심비 밴드 0.8~1.2 가 그 축을
+전제)로 채택해 M3 P-9 ③ 「미확정」을 닫는다(3A policy-values §1.7.1 닫힘 주석, `procurement` 타입 불변). 마이그레이션 없음(인덱스는
+`OPEN-4B7-QUERY-INDEX`), 정책 슬롯 둘 placeholder(`OPEN-4B7-POLICY-VALUES`), 대상 공고 라벨은 `OPEN-4B7-TARGET-LABEL`. 4D-1 알려진 제한 2
+해소. 레인 `bid-vector-v2-m4e`/`m4-4b7/2026-09-16`, base `8799e05`(PR #20 5E-2 병합 뒤 — 다른 레인), Python 소스 겹침 0.
+
+**4B-7 종결 2026-09-16(사용자 승인 — 「추천안으로 진행」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1 `not-ready`(HIGH:
+「최신 순」 조회 test 가 같은 날짜 후보로 정렬을 못 잼 · MEDIUM: 자격 정책 `single()` 우회·소실 후보 사유 없는 drop·예비가
+순번을 리스트 순서에 의존) → r2 `not-ready`(HIGH: r1 F-4 를 닫은 순번 정렬이 **유일한 방어**인데 픽스처가 전부 zero-pad 라 정렬
+제거 변이가 전건 통과 — 실 DB 는 사전순 `1,10,11,…` 으로 되읽고 엔진은 거부 없이 사정률만 0.90725→0.90625 로 조용히 틀림) →
+사전순 픽스처로 변이를 죽임 → r3 `ready`. **재작업 2회**. test +46(workflow 249·adapters 516). **엔진 교차 실측**: Kotlin 공급
+경로가 만든 wire 표본을 Python `observe_sample` 이 `ReserveDrawSample(CLEAN)` 로 수용(거부 축 0) — ML-04 ② 서빙 경로가 Kotlin
+끝까지 이어진다(공종/전역 2계층, 기관 계층은 `OPEN-2B-AGENCY-ID` 뒤). 구현 이탈 셋(자격 함수 public·어댑터 `adapters/ml` 배치·
+port 주입 N+1)은 기존 경계 게이트가 강제(게이트 술어 무변경). 제외 사유 enum 8종(`CANDIDATE_VANISHED`·`RESERVE_PRICE_SEQUENCE_INVALID`
+포함). **알려진 제한·OPEN**: `OPEN-4B7-QUERY-INDEX`(인덱스 0·N+1) · `OPEN-4B7-POLICY-VALUES`(창 365·상한 500·건수 15·provenance
+임계 넷 잠정) · `OPEN-4B7-TARGET-LABEL` · `OPEN-4B7-CATEGORY-NORMALIZATION` · D-4B7-9 사유 전파는 오늘 관측 효과 없음(`Analyzed` 가
+드롭 사유를 안 나름 — `OPEN-4D3-DIAGNOSTICS-RENDER` 이후 실효) · 조립 근 없음(실 JDBC 주입은 M6). `OPEN-4D3-SAMPLE-SUPPLY` 닫힘(2계층),
+4D-1 알려진 제한 2 해소. 정본 `reports/evidence/m4/4b7/checklist.md`.
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,

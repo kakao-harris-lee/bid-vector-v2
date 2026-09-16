@@ -236,6 +236,8 @@
 | `plnprc` | 예정가격 | `YEGA` | 원(KRW) / 정수, 21 | **미선언 → `UNKNOWN`** | nullable(옵션) | 예비가격 상세 4 | 같음 | 항목설명이 예정가격을 정의한다 — *"… 낙찰자 선정의 기준이고 계약체결에 대한 최고 상한 금액을 의미함.  (원화,원)"* |
 | `bsisPlnprc` | 기초예정가격 | **미확정** | 원(KRW) / 정수, 21 | **미선언 → `UNKNOWN`** | nullable(옵션) | 예비가격 상세 4 | 단위 `authoritative` · **basis·과세 미확정** | 항목설명은 *"기초예정가격(원화,원)"* 뿐이다. 행이 `compnoRsrvtnPrceSno`(복수예가순번)마다 반복되는 **복수예비가격 후보 하나**이고 확정 예정가격이 아니다 — `YEGA` 로 접으면 §1.1 `bssAmtPurcnstcst` 와 같은 **「부분을 전체 자리에」** 가 된다. `OPEN` 후보 |
 
+> **닫힘 — M4/4B-7 D-4B7-1 (a), 운영자 승인 2026-09-16.** `bsisPlnprc` 의 basis 는 **`BASE_AMOUNT`(기초금액 축의 원문 관측값, `legacy-behavior`)** 로 확정한다 — legacy `app/services/base_amount_basis.py:43-55` 가 15 후보를 기초금액과 같은 축으로 순회하고, 엔진 K6 의 중심비 개연 밴드 `assessment.plausible_min/max = 0.8~1.2`(M5/5D policy-values) 가 그 축을 전제로 존재한다(축이 다르면 밴드가 무의미). 축 오판은 엔진이 `CENTER_OUT_OF_BAND` 로 fail-closed 거른다. **과세는 여전히 미확정(`UNKNOWN`)**. `procurement`의 `ReservePriceCandidateAmount` 는 이 결정 뒤에도 `Money` 를 구현하지 않는다 — 변환은 M4 workflow(`SampleEligibility`)가 wire `Money(basis BASE_AMOUNT, provenance Published(회차))` 로 한 자리에서 한다. 정본 `reports/evidence/m4/4b7/scope.md` D-4B7-1. 위 행의 「미확정」 문면은 이력으로 남긴다.
+
 > **같은 오퍼레이션이 `bssamt`(기초금액)도 준다** — 항목설명이 §1.1 의 기초금액조회 3종과 **같은
 > 문면**이다(*"… 검토조정한 가격(원화,원)"*). §1.1 의 `bssamt` 행은 그대로 서고 `presentIn` 만
 > 예비가격 상세 4종으로 넓어진다. 함께 `PrearngPrcePurcnstcst`(예정가격순공사비)가 있고 그 항목설명이

@@ -176,4 +176,6 @@ internal val TEST_POLICY =
         objective = OptimizationObjective.SCENARIO_TRIPLE,
         categoryOffset = BigDecimal.ZERO,
         recommendedAmountRounding = RoundingPolicy(scaleDigits = 0, mode = RoundingMode.HALF_UP),
+        sampleWindowDays = 365,
+        maxSamples = 500,
     )
