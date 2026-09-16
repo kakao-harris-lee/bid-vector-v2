@@ -53,3 +53,27 @@
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL(`leakPatternGate` 포함) — evidence 문서가 스캔 어휘를 축어로
   담지 않고 파일 참조·간접 표현만 쓴다는 것을 이 커밋 HEAD 에서 직접 확인
+
+## 승인 전 일괄(2) — D-5F2-4 신설 test, 값 갱신 전 실행 (2026-09-16)
+- cmd: `./gradlew --no-daemon :adapters:test --tests "bidvector.adapters.ml.RequestMappingTest"`
+- exit: 0
+- 핵심 결과: 6 tests(신설 test 포함) 전부 통과 — 값은 이미 GREEN 상태이므로 이 test 는
+  최초부터 통과, 방어력은 아래 변이 B 로 확인
+
+## 승인 전 일괄(2) — D-5F2-4 변이 B 재현 (2026-09-16, 이 worktree 실측 편집→원복)
+- cmd: `PredictionEnvelopeMapping.kt` 의 `.setFeatureSchemaVersion(featureSchemaVersion)` →
+  `.setFeatureSchemaVersion(featureSchemaVersion.reversed())` 로 편집 후
+  `./gradlew --no-daemon :adapters:test --tests "bidvector.adapters.ml.RequestMappingTest"`
+- exit: 1
+- 핵심 결과: `6 tests completed, 1 failed` — 신설 test 단독 실패
+  (`expected:<award-rate-features-v2> but was:<2v-serutaef-etar-drawa>`), 나머지 5개는 그대로 초록
+- cmd: 원복 후 `git diff -- adapters/src/main/kotlin/bidvector/adapters/ml/PredictionEnvelopeMapping.kt | wc -l`
+- exit: 0
+- 핵심 결과: `0`(diff 없음 — 완전 원복 확인)
+
+## 승인 전 일괄(2) — 중복 test 삭제·source 라벨 갱신 뒤 재검증 (2026-09-16)
+- cmd: `./gradlew --no-daemon :adapters:test --tests "bidvector.adapters.ml.*"`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — `MlCallPolicyDataTest`(중복 제거 뒤 8개)·`RequestMappingTest`
+  (6개)·`EmbeddingCallPolicyTest`·`GrpcBidPredictionGatewayTest` 등 `ml` 패키지 전체 통과
+
