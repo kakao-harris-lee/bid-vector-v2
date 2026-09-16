@@ -140,9 +140,10 @@ verifier r3 는 r1 F-3·r2 R2-1·r3 R3-1 이 **같은 함수**(`_policy_value`)�
 라운드는 R3-1 한 줄로 닫고, 「혹시 모를 다른 모양」을 찾는 추가 분기는 넣지 않았다.
 근본 처방(정책 파싱·술어를 `build-logic`의 Kotlin 게이트 태스크로 옮겨 잘못된 정책이
 파싱 실패가 되게 하고, 술어마다 음성 대조 단위 test 를 붙이는 것)은 verifier·팀장
-모두 **6C 안의 패치가 아니라 별도 slice**로 판단했다 — 운영자 결정을 기다리며 이
-slice 에서는 착수하지 않는다. `OPEN-6C-POLICY-GATE-STRUCTURAL`로 신설 등재한다(아래
-OPEN 표).
+모두 **6C 안의 패치가 아니라 별도 slice**로 판단했다. **운영자 결정 2026-09-17 (a)**로
+6C 는 현 셸 위생 게이트로 종결하고, 이 구조적 이식은 별 slice(`OPEN-6C-POLICY-GATE-
+STRUCTURAL`, D-6C-11)로 남긴다 — 착수 가치는 앱 이미지·레지스트리·배포가 있는 slice 가
+생길 때 평가한다(아래 OPEN 표).
 
 ## (2b) 새 public 표면 여부
 
@@ -215,13 +216,14 @@ OPEN 표).
   check`·`qualityBaseline`을 두 번(직접 step + one-command-check.sh 내부) 돈다 — Gradle
   증분 캐시 덕에 두 번째는 싸다(로컬 실측 5~6초). 고치려면 step 순서를 다시 건드려야 하는데
   팀장 지시로 이번 라운드는 손대지 않는다.
-- `OPEN-6C-POLICY-GATE-STRUCTURAL`(수정 라운드 3 신설) — `tools/image-hygiene-check.sh`의
+- `OPEN-6C-POLICY-GATE-STRUCTURAL`(수정 라운드 3 신설, D-6C-11) — `tools/image-hygiene-check.sh`의
   정책 값 파싱·모양 검증이 r1 F-3·r2 R2-1·r3 R3-1 세 라운드 연속 서로 다른 미검증 모양을
-  냈다(verifier r3 진단 — 「열거 방어의 서명」). 근본 처방은 정책 파싱·술어를
+  냈다(verifier r3 진단 — 「열거 방어의 서명」). 근본 처방(정책 파싱·술어를
   `build-logic`의 Kotlin 게이트 태스크로 옮겨 잘못된 정책을 파싱 실패로 만들고 술어마다
-  음성 대조 단위 test 를 붙이는 것이지만, 이는 6C 안의 패치가 아니라 **별도 slice**로
-  운영자 결정이 필요하다(verifier·팀장 합의). 이 slice 는 R3-1 한 줄로 지금 알려진
-  구멍만 닫고 그 이상 착수하지 않는다.
+  음성 대조 단위 test 를 붙이는 것)은 6C 안의 패치가 아니라 **별도 slice**다. **운영자
+  결정 2026-09-17 (a)**로 6C 는 R3-1 한 줄로 지금 알려진 구멍만 닫은 현 셸 게이트로
+  종결하고, 구조적 이식의 착수 가치는 앱 이미지·레지스트리·배포가 있는 slice 가
+  생길 때 평가한다.
 
 ## OPEN 처분 확인 (scope.md 대비)
 
@@ -233,5 +235,5 @@ OPEN 표).
 | `OPEN-6C-IMAGE-VULN-SCAN`(신설) | D-6C-5, 6E | 신설 그대로 |
 | `OPEN-6C-MULTIARCH`(신설) | 6E | 신설 그대로 |
 | `OPEN-6C-CONDITIONAL-GATE-TEST`(신설, 팀장) | 잔여 | 신설 그대로 |
-| `OPEN-6C-POLICY-GATE-STRUCTURAL`(수정 라운드 3 신설) | 잔여 — 운영자 결정 대기 | 정책 파싱을 Kotlin 게이트로 옮기는 근본 처방은 별도 slice. 이 slice 는 R3-1 로 알려진 구멍만 닫음 |
+| `OPEN-6C-POLICY-GATE-STRUCTURAL`(수정 라운드 3 신설, D-6C-11) | **결정 완료 — 별 slice, 배포 경로가 생길 때 착수 가치 평가**(운영자 결정 2026-09-17 (a)) | 6C 는 현 셸 위생 게이트로 종결한다. 정책 파싱을 `build-logic` 타입 게이트 태스크로 옮기는 구조적 처방은 6C 안의 패치가 아니라 별 slice — 착수는 앱 이미지·레지스트리·배포가 있는 slice 가 생길 때 평가한다 |
 | `OPEN-ADR-09` | 닫힘(운영자 결정) | 이 slice 밖(6A 소관), 무변경 |
