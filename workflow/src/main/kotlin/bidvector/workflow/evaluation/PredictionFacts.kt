@@ -19,6 +19,7 @@ import bidvector.sharedkernel.times
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.prediction.BidPredictionOutcome
 import bidvector.workflow.prediction.BidPredictionRequest
+import bidvector.workflow.prediction.CompetitionSample
 import java.math.BigDecimal
 
 /**
@@ -31,13 +32,16 @@ internal fun predictionRequestFor(
     notice: Notice,
     policies: ResolvedPolicies,
     correlationId: CorrelationId,
+    // M4/4B-7(D-4B7-9) — 표본 공급은 OpportunityAnalysis가 CompetitionSamplePort로 얻어 넘긴다.
+    // 이 파일은 port를 읽지 않는다(scope.md ③ KDoc) — 값만 조립한다.
+    competitionSamples: List<CompetitionSample> = emptyList(),
 ): BidPredictionRequest =
     BidPredictionRequest(
         baseAmount = resolvedBaseAmount,
         businessCategory = notice.businessCategory,
         agencyId = null,
         baseAmountProvenanceLabel = BaseAmountProvenance.Unknown,
-        competitionSamples = emptyList(),
+        competitionSamples = competitionSamples,
         objective = policies.opportunity.objective,
         releaseSelector = policies.opportunity.releaseSelector,
         correlationId = correlationId,

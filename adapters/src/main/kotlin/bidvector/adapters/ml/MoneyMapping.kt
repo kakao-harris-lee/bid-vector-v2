@@ -8,8 +8,10 @@ import bidvector.sharedkernel.export
 import contract.bidvector.ml.v1.AmountProvenanceKind
 import contract.bidvector.ml.v1.Basis
 import bidvector.sharedkernel.Basis as DomainBasis
+import bidvector.workflow.prediction.ReserveDrawObservation as DomainReserveDrawObservation
 import contract.bidvector.ml.v1.Currency as ProtoCurrency
 import contract.bidvector.ml.v1.Money as ProtoMoney
+import contract.bidvector.ml.v1.ReserveDrawObservation as ProtoReserveDrawObservation
 import contract.bidvector.ml.v1.VatTreatment as ProtoVatTreatment
 
 /**
@@ -29,6 +31,19 @@ internal fun Money.toProtoMoney(): ProtoMoney {
         .setProvenance(record.provenance.toProto())
         .build()
 }
+
+/**
+ * M4/4B-7(D-4B7-5) — `reserve_draw`(7). `RequestMapping.kt`에서 갈라낸 함수다(같은 이유,
+ * 이 파일의 [toProtoMoney]를 그대로 쓴다 — 파일을 가르면서 중복은 만들지 않는다).
+ * `null`이면 어댑터가 필드 자체를 안 채운다(호출부, `RequestMapping.kt` — 엔진이
+ * `NO_RESERVE_DRAW`로 계수).
+ */
+internal fun DomainReserveDrawObservation.toProtoReserveDraw(): ProtoReserveDrawObservation =
+    ProtoReserveDrawObservation
+        .newBuilder()
+        .addAllReservePrices(reservePrices.map { it.toProtoMoney() })
+        .addAllSelectedNumbers(selectedNumbers)
+        .build()
 
 private fun Currency.toProto(): ProtoCurrency =
     when (this) {

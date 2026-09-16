@@ -3,11 +3,14 @@ package bidvector.workflow.evaluation
 import bidvector.decision.MlUnavailableReason
 import bidvector.decision.UnitScore
 import bidvector.decision.Verdict
+import bidvector.procurement.CategoryCode
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseVerdict
 import bidvector.strategy.WatchSubject
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.prediction.CompetitionSample
+import java.time.Instant
 
 /**
  * 후보 원천 port(scope.md ⑦, ADR 0005 D-9) — 열린 공고 목록을 낸다. 실 조회(3A repository
@@ -130,6 +133,56 @@ sealed interface NotificationRequestOutcome {
 /** 알림 요청 port(scope.md) — 실 발송·렌더링은 4E. */
 fun interface NotificationRequestPort {
     fun request(notification: NotificationRequest): NotificationRequestOutcome
+}
+
+/**
+ * 경쟁 표본 조회 축(M4/4B-7, D-4B7-3) — 같은 [CategoryCode]·과거 개찰 결과 창. `excludeNoticeId`
+ * 는 대상 공고 자신을 표본에서 제외한다(설계 검토 우회 (1)). `asOf`는 미래 표본 누출을 막는
+ * 기준 시각(호출부의 [bidvector.workflow.strategy.Clock]), `windowDays`·`limit`은
+ * [OpportunityPolicyData]의 정책 슬롯에서 온다.
+ */
+data class CompetitionSampleQuery(
+    val categoryCode: CategoryCode,
+    val excludeNoticeId: NoticeId,
+    val asOf: Instant,
+    val windowDays: Int,
+    val limit: Int,
+)
+
+/**
+ * 표본 자격 판정이 후보를 제외한 사유(M4/4B-7, D-4B7-2) — 조용한 drop 대신 사유별로 센다.
+ * 「개찰 결과 존재」(D-4B7-2 ①)는 여기 없다 — 어댑터의 조인이 이미 그 존재를 보장하므로
+ * (`JdbcCompetitionSampleSource`) 후보 쌍 자체가 만들어지지 않는 경우라 판정 함수에 도달하는
+ * 입력이 아니다.
+ */
+enum class SampleExclusionReason {
+    RANK_ONE_RATE_MISSING,
+    RESERVE_PRICE_COUNT_MISMATCH,
+    RESERVE_PRICE_MISSING,
+    DRAW_NUMBERS_OUT_OF_RANGE,
+    BASE_AMOUNT_MISSING,
+    OPENING_DATE_MISSING,
+}
+
+/** [CompetitionSamplePort]의 결과(D-4B7-9) — 조회 실패는 예외가 아니라 이 값이 진다. */
+sealed interface CompetitionSampleSupply {
+    data class Supplied(
+        val samples: List<CompetitionSample>,
+        val excluded: Map<SampleExclusionReason, Int>,
+    ) : CompetitionSampleSupply
+
+    data class Unavailable(
+        val reason: MlUnavailableReason,
+    ) : CompetitionSampleSupply
+}
+
+/**
+ * 경쟁 표본 조회 port(M4/4B-7, D-4B7-4) — 구현(어댑터)은 조인·창·상한만 진다(RO, 쓰기 0,
+ * 트랜잭션 없음). 자격·라벨·변환은 workflow 순수 함수(`SampleEligibility.kt`)가 진다 —
+ * 판정을 SQL에 두지 않는다.
+ */
+fun interface CompetitionSamplePort {
+    fun samplesFor(query: CompetitionSampleQuery): CompetitionSampleSupply
 }
 
 /**

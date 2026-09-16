@@ -92,6 +92,7 @@ private fun CompetitionSample.toProto(): ProtoCompetitionSample {
             .setAgencyId(agencyId.toSampleAgencyIdFact())
             .setCategoryCode(categoryCode.toSampleCategoryCodeFact())
     awardRate?.let { builder.setAwardRate(it.toProtoRate()) }
+    reserveDraw?.let { builder.setReserveDraw(it.toProtoReserveDraw()) }
     return builder.build()
 }
 
