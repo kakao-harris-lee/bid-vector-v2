@@ -501,6 +501,17 @@ alignment 성분 상수 1(`OPEN-4B6B-PREDICTED-RATE`) · `BaseAmountProvenance` 
 미확증 · adapters 등재 test 도 같은 Gradle 입력 사각 가능 · init 술어 추가는 자동 감지 안 됨.
 `UnavailableMlAnalysis` 처분과 app 배선은 6A. **4B 축은 이것으로 닫힌다**(4B-1~4B-6b).
 
+**4B-7 착수 2026-09-16(운영자 결정 — `OPEN-4D3-SAMPLE-SUPPLY` (a) + D-4B7-1 (a), 정본 `reports/evidence/m4/4b7/scope.md`)** —
+과거 경쟁 표본 공급. 4D-3 착수 조사가 실측한 「Kotlin 요청은 표본 0건·기관 없음이라 분포 엔진을 구동하지 못한다」를 닫는다:
+① `CompetitionSamplePort`(같은 공종·개찰일 창·상한, RO 조회 — `JdbcCompetitionSampleSource`) ② `(Notice, OpeningResult)` →
+`CompetitionSample` 순수 변환(`SampleEligibility` — 자격 사유 7 계수, 라벨은 기존 `ProvenanceRules` 분류기, CLEAN 강제 없음 — 엔진이
+거른다) ③ 도메인 `CompetitionSample.reserveDraw`(예비가격 15·추첨 번호) + `toProto()` 7번 필드 ④ `OpportunityAnalysis` 가 표본과
+공종 축을 요청에 싣는다(기관 축은 `NOT_COLLECTED_YET` — 공종/전역 2계층부터, 기관 계층은 `OPEN-2B-AGENCY-ID` 뒤). **D-4B7-1**:
+복수예비가격 후보(`bsisPlnprc`)의 basis 를 `BASE_AMOUNT`(legacy-behavior — 15 후보 순회 축 + 엔진 중심비 밴드 0.8~1.2 가 그 축을
+전제)로 채택해 M3 P-9 ③ 「미확정」을 닫는다(3A policy-values §1.7.1 닫힘 주석, `procurement` 타입 불변). 마이그레이션 없음(인덱스는
+`OPEN-4B7-QUERY-INDEX`), 정책 슬롯 둘 placeholder(`OPEN-4B7-POLICY-VALUES`), 대상 공고 라벨은 `OPEN-4B7-TARGET-LABEL`. 4D-1 알려진 제한 2
+해소. 레인 `bid-vector-v2-m4e`/`m4-4b7/2026-09-16`, base `8799e05`(PR #20 5E-2 병합 뒤 — 다른 레인), Python 소스 겹침 0.
+
 ### Slice 4C — event/outbox
 
 - `StrategyUpdated`, `NoticeQualified`, `PredictionRequested`, `DecisionPrepared`,
