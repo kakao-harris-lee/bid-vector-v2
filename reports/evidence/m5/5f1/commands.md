@@ -143,7 +143,13 @@
   최종 갱신 직후)
 - exit: 0 — BUILD SUCCESSFUL, 337 tasks(32 executed, 305 up-to-date)
 - cmd: `./gradlew --no-daemon check`(HEAD `1743257`, rollback.md `test_scenario.py`
-  편입 반영 직후 — 이 slice 의 마지막 evidence 편집)
+  편입 반영 직후)
+- exit: 0 — BUILD SUCCESSFUL, 337 tasks(32 executed, 305 up-to-date)
+- cmd: `./gradlew --no-daemon check`(HEAD `eceb488`, D-5F1-5 강화 + Kotlin 소비자
+  규칙 실측 등재 직후)
+- exit: 0 — BUILD SUCCESSFUL, 337 tasks(32 executed, 305 up-to-date)
+- cmd: `./gradlew --no-daemon check`(HEAD `2ba6022`, rollback.md 최종 재실측 등재
+  직후 — 이 slice 의 마지막 evidence 편집)
 - exit: 0 — BUILD SUCCESSFUL, 337 tasks(32 executed, 305 up-to-date)
 
 ## S-11
