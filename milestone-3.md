@@ -339,6 +339,24 @@ KDoc 으로 유지, 중복 제거 — cpdCheck).
 당장 영향이 없고, 그것이 신규 class 를 만들지 않은 이유이기도 하다) · admin 역할·RLS·컬럼 단위 권한은
 경계 밖(3D 위협 모델).
 
+### Slice 3H — 발주기관 fact(`OPEN-2B-AGENCY-ID` 후속, 두 slice)
+
+**3H-1 착수 2026-09-16 — 운영자 결정 「추천대로」(P-14 등재 · 엔진 키 = 수요기관코드 · V7 마이그레이션 + migration-reviewer +
+Codex 1 라운드 · 채움률 read-only 실호출 1회 · 3H-1/3H-2 분할). 정본 `reports/evidence/m3/3h/scope.md` D-3H-1~8.**
+**착수 조사 실측**: 발주기관 축이 V2 에 없다 — 필드 계약 레지스트리 24 키·`FieldConcept`·`notice` 스키마·`Notice`·요청/표본
+조립 어디에도 기관 키 0(3A policy-values 의 셈은 legacy 60 키를 덮는다고 적지만 legacy 가 소비한 기관 이름 키 둘이 표에
+없었다). 조달청 참고자료(입찰공고정보서비스 1.2)는 `ntceInsttCd`(7, 옵션)·`ntceInsttNm`(400, 필수)·`dminsttCd`(7, 옵션)·
+`dminsttNm`(400, 옵션)을 응답 항목으로 선언 — 코드는 행자부 코드 또는 조달청 부여 코드. legacy 는 코드를 수집한 적이 없고
+이름 문자열만 두 컬럼에 저장했으며 역할 우선순위가 경로마다 달랐고(legacy 자신이 누수로 명시) 같은 컬럼에 정규화기 셋이
+갈렸다 — 전부 비채택. 정규화는 §6.3.1(strip+소문자화, 별칭·계층 사전 없음, `CategoryCode.of` 와 같은 함수)이 이미 승인.
+**3H-1 범위**: `FieldConcept` 토큰 넷 + 레지스트리 초기값(P-14) · `procurement` `AgencyCode.of`·`AgencyName`·`Agency`,
+`Notice.demandAgency`·`noticeAgency`(역할별 자기 필드, 폴백 없음) · `Canonicalize` 조립 · **V7** `notice` nullable TEXT 컬럼 넷
+(`ALTER TABLE … ADD COLUMN`, 제약·인덱스 없음) · `NoticeRow`·`Sql`·`NoticeReconstruction`·`CleanMigrationColumnTest`. 담당자
+개인정보 키(`*Ofcl*`)는 등재하지 않는다. **3H-2(별도 계약)**: `predictionRequestFor`·`SampleConversion` 의 `agencyId` 채움,
+표본 축 「수집했으나 원천에 없음」 사유는 M5 레인 `OPEN-3H-SAMPLE-MISSING-REASON`, 엔진 교차 실측(`segment_support = DIRECT`
+첫 도달). 백필은 운영 데이터 0 → `OPEN-3H-AGENCY-BACKFILL`. 레인 `bid-vector-v2-m4e`/`m3-3h/2026-09-16`, base `0ad8e59`
+(PR #29 병합 뒤), M3 후속은 `main` 병행(3G 선례).
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
