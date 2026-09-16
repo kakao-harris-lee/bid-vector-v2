@@ -278,6 +278,30 @@ class TestPredictDistribution:
         assert isinstance(result, Unmeasurable)
         assert result.reason is UnmeasurableReason.INSUFFICIENT_SAMPLES
 
+    def test_segment_axis_rejection_count_is_exact_not_double_counted(
+        self, policy: InferencePolicy
+    ) -> None:
+        """verifier r1 F-6 — 위 test는 표본 부족으로 `Unmeasurable`이 나와 `Diagnostics`
+        자체가 없다(계수를 실제로 재지 않는다). 이 test는 `Success`가 나오는 표본 수에서
+        세그먼트 거부 1건이 `excluded_observations`에 정확히 1로 실리는지 잰다 — 관측
+        게이트와 세그먼트 게이트가 같은 표본을 두 번 세면(회귀) 이 단언이 깨진다."""
+        valid = [
+            competition_sample(observed_bid_rate=_BID_RATES[i % len(_BID_RATES)])
+            for i in range(9)
+        ]
+        segments: list[SampleSegment | SampleRejected] = [_MISSING_SEGMENT] * 9
+        segments[0] = SampleRejected(SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED)
+        request = DistributionRequest(
+            samples=_segmented(valid, segments),
+            base_amount=_NOT_COLLECTED_YET,
+            agency=_NOT_COLLECTED_YET,
+            category=_NOT_COLLECTED_YET,
+        )
+        result = predict_distribution(request, policy)
+        assert isinstance(result, Success)
+        assert result.diagnostics.excluded_observations == 1
+        assert result.uncertainty.sample_size == 8
+
     def test_agency_and_category_match_builds_direct_segment_support(
         self, policy: InferencePolicy
     ) -> None:

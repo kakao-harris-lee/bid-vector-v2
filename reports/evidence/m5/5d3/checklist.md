@@ -32,6 +32,7 @@
 | `resolve_text_fact`(`features` 신규 public) | 임의 `*Fact`(`CategoryCodeFact`/`AgencyIdFact`)를 정규화된 `Present`/`Missing`/`FactRejected`로만 낸다 — 입력을 그대로 정규화할 뿐 값을 지어내지 않는다. `FactRejectionReason.MISSING_REASON_NOT_ALLOWED` 신설(열거 확장, 계수 축만). |
 | `SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED`(열거 +1) | `observations.py`에 값만 추가 — `observe_sample` 자신은 이 사유를 내지 않는다(`distribution._resolve_segment`가 낸다, 사유 어휘의 단일 소유는 `observations` 모듈). |
 | `DistributionRequest.from_proto` | 유일 생성 경로 그대로, 이제 표본마다 `_resolve_segment`로 세그먼트를 즉시 판독(정책 불필요한 순수 매핑이라 관측 게이트보다 먼저 끝낼 수 있다). |
+| `ALL_MISSING_REASONS`(`features.facts`, `features.__all__` 재수출) | 기존 기본 동작(요청 축이 `UNSPECIFIED` 외 결측 사유를 전부 받아들이던 것)에 이름을 붙인 읽기 전용 `frozenset` — 없던 권한이 아니고 값을 나르지 않는다(verifier r1 F-5). |
 | 「경계로 처리」 행 | 없음 — 매칭·집계는 전부 `distribution.py` 내부(private 함수: `_matches`·`_matched_level`·`_resolve_levels`). |
 
 ## 착수 grep 실측
@@ -56,6 +57,20 @@ ml-engine/src ml-engine/tests`(구현 전, 설계 검토 구현 지시 1). src �
    범위 밖(과잉으로 뺀 항목, 설계 검토 (3)).
 4. **`award_rate` 파싱 실패 사유 미분리**(5D-2 알려진 제한 9, 변경 없음) — 세그먼트 게이트와
    무관, 그대로 승계.
+5. **`OPEN-5D3-SENDER-PRECONDITION`**(verifier r1 F-4) — 표본 축(`agency_id`/`category_code`)
+   oneof 를 설정하지 않는 송신자(2F 이전 클라이언트, 또는 이 필드를 모르는 재구현)는 전
+   표본이 `SampleRejected(SEGMENT_REASON_NOT_ALLOWED)`로 거부돼, base(5D-2)에서 `Success`
+   이던 요청이 `Unmeasurable(INSUFFICIENT_SAMPLES, TOO_FEW_OBSERVATIONS)`가 된다(D-5D3-2의
+   명시 결정에 따른 정상 동작이지 결함이 아니다). 현행 유일 송신자(Kotlin `RequestMapping`)는
+   도메인 값이 없을 때 `MISSING_REASON_NOT_COLLECTED_YET`을 항상 설정하므로 지금 이 경로로
+   깨지는 요청은 없다 — 5E(서빙 활성화) 전제로 이월한다.
+6. **요청 축 결측 사유 허용 집합이 이 slice로 좁아졌다**(scope.md 계약 갱신 이력, 팀장 표적
+   11) — `FeatureFacts.from_proto`(요청 축)가 이전에는 `MISSING_REASON_UNSPECIFIED`만 거부
+   하고 그 밖의 정수(열거값 밖 포함)는 전부 `Missing(raw)`로 수용했다. 이제는 선언된
+   `MissingReason` 값 셋(`UNKNOWN`·`NOT_APPLICABLE`·`NOT_COLLECTED_YET`, `ALL_MISSING_
+   REASONS`)만 수용하고 그 밖(`UNSPECIFIED`·enum 밖 정수)은 `FactRejected(MISSING_REASON_
+   NOT_ALLOWED)`다 — base 대비 `missing = 99`(enum 밖) 같은 입력의 거동이 `Missing(99)`
+   수용에서 거부로 바뀐다(fail-closed 방향, 팀장이 구현을 계약으로 채택).
 
 ## 5D-2 알려진 제한 해소 등재
 
