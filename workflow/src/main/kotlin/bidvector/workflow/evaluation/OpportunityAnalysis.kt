@@ -231,7 +231,7 @@ class OpportunityAnalysis internal constructor(
         // 스마트캐스트로 접는다(M4/4B-7, 두 번째이자 마지막 return).
         return when (val supply = competitionSampleSupplyFor(notice, policies)) {
             is CompetitionSampleSupply.Unavailable -> {
-                absentPair(supply.reason)
+                absentPairForUnavailableSupply(supply)
             }
 
             is CompetitionSampleSupply.Supplied -> {

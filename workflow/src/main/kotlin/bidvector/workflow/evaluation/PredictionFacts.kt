@@ -127,3 +127,16 @@ private fun expectedMarginFact(
 
 internal fun absentPair(reason: MlUnavailableReason): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> =
     ScoreFact.Absent(reason) to ScoreFact.Absent(reason)
+
+/**
+ * D-4B7-9(verifier r2 N-2) — 표본 공급 실패(`CompetitionSampleSupply.Unavailable`) 사유를
+ * 그대로 예측 성분 드롭 사유로 옮긴다(예측 자체를 시도하지 않는다). `internal`로 뽑은
+ * 이유는 `PredictionFactsTest.kt` 헤더 KDoc과 같다 — `analyze()` 전체를 거치면
+ * `MlAnalysisOutcome.Analyzed`가 budgetCapture·expectedMargin 성분(과 그 드롭 사유)을
+ * 노출하지 않아 D-4B7-9가 실제로 `ScoreNotProvided`로 뭉개지 않고 `supply.reason`을
+ * 그대로 옮기는지를 `OpportunityAnalysisTest`(통합 층)에서는 잴 수 없다 — 같은 패키지
+ * test가 이 함수를 직접 불러 잰다(verifier r1 F-1이 세운 같은 관례).
+ */
+internal fun absentPairForUnavailableSupply(
+    supply: CompetitionSampleSupply.Unavailable,
+): Pair<ScoreFact<UnitScore>, ScoreFact<UnitScore>> = absentPair(supply.reason)
