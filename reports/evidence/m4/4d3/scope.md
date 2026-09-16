@@ -25,6 +25,7 @@
 milestone: m4
 slice: 4d3-diagnostics-domain
 base_sha: 4b9fa2166549ce9e6af9c5f2b09325f11bbbbdcf
+head_sha: d651bd9   # 리뷰 요청 시점(verifier r1 ready + 장부층 시정 완료) — verifier r1 F-6. 종결 등재 커밋은 이 뒤에 붙는다
 in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/prediction/BidPredictionOutcome.kt   # ① 도메인 타입: Weight([0,1]) · SegmentSupport(Direct/ParentCategory/Global) · PredictionDiagnostics(6 성분, init 불변식) · Predicted.diagnostics 필드(D-4D3-1·3)
   - adapters/src/main/kotlin/bidvector/adapters/ml/ParsedSuccessFields.kt             # ② isAcceptableSuccessShape 에 진단 형태 술어 추가 + 파싱(D-4D3-2) — 기존 파일 관례(검증층이 init 보다 먼저)

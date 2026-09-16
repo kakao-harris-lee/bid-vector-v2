@@ -700,6 +700,17 @@ Kotlin 은 임계를 재판정하지 않는다) · 요청 조립 무변경. **�
 `data-dictionary.md` §6.5 `intervalSource`·`Diagnostics` 성분 표는 팀장이 써 `OPEN-2F-DICT-INTERVAL-SOURCE` 를 닫는다.
 레인 `bid-vector-v2-m4e`/`m4-4d3/2026-09-16`, base `4b9fa21`(PR #18 5E-1 병합 뒤), 다른 레인(5E-2, Python)과 소스 겹침 0.
 
+**4D-3 종결 2026-09-16(사용자 승인 — 「추천 방식으로 진행」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1
+`ready-for-review`(산출물 blocker/high 0 — 스무 표본 fail-closed 실측 예외 0, testdata 진단 여섯 값 `BigDecimal` 등가,
+점수 불변, rollback ①~⑥ 초록; 장부층 medium 2·low 5 는 팀장 F-1(§6.5.1 위치)·F-6(`head_sha`) + 구현 레인 일괄
+`91fb85d` 로 등재 처리, 재검증 없이 종결). **재작업 0회**. `@Test` +12·H-6 table +4행. `OPEN-2F-DIAGNOSTICS-DOMAIN`·
+`OPEN-2F-DICT-INTERVAL-SOURCE` 닫힘. **알려진 제한**: 임계 미검증(엔진 정책) · `excluded_observations` 요청 표본 수 대조
+불가 · 진단 없는 응답(2F 이전 서버)은 계약 위반 — 배포 순서 「제공자 먼저」 축(현재 프로덕션 배포 전) · `PredictionDiagnostics`
+위조는 4D-1 알려진 제한 6 승계 · H-6 table 손 유지는 4D-1 알려진 제한 9 승계(변이 실측: `Weight.init` 조건 추가 + 표 미갱신이면
+초록 — 구조 처방은 후속). **운영자 결정 대기(Phase 6 에스컬레이션)**: `OPEN-4D3-SAMPLE-SUPPLY`((a) 4B 후속 slice — 과거 표본
+조회 port + `OpeningResult` → `CompetitionSample` 변환·표본 축 채움 / (b) M6 수집 축(기관 fact)과 묶음 / (c) 당분간
+`Unmeasurable` 정직) · `OPEN-4D3-DIAGNOSTICS-RENDER`(4E 알림 본문 규약과 묶음). 정본 `reports/evidence/m4/4d3/checklist.md`.
+
 ### Slice 4E — notification adapter contract
 
 - delivery request와 rendered content 분리

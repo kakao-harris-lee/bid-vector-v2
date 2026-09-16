@@ -85,3 +85,13 @@
   실측(구현 레인, 이번 라운드): `PredictionDiagnostics`에 조건 하나를 늘리고 대응
   table 행을 빼는 시나리오를 코드로 만들지는 않았다 — 4D-1 알려진 제한 9가 이미
   기록한 한계이고 구조 처방(자동 대조)은 이 slice 밖이다. verifier 표적으로 승계.
+  verifier r1 표적 2 실측: `Weight.init` 에 조건 하나를 늘리고 표 행을 안 늘린 변이에서
+  두 모듈 test 가 통째로 초록 — 4D-1 알려진 제한 9 의 승계가 맞고 새 갈래 아님.
+
+## 사용자 승인
+
+2026-09-16 — 운영자 지시 「추천 방식으로 진행」(5D-3 종결 뒤 (a) 4D-1 후속) 하에 착수·구현·검증·종결·PR 까지
+진행(머지는 별도 승인). verifier r1 `ready-for-review`(`_workspace/m4-4d3/03_verifier_report.md`), 재작업 0회.
+장부층 F-1(팀장 `30ae0bf`)·F-2~F-5·F-7(구현 레인 `91fb85d`)·F-6(팀장, scope.md `head_sha`) 은 재검증 없이
+등재 처리(차단 문턱 밖 — 리뷰 레인이 본다). Phase 6 에스컬레이션: `OPEN-4D3-SAMPLE-SUPPLY`(운영자 선택
+(a)/(b)/(c)) · `OPEN-4D3-DIAGNOSTICS-RENDER`(4E 규약과 묶음) — milestone-4.md 4D-3 종결 문단 참조.
