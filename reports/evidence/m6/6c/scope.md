@@ -81,6 +81,7 @@ CI step 으로 건다. 「상시 붉은 게이트도, 안 돌린 게이트도 �
 | **D-6C-5** | SBOM·CVE 스캔 도구 채택은 **6E**, 6C 는 고정 태그·금지 패키지·non-root·크기까지 | 스캔은 외부 서비스·계정·정책(무엇을 차단하는가)이 필요한 운영 축이다. 6C 에서 흉내만 낸 스캔은 상시 초록 게이트가 된다 |
 | **D-6C-6** | `OPEN-5E-EMBEDDING-MODEL` 은 6C 가 **닫지 않는다** | 모델 선택·가중치 배포는 승인된 입력이 없고 컨테이너 축과 독립이다. 6C 종결 보고에서 운영자에게 처분(별 slice / M6 뒤)을 묻는다 |
 | **D-6C-8** (계약 갱신 (2), 구현 레인 정지·보고) | 실 서버 통합 test 는 `bidvector.adapters.contract` 에 둔다 — **게이트 술어를 건드리지 않는다**. `adapters.ml` 안에서는 기존 게이트 둘(디렉터리 전수 등재 요구 · 등재된 게이트 test 의 skip 0 요구)이 **환경 조건부 test 에 대해 동시에 만족 불가**다(등재하면 skip 위반, 빼면 등재 위반). 채택하지 않은 안: ⓐ 게이트에 「조건부 허용」 키 신설 · ⓑ 등재 요구 예외 목록 — 둘 다 **어떤 test 든 자기를 조건부로 선언해 영원히 안 돌 수 있는 문**을 만든다(오탐을 닫으려다 미탐을 여는 방향, 하네스 2026-09-04 게이트 술어 예외 조항). 채택안은 같은 축의 기존 전례와 동일 — `CrossLangSmokeTest`(교차 언어 스모크)가 이미 `adapters.contract` 에 있고 이 test 는 그 컨테이너 판이다. 잔여는 `OPEN-6C-CONDITIONAL-GATE-TEST` | 구현 레인 실측: `MlGateRegistrationTest` 는 `src/test/kotlin/bidvector/adapters/ml` 디렉터리의 `*Test.kt` 전수를 `gate.tests.adapters` 등재와 대조하고, `GateExecutionGateTask` 는 등재된 클래스의 skip 0 을 요구한다 |
+| **D-6C-9** (계약 갱신 (4), verifier r1 HIGH 둘) | 위생 게이트의 두 술어는 **선언이 아니라 실행·빌드 산출물**을 읽는다 — ① non-root: `--entrypoint` 로 덮어쓴 `id -u`(선언된 `USER` 만 잼)가 아니라 **실 ENTRYPOINT 로 띄운 컨테이너의 pid 1 사용자**(`docker top -o user` 류)를 정책 값과 대조 ② 베이스 고정: Dockerfile 이 손으로 적는 라벨 문자열이 아니라 **빌드가 실제로 해석한 베이스 다이제스트**(BuildKit provenance attestation, 없으면 layer 접두 대조)를 대조. 라벨·선언은 보조 근거로만 쓰고 단독 근거로 쓰지 않는다 | verifier r1 실측: `USER` 를 유지한 채 setuid 로 root 를 얻는 entrypoint 이미지에서 게이트 exit 0(그냥 실행하면 EUID 0) · `FROM` 을 떠 있는 태그로 바꾸고 라벨만 남긴 이미지에서 게이트 exit 0. **출하 이미지 자신은 안전**(pid 1 uid 10001, root 잠김)이고 게이트의 맹점이다. 우회 (1)·위협 모델 (b)(c) 가 한 토큰 편집으로 무력화됐다 |
 | **D-6C-7** | 이미지 안 정책 파일은 **저장소의 것을 복사**하고 런타임 경로를 env 로 지정한다(기본값 없음, 5E-1 D-5E-7 계승) | 정책 값의 정본은 저장소이고 이미지가 두 번째 자리가 되면 안 된다 — 이미지 빌드 시점의 정책 checksum 을 evidence 에 남긴다 |
 
 ## 위협 모델 — 6C 고유 경계
@@ -133,5 +134,6 @@ root 로 돌지 않는다 (c) 버전이 떠 있지 않다(`:latest`·미고정 0
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-6C-1~7 | 사용자 「M6 착수」 + 착수 slice 6C 선택 · M6 입력 재고 |
+| 2026-09-16 수정 라운드 1(4) | **D-6C-9 신설** — 위생 게이트 두 술어의 정본 형태를 실행·빌드 산출물로 못 박는다(선언 단독 금지) · F-3~F-6 처분 지시(정책 파서 중복 키 · 어휘 스캔 경로와 `ci.yml` 누락 · rollback 시작 트리 · one-command 의 `qualityBaseline` 누락과 CI 미연결) | verifier r1 not-ready(HIGH 2 — 게이트 술어, 표적 재검증 대상) |
 | 2026-09-16 리뷰 요청(3) | in_scope 에 `config/quality/image-hygiene-policy.properties`(위생 게이트 정책 값 외부화 — 스크립트에 매직넘버 금지) 추가 · `.dockerignore` 파일명을 실제 동작하는 `docker/ml-serving.Dockerfile.dockerignore` 로 정정 | 구현 완료 보고 `50c108a` 의 새 파일 대조 — 둘 다 계약 초판에 없었다. 값의 자리를 스크립트 밖으로 뺀 것은 규율에 맞고, 파일명은 docker 의 실제 해석 규칙이다 |
 | 2026-09-16 구현 중(2) | **D-6C-8 신설** — 실 서버 통합 test 패키지를 `adapters.ml` → `adapters.contract`(같은 축 기존 전례와 한자리), in_scope 경로 갱신 · `OPEN-6C-CONDITIONAL-GATE-TEST` 신설 | 구현 레인 정지·보고: 기존 게이트 둘이 환경 조건부 test 에 동시 만족 불가. 게이트 술어를 약화시키는 두 안을 거부하고 패키지 분리 |
