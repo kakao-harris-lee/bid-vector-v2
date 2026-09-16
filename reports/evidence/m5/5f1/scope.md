@@ -14,6 +14,7 @@ in_scope:
   - ml-engine/tests/app/test_server_prediction.py             # (B) 「출하 정책 → NOT_READY」 를 「출하 정책 그대로 → READY·promoted·Success」 로 뒤집음(실 socket). (A) 임시 사본 경로는 threshold 가 이제 출하에 있으므로 제거하거나 (B) 와 합침 — 판단 등재. `test_single_broken_policy_*` 무편집
   - ml-engine/tests/serving/test_kotlin_rules_parity.py       # placeholder 주입 제거(출하 파일 그대로) — 미러 규칙 단언 무편집
   - ml-engine/tests/serving/test_wire.py                      # (있으면) clamp 상한 1.0 인 정책으로 「후보율 ≤ 1」 이 정책 층에서 보장됨을 실 엔진 경로 1 case 로 고정 — 없으면 tests/app/test_server_prediction.py 에
+  - ml-engine/tests/inference/test_scenario.py                # 계약 갱신 (2): 두 test 의 fixture center 1.0 이 새 상한에 걸침 → center 를 상한 안(예 0.9)으로 옮겨 원 의도(라벨 순서·legacy 산식) 유지 + **새 test 1**: center ≥ clamp_max(1.0) 에서 base·aggressive 가 둘 다 1.0 으로 접혀 같아지고 예외 0·후보 3 유지(값 변경의 실제 결과를 고정). 산식·src 무편집
   - reports/evidence/m5/5f1/**
 out_of_scope:
   - ml-engine/src/**                       # 산식·로더·엔진 코드 무편집 — 값만 바뀐다. 코드가 바뀌어야 값이 서면 slice 를 멈추고 보고
@@ -72,3 +73,4 @@ rollback: |
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-5F1-1~4 | 운영자 결정 ①③(선택지 답변, 종결 판정 §3) |
+| 2026-09-16 구현 중(2) | in_scope 에 `tests/inference/test_scenario.py` 추가(fixture center 이동 + 접힘 거동 test 1) · **D-5F1-5 신설**: `center ≥ clamp_max` 이면 base·aggressive 후보가 같은 값(1.0)으로 접힌다 — 엔진 불변식 위반이 아니고(src 는 엄격 순서를 강제하지 않음) 계약도 후보 셋의 순서를 요구하지 않음을 실측(Kotlin `ParsedSuccessFields`·`ResponseMapping` 이 순서·유일성을 강제하면 멈추고 보고). 알려진 제한으로 등재하고 test 로 고정 | 구현 레인 보고 — clamp 1.0 에서 두 test 가 붉음(fixture center 1.0 이 경계). 값 변경의 결과이므로 피하지 않고 고정한다 |
