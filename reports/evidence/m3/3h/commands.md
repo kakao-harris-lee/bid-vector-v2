@@ -81,3 +81,8 @@
 - cmd: `./gradlew --no-build-cache --no-daemon clean check`
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 46s). 신설 test 포함 전건 GREEN.
+
+## evidence 커밋(`787a270`, 장부층 시정) 뒤 재실측
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 54s).
