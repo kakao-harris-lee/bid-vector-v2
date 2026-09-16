@@ -161,3 +161,58 @@ jobs:
         run: |
           uv build --wheel -o /tmp/ml-engine-wheel
           uv run python -m pytest tests/gates/test_wheel_reexport.py -q
+
+  # M6/6C — 이미지 빌드·위생 게이트·실 서버 통합 test(D-6C-4). `check`·`ml-engine` 두
+  # job 의 명령은 위에서 무편집이다 — 이 job이 컨테이너 축 전부를 진다(하네스 2026-09-12
+  # 「줄일 수 있는 단위는 게이트가 아니라 job」). 소스 겹침은 `docker/`·`tools/*.sh`·이
+  # job 전용 test 하나뿐 — 위 두 job과 독립.
+  container:
+    runs-on: ubuntu-latest
+    env:
+      # compose 의 postgres 서비스 전용 — 이 job 안에서만 뜨는 일회성 컨테이너의
+      # 자격증명이다(6B 스키마도 얹기 전, 저장 데이터 없음). scope.md (2b) 「경계로
+      # 처리」— compose.yaml 파일 자체에는 이 값이 없고 `${VAR:?...}` 참조만 있다
+      # (D-6C-7과 같은 규율, 리터럴 0을 게이트로 실측).
+      BIDVECTOR_PG_USER: bidvector_ci
+      BIDVECTOR_PG_PASSWORD: bidvector_ci_ephemeral
+      BIDVECTOR_PG_DB: bidvector_ci
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: 이미지 빌드 (S-21)
+        run: docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .
+
+      - name: 이미지 위생 게이트 — non-root·고정 태그·금지 패키지 0·크기 상한 (S-22)
+        run: ./tools/image-hygiene-check.sh bidvector/ml-serving:local
+
+      - name: 로컬 환경 기동 — ml-serving+postgres 가 healthy 로 수렴 (S-23)
+        run: |
+          docker compose -f docker/compose.yaml up -d
+          for i in $(seq 1 20); do
+            ps_out="$(docker compose -f docker/compose.yaml ps --format '{{.Service}}: {{.Status}}')"
+            echo "$ps_out"
+            if echo "$ps_out" | grep -q "ml-serving:.*healthy" && echo "$ps_out" | grep -q "postgres:.*healthy"; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "ml-serving/postgres 가 제한 시간 안에 healthy 로 수렴하지 않았다" >&2
+          docker compose -f docker/compose.yaml logs
+          exit 1
+
+      - name: 실 Kotlin gateway ↔ 컨테이너의 실 Python 서버 (S-24, OPEN-5E2-CROSSLANG-REAL-SERVER)
+        # `RealServerIntegrationTest`는 Testcontainers 로 (S-21) 이미지의 **자기 전용**
+        # 컨테이너를 새로 띄운다(위 compose 환경과 별개 — 두 검증이 서로를 대신하지
+        # 않는다: compose 는 로컬 환경 기동 자체를, 이 test 는 실 Kotlin 소비자 규칙을 잰다).
+        run: ./gradlew --no-daemon :adapters:test --tests '*RealServerIntegrationTest*' -PrealServer=true
+
+      - name: 로컬 환경 정리 — 볼륨까지 (S-25)
+        if: always()
+        run: docker compose -f docker/compose.yaml down -v
