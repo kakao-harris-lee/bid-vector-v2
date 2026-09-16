@@ -101,3 +101,8 @@
 - cmd: 임시 clone(`/tmp/3h1-rollback-b-check`)에서 in_scope 21 경로(V7 제외) restore + 실측용 `V8__drop_notice_agency.sql`(커밋 안 함) 추가 뒤 `./gradlew --no-build-cache --no-daemon clean check`
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL(355 actionable tasks, 1m 3s). `CleanMigrationTest`의 flyway validate test·`CleanMigrationColumnTest` 전부 GREEN(V7 파일 유지 + V8 보상 마이그레이션으로 이력·파일 불일치 없이 최종 스키마가 base 와 일치). 확인 뒤 clone 삭제.
+
+## evidence 커밋(`0f56131`, Codex 1차 시정) 뒤 재실측
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 44s).
