@@ -19,7 +19,6 @@ COPY contracts/proto ./contracts/proto
 COPY ml-engine/pyproject.toml ml-engine/setup.py ml-engine/.python-version ./ml-engine/
 COPY ml-engine/tools ./ml-engine/tools
 COPY ml-engine/src ./ml-engine/src
-COPY ml-engine/policy ./ml-engine/policy
 
 WORKDIR /src/ml-engine
 # uv.lock 은 dev 그룹(pytest·mypy 등)까지 고정한다 — wheel 빌드는 `[build-system].requires`
@@ -30,10 +29,13 @@ RUN uv build --wheel -o /wheels
 # ---- runtime ----
 FROM python:3.12.8-slim-bookworm@sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0 AS runtime
 
-# `tools/image-hygiene-check.sh` 가 텍스트가 아니라 **이 라벨**(이미지 config 에 실제로
-# 구운 값)로 베이스 다이제스트 고정을 실측한다(설계 검토 (1) — Dockerfile 을 고쳐도 라벨과
-# 실제로 받은 layer 가 같은 다이제스트에서 왔는지까지는 이 라벨 하나로 증명하지 못하지만,
-# 최소한 "빌드 시점에 다이제스트 참조를 썼다"는 사실은 이미지 자신에 남는다).
+# D-6C-9(verifier r1 F-2) 이후 — 이 라벨은 **보조 정보**일 뿐이다. Dockerfile 이 손으로
+# 적는 자유 텍스트라 실제 `FROM`과 아무 것도 묶지 않는다(라벨만 남기고 FROM 을 떠 있는
+# 태그로 바꿔도 라벨은 그대로다, verifier r1 실측). 위생 게이트의 **구속력 있는** 베이스
+# 고정 판정은 `tools/image-hygiene-check.sh`가 이 이미지의 `RootFS.Layers` 앞부분을
+# `config/quality/image-hygiene-policy.properties`의 `base.image.layers`(고정 다이제스트의
+# 실제 layer 체인, 위조 불가 — 같은 바이트가 아니면 같은 다이제스트가 나올 수 없다)와
+# 대조하는 것이다.
 LABEL org.bidvector.baseimage="python:3.12.8-slim-bookworm@sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0"
 
 # non-root — 위생 게이트 (1)이 `docker inspect` 의 `Config.User` 와 이미지 안 `id -u` 로
