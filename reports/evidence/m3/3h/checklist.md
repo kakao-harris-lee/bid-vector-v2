@@ -3,8 +3,10 @@
 - [x] 구현 diff 가 커밋되어 base/head 고정 — `base_sha 0ad8e597ff08e4fb4e23d422659fb33a116b5ab1`,
       `head_sha ec03ddb1d5b31ebc36d2ed6fcc7ad1bb71351121`(4 커밋). `git status --porcelain`
       결과 없음(scope.md·commands.md·checklist.md·rollback.md 커밋 전 상태 제외 — evidence
-      경로만 남는다). 양성 대조 1회: `Agency.kt`에 주석 한 줄을 추가해 `git status --porcelain`
-      이 `M`으로 잡는 것을 확인 → `git restore --source=HEAD --staged --worktree`로 절삭 복원.
+      경로만 남는다). 양성 대조 1회: `Agency.kt`에 줄 하나를 추가해 `git status --porcelain`
+      이 `M`으로 잡는 것을 확인 → `head -n <원래 줄수>` 비파괴 절삭으로 원복(그 파일이
+      원래 HEAD 와 바이트 동일했음을 사전에 `git status --porcelain`으로 확인한 뒤에만
+      사용 — `git checkout --`·`git restore` 계열의 파괴 위험을 피한다).
 - [x] scope.md `acceptance_commands` 전부 exit 0 — `commands.md`의 최종 전건 실측(HEAD
       `ec03ddb`, 재실행 두 번) GREEN(346 actionable tasks, 46~47s).
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — 부분 게이트가 아니라
@@ -27,7 +29,7 @@
 | P-14 승인 등재(policy-values §1.3 행 넷 + P 표) | 팀장 커밋 `84426a2`(이 slice 착수 전, 별도 레인) |
 | `FieldContractTest`(토큰 넷·담당자 0) | `AgencyFieldContractTest`(`FieldContractTest.kt`) 「발주기관 넷이 정확한 개념으로 등재된다」·「담당자 키는 어떤 rawName 에도 없다」 |
 | `CanonicalizeTest`(역할별 조립·폴백 없음·정규화) | `AgencyCanonicalizeTest`(`CanonicalizeTest.kt`에서 sizeGate 분리) 4건 |
-| `AgencyTest`(`of` 정규화 = `CategoryCode.of`, 빈 값 거부) | `AgencyTest` 10건 |
+| `AgencyTest`(`of` 정규화 = `CategoryCode.of`, 빈 값 거부) | `AgencyTest` 9건 |
 | JDBC 왕복(컬럼 넷 저장·복원, 원문 보존) | `NoticeFindRoundTripTest` 신설 2건(값 왕복 + 결측 왕복) |
 | `CleanMigration*Test` 행렬 | `CleanMigrationColumnTest`에 컬럼 넷 행 추가(`CleanMigrationCheckTest`·`CleanMigrationTriggerTest`는 제약·트리거 신설이 없어 갱신 불필요 — D-3H-4 「제약·인덱스·트리거 없음」과 일치) |
 | 우회 (1)~(8) 실측 | 아래 「우회 대조표」 |
@@ -92,3 +94,8 @@ _PRESENT_IN`도 `internal` — 모듈 밖 신규 조립 경로 없음).
   절차다.
 - **migration-reviewer·Codex 리뷰 미실행** — 운영자 범위·비용 승인 뒤 별도 레인 소관
   (scope.md 「레인」 절). 이 slice 는 구현·자체 검증까지다.
+- **`OPEN-3H-MERGE-GUARD-TESTS`** — verifier r1 F-1(medium) 수정으로 발주기관 넷의
+  병합 보존 규칙은 test 로 잠겼다(`NoticeFindRoundTripTest`). 같은 부채가 선례 축
+  (`businessCategoryCode`·`floorRateFraction`)에는 여전히 남아 있다 — 존재 가드를
+  지워도 전건 `check` 가 초록이다. 이 slice 가 상속한 부채이지 이 slice 가 도입한
+  것이 아니라 범위 밖으로 두고, 팀장이 `capability-map.md` OPEN 표에 등재한다.

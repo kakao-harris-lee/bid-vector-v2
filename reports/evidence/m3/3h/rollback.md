@@ -41,7 +41,7 @@ M  procurement/src/test/kotlin/bidvector/procurement/CollectionPolicyTest.kt
 M  procurement/src/test/kotlin/bidvector/procurement/FieldContractTest.kt
 ```
 
-(`M` 13 · `A` 8 — 라운드마다 이 목록을 다시 산출한다.)
+(`M` 16 · `A` 6 — 라운드마다 이 목록을 다시 산출한다.)
 
 ## 공유 파일 판별
 
@@ -102,12 +102,12 @@ ALTER TABLE notice
 스스로 되돌리지 않는다 — `flyway_schema_history`에서 V7 행을 지우는 것은 이 slice
 rollback의 범위 밖이며, 운영 DB 조작은 사용자 승인 없이 실행하지 않는다).
 
-## 임시 clone 실측(`git clone --no-hardlinks`, `/tmp/3h1-rollback-check`)
+## 임시 clone 실측(`git clone --no-hardlinks`, `/tmp/3h1-rollback-check2`)
 
 ① `git diff --name-status 0ad8e597..HEAD -- <in_scope>` — 위 목록과 일치(기계 산출,
 재확인).
 ② `git restore --source=0ad8e597ff08e4fb4e23d422659fb33a116b5ab1 ...` 실행 —
-`git status --short` 결과: `M` 13 · `D` 8(신규 여덟 개가 삭제로 나타남 — `A`→`D`,
+`git status --short` 결과: `M` 16 · `D` 6(신규 여섯 개가 삭제로 나타남 — `A`→`D`,
 restore의 정상 동작). exit 0.
 ③ `git diff 0ad8e597ff08e4fb4e23d422659fb33a116b5ab1 -- <in_scope 코드 경로> | wc -l`
 → **0** — in_scope 경로가 base와 바이트 동일.
@@ -115,12 +115,12 @@ restore의 정상 동작). exit 0.
 :adapters:compileKotlin :adapters:compileTestKotlin` → exit 0.
 ⑤ `./gradlew --no-daemon :procurement:test :adapters:test` → exit 0.
 ⑥ `./gradlew --no-build-cache --no-daemon clean check`(되돌린 트리 전건) → **exit 0**.
-BUILD SUCCESSFUL(355 actionable tasks, 57s — 신선한 clone이라 4D-4 rollback 실측보다
-task 수가 많다, 캐시 재사용 차이). 되돌린 트리가 게이트를 붉히지 않는다 — evidence
+BUILD SUCCESSFUL(355 actionable tasks, 55s — 신선한 clone이라 캐시 재사용이 적어
+worktree 실측보다 task 수가 많다). 되돌린 트리가 게이트를 붉히지 않는다 — evidence
 디렉터리(`reports/evidence/m3/3h/**`)·`milestone-3.md`·`policy-values.md`는
 되돌리지 않았고 그것이 게이트에 걸리지 않음도 이 실행으로 확인됐다.
 
-임시 clone은 확인 뒤 삭제했다(`rm -rf /tmp/3h1-rollback-check`).
+임시 clone은 확인 뒤 삭제했다(`rm -rf /tmp/3h1-rollback-check2`).
 
 ## 하네스 레인 변경
 
