@@ -16,8 +16,12 @@ import bidvector.workflow.prediction.SegmentSupport
  * 구간·학습 행·기관 표본·수축 가중치·엔진 제외 관측, [PredictionEvidence.NotPredicted]는 사유
  * 1줄) ③ 표본 제외 요약(`excludedSamples`가 비어 있으면 생략).
  *
- * 숫자는 [java.math.BigDecimal.toPlainString]·[Int.toString]만 쓴다 — `String.format`·
- * `Locale`은 이 파일에 없다(`ArchitectureGateTest`가 그 import 자체를 거부한다).
+ * 숫자는 [java.math.BigDecimal.toPlainString]·[Int.toString]만 쓴다 — printf 계열 서식
+ * 함수·locale 종속 API는 이 파일에 없다. **갱신 2(verifier r1 V-1)** — `ArchitectureGateTest`
+ * 의 locale 누출 축은 `layer.domain` 모듈에만 걸리고 `workflow`는 `layer.application`이라
+ * 대상 밖이다. 잠금은 `EvidenceLinesBoundaryTest`(소스 텍스트 경계 test, S-5
+ * `NotificationBoundaryTest` 관례)가 진다 — 그 test 의 금지 어휘 목록은 여기 적지 않는다
+ * (이 KDoc 자신이 스캔 대상이라 어휘를 그대로 옮기면 자기매치가 난다).
  */
 fun evidenceLinesFor(
     verdict: Verdict.BidNow,
