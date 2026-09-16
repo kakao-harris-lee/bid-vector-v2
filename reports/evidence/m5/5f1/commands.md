@@ -78,12 +78,30 @@
   950 passed. checklist.md 판단 4(해소 기록) 참고 — 팀장 계약 갱신(커밋 `e4ba6a4`)
   뒤 `test_scenario.py`를 in_scope 로 편입하고 아래에서 재실측했다.
 
-## S-5(계약 갱신 (2) 반영 뒤, 최종)
+## S-5(계약 갱신 (2) 반영 뒤)
 
 - cmd: `(cd ml-engine && uv run python -m pytest tests -q)`
 - exit: 0
 - 핵심 결과: 953 passed(base 952 + 신설 `test_center_at_clamp_max_folds_base_and_
   aggressive_but_keeps_three_candidates` 1) — 전체 스위트 초록, 커밋 `1aac701`
+
+## Kotlin 소비자 규칙 실측(팀장 지시 — D-5F1-5 착수 전 확인)
+
+- cmd: `grep -n "require\|<=\|distinct\|unique" adapters/src/main/kotlin/bidvector/adapters/ml/CandidateShapeValidation.kt workflow/src/main/kotlin/bidvector/workflow/prediction/BidPredictionOutcome.kt`
+- 핵심 결과: `CandidateShapeValidation.kt::hasOrderedCandidateRates`는
+  `rates[0] <= rates[1] && rates[1] <= rates[2]`(비엄격). `BidPredictionOutcome.kt::
+  BidRateCandidates.init`은 `require(conservative <= base)`·`require(base <=
+  aggressive)`(비엄격). `ResponseMapping.kt`에는 순서·유일성 검사 자체가 없음(별도
+  grep 확인, 매치 없음). **엄격 순서·유일성을 강제하는 곳이 없다** — (a) 가 서빙을
+  깨뜨리지 않으므로 계약 재결정 없이 진행
+
+## S-5(D-5F1-5 test 강화 뒤, 최종)
+
+- cmd: `(cd ml-engine && uv run python -m pytest tests -q)`
+- exit: 0
+- 핵심 결과: 954 passed(953 + `test_center_at_or_above_clamp_max_folds_base_and_
+  aggressive_but_keeps_three_candidates`를 `center` `1.0`·`1.05` 로 parametrize
+  하며 순증 1) — 전체 스위트 초록, 커밋 `0d41d6e`
 
 ## S-5(golden 서브셋, scope.md out_of_scope 「영향 0」 실측)
 
