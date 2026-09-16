@@ -117,6 +117,12 @@ policy.py::load_policy`가 문법 오류를 raw 예외로 전파, `run_holdout`�
 `git diff --name-status 8799e05..HEAD`가 위 목록과 항목 수(19) 그대로다(이번
 라운드는 기존 두 파일 — `pyproject.toml`·게이트 test — 만 더 고쳤다). 새 임시
 clone 에서 ①~⑤ 재실행: ①②③ exit 0(diff 0), ④ 938 passed, ⑤ `Success: no
-issues found in 72 source files`. **⑥은 S-10이 같은 최종 HEAD에서 이미 초록임
-(commands.md 「S-10」)으로 갈음** — 되돌린 트리의 `lint-imports`(7 kept, D-5E3-6
-④ test 도 파일째 삭제되어 대상 없음)만 별도 확인, exit 0.
+issues found in 72 source files`. **⑥ 갈음 논거 정정(verifier r3 LOW-1)** — 「S-10
+이 최종 HEAD 에서 초록이므로 갈음」은 되돌린 **트리**의 초록을 함의하지 않는다
+(M4/leak-baseline-coord 가 그 둘이 갈리는 반례 — HEAD 초록·되돌린 트리 게이트
+exit 1). 올바른 논거는 **트리 동일성**이다: verifier r3 가 HEAD `b6fcb31`에서
+새 clone 에 ①~③을 실행해 되돌린 트리를 만들고, 추적 파일 전부의 SHA-256 목록을
+r2 판정 시점에 실측된 되돌린 트리와 대조해 **차이 0 줄**임을 확인한 뒤 게이트를
+직접 돌렸다 — `lint-imports` exit 0(7 kept) · `pytest` 938 passed · `./gradlew
+--no-daemon check` exit 0(BUILD SUCCESSFUL). 이 slice 는 그 실측을 참조로
+받아들인다(직접 재실행 반복 없음).

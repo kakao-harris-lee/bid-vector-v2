@@ -116,6 +116,7 @@ cmd 는 매번 `./gradlew --no-daemon check` — 전부 exit 0(BUILD SUCCESSFUL)
 | `fe76d50` | 수정 라운드 1 LOW 일괄 커밋 뒤 |
 | `7df311e`·`1c410d0` | 수정 라운드 1 종결 시점 |
 | `930891d` | 승인 전 일괄 커밋 뒤 — 이 줄을 적기 직전의 최종 재실측 |
+| `b6fcb31` | **verifier r3 가 직접 실측**(구현 레인이 아니라 독립 검증) — 알려진 제한 5(「최종 evidence 커밋은 자기 뒤를 기록할 수 없다」)를 이 실측이 닫는다: 그 커밋 자신이 HEAD 였던 시점에 verifier r3 가 그 HEAD 에서 `./gradlew --no-daemon check` exit 0 을 확인했다 |
 
 ## 승인 전 일괄(verifier r2 MEDIUM-1 + LOW 1·2) — 최종 HEAD 재실측
 

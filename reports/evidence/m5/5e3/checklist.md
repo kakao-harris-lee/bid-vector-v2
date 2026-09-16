@@ -59,7 +59,7 @@ scope.md in_scope 에 이미 등재돼 있다(`pyproject.toml`은 계약 갱신 
 | (3) | 창 루프의 취소 확인을 학습 **뒤**로 옮기는 변이 | `tests/training/test_holdout.py::test_run_holdout_should_stop_halts_before_training_next_window` — mutation 대조 실측(commands.md 「RED 확인」): 확인을 학습 뒤로 옮긴 사본에서 `completed_windows`가 기대보다 1 많아져 이 test 가 실제로 붉어짐을 확인했다 |
 | (4) | `HoldoutCancelled`를 `PipelineFailed`로 매핑해 FAILED 로 위장 | `tests/app/test_pipeline.py::test_holdout_cancelled_mid_windows_maps_to_pipeline_cancelled_with_no_artifact_files`(`PipelineCancelled` 타입 고정 단언 + artifact 파일 0) |
 | (5) | 게이트 test 의 로더 열거가 손 목록이라 새 로더 누락 | **수정 라운드 1(D-5E3-6) 재작성** — `_iter_fail_closed_loaders`가 `pkgutil.walk_packages`로 `ml_engine` 아래 `policy` 서브모듈을 전수 순회하고, **이름 규약 하나만**(모듈에 정의된 `load_` 접두 함수, 뿌리만 이름으로 명시 제외)으로 대상을 고른다 — 반환 타입 주석은 더는 보지 않는다(verifier r1 HIGH-1 이 반환 주석을 타입 별칭으로 적은 다섯째 로더로 그 필터를 우회했다). `test_collected_loader_set_equals_independent_enumeration`이 다른 내부 경로(`inspect` vs `vars()`+`callable`)로 다시 계산한 집합과 일치하는지 대조해 숨은 이차 필터 재도입을 구조적으로 막는다. `test_every_non_root_policy_module_has_at_least_one_loader`가 하한 `>= 4`(로더가 늘어도 안 보이던 값) 대신 「정책 모듈마다 로더 ≥1」을 고정하고, `test_root_loader_itself_is_not_collected_as_fail_closed`가 뿌리 제외를 확인한다. verifier의 재현 probe(반환 타입 별칭 + `yaml` 별칭 import)로 새 test 들이 실제로 그 로더를 수집해 예외 누출을 잡는 것을 확인했다(commands.md 「우회 대응표 갱신 실측」) |
-| (1)∩(5) | **승인 전 일괄(verifier r2 MEDIUM-1)** — 예외 셋(로더 (1))과 `load_` 이름 규약(로더 (5)) 의 교집합: 예외 모듈에 `load_` 아닌 이름으로 `yaml.safe_load`를 직접 부르면 둘 다 통과한다 | `test_exception_modules_reference_only_yaml_yamlerror`(D-5E3-6 ④) — 예외 세 모듈을 AST 전수 스캔해 `yaml` 참조가 `YAMLError` 뿐임을 이름 규약과 무관하게 단언. 변이 둘(`safe_load` 호출 추가·verifier의 `read_training_policy_v2` probe 그대로) 모두 실제로 실패시킴을 확인했다(commands.md) |
+| (1)∩(5) | **승인 전 일괄(verifier r2 MEDIUM-1)** — 예외 셋(로더 (1))과 `load_` 이름 규약(로더 (5)) 의 교집합: 예외 모듈에 `load_` 아닌 이름으로 `yaml.safe_load`를 직접 부르면 둘 다 통과한다 | `test_exception_modules_reference_only_yaml_yamlerror`(D-5E3-6 ④) — 예외 세 모듈을 AST 전수 스캔해 `yaml` 참조가 `YAMLError` 뿐임을 이름 규약과 무관하게 단언. 변이 둘(`safe_load` 호출 추가·verifier의 `read_training_policy_v2` probe 그대로) 모두 실제로 실패시킴을 확인했다(commands.md). **잔여: MEDIUM-2**(verifier r3, 아래 「알려진 제한」) |
 | (경계) | **동적 import**(`importlib.import_module("yaml").safe_load(...)`) — import 문이 아니라 호출이라 import-linter 계약이 보지 못한다(verifier r2 LOW-2) | 방어 대상 밖으로 scope.md 위협 모델 「방어하지 않는다」에 등재(계약 (4)) — 정책 로더로는 평범한 스타일이 아니고, `policy` 모듈 + `load_` 접두라면 이름 규약 게이트가 여전히 잡는다 |
 
 ## (2b) 값 획득 축 — 실측(commands.md 「(2b)」 절)
@@ -126,6 +126,20 @@ inference_policy`는 시그니처·반환 타입 무변경(공개 표면 증가 
    않고 그대로 전파한다」)도 이제 사실과 어긋난다. scope.md out_of_scope(「기존 절을
    남겨 둔다 — 제거는 값 없음」)에 따라 이번 라운드에서 고치지 않는다 — 이 세 파일을
    다음에 만질 기회에 죽은 분기와 docstring 을 함께 정리하는 것을 권한다.
+8. **예외 모듈 안 `yaml` 이중 별칭 import 는 신설 AST test 를 우회한다**(verifier r3
+   MEDIUM-2, 미차단) — `test_exception_modules_reference_only_yaml_yamlerror`가
+   `node.value.id == "yaml"`로 판별하므로, 이미 `import yaml`이 있는 예외 모듈에
+   `import yaml as _y`를 한 번 더 두고 `load_` 아닌 이름으로 `_y.safe_load(...)`를
+   부르면 이름이 다른 별칭이라 검사가 놓치고 raw 파서 예외가 샌다(ruff·mypy·
+   `lint-imports`·design ratchet 전부 통과, verifier r3 실측). 미차단 사유 —
+   평범한 저자는 그 파일에 이미 있는 `yaml.safe_load`를 쓰고 그러면 잡힌다(표적
+   1(b)(c)). 형제 형태 `getattr(yaml, "safe_load")(...)`는 ruff `B009`가 별도로
+   잡는다. **구조적 해소는 세 로더의 죽은 `except yaml.YAMLError` 절 제거**다 —
+   그러면 `ignore_imports`가 뿌리 한 줄로 수렴하고 이 AST 검사의 대상·MEDIUM-2 의
+   도달 경로가 함께 사라진다(out_of_scope 유지 — 다음에 그 세 파일을 만지는
+   slice 의 후속 소폭으로 남긴다). 대증 처방(`_yaml_reference_summary`가 이름
+   `yaml` 대신 `ast.Import`의 바인딩 이름 집합 전체를 재는 것)은 운영자가 이번
+   PR에서 원하면 한 줄로 가능하다.
 
 ## OPEN 처분
 
