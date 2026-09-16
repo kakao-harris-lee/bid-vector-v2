@@ -92,3 +92,10 @@ verifier r2 N-5가 지적한 대로, 「이 문서에 적힌 `clean check` 결�
 (바로 위 항목) — evidence 커밋 자체에서의 재실측은 **다음 라운드**가 있다면 그때 이
 문서를 다시 열어 확인한다(다음 라운드가 없으면 이 한계는 등재로 남는다, F-10/N-5와 같은
 성격).
+
+## 라운드 이력 절 제거 커밋(`b7f917a`) HEAD 재실측
+
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — 코드 무변경 커밋(evidence만), 위 N-5 한계대로 이 기록을
+  담는 커밋(다음 행) 자체의 재실측은 별도 절 없음.
