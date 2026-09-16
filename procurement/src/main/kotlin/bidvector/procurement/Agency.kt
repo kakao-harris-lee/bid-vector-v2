@@ -63,3 +63,45 @@ data class Agency(
         require(code != null || name != null) { "Agency는 code·name 이 둘 다 null 일 수 없다" }
     }
 }
+
+/**
+ * 발주기관 조립(D-3H-3, M3/3H-1) — `businessCategoryFrom`(`Canonicalize.kt`)과 같은 관례로
+ * `registry.contractsFor(concept)` 경유만 읽는다(scope.md 우회 (1)). [codeConcept]·
+ * [nameConcept]는 호출부가 역할별로 고정해 넘긴다 — 이 함수 자신은 "수요"·"공고" 어느
+ * 쪽인지 모른다(그래서 폴백이 구조적으로 불가능하다, 우회 (3)). 코드·이름이 둘 다 없으면
+ * fact 자체가 없다(`null`). `Canonicalize.kt`가 아니라 여기 사는 이유는 detekt
+ * `TooManyFunctions`(파일당 함수 수 상한, v2-지침서 §5) — Agency 조립은 Agency 타입과
+ * 같은 파일이 자연스러운 경계이기도 하다.
+ */
+private fun agencyFrom(
+    observation: RawNoticeObservation,
+    registry: KonepsFieldContractRegistry,
+    codeConcept: FieldConcept,
+    nameConcept: FieldConcept,
+): Agency? {
+    val code =
+        registry
+            .contractsFor(codeConcept)
+            .firstOrNull()
+            ?.let(observation::valueOf)
+            ?.let(AgencyCode::of)
+    val name =
+        registry
+            .contractsFor(nameConcept)
+            .firstOrNull()
+            ?.let(observation::valueOf)
+            ?.let(AgencyName::of)
+    return if (code == null && name == null) null else Agency(code, name)
+}
+
+/** 수요기관(`dminsttCd`·`dminsttNm`) — 엔진 `agency_id` 정본 축(D-3H-2). */
+internal fun demandAgencyFrom(
+    observation: RawNoticeObservation,
+    registry: KonepsFieldContractRegistry,
+): Agency? = agencyFrom(observation, registry, FieldConcept.DEMAND_AGENCY_CODE, FieldConcept.DEMAND_AGENCY_NAME)
+
+/** 공고기관(`ntceInsttCd`·`ntceInsttNm`) — [demandAgencyFrom]과 다른 축(자기 필드만). */
+internal fun noticeAgencyFrom(
+    observation: RawNoticeObservation,
+    registry: KonepsFieldContractRegistry,
+): Agency? = agencyFrom(observation, registry, FieldConcept.NOTICE_AGENCY_CODE, FieldConcept.NOTICE_AGENCY_NAME)
