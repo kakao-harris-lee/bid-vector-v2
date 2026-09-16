@@ -197,3 +197,12 @@ enum이라 값 추가는 새 권한이 아니다(같은 enum을 소비하는 `wh
 
 `decision`·`adapters` 모두 되돌리기 어려운 경로(인증·인가·암호화·마이그레이션·데이터 파기)가
 아니다 — Codex 심판 대상 아님(CLAUDE.md 운영자 지시 2026-09-11). `verifier`가 다음 레인이다.
+
+## 사용자 승인
+
+2026-09-16 — 운영자 지시 「`OPEN-4D3-SAMPLE-SUPPLY` (a) 추천안으로 진행」·「D-4B7-1 추천 방향으로 진행」 하에
+착수·구현·검증·종결·PR 까지 진행(머지는 별도 승인). verifier r3 `ready-for-review`
+(`_workspace/m4-4b7/05_verifier_report_r3.md`), 재작업 2회(r1 HIGH: 정렬 무측정 · r2 HIGH: 순번 정렬이
+유일 방어인데 무측정). r3 LOW 둘(N-2 호출부 변이 생존 — 통합 층이 드롭 사유를 안 나름 · D-4B7-9 사유 전파의
+오늘 관측 효과 없음)은 알려진 제한으로 등재, 재검증 없이 종결. 팀장 종결 등재 뒤 evidence 편집 커밋의 HEAD 에서
+루트 `clean check` 재실측(commands.md).
