@@ -49,6 +49,13 @@ autoformat(`ktlintMainSourceSetFormat`)으로 chain 줄바꿈 수정.
 - exit: 1 (매치 없음 = 통과)
 - 핵심 결과: 비밀값·개인정보 패턴 매치 0. Telegram id·사업자 정보 없음(육안 확인 병행).
 
+## 2026-09-16T01:49:07Z
+- cmd: `./gradlew --no-build-cache --no-daemon clean check` (evidence 커밋 `9257c60` HEAD
+  재실측 — 2026-09-16 규칙: evidence 편집 커밋마다 그 HEAD 에서 재확인)
+- exit: 0
+- 핵심 결과: 346 actionable tasks(321 executed) 전건 통과. evidence 문서 자체가
+  `leakPatternGate`(scanRoot `reports/evidence`)를 붉히지 않았다.
+
 ## 2026-09-16T01:47:09Z
 - cmd: 임시 clone(`git clone --no-hardlinks`)에서 rollback.md ①~⑥ 실측 — `git restore
   --source=4b9fa21 --staged --worktree -- <9개 M 파일>` + `rm -f
