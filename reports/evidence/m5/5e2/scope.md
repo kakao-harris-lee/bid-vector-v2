@@ -33,11 +33,11 @@ acceptance_commands:
   - "(cd ml-engine && uv sync --extra serving --extra dev)"                                                            # S-0
   - "(cd ml-engine && uv run python -c 'import ml_engine.serving.prediction, ml_engine.serving.wire, ml_engine.serving.runtime')"  # S-1c 승계
   - "(cd ml-engine && uv run ruff check . && uv run ruff format --check .)"                                           # S-2
-  - "(cd ml-engine && uv run mypy)"                                                                                    # S-3
+  - "(cd ml-engine && uv run mypy --strict src/ml_engine)"                                                                                    # S-3
   - "(cd ml-engine && uv run lint-imports)"                                                                            # S-4
   - "(cd ml-engine && uv run python -m pytest tests -q)"                                                               # S-5 — S-12b 자동화 test 포함
-  - "(cd ml-engine && uv run python tools/design_ratchet.py)"                                                          # S-6
-  - "(cd ml-engine && uv run python tools/reuse_provenance.py)"                                                        # S-7
+  - "(cd ml-engine && uv run python tools/design_ratchet.py --check)"                                                          # S-6
+  - "(cd ml-engine && uv run python tools/reuse_provenance_check.py)"                                                        # S-7
   - "(cd ml-engine && uv run python -c \"import tomllib,pathlib; p=tomllib.load(open('pyproject.toml','rb')); v=pathlib.Path('.python-version').read_text().strip(); assert v.startswith('3.12') and '3.12' in p['project']['requires-python']\")"   # S-9
   - "./gradlew --no-daemon check"                                                                                      # S-10 — evidence 커밋마다 그 HEAD 에서(leakPatternGate)
   - "(cd ml-engine && uv build --wheel -o /tmp/ml-engine-wheel && uv run python -m pytest tests/gates/test_wheel_reexport.py -q)"   # S-11 승계
@@ -135,3 +135,4 @@ rollback: |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-5E2-1~10, OPEN 신설 둘 | 사용자 「5E 착수」 후반 · 착수 조사 |
 | 2026-09-16 (2) 구현 완료 뒤 | S-9 를 5E-1 과 같은 인라인 python 버전 대조 명령으로 정정(초판이 존재하지 않는 `tools/check_python_version.py` 를 가리킴 — 팀장 계약 오류) · in_scope 에 `tests/serving/test_grpc.py` 추가 | 구현 보고 — 도구 부재 실측 · 생성자 시그니처 변경의 필연적 collateral |
+| 2026-09-16 (3) verifier r1 뒤 | S-3·S-6·S-7 을 CI `ml-engine` job 의 명령 그대로(`mypy --strict src/ml_engine` · `design_ratchet.py --check` · `reuse_provenance_check.py`)로 정정 | verifier r1 M-3 — 초판 acceptance 가 CI 와 달랐다(S-9 와 같은 계약 오류 계열). 정본은 CI job 명령이다(하네스 2026-09-12) |
