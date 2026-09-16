@@ -327,6 +327,31 @@ class TestPredictDistribution:
         assert isinstance(result, Success)
         assert result.diagnostics.excluded_observations == 1
 
+    def test_sample_rejected_by_both_gates_is_counted_only_once(
+        self, policy: InferencePolicy
+    ) -> None:
+        """verifier r2 N-3 — `_observe_all` docstring이 주장하는 「이중 계수 금지」의
+        정작 그 갈래: 관측 게이트(`observe_sample`, 예비가 없음)와 세그먼트 게이트
+        (`_resolve_segment`, 결측 사유 `99`) **둘 다**가 같은 표본 하나를 거부해도
+        `excluded_observations`는 1이어야 한다(둘 다 거부해서 2가 되면 회귀)."""
+        samples = [
+            competition_sample(observed_bid_rate=_BID_RATES[i % len(_BID_RATES)])
+            for i in range(20)
+        ]
+        samples.append(competition_sample(with_reserve_draw=False, agency_id=99))
+        request = prediction_pb2.CalculateOptimalBidRequest(
+            features=_valid_features_inputs(), competition_samples=samples
+        )
+        distribution_request = DistributionRequest.from_proto(request)
+        assert isinstance(distribution_request, DistributionRequest)
+        assert distribution_request.samples[-1].segment == SampleRejected(
+            SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED
+        )
+
+        result = predict_distribution(distribution_request, policy)
+        assert isinstance(result, Success)
+        assert result.diagnostics.excluded_observations == 1
+
     def test_agency_and_category_match_builds_direct_segment_support(
         self, policy: InferencePolicy
     ) -> None:
