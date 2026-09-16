@@ -86,6 +86,9 @@ dependencies {
     // 이미 platform 으로 얹었으므로 test 는 모듈 좌표만 더한다.
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.junit.jupiter)
+    // M6/6C — `RealServerIntegrationTest`가 `GenericContainer`로 `docker/ml-serving.Dockerfile`
+    // 이미지를 띄운다(postgres 전용이 아닌 임의 이미지, gradle/libs.versions.toml 주석).
+    testImplementation(libs.testcontainers.core)
 }
 
 // M2/2A — `ContractRoundTripTest`가 `contracts/testdata/*.binpb`(canonical, VCS 커밋)를 읽는다.
@@ -104,6 +107,18 @@ tasks.test {
     // (따라서 `check`)는 이 class 를 이름으로 제외한다 — Python 서버 없이 도는 보통의
     // 실행에서 연결 실패로 죽지 않게 한다. 실행은 `crossLangSmokeTest`(아래)만 한다.
     filter { excludeTestsMatching("*CrossLangSmokeTest") }
+    // M6/6C D-6C-4 — `RealServerIntegrationTest`는 **제외하지 않는다**(crossLangSmokeTest
+    // 와 다른 배선): S-24 acceptance 명령이 그대로 `:adapters:test --tests
+    // '*RealServerIntegrationTest*' -PrealServer=true`를 쓰기 때문에, class 를 `test`
+    // task 밖으로 빼면 `--tests`로 다시 골라도 이 필터가 항상 이긴다(Gradle 실측 —
+    // 스크립트의 exclude 는 커맨드라인 include 보다 우선한다). 대신 test class 자신이
+    // `@EnabledIfSystemProperty(named = "bidvector.realServer.enabled")`로 스스로
+    // 건너뛴다 — 이 system property 가 project property `-PrealServer`를 그대로
+    // 옮긴 것이다(없으면 "false", 항상 명시적으로 채운다 — 조용한 기본 통과가 없다).
+    systemProperty(
+        "bidvector.realServer.enabled",
+        (project.findProperty("realServer") as String?) ?: "false",
+    )
 }
 
 // M2/2D S-6 — `tools/contract-crosslang-smoke.sh`가 Python 서버를 띄운 뒤 이 task 만 골라
