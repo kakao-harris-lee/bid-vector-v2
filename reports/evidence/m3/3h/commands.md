@@ -96,3 +96,8 @@
 - cmd: `./gradlew --no-build-cache --no-daemon clean check`(HEAD `d06ec8d`)
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks). push·PR #30 은 이 결과 뒤. code-reviewer 레인이 같은 HEAD 에서 독립 재실행해 초록을 확인(PR 코멘트).
+
+## Codex 1차 request_changes(high) 시정 — rollback.md (b) 롤포워드 경로 실측
+- cmd: 임시 clone(`/tmp/3h1-rollback-b-check`)에서 in_scope 21 경로(V7 제외) restore + 실측용 `V8__drop_notice_agency.sql`(커밋 안 함) 추가 뒤 `./gradlew --no-build-cache --no-daemon clean check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(355 actionable tasks, 1m 3s). `CleanMigrationTest`의 flyway validate test·`CleanMigrationColumnTest` 전부 GREEN(V7 파일 유지 + V8 보상 마이그레이션으로 이력·파일 불일치 없이 최종 스키마가 base 와 일치). 확인 뒤 clone 삭제.

@@ -82,27 +82,45 @@ git restore --source=0ad8e597ff08e4fb4e23d422659fb33a116b5ab1 --staged --worktre
 high 재발 방지). 신규 파일 여덟 개(`A`)는 `--source`에 해당 경로가 없으므로 restore가
 작업 트리에서 삭제한다.
 
-## V7 마이그레이션 롤백(운영 DB 적용 시)
+## V7 마이그레이션 롤백 — 경로 둘(Codex 1차 request_changes high 시정)
 
 V7 은 `notice`에 `ADD COLUMN` 넷만 했다 — 컬럼을 걷어내도 데이터 손실이 없다(다른
 컬럼·행을 건드리지 않고, 이 컬럼들 자체가 비어 있는 상태에서 되돌린다면 값 손실도
 없다. 이미 채워진 뒤라면 그 네 컬럼의 값만 사라진다 — 도메인 fact 재수집으로 복구
-가능, 원본은 `raw_observation.payload`에 원문 그대로 남아 있다).
+가능, 원본은 `raw_observation.payload`에 원문 그대로 남아 있다). **이 데이터 손실
+조건은 아래 두 경로 어느 쪽으로 되돌리든 같다.**
 
-```sql
-ALTER TABLE notice
-    DROP COLUMN demand_agency_code,
-    DROP COLUMN demand_agency_name,
-    DROP COLUMN notice_agency_code,
-    DROP COLUMN notice_agency_name;
-```
+경로는 **DB 에 V7 이 이미 적용됐는가**로 갈린다 — `V7` 파일을 지우고 되돌리는 방식은
+**DB 미적용**일 때만 성립한다. 이미 적용된 뒤 같은 방식을 쓰면 로컬 migration 파일
+집합에서 V7 이 사라지는데 `flyway_schema_history`엔 V7 행이 남아, `CleanMigrationTest`
+의 `flyway validate 가 통과한다` test(파일↔이력 불일치를 실패로 고정)가 실패한다 —
+되돌린 코드가 자기 게이트 위에 서지 못한다(Codex 1차 심판 `codex-review-20260916T162509Z.json`
+finding, high).
 
-파일 삭제(위 restore가 처리)와 별개로, 이미 migrate 된 DB 인스턴스에는 이 DDL을
-별도로 실행해야 한다(Flyway는 파일이 사라져도 이미 적용된 마이그레이션 이력을
-스스로 되돌리지 않는다 — `flyway_schema_history`에서 V7 행을 지우는 것은 이 slice
-rollback의 범위 밖이며, 운영 DB 조작은 사용자 승인 없이 실행하지 않는다).
+### (a) DB 미적용 — 오늘 상태(프로덕션 배포 전, 운영 데이터 0)
 
-## 임시 clone 실측(`git clone --no-hardlinks`, `/tmp/3h1-rollback-check2`)
+`V7__notice_agency.sql` 을 포함해 위 in_scope 목록 전체를 `git restore`로 되돌린다
+(아래 「임시 clone 실측」 절 그대로 — 이미 실측 완료). `flyway_schema_history`에 V7
+행 자체가 없으므로 파일 삭제가 이력과 어긋나지 않는다.
+
+### (b) DB 적용 후(롤포워드) — V7 파일은 지우지 않는다
+
+**`flyway repair`는 대안이 아니다** — `repair`는 `flyway_schema_history`를 로컬
+migration 파일 집합과 다시 맞추는 명령이지, **없어진 파일에 대응하는 이력 행을
+지우지 않는다**(공식 동작 — 체크섬 재계산·실패 항목 정리가 전부이지 applied-but-
+missing 행 삭제가 아니다). 이력 행을 직접 `DELETE`하는 것도 채택하지 않는다 —
+운영자 승인 없는 이력 편집이다.
+
+절차: ① 코드는 in_scope 목록에서 **`V7__notice_agency.sql` 을 뺀 나머지**만
+`git restore`로 되돌린다 — 즉 V7 파일은 그대로 두고 V7 이 편집한 Kotlin 코드
+(persistence·도메인)만 base 로 되돌린다. ② 보상 마이그레이션
+`V8__drop_notice_agency.sql`(`ALTER TABLE notice DROP COLUMN` ×4, V7 이 더한 컬럼
+그대로 되돌림)을 새로 만든다. ③ 적용: V1~V6 는 원래 이력과 그대로 일치하고, V7 은
+파일이 남아 있어 이력의 V7 행과 체크섬이 계속 맞는다(validate 통과). V8 은 처음
+보는 신규 이력이라 정상적으로 `migrate`된다. 되돌린 코드가 참조하는 스키마(기관
+컬럼 없음)와 V8 이후 실제 스키마가 일치한다.
+
+## 임시 clone 실측 — (a) 경로(`git clone --no-hardlinks`, `/tmp/3h1-rollback-check2`)
 
 ① `git diff --name-status 0ad8e597..HEAD -- <in_scope>` — 위 목록과 일치(기계 산출,
 재확인).
@@ -122,6 +140,34 @@ worktree 실측보다 task 수가 많다). 되돌린 트리가 게이트를 붉�
 
 임시 clone은 확인 뒤 삭제했다(`rm -rf /tmp/3h1-rollback-check2`).
 
+## 임시 clone 실측 — (b) 경로(`git clone --no-hardlinks`, `/tmp/3h1-rollback-b-check`)
+
+절차: ① 코드 in_scope 22 경로 중 `V7__notice_agency.sql` 을 **뺀 21 경로**만
+`git restore --source=0ad8e597ff08e4fb4e23d422659fb33a116b5ab1 --staged --worktree --`
+로 되돌린다 — exit 0, `git status --short` 결과 `M` 16 · `D` 5(V7 은 목록에서 빠져
+그대로 남는다). ② `git diff 0ad8e597.. -- <되돌린 21 경로> | wc -l` → **0**(V7 은
+대조 대상에서 제외 — base 자체에 없던 파일이라 애초에 diff 가 없다). ③ V7 파일이
+여전히 있는지 `ls adapters/src/main/resources/db/migration/` 로 확인 — `V7__notice_
+agency.sql` 존재. ④ **실측용 임시 파일**
+`adapters/src/main/resources/db/migration/V8__drop_notice_agency.sql`(`ALTER TABLE
+notice DROP COLUMN demand_agency_code, DROP COLUMN demand_agency_name, DROP COLUMN
+notice_agency_code, DROP COLUMN notice_agency_name;`, 이 브랜치에는 커밋하지 않는다
+— 내용은 이 문서에 전문 보존) 을 추가한다. ⑤ `./gradlew --no-build-cache --no-daemon
+clean check`(되돌린 트리 + V8, 전건) → **exit 0**. BUILD SUCCESSFUL(355 actionable
+tasks, 1m 3s, 355 개 전부 실행 — 신선 clone). `CleanMigrationTest`의 `flyway
+validate 가 통과한다` test GREEN(6 tests 중 포함, 0 failed) — V1~V6 는 이력과
+그대로 일치, V7 은 파일이 남아 있어 체크섬이 맞고, V8 은 신규 이력으로 정상
+적용된다. `CleanMigrationColumnTest`(3 tests, 0 failed)도 GREEN — V8 이 V7 의
+컬럼 넷을 되돌려 최종 스키마가 base 의 컬럼 행렬과 다시 일치하고, 되돌린 코드
+(기관 컬럼 참조 0)와 어긋나지 않는다. ⑥ 확인 뒤 `V8__drop_notice_agency.sql` 을
+포함해 임시 clone 을 통째로 삭제했다(`rm -rf /tmp/3h1-rollback-b-check`) — V8 파일은
+어디에도 커밋되지 않았다.
+
+(b) 경로가 실제 운영 rollback 을 수행할 때는 ④의 `V8__drop_notice_agency.sql` 을
+그대로(위 SQL 문면 그대로) 새 마이그레이션 파일로 커밋·배포한다 — 이 evidence
+실측은 그 파일이 기존 이력과 충돌 없이 적용되고 최종 상태가 게이트를 통과함을
+미리 증명해 둔 것이다.
+
 ## 하네스 레인 변경
 
 없음. `git log --oneline 0ad8e597ff08e4fb4e23d422659fb33a116b5ab1..HEAD -- CLAUDE.md
@@ -129,6 +175,7 @@ worktree 실측보다 task 수가 많다). 되돌린 트리가 게이트를 붉�
 
 ## 예상 복구 시간
 
-원격 상태 변경 없음, 로컬 Postgres 마이그레이션(V7, 컬럼 넷 추가)만 — 적용된 DB 가
-있으면 위 `ALTER TABLE ... DROP COLUMN` 넷 추가 실행, 없으면 `git restore` 한 명령 +
-재빌드 시간(로컬 실측 ~1분) 이내.
+원격 상태 변경 없음, 로컬 Postgres 마이그레이션(V7, 컬럼 넷 추가)만. (a) DB 미적용
+— `git restore` 한 명령 + 재빌드 시간(로컬 실측 ~1분) 이내. (b) DB 적용 후(롤포워드)
+— 21 경로 `git restore` + `V8__drop_notice_agency.sql` 신설·배포 한 마이그레이션,
+재빌드 포함 ~1분 이내(위 실측과 같은 규모).
