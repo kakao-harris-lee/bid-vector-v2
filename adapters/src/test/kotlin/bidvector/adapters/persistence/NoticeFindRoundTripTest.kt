@@ -1,5 +1,8 @@
 package bidvector.adapters.persistence
 
+import bidvector.procurement.Agency
+import bidvector.procurement.AgencyCode
+import bidvector.procurement.AgencyName
 import bidvector.procurement.BusinessCategory
 import bidvector.procurement.CategoryCode
 import bidvector.procurement.CategoryLabel
@@ -82,5 +85,71 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
         found.allocatedBudget shouldBe command.allocatedBudget
         found.floorRate shouldBe command.floorRate
         found.deadlineAt shouldBe deadline
+    }
+
+    /** D-3H-4 — 발주기관 넷 저장·복원, 원문 이름 보존(우회 (7)). */
+    @Test
+    fun `수요기관·공고기관이 실린 notice 를 저장하고 find 하면 그대로 복원된다`() {
+        val id = NoticeId(NoticeNumber.of("FIND-ROUNDTRIP-AGENCY-001"), NoticeRound.of("000"))
+        val observation =
+            RawNoticeObservation.of(
+                mapOf(RawKey("bidNtceNo") to id.number.value, RawKey("bidNtceOrd") to id.round.value),
+                SourceEndpoint.NOTICE_LIST,
+                Instant.parse("2026-09-16T00:00:00Z"),
+            )
+        val key = appendRawObservation(observation)
+        val command =
+            NoticeCollected(
+                id = id,
+                businessCategory = null,
+                baseAmount = null,
+                estimatedAmount = null,
+                allocatedBudget = null,
+                floorRate = null,
+                deadlineAt = null,
+                openingScheduledAt = null,
+                raw = observation,
+                demandAgency = Agency(AgencyCode.of("1234567"), AgencyName.of("  수요 기관  ")),
+                noticeAgency = Agency(AgencyCode.of("7654321"), AgencyName.of("공고기관")),
+            )
+
+        JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
+
+        val found = requireNotNull(JdbcNoticeRepository(dataSource()).find(id))
+
+        found.demandAgency shouldBe Agency(AgencyCode.of("1234567"), AgencyName.of("수요 기관"))
+        found.noticeAgency shouldBe Agency(AgencyCode.of("7654321"), AgencyName.of("공고기관"))
+    }
+
+    /** D-3H-4 — 발주기관 키가 결측이면 null 이 왕복된다(지어내지 않는다). */
+    @Test
+    fun `발주기관이 없는 notice 는 null 이 그대로 왕복된다`() {
+        val id = NoticeId(NoticeNumber.of("FIND-ROUNDTRIP-AGENCY-002"), NoticeRound.of("000"))
+        val observation =
+            RawNoticeObservation.of(
+                mapOf(RawKey("bidNtceNo") to id.number.value, RawKey("bidNtceOrd") to id.round.value),
+                SourceEndpoint.NOTICE_LIST,
+                Instant.parse("2026-09-16T00:00:00Z"),
+            )
+        val key = appendRawObservation(observation)
+        val command =
+            NoticeCollected(
+                id = id,
+                businessCategory = null,
+                baseAmount = null,
+                estimatedAmount = null,
+                allocatedBudget = null,
+                floorRate = null,
+                deadlineAt = null,
+                openingScheduledAt = null,
+                raw = observation,
+            )
+
+        JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
+
+        val found = requireNotNull(JdbcNoticeRepository(dataSource()).find(id))
+
+        found.demandAgency shouldBe null
+        found.noticeAgency shouldBe null
     }
 }

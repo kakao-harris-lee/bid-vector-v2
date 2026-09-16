@@ -63,6 +63,11 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice", "floor_rate_fraction", "numeric", true),
             ColumnSpec("notice", "floor_rate_origin_kind", "text", true),
             ColumnSpec("notice", "floor_rate_origin_detail", "text", true),
+            // M3/3H-1 D-3H-4 — 발주기관 넷(추가만, V7). provenance 컬럼 없음(D-3H-3).
+            ColumnSpec("notice", "demand_agency_code", "text", true),
+            ColumnSpec("notice", "demand_agency_name", "text", true),
+            ColumnSpec("notice", "notice_agency_code", "text", true),
+            ColumnSpec("notice", "notice_agency_name", "text", true),
             ColumnSpec("notice", "deadline_at", "timestamp with time zone", true),
             ColumnSpec("notice", "revision", "bigint", false),
             ColumnSpec("notice", "observation_key", "text", false),

@@ -26,6 +26,7 @@ internal object Sql {
         estimated_amount_provenance, estimated_amount_provenance_detail, estimated_amount_source_key,
         allocated_budget_won, allocated_budget_provenance, allocated_budget_provenance_detail,
         floor_rate_fraction, floor_rate_origin_kind, floor_rate_origin_detail,
+        demand_agency_code, demand_agency_name, notice_agency_code, notice_agency_name,
         deadline_at, revision
         """
 
@@ -44,8 +45,9 @@ internal object Sql {
             estimated_amount_provenance, estimated_amount_provenance_detail, estimated_amount_source_key,
             allocated_budget_won, allocated_budget_provenance, allocated_budget_provenance_detail,
             floor_rate_fraction, floor_rate_origin_kind, floor_rate_origin_detail,
+            demand_agency_code, demand_agency_name, notice_agency_code, notice_agency_name,
             deadline_at, revision, observation_key
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         """
 
     const val UPDATE_NOTICE =
@@ -58,6 +60,7 @@ internal object Sql {
             estimated_amount_provenance = ?, estimated_amount_provenance_detail = ?, estimated_amount_source_key = ?,
             allocated_budget_won = ?, allocated_budget_provenance = ?, allocated_budget_provenance_detail = ?,
             floor_rate_fraction = ?, floor_rate_origin_kind = ?, floor_rate_origin_detail = ?,
+            demand_agency_code = ?, demand_agency_name = ?, notice_agency_code = ?, notice_agency_name = ?,
             deadline_at = ?, observation_key = ?
         WHERE notice_number = ? AND notice_round = ?
         """

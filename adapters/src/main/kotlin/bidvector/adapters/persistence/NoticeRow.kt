@@ -30,6 +30,11 @@ internal data class NoticeRow(
     val floorRateFraction: BigDecimal?,
     val floorRateOriginKind: String?,
     val floorRateOriginDetail: String?,
+    // M3/3H-1 D-3H-4 — 발주기관 넷. provenance 컬럼 없음(business_category_* 와 같은 축).
+    val demandAgencyCode: String?,
+    val demandAgencyName: String?,
+    val noticeAgencyCode: String?,
+    val noticeAgencyName: String?,
     val deadlineAt: Instant?,
     val revision: Long,
 )
@@ -56,6 +61,10 @@ internal fun ResultSet.toNoticeRow(): NoticeRow =
         floorRateFraction = getBigDecimal("floor_rate_fraction"),
         floorRateOriginKind = getString("floor_rate_origin_kind"),
         floorRateOriginDetail = getString("floor_rate_origin_detail"),
+        demandAgencyCode = getString("demand_agency_code"),
+        demandAgencyName = getString("demand_agency_name"),
+        noticeAgencyCode = getString("notice_agency_code"),
+        noticeAgencyName = getString("notice_agency_name"),
         deadlineAt = getTimestamp("deadline_at")?.toInstant(),
         revision = getLong("revision"),
     )
@@ -86,6 +95,10 @@ internal fun NoticeCollected.toNoticeRow(): NoticeRow =
         floorRateFraction = floorRate?.rate?.fraction,
         floorRateOriginKind = floorRate?.origin?.let(FloorRateOriginCodec::kindOf),
         floorRateOriginDetail = floorRate?.origin?.let(FloorRateOriginCodec::detailOf),
+        demandAgencyCode = demandAgency?.code?.value,
+        demandAgencyName = demandAgency?.name?.value,
+        noticeAgencyCode = noticeAgency?.code?.value,
+        noticeAgencyName = noticeAgency?.name?.value,
         deadlineAt = deadlineAt,
         revision = 1L,
     )

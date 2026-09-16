@@ -121,6 +121,11 @@ internal fun mergeNoticeRow(
         floorRateFraction = incomingRow.floorRateFraction ?: existing.floorRateFraction,
         floorRateOriginKind = incomingRow.floorRateOriginKind ?: existing.floorRateOriginKind,
         floorRateOriginDetail = incomingRow.floorRateOriginDetail ?: existing.floorRateOriginDetail,
+        // M3/3H-1 D-3H-3 — business_category_* 와 같은 존재 가드(provenance 축 없음).
+        demandAgencyCode = incomingRow.demandAgencyCode ?: existing.demandAgencyCode,
+        demandAgencyName = incomingRow.demandAgencyName ?: existing.demandAgencyName,
+        noticeAgencyCode = incomingRow.noticeAgencyCode ?: existing.noticeAgencyCode,
+        noticeAgencyName = incomingRow.noticeAgencyName ?: existing.noticeAgencyName,
         deadlineAt = incomingRow.deadlineAt ?: existing.deadlineAt,
     )
 }

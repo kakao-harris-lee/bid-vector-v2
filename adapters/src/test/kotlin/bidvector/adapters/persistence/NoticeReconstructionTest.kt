@@ -46,6 +46,10 @@ class NoticeReconstructionTest {
             floorRateFraction = null,
             floorRateOriginKind = null,
             floorRateOriginDetail = null,
+            demandAgencyCode = null,
+            demandAgencyName = null,
+            noticeAgencyCode = null,
+            noticeAgencyName = null,
             deadlineAt = null,
             revision = 1L,
         )

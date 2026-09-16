@@ -137,6 +137,10 @@ class JdbcNoticeRepository(
         statement.setBigDecimal(index++, row.floorRateFraction)
         statement.setString(index++, row.floorRateOriginKind)
         statement.setString(index++, row.floorRateOriginDetail)
+        statement.setString(index++, row.demandAgencyCode)
+        statement.setString(index++, row.demandAgencyName)
+        statement.setString(index++, row.noticeAgencyCode)
+        statement.setString(index++, row.noticeAgencyName)
         index = bindDeadline(statement, index, row)
         statement.setString(index++, observationKey.value)
         if (!includeStatusAndId) {
