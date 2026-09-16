@@ -213,20 +213,27 @@ class OpportunityAnalysisTest {
         analyzed.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided)
     }
 
+    // verifier r1 V-2 — D-4D4-1 의 다섯 사유 매핑 중 Unavailable 가지: evidence 도 outcome.reason 을 그대로 옮긴다.
     @Test
-    fun `예측 Unavailable(DeadlineExceeded) 여도 Analyzed 유지 — 두 성분만 drop`() {
+    fun `예측 Unavailable(DeadlineExceeded) 여도 Analyzed 유지 — 두 성분만 drop, evidence 는 그 사유의 NotPredicted`() {
         val prediction =
             FakeBidPredictionPort { BidPredictionOutcome.Unavailable(MlUnavailableReason.DeadlineExceeded) }
 
-        analyzeNotice(analysis(prediction = prediction)).shouldBeAnalyzed()
+        val analyzed = analyzeNotice(analysis(prediction = prediction)).shouldBeAnalyzed()
+
+        analyzed.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.DeadlineExceeded)
     }
 
+    // verifier r1 V-2 — Unmeasurable 가지: outcome 자체에 재사용할 MlUnavailableReason 이 없어
+    // ScoreNotProvided 로 접는다(predictionFacts 의 absentPair(MlUnavailableReason.ScoreNotProvided) 배선).
     @Test
-    fun `예측 Unmeasurable 이어도 Analyzed 유지`() {
+    fun `예측 Unmeasurable 이어도 Analyzed 유지 — evidence 는 NotPredicted(ScoreNotProvided)`() {
         val prediction =
             FakeBidPredictionPort { BidPredictionOutcome.Unmeasurable(UnmeasurableReason.InsufficientSamples) }
 
-        analyzeNotice(analysis(prediction = prediction)).shouldBeAnalyzed()
+        val analyzed = analyzeNotice(analysis(prediction = prediction)).shouldBeAnalyzed()
+
+        analyzed.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided)
     }
 
     @Test
