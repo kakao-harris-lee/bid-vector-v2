@@ -1,6 +1,7 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.ProvenancePolicyData
 import bidvector.decision.UnitScore
 import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.PriorityInputs
@@ -118,12 +119,25 @@ class OpportunityAnalysis internal constructor(
             }
         }
 
+    /**
+     * M4/4B-8(D-4B8-5) — `SAMPLE_PROVENANCE_POLICY`도 이 자리에서 함께 resolve한다.
+     * `predictionRequestFor`(`PredictionFacts.kt`, port를 읽지 않는 파일)가 `Clock`을 직접
+     * 읽지 않고도 대상 공고 라벨에 쓸 정책을 받도록 — 표본 라벨(`JdbcCompetitionSampleSource`)과
+     * 대상 라벨이 같은 정책 singleton을 참조한다(대상·표본이 같은 version으로 판정).
+     */
     private fun resolvePolicies(referenceDate: LocalDate): Step<ResolvedPolicies> {
         val opportunity = resolvedOrNull(opportunityPolicyTable, referenceDate)
         val derivation = resolvedOrNull(derivationPolicyTable, referenceDate)
         val priority = resolvedOrNull(priorityPolicyTable, referenceDate)
+        val provenance = resolvedOrNull(SAMPLE_PROVENANCE_POLICY, referenceDate)
+        // detekt ComplexCondition(≤3) — 네 slot 을 한 `&&` 사슬로 묶지 않고 중첩한다(스마트캐스트
+        // 보존 — 중간 Boolean 변수로 쪼개면 opportunity 등이 다시 nullable 로 보인다).
         return if (opportunity != null && derivation != null && priority != null) {
-            ok(ResolvedPolicies(opportunity.value, opportunity.version, derivation, priority.value))
+            if (provenance != null) {
+                ok(ResolvedPolicies(opportunity.value, opportunity.version, derivation, priority.value, provenance))
+            } else {
+                halt(MlUnavailableReason.ContractViolation)
+            }
         } else {
             halt(MlUnavailableReason.ContractViolation)
         }
@@ -305,12 +319,17 @@ private suspend fun <T, R> Step<T>.andThen(f: suspend (T) -> Step<R>): Step<R> =
         is Step.Halt -> this
     }
 
-/** 세 파일이 공유하는 정책 스냅샷(internal) — 매 `analyze` 호출마다 한 번만 resolve 한다. */
+/**
+ * 세 파일이 공유하는 정책 스냅샷(internal) — 매 `analyze` 호출마다 한 번만 resolve 한다.
+ * `provenancePolicy`는 M4/4B-8(D-4B8-5) — 대상 공고 라벨(`predictionRequestFor`)이 표본
+ * 라벨(`sampleOf`)과 같은 `SAMPLE_PROVENANCE_POLICY` singleton·같은 version을 쓴다.
+ */
 internal data class ResolvedPolicies(
     val opportunity: OpportunityPolicyData,
     val opportunityVersion: PolicyVersion,
     val derivation: Resolution.Resolved<DerivationPolicyData>,
     val priority: PriorityPolicyData,
+    val provenancePolicy: Resolution.Resolved<ProvenancePolicyData>,
 )
 
 private fun <T> resolvedOrNull(

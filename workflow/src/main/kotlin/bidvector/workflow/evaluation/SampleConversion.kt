@@ -83,10 +83,16 @@ internal fun drawNumberSet(observation: DrawNumberObservation): Set<Int>? =
  * 대응으로 확정한다(`bid-vector/app/services/base_amount_basis.py:96-99`의
  * `_BasisContext.budget_estimate` 주석). CLEAN 강제는 하지 않는다 — 라벨만 붙이고
  * 필터링은 엔진(`admit_clean`)이 진다(설계 검토 우회 (5)).
+ *
+ * M4/4B-8(D-4B8-1·2) — `opening`을 `OpeningResult?`로 일반화했다. 표본(`sampleOf`)은
+ * 항상 있는 개찰 결과를 넘기고, 대상 공고(`predictionRequestFor`)는 개찰 전이라 `null`을
+ * 넘긴다 — `winningAmount`·`winningRate`가 그대로 `null`이 되어 `ProvenanceRules.
+ * isDerivedYega`(둘 다 non-null을 요구)가 구조적으로 `false`다. 대상용 별도 함수를 두지
+ * 않는다(같은 분류기 재사용, D-4B8-1 「두 번째 분류기 금지」).
  */
 internal fun provenanceLabelFor(
     notice: Notice,
-    opening: OpeningResult,
+    opening: OpeningResult?,
     original: BaseAmount,
     policy: Resolution.Resolved<ProvenancePolicyData>,
 ): BaseAmountProvenance {
@@ -97,7 +103,8 @@ internal fun provenanceLabelFor(
             ?.won
             ?.let(BigDecimal::valueOf)
     val winningAmount =
-        opening.finalAwardAmount
+        opening
+            ?.finalAwardAmount
             ?.export()
             ?.won
             ?.let(BigDecimal::valueOf)
@@ -106,7 +113,7 @@ internal fun provenanceLabelFor(
             rawBaseAmount = BigDecimal.valueOf(original.export().won),
             budgetEstimate = budgetEstimate,
             winningAmount = winningAmount,
-            winningRate = opening.winningRate,
+            winningRate = opening?.winningRate,
         )
     // 이 slice는 복구 추정치를 계산하지 않는다(3D 소관) — Absent로 그 사실을 정직하게 나른다.
     val recoveryEstimate = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE)
