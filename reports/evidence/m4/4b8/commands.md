@@ -80,3 +80,8 @@ exit 0(BUILD SUCCESSFUL, 355 tasks) — 되돌린 트리가 4B-7 종결 시점�
 - 핵심 결과: BUILD SUCCESSFUL — evidence만 고친 커밋(코드 무변경) 뒤에도 전 모듈 `check`
   그대로 통과. N-5 한계(이 기록 자체를 담는 커밋의 재실측은 다음 라운드로 미룸)는 위와
   같은 성격으로 등재.
+
+## 2026-09-16 종결 커밋 HEAD 재실측 (팀장)
+- cmd: `./gradlew --no-build-cache --no-daemon clean check` (HEAD `b458a3d` — milestone-4 종결 문단·scope `head_sha`·checklist 승인 절)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL, 346 tasks. `origin/main` 은 base `845e29b` 그대로 — 흡수 병합 없음.
