@@ -9,6 +9,7 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/ml/MlCallPolicyData.kt        # 한 줄 — placeholderMlCallPolicy(featureSchemaVersion = "bidvector.ml.v1") → "award-rate-features-v2". KDoc 이 「패키지 식별자」라고 설명하면 그 문장도 갱신
   - adapters/src/test/kotlin/bidvector/adapters/ml/MlCallPolicyDataTest.kt   # 기대값 한 줄 갱신 + 「값이 Python SUPPORTED_FEATURE_SCHEMAS 와 같다」를 잠그는 test 1(값 리터럴은 정책 데이터 한 자리에서만 — test 는 그 상수를 참조)
   - reports/evidence/m4/4d/policy-values.md                                   # §3 행 값 + 근거 문면(「계약 패키지 식별자」→「5B feature schema version, D-5B-1」) + change_history 1행(운영자 결정 2026-09-16 ②) — 4D 문서지만 승인 값의 정본 자리
+  - adapters/src/test/kotlin/bidvector/adapters/ml/RequestMappingTest.kt     # 계약 갱신 (2): 요청 proto 실측 test 1 — 실 정책(`ML_CALL_POLICY`)으로 만든 CalculateOptimalBid 요청의 `feature_schema_version` 이 정책 값과 같다(verifier r1 변이 B: `PredictionEnvelopeMapping` 의 setFeatureSchemaVersion 을 뒤집어도 전건 초록이던 무보호를 닫는다). 기존 case 무편집
   - reports/evidence/m5/5f2/**
 out_of_scope:
   - ml-engine/**                          # Python 은 무편집 — 별칭 수용(b) 은 거부됨
@@ -52,3 +53,5 @@ Kotlin 이 `CalculateOptimalBid` 요청에 싣는 `feature_schema_version` 은 4
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-5F2-1~3 | 운영자 결정 ②(선택지 답변, 종결 판정 §3) |
+| 2026-09-16 구현 중(문면) | `head_sha` placeholder 문면만 구현 레인이 갱신(`c170035`) — 계약 내용 무변경(verifier r1 LOW) | 구현 레인 |
+| 2026-09-16 승인 전 일괄(2) | in_scope 에 `RequestMappingTest.kt` 추가 — **D-5F2-4 신설**: 값이 요청 proto 에 실리는 경로를 test 로 잠근다(`ML_CALL_POLICY` → 요청 `feature_schema_version` 동일; 변이 B 에서 붉어져야 함). 중복 parity test(reviewer MEDIUM·verifier LOW — 기존 앵커 대비 판별력 0)는 삭제하고 그 자리를 이 test 가 대신한다. `ML_CALL_POLICY.source` 라벨의 승인 일자 문면 갱신 · rollback.md 「기계 산출」 목록에 checklist.md 누락 정정(verifier MEDIUM) | verifier r1 ready-for-review(MEDIUM 2·LOW 5) + code-reviewer 머지 가능(MEDIUM 1) — 게이트(test 추가)라 표적 재검증 1회 |
