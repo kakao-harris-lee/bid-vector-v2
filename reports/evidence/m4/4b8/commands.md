@@ -35,18 +35,13 @@ slice와 소스 비중첩이라 Kotlin `check` 전건이 정본이다.
   4B-7 종결 시점 대비 `workflow` +5(대상 라벨 규칙표·변이 test)·`adapters` +1(정규화 일치
   test)·`procurement` +7(`BusinessCategoryTest` 신설).
 
-## 영향 범위 사전 실행(참고 — 위 전건이 정본)
+## 크기 게이트(verifier r1 F-4)
 
-- cmd: `./gradlew --no-daemon --no-build-cache :procurement:test --tests "bidvector.procurement.BusinessCategoryTest" --tests "bidvector.procurement.CanonicalizeTest" :workflow:test --tests "bidvector.workflow.evaluation.PredictionFactsTest" --tests "bidvector.workflow.evaluation.SampleEligibilityTest" --tests "bidvector.workflow.evaluation.OpportunityAnalysisTest"`
-- exit: 0
-- 핵심 결과: 신설·수정 test 전부 통과 — `BusinessCategoryTest` 7 · `CanonicalizeTest` 13 ·
-  `PredictionFactsTest` 10(+5) · `SampleEligibilityTest` 17 · `OpportunityAnalysisTest` 26.
-- cmd: `./gradlew --no-daemon --no-build-cache :adapters:test --tests "bidvector.adapters.ml.JdbcCompetitionSampleSourceTest" --tests "bidvector.adapters.persistence.NoticeFindRoundTripTest" --tests "bidvector.adapters.persistence.NoticeReconstructionTest" --tests "bidvector.adapters.extraction.ExtractionGateTest" --tests "bidvector.adapters.ml.UnavailableMlAnalysisTest" :app:test --tests "bidvector.app.conformance.SharedKernelCorpusConformanceTest"`
-- exit: 0
-- 핵심 결과: `JdbcCompetitionSampleSourceTest` 11(+1, Testcontainers PostgreSQL 실행) ·
-  `NoticeFindRoundTripTest` 1 · `NoticeReconstructionTest` 1 · `ExtractionGateTest` 4 ·
-  `UnavailableMlAnalysisTest` 1 · `SharedKernelCorpusConformanceTest` 86(`KonepsCollectionExecutors`
-  전환 회귀 없음) 전부 통과.
+evidence(430줄) 대 산출물(코드·게이트 303줄)이 1.32배 초과 — 정규화 규칙표(26 입력 대조)·
+대상 라벨 규칙표·(2b) 목록이 산출물(순수 함수 몇 개)보다 큰 소형 slice의 구조적 초과다.
+중복이던 것은 줄였다: 이 절 위에 있던 「영향 범위 사전 실행」(클래스별 부분 test 재실행,
+아래 전건과 수치 중복)을 삭제했다 — 전건이 정본이라는 이 문서의 첫 줄과 실제로도
+일치시킨다. `rollback.md`의 절차·공유 파일 논증도 같은 라운드에서 압축했다.
 
 ## 비밀값 스캔
 

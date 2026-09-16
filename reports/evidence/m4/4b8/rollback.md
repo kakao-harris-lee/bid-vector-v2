@@ -73,32 +73,26 @@ git diff --name-status 845e29b -- $(cat /tmp/4b8-rollback-files.txt)
 ./gradlew --no-build-cache --no-daemon clean check
 ```
 
-## 실측 결과(2026-09-16, 임시 clone `--no-hardlinks`, HEAD `f528bdb`)
+## 실측 결과
 
-| 단계 | 명령 | exit |
-| --- | --- | --- |
-| ① 목록 추출 | 위 명령 | 0(16줄) |
-| ② 역적용 | `xargs git restore --source=845e29b --staged --worktree --` | 0 |
-| ③ 대조 | `git diff --name-status 845e29b -- <목록>` | 0(출력 없음) |
-| ④ compile | 3모듈+app test compile(7 task) | 0(BUILD SUCCESSFUL) |
-| ⑥ 게이트 전건 | `clean check` | 0(BUILD SUCCESSFUL) — commands.md에 세부 |
+| HEAD | 시점 | ①목록 | ②역적용 | ③대조 | ④compile | ⑥`clean check` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `f528bdb` | 구현 GREEN 직후(evidence 없음) | 0(16줄) | 0 | 0(빈 출력) | 0 | 0(BUILD SUCCESSFUL, 355 task) |
+| `2ae102b`(**최신** — verifier r1 F-6, 팀장 장부 처분 뒤) | evidence 5커밋+팀장 문서 정정 뒤 | 0(같은 16줄) | 0 | 0(빈 출력) | 0(37 task) | 0(BUILD SUCCESSFUL, 355 task) |
 
-## 공유 파일
+두 HEAD 모두 같은 in_scope 목록·같은 결과 — evidence 문서·팀장의 장부 정정(capability-map·
+data-dictionary·milestone-4·scope.md, 코드 무변경)이 rollback 절차 자체에 영향을 주지
+않는다. 임시 clone `--no-hardlinks`.
 
-`config/quality/gate-tests.properties`는 여러 slice가 상시 공유하지만, 이 slice의 두
-커밋(`git log --oneline 845e29b..HEAD -- config/quality/gate-tests.properties`)만 그
-파일을 만졌다(추가한 것은 `BusinessCategoryTest` 한 줄 + 설명 주석 한 단락) — base 시점
-이후 다른 브랜치 병합이 이 파일에 아직 반영되지 않은 상태(브랜치 전용, 병합 전)라 hunk
-격리가 필요 없다. **병합 전 상태에서만 유효한 가정이다** — main 병합 뒤 다른 slice의
-등재가 사이에 낀 채로 이 문서의 역적용을 그대로 실행하면 그 slice의 줄도 함께 사라질 수
-있다. 그 시점에는 이 문서의 목록을 2026-09-09/2026-09-16 hunk 격리 규약(커밋 해시별
-`git diff <sha>~1..<sha> | git apply -R`)으로 다시 좁혀야 한다.
+## 공유 파일 · 되돌리지 않는 문서
 
-**되돌리지 않는 공유 승인 문서** — 팀장이 `scope.md`(계약 고정 커밋 `c4ee7e0`)·
-`milestone-4.md`·`docs/discovery/capability-map.md`·`docs/discovery/data-dictionary.md`
-(§6.3.1, `dfaff1a`)를 이 slice 착수 전에 이미 갱신했다. 이 rollback 절차는 그 문서들을
-**되돌리지 않는다**(목록에 없음, in_scope 코드 경로만 대상) — 되돌린 트리에서는 그
-문서들이 여전히 "정규화 정본이 `CategoryCode.of`" 를 서술하는데 코드는 base(정규화 없음)로
-돌아가 있다는 뜻이다. 게이트는 이 어긋남을 잡지 못한다 — rollback을 실행하는 쪽이 그
-문서들도 함께 되돌릴지 별도로 판단해야 한다(4B-7 rollback.md의 같은 판정과 동일한 성격,
-등재로 족한다).
+`config/quality/gate-tests.properties`는 이 slice의 커밋만 만졌다(`BusinessCategoryTest`
+한 줄 + 주석) — 병합 전 브랜치 전용이라 hunk 격리 없이 안전하다. **병합 뒤에는 무효** —
+다른 slice의 등재가 사이에 끼면 2026-09-09/2026-09-16 hunk 격리(`git diff <sha>~1..<sha> |
+git apply -R`)로 다시 좁혀야 한다.
+
+팀장이 갱신한 `scope.md`·`milestone-4.md`·`docs/discovery/{capability-map,data-dictionary}.md`
+는 목록에 없어 되돌리지 않는다 — 되돌린 트리에서는 그 문서들이 "정규화 정본이
+`CategoryCode.of`"를 서술하는데 코드는 base(정규화 없음)로 돌아가 어긋난다. 게이트가 이
+어긋남을 잡지 못하므로 rollback을 실행하는 쪽이 문서도 함께 되돌릴지 별도 판단해야 한다
+(4B-7 rollback.md와 같은 판정, 등재로 족하다).

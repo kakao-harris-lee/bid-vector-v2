@@ -14,7 +14,7 @@
 
 | 결정 | 구현 | test |
 | --- | --- | --- |
-| D-4B8-1 — 대상 라벨 = 표본과 같은 분류기(`ProvenanceRules.judgeRow`), `DerivedYega`는 개찰 부재로 구조적 불가 | `predictionRequestFor`(`PredictionFacts.kt`)가 `provenanceLabelFor(notice, opening = null, resolvedBaseAmount.amount, policies.provenancePolicy)`를 호출 — `BaseAmountProvenance.Unknown` 상수 삭제 | `PredictionFactsTest`「대상 라벨 — 추정가격이 없어 SuspectRatio는 불가하고 기초금액이 정수라 Clean」·「... SuspectRatio」·「... 기초금액이 0이면 ... Unknown」·「predictionRequestFor 라벨은 Unknown 상수가 아니다」 |
+| D-4B8-1 — 대상 라벨 = 표본과 같은 분류기(`ProvenanceRules.judgeRow`). **정정(verifier r1 F-1)**: `DerivedYega`뿐 아니라 `DerivedVat`도 구조적으로 도달 불가 — `BaseAmount.won`이 비음 정수라 `isCleanInteger`는 won>0이면 항상 참이고, production `ruleOrder`(suspect→clean→yega→vat)에서 `CleanInteger`가 둘 다보다 앞이다. 실제 도달 라벨은 `SuspectRatio`·`Clean`·`Unknown` 셋뿐(검증 레인 probe — 명령·수치는 `_workspace/m4-4b8/03_verifier_report.md` 표 #16 「도달 가능 라벨 probe」 참고). 팀장이 `OPEN-4B8-DEAD-DERIVED-RULES`를 capability-map에 신설한다(이 문서는 등재만) | `predictionRequestFor`(`PredictionFacts.kt`)가 `provenanceLabelFor(notice, opening = null, resolvedBaseAmount.amount, policies.provenancePolicy)`를 호출 — `BaseAmountProvenance.Unknown` 상수 삭제 | `PredictionFactsTest`「대상 라벨 — 추정가격이 없어 SuspectRatio는 불가하고 기초금액이 정수라 Clean」·「... SuspectRatio」·「... 기초금액이 0이면 ... Unknown」·「predictionRequestFor 라벨은 Unknown 상수가 아니다」 |
 | D-4B8-2 — `provenanceLabelFor`의 `opening` 인자를 `OpeningResult?`로 일반화(표본은 non-null, 대상은 null) | `SampleConversion.kt` `provenanceLabelFor(notice, opening: OpeningResult?, original, policy)` — `winningAmount`/`winningRate`가 `opening?.` 로 nullable 전파 | `PredictionFactsTest`「대상 라벨 — DerivedYega는 opening이 있어야만 매치한다(변이)」(같은 데이터·같은 정책, `opening` 유무만 바꿔 `DerivedYega` ↔ `Clean` 대조) + 4B-7 `SampleEligibilityTest`(opening 비-null 기존 test 17건 전부 재통과 — `sampleOf` 회귀 없음) |
 | D-4B8-3 — `CategoryCode`는 `private` 생성자(`@ConsistentCopyVisibility`) + `of(raw)` 단일 생성 경로, `normalizeCategoryKey(raw) = trim + 문자 단위 lowercase` | `BusinessCategory.kt` — `CategoryCode.of`, `normalizeCategoryKey` | `BusinessCategoryTest` 7건(strip+lower·이미 정규화됨·빈 문자열 거부·공백만 거부·전각 공백·순수 함수·`of`를 거쳐야 함) |
 | D-4B8-4 — 정규화 적용 자리(수집 canonicalize 쓰기 + persistence 복원 읽기, SQL은 정확 일치 유지) | `Canonicalize.kt` `businessCategoryFrom`이 `CategoryCode.of(code)` · `NoticeReconstruction.kt` `businessCategoryOf`가 `CategoryCode.of(code)`(관용) · `JdbcCompetitionSampleSource`의 `SELECT_COMPETITION_SAMPLE_CANDIDATES` 무변경 | `JdbcCompetitionSampleSourceTest`「공종 코드가 대소문자·공백만 다르면 같은 표본으로 조회된다 — 정규화 일치(D-4B8-4)」(쓰기 `"A01"`·조회 `"  a01 "`로 정규화 후 일치 실증) + 기존 「공종이 다르면 후보에서 빠진다」(정확 일치 유지 회귀 없음) + `git diff`로 `SELECT_COMPETITION_SAMPLE_CANDIDATES` 문자열 무변경 확인(아래 rollback.md 목록 참고 — `JdbcCompetitionSampleSource.kt` 자체는 in_scope 밖) |
@@ -70,15 +70,23 @@
   Locale 미참조)로 구현했다 — 한 글자가 여러 글자로 바뀌는 유니코드 특수 매핑(예: 터키어
   `İ`)은 `String.toLowerCase(Locale.ROOT)`와 바이트 단위로 갈릴 수 있으나, 위와 같은 이유로
   KONEPS 코드에서는 관측되지 않는다.
-- `SampleEligibilityTest`「라벨 — ...」두 test(Clean·SuspectRatio)만 표본 라벨을 재고,
-  `DerivedYega`·`DerivedVat`은 `ProvenanceRulesTest`(1D 커널)가 이미 규칙표 전수를 잰다(4B-7
-  알려진 제한 유지, 4B-8도 같은 이유로 반복하지 않는다) — 단 이 slice는 `DerivedYega`가
-  `provenanceLabelFor`(대상·표본 공통 wiring)를 통해서는 production `ruleOrder`([SuspectRatio,
-  CleanInteger, DerivedYega, DerivedVat])에서 **원화가 항상 정수라 CleanInteger가 먼저
-  매치해 구조적으로 도달 불가**하다는 사실을 새로 확인했다(`PredictionFactsTest`
-  「DerivedYega는 opening이 있어야만 매치한다」KDoc). 이는 4B-8이 새로 만든 제약이 아니라
-  4B-7부터 있던 wiring의 성질이고, D-4B8-1의 「DerivedYega 구조적 불가」 주장을 opening 유무
-  이상으로 더 강하게 만든다.
+- **`DerivedYega`·`DerivedVat` 둘 다 `provenanceLabelFor`를 통해서는 production `ruleOrder`
+  ([SuspectRatio, CleanInteger, DerivedYega, DerivedVat])에서 도달 불가하다(verifier r1
+  F-1 정정 — 구현 레인은 최초 `DerivedYega`만 이 논증을 적었고, 같은 기제가 `DerivedVat`에도
+  그대로 적용된다는 것을 놓쳤다).** 원화가 항상 정수(`BaseAmount.won: Long`, 비음)라
+  `CleanInteger`가 won>0이면 항상 먼저 매치하고, 그 자리가 `ruleOrder`에서 둘 다보다 앞이다
+  — 대상·표본 공통 wiring의 성질이라 4B-8이 새로 만든 제약이 아니다(4B-7부터 있었다).
+  `PredictionFactsTest`「DerivedYega는 opening이 있어야만 매치한다」가 test 전용 정책으로
+  `CleanInteger`의 선매치를 비활성화해 그 매치 자체는 가능함을 증명하지만, production 정책
+  으로는 두 라벨 다 절대 나오지 않는다. `SampleEligibilityTest`가 이 둘을 재지 않는 것은
+  4B-7부터의 결정(`ProvenanceRulesTest`가 커널 층 전수를 이미 잰다)이지 이 slice가 새로
+  만든 공백이 아니다. 하류 귀결은 `OPEN-4B8-DEAD-DERIVED-RULES`(팀장 신설)로 등재.
+- **복원 경로 정규화(D-4B8-4 「관용」)를 잡는 test가 없다(verifier r1 F-3, LOW)** —
+  `NoticeReconstruction.businessCategoryOf`의 `CategoryCode.of`를 정규화 없는 팩토리로
+  바꿔도 `adapters` test suite가 초록이다. 오늘은 구조적으로 관측 불가하다 — 쓰기 경로
+  (`Canonicalize.kt`)가 이미 정규화된 값만 저장하므로 저장된 행은 항상 정규화 형태이고,
+  그 위에서 읽기 쪽 정규화는 항등이다. 이 축은 `OPEN-4B8-CATEGORY-BACKFILL`이 실제
+  비정규화 행(SQL 직접 심기 등)을 다룰 때 함께 고정 대상이다.
 
 ## Codex 범위
 
