@@ -249,6 +249,44 @@ def test_step3b_exact_release_mismatch_is_unsupported_release() -> None:
     assert response.failure.detail_code == "RELEASE_MISMATCH"
 
 
+def test_step3b_exact_release_same_id_different_checksum_is_unsupported_release() -> (
+    None
+):
+    """verifier r1 M-4 — D-5E2-9 는 「id·checksum 둘 다 같아야 통과」다. 기존
+    `..._mismatch...` test 는 둘 다 틀린 값을 썼다 — 재야 할 case 는 한쪽만 같은
+    부분 불일치다."""
+    runtime = _runtime()
+    servicer = _servicer(runtime=runtime)
+    request = _valid_calc_request()
+    request.envelope.model_release_selector.exact_release.release_id = (
+        runtime.release.release_id
+    )
+    request.envelope.model_release_selector.exact_release.artifact_checksum = (
+        "sha256:" + "1" * 64
+    )
+    response = servicer.CalculateOptimalBid(request, _ActiveContext())
+    assert response.WhichOneof("result") == "failure"
+    assert response.failure.code == error_pb2.FAILURE_CODE_UNSUPPORTED_RELEASE
+    assert response.failure.detail_code == "RELEASE_MISMATCH"
+
+
+def test_step3b_exact_release_same_checksum_different_id_is_unsupported_release() -> (
+    None
+):
+    """verifier r1 M-4 — 반대 방향 부분 불일치(checksum 만 같음)."""
+    runtime = _runtime()
+    servicer = _servicer(runtime=runtime)
+    request = _valid_calc_request()
+    request.envelope.model_release_selector.exact_release.release_id = "wrong-id"
+    request.envelope.model_release_selector.exact_release.artifact_checksum = (
+        runtime.release.artifact_checksum
+    )
+    response = servicer.CalculateOptimalBid(request, _ActiveContext())
+    assert response.WhichOneof("result") == "failure"
+    assert response.failure.code == error_pb2.FAILURE_CODE_UNSUPPORTED_RELEASE
+    assert response.failure.detail_code == "RELEASE_MISMATCH"
+
+
 def test_step3b_exact_release_matching_current_release_passes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
