@@ -72,7 +72,16 @@ class MappingRejected:
 def _format_fraction(value: Decimal) -> str:
     """D-5E2-5 — decimal 정규형(`format(d, "f")`, 지수 표기 없음·scale 보존). 호출 전
     `value.is_finite()`를 확인하는 것은 호출부(`_check_invariants`) 책임이다 — 이 함수는
-    유한값만 받는다고 가정한다(비유한 값은 매핑 불변식 위반으로 그 전에 걸러진다)."""
+    유한값만 받는다고 가정한다(비유한 값은 매핑 불변식 위반으로 그 전에 걸러진다).
+
+    code-reviewer MEDIUM(R-M1) — 음수 0(`Decimal("-0.0000")`)은 값이 아니라 **부호
+    표현**만의 차이다(수학적으로 0). `format`은 부호를 보존해 `"-0.0000"`을 내지만
+    `BigDecimal`에는 음수 0 개념이 없어 `toPlainString()`이 `"0.0000"`을 낸다 —
+    Kotlin `FractionRules.isNormalizedFraction`의 왕복 검사가 이 문자열을 거부한다.
+    `abs()`로 부호만 지운다(scale·정밀도는 그대로 — 값을 바꾸지 않는다, `Decimal("-0.0000")
+    == Decimal("0.0000")`)."""
+    if value.is_zero():
+        value = abs(value)
     return format(value, "f")
 
 

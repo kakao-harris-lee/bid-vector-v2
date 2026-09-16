@@ -103,7 +103,13 @@ class _ActiveContext:
 
 
 def _is_normalized_fraction(value: str) -> bool:
-    """`FractionRules.kt::isNormalizedFraction` 미러."""
+    """`FractionRules.kt::isNormalizedFraction` 미러.
+
+    code-reviewer MEDIUM/verifier r1 L-1 — Kotlin `BigDecimal`에는 음수 0 개념이
+    없어 `BigDecimal("-0").toPlainString() == "0"`(부호가 사라진다) — 왕복 검사가
+    `"-0"`·`"-0.00"` 을 거부한다. Python `Decimal`은 부호를 보존해(`format(Decimal
+    ("-0"), "f") == "-0"`) 왕복 자기동일성만으로는 이 값을 잘못 수용한다 — 명시
+    검사로 막는다."""
     if not value or any(char in ("e", "E") for char in value):
         return False
     try:
@@ -111,6 +117,8 @@ def _is_normalized_fraction(value: str) -> bool:
     except InvalidOperation:
         return False
     if not parsed.is_finite():
+        return False
+    if parsed.is_zero() and parsed.is_signed():
         return False
     return format(parsed, "f") == value
 
@@ -251,6 +259,14 @@ def test_real_response_is_success() -> None:
     servicer, _runtime = _servicer_and_runtime()
     response = servicer.CalculateOptimalBid(_success_request(), _ActiveContext())
     assert response.WhichOneof("result") == "success"
+
+
+@pytest.mark.parametrize("value", ["-0", "-0.0000"])
+def test_fraction_rules_reject_negative_zero(value: str) -> None:
+    """code-reviewer MEDIUM(R-M1)/verifier r1 L-1 — `BigDecimal`은 음수 0 이 없어
+    `toPlainString()`이 부호를 지운다. 이 미러가 이전에는 `format(Decimal(...), "f")`
+    왕복 자기동일성만으로 `"-0"` 류를 잘못 수용했었다."""
+    assert not _is_normalized_fraction(value)
 
 
 def test_fraction_rules_accept_all_decimal_fields() -> None:

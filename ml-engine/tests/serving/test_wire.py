@@ -209,3 +209,11 @@ def test_format_fraction_round_trips_kotlin_normalized_forms(value: str) -> None
     """D-5E2-5 — Kotlin `FractionRules.isNormalizedFraction`가 받아들이는 형태와
     `format(d, "f")`가 낸 형태가 같음을 왕복으로 확인한다(exponent 없음, scale 보존)."""
     assert _format_fraction(Decimal(value)) == value
+
+
+@pytest.mark.parametrize("value", ["-0", "-0.0000", "-0.00"])
+def test_format_fraction_normalizes_negative_zero(value: str) -> None:
+    """code-reviewer MEDIUM(R-M1)/verifier r1 L-1 — `BigDecimal`에는 음수 0 개념이
+    없어 `toPlainString()`이 부호를 지운다. `_format_fraction`도 부호만 지워
+    (scale·값은 불변) Kotlin 과 같은 형태를 낸다."""
+    assert _format_fraction(Decimal(value)) == value.lstrip("-")
