@@ -1019,6 +1019,17 @@ DEC-04 acceptance 문면 그대로다. 정책 데이터 `FloorShortfallPolicyDat
 앞이며 그 이유가 코드에 선언돼 있다. **순서를 정책 데이터로 선언하고 테스트와 정책
 version으로 고정한다**(`v2-지침서.md` §4.3).
 
+> **귀결 — `DerivedYega`·`DerivedVat` 는 V2 에서 도달 불가다(M4/4B-8 실측, `OPEN-4B8-DEAD-DERIVED-RULES` 닫힘 2026-09-16).**
+> 위 ①로 커널 입력은 항상 원화 정수(`BaseAmount.won`)이고, `CleanInteger` 는 양수 정수에서 항상 참이며 first-match 순서에서
+> yega·vat 둘 다보다 앞이다 — 그래서 실제 라벨은 `SuspectRatio`·`Clean`·`Unknown`(양수 아님) 셋이다(verifier probe 20만 행,
+> `reports/evidence/m4/4b8/checklist.md`). **legacy 도 같았다** — 정수값 float 는 `clean-integer` 가 먼저 매치했고, yega·vat 는
+> **소수부가 있는 raw 금액**(파생 흔적)에서만 매치했다. V2 는 그 소수부 금액을 ①로 경계에서 거부하므로 두 규칙이 맡던 사례는
+> 라벨이 아니라 **거부**(`AmountNotRepresentable`)로 나타난다. 이것은 결정 27 의 귀결이지 새 결함이 아니다 — 승인 라벨 다섯과 wire
+> `BaseAmountProvenanceLabel` 5값, Python `admit_clean` 의 `DERIVED_*` 제외 갈래는 **다른 송신자·과거 데이터를 위한 계약 처리**로
+> 유지한다(Kotlin 송신자가 지금 내지 않을 뿐). **yega 규칙을 정수 판정 앞으로 옮기는 것**(정수로 반올림된 파생 기초금액을 잡으려는
+> 재설계)은 legacy 근거가 없고 `base-amount-provenance-003`(정수 → `Clean`) 기대값을 바꾸므로 운영 데이터의 실측 없이는 열지
+> 않는다 — `DerivedVat` 는 정수 raw 에서 「raw×1.1 이 정수」가 10의 배수 전부에 참이라 재정렬하면 오탐이 된다(재정렬 불가).
+
 > **규칙**: **원본 값을 조용히 교정하지 않는다.** 원본 · 판정 · 근거 · 정책 version을 함께
 > 보존한다. 복구 추정치는 **별도 필드**이며 원본 필드에 기록되지 않는다.
 
