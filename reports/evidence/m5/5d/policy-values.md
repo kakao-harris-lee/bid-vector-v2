@@ -10,7 +10,7 @@
 | `scenario.z` | `1.2816` | `app/ai/predictors/scenario_spec.py` `SCENARIO_INTERVAL_Z` |
 | `scenario.conservative.weight` / `scenario.base.weight` / `scenario.aggressive.weight` | `0.24` / `0.52` / `0.24` | `CANDIDATE_SCENARIOS`(합 1 불변식) |
 | `scenario.conservative.z_sign` / `scenario.base.z_sign` / `scenario.aggressive.z_sign` | `-1` / `0` / `1` | 같은 곳 |
-| `scenario.clamp_min` / `scenario.clamp_max` | `0.7` / `1.4` | `app/ai/predictors/historical/statistics.py` `clamp_bid_rate` |
+| `scenario.clamp_min` / `scenario.clamp_max` | `0.7` / `1.0` | `app/ai/predictors/historical/statistics.py` `clamp_bid_rate`(`clamp_max` 는 legacy 값 `1.4`가 아니다 — 5F-1 갱신, 아래 change_history) |
 | `scenario.bid_rate_digits` | `4` | `_BID_RATE_DIGITS` |
 | `assessment.agency_prior_strength` / `assessment.category_prior_strength` | `12.0` / `40.0` | `app/domain/assessment_shrinkage.py:45-46` — **사정률 축**(5B 낙찰률 축 κ 와 별도 선언, 재사용 금지) |
 | `assessment.min_predictive_std` | `0.002` | `MIN_PREDICTIVE_STD` |
@@ -30,3 +30,4 @@
 | 일자 | 변경 | 근거 |
 | --- | --- | --- |
 | 2026-09-12 착수 | 표 등재·승인 | 운영자 「승인」(D-5D-8 legacy 값) |
+| 2026-09-16 (5F-1) | `scenario.clamp_max` `1.4` → `1.0` | 운영자 결정 ①(`OPEN-5E2-CANDIDATE-RATE-UPPER` (a) 채택·종결) — 계약 응답 후보율 축은 ≤ 1(D-2B-8·D-2F-4)인데 legacy clamp 상한(1.4)이 1 을 넘어 5E-2 wire 층이 적법한 입력도 `MappingRejected`로 거부했다. 이 값은 더 이상 legacy-behavior 그대로가 아니다(legacy `1.4`는 위 표 각주로 보존). 산식·다른 값 무변경 |

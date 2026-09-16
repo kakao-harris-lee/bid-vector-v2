@@ -1,7 +1,8 @@
-# M5/5D 정책 값 — 정본 `reports/evidence/m5/5d/policy-values.md`(사용자 승인 2026-09-12).
-# 값을 바꾸려면 그 문서 → 이 파일 → test 순으로 갱신한다(load_inference_policy 가
-# known_keys 전수·값 불변식으로 대조하고, tests/inference/test_policy.py 가 이 표와
-# 대조한다). 전부 legacy-behavior(ed4b06c) — 5D 가 지어낸 수치 없음.
+# M5/5D 정책 값 — 정본 `reports/evidence/m5/5d/policy-values.md`(사용자 승인 2026-09-12,
+# 값 둘 갱신 2026-09-16(5F-1)). 값을 바꾸려면 그 문서 → 이 파일 → test 순으로 갱신한다
+# (load_inference_policy 가 known_keys 전수·값 불변식으로 대조하고,
+# tests/inference/test_policy.py 가 이 표와 대조한다). 전부 legacy-behavior(ed4b06c) —
+# 5D 가 지어낸 수치 없음(단, clamp_max·agency_sample_threshold 는 5F-1 갱신·신설 — 아래 참고).
 version: inference-v1
 
 scenario.z: 1.2816
@@ -12,7 +13,11 @@ scenario.conservative.z_sign: -1
 scenario.base.z_sign: 0
 scenario.aggressive.z_sign: 1
 scenario.clamp_min: 0.7
-scenario.clamp_max: 1.4
+# 5F-1(2026-09-16, 운영자 결정 ①) — 1.4 → 1.0. 계약 응답 후보율 축은 ≤ 1(D-2B-8·
+# D-2F-4)인데 clamp 상한이 1 을 넘으면 5E-2 wire 층이 적법한 입력도 MappingRejected
+# 로 거부한다(`OPEN-5E2-CANDIDATE-RATE-UPPER` (a) 채택, 종결). 산식 무변경, fail-closed
+# 는 그대로(정책이 다시 1 을 넘으면 여전히 거부된다).
+scenario.clamp_max: 1.0
 scenario.bid_rate_digits: 4
 
 assessment.agency_prior_strength: 12.0
@@ -21,6 +26,10 @@ assessment.min_predictive_std: 0.002
 assessment.min_samples_for_variance: 2
 assessment.plausible_min: 0.8
 assessment.plausible_max: 1.2
+# 5F-1(2026-09-16, 운영자 결정 ③) — 잠정값. legacy 대응 상수가 없어(`OPEN-5D2-
+# POLICY-VALUES`) golden synthetic 10(`ml-kernel-011`)을 옮겼다. 실 코퍼스 재학습
+# 지표가 나오면 재승인한다(`reports/evidence/m5/5d2/policy-values.md`).
+assessment.agency_sample_threshold: 10
 
 reserve.draw_count: 4
 reserve.expected_price_count: 15

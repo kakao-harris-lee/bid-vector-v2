@@ -57,8 +57,9 @@ def test_shipped_policy_file_loads_with_lowered_clamp_and_agency_sample_threshol
 def test_shipped_values_with_agency_sample_threshold_declared_load_successfully(
     tmp_path: Path,
 ) -> None:
-    """출하 값 스물셋 + synthetic `agency_sample_threshold` 하나가 전부 올바르게
-    타입 변환·불변식 통과되는지 — 이 키 신설이 기존 스물세 값의 로드를 깨지 않는다."""
+    """출하 값(5F-1 갱신 이후 clamp_max 1.0·agency_sample_threshold 10 포함) 위에
+    `_base_values()`가 `agency_sample_threshold`만 synthetic `1`로 덮어써 격리한
+    스물넷 전부가 올바르게 타입 변환·불변식 통과되는지."""
     policy = load_inference_policy(_write(tmp_path, _base_values()))
     assert isinstance(policy, InferencePolicy)
     assert policy.version == "inference-v1"
@@ -70,7 +71,7 @@ def test_shipped_values_with_agency_sample_threshold_declared_load_successfully(
     )
     assert policy.scenario_z_signs == (-1, 0, 1)
     assert policy.scenario_clamp_min == Decimal("0.7")
-    assert policy.scenario_clamp_max == Decimal("1.4")
+    assert policy.scenario_clamp_max == Decimal("1.0")
     assert policy.scenario_bid_rate_digits == 4
     assert policy.assessment_agency_prior_strength == Decimal("12.0")
     assert policy.assessment_category_prior_strength == Decimal("40.0")
@@ -226,9 +227,9 @@ def test_clamp_min_quantizes_to_zero_is_rejected_digits_4(tmp_path: Path) -> Non
 
 def test_shipped_clamp_min_survives_quantize_check(tmp_path: Path) -> None:
     """출하 정책(clamp_min 0.7, digits 4)은 F-1 불변식에 영향받지 않는다 — 회귀 없음.
-    `_base_values()`를 거쳐 로드한다(M5/5D-2 — 출하 파일 자체는 `agency_sample_threshold`
-    미선언으로 이제 항상 거부되므로, `agency_sample_threshold` 를 제외한 다른 값의 회귀
-    여부는 synthetic 주입 경로로 확인한다)."""
+    `_base_values()`를 거쳐 로드한다(`agency_sample_threshold`를 synthetic 값으로
+    격리해, 그 키를 제외한 다른 값의 회귀 여부를 확인하는 이 test 파일의 관례를
+    따른다)."""
     policy = load_inference_policy(_write(tmp_path, _base_values()))
     assert isinstance(policy, InferencePolicy)
     assert policy.scenario_clamp_min == Decimal("0.7")
