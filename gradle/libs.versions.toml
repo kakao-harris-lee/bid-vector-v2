@@ -88,6 +88,12 @@ testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgr
 # 이 모듈도 `testcontainers-` 접두로 이름을 바꿨다(실측 — `org.testcontainers:junit-jupiter`는
 # 이 BOM 아래서 해석되지 않는다, 위 `testcontainers-postgresql` 좌표 개명과 같은 축).
 testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+# M6/6C — `RealServerIntegrationTest`가 `GenericContainer`로 `bidvector/ml-serving:local`
+# 이미지를 띄운다(postgres 전용 모듈이 아니라 임의 이미지). 이 core 모듈은 2.x 에서도
+# **접두 없이** `org.testcontainers:testcontainers`다(2026-09-16 실측 —
+# testcontainers-bom:2.0.5 의 POM 을 직접 확인, `testcontainers-postgresql`과 달리 개명되지
+# 않았다). 버전은 Boot BOM 이 관리한다(위 postgresql 모듈과 같은 축).
+testcontainers-core = { module = "org.testcontainers:testcontainers" }
 # M3/3D — D-3D-1 (a) JDBC 직접 접근(HikariCP 없음, `PGSimpleDataSource`). 버전은 Boot BOM 관리.
 postgresql-driver = { module = "org.postgresql:postgresql" }
 

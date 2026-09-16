@@ -1,0 +1,74 @@
+# M6/6C — 로컬 환경(scope.md ②, D-6C-2). ml-serving + postgres 둘만 — broker 는
+# 소비자 코드가 없어 세우지 않는다(milestone-6.md 「필요한 경우에만」).
+#
+# 자격증명은 파일에 리터럴로 두지 않는다((2b) 표 「경계로 처리」) — `${VAR:?message}`는
+# 호스트/CI 환경에 값이 없으면 `docker compose up`이 그 자리에서 실패한다(기본값 없음,
+# D-6C-7 과 같은 규율). 로컬 실행자는 셸에서 내보내거나 `docker compose --env-file`로
+# 넘긴다 — 이 파일도 `.env`도 값을 갖지 않는다.
+services:
+  ml-serving:
+    build:
+      context: ..
+      dockerfile: docker/ml-serving.Dockerfile
+    image: bidvector/ml-serving:local
+    environment:
+      # 정책 파일은 이미지에 복사된 저장소 사본이다(D-6C-7) — 경로만 env 로 준다.
+      ML_ENGINE_BIND: "0.0.0.0:50051"
+      ML_ENGINE_INFERENCE_POLICY: /app/policy/inference-v1.yaml
+      ML_ENGINE_TRAINING_POLICY: /app/policy/training-v1.yaml
+      ML_ENGINE_EVALUATION_POLICY: /app/policy/evaluation-v1.yaml
+      ML_ENGINE_SERVING_POLICY: /app/policy/serving-v1.yaml
+      ML_ENGINE_ARTIFACT_OUT_DIR: /app/artifacts
+      ML_ENGINE_CODE_VERSION: "6c-local"
+    # R2-3(D-6C-10 ③) — 위생 게이트와 같은 능력 차단. setuid/setgid 상승이 구성상
+    # 불가능해진다 — 점 표집(프로브·게이트)에 기대지 않고 로컬 환경도 같은 보장을 받는다.
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "50051:50051"
+    healthcheck:
+      # compose 의 healthcheck 는 하나뿐이다 — **readiness**(정책 넷 preload 성공)를
+      # 건다. `docker compose ps`의 healthy 는 "요청을 받아도 되는가"를 뜻해야 하고,
+      # 그 축은 liveness 가 아니라 readiness 다(scope.md ③, 설계 검토 구현순서 4 —
+      # "ml-serving 이 healthy 로 수렴함을 실측(출하 정책 그대로 READY)"). liveness
+      # 프로브는 이 이미지 안에 여전히 존재하고(`/app/probe/liveness.py`) 표준
+      # orchestrator 배선(k8s livenessProbe 등)이 생기는 6A/6D 에서 그 자리에 쓴다
+      # (D-6C-3 — 이 slice 는 프로브 둘을 분리해 두는 것까지다).
+      test: ["CMD", "python", "/app/probe/readiness.py"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+
+  postgres:
+    # 6B(Flyway 스키마·backup/restore)가 쓸 자리 — 6C 는 기동·연결까지만(D-6C-2).
+    # 다이제스트 고정, adapters 의 Testcontainers 대역과 같은 버전(16.4,
+    # PersistenceTestSupport.kt) — 두 대역이 다른 postgres 버전으로 갈라지지 않는다.
+    image: postgres:16.4@sha256:e62fbf9d3e2b49816a32c400ed2dba83e3b361e6833e624024309c35d334b412
+    environment:
+      POSTGRES_USER: ${BIDVECTOR_PG_USER:?BIDVECTOR_PG_USER 환경변수가 필요합니다 — 로컬 셸에서 내보내거나 --env-file 로 넘긴다}
+      POSTGRES_PASSWORD: ${BIDVECTOR_PG_PASSWORD:?BIDVECTOR_PG_PASSWORD 환경변수가 필요합니다}
+      POSTGRES_DB: ${BIDVECTOR_PG_DB:?BIDVECTOR_PG_DB 환경변수가 필요합니다}
+    # R3-2(verifier r3 LOW) — ml-serving 과 같은 능력 차단. 공식 postgres 이미지가 이
+    # 옵션 아래 정상 기동·`pg_isready`함을 실측 확인(무해) — 판정이 실행 플래그
+    # 조건부라는 지적의 남은 두 미적용 경로 중 하나를 닫는다(나머지 하나는
+    # RealServerIntegrationTest 의 Testcontainers 컨테이너, checklist.md 알려진 제한).
+    security_opt:
+      - no-new-privileges:true
+    # host 포트를 publish 하지 않는다 — 이 컨테이너의 소비자(6B·`RealServerIntegrationTest`
+    # 의 ml-serving 대역)는 compose 네트워크 안 서비스 이름(`postgres:5432`)이나
+    # Testcontainers 가 각자 관리하는 별도 컨테이너를 쓴다. 로컬 머신의 5432 는 다른
+    # 프로젝트가 이미 점유하고 있을 수 있어(2026-09-16 이 개발 환경에서 실측 충돌)
+    # host bind 를 강제하지 않는다 — 필요하면 실행자가 `docker compose ... --
+    # publish 5432:5432` 상당을 직접 얹는다.
+    volumes:
+      - bidvector-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  bidvector-pg-data:

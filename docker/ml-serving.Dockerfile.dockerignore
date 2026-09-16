@@ -1,0 +1,24 @@
+# scope.md 위협 모델 (f) — 빌드 컨텍스트가 학습 산출물·리뷰 노트·심볼릭 링크를 담지 않는다.
+# 정본 COPY 는 contracts/proto·ml-engine/{pyproject.toml,uv.lock,setup.py,.python-version,tools,src,policy}
+# 뿐이라 그 밖은 컨텍스트에 실릴 필요가 없다 — 명시 제외로 전송량과 캐시 무효화 표면을 줄인다.
+.venv
+**/.venv
+build
+**/build
+.gradle
+**/.gradle
+reports
+_workspace
+bid-vector
+.git
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.idea
+*.iml
+ml-engine/tests
+ml-engine/.pytest_cache
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+node_modules
