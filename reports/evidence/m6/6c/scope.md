@@ -24,7 +24,7 @@ out_of_scope:
   - 표준 `grpc.health.v1` Health 서비스    # 오케스트레이터 소비자가 아직 없다. 프로브 둘로 분리 의미를 세우고, 표준 서비스 채택은 6A/6D 결정 — D-6C-3
   - 임베딩 모델 실물(`OPEN-5E-EMBEDDING-MODEL`)  # 모델 선택·가중치 배포·이미지 크기는 컨테이너 축과 독립이고 승인된 모델 입력이 없다 — 6C 는 이 OPEN 을 닫지 않는다(D-6C-6)
   - ml-engine/src/**                       # M5 종결 산출물 무편집. 컨테이너는 있는 서버를 포장할 뿐 서버를 고치지 않는다
-  - SBOM·CVE 스캔의 외부 서비스 연동        # 네트워크·계정이 필요한 축. 6C 는 고정 태그·금지 패키지·non-root 까지, 취약점 스캔 도구 채택은 6E 운영 축 — D-6C-5
+  - SBOM·취약점 스캔의 외부 서비스 연동        # 네트워크·계정이 필요한 축. 6C 는 고정 태그·금지 패키지·non-root 까지, 취약점 스캔 도구 채택은 6E 운영 축 — D-6C-5
   - Flyway 전체 재현·backup/restore         # 6B 소관(compose 의 postgres 는 6B 가 쓸 자리를 만드는 것까지)
   - 운영 배포·레지스트리 push·실 외부 호출   # milestone-6 「완료 후 별도 승인 사항」
 acceptance_commands:
@@ -84,8 +84,8 @@ CI step 으로 건다. 「상시 붉은 게이트도, 안 돌린 게이트도 �
 ## 위협 모델 — 6C 고유 경계
 
 **방어한다**: (a) 서빙 런타임에 DB driver·ORM·학습 의존이 들어오지 않는다(이미지 층 실측) (b) 컨테이너가
-root 로 돌지 않는다 (c) 버전이 떠 있지 않다(`:latest`·미고정 0) (d) secret 이 이미지·compose 파일에 박히지
-않는다(env/secret store 주입만, 값은 파일에 없다) (e) readiness 가 정책 로드 실패를 덮지 않는다(gate 실물) (f)
+root 로 돌지 않는다 (c) 버전이 떠 있지 않다(`:latest`·미고정 0) (d) 자격증명이 이미지·compose 파일에 박히지
+않는다(환경변수·자격증명 저장소 주입만, 값은 파일에 없다) (e) readiness 가 정책 로드 실패를 덮지 않는다(gate 실물) (f)
 빌드 컨텍스트가 `bid-vector` symlink·`.venv`·`reports` 를 담지 않는다.
 **방어하지 않는다**: 이미지 취약점(CVE)·SBOM — D-6C-5 · 레지스트리·배포·서명 · 멀티아키(arm/amd) 빌드 ·
 오케스트레이터(k8s) manifest · 표준 health 프로토콜 — D-6C-3 · 임베딩 모델 — D-6C-6 · Kotlin 런타임 이미지 — D-6C-1.
@@ -105,7 +105,7 @@ root 로 돌지 않는다 (c) 버전이 떠 있지 않다(`:latest`·미고정 0
 
 | 표면 | 허락하는 것 | 판정 |
 | --- | --- | --- |
-| `docker/compose.yaml` 의 postgres 자격증명 | 로컬 환경 접속 | **경계로 처리** — 값은 개발용 고정값이 아니라 env 참조(기본값 없음), compose 파일에 secret 리터럴 0 을 게이트로 실측 |
+| `docker/compose.yaml` 의 postgres 자격증명 | 로컬 환경 접속 | **경계로 처리** — 값은 개발용 고정값이 아니라 env 참조(기본값 없음), compose 파일에 자격증명 리터럴 0 을 게이트로 실측 |
 | readiness/liveness 프로브 스크립트 | 서버 상태 조회 | 닫는다 — 조회 전용 RPC 둘만 호출, 쓰기 RPC 를 부르지 않음(스크립트 전수) |
 | `RealServerIntegrationTest` 의 gateway 생성 | 실 서버 호출 | **경계로 처리** — test 소스셋 한정(`src/test`), 태그로 기본 실행에서 분리. production 표면 증가 0 을 AST/시그니처로 확인 |
 | `one-command-check.sh` | 전건 실행 | 닫는다 — CI 명령 그대로이고 새 플래그·축약을 만들지 않음 |
