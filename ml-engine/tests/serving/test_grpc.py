@@ -82,7 +82,7 @@ def _build_real_servicers(
         idempotency_key_max_chars=256,
     )
     return Servicers(
-        prediction=BidPredictionServicer(gate, ("v2",)),
+        prediction=BidPredictionServicer(gate, ("v2",), None),
         embedding=EmbeddingServicer(gate, text_max_chars=1000),
         training_job=training_job_servicer,
     )
