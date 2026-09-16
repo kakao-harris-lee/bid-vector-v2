@@ -13,7 +13,7 @@ in_scope:
   - docker/.dockerignore                            # 빌드 컨텍스트에서 .venv·build·reports·_workspace·bid-vector symlink 제외
   - tools/one-command-check.sh                      # 완료 조건 1 — 새 checkout 에서 Kotlin check + Python 전건을 한 명령으로(내부는 CI job 명령 그대로)
   - tools/image-hygiene-check.sh                    # non-root·고정 태그·금지 패키지 부재·크기 상한을 만든 이미지에 대해 실측(6C 게이트)
-  - adapters/src/test/kotlin/bidvector/adapters/ml/RealServerIntegrationTest.kt   # OPEN-5E2-CROSSLANG-REAL-SERVER — 컨테이너의 실 Python 서버에 실 Kotlin gateway 로 붙는다(태그로 분리, 기본 check 에서 제외)
+  - adapters/src/test/kotlin/bidvector/adapters/contract/RealServerIntegrationTest.kt   # OPEN-5E2-CROSSLANG-REAL-SERVER — 컨테이너의 실 Python 서버에 실 Kotlin gateway 로 붙는다(조건부 실행, 기본 check 에서 skip). **패키지는 `adapters.contract`**(계약 갱신 (2), D-6C-8) — 같은 축의 기존 전례 `CrossLangSmokeTest` 와 한자리
   - gradle/libs.versions.toml                       # 위 test 가 컨테이너를 띄우는 데 필요한 의존(Testcontainers) 추가만
   - adapters/build.gradle.kts                       # 같은 test 의 의존·태그 배선만
   - .github/workflows/ci.yml                        # 이미지 빌드·위생 게이트·실 서버 통합 test step 추가(기존 두 job 의 명령 무편집)
@@ -79,6 +79,7 @@ CI step 으로 건다. 「상시 붉은 게이트도, 안 돌린 게이트도 �
 | **D-6C-4** | 실 서버 통합 test 는 **태그로 분리**하고 기본 `check` 에 넣지 않되 **CI 에서는 돈다** | Docker 를 요구하는 test 가 기본 `check` 에 들어가면 Docker 없는 환경에서 상시 붉어진다. CI step 으로 걸어 「안 돌린 게이트」가 되지 않게 한다 |
 | **D-6C-5** | SBOM·CVE 스캔 도구 채택은 **6E**, 6C 는 고정 태그·금지 패키지·non-root·크기까지 | 스캔은 외부 서비스·계정·정책(무엇을 차단하는가)이 필요한 운영 축이다. 6C 에서 흉내만 낸 스캔은 상시 초록 게이트가 된다 |
 | **D-6C-6** | `OPEN-5E-EMBEDDING-MODEL` 은 6C 가 **닫지 않는다** | 모델 선택·가중치 배포는 승인된 입력이 없고 컨테이너 축과 독립이다. 6C 종결 보고에서 운영자에게 처분(별 slice / M6 뒤)을 묻는다 |
+| **D-6C-8** (계약 갱신 (2), 구현 레인 정지·보고) | 실 서버 통합 test 는 `bidvector.adapters.contract` 에 둔다 — **게이트 술어를 건드리지 않는다**. `adapters.ml` 안에서는 기존 게이트 둘(디렉터리 전수 등재 요구 · 등재된 게이트 test 의 skip 0 요구)이 **환경 조건부 test 에 대해 동시에 만족 불가**다(등재하면 skip 위반, 빼면 등재 위반). 채택하지 않은 안: ⓐ 게이트에 「조건부 허용」 키 신설 · ⓑ 등재 요구 예외 목록 — 둘 다 **어떤 test 든 자기를 조건부로 선언해 영원히 안 돌 수 있는 문**을 만든다(오탐을 닫으려다 미탐을 여는 방향, 하네스 2026-09-04 게이트 술어 예외 조항). 채택안은 같은 축의 기존 전례와 동일 — `CrossLangSmokeTest`(교차 언어 스모크)가 이미 `adapters.contract` 에 있고 이 test 는 그 컨테이너 판이다. 잔여는 `OPEN-6C-CONDITIONAL-GATE-TEST` | 구현 레인 실측: `MlGateRegistrationTest` 는 `src/test/kotlin/bidvector/adapters/ml` 디렉터리의 `*Test.kt` 전수를 `gate.tests.adapters` 등재와 대조하고, `GateExecutionGateTask` 는 등재된 클래스의 skip 0 을 요구한다 |
 | **D-6C-7** | 이미지 안 정책 파일은 **저장소의 것을 복사**하고 런타임 경로를 env 로 지정한다(기본값 없음, 5E-1 D-5E-7 계승) | 정책 값의 정본은 저장소이고 이미지가 두 번째 자리가 되면 안 된다 — 이미지 빌드 시점의 정책 checksum 을 evidence 에 남긴다 |
 
 ## 위협 모델 — 6C 고유 경계
@@ -122,6 +123,7 @@ root 로 돌지 않는다 (c) 버전이 떠 있지 않다(`:latest`·미고정 0
 | `OPEN-5E-EMBEDDING-MODEL`(M5 이월) | **유지** — D-6C-6, 6C 밖. 종결 보고에서 운영자 처분을 묻는다 |
 | `OPEN-5E-JOB-PERSISTENCE`·`OPEN-5E-JOB-QUEUE-BOUND`(M5 이월) | **6B** — 이 slice 밖(compose 의 postgres 가 그 자리를 만든다) |
 | `OPEN-6C-IMAGE-VULN-SCAN`(신설) | SBOM·CVE 스캔 도구·차단 정책 — D-6C-5, 6E |
+| `OPEN-6C-CONDITIONAL-GATE-TEST`(신설) | `adapters.ml` 안에 **환경 조건부 test 가 필요해지면** 기존 게이트 둘이 동시 만족 불가다(D-6C-8). 지금은 패키지 분리로 피했고, 그 자리가 실제로 생기면 게이트 술어 개정을 **설계 검토**로 받는다(조건부 허용 목록을 그냥 두면 미탐 문이다) |
 | `OPEN-6C-MULTIARCH`(신설) | arm64/amd64 멀티아키 빌드 필요 여부 — 배포 대상이 정해질 때(6E) |
 | `OPEN-ADR-09`(운영자 결정 2026-09-16) | **닫힘 — API 전용 + 기존 화면 유지**(운영자 답변). 6A 가 그 결정을 계약으로 옮기고 ADR 에 등재한다 |
 
@@ -130,3 +132,4 @@ root 로 돌지 않는다 (c) 버전이 떠 있지 않다(`:latest`·미고정 0
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-6C-1~7 | 사용자 「M6 착수」 + 착수 slice 6C 선택 · M6 입력 재고 |
+| 2026-09-16 구현 중(2) | **D-6C-8 신설** — 실 서버 통합 test 패키지를 `adapters.ml` → `adapters.contract`(같은 축 기존 전례와 한자리), in_scope 경로 갱신 · `OPEN-6C-CONDITIONAL-GATE-TEST` 신설 | 구현 레인 정지·보고: 기존 게이트 둘이 환경 조건부 test 에 동시 만족 불가. 게이트 술어를 약화시키는 두 안을 거부하고 패키지 분리 |
