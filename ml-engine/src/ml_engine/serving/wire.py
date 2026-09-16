@@ -101,10 +101,38 @@ def _check_invariants(success: Success) -> MappingRejected | None:
             "training_row_count 는 DERIVED release 에서 0이어야 한다: "
             f"{success.diagnostics.training_row_count}"
         )
+    out_of_range_candidate = _first_candidate_rate_out_of_range(candidates)
+    if out_of_range_candidate is not None:
+        return MappingRejected(
+            "Candidate.bid_rate 는 (0, 1] 구간이어야 한다(D-2B-8·D-2F-4 응답 후보율 축): "
+            f"{out_of_range_candidate.bid_rate!r}"
+        )
     non_finite = _first_non_finite_decimal(success)
     if non_finite is not None:
         return MappingRejected(f"비유한 Decimal 값: {non_finite!r}")
     return None
+
+
+def _first_candidate_rate_out_of_range(
+    candidates: Sequence[Candidate],
+) -> Candidate | None:
+    """verifier r1 H-1 — `Candidate.bid_rate`는 대상 공고 후보율 축이다(D-2B-8·
+    D-2F-4). `features.proto`의 `CompetitionSample.observed_bid_rate`(과거 표본
+    관측값 축)와 달리 `> 1`을 허용하지 않는다 — proto 주석이 그 축 한정을 명시한다.
+    엔진 `scenario.py::build_scenario_candidates`는 정책 `scenario.clamp_max`로
+    클램프할 뿐이고 그 값이 1 을 넘으면(출하 정책 `1.4`) 계약 위반 후보가 그대로
+    나온다 — `Candidate.__post_init__`은 `bid_rate > 0`만 강제하고 상한을 모른다.
+    값을 자르거나(clamp) 바꾸지 않는다(값 지어내기 금지) — fail-closed 로
+    `MappingRejected`. 처분(정책 상한 축소/계약 확장/새 Unmeasurable 사유)은 운영자
+    결정(`OPEN-5E2-CANDIDATE-RATE-UPPER`, checklist.md)."""
+    return next(
+        (
+            candidate
+            for candidate in candidates
+            if not (Decimal(0) < candidate.bid_rate <= 1)
+        ),
+        None,
+    )
 
 
 def _first_non_finite_decimal(success: Success) -> Decimal | None:

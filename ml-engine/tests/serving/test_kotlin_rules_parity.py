@@ -14,6 +14,7 @@ import tempfile
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+import pytest
 import yaml
 
 from ml_engine.contracts import common_pb2, prediction_pb2
@@ -164,7 +165,13 @@ def _has_ordered_candidate_rates(success: prediction_pb2.Success) -> bool:
 
 
 def _is_acceptable_success_shape(success: prediction_pb2.Success) -> bool:
-    """`ParsedSuccessFields.kt::isAcceptableSuccessShape` 미러 — 다섯 검사 전부."""
+    """`ParsedSuccessFields.kt::isAcceptableSuccessShape` 미러 — 다섯 검사 전부.
+    verifier r1 H-1 — 이 함수 **하나만으로는 Kotlin 의 수용 게이트를 대표하지 않는다**
+    (아래 `_is_response_accepted_by_kotlin` 참고). `ResponseMapping.kt::mapSuccess`는
+    `validatedSuccessFields = isAcceptableSuccessShape(success) && parsedSuccessFields(
+    success) != null`(둘 다) 를 본다 — `isAcceptableSuccessShape`는 형태(개수·순서·
+    origin·release 모양)만 재고, 범위(후보율 `(0,1]`)는 `parsedSuccessFields` 쪽
+    `toRateOrNull`이 잰다."""
     checks = [
         success.uncertainty.sample_size >= 1,
         _has_exactly_three_ordered_candidate_labels(success),
@@ -176,6 +183,63 @@ def _is_acceptable_success_shape(success: prediction_pb2.Success) -> bool:
         _has_ordered_candidate_rates(success),
     ]
     return all(checks)
+
+
+def _to_valid_decimal_or_none(value: str) -> Decimal | None:
+    """`FractionRules.kt::isNormalizedFraction` 왕복 +
+    `ParsedSuccessFields.kt::toValidatedBigDecimalOrNull` 미러."""
+    if not _is_normalized_fraction(value):
+        return None
+    return Decimal(value)
+
+
+def _to_rate_or_none(value: str) -> Decimal | None:
+    """`ParsedSuccessFields.kt::String.toRateOrNull` 미러(verifier r1 H-1 이 지목한
+    빠진 절반) — 정규형이면서 `signum() >= 0`이고 `<= 1`이어야 한다(Kotlin 원문:
+    `value.signum() < 0 || value > BigDecimal.ONE` 이면 `null`)."""
+    parsed = _to_valid_decimal_or_none(value)
+    if parsed is None:
+        return None
+    if parsed < 0 or parsed > 1:
+        return None
+    return parsed
+
+
+def _parsed_success_fields_or_none(
+    success: prediction_pb2.Success,
+) -> tuple[Decimal, ...] | None:
+    """`ParsedSuccessFields.kt::parsedSuccessFields` 미러 — 후보 3건의 `bid_rate`
+    (범위 포함) + `fitness`·`dispersion`·`estimate_margin` 전부가 파싱돼야 한다.
+    하나라도 `None`이면 전체가 `None`(`allNotNull`, 부분 성공 불인정)."""
+    parsed_candidates = [
+        _to_rate_or_none(candidate.bid_rate.fraction)
+        for candidate in success.candidates
+    ]
+    parsed_fitness = _to_valid_decimal_or_none(success.fitness.score)
+    parsed_dispersion = _to_valid_decimal_or_none(success.uncertainty.dispersion)
+    parsed_estimate_margin = _to_valid_decimal_or_none(
+        success.uncertainty.estimate_margin
+    )
+    values = (
+        parsed_fitness,
+        parsed_dispersion,
+        parsed_estimate_margin,
+        *parsed_candidates,
+    )
+    if any(value is None for value in values):
+        return None
+    return values  # type: ignore[return-value]  # 위에서 None 을 전수 배제했다
+
+
+def _is_response_accepted_by_kotlin(success: prediction_pb2.Success) -> bool:
+    """`ResponseMapping.kt::mapSuccess`가 성공으로 접수하는 실제 조건
+    (`validatedSuccessFields`) — `isAcceptableSuccessShape` **그리고**
+    `parsedSuccessFields`. verifier r1 H-1 이 지목한 「미러가 앞쪽 다섯만 옮겨
+    Kotlin 과 반대 판정을 낸다」의 시정 — 이 함수가 완전한 대체 판정이다."""
+    return (
+        _is_acceptable_success_shape(success)
+        and _parsed_success_fields_or_none(success) is not None
+    )
 
 
 # ---- test ----
@@ -229,3 +293,27 @@ def test_parsed_success_fields_shape_is_acceptable() -> None:
     servicer, _runtime = _servicer_and_runtime()
     response = servicer.CalculateOptimalBid(_success_request(), _ActiveContext())
     assert _is_acceptable_success_shape(response.success)
+
+
+def test_response_is_fully_accepted_by_kotlin() -> None:
+    """verifier r1 H-1 — `isAcceptableSuccessShape` 만이 아니라 `parsedSuccessFields`
+    까지 통과해야 Kotlin 이 이 응답을 받아들인다(`_is_response_accepted_by_kotlin`)."""
+    servicer, _runtime = _servicer_and_runtime()
+    response = servicer.CalculateOptimalBid(_success_request(), _ActiveContext())
+    assert _is_response_accepted_by_kotlin(response.success)
+
+
+def test_candidate_rate_above_one_fails_closed_end_to_end() -> None:
+    """verifier r1 H-1 재현 그대로 — 계약이 허용하는 축(`observed_bid_rate`, D-2F-4)에
+    1 을 넘는 관측값을 넣으면 엔진(`scenario.py`)이 정책 clamp 상한(출하
+    `scenario.clamp_max = 1.4`)까지 후보율을 낼 수 있다. 시정 전에는 그 응답이
+    `success` 로 그대로 나가 Kotlin `ParsedSuccessFields.toRateOrNull`이 그 응답
+    전체를 `ContractViolation`으로 버렸다(정직한 계산이 소비자 쪽에서 폐기). 시정
+    후에는 wire 층이 `MappingRejected` → `RuntimeError`로 fail-closed 한다 —
+    Unmeasurable 로 위장하지 않는다(값 지어내기 금지, D-5E2-6)."""
+    servicer, _runtime = _servicer_and_runtime()
+    request = _success_request()
+    for sample in request.competition_samples:
+        sample.observed_bid_rate.fraction = "1.3000"  # D-2F-4 축 — 이 필드는 > 1 허용
+    with pytest.raises(RuntimeError, match="D-2B-8"):
+        servicer.CalculateOptimalBid(request, _ActiveContext())

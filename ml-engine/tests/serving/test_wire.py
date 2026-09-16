@@ -181,6 +181,26 @@ def test_candidate_count_not_three_is_mapping_rejected() -> None:
     assert isinstance(mapped, MappingRejected)
 
 
+def test_candidate_rate_above_one_is_mapping_rejected() -> None:
+    """verifier r1 H-1 — 대상 공고 후보율 축(D-2B-8·D-2F-4, `Candidate.bid_rate`)은
+    1 을 넘을 수 없다. `features.proto` 의 `CompetitionSample.observed_bid_rate`(과거
+    표본 관측값 축)와는 다른 축이라 `> 1`을 허용하지 않는다. 엔진 clamp 상한이 1 을
+    넘는 정책 값(예: 출하 `scenario.clamp_max = 1.4`)과 만나면 발생할 수 있다 — 값을
+    자르지 않고 fail-closed 로 거부한다(`OPEN-5E2-CANDIDATE-RATE-UPPER`)."""
+    mapped = map_kernel_result(
+        _success(bid_rate="1.2900"), _release(), "award-rate-features-v2"
+    )
+    assert isinstance(mapped, MappingRejected)
+
+
+def test_candidate_rate_exactly_one_is_accepted() -> None:
+    """경계값 — `(0, 1]`은 닫힌 상한이다(1 자체는 계약 위반이 아니다)."""
+    mapped = map_kernel_result(
+        _success(bid_rate="1.0000"), _release(), "award-rate-features-v2"
+    )
+    assert not isinstance(mapped, MappingRejected)
+
+
 @pytest.mark.parametrize(
     "value",
     ["0.0000001", "0.24", "1", "0.8700"],
