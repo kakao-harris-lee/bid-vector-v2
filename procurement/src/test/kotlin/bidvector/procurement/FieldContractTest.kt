@@ -2,10 +2,12 @@ package bidvector.procurement
 
 import bidvector.sharedkernel.Basis
 import bidvector.sharedkernel.EffectiveFrom
+import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.time.LocalDate
 
 private fun wonContract(
     rawName: String,
@@ -119,6 +121,47 @@ class FieldContractTest {
             )
 
         registry.contractsFor(FieldConcept.BASE_AMOUNT).map { it.rawName } shouldBe listOf(RawKey("bssAmt"))
+    }
+}
+
+/**
+ * M3/3H-1 D-3H-1 — 발주기관 넷이 운영 정책에 등재되고(scope.md 종결 조건), 담당자 키
+ * (`*Ofcl*`)는 어디에도 없다는 것을 단언한다(우회 (4)).
+ */
+class AgencyFieldContractTest {
+    private val resolvedPolicy: KonepsCollectionPolicyData =
+        when (val resolution = KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 9, 7))) {
+            is Resolution.Resolved -> resolution.value
+            is Resolution.NotApplicable -> error("KONEPS_COLLECTION_POLICY 가 해석되지 않는다: ${resolution.reason}")
+        }
+
+    @Test
+    fun `발주기관 넷이 정확한 개념으로 등재된다 — D-3H-1`() {
+        val demandCode = resolvedPolicy.fieldContracts.contractFor(RawKey("dminsttCd"))!!
+        val demandName = resolvedPolicy.fieldContracts.contractFor(RawKey("dminsttNm"))!!
+        val noticeCode = resolvedPolicy.fieldContracts.contractFor(RawKey("ntceInsttCd"))!!
+        val noticeName = resolvedPolicy.fieldContracts.contractFor(RawKey("ntceInsttNm"))!!
+
+        demandCode.concept shouldBe FieldConcept.DEMAND_AGENCY_CODE
+        demandCode.scale shouldBe FieldScale.IDENTIFIER
+        demandCode.nullability shouldBe FieldNullability.OPTIONAL
+
+        demandName.concept shouldBe FieldConcept.DEMAND_AGENCY_NAME
+        demandName.nullability shouldBe FieldNullability.OPTIONAL
+
+        noticeCode.concept shouldBe FieldConcept.NOTICE_AGENCY_CODE
+        noticeCode.nullability shouldBe FieldNullability.OPTIONAL
+
+        noticeName.concept shouldBe FieldConcept.NOTICE_AGENCY_NAME
+        // 참고자료 문면 — ntceInsttNm 만 필수다(D-3H-1).
+        noticeName.nullability shouldBe FieldNullability.REQUIRED
+    }
+
+    @Test
+    fun `담당자 키는 어떤 rawName 에도 없다 — 우회 (4), 개인정보`() {
+        val rawNames = resolvedPolicy.fieldContracts.contracts.map { it.rawName.name }
+
+        rawNames.none { it.contains("Ofcl") } shouldBe true
     }
 }
 

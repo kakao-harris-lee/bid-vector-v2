@@ -135,6 +135,22 @@ enum class FieldConcept {
 
     /** 투찰일시(`bidprcDt`, §1.11) — zone 미확정(§1.7.4 와 같은 결, `ASSUME_KST` 초기값). */
     BID_AT,
+
+    /**
+     * 수요기관코드(`dminsttCd`, M3/3H-1 D-3H-1) — 엔진 `agency_id` 정본(D-3H-2). 코드가
+     * 있으면 「행자부코드, 없으면 조달청 부여 코드」(참고자료 문면). [NOTICE_AGENCY_CODE]
+     * 값으로 접지 않는다(폴백 없음, scope.md 우회 (3)).
+     */
+    DEMAND_AGENCY_CODE,
+
+    /** 수요기관명(`dminsttNm`, D-3H-1) — 표시·감사용, 동일성 판정에 쓰지 않는다(D-3H-2). */
+    DEMAND_AGENCY_NAME,
+
+    /** 공고기관코드(`ntceInsttCd`, D-3H-1) — [DEMAND_AGENCY_CODE]와 다른 축(자기 필드만). */
+    NOTICE_AGENCY_CODE,
+
+    /** 공고기관명(`ntceInsttNm`, D-3H-1, 문서 필수) — 표시·감사용. */
+    NOTICE_AGENCY_NAME,
 }
 
 /**

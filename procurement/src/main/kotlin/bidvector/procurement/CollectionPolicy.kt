@@ -113,20 +113,6 @@ internal data class FieldContractRow(
         )
 }
 
-// bidNtceNo·bidNtceOrd 공용 presentIn — 공고 식별자라 개찰 축 세 엔드포인트(F-6)·license-limit
-// (G-4, §1.9.5)·개찰완료(P-13)에도 실린다(어느 응답이든 「어느 공고의 행인가」 없이 오지 않는다).
-// 좁히면 개찰 축 allow-list 강제가 이 필드부터 떨어뜨려 전 항목이 「공고번호 없음」으로 오분류된다.
-// 여러 행이 이 집합을 그대로 반복해 `cpdCheck`가 중복으로 잡아 값 객체로 뽑았다(§5 중복 금지).
-private val NOTICE_IDENTIFIER_PRESENT_IN: Set<SourceEndpoint> =
-    setOf(
-        SourceEndpoint.NOTICE_LIST,
-        SourceEndpoint.OPENING_AWARD_LIST,
-        SourceEndpoint.OPENING_RESULT_LIST,
-        SourceEndpoint.RESERVE_PRICE_DETAIL,
-        SourceEndpoint.LICENSE_LIMIT_DETAIL,
-        SourceEndpoint.OPENING_COMPLETE,
-    )
-
 /**
  * 운영 필드 계약 열 — 운영자 승인 2026-09-07(P-1)의 `authoritative` 칸만 옮긴다
  * (`policy-values.md` §1.1~§1.5). 「미확정」 칸(`bssAmt`·`bssAmtPurcnstcst`·`presmptAmt`·
@@ -435,6 +421,8 @@ private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
 
 private val KONEPS_OPERATIONAL_FIELD_CONTRACTS: List<KonepsFieldContract> =
     (KONEPS_OPERATIONAL_FIELD_ROWS + KONEPS_OPENING_FIELD_ROWS + KONEPS_OPENING_COMPLETE_ROWS).map { it.toContract() }
+private val KONEPS_ALL_FIELD_CONTRACTS: List<KonepsFieldContract> =
+    KONEPS_OPERATIONAL_FIELD_CONTRACTS + KONEPS_AGENCY_FIELD_ROWS.map { it.toContract() }
 
 /**
  * `resultCode` → 범주(D-M3-4, `OPEN-COL-02`) — 운영자 승인 2026-09-07(P-4 ②③)의 범주
@@ -476,7 +464,7 @@ val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
             listOf(
                 EffectiveFrom.Initial to
                     KonepsCollectionPolicyData(
-                        fieldContracts = KonepsFieldContractRegistry.of(KONEPS_OPERATIONAL_FIELD_CONTRACTS),
+                        fieldContracts = KonepsFieldContractRegistry.of(KONEPS_ALL_FIELD_CONTRACTS),
                         resultCodeCategories = KONEPS_OPERATIONAL_RESULT_CODE_CATEGORIES,
                         baseAmountResolutionOrder = listOf(RawKey("bssamt"), RawKey("asignBdgtAmt"), RawKey("bdgtAmt")),
                         // P-3 는 기초금액 순서의 legacy 불채택만 결정하고 추정가격 순서는

@@ -20,61 +20,73 @@ private val RESOLVED_POLICY: KonepsCollectionPolicyData =
         }
     }
 
+// sizeGate(함수 50줄)는 본문 있는 선언만 잰다 — 「값을 담을 뿐인 프로퍼티 초기화식」은 그
+// 축이 아니다(CleanMigrationColumnTest.kt 관례와 같은 예외, size-policy.properties). 마흔
+// 개 rawName 리터럴 목록을 함수 본문 밖으로 뽑은 이유가 그것이다(M3/3H-1 발주기관 넷
+// 추가 뒤 함수 본문이 50줄 한도를 넘겨서).
+private val EXPECTED_ADOPTED_FIELD_RAW_NAMES: Set<String> =
+    setOf(
+        "bidNtceNo",
+        "bidNtceOrd",
+        "bssamt",
+        "asignBdgtAmt",
+        "bdgtAmt",
+        "presmptPrce",
+        "sucsfbidLwltRate",
+        "bidClseDt",
+        "opengDt",
+        "bsnsDivNm",
+        // M3/3H-1 D-3H-1 — 발주기관 넷(참고자료 응답 항목 표, P-14). 담당자 키는
+        // 등재하지 않는다(scope.md 우회 (4)).
+        "dminsttCd",
+        "dminsttNm",
+        "ntceInsttCd",
+        "ntceInsttNm",
+        // v2-defect 018 수정(3A 잔여 일괄 verifier r3 전) — D-3A-8, §5.5.
+        "cnstrtnAbltyEvlAmtList",
+        // P-9 승인(3B-2, 2026-09-08) — 개찰 축 12행. `bidwinnrBizno`는 P-10 (a) 로
+        // 저장하지 않아 등재되지 않는다(13행 중 12행만 인스턴스화).
+        "sucsfbidAmt",
+        "sucsfbidRate",
+        "bidwinnrNm",
+        "rlOpengDt",
+        "prtcptCnum",
+        "fnlSucsfDate",
+        // 대문자 변형(외자 2종) — verifier r1 F-5 수정, §1.7.4 「두 표기를 각각 등재」.
+        "FnlSucsfDate",
+        "plnprc",
+        "bsisPlnprc",
+        "compnoRsrvtnPrceSno",
+        "drwtYn",
+        "progrsDivCdNm",
+        "opengCorpInfo",
+        // license-limit(§1.9.5) — verifier r2 G-4, 행 식별자로 쓰는 키를 계약에 등재.
+        "lmtGrpNo",
+        "lmtSno",
+        // M3/3F P-13 (a) 승인(2026-09-09, §1.11) — 개찰완료(투찰 행) 10행. 평가점수
+        // 넷·prcbdrBizno·prcbdrCeoNm·rmrk·cnsttyAccotBidAmtUrl 은 제외돼 등재되지 않는다.
+        "opengRsltDivNm",
+        "bidClsfcNo",
+        "rbidNo",
+        "opengRank",
+        "prcbdrNm",
+        "bidprcAmt",
+        "bidprcrt",
+        "drwtNo1",
+        "drwtNo2",
+        "bidprcDt",
+    )
+
 /**
  * 운영 정책 인스턴스와 승인 표(`policy-values.md` §6)의 일치 대조 — 옮겨 적기 오류 방지
  * (team-lead 지시, 3A 잔여 일괄 ①). 표 항목 수와 대표 키 몇 개의 값을 대조한다.
  */
 class CollectionPolicyTest {
     @Test
-    fun `필드 계약은 승인된 채택분 서른여섯 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
+    fun `필드 계약은 승인된 채택분 마흔 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contracts
             .map { it.rawName.name }
-            .toSet() shouldBe
-            setOf(
-                "bidNtceNo",
-                "bidNtceOrd",
-                "bssamt",
-                "asignBdgtAmt",
-                "bdgtAmt",
-                "presmptPrce",
-                "sucsfbidLwltRate",
-                "bidClseDt",
-                "opengDt",
-                "bsnsDivNm",
-                // v2-defect 018 수정(3A 잔여 일괄 verifier r3 전) — D-3A-8, §5.5.
-                "cnstrtnAbltyEvlAmtList",
-                // P-9 승인(3B-2, 2026-09-08) — 개찰 축 12행. `bidwinnrBizno`는 P-10 (a) 로
-                // 저장하지 않아 등재되지 않는다(13행 중 12행만 인스턴스화).
-                "sucsfbidAmt",
-                "sucsfbidRate",
-                "bidwinnrNm",
-                "rlOpengDt",
-                "prtcptCnum",
-                "fnlSucsfDate",
-                // 대문자 변형(외자 2종) — verifier r1 F-5 수정, §1.7.4 「두 표기를 각각 등재」.
-                "FnlSucsfDate",
-                "plnprc",
-                "bsisPlnprc",
-                "compnoRsrvtnPrceSno",
-                "drwtYn",
-                "progrsDivCdNm",
-                "opengCorpInfo",
-                // license-limit(§1.9.5) — verifier r2 G-4, 행 식별자로 쓰는 키를 계약에 등재.
-                "lmtGrpNo",
-                "lmtSno",
-                // M3/3F P-13 (a) 승인(2026-09-09, §1.11) — 개찰완료(투찰 행) 10행. 평가점수
-                // 넷·prcbdrBizno·prcbdrCeoNm·rmrk·cnsttyAccotBidAmtUrl 은 제외돼 등재되지 않는다.
-                "opengRsltDivNm",
-                "bidClsfcNo",
-                "rbidNo",
-                "opengRank",
-                "prcbdrNm",
-                "bidprcAmt",
-                "bidprcrt",
-                "drwtNo1",
-                "drwtNo2",
-                "bidprcDt",
-            )
+            .toSet() shouldBe EXPECTED_ADOPTED_FIELD_RAW_NAMES
     }
 
     @Test

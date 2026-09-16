@@ -149,6 +149,10 @@
 | `refNo` | 참조번호 | identifier | 항목크기 105 — 자체 시스템 공고번호 또는 G2B 번호 | 옵션 | `authoritative` |
 | `bidClsfcNo` | 입찰분류번호 | identifier | 항목크기 5 | 필수 | `authoritative` |
 | `rbidNo` | 재입찰번호 | identifier | 항목크기 11 | 옵션 | `authoritative` |
+| `ntceInsttCd` | 공고기관코드 | identifier(불투명 — 「행자부코드가 있는 경우 행자부코드, 없는 경우 조달청에서 부여한 공고기관 코드」) | 항목크기 7 | 옵션 | `authoritative` · **P-14**(M3/3H-1, 2026-09-16) |
+| `ntceInsttNm` | 공고기관명 | text(표시·감사용, 키 아님) | 항목크기 400 — *"수요기관의 의뢰를 받아 공고하는 기관의 명"* | **필수** | `authoritative` · P-14 |
+| `dminsttCd` | 수요기관코드 | identifier(불투명, 공고기관코드와 같은 부여 규칙) — **엔진 키 `agency_id` 의 원천**(3H scope D-3H-2) | 항목크기 7 | 옵션 | `authoritative` · P-14 |
+| `dminsttNm` | 수요기관명 | text(표시·감사용, 키 아님) | 항목크기 400 — *"… 계약을 의뢰한 기관의 명으로 공고기관과 수요기관이 동일할 수 있음"* | 옵션 | `authoritative` · P-14 |
 | `bidPbancNo` | — | — | **문서에 없다** | — | 미확정(미등재 키) — legacy 의 공고번호 폴백 사슬 둘째 |
 
 > **`bidNtceOrd` 의 `int` 변환 금지가 이 표의 무게중심이다.** 폭이 3으로 고정된 자리에서 선행 `0` 은
@@ -369,6 +373,11 @@ slice 계약이 정한다.
 
 `37 + 13 + 1 + 9 = 60`. **2026-09-07 판의 「문서에 없는 키 23」이 「13 + 1 + 9」로 갈라진 것이 이
 갱신의 전부**이고 legacy 소비 키 집합 자체는 변하지 않았다.
+
+> **P-14(2026-09-16) 는 이 셈을 바꾸지 않는다** — §1.3 에 더한 기관 키 넷은 입찰공고정보서비스 참고자료의
+> 응답 항목이고 legacy 는 그중 이름 둘(`dminsttNm`·`ntceInsttNm`)을 별도 필드 계약 spec 에서 소비했다
+> (`_workspace/m3-agency/02_scout_legacy.md`). 위 표의 60 은 `KNOWN_FIELDS` 기준이라 그 둘의 포함 여부는 이
+> 갱신에서 재대조하지 않았다 — 셈과 §1.3 표가 어긋난 자리로 등재만 한다(값의 정본은 §1.3 행).
 
 **§5.3 은 「소비되는 모든 키에 계약이 필수」다.** §1.1~§1.6 이 37 건을 덮고, §1.7 이 13 건에 문서
 근거를 붙였다 — 다만 **P-9 승인과 「P-9 채택이 요구하는 3A 확장」 ①②④ 전까지는 계약이 없으므로 그
@@ -819,6 +828,7 @@ legacy `html_parsing` 이 **개찰결과 그리드의 업무코드**를 라벨�
 | **P-9** | §1.7 의 `authoritative` 칸을 **3B-2 필드 계약 정책 데이터의 초기값**으로(P-1 의 개찰 축 판) | `authoritative`(문서 출처) | **(a) 전 13 행 채택.** 「미확정」 칸(`bsisPlnprc` 의 basis · `sucsfbidRate` 밴드)은 그대로 미확정이고 인스턴스화 대상이 아니다. **함께 승인된 것**: 「P-9 채택이 요구하는 3A 확장」 **①②④**(`FieldConcept` 개찰 축 토큰 · `FieldScale` 셈 축 · 계약 행이 오퍼레이션 군을 구별) — **추가만** 하는 3A 좁은 확장 한 커밋이며 기존 계약 행과 corpus 27/27 은 불변. ③(복수예가 후보 basis)은 값이 미확정이라 열지 않는다 |
 | **P-10** | `bidwinnrNm`·`bidwinnrBizno`·`opengCorpInfo`(및 §1.9.4 의 `prcbdrBizno`·`prcbdrCeoNm`)의 **수집·저장·원문 보존·로그 masking 정책** | 정책 결정(층 부여 대상 아님) | **(a) 상호만 남기고 나머지는 어댑터 경계에서 제거.** `bidwinnrNm` 은 원문 문자열로 canonical 에 저장한다(SET-01 이 상호 정규화 정확매치로 낙찰/패찰을 판정하므로 소비자가 확인된 유일한 식별자다). **사업자등록번호·대표자명은 저장하지 않는다** — 어댑터가 관측을 만들기 **전에** 그 자리를 고정 토큰으로 치환하고 치환 사실을 회계에 남긴다. `sourceText`(3D append 감사 통로)와 로그·evidence 에도 원문이 남지 않는다 — **「원문 무변환」의 예외를 이 축에 한해 명시적으로 둔다.** `opengCorpInfo` 는 성분 분해 뒤 상호·투찰금액·투찰율만 남기고, 성분 수가 경우마다 다르므로 **분해 실패는 조용한 성공이 아니라 명시적 결과**로 회계한다 |
 | **P-12** | §1.9 의 오퍼레이션 계약 — `inqryDiv` 의 자리와 걷는 축 | 문면 `authoritative` · 축 선택은 정책 | **(a) 오퍼레이션 → (조회 축 값, 필수 항목, 기간 조건) 표를 정책 데이터로** 두고 URI 빌더는 해석만 한다(전역 상수 금지 — 같은 값이 군마다 다른 축을 뜻한다). **걷는 축 초기값은 개찰일시**(낙찰 목록 `3` · 개찰결과 목록 `3` · 검색군 `2`) — 기준일의 뜻이 `CollectionReferenceDate`(KST 캘린더 일자)와 맞는다. legacy 의 주석-문서 어긋남은 `insufficient-evidence` 로 등재하고 판정하지 않는다. base URI·tps·항목크기 문면은 초기값으로 채택 |
+| **P-14** (2026-09-16, M3/3H-1) | §1.3 의 **발주기관 키 넷**(`ntceInsttCd`·`ntceInsttNm`·`dminsttCd`·`dminsttNm`)을 P-1 격의 승인 항목으로 등재 + 엔진 키 `agency_id` 의 원천 | `authoritative`(문서 출처) · 키 선택은 정책 | **(a) 채택 「추천대로」.** 넷을 필드 계약 초기값으로(항목크기 7/400/7/400, 필수는 `ntceInsttNm` 만 — 문서 항목구분). **엔진 키 = 수요기관코드**(`dminsttCd`) 의 정규화값(§6.3.1 strip+소문자화, `CategoryCode.of` 와 같은 함수), **역할 간 폴백 없음**(공고기관 값으로 대체 금지 — legacy 의 개찰수요>수요>공고 폴백이 누수였다), 이름 둘은 표시·감사용 저장, 별칭·계층 사전 없음. 담당자 키(`ntceInsttOfclNm`·`…TelNo`·`…EmailAdrs`·`dminsttOfcl…`)는 **등재하지 않는다**(개인정보, P-10 과 같은 축). 코드 채움률은 문서(옵션)로 알 수 없어 read-only 실호출 1회로 재는 것을 함께 승인(3H-2 착수 전). 정본 `reports/evidence/m3/3h/scope.md` D-3H-1·2·7·8 |
 
 **같은 승인에서 slice 범위 결정 하나** — `getOpengResultListInfoOpengCompt`(개찰완료) 는 **이번 3B-2
 밖**이다(D-3B2-9 (a)). `COL-03` 문면의 **추첨번호**(`drwtNo1`·`drwtNo2`)와 투찰 축(`bidprcAmt`·`bidprcrt`)을

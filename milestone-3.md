@@ -339,6 +339,39 @@ KDoc 으로 유지, 중복 제거 — cpdCheck).
 당장 영향이 없고, 그것이 신규 class 를 만들지 않은 이유이기도 하다) · admin 역할·RLS·컬럼 단위 권한은
 경계 밖(3D 위협 모델).
 
+### Slice 3H — 발주기관 fact(`OPEN-2B-AGENCY-ID` 후속, 두 slice)
+
+**3H-1 착수 2026-09-16 — 운영자 결정 「추천대로」(P-14 등재 · 엔진 키 = 수요기관코드 · V7 마이그레이션 + migration-reviewer +
+Codex 1 라운드 · 채움률 read-only 실호출 1회 · 3H-1/3H-2 분할). 정본 `reports/evidence/m3/3h/scope.md` D-3H-1~8.**
+**착수 조사 실측**: 발주기관 축이 V2 에 없다 — 필드 계약 레지스트리 24 키·`FieldConcept`·`notice` 스키마·`Notice`·요청/표본
+조립 어디에도 기관 키 0(3A policy-values 의 셈은 legacy 60 키를 덮는다고 적지만 legacy 가 소비한 기관 이름 키 둘이 표에
+없었다). 조달청 참고자료(입찰공고정보서비스 1.2)는 `ntceInsttCd`(7, 옵션)·`ntceInsttNm`(400, 필수)·`dminsttCd`(7, 옵션)·
+`dminsttNm`(400, 옵션)을 응답 항목으로 선언 — 코드는 행자부 코드 또는 조달청 부여 코드. legacy 는 코드를 수집한 적이 없고
+이름 문자열만 두 컬럼에 저장했으며 역할 우선순위가 경로마다 달랐고(legacy 자신이 누수로 명시) 같은 컬럼에 정규화기 셋이
+갈렸다 — 전부 비채택. 정규화는 §6.3.1(strip+소문자화, 별칭·계층 사전 없음, `CategoryCode.of` 와 같은 함수)이 이미 승인.
+**3H-1 범위**: `FieldConcept` 토큰 넷 + 레지스트리 초기값(P-14) · `procurement` `AgencyCode.of`·`AgencyName`·`Agency`,
+`Notice.demandAgency`·`noticeAgency`(역할별 자기 필드, 폴백 없음) · `Canonicalize` 조립 · **V7** `notice` nullable TEXT 컬럼 넷
+(`ALTER TABLE … ADD COLUMN`, 제약·인덱스 없음) · `NoticeRow`·`Sql`·`NoticeReconstruction`·`CleanMigrationColumnTest`. 담당자
+개인정보 키(`*Ofcl*`)는 등재하지 않는다. **3H-2(별도 계약)**: `predictionRequestFor`·`SampleConversion` 의 `agencyId` 채움,
+표본 축 「수집했으나 원천에 없음」 사유는 M5 레인 `OPEN-3H-SAMPLE-MISSING-REASON`, 엔진 교차 실측(`segment_support = DIRECT`
+첫 도달). 백필은 운영 데이터 0 → `OPEN-3H-AGENCY-BACKFILL`. 레인 `bid-vector-v2-m4e`/`m3-3h/2026-09-16`, base `0ad8e59`
+(PR #29 병합 뒤), M3 후속은 `main` 병행(3G 선례).
+
+**3H-1 종결 2026-09-17(사용자 승인 — 「추천대로」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1 `ready-for-review`
+(산출물 blocker/high 0 · medium 1 = 새 컬럼 넷의 병합 보존 규칙 무잠금 → 3단계 왕복 test + 존재 가드 삭제 변이 RED 로 닫음 ·
+low 3·장부층 6 일괄; 우회 (1)~(8) 직접 실측 — private 생성자·`copy()` 변이 컴파일 거부, 담당자 키 등재 변이 붉음, 컬럼 행렬
+변이 붉음, 3G 권한 행렬 초록, 역할 폴백 코드 0, `AgencyCode.of`/`CategoryCode.of` 동일 함수, rollback ①~⑥ 격리 clone 에서
+V7 제거 뒤 전건 초록). **재작업 0회**. **migration-reviewer 통과**(BLOCKER 0 · HIGH 0 · MEDIUM 0 · LOW 1 — nullable ADD COLUMN 만,
+메타데이터 전용, `SELECT *` 0 으로 구버전 공존, 테이블 단위 GRANT 라 재GRANT 불요, Testcontainers 실적용 초록). 계약 갱신 셋
+(운영자 결정 등재 · `AgencyName.of` 대칭 · in_scope 에 persistence bind·병합 파일과 sizeGate 분리 파일). 산출물: `FieldConcept`
+토큰 넷 + 레지스트리 행 넷(P-14), `Agency`·`AgencyCode.of`·`AgencyName.of`, `Notice.demandAgency`/`noticeAgency`, `Canonicalize`
+역할별 조립(폴백 0), **V7** 컬럼 넷, persistence 다섯 파일, test(AgencyTest·AgencyFieldContractTest·AgencyCanonicalizeTest·
+왕복·병합 보존·컬럼 행렬). **알려진 제한**: `OPEN-2B-AGENCY-ID` 는 반 닫힘(3H-2 조립 대기) · 코드 채움률 미실측(D-3H-8, 3H-2 전
+read-only 실호출 1회) · `OPEN-3H-SAMPLE-MISSING-REASON`(M5 레인 — 표본 축 허용 결측 사유 확장, 3H-2 착수 전) ·
+`OPEN-3H-AGENCY-BACKFILL`(운영 데이터 0) · `OPEN-3H-MERGE-GUARD-TESTS`(기존 축의 병합 보존 무잠금 — 상속 부채) · 기관명·코드의
+개인정보 판정은 PR 의 privacy-gate 코멘트 · **Codex 심판**(마이그레이션, 운영자 범위·비용 승인)은 PR 에서. 정본
+`reports/evidence/m3/3h/checklist.md`.
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의

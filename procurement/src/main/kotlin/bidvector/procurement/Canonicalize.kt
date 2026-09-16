@@ -26,6 +26,14 @@ data class NoticeCollected(
     val deadlineAt: Instant?,
     val openingScheduledAt: Instant?,
     val raw: RawNoticeObservation,
+    /**
+     * 수요기관(D-3H-3, M3/3H-1) — 기본값 `null`이라 이 slice 밖 호출부(workflow·ml 어댑터
+     * test 등)는 수정 없이 그대로 컴파일된다(scope.md 우회 (6) — `agencyId = null` 두 자리
+     * 불변).
+     */
+    val demandAgency: Agency? = null,
+    /** 공고기관(D-3H-3, M3/3H-1) — [demandAgency]와 다른 축, 기본값 `null`(위와 같은 이유). */
+    val noticeAgency: Agency? = null,
 )
 
 /** 추정가격도 기초금액과 같은 형태 규율(파생이 원본을 덮지 않는다)을 받는다 — `Published`만 직접값이다. */
@@ -210,6 +218,8 @@ private fun normalizedCommand(
                     deadlineAt = instantOrNull(deadlineResolution),
                     openingScheduledAt = instantOrNull(openingResolution),
                     raw = observation,
+                    demandAgency = demandAgencyFrom(observation, policy.fieldContracts),
+                    noticeAgency = noticeAgencyFrom(observation, policy.fieldContracts),
                 ),
                 unknownFieldCount,
             )

@@ -1,5 +1,8 @@
 package bidvector.adapters.persistence
 
+import bidvector.procurement.Agency
+import bidvector.procurement.AgencyCode
+import bidvector.procurement.AgencyName
 import bidvector.procurement.BusinessCategory
 import bidvector.procurement.CategoryCode
 import bidvector.procurement.CategoryLabel
@@ -59,6 +62,20 @@ private fun businessCategoryOf(row: NoticeRow): BusinessCategory? {
 }
 
 /**
+ * D-3H-3 — 복원 경로도 [AgencyCode.of]·[AgencyName.of]로 정규화·trim 한다(위
+ * [businessCategoryOf]와 같은 관례). 저장 시점에 이미 정규화·trim 된 문자열만 오므로(D-3H-4
+ * KDoc) 여기서는 값을 다시 뒤틀지 않는다 — 코드·이름이 둘 다 없으면 fact 없음(`null`).
+ */
+private fun agencyOf(
+    code: String?,
+    name: String?,
+): Agency? {
+    val agencyCode = code?.let(AgencyCode::of)
+    val agencyName = name?.let(AgencyName::of)
+    return if (agencyCode == null && agencyName == null) null else Agency(agencyCode, agencyName)
+}
+
+/**
  * verifier r1 F-8 뒤 개정 — 이전 판(`EVENT_PATH_TO_STATUS[status] ?: return collected`)은
  * 표에 없는 상태를 만나면 예외 대신 **조용히 `Open`을 냈다**. [eventPathFor]의 exhaustive
  * `when`이 이제 그 결손 자체를 컴파일 시점에 막는다(verifier r2 N-5, 위 KDoc).
@@ -91,6 +108,8 @@ internal fun NoticeId.reconstructNotice(row: NoticeRow): Notice {
             deadlineAt = row.deadlineAt,
             openingScheduledAt = null,
             raw = placeholderRaw,
+            demandAgency = agencyOf(row.demandAgencyCode, row.demandAgencyName),
+            noticeAgency = agencyOf(row.noticeAgencyCode, row.noticeAgencyName),
         )
     return applyStatusPath(Notice.collected(command), NoticeStatus.valueOf(row.status))
 }

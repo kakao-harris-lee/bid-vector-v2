@@ -42,7 +42,7 @@ private fun testContract(
     )
 
 /** legacy-behavior — test 전용 정책 인스턴스(조사 b-4). main `KONEPS_COLLECTION_POLICY`는 형태만 갖는다. */
-private val TEST_REGISTRY =
+internal val TEST_REGISTRY =
     KonepsFieldContractRegistry.of(
         listOf(
             testContract("bidNtceNo", FieldConcept.NOTICE_NUMBER, FieldScale.IDENTIFIER),
@@ -114,10 +114,15 @@ private val TEST_REGISTRY =
                 FieldScale.DATETIME_NO_ZONE,
                 sourceZone = SourceZoneRuleId.ASSUME_KST,
             ),
+            // M3/3H-1 D-3H-1 — 발주기관 넷.
+            testContract("dminsttCd", FieldConcept.DEMAND_AGENCY_CODE, FieldScale.IDENTIFIER),
+            testContract("dminsttNm", FieldConcept.DEMAND_AGENCY_NAME, FieldScale.OPAQUE_TEXT),
+            testContract("ntceInsttCd", FieldConcept.NOTICE_AGENCY_CODE, FieldScale.IDENTIFIER),
+            testContract("ntceInsttNm", FieldConcept.NOTICE_AGENCY_NAME, FieldScale.OPAQUE_TEXT),
         ),
     )
 
-private val TEST_POLICY =
+internal val TEST_POLICY =
     KonepsCollectionPolicyData(
         fieldContracts = TEST_REGISTRY,
         resultCodeCategories = emptyList(),
@@ -130,7 +135,7 @@ private val TEST_POLICY =
         dateTimePatterns = listOf(DateTimePatternId.KONEPS_SPACE_DELIMITED_19),
     )
 
-private fun observationOf(fields: Map<String, String>): RawNoticeObservation =
+internal fun observationOf(fields: Map<String, String>): RawNoticeObservation =
     RawNoticeObservation.of(fields.mapKeys { RawKey(it.key) }, SourceEndpoint.NOTICE_LIST, Instant.EPOCH)
 
 /** ⑤ — provenance 해석 지점 하나. */

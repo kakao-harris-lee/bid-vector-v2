@@ -26,6 +26,10 @@ data class Notice internal constructor(
     val allocatedBudget: AllocatedBudget?,
     val floorRate: FloorRate?,
     val deadlineAt: Instant?,
+    /** 수요기관(D-3H-3, M3/3H-1) — 역할별 자기 필드, 접지 않는다(scope.md 우회 (3)). */
+    val demandAgency: Agency? = null,
+    /** 공고기관(D-3H-3, M3/3H-1) — [demandAgency]와 다른 축. */
+    val noticeAgency: Agency? = null,
 ) {
     /** 유일한 상태 변경 경로 — 표 밖의 전이는 [NoticeTransitionOutcome.Rejected]로 관측된다. */
     fun applyEvent(event: NoticeEvent): NoticeTransitionOutcome =
@@ -46,6 +50,8 @@ data class Notice internal constructor(
                 allocatedBudget = command.allocatedBudget,
                 floorRate = command.floorRate,
                 deadlineAt = command.deadlineAt,
+                demandAgency = command.demandAgency,
+                noticeAgency = command.noticeAgency,
             )
     }
 }
