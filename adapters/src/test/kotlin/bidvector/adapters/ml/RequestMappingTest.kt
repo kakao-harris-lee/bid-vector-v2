@@ -6,6 +6,7 @@ import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
+import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.export
 import bidvector.workflow.prediction.CompetitionSample
@@ -13,6 +14,7 @@ import bidvector.workflow.prediction.ReserveDrawObservation
 import contract.bidvector.ml.v1.AmountProvenanceKind
 import contract.bidvector.ml.v1.Basis
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -133,5 +135,30 @@ class RequestMappingTest {
 
         proto.reserveDraw.selectedNumbersList shouldBe emptyList()
         proto.reserveDraw.reservePricesCount shouldBe 1
+    }
+
+    /**
+     * D-5F2-4(scope.md 계약 갱신 (2)) — `ML_CALL_POLICY`(운영 정책, `MlCallPolicyData.kt`)를
+     * `mapRequest`에 그대로 흘려 실제 `CalculateOptimalBidRequest.envelope.featureSchemaVersion`
+     * 이 그 정책 값과 같은지 잰다. `testMlCallPolicy()`(다른 test 전부가 쓰는 좁은 값)를 쓰지
+     * 않는 것이 핵심이다 — 그래야 `PredictionEnvelopeMapping.buildPredictionEnvelope`가 그
+     * 값을 조용히 다른 문자열로 바꿔도(verifier r1 변이 B) 이 test 가 잡는다. 저장소에 이
+     * 경로(정책 값 → 요청 proto)를 재는 test 가 이전까지 없었다(verifier r1 L-1).
+     */
+    @Test
+    fun `feature_schema_version 은 실 정책 ML_CALL_POLICY 값을 그대로 요청 envelope 에 싣는다`() {
+        val resolution = ML_CALL_POLICY.resolve(LocalDate.now())
+        resolution.shouldBeInstanceOf<Resolution.Resolved<MlCallPolicyData>>()
+        val policy = resolution.value
+
+        val proto =
+            mapRequest(
+                request = testBidPredictionRequest(),
+                requestId = "req-1",
+                policy = policy,
+                deadlinePolicyVersion = "deadline-test",
+            )
+
+        proto.envelope.featureSchemaVersion shouldBe policy.featureSchemaVersion
     }
 }

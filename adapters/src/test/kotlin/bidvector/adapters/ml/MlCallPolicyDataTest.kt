@@ -93,6 +93,6 @@ class MlCallPolicyDataTest {
         data.breakerFailureRateThresholdPercent shouldBe 50
         data.breakerSlidingWindowSize shouldBe 10
         data.breakerWaitDurationInOpenState shouldBe Duration.ofSeconds(30)
-        data.featureSchemaVersion shouldBe "bidvector.ml.v1"
+        data.featureSchemaVersion shouldBe "award-rate-features-v2"
     }
 }

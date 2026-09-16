@@ -1,0 +1,4 @@
+{
+  "status": "N/A",
+  "reason": "5F-2 는 정책 데이터 값 한 자리(featureSchemaVersion 리터럴)만 바꾸는 slice 다 — fixture corpus(fixtures/manifest.yaml)를 참조·소비하지 않고, differential.json 을 요구하는 Python/V2 동작 비교 대상도 없다(코드 경로·타입 무변경, D-5F2-1)."
+}

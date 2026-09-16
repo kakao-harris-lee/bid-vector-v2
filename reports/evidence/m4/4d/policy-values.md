@@ -46,13 +46,16 @@
 
 | 필드 | 값 | 근거 |
 | --- | --- | --- |
-| `featureSchemaVersion` | `bidvector.ml.v1` | **사용자 승인 2026-09-10.** 계약 패키지 식별자(`contracts/proto/bidvector/ml/v1/*.proto` 의 `package bidvector.ml.v1`)를 그대로 썼다 — ADR 0010 D-7 "패키지가 version을 나른다"의 문면을 값으로 옮긴 것. 별도 schema 버전 축이 승인 문서에 없어 임의로 세분화하지 않았다(알려진 제한 — `docs/discovery/data-dictionary.md`가 이 축을 더 세분화하기 전까지는 패키지 식별자가 유일한 값) |
+| `featureSchemaVersion` | `award-rate-features-v2` | **운영자 결정 2026-09-16 ②(M5/5F-2) — 4D 승인 값(`bidvector.ml.v1`, 계약 패키지 식별자)을 대체.** M5/5B 가 feature schema 버전 축을 신설(D-5B-1, 별칭 금지)해 계약 패키지 식별자가 더는 이 필드의 근거가 아니게 됐다 — 정본은 이제 5B feature schema version, Python `ml_engine.features.schema.SUPPORTED_FEATURE_SCHEMAS`(무편집 참고, 정본은 그 모듈)와 같은 값이어야 한다. 동일성은 문서 대조로 둔다(D-5F2-2) — 실 교차 언어 대조는 `OPEN-5E2-CROSSLANG-REAL-SERVER`(6C) 몫 |
 
-**착수 시 placeholder였다가 이 승인으로 확정됐다.** `reports/evidence/m4/4d/scope.md`
-D-4D-7은 "정책 초기값(placeholder, 승인 대상)"으로 구조만 고정했고, 값 자체는 착수
-이후 한 번도 바뀌지 않은 채 이 승인으로 운영 정책값이 됐다 — 4A `EditSessionPolicyData`·
-4E `NotificationDeliveryPolicyData`가 placeholder에서 종결 승인으로 확정된 것과 같은
-절차.
+**착수 시 placeholder였다가 2026-09-10 승인으로 확정됐고, 2026-09-16 운영자 결정 ②로 값이
+갱신됐다.** `reports/evidence/m4/4d/scope.md` D-4D-7은 "정책 초기값(placeholder, 승인
+대상)"으로 구조만 고정했다. 값 자체는 2026-09-10 승인으로 운영 정책값이 됐으나(4A
+`EditSessionPolicyData`·4E `NotificationDeliveryPolicyData`가 placeholder에서 종결
+승인으로 확정된 것과 같은 절차), 5B 가 신설한 feature schema 축과 어긋나 5E-2 servicer 가
+전량 `UNSUPPORTED_SCHEMA` 로 거부하는 상태였다(`OPEN-5E2-FEATURE-SCHEMA-PARITY`). M5/5F-2
+가 값을 Python 이 지원하는 `award-rate-features-v2` 로 갱신해 그 OPEN 을 종결했다 — 코드
+경로·타입은 무변경(D-5F2-1).
 
 ---
 
@@ -75,3 +78,9 @@ D-4D-7은 "정책 초기값(placeholder, 승인 대상)"으로 구조만 고정�
 - **2026-09-10 사용자 승인** — slice 4D-1 종결 승인과 같은 결정으로 §1~§3 값 자체가
   확정됐다(`OPEN-4D-POLICY-VALUES` 종결). 값은 착수 시점에서 변경 없음.
   `OPEN-M2-DEADLINE-VALUES`는 5E 실측 뒤 갱신 경로로 활성 유지.
+- **2026-09-16 운영자 결정 ②(M5/5F-2)** — §3 `featureSchemaVersion` 값을 `bidvector.ml.v1`
+  에서 `award-rate-features-v2` 로 대체(4D 승인 값의 갱신, §1·§2 는 무변경). 사유는
+  5B(D-5B-1)가 feature schema 버전 축을 신설해 4D 가 쓰던 계약 패키지 식별자 논리가
+  낡았고, 5E-2 servicer 가 옛 값을 `UNSUPPORTED_SCHEMA` 로 거부했기 때문이다
+  (`OPEN-5E2-FEATURE-SCHEMA-PARITY` 종결). 코드 쪽 정본은
+  `adapters/src/main/kotlin/bidvector/adapters/ml/MlCallPolicyData.kt` 의 `ML_CALL_POLICY`.
