@@ -137,12 +137,25 @@
 - exit: 0
 
 ### 2026-09-16T21:35:00Z
-- cmd: `./gradlew --no-build-cache --no-daemon clean check`(V-1·V-2·장부층 반영 뒤 재실측)
-- exit: <아래 채움>
-- 핵심 결과: <아래 채움>
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`(V-1·V-2·장부층 반영 뒤 재실측, HEAD `6e040df`)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 44s). JUnit XML 집계 **1694 tests · 0 failed · 0 skipped**(verifier r1 이 HEAD `87f495f` 에서 잰 1691보다 3 많다 — 이번 라운드가 더한 test 3건: `EvidenceLinesBoundaryTest` 3 − 순감소 0, `OpportunityAnalysisTest` 는 기존 2건 확장이라 개수 불변). **acceptance_commands 재충족.**
 
-### rollback 재실측(임시 clone, `git clone --no-hardlinks`)
-- cmd: ①~⑥ 재실행(목록에 `EvidenceLinesBoundaryTest.kt` 추가 반영) — `rollback.md` 참고.
-- exit: <아래 채움>
+### rollback 재실측(임시 clone 2 회, `git clone --no-hardlinks`)
+- cmd: ① `git diff --name-status 44721cf..HEAD -- <in_scope>`(`/tmp/4d4-rollback-check2`) → 15경로, `rollback.md` 목록과 일치.
+- exit: 0
+- cmd: ② `git restore --source=44721cf --staged --worktree -- <15경로>`
+- exit: 0
+- 핵심 결과: `git status --short` = `M` 11 · `D` 4(신규 넷이 삭제로 표시 — `A`→`D`, 정상).
+- cmd: ③ `git diff 44721cf -- <in_scope 코드 경로> | wc -l`
+- exit: 0
+- 핵심 결과: `0`.
+- cmd: ④ `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin`
+- exit: 0
+- cmd: ⑤ `./gradlew --no-daemon :workflow:test`
+- exit: 0
+- cmd: ⑥ `./gradlew --no-build-cache --no-daemon clean check`(되돌린 트리 전건)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(355 actionable tasks, 57s) — rollback 이 게이트를 붉히지 않는다.
 
 **마지막 HEAD 의 게이트 결과 정본은 evidence 가 아니라 verifier·PR 조치 코멘트다**(evidence-pack §「리뷰 요청 조건 점검」) — 이 문서는 그 직전까지의 명령만 담는다.
