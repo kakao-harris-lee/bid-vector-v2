@@ -41,7 +41,7 @@ in_scope:
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/PredictionFactsTest.kt
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/EvidenceLinesTest.kt         # 신설 — 골든·전수(exhaustive)·Locale 무접촉(갱신 1)
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/EvidenceLinesBoundaryTest.kt # 신설(갱신 2) — Locale·서식 API 소스 경계 test(우회 (7) 잠금)
-  - config/quality/gate-tests.properties                                                # gate.tests.workflow 에 EvidenceLinesTest 등재만(다른 키 무편집)
+  - config/quality/gate-tests.properties                                                # gate.tests.workflow 에 EvidenceLinesTest·EvidenceLinesBoundaryTest 등재만(다른 키 무편집)
   - milestone-4.md                                                                      # 4D-4 착수·종결 문단(팀장)
   - docs/discovery/capability-map.md                                                    # OPEN 표: OPEN-4D3-DIAGNOSTICS-RENDER 닫힘, 신설 OPEN 등재(팀장)
   - reports/evidence/m4/4d4/**
@@ -75,7 +75,7 @@ rollback: in_scope 경로 한정 restore(rollback.md) — 공유 파일(mileston
 
 | # | 우회 | 닫힘 |
 | --- | --- | --- |
-| (1) | `Analyzed`·`NotificationRequest` 를 근거 없이 짓는다 | 필수 인자·기본값 없음 — 컴파일 거부(변이 실측: 인자 제거 시 main 1·test 3 파일 붉음) |
+| (1) | `Analyzed`·`NotificationRequest` 를 근거 없이 짓는다 | 필수 인자·기본값 없음 — 컴파일 거부(변이 실측: `Analyzed.evidence` 제거 시 main 두 참조점 — `finalOutcomeOf` 인자 초과·`reach` 의 `outcome.evidence` 미해결 — 에서 모듈 컴파일 거부, test 는 그 뒤라 세지 않는다; 사전 추정 「main 1·test 3」보다 강한 형태) |
 | (2) | 근거가 `LadderInput`·`Verdict` 에 스며 판정을 바꾼다 | `decision` 무접촉(모듈 의존이 `shared-kernel` 뿐) · test: 같은 점수·다른 근거 → 같은 `Verdict` |
 | (3) | 다른 공고·다른 호출의 근거가 `NotificationRequest` 에 실린다 | `reach` 안에서 같은 `outcome` 의 값만 — 생성자 `internal`, 두 번째 생성 경로 없음(4B-2 결정 5 승계) |
 | (4) | 문구가 결과 타입을 만든다(문장으로만 구분되는 판정) | `evidenceLinesFor` 는 `List<String>` 만 내고 어떤 sealed 결과도 만들지 않는다 · 입력이 sealed 라 `when` 전수 — 새 `MlUnavailableReason`·`SampleExclusionReason` 추가 시 컴파일 거부 |
@@ -92,7 +92,7 @@ rollback: in_scope 경로 한정 restore(rollback.md) — 공유 파일(mileston
 | `evidenceLinesFor` 최상위 public 함수 | 문자열 생성 | 아니오(부작용 0) | 아니오 | — |
 | `PredictionComponents` | — | `internal` | — | — |
 | `object` 커널 주입 자리 | 해당 없음(신설 `object` 0) | — | — | — |
-수정 라운드마다 이 표를 갱신한다.
+수정 라운드마다 이 표를 갱신한다. — r1 수정 라운드(계약 갱신 2, V-1·V-2): 새 public 표면 0(test 파일 둘 추가·KDoc 정정뿐, verifier r2 실측).
 
 ## 종결 조건
 `Analyzed.evidence` 가 `Predicted.diagnostics`·`Supplied.excluded` 와 등가(통합 층 test) · `NotificationRequest.evidence == Analyzed.evidence`(use case test) · 우회 (1)~(8) 각 실측 · `EvidenceLinesTest` 골든(두 줄 + `NotPredicted` 11 사유 전수 + `SampleExclusionReason` 8 전수 + 같은 점수·다른 근거 → 같은 verdict) · 전건 `check` · verifier `ready-for-review` · 사용자 승인. `OPEN-4D3-DIAGNOSTICS-RENDER` 닫힘, `OPEN-4D4-CONTENT-REF`·`OPEN-4D4-REVIEW-EVIDENCE` 등재(Phase 6 에스컬레이션).
