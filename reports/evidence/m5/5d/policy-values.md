@@ -1,6 +1,8 @@
 # M5/5D 정책 값 — `OPEN-5D-POLICY-VALUES`(**사용자 승인 2026-09-12, 착수 시**)
 
-> **지위: 승인.** 전부 legacy-behavior(`ed4b06c` 모듈 상수·`app/core/config.py`), 5D 가 지어낸 수치 없음. 정본은 이 문서 —
+> **지위: 승인.** 전부 legacy-behavior(`ed4b06c` 모듈 상수·`app/core/config.py`), 5D 가 지어낸 수치 없음
+> (단 `scenario.clamp_max` 는 2026-09-16 운영자 결정 ①로 `1.0`이다 — 계약 후보율 축 ≤ 1 에 맞춘 값, legacy `1.4` 대체,
+> 아래 표 각주·change_history 참고). 정본은 이 문서 —
 > 실물은 `ml-engine/policy/inference-v1.yaml`(평탄 키, `PolicyScalar` 제약), 로더 `load_inference_policy` 가 `known_keys` 전수·값 불변식으로
 > 대조하고 test 가 이 표와 YAML 을 대조한다. 값을 바꾸려면 이 문서 → YAML → test 순.
 

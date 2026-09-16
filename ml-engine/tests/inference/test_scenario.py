@@ -32,8 +32,8 @@ def test_candidates_have_fixed_order_and_labels(policy: InferencePolicy) -> None
     """M5/5F-1 계약 갱신 (2) — `center=0.9`(이전엔 `1.0`). `scenario.clamp_max` 가
     `1.0`으로 내려간 뒤(D-5F1-1) `center=1.0`은 `aggressive`를 상한에 접어 이
     test 의 엄격 부등식 전제(순서만 확인, clamp 자체는 아래 `test_clamp_band_
-    applied`·`test_center_at_clamp_max_folds_base_and_aggressive_but_keeps_
-    three_candidates`가 담당)와 우연히 충돌했다 — clamp 를 안 건드리는 `0.9`로
+    applied`·`test_center_at_or_above_clamp_max_folds_base_and_aggressive_but_
+    keeps_three_candidates`가 담당)와 우연히 충돌했다 — clamp 를 안 건드리는 `0.9`로
     옮겨 원래 의도(라벨 순서·엄격 순서)를 그대로 검증한다."""
     candidates = build_scenario_candidates(center=0.9, std=0.05, policy=policy)
     assert isinstance(candidates, tuple)
