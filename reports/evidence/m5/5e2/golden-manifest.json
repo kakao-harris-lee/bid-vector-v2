@@ -1,0 +1,6 @@
+{
+  "milestone": "m5",
+  "slice": "5e2-calculate-optimal-bid-wire-mapping",
+  "status": "N/A",
+  "reason": "이 slice는 새 authoritative/observed/legacy-behavior fixture corpus case를 추가하지 않는다. CalculateOptimalBid의 도메인 판정(엔진 수치)은 5D-2/5D-3가 이미 golden으로 잠갔고(ml-kernel-011 등), 5E-2는 그 엔진 결과를 wire 계약으로 옮기는 매핑·검증 층만 구현한다(scope.md in_scope — serving/{wire,runtime,prediction,status}.py). test는 합성 Success/Unmeasurable 값(test_wire.py·test_prediction.py)과 2F 승인 testdata(contracts/testdata/prediction/calculate_optimal_bid_request.binpb, 승인 태그 contracts/v1-approved-2026-09-16)의 유일한 완비 competition_sample을 복제해 정책 임계를 채운 실 엔진 호출(test_kotlin_rules_parity.py·test_server_prediction.py)로 이뤄진다 — 새 fixture 파일을 만들거나 fixtures/manifest.yaml을 편집하지 않았다(무접촉, git diff로 확인)."
+}
