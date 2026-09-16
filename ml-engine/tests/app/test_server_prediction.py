@@ -1,11 +1,12 @@
-"""RED — S-12b 자동화(scope.md ⑧, 5E-1 알려진 제한 9 해소). 실 TCP socket 위에서
+"""S-12b 자동화(scope.md ⑧, 5E-1 알려진 제한 9 해소). 실 TCP socket 위에서
 `ml_engine.app.server`가 조립한 서버에 실 gRPC client 로 접속해 두 경로를 확인한다:
 
-  (A) 완성 case 정책(`assessment.agency_sample_threshold` 채움) → READY + `promoted`
-      → `CalculateOptimalBid` Success → `promoted == success.release`(id·checksum).
-  (B) 출하 정책(그 키 미선언, `policy/inference-v1.yaml` 그대로) → NOT_READY +
-      `MODEL_NOT_READY` — "출하 정책으로는 서빙이 안 된다"가 test 로 고정된다
-      (`OPEN-5D2-POLICY-VALUES`, D-5D2-3).
+  - 출하 정책(`policy/inference-v1.yaml` 그대로) → READY + `promoted` →
+    `CalculateOptimalBid` Success → `promoted == success.release`(id·checksum),
+    후보율 전부 (0, 1] 안(M5/5F-1 값 변경 이후 — D-5F1-3 반전, 이전엔 `assessment.
+    agency_sample_threshold` 미선언으로 이 경로가 NOT_READY 였다, `OPEN-5D2-
+    POLICY-VALUES`).
+  - (N-2) 정책 넷 중 하나만 깨져도 두 RPC 가 동시에 NOT_READY.
 
 `server.run()`(SIGTERM 핸들러 등록, main thread 전용)을 직접 부르지 않는다 — 이
 test 는 `app.server`의 조립 조각(`_preload`·`_preload_outcomes`·`_build_servicers`)과
@@ -14,6 +15,7 @@ test 는 `app.server`의 조립 조각(`_preload`·`_preload_outcomes`·`_build_
 
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 
 import grpc
@@ -133,15 +135,26 @@ def _success_calc_request() -> prediction_pb2.CalculateOptimalBidRequest:
     return request
 
 
-# ---- (A) 완성 case 정책 — READY, Success, promoted 일치 ----
+# ---- (A/B 병합, M5/5F-1) 출하 정책 그대로 — READY, Success, promoted 일치 ----
+#
+# D-5F1-3 반전 — 5F-1 이전엔 출하 `policy/inference-v1.yaml`에
+# `assessment.agency_sample_threshold`가 없어 이 경로가 영원히 NOT_READY 였다((B)
+# 옛 test 가 그 사실을 고정했다). 5F-1 이 그 키(잠정값 10)와 `scenario.clamp_max
+# 1.0`을 채운 뒤로는 **출하 정책 그대로 gate 가 READY 다** — 값 변경만으로 여기까지
+# 온 것이 이 slice 의 전제(scope.md ④)라, 이 test 가 반대 방향(값이 빠지면 다시
+# NOT_READY)으로 그 사실을 고정한다. (A)(완성 case 정책 — `_completed_case_
+# inference_policy_path`로 temp 사본을 읽던 test)는 이제 출하 정책과 결과가
+# 동일해져 중복이므로 이 test 하나로 합친다(판단 등재, `_completed_case_
+# inference_policy_path` 자체는 아래 N-2 test 가 "정상 정책 하나" 자리로 계속 쓴다).
 
 
-def test_completed_case_policy_serves_success_matching_promoted(
-    tmp_path: Path,
-) -> None:
+def test_shipped_policy_serves_success_matching_promoted(tmp_path: Path) -> None:
+    """5F-1 값 변경(clamp_max 1.0·agency_sample_threshold 10) 이후 출하 정책
+    그대로 READY + `promoted` + `CalculateOptimalBid` Success 이고
+    `promoted == success.release`(id·checksum)."""
     config = _config(
-        inference_policy_path=_completed_case_inference_policy_path(tmp_path),
-        artifact_out_dir=tmp_path / "artifacts-a",
+        inference_policy_path=_SHIPPED_INFERENCE_POLICY,
+        artifact_out_dir=tmp_path / "artifacts-shipped",
     )
     running = _RunningServer(config)
     try:
@@ -160,38 +173,12 @@ def test_completed_case_policy_serves_success_matching_promoted(
             calc_response.success.release.artifact_checksum
             == promoted.artifact_checksum
         )
-    finally:
-        running.close()
-
-
-# ---- (B) 출하 정책 — NOT_READY, MODEL_NOT_READY ----
-
-
-def test_shipped_policy_without_agency_sample_threshold_stays_not_ready(
-    tmp_path: Path,
-) -> None:
-    """D-5D2-3 — `assessment.agency_sample_threshold` 미선언인 출하
-    `policy/inference-v1.yaml`을 그대로 쓰면 영원히 NOT_READY 다(`OPEN-5D2-POLICY-
-    VALUES` 값 미정). 이 test 가 그 사실을 문서가 아니라 test 로 고정한다."""
-    config = _config(
-        inference_policy_path=_SHIPPED_INFERENCE_POLICY,
-        artifact_out_dir=tmp_path / "artifacts-b",
-    )
-    running = _RunningServer(config)
-    try:
-        assert running.gate.snapshot().state is Readiness.NOT_READY
-
-        metadata_response = running.stub.GetModelMetadata(_metadata_request())
-        assert (
-            metadata_response.metadata.readiness == prediction_pb2.READINESS_NOT_READY
-        )
-        assert not metadata_response.metadata.HasField("promoted")
-
-        calc_response = running.stub.CalculateOptimalBid(_success_calc_request())
-        assert calc_response.WhichOneof("result") == "failure"
-        # verifier r1 L-4 — detail_code 만이 아니라 코드 자체도 단언한다.
-        assert calc_response.failure.code == error_pb2.FAILURE_CODE_MODEL_NOT_READY
-        assert calc_response.failure.detail_code == "SERVER_NOT_READY"
+        # scope.md ⑤ — 정책 clamp_max ≤ 1 이 출하 경로에서도 후보율 계약(D-2B-8)을
+        # 지킨다: Success 로 나온 이상 세 후보 전부 (0, 1] 안이다(wire 층
+        # `_to_rate_or_none`이 그 밖을 이미 `MappingRejected`로 막는다).
+        for candidate in calc_response.success.candidates:
+            rate = Decimal(candidate.bid_rate.fraction)
+            assert Decimal("0") < rate <= Decimal("1")
     finally:
         running.close()
 

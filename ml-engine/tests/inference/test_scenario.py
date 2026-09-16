@@ -29,7 +29,13 @@ def policy() -> InferencePolicy:
 
 
 def test_candidates_have_fixed_order_and_labels(policy: InferencePolicy) -> None:
-    candidates = build_scenario_candidates(center=1.0, std=0.05, policy=policy)
+    """M5/5F-1 계약 갱신 (2) — `center=0.9`(이전엔 `1.0`). `scenario.clamp_max` 가
+    `1.0`으로 내려간 뒤(D-5F1-1) `center=1.0`은 `aggressive`를 상한에 접어 이
+    test 의 엄격 부등식 전제(순서만 확인, clamp 자체는 아래 `test_clamp_band_
+    applied`·`test_center_at_or_above_clamp_max_folds_base_and_aggressive_but_
+    keeps_three_candidates`가 담당)와 우연히 충돌했다 — clamp 를 안 건드리는 `0.9`로
+    옮겨 원래 의도(라벨 순서·엄격 순서)를 그대로 검증한다."""
+    candidates = build_scenario_candidates(center=0.9, std=0.05, policy=policy)
     assert isinstance(candidates, tuple)
     conservative, base, aggressive = candidates
     assert conservative.label is CandidateLabel.CONSERVATIVE
@@ -52,8 +58,11 @@ def test_bid_rate_is_decimal_with_scale_preserved(policy: InferencePolicy) -> No
 @pytest.mark.legacy_parity
 def test_matches_legacy_scenario_bid_rates_formula(policy: InferencePolicy) -> None:
     """legacy `scenario_bid_rates` — `clamp(scale*(center + sign*z*std))`(회귀 관측,
-    판정 근거 아님 — S-8 관측 전용, verifier r1 L-4)."""
-    center, std, scale = 1.0, 0.03, 1.0
+    판정 근거 아님 — S-8 관측 전용, verifier r1 L-4). `center=0.9`(M5/5F-1 계약
+    갱신 (2), 이전엔 `1.0` — clamp_max 1.0 하에서 `aggressive` 기대값(clamp 미고려
+    raw 산식)이 실제 clamp 된 값과 어긋났다). 이 test 의 관심은 clamp 미적용
+    구간에서의 산식 일치이므로 clamp 상한을 안 건드리는 값으로 옮긴다."""
+    center, std, scale = 0.9, 0.03, 1.0
     z = float(policy.scenario_z)
     expected_base = round(scale * (center + (0 * z * std)), 4)
     expected_conservative = round(scale * (center + (-1 * z * std)), 4)
@@ -74,6 +83,38 @@ def test_clamp_band_applied(policy: InferencePolicy) -> None:
     assert isinstance(candidates, tuple)
     for candidate in candidates:
         assert candidate.bid_rate == policy.scenario_clamp_max
+
+
+@pytest.mark.parametrize("center", [1.0, 1.05])
+def test_center_at_or_above_clamp_max_folds_base_and_aggressive_but_keeps_three_candidates(
+    policy: InferencePolicy, center: float
+) -> None:
+    """D-5F1-5(M5/5F-1 계약 갱신 (2)) — `scenario.clamp_max` 를 `1.0`으로 내린 뒤
+    `center >= clamp_max`인 입력(경계 `1.0`과 그 너머 `1.05` 둘 다)에서 `base`
+    (sign 0)와 `aggressive`(sign +1, std>0)가 똑같이 상한으로 접혀 같은 값이 된다
+    (`conservative`는 sign -1 이라 상한 밑에 남는다). 이것은 엔진 결함이 아니다 —
+    `build_scenario_candidates`(src, 무편집)는 후보 간 엄격한 순서를 강제하지
+    않는다(clamp 는 후보 셋을 독립적으로 자른다, `test_zero_std_does_not_reject_
+    but_produces_equal_candidates`가 이미 셋 다 같은 값이 되는 경로를 허용해
+    뒀다). 계약·소비자 어느 쪽도 엄격 순서나 유일성을 요구하지 않는다 — **실측**:
+    Kotlin `ParsedSuccessFields.kt`(`isAcceptableSuccessShape` → `hasOrderedCandidateRates`
+    호출, `CandidateShapeValidation.kt`에 `rates[0] <= rates[1] && rates[1] <=
+    rates[2]`, 비엄격 `<=`)와 `ResponseMapping.kt`(순서·유일성 검사 없음, grep 확인)
+    둘 다, 그리고 그 아래 도메인 타입 `BidRateCandidates.init`(`BidPredictionOutcome.kt`)
+    도 `require(conservative <= base)`·`require(base <= aggressive)`(비엄격)만 둔다.
+    예외 없이 후보 3·라벨 순서·`conservative < base`(엄격, sign -1 이 항상 중심보다
+    낮으므로)는 유지한 채 값 지어내기·조용한 실패 없이 그대로 낸다."""
+    candidates = build_scenario_candidates(center=center, std=0.05, policy=policy)
+    assert isinstance(candidates, tuple)
+    assert len(candidates) == 3
+    conservative, base, aggressive = candidates
+    assert conservative.label is CandidateLabel.CONSERVATIVE
+    assert base.label is CandidateLabel.BASE
+    assert aggressive.label is CandidateLabel.AGGRESSIVE
+    assert base.bid_rate == policy.scenario_clamp_max
+    assert aggressive.bid_rate == policy.scenario_clamp_max
+    assert base.bid_rate == aggressive.bid_rate
+    assert conservative.bid_rate < base.bid_rate
 
 
 @pytest.mark.parametrize("bad_value", [math.nan, math.inf, -math.inf])

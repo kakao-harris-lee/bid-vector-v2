@@ -18,11 +18,13 @@ from ml_engine.inference.policy import (
 
 _POLICY_PATH = Path(__file__).resolve().parents[2] / "policy" / "inference-v1.yaml"
 
-# M5/5D-2 — `assessment.agency_sample_threshold`는 출하 `inference-v1.yaml`에 없다
-# (D-5D2-3, `OPEN-5D2-POLICY-VALUES` 값 미정, 운영자 결정 2026-09-13 (c)). 이 test 파일의
-# 다른 모든 test 는 이 키와 무관한 동작(다른 필드의 불변식)을 검증하므로, `_base_values()`가
-# 실제 출하 값 위에 이 키만 synthetic 으로 채워 넣는다 — 값 자체(`1`, 가장 관대해 다른
-# 어떤 test 의 단언에도 영향을 주지 않는다)는 `OPEN-5D2-POLICY-VALUES`의 답이 아니다.
+# M5/5F-1 — `assessment.agency_sample_threshold`는 이제 출하 `inference-v1.yaml`에
+# 잠정값 10으로 있다(`OPEN-5D2-POLICY-VALUES` 종결, 운영자 결정 2026-09-16 ③). 이 test
+# 파일의 다른 모든 test 는 이 키와 무관한 동작(다른 필드의 불변식)을 검증하므로,
+# `_base_values()`가 실제 출하 값 위에 이 키만 synthetic 으로 **덮어써** 격리한다 — 값
+# 자체(`1`, 가장 관대해 다른 어떤 test 의 단언에도 영향을 주지 않는다)는 잠정값 10 과
+# 무관하게 고정된 채로 남는다. 잠정값 10 자체를 잠그는 test 는
+# `test_shipped_policy_file_loads_with_lowered_clamp_and_agency_sample_threshold`다.
 _SYNTHETIC_AGENCY_SAMPLE_THRESHOLD = 1
 
 
@@ -38,20 +40,26 @@ def _write(tmp_path: Path, values: dict[str, object]) -> Path:
     return path
 
 
-def test_shipped_policy_file_is_rejected_missing_agency_sample_threshold() -> None:
-    """D-5D2-3 — `assessment.agency_sample_threshold` 키 신설 이후, 그 값이 아직
-    승인되지 않아(`OPEN-5D2-POLICY-VALUES`) 출하 파일에 없다. 이 로드 실패가
-    의도된 상태다: 서빙(5E)이 켜지려면 값 승인이 선행돼야 함이 로더에서 드러난다."""
+def test_shipped_policy_file_loads_with_lowered_clamp_and_agency_sample_threshold() -> (
+    None
+):
+    """D-5F1-3 — 반전(이전엔 `assessment.agency_sample_threshold` 부재로 이 로드가
+    거부됐다, `OPEN-5D2-POLICY-VALUES`). 5F-1 이 출하 파일에 그 키(잠정값 10, 근거
+    golden `ml-kernel-011`, 재승인 조건은 실 코퍼스 재학습 지표)와 `scenario.clamp_max
+    1.0`(`OPEN-5E2-CANDIDATE-RATE-UPPER` (a) 채택)을 채워, 출하 파일이 이제 그대로
+    로드된다 — 값이 빠지면 이 test 가 다시 붉어진다."""
     result = load_inference_policy(_POLICY_PATH)
-    assert isinstance(result, PolicyRejected)
-    assert "agency_sample_threshold" in result.reason
+    assert isinstance(result, InferencePolicy)
+    assert result.assessment_agency_sample_threshold == 10
+    assert result.scenario_clamp_max == Decimal("1.0")
 
 
 def test_shipped_values_with_agency_sample_threshold_declared_load_successfully(
     tmp_path: Path,
 ) -> None:
-    """출하 값 스물셋 + synthetic `agency_sample_threshold` 하나가 전부 올바르게
-    타입 변환·불변식 통과되는지 — 이 키 신설이 기존 스물세 값의 로드를 깨지 않는다."""
+    """출하 값(5F-1 갱신 이후 clamp_max 1.0·agency_sample_threshold 10 포함) 위에
+    `_base_values()`가 `agency_sample_threshold`만 synthetic `1`로 덮어써 격리한
+    스물넷 전부가 올바르게 타입 변환·불변식 통과되는지."""
     policy = load_inference_policy(_write(tmp_path, _base_values()))
     assert isinstance(policy, InferencePolicy)
     assert policy.version == "inference-v1"
@@ -63,7 +71,7 @@ def test_shipped_values_with_agency_sample_threshold_declared_load_successfully(
     )
     assert policy.scenario_z_signs == (-1, 0, 1)
     assert policy.scenario_clamp_min == Decimal("0.7")
-    assert policy.scenario_clamp_max == Decimal("1.4")
+    assert policy.scenario_clamp_max == Decimal("1.0")
     assert policy.scenario_bid_rate_digits == 4
     assert policy.assessment_agency_prior_strength == Decimal("12.0")
     assert policy.assessment_category_prior_strength == Decimal("40.0")
@@ -219,9 +227,9 @@ def test_clamp_min_quantizes_to_zero_is_rejected_digits_4(tmp_path: Path) -> Non
 
 def test_shipped_clamp_min_survives_quantize_check(tmp_path: Path) -> None:
     """출하 정책(clamp_min 0.7, digits 4)은 F-1 불변식에 영향받지 않는다 — 회귀 없음.
-    `_base_values()`를 거쳐 로드한다(M5/5D-2 — 출하 파일 자체는 `agency_sample_threshold`
-    미선언으로 이제 항상 거부되므로, `agency_sample_threshold` 를 제외한 다른 값의 회귀
-    여부는 synthetic 주입 경로로 확인한다)."""
+    `_base_values()`를 거쳐 로드한다(`agency_sample_threshold`를 synthetic 값으로
+    격리해, 그 키를 제외한 다른 값의 회귀 여부를 확인하는 이 test 파일의 관례를
+    따른다)."""
     policy = load_inference_policy(_write(tmp_path, _base_values()))
     assert isinstance(policy, InferencePolicy)
     assert policy.scenario_clamp_min == Decimal("0.7")
