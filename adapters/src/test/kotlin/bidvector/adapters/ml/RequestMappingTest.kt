@@ -88,6 +88,36 @@ class RequestMappingTest {
         price.provenance shouldBe AmountProvenanceKind.AMOUNT_PROVENANCE_KIND_PUBLISHED
     }
 
+    /**
+     * verifier r2 N-1 관련 — `mapRequest`/`toProtoReserveDraw`는 받은 `List<BaseAmount>`
+     * 순서를 그대로 옮긴다(재정렬하지 않는다). 순번 정렬 자체는 `SampleConversion.
+     * reservePriceAmounts`(workflow, `SampleEligibilityTest`의 N-1 test) 소관 — 이 test는
+     * 그 인접 위험(매핑 층이 이미 정렬된 리스트를 다시 섞지 않는가)을 잰다. 같은 픽스처
+     * 정신으로 DB 사전순에 대응하는 뒤섞인 입력을 그대로 주고 wire 순서가 입력 순서와
+     * 바이트 단위로 같은지 대조한다.
+     */
+    @Test
+    fun `reserveDraw 는 입력 List 순서를 그대로 옮긴다 — 재정렬하지 않는다`() {
+        val lexicographicOrder = (1..15).map(Int::toString).sorted().map { it.toInt() }
+        val scrambledDraw =
+            ReserveDrawObservation(
+                reservePrices =
+                    lexicographicOrder.map { n ->
+                        BaseAmount(
+                            900_000_000L + n,
+                            Currency.KRW,
+                            VatTreatment.UNKNOWN,
+                            Provenance.Published(NoticeRound.of("000")),
+                        )
+                    },
+                selectedNumbers = setOf(1),
+            )
+
+        val proto = mapped(sampleWith(scrambledDraw)).getCompetitionSamples(0)
+
+        proto.reserveDraw.reservePricesList.map { it.amountWon } shouldBe lexicographicOrder.map { 900_000_000L + it }
+    }
+
     @Test
     fun `reserveDraw null 이면 필드를 채우지 않는다 — 엔진이 NO_RESERVE_DRAW 로 계수`() {
         val proto = mapped(sampleWith(null)).getCompetitionSamples(0)

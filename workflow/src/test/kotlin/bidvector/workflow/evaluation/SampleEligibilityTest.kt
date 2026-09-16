@@ -66,6 +66,19 @@ class SampleEligibilityTest {
     private fun fifteenRows(hasPrice: Boolean = true): List<OpeningReservePriceRow> =
         (1..15).map { n -> reserveRow(n.toString().padStart(3, '0'), 900_000_000L + n, hasPrice) }
 
+    /**
+     * verifier r2 N-1 — `reserve_price_sequence`는 zero-pad 없는 원문 그대로 저장된다
+     * (`OpeningReservePriceRow.init`은 공백만 거부, `KonepsOpeningResultSourceTest`의
+     * `sno.toString()`이 실제 수집 형태다) — 실 DB `ORDER BY reserve_price_sequence`(TEXT)는
+     * 사전순이라 `"1","10","11",…,"15","2",…,"9"` 순으로 행을 돌려준다. `fifteenRows()`는
+     * zero-pad라 이미 정렬된 입력이라 정렬 로직 자체를 재지 못한다 — 이 헬퍼가 그 사전순을
+     * 그대로 재현한다.
+     */
+    private fun lexicographicOrderRows(): List<OpeningReservePriceRow> {
+        val lexicographicSequence = (1..15).map(Int::toString).sorted()
+        return lexicographicSequence.map { sequence -> reserveRow(sequence, 900_000_000L + sequence.toInt()) }
+    }
+
     private fun testNotice(
         number: String = "20260916001",
         round: String = "000",
@@ -166,6 +179,27 @@ class SampleEligibilityTest {
         (firstPrice.export().won) shouldBe 900_000_001L
         // 우회 (18) — Published 의 회차는 표본 공고 자기 회차("001")다. 대상 공고 회차를 빌리지 않는다.
         firstPrice.provenance shouldBe Provenance.Published(NoticeRound.of("001"))
+    }
+
+    /**
+     * verifier r2 N-1(HIGH) — `reservePriceAmounts`의 정렬(`RESERVE_PRICE_SEQUENCE_ORDER`)이
+     * 실제로 측정되는 유일한 자리. 입력을 DB 사전순(`lexicographicOrderRows()`)으로 주고
+     * 출력 `reserveDraw.reservePrices`가 **순번 1..15 순**(사전순이 아니라)인지 잰다 —
+     * 정렬을 지우는 편집(`rows.sortedWith(...)` → `rows`)이 이 test에서만 붉어진다
+     * (`fifteenRows()`는 zero-pad라 이미 정렬돼 있어 이 결함을 못 잡는다).
+     */
+    @Test
+    fun `예비가격은 DB 사전순 입력이어도 순번 1 부터 15 순으로 정렬돼 나간다`() {
+        val notice = testNotice()
+        val opening = testOpening(notice.id, reservePrices = lexicographicOrderRows())
+
+        val outcome = judge(notice, opening) as SampleEligibilityOutcome.Eligible
+
+        val wonInOutputOrder =
+            outcome.sample.reserveDraw
+                ?.reservePrices
+                ?.map { it.export().won }
+        wonInOutputOrder shouldBe (1..15).map { n -> 900_000_000L + n }
     }
 
     @Test
