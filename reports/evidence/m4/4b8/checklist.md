@@ -96,5 +96,8 @@
 
 ## 사용자 승인
 
-미승인 — 구현 레인 완료 보고 대기. verifier 검증 뒤 사용자 승인 절차(milestone-0 「verifier
-ready-for-review + 사용자 승인」).
+2026-09-16 — 운영자 지시 「추천 A 진행」(4B-7 다음 (a)) 하에 착수·구현·검증·종결·PR 까지 진행(머지는 별도 승인).
+verifier r1 `ready-for-review`(`_workspace/m4-4b8/03_verifier_report.md`), 재작업 0회. 장부층 MEDIUM 2·LOW 4 는 팀장
+`2ae102b`(D-4B8-1 문면·data-dictionary §6.3.1·capability-map 취소선·`OPEN-4B8-DEAD-DERIVED-RULES`) + 구현 레인
+`86ba432`(F-1·F-3·F-4·F-6) 로 등재 처리, 재검증 없이 종결(차단 문턱 밖 — 리뷰 레인이 본다). 팀장 종결 등재 뒤 evidence
+편집 커밋의 HEAD 에서 루트 `clean check` 재실측(commands.md).
