@@ -282,6 +282,19 @@ def test_step4a_unspecified_objective_is_invalid_request() -> None:
     assert response.failure.detail_code == "OBJECTIVE_UNSPECIFIED"
 
 
+def test_step4b_unsupported_objective_value_is_invalid_request() -> None:
+    """verifier r1 M-1 — `OBJECTIVE_UNSUPPORTED`(닫힌 집합 밖 값, `UNSPECIFIED`와
+    다른 사유)에 생산 test 가 없었다. `_validate_objective`는 이미 옳게 이 값을
+    내지만(실측 — 5E-1 verifier r1 M-8/L-5 규율의 반대 방향: 생산은 있고 증거가
+    없는 어휘를 남기지 않는다) 그것을 고정하는 test 가 없었다."""
+    servicer = _servicer(runtime=_runtime())
+    request = _valid_calc_request(objective=99)  # 닫힌 집합(SCENARIO_TRIPLE) 밖 값
+    response = servicer.CalculateOptimalBid(request, _ActiveContext())
+    assert response.WhichOneof("result") == "failure"
+    assert response.failure.code == error_pb2.FAILURE_CODE_INVALID_REQUEST
+    assert response.failure.detail_code == "OBJECTIVE_UNSUPPORTED"
+
+
 def test_step5_runtime_none_is_model_not_ready() -> None:
     servicer = _servicer(runtime=None)
     request = _valid_calc_request()
