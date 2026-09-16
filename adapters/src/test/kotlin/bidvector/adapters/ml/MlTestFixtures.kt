@@ -20,12 +20,14 @@ import contract.bidvector.ml.v1.CalculateOptimalBidRequest
 import contract.bidvector.ml.v1.CalculateOptimalBidResponse
 import contract.bidvector.ml.v1.Candidate
 import contract.bidvector.ml.v1.CandidateLabel
+import contract.bidvector.ml.v1.Diagnostics
 import contract.bidvector.ml.v1.GetModelMetadataRequest
 import contract.bidvector.ml.v1.GetModelMetadataResponse
 import contract.bidvector.ml.v1.IntervalSource
 import contract.bidvector.ml.v1.ModelRelease
 import contract.bidvector.ml.v1.PriceFitness
 import contract.bidvector.ml.v1.ReleaseKind
+import contract.bidvector.ml.v1.SegmentSupport
 import contract.bidvector.ml.v1.Success
 import contract.bidvector.ml.v1.Uncertainty
 import contract.bidvector.ml.v1.Weight
@@ -109,6 +111,31 @@ internal fun testSuccessResponse(
                 .setIntervalSource(IntervalSource.INTERVAL_SOURCE_CROSS_VALIDATION_RESIDUAL)
                 .build(),
         ).setRelease(testModelRelease(releaseId, artifactChecksum))
+        .setDiagnostics(testDiagnostics())
+        .build()
+
+/**
+ * M4/4D-3(scope.md D-4D3-2) — `hasValidDiagnosticsShape`가 진단 없는 응답(proto 기본
+ * 인스턴스, `shrinkage_weight.fraction = ""`)을 거부하므로(우회 (5)) 이 fixture 는 항상
+ * 유효한 진단을 채운다. `testSuccessResponse()`의 기본 `releaseKind`(`ARTIFACT`)와 짝을
+ * 맞춰 `trainingRowCount`를 0보다 크게 둔다(D-4D3-2(d)는 `DERIVED`에서만 0을 강제한다).
+ */
+internal fun testDiagnostics(
+    trainingRowCount: Int = 120,
+    segmentSupport: SegmentSupport = SegmentSupport.SEGMENT_SUPPORT_DIRECT,
+    shrinkageWeightFraction: String = "0.1000",
+    excludedObservations: Int = 2,
+    agencySampleCount: Int = 15,
+    agencySampleBelowThreshold: Boolean = false,
+): Diagnostics =
+    Diagnostics
+        .newBuilder()
+        .setTrainingRowCount(trainingRowCount)
+        .setSegmentSupport(segmentSupport)
+        .setShrinkageWeight(Weight.newBuilder().setFraction(shrinkageWeightFraction).build())
+        .setExcludedObservations(excludedObservations)
+        .setAgencySampleCount(agencySampleCount)
+        .setAgencySampleBelowThreshold(agencySampleBelowThreshold)
         .build()
 
 /**
