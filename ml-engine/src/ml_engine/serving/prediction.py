@@ -7,7 +7,8 @@
   ⑶ model_release_selector 미설정 거부, exact_release 는 현재 DERIVED release 와
      id·checksum 둘 다 같아야 한다(런타임이 있을 때만 대조 가능 — 없으면 ⑸ 가 잡는다)
   ⑷ objective 가 SCENARIO_TRIPLE 이어야 한다(UNSPECIFIED·그 밖 값은 거부)
-  ⑸ runtime 없음(preload 실패/미완 — gate NOT_READY) → `MODEL_NOT_READY`
+  ⑸ gate 스냅샷이 READY 가 아님(정책 넷 preload 중 하나라도 실패) → `MODEL_NOT_READY`
+     (code-reviewer HIGH R-H1 시정 — `runtime` 유무가 아니라 gate 를 본다)
   ⑹ `context.is_active()` 거짓 → 계산 없이 반환(ADR 0010 D-2)
   ⑺ `serve_bid_rates` 호출 → `serving.wire.map_kernel_result`
 
@@ -62,6 +63,7 @@ class _Rejection:
 
 def _validate(
     request: prediction_pb2.CalculateOptimalBidRequest,
+    gate: ReadinessGate,
     runtime: PredictionRuntime | None,
     supported_feature_schema_versions: tuple[str, ...],
 ) -> _Rejection | None:
@@ -87,7 +89,16 @@ def _validate(
     if objective_rejection is not None:
         return objective_rejection
 
-    if runtime is None:
+    # code-reviewer HIGH(R-H1) — 미준비 판정은 **gate 스냅샷**을 본다, `runtime` 유무가
+    # 아니라(D-5E2-10, scope 위협 모델 (f) 「⑸는 gate 실물」). 이전 판은 `runtime is
+    # None`만 봤는데, 조립 근이 inference 정책 성공만으로 `runtime`을 만들면서
+    # training/evaluation/serving 정책이 깨져 gate 가 NOT_READY(`GetModelMetadata`가
+    # `promoted` 미설정)여도 `CalculateOptimalBid`은 계산을 진행해 성공 응답을 냈다 —
+    # Kotlin `ReleaseCheck`(`latest_promoted`)가 `promoted`가 없어 그 정직한 응답을
+    # 폐기하는 반면 서버는 자신이 미준비임을 스스로 드러내지 않는 상태였다. 이제
+    # `runtime`이 있어도 gate 가 READY 가 아니면 거부한다 — 두 조건의 동시 성립은
+    # 조립 근(`app/server.py::_prediction_runtime`)이 gate 와 같은 기준으로 보장한다.
+    if gate.snapshot().state is not Readiness.READY:
         return _Rejection(
             error_pb2.FAILURE_CODE_MODEL_NOT_READY,
             True,
@@ -199,7 +210,7 @@ class BidPredictionServicer(prediction_pb2_grpc.BidPredictionServiceServicer):  
     ) -> prediction_pb2.CalculateOptimalBidResponse:
         response = prediction_pb2.CalculateOptimalBidResponse()
         rejection = _validate(
-            request, self._runtime, self._supported_feature_schema_versions
+            request, self._gate, self._runtime, self._supported_feature_schema_versions
         )
         if rejection is not None:
             fill_application_failure(

@@ -192,10 +192,21 @@ def _training_pipeline_factory(
 def _prediction_runtime(
     preloaded: _Preloaded, config: ServerConfig
 ) -> PredictionRuntime | None:
-    """M5/5E-2(D-5E2-1) — inference 정책 preload 가 성공했을 때만 `PredictionRuntime`을
-    한 번 만든다. 실패면 `None`(`BidPredictionServicer`가 `MODEL_NOT_READY`로 답한다) —
-    `build_derived_release`를 요청마다 부르지 않는다(런타임 상수, 결정적)."""
+    """M5/5E-2(D-5E2-1) — `ReadinessGate.from_preload`가 READY 로 판정하는 조건(정책
+    넷 전부 preload 성공)과 **정확히 같은** 조건에서만 `PredictionRuntime`을 한 번
+    만든다. 실패면 `None`(`BidPredictionServicer`가 `MODEL_NOT_READY`로 답한다) —
+    `build_derived_release`를 요청마다 부르지 않는다(런타임 상수, 결정적).
+
+    code-reviewer HIGH(R-H1) 시정 — 이전 판은 `inference` 성공만 봤다. `training`·
+    `evaluation`·`serving` 중 하나가 깨져도 `runtime`이 만들어져, `GetModelMetadata`
+    는 `NOT_READY`(+promoted 미설정)를 내는 동안 `CalculateOptimalBid`은 계산을
+    진행해 성공 응답을 냈다 — Kotlin `ReleaseCheck`가 `promoted` 부재로 그 정직한
+    응답을 폐기하는 반면 서버는 자신의 미준비를 드러내지 않았다. `_preload_outcomes`
+    가 이미 gate 와 같은 판정을 계산하므로 그 결과를 그대로 재사용한다(같은 기준을
+    두 곳에서 각자 다시 구현하지 않는다 — 어긋날 여지 자체를 없앤다)."""
     if not isinstance(preloaded.inference, InferencePolicy):
+        return None
+    if any(not outcome.ok for outcome in _preload_outcomes(preloaded)):
         return None
     release = build_derived_release(preloaded.inference, config.code_version)
     return PredictionRuntime(

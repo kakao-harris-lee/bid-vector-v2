@@ -292,6 +292,30 @@ def test_step5_runtime_none_is_model_not_ready() -> None:
     assert response.failure.detail_code == "SERVER_NOT_READY"
 
 
+def test_step5_runtime_present_but_gate_not_ready_is_model_not_ready(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """code-reviewer HIGH(R-H1) — 미준비 판정은 gate 스냅샷을 본다, `runtime` 유무가
+    아니라. 정상 배선(`app/server.py::_prediction_runtime`)에서는 이 조합(runtime
+    있음 + gate NOT_READY)이 생기지 않지만(둘이 같은 조건에서만 성립하도록 조립
+    근이 보장한다), 검증 로직 자체가 `runtime`이 아니라 gate 를 보고 있는지는 이
+    조합을 직접 구성해야만 확인된다 — `runtime`이 있다는 이유만으로 계산이
+    진행되면 Kotlin `ReleaseCheck`(latest_promoted)가 promoted 부재로 그 정직한
+    응답을 폐기한다(scope 위협 모델 (f))."""
+    servicer = _servicer(runtime=_runtime(), ready=False)
+    request = _valid_calc_request()
+    calls: list[int] = []
+    monkeypatch.setattr(
+        "ml_engine.serving.prediction.serve_bid_rates",
+        lambda req, policy: calls.append(1),
+    )
+    response = servicer.CalculateOptimalBid(request, _ActiveContext())
+    assert response.WhichOneof("result") == "failure"
+    assert response.failure.code == error_pb2.FAILURE_CODE_MODEL_NOT_READY
+    assert response.failure.detail_code == "SERVER_NOT_READY"
+    assert calls == []
+
+
 def test_step6_inactive_context_returns_without_computing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
