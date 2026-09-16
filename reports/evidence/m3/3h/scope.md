@@ -33,7 +33,8 @@ in_scope:
   - procurement/src/main/kotlin/bidvector/procurement/Canonicalize.kt                  # businessCategoryFrom 관례로 기관 둘 조립
   - procurement/src/test/kotlin/bidvector/procurement/**                               # FieldContractTest·CanonicalizeTest·AgencyTest(신설)
   - adapters/src/main/resources/db/migration/V7__notice_agency.sql                     # 신설 — ALTER TABLE notice ADD COLUMN ×4(nullable TEXT)
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/{NoticeRow,Sql,NoticeReconstruction}.kt
+  - adapters/src/main/kotlin/bidvector/adapters/persistence/{NoticeRow,Sql,NoticeReconstruction,JdbcNoticeRepository,NoticeRowMerge}.kt   # 갱신 3 — 컬럼 넷 bind·존재 가드 병합은 같은 층의 구조적 필수 부분
+  - procurement/src/main/kotlin/bidvector/procurement/{KonepsAgencyFieldContracts,KonepsPresentInSets}.kt   # 갱신 3 — sizeGate(500줄)·detekt TooManyFunctions 가 CollectionPolicy.kt·Canonicalize.kt 에 걸려 내용 이동만으로 분리(KonepsOpeningCompleteFieldContracts.kt 선례)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/**                         # CleanMigrationColumnTest 행 넷·JDBC 왕복 test
   - config/quality/gate-tests.properties                                               # 신설 test 등재만
   - reports/evidence/m3/3a/policy-values.md                                            # §1.3 기관 행 넷 + P-14 행(팀장)
@@ -95,4 +96,8 @@ P-14 승인 등재(policy-values §1.3 행 넷 + P 표) · `FieldContractTest`(�
 없음(리뷰 요청 시점에 재확인).
 
 ## 계약 갱신 이력
-(없음)
+| # | 일시 | 갱신 | 사유 |
+| --- | --- | --- | --- |
+| 1 | 2026-09-16 | 운영자 결정 「추천대로」 — D-3H-1·2·4·6·8 확정(지위 문단) | 운영자 승인 |
+| 2 | 2026-09-16 | `AgencyName` 도 `of(raw)` 생성 경로(빈 값은 null) — D-3H-3 문면의 「`AgencyName`(원문 trim)」을 같은 관례로 | 구현 레인이 `AgencyCode.of` 와 대칭으로 둔 것을 흡수(권한 변화 없음) |
+| 3 | 2026-09-17 | in_scope 에 `JdbcNoticeRepository.kt`·`NoticeRowMerge.kt`(persistence 층 bind·병합) + `KonepsAgencyFieldContracts.kt`·`KonepsPresentInSets.kt`(sizeGate·detekt 로 내용 이동만 분리) 추가 | 구현 레인 보고 — D-3H-4 를 실제로 컴파일·저장되게 하려면 같은 층의 두 파일이 구조적으로 필요했고, `CollectionPolicy.kt`·`Canonicalize.kt` 가 sizeGate 500줄·TooManyFunctions 11 에 걸렸다. 계약 in_scope 가 파일을 손으로 열거해 생긴 누락(4B-7 F-8 과 같은 갈래) — verifier 표적: 분리 파일은 **내용 이동만**인지(`git diff -M` 유사도) |
