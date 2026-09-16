@@ -302,6 +302,31 @@ class TestPredictDistribution:
         assert result.diagnostics.excluded_observations == 1
         assert result.uncertainty.sample_size == 8
 
+    def test_segment_axis_enum_outside_missing_reason_rejects_only_that_sample(
+        self, policy: InferencePolicy
+    ) -> None:
+        """F-10 — 표본 축은 요청 축과 달리 여전히 닫힌 집합이다: enum 밖 정수(`99`)를
+        결측 사유로 실은 표본은 `SEGMENT_REASON_NOT_ALLOWED`로 거부되지만, 그 표본
+        하나만 빠지고 요청은 `Success`로 남는다(wire 경유, `DistributionRequest.
+        from_proto` 실제 판독 확인)."""
+        samples = [
+            competition_sample(observed_bid_rate=_BID_RATES[i % len(_BID_RATES)])
+            for i in range(9)
+        ]
+        samples[0] = competition_sample(observed_bid_rate=_BID_RATES[0], agency_id=99)
+        request = prediction_pb2.CalculateOptimalBidRequest(
+            features=_valid_features_inputs(), competition_samples=samples
+        )
+        distribution_request = DistributionRequest.from_proto(request)
+        assert isinstance(distribution_request, DistributionRequest)
+        assert distribution_request.samples[0].segment == SampleRejected(
+            SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED
+        )
+
+        result = predict_distribution(distribution_request, policy)
+        assert isinstance(result, Success)
+        assert result.diagnostics.excluded_observations == 1
+
     def test_agency_and_category_match_builds_direct_segment_support(
         self, policy: InferencePolicy
     ) -> None:
