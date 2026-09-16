@@ -686,6 +686,31 @@ bounded retry)은 4D-1 `ResilientPredictionCall`을 제네릭화(D-4D2-4)해 재
 로 실측을 연다). 구현·verifier 1차 완료, 수정 라운드 진행 중(재작업 카운터 활성) —
 종결 등재는 사용자 승인 뒤.
 
+**4D-3 착수 2026-09-16(운영자 결정 「추천 방식으로 진행」 — 5D-3 다음 (a), 정본 `reports/evidence/m4/4d3/scope.md`)** —
+`OPEN-2F-DIAGNOSTICS-DOMAIN` 을 닫는 소형 Kotlin slice. 2F 가 wire 에 올린 `Diagnostics` 여섯 성분(`training_row_count`·
+`segment_support`·`shrinkage_weight`·`excluded_observations`·`agency_sample_count`·`agency_sample_below_threshold`)을
+4D-1 gateway 가 **읽지 않는다**(`mapSuccess` 미참조, 계약 test 의 proto 보존 단언뿐). 결정 D-4D3-1~6: 도메인 값 타입
+`Weight`([0,1], `decision.UnitScore` 와 분리 — 점수와 가중치 혼용 금지)·`SegmentSupport`·`PredictionDiagnostics` 신설,
+`Predicted.diagnostics` **필수 인자** · 검증층(`isAcceptableSuccessShape`)에 `init` 짝 술어 넷(범위·미지 enum·`uint32`
+오버플로·DERIVED ⇒ 학습 행 0) + H-6 table 행 동반(4D-1 알려진 제한 9 규율) · 사다리 점수 불변(수축은 엔진이 이미 반영,
+Kotlin 은 임계를 재판정하지 않는다) · 요청 조립 무변경. **착수 조사 실측**: Kotlin 요청은 표본 0건·`agencyId = null` 로
+나가고(`predictionRequestFor`), `Notice` 에 기관 fact 가 없으며(`OPEN-2B-AGENCY-ID`), 기관/공종별 과거 표본 조회 port 가
+없다 — 분포 엔진(5D-2/5D-3)을 Kotlin 이 구동하려면 별도 slice 가 필요 → **`OPEN-4D3-SAMPLE-SUPPLY`**(운영자 결정
+대기). ML-04 ② 의 사용자 가시 착지(근거 문구)는 렌더러가 없어 **`OPEN-4D3-DIAGNOSTICS-RENDER`**(4E 알림 본문 규약과 묶음).
+`data-dictionary.md` §6.5 `intervalSource`·`Diagnostics` 성분 표는 팀장이 써 `OPEN-2F-DICT-INTERVAL-SOURCE` 를 닫는다.
+레인 `bid-vector-v2-m4e`/`m4-4d3/2026-09-16`, base `4b9fa21`(PR #18 5E-1 병합 뒤), 다른 레인(5E-2, Python)과 소스 겹침 0.
+
+**4D-3 종결 2026-09-16(사용자 승인 — 「추천 방식으로 진행」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1
+`ready-for-review`(산출물 blocker/high 0 — 스무 표본 fail-closed 실측 예외 0, testdata 진단 여섯 값 `BigDecimal` 등가,
+점수 불변, rollback ①~⑥ 초록; 장부층 medium 2·low 5 는 팀장 F-1(§6.5.1 위치)·F-6(`head_sha`) + 구현 레인 일괄
+`91fb85d` 로 등재 처리, 재검증 없이 종결). **재작업 0회**. `@Test` +12·H-6 table +4행. `OPEN-2F-DIAGNOSTICS-DOMAIN`·
+`OPEN-2F-DICT-INTERVAL-SOURCE` 닫힘. **알려진 제한**: 임계 미검증(엔진 정책) · `excluded_observations` 요청 표본 수 대조
+불가 · 진단 없는 응답(2F 이전 서버)은 계약 위반 — 배포 순서 「제공자 먼저」 축(현재 프로덕션 배포 전) · `PredictionDiagnostics`
+위조는 4D-1 알려진 제한 6 승계 · H-6 table 손 유지는 4D-1 알려진 제한 9 승계(변이 실측: `Weight.init` 조건 추가 + 표 미갱신이면
+초록 — 구조 처방은 후속). **운영자 결정 대기(Phase 6 에스컬레이션)**: `OPEN-4D3-SAMPLE-SUPPLY`((a) 4B 후속 slice — 과거 표본
+조회 port + `OpeningResult` → `CompetitionSample` 변환·표본 축 채움 / (b) M6 수집 축(기관 fact)과 묶음 / (c) 당분간
+`Unmeasurable` 정직) · `OPEN-4D3-DIAGNOSTICS-RENDER`(4E 알림 본문 규약과 묶음). 정본 `reports/evidence/m4/4d3/checklist.md`.
+
 ### Slice 4E — notification adapter contract
 
 - delivery request와 rendered content 분리

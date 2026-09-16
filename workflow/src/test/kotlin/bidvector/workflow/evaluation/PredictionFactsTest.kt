@@ -12,6 +12,9 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.prediction.PredictionDiagnostics
+import bidvector.workflow.prediction.SegmentSupport
+import bidvector.workflow.prediction.Weight
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -90,6 +93,44 @@ class PredictionFactsTest {
             }
         overBudget.shouldBePresent()
         overMargin shouldBe ScoreFact.Absent(MlUnavailableReason.InvalidRequest)
+    }
+
+    // ---- M4/4D-3(scope.md D-4D3-3, 위협 모델 우회 (8)) — 진단은 사다리 점수를 바꾸지
+    // 않는다. 진단만 다른 두 Predicted 가 같은 ScoreFact 쌍을 낸다. ----
+
+    @Test
+    fun `진단만 다른 두 Predicted 는 같은 ScoreFact 쌍을 낸다(우회 8)`() {
+        val notice = testNoticeWithMoney()
+        val baseAmount = requireNotNull(notice.baseAmount).amount
+        val lowShrinkage =
+            predicted(
+                diagnostics =
+                    PredictionDiagnostics(
+                        trainingRowCount = 4000,
+                        segmentSupport = SegmentSupport.Direct,
+                        shrinkageWeight = Weight(BigDecimal("0.0500")),
+                        excludedObservations = 1,
+                        agencySampleCount = 40,
+                        agencySampleBelowThreshold = false,
+                    ),
+            )
+        val highShrinkage =
+            predicted(
+                diagnostics =
+                    PredictionDiagnostics(
+                        trainingRowCount = 0,
+                        segmentSupport = SegmentSupport.Global,
+                        shrinkageWeight = Weight(BigDecimal("0.9500")),
+                        excludedObservations = 30,
+                        agencySampleCount = 2,
+                        agencySampleBelowThreshold = true,
+                    ),
+            )
+
+        val fromLowShrinkage = predictedFacts(lowShrinkage, baseAmount, notice, testPolicies, testCapacity)
+        val fromHighShrinkage = predictedFacts(highShrinkage, baseAmount, notice, testPolicies, testCapacity)
+
+        fromLowShrinkage shouldBe fromHighShrinkage
     }
 
     private fun ScoreFact<UnitScore>.shouldBePresent() {

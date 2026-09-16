@@ -30,8 +30,11 @@ import bidvector.workflow.prediction.BidRateCandidates
 import bidvector.workflow.prediction.CallBudget
 import bidvector.workflow.prediction.IntervalSource
 import bidvector.workflow.prediction.ModelReleaseRef
+import bidvector.workflow.prediction.PredictionDiagnostics
 import bidvector.workflow.prediction.PriceFitness
+import bidvector.workflow.prediction.SegmentSupport
 import bidvector.workflow.prediction.Uncertainty
+import bidvector.workflow.prediction.Weight
 import java.math.BigDecimal
 import java.time.Instant
 import kotlin.math.sqrt
@@ -71,12 +74,24 @@ internal fun embedded(
     release: ModelReleaseRef = TEST_RELEASE,
 ): EmbeddingOutcome.Embedded = EmbeddingOutcome.Embedded(vector, release)
 
+/** M4/4D-3(scope.md D-4D3-3) — `predictedFacts`는 이 값을 바꾸지 않는다(우회 (8) test 대상). */
+internal val TEST_DIAGNOSTICS =
+    PredictionDiagnostics(
+        trainingRowCount = 100,
+        segmentSupport = SegmentSupport.Direct,
+        shrinkageWeight = Weight(BigDecimal("0.1500")),
+        excludedObservations = 3,
+        agencySampleCount = 20,
+        agencySampleBelowThreshold = false,
+    )
+
 internal fun predicted(
     base: Rate = Rate.ofFraction(BigDecimal("0.85")),
     conservative: Rate = Rate.ofFraction(BigDecimal("0.80")),
     aggressive: Rate = Rate.ofFraction(BigDecimal("0.90")),
     fitness: BigDecimal = BigDecimal("0.7"),
     release: ModelReleaseRef = TEST_RELEASE,
+    diagnostics: PredictionDiagnostics = TEST_DIAGNOSTICS,
 ): BidPredictionOutcome.Predicted =
     BidPredictionOutcome.Predicted(
         candidates = BidRateCandidates(conservative, base, aggressive),
@@ -89,6 +104,7 @@ internal fun predicted(
                 intervalSource = IntervalSource.CrossValidationResidual,
             ),
         release = release,
+        diagnostics = diagnostics,
     )
 
 internal class FakeEmbedTextPort(

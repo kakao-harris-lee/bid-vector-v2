@@ -83,4 +83,57 @@ class PredictionValueTest {
     fun `PriceFitness 는 계약에 부호 근거가 없어 음수도 정상 생성된다(verifier r2 G-2 — r1 F-5 되돌림)`() {
         PriceFitness(BigDecimal("-9999")).score shouldBe BigDecimal("-9999")
     }
+
+    // ---- M4/4D-3(scope.md D-4D3-1) — Weight·PredictionDiagnostics 불변식 ----
+
+    @Test
+    fun `Weight 는 0과 1 경계를 포함해 정상 생성된다`() {
+        Weight(BigDecimal.ZERO).value shouldBe BigDecimal.ZERO
+        Weight(BigDecimal.ONE).value shouldBe BigDecimal.ONE
+        Weight(BigDecimal("0.5000")).value shouldBe BigDecimal("0.5000")
+    }
+
+    @Test
+    fun `Weight 는 0 미만 또는 1 초과를 거부한다`() {
+        shouldThrow<IllegalArgumentException> { Weight(BigDecimal("-0.0001")) }
+        shouldThrow<IllegalArgumentException> { Weight(BigDecimal("1.0000001")) }
+    }
+
+    @Test
+    fun `PredictionDiagnostics 는 세 uint32 성분의 음수를 각각 거부한다`() {
+        shouldThrow<IllegalArgumentException> {
+            testDiagnostics(trainingRowCount = -1)
+        }
+        shouldThrow<IllegalArgumentException> {
+            testDiagnostics(excludedObservations = -1)
+        }
+        shouldThrow<IllegalArgumentException> {
+            testDiagnostics(agencySampleCount = -1)
+        }
+    }
+
+    @Test
+    fun `PredictionDiagnostics 는 0 이상 성분으로 정상 생성된다`() {
+        val diagnostics = testDiagnostics()
+        diagnostics.trainingRowCount shouldBe 0
+        diagnostics.excludedObservations shouldBe 0
+        diagnostics.agencySampleCount shouldBe 0
+    }
 }
+
+private fun testDiagnostics(
+    trainingRowCount: Int = 0,
+    segmentSupport: SegmentSupport = SegmentSupport.Direct,
+    shrinkageWeight: Weight = Weight(BigDecimal("0.1000")),
+    excludedObservations: Int = 0,
+    agencySampleCount: Int = 0,
+    agencySampleBelowThreshold: Boolean = false,
+): PredictionDiagnostics =
+    PredictionDiagnostics(
+        trainingRowCount = trainingRowCount,
+        segmentSupport = segmentSupport,
+        shrinkageWeight = shrinkageWeight,
+        excludedObservations = excludedObservations,
+        agencySampleCount = agencySampleCount,
+        agencySampleBelowThreshold = agencySampleBelowThreshold,
+    )

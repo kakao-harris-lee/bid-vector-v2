@@ -1,16 +1,25 @@
 package bidvector.adapters.ml
 
+import bidvector.adapters.contract.contractTestdataRoot
+import bidvector.adapters.contract.readTestdataBytes
 import bidvector.decision.MlUnavailableReason
 import bidvector.workflow.prediction.BidPredictionOutcome
+import bidvector.workflow.prediction.PredictionDiagnostics
+import bidvector.workflow.prediction.SegmentSupport
 import bidvector.workflow.prediction.UnmeasurableReason
+import bidvector.workflow.prediction.Weight
 import contract.bidvector.ml.v1.ApplicationFailure
 import contract.bidvector.ml.v1.BidRateOrigin
+import contract.bidvector.ml.v1.CalculateOptimalBidResponse
 import contract.bidvector.ml.v1.CandidateLabel
 import contract.bidvector.ml.v1.FailureCode
+import contract.bidvector.ml.v1.ReleaseKind
 import contract.bidvector.ml.v1.Unmeasurable
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
 import contract.bidvector.ml.v1.UnmeasurableReason as ProtoUnmeasurableReason
 
 /**
@@ -166,6 +175,129 @@ class ResponseMappingTest {
 
         outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
         outcome.reason shouldBe MlUnavailableReason.UnsupportedSchema
+    }
+
+    // ---- M4/4D-3(scope.md D-4D3-2, 위협 모델 우회 (1)~(5)) — 진단 fail-closed ----
+
+    @Test
+    fun `shrinkage_weight fraction 이 범위 밖 형태면 ContractViolation 이다(우회 1)`() {
+        listOf("1.5000", "-0.1000", "", "1e-1").forEach { badFraction ->
+            val mutated =
+                testSuccessResponse()
+                    .toBuilder()
+                    .also { it.diagnosticsBuilder.shrinkageWeightBuilder.fraction = badFraction }
+                    .build()
+
+            val outcome = mapSuccess(mutated, expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
+
+            withClue(badFraction) {
+                outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+                outcome.reason shouldBe MlUnavailableReason.ContractViolation
+            }
+        }
+    }
+
+    @Test
+    fun `segment_support 가 미설정이면 ContractViolation 이다(우회 2)`() {
+        val unset =
+            testSuccessResponse()
+                .toBuilder()
+                .also { it.diagnosticsBuilder.clearSegmentSupport() }
+                .build()
+
+        val outcome = mapSuccess(unset, expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
+
+        outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        outcome.reason shouldBe MlUnavailableReason.ContractViolation
+    }
+
+    @Test
+    fun `uint32 성분이 오버플로(Kotlin Int 음수)면 ContractViolation 이다(우회 3)`() {
+        val mutated =
+            testSuccessResponse()
+                .toBuilder()
+                .also { it.diagnosticsBuilder.excludedObservations = -1 }
+                .build()
+
+        val outcome = mapSuccess(mutated, expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
+
+        outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        outcome.reason shouldBe MlUnavailableReason.ContractViolation
+    }
+
+    @Test
+    fun `DERIVED release 인데 training_row_count 가 0보다 크면 ContractViolation 이다(우회 4)`() {
+        val mutated =
+            testSuccessResponse()
+                .toBuilder()
+                .also {
+                    it.releaseBuilder.releaseKind = ReleaseKind.RELEASE_KIND_DERIVED
+                    it.releaseBuilder.releaseId = "distribution/reserve-draw-distribution-v1"
+                    it.diagnosticsBuilder.trainingRowCount = 10
+                }.build()
+
+        val outcome = mapSuccess(mutated, expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
+
+        outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        outcome.reason shouldBe MlUnavailableReason.ContractViolation
+    }
+
+    @Test
+    fun `진단 없는 응답(proto 기본 인스턴스)은 ContractViolation 이다(우회 5, 알려진 제한 — 2F 이전 서버)`() {
+        val mutated = testSuccessResponse().toBuilder().clearDiagnostics().build()
+
+        val outcome = mapSuccess(mutated, expectedFeatureSchemaVersion = TEST_SCHEMA_VERSION)
+
+        outcome.shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
+        outcome.reason shouldBe MlUnavailableReason.ContractViolation
+    }
+
+    // ---- testdata ARTIFACT/DERIVED 두 응답의 진단 값이 wire 와 같음(scope.md 종결 조건) ----
+
+    @Test
+    fun `ARTIFACT testdata 는 wire 진단 값 그대로 Predicted 로 매핑된다`() {
+        val bytes =
+            readTestdataBytes(
+                contractTestdataRoot("prediction"),
+                "calculate_optimal_bid_response_success.binpb",
+            )
+        val success = CalculateOptimalBidResponse.parseFrom(bytes).success
+
+        val outcome = mapSuccess(success, expectedFeatureSchemaVersion = "award-rate-v1")
+
+        outcome.shouldBeInstanceOf<BidPredictionOutcome.Predicted>()
+        outcome.diagnostics shouldBe
+            PredictionDiagnostics(
+                trainingRowCount = 4120,
+                segmentSupport = SegmentSupport.Direct,
+                shrinkageWeight = Weight(BigDecimal("0.1500")),
+                excludedObservations = 12,
+                agencySampleCount = 38,
+                agencySampleBelowThreshold = false,
+            )
+    }
+
+    @Test
+    fun `DERIVED testdata 는 wire 진단 값 그대로 Predicted 로 매핑된다`() {
+        val bytes =
+            readTestdataBytes(
+                contractTestdataRoot("prediction"),
+                "calculate_optimal_bid_response_success_posterior_predictive.binpb",
+            )
+        val success = CalculateOptimalBidResponse.parseFrom(bytes).success
+
+        val outcome = mapSuccess(success, expectedFeatureSchemaVersion = "award-rate-v1")
+
+        outcome.shouldBeInstanceOf<BidPredictionOutcome.Predicted>()
+        outcome.diagnostics shouldBe
+            PredictionDiagnostics(
+                trainingRowCount = 0,
+                segmentSupport = SegmentSupport.Global,
+                shrinkageWeight = Weight(BigDecimal("0.0000")),
+                excludedObservations = 0,
+                agencySampleCount = 0,
+                agencySampleBelowThreshold = false,
+            )
     }
 }
 

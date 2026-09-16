@@ -344,4 +344,26 @@ private val shapeInvariantCases =
             { b -> b.releaseBuilder.datasetId = "" },
             MlUnavailableReason.ContractViolation,
         ),
+        // ---- M4/4D-3(scope.md D-4D3-2, 설계 검토 (5)③) — PredictionDiagnostics·Weight init
+        // 짝. ----
+        ShapeInvariantCase(
+            "PredictionDiagnostics: shrinkage_weight fraction 1.0000001(상한 초과)",
+            { b -> b.diagnosticsBuilder.shrinkageWeightBuilder.fraction = "1.0000001" },
+            MlUnavailableReason.ContractViolation,
+        ),
+        ShapeInvariantCase(
+            "PredictionDiagnostics: shrinkage_weight fraction -0.0001(하한 미만)",
+            { b -> b.diagnosticsBuilder.shrinkageWeightBuilder.fraction = "-0.0001" },
+            MlUnavailableReason.ContractViolation,
+        ),
+        ShapeInvariantCase(
+            "PredictionDiagnostics: excluded_observations 오버플로(uint32 max → Kotlin -1)",
+            { b -> b.diagnosticsBuilder.excludedObservations = -1 },
+            MlUnavailableReason.ContractViolation,
+        ),
+        ShapeInvariantCase(
+            "PredictionDiagnostics: segment_support UNSPECIFIED",
+            { b -> b.diagnosticsBuilder.clearSegmentSupport() },
+            MlUnavailableReason.ContractViolation,
+        ),
     )
