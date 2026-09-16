@@ -1,0 +1,6 @@
+{
+  "milestone": "m5",
+  "slice": "5e1-grpc-serving-frame",
+  "status": "N/A",
+  "reason": "이 slice는 새 authoritative/observed/legacy-behavior fixture corpus case를 추가하지 않는다(scope.md in_scope — 서버 골격·readiness·training job 상태 기계·검증·wheel 빌드 훅만, 도메인 판정 로직 없음). CalculateOptimalBid 판정 자체는 5E-2로 미뤘다(D-5E-3) — 5E-1은 그 RPC를 오버라이드조차 하지 않는다. 실측은 전부 test 내부 합성 값(dataset 디렉터리·정책 객체·gRPC 요청 메시지)과 실 LightGBM 1건(tests/app/test_pipeline.py)으로 이뤄지며, 기존 corpus(5C-1/5C-2/5D가 등록한 것들)는 이 slice가 손대지 않았다(무접촉 — 그 slice들의 기존 test가 전부 그대로 통과하는 것이 증거, commands.md S-5)."
+}

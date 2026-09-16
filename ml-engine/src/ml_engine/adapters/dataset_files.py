@@ -16,6 +16,12 @@ from urllib.parse import urlparse
 class DatasetFiles:
     manifest_bytes: bytes
     rows_bytes: bytes
+    settlements_bytes: bytes | None = None
+    """M5/5E-1 D-5E-4 — `settlements.jsonl`(세 번째 파일, 선택적으로 읽는다: 있으면
+    채우고 없으면 `None`). **파일 부재를 여기서 거부하지 않는다** —
+    `tests/adapters/test_dataset_files.py`(out_of_scope, 무편집)의 기존 round-trip
+    test 가 이 파일 없이 성공을 기대한다. "정산 관측 없이는 job 실패"라는 요구는
+    이 파일이 아니라 `ml_engine.app.pipeline`(D-5E-4 를 실제로 강제하는 자리)이 진다."""
 
 
 class DatasetUnreadableReason(StrEnum):
@@ -64,6 +70,15 @@ def read_dataset_files(uri: str) -> DatasetFiles | DatasetUnreadable:
     if not rows_path.is_file():
         return DatasetUnreadable(DatasetUnreadableReason.NOT_FOUND, str(rows_path))
 
+    # D-5E-4 — `settlements.jsonl`은 선택적으로 읽는다(있으면만). 「없으면 job 실패」
+    # 강제는 `ml_engine.app.pipeline`의 몫이다(이 함수의 계약을 넓히지 않는다).
+    settlements_path = directory / "settlements.jsonl"
+    settlements_bytes = (
+        settlements_path.read_bytes() if settlements_path.is_file() else None
+    )
+
     return DatasetFiles(
-        manifest_bytes=manifest_path.read_bytes(), rows_bytes=rows_path.read_bytes()
+        manifest_bytes=manifest_path.read_bytes(),
+        rows_bytes=rows_path.read_bytes(),
+        settlements_bytes=settlements_bytes,
     )
