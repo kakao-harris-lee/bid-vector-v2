@@ -34,11 +34,6 @@ _TESTDATA_REQUEST = (
 )
 _SHIPPED_POLICY_PATH = _ML_ENGINE_ROOT / "policy" / "inference-v1.yaml"
 
-# `_policy_support.py`(tests/inference)와 같은 placeholder — `OPEN-5D2-POLICY-VALUES`
-# 값 결정이 아니다(5D-3 test 가 쓰는 값과 동일, tests/serving 은 tests/inference 의
-# 비공개 helper 를 import 하지 않는다 — 디렉터리 경계를 넘지 않는다는 관례).
-_AGENCY_SAMPLE_THRESHOLD_PLACEHOLDER = 1
-
 # testdata 요청의 competition_samples 는 2건뿐이고 그중 예비가격 추첨 관측(reserve_draw)이
 # 있는 것은 1건이다 — `policy/inference-v1.yaml`의 `reserve.min_reserve_records: 8`에
 # 못 미쳐 실 엔진이 `Unmeasurable(INSUFFICIENT_SAMPLES)`를 낸다(실측). 이 test 는 후보
@@ -51,17 +46,30 @@ _MIN_RESERVE_RECORDS_FOR_SUCCESS = 10
 
 
 def _completed_case_inference_policy() -> InferencePolicy:
+    """M5/5F-1 — 출하 `inference-v1.yaml`이 이제 `assessment.agency_sample_threshold`
+    (잠정값 10)를 포함해 "완성 case"다(`OPEN-5D2-POLICY-VALUES` 종결). 이전엔 그
+    키가 없어 placeholder(`1`)를 얹은 임시 사본을 읽었으나, 이제는 출하 파일을
+    그대로 읽는다(호출부 시그니처 무변경 — 판단 등재, 이 파일 자체는 무편집이라
+    직접 로드가 임시 사본보다 단순하다)."""
+    policy = load_inference_policy(_SHIPPED_POLICY_PATH)
+    assert isinstance(policy, InferencePolicy), f"출하 정책 로드 실패: {policy!r}"
+    return policy
+
+
+def _inference_policy_with_clamp_max(clamp_max: str) -> InferencePolicy:
+    """변이 helper(scope.md ⑤) — 출하 값 위에 `scenario.clamp_max`만 바꾼 임시
+    사본에서 로드한다. 5E-2 fail-closed(`OPEN-5E2-CANDIDATE-RATE-UPPER`)가 정책
+    값과 독립으로 여전히 서 있는지 확인하는 데 쓴다(출하 파일 자체는 편집하지
+    않는다)."""
     raw_values = dict(yaml.safe_load(_SHIPPED_POLICY_PATH.read_text(encoding="utf-8")))
-    raw_values.setdefault(
-        "assessment.agency_sample_threshold", _AGENCY_SAMPLE_THRESHOLD_PLACEHOLDER
-    )
+    raw_values["scenario.clamp_max"] = clamp_max
     with tempfile.TemporaryDirectory(
-        prefix="bidvector-inference-policy-kotlin-parity-"
+        prefix="bidvector-inference-policy-clamp-mutation-"
     ) as tmp:
         temp_path = Path(tmp) / "inference-v1.yaml"
         temp_path.write_text(yaml.safe_dump(raw_values), encoding="utf-8")
         policy = load_inference_policy(temp_path)
-    assert isinstance(policy, InferencePolicy), f"완성 case 정책 로드 실패: {policy!r}"
+    assert isinstance(policy, InferencePolicy), f"변이 정책 로드 실패: {policy!r}"
     return policy
 
 
@@ -79,8 +87,14 @@ def _success_request() -> prediction_pb2.CalculateOptimalBidRequest:
     return request
 
 
-def _servicer_and_runtime() -> tuple[BidPredictionServicer, PredictionRuntime]:
-    policy = _completed_case_inference_policy()
+def _servicer_and_runtime(
+    policy: InferencePolicy | None = None,
+) -> tuple[BidPredictionServicer, PredictionRuntime]:
+    """scope.md ⑤ — `policy` 를 생략하면 출하 완성 case(기존 동작 무변경). 변이
+    test 가 `_inference_policy_with_clamp_max`로 만든 정책을 주입할 수 있게
+    선택 인자를 뒀다(기존 호출부 전부 무편집)."""
+    if policy is None:
+        policy = _completed_case_inference_policy()
     release = build_derived_release(policy, "sha-kotlin-parity-test")
     runtime = PredictionRuntime(
         policy=policy,
@@ -352,15 +366,40 @@ def test_unrecognized_interval_source_is_rejected_by_parsed_success_fields() -> 
     assert not _is_response_accepted_by_kotlin(response.success)
 
 
-def test_candidate_rate_above_one_fails_closed_end_to_end() -> None:
-    """verifier r1 H-1 재현 그대로 — 계약이 허용하는 축(`observed_bid_rate`, D-2F-4)에
-    1 을 넘는 관측값을 넣으면 엔진(`scenario.py`)이 정책 clamp 상한(출하
-    `scenario.clamp_max = 1.4`)까지 후보율을 낼 수 있다. 시정 전에는 그 응답이
-    `success` 로 그대로 나가 Kotlin `ParsedSuccessFields.toRateOrNull`이 그 응답
-    전체를 `ContractViolation`으로 버렸다(정직한 계산이 소비자 쪽에서 폐기). 시정
-    후에는 wire 층이 `MappingRejected` → `RuntimeError`로 fail-closed 한다 —
-    Unmeasurable 로 위장하지 않는다(값 지어내기 금지, D-5E2-6)."""
+def test_shipped_clamp_max_keeps_extreme_observation_within_contract_rate() -> None:
+    """M5/5F-1(scope.md ⑤) — 반전. 이전엔(출하 `scenario.clamp_max = 1.4`) 계약이
+    허용하는 축(`observed_bid_rate`, D-2F-4)에 1 을 넘는 관측값을 넣으면 엔진
+    (`scenario.py`)이 clamp 상한까지 후보율을 낼 수 있어 `success` 가 그대로 나가
+    Kotlin `ParsedSuccessFields.toRateOrNull`이 응답 전체를 `ContractViolation`으로
+    버렸다(정직한 계산이 소비자 쪽에서 폐기). `scenario.clamp_max` 를 1.0 으로 내린
+    뒤로는(`OPEN-5E2-CANDIDATE-RATE-UPPER` (a) 채택) 같은 극단 입력도 정책 층에서
+    이미 (0, 1] 안으로 clamp 돼 `Success`로 나가고 Kotlin 이 그대로 받는다 — 값이
+    후보를 계약 안에서 만들게 한다(산식 무변경). 짝인
+    `test_candidate_rate_above_one_still_fails_closed_with_reverted_clamp_max` 가
+    같은 입력에서 clamp_max 를 1.4 로 되돌리면 fail-closed 가 여전히 서 있음을
+    확인한다 — 이 test 는 값이 서 있을 때의 정상 경로다."""
     servicer, _runtime = _servicer_and_runtime()
+    request = _success_request()
+    for sample in request.competition_samples:
+        sample.observed_bid_rate.fraction = "1.3000"  # D-2F-4 축 — 이 필드는 > 1 허용
+    response = servicer.CalculateOptimalBid(request, _ActiveContext())
+    assert response.WhichOneof("result") == "success"
+    for candidate in response.success.candidates:
+        rate = Decimal(candidate.bid_rate.fraction)
+        assert Decimal("0") < rate <= Decimal("1")
+
+
+def test_candidate_rate_above_one_still_fails_closed_with_reverted_clamp_max() -> None:
+    """변이(scope.md ⑤) — `scenario.clamp_max` 를 임시 사본에서 legacy 값 1.4 로
+    되돌리면(출하 파일은 편집하지 않는다), 위 test 와 같은 극단 입력(observed_bid_rate
+    1.3)이 다시 `MappingRejected` → `RuntimeError`(D-2B-8)로 fail-closed 한다 —
+    이 test 는 5E-2 fail-closed 자체가 아니라 **그 fail-closed 가 정책 clamp_max
+    값과 실제로 결합돼 있음**(값이 1.4 로 돌아가면 재현되고 1.0 이면 재현되지 않는다)
+    을 잠근다. `test_wire.py::test_candidate_rate_above_one_is_mapping_rejected`가
+    같은 불변식을 wire 층 단위 test 로 이미 고정하고 있다 — 여기서는 실 엔진 경로로
+    재확인한다(Unmeasurable 로 위장하지 않는다, 값 지어내기 금지 D-5E2-6)."""
+    reverted_policy = _inference_policy_with_clamp_max("1.4")
+    servicer, _runtime = _servicer_and_runtime(reverted_policy)
     request = _success_request()
     for sample in request.competition_samples:
         sample.observed_bid_rate.fraction = "1.3000"  # D-2F-4 축 — 이 필드는 > 1 허용
