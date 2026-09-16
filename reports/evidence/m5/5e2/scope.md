@@ -120,6 +120,7 @@ rollback: |
 | OPEN | 처리 |
 | --- | --- |
 | **`OPEN-5E2-FEATURE-SCHEMA-PARITY`**(신설) | Kotlin `ML_CALL_POLICY.featureSchemaVersion = "bidvector.ml.v1"` vs Python `award-rate-features-v2`. 운영자 결정: **(a) 추천** Kotlin 값을 `award-rate-features-v2` 로(4D `policy-values.md` §3 갱신 + `MlCallPolicyData.kt` 한 줄, Kotlin 레인/6C) · (b) Python 이 패키지 식별자를 schema 로 받기(5B D-5B-1 위반 — 비추천) |
+| **`OPEN-5E2-CANDIDATE-RATE-UPPER`**(신설, verifier r1 H-1) | 엔진 clamp 상한(출하 `inference-v1.yaml` `scenario.clamp_max=1.4`, 5D 승인 값)이 계약의 응답 후보율 축(`Candidate.bid_rate ≤ 1`, D-2B-8·D-2F-4)과 충돌 — 관측 표본이 1 을 넘으면 엔진이 1 초과 후보를 내고 5E-2 는 값을 자르지 않고 `MappingRejected`→INTERNAL 로 거부한다(적법한 입력이 INTERNAL 을 받는다). 운영자 결정: (a) 정책 `clamp_max ≤ 1`(5D 정책 값 갱신, 가장 작음) · (b) 계약 확장(응답 후보율 > 1 허용 — Kotlin `ParsedSuccessFields` 도 함께, breaking 성격 검토) · (c) 새 `UnmeasurableReason`(additive, 제공자 먼저) |
 | **`OPEN-5E2-CROSSLANG-REAL-SERVER`**(신설) | 실 Kotlin gateway ↔ 실 Python 서버 통합 test 는 6C(컨테이너) — 5E-2 는 Kotlin 규칙 미러(D-5E2-7)까지 |
 | `OPEN-5D2-POLICY-VALUES` | `assessment.agency_sample_threshold` 출하 값 — 운영자 (c) 유지. **값이 없으면 출하 정책으로 READY 불가**(⑧ test 가 그 사실을 고정). 운영자 결정 필요: 잠정값 지정(5D-3 golden 011 case 값 참고) 또는 5C 재학습 지표까지 NOT_READY 유지 |
 | `OPEN-5D2-RELEASE-FOR-DISTRIBUTION`·`OPEN-5D2-INTERVAL-SOURCE-WIRE`·`OPEN-5D-DIAGNOSTICS-WIRE` | **이 slice 로 종결**(Python 매핑 실물) |
@@ -136,3 +137,4 @@ rollback: |
 | 2026-09-16 착수 | 초판 — D-5E2-1~10, OPEN 신설 둘 | 사용자 「5E 착수」 후반 · 착수 조사 |
 | 2026-09-16 (2) 구현 완료 뒤 | S-9 를 5E-1 과 같은 인라인 python 버전 대조 명령으로 정정(초판이 존재하지 않는 `tools/check_python_version.py` 를 가리킴 — 팀장 계약 오류) · in_scope 에 `tests/serving/test_grpc.py` 추가 | 구현 보고 — 도구 부재 실측 · 생성자 시그니처 변경의 필연적 collateral |
 | 2026-09-16 (3) verifier r1 뒤 | S-3·S-6·S-7 을 CI `ml-engine` job 의 명령 그대로(`mypy --strict src/ml_engine` · `design_ratchet.py --check` · `reuse_provenance_check.py`)로 정정 | verifier r1 M-3 — 초판 acceptance 가 CI 와 달랐다(S-9 와 같은 계약 오류 계열). 정본은 CI job 명령이다(하네스 2026-09-12) |
+| 2026-09-16 (4) verifier r2 뒤 | OPEN 표에 `OPEN-5E2-CANDIDATE-RATE-UPPER` 등재(선택지 셋) | verifier r1 H-1·r2 LOW — 운영자가 읽는 자리에 없었다 |
