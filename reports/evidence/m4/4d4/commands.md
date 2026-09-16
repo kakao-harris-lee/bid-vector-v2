@@ -159,3 +159,8 @@
 - 핵심 결과: BUILD SUCCESSFUL(355 actionable tasks, 57s) — rollback 이 게이트를 붉히지 않는다.
 
 **마지막 HEAD 의 게이트 결과 정본은 evidence 가 아니라 verifier·PR 조치 코멘트다**(evidence-pack §「리뷰 요청 조건 점검」) — 이 문서는 그 직전까지의 명령만 담는다.
+
+## 2026-09-16 종결 시점 HEAD 재실측(팀장 — 장부층 일괄 `342327d` 뒤)
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`(HEAD `342327d`)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks), JUnit 집계 1694 tests · 0 failed · 0 skipped. `head_sha` 기입 커밋의 재실측은 verifier r2 뒤 다음 라운드가 있으면 그때(N-5, 4B-8 관례).

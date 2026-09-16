@@ -25,7 +25,7 @@
 milestone: M4
 slice: 4d4-prediction-evidence-and-lines
 base_sha: 44721cf61ba9275f604918890c93f8744b5e2cc1
-head_sha: c2f70586de275bc4577db3355d8dda4e2edb9ec1
+head_sha: 342327d9f9fe730ae631611cc3a0e495cbbab012
 in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/PredictionEvidence.kt        # 신설 — sealed 캐리어(D-4D4-1)
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/PredictionFacts.kt           # predictedFacts·absentPair 반환형 → PredictionComponents(내부)
