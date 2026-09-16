@@ -1,0 +1,6 @@
+{
+  "milestone": "m5",
+  "slice": "5f1-inference-policy-values",
+  "status": "N/A",
+  "reason": "이 slice는 값 둘(scenario.clamp_max, assessment.agency_sample_threshold)만 바꾼다(D-5F1-1, src/** 무편집). 새 authoritative/observed/legacy-behavior fixture corpus case를 추가하거나 fixtures/manifest.yaml을 편집하지 않는다(무접촉, git diff --name-status로 확인). golden test(tests/inference/golden, 14 case)는 각자 자체 정책 cfg(clampMax·agencySampleThreshold)를 실어 이 slice의 출하 정책 값 변경과 독립이며, 영향 0을 commands.md 「S-5-golden」으로 실측했다. agency_sample_threshold=10의 근거인 golden ml-kernel-011 case 자체는 이 slice가 만들거나 고치지 않았다 — 이미 승인된 corpus의 기존 값을 정책 파일로 옮겼을 뿐이다(reuse.md)."
+}
