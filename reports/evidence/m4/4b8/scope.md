@@ -29,7 +29,12 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/persistence/NoticeReconstruction.kt   # 복원 경로 `CategoryCode.of(code)`(관용 — 기존 행도 읽힘)
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/{SampleConversion,PredictionFacts}.kt   # ② provenanceLabelFor 의 개찰 인자 선택화(`opening: OpeningResult?`) + predictionRequestFor 가 대상 공고 라벨을 같은 함수로 — D-4B8-1·2
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityAnalysis.kt   # 필요 시 정책 인자 전달만(라벨 정책은 4B-7 `SAMPLE_PROVENANCE_POLICY` 재사용 — 새 정책 없음)
-  - 관련 test(procurement·adapters·workflow·app — `CategoryCode(` 호출부 27 의 `of` 전환 + 정규화 규칙표 + 대상 라벨 규칙표 + 조회 일치 test) · config/quality/gate-tests.properties(신설 test 있을 때)
+  - 관련 test(`CategoryCode(` 호출부의 `of` 전환 + 정규화 규칙표 + 대상 라벨 규칙표 + 조회 일치 test) — 실제 변경 경로(리뷰 요청 시점 `git diff --name-status` 기계 대조, 2026-09-16):
+  - procurement/src/test/kotlin/bidvector/procurement/{BusinessCategoryTest,CanonicalizeTest}.kt
+  - adapters/src/test/kotlin/bidvector/adapters/ml/JdbcCompetitionSampleSourceTest.kt · adapters/src/test/kotlin/bidvector/adapters/persistence/NoticeFindRoundTripTest.kt
+  - workflow/src/test/kotlin/bidvector/workflow/evaluation/{OpportunityAnalysisFixtures,OpportunityAnalysisTest,PredictionFactsTest,SampleEligibilityTest}.kt
+  - app/src/test/kotlin/bidvector/app/conformance/KonepsCollectionExecutors.kt
+  - config/quality/gate-tests.properties(`BusinessCategoryTest` 등재)
   - reports/evidence/m4/4b8/** · milestone-4.md · docs/discovery/capability-map.md(OPEN 둘 닫힘 + 백필 OPEN 신설) · docs/discovery/data-dictionary.md(공종 키 정규화 규칙 한 줄 — 팀장)
 out_of_scope:
   - 별칭·계층 사전(5B `_NO_ALIASES` 계승) · 기존 저장 행 백필/마이그레이션(`OPEN-4B8-CATEGORY-BACKFILL` — 운영 데이터 없음, M6) · SQL 측 정규화(두 번째 규칙 금지 — 저장 값이 정규화됐다는 전제) · 기관 축(`OPEN-2B-AGENCY-ID`) · 복구 추정치(`recoveryEstimate` 는 계속 `Absent`, 3D 소관) · 예비가 0원 자격(contract-keeper PR #22 비차단 — 엔진이 거름, `OPEN-4B7-POLICY-VALUES` 의 이웃으로 등재만) · 계약 파일 · Python
