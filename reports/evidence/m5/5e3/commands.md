@@ -50,6 +50,8 @@
 ## S-10 (Kotlin `check`, evidence 커밋마다 그 HEAD 에서 재실측)
 - cmd: `./gradlew --no-daemon check`(HEAD `b78082d`, 구현 종결)
 - exit: 0 — BUILD SUCCESSFUL, 337 task(35 executed, 302 up-to-date)
+- cmd: `./gradlew --no-daemon check`(HEAD `4d2c1d8`, evidence 패키지 커밋 뒤 재실측)
+- exit: 0 — BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date)
 
 ## S-11
 - cmd: `(cd ml-engine && uv build --wheel -o /tmp/ml-engine-wheel-5e3 && uv run python -m pytest tests/gates/test_wheel_reexport.py -q)`
