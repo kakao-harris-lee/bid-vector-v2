@@ -15,7 +15,7 @@
 | 5 | `PREDICTION_FLOOR_SAFETY_MARGIN_RATE` | `0.001` | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
 | 6 | `PREDICTION_CONSTRUCTION_SCENARIO_FLOOR_OFFSETS` | 3키 dict | 정책(근거 있음 — n=2,051 백분위) | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
 | 7 | `BUSINESS_GROUP_CODE_PREFIXES` | 3키 dict | 정책(분류표) | 5B |
-| 8 | `BUSINESS_GROUP_CALIBRATION_ENABLED` | `True` | 환경(토글) | 5C |
+| 8 | `BUSINESS_GROUP_CALIBRATION_ENABLED` | `True` | 환경(토글) | Kotlin guardrail(M4 소관 — 5C-1 실측: legacy 소비처가 `guardrail_core.py` 뿐, 학습 경로 아님) |
 | 9 | `PREDICTION_GROUP_MINIMUM_BID_RATES` | 3키 dict | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
 | 10 | `PREDICTION_GROUP_MAXIMUM_BID_RATES` | 3키 dict | 정책 | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
 | 11 | `PREDICTION_AGENCY_MINIMUM_BID_RATES` | 1키 dict | 정책(기관 고유) | Kotlin decision/guardrail(5D 소비 안 함 — 5D D-5D-9) |
@@ -38,9 +38,9 @@
 | 28 | `PRICE_PREDICTION_DISTRIBUTION_MIN_RESERVE_RECORDS` | `8` | 정책(최소 표본) | 5D |
 | 29 | `PRICE_PREDICTION_DISTRIBUTION_MIN_BID_RATIO_SAMPLES` | `3` | 정책(최소 표본) | 5D |
 | 30 | `PRICE_PREDICTION_AWARD_RATE_GBM_MODEL_PATH` | `""` | 환경(경로) | 5E |
-| 31 | `PRICE_PREDICTION_AWARD_RATE_GBM_MIN_CATEGORY_ROWS` | `40` | 정책(미학습 가드 — 끌 수 없음) | 5C·5D(5D 미학습 가드 임계, D-5D-9) |
-| 32 | `PRICE_PREDICTION_BACKTEST_MIN_TRAINING_SAMPLES` | `5` | 정책 | 5C |
-| 33 | `PRICE_PREDICTION_BACKTEST_HOLDOUT_SIZE` | `5` | 정책 | 5C |
+| 31 | `PRICE_PREDICTION_AWARD_RATE_GBM_MIN_CATEGORY_ROWS` | `40` | 정책(미학습 가드 — 끌 수 없음) | 5D 만(미학습 가드 임계, D-5D-9 — 5C-1 실측: 학습기는 이 값을 읽지 않는다) |
+| 32 | `PRICE_PREDICTION_BACKTEST_MIN_TRAINING_SAMPLES` | `5` | 정책 | 미이식(B 계보 `dataset_quality`·`comparison` 소비 — D-5C-1) |
+| 33 | `PRICE_PREDICTION_BACKTEST_HOLDOUT_SIZE` | `5` | 정책 | 미이식(B 계보 — D-5C-1) |
 
 집계: **정책 23 · 환경 6 · 미분류 4** (조사 노트와 일치). 경계 밖 동류 3건(`…GBM_MIN_TRAINING_ROWS`·`…FEED_ORIGIN_ONLY`·
 `GROUP_CALIBRATION_MIN_SAMPLES`)은 5C 가 만나면 같은 표 형식으로 그 slice 에 등재한다.
@@ -55,3 +55,4 @@
 | 2026-09-11 착수 | 표 등재(조사 b-1 그대로), 분류 승인 | 운영자 D-M5-6 (a) |
 | 2026-09-12 | 「소비 예정」 배정 정정 — guardrail·가격 15행은 Kotlin, #31 은 5C·5D | 5D 착수 D-5D-9 |
 | 2026-09-13 | #27 배정 「5D」→「미이식」 | 5D-2 착수 D-5D2-2 |
+| 2026-09-16 | #8 「5C」→「Kotlin guardrail」 · #31 「5C·5D」→「5D 만」 · #32·#33 「5C」→「미이식(B 계보)」 — 분류·값 무변경, 배정만 | 5C-1 §3 실측(`reports/evidence/m5/5c/policy-values.md`) · `OPEN-5C-5A-TABLE-REASSIGN` 종결(M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §2.2) |

@@ -239,6 +239,8 @@ acceptance 는 CI `ml-engine` job 전건 + evidence 라운드 Kotlin `check`. �
 - 이식한 모듈마다 출처(파일·commit)와 수정·튜닝 내역이 기록됨
 - 이식한 코드가 신규 코드와 동일한 lint/typecheck/import boundary/래칫을 통과
 
+**M5 완료 조건 대조 2026-09-16 — 조건부 종결(운영자 결정 다섯 대기)** — 정본 `reports/evidence/m5/closure/checklist.md`. 열 조건 전부에 담당 근거가 있다: 문면 그대로 충족 6(패키지 순수성·import mutation CI 실패·오류/최소 표본 비변환·출처 기록·품질 도구 동일 통과·재현성(호스트·스레드 한정, D-5C-12)) · **범위 좁혀진 충족 3**(동일 transform/schema · checksum fail-closed · Kotlin 계약 통과) · 부분 미측정 1(metric threshold 「충족」 — 실 코퍼스 부재, 「`not-promotable` 명시」는 충족). 좁혀진 셋의 원인은 하나 — **M5 는 GBM 을 서빙하지 않는다**(5D-2 D-5D2-1 (b), 분포 엔진 단독). 그래서 readiness 를 좌우하는 checksum 은 정책 checksum 이고, 5B 피처 벡터를 쓰는 서빙 경로는 아직 없다. OPEN 47 배타 처분: 종결 선언 기존 16 · 이 판정으로 종결 9(`OPEN-5D-GOLDEN`·`OPEN-5D2-BID-RATE-UPPER`(2F 가 닫음)·5C 처분 포인터 다섯·`OPEN-5C-5A-TABLE-REASSIGN`(5A 표 4행 정정)·`OPEN-5A-MYPY-ALLOWLIST`(0건)) · **5E-3 조건부 3**(정책 로더 뿌리 처방 둘 + 창 단위 취소, 병합 시 확정) · **운영자 결정 대기 5**(`OPEN-5E2-CANDIDATE-RATE-UPPER` 추천 (a) clamp ≤ 1 · `OPEN-5E2-FEATURE-SCHEMA-PARITY` 추천 (a) Kotlin 값 갱신 · `OPEN-5D2-POLICY-VALUES` 추천 (a) 잠정값 · `OPEN-5C2-POLICY-VALUES`·`OPEN-5E-POLICY-VALUES` 승인 문면) · 이월 14(GBM 서빙 묶음 4 · 6B 2 · 6C 3 · curator 2 · 재학습 2 · 후속 소폭 1). **다섯이 처분되기 전까지 M5 는 「구현 완료·운영 미가용」**이다 — 출하 정책으로는 gate 가 NOT_READY 이고 현 Kotlin 송신값은 `UNSUPPORTED_SCHEMA` 를 받는다. 결정을 M6 착수 계약에 승계시키는 것도 선택지다.
+
 ## Codex 독립 리뷰
 
 > **2026-09-04 운영자 결정:** 아래 관점은 Phase 4 `verifier` 가 적용한다. Codex 리뷰는 코드 slice 의
