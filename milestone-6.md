@@ -12,6 +12,27 @@
 - M0 capability map의 V2 필수 범위 확정
 - 실제 외부 호출/배포 여부에 대한 사용자 승인 경계 확인
 
+**M6 착수 2026-09-16(사용자 「M6 착수」) — 전제 판정과 운영자 결정 둘** — 착수 전 입력 재고
+(`_workspace/m6-prep/01_inputs.md`, 읽기 전용 조사)로 다섯 slice 의 입력 충족을 문면으로 판정했다.
+**전제 상태**: M5 는 종결(PR #23, 종결 33·이월 14) · M1~M3 종결 · **M4 는 4A~4E·4B-1~4B-8 이 전부
+종결됐으나 마일스톤 종결 판정 커밋이 아직 없다**(다른 세션 소관) — 각 slice 가 개별 사용자 승인으로
+닫혔으므로 M6 착수를 막지 않으나, M6 완료 조건 9(verifier 최종 + release 승인)는 M4 종결 판정이
+선행돼야 한다. **완료 조건 아홉 중 지금 성립하는 것은 조건 2 하나**(`bid-vector` symlink·import·DB
+schema 런타임 의존 0 — 남은 문자열은 rootProject 이름·KDoc 인용뿐)이고, 조건 1(one-command)·3(E2E)·
+7(rollback/restore rehearsal)·8(이미지 SBOM/스캔)은 미성립이다. **입력 판정**: 6B·6C 는 M5 가 이월
+항목을 명시해 착수 가능 · 6A 는 승인된 입력이 없었다(capability-map 8축에 UI·endpoint 축이 없고
+ADR 0008 §1.3 이 「UI 에는 승인된 사용자 가치도 acceptance scenario 도 없다」, 인바운드 인증 승인 문면
+0, 코드 0) · 6D·6E 는 6A~6C 뒤.
+
+그래서 **운영자 결정 둘을 받았다(2026-09-16, 선택지 + 추천)**: ① **`OPEN-ADR-09` 닫힘 — V2 의
+소비자는 API 전용이고 화면은 기존 시스템을 계속 쓴다.** 6A 는 운영자 대상 HTTP endpoint·인증·audit 로
+좁혀지고 UI 승인 공백을 만들지 않는다. ② **6A 인바운드 인증은 단일 운영자 토큰 + 전 요청 audit**
+(정적 토큰을 secret store/env 로 주입, scope·RBAC 는 소비자가 늘 때 확장). 둘은 6A 착수 계약과 ADR
+등재의 입력이다 — 6A 가 그 자리에서 문면으로 옮긴다.
+
+**착수 순서**: **6C**(입력이 가장 명확하고 6D E2E 의 전제) → 6B(병렬 가능) → 6A(위 결정 둘로 입력이
+섰다) → 6D → 6E.
+
 ## 구현 대상
 
 ### Slice 6A — public API와 auth
@@ -38,6 +59,22 @@
 - health/readiness 분리
 - secret는 environment/secret store로만 주입
 - dependency/image version 고정과 SBOM/vulnerability check
+
+**6C 착수 2026-09-16** — base `f3ac571`, 레인 worktree `bid-vector-v2-m6`·브랜치 `m6-6c/2026-09-16`.
+정본 `reports/evidence/m6/6c/scope.md`(D-6C-1~7). 착수 조사 실측: 컨테이너 자산 0(Dockerfile·compose
+검색 0건, CI 에 이미지 단계 없음) · `app/` 모듈에 `main()` 이 **없다**(모듈 경계 앵커 + test 뿐) ·
+ml-engine `serving` extra 는 이미 경량(numpy·lightgbm 만, 5A D-5A-0 (b)) · `tools/contract-crosslang-smoke.sh`
+는 로컬 `.venv` 에 fake servicer 를 띄우는 **1회 수동 스모크**이고 스스로 「상시 게이트 아님」이라 적는다 ·
+Python 서버에 표준 health 서비스가 없고 readiness 는 `GetModelMetadata.readiness`(5E-1 gate 실물)로 나온다.
+**결정**: Kotlin 앱 이미지·entrypoint 는 실행할 것이 없으므로 **6A**(D-6C-1, 4B-6b 의 app 배선 인계와 같은
+자리) · compose 는 ml-serving + postgres 둘만(broker 는 소비자 코드가 없어 세우지 않는다, D-6C-2) ·
+health/readiness 는 **프로브 둘**로 분리하고 서버 코드(M5 종결)를 열지 않는다(D-6C-3, 표준 `grpc.health.v1`
+채택은 6A/6D) · 실 서버 통합 test 는 태그로 기본 `check` 에서 빼되 **CI 에서는 돈다**(D-6C-4 — Docker 없는
+환경의 상시 붉음과 「안 돌린 게이트」를 동시에 피한다) · SBOM·CVE 스캔 도구 채택은 6E(D-6C-5, `OPEN-6C-IMAGE-VULN-SCAN`) ·
+`OPEN-5E-EMBEDDING-MODEL` 은 6C 가 닫지 않는다(D-6C-6 — 모델 선택은 컨테이너 축과 독립이고 승인 입력이 없다).
+**이 slice 가 닫는 것**: `OPEN-5E2-CROSSLANG-REAL-SERVER`(실 Kotlin gateway ↔ 컨테이너의 실 Python 서버 —
+5E-2 가 Python 미러로만 확인한 Kotlin 소비자 규칙 다섯과 5F-2 가 맞춘 `featureSchemaVersion` 이 실 응답에서
+처음 실측된다) · 완료 조건 1 의 one-command · 완료 조건 8 의 이미지 위생 절반(고정 태그·non-root·금지 패키지).
 
 ### Slice 6D — E2E와 장애 주입
 
