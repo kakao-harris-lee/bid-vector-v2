@@ -39,3 +39,24 @@ Kotlin `check` 전건이 정본이다.
 - exit: 0
 - 핵심 결과: evidence 문서 다섯(이 파일 포함) 커밋 뒤에도 전 모듈 `check` 그대로 통과 —
   이 문서들이 비밀값 스캔 게이트를 스스로 깨지 않는다.
+
+## verifier r1 수정 라운드 — F-1 변이 실측(2026-09-16)
+
+- cmd: `sed -i '' 's/ORDER BY o.actual_opening_at DESC NULLS LAST/ORDER BY o.actual_opening_at ASC NULLS LAST/' adapters/src/main/kotlin/bidvector/adapters/ml/JdbcCompetitionSampleSource.kt && ./gradlew --no-daemon --no-build-cache :adapters:test --tests "bidvector.adapters.ml.JdbcCompetitionSampleSourceTest"`
+- exit: 1(예상된 실패 — 변이 실측)
+- 핵심 결과: 「상한을 넘는 후보는 최신 순으로 잘리고 결측일 후보가 상한을 먼저 먹지
+  않는다」 1건만 `expected:<[2026-09-15, 2026-09-14]> but was:<[2026-09-13, 2026-09-14]>`
+  로 실패(나머지 9건 통과) — F-1이 실제로 정렬을 잰다는 증거.
+- cmd: 위 `sed` 를 원복(`DESC NULLS LAST`)한 뒤 같은 test 재실행
+- exit: 0
+- 핵심 결과: 10 tests 전부 통과(원복 확인) — 이후 `git diff`로 파일이 편집 전과 바이트
+  동일함을 확인.
+
+## verifier r1 수정 라운드 — 전건 재실측
+
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`(F-1~F-4·F-11·F-5~F-7 반영,
+  jarContentGate `sortedBy` 함정 수정 포함 — 총 4라운드: ktlint/detekt 스타일 2회·
+  TooManyFunctions 1회·jarContentGate 1회 실패 → 수정 → 본 실행)
+- exit: 0
+- 핵심 결과: 전 모듈 `check` 통과. `adapters` 515 tests(0 failed, +4) · `workflow` 246
+  tests(0 failed, +3).

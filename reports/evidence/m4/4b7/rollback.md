@@ -69,15 +69,28 @@ git diff --name-status <base> -- $(cat /tmp/4b7-rollback-files.txt)
 ./gradlew --no-build-cache --no-daemon clean check
 ```
 
-## 실측 결과(2026-09-16, 임시 clone `--no-hardlinks`, 브랜치 `m4-4b7/2026-09-16` HEAD `c943fc7`)
+## 실측 결과(2026-09-16, 임시 clone `--no-hardlinks`, verifier r1 수정 라운드 뒤 HEAD `295d850`)
 
 | 단계 | 명령 | exit |
 | --- | --- | --- |
-| ① 목록 추출 | 위 명령 | 0(19줄) |
+| ① 목록 추출 | 위 명령 | 0(19줄 — verifier r1 수정 라운드로 기존 파일 다섯이 더 바뀌었으나 신규 파일은 없어 목록 불변) |
 | ② 역적용 | `xargs git restore --source=<base> --staged --worktree --` | 0 |
 | ③ 대조 | `git diff --name-status <base> -- <목록>` | 0(출력 없음) |
 | ④ compile | 4모듈 compileKotlin·compileTestKotlin | 0(BUILD SUCCESSFUL) |
 | ⑥ 게이트 전건 | `clean check` | 0(BUILD SUCCESSFUL, 355 tasks) |
+
+이전 실측(HEAD `c943fc7`, F-1~F-4·F-11 수정 전)도 같은 ①~⑥ 전부 exit 0이었다 — 두
+HEAD 모두에서 역적용이 동일하게 선다(목록이 바뀌지 않았으므로 당연한 결과지만, 수정
+라운드가 rollback 경계를 흔들지 않았다는 것 자체를 실측으로 남긴다).
+
+**verifier r1 F-10 — 되돌리지 않는 공유 승인 문서.** 팀장이 `scope.md`(계약 갱신 커밋
+`f93abde`·`3475434`)·`milestone-4.md`·`docs/discovery/capability-map.md`·3A
+`policy-values.md`를 이 slice 진행 중 갱신했다. 이 rollback 절차는 그 문서들을
+**되돌리지 않는다**(목록에 없음, in_scope 코드 경로만 대상) — 되돌린 트리에서는
+그 문서들이 여전히 "표본 공급 완료"를 서술하는데 코드는 base(표본 0건)로 돌아가
+있다는 뜻이다. 게이트는 이 어긋남을 잡지 못한다(문서 내용 진위를 검사하는 게이트가
+없다) — rollback을 실행하는 쪽이 그 문서들도 함께 되돌릴지 별도로 판단해야 한다는
+것을 여기 명시로 남긴다(등재로 족하다, F-10 판정).
 
 이 slice는 `Sql.kt`(`adapters/persistence`)에 변경을 남기지 않는다 — SELECT 상수를
 1라운드에 추가했다가 2라운드에서(`MlAdapterDependencyTest` 형제 패키지 import 경계
