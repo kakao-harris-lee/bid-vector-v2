@@ -96,9 +96,12 @@ git checkout m5-5e2/2026-09-16
 아니므로 그대로 남는다, base 자체의 test 수는 837 — 5E-1 종결 시점 808 과 다른 이유는
 그 사이 병합된 다른 slice 들의 순증).
 
-## 실측 결과(2026-09-16, 이 문서 작성 시점 실행)
+## 실측 결과
 
-임시 clone(`/tmp/5e2-rollback-check`)에서 ①~⑥ 전부 실행, exit 코드와 핵심 결과는
-`commands.md`에 옮기지 않는다(evidence-pack 규율 — rollback 실측은 이 문서 자체가
-정본). ①②③ 성립(diff 0), ④ 837 passed, ⑤ `Success: no issues found in 70 source
-files`, ⑥ `BUILD SUCCESSFUL`. 임시 clone 은 확인 뒤 삭제했다.
+구현 종결 시점(HEAD `6d26eac`)과 fix round 1 종결 시점(HEAD `361c957`) 둘 다
+임시 clone 에서 ①~⑥ 전부 재실행했다 — 파일 목록·hunk 대상이 라운드 사이 변하지
+않아(이번 라운드는 기존 파일만 수정, 신규 파일 0) 결과도 동일하다. exit 코드와
+핵심 결과는 `commands.md`에 옮기지 않는다(evidence-pack 규율 — rollback 실측은
+이 문서 자체가 정본). ①②③ 성립(diff 0), ④ 837 passed, ⑤ `Success: no issues
+found in 70 source files`, ⑥ `BUILD SUCCESSFUL`. 임시 clone 은 매번 확인 뒤
+삭제했다.

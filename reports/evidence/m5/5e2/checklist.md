@@ -56,6 +56,11 @@
 | `BidPredictionServicer(gate, schemas, runtime)` | 생성자 세 번째 인자로 `PredictionRuntime | None` — 호출자 하나(`app/server.py`) |
 | `status.ValidationDetailCode` 신설 5값 + `ReadinessDetailCode.SERVER_NOT_READY` | 어휘 읽기(닫힌 집합) |
 
+**fix round 1(verifier r1·code-reviewer 수정) 추가 표면 — 없음.** `_validate`(3번째
+인자 `gate` 추가)·`_compute_and_map`(R-M2 리팩터 신설)·`_first_candidate_rate_
+out_of_range`(H-1 신설)는 전부 밑줄 접두 모듈 내부 함수이고 `serving/__init__.py`
+는 이번 라운드에 변경이 없다(diff 로 확인, `commands.md` 「(2b)」 참고).
+
 ## 미달/과잉 판정(설계 검토 (3))
 
 - **미달 후보였던 것**: `Readiness.LOADING`을 wire 에 내는 경로 — `ReadinessGate`는 `from_preload`에서 곧바로 READY/NOT_READY 만 내고 `LOADING` 상태를 생산하는 production 경로가 없다(gate 실물 확인, `readiness.py` 전수 읽음). `_READINESS_TO_WIRE`엔 `LOADING` 매핑 항목을 **뒀다**(값 지어내기가 아니라 존재하는 wire enum 값을 빠짐없이 다루기 위함) — 이 경로는 현재 시스템에서 도달 불가능하지만, gate 가 장차 `LOADING`을 내게 되면 매핑이 이미 있어 조용한 기본값(예: NOT_READY 로 잘못 접히는 것)을 막는다. 알려진 제한 1로 등재.
