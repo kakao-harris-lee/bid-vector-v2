@@ -54,7 +54,7 @@ rollback: |
 | D-5F1-4 | 5D·5D-2 policy-values 표 갱신은 이 slice 가 한다(승인 값의 정본 자리) — 5E-2 알려진 제한 문면은 무편집(종결 판정이 처분) | 두 문서가 다른 말을 하지 않게 |
 
 ## 위협 모델 — 5F-1 고유 경계
-**방어한다**: (a) 출하 정책이 계약 밖 후보를 만들지 않는다(clamp ≤ 1) (b) 출하 정책 그대로 READY 가 된다는 사실이 test 로 고정된다(값이 빠지면 붉음). **방어하지 않는다**: 임계 10 의 통계적 타당성(재학습 slice 몫) · 정책 값이 바뀔 때 5D golden 이 재생성돼야 하는가(golden 은 자체 cfg — 영향 0 을 S-5 로 실측만).
+**방어한다**: (a) 출하 정책이 계약 밖 후보를 만들지 않는다(clamp ≤ 1) (b) 출하 정책 그대로 READY 가 된다는 사실이 test 로 고정된다(값이 빠지면 붉음). **방어하지 않는다**: 임계 10 의 통계적 타당성(재학습 slice 몫) · 정책 값이 바뀔 때 5D golden 이 재생성돼야 하는가(golden 은 자체 cfg — 영향 0 을 S-5 로 실측만) · **로더 불변식 `clamp_max ≤ 1`**(계약 갱신 (3), verifier r1 MEDIUM-3): 5D 로더는 `clamp_min < clamp_max` 만 검사해 `1.05` 도 정상 로드·READY 이고 계약 위반은 요청마다 5E-2 런타임 fail-closed 로만 걸린다. (a) 의 방어는 값 고정 test + 런타임 fail-closed 두 층이며 **구성상 닫히지 않는다** — D-5F1-1(값만, `src/**` 무편집)이 친 울타리라 이 slice 밖. 구조적 폐쇄(로더 불변식 한 줄 + test)는 후속 소폭(5D 로더 파일을 다음에 만지는 slice), M5 종결 판정 §2.5 에 등재.
 **우회 후보**: (1) 값을 바꾸고 test 를 안 뒤집으면 — S-5 가 붉어야 한다(5E-2 test 가 「NOT_READY」를 단언하므로 자동) (2) clamp_max 1.0 에서 `clamp_min < clamp_max` 불변식(0.7 < 1.0) 유지 — 로더 test 가 확인 (3) `assessment.plausible_max 1.2` 는 입력 표본 밴드라 무관 — 혼동하지 않는다.
 
 ## (2b) 값 획득 축
@@ -74,3 +74,4 @@ rollback: |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-5F1-1~4 | 운영자 결정 ①③(선택지 답변, 종결 판정 §3) |
 | 2026-09-16 구현 중(2) | in_scope 에 `tests/inference/test_scenario.py` 추가(fixture center 이동 + 접힘 거동 test 1) · **D-5F1-5 신설**: `center ≥ clamp_max` 이면 base·aggressive 후보가 같은 값(1.0)으로 접힌다 — 엔진 불변식 위반이 아니고(src 는 엄격 순서를 강제하지 않음) 계약도 후보 셋의 순서를 요구하지 않음을 실측(Kotlin `ParsedSuccessFields`·`ResponseMapping` 이 순서·유일성을 강제하면 멈추고 보고). 알려진 제한으로 등재하고 test 로 고정 | 구현 레인 보고 — clamp 1.0 에서 두 test 가 붉음(fixture center 1.0 이 경계). 값 변경의 결과이므로 피하지 않고 고정한다 |
+| 2026-09-16 종결 전 문서(3) | 위협 모델 「방어하지 않는다」에 로더 불변식 `clamp_max ≤ 1` 부재 등재(verifier r1 MEDIUM-3 — 구성상 닫히지 않음, 후속 소폭) · `5d/policy-values.md` 헤더 전칭 「전부 legacy-behavior」에 clamp 행 예외절(MEDIUM-1, 정본 문서에 YAML 과 같은 예외절) · 개명된 test 이름 참조 둘 정정(LOW-2) · Python 미러의 `hasValidDiagnosticsShape` 누락은 5E-2 소유 부채로 등재(참고) | verifier r1 ready-for-review(MEDIUM 2·LOW 2) + code-reviewer 머지 가능(LOW 1) — 코드 무변경(docstring 만), 재검증 없음 |
