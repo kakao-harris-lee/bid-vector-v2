@@ -1,17 +1,24 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.MlUnavailableReason
+import bidvector.decision.ProvenanceRuleId
 import bidvector.decision.UnitScore
 import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.ScoreFact
 import bidvector.decision.priority.derive.DERIVATION_POLICY
+import bidvector.procurement.OpeningResult
+import bidvector.sharedkernel.AwardAmount
+import bidvector.sharedkernel.BaseAmountProvenance
+import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.FloorRateOrigin
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
+import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.prediction.PredictionDiagnostics
 import bidvector.workflow.prediction.SegmentSupport
 import bidvector.workflow.prediction.Weight
@@ -19,6 +26,7 @@ import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
+import java.time.Instant
 
 /**
  * verifier r1 F-1 — [predictedFacts]가 `MarginInputs.init`의 세 술어(recommendedRate·
@@ -37,6 +45,8 @@ class PredictionFactsTest {
             opportunityVersion = version,
             derivation = Resolution.Resolved(DERIVATION_POLICY.entries.single().second, version),
             priority = PRIORITY_POLICY.entries.single().second,
+            // M4/4B-8(D-4B8-5) — 표본과 같은 SAMPLE_PROVENANCE_POLICY singleton.
+            provenancePolicy = Resolution.Resolved(SAMPLE_PROVENANCE_POLICY.entries.single().second, version),
         )
     }
 
@@ -161,5 +171,110 @@ class PredictionFactsTest {
         budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.CircuitOpen)
         expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.CircuitOpen)
         (budgetCapture == ScoreFact.Absent(MlUnavailableReason.ScoreNotProvided)) shouldBe false
+    }
+
+    // ---- M4/4B-8(D-4B8-1·2, OPEN-4B7-TARGET-LABEL 닫힘) — 대상 공고 라벨 규칙표.
+    // `provenanceLabelFor`(SampleConversion.kt)를 `opening = null`로 직접 불러 잰다 — 4B-7
+    // `SampleEligibilityTest`의 라벨 test와 같은 관례(같은 분류기, 다른 opening 인자). ----
+
+    @Test
+    fun `대상 라벨 — 추정가격이 없어 SuspectRatio 는 불가하고 기초금액이 정수라 Clean`() {
+        val notice = testNoticeWithMoney(number = "20260101020", won = 1_000_000_000L)
+        val baseAmount = requireNotNull(notice.baseAmount).amount
+
+        val label = provenanceLabelFor(notice, null, baseAmount, testPolicies.provenancePolicy)
+
+        label shouldBe BaseAmountProvenance.Clean
+    }
+
+    @Test
+    fun `대상 라벨 — 기초금액이 추정가격의 신뢰 상한(1점15배)을 넘으면 SuspectRatio`() {
+        val notice =
+            testNoticeWithMoney(number = "20260101021", won = 1_200_000_001L, estimatedAmountWon = 1_000_000_000L)
+        val baseAmount = requireNotNull(notice.baseAmount).amount
+
+        val label = provenanceLabelFor(notice, null, baseAmount, testPolicies.provenancePolicy)
+
+        label shouldBe BaseAmountProvenance.SuspectRatio
+    }
+
+    @Test
+    fun `대상 라벨 — 기초금액이 0이면 네 규칙 모두 불성립해 Unknown`() {
+        val notice = testNoticeWithMoney(number = "20260101022", won = 0L)
+        val baseAmount = requireNotNull(notice.baseAmount).amount
+
+        val label = provenanceLabelFor(notice, null, baseAmount, testPolicies.provenancePolicy)
+
+        label shouldBe BaseAmountProvenance.Unknown
+    }
+
+    /**
+     * D-4B8-1 「DerivedYega는 구조적으로 불가」의 직접 증거다. **알려진 제한** — 원화는
+     * `Long`이라 `rawBaseAmount`가 항상 정수이고, production `ruleOrder`(SuspectRatio →
+     * CleanInteger → DerivedYega → DerivedVat)에서는 CleanInteger가 SuspectRatio 다음
+     * 자리에서 그 정수성만으로 항상 먼저 매치한다 — 그래서 production 정책으로는
+     * DerivedYega·DerivedVat 자체가 (대상이든 표본이든, opening 유무와 무관하게) 관측되지
+     * 않는다(4B-7 `SampleEligibilityTest`에도 두 라벨의 test가 없다 — 같은 이유). 그래서 이
+     * test는 `ruleOrder`만 DerivedYega 우선으로 바꾼 test 전용 정책으로 CleanInteger의
+     * 선매치를 비활성화하고, opening 유무만 바꿔 「대상 조립부가 낙찰 입력을 null로
+     * 강제한다」는 D-4B8-1의 주장을 직접 잰다(변이).
+     */
+    @Test
+    fun `대상 라벨 — DerivedYega 는 opening 이 있어야만 매치한다(변이 — opening=null 이면 불가)`() {
+        val notice = testNoticeWithMoney(number = "20260101023", won = 1_000_000_000L)
+        val baseAmount = requireNotNull(notice.baseAmount).amount
+        val winningRate = Rate.ofFraction(BigDecimal("0.5"))
+        val matchingOpening =
+            OpeningResult(
+                noticeId = notice.id,
+                winningRate = winningRate,
+                derivedBaseAmount = null,
+                observedAt = Instant.parse("2026-09-16T00:00:00Z"),
+                finalAwardAmount = AwardAmount(500_000_000L, Currency.KRW, Provenance.DerivedFromOpening),
+            )
+        val yegaFirstPolicy =
+            Resolution.Resolved(
+                testPolicies.provenancePolicy.value.copy(
+                    ruleOrder =
+                        listOf(
+                            ProvenanceRuleId.DerivedYega,
+                            ProvenanceRuleId.SuspectRatio,
+                            ProvenanceRuleId.CleanInteger,
+                            ProvenanceRuleId.DerivedVat,
+                        ),
+                ),
+                PolicyVersion(EffectiveFrom.Initial, "test-yega-first"),
+            )
+
+        // 대조군 — 같은 데이터에 opening 이 있으면 DerivedYega 가 실제로 매치할 수 있다.
+        provenanceLabelFor(notice, matchingOpening, baseAmount, yegaFirstPolicy) shouldBe
+            BaseAmountProvenance.DerivedYega
+        // predictionRequestFor 가 실제로 쓰는 형태 — opening = null 이면 같은 정책·같은 base 라도
+        // DerivedYega 가 나올 수 없고, 다음 매치인 CleanInteger(Clean)로 접힌다.
+        provenanceLabelFor(notice, null, baseAmount, yegaFirstPolicy) shouldBe BaseAmountProvenance.Clean
+    }
+
+    @Test
+    fun `predictionRequestFor 라벨은 Unknown 상수가 아니다 — 입력에 따라 갈린다(OPEN-4B7-TARGET-LABEL 닫힘)`() {
+        val cleanNotice = testNoticeWithMoney(number = "20260101024", won = 1_000_000_000L)
+        val suspectNotice =
+            testNoticeWithMoney(number = "20260101025", won = 1_200_000_001L, estimatedAmountWon = 1_000_000_000L)
+        val cleanResolved = requireNotNull(cleanNotice.baseAmount)
+        val suspectResolved = requireNotNull(suspectNotice.baseAmount)
+
+        val cleanRequest =
+            predictionRequestFor(cleanResolved, cleanNotice, testPolicies, CorrelationId("corr-clean"), emptyList())
+        val suspectRequest =
+            predictionRequestFor(
+                suspectResolved,
+                suspectNotice,
+                testPolicies,
+                CorrelationId("corr-suspect"),
+                emptyList(),
+            )
+
+        cleanRequest.baseAmountProvenanceLabel shouldBe BaseAmountProvenance.Clean
+        suspectRequest.baseAmountProvenanceLabel shouldBe BaseAmountProvenance.SuspectRatio
+        (cleanRequest.baseAmountProvenanceLabel == BaseAmountProvenance.Unknown) shouldBe false
     }
 }

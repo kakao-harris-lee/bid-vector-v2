@@ -107,7 +107,7 @@ class SampleEligibilityTest {
         return Notice.collected(
             NoticeCollected(
                 id = id,
-                businessCategory = categoryCode?.let { BusinessCategory(CategoryCode(it), CategoryLabel("공사")) },
+                businessCategory = categoryCode?.let { BusinessCategory(CategoryCode.of(it), CategoryLabel("공사")) },
                 baseAmount = baseAmount,
                 estimatedAmount = estimatedAmount,
                 allocatedBudget = null,
@@ -163,7 +163,7 @@ class SampleEligibilityTest {
         outcome.sample.observedBidRate shouldBe Rate.ofFraction(BigDecimal("0.9200"))
         outcome.sample.baseAmount shouldBe notice.baseAmount?.amount
         outcome.sample.openedOn shouldBe LocalDate.of(2026, 9, 17) // D-4B7-7 — Asia/Seoul 로 접은 날짜
-        outcome.sample.categoryCode shouldBe CategoryCode("A01")
+        outcome.sample.categoryCode shouldBe CategoryCode.of("A01")
         outcome.sample.agencyId shouldBe null
         outcome.sample.awardRate shouldBe Rate.ofFraction(BigDecimal("0.9200"))
         val reserveDraw = requireNotNull(outcome.sample.reserveDraw)

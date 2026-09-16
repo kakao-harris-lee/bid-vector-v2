@@ -365,7 +365,7 @@ class CanonicalizeTest {
 
         val outcome = canonicalize(observation, TEST_POLICY) as CanonicalizationOutcome.Normalized
 
-        outcome.command.businessCategory shouldBe BusinessCategory(CategoryCode("0411"), CategoryLabel("기술용역"))
+        outcome.command.businessCategory shouldBe BusinessCategory(CategoryCode.of("0411"), CategoryLabel("기술용역"))
     }
 
     @Test

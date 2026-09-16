@@ -10,9 +10,11 @@ import bidvector.procurement.NoticeNumber
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.ResolvedBaseAmount
+import bidvector.procurement.ResolvedEstimatedAmount
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.OperatorLicenses
 import bidvector.sharedkernel.Currency
+import bidvector.sharedkernel.EstimatedAmount
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
@@ -189,6 +191,9 @@ internal fun testNoticeWithMoney(
     deadlineAt: Instant? = FUTURE_DEADLINE,
     // M4/4B-7(D-4B7-9) — 경쟁 표본 조회 축(categoryCode) test 용. 기본값은 기존 fixture와 바이트 동일.
     businessCategory: bidvector.procurement.BusinessCategory? = null,
+    // M4/4B-8(D-4B8-1) — 대상 라벨 규칙표(`PredictionFactsTest`)의 SuspectRatio 판정에 쓰는
+    // 추정가격 축. 기본값 null 은 기존 fixture와 바이트 동일.
+    estimatedAmountWon: Long? = null,
 ): Notice {
     val observation =
         RawNoticeObservation.of(
@@ -203,12 +208,19 @@ internal fun testNoticeWithMoney(
             VatTreatment.EXCLUSIVE,
             Provenance.Published(NoticeRound.of("000")),
         )
+    val resolvedEstimatedAmount =
+        estimatedAmountWon?.let {
+            ResolvedEstimatedAmount(
+                RawKey("presmptPrce"),
+                EstimatedAmount(it, Currency.KRW, VatTreatment.EXCLUSIVE, Provenance.Published(NoticeRound.of("000"))),
+            )
+        }
     return Notice.collected(
         NoticeCollected(
             id = NoticeId(NoticeNumber.of(number), NoticeRound.of("000")),
             businessCategory = businessCategory,
             baseAmount = resolvedBaseAmount,
-            estimatedAmount = null,
+            estimatedAmount = resolvedEstimatedAmount,
             allocatedBudget = null,
             floorRate = floorRate,
             deadlineAt = deadlineAt,

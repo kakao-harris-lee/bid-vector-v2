@@ -64,7 +64,9 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
     private fun query(
         windowDays: Int = 365,
         limit: Int = 500,
-    ): CompetitionSampleQuery = CompetitionSampleQuery(CategoryCode(category), targetId, asOf, windowDays, limit)
+        // M4/4B-8(D-4B8-4) — 정규화 일치 test 용(기본값은 기존 fixture와 바이트 동일).
+        categoryCode: String = category,
+    ): CompetitionSampleQuery = CompetitionSampleQuery(CategoryCode.of(categoryCode), targetId, asOf, windowDays, limit)
 
     private fun appendRaw(observedAt: Instant): ObservationKey =
         appendRawObservation(RawNoticeObservation.of(emptyMap(), SourceEndpoint.NOTICE_LIST, observedAt))
@@ -84,7 +86,7 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
         val command =
             NoticeCollected(
                 id = id,
-                businessCategory = BusinessCategory(CategoryCode(categoryCode), CategoryLabel("공사")),
+                businessCategory = BusinessCategory(CategoryCode.of(categoryCode), CategoryLabel("공사")),
                 baseAmount =
                     ResolvedBaseAmount.Direct.of(
                         1_000_000_000L,
@@ -204,6 +206,22 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
         supply.samples.single().openedOn shouldBe lowerBound.atZone(OPENING_DATE_ZONE).toLocalDate()
     }
 
+    /**
+     * D-4B8-4 — 조회 SQL은 정확 일치(`business_category_code = ?`)를 유지한다(정규화를
+     * 두 번째 규칙으로 SQL에 두지 않는다). 저장 값·조회 값이 둘 다 [CategoryCode.of]를
+     * 거치므로 원문 대소문자·공백이 달라도(쓰기는 `"A01"`, 조회는 `"  a01 "`) 같은 표본을
+     * 찾는다 — 설계 검토 우회 (10)(픽스처는 `of`를 통해 만든 값을 저장에도 쓴다) 실측.
+     */
+    @Test
+    fun `공종 코드가 대소문자·공백만 다르면 같은 표본으로 조회된다 — 정규화 일치(D-4B8-4)`() {
+        seedCandidate("SAMPLE-NORMALIZE-001", categoryCode = "A01", actualOpeningAt = asOf.minusSeconds(3600))
+
+        val supply = source().samplesFor(query(categoryCode = "  a01 ")) as CompetitionSampleSupply.Supplied
+
+        supply.samples.size shouldBe 1
+        supply.samples.single().categoryCode shouldBe CategoryCode.of("A01")
+    }
+
     @Test
     fun `창 안 후보는 자격을 만족하면 Eligible 로 포함된다`() {
         val id = seedCandidate("SAMPLE-WITHIN-001", actualOpeningAt = asOf.minusSeconds(3600))
@@ -211,7 +229,7 @@ class JdbcCompetitionSampleSourceTest : PersistenceTestSupport() {
         val supply = source().samplesFor(query()) as CompetitionSampleSupply.Supplied
 
         supply.samples.size shouldBe 1
-        supply.samples.single().categoryCode shouldBe CategoryCode(category)
+        supply.samples.single().categoryCode shouldBe CategoryCode.of(category)
         supply.excluded shouldBe emptyMap()
         // NoticeId 자체는 CompetitionSample 에 안 실린다(D-2B-3 — 표본은 식별자가 아니다) — id 를
         // 참조하는 것은 이 test 가 후보를 정확히 하나 심었다는 것을 스스로 확인하기 위함이다.
