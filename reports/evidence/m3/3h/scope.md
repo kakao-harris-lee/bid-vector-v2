@@ -1,7 +1,6 @@
 # Slice 계약 — M3 / 3H-1 · 발주기관 fact 수집·저장·도메인(`OPEN-2B-AGENCY-ID` 1/2)
 
-> **지위**: 초안(운영자 결정 대기 — ① P-14 등재·엔진 키 ② V7 마이그레이션 + Codex 범위·비용 ③ 채움률 실호출 1회 ④ 3H-1/3H-2 분할).
-> 이 문서는 추천안으로 쓴다. 세션 모델 단독 작성. Phase 2.5 설계 검토는 아래 「위협 모델 경계·우회·(2b)」 절.
+> **지위**: 운영자 결정 2026-09-16 「추천대로」 — ① P-14 등재 + 엔진 키 = 수요기관코드 ② V7 마이그레이션 + migration-reviewer + Codex 1 라운드(범위·비용 승인) ③ 채움률 read-only 실호출 1회 승인(3H-2 착수 전 실행) ④ 3H-1/3H-2 분할. D-3H-1·2·4·6·8 의 「운영자 결정 대기」는 전부 **결정**으로 읽는다. 세션 모델 단독 작성. Phase 2.5 설계 검토는 아래 「위협 모델 경계·우회·(2b)」 절.
 > 레인: worktree `bid-vector-v2-m4e`, 브랜치 `m3-3h/2026-09-16`, base = `origin/main`(PR #29 병합 뒤). M3 후속은 `main` 병행(3G 선례).
 > 구현 `kotlin-implementer`(sonnet) → `verifier`(opus) → 리뷰 레인(`code-reviewer` + **`migration-reviewer`**) → **Codex**(마이그레이션 — 되돌리기 어려운 경로, 운영자 범위·비용 승인 뒤).
 > 다른 레인(M5 Python)과 소스 겹침 0 — 단, 3H-2 가 M5 레인에 `OPEN-3H-SAMPLE-MISSING-REASON` 을 건넨다.
