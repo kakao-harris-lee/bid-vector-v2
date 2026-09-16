@@ -1,6 +1,6 @@
 # Slice 계약 — M3 / 3H-2 · 발주기관 요청·표본 축 조립 + 표본 축 결측 사유(`OPEN-2B-AGENCY-ID` 2/2)
 
-> **지위**: 운영자 결정 2026-09-17 「추천대로」 — ① 채움률 실호출은 공사 목록 1페이지(≤100건) read-only, 비율만 기록 ② 엔진 표본 축 결측 사유 확장(D-3H2-3)은 **이 레인**이 `ml-implementer` 로(M6 세션과 소스 겹침 0 실측) ③ Codex 모델 핀 `gpt-5.5`(하네스 `ff061e2`) ④ 키 파일 생성 → 프로브 → 결과가 낮지 않으면 즉시 구현. 환경·인증키 파일 자리는 `config/secrets/`(운영자 결정, `5b362b7`). D-3H2-3 의 「확인 대기」는 **결정**으로 읽는다. 세션 모델 단독 작성.
+> **지위**: 운영자 결정 2026-09-17 「추천대로」 — ① 채움률 실호출은 공사 목록 1페이지(≤100건) read-only, 비율만 기록 ② 엔진 표본 축 결측 사유 확장(D-3H2-3)은 **이 레인**이 `ml-implementer` 로(M6 세션과 소스 겹침 0 실측) ③ Codex 모델 핀 `gpt-5.5`(하네스 `ff061e2`) ④ 환경 파일 생성 → 프로브 → 결과가 낮지 않으면 즉시 구현. 환경 파일 자리는 `config/` 아래 gitignore 된 디렉터리(운영자 결정, `5b362b7` — 경로·변수 이름은 그 커밋의 예시 파일이 정본). D-3H2-3 의 「확인 대기」는 **결정**으로 읽는다. 세션 모델 단독 작성.
 > 3H-1 종결 기록: PR #30 머지 `e101a0c`(2026-09-17, 운영자 「pr #30 머지」). **Codex r1 `request_changes`(high 1 — 적용 DB rollback 경로)의 조치 `0f56131` 뒤 재심 r2 는 운영자 결정으로 생략** — v2-slice-pipeline 정지선의 「종결은 운영자 개별 명시 결정(예외 기록)」 에 따른 기록(PR #30 코멘트에도 남김).
 > 레인: worktree `bid-vector-v2-m4e`, 브랜치 `m3-3h2/2026-09-17`, base = `origin/main`(PR #30 병합 뒤). 구현 `kotlin-implementer`(sonnet) + (②가 이 레인이면) `ml-implementer`(sonnet) → `verifier`(opus) → 리뷰 레인(`code-reviewer`; wire·계약 파일 무변경이라 contract-keeper 는 `RequestMapping` 호출부 변경 시에만). 마이그레이션 없음 → Codex 대상 아님.
 
