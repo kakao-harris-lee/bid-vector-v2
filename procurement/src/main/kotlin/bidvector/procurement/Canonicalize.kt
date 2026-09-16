@@ -116,7 +116,7 @@ private fun businessCategoryFrom(
         ?.let { code ->
             val label =
                 registry.contractsFor(FieldConcept.BUSINESS_CATEGORY_LABEL).firstOrNull()?.let(observation::valueOf)
-            BusinessCategory(CategoryCode(code), label?.let(::CategoryLabel))
+            BusinessCategory(CategoryCode.of(code), label?.let(::CategoryLabel))
         }
 
 /**

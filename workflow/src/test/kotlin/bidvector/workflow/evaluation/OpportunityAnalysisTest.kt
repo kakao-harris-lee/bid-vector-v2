@@ -309,7 +309,7 @@ class OpportunityAnalysisTest {
     fun `businessCategory 있으면 categoryCode 를 실은 query 로 port 를 부른다`() {
         val category =
             bidvector.procurement.BusinessCategory(
-                bidvector.procurement.CategoryCode("A01"),
+                bidvector.procurement.CategoryCode.of("A01"),
                 null,
             )
         val notice = testNoticeWithMoney(number = "20260101006", businessCategory = category)
@@ -338,7 +338,7 @@ class OpportunityAnalysisTest {
     fun `Supplied 표본이 예측 요청에 그대로 실린다`() {
         val category =
             bidvector.procurement.BusinessCategory(
-                bidvector.procurement.CategoryCode("A01"),
+                bidvector.procurement.CategoryCode.of("A01"),
                 null,
             )
         val notice = testNoticeWithMoney(number = "20260101008", businessCategory = category)
@@ -370,7 +370,7 @@ class OpportunityAnalysisTest {
     fun `Unavailable 표본 공급은 Analyzed 를 유지하되 예측 성분만 Absent`() {
         val category =
             bidvector.procurement.BusinessCategory(
-                bidvector.procurement.CategoryCode("A01"),
+                bidvector.procurement.CategoryCode.of("A01"),
                 null,
             )
         val notice = testNoticeWithMoney(number = "20260101009", businessCategory = category)

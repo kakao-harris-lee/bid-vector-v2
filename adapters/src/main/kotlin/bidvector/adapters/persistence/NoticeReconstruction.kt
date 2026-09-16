@@ -48,9 +48,14 @@ private fun eventPathFor(status: NoticeStatus): List<NoticeEvent> =
         NoticeStatus.Cancelled -> listOf(NoticeEvent.CancellationObserved)
     }
 
+/**
+ * D-4B8-4 — 복원 경로도 [CategoryCode.of]로 정규화한다(관용). 정규화 전에 저장된 기존 행은
+ * 도메인 객체로는 복원되지만 조회 SQL(정확 일치, `business_category_code = ?`)에서는 빠진다
+ * — `OPEN-4B8-CATEGORY-BACKFILL`(운영 데이터 없음, M6).
+ */
 private fun businessCategoryOf(row: NoticeRow): BusinessCategory? {
     val code = row.businessCategoryCode ?: return null
-    return BusinessCategory(CategoryCode(code), row.businessCategoryLabel?.let(::CategoryLabel))
+    return BusinessCategory(CategoryCode.of(code), row.businessCategoryLabel?.let(::CategoryLabel))
 }
 
 /**

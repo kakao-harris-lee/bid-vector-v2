@@ -10,7 +10,6 @@ import bidvector.decision.priority.derive.deriveExpectedMargin
 import bidvector.procurement.Notice
 import bidvector.procurement.ResolvedBaseAmount
 import bidvector.sharedkernel.BaseAmount
-import bidvector.sharedkernel.BaseAmountProvenance
 import bidvector.sharedkernel.BidRate
 import bidvector.sharedkernel.Measurement
 import bidvector.sharedkernel.Rate
@@ -26,6 +25,14 @@ import java.math.BigDecimal
  * `OpportunityAnalysis.predictionFacts`(scope.md ③⑥)가 쓰는 예측 요청 조립·budgetCapture·
  * expectedMargin 파생 — port 를 읽지 않는다(예측 호출 자체는 `OpportunityAnalysis.kt`
  * 소관, 이 파일은 요청 조립과 응답의 값 변환만 한다).
+ *
+ * M4/4B-8(D-4B8-1·2, `OPEN-4B7-TARGET-LABEL` 닫힘) — `baseAmountProvenanceLabel`은 더는
+ * `BaseAmountProvenance.Unknown` 상수가 아니다. 4B-7 표본 라벨과 같은 분류기
+ * (`provenanceLabelFor`, `SampleConversion.kt`)를 `opening = null`로 부른다 — 대상 공고는
+ * 개찰 전이라 낙찰 입력이 구조적으로 없다(`DerivedYega`는 그 부재로 항상 불가, 두 번째
+ * 분류기를 두지 않는다). 정책은 `policies.provenancePolicy`(`OpportunityAnalysis.
+ * resolvePolicies`가 표본과 같은 `SAMPLE_PROVENANCE_POLICY` singleton에서 resolve) — 이
+ * 함수는 여전히 port·Clock을 읽지 않는다(값으로 받는다).
  */
 internal fun predictionRequestFor(
     resolvedBaseAmount: ResolvedBaseAmount,
@@ -43,7 +50,8 @@ internal fun predictionRequestFor(
         baseAmount = resolvedBaseAmount,
         businessCategory = notice.businessCategory,
         agencyId = null,
-        baseAmountProvenanceLabel = BaseAmountProvenance.Unknown,
+        baseAmountProvenanceLabel =
+            provenanceLabelFor(notice, null, resolvedBaseAmount.amount, policies.provenancePolicy),
         competitionSamples = competitionSamples,
         objective = policies.opportunity.objective,
         releaseSelector = policies.opportunity.releaseSelector,

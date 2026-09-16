@@ -46,7 +46,7 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
         val command =
             NoticeCollected(
                 id = id,
-                businessCategory = BusinessCategory(CategoryCode("0411"), CategoryLabel("기술용역")),
+                businessCategory = BusinessCategory(CategoryCode.of("0411"), CategoryLabel("기술용역")),
                 baseAmount =
                     ResolvedBaseAmount.Direct.of(
                         1_234_000L,
@@ -76,7 +76,7 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
         val found = requireNotNull(JdbcNoticeRepository(dataSource()).find(id))
 
         found.id shouldBe id
-        found.businessCategory shouldBe BusinessCategory(CategoryCode("0411"), CategoryLabel("기술용역"))
+        found.businessCategory shouldBe BusinessCategory(CategoryCode.of("0411"), CategoryLabel("기술용역"))
         found.baseAmount shouldBe command.baseAmount
         found.estimatedAmount shouldBe command.estimatedAmount
         found.allocatedBudget shouldBe command.allocatedBudget

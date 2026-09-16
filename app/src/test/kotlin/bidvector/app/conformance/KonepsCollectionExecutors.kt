@@ -184,7 +184,7 @@ private fun case005(input: JsonNode): Map<String, Any?> {
 private fun case006(input: JsonNode): Map<String, Any?> {
     val (code, _) = splitCodeCell(input.path("rawCell").asString())
     val label = mappedLabel(input.path("codeMapping"), code)
-    val category = BusinessCategory(CategoryCode(code), label?.let(::CategoryLabel))
+    val category = BusinessCategory(CategoryCode.of(code), label?.let(::CategoryLabel))
     return mapOf(
         "code" to category.code.value,
         "label" to category.label?.value,
@@ -195,7 +195,7 @@ private fun case006(input: JsonNode): Map<String, Any?> {
 private fun case007(input: JsonNode): Map<String, Any?> {
     val (code, _) = splitCodeCell(input.path("rawCell").asString())
     val label = mappedLabel(input.path("codeMapping"), code)
-    val category = BusinessCategory(CategoryCode(code), label?.let(::CategoryLabel))
+    val category = BusinessCategory(CategoryCode.of(code), label?.let(::CategoryLabel))
     return mapOf(
         "code" to category.code.value,
         "codeKnown" to (category.label != null),
