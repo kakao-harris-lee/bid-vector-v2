@@ -12,13 +12,13 @@
 **F-5(D-6C-9, verifier r1 MEDIUM) 시정** — 이전 판은 이 명령의 시작 트리가 `f3ac571`
 (base) 자체였다. 그 트리에는 6C 산출물이 애초에 없어 뒤이은 삭제·복원이 전부 no-op으로
 "성공"했고, 확인 ①~⑥이 절차의 옳음과 무관하게 자동으로 참이었다(verifier 실측). 아래
-명령은 **이 slice 의 실제 HEAD**(`bbdfba3`, rollback.md 자신을 커밋하기 직전 — evidence-pack
+명령은 **이 slice 의 실제 HEAD**(`29e0b40`, rollback.md 자신을 커밋하기 직전 — evidence-pack
 규율상 이 문서를 담은 커밋은 자기 자신을 목록에 넣을 수 없다)에서 시작해 실제로 파일을
 지우고 복원한다.
 
 ## 대상 파일
 
-`git diff --name-status f3ac571..bbdfba3`(구현 레인의 전 커밋 반영, `git status --porcelain`
+`git diff --name-status f3ac571..29e0b40`(구현 레인의 전 커밋 반영, `git status --porcelain`
 빈 결과로 교차 확인) 기준 — 아래 목록은 이 문서를 작성한 시점의 기계 산출이다.
 **라운드마다 파일이 늘면 이 명령을 다시 돌려 목록을 갱신한다.**
 
@@ -45,14 +45,14 @@
   `bidvector.realServer.enabled` system property 배선 두 군데만 추가 — 기존 블록 무변경)
 - `gradle/libs.versions.toml`(`testcontainers-core` alias 한 줄 추가만)
 
-이 셋은 **다른 slice 의 줄이 이 range 안에 없다**(`git log --oneline f3ac571..bbdfba3 -- <파일>`
+이 셋은 **다른 slice 의 줄이 이 range 안에 없다**(`git log --oneline f3ac571..29e0b40 -- <파일>`
 전부 이 slice 커밋뿐 — 실측: 아래 명령 실행 기록). 따라서 hunk 격리 없이 **`base..HEAD`
 전체 복원**으로 충분하다.
 
-## 명령(임시 worktree 에서 실행, 이 문서 작성 시점 실측 — HEAD `bbdfba3` 기준)
+## 명령(임시 worktree 에서 실행, 이 문서 작성 시점 실측 — HEAD `29e0b40` 기준)
 
 ```bash
-git worktree add /tmp/6c-rollback-check2 bbdfba3 --detach   # base 가 아니라 이 slice 의 실제 HEAD
+git worktree add /tmp/6c-rollback-check2 29e0b40 --detach   # base 가 아니라 이 slice 의 실제 HEAD
 cd /tmp/6c-rollback-check2
 rm -rf docker tools/image-hygiene-check.sh tools/one-command-check.sh \
   config/quality/image-hygiene-policy.properties \
@@ -63,30 +63,27 @@ git restore --source=f3ac571 --staged --worktree -- \
   .github/workflows/ci.yml adapters/build.gradle.kts gradle/libs.versions.toml
 ```
 
-**실측(임시 worktree, 2026-09-17, HEAD `bbdfba3`에서 시작 — F-5 시정 확인)**:
-- ① 위 명령 시퀀스 — `exit 0`.
-- ② `git diff f3ac571 -- .github/workflows/ci.yml adapters/build.gradle.kts gradle/libs.versions.toml` —
-  비어 있음(base 와 동일).
-- ③ 신규 파일 목록의 각 경로 — `test -e` 전부 거짓(삭제 확인).
-- ④ `./gradlew --no-daemon :adapters:compileKotlin :adapters:compileTestKotlin` — `exit 0`
-  (되돌린 트리가 컴파일된다 — `RealServerIntegrationTest.kt` 삭제 뒤 `testcontainers-core`
-  의존 제거로 남은 참조 없음).
-- ⑤ `./gradlew --no-daemon :adapters:test` — `exit 0`(기존 test 전부 그대로 통과, 새 test
-  0건이라 회귀 없음).
-- ⑥ `./gradlew --no-daemon check` — `exit 0`(이 slice 가 닿은 게이트는 `check` 전체와
-  `gateExecutionGate`뿐이고, 되돌린 트리에는 이 slice 의 변경이 전혀 없어 f3ac571 시점의
-  통과 상태 그대로다).
-- 잔여(`git diff --name-status f3ac571` — **R2-6 정정, verifier r2 LOW**: 직전 판은 이 명령을
-  `git status --porcelain`으로 잘못 적었다. 그 명령은 이 worktree 에서 15행(삭제 8·staged
-  M 3·D 8 등 조작 자체를 그대로 보여준다)을 내고, 아래 두 행을 내는 것은 `git diff
-  --name-status f3ac571`다 — 관측 자체는 맞았고 명령 이름만 틀렸다):
-  `M milestone-6.md`·`A reports/evidence/m6/6c/scope.md` —
-  「범위」절이 비대상으로 선언한 둘과 정확히 일치(팀장 계약 레인 산출물이라 이 절차가
-  건드리지 않는다).
+**실측 출처(R3-4, verifier r3 LOW 정정)** — 이 라운드는 위 명령 시퀀스를 이 worktree 에서
+다시 돌리지 않았다(팀장 지시 — 기준 커밋만 갱신하고 재실행은 verifier 결과를 참조).
+verifier r3 가 직전 태그(`768a647`, 이번 라운드 파일 편집 전 HEAD)의 임시 clone 에서
+①~⑥을 전부 재현했고(`_workspace/m6-6c/06_verifier_report_r3.md` 「rollback ①~⑥」 절),
+이번 라운드의 변경은 전부 **기존 파일의 줄 수정뿐**(신규 A·삭제 D 없음 — `git diff
+--name-status 29e0b40..HEAD` 로 확인)이라 삭제 대상·복원 대상 목록과 명령 시퀀스 자체는
+그 재현 결과 그대로 유효하다:
 
-이전 판(base 시작)이 자동으로 참이었던 것과 달리, 이번에는 실제 산출물이 있는 트리에서
-지우고 복원했고 위 여섯이 전부 실측으로 통과했다 — 절차 자체의 건전성이 처음으로
-증명됐다(F-5 종결).
+- ① 명령 시퀀스 — `exit 0`(verifier r3 재현).
+- ② 세 M 파일 `git diff f3ac571` — 0 줄(verifier r3 재현).
+- ③ 신규 파일 목록의 각 경로 — `test -e` 전부 거짓(verifier r3 재현).
+- ④ `./gradlew --no-daemon :adapters:compileKotlin :adapters:compileTestKotlin` — `exit 0`(verifier r3 재현).
+- ⑤ `./gradlew --no-daemon :adapters:test` — `exit 0`(verifier r3 재현).
+- ⑥ `./gradlew --no-daemon check` — `exit 0`(verifier r3 재현).
+- 잔여(`git diff --name-status f3ac571`): `M milestone-6.md`·`A reports/evidence/m6/6c/scope.md`
+  — 「범위」절이 비대상으로 선언한 둘과 일치(verifier r3 가 참고용으로 `git status
+  --porcelain`도 같은 worktree 에서 재확인 — **15행**, R2-6 이 정정한 문면과 일치).
+
+이 라운드의 편집(R3-1 목록 절삭·R3-2 compose 옵션·R3-3 문면·R3-6 요약)은 위 파일 셋
+바깥 코드를 새로 만들지 않았으므로 삭제·복원 목록이 여전히 정확하다 — 다음 라운드에서
+새 파일이 생기면 그때 다시 기계 산출로 목록을 갱신한다.
 
 ## 호스트 상태(git 밖) 정리
 

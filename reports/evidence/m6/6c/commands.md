@@ -323,6 +323,56 @@
 - cmd: `docker compose -f docker/compose.yaml down -v` (S-25)
 - exit: 0
 
+## 수정 라운드 3 — D-6C-10 이후 verifier r3 R3-1 표적 재검증(마무리)
+
+## 2026-09-17T02:00:00Z — 변이 셋(버릴 정책 사본, 스크립트 사본이 그 사본을 읽게 함)
+- cmd: (a) `forbidden.packages=`(공백 세 칸) (b) `forbidden.packages=`(탭 한 칸)
+  (c) `forbidden.packages=sqlalchemy,   ,requests`(혼합)
+- exit: 전부 2
+- 핵심 결과: 셋 다 「정책 키 forbidden.packages 에 빈(또는 공백만인) 원소가 있다」로
+  즉시 거부(이전 판은 (a)(b) 에서 exit 0·「위생 게이트 통과」, (c) 에서 `requests`만
+  잡혀 `sqlalchemy`가 검사되지 않았다). 정본(미변이) 정책으로 같은 이미지를 다시
+  돌리면 그대로 통과(임시 스크립트·정책 사본 삭제 완료).
+
+## 2026-09-17T02:05:00Z — postgres 능력 차단 무해성 확인(R3-2)
+- cmd: `docker run -d --security-opt no-new-privileges -e POSTGRES_USER=... postgres:16.4@sha256:...` 뒤 `pg_isready`
+- exit: 0
+- 핵심 결과: 정상 기동·`accepting connections`. compose 에 옵션 추가 뒤 실제 S-23 구동
+  중 `docker inspect docker-postgres-1 --format '{{.HostConfig.SecurityOpt}}'` →
+  `[no-new-privileges:true]` 확인(아래 최종 연속 실측 참고).
+
+### 최종 연속 실측(S-20~S-25, 한 자리에서 순서대로, R3-1·R3-2 반영 뒤)
+
+## 2026-09-17T02:10:00Z
+- cmd: `./tools/one-command-check.sh` (S-20)
+- exit: 0
+
+## 2026-09-17T02:11:00Z
+- cmd: `docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .` (S-21)
+- exit: 0
+
+## 2026-09-17T02:12:00Z
+- cmd: `./tools/image-hygiene-check.sh bidvector/ml-serving:local` (S-22)
+- exit: 0
+- 핵심 결과: `실프로세스-uid전체=[10001]`(R3-6 요약 갱신 확인), base-layer-접두-일치=true,
+  size_bytes=113710196(cap 400000000).
+
+## 2026-09-17T02:13:00Z
+- cmd: `docker compose -f docker/compose.yaml up -d` 뒤 폴링 (S-23)
+- exit: 0
+- 핵심 결과: ml-serving·postgres 둘 다 healthy 로 수렴. `docker inspect docker-postgres-1
+  --format '{{.HostConfig.SecurityOpt}}'` → `[no-new-privileges:true]`(R3-2 반영 확인).
+
+## 2026-09-17T02:14:00Z
+- cmd: `./gradlew --no-daemon :adapters:test --tests '*RealServerIntegrationTest*' -PrealServer=true --rerun-tasks` (S-24)
+- exit: 0
+- 핵심 결과: 캐시 우회 강제 재실행 — `tests="4" skipped="0" failures="0"`, timestamp 가
+  이 실행 시각과 일치.
+
+## 2026-09-17T02:15:00Z
+- cmd: `docker compose -f docker/compose.yaml down -v` (S-25)
+- exit: 0
+
 ## 정본 참고
 
 마지막 HEAD 의 acceptance 전건 재실측 결과 정본은 이 문서가 아니라 verifier 와 PR 조치
