@@ -16,7 +16,7 @@
 | D-5F1-2 | `assessment.agency_sample_threshold: 10`의 근거는 golden `ml-kernel-011`(승인 corpus) — `reuse.md`·`reports/evidence/m5/5d2/policy-values.md` 재승인 조건 문면 |
 | D-5F1-3 | `test_shipped_policy_file_is_rejected_missing_agency_sample_threshold`(5E-2 소유) 반전 — `test_shipped_policy_file_loads_with_lowered_clamp_and_agency_sample_threshold`가 값이 빠지면 다시 붉어짐을 보장(로더가 `PolicyRejected(MissingKey)`를 내는 동작 자체는 무변경 — commands.md 「RED 확인」) |
 | D-5F1-4 | `reports/evidence/m5/5d/policy-values.md`·`reports/evidence/m5/5d2/policy-values.md` 갱신은 이 slice 가 함 — `reports/evidence/m5/5e2/**`는 무편집(`git diff --name-status <base> -- reports/evidence/m5/5e2` 무출력) |
-| D-5F1-5(계약 갱신 (2), 팀장 확인 `e4ba6a4`) | `center >= clamp_max`에서 `base`·`aggressive`가 같은 값으로 접히는 것은 결함이 아니다 — `src/**`가 엄격 순서를 강제하지 않고 Kotlin `CandidateShapeValidation.kt::hasOrderedCandidateRates`도 `<=`(비엄격)을 씀을 확인. `tests/inference/test_scenario.py::test_center_at_clamp_max_folds_base_and_aggressive_but_keeps_three_candidates`가 고정 |
+| D-5F1-5(계약 갱신 (2), 팀장 확인 `e4ba6a4`) | `center >= clamp_max`에서 `base`·`aggressive`가 같은 값으로 접히는 것은 결함이 아니다. **실측**(팀장 지시 — 강제하면 멈추고 보고): Kotlin `ParsedSuccessFields.kt`(`hasOrderedCandidateRates` 호출)·`CandidateShapeValidation.kt`(`rates[0] <= rates[1] && rates[1] <= rates[2]`)·`ResponseMapping.kt`(순서·유일성 검사 없음, grep 확인)와 도메인 타입 `BidPredictionOutcome.kt::BidRateCandidates.init`(`require(conservative <= base)`·`require(base <= aggressive)`) 전부 비엄격 `<=`만 두고 엄격 순서·유일성을 강제하지 않음을 확인 — 재결정 불필요. `tests/inference/test_scenario.py::test_center_at_or_above_clamp_max_folds_base_and_aggressive_but_keeps_three_candidates`(center `1.0`·`1.05` 파라미터화)가 예외 0·후보 3·라벨 순서·`conservative < base`(엄격)·`base == aggressive == clamp_max`를 고정 |
 
 ## 위협 모델 우회 후보 ↔ 대응표(scope.md 「우회 후보」)
 
@@ -82,6 +82,16 @@ production 표면이 아니다: `tests/serving/test_kotlin_rules_parity.py::_inf
    synthetic 값을 옮긴 것이고, 5C 재학습 지표가 나오면 재승인 대상이다(`reports/evidence/m5/
    5d2/policy-values.md`). 재학습 지표가 이 값을 다르게 가리키면 이 slice 의 값 갱신 절차(정책
    문서 → YAML → test)를 다시 밟아야 한다.
-2. **`OPEN-5E2-FEATURE-SCHEMA-PARITY`(5E-2 알려진 제한 3, 미해결 승계)** — 이 slice 는 건드리지
+2. **`center ≥ clamp_max` 에서 후보 둘 접힘 — 계약·소비자 무위반, 정책 (a) 의 귀결**
+   (D-5F1-5, 계약 갱신 (2)). `scenario.clamp_max` 를 `1.0`으로 내린 값 변경(`OPEN-5E2-
+   CANDIDATE-RATE-UPPER` (a) 채택)의 실제 결과로, `center`(대상 공고 축)가 `1.0` 이상인
+   입력에서는 `base`와 `aggressive` 후보가 항상 같은 값(`1.0`)으로 접힌다 — 세 후보가
+   서로 다른 값이라는 보장은 없다. 실측 확인(위 D-5F1-5 행): Kotlin 소비자
+   (`ParsedSuccessFields.kt`·`CandidateShapeValidation.kt`·`ResponseMapping.kt`)도
+   도메인 타입(`BidRateCandidates.init`)도 엄격 순서나 유일성을 요구하지 않아 이 접힘이
+   계약 위반이나 서빙 장애로 이어지지 않는다. `tests/inference/test_scenario.py::
+   test_center_at_or_above_clamp_max_folds_base_and_aggressive_but_keeps_three_candidates`
+   가 이 사실을 test 로 고정한다 — 값을 지어내거나 감추지 않는다.
+3. **`OPEN-5E2-FEATURE-SCHEMA-PARITY`(5E-2 알려진 제한 3, 미해결 승계)** — 이 slice 는 건드리지
    않는다. Kotlin `ML_CALL_POLICY.featureSchemaVersion`과 Python `SUPPORTED_FEATURE_SCHEMAS`
    불일치는 그대로 남아 있다.
