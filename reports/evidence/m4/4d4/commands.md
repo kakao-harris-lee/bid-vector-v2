@@ -77,7 +77,7 @@
 ## 2026-09-16T12:40:00Z — 우회 (1) 변이 실측
 - cmd: `Analyzed.evidence` 필드를 임시 제거한 뒤 `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin`
 - exit: 1
-- 핵심 결과: main 2 파일에서 즉시 컴파일 거부 — `EvaluateCandidatesUseCase.kt` 의 `analyzeAndJudge`(`outcome.evidence` 를 읽는 자리)가 `Unresolved reference 'evidence'`, `OpportunityAnalysisPipeline.kt` 의 `finalOutcomeOf`(`Analyzed` 생성 자리)가 `Too many arguments`. main 이 먼저 실패해 `compileTestKotlin` 자체가 진행되지 않는다(모듈 전체가 컴파일 거부, scope.md 사전 추정 「main 1·test 3」보다 이 slice 최종 구현이 만든 두 번째 main 참조점까지 반영된 강한 결과). 원복 뒤 `git diff` 빈 상태 확인. (verifier r1 V-3 정정 — 좌표 대신 함수명·오류 종류로 서술)
+- 핵심 결과: main 2 파일에서 즉시 컴파일 거부 — `EvaluateCandidatesUseCase.kt` 의 `analyzeAndJudge`(`outcome.evidence` 를 읽는 자리)가 `Unresolved reference 'evidence'`, `OpportunityAnalysisPipeline.kt` 의 `finalOutcomeOf`(`Analyzed` 생성 자리)가 `Too many arguments`. main 이 먼저 실패해 `compileTestKotlin` 자체가 진행되지 않는다(모듈 전체가 컴파일 거부, scope.md 사전 추정 「main 1·test 3」보다 이 slice 최종 구현이 만든 두 번째 main 참조점까지 반영된 강한 결과). 원복 뒤 `git diff` 빈 상태 확인.
 
 ## 2026-09-16T12:42:00Z
 - cmd: (원복 뒤) `./gradlew --no-daemon :workflow:compileTestKotlin`
@@ -107,7 +107,7 @@
 - exit: 1
 - 핵심 결과: 매치 없음(패턴 무매치 = 통과). 육안 확인 — Telegram id·사업자 정보 없음.
 
-## verifier r1 수정 라운드(V-1·V-2·장부층)
+## EvidenceLinesBoundaryTest 신설과 우회 (7)·evidence 단언 재검증
 
 ### 2026-09-16T21:10:00Z
 - cmd: `./gradlew --no-daemon :workflow:test --tests "bidvector.workflow.evaluation.EvidenceLinesBoundaryTest"`(신설 직후)
@@ -118,7 +118,7 @@
 - cmd: (재작성 뒤) `./gradlew --no-daemon :workflow:test --tests "bidvector.workflow.evaluation.EvidenceLinesBoundaryTest"`
 - exit: 0
 
-### 2026-09-16T21:15:00Z — 우회 (7) 변이 실측(verifier r1 V-1 재현 확인)
+### 2026-09-16T21:15:00Z — 우회 (7) 변이 실측
 - cmd: `EvidenceLines.kt` 에 `import java.util.Locale` + `diagnosedLines` 의 `agencyCount` 를 `String.format(Locale.getDefault(), "%d", …)` 로 임시 치환한 뒤 `./gradlew --no-daemon :workflow:test --tests "bidvector.workflow.evaluation.EvidenceLinesBoundaryTest"`
 - exit: 1
 - 핵심 결과: RED 확인 — `EvidenceLines kt 소스에 Locale 서식 API 참조가 없다` 가 4건 매치로 실패. 원복 뒤 `git diff` 가 KDoc 정정분만 남음을 확인.
@@ -137,12 +137,12 @@
 - exit: 0
 
 ### 2026-09-16T21:35:00Z
-- cmd: `./gradlew --no-build-cache --no-daemon clean check`(V-1·V-2·장부층 반영 뒤 재실측, HEAD `6e040df`)
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`(HEAD `6e040df`)
 - exit: 0
-- 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 44s). JUnit XML 집계 **1694 tests · 0 failed · 0 skipped**(verifier r1 이 HEAD `87f495f` 에서 잰 1691보다 3 많다 — 이번 라운드가 더한 test 3건: `EvidenceLinesBoundaryTest` 3 − 순감소 0, `OpportunityAnalysisTest` 는 기존 2건 확장이라 개수 불변). **acceptance_commands 재충족.**
+- 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 44s). JUnit XML 집계 **1694 tests · 0 failed · 0 skipped**. **acceptance_commands 충족.**
 
-### rollback 재실측(임시 clone 2 회, `git clone --no-hardlinks`)
-- cmd: ① `git diff --name-status 44721cf..HEAD -- <in_scope>`(`/tmp/4d4-rollback-check2`) → 15경로, `rollback.md` 목록과 일치.
+### rollback 실측(임시 clone, `git clone --no-hardlinks`)
+- cmd: ① `git diff --name-status 44721cf..HEAD -- <in_scope>` → 15경로, `rollback.md` 목록과 일치.
 - exit: 0
 - cmd: ② `git restore --source=44721cf --staged --worktree -- <15경로>`
 - exit: 0

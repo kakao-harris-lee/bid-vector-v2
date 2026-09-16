@@ -6,7 +6,7 @@ in_scope 경로 한정 restore. `base_sha = 44721cf`. 목록은 `git diff --name
 44721cf..HEAD -- <in_scope 경로>`(수동 기입 금지 — 라운드마다 재실행)로 낸다.
 
 **`milestone-4.md`·`reports/evidence/m4/4d4/**`(scope.md 포함)는 이 rollback
-대상이 아니다(verifier r1 V-6).** 둘 다 팀장 레인이 쓰는 문서다 — 구현 레인은
+대상이 아니다.** 둘 다 팀장 레인이 쓰는 문서다 — 구현 레인은
 편집하지 않았고, `git log --oneline 44721cf..HEAD -- milestone-4.md
 reports/evidence/m4/4d4/scope.md` 로 확인해도 저자가 전부 팀장이다. 되돌린
 트리에서 전건 `check` 가 초록인 것도(아래 ⑥) 두 파일을 원상태로 되돌리지 않아도
@@ -31,8 +31,7 @@ M  workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisTes
 M  workflow/src/test/kotlin/bidvector/workflow/evaluation/PredictionFactsTest.kt
 ```
 
-(verifier r1 라운드에서 `EvidenceLinesBoundaryTest.kt` 신규 1건이 늘었다 — `M` 11 ·
-`A` 4, 위 목록이 그 갱신 결과다. 라운드마다 이 목록을 다시 산출한다.)
+(`M` 11 · `A` 4 — 라운드마다 이 목록을 다시 산출한다.)
 
 ## 공유 파일 판별(2026-09-08·09·16 규율)
 
@@ -42,9 +41,8 @@ config/quality/gate-tests.properties` 로 확인) — 다른 slice와 겹치지 
 격리 없이 `base..HEAD` 전체 역적용으로 충분하다. `EvidenceLines.kt`·
 `EvidenceLinesTest.kt` 는 `git mv` 로 경로만 바뀌었을 뿐(`workflow.notification`
 → `workflow.evaluation`) base 에는 두 경로 다 없어 `A`(신규)로 취급.
-`EvidenceLinesBoundaryTest.kt` 는 verifier r1 라운드에서 완전히 새로 신설된
-파일이라 base 에 없다 — 역시 `A`. restore 가 `--source` 없는 경로를 삭제해
-준다(별도 `git rm` 불필요).
+`EvidenceLinesBoundaryTest.kt` 는 신설 파일이라 base 에 없다 — 역시 `A`.
+restore 가 `--source` 없는 경로를 삭제해 준다(별도 `git rm` 불필요).
 
 ## 절차(in_scope 경로 개별 인자, `A` 항목 포함 — 삭제는 restore 가 처리)
 
@@ -76,9 +74,7 @@ git restore --source=44721cf --staged --worktree -- \
 
 ① `git diff --name-status 44721cf..HEAD -- <in_scope>` — 위 목록과 일치(기계 산출, 재확인).
 ② `git restore --source=44721cf ...` 실행 — `git status --short` 결과: `M` 11 ·
-`D` 4(신규 네 파일이 삭제로 나타남 — `A`→`D`, restore 의 정상 동작. verifier r1
-V-4 — 이전 라운드는 `D 2` 로 잘못 적었다가 실측 `D 3` 으로 정정됐고, 이번
-라운드는 파일이 하나 늘어 `D 4` 다). exit 0.
+`D` 4(신규 네 파일이 삭제로 나타남 — `A`→`D`, restore 의 정상 동작). exit 0.
 ③ `git diff 44721cf -- workflow/src/main/kotlin/bidvector/workflow/evaluation/
 workflow/src/test/kotlin/bidvector/workflow/evaluation/
 config/quality/gate-tests.properties | wc -l` → **0** — in_scope 경로가 base 와

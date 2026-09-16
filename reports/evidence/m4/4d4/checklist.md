@@ -1,12 +1,12 @@
 # checklist.md — M4 / 4D-4 리뷰 요청 조건 점검
 
-- [x] 구현 diff가 커밋되어 base/head 고정 — `git status --porcelain -- <in_scope 경로 13개
+- [x] 구현 diff가 커밋되어 base/head 고정 — `git status --porcelain -- <in_scope 경로 15개
       개별 인자>` 결과 없음(clean). 양성 대조 1회: `PredictionFacts.kt` 에 주석 한 줄을
       일부러 추가해 `git status --porcelain` 이 `M` 으로 잡는 것을 확인 → `git restore`
       로 절삭 복원(그 파일이 원래 HEAD 와 바이트 동일했음을 사전에 `git status --porcelain`
       으로 확인한 뒤에만 사용 — `git checkout --` 계열의 위험을 피한 비파괴 절삭).
-- [x] scope.md acceptance_commands 전부 exit 0 — `commands.md` 2026-09-16T12:30:00Z(재배치·
-      우회 (2)(3) test 반영 뒤 첫 전건 GREEN).
+- [x] scope.md acceptance_commands 전부 exit 0 — `commands.md` 의 최종 전건 실측(HEAD
+      `d00f8cb`) GREEN.
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — 부분 게이트가 아니라
       `./gradlew --no-build-cache --no-daemon clean check` 전건(워크플로 job `check` 그대로)을
       네 번 돌렸고 마지막 실행이 GREEN(`commands.md` 참고). `ArchitectureGateTest`·
@@ -16,7 +16,7 @@
       그대로 재사용 — 이 slice가 새로 추가한 fixture는 `EvaluateCandidatesUseCaseTest`의
       로컬 `evidence`/`evidenceA`/`evidenceB` 값(값 리터럴, manifest 대상 아님)뿐이다.
 - [x] 알려진 제한과 rollback 또는 비활성화 방법 기록 — 아래 「알려진 제한」·`rollback.md`.
-- [x] 비밀값 스캔 통과 — `grep -rniE -f config/quality/leak-patterns.txt <in_scope 13개
+- [x] 비밀값 스캔 통과 — `grep -rniE -f config/quality/leak-patterns.txt <in_scope 15개
       개별 인자> reports/evidence/m4/4d4/` exit 1(매치 없음). 육안 확인 — Telegram id·
       사업자 정보 없음.
 
@@ -28,8 +28,8 @@
 | `NotificationRequest.evidence == Analyzed.evidence`(use case test) | `EvaluateCandidatesUseCaseTest`: 「BidNow 알림 요청의 evidence 는 Analyzed evidence 와 같다(우회 3)」 |
 | 우회 (1)~(8) 각 실측 | 아래 「우회 대조표」 |
 | `EvidenceLinesTest` 골든(두 줄 + `NotPredicted` 11 전수 + `SampleExclusionReason` 8 전수 + 같은 점수·다른 근거 → 같은 verdict) | `EvidenceLinesTest` 9건(골든 2 포함, 전수 2, 순서·생략 규칙) + `EvaluateCandidatesUseCaseTest`: 「같은 점수 다른 evidence 는 같은 Verdict 를 낸다(우회 2)」 |
-| 전건 `check` | `commands.md` 2026-09-16T12:30:00Z GREEN |
-| verifier `ready-for-review` | 이 보고 뒤 verifier 레인 소관 |
+| 전건 `check` | `commands.md` 의 최종 전건 실측(HEAD `d00f8cb`) GREEN |
+| verifier `ready-for-review` | r2 ready-for-review(blocker 0 · high 0) |
 | 사용자 승인 | 팀장·사용자 소관 |
 
 ## 우회 대조표(scope.md 위협 모델, Phase 2.5 대응)
@@ -42,7 +42,7 @@
 | (4) | 문구가 결과 타입을 만든다 | `evidenceLinesFor` 는 `List<String>` 만 반환, 입력 sealed/enum 전수 `when`(else 없음) | 컴파일 시점 강제(새 `MlUnavailableReason`·`SampleExclusionReason` 값 추가 시 `EvidenceLines.kt` 컴파일 거부) — 구조 자체가 증거, 별도 test 불요 |
 | (5) | `Diagnosed` 가 `Supplied.excluded` 를 빼먹고 빈 맵을 넣는다 | `OpportunityAnalysisTest` D-4D4-7 test | 위 표 첫 행과 동일 test |
 | (6) | `BidNow` 가 `NotPredicted` 와 동반 | 불가능 상태가 아니라 정직한 상태 — 골든 문구로 표현 | `EvidenceLinesTest`: 「NotPredicted 11 사유 전부 근거 없음 줄을 낸다」(`bidNowVia()` 로 실제 `BidNow` 판정과 `NotPredicted` 근거를 짝지어 렌더링이 깨지지 않음을 확인) |
-| (7) | `String.format`·`%.2f`·`Locale` 로 숫자를 찍는다 | `ArchitectureGateTest` 앰비언트 효과 게이트(`Locale`·`Formatter` import 금지) · `EvidenceLines.kt` 는 `toPlainString()`·(암묵) 문자열 템플릿만 사용 | `commands.md` 전건 `check`(`ArchitectureGateTest` 포함) GREEN. `EvidenceLines.kt` 에 `Locale`·`String.format` import·호출 0건(파일 열람 확인). |
+| (7) | `String.format`·`%.2f`·`Locale` 로 숫자를 찍는다 | **계약 갱신 2** — `EvidenceLinesBoundaryTest`(소스 텍스트 경계 test, `EvidenceLines.kt` 한 파일 대상, 금지 어휘 5종). `ArchitectureGateTest` 는 `layer.domain` 모듈에만 걸려 `workflow`(application 층)는 대상 밖이라 이 우회를 막지 못한다(verifier r1 V-1) | 변이 세 종(`Locale.getDefault()`+`String.format` / `.format(` 단독 / `DecimalFormat`) 을 `EvidenceLines.kt` 에 주입할 때마다 `EvidenceLinesBoundaryTest` 가 붉어짐을 확인, 원복. `EvidenceLines.kt` 에 금지 어휘 실측 0건(파일 열람 확인). |
 | (8) | 문구를 이벤트·persistence 에 싣는다 | persistence·event 편집 0(out_of_scope) | `git diff --name-status 44721cf..HEAD` 에 `workflow/event/**`·`adapters/**` 없음 |
 
 ## 알려진 제한
