@@ -24,6 +24,7 @@
 milestone: m4
 slice: 4b7-competition-sample-supply
 base_sha: 8799e0594496593521691a24a29551ee51b6f147
+head_sha: 77256b5   # 리뷰 요청 시점(verifier r3 ready) — 종결 등재 커밋은 이 뒤에 붙는다
 in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/prediction/BidPredictionRequest.kt        # ① CompetitionSample.reserveDraw: ReserveDrawObservation?(reservePrices: List<BaseAmount>, selectedNumbers: Set<Int>) — D-4B7-5
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/Ports.kt                       # ② CompetitionSamplePort(fun interface) + CompetitionSampleQuery(categoryCode, asOf, window, limit) + CompetitionSampleSupply(samples, excluded: Map<SampleExclusionReason, Int>) — D-4B7-3·4
