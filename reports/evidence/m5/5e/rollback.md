@@ -1,13 +1,13 @@
 # M5/5E-1 — rollback.md
 
 base = `d78e162`(PR #15 머지 = origin/main). 이 slice 의 코드·evidence 커밋 전부는
-**단일 레인**(이 구현자)이 만들었다(fix round 1 포함) — base 이후 이 브랜치를 만진
-다른 레인이 없어 hunk 격리 없이 파일 단위로 되돌릴 수 있다(M3/M4 의 다중 레인 공유
-파일 hunk 분리와 다른 사정). 예외 셋은 `reports/evidence/m5/5e/policy-values.md`·
-`milestone-5.md`·`reports/evidence/m5/5e/scope.md` — **하네스 레인**(팀장, 착수 계약
-커밋 `41076d0` + 뒤이은 계약 갱신 (2)(3)(4): `d7f8b1a`·`661dcfd`·`b8ea0e2`, 판별은
-author 가 아니라 커밋 메시지 내용 — 넷 다 이 구현자와 같은 git 신원으로 커밋됐다)이
-만들었다.
+**단일 레인**(이 구현자)이 만들었다(fix round 1·2 포함) — base 이후 이 브랜치를
+만진 다른 레인이 없어 hunk 격리 없이 파일 단위로 되돌릴 수 있다(M3/M4 의 다중
+레인 공유 파일 hunk 분리와 다른 사정). 예외 셋은 `reports/evidence/m5/5e/
+policy-values.md`·`milestone-5.md`·`reports/evidence/m5/5e/scope.md` — **하네스
+레인**(팀장, 착수 계약 커밋 `41076d0` + 뒤이은 계약 갱신 (2)(3)(4)(5): `d7f8b1a`·
+`661dcfd`·`b8ea0e2`·`f1f060b`, 판별은 author 가 아니라 커밋 메시지 내용 — 다섯
+다 이 구현자와 같은 git 신원으로 커밋됐다)이 만들었다.
 
 - `milestone-5.md`는 착수 이후 이 range 에서 전혀 다시 손대지 않았다 — 되돌릴 게 없다.
 - `policy-values.md`는 이 구현자가 change_history 한 줄을 더했다 — **그 한 줄만**
@@ -16,11 +16,14 @@ author 가 아니라 커밋 메시지 내용 — 넷 다 이 구현자와 같은
   건드린다」가 아니라 **자기 이력 전체를 착수 커밋 `41076d0` 기준 단일 역적용**한다
   (하네스 규칙 2026-09-16 — 같은 slice 안에서 여러 커밋이 이어 만진 파일은 커밋별
   hunk 역적용 대신 착수 시점 기준 한 번에). scope.md 의 **내용** 정오 자체는 팀장
-  소관(L-1)이고, 이 문서는 scope.md 가 스스로 선언한 처분(계약 갱신 이력 (4) 행)을
-  그대로 따른다.
+  소관(L-1)이고, 이 문서는 scope.md 가 스스로 선언한 처분(계약 갱신 이력 (4)(5) 행)을
+  그대로 따른다. 계약 갱신 (5)(`f1f060b`)는 R2-2(`test_artifact_files.py` in_scope
+  추가)·R2-5(환경 7 주석)를 반영했다 — 자기 이력 단일 역적용의 대상이 하나 더 늘었을
+  뿐, 처분 방식 자체는 그대로다.
 
-fix round 1(2026-09-16, H-1~M-8·L 일괄)은 이 셋 중 어느 것도 만지지 않았다 — 이
-구현자가 낸 새 하네스 레인 변경 없음.
+fix round 1(2026-09-16, H-1~M-8·L 일괄)과 fix round 2(2026-09-16, H-1 잔존·
+R2-1·R2-3·R2-4)모두 이 셋을 이 구현자가 직접 만지지 않았다 — 이 구현자가 낸 새
+하네스 레인 변경 없음.
 
 ## 기계 산출 diff(`git diff --name-status d78e162..HEAD`, in_scope 경로만 — 아래에서
 하네스 소유 `milestone-5.md`·`scope.md`는 제외했다, `policy-values.md`는 하네스가
@@ -91,13 +94,23 @@ A  reports/evidence/m5/5e/rollback.md
 정정 아님, 목록에는 이번에 처음 반영). 그 밖의 실질 코드 변경(H-1~M-8)은 전부 기존
 파일의 내용 수정이라 파일 목록 자체는 늘지 않았다.
 
-**하네스 레인 커밋**(팀장 — `41076d0`(착수)·`d7f8b1a`·`661dcfd`·`b8ea0e2`(계약 갱신
-(2)(3)(4), 전부 `scope.md`를 만졌다)): `milestone-5.md`·`reports/evidence/m5/5e/scope.md`·
-`reports/evidence/m5/5e/policy-values.md`(최초 등재). 같은 range 안에 있으나 **산출물이
-아니다**(2026-09-04 규율). `milestone-5.md`는 rollback 대상 아님(무편집). `policy-values.md`
-는 위 예외대로 내 한 줄만. `scope.md`는 「대상 아님」이 아니라 **자기 이력 단일
-역적용**(M-10, 아래 롤백 명령 참고) — scope.md 내용 자체의 옳고 그름은 여전히 팀장
-소관(L-1)이고 이 문서는 그 처분 방식만 따른다.
+**fix round 2(2026-09-16, H-1 잔존·R2-1·R2-3·R2-4)는 새 경로를 추가·제거하지
+않았다** — `git diff --name-status f1f060b..HEAD`(팀장의 계약 갱신 (5) 이후)가
+`ml-engine/src/ml_engine/app/server.py`·`training/jobs/runner.py`·
+`training/jobs/servicer.py`·`training/jobs/store.py`·`tests/app/test_server.py`·
+`tests/training/test_jobs_runner.py`·`tests/training/test_jobs_servicer.py`·
+`tests/training/test_jobs_store.py`·`reports/evidence/m5/5e/checklist.md`·
+`reports/evidence/m5/5e/commands.md` 전부 `M`(기존 파일 내용 수정)만 낸다 —
+`NEW_FILES`/`RESTORE_FILES` 목록은 round 1 종결 시점과 동일하게 유지한다.
+
+**하네스 레인 커밋**(팀장 — `41076d0`(착수)·`d7f8b1a`·`661dcfd`·`b8ea0e2`·`f1f060b`
+(계약 갱신 (2)(3)(4)(5), 전부 `scope.md`를 만졌다)): `milestone-5.md`·
+`reports/evidence/m5/5e/scope.md`·`reports/evidence/m5/5e/policy-values.md`(최초
+등재). 같은 range 안에 있으나 **산출물이 아니다**(2026-09-04 규율). `milestone-5.md`
+는 rollback 대상 아님(무편집). `policy-values.md`는 위 예외대로 내 한 줄만.
+`scope.md`는 「대상 아님」이 아니라 **자기 이력 단일 역적용**(M-10, 아래 롤백 명령
+참고) — scope.md 내용 자체의 옳고 그름은 여전히 팀장 소관(L-1)이고 이 문서는 그
+처분 방식만 따른다.
 
 ## 롤백 명령(실측 완료 — 아래 「임시 clone 실측」 참고)
 
@@ -173,11 +186,11 @@ rmdir ml-engine/src/ml_engine/app ml-engine/src/ml_engine/training/jobs 2>/dev/n
 쓴다(2026-09-04 규율 — 신규 경로에서 `checkout`은 pathspec 오류로 exit 1). 신규 경로는
 `git rm`으로(복원할 base 내용이 없다).
 
-## 임시 clone 실측(2026-09-16, M-9·M-10 반영 재검증 — 완료)
+## 임시 clone 실측(2026-09-16, fix round 2 종결 재검증 — 완료)
 
 ```bash
-git clone . <tmp>/rollback-check-r3   # HEAD = f992fd5(fix round 1 종결)
-cd <tmp>/rollback-check-r3
+git clone . <tmp>/rollback-check-r4   # HEAD = e0e2d80(fix round 2 종결)
+cd <tmp>/rollback-check-r4
 # (위 롤백 명령 실행 — scope.md 역적용·재등재 포함)
 ```
 
@@ -189,16 +202,19 @@ cd <tmp>/rollback-check-r3
   완전히 같아졌다).
 - `git diff 41076d0 -- reports/evidence/m5/5e/scope.md` → 재등재한 「하네스 레인 변경」
   절 hunk **하나만** 남는다(그 절 텍스트 자체는 41076d0 이후 신설이라 diff 에 남는
-  것이 맞다 — 그 밖의 모든 계약 갱신 (2)(3)(4) 내용은 사라져 41076d0 와 정확히
+  것이 맞다 — 그 밖의 모든 계약 갱신 (2)(3)(4)(5) 내용은 사라져 41076d0 와 정확히
   같아졌다). 재등재한 절 본문을 `grep`으로 원문과 대조 — 한 글자도 다르지 않음.
-- **M-9/M-10 이 요구한 확인**: 되돌린 트리에서 `grep -rn "setup.py\|test_dataset_
-  settlements\|leak-pattern-baseline" reports/evidence/m5/5e/scope.md
+- **M-9/M-10 이 요구한 확인**(계약 갱신 (5) 로 넓어진 대상 포함): 되돌린 트리에서
+  `grep -rn "setup.py\|test_dataset_settlements\|test_artifact_files\|
+  leak-pattern-baseline" reports/evidence/m5/5e/scope.md
   reports/evidence/m5/5e/policy-values.md milestone-5.md` → **빈 출력**. 계약 갱신
-  (2)(3)(4)가 in_scope 에 추가했던 세 경로(`setup.py`·`uv.lock`·
-  `test_dataset_settlements.py`)를 가리키는 문장이 되돌린 scope.md 에도, 다른 하네스
-  파일에도 남지 않았다 — 「in_scope 선언 없는 파일을 가리키는 문장」이 없다.
+  (2)(3)(4)(5)가 in_scope 에 추가했던 네 경로(`setup.py`·`uv.lock`·
+  `test_dataset_settlements.py`·`test_artifact_files.py`)를 가리키는 문장이 되돌린
+  scope.md 에도, 다른 하네스 파일에도 남지 않았다 — 「in_scope 선언 없는 파일을
+  가리키는 문장」이 없다.
 - `(cd ml-engine && uv sync --frozen --all-extras && uv run python -m pytest tests -q)` →
-  **658 passed** — base(`d78e162`) 직접 계수와 **정확히 일치**.
+  **658 passed** — base(`d78e162`) 직접 계수와 **정확히 일치**(fix round 1·2 가 늘린
+  150 개는 전부 되돌린 코드에 있었다).
 - `(cd ml-engine && uv run ruff check . && uv run mypy --strict src/ml_engine && uv run lint-imports)`
   → 전부 초록, `mypy`: **54 source files**(base 와 일치), `lint-imports`: **Contracts: 6
   kept**(base 계약 수와 일치, `app` 계약·grpc ignore_imports 둘 다 사라짐).
@@ -229,7 +245,9 @@ cd <tmp>/rollback-check-r3
   영향은 없다(M-9 는 그래서 이 문서의 목록을 바꾸지 않는다고 명시했다). scope.md
   **내용**의 옳고 그름(예: in_scope 폭이 실제로 맞는지)은 이 rollback.md 가 판단하지
   않는다 — 팀장 소관(L-1).
-- 재등재하는 「하네스 레인 변경」 절은 이 rollback.md 작성 시점(fix round 1 종결,
-  `f992fd5`)의 원문을 그대로 박아 넣는다 — 이후 팀장이 그 절 내용을 바꾸면(예:
+- 재등재하는 「하네스 레인 변경」 절은 이 rollback.md 작성 시점(fix round 2 종결,
+  이 문서 HEAD)의 원문을 그대로 박아 넣는다 — 이후 팀장이 그 절 내용을 바꾸면(예:
   CLAUDE.md·.claude/ 변경이 실제로 생기면) 이 스크립트의 heredoc 도 같이 갱신해야
-  한다(그렇지 않으면 재등재본이 그 시점 HEAD 와 어긋난다).
+  한다(그렇지 않으면 재등재본이 그 시점 HEAD 와 어긋난다). 이 절 자체의 텍스트는
+  fix round 1 종결(`f992fd5`) 이후 아직 바뀐 적이 없다(`git log --oneline
+  d78e162..HEAD -- CLAUDE.md .claude/` 여전히 빈 출력).
