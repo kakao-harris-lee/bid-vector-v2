@@ -122,7 +122,10 @@
   등재 직후)
 - exit: 0 — BUILD SUCCESSFUL, 337 tasks(32 executed, 305 up-to-date)
 - cmd: `./gradlew --no-daemon check`(HEAD `82e5267`, 계약 갱신 (2) 반영 + commands.md S-5
-  최종 갱신 직후 — 이 slice 의 마지막 evidence 편집)
+  최종 갱신 직후)
+- exit: 0 — BUILD SUCCESSFUL, 337 tasks(32 executed, 305 up-to-date)
+- cmd: `./gradlew --no-daemon check`(HEAD `1743257`, rollback.md `test_scenario.py`
+  편입 반영 직후 — 이 slice 의 마지막 evidence 편집)
 - exit: 0 — BUILD SUCCESSFUL, 337 tasks(32 executed, 305 up-to-date)
 
 ## S-11
