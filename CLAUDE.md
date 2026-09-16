@@ -13,7 +13,9 @@
   첫 적용 PR #5). 그 밖의 코드 slice 는 Codex 로 보내지 않고 Claude 측 `verifier`(저작 레인과 다른 패스)가
   본다 — milestone 계약의 「Codex approve + 사용자 승인」은 그런 slice 에서 **「verifier ready-for-review +
   사용자 승인」** 으로 읽는다. Codex 는 유료 외부 호출이므로 운영자가 명시 요청하고 범위·비용을 승인할 때만
-  탄다(「리뷰해줘」는 승인이 아니라 레인 선택). 전역 규약 `~/.claude/review-lane.md`.
+  탄다(「리뷰해줘」는 승인이 아니라 레인 선택). **대상은 둘** — 위의 되돌리기 어려운 경로·계약 파일 slice 와
+  **기획 문서(스팩·로드맵)의 계획 검토**(전역 규약 §4 ②). 그 밖의 코드 slice 는 대상이 아니다. 전역 규약
+  `~/.claude/review-lane.md`.
 - **리뷰 판정은 PR 에 남긴다**(전역 규약 §2). PR 을 만드는 변경이면 머지 전에 판정을 PR 코멘트로 남긴다 —
   지적이 0건이어도 남긴다. **세션 안에만 있는 리뷰는 남에게는 없는 리뷰다.** 게이트(`privacy-gate`·
   `contract-keeper`·`migration-reviewer`)를 돌렸으면 그 판정도 같은 자리에 붙이고, 수정한 뒤에는 **조치
@@ -125,3 +127,15 @@ Codex 가 `request_changes` 를 반환하면 같은 scope 에서 Claude 가 수�
 **CI**
 - 상시 붉은 게이트도, 안 돌린 게이트도 아무것도 막지 못한다. 러너에 도구가 없으면 로컬 초록은 의미가 없다
   (`buf` 설치·`fetch-depth: 0`). collection 선택에 따라 답이 달라지는 게이트는 서브프로세스 격리로.
+
+**그 밖의 계열(색인 생략 — 정본과 이력만)**: 재활용 우선·두 갈래 전략(v2-지침서, ml-implementer) · Kotlin 코딩 규율
+(v2-지침서 §5, kotlin-implementer) · OPEN 에스컬레이션·M0 문서 slice N/A 규칙(v2-slice-pipeline Phase 6, evidence-pack)
+· codex strict 스키마·`immutable=1` preflight·누출 판독 규칙·preflight 형제 JSON·`.gradle-home/`·사전 스모크
+(codex-review-gate) · CI 액션 major 정책(`.github/workflows/ci.yml` 주석).
+
+※ **아직 스킬 파일에 문장이 없어 이 요약이 정본인 규율** — 「레인 동결 + 판정 대상 SHA 고정」(구현 레인의 완료
+보고와 팀장 지시가 엇갈리면 검증 중 HEAD 가 움직인다 — 판정 전 동결하고 SHA 를 고정한다) · 「rollback 갈음은
+「HEAD 초록」이 아니라 트리 동일성(되돌린 트리의 파일 SHA 가 이미 실측한 트리와 같음)으로만」 · 「collection 선택에
+따라 답이 갈리는 게이트는 서브프로세스 격리」 · 「수정 라운드가 만든 새 파일 ↔ in_scope 대조를 보고 항목으로」 ·
+「code-reviewer(sonnet)를 verifier 와 병렬로」(전역 규약 §1 유래). 다음 하네스 편집에서 해당 스킬(v2-slice-pipeline
+Phase 3·4, evidence-pack rollback 절)로 옮긴다. 이력은 `docs/harness/change-history.md` 와 M5 evidence.
