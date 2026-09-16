@@ -4,7 +4,7 @@
 milestone: M5
 slice: 5f2-kotlin-feature-schema-value
 base_sha: 845e29b   # PR #21(5E-3) 머지 커밋 = main
-head_sha: <리뷰 요청 시점에 기입>
+head_sha: 리뷰 요청 시점의 `git rev-parse HEAD` — 값을 박지 않는다(4D scope.md 관례)
 in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/ml/MlCallPolicyData.kt        # 한 줄 — placeholderMlCallPolicy(featureSchemaVersion = "bidvector.ml.v1") → "award-rate-features-v2". KDoc 이 「패키지 식별자」라고 설명하면 그 문장도 갱신
   - adapters/src/test/kotlin/bidvector/adapters/ml/MlCallPolicyDataTest.kt   # 기대값 한 줄 갱신 + 「값이 Python SUPPORTED_FEATURE_SCHEMAS 와 같다」를 잠그는 test 1(값 리터럴은 정책 데이터 한 자리에서만 — test 는 그 상수를 참조)
