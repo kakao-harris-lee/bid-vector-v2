@@ -59,6 +59,7 @@
 ## 미달/과잉 판정(설계 검토 (3))
 
 - **미달 후보였던 것**: `Readiness.LOADING`을 wire 에 내는 경로 — `ReadinessGate`는 `from_preload`에서 곧바로 READY/NOT_READY 만 내고 `LOADING` 상태를 생산하는 production 경로가 없다(gate 실물 확인, `readiness.py` 전수 읽음). `_READINESS_TO_WIRE`엔 `LOADING` 매핑 항목을 **뒀다**(값 지어내기가 아니라 존재하는 wire enum 값을 빠짐없이 다루기 위함) — 이 경로는 현재 시스템에서 도달 불가능하지만, gate 가 장차 `LOADING`을 내게 되면 매핑이 이미 있어 조용한 기본값(예: NOT_READY 로 잘못 접히는 것)을 막는다. 알려진 제한 1로 등재.
+- **verifier r1 L-2 — 도달 불가 매핑이 하나 더 있었다**: `wire.py::_INTERVAL_SOURCE_TO_WIRE`의 `TIME_HOLDOUT_RESIDUAL`은 `ml-engine/src` 전역에 생산자가 0(실측, grep)이고, `CROSS_VALIDATION_RESIDUAL`은 `inference/predict.py`(GBM 경로)에만 있는데 `inference/engine.py`(이 slice 가 소비하는 유일 진입점)는 그 모듈을 import 하지 않는다(분포 단독, ADR 0001 D-6). `Readiness.LOADING`과 같은 처분 — 매핑은 남기되(존재하는 wire enum 값을 빠짐없이 다룬다) 도달 불가임을 여기 명시한다. `_SEGMENT_SUPPORT_TO_WIRE`·`_UNMEASURABLE_REASON_TO_WIRE`는 셋 다 생산자가 있어 대상이 아니다.
 - **과잉 후보 확인**: `DistributionRelease.method`를 wire 에 싣지 않았다(축 없음, D-2F-5 확인) — `wire.py`가 `Success`에서 오는 값만 옮기고 `runtime.release`는 정책+code_version 에서만 온다. GBM/ARTIFACT 분기 코드는 두지 않았다(생산 경로 없음, `engine.py`가 분포 단독임을 재확인).
 
 ## 알려진 제한
@@ -82,6 +83,7 @@
 | `OPEN-5D2-POLICY-VALUES` | 유지(운영자 (c), 알려진 제한 2) |
 | `OPEN-5E2-FEATURE-SCHEMA-PARITY`(신설) | 미해결 — 운영자 결정 대기(알려진 제한 3) |
 | `OPEN-5E2-CROSSLANG-REAL-SERVER`(신설) | 미해결 — 6C 이월(알려진 제한 5) |
+| `OPEN-5E2-CANDIDATE-RATE-UPPER`(신설, verifier r1 H-1) | 미해결 — 엔진 clamp 상한(출하 정책 `scenario.clamp_max = 1.4`)이 계약 축(`Candidate.bid_rate ≤ 1`, D-2B-8·D-2F-4)과 충돌할 수 있다. 이 slice 는 fail-closed(`MappingRejected`)까지만 하고 처분은 운영자 결정 대기 — 선택지 (a) 정책 `scenario.clamp_max`를 1 이하로 낮춘다(`policy/inference-v1.yaml`, out_of_scope — 5D-2/정책 값 소관) (b) 계약(`prediction.proto` `Candidate.bid_rate`)의 상한 자체를 넓힌다(2F 재개정, Kotlin `ParsedSuccessFields.toRateOrNull`도 함께 바꿔야 한다) (c) 상한 초과를 새 `Unmeasurable` 사유로 접는다(도메인 결과로 재분류 — 지금처럼 엔진 결함으로 볼지, 표현 가능한 결과로 볼지의 판단이 선행돼야 한다) |
 | `OPEN-2C-FAILURE-CODES`·`OPEN-5C-REJECT-ACCOUNTING`·`OPEN-5E-*` 나머지 | 5E-2 무변경 |
 
 ## 계약 불일치

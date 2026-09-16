@@ -26,7 +26,7 @@ from ml_engine.app.server import (
     _preload,
     _preload_outcomes,
 )
-from ml_engine.contracts import prediction_pb2, prediction_pb2_grpc
+from ml_engine.contracts import error_pb2, prediction_pb2, prediction_pb2_grpc
 from ml_engine.serving import Readiness, ReadinessGate, build_server
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -182,6 +182,8 @@ def test_shipped_policy_without_agency_sample_threshold_stays_not_ready(
 
         calc_response = running.stub.CalculateOptimalBid(_success_calc_request())
         assert calc_response.WhichOneof("result") == "failure"
+        # verifier r1 L-4 — detail_code 만이 아니라 코드 자체도 단언한다.
+        assert calc_response.failure.code == error_pb2.FAILURE_CODE_MODEL_NOT_READY
         assert calc_response.failure.detail_code == "SERVER_NOT_READY"
     finally:
         running.close()

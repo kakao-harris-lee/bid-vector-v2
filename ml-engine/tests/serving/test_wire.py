@@ -121,6 +121,39 @@ def test_release_is_copied_from_runtime_release_with_schema_echo() -> None:
     assert mapped.success.release.feature_schema_version == "award-rate-features-v2"
 
 
+def test_schema_echo_overrides_runtime_template_value() -> None:
+    """verifier r1 L-3 — 지원 집합이 지금 하나뿐이라 요청 에코 값과 런타임 템플릿
+    값이 항상 같아서, 위 test 는 echo 대입 줄이 삭제돼도 붉어지지 않는다(변이
+    검증으로 확인). 이 test 는 템플릿과 에코에 **서로 다른** 값을 줘 결정적으로
+    가른다 — `map_kernel_result`는 schema 값을 검증하지 않는 순수 함수라 이 값들이
+    실제로 SUPPORTED 집합에 속할 필요가 없다."""
+    release = _release()
+    release.feature_schema_version = "template-value"
+    mapped = map_kernel_result(_success(), release, "echoed-request-value")
+    assert not isinstance(mapped, MappingRejected)
+    assert mapped.success.release.feature_schema_version == "echoed-request-value"
+    # 나머지 네 성분은 여전히 템플릿 것 그대로다 — echo 는 이 필드 하나만 덮어쓴다.
+    assert mapped.success.release.release_id == release.release_id
+    assert mapped.success.release.code_version == release.code_version
+
+
+def test_release_template_is_not_mutated_across_two_mappings() -> None:
+    """code-reviewer LOW/verifier r1 근거 — "공유 release 객체를 in-place 로 바꾸지
+    않는다"는 설계 불변식(runtime.py·wire.py 문서화)의 회귀 test. 같은 `release`
+    객체를 서로 다른 `feature_schema_version` 에코로 두 번 매핑해도 원본 객체
+    (런타임 템플릿)는 물들지 않아야 한다 — 향후 `CopyFrom` 대신 인자로 받은
+    `release` 에 직접 대입하는 리팩터로 회귀하면 이 test 가 잡는다."""
+    release = _release()
+    original_schema = release.feature_schema_version
+    mapped_a = map_kernel_result(_success(), release, "echo-a")
+    mapped_b = map_kernel_result(_success(), release, "echo-b")
+    assert not isinstance(mapped_a, MappingRejected)
+    assert not isinstance(mapped_b, MappingRejected)
+    assert mapped_a.success.release.feature_schema_version == "echo-a"
+    assert mapped_b.success.release.feature_schema_version == "echo-b"
+    assert release.feature_schema_version == original_schema
+
+
 def test_diagnostics_are_copied_through() -> None:
     mapped = map_kernel_result(_success(), _release(), "award-rate-features-v2")
     assert not isinstance(mapped, MappingRejected)
