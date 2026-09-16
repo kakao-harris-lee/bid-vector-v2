@@ -85,27 +85,36 @@ def test_clamp_band_applied(policy: InferencePolicy) -> None:
         assert candidate.bid_rate == policy.scenario_clamp_max
 
 
-def test_center_at_clamp_max_folds_base_and_aggressive_but_keeps_three_candidates(
-    policy: InferencePolicy,
+@pytest.mark.parametrize("center", [1.0, 1.05])
+def test_center_at_or_above_clamp_max_folds_base_and_aggressive_but_keeps_three_candidates(
+    policy: InferencePolicy, center: float
 ) -> None:
     """D-5F1-5(M5/5F-1 계약 갱신 (2)) — `scenario.clamp_max` 를 `1.0`으로 내린 뒤
-    `center >= clamp_max`인 입력(`center=1.0, std=0.05`)에서 `base`(sign 0)와
-    `aggressive`(sign +1, std>0)가 똑같이 상한으로 접혀 같은 값이 된다(`conservative`
-    는 sign -1 이라 상한 밑에 남는다). 이것은 엔진 결함이 아니다 — `build_scenario_
-    candidates`(src, 무편집)는 후보 간 엄격한 순서를 강제하지 않는다(clamp 는 후보
-    셋을 독립적으로 자른다, `test_zero_std_does_not_reject_but_produces_equal_
-    candidates`가 이미 셋 다 같은 값이 되는 경로를 허용해 뒀다). 계약도 엄격 순서를
-    요구하지 않는다 — Kotlin `CandidateShapeValidation.kt::hasOrderedCandidateRates`
-    가 `rates[0] <= rates[1] && rates[1] <= rates[2]`(비엄격 `<=`)를 쓴다. 예외 없이
-    후보 3 을 그대로 낸다(값 지어내기·조용한 실패 없음)."""
-    candidates = build_scenario_candidates(center=1.0, std=0.05, policy=policy)
+    `center >= clamp_max`인 입력(경계 `1.0`과 그 너머 `1.05` 둘 다)에서 `base`
+    (sign 0)와 `aggressive`(sign +1, std>0)가 똑같이 상한으로 접혀 같은 값이 된다
+    (`conservative`는 sign -1 이라 상한 밑에 남는다). 이것은 엔진 결함이 아니다 —
+    `build_scenario_candidates`(src, 무편집)는 후보 간 엄격한 순서를 강제하지
+    않는다(clamp 는 후보 셋을 독립적으로 자른다, `test_zero_std_does_not_reject_
+    but_produces_equal_candidates`가 이미 셋 다 같은 값이 되는 경로를 허용해
+    뒀다). 계약·소비자 어느 쪽도 엄격 순서나 유일성을 요구하지 않는다 — **실측**:
+    Kotlin `ParsedSuccessFields.kt`(`isAcceptableSuccessShape` → `hasOrderedCandidateRates`
+    호출, `CandidateShapeValidation.kt`에 `rates[0] <= rates[1] && rates[1] <=
+    rates[2]`, 비엄격 `<=`)와 `ResponseMapping.kt`(순서·유일성 검사 없음, grep 확인)
+    둘 다, 그리고 그 아래 도메인 타입 `BidRateCandidates.init`(`BidPredictionOutcome.kt`)
+    도 `require(conservative <= base)`·`require(base <= aggressive)`(비엄격)만 둔다.
+    예외 없이 후보 3·라벨 순서·`conservative < base`(엄격, sign -1 이 항상 중심보다
+    낮으므로)는 유지한 채 값 지어내기·조용한 실패 없이 그대로 낸다."""
+    candidates = build_scenario_candidates(center=center, std=0.05, policy=policy)
     assert isinstance(candidates, tuple)
     assert len(candidates) == 3
     conservative, base, aggressive = candidates
+    assert conservative.label is CandidateLabel.CONSERVATIVE
+    assert base.label is CandidateLabel.BASE
+    assert aggressive.label is CandidateLabel.AGGRESSIVE
     assert base.bid_rate == policy.scenario_clamp_max
     assert aggressive.bid_rate == policy.scenario_clamp_max
     assert base.bid_rate == aggressive.bid_rate
-    assert conservative.bid_rate <= base.bid_rate
+    assert conservative.bid_rate < base.bid_rate
 
 
 @pytest.mark.parametrize("bad_value", [math.nan, math.inf, -math.inf])
