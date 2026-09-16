@@ -77,7 +77,7 @@
 ## 2026-09-16T12:40:00Z — 우회 (1) 변이 실측
 - cmd: `Analyzed.evidence` 필드를 임시 제거한 뒤 `./gradlew --no-daemon :workflow:compileKotlin :workflow:compileTestKotlin`
 - exit: 1
-- 핵심 결과: main 2 파일(`EvaluateCandidatesUseCase.kt:287` `Unresolved reference 'evidence'` · `OpportunityAnalysisPipeline.kt:104` `Too many arguments`)에서 즉시 컴파일 거부 — main 이 먼저 실패해 `compileTestKotlin` 자체가 진행되지 않는다(모듈 전체가 컴파일 거부, scope.md 사전 추정 「main 1·test 3」보다 이 slice 최종 구현이 만든 두 번째 main 참조점[`EvaluateCandidatesUseCase.kt` 의 `outcome.evidence` 읽기]까지 반영된 강한 결과). 원복 뒤 `git diff` 빈 상태 확인.
+- 핵심 결과: main 2 파일에서 즉시 컴파일 거부 — `EvaluateCandidatesUseCase.kt` 의 `analyzeAndJudge`(`outcome.evidence` 를 읽는 자리)가 `Unresolved reference 'evidence'`, `OpportunityAnalysisPipeline.kt` 의 `finalOutcomeOf`(`Analyzed` 생성 자리)가 `Too many arguments`. main 이 먼저 실패해 `compileTestKotlin` 자체가 진행되지 않는다(모듈 전체가 컴파일 거부, scope.md 사전 추정 「main 1·test 3」보다 이 slice 최종 구현이 만든 두 번째 main 참조점까지 반영된 강한 결과). 원복 뒤 `git diff` 빈 상태 확인. (verifier r1 V-3 정정 — 좌표 대신 함수명·오류 종류로 서술)
 
 ## 2026-09-16T12:42:00Z
 - cmd: (원복 뒤) `./gradlew --no-daemon :workflow:compileTestKotlin`
@@ -106,5 +106,43 @@
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt workflow/src/main/kotlin/bidvector/workflow/evaluation/PredictionEvidence.kt workflow/src/main/kotlin/bidvector/workflow/evaluation/PredictionFacts.kt workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityAnalysis.kt workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisPipeline.kt workflow/src/main/kotlin/bidvector/workflow/evaluation/Ports.kt workflow/src/main/kotlin/bidvector/workflow/evaluation/EvaluateCandidatesUseCase.kt workflow/src/main/kotlin/bidvector/workflow/evaluation/EvidenceLines.kt workflow/src/test/kotlin/bidvector/workflow/evaluation/EvaluateCandidatesUseCaseTest.kt workflow/src/test/kotlin/bidvector/workflow/evaluation/EvaluateCandidatesUseCaseIsolationTest.kt workflow/src/test/kotlin/bidvector/workflow/evaluation/EvaluationTestFixtures.kt workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisTest.kt workflow/src/test/kotlin/bidvector/workflow/evaluation/PredictionFactsTest.kt workflow/src/test/kotlin/bidvector/workflow/evaluation/EvidenceLinesTest.kt config/quality/gate-tests.properties reports/evidence/m4/4d4/`
 - exit: 1
 - 핵심 결과: 매치 없음(패턴 무매치 = 통과). 육안 확인 — Telegram id·사업자 정보 없음.
+
+## verifier r1 수정 라운드(V-1·V-2·장부층)
+
+### 2026-09-16T21:10:00Z
+- cmd: `./gradlew --no-daemon :workflow:test --tests "bidvector.workflow.evaluation.EvidenceLinesBoundaryTest"`(신설 직후)
+- exit: 1
+- 핵심 결과: `EvidenceLines.kt` KDoc 산문이 `String.format` 어휘를 그대로 인용해 새 술어가 자기매치(1건) — evidence 자기참조와 같은 함정. KDoc 을 간접 표현으로 재작성.
+
+### 2026-09-16T21:12:00Z
+- cmd: (재작성 뒤) `./gradlew --no-daemon :workflow:test --tests "bidvector.workflow.evaluation.EvidenceLinesBoundaryTest"`
+- exit: 0
+
+### 2026-09-16T21:15:00Z — 우회 (7) 변이 실측(verifier r1 V-1 재현 확인)
+- cmd: `EvidenceLines.kt` 에 `import java.util.Locale` + `diagnosedLines` 의 `agencyCount` 를 `String.format(Locale.getDefault(), "%d", …)` 로 임시 치환한 뒤 `./gradlew --no-daemon :workflow:test --tests "bidvector.workflow.evaluation.EvidenceLinesBoundaryTest"`
+- exit: 1
+- 핵심 결과: RED 확인 — `EvidenceLines kt 소스에 Locale 서식 API 참조가 없다` 가 4건 매치로 실패. 원복 뒤 `git diff` 가 KDoc 정정분만 남음을 확인.
+
+### 2026-09-16T21:20:00Z
+- cmd: (원복 뒤) `./gradlew --no-daemon :workflow:test --tests "bidvector.workflow.evaluation.EvidenceLinesBoundaryTest" --tests "bidvector.workflow.evaluation.EvidenceLinesTest"`
+- exit: 0
+
+### 2026-09-16T21:25:00Z
+- cmd: `./gradlew --no-daemon :workflow:test --tests "bidvector.workflow.evaluation.OpportunityAnalysisTest"`(V-2 evidence 단언 추가 뒤)
+- exit: 0
+- 핵심 결과: 27건 GREEN(개수 불변, 기존 두 test 확장).
+
+### 2026-09-16T21:26:00Z
+- cmd: `./gradlew --no-daemon :workflow:ktlintMainSourceSetCheck :workflow:ktlintTestSourceSetCheck :workflow:detekt`
+- exit: 0
+
+### 2026-09-16T21:35:00Z
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`(V-1·V-2·장부층 반영 뒤 재실측)
+- exit: <아래 채움>
+- 핵심 결과: <아래 채움>
+
+### rollback 재실측(임시 clone, `git clone --no-hardlinks`)
+- cmd: ①~⑥ 재실행(목록에 `EvidenceLinesBoundaryTest.kt` 추가 반영) — `rollback.md` 참고.
+- exit: <아래 채움>
 
 **마지막 HEAD 의 게이트 결과 정본은 evidence 가 아니라 verifier·PR 조치 코멘트다**(evidence-pack §「리뷰 요청 조건 점검」) — 이 문서는 그 직전까지의 명령만 담는다.
