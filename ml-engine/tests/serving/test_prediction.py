@@ -5,6 +5,7 @@ M5/5E-2 가 `CalculateOptimalBid`를 채운다(5E-1 의 UNIMPLEMENTED 단언을 
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 import pytest
@@ -482,3 +483,55 @@ def test_not_ready_never_calls_serve_bid_rates(monkeypatch: pytest.MonkeyPatch) 
     )
     servicer.CalculateOptimalBid(_valid_calc_request(), _ActiveContext())
     assert calls == []
+
+
+# ---- 로그(code-reviewer MEDIUM R-M2) ----
+
+
+def test_calculate_optimal_bid_logs_rejection_with_request_id(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """`GetModelMetadata`는 이미 `request_id`를 실은 로그 선례가 있다 —
+    `CalculateOptimalBid`도 거부 경로에서 같은 관례를 따른다."""
+    servicer = _servicer(runtime=_runtime())
+    request = _valid_calc_request(
+        request_id="req-log-reject", feature_schema_version="bidvector.ml.v1"
+    )
+    with caplog.at_level(logging.WARNING, logger="ml_engine.serving.prediction"):
+        servicer.CalculateOptimalBid(request, _ActiveContext())
+    assert "req-log-reject" in caplog.text
+    assert "FEATURE_SCHEMA_VERSION_UNSUPPORTED" in caplog.text
+
+
+def test_calculate_optimal_bid_logs_before_raising_on_mapping_rejected(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """D-5E2-6 예외 직전에 `request_id`를 남긴다 — 예외 메시지 자체엔 없다."""
+    servicer = _servicer(runtime=_runtime())
+    request = _valid_calc_request(request_id="req-log-mapping-rejected")
+    broken = _success()
+    object.__setattr__(broken.uncertainty, "sample_size", 0)
+    monkeypatch.setattr(
+        "ml_engine.serving.prediction.serve_bid_rates",
+        lambda req, policy: broken,
+    )
+    with (
+        caplog.at_level(logging.ERROR, logger="ml_engine.serving.prediction"),
+        pytest.raises(RuntimeError),
+    ):
+        servicer.CalculateOptimalBid(request, _ActiveContext())
+    assert "req-log-mapping-rejected" in caplog.text
+
+
+def test_calculate_optimal_bid_logs_completion_with_request_id(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    servicer = _servicer(runtime=_runtime())
+    request = _valid_calc_request(request_id="req-log-success")
+    monkeypatch.setattr(
+        "ml_engine.serving.prediction.serve_bid_rates",
+        lambda req, policy: _success(),
+    )
+    with caplog.at_level(logging.INFO, logger="ml_engine.serving.prediction"):
+        servicer.CalculateOptimalBid(request, _ActiveContext())
+    assert "req-log-success" in caplog.text

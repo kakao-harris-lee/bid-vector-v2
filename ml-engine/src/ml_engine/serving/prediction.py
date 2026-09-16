@@ -148,6 +148,44 @@ def _validate_objective(objective: int) -> _Rejection | None:
     return None
 
 
+def _compute_and_map(
+    request: prediction_pb2.CalculateOptimalBidRequest,
+    runtime: PredictionRuntime,
+    request_id: str,
+    correlation_id: str,
+) -> prediction_pb2.CalculateOptimalBidResponse:
+    """검증(⑴~⑹)을 통과한 뒤의 ⑺ — 엔진 호출 + wire 매핑 + 로그(code-reviewer
+    MEDIUM R-M2, design ratchet 함수 50줄 완화를 위해 `CalculateOptimalBid`에서
+    분리)."""
+    result = serve_bid_rates(request, runtime.policy)
+    mapped = map_kernel_result(
+        result, runtime.release, request.envelope.feature_schema_version
+    )
+    if isinstance(mapped, MappingRejected):
+        # D-5E2-6 — 매핑 불변식 위반은 엔진 결함이다. Unmeasurable 로 위장하지
+        # 않는다(값 지어내기 금지) — 예외로 올려 grpc 런타임이 INTERNAL/UNKNOWN
+        # 으로 옮기게 한다(BLE 규율, 5E-1 ⑩). 예외 직전에 request_id 를 남긴다
+        # (예외 메시지 자체엔 없다).
+        _logger.error(
+            "CalculateOptimalBid request_id=%s correlation_id=%s — "
+            "매핑 불변식 위반(D-5E2-6): %s",
+            request_id,
+            correlation_id,
+            mapped.reason,
+        )
+        raise RuntimeError(f"매핑 불변식 위반(D-5E2-6): {mapped.reason}")
+    # `mapped`는 `success`·`unmeasurable` 둘 다일 수 있다(ADR 0010 D-3, 둘 다
+    # 도메인 결과 층 — "완료"는 `success` 오너프만이 아니라 정상 처리를 뜻한다) —
+    # `WhichOneof`로 어느 쪽인지 남긴다(값을 지어내지 않는다).
+    _logger.info(
+        "CalculateOptimalBid request_id=%s correlation_id=%s — 처리 완료: %s",
+        request_id,
+        correlation_id,
+        mapped.WhichOneof("result"),
+    )
+    return mapped
+
+
 # `prediction_pb2_grpc`는 `contracts/__init__.py`처럼 `bidvector.*`(생성물) 재수출이라
 # mypy 는 이 base 를 `Any`로 본다 — "Class cannot subclass ... (has type Any)"(구조적,
 # `contracts/__init__.py` 구현 노트 참고). 생성물이 VCS 밖인 한 계속 필요한 예외다.
@@ -208,11 +246,24 @@ class BidPredictionServicer(prediction_pb2_grpc.BidPredictionServiceServicer):  
         request: prediction_pb2.CalculateOptimalBidRequest,
         context: ServicerContext,
     ) -> prediction_pb2.CalculateOptimalBidResponse:
+        request_id = request.envelope.base.request_id
+        correlation_id = request.envelope.base.correlation_id
         response = prediction_pb2.CalculateOptimalBidResponse()
         rejection = _validate(
             request, self._gate, self._runtime, self._supported_feature_schema_versions
         )
         if rejection is not None:
+            # code-reviewer MEDIUM(R-M2) — `GetModelMetadata`는 이미 `request_id`를
+            # 실은 로그 선례가 있다(위). `CalculateOptimalBid`은 없었다 — 운영 중
+            # 어떤 요청이 어떤 사유로 거부됐는지 추적할 자리가 없었다.
+            _logger.warning(
+                "CalculateOptimalBid request_id=%s correlation_id=%s — 거부: "
+                "code=%s detail_code=%s",
+                request_id,
+                correlation_id,
+                rejection.code,
+                rejection.detail_code.value,
+            )
             fill_application_failure(
                 response.failure,
                 code=rejection.code,
@@ -229,19 +280,9 @@ class BidPredictionServicer(prediction_pb2_grpc.BidPredictionServiceServicer):  
 
         runtime = self._runtime
         if runtime is None:
-            # `_validate`가 이미 `runtime is None`을 걸렀으므로 여기 도달하면 배선
+            # `_validate`가 이미 `gate` 미준비를 걸렀으므로 여기 도달하면 배선
             # 결함이다(server.py::_unreachable_pipeline_factory 와 같은 관례).
             raise AssertionError(
                 "검증을 통과했는데 runtime 이 없다 — 배선 결함(D-5E2-1)."
             )
-
-        result = serve_bid_rates(request, runtime.policy)
-        mapped = map_kernel_result(
-            result, runtime.release, request.envelope.feature_schema_version
-        )
-        if isinstance(mapped, MappingRejected):
-            # D-5E2-6 — 매핑 불변식 위반은 엔진 결함이다. Unmeasurable 로 위장하지
-            # 않는다(값 지어내기 금지) — 예외로 올려 grpc 런타임이 INTERNAL/UNKNOWN
-            # 으로 옮기게 한다(BLE 규율, 5E-1 ⑩).
-            raise RuntimeError(f"매핑 불변식 위반(D-5E2-6): {mapped.reason}")
-        return mapped
+        return _compute_and_map(request, runtime, request_id, correlation_id)
