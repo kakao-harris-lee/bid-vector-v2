@@ -45,7 +45,7 @@ rollback: in_scope 경로 한정 단일 역적용(2026-09-16 규칙), 임시 clo
 ## 결정(계약 고정 — 전부 4B-7·5B·5D-3 결정의 귀결)
 | ID | 판단 | 근거 |
 | --- | --- | --- |
-| D-4B8-1 | 대상 공고 라벨 = `ProvenanceRules.judgeRow(original = 공고 기초금액, row = ProvenanceRow(rawBaseAmount, budgetEstimate = estimatedAmount, winningAmount = null, winningRate = null), Absent, SAMPLE_PROVENANCE_POLICY)` — `DerivedYega` 는 구조적으로 불가(정직), 나머지 셋으로 판정. 기초금액이 없으면 요청 자체가 `ScoreNotProvided`(기존 경로) | 두 번째 분류기 금지 · 개찰 전 입력은 없는 그대로(「모름을 지어내지 않는다」) |
+| D-4B8-1 | 대상 공고 라벨 = `ProvenanceRules.judgeRow(original = 공고 기초금액, row = ProvenanceRow(rawBaseAmount, budgetEstimate = estimatedAmount, winningAmount = null, winningRate = null), Absent, SAMPLE_PROVENANCE_POLICY)` — 개찰 입력이 없어 `DerivedYega` 는 구조적으로 불가(정직). **실측(verifier r1 F-1)**: `BaseAmount.won` 이 비음 정수라 `isCleanInteger` 는 won>0 이면 항상 참이고 `ruleOrder`(suspect→clean→yega→vat)에서 yega·vat 둘 다보다 앞이므로 **`DerivedVat` 도 도달 불가** — 실제 라벨은 `SuspectRatio`(비율>1.15) · `Clean`(그 외 won>0) · `Unknown`(won=0) 셋. 이것은 4B 분류기의 성질(표본 라벨도 같음)이지 이 slice 결함이 아님 → `OPEN-4B8-DEAD-DERIVED-RULES`. 기초금액이 없으면 요청 자체가 `ScoreNotProvided`(기존 경로) | 두 번째 분류기 금지 · 개찰 전 입력은 없는 그대로(「모름을 지어내지 않는다」) |
 | D-4B8-2 | 4B-7 `provenanceLabelFor` 의 `opening` 인자를 `OpeningResult?` 로 일반화(표본은 있음, 대상은 `null`) — 함수 하나, 분기는 입력 조립부 | 재사용 우선 |
 | D-4B8-3 | `CategoryCode` 는 `@ConsistentCopyVisibility` + `private constructor`, 생성은 `CategoryCode.of(raw)` 하나: `normalizeCategoryKey(raw) = raw.trim().lowercase()`(Python `strip().lower()` 미러 — 유니코드 소문자화 규칙 차이는 알려진 제한) 뒤 빈 키는 `require` 거부(기존 동작). `value` 는 항상 정규화된 형태(불변식) | 5D-3 D-5D3-1 「요청 축·표본 축 같은 함수」 · `Rate`/`BidAmount` 생성자 관례 |
 | D-4B8-4 | 정규화 적용 자리: 수집 canonicalize(쓰기) + persistence 복원(읽기, 관용) + 그 밖 `of` 호출 전부 — SQL 은 정확 일치 유지(저장 값이 정규화됐다는 전제). 정규화 전 저장 행은 조회에서 빠진다 → `OPEN-4B8-CATEGORY-BACKFILL`(운영 데이터 없음) | 두 번째 규칙 금지 |
@@ -62,7 +62,7 @@ rollback: in_scope 경로 한정 단일 역적용(2026-09-16 규칙), 임시 clo
 | 「`object` 주입」·「경계로 처리」 | 없음 |
 
 ## 종결 조건
-정규화 규칙표 test(strip·lower·빈 키·유니코드 한 case) · `CategoryCode(` 직접 호출 0(컴파일) · 대상 라벨 규칙표(SuspectRatio·CleanInteger·DerivedVat·Unknown, DerivedYega 불가 변이) · `predictionRequestFor` 라벨이 `Unknown` 상수가 아님을 재는 test · 조회 SQL 무변경 확인 · 전건 `check` · verifier ready · 사용자 승인. `OPEN-4B7-TARGET-LABEL`·`OPEN-4B7-CATEGORY-NORMALIZATION` 닫힘, `OPEN-4B8-CATEGORY-BACKFILL` 등재.
+정규화 규칙표 test(strip·lower·빈 키·유니코드 한 case) · `CategoryCode(` 직접 호출 0(컴파일) · 대상 라벨 규칙표(SuspectRatio·Clean·Unknown — DerivedYega·DerivedVat 은 도달 불가, D-4B8-1 실측) · `predictionRequestFor` 라벨이 `Unknown` 상수가 아님을 재는 test · 조회 SQL 무변경 확인 · 전건 `check` · verifier ready · 사용자 승인. `OPEN-4B7-TARGET-LABEL`·`OPEN-4B7-CATEGORY-NORMALIZATION` 닫힘, `OPEN-4B8-CATEGORY-BACKFILL` 등재.
 
 ## 하네스 레인 변경
 없음(리뷰 요청 시점에 `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 로 갱신).
@@ -70,4 +70,5 @@ rollback: in_scope 경로 한정 단일 역적용(2026-09-16 규칙), 임시 clo
 ## 계약 갱신 이력
 | 날짜 | 변경 | 사유 |
 | --- | --- | --- |
+| 2026-09-16 (verifier r1 `ready-for-review`, 장부층 F-1·F-2·F-5 팀장 처분) | **D-4B8-1 문면 정정** — 「나머지 셋으로 판정」이 거짓: `DerivedVat` 도 도달 불가(위 표 실측 문장). milestone-4 착수 문단·종결 조건·capability-map 동기 정정, `OPEN-4B8-DEAD-DERIVED-RULES` 신설(`decision` 후속). **F-2** data-dictionary §6.3.1 「공백 절삭은 갈리지 않는다」·「멱등」 단정을 verifier 교차 대조(26 입력 중 4 갈림 — U+0085 절삭, `İ`·종단 시그마·U+10400 소문자화)로 정정. **F-5** capability-map 닫힌 OPEN 둘에 취소선 관례 적용 + 2F 둘도 동일(4D-3 때 누락) | 코드 무변경 — 분류기 성질을 팀장이 잘못 추정한 것(개찰 입력 부재만 보고 정수 성질을 놓침) |
 | 2026-09-16 (팀장 문서) | `data-dictionary.md` §6.3.1 「공종·발주기관 키의 정규화 — 한 규칙, 두 언어」 신설(+11줄, 삽입 지점 §6.3 끝). 역방향 파급: 그 파일을 `파일:줄` 로 인용하는 곳 중 삽입 지점 아래는 `reports/evidence/m0/0c/commands.md`·`reports/evidence/m4/4b1/checklist.md` 의 `data-dictionary.md:1551,1554` 둘 — 둘 다 **종결된 slice 의 evidence** 로 4B-1 이 이미 「범위 밖 낡은 좌표」로 등재한 자리라 고치지 않고 알려진 제한 승계(4B-8 checklist 에 등재) | evidence-pack 역방향 파급 규격 |

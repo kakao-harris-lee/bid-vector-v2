@@ -527,7 +527,9 @@ port 주입 N+1)은 기존 경계 게이트가 강제(게이트 술어 무변경
 
 **4B-8 착수 2026-09-16(운영자 결정 「추천 A 진행」, 정본 `reports/evidence/m4/4b8/scope.md`)** — 4B-7 이 남긴 소형 OPEN 둘을 한
 slice 로: ① `OPEN-4B7-TARGET-LABEL` — 대상 공고의 요청 축 `baseAmountProvenanceLabel`(`Unknown` 상수)을 4B-7 표본과 **같은 분류기**
-(`ProvenanceRules.judgeRow`, 개찰 입력은 `null` — `DerivedYega` 만 구조적으로 불가, 나머지 셋으로 정직한 라벨)로 붙인다 ② `OPEN-4B7-CATEGORY-
+(`ProvenanceRules.judgeRow`, 개찰 입력은 `null` — `DerivedYega` 는 구조적으로 불가이고, verifier r1 실측으로 `DerivedVat` 도 도달 불가:
+`won` 이 비음 정수라 `CleanInteger` 가 yega·vat 보다 항상 먼저 매치 — 실제 라벨은 `SuspectRatio`·`Clean`·`Unknown` 셋, 4B 분류기의
+성질이라 `OPEN-4B8-DEAD-DERIVED-RULES` 로 등재)로 붙인다 ② `OPEN-4B7-CATEGORY-
 NORMALIZATION` — `CategoryCode` 를 private 생성자 + `of(raw)`(strip + lower, Python `normalize_feature_key` 미러)로 닫아 수집·복원·요청·
 표본·조회가 같은 키를 쓰게 한다(SQL 은 정확 일치 유지, 두 번째 규칙 금지). 결정 D-4B8-1~5. 정규화 전 저장 행은 `OPEN-4B8-CATEGORY-
 BACKFILL`(운영 데이터 없음, M6). 레인 `bid-vector-v2-m4e`/`m4-4b8/2026-09-16`, base `845e29b`(PR #21 5E-3 병합 뒤 — Kotlin 변경 0).

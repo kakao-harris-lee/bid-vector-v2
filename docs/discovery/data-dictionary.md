@@ -1538,10 +1538,11 @@ ADR 명문화는 0D 소관이다.
 (legacy `normalize_lookup_key` 의 별칭 해소를 걷어냈다 — 별칭 표는 학습 어휘에 없는 철자를 조용히 다른 값으로 접는다).
 Python 정본은 `ml_engine.features.normalize.normalize_feature_key`(요청 축·표본 축 모두 이 함수), Kotlin 정본은
 `procurement.CategoryCode.of(raw)`(생성이 곧 정규화 — 정규화 안 된 `CategoryCode` 는 표현 불가, 수집·복원·요청·표본·표본
-조회가 같은 값). **wire 에는 Kotlin 이 정규화한 값이 실리고 Python 이 다시 정규화한다(멱등)** — 두 규칙이 아니라 한 규칙의
-두 구현이며, 갈릴 수 있는 자리(JVM 문자 단위 소문자화 대 Python `str.lower()` 의 유니코드 경계 — 예: 다중 코드포인트로 접히는 문자)는
-4B-8 알려진 제한으로 등재한다. 공백 절삭은 갈리지 않는다 — Kotlin `trim()`(`Char.isWhitespace`)과 Python `str.strip()` 둘 다
-전각 공백(U+3000)을 제거한다(4B-8 구현 레인 실측, kotlinc 2.2.20). 정규화 전 저장 행은 `OPEN-4B8-CATEGORY-BACKFILL`. 발주기관 키의 Kotlin 정본은 기관 fact 가 생길 때
+조회가 같은 값). **wire 에는 Kotlin 이 정규화한 값이 실리고 Python 이 다시 정규화한다** — 한 규칙의 두 구현이고, ASCII·한글·전각 공백(U+3000,
+둘 다 절삭)에서는 결과가 같다(4B-8 verifier r1 교차 대조 26 입력 중 22 동일). **갈리는 입력 넷은 알려진 제한이다**(같은 대조):
+절삭 축 — U+0085(NEL)를 Kotlin `trim()` 은 남기고 Python `str.strip()` 은 제거한다 · 소문자화 축 — `İ`(U+0130)·종단 시그마·보충면
+문자(U+10400)에서 JVM 문자 단위 `Char.lowercaseChar()` 와 Python `str.lower()` 가 다르다. 그래서 「Python 재정규화가 멱등」은 그 넷에서
+거짓이다 — 실무 영향은 없다(공종 코드는 ASCII). 정본은 4B-8 checklist 의 대조 표. 정규화 전 저장 행은 `OPEN-4B8-CATEGORY-BACKFILL`. 발주기관 키의 Kotlin 정본은 기관 fact 가 생길 때
 (`OPEN-2B-AGENCY-ID`) 같은 함수로 둔다.
 
 ### 6.4 성숙도 — 계산과 판정의 분리 (`OPEN-ML-01` 잔여 확인)
