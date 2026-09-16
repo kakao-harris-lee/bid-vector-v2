@@ -80,6 +80,41 @@ def test_checksum_covers_tuple_fields() -> None:
     assert derived_release_checksum(changed) != derived_release_checksum(_POLICY)
 
 
+def _bump_field_value(
+    value: str | int | Decimal | tuple[int, ...] | tuple[Decimal, ...],
+) -> str | int | Decimal | tuple[int, ...] | tuple[Decimal, ...]:
+    """필드 값과 같은 타입으로 "다른 값"을 만든다(도메인 유효성은 무관 — 이 함수는
+    정책 불변식을 통과시킬 필요가 없다, `dataclasses.replace`로 직접 만든 객체를
+    `derived_release_checksum`에만 넘긴다)."""
+    if isinstance(value, str):
+        return value + "-changed"
+    if isinstance(value, Decimal):
+        return value + Decimal("0.0001")
+    if isinstance(value, tuple):
+        first, *rest = value
+        return (_bump_field_value(first), *rest)  # type: ignore[return-value]
+    if isinstance(value, int):
+        return value + 1
+    raise TypeError(f"알 수 없는 정책 값 타입: {type(value)!r}")
+
+
+@pytest.mark.parametrize(
+    "field", dataclasses.fields(InferencePolicy), ids=lambda f: f.name
+)
+def test_checksum_changes_for_every_declared_field(
+    field: dataclasses.Field[object],
+) -> None:
+    """verifier r1 M-2 — 손 목록이 아니라 `dataclasses.fields(InferencePolicy)`
+    **전수**를 재는 test. 열거에서 필드 하나가 빠지면(예: `maturity_window_days`)
+    이 test 의 그 case 만 초록으로 남아 누락을 드러낸다(변이 검증, verifier 재현:
+    parametrize 밖 필드를 손 목록에서 빼도 890 passed 로 안 붉어졌다)."""
+    current_value = getattr(_POLICY, field.name)
+    changed = dataclasses.replace(
+        _POLICY, **{field.name: _bump_field_value(current_value)}
+    )
+    assert derived_release_checksum(changed) != derived_release_checksum(_POLICY)
+
+
 # ---- build_derived_release(D-2F-2, D-5E2-2~4) ----
 
 
