@@ -70,9 +70,13 @@ class HoldoutRejected:
 @dataclass(frozen=True)
 class HoldoutCancelled:
     """M5/5E-3 D-5E3-3 — `should_stop`이 창 처리 중 참이 되어 실행이 중단됐다(결과
-    타입, 예외 아님). `completed_windows`는 중단 전에 **학습까지 끝난** 창 수다 —
-    부분 보고서를 조립하지 않는다(우회 후보 (4): 이 타입을 `PipelineFailed`로
-    매핑하면 FAILED 로 위장하는 것이므로 호출부는 `PipelineCancelled`로만 옮긴다)."""
+    타입, 예외 아님). `completed_windows`는 중단 전에 **처리를 끝낸**(학습이
+    실패해 건너뛴 창도 포함, 학습에 성공한 창만은 아니다) 창 수다 — 부분 보고서를
+    조립하지 않는다(우회 후보 (4): 이 타입을 `PipelineFailed`로 매핑하면 FAILED 로
+    위장하는 것이므로 호출부는 `PipelineCancelled`로만 옮긴다). verifier r1 LOW-1 —
+    이전 문면은 「학습까지 끝난」이라 적어 실제 계수 대상(성공·실패 무관, 루프가
+    처리한 창)과 어긋났다. 현재 production 소비자는 없다(`app/pipeline.py`가 이
+    값을 버리고 `PipelineCancelled()`만 낸다)."""
 
     completed_windows: int
 

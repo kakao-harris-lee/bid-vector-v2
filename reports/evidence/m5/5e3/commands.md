@@ -24,7 +24,9 @@
 ## S-4
 - cmd: `(cd ml-engine && uv run lint-imports)`
 - exit: 0
-- 핵심 결과: Contracts: 7 kept, 0 broken(ignored import 2)
+- 핵심 결과(구현 종결 시점, D-5E3-6 이전): Contracts: 7 kept, 0 broken(ignored
+  import 2). **수정 라운드 1 뒤 최종값은 아래 「S-4 재실측」 절 참고**(8 kept,
+  ignored import 4)
 
 ## S-5
 - cmd: `(cd ml-engine && uv run python -m pytest tests -q)`
@@ -38,14 +40,65 @@
 - exit: 0
 - 핵심 결과: 설계 래칫 위반 없음(대상 0개 파일 중 allowlist 밖 위반 0) — `holdout.py`
   에 `should_stop` 확인을 추가하며 `_evaluate_windows`가 50줄을 넘겨(59줄) 한 번
-  위반했고, `_record_window_outcome` 헬퍼로 분리해 재통과시켰다(창 처리 결과를
-  results/excluded 로 나누는 기존 로직을 그대로 옮긴 것 — 5C-2 golden·mutation
-  test 무편집 통과가 동작 불변의 증거)
+  위반했고, `_record_window_outcome` 헬퍼로 분리해 재통과시켰다. **verifier r1
+  LOW-5 정정(수정 라운드 1)** — 이 분리는 래칫 통과에 필수가 아니었다: 헬퍼를
+  인라인으로 되돌린 사본을 재실측하면 정확히 50줄이고 판정식이 `> 50`이라 그
+  사본도 `design_ratchet.py --check` exit 0(위반 0)이다 — 원래 긴 docstring 을
+  짧게 줄인 것만으로 이미 50줄에 닿아 있었다. 분리는 산식·분기·순서·호출 인자가
+  원본과 동일한 예방적 순수 이동으로 재분류(checklist.md D-5E3-5)
 
 ## S-7
 - cmd: `(cd ml-engine && uv run python tools/reuse_provenance_check.py)`
 - exit: 0
 - 핵심 결과: 재활용 출처 두 자리 일치 — 위반 0(이 slice 는 이식 없음, reuse.md)
+
+## 수정 라운드 1(verifier r1 HIGH-1 + LOW 5, code-reviewer LOW 1) — 최종 HEAD 재실측
+
+verifier r1 LOW-2 — 초판 acceptance_commands 가 CI `ml-engine` job 의 세 step
+(S-1b·S-7 양성 대조·S-9)을 빠뜨렸다. 팀장 계약 갱신 (3)이 세 step 을 scope.md 에
+추가했다 — 아래는 그 셋을 이 worktree 에서 직접 실행한 결과다.
+
+## S-1b (CI step 「serving extras 분리 확인」)
+- cmd: `(cd ml-engine && set -euo pipefail && uv sync --frozen --extra serving --no-dev && for m in sqlalchemy psycopg requests httpx celery; do if uv run --no-sync python -c "import $m" >/dev/null 2>&1; then echo "금지 패키지 $m 이 serving extras 에 설치됐다" >&2; exit 1; fi; done && uv sync --frozen --all-extras)`
+- exit: 0 — 금지 패키지 5종 미설치. 명령 끝의 `uv sync --frozen --all-extras`가
+  venv 를 원상 복구한다(뒤이은 S-5 재실행으로 951 passed 확인, venv 손상 없음)
+
+## S-7 양성 대조(CI step 「재활용 출처 두 자리 대조」 후반)
+- cmd: `(cd ml-engine && set -euo pipefail && uv run python tools/reuse_provenance_check.py && if uv run python tools/reuse_provenance_check.py --evidence tests/gates/fixtures/reuse-mismatch.md; then echo "양성 대조(어긋난 evidence)가 실패해야 하는데 통과했다" >&2; exit 1; fi)`
+- exit: 0 — 어긋난 evidence(`reuse-mismatch.md`)를 두 번째 호출이 정상적으로
+  거부해(그 자체는 비0 종료) 바깥 `if` 조건이 거짓이 되고 스크립트 전체는 exit 0
+  으로 끝난다(양성 대조가 기대대로 실패함을 확인하는 것이 성공 기준)
+
+## S-9 (CI step 「Python 버전 두 자리 대조」)
+- cmd: `(cd ml-engine && uv run python -c "import tomllib,pathlib; p=tomllib.load(open('pyproject.toml','rb')); v=pathlib.Path('.python-version').read_text().strip(); assert v.startswith('3.12') and '3.12' in p['project']['requires-python'], (v, p['project']['requires-python'])")`
+- exit: 0
+
+## S-4 재실측(D-5E3-6 반영 뒤)
+- cmd: `(cd ml-engine && uv run lint-imports)`
+- exit: 0
+- 핵심 결과: Contracts: **8** kept, 0 broken(신설 계약 `yaml 을 직접 import 하는
+  곳은 registry.policy 하나` — ignored import 4: `registry.policy`(뿌리) +
+  `training`·`evaluation`·`serving`의 `policy.py`(out_of_scope 유지 죽은 except
+  절의 무해 참조, checklist.md 알려진 제한 7))
+
+## HIGH-1 수정 검증 — 양성 대조(구조 계약이 실제로 우회를 잡는지)
+- 절차: verifier r1 이 심었던 정확한 재현 probe(반환 타입은 `ProbeResult =
+  ProbePolicy | PolicyRejected` **타입 별칭**, `import yaml as _y`, `load_probe_
+  policy` 함수)를 `ml_engine.probe_pkg.policy`에 임시로 심고 두 방어를 각각 확인
+  한 뒤 probe 삭제(작업 트리 클린 확인)
+- cmd: `(cd ml-engine && uv run python -m pytest tests/gates/test_policy_loaders_fail_closed.py -q)`(probe 심은 상태)
+- exit: 1 — `test_every_collected_loader_rejects_malformed_yaml_without_raising`
+  1 failed(`ml_engine.probe_pkg.policy.load_probe_policy 가 예외를 던졌다:
+  ParserError(...)`) — **재작성된 게이트가 이제 이 로더를 수집해 누출을 잡는다**
+  (수정 전에는 반환 주석이 타입 별칭이라 수집에서 빠져 0 failed 였다, verifier r1
+  재현 그대로)
+- cmd: `(cd ml-engine && uv run lint-imports)`(probe 심은 상태)
+- exit: 1 — `ml_engine is not allowed to import yaml: ml_engine.probe_pkg.policy
+  -> yaml (l.7)` — **import-linter 가 별칭 import 를 독립적으로 잡는다**
+- probe 삭제 뒤: `git status --short src/ml_engine/`에 probe 잔재 없음(이 라운드의
+  다른 pending 편집 — `training/holdout.py` LOW-1 정정 — 만 남음), `uv run python
+  -m pytest tests/gates/test_policy_loaders_fail_closed.py -q` exit 0(4 passed),
+  `uv run lint-imports` exit 0(8 kept)
 
 ## S-10 (Kotlin `check`, evidence 커밋마다 그 HEAD 에서 재실측)
 - cmd: `./gradlew --no-daemon check`(HEAD `b78082d`, 구현 종결)
