@@ -384,10 +384,12 @@ def test_ml_kernel_011_shrinkage_weight_carried_in_response() -> None:
 
     **이 test 는 서빙 경로(`engine.serve_bid_rates`/`distribution.predict_distribution`)
     를 거치지 않는다** — `resolve_assessment_posterior`·`_resolve_diagnostics`를
-    agency/category 를 채워 직접 호출한다(K5·조립기의 진단 조립 함수 단위 검증). 서빙
-    경로는 `OPEN-5D2-SAMPLE-SEGMENT`(scope.md 계약 갱신 이력)로 agency/category 가
-    항상 `None`이라 이 갈래(`segment_support == DIRECT`)에 도달하지 않는다(알려진 제한
-    1, checklist.md) — 계약 갱신 ③(2026-09-15)이 요구한 문면 명시(verifier r1 F-4)."""
+    agency/category 를 채워 직접 호출한다(K5·조립기의 진단 조립 함수 단위 검증,
+    수치 대조는 이 갈래가 맡는다). M5/5D-3(D-5D3-7)이 `OPEN-5D2-SAMPLE-SEGMENT`를
+    서빙 경로에서 닫아 같은 갈래(`segment_support == DIRECT`)가 `tests/inference/
+    test_engine.py::test_serve_bid_rates_wire_driven_direct_segment_support_matches_
+    golden_011`로도 wire 요청만으로 재현된다(값이 아니라 계층 표본 **수**의 함수라
+    골든 corpus 편집 없이 재현 가능, 5D-2 알려진 제한 1·8 해소 — checklist.md)."""
     case = _CASES["ml-kernel-011"]
     inp, exp = case["input"], case["expected"]
     policy_cfg = inp["policy"]["assessment"]

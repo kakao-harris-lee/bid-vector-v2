@@ -24,6 +24,7 @@ from ml_engine.features.facts import (
     FeatureFacts,
     Missing,
     Present,
+    resolve_text_fact,
 )
 from ml_engine.features.manifest import (
     CanonicalizationRejected,
@@ -129,6 +130,7 @@ __all__ = [
     "pseudo_count_weight",
     "require_declared",
     "resolve_schema",
+    "resolve_text_fact",
     "shrink_toward",
     "verify_feature_names",
     "verify_manifest",

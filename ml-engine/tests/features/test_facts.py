@@ -10,6 +10,7 @@ from ml_engine.features.facts import (
     FeatureFacts,
     Missing,
     Present,
+    resolve_text_fact,
 )
 
 
@@ -152,3 +153,76 @@ def test_from_proto_category_and_agency_missing_are_independent() -> None:
     assert isinstance(facts, FeatureFacts)
     assert facts.category_code == Missing(common_pb2.MISSING_REASON_UNKNOWN)
     assert facts.agency_id == Missing(common_pb2.MISSING_REASON_NOT_APPLICABLE)
+
+
+# ---- M5/5D-3(D-5D3-6, 계약 갱신 F-10) — `resolve_text_fact` 공개 승격, 결측 사유 술어
+# 인자화. 요청 축은 열린 집합(UNSPECIFIED만 거부), 표본 축만 닫힌 집합 ----
+
+
+def test_resolve_text_fact_default_allows_any_non_unspecified_reason() -> None:
+    """F-10 — 요청 축은 열린 집합이다: `UNSPECIFIED`(0)만 거부하고, 선언된 enum 값이든
+    (`NOT_APPLICABLE`) enum 밖 정수(`99`)든 전부 `Missing(raw)`로 수용한다."""
+    declared = features_pb2.AgencyIdFact(
+        missing=common_pb2.MISSING_REASON_NOT_APPLICABLE
+    )
+    assert resolve_text_fact(declared, field="agency_id") == Missing(
+        common_pb2.MISSING_REASON_NOT_APPLICABLE
+    )
+
+    undeclared = features_pb2.AgencyIdFact(missing=99)
+    assert resolve_text_fact(undeclared, field="agency_id") == Missing(99)
+
+    unspecified = features_pb2.AgencyIdFact(
+        missing=common_pb2.MISSING_REASON_UNSPECIFIED
+    )
+    result = resolve_text_fact(unspecified, field="agency_id")
+    assert result == FactRejected(FactRejectionReason.MALFORMED, "agency_id")
+
+
+def test_resolve_text_fact_default_still_normalizes_and_rejects_empty() -> None:
+    fact = features_pb2.CategoryCodeFact(value="  Civil Works  ")
+    assert resolve_text_fact(fact, field="category_code") == Present("civil works")
+    empty = features_pb2.CategoryCodeFact(value="   ")
+    result = resolve_text_fact(empty, field="category_code")
+    assert result == FactRejected(FactRejectionReason.EMPTY_KEY, "category_code")
+
+
+def _only_not_collected_yet(raw: int) -> bool:
+    return raw == common_pb2.MISSING_REASON_NOT_COLLECTED_YET
+
+
+def test_resolve_text_fact_narrow_predicate_accepts_only_that_reason() -> None:
+    """표본 축(D-5D3-2)이 쓰는 형태 — 술어 밖 사유는 `FactRejected`."""
+    ok = features_pb2.AgencyIdFact(missing=common_pb2.MISSING_REASON_NOT_COLLECTED_YET)
+    result = resolve_text_fact(
+        ok, field="agency_id", is_allowed_missing_reason=_only_not_collected_yet
+    )
+    assert result == Missing(common_pb2.MISSING_REASON_NOT_COLLECTED_YET)
+
+
+def test_resolve_text_fact_narrow_predicate_rejects_reason_outside_predicate() -> None:
+    fact = features_pb2.AgencyIdFact(missing=common_pb2.MISSING_REASON_UNKNOWN)
+    result = resolve_text_fact(
+        fact, field="agency_id", is_allowed_missing_reason=_only_not_collected_yet
+    )
+    assert result == FactRejected(
+        FactRejectionReason.MISSING_REASON_NOT_ALLOWED, "agency_id"
+    )
+
+
+def test_resolve_text_fact_narrow_predicate_still_rejects_unspecified() -> None:
+    """`UNSPECIFIED`는 어떤 술어보다도 먼저 걸러진다 — 좁힌 술어에서도 `MALFORMED`
+    (술어가 낸 거부와는 다른 사유)로 남는다."""
+    fact = features_pb2.AgencyIdFact(missing=common_pb2.MISSING_REASON_UNSPECIFIED)
+    result = resolve_text_fact(
+        fact, field="agency_id", is_allowed_missing_reason=_only_not_collected_yet
+    )
+    assert result == FactRejected(FactRejectionReason.MALFORMED, "agency_id")
+
+
+def test_resolve_text_fact_oneof_unset_is_malformed_regardless_of_predicate() -> None:
+    fact = features_pb2.CategoryCodeFact()
+    result = resolve_text_fact(
+        fact, field="category_code", is_allowed_missing_reason=_only_not_collected_yet
+    )
+    assert result == FactRejected(FactRejectionReason.MALFORMED, "category_code")

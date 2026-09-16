@@ -9,7 +9,15 @@
 않는다). 이 모듈은 그 둘을 **분리된 사유**로 낸다(조용한 drop 금지, 위협 모델 (b))(D-5D-2
 「사유가 섞이면 구별 안 됨」과 같은 원칙).
 
-8 사유(`SampleRejectionReason`): `BASE_AMOUNT_INVALID`(4성분 검증 — verifier r2 N-4,
+M5/5D-3(D-5D3-2) — 9번째 사유 `SEGMENT_REASON_NOT_ALLOWED` 신설. `observe_sample` 자신은
+표본별 기관·공종 축(`agency_id`/`category_code`)을 읽지 않는다 — 그 축은
+`ml_engine.inference.distribution`이 5B `resolve_text_fact`(허용 결측 사유
+`{NOT_COLLECTED_YET}`로 좁힘)로 직접 판독하고, 거부되면 이 사유를 실어 표본 전체를
+`SampleRejected`로 접는다(이 모듈은 그 **사유 어휘**만 소유 — 관문 배치는 조립기,
+표본 거부 사유의 단일 어휘는 이 모듈, D-5D3-2). `Diagnostics.excluded_observations`가
+그 개수를 다른 8 사유와 함께 총계로 나른다.
+
+9 사유(`SampleRejectionReason`): `BASE_AMOUNT_INVALID`(4성분 검증 — verifier r2 N-4,
 `Money` 다섯 필드 중 `vat_treatment`는 5B 도 판정하지 않는다 — 5B `features/facts.py`
 `_resolve_base_amount`와 같은 규칙 — `CompetitionSample.base_amount`는 oneof/Fact 래퍼가
 아닌 바로 `Money`라 그 함수를 그대로 재사용할 수 없어 규칙만 재현한다, 5B 파일은 편집하지
@@ -70,10 +78,11 @@ _PROVENANCE_LABELS: dict[int, AssessmentProvenance] = {
 
 
 class SampleRejectionReason(StrEnum):
-    """관문 여덟 — 설계 검토 (5) 구현 지시 3 「7 사유」에 verifier r1 F-1·F-2 가
+    """관문 아홉 — 설계 검토 (5) 구현 지시 3 「7 사유」에 verifier r1 F-1·F-2 가
     `BID_RATE_UNPARSEABLE` 신설 + `NON_POSITIVE_PRICE`→`RESERVE_PRICE_INVALID` 확장·
-    개명(포섭)을 더했다. wire 로 나가지 않는다(Python 결과 타입 전용,
-    `Diagnostics.excluded_observations`가 사유별이 아니라 총계만 나른다)."""
+    개명(포섭)을 더했고, M5/5D-3(D-5D3-2)이 `SEGMENT_REASON_NOT_ALLOWED`를 더했다.
+    wire 로 나가지 않는다(Python 결과 타입 전용, `Diagnostics.excluded_observations`가
+    사유별이 아니라 총계만 나른다)."""
 
     BASE_AMOUNT_INVALID = "BASE_AMOUNT_INVALID"
     NO_RESERVE_DRAW = "NO_RESERVE_DRAW"
@@ -83,6 +92,7 @@ class SampleRejectionReason(StrEnum):
     CENTER_OUT_OF_BAND = "CENTER_OUT_OF_BAND"
     BID_RATE_UNPARSEABLE = "BID_RATE_UNPARSEABLE"
     BID_RATE_OUT_OF_BAND = "BID_RATE_OUT_OF_BAND"
+    SEGMENT_REASON_NOT_ALLOWED = "SEGMENT_REASON_NOT_ALLOWED"
 
 
 @dataclass(frozen=True)

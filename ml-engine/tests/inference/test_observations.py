@@ -305,7 +305,11 @@ def test_observed_bid_rate_is_read_via_decimal_not_bare_float(
     assert result.observed_bid_rate == float(Decimal("0.9500"))
 
 
-def test_rejection_reasons_are_eight() -> None:
+def test_rejection_reasons_are_nine() -> None:
     """설계 검토 (5) 구현 지시 3 「7 사유」 + verifier r1 F-1(`BID_RATE_UNPARSEABLE`
-    신설)·F-2(`NON_POSITIVE_PRICE`→`RESERVE_PRICE_INVALID` 대체, 개수 불변)."""
-    assert len(list(SampleRejectionReason)) == 8
+    신설)·F-2(`NON_POSITIVE_PRICE`→`RESERVE_PRICE_INVALID` 대체, 개수 불변) +
+    M5/5D-3(D-5D3-2) `SEGMENT_REASON_NOT_ALLOWED` 신설."""
+    assert len(list(SampleRejectionReason)) == 9
+    assert SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED in list(
+        SampleRejectionReason
+    )

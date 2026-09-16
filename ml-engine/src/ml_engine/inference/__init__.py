@@ -24,7 +24,6 @@ from ml_engine.inference.distribution import (
     DistributionRequest,
     SampleSegment,
     SegmentedSample,
-    SegmentMissing,
     predict_distribution,
 )
 from ml_engine.inference.engine import ENGINE, serve_bid_rates
@@ -104,7 +103,6 @@ __all__ = [
     "SampleRejected",
     "SampleRejectionReason",
     "SampleSegment",
-    "SegmentMissing",
     "SegmentSupport",
     "SegmentedSample",
     "SettlementObservation",
