@@ -1,10 +1,8 @@
-package bidvector.workflow.notification
+package bidvector.workflow.evaluation
 
 import bidvector.decision.BidNowReason
 import bidvector.decision.MlUnavailableReason
 import bidvector.decision.Verdict
-import bidvector.workflow.evaluation.PredictionEvidence
-import bidvector.workflow.evaluation.SampleExclusionReason
 import bidvector.workflow.prediction.SegmentSupport
 
 /**

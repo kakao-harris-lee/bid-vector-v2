@@ -1,4 +1,4 @@
-package bidvector.workflow.notification
+package bidvector.workflow.evaluation
 
 import bidvector.decision.LadderInput
 import bidvector.decision.MlUnavailableReason
@@ -9,8 +9,6 @@ import bidvector.decision.VerdictLadderPolicyData
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.evaluation.PredictionEvidence
-import bidvector.workflow.evaluation.SampleExclusionReason
 import bidvector.workflow.prediction.ModelReleaseRef
 import bidvector.workflow.prediction.PredictionDiagnostics
 import bidvector.workflow.prediction.SegmentSupport
