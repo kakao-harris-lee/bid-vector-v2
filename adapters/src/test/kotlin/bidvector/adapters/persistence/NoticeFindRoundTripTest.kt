@@ -152,4 +152,86 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
         found.demandAgency shouldBe null
         found.noticeAgency shouldBe null
     }
+
+    private val mergeGuardId = NoticeId(NoticeNumber.of("MERGE-AGENCY-001"), NoticeRound.of("000"))
+
+    private fun mergeGuardObservation(
+        marker: String,
+        observedAt: Instant,
+    ): RawNoticeObservation =
+        RawNoticeObservation.of(
+            mapOf(
+                RawKey("bidNtceNo") to mergeGuardId.number.value,
+                RawKey("bidNtceOrd") to mergeGuardId.round.value,
+                RawKey("marker") to marker,
+            ),
+            SourceEndpoint.NOTICE_LIST,
+            observedAt,
+        )
+
+    private fun mergeGuardCommand(
+        raw: RawNoticeObservation,
+        demandAgency: Agency?,
+        noticeAgency: Agency?,
+    ): NoticeCollected =
+        NoticeCollected(
+            id = mergeGuardId,
+            businessCategory = null,
+            baseAmount = null,
+            estimatedAmount = null,
+            allocatedBudget = null,
+            floorRate = null,
+            deadlineAt = null,
+            openingScheduledAt = null,
+            raw = raw,
+            demandAgency = demandAgency,
+            noticeAgency = noticeAgency,
+        )
+
+    /**
+     * verifier r1 F-1 — `NoticeRowMerge`의 발주기관 존재 가드(「유입이 없으면 기존을 지킨다」,
+     * `business_category_*`와 같은 형태)가 실제 재수집 흐름에서 성립하는지 3단계로 잠근다.
+     * ① 기관 넷이 실린 insert ② 기관이 결측인 재관측 — 존재 가드가 기존 값을 지켜 다른
+     * 필드도 안 바뀌므로 `Unchanged`(SQL write 자체가 없다 — 가드가 없으면 컬럼이 null 로
+     * 덮여 merged != existing 이 되어 Updated 로 갈린다, 이 단언 자체가 가드의 증거다) ③
+     * 수요기관만 새 값이 실린 재관측 — 수요기관만 교체되고 공고기관은 그대로다(역할 간
+     * 누출 0, 우회 (3)과 같은 결의 persistence 층 대응).
+     */
+    @Test
+    fun `발주기관은 결측 재관측에 지워지지 않고 값 있는 재관측에만 교체된다 — 역할 간 누출 0`() {
+        val repository = JdbcNoticeRepository(dataSource())
+        val demand = Agency(AgencyCode.of("1111111"), AgencyName.of("수요기관"))
+        val notice = Agency(AgencyCode.of("2222222"), AgencyName.of("공고기관"))
+
+        val firstObservation = mergeGuardObservation("first", Instant.parse("2026-09-17T00:00:00Z"))
+        val firstOutcome =
+            repository.persist(
+                mergeGuardCommand(firstObservation, demand, notice),
+                appendRawObservation(firstObservation),
+            )
+        firstOutcome shouldBe PersistOutcome.Inserted
+
+        val secondObservation = mergeGuardObservation("second", Instant.parse("2026-09-17T01:00:00Z"))
+        val secondOutcome =
+            repository.persist(
+                mergeGuardCommand(secondObservation, null, null),
+                appendRawObservation(secondObservation),
+            )
+        secondOutcome shouldBe PersistOutcome.Unchanged
+        val afterSecond = requireNotNull(repository.find(mergeGuardId))
+        afterSecond.demandAgency shouldBe demand
+        afterSecond.noticeAgency shouldBe notice
+
+        val newDemand = Agency(AgencyCode.of("3333333"), AgencyName.of("수요기관B"))
+        val thirdObservation = mergeGuardObservation("third", Instant.parse("2026-09-17T02:00:00Z"))
+        val thirdOutcome =
+            repository.persist(
+                mergeGuardCommand(thirdObservation, newDemand, null),
+                appendRawObservation(thirdObservation),
+            )
+        thirdOutcome shouldBe PersistOutcome.Updated(2L)
+        val afterThird = requireNotNull(repository.find(mergeGuardId))
+        afterThird.demandAgency shouldBe newDemand
+        afterThird.noticeAgency shouldBe notice
+    }
 }

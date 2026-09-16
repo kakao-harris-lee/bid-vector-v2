@@ -73,3 +73,11 @@
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 1m 2s). evidence 문서 편집이
   코드 게이트에 영향 없음을 확인.
+
+## verifier r1 F-1 변이 실측 — 발주기관 병합 보존 test
+- cmd: `NoticeRowMerge.kt`의 발주기관 존재 가드 넷을 임시로 지운 뒤 `./gradlew --no-daemon :adapters:test --tests "bidvector.adapters.persistence.NoticeFindRoundTripTest"`
+- exit: 1
+- 핵심 결과: 신설 3단계 test 의 `Unchanged` 단언이 `Updated(revision=2)`로 실패(RED) — `git restore --source=HEAD --staged --worktree`로 원복 뒤 같은 명령 exit 0(4 tests GREEN).
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 46s). 신설 test 포함 전건 GREEN.
