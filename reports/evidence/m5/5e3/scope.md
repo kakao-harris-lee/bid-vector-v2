@@ -14,7 +14,7 @@ in_scope:
   - ml-engine/src/ml_engine/app/server.py                    # (a) `_load_inference_policy_safe` 래퍼 제거(호출부 정규화가 뿌리로 이동 — 5E-1 verifier r3 「다른 호출자가 생기면 재발」 조건 소멸). 제거 뒤 5E-1 test 가 여전히 초록이어야 한다
   - ml-engine/src/ml_engine/training/holdout.py              # (b) run_holdout(..., should_stop: Callable[[], bool] = _never) — _evaluate_windows 가 창마다 학습 전에 확인, 멈추면 HoldoutCancelled(결과 타입, 완료 창 수 동반) 반환. 나머지 시그니처·산식 무변경
   - ml-engine/src/ml_engine/training/__init__.py             # HoldoutCancelled 재수출
-  - ml-engine/src/ml_engine/app/pipeline.py                  # (b) _run_holdout 이 cancel_token.is_cancelled 를 should_stop 으로 넘기고 HoldoutCancelled → PipelineCancelled. 기존 경계 넷 유지
+  - ml-engine/src/ml_engine/app/pipeline.py                  # (b) _run_holdout 이 취소 신호의 확인 함수(`is_cancelled`)를 should_stop 으로 넘기고 HoldoutCancelled → PipelineCancelled. 기존 경계 넷 유지
   - ml-engine/tests/registry/test_policy.py                  # (a) 문법 오류 세 형태 → PolicyError(예외 타입 고정), 정상 경로 무변경
   - ml-engine/tests/gates/test_policy_loaders_fail_closed.py # (a) 신규 게이트 — 네 로더 각각에 문법 깨진 YAML → 결과 타입(PolicyRejected 류)만, 예외 0. 로더가 늘면 이 표에 더한다(열거는 ml_engine.*.policy 의 load_* 를 기계 수집)
   - ml-engine/tests/app/test_server.py                       # (a) 래퍼 제거 뒤 malformed 4 case parametrize 가 그대로 초록(수정 0 목표)
