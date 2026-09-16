@@ -49,6 +49,12 @@ services:
       POSTGRES_USER: ${BIDVECTOR_PG_USER:?BIDVECTOR_PG_USER 환경변수가 필요합니다 — 로컬 셸에서 내보내거나 --env-file 로 넘긴다}
       POSTGRES_PASSWORD: ${BIDVECTOR_PG_PASSWORD:?BIDVECTOR_PG_PASSWORD 환경변수가 필요합니다}
       POSTGRES_DB: ${BIDVECTOR_PG_DB:?BIDVECTOR_PG_DB 환경변수가 필요합니다}
+    # R3-2(verifier r3 LOW) — ml-serving 과 같은 능력 차단. 공식 postgres 이미지가 이
+    # 옵션 아래 정상 기동·`pg_isready`함을 실측 확인(무해) — 판정이 실행 플래그
+    # 조건부라는 지적의 남은 두 미적용 경로 중 하나를 닫는다(나머지 하나는
+    # RealServerIntegrationTest 의 Testcontainers 컨테이너, checklist.md 알려진 제한).
+    security_opt:
+      - no-new-privileges:true
     # host 포트를 publish 하지 않는다 — 이 컨테이너의 소비자(6B·`RealServerIntegrationTest`
     # 의 ml-serving 대역)는 compose 네트워크 안 서비스 이름(`postgres:5432`)이나
     # Testcontainers 가 각자 관리하는 별도 컨테이너를 쓴다. 로컬 머신의 5432 는 다른

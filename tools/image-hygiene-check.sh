@@ -69,10 +69,14 @@ _policy_value() {
         echo "정책 키 ${key} 는 최소 1개 원소가 있어야 한다: '${raw}'" >&2
         exit 2
       fi
-      local item
+      # R3-1(D-6C-10 이후, verifier r3 HIGH, 표적 재검증) — 공백만(또는 탭)인 원소는
+      # `[ -z ]`를 통과하는 "의미상 빈" 값이었다 — 그 원소로 `import`를 시도하면
+      # SyntaxError 가 나 게이트가 "위반 없음"으로 잘못 읽었다. 절삭 뒤에도 빈 원소는 거부.
+      local item trimmed
       for item in "${items[@]}"; do
-        if [ -z "$item" ]; then
-          echo "정책 키 ${key} 에 빈 원소가 있다: '${raw}'" >&2
+        trimmed="$(printf '%s' "$item" | tr -d '[:space:]')"
+        if [ -z "$trimmed" ]; then
+          echo "정책 키 ${key} 에 빈(또는 공백만인) 원소가 있다: '${raw}'" >&2
           exit 2
         fi
       done
@@ -163,7 +167,9 @@ docker run -d --name "$HYGIENE_CONTAINER" \
 
 sleep 1
 
-RUNTIME_UID=""
+# R3-6(verifier r3 LOW) — 요약 줄이 검사 범위를 그대로 드러내도록 **관측한 uid 전부**를
+# 모은다(이전 판은 첫 행만 담아, 판정은 전 행을 보면서도 요약은 그것을 못 보여줬다).
+RUNTIME_UIDS_SUMMARY=""
 CONTAINER_RUNNING="$(docker inspect "$HYGIENE_CONTAINER" --format '{{.State.Running}}' 2>/dev/null || echo false)"
 if [ "$CONTAINER_RUNNING" != "true" ]; then
   fail "실 ENTRYPOINT 컨테이너가 뜨지 않았다(State.Running=${CONTAINER_RUNNING}) — 프로세스 사용자를 잴 수 없다"
@@ -176,7 +182,7 @@ else
     # 프로세스 여러 개가 되는 날에도 root 자식이 조용히 통과하지 않는다.
     while IFS= read -r row; do
       row_uid="$(printf '%s\n' "$row" | awk '{print $2}')"
-      [ -z "$RUNTIME_UID" ] && RUNTIME_UID="$row_uid"
+      RUNTIME_UIDS_SUMMARY="${RUNTIME_UIDS_SUMMARY:+${RUNTIME_UIDS_SUMMARY},}${row_uid}"
       if ! [[ "$row_uid" =~ ^[0-9]+$ ]]; then
         fail "컨테이너 안 프로세스 uid 를 숫자로 읽지 못했다: '${row_uid}'"
       elif [ "$row_uid" -eq 0 ]; then
@@ -223,9 +229,13 @@ else
       [ -n "$layer_line" ] && actual_layers+=("$layer_line")
     done < <(docker image inspect "$IMAGE_REF" --format '{{json .RootFS.Layers}}' 2>/dev/null | jq -r '.[]' 2>/dev/null || true)
 
+    # R3-3(verifier r3 LOW) — 파생이 linux/amd64 로 고정돼 있다(OPEN-6C-MULTIARCH, 6E 전까지
+    # 대상 밖). 아래 실패 사유는 그래서 두 가지를 함께 언급한다 — FROM 이 실제로 다른
+    # 이미지를 가리키거나, **이 이미지가 linux/amd64 가 아닌 플랫폼으로 빌드됐다.** 둘을
+    # 구분하는 추가 판정은 넣지 않는다(하드코딩된 축 자체가 OPEN 이다) — 문면만 정확히 한다.
     expected_count=${#expected_base_layers[@]}
     if [ "${#actual_layers[@]}" -lt "$expected_count" ]; then
-      fail "이미지 layer 수(${#actual_layers[@]})가 파생한 베이스 layer 수(${expected_count})보다 적다 — 베이스가 정책과 다르다"
+      fail "이미지 layer 수(${#actual_layers[@]})가 파생한 베이스 layer 수(${expected_count})보다 적다 — 베이스가 정책과 다르거나 이 이미지가 linux/amd64 가 아닐 수 있다(OPEN-6C-MULTIARCH)"
     else
       base_mismatch=0
       for i in "${!expected_base_layers[@]}"; do
@@ -235,7 +245,7 @@ else
         fi
       done
       if [ "$base_mismatch" -ne 0 ]; then
-        fail "이미지의 앞 ${expected_count} layer 가 정책이 파생한 베이스 layer 체인과 다르다 — FROM 이 다른 이미지를 가리킨다(라벨과 무관하게 위반)"
+        fail "이미지의 앞 ${expected_count} layer 가 정책이 파생한 베이스 layer 체인과 다르다 — FROM 이 다른 이미지를 가리키거나 이 이미지가 linux/amd64 가 아닐 수 있다(라벨과 무관하게 위반, OPEN-6C-MULTIARCH)"
       else
         base_layer_prefix_ok=true
       fi
@@ -260,7 +270,7 @@ IMAGE_SIZE_BYTES="$(docker image inspect "$IMAGE_REF" --format '{{.Size}}')"
 _check_at_most "이미지 크기" "$IMAGE_SIZE_BYTES" "$SIZE_CAP_BYTES"
 
 echo "-- 실측 요약 --"
-echo "Config.User=${CONFIG_USER} 실프로세스-uid=${RUNTIME_UID} base-label(보조)=${BASE_LABEL}"
+echo "Config.User=${CONFIG_USER} 실프로세스-uid전체=[${RUNTIME_UIDS_SUMMARY}] base-label(보조)=${BASE_LABEL}"
 echo "base-layer-접두-일치=${base_layer_prefix_ok}"
 echo "size_bytes=${IMAGE_SIZE_BYTES} cap_bytes=${SIZE_CAP_BYTES}"
 
