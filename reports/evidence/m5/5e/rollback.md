@@ -186,13 +186,19 @@ rmdir ml-engine/src/ml_engine/app ml-engine/src/ml_engine/training/jobs 2>/dev/n
 쓴다(2026-09-04 규율 — 신규 경로에서 `checkout`은 pathspec 오류로 exit 1). 신규 경로는
 `git rm`으로(복원할 base 내용이 없다).
 
-## 임시 clone 실측(2026-09-16, fix round 2 종결 재검증 — 완료)
+## 임시 clone 실측(2026-09-16, fix round 2 종결 재검증 — 완료, `test_serving_purity`
+격리 수정 뒤 재실측으로 최신화)
 
 ```bash
-git clone . <tmp>/rollback-check-r4   # HEAD = e0e2d80(fix round 2 종결)
-cd <tmp>/rollback-check-r4
+git clone . <tmp>/rollback-check-r5   # HEAD = 876b8ef(test_serving_purity 격리
+                                        # 수정 + 재확인 반영 최종)
+cd <tmp>/rollback-check-r5
 # (위 롤백 명령 실행 — scope.md 역적용·재등재 포함)
 ```
+
+`test_serving_purity.py` 수정은 `RESTORE_FILES`에 이미 있던 기존 파일의 내용만
+바꿨다(파일 목록 불변) — `e0e2d80`에서의 실측과 `876b8ef`에서의 재실측이 파일
+집합 기준으로는 같은 명령을 검증한다.
 
 - `git status --short` — 위 `NEW_FILES` 전부 `D`, `RESTORE_FILES` 전부 `M`,
   `policy-values.md`·`scope.md` 둘 다 `M` — 정확히 예상한 파일 집합. `rollback.md`는
