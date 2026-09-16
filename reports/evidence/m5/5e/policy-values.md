@@ -1,4 +1,4 @@
-# M5/5E-1 정책 값 — `OPEN-5E-POLICY-VALUES`(**승인 대기 2026-09-16, 착수 시**)
+# M5/5E-1 정책 값 — `OPEN-5E-POLICY-VALUES`(**잠정 승인 2026-09-16 — 착수 시점엔 승인 대기, 재승인 조건 M6 6C/6E 실측**)
 
 > **지위: 잠정 승인(2026-09-16, 운영자 「둘 다 승인」 — M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ⑤, `OPEN-5E-POLICY-VALUES` 종결). 재승인 조건 = M6 6C/6E 실측.** 실물은 `ml-engine/policy/serving-v1.yaml`(평탄 키, `PolicyScalar` 제약, 목록은 평탄 인덱스 키 — 5C-2 관례), 로더 `load_serving_policy` 가 `known_keys` 전수·값 불변식으로 대조하고 test 가 이 표와 YAML 을 대조한다. **legacy 근거 0** — legacy 런타임은 FastAPI+Celery 라 gRPC 동시성·종료 유예에 대응물이 없다. 전부 **보수적 초기값 + 측정 의무**(ADR 0010 D-1) 층이며, M6 6C/6E 실측 뒤 갱신한다.
 
@@ -41,4 +41,5 @@
 | 일자 | 변경 | 근거 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 표 등재(승인 대기) | D-5E-6·D-5E-7 |
+| 2026-09-16 잠정 승인 | 지위 「승인 대기」→「잠정 승인」(값·표 무변경, 재승인 조건 = M6 6C/6E 실측) | 운영자 「둘 다 승인」 — M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ⑤ |
 | 2026-09-15 구현 | `ml-engine/policy/serving-v1.yaml` 실물 작성(표 값 그대로) — `embedding_text_max_chars=4000`이 Kotlin `config/quality/contract-policy.properties`의 `embedding.text.max-chars=4000`과 일치함을 `tests/serving/test_policy_kotlin_parity.py`로 실측(D-2D-6 경계 쌍). `load_serving_policy`가 §4 불변식 전부(≥1 넷·`dataset_uri_schemes` 비어 있지 않음·중복 없음·소문자)를 강제하는 것을 `tests/serving/test_serving_policy.py`로 확인 | D-5E-6 구현 완료, 값은 여전히 보수적 초기값(측정 의무 유지) |

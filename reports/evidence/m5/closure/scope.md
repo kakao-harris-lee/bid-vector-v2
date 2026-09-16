@@ -3,7 +3,7 @@
 ```yaml
 milestone: M5
 slice: closure
-base_sha: 8799e0594496593521691a24a29551ee51b6f147   # PR #20(5E-2) 머지 커밋 = main
+base_sha: 845e29b   # PR #21(5E-3) 머지 커밋 = main — 계약 갱신 (2) 로 rebase(초판 base 는 PR #20 `8799e05`). PR range 는 845e29b..HEAD(이 slice 커밋만)
 head_sha: <PR 요청 시점에 기입>
 in_scope:
   - reports/evidence/m5/closure/**          # 이 계약 · checklist(종결 판정 정본) · open-inventory(입력 사본)
@@ -13,7 +13,7 @@ in_scope:
   - milestone-5.md                           # 「## 완료 조건」 아래 종결 판정 문단
 out_of_scope:
   - ml-engine/**, adapters/**, contracts/**  # 코드·계약 무편집 — 종결 판정은 문서다
-  - reports/evidence/m5/{5b,5c,5c2,5d,5d2,5d3,5e,5e2,5e3}/**  # 앞 slice 문서는 편집하지 않는다(처분은 checklist 에 등재)
+  - reports/evidence/m5/{5b,5c,5d,5d2,5d3,5e2,5e3}/**  # 앞 slice 문서는 편집하지 않는다(처분은 checklist 에 등재). 5a·5c2·5e 는 각각 policy-values.md 한 파일만 in_scope(승인 문면 정본 자리), 나머지 파일은 무편집
   - 운영자 결정 다섯의 실행(정책 값 변경·Kotlin 한 줄) — 각각 별도 소규모 slice
 acceptance_commands:
   - N/A — 문서 slice. 완료 조건 대조는 checklist.md 로 기록(evidence-pack 「문서 slice 의 evidence」)
@@ -36,9 +36,10 @@ rollback: N/A — 문서 산출물은 git revert 로 복구. 5a/policy-values.md
 
 ## 하네스 레인 변경
 
-`git log --oneline 8799e05..HEAD -- CLAUDE.md .claude/` — **없음**(PR 요청 시점에 재확인).
+`git log --oneline 845e29b..HEAD -- CLAUDE.md .claude/` — **없음**(rebase 뒤 base 기준, verifier r2 재확인).
 
 ## 계약 갱신 이력
 
 - 2026-09-16 착수: 초판.
 - 2026-09-16 (2) 5E-3 병합(PR #21) 뒤: base 를 `845e29b` 위로 rebase(충돌 0, 커밋 해시 변경 — checklist §4 선언) · 운영자 결정 다섯 수령 · ④⑤ 실행을 이 slice 에 포함(in_scope 에 `5c2/policy-values.md`·`5e/policy-values.md` 표제 한 줄씩 — 승인 문면의 정본 자리가 그 표제라 여기서 적는다) · ①③ → 5F-1, ② → 5F-2 별도 slice · 판정 「조건부 종결」→「종결(결정 완료·실행 slice 둘 대기)」. verifier r1 ready-for-review 뒤 장부층 일괄은 `9bb51bf`(rebase 전 `e3c61d4`).
+- 2026-09-16 (3) verifier r2 ready-for-review 장부층 일괄(MEDIUM 4·LOW 3): base_sha·하네스 명령 범위를 rebase 뒤 `845e29b` 로 · out_of_scope 글롭에서 5c2·5e 제외(policy-values 한 파일만 in_scope) · 두 policy-values H1 표제도 「승인」/「잠정 승인」으로(지위 줄만 고쳐 H1 과 어긋났었다) + change_history 승인 행 · checklist §3 ③ 확정 값 `10` 명시(후보 표 (a) 40 과 선택지 (a) 의 기호 충돌 해소) · §2.5 에 MEDIUM-2 후속 행 · 계수 30/3/14 를 판정 정본에 · §3 결정 전 문단을 작성 시점 기록으로 표시.
