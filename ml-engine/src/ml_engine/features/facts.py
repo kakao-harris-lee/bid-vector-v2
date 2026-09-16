@@ -6,14 +6,22 @@ legacy predictor는 `amount: float`·`category: str | None`·`denominator_source
 oneof 존재, `MissingReason.UNSPECIFIED`를 걸러낸 뒤에만 `FeatureFacts`를 낸다. 위반은 전부
 `FactRejected`(결과 타입) — 예외 없음.
 
-M5/5D-3(D-5D3-6) — 텍스트 fact 판독기(`resolve_text_fact`)를 공개 승격했다. 허용 결측
-사유 집합을 인자화해 요청 축(`FeatureFacts.from_proto`, 기존 집합 — `MISSING_REASON_
-UNSPECIFIED`만 거부)과 표본 축(`ml_engine.inference.distribution`, `{NOT_COLLECTED_YET}`만
-허용)이 **같은 코드**로 정규화·거부한다 — 분포 엔진 안에 두 번째 판독기를 두지 않는다.
+M5/5D-3(D-5D3-6, 계약 갱신 F-10) — 텍스트 fact 판독기(`resolve_text_fact`)를 공개
+승격했다. 결측 사유 판정을 **술어**(`is_allowed_missing_reason: Callable[[int], bool]`)로
+인자화해 요청 축(`FeatureFacts.from_proto`)과 표본 축(`ml_engine.inference.distribution`)이
+**같은 코드**로 정규화·거부한다 — 분포 엔진 안에 두 번째 판독기를 두지 않는다.
+
+**요청 축은 열린 집합이다** — `MISSING_REASON_UNSPECIFIED`만 거부하고 그 밖의 모든 정수
+(enum 밖 값 포함)는 `Missing(raw)`로 수용한다(base·이전 동작 그대로). 열거로 닫으면
+common.proto가 `MissingReason` 값을 늘릴 때마다 구버전 엔진이 신규 값을 담은 요청 전체를
+거부하는 전방 호환 위반이 생긴다(F-10, verifier r1 표적 11 HIGH — 팀장이 「기존 집합
+유지」 채택을 철회). **표본 축만 닫힌 집합**(`{NOT_COLLECTED_YET}` 하나)이다 — 2F 계약이
+그 축의 허용 사유를 그 값 하나로 명시했다(D-5D3-2).
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -56,24 +64,21 @@ class FactRejected:
     field: str
 
 
-# 요청 축(`FeatureInputs`)의 기존 허용 집합(D-5D3-6) — `MISSING_REASON_UNSPECIFIED`만
-# 거부하던 이전 동작 그대로. 표본 축(`ml_engine.inference.distribution`)은 이 집합보다
-# 좁은 `{MISSING_REASON_NOT_COLLECTED_YET}`만 넘긴다(D-5D3-2).
-ALL_MISSING_REASONS: frozenset[int] = frozenset(
-    {
-        common_pb2.MISSING_REASON_UNKNOWN,
-        common_pb2.MISSING_REASON_NOT_APPLICABLE,
-        common_pb2.MISSING_REASON_NOT_COLLECTED_YET,
-    }
-)
+def _always_allowed(_raw: int) -> bool:
+    """요청 축 기본 술어(F-10) — `UNSPECIFIED`는 `_resolve_missing_reason`이 그 사유
+    확인보다 먼저 걸러내므로, 여기 도달한 값은 전부 수용한다(열린 집합)."""
+    return True
 
 
 def _resolve_missing_reason(
-    raw: int, *, field: str, allowed: frozenset[int]
+    raw: int,
+    *,
+    field: str,
+    is_allowed_missing_reason: Callable[[int], bool] = _always_allowed,
 ) -> Missing | FactRejected:
     if raw == common_pb2.MISSING_REASON_UNSPECIFIED:
         return FactRejected(FactRejectionReason.MALFORMED, field)
-    if raw not in allowed:
+    if not is_allowed_missing_reason(raw):
         return FactRejected(FactRejectionReason.MISSING_REASON_NOT_ALLOWED, field)
     return Missing(raw)
 
@@ -85,9 +90,7 @@ def _resolve_base_amount(
     if which is None:
         return FactRejected(FactRejectionReason.MALFORMED, "base_amount")
     if which == "missing":
-        return _resolve_missing_reason(
-            fact.missing, field="base_amount", allowed=ALL_MISSING_REASONS
-        )
+        return _resolve_missing_reason(fact.missing, field="base_amount")
     money = fact.value
     if money.basis != common_pb2.BASIS_BASE_AMOUNT:
         return FactRejected(FactRejectionReason.BASIS_MISMATCH, "base_amount.basis")
@@ -110,18 +113,20 @@ def resolve_text_fact(
     fact: features_pb2.CategoryCodeFact | features_pb2.AgencyIdFact,
     *,
     field: str,
-    allowed_missing_reasons: frozenset[int] = ALL_MISSING_REASONS,
+    is_allowed_missing_reason: Callable[[int], bool] = _always_allowed,
 ) -> FactValue[str] | FactRejected:
-    """텍스트 fact(공종·발주기관) 판독기(D-5D3-6, 공개 승격) — oneof 미설정·허용 밖
-    결측 사유·정규화 뒤 빈 키는 전부 `FactRejected`다. `allowed_missing_reasons`를
-    좁히면 같은 코드로 더 엄격한 축(표본별 기관·공종)을 판정할 수 있다 — 기본값은
-    요청 축(`FeatureFacts.from_proto`)의 기존 동작과 같다."""
+    """텍스트 fact(공종·발주기관) 판독기(D-5D3-6, 공개 승격) — oneof 미설정·거부된
+    결측 사유·정규화 뒤 빈 키는 전부 `FactRejected`다. `is_allowed_missing_reason`을
+    좁히면 같은 코드로 더 엄격한 축(표본별 기관·공종)을 판정할 수 있다 — 기본값(F-10)은
+    요청 축(`FeatureFacts.from_proto`)의 열린 집합과 같다(`UNSPECIFIED`만 거부)."""
     which = fact.WhichOneof("fact")
     if which is None:
         return FactRejected(FactRejectionReason.MALFORMED, field)
     if which == "missing":
         return _resolve_missing_reason(
-            fact.missing, field=field, allowed=allowed_missing_reasons
+            fact.missing,
+            field=field,
+            is_allowed_missing_reason=is_allowed_missing_reason,
         )
     normalized = normalize_feature_key(fact.value)
     if not normalized:
@@ -136,9 +141,7 @@ def _resolve_denominator_source(
     if which is None:
         return FactRejected(FactRejectionReason.MALFORMED, "denominator_source")
     if which == "missing":
-        return _resolve_missing_reason(
-            fact.missing, field="denominator_source", allowed=ALL_MISSING_REASONS
-        )
+        return _resolve_missing_reason(fact.missing, field="denominator_source")
     if fact.value == common_pb2.BASE_AMOUNT_PROVENANCE_LABEL_UNSPECIFIED:
         return FactRejected(FactRejectionReason.UNSPECIFIED_ENUM, "denominator_source")
     return Present(denominator_source_label_name(fact.value))

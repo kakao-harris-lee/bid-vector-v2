@@ -65,12 +65,12 @@ from ml_engine.inference.results import (
 )
 from ml_engine.inference.scenario import build_scenario_candidates, resolve_uncertainty
 
-# 표본 축(agency_id/category_code)이 허용하는 유일한 결측 사유(D-5D3-2) — 요청 축의
-# 허용 집합(5B `ALL_MISSING_REASONS`)보다 좁다. 송신 어댑터가 다른 사유를 지어내면
-# 거부다(2F `features.proto` 주석 「송신 어댑터가 다른 사유를 지어내지 않는다」).
-_ALLOWED_SEGMENT_MISSING_REASONS: frozenset[int] = frozenset(
-    {common_pb2.MISSING_REASON_NOT_COLLECTED_YET}
-)
+
+# 표본 축(agency_id/category_code)이 허용하는 유일한 결측 사유(D-5D3-2) — 요청 축(열린
+# 집합, F-10)과 달리 닫힌 집합이다. 송신 어댑터가 다른 사유를 지어내면 거부다(2F
+# `features.proto` 주석 「송신 어댑터가 다른 사유를 지어내지 않는다」).
+def _is_segment_missing_reason_allowed(raw: int) -> bool:
+    return bool(raw == common_pb2.MISSING_REASON_NOT_COLLECTED_YET)
 
 
 @dataclass(frozen=True)
@@ -135,21 +135,21 @@ def _resolve_segment(
     sample: features_pb2.CompetitionSample,
 ) -> SampleSegment | SampleRejected:
     """표본별 기관·공종 축 판독(D-5D3-6) — 5B `resolve_text_fact`를 요청 축과 같은
-    코드로 쓰되 허용 결측 사유를 `{NOT_COLLECTED_YET}`로 좁힌다(D-5D3-2). 어느 한
-    축이라도 거부되면(oneof 미설정·정규화 뒤 빈 키·그 밖 결측 사유) 표본 전체가
-    `SampleRejected(SEGMENT_REASON_NOT_ALLOWED)`다 — 5B 의 구체적 `FactRejectionReason`
-    은 여기서 이 사유 하나로 접힌다."""
+    코드로 쓰되 결측 사유 술어를 `{NOT_COLLECTED_YET}`만 참인 닫힌 집합으로 좁힌다
+    (D-5D3-2). 어느 한 축이라도 거부되면(oneof 미설정·정규화 뒤 빈 키·그 밖 결측 사유)
+    표본 전체가 `SampleRejected(SEGMENT_REASON_NOT_ALLOWED)`다 — 5B 의 구체적
+    `FactRejectionReason`은 여기서 이 사유 하나로 접힌다."""
     agency = resolve_text_fact(
         sample.agency_id,
         field="agency_id",
-        allowed_missing_reasons=_ALLOWED_SEGMENT_MISSING_REASONS,
+        is_allowed_missing_reason=_is_segment_missing_reason_allowed,
     )
     if isinstance(agency, FactRejected):
         return SampleRejected(SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED)
     category = resolve_text_fact(
         sample.category_code,
         field="category_code",
-        allowed_missing_reasons=_ALLOWED_SEGMENT_MISSING_REASONS,
+        is_allowed_missing_reason=_is_segment_missing_reason_allowed,
     )
     if isinstance(category, FactRejected):
         return SampleRejected(SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED)
