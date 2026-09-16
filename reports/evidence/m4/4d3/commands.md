@@ -102,3 +102,8 @@ autoformat(`ktlintMainSourceSetFormat`)으로 chain 줄바꿈 수정.
 - exit: 0(전 단계)
 - 핵심 결과: 문서 3파일(`data-dictionary.md`·`capability-map.md`·`milestone-4.md`)을
   포함해 되돌려도 355 actionable tasks(338 executed) 전건 통과. rollback.md 참고.
+
+## 2026-09-16 종결 커밋 HEAD 재실측 (팀장)
+- cmd: `./gradlew --no-build-cache --no-daemon clean check` (HEAD `52fc9b3` — milestone-4 종결 문단·checklist 승인 절·scope `head_sha`)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL, 346 tasks. `origin/main` 은 base `4b9fa21` 그대로 — 흡수 병합 없음.
