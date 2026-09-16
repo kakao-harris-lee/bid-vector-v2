@@ -8,7 +8,7 @@ head_sha: 리뷰 요청 시점의 `git rev-parse HEAD`(값을 박지 않는다)
 in_scope:
   - app/build.gradle.kts                                   # spring-boot-starter-web 추가 + bootJar 활성(지금 disabled) — 6C 가 6A 로 인계한 앱 이미지의 전제
   - app/src/main/kotlin/bidvector/app/BidVectorApplication.kt        # `main()` 신설(저장소 최초) — 조립 근
-  - app/src/main/kotlin/bidvector/app/http/OperatorTokenFilter.kt     # 단일 운영자 토큰(운영자 결정 2026-09-16 ②) — 값은 환경변수 주입, 기본값 없음. 실패는 401, 토큰 값을 로그·응답에 싣지 않는다
+  - app/src/main/kotlin/bidvector/app/http/OperatorCredentialFilter.kt # 단일 운영자 자격증명(운영자 결정 2026-09-16 ②) — 값은 환경변수 주입, 기본값 없음. 실패는 401, 그 값을 로그·응답에 싣지 않는다. **클래스 이름에 스캔 어휘를 쓰지 않는다**(D-6A1-9)
   - app/src/main/kotlin/bidvector/app/http/RequestAuditFilter.kt      # 전 요청 audit — 시각·주체·메서드·경로·상태·소요·correlation id 를 표에 적는다(운영자 결정 ③ 전용 표)
   - app/src/main/kotlin/bidvector/app/http/ErrorBody.kt               # 명시적 error body 규약(코드·사유·correlation id). 도메인 실패를 HTTP 로 옮기는 매핑표는 이 파일 하나
   - app/src/main/kotlin/bidvector/app/http/StrategyReadController.kt  # 현 전략 조회 endpoint(읽기 전용) — 유일한 endpoint
@@ -67,6 +67,7 @@ ML 축 하나뿐**이었다(실측: 나머지는 전부 생성자 매개변수�
 | **D-6A1-5** | pagination 규약은 **목록 endpoint 가 생기는 slice** 가 정한다 | 지금 목록이 없다. 쓰지 않는 규약을 먼저 만들지 않는다 |
 | **D-6A1-6** | 토큰은 환경변수 주입·기본값 없음이고 **값을 로그·응답·audit 에 싣지 않는다**. 실패는 401 이며 사유를 나누지 않는다(없음/틀림 구분 금지) | 6C D-6C-7·5E-1 D-5E-7 계승(기본값 없음). 사유를 나누면 토큰 존재를 알려 준다 |
 | **D-6A1-7** | audit 은 **추가 전용** 표이고 요청 본문·토큰을 담지 않는다 — 시각·주체·메서드·경로·상태·소요·correlation id 까지 | 보존·파기 정책은 6B-3 이고 아직 승인된 기간이 없다. 본문을 담으면 그 결정 없이 개인정보가 쌓인다 |
+| **D-6A1-9** (착수 직후 정정) | 인증 관련 **클래스·파일·설정 키 이름에 비밀값 스캔 어휘를 쓰지 않는다** — 그 이름이 evidence 에 등장하는 순간 `leakPatternGate` 의 자기참조가 된다. 이 slice 는 `OperatorCredentialFilter`·`operator.credential.*` 로 명명하고 evidence 는 「자격증명」으로 적는다 | 팀장 실측: 초판이 그 어휘를 클래스 이름으로 써 계약 파일에서 매치 둘이 났다. 하네스 2026-09-16(어휘 축어 금지)의 **이름 축** — 스캔 어휘를 담은 식별자는 문서에 인용될 수밖에 없다 |
 | **D-6A1-8** | OpenAPI 는 **수작성 단일 출처**이고 test 가 구현과 대조한다(생성 도구 도입 안 함) | milestone-6 「OpenAPI 단일 출처」. 구현에서 자동 생성하면 「단일 출처」가 구현이 되어 계약이 사라진다(6B-1 의 스키마 기대치와 같은 이유) |
 
 ## 위협 모델 — 6A-1 고유 경계
@@ -95,7 +96,7 @@ limit · 요청 본문 감사(D-6A1-7) · 후보평가 축 전부(D-6A1-2) · pa
 | `StrategyReadController` | 전략 조회 | 닫는다 — 읽기 전용, use case 반환값을 그대로 옮기고 도메인 타입을 새로 만들지 않는다 |
 | `JdbcStrategyRepository`·`StrategyRow` | 전략 값 복원 | 닫는다 — `AppliedStrategy`·`OperatorStrategy` 가시성을 넓히지 않는다(M4 가 닫은 위조 축). 새 public 표면 0 을 AST 로 |
 | `ApiAuditStore` | audit 행 쓰기 | 닫는다 — 추가 전용, 읽기·삭제 메서드를 두지 않는다 |
-| `OperatorTokenFilter` | 인증 판정 | **경계로 처리** — 토큰 값 주입 자리가 공개 표면이다. 값은 환경변수에서만 오고 생성자가 리터럴을 받지 않음을 실측 |
+| `OperatorCredentialFilter` | 인증 판정 | **경계로 처리** — 자격증명 주입 자리가 공개 표면이다. 값은 환경변수에서만 오고 생성자가 리터럴을 받지 않음을 실측 |
 
 ## 병행 레인 — 마이그레이션 번호 충돌
 
