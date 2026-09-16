@@ -86,3 +86,8 @@
 - cmd: `./gradlew --no-build-cache --no-daemon clean check`
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL(346 actionable tasks, 54s).
+
+## verifier r1 F-2 수정 — AgencyName 대소문자 보존 test(표적 실행, 전건은 팀장 종결 커밋에서)
+- cmd: `./gradlew --no-daemon :procurement:test --tests "bidvector.procurement.AgencyTest"`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL, `AgencyTest` 10건(신설 1건 포함) 전부 GREEN.

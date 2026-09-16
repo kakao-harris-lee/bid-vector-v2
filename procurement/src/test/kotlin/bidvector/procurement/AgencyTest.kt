@@ -35,6 +35,12 @@ class AgencyTest {
         AgencyName.of("조 달 청")?.value shouldBe "조 달 청"
     }
 
+    /** verifier r1 F-2 — 우회 (7) 문면 「대소문자·내부 공백 보존」의 대소문자 절반. */
+    @Test
+    fun `AgencyName of 는 라틴 대소문자를 그대로 보존한다 — 우회 (7)`() {
+        AgencyName.of("  ABC Corp 지사  ")?.value shouldBe "ABC Corp 지사"
+    }
+
     @Test
     fun `AgencyName 빈 문자열은 예외 없이 null 이다`() {
         AgencyName.of("") shouldBe null

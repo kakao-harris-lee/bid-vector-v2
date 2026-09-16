@@ -29,7 +29,7 @@
 | P-14 승인 등재(policy-values §1.3 행 넷 + P 표) | 팀장 커밋 `84426a2`(이 slice 착수 전, 별도 레인) |
 | `FieldContractTest`(토큰 넷·담당자 0) | `AgencyFieldContractTest`(`FieldContractTest.kt`) 「발주기관 넷이 정확한 개념으로 등재된다」·「담당자 키는 어떤 rawName 에도 없다」 |
 | `CanonicalizeTest`(역할별 조립·폴백 없음·정규화) | `AgencyCanonicalizeTest`(`CanonicalizeTest.kt`에서 sizeGate 분리) 4건 |
-| `AgencyTest`(`of` 정규화 = `CategoryCode.of`, 빈 값 거부) | `AgencyTest` 9건 |
+| `AgencyTest`(`of` 정규화 = `CategoryCode.of`, 빈 값 거부) | `AgencyTest` 10건(verifier r1 F-2 시정 — 대소문자 보존 1건 포함) |
 | JDBC 왕복(컬럼 넷 저장·복원, 원문 보존) | `NoticeFindRoundTripTest` 신설 2건(값 왕복 + 결측 왕복) |
 | `CleanMigration*Test` 행렬 | `CleanMigrationColumnTest`에 컬럼 넷 행 추가(`CleanMigrationCheckTest`·`CleanMigrationTriggerTest`는 제약·트리거 신설이 없어 갱신 불필요 — D-3H-4 「제약·인덱스·트리거 없음」과 일치) |
 | 우회 (1)~(8) 실측 | 아래 「우회 대조표」 |
