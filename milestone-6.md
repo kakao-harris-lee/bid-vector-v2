@@ -45,6 +45,31 @@ ADR 0008 §1.3 이 「UI 에는 승인된 사용자 가치도 acceptance scenari
 
 기존 FastAPI path/schema와의 호환은 제품 요구로 승인된 항목에만 적용한다.
 
+**6A 분할·6A-1 착수 2026-09-17** — base `c4d09cc`(PR #31, 6C), 레인 worktree `bid-vector-v2-m6a`·브랜치
+`m6-6a/2026-09-17`. 정본 `reports/evidence/m6/6a1/scope.md`(D-6A1-1~8). **운영자 결정 다섯**이 입력이다 —
+2026-09-16 ① 소비자는 **API 전용**(화면은 기존 시스템, `OPEN-ADR-09` 닫힘) ② 인바운드 인증은 **단일 운영자
+토큰 + 전 요청 audit**; 2026-09-17 ③ 웹 스택 **Spring Boot Web**(`app` 은 이미 Boot 플러그인·starter 를 갖고
+있고 `group.forbidden` 은 domain 모듈만 겨눈다) ④ 6A 는 **기존 use case 만 노출**(검색·투찰가 요청 use case
+신설은 별 slice) ⑤ audit 은 **전용 표 신설**.
+
+**착수 조사가 범위를 바꿨다.** 노출 후보 use case 가 받는 **포트의 production 구현을 세어 보니 ML 축
+하나뿐이었다** — 후보 공급·감시 대상·면허 게이트·여력·알림 요청·correlation id·전략 저장이 전부 test fake 다
+(실측). 「기존 use case 를 노출한다」가 지금 상태로는 성립하지 않고, 노출하려면 **어댑터 여섯**을 먼저 써야
+한다. M3 가 수집을, M4 가 판정을 세웠으나 **그 둘을 잇는 어댑터가 없다.** 그래서 6A 를 셋으로 가른다(D-6A1-1):
+**6A-1** HTTP 골격·단일 운영자 토큰·요청 audit 표·전략 조회(배선이 가능한 유일한 축, `main()` 과 `bootJar`
+활성 포함 — 6C 가 인계한 앱 이미지의 전제) · **6A-2** 세션 편집 명령 endpoint + 앱 이미지(`EditSessionRepository`
+실 구현이 6B-1 소관이라 그 병합 뒤) · **6A-3** 후보평가·알림 축(`OPEN-6A-EVALUATION-ADAPTERS` — 어댑터 여섯의
+slice 계획을 별도로 받는다).
+
+**6A-1 의 경계**: endpoint 는 **읽기 하나**뿐이다(D-6A1-4) — 후보평가 use case 는 호출마다 알림 요청을 낳으므로
+승인 문면 없는 외부 effect 를 HTTP 로 열지 않고, 실행 경로는 6A-2 에서 **dry-run 강제**로 시작한다. 토큰은
+환경변수 주입·기본값 없음이고 값을 로그·응답·audit 에 싣지 않으며 실패 사유를 나누지 않는다(D-6A1-6). audit 은
+**추가 전용**이고 요청 본문·토큰을 담지 않는다 — 보존·파기는 6B-3 이고 승인된 기간이 없다(D-6A1-7). OpenAPI 는
+**수작성 단일 출처**이고 test 가 구현과 대조한다(생성 도구 도입 안 함 — 자동 생성하면 단일 출처가 구현이 되어
+계약이 사라진다, D-6A1-8). **병행 레인**: 6B-1 이 `V8` 을 쓰므로 이 slice 는 `V9` 를 쓰고, 병합 순서가 바뀌면
+번호를 다시 붙인다. 리뷰 레인은 `migration-reviewer`·`privacy-gate`·`contract-keeper` 셋이 추가로 붙는다
+(전역 규약 §3 세 줄 전부 해당).
+
 ### Slice 6B — persistence와 migration completeness
 
 - clean PostgreSQL에서 Flyway 전체 재현
