@@ -16,6 +16,7 @@ in_scope:
   - ml-engine/src/ml_engine/serving/__init__.py             # 재수출
   - ml-engine/src/ml_engine/app/server.py                   # preload 성공 시 PredictionRuntime 조립(정책·code_version·release), 실패 시 None — 5E-1 D-5E-7 env 7 그대로(추가 env 없음)
   - ml-engine/tests/serving/test_prediction.py              # 5E-1 test 갱신(UNIMPLEMENTED 단언 → 실물) + 검증 순서 ①~⑦ 각 1 + READY/NOT_READY 각
+  - ml-engine/tests/serving/test_grpc.py                    # 5E-1 test — `BidPredictionServicer` 생성자 확장의 부수 편집 1줄(인자 `None` 추가, 검증 로직 무변경). 계약 갱신 (2)
   - ml-engine/tests/serving/test_runtime.py                 # DERIVED release 채움 규약·checksum 결정성(같은 정책 두 번 = 같은 값, 값 하나 바꾸면 다른 값)
   - ml-engine/tests/serving/test_wire.py                    # Success/Unmeasurable 매핑 · 후보 3 순서 · Decimal 정규형 경계(D-5E2-5) · 매핑 불변식 위반(sample_size 0 등) → MappingRejected
   - ml-engine/tests/serving/test_kotlin_rules_parity.py     # Kotlin 소비자 규칙 미러(D-5E2-7): ReleaseShapeValidation(prefix·비공백 넷·dataset_id 공백은 DERIVED 만) · FractionRules(BigDecimal.toPlainString 동일성) · ParsedSuccessFields(sample_size>0·후보 3·origin RECOMMENDED) · ReleaseCheck(latest_promoted ⇒ response.release == promoted)
@@ -37,7 +38,7 @@ acceptance_commands:
   - "(cd ml-engine && uv run python -m pytest tests -q)"                                                               # S-5 — S-12b 자동화 test 포함
   - "(cd ml-engine && uv run python tools/design_ratchet.py)"                                                          # S-6
   - "(cd ml-engine && uv run python tools/reuse_provenance.py)"                                                        # S-7
-  - "(cd ml-engine && uv run python tools/check_python_version.py)"                                                    # S-9
+  - "(cd ml-engine && uv run python -c \"import tomllib,pathlib; p=tomllib.load(open('pyproject.toml','rb')); v=pathlib.Path('.python-version').read_text().strip(); assert v.startswith('3.12') and '3.12' in p['project']['requires-python']\")"   # S-9
   - "./gradlew --no-daemon check"                                                                                      # S-10 — evidence 커밋마다 그 HEAD 에서(leakPatternGate)
   - "(cd ml-engine && uv build --wheel -o /tmp/ml-engine-wheel && uv run python -m pytest tests/gates/test_wheel_reexport.py -q)"   # S-11 승계
   - "./tools/contract-crosslang-smoke.sh"                                                                              # S-12 승계(fake 서버, 무편집 — 5E-2 가 계약 표면을 안 바꿨음을 증명)
@@ -133,3 +134,4 @@ rollback: |
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-5E2-1~10, OPEN 신설 둘 | 사용자 「5E 착수」 후반 · 착수 조사 |
+| 2026-09-16 (2) 구현 완료 뒤 | S-9 를 5E-1 과 같은 인라인 python 버전 대조 명령으로 정정(초판이 존재하지 않는 `tools/check_python_version.py` 를 가리킴 — 팀장 계약 오류) · in_scope 에 `tests/serving/test_grpc.py` 추가 | 구현 보고 — 도구 부재 실측 · 생성자 시그니처 변경의 필연적 collateral |
