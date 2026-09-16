@@ -20,6 +20,7 @@ in_scope:
   - ml-engine/tests/app/test_server.py                       # (a) 래퍼 제거 뒤 malformed 4 case parametrize 가 그대로 초록(수정 0 목표)
   - ml-engine/tests/training/test_holdout.py                 # (b) should_stop 이 N 창 뒤 참 → HoldoutCancelled, trainer 호출 수 == N(변이: 확인 지점 제거 시 붉어짐) · 기본 인자면 기존 test 무변경
   - ml-engine/tests/app/test_pipeline.py                     # (b) 창 중간 취소 → PipelineCancelled, artifact 파일 0, 기존 경계 test 무변경
+  - ml-engine/tests/registry/__init__.py                     # (a) 빈 패키지 마커 — tests/registry/test_policy.py 가 tests/inference/test_policy.py 와 basename 충돌(rootless test 트리, 5C-1 rebase 때와 같은 함정)해 collection 오류. 계약 갱신 (2)
   - milestone-5.md                                           # 5E 절 5E-3 착수 문단
   - reports/evidence/m5/5e3/**
 out_of_scope:
@@ -65,7 +66,7 @@ rollback: |
 | `registry.load_policy` 예외 타입 변경 | 호출자가 잡을 예외가 하나로 준다 — 권한 축소 | 닫는다 |
 
 ## 하네스 레인 변경(리뷰 요청 시점마다 갱신 — `git log --oneline 8799e05..HEAD -- CLAUDE.md .claude/`)
-없음(착수 시점).
+없음(착수 시점 · 리뷰 요청 시점 `80629cd` 재확인 — 출력 없음).
 
 ---
 
@@ -80,3 +81,4 @@ rollback: |
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
 | 2026-09-16 착수 | 초판 — D-5E3-1~5 | 사용자 「M5 남은 작업 계속 진행」 · 결정 불요 미결 둘 |
+| 2026-09-16 리뷰 요청(2) | in_scope 에 `ml-engine/tests/registry/__init__.py` 추가(구현 레인 보고 「새 파일 ↔ in_scope 대조 1건 미등재」) · **D-5E3-5 해석 등재**: 「추가만」은 산식·창 계획·보고서 조립의 불변을 뜻하고, design ratchet(함수 50줄)을 지키기 위한 `_evaluate_windows` → `_record_window_outcome` 순수 이동은 그 안에서 허용한다(5C-2 test 22 case 무편집 통과가 불변의 증거 — verifier 표적) | 팀장 — 구현 완료 보고 `80629cd` 대조. 하네스 레인 절 재확인(없음) |
