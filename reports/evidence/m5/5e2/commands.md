@@ -59,13 +59,17 @@
   Python 버전 자체는 `pyproject.toml`(`requires-python = ">=3.12,<3.13"`)·
   `.python-version`(둘 다 5E-2 무편집)로 이미 고정돼 있다.
 
-## S-10 (Kotlin `check`, evidence 커밋마다 그 HEAD 에서 재실측 — 아래는 최종 evidence
-커밋 뒤 재실행 결과)
-- cmd: `./gradlew --no-daemon check`
+## S-10 (Kotlin `check`, evidence 커밋마다 그 HEAD 에서 재실측)
+- cmd: `./gradlew --no-daemon check`(HEAD `3ddb36f`, 코드 종결 시점)
 - exit: 0
 - 핵심 결과: BUILD SUCCESSFUL, `leakPatternGate` 포함 337 task(35 executed, 302
   up-to-date) — 이 slice 는 Kotlin 소스를 만지지 않았다(교차 언어 실서버 통합은
   `OPEN-5E2-CROSSLANG-REAL-SERVER`)
+- cmd: `./gradlew --no-daemon check`(HEAD `03f140a`, 마지막 evidence 커밋 뒤 재실측)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL, 337 task(32 executed, 305 up-to-date) —
+  evidence 문서 신설이 `leakPatternGate`를 붉히지 않았다(비밀값 스캔 어휘를
+  축어로 적지 않는 규율 준수 확인)
 
 ## S-11
 - cmd: `(cd ml-engine && uv build --wheel -o <임시 디렉터리> && uv run python -m pytest tests/gates/test_wheel_reexport.py -q)`
