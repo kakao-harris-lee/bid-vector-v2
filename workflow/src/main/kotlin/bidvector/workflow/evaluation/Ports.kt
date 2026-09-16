@@ -62,10 +62,15 @@ fun interface LicenseGatePort {
  * `decision` 안에서 `internal`이라 이 port는 그 값을 직접 만들 수 없다.
  */
 sealed interface MlAnalysisOutcome {
+    /**
+     * `evidence`(M4/4D-4, D-4D4-2) — 필수 인자, 기본값 없음. 예측 근거가 판정을 거쳐
+     * 알림까지 조용히 사라지는 것을 컴파일 거부로 막는다(scope.md 우회 (1)).
+     */
     data class Analyzed(
         val priorityScore: UnitScore,
         val probabilityScore: UnitScore?,
         val matchedScore: UnitScore?,
+        val evidence: PredictionEvidence,
     ) : MlAnalysisOutcome
 
     data object SimilarityProjectionNotReady : MlAnalysisOutcome
@@ -115,12 +120,17 @@ fun interface CapacityPort {
  * **요청**과 **배달**을 타입으로 가른다. `verdict`가 [Verdict.BidNow]로 고정돼 있어
  * 이 값 자체가 「판정이 확정적으로 승격이었다」를 나른다. 생성자는 `internal` — 밖에서
  * 지으면 「판정 없이 알림을 요청했다」를 위조.
+ *
+ * **`evidence`(M4/4D-4, D-4D4-3)** — 필수 인자. 근거는 같은 `reach` 호출의 `outcome`
+ * 에서만 온다(scope.md 우회 (3)) — 생성자가 `internal`이라 다른 호출·다른 공고의
+ * 근거를 여기 실을 수 없다.
  */
 @ConsistentCopyVisibility
 data class NotificationRequest internal constructor(
     val noticeId: NoticeId,
     val correlationId: CorrelationId,
     val verdict: Verdict.BidNow,
+    val evidence: PredictionEvidence,
 )
 
 /** [NotificationRequestPort]의 결과 — 배달 성공을 주장하지 않는다(요청 접수/실패만). */

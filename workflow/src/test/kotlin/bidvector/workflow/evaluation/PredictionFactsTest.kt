@@ -68,15 +68,19 @@ class PredictionFactsTest {
                 aggressive = Rate.ofFraction(BigDecimal("1.1")),
             )
 
-        val (atBudget, atMargin) =
-            shouldNotThrowAny { predictedFacts(atBoundary, baseAmount, notice, testPolicies, testCapacity) }
-        atBudget.shouldBePresent()
-        atMargin.shouldBePresent()
+        val at =
+            shouldNotThrowAny { predictedFacts(atBoundary, baseAmount, notice, testPolicies, testCapacity, emptyMap()) }
+        at.budgetCapture.shouldBePresent()
+        at.expectedMargin.shouldBePresent()
 
-        val (overBudget, overMargin) =
-            shouldNotThrowAny { predictedFacts(overBoundary, baseAmount, notice, testPolicies, testCapacity) }
-        overBudget shouldBe ScoreFact.Absent(MlUnavailableReason.ContractViolation)
-        overMargin shouldBe ScoreFact.Absent(MlUnavailableReason.ContractViolation)
+        val over =
+            shouldNotThrowAny {
+                predictedFacts(overBoundary, baseAmount, notice, testPolicies, testCapacity, emptyMap())
+            }
+        over.budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.ContractViolation)
+        over.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.ContractViolation)
+        // M4/4D-4(D-4D4-1) — 신뢰 못 할 응답은 NotPredicted다(진단이 있어도 Diagnosed가 아니다).
+        over.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.ContractViolation)
     }
 
     @Test
@@ -90,19 +94,19 @@ class PredictionFactsTest {
         val baseAmount = requireNotNull(noticeAtBoundary.baseAmount).amount
         val validPrediction = predicted()
 
-        val (atBudget, atMargin) =
+        val at =
             shouldNotThrowAny {
-                predictedFacts(validPrediction, baseAmount, noticeAtBoundary, testPolicies, testCapacity)
+                predictedFacts(validPrediction, baseAmount, noticeAtBoundary, testPolicies, testCapacity, emptyMap())
             }
-        atBudget.shouldBePresent()
-        atMargin.shouldBePresent()
+        at.budgetCapture.shouldBePresent()
+        at.expectedMargin.shouldBePresent()
 
-        val (overBudget, overMargin) =
+        val over =
             shouldNotThrowAny {
-                predictedFacts(validPrediction, baseAmount, noticeOverBoundary, testPolicies, testCapacity)
+                predictedFacts(validPrediction, baseAmount, noticeOverBoundary, testPolicies, testCapacity, emptyMap())
             }
-        overBudget.shouldBePresent()
-        overMargin shouldBe ScoreFact.Absent(MlUnavailableReason.InvalidRequest)
+        over.budgetCapture.shouldBePresent()
+        over.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.InvalidRequest)
     }
 
     // ---- M4/4D-3(scope.md D-4D3-3, 위협 모델 우회 (8)) — 진단은 사다리 점수를 바꾸지
@@ -137,10 +141,38 @@ class PredictionFactsTest {
                     ),
             )
 
-        val fromLowShrinkage = predictedFacts(lowShrinkage, baseAmount, notice, testPolicies, testCapacity)
-        val fromHighShrinkage = predictedFacts(highShrinkage, baseAmount, notice, testPolicies, testCapacity)
+        val fromLowShrinkage =
+            predictedFacts(lowShrinkage, baseAmount, notice, testPolicies, testCapacity, emptyMap())
+        val fromHighShrinkage =
+            predictedFacts(highShrinkage, baseAmount, notice, testPolicies, testCapacity, emptyMap())
 
-        fromLowShrinkage shouldBe fromHighShrinkage
+        // M4/4D-4(D-4D4-2) — 진단은 사다리 점수(ScoreFact 쌍)를 바꾸지 않는다. evidence는
+        // 그 정의상 진단을 그대로 옮기므로 둘은 여기서 갈린다(아래가 그 사실을 직접 잰다).
+        fromLowShrinkage.budgetCapture shouldBe fromHighShrinkage.budgetCapture
+        fromLowShrinkage.expectedMargin shouldBe fromHighShrinkage.expectedMargin
+        (fromLowShrinkage.evidence == fromHighShrinkage.evidence) shouldBe false
+    }
+
+    // ---- M4/4D-4(D-4D4-1·7) — evidence 캐리어가 진단·release·표본 제외 계수를 그대로 옮긴다. ----
+
+    @Test
+    fun `predictedFacts 는 Predicted 의 diagnostics release 와 호출자의 excludedSamples 를 Diagnosed 로 옮긴다(D-4D4-1·7)`() {
+        val notice = testNoticeWithMoney()
+        val baseAmount = requireNotNull(notice.baseAmount).amount
+        val excludedSamples = mapOf(SampleExclusionReason.BASE_AMOUNT_MISSING to 3)
+        val prediction = predicted()
+
+        val components = predictedFacts(prediction, baseAmount, notice, testPolicies, testCapacity, excludedSamples)
+
+        val evidence = components.evidence.shouldBeInstanceOfDiagnosed()
+        evidence.diagnostics shouldBe prediction.diagnostics
+        evidence.release shouldBe prediction.release
+        evidence.excludedSamples shouldBe excludedSamples
+    }
+
+    private fun PredictionEvidence.shouldBeInstanceOfDiagnosed(): PredictionEvidence.Diagnosed {
+        check(this is PredictionEvidence.Diagnosed) { "Diagnosed 가 아니다: $this" }
+        return this
     }
 
     private fun ScoreFact<UnitScore>.shouldBePresent() {
@@ -156,21 +188,24 @@ class PredictionFactsTest {
     fun `absentPairForUnavailableSupply 는 supply 의 사유를 그대로 옮긴다(D-4B7-9)`() {
         val supply = CompetitionSampleSupply.Unavailable(MlUnavailableReason.TransportFailed)
 
-        val (budgetCapture, expectedMargin) = absentPairForUnavailableSupply(supply)
+        val components = absentPairForUnavailableSupply(supply)
 
-        budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.TransportFailed)
-        expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.TransportFailed)
+        components.budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.TransportFailed)
+        components.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.TransportFailed)
+        // M4/4D-4(D-4D4-1) — 예측을 시도하지 않은 경로는 NotPredicted다.
+        components.evidence shouldBe PredictionEvidence.NotPredicted(MlUnavailableReason.TransportFailed)
     }
 
     @Test
     fun `absentPairForUnavailableSupply 는 ScoreNotProvided 로 뭉개지 않는다 — 다른 사유와 구별된다`() {
         val supply = CompetitionSampleSupply.Unavailable(MlUnavailableReason.CircuitOpen)
 
-        val (budgetCapture, expectedMargin) = absentPairForUnavailableSupply(supply)
+        val components = absentPairForUnavailableSupply(supply)
 
-        budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.CircuitOpen)
-        expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.CircuitOpen)
-        (budgetCapture == ScoreFact.Absent(MlUnavailableReason.ScoreNotProvided)) shouldBe false
+        components.budgetCapture shouldBe ScoreFact.Absent(MlUnavailableReason.CircuitOpen)
+        components.expectedMargin shouldBe ScoreFact.Absent(MlUnavailableReason.CircuitOpen)
+        (components.budgetCapture == ScoreFact.Absent(MlUnavailableReason.ScoreNotProvided)) shouldBe false
+        (components.evidence == PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided)) shouldBe false
     }
 
     // ---- M4/4B-8(D-4B8-1·2, OPEN-4B7-TARGET-LABEL 닫힘) — 대상 공고 라벨 규칙표.

@@ -212,6 +212,7 @@ class EvaluateCandidatesUseCaseTest {
                             priorityScore = UnitScore(BigDecimal("0.9")),
                             probabilityScore = null,
                             matchedScore = UnitScore(BigDecimal("0.2")),
+                            evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
                         )
                     },
             )
@@ -251,6 +252,7 @@ class EvaluateCandidatesUseCaseTest {
                             priorityScore = UnitScore(BigDecimal("0.9")),
                             probabilityScore = null,
                             matchedScore = UnitScore(BigDecimal("0.2")),
+                            evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
                         )
                     },
                 capacity = FakeCapacityPort(CapacitySnapshot(currentActiveBids = -1, maxActiveBids = 10)),
@@ -309,5 +311,70 @@ class EvaluateCandidatesUseCaseTest {
         val verdict = result.verdict.shouldBeInstanceOf<Verdict.Review>()
         val reason = verdict.reasons.single().shouldBeInstanceOf<ReviewReason.MlUnavailable>()
         reason.reason shouldBe MlUnavailableReason.DeadlineExceeded
+    }
+
+    // ---- M4/4D-4(scope.md 우회 (2)·(3)) ----
+
+    // 우회 (3) — NotificationRequest.evidence 는 같은 reach 호출의 Analyzed.evidence 그대로다
+    // (다른 호출·다른 공고의 근거가 실릴 통로가 없다).
+    @Test
+    fun `BidNow 알림 요청의 evidence 는 Analyzed evidence 와 같다(우회 3)`() {
+        val notice = testNotice()
+        val notifications = FakeNotificationRequestPort()
+        val evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.CircuitOpen)
+        val analyzed =
+            MlAnalysisOutcome.Analyzed(
+                priorityScore = UnitScore(BigDecimal("0.9")),
+                probabilityScore = null,
+                matchedScore = null,
+                evidence = evidence,
+            )
+        val useCase =
+            useCase(
+                strategyRepository = FakeStrategyRepository(testStrategy()),
+                candidateSource = FakeCandidateSource(listOf(notice)),
+                mlAnalysis = FakeMlAnalysisPort { analyzed },
+                notifications = notifications,
+            )
+
+        runBlocking { useCase.evaluate() }
+
+        notifications.requested.single().evidence shouldBe evidence
+    }
+
+    // 우회 (2) — 근거가 decision(LadderInput·Verdict)에 스며 판정을 바꾸지 않는다. 같은 점수,
+    // 다른 evidence 두 번 평가해도 같은 Verdict(사유 내용까지)가 나온다.
+    @Test
+    fun `같은 점수 다른 evidence 는 같은 Verdict 를 낸다(우회 2)`() {
+        val noticeA = testNotice(number = "20260101030")
+        val noticeB = testNotice(number = "20260101031")
+        val evidenceA = PredictionEvidence.NotPredicted(MlUnavailableReason.CircuitOpen)
+        val evidenceB =
+            PredictionEvidence.Diagnosed(
+                diagnostics = TEST_DIAGNOSTICS,
+                release = TEST_RELEASE,
+                excludedSamples = mapOf(SampleExclusionReason.BASE_AMOUNT_MISSING to 5),
+            )
+        val useCase =
+            useCase(
+                strategyRepository = FakeStrategyRepository(testStrategy()),
+                candidateSource = FakeCandidateSource(listOf(noticeA, noticeB)),
+                mlAnalysis =
+                    FakeMlAnalysisPort { notice ->
+                        val evidence = if (notice.id == noticeA.id) evidenceA else evidenceB
+                        MlAnalysisOutcome.Analyzed(
+                            priorityScore = UnitScore(BigDecimal("0.9")),
+                            probabilityScore = null,
+                            matchedScore = null,
+                            evidence = evidence,
+                        )
+                    },
+            )
+
+        val results = runBlocking { useCase.evaluate() }
+
+        val verdictA = (results[0] as CandidateEvaluation.Reached).verdict
+        val verdictB = (results[1] as CandidateEvaluation.Reached).verdict
+        verdictA shouldBe verdictB
     }
 }

@@ -753,6 +753,37 @@ Kotlin 은 임계를 재판정하지 않는다) · 요청 조립 무변경. **�
 조회 port + `OpeningResult` → `CompetitionSample` 변환·표본 축 채움 / (b) M6 수집 축(기관 fact)과 묶음 / (c) 당분간
 `Unmeasurable` 정직) · `OPEN-4D3-DIAGNOSTICS-RENDER`(4E 알림 본문 규약과 묶음). 정본 `reports/evidence/m4/4d3/checklist.md`.
 
+**4D-4 착수 2026-09-16(운영자 결정 「(A) 캐리어 + 문구 합성(초안 그대로, 추천) 으로 진행」, 정본 `reports/evidence/m4/4d4/scope.md`)** —
+`OPEN-4D3-DIAGNOSTICS-RENDER` 를 닫는 Kotlin `workflow` 전용 slice. **착수 조사 실측**: `Predicted.diagnostics`(4D-3)를 읽는 main
+코드가 0 — `predictedFacts` 가 점수 둘만 내고 진단을 버리며, 4B-7 의 표본 제외 계수(`Supplied.excluded`)도 같은 자리에서
+버려진다(D-4B7-9 「RENDER 이후 실효」). `Analyzed`·`NotificationRequest` 에 근거 자리가 없고, `decision` 은 `shared-kernel` 만
+의존해 진단을 `Verdict` 에 태울 수 없다. 4E 는 port 뿐이라(렌더러·`NotificationRequestPort` 구현 0, `ContentRef` 불투명 문자열,
+본문 골든 0) 채널 본문 착지는 6A. data-dictionary §3.1 「판정은 enum + 구조화 payload, 문장은 렌더링 시점 생성·비영속」.
+결정 D-4D4-1~8: sealed `PredictionEvidence`(`Diagnosed(diagnostics, release, excludedSamples)` | `NotPredicted(reason)`)를
+`Analyzed`·`NotificationRequest` 의 **필수 인자**로(누락 = 컴파일 거부, `decision` 우회) · `workflow.evaluation` 에 순수
+`evidenceLinesFor(verdict: BidNow, evidence): List<String>`(채널 무관·한국어·비영속, 골든 「기관 표본 n건(임계 미만) · 수축
+가중치 w」, `toPlainString` 고정 — 잠금은 소스 경계 test `EvidenceLinesBoundaryTest`) · 4E port·타입·`ContentRef` 무변경(근거의 `ContentRef` 참조 방식은 6A →
+`OPEN-4D4-CONTENT-REF`) · 정책 슬롯 신설 0(임계는 엔진 정책, 노출 조건은 `agencySampleBelowThreshold` 하나) · D-4B7-9 실효 ·
+`Reached` 무변경(Review 판정·알림함 기록의 근거 동반 → `OPEN-4D4-REVIEW-EVIDENCE`). 레인 `bid-vector-v2-m4e`/`m4-4d4/2026-09-16`,
+base `44721cf`(PR #27 병합 뒤), Python 레인과 소스 겹침 0. **계약 갱신 둘**(정본 scope.md 「계약 갱신 이력」): ① 원안의
+`workflow.notification` 배치는 4E S-5 `NotificationBoundaryTest` 가 `decision` 참조를 거부해 `workflow.evaluation` 으로 ② 원안이
+인용한 `ArchitectureGateTest` Locale 축은 `layer.domain` 에만 걸려 `workflow`(application) 에 무효 — verifier r1 V-1(high) 실측으로
+소스 경계 test 로 교체.
+
+**4D-4 종결 2026-09-16(사용자 승인 — 「(A) 캐리어 + 문구 합성」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1
+`not-ready`(high 1: 우회 (7) 의 닫힘 기제 부재 — `Locale`+`String.format` 을 심어도 전건 exit 0 · medium 1: `Unavailable`·
+`Unmeasurable` 가지 evidence 단언 없음) → 계약 갱신 2 + 수정 라운드 → r2 `ready-for-review`(**게이트 술어 변경 표적 재검증**:
+verifier 가 변이 세 종 — `Locale`+`String.format` / `.format(` 단독 / `DecimalFormat` — 을 직접 심어 `EvidenceLinesBoundaryTest`
+붉음 확인, 우회 (1)·(4) 변이 컴파일 거부, rollback ①~⑥ 임시 clone 재현, 전건 1694 tests 0 failed). **재작업 1회**. 산출물:
+`PredictionEvidence`·`PredictionComponents`(internal)·`Analyzed.evidence`·`NotificationRequest.evidence`·`evidenceLinesFor`·
+`EvidenceLinesBoundaryTest`, `@Test` +13(골든·전수·경계·V-2). `OPEN-4D3-DIAGNOSTICS-RENDER` 닫힘 — ML-04 ② 「기관 표본이 임계
+미만이면 수축 가중치가 응답 근거에 실린다」의 Kotlin 착지가 wire(2F) → 도메인(4D-3) → 요청 표본(4B-7) → **판정 근거 캐리어·
+문구(4D-4)** 까지 이어졌고, D-4B7-9(표본 제외 사유가 `Analyzed` 까지 나름)도 실효. **알려진 제한**: 채널 본문 착지는 6A 렌더러
+구현이 `evidenceLinesFor` 를 호출할 때 완성(오늘 닿는 표면은 알림 본문 하나, 리뷰 화면은 NOTI-10/6A) · `EvidenceLinesBoundaryTest`
+는 파일 하나만 스캔(문구 합성을 두 파일로 나누면 자동으로 덮이지 않음 — `OPEN-4D4-CONTENT-REF` 부수 등재) · 근거의 참됨은 port
+구현 층(4B-3·4D-3 위협 모델 승계). **신설 OPEN(Phase 6 에스컬레이션, 둘 다 6A 소유)**: `OPEN-4D4-CONTENT-REF`(근거를 `ContentRef`
+로 어떻게 참조할지) · `OPEN-4D4-REVIEW-EVIDENCE`(Review 판정·알림함 기록의 근거 동반). 정본 `reports/evidence/m4/4d4/checklist.md`.
+
 ### Slice 4E — notification adapter contract
 
 - delivery request와 rendered content 분리
