@@ -73,6 +73,12 @@ autoformat(`ktlintMainSourceSetFormat`)으로 chain 줄바꿈 수정.
   1554·3457 — 전부 삽입 지점 위라 밀린 인용 0. `*.kt`·`*.properties`엔 이런 인용
   자체가 없다.
 
+## 2026-09-16T02:13:20Z
+- cmd: `./gradlew --no-build-cache --no-daemon clean check` (F-2·3·4·5·7 시정 커밋
+  `91fb85d` HEAD 재실측 — 2026-09-16 규칙)
+- exit: 0
+- 핵심 결과: 346 actionable tasks(321 executed) 전건 통과.
+
 ## 2026-09-16T01:49:07Z
 - cmd: `./gradlew --no-build-cache --no-daemon clean check` (evidence 커밋 `9257c60` HEAD
   재실측 — 2026-09-16 규칙: evidence 편집 커밋마다 그 HEAD 에서 재확인)
