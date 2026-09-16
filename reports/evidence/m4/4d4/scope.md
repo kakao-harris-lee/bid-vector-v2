@@ -33,13 +33,13 @@ in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisPipeline.kt  # finalOutcomeOf(…, evidence)
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/Ports.kt                     # Analyzed.evidence · NotificationRequest.evidence(둘 다 필수 인자)
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/EvaluateCandidatesUseCase.kt # reach(…, evidence) — Unavailable 가지는 NotPredicted(reason)
-  - workflow/src/main/kotlin/bidvector/workflow/notification/EvidenceLines.kt           # 신설 — 순수 문구 합성(D-4D4-4)
+  - workflow/src/main/kotlin/bidvector/workflow/evaluation/EvidenceLines.kt             # 신설 — 순수 문구 합성(D-4D4-4, 갱신 1 로 evaluation 배치)
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/EvaluateCandidatesUseCaseTest.kt
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/EvaluateCandidatesUseCaseIsolationTest.kt
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/EvaluationTestFixtures.kt
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/OpportunityAnalysisTest.kt
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/PredictionFactsTest.kt
-  - workflow/src/test/kotlin/bidvector/workflow/notification/EvidenceLinesTest.kt       # 신설 — 골든·전수(exhaustive)·Locale 무접촉
+  - workflow/src/test/kotlin/bidvector/workflow/evaluation/EvidenceLinesTest.kt         # 신설 — 골든·전수(exhaustive)·Locale 무접촉(갱신 1)
   - config/quality/gate-tests.properties                                                # gate.tests.workflow 에 EvidenceLinesTest 등재만(다른 키 무편집)
   - milestone-4.md                                                                      # 4D-4 착수·종결 문단(팀장)
   - docs/discovery/capability-map.md                                                    # OPEN 표: OPEN-4D3-DIAGNOSTICS-RENDER 닫힘, 신설 OPEN 등재(팀장)
@@ -62,7 +62,7 @@ rollback: in_scope 경로 한정 restore(rollback.md) — 공유 파일(mileston
 | **D-4D4-1** | 근거 캐리어 `PredictionEvidence`(sealed, `workflow.evaluation`) 신설: `Diagnosed(diagnostics: PredictionDiagnostics, release: ModelReleaseRef, excludedSamples: Map<SampleExclusionReason, Int>)` · `NotPredicted(reason: MlUnavailableReason)`. 예측을 시도하지 않았거나(기초금액 없음·표본 공급 Unavailable) 시도가 `Unavailable`·`Unmeasurable`·`ContractViolation` 으로 끝난 경우가 전부 `NotPredicted` — 「분석됐는데 근거가 없다」는 상태가 없다 | `decision` 우회 제약 · data-dictionary §3.1(구조가 정본) | 계약 |
 | **D-4D4-2** | `predictedFacts`·`absentPair`·`absentPairForUnavailableSupply` 의 반환형을 `Pair` 에서 `internal data class PredictionComponents(budgetCapture, expectedMargin, evidence)` 로. `MlAnalysisOutcome.Analyzed` 에 `evidence: PredictionEvidence` **필수 인자**(기본값 없음) · `finalOutcomeOf(priorityOutcome, matchScore, evidence)` | 필수 인자 = 누락이 컴파일 거부(4D-3 `Predicted.diagnostics` 와 같은 처방) | 계약 |
 | **D-4D4-3** | `NotificationRequest` 에 `evidence: PredictionEvidence` 필수 인자. `reach(…, evidence)` — `Analyzed` 가지는 `outcome.evidence`, `Unavailable` 가지는 `NotPredicted(outcome.reason)`. 생성자 `internal` 그대로 — 근거는 같은 `reach` 호출의 `outcome` 에서만 온다 | 4B-3 「알림 요청은 판정과 같은 자리」 | 계약 |
-| **D-4D4-4** | 문구 합성은 `workflow.notification` 의 **순수 최상위 함수** `evidenceLinesFor(verdict: Verdict.BidNow, evidence: PredictionEvidence): List<String>` — 채널 무관, 한국어, 영속 없음, 부작용 없음. 줄 순서 고정: ① 판정 근거(`BidNowReason` 각 1줄) ② 예측 근거(`Diagnosed` 는 구간·학습 행·수축 가중치, `NotPredicted` 는 사유 1줄) ③ 표본 제외 요약(`excludedSamples` 비면 생략, 사유별 1줄). **골든 두 줄(ML-04 ② 착지)**: `agencySampleBelowThreshold` 참이면 `기관 표본 {n}건(임계 미만) · 수축 가중치 {w}`, 거짓이면 `기관 표본 {n}건 · 수축 가중치 {w}`. 숫자는 `BigDecimal.toPlainString()`·`Int.toString()` — `String.format`·Locale 금지(`ArchitectureGateTest` 축) | capability-map OPEN 행 문면 · data-dictionary §3.1 「렌더링 시점 생성」 | 계약 |
+| **D-4D4-4** | 문구 합성은 `workflow.evaluation` 의(갱신 1 — 원안 `workflow.notification` 은 4E S-5 `NotificationBoundaryTest` 가 `decision` 참조를 거부) **순수 최상위 함수** `evidenceLinesFor(verdict: Verdict.BidNow, evidence: PredictionEvidence): List<String>` — 채널 무관, 한국어, 영속 없음, 부작용 없음. 줄 순서 고정: ① 판정 근거(`BidNowReason` 각 1줄) ② 예측 근거(`Diagnosed` 는 구간·학습 행·수축 가중치, `NotPredicted` 는 사유 1줄) ③ 표본 제외 요약(`excludedSamples` 비면 생략, 사유별 1줄). **골든 두 줄(ML-04 ② 착지)**: `agencySampleBelowThreshold` 참이면 `기관 표본 {n}건(임계 미만) · 수축 가중치 {w}`, 거짓이면 `기관 표본 {n}건 · 수축 가중치 {w}`. 숫자는 `BigDecimal.toPlainString()`·`Int.toString()` — `String.format`·Locale 금지(`ArchitectureGateTest` 축) | capability-map OPEN 행 문면 · data-dictionary §3.1 「렌더링 시점 생성」 | 계약 |
 | **D-4D4-5** | 6A 가 `ContentRenderer` 구현에서 `evidenceLinesFor` 를 호출해 채널 본문에 싣는다. 이 slice 는 4E port·타입·`ContentRef` 를 편집하지 않는다 — 근거를 `ContentRef` 로 어떻게 참조할지(요청 저장 후 id 참조 vs 본문 직렬화)는 6A 결정 → **`OPEN-4D4-CONTENT-REF`** | 4E D-4E-1·5(adapters 편집 0, 렌더러 구현은 후속) | 계약 |
 | **D-4D4-6** | 정책 슬롯 신설 0 · 노출 여부 게이트 0 — 모든 `NotificationRequest` 가 근거를 동반한다. 임계값은 엔진 정책이라 문구에 숫자로 넣지 않는다(4D-3 D-4D3-4 「Kotlin 은 임계를 재판정하지 않는다」의 문구 버전) | 정책 표 슬롯 없음(실측) | 계약 |
 | **D-4D4-7** | D-4B7-9 실효: `Supplied.excluded` 는 `Diagnosed.excludedSamples` 로, `Unavailable.reason` 은 `NotPredicted(reason)` 으로 `Analyzed` 까지 나른다 — `PredictionFactsTest` 가 같은 패키지 직접 호출로만 재던 것을 `OpportunityAnalysisTest`(통합 층)에서도 잰다 | milestone-4 D-4B7-9 등재 문면 | 계약 |
@@ -100,4 +100,6 @@ rollback: in_scope 경로 한정 restore(rollback.md) — 공유 파일(mileston
 없음(리뷰 요청 시점에 `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 로 재확인).
 
 ## 계약 갱신 이력
-(없음)
+| # | 일시 | 갱신 | 사유 |
+| --- | --- | --- | --- |
+| 1 | 2026-09-16 | D-4D4-4 의 `evidenceLinesFor`(와 `EvidenceLinesTest`)를 `workflow.notification` → **`workflow.evaluation`** 으로. in_scope 두 경로·`gate.tests.workflow` 등재 이름이 따라간다. D-4D4-5(6A 렌더러가 호출)·시그니처·골든은 불변 | 구현 레인 실측 — 4E 의 S-5 `NotificationBoundaryTest` 가 `workflow.notification` 소스에서 `bidvector.decision` 참조를 거부하는데(`Verdict.BidNow`·`BidNowReason`·`MlUnavailableReason` 전수 `when` 이 그 이름을 소스에 낸다), 착수 조사 표가 이 게이트를 보지 못했다. 게이트를 `decision` 까지 넓히는 대안은 4E 경계(알림은 판정을 모른다)를 이 slice 하나를 위해 허무는 것이라 기각 — 근거 문구는 판정과 같은 패키지에서 나오고 알림은 `List<String>` 만 받는다 |
