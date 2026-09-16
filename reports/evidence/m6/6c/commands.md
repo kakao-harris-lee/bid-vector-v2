@@ -222,6 +222,107 @@
 - cmd: `docker compose -f docker/compose.yaml down -v` (S-25)
 - exit: 0
 
+## 수정 라운드 2 — D-6C-10 게이트 술어 표적 재검증(verifier r2 R2-1·R2-3·R2-4·R2-5·R2-8)
+
+### R2-1 — 정책 값 모양 검증(빈 값·CRLF)
+
+## 2026-09-17T01:00:00Z — 변이 넷(버릴 정책 사본, 스크립트 사본이 그 사본을 읽게 함)
+- cmd: (a) `forbidden.packages=`(빈 값) (b) `base.image.digest=`(빈 값) (c) `size.cap.bytes=`(빈 값)
+  (d) `size.cap.bytes=1` + 그 줄만 CRLF 줄끝
+- exit: (a)(b)(c) 전부 2 · (d) 1
+- 핵심 결과: (a)(b)(c) 「정책 키 ... 의 값이 비어 있다(정책 오류)」로 즉시 거부(이전 판은
+  검사 자체가 꺼져 통과했었다). (d)는 CRLF 가 절삭돼 `cap_bytes=1`로 정상 비교되고 출하
+  이미지(113.7MB)가 정확히 그 이유로 실패 — 더 이상 "숫자처럼 안 보여서 통과"가 아니다.
+  정본(미변이) 정책으로 같은 이미지를 다시 돌리면 그대로 통과.
+
+### R2-4 — 베이스 다이제스트 파생(다이제스트 하나 → layer 체인)
+
+## 2026-09-17T01:05:00Z — 판정 불가 변이(존재하지 않는 다이제스트)
+- cmd: `base.image.digest`를 전부 0인 가짜 다이제스트로 바꾼 정책 사본으로 실행
+- exit: 1
+- 핵심 결과: 「정책 기준 베이스(...)의 linux/amd64 manifest 를 조회하지 못했다」로 실패
+  (요약도 `base-layer-접두-일치=false`를 정직하게 찍는다) — R2-1 이 고친 것과 같은 클래스의
+  "판정 불가가 조용히 통과"를 이 축에서도 막는다.
+
+## 2026-09-17T01:07:00Z — F-2 스타일 변이 재확인(런타임 FROM 만 뜬 태그로)
+- cmd: `docker/ml-serving.Dockerfile`의 runtime stage `FROM`만 `python:3.12-slim`으로 바꾼
+  임시 Dockerfile 빌드 → `./tools/image-hygiene-check.sh`
+- exit: 1
+- 핵심 결과: 「이미지의 앞 4 layer 가 정책이 파생한 베이스 layer 체인과 다르다」— 다이제스트
+  기반 파생으로 바뀐 뒤에도 이 변이 계열이 그대로 잡힘. 임시 이미지 삭제 완료.
+
+### R2-3 — 능력 차단(시간차 setuid, 2단계 재현)
+
+## 2026-09-17T01:15:00Z — 시간차 재현(pid 1 유지, 5초 뒤 setuid 실행 파일로 execve)
+- cmd: 1단계 바이너리가 즉시 `STAGE1_EUID`를 찍고 5초 뒤 setuid-root 2단계 바이너리로
+  `execl`. `no-new-privileges` 없이/있이 각각 `docker run`으로 t=1s·t=7s 관측
+- exit: N/A(관측 전용)
+- 핵심 결과: 플래그 없이 — t=1s `STAGE1_EUID=10001`, t=7s `STAGE2_EUID=0`(**상승 성공**).
+  플래그 있이 — t=1s `STAGE1_EUID=10001`, t=7s `STAGE2_EUID=10001`(**상승 실패**).
+
+## 2026-09-17T01:18:00Z — 같은 이미지에 위생 게이트(항상 플래그를 건다) 실행
+- cmd: `./tools/image-hygiene-check.sh bidvector/r2-late:v2`
+- exit: 0
+- 핵심 결과: 능력이 차단돼 애초에 상승이 안 되므로 정상 통과 — "게이트가 못 잡아서"가
+  아니라 "이미지가 실제로 root 를 얻지 못해서" 통과다.
+
+## 2026-09-17T01:19:00Z — 같은 이미지에 플래그 없는 구판 시뮬레이션(비교용)
+- cmd: `--security-opt no-new-privileges` 두 곳을 제거한 스크립트 사본으로 같은 이미지 실행
+- exit: 0
+- 핵심 결과: 표집이 t≈1s(exec 전)라 상승을 놓치고 그대로 통과 — r2 가 지목한 맹점을
+  재현. 스크립트 사본·이미지 삭제 완료.
+
+### 기존 F-1/F-2 변이 + 정책 값 넷 재확인(구조가 바뀐 뒤에도 잡히는지)
+
+## 2026-09-17T01:20:00Z
+- cmd: non-root 제거 · 금지 패키지 주입 · 이미지 자신의 태그 `:latest` — 세 변이를 새
+  스크립트로 재실행
+- exit: 전부 1
+- 핵심 결과: 셋 다 그대로 검출 — R2-1·R2-3·R2-4 시정이 기존 방어를 깨지 않았다.
+
+### CI 반영 확인
+
+## 2026-09-17T01:25:00Z
+- cmd: `python3 -c "import yaml; d=yaml.safe_load(open('.github/workflows/ci.yml')); ..."`(job·
+  step 순서 출력)
+- exit: 0
+- 핵심 결과: `check` job step 순서 — `checkout(fetch-depth 0)`→`setup-java`→`install buf`→
+  `setup-gradle`→`check`→`qualityBaseline`→`setup-python`→`setup-uv`→`one-command-check.sh
+  (S-20)`→`upload-artifact`(buf·전체 이력 전제가 S-20 **앞**에 이미 있음). `container` job
+  step 순서 — `checkout`→`setup-java`→`setup-gradle`→DB 값 생성→S-21→S-22→S-23→S-24→S-25
+  (python/uv·S-20 없음, R2-8 중복 비용 해소).
+
+### 최종 연속 실측(S-20~S-25, 한 자리에서 순서대로, D-6C-10 반영 뒤)
+
+## 2026-09-17T01:30:00Z
+- cmd: `./tools/one-command-check.sh` (S-20)
+- exit: 0
+
+## 2026-09-17T01:31:00Z
+- cmd: `docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .` (S-21)
+- exit: 0
+
+## 2026-09-17T01:32:00Z
+- cmd: `./tools/image-hygiene-check.sh bidvector/ml-serving:local` (S-22)
+- exit: 0
+- 핵심 결과: 실프로세스-uid=10001, base-layer-접두-일치=true(다이제스트에서 파생),
+  size_bytes=113710196(cap 400000000).
+
+## 2026-09-17T01:33:00Z
+- cmd: `docker compose -f docker/compose.yaml up -d` 뒤 폴링 (S-23)
+- exit: 0
+- 핵심 결과: ml-serving·postgres 둘 다 7초 안에 healthy 로 수렴(`no-new-privileges` 적용 뒤).
+
+## 2026-09-17T01:34:00Z
+- cmd: `./gradlew --no-daemon :adapters:test --tests '*RealServerIntegrationTest*' -PrealServer=true --rerun-tasks` (S-24)
+- exit: 0
+- 핵심 결과: 캐시 우회 강제 재실행 — `tests="4" skipped="0" failures="0"`, timestamp 가 이
+  실행 시각과 일치.
+
+## 2026-09-17T01:35:00Z
+- cmd: `docker compose -f docker/compose.yaml down -v` (S-25)
+- exit: 0
+
 ## 정본 참고
 
 마지막 HEAD 의 acceptance 전건 재실측 결과 정본은 이 문서가 아니라 verifier 와 PR 조치

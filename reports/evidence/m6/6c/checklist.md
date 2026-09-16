@@ -84,6 +84,39 @@ HIGH 둘은 D-6C-9(scope.md 계약 갱신 (4))로 처방이 계약에 이미 고
 | reviewer LOW(죽은 COPY) | reviewer | LOW | **수정** — builder stage `COPY ml-engine/policy` 제거(uv build 무참조, grep 확인) | docker/ml-serving.Dockerfile |
 | reviewer LOW(임시 wheel 정리) | reviewer | LOW | **수정** — `mktemp -d` + `trap ... EXIT` 로 스크립트 종료 시 항상 정리 | tools/one-command-check.sh, 실패 종료 포함 실측 |
 
+## 수정 라운드 2 — verifier r2 처분(r1 HIGH 둘은 닫힘, 수정 라운드가 새 HIGH 둘을 만듦)
+
+r2 판정: r1 HIGH(F-1·F-2)는 닫혔다(더 어려운 변이에도 버팀). **그런데 r1 을 닫은 커밋이
+새 HIGH 둘을 냈다** — 하네스 「low 를 닫은 커밋이 high 를 낳았다」계열의 재발. D-6C-10 처방을
+그대로 반영한다.
+
+| ID | severity | 처분 | 근거 |
+| --- | --- | --- | --- |
+| R2-1 | HIGH | **수정** — 빈 값 거부 복원 + kind(수치/목록)별 모양 검증 + CRLF 절삭. 수치 비교를 `elif`에서 뽑아 독립 `if`(`_check_at_most`)로 | `_policy_value`가 F-3 수정에서 값 모양 검증을 지웠던 것을 되살림, 변이 넷 재현+시정 |
+| R2-2 | HIGH | **수정** — S-20 을 `container` job → `check` job 으로 이동(그 job 이 이미 `buf`+`fetch-depth: 0`을 가짐) | `container` job 에 그 전제가 없어 S-20 이 반드시 실패하고 뒤 S-21~S-25 전부가 CI 미실행이었다 |
+| R2-3 | MEDIUM | **수정** — `docker run --security-opt no-new-privileges`(위생 게이트)·`security_opt: [no-new-privileges:true]`(compose) | `sleep 1` 한 점 표집은 표집 뒤 상승하는 entrypoint 를 놓친다. 능력 자체를 차단해 표집 시점과 무관하게 만든다 |
+| R2-4 | MEDIUM | **수정** — `base.image.layers`(목록) → `base.image.repo`+`base.image.digest`(다이제스트 하나) + 게이트가 `docker buildx imagetools inspect`로 그때그때 layer 체인 파생 | 목록 자체를 변이 이미지 것으로 바꿔치면 통과했다 — 바꿔치기 표면을 다이제스트 하나로 줄인다 |
+| R2-5 | LOW | **수정** — 「행 수 ≠ 1」이 아니라 **행마다 uid** 를 검사 | 프로세스 여러 개가 되는 날에도 root 자식이 조용히 통과하지 않게 |
+| R2-6 | LOW | **수정** — rollback.md 잔여 절의 명령 이름을 `git status --porcelain` → `git diff --name-status f3ac571`로 정정 | 관측 자체는 맞았고 명령 이름이 틀렸다 |
+| R2-7 | LOW | **등재**(실질 이탈 아님, r1 판정 유지) — wheel `-o` 인자가 `mktemp -d`라 CI 고정 경로와 다르다. r1 MEDIUM(임시 정리) 시정의 의도된 결과 | verifier r2 도 같은 결론(정리 동작 실측 확인, 이탈 아님) |
+| R2-8 | LOW | **수정** — 게이트 시작부에 `command -v jq` 로 명시적 선결조건 확인(없으면 exit 2, 오귀속 방지) | `jq` 가 `ubuntu-latest` 선탑재라 지금은 서지만 미선언 의존이었다 — 없으면 (2) 절이 엉뚱한 사유로 떨어졌다 |
+
+### R2-3 능력 차단 실측(출하 서고 변이 실패)
+
+시간차 setuid 변이(pid 1 은 시작부터 끝까지 하나 — 5초 뒤 자기 자신을 setuid-root 실행
+파일로 `execve`하는 2단계 재현, r2 의 실측 형태 그대로):
+
+| 조건 | t=1s(1단계) | t=7s(exec 뒤 2단계) |
+| --- | --- | --- |
+| `no-new-privileges` 없이 | euid 10001 | **euid 0(상승 성공)** |
+| `no-new-privileges` 로 | euid 10001 | euid 10001(**상승 실패**) |
+
+같은 변이 이미지에 위생 게이트(항상 `no-new-privileges`를 건다)를 그대로 돌리면 exit 0 —
+**출하 이미지가 정상 기동하는 것과 같은 이유로**(능력이 차단돼 상승 자체가 안 된다) 통과한다.
+구판(플래그 없이 한 점만 표집)을 이 이미지에 시뮬레이션하면 `docker top`이 t≈1s 에 표집돼
+그대로 통과했을 것 — r2 가 지목한 정확한 맹점을 재현했다. 출하 이미지(`bidvector/ml-serving:local`)
+는 이 옵션 아래 정상 기동해 S-22·S-23(compose healthcheck)이 그대로 통과한다(commands.md).
+
 ## (2b) 새 public 표면 여부
 
 - `docker/probe/liveness.py`·`readiness.py` — 조회 전용 RPC(`GetModelMetadata`) 둘만 호출.
@@ -111,10 +144,14 @@ HIGH 둘은 D-6C-9(scope.md 계약 갱신 (4))로 처방이 계약에 이미 고
   드물게 다른 job 과 충돌할 수 있다(이 slice 의 CI job 은 그 포트를 다른 무엇도 쓰지 않아
   이번 실행에서는 문제가 없었다). 충돌이 관측되면 host publish 를 완전히 빼는 쪽으로 정리한다.
 - 이미지 base·postgres 이미지 다이제스트는 2026-09-16 pull 시점 값으로 고정했다(재현성) —
-  상류가 그 태그를 재빌드하면 다이제스트가 바뀐다. **수정 라운드 1 이후**: 위생 게이트의
-  구속력 있는 판정은 라벨이 아니라 `base.image.layers`(정책 데이터)다 — `FROM`의 다이제스트를
-  바꾸면 `docker buildx imagetools inspect`로 새 layer 체인을 다시 뽑아 그 값과 Dockerfile의
-  라벨을 함께 갱신한다(라벨은 보조지만 사람이 리뷰에서 둘의 일치를 확인한다).
+  상류가 그 태그를 재빌드하면 다이제스트가 바뀐다. **수정 라운드 2(R2-4, D-6C-10 ②) 이후**:
+  위생 게이트는 정책의 `base.image.digest`(Dockerfile 의 FROM 과 같은 값) 하나만 갖고
+  `docker buildx imagetools inspect`로 layer 체인을 **그때그때** 파생한다 — layer 목록을
+  정책에 다시 적지 않으므로 "정책과 이미지가 몰래 같이 바뀌는" 경로가 없다. `FROM`을
+  바꾸면 이 값도 같이 바꾸고, 이미지 라벨(보조 정보)도 사람이 리뷰에서 일치를 확인한다.
+  **새 알려진 제한(R2-4 대가)**: 이 파생에 **레지스트리 네트워크 접근이 필요**하다 — 접근이
+  없는 오프라인 환경에서는 이 축이 판정 불가로 실패한다(fail-closed, 조용한 통과는 아니다).
+  CI 러너(`ubuntu-latest`)와 이 개발 환경 둘 다 접근이 있어 실측 확인했다.
 - (수정 라운드 1 신설, F-8 승계) 금지 패키지 판정은 다섯 **이름**을 실제 import 해 잡는다
   (우회 (2) 닫힘 — 같은 이름의 dist-info 없는 사본도 잡는다, verifier r1 MUT-C1 재확인).
   **다른 이름으로 벤더링한 사본**(예: `sqlalchemy`를 `_vendored_sqlalchemy`로 복사)은 이
