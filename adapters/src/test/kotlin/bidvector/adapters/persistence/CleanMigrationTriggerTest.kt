@@ -41,6 +41,11 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             // M3/3F — 개찰완료 축 부모 슬롯 가드(추가만, 스키마 스냅샷 래칫 예외 D-3F-6).
             "guard_opening_result_opening_rank_one",
             "guard_opening_result_draw_numbers",
+            // M6/6B-1(D-6B1-8, 등재) — `edit_session`(V8__edit_session.sql)은 트리거가
+            // 0개다. session_version 은 애플리케이션이 싣고 DB 는 전제조건으로만 검사한다
+            // (D-6B1-3) — 트리거로 값을 정하면 그 전제조건 자체가 무의미해진다. 이 표는
+            // 이 목록(전역 DISTINCT trigger_name)에 아무 이름도 보태지 않는다 — 그 부재를
+            // 여기 명시로 남긴다(우회 (5), 카탈로그로 트리거 없음을 확인).
         )
 
     @Test

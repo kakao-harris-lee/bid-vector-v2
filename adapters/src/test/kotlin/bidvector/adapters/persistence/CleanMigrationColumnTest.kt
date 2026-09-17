@@ -222,10 +222,24 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("inbox", "processed_at", "timestamp with time zone", false),
         )
 
+    // M6/6B-1 — V8__edit_session.sql(추가만, D-6B1-8). state_payload·last_command 는
+    // JSON 텍스트(nullable — EXPIRED 는 payload 없음, 세션 시작 직후는 command 없음).
+    private val editSessionColumns =
+        listOf(
+            ColumnSpec("edit_session", "id", "text", false),
+            ColumnSpec("edit_session", "operator_id", "text", false),
+            ColumnSpec("edit_session", "state", "text", false),
+            ColumnSpec("edit_session", "state_payload", "text", true),
+            ColumnSpec("edit_session", "expires_at", "timestamp with time zone", false),
+            ColumnSpec("edit_session", "session_version", "integer", false),
+            ColumnSpec("edit_session", "last_command", "text", true),
+            ColumnSpec("edit_session", "created_at", "timestamp with time zone", false),
+        )
+
     private val expectedColumns =
         rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
             rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
-            openingReservePriceColumns + outboxColumns + inboxColumns
+            openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {

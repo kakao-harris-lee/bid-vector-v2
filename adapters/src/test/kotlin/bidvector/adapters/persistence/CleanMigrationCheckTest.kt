@@ -46,6 +46,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // M4/4C-2 — 신규(추가만, D-4C2-2).
             "outbox" to 11,
             "inbox" to 1,
+            // M6/6B-1 — 신규(추가만, D-6B1-8). V8__edit_session.sql: id<>''·operator_id<>''·
+            // state enum·session_version>=0·(state=EXPIRED)=(state_payload IS NULL) 짝 — 5.
+            "edit_session" to 5,
         )
 
     @Test
