@@ -152,9 +152,25 @@ class TestDistributionRequestFromProto:
         assert segment.agency == Present("agency-opaque-771")
         assert segment.category == Present("cat-0821")
 
-    def test_sample_with_disallowed_missing_reason_is_rejected(self) -> None:
-        """D-5D3-2 — 표본 축이 허용하는 유일한 결측 사유는 `NOT_COLLECTED_YET`이다."""
+    def test_sample_with_unknown_missing_reason_is_accepted_as_missing(self) -> None:
+        """3H-2 D-3H2-3(`OPEN-3H-SAMPLE-MISSING-REASON` 해소) — 표본 축이 허용하는
+        결측 사유는 `NOT_COLLECTED_YET`과 `UNKNOWN`(수집했으나 원천에 없음) 둘이다.
+        거부되지 않고 `Missing(UNKNOWN)`으로 남아 공종·전역 계층 관측에 든다(3H-1
+        뒤 코드 없는 표본이 `NOT_COLLECTED_YET`으로 거짓 표시되는 것을 막는다)."""
         sample = competition_sample(agency_id=common_pb2.MISSING_REASON_UNKNOWN)
+        request = prediction_pb2.CalculateOptimalBidRequest(
+            features=_valid_features_inputs(), competition_samples=[sample]
+        )
+        result = DistributionRequest.from_proto(request)
+        assert isinstance(result, DistributionRequest)
+        segment = result.samples[0].segment
+        assert isinstance(segment, SampleSegment)
+        assert segment.agency == Missing(common_pb2.MISSING_REASON_UNKNOWN)
+
+    def test_sample_with_not_applicable_missing_reason_is_rejected(self) -> None:
+        """D-3H2-3 — 허용 집합 확장은 `UNKNOWN`만이다. `NOT_APPLICABLE`은 여전히
+        표본 축 허용 집합 밖이라 거부된다."""
+        sample = competition_sample(agency_id=common_pb2.MISSING_REASON_NOT_APPLICABLE)
         request = prediction_pb2.CalculateOptimalBidRequest(
             features=_valid_features_inputs(), competition_samples=[sample]
         )
@@ -189,8 +205,23 @@ class TestDistributionRequestFromProto:
 
 
 class TestPredictDistribution:
-    def test_success_with_eight_clean_samples(self, policy: InferencePolicy) -> None:
-        request = _valid_request()
+    @pytest.mark.parametrize(
+        "missing_reason",
+        [
+            common_pb2.MISSING_REASON_NOT_COLLECTED_YET,
+            common_pb2.MISSING_REASON_UNKNOWN,
+        ],
+        ids=["not_collected_yet", "unknown"],
+    )
+    def test_success_with_eight_clean_samples(
+        self, policy: InferencePolicy, missing_reason: int
+    ) -> None:
+        """D-5D3-5 회귀 — 표본 축 결측 사유가 `NOT_COLLECTED_YET`이든 `UNKNOWN`(3H-2
+        D-3H2-3)이든 결과는 비트 동일하다(둘 다 요청 축 매칭 없이 global-only)."""
+        missing_segment = SampleSegment(
+            agency=Missing(missing_reason), category=Missing(missing_reason)
+        )
+        request = _valid_request(segments=[missing_segment] * 8)
         result = predict_distribution(request, policy)
         assert isinstance(result, Success)
         assert len(result.candidates) == 3
