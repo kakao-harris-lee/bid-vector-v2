@@ -97,19 +97,22 @@ private fun CompetitionSample.toProto(): ProtoCompetitionSample {
 }
 
 /**
- * M2/2F(scope.md ①, D-2F-1) — `CompetitionSample`(표본) 축의 결측 사유는
- * `NOT_COLLECTED_YET` 하나뿐이다. `FeatureInputs`(대상 공고) 축의 `toAgencyIdFact()`(위,
- * `UNKNOWN`)와 사유가 다르다 — 사유를 지어내지 않는다는 규약(2B 위협 우회 (5))이 두 축을
- * 갈랐으므로 확장 함수를 공유하지 않는다.
+ * M3/3H-2(D-3H2-2) — 표본 축 `agency_id` 결측 사유는 이제 대상 공고 축([toAgencyIdFact])과
+ * 같은 `UNKNOWN`이다. M2/2F 시점에는 `NOT_COLLECTED_YET`(수집 전이라 값이 없다) 하나였지만,
+ * 3H-1 뒤로는 수요기관 코드가 실제로 수집되는데도 원천 문서에 코드 자체가 없는 공고가 있어
+ * "수집 전"이 더 이상 참이 아니다(`OPEN-3H-AGENCY-BACKFILL`). 「수집 전」과 「원천에 없음」을
+ * 구별하는 컬럼을 새로 두지 않기로 했으므로(D-3H2-2 — 백필은 값을 채울 뿐 사유를 바꾸지
+ * 않는다) 두 축이 갈릴 이유가 사라져 [toAgencyIdFact]에 위임한다. `categoryCode`
+ * ([toSampleCategoryCodeFact], M2/2F)는 이 slice가 건드리지 않는다 — 여전히
+ * `NOT_COLLECTED_YET` 하나뿐이다.
  */
-private fun AgencyId?.toSampleAgencyIdFact(): AgencyIdFact =
-    if (this == null) {
-        AgencyIdFact.newBuilder().setMissing(MissingReason.MISSING_REASON_NOT_COLLECTED_YET).build()
-    } else {
-        AgencyIdFact.newBuilder().setValue(value).build()
-    }
+private fun AgencyId?.toSampleAgencyIdFact(): AgencyIdFact = toAgencyIdFact()
 
-/** 위 [toSampleAgencyIdFact]와 같은 규약 — `CategoryCode`(procurement, 표본 축)를 나른다. */
+/**
+ * M2/2F 규약 그대로 — `CategoryCode`(procurement, 표본 축)는 M3/3H-2가 건드리지 않는다.
+ * [toSampleAgencyIdFact]와 결측 사유가 이제 다르다(이쪽은 `NOT_COLLECTED_YET` 유지) — 공종
+ * 축은 아직 「원천에 없음」과 「수집 전」을 구별할 필요가 제기되지 않았다.
+ */
 private fun CategoryCode?.toSampleCategoryCodeFact(): CategoryCodeFact =
     if (this == null) {
         CategoryCodeFact.newBuilder().setMissing(MissingReason.MISSING_REASON_NOT_COLLECTED_YET).build()
