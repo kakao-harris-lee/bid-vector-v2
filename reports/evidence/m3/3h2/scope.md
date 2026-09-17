@@ -53,7 +53,7 @@ rollback: in_scope 경로 한정 restore. 공유 파일(5d3 scope·data-dictiona
 | --- | --- | --- | --- |
 | **D-3H2-1** | 요청 축·표본 축 `agencyId` = `notice.demandAgency?.code` 의 값(`AgencyId(code.value)`). 공고기관으로 폴백하지 않는다(D-3H-2). 코드 없는 공고는 요청 축 `UNKNOWN` 그대로 | 3H D-3H-2 | 계약 |
 | **D-3H2-2** | 표본 축 결측 사유를 `NOT_COLLECTED_YET` → **`UNKNOWN`** 으로(`toSampleAgencyIdFact`). 「수집 전」과 「원천에 없음」을 구별하는 컬럼을 두지 않는다 — 두 경우 모두 오늘 값이 없다는 사실만 참이고, 백필은 값을 채울 뿐 사유를 바꾸지 않는다 | 정직 규율(4B-3 미가용의 이름) · `OPEN-3H-AGENCY-BACKFILL` | 계약 |
-| **D-3H2-3** | (②) 엔진 표본 축 허용 결측 사유 집합을 `{NOT_COLLECTED_YET, UNKNOWN}` 으로 — `UNSPECIFIED`·`NOT_APPLICABLE`·미지 정수는 그대로 거부. 5D-3 계약 갱신 이력에 등재. D-5D3-5 회귀(전부 `Missing` 인 요청은 5D-2 와 비트 동일)는 `UNKNOWN` 으로도 성립해야 한다 | `OPEN-3H-SAMPLE-MISSING-REASON` · 거부가 죽이는 것 = 코드 없는 표본 전부(공종·전역 계층에서도 탈락) | **운영자·M5 레인 확인 대기** |
+| **D-3H2-3** | (②) 엔진 표본 축 허용 결측 사유 집합을 `{NOT_COLLECTED_YET, UNKNOWN}` 으로 — `UNSPECIFIED`·`NOT_APPLICABLE`·미지 정수는 그대로 거부. **술어가 두 축(`agency_id`·`category_code`)에 공유되므로 공종 표본 축의 수신 허용 집합도 함께 넓어진다**(verifier r2 N-1 실측) — 송신(`RequestMapping` 공종 축)은 무변경이라 오늘 나가는 바이트는 계약 안, `features.proto` 9번 필드 주석도 같은 집합으로(갱신 3). 5D-3 계약 갱신 이력에 등재. D-5D3-5 회귀(전부 `Missing` 인 요청은 5D-2 와 비트 동일)는 `UNKNOWN` 으로도 성립해야 한다 | `OPEN-3H-SAMPLE-MISSING-REASON` · 거부가 죽이는 것 = 코드 없는 표본 전부(공종·전역 계층에서도 탈락) | **운영자·M5 레인 확인 대기** |
 | **D-3H2-4** | 엔진 교차 실측: 요청·표본이 같은 수요기관코드를 실은 fixture 로 `serve_bid_rates` 를 돌려 `segment_support = DIRECT`·`agency_sample_count ≥ 1` 을 처음 관측(ML-04 ② 「기관 표본이 임계 미만이면 수축 가중치가 응답 근거에 실린다」 의 Kotlin→엔진 왕복). 4B-7 교차 실측 관례 | ML-04 ② acceptance | 계약 |
 | **D-3H2-5** | 채움률 실호출(D-3H-8)은 구현 전에 — 결과(표본 n 건 중 `dminsttCd` 채움 k, 공고기관과 동일 비율)를 evidence 에 비율만 적는다. k/n 이 낮으면 D-3H-2 재결정을 운영자에게 올리고 구현을 멈춘다 | 「측정 전 잠정」 | **충족(2026-09-17)** — 공사 목록 100건: 코드·이름 넷 전부 100/100, 수요=공고 91/100, 길이 {7}, 영문자 포함 29/100(`commands.md`). 코드 키 확정 |
 
@@ -66,7 +66,7 @@ rollback: in_scope 경로 한정 restore. 공유 파일(5d3 scope·data-dictiona
 | (3) | 엔진이 `UNKNOWN` 표본을 거부 | (②) 엔진 test + Kotlin 교차 실측(코드 없는 표본이 `excluded_observations` 에 안 잡힘) |
 | (4) | 이름을 `AgencyId` 로 싣는다 | `AgencyId` 는 `AgencyCode.value` 에서만 — grep + test |
 | (5) | 요청·표본 정규화 불일치로 `DIRECT` 미도달 | 같은 `AgencyCode.of` 값(3H-1) · 교차 실측 D-3H2-4 |
-(2b): `AgencyId` 생성 자리 둘(기존 타입, 새 표면 0) · (②) Python 허용 집합 상수 — 새 public 표면 0.
+(2b): `AgencyId` 생성 자리 둘(기존 타입, 새 표면 0) · (②) Python 허용 집합 상수 — 새 public 표면 0. — r1 수정 라운드(F-1~F-5): main 소스 변경은 전부 주석·test, 새 public 표면 0(verifier r2 실측). 갱신 3(proto 9번 주석)도 같다.
 
 ## 종결 조건
 채움률 실측 등재 · 요청·표본 축 값 test · 사유 `UNKNOWN` test · (②) 엔진 허용 집합 test + golden 불변 · 교차 실측 `DIRECT` 관측 · 전건 `check`(+ pytest) · verifier ready · `OPEN-2B-AGENCY-ID`·`OPEN-3H-SAMPLE-MISSING-REASON` 닫힘 · 사용자 승인.
@@ -82,3 +82,4 @@ slice 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은 range 
 | --- | --- | --- | --- |
 | 1 | 2026-09-17 | in_scope 에 `ml-engine/.../inference/observations.py`·`features/facts.py`(docstring 문면 정정만, 코드 무변경) 추가 | 구현 레인 보고 — 허용 집합 확장으로 두 모듈 docstring 의 「`{NOT_COLLECTED_YET}` 하나」 문면이 낡았다. in_scope 손 열거 누락(3H-1 갱신 3 과 같은 갈래) |
 | 2 | 2026-09-17 | in_scope 에 `contracts/proto/bidvector/ml/v1/features.proto`(`CompetitionSample.agency_id` 주석의 허용 결측 사유 선언 — 주석만, 필드·타입·번호·태그 무변경) + `workflow/prediction/BidPredictionRequest.kt`(같은 문면의 KDoc 사본) 추가. out_of_scope 의 「`contracts/**` 무변경」을 「필드·타입·번호·태그 무변경」으로 좁힘. PR 리뷰 레인에 **contract-keeper** 추가. 계약 파일 변경이라 Codex 심사 대상 여부는 운영자 결정(주석만) | verifier r1 **F-1(high, 계약층)** — 계약 문면이 「허용 사유는 `NOT_COLLECTED_YET` 하나뿐, 송신 어댑터가 다른 사유를 지어내지 않는다」로 선언하는데 이 slice 가 송신·수신 양쪽에 `UNKNOWN` 을 넣었다. `buf breaking` 은 주석을 안 보고 `leakPatternGate` 는 evidence 만 봐 게이트가 못 잡는다. 원 계약의 「wire 무변경」 제외 사유는 인코딩 호환만 덮고 허용값 선언을 안 덮었다 |
+| 3 | 2026-09-17 | `features.proto` `CompetitionSample.category_code`(9번) 주석도 같은 집합으로(주석만) + D-3H2-3 에 「술어 공유로 공종 표본 축 수신 허용 집합도 함께 넓어진다(송신 무변경)」 명시 | verifier r2 **N-1(medium)** — F-1 시정이 같은 메시지 안의 형제 필드 주석과 자기모순을 만들었고, `_resolve_segment` 가 술어를 두 축에 공유해 엔진이 `category_code = UNKNOWN` 도 수용한다(프로브 실측). 수신이 문서보다 관대한 쪽이라 상호운용은 안 깨지지만 문면은 맞춰 둔다 |
