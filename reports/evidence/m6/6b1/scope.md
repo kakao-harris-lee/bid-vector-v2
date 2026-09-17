@@ -8,7 +8,8 @@ head_sha: 리뷰 요청 시점의 `git rev-parse HEAD`(값을 박지 않는다)
 in_scope:
   - adapters/src/main/resources/db/migration/V8__edit_session.sql     # 세션 영속 표 신설 — id PK · state · expires_at · session_version · actor · last_command · 감사 열. 낙관적 동시성은 session_version 전제조건으로(트리거가 값을 정하지 않는다 — V2 의 revision 과 다른 축, D-6B1-3)
   - workflow/src/main/kotlin/bidvector/workflow/strategy/Ports.kt        # 계약 갱신 (2)·D-6B1-7: `load` 반환을 **원시 스냅숏**으로(`save` 시그니처 무편집). M4/4C-1 의 `OutboxPort.claim() -> ClaimedOutboxRow` 패턴 재사용
-  - workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionSnapshot.kt   # 계약 갱신 (2): 원시 필드만 담는 공개 스냅숏 타입(도메인 불변식 없음) + **`internal` 복원 함수**(미지·불량 값 거부). 어댑터는 이것만 만든다
+  - workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionSnapshot.kt   # 계약 갱신 (2): 원시 필드만 담는 공개 스냅숏 타입(도메인 불변식 없음) + 인코딩. 어댑터는 이것만 만든다
+  - workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionRestore.kt     # 계약 갱신 (5): **`internal` 복원 함수**(미지·불량 값 거부). detekt 파일당 함수 상한 때문에 스냅숏 파일에서 기계적으로 분리 — 설계 변경 아님(`CleanMigration*Test` 가 크기 게이트로 넷으로 갈린 것과 같은 종류)
   - workflow/src/main/kotlin/bidvector/workflow/strategy/EditStrategyWorkflow.kt  # 계약 갱신 (2): `sessions.load` 호출부가 스냅숏 → 복원을 지난다(로직 무변경)
   - workflow/src/test/kotlin/bidvector/workflow/strategy/**              # 계약 갱신 (2): `EditSessionRepository` fake 넷의 `load` 반환 타입만(단언·시나리오 무편집)
   - adapters/src/main/kotlin/bidvector/adapters/strategy/JdbcEditSessionRepository.kt      # 계약 갱신 (4)·D-6B1-9: **패키지는 `adapters.strategy`**(신설) — `persistence` 는 workflow 참조가 게이트로 금지돼 있다
@@ -32,7 +33,7 @@ out_of_scope:
 acceptance_commands:
   - "./gradlew --no-daemon check"                                                   # S-10 — 전건(evidence 커밋마다 그 HEAD 에서, 마지막 HEAD 결과는 보고·PR 코멘트가 정본)
   - "./gradlew --no-daemon :adapters:test --tests '*JdbcEditSessionRepositoryTest*' --rerun-tasks"      # S-30 — 세션 왕복·낙관적 충돌(캐시 우회)
-  - "./gradlew --no-daemon :adapters:test --tests '*CleanDatabaseReproductionTest*' --rerun-tasks"      # S-31 — 빈 컨테이너 V1~V8 전건 + 스키마 대조
+  - "./gradlew --no-daemon :adapters:test --tests '*CleanMigration*' --rerun-tasks"                     # S-31 — 빈 컨테이너 전건 적용 뒤 여덟 축 스키마 대조(계약 갱신 (5) 정정 — D-6B1-8 이 삭제한 파일을 가리키고 있었다, 팀장 오류)
   - "./tools/one-command-check.sh"                                                  # S-20 승계(6C) — 새 checkout 한 명령
 rollback: |
   신규 파일 삭제 + 편집 둘(`Sql.kt`·`milestone-6.md`)을 base 로.
@@ -104,6 +105,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 구현 중(5) | in_scope 에 `workflow/.../EditSessionRestore.kt` 등재(detekt 파일당 함수 상한으로 스냅숏 파일에서 기계적 분리) · **S-31 acceptance 명령 정정** — D-6B1-8 이 삭제한 파일을 계속 가리키고 있었다(**팀장 오류** — 갱신 (3)(4)가 in_scope·결정·이력만 고치고 acceptance 절에 전파되지 않았다. 「낡는 좌표」의 계약 내부 판) | 구현 레인 보고(새 파일 1·낡은 좌표 1) |
 | 2026-09-17 구현 중(4) | **D-6B1-9 신설** — 세션 어댑터 패키지를 `adapters.persistence` → **`adapters.strategy`**(신설) + 전용 의존 게이트 test 추가, in_scope 경로 교체 | 구현 레인 정지·보고: `persistence` 패키지는 workflow 참조가 기존 게이트로 금지돼 있고, 같은 필요로 `adapters.event` 가 이미 갈라져 있다(그 KDoc 이 allow-list 확대를 거부). **6F-1 의 전략 저장소도 같은 벽을 만나므로 같은 패키지를 쓴다**(6F-1 계약 갱신 (2)) |
 | 2026-09-17 구현 중(3) | **D-6B1-8 신설** — clean DB 축을 기존 여덟 축 계열 확장으로(새 게이트·속성 파일 삭제), in_scope 교체(신규 둘 → 기존 넷), ① 문면 정정 · **계약 초판의 전제 오류를 사실로 선언**(공유 컨테이너가 이미 빈 DB 전건 적용을 충족한다) | 구현 레인 정지·보고: 「바퀴 재발명 금지」(CLAUDE.md)에 걸렸고 기존 계열이 더 엄격하다. 선택지 셋 중 1(기존 확장)을 채택 — 2(중복 유지)는 평행 메커니즘 둘, 3(기존 넷을 속성 파일 방식으로 흡수)은 과거 slice 넷의 산출물 재작성이라 범위 초과 |
 | 2026-09-17 구현 전(2) | **D-6B1-7 신설** — `load` 반환만 원시 스냅숏으로 좁게 재개방(`save` 불변), in_scope 에 workflow 네 자리 추가(Ports·스냅숏 타입·호출부·test fake 반환 타입) · out_of_scope 문구를 `save` 한정으로 정정 · 충돌 ②(트리거) **차단 아님**으로 확정(기존 트리거 25 개가 세 표군에만 붙어 있고 신설 표는 대상 아님 — 실측), 충돌 ③ 은 구현 순서 3 에서 확정 · 인덱스 감사 완료(표 11·인덱스 14·제약 93·트리거 25, **소비 질의 없는 FK 인덱스 공백 4** → `OPEN-6B1-INDEX-GAPS` 등재, 추가 없음) | 구현 레인 정지·보고(앞 레인이 네트워크 오류로 죽으며 유실한 「충돌 셋」의 내용). 선례가 가리키는 해법이 계약이 막아 둔 항목과 **이름만 같았다** |
