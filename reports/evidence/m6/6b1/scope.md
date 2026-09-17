@@ -15,8 +15,10 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/persistence/EditSessionRow.kt              # 행 ↔ 도메인 매핑. `EditSession` 은 `internal constructor`(M4 가 위조를 닫았다)이므로 복원 진입점의 가시성을 넓히지 않는 방법을 설계 검토에서 정한다
   - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                         # 세션 SQL 문자열 추가만(기존 문장 무편집)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcEditSessionRepositoryTest.kt   # 왕복·낙관적 충돌(0행 → 실패)·상태 전이 보존·만료 시각 왕복
-  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanDatabaseReproductionTest.kt    # 완료 조건 1·6B ① — 빈 컨테이너에 V1~V8 전건 적용 뒤 스키마 불변식 실측(표·제약·인덱스·트리거 목록을 카탈로그에서 읽어 정책과 대조)
-  - config/quality/schema-baseline.properties                          # 위 test 가 대조하는 스키마 기대치(표·PK·UNIQUE·인덱스·트리거 목록). 매직값을 test 에 박지 않는다(v2-지침서 §5)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt          # 계약 갱신 (3)·D-6B1-8: **기존 여덟 축 계열에 `edit_session` 을 「추가만」으로 등재** — 축1 테이블·축5 UNIQUE·축5b PK·축6 FK·축9 GRANT 유효권한
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt    # 축2·3·4 — 컬럼 존재·타입·NOT NULL
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTriggerTest.kt   # 축7 — 트리거(신설 표는 트리거 0 임을 **등재**해야 한다, 지금은 안 붉지만 누락 상태)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt     # 축8 — CHECK 개수 등재
   - reports/evidence/m6/6b1/**
   - milestone-6.md                                                     # 6B 분할·6B-1 착수 문단(팀장 커밋)
 out_of_scope:
@@ -47,7 +49,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 
 ## 이 slice 가 하는 일
 
-① **clean DB 전체 재현을 게이트로** — 지금은 Testcontainers 가 test 마다 Flyway 를 태워 **간접** 재현만 한다(그 test 들의 목적은 도메인 왕복이다). 빈 컨테이너에 V1~V8 을 전건 적용한 뒤 **카탈로그를 읽어** 표·PK·UNIQUE·인덱스·트리거 목록을 기대치와 대조한다. 기대치는 `config/quality/schema-baseline.properties`(값의 자리를 test 밖으로).
+① **clean DB 재현 게이트에 신설 표를 잇는다**(계약 갱신 (3)·D-6B1-8 — 초판의 「새 게이트 신설」은 재발명이었다) — 기존 여덟 축 계열(`CleanMigration*Test` 넷, 정본 D-3D-6)이 빈 컨테이너 전건 적용 뒤 테이블·UNIQUE·PK·FK·컬럼 타입·NOT NULL·트리거·CHECK·GRANT 유효권한을 이미 대조한다. V8 이 그 계열을 붉히므로(실측 5 failed) `edit_session` 을 「추가만」으로 등재하고, **지금은 붉지 않지만 등재가 빠진 축 7·8**(트리거 0·CHECK 개수)도 함께 채운다.
 ② **제약·인덱스 실측과 공백 등재** — 현재 인덱스 셋(감사·수집 회계·outbox 순서)과 제약을 카탈로그에서 뽑아 evidence 에 표로 남기고, **소비 질의가 있는데 인덱스가 없는 자리**를 공백으로 등재한다. 추가 자체는 근거를 가진 slice 가 한다(D-6B1-5).
 ③ **낙관적 동시성 실물** — `EditSessionRepository` 의 실 구현을 세우고 `session_version` 을 **전제조건**으로 쓴다(`UPDATE … WHERE session_version = :expected`, 0행이면 실패). M4 가 port+fake 까지만 하고 남긴 자리이며, 지금 저장소에는 `revision`(V2 트리거가 정하는 값)만 있고 **잃어버린 갱신을 막는 전제조건이 어디에도 없다**.
 
@@ -60,6 +62,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 | **D-6B1-3** | 세션 표의 `session_version` 은 **애플리케이션이 싣고 DB 가 전제조건으로 검사**한다 — V2 의 `revision`(트리거가 정하는 값)과 다른 축이다 | 낙관적 동시성은 「내가 읽은 값이 아직 그 값인가」를 묻는 것이고, 트리거가 값을 정하면 그 질문이 사라진다. 두 메커니즘을 한 표에 섞지 않는다 |
 | **D-6B1-4** | 충돌은 port 시그니처를 바꾸지 않고 **큰 소리로 실패**한다(구체 예외) — 결과 타입화는 `OPEN-6B1-SAVE-OUTCOME` | `save(session): Unit` 에 충돌 통로가 없다. 결과 타입으로 나르려면 M4 종결 산출물(workflow)과 호출부·fake 가 전부 바뀌고 「충돌 시 무엇을 하는가」는 workflow 도메인 결정이다. **조용한 덮어쓰기만은 허용하지 않는다** — 그것이 이 축의 요점이다 |
 | **D-6B1-7** (계약 갱신 (2), 구현 레인 정지·보고) | `EditSessionRepository.load` 는 **원시 스냅숏**을 반환하고 `EditSession` 복원은 **workflow 안 `internal` 함수**가 진다 — 어댑터는 `EditSession` 을 만들지 않는다. `save` 시그니처는 불변(D-6B1-4). 스냅숏 타입은 **원시 필드만**(도메인 불변식 0)이고 복원은 **미지·불량 값을 거부**한다(지어내지 않는다) | 구현 레인 실측: `EditSession` 은 `internal constructor` + `@ConsistentCopyVisibility` 이고 저장소에 `friendPaths`·`associate` 설정이 0 이라 `adapters` 에서 생성자 호출이 **컴파일 불가**다. 통로 타입은 쓰기 주체만 가르고 **읽기·복원 문제를 풀지 않는다**. 같은 계열을 M4/4C-1 이 이미 겪었고(공개 복원 진입점이 위조 재료를 내준다 — verifier H-1) 해법이 **port 반환을 원시 행으로**(`OutboxPort.claim() -> ClaimedOutboxRow`, 복원은 workflow `internal`)였다. 대안 둘은 거부: 새 public 복원 팩토리는 D-6B1-6 이 막은 바로 그 자리를 다시 열고, 세션 축을 이 slice 에서 빼면 M4/4B 인계가 무기한 미결로 남는다 |
+| **D-6B1-8** (계약 갱신 (3), 구현 레인 정지·보고) | clean DB 재현은 **기존 여덟 축 계열**(`CleanMigration*Test` 넷, 정본 D-3D-6)에 신설 표를 「추가만」으로 등재해 잇는다 — 새 게이트를 만들지 않고 계약 초판이 지정한 `CleanDatabaseReproductionTest`·`schema-baseline.properties` 는 **삭제**한다. 스키마 기대치는 **test 코드에 둔다**(외부 속성 파일로 빼지 않는다) | ① **재발명이었다**: 그 계열이 M3/3D→3E→3F→3G→M4/4C-2 를 거쳐 「추가만」으로 확장돼 왔고 **FK·CHECK 개수·컬럼별 타입·NOT NULL 까지 더 엄격**하다(내 초판 구상은 표·PK·인덱스·트리거 **이름 집합**만 봤다). ② **전제가 틀렸다**: `PersistenceTestSupport` 의 공유 컨테이너는 `init` 에서 Flyway 를 **한 번** 태우므로 그 뒤 다른 test 의 DML 은 스키마 카탈로그에 영향이 없고, 「빈 컨테이너 전건 적용」 요구를 **이미 충족**한다 — 계약 초판의 「간접 재현만」은 **팀장 오류**다. ③ 기대치를 외부 속성 파일로 빼면 6C 가 실측한 표면이 생긴다(`OPEN-6C-POLICY-GATE-STRUCTURAL` — **정책 값이 곧 게이트의 세기**이고 값을 느슨하게 바꾸면 조용히 약해진다). 스키마 기대치는 test 코드가 정본인 편이 강하다 |
 | **D-6B1-5** | 인덱스·제약의 **추가**는 소비 질의를 가진 slice 가 근거와 함께. 이 slice 는 실측·공백 등재까지 | 근거 없는 인덱스는 쓰기 비용만 늘린다. 공백을 보이게 만드는 것이 이 slice 의 값이다 |
 | **D-6B1-6** | `EditSession` 의 복원은 **가시성을 넓히지 않는다** — M4 가 `internal constructor` 로 위조를 닫았다. 복원 진입점의 형태는 설계 검토에서 정하고(같은 모듈 내 팩토리 · 전용 통로 타입 중) 새 public 표면 0 을 실측한다 | M4/4C-1 의 high 가 정확히 「public 복원 진입점이 아무 모듈에나 위조를 허락한다」였다. 같은 자리를 다시 열지 않는다 |
 
@@ -99,5 +102,6 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 구현 중(3) | **D-6B1-8 신설** — clean DB 축을 기존 여덟 축 계열 확장으로(새 게이트·속성 파일 삭제), in_scope 교체(신규 둘 → 기존 넷), ① 문면 정정 · **계약 초판의 전제 오류를 사실로 선언**(공유 컨테이너가 이미 빈 DB 전건 적용을 충족한다) | 구현 레인 정지·보고: 「바퀴 재발명 금지」(CLAUDE.md)에 걸렸고 기존 계열이 더 엄격하다. 선택지 셋 중 1(기존 확장)을 채택 — 2(중복 유지)는 평행 메커니즘 둘, 3(기존 넷을 속성 파일 방식으로 흡수)은 과거 slice 넷의 산출물 재작성이라 범위 초과 |
 | 2026-09-17 구현 전(2) | **D-6B1-7 신설** — `load` 반환만 원시 스냅숏으로 좁게 재개방(`save` 불변), in_scope 에 workflow 네 자리 추가(Ports·스냅숏 타입·호출부·test fake 반환 타입) · out_of_scope 문구를 `save` 한정으로 정정 · 충돌 ②(트리거) **차단 아님**으로 확정(기존 트리거 25 개가 세 표군에만 붙어 있고 신설 표는 대상 아님 — 실측), 충돌 ③ 은 구현 순서 3 에서 확정 · 인덱스 감사 완료(표 11·인덱스 14·제약 93·트리거 25, **소비 질의 없는 FK 인덱스 공백 4** → `OPEN-6B1-INDEX-GAPS` 등재, 추가 없음) | 구현 레인 정지·보고(앞 레인이 네트워크 오류로 죽으며 유실한 「충돌 셋」의 내용). 선례가 가리키는 해법이 계약이 막아 둔 항목과 **이름만 같았다** |
 | 2026-09-17 착수 | 초판 — D-6B1-1~6 | 6C 병합 뒤 기록된 착수 순서(6C → 6B) · M6 입력 재고 §3 · M4/4B 인계 |
