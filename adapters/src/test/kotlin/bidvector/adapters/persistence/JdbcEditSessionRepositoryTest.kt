@@ -1,41 +1,18 @@
 package bidvector.adapters.persistence
 
-import bidvector.adapters.strategy.JdbcEditSessionRepository
-import bidvector.sharedkernel.EffectiveFrom
-import bidvector.sharedkernel.PolicyVersion
-import bidvector.sharedkernel.Resolution
-import bidvector.strategy.BudgetBoundInclusivity
-import bidvector.strategy.OperatorStrategy
-import bidvector.strategy.ScoreRange
 import bidvector.strategy.StrategyDraft
-import bidvector.strategy.StrategyEvent
-import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
-import bidvector.strategy.StrategyValidation
-import bidvector.strategy.ThresholdField
-import bidvector.strategy.validate
 import bidvector.workflow.strategy.Actor
-import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.BeginOutcome
-import bidvector.workflow.strategy.CancellationReason
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.CommandId
 import bidvector.workflow.strategy.CommandResult
 import bidvector.workflow.strategy.EditCommand
 import bidvector.workflow.strategy.EditSessionConflictException
 import bidvector.workflow.strategy.EditSessionId
-import bidvector.workflow.strategy.EditSessionPolicyData
-import bidvector.workflow.strategy.EditSessionRepository
 import bidvector.workflow.strategy.EditSessionState
-import bidvector.workflow.strategy.EditStrategyWorkflow
 import bidvector.workflow.strategy.EditableField
-import bidvector.workflow.strategy.EventSink
-import bidvector.workflow.strategy.OperatorId
-import bidvector.workflow.strategy.RejectionReason
-import bidvector.workflow.strategy.StrategyRepository
-import bidvector.workflow.strategy.TransitionOutcome
 import bidvector.workflow.strategy.toSnapshot
-import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -47,70 +24,15 @@ import java.sql.Timestamp
 import java.time.Duration
 import java.time.Instant
 
-private val OPERATOR = OperatorId("op-jdbc-1")
-private val FIELD = EditableField.Threshold(ThresholdField.BidNowThreshold)
-private val TEST_POLICY_VERSION = PolicyVersion(EffectiveFrom.Initial, "test-jdbc-policy")
+private val OPERATOR = EDIT_SESSION_TEST_OPERATOR
+private val FIELD = EDIT_SESSION_TEST_FIELD
 
 /**
- * S-30(scope.md) — 세션 왕복·낙관적 충돌(0행 → 실패)·상태 전이 보존·만료 시각 왕복. `adapters`
- * 는 `EditSession`을 만들 수 없다(`internal constructor` + `@ConsistentCopyVisibility`가
- * `copy()`도 internal로 내린다, D-6B1-6) — 그래서 이 test 는 [EditStrategyWorkflow]의 실제
- * 흐름으로 정당한 [bidvector.workflow.strategy.EditSession] 값을 얻고, 그 값으로
- * [JdbcEditSessionRepository]를 직접 몰아 write 경로를 실측한다.
+ * S-30(scope.md) — 세션 왕복·낙관적 충돌(0행 → 실패)·상태 전이 보존·만료 시각 왕복. 공용
+ * fixture 는 [EditSessionWorkflowTestSupport](v2-지침서.md §5 「파일 500줄 한도」로
+ * [JdbcEditSessionSaveGuardTest](D-6B1-10 회귀 보호)와 갈렸다 — 설계 변경이 아니다).
  */
-class JdbcEditSessionRepositoryTest : PersistenceTestSupport() {
-    private fun repository(): JdbcEditSessionRepository = JdbcEditSessionRepository(dataSource())
-
-    private fun strategyPolicy(): Resolution.Resolved<StrategyPolicyData> =
-        Resolution.Resolved(
-            StrategyPolicyData(
-                matchScoreRange = ScoreRange(BigDecimal.ZERO, BigDecimal.ONE),
-                probabilityScoreRange = ScoreRange(BigDecimal.ZERO, BigDecimal.ONE),
-                priorityScoreRange = ScoreRange(BigDecimal.ZERO, BigDecimal.ONE),
-                budgetBoundInclusivity = BudgetBoundInclusivity.Inclusive,
-            ),
-            TEST_POLICY_VERSION,
-        )
-
-    private fun initialStrategy(): OperatorStrategy =
-        (validate(StrategyDraft(), StrategyRevision(1), strategyPolicy()) as StrategyValidation.Valid).strategy
-
-    private class InMemoryStrategyRepository(
-        var strategy: OperatorStrategy,
-    ) : StrategyRepository {
-        override fun load(): OperatorStrategy = strategy
-
-        override fun save(applied: AppliedStrategy) {
-            strategy = applied.strategy
-        }
-    }
-
-    private class NoopEventSink : EventSink {
-        val published = mutableListOf<StrategyEvent>()
-
-        override fun publish(
-            event: StrategyEvent,
-            actor: Actor,
-        ) {
-            published += event
-        }
-    }
-
-    private fun workflow(
-        sessions: EditSessionRepository = repository(),
-        clock: Clock = Clock { Instant.parse("2026-09-17T00:00:00Z") },
-        strategies: InMemoryStrategyRepository = InMemoryStrategyRepository(initialStrategy()),
-        timeout: Duration = Duration.ofMinutes(15),
-    ): EditStrategyWorkflow =
-        EditStrategyWorkflow(
-            sessions,
-            strategies,
-            clock,
-            NoopEventSink(),
-            strategyPolicy(),
-            EditSessionPolicyData(timeout),
-        )
-
+class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
     @Test
     fun `begin 으로 만든 세션을 load 하면 원본과 같은 스냅숏이 나온다 — 왕복`() {
         val sessions = repository()
@@ -399,179 +321,5 @@ class JdbcEditSessionRepositoryTest : PersistenceTestSupport() {
         seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
 
         shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
-    }
-
-    /**
-     * verifier r3 HIGH-3 재현·회귀 보호(D-6B1-10) — 실 저장소 + 실 [EditStrategyWorkflow]로
-     * 다섯 경로(`R2 1`·`2b`·`3b`·`3c`·`4b`, verifier report)를 돌려 전부 예외 없이
-     * 문서화된 [CommandResult.Processed] 결과를 낸다는 것과, 저장소 `session_version`이
-     * 그 호출로 **바뀌지 않는다**(재저장이 일어나지 않았다)는 것을 함께 잠근다. 고친 전
-     * (`EditStrategyWorkflow.process`가 무조건 `sessions.save`)에는 다섯 다
-     * `EditSessionConflictException`으로 터졌다(verifier r3 재현).
-     */
-    @Test
-    fun `잘못된 전이(WaitingForValue 에 Confirm)는 예외 없이 거부로 반환되고 버전은 그대로다 — HIGH-3 R2 1`() {
-        val sessions = repository()
-        val id = EditSessionId("jdbc-high3-invalid-transition")
-        val flow = workflow(sessions)
-        val begun = flow.begin(id, OPERATOR, FIELD)
-        check(begun is BeginOutcome.Started)
-        val versionBefore = sessions.load(id)!!.sessionVersion
-
-        val result =
-            shouldNotThrowAny {
-                flow.confirm(EditCommand.Confirm(CommandId("cmd-x"), id, Actor.Operator(OPERATOR), StrategyRevision(1)))
-            }
-
-        result.shouldBeInstanceOf<CommandResult.Processed>()
-        val outcome = result.outcome
-        outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
-        outcome.reason shouldBe RejectionReason.InvalidTransition
-        sessions.load(id)!!.sessionVersion shouldBe versionBefore
-    }
-
-    @Test
-    fun `같은 command 를 재전달하면 예외 없이 Accepted(중복)로 반환되고 버전은 그대로다 — HIGH-3 R2 2b`() {
-        val sessions = repository()
-        val id = EditSessionId("jdbc-high3-idempotent-redelivery")
-        val flow = workflow(sessions)
-        val begun = flow.begin(id, OPERATOR, FIELD)
-        check(begun is BeginOutcome.Started)
-        val command =
-            EditCommand.ProvideValue(
-                CommandId("cmd-1"),
-                id,
-                Actor.Operator(OPERATOR),
-                FIELD,
-                StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
-            )
-        val first = flow.provideValue(command)
-        check(first is CommandResult.Processed)
-        val versionAfterFirst = sessions.load(id)!!.sessionVersion
-
-        val redelivered = shouldNotThrowAny { flow.provideValue(command) }
-
-        redelivered.shouldBeInstanceOf<CommandResult.Processed>()
-        redelivered.outcome.shouldBeInstanceOf<TransitionOutcome.Accepted>()
-        sessions.load(id)!!.sessionVersion shouldBe versionAfterFirst
-    }
-
-    @Test
-    fun `APPLIED 뒤 같은 confirm 을 재전달하면 예외 없이 Accepted(중복)로 반환된다 — HIGH-3 R2 3b`() {
-        val sessions = repository()
-        val id = EditSessionId("jdbc-high3-applied-redelivery")
-        val flow = workflow(sessions)
-        flow.begin(id, OPERATOR, FIELD)
-        flow.provideValue(
-            EditCommand.ProvideValue(
-                CommandId("cmd-1"),
-                id,
-                Actor.Operator(OPERATOR),
-                FIELD,
-                StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
-            ),
-        )
-        val confirmCommand = EditCommand.Confirm(CommandId("cmd-2"), id, Actor.Operator(OPERATOR), StrategyRevision(1))
-        val confirmed = flow.confirm(confirmCommand)
-        check(confirmed is CommandResult.Processed)
-        val versionAfterApplied = sessions.load(id)!!.sessionVersion
-
-        val redelivered = shouldNotThrowAny { flow.confirm(confirmCommand) }
-
-        redelivered.shouldBeInstanceOf<CommandResult.Processed>()
-        redelivered.outcome.shouldBeInstanceOf<TransitionOutcome.Accepted>()
-        sessions.load(id)!!.sessionVersion shouldBe versionAfterApplied
-    }
-
-    @Test
-    fun `APPLIED 뒤 cancel(잘못된 전이)은 예외 없이 거부로 반환된다 — HIGH-3 R2 3c`() {
-        val sessions = repository()
-        val id = EditSessionId("jdbc-high3-applied-cancel")
-        val flow = workflow(sessions)
-        flow.begin(id, OPERATOR, FIELD)
-        flow.provideValue(
-            EditCommand.ProvideValue(
-                CommandId("cmd-1"),
-                id,
-                Actor.Operator(OPERATOR),
-                FIELD,
-                StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
-            ),
-        )
-        flow.confirm(EditCommand.Confirm(CommandId("cmd-2"), id, Actor.Operator(OPERATOR), StrategyRevision(1)))
-        val versionAfterApplied = sessions.load(id)!!.sessionVersion
-
-        val result =
-            shouldNotThrowAny {
-                flow.cancel(
-                    EditCommand.Cancel(CommandId("cmd-3"), id, Actor.Operator(OPERATOR), CancellationReason.OperatorRequested),
-                )
-            }
-
-        result.shouldBeInstanceOf<CommandResult.Processed>()
-        val outcome = result.outcome
-        outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
-        outcome.reason shouldBe RejectionReason.InvalidTransition
-        sessions.load(id)!!.sessionVersion shouldBe versionAfterApplied
-    }
-
-    @Test
-    fun `EXPIRED 뒤 cancel 은 예외 없이 SessionExpired 거부로 반환된다 — HIGH-3 R2 4b`() {
-        val sessions = repository()
-        val id = EditSessionId("jdbc-high3-expired-cancel")
-        val startClock = Clock { Instant.parse("2026-09-17T00:00:00Z") }
-        val begun = workflow(sessions, clock = startClock, timeout = Duration.ofMinutes(1)).begin(id, OPERATOR, FIELD)
-        check(begun is BeginOutcome.Started)
-        val afterExpiry = Clock { Instant.parse("2026-09-17T00:10:00Z") }
-        workflow(sessions, clock = afterExpiry).expire(id)
-        val versionAfterExpiry = sessions.load(id)!!.sessionVersion
-
-        val result =
-            shouldNotThrowAny {
-                workflow(sessions, clock = afterExpiry).cancel(
-                    EditCommand.Cancel(CommandId("cmd-1"), id, Actor.Operator(OPERATOR), CancellationReason.OperatorRequested),
-                )
-            }
-
-        result.shouldBeInstanceOf<CommandResult.Processed>()
-        val outcome = result.outcome
-        outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
-        outcome.reason shouldBe RejectionReason.SessionExpired
-        sessions.load(id)!!.sessionVersion shouldBe versionAfterExpiry
-    }
-
-    /**
-     * 경계 회귀 — 명령 처리 **중** 만료로 접히는 경로(verifier r3 「R2-FOLD」)는 위 다섯과
-     * 달리 `outcome.session`이 새 인스턴스(버전 +1)라 저장이 그대로 일어나야 한다. HIGH-3
-     * 수정이 이 정당한 저장까지 막지 않는지를 실 저장소로 확인한다.
-     */
-    @Test
-    fun `명령 처리 중 만료로 접히면 Rejected(SessionExpired) 가 반환되고 fold 는 저장된다`() {
-        val sessions = repository()
-        val id = EditSessionId("jdbc-high3-fold-during-process")
-        val clock = Clock { Instant.parse("2026-09-17T00:00:00Z") }
-        val begun = workflow(sessions, clock = clock, timeout = Duration.ofMinutes(1)).begin(id, OPERATOR, FIELD)
-        check(begun is BeginOutcome.Started)
-        val versionBefore = sessions.load(id)!!.sessionVersion
-
-        val afterExpiry = Clock { Instant.parse("2026-09-17T00:10:00Z") }
-        val result =
-            workflow(sessions, clock = afterExpiry).provideValue(
-                EditCommand.ProvideValue(
-                    CommandId("cmd-1"),
-                    id,
-                    Actor.Operator(OPERATOR),
-                    FIELD,
-                    StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
-                ),
-            )
-
-        result.shouldBeInstanceOf<CommandResult.Processed>()
-        val outcome = result.outcome
-        outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
-        outcome.reason shouldBe RejectionReason.SessionExpired
-        val loaded = sessions.load(id)!!
-        loaded.stateKind shouldBe "EXPIRED"
-        loaded.sessionVersion shouldBe versionBefore + 1
     }
 }

@@ -14,16 +14,18 @@ in_scope:
   - workflow/src/test/kotlin/bidvector/workflow/strategy/**              # 계약 갱신 (2): `EditSessionRepository` fake 넷의 `load` 반환 타입만(단언·시나리오 무편집)
   - adapters/src/main/kotlin/bidvector/adapters/strategy/JdbcEditSessionRepository.kt      # 계약 갱신 (4)·D-6B1-9: **패키지는 `adapters.strategy`**(신설) — `persistence` 는 workflow 참조가 게이트로 금지돼 있다
   - adapters/src/main/kotlin/bidvector/adapters/strategy/EditSessionRow.kt                 # 행 → 스냅숏 매핑(D-6B1-7). 도메인 복원은 workflow `internal`
-  - adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt  # 계약 갱신 (4): 신설 패키지 전용 의존 게이트(허용 = `workflow.strategy`·`strategy`·`sharedkernel`·`adapters.persistence` 의 트랜잭션 경계). `adapters.event` 의 전례와 같은 형태
+  - adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt  # 계약 갱신 (4): 신설 패키지 전용 의존 게이트(허용 = `workflow.strategy`·`strategy`·`sharedkernel`·`adapters.persistence` 의 트랜잭션 경계). `adapters.event` 의 전례와 같은 형태. 계약 갱신 (9): MEDIUM-5 수정 — 술어를 점 표기 좌표까지 보게, `javap` 를 `java.home` 기준으로 해석(code-reviewer 지적)
   - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                         # 세션 SQL 문자열 추가만(기존 문장 무편집)
-  - adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcEditSessionRepositoryTest.kt   # 왕복·낙관적 충돌(0행 → 실패)·상태 전이 보존·만료 시각 왕복. 계약 갱신 (9): D-6B1-10 재현·회귀 보호 — 실 저장소+실 workflow 로 거부·중복재전달 다섯 경로(예외 없이 반환·버전 불변) + 명령 중 만료 fold(정당한 저장) 여섯
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcEditSessionRepositoryTest.kt   # 왕복·낙관적 충돌(0행 → 실패)·상태 전이 보존·만료 시각 왕복. 계약 갱신 (10): 공용 fixture 를 `EditSessionWorkflowTestSupport`로 추출(500줄 한도, 설계 변경 아님)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/EditSessionWorkflowTestSupport.kt   # 계약 갱신 (10, 신설) — `JdbcEditSessionRepositoryTest`·`JdbcEditSessionSaveGuardTest` 공용 fixture(500줄 한도로 기계적 추출, `EditSessionRestore.kt`·`CleanMigration*Test` 넷과 같은 전례)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcEditSessionSaveGuardTest.kt   # 계약 갱신 (9)·(10, 신설) — D-6B1-10 재현·회귀 보호: 실 저장소+실 workflow 로 거부·중복재전달 다섯 경로(예외 없이 문서화된 결과로 반환·버전 불변) + 명령 중 만료 fold(정당한 저장) 여섯
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt          # 계약 갱신 (3)·D-6B1-8: **기존 여덟 축 계열에 `edit_session` 을 「추가만」으로 등재** — 축1 테이블·축5 UNIQUE·축5b PK·축6 FK·축9 GRANT 유효권한
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt    # 축2·3·4 — 컬럼 존재·타입·NOT NULL
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTriggerTest.kt   # 축7 — 트리거(신설 표는 트리거 0 임을 **등재**해야 한다, 지금은 안 붉지만 누락 상태)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt     # 축8 — CHECK 개수 등재
   - app/src/test/kotlin/bidvector/app/conformance/**        # 계약 갱신 (6): `EditSessionRepository.load` 반환 타입 변경(D-6B1-7)의 기계적 귀결 — conformance fake 의 시그니처만
   - adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt   # 계약 갱신 (6): 신설 표를 test 간 정리 목록에 추가(기계적)
-  - config/quality/gate-tests.properties                    # 계약 갱신 (6): 신설 test 를 양방향 등재 게이트에 등재(그 게이트가 요구한다 — 우회가 아니라 이행)
+  - config/quality/gate-tests.properties                    # 계약 갱신 (6): 신설 test 를 양방향 등재 게이트에 등재(그 게이트가 요구한다 — 우회가 아니라 이행). 계약 갱신 (10): `StrategyAdapterDependencyTest`(D-6B1-9, 형제 다섯 `*AdapterDependencyTest`는 이미 등재돼 있었다) 등재 누락을 verifier r3 MEDIUM-5 수정 라운드에서 발견해 보충 — 추가만(6F-1 도 이 공유 파일을 만진다)
   - reports/evidence/m6/6b1/**
   - milestone-6.md                                                     # 6B 분할·6B-1 착수 문단(팀장 커밋)
 out_of_scope:
@@ -120,6 +122,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 수정 라운드 2(10) | 수정 라운드가 만든 새 파일 둘을 in_scope 에 등재 — `EditSessionWorkflowTestSupport.kt`(공용 fixture, 500줄 한도로 기계적 추출)·`JdbcEditSessionSaveGuardTest.kt`(D-6B1-10 회귀 보호 여섯 test). `StrategyAdapterDependencyTest`의 `config/quality/gate-tests.properties` 등재 누락(D-6B1-9, 형제 다섯은 이미 등재)을 발견해 보충(추가만) | 하네스 2026-09-10 「수정 라운드가 만드는 새 파일은 in_scope 와 대조해 계약을 갱신한다」. 팀장 재개 지시 항목 2 |
 | 2026-09-17 수정 라운드 2(9) | **D-6B1-10 신설** — `EditStrategyWorkflow.process`가 `outcome.session !== session`일 때만 저장하도록 조건화. `workflow/**`를 D-6B1-7 범위(스냅숏 배관) 밖으로 넓힌 것을 **팀장 오류로 사실 등재**(그 범위를 좁게 그은 것 자체가 오류였다) — in_scope 의 `EditStrategyWorkflow.kt`·`JdbcEditSessionRepositoryTest.kt` 서술 갱신. `Transition.kt`(전이·판정 로직)는 무편집 | verifier r3 HIGH-3 — 정당한 거부·멱등 재전달의 저장이 낙관적 동시성 전제조건에 걸려 예외로 터졌다(재현 다섯: `R2 1`·`2b`·`3b`·`3c`·`4b`). 어댑터 쪽 흡수는 거부(저장소 정의가 옳다) |
 | 2026-09-17 수정 라운드 1(8) | D-6B1-6·위협 모델 (c)·(2b) `EditSessionSnapshot` 행·`OPEN-6B1-CROSS-FIELD-CONSISTENCY`를 verifier r2 실행 증거로 갱신 — 필드 간 정합 공백이 **이론이 아니라 실행 재현**(순수 Kotlin, `Applied(999999)`+`ProvideValue`+`v0`)임을 반영, 닫는 문 후보 둘(`Transition.kt` 정합 조회 함수 신설 / `EditSession` init 불변식) 명시 후 코딩하지 않고 계약 결정으로 올림. `internal` 위조 차단의 실제 강도(Kotlin 컴파일러+`sourceLanguageGate`+friendPaths 부재 세 겹, 리플렉션은 경계 밖·무방비, 이 slice 고유 한계 아님)를 D-6B1-6·위협 모델에 등재 | verifier r2 LOW-5(문면이 "위조 불가"로 읽히나 실제는 "Kotlin 소스 경계") · MEDIUM-4 승격(읽기 지적 → 실행 확인) |
 | 2026-09-17 수정 라운드 1(7) | (2b) 표를 일곱 행으로 갱신(`EditSessionSnapshot`·nested 넷·`toSnapshot()`·`EditSessionConflictException`) + 판정되지 않았던 실질(`EditSessionSnapshot`이 여는 필드 간 정합 공백) 판정·문서화 + `schema-baseline.properties` 낡은 행 제거 + `OPEN-6B1-CROSS-FIELD-CONSISTENCY` 신설(닫으려면 `Transition.kt` 변경 필요 — 이 slice 범위 밖으로 판단, 코딩하지 않음) | verifier r1 MEDIUM-4 — 계약이 그 뒤 다섯 번 갱신되는 동안 (2b) 표를 갱신하지 않았다(하네스 2026-09-10 「수정 라운드마다 갱신」 위반) |
