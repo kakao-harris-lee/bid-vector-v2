@@ -57,6 +57,7 @@
 4. ~~scope 밖 파일 셋의 기계적 편집~~ — **계약 갱신(6)으로 in_scope 편입**(팀장, 「알려진 제한이 아니라 in_scope다 — slice의 커밋 집합은 in_scope 경로의 변경」): `app/src/test/kotlin/bidvector/app/conformance/**`(fake `load` 반환 타입, D-6B1-7 귀결)·`adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt`(TRUNCATE 목록에 `edit_session` 추가)·`config/quality/gate-tests.properties`(`EditSessionSnapshotTest` 등재). 더 이상 알려진 제한이 아니다 — `scope.md` in_scope 목록 참조.
 5. **비밀값 스캔 오탐** — `commands.md` 참조. 도메인 상용어(토큰 문자열 상수 함수명·정책 문서의 일반 서술) 매치이고 실 비밀값 0건.
 6. **`StrategyAdapterDependencyTest`(바이트코드 상수 풀 의존 게이트)는 인라인되는 표면을 구조적으로 못 본다(verifier r3 LOW-6)** — 금지 모듈이 `public const val`이나 top-level `public inline fun`을 내놓으면, 그것을 쓰는 코드는 컴파일 시점에 값·본문이 인라인돼 상수 풀에 금지 좌표가 남지 않는다. verifier가 금지 모듈에 그런 표면을 심어 실측했다(게이트 초록, 상수 풀 흔적 0). 지금은 잠재다 — 금지 루트(`procurement`·`decision`·`qualification`·`workflow.event`·`adapters.ml`)에 `public const val`도 top-level `inline fun`도 현재 0건이다. 처방은 게이트 신설이 아니라 이 한계를 적어 두는 것 — 뒤 slice가 금지 모듈에 인라인 표면을 만들 때 이 항목이 걸린다.
+7. **`StrategyAdapterDependencyTest`의 넓힌 정규식(verifier r3 MEDIUM-5 수정)이 산문 문자열 상수도 본다(verifier r4 LOW-7)** — 술어가 상수 풀의 Utf8 문자열을 점·슬래시 표기 양쪽으로 훑으므로, `bidvector.adapters.strategy` 패키지의 **의존이 아닌** 산문 문자열 리터럴이 금지 루트(`procurement`·`decision`·`qualification`·`workflow.event`·`adapters.ml`)를 언급하면(예: 주석성 텍스트를 문자열 상수로 박아 두는 경우) 게이트가 거짓 양성으로 걸린다. verifier가 변이로 확인했다. 영향은 이 패키지 main 소스의 문자열 리터럴에 한정되고, 실패 메시지가 걸린 문자열을 그대로 찍어 줘 원인 파악이 즉시 된다 — 코드 수정 없이 등재만 한다.
 
 ## OPEN 처분 — scope.md 승계
 

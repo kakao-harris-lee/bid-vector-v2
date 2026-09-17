@@ -113,6 +113,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 | `OPEN-6B1-SAVE-OUTCOME`(신설) | 충돌을 결과 타입으로 나를지 — 두 번째 writer(API·스케줄러)가 생길 때 workflow 도메인 결정과 함께 |
 | `OPEN-6B1-INDEX-GAPS`(신설) | ② 가 등재할 인덱스 공백 — 소비 질의를 가진 slice 가 근거와 함께 추가(D-6B1-5) |
 | `OPEN-6B1-CROSS-FIELD-CONSISTENCY`(신설, verifier r1 MEDIUM-4 지적 → r2 실행으로 확인) | `restoreEditSession`이 (상태, `lastCommand`) 필드 간 정합을 검사하지 않는다 — **순수 Kotlin, 리플렉션·Java·가시성 우회 없이 실행 재현됨**(`Applied(999999)`+`lastCommand=ProvideValue`+`sessionVersion=0`). 닫는 문 후보 둘(둘 다 `workflow/**`를 D-6B1-7 범위(스냅숏 배관) 밖으로 넓혀 이 slice 에서 코딩하지 않는다): ① `Transition.kt`에 정합 조회 함수 신설(재사용) ② `EditSession`에 `init` 불변식 추가(방어 심층). 오늘은 `EditSessionRepository` 실 구현·배선이 `JdbcEditSessionRepository` 하나뿐이고 `EditStrategyWorkflow`가 6A 이전이라 배선 안 돼 실제 주입 지점이 없다 — 6A 배선 slice 또는 `Transition.kt` 재설계 slice에서 팀장 계약 결정으로 처분 |
+| `OPEN-6B1-REGISTRATION-GATE-GENERALIZATION`(신설, verifier r4 MEDIUM-7 지적) | `gate-tests.properties` 양방향 등재를 자동으로 채우는 장치가 셋뿐이고 **전부 자기 디렉터리를 하드코딩**한다 — `adapters.strategy`(신설 패키지)는 그런 장치가 없어 `StrategyAdapterDependencyTest`가 「의존 게이트 + 등재 게이트」 관례의 절반(의존 게이트)만 갖춘 채 남았고, 그래서 이번 라운드에 등재 누락이 생겼다(승인 전 일괄, gate-tests.properties 계약 갱신 (10)에서 수동 보충). **세 번째 하드코딩 복제를 만들지 않는다** — 디렉터리를 입력으로 받는 일반화가 맞고 그건 이 slice 밖 별도 slice 감이다. 새 패키지가 생길 때마다 같은 누락이 재발할 구조적 자리이므로, 등재 게이트 생성기(또는 검증기)를 디렉터리 인자화하는 slice에서 처분 |
 
 ## 리뷰 레인
 
@@ -122,6 +123,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 승인 전 일괄(12) | **LOW-7 등재**(`checklist.md` 알려진 제한 7 — MEDIUM-5 가 넓힌 정규식이 산문 문자열 상수도 걸린다, 코드 수정 없음) · **`OPEN-6B1-REGISTRATION-GATE-GENERALIZATION` 신설**(MEDIUM-7 — 등재 게이트 자동화 장치 셋이 전부 디렉터리 하드코딩이라 신설 패키지엔 없다, 복제 대신 일반화 방향으로 별도 slice) | verifier r4 LOW-7·MEDIUM-7 — 둘 다 코드 수정 없이 장부층 등재만 |
 | 2026-09-17 승인 전 일괄(11) | **MEDIUM-8 시정** — `EditSessionTransitionTableTest`에 저장 판별자 불변식 test 신설(`outcome.session !== session`이면 반드시 `sessionVersion`이 입력보다 정확히 1 크다). `RejectionReason` 여섯(`SessionAlreadyActive` 제외 — `begin()` 전용) + `Accepted`·`Applied` 전 갈래를 돈다. 판별자(`!==`)는 바꾸지 않는다(`begin()`/`expire()`와 일관, code-reviewer가 현 전이표에서 구조적으로 옳음을 확인) — 등가 자체를 test 로 잠근다. `Transition.kt`(전이·판정 로직)는 무편집 | verifier r4 MEDIUM-8 — 「버전이 올랐다」와 「인스턴스가 다르다」의 등가는 현재 전이표에서만 참이고 코드에 안 잠겨 있었다. `StaleRevision` 거부 갈래에 "새 인스턴스인데 버전 불변"을 심어도 `:workflow:test`·어댑터 test 전건이 초록이었다(신설 여섯이 덮는 거부 사유는 셋뿐) |
 | 2026-09-17 수정 라운드 2(10) | 수정 라운드가 만든 새 파일 둘을 in_scope 에 등재 — `EditSessionWorkflowTestSupport.kt`(공용 fixture, 500줄 한도로 기계적 추출)·`JdbcEditSessionSaveGuardTest.kt`(D-6B1-10 회귀 보호 여섯 test). `StrategyAdapterDependencyTest`의 `config/quality/gate-tests.properties` 등재 누락(D-6B1-9, 형제 다섯은 이미 등재)을 발견해 보충(추가만) | 하네스 2026-09-10 「수정 라운드가 만드는 새 파일은 in_scope 와 대조해 계약을 갱신한다」. 팀장 재개 지시 항목 2 |
 | 2026-09-17 수정 라운드 2(9) | **D-6B1-10 신설** — `EditStrategyWorkflow.process`가 `outcome.session !== session`일 때만 저장하도록 조건화. `workflow/**`를 D-6B1-7 범위(스냅숏 배관) 밖으로 넓힌 것을 **팀장 오류로 사실 등재**(그 범위를 좁게 그은 것 자체가 오류였다) — in_scope 의 `EditStrategyWorkflow.kt`·`JdbcEditSessionRepositoryTest.kt` 서술 갱신. `Transition.kt`(전이·판정 로직)는 무편집 | verifier r3 HIGH-3 — 정당한 거부·멱등 재전달의 저장이 낙관적 동시성 전제조건에 걸려 예외로 터졌다(재현 다섯: `R2 1`·`2b`·`3b`·`3c`·`4b`). 어댑터 쪽 흡수는 거부(저장소 정의가 옳다) |
