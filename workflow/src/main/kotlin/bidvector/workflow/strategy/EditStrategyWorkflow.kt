@@ -80,7 +80,7 @@ class EditStrategyWorkflow(
         operator: OperatorId,
         field: EditableField,
     ): BeginOutcome {
-        val existing = sessions.load(sessionId)
+        val existing = sessions.load(sessionId)?.let(::restoreEditSession)
         if (existing != null) {
             val folded = expireIfDue(existing, clock.now())
             if (folded !== existing) sessions.save(folded)
@@ -103,7 +103,7 @@ class EditStrategyWorkflow(
 
     /** 주기 sweep 배선은 이 slice 밖(트리거는 4B/후속) — 순수 만료 판정만 여기서 노출한다. */
     fun expire(sessionId: EditSessionId): EditSessionState? {
-        val session = sessions.load(sessionId) ?: return null
+        val session = sessions.load(sessionId)?.let(::restoreEditSession) ?: return null
         val expired = expireIfDue(session, clock.now())
         if (expired !== session) sessions.save(expired)
         return expired.state
@@ -120,7 +120,7 @@ class EditStrategyWorkflow(
      * 제한 — 원자적 저장+발행+세션전진은 4C 트랜잭션 outbox 소관.
      */
     private fun process(command: EditCommand): CommandResult {
-        val session = sessions.load(command.sessionId) ?: return CommandResult.SessionNotFound
+        val session = sessions.load(command.sessionId)?.let(::restoreEditSession) ?: return CommandResult.SessionNotFound
         val outcome = apply(session, command, clock.now(), strategies.load(), strategyPolicy)
         if (outcome is TransitionOutcome.Applied) {
             strategies.save(outcome.applied)

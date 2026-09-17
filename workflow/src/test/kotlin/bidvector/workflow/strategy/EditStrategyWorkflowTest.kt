@@ -58,10 +58,15 @@ private class InMemoryStrategyRepository(
     }
 }
 
+/**
+ * D-6B1-7(계약 갱신 (2)) — `load`는 원시 스냅숏을 반환한다. fake 는 여전히 [EditSession]을
+ * 저장하고(테스트가 이미 정당하게 가진 값), 반환 시점에만 [EditSession.toSnapshot]으로
+ * 내린다 — 단언·시나리오는 그대로다.
+ */
 private class InMemorySessionRepository : EditSessionRepository {
     private val sessions = mutableMapOf<EditSessionId, EditSession>()
 
-    override fun load(id: EditSessionId): EditSession? = sessions[id]
+    override fun load(id: EditSessionId): EditSessionSnapshot? = sessions[id]?.toSnapshot()
 
     override fun save(session: EditSession) {
         sessions[session.id] = session
@@ -323,7 +328,7 @@ class EditStrategyWorkflowTest {
         strategies.failNextSave = true
         shouldThrow<IllegalStateException> { workflow.confirm(confirmCommand) }
 
-        sessions.load(sessionId)!!.state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
+        restoreEditSession(sessions.load(sessionId)!!).state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
         strategies.load().revision shouldBe StrategyRevision(1)
         events.published.shouldBeEmpty()
 
@@ -371,7 +376,7 @@ class EditStrategyWorkflowTest {
         shouldThrow<IllegalStateException> { workflow.confirm(confirmCommand) }
 
         strategies.strategy.revision shouldBe StrategyRevision(2)
-        sessions.load(sessionId)!!.state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
+        restoreEditSession(sessions.load(sessionId)!!).state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
 
         val retried = workflow.confirm(confirmCommand)
         retried.shouldBeInstanceOf<CommandResult.Processed>()
@@ -423,6 +428,6 @@ class EditStrategyWorkflowTest {
         // sessions 참조로 확인한다 — outcome.session 자체가 Expired 라는 것만으로는
         // process() 의 저장 호출 여부를 재지 못한다(변이: sessions.save 를 조건부로 감싸도
         // outcome 필드는 그대로 Expired 라 통과했을 것이다, verifier L-5).
-        sessions.load(sessionId)!!.state shouldBe EditSessionState.Expired
+        restoreEditSession(sessions.load(sessionId)!!).state shouldBe EditSessionState.Expired
     }
 }

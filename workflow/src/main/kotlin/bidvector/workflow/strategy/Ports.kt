@@ -39,12 +39,39 @@ interface StrategyRepository {
     fun save(applied: AppliedStrategy)
 }
 
-/** 편집 세션 저장 port(scope.md ⑤) — 낙관적 동시성은 [EditSession.sessionVersion]이 나른다. */
+/**
+ * 편집 세션 저장 port(scope.md ⑤) — 낙관적 동시성은 [EditSession.sessionVersion]이 나른다.
+ *
+ * **`load` 반환은 원시 스냅숏이다(D-6B1-7, 계약 갱신 (2), 6B-1 구현 레인 실측).**
+ * `EditSession`은 `internal constructor`(M4가 위조를 막았다)라 `adapters`에서 생성자
+ * 호출 자체가 컴파일되지 않는다 — `friendPaths`·`associate` 설정이 저장소에 0건이라
+ * `AppliedStrategy` 같은 통로 타입으로는 이 문제(획득/복원)가 풀리지 않는다(통로 타입은
+ * 쓰기 주체만 가른다). M4/4C-1이 같은 계열을 겪었고(`EventEnvelope.restore`가 public
+ * 이라 저장소 복원 진입점이 위조 재료를 내줬다, verifier H-1) 해법이 **port 반환을 원시
+ * 값으로**(`OutboxPort.claim() -> ClaimedOutboxRow`, 복원은 `workflow` 안 `internal`)였다
+ * — 이 port도 같은 형태를 취한다. 실 복원은 [restoreEditSession] 하나뿐이고
+ * [EditStrategyWorkflow]가 로드 직후 그것을 거친다. `save`의 시그니처는 그대로다
+ * (D-6B1-4 — 어댑터는 이미 완성된 [EditSession]의 public 프로퍼티를 읽을 뿐이라 복원이
+ * 필요 없다).
+ */
 interface EditSessionRepository {
-    fun load(id: EditSessionId): EditSession?
+    fun load(id: EditSessionId): EditSessionSnapshot?
 
     fun save(session: EditSession)
 }
+
+/**
+ * [EditSessionRepository.save]의 낙관적 동시성 충돌(D-6B1-4) — 세션 표는 `session_version`을
+ * 전제조건으로 쓰고(`UPDATE ... WHERE session_version = :expected`), 0행이면 이 예외로
+ * 크게 실패한다. 조용한 덮어쓰기를 허용하지 않는 것이 이 축의 요점이다 — 결과 타입화는
+ * 두 번째 writer가 생길 때(`OPEN-6B1-SAVE-OUTCOME`).
+ */
+class EditSessionConflictException(
+    val sessionId: EditSessionId,
+    val expectedVersion: Int,
+) : RuntimeException(
+        "EditSession(${sessionId.value}) 저장 충돌 — 기대 session_version=$expectedVersion 이 저장소와 다르다",
+    )
 
 /**
  * 적용 이벤트 발행 port(scope.md ⑥) — 봉투·outbox 는 4C, 이 slice 는 payload 를 넘기는
