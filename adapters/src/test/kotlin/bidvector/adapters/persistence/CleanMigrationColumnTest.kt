@@ -245,10 +245,60 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("edit_session", "created_at", "timestamp with time zone", false, true),
         )
 
+    // M6/6F-1 — 전략 영속(추가만, D-6F1-1). 두 표가 감시·임계·상한 열 형태를 공유한다
+    // (operator_strategy = 싱글턴 현재 값, operator_strategy_revision = 개정 이력). 감시 규칙
+    // 다섯 축은 `StrategyDraft`가 항상 `List<String>`(빈 목록이 「규칙 없음」)이라 NOT NULL —
+    // 나머지(예산·점수·상한)만 진짜 nullable이다.
+    private val operatorStrategyNotNullArrayColumns =
+        listOf(
+            "focus_categories" to "ARRAY",
+            "focus_region_terms" to "ARRAY",
+            "exclude_region_terms" to "ARRAY",
+            "required_keyword_terms" to "ARRAY",
+            "exclude_keyword_terms" to "ARRAY",
+        )
+
+    private val operatorStrategyNullableColumns =
+        listOf(
+            "min_budget_won" to "numeric",
+            "min_budget_currency" to "text",
+            "min_budget_vat" to "text",
+            "min_budget_provenance" to "text",
+            "min_budget_provenance_detail" to "text",
+            "max_budget_won" to "numeric",
+            "max_budget_currency" to "text",
+            "max_budget_vat" to "text",
+            "max_budget_provenance" to "text",
+            "max_budget_provenance_detail" to "text",
+            "minimum_match_score" to "numeric",
+            "minimum_probability_score" to "numeric",
+            "bid_now_threshold" to "numeric",
+            "review_threshold" to "numeric",
+            "candidate_limit" to "integer",
+        )
+
+    private fun operatorStrategySharedColumns(table: String): List<ColumnSpec> =
+        operatorStrategyNotNullArrayColumns.map { (name, type) -> ColumnSpec(table, name, type, false) } +
+            operatorStrategyNullableColumns.map { (name, type) -> ColumnSpec(table, name, type, true) }
+
+    private val operatorStrategyColumns =
+        listOf(
+            ColumnSpec("operator_strategy", "id", "smallint", false),
+            ColumnSpec("operator_strategy", "revision", "integer", false),
+            ColumnSpec("operator_strategy", "updated_at", "timestamp with time zone", false),
+        ) + operatorStrategySharedColumns("operator_strategy")
+
+    private val operatorStrategyRevisionColumns =
+        listOf(
+            ColumnSpec("operator_strategy_revision", "revision", "integer", false),
+            ColumnSpec("operator_strategy_revision", "applied_at", "timestamp with time zone", false),
+        ) + operatorStrategySharedColumns("operator_strategy_revision")
+
     private val expectedColumns =
         rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
             rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
-            openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns
+            openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns +
+            operatorStrategyColumns + operatorStrategyRevisionColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {
@@ -294,6 +344,11 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
                 "opening_reserve_price.base_reserve_price_won",
                 // M3/3F — 개찰완료 축 부모 슬롯(추가만).
                 "opening_result.opening_rank_one_bid_amount_won",
+                // M6/6F-1 — 전략 예산 한계 둘(추가만, D-6F1-1).
+                "operator_strategy.min_budget_won",
+                "operator_strategy.max_budget_won",
+                "operator_strategy_revision.min_budget_won",
+                "operator_strategy_revision.max_budget_won",
             )
         for (qualified in wonColumns) {
             val (table, column) = qualified.split(".")
