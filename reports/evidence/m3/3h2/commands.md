@@ -124,6 +124,10 @@ hunk 격리)로 재작성 — 임시 clone(`029ccdb6.../scratchpad/3h2-rollback-
   송신 `toAgencyIdFact` 위임·수신 `_ALLOWED_SEGMENT_MISSING_REASONS`), 세 자리가
   같은 두 값 집합을 선언한다.
 
+## 2026-09-17 verifier r1 F-5(low) 마무리 — 표본 축 UNSPECIFIED·미지 정수 거부 test
+
+- cmd: `cd ml-engine && uv run pytest tests/inference/test_distribution.py -q` — `UNSPECIFIED`·enum 밖 정수(`99`) 파라미터화 신설 test 포함 24 passed, exit 0.
+
 ## 이 문서의 마지막 HEAD
 
 이 문서의 명령 표는 evidence 편집 커밋 직전까지만 담는다 — **이 문서를 담는 커밋

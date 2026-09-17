@@ -180,6 +180,29 @@ class TestDistributionRequestFromProto:
             SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED
         )
 
+    @pytest.mark.parametrize(
+        "missing_reason",
+        [common_pb2.MISSING_REASON_UNSPECIFIED, 99],
+        ids=["unspecified", "enum_outside_missing_reason"],
+    )
+    def test_sample_with_unspecified_or_unknown_enum_missing_reason_is_rejected(
+        self, missing_reason: int
+    ) -> None:
+        """verifier r1 F-5(low) — `UNSPECIFIED`는 5B `_resolve_missing_reason`이 먼저
+        `MALFORMED`로 걸러(`_resolve_segment`가 그 구체적 사유를
+        `SEGMENT_REASON_NOT_ALLOWED` 하나로 접는다) 거부된다. enum 밖 정수(`99`,
+        `Missing(raw)`로 판독되는 값)도 표본 축 허용 집합(`{NOT_COLLECTED_YET,
+        UNKNOWN}`, D-3H2-3) 밖이라 거부된다 — 확장은 `UNKNOWN` 하나뿐이다."""
+        sample = competition_sample(agency_id=missing_reason)
+        request = prediction_pb2.CalculateOptimalBidRequest(
+            features=_valid_features_inputs(), competition_samples=[sample]
+        )
+        result = DistributionRequest.from_proto(request)
+        assert isinstance(result, DistributionRequest)
+        assert result.samples[0].segment == SampleRejected(
+            SampleRejectionReason.SEGMENT_REASON_NOT_ALLOWED
+        )
+
     def test_sample_with_unset_agency_oneof_is_rejected(self) -> None:
         sample = competition_sample(agency_id=None)
         request = prediction_pb2.CalculateOptimalBidRequest(
