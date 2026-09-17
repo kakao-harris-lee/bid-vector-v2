@@ -72,3 +72,61 @@ acceptance: `./gradlew --no-build-cache --no-daemon clean check` + `cd ml-engine
   exit 0.
 - cmd: `./gradlew --no-build-cache --no-daemon clean check`(되돌린 트리 전건) — exit 0
   (355 actionable tasks, 338 executed).
+
+## 2026-09-17 verifier r1 수정 라운드 — F-1(HIGH)·F-2(MEDIUM) 계약 문면 정정
+
+- cmd: `cd ml-engine && uv run ruff check src/ml_engine/inference/distribution.py &&
+  uv run ruff format --check src/ml_engine/inference/distribution.py`(주석 인용구
+  정정, 코드 무변경) — exit 0.
+- cmd: `./gradlew --offline --no-daemon --no-build-cache :workflow:compileKotlin
+  :workflow:runKtlintCheckOverMainSourceSet` — exit 0.
+- cmd: `./gradlew --offline --no-daemon --no-build-cache :contractGate`(커밋
+  `e46d96c` 뒤) — exit 0 — 주석만 정정했으므로 `buf breaking`이 승인 태그를 걸지
+  않는다.
+- 전건: `./gradlew --no-build-cache --no-daemon clean check`(HEAD `e46d96c`) — exit 0
+  (346 actionable tasks, 328 executed).
+- `cd ml-engine && uv run pytest -q`(HEAD `e46d96c`) — exit 0, 956 passed.
+
+## 2026-09-17 verifier r1 수정 라운드 — F-3·F-4(MEDIUM, rollback.md 전체 경로 커버)
+
+`rollback.md`를 그룹 A(Kotlin·계약 주석 10개)·그룹 B(Python 4개)·그룹 C(공유 문서 4개,
+hunk 격리)로 재작성 — 임시 clone(`029ccdb6.../scratchpad/3h2-rollback-clone-r1`,
+`--no-hardlinks`)에서 ①~⑧ 전부 재실행.
+
+- cmd: 그룹 A+B `git restore --source=e101a0c --staged --worktree -- <14개 경로>` —
+  exit 0. `git diff --name-status e101a0c -- <같은 14개>` 빈 결과(바이트 동일).
+- cmd: 그룹 C hunk 격리 셋(`git diff <sha>~1..<sha> -- <파일> | git apply -R`,
+  `milestone-3.md`/`capability-map.md`+`data-dictionary.md`/`5d3/scope.md`) — 전부
+  exit 0, conflict 0. 4개 파일 모두 `git diff --name-status e101a0c -- <파일>` 빈
+  결과(바이트 동일 — 각 파일이 이 range 안에서 3H-2 커밋 하나씩만 가져 hunk 격리가
+  전체 restore와 같은 결과를 냈다). 「남의 줄이 남았다」 확인: `milestone-3.md`의 `##`
+  절 6개·3B-2/3E/3F 종결 언급 22건, `capability-map.md`의 다른 `OPEN-*` 행 3개,
+  `5d3/scope.md`의 다른 계약 갱신 행 3개 — 전부 그대로.
+- cmd: 위 복구 상태를 임시 clone 전용 커밋으로 고정(`contractGate`가 `contracts`/
+  `ml-contract` 경로의 **비커밋 diff**를 방향과 무관하게 위반으로 본다 — rollback.md
+  ⑧ 주의 문단).
+- cmd: `./gradlew --offline --no-daemon --no-build-cache :workflow:compileTestKotlin
+  :adapters:compileTestKotlin` — exit 0.
+- cmd: `./gradlew --offline --no-daemon --no-build-cache :workflow:test
+  :adapters:test` — exit 0.
+- cmd: `cd ml-engine && uv sync --extra dev --extra serving --extra training && uv
+  run pytest -q` — exit 0, 954 passed(임시 clone은 인용구 정정 커밋으로 되돌아간
+  `test_distribution.py`의 D-3H2-3 RED test 2건이 빠져 956→954, 3H-1 시점과 정합).
+- cmd: `./gradlew --no-build-cache --no-daemon clean check`(되돌린 트리 전건,
+  임시 clone 커밋 뒤) — exit 0(346 actionable tasks, 318 executed).
+
+## 2026-09-17 verifier r1 재검증 표적 — F-1 계약 문면↔송신↔수신 세 자리 일치(checklist 우회 (6))
+
+- cmd: `grep -n "NOT_COLLECTED_YET.*UNKNOWN\|UNKNOWN.*NOT_COLLECTED_YET"
+  contracts/proto/bidvector/ml/v1/features.proto
+  adapters/src/main/kotlin/bidvector/adapters/ml/RequestMapping.kt
+  ml-engine/src/ml_engine/inference/distribution.py` — 세 파일 모두 매치(계약 주석·
+  송신 `toAgencyIdFact` 위임·수신 `_ALLOWED_SEGMENT_MISSING_REASONS`), 세 자리가
+  같은 두 값 집합을 선언한다.
+
+## 이 문서의 마지막 HEAD
+
+이 문서의 명령 표는 evidence 편집 커밋 직전까지만 담는다 — **이 문서를 담는 커밋
+자체의 게이트 결과 정본은 verifier와 PR 조치 코멘트**다(evidence-pack 2026-09-16
+규약, F-6). 마지막으로 기록된 exit 0은 HEAD `e46d96c`(F-1·F-2 정정 커밋)와 rollback
+임시 clone 실측 — 이 문서를 담는 evidence 커밋 자체의 재확인은 verifier r2가 한다.

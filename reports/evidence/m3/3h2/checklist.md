@@ -18,6 +18,7 @@
 | (3) | 엔진이 `UNKNOWN` 표본을 거부 | D-3H2-3(ml-implementer, engine test) + D-3H2-4 교차 실측의 「`UNKNOWN` 표본 혼입 시 `excluded_observations=0`」 |
 | (4) | 이름을 `AgencyId`로 싣는다 | `predictionRequestFor`/`sampleOf` 둘 다 `notice.demandAgency?.code`(코드 필드)만 읽는다 — `Agency.name`을 참조하는 경로가 없다(코드 검토). `PredictionFactsTest`·`SampleEligibilityTest`의 「이름만 있고 코드가 없으면 … null이다」가 이름만 있는 `Agency(code = null, name = ...)` 입력에서도 `agencyId`가 여전히 `null`임을 직접 잰다 |
 | (5) | 요청·표본 정규화 불일치로 `DIRECT` 미도달 | D-3H2-4 — 두 축 모두 같은 `AgencyId("agency-cross-3h2")` 문자열을 실은 교차 실측에서 `DIRECT`를 실제로 관측 |
+| (6) | 계약 문면과 송신·수신 구현이 서로 다른 말을 한다(verifier r1 F-1, HIGH) | **닫힘.** `features.proto`의 `CompetitionSample.agency_id` 주석이 이제 허용 사유 둘(`NOT_COLLECTED_YET`·`UNKNOWN`)을 선언하고, 송신(`RequestMapping.kt` `toSampleAgencyIdFact`→`toAgencyIdFact` 위임)과 수신(`distribution.py` `_ALLOWED_SEGMENT_MISSING_REASONS`)이 그 선언과 값 집합이 일치한다 — 세 자리 전부 `{NOT_COLLECTED_YET, UNKNOWN}` 하나로 수렴(도메인층 사본 `BidPredictionRequest.kt` KDoc도 같은 문면, F-2 동시 닫힘). `distribution.py`의 인용 주석도 새 계약 문면에 맞게 정정 |
 
 ## (2b) 값 획득 축
 
