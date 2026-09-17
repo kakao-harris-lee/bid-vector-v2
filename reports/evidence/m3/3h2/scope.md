@@ -29,6 +29,8 @@ in_scope:
   - ml-engine/src/ml_engine/inference/distribution.py                                   # (②) 표본 축 허용 결측 사유 {NOT_COLLECTED_YET, UNKNOWN}
   - ml-engine/src/ml_engine/inference/observations.py                                   # (②) 갱신 1 — 표본 축 허용 집합 문면(docstring) 정정, 코드 무변경
   - ml-engine/src/ml_engine/features/facts.py                                            # (②) 갱신 1 — 「표본 축만 닫힌 집합 하나」 문면 정정, 코드 무변경
+  - contracts/proto/bidvector/ml/v1/features.proto                                        # 갱신 2 — CompetitionSample.agency_id 주석의 허용 결측 사유 선언({NOT_COLLECTED_YET} → {NOT_COLLECTED_YET, UNKNOWN}) — 주석만, 필드·타입·번호 무변경(buf breaking 무영향), contract-keeper 대상
+  - workflow/src/main/kotlin/bidvector/workflow/prediction/BidPredictionRequest.kt       # 갱신 2 — CompetitionSample KDoc 의 같은 문면(도메인층 사본) 정정
   - ml-engine/tests/**                                                                   # (②) 허용 집합 test·회귀 golden 불변 확인
   - reports/evidence/m5/5d3/scope.md                                                    # (②) 계약 갱신 이력 — D-5D3-2 표본 축 집합 확장(팀장)
   - docs/discovery/data-dictionary.md                                                   # §6.3.2 결측 행 갱신(팀장)
@@ -37,7 +39,7 @@ in_scope:
   - reports/evidence/m3/3h2/**
 out_of_scope:
   - procurement/** · adapters/persistence/** · db/migration/**                           # 3H-1 산출물 소비만, 마이그레이션 없음
-  - contracts/**                                                                         # wire 무변경(MissingReason 값은 이미 있다)
+  - contracts/** 의 필드·타입·번호·승인 태그                                               # wire 인코딩 무변경(MissingReason 값은 이미 있다) — 단 features.proto 의 허용 사유 **주석**은 갱신 2 로 in_scope(verifier r1 F-1)
   - 표본 조회 SQL(기관 필터·인덱스 — OPEN-4B7-QUERY-INDEX) · 이름 키 · 계층 · 백필
   - 채움률 실호출의 값 저장·인용(구조 관측·비율만 evidence 에)
 acceptance_commands:
@@ -79,3 +81,4 @@ slice 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은 range 
 | # | 일시 | 갱신 | 사유 |
 | --- | --- | --- | --- |
 | 1 | 2026-09-17 | in_scope 에 `ml-engine/.../inference/observations.py`·`features/facts.py`(docstring 문면 정정만, 코드 무변경) 추가 | 구현 레인 보고 — 허용 집합 확장으로 두 모듈 docstring 의 「`{NOT_COLLECTED_YET}` 하나」 문면이 낡았다. in_scope 손 열거 누락(3H-1 갱신 3 과 같은 갈래) |
+| 2 | 2026-09-17 | in_scope 에 `contracts/proto/bidvector/ml/v1/features.proto`(`CompetitionSample.agency_id` 주석의 허용 결측 사유 선언 — 주석만, 필드·타입·번호·태그 무변경) + `workflow/prediction/BidPredictionRequest.kt`(같은 문면의 KDoc 사본) 추가. out_of_scope 의 「`contracts/**` 무변경」을 「필드·타입·번호·태그 무변경」으로 좁힘. PR 리뷰 레인에 **contract-keeper** 추가. 계약 파일 변경이라 Codex 심사 대상 여부는 운영자 결정(주석만) | verifier r1 **F-1(high, 계약층)** — 계약 문면이 「허용 사유는 `NOT_COLLECTED_YET` 하나뿐, 송신 어댑터가 다른 사유를 지어내지 않는다」로 선언하는데 이 slice 가 송신·수신 양쪽에 `UNKNOWN` 을 넣었다. `buf breaking` 은 주석을 안 보고 `leakPatternGate` 는 evidence 만 봐 게이트가 못 잡는다. 원 계약의 「wire 무변경」 제외 사유는 인코딩 호환만 덮고 허용값 선언을 안 덮었다 |
