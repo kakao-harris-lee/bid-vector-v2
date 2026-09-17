@@ -7,8 +7,9 @@ base_sha: c4d09cc   # PR #31(6C) 머지 커밋 = main
 head_sha: 리뷰 요청 시점의 `git rev-parse HEAD`(값을 박지 않는다)
 in_scope:
   - adapters/src/main/resources/db/migration/V9__operator_strategy.sql   # 전략 영속 표 + 개정 이력. **V8 은 6B-1**(세션), **V10 은 6A-1**(요청 감사) — 「병행 레인」 절
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/JdbcStrategyRepository.kt   # `StrategyRepository` 실 구현 — 저장소에 production 구현이 없다(실측)
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/StrategyRow.kt              # 행 ↔ 초안 매핑. **도메인 타입을 직접 만들지 않는다**(D-6F1-2)
+  - adapters/src/main/kotlin/bidvector/adapters/strategy/JdbcStrategyRepository.kt      # 계약 갱신 (2)·D-6F1-7: **패키지는 `adapters.strategy`** — `persistence` 는 workflow·strategy 참조가 게이트로 금지돼 있다(6B-1 실측)
+  - adapters/src/main/kotlin/bidvector/adapters/strategy/StrategyRow.kt                 # 행 → **초안** 매핑. 도메인 타입을 직접 만들지 않는다(D-6F1-2)
+  - adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt  # 신설 패키지 전용 의존 게이트 — **6B-1 이 먼저 병합되면 그 파일에 합류**(중복 신설 금지, 계약 갱신 (2))
   - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                      # 전략 SQL 추가만(기존 문장 무편집)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt   # 왕복·개정 증가·정책 불일치 실패·빈 전략 초기값
   - reports/evidence/m6/6f1/**
@@ -55,6 +56,7 @@ rollback: |
 | --- | --- | --- |
 | **D-6F1-1** | milestone-6 에 **6F slice 군**(수집↔판정 배선 어댑터)을 신설하고 포트별로 가른다 — 6F-1 전략 · 6F-2 후보 원천 + trace 축 · 6F-3 여력 · 6F-4 감시 대상 · 6F-5 면허 게이트 · 6F-6 운영자 프로필 + 업무량 · 6F-7 알림 요청 → outbox | milestone-6 의 6A~6E 에 **이 축이 없었다**. M3 가 수집을, M4 가 판정을 세웠으나 그 둘을 잇는 어댑터가 없고, 완료 조건 3(필수 capability E2E)이 여기에 걸려 있다. 포트마다 데이터 소재·외부 계약·미결 결정이 달라 한 slice 로 묶으면 6C 의 3 라운드를 반복한다 |
 | **D-6F1-2** | 어댑터는 **도메인 타입을 직접 만들지 않는다** — 행을 **초안**으로 읽어 **기존 공개 검증 함수**에 통과시킨다. port 시그니처·가시성 **무편집**, 새 public 표면 0 | `OperatorStrategy` 는 `internal constructor` 이고 유일한 생성 경로가 검증 함수다. 그 문을 그대로 쓰면 「전략은 검증을 통과한 것만 존재한다」가 유지되고 어댑터가 새로 얻는 권한이 0 이다(누구나 그 함수를 부를 수 있다). **세션 축(6B-1 D-6B1-7)은 그런 문이 없어 port 반환을 원시 스냅숏으로 바꿔야 했다 — 여기는 필요 없다** |
+| **D-6F1-7** (계약 갱신 (2), 6B-1 실측 인계) | 전략 어댑터의 패키지는 **`bidvector.adapters.strategy`**(6B-1 이 신설) — `adapters.persistence` 에 두지 않는다. 전용 의존 게이트 test 는 **먼저 병합되는 레인이 만들고 뒤가 합류**한다(허용 = `workflow.strategy`·`strategy`·`sharedkernel`·`adapters.persistence` 의 트랜잭션 경계). `Sql.kt` 는 `persistence` 에 두고 `internal`(모듈 범위)로 참조 | 6B-1 구현 레인 실측: `PersistenceAdapterDependencyTest`(M3/3D)가 `adapters.persistence` 의 domain 참조를 좁히고 `bidvector.workflow` 를 명시 금지한다. 같은 필요로 `adapters.event` 가 이미 갈라져 있고 그 게이트 KDoc 이 allow-list 확대를 거부해 뒀다. **전략 저장소는 `workflow.strategy.AppliedStrategy` 와 `strategy.OperatorStrategy` 를 둘 다 참조하므로 같은 벽을 만난다** |
 | **D-6F1-3** | 저장된 전략이 현 정책으로 **무효면 실패**한다(전략을 지어내지 않는다). 실패 형태는 구체 예외이고 그 사유에 「무엇이 무효인가」를 담는다 | 정책 값이 바뀌면 옛 전략이 무효가 될 수 있다. 그때 기본값·부분값으로 채우면 **운영자가 승인하지 않은 전략으로 판정이 돌아간다**. 「오류·최소 표본이 0점/성공으로 변환되지 않는다」(M5 완료 조건)와 같은 규율 |
 | **D-6F1-4** | 전략이 **아직 없는 상태**(첫 기동)는 실패가 아니라 **빈 전략**이다 — 그 값도 검증 함수를 지나며, 「설정됐는가」 술어가 거짓인 상태로 산다 | 도메인에 그 술어가 이미 있다(전략 미설정과 규칙 비어 있음은 다른 물음이라고 문서가 적는다). 첫 기동을 오류로 만들면 배선이 서지 않는다 |
 | **D-6F1-5** | 개정 번호는 **도메인이 정한 값을 그대로** 저장한다 — DB 기본값·트리거를 두지 않는다 | 6B-1 D-6B1-3 과 같은 규율(값의 주인을 하나로). V2 의 `revision` 트리거는 공고 축이고 이 표에 상속되지 않는다 |
@@ -122,4 +124,5 @@ test 를 각각 둔다(없음 ≠ 무효). (5) 어댑터가 정책 파일을 직
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 구현 중(2) | **D-6F1-7 신설** — 전략 어댑터 패키지를 `adapters.persistence` → **`adapters.strategy`**(6B-1 신설), 의존 게이트 test 는 먼저 병합되는 레인 소유·뒤가 합류 | 6B-1 정지·보고의 인계(`persistence` 는 workflow 참조 금지, 같은 벽을 전략 저장소도 만난다) |
 | 2026-09-17 착수 | 초판 — D-6F1-1~6 | 운영자 지시(배선 우선) · 배선 재고의 착수 권고 · 전략 타입에 **이미 공개된 검증 문**이 있다는 실측 |
