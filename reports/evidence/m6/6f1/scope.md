@@ -11,6 +11,12 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/strategy/StrategyRow.kt                 # 행 → **초안** 매핑. 도메인 타입을 직접 만들지 않는다(D-6F1-2)
   - adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt  # 신설 패키지 전용 의존 게이트 — **6B-1 이 먼저 병합되면 그 파일에 합류**(중복 신설 금지, 계약 갱신 (2))
   - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                      # 전략 SQL 추가만(기존 문장 무편집)
+  - adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt   # 계약 갱신 (3): 배열 컬럼 판독 헬퍼 추가(기계적 — 전략 값이 목록을 담는다)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt        # 계약 갱신 (3): **신설 표 둘을 여덟 축 스키마 게이트에 등재**(V9 가 표를 만드는 이상 이 등재 없이는 `check` 가 통과할 수 없다 — M3/3E·M4/4C-2 가 반복해 온 「추가만」 패턴)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt  # 같은 축(컬럼 존재·타입·NOT NULL)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt   # 같은 축(CHECK 개수)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt    # 계약 갱신 (3): 신설 표를 test 간 정리 목록에 추가(기계적)
+  - adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt # 계약 갱신 (3): **6B-1 파일과 바이트 동일**(md5 대조 실측) — 어느 쪽이 먼저 병합돼도 add/add 가 동일 내용이라 충돌하지 않는다(D-6F1-7 의 「먼저 병합되는 레인 소유」를 실무적으로 만족)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt   # 왕복·개정 증가·정책 불일치 실패·빈 전략 초기값
   - reports/evidence/m6/6f1/**
   - milestone-6.md                                                                      # 6F slice 군 신설·6F-1 착수 문단(팀장 커밋)
@@ -120,9 +126,14 @@ test 를 각각 둔다(없음 ≠ 무효). (5) 어댑터가 정책 파일을 직
 마이그레이션 파일(V9)이 생기므로 **`migration-reviewer`** 가 추가로 붙는다. Codex 는 되돌리기 어려운 경로(DB
 마이그레이션)라 대상이 되지만 유료 호출이므로 리뷰 요청 시점에 범위·비용을 운영자에게 제시하고 승인받은 뒤에만 건다.
 
+## 사실 선언 — 게이트 완화가 이력에 남았고 원복됐다
+
+구현 중 `PersistenceAdapterDependencyTest`(3D 원안)와 충돌했을 때 구현 레인이 **먼저 그 게이트를 완화하는 방향으로 갔다**(커밋 `76b3902`). 직후 팀장의 계약 갱신 (2)·D-6F1-7(6B-1 이 같은 벽을 먼저 만나 새 패키지 + 전용 게이트로 처분)을 발견해 **게이트를 원복하고**(`91e386a`) 두 파일을 `adapters.strategy` 로 옮겼다. 최종 상태에 완화는 남아 있지 않다(`git diff c4d09cc..HEAD -- <그 게이트 파일>` 비어 있음 — 리뷰 레인이 재확인 대상). **이력을 되쓰지 않고 사실로 선언한다**(하네스 2026-09-02) — 게이트 술어를 건드리는 방향이 한 번 시도됐고, 그것이 옳지 않다는 판단은 병행 레인의 처분이 알려 줬다.
+
 ## 계약 갱신 이력
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 완료 보고 뒤(3) | in_scope 에 기계적 귀결 **여섯** 등재(배열 판독 헬퍼 · 여덟 축 게이트 셋 · test 정리 목록 · 의존 게이트 파일) — **알려진 제한이 아니라 in_scope**(slice 의 커밋 집합 = in_scope 경로의 변경) · 의존 게이트 파일이 6B-1 것과 **바이트 동일**함을 팀장이 md5 로 실측 등재 | 구현 레인 완료 보고의 「scope 에 없는 편집 다섯」 + 게이트 파일 조율. V9 가 표를 만드는 이상 그 등재 없이는 `check` 가 서지 않는 **구조적 필연**이고 우회가 아니다 |
 | 2026-09-17 구현 중(2) | **D-6F1-7 신설** — 전략 어댑터 패키지를 `adapters.persistence` → **`adapters.strategy`**(6B-1 신설), 의존 게이트 test 는 먼저 병합되는 레인 소유·뒤가 합류 | 6B-1 정지·보고의 인계(`persistence` 는 workflow 참조 금지, 같은 벽을 전략 저장소도 만난다) |
 | 2026-09-17 착수 | 초판 — D-6F1-1~6 | 운영자 지시(배선 우선) · 배선 재고의 착수 권고 · 전략 타입에 **이미 공개된 검증 문**이 있다는 실측 |
