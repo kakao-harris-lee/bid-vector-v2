@@ -30,8 +30,17 @@ private fun isDisallowed(importedPackage: String): Boolean =
     importedPackage.startsWith("bidvector.") &&
         ALLOWED_ROOTS.none { importedPackage == it || importedPackage.startsWith("$it.") }
 
-/** 바이트코드 내부 이름(`a/b/C`)에서 `bidvector/...` 부분만 뽑는다 — 상수 풀 전체를 훑는다. */
-private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector/[A-Za-z0-9_/$]+""")
+/**
+ * 바이트코드 내부 이름(`a/b/C`)과 이름 기반 클래스 로드가 남기는 점 표기 좌표
+ * (`a.b.C`) 양쪽에서 `bidvector...` 부분을 뽑는다 — 상수 풀 전체를 훑는다.
+ *
+ * **verifier r3 MEDIUM-5 수정** — 이전 판(`bidvector/[A-Za-z0-9_/$]+`, 슬래시 형태만)은
+ * `Class.forName("bidvector.procurement...")`처럼 이름으로 클래스를 로드하면 상수 풀에
+ * 남는 점 표기 Utf8 문자열을 놓쳤다(그 로드는 런타임 classpath 에 있어 실제로 성공한다).
+ * 문자 클래스에 `.`을 더해 두 표기 모두 잡는다 — 허용 루트는 어차피 `isDisallowed`가
+ * 거른다.
+ */
+private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
 
 /**
  * S-3B 계열, MEDIUM-2 시정(verifier r1) — **소스 텍스트가 아니라 컴파일된 클래스의 상수
