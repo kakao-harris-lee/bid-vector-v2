@@ -1,0 +1,53 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "c4d09cc398d9c4243058bde57c04ddd99eb50769",
+  "reviewed_head": "594c9675fc1b2eade6ad969c1b2e237ab403dcac",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "adapters/src/main/kotlin/bidvector/adapters/strategy/EditSessionRow.kt",
+      "line": 185,
+      "evidence": "`requireIntValue`/`requireLongValue`는 `canConvertToInt()`/`canConvertToLong()`만 검사한 뒤 `asInt()`/`asLong()`을 호출한다. Jackson 2.18.6에서 `1.2`와 `1e2`는 `isIntegralNumber=false`인데도 `canConvertToInt=true`이고 `asInt()`가 각각 `1`, `100`을 반환한다는 것을 `/tmp` Java probe로 확인했다. 따라서 `state_payload`의 `revision`, `seenRevision`, `candidateLimit`, `won` 같은 정수 원시값이 소수/지수 JSON 숫자로 들어오면 거부되지 않고 조용히 절삭·변환된다. 이는 D-6B1-7의 “미지·불량 값 거부”와 raw numeric 손실 금지 위험을 깨며, DB의 `TEXT` payload에서 production load 경로로 재현 가능하다.",
+      "required_fix": "정수 필드 디코드에서 `isIntegralNumber` 같은 정수성 검사를 추가한 뒤 범위 검사를 수행하고, 소수/지수 등 정수 표기가 아닌 JSON 숫자에 대한 회귀 테스트를 `EditSessionRow`/`JdbcEditSessionRepositoryTest`에 추가하라."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse HEAD && git rev-parse c4d09cc398d9c4243058bde57c04ddd99eb50769 && git rev-parse 594c9675fc1b2eade6ad969c1b2e237ab403dcac && git status --short --branch",
+    "rg --files",
+    "git diff --stat c4d09cc398d9c4243058bde57c04ddd99eb50769...594c9675fc1b2eade6ad969c1b2e237ab403dcac",
+    "git diff --name-status c4d09cc398d9c4243058bde57c04ddd99eb50769...594c9675fc1b2eade6ad969c1b2e237ab403dcac",
+    "sed -n '1,260p' agent-workflow.md",
+    "sed -n '1,260p' milestone-6.md",
+    "sed -n '1,260p' reports/evidence/m6/6b1/scope.md",
+    "sed -n '1,260p' reports/evidence/m6/6b1/checklist.md",
+    "sed -n '1,260p' reports/evidence/m6/6b1/commands.md",
+    "sed -n '1,260p' reports/evidence/m6/6b1/rollback.md",
+    "sed -n '1,260p' docs/adr/0001-target-architecture.md",
+    "sed -n '1,260p' docs/adr/0004-persistence-and-events.md",
+    "sed -n '1,260p' docs/adr/0005-domain-events-and-outbox.md",
+    "sed -n '1,260p' docs/adr/0007-test-pyramid-and-ratchet.md",
+    "rg -n \"6B|6B-1|optimistic|concurrency|session|migration|rollback|database|PostgreSQL|Flyway|persistence|outbox|schema|Uncertain|Unmeasurable|provenance|basis|VAT|unit\" v2-지침서.md milestone-6.md docs/adr/0001-target-architecture.md docs/adr/0004-persistence-and-events.md docs/adr/0005-domain-events-and-outbox.md docs/adr/0007-test-pyramid-and-ratchet.md",
+    "git diff --find-renames c4d09cc398d9c4243058bde57c04ddd99eb50769...594c9675fc1b2eade6ad969c1b2e237ab403dcac -- adapters/src/main/resources/db/migration/V8__edit_session.sql adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt adapters/src/main/kotlin/bidvector/adapters/strategy/EditSessionRow.kt adapters/src/main/kotlin/bidvector/adapters/strategy/JdbcEditSessionRepository.kt workflow/src/main/kotlin/bidvector/workflow/strategy/Ports.kt workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionSnapshot.kt workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionRestore.kt workflow/src/main/kotlin/bidvector/workflow/strategy/EditStrategyWorkflow.kt",
+    "nl -ba adapters/src/main/resources/db/migration/V8__edit_session.sql",
+    "nl -ba workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionRestore.kt",
+    "nl -ba workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionTypes.kt | sed -n '1,260p'",
+    "nl -ba workflow/src/main/kotlin/bidvector/workflow/strategy/Transition.kt | sed -n '1,280p'",
+    "nl -ba adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcEditSessionRepositoryTest.kt | sed -n '1,380p'",
+    "nl -ba workflow/src/test/kotlin/bidvector/workflow/strategy/EditSessionSnapshotTest.kt | sed -n '1,360p'",
+    "rg -n \"failures=\\\"[1-9]|errors=\\\"[1-9]|<failure|<error\" adapters/build/test-results workflow/build/test-results app/build/test-results build/reports || true",
+    "python3 - <<'PY'\nimport glob, xml.etree.ElementTree as ET, os\nroots=set()\nfor f in glob.glob('**/build/test-results/**/TEST-*.xml', recursive=True):\n    roots.add(os.path.dirname(f))\nfor root in sorted(roots):\n    total=fail=err=skip=files=0\n    for f in glob.glob(root+'/TEST-*.xml'):\n        t=ET.parse(f).getroot(); files+=1\n        total+=int(t.attrib.get('tests',0)); fail+=int(t.attrib.get('failures',0)); err+=int(t.attrib.get('errors',0)); skip+=int(t.attrib.get('skipped',0))\n    print(root, files, total, fail, err, skip)\nPY",
+    "git diff --check c4d09cc398d9c4243058bde57c04ddd99eb50769...594c9675fc1b2eade6ad969c1b2e237ab403dcac",
+    "python3 - <<'PY'\nimport re, subprocess, pathlib\nnames = subprocess.check_output(['git','diff','--name-only','c4d09cc398d9c4243058bde57c04ddd99eb50769...594c9675fc1b2eade6ad969c1b2e237ab403dcac'], text=True).splitlines()\nrollback = pathlib.Path('reports/evidence/m6/6b1/rollback.md').read_text()\nblock = re.search(r'git restore.*?-- \\\\\\n(.*?)\\n```', rollback, re.S).group(1)\nlisted=[]\nfor line in block.splitlines():\n    line=line.strip()\n    if not line: continue\n    if line.endswith('\\\\'): line=line[:-1].strip()\n    listed.append(line)\nexclude={'reports/evidence/m6/6b1/commands.md','reports/evidence/m6/6b1/checklist.md','reports/evidence/m6/6b1/rollback.md'}\nexpected=[n for n in names if n not in exclude]\nprint('diff', len(names), 'expected rollback', len(expected), 'listed', len(listed))\nprint('missing', sorted(set(expected)-set(listed)))\nprint('extra', sorted(set(listed)-set(expected)))\nPY",
+    "rg -n \"java\\.sql|javax\\.sql|org\\.postgresql|DataSource|Connection|PreparedStatement|ResultSet|ObjectMapper|jackson|Flyway|jdbc|db|database|transport|http|grpc\" workflow/src/main/kotlin strategy/src/main/kotlin shared-kernel/src/main/kotlin procurement/src/main/kotlin qualification/src/main/kotlin decision/src/main/kotlin",
+    "rg -n \"Uncertain|Unmeasurable|0|fallback|basis|vat|provenance|currency|won|rate|fraction\" adapters/src/main/kotlin/bidvector/adapters/strategy workflow/src/main/kotlin/bidvector/workflow/strategy adapters/src/main/resources/db/migration/V8__edit_session.sql",
+    "javac/java Jackson probe for JsonNode canConvertToInt/canConvertToLong on 1.2, 1, 1e2, \"5\", 9223372036854775808"
+  ],
+  "residual_risks": [
+    "Gradle could not be started in this sandbox as instructed; I relied on committed offline build/test XML and reports for acceptance-command corroboration.",
+    "`.gradle-home/` is untracked in the checkout and was treated as review-lane cache, not review target."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.154.0",
+    "model": "gpt-5.5 (reasoning effort: high)"
+  }
+}
