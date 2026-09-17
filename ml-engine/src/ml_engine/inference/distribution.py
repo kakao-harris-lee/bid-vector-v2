@@ -69,8 +69,9 @@ from ml_engine.inference.scenario import build_scenario_candidates, resolve_unce
 # 표본 축(agency_id/category_code)이 허용하는 결측 사유 집합(D-5D3-2, 3H-2 D-3H2-3 확장)
 # — 요청 축(열린 집합, F-10)과 달리 닫힌 집합이다. `NOT_COLLECTED_YET`(수집 전)과
 # `UNKNOWN`(수집했으나 원천에 없음) 둘만 수용한다 — `NOT_APPLICABLE`·`UNSPECIFIED`·
-# 미지 정수는 그대로 거부. 송신 어댑터가 다른 사유를 지어내면 거부다(2F
-# `features.proto` 주석 「송신 어댑터가 다른 사유를 지어내지 않는다」).
+# 미지 정수는 그대로 거부. 송신 어댑터가 이 둘 밖의 사유를 지어내면 거부다(2F
+# `features.proto` 주석 「송신 어댑터는 이 둘만 싣고 수신(분포 엔진)은 그 밖을 표본
+# 거부한다」, M3/3H-2 갱신).
 _ALLOWED_SEGMENT_MISSING_REASONS = frozenset(
     {
         common_pb2.MISSING_REASON_NOT_COLLECTED_YET,
