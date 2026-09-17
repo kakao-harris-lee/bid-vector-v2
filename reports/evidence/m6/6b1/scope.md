@@ -21,6 +21,9 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt    # 축2·3·4 — 컬럼 존재·타입·NOT NULL
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTriggerTest.kt   # 축7 — 트리거(신설 표는 트리거 0 임을 **등재**해야 한다, 지금은 안 붉지만 누락 상태)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt     # 축8 — CHECK 개수 등재
+  - app/src/test/kotlin/bidvector/app/conformance/**        # 계약 갱신 (6): `EditSessionRepository.load` 반환 타입 변경(D-6B1-7)의 기계적 귀결 — conformance fake 의 시그니처만
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt   # 계약 갱신 (6): 신설 표를 test 간 정리 목록에 추가(기계적)
+  - config/quality/gate-tests.properties                    # 계약 갱신 (6): 신설 test 를 양방향 등재 게이트에 등재(그 게이트가 요구한다 — 우회가 아니라 이행)
   - reports/evidence/m6/6b1/**
   - milestone-6.md                                                     # 6B 분할·6B-1 착수 문단(팀장 커밋)
 out_of_scope:
@@ -105,6 +108,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 완료 보고 뒤(6) | in_scope 에 기계적 귀결 셋 등재 — conformance fake 시그니처(D-6B1-7 의 귀결) · 신설 표의 test 간 정리 목록 · 신설 test 의 양방향 등재. **알려진 제한이 아니라 in_scope** 다(slice 의 커밋 집합 = in_scope 경로의 변경, 하네스 2026-09-04) | 구현 레인 완료 보고의 「scope 밖 기계적 편집 3건」. 셋 다 in_scope 변경이 **강제한** 편집이고 우회가 아니다 |
 | 2026-09-17 구현 중(5) | in_scope 에 `workflow/.../EditSessionRestore.kt` 등재(detekt 파일당 함수 상한으로 스냅숏 파일에서 기계적 분리) · **S-31 acceptance 명령 정정** — D-6B1-8 이 삭제한 파일을 계속 가리키고 있었다(**팀장 오류** — 갱신 (3)(4)가 in_scope·결정·이력만 고치고 acceptance 절에 전파되지 않았다. 「낡는 좌표」의 계약 내부 판) | 구현 레인 보고(새 파일 1·낡은 좌표 1) |
 | 2026-09-17 구현 중(4) | **D-6B1-9 신설** — 세션 어댑터 패키지를 `adapters.persistence` → **`adapters.strategy`**(신설) + 전용 의존 게이트 test 추가, in_scope 경로 교체 | 구현 레인 정지·보고: `persistence` 패키지는 workflow 참조가 기존 게이트로 금지돼 있고, 같은 필요로 `adapters.event` 가 이미 갈라져 있다(그 KDoc 이 allow-list 확대를 거부). **6F-1 의 전략 저장소도 같은 벽을 만나므로 같은 패키지를 쓴다**(6F-1 계약 갱신 (2)) |
 | 2026-09-17 구현 중(3) | **D-6B1-8 신설** — clean DB 축을 기존 여덟 축 계열 확장으로(새 게이트·속성 파일 삭제), in_scope 교체(신규 둘 → 기존 넷), ① 문면 정정 · **계약 초판의 전제 오류를 사실로 선언**(공유 컨테이너가 이미 빈 DB 전건 적용을 충족한다) | 구현 레인 정지·보고: 「바퀴 재발명 금지」(CLAUDE.md)에 걸렸고 기존 계열이 더 엄격하다. 선택지 셋 중 1(기존 확장)을 채택 — 2(중복 유지)는 평행 메커니즘 둘, 3(기존 넷을 속성 파일 방식으로 흡수)은 과거 slice 넷의 산출물 재작성이라 범위 초과 |
