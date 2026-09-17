@@ -13,7 +13,8 @@ M5/5D-3(scope.md, `_workspace/m5-5d3/02_design-review.md`) — `OPEN-5D2-SAMPLE-
 D-5D3-1)으로 이어 3계층(발주기관/공종/전역) 수축을 서빙 경로에서 만든다. 요청 축이
 `Missing`이면 그 계층은 매칭 불가(`None`) — 표본 축이 있어도 요청을 같은 기관이라
 가정하지 않는다(D-5D3-3). 표본 축 판독은 5B `resolve_text_fact`(허용 결측 사유를
-`{NOT_COLLECTED_YET}`로 좁힘)를 그대로 쓴다 — 분포 엔진 안에 두 번째 판독기를 두지
+`{NOT_COLLECTED_YET, UNKNOWN}`로 좁힘 — 3H-2 D-3H2-3, `UNKNOWN`은 「수집했으나 원천에
+없음」)를 그대로 쓴다 — 분포 엔진 안에 두 번째 판독기를 두지
 않는다(D-5D3-6). 판독 거부는 표본 하나만 `SampleRejected(SEGMENT_REASON_NOT_ALLOWED)`로
 접혀 요청 전체를 죽이지 않는다(D-5D3-2).
 """
@@ -65,12 +66,21 @@ from ml_engine.inference.results import (
 )
 from ml_engine.inference.scenario import build_scenario_candidates, resolve_uncertainty
 
-
-# 표본 축(agency_id/category_code)이 허용하는 유일한 결측 사유(D-5D3-2) — 요청 축(열린
-# 집합, F-10)과 달리 닫힌 집합이다. 송신 어댑터가 다른 사유를 지어내면 거부다(2F
+# 표본 축(agency_id/category_code)이 허용하는 결측 사유 집합(D-5D3-2, 3H-2 D-3H2-3 확장)
+# — 요청 축(열린 집합, F-10)과 달리 닫힌 집합이다. `NOT_COLLECTED_YET`(수집 전)과
+# `UNKNOWN`(수집했으나 원천에 없음) 둘만 수용한다 — `NOT_APPLICABLE`·`UNSPECIFIED`·
+# 미지 정수는 그대로 거부. 송신 어댑터가 다른 사유를 지어내면 거부다(2F
 # `features.proto` 주석 「송신 어댑터가 다른 사유를 지어내지 않는다」).
+_ALLOWED_SEGMENT_MISSING_REASONS = frozenset(
+    {
+        common_pb2.MISSING_REASON_NOT_COLLECTED_YET,
+        common_pb2.MISSING_REASON_UNKNOWN,
+    }
+)
+
+
 def _is_segment_missing_reason_allowed(raw: int) -> bool:
-    return bool(raw == common_pb2.MISSING_REASON_NOT_COLLECTED_YET)
+    return raw in _ALLOWED_SEGMENT_MISSING_REASONS
 
 
 @dataclass(frozen=True)
@@ -135,8 +145,8 @@ def _resolve_segment(
     sample: features_pb2.CompetitionSample,
 ) -> SampleSegment | SampleRejected:
     """표본별 기관·공종 축 판독(D-5D3-6) — 5B `resolve_text_fact`를 요청 축과 같은
-    코드로 쓰되 결측 사유 술어를 `{NOT_COLLECTED_YET}`만 참인 닫힌 집합으로 좁힌다
-    (D-5D3-2). 어느 한 축이라도 거부되면(oneof 미설정·정규화 뒤 빈 키·그 밖 결측 사유)
+    코드로 쓰되 결측 사유 술어를 `{NOT_COLLECTED_YET, UNKNOWN}`만 참인 닫힌 집합으로
+    좁힌다(D-5D3-2, 3H-2 D-3H2-3). 어느 한 축이라도 거부되면(oneof 미설정·정규화 뒤 빈 키·그 밖 결측 사유)
     표본 전체가 `SampleRejected(SEGMENT_REASON_NOT_ALLOWED)`다 — 5B 의 구체적
     `FactRejectionReason`은 여기서 이 사유 하나로 접힌다."""
     agency = resolve_text_fact(
