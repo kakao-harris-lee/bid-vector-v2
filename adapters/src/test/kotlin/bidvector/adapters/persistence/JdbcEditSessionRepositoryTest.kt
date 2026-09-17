@@ -322,4 +322,63 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
 
         shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
     }
+
+    /**
+     * Codex 1라운드 HIGH 재현·회귀 보호 — `requireIntValue`/`requireLongValue`가 변환
+     * "가능성"만 보고 정수 "표기"인지 안 봐서, 소수·지수 표기 JSON 숫자가 조용히 절삭돼
+     * 통과했다(`1.2`→`1`, `1e2`→`100`, `:adapters` 실 컴파일 classpath 의 jackson-databind
+     * 2.21.5 로 재현). DB 행에서 출발해 `EditSessionRow.toSnapshot`(디코드 층)을 직접
+     * 지난다 — `EditSessionSnapshotTest`(workflow)는 이 층을 지나지 않는다(HIGH-2 재현
+     * 셋과 같은 이유).
+     */
+    @Test
+    fun `state_payload 의 revision 이 소수(1_2)면 load 가 거부한다 — Codex 1라운드 HIGH 재현`() {
+        val id = "jdbc-fractional-revision"
+        seedRawEditSessionRow(id, "APPLIED", """{"revision":1.2}""")
+
+        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+    }
+
+    @Test
+    fun `state_payload 의 revision 이 지수 표기(1e2)면 load 가 거부한다 — Codex 1라운드 HIGH 재현`() {
+        val id = "jdbc-exponential-revision"
+        seedRawEditSessionRow(id, "APPLIED", """{"revision":1e2}""")
+
+        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+    }
+
+    /** `requireLongValue`(`MoneySnapshot.won`) 쪽도 같은 결함이었다 — Int 축과 대칭으로 잠근다. */
+    @Test
+    fun `draft 의 minBudget won 이 소수면 load 가 거부한다 — Codex 1라운드 HIGH 재현(Long 축)`() {
+        val id = "jdbc-fractional-won"
+        val minBudget =
+            """{"won":1.2,"currency":"KRW","vatTreatment":"INCLUSIVE","provenanceKind":"OPERATOR_DECLARED"}"""
+        val draft =
+            """{"focusCategories":[],"focusRegionTerms":[],"excludeRegionTerms":[],""" +
+                """"requiredKeywordTerms":[],"excludeKeywordTerms":[],"minBudget":$minBudget}"""
+        seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
+
+        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+    }
+
+    /**
+     * 과잉 거부 방지(팀장 요청) — 정수 표기의 정상 `won`은 여전히 통과하고 값도 보존된다.
+     * `revision`(Int) 축의 정상 통과는 기존 왕복 test 들(`Applied 까지 전이…` 등)이 이미
+     * 잠근다 — 이 test 는 그 test 들이 안 덮는 `won`(Long, `readMoney`)을 DB 행에서
+     * 출발해 잠근다.
+     */
+    @Test
+    fun `draft 의 minBudget won 이 정수면 load 가 그대로 복원한다 — 과잉 거부 방지`() {
+        val id = "jdbc-integral-won"
+        val minBudget =
+            """{"won":1200000,"currency":"KRW","vatTreatment":"INCLUSIVE","provenanceKind":"OPERATOR_DECLARED"}"""
+        val draft =
+            """{"focusCategories":[],"focusRegionTerms":[],"excludeRegionTerms":[],""" +
+                """"requiredKeywordTerms":[],"excludeKeywordTerms":[],"minBudget":$minBudget}"""
+        seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
+
+        val loaded = repository().load(EditSessionId(id))
+
+        loaded!!.stateDraft!!.minBudget!!.won shouldBe 1_200_000L
+    }
 }

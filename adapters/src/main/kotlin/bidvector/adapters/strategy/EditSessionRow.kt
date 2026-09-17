@@ -181,13 +181,24 @@ private fun requireStringArray(
  * (Jackson 관용). `StrategyRevision`은 0 을 허용하는 값이라 그 위조값이 그대로 통과해
  * workflow 가 "아무도 쓴 적 없는" revision 을 받았다. `canConvertToInt`/`canConvertToLong`
  * 으로 먼저 확인해 변환 불가능하면 거부한다.
+ *
+ * **Codex 1라운드 HIGH 수정 — `canConvertToInt`/`canConvertToLong`은 변환 "가능성"만 보고
+ * 정수 "표기"인지는 안 본다.** Jackson 2.21.5(`:adapters` 실 컴파일 클래스패스 실측,
+ * `2.18.3 -> 2.21.5` 카탈로그 상향)에서 `DoubleNode(1.2).canConvertToInt()`는 `true`이고
+ * `asInt()`는 `1`을 돌려준다 — `1e2`도 `canConvertToInt()=true`·`asInt()=100`. 둘 다
+ * 정수가 아닌데 통과해 **아무도 쓴 적 없는 값으로 절삭**된다(HIGH-2 가 남긴 반쪽 —
+ * 그때는 변환 "불가능"만 막았고 변환은 되지만 표기가 정수가 아닌 경우는 열려 있었다).
+ * `isIntegralNumber`(정수 표기 JSON 노드에서만 참 — `IntNode`·`LongNode`·`BigIntegerNode`
+ * 등, `DoubleNode`·`FloatNode`는 값이 `2.0`처럼 정수여도 거짓)를 먼저 검사해 닫는다 —
+ * 인코더([EditSessionRow.encodeStatePayload] 등)가 이 필드들에 항상 `Int`/`Long`을
+ * `put()`하므로 정상 행은 언제나 정수 표기 노드다.
  */
 private fun JsonNode.requireIntValue(field: String): Int {
-    require(canConvertToInt()) { "$field 는 정수여야 한다 — 실제: $this" }
+    require(isIntegralNumber && canConvertToInt()) { "$field 는 정수여야 한다 — 실제: $this" }
     return asInt()
 }
 
 private fun JsonNode.requireLongValue(field: String): Long {
-    require(canConvertToLong()) { "$field 는 정수여야 한다 — 실제: $this" }
+    require(isIntegralNumber && canConvertToLong()) { "$field 는 정수여야 한다 — 실제: $this" }
     return asLong()
 }
