@@ -8,6 +8,13 @@ bid-vector
 # codex 리뷰 레인의 로컬 실행 산출물
 *.raw-output.txt
 
+# 운영자 결정 2026-09-17 — 환경·비밀값 파일은 `config/secrets/` 에 둔다. 값 파일(`*.env`)은
+# 저장소 밖이 아니라 이 디렉터리에 두되 커밋하지 않고, 변수 이름만 적은 `*.env.example` 만
+# 커밋한다. 읽는 쪽(실호출 프로브·M6 배선)은 이 경로 하나만 안다 — 값이 명령·로그·evidence 에
+# 나오지 않는 것은 `ServiceKey`(D-3B-5)와 `leakPatternGate` 가 지킨다.
+config/secrets/*
+!config/secrets/*.example
+
 # 커밋된 도구를 돌리면 생기는 바이트코드 (`fixtures/tools/` 는 모듈을 import 한다)
 __pycache__/
 

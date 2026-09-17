@@ -16,6 +16,7 @@ import bidvector.sharedkernel.ReasonCode
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.export
+import bidvector.workflow.prediction.AgencyId
 import bidvector.workflow.prediction.CompetitionSample
 import bidvector.workflow.prediction.ReserveDrawObservation
 import java.math.BigDecimal
@@ -142,7 +143,9 @@ internal fun sampleOf(
         baseAmountProvenanceLabel = provenanceLabelFor(notice, opening, baseAmount, provenancePolicy),
         openedOn = openedOn,
         awardRate = opening.winningRate,
-        agencyId = null,
+        // M3/3H-2(D-3H2-1) — 표본 공고의 수요기관 코드. `predictionRequestFor`와 같은 축·
+        // 같은 규칙(공고기관 폴백 없음, 이름 미사용) — `Agency.kt` 값을 두 자리가 공유한다.
+        agencyId = notice.demandAgency?.code?.let { AgencyId(it.value) },
         categoryCode = notice.businessCategory?.code,
         reserveDraw = ReserveDrawObservation(reservePrices, selectedNumbers),
     )

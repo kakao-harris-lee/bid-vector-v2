@@ -1565,9 +1565,9 @@ Python 정본은 `ml_engine.features.normalize.normalize_feature_key`(요청 축
 | **도메인** | `Notice.demandAgency: Agency?` · `Notice.noticeAgency: Agency?` — **역할별 자기 필드**. `Agency(code: AgencyCode?, name: AgencyName?)`(둘 다 null 인 fact 는 없다). `AgencyCode.of` = 정규화 키, `AgencyName.of` = trim 만(표시·감사용, 키 아님) |
 | **엔진 키** | `FeatureInputs.agency_id` = **수요기관코드**의 정규화값. **역할 간 폴백 없음** — 수요기관코드가 없으면 공고기관코드로 채우지 않는다(legacy 의 「개찰수요 > 수요 > 공고」 폴백은 legacy 자신이 누수로 명시했다). 이름은 키가 아니다. 별칭·계층 사전 없음(§6.3.1) |
 | **저장** | `notice.demand_agency_code`·`demand_agency_name`·`notice_agency_code`·`notice_agency_name`(V7, nullable TEXT, 제약·인덱스 없음). DB 는 재정규화하지 않는다 |
-| **결측** | 요청 축 `UNKNOWN`(3H-2 에서 채움), 표본 축은 오늘 `NOT_COLLECTED_YET` — 수집 뒤에는 「수집했으나 원천에 없음」이 되어 그 사유가 거짓이 된다. 엔진 표본 축 허용 집합 `{NOT_COLLECTED_YET}` 의 확장은 `OPEN-3H-SAMPLE-MISSING-REASON`(M5 레인) |
+| **결측** | 요청 축·표본 축 모두 **`UNKNOWN`**(M3/3H-2 D-3H2-2, 2026-09-17) — 수요기관코드가 원천에 없으면 「수집했으나 원천에 없음」이 참이고, 「수집 전」 행과 구별하는 컬럼은 두지 않는다(백필은 값을 채울 뿐 사유를 바꾸지 않는다). 엔진 표본 축 허용 집합은 `{NOT_COLLECTED_YET, UNKNOWN}`(5D-3 D-5D3-2 계약 갱신, D-3H2-3) — `UNSPECIFIED`·`NOT_APPLICABLE`·미지 정수는 표본 거부. 계약 문면 정본은 `features.proto` `CompetitionSample.agency_id` 주석(3H-2 갱신 2) |
 | **등재하지 않는 것** | 같은 응답의 담당자 이름·전화·이메일(`ntceInsttOfcl*`·`dminsttOfcl*`) — 개인정보, P-10 과 같은 축 |
-| **잔여** | 3H-2(요청·표본 축 조립, `segment_support = DIRECT` 첫 도달) · 코드 채움률 실측(read-only 실호출 1회, D-3H-8) |
+| **실측** | D-3H-8 채움률 프로브(read-only 1회, 2026-09-17, 공사 목록 100건): 코드·이름 넷 100/100, 수요=공고 91/100, 코드 길이 {7}, 영문자 포함 29/100 → 코드 키 확정. 엔진 교차 실측(D-3H2-4): Kotlin 요청 바이트로 `segment_support = DIRECT`·`agency_sample_count = 8`·`shrinkage_weight = 0.4` 첫 관측 — ML-04 ② 가 필드→계약→저장→도메인→요청·표본→엔진→`PredictionEvidence`(4D-4)까지 이어진다 |
 
 ### 6.4 성숙도 — 계산과 판정의 분리 (`OPEN-ML-01` 잔여 확인)
 

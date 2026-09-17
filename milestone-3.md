@@ -370,7 +370,35 @@ V7 제거 뒤 전건 초록). **재작업 0회**. **migration-reviewer 통과**(
 read-only 실호출 1회) · `OPEN-3H-SAMPLE-MISSING-REASON`(M5 레인 — 표본 축 허용 결측 사유 확장, 3H-2 착수 전) ·
 `OPEN-3H-AGENCY-BACKFILL`(운영 데이터 0) · `OPEN-3H-MERGE-GUARD-TESTS`(기존 축의 병합 보존 무잠금 — 상속 부채) · 기관명·코드의
 개인정보 판정은 PR 의 privacy-gate 코멘트 · **Codex 심판**(마이그레이션, 운영자 범위·비용 승인)은 PR 에서. 정본
-`reports/evidence/m3/3h/checklist.md`.
+`reports/evidence/m3/3h/checklist.md`. **PR #30 머지 `e101a0c`(2026-09-17)** — code-reviewer 머지 가능(LOW 1)·privacy-gate 통과·
+migration-reviewer 통과 · **Codex r1 `request_changes`(high 1 — 적용 DB rollback 이 flyway validate 를 깨뜨림)의 조치 `0f56131`
+(rollback.md 두 경로: 미적용 / 적용 후 보상 V8 롤포워드, 임시 clone 실측) 뒤 재심 r2 는 운영자 결정으로 생략** — 정지선
+규정의 「종결은 운영자 개별 명시 결정(예외 기록)」(PR 코멘트에도 기록).
+
+**3H-2 착수 2026-09-17(운영자 결정 「추천대로」 ×4 — 채움률 프로브 1페이지 · 엔진 표본 축 사유 확장은 이 레인 · Codex 모델 핀
+`gpt-5.5` · 프로브 뒤 즉시 구현, 정본 `reports/evidence/m3/3h2/scope.md` D-3H2-1~5)** — 요청 축(`predictionRequestFor`)·표본 축
+(`sampleOf`)의 `agencyId` 를 `Notice.demandAgency.code` 로(역할 폴백 없음), 표본 축 결측 사유 `NOT_COLLECTED_YET` → `UNKNOWN`
+(3H-1 뒤 「수집했으나 원천에 없음」이 참), 엔진 표본 축 허용 집합 `{NOT_COLLECTED_YET, UNKNOWN}`(5D-3 D-5D3-2 계약 갱신 —
+거부가 죽이는 것은 그 표본의 공종·전역 계층 기여), 엔진 교차 실측으로 `segment_support = DIRECT` 첫 도달. **D-3H-8 프로브
+실측(read-only 1회, 승인 하)**: 공사 목록 100건에서 수요·공고기관 코드·이름 넷 전부 100/100, 수요=공고 91/100, 코드 길이 {7},
+영문자 포함 29/100 — **코드 키 확정, 이름 키 대안 불필요**. 첫 두 시도는 `returnReasonCode 30`(서비스별 활용신청 미승인 —
+인코딩 아님). 환경·인증 파일 자리는 `config/` 아래 gitignore 디렉터리(운영자 결정, `5b362b7`). 레인 `bid-vector-v2-m4e`/
+`m3-3h2/2026-09-17`, base `e101a0c`. 마이그레이션 없음 → Codex 대상 아님.
+
+**3H-2 종결 2026-09-17(사용자 승인 — 「추천대로」 하 종결·PR 까지, 머지는 별도 승인)** — verifier r1 `not-ready`(HIGH 1 = 계약 문면:
+`features.proto` `CompetitionSample.agency_id` 주석이 허용 결측 사유를 `NOT_COLLECTED_YET` 하나로 선언한 채 송신·수신이 `UNKNOWN`
+을 쓰게 됐고 `buf breaking` 은 주석을 보지 않는다 · MEDIUM 2 = KDoc 사본·rollback 이 Python·공유 문서를 안 덮음) → 계약 갱신
+2·3(proto 주석 둘 — `agency_id`·`category_code` — 과 KDoc 을 in_scope 로, 주석만·필드·번호·태그 무변경, contract-keeper 레인) +
+수정 라운드 1 → r2 `ready-for-review`(F-1~F-5 닫힘 직접 실측 — 계약 문면↔송신↔수신 세 자리 일치, rollback 세 그룹(Kotlin·계약
+주석 / Python / 공유 문서 hunk 격리) 새 clone 재실행 conflict 0, `contractGate` 가 `contracts/` 의 미커밋 diff 를 방향 무관 위반으로
+보는 제약 실증, 교차 실측을 verifier 가 독립 재구성해 같은 수치). **재작업 1회**. 전건 `clean check` exit 0 · pytest 958(+4). 산출물:
+`predictionRequestFor`·`sampleOf` 의 `agencyId` = 수요기관코드(폴백 0), 표본 축 결측 `UNKNOWN`, 엔진 허용 집합
+`{NOT_COLLECTED_YET, UNKNOWN}`(두 축 공유 술어 — 공종 축 수신도 함께 넓어짐, 송신 무변경), 5D-3 계약 갱신 이력, proto 주석 정합.
+**`OPEN-2B-AGENCY-ID`·`OPEN-3H-SAMPLE-MISSING-REASON` 닫힘** — ML-04 ② 「기관 표본이 임계 미만이면 수축 가중치가 응답 근거에 실린다」가
+KONEPS 필드 → 3A 계약(P-14) → V7 저장 → `Notice` → 요청·표본 → 엔진(`DIRECT`, 표본 8, 수축 가중치 0.4) → `PredictionEvidence`(4D-4)
+까지 한 줄로 이어진다. **알려진 제한**: 표본 축은 통합 층에서 관측 불가(단위 test 가 잰다, 4B-7 과 같은 구조) · 채움률은 공사 축
+1페이지 표본(용역·물품 미측정) · 크기 게이트 초과(rollback 세 그룹 기록이 부풀린 자리) · `OPEN-3H-AGENCY-BACKFILL`·
+`OPEN-3H-MERGE-GUARD-TESTS`·`OPEN-4B7-QUERY-INDEX`(기관 조회 인덱스, M6) 그대로. 정본 `reports/evidence/m3/3h2/checklist.md`.
 
 ## Codex 독립 리뷰
 

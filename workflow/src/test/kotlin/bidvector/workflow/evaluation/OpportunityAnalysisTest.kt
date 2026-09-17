@@ -375,6 +375,29 @@ class OpportunityAnalysisTest {
         prediction.requestsSeen.single().competitionSamples shouldBe listOf(sample)
     }
 
+    /**
+     * M3/3H-2(D-3H2-1) — `predictionRequestFor`가 `analyze()` 전체 경로를 거쳐도
+     * `notice.demandAgency`의 코드를 요청 `agencyId`에 그대로 싣는지 잰다(단위 test는
+     * `PredictionFactsTest`가 같은 값을 직접 잰다 — 이 test는 배선 자체를 확인한다).
+     * 표본 축(`CompetitionSample.agencyId`)은 이 test 층에서 관측 불가 — `FakeCompetitionSamplePort`가
+     * `sampleOf`를 거치지 않고 fake 가 직접 `CompetitionSample`을 주므로(우회 (5) 관련),
+     * 표본 축 조립은 `SampleEligibilityTest`(단위)가 잰다.
+     */
+    @Test
+    fun `notice 의 수요기관 코드가 analyze() 경유로도 요청 agencyId 에 그대로 실린다(D-3H2-1)`() {
+        val demandAgency =
+            bidvector.procurement.Agency(
+                bidvector.procurement.AgencyCode.of("1234567"),
+                bidvector.procurement.AgencyName.of("수요기관"),
+            )
+        val notice = testNoticeWithMoney(number = "20260101011", demandAgency = demandAgency)
+        val prediction = FakeBidPredictionPort { predicted() }
+
+        analyzeNotice(analysis(prediction = prediction), notice).shouldBeAnalyzed()
+
+        prediction.requestsSeen.single().agencyId shouldBe bidvector.workflow.prediction.AgencyId("1234567")
+    }
+
     @Test
     fun `Unavailable 표본 공급은 Analyzed 를 유지하되 예측 성분만 Absent — evidence 는 supply reason 의 NotPredicted(D-4D4-7)`() {
         val category =

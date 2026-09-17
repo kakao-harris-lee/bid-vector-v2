@@ -1,6 +1,9 @@
 package bidvector.workflow.evaluation
 
 import bidvector.decision.ProvenancePolicyData
+import bidvector.procurement.Agency
+import bidvector.procurement.AgencyCode
+import bidvector.procurement.AgencyName
 import bidvector.procurement.BusinessCategory
 import bidvector.procurement.CategoryCode
 import bidvector.procurement.CategoryLabel
@@ -30,6 +33,7 @@ import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.export
+import bidvector.workflow.prediction.AgencyId
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
@@ -85,6 +89,10 @@ class SampleEligibilityTest {
         categoryCode: String? = "A01",
         baseAmountWon: Long? = 1_000_000_000L,
         estimatedAmountWon: Long? = null,
+        // M3/3H-2(D-3H2-1) — 표본 축 agencyId 조립(`sampleOf`) test 용. 기본값 null 은
+        // 기존 fixture와 바이트 동일.
+        demandAgency: Agency? = null,
+        noticeAgency: Agency? = null,
     ): Notice {
         val id = NoticeId(NoticeNumber.of(number), NoticeRound.of(round))
         val observation =
@@ -115,6 +123,8 @@ class SampleEligibilityTest {
                 deadlineAt = null,
                 openingScheduledAt = null,
                 raw = observation,
+                demandAgency = demandAgency,
+                noticeAgency = noticeAgency,
             ),
         )
     }
@@ -179,6 +189,40 @@ class SampleEligibilityTest {
         (firstPrice.export().won) shouldBe 900_000_001L
         // 우회 (18) — Published 의 회차는 표본 공고 자기 회차("001")다. 대상 공고 회차를 빌리지 않는다.
         firstPrice.provenance shouldBe Provenance.Published(NoticeRound.of("001"))
+    }
+
+    // ---- M3/3H-2(D-3H2-1, scope.md 우회 (1)(4)) — 표본 축 agencyId 조립(`sampleOf`). ----
+
+    @Test
+    fun `수요기관 코드가 있으면 표본 agencyId 는 그 코드 값이다`() {
+        val notice =
+            testNotice(round = "002", demandAgency = Agency(AgencyCode.of("1234567"), AgencyName.of("수요기관")))
+        val opening = testOpening(notice.id)
+
+        val outcome = judge(notice, opening) as SampleEligibilityOutcome.Eligible
+
+        outcome.sample.agencyId shouldBe AgencyId("1234567")
+    }
+
+    @Test
+    fun `수요기관이 없고 공고기관만 있으면 표본 agencyId 는 null 이다 — 우회 (1), 폴백 없음`() {
+        val notice =
+            testNotice(round = "003", noticeAgency = Agency(AgencyCode.of("7654321"), AgencyName.of("공고기관")))
+        val opening = testOpening(notice.id)
+
+        val outcome = judge(notice, opening) as SampleEligibilityOutcome.Eligible
+
+        outcome.sample.agencyId shouldBe null
+    }
+
+    @Test
+    fun `수요기관에 이름만 있고 코드가 없으면 표본 agencyId 는 null 이다 — 우회 (4), 이름을 키로 쓰지 않는다`() {
+        val notice = testNotice(round = "004", demandAgency = Agency(code = null, name = AgencyName.of("수요기관")))
+        val opening = testOpening(notice.id)
+
+        val outcome = judge(notice, opening) as SampleEligibilityOutcome.Eligible
+
+        outcome.sample.agencyId shouldBe null
     }
 
     /**
