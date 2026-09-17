@@ -234,47 +234,24 @@ private data class SaveDiscriminatorCase(
 
 /**
  * [RejectionReason] 여섯 전부(`SessionAlreadyActive`는 `begin()` 전용이라 `apply()`가 만들
- * 수 없다 — 제외)와 `Accepted`·`Applied` 양쪽을 모두 돈다. 같은 인스턴스를 내는 갈래(만료
- * 상태 유지·중복 거부·actor 불일치·SystemActor·StaleRevision·InvalidTransition)는 불변식이
- * 공허하게 성립하지만, 새 인스턴스를 내는 갈래(만료 fold·모든 accepted 전이·Applied)에서
- * 실제로 `+1`인지를 잰다 — 그게 이 test 의 값이다.
+ * 수 없다 — 제외)와 `Accepted`·`Applied` 양쪽을 모두 돈다 — 절반은 같은 인스턴스를 내는
+ * 갈래([sameInstanceCases], 불변식이 공허하게 성립), 절반은 새 인스턴스를 내는 갈래
+ * ([newInstanceCases], 실제로 `+1`인지를 잰다 — 그게 이 test 의 값이다). 함수당 50줄
+ * 한도로 둘로 나눴을 뿐 하나의 case 집합이다.
  */
-private fun saveDiscriminatorInvariantCases(): List<SaveDiscriminatorCase> {
-    val expiredButNotFolded =
-        sessionAt(EditSessionState.WaitingForValue(FIELD), expiresAt = NOW.minusSeconds(1), sessionVersion = 2)
-    val withDuplicateLastCommand =
-        sessionAt(
-            EditSessionState.WaitingForValue(FIELD),
-            sessionVersion = 1,
-            lastCommand = provideValue(id = "cmd-dup", draft = VALID_DRAFT),
-        )
-    val withSameLastCommand =
-        sessionAt(
-            EditSessionState.WaitingForValue(FIELD),
-            sessionVersion = 1,
-            lastCommand = provideValue(id = "cmd-same", draft = VALID_DRAFT),
-        )
+private fun saveDiscriminatorInvariantCases(): List<SaveDiscriminatorCase> =
+    sameInstanceCases() + duplicateCommandCases() + newInstanceCases()
 
-    return listOf(
+/**
+ * 판정 순서 ①③④에서 거부돼 입력 세션과 같은 인스턴스를 돌려주는 갈래(불변식이 공허하게
+ * 참) — 판정 순서 ②(중복 command)는 [duplicateCommandCases]로 나눴다(50줄 한도).
+ */
+private fun sameInstanceCases(): List<SaveDiscriminatorCase> =
+    listOf(
         SaveDiscriminatorCase(
             "이미 Expired — 판정 순서 ①, 같은 인스턴스",
             sessionAt(EditSessionState.Expired, sessionVersion = 3),
             provideValue(),
-        ),
-        SaveDiscriminatorCase(
-            "비종단인데 시각상 만료 — 판정 순서 ① fold, 새 인스턴스",
-            expiredButNotFolded,
-            provideValue(),
-        ),
-        SaveDiscriminatorCase(
-            "같은 command 재전달(다른 내용) — 판정 순서 ② IdempotencyConflict, 같은 인스턴스",
-            withDuplicateLastCommand,
-            provideValue(id = "cmd-dup", draft = INVALID_DRAFT),
-        ),
-        SaveDiscriminatorCase(
-            "같은 command 재전달(같은 내용) — 판정 순서 ② Accepted 중복, 같은 인스턴스",
-            withSameLastCommand,
-            provideValue(id = "cmd-same", draft = VALID_DRAFT),
         ),
         SaveDiscriminatorCase(
             "다른 operator — 판정 순서 ③ ActorMismatch, 같은 인스턴스",
@@ -295,6 +272,41 @@ private fun saveDiscriminatorInvariantCases(): List<SaveDiscriminatorCase> {
             "전이표 밖 — 판정 순서 ④ InvalidTransition, 같은 인스턴스",
             sessionAt(EditSessionState.Applied(StrategyRevision(2)), sessionVersion = 2),
             cancel(),
+        ),
+    )
+
+/** 판정 순서 ②(같은 commandId 재전달) — 내용이 다르면 거부(같은 인스턴스), 같으면 Accepted 중복(같은 인스턴스). */
+private fun duplicateCommandCases(): List<SaveDiscriminatorCase> {
+    fun sessionWithLastCommand(id: String) =
+        sessionAt(
+            EditSessionState.WaitingForValue(FIELD),
+            sessionVersion = 1,
+            lastCommand = provideValue(id = id, draft = VALID_DRAFT),
+        )
+    val withDuplicateLastCommand = sessionWithLastCommand("cmd-dup")
+    val withSameLastCommand = sessionWithLastCommand("cmd-same")
+
+    return listOf(
+        SaveDiscriminatorCase(
+            "같은 command 재전달(다른 내용) — 판정 순서 ② IdempotencyConflict, 같은 인스턴스",
+            withDuplicateLastCommand,
+            provideValue(id = "cmd-dup", draft = INVALID_DRAFT),
+        ),
+        SaveDiscriminatorCase(
+            "같은 command 재전달(같은 내용) — 판정 순서 ② Accepted 중복, 같은 인스턴스",
+            withSameLastCommand,
+            provideValue(id = "cmd-same", draft = VALID_DRAFT),
+        ),
+    )
+}
+
+/** 만료 fold·`accept()`·`onConfirm()`이 `.copy()`로 새 인스턴스를 내는 갈래(`+1` 실측 대상). */
+private fun newInstanceCases(): List<SaveDiscriminatorCase> =
+    listOf(
+        SaveDiscriminatorCase(
+            "비종단인데 시각상 만료 — 판정 순서 ① fold, 새 인스턴스",
+            sessionAt(EditSessionState.WaitingForValue(FIELD), expiresAt = NOW.minusSeconds(1), sessionVersion = 2),
+            provideValue(),
         ),
         SaveDiscriminatorCase(
             "유효한 ValueProvided — Accepted, 새 인스턴스",
@@ -322,4 +334,3 @@ private fun saveDiscriminatorInvariantCases(): List<SaveDiscriminatorCase> {
             confirm(seenRevision = StrategyRevision(1)),
         ),
     )
-}
