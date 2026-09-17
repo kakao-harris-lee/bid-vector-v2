@@ -157,3 +157,20 @@
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로 개별 인자 전부> reports/evidence/m6/6b1/`
 - exit: 0(매치 있음)
 - 핵심 결과: 매치 전부 육안 확인 — 도메인 코드의 일반 영단어(토큰 문자열 상수 함수명·정책 문서의 절차 설명)이고 실 비밀값 0건. `4c1`·`m3-3g` 등 선행 slice의 같은 판단과 동일한 근거(패턴이 넓게 걸리는 상용어라는 것은 기존에도 알려진 특성).
+
+## D-6B1-6 — 새 public 표면 0 실측(우회 (6), 팀장 요청 — AST/바이트코드)
+
+## 2026-09-17T04:15:00Z
+- cmd: `javap -p -classpath workflow/build/classes/kotlin/main bidvector.workflow.strategy.EditSession`
+- exit: 0
+- 핵심 결과: 생성자가 바이트코드 수준에서는 `public`(Kotlin `internal`은 컴파일 타임 검사 — M4 `AppliedStrategy`도 같은 메커니즘, 이 slice가 만든 약점 아님). checklist.md 「새 public 표면 0」 절 참조.
+
+## 2026-09-17T04:16:00Z
+- cmd: `javap -p -classpath workflow/build/classes/kotlin/main bidvector.workflow.strategy.EditSessionRestoreKt`
+- exit: 0
+- 핵심 결과: `restoreEditSession`만 `public static`(반환 타입·매개변수가 이미 public 이라 이름 맹글링 없음), 나머지 10개 함수는 전부 `private static`.
+
+## 2026-09-17T04:17:00Z
+- cmd: `javap -p -classpath adapters/build/classes/kotlin/main bidvector.adapters.strategy.JdbcEditSessionRepository bidvector.adapters.strategy.EditSessionRow`
+- exit: 0
+- 핵심 결과: `JdbcEditSessionRepository`의 공개 멤버는 `load(...): EditSessionSnapshot`·`save(...): void`뿐. `EditSessionRow`(바이트코드는 public class)의 공개 멤버 전부 `EditSessionSnapshot`·`String`만 반환 — `EditSession`을 반환하는 멤버 0건.

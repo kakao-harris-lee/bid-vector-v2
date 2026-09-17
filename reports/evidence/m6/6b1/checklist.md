@@ -19,6 +19,15 @@
 | `EditSessionRow`의 도메인 복원 | 닫는다(D-6B1-6) | `EditSessionRow`는 `EditSessionSnapshot`(원시 필드)만 만든다 — `EditSession` 생성 없음. 유일한 복원 경로는 `workflow` 안 `internal fun restoreEditSession`이고 `adapters`에서 호출 자체가 컴파일되지 않는다(`commands.md` friendPaths 실측). |
 | `config/quality/schema-baseline.properties` | 폐기(D-6B1-8) | 계약 갱신 (3)으로 삭제 — 스키마 기대치는 `CleanMigration*Test` 코드 자체가 정본(외부 정책 파일 없음, `OPEN-6C-POLICY-GATE-STRUCTURAL` 계열 표면을 만들지 않는다). |
 
+### 새 public 표면 0 — `javap` 바이트코드 실측(우회 (6))
+
+`javap -p`로 컴파일된 클래스를 직접 읽었다(소스 주석이 아니라 바이트코드 자체):
+
+- `bidvector.workflow.strategy.EditSession`의 생성자와 `bidvector.workflow.strategy.EditSessionRestoreKt.restoreEditSession(...)`는 **바이트코드 수준에서는 `public`이다** — Kotlin의 `internal` 가시성은 컴파일 타임 검사이고, 이 함수의 매개변수·반환 타입(`EditSessionSnapshot`·`EditSession`)이 이미 `public`이라 이름 맹글링(mangling)도 붙지 않는다. 이것은 **이 slice가 만든 새 약점이 아니다** — `AppliedStrategy`·`OperatorStrategy`(M4)의 `internal constructor`도 같은 메커니즘(컴파일 타임 강제)에 의존해 왔다. 리플렉션이나 다른 JVM 언어로 이 바이트코드를 직접 호출하는 것은 이 slice 이전부터 있던 한계이고 방어하지 않는다(scope.md 위협 모델 방어 밖 — Kotlin 소스 코드로 작성된 `adapters`·`app`이 **컴파일**되지 않는 것까지만 방어한다).
+- `bidvector.adapters.strategy.EditSessionRow`(소스는 `internal object`)도 바이트코드는 `public final class`다 — 그러나 그 공개 멤버(`encodeStatePayload`·`encodeLastCommand`·`toSnapshot`)는 전부 `EditSessionSnapshot`·`String`만 반환한다. `EditSession`을 반환하는 멤버가 **하나도 없다**(`javap -p -classpath adapters/build/classes/kotlin/main bidvector.adapters.strategy.EditSessionRow` 실측).
+- `bidvector.adapters.strategy.JdbcEditSessionRepository`의 공개 멤버는 `load(EditSessionId): EditSessionSnapshot`·`save(EditSession): void`뿐이다 — `EditSessionRepository` port가 요구하는 시그니처와 정확히 같다(신규 증분 없음).
+- 결론: **`adapters` Kotlin 소스에서 `EditSession(...)`·`restoreEditSession(...)`·`EditSession.copy(...)`를 호출하는 코드는 컴파일되지 않는다**(`commands.md`의 `friendPaths` 실측과 실제 컴파일 시도가 이미 이것을 보였다). 「새 public 표면 0」의 의미는 바이트코드의 `public` 키워드 개수가 아니라 **어댑터 소스 코드로 도달 가능한 새 진입점이 없다**는 것이다.
+
 ## 제약·인덱스 실측표(설계 검토 ②, D-6B1-5)
 
 `postgres:16.4` 빈 컨테이너에 V1~V7 적용 후 카탈로그 실측(`commands.md` 조사 항목). 표 11·인덱스 14·제약 93·트리거 25(V8 적용 후 표 12·인덱스 15·트리거 25·CHECK +5 — `CleanMigration*Test` 값이 정본).
