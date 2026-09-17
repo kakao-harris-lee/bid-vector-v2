@@ -75,3 +75,15 @@
 3. **D-6B1-9** — 세션 어댑터를 `adapters.persistence`에 두면 그 패키지의 workflow 참조 금지 게이트(`PersistenceAdapterDependencyTest`, M3/3D)에 걸렸다. `adapters.event`의 선례를 따라 `adapters.strategy` 신설 패키지 + 전용 게이트로 이동.
 
 세 자리 모두 코드를 짜기 전 또는 짠 직후 멈추고 팀장에게 선택지와 함께 보고했고, 팀장이 계약을 갱신한 뒤 이어갔다(scope.md 「계약 갱신 이력」 표).
+
+## Codex 1라운드 — request_changes 처분
+
+판정 `reports/evidence/m6/6b1/codex-review-20260917T151517Z.json`(reviewed `c4d09cc..594c967`, blocker 0 · high 1).
+
+| finding | 처분 | 근거 |
+| --- | --- | --- |
+| HIGH — `requireIntValue`/`requireLongValue`가 변환 가능성만 보고 정수 표기인지 안 봐 소수·지수 JSON 숫자(`1.2`→`1`, `1e2`→`100`)가 조용히 절삭된다 | **수정** — `isIntegralNumber` 선검사 추가(`EditSessionRow.kt`). Int(`revision`·`seenRevision`·`candidateLimit`)·Long(`won`) 두 호출부 전부 닫힌다 | `JdbcEditSessionRepositoryTest`에 DB 행 기원 회귀 test 넷(소수·지수 거부 각 1 + Long 축 거부 1 + 정수 정상 통과 1, 과잉 거부 방지) |
+| 전수 확인(열거 방어 금지) | `EditSessionRow.kt`의 모든 디코드 접근자를 grep으로 전수 확인 — `.asInt()`/`.asLong()`/`.asDouble()`/`.asBoolean()`은 `requireIntValue`/`requireLongValue` 안 둘뿐(수정됨). `BigDecimal(it.asText())` 넷(임계값·점수)은 정확히 왕복되거나 `NumberFormatException`으로 크게 실패해 같은 결함 계열이 아니다. `.asText()`로 읽는 enum·kind 문자열 필드들은 이 파일이 아니라 `workflow/EditSessionRestore.kt`의 소진 `when`/`else -> error(...)`가 한 층 뒤에서 닫는다 — 이미 문서화된 설계 분업(D-6B1-7, (2b) 값 획득 축 표의 「필드별 어휘는 검사」)이고 이번 라운드가 새로 만든 공백이 아니다 | 없음 — 코드 변경 0, 이 표가 실측 근거 |
+| Codex 클래스패스 재현 근거 보강 | `:adapters:dependencies --configuration compileClasspath`로 실제 resolved 버전 확인: `com.fasterxml.jackson.core:jackson-databind 2.18.3 -> 2.21.5`(카탈로그 상향). 버릴 clone 에서 수정 전 코드로 신설 회귀 test 넷을 돌려 셋(소수·지수·Long 소수)이 **정확히 이 버전에서** FAILED로 재현됨을 확인(정수 정상 통과 test는 수정 전에도 통과 — 과잉 거부 쪽 회귀 없음) | 아래 「변이 실측」 |
+
+**변이 실측(버릴 clone, `/tmp/6b1-codex-verify`, 실측 뒤 삭제)** — 수정 전 `requireIntValue`/`requireLongValue`(`isIntegralNumber` 없는 판)로 신설 test 넷을 실행: 소수 revision·지수 revision·소수 won 셋 다 `AssertionFailedError: Expected exception ... but no exception was thrown`로 FAILED(버그 재현), 정수 won 정상 통과 test는 그대로 통과(GREEN, 과잉 거부 없음). 수정 후 원 worktree 에서 재실행하면 17 tests 전부 0 failed.
