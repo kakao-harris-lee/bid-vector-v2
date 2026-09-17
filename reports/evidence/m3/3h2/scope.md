@@ -18,7 +18,7 @@
 ```yaml
 milestone: M3
 slice: 3h2-agency-request-sample-axis
-base_sha: <origin/main 40자 — 착수 시 기입>
+base_sha: e101a0c  # origin/main(PR #30 병합) — 40자는 리뷰 요청 시점 head_sha 와 함께 기입
 head_sha: <리뷰 요청 시점에 기입>
 in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/PredictionFacts.kt           # predictionRequestFor agencyId = demandAgency code
@@ -51,7 +51,7 @@ rollback: in_scope 경로 한정 restore. 공유 파일(5d3 scope·data-dictiona
 | **D-3H2-2** | 표본 축 결측 사유를 `NOT_COLLECTED_YET` → **`UNKNOWN`** 으로(`toSampleAgencyIdFact`). 「수집 전」과 「원천에 없음」을 구별하는 컬럼을 두지 않는다 — 두 경우 모두 오늘 값이 없다는 사실만 참이고, 백필은 값을 채울 뿐 사유를 바꾸지 않는다 | 정직 규율(4B-3 미가용의 이름) · `OPEN-3H-AGENCY-BACKFILL` | 계약 |
 | **D-3H2-3** | (②) 엔진 표본 축 허용 결측 사유 집합을 `{NOT_COLLECTED_YET, UNKNOWN}` 으로 — `UNSPECIFIED`·`NOT_APPLICABLE`·미지 정수는 그대로 거부. 5D-3 계약 갱신 이력에 등재. D-5D3-5 회귀(전부 `Missing` 인 요청은 5D-2 와 비트 동일)는 `UNKNOWN` 으로도 성립해야 한다 | `OPEN-3H-SAMPLE-MISSING-REASON` · 거부가 죽이는 것 = 코드 없는 표본 전부(공종·전역 계층에서도 탈락) | **운영자·M5 레인 확인 대기** |
 | **D-3H2-4** | 엔진 교차 실측: 요청·표본이 같은 수요기관코드를 실은 fixture 로 `serve_bid_rates` 를 돌려 `segment_support = DIRECT`·`agency_sample_count ≥ 1` 을 처음 관측(ML-04 ② 「기관 표본이 임계 미만이면 수축 가중치가 응답 근거에 실린다」 의 Kotlin→엔진 왕복). 4B-7 교차 실측 관례 | ML-04 ② acceptance | 계약 |
-| **D-3H2-5** | 채움률 실호출(D-3H-8)은 구현 전에 — 결과(표본 n 건 중 `dminsttCd` 채움 k, 공고기관과 동일 비율)를 evidence 에 비율만 적는다. k/n 이 낮으면 D-3H-2 재결정을 운영자에게 올리고 구현을 멈춘다 | 「측정 전 잠정」 | 착수 조건 |
+| **D-3H2-5** | 채움률 실호출(D-3H-8)은 구현 전에 — 결과(표본 n 건 중 `dminsttCd` 채움 k, 공고기관과 동일 비율)를 evidence 에 비율만 적는다. k/n 이 낮으면 D-3H-2 재결정을 운영자에게 올리고 구현을 멈춘다 | 「측정 전 잠정」 | **충족(2026-09-17)** — 공사 목록 100건: 코드·이름 넷 전부 100/100, 수요=공고 91/100, 길이 {7}, 영문자 포함 29/100(`commands.md`). 코드 키 확정 |
 
 ## 위협 모델 경계·우회·(2b)(초안 — 확정 시 갱신)
 **방어하는 것**: 역할 혼용(공고기관 코드가 `agency_id` 로), 사유 거짓(`NOT_COLLECTED_YET` 잔존), 엔진 거부로 코드 없는 표본이 공종·전역 계층에서도 탈락하는 것, 이름이 키로 새는 것.
