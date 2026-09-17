@@ -11,11 +11,20 @@ import org.junit.jupiter.api.Test
  * 넘었다). D-3D-6 여덟 축 중 컬럼 셋만 다룬다(다른 다섯 축은 `CleanMigrationTest`).
  */
 class CleanMigrationColumnTest : PersistenceTestSupport() {
+    /**
+     * `hasDefault` — M6/6B-1 verifier r1 MEDIUM-1(a) 시정. 이름·타입·NOT NULL 삼중항만으로는
+     * `session_version INTEGER NOT NULL DEFAULT 0`(D-6B1-3 이 금지한 바로 그 것)이 초록으로
+     * 지났다. 정확한 DEFAULT 식 문자열이 아니라 **있고 없음**만 잰다 — 식 문자열은 Postgres
+     * 버전·캐스트 표기가 갈릴 수 있어 이름 재작성만으로 오탐이 날 수 있다(예: `1` vs
+     * `1::bigint`). 기존 행은 전부 `hasDefault` 를 안 적어 Kotlin 기본값 `false` 를 쓴다 —
+     * 실제로 DEFAULT 가 있는 21개 컬럼만 `true` 로 명시했다(추가만, 기존 표 기대치는 그대로).
+     */
     private data class ColumnSpec(
         val table: String,
         val column: String,
         val dataType: String,
         val nullable: Boolean,
+        val hasDefault: Boolean = false,
     )
 
     // sizeGate(함수 50줄)는 본문 있는 선언만 잰다 — 「값을 담을 뿐인 프로퍼티 초기화식」은
@@ -30,7 +39,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("raw_observation", "payload_fields", "jsonb", false),
             ColumnSpec("raw_observation", "observed_at", "timestamp with time zone", false),
             ColumnSpec("raw_observation", "release_sha", "text", false),
-            ColumnSpec("raw_observation", "inserted_at", "timestamp with time zone", false),
+            ColumnSpec("raw_observation", "inserted_at", "timestamp with time zone", false, true),
         )
 
     private val provenanceAuthorityColumns =
@@ -69,10 +78,10 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice", "notice_agency_code", "text", true),
             ColumnSpec("notice", "notice_agency_name", "text", true),
             ColumnSpec("notice", "deadline_at", "timestamp with time zone", true),
-            ColumnSpec("notice", "revision", "bigint", false),
+            ColumnSpec("notice", "revision", "bigint", false, true),
             ColumnSpec("notice", "observation_key", "text", false),
-            ColumnSpec("notice", "created_at", "timestamp with time zone", false),
-            ColumnSpec("notice", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("notice", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("notice", "updated_at", "timestamp with time zone", false, true),
         )
 
     private val noticeAuditColumns =
@@ -84,7 +93,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice_audit", "observation_key", "text", false),
             ColumnSpec("notice_audit", "reason", "text", false),
             ColumnSpec("notice_audit", "previous_row", "jsonb", false),
-            ColumnSpec("notice_audit", "recorded_at", "timestamp with time zone", false),
+            ColumnSpec("notice_audit", "recorded_at", "timestamp with time zone", false, true),
         )
 
     private val rejectedWriteColumns =
@@ -95,7 +104,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("rejected_write", "observation_key", "text", false),
             ColumnSpec("rejected_write", "reason", "text", false),
             ColumnSpec("rejected_write", "attempted_value", "jsonb", true),
-            ColumnSpec("rejected_write", "recorded_at", "timestamp with time zone", false),
+            ColumnSpec("rejected_write", "recorded_at", "timestamp with time zone", false, true),
         )
 
     private val openingResultColumns =
@@ -107,10 +116,10 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "derived_base_amount_currency", "text", true),
             ColumnSpec("opening_result", "derived_base_amount_vat", "text", true),
             ColumnSpec("opening_result", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("opening_result", "revision", "bigint", false),
+            ColumnSpec("opening_result", "revision", "bigint", false, true),
             ColumnSpec("opening_result", "observation_key", "text", false),
-            ColumnSpec("opening_result", "created_at", "timestamp with time zone", false),
-            ColumnSpec("opening_result", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("opening_result", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("opening_result", "updated_at", "timestamp with time zone", false, true),
             // M3/3E — 층 C fact 슬롯(추가만, 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
             ColumnSpec("opening_result", "final_award_amount_won", "numeric", true),
             ColumnSpec("opening_result", "final_award_amount_currency", "text", true),
@@ -157,10 +166,10 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("opening_reserve_price", "is_drawn", "boolean", true),
             ColumnSpec("opening_reserve_price", "draw_count", "integer", true),
             ColumnSpec("opening_reserve_price", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("opening_reserve_price", "revision", "bigint", false),
+            ColumnSpec("opening_reserve_price", "revision", "bigint", false, true),
             ColumnSpec("opening_reserve_price", "observation_key", "text", false),
-            ColumnSpec("opening_reserve_price", "created_at", "timestamp with time zone", false),
-            ColumnSpec("opening_reserve_price", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("opening_reserve_price", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("opening_reserve_price", "updated_at", "timestamp with time zone", false, true),
         )
 
     private val qualificationTextColumns =
@@ -169,10 +178,10 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("qualification_text", "notice_round", "text", false),
             ColumnSpec("qualification_text", "raw_text", "text", false),
             ColumnSpec("qualification_text", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("qualification_text", "revision", "bigint", false),
+            ColumnSpec("qualification_text", "revision", "bigint", false, true),
             ColumnSpec("qualification_text", "observation_key", "text", false),
-            ColumnSpec("qualification_text", "created_at", "timestamp with time zone", false),
-            ColumnSpec("qualification_text", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("qualification_text", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("qualification_text", "updated_at", "timestamp with time zone", false, true),
         )
 
     private val collectionRunColumns =
@@ -192,9 +201,9 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("collection_run", "truncated", "boolean", false),
             ColumnSpec("collection_run", "unknown_fields", "integer", false),
             ColumnSpec("collection_run", "truncation_cause", "text", true),
-            ColumnSpec("collection_run", "quota_exceeded", "integer", false),
-            ColumnSpec("collection_run", "backoff_skipped", "integer", false),
-            ColumnSpec("collection_run", "inserted_at", "timestamp with time zone", false),
+            ColumnSpec("collection_run", "quota_exceeded", "integer", false, true),
+            ColumnSpec("collection_run", "backoff_skipped", "integer", false, true),
+            ColumnSpec("collection_run", "inserted_at", "timestamp with time zone", false, true),
         )
 
     // M4/4C-2 — outbox·inbox(추가만, D-4C2-2). 어휘·필드는 V6__outbox_inbox.sql 그대로.
@@ -213,13 +222,13 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("outbox", "payload_type", "text", false),
             ColumnSpec("outbox", "payload", "text", false),
             ColumnSpec("outbox", "state", "text", false),
-            ColumnSpec("outbox", "inserted_at", "timestamp with time zone", false),
+            ColumnSpec("outbox", "inserted_at", "timestamp with time zone", false, true),
         )
 
     private val inboxColumns =
         listOf(
             ColumnSpec("inbox", "idempotency_key", "text", false),
-            ColumnSpec("inbox", "processed_at", "timestamp with time zone", false),
+            ColumnSpec("inbox", "processed_at", "timestamp with time zone", false, true),
         )
 
     // M6/6B-1 — V8__edit_session.sql(추가만, D-6B1-8). state_payload·last_command 는
@@ -233,7 +242,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("edit_session", "expires_at", "timestamp with time zone", false),
             ColumnSpec("edit_session", "session_version", "integer", false),
             ColumnSpec("edit_session", "last_command", "text", true),
-            ColumnSpec("edit_session", "created_at", "timestamp with time zone", false),
+            ColumnSpec("edit_session", "created_at", "timestamp with time zone", false, true),
         )
 
     private val expectedColumns =
@@ -248,7 +257,8 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             connection.createStatement().use { statement ->
                 statement
                     .executeQuery(
-                        "SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns " +
+                        "SELECT table_name, column_name, data_type, is_nullable, column_default " +
+                            "FROM information_schema.columns " +
                             "WHERE table_schema = 'public' AND table_name <> 'flyway_schema_history'",
                     ).use { rs ->
                         while (rs.next()) {
@@ -258,6 +268,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
                                     rs.getString("column_name"),
                                     rs.getString("data_type"),
                                     rs.getString("is_nullable") == "YES",
+                                    rs.getString("column_default") != null,
                                 )
                         }
                     }

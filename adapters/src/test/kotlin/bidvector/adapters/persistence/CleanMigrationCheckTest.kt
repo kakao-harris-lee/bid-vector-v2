@@ -93,6 +93,20 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
         body shouldBe expected
     }
 
+    /**
+     * M6/6B-1 verifier r1 MEDIUM-1(c) 시정 — 위 개수 축(테스트 「축8 CHECK 개수가...」)만으로는
+     * `state` 어휘 다섯에 여섯째 값을 더해도 `edit_session` 의 CHECK 총수(5)가 그대로라
+     * 안 잡힌다. `outbox_state_check`(바로 위 test)와 같은 관례로 본문을 정확히 고정한다.
+     */
+    @Test
+    fun `축8 부가 — edit_session_state_check 본문이 다섯 어휘로 정확히 고정된다(D-6B1-3)`() {
+        val body = queryConstraintDef("edit_session_state_check")
+        val expected =
+            "CHECK ((state = ANY (ARRAY['WAITING_FOR_VALUE'::text, 'WAITING_FOR_CONFIRMATION'::text, " +
+                "'APPLIED'::text, 'CANCELLED'::text, 'EXPIRED'::text])))"
+        body shouldBe expected
+    }
+
     private fun queryConstraintDef(constraintName: String): String =
         dataSource().connection.use { connection ->
             connection
