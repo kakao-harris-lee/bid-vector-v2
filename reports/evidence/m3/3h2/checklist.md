@@ -37,10 +37,19 @@ prediction.AgencyId`, 새 public 표면 0) — 값은 `AgencyCode.value`에서�
   (`CompetitionSample.agencyId`)은 `FakeCompetitionSamplePort`가 `sampleOf`를 거치지 않고
   fake가 직접 `CompetitionSample`을 주므로 그 test 층에서 재지 못한다. 표본 축 조립은
   `SampleEligibilityTest`(단위)가 잰다 — 4B-7의 같은 구조적 한계와 동일.
+- 크기 게이트 초과(verifier r2 N-2, LOW) — evidence 합계가 산출물(삽입·총 변경 기준) 을
+  넘는다. 부푼 자리는 `commands.md`·`rollback.md` — 둘 다 F-3(rollback 전체 경로 재커버)
+  시정이 요구한 절차·실측 기록이라 규격이 스스로 부른 증가다. 규격이 요구하는 「멈추고
+  무엇이 부풀었는지 보고」를 이 항으로 이행한다.
+- (2b) 표는 F-1~F-5·N-1 수정 라운드에서 새 public 표면을 만들지 않았다(verifier r2 N-3 —
+  main 소스 변경이 전부 주석이었고, 추가는 test 하나뿐이었다는 실측).
 
 ## 종결 조건 대응(scope.md 기준)
 
 요청·표본 축 값 test(D-3H2-1) · 사유 `UNKNOWN` test(D-3H2-2) · 엔진 허용 집합 test + golden
 불변(D-3H2-3, ml-implementer 레인) · 교차 실측 `DIRECT` 관측(D-3H2-4) · 전건 `check`(+ pytest)
-— commands.md 전부 충족. verifier ready·`OPEN-2B-AGENCY-ID`·`OPEN-3H-SAMPLE-MISSING-REASON`
-닫힘·사용자 승인은 이 문서 소관 밖(팀장·verifier).
+— commands.md 충족. 계약 갱신 1~3(observations.py·facts.py docstring 정정, features.proto·
+BidPredictionRequest.kt in_scope 편입·정정, category_code 주석 수신 허용 집합 동기화) 전부
+반영. verifier r1 F-1~F-6 닫힘 · r2 N-1(계약 문면) 닫힘 — `OPEN-2B-AGENCY-ID`·
+`OPEN-3H-SAMPLE-MISSING-REASON` 닫힘(팀장 종결 문서, `docs/discovery/capability-map.md`).
+verifier r2 판정 `ready-for-review`(blocker 0·high 0). 사용자 승인은 이 문서 소관 밖(팀장).

@@ -128,9 +128,20 @@ hunk 격리)로 재작성 — 임시 clone(`029ccdb6.../scratchpad/3h2-rollback-
 
 - cmd: `cd ml-engine && uv run pytest tests/inference/test_distribution.py -q` — `UNSPECIFIED`·enum 밖 정수(`99`) 파라미터화 신설 test 포함 24 passed, exit 0.
 
+## 2026-09-17 verifier r2 수정 라운드 — N-1(medium) category_code 계약 주석 동기화
+
+`features.proto`의 `CompetitionSample.category_code`(9번 필드) 주석이 여전히 「허용
+사유는 `NOT_COLLECTED_YET` 하나뿐」이라 적혀 있었는데, D-3H2-3이
+`_ALLOWED_SEGMENT_MISSING_REASONS`를 `agency_id`·`category_code` 두 축에 공유시켜
+수신(분포 엔진)은 이미 `category_code = UNKNOWN`도 받는다 — 주석을 수신 허용
+집합·송신 실제 동작과 맞춘다(주석만).
+
+- cmd: `./gradlew --offline --no-daemon --no-build-cache :contractGate`(커밋
+  `b136e4c` 뒤) — exit 0. 주석만 정정했으므로 `buf breaking`·승인 태그 무영향.
+
 ## 이 문서의 마지막 HEAD
 
 이 문서의 명령 표는 evidence 편집 커밋 직전까지만 담는다 — **이 문서를 담는 커밋
 자체의 게이트 결과 정본은 verifier와 PR 조치 코멘트**다(evidence-pack 2026-09-16
-규약, F-6). 마지막으로 기록된 exit 0은 HEAD `e46d96c`(F-1·F-2 정정 커밋)와 rollback
-임시 clone 실측 — 이 문서를 담는 evidence 커밋 자체의 재확인은 verifier r2가 한다.
+규약, F-6). 이 라운드(N-1)의 전건 `clean check`은 팀장 종결 커밋 HEAD에서 돈다
+(verifier r2 N-5) — 이 문서는 `contractGate` 표적 실행까지만 기록한다.
