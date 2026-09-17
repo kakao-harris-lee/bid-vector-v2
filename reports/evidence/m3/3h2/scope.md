@@ -18,8 +18,8 @@
 ```yaml
 milestone: M3
 slice: 3h2-agency-request-sample-axis
-base_sha: e101a0c  # origin/main(PR #30 병합) — 40자는 리뷰 요청 시점 head_sha 와 함께 기입
-head_sha: <리뷰 요청 시점에 기입>
+base_sha: e101a0c33adc52b1a5688afcaab6a39bfe777a66
+head_sha: 2542e3262a56e8cdb3f217cd5b00c601aceffb7b
 in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/PredictionFacts.kt           # predictionRequestFor agencyId = demandAgency code
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/SampleConversion.kt          # sampleOf agencyId = 표본 공고 demandAgency code
@@ -69,8 +69,11 @@ rollback: in_scope 경로 한정 restore. 공유 파일(5d3 scope·data-dictiona
 ## 종결 조건
 채움률 실측 등재 · 요청·표본 축 값 test · 사유 `UNKNOWN` test · (②) 엔진 허용 집합 test + golden 불변 · 교차 실측 `DIRECT` 관측 · 전건 `check`(+ pytest) · verifier ready · `OPEN-2B-AGENCY-ID`·`OPEN-3H-SAMPLE-MISSING-REASON` 닫힘 · 사용자 승인.
 
-## 하네스 레인 변경
-없음.
+## 하네스 레인 변경(리뷰 요청 시점 `git log --oneline e101a0c..HEAD -- CLAUDE.md .claude/ docs/harness/`)
+slice 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은 range 에 있다. rollback 대상이 아니다.
+- `ff061e2` `.claude/skills/codex-review-gate/SKILL.md` — Codex 심판 모델 핀 `gpt-5.5`(운영자 결정 2026-09-17 「추천대로」 ③).
+- `7a230bb` `docs/harness/change-history.md` — 위 모델 핀 + `config/secrets/` 자리 두 행(같은 커밋이 이 scope 지위 문단도 확정 — 그 부분은 slice 산출물).
+- **운영자 결정 변경(하네스는 아니나 slice 산출물도 아님)**: `5b362b7` `.gitignore`·`config/secrets/koneps.env.example` — 환경·인증 파일 자리(운영자 지시 2026-09-17 「환경 파일 등은 기본적으로 config/ 에 두자」). D-3H-8 프로브가 이 자리를 읽었다. rollback 대상 아님.
 
 ## 계약 갱신 이력
 | # | 일시 | 갱신 | 사유 |
