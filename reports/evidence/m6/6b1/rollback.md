@@ -19,7 +19,9 @@ git restore --source=c4d09cc --staged --worktree -- \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTriggerTest.kt \
+  adapters/src/test/kotlin/bidvector/adapters/persistence/EditSessionWorkflowTestSupport.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcEditSessionRepositoryTest.kt \
+  adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcEditSessionSaveGuardTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt \
   adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt \
   app/src/test/kotlin/bidvector/app/conformance/StrategyEditExecutors.kt \
@@ -34,7 +36,15 @@ git restore --source=c4d09cc --staged --worktree -- \
   workflow/src/test/kotlin/bidvector/workflow/strategy/EditStrategyWorkflowTest.kt
 ```
 
-`--source`에 없는 경로(위 목록의 신규 파일 9개)는 삭제되므로 별도 `git rm`이 필요 없다
+**verifier r4 MEDIUM-6 시정** — 수정 라운드 2(sizeGate 분리)가 만든 신설 파일 둘
+(`EditSessionWorkflowTestSupport.kt`·`JdbcEditSessionSaveGuardTest.kt`)이 위 목록에
+빠져 있었다. verifier 가 실제로 그 명령을 실행해 재현했다 — 두 파일만 남고 저장소
+구현(`JdbcEditSessionRepository`·`EditSessionRow` 등)이 삭제돼 `:adapters:compileTestKotlin`
+이 `Unresolved reference`로 exit 1. 위 목록은 `git diff --name-status c4d09cc..HEAD`를
+다시 돌려 재산출했다(손으로 두 줄 끼워 넣지 않았다) — 아래 임시 clone 실측이 재발
+방지 확인이다.
+
+`--source`에 없는 경로(위 목록의 신규 파일 11개)는 삭제되므로 별도 `git rm`이 필요 없다
 (`--staged --worktree` 조합, 하네스 2026-09-04). `reports/evidence/m6/6b1/commands.md`·
 `checklist.md`·`rollback.md`(이 파일 자신)는 위 목록에 없다 — evidence 문서는 slice 종결
 판단의 일부이므로 되돌리지 않고 그대로 둔다(같은 slice 안의 자기 이력이지 다른 slice
@@ -75,6 +85,22 @@ DROP TABLE edit_session;
 되돌린 트리는 컴파일·테스트·전체 품질 게이트가 전부 초록이다 — `edit_session`이 코드에서
 사라진 상태에서 `CleanMigration*Test` 계열이 그 부재를 정확히 반영해 통과함을(base_sha
 시점 기대치로 자동 복귀) 함께 확인했다. 임시 clone은 실측 뒤 삭제했다.
+
+## 재실측(2026-09-17, verifier r4 MEDIUM-6 시정 뒤)
+
+목록 재산출(신규 파일 둘 추가, A→D 9건 → **11건**, M 12건 불변) 뒤 같은 ①~⑥을 새
+임시 clone(`/tmp/6b1-rollback-verify-r4`)에서 다시 실행했다 — verifier 가 재현한
+`:adapters:compileTestKotlin` exit 1(`Unresolved reference`)이 **지금은 exit 0**.
+
+| 단계 | 명령 | 결과 |
+| --- | --- | --- |
+| ① clone | `git clone --no-hardlinks <워크트리> /tmp/6b1-rollback-verify-r4` | exit 0 |
+| ② 경로 한정 restore(신규 목록) | 위 `git restore` 명령(신규 파일 둘 포함) | exit 0, `git status --short`: D 11건·M 12건 — 목록과 정확히 일치 |
+| ④ compile | 같은 6-태스크 compile 명령 | **exit 0**(verifier r4 재현 시점엔 exit 1) |
+| ⑤ test | `:workflow:test :adapters:test :app:test --rerun-tasks` | exit 0 |
+| ⑥ 게이트 | `./gradlew --no-daemon check`(전건) | exit 0 |
+
+임시 clone은 실측 뒤 삭제했다. Testcontainers 컨테이너는 ryuk 가 회수했다(잔존 0 확인).
 
 ## 공유 파일 — 다른 slice와 겹치는 줄 없음
 
