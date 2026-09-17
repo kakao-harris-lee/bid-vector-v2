@@ -64,3 +64,25 @@ internal fun PreparedStatement.setNullableBoolean(
 ) {
     if (value != null) setBoolean(index, value) else setNull(index, Types.BOOLEAN)
 }
+
+/**
+ * `TEXT[]` 바인딩(M6/6F-1) — [OpeningCompleteAxisCodec]의 `createArrayOf("integer", ...)`와
+ * 같은 관용구를 문자열 목록으로 확장한다. 전략 감시 규칙 다섯 축(`focus_categories` 등)은
+ * `StrategyDraft`가 항상 `List<String>`(빈 리스트가 「규칙 없음」)이라 `NULL`을 쓰지 않는다
+ * — 이 헬퍼는 nullable을 다루지 않는다(호출부가 항상 빈 리스트 이상을 준다).
+ */
+internal fun PreparedStatement.setTextArray(
+    index: Int,
+    values: List<String>,
+) {
+    setArray(index, connection.createArrayOf("text", values.toTypedArray()))
+}
+
+/** [setTextArray]의 역함수 — `NULL`(이 열이 안 실린 관측)이면 빈 목록을 낸다. */
+internal fun ResultSet.getTextList(column: String): List<String> {
+    val sqlArray = getArray(column) ?: return emptyList()
+
+    @Suppress("UNCHECKED_CAST")
+    val elements = sqlArray.array as Array<String?>
+    return elements.filterNotNull()
+}
