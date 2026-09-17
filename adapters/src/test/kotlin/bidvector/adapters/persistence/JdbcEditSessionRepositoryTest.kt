@@ -12,6 +12,7 @@ import bidvector.workflow.strategy.EditSessionConflictException
 import bidvector.workflow.strategy.EditSessionId
 import bidvector.workflow.strategy.EditSessionState
 import bidvector.workflow.strategy.EditableField
+import bidvector.workflow.strategy.TransitionOutcome
 import bidvector.workflow.strategy.toSnapshot
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
@@ -380,5 +381,71 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         val loaded = repository().load(EditSessionId(id))
 
         loaded!!.stateDraft!!.minBudget!!.won shouldBe 1_200_000L
+    }
+
+    /**
+     * verifier r7 HIGH-5 재현·회귀 보호 — 인코더는 정확한 십진 노드로 쓰지만, 디코더의
+     * 기본 `ObjectMapper`는 부동소수 토큰을 `DoubleNode`로 읽어 `.asText()`가 **그 double
+     * 의 최단 표기**를 돌려준다(척도·유효숫자가 예외·거부 없이 바뀐다 — HIGH-2/Codex 1
+     * 라운드가 막은 "값이 다른 값으로" 축과 같은 계열이지만 숫자가 아니라 **표기**가
+     * 갈리는 자리). `0.70`(정확 왕복 기대)이 `0.7`로 오는 것과 double 정밀도를 넘는
+     * 고정밀 값의 끝자리가 바뀌는 것, 둘 다 DB 행에서 출발해 직접 확인한다 — 기존 왕복
+     * test 의 소수 리터럴(`0.7`)은 우연히 double 최단 표기와 같아 이 결함을 못 봤다.
+     */
+    @Test
+    fun `state_payload 의 소수가 척도(0_70)를 유지한 채 복원된다 — HIGH-5 재현`() {
+        val id = "jdbc-decimal-scale"
+        val draft =
+            """{"focusCategories":[],"focusRegionTerms":[],"excludeRegionTerms":[],""" +
+                """"requiredKeywordTerms":[],"excludeKeywordTerms":[],"bidNowThreshold":0.70}"""
+        seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
+
+        val loaded = repository().load(EditSessionId(id))
+
+        loaded!!.stateDraft!!.bidNowThreshold shouldBe BigDecimal("0.70")
+    }
+
+    @Test
+    fun `state_payload 의 소수가 double 정밀도를 넘는 자릿수도 그대로 복원된다 — HIGH-5 재현`() {
+        val id = "jdbc-decimal-high-precision"
+        val precise = "0.123456789012345678901"
+        val draft =
+            """{"focusCategories":[],"focusRegionTerms":[],"excludeRegionTerms":[],""" +
+                """"requiredKeywordTerms":[],"excludeKeywordTerms":[],"minimumMatchScore":$precise}"""
+        seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
+
+        val loaded = repository().load(EditSessionId(id))
+
+        loaded!!.stateDraft!!.minimumMatchScore shouldBe BigDecimal(precise)
+    }
+
+    /**
+     * verifier r7 HIGH-5 — 실제로 깨지는 계약(왕복 단언만으로는 안 보인다). `0.70`으로
+     * `provideValue`를 두 번(같은 command) 보내면, 척도가 온전히 왕복하지 않는 한 두
+     * 번째 호출에서 `session.lastCommand`(DB 재로드·디코드된 값, 척도 1)와 재전달된
+     * `command`(원본 척도 2)가 데이터 클래스 동등성에서 갈려 `IdempotencyConflict`로
+     * 거부된다 — 계약은 「재전달 효과 0 의 `Accepted`」(HIGH-3 와 같은 계약, 다른 기제).
+     */
+    @Test
+    fun `척도 있는 소수(0_70)로 같은 command 를 재전달하면 효과 0 의 Accepted 다 — HIGH-5 계약 회귀`() {
+        val sessions = repository()
+        val id = EditSessionId("jdbc-decimal-scale-idempotent")
+        val flow = workflow(sessions)
+        flow.begin(id, OPERATOR, FIELD)
+        val command =
+            EditCommand.ProvideValue(
+                CommandId("cmd-1"),
+                id,
+                Actor.Operator(OPERATOR),
+                FIELD,
+                StrategyDraft(bidNowThreshold = BigDecimal("0.70")),
+            )
+        val first = flow.provideValue(command)
+        check(first is CommandResult.Processed)
+
+        val redelivered = flow.provideValue(command)
+
+        redelivered.shouldBeInstanceOf<CommandResult.Processed>()
+        redelivered.outcome.shouldBeInstanceOf<TransitionOutcome.Accepted>()
     }
 }

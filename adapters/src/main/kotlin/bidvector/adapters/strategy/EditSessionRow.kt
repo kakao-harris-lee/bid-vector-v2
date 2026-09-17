@@ -7,8 +7,10 @@ import bidvector.workflow.strategy.EditSessionSnapshot
 import bidvector.workflow.strategy.EditableFieldSnapshot
 import bidvector.workflow.strategy.MoneySnapshot
 import bidvector.workflow.strategy.StrategyDraftSnapshot
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.cfg.JsonNodeFeature
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -29,7 +31,24 @@ import java.time.Instant
  * 기존 것의 세 번째 사용이다.
  */
 internal object EditSessionRow {
-    private val mapper = ObjectMapper()
+    /**
+     * verifier r7 HIGH-5 수정 — 이 코덱 전용 인스턴스(`adapters` 전체에서 `ObjectMapper`를
+     * 쓰는 다른 자리는 `SchemaValidation.kt`가 자기 인스턴스를 따로 갖는다, 실측:
+     * `grep -rn "ObjectMapper(" adapters/src/main/kotlin/` 2건, 공유 0). 인코더는 정확한
+     * 십진 노드로 쓰지만, 기본 `ObjectMapper`는 `readTree`가 부동소수 토큰을
+     * `DoubleNode`로 읽어 `.asText()`가 그 double 의 최단 표기를 돌려준다 — 척도·유효숫자가
+     * 예외·거부 없이 바뀐다(`0.70`→`0.7`, 고정밀 값은 끝자리가 바뀜). 두 설정이 함께
+     * 필요하다(바이트코드 실측, `BaseNodeDeserializer._fromFloat`) — `USE_BIG_DECIMAL_
+     * FOR_FLOATS`는 부동소수 토큰을 `DecimalNode`로 파싱하게 하지만, Jackson 내부가 그 값을
+     * 만든 뒤 기본으로 켜진 `STRIP_TRAILING_BIGDECIMAL_ZEROES`(디폴트 `true`)로 **끝자리
+     * 0 을 지운다** — `getDecimalValue()`가 척도 2 로 정확히 돌려준 `0.70`이 이 단계에서
+     * 척도 1(`0.7`)로 깎인다(고정밀 값은 지울 끝자리 0 이 없어 영향받지 않는다 — 짧은
+     * 척도값만 조용히 깎이는 이유). 이 기능도 꺼야 척도·정밀도 두 축이 함께 닫힌다.
+     */
+    private val mapper =
+        ObjectMapper()
+            .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
+            .configure(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES, false)
 
     fun encodeStatePayload(snapshot: EditSessionSnapshot): String? {
         if (snapshot.stateKind == "EXPIRED") return null
