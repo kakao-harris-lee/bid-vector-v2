@@ -10,7 +10,6 @@
 | A | `adapters/src/main/kotlin/bidvector/adapters/strategy/JdbcStrategyRepository.kt` | scope.md는 원래 `adapters/persistence/` 경로였으나 **계약 갱신(2) D-6F1-7**로 패키지가 바뀌었다(아래 「scope 이탈과 정정」) |
 | A | `adapters/src/main/kotlin/bidvector/adapters/strategy/StrategyRow.kt` | 위와 동일 |
 | A | `adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt` | scope.md 그대로(패키지 무변경 — `PersistenceTestSupport` 상속 자리) |
-| A | `adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt` | scope.md 갱신(2)이 신설을 지시(D-6F1-7) — in_scope 목록에 항목명은 없으나 본문에 파일 경로가 명시됨 |
 | M | `adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt` | scope.md 그대로(「전략 SQL 추가만」) |
 | M | `adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt` | **scope 밖 발견** — 아래 「scope 밖 필연적 companion」 |
 | M | `adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt` | **scope 밖 필연적 companion** |
@@ -64,14 +63,30 @@ D-6F1-7**을 커밋했다(`a3a90d6`) — 6B-1 레인(다른 worktree)이 세션 
 - `JdbcStrategyRepository.kt`·`StrategyRow.kt`를 `adapters.strategy` 패키지로 옮겼다
   (`bd00c5e`·`b7d2265`).
 - 6B-1의 `StrategyAdapterDependencyTest.kt`(worktree `bid-vector-v2-m6b`, 읽기 전용
-  참고)를 **바이트 단위로 동일하게** 가져왔다(`682e03e`) — 「먼저 병합되는 레인이
-  만들고 뒤가 합류한다」는 계약 문구를 병합 충돌 없는 형태로 만족시키는 방법은 같은
-  경로에 같은 내용을 두는 것뿐이다. 이 두 worktree의 실제 병합 순서는 오케스트레이터
-  소관이라, 6B-1이 먼저 병합되면 이 커밋은 무변화(동일 내용) 병합이 되고, 6F-1이 먼저
-  병합되면 6B-1 쪽에서 같은 대조가 성립한다 — 어느 경우든 파일 내용 충돌은 없다.
+  참고)를 처음에는 바이트 단위로 동일하게 가져왔으나(`682e03e`), 팀장 조율 메시지가
+  **소유권을 6B-1로 확정**해(그 레인이 이미 그 파일을 만들어 병합 대기 중) 그 커밋을
+  `d9fda0a`로 철회했다 — 이 slice의 branch에는 이제 그 게이트 파일이 없다(아래
+  「의존 게이트 병합 전 대조」).
 
-이 왕복(패키지 이동 전후) 전부가 커밋 이력에 그대로 남아 있다 — 되돌리거나 rebase하지
-않았다(운영자 지시 「이력은 되쓰지 않는다」).
+이 왕복(패키지 이동·게이트 신설·게이트 철회) 전부가 커밋 이력에 그대로 남아 있다 —
+되돌리거나 rebase하지 않았다(운영자 지시 「이력은 되쓰지 않는다」).
+
+## 의존 게이트 병합 전 대조(팀장 조율 — 소유권 6B-1)
+
+이 branch의 `check`는 `StrategyAdapterDependencyTest`를 **돌리지 않는다**(파일이
+없다 — 병합 뒤 `main`에서 6B-1의 파일과 함께 처음 돈다, 알려진 제한). 병합 전에
+버릴 임시 clone에서 6B-1 worktree(`bid-vector-v2-m6b`, 읽기 전용 참고)의 게이트
+파일만 복사해 실측했다:
+
+- `./gradlew --no-daemon :adapters:test --tests '*StrategyAdapterDependencyTest*' --rerun-tasks` → exit 0
+- `./gradlew --no-daemon :adapters:check` → exit 0
+
+6B-1의 허용 목록(`workflow.strategy`·`strategy`·`sharedkernel`·`adapters.persistence`)이
+이 slice의 실제 import(`bidvector.workflow.strategy.{AppliedStrategy,StrategyRepository}`·
+`bidvector.strategy.{OperatorStrategy,StrategyDraft,StrategyPolicyData,StrategyRevision,
+StrategyValidation,StrategyViolation,validate,CategoryCode}`·`bidvector.sharedkernel.*`·
+`bidvector.adapters.persistence.{Sql,ProvenanceCodec,getTextList,setNullableInt,
+setTextArray}`)를 전부 덮는다 — **추가 좌표 요청 없음**.
 
 ## (2b) 값 획득 축 — 실측 대응표
 
@@ -89,9 +104,17 @@ D-6F1-7**을 커밋했다(`a3a90d6`) — 6B-1 레인(다른 worktree)이 세션 
   자란다. 삭제·보관 정책은 6B-3 소관(scope.md 위협 모델과 동일 경계).
 - **app 조립 미배선** — `JdbcStrategyRepository`를 실제로 생성해 `EvaluateCandidatesUseCase`
   ·`EditStrategyWorkflow`에 주입하는 자리는 이 slice 밖(`OPEN-6F-ASSEMBLY`, scope.md 그대로).
-- **패키지 조정 잔여 리스크** — 위 「scope 이탈과 정정」의 `StrategyAdapterDependencyTest.kt`
-  동일 내용 가정이 6B-1 실제 병합 시점에 어긋나면(그 사이 6B-1이 파일을 더 고쳤다면)
-  병합 시 재조정이 필요하다 — 오케스트레이터가 병합 순서를 정할 때 이 파일을 확인해야 한다.
+- **`StrategyAdapterDependencyTest`를 이 branch의 `check`가 돌리지 않는다** — 소유권이
+  6B-1로 확정돼 이 slice는 그 파일을 만들지 않는다. `main` 병합 뒤 6B-1의 파일과 함께
+  비로소 이 slice의 코드에도 적용된다. 병합 전 대조(위 절)로 통과를 실측했으나, **6B-1이
+  병합 시점까지 그 게이트의 허용 목록을 좁히는 방향으로 바꾸면** 이 실측은 무효가 되고
+  재확인이 필요하다.
+- **마이그레이션 병합 순서** — 팀장 조율: 기본 순서는 6B-1(V8) → 6F-1(V9, 이 slice) →
+  6A-1(V10)이다(Flyway `outOfOrder`가 이 저장소에 없어 기본값 `false` — 낮은 번호를
+  나중에 적용하면 거부된다). 6B-1이 먼저 병합될 예정이라 이 slice는 V9를 유지한다.
+  **PR 요청 시점에 `main`의 최신 마이그레이션 번호를 다시 확인해야 한다** — 이 문서
+  작성 시점(base `c4d09cc`) 기준 `main`의 최신은 V7이고 이 slice의 파일명은 V9다(V8은
+  6B-1 몫으로 미리 비워 둔 자리).
 
 ## OPEN 처분
 

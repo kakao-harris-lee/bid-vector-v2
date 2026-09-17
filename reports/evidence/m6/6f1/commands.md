@@ -1,6 +1,11 @@
 # M6/6F-1 — commands.md
 
-정본: `reports/evidence/m6/6f1/scope.md`. HEAD `48133c9`(base `c4d09cc`).
+정본: `reports/evidence/m6/6f1/scope.md`. base `c4d09cc`. 아래 블록은 `48133c9`
+시점(패키지 이동 직후)까지 기록이고, 그 뒤 팀장 조율로 `StrategyAdapterDependencyTest`
+소유권이 6B-1로 확정돼 그 파일을 철회한 커밋(`d9fda0a`)이 이어졌다 — 「의존 게이트
+병합 전 대조」 절이 그 뒤 실측이다. 최종 HEAD의 acceptance 재확인은 evidence가 아니라
+완료 보고 메시지가 정본이다(2026-09-16 규율 — 자기 마지막 커밋의 post-state는 evidence가
+담을 수 없다).
 
 ## acceptance (전건, 최종 HEAD)
 
@@ -92,3 +97,19 @@
 - exit: 0
 - 핵심 결과: 21·21(StrategyRow 필드 수 21과 일치) — 최초 작성 시 20개였던 것을 이 대조로
   발견해 수정(구현 중 실측, 커밋 전).
+
+## 의존 게이트 병합 전 대조(팀장 조율 — 소유권 6B-1로 확정, checklist.md 참고)
+
+## 2026-09-17T01:12:00Z
+- cmd: (임시 clone, HEAD `d9fda0a`) 6B-1 worktree의 `StrategyAdapterDependencyTest.kt`만
+  `adapters/src/test/kotlin/bidvector/adapters/strategy/`에 복사한 뒤
+  `./gradlew --no-daemon :adapters:test --tests '*StrategyAdapterDependencyTest*' --rerun-tasks`
+- exit: 0
+- 핵심 결과: 6B-1의 허용 목록(workflow.strategy·strategy·sharedkernel·adapters.persistence)
+  이 이 slice의 실제 import를 전부 덮는다 — 3 tests(허용 확인·양성 대조 둘) 0 failed.
+
+## 2026-09-17T01:13:00Z
+- cmd: (같은 임시 clone) `./gradlew --no-daemon :adapters:check`
+- exit: 0
+- 핵심 결과: 이 slice의 코드가 6B-1의 의존 게이트를 포함한 `adapters` 모듈 전건 게이트를
+  통과한다(병합 전 사전 확인).
