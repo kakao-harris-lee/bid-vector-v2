@@ -111,8 +111,10 @@ message CompetitionSample {
   // `OPEN-5D2-SAMPLE-SEGMENT`).
   AgencyIdFact agency_id = 8;
   // 표본 공고의 업종/공종 fact(M2/2F additive, D-2F-1) — 위 `agency_id`와 같은 규약
-  // (식별자 아님, 정본은 `FeatureInputs.category_code`와 동일, 허용 `missing` 사유는
-  // `MISSING_REASON_NOT_COLLECTED_YET` 하나뿐).
+  // (식별자 아님, 정본은 `FeatureInputs.category_code`와 동일). 수신(분포 엔진)이 허용하는
+  // `missing` 사유는 `agency_id`와 같다 — `NOT_COLLECTED_YET`·`UNKNOWN` 둘, 두 축에 같은
+  // 술어를 쓴다(M3/3H-2 D-3H2-3). 다만 송신 어댑터는 오늘 이 축에서 `UNKNOWN`을 만들지
+  // 않는다 — `NOT_COLLECTED_YET`만 싣는다(수신이 더 관대할 뿐, 계약 위반이 아니다).
   CategoryCodeFact category_code = 9;
 }
 
