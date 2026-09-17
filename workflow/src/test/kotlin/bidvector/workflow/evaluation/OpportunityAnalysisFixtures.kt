@@ -3,6 +3,7 @@ package bidvector.workflow.evaluation
 import bidvector.decision.UnitScore
 import bidvector.decision.priority.derive.DerivationAbsence
 import bidvector.decision.priority.derive.DerivationOutcome
+import bidvector.procurement.Agency
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeId
@@ -194,6 +195,10 @@ internal fun testNoticeWithMoney(
     // M4/4B-8(D-4B8-1) — 대상 라벨 규칙표(`PredictionFactsTest`)의 SuspectRatio 판정에 쓰는
     // 추정가격 축. 기본값 null 은 기존 fixture와 바이트 동일.
     estimatedAmountWon: Long? = null,
+    // M3/3H-2(D-3H2-1) — 요청 축 agencyId 조립(`predictionRequestFor`) test 용. 기본값
+    // null 은 기존 fixture와 바이트 동일.
+    demandAgency: Agency? = null,
+    noticeAgency: Agency? = null,
 ): Notice {
     val observation =
         RawNoticeObservation.of(
@@ -226,6 +231,8 @@ internal fun testNoticeWithMoney(
             deadlineAt = deadlineAt,
             openingScheduledAt = null,
             raw = observation,
+            demandAgency = demandAgency,
+            noticeAgency = noticeAgency,
         ),
     )
 }
