@@ -60,9 +60,13 @@ ADR 0008 §1.3 이 「UI 에는 승인된 사용자 가치도 acceptance scenari
 (`OPEN-5E-JOB-PERSISTENCE`·`OPEN-5E-JOB-QUEUE-BOUND` — Python·파일 계열, 큐 정책 결정 선행). 근거는
 6C 가 네 축을 한 slice 에 담아 **재작업 3 라운드**를 쓴 실측이다.
 
-**6B-1 이 하는 것**: ① clean DB 전체 재현을 **게이트로** — 지금은 Testcontainers 가 test 마다 Flyway 를
-태워 간접 재현만 하고(그 test 들의 목적은 도메인 왕복이다), 빈 컨테이너에 V1~V8 을 전건 적용한 뒤
-**카탈로그를 읽어** 표·PK·UNIQUE·인덱스·트리거를 손으로 선언한 기대치와 대조한다 ② 제약·인덱스 **실측과
+**6B-1 이 하는 것**(D-6B1-8, 착수 뒤 정정 — 아래 「수정 라운드 1」 참고): ① clean DB 전체 재현을
+**기존 게이트 계열**(`CleanMigration*Test` 넷, D-3D-6 여덟 축)에 신설 표를 등재해 잇는다 —
+`PersistenceTestSupport`의 공유 컨테이너가 `init`에서 Flyway 를 **한 번** 태우므로 그 뒤 다른 test 의
+DML 은 스키마 카탈로그에 영향이 없고, 빈 컨테이너에 마이그레이션 전건을 적용하는 조건을 **이미
+충족한다**(착수 계약의 "간접 재현만"은 팀장 오류였다). **카탈로그를 읽어** 표·PK·UNIQUE·컬럼 타입·
+NOT NULL·트리거·CHECK 을 손으로 선언한 기대치와 대조한다(**인덱스는 이 게이트의 축이 아니다** — PK·
+UNIQUE 만 재고, 인덱스 공백은 ②가 별도 표로 등재한다) ② 제약·인덱스 **실측과
 공백 등재**(추가는 소비 질의를 가진 slice 가 근거와 함께 — D-6B1-5, `OPEN-6B1-INDEX-GAPS`) ③ **낙관적
 동시성 실물** — `EditSessionRepository` 실 구현 + `session_version` **전제조건**(0행이면 실패). M4/4B 가
 「세션 영속 실 구현 부재 + `sessionVersion` 낙관적 동시성 미검증」으로 남긴 자리이고, 지금 저장소에는

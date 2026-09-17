@@ -4,7 +4,10 @@
 
 `base_sha`(`c4d09cc`)로 in_scope 경로만 되돌린다 — range revert 가 아니다(하네스
 2026-09-04). 목록은 `git diff --name-status c4d09cc..HEAD -- <in_scope 경로>`로 기계
-생성한다(손으로 쓰지 않는다). **라운드마다 파일이 늘면 이 목록을 다시 생성한다.**
+산출한 뒤, **evidence 문서 셋(`commands.md`·`checklist.md`·`rollback.md`)을 의도적으로
+뺀다**(아래 근거) — 그 셋을 뺀 나머지는 산출된 그대로 쓰고 손으로 고치지 않는다.
+**라운드마다 파일이 늘면 이 산출을 다시 돌린다**(verifier r1 LOW-3 시정 — "손으로 쓰지
+않는다"였던 이전 문구가 이 의도적 제외까지 "기계 생성"으로 뭉뚱그려 부정확했다).
 
 ```bash
 git restore --source=c4d09cc --staged --worktree -- \

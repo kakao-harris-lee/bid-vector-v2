@@ -11,13 +11,16 @@
 - [x] 알려진 제한과 rollback 방법 — 아래 「알려진 제한」·`rollback.md`.
 - [x] 비밀값 스캔 — `commands.md` 마지막 항목. exit 0(매치 있음)이나 전건 육안 확인 결과 실 비밀값 0건(도메인 상용어 오탐, 선행 slice와 같은 판단).
 
-## (2b) 값 획득 축 — 실측 결과(scope.md 표 대응)
+## (2b) 값 획득 축 — 실측 결과
 
-| 표면 | 판정 | 실측 |
-| --- | --- | --- |
-| `JdbcEditSessionRepository`(public class) | 경계로 처리 | 생성자는 `DataSource` 하나뿐(`adapters/src/main/kotlin/bidvector/adapters/strategy/JdbcEditSessionRepository.kt`) — 도메인 값을 만들지 않는다. `save`는 이미 완성된 `EditSession`을 받아 `toSnapshot()`(안전한 방향)으로 내릴 뿐이다. |
-| `EditSessionRow`의 도메인 복원 | 닫는다(D-6B1-6) | `EditSessionRow`는 `EditSessionSnapshot`(원시 필드)만 만든다 — `EditSession` 생성 없음. 유일한 복원 경로는 `workflow` 안 `internal fun restoreEditSession`이고 `adapters`에서 호출 자체가 컴파일되지 않는다(`commands.md` friendPaths 실측). |
-| `config/quality/schema-baseline.properties` | 폐기(D-6B1-8) | 계약 갱신 (3)으로 삭제 — 스키마 기대치는 `CleanMigration*Test` 코드 자체가 정본(외부 정책 파일 없음, `OPEN-6C-POLICY-GATE-STRUCTURAL` 계열 표면을 만들지 않는다). |
+**verifier r1 MEDIUM-4 시정** — 표의 정본을 `scope.md` 「(2b) 값 획득 축」 절 하나로 좁힌다
+(낡는 좌표 회피 — 같은 표를 두 문서에 각자 유지하면 한쪽만 갱신되고 벌어진다, 이번이 그
+사례였다). 그 표가 이제 일곱 행(계약 갱신 (2)·(5)가 실제로 내놓은 public 표면 전부)이고
+**판정되지 않았던 실질**(`EditSessionSnapshot`이 여는 필드 간 정합 공백, `EditSession`에
+`init` 불변식이 없어 `restoreEditSession`이 상태-lastCommand 조합까지는 못 본다)을
+판정·문서화했다. 닫으려면 `Transition.kt`가 정합 조합을 재사용 가능한 형태로 내놓아야
+하는데 이 slice(D-6B1-7, `workflow/**` 를 스냅숏 배관에 한정) 범위 밖이라 코딩하지
+않았다 — `OPEN-6B1-CROSS-FIELD-CONSISTENCY` 로 등재(scope.md OPEN 표).
 
 ### 새 public 표면 0 — `javap` 바이트코드 실측(우회 (6))
 

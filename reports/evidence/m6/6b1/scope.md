@@ -81,11 +81,20 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 
 ## (2b) 값 획득 축
 
+**verifier r1 MEDIUM-4 시정** — 초판 표 세 행 중 하나(`schema-baseline.properties`)는 D-6B1-8
+이 만들지 않기로 결정한 파일이라 제거한다. 계약 갱신 (2)·(5) 가 실제로 새로 내놓은 public
+표면 일곱(`EditSessionSnapshot`·`EditableFieldSnapshot`·`MoneySnapshot`·
+`StrategyDraftSnapshot`·`EditCommandSnapshot`·`fun EditSession.toSnapshot()`·
+`EditSessionConflictException`)이 한 행도 없었다 — 아래에 채운다.
+
 | 표면 | 허락하는 것 | 판정 |
 | --- | --- | --- |
-| `JdbcEditSessionRepository`(public class) | 세션 읽기·쓰기 | **경계로 처리** — 배선 주체가 port 로 이미 갖는 권한과 동치. 생성자는 DataSource 주입뿐이고 도메인 값을 만들지 않음을 실측 |
-| `EditSessionRow` 의 도메인 복원 | `EditSession` 인스턴스 생성 | 닫는다 — D-6B1-6, 가시성을 넓히지 않고 새 public 표면 0(AST 증분) |
-| `config/quality/schema-baseline.properties` | 게이트 기대치 | **경계로 처리** — 값을 느슨하게 바꾸면 게이트가 약해진다. 6C 의 `OPEN-6C-POLICY-GATE-STRUCTURAL` 과 같은 계열이며, 이 slice 는 **기대치를 손으로 선언**하는 형태까지(자동 추출 금지, 우회 (2)) |
+| `JdbcEditSessionRepository`(public class) | 세션 읽기·쓰기 | **경계로 처리** — 배선 주체가 port 로 이미 갖는 권한과 동치. 생성자는 `DataSource` 주입뿐이고 도메인 값을 만들지 않음을 `javap` 로 실측(공개 멤버는 `load`·`save` 뿐, port 시그니처와 정확히 같다) |
+| `EditSessionRow` 의 도메인 복원 | (없음 — `EditSession` 인스턴스를 만들지 않는다) | 닫는다 — D-6B1-6. `javap` 실측(`bidvector.adapters.strategy.EditSessionRow`)으로 공개 멤버가 전부 `EditSessionSnapshot`·`String` 만 반환함을 확인, `EditSession` 반환 0건 |
+| `EditSessionSnapshot`(public data class, public 생성자) | 원시 필드로 `EditSessionRepository.load()` 반환값을 구성 | **연다(제한적) — 판정되지 않았던 실질(verifier r1 MEDIUM-4).** port(`EditSessionRepository`)가 public 이라 **아무 모듈이나 그 port 를 구현해** 위조 스냅숏을 `restoreEditSession`에 건넬 수 있다. 그 함수는 필드별 어휘(state kind·command kind·provenance 등, HIGH-2 로 강화됨)는 거부하지만 **필드 간 정합**(예: `APPLIED` 상태에 `lastCommand`가 `PROVIDE_VALUE`)은 검사하지 않는다 — `EditSession`에 `init` 불변식이 없다. D-6B1-7 **이전에는** `internal constructor`가 이 주입 자체를 원천 차단했다. **오늘의 실제 노출**: `EditSessionRepository`의 실 구현은 `JdbcEditSessionRepository` 하나뿐이고 `EditStrategyWorkflow`는 아직 어디에도 배선되지 않았다(6A 이전) — 이 경로로 실제 주입 가능한 지점이 지금은 없다. 닫으려면 `Transition.kt`가 (상태, lastCommand) 정합 조합을 재사용 가능한 형태로 내놓아야 하는데, 그건 이 slice(D-6B1-7 이 `workflow/**` 변경을 스냅숏 배관에 한정)의 범위 밖이다 — 재작업 라운드에서 시도하지 않고 **`OPEN-6B1-CROSS-FIELD-CONSISTENCY`로 등재**한다(아래) |
+| `EditableFieldSnapshot`·`MoneySnapshot`·`StrategyDraftSnapshot`·`EditCommandSnapshot`(public data class 넷) | `EditSessionSnapshot`의 nested 원시 필드 구성 | **경계로 처리** — 전부 원시 스칼라·리스트만 담고 그 자체로는 아무 권한도 열지 않는다. 위 `EditSessionSnapshot` 행의 잔여 위험에 얹힐 뿐 개별 위험은 없다 |
+| `fun EditSession.toSnapshot()`(public 확장 함수) | `EditSession` → `EditSessionSnapshot` | 닫는다(안전한 방향) — 이미 정당하게 보유한 `EditSession`에서 값을 꺼낼 뿐이라 새 권한을 만들지 않는다 |
+| `EditSessionConflictException`(public class) | 충돌 정보(`sessionId`·`expectedVersion`) 전달 | **경계로 처리** — 순수 정보 전달용 예외, 생성 자체가 아무것도 우회하지 않는다 |
 
 ## 하네스 레인 변경
 
@@ -99,6 +108,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 | `OPEN-5E-JOB-PERSISTENCE`·`OPEN-5E-JOB-QUEUE-BOUND` | **6B-4**(D-6B1-2) — 큐 정책 결정 선행 |
 | `OPEN-6B1-SAVE-OUTCOME`(신설) | 충돌을 결과 타입으로 나를지 — 두 번째 writer(API·스케줄러)가 생길 때 workflow 도메인 결정과 함께 |
 | `OPEN-6B1-INDEX-GAPS`(신설) | ② 가 등재할 인덱스 공백 — 소비 질의를 가진 slice 가 근거와 함께 추가(D-6B1-5) |
+| `OPEN-6B1-CROSS-FIELD-CONSISTENCY`(신설, verifier r1 MEDIUM-4) | `restoreEditSession`이 (상태, `lastCommand`) 필드 간 정합(예: `APPLIED`엔 `lastCommand`가 `Confirm`만 legitimate)을 검사하지 않는다 — `Transition.kt`가 그 정합 조합을 재사용 가능한 형태로 노출해야 복제 없이 닫히는데, 이 slice(D-6B1-7, `workflow/**` 변경을 스냅숏 배관에 한정)의 범위 밖이다. 오늘은 `EditSessionRepository`의 실 구현·배선이 `JdbcEditSessionRepository` 하나뿐이고 `EditStrategyWorkflow`가 아무 곳에도 배선되지 않아(6A 이전) 실제 주입 지점이 없다 — 6A 배선 또는 `Transition.kt`를 데이터 기반 전이표로 재설계하는 slice에서 함께 처분 |
 
 ## 리뷰 레인
 
@@ -108,6 +118,7 @@ milestone-6 의 6B 는 네 축을 한 bullet 목록에 담고 있는데 성질�
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 수정 라운드 1(7) | (2b) 표를 일곱 행으로 갱신(`EditSessionSnapshot`·nested 넷·`toSnapshot()`·`EditSessionConflictException`) + 판정되지 않았던 실질(`EditSessionSnapshot`이 여는 필드 간 정합 공백) 판정·문서화 + `schema-baseline.properties` 낡은 행 제거 + `OPEN-6B1-CROSS-FIELD-CONSISTENCY` 신설(닫으려면 `Transition.kt` 변경 필요 — 이 slice 범위 밖으로 판단, 코딩하지 않음) | verifier r1 MEDIUM-4 — 계약이 그 뒤 다섯 번 갱신되는 동안 (2b) 표를 갱신하지 않았다(하네스 2026-09-10 「수정 라운드마다 갱신」 위반) |
 | 2026-09-17 완료 보고 뒤(6) | in_scope 에 기계적 귀결 셋 등재 — conformance fake 시그니처(D-6B1-7 의 귀결) · 신설 표의 test 간 정리 목록 · 신설 test 의 양방향 등재. **알려진 제한이 아니라 in_scope** 다(slice 의 커밋 집합 = in_scope 경로의 변경, 하네스 2026-09-04) | 구현 레인 완료 보고의 「scope 밖 기계적 편집 3건」. 셋 다 in_scope 변경이 **강제한** 편집이고 우회가 아니다 |
 | 2026-09-17 구현 중(5) | in_scope 에 `workflow/.../EditSessionRestore.kt` 등재(detekt 파일당 함수 상한으로 스냅숏 파일에서 기계적 분리) · **S-31 acceptance 명령 정정** — D-6B1-8 이 삭제한 파일을 계속 가리키고 있었다(**팀장 오류** — 갱신 (3)(4)가 in_scope·결정·이력만 고치고 acceptance 절에 전파되지 않았다. 「낡는 좌표」의 계약 내부 판) | 구현 레인 보고(새 파일 1·낡은 좌표 1) |
 | 2026-09-17 구현 중(4) | **D-6B1-9 신설** — 세션 어댑터 패키지를 `adapters.persistence` → **`adapters.strategy`**(신설) + 전용 의존 게이트 test 추가, in_scope 경로 교체 | 구현 레인 정지·보고: `persistence` 패키지는 workflow 참조가 기존 게이트로 금지돼 있고, 같은 필요로 `adapters.event` 가 이미 갈라져 있다(그 KDoc 이 allow-list 확대를 거부). **6F-1 의 전략 저장소도 같은 벽을 만나므로 같은 패키지를 쓴다**(6F-1 계약 갱신 (2)) |
