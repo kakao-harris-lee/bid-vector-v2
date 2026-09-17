@@ -33,8 +33,19 @@ git restore --source=c4d09cc --staged --worktree -- \
   workflow/src/main/kotlin/bidvector/workflow/strategy/EditStrategyWorkflow.kt \
   workflow/src/main/kotlin/bidvector/workflow/strategy/Ports.kt \
   workflow/src/test/kotlin/bidvector/workflow/strategy/EditSessionSnapshotTest.kt \
+  workflow/src/test/kotlin/bidvector/workflow/strategy/EditSessionTransitionTableTest.kt \
   workflow/src/test/kotlin/bidvector/workflow/strategy/EditStrategyWorkflowTest.kt
 ```
+
+**verifier r6 MEDIUM-9 시정** — MEDIUM-6 재산출(직전 절)을 승인 전 일괄 라운드의 **마지막
+내용 커밋 앞**(`c37835c`)에서 돌려, 그 뒤 커밋(`ba762fa`, `EditSessionTransitionTableTest.kt`
+수정)이 목록을 다시 낡게 만들었다 — MEDIUM-6 과 같은 기제의 재발이다. verifier 가 재현:
+목록 그대로 되돌리면 `EditSessionTransitionTableTest.kt`가 HEAD 내용(MEDIUM-8 불변식 test
+포함)인 채로 남아 `:workflow:sizeGate`(50줄 함수 한도)가 exit 1 — rollback ⑥(전건 게이트
+초록)이 성립하지 않았다. **교훈**: rollback 목록 재산출은 그 라운드의 **마지막 내용 커밋
+뒤**에 돌린다 — 중간에 돌리면 뒤따르는 커밋이 목록을 낡게 만든다(같은 함정을 두 라운드
+연속 밟았다). 이번 재산출은 이 수정(`rollback.md`만 건드리고, evidence 문서 셋에 들어가
+목록에서 제외된다)이 그 라운드의 마지막 커밋이므로 자기 자신 때문에 다시 낡지 않는다.
 
 **verifier r4 MEDIUM-6 시정** — 수정 라운드 2(sizeGate 분리)가 만든 신설 파일 둘
 (`EditSessionWorkflowTestSupport.kt`·`JdbcEditSessionSaveGuardTest.kt`)이 위 목록에
@@ -99,6 +110,23 @@ DROP TABLE edit_session;
 | ④ compile | 같은 6-태스크 compile 명령 | **exit 0**(verifier r4 재현 시점엔 exit 1) |
 | ⑤ test | `:workflow:test :adapters:test :app:test --rerun-tasks` | exit 0 |
 | ⑥ 게이트 | `./gradlew --no-daemon check`(전건) | exit 0 |
+
+임시 clone은 실측 뒤 삭제했다. Testcontainers 컨테이너는 ryuk 가 회수했다(잔존 0 확인).
+
+## 재실측(2026-09-17, verifier r6 MEDIUM-9 시정 뒤)
+
+목록 재산출(`EditSessionTransitionTableTest.kt` M 추가, D 11건 불변·M 12건 → **13건**) 뒤
+같은 ①~⑥을 새 임시 clone(`/tmp/6b1-rollback-verify-r6`)에서 다시 실행했다 — verifier
+가 재현한 `:workflow:sizeGate` exit 1(50줄 함수 한도, `EditSessionTransitionTableTest.kt`
+가 HEAD 내용인 채로 남았기 때문)이 **지금은 exit 0**.
+
+| 단계 | 명령 | 결과 |
+| --- | --- | --- |
+| ① clone | `git clone --no-hardlinks <워크트리> /tmp/6b1-rollback-verify-r6` | exit 0 |
+| ② 경로 한정 restore(신규 목록) | 위 `git restore` 명령(`EditSessionTransitionTableTest.kt` 포함) | exit 0, `git status --short`: D 11건·M 13건 — 목록과 정확히 일치 |
+| ④ compile | 같은 6-태스크 compile 명령 | exit 0 |
+| ⑤ test | `:workflow:test :adapters:test :app:test --rerun-tasks` | exit 0 |
+| ⑥ 게이트 | `./gradlew --no-daemon check`(전건, `:workflow:sizeGate` 포함) | **exit 0**(verifier r6 재현 시점엔 `:workflow:sizeGate` exit 1) |
 
 임시 clone은 실측 뒤 삭제했다. Testcontainers 컨테이너는 ryuk 가 회수했다(잔존 0 확인).
 
