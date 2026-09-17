@@ -1,5 +1,7 @@
 package bidvector.adapters.persistence
 
+import bidvector.adapters.strategy.InvalidStoredStrategyException
+import bidvector.adapters.strategy.JdbcStrategyRepository
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
