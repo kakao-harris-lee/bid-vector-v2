@@ -13,13 +13,10 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/http/ErrorBody.kt               # 명시적 error body 규약(코드·사유·correlation id). 도메인 실패를 HTTP 로 옮기는 매핑표는 이 파일 하나
   - app/src/main/kotlin/bidvector/app/http/StrategyReadController.kt  # 현 전략 조회 endpoint(읽기 전용) — 유일한 endpoint
   - app/src/main/kotlin/bidvector/app/wiring/PersistenceWiring.kt     # DataSource·Flyway·repository 조립(값은 환경변수, 기본값 없음)
-  - adapters/src/main/resources/db/migration/V9__strategy_and_api_audit.sql   # 전략 영속 표 + `api_audit` 표. **V8 은 6B-1 이 쓴다**(레인 겹침 — 아래 「병행 레인」)
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/JdbcStrategyRepository.kt   # `StrategyRepository` 실 구현(저장소에 production 구현이 없다 — 실측)
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/StrategyRow.kt              # 행 ↔ 도메인 매핑. `AppliedStrategy`·`OperatorStrategy` 의 가시성을 넓히지 않는다
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/ApiAuditStore.kt            # audit 표 쓰기(추가 전용)
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                      # 위 둘의 SQL 추가만
+  - adapters/src/main/resources/db/migration/V10__api_audit.sql   # 요청 감사 표. **번호 변경(계약 갱신 (3))** — V8 은 6B-1(세션), **V9 는 6F-1(전략 영속)**
+  - adapters/src/main/kotlin/bidvector/adapters/persistence/ApiAuditStore.kt            # 감사 표 쓰기(추가 전용)
+  - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                      # 감사 SQL 추가만
   - app/src/test/kotlin/bidvector/app/http/**               # 인증(없는·틀린·맞는 토큰) · audit 행 생성 · error body 형태 · 조회 응답 · 토큰이 로그·응답에 안 실림
-  - adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt
   - openapi/bidvector-operator-api.yaml                     # OpenAPI 단일 출처(수작성) + 구현과의 대조 test
   - gradle/libs.versions.toml                               # spring-boot-starter-web 좌표 추가만
   - reports/evidence/m6/6a1/**
@@ -32,6 +29,7 @@ out_of_scope:
   - 실제 외부 effect(알림 발송·수집 트리거)  # milestone-6 「완료 후 별도 승인 사항」. 이 slice 의 endpoint 는 **읽기 하나**뿐이라 effect 경로가 없다(D-6A1-4)
   - Kotlin 앱 이미지·compose 편입            # 6C 가 6A 로 인계했으나 `bootJar` 활성까지가 이 slice — 이미지·compose 는 **6A-2**(entrypoint 가 실제로 무엇을 서비스하는지 정해진 뒤)
   - pagination                               # 목록 endpoint 가 없다. 목록이 생기는 slice 가 규약과 함께(D-6A1-5)
+  - 전략 영속(`StrategyRepository` 실 구현·전략 표)  # **6F-1 로 이동**(계약 갱신 (3), 운영자 지시 「배선이 먼저」). 이 slice 의 조회 endpoint 는 **6F-1 이 낸 구현을 소비**한다 — 6F-1 병합이 선행이다(D-6A1-10)
 acceptance_commands:
   - "./gradlew --no-daemon check"                                                          # S-10 — 전건(evidence 커밋마다 그 HEAD 에서, 마지막은 보고·PR 코멘트가 정본)
   - "./gradlew --no-daemon :app:test --tests '*http*' --rerun-tasks"                       # S-40 — 인증·audit·error body·조회(캐시 우회)
@@ -67,6 +65,7 @@ ML 축 하나뿐**이었다(실측: 나머지는 전부 생성자 매개변수�
 | **D-6A1-5** | pagination 규약은 **목록 endpoint 가 생기는 slice** 가 정한다 | 지금 목록이 없다. 쓰지 않는 규약을 먼저 만들지 않는다 |
 | **D-6A1-6** | 토큰은 환경변수 주입·기본값 없음이고 **값을 로그·응답·audit 에 싣지 않는다**. 실패는 401 이며 사유를 나누지 않는다(없음/틀림 구분 금지) | 6C D-6C-7·5E-1 D-5E-7 계승(기본값 없음). 사유를 나누면 토큰 존재를 알려 준다 |
 | **D-6A1-7** | audit 은 **추가 전용** 표이고 요청 본문·토큰을 담지 않는다 — 시각·주체·메서드·경로·상태·소요·correlation id 까지 | 보존·파기 정책은 6B-3 이고 아직 승인된 기간이 없다. 본문을 담으면 그 결정 없이 개인정보가 쌓인다 |
+| **D-6A1-10** (계약 갱신 (3), 운영자 지시 2026-09-17) | 전략 영속은 **6F-1**(배선 slice 군) 소관으로 옮긴다 — 이 slice 는 HTTP 골격·인증·요청 감사까지이고 조회 endpoint 는 6F-1 이 낸 구현을 **소비**한다(6F-1 병합 선행). 마이그레이션 번호는 **V10** | 운영자가 「어댑터 부재는 중요한 결함이고 배선이 먼저」로 우선순위를 정했다. 전략 영속은 `evaluate()` 의 첫 줄이 요구하는 **판정 경로의 선행 의존**이라 HTTP 축보다 먼저 서야 하고, HTTP 와 묶으면 판정 배선이 웹 스택 결정에 묶인다 |
 | **D-6A1-9** (착수 직후 정정) | 인증 관련 **클래스·파일·설정 키 이름에 비밀값 스캔 어휘를 쓰지 않는다** — 그 이름이 evidence 에 등장하는 순간 `leakPatternGate` 의 자기참조가 된다. 이 slice 는 `OperatorCredentialFilter`·`operator.credential.*` 로 명명하고 evidence 는 「자격증명」으로 적는다 | 팀장 실측: 초판이 그 어휘를 클래스 이름으로 써 계약 파일에서 매치 둘이 났다. 하네스 2026-09-16(어휘 축어 금지)의 **이름 축** — 스캔 어휘를 담은 식별자는 문서에 인용될 수밖에 없다 |
 | **D-6A1-8** | OpenAPI 는 **수작성 단일 출처**이고 test 가 구현과 대조한다(생성 도구 도입 안 함) | milestone-6 「OpenAPI 단일 출처」. 구현에서 자동 생성하면 「단일 출처」가 구현이 되어 계약이 사라진다(6B-1 의 스키마 기대치와 같은 이유) |
 
@@ -130,4 +129,5 @@ limit · 요청 본문 감사(D-6A1-7) · 후보평가 축 전부(D-6A1-2) · pa
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-17 배선 우선(3) | **D-6A1-10 신설** — 전략 영속을 6F-1 로 이동(in_scope 에서 repository·row·test·전략 표 제거), 마이그레이션 번호 V9 → **V10**, 조회 endpoint 는 6F-1 소비(선행) | 운영자 지시 2026-09-17 「배선이 먼저」 · 배선 재고가 전략 영속을 첫 착수로 지목 |
 | 2026-09-17 착수 | 초판 — D-6A1-1~8 | 운영자 결정 다섯(2026-09-16 둘 · 2026-09-17 셋) · 6A 입력 재고 · **포트 구현 실측이 6A 를 셋으로 가르게 했다** |
