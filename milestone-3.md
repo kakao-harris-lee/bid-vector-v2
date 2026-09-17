@@ -370,7 +370,20 @@ V7 제거 뒤 전건 초록). **재작업 0회**. **migration-reviewer 통과**(
 read-only 실호출 1회) · `OPEN-3H-SAMPLE-MISSING-REASON`(M5 레인 — 표본 축 허용 결측 사유 확장, 3H-2 착수 전) ·
 `OPEN-3H-AGENCY-BACKFILL`(운영 데이터 0) · `OPEN-3H-MERGE-GUARD-TESTS`(기존 축의 병합 보존 무잠금 — 상속 부채) · 기관명·코드의
 개인정보 판정은 PR 의 privacy-gate 코멘트 · **Codex 심판**(마이그레이션, 운영자 범위·비용 승인)은 PR 에서. 정본
-`reports/evidence/m3/3h/checklist.md`.
+`reports/evidence/m3/3h/checklist.md`. **PR #30 머지 `e101a0c`(2026-09-17)** — code-reviewer 머지 가능(LOW 1)·privacy-gate 통과·
+migration-reviewer 통과 · **Codex r1 `request_changes`(high 1 — 적용 DB rollback 이 flyway validate 를 깨뜨림)의 조치 `0f56131`
+(rollback.md 두 경로: 미적용 / 적용 후 보상 V8 롤포워드, 임시 clone 실측) 뒤 재심 r2 는 운영자 결정으로 생략** — 정지선
+규정의 「종결은 운영자 개별 명시 결정(예외 기록)」(PR 코멘트에도 기록).
+
+**3H-2 착수 2026-09-17(운영자 결정 「추천대로」 ×4 — 채움률 프로브 1페이지 · 엔진 표본 축 사유 확장은 이 레인 · Codex 모델 핀
+`gpt-5.5` · 프로브 뒤 즉시 구현, 정본 `reports/evidence/m3/3h2/scope.md` D-3H2-1~5)** — 요청 축(`predictionRequestFor`)·표본 축
+(`sampleOf`)의 `agencyId` 를 `Notice.demandAgency.code` 로(역할 폴백 없음), 표본 축 결측 사유 `NOT_COLLECTED_YET` → `UNKNOWN`
+(3H-1 뒤 「수집했으나 원천에 없음」이 참), 엔진 표본 축 허용 집합 `{NOT_COLLECTED_YET, UNKNOWN}`(5D-3 D-5D3-2 계약 갱신 —
+거부가 죽이는 것은 그 표본의 공종·전역 계층 기여), 엔진 교차 실측으로 `segment_support = DIRECT` 첫 도달. **D-3H-8 프로브
+실측(read-only 1회, 승인 하)**: 공사 목록 100건에서 수요·공고기관 코드·이름 넷 전부 100/100, 수요=공고 91/100, 코드 길이 {7},
+영문자 포함 29/100 — **코드 키 확정, 이름 키 대안 불필요**. 첫 두 시도는 `returnReasonCode 30`(서비스별 활용신청 미승인 —
+인코딩 아님). 환경·인증 파일 자리는 `config/` 아래 gitignore 디렉터리(운영자 결정, `5b362b7`). 레인 `bid-vector-v2-m4e`/
+`m3-3h2/2026-09-17`, base `e101a0c`. 마이그레이션 없음 → Codex 대상 아님.
 
 ## Codex 독립 리뷰
 
