@@ -72,8 +72,8 @@ rollback: in_scope 경로 한정 restore. 공유 파일(5d3 scope·data-dictiona
 ## 하네스 레인 변경(리뷰 요청 시점 `git log --oneline e101a0c..HEAD -- CLAUDE.md .claude/ docs/harness/`)
 slice 산출물이 아니며 in_scope 밖, 운영자 승인 하에 같은 range 에 있다. rollback 대상이 아니다.
 - `ff061e2` `.claude/skills/codex-review-gate/SKILL.md` — Codex 심판 모델 핀 `gpt-5.5`(운영자 결정 2026-09-17 「추천대로」 ③).
-- `7a230bb` `docs/harness/change-history.md` — 위 모델 핀 + `config/secrets/` 자리 두 행(같은 커밋이 이 scope 지위 문단도 확정 — 그 부분은 slice 산출물).
-- **운영자 결정 변경(하네스는 아니나 slice 산출물도 아님)**: `5b362b7` `.gitignore`·`config/secrets/koneps.env.example` — 환경·인증 파일 자리(운영자 지시 2026-09-17 「환경 파일 등은 기본적으로 config/ 에 두자」). D-3H-8 프로브가 이 자리를 읽었다. rollback 대상 아님.
+- `7a230bb` `docs/harness/change-history.md` — 위 모델 핀 + 환경 파일 자리 두 행(같은 커밋이 이 scope 지위 문단도 확정 — 그 부분은 slice 산출물).
+- **운영자 결정 변경(하네스는 아니나 slice 산출물도 아님)**: `5b362b7` `.gitignore` + `config/` 아래 예시 환경 파일 하나 — 환경 파일 자리(운영자 지시 2026-09-17 「환경 파일 등은 기본적으로 config/ 에 두자」, 경로·변수 이름은 그 커밋이 정본). D-3H-8 프로브가 이 자리를 읽었다. rollback 대상 아님.
 
 ## 계약 갱신 이력
 | # | 일시 | 갱신 | 사유 |
