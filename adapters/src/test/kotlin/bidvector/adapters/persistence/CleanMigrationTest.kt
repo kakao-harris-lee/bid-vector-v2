@@ -39,6 +39,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M4/4C-2 — 스키마 스냅샷 래칫 예외(D-4C2-2, 추가만). V6__outbox_inbox.sql.
             "outbox",
             "inbox",
+            // M6/6B-1 — 스키마 스냅샷 래칫 예외(D-6B1-8, 추가만). V8__edit_session.sql.
+            "edit_session",
         )
 
     @Test
@@ -79,6 +81,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 않는다, V6__outbox_inbox.sql).
             "outbox" to setOf("entry_id"),
             "inbox" to setOf("idempotency_key"),
+            // M6/6B-1 — 애플리케이션이 발급하는 TEXT PK(추가만, D-6B1-8). V8__edit_session.sql.
+            "edit_session" to setOf("id"),
         )
 
     @Test
@@ -328,6 +332,19 @@ class CleanMigrationTest : PersistenceTestSupport() {
                     select = false,
                     insert = false,
                     update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            // M6/6B-1 — 조회·최초 생성·전이 저장(추가만, D-6B1-8). GRANT SELECT, INSERT,
+            // UPDATE ON edit_session(V8__edit_session.sql) — DELETE·TRUNCATE 는 주지 않는다
+            // (보존·파기는 6B-3 소관, D-6B1-1).
+            "edit_session" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
                     delete = false,
                     truncate = false,
                     references = false,

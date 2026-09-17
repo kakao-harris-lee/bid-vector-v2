@@ -13,6 +13,7 @@ import bidvector.strategy.StrategyValidation
 import bidvector.strategy.ThresholdField
 import bidvector.strategy.WatchRuleId
 import bidvector.strategy.validate
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
@@ -193,4 +194,143 @@ class EditSessionTransitionTableTest {
             outcome.session.state shouldBe session.state
         }
     }
+
+    /**
+     * verifier r4 MEDIUM-8 — `EditStrategyWorkflow.process`(D-6B1-10)가 저장 여부를 가르는
+     * 판별자는 `outcome.session !== session`(인스턴스 동일성)이지 「버전이 올랐다」가
+     * 아니다. 둘의 등가는 **현재 전이표에서만** 참이고 코드 어디에도 잠겨 있지 않다 —
+     * verifier 실측: `StaleRevision` 거부 갈래에 "새 인스턴스인데 버전 그대로"를 심어도
+     * `:workflow:test`·어댑터 test 전건이 초록이었다. 판별자 자체(`!==`)는 바꾸지 않는다
+     * (`begin()`/`expire()`와 일관되고 code-reviewer가 현 전이표 위에서 구조적으로 옳음을
+     * 확인했다) — 대신 **등가 자체를 불변식으로 잠근다**: `apply()`가 새 인스턴스를 낼 때는
+     * 반드시 `sessionVersion`이 입력보다 정확히 1 크다. 전이표가 바뀌어(새 command·새 분기)
+     * 이 등가가 깨지면 이 test 가 먼저 붉어져야 한다 — `process`의 저장 판별자가 아니라
+     * `apply()`가 지키는 계약이므로 이 table test 에 둔다(같은 파일이 이미 전이표 전수를
+     * 다룬다). case 구성 근거는 [saveDiscriminatorInvariantCases] KDoc 참고 — 함수당
+     * 50줄 한도로 분리했을 뿐 설계 변경은 아니다.
+     */
+    @Test
+    fun `apply 가 새 인스턴스를 내면 언제나 sessionVersion 이 정확히 1 오른다 — 저장 판별자 불변식`() {
+        val strategy = currentStrategy(1)
+
+        saveDiscriminatorInvariantCases().forEach { (label, session, command) ->
+            val outcome = apply(session, command, NOW, strategy, policyOf())
+
+            withClue(label) {
+                if (outcome.session !== session) {
+                    outcome.session.sessionVersion shouldBe session.sessionVersion + 1
+                }
+            }
+        }
+    }
 }
+
+/** verifier r4 MEDIUM-8 위 test 전용 — `EditSessionTransitionTableTest`의 50줄 함수 한도로 분리(설계 변경 아님). */
+private data class SaveDiscriminatorCase(
+    val label: String,
+    val session: EditSession,
+    val command: EditCommand,
+)
+
+/**
+ * [RejectionReason] 여섯 전부(`SessionAlreadyActive`는 `begin()` 전용이라 `apply()`가 만들
+ * 수 없다 — 제외)와 `Accepted`·`Applied` 양쪽을 모두 돈다 — 절반은 같은 인스턴스를 내는
+ * 갈래([sameInstanceCases], 불변식이 공허하게 성립), 절반은 새 인스턴스를 내는 갈래
+ * ([newInstanceCases], 실제로 `+1`인지를 잰다 — 그게 이 test 의 값이다). 함수당 50줄
+ * 한도로 둘로 나눴을 뿐 하나의 case 집합이다.
+ */
+private fun saveDiscriminatorInvariantCases(): List<SaveDiscriminatorCase> =
+    sameInstanceCases() + duplicateCommandCases() + newInstanceCases()
+
+/**
+ * 판정 순서 ①③④에서 거부돼 입력 세션과 같은 인스턴스를 돌려주는 갈래(불변식이 공허하게
+ * 참) — 판정 순서 ②(중복 command)는 [duplicateCommandCases]로 나눴다(50줄 한도).
+ */
+private fun sameInstanceCases(): List<SaveDiscriminatorCase> =
+    listOf(
+        SaveDiscriminatorCase(
+            "이미 Expired — 판정 순서 ①, 같은 인스턴스",
+            sessionAt(EditSessionState.Expired, sessionVersion = 3),
+            provideValue(),
+        ),
+        SaveDiscriminatorCase(
+            "다른 operator — 판정 순서 ③ ActorMismatch, 같은 인스턴스",
+            sessionAt(EditSessionState.WaitingForValue(FIELD), sessionVersion = 1),
+            provideValue(actor = Actor.Operator(OperatorId("other-operator"))),
+        ),
+        SaveDiscriminatorCase(
+            "System actor — 판정 순서 ③ SystemActorNotPermitted, 같은 인스턴스",
+            sessionAt(EditSessionState.WaitingForValue(FIELD), sessionVersion = 1),
+            provideValue(actor = Actor.System("sweep")),
+        ),
+        SaveDiscriminatorCase(
+            "seenRevision 불일치 — 판정 순서 ④ StaleRevision, 같은 인스턴스",
+            sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT), sessionVersion = 1),
+            confirm(seenRevision = StrategyRevision(99)),
+        ),
+        SaveDiscriminatorCase(
+            "전이표 밖 — 판정 순서 ④ InvalidTransition, 같은 인스턴스",
+            sessionAt(EditSessionState.Applied(StrategyRevision(2)), sessionVersion = 2),
+            cancel(),
+        ),
+    )
+
+/** 판정 순서 ②(같은 commandId 재전달) — 내용이 다르면 거부(같은 인스턴스), 같으면 Accepted 중복(같은 인스턴스). */
+private fun duplicateCommandCases(): List<SaveDiscriminatorCase> {
+    fun sessionWithLastCommand(id: String) =
+        sessionAt(
+            EditSessionState.WaitingForValue(FIELD),
+            sessionVersion = 1,
+            lastCommand = provideValue(id = id, draft = VALID_DRAFT),
+        )
+    val withDuplicateLastCommand = sessionWithLastCommand("cmd-dup")
+    val withSameLastCommand = sessionWithLastCommand("cmd-same")
+
+    return listOf(
+        SaveDiscriminatorCase(
+            "같은 command 재전달(다른 내용) — 판정 순서 ② IdempotencyConflict, 같은 인스턴스",
+            withDuplicateLastCommand,
+            provideValue(id = "cmd-dup", draft = INVALID_DRAFT),
+        ),
+        SaveDiscriminatorCase(
+            "같은 command 재전달(같은 내용) — 판정 순서 ② Accepted 중복, 같은 인스턴스",
+            withSameLastCommand,
+            provideValue(id = "cmd-same", draft = VALID_DRAFT),
+        ),
+    )
+}
+
+/** 만료 fold·`accept()`·`onConfirm()`이 `.copy()`로 새 인스턴스를 내는 갈래(`+1` 실측 대상). */
+private fun newInstanceCases(): List<SaveDiscriminatorCase> =
+    listOf(
+        SaveDiscriminatorCase(
+            "비종단인데 시각상 만료 — 판정 순서 ① fold, 새 인스턴스",
+            sessionAt(EditSessionState.WaitingForValue(FIELD), expiresAt = NOW.minusSeconds(1), sessionVersion = 2),
+            provideValue(),
+        ),
+        SaveDiscriminatorCase(
+            "유효한 ValueProvided — Accepted, 새 인스턴스",
+            sessionAt(EditSessionState.WaitingForValue(FIELD), sessionVersion = 1),
+            provideValue(draft = VALID_DRAFT),
+        ),
+        SaveDiscriminatorCase(
+            "무효한 ValueProvided — Accepted(상태 불변), 새 인스턴스",
+            sessionAt(EditSessionState.WaitingForValue(FIELD), sessionVersion = 1),
+            provideValue(draft = INVALID_DRAFT),
+        ),
+        SaveDiscriminatorCase(
+            "RequestEdit — Accepted, 새 인스턴스",
+            sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT), sessionVersion = 1),
+            requestEdit(),
+        ),
+        SaveDiscriminatorCase(
+            "비종단 Cancel — Accepted, 새 인스턴스",
+            sessionAt(EditSessionState.WaitingForValue(FIELD), sessionVersion = 1),
+            cancel(),
+        ),
+        SaveDiscriminatorCase(
+            "유효한 Confirmed — Applied, 새 인스턴스",
+            sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT), sessionVersion = 1),
+            confirm(seenRevision = StrategyRevision(1)),
+        ),
+    )

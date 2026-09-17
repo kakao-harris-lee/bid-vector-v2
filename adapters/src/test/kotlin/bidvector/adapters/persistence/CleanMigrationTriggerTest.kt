@@ -9,46 +9,72 @@ import org.junit.jupiter.api.Test
  * D-3D-6 여덟 축 중 트리거 하나만 다룬다(다른 일곱 축은 `CleanMigrationTest`).
  */
 class CleanMigrationTriggerTest : PersistenceTestSupport() {
+    /**
+     * (표, 트리거 이름) 쌍 — M6/6B-1 verifier r1 MEDIUM-1(b) 시정. PostgreSQL 은 트리거
+     * 이름을 표마다 독립으로 유일화한다 — 예전 `Set<String>`(전역 DISTINCT 이름)은 신설
+     * 표가 **기존 표의 트리거 이름을 재사용**하면(예: `edit_session` 에 `guard_notice_status`
+     * 라는 이름의 새 트리거) 이름 집합이 안 변해 놓쳤다(D-6B1-3 이 금지한 「session_version
+     * 을 건드리는 트리거」가 바로 이 형태로 숨을 수 있었다).
+     */
+    private data class TriggerSpec(
+        val table: String,
+        val name: String,
+    )
+
     // verifier r1 뒤 F-5로 3개 신설(opening_result 2·qualification_text 1), verifier r2
     // N-2 뒤 status 축 1개 추가.
     private val expectedTriggers =
         setOf(
-            "guard_notice_base_amount",
-            "guard_notice_estimated_amount",
-            "guard_notice_allocated_budget",
-            "guard_notice_floor_rate",
-            "guard_notice_status",
-            "notice_revision_bump_trigger",
-            "notice_audit_insert_trigger",
-            "raw_observation_append_only",
-            "notice_audit_append_only",
-            "guard_opening_result_winning_rate",
-            "guard_opening_result_derived_base_amount",
-            "guard_qualification_text_raw_text",
+            TriggerSpec("notice", "guard_notice_base_amount"),
+            TriggerSpec("notice", "guard_notice_estimated_amount"),
+            TriggerSpec("notice", "guard_notice_allocated_budget"),
+            TriggerSpec("notice", "guard_notice_floor_rate"),
+            TriggerSpec("notice", "guard_notice_status"),
+            TriggerSpec("notice", "notice_revision_bump_trigger"),
+            TriggerSpec("notice", "notice_audit_insert_trigger"),
+            TriggerSpec("raw_observation", "raw_observation_append_only"),
+            TriggerSpec("notice_audit", "notice_audit_append_only"),
+            TriggerSpec("opening_result", "guard_opening_result_winning_rate"),
+            TriggerSpec("opening_result", "guard_opening_result_derived_base_amount"),
+            TriggerSpec("qualification_text", "guard_qualification_text_raw_text"),
             // M3/3E — 층 C 부모 fact 슬롯 가드(추가만, 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
-            "guard_opening_result_final_award_amount",
-            "guard_opening_result_final_award_company_name",
-            "guard_opening_result_participant_count",
-            "guard_opening_result_progress_division",
-            "guard_opening_result_planned_price",
-            "guard_opening_result_opening_base_amount",
-            "guard_opening_result_total_reserve_price_candidate_count",
-            "guard_opening_result_actual_opening_at",
+            TriggerSpec("opening_result", "guard_opening_result_final_award_amount"),
+            TriggerSpec("opening_result", "guard_opening_result_final_award_company_name"),
+            TriggerSpec("opening_result", "guard_opening_result_participant_count"),
+            TriggerSpec("opening_result", "guard_opening_result_progress_division"),
+            TriggerSpec("opening_result", "guard_opening_result_planned_price"),
+            TriggerSpec("opening_result", "guard_opening_result_opening_base_amount"),
+            TriggerSpec("opening_result", "guard_opening_result_total_reserve_price_candidate_count"),
+            TriggerSpec("opening_result", "guard_opening_result_actual_opening_at"),
             // M3/3E — 층 B 자식 표 가드.
-            "guard_opening_reserve_price_base_reserve_price",
-            "guard_opening_reserve_price_is_drawn",
-            "guard_opening_reserve_price_draw_count",
+            TriggerSpec("opening_reserve_price", "guard_opening_reserve_price_base_reserve_price"),
+            TriggerSpec("opening_reserve_price", "guard_opening_reserve_price_is_drawn"),
+            TriggerSpec("opening_reserve_price", "guard_opening_reserve_price_draw_count"),
             // M3/3F — 개찰완료 축 부모 슬롯 가드(추가만, 스키마 스냅샷 래칫 예외 D-3F-6).
-            "guard_opening_result_opening_rank_one",
-            "guard_opening_result_draw_numbers",
+            TriggerSpec("opening_result", "guard_opening_result_opening_rank_one"),
+            TriggerSpec("opening_result", "guard_opening_result_draw_numbers"),
+            // M6/6B-1(D-6B1-8, 등재) — `edit_session`(V8__edit_session.sql)은 트리거가
+            // 0개다. session_version 은 애플리케이션이 싣고 DB 는 전제조건으로만 검사한다
+            // (D-6B1-3) — 트리거로 값을 정하면 그 전제조건 자체가 무의미해진다. `edit_session`
+            // 을 대상으로 하는 행이 이 목록에 하나도 없다는 것 자체가 그 부재의 등재다.
         )
 
     @Test
-    fun `축7 트리거 목록이 기대와 같다`() {
-        val actual =
-            queryStrings(
-                "SELECT DISTINCT trigger_name FROM information_schema.triggers WHERE trigger_schema = 'public'",
-            )
+    fun `축7 트리거 목록이 (표, 이름) 쌍으로 기대와 같다`() {
+        val actual = mutableSetOf<TriggerSpec>()
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement
+                    .executeQuery(
+                        "SELECT DISTINCT event_object_table, trigger_name FROM information_schema.triggers " +
+                            "WHERE trigger_schema = 'public'",
+                    ).use { rs ->
+                        while (rs.next()) {
+                            actual += TriggerSpec(rs.getString("event_object_table"), rs.getString("trigger_name"))
+                        }
+                    }
+            }
+        }
         actual shouldContainExactlyInAnyOrder expectedTriggers
     }
 
@@ -151,17 +177,5 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             }
         }
         actual shouldBe expectedGuardArguments
-    }
-
-    private fun queryStrings(sql: String): Set<String> {
-        val actual = mutableSetOf<String>()
-        dataSource().connection.use { connection ->
-            connection.createStatement().use { statement ->
-                statement.executeQuery(sql).use { rs ->
-                    while (rs.next()) actual += rs.getString(1)
-                }
-            }
-        }
-        return actual
     }
 }

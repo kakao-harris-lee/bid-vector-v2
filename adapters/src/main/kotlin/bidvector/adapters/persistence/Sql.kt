@@ -292,4 +292,47 @@ internal object Sql {
             truncation_cause, quota_exceeded, backoff_skipped
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
         """
+
+    const val SELECT_EDIT_SESSION =
+        """
+        SELECT operator_id, state, state_payload, expires_at, session_version, last_command
+        FROM edit_session WHERE id = ?
+        """
+
+    // M6/6B-1 D-6B1-3·D-6B1-4 — 낙관적 동시성의 유일한 write 경로(우회 (3)). WHERE 절이
+    // 전제조건 둘 중 하나를 요구한다: (a) **저장소의 현재 state 가 이미 종단(APPLIED·
+    // CANCELLED·EXPIRED)이고 동시에 이번 쓰기가 새 episode(EXCLUDED.session_version = 0,
+    // beginSession) 일 때만** 버전을 안 보고 갈아 끼운다 — 끝난 세션 위에 새로 여는 것은
+    // "잃어버린 갱신"이 아니다. (b) 저장소의 session_version 이 정확히 "새 값 - 1"이면
+    // 정상 순차 전이다. 그 외(동시 writer 가 먼저 썼다, 또는 두 begin() 이 같은 id 로
+    // 경합한다 — 저장된 state 가 아직 비종단인데 버전도 안 맞는다)는 WHERE 가 거짓이라
+    // ON CONFLICT 분기 전체가 no-op 이고 RETURNING 이 0행이다(Sql.kt KDoc 의
+    // `toUpsertOutcome` 관용구와 같은 계열, 여기는 계수만 본다).
+    //
+    // **verifier r1 HIGH-1 수정** — 이전 판은 (a) 를 `edit_session.state IN (...)` 만으로
+    // 열어 뒀다. 그러면 **저장소가 이미 종단**이기만 하면(과거의 정상 전이로 종단이 된
+    // 경우도 포함) **어떤 버전의 새 쓰기든** 통과했다 — 같은 비종단 세션을 버전 N 에서
+    // 읽은 두 writer 가 각각 종단 전이(APPLIED·CANCELLED)를 저장하면 **둘 다 성공**하고
+    // 뒤에 온 쪽이 앞의 결정을 조용히 덮었다(재현: `state=CANCELLED v=2` 위에
+    // `(APPLIED,v2)`→1행, 이어서 `(CANCELLED,v2)`→1행, 정상이면 두 번째는 0행이어야
+    // 한다). `AND EXCLUDED.session_version = 0` 을 더해 "새 episode" 로 뜻을 좁힌다 —
+    // 정당한 재시작(v0, 저장소가 종단)은 여전히 통과하고, 종단 위의 임의 버전 갈아치우기는
+    // 이제 (b) 로 떨어져 버전이 안 맞으면 거부된다. **처음 값 EXCLUDED.session_version=0
+    // 만으로 무조건 통과시키지도 않는다** — 그러면 같은 id 로 경합하는 두 begin() 이
+    // 서로 조용히 덮어써 우회 (3)이 다시 열린다(구현 레인 실측, 별도 회귀).
+    const val UPSERT_EDIT_SESSION =
+        """
+        INSERT INTO edit_session (id, operator_id, state, state_payload, expires_at, session_version, last_command)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (id) DO UPDATE SET
+            operator_id = EXCLUDED.operator_id,
+            state = EXCLUDED.state,
+            state_payload = EXCLUDED.state_payload,
+            expires_at = EXCLUDED.expires_at,
+            session_version = EXCLUDED.session_version,
+            last_command = EXCLUDED.last_command
+        WHERE (edit_session.state IN ('APPLIED', 'CANCELLED', 'EXPIRED') AND EXCLUDED.session_version = 0)
+           OR edit_session.session_version = EXCLUDED.session_version - 1
+        RETURNING id
+        """
 }

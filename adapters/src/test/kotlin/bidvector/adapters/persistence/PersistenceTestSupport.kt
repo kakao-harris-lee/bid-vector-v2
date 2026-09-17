@@ -61,9 +61,10 @@ abstract class PersistenceTestSupport {
             connection.createStatement().use { statement ->
                 // M4/4C-2 — outbox·inbox 도 매 test 전 비운다(설계 검토 (4)-⑥) — 빠뜨리면
                 // claim/dedup 결과가 실행 순서에 의존하는 조용한 실패가 된다.
+                // M6/6B-1 — edit_session 도 같은 이유로 더한다(추가만, 기존 목록 무편집).
                 statement.execute(
                     "TRUNCATE TABLE rejected_write, notice_audit, notice, opening_result, " +
-                        "qualification_text, collection_run, raw_observation, outbox, inbox " +
+                        "qualification_text, collection_run, raw_observation, outbox, inbox, edit_session " +
                         "RESTART IDENTITY CASCADE",
                 )
             }
