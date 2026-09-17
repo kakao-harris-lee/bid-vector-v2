@@ -99,8 +99,8 @@ class StrategyAdapterDependencyTest {
  */
 private val javapExecutable: String by lazy {
     val javaHome = System.getProperty("java.home")
-    val executableName = if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) "javap.exe" else "javap"
-    File(javaHome, "bin/$executableName").absolutePath
+    val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+    File(javaHome, "bin/${if (isWindows) "javap.exe" else "javap"}").absolutePath
 }
 
 private fun disallowedBytecodeReferences(classFile: File): List<String> {
