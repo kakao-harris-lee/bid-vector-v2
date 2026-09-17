@@ -168,7 +168,7 @@
 ## 2026-09-17T04:16:00Z
 - cmd: `javap -p -classpath workflow/build/classes/kotlin/main bidvector.workflow.strategy.EditSessionRestoreKt`
 - exit: 0
-- 핵심 결과: `restoreEditSession`만 `public static`(반환 타입·매개변수가 이미 public 이라 이름 맹글링 없음), 나머지 10개 함수는 전부 `private static`.
+- 핵심 결과: `restoreEditSession`만 `public static`, 나머지 10개 함수는 전부 `private static`. **verifier r2 LOW-4 시정** — 맹글링 부재의 판별자는 "반환·매개변수 타입이 public"이 아니라 **top-level 함수인가 클래스 멤버인가**다(같은 저장소의 `EditSession.copy$bid_vector_workflow`·`OperatorStrategy.copy$bid_vector_strategy`는 타입이 전부 public인 `internal` 멤버인데도 맹글링된다 — verifier r2 실측). `restoreEditSession`·`beginSession`·`isTerminal`·`expireIfDue`는 전부 top-level `internal fun`이라 맹글링이 없다.
 
 ## 2026-09-17T04:17:00Z
 - cmd: `javap -p -classpath adapters/build/classes/kotlin/main bidvector.adapters.strategy.JdbcEditSessionRepository bidvector.adapters.strategy.EditSessionRow`
