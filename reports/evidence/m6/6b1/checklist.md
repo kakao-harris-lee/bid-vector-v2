@@ -50,7 +50,7 @@
 1. **`OPEN-6B1-SAVE-OUTCOME`(신설, scope.md 계승)** — 낙관적 충돌은 구체 예외(`EditSessionConflictException`)로만 표현된다. 결과 타입화(재시도·거부 정책)는 두 번째 writer(API·스케줄러)가 생길 때 workflow 도메인 결정과 함께.
 2. **`OPEN-6B1-INDEX-GAPS`(신설)** — 위 표의 인덱스 공백 4건. 소비 질의가 생기는 slice가 추가.
 3. **마이그레이션 rollback 비대칭** — 코드를 되돌려도 이미 적용된 DB에는 `edit_session` 표가 남는다(`rollback.md` 참고).
-4. **scope 밖 파일 셋의 기계적 편집** — 계약 in_scope에 명시되지 않았으나 포트 시그니처·패키지 이동의 필연적 결과로 편집한 파일: `app/src/test/kotlin/bidvector/app/conformance/StrategyEditExecutors.kt`(fake `load` 반환 타입, D-6B1-7 파급), `adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt`(TRUNCATE 목록에 `edit_session` 추가), `config/quality/gate-tests.properties`(`EditSessionSnapshotTest` 등재). 셋 다 단언·시나리오 무편집의 기계적 추가이고 M4/4C-1의 같은 계열 선례(port 시그니처 변경의 파급)와 동형이다.
+4. ~~scope 밖 파일 셋의 기계적 편집~~ — **계약 갱신(6)으로 in_scope 편입**(팀장, 「알려진 제한이 아니라 in_scope다 — slice의 커밋 집합은 in_scope 경로의 변경」): `app/src/test/kotlin/bidvector/app/conformance/**`(fake `load` 반환 타입, D-6B1-7 귀결)·`adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt`(TRUNCATE 목록에 `edit_session` 추가)·`config/quality/gate-tests.properties`(`EditSessionSnapshotTest` 등재). 더 이상 알려진 제한이 아니다 — `scope.md` in_scope 목록 참조.
 5. **비밀값 스캔 오탐** — `commands.md` 참조. 도메인 상용어(토큰 문자열 상수 함수명·정책 문서의 일반 서술) 매치이고 실 비밀값 0건.
 
 ## OPEN 처분 — scope.md 승계
