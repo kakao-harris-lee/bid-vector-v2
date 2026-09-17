@@ -341,4 +341,59 @@ class JdbcEditSessionRepositoryTest : PersistenceTestSupport() {
             connection.rollback()
         }
     }
+
+    /**
+     * verifier r1 HIGH-2 재현·회귀 보호 — `EditSessionRow.toSnapshot`(디코드 층)을 직접
+     * 지나야 하므로 원시 SQL 로 행을 심는다. `EditSessionSnapshotTest`(workflow)의 24건은
+     * 스냅숏을 Kotlin 에서 직접 만들어 넣어 이 디코드 층을 지나지 않는다 — 그래서 DB 행에서
+     * 출발하는 이 셋이 필요하다.
+     */
+    private fun seedRawEditSessionRow(
+        id: String,
+        state: String,
+        statePayload: String,
+    ) {
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "INSERT INTO edit_session (id, operator_id, state, state_payload, expires_at, session_version) " +
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                ).use { statement ->
+                    statement.setString(1, id)
+                    statement.setString(2, "op-seed")
+                    statement.setString(3, state)
+                    statement.setString(4, statePayload)
+                    statement.setTimestamp(5, Timestamp.from(Instant.parse("2026-09-17T00:00:00Z")))
+                    statement.setInt(6, 1)
+                    statement.executeUpdate()
+                }
+        }
+    }
+
+    @Test
+    fun `state_payload 의 revision 이 숫자가 아니면 load 가 거부한다 — HIGH-2 재현`() {
+        val id = "jdbc-bad-revision"
+        seedRawEditSessionRow(id, "APPLIED", """{"revision":"not-a-number"}""")
+
+        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+    }
+
+    @Test
+    fun `draft 의 리스트 키가 없으면 load 가 거부한다 — HIGH-2 재현`() {
+        val id = "jdbc-missing-list-key"
+        seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":{}}""")
+
+        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+    }
+
+    @Test
+    fun `draft 의 리스트 키가 배열이 아니면 load 가 거부한다 — HIGH-2 재현`() {
+        val id = "jdbc-list-type-mismatch"
+        val draft =
+            """{"focusCategories":"not-an-array","focusRegionTerms":[],"excludeRegionTerms":[],""" +
+                """"requiredKeywordTerms":[],"excludeKeywordTerms":[]}"""
+        seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
+
+        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+    }
 }

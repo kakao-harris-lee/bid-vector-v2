@@ -73,7 +73,7 @@ internal object EditSessionRow {
             stateKind = stateKind,
             stateField = payload?.get("field")?.let(::readField),
             stateDraft = payload?.get("draft")?.let(::readDraft),
-            stateRevision = payload?.get("revision")?.asInt(),
+            stateRevision = payload?.get("revision")?.let { it.requireIntValue("revision") },
             stateCancelReasonKind = payload?.get("cancelReasonKind")?.asText(),
             stateCancelReasonNote = payload?.get("cancelReasonNote")?.asText(),
             lastCommand = lastCommand?.let(mapper::readTree)?.let(::readCommand),
@@ -100,7 +100,7 @@ internal object EditSessionRow {
 
     private fun readMoney(node: JsonNode): MoneySnapshot =
         MoneySnapshot(
-            won = node.get("won").asLong(),
+            won = node.get("won").requireLongValue("won"),
             currency = node.get("currency").asText(),
             vatTreatment = node.get("vatTreatment").asText(),
             provenanceKind = node.get("provenanceKind").asText(),
@@ -125,18 +125,18 @@ internal object EditSessionRow {
 
     private fun readDraft(node: JsonNode): StrategyDraftSnapshot =
         StrategyDraftSnapshot(
-            focusCategories = readStringList(node.get("focusCategories")),
-            focusRegionTerms = readStringList(node.get("focusRegionTerms")),
-            excludeRegionTerms = readStringList(node.get("excludeRegionTerms")),
-            requiredKeywordTerms = readStringList(node.get("requiredKeywordTerms")),
-            excludeKeywordTerms = readStringList(node.get("excludeKeywordTerms")),
+            focusCategories = requireStringArray(node.get("focusCategories"), "focusCategories"),
+            focusRegionTerms = requireStringArray(node.get("focusRegionTerms"), "focusRegionTerms"),
+            excludeRegionTerms = requireStringArray(node.get("excludeRegionTerms"), "excludeRegionTerms"),
+            requiredKeywordTerms = requireStringArray(node.get("requiredKeywordTerms"), "requiredKeywordTerms"),
+            excludeKeywordTerms = requireStringArray(node.get("excludeKeywordTerms"), "excludeKeywordTerms"),
             minBudget = node.get("minBudget")?.let(::readMoney),
             maxBudget = node.get("maxBudget")?.let(::readMoney),
             minimumMatchScore = node.get("minimumMatchScore")?.let { BigDecimal(it.asText()) },
             minimumProbabilityScore = node.get("minimumProbabilityScore")?.let { BigDecimal(it.asText()) },
             bidNowThreshold = node.get("bidNowThreshold")?.let { BigDecimal(it.asText()) },
             reviewThreshold = node.get("reviewThreshold")?.let { BigDecimal(it.asText()) },
-            candidateLimit = node.get("candidateLimit")?.asInt(),
+            candidateLimit = node.get("candidateLimit")?.let { it.requireIntValue("candidateLimit") },
         )
 
     private fun readCommand(node: JsonNode): EditCommandSnapshot =
@@ -145,15 +145,49 @@ internal object EditSessionRow {
             kind = node.get("kind").asText(),
             field = node.get("field")?.let(::readField),
             draft = node.get("draft")?.let(::readDraft),
-            seenRevision = node.get("seenRevision")?.asInt(),
+            seenRevision = node.get("seenRevision")?.let { it.requireIntValue("seenRevision") },
             cancelReasonKind = node.get("cancelReasonKind")?.asText(),
             cancelReasonNote = node.get("cancelReasonNote")?.asText(),
         )
 }
 
-// detekt TooManyFunctions(11) — 리스트 왕복 둘은 EditSessionRow 밖 top-level 로 뺀다
-// (JsonNodeFactory 는 ObjectMapper 없이도 노드를 만든다, 상태 없는 순수 변환이라 무해).
+// detekt TooManyFunctions(11) — 이 넷은 EditSessionRow 밖 top-level 로 뺀다(JsonNodeFactory
+// 는 ObjectMapper 없이도 노드를 만든다, 상태 없는 순수 변환이라 무해).
 private fun stringListNode(values: List<String>): ArrayNode =
     JsonNodeFactory.instance.arrayNode().apply { values.forEach(::add) }
 
-private fun readStringList(node: JsonNode?): List<String> = node?.map { it.asText() } ?: emptyList()
+/**
+ * verifier r1 HIGH-2 수정 — 이전 판은 `node?.map { it.asText() } ?: emptyList()`라 리스트
+ * 키가 **없거나 배열이 아니면 조용히 빈 리스트로 채웠다**(D-6B1-7 「지어내지 않는다」 위반).
+ * 인코더([bidvector.adapters.strategy.EditSessionRow.draftNode])는 다섯 리스트 필드를
+ * 예외 없이 항상 배열로 쓰므로, 정상적으로 인코딩된 행이라면 이 키는 **항상 존재하고
+ * 항상 배열**이다 — 그 전제가 깨지면(키 없음·배열 아님·원소가 문자열이 아님) 거부한다.
+ */
+private fun requireStringArray(
+    node: JsonNode?,
+    field: String,
+): List<String> {
+    val array = requireNotNull(node) { "$field 가 없다" }
+    require(array.isArray) { "$field 는 배열이어야 한다 — 실제: $array" }
+    return array.map {
+        require(it.isTextual) { "$field 의 원소는 문자열이어야 한다 — 실제: $it" }
+        it.asText()
+    }
+}
+
+/**
+ * verifier r1 HIGH-2 수정 — 이전 판은 `JsonNode.asInt()`/`asLong()`을 그대로 썼는데, 그
+ * 함수들은 숫자로 변환할 수 없는 값(문자열 `"not-a-number"` 등)에 **조용히 0 을 돌려준다**
+ * (Jackson 관용). `StrategyRevision`은 0 을 허용하는 값이라 그 위조값이 그대로 통과해
+ * workflow 가 "아무도 쓴 적 없는" revision 을 받았다. `canConvertToInt`/`canConvertToLong`
+ * 으로 먼저 확인해 변환 불가능하면 거부한다.
+ */
+private fun JsonNode.requireIntValue(field: String): Int {
+    require(canConvertToInt()) { "$field 는 정수여야 한다 — 실제: $this" }
+    return asInt()
+}
+
+private fun JsonNode.requireLongValue(field: String): Long {
+    require(canConvertToLong()) { "$field 는 정수여야 한다 — 실제: $this" }
+    return asLong()
+}
