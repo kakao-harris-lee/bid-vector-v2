@@ -36,7 +36,10 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import org.postgresql.util.PSQLException
 import java.math.BigDecimal
+import java.sql.Connection
+import java.sql.Timestamp
 import java.time.Duration
 import java.time.Instant
 
@@ -243,5 +246,99 @@ class JdbcEditSessionRepositoryTest : PersistenceTestSupport() {
         val restarted = workflow(sessions).begin(id, OPERATOR, EditableField.CandidateLimit)
         restarted.shouldBeInstanceOf<BeginOutcome.Started>()
         sessions.load(id)!!.stateKind shouldBe "WAITING_FOR_VALUE"
+    }
+
+    /**
+     * verifier r1 HIGH-1 재현·회귀 보호 — `Sql.UPSERT_EDIT_SESSION`을 원시 값으로 직접 몬다
+     * (adapters 는 `EditSession`을 만들 수 없어 두 "경쟁하는 writer"를 도메인 API 로는
+     * 구성할 수 없다 — `EditStrategyWorkflow`는 load-then-save 가 한 호출 안에서 원자적이라
+     * 같은 사전 상태를 두 번 읽는 경합을 재현하지 못한다. 저장소 write 경로 자체의 계약을
+     * 재는 이 셋은 그래서 SQL 수준이 맞다).
+     */
+    private fun Connection.rawUpsertEditSession(
+        id: String,
+        state: String,
+        sessionVersion: Int,
+        statePayload: String? = "{}",
+    ): Int =
+        prepareStatement(Sql.UPSERT_EDIT_SESSION).use { statement ->
+            var index = 1
+            statement.setString(index++, id)
+            statement.setString(index++, "op-raw")
+            statement.setString(index++, state)
+            statement.setString(index++, statePayload)
+            statement.setTimestamp(index++, Timestamp.from(Instant.parse("2026-09-17T00:00:00Z")))
+            statement.setInt(index++, sessionVersion)
+            statement.setString(index, null)
+            statement.executeQuery().use { rs -> if (rs.next()) 1 else 0 }
+        }
+
+    @Test
+    fun `종단 상태 위의 다른 종단 전이는 버전이 같으면 충돌한다 — HIGH-1 잃어버린 갱신 재현`() {
+        val id = "jdbc-terminal-race"
+        appConnection().use { connection ->
+            connection.rawUpsertEditSession(id, "WAITING_FOR_CONFIRMATION", sessionVersion = 1) shouldBe 1
+            connection.commit()
+
+            // writer A — 정상 순차 전이(저장소 1 -> 새 값 2), APPLIED 로 승격.
+            connection.rawUpsertEditSession(id, "APPLIED", sessionVersion = 2) shouldBe 1
+            connection.commit()
+
+            // writer B — 같은 시작(v1, WaitingForConfirmation)을 읽었다고 가정하고 CANCELLED,
+            // 같은 목표 버전(2)으로 경합한다. 저장소는 이미 종단(APPLIED)이라 HIGH-1 이전에는
+            // "저장소가 종단이면 버전을 안 본다"는 첫 갈래가 무조건 통과시켰다(잃어버린 갱신).
+            // 지금은 그 갈래가 EXCLUDED.session_version = 0 도 요구해 여기(2)서는 통과하지
+            // 않고, 둘째 갈래(저장소 버전 2 = 새 값 2 - 1 = 1?)도 거짓이라 0행이어야 한다.
+            connection.rawUpsertEditSession(id, "CANCELLED", sessionVersion = 2) shouldBe 0
+            connection.commit()
+        }
+    }
+
+    @Test
+    fun `같은 종단 전이를 두 번 쓰면 두 번째는 충돌한다 — 이중 적용 방지`() {
+        val id = "jdbc-double-apply"
+        appConnection().use { connection ->
+            connection.rawUpsertEditSession(id, "WAITING_FOR_CONFIRMATION", sessionVersion = 5) shouldBe 1
+            connection.commit()
+
+            connection.rawUpsertEditSession(id, "APPLIED", sessionVersion = 6) shouldBe 1
+            connection.commit()
+
+            // 같은 목표 버전(6)으로 APPLIED 를 또 쓴다 — 저장소가 이미 6 이라 둘째 갈래
+            // (6 = 6-1?) 거짓, 첫 갈래도 새 값이 0 이 아니라 거짓 — 0행이어야 한다.
+            connection.rawUpsertEditSession(id, "APPLIED", sessionVersion = 6) shouldBe 0
+            connection.commit()
+        }
+    }
+
+    /**
+     * verifier r1 MEDIUM-3 시정 — 이 파일의 다른 test 는 전부 `dataSource()`(admin)로
+     * `JdbcEditSessionRepository`를 만든다. admin 은 GRANT 와 무관하게 항상 성공하므로
+     * `bidvector_app`의 실제 부여가 틀려도(예: UPDATE 를 뺀 뒤 axis9 기대 행렬만 맞춰 고침,
+     * MUT-G) 이 파일의 다른 test 는 못 잡는다. 이 test 는 형제 파일(`RawAppendOnlyTest` 등)과
+     * 같은 방식으로 `appConnection()`(`SET ROLE bidvector_app`)을 직접 써서, 저장 경로가
+     * 실제로 요구하는 권한(INSERT+UPDATE — `ON CONFLICT DO UPDATE` 한 문이 둘 다 쓴다)이
+     * 실효 부여와 맞는지, 그리고 부여 밖(DELETE)은 거부되는지를 앱 역할로 직접 잰다.
+     */
+    @Test
+    fun `앱 역할 연결로 UPSERT 양 분기가 성공하고 DELETE 는 거부된다 — GRANT 실효 권한`() {
+        val id = "jdbc-app-role-grant"
+        appConnection().use { connection ->
+            // INSERT 분기(신규 id, ON CONFLICT 미충돌).
+            connection.rawUpsertEditSession(id, "WAITING_FOR_VALUE", sessionVersion = 0) shouldBe 1
+            connection.commit()
+
+            // UPDATE 분기(ON CONFLICT DO UPDATE) — INSERT 권한만으로는 이 분기가 못 돈다.
+            connection.rawUpsertEditSession(id, "WAITING_FOR_VALUE", sessionVersion = 1) shouldBe 1
+            connection.commit()
+
+            shouldThrow<PSQLException> {
+                connection.prepareStatement("DELETE FROM edit_session WHERE id = ?").use { statement ->
+                    statement.setString(1, id)
+                    statement.executeUpdate()
+                }
+            }
+            connection.rollback()
+        }
     }
 }
