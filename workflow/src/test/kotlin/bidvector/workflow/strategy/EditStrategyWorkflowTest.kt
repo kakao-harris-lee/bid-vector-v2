@@ -328,7 +328,9 @@ class EditStrategyWorkflowTest {
         strategies.failNextSave = true
         shouldThrow<IllegalStateException> { workflow.confirm(confirmCommand) }
 
-        restoreEditSession(sessions.load(sessionId)!!).state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
+        restoreEditSession(
+            sessions.load(sessionId)!!,
+        ).state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
         strategies.load().revision shouldBe StrategyRevision(1)
         events.published.shouldBeEmpty()
 
@@ -376,7 +378,9 @@ class EditStrategyWorkflowTest {
         shouldThrow<IllegalStateException> { workflow.confirm(confirmCommand) }
 
         strategies.strategy.revision shouldBe StrategyRevision(2)
-        restoreEditSession(sessions.load(sessionId)!!).state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
+        restoreEditSession(
+            sessions.load(sessionId)!!,
+        ).state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
 
         val retried = workflow.confirm(confirmCommand)
         retried.shouldBeInstanceOf<CommandResult.Processed>()

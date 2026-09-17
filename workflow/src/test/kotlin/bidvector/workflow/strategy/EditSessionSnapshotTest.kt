@@ -107,7 +107,8 @@ class EditSessionSnapshotTest {
         val draft = StrategyDraft(candidateLimit = 3)
         val command =
             EditCommand.ProvideValue(CommandId("cmd-1"), id, operator, EditableField.CandidateLimit, draft)
-        val original = session(EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft), lastCommand = command)
+        val original =
+            session(EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft), lastCommand = command)
 
         restoreEditSession(original.toSnapshot()) shouldBe original
     }
@@ -124,7 +125,8 @@ class EditSessionSnapshotTest {
     fun `lastCommand(RequestEdit)이 있는 세션을 왕복한다`() {
         val command =
             EditCommand.RequestEdit(CommandId("cmd-3"), id, operator, EditableField.Watch(WatchRuleId.MinBudget))
-        val original = session(EditSessionState.WaitingForValue(EditableField.Watch(WatchRuleId.MinBudget)), lastCommand = command)
+        val original =
+            session(EditSessionState.WaitingForValue(EditableField.Watch(WatchRuleId.MinBudget)), lastCommand = command)
 
         restoreEditSession(original.toSnapshot()) shouldBe original
     }
@@ -230,9 +232,10 @@ class EditSessionSnapshotTest {
                 .toSnapshot()
                 .let { snapshot ->
                     snapshot.copy(
-                        stateDraft = snapshot.stateDraft!!.copy(
-                            minBudget = snapshot.stateDraft.minBudget!!.copy(provenanceKind = "UNDECLARED"),
-                        ),
+                        stateDraft =
+                            snapshot.stateDraft!!.copy(
+                                minBudget = snapshot.stateDraft.minBudget!!.copy(provenanceKind = "UNDECLARED"),
+                            ),
                     )
                 }
 
@@ -250,7 +253,10 @@ class EditSessionSnapshotTest {
                 .toSnapshot()
                 .let { snapshot ->
                     snapshot.copy(
-                        stateDraft = snapshot.stateDraft!!.copy(minBudget = snapshot.stateDraft.minBudget!!.copy(won = -1L)),
+                        stateDraft =
+                            snapshot.stateDraft!!.copy(
+                                minBudget = snapshot.stateDraft.minBudget!!.copy(won = -1L),
+                            ),
                     )
                 }
 

@@ -120,7 +120,8 @@ class EditStrategyWorkflow(
      * 제한 — 원자적 저장+발행+세션전진은 4C 트랜잭션 outbox 소관.
      */
     private fun process(command: EditCommand): CommandResult {
-        val session = sessions.load(command.sessionId)?.let(::restoreEditSession) ?: return CommandResult.SessionNotFound
+        val session =
+            sessions.load(command.sessionId)?.let(::restoreEditSession) ?: return CommandResult.SessionNotFound
         val outcome = apply(session, command, clock.now(), strategies.load(), strategyPolicy)
         if (outcome is TransitionOutcome.Applied) {
             strategies.save(outcome.applied)

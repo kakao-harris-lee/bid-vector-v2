@@ -10,6 +10,7 @@ import bidvector.workflow.strategy.StrategyDraftSnapshot
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.fasterxml.jackson.databind.node.ObjectNode
 import java.math.BigDecimal
 import java.time.Instant
@@ -106,10 +107,6 @@ internal object EditSessionRow {
             provenanceDetail = node.get("provenanceDetail")?.asText(),
         )
 
-    private fun stringListNode(values: List<String>): ArrayNode = mapper.createArrayNode().apply { values.forEach(::add) }
-
-    private fun readStringList(node: JsonNode?): List<String> = node?.map { it.asText() } ?: emptyList()
-
     private fun draftNode(draft: StrategyDraftSnapshot): ObjectNode =
         mapper.createObjectNode().apply {
             set<JsonNode>("focusCategories", stringListNode(draft.focusCategories))
@@ -153,3 +150,10 @@ internal object EditSessionRow {
             cancelReasonNote = node.get("cancelReasonNote")?.asText(),
         )
 }
+
+// detekt TooManyFunctions(11) — 리스트 왕복 둘은 EditSessionRow 밖 top-level 로 뺀다
+// (JsonNodeFactory 는 ObjectMapper 없이도 노드를 만든다, 상태 없는 순수 변환이라 무해).
+private fun stringListNode(values: List<String>): ArrayNode =
+    JsonNodeFactory.instance.arrayNode().apply { values.forEach(::add) }
+
+private fun readStringList(node: JsonNode?): List<String> = node?.map { it.asText() } ?: emptyList()
