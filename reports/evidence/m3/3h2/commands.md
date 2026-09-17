@@ -15,3 +15,4 @@ acceptance: `./gradlew --no-build-cache --no-daemon clean check` + `cd ml-engine
 - GREEN: 같은 명령, `_is_segment_missing_reason_allowed` 확장 뒤. exit 0.
 - 전건: `cd ml-engine && uv run pytest -q` — exit 0, 956 passed(golden 서브셋 16 passed 포함, `fixtures/**` 무편집).
 - `uv run ruff check` / `uv run ruff format --check` / `uv run mypy` — 수정 대상 세 파일 전부 exit 0(포맷 위반 1건은 `ruff format` 로 정정 뒤 재확인 exit 0).
+- `ml-engine/src/ml_engine/features/facts.py` 모듈 docstring 정정(코드 무변경, 계약 갱신 1): `uv run ruff check src/ml_engine/features/facts.py` exit 0.
