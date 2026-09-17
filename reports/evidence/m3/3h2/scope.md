@@ -27,6 +27,8 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/ml/RequestMapping.kt                    # 표본 축 null → UNKNOWN(D-3H2-2)
   - adapters/src/test/kotlin/bidvector/adapters/ml/**                                   # RequestMapping 왕복·엔진 교차 실측 test
   - ml-engine/src/ml_engine/inference/distribution.py                                   # (②) 표본 축 허용 결측 사유 {NOT_COLLECTED_YET, UNKNOWN}
+  - ml-engine/src/ml_engine/inference/observations.py                                   # (②) 갱신 1 — 표본 축 허용 집합 문면(docstring) 정정, 코드 무변경
+  - ml-engine/src/ml_engine/features/facts.py                                            # (②) 갱신 1 — 「표본 축만 닫힌 집합 하나」 문면 정정, 코드 무변경
   - ml-engine/tests/**                                                                   # (②) 허용 집합 test·회귀 golden 불변 확인
   - reports/evidence/m5/5d3/scope.md                                                    # (②) 계약 갱신 이력 — D-5D3-2 표본 축 집합 확장(팀장)
   - docs/discovery/data-dictionary.md                                                   # §6.3.2 결측 행 갱신(팀장)
@@ -71,4 +73,6 @@ rollback: in_scope 경로 한정 restore. 공유 파일(5d3 scope·data-dictiona
 없음.
 
 ## 계약 갱신 이력
-(없음)
+| # | 일시 | 갱신 | 사유 |
+| --- | --- | --- | --- |
+| 1 | 2026-09-17 | in_scope 에 `ml-engine/.../inference/observations.py`·`features/facts.py`(docstring 문면 정정만, 코드 무변경) 추가 | 구현 레인 보고 — 허용 집합 확장으로 두 모듈 docstring 의 「`{NOT_COLLECTED_YET}` 하나」 문면이 낡았다. in_scope 손 열거 누락(3H-1 갱신 3 과 같은 갈래) |
