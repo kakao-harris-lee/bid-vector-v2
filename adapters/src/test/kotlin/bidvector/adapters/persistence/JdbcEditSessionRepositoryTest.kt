@@ -1,5 +1,6 @@
 package bidvector.adapters.persistence
 
+import bidvector.adapters.strategy.JdbcEditSessionRepository
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution

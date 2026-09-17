@@ -1,5 +1,6 @@
-package bidvector.adapters.persistence
+package bidvector.adapters.strategy
 
+import bidvector.adapters.persistence.Sql
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.EditSession
 import bidvector.workflow.strategy.EditSessionConflictException

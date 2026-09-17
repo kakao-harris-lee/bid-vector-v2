@@ -1,4 +1,4 @@
-package bidvector.adapters.persistence
+package bidvector.adapters.strategy
 
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.EditCommandSnapshot
