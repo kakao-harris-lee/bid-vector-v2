@@ -5,9 +5,16 @@ description: "Codex CLI로 base...head diff의 독립 리뷰를 clean worktree�
 
 # Codex Review Gate — 독립 리뷰 실행 절차
 
-> **범위 제한 (2026-09-04 운영자 지시): 코드 slice 는 이 게이트를 타지 않는다.** 코드 slice 의
-> 완료 조건은 verifier `ready-for-review` + 사용자 승인이다. 기획 문서의 계획 검토는 운영자가
-> 명시 요청한 경우에만 아래 절차로 실행한다.
+> **심사 범위 (2026-09-11 운영자 결정 — 2026-09-04 의 「전면 코드 제외」를 대체한다).** 이 게이트를
+> 타는 것은 둘뿐이다 — ① **되돌리기 어려운 경로의 코드**(결제·실주문·인증/인가·암호화·비밀번호/
+> 토큰·**DB 마이그레이션**·데이터 파기처럼 사고가 나면 복구가 없거나 비싼 변경) ② **코드 외
+> 산출물**(기획 문서·계약 파일). 그 밖의 코드 slice 는 이 게이트를 타지 않고 완료 조건은 verifier
+> `ready-for-review` + 사용자 승인이며, 저자와 다른 패스의 Claude 측 `code-reviewer`(sonnet)가 본다.
+>
+> 어느 쪽이든 **유료 외부 호출이므로 운영자가 심사 범위와 비용을 승인한 뒤에만** 디스패치한다 —
+> 「리뷰해줘」·「codex 로 봐줘」는 승인이 아니라 레인 선택이다. 자동 실행하지 않는다. 정본은
+> 전역 규약 `~/.claude/review-lane.md` §4 와 프로젝트 `CLAUDE.md` 운영자 지시 절이고, 레인 계약은
+> `~/.claude/agents/codex-reviewer.md` 다(범위 밖이 넘어오면 `SCOPE_EXCLUDED` 반환).
 
 codex CLI(로컬 `codex`, v0.151 기준)로 slice diff의 독립 리뷰를 실행하고 판정 JSON을
 보존한다. 판정 계약과 리뷰 기준은 `CODEX-REVIEW.md`와 `agent-workflow.md` 4~5절이
