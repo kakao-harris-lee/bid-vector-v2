@@ -90,9 +90,22 @@ class StrategyAdapterDependencyTest {
     }
 }
 
+/**
+ * `javap`를 OS `PATH`의 이름 조회가 아니라 **실행 중인 JVM 의 `java.home`**에서 해석한다
+ * (code-reviewer 지적) — `PATH`가 toolchain 과 무관한 버전을 조용히 골라 이 게이트가 CI 의
+ * JDK 21(`actions/setup-java@v5`, `distribution: temurin`)과 다른 `javap`를 부를 여지를
+ * 없앤다. `java.home`이 가리키는 JDK 에 `bin/javap`가 없으면(JRE 등) 아래 `check(exitCode
+ * == 0)`가 그대로 크게 실패한다 — 조용히 통과하지 않는다.
+ */
+private val javapExecutable: String by lazy {
+    val javaHome = System.getProperty("java.home")
+    val executableName = if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) "javap.exe" else "javap"
+    File(javaHome, "bin/$executableName").absolutePath
+}
+
 private fun disallowedBytecodeReferences(classFile: File): List<String> {
     val process =
-        ProcessBuilder("javap", "-p", "-v", classFile.absolutePath)
+        ProcessBuilder(javapExecutable, "-p", "-v", classFile.absolutePath)
             .redirectErrorStream(true)
             .start()
     val output = process.inputStream.bufferedReader().readText()
