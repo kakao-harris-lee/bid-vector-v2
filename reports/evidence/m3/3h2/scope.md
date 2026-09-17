@@ -19,7 +19,7 @@
 milestone: M3
 slice: 3h2-agency-request-sample-axis
 base_sha: e101a0c33adc52b1a5688afcaab6a39bfe777a66
-head_sha: 2542e3262a56e8cdb3f217cd5b00c601aceffb7b
+head_sha: 9aa29319f6320cfdbc16e4cbcf6b6d589d3c7b02
 in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/PredictionFacts.kt           # predictionRequestFor agencyId = demandAgency code
   - workflow/src/main/kotlin/bidvector/workflow/evaluation/SampleConversion.kt          # sampleOf agencyId = 표본 공고 demandAgency code
