@@ -51,6 +51,13 @@ private const val LICENSE_POLICY_LOADER_CLASS_MARKER = "LicensePolicyKt"
 private const val LICENSE_POLICY_LOADER_GETTER_MARKER = "getLICENSE_QUALIFICATION_POLICY"
 
 /**
+ * D-6F5-10(verifier r1 HIGH-2) — 「`LicenseEligibility`·`judge` 어휘가 있는지」만 보는 참조
+ * 단언은 호출을 **남긴 채 결과만 갈아치우는** 우회를 못 잡는다. 어댑터는 `LicenseVerdict`를
+ * 생성할 이유가 없다(반환만 한다) — 그 사실을 상수 풀에서 생성자 참조 부재로 건다.
+ */
+private const val LICENSE_VERDICT_CONSTRUCTION_MARKER = "LicenseVerdict\$"
+
+/**
  * D-6F5-6 — **소스 텍스트가 아니라 컴파일된 클래스의 상수 풀을 `javap -p -v`로 훑는다.**
  * import 문 없이 전체 한정 좌표로 직접 참조하는 우회(scope.md 우회 5)를 소스 텍스트 정규식
  * 형태는 못 본다(6F-1 verifier MUT-E3 실측 — `EvaluationAdapterDependencyTest`가 인계한
@@ -99,7 +106,8 @@ class QualificationAdapterDependencyTest {
      * 조립하지 않고 실제로 `LicenseEligibility`를 참조하는지, 컴파일된 상수 풀로 잰다(SQL
      * 문자열 grep 같은 스타일 술어가 아니다 — `EvaluationAdapterDependencyTest`의
      * `biddableStatuses` 참조 단언과 같은 형태). 판정 호출을 지우고 직접 조립으로 바꾸면
-     * 이 이름 자체가 상수 풀에서 사라진다.
+     * 이 이름 자체가 상수 풀에서 사라진다. **이 존재 단언 하나로는 부족하다** — 호출을
+     * 남긴 채 결과만 갈아치우는 우회는 아래 `LicenseVerdict` 부재 단언(D-6F5-10)이 잡는다.
      */
     @Test
     fun `StoredRequirementLicenseGate 의 컴파일된 클래스는 LicenseEligibility 를 참조한다`() {
@@ -123,6 +131,18 @@ class QualificationAdapterDependencyTest {
     }
 
     /**
+     * D-6F5-10(verifier r1 HIGH-2) — 재현: `judge(...)` 호출은 남긴 채 `Collected(빈 rows)`
+     * 경로의 반환값만 `LicenseVerdict.Eligible(emptySet())`로 뒤집어도 전건 `check`가
+     * 초록이었다(커널 참값은 `Uncertain(RequirementDataAbsent)` — 부적격을 적격으로 뒤집는
+     * 가장 비싼 방향의 오판). 원판 상수 풀에는 `LicenseVerdict$` 항목이 0건이다 — 어댑터는
+     * verdict를 생성할 이유가 없다.
+     */
+    @Test
+    fun `StoredRequirementLicenseGate 의 컴파일된 클래스는 LicenseVerdict 를 직접 생성하지 않는다`() {
+        javapOutput(storedRequirementLicenseGateClassFile()) shouldNotContain LICENSE_VERDICT_CONSTRUCTION_MARKER
+    }
+
+    /**
      * 양성 대조(D-6F5-9) — verifier가 실측한 변이 상태의 상수 풀 문구(`javap -p -v` 출력의
      * `Methodref` 행 형태)를 표본으로 써서, 그 어휘가 있으면 위 부재 단언이 실제로
      * 실패함을 보인다. 술어가 늘 통과만 하는 회귀를 막는다.
@@ -134,6 +154,15 @@ class QualificationAdapterDependencyTest {
 
         shouldThrow<AssertionError> { mutatedConstantPoolSample shouldNotContain LICENSE_POLICY_LOADER_CLASS_MARKER }
         shouldThrow<AssertionError> { mutatedConstantPoolSample shouldNotContain LICENSE_POLICY_LOADER_GETTER_MARKER }
+    }
+
+    /** 양성 대조(D-6F5-10) — 위와 같은 이유, `LicenseVerdict` 생성자 어휘 표본으로 잰다. */
+    @Test
+    fun `LicenseVerdict 생성자 어휘가 있으면 부재 단언이 실패한다 — 양성 대조`() {
+        val mutatedConstantPoolSample =
+            "  #78 = Methodref  #23.#90  // bidvector/qualification/LicenseVerdict\$Eligible.\"<init>\":(Ljava/util/Set;)V"
+
+        shouldThrow<AssertionError> { mutatedConstantPoolSample shouldNotContain LICENSE_VERDICT_CONSTRUCTION_MARKER }
     }
 }
 
