@@ -121,14 +121,48 @@ raw 원문에만 있다 · 「활성 투찰」 정의가 저장소·discovery �
 | --- | --- | --- |
 | **6F-1** | 전략 영속(`StrategyRepository`) | **없음 — 첫째.** `evaluate()` 의 첫 줄이 `strategies.load()` 라 유일한 진짜 선행 의존이고, 도메인에 **이미 공개된 검증 문**이 있어 새 표면 없이 배선된다 |
 | 6F-2 | 후보 원천 + trace 축 | 6F-1. 질의만 신설(다건 스캔) |
-| 6F-3 | 여력 | **운영자 결정** — `OPEN-6F-ACTIVE-BID-DEFINITION`(「활성 투찰」 정의·상한 출처가 없다) |
-| 6F-4 | 감시 대상 | **결정** — `OPEN-6F-WATCH-TEXT-SOURCE`(원문 텍스트를 계약에 등재할지, raw 를 읽을지) |
-| 6F-5 | 면허 게이트 | 요구사항 영속·운영자 면허 설계(LLM 재추출 대신 영속이 필요한지 포함) |
-| 6F-6 | 운영자 프로필 + 업무량 | `OPEN-4B6-PROFILE-SOURCE`(M4 이월) |
+| 6F-3 | 여력 | **결정 ③ 로 열림**(2026-09-18) — 현재 활성 수는 평가 요청이 싣고 상한은 전략 필드. **6A 평가 endpoint 선행** |
+| 6F-4 | 감시 대상 | **결정 ① 로 열림**(2026-09-18) — 원문 텍스트를 canonical 열로 싣는다(공고명부터). **셋 중 먼저** |
+| 6F-5 | 면허 게이트 | 요구사항 영속 설계(LLM 재추출 대신 영속이 필요한지 포함). 운영자 면허는 **결정 ② 가 6F-6 에서 같이 푼다** |
+| 6F-6 | 운영자 프로필 + 업무량 | **결정 ② 로 열림**(2026-09-18) — 프로필 표 + 편집 endpoint. 업무량은 분리(`WorkloadNotCollected` 유지) |
 | 6F-7 | 알림 요청 → outbox | 요청·의도 타입 연결. 발송 채널은 `OPEN-STR-12`(그 뒤) |
 
 세션 영속은 **6B-1** 이 이미 진행 중이라 6F 군에 넣지 않는다(같은 축, 다른 레인). app DI 조립은
 `OPEN-6F-ASSEMBLY` — 포트 구현이 모이는 시점에 6A-1(HTTP) 또는 전용 slice 가 받는다.
+
+**운영자 결정 셋 2026-09-18 (선택지 + 추천, 전부 추천안 채택) — 6F-3·6F-4·6F-6 의 미결을 연다.**
+세션 모델이 저장소와 legacy 를 실측해 선택지를 세우고 운영자가 「전체 추천 방향」으로 승인했다. 착수 순서는
+**6F-4 → 6F-6 → 6F-3**(결정이 가장 가볍고 가치가 큰 것부터, 6F-3 은 6A 평가 endpoint 뒤).
+
+- **결정 ① `OPEN-6F-WATCH-TEXT-SOURCE` 닫힘 — 원문 텍스트는 canonical 에 열로 싣는다(6F-4).** 조립 규칙은
+  이미 승인돼 있다(capability-map STR-02: `keywordText` = 공고명 + 요건 + 공종, **description 제외** ·
+  `fullText` = description 포함). V2 가 가진 것은 공종(`notice`)과 요건 원문(`qualification_text`)이고 **공고명이
+  없다** — 그런데 **KONEPS 는 준다**(legacy 수집 어댑터가 `bidNtceNm`/`ntceNm` 를 읽어 title 로 넣고 필드 계약
+  목록에도 등재돼 있다). 「API 가 안 준다」가 아니라 **V2 가 안 싣는다**. raw 를 판정 경로에서 읽는 안은
+  **채택하지 않는다** — M3 가 세운 raw/canonical 경계가 무너지고 판정이 수집 계약(JSON 키)에 매번 묶인다.
+  이 텍스트는 감시(STR-01·02)와 검색(STR-16) 두 capability 의 입력이라 정본이 하나여야 한다. **운영 데이터 0
+  이라 백필 비용이 지금이 최저다.** 공고명부터 싣고, **공고 본문(`description`)의 KONEPS 출처는 미확인**이라
+  6F-4 착수 조사가 실측한다 — 그때까지 「본문 없음」은 알려진 제한으로 등재하고 `fullText` 는 공고명·요건·공종
+  으로만 선다(지역 규칙이 좁게 돈다).
+- **결정 ② `OPEN-4B6-PROFILE-SOURCE` 닫힘 — 운영자 프로필은 표로 세우고 편집 endpoint 를 둔다(6F-6).**
+  `ProfileFacts(businessTypes, licenses, regionTerms)` 는 legacy `company_profiles` 의 세 열과 1:1 이고 legacy 도
+  DB 표로 들고 있었다. 설정 주입 안은 **편집이 곧 배포**가 되고 감사가 없어 버린다. 전략 표에 합치는 안은
+  수명이 달라 버린다(전략 개정마다 프로필이 딸려 개정돼 개정 이력이 오염된다). 개인정보 축은 이미 닫혀 있다
+  — 사업자번호·대표자·연락처는 `ProfileFacts` 에 **필드가 없어** 구조적으로 못 들어온다(4B-6a 위협 모델).
+  이 결정은 **6F-5 의 절반을 같이 푼다**(`OperatorLicenses` 를 두 slice 가 공유한다). **`WorkloadPort` 는
+  분리한다** — legacy 도 파생하지 않았고(요청이 싣고 `"auto"` 는 감점 배율만 바꾼다) V2 에 집계 원천이 없다.
+  `DerivationAbsence.WorkloadNotCollected` 유지를 명시 결정으로 등재하고, 파생은 아래 ③ 의 기록 표가 생기는
+  축으로 미룬다.
+- **결정 ③ `OPEN-6F-ACTIVE-BID-DEFINITION` 닫힘 — 활성 투찰 수는 호출자가 싣고, 상한은 전략 필드다(6F-3).**
+  실측: V2 표 열넷에 **판정·투찰 기록 표가 없고** `CandidateEvaluation` 을 읽는 코드도 0 이다 — V2 에 투찰 제출
+  경로 자체가 없어 「지금 몇 건이 활성인가」는 **시스템 밖 사실**이다. legacy 도 세지 않았다(요청 파라미터
+  `current_active_bids`, 결정 레코드에 스냅샷으로 적힘, `workload_source="provided"`). 그래서 **현재 활성 수는
+  평가 요청이 싣고**(재현을 위해 입력으로 기록된다), **상한은 운영자마다 다른 정책**이라 전략 표(6F-1)에
+  영속·감사되는 자리에 둔다 — 정책 데이터(`VerdictLadderPolicyData.capacityHoldPriorityThreshold` 가 사는 자리)가
+  아니다. **「상한만 두고 현재값 0 고정」 안은 기각한다** — 용량 게이트가 꺼진 채 초록이 되고, 그것은 「안 돌린
+  게이트는 아무것도 막지 못한다」에 정면으로 걸린다. 기록 표를 세워 진짜로 세는 안은 옳지만 slice 하나가 아니라
+  축 하나이고(「투찰 사실을 무엇으로 아는가」가 먼저 승인돼야 한다) 6D·6E 와 얽힌다 — `OPEN-6F3-BID-RECORD`
+  로 신설해 그 축에 남긴다. 6F-3 은 **6A 평가 endpoint 선행**이다.
 
 **6F-1 착수 2026-09-17** — base `c4d09cc`, 레인 worktree `bid-vector-v2-m6f`·브랜치 `m6-6f1/2026-09-17`.
 정본 `reports/evidence/m6/6f1/scope.md`(D-6F1-1~6). 전략 표(**V9**) + `JdbcStrategyRepository` + 왕복·개정·
