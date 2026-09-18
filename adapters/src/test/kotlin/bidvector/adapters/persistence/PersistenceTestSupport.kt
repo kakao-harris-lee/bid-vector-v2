@@ -65,10 +65,11 @@ abstract class PersistenceTestSupport {
                 // M6/6F-1 — operator_strategy·operator_strategy_revision 도 매 test 전 비운다
                 // (D-6F1-1, M4/4C-2가 outbox·inbox에 쓴 것과 같은 이유 — 싱글턴 행이 test 간에
                 // 새어 나가면 「전략 없음」 test가 다른 test의 잔여 행을 보게 된다).
+                // M6/6F-6 — operator_profile 도 같은 이유로 더한다(싱글턴, D-6F6-3).
                 statement.execute(
                     "TRUNCATE TABLE rejected_write, notice_audit, notice, opening_result, " +
                         "qualification_text, collection_run, raw_observation, outbox, inbox, " +
-                        "edit_session, operator_strategy, operator_strategy_revision " +
+                        "edit_session, operator_strategy, operator_strategy_revision, operator_profile " +
                         "RESTART IDENTITY CASCADE",
                 )
             }
