@@ -285,13 +285,13 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
         listOf(
             ColumnSpec("operator_strategy", "id", "smallint", false),
             ColumnSpec("operator_strategy", "revision", "integer", false),
-            ColumnSpec("operator_strategy", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("operator_strategy", "updated_at", "timestamp with time zone", false, true),
         ) + operatorStrategySharedColumns("operator_strategy")
 
     private val operatorStrategyRevisionColumns =
         listOf(
             ColumnSpec("operator_strategy_revision", "revision", "integer", false),
-            ColumnSpec("operator_strategy_revision", "applied_at", "timestamp with time zone", false),
+            ColumnSpec("operator_strategy_revision", "applied_at", "timestamp with time zone", false, true),
         ) + operatorStrategySharedColumns("operator_strategy_revision")
 
     private val expectedColumns =

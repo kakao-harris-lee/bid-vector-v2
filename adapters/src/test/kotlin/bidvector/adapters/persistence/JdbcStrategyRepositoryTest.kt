@@ -29,12 +29,14 @@ import bidvector.workflow.strategy.EditSession
 import bidvector.workflow.strategy.EditSessionId
 import bidvector.workflow.strategy.EditSessionPolicyData
 import bidvector.workflow.strategy.EditSessionRepository
+import bidvector.workflow.strategy.EditSessionSnapshot
 import bidvector.workflow.strategy.EditStrategyWorkflow
 import bidvector.workflow.strategy.EditableField
 import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.OperatorId
 import bidvector.workflow.strategy.StrategyRepository
 import bidvector.workflow.strategy.TransitionOutcome
+import bidvector.workflow.strategy.toSnapshot
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -60,7 +62,7 @@ private fun testPolicy(matchScoreMax: BigDecimal = BigDecimal.ONE): Resolution.R
 private class InMemorySessionRepository : EditSessionRepository {
     private val sessions = mutableMapOf<EditSessionId, EditSession>()
 
-    override fun load(id: EditSessionId): EditSession? = sessions[id]
+    override fun load(id: EditSessionId): EditSessionSnapshot? = sessions[id]?.toSnapshot()
 
     override fun save(session: EditSession) {
         sessions[session.id] = session
