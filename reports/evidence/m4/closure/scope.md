@@ -20,7 +20,7 @@ acceptance_commands:
   - "./gradlew --no-daemon :workflow:test --tests '*EvaluateCandidatesUseCaseIsolationTest*' --tests '*EvaluateCandidatesUseCaseTest*' --rerun-tasks"   # C-2 — 조건 ②(fake port, DB·network 없음)
   - "./gradlew --no-daemon :workflow:test --tests '*InboxDedupPropertyTest*' --tests '*OutboxTransitionTableTest*' --tests '*EditSessionIdempotencyPropertyTest*' --tests '*EditSessionTransitionTableTest*' --rerun-tasks"   # C-3 — 조건 ①③
   - "./gradlew --no-daemon :adapters:test --tests '*DeadlineCancellationRetryTest*' --tests '*EmbeddingDeadlineCancellationRetryTest*' --rerun-tasks"   # C-4 — 조건 ④(ML deadline·취소·재시도)
-  - "git status --porcelain -- reports/evidence/m4/closure milestone-4.md docs/discovery/capability-map.md"   # C-5 — clean-tree 게이트(빈 출력 + 양성 대조 1회)
+  - "git status --porcelain -- reports/evidence/m4/closure milestone-4.md"   # C-5 — clean-tree 게이트(빈 출력 + 양성 대조 1회). capability-map 경로는 **제거**했다(운영자 결정 ① 로 범위 밖 — verifier r2 LOW)
 rollback: |
   in_scope 경로 한정 복원이다(range revert 아님). 목록은 라운드마다
   `git diff --name-status 8652893..HEAD` 로 **기계 산출**하고, 현재 값은 `M milestone-4.md` 와
@@ -76,7 +76,18 @@ M5 종결이 쓴 셋을 그대로 쓴다 — **충족**(그것을 재는 게이�
 ## 하네스 레인 변경
 
 상시 절이다. 리뷰 요청 시점마다 `git log --oneline 8652893..HEAD -- CLAUDE.md .claude/ docs/harness/`
-로 재산출해 등재한다. 착수 시점: **없음**.
+로 재산출해 등재한다.
+
+| 재산출 시점 | 값 |
+| --- | --- |
+| 착수 | 없음 |
+| verifier r1 요청 전 | 없음 |
+| verifier r2 요청 전(정정 커밋 둘 뒤) | **없음** — 명령 재실행 결과 0건 |
+| 승인 전 일괄 뒤 | **없음** — 이 절을 고치는 커밋 자신이 `reports/evidence/` 안이므로 값이 바뀌지 않는다 |
+
+**verifier r2 LOW 처분**: r2 요청 때 「재산출했다」고 보고했으나 **절의 문면이 r1 과 바이트
+동일**이었다(값은 0 이 맞았다). 재산출은 명령 실행이고 등재는 문면이다 — 둘을 같은 것으로 적은
+것이 결함이므로 이 표로 바꿔 **시점별 값**을 남긴다.
 
 ## 리뷰 레인
 
