@@ -15,6 +15,7 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/evaluation/CandidateStatusSetTest.kt     # 집합 등식 게이트(D-6F2-2) — SQL 이 쓰는 상태 집합 == 도메인 술어가 참인 집합
   - adapters/src/test/kotlin/bidvector/adapters/strategy/SystemClockTest.kt              # 단조 진행·`Instant.now()` 위임
   - adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt    # 필요 시 정리 목록 조정만(기계적, 신설 표 없음)
+  - config/quality/gate-tests.properties                                                 # **계약 갱신 (1)**: 신설 게이트 test 등재(추가만) — verifier r1 HIGH-2. 공유 파일이라 rollback 은 커밋 해시 hunk 격리
   - reports/evidence/m6/6f2/**
   - milestone-6.md                                                                       # 6F-2 착수 문단(팀장 커밋)
 out_of_scope:
@@ -116,6 +117,21 @@ trace 축(`CorrelationIdFactory`·`Clock`)을 같이 싣는 이유: 둘 다 구�
 | 5 | 순서를 빼거나(`ORDER BY` 제거) 비결정으로 만든다 | 같은 마감·다른 식별자 표본으로 순서를 재는 test |
 | 6 | `adapters.evaluation` 에서 금지된 도메인 루트를 전체 한정 좌표로 참조한다(import 없이) | D-6F2-1 — 바이트코드 상수 풀 게이트가 **컴파일러가 실제로 만든 참조**를 본다 |
 | 7 | 복원 경로를 우회해 어댑터가 `Notice` 를 직접 조립한다 | D-6F2-6 — `Notice` 는 `internal constructor` 이고 `adapters` 는 다른 모듈이라 **컴파일이 거부한다**(구조로 닫힘). 공개 팩토리를 쓰더라도 복원 경로 중복은 의존 게이트·리뷰가 본다 |
+
+## 계약 갱신 (1) — verifier r1 HIGH 둘 (2026-09-18, 팀장)
+
+verifier r1 이 **게이트 둘이 서 있지 않음**을 변이로 실측했다(판정 대상 `8a21cfc`). 둘 다 게이트 술어를
+바꾸는 자리라 severity 무관 표적 재검증 대상이고, HIGH-2 는 in_scope 밖 파일을 요구해 계약을 먼저 갱신한다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6F2-9**(HIGH-1) | 상태 집합 게이트를 **두 축**으로 다시 세운다 — ① **거동 등식**: `NoticeStatus` 전 값을 표에 심고 스캔 결과 집합이 `isBiddable` 이 참인 집합과 **같음**을 DB 왕복으로 잰다(열거가 늘면 기대도 같이 는다) ② **참조 단언**: 이 slice 가 이미 들여온 `javap` 상수 풀 하네스로 `JdbcCandidateSource` 가 `biddableStatuses` 를 참조함을 단언한다. SQL 문자열 grep 은 쓰지 않는다 | 실측: 바인딩을 `arrayOf("Open","Renoticed")` 로 바꿔도 `check` BUILD SUCCESSFUL — `biddableStatuses()` 가 질의에서 전혀 안 쓰여도 전건이 초록이었다. 기존 test 가 재던 것은 **함수와 그 함수 본문 재계산값의 비교**(거의 항진명제)이고 실질 단언은 손 목록 하나였다. **우회 표 #1 의 「리터럴을 되살리면 붉어진다」가 실측으로 거짓이었다** — 게이트나 문면 중 하나가 움직여야 하고, 여기서는 **게이트를 움직인다**. ①이 드리프트 축(술어가 바뀌면 붉어짐), ②가 철자 축(리터럴 재도입이 붉어짐) — 어느 하나만으로는 계약 문면이 참이 되지 않는다 |
+| **D-6F2-10**(HIGH-2) | 신설 게이트 test 넷을 `config/quality/gate-tests.properties` 의 `gate.tests.adapters` 에 **등재**한다(추가만). 등재 누락 자체를 잡는 완결성 검사가 저장소에 있으면 이 패키지도 그 검사 범위에 넣는다 | 실측: `EvaluationAdapterDependencyTest.kt` 를 **파일째 삭제해도** `check` BUILD SUCCESSFUL. 저장소의 `*AdapterDependencyTest` **여섯**(ml·extraction·koneps·persistence·strategy·event)은 전부 등재돼 있고 이 slice 것만 빠졌다(`evaluation` discovered 3 / registered 0). `gate-tests.properties` 머리말과 `EventGateRegistrationTest` KDoc 이 **정확히 이 실패 형태를 규율로 적어 뒀다**. 「안 돌린 게이트는 아무것도 막지 못한다」(CLAUDE.md) — 신설 게이트가 등재 밖이면 그 게이트는 존재하지 않는 것과 같다 |
+
+같은 라운드에서 함께 닫는 비차단 항목: **MEDIUM-1**(순서 잠금 — `notice_round ASC` 를 빼도 9건이 초록이다.
+같은 번호·다른 차수·같은 마감 표본으로 잠근다) · **LOW-1**(`cap` 에 `require(cap > 0)` — 잘못된 배선이
+도메인 실패가 아니라 DB 오류로 새지 않게) · **code-reviewer MEDIUM**(6F-1 이 같은 목적으로 신설한
+`PreparedStatement.setTextArray` 재사용 — 배열 바인딩의 두 번째 구현을 남기지 않는다) · 장부층 다섯.
 
 ## 하네스 레인 변경 (상시 절)
 
