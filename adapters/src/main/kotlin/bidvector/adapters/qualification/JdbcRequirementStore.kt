@@ -1,6 +1,8 @@
 package bidvector.adapters.qualification
 
 import bidvector.adapters.persistence.Sql
+import bidvector.adapters.persistence.getTextList
+import bidvector.adapters.persistence.setTextArray
 import bidvector.procurement.NoticeId
 import bidvector.qualification.RequirementCollection
 import bidvector.qualification.RequirementSourceField
@@ -137,18 +139,20 @@ private fun PreparedStatement.setNullableString(
 /**
  * `license_names`는 PARSED에서만 실린다 — `NULL`(이 행이 UNPARSABLE)과 「빈 배열」을 구분
  * 해야 한다(빈 배열은 `RequirementRow.Parsed.licenseNames`의 init 불변식이 애초에 만들지
- * 않는다 — V13 CHECK가 저장 시점에도 같은 방어를 심층으로 둔다). `setTextArray`
- * (`adapters.persistence`)는 nullable을 다루지 않아 재사용하지 않는다 — 계약이 다르다.
+ * 않는다 — V13 CHECK가 저장 시점에도 같은 방어를 심층으로 둔다). **D-6F5-11** — 값이 있을
+ * 때는 [setTextArray][bidvector.adapters.persistence.setTextArray]에 그대로 위임한다(형제
+ * 위임, `internal`이라 파일 편집·scope 확장 없이 부를 수 있었다 — CPD 중복을 피하려고
+ * 별도 알고리즘을 지을 필요가 없었다). `NULL`만 이 함수의 몫이다.
  */
 private fun PreparedStatement.setNullableTextArray(
     index: Int,
     values: List<String>?,
 ) {
-    if (values != null) {
-        setArray(index, connection.createArrayOf("text", values.toTypedArray()))
-    } else {
+    if (values == null) {
         setNull(index, Types.ARRAY)
+        return
     }
+    setTextArray(index, values)
 }
 
 private fun ResultSet.toRequirementRowRecord(): RequirementRowRecord =
@@ -161,19 +165,13 @@ private fun ResultSet.toRequirementRowRecord(): RequirementRowRecord =
     )
 
 /**
- * [getTextList][bidvector.adapters.persistence.getTextList]의 nullable 판(NULL을 빈 목록으로
- * 접지 않는다 — 위 계약과 같은 이유, CPD 중복을 피하려고 판정 방식은 다르게 짠다: 크기
- * 비교 대신 NULL 원소 개수를 직접 센다).
+ * **D-6F5-11(verifier r1 LOW-1, code-reviewer HIGH)** — [getTextList][bidvector.adapters
+ * .persistence.getTextList]의 nullable 판. `NULL`(이 열 자체가 없음, 이 행이 UNPARSABLE)과
+ * 「빈 배열」을 구분해야 하는 계약만 여기서 더하고, 배열 원소 검증(NULL 원소 거부)은
+ * `getTextList`에 **형제 위임**한다 — `internal`(모듈 범위)이라 이 패키지가 파일 편집·scope
+ * 확장 없이 이미 부를 수 있었다. 회피가 필요하지 않았다(중복 재서술 금지, CLAUDE.md).
  */
 private fun ResultSet.getNullableTextArray(column: String): List<String>? {
-    val raw = getArray(column) ?: return null
-
-    @Suppress("UNCHECKED_CAST")
-    val items = raw.array as Array<String?>
-    val nullElementCount = items.count { it == null }
-    require(nullElementCount == 0) {
-        "$column license_names 원소에 NULL이 ${nullElementCount}개 있다 — 조용히 거르면 " +
-            "요건 면허명 하나가 사라진 채로 판정에 들어간다"
-    }
-    return items.filterNotNull()
+    getArray(column) ?: return null
+    return getTextList(column)
 }
