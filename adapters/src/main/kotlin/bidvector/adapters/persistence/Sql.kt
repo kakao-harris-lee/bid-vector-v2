@@ -35,6 +35,23 @@ internal object Sql {
 
     const val SELECT_NOTICE = "SELECT $NOTICE_COLUMNS FROM notice WHERE notice_number = ? AND notice_round = ?"
 
+    /**
+     * 후보 다건 스캔(M6/6F-2, D-6F2-2~5) — 상태 집합은 `= ANY(?)`로 바인딩한다(호출부가
+     * `bidvector.adapters.evaluation.biddableStatuses()`로 도메인 술어에서 기계 산출한
+     * 값을 넘긴다 — 여기 상태 리터럴을 적지 않는다). `deadline_at > ?`는 반개구간(D-6F2-3,
+     * `?`는 주입된 `Clock.now()` — DB `now()`를 쓰지 않는다). `LIMIT ?`는 호출부가
+     * `cap + 1`을 넘겨 절삭 여부를 판단한다(D-6F2-4, 조용한 절삭이 아니다). 정렬은
+     * 결정적이다(D-6F2-5) — `analysisBudget`이 이 순서 그대로 앞에서부터 쓴다.
+     */
+    const val SELECT_OPEN_CANDIDATES =
+        """
+        SELECT notice_number, notice_round, $NOTICE_COLUMNS
+        FROM notice
+        WHERE status = ANY(?) AND deadline_at > ?
+        ORDER BY deadline_at ASC, notice_number ASC, notice_round ASC
+        LIMIT ?
+        """
+
     const val INSERT_NOTICE =
         """
         INSERT INTO notice (
