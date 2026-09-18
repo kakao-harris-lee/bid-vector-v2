@@ -46,8 +46,20 @@ scope.md 「경계로 처리」 둘을 실측한다(계약이 요구한 실측 �
 - **동시 쓰기 충돌 무방어** — `save()`는 delete-then-insert 단일 트랜잭션일 뿐 낙관적
   잠금이 없다. 6F-5-a는 쓰기 호출자를 하나도 배선하지 않아(`OPEN-6F-ASSEMBLY`) 지금은
   동시 호출 경로 자체가 없다 — 6F-5-b가 실 호출자를 배선할 때 재평가 대상.
-- **보존·파기 정책 없음**(`OPEN-6F5A-RETENTION`, scope.md 그대로) — `notice_requirement`
-  행은 삭제·만료 트리거 없이 계속 남는다. 6B-3 소관.
+- **보존·파기 정책 없음**(`OPEN-6F5A-RETENTION`, `milestone-6.md`에 계약 갱신 (1)로 등재됨,
+  verifier r1 LOW-3 정정 — 이전 라운드에는 `scope.md`·`checklist.md`에만 있었다) —
+  `notice_requirement` 행은 삭제·만료 트리거 없이 계속 남는다. 받는 쪽 6B-3.
+- **`status='FAILED'`면 자식 행이 없다는 교차 표 불변식이 DB `CHECK`가 아니라 앱 읽기
+  경로로만 방어된다**(D-6F5-12, migration-reviewer 권고 1) — 헤더/행이 별표라 트리거
+  없이는 DB가 직접 강제하지 못한다. 지금은 읽기 경로(`toRequirementCollection`)가
+  `FAILED`면 행 인자를 무시해 판정에 지어낸 값이 섞이지 않는다. **6F-5-b가 두 번째
+  writer가 될 때 이 방어가 유지되는지가 그 slice의 확인 항목**이다.
+- **마이그레이션 병합 순서 자동 게이트 없음**(`OPEN-MIGRATION-ORDER-GATE`, D-6F5-13) —
+  받는 쪽 하네스 레인, 실 배선(`OPEN-6F-ASSEMBLY`) 전에 닫아야 한다. 이 slice가 새로
+  만드는 위험이 아니라 6F-4·6F-6과 함께 쌓인 것을 여기서 처음 등재만 한다.
+- **동시 쓰기 충돌 무방어** — `save()`는 delete-then-insert 단일 트랜잭션일 뿐 낙관적
+  잠금이 없다. 6F-5-a는 쓰기 호출자를 하나도 배선하지 않아(`OPEN-6F-ASSEMBLY`) 지금은
+  동시 호출 경로 자체가 없다 — 6F-5-b가 실 호출자를 배선할 때 재평가 대상.
 - **`OPEN-GATE-REGISTRATION-STALE-INPUT`을 이 slice의 신설 완결성 게이트
   (`QualificationGateRegistrationTest`)도 물려받는다**(scope.md 그대로 — verifier r1
   HIGH-2 계열 한계, 등재된 test class가 실제로 도는지의 반대 방향인 "등재 안 된 class가
@@ -56,14 +68,19 @@ scope.md 「경계로 처리」 둘을 실측한다(계약이 요구한 실측 �
 - **`OperatorProfilePort`의 실 구현(6F-6, PR #38)에 이 slice는 의존하지 않는다** —
   test는 fake(`OperatorProfilePort { ... }`)만 쓴다. 프로필 미설정(`null`) 분기는
   실측했으나 실제 JDBC 구현과의 통합은 이 slice 범위 밖이다(D-6F5-3, port 계약만 공유).
+- **범위 밖 부채(등재만, 이 slice가 만든 것 아님)**: CPD 중복 게이트가 이름 치환 하나로
+  열린다(`OPEN-CPD-GATE-RENAME-BYPASS`, verifier r1 실측 — 변수명만 바꿔도, 판정식만
+  바꿔도 통과). 받는 쪽 하네스 레인.
 
 ## 재활용(reuse) — N/A
 
 legacy Python bid-vector에 「요건 영속 표」에 대응하는 코드가 없다(`app/services/
 license_eligibility.py`는 판정 로직만 갖고 저장은 매 호출 재추출이었다 — 영속 자체가
-V2 신설 capability). `PersistenceJdbcSupport`의 `setTextArray`/`getTextList` 관용구는
-재사용하지 않았다(license_names의 NULL 유무가 계약이 달라 새 nullable 판을 썼다 —
-JdbcRequirementStore.kt KDoc에 근거 기록).
+V2 신설 capability). **D-6F5-11(verifier r1 LOW-1 뒤 정정)** — 착수 판은
+`PersistenceJdbcSupport`의 `setTextArray`/`getTextList`를 재사용하지 않고 CPD 중복
+게이트를 문면으로 피한 별도 재서술을 썼다(code-reviewer HIGH). 지금은 그 관용구에
+**형제 위임**한다(`internal`=모듈 범위라 파일 편집·scope 확장 없이 가능했다) — NULL과
+「빈 배열」의 구분(D-6F5-2 계약)만 `JdbcRequirementStore.kt`가 더한다.
 
 ## golden-manifest — N/A
 
