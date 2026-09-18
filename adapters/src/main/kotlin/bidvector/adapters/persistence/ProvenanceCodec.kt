@@ -25,7 +25,7 @@ internal object ProvenanceCodec {
         }
 
     /**
-     * [kindOf]의 이름만 돌려주는 진입문(M6/6F-1 D-6F1-5) — `bidvector.procurement.ProvenanceKind`를
+     * [kindOf]의 이름만 돌려주는 진입문(M6/6F-1 D-6F1-8) — `bidvector.procurement.ProvenanceKind`를
      * 허용 루트 밖(`bidvector.adapters.strategy` 등)에 반환형으로 노출하지 않는다. [kindOf]는
      * 그대로 둔다(`persistence` 패키지 자신·`JdbcOpeningResultRepository` 등 procurement가
      * 허용된 소비자가 쓴다) — 이 함수는 그 값의 `.name`만 원하는 소비자를 위한 별도 진입점이다.
