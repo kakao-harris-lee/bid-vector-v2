@@ -8,9 +8,12 @@
 
 ## 되돌릴 대상(기계 산출, base `8652893`)
 
-`git diff --name-status 8652893..HEAD -- . ':!reports/evidence'`가 낸 **열둘**(라운드마다
+`git diff --name-status 8652893..HEAD -- . ':!reports/evidence'`가 낸 **열셋**(라운드마다
 파일이 늘면 이 라운드의 **마지막 내용 커밋 뒤에** 이 명령을 다시 돌린다 — 너무 일찍
-돌리면 6B-1이 두 번 겪은 것과 같은 자리에서 목록이 곧 낡는다):
+돌리면 6B-1이 두 번, 이 slice가 code-reviewer 라운드에서 한 번 겪은 것과 같은 자리에서
+목록이 곧 낡는다. 2026-09-18 code-reviewer HIGH: Codex 회귀 라운드가 신설한
+`JdbcStrategyRepositoryCodexRegressionTest.kt`가 이 목록에서 빠져 있었다 — 아래는 그
+수정 뒤 재산출이다):
 
 ```
 M  adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt
@@ -22,6 +25,7 @@ A  adapters/src/main/resources/db/migration/V9__operator_strategy.sql
 M  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt
 M  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt
 M  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt
+A  adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryCodexRegressionTest.kt
 A  adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt
 M  adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt
 M  milestone-6.md
@@ -36,7 +40,7 @@ M  milestone-6.md
 계약 갱신 뒤 원복, checklist.md 「scope 이탈과 정정」) base(`8652893`) 대비 순 diff가
 비어 있어 이 목록에 없다(왕복 실측).
 
-**공유 파일 여부** — 위 열둘 중 `CleanMigration*`·`PersistenceTestSupport.kt`는 6B-1도
+**공유 파일 여부** — 위 열셋 중 `CleanMigration*`·`PersistenceTestSupport.kt`는 6B-1도
 편집한 파일이지만, base가 이미 `8652893`(6B-1 병합 후)이라 이 range의 diff는 **이
 slice가 그 위에 더한 줄만** 담는다 — 6B-1의 줄과 물리적으로 섞이지 않는다.
 
@@ -56,6 +60,7 @@ git restore --source=8652893 --staged --worktree -- \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt \
+  adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryCodexRegressionTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt \
   milestone-6.md
@@ -63,26 +68,35 @@ git restore --source=8652893 --staged --worktree -- \
 
 `StrategyAdapterDependencyTest.kt`는 목록에서 **의도적으로 빠졌다** — base(`8652893`)에
 이미 있는 6B-1 소유 파일이라 이 slice의 rollback이 손대지 않는다(손대면 그 게이트가
-사라진다). `--source`에 없는 나머지 넷(신규 파일 + 신규 test)은 이 명령 한 번으로
+사라진다). `--source`에 없는 나머지 다섯(신규 파일 + 신규 test 둘)은 이 명령 한 번으로
 삭제된다 — 별도 `git rm` 불필요. `git checkout <base> --`는 쓰지 않는다(신규 경로마다
 pathspec 오류로 exit 1이 나는 문제가 이 저장소에서 이미 실측됨).
 
-## 임시 clone 실측(2026-09-18, verifier r2 HIGH-1 수정 뒤 — 이 축이 정본)
+## 임시 clone 실측(2026-09-18, code-reviewer HIGH 수정 뒤 — 이 축이 정본)
 
-`git clone --no-hardlinks`로 만든 버릴 clone에서 HEAD(`7bef521`) 기준으로 위 명령을
-그대로 실행했다.
+`git clone --no-hardlinks`로 만든 버릴 clone에서 HEAD(`9dc5bf5`, Codex 회귀 라운드
+전체 포함) 기준으로 위 명령을 그대로 실행했다. **이전 실측(HEAD `7bef521`)은 그 뒤
+네 커밋(`b22f010`·`2e41ab2`·`5d9890f`·`da36f08`·`068f6f5`·`602a169`·`9dc5bf5`)이
+반영되지 않은 낡은 기록이었다** — code-reviewer 가 문서의 명령을 그대로 실행해
+`JdbcStrategyRepositoryCodexRegressionTest.kt`가 목록 밖이라 되돌려지지 않고 남고, 그
+파일이 참조하는 것들이 지워져 **`:adapters:compileTestKotlin` 이 실패**함을 실측했다
+(HIGH, 세 번째 반복 — 선행 slice 에서 둘, verifier 에서 한 번, 이번이 세 번째).
 
 | 단계 | 명령 | 결과 |
 | --- | --- | --- |
 | ① restore | 위 명령 | exit 0 |
-| ② 내 줄 사라짐 | `git diff 8652893 -- <위 열두 경로>` | 0줄 |
+| ② 내 줄 사라짐 | `git diff 8652893 -- <위 열세 경로>` | 0줄 |
+| ② D/M 수 | `git status --porcelain` | **D 5 · M 8** = 13(기계 목록과 일치) |
 | ②b 신규 디렉터리 잔존 | `find adapters/.../strategy` (main+test) | `JdbcEditSessionRepository.kt`·`EditSessionRow.kt`·`StrategyAdapterDependencyTest.kt`(전부 6B-1 소유, base에서 옴)만 남고 이 slice의 `JdbcStrategyRepository.kt`·`StrategyRow.kt`는 삭제됨 |
-| ②c 남의 줄 남음 | `test -f .../StrategyAdapterDependencyTest.kt` · `grep -c edit_session CleanMigrationTest.kt` | 파일 존재 · 6건(6B-1 몫 그대로) |
+| ②c 남의 줄 남음 | `test -f .../StrategyAdapterDependencyTest.kt` · `grep -c edit_session CleanMigrationTest.kt`·`PersistenceTestSupport.kt` | 파일 존재 · 6건·2건(6B-1 몫 그대로) |
 | ②d 내 표 소멸 | `grep -c operator_strategy CleanMigrationTest.kt` | 0 |
-| ②e 하네스 무변경 | `git diff --name-only 8652893 -- CLAUDE.md .claude/` | 0줄 |
-| ④ compile | `./gradlew --no-daemon :adapters:compileKotlin :adapters:compileTestKotlin` | **exit 0**(초판 절차로는 exit 1 — 아래 「부록」에서 같은 clone으로 재현 확인) |
-| ⑤ test | `./gradlew --no-daemon :adapters:test`(필터 없이 전체 — `NoticeFindRoundTripTest` 포함) | exit 0 |
+| ②e 하네스 무변경 | `git diff --name-only 8652893 -- CLAUDE.md .claude/ docs/harness/` | 0줄 |
+| ④ compile | `./gradlew --no-daemon :adapters:compileKotlin :adapters:compileTestKotlin` | **exit 0**(수정 전엔 `JdbcStrategyRepositoryCodexRegressionTest.kt`가 남아 `Unresolved reference` 다섯으로 exit 1 — code-reviewer 실측 그대로 재현 확인) |
+| ⑤ test | `./gradlew --no-daemon :adapters:test`(필터 없이 전체) | exit 0 |
 | ⑥ 게이트 | `./gradlew --no-daemon check` | **exit 0**(전 모듈, 346 tasks) |
+
+**양방향 차집합**: 기계 산출(`git diff --name-status 8652893..HEAD`)과 이 문서의
+목록·`git restore` 인자를 `comm`으로 대조 — diff-only 0 · doc-only 0(둘 다 13).
 
 신규 디렉터리 잔존 확인의 기대값 — `adapters.strategy` 패키지에는 6B-1이 이미 세션
 파일 둘을 심어 뒀으므로 「이 slice의 파일 둘만 사라지고 6B-1의 파일 셋은 남는다」가
