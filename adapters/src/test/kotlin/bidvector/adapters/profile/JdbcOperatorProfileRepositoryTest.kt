@@ -45,8 +45,10 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
      */
     @Test
     fun `왕복 — NotDeclared 는 Declared 빈 목록과 다르게 복원된다`() {
-        val notDeclared = ProfileFacts(setOf(CategoryCode("건설업")), OperatorLicenses.NotDeclared, emptyList())
-        val declaredEmpty = ProfileFacts(setOf(CategoryCode("건설업")), OperatorLicenses.Declared(emptyList()), emptyList())
+        val notDeclared =
+            ProfileFacts(setOf(CategoryCode("건설업")), OperatorLicenses.NotDeclared, emptyList())
+        val declaredEmpty =
+            ProfileFacts(setOf(CategoryCode("건설업")), OperatorLicenses.Declared(emptyList()), emptyList())
 
         repository().save(notDeclared)
         val afterNotDeclared = repository().current()
@@ -62,7 +64,11 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
     @Test
     fun `갱신 — 두 번째 save 가 첫 번째 값을 덮어쓴다(싱글턴 upsert)`() {
         val first =
-            ProfileFacts(setOf(CategoryCode("건설업")), OperatorLicenses.Declared(listOf(LicenseName("건설업"))), listOf("서울"))
+            ProfileFacts(
+                setOf(CategoryCode("건설업")),
+                OperatorLicenses.Declared(listOf(LicenseName("건설업"))),
+                listOf("서울"),
+            )
         val second =
             ProfileFacts(setOf(CategoryCode("전기공사업")), OperatorLicenses.NotDeclared, listOf("부산", "울산"))
 
@@ -79,12 +85,12 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
      */
     @Test
     fun `싱글턴 제약 — id 2 로 두 번째 행을 직접 SQL 로 넣으면 표 제약이 거부한다`() {
+        val insertSecondRow =
+            "INSERT INTO operator_profile (id, business_types, licenses_declared, license_names, region_terms) " +
+                "VALUES (2, '{}', false, '{}', '{}')"
         appConnection().use { connection ->
             connection.autoCommit = true
-            connection.prepareStatement(
-                "INSERT INTO operator_profile (id, business_types, licenses_declared, license_names, region_terms) " +
-                    "VALUES (2, '{}', false, '{}', '{}')",
-            ).use { statement ->
+            connection.prepareStatement(insertSecondRow).use { statement ->
                 shouldThrow<SQLException> { statement.executeUpdate() }
             }
         }
