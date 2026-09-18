@@ -2,6 +2,7 @@ package bidvector.adapters.evaluation
 
 import bidvector.adapters.persistence.Sql
 import bidvector.adapters.persistence.reconstructNotice
+import bidvector.adapters.persistence.setTextArray
 import bidvector.adapters.persistence.toNoticeRow
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
@@ -52,19 +53,29 @@ class CandidateCapExceededException(
  *
  * **`cap`은 생성자 주입이고 기본값이 없다(D-6F2-4).** 값과 초과 시 운영 처분은 조립 축의
  * 결정이다(`OPEN-6F2-CANDIDATE-BOUND`) — 이 클래스는 "조용히 자르지 않는다"만 고정한다.
+ * `cap <= 0`은 생성자에서 거부한다(verifier r1 LOW-1) — 잘못된 배선이 도메인 실패가 아니라
+ * `LIMIT` 음수 등 DB 오류로 새지 않게 한다.
  */
 class JdbcCandidateSource(
     private val dataSource: DataSource,
     private val clock: Clock,
     private val cap: Int,
 ) : CandidateSourcePort {
+    init {
+        require(cap > 0) { "cap은 1 이상이어야 한다: $cap" }
+    }
+
+    /**
+     * 상태 배열 바인딩은 [setTextArray](`adapters.persistence`, 6F-1 이 같은 목적으로 신설,
+     * verifier r1 code-reviewer MEDIUM)을 그대로 쓴다 — `connection.createArrayOf("text",
+     * ...)`를 여기서 다시 적지 않는다(중복 금지, CLAUDE.md).
+     */
     override fun openCandidates(): List<Notice> {
-        val statuses = biddableStatuses().map { it.name }.toTypedArray()
         val now = clock.now()
         val scanned =
             dataSource.connection.use { connection ->
                 connection.prepareStatement(Sql.SELECT_OPEN_CANDIDATES).use { statement ->
-                    statement.setArray(1, connection.createArrayOf("text", statuses))
+                    statement.setTextArray(1, biddableStatuses().map { it.name })
                     statement.setTimestamp(2, Timestamp.from(now))
                     statement.setInt(3, cap + 1)
                     statement.executeQuery().use { rs -> rs.readCandidateRows() }
