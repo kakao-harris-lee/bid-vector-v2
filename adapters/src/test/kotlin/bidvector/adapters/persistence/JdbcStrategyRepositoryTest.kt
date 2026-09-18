@@ -218,6 +218,31 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
                 }
             }
         historyRevisions shouldBe listOf(1, 2)
+
+        // verifier r2 MEDIUM-2 — `operator_strategy_revision`의 payload 컬럼은 위 `revision`
+        // 하나 말고는 아무 test 도 되읽지 않았다(컬럼 순서를 바꿔 심어도 전건이 초록이었다).
+        // `min_budget_currency`·`min_budget_vat`을 나란히 되읽어 그 둘이 서로 바뀌면 잡히게
+        // 한다 — `INSERT_STRATEGY_REVISION`의 바인딩 순서(`bindStrategyRow`)가 실제로
+        // 지켜지는지를 이력 표 자신에서 확인한다(현재 값 표가 아니라).
+        val secondRevisionPayload =
+            dataSource().connection.use { connection ->
+                connection
+                    .prepareStatement(
+                        "SELECT min_budget_currency, min_budget_vat, candidate_limit, bid_now_threshold " +
+                            "FROM operator_strategy_revision WHERE revision = 2",
+                    ).use { statement ->
+                        statement.executeQuery().use { rs ->
+                            check(rs.next()) { "operator_strategy_revision 에 revision=2 행이 없다" }
+                            listOf(
+                                rs.getString("min_budget_currency"),
+                                rs.getString("min_budget_vat"),
+                                rs.getInt("candidate_limit"),
+                                rs.getBigDecimal("bid_now_threshold"),
+                            )
+                        }
+                    }
+            }
+        secondRevisionPayload shouldBe listOf("KRW", "INCLUSIVE", 25, BigDecimal("0.80"))
     }
 
     // ⓒ — 저장된 값이 현재 정책으로 무효면 실패한다(전략을 지어내지 않는다, D-6F1-3).
