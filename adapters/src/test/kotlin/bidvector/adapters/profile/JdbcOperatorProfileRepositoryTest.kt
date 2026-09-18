@@ -97,25 +97,40 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * `OPEN-6F6-CATEGORY-CODE-NORMALIZATION`(D-6F6-4) — 이 표가 싣는 `bidvector.strategy.
-     * CategoryCode`는 `bidvector.procurement.CategoryCode.of()`와 달리 정규화가 없는 평범한
-     * `data class`다. 이 test는 그 공백을 **닫지 않고 보이게** 고정한다 — 표기가 다른(공백·
-     * 대소문자) 두 업종 코드가 서로 다른 값으로 왕복돼 공고 공종(정규화됨)과 조용히
-     * 어긋날 수 있다는 현 거동의 회귀 방지다(`strategy/Text.kt`는 6F-4 소관이라 이 slice가
-     * 열지 않는다).
+     * `OPEN-6F6-CATEGORY-CODE-NORMALIZATION`(D-6F6-4, D-6F6-10 수정 라운드 1) — 이 표가 싣는
+     * `bidvector.strategy.CategoryCode`는 `bidvector.procurement.CategoryCode.of()`와 달리
+     * 정규화가 없는 평범한 `data class`다. 이 test는 그 공백을 **닫지 않고 보이게** 고정한다.
+     *
+     * **verifier r1 HIGH-1 시정** — 원판은 `repository().current()!!.businessTypes shouldBe
+     * facts.businessTypes`로, 양변이 같은 `CategoryCode(...)` 생성자를 지난 값이라 그 생성자
+     * 안에 멱등 정규화가 들어오면 양변이 함께 접혀 단언이 계속 통과하는 항진명제였다(6F-2
+     * HIGH-1과 같은 결함 클래스 — 함수와 그 함수 본문 재계산값의 비교). 이 판은 복원된
+     * `.value`(String, 재구성이 아니라 단순 필드 접근)를 리터럴 `String` 기대값과 직접
+     * 대조한다 — 어느 쪽도 `CategoryCode(...)`를 다시 통과하지 않는다. `CategoryCode`
+     * 생성자에 trim+lowercase가 들어오면 `spaced`·`plain` 두 리터럴이 생성 시점부터 이미
+     * 같은 정규화 값이 되어 `businessTypes`(Set)가 1원소로 접히고, 아래 **원소 수 2** 단언이
+     * 먼저 붉어진다 — `strategy/Text.kt`는 여전히 무편집(6F-4 소관), 이 test는 그 타입이
+     * 바뀌는 순간을 잡을 뿐이다.
      */
     @Test
     fun `업종 코드는 정규화 없이 원문 그대로 왕복된다 — OPEN-6F6-CATEGORY-CODE-NORMALIZATION`() {
+        val spaced = " 정보통신공사업 "
+        val plain = "정보통신공사업"
         val facts =
             ProfileFacts(
-                businessTypes = setOf(CategoryCode(" 정보통신공사업 "), CategoryCode("정보통신공사업")),
+                businessTypes = setOf(CategoryCode(spaced), CategoryCode(plain)),
                 licenses = OperatorLicenses.NotDeclared,
                 regionTerms = emptyList(),
             )
 
         repository().save(facts)
 
-        // 두 값이 strip·lower 없이 서로 다른 원소로 남는다 — 정규화됐다면 하나로 접혔을 것.
-        repository().current()!!.businessTypes shouldBe facts.businessTypes
+        val restoredProfile = repository().current()!!
+        val restoredValues = restoredProfile.businessTypes.map(CategoryCode::value).toSet()
+
+        // 원소 수 — 정규화가 들어오면 두 리터럴이 생성 시점에 이미 하나로 접혀 여기서 붉어진다.
+        restoredValues.size shouldBe 2
+        // 원문 리터럴 보존 — strip·lower 없이 공백이 붙은 원문이 그대로 남는다(재구성 비교 아님).
+        restoredValues shouldBe setOf(spaced, plain)
     }
 }
