@@ -184,6 +184,15 @@ writer 가 임시 SQL 이 된다.
 `migration-reviewer` 와 `privacy-gate` 를 붙인다(D-6F6-8 — 새 저장소가 생기는 자리라 「개인정보 필드가 구조적으로
 못 들어온다」를 저자가 아닌 쪽이 확인한다).
 
+**6F-6 이 신설해 인계하는 OPEN 둘**(판정 레인 넷의 결과, 계약 갱신 (1)) — ① **`OPEN-6F6-PROFILE-RETENTION`**:
+프로필 표에 수명 정책이 없다(GRANT 가 `DELETE`·`TRUNCATE` 를 빼 최소권한은 지키지만 「언제 지우는가」가 없다).
+**받는 쪽은 6B-3**(데이터 수명·마스킹 — 승인된 보존 기간이 없어 결정 선행). ② **`OPEN-GATE-REGISTRATION-STALE-INPUT`**:
+등재 완결성 게이트 셋(`Profile`·`Evaluation`·`Event`)이 `gate-tests.properties` 를 런타임 `File(...)` 로 읽어
+**Gradle 의 선언된 입력이 아니다** — 증분 빌드에서 등재 행만 지우면 `UP-TO-DATE` 로 건너뛰어 초록이 된다
+(`--rerun-tasks` 면 붉고, CI 는 clean checkout 이라 영향 없다). 6F-2 가 세운 게이트도 같은 구멍이다 —
+**받는 쪽은 하네스 레인**. 그 밖에 **병합 순서 제약**이 하나 선다: Flyway 가 `outOfOrder=false` 이므로
+**6F-6(V12)은 6F-4(V11) 뒤에 병합한다**(V10 은 파일이 없어 기다리지 않는다, D-6F6-13).
+
 **6F-1 착수 2026-09-17** — base `c4d09cc`, 레인 worktree `bid-vector-v2-m6f`·브랜치 `m6-6f1/2026-09-17`.
 정본 `reports/evidence/m6/6f1/scope.md`(D-6F1-1~6). 전략 표(**V9**) + `JdbcStrategyRepository` + 왕복·개정·
 정책 불일치 test. 핵심 결정: 어댑터는 **도메인 타입을 직접 만들지 않고** 행을 초안으로 읽어 **기존 공개 검증

@@ -143,6 +143,9 @@ verifier `not-ready`(BLOCKER 1 · HIGH 1 · LOW 1) · code-reviewer **지적 0**
 **in_scope 경로의 변경**이다. 리뷰 요청 시점마다 이 절을 갱신한다.
 
 - (착수 시점) 없음.
+- **라운드 2** — 팀장 커밋 `55006bfb`(계약 갱신 (1), in_scope `scope.md` 편집) 와 그 뒤의 OPEN 표·이 절 갱신
+  커밋. 하네스(`​.claude/`·`CLAUDE.md`) 변경은 없다 — 이 slice 의 range 에 들어온 팀장 커밋은 **모두
+  in_scope 문서**(`scope.md`·`milestone-6.md`)다.
 
 ## 병행 레인
 
@@ -160,3 +163,5 @@ verifier `not-ready`(BLOCKER 1 · HIGH 1 · LOW 1) · code-reviewer **지적 0**
 | `OPEN-6F6-CATEGORY-CODE-NORMALIZATION`(신설) | 프로필 업종 코드에 정규화가 없어 공고 공종과 어긋날 수 있다 — 등재만(D-6F6-4). 받는 쪽은 `strategy` 타입을 여는 slice |
 | `OPEN-6F3-BID-RECORD` | 변경 없음 — `WorkloadPort` 파생의 전제(D-6F6-5) |
 | `OPEN-6F-ASSEMBLY` | 변경 없음 — 어댑터를 만들 뿐 꽂지 않는다 |
+| `OPEN-6F6-PROFILE-RETENTION`(신설, D-6F6-11) | 이 표의 수명 정책이 없다 — 「언제 지우는가」가 정해지지 않았다(GRANT 가 `DELETE`·`TRUNCATE` 를 빼 최소권한은 지킨다). **받는 쪽은 6B-3**(데이터 수명·마스킹, 보존 기간 결정 선행) |
+| `OPEN-GATE-REGISTRATION-STALE-INPUT`(신설, 범위 밖 부채) | 등재 완결성 게이트 셋(`Profile`·`Evaluation`·`Event`)이 `gate-tests.properties` 를 런타임 `File(...)` 로 읽어 **`:adapters:test` 의 선언된 입력이 아니다** — 증분 빌드에서 등재 행만 지우면 `UP-TO-DATE` 로 건너뛰어 초록이 된다(`--rerun-tasks` 면 붉다). 술어는 옳고 CI 는 clean checkout 이라 영향 없다. **받는 쪽은 하네스 레인** |
