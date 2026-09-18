@@ -122,6 +122,23 @@ rollback: |
 | 6 | **게이트 술어가 자기 입력을 재계산해 항진명제가 된다** | **상시 경계**(6F-2 HIGH-1 · 6F-6 HIGH-1 **두 번 연속**) — 단언 양변이 같은 생성 경로를 지나지 않게 하고, **닫힘 판정은 변이가 붉어지는 실측으로만** |
 | 7 | 요건 행이 공고와 무관하게 남아 다른 공고 판정에 실린다 | 표의 FK·조회 키를 공고 식별자로 닫고 test 로 잰다 |
 
+## 계약 갱신 (1) — 판정 레인 셋의 결과 (2026-09-19, 팀장)
+
+verifier `not-ready`(산출물 HIGH 2 · LOW 3) · code-reviewer(HIGH 1 · LOW 2) · migration-reviewer 통과(권고 2).
+판정 대상 `eac38c85`. **HIGH 둘은 이 계약의 우회 처분이 틀렸다고 지목한 자리다** — 계약이 먼저 움직인다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6F5-9**(HIGH-1, **계약 오류 정정**) | 우회 3 의 처분 「의존 게이트가 정책 로더 좌표 참조를 잡는다」는 **거짓이다.** 처분을 **상수 풀 부재 단언**으로 바꾼다 — 어댑터의 컴파일된 클래스에 정책 로더 좌표가 **없어야 한다**를 단언한다 | `LICENSE_QUALIFICATION_POLICY` 는 `bidvector.qualification` 에 있고 그 루트는 의존 게이트의 **허용 루트**다(어댑터가 커널을 봐야 해서 필연이다). 실측: 어댑터에 그 좌표를 심어도 의존 test·`:adapters:check`·전건 `check` 가 **전부 초록**. 위협 모델이 「방어한다 ③」으로 적은 자리가 무방비였다. **허용 루트 안의 좌표는 「루트 단위 금지」로 닫히지 않는다** — 그 안에서 **무엇을 참조하면 안 되는지**를 따로 적어야 한다. 처방의 근거도 실측이다: 변이 상태의 상수 풀에 `LicensePolicyKt`·`getLICENSE_QUALIFICATION_POLICY` 가 남는다(새 하네스 불필요) |
+| **D-6F5-10**(HIGH-2, **계약 오류 정정**) | 우회 2 의 처분 「판정 호출 자리가 하나임을 test 로 잠근다」는 **존재 단언이라 부족하다.** ① 상수 풀에 **`LicenseVerdict$` 부재 단언**을 더한다(어댑터는 verdict 를 **생성할 이유가 없다** — 원판 상수 풀에 0건) ② 게이트 test 에 **`Collected(빈 rows)`** 케이스를 더한다 | 의존 게이트는 `LicenseEligibility`·`judge` **어휘가 있는지**만 본다 — 호출을 **남긴 채 결과만 갈아치우면 통과**한다. 실측: `Collected(빈 rows)` 경로만 `Eligible(emptySet())` 로 뒤집었더니 전건 `check` **초록**, 커널 참값은 `Uncertain(RequirementDataAbsent)`. **면허 판정에서 가장 비싼 방향의 오판**(부적격을 적격으로)이다. 커버리지 공백이 나란히 있었다 — 게이트 test 6 케이스에 **`Collected(빈 rows)` 가 없었다**. D-6F5-4 가 표를 둘로 가른 바로 그 상태인데 **저장만 잠그고 판정은 안 잠갔다** |
+| **D-6F5-11**(CPD 재서술) | `getNullableTextArray` 를 **형제 `getTextList` 위임**으로 바꾼다(`getArray(column) ?: return null; return getTextList(column)`). `setNullableTextArray` 도 같은 형태로 | **두 레인이 사실에는 합의하고 severity 만 갈렸다** — code-reviewer **HIGH**(중복 최소화 규율 위반, 더 나은 대안이 계약 변경 없이 존재), verifier **LOW**(거동 동일·게이트 무손상이라 라운드를 막지 않는다). 사실 판정은 같다: **중복 게이트를 문면으로 피한 재서술**이다. 실측 둘 — 같은 행에 입력 다섯(SQL NULL·빈 배열·정상·NULL 원소 1·전부 NULL)을 넣어 **두 구현이 전부 같은 결과**(예외 「형」만 ISE/IAE 차이) · 위임 대안이 `cpdCheck` 0 + 왕복·게이트 test 0. 회피가 **필요하지 않았다** — `getTextList` 는 `internal`(**모듈 범위**)이라 `adapters.qualification` 이 파일 편집·scope 확장 없이 이미 호출할 수 있다 |
+| **D-6F5-12**(migration 권고 1) | 「`status='FAILED'` 면 자식 행이 없다」 불변식이 **DB CHECK 가 아니라 앱 읽기 경로**로만 방어된다는 사실을 알려진 제한에 등재하고, **6F-5-b 의 확인 항목**으로 넘긴다 | 헤더/행이 별표라 교차 표 제약은 트리거가 필요해 이 slice 가 두지 않았다. 읽기 경로가 `FAILED` 면 자식 인자를 무시하도록 짜여 있어 **판정에 지어낸 값이 섞이지는 않는다**(migration-reviewer 실측). **6F-5-b 가 두 번째 writer 가 될 때** 그 방어가 유지되는지가 그 slice 의 항목이다 |
+| **D-6F5-13**(migration 권고 2) | 병합 순서 규율(D-6F5-8)에 **자동 게이트가 없다**는 사실을 `OPEN-MIGRATION-ORDER-GATE` 로 등재한다 — 받는 쪽은 하네스 레인 | CI 에 버전 연속성·순서 강제가 없다(grep 확인). 지금은 적용 인스턴스 0 이라 실질 위험이 0 이지만 **세 slice(6F-4·6F-6·6F-5-a)가 연쇄로 같은 수동 규율에 의존**한다. **산문으로만 사는 규율은 어긴 것이 보이지 않는다** — 이 저장소가 되돌리기 목록 낡음에서 세 번 겪은 형태다. 실 배선(`OPEN-6F-ASSEMBLY`)이 열리기 전에 닫아야 한다 |
+
+**범위 밖 부채(등재만)**: **CPD 게이트가 이름 치환 하나로 열린다** — verifier 실측: 축어 복사판은 `cpdCheck` exit 1 인데 **변수명만** 바꿔도 0, **판정식만** 바꿔도 0. 이 slice 밖 기존 부채이고 `OPEN-CPD-GATE-RENAME-BYPASS` 로 등재한다(받는 쪽 하네스 레인).
+
+**환경 경합 기록(finding 아님)**: verifier 의 S-52 첫 실행이 in_scope 밖 파일에서 exit 1 이었고 `Detected multiple Kotlin daemon sessions` 경고가 동반됐다 — **재실행 exit 0**, 직후 전건 `check` 도 0. 다른 세션 빌드와의 경합으로 판단했고 그 사실을 숨기지 않고 적는다.
+
 ## 하네스 레인 변경 (상시 절)
 
 - (착수 시점) 없음.
@@ -142,3 +159,5 @@ rollback: |
 | `OPEN-6F5A-RETENTION`(신설) | 요건 표의 수명 정책 없음 — 받는 쪽 **6B-3** |
 | `OPEN-6F-ASSEMBLY` | 변경 없음 — 어댑터를 만들 뿐 꽂지 않는다 |
 | `OPEN-GATE-REGISTRATION-STALE-INPUT` | 변경 없음(6F-6 이 등재) — 이 slice 의 신설 완결성 게이트도 **같은 한계를 물려받는다**. 그 사실을 알려진 제한에 적는다 |
+| `OPEN-MIGRATION-ORDER-GATE`(신설, D-6F5-13) | 마이그레이션 **번호 순서 병합 규율에 자동 게이트가 없다** — 세 slice 가 연쇄로 수동 규율에 의존한다. 받는 쪽 **하네스 레인**, 실 배선 전 |
+| `OPEN-CPD-GATE-RENAME-BYPASS`(신설, 범위 밖 부채) | **CPD 중복 게이트가 이름 치환 하나로 열린다**(변수명만 바꿔도 통과, 판정식만 바꿔도 통과 — verifier 실측). 이 slice 밖 기존 부채. 받는 쪽 **하네스 레인** |
