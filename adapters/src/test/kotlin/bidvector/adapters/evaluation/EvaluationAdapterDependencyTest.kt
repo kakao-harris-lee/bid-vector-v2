@@ -2,6 +2,7 @@ package bidvector.adapters.evaluation
 
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import java.io.File
 
@@ -79,6 +80,26 @@ class EvaluationAdapterDependencyTest {
         isDisallowed("bidvector.adapters.persistence") shouldBe false
         isDisallowed("bidvector.adapters.evaluation") shouldBe false
     }
+
+    /**
+     * D-6F2-9 ② 참조 단언(verifier r1 HIGH-1 수정) — ①(거동 등식, `JdbcCandidateSourceTest`)
+     * 은 SQL이 **낸 결과값**만 잰다. `biddableStatuses()`를 안 쓰고 우연히 같은 리터럴
+     * (`"Open"`·`"Renoticed"`)을 SQL에 하드코딩해도 그 값은 통과하므로, 여기서는 컴파일된
+     * `JdbcCandidateSource`의 상수 풀이 **실제로 `biddableStatuses`를 참조**하는지를 잰다 —
+     * SQL 문자열을 grep 하지 않는다(스타일 하나로 열리는 문자열 술어를 쓰지 않는다,
+     * CLAUDE.md 「게이트 술어는 구조로」). 이 상수 풀은 컴파일러가 실제로 만든 참조라
+     * `biddableStatuses()` 호출을 지우면(리터럴 배열로 되돌리면) 이 이름 자체가 상수 풀에서
+     * 사라진다 — 소스 문법과 무관하게 참조 유무만 재는 구조 게이트다.
+     */
+    @Test
+    fun `JdbcCandidateSource 의 컴파일된 클래스는 biddableStatuses 를 참조한다`() {
+        val classFile = File("build/classes/kotlin/main/bidvector/adapters/evaluation/JdbcCandidateSource.class")
+        check(classFile.isFile) {
+            "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
+        }
+
+        javapOutput(classFile) shouldContain "biddableStatuses"
+    }
 }
 
 /**
@@ -92,7 +113,8 @@ private val javapExecutable: String by lazy {
     File(javaHome, "bin/${if (isWindows) "javap.exe" else "javap"}").absolutePath
 }
 
-private fun disallowedBytecodeReferences(classFile: File): List<String> {
+/** `javap -p -v`의 원문 출력 — [disallowedBytecodeReferences]와 참조 단언 test가 공유한다. */
+private fun javapOutput(classFile: File): String {
     val process =
         ProcessBuilder(javapExecutable, "-p", "-v", classFile.absolutePath)
             .redirectErrorStream(true)
@@ -100,10 +122,12 @@ private fun disallowedBytecodeReferences(classFile: File): List<String> {
     val output = process.inputStream.bufferedReader().readText()
     val exitCode = process.waitFor()
     check(exitCode == 0) { "javap 실행 실패(exit=$exitCode): ${classFile.name}\n$output" }
+    return output
+}
 
-    return BIDVECTOR_INTERNAL_NAME
-        .findAll(output)
+private fun disallowedBytecodeReferences(classFile: File): List<String> =
+    BIDVECTOR_INTERNAL_NAME
+        .findAll(javapOutput(classFile))
         .map { it.value.replace('/', '.') }
         .filter(::isDisallowed)
         .toList()
-}
