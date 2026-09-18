@@ -56,6 +56,14 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // + 예산 페어 여섯 = 12(id 가 없다) + 같은 won 범위 CHECK 둘 = 14.
             "operator_strategy" to 15,
             "operator_strategy_revision" to 14,
+            // M6/6F-5-a — 신규(추가만, D-6F5-4). V13__notice_requirement.sql.
+            // notice_requirement: status enum = 1.
+            "notice_requirement" to 1,
+            // notice_requirement_row: kind enum(컬럼 인라인) + source_field enum(컬럼 인라인)
+            // + (kind='PARSED')=(source_field IS NOT NULL) + (kind='PARSED')=(license_names
+            // IS NOT NULL) + (kind='PARSED' OR group_no IS NULL) + license_names 비어있지
+            // 않음 = 6.
+            "notice_requirement_row" to 6,
         )
 
     @Test

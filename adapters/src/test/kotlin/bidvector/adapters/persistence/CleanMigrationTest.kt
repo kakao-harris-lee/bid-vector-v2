@@ -44,6 +44,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M6/6F-1 — 스키마 스냅샷 래칫 예외(D-6F1-1, 추가만). V9__operator_strategy.sql.
             "operator_strategy",
             "operator_strategy_revision",
+            // M6/6F-5-a — 스키마 스냅샷 래칫 예외(D-6F5-4, 추가만). V13__notice_requirement.sql.
+            "notice_requirement",
+            "notice_requirement_row",
         )
 
     @Test
@@ -90,6 +93,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 둘 다 시퀀스를 만들지 않는다(D-6F1-5, D-6F1-1 추가만).
             "operator_strategy" to setOf("id"),
             "operator_strategy_revision" to setOf("revision"),
+            // M6/6F-5-a — 헤더는 공고 복합키, 행은 그 위에 자연 키(serialNo)를 더한다(D-6F5-4).
+            "notice_requirement" to setOf("notice_number", "notice_round"),
+            "notice_requirement_row" to setOf("notice_number", "notice_round", "serial_no"),
         )
 
     @Test
@@ -138,6 +144,12 @@ class CleanMigrationTest : PersistenceTestSupport() {
             FkSpec("opening_reserve_price", "notice_number", "opening_result", "notice_round"),
             FkSpec("opening_reserve_price", "notice_round", "opening_result", "notice_number"),
             FkSpec("opening_reserve_price", "notice_round", "opening_result", "notice_round"),
+            // M6/6F-5-a — 행 표가 헤더 표를 참조한다(D-6F5-4, ON DELETE CASCADE).
+            // 복합(2컬럼) FK라 같은 cross product 넷이 나온다(위 opening_reserve_price와 같은 이유).
+            FkSpec("notice_requirement_row", "notice_number", "notice_requirement", "notice_number"),
+            FkSpec("notice_requirement_row", "notice_number", "notice_requirement", "notice_round"),
+            FkSpec("notice_requirement_row", "notice_round", "notice_requirement", "notice_number"),
+            FkSpec("notice_requirement_row", "notice_round", "notice_requirement", "notice_round"),
         )
 
     @Test
@@ -376,6 +388,29 @@ class CleanMigrationTest : PersistenceTestSupport() {
                     insert = true,
                     update = true,
                     delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            // M6/6F-5-a — 헤더는 upsert + 리셋(DataAbsent로 되돌리는 save() 경로가 DELETE를
+            // 쓴다, D-6F5-4). 행은 delete-then-insert(UPDATE 없음 — save()가 행을 갱신하지
+            // 않고 항상 통째로 교체한다). V13__notice_requirement.sql.
+            "notice_requirement" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = true,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "notice_requirement_row" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = true,
                     truncate = false,
                     references = false,
                     trigger = false,
