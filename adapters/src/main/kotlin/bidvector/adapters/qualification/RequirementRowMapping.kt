@@ -45,7 +45,7 @@ internal fun RequirementCollection.toStoredForm(): Pair<RequirementCollectionSta
 
 private fun toRecord(row: RequirementRow): RequirementRowRecord =
     when (row) {
-        is RequirementRow.Parsed ->
+        is RequirementRow.Parsed -> {
             RequirementRowRecord(
                 serialNo = row.serialNo.value,
                 kind = RequirementRowKind.PARSED,
@@ -53,8 +53,9 @@ private fun toRecord(row: RequirementRow): RequirementRowRecord =
                 sourceField = row.sourceField,
                 licenseNames = row.licenseNames.map { it.value },
             )
+        }
 
-        is RequirementRow.Unparsable ->
+        is RequirementRow.Unparsable -> {
             RequirementRowRecord(
                 serialNo = row.serialNo.value,
                 kind = RequirementRowKind.UNPARSABLE,
@@ -62,6 +63,7 @@ private fun toRecord(row: RequirementRow): RequirementRowRecord =
                 sourceField = null,
                 licenseNames = null,
             )
+        }
     }
 
 /**
@@ -81,7 +83,7 @@ internal fun toRequirementCollection(
 
 private fun toRow(record: RequirementRowRecord): RequirementRow =
     when (record.kind) {
-        RequirementRowKind.PARSED ->
+        RequirementRowKind.PARSED -> {
             RequirementRow.Parsed(
                 groupNo = record.groupNo?.let(::LmtGrpNo),
                 serialNo = LmtSno(record.serialNo),
@@ -90,6 +92,9 @@ private fun toRow(record: RequirementRowRecord): RequirementRow =
                     requireNotNull(record.licenseNames) { "PARSED 행의 licenseNames가 없다: ${record.serialNo}" }
                         .map(::LicenseName),
             )
+        }
 
-        RequirementRowKind.UNPARSABLE -> RequirementRow.Unparsable(serialNo = LmtSno(record.serialNo))
+        RequirementRowKind.UNPARSABLE -> {
+            RequirementRow.Unparsable(serialNo = LmtSno(record.serialNo))
+        }
     }

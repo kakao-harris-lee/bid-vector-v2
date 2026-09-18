@@ -42,7 +42,10 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
     private val now = Instant.parse("2026-09-19T00:00:00Z")
     private val emptyPolicy =
         Resolution.Resolved(
-            LicenseQualificationPolicyData(aliasTable = LicenseAliasTable(emptyList()), regionalConditions = emptyList()),
+            LicenseQualificationPolicyData(
+                aliasTable = LicenseAliasTable(emptyList()),
+                regionalConditions = emptyList(),
+            ),
             PolicyVersion(EffectiveFrom.Initial, "test"),
         )
 
@@ -176,6 +179,8 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
         val verdict = gate(declaredLicenses("전기공사업")).verdictFor(findNotice(id))
 
         verdict shouldBe
-            LicenseVerdict.Ineligible(mapOf(RequirementGroupId.Numbered(LmtGrpNo("001")) to setOf(LicenseName("정보통신공사업"))))
+            LicenseVerdict.Ineligible(
+                mapOf(RequirementGroupId.Numbered(LmtGrpNo("001")) to setOf(LicenseName("정보통신공사업"))),
+            )
     }
 }

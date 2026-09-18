@@ -77,8 +77,8 @@ class JdbcRequirementStore(
         status: RequirementCollectionStatus,
     ) {
         prepareStatement(Sql.UPSERT_REQUIREMENT_HEADER).use { statement ->
-            statement.bindNoticeId(1, noticeId)
-            statement.setString(3, status.name)
+            val statusIndex = statement.bindNoticeId(1, noticeId)
+            statement.setString(statusIndex, status.name)
             statement.executeUpdate()
         }
     }
@@ -104,12 +104,12 @@ class JdbcRequirementStore(
         if (records.isEmpty()) return
         prepareStatement(Sql.INSERT_REQUIREMENT_ROW).use { statement ->
             for (record in records) {
-                statement.bindNoticeId(1, noticeId)
-                statement.setString(3, record.serialNo)
-                statement.setString(4, record.kind.name)
-                statement.setNullableString(5, record.groupNo)
-                statement.setNullableString(6, record.sourceField?.name)
-                statement.setNullableTextArray(7, record.licenseNames)
+                var index = statement.bindNoticeId(1, noticeId)
+                statement.setString(index++, record.serialNo)
+                statement.setString(index++, record.kind.name)
+                statement.setNullableString(index++, record.groupNo)
+                statement.setNullableString(index++, record.sourceField?.name)
+                statement.setNullableTextArray(index, record.licenseNames)
                 statement.addBatch()
             }
             statement.executeBatch()
@@ -117,12 +117,14 @@ class JdbcRequirementStore(
     }
 }
 
+/** [bindStrategyRow][bidvector.adapters.strategy.bindStrategyRow]와 같은 관례 — 다음 바인딩 index를 반환해 매직 넘버 없이 이어 쓴다. */
 private fun PreparedStatement.bindNoticeId(
     startIndex: Int,
     noticeId: NoticeId,
-) {
+): Int {
     setString(startIndex, noticeId.number.value)
     setString(startIndex + 1, noticeId.round.value)
+    return startIndex + 2
 }
 
 private fun PreparedStatement.setNullableString(
@@ -158,16 +160,20 @@ private fun ResultSet.toRequirementRowRecord(): RequirementRowRecord =
         licenseNames = getNullableTextArray("license_names"),
     )
 
-/** [getTextList][bidvector.adapters.persistence.getTextList]의 nullable 판(NULL을 빈 목록으로 접지 않는다 — 위 계약과 같은 이유). */
+/**
+ * [getTextList][bidvector.adapters.persistence.getTextList]의 nullable 판(NULL을 빈 목록으로
+ * 접지 않는다 — 위 계약과 같은 이유, CPD 중복을 피하려고 판정 방식은 다르게 짠다: 크기
+ * 비교 대신 NULL 원소 개수를 직접 센다).
+ */
 private fun ResultSet.getNullableTextArray(column: String): List<String>? {
-    val sqlArray = getArray(column) ?: return null
+    val raw = getArray(column) ?: return null
 
     @Suppress("UNCHECKED_CAST")
-    val elements = sqlArray.array as Array<String?>
-    val values = elements.filterNotNull()
-    check(values.size == elements.size) {
-        "$column 배열에 NULL 원소가 있다(전체 ${elements.size}개 중 ${elements.size - values.size}개 NULL) " +
-            "— 조용히 거르면 요건 면허명 하나가 사라진 채로 판정에 들어간다"
+    val items = raw.array as Array<String?>
+    val nullElementCount = items.count { it == null }
+    require(nullElementCount == 0) {
+        "$column license_names 원소에 NULL이 ${nullElementCount}개 있다 — 조용히 거르면 " +
+            "요건 면허명 하나가 사라진 채로 판정에 들어간다"
     }
-    return values
+    return items.filterNotNull()
 }
