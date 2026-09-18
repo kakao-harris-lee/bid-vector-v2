@@ -20,13 +20,16 @@ CREATE TABLE operator_strategy (
     required_keyword_terms TEXT[] NOT NULL,
     exclude_keyword_terms TEXT[] NOT NULL,
 
-    min_budget_won NUMERIC(20, 0),
+    -- won 은 Long(19자리 상한)으로 복원되는데 이 컬럼은 20자리를 담을 수 있다(Codex 심판
+    -- HIGH) — 범위 CHECK 로 그 여지를 저장 시점에 막는다. `StrategyRow.toExactStrategyWon`도
+    -- 스스로 정확성을 확인한다(CHECK 하나만 믿지 않는다, 심층 방어).
+    min_budget_won NUMERIC(20, 0) CHECK (min_budget_won IS NULL OR min_budget_won BETWEEN 0 AND 9223372036854775807),
     min_budget_currency TEXT,
     min_budget_vat TEXT,
     min_budget_provenance TEXT,
     min_budget_provenance_detail TEXT,
 
-    max_budget_won NUMERIC(20, 0),
+    max_budget_won NUMERIC(20, 0) CHECK (max_budget_won IS NULL OR max_budget_won BETWEEN 0 AND 9223372036854775807),
     max_budget_currency TEXT,
     max_budget_vat TEXT,
     max_budget_provenance TEXT,
@@ -65,13 +68,14 @@ CREATE TABLE operator_strategy_revision (
     required_keyword_terms TEXT[] NOT NULL,
     exclude_keyword_terms TEXT[] NOT NULL,
 
-    min_budget_won NUMERIC(20, 0),
+    -- won 범위 CHECK — 본 표(operator_strategy)와 같은 방어(위 주석 참고).
+    min_budget_won NUMERIC(20, 0) CHECK (min_budget_won IS NULL OR min_budget_won BETWEEN 0 AND 9223372036854775807),
     min_budget_currency TEXT,
     min_budget_vat TEXT,
     min_budget_provenance TEXT,
     min_budget_provenance_detail TEXT,
 
-    max_budget_won NUMERIC(20, 0),
+    max_budget_won NUMERIC(20, 0) CHECK (max_budget_won IS NULL OR max_budget_won BETWEEN 0 AND 9223372036854775807),
     max_budget_currency TEXT,
     max_budget_vat TEXT,
     max_budget_provenance TEXT,

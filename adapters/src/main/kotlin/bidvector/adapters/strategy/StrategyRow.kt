@@ -124,8 +124,26 @@ private fun toBudgetAmount(columns: BudgetColumns): BaseAmount? {
     val provenanceKind =
         requireNotNull(columns.provenance) { "예산 한계는 provenance 없이 저장될 수 없다" }
     val provenance = ProvenanceCodec.decode(provenanceKind, columns.provenanceDetail)
-    return BaseAmount(won.toLong(), currency, vat, provenance)
+    return BaseAmount(won.toExactStrategyWon(), currency, vat, provenance)
 }
+
+/**
+ * `NUMERIC(20,0)` 컬럼(20자리)을 `Long`(19자리 상한)으로 **정확하게** 복원한다(Codex 심판
+ * HIGH, M6/6F-1) — `toLong()`은 범위를 벗어나면 예외 없이 하위 64비트만 남겨 전혀 다른
+ * 금액을 조용히 만든다. V9가 이제 저장 시점에 범위 CHECK를 걸어(`0..Long.MAX_VALUE`) 정상
+ * 경로에서는 이 실패가 일어나지 않지만, 복원 쪽도 스스로 정확성을 확인한다(D-6F1-3 「지어내지
+ * 않고 실패한다」와 같은 경계 — CHECK 하나만 믿지 않는다).
+ */
+private fun BigDecimal.toExactStrategyWon(): Long =
+    try {
+        longValueExact()
+    } catch (overflow: ArithmeticException) {
+        // detekt SwallowedException — 원인 예외를 cause 로 실어 보존한다.
+        throw IllegalStateException(
+            "예산 won 값이 Long 범위를 벗어나 정확히 복원할 수 없다(저장된 값 손상 의심): $this",
+            overflow,
+        )
+    }
 
 /** [BudgetColumns]의 역함수 — [OperatorStrategy.toRow]가 min·max 각각에 대해 부른다. */
 private fun budgetColumnsOf(amount: BaseAmount?): BudgetColumns =
