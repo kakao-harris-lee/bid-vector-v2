@@ -283,6 +283,62 @@ internal object Sql {
         RETURNING (xmax = 0) AS inserted, revision
         """
 
+    // M6/6F-1 — 전략 영속(D-6F1-1). `operator_strategy`는 싱글턴(id=1, 리터럴), `revision`이
+    // 두 표 모두 플레이스홀더 순서의 첫 자리다(`StrategyRow.bindStrategyRow`가 그 순서로
+    // 채운다 — 표 둘이 한 바인더를 공유한다).
+    private const val STRATEGY_COLUMNS =
+        """
+        focus_categories, focus_region_terms, exclude_region_terms,
+        required_keyword_terms, exclude_keyword_terms,
+        min_budget_won, min_budget_currency, min_budget_vat, min_budget_provenance, min_budget_provenance_detail,
+        max_budget_won, max_budget_currency, max_budget_vat, max_budget_provenance, max_budget_provenance_detail,
+        minimum_match_score, minimum_probability_score, bid_now_threshold, review_threshold, candidate_limit
+        """
+
+    const val SELECT_STRATEGY = "SELECT revision, $STRATEGY_COLUMNS FROM operator_strategy WHERE id = 1"
+
+    const val UPSERT_STRATEGY =
+        """
+        INSERT INTO operator_strategy (id, revision, $STRATEGY_COLUMNS)
+        VALUES (
+            1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        ON CONFLICT (id) DO UPDATE SET
+            revision = EXCLUDED.revision,
+            focus_categories = EXCLUDED.focus_categories,
+            focus_region_terms = EXCLUDED.focus_region_terms,
+            exclude_region_terms = EXCLUDED.exclude_region_terms,
+            required_keyword_terms = EXCLUDED.required_keyword_terms,
+            exclude_keyword_terms = EXCLUDED.exclude_keyword_terms,
+            min_budget_won = EXCLUDED.min_budget_won,
+            min_budget_currency = EXCLUDED.min_budget_currency,
+            min_budget_vat = EXCLUDED.min_budget_vat,
+            min_budget_provenance = EXCLUDED.min_budget_provenance,
+            min_budget_provenance_detail = EXCLUDED.min_budget_provenance_detail,
+            max_budget_won = EXCLUDED.max_budget_won,
+            max_budget_currency = EXCLUDED.max_budget_currency,
+            max_budget_vat = EXCLUDED.max_budget_vat,
+            max_budget_provenance = EXCLUDED.max_budget_provenance,
+            max_budget_provenance_detail = EXCLUDED.max_budget_provenance_detail,
+            minimum_match_score = EXCLUDED.minimum_match_score,
+            minimum_probability_score = EXCLUDED.minimum_probability_score,
+            bid_now_threshold = EXCLUDED.bid_now_threshold,
+            review_threshold = EXCLUDED.review_threshold,
+            candidate_limit = EXCLUDED.candidate_limit,
+            updated_at = now()
+        """
+
+    // D-6F1-1 ① — 개정 이력(append-only). `revision`이 PK라 같은 값 재저장은 거부된다
+    // (재확인·중복 confirm 재전달은 EditStrategyWorkflow 의 idempotency 판정이 앞단에서 막는다 —
+    // 이 표까지 같은 revision 이 두 번 오는 정상 경로가 없다).
+    const val INSERT_STRATEGY_REVISION =
+        """
+        INSERT INTO operator_strategy_revision (revision, $STRATEGY_COLUMNS)
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        """
+
     const val INSERT_COLLECTION_RUN =
         """
         INSERT INTO collection_run (

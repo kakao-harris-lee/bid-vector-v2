@@ -64,3 +64,37 @@ internal fun PreparedStatement.setNullableBoolean(
 ) {
     if (value != null) setBoolean(index, value) else setNull(index, Types.BOOLEAN)
 }
+
+/**
+ * `TEXT[]` 바인딩(M6/6F-1) — [OpeningCompleteAxisCodec]의 `createArrayOf("integer", ...)`와
+ * 같은 관용구를 문자열 목록으로 확장한다. 전략 감시 규칙 다섯 축(`focus_categories` 등)은
+ * `StrategyDraft`가 항상 `List<String>`(빈 리스트가 「규칙 없음」)이라 `NULL`을 쓰지 않는다
+ * — 이 헬퍼는 nullable을 다루지 않는다(호출부가 항상 빈 리스트 이상을 준다).
+ */
+internal fun PreparedStatement.setTextArray(
+    index: Int,
+    values: List<String>,
+) {
+    setArray(index, connection.createArrayOf("text", values.toTypedArray()))
+}
+
+/**
+ * [setTextArray]의 역함수 — `NULL`(이 열이 안 실린 관측)이면 빈 목록을 낸다. **배열
+ * 원소가 NULL이면 크게 실패한다**(Codex 심판 MEDIUM, M6/6F-1) — 컬럼 자체의 `NOT NULL`은
+ * 배열 원소를 막지 않아, 조용히 걸러내면 축소된 규칙(원소 하나가 사라진 감시 규칙)이
+ * 유효 전략처럼 검증을 통과한다. 빈 문자열 원소가 `BlankTerm`으로 크게 실패하는 것과
+ * 같은 자리, 같은 방향(D-6F1-3 「지어내지 않고 실패한다」) — NULL만 조용했던 비대칭을
+ * 없앤다.
+ */
+internal fun ResultSet.getTextList(column: String): List<String> {
+    val sqlArray = getArray(column) ?: return emptyList()
+
+    @Suppress("UNCHECKED_CAST")
+    val elements = sqlArray.array as Array<String?>
+    val values = elements.filterNotNull()
+    check(values.size == elements.size) {
+        "$column 배열에 NULL 원소가 있다(전체 ${elements.size}개 중 ${elements.size - values.size}개 NULL) " +
+            "— 조용히 거르면 축소된 규칙이 유효 전략처럼 통과한다"
+    }
+    return values
+}

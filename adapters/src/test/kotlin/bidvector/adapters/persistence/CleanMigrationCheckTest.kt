@@ -49,6 +49,13 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // M6/6B-1 — 신규(추가만, D-6B1-8). V8__edit_session.sql: id<>''·operator_id<>''·
             // state enum·session_version>=0·(state=EXPIRED)=(state_payload IS NULL) 짝 — 5.
             "edit_session" to 5,
+            // M6/6F-1 — 신규(추가만, D-6F1-1). operator_strategy: id 싱글턴 1 + score 넷
+            // + candidate_limit 1 + revision 1 + 예산 페어 여섯(min 셋 + max 셋) = 13,
+            // + Codex 심판 HIGH 수정(won 범위 CHECK 둘, min·max 각 하나) = 15.
+            // operator_strategy_revision: revision(PK 인라인) 1 + score 넷 + candidate_limit 1
+            // + 예산 페어 여섯 = 12(id 가 없다) + 같은 won 범위 CHECK 둘 = 14.
+            "operator_strategy" to 15,
+            "operator_strategy_revision" to 14,
         )
 
     @Test

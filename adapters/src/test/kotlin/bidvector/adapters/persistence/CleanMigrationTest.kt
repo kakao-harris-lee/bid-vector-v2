@@ -41,6 +41,9 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "inbox",
             // M6/6B-1 — 스키마 스냅샷 래칫 예외(D-6B1-8, 추가만). V8__edit_session.sql.
             "edit_session",
+            // M6/6F-1 — 스키마 스냅샷 래칫 예외(D-6F1-1, 추가만). V9__operator_strategy.sql.
+            "operator_strategy",
+            "operator_strategy_revision",
         )
 
     @Test
@@ -83,6 +86,10 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "inbox" to setOf("idempotency_key"),
             // M6/6B-1 — 애플리케이션이 발급하는 TEXT PK(추가만, D-6B1-8). V8__edit_session.sql.
             "edit_session" to setOf("id"),
+            // M6/6F-1 — 싱글턴 고정 키(operator_strategy)·도메인 개정 번호(operator_strategy_revision).
+            // 둘 다 시퀀스를 만들지 않는다(D-6F1-5, D-6F1-1 추가만).
+            "operator_strategy" to setOf("id"),
+            "operator_strategy_revision" to setOf("revision"),
         )
 
     @Test
@@ -318,6 +325,29 @@ class CleanMigrationTest : PersistenceTestSupport() {
                     trigger = false,
                 ),
             "inbox" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            // M6/6F-1 D-6F1-1 — operator_strategy 는 upsert(SELECT·INSERT·UPDATE)를 진다.
+            // operator_strategy_revision 은 append-only(SELECT·INSERT만, outbox·raw_observation과
+            // 같은 관례).
+            "operator_strategy" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            "operator_strategy_revision" to
                 TablePrivileges(
                     select = true,
                     insert = true,

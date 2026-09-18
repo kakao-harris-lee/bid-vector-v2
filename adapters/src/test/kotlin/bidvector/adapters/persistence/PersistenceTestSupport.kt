@@ -62,9 +62,13 @@ abstract class PersistenceTestSupport {
                 // M4/4C-2 — outbox·inbox 도 매 test 전 비운다(설계 검토 (4)-⑥) — 빠뜨리면
                 // claim/dedup 결과가 실행 순서에 의존하는 조용한 실패가 된다.
                 // M6/6B-1 — edit_session 도 같은 이유로 더한다(추가만, 기존 목록 무편집).
+                // M6/6F-1 — operator_strategy·operator_strategy_revision 도 매 test 전 비운다
+                // (D-6F1-1, M4/4C-2가 outbox·inbox에 쓴 것과 같은 이유 — 싱글턴 행이 test 간에
+                // 새어 나가면 「전략 없음」 test가 다른 test의 잔여 행을 보게 된다).
                 statement.execute(
                     "TRUNCATE TABLE rejected_write, notice_audit, notice, opening_result, " +
-                        "qualification_text, collection_run, raw_observation, outbox, inbox, edit_session " +
+                        "qualification_text, collection_run, raw_observation, outbox, inbox, " +
+                        "edit_session, operator_strategy, operator_strategy_revision " +
                         "RESTART IDENTITY CASCADE",
                 )
             }

@@ -100,6 +100,44 @@ health/readiness 는 **프로브 둘**로 분리하고 서버 코드(M5 종결)�
 5E-2 가 Python 미러로만 확인한 Kotlin 소비자 규칙 다섯과 5F-2 가 맞춘 `featureSchemaVersion` 이 실 응답에서
 처음 실측된다) · 완료 조건 1 의 one-command · 완료 조건 8 의 이미지 위생 절반(고정 태그·non-root·금지 패키지).
 
+### Slice 6F — 수집↔판정 배선 어댑터 (2026-09-17 신설)
+
+**운영자 지시 2026-09-17 「어댑터 부재는 중요한 결함이고 배선이 먼저」** 로 신설한 축이다. 6A 착수 조사와
+배선 재고(`_workspace/m6-wiring/01_ports.md`)가 같은 사실을 냈다 — **M3 가 수집을, M4 가 판정을 세웠으나 그
+둘을 잇는 어댑터가 없다.** `EvaluateCandidatesUseCase`·`OpportunityAnalysis`·`EditStrategyWorkflow` 가 받는
+포트 가운데 **production 구현이 있는 것은 넷**(임베딩·투찰 예측 gRPC gateway · 경쟁 표본 JDBC 소스 · outbox
+event sink)이고 **아홉이 비어 있다**(전략 저장·세션 저장·후보 원천·감시 대상·면허 게이트·여력·운영자 프로필·
+업무량·알림 요청). `app/src/main` 은 앵커 파일 하나뿐이어서 **DI 조립 코드가 통째로 없다**. 완료 조건 3(필수
+capability E2E 전체 통과)이 이 축에 걸려 있다.
+
+**공백의 성격이 셋으로 갈린다** — ① **질의만 없음**(후보 원천: 표에 데이터가 있고 repository 가 단건 조회만
+낸다 · trace 축 생성) ② **데이터·정의 자체가 없음**(감시 대상의 원문 텍스트는 canonical 공고 fact 에 열이 없고
+raw 원문에만 있다 · 「활성 투찰」 정의가 저장소·discovery 에 없다 · 면허 요구사항 영속과 운영자 면허가 없다 ·
+운영자 프로필 모델이 미결) ③ **타입 체계가 갈라져 있음**(알림 **요청** 값과 배달 **의도** 값을 잇는 코드가
+없고 outbox 소비자·발송 채널이 없다). 포트마다 데이터 소재·외부 계약·미결 결정이 달라 **포트별로 가른다**
+(D-6F1-1) — 한 slice 로 묶으면 6C 가 쓴 재작업 3 라운드를 반복한다.
+
+| slice | 축 | 선행·미결 |
+| --- | --- | --- |
+| **6F-1** | 전략 영속(`StrategyRepository`) | **없음 — 첫째.** `evaluate()` 의 첫 줄이 `strategies.load()` 라 유일한 진짜 선행 의존이고, 도메인에 **이미 공개된 검증 문**이 있어 새 표면 없이 배선된다 |
+| 6F-2 | 후보 원천 + trace 축 | 6F-1. 질의만 신설(다건 스캔) |
+| 6F-3 | 여력 | **운영자 결정** — `OPEN-6F-ACTIVE-BID-DEFINITION`(「활성 투찰」 정의·상한 출처가 없다) |
+| 6F-4 | 감시 대상 | **결정** — `OPEN-6F-WATCH-TEXT-SOURCE`(원문 텍스트를 계약에 등재할지, raw 를 읽을지) |
+| 6F-5 | 면허 게이트 | 요구사항 영속·운영자 면허 설계(LLM 재추출 대신 영속이 필요한지 포함) |
+| 6F-6 | 운영자 프로필 + 업무량 | `OPEN-4B6-PROFILE-SOURCE`(M4 이월) |
+| 6F-7 | 알림 요청 → outbox | 요청·의도 타입 연결. 발송 채널은 `OPEN-STR-12`(그 뒤) |
+
+세션 영속은 **6B-1** 이 이미 진행 중이라 6F 군에 넣지 않는다(같은 축, 다른 레인). app DI 조립은
+`OPEN-6F-ASSEMBLY` — 포트 구현이 모이는 시점에 6A-1(HTTP) 또는 전용 slice 가 받는다.
+
+**6F-1 착수 2026-09-17** — base `c4d09cc`, 레인 worktree `bid-vector-v2-m6f`·브랜치 `m6-6f1/2026-09-17`.
+정본 `reports/evidence/m6/6f1/scope.md`(D-6F1-1~6). 전략 표(**V9**) + `JdbcStrategyRepository` + 왕복·개정·
+정책 불일치 test. 핵심 결정: 어댑터는 **도메인 타입을 직접 만들지 않고** 행을 초안으로 읽어 **기존 공개 검증
+함수**에 통과시킨다(D-6F1-2 — port 시그니처·가시성 무편집, 새 public 표면 0). 6B-1 이 세션에서 만난 벽
+(`internal constructor` 라 어댑터에서 생성 불가)과 **같은 계열이지만 처방이 다르다** — 전략에는 이미 문이 있다.
+저장된 값이 현 정책으로 무효면 **지어내지 않고 실패**하고(D-6F1-3), 전략 **없음**과 **무효**를 가른다(D-6F1-4).
+마이그레이션 번호는 6B-1 V8 · 6F-1 V9 · 6A-1 V10 으로 갈랐다.
+
 ### Slice 6D — E2E와 장애 주입
 
 - mock KONEPS → canonical fact → qualification → ML → decision → fake notification
