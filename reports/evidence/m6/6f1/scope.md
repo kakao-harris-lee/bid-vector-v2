@@ -11,6 +11,7 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/strategy/StrategyRow.kt                 # 행 → **초안** 매핑. 도메인 타입을 직접 만들지 않는다(D-6F1-2)
   - adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt  # 신설 패키지 전용 의존 게이트 — **6B-1 이 먼저 병합되면 그 파일에 합류**(중복 신설 금지, 계약 갱신 (2))
   - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                      # 전략 SQL 추가만(기존 문장 무편집)
+  - adapters/src/main/kotlin/bidvector/adapters/persistence/ProvenanceCodec.kt          # 계약 갱신 (5)·D-6F1-8: `kindNameOf` 신설(기존 `kindOf`·`detailOf` 무편집) — 의존 위반 수정 라운드
   - adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt   # 계약 갱신 (3): 배열 컬럼 판독 헬퍼 추가(기계적 — 전략 값이 목록을 담는다)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt        # 계약 갱신 (3): **신설 표 둘을 여덟 축 스키마 게이트에 등재**(V9 가 표를 만드는 이상 이 등재 없이는 `check` 가 통과할 수 없다 — M3/3E·M4/4C-2 가 반복해 온 「추가만」 패턴)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt  # 같은 축(컬럼 존재·타입·NOT NULL)
@@ -67,6 +68,7 @@ rollback: |
 | **D-6F1-4** | 전략이 **아직 없는 상태**(첫 기동)는 실패가 아니라 **빈 전략**이다 — 그 값도 검증 함수를 지나며, 「설정됐는가」 술어가 거짓인 상태로 산다 | 도메인에 그 술어가 이미 있다(전략 미설정과 규칙 비어 있음은 다른 물음이라고 문서가 적는다). 첫 기동을 오류로 만들면 배선이 서지 않는다 |
 | **D-6F1-5** | 개정 번호는 **도메인이 정한 값을 그대로** 저장한다 — DB 기본값·트리거를 두지 않는다 | 6B-1 D-6B1-3 과 같은 규율(값의 주인을 하나로). V2 의 `revision` 트리거는 공고 축이고 이 표에 상속되지 않는다 |
 | **D-6F1-6** | 정책은 **조립이 주입**한다 — 어댑터가 정책 파일을 직접 읽지 않는다 | 정책의 정본은 하나이고(승인된 정책 데이터) 어댑터가 두 번째 독자가 되면 값이 갈린다. 조립 자리는 `OPEN-6F-ASSEMBLY` |
+| **D-6F1-8** (계약 갱신 (5), 의존 위반 수정) | `StrategyRow.toRow()`(→`budgetColumnsOf`)가 `ProvenanceCodec.kindOf(it).name`을 써 **반환형으로만** `bidvector.procurement.ProvenanceKind`를 스쳤다 — import 는 없어 소스 텍스트 게이트(6F-1 이 철회했던 초안)는 못 봤고, **6B-1 이 벼린 바이트코드 상수 풀 게이트**(`StrategyAdapterDependencyTest`)가 잡았다(2/3 → 실측). 처분은 **허용 루트 확대가 아니라** `ProvenanceCodec`에 이름만 돌려주는 `kindNameOf(provenance): String`(non-inline)을 더해 `StrategyRow.kt`가 그 진입점만 쓰게 한다. 기존 `kindOf`는 그대로 둔다(`NoticeRow.kt`·`JdbcOpeningResultRepository.kt`가 `persistence` 패키지 안에서 계속 쓴다) | 허용 루트를 넓히는 것이 가장 쉬운 길이지만 **가장 나쁜 길**이다 — 그 게이트는 6B-1 이 두 라운드(정규식 → 바이트코드 상수 풀 → 점 표기 포함)에 걸쳐 좁혔고 KDoc 이 allow-list 확대를 거부해 뒀다. 이번이 **그 게이트의 첫 실전 적발**이고, 첫 적발에 게이트를 완화하면 그 두 라운드의 성과가 되돌려진다. `inline`을 금지한 것은 실측(병행 세션 리허설)에서 확인된 함정 — inline 이면 본문이 호출부에 펴져 `ProvenanceKind` 좌표가 그대로 호출부 클래스에 실려 수정이 무효화된다 |
 
 ## 위협 모델 — 6F-1 고유 경계
 
@@ -94,6 +96,7 @@ test 를 각각 둔다(없음 ≠ 무효). (5) 어댑터가 정책 파일을 직
 | `JdbcStrategyRepository`(public class) | 전략 읽기·쓰기 | **경계로 처리** — 배선 주체가 port 로 이미 갖는 권한과 동치. 생성자는 DataSource·정책만 받고 도메인 값을 만들지 않음을 실측 |
 | `StrategyRow`(행 → 초안) | **초안** 생성 | 닫는다 — 초안은 공개 타입이고 불변식을 나르지 않는다. 전략은 검증 함수만 낸다(D-6F1-2) |
 | 검증 함수 재사용 | 유효한 전략 획득 | **경계로 처리** — 이미 공개된 유일한 문이고 어댑터가 새로 얻는 권한이 0 이다. 이 판정이 틀렸다면(그 함수가 실제로는 무효 입력을 통과시킨다면) HIGH — verifier 표적 |
+| `ProvenanceCodec.kindNameOf`(신설, public, D-6F1-8) | `Provenance` → `ProvenanceKind.name`(String) 획득 | **닫는다(안전 방향으로)** — `kindOf`가 이미 같은 모듈(`persistence`) 안에서 공개돼 있어 새 *권한*은 없지만, `String` 만 돌려주므로 `strategy` 등 procurement 비허용 패키지가 `ProvenanceKind` 타입 자체를 반환형으로 얻는 경로를 **닫는다** — 이 slice 의 의존 위반이 바로 그 경로였다 |
 
 ## 병행 레인 — 마이그레이션 번호와 공유 파일
 
@@ -166,6 +169,7 @@ test 를 각각 둔다(없음 ≠ 무효). (5) 어댑터가 정책 파일을 직
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
+| 2026-09-18 rebase 뒤(5) | **D-6F1-8 신설** — `StrategyRow.kt` 의 실재 의존 위반(반환형으로만 스친 `ProvenanceKind`)을 `ProvenanceCodec.kindNameOf`(신설, non-inline)로 닫음. `ProvenanceCodec.kt` in_scope 추가. (2b) 표에 신설 public 표면 한 행 등재 | 6B-1 의 바이트코드 상수 풀 게이트(`StrategyAdapterDependencyTest`)가 rebase 뒤 처음으로 이 slice 의 production 결함을 실제로 잡았다(2/3 → 3/3 실측, 근거는 병행 세션 병합 리허설 `_workspace/m6-6f1/09_rebase_spike.md`) |
 | 2026-09-17 동결 뒤(4) | **병합 계획 절 신설** — 병합 전 대조가 찾은 위험 둘(공유 파일 넷의 위치 충돌 중 둘은 수동 해소 · 6B-1 port 시그니처 변경이 이 slice 의 test fake 를 깬다)과 해소 형태·실측 결과·절차를 등재 | 구현 레인이 버릴 clone 에서 실제 병합을 수행해 실측했다. **어느 브랜치의 CI 도 잡지 못하는 자리**라 계약에 남긴다 |
 | 2026-09-17 완료 보고 뒤(3) | in_scope 에 기계적 귀결 **여섯** 등재(배열 판독 헬퍼 · 여덟 축 게이트 셋 · test 정리 목록 · 의존 게이트 파일) — **알려진 제한이 아니라 in_scope**(slice 의 커밋 집합 = in_scope 경로의 변경) · 의존 게이트 파일이 6B-1 것과 **바이트 동일**함을 팀장이 md5 로 실측 등재 | 구현 레인 완료 보고의 「scope 에 없는 편집 다섯」 + 게이트 파일 조율. V9 가 표를 만드는 이상 그 등재 없이는 `check` 가 서지 않는 **구조적 필연**이고 우회가 아니다 |
 | 2026-09-17 구현 중(2) | **D-6F1-7 신설** — 전략 어댑터 패키지를 `adapters.persistence` → **`adapters.strategy`**(6B-1 신설), 의존 게이트 test 는 먼저 병합되는 레인 소유·뒤가 합류 | 6B-1 정지·보고의 인계(`persistence` 는 workflow 참조 금지, 같은 벽을 전략 저장소도 만난다) |
