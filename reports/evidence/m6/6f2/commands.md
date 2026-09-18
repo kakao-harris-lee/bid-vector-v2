@@ -36,9 +36,10 @@
 ## 2026-09-18T08:21:44Z (acceptance ①, RED — ktlint import 순서)
 - cmd: `./gradlew --no-daemon check`
 - exit: 1
-- 핵심 결과: `:adapters:ktlintMainSourceSetCheck` FAILED —
-  `UuidCorrelationIdFactory.kt:3:1 Imports must be ordered in lexicographic order`
-  (`workflow.event` vs `workflow.evaluation` 순서). 별도 커밋으로 수정.
+- 핵심 결과: `:adapters:ktlintMainSourceSetCheck` FAILED — `UuidCorrelationIdFactory.kt`의
+  import 정렬 위반(`Imports must be ordered in lexicographic order`, `workflow.event` vs
+  `workflow.evaluation` 순서). 별도 커밋으로 수정(LEDGER-2 — 좌표를 줄 번호 없이 규칙
+  인용으로 정정, verifier r1).
 
 ## 2026-09-18T08:33:59Z (acceptance ①, GREEN)
 - cmd: `./gradlew --no-daemon check`
@@ -85,6 +86,54 @@
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로 여덟 개 개별 인자>`
 - exit: 1
 - 핵심 결과: 매치 없음 = 통과.
+
+## 수정 라운드 1(verifier r1 HIGH 2·MEDIUM 1·LOW 1·code-reviewer MEDIUM 1) — 재검증
+
+### 2026-09-18T09:05:11Z (표적 재검증, D-6F2-9·10 반영 뒤)
+- cmd: `./gradlew --no-daemon :adapters:test --tests '*JdbcCandidateSourceTest*' --tests
+  '*CandidateStatusSetTest*' --tests '*EvaluationAdapterDependencyTest*' --tests
+  '*EvaluationGateRegistrationTest*' --rerun-tasks`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — 신설 test(상태 집합 거동 등식·round 타이브레이커·cap 거부·
+  참조 단언·완결성 test) 전부 포함.
+
+### 2026-09-18T09:07:40Z (`SystemClockTest` 회귀 확인)
+- cmd: `./gradlew --no-daemon :adapters:test --tests '*SystemClockTest*' --rerun-tasks`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL.
+
+### 2026-09-18T09:09:02Z (acceptance ①, 수정 라운드 1 반영 뒤 GREEN)
+- cmd: `./gradlew --no-daemon check`
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL — 346 actionable tasks(`gateExecutionGate` 포함, 신설 다섯
+  등재가 실제로 실행 확인됨).
+
+### 변이 재실측 — 버릴 clone 셋(`git clone --no-hardlinks` 동가, `git clone .`), 전경 실행
+
+verifier r1 이 착수 라운드 HEAD에서 심었던 MUT-1·MUT-7을 이 수정 라운드의 HEAD(`c8d290e`)에
+다시 심어 재실행했다. 팀장 지시(D-6F2-9·10이 게이트 술어를 바꾸는 자리라 severity 무관
+표적 재검증)에 더해 신설 완결성 test 자신도 잰다(MUT-self).
+
+| 변이 | 조작 | 명령 | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| MUT-1 | `JdbcCandidateSource.openCandidates()`의 `statement.setTextArray(1, biddableStatuses().map { it.name })`를 `statement.setTextArray(1, listOf("Open", "Renoticed"))`로 되돌림 | `./gradlew --no-daemon check` | **1(FAILED)** | `EvaluationAdapterDependencyTest > JdbcCandidateSource 의 컴파일된 클래스는 biddableStatuses 를 참조한다()` FAILED — D-6F2-9 ②가 닫는다 |
+| MUT-7 | `EvaluationAdapterDependencyTest.kt` 파일째 삭제 | `./gradlew --no-daemon check` | **1(FAILED)** | `:adapters:gateExecutionGate` FAILED — 「게이트 test class 가 실행되지 않았다 — bidvector.adapters.evaluation.EvaluationAdapterDependencyTest」. D-6F2-10 등재가 닫는다 |
+| MUT-self | `gate-tests.properties`에서 `bidvector.adapters.evaluation.JdbcCandidateSourceTest,\` 등재 행 삭제(properties 문법은 그대로 유효) | `./gradlew --no-daemon check` | **1(FAILED)** | `EvaluationGateRegistrationTest > adapters evaluation 패키지의 모든 Test class 는 gate-tests properties 에 등재된다()` FAILED — 완결성 test가 **자기 패키지의 등재 결손**도 잡는다 |
+
+세 변이 모두 붉어졌다 — D-6F2-9·10이 겨눈 우회가 이번 HEAD에서는 실제로 막힌다. 첫 시도에서
+MUT-1 clone에 `sed -i.bak`이 남긴 `.kt.bak` 파일이 `sourceLanguageGate`를 무관하게 실패시켜
+(비Kotlin 소스 검출) 재실행했다 — 재현 절차에 남기는 것은 그 잔여 파일 삭제 단계다.
+
+### acceptance 6건 전경 재확인(수정 라운드 1 반영 뒤, 배경 실행 없이 직접 exit 수신)
+
+| # | 명령 | exit | 핵심 결과 |
+| --- | --- | --- | --- |
+| S-50 | `:adapters:test --tests '*JdbcCandidateSourceTest*' --rerun-tasks` | 0 | BUILD SUCCESSFUL |
+| S-51 | `:adapters:test --tests '*CandidateStatusSetTest*' --rerun-tasks` | 0 | BUILD SUCCESSFUL |
+| S-52 | `:adapters:test --tests '*EvaluationAdapterDependencyTest*' --rerun-tasks` | 0 | BUILD SUCCESSFUL |
+| S-11 | `qualityBaseline` | 0 | BUILD SUCCESSFUL(UP-TO-DATE) |
+| S-10 | `check` | 0 | BUILD SUCCESSFUL, 337 actionable tasks |
+| S-20 | `./tools/one-command-check.sh` | 0 | `one-command-check: 완료 — Kotlin 전건 + Python 전건 통과` |
 
 **마지막 HEAD(evidence 문서 자체를 포함한 커밋 이후)의 `check` 재실측 정본은 이 문서가 아니라
 verifier와 PR 조치 코멘트다** — evidence 편집이 leakPatternGate의 자기 매치를 만들 수 있어
