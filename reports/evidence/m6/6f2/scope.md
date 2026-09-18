@@ -111,7 +111,7 @@ trace 축(`CorrelationIdFactory`·`Clock`)을 같이 싣는 이유: 둘 다 구�
 
 | # | 우회 | 처분 |
 | --- | --- | --- |
-| 1 | SQL 에 상태 리터럴을 직접 적어 도메인 술어와 갈라놓는다 | D-6F2-2 — 집합을 술어에서 기계 산출하고 **집합 등식** test 가 잰다. 리터럴을 되살리면 그 test 가 붉어진다 |
+| 1 | SQL 에 상태 리터럴을 직접 적어 도메인 술어와 갈라놓는다 | D-6F2-9 두 축. **`biddableStatuses` 참조를 지우고 리터럴로 되돌리면** 상수 풀 참조 단언이 붉어지고, 참조를 살린 채 **집합이 달라지면** 거동 등식이 붉어진다(verifier r2 가 MUT-A·MUT-B 로 **대칭임을 실측** — 어느 한 축도 다른 축을 포함하지 않는다). **잔여 한계(verifier r2 LOW-2)**: 호출을 **살려둔 채**(`check(biddableStatuses().isNotEmpty())` 처럼) 바인딩만 리터럴로 두면 두 축 모두 초록이다 — 참조 단언은 「참조 유무」를 재고 「그 값이 바인딩에 흘렀는가」는 재지 못한다. **의도적 조작이라야 성립한다**(이 저장소는 `-Werror` 로 죽은 식을 컴파일 거부하므로 우발적 경로는 위 MUT-A 로 닫혀 있다). 값 축까지 닫으려면 dataflow·바인딩 가로채기가 필요해 **저렴한 구조 게이트가 없다** — 게이트를 늘리지 않고 이 문면으로 한계를 고정한다 |
 | 2 | `NoticeStatus` 에 값이 추가되는데 질의가 따라가지 않는다 | 같은 집합 등식 test — 열거가 늘면 기대 집합도 같이 는다(손 목록이 아니다) |
 | 3 | 마감 비교를 닫힌 구간(`>=`)으로 바꾸거나 `NULL` 을 통과시킨다 | 경계 test 둘(마감 == now · `deadline_at IS NULL`) |
 | 4 | 상한을 조용한 `LIMIT` 으로 되돌려 절삭을 숨긴다 | D-6F2-4 — 상한 초과 표본이 **실패**함을 재는 test. `LIMIT cap` 으로 되돌리면 그 test 가 붉어진다 |
@@ -127,7 +127,7 @@ verifier r1 이 **게이트 둘이 서 있지 않음**을 변이로 실측했다
 | ID | 결정 | 근거 |
 | --- | --- | --- |
 | **D-6F2-9**(HIGH-1) | 상태 집합 게이트를 **두 축**으로 다시 세운다 — ① **거동 등식**: `NoticeStatus` 전 값을 표에 심고 스캔 결과 집합이 `isBiddable` 이 참인 집합과 **같음**을 DB 왕복으로 잰다(열거가 늘면 기대도 같이 는다) ② **참조 단언**: 이 slice 가 이미 들여온 `javap` 상수 풀 하네스로 `JdbcCandidateSource` 가 `biddableStatuses` 를 참조함을 단언한다. SQL 문자열 grep 은 쓰지 않는다 | 실측: 바인딩을 `arrayOf("Open","Renoticed")` 로 바꿔도 `check` BUILD SUCCESSFUL — `biddableStatuses()` 가 질의에서 전혀 안 쓰여도 전건이 초록이었다. 기존 test 가 재던 것은 **함수와 그 함수 본문 재계산값의 비교**(거의 항진명제)이고 실질 단언은 손 목록 하나였다. **우회 표 #1 의 「리터럴을 되살리면 붉어진다」가 실측으로 거짓이었다** — 게이트나 문면 중 하나가 움직여야 하고, 여기서는 **게이트를 움직인다**. ①이 드리프트 축(술어가 바뀌면 붉어짐), ②가 철자 축(리터럴 재도입이 붉어짐) — 어느 하나만으로는 계약 문면이 참이 되지 않는다 |
-| **D-6F2-10**(HIGH-2) | 신설 게이트 test 넷을 `config/quality/gate-tests.properties` 의 `gate.tests.adapters` 에 **등재**한다(추가만). 등재 누락 자체를 잡는 완결성 검사가 저장소에 있으면 이 패키지도 그 검사 범위에 넣는다 | 실측: `EvaluationAdapterDependencyTest.kt` 를 **파일째 삭제해도** `check` BUILD SUCCESSFUL. 저장소의 `*AdapterDependencyTest` **여섯**(ml·extraction·koneps·persistence·strategy·event)은 전부 등재돼 있고 이 slice 것만 빠졌다(`evaluation` discovered 3 / registered 0). `gate-tests.properties` 머리말과 `EventGateRegistrationTest` KDoc 이 **정확히 이 실패 형태를 규율로 적어 뒀다**. 「안 돌린 게이트는 아무것도 막지 못한다」(CLAUDE.md) — 신설 게이트가 등재 밖이면 그 게이트는 존재하지 않는 것과 같다 |
+| **D-6F2-10**(HIGH-2) | 신설 게이트 test **다섯**(`evaluation` 넷 + `SystemClockTest`)을 `config/quality/gate-tests.properties` 의 `gate.tests.adapters` 에 **등재**한다(추가만). 등재 누락 자체를 잡는 완결성 검사가 저장소에 있으면 이 패키지도 그 검사 범위에 넣는다. **구조적 한계(verifier r2 확인 불가 ④)** — 게이트와 그 등재를 **한 커밋에서 함께** 지우는 경우는 어떤 게이트도 막지 못한다(게이트가 자기 존재를 스스로 요구할 수 없다). `event`·`ml` 을 포함한 **저장소 전체의 한계**이지 이 slice 고유 결함이 아니며, 방어는 코드 리뷰다 | 실측: `EvaluationAdapterDependencyTest.kt` 를 **파일째 삭제해도** `check` BUILD SUCCESSFUL. 저장소의 `*AdapterDependencyTest` **여섯**(ml·extraction·koneps·persistence·strategy·event)은 전부 등재돼 있고 이 slice 것만 빠졌다(`evaluation` discovered 3 / registered 0). `gate-tests.properties` 머리말과 `EventGateRegistrationTest` KDoc 이 **정확히 이 실패 형태를 규율로 적어 뒀다**. 「안 돌린 게이트는 아무것도 막지 못한다」(CLAUDE.md) — 신설 게이트가 등재 밖이면 그 게이트는 존재하지 않는 것과 같다 |
 
 같은 라운드에서 함께 닫는 비차단 항목: **MEDIUM-1**(순서 잠금 — `notice_round ASC` 를 빼도 9건이 초록이다.
 같은 번호·다른 차수·같은 마감 표본으로 잠근다) · **LOW-1**(`cap` 에 `require(cap > 0)` — 잘못된 배선이
