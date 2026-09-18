@@ -147,31 +147,95 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         }
 
     /**
-     * 이력 표의 payload 컬럼 넷을 [revision] 행에서 되읽는다(verifier r2 MEDIUM-2) —
-     * `operator_strategy_revision`의 payload 스무 컬럼이 `revision` 하나 말고는 아무 test 도
-     * 되읽지 않았다(컬럼 순서를 바꿔 심어도 전건이 초록이었다). `min_budget_currency`·
-     * `min_budget_vat`을 나란히 되읽어 그 둘이 서로 바뀌면(`INSERT_STRATEGY_REVISION`의
-     * 바인딩 순서 위반) 이 대조가 잡는다.
+     * 이력 표의 감시 규칙 다섯 컬럼(`TEXT[]`)을 [revision] 행에서 되읽는다(verifier r2
+     * MEDIUM-2 완결 — 스무 컬럼 전부를 되읽는 세 헬퍼 중 하나, [historyPayloadAt] 참고).
      */
-    private fun historyPayloadAt(revision: Int): List<Any?> =
+    private fun historyWatchRulesAt(revision: Int): List<Any?> =
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "SELECT min_budget_currency, min_budget_vat, candidate_limit, bid_now_threshold " +
+                    "SELECT focus_categories, focus_region_terms, exclude_region_terms, " +
+                        "required_keyword_terms, exclude_keyword_terms " +
+                        "FROM operator_strategy_revision WHERE revision = ?",
+                ).use { statement ->
+                    statement.setInt(1, revision)
+                    statement.executeQuery().use { rs ->
+                        check(rs.next()) { "operator_strategy_revision 에 revision=$revision 행이 없다" }
+                        listOf<Any?>(
+                            rs.getTextList("focus_categories"),
+                            rs.getTextList("focus_region_terms"),
+                            rs.getTextList("exclude_region_terms"),
+                            rs.getTextList("required_keyword_terms"),
+                            rs.getTextList("exclude_keyword_terms"),
+                        )
+                    }
+                }
+        }
+
+    /**
+     * 예산 한계(`min_budget`|`max_budget`) 다섯 컬럼을 [prefix]로 되읽는다 — 왕복 표현이
+     * min·max 양쪽에 같은 컬럼 형태를 공유하는 것과 같은 이유로 한 헬퍼를 재사용한다
+     * ([bidvector.adapters.strategy.StrategyRow]의 `BudgetColumns`와 같은 원칙).
+     */
+    private fun historyBudgetAt(
+        revision: Int,
+        prefix: String,
+    ): List<Any?> =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "SELECT ${prefix}_won, ${prefix}_currency, ${prefix}_vat, " +
+                        "${prefix}_provenance, ${prefix}_provenance_detail " +
                         "FROM operator_strategy_revision WHERE revision = ?",
                 ).use { statement ->
                     statement.setInt(1, revision)
                     statement.executeQuery().use { rs ->
                         check(rs.next()) { "operator_strategy_revision 에 revision=$revision 행이 없다" }
                         listOf(
-                            rs.getString("min_budget_currency"),
-                            rs.getString("min_budget_vat"),
-                            rs.getInt("candidate_limit"),
-                            rs.getBigDecimal("bid_now_threshold"),
+                            rs.getBigDecimal("${prefix}_won"),
+                            rs.getString("${prefix}_currency"),
+                            rs.getString("${prefix}_vat"),
+                            rs.getString("${prefix}_provenance"),
+                            rs.getString("${prefix}_provenance_detail"),
                         )
                     }
                 }
         }
+
+    /** 임계값 넷과 후보 상한 하나, 남은 다섯 컬럼을 [revision] 행에서 되읽는다. */
+    private fun historyThresholdsAt(revision: Int): List<Any?> =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "SELECT minimum_match_score, minimum_probability_score, bid_now_threshold, " +
+                        "review_threshold, candidate_limit FROM operator_strategy_revision WHERE revision = ?",
+                ).use { statement ->
+                    statement.setInt(1, revision)
+                    statement.executeQuery().use { rs ->
+                        check(rs.next()) { "operator_strategy_revision 에 revision=$revision 행이 없다" }
+                        listOf(
+                            rs.getBigDecimal("minimum_match_score"),
+                            rs.getBigDecimal("minimum_probability_score"),
+                            rs.getBigDecimal("bid_now_threshold"),
+                            rs.getBigDecimal("review_threshold"),
+                            rs.getInt("candidate_limit"),
+                        )
+                    }
+                }
+        }
+
+    /**
+     * `operator_strategy_revision`의 payload **스무 컬럼 전부**를 [revision] 행에서 되읽는다
+     * (verifier r2 MEDIUM-2 완결 — 최초 수정은 넷만 덮어 나머지 열여섯이 무방비였다: 다른
+     * 두 컬럼 쌍을 바꾸는 변이에도 전건이 초록이었다). 다섯 컬럼씩 네 헬퍼로 나눠 각 함수를
+     * sizeGate 한도 안에 둔다 — `Sql.STRATEGY_COLUMNS`(`INSERT_STRATEGY_REVISION`)와 같은
+     * 순서로 이어 붙인다.
+     */
+    private fun historyPayloadAt(revision: Int): List<Any?> =
+        historyWatchRulesAt(revision) +
+            historyBudgetAt(revision, "min_budget") +
+            historyBudgetAt(revision, "max_budget") +
+            historyThresholdsAt(revision)
 
     private fun fullDraft(): StrategyDraft =
         StrategyDraft(
@@ -248,8 +312,30 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         // 이력 두 줄이 각각 다른 revision·값으로 실제로 쌓였다(D-6F1-1 ① 「개정 이력」).
         historyRevisions() shouldBe listOf(1, 2)
 
-        // verifier r2 MEDIUM-2 — 이력 표의 payload 컬럼도 되읽어 왕복을 확인한다(historyPayloadAt 참고).
-        historyPayloadAt(2) shouldBe listOf("KRW", "INCLUSIVE", 25, BigDecimal("0.80"))
+        // verifier r2 MEDIUM-2 완결 — 이력 표의 payload 스무 컬럼 전부를 secondDraft 값과 대조한다.
+        historyPayloadAt(2) shouldBe
+            listOf(
+                listOf("BC01", "BC02"),
+                listOf("서울", "경기"),
+                listOf("제주"),
+                listOf("소프트웨어"),
+                listOf("건설"),
+                BigDecimal.valueOf(1_000_000L),
+                "KRW",
+                "INCLUSIVE",
+                "OPERATOR_DECLARED",
+                null,
+                BigDecimal.valueOf(50_000_000L),
+                "KRW",
+                "INCLUSIVE",
+                "OPERATOR_DECLARED",
+                null,
+                BigDecimal("0.60"),
+                BigDecimal("0.55"),
+                BigDecimal("0.80"),
+                BigDecimal("0.45"),
+                25,
+            )
     }
 
     // ⓒ — 저장된 값이 현재 정책으로 무효면 실패한다(전략을 지어내지 않는다, D-6F1-3).
