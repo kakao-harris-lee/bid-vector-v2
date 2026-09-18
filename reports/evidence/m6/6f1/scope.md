@@ -113,9 +113,14 @@ test 를 각각 둔다(없음 ≠ 무효). (5) 어댑터가 정책 파일을 직
 
 ## 하네스 레인 변경
 
-`git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(착수 시점).
-**rebase 뒤 base 갱신**(계약 갱신 (7), verifier r2 HIGH-1): `git log --oneline 8652893..HEAD --
-CLAUDE.md .claude/ docs/harness/` — 없음. 결론은 그대로이고 명령의 base 만 새 값으로 재확인했다.
+**현행(base `8652893`, 계약 갱신 (7))**: `git log --oneline 8652893..HEAD -- CLAUDE.md
+.claude/ docs/harness/` — 없음.
+
+착수 시점(base `c4d09cc`)에도 같은 명령이 「없음」이었다 — 그 base 로 현 HEAD 에서 다시
+돌리면 rebase 로 들어온 커밋 셋이 섞여 「없음」이 아니게 된다(verifier r3 LOW-A: 옛
+base 문자열이 새 base보다 먼저 읽히면 오독을 부른다는 지적 — `rollback.md`에서 이미
+적용한 「현행이 먼저, 폐기분은 산문으로 뒤에」 원칙을 여기도 적용했다). 결론(하네스
+무변경)은 그때나 지금이나 같고 갱신된 것은 base 뿐이다.
 
 ## OPEN — 수령·신설
 
