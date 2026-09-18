@@ -123,7 +123,7 @@ raw 원문에만 있다 · 「활성 투찰」 정의가 저장소·discovery �
 | 6F-2 | 후보 원천 + trace 축 | 6F-1. 질의만 신설(다건 스캔) |
 | 6F-3 | 여력 | **결정 ③ 로 열림**(2026-09-18) — 현재 활성 수는 평가 요청이 싣고 상한은 전략 필드. **6A 평가 endpoint 선행** |
 | 6F-4 | 감시 대상 | **결정 ① 로 열림**(2026-09-18) — 원문 텍스트를 canonical 열로 싣는다(공고명부터). **셋 중 먼저** |
-| 6F-5 | 면허 게이트 | 요구사항 영속 설계(LLM 재추출 대신 영속이 필요한지 포함). 운영자 면허는 **결정 ② 가 6F-6 에서 같이 푼다** |
+| 6F-5 | 면허 게이트 | **둘로 갈랐다**(2026-09-19, D-6F5-1) — **6F-5-a** 요건 영속 + 게이트가 저장된 것만 읽는다(LLM 0, 착수함) · **6F-5-b** 추출 결과를 채우는 경로(**LLM 호출 = 운영자 승인 대상**, 6F-4 선행) |
 | 6F-6 | 운영자 프로필 + 업무량 | **결정 ② 로 열림**(2026-09-18) — 프로필 표 + 편집 endpoint. 업무량은 분리(`WorkloadNotCollected` 유지) |
 | 6F-7 | 알림 요청 → outbox | 요청·의도 타입 연결. 발송 채널은 `OPEN-STR-12`(그 뒤) |
 
@@ -249,3 +249,26 @@ verifier·Codex 승인은 다음을 자동 허용하지 않는다.
 - public 배포
 - 기존 `bid-vector` 중지·삭제
 - 원격 merge/push
+
+**6F-5 분할·6F-5-a 착수 2026-09-19** — base `ede5d5b`, 레인 worktree `bid-vector-v2-m6f5`·브랜치
+`m6-6f5/2026-09-19`. 정본 `reports/evidence/m6/6f5a/scope.md`(D-6F5-1~8). 착수 조사가 **구조적 제약 셋**을
+냈고 그것이 분할 근거다: ① **`WatchGatedExtractor` 는 `WatchVerdict.Passed` 를 요구하는데
+`LicenseGatePort.verdictFor(notice)` 는 그 값을 주지 않는다** — 판정 경로에서 추출을 부르려면 port 를 열거나
+어댑터가 감시를 재평가해야 하고, 둘 다 이 slice 가 할 일이 아니다 ② **실제 LLM 호출은 사용자 승인 대상**이고
+매 run·매 후보 호출은 비용·비결정성·지연을 판정 경로에 넣는다 ③ production 에서 `Passed` 가 나오려면
+**6F-4 선행**이다(다른 세션 진행 중).
+
+**6F-5-a 가 하는 것**: 요건 **영속 자리**(V13)를 만들고 `LicenseGatePort` 가 **저장된 것만 읽어** 판정한다 —
+LLM 호출 0, port 시그니처 무편집, 6F-4·6F-6 브랜치 무의존(`OperatorLicenses` 는 **`OperatorProfilePort` 로만**
+받는다, D-6F5-3). **표가 비어 있는 동안 게이트는 모든 공고에 `Uncertain(RequirementDataAbsent)` 를 낸다 —
+가짜가 아니라 참인 진술**이고, 1C U-5 가 「`Uncertain` 은 미보유가 아니다」로 정해 use case 가 후보를 떨어뜨리지
+않는다(실측: `licenseGateDrop` 이 `Ineligible` 만 떨어뜨린다). 이 slice 는 **판정을 바꾸지 않고 자리를 만든다.**
+
+핵심 결정: 커널의 세 갈래(`DataAbsent`/`CollectionFailed`/`Collected`)를 **표가 잃지 않게** 저장한다(D-6F5-4 —
+「행이 없다」와 「수집을 시도했으나 실패했다」는 다른 사실이고, 후자를 전자로 접으면 실패가 조용히 사라진다.
+6F-6 이 `licenses_declared` 로 같은 문제를 푼 형태를 따른다) · 마이그레이션 **V13**(V10 6A-1 · V11 6F-4 ·
+V12 6F-6 선점) · **병합 순서는 V12 뒤**(D-6F5-8) · `migration-reviewer`·`privacy-gate` 를 붙이고 **Codex 는
+대상 아님**(적용 DB 인스턴스 0 — 6F-4·6F-6 이 각각 실측).
+
+**6F-5-b 로 미룬 것**(`OPEN-6F5-EXTRACTION-FILL`): 요건을 **채우는 경로**. 추출 시점(감시 통과 시점 vs 별도
+job)과 무효화 정책이 그 slice 의 결정이고, **실제 LLM 호출은 운영자 승인 대상**이다.
