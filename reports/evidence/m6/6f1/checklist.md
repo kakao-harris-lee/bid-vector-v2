@@ -23,6 +23,39 @@
 adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceAdapterDependencyTest.kt`
 가 비어 있다(왕복 실측, `git status`가 아니라 base 대비 diff로 확인).
 
+### 재산출 — base `8652893`(계약 갱신 (7), verifier r2 LOW-2 정정)
+
+위 표는 rebase 이전 base(`c4d09cc`) 기준이라 **이제 낡았다** — 지우지 않고 아래에 새 base
+기준 재산출을 덧붙인다. `git diff --name-status 8652893..HEAD -- . ':!reports/evidence'`
+(2026-09-18, 이 라운드의 마지막 내용 커밋 뒤 재산출):
+
+```
+M  adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt
+M  adapters/src/main/kotlin/bidvector/adapters/persistence/ProvenanceCodec.kt
+M  adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt
+A  adapters/src/main/kotlin/bidvector/adapters/strategy/JdbcStrategyRepository.kt
+A  adapters/src/main/kotlin/bidvector/adapters/strategy/StrategyRow.kt
+A  adapters/src/main/resources/db/migration/V9__operator_strategy.sql
+M  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt
+M  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt
+M  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt
+A  adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt
+M  adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt
+M  milestone-6.md
+```
+
+옛 표 대비 **둘이 달라졌다**:
+- **`ProvenanceCodec.kt`(M) 가 새로 나타난다** — 이번 라운드(D-6F1-8)의 편집. scope.md
+  in_scope 에는 이미 계약 갱신 (5)로 등재돼 있었으나 **이 표에는 verifier r2 LOW-2 전까지
+  빠져 있었다** — 반영한다.
+- **`StrategyAdapterDependencyTest.kt` 가 더 이상 나타나지 않는다** — 옛 표에도 없었지만
+  이유가 다르다: 옛 base 시점엔 「추가했다 철회해 순 diff 0」(위 「scope 이탈과 정정」)였고,
+  새 base(`8652893`)는 **6B-1 의 병합으로 그 파일을 이미 담고 있어** 이 slice 쪽 diff 에
+  안 잡힌다(rebase 가 add/add 를 6B-1 판으로 채택 — scope.md 「병합 계획」 절 rebase 실측).
+  `PersistenceAdapterDependencyTest.kt` 는 여전히 순 diff 0(왕복 확인 재실측, 변화 없음).
+
+이 12 는 scope.md in_scope 열넷(신설 `ProvenanceCodec.kt` 포함) 전부에 걸린다.
+
 ## scope 밖 필연적 companion(구현 중 발견, 오케스트레이터 보고 대상)
 
 **`PersistenceJdbcSupport.kt`·`CleanMigrationTest.kt`·`CleanMigrationColumnTest.kt`·
@@ -88,6 +121,13 @@ StrategyValidation,StrategyViolation,validate,CategoryCode}`·`bidvector.sharedk
 `bidvector.adapters.persistence.{Sql,ProvenanceCodec,getTextList,setNullableInt,
 setTextArray}`)를 전부 덮는다 — **추가 좌표 요청 없음**.
 
+**rebase 뒤 사실 갱신(verifier r2 LOW-2)**: 위 절은 병합 **전** 상태의 기록이라 지금은
+낡았다 — 지우지 않고 사실을 덧붙인다. rebase(2026-09-18)로 6B-1 이 병합해 둔
+`StrategyAdapterDependencyTest.kt` 가 **이제 이 branch 의 트리에 있고 `check` 가 실제로
+돌린다**(「병합 전 대조 실측만 있었다」가 아니라 그 자리에서 D-6F1-8 결함을 실제로 잡았다
+— scope.md D-6F1-8·완료 보고 참고). 아래 「알려진 제한」의 관련 두 항목도 같은 이유로
+갱신한다.
+
 ## (2b) 값 획득 축 — 실측 대응표
 
 | 표면 | scope.md 판정 | 실측 |
@@ -104,17 +144,42 @@ setTextArray}`)를 전부 덮는다 — **추가 좌표 요청 없음**.
   자란다. 삭제·보관 정책은 6B-3 소관(scope.md 위협 모델과 동일 경계).
 - **app 조립 미배선** — `JdbcStrategyRepository`를 실제로 생성해 `EvaluateCandidatesUseCase`
   ·`EditStrategyWorkflow`에 주입하는 자리는 이 slice 밖(`OPEN-6F-ASSEMBLY`, scope.md 그대로).
-- **`StrategyAdapterDependencyTest`를 이 branch의 `check`가 돌리지 않는다** — 소유권이
-  6B-1로 확정돼 이 slice는 그 파일을 만들지 않는다. `main` 병합 뒤 6B-1의 파일과 함께
-  비로소 이 slice의 코드에도 적용된다. 병합 전 대조(위 절)로 통과를 실측했으나, **6B-1이
-  병합 시점까지 그 게이트의 허용 목록을 좁히는 방향으로 바꾸면** 이 실측은 무효가 되고
-  재확인이 필요하다.
+- **`StrategyAdapterDependencyTest`를 이 branch의 `check`가 돌리지 않는다** — ~~병합 전
+  시점의 서술~~. **verifier r2 LOW-2로 갱신(거짓이 됨)**: rebase(2026-09-18)로 이 파일이
+  이제 트리에 있고 `check`가 실제로 돌린다 — 병합 전 대조(위 절)는 예측이었고, rebase
+  뒤 그 예측대로 통과했을 뿐 아니라 **이 라운드의 D-6F1-8 의존 위반을 실제로 잡았다**
+  (2/3 → 수정 후 3/3, scope.md D-6F1-8·완료 보고 참고). 남는 위험은 이 게이트 자신의
+  허용 목록이 **앞으로** 좁혀질 가능성뿐이고, 그것은 이 slice가 통제할 수 없는 6B-1
+  소유 파일의 몫이다.
 - **마이그레이션 병합 순서** — 팀장 조율: 기본 순서는 6B-1(V8) → 6F-1(V9, 이 slice) →
   6A-1(V10)이다(Flyway `outOfOrder`가 이 저장소에 없어 기본값 `false` — 낮은 번호를
-  나중에 적용하면 거부된다). 6B-1이 먼저 병합될 예정이라 이 slice는 V9를 유지한다.
-  **PR 요청 시점에 `main`의 최신 마이그레이션 번호를 다시 확인해야 한다** — 이 문서
-  작성 시점(base `c4d09cc`) 기준 `main`의 최신은 V7이고 이 slice의 파일명은 V9다(V8은
-  6B-1 몫으로 미리 비워 둔 자리).
+  나중에 적용하면 거부된다). ~~이 문서 작성 시점(base `c4d09cc`) 기준 `main`의 최신은
+  V7이고 이 slice의 파일명은 V9다(V8은 6B-1 몫으로 미리 비워 둔 자리)~~ — **verifier r2
+  LOW-2로 갱신(거짓이 됨)**: rebase 뒤 `main`(`8652893`)에 6B-1의 **V8이 이미 있다**.
+  이 slice는 예정대로 **V9**를 유지했고(계약 갱신 그대로), Flyway가 V1~V9를 순서대로
+  적용함을 빈 컨테이너로 실측했다(verifier r2 §2①). **6A-1(V10)과의 병합 시점에 `main`의
+  최신 번호를 다시 확인해야 한다**는 원래 문장은 여전히 유효하다.
+- **MEDIUM-1(verifier r2)** — `PersistenceJdbcSupport.kt`의 `getTextList`가 `TEXT[]`의
+  NULL 원소를 조용히 버린다(`{서울, NULL, 경기}` → `[서울, 경기]`). 빈 문자열은
+  `BlankTerm` 위반으로 크게 실패하는데 NULL은 통과해 비대칭이다. 이 slice의 writer는
+  NULL 원소를 만들지 않아 시스템 내부 경로로는 도달 불가 — DB 직접 쓰기·복원·후속
+  writer에서만 발생한다. 코드는 고치지 않는다(팀장 지시 — 등재만).
+
+## MEDIUM-2 처분(verifier r2) — 이력 표 payload 컬럼 왕복 test 신설
+
+`operator_strategy_revision`의 payload 컬럼 스물이 `revision` 말고는 아무 test 도
+되읽지 않았다(verifier MUT-8: `INSERT_STRATEGY_REVISION`의 컬럼 두 자리를 바꿔도
+`:adapters:test`가 전건 초록이었다). **이 라운드에서 닫는다** — 새 읽기 코드가
+필요 없었다: `JdbcStrategyRepositoryTest`(`PersistenceTestSupport` 상속, 기존
+`historyRevisions` 단언과 같은 자리)가 **이미 원시 JDBC로 이력 표를 직접 SELECT 하는
+관례**를 갖고 있어(`SELECT revision FROM operator_strategy_revision ...`), 그 관례를
+그대로 확장해 `min_budget_currency`·`min_budget_vat`·`candidate_limit`·
+`bid_now_threshold` 네 컬럼을 revision=2 행에서 되읽어 두 번째 저장값과 대조하는
+단언을 test ⓑ에 추가했다(`min_budget_currency`·`min_budget_vat`을 나란히 확인해
+MUT-8이 심은 「두 컬럼 자리가 바뀌어도 통과」를 직접 겨눈다). **production 코드는
+편집하지 않았다** — `JdbcStrategyRepositoryTest.kt`(test-only) 한 파일. 이 편집은
+게이트 술어를 넓히는 test 추가라 표적 재검증 대상이다(팀장 지시, 아래 완료 보고의
+전건·표적 재실측이 그 대상).
 
 ## OPEN 처분
 
