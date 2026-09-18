@@ -16,6 +16,7 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/strategy/SystemClockTest.kt              # 단조 진행·`Instant.now()` 위임
   - adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt    # 필요 시 정리 목록 조정만(기계적, 신설 표 없음)
   - config/quality/gate-tests.properties                                                 # **계약 갱신 (1)**: 신설 게이트 test 등재(추가만) — verifier r1 HIGH-2. 공유 파일이라 rollback 은 커밋 해시 hunk 격리
+  - adapters/src/test/kotlin/bidvector/adapters/evaluation/EvaluationGateRegistrationTest.kt  # **계약 갱신 (2)**: 등재 결손 자체를 잡는 완결성 게이트(`MlGateRegistrationTest`·`EventGateRegistrationTest` 관례) — D-6F2-10 의 「완결성 검사가 있으면 이 패키지도 범위에 넣어라」의 귀결
   - reports/evidence/m6/6f2/**
   - milestone-6.md                                                                       # 6F-2 착수 문단(팀장 커밋)
 out_of_scope:
@@ -153,5 +154,5 @@ range 가 아니라 **in_scope 경로의 변경**이다. 리뷰 요청 시점마
 | ID | 처분 |
 | --- | --- |
 | `OPEN-6F-ASSEMBLY` | 변경 없음 — 이 slice 는 어댑터를 만들 뿐 꽂지 않는다 |
-| `OPEN-6B1-INDEX-GAPS` | **이 질의의 축을 등재**(D-6F2-7) — 상태 집합 + `deadline_at` 범위·정렬. 추가는 규모 근거를 가진 slice |
+| `OPEN-6B1-INDEX-GAPS` | **이 질의의 축을 등재**(D-6F2-7) — 상태 집합 + `deadline_at` 범위·정렬. 추가는 규모 근거를 가진 slice. **등재 자리**(verifier r1 장부층 ⑤, 계약 갱신 (2)): 소유 문서인 6B-1 evidence 는 병합돼 이 slice 의 in_scope 밖이므로 **`milestone-6.md` 6F-2 문단**에 팀장이 문면으로 옮긴다 — 그 파일이 이 slice 의 in_scope 이고 OPEN 의 다음 소비자가 먼저 읽는 자리다 |
 | `OPEN-6F2-CANDIDATE-BOUND`(신설) | 상한의 **값**과 초과 시 운영 처분(실패로 멈출 것인가, 운영자 알림인가)은 조립·운영 축의 결정이다. 이 slice 는 「조용히 자르지 않는다」만 고정한다 |
