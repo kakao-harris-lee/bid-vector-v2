@@ -41,15 +41,19 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
-import java.sql.SQLException
 import java.time.Duration
 import java.time.Instant
 
 private val OPERATOR = OperatorId("op-6f1")
 private val CLOCK_INSTANT: Instant = Instant.parse("2026-09-17T00:00:00Z")
 
-/** [StrategyPolicyData.matchScoreRange]만 좁혀 「정책이 바뀌었다」를 흉내낸다 — 나머지는 항상 `[0,1]`. */
-private fun testPolicy(matchScoreMax: BigDecimal = BigDecimal.ONE): Resolution.Resolved<StrategyPolicyData> =
+/**
+ * [StrategyPolicyData.matchScoreRange]만 좁혀 「정책이 바뀌었다」를 흉내낸다 — 나머지는 항상
+ * `[0,1]`. `internal`(파일 범위가 아니라 모듈 범위) — sizeGate(파일 500줄) 로 Codex 회귀
+ * test 를 [JdbcStrategyRepositoryCodexRegressionTest]로 분리하면서 이 fixture 를 공유한다
+ * (중복 금지, 같은 원칙).
+ */
+internal fun testPolicy(matchScoreMax: BigDecimal = BigDecimal.ONE): Resolution.Resolved<StrategyPolicyData> =
     Resolution.Resolved(
         StrategyPolicyData(
             matchScoreRange = ScoreRange(BigDecimal.ZERO, matchScoreMax),
@@ -442,37 +446,10 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         triggers shouldBe emptyList()
     }
 
-    /**
-     * `operator_strategy` 싱글턴 행을 원시 SQL로 심는다(Codex 회귀 test 전용) — 도메인 경로
-     * (`validate()`)를 우회해 저장 계층 자체의 방어(CHECK·`getTextList`)만 겨눈다.
-     */
-    private fun insertRawStrategy(
-        minBudgetWon: BigDecimal,
-        focusRegionTerms: String = "'{}'::text[]",
-    ) {
-        dataSource().connection.use { connection ->
-            connection
-                .prepareStatement(
-                    "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
-                        "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
-                        "min_budget_won, min_budget_currency, min_budget_vat, min_budget_provenance) " +
-                        "VALUES (1, 0, '{}'::text[], $focusRegionTerms, '{}'::text[], '{}'::text[], '{}'::text[], " +
-                        "?, 'KRW', 'INCLUSIVE', 'OPERATOR_DECLARED')",
-                ).use { statement ->
-                    statement.setBigDecimal(1, minBudgetWon)
-                    statement.executeUpdate()
-                }
-        }
-    }
-
-    // Codex 심판 HIGH 회귀 — V9 의 won 범위 CHECK 가 Long 상한 초과 값의 저장 자체를 막는다.
-    @Test
-    fun `Codex 심판 HIGH 회귀 — 예산 won 이 Long 상한을 넘으면 저장이 거부된다`() {
-        val overflow = BigDecimal("9223372036854775808") // Long.MAX_VALUE + 1
-        shouldThrow<SQLException> { insertRawStrategy(overflow) }
-    }
-
     // Codex 심판 HIGH 회귀 — 정상 경계값(Long 상한)은 과잉 거부 없이 왕복한다.
+    // (범위 초과·배열 NULL·CHECK 우회 회귀는 원시 SQL 로 도메인 경로를 우회한다 — sizeGate
+    // 로 JdbcStrategyRepositoryCodexRegressionTest 에 분리, 이 test 만 workflow 경로를 써서
+    // 여기 남겼다.)
     @Test
     fun `Codex 심판 HIGH 회귀 — 예산 won 의 Long 상한 경계값은 정상 왕복한다`() {
         val repository = JdbcStrategyRepository(dataSource(), testPolicy())
@@ -487,12 +464,6 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         reloaded.watchRules.budget.min shouldBe boundary
     }
 
-    // Codex 심판 MEDIUM 회귀 — 배열 원소의 NULL 이 조용히 사라지지 않고 load 가 크게 실패한다.
-    @Test
-    fun `Codex 심판 MEDIUM 회귀 — 배열 원소에 NULL 이 있으면 load 가 크게 실패한다`() {
-        insertRawStrategy(BigDecimal.TEN, "ARRAY['서울', NULL]::text[]")
-        val repository = JdbcStrategyRepository(dataSource(), testPolicy())
-
-        shouldThrow<IllegalStateException> { repository.load() }
-    }
+    // Codex 심판 MEDIUM 회귀·범위 초과·CHECK 우회 회귀는 원시 SQL 로 도메인 경로를 우회한다
+    // — sizeGate(파일 500줄)로 JdbcStrategyRepositoryCodexRegressionTest.kt 에 분리했다.
 }
