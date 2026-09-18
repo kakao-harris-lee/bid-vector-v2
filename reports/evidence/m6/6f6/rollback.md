@@ -121,7 +121,7 @@ git status --porcelain -- . ':!reports/evidence'   # ③ diff 빈 것(base와 �
 
 ## 실측 결과(2026-09-18, `/tmp/6f6-rollback-check`, `git clone --no-hardlinks`, 라운드 1 반영 뒤)
 
-위 절차를 판정 대상 HEAD(`ac8c1a03`)에서 실제로 실행했다(체크아웃 → 신규 파일 6개 삭제
+위 절차를 이 라운드의 마지막 내용 커밋(`ac8c1a03`)에서 실제로 실행했다(체크아웃 → 신규 파일 6개 삭제
 → 공유 파일 6개 `git restore --source=ede5d5b` → `git add -A`).
 
 - `git diff ede5d5b -- . ':!reports/evidence'` — **트리 동일성 확인**: 남은 차이는
