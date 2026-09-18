@@ -136,6 +136,43 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         }
     }
 
+    /** 이력 표(`operator_strategy_revision`)에 실제로 쌓인 revision 번호들(D-6F1-1 ① 「개정 이력」). */
+    private fun historyRevisions(): List<Int> =
+        dataSource().connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT revision FROM operator_strategy_revision ORDER BY revision").use {
+                    generateSequence { if (it.next()) it.getInt("revision") else null }.toList()
+                }
+            }
+        }
+
+    /**
+     * 이력 표의 payload 컬럼 넷을 [revision] 행에서 되읽는다(verifier r2 MEDIUM-2) —
+     * `operator_strategy_revision`의 payload 스무 컬럼이 `revision` 하나 말고는 아무 test 도
+     * 되읽지 않았다(컬럼 순서를 바꿔 심어도 전건이 초록이었다). `min_budget_currency`·
+     * `min_budget_vat`을 나란히 되읽어 그 둘이 서로 바뀌면(`INSERT_STRATEGY_REVISION`의
+     * 바인딩 순서 위반) 이 대조가 잡는다.
+     */
+    private fun historyPayloadAt(revision: Int): List<Any?> =
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "SELECT min_budget_currency, min_budget_vat, candidate_limit, bid_now_threshold " +
+                        "FROM operator_strategy_revision WHERE revision = ?",
+                ).use { statement ->
+                    statement.setInt(1, revision)
+                    statement.executeQuery().use { rs ->
+                        check(rs.next()) { "operator_strategy_revision 에 revision=$revision 행이 없다" }
+                        listOf(
+                            rs.getString("min_budget_currency"),
+                            rs.getString("min_budget_vat"),
+                            rs.getInt("candidate_limit"),
+                            rs.getBigDecimal("bid_now_threshold"),
+                        )
+                    }
+                }
+        }
+
     private fun fullDraft(): StrategyDraft =
         StrategyDraft(
             focusCategories = listOf("BC01", "BC02"),
@@ -209,40 +246,10 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
             ?.value shouldBe BigDecimal("0.80")
 
         // 이력 두 줄이 각각 다른 revision·값으로 실제로 쌓였다(D-6F1-1 ① 「개정 이력」).
-        val historyRevisions =
-            dataSource().connection.use { connection ->
-                connection.createStatement().use { statement ->
-                    statement.executeQuery("SELECT revision FROM operator_strategy_revision ORDER BY revision").use {
-                        generateSequence { if (it.next()) it.getInt("revision") else null }.toList()
-                    }
-                }
-            }
-        historyRevisions shouldBe listOf(1, 2)
+        historyRevisions() shouldBe listOf(1, 2)
 
-        // verifier r2 MEDIUM-2 — `operator_strategy_revision`의 payload 컬럼은 위 `revision`
-        // 하나 말고는 아무 test 도 되읽지 않았다(컬럼 순서를 바꿔 심어도 전건이 초록이었다).
-        // `min_budget_currency`·`min_budget_vat`을 나란히 되읽어 그 둘이 서로 바뀌면 잡히게
-        // 한다 — `INSERT_STRATEGY_REVISION`의 바인딩 순서(`bindStrategyRow`)가 실제로
-        // 지켜지는지를 이력 표 자신에서 확인한다(현재 값 표가 아니라).
-        val secondRevisionPayload =
-            dataSource().connection.use { connection ->
-                connection
-                    .prepareStatement(
-                        "SELECT min_budget_currency, min_budget_vat, candidate_limit, bid_now_threshold " +
-                            "FROM operator_strategy_revision WHERE revision = 2",
-                    ).use { statement ->
-                        statement.executeQuery().use { rs ->
-                            check(rs.next()) { "operator_strategy_revision 에 revision=2 행이 없다" }
-                            listOf(
-                                rs.getString("min_budget_currency"),
-                                rs.getString("min_budget_vat"),
-                                rs.getInt("candidate_limit"),
-                                rs.getBigDecimal("bid_now_threshold"),
-                            )
-                        }
-                    }
-            }
-        secondRevisionPayload shouldBe listOf("KRW", "INCLUSIVE", 25, BigDecimal("0.80"))
+        // verifier r2 MEDIUM-2 — 이력 표의 payload 컬럼도 되읽어 왕복을 확인한다(historyPayloadAt 참고).
+        historyPayloadAt(2) shouldBe listOf("KRW", "INCLUSIVE", 25, BigDecimal("0.80"))
     }
 
     // ⓒ — 저장된 값이 현재 정책으로 무효면 실패한다(전략을 지어내지 않는다, D-6F1-3).
