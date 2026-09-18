@@ -26,7 +26,7 @@
 | D-6F2-4 | 조용한 LIMIT 아님, cap+1 읽고 초과 시 실패 | `cap + 1`을 `LIMIT` 파라미터로 바인딩, `scanned.size > cap`이면 `CandidateCapExceededException` throw. `상한을 넘으면 조용히 자르지 않고 크게 실패한다`·`cap 을 넘지 않으면 성공한다` 2개 test. **verifier r1 LOW-1 수정** — 생성자가 `require(cap > 0)`으로 잘못된 배선을 즉시 거부(`cap 이 0 이하이면 생성자가 거부한다` test, DB 오류로 새지 않는다) |
 | D-6F2-5 | 결정적 순서 | `ORDER BY deadline_at ASC, notice_number ASC, notice_round ASC`. `순서는 마감 오름차순, 그 다음 공고번호, 그 다음 차수다` test — 같은 마감 두 건의 상대 순서까지 확인. **verifier r1 MEDIUM-1 수정** — 기존 표본은 `notice_round`가 전부 `"000"`이라 그 타이브레이커를 못 쟀다(빼도 초록이었다). `같은 마감·같은 공고번호에서는 notice_round 오름차순이다` test를 더해 그 축만 따로 잠갔다 |
 | D-6F2-6 | 도메인 타입 직접 조립 금지 | `JdbcCandidateSource`는 `NoticeId.reconstructNotice(row)`만 호출한다(같은 모듈 `internal`, `adapters.persistence` 소유). `Notice`는 `internal constructor` — `adapters.evaluation`에서 직접 생성자 호출은 컴파일 자체가 거부한다(구조로 닫힘, 별도 test 불필요) |
-| D-6F2-7 | 마이그레이션·인덱스 없음 | `git diff --stat 547fd7b..HEAD`에 `db/migration/` 경로 없음(rollback.md). `OPEN-6B1-INDEX-GAPS`에 이 질의의 축(상태 집합 + `deadline_at` 범위·정렬)만 등재 — 별도 파일 생성 없이 이 checklist에 등재로 갈음(원 OPEN 항목은 6B-1 소유 문서에 있고 이 slice는 새 마이그레이션을 만들지 않으므로 그 문서 편집 자체가 범위 밖이다) |
+| D-6F2-7 | 마이그레이션·인덱스 없음 | `git diff --stat 547fd7b..HEAD`에 `db/migration/` 경로 없음(rollback.md). `OPEN-6B1-INDEX-GAPS`에 이 질의의 축(상태 집합 + `deadline_at` 범위·정렬, 「추가하더라도 전체 인덱스」 판정)은 **계약 갱신 (2)로 `milestone-6.md` 6F-2 문단에 등재됐다**(소유 문서인 6B-1 evidence는 병합돼 이 slice in_scope 밖이라 팀장이 그 문단에 확정) |
 | D-6F2-8 | SystemClock → adapters.strategy, UuidCorrelationIdFactory → adapters.evaluation | 파일 위치로 직접 확인(`SystemClock.kt`·`UuidCorrelationIdFactory.kt` 경로) |
 
 ## 위협 모델 경계 — 방어 대상 셋 실측
