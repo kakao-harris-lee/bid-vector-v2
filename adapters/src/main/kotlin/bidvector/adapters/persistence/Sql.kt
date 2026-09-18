@@ -408,4 +408,42 @@ internal object Sql {
            OR edit_session.session_version = EXCLUDED.session_version - 1
         RETURNING id
         """
+
+    // M6/6F-5-a — 자격 요건 영속(D-6F5-4). save()는 매번 헤더를 upsert하고 행을 통째로
+    // 교체한다(delete-then-insert, UPDATE 없음) — `bidvector.adapters.qualification
+    // .JdbcRequirementStore`가 한 트랜잭션에서 순서대로 쓴다.
+    const val SELECT_REQUIREMENT_STATUS =
+        "SELECT status FROM notice_requirement WHERE notice_number = ? AND notice_round = ?"
+
+    const val SELECT_REQUIREMENT_ROWS =
+        """
+        SELECT serial_no, kind, group_no, source_field, license_names
+        FROM notice_requirement_row
+        WHERE notice_number = ? AND notice_round = ?
+        ORDER BY serial_no
+        """
+
+    const val UPSERT_REQUIREMENT_HEADER =
+        """
+        INSERT INTO notice_requirement (notice_number, notice_round, status)
+        VALUES (?, ?, ?)
+        ON CONFLICT (notice_number, notice_round) DO UPDATE SET
+            status = EXCLUDED.status,
+            updated_at = now()
+        """
+
+    /** DataAbsent로 되돌리는 경로 — `ON DELETE CASCADE`(V13)가 자식 행을 함께 지운다. */
+    const val DELETE_REQUIREMENT_HEADER =
+        "DELETE FROM notice_requirement WHERE notice_number = ? AND notice_round = ?"
+
+    /** 헤더가 남아 있는(FAILED→COLLECTED 등) 상태 전이에서 옛 행을 지운다 — CASCADE로는 못 잡는다. */
+    const val DELETE_REQUIREMENT_ROWS =
+        "DELETE FROM notice_requirement_row WHERE notice_number = ? AND notice_round = ?"
+
+    const val INSERT_REQUIREMENT_ROW =
+        """
+        INSERT INTO notice_requirement_row
+            (notice_number, notice_round, serial_no, kind, group_no, source_field, license_names)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
 }
