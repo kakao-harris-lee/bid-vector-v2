@@ -8,7 +8,8 @@ head_sha: 리뷰 요청 시점의 `git rev-parse HEAD`(값을 박지 않는다)
 in_scope:
   - reports/evidence/m4/closure/**          # 신설 — scope.md · checklist.md · open-inventory.md (M5 종결 전례와 같은 셋)
   - milestone-4.md                          # 종결 문단(완료 조건 판정 요약 + 알려진 제한의 현재 상태)
-  - docs/discovery/capability-map.md        # M4 계열 OPEN 행의 처분만. 겹침 0 을 병행 레인이 실측 확인(아래 「병행 레인」)
+  # docs/discovery/capability-map.md 는 in_scope 에서 **제거**됐다 — 운영자 결정 2026-09-18 ①(최소 종결)이
+  # 문면 정정을 각 계열 소유 slice 로 넘겼다. 이 slice 는 그 파일을 편집하지 않는다(실제 diff 도 0).
 out_of_scope:
   - M4 코드 변경                            # 이것은 **판정**이고 구현이 아니다. 미충족·좁혀짐이 나오면 후속 slice 로 등재하고 이 slice 가 고치지 않는다
   - M6 문서·slice                           # 6F·6A 계열은 다른 레인 소관(milestone-6.md 무편집)
@@ -21,12 +22,15 @@ acceptance_commands:
   - "./gradlew --no-daemon :adapters:test --tests '*DeadlineCancellationRetryTest*' --tests '*EmbeddingDeadlineCancellationRetryTest*' --rerun-tasks"   # C-4 — 조건 ④(ML deadline·취소·재시도)
   - "git status --porcelain -- reports/evidence/m4/closure milestone-4.md docs/discovery/capability-map.md"   # C-5 — clean-tree 게이트(빈 출력 + 양성 대조 1회)
 rollback: |
-  in_scope 경로 한정 복원이다(range revert 아님).
-  `git restore --source=8652893 --staged --worktree -- milestone-4.md docs/discovery/capability-map.md`
+  in_scope 경로 한정 복원이다(range revert 아님). 목록은 라운드마다
+  `git diff --name-status 8652893..HEAD` 로 **기계 산출**하고, 현재 값은 `M milestone-4.md` 와
+  `A reports/evidence/m4/closure/{scope,checklist,open-inventory}.md` 넷이다.
+  `git restore --source=8652893 --staged --worktree -- milestone-4.md`
   + `reports/evidence/m4/closure/` 삭제(신설 디렉터리).
-  공유 파일은 `capability-map.md` 하나뿐이고 이 slice 는 **M4 계열 행만** 만진다 — 되돌림 확인은
-  「내 줄 사라짐」과 「남의 줄 남음」 둘 다 본다. 목록은 라운드마다 `git diff --name-status 8652893..HEAD` 로 재산출한다.
-  코드 변경이 없으므로 컴파일·test 재실행은 갈음 대상이 아니다 — 트리 동일성으로만 확인한다.
+  **공유 파일이 없다** — `capability-map.md` 는 운영자 결정 ①(최소 종결)로 in_scope 에서 빠졌고
+  실제 diff 도 0 이다(verifier r1 LOW: 초판 rollback 이 diff 에 없는 파일을 가리켰다). 그래서
+  「남의 줄 남음」 대조는 이 slice 에 해당 항목이 없고, 되돌림 확인은 **트리 동일성**으로만 한다.
+  코드 변경이 없으므로 컴파일·test 재실행은 갈음 대상이 아니다.
 ```
 
 작성: 2026-09-18, 세션 모델 단독(CLAUDE.md 「목표·마일스톤·로드맵·스팩은 세션 모델 하나가 단독으로
@@ -65,7 +69,7 @@ M5 종결이 쓴 셋을 그대로 쓴다 — **충족**(그것을 재는 게이�
 | --- | --- |
 | `milestone-4.md` | 6F-1·6A-1 in_scope 에 **없음**(실측) |
 | `reports/evidence/m4/closure/**` | 신설 — 겹칠 것이 없다 |
-| `docs/discovery/capability-map.md` | **겹침 0** — 병행 레인이 자기 변경과 계약 양쪽에 그 파일이 0건임을 실측해 회신했고, 만질 계획이 없으며 생기면 먼저 알린다고 확인했다 |
+| `docs/discovery/capability-map.md` | **해당 없음** — 병행 레인이 겹침 0 을 실측해 회신했으나(만질 계획 없음, 생기면 먼저 알린다고 확인), 운영자 결정 ①(최소 종결)로 **이 slice 가 편집하지 않는다** |
 
 `_workspace/m4-closure/` 는 gitignore 라 커밋되지 않는다.
 
