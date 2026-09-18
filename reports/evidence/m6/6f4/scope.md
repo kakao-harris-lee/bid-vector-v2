@@ -51,14 +51,33 @@
   덤프이고, legacy 자신이 「키워드 매칭에 쓰면 오탐」이라는 사유로 제외하고 있다. 그 모양을 V2 에
   옮기는 것은 결함을 옮기는 것이다(1:1 복제 금지). `differential.json` 에
   `intentional-redesign` 으로 등재한다.
-- **D-6F4-3 — 감시 텍스트 둘을 V2 용어로 다시 정의한다.**
-  - 키워드 매칭 대상 = **공고명 + 요건(`qualification_text`) + 공종(`business_category_label`)**
-    (capability-map STR-02 의 승인된 조립 규칙 그대로).
+- **D-6F4-3 — 감시 텍스트 둘을 V2 용어로 다시 정의한다(운영자 결정 A, 2026-09-18 로 개정).**
+  - 키워드 매칭 대상 = **공고명 + 공종(`business_category_label`)**.
   - 지역 매칭 대상 = 위 + **기관명 두 열(V7)**. legacy 가 메타데이터 덤프에서 긁던 지역 단서를
     **타입이 있는 열**에서 얻는다 — 덤프가 없으므로 「기관명이 필수 키워드를 만족시키는」 오탐
     경로가 **구조적으로** 생기지 않는다.
-  - 따라서 본문을 포함하는 제3의 텍스트는 V2 에 **존재하지 않는다**. capability-map STR-02 문면과
-    이 차이를 evidence 에 대조로 남긴다.
+  - 본문을 포함하는 제3의 텍스트는 V2 에 **존재하지 않는다**.
+- **D-6F4-3b — 요건 축(`qualification_text`)은 키워드 대상에서 뺀다(운영자 결정 A).** 실측 셋:
+  (a) legacy 의 `requirements` 는 작업 서술이 아니라 **합성 행정 메타데이터** 다섯 줄이고 그중
+  둘이 금액이다. (b) V2 `qualification_text` 는 legacy 의 그 필드가 아니라 **면허제한 오퍼레이션**
+  (`getBidPblancListInfoLicenseLimit`)에서 오며 응답 필드는 면허명·허용업종·업종분야다 — 업무
+  키워드가 들어올 자리가 아니다. (c) legacy 가 같은 성격의 열(`eligibility_raw`)에 **「현재 소비자
+  없음」**을 주석으로 적어 뒀다.
+  「키워드에서 빼고 지역 대상으로 옮긴다」는 절충안은 **성립하지 않는다** — 그 텍스트에 지역
+  어휘가 없다(위 응답 필드 전수). 그래서 옮김이 아니라 제거다.
+  **이 결정은 승인 문면을 줄인다** — capability-map STR-02 의 acceptance 둘째 줄(「같은 키워드가
+  제목 **또는 요건**에 있으면 후보」)의 뒷절에 대응할 데이터가 V2 에 없다. 축소를
+  **`OPEN-6F4-STR02-REQUIREMENTS-AXIS`** 로 등재하고, 요건 원문을 싣는 축이 생기면 그때 다시 본다.
+- **D-6F4-8 — 공고명 갱신은 기존 쓰기 규율에 맡기고, 「없음」은 센티넬이 아니라 타입으로 닫는다
+  (운영자 결정 B).** 권위 provenance·덮어쓰기 규칙을 그대로 적용하고 별도 규칙을 만들지 않는다.
+  legacy 는 합성 title 을 **센티넬 접두사**로 표시하고 `startswith` 로 되읽어 덮어쓸지를 정했는데,
+  그 결과 **진짜 공고명이 한 번 들어오면 정정 공고에도 영구 고정**됐다(실측 확인). 재현하지 않는다
+  — 값이 없으면 nullable 로 없다.
+- **D-6F4-9 — 도메인 슬롯까지가 이 slice 다.** canonical 열만 세우고 도메인이 그 값을 못 나르면
+  복원 경로가 값을 **조용히 버린다**(열은 있는데 왕복은 가짜다). 그래서 `procurement` 의 canonical
+  fact 와 그 조립 커맨드에 공고명 슬롯을 **기본값 null 로** 더한다 — D-3H-3 가 기관 축을 더할 때
+  쓴 것과 같은 형태이고 production 호출부는 둘뿐이다. 이것이 in_scope 에 `procurement/` 가 있는
+  이유다(착수 계약 누락을 실측으로 메운 것).
 - **D-6F4-4 — 백필 문제가 성립하지 않는다.** 되돌릴 행도 채울 행도 없다(실측 5). 열은 nullable
   로 서고, 채우는 것은 수집 경로가 생기는 slice 의 일이다.
 - **D-6F4-4b — 수집→canonical 배선은 이 slice 가 하지 않는다(운영자 결정 2026-09-18).**
@@ -81,7 +100,10 @@
 - `adapters/src/main/resources/db/migration/V11__notice_title.sql` (신설)
 - `adapters/src/main/kotlin/bidvector/adapters/persistence/` — `Sql.kt`, `NoticeRow.kt`,
   `NoticeRowMerge.kt`, `NoticeReconstruction.kt`, `JdbcNoticeRepository.kt`
-- 감시 텍스트 조립이 서는 도메인 자리(`workflow` 전략 평가 경로) 및 그 test — 이 slice 의 실질
+- `procurement/` — canonical fact 와 조립 커맨드의 공고명 슬롯(기본값 null, D-6F4-9)
+- `strategy/` — 감시 텍스트 두 타입의 조립 규칙과 그 문서(현재 KDoc 이 요건 축·본문을 전제해
+  D-6F4-3·3b 와 어긋난다. 코드와 계약이 갈린 채 남기지 않는다)
+- 감시 텍스트 조립 순수 함수와 그 test — 이 slice 의 실질
 - `adapters/src/test/kotlin/bidvector/adapters/persistence/` — `CleanMigrationColumnTest.kt`,
   `CleanMigrationCheckTest.kt`, `NoticeReconstructionTest.kt` 등 스키마 대조 test
 - `reports/evidence/m6/6f4/`
