@@ -1,5 +1,25 @@
 # M6/6B-1 — rollback.md
 
+> ## ⚠ 실행 전에 — 이 절차는 **이 slice 의 base 기준**이다
+>
+> 이 문서가 쓰인 뒤 **후속 slice 가 같은 공유 파일에 줄을 더했다.** 아래 목록의
+> `CleanMigrationTest.kt`·`CleanMigrationColumnTest.kt`·`CleanMigrationCheckTest.kt`·
+> `PersistenceTestSupport.kt` 넷은 M6/6F-1(`V9__operator_strategy.sql`, 2026-09-18 병합)도
+> 만진다. **아래 명령을 그대로 실행하면 6B-1 의 줄만이 아니라 6F-1 이 같은 파일에 더한 줄까지
+> 함께 되돌아간다** — 그 slice 의 스키마 축이 조용히 사라지고 빌드는 초록일 수 있다.
+>
+> 이 절차가 **틀린 것이 아니라 낡았다.** 6B-1 의 base(`c4d09cc`) 기준으로는 맞고, 낡게 만든
+> 것은 뒤에 온 병합이다. 그래서 명령과 base 를 고치지 않고 이 주의만 둔다.
+>
+> **실행할 때**: 목록을 `git diff --name-status <base>..HEAD` 로 다시 뽑고, **공유 파일은 이
+> slice 의 커밋 해시로 hunk 를 격리해** 되돌린다(`git diff <sha>~1..<sha> -- <파일> |
+> git apply -R`, 하네스의 공유 파일 rollback 규율). 확인은 「내 줄 사라짐」과 **「남의 줄 남음」**
+> 둘 다.
+>
+> **이것은 구조적 사실이다** — 병합된 slice 의 되돌리기 절차는 후속 slice 가 같은 파일을
+> 만지는 순간 낡는다. slice 마다 이 주의를 손으로 다는 것은 같은 실패 모양(사람 기억에 기댄
+> 절차)이므로, **되돌리기 목록이 실제 diff 와 일치하는지 재는 게이트**를 하네스 후보로 올린다.
+
 ## 명령
 
 `base_sha`(`c4d09cc`)로 in_scope 경로만 되돌린다 — range revert 가 아니다(하네스
