@@ -164,6 +164,26 @@ raw 원문에만 있다 · 「활성 투찰」 정의가 저장소·discovery �
   축 하나이고(「투찰 사실을 무엇으로 아는가」가 먼저 승인돼야 한다) 6D·6E 와 얽힌다 — `OPEN-6F3-BID-RECORD`
   로 신설해 그 축에 남긴다. 6F-3 은 **6A 평가 endpoint 선행**이다.
 
+**6F-6 착수 2026-09-18** — base `ede5d5b`(PR #36·#37 병합 뒤의 `main`), 레인 worktree `bid-vector-v2-m6f6`·
+브랜치 `m6-6f6/2026-09-18`. 정본 `reports/evidence/m6/6f6/scope.md`(D-6F6-1~8). 결정 ② 가 연 축이고
+**6F-5 의 절반을 같이 푼다** — `OperatorLicenses` 를 두 slice 가 공유하는데 그 값의 저장소가 저장소 전체에
+없다. 레인 점유는 병행 세션에 확인했다(6F-4 는 그 세션, 6F-5·6F-6 은 비어 있음).
+
+**범위 한 가지가 결정문에서 이동한다(D-6F6-1)** — 결정 ② 의 「프로필 표 + **편집 endpoint**」에서 endpoint 는
+**6A 로 이관**한다(폐기가 아니다). `6A-1` 착수 계약이 `BidVectorApplication.kt`·`app/build.gradle.kts`·
+`PersistenceWiring.kt` 를 이미 in_scope 로 선점했고 **두 레인이 같은 파일을 만들면 병합이 아니라 충돌**이다.
+대신 이 slice 가 어댑터의 **저장 진입점까지** 내서 6A 가 HTTP 만 얹게 한다 — 쓰기 경로가 없으면 이 표의 유일한
+writer 가 임시 SQL 이 된다.
+
+핵심 결정: **「미설정」·「미선언」·「빈 목록」 셋을 섞지 않는다**(`OperatorLicenses` 가 이미 sealed 로 그 구분을
+갖고 있고, 납작해지면 판정이 `Uncertain` 에서 「면허 0개 보유」로 바뀐다) · **`WorkloadPort` 는 구현하지 않는다**
+(D-6F6-5, 결정 ② — 파생 원천은 `OPEN-6F3-BID-RECORD` 축) · `businessTypes` 의 `strategy.CategoryCode` 에는
+**정규화가 없어** 공고 공종(`procurement.CategoryCode.of`)과 어긋날 수 있으나 그 타입이 사는 `strategy/Text.kt` 는
+**6F-4 가 잡고 있어** 열지 않고 `OPEN-6F6-CATEGORY-CODE-NORMALIZATION` 으로 **보이게만** 한다(D-6F6-4) ·
+마이그레이션 **V12**(V10 6A-1 · V11 6F-4 선점) · 되돌리기 어려운 경로가 아니라 **Codex 대상 아님**이고
+`migration-reviewer` 와 `privacy-gate` 를 붙인다(D-6F6-8 — 새 저장소가 생기는 자리라 「개인정보 필드가 구조적으로
+못 들어온다」를 저자가 아닌 쪽이 확인한다).
+
 **6F-1 착수 2026-09-17** — base `c4d09cc`, 레인 worktree `bid-vector-v2-m6f`·브랜치 `m6-6f1/2026-09-17`.
 정본 `reports/evidence/m6/6f1/scope.md`(D-6F1-1~6). 전략 표(**V9**) + `JdbcStrategyRepository` + 왕복·개정·
 정책 불일치 test. 핵심 결정: 어댑터는 **도메인 타입을 직접 만들지 않고** 행을 초안으로 읽어 **기존 공개 검증
