@@ -89,4 +89,27 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
             }
         }
     }
+
+    /**
+     * `OPEN-6F6-CATEGORY-CODE-NORMALIZATION`(D-6F6-4) — 이 표가 싣는 `bidvector.strategy.
+     * CategoryCode`는 `bidvector.procurement.CategoryCode.of()`와 달리 정규화가 없는 평범한
+     * `data class`다. 이 test는 그 공백을 **닫지 않고 보이게** 고정한다 — 표기가 다른(공백·
+     * 대소문자) 두 업종 코드가 서로 다른 값으로 왕복돼 공고 공종(정규화됨)과 조용히
+     * 어긋날 수 있다는 현 거동의 회귀 방지다(`strategy/Text.kt`는 6F-4 소관이라 이 slice가
+     * 열지 않는다).
+     */
+    @Test
+    fun `업종 코드는 정규화 없이 원문 그대로 왕복된다 — OPEN-6F6-CATEGORY-CODE-NORMALIZATION`() {
+        val facts =
+            ProfileFacts(
+                businessTypes = setOf(CategoryCode(" 정보통신공사업 "), CategoryCode("정보통신공사업")),
+                licenses = OperatorLicenses.NotDeclared,
+                regionTerms = emptyList(),
+            )
+
+        repository().save(facts)
+
+        // 두 값이 strip·lower 없이 서로 다른 원소로 남는다 — 정규화됐다면 하나로 접혔을 것.
+        repository().current()!!.businessTypes shouldBe facts.businessTypes
+    }
 }
