@@ -34,4 +34,6 @@
 2. **면허 요구사항 게이트 미배선**(D-6F6-5·6F-5 소관) — 이 slice는 `OperatorLicenses`를 싣기만 하고 자격 판정에 꽂지 않는다.
 3. **`WorkloadPort` 미구현**(D-6F6-5, 운영자 결정 ②) — 이 slice의 명시적 out_of_scope다.
 4. **HTTP 편집 endpoint 없음**(D-6F6-1) — 저장 진입점은 있으나 인가·HTTP 배선은 6A 소관. 초기 투입 전까지 `current()`는 `null`(「미설정」)을 낸다.
-5. **`privacy-gate`·`migration-reviewer` 판정은 이 evidence 밖** — D-6F6-8이 지정한 두 게이트는 별도 실행·별도 기록이다(이 slice는 구조적 방어만 여기 남긴다).
+5. **`privacy-gate`·`migration-reviewer` 판정은 이 evidence 밖** — D-6F6-8이 지정한 두 게이트는 별도 레인이 실행·기록한다(이 slice는 구조적 방어만 여기 남긴다). 수정 라운드 1에서 실제로 돈 판정 결과(privacy-gate 통과·수정 필요 2·확인 불가 1, migration-reviewer 통과·권고 1)는 `scope.md` 「계약 갱신 (1)」이 정본이다.
+6. **보존·파기 미정**(`OPEN-6F6-PROFILE-RETENTION`, D-6F6-11) — 프로필 표에 수명 정책이 없다. 상세는 `scope.md` 위협 모델 「방어하지 않는다」⑤ 참고(중복 서술하지 않는다).
+7. **프로필 어휘 재식별 가능성**(D-6F6-12) — 범주 어휘라 식별성이 낮으나 희소 조합을 코드로 배제할 근거가 없다. 상세는 `scope.md` 위협 모델 「방어하지 않는다」⑥ 참고(중복 서술하지 않는다).
