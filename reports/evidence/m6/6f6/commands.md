@@ -90,15 +90,18 @@
   출력 없음 — 파일이 정확히 78줄로 복귀)
 - 핵심 결과: 게이트가 실제로 변경을 잡는다 — 항상 통과만 하는 회귀가 아님을 확인.
 
-## 2026-09-18T11:36:00Z (비밀값 스캔)
+## 2026-09-18T11:36:00Z (비밀값 스캔, verifier r1 BLOCKER-1 시정 — 참조형으로 재작성)
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt adapters/src/main/kotlin/bidvector/adapters/profile adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt adapters/src/main/resources/db/migration/V12__operator_profile.sql adapters/src/test/kotlin/bidvector/adapters/profile adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt config/quality/gate-tests.properties`
 - exit: 0
-- 핵심 결과: `PersistenceTestSupport.kt`에서 매치 2건 — 둘 다 이 slice가 편집한 줄이 아니라
-  기존 Testcontainers 고정 test 자격증명(`bidvector_test_only`, `container.password`)이다
-  (실 `LeakPatternGateTask`는 `reports/evidence/`만 스캔해 이 파일을 보지 않는다 — 이
-  grep은 그보다 넓은 참조형 수동 확인이다). 이 slice가 더한 `operator_profile` 등재
-  한 줄에는 매치가 없다 — 신규 매치 0건.
+- 핵심 결과: `PersistenceTestSupport.kt`의 Testcontainers 고정 test 자격증명 줄 둘에서 매치 —
+  둘 다 이 slice가 편집한 줄이 아니고(기존 코드, `operator_profile` 등재 한 줄에는 매치
+  없음), 값 자체가 test 컨테이너 전용 상수라 비밀값이 아니다. **어휘를 이 문서에 축어로
+  적지 않는다** — `LeakPatternGateTask`의 `scanRoot`가 `reports/evidence`라(제외는
+  `scope.md` 하나뿐, `build-logic`의 `bidvector.quality-baseline.gradle.kts`
+  `leakPatternGate` 등록 참고) **이 문서 자신도 그 게이트의 스캔 대상이다** — 앞 판(verifier
+  r1 BLOCKER-1)이 「이 파일을 보지 않는다」고 적은 것은 사실과 반대였고, 그 문장이 적은
+  어휘 자체가 `check`를 붉게 만들었다.
 
-**마지막 HEAD(evidence 문서 자체를 포함한 커밋 이후)의 `check` 재실측 정본은 이 문서가 아니라
-verifier와 PR 조치 코멘트다** — evidence 편집이 leakPatternGate의 자기 매치를 만들 수 있어
-(CLAUDE.md 「비밀값 스캔 어휘 축어 금지」) 마지막 칸은 이 규격에 따라 여기 담지 않는다.
+**마지막 HEAD(이 문단을 포함한 evidence 커밋 이후)의 `check` 재실측**은 아래 「acceptance
+재실측(수정 라운드 1)」 절 — 이 절 자체가 이제 어휘를 적지 않으므로 그 재실측이 스스로를
+다시 깨뜨리지 않는다.
