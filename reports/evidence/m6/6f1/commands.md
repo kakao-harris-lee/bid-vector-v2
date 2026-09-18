@@ -1,11 +1,12 @@
 # M6/6F-1 — commands.md
 
-정본: `reports/evidence/m6/6f1/scope.md`. base `c4d09cc`. 아래 블록은 `48133c9`
-시점(패키지 이동 직후)까지 기록이고, 그 뒤 팀장 조율로 `StrategyAdapterDependencyTest`
-소유권이 6B-1로 확정돼 그 파일을 철회한 커밋(`d9fda0a`)이 이어졌다 — 「의존 게이트
-병합 전 대조」 절이 그 뒤 실측이다. 최종 HEAD의 acceptance 재확인은 evidence가 아니라
-완료 보고 메시지가 정본이다(2026-09-16 규율 — 자기 마지막 커밋의 post-state는 evidence가
-담을 수 없다).
+정본: `reports/evidence/m6/6f1/scope.md`(base 값도 그 문서가 정본 — verifier r3 LOW-B:
+여기 base를 고정 문자열로 또 적으면 scope.md가 rebase로 갱신될 때 이 문서만 낡는다).
+아래 블록은 `48133c9` 시점(패키지 이동 직후)까지 기록이고, 그 뒤 팀장 조율로
+`StrategyAdapterDependencyTest` 소유권이 6B-1로 확정돼 그 파일을 철회한 커밋(`d9fda0a`)이
+이어졌다 — 「의존 게이트 병합 전 대조」 절이 그 뒤 실측이다. 최종 HEAD의 acceptance
+재확인은 evidence가 아니라 완료 보고 메시지가 정본이다(2026-09-16 규율 — 자기 마지막
+커밋의 post-state는 evidence가 담을 수 없다).
 
 ## acceptance (전건, 최종 HEAD)
 
