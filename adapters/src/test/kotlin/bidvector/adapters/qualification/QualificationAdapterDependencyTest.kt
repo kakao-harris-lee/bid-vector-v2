@@ -1,8 +1,10 @@
 package bidvector.adapters.qualification
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import java.io.File
 
@@ -37,6 +39,16 @@ private fun isDisallowed(importedPackage: String): Boolean =
  * 같은 정규식·같은 근거).
  */
 private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
+
+/**
+ * D-6F5-9(verifier r1 HIGH-1) — `LICENSE_QUALIFICATION_POLICY`는 `bidvector.qualification`에
+ * 있고 그 루트는 이 게이트의 **허용 루트**다(어댑터가 `LicenseEligibility`·`LicenseVerdict`를
+ * 보려면 필연이라 좁힐 수 없다). 패키지 루트 단위 술어로는 「커널을 쓴다」와 「정책을 직접
+ * 읽는다」를 가를 수 없어, 그 두 어휘(정책 로더가 컴파일된 클래스의 `getstatic`/`invoke`
+ * 대상으로 남기는 이름)의 **부재**를 따로 건다.
+ */
+private const val LICENSE_POLICY_LOADER_CLASS_MARKER = "LicensePolicyKt"
+private const val LICENSE_POLICY_LOADER_GETTER_MARKER = "getLICENSE_QUALIFICATION_POLICY"
 
 /**
  * D-6F5-6 — **소스 텍스트가 아니라 컴파일된 클래스의 상수 풀을 `javap -p -v`로 훑는다.**
@@ -91,16 +103,47 @@ class QualificationAdapterDependencyTest {
      */
     @Test
     fun `StoredRequirementLicenseGate 의 컴파일된 클래스는 LicenseEligibility 를 참조한다`() {
-        val classFile =
-            File("build/classes/kotlin/main/bidvector/adapters/qualification/StoredRequirementLicenseGate.class")
-        check(classFile.isFile) {
-            "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
-        }
-
-        val output = javapOutput(classFile)
+        val output = javapOutput(storedRequirementLicenseGateClassFile())
         output shouldContain "LicenseEligibility"
         output shouldContain "judge"
     }
+
+    /**
+     * D-6F5-9(verifier r1 HIGH-1) — 재현: `verdictFor` 첫 줄 앞에
+     * `LICENSE_QUALIFICATION_POLICY.resolve(...)`를 전체 한정 좌표로 심으면 의존 게이트의
+     * 허용 루트 판정(`isDisallowed`)도, 전건 `check`도 초록이었다(어댑터가 정책의 두 번째
+     * 독자가 되는 것을 D-6F5-5가 막으려 했으나 실제로 막는 게이트가 없었다). 정책 로더
+     * 좌표가 상수 풀에 남는지를 직접 잰다.
+     */
+    @Test
+    fun `StoredRequirementLicenseGate 의 컴파일된 클래스는 정책 로더 좌표를 참조하지 않는다`() {
+        val output = javapOutput(storedRequirementLicenseGateClassFile())
+        output shouldNotContain LICENSE_POLICY_LOADER_CLASS_MARKER
+        output shouldNotContain LICENSE_POLICY_LOADER_GETTER_MARKER
+    }
+
+    /**
+     * 양성 대조(D-6F5-9) — verifier가 실측한 변이 상태의 상수 풀 문구(`javap -p -v` 출력의
+     * `Methodref` 행 형태)를 표본으로 써서, 그 어휘가 있으면 위 부재 단언이 실제로
+     * 실패함을 보인다. 술어가 늘 통과만 하는 회귀를 막는다.
+     */
+    @Test
+    fun `정책 로더 좌표 어휘가 있으면 부재 단언이 실패한다 — 양성 대조`() {
+        val mutatedConstantPoolSample =
+            "  #45 = Methodref  #12.#67  // bidvector/qualification/LicensePolicyKt.getLICENSE_QUALIFICATION_POLICY:()Lbidvector/sharedkernel/EffectiveDatedPolicy;"
+
+        shouldThrow<AssertionError> { mutatedConstantPoolSample shouldNotContain LICENSE_POLICY_LOADER_CLASS_MARKER }
+        shouldThrow<AssertionError> { mutatedConstantPoolSample shouldNotContain LICENSE_POLICY_LOADER_GETTER_MARKER }
+    }
+}
+
+private fun storedRequirementLicenseGateClassFile(): File {
+    val classFile =
+        File("build/classes/kotlin/main/bidvector/adapters/qualification/StoredRequirementLicenseGate.class")
+    check(classFile.isFile) {
+        "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
+    }
+    return classFile
 }
 
 /**
