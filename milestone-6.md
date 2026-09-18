@@ -138,6 +138,18 @@ raw 원문에만 있다 · 「활성 투찰」 정의가 저장소·discovery �
 저장된 값이 현 정책으로 무효면 **지어내지 않고 실패**하고(D-6F1-3), 전략 **없음**과 **무효**를 가른다(D-6F1-4).
 마이그레이션 번호는 6B-1 V8 · 6F-1 V9 · 6A-1 V10 으로 갈랐다.
 
+**6F-2 착수 2026-09-18** — base `547fd7b`(6F-1·6B-1·M4 종결 병합 뒤의 `main`), 레인 worktree
+`bid-vector-v2-m6f2`·브랜치 `m6-6f2/2026-09-18`. 정본 `reports/evidence/m6/6f2/scope.md`(D-6F2-1~8).
+6F-1 이 `evaluate()` 의 첫 줄을 세웠고 **둘째 줄이 `candidateSource.openCandidates()`** 다 — 6F 군에서
+**설계 미결이 없는 남은 축은 이것 하나**다(6F-3·6F-4·6F-6 은 운영자 결정 대기, 6F-5 는 요구사항 영속 설계
+선행, 6F-7 은 타입 체계 연결). `notice` 표(V1)에 행은 있고 없는 것은 **다건 스캔 질의**뿐이라 **이 slice 는
+표를 만들지 않는다**(마이그레이션 0 — V10 은 6A-1 이 그대로 잡는다). 핵심 결정: 「입찰 가능」의 **상태 집합을
+SQL 리터럴로 적지 않고** 도메인 술어 `isBiddable` 에서 기계 산출해 바인딩하고 **집합 등식**으로 잰다(D-6F2-2 —
+정의가 두 벌이 되면 둘째 벌은 컴파일러가 보지 않는다) · 상한은 **조용한 절삭이 아니라 큰 실패**(D-6F2-4 —
+port 반환 타입에 「잘렸다」를 실을 자리가 없다) · 순서는 결정적(D-6F2-5 — `analysisBudget` 이 목록 순서를
+그대로 쓴다) · 어댑터 패키지 `adapters.evaluation` 신설 + **바이트코드 상수 풀** 의존 게이트(D-6F2-1).
+trace 축(`CorrelationIdFactory`·`Clock`)을 같이 싣는다 — 후보 스캔의 마감 경계가 `Clock` 을 실제로 요구한다.
+
 ### Slice 6D — E2E와 장애 주입
 
 - mock KONEPS → canonical fact → qualification → ML → decision → fake notification
