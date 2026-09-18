@@ -133,7 +133,7 @@ private fun budgetColumnsOf(amount: BaseAmount?): BudgetColumns =
         won = amount?.let { BigDecimal.valueOf(it.exportWon()) },
         currency = amount?.currency?.name,
         vat = amount?.vatTreatment?.name,
-        provenance = amount?.provenance?.let { ProvenanceCodec.kindOf(it).name },
+        provenance = amount?.provenance?.let(ProvenanceCodec::kindNameOf),
         provenanceDetail = amount?.provenance?.let(ProvenanceCodec::detailOf),
     )
 

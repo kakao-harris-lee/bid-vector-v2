@@ -24,6 +24,16 @@ internal object ProvenanceCodec {
             Provenance.Undeclared -> ProvenanceKind.UNDECLARED
         }
 
+    /**
+     * [kindOf]의 이름만 돌려주는 진입문(M6/6F-1 D-6F1-5) — `bidvector.procurement.ProvenanceKind`를
+     * 허용 루트 밖(`bidvector.adapters.strategy` 등)에 반환형으로 노출하지 않는다. [kindOf]는
+     * 그대로 둔다(`persistence` 패키지 자신·`JdbcOpeningResultRepository` 등 procurement가
+     * 허용된 소비자가 쓴다) — 이 함수는 그 값의 `.name`만 원하는 소비자를 위한 별도 진입점이다.
+     * `inline`이 아니다 — inline이면 본문이 호출부에 펴져 `ProvenanceKind` 좌표가 그대로
+     * 호출부(컴파일된 클래스)에 실려 이 진입점의 목적이 무효가 된다.
+     */
+    fun kindNameOf(provenance: Provenance): String = kindOf(provenance).name
+
     /** 재구성에 필요한 detail — `Published.noticeRevision`·`FilledFromBudgetKey.key`만 값을 낸다. */
     fun detailOf(provenance: Provenance): String? =
         when (provenance) {
