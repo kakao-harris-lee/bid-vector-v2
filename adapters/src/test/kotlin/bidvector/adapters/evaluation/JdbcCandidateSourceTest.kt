@@ -10,6 +10,7 @@ import bidvector.procurement.PersistOutcome
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
+import bidvector.procurement.isBiddable
 import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.strategy.Clock
 import io.kotest.assertions.throwables.shouldThrow
@@ -95,19 +96,30 @@ class JdbcCandidateSourceTest : PersistenceTestSupport() {
         }
     }
 
+    /**
+     * D-6F2-9 ① 거동 등식(verifier r1 HIGH-1 수정) — `NoticeStatus.entries` **전 값**을 DB에
+     * 심고, 스캔 결과 집합이 `isBiddable`이 참인 집합과 같은지를 잰다. 기대 집합은 손으로
+     * 적지 않고 `isBiddable`을 걸러 산출한다 — `NoticeStatus`에 값이 늘면 표본·기대 둘 다
+     * 같이 는다. 이 DB 왕복 test는 「스캔이 실제로 낸 값」을 재므로 SQL이 `biddableStatuses()`
+     * 를 안 쓰고 우연히 같은 값을 하드코딩해도 통과할 수 있다 — 그 철자 축은
+     * `EvaluationAdapterDependencyTest`의 참조 단언(D-6F2-9 ②)이 잰다.
+     */
     @Test
-    fun `Open 과 Renoticed 만 후보다 — 나머지 네 상태는 제외된다`() {
+    fun `상태 집합 거동 등식 — 스캔 결과가 isBiddable 이 참인 집합과 같다`() {
         val future = now.plusSeconds(3600)
-        val open = insertNotice("STATUS-OPEN", future, NoticeStatus.Open)
-        val renoticed = insertNotice("STATUS-RENOTICED", future, NoticeStatus.Renoticed)
-        insertNotice("STATUS-CLOSED", future, NoticeStatus.Closed)
-        insertNotice("STATUS-AWARDED", future, NoticeStatus.Awarded)
-        insertNotice("STATUS-FAILED", future, NoticeStatus.Failed)
-        insertNotice("STATUS-CANCELLED", future, NoticeStatus.Cancelled)
+        val idByStatus =
+            NoticeStatus.entries.associateWith { status ->
+                insertNotice("STATUS-${status.name.uppercase()}", future, status)
+            }
+        val expectedIds =
+            NoticeStatus.entries
+                .filter { status -> isBiddable(status, now, future) }
+                .map { status -> idByStatus.getValue(status) }
+                .toSet()
 
         val candidateIds = source().openCandidates().map { it.id }.toSet()
 
-        candidateIds shouldBe setOf(open, renoticed)
+        candidateIds shouldBe expectedIds
     }
 
     @Test
@@ -148,6 +160,27 @@ class JdbcCandidateSourceTest : PersistenceTestSupport() {
         val orderedIds = source().openCandidates().map { it.id }
 
         orderedIds shouldBe listOf(near, sameDeadlineA, sameDeadlineB, far)
+    }
+
+    /**
+     * verifier r1 MEDIUM-1 — 기존 순서 test 넷은 표본의 `round`가 전부 `"000"`이라
+     * `notice_round ASC` 타이브레이커를 재지 못했다(그 축을 빼도 9건이 초록이었다). 같은
+     * 공고번호·같은 마감·다른 차수 표본으로 그 축만 따로 잠근다.
+     */
+    @Test
+    fun `같은 마감·같은 공고번호에서는 notice_round 오름차순이다`() {
+        val deadline = now.plusSeconds(2000)
+        val later = insertNotice("ORDER-TIE-001", deadline, round = "001")
+        val earlier = insertNotice("ORDER-TIE-001", deadline, round = "000")
+
+        source().openCandidates().map { it.id } shouldBe listOf(earlier, later)
+    }
+
+    /** verifier r1 LOW-1 — 잘못된 배선(`cap <= 0`)은 DB 오류가 아니라 생성자에서 즉시 거부된다. */
+    @Test
+    fun `cap 이 0 이하이면 생성자가 거부한다`() {
+        shouldThrow<IllegalArgumentException> { JdbcCandidateSource(dataSource(), clock, cap = 0) }
+        shouldThrow<IllegalArgumentException> { JdbcCandidateSource(dataSource(), clock, cap = -1) }
     }
 
     @Test
