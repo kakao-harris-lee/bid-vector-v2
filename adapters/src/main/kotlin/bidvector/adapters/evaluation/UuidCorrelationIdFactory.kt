@@ -1,7 +1,7 @@
 package bidvector.adapters.evaluation
 
-import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.evaluation.CorrelationIdFactory
+import bidvector.workflow.event.CorrelationId
 import java.util.UUID
 
 /**
