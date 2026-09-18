@@ -4,8 +4,9 @@
 - **브랜치/worktree**: `m6-6f4/2026-09-18` / `bid-vector-v2-m6f4`
 - **여는 결정**: 운영자 결정 ① (2026-09-18) — `OPEN-6F-WATCH-TEXT-SOURCE` 닫힘. 원문 텍스트를
   canonical 에 열로 싣는다(raw 를 판정 경로에서 읽는 안은 기각 — M3 의 raw/canonical 경계).
-- **성격**: DB 마이그레이션(되돌리기 어려운 경로) → `migration-reviewer` 게이트 필수,
-  Codex 심판은 운영자가 범위·비용을 승인하면.
+- **성격**: 스키마 파일 추가 + 도메인 조립 규칙. `migration-reviewer` 게이트는 붙인다(제약·인덱스
+  설계). **「되돌리기 어려운 경로」가 아니다** — 아래 실측 5 참조. 따라서 Codex 유료 심판의
+  자격 근거가 없다(그 분류를 착수 시점에 한 번 잘못 적었고, 실측으로 철회했다).
 
 ## 왜 (착수 조사 실측, base_sha 기준)
 
@@ -24,6 +25,23 @@
 4. **그 필드가 실제로 나르던 것은 지역 단서다.** 같은 파일이 지역 매칭에만 전체 텍스트를 쓰는
    이유를 적어 뒀다 — *지역은 그 메타데이터 필드에 정당하게 들어 있을 수 있다*. 그런데 V2 는
    그 단서를 **이미 구조화된 열로** 갖고 있다(V7 의 `demand_agency_name`·`notice_agency_name`).
+5. **대상 데이터가 없고, 채울 경로도 없다 — 이 slice 의 범위를 정하는 실측이다.**
+   - **DB 인스턴스 0.** 이 머신에 이 프로젝트의 Postgres 볼륨·컨테이너가 없고, 저장소 전체에
+     실 DB 를 가리키는 JDBC URL 이 없다(유일한 리터럴은 *일부러 없는 호스트*를 쓰는 test).
+     스키마는 `check` 의 **일회성 Testcontainers** 와 CI 의 compose(끝에 볼륨까지 삭제)에만 선다.
+   - **실행 진입점 0.** `app` 모듈의 main 소스는 경계 표식 하나뿐이고 `application` 플러그인도
+     `mainClass` 도 없다 — 수집을 돌릴 프로세스가 아직 없다(6A-1 이 세운다).
+   - **공고명 표본 0.** input fixture 119개 중 이 키를 가진 것은 1개이고, 그 1건의 값도 공고명이
+     아니라 「공고번호가 없는 행」을 만들려고 넣은 test 문자열이다.
+   - 귀결 둘: (a) V11 은 **파일을 지우면 완전히 되돌아간다** — 적용된 상태가 없으므로 「되돌리기
+     어려운 경로」가 아니다. (b) authoritative fixture 가 0건이면 **수집→canonical 배선을 잠그는
+     test 를 쓸 근거가 없다** — 만들어 놓고 진짜 값을 한 번도 본 적 없는 코드가 된다.
+     그래서 이 slice 는 **열과 조립 규칙까지**만 한다(운영자 결정 2026-09-18).
+   - 결정문의 착수 근거 「운영 데이터 0 이라 백필 비용이 지금이 최저」는 참이지만 **공허**하다 —
+     프로세스가 생기기 전까지 그 값은 계속 0 이다. 지금 해도 되는 이유이지 지금 해야 하는
+     이유는 아니다. 그래도 지금 하는 이유는 **감시 조건의 정본 자리를 먼저 세워 두면 6A-1 이
+     만드는 수집 경로가 그 자리에 붙을 뿐**이기 때문이다(반대 순서면 배선이 먼저 서고 정본이
+     나중에 와서 정본이 배선을 따라간다).
 
 ## 결정
 
@@ -41,13 +59,19 @@
     경로가 **구조적으로** 생기지 않는다.
   - 따라서 본문을 포함하는 제3의 텍스트는 V2 에 **존재하지 않는다**. capability-map STR-02 문면과
     이 차이를 evidence 에 대조로 남긴다.
-- **D-6F4-4 — 백필하지 않는다.** 열은 nullable 로 서고 수집 경로가 채운다. 운영 데이터 0 이
-  이 slice 를 지금 하는 이유다(결정문).
+- **D-6F4-4 — 백필 문제가 성립하지 않는다.** 되돌릴 행도 채울 행도 없다(실측 5). 열은 nullable
+  로 서고, 채우는 것은 수집 경로가 생기는 slice 의 일이다.
+- **D-6F4-4b — 수집→canonical 배선은 이 slice 가 하지 않는다(운영자 결정 2026-09-18).**
+  공고명 표본이 0건이라 배선을 잠그는 test 의 기대값을 authoritative 하게 세울 수 없다. 배선은
+  **표본이 생기거나 실행 경로가 생기는 slice** 가 가져간다 — `OPEN-6F4-TITLE-WIRING`.
+  이 slice 가 남기는 것은 그 배선이 붙을 **정본 자리**(열 + 조립 규칙 + 그 둘을 고정하는 test)다.
 - **D-6F4-5 — 본문이 필요해지면 선행 축이 있다.** 목록 응답에 없고 상세 URL 뒤에 있으므로
   **`OPEN-6F4-NOTICE-BODY-SOURCE`** 를 신설한다. 이 slice 는 그 축을 열지 않는다.
-- **D-6F4-6 — 공고명 키를 어댑터에 하드코딩하지 않는다.** KONEPS 원시 키는 현재 정책 데이터가
-  나르고 매퍼는 그것을 읽는다. 그 구조를 유지한다 — 키를 코드에 박으면 수집 계약 변경이 코드
-  변경이 된다.
+- **D-6F4-6 — 배선이 올 때 공고명 키를 어댑터에 하드코딩하지 않는다.** KONEPS 원시 키는 정책
+  데이터가 나르고 매퍼가 그것을 읽는 구조다(생산 쪽 필드 계약을 구성하는 코드는 현재 test 지원
+  파일에만 있다 — 실행 경로가 없기 때문이다). 이 결정은 `OPEN-6F4-TITLE-WIRING` 을 가져가는
+  slice 에 대한 **선행 제약**으로 여기 남긴다 — 키를 코드에 박으면 수집 계약 변경이 코드 변경이
+  된다.
 - **D-6F4-7 — 마이그레이션 번호는 V11 이다.** main 은 V9 까지이고 **V10 은 6A-1 계약이 선점**했다
   (`m6-6a/2026-09-17`, 미병합). 번호는 순서일 뿐이므로 이 slice 가 비켜선다. 6A-1 이 번호를
   바꾸면 이 결정을 갱신한다.
@@ -57,14 +81,14 @@
 - `adapters/src/main/resources/db/migration/V11__notice_title.sql` (신설)
 - `adapters/src/main/kotlin/bidvector/adapters/persistence/` — `Sql.kt`, `NoticeRow.kt`,
   `NoticeRowMerge.kt`, `NoticeReconstruction.kt`, `JdbcNoticeRepository.kt`
-- `adapters/src/main/kotlin/bidvector/adapters/koneps/` — 원시 키 정책과 매퍼(D-6F4-6)
-- 감시 텍스트 조립이 서는 도메인 자리(`workflow` 전략 평가 경로) 및 그 test
+- 감시 텍스트 조립이 서는 도메인 자리(`workflow` 전략 평가 경로) 및 그 test — 이 slice 의 실질
 - `adapters/src/test/kotlin/bidvector/adapters/persistence/` — `CleanMigrationColumnTest.kt`,
   `CleanMigrationCheckTest.kt`, `NoticeReconstructionTest.kt` 등 스키마 대조 test
 - `reports/evidence/m6/6f4/`
 
 ## out_of_scope
 
+- **수집→canonical 공고명 배선**(KONEPS 원시 키 정책·매퍼) — `OPEN-6F4-TITLE-WIRING`, D-6F4-4b
 - 공고 본문 수집(상세 URL 경로) — `OPEN-6F4-NOTICE-BODY-SOURCE`
 - 전략 편집·조회 endpoint(6A-1·6F-1 소유), 감시 알림 채널(6F 다른 slice)
 - 기존 59개 slice 의 evidence 문서
