@@ -3,13 +3,12 @@
 ```yaml
 milestone: M6
 slice: 6f1-strategy-persistence
-base_sha: c4d09cc   # PR #31(6C) 머지 커밋 = main
+base_sha: 8652893   # 계약 갱신 (7): rebase 뒤 재확인. origin/main, 6B-1 의 V8 포함. 원래 c4d09cc(PR #31/6C) — verifier r2 HIGH-1: rebase 지시(팀장)에 이 값 갱신이 빠졌었다(팀장 오류, 「사실 선언」 절 참고)
 head_sha: 리뷰 요청 시점의 `git rev-parse HEAD`(값을 박지 않는다)
 in_scope:
   - adapters/src/main/resources/db/migration/V9__operator_strategy.sql   # 전략 영속 표 + 개정 이력. **V8 은 6B-1**(세션), **V10 은 6A-1**(요청 감사) — 「병행 레인」 절
   - adapters/src/main/kotlin/bidvector/adapters/strategy/JdbcStrategyRepository.kt      # 계약 갱신 (2)·D-6F1-7: **패키지는 `adapters.strategy`** — `persistence` 는 workflow·strategy 참조가 게이트로 금지돼 있다(6B-1 실측)
   - adapters/src/main/kotlin/bidvector/adapters/strategy/StrategyRow.kt                 # 행 → **초안** 매핑. 도메인 타입을 직접 만들지 않는다(D-6F1-2)
-  - adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt  # 신설 패키지 전용 의존 게이트 — **6B-1 이 먼저 병합되면 그 파일에 합류**(중복 신설 금지, 계약 갱신 (2))
   - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                      # 전략 SQL 추가만(기존 문장 무편집)
   - adapters/src/main/kotlin/bidvector/adapters/persistence/ProvenanceCodec.kt          # 계약 갱신 (5)·D-6F1-8: `kindNameOf` 신설(기존 `kindOf`·`detailOf` 무편집) — 의존 위반 수정 라운드
   - adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt   # 계약 갱신 (3): 배열 컬럼 판독 헬퍼 추가(기계적 — 전략 값이 목록을 담는다)
@@ -17,7 +16,7 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt  # 같은 축(컬럼 존재·타입·NOT NULL)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt   # 같은 축(CHECK 개수)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt    # 계약 갱신 (3): 신설 표를 test 간 정리 목록에 추가(기계적)
-  - adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt # 계약 갱신 (3): **6B-1 파일과 바이트 동일**(md5 대조 실측) — 어느 쪽이 먼저 병합돼도 add/add 가 동일 내용이라 충돌하지 않는다(D-6F1-7 의 「먼저 병합되는 레인 소유」를 실무적으로 만족)
+  - adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt # 신설 패키지 전용 의존 게이트 — **6B-1 이 먼저 병합되면 그 파일에 합류**(계약 갱신 (2)). 계약 갱신 (3): **6B-1 파일과 바이트 동일**(md5 대조 실측) — 어느 쪽이 먼저 병합돼도 add/add 가 동일 내용이라 충돌하지 않는다(D-6F1-7 의 「먼저 병합되는 레인 소유」를 실무적으로 만족). rebase 뒤 실제로 6B-1 판이 채택됐다(「병합 계획」 절 rebase 실측) — **verifier r2 LOW-3 정정: 이 항목이 두 행으로 중복 등재돼 있던 것을 한 행으로 합쳤다**
   - adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt   # 왕복·개정 증가·정책 불일치 실패·빈 전략 초기값
   - reports/evidence/m6/6f1/**
   - milestone-6.md                                                                      # 6F slice 군 신설·6F-1 착수 문단(팀장 커밋)
@@ -32,10 +31,13 @@ acceptance_commands:
   - "./gradlew --no-daemon :adapters:test --tests '*JdbcStrategyRepositoryTest*' --rerun-tasks"   # S-50 — 왕복·개정·정책 불일치(캐시 우회)
   - "./tools/one-command-check.sh"                                                                # S-20 승계(6C)
 rollback: |
-  신규 파일 삭제 + 편집 둘(`Sql.kt`·`milestone-6.md`)을 base 로.
-  `git restore --source=c4d09cc --staged --worktree -- <in_scope 경로 개별 인자>`, 신규는 삭제.
+  신규 파일 삭제 + 편집을 base(`8652893`, 계약 갱신 (7))로. 목록은 손으로 적지 않고
+  `git diff --name-status 8652893..HEAD -- . ':!reports/evidence'` 로 매번 재산출한다
+  (verifier r2 HIGH-1: rebase 이전 base 로 문서화된 목록이 6B-1 의 게이트 파일을 삭제하고
+  컴파일을 깨뜨림을 실측 — 재산출은 라운드의 **마지막 내용 커밋 뒤**에 돌린다).
+  `git restore --source=8652893 --staged --worktree -- <재산출한 경로 개별 인자>`, 신규는 삭제.
   **마이그레이션 비대칭**: 적용된 DB 에는 V9 가 남고 되돌린 코드는 그 표를 쓰지 않는다. 실제 삭제는 사용자 승인 대상.
-  임시 clone ①~⑥ + 빈 컨테이너 재적용으로 실측. 정본 `reports/evidence/m6/6f1/rollback.md`.
+  임시 clone ①~⑥(컴파일·test·게이트 포함) + 빈 컨테이너 재적용으로 실측. 정본 `reports/evidence/m6/6f1/rollback.md`.
 ```
 
 작성: 2026-09-17, 세션 모델 단독. 근거: **운영자 지시 2026-09-17 「어댑터 부재는 중요한 결함이고 배선이 먼저」** ·
@@ -112,6 +114,8 @@ test 를 각각 둔다(없음 ≠ 무효). (5) 어댑터가 정책 파일을 직
 ## 하네스 레인 변경
 
 `git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(착수 시점).
+**rebase 뒤 base 갱신**(계약 갱신 (7), verifier r2 HIGH-1): `git log --oneline 8652893..HEAD --
+CLAUDE.md .claude/ docs/harness/` — 없음. 결론은 그대로이고 명령의 base 만 새 값으로 재확인했다.
 
 ## OPEN — 수령·신설
 
@@ -196,7 +200,7 @@ test 를 각각 둔다(없음 ≠ 무효). (5) 어댑터가 정책 파일을 직
 
 | 일자 | 갱신 | 사유 |
 | --- | --- | --- |
-| 2026-09-18 rebase 뒤(6) | 「병합 계획」 절에 **rebase 실측 — 예측 대조** 서브절 신설 — 예측(위험 ①·②)을 지우지 않고 실측(커밋 20→18·멈춤 넷·rebase 직후 전건 563/1 failed)으로 대조해 「예측이 전부 맞았다」를 등재 | 팀장 지시 — 「병합 전 대조를 버릴 clone 에서」 절차의 근거를 이번 실측으로 남긴다. 예측 문장은 보존(다음 slice 가 어느 예측이 맞았는지 봐야 한다) |
+| 2026-09-18 verifier r2 뒤(7) | **HIGH-1 수정** — `base_sha` 를 `c4d09cc` → `8652893`(rebase 뒤 값)로 갱신, `rollback:` 블록·「하네스 레인 변경」 절의 명령 base 를 같게 갱신, `rollback.md` 의 되돌릴 대상 목록을 새 base 기준으로 재산출. LOW-1(`ProvenanceCodec.kt` KDoc 의 결정 ID `D-6F1-5`→`D-6F1-8`)·LOW-3(in_scope 의 `StrategyAdapterDependencyTest.kt` 중복 행 병합)·MEDIUM-2(이력 표 payload 컬럼 왕복 test 신설, `JdbcStrategyRepositoryTest`)도 이 라운드에서 처리. MEDIUM-1 은 알려진 제한으로 등재(checklist.md) | verifier r2 판정 **not-ready**(HIGH-1). **팀장 오류**로 기록: rebase 지시(계약 갱신 (6))에 `base_sha`·rollback 재산출을 함께 지시하지 않아, 문서대로 rollback 을 실행하면 6B-1 이 병합한 의존 게이트 파일(이번 라운드 D-6F1-8 결함을 잡은 그 파일)이 삭제되고 컴파일이 깨짐을 verifier 가 버릴 clone 에서 실행 실측했다 | 「병합 계획」 절에 **rebase 실측 — 예측 대조** 서브절 신설 — 예측(위험 ①·②)을 지우지 않고 실측(커밋 20→18·멈춤 넷·rebase 직후 전건 563/1 failed)으로 대조해 「예측이 전부 맞았다」를 등재 | 팀장 지시 — 「병합 전 대조를 버릴 clone 에서」 절차의 근거를 이번 실측으로 남긴다. 예측 문장은 보존(다음 slice 가 어느 예측이 맞았는지 봐야 한다) |
 | 2026-09-18 rebase 뒤(5) | **D-6F1-8 신설** — `StrategyRow.kt` 의 실재 의존 위반(반환형으로만 스친 `ProvenanceKind`)을 `ProvenanceCodec.kindNameOf`(신설, non-inline)로 닫음. `ProvenanceCodec.kt` in_scope 추가. (2b) 표에 신설 public 표면 한 행 등재 | 6B-1 의 바이트코드 상수 풀 게이트(`StrategyAdapterDependencyTest`)가 rebase 뒤 처음으로 이 slice 의 production 결함을 실제로 잡았다(2/3 → 3/3 실측, 근거는 병행 세션 병합 리허설 `_workspace/m6-6f1/09_rebase_spike.md`) |
 | 2026-09-17 동결 뒤(4) | **병합 계획 절 신설** — 병합 전 대조가 찾은 위험 둘(공유 파일 넷의 위치 충돌 중 둘은 수동 해소 · 6B-1 port 시그니처 변경이 이 slice 의 test fake 를 깬다)과 해소 형태·실측 결과·절차를 등재 | 구현 레인이 버릴 clone 에서 실제 병합을 수행해 실측했다. **어느 브랜치의 CI 도 잡지 못하는 자리**라 계약에 남긴다 |
 | 2026-09-17 완료 보고 뒤(3) | in_scope 에 기계적 귀결 **여섯** 등재(배열 판독 헬퍼 · 여덟 축 게이트 셋 · test 정리 목록 · 의존 게이트 파일) — **알려진 제한이 아니라 in_scope**(slice 의 커밋 집합 = in_scope 경로의 변경) · 의존 게이트 파일이 6B-1 것과 **바이트 동일**함을 팀장이 md5 로 실측 등재 | 구현 레인 완료 보고의 「scope 에 없는 편집 다섯」 + 게이트 파일 조율. V9 가 표를 만드는 이상 그 등재 없이는 `check` 가 서지 않는 **구조적 필연**이고 우회가 아니다 |
