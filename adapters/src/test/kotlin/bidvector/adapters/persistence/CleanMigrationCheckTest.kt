@@ -34,7 +34,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
     private val expectedCheckCountByTable =
         mapOf(
             "collection_run" to 13,
-            "notice" to 12,
+            // M6/6F-4 D-6F4-1·8 — 신규(추가만). `notice_title`이 감시 키워드 매칭 입력이라
+            // (기관 열 넷과 달리) 빈 문자열이 조용히 성립하지 않도록 CHECK 하나를 더 얹는다.
+            "notice" to 13,
             "notice_audit" to 1,
             "opening_result" to 24,
             "provenance_authority" to 1,

@@ -27,7 +27,7 @@ internal object Sql {
         allocated_budget_won, allocated_budget_provenance, allocated_budget_provenance_detail,
         floor_rate_fraction, floor_rate_origin_kind, floor_rate_origin_detail,
         demand_agency_code, demand_agency_name, notice_agency_code, notice_agency_name,
-        deadline_at, revision
+        notice_title, deadline_at, revision
         """
 
     const val SELECT_NOTICE_FOR_UPDATE =
@@ -46,8 +46,8 @@ internal object Sql {
             allocated_budget_won, allocated_budget_provenance, allocated_budget_provenance_detail,
             floor_rate_fraction, floor_rate_origin_kind, floor_rate_origin_detail,
             demand_agency_code, demand_agency_name, notice_agency_code, notice_agency_name,
-            deadline_at, revision, observation_key
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+            notice_title, deadline_at, revision, observation_key
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         """
 
     const val UPDATE_NOTICE =
@@ -61,7 +61,7 @@ internal object Sql {
             allocated_budget_won = ?, allocated_budget_provenance = ?, allocated_budget_provenance_detail = ?,
             floor_rate_fraction = ?, floor_rate_origin_kind = ?, floor_rate_origin_detail = ?,
             demand_agency_code = ?, demand_agency_name = ?, notice_agency_code = ?, notice_agency_name = ?,
-            deadline_at = ?, observation_key = ?
+            notice_title = ?, deadline_at = ?, observation_key = ?
         WHERE notice_number = ? AND notice_round = ?
         """
 

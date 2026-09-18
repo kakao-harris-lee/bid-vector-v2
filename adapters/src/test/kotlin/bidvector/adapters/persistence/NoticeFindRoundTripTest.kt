@@ -9,6 +9,7 @@ import bidvector.procurement.CategoryLabel
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.procurement.NoticeTitle
 import bidvector.procurement.PersistOutcome
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
@@ -151,6 +152,69 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
 
         found.demandAgency shouldBe null
         found.noticeAgency shouldBe null
+    }
+
+    /** D-6F4-9 — 공고명 저장·복원, 원문 흔들림 보존(trim만, [NoticeTitle]과 같은 관례). */
+    @Test
+    fun `공고명이 실린 notice 를 저장하고 find 하면 그대로 복원된다`() {
+        val id = NoticeId(NoticeNumber.of("FIND-ROUNDTRIP-TITLE-001"), NoticeRound.of("000"))
+        val observation =
+            RawNoticeObservation.of(
+                mapOf(RawKey("bidNtceNo") to id.number.value, RawKey("bidNtceOrd") to id.round.value),
+                SourceEndpoint.NOTICE_LIST,
+                Instant.parse("2026-09-18T00:00:00Z"),
+            )
+        val key = appendRawObservation(observation)
+        val command =
+            NoticeCollected(
+                id = id,
+                businessCategory = null,
+                baseAmount = null,
+                estimatedAmount = null,
+                allocatedBudget = null,
+                floorRate = null,
+                deadlineAt = null,
+                openingScheduledAt = null,
+                raw = observation,
+                title = NoticeTitle.of("  2026년 정보시스템 유지보수 용역  "),
+            )
+
+        JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
+
+        val found = requireNotNull(JdbcNoticeRepository(dataSource()).find(id))
+
+        found.title shouldBe NoticeTitle.of("2026년 정보시스템 유지보수 용역")
+    }
+
+    /** D-6F4-9·8 — 공고명이 없으면 null 이 그대로 왕복된다(지어내지 않는다). */
+    @Test
+    fun `공고명이 없는 notice 는 null 이 그대로 왕복된다`() {
+        val id = NoticeId(NoticeNumber.of("FIND-ROUNDTRIP-TITLE-002"), NoticeRound.of("000"))
+        val observation =
+            RawNoticeObservation.of(
+                mapOf(RawKey("bidNtceNo") to id.number.value, RawKey("bidNtceOrd") to id.round.value),
+                SourceEndpoint.NOTICE_LIST,
+                Instant.parse("2026-09-18T00:00:00Z"),
+            )
+        val key = appendRawObservation(observation)
+        val command =
+            NoticeCollected(
+                id = id,
+                businessCategory = null,
+                baseAmount = null,
+                estimatedAmount = null,
+                allocatedBudget = null,
+                floorRate = null,
+                deadlineAt = null,
+                openingScheduledAt = null,
+                raw = observation,
+            )
+
+        JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
+
+        val found = requireNotNull(JdbcNoticeRepository(dataSource()).find(id))
+
+        found.title shouldBe null
     }
 
     private val mergeGuardId = NoticeId(NoticeNumber.of("MERGE-AGENCY-001"), NoticeRound.of("000"))

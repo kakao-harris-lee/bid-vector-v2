@@ -30,6 +30,11 @@ data class Notice internal constructor(
     val demandAgency: Agency? = null,
     /** 공고기관(D-3H-3, M3/3H-1) — [demandAgency]와 다른 축. */
     val noticeAgency: Agency? = null,
+    /**
+     * 공고명(D-6F4-9, M6/6F-4) — 기본값 `null`(D-3H-3 관례, 이 slice 밖 호출부는 수정 없이
+     * 그대로 컴파일된다). 감시 키워드 매칭 입력 조각 하나([NoticeTitle] KDoc).
+     */
+    val title: NoticeTitle? = null,
 ) {
     /** 유일한 상태 변경 경로 — 표 밖의 전이는 [NoticeTransitionOutcome.Rejected]로 관측된다. */
     fun applyEvent(event: NoticeEvent): NoticeTransitionOutcome =
@@ -52,6 +57,7 @@ data class Notice internal constructor(
                 deadlineAt = command.deadlineAt,
                 demandAgency = command.demandAgency,
                 noticeAgency = command.noticeAgency,
+                title = command.title,
             )
     }
 }
