@@ -1,0 +1,131 @@
+package bidvector.strategy
+
+import bidvector.sharedkernel.Fact
+import bidvector.sharedkernel.ReasonCode
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
+import org.junit.jupiter.api.Test
+
+private fun noBudgetRules(
+    focusRegionTerms: List<String> = emptyList(),
+    requiredKeywordTerms: List<String> = emptyList(),
+): WatchRules =
+    WatchRules(
+        focusCategories = emptySet(),
+        focusRegionTerms = focusRegionTerms,
+        excludeRegionTerms = emptyList(),
+        requiredKeywordTerms = requiredKeywordTerms,
+        excludeKeywordTerms = emptyList(),
+        budget = BudgetBound(null, null, BudgetBoundInclusivity.Inclusive),
+    )
+
+private fun subjectOf(
+    keyword: KeywordScopeText,
+    full: FullScopeText,
+): WatchSubject = WatchSubject(emptySet(), keyword, full, Fact.Absent(ReasonCode.EMPTY_INPUT))
+
+/**
+ * M6/6F-4(D-6F4-3·3b) — 감시 텍스트 조립 순수 함수. `assembleKeywordScopeText`/
+ * `assembleFullScopeText`는 이 slice의 실질이고, 어댑터(M3)에서 이 함수를 실제로 부르는
+ * 호출자는 아직 없다(`OPEN-6F4-TITLE-WIRING`, D-6F4-4b — 수집→canonical 배선이 이 slice
+ * 밖이다). 그래서 이 test는 함수 자체의 조립 규칙과, `WatchRules.evaluate`를 거친 행동까지
+ * 잠근다 — legacy가 주석으로만 막던 오탐을 V2는 구조로 막는다는 것이 요점이다.
+ */
+class WatchTextAssemblyTest {
+    @Test
+    fun `키워드 대상은 공고명과 공종을 공백으로 이어 붙인다`() {
+        val text = assembleKeywordScopeText(noticeTitle = "정보시스템 유지보수 용역", businessCategoryLabel = "기술용역")
+        text shouldBe KeywordScopeText("정보시스템 유지보수 용역 기술용역")
+    }
+
+    @Test
+    fun `공고명만 있으면 키워드 대상은 그 값만 싣는다`() {
+        assembleKeywordScopeText(noticeTitle = "도로 보수 공사", businessCategoryLabel = null) shouldBe
+            KeywordScopeText("도로 보수 공사")
+    }
+
+    @Test
+    fun `공종만 있으면 키워드 대상은 그 값만 싣는다`() {
+        assembleKeywordScopeText(noticeTitle = null, businessCategoryLabel = "공사") shouldBe
+            KeywordScopeText("공사")
+    }
+
+    /** D-6F4-4b — 값이 없으면 없는 것이다. 빈 문자열을 지어내지 않고 `""`으로 닫는다. */
+    @Test
+    fun `공고명과 공종이 둘 다 없으면 키워드 대상은 빈 문자열이다`() {
+        assembleKeywordScopeText(noticeTitle = null, businessCategoryLabel = null) shouldBe KeywordScopeText("")
+    }
+
+    @Test
+    fun `지역 대상은 키워드 조각 뒤에 발주기관명 둘을 더 잇는다`() {
+        val text =
+            assembleFullScopeText(
+                noticeTitle = "정보시스템 유지보수 용역",
+                businessCategoryLabel = "기술용역",
+                demandAgencyName = "해양수산부",
+                noticeAgencyName = "국가정보자원관리원",
+            )
+        text shouldBe FullScopeText("정보시스템 유지보수 용역 기술용역 해양수산부 국가정보자원관리원")
+    }
+
+    /** D-6F4-4b — 네 조각이 전부 없으면 지역 대상도 빈 문자열이다. */
+    @Test
+    fun `네 조각이 전부 없으면 지역 대상도 빈 문자열이다`() {
+        assembleFullScopeText(null, null, null, null) shouldBe FullScopeText("")
+    }
+
+    /**
+     * D-6F4-3 — legacy가 주석으로만 막던 오탐(발주기관명이 필수 키워드를 거짓 만족)을
+     * V2는 구조로 막는다: [assembleKeywordScopeText]는 기관명 인자 자체가 없다. 같은 값이
+     * 지역 규칙에는 정당하게 보인다.
+     */
+    @Test
+    fun `발주기관명은 필수 키워드를 만족시키지 않지만 같은 값이 지역 규칙에는 보인다`() {
+        val keyword = assembleKeywordScopeText(noticeTitle = "정보시스템 유지보수 용역", businessCategoryLabel = "기술용역")
+        val full =
+            assembleFullScopeText(
+                noticeTitle = "정보시스템 유지보수 용역",
+                businessCategoryLabel = "기술용역",
+                demandAgencyName = "해양수산부",
+                noticeAgencyName = null,
+            )
+        val subject = subjectOf(keyword, full)
+
+        val keywordVerdict = noBudgetRules(requiredKeywordTerms = listOf("해양수산부")).evaluate(subject)
+        keywordVerdict shouldBe WatchVerdict.Rejected(setOf(WatchRuleId.RequiredKeyword))
+
+        val regionVerdict = noBudgetRules(focusRegionTerms = listOf("해양수산부")).evaluate(subject)
+        regionVerdict.shouldBeInstanceOf<WatchVerdict.Passed>()
+        regionVerdict.matched shouldBe setOf(WatchRuleId.FocusRegion)
+    }
+
+    /**
+     * D-6F4-3b — V2 `qualification_text`(면허제한 오퍼레이션 응답: 면허명·허용업종·업종분야)는
+     * [assembleKeywordScopeText]의 인자 자체가 아니다. 면허 어휘를 필수 키워드로 걸어도
+     * 공고명·공종에 없으면 매칭되지 않는다 — 요건 텍스트가 애초에 조립에 들어올 자리가
+     * 없다는 것을 행동으로 보인다(legacy `requirements`처럼 업무 서술이 아니라는 실측,
+     * scope.md D-6F4-3b).
+     */
+    @Test
+    fun `면허 요건 어휘는 필수 키워드를 만족시키지 않는다`() {
+        val keyword = assembleKeywordScopeText(noticeTitle = "정보시스템 유지보수 용역", businessCategoryLabel = "기술용역")
+        val full = assembleFullScopeText("정보시스템 유지보수 용역", "기술용역", null, null)
+        val subject = subjectOf(keyword, full)
+
+        val verdict = noBudgetRules(requiredKeywordTerms = listOf("전기공사업")).evaluate(subject)
+
+        verdict shouldBe WatchVerdict.Rejected(setOf(WatchRuleId.RequiredKeyword))
+    }
+
+    /** 값이 없는 축(공고명·공종 둘 다 null)에서도 조립·판정이 예외 없이 값으로 흐른다. */
+    @Test
+    fun `공고명과 공종이 둘 다 없어도 감시 판정은 예외 없이 값으로 흐른다`() {
+        val keyword = assembleKeywordScopeText(noticeTitle = null, businessCategoryLabel = null)
+        val full = assembleFullScopeText(null, null, demandAgencyName = "해양수산부", noticeAgencyName = null)
+        val subject = subjectOf(keyword, full)
+
+        noBudgetRules(requiredKeywordTerms = listOf("기술용역")).evaluate(subject) shouldBe
+            WatchVerdict.Rejected(setOf(WatchRuleId.RequiredKeyword))
+        noBudgetRules(focusRegionTerms = listOf("해양수산부")).evaluate(subject).shouldBeInstanceOf<WatchVerdict.Passed>()
+    }
+}
