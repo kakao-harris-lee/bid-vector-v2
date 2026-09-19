@@ -117,11 +117,13 @@
   안전은 같다.** 갈리는 것은 앞으로다 — V12 뒤에 V11 을 넣으면 「버전 순서 == 병합 순서」 불변식이
   **파일 이력에 영구히 깨진 채** 남고, V12 를 적용한 긴 수명 DB 가 생기는 첫날 `outOfOrder=false`
   에서 막힌다. 재번호 비용은 파일명 하나이므로 남길 이유가 없다.
-  V13 이 이 slice 보다 먼저 병합된다는 전제이며, 순서가 뒤집히면 그때 다시 잡는다.
+  **전제는 V13(PR #39)이 이 slice 보다 먼저 병합되는 것이고, 기계적 강제는 없다**(verifier r2 MEDIUM-2).
+  그러므로 **병합 직전에 `main` 의 마이그레이션 목록을 다시 확인**하고, V13 이 아직 없으면 그 시점에
+  번호를 다시 잡는다 — 병합 순서 확인을 사람의 기억이 아니라 **절차의 한 단계**로 둔다.
 
 ## in_scope
 
-- `adapters/src/main/resources/db/migration/V11__notice_title.sql` (신설)
+- `adapters/src/main/resources/db/migration/V14__notice_title.sql` (신설 — 착수 시 V11, D-6F4-7 로 재번호)
 - `adapters/src/main/kotlin/bidvector/adapters/persistence/` — `Sql.kt`, `NoticeRow.kt`,
   `NoticeRowMerge.kt`, `NoticeReconstruction.kt`, `JdbcNoticeRepository.kt`
 - `procurement/` — canonical fact 와 조립 커맨드의 공고명 슬롯(기본값 null, D-6F4-9)
