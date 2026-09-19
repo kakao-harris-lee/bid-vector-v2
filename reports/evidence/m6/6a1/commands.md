@@ -37,31 +37,46 @@ acceptance_commands(scope.md) 전건 + 리뷰 요청 조건 점검. 출력 전�
 각 항목은 production/test 파일을 임시로 mutate해 대상 test가 RED로 떨어지는지 확인한
 뒤 `cp` 백업본으로 원복했다(`git diff --stat`으로 원복 후 변경 없음을 매번 확인).
 
+**6F-4 하네스 규율(변이가 실제로 적용됐는지 먼저 잰다) 반영 — 2026-09-19 재실측.**
+아래 일곱 항목 전부, mutate 직후 **`git diff --numstat`으로 변경 라인 수가 0이 아님을
+먼저 확인한 뒤에만** test를 돌렸다(6F-4가 셸 heredoc의 유니코드 이스케이프가 실제
+제어문자로 치환돼 변이가 적용되지 않은 채 BUILD SUCCESSFUL이 난 것을 겪었다 — 같은
+함정 방지). 아래 각 항목의 `numstat`은 그 재실측에서 나온 실제 값이다.
+
 - **우회 (1)**(기본 거부·기계 전수): `OperatorCredentialFilter` urlPatterns를 `/api/strategy`로
-  좁히고 새 `@RestController`(`/api/new-unprotected-endpoint`)를 임시 추가 →
-  `OperatorAuthenticationTest`의 「등록된 모든 endpoint가…기계 전수」 RED(expected 401
-  but was 500, 새 경로가 인증 밖으로 태어남을 잡음).
+  좁히고 새 `@RestController`(`/api/new-unprotected-endpoint`)를 임시 추가(`numstat`:
+  `9 1 HttpTestSupport.kt`) → `OperatorAuthenticationTest`의 「등록된 모든 endpoint가…
+  기계 전수」 RED(expected 401 but was 200, 새 경로가 인증 밖으로 태어남을 잡음).
 - **우회 (2)**(audit이 성공 경로에만): `HttpTestApplication`의 두 필터 `order`를 서로
-  바꿔 인증 필터가 audit 필터보다 바깥이 되게 함 → `RequestAuditFilterTest`의 「인증
-  실패 요청도 audit 행을 남긴다」 RED(expected 1 but was 0).
+  바꿔 인증 필터가 audit 필터보다 바깥이 되게 함(`numstat`: `2 2 HttpTestSupport.kt`) →
+  `RequestAuditFilterTest`의 「인증 실패 요청도 audit 행을 남긴다」 RED(expected 1 but
+  was 0).
 - **우회 (3)**(error body 예외 메시지 노출): `ErrorMapping.forThrowable`의 기본 분기를
-  `throwable.message`를 싣도록 수정 → `RequestAuditFilterTest`의 「컨트롤러 예외도…노출하지
-  않는다」 RED(expected false but was true, 내부 문구가 응답에 실림).
-- **우회 (4)**(상수 시간 비교): `constantTimeEquals`를 `presented == expected`로 치환 →
-  `ConstantTimeComparisonStructureTest` RED(`MessageDigest.isEqual` 상수 풀 항목 부재).
+  `throwable.message`를 싣도록 수정(`numstat`: `1 1 ErrorBody.kt`) →
+  `RequestAuditFilterTest`의 「컨트롤러 예외도…노출하지 않는다」 RED(expected false but
+  was true, 내부 문구가 응답에 실림).
+- **우회 (4)**(상수 시간 비교): `constantTimeEquals`를 `presented == expected`로 치환
+  (`numstat`: `1 4 OperatorCredentialFilter.kt`) → `ConstantTimeComparisonStructureTest`
+  RED(expected true but was false — `MessageDigest.isEqual` 상수 풀 항목 부재).
 - **D-6A1-17**(fail-closed): `RequestAuditFilter`의 `when`에서 `auditOutcome.isFailure`
-  분기를 제거(audit 실패를 무시) → `RequestAuditFilterTest`의 「audit 쓰기 실패는
-  fail-closed다」 RED(expected 500 but was 200, 원 조회 결과가 그대로 나감).
+  분기를 제거(audit 실패를 무시, `numstat`: `0 4 RequestAuditFilter.kt`) →
+  `RequestAuditFilterTest`의 「audit 쓰기 실패는 fail-closed다」 RED(expected 500 but was
+  200, 원 조회 결과가 그대로 나감).
 - **우회 (6) / D-6A1-20 ⓑ**(OpenAPI 완전 일치·깊이): `StrategyReadResponse`에 여분 필드
-  `mutationExtraField`(기본값 있음, 호출부 무편집) 추가 → `OpenApiContractTest`의 「200
-  응답의 최상위 키 집합이…완전히 일치한다」 RED(집합 불일치). 별도로 YAML 스키마에
-  `mutationNested`(`type: object`) 속성을 추가 → 「D-6A1-20 ⓑ…중첩 object 속성을 갖지
-  않는다」 RED(`StrategyReadResponse.mutationNested` 검출) — 문서 축·값 축 둘 다 변이로
-  확인.
+  `mutationExtraField`(기본값 있음, 호출부 무편집, `numstat`: `1 0
+  StrategyReadController.kt`) 추가 → `OpenApiContractTest`의 「200 응답의 최상위 키
+  집합이…완전히 일치한다」 RED(집합 불일치). 별도로 YAML 스키마에
+  `mutationNested`(`type: object`) 속성을 추가(`numstat`: `5 0
+  bidvector-operator-api.yaml`) → 「D-6A1-20 ⓑ…중첩 object 속성을 갖지 않는다」
+  RED(`StrategyReadResponse.mutationNested` 검출) — 문서 축·값 축 둘 다 변이로 확인.
 - **D-6A1-21**(디스패치 실측): `RequestAuditFilterTest`의 `@SpringBootTest(properties=[])`로
-  두 설정(`throw-exception-if-no-handler-found`·`add-mappings`)을 제거 → 「미매핑
-  경로도…디스패치에서 끝나고」 RED(expected 404 but was 500 — 두 설정이 실제로 이 슬라이스
-  설계의 전제임을 확인, 가정이 아니라 실측).
+  두 설정(`throw-exception-if-no-handler-found`·`add-mappings`)을 제거(`numstat`: `1 1
+  RequestAuditFilterTest.kt`) → 「미매핑 경로도…디스패치에서 끝나고」 RED(expected 404
+  but was 500 — 두 설정이 실제로 이 슬라이스 설계의 전제임을 확인, 가정이 아니라 실측).
+
+재실측 뒤 `git status --porcelain`·`git diff --numstat`(인자 없음, 전체) 둘 다 빈
+출력으로 완전 원복을 확인했고, 그 상태에서 `./gradlew --no-daemon check`를 다시 돌려
+BUILD SUCCESSFUL을 재확인했다.
 
 ## 비밀값 스캔(참조형)
 
@@ -97,6 +112,45 @@ git status --porcelain -- <in_scope 경로 개별 인자>
   잡는 것을 확인한 뒤, 그 줄만 있는 유일한 변경이라 `git checkout -- app/build.gradle.kts`로
   절삭(다른 미커밋 편집이 없었음을 `git status` 직전에 확인했다 — 심은 줄 외 편집이 있는
   일반적인 경우 이 명령은 쓰지 않는다, evidence-pack 규격).
+
+## main 흡수 (계약 갱신 (6)(7) 지시 반영, 2026-09-19)
+
+```
+git fetch origin main
+git merge origin/main --no-edit
+```
+- exit: 0
+- 핵심 결과: `자동 병합`(conflict marker 0건) — `CleanMigrationCheckTest.kt`·
+  `CleanMigrationColumnTest.kt`·`milestone-6.md` 셋이 6F-4(`V14__notice_title.sql`)와
+  겹쳤으나 hunk가 서로 다른 자리(내 `api_request_audit` 항목 vs 그쪽 `notice_title`
+  항목)라 자동 해소됐다. `gate-tests.properties`·`Sql.kt`는 실제로는 겹치지 않았다
+  (팀장 사전 경고와 달리 6F-4가 그 두 파일을 이 range에서 건드리지 않음, 병합 뒤
+  `git show`로 확인). 병합 뒤 `./gradlew --no-daemon check` 재실행 — BUILD SUCCESSFUL
+  (336 tasks, 126 executed·210 up-to-date).
+
+## D-6A1-22/23/24 반영 — 신설 패키지 게이트 공백 시정
+
+계약 갱신 (6)이 지적한 게이트 공백을 닫았다: `bidvector.adapters.audit` 패키지에
+형제 셋(`evaluation`·`qualification`·`profile`)과 같은 형태의 의존 게이트 +
+등재 완결성 게이트를 신설.
+
+- 신설: `AuditAdapterDependencyTest.kt`(허용 루트 = 자기 패키지 하나 — `ApiAuditStore`/
+  `ApiAuditSql`이 domain·workflow 타입을 참조하지 않는다, 실측), `AuditGateRegistrationTest.kt`
+  (`ProfileGateRegistrationTest`와 동형).
+- 등재: `config/quality/gate-tests.properties`의 `gate.tests.adapters`에 둘 추가.
+
+**변이 실측(D-6A1-22가 요구한 그대로)**:
+- 금지 루트 전체 한정 좌표 참조: `ApiAuditStore.kt`에 `bidvector.adapters.persistence.Sql`
+  객체 참조(오브젝트 자체, `const val`이 아니다 — `const val`로 먼저 시도했더니 컴파일러
+  인라인으로 상수 풀에서 사라져 게이트가 못 봤다, 실측으로 확인 뒤 오브젝트 참조로
+  교체)를 삽입(`numstat`: `2 0`) → `AuditAdapterDependencyTest` RED(`["bidvector.adapters
+  .persistence.Sql", "...Sql.INSTANCE"]` 검출). 원복 확인(`numstat` 0).
+- 등재 삭제: `gate-tests.properties`에서 `AuditGateRegistrationTest` 자신의 등재 줄을
+  제거(`numstat`: `1 0`) → `AuditGateRegistrationTest` RED(자기 자신이 discovered에는
+  있지만 등재에는 없음을 검출). 원복 확인.
+
+재실측 뒤 `./gradlew --no-daemon check` — BUILD SUCCESSFUL(336 tasks, 60 executed·276
+up-to-date). 비밀값 스캔(참조형, 신설 파일 셋) — exit 1(매치 없음).
 
 ## 참고 — 하네스 레인 변경
 
