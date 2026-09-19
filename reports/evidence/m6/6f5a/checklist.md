@@ -188,6 +188,22 @@ V2 신설 capability). **D-6F5-11(verifier r1 LOW-1 뒤 정정)** — 착수 판
 **형제 위임**한다(`internal`=모듈 범위라 파일 편집·scope 확장 없이 가능했다) — NULL과
 「빈 배열」의 구분(D-6F5-2 계약)만 `JdbcRequirementStore.kt`가 더한다.
 
+**D-6F5-27(위임이 아니라 사본), D-6F5-32(r6 LOW-1, 근거 정정)** — 병합이 만든
+`CleanMigrationPrivilegeTest.kt`의 `queryStrings`는 원본 `CleanMigrationTest.queryStrings`
+(축1·축5가 계속 씀)를 위임하지 않고 **사본**으로 둔다. 좁은 이유(참)는
+`PersistenceTestSupport.dataSource()`가 `protected`라 클래스 경계를 넘는 위임이 안
+된다는 것뿐이다 — 처음 든 근거 둘은 **틀렸다**: ⓐ 「이 패키지의 기존 관례도 이미
+사본이다」는 거짓이다 — `CleanMigrationCheckTest`의 `queryConstraintDef`·
+`queryCheckBodies`는 이 헬퍼의 사본이 아니라 **다른 질의를 하는 별개 헬퍼**이고,
+`fun queryStrings`는 이 저장소에 **정확히 이 두 파일**뿐이라 **그 중복은 이 병합이
+처음 만들었다**(전례가 없다) ⓑ 막히지 않는 **제3안**이 있었다 —
+`PersistenceTestSupport`에 `protected fun`으로 올리는 것(그 자리에 `dataSource()`가
+이미 있고 그 파일은 in_scope다). 사본 선택 자체는 유지한다 — 11줄짜리 배관이고
+`PersistenceTestSupport`는 6F-4가 지금 편집 중이라 기반 클래스를 건드리는 비용이
+크다. **D-6F5-11이 「회피가 필요하지 않았다」로 code-reviewer HIGH를 받아들인
+slice에서, 같은 물음에 부정확한 근거로 답을 세우면 안 된다는 원칙**을 여기서도
+지킨다 — 선택은 그대로 두되 근거를 사실로 고친다.
+
 ## golden-manifest — N/A
 
 fixture corpus를 소비하지 않는다. 왕복·판정 test 전부 합성 도메인 값(`RequirementRow`·
