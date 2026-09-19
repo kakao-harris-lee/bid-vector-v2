@@ -1,13 +1,14 @@
 # M6 / 6F-4 — 감시 대상 텍스트를 canonical 에 싣는다
 
-- **base_sha**: `edeaa9a3`(2차 갱신) — 착수는 `48cb072`, 1차 흡수 병합으로 `ede5d5b`(6F-2 등),
-  slice 진행 중 `main` 이 다시 전진해(6F-6, PR #38) **2차 흡수 병합**했다. 되돌리기 목록·
-  `git restore --source` 는 **갱신된 이 값**을 기준으로 산출한다. 겹친 파일 다섯
-  (`CleanMigrationTest.kt`·`CleanMigrationColumnTest.kt`·`CleanMigrationCheckTest.kt`·
-  `PersistenceTestSupport.kt`·`gate-tests.properties`) 은 전부 자동 병합됐다(양쪽이 각자
-  더한 자리라 「둘 다 취한다」로 해소 — 자동 병합 결과를 grep 으로 「내 줄 있음」·「남의 줄
-  남음」 둘 다 확인). `milestone-6.md` 는 유일하게 수동 충돌(둘 다 보존, 순서만 정리)했다.
-  자동 병합의 의미 정합은 acceptance 전건이 판정한다(자동 병합 성공은 의미 정합이 아니다).
+- **base_sha**: `128f9cd3`(3차 갱신) — 착수는 `48cb072`, 1차 흡수로 `ede5d5b`(6F-2 등), 2차
+  흡수로 `edeaa9a3`(6F-6, V12), slice 진행 중 `main` 이 다시 전진해(6F-5-a, PR #39, V13)
+  **3차 흡수 병합**했다. 되돌리기 목록·`git restore --source` 는 **갱신된 이 값**을 기준으로
+  산출한다. 충돌 하나(`CleanMigrationCheckTest.kt`, 양쪽이 같은 자리에 새 test 를 더한
+  형태) — 「둘 다 취한다」로 수동 해소(내 test 1 + 그쪽 test 2, `grep -c "@Test"` 로 7개
+  확인). 나머지 파일(`Sql.kt`·`CleanMigrationColumnTest.kt`)은 자동 병합, `milestone-6.md`도
+  자동 병합(양쪽 내용 grep 으로 확인). 자동 병합의 의미 정합은 acceptance 전건이 판정한다
+  (자동 병합 성공은 의미 정합이 아니다). V13 이 먼저 병합되며 D-6F4-7 의 재번호(V11→V14)
+  전제가 충족됐다(팀장 갱신).
   *이 한 줄이 2026-09-18 하네스 규율이 새로 요구하는 것이다 — base 가 움직이면 목록의 기준도
   함께 움직이고, 그것을 놓친 것이 M6 에서 네 번 재발한 결함의 실제 원인이었다.*
 - **브랜치/worktree**: `m6-6f4/2026-09-18` / `bid-vector-v2-m6f4`
