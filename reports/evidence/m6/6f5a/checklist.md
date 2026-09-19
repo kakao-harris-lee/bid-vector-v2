@@ -57,9 +57,6 @@ scope.md 「경계로 처리」 둘을 실측한다(계약이 요구한 실측 �
 - **마이그레이션 병합 순서 자동 게이트 없음**(`OPEN-MIGRATION-ORDER-GATE`, D-6F5-13) —
   받는 쪽 하네스 레인, 실 배선(`OPEN-6F-ASSEMBLY`) 전에 닫아야 한다. 이 slice가 새로
   만드는 위험이 아니라 6F-4·6F-6과 함께 쌓인 것을 여기서 처음 등재만 한다.
-- **동시 쓰기 충돌 무방어** — `save()`는 delete-then-insert 단일 트랜잭션일 뿐 낙관적
-  잠금이 없다. 6F-5-a는 쓰기 호출자를 하나도 배선하지 않아(`OPEN-6F-ASSEMBLY`) 지금은
-  동시 호출 경로 자체가 없다 — 6F-5-b가 실 호출자를 배선할 때 재평가 대상.
 - **`OPEN-GATE-REGISTRATION-STALE-INPUT`을 이 slice의 신설 완결성 게이트
   (`QualificationGateRegistrationTest`)도 물려받는다**(scope.md 그대로 — verifier r1
   HIGH-2 계열 한계, 등재된 test class가 실제로 도는지의 반대 방향인 "등재 안 된 class가
