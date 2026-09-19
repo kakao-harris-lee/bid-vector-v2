@@ -14,8 +14,12 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/http/StrategyReadController.kt  # 현 전략 조회 endpoint(읽기 전용) — 유일한 endpoint
   - app/src/main/kotlin/bidvector/app/wiring/PersistenceWiring.kt     # DataSource·Flyway·repository 조립(값은 환경변수, 기본값 없음)
   - adapters/src/main/resources/db/migration/V15__api_audit.sql   # 요청 감사 표. **번호는 고정값이 아니라 정의다(계약 갱신 (4) D-6A1-12)** — 「PR 시점 main 최대 + 선점 통보 회피」. 현재 기대값 V15(main 최대 V13 · 6F-4 가 V14 선점). **V10·V11 공석을 줍지 않는다**
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/ApiAuditStore.kt            # 감사 표 쓰기(추가 전용)
-  - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                      # 감사 SQL 추가만
+  - adapters/src/main/kotlin/bidvector/adapters/audit/**                                # **패키지 신설**(계약 갱신 (6) D-6A1-22·23) — `ApiAuditStore`(추가 전용)·`ApiAuditSql`. Sql.kt 는 무편집(sizeGate 회피, EventSql·RequirementSql 선례)
+  - adapters/src/test/kotlin/bidvector/adapters/audit/**                                # 왕복 test + **의존 게이트 + 등재 완결성 게이트**(D-6A1-22 — 신설 패키지는 한 벌이다)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigration*Test.kt      # 스키마 스냅샷 래칫 넷(표를 더하면 반드시 따라 움직인다)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt   # TRUNCATE 목록 추가(기계적)
+  - config/quality/gate-tests.properties                                                # 신설 게이트 test 등재(추가만) — 공유 파일
+  - app/src/test/kotlin/bidvector/app/compatibility/BootCompatibilitySmokeTest.kt       # spring-boot-starter-web 을 expectedModules 에 등재(D-6A1-16)
   - app/src/test/kotlin/bidvector/app/http/**               # 인증(없는·틀린·맞는 토큰) · audit 행 생성 · error body 형태 · 조회 응답 · 토큰이 로그·응답에 안 실림
   - openapi/bidvector-operator-api.yaml                     # OpenAPI 단일 출처(수작성) + 구현과의 대조 test
   - gradle/libs.versions.toml                               # spring-boot-starter-web 좌표 추가만
@@ -157,6 +161,27 @@ OpenAPI 를 `Set.equals` 로 완전 일치). 재사용 조사도 충분하다 �
 **조사가 확인한 사실 하나를 등재한다** — Flyway 기동 배선은 **production 코드에 선례가 없다**
 (`PersistenceTestSupport` 가 test 전용으로만 쓴다). `PersistenceWiring` 이 그 관례를 **처음 production 에
 놓는다**. 재사용이 아니라 **첫 배선**이므로 그 사실을 알려진 제한과 리뷰 요청에 적는다.
+
+## 계약 갱신 (6) — 구현 완료 뒤 in_scope 대조 (2026-09-19, 팀장)
+
+구현 레인이 완료를 보고했고(HEAD `986c3c50`) 팀장이 **실제 변경 파일을 in_scope 와 대조**했다. **계약이
+예상하지 못한 자리 셋**이 나왔고 그중 **하나는 게이트 공백**이다. 「수정 라운드가 만드는 새 파일은 in_scope
+와 대조해 계약을 갱신한다」(반복 사각)의 적용이다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6A1-22**(**게이트 공백 — 신설 어댑터 패키지에 의존 게이트가 없다**) | `bidvector.adapters.audit` 패키지 신설에 **바이트코드 상수 풀 의존 게이트 + `gate-tests.properties` 등재 + 등재 완결성 게이트**를 **한 벌로** 낸다(형제 셋과 같은 형태). **닫힘은 변이로만** 판정한다 — 그 패키지에서 **금지 루트를 전체 한정 좌표로** 참조해 RED 인지, 게이트 파일을 **삭제**해 완결성 게이트가 RED 인지 | 계약은 `ApiAuditStore` 를 **`adapters/persistence/`** 에 두라고 적었다. 구현은 팀장의 `Sql.kt` 분리 조언(`sizeGate` 회피)을 따라 **새 패키지로 갔고**, 그 이동이 **`PersistenceAdapterDependencyTest` 의 적용 범위 밖으로 나가는 것**임을 아무도 짚지 않았다. 형제 패키지는 전부 한 벌을 갖는다 — `evaluation`(6F-2) · `qualification`(6F-5-a) · `profile`(6F-6), **D-6F5-6 이 그것을 규율로 적었다**. 지금 `adapters/test/.../audit/` 에는 `ApiAuditStoreTest` 하나뿐이다. **패키지를 옮기면 게이트 적용 범위가 따라오지 않는다** — 6F-5-a r2 가 「술어의 범위가 계약의 선언보다 좁다」로 HIGH 를 받은 것과 **같은 축의 반대 방향**(코드가 술어 밖으로 나갔다) |
+| **D-6A1-23**(in_scope 를 실제에 맞춘다) | 계약의 `adapters/…/persistence/ApiAuditStore.kt`·`…/persistence/Sql.kt` 두 줄을 **`adapters/…/audit/**`** 로 바꾼다(`ApiAuditSql.kt`·`ApiAuditStore.kt` + 신설 게이트들 + `ApiAuditStoreTest`). 그리고 계약이 빠뜨린 **스키마 스냅샷 래칫 넷**(`CleanMigration{,Check,Column,Privilege}Test`)·**`PersistenceTestSupport`**(TRUNCATE 목록)·**`config/quality/gate-tests.properties`**·**`app/…/compatibility/BootCompatibilitySmokeTest.kt`** 를 in_scope 에 넣는다 | `Sql.kt` 는 **무편집**이 됐다(감사 SQL 이 `ApiAuditSql` 로 갔다) — 그 편이 옳다(6F-4 도 `Sql.kt` 를 늘리고, 직전 병합에서 두 레인의 합이 `sizeGate` 를 울린 실측이 있다). 나머지 넷은 **표를 하나 더하면 반드시 따라 움직이는 자리**인데 계약이 이름을 안 적었다 — 6B-1·6F-1·6F-2·6F-5-a·6F-6 이 전부 같은 파일들을 만졌으므로 **예측 가능했던 누락**이다 |
+| **D-6A1-24**(test 전용 좌표 셋을 등재한다) | `spring-boot-test`·`spring-boot-resttestclient`·`spring-boot-restclient` 를 in_scope 의 `gradle/libs.versions.toml` 아래 **test 전용**으로 명시 등재한다. **`compatibilitySmoke.expectedModules` 에는 올리지 않는다**(production 좌표가 아니다). 그 판단 근거를 알려진 제한에 적는다 | 구현 실측: Boot 4.1 에서 `TestRestTemplate` 이 `spring-boot-resttestclient` 로 옮겨졌는데 **그 모듈의 선언된 의존 그래프에 `RestTemplateBuilder` 가 빠져 있어**(`NoClassDefFoundError`) 셋째 좌표를 직접 채워야 했다. `@AutoConfigureTestRestTemplate` 자동 배선도 `@ConditionalOnMissingBean` 타입 추론 예외를 내 우회했다. **이것은 Boot 쪽 결함으로 판단된 우회**이므로 **사실과 판단 근거를 evidence 에 남긴다** — 다음 Boot 상향에서 되돌릴 수 있는지 보는 자리다 |
+
+**팀장이 확인한 것(실측)** — HEAD `986c3c50` clean · 마이그레이션 `V15__api_audit.sql`(정의대로) · `Sql.kt`
+무편집 · `gate-tests.properties` 에 신설 test 다섯 등재(`adapters.audit.ApiAuditStoreTest` 포함).
+
+**아직 안 된 것 — `main` 미흡수.** merge-base 가 `128f9cd3` 이고 `origin/main` 은 **`1881c82c`**(6F-4, **V14**)
+다. 팀장이 **두 번** 지시했으나 흡수되지 않은 채 구현 여섯 커밋이 쌓였다. **이 사실을 그대로 적는다** —
+직전 slice 가 늦은 흡수로 충돌 7 hunk + `sizeGate` 둘을 한꺼번에 맞았고, 이 레인은 6F-4 와 **`CleanMigration*`
+넷·`PersistenceTestSupport`·`gate-tests.properties`** 를 공유한다(위 D-6A1-23 이 in_scope 로 편입한 바로 그
+파일들). **검증 전에 흡수한다.**
 
 ## 하네스 레인 변경
 
