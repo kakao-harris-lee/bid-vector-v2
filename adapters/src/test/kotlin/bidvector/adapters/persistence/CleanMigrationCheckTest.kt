@@ -119,6 +119,22 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
         body shouldBe expected
     }
 
+    /**
+     * 팀장 지적(`OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`, 6F-6 세션 실측) — `any { contains ... }`
+     * 형태(위 COL-06/H-3 test)는 CHECK 를 제자리에서 항진명제로 약화해도 통과한다. V14 의
+     * 문자 클래스가 verifier r2·팀장 2차 지적으로 두 번 좁아졌을 때도 개수 축(축8 CHECK
+     * 개수)은 계속 초록이었다 — `outbox_state_check`·`edit_session_state_check`(위 두 test)와
+     * 같은 관례로 본문을 **정확히** 고정한다. 클래스가 좁아지는 순간 이 test 가 먼저 붉어진다.
+     */
+    @Test
+    fun `축8 부가 — notice_notice_title_check 본문이 V4 bracket 과 정확히 같은 문자 클래스로 고정된다(D-6F4-1)`() {
+        val body = queryConstraintDef("notice_notice_title_check")
+        val expected =
+            "CHECK (((notice_title IS NULL) OR (notice_title ~ '[^\\u0009-\\u000D\\u001C-\\u001F\\u0020\\u00A0" +
+                "\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]'::text)))"
+        body shouldBe expected
+    }
+
     private fun queryConstraintDef(constraintName: String): String =
         dataSource().connection.use { connection ->
             connection
