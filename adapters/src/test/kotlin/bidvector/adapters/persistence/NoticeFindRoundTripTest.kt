@@ -25,8 +25,10 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.VatTreatment
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import org.postgresql.util.PSQLException
 import java.math.BigDecimal
 import java.time.Instant
 
@@ -217,16 +219,87 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
         found.title shouldBe null
     }
 
+    /**
+     * verifier r2 MEDIUM-1 — V11 CHECK(공백류 정규식으로 교체됨, V4의 `reserve_price_sequence`
+     * 선례와 같은 형태)와 `NoticeTitle.of`가 **같은 입력 집합에 같은 답**을 낸다. 빈 문자열뿐
+     * 아니라 공백류(ASCII 공백·탭·개행·NBSP·전각 공백)도 DB 직접 UPDATE 로는 거부되고,
+     * `NoticeTitle.of`도 같은 값에 `null`을 낸다 — 저장은 non-null 인데 복원은 부재인
+     * 비대칭(verifier r2 실측)을 재현하지 않는다.
+     */
+    @Test
+    fun `notice_title CHECK 와 NoticeTitle of 는 공백 판정이 일치한다`() {
+        val id = NoticeId(NoticeNumber.of("TITLE-CHECK-001"), NoticeRound.of("000"))
+        val observation =
+            RawNoticeObservation.of(
+                mapOf(RawKey("bidNtceNo") to id.number.value, RawKey("bidNtceOrd") to id.round.value),
+                SourceEndpoint.NOTICE_LIST,
+                Instant.parse("2026-09-19T00:00:00Z"),
+            )
+        val key = appendRawObservation(observation)
+        val command =
+            NoticeCollected(
+                id = id,
+                businessCategory = null,
+                baseAmount = null,
+                estimatedAmount = null,
+                allocatedBudget = null,
+                floorRate = null,
+                deadlineAt = null,
+                openingScheduledAt = null,
+                raw = observation,
+            )
+        JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
+
+        val rejected =
+            listOf(
+                "" to "빈 문자열",
+                " " to "ASCII 공백",
+                "\t" to "탭",
+                "\n" to "개행",
+                " " to "NBSP",
+                "　" to "전각 공백",
+            )
+        for ((value, label) in rejected) {
+            // DB — 직접 UPDATE 가 거부된다. label 은 실패 시 어떤 입력인지 보여주는 표식이다.
+            shouldThrow<PSQLException> { updateNoticeTitleDirect(id, value) }
+            // Kotlin — 같은 값은 NoticeTitle.of 에서 null 이다(같은 판정을 공유).
+            NoticeTitle.of(value) shouldBe null
+        }
+
+        // DB — 공백 하나라도 아닌 문자가 있으면 UPDATE 가 성공한다.
+        updateNoticeTitleDirect(id, "정상 공고명")
+        // Kotlin — 같은 값으로 타입이 만들어진다(거부되지 않는다).
+        NoticeTitle.of("정상 공고명") shouldBe NoticeTitle.of("정상 공고명")
+    }
+
+    private fun updateNoticeTitleDirect(
+        id: NoticeId,
+        value: String,
+    ) {
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement("UPDATE notice SET notice_title = ? WHERE notice_number = ? AND notice_round = ?")
+                .use { statement ->
+                    statement.setString(1, value)
+                    statement.setString(2, id.number.value)
+                    statement.setString(3, id.round.value)
+                    statement.executeUpdate()
+                }
+        }
+    }
+
     private val mergeGuardId = NoticeId(NoticeNumber.of("MERGE-AGENCY-001"), NoticeRound.of("000"))
+    private val mergeGuardTitleId = NoticeId(NoticeNumber.of("MERGE-TITLE-001"), NoticeRound.of("000"))
 
     private fun mergeGuardObservation(
+        id: NoticeId,
         marker: String,
         observedAt: Instant,
     ): RawNoticeObservation =
         RawNoticeObservation.of(
             mapOf(
-                RawKey("bidNtceNo") to mergeGuardId.number.value,
-                RawKey("bidNtceOrd") to mergeGuardId.round.value,
+                RawKey("bidNtceNo") to id.number.value,
+                RawKey("bidNtceOrd") to id.round.value,
                 RawKey("marker") to marker,
             ),
             SourceEndpoint.NOTICE_LIST,
@@ -234,12 +307,14 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
         )
 
     private fun mergeGuardCommand(
+        id: NoticeId,
         raw: RawNoticeObservation,
-        demandAgency: Agency?,
-        noticeAgency: Agency?,
+        demandAgency: Agency? = null,
+        noticeAgency: Agency? = null,
+        title: NoticeTitle? = null,
     ): NoticeCollected =
         NoticeCollected(
-            id = mergeGuardId,
+            id = id,
             businessCategory = null,
             baseAmount = null,
             estimatedAmount = null,
@@ -250,6 +325,7 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
             raw = raw,
             demandAgency = demandAgency,
             noticeAgency = noticeAgency,
+            title = title,
         )
 
     /**
@@ -267,18 +343,18 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
         val demand = Agency(AgencyCode.of("1111111"), AgencyName.of("수요기관"))
         val notice = Agency(AgencyCode.of("2222222"), AgencyName.of("공고기관"))
 
-        val firstObservation = mergeGuardObservation("first", Instant.parse("2026-09-17T00:00:00Z"))
+        val firstObservation = mergeGuardObservation(mergeGuardId, "first", Instant.parse("2026-09-17T00:00:00Z"))
         val firstOutcome =
             repository.persist(
-                mergeGuardCommand(firstObservation, demand, notice),
+                mergeGuardCommand(mergeGuardId, firstObservation, demandAgency = demand, noticeAgency = notice),
                 appendRawObservation(firstObservation),
             )
         firstOutcome shouldBe PersistOutcome.Inserted
 
-        val secondObservation = mergeGuardObservation("second", Instant.parse("2026-09-17T01:00:00Z"))
+        val secondObservation = mergeGuardObservation(mergeGuardId, "second", Instant.parse("2026-09-17T01:00:00Z"))
         val secondOutcome =
             repository.persist(
-                mergeGuardCommand(secondObservation, null, null),
+                mergeGuardCommand(mergeGuardId, secondObservation),
                 appendRawObservation(secondObservation),
             )
         secondOutcome shouldBe PersistOutcome.Unchanged
@@ -287,15 +363,60 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
         afterSecond.noticeAgency shouldBe notice
 
         val newDemand = Agency(AgencyCode.of("3333333"), AgencyName.of("수요기관B"))
-        val thirdObservation = mergeGuardObservation("third", Instant.parse("2026-09-17T02:00:00Z"))
+        val thirdObservation = mergeGuardObservation(mergeGuardId, "third", Instant.parse("2026-09-17T02:00:00Z"))
         val thirdOutcome =
             repository.persist(
-                mergeGuardCommand(thirdObservation, newDemand, null),
+                mergeGuardCommand(mergeGuardId, thirdObservation, demandAgency = newDemand),
                 appendRawObservation(thirdObservation),
             )
         thirdOutcome shouldBe PersistOutcome.Updated(2L)
         val afterThird = requireNotNull(repository.find(mergeGuardId))
         afterThird.demandAgency shouldBe newDemand
         afterThird.noticeAgency shouldBe notice
+    }
+
+    /**
+     * verifier r2 MEDIUM-2 — `NoticeRowMerge`의 공고명 존재 가드(`title = incomingRow.title
+     * ?: existing.title`)가 발주기관 축과 같은 형태이지만 그 대응 test가 없었다. 같은 3단계
+     * 형태로 잠근다: ① 공고명이 실린 insert ② 결측 재관측 — 존재 가드가 기존 값을 지켜
+     * `Unchanged`(가드가 없으면 title 이 null 로 덮여 merged != existing 이 되어 Updated로
+     * 갈린다 — 이 단언 자체가 가드의 증거) ③ 새 공고명이 실린 재관측 — 값이 교체된다. verifier
+     * 가 실측한 변이(`title = existing.title`로 존재 가드를 지워도 `:adapters:test` 전건이
+     * 초록이던 것)는 이 test 가 있으면 ②·③ 단계에서 붉어진다.
+     */
+    @Test
+    fun `공고명은 결측 재관측에 지워지지 않고 값 있는 재관측에만 교체된다`() {
+        val repository = JdbcNoticeRepository(dataSource())
+        val firstTitle = requireNotNull(NoticeTitle.of("정보시스템 유지보수 용역"))
+
+        val firstObservation =
+            mergeGuardObservation(mergeGuardTitleId, "first", Instant.parse("2026-09-19T00:00:00Z"))
+        val firstOutcome =
+            repository.persist(
+                mergeGuardCommand(mergeGuardTitleId, firstObservation, title = firstTitle),
+                appendRawObservation(firstObservation),
+            )
+        firstOutcome shouldBe PersistOutcome.Inserted
+
+        val secondObservation =
+            mergeGuardObservation(mergeGuardTitleId, "second", Instant.parse("2026-09-19T01:00:00Z"))
+        val secondOutcome =
+            repository.persist(
+                mergeGuardCommand(mergeGuardTitleId, secondObservation),
+                appendRawObservation(secondObservation),
+            )
+        secondOutcome shouldBe PersistOutcome.Unchanged
+        requireNotNull(repository.find(mergeGuardTitleId)).title shouldBe firstTitle
+
+        val newTitle = requireNotNull(NoticeTitle.of("정보시스템 유지보수 용역(정정)"))
+        val thirdObservation =
+            mergeGuardObservation(mergeGuardTitleId, "third", Instant.parse("2026-09-19T02:00:00Z"))
+        val thirdOutcome =
+            repository.persist(
+                mergeGuardCommand(mergeGuardTitleId, thirdObservation, title = newTitle),
+                appendRawObservation(thirdObservation),
+            )
+        thirdOutcome shouldBe PersistOutcome.Updated(2L)
+        requireNotNull(repository.find(mergeGuardTitleId)).title shouldBe newTitle
     }
 }
