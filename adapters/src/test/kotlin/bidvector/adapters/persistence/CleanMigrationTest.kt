@@ -51,6 +51,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M6/6F-5-a — 스키마 스냅샷 래칫 예외(D-6F5-4, 추가만). V13__notice_requirement.sql.
             "notice_requirement",
             "notice_requirement_row",
+            // M6/6A-1 — 스키마 스냅샷 래칫 예외(D-6A1-7, 추가만). V15__api_audit.sql.
+            "api_request_audit",
         )
 
     @Test
@@ -102,6 +104,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M6/6F-5-a — 헤더는 공고 복합키, 행은 그 위에 자연 키(serialNo)를 더한다(D-6F5-4).
             "notice_requirement" to setOf("notice_number", "notice_round"),
             "notice_requirement_row" to setOf("notice_number", "notice_round", "serial_no"),
+            // M6/6A-1 — 애플리케이션이 발급하지 않는다(GENERATED ALWAYS AS IDENTITY, D-6A1-7).
+            "api_request_audit" to setOf("id"),
         )
 
     @Test

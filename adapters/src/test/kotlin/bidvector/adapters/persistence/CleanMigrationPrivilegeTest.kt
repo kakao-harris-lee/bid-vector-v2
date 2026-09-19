@@ -251,6 +251,18 @@ class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
                     references = false,
                     trigger = false,
                 ),
+            // M6/6A-1 — 요청 감사는 추가 전용(D-6A1-7, outbox·inbox와 같은 관례).
+            // V15__api_audit.sql.
+            "api_request_audit" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
         )
 
     @Test

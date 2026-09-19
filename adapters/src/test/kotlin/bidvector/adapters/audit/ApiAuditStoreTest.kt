@@ -30,20 +30,21 @@ class ApiAuditStoreTest : PersistenceTestSupport() {
         val stored =
             dataSource().connection.use { connection ->
                 connection.createStatement().use { statement ->
-                    statement.executeQuery(
-                        "SELECT subject, method, path, status_code, duration_ms, correlation_id " +
-                            "FROM api_request_audit",
-                    ).use { rs ->
-                        check(rs.next()) { "행이 저장되지 않았다" }
-                        listOf(
-                            rs.getString("subject"),
-                            rs.getString("method"),
-                            rs.getString("path"),
-                            rs.getInt("status_code"),
-                            rs.getLong("duration_ms"),
-                            rs.getString("correlation_id"),
-                        )
-                    }
+                    statement
+                        .executeQuery(
+                            "SELECT subject, method, path, status_code, duration_ms, correlation_id " +
+                                "FROM api_request_audit",
+                        ).use { rs ->
+                            check(rs.next()) { "행이 저장되지 않았다" }
+                            listOf(
+                                rs.getString("subject"),
+                                rs.getString("method"),
+                                rs.getString("path"),
+                                rs.getInt("status_code"),
+                                rs.getLong("duration_ms"),
+                                rs.getString("correlation_id"),
+                            )
+                        }
                 }
             }
 
@@ -52,7 +53,10 @@ class ApiAuditStoreTest : PersistenceTestSupport() {
 
     @Test
     fun `추가 전용이다 — 읽기·삭제 메서드가 없다`() {
-        val methodNames = ApiAuditStore::class.java.declaredMethods.map { it.name }.toSet()
+        val methodNames =
+            ApiAuditStore::class.java.declaredMethods
+                .map { it.name }
+                .toSet()
         methodNames shouldBe setOf("append")
     }
 }

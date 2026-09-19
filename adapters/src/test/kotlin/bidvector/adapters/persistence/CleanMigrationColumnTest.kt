@@ -332,12 +332,25 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice_requirement_row", "created_at", "timestamp with time zone", false, true),
         )
 
+    // M6/6A-1 — 요청 감사(추가만, D-6A1-7). 요청 본문·자격증명 값은 담지 않는다.
+    private val apiRequestAuditColumns =
+        listOf(
+            ColumnSpec("api_request_audit", "id", "bigint", false),
+            ColumnSpec("api_request_audit", "occurred_at", "timestamp with time zone", false),
+            ColumnSpec("api_request_audit", "subject", "text", false),
+            ColumnSpec("api_request_audit", "method", "text", false),
+            ColumnSpec("api_request_audit", "path", "text", false),
+            ColumnSpec("api_request_audit", "status_code", "integer", false),
+            ColumnSpec("api_request_audit", "duration_ms", "bigint", false),
+            ColumnSpec("api_request_audit", "correlation_id", "text", false),
+        )
+
     private val expectedColumns =
         rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
             rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
             openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns +
             operatorStrategyColumns + operatorStrategyRevisionColumns + operatorProfileColumns +
-            noticeRequirementColumns + noticeRequirementRowColumns
+            noticeRequirementColumns + noticeRequirementRowColumns + apiRequestAuditColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {

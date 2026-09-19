@@ -17,7 +17,8 @@ import org.springframework.web.servlet.NoHandlerFoundException
 const val CORRELATION_ID_ATTRIBUTE = "bidvector.http.correlationId"
 const val AUDIT_SUBJECT_ATTRIBUTE = "bidvector.http.subject"
 
-private fun HttpServletRequest.correlationIdOrUnknown(): String = getAttribute(CORRELATION_ID_ATTRIBUTE) as? String ?: "unknown"
+private fun HttpServletRequest.correlationIdOrUnknown(): String =
+    getAttribute(CORRELATION_ID_ATTRIBUTE) as? String ?: "unknown"
 
 /**
  * 오류 응답 형태(D-6A1-7 우회 (3)) — 코드·고정 문구·correlation id 셋뿐이다. 예외 메시지·
@@ -53,10 +54,17 @@ object ErrorMapping {
         correlationId: String,
     ): ErrorBody =
         when (throwable) {
-            is NoHandlerFoundException -> ErrorBody(ErrorCode.NOT_FOUND, "요청한 경로가 없다", correlationId)
-            is InvalidStoredStrategyException ->
+            is NoHandlerFoundException -> {
+                ErrorBody(ErrorCode.NOT_FOUND, "요청한 경로가 없다", correlationId)
+            }
+
+            is InvalidStoredStrategyException -> {
                 ErrorBody(ErrorCode.INVALID_STORED_STRATEGY, "저장된 전략이 유효하지 않다", correlationId)
-            else -> ErrorBody(ErrorCode.INTERNAL_ERROR, "요청을 처리하는 중 오류가 발생했다", correlationId)
+            }
+
+            else -> {
+                ErrorBody(ErrorCode.INTERNAL_ERROR, "요청을 처리하는 중 오류가 발생했다", correlationId)
+            }
         }
 }
 
@@ -69,7 +77,9 @@ object ErrorMapping {
  * [GlobalErrorHandler](이 파일 아래)는 Spring이 이미 배선한 JSON 변환을 그대로 쓴다.
  */
 fun ErrorBody.toJson(): String =
-    """{"code":"${escapeJson(code)}","message":"${escapeJson(message)}","correlationId":"${escapeJson(correlationId)}"}"""
+    """{"code":"${escapeJson(
+        code,
+    )}","message":"${escapeJson(message)}","correlationId":"${escapeJson(correlationId)}"}"""
 
 private fun escapeJson(value: String): String = value.replace("\\", "\\\\").replace("\"", "\\\"")
 

@@ -67,6 +67,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // IS NOT NULL) + (kind='PARSED' OR group_no IS NULL) + license_names 비어있지
             // 않음 = 6.
             "notice_requirement_row" to 6,
+            // M6/6A-1 — 신규(추가만, D-6A1-7). V15__api_audit.sql: status_code 범위 1 +
+            // duration_ms>=0 1 = 2.
+            "api_request_audit" to 2,
         )
 
     @Test

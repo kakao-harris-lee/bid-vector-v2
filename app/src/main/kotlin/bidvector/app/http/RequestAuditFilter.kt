@@ -47,31 +47,61 @@ class RequestAuditFilter(
 
         val start = clock.now()
         val wrapper = ContentCachingResponseWrapper(httpResponse)
-        val dispatchOutcome = runCatching { chain.doFilter(httpRequest, wrapper); wrapper.status }
+        val dispatchOutcome =
+            runCatching {
+                chain.doFilter(httpRequest, wrapper)
+                wrapper.status
+            }
 
+        val auditOutcome = recordAudit(httpRequest, dispatchOutcome, start, correlationId)
+        respond(httpResponse, wrapper, dispatchOutcome, auditOutcome, correlationId)
+    }
+
+    /** audit은 성공·실패 어느 쪽에서도 시도한다(우회 (2)) — 이 함수는 그 시도의 결과만 낸다. */
+    private fun recordAudit(
+        httpRequest: HttpServletRequest,
+        dispatchOutcome: Result<Int>,
+        start: Instant,
+        correlationId: String,
+    ): Result<Unit> {
         val subject = httpRequest.getAttribute(AUDIT_SUBJECT_ATTRIBUTE) as? String ?: "unauthenticated"
         val statusForAudit = dispatchOutcome.getOrDefault(HttpServletResponse.SC_INTERNAL_SERVER_ERROR)
         val durationMillis = Duration.between(start, clock.now()).toMillis()
+        return runCatching {
+            record(
+                ApiAuditRecord(
+                    occurredAt = start,
+                    subject = subject,
+                    method = httpRequest.method,
+                    path = httpRequest.requestURI,
+                    status = statusForAudit,
+                    durationMillis = durationMillis,
+                    correlationId = correlationId,
+                ),
+            )
+        }
+    }
 
-        val auditOutcome =
-            runCatching {
-                record(
-                    ApiAuditRecord(
-                        occurredAt = start,
-                        subject = subject,
-                        method = httpRequest.method,
-                        path = httpRequest.requestURI,
-                        status = statusForAudit,
-                        durationMillis = durationMillis,
-                        correlationId = correlationId,
-                    ),
-                )
+    /** D-6A1-17 — audit이 실패하면 성공한 dispatch 결과라도 내보내지 않는다(fail-closed). */
+    private fun respond(
+        httpResponse: HttpServletResponse,
+        wrapper: ContentCachingResponseWrapper,
+        dispatchOutcome: Result<Int>,
+        auditOutcome: Result<Unit>,
+        correlationId: String,
+    ) {
+        when {
+            dispatchOutcome.isFailure -> {
+                writeDirectError(httpResponse, dispatchOutcome.exceptionOrNull()!!, correlationId)
             }
 
-        when {
-            dispatchOutcome.isFailure -> writeDirectError(httpResponse, dispatchOutcome.exceptionOrNull()!!, correlationId)
-            auditOutcome.isFailure -> writeDirectError(httpResponse, auditOutcome.exceptionOrNull()!!, correlationId)
-            else -> wrapper.copyBodyToResponse()
+            auditOutcome.isFailure -> {
+                writeDirectError(httpResponse, auditOutcome.exceptionOrNull()!!, correlationId)
+            }
+
+            else -> {
+                wrapper.copyBodyToResponse()
+            }
         }
     }
 

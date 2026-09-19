@@ -48,7 +48,14 @@ dependencies {
     testImplementation(libs.spring.boot.test)
     testImplementation(libs.spring.boot.resttestclient)
     testImplementation(libs.spring.boot.restclient)
+}
 
+// M6/6A-1 — sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties, `adapters
+// /build.gradle.kts` 주석과 같은 이유). 위 `dependencies {}` 가 이 slice의 추가로 그 상한에
+// 닿아, 관련 없는 나머지 배선(corpus 소비 test 전용 project 의존)을 별도 블록으로 나눈다
+// — Gradle 은 같은 스크립트 안 `dependencies {}` 를 여러 번 받아 누적 적용한다(내용 변경
+// 없음, 크기 축 회피만).
+dependencies {
     // 위반 fixture 전용 — 금지 가족을 실제로 컴파일해야 게이트가 그것을 잡는지 잴 수 있다.
     testImplementation(libs.jakarta.persistence)
     testImplementation(libs.jakarta.jms)

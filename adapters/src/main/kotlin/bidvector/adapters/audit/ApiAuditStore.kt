@@ -32,13 +32,16 @@ class ApiAuditStore(
     fun append(row: ApiAuditRow) {
         dataSource.connection.use { connection ->
             connection.prepareStatement(ApiAuditSql.INSERT_API_REQUEST_AUDIT).use { statement ->
-                statement.setTimestamp(1, Timestamp.from(row.occurredAt))
-                statement.setString(2, row.subject)
-                statement.setString(3, row.method)
-                statement.setString(4, row.path)
-                statement.setInt(5, row.statusCode)
-                statement.setLong(6, row.durationMillis)
-                statement.setString(7, row.correlationId)
+                // detekt MagicNumber — 바인딩 순서를 리터럴 색인이 아니라 증가하는 index로
+                // 짠다(`bidvector.adapters.strategy.StrategyRow.bindStrategyRow`와 같은 관례).
+                var index = 1
+                statement.setTimestamp(index++, Timestamp.from(row.occurredAt))
+                statement.setString(index++, row.subject)
+                statement.setString(index++, row.method)
+                statement.setString(index++, row.path)
+                statement.setInt(index++, row.statusCode)
+                statement.setLong(index++, row.durationMillis)
+                statement.setString(index, row.correlationId)
                 statement.executeUpdate()
             }
         }

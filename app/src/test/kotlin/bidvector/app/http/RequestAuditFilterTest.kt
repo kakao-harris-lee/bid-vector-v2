@@ -41,7 +41,8 @@ class RequestAuditFilterTest : HttpIntegrationTestBase() {
         strategyRepository.loadFailure = null
     }
 
-    private fun authorizedHeaders(): HttpHeaders = HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+    private fun authorizedHeaders(): HttpHeaders =
+        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
     @Test
     fun `성공 요청은 audit 행 하나를 남긴다`() {

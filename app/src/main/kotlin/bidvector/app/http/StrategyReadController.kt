@@ -49,8 +49,12 @@ data class StrategyReadResponse(
 ) {
     companion object {
         fun from(strategy: OperatorStrategy): StrategyReadResponse {
-            val min = strategy.watchRules.budget.min?.export()
-            val max = strategy.watchRules.budget.max?.export()
+            val min =
+                strategy.watchRules.budget.min
+                    ?.export()
+            val max =
+                strategy.watchRules.budget.max
+                    ?.export()
             return StrategyReadResponse(
                 revision = strategy.revision.value,
                 focusCategories = strategy.watchRules.focusCategories.map(CategoryCode::value),
@@ -66,10 +70,22 @@ data class StrategyReadResponse(
                 maxBudgetCurrency = max?.currency?.name,
                 maxBudgetVatTreatment = max?.vatTreatment?.name,
                 maxBudgetProvenance = max?.provenance?.let(::provenanceLabel),
-                minimumMatchScore = strategy.actionThresholds.minimumMatchScore?.score?.value,
-                minimumProbabilityScore = strategy.actionThresholds.minimumProbabilityScore?.score?.value,
-                bidNowThreshold = strategy.actionThresholds.bidNowThreshold?.score?.value,
-                reviewThreshold = strategy.actionThresholds.reviewThreshold?.score?.value,
+                minimumMatchScore =
+                    strategy.actionThresholds.minimumMatchScore
+                        ?.score
+                        ?.value,
+                minimumProbabilityScore =
+                    strategy.actionThresholds.minimumProbabilityScore
+                        ?.score
+                        ?.value,
+                bidNowThreshold =
+                    strategy.actionThresholds.bidNowThreshold
+                        ?.score
+                        ?.value,
+                reviewThreshold =
+                    strategy.actionThresholds.reviewThreshold
+                        ?.score
+                        ?.value,
                 candidateLimit = strategy.candidateLimit?.value,
             )
         }

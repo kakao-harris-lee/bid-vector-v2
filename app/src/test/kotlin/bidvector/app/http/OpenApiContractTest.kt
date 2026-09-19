@@ -1,7 +1,6 @@
 package bidvector.app.http
 
 import io.kotest.matchers.shouldBe
-import java.io.File
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -11,6 +10,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.ResponseEntity
 import org.yaml.snakeyaml.Yaml
+import java.io.File
 
 /**
  * 우회 (6) 폐쇄 — D-6A1-8(수작성 단일 출처) · D-6A1-20(대조 깊이). 경로 이름만 보지 않고
@@ -38,26 +38,33 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
     }
 
     private val spec: Map<String, Any?> by lazy {
-        val specFile = File(requireNotNull(System.getProperty("bidvector.openapi.spec")) { "bidvector.openapi.spec 시스템 프로퍼티가 없다" })
+        val specProperty =
+            requireNotNull(System.getProperty("bidvector.openapi.spec")) {
+                "bidvector.openapi.spec 시스템 프로퍼티가 없다"
+            }
+        val specFile = File(specProperty)
         Yaml().load<Map<String, Any?>>(specFile.readText())
     }
 
     private fun schema(name: String): Map<String, Any?> =
         ((spec["components"] as Map<String, Any?>)["schemas"] as Map<String, Any?>)[name] as Map<String, Any?>
 
-    private fun propertyKeys(schemaName: String): Set<String> = (schema(schemaName)["properties"] as Map<String, Any?>).keys
+    private fun propertyKeys(schemaName: String): Set<String> =
+        (schema(schemaName)["properties"] as Map<String, Any?>).keys
 
     /** 모든 스키마를 재귀로 훑어 `type: object`인 **속성**(스키마 자신 말고)이 없는지 잰다. */
     private fun collectNestedObjectProperties(): List<String> {
         val schemas = (spec["components"] as Map<String, Any?>)["schemas"] as Map<String, Any?>
         return schemas.flatMap { (schemaName, schemaBody) ->
             val properties = (schemaBody as Map<String, Any?>)["properties"] as Map<String, Any?>
-            properties.filter { (_, definition) -> (definition as Map<String, Any?>)["type"] == "object" }
+            properties
+                .filter { (_, definition) -> (definition as Map<String, Any?>)["type"] == "object" }
                 .map { (propertyName, _) -> "$schemaName.$propertyName" }
         }
     }
 
-    private fun authorizedHeaders(): HttpHeaders = HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+    private fun authorizedHeaders(): HttpHeaders =
+        HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
     @Test
     fun `D-6A1-20 ⓑ — 계약의 어떤 스키마도 중첩 object 속성을 갖지 않는다`() {
@@ -83,7 +90,8 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
 
     @Test
     fun `401 응답의 최상위 키 집합이 계약과 완전히 일치한다`() {
-        val response = restTemplate.getForEntity(url("/api/strategy"), Map::class.java) as ResponseEntity<Map<String, Any?>>
+        val response =
+            restTemplate.getForEntity(url("/api/strategy"), Map::class.java) as ResponseEntity<Map<String, Any?>>
 
         response.statusCode.value() shouldBe 401
         (response.body?.keys ?: emptySet()) shouldBe propertyKeys("ErrorBody")
