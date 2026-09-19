@@ -8,6 +8,11 @@ package bidvector.adapters.persistence
  * 없는 「최신 관측 우선」 축이라 `ON CONFLICT ... WHERE observed_at >= ...` 한 문으로
  * insert/update/no-op을 다 낸다 — `RETURNING (xmax = 0) AS inserted`로 어느 경로였는지
  * 왕복 한 번에 안다(PostgreSQL 관용구: 이 문이 실제로 삽입한 행은 `xmax`가 0이다).
+ *
+ * `bidvector.adapters.event.EventSql`이 outbox·inbox SQL을 이 object 밖에 두는 것과 같은
+ * 이유로, M6/6F-5-a의 자격 요건 SQL도 `bidvector.adapters.qualification.RequirementSql`에
+ * 있다(M6/6F-5-a+6F-6 병합 뒤 두 slice가 각자 정당하게 더한 상수의 합이 타입 멤버 31개가
+ * 되어(OPEN-ADR-06 (a), 30개 한도) 6F-5-a 몫을 떼어냈다 — 각자는 한도 안이었다).
  */
 internal object Sql {
     const val INSERT_RAW_OBSERVATION =
@@ -34,6 +39,23 @@ internal object Sql {
         "SELECT $NOTICE_COLUMNS FROM notice WHERE notice_number = ? AND notice_round = ? FOR UPDATE"
 
     const val SELECT_NOTICE = "SELECT $NOTICE_COLUMNS FROM notice WHERE notice_number = ? AND notice_round = ?"
+
+    /**
+     * 후보 다건 스캔(M6/6F-2, D-6F2-2~5) — 상태 집합은 `= ANY(?)`로 바인딩한다(호출부가
+     * `bidvector.adapters.evaluation.biddableStatuses()`로 도메인 술어에서 기계 산출한
+     * 값을 넘긴다 — 여기 상태 리터럴을 적지 않는다). `deadline_at > ?`는 반개구간(D-6F2-3,
+     * `?`는 주입된 `Clock.now()` — DB `now()`를 쓰지 않는다). `LIMIT ?`는 호출부가
+     * `cap + 1`을 넘겨 절삭 여부를 판단한다(D-6F2-4, 조용한 절삭이 아니다). 정렬은
+     * 결정적이다(D-6F2-5) — `analysisBudget`이 이 순서 그대로 앞에서부터 쓴다.
+     */
+    const val SELECT_OPEN_CANDIDATES =
+        """
+        SELECT notice_number, notice_round, $NOTICE_COLUMNS
+        FROM notice
+        WHERE status = ANY(?) AND deadline_at > ?
+        ORDER BY deadline_at ASC, notice_number ASC, notice_round ASC
+        LIMIT ?
+        """
 
     const val INSERT_NOTICE =
         """
@@ -283,6 +305,85 @@ internal object Sql {
         RETURNING (xmax = 0) AS inserted, revision
         """
 
+    // M6/6F-1 — 전략 영속(D-6F1-1). `operator_strategy`는 싱글턴(id=1, 리터럴), `revision`이
+    // 두 표 모두 플레이스홀더 순서의 첫 자리다(`StrategyRow.bindStrategyRow`가 그 순서로
+    // 채운다 — 표 둘이 한 바인더를 공유한다).
+    private const val STRATEGY_COLUMNS =
+        """
+        focus_categories, focus_region_terms, exclude_region_terms,
+        required_keyword_terms, exclude_keyword_terms,
+        min_budget_won, min_budget_currency, min_budget_vat, min_budget_provenance, min_budget_provenance_detail,
+        max_budget_won, max_budget_currency, max_budget_vat, max_budget_provenance, max_budget_provenance_detail,
+        minimum_match_score, minimum_probability_score, bid_now_threshold, review_threshold, candidate_limit
+        """
+
+    const val SELECT_STRATEGY = "SELECT revision, $STRATEGY_COLUMNS FROM operator_strategy WHERE id = 1"
+
+    const val UPSERT_STRATEGY =
+        """
+        INSERT INTO operator_strategy (id, revision, $STRATEGY_COLUMNS)
+        VALUES (
+            1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        ON CONFLICT (id) DO UPDATE SET
+            revision = EXCLUDED.revision,
+            focus_categories = EXCLUDED.focus_categories,
+            focus_region_terms = EXCLUDED.focus_region_terms,
+            exclude_region_terms = EXCLUDED.exclude_region_terms,
+            required_keyword_terms = EXCLUDED.required_keyword_terms,
+            exclude_keyword_terms = EXCLUDED.exclude_keyword_terms,
+            min_budget_won = EXCLUDED.min_budget_won,
+            min_budget_currency = EXCLUDED.min_budget_currency,
+            min_budget_vat = EXCLUDED.min_budget_vat,
+            min_budget_provenance = EXCLUDED.min_budget_provenance,
+            min_budget_provenance_detail = EXCLUDED.min_budget_provenance_detail,
+            max_budget_won = EXCLUDED.max_budget_won,
+            max_budget_currency = EXCLUDED.max_budget_currency,
+            max_budget_vat = EXCLUDED.max_budget_vat,
+            max_budget_provenance = EXCLUDED.max_budget_provenance,
+            max_budget_provenance_detail = EXCLUDED.max_budget_provenance_detail,
+            minimum_match_score = EXCLUDED.minimum_match_score,
+            minimum_probability_score = EXCLUDED.minimum_probability_score,
+            bid_now_threshold = EXCLUDED.bid_now_threshold,
+            review_threshold = EXCLUDED.review_threshold,
+            candidate_limit = EXCLUDED.candidate_limit,
+            updated_at = now()
+        """
+
+    // D-6F1-1 ① — 개정 이력(append-only). `revision`이 PK라 같은 값 재저장은 거부된다
+    // (재확인·중복 confirm 재전달은 EditStrategyWorkflow 의 idempotency 판정이 앞단에서 막는다 —
+    // 이 표까지 같은 revision 이 두 번 오는 정상 경로가 없다).
+    const val INSERT_STRATEGY_REVISION =
+        """
+        INSERT INTO operator_strategy_revision (revision, $STRATEGY_COLUMNS)
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        """
+
+    // M6/6F-6 — 프로필 영속(D-6F6-1~3). 싱글턴(id=1, operator_strategy 와 같은 관례).
+    // `licenses_declared`·`license_names`가 짝을 이뤄 세 상태(미설정=행 없음·NotDeclared·
+    // Declared(빈 목록 포함))를 구분한다 — V12 CHECK 가 그 짝의 모순만 막고, 세 상태 자체의
+    // 구분은 이 열 형태가 진다.
+    private const val PROFILE_COLUMNS =
+        """
+        business_types, licenses_declared, license_names, region_terms
+        """
+
+    const val SELECT_PROFILE = "SELECT $PROFILE_COLUMNS FROM operator_profile WHERE id = 1"
+
+    const val UPSERT_PROFILE =
+        """
+        INSERT INTO operator_profile (id, $PROFILE_COLUMNS)
+        VALUES (1, ?, ?, ?, ?)
+        ON CONFLICT (id) DO UPDATE SET
+            business_types = EXCLUDED.business_types,
+            licenses_declared = EXCLUDED.licenses_declared,
+            license_names = EXCLUDED.license_names,
+            region_terms = EXCLUDED.region_terms,
+            updated_at = now()
+        """
+
     const val INSERT_COLLECTION_RUN =
         """
         INSERT INTO collection_run (
@@ -291,5 +392,48 @@ internal object Sql {
             source_total, pages_fetched, truncated, unknown_fields,
             truncation_cause, quota_exceeded, backoff_skipped
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+    const val SELECT_EDIT_SESSION =
+        """
+        SELECT operator_id, state, state_payload, expires_at, session_version, last_command
+        FROM edit_session WHERE id = ?
+        """
+
+    // M6/6B-1 D-6B1-3·D-6B1-4 — 낙관적 동시성의 유일한 write 경로(우회 (3)). WHERE 절이
+    // 전제조건 둘 중 하나를 요구한다: (a) **저장소의 현재 state 가 이미 종단(APPLIED·
+    // CANCELLED·EXPIRED)이고 동시에 이번 쓰기가 새 episode(EXCLUDED.session_version = 0,
+    // beginSession) 일 때만** 버전을 안 보고 갈아 끼운다 — 끝난 세션 위에 새로 여는 것은
+    // "잃어버린 갱신"이 아니다. (b) 저장소의 session_version 이 정확히 "새 값 - 1"이면
+    // 정상 순차 전이다. 그 외(동시 writer 가 먼저 썼다, 또는 두 begin() 이 같은 id 로
+    // 경합한다 — 저장된 state 가 아직 비종단인데 버전도 안 맞는다)는 WHERE 가 거짓이라
+    // ON CONFLICT 분기 전체가 no-op 이고 RETURNING 이 0행이다(Sql.kt KDoc 의
+    // `toUpsertOutcome` 관용구와 같은 계열, 여기는 계수만 본다).
+    //
+    // **verifier r1 HIGH-1 수정** — 이전 판은 (a) 를 `edit_session.state IN (...)` 만으로
+    // 열어 뒀다. 그러면 **저장소가 이미 종단**이기만 하면(과거의 정상 전이로 종단이 된
+    // 경우도 포함) **어떤 버전의 새 쓰기든** 통과했다 — 같은 비종단 세션을 버전 N 에서
+    // 읽은 두 writer 가 각각 종단 전이(APPLIED·CANCELLED)를 저장하면 **둘 다 성공**하고
+    // 뒤에 온 쪽이 앞의 결정을 조용히 덮었다(재현: `state=CANCELLED v=2` 위에
+    // `(APPLIED,v2)`→1행, 이어서 `(CANCELLED,v2)`→1행, 정상이면 두 번째는 0행이어야
+    // 한다). `AND EXCLUDED.session_version = 0` 을 더해 "새 episode" 로 뜻을 좁힌다 —
+    // 정당한 재시작(v0, 저장소가 종단)은 여전히 통과하고, 종단 위의 임의 버전 갈아치우기는
+    // 이제 (b) 로 떨어져 버전이 안 맞으면 거부된다. **처음 값 EXCLUDED.session_version=0
+    // 만으로 무조건 통과시키지도 않는다** — 그러면 같은 id 로 경합하는 두 begin() 이
+    // 서로 조용히 덮어써 우회 (3)이 다시 열린다(구현 레인 실측, 별도 회귀).
+    const val UPSERT_EDIT_SESSION =
+        """
+        INSERT INTO edit_session (id, operator_id, state, state_payload, expires_at, session_version, last_command)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (id) DO UPDATE SET
+            operator_id = EXCLUDED.operator_id,
+            state = EXCLUDED.state,
+            state_payload = EXCLUDED.state_payload,
+            expires_at = EXCLUDED.expires_at,
+            session_version = EXCLUDED.session_version,
+            last_command = EXCLUDED.last_command
+        WHERE (edit_session.state IN ('APPLIED', 'CANCELLED', 'EXPIRED') AND EXCLUDED.session_version = 0)
+           OR edit_session.session_version = EXCLUDED.session_version - 1
+        RETURNING id
         """
 }

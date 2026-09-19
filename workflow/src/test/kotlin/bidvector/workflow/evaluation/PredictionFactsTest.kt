@@ -6,6 +6,9 @@ import bidvector.decision.UnitScore
 import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.ScoreFact
 import bidvector.decision.priority.derive.DERIVATION_POLICY
+import bidvector.procurement.Agency
+import bidvector.procurement.AgencyCode
+import bidvector.procurement.AgencyName
 import bidvector.procurement.OpeningResult
 import bidvector.sharedkernel.AwardAmount
 import bidvector.sharedkernel.BaseAmountProvenance
@@ -19,6 +22,7 @@ import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.prediction.AgencyId
 import bidvector.workflow.prediction.PredictionDiagnostics
 import bidvector.workflow.prediction.SegmentSupport
 import bidvector.workflow.prediction.Weight
@@ -311,5 +315,50 @@ class PredictionFactsTest {
         cleanRequest.baseAmountProvenanceLabel shouldBe BaseAmountProvenance.Clean
         suspectRequest.baseAmountProvenanceLabel shouldBe BaseAmountProvenance.SuspectRatio
         (cleanRequest.baseAmountProvenanceLabel == BaseAmountProvenance.Unknown) shouldBe false
+    }
+
+    // ---- M3/3H-2(D-3H2-1, scope.md 우회 (1)(4)) — 요청 축 agencyId 조립(`predictionRequestFor`). ----
+
+    @Test
+    fun `수요기관 코드가 있으면 요청 agencyId 는 그 코드 값이다`() {
+        val notice =
+            testNoticeWithMoney(
+                number = "20260101030",
+                demandAgency = Agency(AgencyCode.of("1234567"), AgencyName.of("수요기관")),
+            )
+        val resolved = requireNotNull(notice.baseAmount)
+
+        val request = predictionRequestFor(resolved, notice, testPolicies, CorrelationId("corr-agency"), emptyList())
+
+        request.agencyId shouldBe AgencyId("1234567")
+    }
+
+    @Test
+    fun `수요기관이 없고 공고기관만 있으면 요청 agencyId 는 null 이다 — 우회 (1), 폴백 없음`() {
+        val notice =
+            testNoticeWithMoney(
+                number = "20260101031",
+                noticeAgency = Agency(AgencyCode.of("7654321"), AgencyName.of("공고기관")),
+            )
+        val resolved = requireNotNull(notice.baseAmount)
+
+        val request =
+            predictionRequestFor(resolved, notice, testPolicies, CorrelationId("corr-no-fallback"), emptyList())
+
+        request.agencyId shouldBe null
+    }
+
+    @Test
+    fun `수요기관에 이름만 있고 코드가 없으면 요청 agencyId 는 null 이다 — 우회 (4), 이름을 키로 쓰지 않는다`() {
+        val notice =
+            testNoticeWithMoney(
+                number = "20260101032",
+                demandAgency = Agency(code = null, name = AgencyName.of("수요기관")),
+            )
+        val resolved = requireNotNull(notice.baseAmount)
+
+        val request = predictionRequestFor(resolved, notice, testPolicies, CorrelationId("corr-name-only"), emptyList())
+
+        request.agencyId shouldBe null
     }
 }

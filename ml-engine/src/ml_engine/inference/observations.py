@@ -12,7 +12,7 @@
 M5/5D-3(D-5D3-2) — 9번째 사유 `SEGMENT_REASON_NOT_ALLOWED` 신설. `observe_sample` 자신은
 표본별 기관·공종 축(`agency_id`/`category_code`)을 읽지 않는다 — 그 축은
 `ml_engine.inference.distribution`이 5B `resolve_text_fact`(허용 결측 사유
-`{NOT_COLLECTED_YET}`로 좁힘)로 직접 판독하고, 거부되면 이 사유를 실어 표본 전체를
+`{NOT_COLLECTED_YET, UNKNOWN}`로 좁힘 — 3H-2 D-3H2-3)로 직접 판독하고, 거부되면 이 사유를 실어 표본 전체를
 `SampleRejected`로 접는다(이 모듈은 그 **사유 어휘**만 소유 — 관문 배치는 조립기,
 표본 거부 사유의 단일 어휘는 이 모듈, D-5D3-2). `Diagnostics.excluded_observations`가
 그 개수를 다른 8 사유와 함께 총계로 나른다.

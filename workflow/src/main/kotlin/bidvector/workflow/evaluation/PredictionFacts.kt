@@ -16,6 +16,7 @@ import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.times
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.prediction.AgencyId
 import bidvector.workflow.prediction.BidPredictionOutcome
 import bidvector.workflow.prediction.BidPredictionRequest
 import bidvector.workflow.prediction.CompetitionSample
@@ -49,7 +50,11 @@ internal fun predictionRequestFor(
     BidPredictionRequest(
         baseAmount = resolvedBaseAmount,
         businessCategory = notice.businessCategory,
-        agencyId = null,
+        // M3/3H-2(D-3H2-1) — 수요기관 코드만 읽는다. 공고기관으로 폴백하지 않는다(D-3H-2,
+        // scope.md 우회 (1)) — 두 축은 canonicalize 단계에서부터 서로 다른 필드다
+        // (`Agency.kt` KDoc). 이름만 있고 코드가 없으면 `AgencyCode`가 없으므로 여기서도
+        // `null`(우회 (4), 이름을 키로 싣지 않는다).
+        agencyId = notice.demandAgency?.code?.let { AgencyId(it.value) },
         baseAmountProvenanceLabel =
             provenanceLabelFor(notice, null, resolvedBaseAmount.amount, policies.provenancePolicy),
         competitionSamples = competitionSamples,

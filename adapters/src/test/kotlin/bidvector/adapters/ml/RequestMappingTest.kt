@@ -9,10 +9,13 @@ import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.export
+import bidvector.workflow.prediction.AgencyId
 import bidvector.workflow.prediction.CompetitionSample
 import bidvector.workflow.prediction.ReserveDrawObservation
+import contract.bidvector.ml.v1.AgencyIdFact
 import contract.bidvector.ml.v1.AmountProvenanceKind
 import contract.bidvector.ml.v1.Basis
+import contract.bidvector.ml.v1.MissingReason
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
@@ -60,6 +63,34 @@ class RequestMappingTest {
             policy = testMlCallPolicy(),
             deadlinePolicyVersion = "deadline-test",
         )
+
+    // ---- M3/3H-2(D-3H2-2, scope.md 우회 (2)) — 표본 축 agencyId 결측 사유는 UNKNOWN. ----
+
+    /**
+     * D-3H2-2 — 표본 축 `agency_id`가 `null`이면 `MISSING_REASON_UNKNOWN`이다.
+     * M2/2F 시절의 `NOT_COLLECTED_YET`은 더는 이 축에서 나오지 않는다(우회 (2)) — 대상
+     * 공고 축(`toAgencyIdFact`)과 사유가 같아졌다.
+     */
+    @Test
+    fun `표본 agencyId 가 null 이면 wire 는 MISSING_REASON_UNKNOWN 이다 — NOT_COLLECTED_YET 이 아니다`() {
+        val sample = sampleWith(reserveDraw = null).copy(agencyId = null)
+
+        val proto = mapped(sample).getCompetitionSamples(0)
+
+        proto.agencyId.factCase shouldBe AgencyIdFact.FactCase.MISSING
+        proto.agencyId.missing shouldBe MissingReason.MISSING_REASON_UNKNOWN
+        (proto.agencyId.missing == MissingReason.MISSING_REASON_NOT_COLLECTED_YET) shouldBe false
+    }
+
+    @Test
+    fun `표본 agencyId 값이 있으면 그 값 그대로 왕복한다`() {
+        val sample = sampleWith(reserveDraw = null).copy(agencyId = AgencyId("agency-opaque-9001"))
+
+        val proto = mapped(sample).getCompetitionSamples(0)
+
+        proto.agencyId.factCase shouldBe AgencyIdFact.FactCase.VALUE
+        proto.agencyId.value shouldBe "agency-opaque-9001"
+    }
 
     @Test
     fun `reserveDraw 있으면 예비가격 15 번호 4 가 그대로 왕복한다`() {

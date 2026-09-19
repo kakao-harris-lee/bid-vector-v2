@@ -31,12 +31,14 @@ import bidvector.workflow.strategy.EditSession
 import bidvector.workflow.strategy.EditSessionId
 import bidvector.workflow.strategy.EditSessionPolicyData
 import bidvector.workflow.strategy.EditSessionRepository
+import bidvector.workflow.strategy.EditSessionSnapshot
 import bidvector.workflow.strategy.EditSessionState
 import bidvector.workflow.strategy.EditStrategyWorkflow
 import bidvector.workflow.strategy.EditableField
 import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.OperatorId
 import bidvector.workflow.strategy.StrategyRepository
+import bidvector.workflow.strategy.toSnapshot
 import tools.jackson.databind.JsonNode
 import java.math.BigDecimal
 import java.time.Duration
@@ -78,10 +80,17 @@ private class FakeStrategyRepository(
     }
 }
 
+/**
+ * D-6B1-7(계약 갱신 (2), M6/6B-1) — `EditSessionRepository.load`가 원시 스냅숏을
+ * 반환하도록 좁게 바뀌면서 이 fake 도 함께 바뀐다(계약이 명시한 곳은 `workflow` test
+ * fake이지만, port 시그니처 변경은 이 구현체에도 기계적으로 번진다 — M4/4C-1
+ * `OutboxPort` 개정 때도 같은 파급이 있었다). 저장은 여전히 [EditSession]으로,
+ * 반환 시점에만 [EditSession.toSnapshot]으로 내린다 — 단언·시나리오는 무편집.
+ */
 private class FakeSessionRepository : EditSessionRepository {
     private val sessions = mutableMapOf<EditSessionId, EditSession>()
 
-    override fun load(id: EditSessionId): EditSession? = sessions[id]
+    override fun load(id: EditSessionId): EditSessionSnapshot? = sessions[id]?.toSnapshot()
 
     override fun save(session: EditSession) {
         sessions[session.id] = session

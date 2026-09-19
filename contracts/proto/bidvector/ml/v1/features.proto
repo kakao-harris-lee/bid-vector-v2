@@ -105,13 +105,16 @@ message CompetitionSample {
   optional ReserveDrawObservation reserve_draw = 7;
   // 표본 공고의 발주기관 fact(M2/2F additive, D-2F-1) — **식별자가 아니다**(D-2B-3 유지,
   // 표본 식별·중복 제거는 여전히 불가). 값의 정본은 `FeatureInputs.agency_id`와 같다
-  // (`OPEN-2B-AGENCY-ID`, 정본 M3). 허용되는 `missing` 사유는
-  // `MISSING_REASON_NOT_COLLECTED_YET` 하나뿐이다 — 송신 어댑터가 다른 사유를 지어내지
-  // 않는다(2B 위협 우회 후보 (5)가 지목한 자리, `OPEN-5D2-SAMPLE-SEGMENT`).
+  // (`OPEN-2B-AGENCY-ID`, 정본 M3). 허용되는 `missing` 사유는 `NOT_COLLECTED_YET`(수집
+  // 전)·`UNKNOWN`(수집했으나 원천에 없음, M3/3H-2 D-3H2-2·3) 둘 — 송신 어댑터는 이 둘만
+  // 싣고 수신(분포 엔진)은 그 밖을 표본 거부한다(2B 위협 우회 후보 (5)가 지목한 자리,
+  // `OPEN-5D2-SAMPLE-SEGMENT`).
   AgencyIdFact agency_id = 8;
   // 표본 공고의 업종/공종 fact(M2/2F additive, D-2F-1) — 위 `agency_id`와 같은 규약
-  // (식별자 아님, 정본은 `FeatureInputs.category_code`와 동일, 허용 `missing` 사유는
-  // `MISSING_REASON_NOT_COLLECTED_YET` 하나뿐).
+  // (식별자 아님, 정본은 `FeatureInputs.category_code`와 동일). 수신(분포 엔진)이 허용하는
+  // `missing` 사유는 `agency_id`와 같다 — `NOT_COLLECTED_YET`·`UNKNOWN` 둘, 두 축에 같은
+  // 술어를 쓴다(M3/3H-2 D-3H2-3). 다만 송신 어댑터는 오늘 이 축에서 `UNKNOWN`을 만들지
+  // 않는다 — `NOT_COLLECTED_YET`만 싣는다(수신이 더 관대할 뿐, 계약 위반이 아니다).
   CategoryCodeFact category_code = 9;
 }
 

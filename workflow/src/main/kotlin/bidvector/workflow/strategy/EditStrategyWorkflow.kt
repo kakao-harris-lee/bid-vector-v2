@@ -80,7 +80,7 @@ class EditStrategyWorkflow(
         operator: OperatorId,
         field: EditableField,
     ): BeginOutcome {
-        val existing = sessions.load(sessionId)
+        val existing = sessions.load(sessionId)?.let(::restoreEditSession)
         if (existing != null) {
             val folded = expireIfDue(existing, clock.now())
             if (folded !== existing) sessions.save(folded)
@@ -103,7 +103,7 @@ class EditStrategyWorkflow(
 
     /** 주기 sweep 배선은 이 slice 밖(트리거는 4B/후속) — 순수 만료 판정만 여기서 노출한다. */
     fun expire(sessionId: EditSessionId): EditSessionState? {
-        val session = sessions.load(sessionId) ?: return null
+        val session = sessions.load(sessionId)?.let(::restoreEditSession) ?: return null
         val expired = expireIfDue(session, clock.now())
         if (expired !== session) sessions.save(expired)
         return expired.state
@@ -118,15 +118,26 @@ class EditStrategyWorkflow(
      * 성공한 뒤)는 다음 재전달의 `seenRevision` 대조가 잡아 `StaleRevision` 거부로 정직하게
      * 드러난다(이중 적용이 아니다). 남는 잔여 창(발행 실패 뒤 세션 미전진)은 알려진
      * 제한 — 원자적 저장+발행+세션전진은 4C 트랜잭션 outbox 소관.
+     *
+     * **verifier r3 HIGH-3 수정(D-6B1-10)** — `outcome.session`이 [session]과 **같은
+     * 인스턴스**(버전이 안 오른 `Rejected` 전부·중복 재전달의 `Accepted`)면 저장하지
+     * 않는다. [EditSessionRepository] 구현(`JdbcEditSessionRepository`)은 낙관적 동시성
+     * 전제조건(저장소 버전 = 새 값 − 1)을 요구하므로, 버전이 그대로인 저장은 구성상 항상
+     * 0행 → `EditSessionConflictException`이었다 — 정당한 거부·멱등 재전달이 예외로
+     * 터졌다. `begin()`/`expire()`가 이미 쓰는 `folded !== existing`/`expired !== session`
+     * 관용구와 같은 판별자다: 버전을 올린 결과(`accept`/`onConfirm`의 `.copy()`, 만료
+     * fold)는 새 인스턴스이고, 안 올린 결과는 같은 인스턴스다. 명령 처리 중 만료 fold는
+     * `apply()` 안에서 새 인스턴스(v+1)를 만들므로 이 판별자로도 정확히 저장된다(L-5 test).
      */
     private fun process(command: EditCommand): CommandResult {
-        val session = sessions.load(command.sessionId) ?: return CommandResult.SessionNotFound
+        val session =
+            sessions.load(command.sessionId)?.let(::restoreEditSession) ?: return CommandResult.SessionNotFound
         val outcome = apply(session, command, clock.now(), strategies.load(), strategyPolicy)
         if (outcome is TransitionOutcome.Applied) {
             strategies.save(outcome.applied)
             events.publish(outcome.event, outcome.session.actor)
         }
-        sessions.save(outcome.session)
+        if (outcome.session !== session) sessions.save(outcome.session)
         return CommandResult.Processed(outcome)
     }
 }

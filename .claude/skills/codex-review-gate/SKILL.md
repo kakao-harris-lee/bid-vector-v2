@@ -5,9 +5,16 @@ description: "Codex CLI로 base...head diff의 독립 리뷰를 clean worktree�
 
 # Codex Review Gate — 독립 리뷰 실행 절차
 
-> **범위 제한 (2026-09-04 운영자 지시): 코드 slice 는 이 게이트를 타지 않는다.** 코드 slice 의
-> 완료 조건은 verifier `ready-for-review` + 사용자 승인이다. 기획 문서의 계획 검토는 운영자가
-> 명시 요청한 경우에만 아래 절차로 실행한다.
+> **심사 범위 (2026-09-11 운영자 결정 — 2026-09-04 의 「전면 코드 제외」를 대체한다).** 이 게이트를
+> 타는 것은 둘뿐이다 — ① **되돌리기 어려운 경로의 코드**(결제·실주문·인증/인가·암호화·비밀번호/
+> 토큰·**DB 마이그레이션**·데이터 파기처럼 사고가 나면 복구가 없거나 비싼 변경) ② **코드 외
+> 산출물**(기획 문서·계약 파일). 그 밖의 코드 slice 는 이 게이트를 타지 않고 완료 조건은 verifier
+> `ready-for-review` + 사용자 승인이며, 저자와 다른 패스의 Claude 측 `code-reviewer`(sonnet)가 본다.
+>
+> 어느 쪽이든 **유료 외부 호출이므로 운영자가 심사 범위와 비용을 승인한 뒤에만** 디스패치한다 —
+> 「리뷰해줘」·「codex 로 봐줘」는 승인이 아니라 레인 선택이다. 자동 실행하지 않는다. 정본은
+> 전역 규약 `~/.claude/review-lane.md` §4 와 프로젝트 `CLAUDE.md` 운영자 지시 절이고, 레인 계약은
+> `~/.claude/agents/codex-reviewer.md` 다(범위 밖이 넘어오면 `SCOPE_EXCLUDED` 반환).
 
 codex CLI(로컬 `codex`, v0.151 기준)로 slice diff의 독립 리뷰를 실행하고 판정 JSON을
 보존한다. 판정 계약과 리뷰 기준은 `CODEX-REVIEW.md`와 `agent-workflow.md` 4~5절이
@@ -66,12 +73,14 @@ worktree를 작업 루트로, 명령 재실행(테스트 등)을 위해 workspac
 ```bash
 CODEX_BIN=/Users/harris/.nvm/versions/node/v22.21.1/bin/codex   # 심판 바이너리 고정 — PATH 에 맡기지 않는다
 CODEX_PIN="0.154.0"                   # 심판 버전 고정 — 바꾸려면 이 스킬을 고친다(2026-09-11 갱신, 아래 참고)
+CODEX_MODEL_PIN="gpt-5.5"             # 심판 모델 고정(운영자 결정 2026-09-17) — `~/.codex/config.toml` 의 model 에 맡기지 않는다
 "$CODEX_BIN" --version | grep -qF "$CODEX_PIN" || {
   echo "codex 버전 불일치: $("$CODEX_BIN" --version) ≠ $CODEX_PIN — preflight 미충족, 리뷰 중단"
   exit 1
 }
 "$CODEX_BIN" --version   # 기록용 — 리뷰 메타데이터의 값은 여전히 raw-output 머리글이 정본
 "$CODEX_BIN" exec -s workspace-write -C ../bid-vector-v2-review-{slice} \
+  -c model="$CODEX_MODEL_PIN" \
   -c model_reasoning_effort="high" \
   --disable memories --ignore-rules \
   --output-schema .claude/skills/codex-review-gate/references/codex-output.strict.schema.json \
@@ -113,6 +122,13 @@ PATH 전환이고 이 갱신은 기록된 명시 결정이다. **진행 중인 s
 아니라 여기 기록된 명시적 결정이며, B6 판정을 읽을 때 이 사실을 함께 읽는다. nvm 경로는
 node 버전을 품고 있어 node 업그레이드 시 경로가 사라진다 — 그때는 실행이 시끄럽게
 실패하므로 핀 갱신 결정을 새로 받으면 된다.
+
+**모델도 핀한다(운영자 결정 2026-09-17, `CODEX_MODEL_PIN`).** 바이너리·effort 핀은 모델을 고정하지 않았고, 그 사이
+`~/.codex/config.toml` 의 `model` 이 바뀌어 PR #5 라운드는 `gpt-6-astra`, M3/3H-1 라운드는 `gpt-5.5` 로 돌았다(3H-1
+preflight 실측) — 같은 CLI 버전 아래 엔진이 조용히 바뀐 것이라 2026-09-01 바이너리 핀이 막으려던 것과 같은 갈래다.
+그래서 모델은 config 에 맡기지 않고 `exec -c model="$CODEX_MODEL_PIN"` 으로 명시 전달한다. 핀 값은 `gpt-5.5`(마지막
+라운드가 실제로 돈 모델). raw-output 머리글의 `model:` 이 핀과 다르면 그 라운드는 preflight 미충족이다. 갱신은 버전 핀과
+같은 규율 — 명시 결정 + 하네스 변경 이력, 진행 중 slice 의 라운드 도중에는 바꾸지 않는다.
 
 **`--disable memories --ignore-rules`는 반드시 붙인다.** worktree 격리는 **프롬프트 주입을
 막지 못한다.** 두 표면이 있고 **둘은 서로 다른 플래그로 닫힌다.**

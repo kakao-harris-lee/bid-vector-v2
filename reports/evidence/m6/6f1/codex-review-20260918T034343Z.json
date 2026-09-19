@@ -1,0 +1,77 @@
+{
+  "verdict": "request_changes",
+  "reviewed_base": "86528933fc057b77873b28313b31a492a47e62db",
+  "reviewed_head": "b56826f55509a806be542396ee0bed16cabfb1de",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "adapters/src/main/kotlin/bidvector/adapters/strategy/StrategyRow.kt",
+      "line": 127,
+      "evidence": "`toBudgetAmount()`가 DB의 `NUMERIC(20,0)` 예산 값을 `won.toLong()`으로 변환한다. V9 스키마의 `min_budget_won`/`max_budget_won`은 `NUMERIC(20,0)`이고 Long 상한 CHECK가 없다. 따라서 `18446744073709551616` 같은 20자리 값은 Java BigDecimal long 변환에서 0으로 접힐 수 있고, `KRW`/`INCLUSIVE`/`OPERATOR_DECLARED`와 함께 저장되면 `BaseAmount(0, ...)` 초안으로 검증을 통과할 수 있다. 저장된 raw numeric이 조용히 다른 전략 예산으로 바뀌므로 v2-지침서 §4.1/ADR 0002의 금액 보존 및 D-6F1-3의 '지어내지 않고 실패' 기준을 막는다.",
+      "required_fix": "예산 won 복원에는 `longValueExact()` 같은 exact/range 검사를 사용하고, 두 전략 표의 min/max budget 컬럼에도 `0 <= won <= 9223372036854775807` 범위 CHECK를 추가하라. min/max 및 revision payload 경로에 overflow 값이 크게 실패한다는 regression test를 추가하라."
+    },
+    {
+      "severity": "medium",
+      "file": "adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt",
+      "line": 86,
+      "evidence": "새 `getTextList()`가 `TEXT[]` 원소를 `Array<String?>`로 읽은 뒤 `filterNotNull()`로 NULL 원소를 조용히 버린다. V9의 전략 배열 컬럼은 컬럼 자체만 `NOT NULL`이고 PostgreSQL 배열 내부 NULL 원소는 막지 않는다. 예를 들어 `required_keyword_terms = ARRAY[NULL]::text[]` 또는 `focus_region_terms = ARRAY['서울', NULL]::text[]`인 저장 행은 로드 시 빈 규칙/축소된 규칙으로 변환되어 유효 전략처럼 통과할 수 있다. 저장된 무효 값을 실패로 드러내야 한다는 D-6F1-3 및 fallback 금지 원칙과 충돌한다.",
+      "required_fix": "다섯 전략 배열 컬럼 모두에 NULL 원소 금지 CHECK를 두 표에 추가하거나, `getTextList()`가 NULL 원소 발견 시 예외로 실패하게 하라. NULL 원소가 규칙 삭제/축소로 접히지 않는 regression test를 추가하라."
+    }
+  ],
+  "commands_run": [
+    "git rev-parse HEAD && git cat-file -e 86528933fc057b77873b28313b31a492a47e62db^{commit} && git cat-file -e b56826f55509a806be542396ee0bed16cabfb1de^{commit} && git status --short",
+    "sed -n '1,220p' agent-workflow.md",
+    "sed -n '1,260p' milestone-6.md",
+    "sed -n '1,260p' v2-지침서.md",
+    "git diff --stat 86528933fc057b77873b28313b31a492a47e62db...b56826f55509a806be542396ee0bed16cabfb1de",
+    "git diff --name-status 86528933fc057b77873b28313b31a492a47e62db...b56826f55509a806be542396ee0bed16cabfb1de",
+    "find reports/evidence/m6/6f1 -maxdepth 2 -type f | sort",
+    "sed -n '1,260p' reports/evidence/m6/6f1/scope.md",
+    "sed -n '1,260p' reports/evidence/m6/6f1/commands.md",
+    "sed -n '1,280p' reports/evidence/m6/6f1/checklist.md",
+    "sed -n '1,240p' reports/evidence/m6/6f1/rollback.md",
+    "find build adapters/build -path '*TEST*.xml' -o -path '*test-results*' -type f | sort | sed -n '1,240p'",
+    "sed -n '1,240p' adapters/src/main/kotlin/bidvector/adapters/strategy/JdbcStrategyRepository.kt",
+    "sed -n '1,280p' adapters/src/main/kotlin/bidvector/adapters/strategy/StrategyRow.kt",
+    "sed -n '1,220p' adapters/src/main/resources/db/migration/V9__operator_strategy.sql",
+    "sed -n '1,220p' adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt",
+    "rg -n \"STRATEGY|operator_strategy|UPSERT_STRATEGY|INSERT_STRATEGY\" adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt",
+    "sed -n '1,200p' adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt",
+    "sed -n '1,220p' adapters/src/main/kotlin/bidvector/adapters/persistence/ProvenanceCodec.kt",
+    "sed -n '1,220p' adapters/src/test/kotlin/bidvector/adapters/strategy/StrategyAdapterDependencyTest.kt",
+    "sed -n '280,360p' adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt",
+    "rg -n \"interface StrategyRepository|class EvaluateCandidatesUseCase|data class AppliedStrategy|OperatorStrategy|StrategyDraft|fun validate|STRATEGY_POLICY\" -S",
+    "sed -n '1,260p' adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt",
+    "sed -n '260,620p' adapters/src/test/kotlin/bidvector/adapters/persistence/JdbcStrategyRepositoryTest.kt",
+    "sed -n '1,280p' strategy/src/main/kotlin/bidvector/strategy/StrategyValidation.kt",
+    "sed -n '1,220p' strategy/src/main/kotlin/bidvector/strategy/StrategyTypes.kt",
+    "sed -n '1,120p' workflow/src/main/kotlin/bidvector/workflow/strategy/Ports.kt && sed -n '1,120p' workflow/src/main/kotlin/bidvector/workflow/strategy/AppliedStrategy.kt",
+    "sed -n '1,420p' workflow/src/main/kotlin/bidvector/workflow/strategy/EditStrategyWorkflow.kt 2>/dev/null || rg -n \"class EditStrategyWorkflow|fun confirm|fun provideValue|strategies.save\" workflow/src/main/kotlin/bidvector/workflow/strategy -S",
+    "sed -n '1,260p' adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt",
+    "sed -n '1,340p' adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt",
+    "sed -n '1,220p' adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt",
+    "sed -n '1,180p' adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt",
+    "rg -n \"<failure|<error|failures=\\\"[1-9]|errors=\\\"[1-9]\" build adapters/build */build 2>/dev/null",
+    "python3 - <<'PY'\nimport glob, xml.etree.ElementTree as ET\nfor path in sorted(glob.glob('**/build/test-results/test/TEST-*.xml', recursive=True)):\n    root=ET.parse(path).getroot()\n    tests=int(root.attrib.get('tests','0')); failures=int(root.attrib.get('failures','0')); errors=int(root.attrib.get('errors','0')); skipped=int(root.attrib.get('skipped','0'))\n    if failures or errors or skipped:\n        print(path, root.attrib)\nPY",
+    "find build/reports -type f | sort | sed -n '1,260p'",
+    "python3 - <<'PY'\nimport glob, xml.etree.ElementTree as ET\ns=[]\nfor path in sorted(glob.glob('**/build/test-results/test/TEST-*.xml', recursive=True)):\n    root=ET.parse(path).getroot()\n    s.append((path,int(root.attrib.get('tests','0')),int(root.attrib.get('failures','0')),int(root.attrib.get('errors','0')),int(root.attrib.get('skipped','0'))))\nprint('files',len(s),'tests',sum(x[1] for x in s),'failures',sum(x[2] for x in s),'errors',sum(x[3] for x in s),'skipped',sum(x[4] for x in s))\nfor path,t,f,e,sk in s:\n    if 'JdbcStrategyRepositoryTest' in path or 'CleanMigration' in path or 'StrategyAdapterDependencyTest' in path:\n        print(path,t,f,e,sk)\nPY",
+    "git diff --check 86528933fc057b77873b28313b31a492a47e62db...b56826f55509a806be542396ee0bed16cabfb1de",
+    "git log --oneline --decorate --max-count=30 86528933fc057b77873b28313b31a492a47e62db..b56826f55509a806be542396ee0bed16cabfb1de",
+    "rg -n \"toLong\\(\\)|longValueExact|getBigDecimal\\(\" adapters/src/main/kotlin shared-kernel strategy procurement decision workflow -S",
+    "nl -ba adapters/src/main/kotlin/bidvector/adapters/strategy/StrategyRow.kt | sed -n '112,130p'",
+    "nl -ba adapters/src/main/resources/db/migration/V9__operator_strategy.sql | sed -n '18,44p'",
+    "python3 - <<'PY'\nfrom decimal import Decimal\nv=18446744073709551616\nx=v & ((1<<64)-1)\nif x >= 1<<63: x-=1<<64\nprint(x)\nPY",
+    "nl -ba adapters/src/main/kotlin/bidvector/adapters/persistence/PersistenceJdbcSupport.kt | sed -n '70,86p'",
+    "nl -ba adapters/src/main/resources/db/migration/V9__operator_strategy.sql | sed -n '15,23p'",
+    "rg -n \"StrategyRepository|operator_strategy|strategy persistence|전략 영속|AppliedStrategy|V9|persistence|migration\" docs/adr docs/discovery -S"
+  ],
+  "residual_risks": [
+    "Gradle/Testcontainers/DB는 이 샌드박스 제약 때문에 직접 재실행하지 못했고, 커밋된 build 산출물(XML/게이트 리포트)을 판독했다.",
+    "실제 운영 DB에 V9를 적용하거나 rollback SQL을 실행하지는 않았다.",
+    "`tools/one-command-check.sh`의 Python 하위 단계는 로그 산출물이 제한적이어서, 저장된 테스트 XML과 게이트 리포트 중심으로 확인했다."
+  ],
+  "reviewer": {
+    "cli_version": "codex-cli 0.154.0",
+    "model": "gpt-5.5 (reasoning effort: high)"
+  }
+}

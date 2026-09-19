@@ -11,11 +11,20 @@ import org.junit.jupiter.api.Test
  * 넘었다). D-3D-6 여덟 축 중 컬럼 셋만 다룬다(다른 다섯 축은 `CleanMigrationTest`).
  */
 class CleanMigrationColumnTest : PersistenceTestSupport() {
+    /**
+     * `hasDefault` — M6/6B-1 verifier r1 MEDIUM-1(a) 시정. 이름·타입·NOT NULL 삼중항만으로는
+     * `session_version INTEGER NOT NULL DEFAULT 0`(D-6B1-3 이 금지한 바로 그 것)이 초록으로
+     * 지났다. 정확한 DEFAULT 식 문자열이 아니라 **있고 없음**만 잰다 — 식 문자열은 Postgres
+     * 버전·캐스트 표기가 갈릴 수 있어 이름 재작성만으로 오탐이 날 수 있다(예: `1` vs
+     * `1::bigint`). 기존 행은 전부 `hasDefault` 를 안 적어 Kotlin 기본값 `false` 를 쓴다 —
+     * 실제로 DEFAULT 가 있는 21개 컬럼만 `true` 로 명시했다(추가만, 기존 표 기대치는 그대로).
+     */
     private data class ColumnSpec(
         val table: String,
         val column: String,
         val dataType: String,
         val nullable: Boolean,
+        val hasDefault: Boolean = false,
     )
 
     // sizeGate(함수 50줄)는 본문 있는 선언만 잰다 — 「값을 담을 뿐인 프로퍼티 초기화식」은
@@ -30,7 +39,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("raw_observation", "payload_fields", "jsonb", false),
             ColumnSpec("raw_observation", "observed_at", "timestamp with time zone", false),
             ColumnSpec("raw_observation", "release_sha", "text", false),
-            ColumnSpec("raw_observation", "inserted_at", "timestamp with time zone", false),
+            ColumnSpec("raw_observation", "inserted_at", "timestamp with time zone", false, true),
         )
 
     private val provenanceAuthorityColumns =
@@ -69,10 +78,10 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice", "notice_agency_code", "text", true),
             ColumnSpec("notice", "notice_agency_name", "text", true),
             ColumnSpec("notice", "deadline_at", "timestamp with time zone", true),
-            ColumnSpec("notice", "revision", "bigint", false),
+            ColumnSpec("notice", "revision", "bigint", false, true),
             ColumnSpec("notice", "observation_key", "text", false),
-            ColumnSpec("notice", "created_at", "timestamp with time zone", false),
-            ColumnSpec("notice", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("notice", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("notice", "updated_at", "timestamp with time zone", false, true),
         )
 
     private val noticeAuditColumns =
@@ -84,7 +93,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice_audit", "observation_key", "text", false),
             ColumnSpec("notice_audit", "reason", "text", false),
             ColumnSpec("notice_audit", "previous_row", "jsonb", false),
-            ColumnSpec("notice_audit", "recorded_at", "timestamp with time zone", false),
+            ColumnSpec("notice_audit", "recorded_at", "timestamp with time zone", false, true),
         )
 
     private val rejectedWriteColumns =
@@ -95,7 +104,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("rejected_write", "observation_key", "text", false),
             ColumnSpec("rejected_write", "reason", "text", false),
             ColumnSpec("rejected_write", "attempted_value", "jsonb", true),
-            ColumnSpec("rejected_write", "recorded_at", "timestamp with time zone", false),
+            ColumnSpec("rejected_write", "recorded_at", "timestamp with time zone", false, true),
         )
 
     private val openingResultColumns =
@@ -107,10 +116,10 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("opening_result", "derived_base_amount_currency", "text", true),
             ColumnSpec("opening_result", "derived_base_amount_vat", "text", true),
             ColumnSpec("opening_result", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("opening_result", "revision", "bigint", false),
+            ColumnSpec("opening_result", "revision", "bigint", false, true),
             ColumnSpec("opening_result", "observation_key", "text", false),
-            ColumnSpec("opening_result", "created_at", "timestamp with time zone", false),
-            ColumnSpec("opening_result", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("opening_result", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("opening_result", "updated_at", "timestamp with time zone", false, true),
             // M3/3E — 층 C fact 슬롯(추가만, 스키마 스냅샷 래칫 예외 운영자 승인 2026-09-08).
             ColumnSpec("opening_result", "final_award_amount_won", "numeric", true),
             ColumnSpec("opening_result", "final_award_amount_currency", "text", true),
@@ -157,10 +166,10 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("opening_reserve_price", "is_drawn", "boolean", true),
             ColumnSpec("opening_reserve_price", "draw_count", "integer", true),
             ColumnSpec("opening_reserve_price", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("opening_reserve_price", "revision", "bigint", false),
+            ColumnSpec("opening_reserve_price", "revision", "bigint", false, true),
             ColumnSpec("opening_reserve_price", "observation_key", "text", false),
-            ColumnSpec("opening_reserve_price", "created_at", "timestamp with time zone", false),
-            ColumnSpec("opening_reserve_price", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("opening_reserve_price", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("opening_reserve_price", "updated_at", "timestamp with time zone", false, true),
         )
 
     private val qualificationTextColumns =
@@ -169,10 +178,10 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("qualification_text", "notice_round", "text", false),
             ColumnSpec("qualification_text", "raw_text", "text", false),
             ColumnSpec("qualification_text", "observed_at", "timestamp with time zone", false),
-            ColumnSpec("qualification_text", "revision", "bigint", false),
+            ColumnSpec("qualification_text", "revision", "bigint", false, true),
             ColumnSpec("qualification_text", "observation_key", "text", false),
-            ColumnSpec("qualification_text", "created_at", "timestamp with time zone", false),
-            ColumnSpec("qualification_text", "updated_at", "timestamp with time zone", false),
+            ColumnSpec("qualification_text", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("qualification_text", "updated_at", "timestamp with time zone", false, true),
         )
 
     private val collectionRunColumns =
@@ -192,9 +201,9 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("collection_run", "truncated", "boolean", false),
             ColumnSpec("collection_run", "unknown_fields", "integer", false),
             ColumnSpec("collection_run", "truncation_cause", "text", true),
-            ColumnSpec("collection_run", "quota_exceeded", "integer", false),
-            ColumnSpec("collection_run", "backoff_skipped", "integer", false),
-            ColumnSpec("collection_run", "inserted_at", "timestamp with time zone", false),
+            ColumnSpec("collection_run", "quota_exceeded", "integer", false, true),
+            ColumnSpec("collection_run", "backoff_skipped", "integer", false, true),
+            ColumnSpec("collection_run", "inserted_at", "timestamp with time zone", false, true),
         )
 
     // M4/4C-2 — outbox·inbox(추가만, D-4C2-2). 어휘·필드는 V6__outbox_inbox.sql 그대로.
@@ -213,19 +222,122 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("outbox", "payload_type", "text", false),
             ColumnSpec("outbox", "payload", "text", false),
             ColumnSpec("outbox", "state", "text", false),
-            ColumnSpec("outbox", "inserted_at", "timestamp with time zone", false),
+            ColumnSpec("outbox", "inserted_at", "timestamp with time zone", false, true),
         )
 
     private val inboxColumns =
         listOf(
             ColumnSpec("inbox", "idempotency_key", "text", false),
-            ColumnSpec("inbox", "processed_at", "timestamp with time zone", false),
+            ColumnSpec("inbox", "processed_at", "timestamp with time zone", false, true),
+        )
+
+    // M6/6B-1 — V8__edit_session.sql(추가만, D-6B1-8). state_payload·last_command 는
+    // JSON 텍스트(nullable — EXPIRED 는 payload 없음, 세션 시작 직후는 command 없음).
+    private val editSessionColumns =
+        listOf(
+            ColumnSpec("edit_session", "id", "text", false),
+            ColumnSpec("edit_session", "operator_id", "text", false),
+            ColumnSpec("edit_session", "state", "text", false),
+            ColumnSpec("edit_session", "state_payload", "text", true),
+            ColumnSpec("edit_session", "expires_at", "timestamp with time zone", false),
+            ColumnSpec("edit_session", "session_version", "integer", false),
+            ColumnSpec("edit_session", "last_command", "text", true),
+            ColumnSpec("edit_session", "created_at", "timestamp with time zone", false, true),
+        )
+
+    // M6/6F-1 — 전략 영속(추가만, D-6F1-1). 두 표가 감시·임계·상한 열 형태를 공유한다
+    // (operator_strategy = 싱글턴 현재 값, operator_strategy_revision = 개정 이력). 감시 규칙
+    // 다섯 축은 `StrategyDraft`가 항상 `List<String>`(빈 목록이 「규칙 없음」)이라 NOT NULL —
+    // 나머지(예산·점수·상한)만 진짜 nullable이다.
+    private val operatorStrategyNotNullArrayColumns =
+        listOf(
+            "focus_categories" to "ARRAY",
+            "focus_region_terms" to "ARRAY",
+            "exclude_region_terms" to "ARRAY",
+            "required_keyword_terms" to "ARRAY",
+            "exclude_keyword_terms" to "ARRAY",
+        )
+
+    private val operatorStrategyNullableColumns =
+        listOf(
+            "min_budget_won" to "numeric",
+            "min_budget_currency" to "text",
+            "min_budget_vat" to "text",
+            "min_budget_provenance" to "text",
+            "min_budget_provenance_detail" to "text",
+            "max_budget_won" to "numeric",
+            "max_budget_currency" to "text",
+            "max_budget_vat" to "text",
+            "max_budget_provenance" to "text",
+            "max_budget_provenance_detail" to "text",
+            "minimum_match_score" to "numeric",
+            "minimum_probability_score" to "numeric",
+            "bid_now_threshold" to "numeric",
+            "review_threshold" to "numeric",
+            "candidate_limit" to "integer",
+        )
+
+    private fun operatorStrategySharedColumns(table: String): List<ColumnSpec> =
+        operatorStrategyNotNullArrayColumns.map { (name, type) -> ColumnSpec(table, name, type, false) } +
+            operatorStrategyNullableColumns.map { (name, type) -> ColumnSpec(table, name, type, true) }
+
+    private val operatorStrategyColumns =
+        listOf(
+            ColumnSpec("operator_strategy", "id", "smallint", false),
+            ColumnSpec("operator_strategy", "revision", "integer", false),
+            ColumnSpec("operator_strategy", "updated_at", "timestamp with time zone", false, true),
+        ) + operatorStrategySharedColumns("operator_strategy")
+
+    private val operatorStrategyRevisionColumns =
+        listOf(
+            ColumnSpec("operator_strategy_revision", "revision", "integer", false),
+            ColumnSpec("operator_strategy_revision", "applied_at", "timestamp with time zone", false, true),
+        ) + operatorStrategySharedColumns("operator_strategy_revision")
+
+    // M6/6F-6 — 프로필 영속(추가만, D-6F6-2·D-6F6-3). V12__operator_profile.sql. 업종·지역
+    // 어휘는 전략과 같은 이유로 NOT NULL 배열(빈 목록이 「없음」). `licenses_declared`가
+    // `license_names`와 짝을 이뤄 세 상태(미설정=행 없음·NotDeclared·Declared(빈 목록))를
+    // 구분한다.
+    private val operatorProfileColumns =
+        listOf(
+            ColumnSpec("operator_profile", "id", "smallint", false),
+            ColumnSpec("operator_profile", "business_types", "ARRAY", false),
+            ColumnSpec("operator_profile", "licenses_declared", "boolean", false),
+            ColumnSpec("operator_profile", "license_names", "ARRAY", false),
+            ColumnSpec("operator_profile", "region_terms", "ARRAY", false),
+            ColumnSpec("operator_profile", "updated_at", "timestamp with time zone", false, true),
+        )
+
+    // M6/6F-5-a — 자격 요건 영속(추가만, D-6F5-4). 헤더(notice_requirement)는 공고당 한 행,
+    // 행(notice_requirement_row)은 `RequirementRow`(Parsed·Unparsable) 왕복 — PARSED만
+    // group_no·source_field·license_names를 채운다(nullable, UNPARSABLE은 항상 NULL).
+    private val noticeRequirementColumns =
+        listOf(
+            ColumnSpec("notice_requirement", "notice_number", "text", false),
+            ColumnSpec("notice_requirement", "notice_round", "text", false),
+            ColumnSpec("notice_requirement", "status", "text", false),
+            ColumnSpec("notice_requirement", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("notice_requirement", "updated_at", "timestamp with time zone", false, true),
+        )
+
+    private val noticeRequirementRowColumns =
+        listOf(
+            ColumnSpec("notice_requirement_row", "notice_number", "text", false),
+            ColumnSpec("notice_requirement_row", "notice_round", "text", false),
+            ColumnSpec("notice_requirement_row", "serial_no", "text", false),
+            ColumnSpec("notice_requirement_row", "kind", "text", false),
+            ColumnSpec("notice_requirement_row", "group_no", "text", true),
+            ColumnSpec("notice_requirement_row", "source_field", "text", true),
+            ColumnSpec("notice_requirement_row", "license_names", "ARRAY", true),
+            ColumnSpec("notice_requirement_row", "created_at", "timestamp with time zone", false, true),
         )
 
     private val expectedColumns =
         rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
             rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
-            openingReservePriceColumns + outboxColumns + inboxColumns
+            openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns +
+            operatorStrategyColumns + operatorStrategyRevisionColumns + operatorProfileColumns +
+            noticeRequirementColumns + noticeRequirementRowColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {
@@ -234,7 +346,8 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             connection.createStatement().use { statement ->
                 statement
                     .executeQuery(
-                        "SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns " +
+                        "SELECT table_name, column_name, data_type, is_nullable, column_default " +
+                            "FROM information_schema.columns " +
                             "WHERE table_schema = 'public' AND table_name <> 'flyway_schema_history'",
                     ).use { rs ->
                         while (rs.next()) {
@@ -244,6 +357,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
                                     rs.getString("column_name"),
                                     rs.getString("data_type"),
                                     rs.getString("is_nullable") == "YES",
+                                    rs.getString("column_default") != null,
                                 )
                         }
                     }
@@ -269,6 +383,11 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
                 "opening_reserve_price.base_reserve_price_won",
                 // M3/3F — 개찰완료 축 부모 슬롯(추가만).
                 "opening_result.opening_rank_one_bid_amount_won",
+                // M6/6F-1 — 전략 예산 한계 둘(추가만, D-6F1-1).
+                "operator_strategy.min_budget_won",
+                "operator_strategy.max_budget_won",
+                "operator_strategy_revision.min_budget_won",
+                "operator_strategy_revision.max_budget_won",
             )
         for (qualified in wonColumns) {
             val (table, column) = qualified.split(".")
