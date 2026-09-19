@@ -223,6 +223,49 @@ OpenAPI 를 `Set.equals` 로 완전 일치). 재사용 조사도 충분하다 �
 없었다). 자동 병합 conflict 0. **경고가 과했던 것을 사실로 적는다** — 다만 **커밋 여섯 단계에서 흡수한 것이
 쌌던 이유**이기도 하다(직전 slice 는 서른여섯 커밋 뒤에 흡수해 충돌 7 hunk + `sizeGate` 둘을 맞았다).
 
+## 계약 갱신 (9) — 검토 레인 다섯의 결과 (2026-09-19, 팀장)
+
+Codex 제외 결정(계약 갱신 (7)) 아래 Claude 측 **다섯 레인을 병렬**로 돌렸다. 결과:
+`privacy-gate` **통과**(위반 0·확인 불가 0) · `contract-keeper` **계약 준수** · `migration-reviewer` **통과**
+(수정 1) · `code-reviewer` **HIGH 1 · MEDIUM 2 · LOW 1** · `verifier` **not-ready — 산출물 HIGH 3**.
+재작업 **1/5**.
+
+**이 라운드가 가르친 것 — 다섯을 돌린 값이 어디서 나왔는가.** `privacy-gate` 는 위협 모델 (a)·(c) 를
+**준수**로 판정했고 그 판정은 **소스에 대해 옳았다**(production 조립에 필터가 등록돼 있다). 그러나
+**verifier 만이 production 조립에 변이를 심었고**, 거기서 **그 등록을 통째로 지워도 전건이 초록**임이
+드러났다. **「코드가 맞다」와 「그 맞음이 게이트로 잠겨 있다」는 다른 물음**이고, 후자는 **변이로만**
+답해진다. 두 레인의 판정이 서로 모순이 아니라 **다른 층**이다 — 그 사실을 여기 적어 둔다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6A1-27**(**F-1, HIGH — 재는 조립이 배포되는 조립이 아니다**) | HTTP test 가 위협 모델 **(a)·(c)** 를 **production 조립**(`BidVectorApplication`)에 대해 재도록 고친다. 지금 넷 전부 `HttpTestApplication`(test 전용)을 띄우고 **필터 등록을 다시 선언**하며, `BidVectorApplication` 을 부팅하는 test 가 **0** 이다. **닫힘 판정은 오직 이것** — **production 필터 bean 을 삭제했을 때 전건 `check` 가 RED** 인가 | verifier 실측: ① production `urlPatterns` 를 아무것도 안 맞는 패턴으로 좁힘 → http test **exit 0** ② **production 자격증명 필터 bean 삭제(9줄) → `./gradlew check` BUILD SUCCESSFUL** — **배포 앱이 무인증으로 열려도 전건 초록**이다 ③ `main()` 의 디스패치 속성 둘 제거 → exit 0, 그래서 `HttpTestSupport` 의 「드리프트가 나면 D-6A1-21 test 가 곧바로 실패한다」는 **거짓으로 실측**됐다. **기제 자체는 건전하다**(새 controller + **test 조립** 필터 축소는 RED) — **재는 대상이 틀렸을 뿐이다.** 이 저장소가 「게이트는 산출물이다」로 적어 둔 것의 가장 비싼 판이다 |
+| **D-6A1-28**(**F-2, HIGH — 게이트가 공허해졌다**) | `app/build.gradle.kts` 에서 **`jar` 를 다시 켠다**(`bootJar` 와 공존). `jarContentGate` 의 `entries` 가 **0 → 20** 으로 복구되는지 실측으로 확인한다. 「파일명 충돌」이라 적은 주석을 **사실로 정정**한다 | base `entries=1/verified=1` → head **`entries=0`/verified=20**. **`bootJar` 를 켜고 `jar` 를 끈 in_scope 편집의 부작용**으로 게이트가 **아무것도 안 보게** 됐다 — 배포물은 `bootJar`(우리 클래스 23개)인데 게이트가 그것을 안 보고 `check` 는 만들지도 않는다. 「파일명 충돌」은 **실측과 다르다**: 둘 다 켜면 `app-plain.jar`+`app.jar` 가 공존하고 게이트가 복구된다(한 줄 처방). **초록인 게이트와 아무것도 안 보는 게이트는 구별되지 않는다** |
+| **D-6A1-29**(**F-3, HIGH — 상수 시간 게이트가 클래스 하나에 걸려 있다**) | `ConstantTimeComparisonStructureTest` 를 **패키지 전체 class 파일**(`walkTopDown()`)에 대해 돌린다 — **같은 slice 의 자매 게이트 `AuditAdapterDependencyTest` 와 같은 형태로.** 닫힘: `doFilter` 조건에 단락 비교(`presented != expected ||`)를 되살렸을 때 RED | 지금 술어는 `OperatorCredentialFilterKt.class`(**파사드**)만 본다. 단락을 넣으면 **타이밍 차가 그대로 되살아나는데 http test 16건 전부 초록**이고, `OperatorCredentialFilter.class` 상수 풀에는 `Intrinsics.areEqual` 이 **2건** 남는다(javap 확인). **한 slice 안에서 자매 게이트 하나는 구조로 닫고 하나는 안 닫았다** — 6F-5-a r2 가 HIGH 를 받은 「술어의 범위가 계약의 선언보다 좁다」의 **재발**이고, 이번엔 **선례가 옆 파일에 있었는데도** 그랬다 |
+| **D-6A1-30**(**HIGH — 깊이 방어가 배열 안 object 를 못 본다. 두 레인이 독립으로 수렴**) | `OpenApiContractTest` 의 중첩 검사 **둘 다** 고친다 — 정적(`collectNestedObjectProperties`)은 `type: array, items: {type: object}` 를, 런타임은 값이 `List<Map>` 인 경우를. 닫힘: 스키마에 object 배열 필드를 넣어 RED | `contract-keeper` 와 `code-reviewer` 가 **서로 모른 채 같은 자리**를 짚었다. 런타임 쪽은 `values.none { it is Map }` 이라 값이 `List<Map<*,*>>` 이면 `it` 이 List 라 **false** 다. 지금 스키마엔 없어 즉시 위반은 아니나 **D-6A1-20 이 선언한 보장 범위보다 실제 커버리지가 좁다.** **팀장 처방의 사각이다** — 내가 「중첩」을 **한 가지 형태로만** 상상했다 |
+| **D-6A1-31**(migration 수정 1 — 신설 CHECK 본문) | `api_request_audit` 의 CHECK 둘(`status_code BETWEEN 100 AND 599`·`duration_ms >= 0`)을 **표 범위 본문 집합 등식**으로 잠근다(6F-5-a D-6F5-21 의 종점 형태). 개수 축만으로는 제자리 `OR TRUE` 항진명제화를 못 잡는다 | `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` 가 **이 slice 의 신설 표에서 재현**됐다. 그 OPEN 은 「**남의 표**라 안 고친다」로 넘긴 것이고, **이번 둘은 이 slice 자신의 표**라 같은 논리로 **닫는다** |
+| **D-6A1-32**(contract 확인 불가 둘 — 닫는다) | `OpenApiContractTest` 의 spec-map 대조에 **500** 을 넣고, `InvalidStoredStrategyException` 전용 500 분기를 때리는 test 를 더한다 | 지금 500 은 `RequestAuditFilterTest` 가 code/message 만 개별 확인하고 **계약 대조 경로에는 없다**. 「계약에 적혀 있는데 대조는 안 한다」가 D-6A1-8(단일 출처)의 구멍이다 |
+| **D-6A1-33**(`provenanceLabel` 중복 — **고치지 않는다**, 근거를 사실로) | `ProvenanceCodec` 가시성을 넓히지 **않는다**. 중복을 유지하고 **그 이유를 알려진 제한에 근거와 함께** 적는다 | `code-reviewer` 가 「가시성만 넓히면 제거 가능」이라고 더 값싼 대안을 냈고 그 지적은 옳다. 그러나 **표현 계층의 라벨 하나를 위해 공개 표면을 영구히 넓히는** 거래다. **양쪽 다 sealed 타입에 대한 소진 `when`** 이라 **drift 는 컴파일러가 잡는다** — 이것은 **안전한 중복**이다. D-6F5-11(「회피가 필요하지 않았다」)과 다른 자리다: 거기서는 위임이 **표면을 안 넓혔다** |
+| **D-6A1-34**(F-9 — `const val` OPEN 의 범위를 넓힌다) | `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT` 의 문면을 **「모든 컴파일 시간 상수 참조」**로 고친다 — `object` const · **top-level** const · **다른 모듈 companion** const 셋 다 미검출임이 실측됐다(실제 정책 상수로도 재현) | 등재 문면이 실측보다 **좁았다.** 좁게 적은 OPEN 은 받는 레인이 **그 좁은 범위만 닫게** 만든다 |
+
+**장부층(막지 않으나 같은 라운드에 닫는다)** — **F-4** rollback 목록이 in_scope `milestone-6.md` 를 빠뜨렸다
+(생성 명령 범위 밖 — 유효성 확인 명령도 같은 누락) · **F-5** rollback **실행 블록이 `--source=1881c82c` 고정
+SHA** 라 **D-6A1-15 문면 위반**이다(서술은 정의인데 실행은 고정 — **서술과 실행이 갈리면 실행이 이긴다**) ·
+**F-6** rollback ② 수치 미재현(문서 D 17 · 재현 **D 18**) · **F-7 + code-reviewer LOW** production KDoc 이
+**존재하지 않는 test 둘**(`RequestAuditFilterDispatchTest`·`StrategyReadResponseIsFlatTest`)을 근거로 인용 ·
+**F-8** **「두 설정 둘 다 필요」는 거짓** — `throw-exception-if-no-handler-found` 만 빼면 GREEN 이고 지탱하는
+것은 `add-mappings=false` **하나**다(**팀장이 이 거짓 주장을 운영자에게 전달했다 — 여기서 정정한다**) ·
+**code-reviewer MEDIUM** D-6A1-21 ① 이 `shouldNotBeEmpty()` 로만 확인돼 **`/error` 포함을 직접 단언하지
+않는다**(Boot 가 바뀌면 조용히 미검증으로 돌아간다 — 직접 단언으로).
+
+**다음 slice 취약 자리로 등재만**(이 slice 가 고치지 않는다): `currency`·`vatTreatment`·`provenance` 문자열
+필드에 **enum 제약이 없어 계약이 실제 고정값 집합보다 느슨하다** · `/{unmatched}` 경로가 **실 codegen 소비자
+에게 진짜 path param 으로 오인될 수 있다**(지금은 D-6A1-8 수작성 방침이라 안전).
+
+**verifier 가 확인한 닫힘** — 기계 전수가 손 목록이 아니고 수집 결과가 `/api/strategy`·`/error` 둘(Boot 자동
+구성 `/error` 까지 401 대조에 든다) · 미매핑·인증실패·예외 **세 경로 전부 audit 행 정확히 하나** · fail-closed
+는 **구현 보고와 다른 자리**에 심은 변이로도 RED · 신설 패키지 게이트 한 벌 **셋 다** 닫힘 · rollback 트리
+동일성과 6F-4 줄 보존 양방향 확인 · evidence 규격 전건 통과.
+
 ## 하네스 레인 변경
 
 `git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(착수 시점).
