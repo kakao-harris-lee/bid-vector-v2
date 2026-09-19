@@ -65,8 +65,16 @@ private const val LICENSE_POLICY_LOADER_GETTER_MARKER = "getLICENSE_QUALIFICATIO
  * D-6F5-14(verifier r2 HIGH, 범위 정정) — 위와 같은 이유로 **패키지 전체**에 대해 돈다.
  * `LicenseVerdict.Eligible(emptySet())` 조립을 새 형제 파일로 옮기면 클래스 단위 술어는
  * 우회되지만 패키지 단위 술어는 그 형제 파일의 class 를 같이 훑어 잡는다(verifier r2 실측 ②).
+ *
+ * D-6F5-15(verifier r2 LOW-1, 문면 정정 — 넓히는 방향) — 이 마커는 **생성자 참조 부재**보다
+ * 넓다: `LicenseVerdict$`는 subtype 의 내부 이름 접두이므로 `is LicenseVerdict.Eligible` 같은
+ * **읽기 전용 타입 검사 한 줄**도 컴파일이 `instanceof …LicenseVerdict$Eligible`을 상수 풀에
+ * 남겨 같이 걸린다(실측). 그래서 어댑터는 verdict를 **통과시키기만 한다** — 상수 풀에 어떤
+ * subtype 좌표도 두지 않는다(생성도 `is` 검사도 막힌다). 마커를 생성 형태로 좁히지 않는다
+ * (좁히면 `copy`·`data object` 싱글턴 참조 같은 다른 획득 경로가 열린다 — 이 slice가 이미
+ * 겪은 실패 방향).
  */
-private const val LICENSE_VERDICT_CONSTRUCTION_MARKER = "LicenseVerdict\$"
+private const val LICENSE_VERDICT_SUBTYPE_MARKER = "LicenseVerdict\$"
 
 /**
  * D-6F5-6 — **소스 텍스트가 아니라 컴파일된 클래스의 상수 풀을 `javap -p -v`로 훑는다.**
@@ -153,12 +161,15 @@ class QualificationAdapterDependencyTest {
      * test 가 덮지 않는 경로(`Unparsable` 행이 섞인 `Collected`)에서 반환하면, 게이트 클래스
      * 하나만 보는 술어는 우회된다(verifier r2 실측 ②③). **패키지 전체 class 파일**에 대해
      * 돌려 형제 파일의 조립도 함께 잡는다.
+     *
+     * D-6F5-15(verifier r2 LOW-1) — 술어는 생성뿐 아니라 **읽기**(`is LicenseVerdict.Eligible`)
+     * 도 막는다. 이름·문서를 「통과만 한다 — subtype 좌표를 두지 않는다」로 넓혀 술어와 맞춘다.
      */
     @Test
-    fun `qualification 패키지의 컴파일된 클래스는 LicenseVerdict 를 직접 생성하지 않는다`() {
+    fun `qualification 패키지의 컴파일된 클래스는 LicenseVerdict 를 통과만 시킨다 — subtype 좌표를 두지 않는다`() {
         qualificationPackageClassFiles().forEach { classFile ->
-            withClue("LicenseVerdict 직접 생성 위반: ${classFile.name}") {
-                javapOutput(classFile) shouldNotContain LICENSE_VERDICT_CONSTRUCTION_MARKER
+            withClue("LicenseVerdict subtype 좌표 위반: ${classFile.name}") {
+                javapOutput(classFile) shouldNotContain LICENSE_VERDICT_SUBTYPE_MARKER
             }
         }
     }
@@ -177,13 +188,17 @@ class QualificationAdapterDependencyTest {
         shouldThrow<AssertionError> { mutatedConstantPoolSample shouldNotContain LICENSE_POLICY_LOADER_GETTER_MARKER }
     }
 
-    /** 양성 대조(D-6F5-10) — 위와 같은 이유, `LicenseVerdict` 생성자 어휘 표본으로 잰다. */
+    /**
+     * 양성 대조(D-6F5-10, D-6F5-15) — 위와 같은 이유, `LicenseVerdict` subtype 좌표 어휘
+     * 표본으로 잰다. 표본은 생성자 참조 형태를 쓰지만 마커 자체는 `is` 검사가 남기는
+     * `instanceof` 어휘도 같은 문자열로 걸린다(D-6F5-15 KDoc 참고).
+     */
     @Test
-    fun `LicenseVerdict 생성자 어휘가 있으면 부재 단언이 실패한다 — 양성 대조`() {
+    fun `LicenseVerdict subtype 좌표 어휘가 있으면 부재 단언이 실패한다 — 양성 대조`() {
         val mutatedConstantPoolSample =
             "  #78 = Methodref  #23.#90  // bidvector/qualification/LicenseVerdict\$Eligible.\"<init>\":(Ljava/util/Set;)V"
 
-        shouldThrow<AssertionError> { mutatedConstantPoolSample shouldNotContain LICENSE_VERDICT_CONSTRUCTION_MARKER }
+        shouldThrow<AssertionError> { mutatedConstantPoolSample shouldNotContain LICENSE_VERDICT_SUBTYPE_MARKER }
     }
 }
 
