@@ -1,6 +1,8 @@
 # M6/6F-5-a — checklist.md
 
-## 새 파일 ↔ in_scope 대조 (실측 HEAD 694fad4a)
+## 새 파일 ↔ in_scope 대조
+
+### 라운드 0 (실측 HEAD 694fad4a)
 
 `git diff --name-status ede5d5b..694fad4a -- . ':!reports/evidence'` 산출(신규 8·수정 6,
 `milestone-6.md` 제외 — 팀장 착수 계약 고정 커밋 하나뿐, 이 레인은 편집하지 않았다):
@@ -25,6 +27,40 @@ M  config/quality/gate-tests.properties
 전부 scope.md in_scope 열넷 그대로다 — 계약 갱신 없이 원판대로 구현했다. scope 밖
 필연적 companion(6F-1이 겪은 형태)은 없다 — `CleanMigration*Test`·`PersistenceTestSupport`
 ·`Sql.kt`·`gate-tests.properties` 넷은 scope.md 자체가 in_scope로 이미 등재해 뒀다.
+
+### round 5 정정 — 병합이 만든 새 파일 둘 (D-6F5-31, 계약 갱신 (7))
+
+병합 커밋 `8ae5014f`가 `sizeGate` 회피로 `RequirementSql.kt`·
+`CleanMigrationPrivilegeTest.kt` 둘을 새로 만들었는데, 이 대조가 위 라운드 0(실측 HEAD
+`694fad4a`, 병합 전) 시점에 멈춰 있어 둘을 놓쳤다. `git diff --name-status
+edeaa9a3..92c83a0b -- . ':!reports/evidence' ':!milestone-6.md'`(현재 merge 커밋을
+`main`과 대조 — 이 slice가 병합 위에 얹은 것만 나온다)로 다시 대조:
+
+```
+M  adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt
+A  adapters/src/main/kotlin/bidvector/adapters/qualification/JdbcRequirementStore.kt
+A  adapters/src/main/kotlin/bidvector/adapters/qualification/RequirementRowMapping.kt
+A  adapters/src/main/kotlin/bidvector/adapters/qualification/RequirementSql.kt
+A  adapters/src/main/kotlin/bidvector/adapters/qualification/StoredRequirementLicenseGate.kt
+A  adapters/src/main/resources/db/migration/V13__notice_requirement.sql
+M  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt
+M  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt
+A  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt
+M  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt
+M  adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt
+A  adapters/src/test/kotlin/bidvector/adapters/qualification/JdbcRequirementStoreTest.kt
+A  adapters/src/test/kotlin/bidvector/adapters/qualification/QualificationAdapterDependencyTest.kt
+A  adapters/src/test/kotlin/bidvector/adapters/qualification/QualificationGateRegistrationTest.kt
+A  adapters/src/test/kotlin/bidvector/adapters/qualification/StoredRequirementLicenseGateTest.kt
+M  config/quality/gate-tests.properties
+```
+
+신규 **10**·수정 6. 새 둘은 `in_scope:` YAML에 이미 등재됐다(계약 갱신 (7),
+`RequirementSql.kt`·`CleanMigrationPrivilegeTest.kt` — 팀장이 직접 넣었다). scope 밖
+필연적 companion은 없다 — 둘 다 `sizeGate`가 만들었을 뿐 기능 변경이 아니고, 계약이
+이름으로 명시 등재했다(기존 glob으로는 안 덮였다 — `qualification/**`는 test 전용이라
+`RequirementSql.kt`를, `persistence/**`의 `CleanMigration*Test` glob 부재가
+`CleanMigrationPrivilegeTest.kt`를 각각 놓쳤을 자리였다).
 
 ## (2b) 값 획득 축 — 실측 대응표
 
