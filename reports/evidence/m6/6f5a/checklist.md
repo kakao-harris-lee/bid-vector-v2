@@ -68,6 +68,12 @@ scope.md 「경계로 처리」 둘을 실측한다(계약이 요구한 실측 �
 - **범위 밖 부채(등재만, 이 slice가 만든 것 아님)**: CPD 중복 게이트가 이름 치환 하나로
   열린다(`OPEN-CPD-GATE-RENAME-BYPASS`, verifier r1 실측 — 변수명만 바꿔도, 판정식만
   바꿔도 통과). 받는 쪽 하네스 레인.
+- **범위 밖 파일의 좌표 낡음(등재만, verifier r2 LOW-3)** — `reports/evidence/m4/4c2/
+  commands.md`가 `CleanMigrationCheckTest.kt:89`를 인용하는데, 이 slice가 그 파일에
+  +32줄을 더해 좌표가 더 밀린다. `f19d2eb`(M4) 이후 그 파일을 만진 커밋이 6B-1
+  둘·6F-1 둘·이 slice 하나라 좌표는 이 slice 이전에 이미 낡아 있었고, 이 slice는
+  더 밀 뿐이다 — evidence-pack의 「낡는 좌표 금지」는 **이 slice가 편집하는 파일**에
+  적용되고, `m4/4c2`는 범위 밖이라 직접 고치지 않는다.
 
 ## 재활용(reuse) — N/A
 
