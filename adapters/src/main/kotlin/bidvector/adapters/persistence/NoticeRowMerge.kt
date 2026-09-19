@@ -126,6 +126,8 @@ internal fun mergeNoticeRow(
         demandAgencyName = incomingRow.demandAgencyName ?: existing.demandAgencyName,
         noticeAgencyCode = incomingRow.noticeAgencyCode ?: existing.noticeAgencyCode,
         noticeAgencyName = incomingRow.noticeAgencyName ?: existing.noticeAgencyName,
+        // M6/6F-4 D-6F4-9 — 위 기관 축과 같은 존재 가드(provenance 축 없음).
+        title = incomingRow.title ?: existing.title,
         deadlineAt = incomingRow.deadlineAt ?: existing.deadlineAt,
     )
 }

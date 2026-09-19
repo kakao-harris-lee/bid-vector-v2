@@ -35,6 +35,8 @@ internal data class NoticeRow(
     val demandAgencyName: String?,
     val noticeAgencyCode: String?,
     val noticeAgencyName: String?,
+    // M6/6F-4 D-6F4-9 — 공고명. provenance 컬럼 없음(business_category_*·agency_* 와 같은 축).
+    val title: String?,
     val deadlineAt: Instant?,
     val revision: Long,
 )
@@ -65,6 +67,7 @@ internal fun ResultSet.toNoticeRow(): NoticeRow =
         demandAgencyName = getString("demand_agency_name"),
         noticeAgencyCode = getString("notice_agency_code"),
         noticeAgencyName = getString("notice_agency_name"),
+        title = getString("notice_title"),
         deadlineAt = getTimestamp("deadline_at")?.toInstant(),
         revision = getLong("revision"),
     )
@@ -99,6 +102,7 @@ internal fun NoticeCollected.toNoticeRow(): NoticeRow =
         demandAgencyName = demandAgency?.name?.value,
         noticeAgencyCode = noticeAgency?.code?.value,
         noticeAgencyName = noticeAgency?.name?.value,
+        title = title?.value,
         deadlineAt = deadlineAt,
         revision = 1L,
     )

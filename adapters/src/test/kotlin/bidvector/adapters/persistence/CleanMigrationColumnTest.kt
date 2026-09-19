@@ -77,6 +77,8 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice", "demand_agency_name", "text", true),
             ColumnSpec("notice", "notice_agency_code", "text", true),
             ColumnSpec("notice", "notice_agency_name", "text", true),
+            // M6/6F-4 D-6F4-1·9 — 감시 키워드 매칭 입력(공고명).
+            ColumnSpec("notice", "notice_title", "text", true),
             ColumnSpec("notice", "deadline_at", "timestamp with time zone", true),
             ColumnSpec("notice", "revision", "bigint", false, true),
             ColumnSpec("notice", "observation_key", "text", false),
