@@ -29,7 +29,11 @@ private fun subjectOf(
  * `assembleFullScopeText`는 이 slice의 실질이고, 어댑터(M3)에서 이 함수를 실제로 부르는
  * 호출자는 아직 없다(`OPEN-6F4-TITLE-WIRING`, D-6F4-4b — 수집→canonical 배선이 이 slice
  * 밖이다). 그래서 이 test는 함수 자체의 조립 규칙과, `WatchRules.evaluate`를 거친 행동까지
- * 잠근다 — legacy가 주석으로만 막던 오탐을 V2는 구조로 막는다는 것이 요점이다.
+ * 잠근다 — legacy가 주석으로만 막던 오탐을 이 조립 함수는 시그니처로 막는다는 것이 요점이다.
+ *
+ * **이 배제는 조립 함수 시그니처까지만 참이다(D-6F4-3c, 2026-09-19 정정)** — `KeywordScopeText`/
+ * `FullScopeText`는 여전히 공개 생성자를 가진 `data class`라 결과 타입을 직접 만들면 이 함수를
+ * 완전히 우회한다(`Text.kt`의 `KeywordScopeText` KDoc 참고). 「V2는 구조로 막는다」로 읽지 않는다.
  */
 class WatchTextAssemblyTest {
     @Test
@@ -76,8 +80,9 @@ class WatchTextAssemblyTest {
 
     /**
      * D-6F4-3 — legacy가 주석으로만 막던 오탐(발주기관명이 필수 키워드를 거짓 만족)을
-     * V2는 구조로 막는다: [assembleKeywordScopeText]는 기관명 인자 자체가 없다. 같은 값이
-     * 지역 규칙에는 정당하게 보인다.
+     * [assembleKeywordScopeText]는 시그니처로 막는다(기관명 인자 자체가 없다, D-6F4-3c —
+     * 결과 타입을 직접 만들면 우회한다는 한계는 이 함수의 방어 범위 밖). 같은 값이 지역
+     * 규칙에는 정당하게 보인다.
      */
     @Test
     fun `발주기관명은 필수 키워드를 만족시키지 않지만 같은 값이 지역 규칙에는 보인다`() {

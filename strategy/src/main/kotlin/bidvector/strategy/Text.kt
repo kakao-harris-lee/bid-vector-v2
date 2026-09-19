@@ -8,11 +8,16 @@ data class CategoryCode(
 /**
  * 키워드 규칙이 보는 텍스트 범위(STR-02, D-6F4-3·3b 개정) — **공고명 + 공종 둘만**. 요건
  * (`qualification_text`)·발주기관명 어느 쪽도 포함하지 않는다. 요건은 V2에서 면허제한
- * 오퍼레이션 응답(면허명·허용업종·업종분야)이라 업무 키워드가 아니고(D-6F4-3b, 인자
- * 자체가 없다 — 구조적 배제), 기관명은 legacy가 겪은 오탐(발주기관명이 필수 키워드를
- * 거짓 만족)의 구조적 차단이다(D-6F4-3). [FullScopeText]와 서로 다른 타입이라 규칙의
- * 시그니처가 어느 텍스트를 보는지 강제한다 — 어댑터가 조립 규율을 지킨다는 전제 자체는
- * 타입이 막지 못한다(scope.md 위협 모델 「방어하지 않는다」). 조립은 [assembleKeywordScopeText]다.
+ * 오퍼레이션 응답(면허명·허용업종·업종분야)이라 업무 키워드가 아니고, 기관명은 legacy가
+ * 겪은 오탐(발주기관명이 필수 키워드를 거짓 만족)의 차단 대상이다(D-6F4-3b·D-6F4-3).
+ * [FullScopeText]와 서로 다른 타입이라 규칙의 시그니처가 어느 텍스트를 보는지 강제한다.
+ *
+ * **그 차단은 [assembleKeywordScopeText] 시그니처까지만 참이다(D-6F4-3c, 2026-09-19
+ * 정정)** — 이 타입은 여전히 공개 생성자를 가진 `data class`라 `KeywordScopeText(rawValue)`
+ * 로 직접 만들면 조립 함수를 완전히 우회해 요건·기관명을 실을 수 있다. 오늘 production
+ * 생성 지점은 [assembleKeywordScopeText] 하나뿐이다(`OPEN-6F4-TITLE-WIRING`) — 그 배선이
+ * 붙는 slice가 `procurement.NoticeTitle`과 같은 경계(비공개 생성자 + 팩토리)로 닫는다.
+ * 조립은 [assembleKeywordScopeText]다.
  */
 data class KeywordScopeText(
     val value: String,
@@ -48,9 +53,10 @@ private fun keywordParts(
  * 부재 조각은 결합에서 빠진다(빈 문자열을 끼워 넣지 않는다) — 둘 다 없으면 `""`(D-6F4-4b,
  * 「값이 없으면 없는 것이다」, 예외로 흐르지 않는다).
  *
- * **요건·기관명은 인자 자체가 없다** — 값이 있어도 부를 방법이 없는 구조적 배제다
+ * **요건·기관명은 이 함수의 인자 자체가 없다** — 이 시그니처를 통해서는 부를 방법이 없다
  * (D-6F4-3b: 요건은 면허제한 오퍼레이션 응답이라 업무 키워드가 아니다. D-6F4-3: 기관명은
- * legacy 오탐의 구조적 차단, [assembleFullScopeText]에만 더한다).
+ * legacy 오탐의 차단 대상, [assembleFullScopeText]에만 더한다). [KeywordScopeText]를 직접
+ * 만들면 이 배제 자체를 우회한다는 한계는 그 타입의 KDoc(D-6F4-3c) 참고.
  */
 fun assembleKeywordScopeText(
     noticeTitle: String?,
@@ -61,7 +67,8 @@ fun assembleKeywordScopeText(
  * 지역 매칭 대상 조립(D-6F4-3) — 키워드 조각(공고명+공종) + 발주기관명 둘(V7). legacy가
  * 메타데이터 덤프에서 긁던 지역 단서를 타입이 있는 열에서 얻는다 — 덤프가 없으므로 「기관명이
  * 필수 키워드를 만족시키는」 오탐 경로가 이 함수가 아니라 [assembleKeywordScopeText]의
- * 시그니처(기관명 인자 없음)로 구조적으로 막힌다.
+ * 시그니처(기관명 인자 없음)로 막힌다. 그 배제가 함수 시그니처까지만 참인 한계는
+ * [KeywordScopeText]의 KDoc(D-6F4-3c) 참고.
  */
 fun assembleFullScopeText(
     noticeTitle: String?,
