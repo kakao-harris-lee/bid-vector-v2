@@ -223,7 +223,7 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
 
     /**
      * verifier r2 MEDIUM-1(팀장 2차 지적) — 1차 표본(빈 문자열·ASCII 공백·탭·개행·NBSP·전각
-     * 공백)은 손으로 골라 VT(U+000B)·FF(U+000C)·CR(U+000D)를 빠뜨렸고, V11 CHECK도 같은
+     * 공백)은 손으로 골라 VT(U+000B)·FF(U+000C)·CR(U+000D)를 빠뜨렸고, V14 CHECK도 같은
      * 세 문자를 빠뜨린 채 그 표본을 통과했다(실무에서 흔한 "\r\n"이 뚫린다). 표본을 다시
      * 손으로 나열하지 않는다 — **정의에서 유도한다**: `NoticeTitle.of`가 쓰는 `String.trim()`은
      * Kotlin `Char.isWhitespace()`(JDK `Character.isWhitespace()` OR `Character.isSpaceChar()`
