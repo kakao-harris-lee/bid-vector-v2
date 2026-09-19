@@ -14,10 +14,17 @@ import org.junit.jupiter.api.Test
  * `CleanMigrationCheckTest`).
  *
  * [queryStrings]는 `CleanMigrationTest`(축1·축5)와 같은 조회 형태를 쓰지만, `dataSource()`가
- * `PersistenceTestSupport`의 `protected` 멤버라 클래스 경계를 넘는 공유가 안 되고, 이
- * 패키지의 다른 분리 파일들(`CleanMigrationCheckTest`의 `queryConstraintDef`·
- * `queryCheckBodies` 등)도 같은 이유로 각자 사본을 갖는 관례다 — 그 관례를 따라 복제한다
- * (원본 `CleanMigrationTest.queryStrings`는 축1·축5가 계속 쓰므로 그대로 둔다).
+ * `PersistenceTestSupport`의 `protected` 멤버라 클래스 경계를 넘는 공유가 안 돼 사본을
+ * 둔다(원본 `CleanMigrationTest.queryStrings`는 축1·축5가 계속 쓰므로 그대로 둔다).
+ * **정정(D-6F5-32, r6 LOW-1)** — 이 사본의 근거로 처음 든 두 문장이 틀렸다: ⓐ
+ * `CleanMigrationCheckTest`의 `queryConstraintDef`·`queryCheckBodies`는 이 헬퍼의 사본이
+ * 아니라 **다른 질의를 하는 별개 헬퍼**다 — `fun queryStrings`는 이 저장소에 **정확히
+ * 이 두 파일**에만 있고, **그 중복은 이 병합이 처음 만들었다**(전례가 없다) ⓑ 막히지
+ * 않는 제3안이 있었다 — `PersistenceTestSupport`에 `protected fun`으로 올리는 것(그
+ * 자리에 `dataSource()`가 이미 있고 그 파일은 in_scope다). 그래도 **사본을 유지한다** —
+ * 11줄짜리 배관이고, `PersistenceTestSupport`는 6F-4가 지금 편집 중이라 기반 클래스를
+ * 건드리는 비용이 크다. 좁은 주장(「`protected dataSource()`라 클래스 간 위임이
+ * 불가능하다」)은 참이고 그것만으로 이 선택의 근거로 충분하다.
  */
 class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
     /**
@@ -299,8 +306,12 @@ class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
                 }
         }
 
-    /** [CleanMigrationTest.queryStrings]와 같은 조회 형태의 사본 — 클래스 경계를 넘는 공유가
-     * 안 돼(`dataSource()`가 `protected`) 이 패키지의 다른 분리 파일들과 같은 관례로 복제한다. */
+    /**
+     * [CleanMigrationTest.queryStrings]와 같은 조회 형태의 사본 — `dataSource()`가
+     * `protected`라 클래스 경계를 넘는 공유가 안 돼 복제한다(근거 상세는 클래스 KDoc의
+     * D-6F5-32 정정 참고 — 이 중복이 이 패키지의 기존 관례는 **아니다**, 이 병합이
+     * 처음 만들었다).
+     */
     private fun queryStrings(sql: String): Set<String> {
         val actual = mutableSetOf<String>()
         dataSource().connection.use { connection ->
