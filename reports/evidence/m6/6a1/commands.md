@@ -152,6 +152,29 @@ git merge origin/main --no-edit
 재실측 뒤 `./gradlew --no-daemon check` — BUILD SUCCESSFUL(336 tasks, 60 executed·276
 up-to-date). 비밀값 스캔(참조형, 신설 파일 셋) — exit 1(매치 없음).
 
+## D-6A1-22 추가 실측(팀장 요청) — 형제 파일 우회·6F-4 줄 보존
+
+**ⓑ 형제 파일 우회 — 클래스 하나만 보면 안 된다(6F-5-a r2 HIGH 선례).** 앞서 ⓐ는
+`ApiAuditStore.kt`에 금지 참조를 심었다. 이번엔 **같은 패키지의 다른 파일**
+(`ApiAuditSql.kt`, 처음 변이와 무관한 파일)에 같은 금지 참조(`bidvector.adapters
+.persistence.Sql` 오브젝트, `const val` 아님)를 삽입(`numstat`: `2 0`, 원복 전 확인) →
+`AuditAdapterDependencyTest` RED(동일하게 `Sql`·`Sql.INSTANCE` 검출) — 게이트가
+`classesDir.walkTopDown()`으로 **패키지 전체**를 훑어 특정 파일에 고정되지 않음을
+확인했다. 원복 확인(`numstat` 0).
+
+**6F-4 줄 보존 확인 — 개수로 잰다.**
+```
+grep -c "notice_title\|notice_notice_title_check" \
+  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt \
+  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt
+```
+결과: `CheckTest.kt` 4건 · `ColumnTest.kt` 1건 — `origin/main`(`1881c82c`, 병합 전
+6F-4 원본)의 같은 명령 결과(각각 4·1)와 **정확히 일치**. 병합이 6F-4의 항목을 지우지
+않았다.
+
+병합 뒤 재실측: `./gradlew --no-daemon check`(2026-09-19T10:57:44Z~50Z) — BUILD
+SUCCESSFUL(336 tasks, 33 executed·3 from cache·300 up-to-date).
+
 ## 참고 — 하네스 레인 변경
 
 `git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(scope.md와 동일).
