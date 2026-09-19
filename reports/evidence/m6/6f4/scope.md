@@ -54,8 +54,9 @@
   `ADD COLUMN ... TEXT`(nullable)로 더한 것과 **같은 형태**다. 스키마 스냅샷 래칫은 추가만 예외.
 - **D-6F4-2 — 본문 열을 만들지 않는다.** legacy 의 그 필드는 공고 본문이 아니라 수집 메타데이터
   덤프이고, legacy 자신이 「키워드 매칭에 쓰면 오탐」이라는 사유로 제외하고 있다. 그 모양을 V2 에
-  옮기는 것은 결함을 옮기는 것이다(1:1 복제 금지). `differential.json` 에
-  `intentional-redesign` 으로 등재한다.
+  옮기는 것은 결함을 옮기는 것이다(1:1 복제 금지). 성격은 `intentional-redesign` 이고 근거는 이
+  결정문과 아래 실측 3·4 다 — **`differential.json` 은 만들지 않는다**(case 별 Python/V2 실행 결과
+  대조가 아니라 설계 판정 하나라 그 규격에 맞지 않고, M6 의 다른 slice 도 두지 않는다).
 - **D-6F4-3 — 감시 텍스트 둘을 V2 용어로 다시 정의한다(운영자 결정 A, 2026-09-18 로 개정).**
   - 키워드 매칭 대상 = **공고명 + 공종(`business_category_label`)**.
   - 지역 매칭 대상 = 위 + **기관명 두 열(V7)**. legacy 가 메타데이터 덤프에서 긁던 지역 단서를
@@ -73,6 +74,15 @@
   **이 결정은 승인 문면을 줄인다** — capability-map STR-02 의 acceptance 둘째 줄(「같은 키워드가
   제목 **또는 요건**에 있으면 후보」)의 뒷절에 대응할 데이터가 V2 에 없다. 축소를
   **`OPEN-6F4-STR02-REQUIREMENTS-AXIS`** 로 등재하고, 요건 원문을 싣는 축이 생기면 그때 다시 본다.
+- **D-6F4-3c — 「구조적 배제」는 조립 함수 시그니처까지만 참이다(2026-09-19 정정).** 조립 함수는
+  요건·기관명을 **인자로 받지 않으므로** 그 함수를 통해서는 키워드 범위에 실을 방법이 없다. 그러나
+  결과 타입 둘은 **공개 생성자를 가진 data class** 라 직접 만들면 조립 함수를 통째로 우회한다 —
+  verifier 가 실행으로 보였다(요건 텍스트로 키워드 범위를 만들어 필수 키워드가 **만족**되고 test 가
+  초록). 착수 계약이 이것을 「구조적 배제」로 적은 것은 **과장이었다**(팀장 문면 오류).
+  **여기서 닫지 않는 이유**: 두 타입의 생성 지점이 `strategy/src/main` 밖에 **54곳**이라, 조립 규칙
+  한 덩이가 실질인 이 slice 의 범위를 넘는다. 실 호출자가 생기는 배선 slice 가 test fake 까지 함께
+  옮기며 `NoticeTitle` 과 같은 경계(비공개 생성자 + 팩토리 + `@ConsistentCopyVisibility`)로 닫는다 —
+  `OPEN-6F4-TITLE-WIRING` 이 함께 받는다. 그때까지 이 한계는 **알려진 제한**이다.
 - **D-6F4-8 — 공고명 갱신은 기존 쓰기 규율에 맡기고, 「없음」은 센티넬이 아니라 타입으로 닫는다
   (운영자 결정 B).** 권위 provenance·덮어쓰기 규칙을 그대로 적용하고 별도 규칙을 만들지 않는다.
   legacy 는 합성 title 을 **센티넬 접두사**로 표시하고 `startswith` 로 되읽어 덮어쓸지를 정했는데,
@@ -140,4 +150,15 @@ CI `check` job 의 명령 그대로(`.github/workflows/ci.yml`). 부분 게이�
 
 ## 하네스 레인 변경 (상시)
 
-착수 시점 없음. 리뷰 요청 시점마다 `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 로 갱신.
+리뷰 요청 시점마다 `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 로 갱신한다. 현재 등재:
+
+- `.claude/skills/evidence-pack/SKILL.md` — 「실측 HEAD」 대조 규율의 자기모순 정정(2026-09-19).
+  처음 쓴 문장이 「실측 HEAD == 판정 SHA」를 요구했는데 evidence 커밋이 언제나 뒤에 와 **구조적으로
+  만족 불가**였다. 대조 대상을 「그 사이에 산출물이 움직이지 않았는가」로 바꿨다. 이 slice 의 verifier
+  가 그 모순을 지적해 나온 정정이다.
+- `milestone-6.md` — 운영자 결정 A·B 와 OPEN 셋(`OPEN-6F4-TITLE-WIRING`·`-STR02-REQUIREMENTS-AXIS`
+  ·`-NOTICE-BODY-SOURCE`) 등재(2026-09-19). 결정 ① 의 조립 구절을 대체하는 후속 결정이며 ① 은
+  기록으로 보존했다. **이 slice 의 승인 근거 자체**라 같은 range 에 있다.
+
+둘 다 **slice 산출물이 아니며 in_scope 밖**이고, 팀장 레인이 운영자 승인 하에 같은 range 에 둔 것이다.
+되돌림 대상이 아니다(`rollback.md`).
