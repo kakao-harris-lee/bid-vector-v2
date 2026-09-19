@@ -204,6 +204,25 @@ OpenAPI 를 `Set.equals` 로 완전 일치). 재사용 조사도 충분하다 �
 정하지 않는다). 대신 ① 다섯을 **한 번에 병렬**로 띄우고 ② 각 레인에 **범위를 좁힌 표적**을 줘 훑기를
 막으며 ③ finding 이 요구하지 않는 한 **추가 라운드를 돌리지 않는다**.
 
+## 계약 갱신 (8) — 게이트 사각 발견 + 이관 판단 (2026-09-19, 팀장)
+
+구현 레인이 D-6A1-22 의 변이 실측 중에 **바이트코드 의존 게이트 계열 전체가 공유하는 사각**을 찾았다.
+그리고 `OPEN-6F4-TITLE-WIRING` 의 겹침 판단을 냈다. 둘 다 등재한다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6A1-25**(**게이트 사각 — `const val` 은 상수 풀에 흔적을 남기지 않는다**) | `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT` 을 신설해 **하네스 레인**에 넘긴다. 이 slice 는 게이트를 고치지 않는다 — **네 게이트가 공유하는 사각**이고 한 slice 의 범위가 아니다 | **실측으로 발견됐다**: 금지 루트 참조를 `const val` 로 심었더니 **컴파일러가 인라인해 상수 풀에서 사라져** 의존 게이트가 못 봤다. `object` 참조로 바꾸자 RED 였다. **구현 레인이 오탐을 오탐으로 알아채고 변이 형태를 바꿔 다시 잰 것**이 이 발견의 경로다 — 「변이를 넣었는데 초록」을 게이트 실패로만 읽었으면 **닫힌 줄 알고 넘어갔을 자리**다(6F-4 가 하네스에 박은 규율이 바로 이 축이다). 영향 범위: `evaluation`(6F-2)·`qualification`(6F-5-a)·`profile`(6F-6)·`audit`(이 slice) **넷 전부**. 위험도: `const val` 은 컴파일 시간 상수(문자열·원시값)라 **호출보다 약한 위반**이지만, 정책 매직값을 그 경로로 끌어오면 게이트가 통째로 초록이다 |
+| **D-6A1-26**(`OPEN-6F4-TITLE-WIRING` 은 **이 slice 와 겹치지 않는다**) | 이관·계약 갱신 없음. 그 OPEN 이 말하는 **실행 진입점**은 수집→canonical 배선을 실제로 트리거하는 자리이고, **6A-3**(`OPEN-6A-EVALUATION-ADAPTERS`) 소관이다. `milestone-6.md` 의 「(6A-1)」 표기는 **6A 가 셋으로 갈리기 전 참조**라 팀장이 같은 커밋에서 **6A-3 으로 정정**했다 | 6A-1 은 **D-6A1-4 로 읽기 endpoint 하나**에 못박혀 실행·명령 경로를 전혀 열지 않는다. **낡은 참조를 그대로 두면 다음 사람이 이 slice 에 없는 책임을 찾게 된다** — 이 저장소가 「낡는 좌표」로 반복해 겪은 형태의 **문면 판**이다 |
+
+**팀장이 실측한 것** — HEAD `b7dde925` clean · `origin/main`(`1881c82c`, V14) **흡수됨** · 신설 게이트 한 벌
+실재(`AuditAdapterDependencyTest`·`AuditGateRegistrationTest`) · `gate-tests.properties` 에 `adapters.audit` **3**건 ·
+마지막 내용 커밋 `fff0faf5`.
+
+**흡수가 예상보다 쌌다(사실 기록)** — 팀장이 `Sql.kt`·`gate-tests.properties` 충돌을 경고했으나 **실제로는
+겹치지 않았다**(6F-4 가 `gate-tests.properties` 를 안 만졌고, `Sql.kt` 는 이 레인이 무편집이라 충돌 자체가
+없었다). 자동 병합 conflict 0. **경고가 과했던 것을 사실로 적는다** — 다만 **커밋 여섯 단계에서 흡수한 것이
+쌌던 이유**이기도 하다(직전 slice 는 서른여섯 커밋 뒤에 흡수해 충돌 7 hunk + `sizeGate` 둘을 맞았다).
+
 ## 하네스 레인 변경
 
 `git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(착수 시점).
@@ -218,6 +237,7 @@ OpenAPI 를 `Set.equals` 로 완전 일치). 재사용 조사도 충분하다 �
 | `OPEN-6A-RBAC`(신설) | scope·RBAC — 소비자가 늘 때(운영자 결정 ②) |
 | `OPEN-6A-SESSION-ENDPOINTS`(신설) | 세션 편집 명령 endpoint — 6B-1 병합 뒤 6A-2(D-6A1-3) |
 | `OPEN-6A1-CONNECTION-POOL`(신설, D-6A1-18) | 커넥션 풀 없이(`PGSimpleDataSource`) production 에 배선한다 — 단일 운영자·저동시성이라 오늘 필요가 없으나 **이 상태로 운영에 나갈 수 없다**. 받는 쪽 **6C/6E** |
+| `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT`(신설, D-6A1-25) | **`const val` 참조는 컴파일러 인라인으로 상수 풀에서 사라져 바이트코드 의존 게이트가 못 본다**(실측). `evaluation`·`qualification`·`profile`·`audit` **네 게이트가 공유하는 사각**이라 한 slice 범위가 아니다. 받는 쪽 **하네스 레인** |
 
 ## 리뷰 레인
 

@@ -215,7 +215,7 @@ raw 원문에만 있다 · 「활성 투찰」 정의가 저장소·discovery �
   `bidNtceDtlUrl`·`ntceSpecDocUrl1` **뒤에** 있다 → **`OPEN-6F4-NOTICE-BODY-SOURCE`**.
 - **수집→canonical 배선은 6F-4 가 하지 않는다 → `OPEN-6F4-TITLE-WIRING`.** 공고명 표본이 **0건**이라
   (input fixture 119 중 이 키를 가진 것 1개, 그 값도 「공고번호 없는 행」이라는 합성 test 문자열) 배선을 잠그는
-  test 의 기대값을 authoritative 하게 세울 수 없고, 실행 진입점도 아직 없다(6A-1). 그 slice 의 계약이 함께
+  test 의 기대값을 authoritative 하게 세울 수 없고, 실행 진입점도 아직 없다(**6A-3** — 「(6A-1)」은 6A 가 셋으로 갈리기 전 참조다. 6A-1 은 D-6A1-4 로 **읽기 endpoint 하나**에 못박혀 실행 경로를 열지 않는다; 2026-09-19 6A-1 구현 레인 판단, 팀장 확인). 그 slice 의 계약이 함께
   받을 것 둘: **실 DB 가 생긴 뒤 이 열을 되돌리려면 파일 삭제가 아니라 새 V 파일의 `DROP COLUMN`** ·
   **감시 텍스트 두 타입의 생성 경계 폐쇄**(현재 공개 생성자라 조립 함수를 우회할 수 있고, 생성 지점이 54곳이라
   6F-4 범위를 넘는다).
