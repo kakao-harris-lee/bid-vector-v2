@@ -50,6 +50,7 @@ class NoticeReconstructionTest {
             demandAgencyName = null,
             noticeAgencyCode = null,
             noticeAgencyName = null,
+            title = null,
             deadlineAt = null,
             revision = 1L,
         )

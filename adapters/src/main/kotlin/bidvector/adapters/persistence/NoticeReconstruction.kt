@@ -11,6 +11,7 @@ import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeEvent
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeStatus
+import bidvector.procurement.NoticeTitle
 import bidvector.procurement.NoticeTransitionOutcome
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
@@ -110,6 +111,7 @@ internal fun NoticeId.reconstructNotice(row: NoticeRow): Notice {
             raw = placeholderRaw,
             demandAgency = agencyOf(row.demandAgencyCode, row.demandAgencyName),
             noticeAgency = agencyOf(row.noticeAgencyCode, row.noticeAgencyName),
+            title = row.title?.let(NoticeTitle::of),
         )
     return applyStatusPath(Notice.collected(command), NoticeStatus.valueOf(row.status))
 }

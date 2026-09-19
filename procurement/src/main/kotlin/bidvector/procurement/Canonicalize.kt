@@ -34,6 +34,12 @@ data class NoticeCollected(
     val demandAgency: Agency? = null,
     /** 공고기관(D-3H-3, M3/3H-1) — [demandAgency]와 다른 축, 기본값 `null`(위와 같은 이유). */
     val noticeAgency: Agency? = null,
+    /**
+     * 공고명(D-6F4-9, M6/6F-4) — 기본값 `null`(위 발주기관 둘과 같은 이유, 이 slice 밖
+     * 호출부는 수정 없이 그대로 컴파일된다). 수집→canonical 배선은 이 slice 밖이다
+     * (`OPEN-6F4-TITLE-WIRING`, D-6F4-4b) — 이 슬롯은 그 배선이 붙을 자리다.
+     */
+    val title: NoticeTitle? = null,
 )
 
 /** 추정가격도 기초금액과 같은 형태 규율(파생이 원본을 덮지 않는다)을 받는다 — `Published`만 직접값이다. */
