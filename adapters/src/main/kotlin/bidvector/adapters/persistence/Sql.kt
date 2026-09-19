@@ -8,6 +8,11 @@ package bidvector.adapters.persistence
  * 없는 「최신 관측 우선」 축이라 `ON CONFLICT ... WHERE observed_at >= ...` 한 문으로
  * insert/update/no-op을 다 낸다 — `RETURNING (xmax = 0) AS inserted`로 어느 경로였는지
  * 왕복 한 번에 안다(PostgreSQL 관용구: 이 문이 실제로 삽입한 행은 `xmax`가 0이다).
+ *
+ * `bidvector.adapters.event.EventSql`이 outbox·inbox SQL을 이 object 밖에 두는 것과 같은
+ * 이유로, M6/6F-5-a의 자격 요건 SQL도 `bidvector.adapters.qualification.RequirementSql`에
+ * 있다(M6/6F-5-a+6F-6 병합 뒤 두 slice가 각자 정당하게 더한 상수의 합이 타입 멤버 31개가
+ * 되어(OPEN-ADR-06 (a), 30개 한도) 6F-5-a 몫을 떼어냈다 — 각자는 한도 안이었다).
  */
 internal object Sql {
     const val INSERT_RAW_OBSERVATION =
