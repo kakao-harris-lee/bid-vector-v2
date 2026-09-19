@@ -3,7 +3,7 @@
 ```yaml
 milestone: M6
 slice: 6a1-http-skeleton-auth-audit
-base_sha: c4d09cc   # PR #31(6C) 머지 커밋 = main
+base_sha: 128f9cd3   # PR #39(6F-5-a) 병합 커밋 = main (계약 갱신 (4) — 착수 재개)
 head_sha: 리뷰 요청 시점의 `git rev-parse HEAD`(값을 박지 않는다)
 in_scope:
   - app/build.gradle.kts                                   # spring-boot-starter-web 추가 + bootJar 활성(지금 disabled) — 6C 가 6A 로 인계한 앱 이미지의 전제
@@ -13,7 +13,7 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/http/ErrorBody.kt               # 명시적 error body 규약(코드·사유·correlation id). 도메인 실패를 HTTP 로 옮기는 매핑표는 이 파일 하나
   - app/src/main/kotlin/bidvector/app/http/StrategyReadController.kt  # 현 전략 조회 endpoint(읽기 전용) — 유일한 endpoint
   - app/src/main/kotlin/bidvector/app/wiring/PersistenceWiring.kt     # DataSource·Flyway·repository 조립(값은 환경변수, 기본값 없음)
-  - adapters/src/main/resources/db/migration/V10__api_audit.sql   # 요청 감사 표. **번호 변경(계약 갱신 (3))** — V8 은 6B-1(세션), **V9 는 6F-1(전략 영속)**
+  - adapters/src/main/resources/db/migration/V15__api_audit.sql   # 요청 감사 표. **번호는 고정값이 아니라 정의다(계약 갱신 (4) D-6A1-12)** — 「PR 시점 main 최대 + 선점 통보 회피」. 현재 기대값 V15(main 최대 V13 · 6F-4 가 V14 선점). **V10·V11 공석을 줍지 않는다**
   - adapters/src/main/kotlin/bidvector/adapters/persistence/ApiAuditStore.kt            # 감사 표 쓰기(추가 전용)
   - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                      # 감사 SQL 추가만
   - app/src/test/kotlin/bidvector/app/http/**               # 인증(없는·틀린·맞는 토큰) · audit 행 생성 · error body 형태 · 조회 응답 · 토큰이 로그·응답에 안 실림
@@ -103,6 +103,31 @@ limit · 요청 본문 감사(D-6A1-7) · 후보평가 축 전부(D-6A1-2) · pa
 같은 번호를 쓰면 병합 시점에 Flyway 가 깨지므로, 병합 순서가 바뀌면 **번호를 다시 붙인다**(먼저 병합된 쪽이
 번호를 지키고 뒤가 밀린다). 그 사실을 rollback.md·checklist 에 적고, PR 요청 시점에 `main` 의 최신 번호를
 재확인한다. 겹치는 다른 파일: `Sql.kt`(6B-1 도 편집 — 문장 추가만, 같은 함수 무편집) · `milestone-6.md`(다른 절).
+
+## 계약 갱신 (4) — 착수 재개 (2026-09-19, 팀장)
+
+이 계약은 **2026-09-17 에 고정되고 배선 우선 지시로 정지**했다. 그 사이 6F 군 다섯(6F-1·6F-2·6F-5-a·6F-6
+및 진행 중인 6F-4)이 돌았고 `main` 이 크게 움직였다. **착수 전에 낡은 자리를 고친다** — 그리고 **계약이
+사실과 다른 근거를 든 자리가 하나 있다.**
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6A1-11**(base 갱신) | `base_sha` `c4d09cc` → **`128f9cd3`**(PR #39 병합 커밋 = 현재 `main`). 레인 worktree `bid-vector-v2-m6a`·브랜치 `m6-6a/2026-09-17` 은 유지하고 `main` 을 **merge** 로 흡수했다(rebase 아님) | 정지 기간에 `main` 이 6F-1(전략 영속)·6B-1(세션)·6F-2(후보 공급·trace)·6F-6(운영자 프로필)·6F-5-a(요건 영속·면허 게이트)를 받았다. rebase 는 **순효과 0 인 신설→철회 쌍을 재생해 상대 레인 파일을 지운다**(6F-1 실측) |
+| **D-6A1-12**(마이그레이션 번호를 **고정값이 아니라 정의**로 둔다) | 번호는 **「PR 시점 `main` 의 최대 번호보다 크고, 병행 레인이 선점 통보한 번호를 피한다」**로 정의한다. **현재 기대값은 `V15`** — `main` 최대가 `V13` 이고 **6F-4 가 `V14` 를 선점**했다(병행 세션이 스스로 정해 통보). 파일명은 `V15__api_audit.sql` 로 시작하되 **PR 직전에 정의대로 재확인**한다 | 계약 갱신 (3) 이 「V10」으로 **고정값**을 박았는데 그 번호는 이미 무의미하다(`main` 은 `V12`·`V13` 까지 갔고 `V10`·`V11` 은 공석이다). **공석을 주워 쓰면 안 된다** — 「버전 순서 == 병합 순서」 불변식이 깨진 채 파일 이력에 영구히 남고, 언젠가 `V13` 을 적용한 긴 수명 DB 가 생기는 첫날 터진다(6F-4 세션이 V11→V14 재번호를 택한 것과 같은 근거). **이것은 6F-5-a 가 일곱 라운드에 걸쳐 산 교훈의 적용이다**(D-6F5-30): **고정 참조를 박지 말고 기준을 정의하면 범위가 레인 밖에서 움직여도 절차가 따라온다** |
+| **D-6A1-13**(**계약의 근거 하나가 더 이상 참이 아니다** — 정정) | `out_of_scope` 의 「후보평가·알림 축 endpoint」 근거 문장 「**포트 구현이 없다** — production 구현은 ML 축 하나뿐」은 **거짓이 됐다.** 실측으로 갈음한다(세는 기준을 함께 적는다): D-6A1-2 가 「여섯」으로 묶은 어댑터 중 **셋**이 생겼다 — **후보 공급**(`JdbcCandidateSource`, 6F-2) · **면허 게이트**(`StoredRequirementLicenseGate`, 6F-5-a) · **correlation id**(`UuidCorrelationIdFactory`, 6F-2). 남은 **셋**은 **감시 대상**(`WatchSubjectPort` — 6F-4 진행 중) · **여력**(`CapacityPort` — 6F-3) · **알림 요청**(`NotificationRequestPort` — 6F-7). 여섯 밖에서도 **전략 저장**(`JdbcStrategyRepository`, 6F-1)·`Clock`(`SystemClock`)·**운영자 프로필**(`JdbcOperatorProfileRepository`, 6F-6)이 생겼다. **범위는 바뀌지 않는다** — 후보평가 endpoint 는 여전히 **6A-3** 이다 | 이 slice 는 **verifier 가 「계약이 사실과 다른 근거를 들었다」를 HIGH 로 내는** 저장소에서 돈다(6F-5-a r1·r2 가 그 계열이었다). 범위 판단이 옳더라도 **근거가 낡으면 계약이 거짓을 진술한다.** 수치를 적을 때 **무엇을 세는지 함께** 적는 것도 같은 라운드의 교훈이다(6F-5-a r7 — 같은 파일에서 척도 셋이 3·4·5 로 갈렸고 **셋 다 각자 옳았다**) |
+| **D-6A1-14**(`OPEN-6A-EVALUATION-ADAPTERS` **부분 닫힘** 등재) | 그 OPEN 을 **부분 닫힘**으로 갱신한다 — 여섯 중 셋이 닫혔고 셋이 남았으며, **남은 셋에는 이미 받는 레인이 정해져 있다**(6F-4·6F-3·6F-7). **6A-3 의 선행 조건은 그 셋의 병합**이다 | 「slice 계획을 별도로 받는다」(D-6A1-2)의 답이 그 사이에 **6F 군 분할로 이미 나왔다.** OPEN 을 열어 둔 채로 두면 이미 답이 있는 물음을 다시 묻게 된다 |
+| **D-6A1-15**(rollback 의 **복원 기준을 정의로** 둔다) | `rollback.md` 를 쓸 때 공유 파일의 복원 기준을 **고정 SHA 로 적지 않는다.** 「**이 브랜치가 분기해 나온 현재 `main`**」으로 정의하고 산출법(`git merge-base HEAD origin/main`)을 함께 적는다. **파괴적 명령보다 「아래」에 경고를 두지 않는다** — 절차가 틀렸으면 절차를 교체한다 | 6F-5-a r6 실측: 복원 기준이 고정 SHA(옆 slice 병합 이전)라 **문서대로 실행하면 남의 산출물이 exit 0 · stderr 없이 사라졌다**(상수 3→0 · 등재 4→0 · TRUNCATE 2→0). 그 slice 는 「무엇 **뒤에** 재산출하는가」를 **다섯 라운드에 걸쳐 한 칸씩 넓히다가** 종점이 열거가 아니라 **기준의 정의**임을 실측으로 확인했다. **이 slice 는 그것을 착수 계약에 처음부터 넣는다** |
+| **D-6A1-16**(`compatibilitySmoke` 는 **등재형 게이트**다) | `app/build.gradle.kts` 에 `spring-boot-starter-web` 을 더하면 같은 파일의 `compatibilitySmoke` **`expectedModules` 목록에도 등재**한다. 등재하지 않으면 **그 의존이 해석·컴파일·로드되는지 아무도 재지 않는다** | `gate-tests.properties` 와 **같은 축**이다 — 「신설 게이트는 등재까지가 한 벌」(6F-2 verifier r1 HIGH-2). 그 task 는 **명시 목록**에 대해서만 해석을 단언하므로, 목록에 없는 의존은 게이트가 통째로 초록인 채 빠진다 |
+
+**병행 레인 갱신** — 「6B-1 이 `V8`, 이 slice 는 `V9`」는 **두 갱신 전 상태**라 폐기한다. 현재:
+`main` = `128f9cd3`(마이그레이션 `V1`~`V9`·`V12`·`V13`, **`V10`·`V11` 공석**) · **6F-4**(병행 세션, 로컬
+브랜치, `V14` 선점, 수정 라운드 중 — `Sql.kt`·`gate-tests.properties`·`CleanMigration*Test`·`milestone-6.md`
+겹침) · 6B-1·6F-1·6F-2·6F-6·6F-5-a **전부 병합 완료**(겹침 해소됨).
+
+**병합 순서 규율에 대한 사실** — 운영자 지시(2026-09-19 「병합하고, M6 잔여 진행해」)로 `V12`·`V13` 이
+`V11` 보다 먼저 병합됐다. **오늘 실질 위험은 0**(적용된 영속 DB 0, CI 는 매번 새 컨테이너)이나 그 규율에
+자동 게이트가 없다는 사실은 `OPEN-MIGRATION-ORDER-GATE`(6F-5-a 신설)로 하네스 레인에 있다. 이 slice 는
+**D-6A1-12 의 정의로 그 규율을 스스로 지킨다.**
 
 ## 하네스 레인 변경
 
