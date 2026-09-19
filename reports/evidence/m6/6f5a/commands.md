@@ -188,8 +188,56 @@ verifier r3 `ready-for-review`(산출물 medium 3 · low 4) 처분 중 산출물
 (Testcontainers) 하나로만 이 저장소 전체가 검증되므로, 이번 신설이 새 버전 의존성을
 들이지 않는다(기존 넷과 같은 위험을 공유할 뿐 늘리지 않는다).
 
+## round 4(수정 라운드, verifier r4 MEDIUM) — 판정 대상 `234079fd` 뒤 재실측
+
+verifier r4 `ready-for-review`(산출물 medium 1 · low 2 · 장부층 medium 1) 처분 중 산출물
+MEDIUM 하나(D-6F5-21)를 이 slice가 닫는다. 마지막 **내용** 커밋 `d8e37fa3`(D-6F5-21)에서
+재측정.
+
+## 2026-09-19T(S-50~53 + CleanMigrationCheckTest, 통합)
+
+- cmd: `./gradlew --no-daemon :adapters:test --tests '*JdbcRequirementStoreTest*' --tests '*StoredRequirementLicenseGateTest*' --tests '*QualificationAdapterDependencyTest*' --tests '*QualificationGateRegistrationTest*' --tests '*CleanMigrationCheckTest*' --rerun-tasks`
+- exit: 0 — JUnit XML 실측: `12 / 7 / 8 / 2 / 6`. `CleanMigrationCheckTest`는 여전히
+  6(D-6F5-21이 「결합식 넷」 test 하나를 「집합 등식」 test 하나로 1:1 대체했을 뿐 개수는
+  안 늘었다).
+
+## 2026-09-19T(S-10)
+- cmd: `./gradlew --no-daemon check`
+- exit: 0 — BUILD SUCCESSFUL(337 actionable tasks: 43 executed, 294 up-to-date).
+
+## 2026-09-19T(S-11)
+- cmd: `./gradlew --no-daemon qualityBaseline`
+- exit: 0 — BUILD SUCCESSFUL(UP-TO-DATE).
+
+## 2026-09-19T(S-20)
+- cmd: `./tools/one-command-check.sh`
+- exit: 0 — 「완료 — Kotlin 전건 + Python 전건 통과」.
+
+## 2026-09-19T(추가)
+- 비밀값 참조형 스캔(`grep -rniE -f config/quality/leak-patterns.txt <이 라운드가 편집한
+  경로>`) — exit 1(매치 없음 = 통과).
+- evidence 안 축어 좌표 스캔(`grep -rnE '[A-Za-z0-9_]+(\.kt|\.sql|\.properties):[0-9]+'
+  reports/evidence/m6/6f5a/`) — exit 1(매치 없음, 0건).
+
+## round 4 닫힘 판정 — D-6F5-21 변이 넷 재현(버릴 clone, `git clone --no-hardlinks`)
+
+`adapters/src/main/resources/db/migration/V13__notice_requirement.sql`을 각각 변이하고
+`:adapters:test --tests '*CleanMigrationCheckTest*' --rerun-tasks`로 재고, 되돌린 뒤 다음
+변이를 심는 순서로(같은 clone, `git checkout --`) 넷 다 확인했다.
+
+| # | 심은 변이 | 결과 |
+| --- | --- | --- |
+| MUT-R4-1 | `(kind='PARSED') = (source_field IS NOT NULL)` 항등식을 제자리에서 `CHECK (((kind='PARSED') = (source_field IS NOT NULL)) OR TRUE)`로 약화 | **RED** — `축8 부가 — notice_requirement_row CHECK 본문 집합이 정확히 고정된다(D-6F5-21)`. Postgres가 `OR true`를 평탄화하지 않아 문자열 자체가 달라졌다(`CHECK ((((kind = 'PARSED'::text) = (source_field IS NOT NULL)) OR true))`) — 집합이 달라져 실패 |
+| MUT-R4-2 | 같은 방식으로 `(kind='PARSED') = (license_names IS NOT NULL)` 항등식 약화 | **RED** — 같은 test, 같은 형태로 집합 불일치 |
+| MUT-R4-3 | `kind = 'PARSED' OR group_no IS NULL` 결합식을 **삭제**(CHECK 절 자체 제거) | **RED** — 개수 축(`축8 CHECK 개수가...`)과 집합 등식 test **둘 다** 실패(집합이 5개로 줄어듦) |
+| MUT-R4-4 | CHECK와 무관한 컬럼(`extraction_note TEXT`)을 `notice_requirement_row`에 추가 | **GREEN**(과잉 차단 없음 — CHECK 본문 집합이 안 바뀌어 `*CleanMigrationCheckTest*` 6/6 그대로 통과) |
+
+셋(①②③)은 표본을 커밋하지 않고 clone을 삭제했다. MUT-R4-1·2가 각각 다른 항등식에서
+같은 실패 유형을 내는 것은 D-6F5-21의 「어떤 제자리 편집도 집합 자체를 바꾼다」는
+주장이 두 항등식 모두에서 성립함을 보인다.
+
 ## 마지막 HEAD 표기
 evidence 커밋(이 파일들) 이후 HEAD에서의 재실측 정본은 **verifier**가 낸다(CLAUDE.md
 「acceptance 재실측은 evidence 커밋 뒤 HEAD 에서」, evidence-pack 규격 「마지막 HEAD는
-verifier·조치 코멘트가 정본」) — 이 표는 그 직전(round 3 마지막 **내용** 커밋 `584f226f`)까지의
+verifier·조치 코멘트가 정본」) — 이 표는 그 직전(round 4 마지막 **내용** 커밋 `d8e37fa3`)까지의
 실측이다.
