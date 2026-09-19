@@ -21,12 +21,12 @@
         procurement/src/main/kotlin/bidvector/procurement/NoticeTitle.kt \
         procurement/src/main/kotlin/bidvector/procurement/NoticeFacts.kt \
         procurement/src/main/kotlin/bidvector/procurement/Canonicalize.kt \
+        procurement/src/test/kotlin/bidvector/procurement/NoticeTitleTest.kt \
         strategy/src/main/kotlin/bidvector/strategy/Text.kt \
         strategy/src/test/kotlin/bidvector/strategy/WatchTextAssemblyTest.kt \
         reports/evidence/m6/6f4/
       ```
-      결과: 빈 출력(`checklist.md`·`rollback.md` 커밋 전 시점 기준 — 이 둘을 커밋한 뒤
-      재확인한다).
+      결과: 빈 출력(수정 라운드 산출물 커밋 전 시점 기준 — evidence 커밋 뒤 재확인한다).
 - [x] scope.md의 acceptance_commands 전건이 exit 0으로 `commands.md`에 기록됨 — HEAD
       `6f8466f1`(base_sha 갱신값 `ede5d5b`) 기준.
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — 부분 게이트가 아니라
@@ -52,19 +52,28 @@
    (D-6F4-2·5). 이 slice는 본문 열을 만들지 않는다.
 4. **`notice_title` 운영 표본 0건** — scope.md 실측 5. 백필 문제 자체가 성립하지 않는다
    (D-6F4-4).
+5. **`KeywordScopeText`·`FullScopeText`는 공개 생성자를 가진 `data class`라 조립 함수
+   (`assembleKeywordScopeText`/`assembleFullScopeText`)를 우회할 수 있다**(D-6F4-3c, verifier
+   r2 MEDIUM-3 실측 — 요건 텍스트로 `KeywordScopeText`를 직접 만들어 필수 키워드를 만족시키는
+   test가 초록이었다). `NoticeTitle`과 달리 이 두 타입은 이 slice가 만든 것이 아니고(base부터
+   공개 생성자, 호출부 13곳 이상) 오늘 production 생성 지점은 조립 함수 하나뿐이다. 두 타입의
+   생성 지점이 `strategy/src/main` 밖에 54곳이라 이 slice 범위를 넘는다 — 실 호출자가 붙는
+   배선 slice(`OPEN-6F4-TITLE-WIRING`)가 test fake까지 함께 옮기며 `NoticeTitle`과 같은 경계
+   (비공개 생성자 + 팩토리)로 닫는다.
 
 ## 수정 라운드가 만든 새 파일 ↔ in_scope 대조
 
 착수 계약(`37b837e`)에는 없었고 팀장 계약 갱신 (2)(`830252d`)에서 `procurement/`·`strategy/`가
-in_scope에 편입된 뒤 이 구현 라운드가 실제로 만든 신설 파일 셋:
+in_scope에 편입된 뒤 이 구현 라운드(과 그 뒤 수정 라운드)가 실제로 만든 신설 파일 넷:
 
 | 신설 파일 | in_scope 등재 근거 |
 | --- | --- |
 | `procurement/src/main/kotlin/bidvector/procurement/NoticeTitle.kt` | scope.md in_scope 「`procurement/` — canonical fact와 조립 커맨드의 공고명 슬롯(기본값 null, D-6F4-9)」 |
 | `strategy/src/test/kotlin/bidvector/strategy/WatchTextAssemblyTest.kt` | scope.md in_scope 「감시 텍스트 조립 순수 함수와 그 test」 |
 | `adapters/src/test/kotlin/bidvector/adapters/persistence/NoticeFindRoundTripTest.kt`(신설 아님, 기존 파일 수정) | scope.md in_scope 「`CleanMigrationColumnTest.kt`·`CleanMigrationCheckTest.kt`·`NoticeReconstructionTest.kt` **등** 스키마 대조 test」의 「등」이 포괄 — 값 왕복 test는 기존에 이 파일이 담당하던 자리다 |
+| `procurement/src/test/kotlin/bidvector/procurement/NoticeTitleTest.kt`(수정 라운드 신설, review MEDIUM) | scope.md in_scope 「`procurement/` — canonical fact와 조립 커맨드의 공고명 슬롯」이 담당 타입(`NoticeTitle`)의 test — `NoticeTitle.kt`와 같은 근거 |
 
-셋 모두 계약 문면 안에 있다 — scope.md 갱신 없이 조용히 넓어진 파일은 없다.
+넷 모두 계약 문면 안에 있다 — scope.md 갱신 없이 조용히 넓어진 파일은 없다.
 
 ## clean-tree 재확인 (evidence 커밋 이후)
 
