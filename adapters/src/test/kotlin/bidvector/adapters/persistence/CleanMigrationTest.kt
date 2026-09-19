@@ -44,6 +44,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // M6/6F-1 — 스키마 스냅샷 래칫 예외(D-6F1-1, 추가만). V9__operator_strategy.sql.
             "operator_strategy",
             "operator_strategy_revision",
+            // M6/6F-6 — 스키마 스냅샷 래칫 예외(D-6F6-3, 추가만). V12__operator_profile.sql.
+            "operator_profile",
         )
 
     @Test
@@ -90,6 +92,8 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 둘 다 시퀀스를 만들지 않는다(D-6F1-5, D-6F1-1 추가만).
             "operator_strategy" to setOf("id"),
             "operator_strategy_revision" to setOf("revision"),
+            // M6/6F-6 — 싱글턴 고정 키(D-6F6-3, 추가만). V12__operator_profile.sql.
+            "operator_profile" to setOf("id"),
         )
 
     @Test
@@ -352,6 +356,19 @@ class CleanMigrationTest : PersistenceTestSupport() {
                     select = true,
                     insert = true,
                     update = false,
+                    delete = false,
+                    truncate = false,
+                    references = false,
+                    trigger = false,
+                ),
+            // M6/6F-6 D-6F6-1 — operator_profile 도 upsert(SELECT·INSERT·UPDATE)만 진다
+            // (operator_strategy와 같은 관례). DELETE·TRUNCATE 는 주지 않는다(보존·파기는
+            // 이 slice 밖).
+            "operator_profile" to
+                TablePrivileges(
+                    select = true,
+                    insert = true,
+                    update = true,
                     delete = false,
                     truncate = false,
                     references = false,
