@@ -8,7 +8,7 @@
       비파괴 절삭 복원(`checkout --` 미사용).
       ```
       git status --porcelain -- \
-        adapters/src/main/resources/db/migration/V11__notice_title.sql \
+        adapters/src/main/resources/db/migration/V14__notice_title.sql \
         adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt \
         adapters/src/main/kotlin/bidvector/adapters/persistence/NoticeRow.kt \
         adapters/src/main/kotlin/bidvector/adapters/persistence/NoticeRowMerge.kt \
@@ -28,8 +28,8 @@
       ```
       결과: 빈 출력(수정 라운드 산출물 커밋 전 시점 기준 — evidence 커밋 뒤 재확인한다).
 - [x] scope.md의 acceptance_commands 전건이 exit 0으로 `commands.md`에 기록됨 — HEAD
-      `d12b0947`(base_sha 갱신값 `ede5d5b`) 기준, verifier r2·code-reviewer 수정 라운드 +
-      팀장 2차 지적(V11 CHECK 범위) 정정 뒤 재실측.
+      `15da367f`(base_sha 2차 갱신값 `edeaa9a3`) 기준, verifier r2·code-reviewer 수정 라운드
+      + 팀장 지적 넷(CHECK 범위·main 2차 흡수·V11→V14 재번호·CHECK 본문 등식) 정정 뒤 재실측.
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — 부분 게이트가 아니라
       `./gradlew --no-daemon check`(Kotlin `check` job 전건) + `./tools/one-command-check.sh`
       (Python `ml-engine` job 포함) 전건.
@@ -84,29 +84,41 @@ in_scope에 편입된 뒤 이 구현 라운드(과 그 뒤 수정 라운드)가 
 
 ## 크기 게이트 재실측(verifier r2 LEDGER-1·review LOW 뒤)
 
-r1 시점 evidence 351줄 대 산출물 315 insertions(+11 삭제, 326줄 변경)로 **위반**이었다. 이
-수정 라운드가 test·문면을 더해 양쪽 다 늘었다 — 최종 수치(HEAD `d12b0947`):
+r1 시점 evidence 351줄 대 산출물 315 insertions(+11 삭제, 326줄 변경)로 **위반**이었다. 최종
+수치(HEAD `15da367f`, base `edeaa9a3`):
 
-- **evidence**: `wc -l reports/evidence/m6/6f4/*.md` ≈ 430줄대(scope 164 + checklist·commands·
-  rollback 나머지 — 이 절 자신이 checklist.md 줄 수를 계속 바꾸므로 정확히 1회 확정하기 어렵다,
-  아래 산출물과의 격차가 이 절의 몇 줄 오차보다 훨씬 커서 결론에는 영향이 없다).
-- **산출물**: `git diff --shortstat ede5d5b..d12b0947 -- . ':!reports/evidence'
-  ':!milestone-6.md' ':!.claude'` = 16 files changed, **520 insertions(+), 22 deletions(-)**
-  (542줄 변경, insertions만 비교해도 520).
+- **evidence**: `wc -l reports/evidence/m6/6f4/*.md` = scope 168 + checklist·commands·
+  rollback 나머지 ≈ **519줄**.
+- **산출물**: `git diff --shortstat edeaa9a3..15da367f -- . ':!reports/evidence'
+  ':!milestone-6.md' ':!.claude'` = 16 files changed, **540 insertions(+), 22 deletions(-)**
+  (562줄 변경, insertions만 비교해도 540).
 
-evidence(~430) < 산출물(520, 542) — **게이트를 충족한다.** r1에서 부풀었던 원인(조사 서술이
-코드보다 긴 형태)은 그대로이지만, 이번 라운드가 더한 산출물(test·migration 정정·KDoc 정정)이
-evidence 증가분보다 커서 비율이 역전됐다 — evidence 절을 줄여서가 아니라 산출물이 늘어서
-통과한다는 것을 그대로 남긴다.
+evidence(519) < 산출물(540, 562) — **게이트를 충족한다.**
 
-## V11 CHECK 범위 정정(팀장 2차 지적, `d12b0947`)
+## V14 CHECK 범위 정정(팀장 2차 지적, 1차 수정)
 
 verifier r2 MEDIUM-1 처방으로 넣은 첫 CHECK 정규식이 V4 선례보다 **좁았다** — 편집 도구가
 유니코드 이스케이프 표기를 실제 제어문자로 치환해 버려, 의도한 TAB부터 CR까지(코드포인트
 9-13) 범위가 TAB·LF 둘(9-10)로 줄어 VT(11)·FF(12)·CR(13)이 빠졌다. 팀장이 바이트 단위로
-디코드해 재지적했다. 정정 방법: V4 파일의 정규식 텍스트를 프로그램으로 그대로 읽어 V11에
+디코드해 재지적했다. 정정 방법: V4 파일의 정규식 텍스트를 프로그램으로 그대로 읽어 V14에
 재사용(사람이 직접 타이핑하지 않음) — 결과가 V4 bracket 표현과 완전히 동일한 텍스트임을
 diff 0으로 확인했고, 파일에 원시 제어문자가 없음도 확인했다. 회귀 test도 손으로 고른 표본
 대신 Kotlin의 공백 판정 함수가 참인 코드포인트 전부를 BMP에서 실측으로 유도하도록 다시 써
 같은 종류의 누락이 재발할 수 없게 했다. 사후 검증: 옛 좁은 CHECK로 되돌리면 이 새 test가
 코드포인트 11(VT)에서 정확히 실패하는 것을 확인했다(`commands.md` 참고).
+
+## main 2차 흡수 · V14 재번호 · CHECK 본문 등식(팀장 지적 셋, 2차 수정)
+
+- **㉮ main 2차 흡수(`edeaa9a3`, 6F-6)**: 팀장이 미리 알려준 다섯 자리(`CleanMigrationTest.kt`·
+  `CleanMigrationColumnTest.kt`·`CleanMigrationCheckTest.kt`·`PersistenceTestSupport.kt`·
+  `gate-tests.properties`) 전부 자동 병합됐고(수동 충돌 없음), `milestone-6.md`만 수동
+  충돌해 두 슬라이스의 문단을 순서대로 이어 붙였다. 「둘 다 취한다」를 grep으로 실측 확인
+  (`rollback.md` 표) — 6F-6의 `operator_profile` 계열이 한 줄도 지워지지 않았다.
+- **㉯ V11 → V14 재번호**: main에 이미 V12(6F-6)가 있고 V13(PR #39)이 병합 대기라
+  `git mv`로 재번호했다. **자기 실측**: 첫 커밋이 옛 경로를 pathspec에서 빠뜨려 삭제가
+  누락된 것을 `git ls-tree HEAD`로 발견하고 후속 커밋으로 정정했다(`commands.md` 참고) —
+  워킹트리는 처음부터 V14 하나였으므로 코드 동작 영향은 없었다.
+- **㉰ CHECK 본문 등식**: `notice_notice_title_check`의 `pg_get_constraintdef` 원문을
+  `outbox_state_check`·`edit_session_state_check`와 같은 관례로 `shouldBe`로 고정하는 test를
+  `CleanMigrationCheckTest.kt`에 추가했다. 사후 검증으로 이번 라운드에서 실제로 두 번 안
+  잡혔던 문자 클래스 축소를 이 test가 즉시 잡는 것을 확인했다(`commands.md` 참고).

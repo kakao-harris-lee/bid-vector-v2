@@ -1,9 +1,13 @@
 # M6 / 6F-4 — 감시 대상 텍스트를 canonical 에 싣는다
 
-- **base_sha**: `ede5d5b` — 착수는 `48cb072` 였고 slice 진행 중 `main` 이 전진해(다른 세션의 6F-2·
-  운영자 결정 문서) **흡수 병합**했다. 되돌리기 목록·`git restore --source` 는 **갱신된 이 값**을
-  기준으로 산출한다. 겹친 파일은 `Sql.kt` 하나이고 자동 병합됐다 — 그 병합의 정합은 acceptance
-  전건이 판정한다(자동 병합 성공은 의미 정합이 아니다).
+- **base_sha**: `edeaa9a3`(2차 갱신) — 착수는 `48cb072`, 1차 흡수 병합으로 `ede5d5b`(6F-2 등),
+  slice 진행 중 `main` 이 다시 전진해(6F-6, PR #38) **2차 흡수 병합**했다. 되돌리기 목록·
+  `git restore --source` 는 **갱신된 이 값**을 기준으로 산출한다. 겹친 파일 다섯
+  (`CleanMigrationTest.kt`·`CleanMigrationColumnTest.kt`·`CleanMigrationCheckTest.kt`·
+  `PersistenceTestSupport.kt`·`gate-tests.properties`) 은 전부 자동 병합됐다(양쪽이 각자
+  더한 자리라 「둘 다 취한다」로 해소 — 자동 병합 결과를 grep 으로 「내 줄 있음」·「남의 줄
+  남음」 둘 다 확인). `milestone-6.md` 는 유일하게 수동 충돌(둘 다 보존, 순서만 정리)했다.
+  자동 병합의 의미 정합은 acceptance 전건이 판정한다(자동 병합 성공은 의미 정합이 아니다).
   *이 한 줄이 2026-09-18 하네스 규율이 새로 요구하는 것이다 — base 가 움직이면 목록의 기준도
   함께 움직이고, 그것을 놓친 것이 M6 에서 네 번 재발한 결함의 실제 원인이었다.*
 - **브랜치/worktree**: `m6-6f4/2026-09-18` / `bid-vector-v2-m6f4`
