@@ -122,6 +122,48 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
         body shouldBe expected
     }
 
+    /**
+     * verifier r3 D-6F5-16 시정 — 위 개수 축(`축8 CHECK 개수가...`)은 V13 두 표의 CHECK 일곱을
+     * **테이블별 개수**로만 받는다. `outbox_state_check`·`edit_session_state_check`와 같은 결함
+     * 클래스(있는지만 보는 단언)라, 상태 열거 셋(`status`·`kind`·`source_field`)에 값을 더하거나
+     * `CHECK (TRUE)`로 약화해도 개수 축은 그대로 초록이었다(verifier r3 실측). 세 열거를
+     * `shouldBe`로 본문까지 정확히 고정한다(D-M4-5 (a)·D-6B1-3 관례).
+     */
+    @Test
+    fun `축8 부가 — notice_requirement·notice_requirement_row 열거 셋이 본문으로 정확히 고정된다(D-6F5-16)`() {
+        queryConstraintDef("notice_requirement_status_check") shouldBe
+            "CHECK ((status = ANY (ARRAY['FAILED'::text, 'COLLECTED'::text])))"
+        queryConstraintDef("notice_requirement_row_kind_check") shouldBe
+            "CHECK ((kind = ANY (ARRAY['PARSED'::text, 'UNPARSABLE'::text])))"
+        val expectedSourceFieldCheck =
+            "CHECK (((source_field IS NULL) OR (source_field = ANY (ARRAY['LcnsLmtNm'::text, " +
+                "'PermsnIndstrytyList'::text]))))"
+        queryConstraintDef("notice_requirement_row_source_field_check") shouldBe expectedSourceFieldCheck
+    }
+
+    /**
+     * verifier r3 D-6F5-16 시정(결합식 넷) — `kind`↔`source_field`·`kind`↔`license_names`
+     * 짝짓기, `group_no` 제약, `license_names` 비어있지 않음 넷은 개수 축에 묻혀 있었다.
+     * COL-06·H-3 관례(`contains`, 열거처럼 완전 대체가 아니라 항등식이라 부분 대조로 충분)로
+     * 본문에 살아 있는지 잰다. `=`를 `OR`로 약화하는 변이(항등식 붕괴)를 이 대조가 잡는다.
+     */
+    @Test
+    fun `축8 부가 — notice_requirement_row 결합식 넷이 본문에 살아 있다(D-6F5-16)`() {
+        val checkBodies = queryCheckBodies()
+        checkBodies.any {
+            it.contains("((kind = 'PARSED'::text) = (source_field IS NOT NULL))")
+        } shouldBe true
+        checkBodies.any {
+            it.contains("((kind = 'PARSED'::text) = (license_names IS NOT NULL))")
+        } shouldBe true
+        checkBodies.any {
+            it.contains("((kind = 'PARSED'::text) OR (group_no IS NULL))")
+        } shouldBe true
+        checkBodies.any {
+            it.contains("((license_names IS NULL) OR (cardinality(license_names) > 0))")
+        } shouldBe true
+    }
+
     private fun queryConstraintDef(constraintName: String): String =
         dataSource().connection.use { connection ->
             connection
