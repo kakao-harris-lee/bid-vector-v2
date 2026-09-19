@@ -61,6 +61,12 @@
    생성 지점이 `strategy/src/main` 밖에 54곳이라 이 slice 범위를 넘는다 — 실 호출자가 붙는
    배선 slice(`OPEN-6F4-TITLE-WIRING`)가 test fake까지 함께 옮기며 `NoticeTitle`과 같은 경계
    (비공개 생성자 + 팩토리)로 닫는다.
+6. **이 브랜치의 커밋 `7e6ead90`은 단독 체크아웃하면 깨진다**(verifier LOW-1 실측) —
+   `V11__notice_title.sql`·`V14__notice_title.sql`이 그 커밋에서 동시에 존재해 Flyway가
+   같은 `ADD COLUMN notice_title`을 두 번 실행, `column "notice_title" of relation "notice"
+   already exists`로 adapters DB test 8건이 전건 실패한다. 최종 HEAD와 병합 결과에는
+   영향이 없다(다음 커밋에서 정정됨, `commands.md` 참고) — `git bisect`가 이 range를
+   지날 때만 주의가 필요하다.
 
 ## 수정 라운드가 만든 새 파일 ↔ in_scope 대조
 
@@ -82,43 +88,23 @@ in_scope에 편입된 뒤 이 구현 라운드(과 그 뒤 수정 라운드)가 
 빈 출력이어야 한다 — verifier가 재확인한다(이 문서 자신이 자기 커밋 이후 상태를 담을 수
 없다는 것은 evidence-pack 스킬의 「낡는 좌표」 절과 같은 이유다).
 
-## 크기 게이트 재실측(verifier r2 LEDGER-1·review LOW 뒤)
+## 크기 게이트 재실측(verifier r2 LEDGER-1·LEDGER-2 뒤, 경로 기준)
 
-r1 시점 evidence 351줄 대 산출물 315 insertions(+11 삭제, 326줄 변경)로 **위반**이었다. 최종
-수치(HEAD `15da367f`, base `edeaa9a3`):
+r1 시점 evidence 351줄 대 산출물 315 insertions(+11 삭제, 326줄 변경)로 **위반**이었다.
+r2 기록(519)이 이번 라운드의 evidence 편집으로 낡았다 — 최종 수치(evidence 편집 직전,
+production HEAD `15da367f`는 그대로):
 
-- **evidence**: `wc -l reports/evidence/m6/6f4/*.md` = scope 168 + checklist·commands·
-  rollback 나머지 ≈ **519줄**.
+- **evidence**: `find reports/evidence/m6/6f4/ -type f | xargs wc -l`(경로 기준,
+  `reports/evidence/m6/6f4/**` 전체 — `.md` 넷뿐이다) = scope 175 + checklist 108 +
+  commands 133 + rollback 117 = **533줄**(이 줄 자신이 checklist.md 줄 수에 포함되므로
+  정확히 1회 확정하기 어렵다 — 아래 산출물과의 격차가 이 줄의 오차보다 커서 결론에는
+  영향이 없다).
 - **산출물**: `git diff --shortstat edeaa9a3..15da367f -- . ':!reports/evidence'
   ':!milestone-6.md' ':!.claude'` = 16 files changed, **540 insertions(+), 22 deletions(-)**
-  (562줄 변경, insertions만 비교해도 540).
+  (562줄 변경, insertions만 비교해도 540) — production 코드는 이번 라운드에서 무변경이라
+  그대로다.
 
-evidence(519) < 산출물(540, 562) — **게이트를 충족한다.**
-
-## V14 CHECK 범위 정정(팀장 2차 지적, 1차 수정)
-
-verifier r2 MEDIUM-1 처방으로 넣은 첫 CHECK 정규식이 V4 선례보다 **좁았다** — 편집 도구가
-유니코드 이스케이프 표기를 실제 제어문자로 치환해 버려, 의도한 TAB부터 CR까지(코드포인트
-9-13) 범위가 TAB·LF 둘(9-10)로 줄어 VT(11)·FF(12)·CR(13)이 빠졌다. 팀장이 바이트 단위로
-디코드해 재지적했다. 정정 방법: V4 파일의 정규식 텍스트를 프로그램으로 그대로 읽어 V14에
-재사용(사람이 직접 타이핑하지 않음) — 결과가 V4 bracket 표현과 완전히 동일한 텍스트임을
-diff 0으로 확인했고, 파일에 원시 제어문자가 없음도 확인했다. 회귀 test도 손으로 고른 표본
-대신 Kotlin의 공백 판정 함수가 참인 코드포인트 전부를 BMP에서 실측으로 유도하도록 다시 써
-같은 종류의 누락이 재발할 수 없게 했다. 사후 검증: 옛 좁은 CHECK로 되돌리면 이 새 test가
-코드포인트 11(VT)에서 정확히 실패하는 것을 확인했다(`commands.md` 참고).
-
-## main 2차 흡수 · V14 재번호 · CHECK 본문 등식(팀장 지적 셋, 2차 수정)
-
-- **㉮ main 2차 흡수(`edeaa9a3`, 6F-6)**: 팀장이 미리 알려준 다섯 자리(`CleanMigrationTest.kt`·
-  `CleanMigrationColumnTest.kt`·`CleanMigrationCheckTest.kt`·`PersistenceTestSupport.kt`·
-  `gate-tests.properties`) 전부 자동 병합됐고(수동 충돌 없음), `milestone-6.md`만 수동
-  충돌해 두 슬라이스의 문단을 순서대로 이어 붙였다. 「둘 다 취한다」를 grep으로 실측 확인
-  (`rollback.md` 표) — 6F-6의 `operator_profile` 계열이 한 줄도 지워지지 않았다.
-- **㉯ V11 → V14 재번호**: main에 이미 V12(6F-6)가 있고 V13(PR #39)이 병합 대기라
-  `git mv`로 재번호했다. **자기 실측**: 첫 커밋이 옛 경로를 pathspec에서 빠뜨려 삭제가
-  누락된 것을 `git ls-tree HEAD`로 발견하고 후속 커밋으로 정정했다(`commands.md` 참고) —
-  워킹트리는 처음부터 V14 하나였으므로 코드 동작 영향은 없었다.
-- **㉰ CHECK 본문 등식**: `notice_notice_title_check`의 `pg_get_constraintdef` 원문을
-  `outbox_state_check`·`edit_session_state_check`와 같은 관례로 `shouldBe`로 고정하는 test를
-  `CleanMigrationCheckTest.kt`에 추가했다. 사후 검증으로 이번 라운드에서 실제로 두 번 안
-  잡혔던 문자 클래스 축소를 이 test가 즉시 잡는 것을 확인했다(`commands.md` 참고).
+evidence(533) < 산출물(540, 562) — **게이트를 충족한다.** 여유는 insertions 기준 7줄,
+총 변경 기준 29줄 — r2 대비 좁아졌다(라운드 이력 절 제거로 evidence가 줄었어야 할 자리에
+사실 정정 서술이 그만큼 늘어서 순변화는 작다). **여유가 한 자릿수라 다음 라운드는 이
+gate를 다시 재기 전에는 evidence를 늘리지 않는다.**

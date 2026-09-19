@@ -42,11 +42,19 @@ base_sha 2차 갱신값 `edeaa9a3`(main 2차 흡수, 6F-6 포함). 아래는 팀
 
 - cmd: `git mv adapters/src/main/resources/db/migration/V11__notice_title.sql
   adapters/src/main/resources/db/migration/V14__notice_title.sql`
-- **주의(자기 실측)**: 뒤이은 `git commit -- V14__notice_title.sql ...`가 옛 경로
-  `V11__notice_title.sql`을 pathspec에서 빠뜨려, `git mv`가 스테이징한 삭제가 커밋되지
-  않고 인덱스에 남았다(`git ls-tree HEAD`로 V11·V14가 동시에 존재하는 것을 발견). 후속
-  커밋(`64332338`)으로 옛 경로의 삭제를 마무리했다 — 워킹트리는 애초에 V14 하나뿐이었으므로
-  코드 동작에는 영향이 없었다(발견 즉시 정정).
+- **주의(자기 실측, verifier LOW-1 뒤 정정)**: 뒤이은 `git commit -- V14__notice_title.sql ...`가
+  옛 경로 `V11__notice_title.sql`을 pathspec에서 빠뜨려, `git mv`가 스테이징한 삭제가
+  커밋되지 않고 인덱스에 남았다(`git ls-tree HEAD`로 V11·V14가 동시에 존재하는 것을
+  발견). 후속 커밋(`64332338`)으로 옛 경로의 삭제를 마무리했다.
+  **워킹트리는 정상이었지만 그 중간 커밋(`7e6ead90`) 자체는 깨져 있었다** — verifier가
+  그 커밋을 체크아웃해 재현: Flyway가 `V11__notice_title.sql`과 `V14__notice_title.sql`을
+  둘 다 적용하며 같은 `ALTER TABLE notice ADD COLUMN notice_title`을 두 번 실행해
+  `column "notice_title" of relation "notice" already exists`로 실패하고, adapters DB
+  test 8건이 전건 실패했다(`ExceptionInInitializerError` 연쇄). 「코드 동작 영향 없음」이
+  아니라 **「이 저장소 CI는 `push:main`·`pull_request`에서만 도는데(`.github/workflows/
+  ci.yml`) 이 브랜치가 아직 push되지 않아 파이프라인이 그 커밋을 실행한 적이 없어 오늘의
+  파이프라인 영향은 0이지만, 그 커밋은 그 자체로 깨져 있어 향후 이 range에서 `git bisect`를
+  돌리면 그 지점에서 멈춘다」**가 사실이다.
 - cmd: `grep -rn "V11" adapters/ procurement/ strategy/` (build/ 제외)
 - 핵심 결과: 재번호 근거를 설명하는 V14 파일 헤더 주석 2줄만 남고 잔존 0건.
 - cmd: `./gradlew --no-daemon :adapters:test`(재번호 뒤)

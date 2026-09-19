@@ -107,8 +107,11 @@ git restore --source=edeaa9a3 --staged --worktree -- \
 
 ## 하네스 레인 절 갱신 필요성
 
-`git log --oneline edeaa9a3..15da367f -- CLAUDE.md .claude/`는 빈 출력이다(이 라운드는
-`.claude/` 스킬 파일을 건드리지 않았다). `milestone-6.md`는 병합 충돌 해소로 이 range에
-등장하지만(수동 머지 커밋 `7a0a8c4f`) **양쪽 슬라이스의 기존 문단을 그대로 이어 붙인
-것**이라 새 결정·새 OPEN을 만들지 않았다 — scope.md 「하네스 레인 변경」 절이 등재할
-대상이 아니다.
+`git log --oneline edeaa9a3..15da367f -- CLAUDE.md .claude/`는 **빈 출력이 아니다**
+(verifier LEDGER-1 — 이전 기록의 오류) — 실제로는 `2b61dff4`(1건) 이 나온다. 이 slice가
+직접 커밋한 것이 아니라 팀장 레인이 운영자 승인 하에 같은 range에 둔 `.claude/skills/
+evidence-pack/SKILL.md` 편집이고, scope.md 「하네스 레인 변경」 절이 정확히 등재 중이다
+— **되돌림 대상이 아니다**(위 복원 명령·목록에 없고, 앞으로도 넣지 않는다).
+`milestone-6.md`도 병합 충돌 해소로 이 range에 등장하지만(수동 머지 커밋 `7a0a8c4f`)
+**양쪽 슬라이스의 기존 문단을 그대로 이어 붙인 것**이라 새 결정·새 OPEN을 만들지 않았고
+— 이 역시 되돌림 대상이 아니다.
