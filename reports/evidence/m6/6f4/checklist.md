@@ -28,7 +28,8 @@
       ```
       결과: 빈 출력(수정 라운드 산출물 커밋 전 시점 기준 — evidence 커밋 뒤 재확인한다).
 - [x] scope.md의 acceptance_commands 전건이 exit 0으로 `commands.md`에 기록됨 — HEAD
-      `6f8466f1`(base_sha 갱신값 `ede5d5b`) 기준.
+      `bdfafc74`(base_sha 갱신값 `ede5d5b`) 기준, verifier r2·code-reviewer 수정 라운드 뒤
+      재실측.
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — 부분 게이트가 아니라
       `./gradlew --no-daemon check`(Kotlin `check` job 전건) + `./tools/one-command-check.sh`
       (Python `ml-engine` job 포함) 전건.
@@ -80,3 +81,21 @@ in_scope에 편입된 뒤 이 구현 라운드(과 그 뒤 수정 라운드)가 
 `checklist.md`·`rollback.md` 커밋 뒤 `git status --porcelain -- reports/evidence/m6/6f4/`가
 빈 출력이어야 한다 — verifier가 재확인한다(이 문서 자신이 자기 커밋 이후 상태를 담을 수
 없다는 것은 evidence-pack 스킬의 「낡는 좌표」 절과 같은 이유다).
+
+## 크기 게이트 재실측(verifier r2 LEDGER-1·review LOW 뒤)
+
+r1 시점 evidence 351줄 대 산출물 315 insertions(+11 삭제, 326줄 변경)로 **위반**이었다. 이
+수정 라운드가 test·문면을 더해 양쪽 다 늘었다 — 최종 수치:
+
+- **evidence**: `wc -l reports/evidence/m6/6f4/*.md`(이 절 자신을 포함한 최종값) = scope 164 +
+  checklist ~99 + commands 63 + rollback 103 ≈ **429줄**(이 문장이 적힌 그 순간에도 이 절
+  자체가 checklist.md 줄 수를 바꾸므로 정확히 1회 확정하기 어렵다 — 아래 산출물과의 격차가
+  이 절의 몇 줄 오차보다 훨씬 커서 결론에는 영향이 없다).
+- **산출물**: `git diff --shortstat ede5d5b..bdfafc74 -- . ':!reports/evidence'
+  ':!milestone-6.md' ':!.claude'` = 16 files changed, **513 insertions(+), 22 deletions(-)**
+  (535줄 변경, insertions만 비교해도 513).
+
+429 < 513(그리고 429 < 535) — **이번 라운드에서 게이트를 충족한다.** r1에서 부풀었던 원인
+(조사 서술이 코드보다 긴 형태)은 그대로이지만, 이번 라운드가 더한 산출물(테스트 132+43줄,
+migration 정규식 12줄, KDoc 정정 23줄 = 210줄)이 evidence 증가분(약 78줄)보다 커서 비율이
+역전됐다 — evidence 절을 줄여서가 아니라 산출물이 늘어서 통과한다는 것을 그대로 남긴다.
