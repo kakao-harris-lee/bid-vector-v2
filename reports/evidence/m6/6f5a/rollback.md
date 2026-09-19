@@ -1,4 +1,4 @@
-실측 HEAD: d8e37fa33432545187a74fc614671d6e401f6000
+실측 HEAD: 51b517bdec67d8dfef78b69b165bc328d8e5f98b
 
 # M6/6F-5-a — rollback
 
@@ -249,20 +249,31 @@ scope.md는 evidence 경로라 위 목록 산출(`':!reports/evidence'`)에서 *
 
 ## 임시 clone 실측 — round 5 (D-6F5-29 보정 절차, 병합 뒤 기준 `edeaa9a3`)
 
-`git clone --no-hardlinks`로 만든 별도 임시 clone(HEAD `e1d90134`)에서 위 보정된
+**정정(계약 갱신 (8)) — 실측 HEAD를 다시 잰다.** 첫 실측은 `e1d90134`에서 돌았는데,
+`51b517bd`(D-6F5-32 KDoc 정정, in_scope 코드 파일 편집이라 **내용 커밋**이다 —
+`git log -1 ede5d5b..HEAD -- . ':!reports/evidence' ':!milestone-6.md'` = `51b517bd`)가
+그 뒤에 나와 실측 HEAD가 판정 대상과 어긋났다. **KDoc이 담긴 파일은 절차가 삭제하는
+파일이라 결과가 같을 것이라는 논증은 실측을 갈음하지 않는다** — 새 clone에서 다시
+쟀다.
+
+`git clone --no-hardlinks`로 만든 별도 임시 clone(HEAD `51b517bd`)에서 위 보정된
 ①②(신규 10개 삭제, 기준 `edeaa9a3`로 공유 6개 복원)를 실행했다. **verifier 결과를
-옮기지 않고 이 구현 레인이 직접 측정했다.**
+옮기지 않고 이 구현 레인이 직접 측정했다** — 수치마다 **무엇을 세는 grep인지**를
+같이 적는다(선언·출현·등재 줄을 구분한다).
 
 | 단계 | 명령 | 결과 |
 | --- | --- | --- |
 | ① | `git rm -f <신규 10개>` | exit 0, 10 deletions staged |
 | ② | `git restore --source=edeaa9a3`(공유 6개만, 경로 개별 인자) | exit 0 |
-| 6F-6 줄 생존 | `grep -c PROFILE Sql.kt` · `grep -c 'bidvector.adapters.profile\.' gate-tests.properties` · `grep -o operator_profile PersistenceTestSupport.kt \| wc -l` | **4 · 3 · 2**(전부 0이 아님 — 생존) |
-| 이 slice 줄 소멸 | `grep -c REQUIREMENT Sql.kt` · `grep -c notice_requirement CleanMigrationTest.kt/CleanMigrationColumnTest.kt/CleanMigrationCheckTest.kt` · `grep -c 'bidvector.adapters.qualification\.' gate-tests.properties` · `grep -o notice_requirement PersistenceTestSupport.kt \| wc -l` | **전부 0** |
+| 6F-6 줄 생존 — `Sql.kt`의 `PROFILE` **선언**(`grep -cE '(private )?const val [A-Za-z_]*PROFILE[A-Za-z_]* =' Sql.kt`) | **3**(`PROFILE_COLUMNS`·`SELECT_PROFILE`·`UPSERT_PROFILE`) |
+| 6F-6 줄 생존 — `Sql.kt`의 `PROFILE` **문자열 출현 총수**(`grep -o PROFILE Sql.kt \| wc -l`, 선언+참조 전부) | **5**(참고 수치 — 이전 라운드가 적은 「4」는 `grep -c`로 **일치하는 줄 수**를 센 것이라 서로 다른 척도였다) |
+| 6F-6 줄 생존 — `gate-tests.properties`의 `adapters.profile.*` **등재 줄**(`grep -c 'bidvector.adapters.profile\.' gate-tests.properties`) | **3** |
+| 6F-6 줄 생존 — `PersistenceTestSupport.kt` TRUNCATE의 `operator_profile` **문자열 출현**(`grep -o operator_profile PersistenceTestSupport.kt \| wc -l`) | **2** |
+| 이 slice 줄 소멸 — `Sql.kt`의 `REQUIREMENT` 출현·`CleanMigrationTest/Column/CheckTest.kt`의 `notice_requirement` 출현(각 파일)·`gate-tests.properties`의 `adapters.qualification.*` 등재 줄·TRUNCATE의 `notice_requirement` 출현 | **전부 0** |
 | 확인 | `git diff edeaa9a3 -- adapters config` | 빈 출력 |
 | 확인 | `git status --porcelain` | D 10 · M 6, milestone-6.md·기타 없음 |
 | 트리 동일성 | 되돌린 6개 파일 전부 `git hash-object`가 `edeaa9a3`의 blob과 일치 | **6/6 일치** |
-| 축9 자동 복귀 | `grep -n '축 9\|effectivePrivileges' CleanMigrationTest.kt` | 있음(`CleanMigrationTest.kt` 466줄 — sizeGate 안, 수동 재삽입 불필요 확인) |
+| 축9 자동 복귀 | `grep -c '축 9\|effectivePrivileges' CleanMigrationTest.kt` = 4(존재) · `wc -l` = 466줄(sizeGate 500 안) | 수동 재삽입 불필요 확인 |
 | ④ | `./gradlew --no-daemon :adapters:compileKotlin :adapters:compileTestKotlin` | exit 0 |
 | ⑤ | `./gradlew --no-daemon :adapters:test --tests '*CleanMigration*Test*' --tests '*ProfileAdapterDependencyTest*' --tests '*ProfileGateRegistrationTest*' --tests '*JdbcOperatorProfileRepositoryTest*' --rerun-tasks` | exit 0 |
 | ⑥ | `./gradlew --no-daemon check` | exit 0 |
