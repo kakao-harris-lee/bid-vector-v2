@@ -26,6 +26,8 @@ import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.VatTreatment
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import org.postgresql.util.PSQLException
@@ -220,14 +222,17 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
     }
 
     /**
-     * verifier r2 MEDIUM-1 — V11 CHECK(공백류 정규식으로 교체됨, V4의 `reserve_price_sequence`
-     * 선례와 같은 형태)와 `NoticeTitle.of`가 **같은 입력 집합에 같은 답**을 낸다. 빈 문자열뿐
-     * 아니라 공백류(ASCII 공백·탭·개행·NBSP·전각 공백)도 DB 직접 UPDATE 로는 거부되고,
-     * `NoticeTitle.of`도 같은 값에 `null`을 낸다 — 저장은 non-null 인데 복원은 부재인
-     * 비대칭(verifier r2 실측)을 재현하지 않는다.
+     * verifier r2 MEDIUM-1(팀장 2차 지적) — 1차 표본(빈 문자열·ASCII 공백·탭·개행·NBSP·전각
+     * 공백)은 손으로 골라 VT(U+000B)·FF(U+000C)·CR(U+000D)를 빠뜨렸고, V11 CHECK도 같은
+     * 세 문자를 빠뜨린 채 그 표본을 통과했다(실무에서 흔한 "\r\n"이 뚫린다). 표본을 다시
+     * 손으로 나열하지 않는다 — **정의에서 유도한다**: `NoticeTitle.of`가 쓰는 `String.trim()`은
+     * Kotlin `Char.isWhitespace()`(JDK `Character.isWhitespace()` OR `Character.isSpaceChar()`
+     * 의 합집합, V4 주석과 같은 정의)로 공백을 가른다. 그 정의를 BMP 전체에서 실측으로 나열해
+     * 표본을 만들고(하드코딩 목록이 다시 빠뜨리지 못하게), DB CHECK 거부와 `NoticeTitle.of`
+     * `null`이 **그 집합 전부에서 일치**하는지를 술어로 단언한다.
      */
     @Test
-    fun `notice_title CHECK 와 NoticeTitle of 는 공백 판정이 일치한다`() {
+    fun `notice_title CHECK 와 NoticeTitle of 는 정의에서 유도한 공백 전체 집합에 같은 답을 낸다`() {
         val id = NoticeId(NoticeNumber.of("TITLE-CHECK-001"), NoticeRound.of("000"))
         val observation =
             RawNoticeObservation.of(
@@ -250,20 +255,22 @@ class NoticeFindRoundTripTest : PersistenceTestSupport() {
             )
         JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
 
-        val rejected =
-            listOf(
-                "" to "빈 문자열",
-                " " to "ASCII 공백",
-                "\t" to "탭",
-                "\n" to "개행",
-                " " to "NBSP",
-                "　" to "전각 공백",
-            )
-        for ((value, label) in rejected) {
-            // DB — 직접 UPDATE 가 거부된다. label 은 실패 시 어떤 입력인지 보여주는 표식이다.
-            shouldThrow<PSQLException> { updateNoticeTitleDirect(id, value) }
-            // Kotlin — 같은 값은 NoticeTitle.of 에서 null 이다(같은 판정을 공유).
-            NoticeTitle.of(value) shouldBe null
+        // BMP 범위(0x0000..0x3001, V4가 선언한 상한과 같다)에서 Char.isWhitespace()가 true인
+        // 코드포인트 전부 — 하드코딩 목록이 아니라 production이 쓰는 정의 자체에서 뽑는다.
+        val whitespaceCodePoints = (0x0000..0x3001).filter { it.toChar().isWhitespace() }
+        // 1차 표본이 빠뜨렸던 세 문자(VT 0x000B·FF 0x000C·CR 0x000D)가 이 정의에는 반드시
+        // 있어야 한다 — 없으면 정의 자체를 잘못 골랐다는 뜻이므로 이 test가 먼저 실패해야 한다.
+        whitespaceCodePoints shouldContainAll listOf(0x000B, 0x000C, 0x000D)
+
+        val rejectedSamples =
+            listOf("") + whitespaceCodePoints.map { it.toChar().toString() } + listOf("\r\n")
+        for (value in rejectedSamples) {
+            withClue("codepoints=${value.map { it.code }}") {
+                // DB — 직접 UPDATE 가 거부된다.
+                shouldThrow<PSQLException> { updateNoticeTitleDirect(id, value) }
+                // Kotlin — 같은 값은 NoticeTitle.of 에서 null 이다(같은 판정을 공유).
+                NoticeTitle.of(value) shouldBe null
+            }
         }
 
         // DB — 공백 하나라도 아닌 문자가 있으면 UPDATE 가 성공한다.

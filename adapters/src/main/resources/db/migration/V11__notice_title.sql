@@ -17,4 +17,4 @@
 ALTER TABLE notice
     ADD COLUMN notice_title TEXT
         CHECK (notice_title IS NULL
-            OR notice_title ~ '[^	--    -     　]');
+            OR notice_title ~ '[^\u0009-\u000D\u001C-\u001F\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]');
