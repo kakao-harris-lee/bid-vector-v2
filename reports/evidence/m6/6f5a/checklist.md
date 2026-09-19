@@ -68,12 +68,21 @@ scope.md 「경계로 처리」 둘을 실측한다(계약이 요구한 실측 �
 - **범위 밖 부채(등재만, 이 slice가 만든 것 아님)**: CPD 중복 게이트가 이름 치환 하나로
   열린다(`OPEN-CPD-GATE-RENAME-BYPASS`, verifier r1 실측 — 변수명만 바꿔도, 판정식만
   바꿔도 통과). 받는 쪽 하네스 레인.
-- **범위 밖 파일의 좌표 낡음(등재만, verifier r2 LOW-3)** — `reports/evidence/m4/4c2/
-  commands.md`가 `CleanMigrationCheckTest.kt:89`를 인용하는데, 이 slice가 그 파일에
-  +32줄을 더해 좌표가 더 밀린다. `f19d2eb`(M4) 이후 그 파일을 만진 커밋이 6B-1
-  둘·6F-1 둘·이 slice 하나라 좌표는 이 slice 이전에 이미 낡아 있었고, 이 slice는
-  더 밀 뿐이다 — evidence-pack의 「낡는 좌표 금지」는 **이 slice가 편집하는 파일**에
-  적용되고, `m4/4c2`는 범위 밖이라 직접 고치지 않는다.
+- **범위 밖 파일의 좌표 낡음(등재만, verifier r2 LOW-3, 팀장 실측으로 수치 정정)** —
+  `m4/4c2`의 `commands.md`가 `CleanMigrationCheckTest`의 한 줄 좌표를 인용하는데, 이
+  slice가 그 파일에 **+8줄**(전부 그 좌표 앞)을 더해 좌표가 밀린다. `f19d2eb`(M4)
+  이후 그 파일을 만진 커밋이 6B-1 둘·6F-1 둘·이 slice 하나라 좌표는 이 slice
+  이전에 이미 낡아 있었고, 이 slice는 더 밀 뿐이다 — evidence-pack의 「낡는 좌표
+  금지」는 **이 slice가 편집하는 파일**에 적용되고, `m4/4c2`는 범위 밖이라 직접
+  고치지 않는다.
+  같은 계열로 `m3/3h`의 codex-review JSON(`codex-review-20260916T162509Z.json`)도
+  `CleanMigrationTest`의 좌표를 인용하는데, `f19d2eb` 이후 그 파일을 만진 커밋이
+  m4-4c2·m3-3g·6B-1·6F-1 넷에 이 slice 하나라 좌표가 이미 낡아 있었다 — **이 slice가
+  만든 낡음이 아니다.** 이쪽은 **고칠 수 없는 종류**다: Codex 심판 기록은 append-only
+  이고 CLAUDE.md가 그 파일의 사후 수정을 규율로 금지한다 — evidence-pack의 「낡는
+  좌표 금지」를 심판 기록 자체에는 적용할 수 없다. **OPEN을 신설하지 않는다** — OPEN은
+  결정이 필요한 항목에 쓰는데, 이것은 결정이 아니라 규율의 적용 범위에 대한 사실이라
+  닫을 수 있는 항목이 아니다.
 
 ## 재활용(reuse) — N/A
 
