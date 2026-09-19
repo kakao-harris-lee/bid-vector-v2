@@ -65,9 +65,36 @@ scope.md 「경계로 처리」 둘을 실측한다(계약이 요구한 실측 �
 - **`OperatorProfilePort`의 실 구현(6F-6, PR #38)에 이 slice는 의존하지 않는다** —
   test는 fake(`OperatorProfilePort { ... }`)만 쓴다. 프로필 미설정(`null`) 분기는
   실측했으나 실제 JDBC 구현과의 통합은 이 slice 범위 밖이다(D-6F5-3, port 계약만 공유).
+- **`LicenseVerdict$` 부재 단언이 소진 `when` 소비 관용구를 어댑터 패키지 안에서
+  금지한다**(D-6F5-17, verifier r3 MEDIUM-a) — 도메인이 KDoc으로 규율한
+  `when (verdict) { is Eligible -> …; is Ineligible -> … }` 형태를 이 패키지 안 코드가
+  쓰면 컴파일이 각 subtype의 `instanceof` 참조를 상수 풀에 남겨 부재 단언에 걸린다.
+  오늘 이 경로의 소비자는 **0**이다(실측 —
+  `bidvector.adapters.qualification` 안에서 `LicenseVerdict`를 `when`으로 소비하는
+  코드가 없다, `StoredRequirementLicenseGate`는 판정 결과를 그대로 반환할 뿐 분기하지
+  않는다) — 지금은 무해하다. **마커를 넓히지 않는다**(넓히면 이 slice가 세 라운드에
+  걸쳐 닫은 방향이 되돌아간다 — 소진 `when` 소비를 허용하는 순간 「호출을 남긴 채
+  결과만 갈아치우기」가 다시 열린다). **`OPEN-6F5-EXTRACTION-FILL`의 확인 항목**으로
+  6F-5-b에 넘긴다(D-6F5-12와 같은 형태의 이관) — 그 slice가 실제 소비자를 만들 때
+  마커와 관용구 중 무엇을 굽힐지 결정한다.
 - **범위 밖 부채(등재만, 이 slice가 만든 것 아님)**: CPD 중복 게이트가 이름 치환 하나로
   열린다(`OPEN-CPD-GATE-RENAME-BYPASS`, verifier r1 실측 — 변수명만 바꿔도, 판정식만
   바꿔도 통과). 받는 쪽 하네스 레인.
+- **남은 우회 하나는 범위를 넓혀도 닫히지 않는다**(D-6F5-18, `OPEN-PERSISTENCE-GATE-
+  PREDICATE-TYPE`) — `adapters.persistence`에 헬퍼를 두고 그 헬퍼가 정책 로더를
+  **전체 한정 좌표**로 부르면 `PersistenceAdapterDependencyTest`가 **소스 텍스트
+  import 정규식**이라 못 본다. 처방은 위치가 아니라 **술어 종류**(바이트코드 상수
+  풀)라 이 slice의 범위(`qualification` 패키지)를 넓히는 것으로는 안 닫힌다. 이
+  slice는 고치지 않는다 — 그 파일은 in_scope 밖이고, 그 패키지는 6F-4가 지금
+  편집 중이라 술어 종류를 바꾸면 남의 레인을 붉힐 수 있다. 받는 쪽 하네스 레인.
+- **위치 술어 사다리의 구조적 종점은 타입이다**(D-6F5-20, `OPEN-VERDICT-CONSTRUCTION-
+  VISIBILITY`, 이 slice 밖) — 이 slice가 세 라운드에 걸쳐 위치 술어(클래스→패키지)를
+  넓혀 온 것은 우회 비용을 단조 상승시켰을 뿐 종점을 만들지 못했다(모듈 전체로
+  넓혀도 커널 모듈 헬퍼로 뚫린다, verifier r3 타당성 실측). 종점은 `LicenseVerdict`
+  subtype 생성자를 `internal` + `@ConsistentCopyVisibility`로 내리는 **타입** 변경이다
+  — 어댑터가 어디에 있든 verdict를 지어낼 수 없어진다. main 소스의 생성 지점은
+  커널 둘뿐이라 깨지는 것은 test 조립뿐(verifier r3 실측). 도메인 커널 변경이라
+  이 slice의 in_scope 밖 — 받는 쪽 도메인 레인.
 - **범위 밖 파일의 좌표 낡음(등재만, verifier r2 LOW-3, 팀장 실측으로 수치 정정)** —
   `m4/4c2`의 `commands.md`가 `CleanMigrationCheckTest`의 한 줄 좌표를 인용하는데, 이
   slice가 그 파일에 **+8줄**(전부 그 좌표 앞)을 더해 좌표가 밀린다. `f19d2eb`(M4)
@@ -78,11 +105,15 @@ scope.md 「경계로 처리」 둘을 실측한다(계약이 요구한 실측 �
   같은 계열로 `m3/3h`의 codex-review JSON(`codex-review-20260916T162509Z.json`)도
   `CleanMigrationTest`의 좌표를 인용하는데, `f19d2eb` 이후 그 파일을 만진 커밋이
   m4-4c2·m3-3g·6B-1·6F-1 넷에 이 slice 하나라 좌표가 이미 낡아 있었다 — **이 slice가
-  만든 낡음이 아니다.** 이쪽은 **고칠 수 없는 종류**다: Codex 심판 기록은 append-only
-  이고 CLAUDE.md가 그 파일의 사후 수정을 규율로 금지한다 — evidence-pack의 「낡는
-  좌표 금지」를 심판 기록 자체에는 적용할 수 없다. **OPEN을 신설하지 않는다** — OPEN은
-  결정이 필요한 항목에 쓰는데, 이것은 결정이 아니라 규율의 적용 범위에 대한 사실이라
-  닫을 수 있는 항목이 아니다.
+  만든 낡음이 아니다**(이 slice의 몫만 **+12** — `git show 056d3a37 --stat`의 세
+  hunk가 그 인용 줄 앞에서 각각 3·3·6줄을 더한다, 뒤 hunk 하나는 인용 줄 뒤라 무관).
+  이쪽은 **고칠 수 없는 종류**다: Codex 심판 기록은 append-only이고 CLAUDE.md가 그
+  파일의 사후 수정을 규율로 금지한다 — evidence-pack의 「낡는 좌표 금지」를 심판
+  기록 자체에는 적용할 수 없다. 다만 **「기록은 못 고쳐도 다음 심판의 인용 관례는
+  닫을 수 있는 결정」**이다(계약 갱신 (3) D-6F5-19, 앞 라운드의 「OPEN을 신설하지
+  않는다」 처분을 절반만 맞은 것으로 정정) — **`OPEN-CODEX-RECORD-COORDINATES`로
+  넘긴다**(받는 쪽 하네스 레인, 다음 Codex 심판부터 `file:line`이 아니라 심볼 단위로
+  인용하도록).
 
 ## 재활용(reuse) — N/A
 
