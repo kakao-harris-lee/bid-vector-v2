@@ -1,0 +1,143 @@
+openapi: 3.0.3
+info:
+  title: bid-vector operator API
+  version: "6a1"
+  description: >-
+    M6/6A-1 — 단일 운영자 소비자 전용(운영자 결정 2026-09-16 ①). 이 문서가 단일 출처다
+    (D-6A1-8, 수작성) — `OpenApiContractTest`가 구현과 대조한다. 이 slice가 여는 endpoint는
+    전략 조회 하나뿐이다(D-6A1-4, 읽기 전용 — 실행·명령 경로 없음).
+servers:
+  - url: /
+security:
+  - operatorCredential: []
+paths:
+  /api/strategy:
+    get:
+      operationId: readStrategy
+      summary: 현재 운영자 전략 조회
+      responses:
+        "200":
+          description: 현재 전략
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategyReadResponse"
+        "401":
+          description: 자격증명 없음 또는 틀림 — 사유를 구분하지 않는다(D-6A1-6)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /{unmatched}:
+    get:
+      operationId: unmatchedPath
+      summary: 미매핑 경로 — 계약 문서화 목적(D-6A1-21, 실제로는 어떤 controller도 이 경로를 다루지 않는다)
+      responses:
+        "404":
+          description: 등록된 endpoint가 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+components:
+  securitySchemes:
+    operatorCredential:
+      type: apiKey
+      in: header
+      name: X-Operator-Credential
+  schemas:
+    # D-6A1-20 ⓑ — 평탄하다는 것을 이 스키마 자신이 단언한다: 모든 속성이 string·integer·
+    # number·array<string> 중 하나이고 중첩 object 속성이 없다(`OpenApiContractTest`가
+    # 이 문서에서 object 타입 속성이 새로 생기면 실패하도록 재확인한다).
+    StrategyReadResponse:
+      type: object
+      required:
+        - revision
+        - focusCategories
+        - focusRegionTerms
+        - excludeRegionTerms
+        - requiredKeywordTerms
+        - excludeKeywordTerms
+      properties:
+        revision:
+          type: integer
+        focusCategories:
+          type: array
+          items:
+            type: string
+        focusRegionTerms:
+          type: array
+          items:
+            type: string
+        excludeRegionTerms:
+          type: array
+          items:
+            type: string
+        requiredKeywordTerms:
+          type: array
+          items:
+            type: string
+        excludeKeywordTerms:
+          type: array
+          items:
+            type: string
+        minBudgetWon:
+          type: integer
+          format: int64
+          nullable: true
+        minBudgetCurrency:
+          type: string
+          nullable: true
+        minBudgetVatTreatment:
+          type: string
+          nullable: true
+        minBudgetProvenance:
+          type: string
+          nullable: true
+        maxBudgetWon:
+          type: integer
+          format: int64
+          nullable: true
+        maxBudgetCurrency:
+          type: string
+          nullable: true
+        maxBudgetVatTreatment:
+          type: string
+          nullable: true
+        maxBudgetProvenance:
+          type: string
+          nullable: true
+        minimumMatchScore:
+          type: number
+          nullable: true
+        minimumProbabilityScore:
+          type: number
+          nullable: true
+        bidNowThreshold:
+          type: number
+          nullable: true
+        reviewThreshold:
+          type: number
+          nullable: true
+        candidateLimit:
+          type: integer
+          nullable: true
+    ErrorBody:
+      type: object
+      required:
+        - code
+        - message
+        - correlationId
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        correlationId:
+          type: string
