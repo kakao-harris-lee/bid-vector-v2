@@ -86,8 +86,51 @@ verifier `not-ready`(HIGH-2) · code-reviewer(HIGH-1) 수정 뒤, 마지막 산�
 
 셋 다 표본은 커밋하지 않고 검증 뒤 clone을 삭제했다.
 
+## round 2(수정 라운드, verifier r2 HIGH-1·LOW-1) — 판정 대상 `d550ee05` 뒤 재실측
+
+verifier r2 `not-ready`(신규 HIGH 1 · MEDIUM 1 · LOW 3) 수정 뒤, 마지막 **내용** 커밋
+`08397073`(D-6F5-14·D-6F5-15)에서 재측정.
+
+## 2026-09-19T(S-50~53, 통합)
+
+- cmd: `./gradlew --no-daemon :adapters:test --tests '*JdbcRequirementStoreTest*' --tests '*StoredRequirementLicenseGateTest*' --tests '*QualificationAdapterDependencyTest*' --tests '*QualificationGateRegistrationTest*' --rerun-tasks`
+- exit: 0 — JUnit XML 실측: `12 / 7 / 8 / 2`, failures 0 · skipped 0(round 1과 동일 —
+  D-6F5-14·D-6F5-15는 범위·문면만 바꿔 test 개수를 바꾸지 않는다).
+
+## 2026-09-19T(S-10)
+- cmd: `./gradlew --no-daemon check`
+- exit: 0 — BUILD SUCCESSFUL.
+
+## 2026-09-19T(S-11)
+- cmd: `./gradlew --no-daemon qualityBaseline`
+- exit: 0 — BUILD SUCCESSFUL(UP-TO-DATE).
+
+## 2026-09-19T(S-20)
+- cmd: `./tools/one-command-check.sh`
+- exit: 0 — 「완료 — Kotlin 전건 + Python 전건 통과」.
+
+## 2026-09-19T(추가)
+- cmd: `./gradlew --no-daemon :leakPatternGate --rerun-tasks`
+- exit: 0.
+- cmd: `./gradlew --no-daemon :adapters:cpdCheck --rerun-tasks`
+- exit: 0(D-6F5-11 위임판 재확인, 무변경).
+- 비밀값 참조형 스캔(`grep -rniE -f config/quality/leak-patterns.txt <이 라운드가 편집한
+  경로>`) — exit 1(매치 없음 = 통과).
+
+## round 2 닫힘 판정 — D-6F5-14 변이 둘 재현(버릴 clone, `git clone --no-hardlinks`)
+
+| # | 심은 변이 | 결과(수정 뒤) |
+| --- | --- | --- |
+| MUT-R2-1 | 새 형제 파일(`internal fun readPolicyDirectly() = LICENSE_QUALIFICATION_POLICY.resolve(LocalDate.now())`)을 두고 `StoredRequirementLicenseGate`가 호출 | **RED** — `QualificationAdapterDependencyTest`(패키지 전체 정책 로더 부재 단언 실패, clue가 `PolicyDirectReadMutationKt.class`를 지목) |
+| MUT-R2-2 | 새 형제 파일에서 `LicenseVerdict.Eligible(emptySet())` 조립 함수를 두고, 게이트가 게이트 test가 덮지 않는 경로(`Unparsable` 행이 섞인 `Collected`)에서 반환 | **RED** — `QualificationAdapterDependencyTest`(패키지 전체 `LicenseVerdict` subtype 좌표 부재 단언 실패, clue가 `VerdictAssemblyMutationKt.class`를 지목) **및** `StoredRequirementLicenseGateTest` 7/7 그대로 green(게이트 test는 이 경로를 덮지 않아 무변화 — 부재 단언이 단독으로 잡는다는 verifier r2 서술을 재확인) |
+
+둘 다 표본은 커밋하지 않고 검증 뒤 clone을 삭제했다. 정당한 사용(정상 경로 —
+`judge(...)` 결과를 그대로 반환)과 같은 패키지의 다른 두 클래스(`JdbcRequirementStore`·
+`RequirementRowMapping`)는 이 라운드가 넓힌 범위에도 걸리지 않는다(위 S-50~53 통합 실행이
+8/8 green으로 확인).
+
 ## 마지막 HEAD 표기
 evidence 커밋(이 파일들) 이후 HEAD에서의 재실측 정본은 **verifier**가 낸다(CLAUDE.md
 「acceptance 재실측은 evidence 커밋 뒤 HEAD 에서」, evidence-pack 규격 「마지막 HEAD는
-verifier·조치 코멘트가 정본」) — 이 표는 그 직전(round 1 마지막 산출물 커밋 `b7da46af`)까지의
+verifier·조치 코멘트가 정본」) — 이 표는 그 직전(round 2 마지막 **내용** 커밋 `08397073`)까지의
 실측이다.
