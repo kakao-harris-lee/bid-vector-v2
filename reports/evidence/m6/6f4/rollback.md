@@ -1,15 +1,17 @@
 # M6/6F-4 — rollback.md
 
-**실측 HEAD: `bdfafc74`**(수정 라운드 2의 마지막 산출물 커밋 — base_sha는 흡수 병합 뒤 갱신값
-`ede5d5b` 그대로다. 이 라운드는 verifier r2·code-reviewer 판정에 답한 커밋 다섯을 더했다:
-V11 CHECK 정규식 교체, CHECK/타입 일치 test + 공고명 merge guard 3단계 test, `NoticeTitle`
-단위 test, KDoc 정정 둘, checklist 갱신 하나. `reports/evidence/m6/6f4/**` 편집 커밋은 이 목록
-계산에서 뺀다).
+**실측 HEAD: `d12b0947`**(수정 라운드 2의 마지막 산출물 커밋 — base_sha는 흡수 병합 뒤 갱신값
+`ede5d5b` 그대로다. 이 라운드는 verifier r2·code-reviewer 판정에 답한 커밋에 더해, 팀장이
+V11 CHECK가 V4 선례보다 좁다고 재지적한 것(VT·FF·CR 누락)을 정정한 커밋(`d12b0947`)까지
+포함한다: V11 CHECK 정규식 교체 → 재지적으로 V4 bracket과 완전히 동일한 텍스트로 재교체,
+CHECK/타입 일치 test(정의에서 유도한 공백 전체 집합으로 재작성) + 공고명 merge guard 3단계
+test, `NoticeTitle` 단위 test, KDoc 정정 둘, checklist 갱신. `reports/evidence/m6/6f4/**`
+편집 커밋은 이 목록 계산에서 뺀다).
 
 ## 목록(기계 산출)
 
 ```
-$ git diff --name-status ede5d5b..bdfafc74 -- . ':!reports/evidence' ':!milestone-6.md' ':!.claude'
+$ git diff --name-status ede5d5b..d12b0947 -- . ':!reports/evidence' ':!milestone-6.md' ':!.claude'
 M	adapters/src/main/kotlin/bidvector/adapters/persistence/JdbcNoticeRepository.kt
 M	adapters/src/main/kotlin/bidvector/adapters/persistence/NoticeReconstruction.kt
 M	adapters/src/main/kotlin/bidvector/adapters/persistence/NoticeRow.kt
@@ -35,13 +37,13 @@ A	strategy/src/test/kotlin/bidvector/strategy/WatchTextAssemblyTest.kt
 
 ## 공유 파일 셋 — 겹침 확인과 절차
 
-`git log --oneline ede5d5b..bdfafc74 -- <파일>`로 이 range 안에서 각 파일을 만진 커밋을
+`git log --oneline ede5d5b..d12b0947 -- <파일>`로 이 range 안에서 각 파일을 만진 커밋을
 먼저 나열했다. 유일하게 `Sql.kt`가 병합 커밋(`6154e2d1`)에도 나타난다 — 6F-2가 흡수 병합으로
 더한 `SELECT_OPEN_CANDIDATES`가 같은 파일에 있기 때문이다. 그러나 **`base_sha`가 이미
 `ede5d5b`(6F-2 병합 뒤 값)라 6F-2의 기여는 base 자체에 포함돼 있다** — 실측:
 
 ```
-$ git diff ede5d5b..bdfafc74 -- adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt
+$ git diff ede5d5b..d12b0947 -- adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt
 ```
 
 출력은 `notice_title` 세 곳(NOTICE_COLUMNS·INSERT_NOTICE·UPDATE_NOTICE)뿐이고
@@ -81,7 +83,7 @@ git restore --source=ede5d5b --staged --worktree -- \
 `-- $P` 로 넘기면 zsh는 단어 분리를 하지 않아 pathspec이 하나로 합쳐진다. 아래 실측은
 배열(`paths=(...)`)과 `"${paths[@]}"`로 각 경로를 개별 인자로 넘겼다.
 
-## 임시 clone 실측(①~⑥, `git clone .` → `bdfafc74` → 복원, 전건 실행)
+## 임시 clone 실측(①~⑥, `git clone .` → `d12b0947` → 복원, 전건 실행)
 
 | # | 확인 | 명령 | 결과 |
 | --- | --- | --- | --- |
@@ -98,6 +100,6 @@ git restore --source=ede5d5b --staged --worktree -- \
 
 ## 하네스 레인 절 갱신 필요성
 
-`git log --oneline ede5d5b..bdfafc74 -- CLAUDE.md .claude/`는 **`.claude/skills/evidence-pack/
+`git log --oneline ede5d5b..d12b0947 -- CLAUDE.md .claude/`는 **`.claude/skills/evidence-pack/
 SKILL.md` 한 커밋(`2b61dff4`)** 을 낸다 — 팀장 레인이 운영자 승인 하에 같은 range에 둔 것이고
 scope.md 「하네스 레인 변경」 절이 이미 등재했다(이 slice 산출물이 아니라 되돌림 대상도 아니다).

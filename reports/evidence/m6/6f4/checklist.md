@@ -28,8 +28,8 @@
       ```
       결과: 빈 출력(수정 라운드 산출물 커밋 전 시점 기준 — evidence 커밋 뒤 재확인한다).
 - [x] scope.md의 acceptance_commands 전건이 exit 0으로 `commands.md`에 기록됨 — HEAD
-      `bdfafc74`(base_sha 갱신값 `ede5d5b`) 기준, verifier r2·code-reviewer 수정 라운드 뒤
-      재실측.
+      `d12b0947`(base_sha 갱신값 `ede5d5b`) 기준, verifier r2·code-reviewer 수정 라운드 +
+      팀장 2차 지적(V11 CHECK 범위) 정정 뒤 재실측.
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — 부분 게이트가 아니라
       `./gradlew --no-daemon check`(Kotlin `check` job 전건) + `./tools/one-command-check.sh`
       (Python `ml-engine` job 포함) 전건.
@@ -85,17 +85,28 @@ in_scope에 편입된 뒤 이 구현 라운드(과 그 뒤 수정 라운드)가 
 ## 크기 게이트 재실측(verifier r2 LEDGER-1·review LOW 뒤)
 
 r1 시점 evidence 351줄 대 산출물 315 insertions(+11 삭제, 326줄 변경)로 **위반**이었다. 이
-수정 라운드가 test·문면을 더해 양쪽 다 늘었다 — 최종 수치:
+수정 라운드가 test·문면을 더해 양쪽 다 늘었다 — 최종 수치(HEAD `d12b0947`):
 
-- **evidence**: `wc -l reports/evidence/m6/6f4/*.md`(이 절 자신을 포함한 최종값) = scope 164 +
-  checklist ~99 + commands 63 + rollback 103 ≈ **429줄**(이 문장이 적힌 그 순간에도 이 절
-  자체가 checklist.md 줄 수를 바꾸므로 정확히 1회 확정하기 어렵다 — 아래 산출물과의 격차가
-  이 절의 몇 줄 오차보다 훨씬 커서 결론에는 영향이 없다).
-- **산출물**: `git diff --shortstat ede5d5b..bdfafc74 -- . ':!reports/evidence'
-  ':!milestone-6.md' ':!.claude'` = 16 files changed, **513 insertions(+), 22 deletions(-)**
-  (535줄 변경, insertions만 비교해도 513).
+- **evidence**: `wc -l reports/evidence/m6/6f4/*.md` ≈ 430줄대(scope 164 + checklist·commands·
+  rollback 나머지 — 이 절 자신이 checklist.md 줄 수를 계속 바꾸므로 정확히 1회 확정하기 어렵다,
+  아래 산출물과의 격차가 이 절의 몇 줄 오차보다 훨씬 커서 결론에는 영향이 없다).
+- **산출물**: `git diff --shortstat ede5d5b..d12b0947 -- . ':!reports/evidence'
+  ':!milestone-6.md' ':!.claude'` = 16 files changed, **520 insertions(+), 22 deletions(-)**
+  (542줄 변경, insertions만 비교해도 520).
 
-429 < 513(그리고 429 < 535) — **이번 라운드에서 게이트를 충족한다.** r1에서 부풀었던 원인
-(조사 서술이 코드보다 긴 형태)은 그대로이지만, 이번 라운드가 더한 산출물(테스트 132+43줄,
-migration 정규식 12줄, KDoc 정정 23줄 = 210줄)이 evidence 증가분(약 78줄)보다 커서 비율이
-역전됐다 — evidence 절을 줄여서가 아니라 산출물이 늘어서 통과한다는 것을 그대로 남긴다.
+evidence(~430) < 산출물(520, 542) — **게이트를 충족한다.** r1에서 부풀었던 원인(조사 서술이
+코드보다 긴 형태)은 그대로이지만, 이번 라운드가 더한 산출물(test·migration 정정·KDoc 정정)이
+evidence 증가분보다 커서 비율이 역전됐다 — evidence 절을 줄여서가 아니라 산출물이 늘어서
+통과한다는 것을 그대로 남긴다.
+
+## V11 CHECK 범위 정정(팀장 2차 지적, `d12b0947`)
+
+verifier r2 MEDIUM-1 처방으로 넣은 첫 CHECK 정규식이 V4 선례보다 **좁았다** — 편집 도구가
+유니코드 이스케이프 표기를 실제 제어문자로 치환해 버려, 의도한 TAB부터 CR까지(코드포인트
+9-13) 범위가 TAB·LF 둘(9-10)로 줄어 VT(11)·FF(12)·CR(13)이 빠졌다. 팀장이 바이트 단위로
+디코드해 재지적했다. 정정 방법: V4 파일의 정규식 텍스트를 프로그램으로 그대로 읽어 V11에
+재사용(사람이 직접 타이핑하지 않음) — 결과가 V4 bracket 표현과 완전히 동일한 텍스트임을
+diff 0으로 확인했고, 파일에 원시 제어문자가 없음도 확인했다. 회귀 test도 손으로 고른 표본
+대신 Kotlin의 공백 판정 함수가 참인 코드포인트 전부를 BMP에서 실측으로 유도하도록 다시 써
+같은 종류의 누락이 재발할 수 없게 했다. 사후 검증: 옛 좁은 CHECK로 되돌리면 이 새 test가
+코드포인트 11(VT)에서 정확히 실패하는 것을 확인했다(`commands.md` 참고).
