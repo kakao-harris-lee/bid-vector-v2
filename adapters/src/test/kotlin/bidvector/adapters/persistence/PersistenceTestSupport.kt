@@ -69,11 +69,13 @@ abstract class PersistenceTestSupport {
                 // M6/6F-5-a — notice_requirement도 같은 이유로 더한다(D-6F5-4, 추가만).
                 // notice_requirement_row는 FK ON DELETE CASCADE라 헤더가 비워지면 함께 비워진다
                 // (명시 나열 없이 CASCADE로 정합, 다른 자식 표와 다른 점 — 명시 대상은 아니다).
+                // M6/6A-1 — api_request_audit도 같은 이유로 더한다(D-6A1-7, 추가만) — 감사
+                // 행이 test 간에 새어 나가면 「요청당 정확히 한 행」 대조가 실행 순서에 의존한다.
                 statement.execute(
                     "TRUNCATE TABLE rejected_write, notice_audit, notice, opening_result, " +
                         "qualification_text, collection_run, raw_observation, outbox, inbox, " +
                         "edit_session, operator_strategy, operator_strategy_revision, " +
-                        "operator_profile, notice_requirement " +
+                        "operator_profile, notice_requirement, api_request_audit " +
                         "RESTART IDENTITY CASCADE",
                 )
             }
