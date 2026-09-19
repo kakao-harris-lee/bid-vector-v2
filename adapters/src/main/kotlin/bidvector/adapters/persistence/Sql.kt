@@ -8,6 +8,11 @@ package bidvector.adapters.persistence
  * 없는 「최신 관측 우선」 축이라 `ON CONFLICT ... WHERE observed_at >= ...` 한 문으로
  * insert/update/no-op을 다 낸다 — `RETURNING (xmax = 0) AS inserted`로 어느 경로였는지
  * 왕복 한 번에 안다(PostgreSQL 관용구: 이 문이 실제로 삽입한 행은 `xmax`가 0이다).
+ *
+ * `bidvector.adapters.event.EventSql`이 outbox·inbox SQL을 이 object 밖에 두는 것과 같은
+ * 이유로, M6/6F-5-a의 자격 요건 SQL도 `bidvector.adapters.qualification.RequirementSql`에
+ * 있다(M6/6F-5-a+6F-6 병합 뒤 두 slice가 각자 정당하게 더한 상수의 합이 타입 멤버 31개가
+ * 되어(OPEN-ADR-06 (a), 30개 한도) 6F-5-a 몫을 떼어냈다 — 각자는 한도 안이었다).
  */
 internal object Sql {
     const val INSERT_RAW_OBSERVATION =
@@ -356,6 +361,29 @@ internal object Sql {
         )
         """
 
+    // M6/6F-6 — 프로필 영속(D-6F6-1~3). 싱글턴(id=1, operator_strategy 와 같은 관례).
+    // `licenses_declared`·`license_names`가 짝을 이뤄 세 상태(미설정=행 없음·NotDeclared·
+    // Declared(빈 목록 포함))를 구분한다 — V12 CHECK 가 그 짝의 모순만 막고, 세 상태 자체의
+    // 구분은 이 열 형태가 진다.
+    private const val PROFILE_COLUMNS =
+        """
+        business_types, licenses_declared, license_names, region_terms
+        """
+
+    const val SELECT_PROFILE = "SELECT $PROFILE_COLUMNS FROM operator_profile WHERE id = 1"
+
+    const val UPSERT_PROFILE =
+        """
+        INSERT INTO operator_profile (id, $PROFILE_COLUMNS)
+        VALUES (1, ?, ?, ?, ?)
+        ON CONFLICT (id) DO UPDATE SET
+            business_types = EXCLUDED.business_types,
+            licenses_declared = EXCLUDED.licenses_declared,
+            license_names = EXCLUDED.license_names,
+            region_terms = EXCLUDED.region_terms,
+            updated_at = now()
+        """
+
     const val INSERT_COLLECTION_RUN =
         """
         INSERT INTO collection_run (
@@ -407,43 +435,5 @@ internal object Sql {
         WHERE (edit_session.state IN ('APPLIED', 'CANCELLED', 'EXPIRED') AND EXCLUDED.session_version = 0)
            OR edit_session.session_version = EXCLUDED.session_version - 1
         RETURNING id
-        """
-
-    // M6/6F-5-a — 자격 요건 영속(D-6F5-4). save()는 매번 헤더를 upsert하고 행을 통째로
-    // 교체한다(delete-then-insert, UPDATE 없음) — `bidvector.adapters.qualification
-    // .JdbcRequirementStore`가 한 트랜잭션에서 순서대로 쓴다.
-    const val SELECT_REQUIREMENT_STATUS =
-        "SELECT status FROM notice_requirement WHERE notice_number = ? AND notice_round = ?"
-
-    const val SELECT_REQUIREMENT_ROWS =
-        """
-        SELECT serial_no, kind, group_no, source_field, license_names
-        FROM notice_requirement_row
-        WHERE notice_number = ? AND notice_round = ?
-        ORDER BY serial_no
-        """
-
-    const val UPSERT_REQUIREMENT_HEADER =
-        """
-        INSERT INTO notice_requirement (notice_number, notice_round, status)
-        VALUES (?, ?, ?)
-        ON CONFLICT (notice_number, notice_round) DO UPDATE SET
-            status = EXCLUDED.status,
-            updated_at = now()
-        """
-
-    /** DataAbsent로 되돌리는 경로 — `ON DELETE CASCADE`(V13)가 자식 행을 함께 지운다. */
-    const val DELETE_REQUIREMENT_HEADER =
-        "DELETE FROM notice_requirement WHERE notice_number = ? AND notice_round = ?"
-
-    /** 헤더가 남아 있는(FAILED→COLLECTED 등) 상태 전이에서 옛 행을 지운다 — CASCADE로는 못 잡는다. */
-    const val DELETE_REQUIREMENT_ROWS =
-        "DELETE FROM notice_requirement_row WHERE notice_number = ? AND notice_round = ?"
-
-    const val INSERT_REQUIREMENT_ROW =
-        """
-        INSERT INTO notice_requirement_row
-            (notice_number, notice_round, serial_no, kind, group_no, source_field, license_names)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
         """
 }

@@ -1,6 +1,5 @@
 package bidvector.adapters.qualification
 
-import bidvector.adapters.persistence.Sql
 import bidvector.adapters.persistence.getTextList
 import bidvector.adapters.persistence.setTextArray
 import bidvector.procurement.NoticeId
@@ -59,7 +58,7 @@ class JdbcRequirementStore(
     }
 
     private fun Connection.selectStatus(noticeId: NoticeId): RequirementCollectionStatus? =
-        prepareStatement(Sql.SELECT_REQUIREMENT_STATUS).use { statement ->
+        prepareStatement(RequirementSql.SELECT_REQUIREMENT_STATUS).use { statement ->
             statement.bindNoticeId(1, noticeId)
             statement.executeQuery().use { rs ->
                 if (rs.next()) RequirementCollectionStatus.valueOf(rs.getString("status")) else null
@@ -67,7 +66,7 @@ class JdbcRequirementStore(
         }
 
     private fun Connection.selectRows(noticeId: NoticeId): List<RequirementRowRecord> =
-        prepareStatement(Sql.SELECT_REQUIREMENT_ROWS).use { statement ->
+        prepareStatement(RequirementSql.SELECT_REQUIREMENT_ROWS).use { statement ->
             statement.bindNoticeId(1, noticeId)
             statement.executeQuery().use { rs ->
                 generateSequence { if (rs.next()) rs.toRequirementRowRecord() else null }.toList()
@@ -78,7 +77,7 @@ class JdbcRequirementStore(
         noticeId: NoticeId,
         status: RequirementCollectionStatus,
     ) {
-        prepareStatement(Sql.UPSERT_REQUIREMENT_HEADER).use { statement ->
+        prepareStatement(RequirementSql.UPSERT_REQUIREMENT_HEADER).use { statement ->
             val statusIndex = statement.bindNoticeId(1, noticeId)
             statement.setString(statusIndex, status.name)
             statement.executeUpdate()
@@ -86,14 +85,14 @@ class JdbcRequirementStore(
     }
 
     private fun Connection.deleteHeader(noticeId: NoticeId) {
-        prepareStatement(Sql.DELETE_REQUIREMENT_HEADER).use { statement ->
+        prepareStatement(RequirementSql.DELETE_REQUIREMENT_HEADER).use { statement ->
             statement.bindNoticeId(1, noticeId)
             statement.executeUpdate()
         }
     }
 
     private fun Connection.deleteRows(noticeId: NoticeId) {
-        prepareStatement(Sql.DELETE_REQUIREMENT_ROWS).use { statement ->
+        prepareStatement(RequirementSql.DELETE_REQUIREMENT_ROWS).use { statement ->
             statement.bindNoticeId(1, noticeId)
             statement.executeUpdate()
         }
@@ -104,7 +103,7 @@ class JdbcRequirementStore(
         records: List<RequirementRowRecord>,
     ) {
         if (records.isEmpty()) return
-        prepareStatement(Sql.INSERT_REQUIREMENT_ROW).use { statement ->
+        prepareStatement(RequirementSql.INSERT_REQUIREMENT_ROW).use { statement ->
             for (record in records) {
                 var index = statement.bindNoticeId(1, noticeId)
                 statement.setString(index++, record.serialNo)

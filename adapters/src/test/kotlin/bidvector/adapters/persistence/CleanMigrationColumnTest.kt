@@ -294,6 +294,20 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("operator_strategy_revision", "applied_at", "timestamp with time zone", false, true),
         ) + operatorStrategySharedColumns("operator_strategy_revision")
 
+    // M6/6F-6 — 프로필 영속(추가만, D-6F6-2·D-6F6-3). V12__operator_profile.sql. 업종·지역
+    // 어휘는 전략과 같은 이유로 NOT NULL 배열(빈 목록이 「없음」). `licenses_declared`가
+    // `license_names`와 짝을 이뤄 세 상태(미설정=행 없음·NotDeclared·Declared(빈 목록))를
+    // 구분한다.
+    private val operatorProfileColumns =
+        listOf(
+            ColumnSpec("operator_profile", "id", "smallint", false),
+            ColumnSpec("operator_profile", "business_types", "ARRAY", false),
+            ColumnSpec("operator_profile", "licenses_declared", "boolean", false),
+            ColumnSpec("operator_profile", "license_names", "ARRAY", false),
+            ColumnSpec("operator_profile", "region_terms", "ARRAY", false),
+            ColumnSpec("operator_profile", "updated_at", "timestamp with time zone", false, true),
+        )
+
     // M6/6F-5-a — 자격 요건 영속(추가만, D-6F5-4). 헤더(notice_requirement)는 공고당 한 행,
     // 행(notice_requirement_row)은 `RequirementRow`(Parsed·Unparsable) 왕복 — PARSED만
     // group_no·source_field·license_names를 채운다(nullable, UNPARSABLE은 항상 NULL).
@@ -322,7 +336,7 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
         rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
             rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
             openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns +
-            operatorStrategyColumns + operatorStrategyRevisionColumns +
+            operatorStrategyColumns + operatorStrategyRevisionColumns + operatorProfileColumns +
             noticeRequirementColumns + noticeRequirementRowColumns
 
     @Test
