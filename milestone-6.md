@@ -315,6 +315,10 @@ main 의 생성 지점은 커널 둘뿐이고 밖은 전부 읽기만이라 깨�
 바이트코드 상수 풀로 바꾸면 `adapters` 모듈 안에 그 코드가 앉을 자리가 없어진다 — 그 파일은 이 slice 의
 in_scope 밖이고 **6F-4 가 그 패키지를 편집 중**이라 여기서 건드리지 않는다(받는 쪽 **하네스 레인**).
 **`OPEN-VERDICT-CONSTRUCTION-VISIBILITY`**: 위 종점 — 받는 쪽 **도메인 레인**.
+**`OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`**: `CleanMigrationCheckTest` 의 COL-06·H-3 단언 셋이
+`any { contains }` **존재 단언**이라 CHECK 본문을 제자리에서 항진명제로 약화해도 통과한다(6F-5-a 가
+자기 표에서 실측한 뒤 같은 형태를 남의 표에서 확인했다 — 범위를 넓히지 않고 넘긴다. 받는 쪽
+**하네스 레인**).
 **`OPEN-CODEX-RECORD-COORDINATES`**: Codex 심판 기록(append-only, 수정 금지)이 `file:line` 을 인용해
 **원리적으로 낡는다**. 기록은 못 고쳐도 **다음 심판의 인용 관례**는 닫을 수 있다(받는 쪽 **하네스 레인**).
 
