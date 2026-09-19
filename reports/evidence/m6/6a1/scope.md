@@ -129,6 +129,35 @@ limit · 요청 본문 감사(D-6A1-7) · 후보평가 축 전부(D-6A1-2) · pa
 자동 게이트가 없다는 사실은 `OPEN-MIGRATION-ORDER-GATE`(6F-5-a 신설)로 하네스 레인에 있다. 이 slice 는
 **D-6A1-12 의 정의로 그 규율을 스스로 지킨다.**
 
+## 계약 갱신 (5) — preflight 조사의 결정 (2026-09-19, 팀장)
+
+구현 레인의 Phase 2 조사(`_workspace/m6-6a/01_preflight.md`)가 설계 영향이 큰 선택 셋을 올렸고, 팀장이
+그중 둘을 실측으로 보강해 여기서 고정한다. **조사의 우회 폐쇄 계획 여섯은 전부 구조적이라 채택한다**
+(필터를 `/*` 로 등록 + `RequestMappingHandlerMapping.handlerMethods` 기계 전수 · audit 필터를 인증 필터
+**바깥**에 · 매핑표 밖 `Throwable` 은 고정 문구 + correlation id · `MessageDigest.isEqual` 상수 시간 ·
+OpenAPI 를 `Set.equals` 로 완전 일치). 재사용 조사도 충분하다 — 새로 만드는 라이브러리·factory 가 **0** 이고
+`JdbcStrategyRepository`·`SystemClock`·`UuidCorrelationIdFactory`·`ContentCachingResponseWrapper`·
+`MessageDigest.isEqual`·`snakeyaml` 을 그대로 쓴다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6A1-17**(audit 실패 처분 = **fail-closed**) | audit insert 가 성공해야 실제 응답을 내보낸다. 실패하면 버퍼를 버리고 고정 500 `ErrorBody`(+correlation id)로 덮는다. **대가를 알려진 제한에 등재**한다 — ① audit 저장소 장애가 **읽기 endpoint 가용성을 죽인다**(받는 쪽 **6E** 런북) ② 응답을 메모리에 버퍼링하므로 **대용량·스트리밍 응답이 생기면 재검토**(목록 endpoint 가 생기는 slice = pagination 을 정하는 그 slice, D-6A1-5 와 같은 자리) | 위협 모델 **(c)「모든 요청이 audit 에 남는다」를 fail-open 으로는 구조적으로 보장할 수 없다** — audit 저장소 장애 구간 **전체가 침묵 감사 공백**이 되고, 그 공백은 사후에 「요청이 없었다」와 구별되지 않는다. 결합 비용은 낮다: 이 slice 의 endpoint 는 **읽기 하나**(D-6A1-4)이고 소비자는 **단일 운영자**(운영자 결정 2026-09-16 ②)다. **가용성을 감사보다 위에 두는 선택은 지금 하지 않는다** — 그 교환은 소비자가 늘 때(`OPEN-6A-RBAC` 와 같은 시점) 다시 판단한다 |
+| **D-6A1-18**(커넥션 풀을 **들이지 않는다**) | `PGSimpleDataSource`(비풀링)를 production 배선에도 쓴다. `spring-boot-starter-jdbc`(HikariCP)를 **추가하지 않는다**. `OPEN-6A1-CONNECTION-POOL` 로 등재 — 받는 쪽 **6C/6E** | 단일 운영자·저동시성이라 오늘 필요가 없고, 들이면 **카탈로그 좌표 + `compatibilitySmoke.expectedModules` + 호환 표면**이 함께 늘어난다(D-6A1-16). test 관례(`PersistenceTestSupport`)가 이미 같은 타입을 쓴다 — **production 과 test 가 같은 DataSource 타입**인 편이 배선 차이로 인한 오판을 줄인다. **다만 이 상태로 운영에 나갈 수는 없다** — 그래서 알려진 제한이 아니라 **OPEN** 이다 |
+| **D-6A1-19**(설정 키 이름 — **D-6A1-9 를 모든 키로 일반화**) | DataSource 설정 키는 `bidvector.persistence.jdbc-url` · `bidvector.persistence.username` · **`bidvector.persistence.credential`** 이다. **`…password` 를 쓰지 않는다.** D-6A1-9 가 「인증 관련 클래스·파일·설정 키」로 적은 규율을 **모든 설정 키 이름**으로 넓힌다 | **팀장 실측**: 제안된 `bidvector.persistence.password` 를 `grep -qiE -f config/quality/leak-patterns.txt` 에 넣으면 **걸린다**. `jdbc-url`·`username`·`credential` 은 통과한다. 그 이름은 evidence·계약·주석에 **인용될 수밖에 없으므로** 이름 자체가 `leakPatternGate` 의 자기참조가 된다 — D-6A1-9 가 초판에서 겪은 것과 **똑같은 덫**이고, 그때는 「인증 관련」으로 좁게 적혀 있었다 |
+| **D-6A1-20**(OpenAPI 대조의 **깊이**를 단언한다) | 「top-level 키 집합 + nullable + 상태 코드」 대조만으로는 부족하다 — **중첩 object 속성이 생기는 순간 조용히 통과**한다. 둘 중 하나를 반드시 한다: ⓐ 대조를 **재귀**로 하거나 ⓑ **응답 스키마에 중첩 object 속성이 없음을 단언**해 중첩이 생기면 test 가 붉어지게 한다. 지금 DTO 가 평탄하면 ⓑ 로 족하되 **「지금 평탄하다」를 단언으로 박아야** 한다 | **이 저장소가 네 번 뚫린 「있는지만 보는 단언」 계열**이다(6F-5-a r1·r2·r4). 부분 대조는 **현재 상태에서만** 참이고, 다음 사람이 필드를 중첩시키는 순간 **게이트가 통째로 초록인 채** 계약과 구현이 갈린다. 우회 (6) 의 처분이 「경로 이름만 보지 마라」였는데 **깊이도 같은 축**이다 |
+| **D-6A1-21**(필터가 **덮지 않는 디스패치**를 실측하라) | `RequestMappingHandlerMapping` 전수는 **핸들러 매핑만** 본다. ① Spring Boot 가 자동 구성하는 **`/error`** 가 그 목록에 있는지 ② 필터가 **어떤 `DispatcherType` 에서 도는지**(내 이해로는 기본이 `REQUEST` 뿐이다 — **단정하지 말고 재라**) ③ 예외가 컨테이너까지 올라가 **ERROR 디스패치**가 일어나는 요청에도 **audit 행이 정확히 하나**(둘도 0 도 아닌) 생기는지. 필요하면 등록 시 디스패처 타입을 명시한다 | **우회 (1) 과 (2) 가 만나는 자리**다. 「등록된 모든 endpoint 가 필터를 지난다」는 전수가 참이어도, **핸들러 매핑 밖의 디스패치**가 남으면 (1) 이 열리고, 그 경로에서 audit 이 빠지면 (2) 가 열린다. 두 전수가 각자 참인데 **교집합 밖이 비는 형태** — 이 저장소가 「커버리지 공백은 대개 계약이 가른 바로 그 자리에 생긴다」로 이름 붙인 것과 같다 |
+
+**(2b) 값 획득 축 — 조사가 낸 다섯 줄을 계약에 흡수한다**: `OperatorCredentialFilter`·`RequestAuditFilter`
+(**경계로 처리** — 표준 SPI, 도메인 값 생성 없음) · `ErrorBody`(**닫는다** — 매핑표가 유일 생성 경로) ·
+`StrategyReadResponse`(**닫는다** — `OperatorStrategy` 필드를 그대로 옮기고 **새 계산값을 만들지 않으며
+도메인 타입을 Jackson 에 직접 물리지 않는다**) · `ApiAuditRow`·`ApiAuditStore`(**닫는다** — 추가 전용,
+읽기·삭제 메서드 없음) · `PersistenceWiring`(**경계로 처리**). **「경계로 처리」 세 줄은 실측 목록에
+넣는다** — 경계 논증은 주체를 한정할 때만 서고, 가시성이 그 한정을 강제하지 않으면 논증이 아니라 희망이다.
+
+**조사가 확인한 사실 하나를 등재한다** — Flyway 기동 배선은 **production 코드에 선례가 없다**
+(`PersistenceTestSupport` 가 test 전용으로만 쓴다). `PersistenceWiring` 이 그 관례를 **처음 production 에
+놓는다**. 재사용이 아니라 **첫 배선**이므로 그 사실을 알려진 제한과 리뷰 요청에 적는다.
+
 ## 하네스 레인 변경
 
 `git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(착수 시점).
@@ -142,6 +171,7 @@ limit · 요청 본문 감사(D-6A1-7) · 후보평가 축 전부(D-6A1-2) · pa
 | `OPEN-6A-EVALUATION-ADAPTERS`(신설) | 후보평가 축 어댑터 여섯 — slice 계획을 별도로 받는다(D-6A1-2) |
 | `OPEN-6A-RBAC`(신설) | scope·RBAC — 소비자가 늘 때(운영자 결정 ②) |
 | `OPEN-6A-SESSION-ENDPOINTS`(신설) | 세션 편집 명령 endpoint — 6B-1 병합 뒤 6A-2(D-6A1-3) |
+| `OPEN-6A1-CONNECTION-POOL`(신설, D-6A1-18) | 커넥션 풀 없이(`PGSimpleDataSource`) production 에 배선한다 — 단일 운영자·저동시성이라 오늘 필요가 없으나 **이 상태로 운영에 나갈 수 없다**. 받는 쪽 **6C/6E** |
 
 ## 리뷰 레인
 
