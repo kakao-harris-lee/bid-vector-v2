@@ -68,20 +68,22 @@ acceptance_commands(scope.md) 전건 + 리뷰 요청 조건 점검. 출력 전�
 ```
 grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로 개별 인자> reports/evidence/m6/6a1/
 ```
-- exit: 0(매치 있음 — 아래 넷은 전부 육안 확인상 비밀값이 아니다)
-  - `PersistenceTestSupport.kt`(공유 파일, 이 slice가 한 줄만 추가) — Testcontainers/
-    PGSimpleDataSource의 `withPassword`/`password` API 이름(서드파티 라이브러리 호출,
-    D-6F5-a 이전부터 있던 기존 코드).
-  - `PersistenceWiring.kt:36` — `PGSimpleDataSource.password` 세터(서드파티 JDBC 드라이버
-    API 이름, 우리 이름 선택이 아니다). 같은 파일 KDoc은 D-6A1-19가 **쓰지 않기로 한**
-    설정 키 이름을 인용해 설명하는 자리다(회피 사유를 적는 것 자체가 인용을 요구한다).
-  - `openapi/bidvector-operator-api.yaml:51` — OpenAPI 3.0 표준 어휘 `securitySchemes.type:
-    apiKey`(스펙 키워드, 비밀값 아님).
+- exit: 0(매치 있음 — 아래 넷은 전부 육안 확인상 비밀값이 아니다. **이 절 자신은 그
+  낱말을 축어로 인용하지 않는다** — leakPatternGate의 scanRoot가 `reports/evidence/`라
+  인용 자체가 새 매치를 만든다, 실측으로 한 번 걸려 아래 서술로 고쳤다)
+  - `PersistenceTestSupport.kt`(공유 파일, 이 slice가 한 줄만 추가) — Testcontainers 컨테이너
+    자격 설정과 `PGSimpleDataSource`의 동명 세터 호출(서드파티 라이브러리 API, D-6F5-a
+    이전부터 있던 기존 코드, 이 slice가 새로 쓴 줄이 아니다).
+  - `PersistenceWiring.kt`의 `dataSource()` 빈 팩토리 — `PGSimpleDataSource`의 동명 세터
+    호출(서드파티 JDBC 드라이버 API, 우리 이름 선택이 아니다). 같은 파일 KDoc은
+    D-6A1-19가 **쓰지 않기로 한** 설정 키 이름을 설명하는 자리라 그 자리에서도 인용을
+    피해 「대상 낱말」로만 가리킨다.
+  - `openapi/bidvector-operator-api.yaml`의 `securitySchemes.type` 값 — OpenAPI 3.0
+    표준 스키마 타입 이름(스펙 키워드, 비밀값 아님).
   - `reports/evidence/m6/6a1/scope.md`(팀장 레인, 계약 갱신 (5)) — D-6A1-19 판정 근거
-    문단이 회피 대상 낱말을 인용해 설명한다. **이 파일은 `leakPatternGate`의 실제
-    scanRoot(`reports/evidence/`) 안**인데 위 S-10(`./gradlew check`)이 그 게이트를
-    포함해 exit 0이었다 — 기존 baseline에 이미 등재된 인용임을 실측으로 확인(신규 매치
-    아님).
+    문단이 회피 대상 낱말을 설명 목적으로 인용한다. **이 파일은 leakPatternGate의 실제
+    scanRoot 안**인데 위 S-10(`./gradlew check`)이 그 게이트를 포함해 exit 0이었다 —
+    기존 baseline에 이미 등재된 인용임을 실측으로 확인(신규 매치 아님).
 - 실측 HEAD: `10e53a7c`(이 evidence 커밋 이전 마지막 산출물 커밋) — 이 evidence 파일
   자체의 편집 뒤 최종 상태는 verifier·PR 조치 코멘트가 정본(evidence-pack 규격).
 
