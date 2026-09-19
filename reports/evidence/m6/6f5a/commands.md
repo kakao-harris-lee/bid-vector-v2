@@ -129,8 +129,67 @@ verifier r2 `not-ready`(신규 HIGH 1 · MEDIUM 1 · LOW 3) 수정 뒤, 마지�
 `RequirementRowMapping`)는 이 라운드가 넓힌 범위에도 걸리지 않는다(위 S-50~53 통합 실행이
 8/8 green으로 확인).
 
+## round 3(수정 라운드, verifier r3 MEDIUM-b) — 판정 대상 `91eafb78` 뒤 재실측
+
+verifier r3 `ready-for-review`(산출물 medium 3 · low 4) 처분 중 산출물 MEDIUM 하나
+(D-6F5-16)를 이 slice가 닫는다. 마지막 **내용** 커밋 `584f226f`(D-6F5-16)에서 재측정.
+
+## 2026-09-19T(S-50~53 + CleanMigrationCheckTest, 통합)
+
+- cmd: `./gradlew --no-daemon :adapters:test --tests '*JdbcRequirementStoreTest*' --tests '*StoredRequirementLicenseGateTest*' --tests '*QualificationAdapterDependencyTest*' --tests '*QualificationGateRegistrationTest*' --tests '*CleanMigrationCheckTest*' --rerun-tasks`
+- exit: 0 — JUnit XML 실측: `12 / 7 / 8 / 2 / 6`. `CleanMigrationCheckTest`가 D-6F5-16이
+  더한 test 둘로 4→6(round 1 이전부터 있던 개수 축·COL-06/H-3 부가·outbox·edit_session
+  넷 + 신규 열거 셋 본문 고정·결합식 넷 본문 대조 둘 = 6).
+
+## 2026-09-19T(S-10)
+- cmd: `./gradlew --no-daemon check`
+- exit: 0 — BUILD SUCCESSFUL(337 actionable tasks: 43 executed, 294 up-to-date).
+
+## 2026-09-19T(S-11)
+- cmd: `./gradlew --no-daemon qualityBaseline`
+- exit: 0 — BUILD SUCCESSFUL(UP-TO-DATE).
+
+## 2026-09-19T(S-20)
+- cmd: `./tools/one-command-check.sh`
+- exit: 0 — 「완료 — Kotlin 전건 + Python 전건 통과」.
+
+## 2026-09-19T(추가)
+- 비밀값 참조형 스캔(`grep -rniE -f config/quality/leak-patterns.txt <이 라운드가 편집한
+  경로>`) — exit 1(매치 없음 = 통과).
+- evidence 안 축어 좌표 스캔(`grep -rnE '[A-Za-z0-9_]+(\.kt|\.sql|\.properties):[0-9]+'
+  reports/evidence/m6/6f5a/`) — exit 1(매치 없음, 0건).
+
+## round 3 닫힘 판정 — D-6F5-16 변이 셋 재현(버릴 clone, `git clone --no-hardlinks`)
+
+`adapters/src/main/resources/db/migration/V13__notice_requirement.sql`을 각각 변이하고
+`:adapters:test --tests '*CleanMigrationCheckTest*' --rerun-tasks`로 재고, 한 변이를 되돌린
+뒤 다음 변이를 심는 순서로(같은 clone, `git checkout --` 로 원판 복귀) 셋 다 확인했다.
+
+| # | 심은 변이 | 결과 |
+| --- | --- | --- |
+| MUT-R3-1 | `notice_requirement_row`의 `license_names` CHECK(`license_names IS NULL OR cardinality(license_names) > 0`)를 `CHECK (TRUE)`로 약화 | **RED** — `축8 부가 — notice_requirement_row 결합식 넷이 본문에 살아 있다(D-6F5-16)`, `AssertionFailedError: expected:<true> but was:<false>`(license_names 결합식이 상수 풀 대조에서 사라짐) |
+| MUT-R3-2 | `notice_requirement.status` 열거에 `'DUMMY'` 추가 | **RED** — `축8 부가 — notice_requirement·notice_requirement_row 열거 셋이 본문으로 정확히 고정된다(D-6F5-16)`, `expected:<...COLLECTED'::text])))> but was:<...COLLECTED'::text, 'DUMMY'::text])))>` |
+| MUT-R3-3 | `notice_requirement_row`의 `(kind = 'PARSED') = (source_field IS NOT NULL)` 결합식의 `=`를 `OR`로 약화 | **RED** — `축8 부가 — notice_requirement_row 결합식 넷이 본문에 살아 있다(D-6F5-16)`, `AssertionFailedError: expected:<true> but was:<false>`(항등식 문구가 상수 풀 대조에서 사라짐) |
+
+셋 다 개수 축(`축8 CHECK 개수가...`)은 **그대로 green**이었다 — 개수만 보는 축은 이 결함
+클래스를 애초에 못 잡는다는 verifier r3 서술을 재확인한다. 표본은 커밋하지 않고 clone을
+삭제했다.
+
+**과잉 차단 확인** — 본문 단언 다섯(열거 셋 `shouldBe` + 결합식 넷 `contains`)은 이
+표에 없는 **정당한 미래 변경**(예: `notice_requirement_row`에 새 nullable 컬럼을 더하는
+것)을 막지 않는다 — 그 변경이 이 다섯 CHECK의 텍스트 자체를 바꾸지 않는 한 본문이
+그대로라 초록이다. 열거 값 자체를 늘리는 변경(예: `source_field`에 세 번째 값 추가)은
+의도적으로 이 test를 RED로 만든다 — `outbox_state_check`(D-M4-5 (a))와 같은 「열거가
+넓어지는 것 자체가 재평가 지점」 설계이지 과잉 차단이 아니다.
+
+**버전 의존성 판단** — `pg_get_constraintdef()`의 정규화 형태(`= ANY (ARRAY[...])`,
+괄호 중첩)는 이 파일이 이미 `outbox_state_check`·`edit_session_state_check`·COL-06·H-3
+넷에서 써 온 것과 같은 형태다 — `PersistenceTestSupport`가 고정한 `postgres:16.4`
+(Testcontainers) 하나로만 이 저장소 전체가 검증되므로, 이번 신설이 새 버전 의존성을
+들이지 않는다(기존 넷과 같은 위험을 공유할 뿐 늘리지 않는다).
+
 ## 마지막 HEAD 표기
 evidence 커밋(이 파일들) 이후 HEAD에서의 재실측 정본은 **verifier**가 낸다(CLAUDE.md
 「acceptance 재실측은 evidence 커밋 뒤 HEAD 에서」, evidence-pack 규격 「마지막 HEAD는
-verifier·조치 코멘트가 정본」) — 이 표는 그 직전(round 2 마지막 **내용** 커밋 `08397073`)까지의
+verifier·조치 코멘트가 정본」) — 이 표는 그 직전(round 3 마지막 **내용** 커밋 `584f226f`)까지의
 실측이다.
