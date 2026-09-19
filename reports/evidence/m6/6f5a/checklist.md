@@ -80,21 +80,34 @@ scope.md 「경계로 처리」 둘을 실측한다(계약이 요구한 실측 �
 - **범위 밖 부채(등재만, 이 slice가 만든 것 아님)**: CPD 중복 게이트가 이름 치환 하나로
   열린다(`OPEN-CPD-GATE-RENAME-BYPASS`, verifier r1 실측 — 변수명만 바꿔도, 판정식만
   바꿔도 통과). 받는 쪽 하네스 레인.
-- **남은 우회 하나는 범위를 넓혀도 닫히지 않는다**(D-6F5-18, `OPEN-PERSISTENCE-GATE-
-  PREDICATE-TYPE`) — `adapters.persistence`에 헬퍼를 두고 그 헬퍼가 정책 로더를
-  **전체 한정 좌표**로 부르면 `PersistenceAdapterDependencyTest`가 **소스 텍스트
-  import 정규식**이라 못 본다. 처방은 위치가 아니라 **술어 종류**(바이트코드 상수
-  풀)라 이 slice의 범위(`qualification` 패키지)를 넓히는 것으로는 안 닫힌다. 이
-  slice는 고치지 않는다 — 그 파일은 in_scope 밖이고, 그 패키지는 6F-4가 지금
-  편집 중이라 술어 종류를 바꾸면 남의 레인을 붉힐 수 있다. 받는 쪽 하네스 레인.
-- **위치 술어 사다리의 구조적 종점은 타입이다**(D-6F5-20, `OPEN-VERDICT-CONSTRUCTION-
-  VISIBILITY`, 이 slice 밖) — 이 slice가 세 라운드에 걸쳐 위치 술어(클래스→패키지)를
+- **남은 우회 하나는 범위를 넓혀도 닫히지 않는다**(D-6F5-18,
+  `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE`) — `adapters.persistence`에 헬퍼를 두고 그
+  헬퍼가 정책 로더를 **전체 한정 좌표**로 부르면 `PersistenceAdapterDependencyTest`가
+  **소스 텍스트 import 정규식**이라 못 본다. 처방은 위치가 아니라 **술어 종류**
+  (바이트코드 상수 풀)라 이 slice의 범위(`qualification` 패키지)를 넓히는 것으로는
+  안 닫힌다. 이 slice는 고치지 않는다 — 그 파일은 in_scope 밖이고, 그 패키지는
+  6F-4가 지금 편집 중이라 술어 종류를 바꾸면 남의 레인을 붉힐 수 있다. 받는 쪽
+  하네스 레인.
+- **위치 술어 사다리의 구조적 종점은 타입이다**(D-6F5-20,
+  `OPEN-VERDICT-CONSTRUCTION-VISIBILITY`, 이 slice 밖) — 이 slice가 세 라운드에
+  걸쳐 위치 술어(클래스→패키지)를
   넓혀 온 것은 우회 비용을 단조 상승시켰을 뿐 종점을 만들지 못했다(모듈 전체로
   넓혀도 커널 모듈 헬퍼로 뚫린다, verifier r3 타당성 실측). 종점은 `LicenseVerdict`
   subtype 생성자를 `internal` + `@ConsistentCopyVisibility`로 내리는 **타입** 변경이다
   — 어댑터가 어디에 있든 verdict를 지어낼 수 없어진다. main 소스의 생성 지점은
   커널 둘뿐이라 깨지는 것은 test 조립뿐(verifier r3 실측). 도메인 커널 변경이라
   이 slice의 in_scope 밖 — 받는 쪽 도메인 레인.
+- **같은 파일의 COL-06·H-3 단언 셋은 고치지 않는다**(D-6F5-22,
+  `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`) — `CleanMigrationCheckTest`의 COL-06 항등식·
+  H-3 결합식·`notice_round` 형식 단언 셋이 D-6F5-16이 쓰던 것과 같은
+  `any { contains }` 존재 단언 형태라 같은 약점을 공유한다(제자리에 `… OR TRUE`를
+  붙여도 통과한다 — D-6F5-21이 실측한 것과 같은 결함, 이 slice의 표에서 실측). 이
+  slice는 **집안 관례를 따랐을 뿐**이고 그 관례의 약점이 이번에 처음 측정됐다 —
+  남의 표(COL-06·H-3은 `notice_requirement_row`가 아니라 `collection_run`·
+  `notice` 등 다른 표 소관)를 고치는 것은 범위 확장이다(D-6F5-18과 같은 판단).
+  r4 LOW-2(`queryConstraintDef` 헬퍼가 결과 없음을 안 보고 제약 이름이 바뀌면
+  불명확한 예외로 죽는다)도 **같은 파일·같은 축**이라 이 OPEN이 함께 받는다 —
+  그 헬퍼도 고치지 않는다. 받는 쪽 하네스 레인.
 - **범위 밖 파일의 좌표 낡음(등재만, verifier r2 LOW-3, 팀장 실측으로 수치 정정)** —
   `m4/4c2`의 `commands.md`가 `CleanMigrationCheckTest`의 한 줄 좌표를 인용하는데, 이
   slice가 그 파일에 **+8줄**(전부 그 좌표 앞)을 더해 좌표가 밀린다. `f19d2eb`(M4)
