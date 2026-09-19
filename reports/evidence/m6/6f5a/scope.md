@@ -216,6 +216,28 @@ GREEN), **집합 등식이 반대 방향으로도 안전하다**는 것이 실�
 | **D-6F5-24**(r5 장부층 low, **팀장 레인 규율**) | **OPEN 을 신설하는 계약 갱신 커밋과 `milestone-6.md` 등재 커밋을 같은 라운드에 낸다.** 이번에 `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` 가 `scope.md`·`checklist.md` 에는 있는데 `milestone-6.md` 에만 없었다 — 계약 갱신 (4) 에서 신설해 놓고 milestone 등재를 다음 라운드로 미룬 탓이다 | **D-6F5-23 과 같은 구조**의 두 번째 발현이다(r1 LOW-3 이 첫 번째). 원인은 부주의가 아니라 **위상**이다 — 구현 레인이 OPEN 을 등재하는 라운드와 팀장 레인이 milestone 에 옮기는 커밋이 어긋난다. 처방은 검사가 아니라 **순서**다: 계약 갱신에서 OPEN 을 신설하면 **그 자리에서** milestone 등재까지 낸다. 세 문서(`scope`·`checklist`·`milestone`)가 **항상 같은 라운드에** 움직인다 |
 | **D-6F5-25**(r5 참고 수용 — 의도된 비용 명문화) | 집합 등식이 울리는 세 경우를 **「깨짐」이 아니라 「의도된 트립와이어」** 로 계약에 적는다 — (가) 그 표에 **CHECK 가 붙은 컬럼**을 더할 때 (나) 제약을 **의미 동일하게 다시 쓸** 때 (다) **Postgres 메이저 상향**으로 `pg_get_constraintdef()` 렌더링이 바뀔 때. 유지 비용은 **축어 2 → 11(고유 9)** 이고 (가)는 이제 `CleanMigrationCheckTest` 두 자리 + `CleanMigrationColumnTest` 를 함께 고쳐야 한다 | **스키마 스냅샷 래칫의 관례 그대로**이고 `outbox_state_check` 가 이미 지불하는 대가와 같은 종류다. 비용을 적어 두지 않으면 **다음 slice 가 「게이트가 깨졌다」로 읽고 단언을 느슨하게 만든다** — 이 저장소가 존재 단언으로 네 번 뚫린 뒤에 얻은 자리를 그렇게 잃는 것이 가장 흔한 경로다. (다)는 새 의존이 아니라 **기존 의존의 확대**다(`postgres:16.4` 단일 상수, 기존 두 단언이 이미 같은 렌더링에 의존) |
 
+## 계약 갱신 (6) — V12 병합 통합 (2026-09-19, 팀장)
+
+운영자가 **「병합하고, M6 잔여 진행해」**로 지시해 병합 순서 규율(D-6F5-8)이 뒤집혔다. PR #38(6F-6, V12)이
+먼저 `main` 에 들어갔고(`edeaa9a3`), 그 결과 이 브랜치가 충돌해 **병합 커밋 `8ae5014f`** 로 흡수했다.
+`main` 을 브랜치로 merge 했다(rebase 아님 — 6F-1 에서 rebase 가 상대 레인 줄을 지우는 것을 실측했다).
+
+**충돌 7 hunk / 5 파일은 전부 「양쪽이 각자 더한 것」이었고 대체 자리는 없었다**(구현 레인 확인, 팀장 재확인).
+남의 줄이 사라지지 않았음을 개수로 쟀다 — 게이트 등재 `adapters.profile` 3 · `adapters.qualification` 4,
+일곱 test class 전부 exit 0, 마이그레이션 개수 축 표에 `operator_profile`·`notice_requirement`·
+`notice_requirement_row` 전부, TRUNCATE 목록에 두 표 다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6F5-26**(병합이 만든 새 파일 둘을 in_scope 에 등재) | `adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt`(축9 유효 권한 행렬 분리) · `adapters/src/main/kotlin/bidvector/adapters/qualification/RequirementSql.kt`(이 slice 몫 SQL 상수 여섯 이전)을 in_scope 에 더한다. **둘 다 `sizeGate` 가 만든 것이지 기능 변경이 아니다** | **두 정당한 추가의 합이 한계를 넘겼다** — ① `CleanMigrationTest.kt` 484(이 브랜치) + main 466 → **501줄**(한도 500) ② `Sql.kt` 타입 멤버 이 브랜치 28 + main 25(base 22) → **31개**(한도 30, `OPEN-ADR-06 (a)`). 각자는 한도 안이었다. **한계 상향은 하지 않는다** — 게이트를 느슨하게 하는 방향이고 이 slice 가 다섯 라운드에 걸쳐 한 일과 정반대다. 둘 다 **이 저장소의 기존 전례**를 따랐다: 이 파일이 같은 이유로 축7(`CleanMigrationTriggerTest`)·축8(`CleanMigrationCheckTest`)을 이미 떼어냈고, `bidvector.adapters.event.EventSql` 이 같은 이유로 outbox·inbox SQL 을 `Sql` 밖에 두고 있다. **6F-6 의 `PROFILE_*` 상수와 그 호출부는 손대지 않았다**(팀장 실측: `Sql.kt` 의 main 대비 diff 는 KDoc 한 블록뿐) |
+| **D-6F5-27**(`queryStrings` 는 위임이 아니라 **사본**이다) | 분리된 파일이 `queryStrings` 헬퍼를 **사본으로** 갖는다. D-6F5-11 이 CPD 회피를 위임으로 고친 것과 **반대 방향으로 보이지만 같은 원칙**이다 | D-6F5-11 의 요지는 「중복 게이트를 문면으로 피했고 **위임이 가능했다**」였다. 여기서는 **가시성이 위임을 막는다** — `PersistenceTestSupport.dataSource()` 가 `protected` 라 클래스 경계를 넘는 공유가 성립하지 않는다. 이 패키지의 기존 관례도 이미 사본이다(`CleanMigrationCheckTest` 의 `queryConstraintDef`·`queryCheckBodies`). **`cpdCheck` exit 0** 으로 중복 게이트가 이 형태를 중복으로 보지 않음을 실측했다. 「회피가 필요하지 않았는가」라는 D-6F5-11 의 물음에 여기서는 **필요했다**가 답이다 |
+| **D-6F5-28**(**rollback 의 모양이 바뀌었다** — 비대칭 하나) | 병합 뒤 이 slice 만의 rollback 은 새 파일 둘을 **다르게** 처분한다. `RequirementSql.kt` 는 **이 slice 자신의 상수만** 담으므로 삭제 대상이다(+ `Sql.kt` KDoc 한 블록 되돌림). 그러나 `CleanMigrationPrivilegeTest.kt` 는 **이 slice 이전부터 있던 축9** 를 옮겨 담은 것이라 **삭제하면 안 되고 `CleanMigrationTest.kt` 로 되돌려 넣어야** 한다 | `rollback.md` 의 「신규 8 삭제」 목록은 **병합 전 브랜치 기준**이고 그 실측(`실측 HEAD d8e37fa3`, 트리 동일성 6/6)은 그 시점에 대해 여전히 참이다. 병합 뒤 형태는 그것과 다르다 — **범위가 이 slice 하나가 아니게 됐기 때문**이다(6F-6 이 끼어 있다). 이 사실을 `rollback.md` 에 절로 적고, **재실측은 하지 않는다**(되돌림 대상이 두 slice 에 걸치면 그것은 이 slice 의 rollback 이 아니라 두 병합의 되돌림이고, 그 절차는 `main` 의 병합 커밋 revert 다) |
+
+**구현 레인의 자기신고를 사실로 등재한다**(이력을 되쓰지 않는다) — 병합 커밋 메시지에 MUT-S1~3 결과를
+**먼저 적고 실측을 그 뒤에** 했다. 셋 다 적은 그대로 나왔고 구현 레인이 순서 역전을 스스로 밝혔다. **결과가
+맞았어도 순서가 틀렸다** — 이 저장소는 6F-6 에서 「측정 전에 초록을 보고한 것」이 BLOCKER 였던 실측을 갖고
+있다. 다음 라운드부터 실측이 먼저다.
+
 ## 하네스 레인 변경 (상시 절)
 
 - (착수 시점) 없음.
