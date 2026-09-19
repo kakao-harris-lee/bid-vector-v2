@@ -202,3 +202,40 @@ scope.md는 evidence 경로라 위 목록 산출(`':!reports/evidence'`)에서 *
 
 실측 명령·exit는 `commands.md`의 별도 절에 남기지 않는다(이 표가 그 기록이다, evidence
 크기 게이트) — 네 임시 clone 모두 검증 뒤 삭제했다(디스크에 남기지 않는다).
+
+## 병합 뒤 비대칭 (D-6F5-28, 계약 갱신 (6))
+
+운영자 지시로 PR #38(6F-6, V12)이 먼저 `main`에 들어가(main의 병합 커밋 `edeaa9a3`) 이
+브랜치가 충돌했다. `main`을 이 브랜치로 merge해 병합 커밋 `8ae5014f`로 흡수했다(rebase가
+아니다 — 6F-1에서 rebase가 상대 레인 줄을 지우는 것을 실측했다). 그 병합이 `sizeGate`
+둘(`CleanMigrationTest.kt` 501/500줄, `Sql.kt` 타입 멤버 31/30개, 각자는 한도 안이었으나
+두 slice의 정당한 추가 합이 한계를 넘겼다)을 만들어 새 파일 둘이 생겼는데, **둘의 되돌림
+처분이 갈린다**:
+
+- **`RequirementSql.kt`** — **이 slice(6F-5-a) 자신의 상수 여섯**(`SELECT_REQUIREMENT_STATUS`
+  등, `bidvector.adapters.persistence.Sql`에서 뽑아낸 것)만 담는다. **삭제 대상**이다 —
+  더해 `bidvector.adapters.persistence.Sql`의 KDoc에 이 분리를 설명하는 문단 한 블록도
+  되돌려야 한다(그 문단이 `RequirementSql`을 인용하므로). 팀장 실측(계약 갱신 (6)
+  D-6F5-26 근거)과 이 구현 레인이 직접 대조한 `diff <(git show edeaa9a3:.../Sql.kt)
+  adapters/.../Sql.kt`가 같은 결론이다 — `main`(6F-6 반영판, `edeaa9a3`) 대비 `Sql.kt`의
+  차이는 **그 KDoc 문단 하나뿐**, 그 밖의 코드(6F-6의 `PROFILE_*` 상수 포함)는 손대지
+  않았다.
+- **`CleanMigrationPrivilegeTest.kt`** — **이 slice 이전부터 있던 축9**(유효 권한 행렬,
+  M3/3G)를 옮겨 담은 파일이다. 이 slice가 새로 지은 test가 아니다 — 단언·기대 행렬·주석
+  근거를 축어 그대로 옮겼을 뿐이다(구현 레인 보고: diff로 값 변경 0 확인). **삭제하면
+  안 된다** — 삭제는 축9 전체를 지우는 것과 같다. 되돌리려면 그 내용을
+  `CleanMigrationTest.kt`로 **도로 넣어야** 하고, `config/quality/gate-tests.properties`의
+  `CleanMigrationPrivilegeTest` 등재도 함께 걷어야 한다(등재만 남기면 존재하지 않는
+  class를 참조해 `gateExecutionGate`가 깨진다).
+
+**기존 ①~⑥ 실측은 그대로 유효하다.** 위쪽 `실측 HEAD: d8e37fa3`와 목록(신규 8·수정 6)·
+round 1~4의 트리 동일성 6/6은 **병합 전 이 브랜치 기준**이고, 그 시점(`d8e37fa3`)에
+대해서는 지금도 참이다 — 이 절이 그 수치를 고치지 않는다.
+
+**재실측은 하지 않는다.** 병합 뒤에는 되돌림 대상이 이 slice(6F-5-a) 하나가 아니라
+6F-5-a·6F-6 **두 slice에 걸쳐** 있다 — 위 두 새 파일의 갈린 처분이 그 증거다. 이것은
+더 이상 「이 slice의 rollback」이 아니다: in_scope 경로만 골라 base로 복원하는 지금까지의
+절차(①~⑥)는 정의상 slice 하나의 범위에서만 성립한다. 병합 자체를 되돌려야 하는 경우의
+절차는 이 절차가 아니라 **`main`의 병합 커밋(V12/PR #38을 흡수한 `edeaa9a3`) revert**다
+— 이 브랜치의 병합 커밋 `8ae5014f`는 그 `main` 병합을 이 브랜치로 가져온 자리일 뿐,
+되돌림의 대상은 `main` 쪽이다. 그 판단·실행은 이 slice의 rollback 범위 밖이다.
