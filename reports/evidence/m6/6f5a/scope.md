@@ -186,6 +186,22 @@ verifier r3 **`ready-for-review`** — 산출물 blocker 0 · high 0 · **medium
 낡음이 이 slice 이전이라는 것 · MEDIUM-1 정정 문면이 r2 실측과 일치). 남은 것은 D-6F5-19 의
 등재뿐이다.
 
+## 계약 갱신 (4) — verifier r4 (2026-09-19, 팀장)
+
+verifier r4 **`ready-for-review`** — 산출물 blocker 0 · high 0 · **medium 1** · low 2 · 장부층 medium 1.
+판정 대상 `a86029bb`. D-6F5-16 의 변이 셋이 전부 RED 이고 개수 축은 초록 그대로라 **새 단언이 단독으로
+잡는다**. 남은 MEDIUM 하나는 **이 slice 에서 같은 결함 클래스의 네 번째**라 닫는다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6F5-21**(r4 MEDIUM, 산출물 — **이 slice 가 닫는다**) | `notice_requirement_row` 의 CHECK 본문을 `any { contains }` 존재 단언이 아니라 **집합 등식**(`shouldBe`)으로 고정한다. 개수·존재·본문·소속이 **한 단언**으로 닫힌다. 닫힘은 변이로만: 항등식 하나를 `… OR TRUE` 로 제자리 약화 → RED | **또 존재 단언이다**(D-6F5-10·D-6F5-14·D-6F5-16 에 이은 **네 번째**). verifier 실측: `CHECK (((kind='PARSED') = (source_field IS NOT NULL)) OR TRUE)` 로 바꾸면 제약이 **항진명제**가 되는데 부분 문자열도 개수도 불변이라 **전건 `check` exit 0**. 나머지 둘이 막히는 것은 술어의 힘이 아니라 **Postgres 의 중첩 `OR` 평탄화** 덕이다 — 즉 **우연이다**. 현재 상태는 「7/7 개수만」이 아니라 **「3/7 완전 고정 + 2/7 우연 보호 + 2/7 열림」**이고, D-6F5-16 KDoc 이 적은 근거(「항등식이라 부분 대조로 충분」)는 **측정으로 반증된다**. **이것은 「범위를 한 칸 넓히기」가 아니라 종점이다**(D-6F5-20 의 교훈 적용) — 집합 등식은 **어떤 제자리 편집도 집합을 바꾸므로** 열거를 늘리지 않고 구조로 닫는다 |
+| **D-6F5-22**(범위 밖 부채 → OPEN) | 같은 파일의 **COL-06·H-3 단언 셋**이 동일한 `any { contains }` 형태라 **같은 약점을 공유한다**. 이 slice 는 그 셋을 고치지 않고 `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` 로 넘긴다. r4 LOW-2(`queryConstraintDef` 가 결과 없음을 안 보고 불명확한 예외로 죽는다 — 기존 헬퍼)도 **같은 파일·같은 축**이라 이 OPEN 이 함께 받는다 | 이 slice 는 **집안 관례를 따랐을 뿐**이고 그 관례의 약점이 이번에 처음 측정됐다 — 남의 표를 고치는 것은 범위 확장이다(D-6F5-18 과 같은 판단). **OPEN 으로 보내는 것이 일관된다** — D-6F5-19 에서 「범위 밖 부채 일부만 OPEN 으로 보내는 것은 일관되지 않는다」를 이미 수용했다 |
+| **D-6F5-23**(장부층 MEDIUM 의 **구조적 원인**) | `rollback.md` 의 **공유 문서 절(§③)은 「마지막 팀장 커밋 뒤」에 재산출한다.** 이번 라운드에 §② 는 재산출됐는데 §③ 만 낡아, 완전 원복 범위가 `3a233938~1..ddefc3c8`(팀장 커밋 **둘**)로 남았다 — 실제로는 **셋**이고 `51614deb`(milestone 등재)가 빠진다 | **팀장 레인이 공유 문서를 커밋할 때마다 구현 레인의 §③ 이 낡는다.** 구현 레인은 자기 커밋 뒤에 재산출하므로 그 뒤에 오는 팀장 커밋을 구조적으로 못 본다 — 순서가 원인이지 부주의가 아니다. **이 저장소가 「되돌리기 목록 낡음」으로 세 번 겪은 그 형태**이고, 주 절차는 `milestone-6.md` 를 대상에서 빼므로 ①~⑥ 재현에는 영향이 없다(그래서 라운드를 막지 않는다) |
+
+**LOW 처분** — r4 LOW-1(`checklist.md` 의 OPEN ID 둘이 **하이픈 줄바꿈**이라 `grep` 에 안 잡힌다): **고친다.**
+등재가 기계 검색으로 보이지 않으면 등재 확인 자체가 서지 않는다(verifier 의 첫 스캔이 오판할 뻔했다).
+r4 LOW-2 는 위 D-6F5-22 가 받는다.
+
 ## 하네스 레인 변경 (상시 절)
 
 - (착수 시점) 없음.
@@ -211,3 +227,4 @@ verifier r3 **`ready-for-review`** — 산출물 blocker 0 · high 0 · **medium
 | `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE`(신설, D-6F5-18) | `PersistenceAdapterDependencyTest` 가 **소스 텍스트 import 정규식**이라 전체 한정 좌표 참조를 못 본다 — 바이트코드 상수 풀 술어로 바꿔야 한다. 그 파일은 이 slice 의 in_scope 밖이고 **6F-4 가 그 패키지를 편집 중**이라 여기서 건드리지 않는다. 받는 쪽 **하네스 레인** |
 | `OPEN-VERDICT-CONSTRUCTION-VISIBILITY`(신설, D-6F5-20) | **위치 술어의 종점은 타입이다** — `LicenseVerdict` subtype 생성자를 `internal` + `@ConsistentCopyVisibility` 로 내리면 어댑터가 어디에 있든 verdict 를 지어낼 수 없다. 실측상 깨지는 것은 test 조립뿐(main 생성 지점은 커널 둘). 도메인 커널 변경이라 받는 쪽 **도메인 레인** |
 | `OPEN-CODEX-RECORD-COORDINATES`(신설, D-6F5-19) | Codex 심판 기록(append-only, 수정 금지)이 `file:line` 좌표를 인용해 **원리적으로 낡는다**. 기록은 못 고쳐도 **다음 심판의 인용 관례**(심볼 단위로 요구)는 닫을 수 있다. 받는 쪽 **하네스 레인** |
+| `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`(신설, D-6F5-22) | `CleanMigrationCheckTest` 의 **COL-06·H-3 단언 셋**이 `any { contains }` 존재 단언이라 CHECK 본문을 제자리 약화해도 통과한다(이 slice 의 표에서 실측). `queryConstraintDef` 가 결과 없음을 안 보는 것도 같은 파일·같은 축. 이 slice 밖 기존 부채 — 받는 쪽 **하네스 레인** |
