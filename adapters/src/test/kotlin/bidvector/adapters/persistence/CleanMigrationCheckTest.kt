@@ -58,6 +58,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // + 예산 페어 여섯 = 12(id 가 없다) + 같은 won 범위 CHECK 둘 = 14.
             "operator_strategy" to 15,
             "operator_strategy_revision" to 14,
+            // M6/6F-6 — 신설(추가만, D-6F6-3). V12__operator_profile.sql: id 싱글턴 1 +
+            // licenses_declared↔license_names 짝 1 = 2.
+            "operator_profile" to 2,
         )
 
     @Test

@@ -296,11 +296,25 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("operator_strategy_revision", "applied_at", "timestamp with time zone", false, true),
         ) + operatorStrategySharedColumns("operator_strategy_revision")
 
+    // M6/6F-6 — 프로필 영속(추가만, D-6F6-2·D-6F6-3). V12__operator_profile.sql. 업종·지역
+    // 어휘는 전략과 같은 이유로 NOT NULL 배열(빈 목록이 「없음」). `licenses_declared`가
+    // `license_names`와 짝을 이뤄 세 상태(미설정=행 없음·NotDeclared·Declared(빈 목록))를
+    // 구분한다.
+    private val operatorProfileColumns =
+        listOf(
+            ColumnSpec("operator_profile", "id", "smallint", false),
+            ColumnSpec("operator_profile", "business_types", "ARRAY", false),
+            ColumnSpec("operator_profile", "licenses_declared", "boolean", false),
+            ColumnSpec("operator_profile", "license_names", "ARRAY", false),
+            ColumnSpec("operator_profile", "region_terms", "ARRAY", false),
+            ColumnSpec("operator_profile", "updated_at", "timestamp with time zone", false, true),
+        )
+
     private val expectedColumns =
         rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
             rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
             openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns +
-            operatorStrategyColumns + operatorStrategyRevisionColumns
+            operatorStrategyColumns + operatorStrategyRevisionColumns + operatorProfileColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {

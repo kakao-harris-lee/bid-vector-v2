@@ -356,6 +356,29 @@ internal object Sql {
         )
         """
 
+    // M6/6F-6 — 프로필 영속(D-6F6-1~3). 싱글턴(id=1, operator_strategy 와 같은 관례).
+    // `licenses_declared`·`license_names`가 짝을 이뤄 세 상태(미설정=행 없음·NotDeclared·
+    // Declared(빈 목록 포함))를 구분한다 — V12 CHECK 가 그 짝의 모순만 막고, 세 상태 자체의
+    // 구분은 이 열 형태가 진다.
+    private const val PROFILE_COLUMNS =
+        """
+        business_types, licenses_declared, license_names, region_terms
+        """
+
+    const val SELECT_PROFILE = "SELECT $PROFILE_COLUMNS FROM operator_profile WHERE id = 1"
+
+    const val UPSERT_PROFILE =
+        """
+        INSERT INTO operator_profile (id, $PROFILE_COLUMNS)
+        VALUES (1, ?, ?, ?, ?)
+        ON CONFLICT (id) DO UPDATE SET
+            business_types = EXCLUDED.business_types,
+            licenses_declared = EXCLUDED.licenses_declared,
+            license_names = EXCLUDED.license_names,
+            region_terms = EXCLUDED.region_terms,
+            updated_at = now()
+        """
+
     const val INSERT_COLLECTION_RUN =
         """
         INSERT INTO collection_run (
