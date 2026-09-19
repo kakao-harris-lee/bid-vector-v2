@@ -85,35 +85,45 @@ git restore --source=ede5d5b --staged --worktree -- \
 
 ### ③ `milestone-6.md` — 되돌리지 않는다
 
-`milestone-6.md`는 이 range에서 **팀장(세션 모델)의 커밋 셋**을 받았다 — 착수 계약 고정
+`milestone-6.md`는 이 range에서 **팀장(세션 모델)의 커밋 넷**을 받았다 — 착수 계약 고정
 (`3a233938`), 계약 갱신 (1)(`ddefc3c8`, OPEN-6F5A-RETENTION 등재 포함), r2·r3 판정 결과
-등재(`51614deb`, 위치 술어의 종점은 타입이다). **D-6F5-23 정정(round 4)** — 앞
-라운드까지의 문면은 `51614deb`를 놓쳐 커밋 **둘**로 적고 원복 범위를 `ddefc3c8`까지만
-뒀다(milestone-6.md 자체는 대상 제외라 절차 결과는 틀리지 않았으나, 완전 원복 예시
-명령이 낡아 있었다). **구조적 원인**(D-6F5-23) — 팀장 레인이 공유 문서를 커밋할
+등재(`51614deb`, 위치 술어의 종점은 타입이다), **계약 갱신 (5) + OPEN 여섯째 등재**
+(`48c66aba`, `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`를 milestone에 옮김, D-6F5-24). **round
+5 정정(D-6F5-24, 팀장 실측)** — 앞 라운드까지의 문면은 `51614deb`까지만 반영해 커밋
+**셋**으로 적었는데(D-6F5-23이 예측한 것과 같은 구조로 `48c66aba`가 또 낡게 했다),
+실제로는 **넷**이다. **구조적 원인**(D-6F5-23·D-6F5-24) — 팀장 레인이 공유 문서를 커밋할
 때마다 구현 레인의 §③이 낡는다: 구현 레인은 자기 커밋 뒤에 재산출하므로 그 뒤에 오는
 팀장 커밋을 구조적으로 못 본다. 이 구현 레인은 milestone-6.md를 한 번도 편집하지
-않았다(round 0~4 공통). CLAUDE.md의 「하네스 경로·승인 문서의 하네스 레인 편집은
+않았다(round 0~5 공통). CLAUDE.md의 「하네스 경로·승인 문서의 하네스 레인 편집은
 되돌리지 않는다」와 같은 취급으로 **이 rollback은 milestone-6.md를 대상에서 뺀다**.
-완전 원복이 필요하면(운영자 판단) 세 커밋 모두 단일 역적용으로 되돌린다 — 범위 상한을
-이 라운드에서 확인된 마지막 팀장 커밋(`234079fd`, 계약 갱신 (4))까지 넓혀 둔다
-(`234079fd` 자체는 milestone-6.md를 건드리지 않지만, 상한을 실제 마지막 지점에
-맞춰 두면 diff 결과는 그대로 정확하고 다음 라운드가 또 좁은 범위로 낡지 않는다):
+완전 원복이 필요하면(운영자 판단) 넷 모두 단일 역적용으로 되돌린다 — 범위 상한을 이
+라운드에서 확인된 마지막 팀장 커밋(`48c66aba`, 계약 갱신 (5))까지 넓힌다:
 
 ```
-git diff 3a233938~1..234079fd -- milestone-6.md | git apply -R
+git diff 3a233938~1..48c66aba -- milestone-6.md | git apply -R
 ```
 
-**참고** — 같은 range에서 `reports/evidence/m6/6f5a/scope.md`도 팀장 레인 커밋
-다섯(`3a233938`·`ddefc3c8`·`cdcfb014`·`353865c9`·`234079fd`)을 받았지만, scope.md는
-evidence 경로라 위 목록 산출(`':!reports/evidence'`)에서 **항상** 제외되므로 이 §③이
-scope.md는 별도로 다루지 않는다.
+**이번엔 상한 확대가 diff를 실제로 바꾼다** — `48c66aba`가 `milestone-6.md`를 직접
+편집했으므로(`OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` 등재), 상한을 `234079fd`에 둔 채로
+두면 이 등재가 완전 원복 diff에서 빠진다(실측: `git diff 3a233938~1..234079fd --
+milestone-6.md`와 `git diff 3a233938~1..48c66aba -- milestone-6.md`가 서로 다르다).
+**앞 두 라운드(round 3→4, round 4→5 이전 문면)의 「상한을 넓혀 두면 다음 라운드가 또
+낡지 않는다」는 일반화는 조건부였다** — 그때는 상한 커밋(`08397073`·`234079fd`)이
+`milestone-6.md`를 안 건드려 무해했을 뿐이다(실측: `git diff 3a233938~1..234079fd --
+milestone-6.md`와 `git diff 3a233938~1..51614deb -- milestone-6.md`는 같다). **상한을
+그 라운드에서 확인된 마지막 팀장 커밋으로 맞추는 것은 매번 필요하고, 그 상한이 해당
+파일을 직접 건드렸는지는 매번 실측해야 한다** — 「한 번 넓혀 두면 끝」이 아니다.
+
+**참고** — 같은 range에서 `reports/evidence/m6/6f5a/scope.md`는 팀장 레인 커밋
+**여섯**(`3a233938`·`ddefc3c8`·`cdcfb014`·`353865c9`·`234079fd`·`48c66aba`)을 받았지만,
+scope.md는 evidence 경로라 위 목록 산출(`':!reports/evidence'`)에서 **항상** 제외되므로
+이 §③이 scope.md는 별도로 다루지 않는다.
 
 ## 확인 지점
 
 - in_scope 경로(위 목록)의 `git diff ede5d5b -- <경로>`가 비어 있다.
-- `milestone-6.md`(팀장 레인, `51614deb` 이후 무편집)·`reports/evidence/m6/6f5a/scope.md`
-  (팀장 레인, 계약 갱신 라운드마다 갱신 — round 4 시점 `234079fd`)는 이 rollback 대상이
+- `milestone-6.md`(팀장 레인, `48c66aba` 이후 무편집)·`reports/evidence/m6/6f5a/scope.md`
+  (팀장 레인, 계약 갱신 라운드마다 갱신 — round 5 시점 `48c66aba`)는 이 rollback 대상이
   아니다(evidence 경로 제외 + 하네스/승인 문서 취급, 위 사유).
 - `git status --porcelain`이 삭제(신규 8개)·수정 취소(공유 6개) 외 잔여가 없다.
 
