@@ -16,6 +16,8 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt    # 같은 축
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt     # 같은 축
   - adapters/src/test/kotlin/bidvector/adapters/persistence/PersistenceTestSupport.kt      # 정리 목록 추가(기계적)
+  - adapters/src/main/kotlin/bidvector/adapters/qualification/RequirementSql.kt            # 이 slice 몫 SQL 상수 여섯(계약 갱신 (6)·(7), 병합 sizeGate 로 Sql.kt 에서 이전)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt  # 축9 유효 권한 행렬(이 slice 이전 내용의 이전 — rollback 은 삭제가 아니라 복귀다, D-6F5-29)
   - config/quality/gate-tests.properties                                                   # 신설 게이트 test 등재(추가만) — 공유 파일
   - reports/evidence/m6/6f5a/**
   - milestone-6.md                                                                         # 6F-5 분할·6F-5-a 착수 문단(팀장 커밋)
@@ -237,6 +239,29 @@ GREEN), **집합 등식이 반대 방향으로도 안전하다**는 것이 실�
 **먼저 적고 실측을 그 뒤에** 했다. 셋 다 적은 그대로 나왔고 구현 레인이 순서 역전을 스스로 밝혔다. **결과가
 맞았어도 순서가 틀렸다** — 이 저장소는 6F-6 에서 「측정 전에 초록을 보고한 것」이 BLOCKER 였던 실측을 갖고
 있다. 다음 라운드부터 실측이 먼저다.
+
+## 계약 갱신 (7) — verifier r6 (2026-09-19, 팀장)
+
+verifier r6 **`not-ready`** — 산출물 **HIGH 1** · MEDIUM 1 · LOW 2. 판정 대상 `92c83a0b`. 재작업 **3/5**.
+**병합 자체는 깨끗하다**(표적 다섯 중 넷 통과 — 삭제 파일 0, 6F-6 산출물 diff 0, 축9 262줄 중 257 축어,
+`Sql.kt` 에서 빠진 38 중 35 가 `RequirementSql.kt` 에 축어, MUT-S1~3 독립 재현 전부 참). 막는 것은
+**되돌리기 문서 하나**이고, **셋은 팀장이 쓴 문면의 결함**이다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6F5-29**(r6 HIGH — **되돌리기 기준을 고정 참조에서 「분기해 나온 현재 `main`」으로 바꾼다**) | `rollback.md` 의 §①② 를 **보정 절차로 교체**한다(경고 한 줄을 덧붙이는 것이 아니다): 공유 파일 복원 기준을 `ede5d5b` → **`edeaa9a3`(병합해 들인 `main`)**, 신규 삭제 **8 → 10**(`RequirementSql.kt`·`CleanMigrationPrivilegeTest.kt` 추가). **D-6F5-28 의 「축9 를 손으로 되돌려 넣어야 한다」도 정정한다 — 보정 절차에서는 축9 가 `CleanMigrationTest` 로 자동 복귀한다**(verifier 실측) | **지금 문서대로 실행하면 6F-6 의 병합된 줄이 조용히 사라진다.** verifier 실측: `PROFILE_*` 3→**0** · 게이트 등재 `adapters.profile` 4→**0** · TRUNCATE 의 `operator_profile` 2→**0**, 그리고 **exit 0 · stderr 없음**. `--source=ede5d5b` 가 **6F-6 이전**이기 때문이다. r2 MEDIUM-1 과 같은 **조용한 실패 양식인데 그때는 결과 트리가 옳았고 이번엔 틀리다.** 팀장이 쓴 「병합 뒤 비대칭」 절은 *모양이 바뀌었다*·*재실측 안 한다*만 적고 **「지금 §①② 를 실행하지 마라」를 적지 않았다** — 파괴적 명령이 문서에서 그 절보다 **위**에 있고, 되돌리기 문서는 사고 때 위에서부터 문자 그대로 실행된다. 보정 절차는 verifier 가 **이미 실측했다**: 6F-6 줄 생존(3/4/2) · 이 slice 줄 소멸 · 공유 6 **트리 동일성 vs main 6/6** · `git diff edeaa9a3 -- adapters config` **0 줄** · 전건 `check` exit 0 |
+| **D-6F5-30**(r6 진단 수용 — **처방 방식 자체를 바꾼다**) | 「무엇 **뒤에** 재산출하는가」를 열거하지 않는다. **복원 기준을 「이 브랜치가 분기해 나온 현재 `main`」으로 정의**하고, 그 정의를 `rollback.md` 에 문장으로 박는다. 그러면 팀장 커밋이든 병합이든 절차가 **따라온다** | 이것은 rollback 축의 **다섯 번째**인데 앞 넷과 성격이 다르다 — 앞 셋은 「문장이 낡음」이라 절차 결과는 옳았고(트리 동일성 매번 6/6) **이번엔 절차가 남의 산출물을 지운다.** 원인은 `rollback.md` 를 **「이 레인의 마지막 커밋 뒤」**에 재산출하는 것인데 **범위는 레인 밖에서 바뀐다** — 팀장 커밋(r3·r4·r5), 이번엔 **병합**. D-6F5-23 이 「팀장 커밋 뒤」로 **한 칸** 고쳤고 병합이 그 규칙 밖이었다. **「한 칸씩 넓히는 처방」의 반복이고 술어 축 r3 진단과 같은 형태다**(D-6F5-20). 종점은 열거가 아니라 **기준의 정의**다 |
+| **D-6F5-31**(r6 MEDIUM — **팀장 문면 결함**) | D-6F5-26 이 「in_scope 에 더한다」고 적고 **`in_scope:` YAML 을 실제로 고치지 않았다.** 이 갱신에서 `RequirementSql.kt`·`CleanMigrationPrivilegeTest.kt` 를 YAML 에 **실제로** 넣는다. `checklist.md` 의 「새 파일 ↔ in_scope 대조」도 두 파일을 담도록 갱신한다 | 두 이름이 **계약 갱신 (6) 표에만** 있었고 기존 glob 으로도 안 덮인다(`qualification/**` 는 test 전용). **CLAUDE.md 가 「반복 사각」으로 이름 붙인 바로 그 자리**(「수정 라운드가 만드는 새 파일은 in_scope 와 대조해 계약을 갱신한다」)이고, r3·r4 에서 「낡았지만 참」으로 LOW 를 줬던 대조가 **이번엔 실제로 불완전**했다 |
+| **D-6F5-32**(r6 LOW-1 — **D-6F5-27 의 근거 둘을 정정**) | 사본 자체는 유지한다(11줄 배관이고 6F-4 가 진행 중이라 기반 클래스를 건드리는 비용이 크다). **근거를 고친다**: ⓐ 「이 패키지의 기존 관례도 이미 사본이다」는 **거짓이다** — `CleanMigrationCheckTest` 의 것들은 *다른 질의를 하는 별개 헬퍼*이고 `fun queryStrings` 는 저장소에 **정확히 두 파일**, **그 중복은 이번 병합이 처음 만들었다** ⓑ 막히지 않는 **제3 안**이 있었다 — `PersistenceTestSupport` 에 `protected fun` 으로 올리기(그 자리에 `dataSource()` 가 이미 있고 그 파일은 in_scope 다) | **좁은 주장(「`protected dataSource()` 라 클래스 간 위임이 불가능하다」)은 참이다**(verifier 실측). 틀린 것은 그 옆에 세운 **두 근거**다. D-6F5-11 이 「회피가 **필요하지 않았다**」로 code-reviewer HIGH 를 받아들인 slice 에서, 같은 물음에 **부정확한 근거로** 답을 세우면 안 된다 — 선택은 유지하되 **왜 그 선택인지를 사실로** 적는다 |
+
+**LOW-2(장부, 같이 닫는다)** — `rollback.md` §③ 의 「팀장 커밋 넷」은 병합 뒤 범위 설명으로 불완전하다
+(`milestone-6.md` 를 만진 커밋은 실제로 **일곱** — 이 레인 넷 + 6F-6 둘 + 병합). **완전 원복 명령 자체는
+지금도 깨끗이 적용된다**(verifier 실측 `git apply -R --check` exit 0).
+
+**verifier 가 확인하지 않은 것으로 구분해 적은 것** — **6F-4 의 V11→V14 재번호는 재지 않았다**(병행 세션
+브랜치이고 이 트리에 없다). 이 트리의 마이그레이션 파일은 `V1`~`V9`·`V12`·`V13` 이고 **V10·V11 은 부재**다.
+재번호가 구조적으로 필요하다는 것은 사실이나 **실제로 되었는지는 측정 밖**이고, 적용 인스턴스 0 이라 오늘
+위험은 0 이다. 병합 순서 규율이 운영자 지시로 뒤집힌 데 따른 6F-4 쪽 후속 부담도 재지 않았다.
 
 ## 하네스 레인 변경 (상시 절)
 
