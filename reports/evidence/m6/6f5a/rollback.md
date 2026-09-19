@@ -1,4 +1,4 @@
-실측 HEAD: 584f226f6f7f76635b5315cd74ee0d08b8db5d68
+실측 HEAD: d8e37fa33432545187a74fc614671d6e401f6000
 
 # M6/6F-5-a — rollback
 
@@ -11,14 +11,13 @@ base: `ede5d5b` (main, PR #36·#37 병합 뒤)
 ## 목록 산출 — 기계적 (base..실측 HEAD, evidence 경로 제외)
 
 ```
-git diff --name-status ede5d5b..584f226f -- . ':!reports/evidence'
+git diff --name-status ede5d5b..d8e37fa3 -- . ':!reports/evidence'
 ```
 
-신규(A) 8개, 수정(M) 6개 — **round 1·round 2·round 3(정정 라운드) 뒤에도 파일 목록
-자체는 그대로**다(round 2는 기존 test 파일 하나(`QualificationAdapterDependencyTest.kt`,
-이미 A로 잡혀 있던 신규 파일)만, round 3은 기존 test 파일 하나
-(`CleanMigrationCheckTest.kt`, 이미 M으로 잡혀 있던 수정 파일)만 재편집했을 뿐 새
-파일을 추가하지 않았다).
+신규(A) 8개, 수정(M) 6개 — **round 1~4(정정 라운드) 뒤에도 파일 목록 자체는 그대로**다
+(round 2는 기존 test 파일 하나(`QualificationAdapterDependencyTest.kt`, 이미 A로 잡혀
+있던 신규 파일)만, round 3·round 4는 기존 test 파일 하나(`CleanMigrationCheckTest.kt`,
+이미 M으로 잡혀 있던 수정 파일)만 재편집했을 뿐 새 파일을 추가하지 않았다).
 
 ## 절차
 
@@ -47,15 +46,20 @@ git rm -f \
 대비 A라 위 ①의 삭제 대상이다 — **restore 대상이 아니다**, 헷갈리기 쉬운 자리라 못 박는다).
 `Sql.kt`는 여전히 `dab9affe` 하나, `CleanMigrationTest.kt`·`CleanMigrationColumnTest.kt`·
 `PersistenceTestSupport.kt`는 `056d3a37` 하나, `gate-tests.properties`는 `4bd5fdda`
-하나뿐이다. `CleanMigrationCheckTest.kt`만 **둘**이다 — `056d3a37`(V13 축8 개수 반영,
-추가만) + **`584f226f`**(round 3 D-6F5-16, 본문 단언 추가, 이 역시 추가만 — 기존
-test·기대값을 지우지 않았다, `git show 584f226f --stat` = `42 insertions(+)` 확인).
-round 2는 이 6개 중 어느 것도 건드리지 않았다(round 2 커밋 `97c44208`·`08397073`은
-신규 파일 `QualificationAdapterDependencyTest.kt` 하나만 편집한다). **다른 레인의
-줄은 이 range 어디에도 없다**(`git log --oneline ede5d5b..584f226f -- <각 파일>`로
-매번 실측 — 전부 이 slice의 커밋만 나온다, 6F-4는 별도 브랜치라 이 워킹트리에 아직
-없다). 보존할 「남의 줄」이 없으므로 커밋별 hunk 격리 대신 **착수 경계(`ede5d5b`)
-기준 단일 역적용**으로 건다.
+하나뿐이다. `CleanMigrationCheckTest.kt`만 **셋**이다 — `056d3a37`(V13 축8 개수 반영,
+추가만) + `584f226f`(round 3 D-6F5-16, 본문 단언 추가, 추가만 — 기존 test·기대값을
+지우지 않았다, `git show 584f226f --stat` = `42 insertions(+)`) + **`d8e37fa3`**(round 4
+D-6F5-21, `git show d8e37fa3 --stat` = `42 insertions(+), 18 deletions(-)` — 이번엔
+**대체**다: 결합식 넷 존재 단언 test 하나를 지우고 집합 등식 test 하나로 바꿨다).
+셋 다 이 slice 자신의 커밋이라 **다른 레인의 줄은 이 range 어디에도 없다**는 결론은
+그대로다(`git log --oneline ede5d5b..d8e37fa3 -- <각 파일>`로 매번 실측 — 전부 이
+slice의 커밋만 나온다, 6F-4는 별도 브랜치라 이 워킹트리에 아직 없다). round 2는 이
+6개 중 어느 것도 건드리지 않았다(round 2 커밋 `97c44208`·`08397073`은 신규 파일
+`QualificationAdapterDependencyTest.kt` 하나만 편집한다). 보존할 「남의 줄」이 없으므로
+커밋별 hunk 격리 대신 **착수 경계(`ede5d5b`) 기준 단일 역적용**으로 건다 — `d8e37fa3`가
+대체(삭제+추가)를 포함해도, 단일 역적용은 파일을 **base 상태로 통째로** 되돌리므로
+중간 커밋이 추가였는지 대체였는지는 절차 결과에 영향이 없다(트리 동일성으로 아래
+확인).
 
 ```
 git restore --source=ede5d5b --staged --worktree -- \
@@ -81,22 +85,35 @@ git restore --source=ede5d5b --staged --worktree -- \
 
 ### ③ `milestone-6.md` — 되돌리지 않는다
 
-`milestone-6.md`는 이 range에서 **팀장(세션 모델)의 커밋 둘만** 건드렸다 — 착수 계약 고정
-(`3a233938`)과 계약 갱신 (1)(`ddefc3c8`, OPEN-6F5A-RETENTION 등재 포함). 이 구현 레인은 그
-파일을 한 번도 편집하지 않았다(round 0·round 1 공통). CLAUDE.md의 「하네스 경로·승인
-문서의 하네스 레인 편집은 되돌리지 않는다」와 같은 취급으로 **이 rollback은
-milestone-6.md를 대상에서 뺀다**. 완전 원복이 필요하면(운영자 판단) 두 커밋 모두 단일
-역적용으로 되돌린다:
+`milestone-6.md`는 이 range에서 **팀장(세션 모델)의 커밋 셋**을 받았다 — 착수 계약 고정
+(`3a233938`), 계약 갱신 (1)(`ddefc3c8`, OPEN-6F5A-RETENTION 등재 포함), r2·r3 판정 결과
+등재(`51614deb`, 위치 술어의 종점은 타입이다). **D-6F5-23 정정(round 4)** — 앞
+라운드까지의 문면은 `51614deb`를 놓쳐 커밋 **둘**로 적고 원복 범위를 `ddefc3c8`까지만
+뒀다(milestone-6.md 자체는 대상 제외라 절차 결과는 틀리지 않았으나, 완전 원복 예시
+명령이 낡아 있었다). **구조적 원인**(D-6F5-23) — 팀장 레인이 공유 문서를 커밋할
+때마다 구현 레인의 §③이 낡는다: 구현 레인은 자기 커밋 뒤에 재산출하므로 그 뒤에 오는
+팀장 커밋을 구조적으로 못 본다. 이 구현 레인은 milestone-6.md를 한 번도 편집하지
+않았다(round 0~4 공통). CLAUDE.md의 「하네스 경로·승인 문서의 하네스 레인 편집은
+되돌리지 않는다」와 같은 취급으로 **이 rollback은 milestone-6.md를 대상에서 뺀다**.
+완전 원복이 필요하면(운영자 판단) 세 커밋 모두 단일 역적용으로 되돌린다 — 범위 상한을
+이 라운드에서 확인된 마지막 팀장 커밋(`234079fd`, 계약 갱신 (4))까지 넓혀 둔다
+(`234079fd` 자체는 milestone-6.md를 건드리지 않지만, 상한을 실제 마지막 지점에
+맞춰 두면 diff 결과는 그대로 정확하고 다음 라운드가 또 좁은 범위로 낡지 않는다):
 
 ```
-git diff 3a233938~1..ddefc3c8 -- milestone-6.md | git apply -R
+git diff 3a233938~1..234079fd -- milestone-6.md | git apply -R
 ```
+
+**참고** — 같은 range에서 `reports/evidence/m6/6f5a/scope.md`도 팀장 레인 커밋
+다섯(`3a233938`·`ddefc3c8`·`cdcfb014`·`353865c9`·`234079fd`)을 받았지만, scope.md는
+evidence 경로라 위 목록 산출(`':!reports/evidence'`)에서 **항상** 제외되므로 이 §③이
+scope.md는 별도로 다루지 않는다.
 
 ## 확인 지점
 
 - in_scope 경로(위 목록)의 `git diff ede5d5b -- <경로>`가 비어 있다.
-- `milestone-6.md`(팀장 레인, `ddefc3c8` 이후 무편집)·`reports/evidence/m6/6f5a/scope.md`
-  (팀장 레인, 계약 갱신 라운드마다 갱신 — round 3 시점 `353865c9`)는 이 rollback 대상이
+- `milestone-6.md`(팀장 레인, `51614deb` 이후 무편집)·`reports/evidence/m6/6f5a/scope.md`
+  (팀장 레인, 계약 갱신 라운드마다 갱신 — round 4 시점 `234079fd`)는 이 rollback 대상이
   아니다(evidence 경로 제외 + 하네스/승인 문서 취급, 위 사유).
 - `git status --porcelain`이 삭제(신규 8개)·수정 취소(공유 6개) 외 잔여가 없다.
 
@@ -157,5 +174,21 @@ git diff 3a233938~1..ddefc3c8 -- milestone-6.md | git apply -R
 | ⑤ | `./gradlew --no-daemon :adapters:test --tests '*CleanMigration*Test*' --rerun-tasks` | exit 0 |
 | ⑥ | `./gradlew --no-daemon check` | exit 0 |
 
+## 임시 clone 실측 — round 4 (HEAD `d8e37fa3`, verifier r4 D-6F5-21 뒤 재실측)
+
+`git clone --no-hardlinks` 로 만든 별도 임시 clone에서 `d8e37fa3` 체크아웃 뒤 같은
+절차를 한 번에(①→②) 실행했다.
+
+| 단계 | 명령 | 결과 |
+| --- | --- | --- |
+| ① | `git rm -f <신규 8개>` | exit 0, 8 deletions staged |
+| ② | `git restore --source=ede5d5b`(수정 6개만, 경로 개별 인자) | exit 0 |
+| 확인 | `git diff ede5d5b -- adapters config` | 빈 출력 |
+| 확인 | `git status --porcelain` | D 8 · M 6, milestone-6.md·기타 없음 |
+| 트리 동일성 | 되돌린 6개 파일 전부 `git hash-object`가 `ede5d5b`의 blob과 일치(`CleanMigrationCheckTest.kt`도 포함 — round 4가 대체한 test까지 정확히 base로 걷힌다) | **6/6 일치** |
+| ④ | `./gradlew --no-daemon :adapters:compileKotlin :adapters:compileTestKotlin` | exit 0 |
+| ⑤ | `./gradlew --no-daemon :adapters:test --tests '*CleanMigration*Test*' --rerun-tasks` | exit 0 |
+| ⑥ | `./gradlew --no-daemon check` | exit 0 |
+
 실측 명령·exit는 `commands.md`의 별도 절에 남기지 않는다(이 표가 그 기록이다, evidence
-크기 게이트) — 세 임시 clone 모두 검증 뒤 삭제했다(디스크에 남기지 않는다).
+크기 게이트) — 네 임시 clone 모두 검증 뒤 삭제했다(디스크에 남기지 않는다).
