@@ -28,8 +28,8 @@
       ```
       결과: 빈 출력(수정 라운드 산출물 커밋 전 시점 기준 — evidence 커밋 뒤 재확인한다).
 - [x] scope.md의 acceptance_commands 전건이 exit 0으로 `commands.md`에 기록됨 — HEAD
-      `15da367f`(base_sha 2차 갱신값 `edeaa9a3`) 기준, verifier r2·code-reviewer 수정 라운드
-      + 팀장 지적 넷(CHECK 범위·main 2차 흡수·V11→V14 재번호·CHECK 본문 등식) 정정 뒤 재실측.
+      `e47901ac`(base_sha 3차 갱신값 `128f9cd3`, main 흡수 — 6F-5-a·V13) 기준, 충돌
+      해소(`CleanMigrationCheckTest.kt`, 「둘 다 취한다」) 뒤 재실측.
 - [x] test/lint/type/architecture/contract 관련 명령 통과 — 부분 게이트가 아니라
       `./gradlew --no-daemon check`(Kotlin `check` job 전건) + `./tools/one-command-check.sh`
       (Python `ml-engine` job 포함) 전건.
@@ -88,21 +88,15 @@ in_scope에 편입된 뒤 이 구현 라운드(과 그 뒤 수정 라운드)가 
 빈 출력이어야 한다 — verifier가 재확인한다(이 문서 자신이 자기 커밋 이후 상태를 담을 수
 없다는 것은 evidence-pack 스킬의 「낡는 좌표」 절과 같은 이유다).
 
-## 크기 게이트 재실측(verifier r2 LEDGER-1·LEDGER-2 뒤, 경로 기준)
+## 크기 게이트 재실측(경로 기준, HEAD `e47901ac`/base `128f9cd3`)
 
-r1 시점 evidence 351줄 대 산출물 315 insertions(+11 삭제, 326줄 변경)로 **위반**이었다.
-r2 기록(519)이 이번 라운드의 evidence 편집으로 낡았다 — 최종 수치(evidence 편집 직전,
-production HEAD `15da367f`는 그대로):
-
-- **evidence**: `find reports/evidence/m6/6f4/ -type f | xargs wc -l`(경로 기준,
-  `reports/evidence/m6/6f4/**` 전체 — `.md` 넷뿐이다) = scope 175 + checklist 108 +
-  commands 133 + rollback 117 = **533줄**(이 줄 자신이 checklist.md 줄 수에 포함되므로
-  정확히 1회 확정하기 어렵다 — 아래 산출물과의 격차가 이 줄의 오차보다 커서 결론에는
-  영향이 없다).
-- **산출물**: `git diff --shortstat edeaa9a3..15da367f -- . ':!reports/evidence'
+- **evidence**: `find reports/evidence/m6/6f4/ -type f | xargs wc -l` = scope 176 +
+  checklist 104 + commands 72 + rollback 108 = **460줄**.
+- **산출물**: `git diff --shortstat 128f9cd3..e47901ac -- . ':!reports/evidence'
   ':!milestone-6.md' ':!.claude'` = 16 files changed, **540 insertions(+), 22 deletions(-)**
-  (562줄 변경, insertions만 비교해도 540) — production 코드는 이번 라운드에서 무변경이라
-  그대로다.
+  (562줄 변경).
+
+evidence(460) < 산출물(540, 562) — **게이트를 충족한다.** 여유 80줄(insertions 기준).
 
 evidence(533) < 산출물(540, 562) — **게이트를 충족한다.** 여유는 insertions 기준 7줄,
 총 변경 기준 29줄 — r2 대비 좁아졌다(라운드 이력 절 제거로 evidence가 줄었어야 할 자리에
