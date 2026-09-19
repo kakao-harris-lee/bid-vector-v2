@@ -19,50 +19,70 @@ git diff --name-status ede5d5b..d8e37fa3 -- . ':!reports/evidence'
 있던 신규 파일)만, round 3·round 4는 기존 test 파일 하나(`CleanMigrationCheckTest.kt`,
 이미 M으로 잡혀 있던 수정 파일)만 재편집했을 뿐 새 파일을 추가하지 않았다).
 
+## 복원 기준의 정의 (D-6F5-30)
+
+**공유 파일의 복원 기준은 고정 SHA가 아니라 「이 브랜치가 분기해 나온 현재 `main`」이다.**
+팀장 커밋이든 병합이든 범위가 이 slice 레인 밖에서 움직이면 기준이 **따라 움직인다** —
+「무엇 뒤에 재산출하는가」를 라운드마다 한 칸씩 열거하지 않는다(D-6F5-23·D-6F5-24가 그
+열거를 한 칸씩 늘렸고, D-6F5-29가 그 한계를 실측했다 — 병합은 「한 칸」이 아니라 기준
+자체를 바꾼다).
+
+**기준 SHA를 구하는 법**(다음 사람이 문서를 읽고 스스로 산출할 수 있어야 한다):
+
+```
+git merge-base HEAD origin/main
+```
+
+착수 시점에는 이 값이 `ede5d5b`였다 — 이 slice가 `ede5d5b` 뒤에서 분기했기 때문이다.
+PR #38(6F-6, V12)이 이 slice보다 먼저 `main`에 병합돼(main 병합 커밋 `edeaa9a3`) 이
+브랜치가 그것을 흡수한 뒤(이 브랜치의 병합 커밋 `8ae5014f`)로는 이 값이 **`edeaa9a3`**로
+바뀐다 — 이 구현 레인이 직접 실행해 확인했다(`git merge-base HEAD origin/main` =
+`edeaa9a3...`, 2026-09-19). 아래 §①②는 **현재 기준(`edeaa9a3`)** 을 쓴다.
+
 ## 절차
 
-### ① 신규 파일 — 삭제
+### ① 신규 파일 — 삭제 (10개, D-6F5-29 보정)
+
+**8 → 10** — 병합이 `sizeGate` 회피로 만든 새 파일 둘(`RequirementSql.kt`·
+`CleanMigrationPrivilegeTest.kt`)이 더해진다. 원래 8개와 성격이 다르다: 원래 8개는 이
+slice가 처음부터 새로 지은 파일이고, 새 둘은 **병합이 만들었다**(§ 「병합 뒤 비대칭」
+참고 — `RequirementSql.kt`는 이 slice 몫 상수 이전, `CleanMigrationPrivilegeTest.kt`는
+이 slice 이전부터 있던 축9를 옮긴 것). 그래도 **기준이 `edeaa9a3`로 바뀌면 열 다
+`edeaa9a3`에 없는 파일**이라 삭제 대상은 같다.
 
 ```
 git rm -f \
   adapters/src/main/kotlin/bidvector/adapters/qualification/JdbcRequirementStore.kt \
   adapters/src/main/kotlin/bidvector/adapters/qualification/RequirementRowMapping.kt \
+  adapters/src/main/kotlin/bidvector/adapters/qualification/RequirementSql.kt \
   adapters/src/main/kotlin/bidvector/adapters/qualification/StoredRequirementLicenseGate.kt \
   adapters/src/main/resources/db/migration/V13__notice_requirement.sql \
+  adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/qualification/JdbcRequirementStoreTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/qualification/QualificationAdapterDependencyTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/qualification/QualificationGateRegistrationTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/qualification/StoredRequirementLicenseGateTest.kt
 ```
 
-### ② 수정 파일 — 단일 역적용(착수 경계 기준, 2026-09-16 규율)
+### ② 수정 파일 — 단일 역적용(복원 기준 = 현재 `main`, D-6F5-29 보정)
 
 **수정(M) 파일은 정확히 6개다** — `Sql.kt`·`CleanMigrationTest.kt`·
 `CleanMigrationColumnTest.kt`·`CleanMigrationCheckTest.kt`·`PersistenceTestSupport.kt`·
-`gate-tests.properties`. **round 1(정정 라운드)이 이 중 둘을 이 slice 자신의 커밋으로
-다시 건드렸다** — 지금 6개 목록에는 없지만 **round 1이 새로 건드린 것은 이 6개가
-아니라 신규 파일 넷**(`JdbcRequirementStore.kt`·`RequirementRowMapping.kt`·
-`QualificationAdapterDependencyTest.kt`·`StoredRequirementLicenseGateTest.kt`, 전부 base
-대비 A라 위 ①의 삭제 대상이다 — **restore 대상이 아니다**, 헷갈리기 쉬운 자리라 못 박는다).
-`Sql.kt`는 여전히 `dab9affe` 하나, `CleanMigrationTest.kt`·`CleanMigrationColumnTest.kt`·
-`PersistenceTestSupport.kt`는 `056d3a37` 하나, `gate-tests.properties`는 `4bd5fdda`
-하나뿐이다. `CleanMigrationCheckTest.kt`만 **셋**이다 — `056d3a37`(V13 축8 개수 반영,
-추가만) + `584f226f`(round 3 D-6F5-16, 본문 단언 추가, 추가만 — 기존 test·기대값을
-지우지 않았다, `git show 584f226f --stat` = `42 insertions(+)`) + **`d8e37fa3`**(round 4
-D-6F5-21, `git show d8e37fa3 --stat` = `42 insertions(+), 18 deletions(-)` — 이번엔
-**대체**다: 결합식 넷 존재 단언 test 하나를 지우고 집합 등식 test 하나로 바꿨다).
-셋 다 이 slice 자신의 커밋이라 **다른 레인의 줄은 이 range 어디에도 없다**는 결론은
-그대로다(`git log --oneline ede5d5b..d8e37fa3 -- <각 파일>`로 매번 실측 — 전부 이
-slice의 커밋만 나온다, 6F-4는 별도 브랜치라 이 워킹트리에 아직 없다). round 2는 이
-6개 중 어느 것도 건드리지 않았다(round 2 커밋 `97c44208`·`08397073`은 신규 파일
-`QualificationAdapterDependencyTest.kt` 하나만 편집한다). 보존할 「남의 줄」이 없으므로
-커밋별 hunk 격리 대신 **착수 경계(`ede5d5b`) 기준 단일 역적용**으로 건다 — `d8e37fa3`가
-대체(삭제+추가)를 포함해도, 단일 역적용은 파일을 **base 상태로 통째로** 되돌리므로
-중간 커밋이 추가였는지 대체였는지는 절차 결과에 영향이 없다(트리 동일성으로 아래
-확인).
+`gate-tests.properties`(목록 자체는 round 1~4와 같다). **round 1~4의 「다른 레인의 줄이
+이 range에 없다」는 결론은 병합 전 얘기다** — 그때는 이 6개 파일에 6F-6의 줄이 없었다.
+병합 뒤에는 이 6개 전부에 6F-6의 줄이 섞여 있다(`Sql.kt`의 `PROFILE_*`,
+`CleanMigrationTest.kt`·`CleanMigrationColumnTest.kt`의 `operator_profile` 항목,
+`PersistenceTestSupport.kt`의 TRUNCATE 목록, `gate-tests.properties`의
+`adapters.profile.*` 등재). **그래서 착수 경계(`ede5d5b`)로 단일 역적용하면 그 줄이
+전부 사라진다** — verifier r6 실측(D-6F5-29): `PROFILE_*` 3→0·등재 4→0·TRUNCATE의
+`operator_profile` 2→0, exit 0·stderr 없음(`ede5d5b`가 6F-6 이전이라 조용히 지워진다).
+
+**보정** — 위 「복원 기준의 정의」대로, 단일 역적용의 기준을 **`ede5d5b`가 아니라
+현재 `main`(`edeaa9a3`)** 으로 쓴다. `edeaa9a3`는 이미 6F-6을 담고 있으므로, 그
+기준으로 되돌리면 6F-6의 줄은 **그대로 남고** 이 slice가 얹은 줄만 사라진다.
 
 ```
-git restore --source=ede5d5b --staged --worktree -- \
+git restore --source=edeaa9a3 --staged --worktree -- \
   adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt \
@@ -71,33 +91,43 @@ git restore --source=ede5d5b --staged --worktree -- \
   config/quality/gate-tests.properties
 ```
 
-`--source=ede5d5b`에 없는 경로(신규 8개, 위 ①)는 이 명령의 대상이 **아니다** — 다만 그
-경로를 ②에 섞었을 때의 실제 거동은 verifier r2가 파이프 없이 종료 코드를 직접 받아
-갈라 실측했다(정정, 아래 표 참고): **작업 트리에 아직 그 경로가 존재하면** `git restore
---source`는 오류 없이 **exit 0으로 조용히 삭제한다**(base에 없으므로 base 상태로
-되돌린 결과가 "없음"이 되어서다). `did not match any file(s)` 오류(exit 1)는 그 경로가
-**어디에도(작업 트리에도) 없을 때만** 난다 — 아래 표의 첫 시도가 그 경우였다: ①을
-먼저 돌려 신규 8개를 이미 지운 뒤 ②에 그중 4개를 남겨 뒀기 때문이지, "base에 없어서
-거부된다"가 아니다. 즉 **①과 ②를 나누는 이유는 「섞으면 오류로 잡히기 때문」이 아니라
-「삭제와 복원의 의도를 문서에서 갈라 두기 위해서」다** — 순서를 지키지 않고 섞어도(아직
-작업 트리에 있는 상태로) 오류 없이 조용히 지워질 뿐이라, 오류가 안전장치 역할을 하지
-않는다. 그래도 ①과 ②는 섞지 않는다(evidence-pack 규격 「신규는 삭제, 편집은 restore」).
+이 복원은 **축9(유효 권한 행렬)도 자동으로 되돌린다** — `edeaa9a3`의 `CleanMigrationTest
+.kt`는 이 slice가 축9를 `CleanMigrationPrivilegeTest.kt`로 분리하기 이전 상태라 축9가
+그 파일 안에 그대로 있다. **D-6F5-28의 정정(D-6F5-29)** — 앞 절(「병합 뒤 비대칭」)이
+「축9를 `CleanMigrationTest.kt`로 손으로 되돌려 넣어야 한다」고 적은 것은 **①②를
+`ede5d5b` 기준으로 실행한다는 전제**였다. 이 보정 절차(기준 `edeaa9a3`)에서는 위 ①이
+`CleanMigrationPrivilegeTest.kt`를 지우고 위 ②가 `CleanMigrationTest.kt`를 축9가 든
+`edeaa9a3` 상태로 되돌리므로 **수동 재삽입이 필요 없다**. 같은 이유로 `Sql.kt`의
+KDoc 되돌림(`RequirementSql.kt`를 인용하는 문단 제거)도 ②의 `Sql.kt` 복원이 자동으로
+한다.
+
+**round 1의 MEDIUM-1 교훈(①과 ②를 나누는 이유)은 기준이 바뀌어도 그대로 유효하다** —
+`--source=<기준>`에 없는 경로를 ②에 섞으면, 작업 트리에 아직 있으면 오류 없이
+조용히 지워지고 어디에도 없을 때만 `did not match any file(s)`로 잡힌다(verifier r2
+실측). ①과 ②는 여전히 섞지 않는다(evidence-pack 규격 「신규는 삭제, 편집은
+restore」).
 
 ### ③ `milestone-6.md` — 되돌리지 않는다
 
-`milestone-6.md`는 이 range에서 **팀장(세션 모델)의 커밋 넷**을 받았다 — 착수 계약 고정
-(`3a233938`), 계약 갱신 (1)(`ddefc3c8`, OPEN-6F5A-RETENTION 등재 포함), r2·r3 판정 결과
-등재(`51614deb`, 위치 술어의 종점은 타입이다), **계약 갱신 (5) + OPEN 여섯째 등재**
-(`48c66aba`, `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`를 milestone에 옮김, D-6F5-24). **round
-5 정정(D-6F5-24, 팀장 실측)** — 앞 라운드까지의 문면은 `51614deb`까지만 반영해 커밋
-**셋**으로 적었는데(D-6F5-23이 예측한 것과 같은 구조로 `48c66aba`가 또 낡게 했다),
-실제로는 **넷**이다. **구조적 원인**(D-6F5-23·D-6F5-24) — 팀장 레인이 공유 문서를 커밋할
-때마다 구현 레인의 §③이 낡는다: 구현 레인은 자기 커밋 뒤에 재산출하므로 그 뒤에 오는
-팀장 커밋을 구조적으로 못 본다. 이 구현 레인은 milestone-6.md를 한 번도 편집하지
+`milestone-6.md`를 이 range에서 만진 커밋은 **일곱**이다 — 이 구현 레인 넷(착수 계약
+고정 `3a233938`, 계약 갱신 (1) `ddefc3c8`, r2·r3 판정 결과 등재 `51614deb`, 계약 갱신
+(5) `48c66aba`) + **6F-6 레인 둘**(6F-6 착수 계약 고정 `73624ab0`, verifier r2 장부층
+등재 `fa9cc90b`) + **병합 커밋 하나**(`8ae5014f`, 두 레인의 milestone-6.md 편집을
+자동 병합) — `git log --oneline ede5d5b..92c83a0b -- milestone-6.md`로 직접 세어
+확인했다. **정정(D-6F5-31/LOW-2)** — 앞 라운드까지의 문면은 이 구현 레인 몫만 세어
+「넷」으로 적었는데, 병합 뒤 범위 설명으로는 불완전했다 — 병합이 6F-6 레인의 커밋
+둘과 병합 커밋 자체를 이 range에 끌어들였다. **구조적 원인은 여전히 D-6F5-23·
+D-6F5-24와 같다**(팀장 레인이 공유 문서를 커밋할 때마다, 이번엔 다른 레인의 병합까지
+포함해, 구현 레인의 §③이 낡는다). 이 구현 레인은 milestone-6.md를 한 번도 편집하지
 않았다(round 0~5 공통). CLAUDE.md의 「하네스 경로·승인 문서의 하네스 레인 편집은
 되돌리지 않는다」와 같은 취급으로 **이 rollback은 milestone-6.md를 대상에서 뺀다**.
-완전 원복이 필요하면(운영자 판단) 넷 모두 단일 역적용으로 되돌린다 — 범위 상한을 이
-라운드에서 확인된 마지막 팀장 커밋(`48c66aba`, 계약 갱신 (5))까지 넓힌다:
+
+**완전 원복 명령 자체는 정정 대상이 아니다** — 아래 명령은 `3a233938`부터 `48c66aba`까지
+(이 구현 레인만의 범위)를 되돌리고, `73624ab0`·`fa9cc90b`·`8ae5014f`는 `48c66aba`의
+조상이 아니라(별도 브랜치에서 나중에 병합됐다) 이 diff 범위 밖이다. 그래도 이 구현
+레인이 만든 문단들은 서로 겹치지 않는 위치에 있어, 이 patch는 **현재(병합 뒤)
+`milestone-6.md`에도 깨끗이 역적용된다** — 직접 확인했다(`git diff 3a233938~1..48c66aba
+-- milestone-6.md`를 저장해 `git apply -R --check`로 현재 HEAD에 대해 검사, exit 0):
 
 ```
 git diff 3a233938~1..48c66aba -- milestone-6.md | git apply -R
@@ -121,11 +151,24 @@ scope.md는 evidence 경로라 위 목록 산출(`':!reports/evidence'`)에서 *
 
 ## 확인 지점
 
-- in_scope 경로(위 목록)의 `git diff ede5d5b -- <경로>`가 비어 있다.
-- `milestone-6.md`(팀장 레인, `48c66aba` 이후 무편집)·`reports/evidence/m6/6f5a/scope.md`
-  (팀장 레인, 계약 갱신 라운드마다 갱신 — round 5 시점 `48c66aba`)는 이 rollback 대상이
-  아니다(evidence 경로 제외 + 하네스/승인 문서 취급, 위 사유).
-- `git status --porcelain`이 삭제(신규 8개)·수정 취소(공유 6개) 외 잔여가 없다.
+**병합 뒤(D-6F5-29 보정 절차, 기준 `edeaa9a3`)**:
+
+- in_scope 경로(위 ①② 목록)의 `git diff edeaa9a3 -- adapters config`가 비어 있다.
+- 6F-6 줄이 살아 있다 — `Sql.kt`의 `PROFILE_*`, `gate-tests.properties`의
+  `adapters.profile.*` 등재, `PersistenceTestSupport.kt` TRUNCATE의 `operator_profile`.
+- 이 slice 줄이 사라졌다 — `Sql.kt`의 `REQUIREMENT_*`, `CleanMigrationTest.kt`·
+  `CleanMigrationColumnTest.kt`·`CleanMigrationCheckTest.kt`의 `notice_requirement*`,
+  `gate-tests.properties`의 `adapters.qualification.*` 등재, TRUNCATE의
+  `notice_requirement`.
+- `milestone-6.md`(팀장 레인 + 6F-6 레인 + 병합, `48c66aba`·`fa9cc90b`·`8ae5014f` 이후
+  무편집)·`reports/evidence/m6/6f5a/scope.md`(팀장 레인, 계약 갱신 라운드마다 갱신 —
+  round 5 시점 `e1d90134`)는 이 rollback 대상이 아니다(evidence 경로 제외 +
+  하네스/승인 문서 취급, 위 사유).
+- `git status --porcelain`이 삭제(신규 **10**개)·수정 취소(공유 6개) 외 잔여가 없다.
+
+**병합 전(round 1~4, 기준 `ede5d5b`, 아래 임시 clone 실측 표들의 근거) — 참고로 남긴다**:
+그 시점에는 신규 8개·기준 `ede5d5b`였고, 그 실측(`실측 HEAD: d8e37fa3`)은 지금도 그
+시점에 대해 참이다.
 
 ## 마이그레이션 비대칭
 
@@ -201,9 +244,32 @@ scope.md는 evidence 경로라 위 목록 산출(`':!reports/evidence'`)에서 *
 | ⑥ | `./gradlew --no-daemon check` | exit 0 |
 
 실측 명령·exit는 `commands.md`의 별도 절에 남기지 않는다(이 표가 그 기록이다, evidence
-크기 게이트) — 네 임시 clone 모두 검증 뒤 삭제했다(디스크에 남기지 않는다).
+크기 게이트) — 네 임시 clone 모두 검증 뒤 삭제했다(디스크에 남기지 않는다). 이 넷은
+**병합 전**(기준 `ede5d5b`) 실측이다.
 
-## 병합 뒤 비대칭 (D-6F5-28, 계약 갱신 (6))
+## 임시 clone 실측 — round 5 (D-6F5-29 보정 절차, 병합 뒤 기준 `edeaa9a3`)
+
+`git clone --no-hardlinks`로 만든 별도 임시 clone(HEAD `e1d90134`)에서 위 보정된
+①②(신규 10개 삭제, 기준 `edeaa9a3`로 공유 6개 복원)를 실행했다. **verifier 결과를
+옮기지 않고 이 구현 레인이 직접 측정했다.**
+
+| 단계 | 명령 | 결과 |
+| --- | --- | --- |
+| ① | `git rm -f <신규 10개>` | exit 0, 10 deletions staged |
+| ② | `git restore --source=edeaa9a3`(공유 6개만, 경로 개별 인자) | exit 0 |
+| 6F-6 줄 생존 | `grep -c PROFILE Sql.kt` · `grep -c 'bidvector.adapters.profile\.' gate-tests.properties` · `grep -o operator_profile PersistenceTestSupport.kt \| wc -l` | **4 · 3 · 2**(전부 0이 아님 — 생존) |
+| 이 slice 줄 소멸 | `grep -c REQUIREMENT Sql.kt` · `grep -c notice_requirement CleanMigrationTest.kt/CleanMigrationColumnTest.kt/CleanMigrationCheckTest.kt` · `grep -c 'bidvector.adapters.qualification\.' gate-tests.properties` · `grep -o notice_requirement PersistenceTestSupport.kt \| wc -l` | **전부 0** |
+| 확인 | `git diff edeaa9a3 -- adapters config` | 빈 출력 |
+| 확인 | `git status --porcelain` | D 10 · M 6, milestone-6.md·기타 없음 |
+| 트리 동일성 | 되돌린 6개 파일 전부 `git hash-object`가 `edeaa9a3`의 blob과 일치 | **6/6 일치** |
+| 축9 자동 복귀 | `grep -n '축 9\|effectivePrivileges' CleanMigrationTest.kt` | 있음(`CleanMigrationTest.kt` 466줄 — sizeGate 안, 수동 재삽입 불필요 확인) |
+| ④ | `./gradlew --no-daemon :adapters:compileKotlin :adapters:compileTestKotlin` | exit 0 |
+| ⑤ | `./gradlew --no-daemon :adapters:test --tests '*CleanMigration*Test*' --tests '*ProfileAdapterDependencyTest*' --tests '*ProfileGateRegistrationTest*' --tests '*JdbcOperatorProfileRepositoryTest*' --rerun-tasks` | exit 0 |
+| ⑥ | `./gradlew --no-daemon check` | exit 0 |
+
+임시 clone은 검증 뒤 삭제했다(디스크에 남기지 않는다).
+
+## 병합 뒤 비대칭 (D-6F5-28, 계약 갱신 (6) — D-6F5-29/30으로 정정됨, 계약 갱신 (7))
 
 운영자 지시로 PR #38(6F-6, V12)이 먼저 `main`에 들어가(main의 병합 커밋 `edeaa9a3`) 이
 브랜치가 충돌했다. `main`을 이 브랜치로 merge해 병합 커밋 `8ae5014f`로 흡수했다(rebase가
@@ -213,29 +279,44 @@ scope.md는 evidence 경로라 위 목록 산출(`':!reports/evidence'`)에서 *
 처분이 갈린다**:
 
 - **`RequirementSql.kt`** — **이 slice(6F-5-a) 자신의 상수 여섯**(`SELECT_REQUIREMENT_STATUS`
-  등, `bidvector.adapters.persistence.Sql`에서 뽑아낸 것)만 담는다. **삭제 대상**이다 —
-  더해 `bidvector.adapters.persistence.Sql`의 KDoc에 이 분리를 설명하는 문단 한 블록도
-  되돌려야 한다(그 문단이 `RequirementSql`을 인용하므로). 팀장 실측(계약 갱신 (6)
-  D-6F5-26 근거)과 이 구현 레인이 직접 대조한 `diff <(git show edeaa9a3:.../Sql.kt)
-  adapters/.../Sql.kt`가 같은 결론이다 — `main`(6F-6 반영판, `edeaa9a3`) 대비 `Sql.kt`의
-  차이는 **그 KDoc 문단 하나뿐**, 그 밖의 코드(6F-6의 `PROFILE_*` 상수 포함)는 손대지
+  등, `bidvector.adapters.persistence.Sql`에서 뽑아낸 것)만 담는다. **삭제 대상**이다(위
+  ①의 신규 10개에 포함). `bidvector.adapters.persistence.Sql`의 KDoc에 이 분리를
+  설명하는 문단 한 블록도 되돌려야 하는데, **위 ②(기준 `edeaa9a3`)가 `Sql.kt`를
+  통째로 복원하므로 자동으로 걷힌다** — 별도 수동 편집이 필요 없다(D-6F5-29 보정 뒤
+  정정). 이 구현 레인이 직접 대조한 `diff <(git show edeaa9a3:.../Sql.kt)
+  adapters/.../Sql.kt`가 `main`(6F-6 반영판, `edeaa9a3`) 대비 `Sql.kt`의 차이는 **그
+  KDoc 문단 하나뿐**임을 확인했다 — 그 밖의 코드(6F-6의 `PROFILE_*` 상수 포함)는 손대지
   않았다.
 - **`CleanMigrationPrivilegeTest.kt`** — **이 slice 이전부터 있던 축9**(유효 권한 행렬,
   M3/3G)를 옮겨 담은 파일이다. 이 slice가 새로 지은 test가 아니다 — 단언·기대 행렬·주석
-  근거를 축어 그대로 옮겼을 뿐이다(구현 레인 보고: diff로 값 변경 0 확인). **삭제하면
-  안 된다** — 삭제는 축9 전체를 지우는 것과 같다. 되돌리려면 그 내용을
-  `CleanMigrationTest.kt`로 **도로 넣어야** 하고, `config/quality/gate-tests.properties`의
-  `CleanMigrationPrivilegeTest` 등재도 함께 걷어야 한다(등재만 남기면 존재하지 않는
-  class를 참조해 `gateExecutionGate`가 깨진다).
+  근거를 축어 그대로 옮겼을 뿐이다(구현 레인 보고: diff로 값 변경 0 확인). **삭제
+  대상이다**(위 ①의 신규 10개에 포함) — 삭제만으로는 축9가 사라지지만, **위 ②(기준
+  `edeaa9a3`)가 `CleanMigrationTest.kt`를 축9가 아직 안 분리된 `edeaa9a3` 상태로
+  복원하므로 축9가 자동으로 돌아온다**. `gate-tests.properties`의
+  `CleanMigrationPrivilegeTest` 등재도 그 파일이 `edeaa9a3`에 없어 같은 ②의 복원이
+  걷어낸다. **정정(D-6F5-29)** — 이 문단이 처음 쓰였을 때(계약 갱신 (6))는 「도로
+  손으로 넣어야 한다」고 적었다. 그것은 §①②가 아직 옛 기준(`ede5d5b`)이던 전제
+  였는데, 그 전제 자체가 **HIGH였다**(아래) — 보정된 절차에서는 수동 재삽입이
+  필요 없다.
 
-**기존 ①~⑥ 실측은 그대로 유효하다.** 위쪽 `실측 HEAD: d8e37fa3`와 목록(신규 8·수정 6)·
-round 1~4의 트리 동일성 6/6은 **병합 전 이 브랜치 기준**이고, 그 시점(`d8e37fa3`)에
-대해서는 지금도 참이다 — 이 절이 그 수치를 고치지 않는다.
+**HIGH였던 것 — 이 절이 처음 쓰였을 때(계약 갱신 (6)) §①②는 여전히 옛 기준
+(`ede5d5b`)이었다.** 그 상태로 §①②를 실행하면 6F-6의 병합된 줄이 **조용히 사라진다**
+(verifier r6 실측, D-6F5-29: `PROFILE_*` 3→0·게이트 등재 `adapters.profile` 4→0·
+TRUNCATE의 `operator_profile` 2→0, exit 0·stderr 없음 — `ede5d5b`가 6F-6 이전이기
+때문이다). 이 절은 「모양이 바뀌었다」·「재실측 안 한다」만 적고 **「지금 §①②를
+실행하지 마라」를 적지 않았다** — 파괴적 명령이 문서에서 이 절보다 **위**에 있어
+사고 때 위에서부터 그대로 실행된다. r2 MEDIUM-1과 같은 조용한 실패 양식인데, 그때는
+결과 트리가 옳았고 이번엔 틀렸다. **§①②는 위에서 이미 기준 `edeaa9a3`로 교체됐고
+round 5 표에서 6F-6 줄 생존·이 slice 줄 소멸·트리 동일성 6/6·전건 `check`를 재측정해
+닫았다** — 이 정정은 D-6F5-29·D-6F5-30(계약 갱신 (7))에서 나왔다.
 
-**재실측은 하지 않는다.** 병합 뒤에는 되돌림 대상이 이 slice(6F-5-a) 하나가 아니라
-6F-5-a·6F-6 **두 slice에 걸쳐** 있다 — 위 두 새 파일의 갈린 처분이 그 증거다. 이것은
-더 이상 「이 slice의 rollback」이 아니다: in_scope 경로만 골라 base로 복원하는 지금까지의
-절차(①~⑥)는 정의상 slice 하나의 범위에서만 성립한다. 병합 자체를 되돌려야 하는 경우의
-절차는 이 절차가 아니라 **`main`의 병합 커밋(V12/PR #38을 흡수한 `edeaa9a3`) revert**다
-— 이 브랜치의 병합 커밋 `8ae5014f`는 그 `main` 병합을 이 브랜치로 가져온 자리일 뿐,
-되돌림의 대상은 `main` 쪽이다. 그 판단·실행은 이 slice의 rollback 범위 밖이다.
+**「재실측은 하지 않는다 / 이것은 더 이상 이 slice의 rollback이 아니다」는 이 절이
+처음 낸 결론이었고, 그 결론도 정정됐다(D-6F5-30).** 되돌림 대상이 6F-5-a·6F-6 두
+레인에 걸치는 것은 사실이지만, **그렇다고 이 slice만의 in_scope 경로를 골라 되돌리는
+절차가 성립하지 않는 것은 아니다** — 복원 기준을 고정 SHA(`ede5d5b`)가 아니라 「이
+브랜치가 분기해 나온 현재 `main`」(`edeaa9a3`, `git merge-base HEAD origin/main`으로
+산출)으로 바꾸면, 그 기준 자체가 이미 6F-6을 담고 있어 이 slice만의 기여를 골라
+되돌릴 수 있다(round 5 표가 그 실측이다). **`main`의 병합 커밋(`edeaa9a3`) 자체를
+되돌리는 것**(V12/PR #38 전체를 `main`에서 되돌리는 것)은 여전히 이 slice의 rollback
+범위 밖이다 — 그러나 그것과 「이 slice가 얹은 것만 걷어내는 것」은 다른 일이고, 후자는
+위 절차로 여전히 가능하다.
