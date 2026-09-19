@@ -61,6 +61,14 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // M6/6F-6 — 신설(추가만, D-6F6-3). V12__operator_profile.sql: id 싱글턴 1 +
             // licenses_declared↔license_names 짝 1 = 2.
             "operator_profile" to 2,
+            // M6/6F-5-a — 신규(추가만, D-6F5-4). V13__notice_requirement.sql.
+            // notice_requirement: status enum = 1.
+            "notice_requirement" to 1,
+            // notice_requirement_row: kind enum(컬럼 인라인) + source_field enum(컬럼 인라인)
+            // + (kind='PARSED')=(source_field IS NOT NULL) + (kind='PARSED')=(license_names
+            // IS NOT NULL) + (kind='PARSED' OR group_no IS NULL) + license_names 비어있지
+            // 않음 = 6.
+            "notice_requirement_row" to 6,
         )
 
     @Test
@@ -135,6 +143,54 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
         body shouldBe expected
     }
 
+    /**
+     * verifier r3 D-6F5-16 시정 — 위 개수 축(`축8 CHECK 개수가...`)은 V13 두 표의 CHECK 일곱을
+     * **테이블별 개수**로만 받는다. `outbox_state_check`·`edit_session_state_check`와 같은 결함
+     * 클래스(있는지만 보는 단언)라, 상태 열거 셋(`status`·`kind`·`source_field`)에 값을 더하거나
+     * `CHECK (TRUE)`로 약화해도 개수 축은 그대로 초록이었다(verifier r3 실측). 세 열거를
+     * `shouldBe`로 본문까지 정확히 고정한다(D-M4-5 (a)·D-6B1-3 관례).
+     */
+    @Test
+    fun `축8 부가 — notice_requirement·notice_requirement_row 열거 셋이 본문으로 정확히 고정된다(D-6F5-16)`() {
+        queryConstraintDef("notice_requirement_status_check") shouldBe
+            "CHECK ((status = ANY (ARRAY['FAILED'::text, 'COLLECTED'::text])))"
+        queryConstraintDef("notice_requirement_row_kind_check") shouldBe
+            "CHECK ((kind = ANY (ARRAY['PARSED'::text, 'UNPARSABLE'::text])))"
+        val expectedSourceFieldCheck =
+            "CHECK (((source_field IS NULL) OR (source_field = ANY (ARRAY['LcnsLmtNm'::text, " +
+                "'PermsnIndstrytyList'::text]))))"
+        queryConstraintDef("notice_requirement_row_source_field_check") shouldBe expectedSourceFieldCheck
+    }
+
+    /**
+     * verifier r4 D-6F5-21 시정 — 위 D-6F5-16의 결합식 넷 존재 단언(`any { contains }`)은
+     * **존재 단언**이라, 항등식 하나에 `… OR TRUE`를 제자리로 붙여 제약을 **항진명제**로
+     * 약화해도 부분 문자열도 개수도 그대로라 전건 `check`가 초록이었다(verifier r4 실측) —
+     * D-6F5-10·D-6F5-14·D-6F5-16에 이은 같은 결함 클래스의 네 번째. 나머지 둘(`group_no`·
+     * `license_names`)이 그때 막힌 것은 술어의 힘이 아니라 Postgres가 중첩 `OR`를 평탄화해
+     * 문자열 형태 자체가 바뀌는 **우연**이었다(실측).
+     *
+     * 이 결함 클래스는 「범위를 한 칸 넓히는」 처방으로는 안 닫힌다(D-6F5-20의 교훈과 같은
+     * 형태) — `notice_requirement_row`의 CHECK 본문 **집합**을 `shouldBe`로 고정한다.
+     * 개수·존재·본문·소속이 한 단언으로 닫힌다: 어떤 제자리 편집(약화·삭제·추가)도 이
+     * 집합 자체를 바꾸므로 우회할 제자리가 없다. **정정** — 이 test가 대체하는 앞
+     * D-6F5-16 KDoc의 「항등식이라 부분 대조로 충분하다」는 근거는 위 실측으로 반증된다.
+     */
+    @Test
+    fun `축8 부가 — notice_requirement_row CHECK 본문 집합이 정확히 고정된다(D-6F5-21)`() {
+        val expectedCheckBodies =
+            setOf(
+                "CHECK ((kind = ANY (ARRAY['PARSED'::text, 'UNPARSABLE'::text])))",
+                "CHECK (((source_field IS NULL) OR (source_field = ANY (ARRAY['LcnsLmtNm'::text, " +
+                    "'PermsnIndstrytyList'::text]))))",
+                "CHECK (((kind = 'PARSED'::text) = (source_field IS NOT NULL)))",
+                "CHECK (((kind = 'PARSED'::text) = (license_names IS NOT NULL)))",
+                "CHECK (((kind = 'PARSED'::text) OR (group_no IS NULL)))",
+                "CHECK (((license_names IS NULL) OR (cardinality(license_names) > 0)))",
+            )
+        queryCheckBodiesForTable("notice_requirement_row").toSet() shouldBe expectedCheckBodies
+    }
+
     private fun queryConstraintDef(constraintName: String): String =
         dataSource().connection.use { connection ->
             connection
@@ -161,6 +217,24 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
                         while (rs.next()) bodies += rs.getString("def")
                     }
             }
+        }
+        return bodies
+    }
+
+    /** D-6F5-21 — [queryCheckBodies]와 같은 조회를 **표 하나로 좁힌다**(집합 등식 대상). */
+    private fun queryCheckBodiesForTable(tableName: String): List<String> {
+        val bodies = mutableListOf<String>()
+        dataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint " +
+                        "WHERE contype='c' AND conrelid = ?::regclass",
+                ).use { statement ->
+                    statement.setString(1, tableName)
+                    statement.executeQuery().use { rs ->
+                        while (rs.next()) bodies += rs.getString("def")
+                    }
+                }
         }
         return bodies
     }

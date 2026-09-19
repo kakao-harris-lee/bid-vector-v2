@@ -310,11 +310,36 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("operator_profile", "updated_at", "timestamp with time zone", false, true),
         )
 
+    // M6/6F-5-a — 자격 요건 영속(추가만, D-6F5-4). 헤더(notice_requirement)는 공고당 한 행,
+    // 행(notice_requirement_row)은 `RequirementRow`(Parsed·Unparsable) 왕복 — PARSED만
+    // group_no·source_field·license_names를 채운다(nullable, UNPARSABLE은 항상 NULL).
+    private val noticeRequirementColumns =
+        listOf(
+            ColumnSpec("notice_requirement", "notice_number", "text", false),
+            ColumnSpec("notice_requirement", "notice_round", "text", false),
+            ColumnSpec("notice_requirement", "status", "text", false),
+            ColumnSpec("notice_requirement", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("notice_requirement", "updated_at", "timestamp with time zone", false, true),
+        )
+
+    private val noticeRequirementRowColumns =
+        listOf(
+            ColumnSpec("notice_requirement_row", "notice_number", "text", false),
+            ColumnSpec("notice_requirement_row", "notice_round", "text", false),
+            ColumnSpec("notice_requirement_row", "serial_no", "text", false),
+            ColumnSpec("notice_requirement_row", "kind", "text", false),
+            ColumnSpec("notice_requirement_row", "group_no", "text", true),
+            ColumnSpec("notice_requirement_row", "source_field", "text", true),
+            ColumnSpec("notice_requirement_row", "license_names", "ARRAY", true),
+            ColumnSpec("notice_requirement_row", "created_at", "timestamp with time zone", false, true),
+        )
+
     private val expectedColumns =
         rawObservationColumns + provenanceAuthorityColumns + noticeColumns + noticeAuditColumns +
             rejectedWriteColumns + openingResultColumns + qualificationTextColumns + collectionRunColumns +
             openingReservePriceColumns + outboxColumns + inboxColumns + editSessionColumns +
-            operatorStrategyColumns + operatorStrategyRevisionColumns + operatorProfileColumns
+            operatorStrategyColumns + operatorStrategyRevisionColumns + operatorProfileColumns +
+            noticeRequirementColumns + noticeRequirementRowColumns
 
     @Test
     fun `축2·3·4 컬럼 존재·타입·NOT NULL 이 기대와 같다`() {
