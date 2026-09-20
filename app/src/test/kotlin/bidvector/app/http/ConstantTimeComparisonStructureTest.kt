@@ -39,7 +39,8 @@ class ConstantTimeComparisonStructureTest {
         val relatedClassFiles =
             packageDir
                 .walkTopDown()
-                .filter { it.isFile && it.extension == "class" && it.nameWithoutExtension.startsWith("OperatorCredentialFilter") }
+                .filter { it.isFile && it.extension == "class" }
+                .filter { it.nameWithoutExtension.startsWith("OperatorCredentialFilter") }
                 .toList()
         relatedClassFiles.shouldNotBeEmpty() // OperatorCredentialFilter.class·…Kt.class 최소 둘
 

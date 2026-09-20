@@ -75,14 +75,12 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         }
     }
 
-    private fun isNestedObjectDefinition(definition: Map<String, Any?>): Boolean {
-        if (definition["type"] == "object") return true
-        if (definition["type"] == "array") {
-            val items = definition["items"] as? Map<String, Any?> ?: return false
-            return items["type"] == "object"
+    private fun isNestedObjectDefinition(definition: Map<String, Any?>): Boolean =
+        when (definition["type"]) {
+            "object" -> true
+            "array" -> (definition["items"] as? Map<String, Any?>)?.get("type") == "object"
+            else -> false
         }
-        return false
-    }
 
     /** D-6A1-30 — 값 자체가 object이거나(Map), object의 배열(List<Map>)이면 평탄하지 않다. */
     private fun containsNestedObject(value: Any?): Boolean =
@@ -147,7 +145,9 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
      */
     @Test
     fun `500 응답(저장된 전략 무효)도 ErrorBody 계약과 일치한다`() {
-        strategyRepository.loadFailure = { InvalidStoredStrategyException(listOf(StrategyViolation.CandidateLimitNotPositive)) }
+        strategyRepository.loadFailure = {
+            InvalidStoredStrategyException(listOf(StrategyViolation.CandidateLimitNotPositive))
+        }
 
         val response =
             restTemplate.exchange(
