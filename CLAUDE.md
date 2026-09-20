@@ -119,9 +119,12 @@ Codex 가 `request_changes` 를 반환하면 같은 scope 에서 Claude 가 수�
   재등재. 확인은 「내 줄 사라짐」과 「남의 줄 남음」 둘 다.
 - 임시 clone 에서 ①~⑥ 실측: 명령 exit · D/M 수 · diff 빈 것 · ④ compile · ⑤ test · **⑥ 게이트**(초록이 아니면
   보완 경로까지 실행). 갈음은 「HEAD 초록」이 아니라 **트리 동일성**으로만.
-- 실측은 **그 slice 의 마지막 산출물 커밋**에서 돌고 `실측 HEAD: <sha>` 를 rollback.md 에 적는다. verifier 는
-  그 SHA 가 판정 대상 SHA 와 같은지를 먼저 보고 다르면 **미검증**으로 처리한다. 앞 라운드 실측을 옮기지 않는다.
-  이 확인은 **CI 텍스트 게이트로 대체되지 않는다**(2026-09-18 측정: 실제 PR 32건 재생 FAIL 23·진짜 결함 0·오탐 1).
+- 실측은 **그 slice 의 마지막 산출물 커밋**에서 돌고 `실측 HEAD: <sha>` 를 rollback.md 에 적는다. 앞 라운드
+  실측을 옮기지 않는다. verifier 가 대조하는 것은 **「실측 HEAD == 판정 SHA」가 아니다**(2026-09-19 정정 —
+  evidence 커밋은 언제나 뒤에 오므로 둘은 영원히 다르다). **그 사이에 되돌림 대상이 움직였는가**를 본다:
+  `git diff --name-only <실측 HEAD>..<판정 SHA> -- <rollback.md 가 되돌리는 경로들>` 이 빈 출력이면 유효하고,
+  한 줄이라도 나오면 미검증이다. 이 확인은 **CI 텍스트 게이트로 대체되지 않는다**(2026-09-18 측정: 실제 PR
+  32건 재생 FAIL 23·진짜 결함 0·오탐 1).
 
 **Codex 레인(`codex-review-gate`)**
 - 저장소 밖 clean worktree, `model_reasoning_effort=high`, `features.memories=false`, 바이너리 핀(0.154.0,
