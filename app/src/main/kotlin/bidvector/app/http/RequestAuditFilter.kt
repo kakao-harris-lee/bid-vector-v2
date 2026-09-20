@@ -26,7 +26,8 @@ import java.time.Instant
  * **D-6A1-21 실측 결과가 이 설계의 전제다** — `spring.mvc.throw-exception-if-no-handler-found`
  * + `spring.web.resources.add-mappings=false`(`BidVectorApplication`)로 모든 실패 경로가
  * [GlobalErrorHandler]를 지나는 **하나의 REQUEST 디스패치**로 닫힌다(컨테이너의 별도 ERROR
- * 재디스패치가 없다 — `RequestAuditFilterDispatchTest`가 실측한다). 아래 `runCatching`은
+ * 재디스패치가 없다 — `RequestAuditFilterTest`의 D-6A1-21 test와
+ * `ProductionAssemblyAuthAuditTest`가 실측한다). 아래 `runCatching`은
  * 그래도 컨트롤러·디스패처를 완전히 벗어나는 예외(핸들러 해석 자체의 실패 등)에 대한
  * 최후 방어선이다.
  */

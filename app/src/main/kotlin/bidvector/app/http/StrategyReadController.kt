@@ -23,8 +23,9 @@ class StrategyReadController(
 }
 
 /**
- * 전략 조회 응답 — **평탄하다**(D-6A1-20 ⓑ, `StrategyReadResponseIsFlatTest`가 이 평탄함을
- * 단언으로 잠근다). 모든 필드가 문자열·숫자·`List<String>` 중 하나이고 중첩 object가 없다.
+ * 전략 조회 응답 — **평탄하다**(D-6A1-20 ⓑ, `OpenApiContractTest`의 두 test가 이 평탄함을
+ * 문서(스키마)와 실제 응답값 양쪽에서 단언으로 잠근다). 모든 필드가 문자열·숫자·
+ * `List<String>` 중 하나이고 중첩 object가 없다.
  */
 data class StrategyReadResponse(
     val revision: Int,
