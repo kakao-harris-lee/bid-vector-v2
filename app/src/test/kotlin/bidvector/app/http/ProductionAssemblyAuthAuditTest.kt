@@ -2,6 +2,7 @@ package bidvector.app.http
 
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
@@ -98,6 +99,9 @@ class ProductionAssemblyAuthAuditTest {
 
         // 술어가 공허하게 참인 회귀를 막는다 — 최소 우리 endpoint 하나는 있어야 한다.
         paths.shouldNotBeEmpty()
+        // code-reviewer MEDIUM 시정(OperatorAuthenticationTest와 같은 관례) — D-6A1-21 ①을
+        // shouldNotBeEmpty()만으로 두지 않는다.
+        paths shouldContain "/error"
 
         paths.forEach { path ->
             val response = restTemplate.getForEntity(url(path), String::class.java)

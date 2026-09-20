@@ -1,5 +1,6 @@
 package bidvector.app.http
 
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -40,6 +41,11 @@ class OperatorAuthenticationTest : HttpIntegrationTestBase() {
 
         // 술어가 공허하게 참인 회귀를 막는다 — 최소 우리 endpoint 하나는 있어야 한다.
         paths.shouldNotBeEmpty()
+        // code-reviewer MEDIUM 시정 — shouldNotBeEmpty()만으로는 D-6A1-21 ①(Boot 자동 구성
+        // /error가 이 기계 전수에 들어오는지)을 확인하지 못한다. Boot 버전이 바뀌어 /error가
+        // handlerMethods 밖으로 나가면(예: 별도 dispatcher로) 이 test가 조용히 그 사실을
+        // 놓치지 않도록 직접 단언한다.
+        paths shouldContain "/error"
 
         paths.forEach { path ->
             val response = restTemplate.getForEntity(url(path), String::class.java)
