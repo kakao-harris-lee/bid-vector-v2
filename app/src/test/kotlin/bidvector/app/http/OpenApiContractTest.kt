@@ -1,5 +1,7 @@
 package bidvector.app.http
 
+import bidvector.adapters.strategy.InvalidStoredStrategyException
+import bidvector.strategy.StrategyViolation
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -19,6 +21,12 @@ import java.io.File
  * (D-6A1-20 ⓑ — 지금 컨트롤러 DTO가 평탄하다는 사실을 이 test가 잠근다: 스키마 어디든
  * `type: object` 속성이 생기면 이 test가 즉시 실패한다).
  *
+ * **D-6A1-30 시정 — 깊이 방어가 배열 안 object를 못 봤다**(contract-keeper·code-reviewer
+ * 독립 수렴). 정적 검사(`collectNestedObjectProperties`)는 `type: object` 속성만 보고
+ * `type: array, items: {type: object}`는 놓쳤다. 런타임 검사(`values.none { it is Map }`)도
+ * 값이 `List<Map<*,*>>`이면 `it`이 List라 `false`를 내 놓쳤다. 둘 다 배열 축까지 보도록
+ * 넓힌다.
+ *
  * 새 라이브러리(swagger-parser 등)를 들이지 않는다 — 계약이 얕아 SnakeYAML(이미 app의
  * test 의존)로 raw Map 순회만으로 충분하다(preflight 조사·재사용 우선).
  */
@@ -35,6 +43,7 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
     @BeforeEach
     fun resetFixture() {
         strategyRepository.strategy = freshStrategy()
+        strategyRepository.loadFailure = null
     }
 
     private val spec: Map<String, Any?> by lazy {
@@ -52,22 +61,42 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
     private fun propertyKeys(schemaName: String): Set<String> =
         (schema(schemaName)["properties"] as Map<String, Any?>).keys
 
-    /** 모든 스키마를 재귀로 훑어 `type: object`인 **속성**(스키마 자신 말고)이 없는지 잰다. */
+    /**
+     * 모든 스키마를 재귀로 훑어 `type: object`인 **속성**(스키마 자신 말고)이 없는지 잰다
+     * — object 자체뿐 아니라 `type: array`의 `items`가 object인 경우(D-6A1-30)도 본다.
+     */
     private fun collectNestedObjectProperties(): List<String> {
         val schemas = (spec["components"] as Map<String, Any?>)["schemas"] as Map<String, Any?>
         return schemas.flatMap { (schemaName, schemaBody) ->
             val properties = (schemaBody as Map<String, Any?>)["properties"] as Map<String, Any?>
             properties
-                .filter { (_, definition) -> (definition as Map<String, Any?>)["type"] == "object" }
+                .filter { (_, definition) -> isNestedObjectDefinition(definition as Map<String, Any?>) }
                 .map { (propertyName, _) -> "$schemaName.$propertyName" }
         }
     }
+
+    private fun isNestedObjectDefinition(definition: Map<String, Any?>): Boolean {
+        if (definition["type"] == "object") return true
+        if (definition["type"] == "array") {
+            val items = definition["items"] as? Map<String, Any?> ?: return false
+            return items["type"] == "object"
+        }
+        return false
+    }
+
+    /** D-6A1-30 — 값 자체가 object이거나(Map), object의 배열(List<Map>)이면 평탄하지 않다. */
+    private fun containsNestedObject(value: Any?): Boolean =
+        when (value) {
+            is Map<*, *> -> true
+            is List<*> -> value.any { it is Map<*, *> }
+            else -> false
+        }
 
     private fun authorizedHeaders(): HttpHeaders =
         HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
     @Test
-    fun `D-6A1-20 ⓑ — 계약의 어떤 스키마도 중첩 object 속성을 갖지 않는다`() {
+    fun `D-6A1-20 ⓑ — 계약의 어떤 스키마도 중첩 object 속성을 갖지 않는다(배열 축 포함)`() {
         collectNestedObjectProperties() shouldBe emptyList()
     }
 
@@ -83,9 +112,8 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
 
         response.statusCode.value() shouldBe 200
         (response.body?.keys ?: emptySet()) shouldBe propertyKeys("StrategyReadResponse")
-        // D-6A1-20 ⓑ — 문서(위 test)뿐 아니라 **실제 응답값**도 평탄한지 잰다. 문서만
-        // 맞고 실제 DTO가 갈라지는 사각을 막는다 — 값 자체가 Map(중첩 object)이면 실패.
-        response.body?.values?.none { it is Map<*, *> } shouldBe true
+        // D-6A1-20 ⓑ — 문서(위 test)뿐 아니라 **실제 응답값**도 평탄한지 잰다(배열 축 포함).
+        response.body?.values?.none(::containsNestedObject) shouldBe true
     }
 
     @Test
@@ -109,6 +137,29 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
 
         response.statusCode.value() shouldBe 404
         (response.body?.keys ?: emptySet()) shouldBe propertyKeys("ErrorBody")
+    }
+
+    /**
+     * D-6A1-32 — 계약(`responses.500`)에 적힌 상태를 실제로 대조한다. 이전 판은 500을
+     * `RequestAuditFilterTest`가 code/message만 개별 확인하고 계약 대조 경로에는 없었다
+     * (D-6A1-8 단일 출처의 구멍). `InvalidStoredStrategyException` 전용 분기를 때려
+     * `ErrorMapping`의 매핑표 두 번째 분기(기본 분기가 아니다)를 실제로 지난다.
+     */
+    @Test
+    fun `500 응답(저장된 전략 무효)도 ErrorBody 계약과 일치한다`() {
+        strategyRepository.loadFailure = { InvalidStoredStrategyException(listOf(StrategyViolation.CandidateLimitNotPositive)) }
+
+        val response =
+            restTemplate.exchange(
+                url("/api/strategy"),
+                HttpMethod.GET,
+                HttpEntity<Void>(authorizedHeaders()),
+                Map::class.java,
+            ) as ResponseEntity<Map<String, Any?>>
+
+        response.statusCode.value() shouldBe 500
+        (response.body?.keys ?: emptySet()) shouldBe propertyKeys("ErrorBody")
+        response.body?.get("code") shouldBe ErrorCode.INVALID_STORED_STRATEGY
     }
 
     @Test
