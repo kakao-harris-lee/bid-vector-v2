@@ -15,6 +15,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.ComponentScan
+import org.springframework.context.annotation.FilterType
 import org.springframework.core.Ordered
 import javax.sql.DataSource
 
@@ -30,10 +32,23 @@ import javax.sql.DataSource
  * 밖이라(`FilterRegistrationBean` 기본 dispatcher가 REQUEST뿐) audit·인증을 모두
  * 우회한다(우회 (1)·(2)가 만나는 자리, D-6A1-21). 이 두 설정으로 미매핑 경로도
  * `NoHandlerFoundException`이 되어 [bidvector.app.http.GlobalErrorHandler]를 지나는
- * **같은 REQUEST 디스패치** 안에서 끝난다 — `RequestAuditFilterDispatchTest`가 이것을
- * 실측으로 확인한다(가정이 아니라 실측, 팀장 지시).
+ * **같은 REQUEST 디스패치** 안에서 끝난다 — `RequestAuditFilterTest`(app/src/test)가
+ * 이것을 실측으로 확인한다(가정이 아니라 실측, 팀장 지시).
+ *
+ * **D-6A1-27 — 중첩 `@SpringBootApplication`을 스캔에서 뺀다.** 기본 컴포넌트 스캔은
+ * `bidvector.app`과 그 하위 전부를 본다 — `bidvector.app.http.HttpTestApplication`
+ * (test 전용, 하위 패키지)도 그 범위 안이다. production 조립을 직접 부팅하는
+ * `ProductionAssemblyAuthAuditTest`가 이 클래스를 부팅하면 두 `@SpringBootApplication`이
+ * 같은 컨텍스트에서 겹쳐 `strategyRepository` 등 bean 이름이 충돌한다(실측 —
+ * `BeanDefinitionOverrideException`). 배포되는 jar에는 test 클래스가 없어 이 필터는
+ * production 런타임에서 공집합이다 — 순수하게 test 부팅을 여는 변경이다.
  */
 @SpringBootApplication
+@ComponentScan(
+    excludeFilters = [
+        ComponentScan.Filter(type = FilterType.ANNOTATION, classes = [SpringBootApplication::class]),
+    ],
+)
 @EnableConfigurationProperties(OperatorCredentialProperties::class)
 open class BidVectorApplication {
     @Bean
@@ -96,14 +111,26 @@ data class OperatorCredentialProperties(
     val value: String,
 )
 
+/**
+ * D-6A1-21 — 위 클래스 문서의 실측 전제. 새 파일(application.yml)을 만들지 않는다
+ * (scope.md in_scope 파일 목록 밖) — 조립 근이 프로그램적으로 못박는다.
+ *
+ * **D-6A1-27 시정 — `main()`과 production 조립 boot test(`ProductionAssemblyAuthAuditTest`)가
+ * 같은 값을 참조한다.** 이전 판은 이 두 속성을 test 파일에 `const val`로 중복 선언하고
+ * (`HttpTestSupport.PROP_*`) 「드리프트가 나면 test가 곧바로 실패한다」고 적었는데, 그
+ * test는 `main()`을 부르지 않고 자기 사본을 그대로 써서 실측으로 거짓임이 드러났다
+ * (verifier — 이 둘을 제거해도 기존 http test 넷은 exit 0). 이 값을 `main()`과 production
+ * boot test가 **같은 참조**로 공유하면, 여기서 지우는 순간 두 자리 모두 같이 비어 실제
+ * 런타임 동작(미매핑 경로의 디스패치 형태)이 갈라지고 그 test가 붉어진다.
+ */
+val PRODUCTION_DISPATCH_PROPERTIES: Map<String, String> =
+    mapOf(
+        "spring.mvc.throw-exception-if-no-handler-found" to "true",
+        "spring.web.resources.add-mappings" to "false",
+    )
+
 fun main(args: Array<String>) {
     SpringApplicationBuilder(BidVectorApplication::class.java)
-        .properties(
-            // D-6A1-21 — 위 클래스 문서의 실측 전제. 새 파일(application.yml)을 만들지
-            // 않는다(scope.md in_scope 파일 목록 밖) — 조립 근이 프로그램적으로 못박는다.
-            mapOf(
-                "spring.mvc.throw-exception-if-no-handler-found" to "true",
-                "spring.web.resources.add-mappings" to "false",
-            ),
-        ).run(*args)
+        .properties(PRODUCTION_DISPATCH_PROPERTIES)
+        .run(*args)
 }

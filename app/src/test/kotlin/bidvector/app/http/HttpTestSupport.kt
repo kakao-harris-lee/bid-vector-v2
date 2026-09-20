@@ -28,10 +28,18 @@ import java.util.concurrent.atomic.AtomicInteger
 const val TEST_CREDENTIAL = "http-layer-test-fixture-credential"
 
 /**
- * `BidVectorApplication.main()`이 굳히는 두 속성을 test에도 그대로 준다 —
- * `@SpringBootTest`는 `main()`을 부르지 않으므로 이 값들을 test가 직접 반복한다(`const
- * val`이라 annotation 인자로 그대로 참조된다. 작은 중복이지만 드리프트가 나면 D-6A1-21
- * test가 곧바로 실패하며 드러난다 — 조용히 갈라지지 않는다).
+ * `BidVectorApplication.main()`이 굳히는 두 속성을 `HttpTestApplication` 기반 test에도
+ * 그대로 준다 — `@SpringBootTest`는 `main()`을 부르지 않고, annotation 속성은 컴파일
+ * 시간 상수만 받아 `main()`의 [bidvector.app.PRODUCTION_DISPATCH_PROPERTIES]를 직접
+ * 참조할 수 없어 이 두 `const val`로 값만 복제한다.
+ *
+ * **D-6A1-27 정정 — 이 복제는 드리프트를 스스로 드러내지 않는다.** 이전 판은 「드리프트가
+ * 나면 D-6A1-21 test가 곧바로 실패한다」고 적었으나 거짓으로 실측됐다(verifier r1) —
+ * `main()`의 `PRODUCTION_DISPATCH_PROPERTIES`에서 두 속성을 지워도 이 test들은 **자기
+ * 사본**을 그대로 쓰므로 영향받지 않고 exit 0이다. 실제 drift 감지는
+ * `ProductionAssemblyAuthAuditTest`(production 조립을 직접 부팅하고
+ * `PRODUCTION_DISPATCH_PROPERTIES`를 참조로 공유한다)가 진다 — 이 두 `const val`은
+ * `HttpTestApplication` 계열 test의 **재현 사본**일 뿐, drift 게이트가 아니다.
  */
 const val PROP_THROW_EXCEPTION_IF_NO_HANDLER_FOUND = "spring.mvc.throw-exception-if-no-handler-found=true"
 const val PROP_NO_STATIC_RESOURCE_MAPPINGS = "spring.web.resources.add-mappings=false"
