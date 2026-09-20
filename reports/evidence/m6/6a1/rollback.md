@@ -19,12 +19,16 @@ adapters.audit 패키지에 의존 게이트 + 등재 완결성 게이트`).
 
 ## 목록(기계 산출, 라운드마다 재산출)
 
+**F-4 시정 — 이전 판이 in_scope `milestone-6.md`를 명령·목록 양쪽에서 빠뜨렸다**(생성
+명령 범위 밖이라 아래 유효성 확인 명령도 같은 이유로 놓쳤다). 아래는 그 파일을 포함한다.
+
 ```
-git diff --name-status 1881c82c..HEAD -- app/ adapters/ gradle/libs.versions.toml \
-  openapi/ config/quality/gate-tests.properties | grep -v '^.\treports/evidence/'
+git diff --name-status $(git merge-base HEAD origin/main)..HEAD -- app/ adapters/ \
+  gradle/libs.versions.toml openapi/ config/quality/gate-tests.properties \
+  milestone-6.md | grep -v '^.\treports/evidence/'
 ```
 
-신규(A, 17개) — `restore`가 아니라 삭제 대상:
+신규(A, 19개) — `restore`가 아니라 삭제 대상:
 - `adapters/src/main/kotlin/bidvector/adapters/audit/ApiAuditSql.kt`
 - `adapters/src/main/kotlin/bidvector/adapters/audit/ApiAuditStore.kt`
 - `adapters/src/main/resources/db/migration/V15__api_audit.sql`
@@ -41,13 +45,12 @@ git diff --name-status 1881c82c..HEAD -- app/ adapters/ gradle/libs.versions.tom
 - `app/src/test/kotlin/bidvector/app/http/HttpTestSupport.kt`
 - `app/src/test/kotlin/bidvector/app/http/OpenApiContractTest.kt`
 - `app/src/test/kotlin/bidvector/app/http/OperatorAuthenticationTest.kt`
+- `app/src/test/kotlin/bidvector/app/http/ProductionAssemblyAuthAuditTest.kt` — 수정 라운드
+  1 신설(D-6A1-27, production 조립 boot test)
 - `app/src/test/kotlin/bidvector/app/http/RequestAuditFilterTest.kt`
 - `openapi/bidvector-operator-api.yaml`
 
-(위는 17개 나열이지만 표에 18번째로 `openapi/...yaml`을 셈해 목록 총합이 스크립트
-출력과 일치한다 — 개수는 항상 위 명령의 실제 출력을 정본으로 삼는다.)
-
-수정(M, 9개, **전부 공유 파일**):
+수정(M, 10개, **전부 공유 파일**):
 - `adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt`
 - `adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt`
 - `adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt`
@@ -57,6 +60,7 @@ git diff --name-status 1881c82c..HEAD -- app/ adapters/ gradle/libs.versions.tom
 - `app/src/test/kotlin/bidvector/app/compatibility/BootCompatibilitySmokeTest.kt`
 - `config/quality/gate-tests.properties`
 - `gradle/libs.versions.toml`
+- `milestone-6.md` — F-4가 놓쳤던 자리(팀장 레인, 6A 분할·착수 문단)
 
 ## 공유 파일 — base를 흡수 뒤 지점으로 잡았으므로 hunk 격리가 필요 없다
 
@@ -69,8 +73,14 @@ git diff --name-status 1881c82c..HEAD -- app/ adapters/ gradle/libs.versions.tom
 
 ## 복원 명령
 
+**F-5 시정 — 실행 블록이 `--source=1881c82c` 고정 SHA였다**(D-6A1-15 문면은 정의인데
+실행이 고정이었다 — 서술과 실행이 갈리면 실행이 이긴다, 팀장 지시). 아래는 매 실행마다
+정의를 재계산한다(파괴적 명령보다 아래에 경고를 두지 않는다 — 절차 자체를 고쳤다).
+
 ```bash
-git restore --source=1881c82c --staged --worktree -- \
+BASE=$(git merge-base HEAD origin/main)
+
+git restore --source="$BASE" --staged --worktree -- \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt \
@@ -79,7 +89,8 @@ git restore --source=1881c82c --staged --worktree -- \
   app/build.gradle.kts \
   app/src/test/kotlin/bidvector/app/compatibility/BootCompatibilitySmokeTest.kt \
   config/quality/gate-tests.properties \
-  gradle/libs.versions.toml
+  gradle/libs.versions.toml \
+  milestone-6.md
 
 git rm -f \
   adapters/src/main/kotlin/bidvector/adapters/audit/ApiAuditSql.kt \
@@ -98,13 +109,15 @@ git rm -f \
   app/src/test/kotlin/bidvector/app/http/HttpTestSupport.kt \
   app/src/test/kotlin/bidvector/app/http/OpenApiContractTest.kt \
   app/src/test/kotlin/bidvector/app/http/OperatorAuthenticationTest.kt \
+  app/src/test/kotlin/bidvector/app/http/ProductionAssemblyAuthAuditTest.kt \
   app/src/test/kotlin/bidvector/app/http/RequestAuditFilterTest.kt \
   openapi/bidvector-operator-api.yaml
 ```
 
-`bootJar`는 다시 `enabled = false`로 돌아간다. `CLAUDE.md`·`.claude/**`(하네스 경로)는
-되돌리지 않는다 — 실측: `git diff --stat 1881c82c..HEAD -- CLAUDE.md .claude/
-docs/harness/` 빈 출력.
+`bootJar`는 다시 `enabled = false`로 돌아간다(이번 라운드에서 `jar`를 재활성했으므로
+`jar`도 함께 `enabled = false`로 — D-6A1-28 이전 상태 원복). `CLAUDE.md`·`.claude/**`
+(하네스 경로)는 되돌리지 않는다 — 실측: `git diff --stat "$BASE"..HEAD -- CLAUDE.md
+.claude/ docs/harness/` 빈 출력.
 
 ## 마이그레이션 비대칭(적용 완료 DB가 있는 경우)
 
@@ -143,9 +156,10 @@ git diff --name-only <실측 HEAD>..<판정 SHA> -- \
   app/build.gradle.kts app/src/main/kotlin/bidvector/app \
   app/src/test/kotlin/bidvector/app/compatibility/BootCompatibilitySmokeTest.kt \
   app/src/test/kotlin/bidvector/app/http \
-  config/quality/gate-tests.properties gradle/libs.versions.toml openapi
+  config/quality/gate-tests.properties gradle/libs.versions.toml openapi \
+  milestone-6.md
 ```
-빈 출력이면 실측이 유효하다. 실측 HEAD(`fff0faf5`)가 판정 SHA의 조상이 아니면 미검증.
+빈 출력이면 실측이 유효하다. 실측 HEAD(아래 갱신)가 판정 SHA의 조상이 아니면 미검증.
 
 ## 마이그레이션 번호 재확인(D-6A1-12)
 
@@ -164,17 +178,31 @@ main 흡수 뒤 재확인: `main` 최대가 이제 **`V14`**(`1881c82c`, 6F-4)�
   재론의).
 - **`OPEN-6A1-CONNECTION-POOL`**: `PGSimpleDataSource`(비풀링) 그대로 운영에 나갈 수
   없다 — 받는 쪽 6C/6E.
-- **Provenance 라벨 중복**: `ProvenanceCodec`(adapters.persistence, 모듈 범위 internal)을
-  `app`에서 재사용하지 못해 `StrategyReadController.provenanceLabel`이 같은 매핑을
-  다시 갖는다(재사용 후보였으나 모듈 경계가 막았다 — 양쪽 다 sealed `when` 소진이라
-  컴파일이 drift를 잡는다).
+- **Provenance 라벨 중복(D-6A1-33, 고치지 않는다)**: `ProvenanceCodec`(adapters.persistence,
+  모듈 범위 internal)을 `app`에서 재사용하지 못해 `StrategyReadController.provenanceLabel`이
+  같은 매핑을 다시 갖는다. code-reviewer가 「가시성만 넓히면 제거 가능」이라는 더 값싼
+  대안을 냈고 그 지적은 옳다 — 그러나 **표현 계층의 라벨 하나를 위해 공개 표면을 영구히
+  넓히는 거래**다. 양쪽 다 sealed 타입에 대한 **소진 `when`**이라 drift는 컴파일러가
+  잡는다 — 이것은 **안전한 중복**이고, 그래서 가시성을 넓히지 않기로 결정했다.
 - **`spring-boot-test`/`-resttestclient`/`-restclient` 세 test 전용 좌표**는 D-6A1-24로
   in_scope에 정식 편입됐다 — Boot 4.1의 `spring-boot-resttestclient` 선언 의존 그래프에
   `RestTemplateBuilder`가 빠져 있는 것(실측)을 메우는 데 필요했다. production 좌표
   아님, `compatibilitySmoke.expectedModules`에는 안 올림.
-- **`const val` 상수 풀 인라인**: `AuditAdapterDependencyTest`를 검증하며 실측 —
-  `bidvector.adapters.persistence.Sql`의 `const val` 필드를 참조하면 Kotlin 컴파일러가
-  값을 인라인해 상수 풀에서 참조 자체가 사라진다(바이트코드 의존 게이트가 놓치는
-  자리). 이 slice의 게이트는 오브젝트 참조(비-const)로 변이해 실제로 잡히는 것만
-  확인했다 — `const val`을 통한 우회는 이 게이트 계열(`*AdapterDependencyTest`) 전체의
-  **알려진 사각**이다(D-6A1-22 대상 밖, 형제 게이트들도 같은 사각을 공유).
+- **`OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT`(D-6A1-25 신설, D-6A1-34로 범위 확장)**:
+  `AuditAdapterDependencyTest`를 검증하며 실측 — `bidvector.adapters.persistence.Sql`의
+  `const val` 필드를 참조하면 Kotlin 컴파일러가 값을 인라인해 상수 풀에서 참조 자체가
+  사라진다(바이트코드 의존 게이트가 놓치는 자리). 이 slice의 게이트는 오브젝트 참조
+  (비-const)로 변이해 실제로 잡히는 것만 확인했다. **D-6A1-34 — 문면을 실측보다 좁게
+  적었던 것을 넓힌다**: 미검출은 `const val` 하나가 아니라 **모든 컴파일 시간 상수
+  참조**다 — `object` const·top-level const·다른 모듈 companion const 셋 다 미검출임이
+  실측됐다(실제 정책 상수로도 재현). 영향 범위는 `evaluation`(6F-2)·`qualification`
+  (6F-5-a)·`profile`(6F-6)·`audit`(이 slice) 네 게이트 계열 전부 — 한 slice의 범위가
+  아니라 **하네스 레인**이 받는다.
+- **`jarContentGate`가 여전히 `jar`만 보고 배포물 `bootJar`는 안 본다(신규 등재,
+  OPEN 후보)**: D-6A1-28에서 `jar`를 재활성해 게이트가 다시 뭔가를 재게(entries
+  0→20) 했지만, 그 「뭔가」는 여전히 **비배포 아티팩트**(`jar` task 산출물)다.
+  `jarContentGate`의 `archives.from(tasks.named("jar")...)` 배선이 build-logic에
+  하드코딩돼 있어(`build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts`),
+  게이트가 실제 배포물(`bootJar`)의 class 바이트를 검증하지 못한다. `jar` 재활성은
+  게이트가 **뭔가라도** 재게 하는 최소 조치였지 배포물을 재는 조치가 아니었다 —
+  하네스 레인 OPEN 후보로 등재한다(가칭 `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`).
