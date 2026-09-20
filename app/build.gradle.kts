@@ -7,11 +7,16 @@ plugins {
 }
 
 // M6/6A-1 D-6A1-4 — 이 slice가 처음으로 진입점(main())·controller를 만든다. bootJar를
-// 켜고(1A가 disabled로 남겨 둔 자리), 충돌을 피하려 평범한 jar는 끈다(Boot Gradle 플러그인
-// 기본 관례 — bootJar가 실행 가능 아티팩트, plain jar는 classifier 없이 같은 파일명과
-// 부딪힌다).
+// 켠다(1A가 disabled로 남겨 둔 자리). **D-6A1-28 정정** — 평범한 jar는 끄지 않는다. 이전
+// 판은 「파일명 충돌」을 근거로 껐으나 실측과 다르다: Boot Gradle 플러그인은 둘 다 켜져
+// 있으면 plain jar에 `-plain` classifier를 자동으로 붙여(`app-plain.jar`) `bootJar`
+// (`app.jar`)와 공존시킨다. `jar`를 끄면 `jarContentGate`(하드코딩된 `jar` task 산출물
+// 대조)가 빈 아카이브를 보게 되어 게이트가 아무것도 검증하지 않는 채로 초록이 된다
+// (verifier 실측 — entries 1→0). 배포물은 `bootJar`이지만 게이트는 `jar`만 본다는
+// 사실은 바뀌지 않으므로(build-logic 하드코딩), `jar`를 켜 두는 것이 이 게이트가 실제로
+// 뭔가를 재게 하는 유일한 방법이다.
 tasks.named<BootJar>("bootJar") { enabled = true }
-tasks.named<Jar>("jar") { enabled = false }
+tasks.named<Jar>("jar") { enabled = true }
 
 dependencies {
     implementation(project(":adapters"))
