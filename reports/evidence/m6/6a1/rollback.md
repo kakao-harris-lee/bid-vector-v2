@@ -1,13 +1,19 @@
 # M6/6A-1 rollback.md
 
-실측 HEAD: `fff0faf5`(이 slice의 마지막 산출물 커밋 — `fix(m6-6a1): D-6A1-22 —
-adapters.audit 패키지에 의존 게이트 + 등재 완결성 게이트`).
+실측 HEAD: `440a7286`(수정 라운드 1의 마지막 산출물 커밋 — `docs(m6-6a1): rollback.md —
+F-4·F-5 시정 + D-6A1-33·34 근거 + jarContentGate 신규 등재`. 이 뒤에도 같은 라운드의
+평가 보고 커밋이 더 있을 수 있으나, in_scope 코드 경로를 건드리지 않는 evidence 전용
+편집이라 아래 clone 실측의 유효성에 영향이 없다 — 검증자는 판정 SHA와의 사이에 코드
+경로 diff가 비었는지로 이 사실을 직접 확인할 수 있다).
 
 기준(`base`)은 **고정 SHA가 아니라 정의**다: 「이 브랜치가 분기해 나온 현재 `main`」
-(`git merge-base HEAD origin/main`, D-6A1-15). **이 slice는 main을 흡수했으므로**
-(`3276c672`, `origin/main`이 `1881c82c`였을 때 병합) 그 정의를 다시 계산하면 지금은
-**`1881c82c`**다(흡수 전 초기 실측값은 `128f9cd3` = scope.md `base_sha` — 「출발한
-지점」이라는 역사적 사실로 scope.md에는 그대로 둔다, 팀장 지시).
+(`git merge-base HEAD origin/main`, D-6A1-15). 이 정의는 `origin/main`이 계속 앞으로
+움직여도 안정적이다 — 실측: 이 라운드 도중 `origin/main`이 `1881c82c` → `00d49135`
+(하네스 문서 정정 커밋 하나)로 다시 전진했지만, `1881c82c`가 그 뒤로도 여전히 조상이라
+`git merge-base HEAD origin/main`은 그대로 **`1881c82c`**를 낸다(재확인 실측, F-5가
+고치려던 「고정 SHA는 이런 전진에 낡는다」의 정반대 증거 — 정의는 낡지 않는다).
+흡수 전 초기 실측값은 `128f9cd3` = scope.md `base_sha`(「출발한 지점」이라는 역사적
+사실로 scope.md에는 그대로 둔다, 팀장 지시).
 
 ## 되돌리는 것
 
@@ -125,21 +131,24 @@ git rm -f \
 않을 뿐 삭제하지 않는다. 실제 `DROP TABLE`은 사용자 승인 대상이다(운영 DB에 아직
 적용된 이력이 없다).
 
-## 임시 clone 실측(①~⑥, 2026-09-19, main 흡수 + D-6A1-22 반영 뒤 재실측)
+## 임시 clone 실측(①~⑥, 2026-09-20, 수정 라운드 1 — F-4·F-5·D-6A1-27 반영 뒤 재실측)
 
-`git clone --no-hardlinks`로 격리된 clone에서 위 복원 명령을 실제로 실행했다.
+`git clone --no-hardlinks`로 격리된 clone(`440a7286` 기준)에서 위 복원 명령을 실제로
+실행했다.
 
 | 단계 | 명령 | 결과 |
 | --- | --- | --- |
 | ① 명령 exit | `git restore` + `git rm` | 둘 다 exit 0 |
-| ② D/M 수 | `git status --porcelain` | D 17 · M 9(위 목록과 정확히 일치) |
-| ③ diff 빈 것 | `git diff --stat 1881c82c -- <위 26개 경로 전부>` | 빈 출력(exit 0) |
-| — 하네스 무편집 | `git diff --stat 1881c82c -- CLAUDE.md .claude/ docs/harness/` | 빈 출력 |
+| ② D/M 수 | `git status --porcelain` | D 19 · M 10(위 목록과 정확히 일치, F-6 시정 — 이전
+  판 「D 17」·verifier 재현 「D 18」은 둘 다 이번 라운드 신설 파일 반영 전 수치였다) |
+| ③ diff 빈 것 | `git diff --stat "$BASE" -- <위 29개 경로 전부>` | 빈 출력(exit 0) |
+| — 하네스 무편집 | `git diff --stat "$BASE"..HEAD -- CLAUDE.md .claude/ docs/harness/` | 빈 출력 |
 | ④ compile | `./gradlew --no-daemon :app:compileKotlin :adapters:compileKotlin` | BUILD SUCCESSFUL |
 | ⑤ test | `./gradlew --no-daemon check`(test 포함) | BUILD SUCCESSFUL |
 | ⑥ 게이트 | 위와 동일 `check`(9개 모듈 전건) | BUILD SUCCESSFUL |
 
-갈음 판정은 「HEAD 초록」이 아니라 **트리 동일성**(③의 빈 diff)으로 확인했다.
+갈음 판정은 「HEAD 초록」이 아니라 **트리 동일성**(③의 빈 diff)으로 확인했다. `$BASE`는
+매 실행 시점의 `git merge-base HEAD origin/main`(F-5 시정 그대로 실행).
 
 ## 검증자 유효성 확인
 
@@ -159,7 +168,7 @@ git diff --name-only <실측 HEAD>..<판정 SHA> -- \
   config/quality/gate-tests.properties gradle/libs.versions.toml openapi \
   milestone-6.md
 ```
-빈 출력이면 실측이 유효하다. 실측 HEAD(아래 갱신)가 판정 SHA의 조상이 아니면 미검증.
+빈 출력이면 실측이 유효하다. 실측 HEAD(`440a7286`)가 판정 SHA의 조상이 아니면 미검증.
 
 ## 마이그레이션 번호 재확인(D-6A1-12)
 
