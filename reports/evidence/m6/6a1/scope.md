@@ -41,10 +41,13 @@ acceptance_commands:
   - "./gradlew --no-daemon :app:test --tests '*OpenApiContractTest*' --rerun-tasks"        # S-42 — OpenAPI 단일 출처 ↔ 구현 대조
   - "./tools/one-command-check.sh"                                                         # S-20 승계(6C)
 rollback: |
-  신규 파일 삭제 + 편집 넷(`app/build.gradle.kts`·`Sql.kt`·`libs.versions.toml`·`milestone-6.md`)을 base 로.
-  `git restore --source=c4d09cc --staged --worktree -- <in_scope 경로 개별 인자>`, 신규는 삭제. `bootJar` 는 다시 disabled 로 돌아간다.
-  **마이그레이션 비대칭**: 적용된 DB 에는 V9 가 남는다(되돌린 코드는 그 표를 쓰지 않는다). 실제 삭제는 사용자 승인 대상이다.
-  임시 clone ①~⑥ + 빈 컨테이너 재적용으로 실측. 정본 `reports/evidence/m6/6a1/rollback.md`.
+  신규 파일 삭제 + 수정 파일을 base 로 복원. **base 는 고정 SHA 가 아니라 정의**다(D-6A1-15·39) —
+  「이 브랜치가 분기해 나온 현재 main」 = `$(git merge-base HEAD origin/main)`. 고정 SHA 를 박으면
+  main 이 전진할 때마다 낡는다(F-5 실측). 목록·수치는 라운드마다 재산출하며 **정본은
+  `reports/evidence/m6/6a1/rollback.md`** 다 — 이 블록은 요약이고, 둘이 갈리면 정본이 이긴다.
+  **마이그레이션 비대칭**: 적용된 DB 에는 `V15`(api_request_audit)가 남는다. 되돌린 코드는 그 표를
+  쓰지 않으므로 무해하고, 실제 삭제는 파일 삭제가 아니라 **새 V 파일의 DROP + 사용자 승인**이다.
+  임시 clone ①~⑥ + 빈 컨테이너 재적용으로 실측.
 ```
 
 작성: 2026-09-17, 세션 모델 단독. 근거: `milestone-6.md` 「Slice 6A」·완료 조건 1·4 · **운영자 결정 2026-09-16**(① 소비자는 API 전용, 화면은 기존 시스템 — `OPEN-ADR-09` 닫힘 ② 인바운드 인증은 단일 운영자 토큰 + 전 요청 audit) · **운영자 결정 2026-09-17**(③ 웹 스택 Spring Boot Web ④ 6A 는 기존 use case 만 노출 ⑤ audit 은 전용 표 신설) · 6A 입력 재고 `_workspace/m6-6a/01_inputs.md` · 4B-6b 인계(「`UnavailableMlAnalysis` 처분과 app 배선은 6A」).
@@ -291,6 +294,45 @@ rollback 을 미검증으로 뒤집을 수 있었다) ② `rollback.md` 의 **�
 
 **운영자에게 올리는 것** — D-6A1-35 는 **예산 제약이 만든 결정**이다. 대안을 사겠다면 test 전용 이동
 한 번 + D-6A1-27 변이 셋 재실행이면 된다. 사지 않겠다면 위 위험을 안고 **6A-2 로 넘긴다.**
+
+## 계약 갱신 (11) — 재판정 (2026-09-23, 팀장)
+
+verifier 재판정 **`not-ready` — 산출물 HIGH 2**. 판정 대상 `1a45dfb0`, 동결 성립. 재작업 **2/5**.
+
+**지정한 표적 일곱은 전부 닫혔다**(변이로 확인) — 특히 **D-6A1-27**: 필터 bean 삭제(−10줄) → **전건
+`check` BUILD FAILED**. 「배포 앱이 무인증으로 열려도 초록」이 진짜로 닫혔고, 새 boot test 가 **조용히
+건너뛰지 않고 실제로 도는지**까지 쟀다(XML `tests=2 skipped=0` · Docker 가용 실측). rollback 도 문서대로
+실행해 **D 19·M 10 · 트리 동일성 · 되돌린 트리 전건 초록 · 양방향 줄 확인**, `$(git merge-base …)` 가
+clone 에서 `00d49135` 를 정확히 산출했다.
+
+**막는 것은 새로 고안한 우회 둘이고, 둘 다 같은 형태다 — 차단 목록에는 종점이 없다.**
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6A1-37**(F-1, HIGH — **판정 범위를 허용 목록으로 뒤집는다**) | `ConstantTimeComparisonStructureTest` 의 판정 대상을 `startsWith("OperatorCredentialFilter")` **이름 축에서 떼어**, **패키지 전체 class 파일**을 판정하되 `Intrinsics.areEqual` 을 써도 되는 클래스를 **명시 허용 목록**으로 둔다. **닫힘**: 비교를 같은 패키지 형제(`CredentialComparator` 류)로 추출하고 `==` 를 쓰면 **RED** | **D-6A1-29 는 발견만 넓히고 판정을 다시 좁혔다.** verifier 실측: 비교를 형제 클래스로 추출하고 `==` 사용 → 상수 풀에 `Intrinsics.areEqual` **1건**(javap)인데 **전건 `check` BUILD SUCCESSFUL**. **앞 F-3 의 「파일 하나」가 「이름 하나」로 옮겨갔을 뿐**이다 — `walkTopDown()` 으로 훑어 놓고 이름으로 거른 것이라 **범위가 실질적으로 그대로였다.** **차단·이름 목록과 허용 목록의 차이는 기본값이다** — 전자에서 새 코드는 **기본이 미판정**이고, 후자에서 새 코드는 **기본이 판정**이다. 그래서 허용 목록은 종점이 있고 이름 목록은 없다 |
+| **D-6A1-38**(F-2, HIGH — **깊이 방어도 허용 목록으로 뒤집고 런타임을 재귀화**) | `OpenApiContractTest` 의 중첩 판정을 **「이런 형태는 중첩이다」 열거에서 「이런 평탄한 형태만 허용한다」로 뒤집는다.** 런타임 검사는 **재귀**로 바꾼다. **닫힘**: 정적 다섯 형태(`items:{type:object}`·`items:$ref`·직접 `$ref`·배열의 배열·`additionalProperties`) **전부 RED**, 런타임은 **깊이 2 이상도 RED** | **내가 물은 「또 다른 갈래」가 실제로 남아 있었다.** verifier 실측: 정적 5형태 중 **4개 GREEN**, 런타임은 **깊이 2부터 GREEN** — 실제 응답에 중첩 object 가 실려도 전건 초록이다. D-6A1-30 이 **배열 축 하나만** 더했기 때문이다. **이것은 D-6A1-37 과 같은 병**이고, 이 slice 안에서 **세 번째** 재발이다(F-3 → D-6A1-29 → F-1). **열거를 한 칸씩 늘리는 처방이 발산한다**는 것을 세 번 확인한 셈이라, 이번엔 **기본값을 뒤집어** 끝낸다 |
+| **D-6A1-39**(L-2 — **처방한 레인이 자기 파일에서 그 결함을 이고 있었다**) | `scope.md` 의 `rollback:` YAML 블록을 F-5 시정과 정합시킨다 — 고정 SHA `c4d09cc` → **정의**(`git merge-base HEAD origin/main`), 낡은 파일 목록(`Sql.kt`·`V9`) → 현재 실제(`ApiAuditSql.kt`·`V15`·`jar` 재활성). **팀장이 자기 레인에서 고친다** | **F-5 는 `rollback.md` 의 실행 블록만 고쳤고 `scope.md` 의 요약 블록은 그대로였다.** 그 요약을 쓴 것도, F-5 를 처방한 것도 팀장이다 — **같은 결함이 처방자의 파일에 한 칸 옆으로 남아 있었다.** D-6A1-36(「실행문은 살아남고 산문이 죽었다」)과 **같은 축의 세 번째 사례**다 |
+
+**장부층(막지 않음, 같은 라운드에)** — **L-1** `jarContentGate` 가 **빈 입력을 통과**시키는 성질은 그대로이고
+(실측 exit 0) 그 사실이 **OPEN 으로 정식 등재되지 않았다** → `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT` 을
+정식 등재하고 **「빈 입력=통과」도 그 OPEN 에 포함**한다 · **L-3·L-4** OPEN 문면 부분 반영, 실측 HEAD 라벨
+부정확(실측 자체는 유효).
+
+**L-5 — 리뷰 규약이 값을 한 자리(사실 기록)**: verifier 가 `_workspace/m6-6a/12_privacy_gate.md` 를 찾지
+못해 privacy-gate 판정을 **대조하지 못했다**(세션 재시작으로 소실). **그러나 그 판정은 살아 있다 — PR #41
+의 코멘트로 남겼기 때문이다.** 「세션 안에만 있는 리뷰는 남에게는 없는 리뷰다」가 **실제로 구해 낸 경우**다.
+
+**확인하지 않은 것으로 분리 — S-20**: `./tools/one-command-check.sh` 가 **exit 1**. Kotlin 전건 통과이고
+Python 은 `1 failed / 957 passed` 인데 원인이 `ml-engine` wheel 게이트의 **PyPI `operation timed out`**,
+즉 **샌드박스 네트워크 문제**다. 이 slice 는 `ml-engine` **무접촉**이고 그 test 도 미편집이다. verifier 가
+**우회를 시도하지 않고** 통과로도 결함으로도 세지 않은 것이 옳다 — **네트워크 있는 CI 러너에서 재실행**해
+확인한다(PR #41 의 CI 가 그 자리다).
+
+**finding 이 아닌 것으로 닫힌 둘** — **D-6A1-35**(production 제외 필터): `main` 의 `@SpringBootApplication`
+은 하나뿐이고 그것은 **primary source 로 등록돼 필터 영향 밖**이며, **배포물에 우리 클래스 24개·test 클래스
+0개**로 **production 공집합이 실측 확인**됐다. **과잉 제외 없음.** 팀장의 우려는 측정으로 해소됐다 ·
+**팀장 교차 셋**: `d240e9c2..HEAD` 산출물 델타 **빈 출력**, 병합은 `CLAUDE.md`+`change-history.md` 둘뿐 —
+**산출물 무접촉 확인**.
 
 ## 하네스 레인 변경
 
