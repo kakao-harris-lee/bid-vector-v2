@@ -253,7 +253,8 @@ private fun isFlatPropertyDefinition(definition: Map<String, Any?>): Boolean {
 
 @Suppress("UNCHECKED_CAST")
 private fun isFlatArrayItems(items: Any?): Boolean {
-    val itemsDefinition = items as? Map<String, Any?> ?: return false
-    if (NON_FLAT_KEYS.any(itemsDefinition::containsKey)) return false
-    return itemsDefinition["type"] in SCALAR_PROPERTY_TYPES
+    val itemsDefinition = items as? Map<String, Any?>
+    return itemsDefinition != null &&
+        NON_FLAT_KEYS.none(itemsDefinition::containsKey) &&
+        itemsDefinition["type"] in SCALAR_PROPERTY_TYPES
 }
