@@ -6,17 +6,25 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 /**
- * 우회 (4) 폐쇄 — 타이밍 test는 CI에서 본질적으로 flaky해 만들지 않는다(팀장 preflight
- * 논의 그대로). 대신 **구조**를 잰다: 패키지의 모든 컴파일된 class 파일이 `MessageDigest
- * .isEqual`은 어딘가에서 쓰되(자격증명 비교가 실재함을 보장), `String.equals`는 아무도
- * 안 쓰고, `Intrinsics.areEqual`(Kotlin `==`이 컴파일되는 자리)은 **명시 허용 목록** 밖
- * 어디에도 없어야 한다.
+ * **회귀 그물(D-6A1-43 이후 — 전칭 주장을 걷어낸다).** 1차 방어는 더 이상 이 게이트가
+ * 아니라 [OperatorCredential] 타입이다 — 그 타입은 `matches()` 하나만 노출하고 `equals`/
+ * `hashCode`/`toString`을 재정의하지 않아, 비교 코드가 파일·패키지 어디로 옮겨져도(MUT-A2~A4가
+ * 뚫었던 세 축 전부) 빠른 비교를 **쓸 수 없다.** 이 게이트는 그 위에 남는 **회귀 그물**이다
+ * — 누군가 타입을 우회해 raw `String`을 다시 직접 비교하는 코드를 이 패키지에 새로 만들면
+ * 잡는다. **이 게이트 자신이 우회 (4)를 폐쇄한다는 주장은 하지 않는다** — 폐쇄는 타입이
+ * 진다. 타이밍 test는 CI에서 본질적으로 flaky해 만들지 않는다(팀장 preflight 논의 그대로).
+ * 대신 **구조**를 잰다: 패키지의 모든 컴파일된 class 파일이 `MessageDigest.isEqual`은
+ * 어딘가에서 쓰되(자격증명 비교가 실재함을 보장), `String.equals`는 아무도 안 쓰고,
+ * `Intrinsics.areEqual`(Kotlin `==`이 컴파일되는 자리)은 **명시 허용 목록** 밖 어디에도
+ * 없어야 한다.
  *
- * **D-6A1-37 시정 — 판정 범위를 이름 축에서 허용 목록으로 뒤집는다.** D-6A1-29 는
- * 발견(`walkTopDown()`)만 패키지 전체로 넓히고 판정 대상은 다시 `OperatorCredentialFilter`
- * 이름 접두사로 좁혔다. verifier 실측(MUT-N1): 자격증명 비교를 같은 패키지의 다른 이름
- * 클래스(`CredentialComparator`)로 추출하고 `==`를 쓰면 그 class 파일은 이름 필터 밖이라
- * **아무도 안 본다** — 전건 `check`가 초록인 채 단락 비교가 되살아난다.
+ * **이 게이트가 여전히 위치·이름 술어라는 한계(그대로 남는다).** D-6A1-37 이 판정 범위를
+ * 이름 축에서 허용 목록으로 뒤집었으나(D-6A1-29 → verifier MUT-N1 재발의 시정), verifier
+ * r3 는 같은 파일 안에서 `==`→`Objects.equals`로 한 글자만 바꾸는 형태(MUT-A4)까지는
+ * 이 게이트의 차단 심볼(`Intrinsics.areEqual`·`String.equals` 둘뿐)이 못 본다는 것과,
+ * 스캔 루트가 한 디렉터리 하드코딩(MUT-A3)·허용 목록 키가 FQN이 아닌 simple name(MUT-A2)
+ * 이라는 것을 실측했다. **이 게이트를 다시 넓히지 않는다** — 넓히는 대신 [OperatorCredential]
+ * 타입이 그 세 축을 전부 기능 고장(인증 항상 거부)으로 강등한다.
  *
  * 이름 목록과 허용 목록의 차이는 **기본값**이다 — 이름 목록에서 새 class는 기본이
  * 미판정이라 우회가 생길 때마다 이름을 늘려야 하고(끝이 없다), 허용 목록에서 새 class는
