@@ -1,14 +1,17 @@
 # M6/6A-1 rollback.md
 
-실측 HEAD: `f5e39a3a`(수정 라운드 2 — evidence 커밋 `docs(m6-6a1): 수정 라운드 2
-evidence — D-6A1-37·38 acceptance 재실행 + 변이 여섯 실측`). **L-4 시정 — 라벨을
-정확히 가른다**: 이 라운드의 **마지막 코드(test 파일) 커밋**은 `d9708f4a`(detekt
-ReturnCount 시정)이고, `f5e39a3a`는 그 뒤에 온 evidence 전용 커밋(`commands.md`만
-편집)이다. 아래 clone 실측은 `f5e39a3a`에서 돌렸다 — `git diff --name-only
-d9708f4a..f5e39a3a`가 `reports/evidence/m6/6a1/commands.md` **한 줄뿐**임을 확인해
-in_scope 코드 경로가 둘 사이에서 전혀 움직이지 않았음을 실측으로 보장했다(라운드 1의
-L-4가 지적한 것과 같은 실수 — 「rollback.md 전용 장부 커밋」을 「마지막 산출물 커밋」
-으로 잘못 부른 것 — 를 이번엔 커밋 성격을 직접 이름으로 가름으로써 피한다).
+실측 HEAD: `9db7da36`(같은 라운드 — evidence 커밋 `docs(m6-6a1): D-6A1-40 evidence +
+S-20 CI 확인으로 상태 갱신`). **L-4 시정 계승 — 라벨을 정확히 가른다**: 이 라운드의
+**마지막 코드(test 파일) 커밋**은 `88fb33e1`(D-6A1-40 — `ProductionAssemblyAuthAuditTest`가
+audit 행을 직접 단언)이고, `9db7da36`는 그 뒤에 온 evidence 전용 커밋(`commands.md`만
+편집)이다. 아래 clone 실측은 `9db7da36`에서 돌렸다 — `git diff --name-only
+88fb33e1..9db7da36`가 `reports/evidence/m6/6a1/commands.md` **한 줄뿐**임을 확인해
+in_scope 코드 경로가 둘 사이에서 전혀 움직이지 않았음을 실측으로 보장했다.
+
+(이전 실측: `f5e39a3a`/마지막 코드 커밋 `d9708f4a` — D-6A1-37·38 반영 직후. 그 사이
+verifier 레인 B가 새 HIGH(D-6A1-40)를 냈고, 팀장 지시로 `ProductionAssemblyAuthAuditTest`
+에 audit 행 단언을 더한 뒤 이 라운드 안에서 실측 HEAD를 갱신했다 — 라운드를 새로 세지
+않는다, 같은 verifier r2 판정 사이클의 연속이다.)
 
 기준(`base`)은 **고정 SHA가 아니라 정의**다: 「이 브랜치가 분기해 나온 현재 `main`」
 (`git merge-base HEAD origin/main`, D-6A1-15). 이 정의는 `origin/main`이 계속 앞으로
@@ -187,6 +190,40 @@ base를 직접 확인하지 않고 「이번 라운드에 잠깐 껐다 켰다�
 실행 시점의 `git merge-base HEAD origin/main` = `00d49135`(라운드 1과 동일 — `main`이
 이 라운드 사이 전진하지 않았다). clone은 실측 직후 삭제했다.
 
+## 임시 clone 실측(①~⑥, 2026-09-23, D-6A1-40 반영 뒤 최종 재실측)
+
+verifier r2 레인 B가 낸 새 HIGH(D-6A1-40, `ProductionAssemblyAuthAuditTest`가 audit
+행을 직접 단언하도록)를 반영한 뒤 `git clone --no-hardlinks`로 격리된 clone(`9db7da36`
+기준, 마지막 산출물 커밋 `88fb33e1`)에서 위 복원 명령을 다시 실행했다. 목록은
+**변화 없음**(이번에도 기존 test 파일 하나의 내용만 늘었을 뿐 신규·삭제 파일 없음 —
+D 19·M 10 그대로).
+
+| 단계 | 명령 | 결과 |
+| --- | --- | --- |
+| ① 명령 exit | `git restore` + `git rm` | 둘 다 exit 0 |
+| ② D/M 수 | `git status --porcelain \| awk '{print $1}' \| sort \| uniq -c` | D 19 · M 10 |
+| ③ diff 빈 것 | `git diff --stat "$BASE" -- <위 29개 경로 전부>` | 빈 출력(exit 0) |
+| — 하네스 무편집 | `git diff --stat "$BASE"..HEAD -- CLAUDE.md .claude/ docs/harness/` | 빈 출력 |
+| ④ compile | `./gradlew --no-daemon :app:compileKotlin :adapters:compileKotlin` | BUILD SUCCESSFUL(FROM-CACHE 다수) |
+| ⑤⑥ test·게이트 | `./gradlew --no-daemon check`(9개 모듈 전건) | BUILD SUCCESSFUL(346 tasks, 197 executed·117 from cache·32 up-to-date) |
+| 부가 확인 | `grep -c notice_title` 두 CleanMigration test | `4`·`1`(6F-4 줄 보존) |
+| 부가 확인 | `grep -c api_request_audit` 같은 두 파일 | `0`·`0`(이 slice 줄 소거) |
+
+`$BASE` = `00d49135`(불변 — `main`이 이 세 라운드 사이 전진하지 않았다). clone은
+실측 직후 삭제했다. **이 실측이 이 slice의 최종 rollback 검증이다** — 이 시점 이후
+in_scope 코드 변경은 없다.
+
+## 알려진 제한 추가 — D-6A1-41(등재만, MEDIUM)
+
+**명시 `@ComponentScan`이 Boot 기본 `excludeFilters` 둘(`TypeExcludeFilter`·
+`AutoConfigurationExcludeFilter`)을 가린다**(verifier r2 레인 B 실측 — Spring이 실제
+쓰는 메타데이터 경로로 확인). **오늘 거동 영향은 0**이고 D-6A1-35의 「production
+공집합」 주장도 사실로 재확인됐다(배포물에 우리 클래스 24개·test 클래스 0개). 그러나
+부수 효과가 있다는 사실 자체가 D-6A1-35(「예산 때문에 유지」)가 남긴 부채의 **크기를
+키운다**. 받는 쪽은 **6A-2**(앱 이미지·entrypoint를 확정하는 slice, D-6A1-35와 같은
+자리) — scope.md의 OPEN 표·알려진 제한에 정식 등재하는 것은 팀장 레인 소관이라 이
+rollback.md 항목이 이 slice가 낼 수 있는 등재다.
+
 ## 검증자 유효성 확인
 
 ```
@@ -225,6 +262,13 @@ verifier가 대조하는 것은 「실측 HEAD == 판정 SHA」가 아니다(evi
 `d9708f4a..f5e39a3a`도 확인 — `reports/evidence/m6/6a1/commands.md` **한 줄뿐**(L-4가
 가른 「마지막 코드 커밋」과 「실측에 쓴 HEAD」 사이 유일한 차이가 evidence 파일 하나임을
 재확인).
+
+**자기 검증(2026-09-23, 최종 — D-6A1-40 반영 뒤)** — 실측 HEAD `9db7da36`부터 이
+rollback.md 편집을 포함한 커밋까지: 그 커밋은 `git add`·`git commit --` 둘 다
+`reports/evidence/m6/6a1/rollback.md` 하나만 개별 인자로 받으므로(공유 working tree
+add+commit 한 명령 규율) **구조적으로 이 파일 하나만** 담는다 — 되돌림 대상 경로는
+움직일 수 없다. 커밋 뒤 `git diff --name-only 9db7da36..<이 커밋>`으로 실측 재확인
+예정(다음 절차가 그 결과를 담는다).
 
 ## 마이그레이션 번호 재확인(D-6A1-12)
 
