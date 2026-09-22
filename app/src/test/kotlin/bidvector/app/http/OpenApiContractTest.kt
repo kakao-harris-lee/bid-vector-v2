@@ -33,6 +33,21 @@ import java.io.File
  * 실패하므로 합성 어휘를 열거할 필요가 없다. [containsNestedObject]는 재귀로 바꿔 임의
  * 깊이의 `Map`을 잡는다.
  *
+ * **D-6A1-44 시정 — 순회 루트를 `components.schemas` 고정에서 문서 전체로 넓힌다.**
+ * D-6A1-38 은 [isFlatPropertyDefinition] 술어 자체는 제대로 뒤집었지만, 그 술어를
+ * **어디에 적용하는가**가 `components.schemas`만 훑는 것으로 고정돼 있었다. verifier
+ * 실측(MUT-D6): `paths`의 **인라인 응답 스키마**에 중첩 object·object 배열을 심어도
+ * `components.schemas` 밖이라는 이유만으로 전건 `check`가 초록이었다 — 게이트가 방금
+ * 닫았다고 선언한 바로 그 형태였다. **처방은 위치를 하나씩 늘리는 것(`paths...schema`를
+ * 손으로 추가하는 것)이 아니다** — 그것은 이 slice가 이미 세 번 겪은 「위치 술어에는
+ * 종점이 없다」병의 재발이다. 대신 [collectPropertyDefiningSchemas]가 **문서 트리
+ * 전체를 재귀로 훑어 `properties` 키를 가진 모든 Map**을 스키마 정의로 수집한다 —
+ * OpenAPI/JSON Schema에서 "이 자리는 속성 정의를 가진 객체 스키마다"를 가르는 유일한
+ * 구조적 표지는 `properties` 키의 존재뿐이고, 그 키가 `components.schemas` 아래 있든
+ * `paths...content...schema` 아래 있든 배열 `items` 아래 있든 무관하다. 문서는
+ * 유한하므로 전체 재귀에는 다음 칸이 없다(`paths 의 인라인 응답 스키마에 심은 위반도
+ * 순회가 잡는다` test가 위치 자체의 폐쇄를 합성 spec으로 고정한다).
+ *
  * 새 라이브러리(swagger-parser 등)를 들이지 않는다 — 계약이 얕아 SnakeYAML(이미 app의
  * test 의존)로 raw Map 순회만으로 충분하다(preflight 조사·재사용 우선).
  */
@@ -68,18 +83,16 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         (schema(schemaName)["properties"] as Map<String, Any?>).keys
 
     /**
-     * 모든 스키마를 훑어 [isFlatPropertyDefinition]이 **허용하지 않는** 속성(스키마 자신
-     * 말고)을 모은다.
+     * 문서 전체(D-6A1-44)에서 속성을 정의하는 스키마를 전부 찾아 [isFlatPropertyDefinition]이
+     * **허용하지 않는** 속성(스키마 자신 말고)을 모은다.
      */
-    private fun collectNonFlatProperties(): List<String> {
-        val schemas = (spec["components"] as Map<String, Any?>)["schemas"] as Map<String, Any?>
-        return schemas.flatMap { (schemaName, schemaBody) ->
-            val properties = (schemaBody as Map<String, Any?>)["properties"] as Map<String, Any?>
+    private fun collectNonFlatProperties(): List<String> =
+        collectPropertyDefiningSchemas(spec, "spec").flatMap { (location, schemaBody) ->
+            val properties = schemaBody["properties"] as Map<String, Any?>
             properties
                 .filterNot { (_, definition) -> isFlatPropertyDefinition(definition as Map<String, Any?>) }
-                .map { (propertyName, _) -> "$schemaName.$propertyName" }
+                .map { (propertyName, _) -> "$location.properties.$propertyName" }
         }
-    }
 
     /** D-6A1-30 — 값 자체가 object이거나(Map), 배열 어느 깊이에서든 object를 담으면 평탄하지 않다. */
     private fun containsNestedObject(value: Any?): Boolean =
@@ -146,6 +159,53 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         containsNestedObject(listOf(listOf(mapOf("k" to "v")))) shouldBe true
         // 깊이 3도 잡는다 — 종점을 열거하지 않는 재귀임을 확인.
         containsNestedObject(listOf(listOf(listOf(mapOf("k" to "v"))))) shouldBe true
+    }
+
+    /**
+     * D-6A1-44 닫힘 판정 — `paths`의 **인라인 응답 스키마**(`components.schemas` 밖)에
+     * ① 중첩 object 속성 ② object 배열 속성 ③ `$ref` 속성을 심어도 [collectNonFlatProperties]가
+     * 셋 다 잡는지를 **합성 spec**으로 잠근다. 실 `openapi.yaml`은 오늘 위반이 없어(파일을
+     * 고쳐도 통과하므로) 위치 폐쇄 자체는 합성 spec 없이는 고정할 수 없다(verifier MUT-D6
+     * 재현).
+     */
+    @Test
+    fun `paths 의 인라인 응답 스키마에 심은 위반도 순회가 잡는다`() {
+        // 아래에서 위로 조립한다 — 한 표현식으로 쓰면 들여쓰기가 깊어져 줄 길이 한도를 넘는다.
+        val innerScalar = mapOf("type" to "string")
+        val nestedObjectProperty = mapOf("type" to "object", "properties" to mapOf("inner" to innerScalar))
+        val objectItems = mapOf("type" to "object", "properties" to mapOf("inner" to innerScalar))
+        val arrayOfObjectProperty = mapOf("type" to "array", "items" to objectItems)
+        val refProperty = mapOf("\$ref" to "#/components/schemas/Nested")
+        val inlineResponseSchema =
+            mapOf(
+                "type" to "object",
+                "properties" to
+                    mapOf(
+                        "nestedObject" to nestedObjectProperty,
+                        "arrayOfObject" to arrayOfObjectProperty,
+                        "refProperty" to refProperty,
+                    ),
+            )
+        val content = mapOf("application/json" to mapOf("schema" to inlineResponseSchema))
+        val responses = mapOf("200" to mapOf("content" to content))
+        val getOperation = mapOf("responses" to responses)
+        val syntheticSpec: Map<String, Any?> =
+            mapOf(
+                "paths" to mapOf("/probe" to mapOf("get" to getOperation)),
+                "components" to mapOf("schemas" to emptyMap<String, Any?>()),
+            )
+
+        val violations =
+            collectPropertyDefiningSchemas(syntheticSpec, "spec").flatMap { (location, schemaBody) ->
+                val properties = schemaBody["properties"] as Map<String, Any?>
+                properties
+                    .filterNot { (_, definition) -> isFlatPropertyDefinition(definition as Map<String, Any?>) }
+                    .map { (propertyName, _) -> "$location.properties.$propertyName" }
+            }
+
+        violations.any { it.contains("nestedObject") } shouldBe true
+        violations.any { it.contains("arrayOfObject") } shouldBe true
+        violations.any { it.contains("refProperty") } shouldBe true
     }
 
     @Test
@@ -227,6 +287,39 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         response.body?.containsKey("minBudgetWon") shouldBe true
         response.body?.get("minBudgetWon") shouldBe null
     }
+}
+
+/**
+ * D-6A1-44 — 문서 트리 전체를 재귀로 훑어 **속성을 정의하는 스키마**(`properties` 키를
+ * 가진 Map)를 위치 무관하게 전부 찾는다. `components.schemas` 아래든 `paths...schema`
+ * 아래든 배열 `items` 아래든, OpenAPI/JSON Schema에서 그 구조적 표지는 `properties`
+ * 키의 존재뿐이다 — 위치를 손으로 나열하지 않고(위치 술어는 종점이 없다) **재귀 하나로**
+ * 문서가 유한하다는 사실을 그대로 이용한다. `location`은 디버깅용 경로 문자열이다.
+ */
+@Suppress("UNCHECKED_CAST")
+private fun collectPropertyDefiningSchemas(
+    node: Any?,
+    location: String,
+): List<Pair<String, Map<String, Any?>>> {
+    val found = mutableListOf<Pair<String, Map<String, Any?>>>()
+    when (node) {
+        is Map<*, *> -> {
+            val map = node as Map<String, Any?>
+            if (map["properties"] is Map<*, *>) {
+                found += location to map
+            }
+            map.forEach { (key, value) -> found += collectPropertyDefiningSchemas(value, "$location.$key") }
+        }
+
+        is List<*> -> {
+            node.forEachIndexed { index, item ->
+                found += collectPropertyDefiningSchemas(item, "$location[$index]")
+            }
+        }
+
+        else -> {}
+    }
+    return found
 }
 
 /** D-6A1-38 이 허용하는 스칼라 타입 — 그 밖은 전부 [isFlatPropertyDefinition]이 거부한다. */
