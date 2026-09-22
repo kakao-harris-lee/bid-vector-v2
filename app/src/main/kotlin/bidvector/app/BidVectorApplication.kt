@@ -115,9 +115,18 @@ open class BidVectorApplication {
 /**
  * 단일 운영자 자격증명 설정 키(D-6A1-9, 「인증 관련」 이름 규율) — 값은 환경변수 주입,
  * 기본값 없음.
+ *
+ * **verifier r4 실측 — `data class`였을 때 `toString()`이 원문을 그대로 냈다.** Spring은
+ * 기동 실패·바인딩 오류·actuator 환경 노출 등에서 `@ConfigurationProperties` 객체를
+ * 문자열화해 로그·응답에 낼 수 있다 — 컴파일러가 합성하는 `data class`의 `toString()`이
+ * 그 경로로 자격증명 원문을 흘린다(D-6A1-43의 (2b) 값 획득 축 전수에서 이 타입이 누락돼
+ * 있었다). 그래서 **`data class`가 아니다** — `equals`/`hashCode`/`copy`/구조 분해도
+ * 같이 사라지지만 이 타입은 [OperatorCredentialFilter]에 생성 직후 한 번 읽히고 버려질
+ * 뿐이라 필요하지 않다. 재정의하지 않은 `Any.toString()`(클래스명@해시코드)을 그대로
+ * 쓴다 — [OperatorCredential]과 같은 근거.
  */
 @ConfigurationProperties(prefix = "operator.credential")
-data class OperatorCredentialProperties(
+class OperatorCredentialProperties(
     val value: String,
 )
 
