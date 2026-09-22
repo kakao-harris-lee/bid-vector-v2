@@ -189,16 +189,29 @@ ReturnCount 시정, MUT-N1 실측 중 버릴 clone의 전건 `check`에서 발�
 | S-40 | `:app:test --tests '*http*' --rerun-tasks` | 15:49:06~38 | 0 | 22 tests, 0 failed(Constant… 3·OpenApiContract 8·OperatorAuthentication 4·ProductionAssemblyAuthAudit 2·RequestAuditFilter 5) |
 | S-41 | `:adapters:test --tests '*JdbcStrategyRepositoryTest*' --rerun-tasks` | 15:49:51~50:12 | 0 | BUILD SUCCESSFUL |
 | S-42 | `:app:test --tests '*OpenApiContractTest*' --rerun-tasks` | 15:50:16~34 | 0 | BUILD SUCCESSFUL, 8 tests(신설 양성 대조 셋 포함) |
-| S-20 | `./tools/one-command-check.sh` | 15:50:39~53:02 | **1** | Kotlin 전건 통과 · Python **1 failed / 957 passed** — verifier r2 E-1과 동일한 환경 문제(아래 참조), 우회하지 않음 |
+| S-20 | `./tools/one-command-check.sh` | 15:50:39~53:02 | **1** | Kotlin 전건 통과 · Python **1 failed / 957 passed** — 로컬 샌드박스 환경 문제(아래 참조), **CI에서는 확인됨** |
 
-**S-20 — 확인하지 않은 것으로 분리(우회하지 않는다).** 실패 원인은
+**S-20 — 로컬은 샌드박스 네트워크로 exit 1, CI 러너에서 3/3 통과 확인(`ml-engine` 포함,
+확인하지 않은 것이 아니라 확인된 것으로 옮긴다).** 로컬 실패 원인은
 `tests/gates/test_wheel_reexport.py::test_wheel_install_outside_repo_exposes_contracts_and_servicers`
 가 `uv build --wheel`로 `build-system.requires`를 해소하려다 PyPI 요청이
 `operation timed out`으로 죽은 것 — 샌드박스 egress 부재다(verifier r2 E-1과 재현 일치).
 `git diff --name-only $(git merge-base HEAD origin/main)..HEAD -- ml-engine` **빈 출력**
 (재확인, 이 slice는 `ml-engine` 무접촉) — 실패한 test 파일도 미편집. 프록시 설정을
-바꾸거나 네트워크를 우회하지 않았다. **네트워크가 있는 CI 러너에서 재실행이 필요**하다
-— 통과로도 결함으로도 세지 않는다(PR #41의 CI가 그 자리).
+바꾸거나 네트워크를 우회하지 않았다.
+
+**PR #41의 CI에서 독립 확인**(`~/.internal-bin/gh` — 운영자가 준 프록시 우회 경로,
+`HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`는 무편집, 바이너리만 교체):
+
+```
+~/.internal-bin/gh pr checks 41
+```
+- `check` pass(8m10s) · `container` pass(3m6s) · `ml-engine` **pass**(56s) — **3/3**.
+- `~/.internal-bin/gh pr view 41 --json headRefOid` → `1a45dfb0...`(팀장 보고와 일치).
+
+**판정**: 로컬 acceptance는 **Kotlin 전건(`check`, S-10)**으로 잡고, Python 축은 위
+CI 실측(head `1a45dfb0`, `ml-engine` 포함 3/3 통과)을 근거로 든다 — 이 slice가
+`ml-engine`을 그 head 이후로도 여전히 무접촉이므로 이 결과가 현재 HEAD에도 적용된다.
 
 ### 변이 실측 여섯 — 버릴 clone(`git clone --no-hardlinks`)에서만, `numstat`으로 적용 먼저 확인
 
@@ -242,6 +255,44 @@ verifier r2가 지정한 닫힘 판정 그대로 재현했다. 각 clone은 실�
 `ErrorBodyKt`·`ErrorCode`·`ErrorMapping`·`GlobalErrorHandler`·`RequestAuditFilter`·
 `StrategyReadController`·`StrategyReadResponse$Companion`)는 HEAD 시점 `areEqual` 0건
 (javap 실측) — 허용 목록 확장 없이 기본 판정 상태 그대로다.
+
+## D-6A1-40(레인 B HIGH) 반영 — production 조립이 audit 행을 직접 단언한다
+
+verifier r2가 스폰 사고로 **둘** 떴고, 레인 B(`16_verifier_report_r2_laneB.md`)가 레인 A와
+독립으로 잡은 HIGH — `ProductionAssemblyAuthAuditTest`가 상태 코드·body만 재고
+`api_request_audit` 행을 한 줄도 단언하지 않아 production audit 필터 bean을 삭제해도
+전건 `check`가 초록이었다. 커밋 `88fb33e1`(`ProductionAssemblyAuthAuditTest.kt`에 새
+test `D-6A1-40 — production 조립에서 성공·인증실패·예외 각각 api_request_audit 행이
+정확히 하나다` 추가 — `@BeforeEach`로 표를 비우고, production `PersistenceWiring`이
+실제로 만든 `DataSource` bean을 그대로 써서 성공(200)·인증실패(401)·미매핑(404) 각각
+행 개수를 개별+합계로 단언). `ApiAuditStore`의 (2b) 불변식(추가 전용, 읽기 메서드
+없음)은 건드리지 않았다 — 표를 직접 조회하는 것은 test 코드뿐이다.
+
+### acceptance 재검증(HEAD `88fb33e1`)
+
+| ID | 명령 | 시각(UTC) | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| S-10 | `./gradlew --no-daemon check` | 16:15:02~09 | 0 | BUILD SUCCESSFUL, 337 tasks |
+| S-40 | `:app:test --tests '*http*' --rerun-tasks` | 16:15:14~38 | 0 | **23** tests, 0 failed(`ProductionAssemblyAuthAuditTest` **3**건으로 증가) |
+| S-41 | `:adapters:test --tests '*JdbcStrategyRepositoryTest*' --rerun-tasks` | 16:15:42~16:03 | 0 | BUILD SUCCESSFUL |
+| S-42 | `:app:test --tests '*OpenApiContractTest*' --rerun-tasks` | 16:16:07~25 | 0 | BUILD SUCCESSFUL |
+
+(S-20은 위 절에서 CI 확인으로 갱신 — 이 코드 변경은 `ml-engine` 무접촉이라 그 결과가
+그대로 적용된다.)
+
+### 변이 실측 — 팀장이 지정한 닫힘 판정 둘, 버릴 clone에서
+
+- **MUT-AUDIT-BEAN** — clone에서 `BidVectorApplication.kt`의 `requestAuditFilterRegistration`
+  bean 전체(및 이제 안 쓰는 import 셋)를 삭제(`numstat`: `0 30`, 적용 확인. 삭제 뒤
+  ktlint가 잡은 빈 줄 하나는 변이와 무관한 서식 문제라 별도로 지워 실제 신호를 가리지
+  않게 했다). 결과: 새 test **FAILED**(`expected:<1> but was:<0>`) · 전건
+  **`./gradlew check` BUILD FAILED**(153 tests, 1 failed). **닫힘 확인**.
+- **MUT-URLPATTERNS** — 별도 clone에서 같은 bean의 `urlPatterns`를
+  `listOf("/mut-d40-nonexistent-path")`로 좁힘(`numstat`: `1 1`, 적용 확인). 결과: 같은
+  test **FAILED**(`expected:<1> but was:<0>`) · 전건 **BUILD FAILED**. **닫힘 확인**.
+
+두 clone 모두 실측 직후 삭제. 팀장이 지정한 두 닫힘 판정("audit 필터 등록 bean을
+삭제 → RED" · "urlPatterns 무매칭으로 좁혀도 RED") 둘 다 실측으로 확인했다.
 
 ## 참고 — 하네스 레인 변경
 
