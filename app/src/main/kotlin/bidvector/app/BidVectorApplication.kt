@@ -5,6 +5,7 @@ import bidvector.adapters.audit.ApiAuditStore
 import bidvector.adapters.evaluation.UuidCorrelationIdFactory
 import bidvector.adapters.strategy.SystemClock
 import bidvector.app.http.ApiAuditRecord
+import bidvector.app.http.OperatorCredential
 import bidvector.app.http.OperatorCredentialFilter
 import bidvector.app.http.RequestAuditFilter
 import bidvector.workflow.evaluation.CorrelationIdFactory
@@ -70,11 +71,16 @@ open class BidVectorApplication {
      * [ApiAuditRow](adapters/audit, 저장 어휘) 변환은 이 조립 지점 하나가 진다(두 타입을
      * 합치지 않는다 — app이 adapters의 저장 행 형태를 몰라도 되게 한다).
      */
+    /**
+     * D-6A1-43 — 환경변수를 읽는 이 자리에서 곧바로 [OperatorCredential.of]로 감싼다.
+     * 그 뒤로는 [OperatorCredentialFilter]도, 이 조립 메서드도 raw 자격증명 문자열을
+     * 다시 다루지 않는다(`properties.value`는 이 한 줄에서만 참조된다).
+     */
     @Bean
     open fun operatorCredentialFilterRegistration(
         properties: OperatorCredentialProperties,
     ): FilterRegistrationBean<OperatorCredentialFilter> =
-        FilterRegistrationBean(OperatorCredentialFilter(properties.value)).apply {
+        FilterRegistrationBean(OperatorCredentialFilter(OperatorCredential.of(properties.value))).apply {
             urlPatterns = listOf("/*")
             order = Ordered.HIGHEST_PRECEDENCE + 1
         }

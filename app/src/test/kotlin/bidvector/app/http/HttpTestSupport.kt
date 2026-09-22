@@ -139,7 +139,7 @@ open class HttpTestApplication {
 
     @Bean
     open fun operatorCredentialFilterRegistration(): FilterRegistrationBean<OperatorCredentialFilter> =
-        FilterRegistrationBean(OperatorCredentialFilter(TEST_CREDENTIAL)).apply {
+        FilterRegistrationBean(OperatorCredentialFilter(OperatorCredential.of(TEST_CREDENTIAL))).apply {
             urlPatterns = listOf("/*")
             order = Ordered.HIGHEST_PRECEDENCE + 1
         }
