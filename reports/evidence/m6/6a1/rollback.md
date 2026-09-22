@@ -1,6 +1,13 @@
 # M6/6A-1 rollback.md
 
-실측 HEAD: `9db7da36`(같은 라운드 — evidence 커밋 `docs(m6-6a1): D-6A1-40 evidence +
+**실측 HEAD(수정 라운드 3, 최신): `92f8f682`**(D-6A1-44 — `OpenApiContractTest` 순회 루트를
+문서 전체로 넓힌 마지막 산출물 커밋. D-6A1-43은 `01c8b005`·`69f8d466`·`06434fed` 세 커밋).
+이하 「임시 clone 실측(①~⑥, 라운드 3)」절이 이 HEAD에서 새로 낸 측정이고, 아래 라운드
+1·2 절은 **그 시점의 유효한 기록으로 보존**한다(앞 라운드 실측을 옮기지 않는다).
+
+---
+
+실측 HEAD(수정 라운드 2): `9db7da36`(같은 라운드 — evidence 커밋 `docs(m6-6a1): D-6A1-40 evidence +
 S-20 CI 확인으로 상태 갱신`). **L-4 시정 계승 — 라벨을 정확히 가른다**: 이 라운드의
 **마지막 코드(test 파일) 커밋**은 `88fb33e1`(D-6A1-40 — `ProductionAssemblyAuthAuditTest`가
 audit 행을 직접 단언)이고, `9db7da36`는 그 뒤에 온 evidence 전용 커밋(`commands.md`만
@@ -46,7 +53,8 @@ git diff --name-status $(git merge-base HEAD origin/main)..HEAD -- app/ adapters
   milestone-6.md | grep -v '^.\treports/evidence/'
 ```
 
-신규(A, 19개) — `restore`가 아니라 삭제 대상:
+신규(A, 20개, 수정 라운드 3에서 `OperatorCredentialTest.kt` 추가) — `restore`가 아니라
+삭제 대상:
 - `adapters/src/main/kotlin/bidvector/adapters/audit/ApiAuditSql.kt`
 - `adapters/src/main/kotlin/bidvector/adapters/audit/ApiAuditStore.kt`
 - `adapters/src/main/resources/db/migration/V15__api_audit.sql`
@@ -63,6 +71,8 @@ git diff --name-status $(git merge-base HEAD origin/main)..HEAD -- app/ adapters
 - `app/src/test/kotlin/bidvector/app/http/HttpTestSupport.kt`
 - `app/src/test/kotlin/bidvector/app/http/OpenApiContractTest.kt`
 - `app/src/test/kotlin/bidvector/app/http/OperatorAuthenticationTest.kt`
+- `app/src/test/kotlin/bidvector/app/http/OperatorCredentialTest.kt` — 수정 라운드 3 신설
+  (D-6A1-43, `OperatorCredential`의 (2b) 값 획득 축 실측)
 - `app/src/test/kotlin/bidvector/app/http/ProductionAssemblyAuthAuditTest.kt` — 수정 라운드
   1 신설(D-6A1-27, production 조립 boot test)
 - `app/src/test/kotlin/bidvector/app/http/RequestAuditFilterTest.kt`
@@ -127,6 +137,7 @@ git rm -f \
   app/src/test/kotlin/bidvector/app/http/HttpTestSupport.kt \
   app/src/test/kotlin/bidvector/app/http/OpenApiContractTest.kt \
   app/src/test/kotlin/bidvector/app/http/OperatorAuthenticationTest.kt \
+  app/src/test/kotlin/bidvector/app/http/OperatorCredentialTest.kt \
   app/src/test/kotlin/bidvector/app/http/ProductionAssemblyAuthAuditTest.kt \
   app/src/test/kotlin/bidvector/app/http/RequestAuditFilterTest.kt \
   openapi/bidvector-operator-api.yaml
@@ -210,8 +221,55 @@ D 19·M 10 그대로).
 | 부가 확인 | `grep -c api_request_audit` 같은 두 파일 | `0`·`0`(이 slice 줄 소거) |
 
 `$BASE` = `00d49135`(불변 — `main`이 이 세 라운드 사이 전진하지 않았다). clone은
-실측 직후 삭제했다. **이 실측이 이 slice의 최종 rollback 검증이다** — 이 시점 이후
-in_scope 코드 변경은 없다.
+실측 직후 삭제했다.
+
+## 임시 clone 실측(①~⑥, 2026-09-23, 수정 라운드 3 — D-6A1-43·44 반영 뒤 최종 재실측)
+
+`git clone --no-hardlinks`로 격리된 clone(`92f8f682` 기준)에서 위 복원 명령을 다시
+실행했다. **목록이 이번에는 바뀌었다** — `OperatorCredentialTest.kt`(D-6A1-43의 (2b) 값
+획득 축 실측 test) 신설로 삭제 대상이 19 → **20개**, 전체 경로가 29 → **30개**.
+
+| 단계 | 명령 | 결과 |
+| --- | --- | --- |
+| ① 명령 exit | `git restore` + `git rm` | 둘 다 exit 0 |
+| ② D/M 수 | `git status --porcelain \| awk '{print $1}' \| sort \| uniq -c` | **D 20 · M 10**(목록 갱신과 정확히 일치) |
+| ③ diff 빈 것 | `git diff --stat "$BASE" -- <위 30개 경로 전부>` | 빈 출력(exit 0) |
+| — 하네스 무편집 | `git diff --stat "$BASE"..HEAD -- CLAUDE.md .claude/ docs/harness/` | 빈 출력 |
+| ④ compile | `./gradlew --no-daemon :app:compileKotlin :adapters:compileKotlin` | BUILD SUCCESSFUL |
+| ⑤⑥ test·게이트 | `./gradlew --no-daemon check`(9개 모듈 전건) | BUILD SUCCESSFUL(346 tasks, 197 executed·117 from cache·32 up-to-date) |
+| 부가 확인 | `grep -c notice_title` 두 CleanMigration test | `4`·`1`(6F-4 줄 보존, 변화 없음) |
+| 부가 확인 | `grep -c api_request_audit` 같은 두 파일 | `0`·`0`(이 slice 줄 소거) |
+| 부가 확인 | `app/build.gradle.kts`의 `bootJar`/`jar` `enabled` 값 | `bootJar=false` · `jar=true`(base와 동일, 변화 없음) |
+
+`$BASE` = `00d49135`(불변 — `main`이 라운드 2 이후 전진하지 않았다). clone은 실측 직후
+삭제했다. **이 실측이 이 slice의 최종 rollback 검증이다** — 이 시점 이후 in_scope 코드
+변경은 없다.
+
+## 알려진 제한 추가 — D-6A1-43 잔존(등재만, 수정 라운드 3에서 발견)
+
+**`OperatorCredential` 타입이 raw `String` 재도입을 완전히 막지는 못한다(실측).**
+D-6A1-43은 위치·이름 술어(`ConstantTimeComparisonStructureTest`)가 세 번 뚫린 것을
+`OperatorCredentialFilter`의 생성자가 `OperatorCredential`만 받도록(raw `String`을 필터
+class 안에 아예 두지 않도록) 강화해 닫았다. **그러나 이 강화는 단일 파일·단일 줄
+수정으로는 재도입을 막지만, 여러 파일에 걸친 의도적 재작성까지 막지는 않는다** —
+버릴 clone에서 실측: ① `OperatorCredentialFilter`의 생성자에 `rawExpectedForComparison:
+String` 매개변수를 새로 추가 ② 이웃 패키지 `bidvector.app.security`에 `a == b`(raw
+`String` 비교) 함수를 신설 ③ 두 조립 지점(`BidVectorApplication.kt`·
+`HttpTestSupport.kt`) 모두에서 호출을 그 raw 문자열까지 넘기도록 고치는 **3파일
+변경**(서식 정정 뒤 `numstat` 각각 `1 1`·`2 1`·`1 1` + 신규 파일)을 넣으면 전건 `check`가
+**BUILD SUCCESSFUL**이다(회귀 그물 게이트도 스캔 루트가 `bidvector.app.http` 한
+패키지라 `bidvector.app.security`를 보지 않는다 — r3 F-1이 지적한 것과 같은 사각).
+**이것은 D-6A1-43이 닫겠다고 선언한 네 형태(`==`·`Objects.equals`·이웃 패키지 이동·
+허용 목록 재사용)의 verbatim 재현이 아니다** — verbatim 재현(기존 코드를 그대로 옮기는
+1~5줄 수정)은 이번 라운드에 전부 닫혔다(MUT-1·MUT-2는 전건 `check` BUILD FAILED로 실측
+확인, `commands.md` 참고). 이 잔존은 **raw 문자열 저장을 의도적으로 되살리는 다중 파일
+재작성**이라는, 질적으로 더 큰 비용의 공격이다 — 환경변수에서 읽은 원문이 **어딘가**의
+Kotlin 코드에는 String으로 존재할 수밖에 없다는 것은 이 애플리케이션의 구조적 한계이고,
+어떤 값 타입도 「그 String을 다시 저장하고 새 함수로 넘기는」 재작성 자체를 막지는
+못한다. 타입이 실제로 닫은 것은 **트리비얼한 1줄 편집으로 재도입 가능했던 경로**이고,
+그 경로가 이번 라운드의 실제 위협(verifier r3가 발견한 형태)이었다. `OPEN` 신설은 팀장
+레인 소관이라 요청만 남긴다 — 받는 쪽은 이 slice를 이어받는 인증 관련 후속 slice(현재
+계획된 것 없음, 필요 시 신설).
 
 ## 알려진 제한 추가 — D-6A1-41(등재만, MEDIUM)
 
@@ -269,6 +327,13 @@ rollback.md 편집을 포함한 커밋까지: 그 커밋은 `git add`·`git comm
 add+commit 한 명령 규율) **구조적으로 이 파일 하나만** 담는다 — 되돌림 대상 경로는
 움직일 수 없다. 커밋 뒤 `git diff --name-only 9db7da36..<이 커밋>`으로 실측 재확인
 예정(다음 절차가 그 결과를 담는다).
+
+**자기 검증(2026-09-23, 수정 라운드 3)** — 실측 HEAD `92f8f682`부터 이 commands.md·
+rollback.md 편집을 담는 evidence 커밋까지: 그 커밋도 `git add`·`git commit --` 둘 다
+`reports/evidence/m6/6a1/commands.md`·`reports/evidence/m6/6a1/rollback.md` 개별 인자만
+받으므로 되돌림 대상 30경로는 그 커밋 안에서 움직일 수 없다. 커밋 뒤 `git diff
+--name-only 92f8f682..<그 커밋>`으로 실측을 재확인한다(아래 「evidence 커밋 뒤 재확인」
+절이 그 결과를 담는다).
 
 ## 마이그레이션 번호 재확인(D-6A1-12)
 

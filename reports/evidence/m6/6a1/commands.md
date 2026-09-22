@@ -294,6 +294,69 @@ test `D-6A1-40 — production 조립에서 성공·인증실패·예외 각각 a
 두 clone 모두 실측 직후 삭제. 팀장이 지정한 두 닫힘 판정("audit 필터 등록 bean을
 삭제 → RED" · "urlPatterns 무매칭으로 좁혀도 RED") 둘 다 실측으로 확인했다.
 
+## 수정 라운드 3 — D-6A1-43·44(운영자 결정 2026-09-23 「타입으로 끝낸다」)
+
+verifier r3 HIGH 둘(위치·이름 술어가 세 번째로 뚫린 상수 시간 게이트, `components.schemas`
+고정 순회) 모두 **타입/구조로 종결**했다 — 게이트를 넓히지 않았다.
+
+- **D-6A1-43** `OperatorCredentialFilter`가 raw `String`을 직접 비교하던 것을
+  `OperatorCredential`(`matches()` 하나만 노출, `equals`/`hashCode`/`toString` 미재정의)로
+  대체. 필터 생성자도 `String` 대신 `OperatorCredential`만 받도록 강화해, raw 자격증명이
+  필터 class 안에 순간적으로도 존재하지 않게 했다(감싸는 지점을 조립 근으로 이동).
+- **D-6A1-44** `OpenApiContractTest`의 평탄성 순회 루트를 `components.schemas` 고정에서
+  **문서 트리 전체 재귀**(`properties` 키를 가진 모든 Map)로 넓혔다 — 위치를 손으로
+  늘리지 않는다.
+
+### acceptance 재검증(HEAD `92f8f682`)
+
+| ID | 명령 | exit | 핵심 결과 |
+| --- | --- | --- | --- |
+| S-10 | `./gradlew --no-daemon check` | 0 | BUILD SUCCESSFUL, 337 tasks |
+| S-40 | `:app:test --tests '*http*' --rerun-tasks` | 0 | BUILD SUCCESSFUL(`OperatorCredentialTest` 7건 신규 포함) |
+| S-41 | `:adapters:test --tests '*JdbcStrategyRepositoryTest*' --rerun-tasks` | 0 | BUILD SUCCESSFUL |
+| S-42 | `:app:test --tests '*OpenApiContractTest*' --rerun-tasks` | 0 | BUILD SUCCESSFUL(9 tests — 신규 `paths 의 인라인 응답 스키마…` 포함) |
+| S-20 | `./tools/one-command-check.sh` | 1 | **환경**(E-1, PyPI 프록시 timeout) — 이 라운드는 Kotlin만 편집, `ml-engine` 무접촉. 우회하지 않았다 |
+
+### 변이 실측 — D-6A1-43(버릴 clone `git clone --no-hardlinks`, `numstat`로 적용 먼저 확인)
+
+닫힘 판정 넷 중 형태별로 **막힌 방식을 구분**해 실측했다:
+
+- **MUT-1**(`==`) — `expected.matches(...)` → `expected != OperatorCredential.wrap(presented)`
+  (numstat `1 1`). 결과: **컴파일 성공, 전건 `check` BUILD FAILED**(11 tests failed, 전부
+  「올바른 자격증명인데 401」류 — 기능 고장으로 강등, 시간이 새는 방향이 아니다).
+- **MUT-2**(`Objects.equals`) — `java.util.Objects.equals(expected, ...)`로 치환(numstat
+  `1 1`). 결과: **전건 `check` BUILD FAILED**(10 tests failed, 같은 형태).
+- **MUT-3**(이웃 패키지 이동, verifier r3 MUT-A3 재현) — `bidvector.app.security` 패키지에
+  raw `String ==` 비교 함수를 신설하고 필터가 그것을 부르게 함(numstat `2 1` + 신규 파일).
+  **1차 구현**(필터 생성자가 `String`을 받아 내부에서 감싸던 판)에서는 raw 문자열을 새
+  필드로 재저장해 넘기면 **BUILD SUCCESSFUL**(닫히지 않음, 착수 실측). **강화 구현**(현재
+  HEAD — 필터 생성자가 `OperatorCredential`만 받음)에서는 같은 형태를 재현하려면 필터
+  생성자 시그니처와 두 조립 지점(`BidVectorApplication`·`HttpTestSupport`) 셋을 모두
+  고쳐야 했다 — 3파일 변경(numstat `1 1` + `2 1` + `1 1` + 신규 파일) 뒤 서식을 바로잡고
+  실측한 결과 **BUILD SUCCESSFUL**(잔존 — 아래 「알려진 제한」에 등재).
+- MUT-4(허용 목록 simple name 재사용) — 실행하지 않음. 1차 방어가 타입으로 옮겨간 뒤에는
+  `Intrinsics.areEqual`을 이름 충돌로 숨겨도 **숨길 만한 exploitable raw 비교가 애초에
+  없다**(회귀 그물 게이트 자체의 맹점은 r3 F-1 그대로 남지만, 보안 성질은 그 게이트에
+  의존하지 않는다) — 이유를 `ConstantTimeComparisonStructureTest` KDoc에 적었다.
+
+### 변이 실측 — D-6A1-44(버릴 clone, 실 `openapi.yaml` 대상)
+
+verifier r3 닫힘 판정 문면(「paths 의 인라인 응답 스키마에 ① 중첩 object ② object 배열
+③ `$ref` 를 각각 심어 전부 RED」) 그대로, `/api/strategy` 200 응답 스키마를 `$ref` 대신
+inline object로 바꿔 속성을 하나씩 심었다(각 clone에서 개별 실행):
+
+- **MUT-D**(중첩 object 속성) — numstat `7 1`. `:app:test --tests '*OpenApiContractTest*'
+  --rerun-tasks` **FAILED**(`D-6A1-20 ⓑ` — `expected:<[]> but was:<[".../probeNestedObject"]>`,
+  나머지 8건은 그대로 통과).
+- **MUT-E**(object 배열 속성) — numstat `9 1`. 같은 test **FAILED**(같은 형태).
+- **MUT-F**(`$ref` 속성) — numstat `4 1`. 같은 test **FAILED**(같은 형태).
+
+세 형태 모두 실 spec 파일에서 **정확한 위치**(`spec.paths./api/strategy.get.responses.200
+.content.application/json.schema.properties.<probe>`)를 assertion 메시지로 식별했다 —
+합성 spec 단위 test(`paths 의 인라인 응답 스키마에 심은 위반도 순회가 잡는다`)뿐 아니라
+실 문서 대상으로도 닫힘을 재확인했다.
+
 ## 참고 — 하네스 레인 변경
 
-`git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(scope.md와 동일).
+`git log --oneline $(git merge-base HEAD origin/main)..HEAD -- CLAUDE.md .claude/ docs/harness/`
+— 없음(scope.md와 동일).
