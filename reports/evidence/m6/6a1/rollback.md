@@ -329,11 +329,11 @@ add+commit 한 명령 규율) **구조적으로 이 파일 하나만** 담는다
 예정(다음 절차가 그 결과를 담는다).
 
 **자기 검증(2026-09-23, 수정 라운드 3)** — 실측 HEAD `92f8f682`부터 이 commands.md·
-rollback.md 편집을 담는 evidence 커밋까지: 그 커밋도 `git add`·`git commit --` 둘 다
-`reports/evidence/m6/6a1/commands.md`·`reports/evidence/m6/6a1/rollback.md` 개별 인자만
-받으므로 되돌림 대상 30경로는 그 커밋 안에서 움직일 수 없다. 커밋 뒤 `git diff
---name-only 92f8f682..<그 커밋>`으로 실측을 재확인한다(아래 「evidence 커밋 뒤 재확인」
-절이 그 결과를 담는다).
+rollback.md 편집을 담는 evidence 커밋(`6ea7002f`)까지: 그 커밋도 `git add`·`git commit --`
+둘 다 `reports/evidence/m6/6a1/commands.md`·`reports/evidence/m6/6a1/rollback.md` 개별
+인자만 받으므로 되돌림 대상 30경로는 그 커밋 안에서 움직일 수 없다. **실행으로 재확인**:
+`git diff --name-only 92f8f682..6ea7002f -- <위 30경로>` → **빈 출력**(exit 0) — 구조적
+guarantee와 실측이 일치한다.
 
 ## 마이그레이션 번호 재확인(D-6A1-12)
 
