@@ -18,14 +18,20 @@ import java.io.File
  * 우회 (6) 폐쇄 — D-6A1-8(수작성 단일 출처) · D-6A1-20(대조 깊이). 경로 이름만 보지 않고
  * **상태 코드 + 응답 JSON top-level 키 집합**을 `Set.equals`로 완전 일치 대조한다(부분
  * 포함이 아니다 — 여분 필드가 생겨도 실패). 추가로 **스키마 자신이 평탄함을 단언**한다
- * (D-6A1-20 ⓑ — 지금 컨트롤러 DTO가 평탄하다는 사실을 이 test가 잠근다: 스키마 어디든
- * `type: object` 속성이 생기면 이 test가 즉시 실패한다).
+ * (D-6A1-20 ⓑ — 지금 컨트롤러 DTO가 평탄하다는 사실을 이 test가 잠근다).
  *
- * **D-6A1-30 시정 — 깊이 방어가 배열 안 object를 못 봤다**(contract-keeper·code-reviewer
- * 독립 수렴). 정적 검사(`collectNestedObjectProperties`)는 `type: object` 속성만 보고
- * `type: array, items: {type: object}`는 놓쳤다. 런타임 검사(`values.none { it is Map }`)도
- * 값이 `List<Map<*,*>>`이면 `it`이 List라 `false`를 내 놓쳤다. 둘 다 배열 축까지 보도록
- * 넓힌다.
+ * **D-6A1-38 시정 — 「이런 형태는 중첩이다」 차단 목록을 「이런 평탄한 형태만 허용한다」
+ * 허용 목록으로 뒤집는다.** D-6A1-30 은 차단 목록에 배열 축 하나(`items.type == "object"`)만
+ * 더했다. verifier 실측: 정적 다섯 형태 중 배열의 `$ref`·속성의 직접 `$ref`·배열의 배열·
+ * `additionalProperties` **넷**이 여전히 GREEN 이었고, 런타임은 `values.none { it is Map }`이
+ * 재귀가 아니라 **깊이 2 이상**(`List<List<Map>>`)이 GREEN 이었다 — 이 slice 안에서
+ * F-3 → D-6A1-29 와 같은 축의 **세 번째 재발**(차단 목록에는 종점이 없다).
+ *
+ * [isFlatPropertyDefinition]은 이제 **스칼라 타입** 또는 **아이템이 스칼라인 배열**만
+ * 허용하고 그 밖(`$ref`·`oneOf`·`allOf`·`anyOf`·`additionalProperties`·`type` 없음·
+ * `type: object`·배열의 배열)은 전부 실패로 판정한다 — `type` 키 자체가 없으면 곧바로
+ * 실패하므로 합성 어휘를 열거할 필요가 없다. [containsNestedObject]는 재귀로 바꿔 임의
+ * 깊이의 `Map`을 잡는다.
  *
  * 새 라이브러리(swagger-parser 등)를 들이지 않는다 — 계약이 얕아 SnakeYAML(이미 app의
  * test 의존)로 raw Map 순회만으로 충분하다(preflight 조사·재사용 우선).
@@ -62,31 +68,24 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         (schema(schemaName)["properties"] as Map<String, Any?>).keys
 
     /**
-     * 모든 스키마를 재귀로 훑어 `type: object`인 **속성**(스키마 자신 말고)이 없는지 잰다
-     * — object 자체뿐 아니라 `type: array`의 `items`가 object인 경우(D-6A1-30)도 본다.
+     * 모든 스키마를 훑어 [isFlatPropertyDefinition]이 **허용하지 않는** 속성(스키마 자신
+     * 말고)을 모은다.
      */
-    private fun collectNestedObjectProperties(): List<String> {
+    private fun collectNonFlatProperties(): List<String> {
         val schemas = (spec["components"] as Map<String, Any?>)["schemas"] as Map<String, Any?>
         return schemas.flatMap { (schemaName, schemaBody) ->
             val properties = (schemaBody as Map<String, Any?>)["properties"] as Map<String, Any?>
             properties
-                .filter { (_, definition) -> isNestedObjectDefinition(definition as Map<String, Any?>) }
+                .filterNot { (_, definition) -> isFlatPropertyDefinition(definition as Map<String, Any?>) }
                 .map { (propertyName, _) -> "$schemaName.$propertyName" }
         }
     }
 
-    private fun isNestedObjectDefinition(definition: Map<String, Any?>): Boolean =
-        when (definition["type"]) {
-            "object" -> true
-            "array" -> (definition["items"] as? Map<String, Any?>)?.get("type") == "object"
-            else -> false
-        }
-
-    /** D-6A1-30 — 값 자체가 object이거나(Map), object의 배열(List<Map>)이면 평탄하지 않다. */
+    /** D-6A1-30 — 값 자체가 object이거나(Map), 배열 어느 깊이에서든 object를 담으면 평탄하지 않다. */
     private fun containsNestedObject(value: Any?): Boolean =
         when (value) {
             is Map<*, *> -> true
-            is List<*> -> value.any { it is Map<*, *> }
+            is List<*> -> value.any(::containsNestedObject)
             else -> false
         }
 
@@ -94,8 +93,59 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         HttpHeaders().apply { set(OperatorCredentialFilter.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
     @Test
-    fun `D-6A1-20 ⓑ — 계약의 어떤 스키마도 중첩 object 속성을 갖지 않는다(배열 축 포함)`() {
-        collectNestedObjectProperties() shouldBe emptyList()
+    fun `D-6A1-20 ⓑ — 계약의 모든 속성 정의가 평탄한 형태(허용 목록)만 쓴다`() {
+        collectNonFlatProperties() shouldBe emptyList()
+    }
+
+    /**
+     * 양성 대조 — [isFlatPropertyDefinition]을 실제 YAML 파싱을 거치지 않고 직접 재서,
+     * verifier가 고안한 다섯 우회 형태(MUT-D2~D5) 전부와 양성 대조(스칼라·스칼라 배열·
+     * `type: object` 직접)를 고정한다. 실 스펙 파일을 건드리지 않고 술어 자체를 잠근다.
+     */
+    @Test
+    fun `평탄 속성 허용 목록 술어는 다섯 우회 형태를 전부 거부하고 평탄 형태만 통과시킨다`() {
+        isFlatPropertyDefinition(mapOf("type" to "string")) shouldBe true
+        isFlatPropertyDefinition(mapOf("type" to "integer", "format" to "int64")) shouldBe true
+        isFlatPropertyDefinition(mapOf("type" to "array", "items" to mapOf("type" to "string"))) shouldBe true
+
+        // MUT-D-P0(양성) — 직접 object.
+        isFlatPropertyDefinition(mapOf("type" to "object")) shouldBe false
+        // MUT-D3 — 속성이 직접 `$ref`(object 스키마를 가리킨다).
+        isFlatPropertyDefinition(mapOf("\$ref" to "#/components/schemas/Nested")) shouldBe false
+        // MUT-D2 — `type: array` + `items: {$ref → object}`.
+        isFlatPropertyDefinition(
+            mapOf("type" to "array", "items" to mapOf("\$ref" to "#/components/schemas/Nested")),
+        ) shouldBe false
+        // D-6A1-30 이 이미 닫은 형태 — `type: array` + `items: {type: object}`.
+        isFlatPropertyDefinition(
+            mapOf("type" to "array", "items" to mapOf("type" to "object")),
+        ) shouldBe false
+        // MUT-D4 — 배열의 배열의 object.
+        isFlatPropertyDefinition(
+            mapOf(
+                "type" to "array",
+                "items" to mapOf("type" to "array", "items" to mapOf("type" to "object")),
+            ),
+        ) shouldBe false
+        // MUT-D5 — `additionalProperties`(자유형 map, `type` 키 없이).
+        isFlatPropertyDefinition(mapOf("additionalProperties" to mapOf("type" to "string"))) shouldBe false
+        // additionalProperties가 `type: object`와 함께 오는 경우도 잡는다.
+        isFlatPropertyDefinition(
+            mapOf("type" to "object", "additionalProperties" to mapOf("type" to "string")),
+        ) shouldBe false
+    }
+
+    /** 양성 대조 — [containsNestedObject]가 재귀로 임의 깊이의 object를 잡는지(MUT-R2). */
+    @Test
+    fun `평탄 응답 값 술어는 임의 깊이의 object 를 재귀로 잡는다`() {
+        containsNestedObject("문자열") shouldBe false
+        containsNestedObject(listOf("문자열", "다른 문자열")) shouldBe false
+        containsNestedObject(mapOf("k" to "v")) shouldBe true
+        containsNestedObject(listOf(mapOf("k" to "v"))) shouldBe true
+        // MUT-R2 — 깊이 2: List<List<Map>>.
+        containsNestedObject(listOf(listOf(mapOf("k" to "v")))) shouldBe true
+        // 깊이 3도 잡는다 — 종점을 열거하지 않는 재귀임을 확인.
+        containsNestedObject(listOf(listOf(listOf(mapOf("k" to "v"))))) shouldBe true
     }
 
     @Test
@@ -177,4 +227,33 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         response.body?.containsKey("minBudgetWon") shouldBe true
         response.body?.get("minBudgetWon") shouldBe null
     }
+}
+
+/** D-6A1-38 이 허용하는 스칼라 타입 — 그 밖은 전부 [isFlatPropertyDefinition]이 거부한다. */
+private val SCALAR_PROPERTY_TYPES = setOf("string", "integer", "number", "boolean")
+
+/** OpenAPI/JSON Schema 합성·참조 어휘 — 하나라도 있으면 그 정의는 평탄하지 않다. */
+private val NON_FLAT_KEYS = setOf("\$ref", "oneOf", "allOf", "anyOf", "additionalProperties")
+
+/**
+ * D-6A1-38 — 허용 목록으로 뒤집은 평탄 속성 판정. 속성 정의가 **스칼라 타입**이거나
+ * **아이템이 스칼라인 배열**일 때만 `true`다. `$ref`·`oneOf`·`allOf`·`anyOf`·
+ * `additionalProperties`가 있거나 `type` 자체가 없거나 `type: object`이거나 배열의
+ * 아이템이 다시 배열·object·참조이면 전부 `false` — 새로 생기는 합성 어휘를 열거할
+ * 필요가 없다(차단 목록에는 종점이 없지만 허용 목록은 종점이 있다).
+ */
+private fun isFlatPropertyDefinition(definition: Map<String, Any?>): Boolean {
+    if (NON_FLAT_KEYS.any(definition::containsKey)) return false
+    return when (definition["type"]) {
+        in SCALAR_PROPERTY_TYPES -> true
+        "array" -> isFlatArrayItems(definition["items"])
+        else -> false
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun isFlatArrayItems(items: Any?): Boolean {
+    val itemsDefinition = items as? Map<String, Any?> ?: return false
+    if (NON_FLAT_KEYS.any(itemsDefinition::containsKey)) return false
+    return itemsDefinition["type"] in SCALAR_PROPERTY_TYPES
 }
