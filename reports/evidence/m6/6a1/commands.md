@@ -175,6 +175,74 @@ grep -c "notice_title\|notice_notice_title_check" \
 병합 뒤 재실측: `./gradlew --no-daemon check`(2026-09-19T10:57:44Z~50Z) — BUILD
 SUCCESSFUL(336 tasks, 33 executed·3 from cache·300 up-to-date).
 
+## 수정 라운드 2 — D-6A1-37·38 (verifier r2 재판정 HIGH 2) 반영
+
+verifier r2가 지정한 표적은 test 파일 둘뿐이고 production 코드는 무편집(HEAD `d9708f4a`
+까지의 세 커밋 — `672f002c` D-6A1-37 · `4ba6082a` D-6A1-38 · `d9708f4a` detekt
+ReturnCount 시정, MUT-N1 실측 중 버릴 clone의 전건 `check`에서 발견).
+
+### 표적 재검증 — acceptance 전건 재실행 (HEAD `d9708f4a`)
+
+| ID | 명령 | 시각(UTC) | exit | 핵심 결과 |
+| --- | --- | --- | --- | --- |
+| S-10 | `./gradlew --no-daemon check` | 15:48:43~49:02 | 0 | BUILD SUCCESSFUL, 337 tasks(43 executed) |
+| S-40 | `:app:test --tests '*http*' --rerun-tasks` | 15:49:06~38 | 0 | 22 tests, 0 failed(Constant… 3·OpenApiContract 8·OperatorAuthentication 4·ProductionAssemblyAuthAudit 2·RequestAuditFilter 5) |
+| S-41 | `:adapters:test --tests '*JdbcStrategyRepositoryTest*' --rerun-tasks` | 15:49:51~50:12 | 0 | BUILD SUCCESSFUL |
+| S-42 | `:app:test --tests '*OpenApiContractTest*' --rerun-tasks` | 15:50:16~34 | 0 | BUILD SUCCESSFUL, 8 tests(신설 양성 대조 셋 포함) |
+| S-20 | `./tools/one-command-check.sh` | 15:50:39~53:02 | **1** | Kotlin 전건 통과 · Python **1 failed / 957 passed** — verifier r2 E-1과 동일한 환경 문제(아래 참조), 우회하지 않음 |
+
+**S-20 — 확인하지 않은 것으로 분리(우회하지 않는다).** 실패 원인은
+`tests/gates/test_wheel_reexport.py::test_wheel_install_outside_repo_exposes_contracts_and_servicers`
+가 `uv build --wheel`로 `build-system.requires`를 해소하려다 PyPI 요청이
+`operation timed out`으로 죽은 것 — 샌드박스 egress 부재다(verifier r2 E-1과 재현 일치).
+`git diff --name-only $(git merge-base HEAD origin/main)..HEAD -- ml-engine` **빈 출력**
+(재확인, 이 slice는 `ml-engine` 무접촉) — 실패한 test 파일도 미편집. 프록시 설정을
+바꾸거나 네트워크를 우회하지 않았다. **네트워크가 있는 CI 러너에서 재실행이 필요**하다
+— 통과로도 결함으로도 세지 않는다(PR #41의 CI가 그 자리).
+
+### 변이 실측 여섯 — 버릴 clone(`git clone --no-hardlinks`)에서만, `numstat`으로 적용 먼저 확인
+
+verifier r2가 지정한 닫힘 판정 그대로 재현했다. 각 clone은 실측 직후 폐기했다.
+
+- **MUT-N1**(D-6A1-37 닫힘) — clone(`d9708f4a` 기준)에서 `OperatorCredentialFilter.kt`의
+  `constantTimeEquals`(MessageDigest 위임)를 삭제하고 같은 패키지의 새 오브젝트
+  `CredentialComparator.matches`(`presented == expected`, 단락 비교)로 교체
+  (`numstat`: `8 12`, 적용 확인). `javap`로 `CredentialComparator.class` 상수 풀에
+  `Intrinsics.areEqual` **1건** 확인(허용 목록 밖). 결과: `ConstantTimeComparisonStructureTest`
+  **FAILED**(`패키지의 어떤 class 도 허용 목록 밖에서 Intrinsics areEqual 을 쓰지
+  않는다` — `expected:<true> but was:<false>`, MessageDigest.isEqual 부재로도 동시에
+  검출) · 전건 **`./gradlew check` BUILD FAILED**(152 tests, 1 failed). **닫힘 확인**.
+- **MUT-D2~D5**(D-6A1-38 정적 닫힘) — 별도 clone의 `openapi/bidvector-operator-api.yaml`에
+  **어디에도 참조되지 않는** `MutationProbe` 스키마를 추가(`numstat`: `20 0`, 적용 확인)해
+  네 형태를 한 번에 심었다: `arrayOfRefItems`(배열의 `$ref`, D2) · `directRef`(속성 직접
+  `$ref`, D3) · `arrayOfArrayOfObject`(배열의 배열의 object, D4) · `freeFormMap`
+  (`additionalProperties`, `type` 키 없이, D5). 결과: `OpenApiContractTest`의
+  `D-6A1-20 ⓑ` **FAILED** — `collectNonFlatProperties()`가 넷 전부 정확히 개별
+  식별(`MutationProbe.arrayOfRefItems`·`.directRef`·`.arrayOfArrayOfObject`·
+  `.freeFormMap`). **닫힘 확인**(네 형태 전부).
+- **MUT-R2**(D-6A1-38 런타임 닫힘) — 별도 clone에서 `containsNestedObject`의 재귀 호출을
+  D-6A1-30 이전 형태(`value.any { it is Map<*, *> }`, 비재귀)로 원복(`numstat`: `1 1`,
+  적용 확인). 결과: `평탄 응답 값 술어는 임의 깊이의 object 를 재귀로 잡는다`
+  **FAILED**(깊이 2, `List<List<Map>>` 지점에서 `expected:<true> but was:<false>`) —
+  재귀가 실제로 깊이 2 이상을 잡는 유일한 이유임을 확인. **닫힘 확인**.
+
+세 clone 모두 실측 직후 삭제(`rm -rf`), 실제 lane worktree는 무접촉으로 유지했다
+(`git status --porcelain` 매 mutation 전후 실측 worktree에서 빈 출력 확인).
+
+### 허용 목록 근거(D-6A1-37) — 개별 class와 근거
+
+| class(nameWithoutExtension) | areEqual 건수(HEAD `d9708f4a`, javap 실측) | 근거 |
+| --- | --- | --- |
+| `ApiAuditRecord` | 6 | data class 자동 `equals()` — 필드는 시각·주체·경로·상태·correlation id, 자격증명 값 없음 |
+| `ErrorBody` | 4 | data class 자동 `equals()` — 필드는 code·message·correlationId, 자격증명 값 없음 |
+| `StrategyReadResponse` | 19 | data class 자동 `equals()` — 전략 필드뿐, 자격증명 값 없음 |
+| `StrategyReadControllerKt` | 5 | `provenanceLabel()`의 `Provenance` sealed 싱글턴 객체 참조 동일성(javap로 `Provenance$DerivedFromOpening.INSTANCE` 등 확인, `when` 소진) — 자격증명과 무관 |
+
+허용 목록 밖 나머지 열 class(`OperatorCredentialFilter`·`$Companion`·`…Kt`·
+`ErrorBodyKt`·`ErrorCode`·`ErrorMapping`·`GlobalErrorHandler`·`RequestAuditFilter`·
+`StrategyReadController`·`StrategyReadResponse$Companion`)는 HEAD 시점 `areEqual` 0건
+(javap 실측) — 허용 목록 확장 없이 기본 판정 상태 그대로다.
+
 ## 참고 — 하네스 레인 변경
 
 `git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(scope.md와 동일).
