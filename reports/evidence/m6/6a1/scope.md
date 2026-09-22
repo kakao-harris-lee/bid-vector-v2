@@ -445,6 +445,45 @@ DELETE/TRUNCATE/UPDATE **0건**), rollback F-4·F-5·F-6 닫힌 채(트리 동�
 (미push)였다. 로컬 `one-command-check.sh` 의 exit 1 은 **샌드박스 PyPI 프록시 문제**이고 **누구도 우회하지
 않았다.**
 
+## 계약 갱신 (15) — 수정 라운드 3 (2026-09-23, 팀장)
+
+운영자 결정(「타입으로 끝낸다」)대로 **게이트를 넓히지 않고 넓힐 필요를 없앴다.**
+
+### D-6A1-43 — 자격증명 전용 타입
+
+`OperatorCredential` 신설: 공개 표면은 **`of(String)`**(신뢰 설정값, blank 거부) · **`wrap(String)`**(신뢰
+안 하는 제시값, 무검증) · **`matches(OperatorCredential)`** **셋뿐**이고 **원시 바이트 accessor 가 없다.**
+필터 **생성자가 `String` 을 아예 받지 않는다** — 감싸는 지점이 조립 근으로 올라가 **raw 문자열이 필터
+클래스에 존재하지 않는다.**
+
+**(2b) 값 획득 축 — 실측으로 닫았다**: `toString()` 이 `Any.toString()` 그대로라 **원문을 흘리지 않는다** ·
+`equals`/`==` 는 내용이 같아도 **항상 거짓**(재정의 안 함)이라 **빠른 비교로 오용할 수 없다** · `of("")`·
+`of("   ")` 는 예외, `wrap("")` 은 `matches()` 로 자연 실패(D-6A1-6 불변식 유지).
+
+**닫힘 실측 — 그리고 타입이 게이트보다 강하게 작동한 자리**: `==`·`Objects.equals` 두 형태는 **컴파일은
+되지만 전건 `check` BUILD FAILED** 다(올바른 자격증명이 401 로 거절돼 **11·10 tests failed**). 즉 **게이트가
+아니라 기능이 깨져서** 잡힌다 — **잘못된 비교가 제품을 고장 내므로 평범한 test 가 잡는다.** 「불가능한 상태는
+타입으로 닫는다」가 실제로 한 일이 이것이다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6A1-45**(**닫히지 않은 것을 사실대로 등재한다**) | **MUT-3(이웃 패키지 이동)은 완전히 닫히지 않았다.** raw String 을 새 필드로 되살려 이웃 패키지의 `==` 함수로 넘기는 **다중 파일 재작성**은 여전히 전건 초록이다. 이 사실을 알려진 제한에 적고 **`OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`** 으로 **6A-2** 에 인계한다 | **구현 레인이 스스로 보고했다** — 1차 구현에서는 **1줄**로 뚫렸고, 강화(생성자에서 `String` 제거) 뒤에는 **생성자 시그니처 + 조립 지점 2곳, 총 3파일**을 고쳐야 재현된다. **우회 비용이 「1줄 편집」에서 「의도적 다중 파일 재작성」으로 올라갔다** — 이 저장소가 severity 를 가르는 선(6F-5-a r3: 「우회가 평범한 리팩터링이면 HIGH, 관용을 벗어난 형태면 MEDIUM」)에서 **후자**다. 뿌리는 구조적이다: **환경변수 원문은 어딘가에 `String` 으로 존재해야 한다.** 완전 폐쇄는 그 경계를 프레임워크 밖으로 옮겨야 가능하고 이 slice 범위가 아니다 |
+| **D-6A1-46**(**전칭 문면을 사실대로 낮춘다** — 차단의 실체를 없앤다) | `ConstantTimeComparisonStructureTest` 의 문면에서 전칭 주장(「우회 (4) 폐쇄」·「허용 목록은 종점이 있다」)을 거두고 **「1차 방어는 타입이고 이 게이트는 회귀 그물」**로 낮춘다. 위협 모델의 해당 줄도 같이 맞춘다 | verifier 가 다섯 번 반복해 지적한 차단의 실체는 **「게이트가 약하다」가 아니라 「계약이 선언한 보장을 게이트가 지지 않는데 졌다고 적혀 있다」**였다. **주 방어가 타입으로 옮겨간 이상 게이트가 전칭을 질 이유가 없다** — 문면을 사실에 맞추면 그 불일치 자체가 사라진다. **게이트를 지우지는 않는다**(회귀 그물로 남는다) |
+
+### D-6A1-44 — 순회 루트를 문서 전체로
+
+`components.schemas` 고정에서 **문서 전체 재귀**로. **실 `openapi.yaml` 에 심은 변이 셋 전부 FAILED** 이고
+test 가 **위반 위치를 정확히 식별**한다(`spec.paths./api/strategy.get.responses.200…properties.…`):
+중첩 object(`7/1`) · object 배열(`9/1`) · `$ref`(`4/1`). **합성 spec 단위 test 를 더해 「위치 폐쇄」 자체를
+잠갔다** — 순회가 다시 좁아지면 그 test 가 붉는다.
+
+**CI 실측** — `0b4094e5`(수정 라운드 2 반영분) 기준 **`check`·`container`·`ml-engine` 3/3 pass**. S-20 의
+Python 축이 **판정 대상에 가까운 SHA 에서** 확인됐다. 로컬 exit 1 은 여전히 샌드박스 PyPI 프록시 문제이고
+**누구도 우회하지 않았다.**
+
+**rollback 재산출** — 신규 `OperatorCredentialTest.kt` 로 목록 **D 19 → 20**, M 10(전체 30 경로). clone
+①~⑥ 전부 재실측(트리 동일성 · 6F-4 줄 **4·1 보존** · 이 slice 줄 **0·0**) + 새 술어 자기 검증 **빈 출력**.
+
 ## 하네스 레인 변경
 
 `git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(착수 시점).
@@ -461,6 +500,7 @@ DELETE/TRUNCATE/UPDATE **0건**), rollback F-4·F-5·F-6 닫힌 채(트리 동�
 | `OPEN-6A1-CONNECTION-POOL`(신설, D-6A1-18) | 커넥션 풀 없이(`PGSimpleDataSource`) production 에 배선한다 — 단일 운영자·저동시성이라 오늘 필요가 없으나 **이 상태로 운영에 나갈 수 없다**. 받는 쪽 **6C/6E** |
 | `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`(신설, D-6A1-42) | `jarContentGate` 의 **사각 둘** — ① 배포물 `bootJar` 를 안 보고 `jar` 만 본다(build-logic 하드코딩) ② **빈 아카이브 입력을 통과**시킨다(게이트가 실행됐는데도 exit 0, 두 verifier 레인 실측). `jar` 재활성(D-6A1-28)은 게이트가 **뭔가라도** 재게 한 것이지 배포물을 재게 한 것이 아니다. 받는 쪽 **하네스 레인** |
 | `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(신설, D-6A1-41) | 명시 `@ComponentScan` 이 Boot 기본 `excludeFilters` 둘(`TypeExcludeFilter`·`AutoConfigurationExcludeFilter`)을 **가린다**(실측). 오늘 거동 영향 0 이나 D-6A1-35 가 예산 때문에 남긴 부채의 크기를 키운다. 받는 쪽 **6A-2** |
+| `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`(신설, D-6A1-45) | 자격증명 타입이 **1줄 우회 넷을 닫았으나**, raw `String` 을 새 필드로 되살려 이웃 패키지의 빠른 비교로 넘기는 **다중 파일 재작성**은 막지 못한다(구현 레인 자진 보고·실측). 뿌리가 구조적이다 — **환경변수 원문은 어딘가에 `String` 으로 존재해야 한다.** 받는 쪽 **6A-2** |
 | `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT`(신설, D-6A1-25) | **`const val` 참조는 컴파일러 인라인으로 상수 풀에서 사라져 바이트코드 의존 게이트가 못 본다**(실측). `evaluation`·`qualification`·`profile`·`audit` **네 게이트가 공유하는 사각**이라 한 slice 범위가 아니다. 받는 쪽 **하네스 레인** |
 
 ## 리뷰 레인
