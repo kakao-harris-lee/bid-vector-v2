@@ -1,10 +1,14 @@
 # M6/6A-1 rollback.md
 
-실측 HEAD: `440a7286`(수정 라운드 1의 마지막 산출물 커밋 — `docs(m6-6a1): rollback.md —
-F-4·F-5 시정 + D-6A1-33·34 근거 + jarContentGate 신규 등재`. 이 뒤에도 같은 라운드의
-평가 보고 커밋이 더 있을 수 있으나, in_scope 코드 경로를 건드리지 않는 evidence 전용
-편집이라 아래 clone 실측의 유효성에 영향이 없다 — 검증자는 판정 SHA와의 사이에 코드
-경로 diff가 비었는지로 이 사실을 직접 확인할 수 있다).
+실측 HEAD: `f5e39a3a`(수정 라운드 2 — evidence 커밋 `docs(m6-6a1): 수정 라운드 2
+evidence — D-6A1-37·38 acceptance 재실행 + 변이 여섯 실측`). **L-4 시정 — 라벨을
+정확히 가른다**: 이 라운드의 **마지막 코드(test 파일) 커밋**은 `d9708f4a`(detekt
+ReturnCount 시정)이고, `f5e39a3a`는 그 뒤에 온 evidence 전용 커밋(`commands.md`만
+편집)이다. 아래 clone 실측은 `f5e39a3a`에서 돌렸다 — `git diff --name-only
+d9708f4a..f5e39a3a`가 `reports/evidence/m6/6a1/commands.md` **한 줄뿐**임을 확인해
+in_scope 코드 경로가 둘 사이에서 전혀 움직이지 않았음을 실측으로 보장했다(라운드 1의
+L-4가 지적한 것과 같은 실수 — 「rollback.md 전용 장부 커밋」을 「마지막 산출물 커밋」
+으로 잘못 부른 것 — 를 이번엔 커밋 성격을 직접 이름으로 가름으로써 피한다).
 
 기준(`base`)은 **고정 SHA가 아니라 정의**다: 「이 브랜치가 분기해 나온 현재 `main`」
 (`git merge-base HEAD origin/main`, D-6A1-15). 이 정의는 `origin/main`이 계속 앞으로
@@ -125,10 +129,15 @@ git rm -f \
   openapi/bidvector-operator-api.yaml
 ```
 
-`bootJar`는 다시 `enabled = false`로 돌아간다(이번 라운드에서 `jar`를 재활성했으므로
-`jar`도 함께 `enabled = false`로 — D-6A1-28 이전 상태 원복). `CLAUDE.md`·`.claude/**`
-(하네스 경로)는 되돌리지 않는다 — 실측: `git diff --stat "$BASE"..HEAD -- CLAUDE.md
-.claude/ docs/harness/` 빈 출력.
+`bootJar`는 다시 `enabled = false`로 돌아간다. **사실 정정(라운드 2 rollback 드릴에서
+발견)** — `jar`는 `enabled = false`로 돌아가지 **않는다**: `base`(`1A`가 남긴 상태)가
+이미 `tasks.named<Jar>("jar") { enabled = true }`를 갖고 있어(실측:
+`git show "$BASE":app/build.gradle.kts`), D-6A1-28이 되살린 `jar` 활성은 **base와
+같은 값으로 돌아가는 것**이지 base를 벗어나는 값이 아니다. `restore`가 만드는 순변화는
+`bootJar`(`true`→`false`) **하나**다 — 이전 판의 「jar도 함께 enabled = false로」는
+base를 직접 확인하지 않고 「이번 라운드에 잠깐 껐다 켰다」는 이력만 보고 쓴 추측이었다.
+`CLAUDE.md`·`.claude/**`(하네스 경로)는 되돌리지 않는다 — 실측: `git diff --stat
+"$BASE"..HEAD -- CLAUDE.md .claude/ docs/harness/` 빈 출력.
 
 ## 마이그레이션 비대칭(적용 완료 DB가 있는 경우)
 
@@ -154,6 +163,29 @@ git rm -f \
 
 갈음 판정은 「HEAD 초록」이 아니라 **트리 동일성**(③의 빈 diff)으로 확인했다. `$BASE`는
 매 실행 시점의 `git merge-base HEAD origin/main`(F-5 시정 그대로 실행).
+
+## 임시 clone 실측(①~⑥, 2026-09-23, 수정 라운드 2 — D-6A1-37·38 반영 뒤 재실측)
+
+`git clone --no-hardlinks`로 격리된 clone(`f5e39a3a` 기준, 이 라운드의 마지막 산출물
+커밋은 `d9708f4a` — 위 L-4 정정 참고)에서 위 복원 명령을 다시 실제로 실행했다. 목록
+자체는 라운드 1과 **파일 집합이 동일**하다(이번 라운드는 기존 test 파일 둘의 내용만
+바꿨을 뿐 신규·삭제 파일이 없다 — D 19·M 10 그대로).
+
+| 단계 | 명령 | 결과 |
+| --- | --- | --- |
+| ① 명령 exit | `git restore` + `git rm` | 둘 다 exit 0 |
+| ② D/M 수 | `git status --porcelain \| awk '{print $1}' \| sort \| uniq -c` | D 19 · M 10(라운드 1과 동일, 목록과 일치) |
+| ③ diff 빈 것 | `git diff --stat "$BASE" -- <위 29개 경로 전부>` | 빈 출력(exit 0) |
+| — 하네스 무편집 | `git diff --stat "$BASE"..HEAD -- CLAUDE.md .claude/ docs/harness/` | 빈 출력 |
+| ④ compile | `./gradlew --no-daemon :app:compileKotlin :adapters:compileKotlin` | BUILD SUCCESSFUL(FROM-CACHE 다수) |
+| ⑤⑥ test·게이트 | `./gradlew --no-daemon check`(9개 모듈 전건) | BUILD SUCCESSFUL(346 tasks, 197 executed·117 from cache·32 up-to-date) |
+| 부가 확인 | `grep -c notice_title CleanMigrationCheckTest.kt CleanMigrationColumnTest.kt` | `4`·`1`(6F-4 줄 보존, 라운드 1과 동일) |
+| 부가 확인 | `grep -c api_request_audit` 같은 두 파일 | `0`·`0`(이 slice의 줄이 실제로 사라짐) |
+| 부가 확인 | `app/build.gradle.kts`의 `bootJar`/`jar` `enabled` 값 | `bootJar=false`(원복) · `jar=true`(base와 동일 — 위 사실 정정 참고) |
+
+갈음 판정은 「HEAD 초록」이 아니라 **트리 동일성**(③의 빈 diff)으로 확인했다. `$BASE`는
+실행 시점의 `git merge-base HEAD origin/main` = `00d49135`(라운드 1과 동일 — `main`이
+이 라운드 사이 전진하지 않았다). clone은 실측 직후 삭제했다.
 
 ## 검증자 유효성 확인
 
@@ -181,10 +213,18 @@ verifier가 대조하는 것은 「실측 HEAD == 판정 SHA」가 아니다(evi
 나오면 미검증이다. 「실측 HEAD가 판정 SHA의 조상」은 이 확인의 전제일 뿐 충분조건이
 아니다(조상이어도 그 사이 되돌림 경로가 움직였으면 미검증).
 
-**자기 검증(2026-09-20)** — 실측 HEAD `440a7286`부터 이 문서의 최신 내용 커밋까지 위
-경로 집합에 대해 직접 실행: `git diff --name-only 440a7286..<이 편집을 포함한 커밋> --
-<위 경로 전부>` → **빈 출력**(exit 0). 즉 `440a7286` 이후 rollback.md 자체 말고는
-되돌림 대상 경로가 전혀 움직이지 않았다 — `440a7286`을 실측 HEAD로 계속 써도 된다.
+**자기 검증(2026-09-20, 라운드 1)** — 실측 HEAD `440a7286`부터 이 문서의 최신 내용
+커밋까지 위 경로 집합에 대해 직접 실행: `git diff --name-only 440a7286..<이 편집을
+포함한 커밋> -- <위 경로 전부>` → **빈 출력**(exit 0). 즉 `440a7286` 이후 rollback.md
+자체 말고는 되돌림 대상 경로가 전혀 움직이지 않았다 — `440a7286`을 실측 HEAD로 계속
+써도 된다.
+
+**자기 검증(2026-09-23, 라운드 2)** — 새 실측 HEAD `f5e39a3a`부터 이 rollback.md 편집을
+포함한 커밋까지 같은 경로 집합에 대해 직접 실행: **빈 출력**(exit 0, `commands.md`·
+`rollback.md` 자신 말고는 아무 것도 움직이지 않았다). 또한 `f5e39a3a`의 부모 쪽으로
+`d9708f4a..f5e39a3a`도 확인 — `reports/evidence/m6/6a1/commands.md` **한 줄뿐**(L-4가
+가른 「마지막 코드 커밋」과 「실측에 쓴 HEAD」 사이 유일한 차이가 evidence 파일 하나임을
+재확인).
 
 ## 마이그레이션 번호 재확인(D-6A1-12)
 
@@ -222,12 +262,25 @@ main 흡수 뒤 재확인: `main` 최대가 이제 **`V14`**(`1881c82c`, 6F-4)�
   참조**다 — `object` const·top-level const·다른 모듈 companion const 셋 다 미검출임이
   실측됐다(실제 정책 상수로도 재현). 영향 범위는 `evaluation`(6F-2)·`qualification`
   (6F-5-a)·`profile`(6F-6)·`audit`(이 slice) 네 게이트 계열 전부 — 한 slice의 범위가
-  아니라 **하네스 레인**이 받는다.
-- **`jarContentGate`가 여전히 `jar`만 보고 배포물 `bootJar`는 안 본다(신규 등재,
-  OPEN 후보)**: D-6A1-28에서 `jar`를 재활성해 게이트가 다시 뭔가를 재게(entries
-  0→20) 했지만, 그 「뭔가」는 여전히 **비배포 아티팩트**(`jar` task 산출물)다.
-  `jarContentGate`의 `archives.from(tasks.named("jar")...)` 배선이 build-logic에
-  하드코딩돼 있어(`build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts`),
-  게이트가 실제 배포물(`bootJar`)의 class 바이트를 검증하지 못한다. `jar` 재활성은
-  게이트가 **뭔가라도** 재게 하는 최소 조치였지 배포물을 재는 조치가 아니었다 —
-  하네스 레인 OPEN 후보로 등재한다(가칭 `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`).
+  아니라 **하네스 레인**이 받는다. **L-3 — 이 문단은 이미 형태 셋을 전부 열거한다**
+  (verifier r2가 짚은 것은 scope.md의 「OPEN — 수령·신설」**표 항목**이 아직 좁은
+  문면이라는 점이다 — 그 표는 팀장 레인 소관이라 이 slice가 직접 넓히지 않는다. 위
+  문단이 이 slice가 낼 수 있는 완전한 등재이고, 팀장 레인에 scope.md 표 동기화를
+  요청한다).
+- **`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`(L-1 시정 — 가칭에서 정식 등재로).**
+  verifier r2가 지적한 대로 이 OPEN이 「가칭」 산문으로만 있고 정식 등재가 안 됐던
+  것을 여기서 정식화한다(scope.md의 「OPEN — 수령·신설」표는 팀장 레인 소관이라 이
+  slice가 직접 편집하지 않는다 — **이 rollback.md 항목이 이 slice가 낼 수 있는
+  등재의 정본이고, 팀장 레인에 scope.md 표 반영을 요청한다**). 두 사실을 하나의
+  OPEN에 함께 담는다:
+  1. **배포물 사각** — `jarContentGate`의 `archives.from(tasks.named("jar")...)` 배선이
+     build-logic에 하드코딩돼(`build-logic/src/main/kotlin/bidvector.kotlin-conventions.gradle.kts`)
+     배포물(`bootJar`)의 class 바이트를 검증하지 못한다.
+     D-6A1-28에서 `jar`를 재활성해 게이트가 다시 뭔가를 재게(entries 0→20) 했지만,
+     그 「뭔가」는 여전히 **비배포 아티팩트**(`jar` task 산출물)다.
+  2. **빈 입력 통과 사각(verifier r2 MUT-J2 실측)** — `jar`를 다시 끄고 clean
+     빌드하면 `entries=0`인데 게이트 **exit 0**(통과)이다. D-6A1-28은 **값**(20)을
+     되돌렸을 뿐 **공허해질 수 있는 기제 자체**는 그대로라, build 파일 한 줄이면
+     이 사각이 재발한다.
+  받는 쪽은 **하네스 레인**(게이트 술어 자체를 구조로 닫아야 하는 층) — 이 slice의
+  범위가 아니다.
