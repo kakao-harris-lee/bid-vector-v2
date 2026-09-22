@@ -334,6 +334,40 @@ Python 은 `1 failed / 957 passed` 인데 원인이 `ml-engine` wheel 게이트�
 **팀장 교차 셋**: `d240e9c2..HEAD` 산출물 델타 **빈 출력**, 병합은 `CLAUDE.md`+`change-history.md` 둘뿐 —
 **산출물 무접촉 확인**.
 
+## 계약 갱신 (12) — verifier 레인이 둘 돌았다 (2026-09-23, 팀장)
+
+**사고로 verifier 레인이 둘 떴다.** 팀장의 첫 스폰 둘이 런타임 타임아웃으로 실패한 것처럼 보였으나 그중
+하나(`m6a1-reverify`)가 **실제로는 떠 있었고**, 세 번째 스폰(`m6a1-rv`)과 **독립으로** 같은 slice 를
+검증했다. 리포트가 둘이다 — `15_verifier_report_r2.md`(레인 A) · `16_verifier_report_r2_laneB.md`(레인 B).
+
+**그리고 그 사고가 이 라운드에서 가장 값진 측정을 만들었다.**
+
+> **독립 verifier 둘이 같은 SHA 를 검증했는데, 가장 무거운 HIGH 는 한쪽만 잡았다.**
+
+레인 A 는 F-1(이름 축)·F-2(깊이 갈래)를 잡았고 **(c) 축 미폐쇄를 놓쳤다.** 레인 B 는 **(c) 축을 잡았고**
+F-1·F-2 는 **독립으로 같은 자리에 수렴**했다(처방 방향까지 「허용 목록으로 뒤집기」로 동일). **이 라운드는
+Codex 교차 심판이 운영자 결정으로 제외된 라운드다**(계약 갱신 (7)) — 그 제외가 무엇을 덜 보게 하는지에
+대한 **직접 증거**가 우연히 만들어졌다. 운영자 보고에 그대로 올린다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6A1-40**(레인 B HIGH ① — **D-6A1-27 이 (a) 만 닫고 (c) 는 안 닫았다**) | `ProductionAssemblyAuthAuditTest` 가 **`api_request_audit` 표를 직접 조회해 행을 단언**하도록 한다 — 성공·**인증 실패**·예외/미매핑 각각에 **행이 정확히 하나**(0 도 2 도 아닌). **닫힘**: production **audit 필터 등록 bean 삭제** → 전건 `check` **RED**, `urlPatterns` 무매칭도 RED | **실측**: audit 필터 bean 을 **삭제(27줄)** 하거나 무매칭으로 좁혀도 **전건 `check` exit 0** — **배포 앱이 모든 요청에 audit 행 0건을 남겨도 아무것도 붉지 않는다.** 원인이 명확하다: 새 boot test 가 **상태 코드와 body 키만** 재고 audit 행을 **한 줄도 단언하지 않는다**(`grep "ApiAuditStore\|api_request_audit" app/src/test` = **0 매치**). **계약(D-6A1-27)은 (a)·(c) 둘 다를 닫겠다고 적었는데 팀장이 준 닫힘 판정은 「자격증명 필터 bean 삭제 → RED」 하나뿐이었다** — **판정 기준이 계약이 선언한 보장보다 좁았다.** 이 slice 에서 같은 형태의 **네 번째**이고, 앞 셋은 **술어의 범위**였는데 **이번엔 닫힘 판정 자체**였다. 처방은 싸다 — 그 test 는 이미 실 Postgres + production `PersistenceWiring` 으로 뜬다 |
+| **D-6A1-41**(레인 B MEDIUM — D-6A1-35 정밀화, 등재만) | 명시 `@ComponentScan` 이 Boot 기본 `excludeFilters` 둘(`TypeExcludeFilter`·`AutoConfigurationExcludeFilter`)을 **가린다**는 사실을 알려진 제한에 적고 **6A-2** 로 넘긴다 | Spring 이 실제 쓰는 메타데이터 경로로 **실측**됐다. **오늘 거동 영향 0** 이고 D-6A1-35 의 「production 공집합」 주장도 **사실로 재확인**됐다(배포물에 우리 클래스 24개·test 클래스 0개). 그러나 **부수 효과가 있다는 것 자체**는 D-6A1-35 가 「예산 때문에 유지」로 남긴 부채의 **크기를 키운다** — 받는 slice 가 알아야 한다 |
+
+**L-1 은 두 레인이 같이 확인했다** — `jarContentGate` 는 `entries` 가 0→20 으로 회복된 뒤에도 **빈 아카이브
+입력을 통과**시킨다(clean 빌드에서 게이트가 **실행됐는데도 exit 0**). `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`
+문면에 **그 사실을 명시**한다.
+
+**레인 동결이 또 깨졌고 이번에도 팀장이 깼다(세 번째)** — 레인 B 의 판정 SHA 가 검증 도중 `1a45dfb0` →
+`9c841002`(팀장의 계약 갱신 (11))로 움직였다. 레인 B 가 **코드·게이트 델타가 빈 출력**임을 확인해 판정을
+유지했다. **동결을 선언한 쪽이 세 번 다 깼다는 사실을 남긴다.**
+
+**두 레인이 같이 확인하지 못한 것** — **S-20**(PyPI 프록시 `operation timed out`, 둘 다 **우회하지 않았다**) ·
+레인 B 는 **PR #41 을 읽지 못했다**(GitHub API 도 프록시 시간 초과)라 privacy-gate 판정을 대조하지 못했다.
+
+**교차 오염 하나(레인 B 실측, 하네스 후보)** — 검증 중 **다른 세션 clone 의 리포트가 재생돼 ktlint 거짓
+RED** 가 났다. `--rerun-tasks` 로 재확인해 해소했다. **CI 에는 해당 없으나 로컬 병행 검증에서 반복될 수 있다.**
+
 ## 하네스 레인 변경
 
 `git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(착수 시점).
