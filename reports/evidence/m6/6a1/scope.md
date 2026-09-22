@@ -368,6 +368,38 @@ Codex 교차 심판이 운영자 결정으로 제외된 라운드다**(계약 �
 **교차 오염 하나(레인 B 실측, 하네스 후보)** — 검증 중 **다른 세션 clone 의 리포트가 재생돼 ktlint 거짓
 RED** 가 났다. `--rerun-tasks` 로 재확인해 해소했다. **CI 에는 해당 없으나 로컬 병행 검증에서 반복될 수 있다.**
 
+## 계약 갱신 (13) — 수정 라운드 2 종료 (2026-09-23, 팀장)
+
+**HIGH 넷이 전부 변이로 닫혔다.** 구현 레인이 각 변이를 버릴 clone 에서 심고 `git diff --numstat` 으로
+**적용을 먼저 확인한 뒤** 판정했다.
+
+| 결정 | 닫힘 실측 |
+| --- | --- |
+| **D-6A1-37** 판정 범위를 이름 접두에서 **패키지 전체 + 명시 허용 목록**으로(허용 넷에 각각 근거 문장) | **MUT-N1** — 비교를 같은 패키지 형제 `CredentialComparator` 로 추출하고 `==` 사용 → 표적 test FAILED **+ 전건 `check` BUILD FAILED** |
+| **D-6A1-38** 깊이 판정을 **허용 목록**으로 뒤집고(`isFlatPropertyDefinition` — 스칼라·스칼라 배열만 허용, `$ref`·`oneOf`·`allOf`·`anyOf`·`additionalProperties`·object·배열의 배열 **전부 기본 거부**) 런타임을 **재귀화** | **MUT-D2~D5** 네 형태를 실 spec 에 심으니 test 가 **넷 전부 개별 식별**해 FAILED · **MUT-R2** 재귀를 되돌리니 **깊이 2** 에서 FAILED |
+| **D-6A1-40** `ProductionAssemblyAuthAuditTest` 가 **`api_request_audit` 표를 직접 조회** — 성공(200)·인증 실패(401)·미매핑(404) 각각 **행이 정확히 하나**(개별 + 합계) | **MUT-AUDIT-BEAN** `requestAuditFilterRegistration` bean 삭제(`numstat 0 30`) → `expected:<1> but was:<0>` FAILED, **전건 `check` BUILD FAILED** · **MUT-URLPATTERNS** 무매칭으로 좁힘(`1 1`) → 같은 방식 FAILED, 전건 BUILD FAILED |
+
+**(a) 와 (c) 가 이제 둘 다 production 조립에서 닫혔다** — 계약이 선언한 보장과 닫힘 판정이 처음으로 같아졌다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6A1-42**(OPEN 표 동기화 — 팀장 레인) | `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT` 을 OPEN 표에 **정식 등재**한다. 문면에 **사각 둘을 합쳐** 적는다 — ① 게이트가 배포물 `bootJar` 를 안 보고 `jar` 만 본다(build-logic 하드코딩) ② **빈 아카이브 입력을 통과**시킨다(게이트가 **실행됐는데도** exit 0, 두 verifier 레인이 각각 실측). 그리고 **D-6A1-41**(명시 `@ComponentScan` 이 Boot 기본 `excludeFilters` 둘을 가린다)을 알려진 제한 ↔ OPEN 표 양쪽에 정합시킨다 | 구현 레인이 `rollback.md` 에 등재하고 **OPEN 표 반영은 팀장 레인 소관이라 요청만** 남겼다 — 레인 경계를 지킨 것이 옳다. 「신설 게이트는 등재까지가 한 벌」과 같은 이유로 **OPEN 도 세 문서(`scope`·`checklist`/`rollback`·`milestone`)가 같은 라운드에 움직여야** 한다(D-6F5-24 의 이 slice 판) |
+
+**S-20 이 「확인하지 않은 것」에서 「확인된 것」으로 옮겨졌다** — 팀장과 구현 레인이 각각 `~/.internal-bin/gh`
+로 PR #41 의 CI 를 확인했다(기본 `gh` 는 프록시 타임아웃). **`check`·`container`·`ml-engine` 3/3 pass**,
+head `1a45dfb0`. 로컬 `one-command-check.sh` 의 exit 1 은 **샌드박스 PyPI 프록시 문제**일 뿐이고 이 slice 는
+`ml-engine` **무접촉**이다. **두 verifier 레인도 구현 레인도 우회를 시도하지 않았다** — 우회했으면 이 확인이
+불가능했다. **프록시 환경변수는 누구도 고치지 않았다**(바이너리만 교체).
+
+**구현 레인이 스스로 잡은 사실 오류 하나** — `rollback.md` 가 「`jar` 도 `enabled = false` 로 원복된다」고
+적었는데 **base 를 직접 확인하니 이미 `jar = true`** 였다. `restore` 가 만드는 순변화는 `bootJar` **하나**다.
+**이력만 보고 쓴 추측을 base 실측으로 잡은 것**이다.
+
+**레인 동결이 네 번 깨졌고 네 번 다 팀장이 깼다(사실 기록).** 이번엔 팀장의 `db15f13b` 가 구현 레인의 시작
+HEAD 와 첫 커밋 **사이에** 끼어들어, 구현 레인이 **그 갱신(D-6A1-40)을 모른 채** 설계에 들어갔다. 팀장이 따로
+보낸 추가 항목 메시지도 닿지 않았다. 구현 레인은 **스코프 밖 일을 임의로 하지 않고 멈춰 물었고** 그 판단이
+옳다. 팀장은 그 뒤 **라운드 종료까지 커밋하지 않기로** 하고 지켰다.
+
 ## 하네스 레인 변경
 
 `git log --oneline c4d09cc..HEAD -- CLAUDE.md .claude/ docs/harness/` — 없음(착수 시점).
@@ -382,6 +414,8 @@ RED** 가 났다. `--rerun-tasks` 로 재확인해 해소했다. **CI 에는 해
 | `OPEN-6A-RBAC`(신설) | scope·RBAC — 소비자가 늘 때(운영자 결정 ②) |
 | `OPEN-6A-SESSION-ENDPOINTS`(신설) | 세션 편집 명령 endpoint — 6B-1 병합 뒤 6A-2(D-6A1-3) |
 | `OPEN-6A1-CONNECTION-POOL`(신설, D-6A1-18) | 커넥션 풀 없이(`PGSimpleDataSource`) production 에 배선한다 — 단일 운영자·저동시성이라 오늘 필요가 없으나 **이 상태로 운영에 나갈 수 없다**. 받는 쪽 **6C/6E** |
+| `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`(신설, D-6A1-42) | `jarContentGate` 의 **사각 둘** — ① 배포물 `bootJar` 를 안 보고 `jar` 만 본다(build-logic 하드코딩) ② **빈 아카이브 입력을 통과**시킨다(게이트가 실행됐는데도 exit 0, 두 verifier 레인 실측). `jar` 재활성(D-6A1-28)은 게이트가 **뭔가라도** 재게 한 것이지 배포물을 재게 한 것이 아니다. 받는 쪽 **하네스 레인** |
+| `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(신설, D-6A1-41) | 명시 `@ComponentScan` 이 Boot 기본 `excludeFilters` 둘(`TypeExcludeFilter`·`AutoConfigurationExcludeFilter`)을 **가린다**(실측). 오늘 거동 영향 0 이나 D-6A1-35 가 예산 때문에 남긴 부채의 크기를 키운다. 받는 쪽 **6A-2** |
 | `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT`(신설, D-6A1-25) | **`const val` 참조는 컴파일러 인라인으로 상수 풀에서 사라져 바이트코드 의존 게이트가 못 본다**(실측). `evaluation`·`qualification`·`profile`·`audit` **네 게이트가 공유하는 사각**이라 한 slice 범위가 아니다. 받는 쪽 **하네스 레인** |
 
 ## 리뷰 레인
