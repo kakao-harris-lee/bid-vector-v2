@@ -100,16 +100,18 @@ git diff "$BASE"..HEAD -- milestone-6.md | git apply -R
 - `config/quality/gate-tests.properties`: `ba258f00`(구현 레인, `NoticeWatchSubjectPortTest`
   등재) · `aee66633`(구현 레인, `WatchTextAssemblyTest` 등재). 이 slice 밖 커밋 없음
   (수정 라운드 1 재확인 — 새 커밋 없음).
-- `milestone-6.md`: `5d896c39`(팀장, 착수 문단). 이 slice 밖 커밋 없음(재확인 동일).
+- `milestone-6.md`: `5d896c39`(팀장, 착수 문단) · `2d3bd632`(팀장, 종결 문단). 이 slice 밖 커밋 없음(재확인 동일).
 
 ## 임시 clone 실측 ①~⑥
 
-**실측 HEAD: `cb1eb311`**(장부 커밋 — verifier r2 LR2-2 가 되돌림 대상 `Text.kt` KDoc 을 움직여 재실측. 앞 실측
-HEAD `13f29522` 와 트리·집계가 같다)
+**실측 HEAD: `2d3bd632`**(종결 문단 커밋 — 되돌림 대상 공유 파일 `milestone-6.md` 를 움직여 재실측. 앞 실측 HEAD
+`cb1eb311`(LR2-2 가 `Text.kt` KDoc 을 움직임)·`13f29522` 와 트리·집계가 같다. 공유 파일 둘의 `git apply -R` 은 새
+worktree 에서 `--check` exit 0 을 팀장이 직접 실측했다 — runner 의 두 번째 실행에서 난 exit 1 은 이미 되돌려진
+트리에 재적용을 시도한 것이다)
 
 ```bash
-git worktree add --detach <scratch>/rb-cb1eb311 cb1eb311   # 버릴 detached worktree, cp -r 아님
-cd <scratch>/rb-cb1eb311
+git worktree add --detach <scratch>/rb-2d3bd632 2d3bd632   # 버릴 detached worktree, cp -r 아님
+cd <scratch>/rb-2d3bd632
 BASE=$(git merge-base HEAD origin/main)   # = 02164e44...
 <위 1)~3) 절차 실행>
 ```
@@ -132,5 +134,5 @@ BASE=$(git merge-base HEAD origin/main)   # = 02164e44...
 
 `git diff --name-only <실측 HEAD>..<판정 SHA> -- <rollback.md 가 되돌리는 경로 전부(위 A·M
 32개, `rollback.md` 자신 포함)>` 가 **`rollback.md` 자신 한 줄만**이면 유효(문서 자기 커밋 — 실측
- HEAD(`cb1eb311`) 뒤에는 이 문서 커밋만 온다). 다른 경로가 한 줄이라도 나오면 미검증
+ HEAD(`2d3bd632`) 뒤에는 이 문서 커밋만 온다). 다른 경로가 한 줄이라도 나오면 미검증
  — verifier 가 재실행 시점(판정 SHA)에서 다시 확인한다(r2 실측: 자기 한 줄).
