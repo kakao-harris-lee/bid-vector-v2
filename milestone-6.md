@@ -424,6 +424,25 @@ production 호출자는 어댑터 하나(`Notice` 타입 입력)라 이 slice �
 검토 레인은 장비 리부팅으로 한 번 유실돼 같은 지시문으로 재발사했다(판정 SHA 불변). evidence 크기 여유가 16줄(825 ≤ 841)
 — 다음 slice 는 착수 시 evidence 예산을 먼저 잡는다.
 
+**6A-3+6F-3 착수 2026-09-23** — base `febad567`(6F-4-w 머지 뒤 `main`), 레인 worktree `bid-vector-v2-m6-6a3f3`·브랜치
+`m6-6a3f3/2026-09-23`. 정본 `reports/evidence/m6/6a3f3/scope.md`(D-6A3-1~11). **배선 순서의 3번과 4번을 한 slice 로**
+— endpoint 가 조립의 뿌리라 배선 없이는 돌지 않는다.
+
+**운영자 결정 넷(2026-09-23, 선택지 + 추천, 전부 추천안)**: ① `MlAnalysisPort` 는 **자리지킴 유지**(실 배선은
+`OPEN-ML-ANALYSIS-WIRING` 신설) ② endpoint 는 **dry-run 전용**(D-6A1-4 문면 그대로 — outbox 에 쓰지 않고 「낳았을 알림
+요청」의 공고 ID 만 응답. 커밋 경로는 `OPEN-6A3-EVALUATION-COMMIT` 신설, 6F-7 인계 둘이 그리로) ③ **포트 아홉 배선
+흡수**(`OPEN-6F-ASSEMBLY` dry-run 닫음, `OPEN-6F4W-ASSEMBLE-CALLER` 도 여기서 세운다) ④ **Codex 없음**(V16 은 nullable
+INT 한 열 — `migration-reviewer` + `verifier`).
+
+**착수 조사가 결정 ③ 의 전제 하나를 드러냈다 — 여력 상한 필드가 없다.** 「상한은 전략 표에 영속·감사되는 자리」인데 V9
+두 표와 `OperatorStrategy` 에 그 자리가 없다(`candidate_limit` 은 후보 상한). **V16** 으로 `max_active_bids` 를 두 표에
+더하고(nullable, DEFAULT 없음) `StrategyDraft`→`validate()`→`OperatorStrategy` 로 올린다. **상한 미설정은 fail-closed**
+(409) — 결정 ③ 이 「현재값 0 고정」을 기각한 이유의 대칭이다. 편집 경로는 6A-2 소관(`OPEN-6A3-MAX-ACTIVE-BIDS-EDIT`).
+
+**응답은 평탄하게 둔다(D-6A3-6).** 6A-1 이 세 라운드로 닫은 D-6A1-38 평탄 게이트(object 배열 거부)를 넓히지 않는다 —
+결과별 공고 ID 배열 + 건수로 답하고, 후보별 사유 상세는 `OPEN-6A3-EVALUATION-DETAIL`(contract-keeper 결정 뒤).
+`wouldNotifyNoticeIds == bidNowNoticeIds` 불변식이 사다리와 알림 경로가 같은 판정을 본다는 것을 잠근다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
