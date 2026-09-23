@@ -115,9 +115,15 @@ class TestStrategyRepository(
  * 를 요구해 `HttpTestApplication` 기반 test(auth·OpenAPI 계약 등, 후보 거동을 보지 않는
  * test)가 빈 후보 목록으로 최소 배선을 한다. 후보가 비어 있어 [watchSubjects]·[licenseGate]
  * 는 절대 안 불린다 — `error()`로 그 사실 자체를 잠근다(우연히 불리면 test가 곧바로 실패).
+ *
+ * **D-6A3-20(검토 라운드 1 contract-keeper V3) — [failure]는 `TestStrategyRepository.
+ * loadFailure`와 같은 관례다.** `OpenApiContractTest`가 409 `CANDIDATE_CAP_EXCEEDED`
+ * (D-6A3-7)의 HTTP 층 형태를 잴 때만 이 값을 채운다 — 기본값은 `null`(빈 목록 그대로).
  */
 class EmptyCandidateSource : CandidateSourcePort {
-    override fun openCandidates(): List<Notice> = emptyList()
+    @Volatile var failure: (() -> Throwable)? = null
+
+    override fun openCandidates(): List<Notice> = failure?.let { throw it() } ?: emptyList()
 }
 
 private class UnreachableWatchSubjectPort : WatchSubjectPort {
@@ -164,6 +170,10 @@ open class HttpTestApplication {
     @Bean
     open fun auditSink(): RecordingAuditSink = RecordingAuditSink()
 
+    /** D-6A3-20 — `OpenApiContractTest`가 [EmptyCandidateSource.failure]를 autowire 해 제어한다. */
+    @Bean
+    open fun emptyCandidateSource(): EmptyCandidateSource = EmptyCandidateSource()
+
     /**
      * `EvaluationDryRunController`(같은 패키지 main)가 요구하는 최소 배선 — 후보가
      * 비어 있어 [watchSubjects]·[licenseGate]는 절대 안 불린다(auth·OpenAPI 계약
@@ -173,12 +183,13 @@ open class HttpTestApplication {
     @Bean
     open fun evaluationDryRunFactory(
         strategyRepository: TestStrategyRepository,
+        candidateSource: EmptyCandidateSource,
         clock: Clock,
         correlationIdFactory: CorrelationIdFactory,
     ): EvaluationDryRunFactory =
         EvaluationDryRunFactory(
             strategyRepository = strategyRepository,
-            candidateSource = EmptyCandidateSource(),
+            candidateSource = candidateSource,
             watchSubjects = UnreachableWatchSubjectPort(),
             licenseGate = UnreachableLicenseGatePort(),
             mlAnalysis = UnavailableMlAnalysis(),

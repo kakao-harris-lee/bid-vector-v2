@@ -14,7 +14,7 @@ import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
-import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -203,19 +203,28 @@ class EvaluationDryRunE2ETest {
         return id
     }
 
+    /**
+     * D-6A3-20(검토 라운드 1 contract-keeper R3) 시정 — `as? List<*>` + null-safe 호출은
+     * 키가 없거나 타입이 달라도 `null?.`로 조용히 건너뛴다(공허한 단언). [shouldNotBeNull]
+     * 로 body 를 먼저 확정하고, **최상위 키 집합 등식**까지 더해 production 조립(E2E)에서도
+     * `OpenApiContractTest`의 계약 키 집합 등식(`propertyKeys("EvaluationDryRunResponse")`)
+     * 과 같은 강도로 잰다 — 전에는 E2E 어디에도 200 키 집합 등식이 없었다.
+     */
     @Test
     fun `① 후보 없음 → 200, 네 배열 빈, candidateCount 0`() {
         insertStrategy(maxActiveBids = 10)
 
         val response = post(0)
+        val body = response.body.shouldNotBeNull()
 
         response.statusCode.value() shouldBe 200
-        response.body?.get("candidateCount") shouldBe 0
-        (response.body?.get("bidNowNoticeIds") as? List<*>)?.shouldBeEmpty()
-        (response.body?.get("reviewNoticeIds") as? List<*>)?.shouldBeEmpty()
-        (response.body?.get("skipNoticeIds") as? List<*>)?.shouldBeEmpty()
-        (response.body?.get("notReachedNoticeIds") as? List<*>)?.shouldBeEmpty()
-        (response.body?.get("wouldNotifyNoticeIds") as? List<*>)?.shouldBeEmpty()
+        body.keys shouldBe EVALUATION_DRY_RUN_RESPONSE_KEYS
+        body["candidateCount"] shouldBe 0
+        body["bidNowNoticeIds"] shouldBe emptyList<String>()
+        body["reviewNoticeIds"] shouldBe emptyList<String>()
+        body["skipNoticeIds"] shouldBe emptyList<String>()
+        body["notReachedNoticeIds"] shouldBe emptyList<String>()
+        body["wouldNotifyNoticeIds"] shouldBe emptyList<String>()
     }
 
     @Test
@@ -250,6 +259,12 @@ class EvaluationDryRunE2ETest {
     /**
      * ⑤⑥⑦을 한 test 로 묶는다 — 같은 호출 하나의 응답에서 세 불변식을 같이 잰다
      * (별도 호출로 가르면 서로 다른 판정 인스턴스를 대조하게 된다).
+     *
+     * **D-6A3-20(검토 라운드 1 contract-keeper R3) 시정** — `orEmpty().toSet()` 등식은 두
+     * 키가 다 없어도(둘 다 `emptySet()`) 참이 되는 공허한 단언이었다. [shouldNotBeNull]로
+     * body 를 확정하고 각 필드를 **엄격 캐스트**(`as List<String>`)로 읽는다 — 키가 없거나
+     * 타입이 다르면 `ClassCastException`/NPE 로 곧바로 실패한다(조용히 빈 값으로 접지
+     * 않는다).
      */
     @Test
     fun `⑤⑥⑦ 표본 공고 1건 — 판정이 결정적으로 review, outbox 등식, wouldNotify == bidNow`() {
@@ -263,23 +278,42 @@ class EvaluationDryRunE2ETest {
         val beforeOutbox = outboxRowCount()
 
         val response = post(0)
+        val body = response.body.shouldNotBeNull()
 
         response.statusCode.value() shouldBe 200
-        response.body?.get("candidateCount") shouldBe 1
+        body.keys shouldBe EVALUATION_DRY_RUN_RESPONSE_KEYS
+        body["candidateCount"] shouldBe 1
         // UnavailableMlAnalysis 라 ML 도달 후보는 전부 Review(MlUnavailable) — BidNow 는 없다.
-        val reviewIds = response.body?.get("reviewNoticeIds") as? List<*>
-        reviewIds?.size shouldBe 1
-        reviewIds?.first().toString() shouldBe "${noticeId.number.value}:${noticeId.round.value}"
-        (response.body?.get("bidNowNoticeIds") as? List<*>)?.shouldBeEmpty()
-        (response.body?.get("skipNoticeIds") as? List<*>)?.shouldBeEmpty()
-        (response.body?.get("notReachedNoticeIds") as? List<*>)?.shouldBeEmpty()
+        @Suppress("UNCHECKED_CAST")
+        val reviewIds = body["reviewNoticeIds"] as List<String>
+        reviewIds shouldBe listOf("${noticeId.number.value}:${noticeId.round.value}")
+        body["bidNowNoticeIds"] shouldBe emptyList<String>()
+        body["skipNoticeIds"] shouldBe emptyList<String>()
+        body["notReachedNoticeIds"] shouldBe emptyList<String>()
 
         // ⑥ — dry-run 은 outbox 를 건드리지 않는다(존재 단언이 아니라 전후 등식).
         outboxRowCount() shouldBe beforeOutbox
 
         // ⑦ — 사다리와 알림 요청 경로가 같은 판정을 본다(둘 다 빈 집합이어도 등식 자체가 불변식).
-        val bidNowIds = (response.body?.get("bidNowNoticeIds") as? List<*>).orEmpty().toSet()
-        val wouldNotifyIds = (response.body?.get("wouldNotifyNoticeIds") as? List<*>).orEmpty().toSet()
+        @Suppress("UNCHECKED_CAST")
+        val bidNowIds = (body["bidNowNoticeIds"] as List<String>).toSet()
+
+        @Suppress("UNCHECKED_CAST")
+        val wouldNotifyIds = (body["wouldNotifyNoticeIds"] as List<String>).toSet()
         wouldNotifyIds shouldBe bidNowIds
     }
 }
+
+/** D-6A3-6 — `EvaluationDryRunResponse` 아홉 키(`OpenApiContractTest`의 계약 키 집합과 같은 값). */
+private val EVALUATION_DRY_RUN_RESPONSE_KEYS =
+    setOf(
+        "strategyRevision",
+        "candidateCount",
+        "currentActiveBids",
+        "maxActiveBids",
+        "bidNowNoticeIds",
+        "reviewNoticeIds",
+        "skipNoticeIds",
+        "notReachedNoticeIds",
+        "wouldNotifyNoticeIds",
+    )
