@@ -315,6 +315,61 @@ D-6F2-9(거동 등식 + 상수 풀 참조 단언 **두 축**)·D-6F2-10(등재 +
 - live read probe와 notification dry-run 절차
 - 기존 시스템과 V2를 비교한 차이 목록과 의도적 폐기 기능
 
+## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
+
+운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
+**포트별 production 구현 존재 여부를 전수**했다.
+
+### `EvaluateCandidatesUseCase` 의 포트 아홉 — 셋이 비어 있다
+
+| 포트 | production 구현 | 낸 slice |
+| --- | --- | --- |
+| `StrategyRepository` | `JdbcStrategyRepository` | 6F-1 ✅ |
+| `CandidateSourcePort` | `JdbcCandidateSource` | 6F-2 ✅ |
+| `LicenseGatePort` | `StoredRequirementLicenseGate` | 6F-5-a ✅ |
+| `CorrelationIdFactory` · `Clock` | `UuidCorrelationIdFactory` · `SystemClock` | 6F-2·6F-1 ✅ |
+| `OperatorProfilePort` | `JdbcOperatorProfileRepository` | 6F-6 ✅ |
+| **`WatchSubjectPort`** | **없음** | — |
+| **`CapacityPort`** | **없음** | — |
+| **`NotificationRequestPort`** | **없음** | — |
+| `MlAnalysisPort` | `UnavailableMlAnalysis`(**자리지킴**) | 처분은 4B-6b 가 6A 로 넘겼다 |
+
+**6F-4 는 감시 텍스트의 「데이터」(V14 `notice_title` + canonical 조립)를 냈지 `WatchSubjectPort` 어댑터를
+내지 않았다** — `OPEN-6F4-TITLE-WIRING` 이 그 자리다.
+
+### 순환은 실재하지 않는다 — 갈라 놓아서 그렇게 보였다
+
+계약 문면상 **6F-3(여력)은 「6A 평가 endpoint 선행」**이고 **6A-3(후보평가 축)은 「어댑터 여섯이 생긴 뒤」**라
+서로를 가리킨다. **실측으로 풀린다**: `CapacityPort.snapshot()` 은 **인자를 받지 않는다.** 그러므로 결정 ③
+(「현재 활성 수는 평가 요청이 싣는다」)이 성립하려면 그 어댑터는 **요청마다 그 값으로 생성**돼야 하고,
+그 생성 자리가 곧 **평가 endpoint** 다. **둘은 서로를 기다리는 것이 아니라 같은 일**이다.
+
+**결정 — 6F-3 과 6A-3 을 한 slice 로 합친다.** 갈라 두면 어느 쪽도 먼저 설 수 없다.
+
+### 착수 순서
+
+1. **6F-7** — `NotificationRequestPort` → outbox. **차단 없음**(outbox 기반은 V6·`JdbcOutboxPort` 로 존재).
+   발송 채널은 `OPEN-STR-12` 로 그 뒤다 — 이 slice 는 **요청을 낳는 자리까지**다.
+2. **6F-4-w** — `WatchSubjectPort`. **차단 없음**(6F-4 의 `notice_title` 이 `main` 에 있다).
+   `OPEN-6F4-TITLE-WIRING` 을 닫는다.
+3. **6A-3 + 6F-3**(합침) — 평가 endpoint + `CapacityPort`. 여기서 **`MlAnalysisPort` 처분**(실 gRPC gateway
+   배선 vs 자리지킴 유지)을 운영자에게 올린다 — 4B-6b 가 6A 로 넘긴 결정이고 **실 외부 호출 축**이다.
+4. **조립**(`OPEN-6F-ASSEMBLY`) — 포트 아홉을 app 에 꽂는다. 1~3 이 전제다.
+
+### 배선 밖 잔여
+
+**지금 열림**: **6A-2**(세션 편집 endpoint + 앱 이미지 — 6A-1 이 남긴 `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`·
+`OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` 을 받는다) · **6B-2**(백업·복원·마이그레이션 되돌림 리허설,
+완료 조건 7).
+
+**운영자 결정 선행**: **6B-3**(데이터 수명·마스킹 — **승인된 보존 기간이 없다**. 6F-6·6F-5-a·6A-1 이 각각
+`OPEN-…-RETENTION` 을 여기로 넘겼다) · **6B-4**(ML job 영속·큐 상한 — **큐 정책 결정**) · **6F-5-b**(요건을
+채우는 LLM 추출 — **실 LLM 호출은 운영자 승인 대상**).
+
+**배선 뒤**: **6D**(E2E·장애 주입) · **6E**(제품 acceptance·운영 runbook — `OPEN-6A1-CONNECTION-POOL` 이
+여기서 닫혀야 운영 반입이 가능하다).
+
+
 ## 완료 조건
 
 - 새 checkout/clean database에서 one-command build/test 가능
