@@ -1,7 +1,14 @@
 package bidvector.app.http
 
 import bidvector.adapters.strategy.InvalidStoredStrategyException
+import bidvector.sharedkernel.Resolution
+import bidvector.strategy.STRATEGY_POLICY
+import bidvector.strategy.StrategyDraft
+import bidvector.strategy.StrategyPolicyData
+import bidvector.strategy.StrategyRevision
+import bidvector.strategy.StrategyValidation
 import bidvector.strategy.StrategyViolation
+import bidvector.strategy.validate
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -13,6 +20,7 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.ResponseEntity
 import org.yaml.snakeyaml.Yaml
 import java.io.File
+import java.time.LocalDate
 
 /**
  * 우회 (6) 폐쇄 — D-6A1-8(수작성 단일 출처) · D-6A1-20(대조 깊이). 경로 이름만 보지 않고
@@ -298,6 +306,27 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
             HttpEntity(body, authorizedHeaders()),
             Map::class.java,
         ) as ResponseEntity<Map<String, Any?>>
+    }
+
+    @Test
+    fun `평가 dry-run 200 응답의 최상위 키 집합이 계약과 완전히 일치한다`() {
+        // 후보가 없어도(candidateCount 0) 응답 스키마는 항상 아홉 키를 모두 낸다.
+        strategyRepository.strategy = strategyWithMaxActiveBids(10)
+
+        val response = postDryRun(mapOf("currentActiveBids" to 0))
+
+        response.statusCode.value() shouldBe 200
+        (response.body?.keys ?: emptySet()) shouldBe propertyKeys("EvaluationDryRunResponse")
+        response.body?.values?.none(::containsNestedObject) shouldBe true
+    }
+
+    private fun strategyWithMaxActiveBids(maxActiveBids: Int): bidvector.strategy.OperatorStrategy {
+        val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
+        val draft = StrategyDraft(focusCategories = listOf("CAT-1"), maxActiveBids = maxActiveBids)
+        return when (val result = validate(draft, StrategyRevision(1), policy)) {
+            is StrategyValidation.Valid -> result.strategy
+            is StrategyValidation.Invalid -> error("test fixture가 유효하지 않다: ${result.violations}")
+        }
     }
 
     @Test
