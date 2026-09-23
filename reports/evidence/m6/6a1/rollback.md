@@ -1,9 +1,14 @@
 # M6/6A-1 rollback.md
 
-**실측 HEAD(수정 라운드 3, 최신): `92f8f682`**(D-6A1-44 — `OpenApiContractTest` 순회 루트를
+**실측 HEAD(수정 라운드 4, 최신): `561d8544`**(`OperatorCredentialProperties.toString()`
+평문 노출 정정의 마지막 산출물 커밋). 이하 「임시 clone 실측(①~⑥, 라운드 4)」절이 이
+HEAD에서 새로 낸 측정이고, 아래 라운드 1~3 절은 **그 시점의 유효한 기록으로 보존**한다
+(앞 라운드 실측을 옮기지 않는다).
+
+---
+
+**실측 HEAD(수정 라운드 3): `92f8f682`**(D-6A1-44 — `OpenApiContractTest` 순회 루트를
 문서 전체로 넓힌 마지막 산출물 커밋. D-6A1-43은 `01c8b005`·`69f8d466`·`06434fed` 세 커밋).
-이하 「임시 clone 실측(①~⑥, 라운드 3)」절이 이 HEAD에서 새로 낸 측정이고, 아래 라운드
-1·2 절은 **그 시점의 유효한 기록으로 보존**한다(앞 라운드 실측을 옮기지 않는다).
 
 ---
 
@@ -53,8 +58,8 @@ git diff --name-status $(git merge-base HEAD origin/main)..HEAD -- app/ adapters
   milestone-6.md | grep -v '^.\treports/evidence/'
 ```
 
-신규(A, 20개, 수정 라운드 3에서 `OperatorCredentialTest.kt` 추가) — `restore`가 아니라
-삭제 대상:
+신규(A, 21개, 수정 라운드 3에서 `OperatorCredentialTest.kt` 추가·수정 라운드 4에서
+`OperatorCredentialPropertiesTest.kt` 추가) — `restore`가 아니라 삭제 대상:
 - `adapters/src/main/kotlin/bidvector/adapters/audit/ApiAuditSql.kt`
 - `adapters/src/main/kotlin/bidvector/adapters/audit/ApiAuditStore.kt`
 - `adapters/src/main/resources/db/migration/V15__api_audit.sql`
@@ -62,6 +67,8 @@ git diff --name-status $(git merge-base HEAD origin/main)..HEAD -- app/ adapters
 - `adapters/src/test/kotlin/bidvector/adapters/audit/AuditAdapterDependencyTest.kt`
 - `adapters/src/test/kotlin/bidvector/adapters/audit/AuditGateRegistrationTest.kt`
 - `app/src/main/kotlin/bidvector/app/BidVectorApplication.kt`
+- `app/src/test/kotlin/bidvector/app/OperatorCredentialPropertiesTest.kt` — 수정 라운드 4
+  신설(`OperatorCredentialProperties.toString()` 평문 노출 정정의 회귀 test)
 - `app/src/main/kotlin/bidvector/app/http/ErrorBody.kt`
 - `app/src/main/kotlin/bidvector/app/http/OperatorCredentialFilter.kt`
 - `app/src/main/kotlin/bidvector/app/http/RequestAuditFilter.kt`
@@ -128,6 +135,7 @@ git rm -f \
   adapters/src/test/kotlin/bidvector/adapters/audit/AuditAdapterDependencyTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/audit/AuditGateRegistrationTest.kt \
   app/src/main/kotlin/bidvector/app/BidVectorApplication.kt \
+  app/src/test/kotlin/bidvector/app/OperatorCredentialPropertiesTest.kt \
   app/src/main/kotlin/bidvector/app/http/ErrorBody.kt \
   app/src/main/kotlin/bidvector/app/http/OperatorCredentialFilter.kt \
   app/src/main/kotlin/bidvector/app/http/RequestAuditFilter.kt \
@@ -242,34 +250,109 @@ D 19·M 10 그대로).
 | 부가 확인 | `app/build.gradle.kts`의 `bootJar`/`jar` `enabled` 값 | `bootJar=false` · `jar=true`(base와 동일, 변화 없음) |
 
 `$BASE` = `00d49135`(불변 — `main`이 라운드 2 이후 전진하지 않았다). clone은 실측 직후
+삭제했다. **(수정 라운드 4가 더 붙어 「최종」 라벨은 아래 절로 넘어간다 — 이 절 자체는
+그 시점의 유효한 기록으로 보존한다.)**
+
+## 임시 clone 실측(①~⑥, 2026-09-23, 수정 라운드 4 — verifier r4 finding 넷 반영 뒤 최종 재실측)
+
+`git clone --no-hardlinks`로 격리된 clone(`561d8544` 기준)에서 위 복원 명령을 다시
+실행했다. **목록이 이번에도 바뀌었다** — `OperatorCredentialPropertiesTest.kt`
+(①의 회귀 test) 신설로 삭제 대상이 20 → **21개**, 전체 경로가 30 → **31개**.
+
+| 단계 | 명령 | 결과 |
+| --- | --- | --- |
+| ① 명령 exit | `git restore` + `git rm` | 둘 다 exit 0 |
+| ② D/M 수 | `git status --porcelain \| awk '{print $1}' \| sort \| uniq -c` | **D 21 · M 10**(목록 갱신과 정확히 일치) |
+| ③ diff 빈 것 | `git diff --stat "$BASE" -- <위 31개 경로 전부>` | 빈 출력(exit 0) |
+| — 하네스 무편집 | `git diff --stat "$BASE"..HEAD -- CLAUDE.md .claude/ docs/harness/` | 빈 출력 |
+| ④ compile | `./gradlew --no-daemon :app:compileKotlin :adapters:compileKotlin` | BUILD SUCCESSFUL |
+| ⑤⑥ test·게이트 | `./gradlew --no-daemon check`(9개 모듈 전건) | BUILD SUCCESSFUL(346 tasks, 197 executed·117 from cache·32 up-to-date) |
+| 부가 확인 | `grep -c notice_title` 두 CleanMigration test | `4`·`1`(6F-4 줄 보존, 변화 없음) |
+| 부가 확인 | `grep -c api_request_audit` 같은 두 파일 | `0`·`0`(이 slice 줄 소거) |
+| 부가 확인 | `app/build.gradle.kts`의 `bootJar`/`jar` `enabled` 값 | `bootJar=false` · `jar=true`(base와 동일, 변화 없음) |
+
+`$BASE` = `00d49135`(불변 — `main`이 라운드 3 이후 전진하지 않았다). clone은 실측 직후
 삭제했다. **이 실측이 이 slice의 최종 rollback 검증이다** — 이 시점 이후 in_scope 코드
 변경은 없다.
 
-## 알려진 제한 추가 — D-6A1-43 잔존(등재만, 수정 라운드 3에서 발견)
+## 알려진 제한 추가 — D-6A1-43 잔존(수정 라운드 4에서 정정 — 이전 판 서술이 사실보다 강했다)
 
-**`OperatorCredential` 타입이 raw `String` 재도입을 완전히 막지는 못한다(실측).**
-D-6A1-43은 위치·이름 술어(`ConstantTimeComparisonStructureTest`)가 세 번 뚫린 것을
-`OperatorCredentialFilter`의 생성자가 `OperatorCredential`만 받도록(raw `String`을 필터
-class 안에 아예 두지 않도록) 강화해 닫았다. **그러나 이 강화는 단일 파일·단일 줄
-수정으로는 재도입을 막지만, 여러 파일에 걸친 의도적 재작성까지 막지는 않는다** —
-버릴 clone에서 실측: ① `OperatorCredentialFilter`의 생성자에 `rawExpectedForComparison:
-String` 매개변수를 새로 추가 ② 이웃 패키지 `bidvector.app.security`에 `a == b`(raw
-`String` 비교) 함수를 신설 ③ 두 조립 지점(`BidVectorApplication.kt`·
-`HttpTestSupport.kt`) 모두에서 호출을 그 raw 문자열까지 넘기도록 고치는 **3파일
-변경**(서식 정정 뒤 `numstat` 각각 `1 1`·`2 1`·`1 1` + 신규 파일)을 넣으면 전건 `check`가
-**BUILD SUCCESSFUL**이다(회귀 그물 게이트도 스캔 루트가 `bidvector.app.http` 한
-패키지라 `bidvector.app.security`를 보지 않는다 — r3 F-1이 지적한 것과 같은 사각).
-**이것은 D-6A1-43이 닫겠다고 선언한 네 형태(`==`·`Objects.equals`·이웃 패키지 이동·
-허용 목록 재사용)의 verbatim 재현이 아니다** — verbatim 재현(기존 코드를 그대로 옮기는
-1~5줄 수정)은 이번 라운드에 전부 닫혔다(MUT-1·MUT-2는 전건 `check` BUILD FAILED로 실측
-확인, `commands.md` 참고). 이 잔존은 **raw 문자열 저장을 의도적으로 되살리는 다중 파일
-재작성**이라는, 질적으로 더 큰 비용의 공격이다 — 환경변수에서 읽은 원문이 **어딘가**의
-Kotlin 코드에는 String으로 존재할 수밖에 없다는 것은 이 애플리케이션의 구조적 한계이고,
-어떤 값 타입도 「그 String을 다시 저장하고 새 함수로 넘기는」 재작성 자체를 막지는
-못한다. 타입이 실제로 닫은 것은 **트리비얼한 1줄 편집으로 재도입 가능했던 경로**이고,
-그 경로가 이번 라운드의 실제 위협(verifier r3가 발견한 형태)이었다. `OPEN` 신설은 팀장
-레인 소관이라 요청만 남긴다 — 받는 쪽은 이 slice를 이어받는 인증 관련 후속 slice(현재
-계획된 것 없음, 필요 시 신설).
+**정정 배경(사실 기록).** 수정 라운드 3의 이 절은 잔존 경로를 「raw 문자열 저장을
+의도적으로 되살리는 다중 파일 재작성」이라고 적었다. **verifier r4가 단일 파일 4줄로
+반증했다** — 그 서술은 **비용을 부풀린 거짓**이었다. 아래가 정정본이다(같은 병 두 축).
+
+**ⓐ 실제 최소 비용 — 단일 파일 4줄, 리플렉션으로 `private` 우회(verifier r4 실측,
+이 세션이 독립 재현).** `OperatorCredentialFilter.doFilter` 안에서
+```kotlin
+val f = OperatorCredential::class.java.getDeclaredField("bytes")
+f.isAccessible = true
+val expectedRaw = String(f.get(expected) as ByteArray, StandardCharsets.UTF_8)
+```
+로 `expected`(같은 파일 안의 매개변수)의 `private val bytes`를 꺼내 `String`으로 복원한
+뒤 `presented`와 `Objects.equals`(내부적으로 `String.equals`, 단락 비교)로 비교하면
+(numstat `4 1`, 신규 파일 없음) **전건 `check`가 BUILD SUCCESSFUL**이다. **타입이
+`private`으로 막은 것은 컴파일 시점 접근뿐이고, 런타임 리플렉션(`isAccessible = true`)은
+막지 않는다** — 이것이 D-6A1-43의 **진짜 잔존 경로**다. 다중 파일 재작성(3파일 변경으로
+raw 문자열을 생성자에 재도입하는 형태, 수정 라운드 3에서 실측)도 여전히 가능하지만
+**그것이 최소 비용이 아니다** — 이 절이 이전에 「그것이 유일한 경로」인 것처럼 적어
+비용을 실제보다 부풀렸다.
+
+**ⓑ MUT-4(허용 목록 simple name 재사용)도 여전히 열려 있다(정정 — 이전 판이 실행하지
+않고 단정했다).** 수정 라운드 3의 이 절 자리는 「1차 방어가 타입으로 옮겨간 뒤엔 숨길
+만한 exploitable raw 비교가 없다」고 적고 MUT-4를 실행하지 않았다. **그 단정이 틀렸다.**
+verifier r4 대조 실험(단일 변수 = 이름): 이웃 패키지에 `internal.CredentialCheck`라는
+이름으로 raw 비교를 심으면 게이트가 **FAILED**(잡음)이지만, **`internal.ErrorBody`(허용
+목록의 simple name을 다른 패키지에서 재사용, 별칭 import로 호출)로 심으면 게이트가
+**exit 0**(못 잡음). 이 세션이 독립 재현: `bidvector.app.http.internal.ErrorBody`에
+`object ErrorBody { fun rawEquals(a: Any?, b: Any?) = a == b }`를 신설(신규 파일) →
+**전건 `check` BUILD SUCCESSFUL**. **허용 목록 simple name 재사용은 여전히 열려 있다**
+— r3 F-1이 지적한 세 축(이름·위치·허용 목록) 중 이 축은 이번 라운드에도 안 닫혔다.
+회귀 그물 게이트(`ConstantTimeComparisonStructureTest`)의 맹점이지, 1차 방어(타입)와는
+별개다.
+
+**남는 사실.** D-6A1-43이 실제로 닫은 것은 **verbatim 4형태**(같은 파일 안의 `==`·
+`Objects.equals` 치환 — MUT-1·MUT-2로 전건 `check` BUILD FAILED 실측 확인,
+`commands.md` 참고)뿐이다. ⓐ(리플렉션)·ⓑ(허용 목록 이름 재사용)는 **둘 다 열려 있고**,
+둘 다 하네스 레인 소관 게이트의 맹점이거나 JVM 리플렉션의 근본적 한계라 **이 slice의
+코드 수정으로 닫을 수 있는 범위가 아니다**(private을 아무리 강하게 걸어도 리플렉션은
+JVM 표준 기능이고, 이름 기반 허용 목록은 구조가 아니라 문자열 비교다). 이 잔존은
+`OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`(scope.md D-6A1-45)에 담기며, 그 문면도 ⓐⓑ
+실측(리플렉션 4줄·허용 목록 simple name 재사용)을 반영해 **팀장 레인이 사실대로
+갱신**한다(요청만 남긴다) — 받는 쪽은 이 slice를 이어받는 인증 관련 후속 slice(현재
+계획된 것 없음, 필요 시 신설) 또는 하네스 레인(게이트 맹점 자체).
+
+## (2b) 값 획득 축 추가 — `OperatorCredentialProperties`(수정 라운드 4, verifier r4 발견 반영)
+
+D-6A1-43 설계 당시 (2b) 표는 `OperatorCredentialFilter`·`OperatorCredential` 둘만 전수
+했고, **자격증명 원문을 들고 있는 두 번째 public 타입**(`OperatorCredentialProperties`,
+`@ConfigurationProperties` 바인딩 객체, `BidVectorApplication.kt`)이 누락됐다. 이번
+라운드에 전수한다:
+
+| 표면 | 노출 경로 | 값을 꺼낼 수 있는가 | 처분 |
+| --- | --- | --- | --- |
+| `value: String`(public `val`) | 직접 필드 접근(`properties.value`) — **의도된 경로**, `OperatorCredentialFilter` 조립 지점 한 곳만 읽는다 | 예 — 그러나 이 필드는 애초에 **원문을 전달하는 것이 존재 목적**(환경변수 → 타입 래핑)이라 이것 자체는 위협이 아니다 | 닫는다 — 읽는 지점이 조립 근 하나뿐임을 실측(grep, `commands.md`) |
+| `toString()`(수정 전: `data class` 합성, 원문 노출 / 수정 후: `Any.toString()`) | Spring이 기동 실패·바인딩 오류·actuator 환경 노출 등에서 **암묵적으로** 이 객체를 문자열화할 수 있는 모든 경로(로그 포함) | **수정 전 — 예(결함, 이번 라운드에 닫음)**. 수정 후 — 아니오(`Any.toString()`은 필드를 담지 않는다) | 닫는다 — `data class` → `class`로 바꾸고 `OperatorCredentialPropertiesTest`(신규)가 `toString()`이 원문을 담지 않음을 실측으로 잠근다 |
+| `copy()`·구조 분해·`equals`/`hashCode`(수정 전: `data class` 자동 생성) | `data class`가 합성하는 전부 — 이 slice 안에서는 실제로 쓰이는 자리가 없었다(grep 확인, 단일 사용처) | 수정 전에는 **잠재적으로 가능**했으나 실제 사용처가 없어 오늘 위협은 아니었다. 수정 후 — 애초에 존재하지 않는다 | 닫는다 — `data class` 제거로 그 표면 자체를 없앴다(사용처 없는 표면은 「경계로 처리」가 아니라 삭제가 맞다) |
+
+**verifier r4가 지적한 누락의 원인(사실 기록)** — D-6A1-43 설계 당시 (2b) 표는
+`OperatorCredentialFilter`(경계로 처리, 자격증명 주입 자리)만 새 public 표면으로
+꼽았다. `OperatorCredentialProperties`는 **그 라운드 이전부터 이미 존재**하던 타입이라
+「이번 라운드가 새로 낸 표면」의 정의(수정 라운드마다 갱신 규율의 대상)에 형식적으로는
+안 들지만, **자격증명 원문을 들고 있다는 실질**은 `OperatorCredential`과 같은 층이었다
+— (2b) 전수가 「새 표면」이 아니라 「자격증명 원문에 닿는 모든 표면」을 기준으로
+갔어야 했다는 것이 이 누락의 교훈이다.
+
+## D-6A1-46 미완 — 문면 정정이 소스 KDoc에만 미쳤다(사실 기록, 수정 라운드 4)
+
+**D-6A1-46**(scope.md, 팀장 결정)은 「`ConstantTimeComparisonStructureTest`의 전칭
+주장을 걷고, **위협 모델의 해당 줄도 같이 맞춘다**」고 적었다. 수정 라운드 3에서
+구현 레인은 `ConstantTimeComparisonStructureTest.kt`·`OperatorCredentialFilter.kt`의
+**소스 KDoc만** 고쳤다 — `scope.md`의 위협 모델 (4)·(2b) 표는 **무편집**으로 남았다
+(구현 레인은 `scope.md`를 편집할 수 없는 레인 경계이기도 하다). **이 문서(rollback.md)를
+사실에 맞춘다** — 위 「알려진 제한 추가 — D-6A1-43 잔존」·「(2b) 값 획득 축 추가」
+두 절이 이번 라운드에 사실대로 정정된 내용이고, `scope.md`의 위협 모델·(2b) 표
+동기화는 **팀장 레인이 직접** 한다(요청만 남긴다 — D-6A1-42가 세운 「OPEN도 세 문서가
+같은 라운드에 움직여야」와 같은 축).
 
 ## 알려진 제한 추가 — D-6A1-41(등재만, MEDIUM)
 
@@ -279,8 +362,18 @@ Kotlin 코드에는 String으로 존재할 수밖에 없다는 것은 이 애플
 공집합」 주장도 사실로 재확인됐다(배포물에 우리 클래스 24개·test 클래스 0개). 그러나
 부수 효과가 있다는 사실 자체가 D-6A1-35(「예산 때문에 유지」)가 남긴 부채의 **크기를
 키운다**. 받는 쪽은 **6A-2**(앱 이미지·entrypoint를 확정하는 slice, D-6A1-35와 같은
-자리) — scope.md의 OPEN 표·알려진 제한에 정식 등재하는 것은 팀장 레인 소관이라 이
-rollback.md 항목이 이 slice가 낼 수 있는 등재다.
+자리) — `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(scope.md OPEN 표 등재분과 같은 ID). scope.md의
+OPEN 표·알려진 제한에 정식 등재하는 것은 팀장 레인 소관이라 이 rollback.md 항목이 이
+slice가 낼 수 있는 등재다(수정 라운드 4 — 이전 판이 이 절에서 OPEN ID 문자열을 빠뜨린
+것을 정정, ④ OPEN ID 정합 점검).
+
+**같은 점검에서 확인한 것(④)** — `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`(scope.md
+D-6A1-45가 신설)은 위 「알려진 제한 추가 — D-6A1-43 잔존」절이 다루는 것과 같은
+사실(raw 자격증명 재도입 잔존)이지만 이 절 작성 시점에 ID 문자열을 인용하지 않았다 —
+여기서 명시한다: **`OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`**. 나머지 세 OPEN ID
+(`OPEN-6A1-CONNECTION-POOL`·`OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT`·
+`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`)는 `grep -oE 'OPEN-[A-Z0-9-]+'`로 대조해
+`scope.md`와 문자열이 정확히 일치함을 확인했다(differs 0).
 
 ## 검증자 유효성 확인
 
@@ -297,9 +390,14 @@ git diff --name-only <실측 HEAD>..<판정 SHA> -- \
   app/build.gradle.kts app/src/main/kotlin/bidvector/app \
   app/src/test/kotlin/bidvector/app/compatibility/BootCompatibilitySmokeTest.kt \
   app/src/test/kotlin/bidvector/app/http \
+  app/src/test/kotlin/bidvector/app/OperatorCredentialPropertiesTest.kt \
   config/quality/gate-tests.properties gradle/libs.versions.toml openapi \
   milestone-6.md
 ```
+
+(수정 라운드 4 — `OperatorCredentialPropertiesTest.kt`가 `bidvector.app` 최상위 test
+패키지에 있어 기존 `app/src/test/kotlin/bidvector/app/http` 디렉터리 경로로는 덮이지
+않는다. 개별 경로로 추가했다.)
 
 **유효성 술어 정정(CLAUDE.md 2026-09-19, `origin/main`에 이미 반영·이 branch는 흡수 전)** —
 verifier가 대조하는 것은 「실측 HEAD == 판정 SHA」가 아니다(evidence 커밋은 언제나 뒤에

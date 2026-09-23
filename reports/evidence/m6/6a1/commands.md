@@ -333,11 +333,23 @@ verifier r3 HIGH 둘(위치·이름 술어가 세 번째로 뚫린 상수 시간
   HEAD — 필터 생성자가 `OperatorCredential`만 받음)에서는 같은 형태를 재현하려면 필터
   생성자 시그니처와 두 조립 지점(`BidVectorApplication`·`HttpTestSupport`) 셋을 모두
   고쳐야 했다 — 3파일 변경(numstat `1 1` + `2 1` + `1 1` + 신규 파일) 뒤 서식을 바로잡고
-  실측한 결과 **BUILD SUCCESSFUL**(잔존 — 아래 「알려진 제한」에 등재).
-- MUT-4(허용 목록 simple name 재사용) — 실행하지 않음. 1차 방어가 타입으로 옮겨간 뒤에는
-  `Intrinsics.areEqual`을 이름 충돌로 숨겨도 **숨길 만한 exploitable raw 비교가 애초에
-  없다**(회귀 그물 게이트 자체의 맹점은 r3 F-1 그대로 남지만, 보안 성질은 그 게이트에
-  의존하지 않는다) — 이유를 `ConstantTimeComparisonStructureTest` KDoc에 적었다.
+  실측한 결과 **BUILD SUCCESSFUL**(잔존).
+- **MUT-4**(허용 목록 simple name 재사용) — **팀장 지시로 사후 재실측(이전 판은 실행하지
+  않고 「exploitable 하지 않다」고 단정했는데 그 단정이 틀렸다).** `bidvector.app.http.internal`
+  패키지에 `object ErrorBody { fun rawEquals(a: Any?, b: Any?) = a == b }`를 신설(신규
+  파일, ktlint 서식 정정 뒤 재확인). 결과: **전건 `check` BUILD SUCCESSFUL** — 허용 목록의
+  simple name(`ErrorBody`)을 다른 패키지에서 재사용하면 여전히 게이트가 못 본다(r3 F-1의
+  세 축 중 이 축은 이번 라운드에도 안 닫혔다). **이전 판의 「숨길 만한 exploitable raw
+  비교가 없다」는 게이트 자체의 맹점 유무와 무관하게 틀린 단정이었다 — 실행하지 않고
+  결론부터 썼다.**
+- **MUT-5**(verifier r4 신규 — 리플렉션으로 `OperatorCredential.bytes` 추출, 단일 파일)
+  — `OperatorCredentialFilter.doFilter` 안에서 `OperatorCredential::class.java
+  .getDeclaredField("bytes")`로 `expected`의 private 필드를 꺼내 `String`으로 복원한 뒤
+  `presented`와 `Objects.equals`(내부적으로 `String.equals`, 단락 비교)로 비교(numstat
+  `4 1`, 같은 파일 하나). 결과: **전건 `check` BUILD SUCCESSFUL** — 타입이 `private`으로
+  막은 것은 **컴파일 시점 접근**뿐이고 런타임 리플렉션은 막지 않는다. **이전 판의
+  「다중 파일 재작성이라야 가능」은 거짓이었다** — 단일 파일 4줄로도 가능하다. 아래
+  「알려진 제한」을 사실대로 정정한다.
 
 ### 변이 실측 — D-6A1-44(버릴 clone, 실 `openapi.yaml` 대상)
 
@@ -355,6 +367,73 @@ inline object로 바꿔 속성을 하나씩 심었다(각 clone에서 개별 실
 .content.application/json.schema.properties.<probe>`)를 assertion 메시지로 식별했다 —
 합성 spec 단위 test(`paths 의 인라인 응답 스키마에 심은 위반도 순회가 잡는다`)뿐 아니라
 실 문서 대상으로도 닫힘을 재확인했다.
+
+## 수정 라운드 4 — verifier r4 finding 넷(승인 전 마지막 한 커밋)
+
+r4 판정은 `ready-for-review`(산출물 HIGH 0)였다 — D-6A1-43·44의 verbatim 4형태·6형태
+전부 verifier가 독립 재현했다(11·10 tests, 여섯 자리 개별 식별). 아래 넷을 반영한다:
+① 진짜 결함(`OperatorCredentialProperties.toString()` 평문 노출) ② 내 이전 문면 정정
+둘(ⓐ 「다중 파일 재작성이라야」 거짓·ⓑ MUT-4 단정 거짓) ③ D-6A1-46 미완 사실 기록
+④ OPEN ID 문자열 정합.
+
+### ① `OperatorCredentialProperties.toString()` 평문 노출 — 수정 + 변이 실측
+
+`@ConfigurationProperties` 바인딩 객체가 `data class`라 `toString()`이 원문을 그대로
+냈다(Spring이 기동 실패·바인딩 오류·actuator 등에서 이 객체를 암묵적으로 문자열화할 수
+있는 로그 노출 경로). `data class` → `class`로 바꾸고(`equals`/`hashCode`/`copy`/구조
+분해도 함께 제거 — 이 slice 안 실제 사용처 없음, grep 확인) `Any.toString()`을 그대로
+쓴다. 회귀 test `OperatorCredentialPropertiesTest`(1 test, 실행 확인) 추가.
+
+**변이 실측(버릴 clone, numstat 적용 확인)** — `class` → `data class`로 되돌림(numstat
+`1 1`):
+- 표적 test `OperatorCredentialPropertiesTest` **FAILED**(`expected:<false> but was:<true>`)
+- **전건 `./gradlew --no-daemon check` BUILD FAILED**
+
+**닫힘 확인.**
+
+### ② 문면 정정 — 실측으로 반증된 이전 판 단정 둘
+
+**ⓐ**(팀장 지시로 재확인, 이 세션이 독립 재현) — 이전 판(수정 라운드 3)이 「다중 파일
+재작성이라야 가능」이라고 적었는데 **단일 파일 4줄**로도 가능했다. `OperatorCredentialFilter
+.doFilter` 안에서 리플렉션(`OperatorCredential::class.java.getDeclaredField("bytes")`
++ `isAccessible = true`)으로 `expected`의 `private val bytes`를 꺼내 `String`으로 복원한
+뒤 `Objects.equals`(내부적으로 `String.equals`, 단락 비교)로 비교(numstat `4 1`, 신규
+파일 없음). 결과: **전건 `check` BUILD SUCCESSFUL** — 타입이 막은 것은 컴파일 시점
+접근뿐이고 런타임 리플렉션은 막지 못한다.
+
+**ⓑ**(팀장 지시로 재확인, 이 세션이 독립 재현) — 이전 판이 MUT-4(허용 목록 simple name
+재사용)를 「exploitable raw 비교가 없다」며 실행하지 않고 건너뛰었는데, 그 단정이
+틀렸다. `bidvector.app.http.internal.ErrorBody`(허용 목록의 simple name을 다른
+패키지에서 재사용)에 `object ErrorBody { fun rawEquals(a: Any?, b: Any?) = a == b }`
+신설(신규 파일, ktlint 서식 정정 뒤 재확인). 결과: **전건 `check` BUILD SUCCESSFUL** —
+회귀 그물 게이트(`ConstantTimeComparisonStructureTest`)는 이 축을 여전히 못 본다.
+
+두 실측 모두 `rollback.md`의 「알려진 제한 추가 — D-6A1-43 잔존」 절을 **정정**했다
+(수치·비용 서술을 사실대로 낮춤).
+
+### ③·④ 문서 정합
+
+D-6A1-46 미완(scope.md 위협 모델·(2b) 표 무편집)과 OPEN ID 문자열 정합 점검을
+`rollback.md`에 각각 별도 절로 기록했다(`## D-6A1-46 미완`·OPEN ID 정합은 D-6A1-41
+절에 병기). `scope.md`·`milestone-6.md`는 팀장 레인이라 손대지 않았다.
+
+### acceptance 재검증(HEAD `561d8544`)
+
+| ID | 명령 | exit | 핵심 결과 |
+| --- | --- | --- | --- |
+| S-10 | `./gradlew --no-daemon check` | 0 | BUILD SUCCESSFUL, 337 tasks |
+| S-40 | `:app:test --tests '*http*' --rerun-tasks` | (전건 `check`에 포함, 별도 재실행은 생략 — http 코드 무편집) | — |
+| S-41 | `:adapters:test --tests '*JdbcStrategyRepositoryTest*' --rerun-tasks` | (전건 `check`에 포함, adapters 무편집) | — |
+| S-42 | `:app:test --tests '*OpenApiContractTest*' --rerun-tasks` | (전건 `check`에 포함, openapi 무편집) | — |
+| S-20 | `./tools/one-command-check.sh` | (미재실행 — 이 라운드는 `ml-engine` 무접촉, 직전 라운드 환경 E-1과 동일 사유) | — |
+
+**참조형 누출 스캔** — evidence 디렉터리: `grep -rniE -f config/quality/leak-patterns.txt
+reports/evidence/m6/6a1/` **exit 1**(매치 없음). in_scope 코드 파일(수동 점검, CI
+`leakPatternGate`의 scanRoot는 `reports/evidence` 뿐이라 이 결과는 CI 게이트 판정이
+아니다): `OperatorCredentialTest.kt`·`OperatorCredentialPropertiesTest.kt`의 test fixture
+문자열 리터럴이 패턴 어휘 하나와 매치되는데(축어로 옮기지 않는다 — 그 자체가 evidence
+자기참조가 된다), 이는 이전 라운드부터 있던 관례(test 전용 placeholder, 실제 비밀값
+아님)이고 `check`가 매 라운드 통과해 CI 영향이 없음을 재확인했다.
 
 ## 참고 — 하네스 레인 변경
 
