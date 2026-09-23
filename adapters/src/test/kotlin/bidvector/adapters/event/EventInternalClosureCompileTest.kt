@@ -63,6 +63,20 @@ class EventInternalClosureCompileTest {
         assertNegativeFails("6-for-strategy-updated")
         assertPositiveCompiles()
     }
+
+    /**
+     * D-6F7-1·scope.md 우회 1 — `NotificationRequest`(`workflow.evaluation`)의 `internal`
+     * 생성자가 이 slice의 새 소비자(`adapters`)에도 여전히 닫혀 있는지 확인한다. fixture는
+     * `VerdictLadder.judge`(public, `decision` 모듈 소유)로 진짜 `Verdict.BidNow`를 얻은
+     * 뒤 그 값으로 `NotificationRequest`를 지으려다 실패한다 — 사다리를 지나지 않고
+     * 판정을 지어내는 축(값 위조)이 아니라, 사다리를 **정직하게 지난** 값으로도 봉투
+     * 조립 통로(`NotificationRequest`) 자체는 여전히 막혀 있는지를 잰다.
+     */
+    @Test
+    fun `NotificationRequest 생성자는 workflow 밖에서 internal 이다`() {
+        assertNegativeFails("7-notification-request-ctor")
+        assertPositiveCompiles()
+    }
 }
 
 private fun assertNegativeFails(fixtureName: String) {

@@ -315,6 +315,99 @@ D-6F2-9(거동 등식 + 상수 풀 참조 단언 **두 축**)·D-6F2-10(등재 +
 - live read probe와 notification dry-run 절차
 - 기존 시스템과 V2를 비교한 차이 목록과 의도적 폐기 기능
 
+**6F-7 착수·종결 2026-09-23** — base `86093972`, 레인 worktree `bid-vector-v2-m6f7`·브랜치 `m6-6f7/2026-09-23`.
+정본 `reports/evidence/m6/6f7/scope.md`(D-6F7-1~12). **배선 순서의 1번**이고 `NotificationRequestPort` 의
+production 구현(`OutboxNotificationRequestPort`)을 낸다 — **알림 요청을 outbox 에 넣는 자리까지**이고 실
+발송·렌더링은 `OPEN-STR-12` 다.
+
+**착수 조사가 설계를 정했다** — `EventEnvelope` 생성이 `workflow` 모듈에 `internal` 로 닫혀 있고 컴파일
+test 가 그것을 잠근다. 그래서 sink 가 `workflow` 안에 있어야 하고, **신설 어댑터 패키지도 마이그레이션도
+불필요**하다(outbox V6 가 payload 종류에 무관하다).
+
+**결정 하나를 조사 추천과 반대로 냈다(D-6F7-2)** — payload 에 `PredictionEvidence` 를 **싣는다**. 팀장 실측:
+**V2 에 판정 기록 표가 없다**(표 18 전수, `OPEN-6F3-BID-RECORD` 가 그래서 열려 있다). 그러므로 **outbox 행이
+그 판정의 유일한 영속 흔적**이고 evidence 를 빼면 **영구히 복원 불가**다. 되돌릴 수 없는 손실 쪽으로 기울이지
+않는다. **멱등은 닫지 않는다(D-6F7-6)** — outbox 에 `idempotency_key` UNIQUE 가 없고 그건 4C-1 의 기존
+한계다. **닫을 수 없는 것을 닫았다고 적지 않는 것**이 처분이다.
+
+**이 slice 가 남긴 하네스 교훈 — 「안 돌린 게이트는 다른 게이트의 실패를 가린다」.** `contractGate` 가 깨진
+git 래퍼(없는 `/opt/homebrew/bin/git` 을 가리킴)로 먼저 죽어 빌드가 `:app:test` 에 **도달하지 못했고**,
+그래서 아키텍처 게이트가 **한 번도 안 돈 채** 「전 gate green」으로 보였다. 래퍼를 고치자마자 **패키지 순환**이
+드러났다(`embedding → event → evaluation → embedding`). 그 순환은 **팀장 결정(D-6F7-5)이 만든 것**이다 —
+codec 의 허용 루트만 보고 위치를 정했고 **그 위치가 만드는 의존 방향**을 재지 않았다. **D-6F7-7** 로 sink 를
+`workflow.evaluation` 으로 옮기고 payload 만 `event` 에 남겨 풀었다(방향이 **이미 있는 변**과 같아진다).
+
+**판정 레인 셋** — `privacy-gate` **통과**(payload 전 필드 비-PII, 폐쇄가 **컴파일 실패**로 실측) ·
+`code-reviewer` **머지 가능**(MEDIUM 1 · LOW 2) · `verifier` **`not-ready` → HIGH 2, 둘 다 계약 문서**.
+**코드·게이트·acceptance 는 전부 초록이었다.** 막은 둘은 **팀장이 쓴 문서**다: ① `in_scope` 가 산출물의
+**62%** 를 안 덮어 **clean-tree 게이트가 실제로 눈이 멀었다**(D-6F7-7 로 sink 를 옮기며 YAML 을 안 고쳤다 —
+**6A-1 D-6A1-26 과 같은 실수의 두 번째**) ② 신설 OPEN 의 **차단 사유 둘이 거짓**이고 **전제까지 틀렸다**
+(경계 게이트는 옮겨진 sink 를 안 덮고, `internal` 생성자는 읽기를 안 막으며, code 로 바꾸면 `toString()` 이
+나르는 **임계·확률 수치를 잃는다**). **6A-1 이 다섯 번 겪은 「보장을 지지 않는데 졌다고 적힘」의 거울상** —
+**못 한다고 적었는데 할 수 있었다.**
+
+**이 slice 가 신설해 인계하는 OPEN 하나** — **`OPEN-6F7-REASON-CODE-STABILITY`**: outbox 에 영속되는 값이
+**Kotlin 합성 `toString()`** 이라 **형식이 조용히 바뀔 수 있다.** 축어 잠금 + 소진 `when` 이 그것을 **「소리
+나게」** 했을 뿐이고 **이미 영속된 옛 행은 고치지 않는다.** 받는 쪽 **도메인 레인**. 그리고 **`OPEN-6F-ASSEMBLY`
+가 둘을 더 받는다** — `SQLException`→`Failed` 가 선례(전파 → 롤백)와 갈려 **배선 뒤 `inTransaction` 에서
+호출부가 `Failed` 를 무시하면 도메인 write 만 커밋되고 outbox 행이 없다**(D-6F7-11) · **하위 소비자의 `Failed`
+로깅**은 배선 전이라 확인 불가(privacy-gate).
+
+## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
+
+운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
+**포트별 production 구현 존재 여부를 전수**했다.
+
+### `EvaluateCandidatesUseCase` 의 포트 아홉 — 셋이 비어 있다
+
+| 포트 | production 구현 | 낸 slice |
+| --- | --- | --- |
+| `StrategyRepository` | `JdbcStrategyRepository` | 6F-1 ✅ |
+| `CandidateSourcePort` | `JdbcCandidateSource` | 6F-2 ✅ |
+| `LicenseGatePort` | `StoredRequirementLicenseGate` | 6F-5-a ✅ |
+| `CorrelationIdFactory` · `Clock` | `UuidCorrelationIdFactory` · `SystemClock` | 6F-2·6F-1 ✅ |
+| `OperatorProfilePort` | `JdbcOperatorProfileRepository` | 6F-6 ✅ |
+| **`WatchSubjectPort`** | **없음** | — |
+| **`CapacityPort`** | **없음** | — |
+| **`NotificationRequestPort`** | **없음** | — |
+| `MlAnalysisPort` | `UnavailableMlAnalysis`(**자리지킴**) | 처분은 4B-6b 가 6A 로 넘겼다 |
+
+**6F-4 는 감시 텍스트의 「데이터」(V14 `notice_title` + canonical 조립)를 냈지 `WatchSubjectPort` 어댑터를
+내지 않았다** — `OPEN-6F4-TITLE-WIRING` 이 그 자리다.
+
+### 순환은 실재하지 않는다 — 갈라 놓아서 그렇게 보였다
+
+계약 문면상 **6F-3(여력)은 「6A 평가 endpoint 선행」**이고 **6A-3(후보평가 축)은 「어댑터 여섯이 생긴 뒤」**라
+서로를 가리킨다. **실측으로 풀린다**: `CapacityPort.snapshot()` 은 **인자를 받지 않는다.** 그러므로 결정 ③
+(「현재 활성 수는 평가 요청이 싣는다」)이 성립하려면 그 어댑터는 **요청마다 그 값으로 생성**돼야 하고,
+그 생성 자리가 곧 **평가 endpoint** 다. **둘은 서로를 기다리는 것이 아니라 같은 일**이다.
+
+**결정 — 6F-3 과 6A-3 을 한 slice 로 합친다.** 갈라 두면 어느 쪽도 먼저 설 수 없다.
+
+### 착수 순서
+
+1. **6F-7** — `NotificationRequestPort` → outbox. **차단 없음**(outbox 기반은 V6·`JdbcOutboxPort` 로 존재).
+   발송 채널은 `OPEN-STR-12` 로 그 뒤다 — 이 slice 는 **요청을 낳는 자리까지**다.
+2. **6F-4-w** — `WatchSubjectPort`. **차단 없음**(6F-4 의 `notice_title` 이 `main` 에 있다).
+   `OPEN-6F4-TITLE-WIRING` 을 닫는다.
+3. **6A-3 + 6F-3**(합침) — 평가 endpoint + `CapacityPort`. 여기서 **`MlAnalysisPort` 처분**(실 gRPC gateway
+   배선 vs 자리지킴 유지)을 운영자에게 올린다 — 4B-6b 가 6A 로 넘긴 결정이고 **실 외부 호출 축**이다.
+4. **조립**(`OPEN-6F-ASSEMBLY`) — 포트 아홉을 app 에 꽂는다. 1~3 이 전제다.
+
+### 배선 밖 잔여
+
+**지금 열림**: **6A-2**(세션 편집 endpoint + 앱 이미지 — 6A-1 이 남긴 `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`·
+`OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` 을 받는다) · **6B-2**(백업·복원·마이그레이션 되돌림 리허설,
+완료 조건 7).
+
+**운영자 결정 선행**: **6B-3**(데이터 수명·마스킹 — **승인된 보존 기간이 없다**. 6F-6·6F-5-a·6A-1 이 각각
+`OPEN-…-RETENTION` 을 여기로 넘겼다) · **6B-4**(ML job 영속·큐 상한 — **큐 정책 결정**) · **6F-5-b**(요건을
+채우는 LLM 추출 — **실 LLM 호출은 운영자 승인 대상**).
+
+**배선 뒤**: **6D**(E2E·장애 주입) · **6E**(제품 acceptance·운영 runbook — `OPEN-6A1-CONNECTION-POOL` 이
+여기서 닫혀야 운영 반입이 가능하다).
+
+
 ## 완료 조건
 
 - 새 checkout/clean database에서 one-command build/test 가능
