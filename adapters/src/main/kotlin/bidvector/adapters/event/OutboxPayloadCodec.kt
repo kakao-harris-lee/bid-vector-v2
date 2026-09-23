@@ -17,42 +17,22 @@ import java.time.LocalDate
  *
  * 값이 단순(정수·날짜·짧은 문자열, 목록·map도 원시 원소뿐)이라 Jackson 등 JSON
  * 라이브러리를 새로 끌어오지 않는다(측정된 필요 없음, §7) — 이스케이프를 인식하는
- * 구분자로 충분하다. [NotificationRequestedPayload]가 목록·map을 나르므로 구분자를
- * 계층별로 하나씩 쓴다([FIELD_SEPARATOR] 최상위, [LIST_SEPARATOR] 목록,
- * [MAP_ENTRY_SEPARATOR] map 항목) — 각 계층은 [escapeFor]/[splitEscapedFor]로 독립적으로
- * 이스케이프되므로(자신의 구분자와 [ESCAPE]만 보호) 중첩이 안전하다(바깥 계층이 안쪽이
- * 이미 이스케이프한 [ESCAPE] 문자를 다시 보호한다 — CSV-in-CSV와 같은 원리).
+ * 구분자로 충분하다. `NotificationRequestedPayload`가 목록·map을 나르므로 구분자를
+ * 계층별로 하나씩 쓴다(`FIELD_SEPARATOR` 최상위, `LIST_SEPARATOR` 목록,
+ * `MAP_ENTRY_SEPARATOR` map 항목) — 각 계층은 `escapeFor`/`splitEscapedFor`로 독립적으로
+ * 이스케이프되므로(자신의 구분자와 `ESCAPE`만 보호) 중첩이 안전하다(바깥 계층이 안쪽이
+ * 이미 이스케이프한 `ESCAPE` 문자를 다시 보호한다 — CSV-in-CSV와 같은 원리).
+ *
+ * 직렬화 상수·하위 조립 함수는 이 object의 멤버가 아니라 **파일 스코프 private
+ * top-level**이다(D-6F7 수정) — object 멤버로 두면 detekt `TooManyFunctions`(상한 11)와
+ * `sizeGate`(함수 50줄 한도, v2-지침서 §5)가 동시에 걸린다: 지역 함수로 나누면 함수
+ * 개수는 줄지만 바깥 함수의 줄 수는 그대로다(지역 함수 본문도 바깥 함수 줄 수에 든다).
+ * 파일 top-level private 함수는 object 멤버가 아니라 `TooManyFunctions` 계수에 들지
+ * 않으면서 줄 수도 각자 짧게 남는다 — 같은 파일이라 접근 범위는 그대로 이 파일 안이다.
  */
 internal object OutboxPayloadCodec {
     const val STRATEGY_UPDATED_TYPE = "StrategyUpdated"
     const val NOTIFICATION_REQUESTED_TYPE = "NotificationRequested"
-
-    private const val FIELD_SEPARATOR = '|'
-    private const val LIST_SEPARATOR = ','
-    private const val MAP_ENTRY_SEPARATOR = ';'
-    private const val MAP_KV_SEPARATOR = '='
-    private const val ESCAPE = '\\'
-
-    /** [encodeStrategyUpdated]가 내는 필드 수(revision·effectiveFrom·source) — [decodeStrategyUpdated]의 형식 검증 상수. */
-    private const val STRATEGY_UPDATED_FIELD_COUNT = 3
-
-    /**
-     * [encodeNotificationRequested]가 내는 최상위 필드 수 — noticeId·bidNowReasons·
-     * evidenceKind·(Diagnosed 열둘 | NotPredicted 하나, 안 쓰는 자리는 빈 문자열)·
-     * excludedSamples. [decodeNotificationRequested]의 형식 검증 상수.
-     */
-    private const val NOTIFICATION_REQUESTED_FIELD_COUNT = 17
-
-    /** noticeId·bidNowReasons(둘)을 뺀 나머지 — evidenceKind 1 + Diagnosed 필드 12 + 미사용 1 + excludedSamples/reason 1. */
-    private const val EVIDENCE_FIELD_COUNT = NOTIFICATION_REQUESTED_FIELD_COUNT - 2
-    private const val EVIDENCE_KIND_DIAGNOSED = "DIAGNOSED"
-    private const val EVIDENCE_KIND_NOT_PREDICTED = "NOT_PREDICTED"
-
-    /** [EVIDENCE_FIELD_COUNT]에서 evidenceKind(1)·마지막 칸(1)을 뺀 나머지 — `NotPredicted`가 채우지 않는 빈 칸 수. */
-    private const val EVIDENCE_BLANK_SLOTS_FOR_NOT_PREDICTED = EVIDENCE_FIELD_COUNT - 2
-
-    /** `evidenceFields`의 마지막 칸 — Diagnosed 는 excludedSamples, NotPredicted 는 reason. */
-    private const val EVIDENCE_TRAILING_SLOT_INDEX = EVIDENCE_FIELD_COUNT - 1
 
     fun payloadTypeOf(payload: Any?): String =
         when (payload) {
@@ -105,110 +85,13 @@ internal object OutboxPayloadCodec {
         return StrategyEvent.StrategyUpdated(revision, PolicyVersion(effectiveFrom, fields[2]))
     }
 
-    /**
-     * evidenceKind + Diagnosed 12칸 + NotPredicted 1칸 + excludedSamples 1칸(총
-     * [EVIDENCE_FIELD_COUNT]칸, noticeId·bidNowReasons와 합쳐
-     * [NOTIFICATION_REQUESTED_FIELD_COUNT]) — 안 쓰는 갈래는 빈 문자열이다(§3.1 「reason
-     * 코드 + 구조화 payload」 — 두 갈래를 한 행에 펴는 관례상 선택이지 값의 혼동은 아니다.
-     * `evidenceKind`가 갈래를 소진적으로 가른다). 갈래별 하위 조립(`evidenceFieldsOf`·
-     * `excludedSamplesField`)은 이 함수의 지역 함수다 — object 멤버 함수 상한(detekt
-     * `TooManyFunctions`)을 넘기지 않으면서 조립을 나눈다.
-     */
     private fun encodeNotificationRequested(payload: NotificationRequestedPayload): String {
-        fun encodeReasons(reasons: List<String>): String =
-            reasons.joinToString(LIST_SEPARATOR.toString()) { escapeFor(it, LIST_SEPARATOR) }
-
-        fun excludedSamplesField(excludedSamples: Map<String, Int>): String =
-            // toSortedMap 은 자연 순서 비교자를 쓴다 — 이 파일의 sortedBy 람다가 낳는
-            // 합성 클래스(jarContentGate가 거부하는 stdlib SourceFile 유출)를 만들지 않는다.
-            excludedSamples
-                .toSortedMap()
-                .entries
-                .joinToString(MAP_ENTRY_SEPARATOR.toString()) { (reason, count) ->
-                    "${escapeFor(reason, MAP_ENTRY_SEPARATOR)}$MAP_KV_SEPARATOR$count"
-                }
-
-        fun evidenceFieldsOf(evidence: NotificationEvidencePayload): List<String> =
-            when (evidence) {
-                is NotificationEvidencePayload.Diagnosed -> {
-                    listOf(
-                        EVIDENCE_KIND_DIAGNOSED,
-                        evidence.trainingRowCount.toString(),
-                        evidence.segmentSupport,
-                        evidence.shrinkageWeight,
-                        evidence.excludedObservations.toString(),
-                        evidence.agencySampleCount.toString(),
-                        evidence.agencySampleBelowThreshold.toString(),
-                        evidence.releaseId,
-                        evidence.artifactChecksum,
-                        evidence.featureSchemaVersion,
-                        evidence.codeVersion,
-                        evidence.datasetId,
-                        evidence.releaseKind,
-                        "",
-                        excludedSamplesField(evidence.excludedSamples),
-                    )
-                }
-
-                is NotificationEvidencePayload.NotPredicted -> {
-                    listOf(EVIDENCE_KIND_NOT_PREDICTED) +
-                        List(EVIDENCE_BLANK_SLOTS_FOR_NOT_PREDICTED) { "" } +
-                        evidence.reason
-                }
-            }
-
-        val fields = listOf(payload.noticeId, encodeReasons(payload.bidNowReasons)) + evidenceFieldsOf(payload.evidence)
+        val fields =
+            listOf(payload.noticeId, encodeReasons(payload.bidNowReasons)) + evidenceFieldsOf(payload.evidence)
         return fields.joinToString(FIELD_SEPARATOR.toString()) { escapeFor(it, FIELD_SEPARATOR) }
     }
 
-    /**
-     * `decodeEvidence`·`decodeExcludedSamples`가 지역 함수인 이유는 [encodeNotificationRequested]
-     * KDoc과 같다(object 멤버 함수 상한).
-     */
     private fun decodeNotificationRequested(payload: String): NotificationRequestedPayload {
-        fun decodeExcludedSamples(field: String): Map<String, Int> =
-            if (field.isEmpty()) {
-                emptyMap()
-            } else {
-                // entry 분리는 splitEscapedFor 로 한다 — 키가 MAP_ENTRY_SEPARATOR 를
-                // 이스케이프해 실었을 수 있어(encode 대칭) 순진한 String.split 은 그
-                // 이스케이프를 못 본다.
-                splitEscapedFor(field, MAP_ENTRY_SEPARATOR).associate { entry ->
-                    val kv = splitEscapedFor(entry, MAP_KV_SEPARATOR)
-                    check(kv.size == 2) { "excludedSamples 항목 형식이 아니다: $entry" }
-                    kv[0] to kv[1].toInt()
-                }
-            }
-
-        fun decodeEvidence(evidenceFields: List<String>): NotificationEvidencePayload =
-            when (val kind = evidenceFields[0]) {
-                EVIDENCE_KIND_DIAGNOSED -> {
-                    NotificationEvidencePayload.Diagnosed(
-                        trainingRowCount = evidenceFields[1].toInt(),
-                        segmentSupport = evidenceFields[2],
-                        shrinkageWeight = evidenceFields[3],
-                        excludedObservations = evidenceFields[4].toInt(),
-                        agencySampleCount = evidenceFields[5].toInt(),
-                        agencySampleBelowThreshold = evidenceFields[6].toBooleanStrict(),
-                        releaseId = evidenceFields[7],
-                        artifactChecksum = evidenceFields[8],
-                        featureSchemaVersion = evidenceFields[9],
-                        codeVersion = evidenceFields[10],
-                        datasetId = evidenceFields[11],
-                        releaseKind = evidenceFields[12],
-                        excludedSamples = decodeExcludedSamples(evidenceFields[EVIDENCE_TRAILING_SLOT_INDEX]),
-                    )
-                }
-
-                EVIDENCE_KIND_NOT_PREDICTED -> {
-                    NotificationEvidencePayload.NotPredicted(reason = evidenceFields[EVIDENCE_TRAILING_SLOT_INDEX])
-                }
-
-                else -> {
-                    error("알 수 없는 NotificationRequested evidenceKind 다: $kind")
-                }
-            }
-
         val fields = splitEscapedFor(payload, FIELD_SEPARATOR)
         check(fields.size == NOTIFICATION_REQUESTED_FIELD_COUNT) {
             "NotificationRequested payload 형식이 아니다(필드 ${NOTIFICATION_REQUESTED_FIELD_COUNT}개 기대, " +
@@ -219,42 +102,154 @@ internal object OutboxPayloadCodec {
         val evidence = decodeEvidence(fields.subList(2, NOTIFICATION_REQUESTED_FIELD_COUNT))
         return NotificationRequestedPayload(noticeId, bidNowReasons, evidence)
     }
+}
 
-    /** [delimiter] 계층 하나를 보호한다 — [ESCAPE] 자신을 먼저 보호해야 중첩이 안전하다(클래스 KDoc). */
-    private fun escapeFor(
-        value: String,
-        delimiter: Char,
-    ): String =
-        value
-            .replace(ESCAPE.toString(), "$ESCAPE$ESCAPE")
-            .replace(delimiter.toString(), "$ESCAPE$delimiter")
+private const val FIELD_SEPARATOR = '|'
+private const val LIST_SEPARATOR = ','
+private const val MAP_ENTRY_SEPARATOR = ';'
+private const val MAP_KV_SEPARATOR = '='
+private const val ESCAPE = '\\'
 
-    /** [escapeFor]의 역함수 — 이스케이프를 인식하며 [delimiter]로 나눈다. */
-    private fun splitEscapedFor(
-        payload: String,
-        delimiter: Char,
-    ): List<String> {
-        val fields = mutableListOf(StringBuilder())
-        var index = 0
-        while (index < payload.length) {
-            val char = payload[index]
-            when {
-                char == ESCAPE && index + 1 < payload.length -> {
-                    fields.last().append(payload[index + 1])
-                    index += 2
-                }
+/** `encodeStrategyUpdated`가 내는 필드 수(revision·effectiveFrom·source) — `decodeStrategyUpdated`의 형식 검증 상수. */
+private const val STRATEGY_UPDATED_FIELD_COUNT = 3
 
-                char == delimiter -> {
-                    fields += StringBuilder()
-                    index += 1
-                }
+/**
+ * `encodeNotificationRequested`가 내는 최상위 필드 수 — noticeId·bidNowReasons·
+ * evidenceKind·(Diagnosed 열둘 | NotPredicted 하나, 안 쓰는 자리는 빈 문자열)·
+ * excludedSamples. `decodeNotificationRequested`의 형식 검증 상수.
+ */
+private const val NOTIFICATION_REQUESTED_FIELD_COUNT = 17
 
-                else -> {
-                    fields.last().append(char)
-                    index += 1
-                }
+/** noticeId·bidNowReasons(둘)을 뺀 나머지 — evidenceKind 1 + Diagnosed 필드 12 + 미사용 1 + excludedSamples/reason 1. */
+private const val EVIDENCE_FIELD_COUNT = NOTIFICATION_REQUESTED_FIELD_COUNT - 2
+private const val EVIDENCE_KIND_DIAGNOSED = "DIAGNOSED"
+private const val EVIDENCE_KIND_NOT_PREDICTED = "NOT_PREDICTED"
+
+/** [EVIDENCE_FIELD_COUNT]에서 evidenceKind(1)·마지막 칸(1)을 뺀 나머지 — `NotPredicted`가 채우지 않는 빈 칸 수. */
+private const val EVIDENCE_BLANK_SLOTS_FOR_NOT_PREDICTED = EVIDENCE_FIELD_COUNT - 2
+
+/** evidence 필드 목록의 마지막 칸 — Diagnosed 는 excludedSamples, NotPredicted 는 reason. */
+private const val EVIDENCE_TRAILING_SLOT_INDEX = EVIDENCE_FIELD_COUNT - 1
+
+private fun encodeReasons(reasons: List<String>): String =
+    reasons.joinToString(LIST_SEPARATOR.toString()) { escapeFor(it, LIST_SEPARATOR) }
+
+private fun excludedSamplesField(excludedSamples: Map<String, Int>): String =
+    // toSortedMap 은 자연 순서 비교자를 쓴다 — sortedBy 람다가 낳는 합성 클래스
+    // (jarContentGate가 거부하는 stdlib SourceFile 유출)를 만들지 않는다.
+    excludedSamples
+        .toSortedMap()
+        .entries
+        .joinToString(MAP_ENTRY_SEPARATOR.toString()) { (reason, count) ->
+            "${escapeFor(reason, MAP_ENTRY_SEPARATOR)}$MAP_KV_SEPARATOR$count"
+        }
+
+/**
+ * evidenceKind + Diagnosed 12칸 + NotPredicted 1칸 + excludedSamples 1칸(총
+ * [EVIDENCE_FIELD_COUNT]칸, noticeId·bidNowReasons와 합쳐 [NOTIFICATION_REQUESTED_FIELD_COUNT])
+ * — 안 쓰는 갈래는 빈 문자열이다(§3.1 「reason 코드 + 구조화 payload」 — 두 갈래를 한
+ * 행에 펴는 관례상 선택이지 값의 혼동은 아니다. `evidenceKind`가 갈래를 소진적으로
+ * 가른다).
+ */
+private fun evidenceFieldsOf(evidence: NotificationEvidencePayload): List<String> =
+    when (evidence) {
+        is NotificationEvidencePayload.Diagnosed ->
+            listOf(
+                EVIDENCE_KIND_DIAGNOSED,
+                evidence.trainingRowCount.toString(),
+                evidence.segmentSupport,
+                evidence.shrinkageWeight,
+                evidence.excludedObservations.toString(),
+                evidence.agencySampleCount.toString(),
+                evidence.agencySampleBelowThreshold.toString(),
+                evidence.releaseId,
+                evidence.artifactChecksum,
+                evidence.featureSchemaVersion,
+                evidence.codeVersion,
+                evidence.datasetId,
+                evidence.releaseKind,
+                "",
+                excludedSamplesField(evidence.excludedSamples),
+            )
+
+        is NotificationEvidencePayload.NotPredicted ->
+            listOf(EVIDENCE_KIND_NOT_PREDICTED) +
+                List(EVIDENCE_BLANK_SLOTS_FOR_NOT_PREDICTED) { "" } +
+                evidence.reason
+    }
+
+private fun decodeExcludedSamples(field: String): Map<String, Int> =
+    if (field.isEmpty()) {
+        emptyMap()
+    } else {
+        // entry 분리는 splitEscapedFor 로 한다 — 키가 MAP_ENTRY_SEPARATOR 를 이스케이프해
+        // 실었을 수 있어(encode 대칭) 순진한 String.split 은 그 이스케이프를 못 본다.
+        splitEscapedFor(field, MAP_ENTRY_SEPARATOR).associate { entry ->
+            val kv = splitEscapedFor(entry, MAP_KV_SEPARATOR)
+            check(kv.size == 2) { "excludedSamples 항목 형식이 아니다: $entry" }
+            kv[0] to kv[1].toInt()
+        }
+    }
+
+private fun decodeEvidence(evidenceFields: List<String>): NotificationEvidencePayload =
+    when (val kind = evidenceFields[0]) {
+        EVIDENCE_KIND_DIAGNOSED ->
+            NotificationEvidencePayload.Diagnosed(
+                trainingRowCount = evidenceFields[1].toInt(),
+                segmentSupport = evidenceFields[2],
+                shrinkageWeight = evidenceFields[3],
+                excludedObservations = evidenceFields[4].toInt(),
+                agencySampleCount = evidenceFields[5].toInt(),
+                agencySampleBelowThreshold = evidenceFields[6].toBooleanStrict(),
+                releaseId = evidenceFields[7],
+                artifactChecksum = evidenceFields[8],
+                featureSchemaVersion = evidenceFields[9],
+                codeVersion = evidenceFields[10],
+                datasetId = evidenceFields[11],
+                releaseKind = evidenceFields[12],
+                excludedSamples = decodeExcludedSamples(evidenceFields[EVIDENCE_TRAILING_SLOT_INDEX]),
+            )
+
+        EVIDENCE_KIND_NOT_PREDICTED ->
+            NotificationEvidencePayload.NotPredicted(reason = evidenceFields[EVIDENCE_TRAILING_SLOT_INDEX])
+
+        else -> error("알 수 없는 NotificationRequested evidenceKind 다: $kind")
+    }
+
+/** [delimiter] 계층 하나를 보호한다 — [ESCAPE] 자신을 먼저 보호해야 중첩이 안전하다(파일 KDoc). */
+private fun escapeFor(
+    value: String,
+    delimiter: Char,
+): String =
+    value
+        .replace(ESCAPE.toString(), "$ESCAPE$ESCAPE")
+        .replace(delimiter.toString(), "$ESCAPE$delimiter")
+
+/** [escapeFor]의 역함수 — 이스케이프를 인식하며 [delimiter]로 나눈다. */
+private fun splitEscapedFor(
+    payload: String,
+    delimiter: Char,
+): List<String> {
+    val fields = mutableListOf(StringBuilder())
+    var index = 0
+    while (index < payload.length) {
+        val char = payload[index]
+        when {
+            char == ESCAPE && index + 1 < payload.length -> {
+                fields.last().append(payload[index + 1])
+                index += 2
+            }
+
+            char == delimiter -> {
+                fields += StringBuilder()
+                index += 1
+            }
+
+            else -> {
+                fields.last().append(char)
+                index += 1
             }
         }
-        return fields.map { it.toString() }
     }
+    return fields.map { it.toString() }
 }
