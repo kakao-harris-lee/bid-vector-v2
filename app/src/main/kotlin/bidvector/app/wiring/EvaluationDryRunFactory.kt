@@ -31,8 +31,7 @@ class EvaluationDryRunRun(
  * 타입을 409 `MAX_ACTIVE_BIDS_NOT_CONFIGURED`로 매핑한다. 현재값을 0 으로도 상한을
  * 무한으로도 지어내지 않는다 — 결정 ③이 「현재값 0 고정」을 기각한 이유와 대칭이다.
  */
-class MaxActiveBidsNotConfiguredException :
-    RuntimeException("전략에 여력 상한(maxActiveBids)이 설정되지 않았다 — dry-run을 거부한다")
+class MaxActiveBidsNotConfiguredException : RuntimeException("전략에 여력 상한(maxActiveBids)이 설정되지 않았다 — dry-run을 거부한다")
 
 /**
  * 요청마다 [EvaluateCandidatesUseCase]를 짓는다(D-6A3-8, D-6A3-5) — 컨트롤러는 이 팩토리의

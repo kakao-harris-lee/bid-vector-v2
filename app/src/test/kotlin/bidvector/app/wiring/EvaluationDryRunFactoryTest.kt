@@ -13,8 +13,8 @@ import bidvector.strategy.validate
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
-import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.MlAnalysisOutcome
+import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
@@ -45,7 +45,11 @@ private class CountingStrategyRepository(
 }
 
 /** `forRequest()` 자체는 이 넷을 부르지 않는다(use case 를 짓기만 한다) — 호출되면 실패시켜 그 사실을 잠근다. */
-private class UnreachablePort : CandidateSourcePort, WatchSubjectPort, LicenseGatePort, MlAnalysisPort {
+private class UnreachablePort :
+    CandidateSourcePort,
+    WatchSubjectPort,
+    LicenseGatePort,
+    MlAnalysisPort {
     override fun openCandidates(): List<Notice> = error("forRequest() 는 이 port 를 부르지 않는다")
 
     override fun subjectFor(notice: Notice): WatchSubjectOutcome = error("forRequest() 는 이 port 를 부르지 않는다")
