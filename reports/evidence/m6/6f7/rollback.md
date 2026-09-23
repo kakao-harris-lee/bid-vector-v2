@@ -1,6 +1,8 @@
 # M6/6F-7 — rollback.md
 
-실측 HEAD: `009ec6bd4e74a65a8e1dd98d2942cb208df40a84`
+실측 HEAD: `08fac0dc69aa3a124578777355849cad28b7f24a`(①~⑥ 전부 이 HEAD에서 재실측 —
+직전 실측은 `009ec6bd`였고 그 뒤 우회 4 트립와이어 test 커밋이 붙어 재산출했다.
+파일 목록·diff 결과는 무변화, ④⑤⑥ 전부 이 HEAD에서 다시 exit 0 확인)
 
 ## base 정의
 
@@ -70,7 +72,7 @@ git restore --source="$BASE" --staged --worktree -- \
 ## 실측 유효성 대조(2026-09-19 정정 규율)
 
 ```
-git diff --name-only 009ec6bd..<판정 SHA> -- \
+git diff --name-only 08fac0dc..<판정 SHA> -- \
   workflow/src/main/kotlin/bidvector/workflow/event/NotificationRequestedPayload.kt \
   workflow/src/main/kotlin/bidvector/workflow/event/OutboxNotificationRequestPort.kt \
   workflow/src/test/kotlin/bidvector/workflow/event/OutboxNotificationRequestPortTest.kt \
@@ -81,7 +83,7 @@ git diff --name-only 009ec6bd..<판정 SHA> -- \
   config/quality/gate-tests.properties
 ```
 
-`009ec6bd`가 이 evidence 작성 시점의 마지막 산출물 커밋이다. evidence 편집 커밋만
+`08fac0dc`가 이 evidence 작성 시점의 마지막 산출물 커밋이다. evidence 편집 커밋만
 그 뒤에 붙을 수 있고, evidence 커밋은 위 8경로를 건드리지 않으므로(evidence는
 `reports/evidence/m6/6f7/**`에만 쓴다) 판정 SHA가 그 이후 어디든 위 명령은 빈
 출력이어야 유효하다. 판정 레인은 자신의 판정 SHA로 이 명령을 재실행해 빈 출력을

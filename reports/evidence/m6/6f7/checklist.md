@@ -57,9 +57,12 @@ Kotlin이 `toString()`을 합성한다 — 6A-1에서 **아무도 명시적으�
 toString이 새는" 형태가 아니라 애초에 새어나갈 필드가 없는 형태다. 이 구조적
 부재는 `OutboxPayloadCodecTest`·`OutboxNotificationRequestPortTest`의 왕복 test들이
 모든 필드값을 `shouldBe`로 고정하고 있어(코덱 왕복 test 넷, sink test 둘) 필드
-집합이 바뀌면(추가·제거) 그 test들이 즉시 깨진다 — 필드 목록 자체가 test로 잠겨
-있다. **향후 slice가 evidence 필드를 확장하면(예: 원문 텍스트·연락처 등) 이 축을
-재실측해야 한다** — 알려진 제한으로 아래에 등재.
+집합이 바뀌면(추가·제거) 그 test들이 즉시 깨진다. **추가로 `payload 필드 집합은
+고정돼 있다` test**(`OutboxNotificationRequestPortTest`, Java reflection으로
+`declaredFields` 이름 집합을 단언)가 필드 집합 자체를 직접 잠근다 — 새 필드가
+`shouldBe`를 안 건드리는 형태로 추가돼도(예: 생성자 밖에서 계산되는 파생 필드)
+이 test는 여전히 걸린다. **향후 slice가 evidence 필드를 확장하면(예: 원문 텍스트·
+연락처 등) 이 축을 재실측해야 한다** — 알려진 제한으로 아래에 등재.
 
 ## 알려진 제한
 

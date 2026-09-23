@@ -1,6 +1,7 @@
 # M6/6F-7 — commands.md
 
-실측 HEAD(마지막 산출물 커밋): `009ec6bd`
+실측 HEAD(마지막 산출물 커밋): `08fac0dc`(우회 4 트립와이어 test 포함 — 그 test도
+아래 「비밀값 스캔」·전건 test·gate 재실측에 들어 있다)
 
 ## acceptance_commands (scope.md)
 
