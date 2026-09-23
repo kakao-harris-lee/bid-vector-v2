@@ -156,6 +156,16 @@ DB 스키마를 **정확 열거**로 잠근다 — 컬럼 집합 `shouldContainE
 - rollback 목록·in_scope 재산출(누적 3회 확장: D-6A3-12·14 — 이 slice 는 기존 축 셋(전략·세션·스키마 게이트)에 걸치는
   additive 변경이라 확장이 예견된 형태다. 그래도 매번 계약에 적는다).
 
+## 계약 갱신 (3) — `app/build.gradle.kts` (2026-09-23, 팀장)
+
+**D-6A3-15 — `app/build.gradle.kts` 를 in_scope 에 넣는다(의존 한 줄).** `EvaluationWiring` 이 `LICENSE_QUALIFICATION_POLICY`
+(`qualification`)를 해소하려면 `app` main classpath 에 `:qualification` 이 있어야 하는데 `adapters` 가 `implementation`
+(비전이)으로만 물어 없었다. `implementation(project(":qualification"))` 추가 + 중복이 된 `testImplementation` 제거 —
+6A-1 이 `:strategy` 에 쓴 것과 같은 패턴이고 같은 파일의 기존 주석이 그 선례를 적고 있다. D-6A3-8 의 기계적 필연이라
+**인정**한다. **사실로 적는다**: 구현 레인이 이 변경을 계약 갱신 전에 커밋했다(`874fc38d`) — in_scope 밖·out_of_scope 밖의
+미선언 파일을 「선례가 있다」로 자체 판단했다. 결과는 옳으나 절차는 「멈추고 보고」였어야 한다. 되쓰지 않는다(이력
+보존), 게이트(app 의존 방향 ArchUnit)가 이 의존을 승인된 방향으로 보는지 verifier 표적에 넣는다.
+
 ## 위협 모델 — 6A-3+6F-3 고유 경계
 
 지키는 것: **① dry-run endpoint 는 외부 effect 를 만들지 않는다**(outbox 에 행이 생기지 않는다, 발송 없음)
@@ -218,6 +228,7 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/http/**                                             # 컨트롤러·DTO·ErrorMapping 행
   - app/src/main/kotlin/bidvector/app/wiring/**                                           # EvaluationWiring·Factory
   - app/src/main/kotlin/bidvector/app/BidVectorApplication.kt                             # 필요 시(속성 바인딩)
+  - app/build.gradle.kts                                                                 # D-6A3-15 — :qualification 의존 한 줄
   - app/src/main/resources/**                                                             # 설정 속성 선언이 있으면
   - app/src/test/kotlin/bidvector/app/**                                                  # http·wiring·architecture(D-6A3-9)·conformance(draft 필드)
   - openapi/bidvector-operator-api.yaml                                                   # D-6A3-11
