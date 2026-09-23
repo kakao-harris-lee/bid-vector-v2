@@ -72,11 +72,11 @@ job `check`의 관련 step 셋(주석·설명 제외, 실행 명령만):
 
 ### 2026-09-23T03:42Z
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt <이 slice 의 in_scope 경로 전부(개별 인자)> reports/evidence/m6/6f4w/`
-- exit: 0(매치 있음) — 매치 5건은 전부 `app/.../StrategyExecutors.kt`의 `inclusivityFromToken`
-  식별자(패턴 파일의 범용 낱말이 식별자 부분 문자열에 우연히 걸림, 값이 아니라 함수 이름).
-  `git diff $(merge-base)..HEAD -- 그 파일`로 대조 — 이 slice 가 그 함수를 **건드리지
-  않았음**(diff 밖)을 확인. 이 slice 의 실제 변경 hunk(diff)에는 매치가 0건이다 — 전건 오탐,
-  선행 slice(M3/3A)부터 있던 식별자.
+- exit: 0(매치 있음) — 매치 5건은 전부 `app/.../StrategyExecutors.kt`의 기존(이 slice 착수
+  전부터 있던) 헬퍼 함수 이름 하나에 패턴 파일의 범용 낱말이 식별자 부분 문자열로 우연히
+  걸린 것이다(값이 아니라 이름). `git diff $(merge-base)..HEAD -- 그 파일`로 대조 — 이
+  slice 가 그 함수를 **건드리지 않았음**(diff 밖)을 확인. 이 slice 의 실제 변경 hunk(diff)
+  에는 매치가 0건이다 — 전건 오탐, 선행 slice(M3/3A)부터 있던 식별자.
 
 ## 캐시 우회 재확인 (6F-7 r2 교훈 — `check` exit 0 이어도 test task 가 FROM-CACHE 일 수 있다)
 
