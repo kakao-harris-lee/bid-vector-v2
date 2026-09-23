@@ -10,11 +10,11 @@ import bidvector.sharedkernel.VatTreatment
 import bidvector.strategy.BudgetBound
 import bidvector.strategy.BudgetBoundInclusivity
 import bidvector.strategy.CategoryCode
-import bidvector.strategy.FullScopeText
-import bidvector.strategy.KeywordScopeText
 import bidvector.strategy.WatchRules
 import bidvector.strategy.WatchSubject
 import bidvector.strategy.WatchVerdict
+import bidvector.strategy.assembleFullScopeText
+import bidvector.strategy.assembleKeywordScopeText
 import bidvector.strategy.evaluate
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -34,8 +34,8 @@ private val RULES =
 private fun subject(category: String) =
     WatchSubject(
         categories = setOf(CategoryCode(category)),
-        keywordText = KeywordScopeText(""),
-        fullText = FullScopeText(""),
+        keywordText = assembleKeywordScopeText(null, null),
+        fullText = assembleFullScopeText(null, null, null, null),
         baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
     )
 
@@ -123,8 +123,8 @@ class ExtractionGateTest {
             val subjectWithoutAmount =
                 WatchSubject(
                     categories = emptySet(),
-                    keywordText = KeywordScopeText(""),
-                    fullText = FullScopeText(""),
+                    keywordText = assembleKeywordScopeText(null, null),
+                    fullText = assembleFullScopeText(null, null, null, null),
                     baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
                 )
 
