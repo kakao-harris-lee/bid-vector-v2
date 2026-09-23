@@ -206,6 +206,14 @@ class ArchitectureRules(
      * 전체에서 `isAssignableTo` 로 도출)은 [allowedImpls] 의 부분집합이다(다른 모듈에
      * 새 구현이 생겨 그것을 배선해도 걸린다). ③ [forbiddenOutboxTypes](outbox 쓰기 타입
      * 전수) 참조 집합은 ∅ 다(포트를 거치지 않고 직접 쓰는 우회를 막는다).
+     *
+     * **①은 명명 구현만 본다(verifier r2 R2-M1).** [portTypeName]이 가리키는
+     * `NotificationRequestPort`는 `fun interface`라 그 SAM 람다 구현은 바이트코드에
+     * 별도 구현 **클래스**를 만들지 않는다(invokedynamic) — ①의 「구현체 집합==∅」
+     * 판정은 이 형태에 닿지 않는다. 그 형태의 폐쇄는 이 구조 규칙이 아니라
+     * `EvaluationDryRunBidNowE2ETest`(거동 다리)가 진다 — `app.wiring`에 outbox
+     * INSERT를 실행하는 람다 tee를 꽂는 변이(N1)가 `architecture.*`는 초록인 채
+     * 그 E2E에서 RED임을 실측으로 확인했다.
      */
     fun notificationPortMustBeStructurallyClosed(
         appRoot: String,
