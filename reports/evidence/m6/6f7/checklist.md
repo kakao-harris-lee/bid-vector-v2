@@ -156,6 +156,29 @@ RED 로 잡지만, 이미 영속된 옛 outbox 행의 형식을 고치거나 마
   프록시(`HTTPS_PROXY`)를 거쳐도 그 목적지에 도달하지 못하는 이 세션의
   네트워크 제약이고, 이 slice는 `ml-engine`을 전혀 건드리지 않는다.
 - **payload evidence 필드 확장 시 toString 재실측 필요** — 위 절 참고.
+- **`NotificationRequested` outbox 행도 6B-3(승인된 보존 기간 없음) 대상이다**
+  (`privacy-gate` 권고, 계약 갱신 (3)). 이 slice는 보존 정책을 새로 만들지도
+  바꾸지도 않는다 — 기존 6B-3 한계가 이 새 payload_type에도 그대로 적용됨을
+  등재만 한다.
+- **`excludedSamples` 코덱 왕복에서 `emptyList()`와 `listOf("")`(빈 문자열
+  하나짜리 목록)를 구분하지 못한다**(`code-reviewer` LOW). `encodeReasons`가
+  빈 목록과 `[""]`을 둘 다 빈 문자열로 인코딩하고 `decodeNotificationRequested`가
+  `fields[1].isEmpty()`를 `emptyList()`로 되돌리기 때문 — 코덱 계층의 일반
+  성질이고 오늘 두 값을 실제로 만드는 호출부가 없어 **도달 불가**다. 구조로
+  닫지 않고 등재만 한다(`OutboxPayloadCodec.kt` `decodeNotificationRequested`).
+- **D-6F7-11 — `SQLException` → `Failed` 매핑이 선례 `OutboxEventSink`(전파 →
+  트랜잭션 롤백)와 갈린다.** 지금은 결함이 아니다(이 port가 아직 배선되지
+  않았다, `OPEN-6F-ASSEMBLY`). **배선 뒤** 호출부가 `inTransaction` 안에서
+  `request()`를 부르고 반환값 `Failed`를 무시하면 도메인 write만 커밋되고
+  outbox 행이 없는 상태가 남는다(dual-write) — `OPEN-6F-ASSEMBLY`가 그 처리를
+  받는다. 소스 KDoc(`OutboxNotificationRequestPort.kt` 클래스 문서)에도
+  같은 문장을 적었다.
+- **`privacy-gate` 확인 불가 — 하위 소비자의 `Failed` 로깅.** 이 port가
+  반환하는 `NotificationRequestOutcome.Failed`를 호출부가 어떻게 로깅·
+  처리하는지는 아직 배선 전이라 확인할 수 없다. **조립 slice
+  (`OPEN-6F-ASSEMBLY`) 재확인 항목**으로 등재한다 — 그 slice가 로깅 경로에
+  payload 원문(민감값 없음이 이 slice의 실측이지만)이나 예외 스택이 새지
+  않는지 다시 봐야 한다.
 
 ## 리뷰 요청 조건 점검
 

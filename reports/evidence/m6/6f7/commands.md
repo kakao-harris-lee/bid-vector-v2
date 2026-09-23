@@ -131,6 +131,39 @@ test를 돌렸다. 결과는 모두 RED(기대대로), 검증 뒤 clone 삭제.
 ·`VerdictLadderPolicyData`를 이미 자유롭게 import하고, `:workflow:test`가 매번
 통과한다(위 표) — main 소스에서만 막힌다는 것이 실행으로 확인된다.
 
+## 수정 라운드 1 — D-6F7-12(codec 구분자 이스케이프) TDD·변이 실측
+
+RED → GREEN → 변이(버릴 clone) 순서. `excludedSamples` Map 직렬화가 구분자 둘
+(`;`·`=`)을 쓰면서 키에서 `;`만 보호하던 결함(`code-reviewer` MEDIUM ·
+`verifier` LOW-1)을 고쳤다 — `excludedSamplesField`가 키를 `MAP_KV_SEPARATOR`로
+먼저 감싸고(안쪽 계층) 그 결과 전체를 `MAP_ENTRY_SEPARATOR`로 다시 감싼다
+(바깥 계층, `FIELD_SEPARATOR`/`LIST_SEPARATOR`와 같은 중첩).
+
+### 2026-09-23T02:00Z — RED
+- cmd: `./gradlew --no-daemon :adapters:test --tests "bidvector.adapters.event.OutboxPayloadCodecTest"`
+- exit: **1**
+- 핵심 결과: 신설 test(`excludedSamples 키에 구분자 문자가 있어도 왕복된다 —
+  D-6F7-12 이스케이프 실측`, 키 `"A=B;C"`)가
+  `IllegalStateException: excludedSamples 항목 형식이 아니다: A=B;C=4`로 실패
+  (`decodeExcludedSamples`의 `check(kv.size == 2)`, 실제 3개).
+
+### 2026-09-23T02:03Z — GREEN(수정 뒤)
+- cmd: `./gradlew --no-daemon :adapters:test --tests "bidvector.adapters.event.OutboxPayloadCodecTest"`
+- exit: 0(12 test 전부 통과)
+
+### 2026-09-23T02:05Z — 회귀 없음
+- cmd: `./gradlew --no-daemon :adapters:test :workflow:test`
+- exit: 0
+
+### 변이 실측(버릴 clone, `git clone --no-hardlinks`, numstat 확인)
+- 대상: `excludedSamplesField`를 수정 전 형태(키를 `MAP_ENTRY_SEPARATOR`로만
+  감싸고 전체 join은 raw)로 되돌림
+- numstat: `1  2`(수정 diff의 정확한 역)
+- cmd: `./gradlew --no-daemon :adapters:test --tests "bidvector.adapters.event.OutboxPayloadCodecTest"`
+- exit: **1** — 신설 test가 **수정 전과 동일한 예외**로 FAILED
+  (`excludedSamples 항목 형식이 아니다: A=B;C=4`, 같은 스택). 원복 확인 후
+  clone 삭제.
+
 ## aggregateVersion 실측(D-6F7-4)
 
 - `grep -rn "aggregateVersion" workflow/src/main/kotlin adapters/src/main/kotlin` —
