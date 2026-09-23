@@ -4,10 +4,13 @@ import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
+import bidvector.procurement.Agency
+import bidvector.procurement.AgencyName
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.procurement.NoticeTitle
 import bidvector.procurement.PersistOutcome
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
@@ -16,6 +19,7 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -201,6 +205,84 @@ class EvaluationDryRunE2ETest {
             )
         JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
         return id
+    }
+
+    /**
+     * D-6A3-22(privacy R-1) — [insertNotice]와 달리 title·기관명을 **채운** 공고를 심는다.
+     * `NoticeCollected.title`·`noticeAgency`·`demandAgency`는 전부 기본값 `null`(D-6F4-9·
+     * D-3H-3)이라 기존 공고 표본은 원문이 없었다 — 「원문이 있어도 응답에 안 실린다」는
+     * 음성 대조가 이 slice에 없었다.
+     */
+    private fun insertNoticeWithTitleAndAgency(
+        number: String,
+        deadline: Instant,
+        title: String,
+        agencyName: String,
+    ): NoticeId {
+        val resolution = KONEPS_COLLECTION_POLICY.resolve(LocalDate.now())
+        val fieldContracts = (resolution as Resolution.Resolved).value.fieldContracts
+        val id = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
+        val observation =
+            RawNoticeObservation.of(
+                mapOf(RawKey("bidNtceNo") to id.number.value, RawKey("bidNtceOrd") to id.round.value),
+                SourceEndpoint.NOTICE_LIST,
+                Instant.now(),
+            )
+        val key = JdbcRawObservationStore(dataSource(), fieldContracts, "eval-e2e-test-privacy").append(observation)
+        val agency = Agency(code = null, name = requireNotNull(AgencyName.of(agencyName)))
+        val command =
+            NoticeCollected(
+                id = id,
+                businessCategory = null,
+                baseAmount = null,
+                estimatedAmount = null,
+                allocatedBudget = null,
+                floorRate = null,
+                deadlineAt = deadline,
+                openingScheduledAt = null,
+                raw = observation,
+                demandAgency = agency,
+                noticeAgency = agency,
+                title = requireNotNull(NoticeTitle.of(title)),
+            )
+        JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
+        return id
+    }
+
+    /**
+     * D-6A3-22(검토 라운드 1 privacy R-1) — 위협 모델 ④(응답에 원문이 실리지 않는다)를
+     * **거동**으로 잰다. 지금까지 닫힘은 구조(DTO 타입·OpenAPI 키 집합)뿐이었다 —
+     * `NoticeId.label()` 대신 `Notice`에서 파생한 값을 응답에 넣는 변이가 생겨도 키 집합
+     * test 는 초록으로 남는다(`List<String>` 안의 값은 형태가 같다). 원시 응답 **문자열**에
+     * 제목·기관명 원문이 없음을 직접 대조해 그 변이를 잡는다.
+     */
+    @Test
+    fun `⑧ 제목·기관명이 있는 공고를 평가해도 응답 원시 문자열에 그 원문이 없다`() {
+        insertStrategy(
+            maxActiveBids = 10,
+            excludeKeywordTerm = "이-문구는-빈-감시텍스트에-나타날-수-없다",
+        )
+        val title = "2026년도 특수 조달 사업 발주 공고문 원문"
+        val agencyName = "테스트전용발주기관명원문"
+        insertNoticeWithTitleAndAgency(
+            "20260101003",
+            Instant.now().plusSeconds(86_400),
+            title = title,
+            agencyName = agencyName,
+        )
+
+        val response =
+            restTemplate.exchange(
+                url("/api/evaluation-dry-runs"),
+                HttpMethod.POST,
+                HttpEntity(mapOf("currentActiveBids" to 0), authorizedHeaders()),
+                String::class.java,
+            )
+        val rawBody = requireNotNull(response.body)
+
+        response.statusCode.value() shouldBe 200
+        rawBody shouldNotContain title
+        rawBody shouldNotContain agencyName
     }
 
     /**
