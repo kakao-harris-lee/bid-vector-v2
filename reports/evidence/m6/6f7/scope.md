@@ -90,6 +90,41 @@ rollback: |
 
 **수정 라운드마다 이 표를 갱신한다.**
 
+## 계약 갱신 (1) — D-6F7-5 가 패키지 순환을 만들었다 (2026-09-23, 팀장)
+
+**팀장 실측: 전건 `check` 가 `:app:test` 의 아키텍처 게이트에서 실패한다.** `bidvector.**` 슬라이스 순환
+금지 규칙 위반 **5건**이고, 사슬은 이것이다:
+
+```
+workflow.embedding → workflow.event → workflow.evaluation → workflow.embedding
+```
+
+- `embedding → event` : `EmbedTextRequest` 가 `CorrelationId`(=`workflow.event`)를 나른다 — **기존 변**
+- `evaluation → embedding` : **기존 변**
+- **`event → evaluation` : 이 slice 가 새로 만든 변** — sink 가 `workflow.event` 에 있는데
+  `NotificationRequestPort`·`NotificationRequest` 는 `workflow.evaluation` 에 선언돼 있다
+
+**이것은 D-6F7-5(팀장 결정)의 결함이다.** 나는 codec 의 **허용 루트**(`EventAdapterDependencyTest`)만 보고
+「payload 를 `workflow.event` 에 두라」고 적었고, **그 위치가 만드는 의존 방향은 보지 않았다.** 위치를
+고르면서 **그 위치가 무엇을 참조하게 되는지**를 함께 재지 않은 것이다 — 이 저장소가 반복해 겪은 형태다.
+
+**그리고 이 결함은 깨진 git 래퍼에 가려져 있었다.** `contractGate` 가 먼저 죽어 빌드가 `:app:test` 에
+**도달하지 못했고**, 그래서 아키텍처 게이트가 **아예 돌지 않았다.** 구현 레인이 「전 gate green」으로 본 것은
+그 때문이다. **「안 돌린 게이트는 아무것도 막지 못한다」에 두 번째 날이 있다 — 안 돌린 게이트는 다른 게이트의
+실패를 가린다.** 래퍼를 고치자마자 드러났다.
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6F7-7**(D-6F7-5 정정 — **sink 와 payload 를 가른다**) | **sink(`OutboxNotificationRequestPort`)를 `workflow.evaluation` 으로 옮긴다.** **payload 타입은 `workflow.event` 에 그대로 둔다.** 그러면 방향이 `evaluation → event` 가 되고 이는 **이미 존재하는 변**이라 순환이 생기지 않는다 | **sink 는 자기가 구현하는 port 가 선언된 곳에 있는 것이 자연스럽다**(`NotificationRequestPort` 가 `workflow.evaluation` 에 있다). **payload 만 `workflow.event` 에 있으면 된다** — codec 이 이름으로 참조해야 하는 것은 payload 뿐이고, 그것이 D-6F7-5 의 **진짜 요구**였다. 봉투 생성이 `workflow` 모듈 `internal` 이라는 D-6F7-1 의 제약은 **모듈 단위**라 패키지를 옮겨도 그대로 만족된다. **대안을 기각한 이유**: ⓐ `CorrelationId` 를 `workflow.event` 밖으로 옮기는 것은 기존 변 둘을 건드리는 큰 변경이고 이 slice 범위가 아니다 ⓑ codec 허용 루트에 `workflow.evaluation` 을 더하는 것은 **「한 칸 넓히기」**이고 adapters 가 evaluation 에 닿게 만든다 — 이 저장소가 여러 번 막은 방향이다 |
+
+**닫힘 판정**: 전건 `./gradlew --no-daemon check` **exit 0**(아키텍처 게이트 포함). 그리고 **순환이 다시
+생기면 붉어지는지**를 변이로 재라 — sink 를 `workflow.event` 로 되돌리면 **RED** 여야 한다.
+
+**acceptance 정정** — 앞선 라운드의 「`contractGate` 는 환경 결함이라 확인하지 않았다」는 **해소됐다**
+(팀장이 `~/.internal-bin/git` 의 `exec` 경로를 `/usr/local/bin/git` 으로 고쳤다 — 이 머신의 git 은 Intel
+homebrew 설치라 `/opt/homebrew` 에 없었다). **`:contractGate` 단독 실행 BUILD SUCCESSFUL 을 팀장이 실측했다.**
+이제 전건이 온전히 돌고, 그래서 위 순환이 드러났다.
+
 ## 하네스 레인 변경 (상시 절)
 
 - (착수 시점) 없음.
@@ -107,6 +142,7 @@ rollback: |
 | --- | --- |
 | `OPEN-STR-12` | 변경 없음 — 발송 채널·렌더링은 그 뒤 |
 | `OPEN-6F-ASSEMBLY` | 변경 없음 — 이 slice 는 포트 구현을 낼 뿐 꽂지 않는다 |
+| `OPEN-6F7-REASON-CODE-STABILITY`(신설) | `BidNowReason`·`MlUnavailableReason`(`bidvector.decision`)이 **직렬화 가능한 안정적 code 속성을 갖지 않아** outbox 에 실리는 값이 **Kotlin 합성 `toString()`** 이다. 지금 못 고치는 이유: 경계 게이트가 main 소스에서 `bidvector.decision` 참조를 막고, 두 하위 타입이 `internal` 생성자다. **이 slice 의 축어 잠금은 「소리 나게」 할 뿐 형식 안정성을 주지 않는다** — 이미 영속된 옛 행을 고치지도 않는다. 받는 쪽 **도메인 레인** |
 | **4C-1 의 outbox `idempotency_key` UNIQUE 부재** | 이 slice 가 **수령만** 한다(D-6F7-3·6) — 고치지 않고 알려진 제한에 등재 |
 
 ## 리뷰 레인
