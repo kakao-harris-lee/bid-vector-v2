@@ -94,11 +94,13 @@ private fun forceBidOverrideVerdict(): Verdict.BidNow {
  */
 private fun expectedBidNowReasonToString(reason: BidNowReason): String =
     when (reason) {
-        is BidNowReason.PriorityAboveBidNowThreshold ->
+        is BidNowReason.PriorityAboveBidNowThreshold -> {
             "PriorityAboveBidNowThreshold(priority=0.9, threshold=0.5)"
+        }
 
-        is BidNowReason.ForceBidOverride ->
+        is BidNowReason.ForceBidOverride -> {
             "ForceBidOverride(probability=0.95, matched=0.95, probabilityThreshold=0.9, matchedThreshold=0.9)"
+        }
     }
 
 /**
@@ -382,10 +384,18 @@ class OutboxNotificationRequestPortTest {
      */
     @Test
     fun `payload 필드 집합은 고정돼 있다 — 새 필드가 조용히 안 늘어난다(우회 4)`() {
-        val payloadFields = NotificationRequestedPayload::class.java.declaredFields.map { it.name }.toSet()
-        val diagnosedFields = NotificationEvidencePayload.Diagnosed::class.java.declaredFields.map { it.name }.toSet()
+        val payloadFields =
+            NotificationRequestedPayload::class.java.declaredFields
+                .map { it.name }
+                .toSet()
+        val diagnosedFields =
+            NotificationEvidencePayload.Diagnosed::class.java.declaredFields
+                .map { it.name }
+                .toSet()
         val notPredictedFields =
-            NotificationEvidencePayload.NotPredicted::class.java.declaredFields.map { it.name }.toSet()
+            NotificationEvidencePayload.NotPredicted::class.java.declaredFields
+                .map { it.name }
+                .toSet()
 
         payloadFields shouldBe setOf("noticeId", "bidNowReasons", "evidence")
         diagnosedFields shouldBe
