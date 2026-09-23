@@ -112,6 +112,47 @@ port KDoc 이 `Unavailable` 을 「원문 텍스트 **조립 실패**」로 정�
 축**이다. 감시 규칙이 둘을 같게 볼지 다르게 볼지는 **팀장이 정한다** — 구현 레인이 test 안에서 정하지
 않는다. 낼 수 없다면 D-6F4W-8 ⓑ다.
 
+## 계약 갱신 (2) — `in_scope` 확장과 착수 계약의 결함 둘 (2026-09-23, 팀장)
+
+**2단계 착수에서 드러났다**: `private constructor` 로 닫으면 직접 생성 **43곳이 즉시 컴파일 불가**가 되고,
+`check` 는 **하나의 컴파일 단위**라 부분 폐쇄로는 빌드가 아예 안 돈다. 그중 **10곳이 `in_scope` 밖**이었다.
+
+### 착수 계약의 결함 둘 — 내가 쓴 것이다
+
+1. **글롭이 틀렸다.** `adapters/src/test/resources/compile-fixtures/**` 로 적었으나 이 slice 의 대상은
+   **`strategy/src/test/resources/compile-fixtures/**`** 다(`CompileFailureHarnessTest` 가 그쪽을 돈다.
+   adapters 쪽은 event envelope 용이라 무관). **정정한다.**
+2. **분기점을 잘못 걸었다.** D-6F4W-7 의 멈춤 조건을 「main 코드에 생성 지점이 있으면」으로 적었는데
+   **진짜 제약은 `in_scope` 덮개**였다. main 0건이어도 **test 가 계약 밖이면 같은 문제**다. 구현 레인이
+   그 자리에서 멈춘 것이 옳다 — 조건의 문면이 아니라 **취지**(계약 밖을 만지게 되면 멈춘다)를 읽었다.
+
+### D-6F4W-10 — `in_scope` 를 넷 넓히고 경계 폐쇄를 이 slice 에서 끝낸다
+
+넓히는 경로: `adapters/.../extraction/**` · `adapters/.../ml/**` · `app/.../conformance/**` ·
+`strategy/src/test/resources/compile-fixtures/**`(글롭 정정).
+
+**가르지 않는 이유**: 가르면 **표면이 줄지 않는다** — 새 slice 도 같은 10곳을 만져야 하고 `in_scope` 문제도
+따라간다. 줄어드는 것 없이 계약·evidence·리뷰 한 바퀴가 **더해질** 뿐이다. 그리고 닫는 대상이 **실측된
+구멍**이다(6F-4 verifier r2 MEDIUM-3 — 요건 텍스트로 직접 만들어 **필수 키워드를 만족시키는 test 가
+초록이었다**). 이관은 기계적이고 거동 동일이 확인됐다. **미루면 구멍이 그만큼 더 열려 있는다.**
+
+**레인 충돌 실측**: 세 파일의 마지막 변경은 전부 **병합된 옛 slice** 다(M3/3C · M4/4B-3 · M3/3A).
+활성 worktree 는 이 레인 하나, 로컬 브랜치는 `main` 과 이 브랜치뿐, 원격은 전부 병합·정지분.
+
+### D-6F4W-11 — 이관에 거는 조건 셋
+
+1. **`.value` 치환을 기본으로 삼지 않는다.** `assemble*` 경유가 **우선**이다(D-6F4W-8 ⓐ — 도달 경로를
+   증명한다). `.value` 비교는 **그 test 의 주제가 문자열 내용 자체일 때만** 쓰고 **건수를 따로 센다** —
+   타입 동등성을 문자열 동등성으로 낮추는 것이므로 무의식적으로 번지면 안 된다.
+2. **D-6F4W-8 ⓐ/ⓑ 건별 집계**를 남긴다(파일별 건수 + ⓑ 사유 + `.value` 건수).
+3. **`compile-fixtures` 는 부호를 먼저 읽는다.** `positive-2-keyword-scope-own-text` 는 「자기 모듈
+   텍스트로는 만들 수 있다」를 증명하는 것으로 보이는데 **폐쇄하면 그 명제가 거짓이 된다.**
+   `negative-2-keyword-scope-cross-text` 의 「남의 모듈 텍스트로는 못 만든다」는 이제
+   **「아무도 못 만든다」의 부분집합**이라 **이름이 가리키는 것을 더 이상 재지 않을 수 있다.**
+   셋 각각에 대해 **폐쇄 뒤에도 고유한 무언가를 재는가**를 답한다. 기계적으로 뒤집지 않는다.
+
+**rollback 재산출** — `in_scope` 가 넓어졌으므로 목록을 다시 기계 산출한다.
+
 ## 위협 모델 — 6F-4-w 고유 경계
 
 이 slice 가 지키려는 것: **감시 판정의 입력 텍스트는 승인된 조립 함수만 만든다.** 조립을 우회해 만든
@@ -147,7 +188,10 @@ port KDoc 이 `Unavailable` 을 「원문 텍스트 **조립 실패**」로 정�
 in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/evaluation/**   # 어댑터 신설 (D-6F4W-5)
   - adapters/src/test/kotlin/bidvector/adapters/evaluation/**   # 조립 test · 의존/등재 게이트 갱신
-  - adapters/src/test/resources/compile-fixtures/**             # 생성 경계 negative probe (D-6F4W-7)
+  - strategy/src/test/resources/compile-fixtures/**             # 생성 경계 probe — 계약 갱신 (2) 로 정정
+  - adapters/src/test/kotlin/bidvector/adapters/extraction/**   # 계약 갱신 (2) — 생성 지점 이관
+  - adapters/src/test/kotlin/bidvector/adapters/ml/**           # 계약 갱신 (2) — 생성 지점 이관
+  - app/src/test/kotlin/bidvector/app/conformance/**            # 계약 갱신 (2) — 생성 지점 이관
   - strategy/src/main/kotlin/bidvector/strategy/Text.kt         # 두 타입 생성 경계 폐쇄 (D-6F4W-7)
   - strategy/src/test/kotlin/bidvector/strategy/**              # 폐쇄로 깨지는 생성 지점 이관
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/**   # test fake 의 생성 지점 이관
