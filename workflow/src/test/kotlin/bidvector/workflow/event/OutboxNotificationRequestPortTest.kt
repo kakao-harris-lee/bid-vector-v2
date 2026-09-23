@@ -248,4 +248,38 @@ class OutboxNotificationRequestPortTest {
         val payloadEvidence = payload.evidence as NotificationEvidencePayload.NotPredicted
         payloadEvidence.reason shouldBe "CircuitOpen"
     }
+
+    /**
+     * scope.md 우회 4(민감값) — `data class`의 합성 `toString()`이 조용히 새 필드를
+     * 흘리는 축(6A-1 교훈)을 field 집합 자체를 잠가 막는다. 지금 필드는 전부
+     * 비민감(코드·수치·식별자, checklist.md "toString·민감값 실측" 절) — 이 test는
+     * 그 사실이 아니라 **field 집합이 바뀌면 조용히 지나가지 않는다**를 보장한다.
+     * 새 필드가 추가되면 이 test가 깨져 「그 필드가 민감한가」를 다시 묻게 만든다.
+     */
+    @Test
+    fun `payload 필드 집합은 고정돼 있다 — 새 필드가 조용히 안 늘어난다(우회 4)`() {
+        val payloadFields = NotificationRequestedPayload::class.java.declaredFields.map { it.name }.toSet()
+        val diagnosedFields = NotificationEvidencePayload.Diagnosed::class.java.declaredFields.map { it.name }.toSet()
+        val notPredictedFields =
+            NotificationEvidencePayload.NotPredicted::class.java.declaredFields.map { it.name }.toSet()
+
+        payloadFields shouldBe setOf("noticeId", "bidNowReasons", "evidence")
+        diagnosedFields shouldBe
+            setOf(
+                "trainingRowCount",
+                "segmentSupport",
+                "shrinkageWeight",
+                "excludedObservations",
+                "agencySampleCount",
+                "agencySampleBelowThreshold",
+                "releaseId",
+                "artifactChecksum",
+                "featureSchemaVersion",
+                "codeVersion",
+                "datasetId",
+                "releaseKind",
+                "excludedSamples",
+            )
+        notPredictedFields shouldBe setOf("reason")
+    }
 }
