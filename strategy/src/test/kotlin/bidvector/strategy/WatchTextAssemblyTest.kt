@@ -13,10 +13,18 @@ import org.junit.jupiter.api.Test
 
 /**
  * D-6F4W-12 — 조립 함수 조각 하나의 경계 표본(전부 blank·일부 blank·전부 비blank·빈 문자열·
- * 공백 낀 비blank). 전건 문자열 열거가 아니라 이 다섯 경계만으로 `isNotBlank` 술어가 실제로
+ * 공백 낀 비blank). 전건 문자열 열거가 아니라 이 경계들만으로 `isNotBlank` 술어가 실제로
  * 거르는 경계를 덮는다.
+ *
+ * **verifier r1 LOW-1** — ASCII 공백(`" "`)만 있으면 `filter(String::isNotBlank)`가
+ * `filter { it.trim(' ').isNotEmpty() }`로 바뀌어도 이 property test 가 못 잡는다(그
+ * 변이는 ASCII 공백만 blank 로 본다). 탭(`\t`)·전각 공백(`　`, 한국어 공고명에서
+ * 현실적)·줄바꿈없는 공백(` `)을 더해 그 변이를 닫는다 — Kotlin `Char.isWhitespace`가
+ * 셋 다 Java `Character.isWhitespace ∪ isSpaceChar`로 blank 로 보므로 원래 술어와는
+ * 여전히 일치한다.
  */
-private val TEXT_FRAGMENT_ARB: Arb<String?> = Arb.of(null, "", "   ", "x", " x ", "x x")
+private val TEXT_FRAGMENT_ARB: Arb<String?> =
+    Arb.of(null, "", "   ", "x", " x ", "x x", "\t", "　", " ")
 
 private fun noBudgetRules(
     focusRegionTerms: List<String> = emptyList(),

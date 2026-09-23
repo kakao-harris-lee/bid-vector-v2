@@ -180,7 +180,8 @@ class EvaluationAdapterDependencyTest {
  * `NoticeWatchSubjectPort`·`NoticeWatchSubjectPortKt` 두 class 를 `javap -p -v`로 실측해
  * 손으로 옮겼다(2026-09-23, commands.md 에 원 출력 대조 기록). `assemble*` 커널 둘·
  * `Notice`/값 객체 getter·`WatchSubject`/`Fact`/`CategoryCode` 생성자·`kotlin.collections.
- * SetsKt`(`.orEmpty()`가 컴파일되어 내리는 stdlib)·`Intrinsics`(null 체크)·`Object.<init>`
+ * SetsKt`(`.orEmpty()`가 컴파일되어 내리는 stdlib)·`Intrinsics`(null 체크)·`Object.<init>`·
+ * `noticeToWatchSubject`가 `private`이라 Kotlin이 내는 `access$` 합성 접근자(D-6F4W-16)
  * 뿐이다 — 이어붙이기 기계(`StringBuilder`·`makeConcatWithConstants`·`String.join`·
  * `joinToString`류)는 어떤 이름도 여기 없다. **새 이름이 어댑터에 나타나면 이 집합의
  * 부분집합 검사가 그 이름과 무관하게 RED 가 된다** — 금지 목록(이름 열거)과 달리 열거를
@@ -189,6 +190,9 @@ class EvaluationAdapterDependencyTest {
 private val ALLOWED_METHOD_REFERENCES =
     setOf(
         "bidvector/adapters/evaluation/NoticeWatchSubjectPortKt.noticeToWatchSubject:(Lbidvector/procurement/Notice;)Lbidvector/strategy/WatchSubject;",
+        // noticeToWatchSubject 를 private 으로 좁히면(D-6F4W-16, code-reviewer LOW) Kotlin 이
+        // 같은 파일의 다른 class(NoticeWatchSubjectPort)가 부를 수 있도록 합성 접근자를 낸다.
+        "bidvector/adapters/evaluation/NoticeWatchSubjectPortKt.access\$noticeToWatchSubject:(Lbidvector/procurement/Notice;)Lbidvector/strategy/WatchSubject;",
         "bidvector/procurement/Agency.getName:()Lbidvector/procurement/AgencyName;",
         "bidvector/procurement/AgencyName.getValue:()Ljava/lang/String;",
         "bidvector/procurement/BusinessCategory.getCode:()Lbidvector/procurement/CategoryCode;",

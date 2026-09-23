@@ -36,7 +36,7 @@ class NoticeWatchSubjectPort : WatchSubjectPort {
  * 싣지 않은 것과 「값은 있는데 계산이 실패했다」류 사유(`POLICY_NOT_APPLICABLE` 등)는 다른
  * 축이다 — scope.md D-6F4W-4 전수 검토.
  */
-internal fun noticeToWatchSubject(notice: Notice): WatchSubject {
+private fun noticeToWatchSubject(notice: Notice): WatchSubject {
     val noticeTitle = notice.title?.value
     val businessCategoryLabel = notice.businessCategory?.label?.value
     return WatchSubject(

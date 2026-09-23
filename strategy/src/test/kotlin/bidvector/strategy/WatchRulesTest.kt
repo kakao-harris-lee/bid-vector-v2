@@ -24,12 +24,19 @@ private fun baseAmount(
 ): BaseAmount = BaseAmount(won, Currency.KRW, vat, provenance)
 
 /**
- * D-6F4W-7/8 이관 — `keywordText`·`fullText` 는 `assembleKeywordScopeText`/
- * `assembleFullScopeText` 에 단일 조각(`noticeTitle`)으로 넘겨 재구성한다(ⓐ, 도달 경로
- * 증명). 단일 비공백 조각은 구분자 없이 그대로 나오므로 이 파일의 기존 literal 은 전부
- * 값 그대로 보존된다 — D-6F4W-9 실측(assemble 은 공백뿐인 비지 않은 문자열을 못 낸다)에
- * 따라 property test 가 생성하는 공백류 문자열은 `""` 로 접힌다(도달 불가능한 상태를
- * 도달 가능한 가장 가까운 값으로 좁힌 것, ⓑ).
+ * D-6F4W-7/8 이관 — 이 함수에는 서로 다른 두 축이 있다(verifier r1 L-4, checklist.md
+ * (2b) 표의 「2건 ⓐ」는 아래 첫째 축만 센다).
+ *
+ * **ⓐ — 기본값 리터럴 전환(2건, checklist.md 집계 대상).** `keywordText`·`fullText`
+ * 기본값 `""`는 `assembleKeywordScopeText`/`assembleFullScopeText`에 단일 조각
+ * (`noticeTitle` 자리)으로 넘겨 재구성한다 — 도달 경로 증명. 단일 비공백 조각은 구분자
+ * 없이 그대로 나오므로 이 파일의 다른 literal 호출부도 값 그대로 보존된다.
+ *
+ * **ⓑ — property test 가 생성하는 공백류 문자열의 narrowing(집계 밖, 별도 성질).**
+ * D-6F4W-9 실측(assemble 은 공백뿐인 비지 않은 문자열을 못 낸다)에 따라, 이 파일의
+ * property test(`Arb.string`)가 우연히 공백류 `keywordText`/`fullText`를 생성해도
+ * 조립 결과는 `""`로 접힌다 — 도달 불가능한 상태(공백뿐인 비지 않은 문자열)를 도달
+ * 가능한 가장 가까운 값(`""`)으로 좁힌 것이다.
  */
 private fun subject(
     categories: Set<String> = emptySet(),
