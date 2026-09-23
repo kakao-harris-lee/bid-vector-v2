@@ -1,7 +1,7 @@
 # M6/6F-7 — rollback.md
 
-실측 HEAD: `b016fd30b33c14cbd762e13254150eb3d070c54e`(①~⑥ 전부 이 HEAD에서
-실측 — 파일 목록·diff·④⑤⑥ 전부 exit 0)
+실측 HEAD: `e7e7a764ac2110ab1a14a16eba56e484d7a2f588`(D-6F7-7 — sink 를
+`workflow.evaluation`으로 옮긴 뒤 ①~⑥ 전부 이 HEAD에서 재실측)
 
 ## base 정의
 
@@ -22,10 +22,14 @@ M  adapters/src/test/kotlin/bidvector/adapters/event/EventInternalClosureCompile
 M  adapters/src/test/kotlin/bidvector/adapters/event/OutboxPayloadCodecTest.kt
 A  adapters/src/test/resources/compile-fixtures/negative-7-notification-request-ctor.kt.txt
 M  config/quality/gate-tests.properties
+A  workflow/src/main/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPort.kt
 A  workflow/src/main/kotlin/bidvector/workflow/event/NotificationRequestedPayload.kt
-A  workflow/src/main/kotlin/bidvector/workflow/event/OutboxNotificationRequestPort.kt
-A  workflow/src/test/kotlin/bidvector/workflow/event/OutboxNotificationRequestPortTest.kt
+A  workflow/src/test/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPortTest.kt
 ```
+
+**D-6F7-7로 경로 둘이 바뀌었다** — sink(main)·sink test 가 `workflow.event`에서
+`workflow.evaluation`으로 옮겨졌다(순 diff는 `base..HEAD`에서 새 경로만 보인다 —
+옛 경로는 base·HEAD 어느 쪽에도 없어 목록에 안 잡힌다, git의 정상 동작).
 
 **`scope.md`·`milestone-6.md`는 되돌리지 않는다** — 팀장(하네스/문서 레인) 소유
 문서다. `scope.md`는 이 slice의 계약 자체이고, `milestone-6.md`의 6F-7 관련 문단도
@@ -42,9 +46,9 @@ hunk 격리 없이 전체 복원으로 안전하다.
 BASE=$(git rev-parse main)   # = 86093972570d016ddc25810872d65137c5e11ef6
 
 git restore --source="$BASE" --staged --worktree -- \
+  workflow/src/main/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPort.kt \
   workflow/src/main/kotlin/bidvector/workflow/event/NotificationRequestedPayload.kt \
-  workflow/src/main/kotlin/bidvector/workflow/event/OutboxNotificationRequestPort.kt \
-  workflow/src/test/kotlin/bidvector/workflow/event/OutboxNotificationRequestPortTest.kt \
+  workflow/src/test/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPortTest.kt \
   adapters/src/main/kotlin/bidvector/adapters/event/OutboxPayloadCodec.kt \
   adapters/src/test/kotlin/bidvector/adapters/event/OutboxPayloadCodecTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/event/EventInternalClosureCompileTest.kt \
@@ -64,17 +68,17 @@ git restore --source="$BASE" --staged --worktree -- \
 | ③ diff 비어 있음 | `git diff $BASE -- <8경로>` | exit 0, 빈 출력 |
 | ③′ 신규 파일 삭제 확인 | `ls` 4개 신규 경로 | 전부 "No such file or directory"(삭제됨) |
 | ④ compile | `./gradlew --no-daemon :workflow:compileKotlin :adapters:compileKotlin :workflow:compileTestKotlin :adapters:compileTestKotlin` | exit 0 |
-| ⑤ test | `./gradlew --no-daemon :workflow:test :adapters:test` | exit 0 |
+| ⑤ test | `./gradlew --no-daemon :workflow:test :adapters:test :app:test` | exit 0(`app:test`의 `ArchitectureGateTest` 포함 — D-6F7-7 뒤 순환 없음 재확인) |
 | ⑥ 게이트 | `./gradlew --no-daemon :workflow:detekt :adapters:detekt :adapters:jarContentGate :adapters:sizeGate :workflow:sizeGate :workflow:runKtlintCheckOverMainSourceSet :workflow:runKtlintCheckOverTestSourceSet :adapters:runKtlintCheckOverMainSourceSet :adapters:runKtlintCheckOverTestSourceSet` | exit 0 |
 | ⑥′ 등재 완전성 | `./gradlew --no-daemon :workflow:test --tests "bidvector.workflow.WorkflowGateRegistrationTest" :adapters:test --tests "bidvector.adapters.event.EventGateRegistrationTest"` | exit 0(되돌린 뒤 `gate-tests.properties`와 소스 트리가 다시 일치) |
 
 ## 실측 유효성 대조(2026-09-19 정정 규율)
 
 ```
-git diff --name-only b016fd30..<판정 SHA> -- \
+git diff --name-only e7e7a764..<판정 SHA> -- \
+  workflow/src/main/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPort.kt \
   workflow/src/main/kotlin/bidvector/workflow/event/NotificationRequestedPayload.kt \
-  workflow/src/main/kotlin/bidvector/workflow/event/OutboxNotificationRequestPort.kt \
-  workflow/src/test/kotlin/bidvector/workflow/event/OutboxNotificationRequestPortTest.kt \
+  workflow/src/test/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPortTest.kt \
   adapters/src/main/kotlin/bidvector/adapters/event/OutboxPayloadCodec.kt \
   adapters/src/test/kotlin/bidvector/adapters/event/OutboxPayloadCodecTest.kt \
   adapters/src/test/kotlin/bidvector/adapters/event/EventInternalClosureCompileTest.kt \
@@ -82,7 +86,7 @@ git diff --name-only b016fd30..<판정 SHA> -- \
   config/quality/gate-tests.properties
 ```
 
-`b016fd30`가 이 evidence 작성 시점의 마지막 산출물 커밋이다. evidence 편집 커밋만
+`e7e7a764`가 이 evidence 작성 시점의 마지막 산출물 커밋이다. evidence 편집 커밋만
 그 뒤에 붙을 수 있고, evidence 커밋은 위 8경로를 건드리지 않으므로(evidence는
 `reports/evidence/m6/6f7/**`에만 쓴다) 판정 SHA가 그 이후 어디든 위 명령은 빈
 출력이어야 유효하다. 판정 레인은 자신의 판정 SHA로 이 명령을 재실행해 빈 출력을

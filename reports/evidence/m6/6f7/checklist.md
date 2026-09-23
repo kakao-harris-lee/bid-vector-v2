@@ -138,12 +138,23 @@ RED 로 잡지만, 이미 영속된 옛 outbox 행의 형식을 고치거나 마
 - **4C-1의 outbox `idempotency_key` UNIQUE 부재** — 이 slice가 수령만 한다(D-6F7-3·6).
   같은 notice가 여러 evaluate run에서 반복 `BidNow`를 받으면 매번 새 outbox 행이
   생긴다. 구조로 닫지 않기로 결정됨(D-6F7-6).
-- **contractGate 환경 결함(신규 등재, 이 slice 발견)** — 이 머신의 `~/.internal-bin/git`
-  래퍼가 존재하지 않는 `/opt/homebrew/bin/git`을 가리켜 `buf breaking`의 내부
-  `git clone`이 실패한다. `git stash`로 이 slice의 변경을 전부 치운 상태에서도
-  동일 실패가 재현되어 **이 slice의 diff와 무관함을 확정**(`commands.md`). 이
-  slice는 `.proto`/`contracts/`를 건드리지 않는다. 수정은 머신 환경(`~/.internal-bin/git`)
-  소관이라 이 slice의 in_scope 밖 — 팀장에게 별도 보고.
+- **`OPEN-6F7-REASON-CODE-STABILITY`** — `scope.md`에 등재됨(팀장). 위 절 참고.
+- **contractGate 환경 결함(이 slice 발견) — 해소됨.** 팀장이 `~/.internal-bin/git`
+  래퍼의 `exec` 경로를 고쳤다(Intel Homebrew 머신에 Apple Silicon 경로가 박혀
+  있었다). `git stash`로 이 slice의 변경을 전부 치운 상태에서도 동일 실패가
+  재현돼 **이 slice의 diff와 무관함을 확정**한 뒤(`commands.md`), 해소 뒤
+  acceptance를 전건 재실측했다(아래).
+- **아키텍처 패키지 순환(이 slice 발견, D-6F7-7로 해소) — `commands.md` 「아키텍처
+  순환 발견과 수정」 절.** `contractGate`가 먼저 죽어 `ArchitectureGateTest`
+  (`:app:test`)가 이 slice의 구현 착수부터 지금까지 **한 번도 실행된 적이
+  없었다** — 안 돌린 게이트가 다른 게이트의 실패를 가렸다. 해소 뒤 처음
+  도달하자 순환 다섯 건이 드러났고, sink를 `workflow.evaluation`으로 옮겨
+  닫았다(팀장 요청대로 순환 재발 변이로 RED 재확인 완료).
+- **`one-command-check.sh`의 Python(ml-engine) 단계 — 외부 네트워크(PyPI) 문제,
+  이 slice와 무관.** Kotlin 두 step(`check`·`qualityBaseline`)은 exit 0로 끝까지
+  돈다. Python 첫 step(`uv sync`)이 `pypi.org` 접속 시간초과로 실패한다 —
+  프록시(`HTTPS_PROXY`)를 거쳐도 그 목적지에 도달하지 못하는 이 세션의
+  네트워크 제약이고, 이 slice는 `ml-engine`을 전혀 건드리지 않는다.
 - **payload evidence 필드 확장 시 toString 재실측 필요** — 위 절 참고.
 
 ## 리뷰 요청 조건 점검
@@ -151,11 +162,12 @@ RED 로 잡지만, 이미 영속된 옛 outbox 행의 형식을 고치거나 마
 - [x] 구현 diff 커밋, base/head 고정 — `git status --porcelain -- <in_scope 8경로>`
   결과 없음(clean). 양성 대조: `config/quality/gate-tests.properties`에 한 줄을
   일부러 지웠다 되돌려 porcelain이 `M`을 잡는 것을 확인 후 원복.
-- [x] acceptance_commands 셋 — `commands.md`(`check`는 환경 결함 하나를 제외하고
-  전건 통과, `qualityBaseline` 통과, `one-command-check.sh`는 같은 환경 결함으로
-  Kotlin 첫 step에서 중단 — Python 단계 무관).
+- [x] acceptance_commands 셋 — `commands.md`. `check`·`qualityBaseline`
+  **전건 exit 0**(아키텍처 게이트 포함). `one-command-check.sh`는 Kotlin
+  단계 exit 0, Python 단계는 PyPI 네트워크 문제로 exit 1(이 slice 무관, 위
+  「알려진 제한」).
 - [x] test/lint/type/architecture/contract 관련 명령 — 이 slice가 닿는 전 gate
-  개별 실행 통과(`commands.md`). `contractGate`만 환경 결함으로 제외, 근거는 위.
+  전건 통과(`commands.md`), `contractGate`·`ArchitectureGateTest` 포함.
 - [x] 변경된 fixture 없음(N/A) · 정책 version 무변경(N/A, 마이그레이션 없음).
 - [x] 알려진 제한·rollback — 위 절, `rollback.md`.
 - [x] 비밀값 스캔 통과 — `commands.md`.
