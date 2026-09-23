@@ -255,6 +255,30 @@ production classpath 에 닿지 않는다(구현 레인 빌드 산출물 실측)
 사후 흡수). 이 slice 의 in_scope 확장은 이것으로 여섯 번째이며, 전부 「기존 축에 걸친 additive 변경」 형태였다 — 다음 배선 slice 는
 착수 계약에서 **게이트·fixture·스키마 게이트·build 파일**을 처음부터 in_scope 에 넣는다(milestone 종결 문단의 교훈으로 적는다).
 
+## 계약 갱신 (7) — 검토 라운드 2 판정과 팀장 결정 (2026-09-23, 팀장)
+
+verifier r2(판정 SHA `e982f2ce`) **not-ready** — HIGH 1 · MEDIUM 1 · 장부 3. 재작업 **2/5**. 나머지 표적(HIGH-1·2·3, 엄격 본문,
+문서 enum, V16 잠금, 원문 부재, 장부)은 **닫힘**(변이 재현 RED, acceptance 셋 exit 0).
+
+**D-6A3-25 — 우회 5 게이트를 「호출 쌍 허용 목록」 규칙 하나로 바꾼다(verifier r2 HIGH, 선택지 (a) 채택).**
+D-6A3-17(c) 는 **포트 인터페이스 이름 일치 × `app.http` 패키지** 두 축에 걸려 있어 한 걸음씩 옮긴 변이 둘이 초록이었다 —
+N6(`app.http` 헬퍼가 구체 어댑터 `JdbcCandidateSource` 를 직접 호출) · N5(같은 헬퍼를 `app.wiring` 에 둠). 계약 문면(「port 인터페이스」)
+과 위협 ③(판정 경로는 use case 하나) 사이의 틈이고, **틈을 만든 것은 D-6A3-17(c) 의 팀장 문면**이다. (b)(범위를 좁혀 등재)는
+기각한다 — 위협 ③ 이 문면만 남는다.
+- 규칙: **app production 전체**에서 평가·전략 포트의 **메서드를 호출하는 (호출자 클래스, 포트) 쌍 집합 ⊆ 허용 쌍**. 호출 대상은 포트
+  인터페이스 **와 그 구현 타입 전부**(구현 관계를 ArchUnit 클래스패스 해석으로 판정 — 이름 목록이 아니다). 허용 쌍은
+  `architecture-policy.properties` 키(오늘 셋: `EvaluationDryRunFactory`→`StrategyRepository.load` · `StrategyReadController`→`load` ·
+  `RequestAuditFilter`→`CorrelationIdFactory` — 구현 레인이 실측해 확정). 기존 D-6A3-17(c) 규칙은 **대체**한다(둘 다 두지 않는다).
+- 표적 변이 RED: M5 · N5 · N6 · PRIV(factory 가 후보를 직접 읽어 컨트롤러로 넘김).
+
+**MEDIUM R2-M1 — KDoc 정정.** `NotificationRequestPort` 는 `fun interface` 라 app 안 SAM 람다 tee 가 구조 규칙 ① 을 통과한다 —
+BidNow E2E(거동 다리)가 잡는다(실측 RED). 규칙 KDoc 에 「구조 규칙은 명명 구현만, 람다 구현은 거동 test 가 닫는다」를 적는다.
+
+**장부(같은 라운드 일괄)**: LR2-1 rollback.md — `milestone-6.md` 는 in_scope 공유 파일이다(착수 문단 `39076f6c`, 종결 문단 예정).
+「`--author` 대조」 논거 삭제(author 가 전부 같다), hunk 격리를 규율대로(`git diff <sha>~1..<sha> -- milestone-6.md | git apply -R`,
+커밋 해시 명시). LR2-2 checklist 낡은 행(`save()` 위임 · 「A 25 중 5」 · 크기 수치). LR2-3 commands.md 변이 명명을 라운드 1 과
+맞추고 라운드 이력 형식 절 삭제.
+
 ## 위협 모델 — 6A-3+6F-3 고유 경계
 
 지키는 것: **① dry-run endpoint 는 외부 effect 를 만들지 않는다**(outbox 에 행이 생기지 않는다, 발송 없음)
