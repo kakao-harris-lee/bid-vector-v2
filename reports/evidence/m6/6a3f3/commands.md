@@ -109,9 +109,9 @@ D-6A3-25 표로 옮겼다 — 그 표적 게이트가 이 라운드에서 대체
 
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로 개별 인자> reports/evidence/m6/6a3f3/`
 - exit: 0(매치 있음, 32건)
-- 핵심 결과: 전부 false positive로 육안 확인 — Testcontainers 고정 fixture 문구(`bidvector_test_only`,
-  운영 값 아님), OpenAPI 보안 스키마 선언 키워드(`type: apiKey`), 편집 필드 토큰 파싱 식별자
-  (`...FromToken` 함수명). 실 비밀값 0건. 이 라운드(D-6A3-25·R2-M1)가 추가한 코드에는 비밀값류
+- 핵심 결과: 전부 false positive로 육안 확인 — 세 부류: E2E 의 Testcontainers 일회성 DB 접속 고정값(운영 값
+  아님) · OpenAPI 인증 스키마 선언의 표준 키워드 · 편집 필드 토큰 파싱 함수 이름. 실 비밀값 0건(어휘를 축어로
+  적지 않는다 — 하네스 규율, verifier r3 BLOCKER-R3-1). 이 라운드(D-6A3-25·R2-M1)가 추가한 코드에는 비밀값류
   문자열이 없다(도메인 예외 메시지·ArchUnit 규칙 설명·KDoc뿐 — 위 32건 목록에 이 라운드의 신규
   파일은 없다).
 

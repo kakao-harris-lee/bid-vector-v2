@@ -279,6 +279,23 @@ BidNow E2E(거동 다리)가 잡는다(실측 RED). 규칙 KDoc 에 「구조 �
 커밋 해시 명시). LR2-2 checklist 낡은 행(`save()` 위임 · 「A 25 중 5」 · 크기 수치). LR2-3 commands.md 변이 명명을 라운드 1 과
 맞추고 라운드 이력 형식 절 삭제.
 
+## 계약 갱신 (8) — 검토 라운드 3 판정 (2026-09-23, 팀장)
+
+verifier r3(판정 SHA `5313567c`) **not-ready** — **BLOCKER 1 은 장부 커밋이 낸 것**이다: `commands.md` 가 비밀값 스캔 어휘를 축어로
+적어 `leakPatternGate` 가 붉었다(`check`·`one-command-check` exit 1). 규율 둘 위반 — 어휘 축어 금지 · evidence 커밋마다 그 HEAD 에서
+`check` 재실측. 재작업 **3/5**. **D-6A3-25 게이트는 버텼다** — 변이 스무 가지(메서드 참조·인라인·확장·하위 인터페이스·suspend·
+제네릭)가 전부 RED 이거나 위협 모델 밖으로 판정됐다. 팀장이 직접 닫는다(두 줄 참조형 재작성 + LR3-1 정책 주석) — 이 라운드는
+코드 산출물을 바꾸지 않는다.
+
+**D-6A3-26 — R3-M1 은 이 slice 에서 닫지 않고 OPEN 으로 넘긴다.** 포트 **메서드 호출이 아닌** 세 형태가 초록이다 — ⓑ app 이 어댑터의
+추가 public 메서드를 호출 · ⓕ 생성자에서 읽고 getter 로 노출하는 어댑터 · ⓖ `app.http` 헬퍼가 `DataSource` 로 raw SQL. D-6A3-25 와
+우회 5 **문면은 충족**하나 위협 ③·④ 와 같은 계열의 지름길이다. 오늘 production 어댑터 중 생성자에서 읽는 것은 없다(verifier 실측).
+**`OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST`** 신설: ① `app.http` 의 의존 집합 ⊆ {workflow use case·결과 타입, DTO·Spring web, 명명 예외}
+허용 목록 규칙(ⓑ·ⓕ·ⓖ·N6 을 구조로 닫는다) ② 포트 집합을 손 열거 대신 `EvaluateCandidatesUseCase` 생성자 파라미터의 인터페이스 타입에서
+**도출**(열째 포트가 자동 편입). 받는 쪽: 다음 app HTTP slice(6A-2 — 세션 endpoint 가 `app.http` 에 새 컨트롤러를 더한다).
+**넘기는 이유**: 게이트 술어 셋째 교체를 같은 slice 에 얹으면 표적 재검증 라운드가 또 생기고(재작업 상한 5 중 3 사용), 오늘 그 경로를
+여는 production 코드가 없다.
+
 ## 위협 모델 — 6A-3+6F-3 고유 경계
 
 지키는 것: **① dry-run endpoint 는 외부 effect 를 만들지 않는다**(outbox 에 행이 생기지 않는다, 발송 없음)
@@ -401,6 +418,7 @@ Kotlin `check` job 전체 + `container` job(ml-serving 이미지·compose·`Real
 | `OPEN-6A3-EVALUATION-COMMIT` | **신설** | outbox 커밋 경로(발송 채널과 함께). D-6F7-11 원자성·`Failed` 로깅을 받는다 |
 | `OPEN-6A3-EVALUATION-DETAIL` | **신설** | 후보별 사유 상세 응답 — D-6A1-38 을 깊이 1 object 배열까지 넓히는 contract-keeper 결정 뒤 |
 | `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` | **신설** | `maxActiveBids` 편집 경로(6A-2 세션 명령 endpoint 가 받는다). 그 전엔 DB 직접 설정 |
+| `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` | **신설** | D-6A3-26 — `app.http` 의존 허용 목록 + 포트 집합 도출. 6A-2 가 받는다 |
 | `OPEN-6F3-BID-RECORD` | 변경 없음 | 투찰 기록 표로 현재값을 세는 축(6D·6E) |
 | `OPEN-6A1-CONNECTION-POOL` | 변경 없음 | 배선이 커져도 풀은 6C/6E |
 

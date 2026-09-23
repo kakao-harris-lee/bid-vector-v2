@@ -1,6 +1,7 @@
 # M6/6A-3+6F-3 rollback
 
-`실측 HEAD: 18fdd72e`(검토 라운드 2 수정의 마지막 산출물 커밋 — 이후 커밋은 evidence 전용)
+`실측 HEAD: 9d7b90e9`(verifier r3 LR3-1 이 공유 파일 `architecture-policy.properties` 주석을 움직여 재실측 — 앞 실측
+HEAD `18fdd72e` 와 산출물 트리는 그 주석 한 hunk 만 다르다. 이후 커밋은 evidence 전용)
 
 ## 되돌리는 것
 
@@ -52,9 +53,9 @@ r2 LR2-1 — 그 논거는 병합 전에만 성립한다, D-6A3-23 「규율대�
 `98a18086`.
 
 `config/quality/architecture-policy.properties`를 만진 이 slice의 커밋(최신→과거):
-`86a48b7e`·`b1982763`·`4213026e`.
+`9d7b90e9`·`86a48b7e`·`b1982763`·`4213026e`.
 
-(목록은 `git log --oneline febad567..18fdd72e -- <파일>` 기계 산출 — 라운드마다 재산출한다.
+(목록은 `git log --oneline febad567..9d7b90e9 -- <파일>` 기계 산출 — 라운드마다 재산출한다.
 일반 in_scope 파일과 달리 이 두 파일은 공유 자원이라 `git restore --source=<base>`로 되돌리지
 않는다 — 다른 레인이 병합 후 같은 파일에 낸 hunk를 함께 지울 위험이 있다.)
 
@@ -107,7 +108,7 @@ git restore --source=febad567 --staged --worktree -- <위 56개에서 공유 파
 ## 그 사이 되돌림 대상이 움직였는가 (실측 HEAD ↔ 판정 SHA)
 
 ```
-git diff --name-only 18fdd72e..<판정 SHA> -- <위 56개 경로>
+git diff --name-only 9d7b90e9..<판정 SHA> -- <위 56개 경로>
 ```
 
 이 slice의 남은 커밋(장부 일괄)은 evidence 파일(`reports/evidence/m6/6a3f3/**`)만 만진다 —
