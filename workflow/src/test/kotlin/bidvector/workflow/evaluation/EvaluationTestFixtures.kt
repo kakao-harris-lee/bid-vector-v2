@@ -24,8 +24,6 @@ import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.ReasonCode
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.BudgetBoundInclusivity
-import bidvector.strategy.FullScopeText
-import bidvector.strategy.KeywordScopeText
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.ScoreRange
 import bidvector.strategy.StrategyDraft
@@ -148,12 +146,16 @@ internal class FakeCandidateSource(
     override fun openCandidates(): List<Notice> = notices
 }
 
-/** 규칙이 하나도 없는 감시 subject — `testStrategy()`의 기본 draft가 아닌, 감시 미설정 자체를 재는 test용. */
+/**
+ * 규칙이 하나도 없는 감시 subject — `testStrategy()`의 기본 draft가 아닌, 감시 미설정 자체를
+ * 재는 test용. **D-6F4W-7/8 이관** — 빈 문자열은 `assembleKeywordScopeText`/
+ * `assembleFullScopeText`가 두 조각 다 없을 때 내는 값 그대로다(ⓐ).
+ */
 internal val EMPTY_SUBJECT =
     WatchSubject(
         categories = emptySet(),
-        keywordText = KeywordScopeText(""),
-        fullText = FullScopeText(""),
+        keywordText = bidvector.strategy.assembleKeywordScopeText(null, null),
+        fullText = bidvector.strategy.assembleFullScopeText(null, null, null, null),
         baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
     )
 
@@ -163,8 +165,8 @@ internal const val DEFAULT_FOCUS_CATEGORY = "SYN-CAT-001"
 internal val MATCHING_SUBJECT =
     WatchSubject(
         categories = setOf(bidvector.strategy.CategoryCode(DEFAULT_FOCUS_CATEGORY)),
-        keywordText = KeywordScopeText(""),
-        fullText = FullScopeText(""),
+        keywordText = bidvector.strategy.assembleKeywordScopeText(null, null),
+        fullText = bidvector.strategy.assembleFullScopeText(null, null, null, null),
         baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
     )
 

@@ -6,9 +6,9 @@ import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.ReasonCode
 import bidvector.sharedkernel.RoundingPolicy
 import bidvector.strategy.CategoryCode
-import bidvector.strategy.FullScopeText
-import bidvector.strategy.KeywordScopeText
 import bidvector.strategy.WatchSubject
+import bidvector.strategy.assembleFullScopeText
+import bidvector.strategy.assembleKeywordScopeText
 import bidvector.workflow.embedding.TextKind
 import bidvector.workflow.prediction.ModelReleaseSelector
 import bidvector.workflow.prediction.OptimizationObjective
@@ -30,8 +30,8 @@ class TextSynthesisTest {
         val subject =
             WatchSubject(
                 categories = setOf(CategoryCode("B-CAT"), CategoryCode("A-CAT")),
-                keywordText = KeywordScopeText("클라우드 보안 시스템 구축"),
-                fullText = FullScopeText("서울특별시 발주 클라우드 인프라 통합 구축 사업 개요"),
+                keywordText = assembleKeywordScopeText("클라우드 보안 시스템 구축", null),
+                fullText = assembleFullScopeText("서울특별시 발주 클라우드 인프라 통합 구축 사업 개요", null, null, null),
                 baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
             )
 
@@ -49,8 +49,8 @@ class TextSynthesisTest {
         val absentForPolicy =
             WatchSubject(
                 categories = setOf(CategoryCode("CAT")),
-                keywordText = KeywordScopeText("키워드"),
-                fullText = FullScopeText("전문"),
+                keywordText = assembleKeywordScopeText("키워드", null),
+                fullText = assembleFullScopeText("전문", null, null, null),
                 baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
             )
         val absentForOtherReason = absentForPolicy.copy(baseAmount = Fact.Absent(ReasonCode.EMPTY_INPUT))
@@ -62,13 +62,21 @@ class TextSynthesisTest {
         firstText shouldBe secondText
     }
 
+    /**
+     * D-6F4W-8/9 이관 — 원래 `fullText = FullScopeText("   ")`(공백 3자)였다. 실측(D-6F4W-9):
+     * `assembleFullScopeText`는 `joinNonBlankParts`가 blank 조각을 join 전에 걸러내므로
+     * 공백뿐인 비지 않은 문자열을 **낼 수 없다** — 조각이 없으면 `""`, 있으면 반드시 비공백
+     * 문자를 포함한다. 그 상태는 production 도달 불가능이라 ⓑ로 처분한다 — 가장 가까운
+     * 도달 가능한 값(완전히 빈 문자열)으로 대체한다. 「절단 뒤 공백만 남는」 축은 바로 아래
+     * `verifier F-1` test 가 이미 재고 있어 커버가 비지 않는다.
+     */
     @Test
     fun `NOTICE 빈 subject 는 SynthesisOutcome Empty`() {
         val blank =
             WatchSubject(
                 categories = emptySet(),
-                keywordText = KeywordScopeText(""),
-                fullText = FullScopeText("   "),
+                keywordText = assembleKeywordScopeText(null, null),
+                fullText = assembleFullScopeText(null, null, null, null),
                 baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
             )
 
@@ -119,14 +127,19 @@ class TextSynthesisTest {
         synthesizeProfileText(blank, TEST_POLICY) shouldBe SynthesisOutcome.Empty
     }
 
+    /**
+     * D-6F4W-8 이관 — `assembleFullScopeText`의 `demandAgencyName` 자리에 긴 문자열을 실으면
+     * 조각이 그 하나뿐이라 구분자 없이 그대로 나온다(ⓐ, 도달 경로 증명) — 원래
+     * `FullScopeText(" ".repeat(N)+"x")` 리터럴과 값이 같다.
+     */
     @Test
     fun `verifier F-1 — NOTICE 절단 뒤 공백만 남으면 Synthesized 가 아니라 Empty`() {
         val shippedPolicy = OPPORTUNITY_POLICY.entries.single().second
         val subject =
             WatchSubject(
                 categories = emptySet(),
-                keywordText = KeywordScopeText(""),
-                fullText = FullScopeText(" ".repeat(shippedPolicy.textMaxChars) + "x"),
+                keywordText = assembleKeywordScopeText(null, null),
+                fullText = assembleFullScopeText(null, null, " ".repeat(shippedPolicy.textMaxChars) + "x", null),
                 baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
             )
 
@@ -151,8 +164,8 @@ class TextSynthesisTest {
         val subject =
             WatchSubject(
                 categories = setOf(CategoryCode("CAT")),
-                keywordText = KeywordScopeText("키워드텍스트"),
-                fullText = FullScopeText("전문에 해당하는 아주 긴 문장을 여기 넣는다"),
+                keywordText = assembleKeywordScopeText("키워드텍스트", null),
+                fullText = assembleFullScopeText("전문에 해당하는 아주 긴 문장을 여기 넣는다", null, null, null),
                 baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
             )
         val untruncated = (synthesizeNoticeText(subject, TEST_POLICY) as SynthesisOutcome.Synthesized).text.value
