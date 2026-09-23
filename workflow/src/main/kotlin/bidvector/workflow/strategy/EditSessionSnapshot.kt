@@ -71,6 +71,9 @@ data class StrategyDraftSnapshot(
     val bidNowThreshold: BigDecimal? = null,
     val reviewThreshold: BigDecimal? = null,
     val candidateLimit: Int? = null,
+    /** M6/6A-3+6F-3 D-6A3-12 — [StrategyDraft.maxActiveBids] 왕복. 빠뜨리면 상한 있는 전략에서
+     * 시작한 세션이 영속·복원 뒤 조용히 상한을 잃는다(6B-1 왕복 안정성 계약 구멍). */
+    val maxActiveBids: Int? = null,
 )
 
 /**
@@ -174,6 +177,7 @@ private fun StrategyDraft.toSnapshot(): StrategyDraftSnapshot =
         bidNowThreshold = bidNowThreshold,
         reviewThreshold = reviewThreshold,
         candidateLimit = candidateLimit,
+        maxActiveBids = maxActiveBids,
     )
 
 /** D-10 전제(위 [MoneySnapshot] KDoc) — 인코딩 시점에도 확정해 낡은 가정을 조기에 드러낸다. */

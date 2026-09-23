@@ -141,6 +141,7 @@ private fun restoreStrategyDraft(snapshot: StrategyDraftSnapshot): StrategyDraft
         bidNowThreshold = snapshot.bidNowThreshold,
         reviewThreshold = snapshot.reviewThreshold,
         candidateLimit = snapshot.candidateLimit,
+        maxActiveBids = snapshot.maxActiveBids,
     )
 
 /** 위 [MoneySnapshot] KDoc의 D-10 전제 — `OperatorDeclared`·`INCLUSIVE` 밖은 지어내지 않고 거부한다. */

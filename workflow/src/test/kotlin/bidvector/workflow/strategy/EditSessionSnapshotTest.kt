@@ -65,6 +65,19 @@ class EditSessionSnapshotTest {
     }
 
     @Test
+    fun `D-6A3-12 WaitingForConfirmation 상태(maxActiveBids 포함)를 왕복하면 값이 그대로 복원된다`() {
+        // 계약 갱신 (1) D-6A3-12 — 6B-1 세션 스냅샷이 이 필드를 빠뜨리면 상한 있는 전략에서
+        // 시작한 세션이 영속·복원 뒤 조용히 상한을 잃는다(왕복 등식으로 그 구멍을 막는다).
+        val draft = StrategyDraft(candidateLimit = 10, maxActiveBids = 5)
+        val original =
+            session(
+                EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft),
+            )
+
+        restoreEditSession(original.toSnapshot()) shouldBe original
+    }
+
+    @Test
     fun `WaitingForConfirmation 예산 한계가 없는 draft 도 왕복한다`() {
         val original =
             session(
