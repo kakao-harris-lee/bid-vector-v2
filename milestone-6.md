@@ -398,6 +398,32 @@ main/test × 모듈로 갈라 보고하고, **`strategy` 밖 main 코드에 생�
 6A-1(D-6A1-26)·6F-7(HIGH-1)에서 **두 번 연속** 「파일이 움직였는데 `in_scope` 를 안 고쳐 clean-tree 게이트가
 눈이 멀었다」가 났다. **세 번째를 만들지 않는다.**
 
+**6F-4-w 종결 2026-09-23** — PR **#43**(head `f9624326`, 계약 갱신 절 넷·D-6F4W-1~16). 판정 넷 + 조치를 PR 코멘트로
+남겼다(verifier r1 `not-ready` → r2 `ready-for-review` · `code-reviewer` 머지 가능 · `privacy-gate` 위반 0 · 조치).
+재작업 **1/5**. CI 세 job 전부 통과(`check` 4m57s · `container` 2m16s · `ml-engine` 49s). Codex 는 대상 아님.
+
+**r1 HIGH 는 게이트 술어의 결함이었다 — 「있는지만 보는」의 변형.** 컴파일 probe 의 기대 조각 `"cannot access"`
+가 `private` 과 `internal` 을 구별하지 못해, 생성자를 `internal` 로 퇴행시켜도 `check` 전체가 초록이었다 —
+D-6F4W-7 이 「`internal` 로 때우지 않는다」를 명시했는데 그 probe 가 바로 그 퇴행을 통과시켰다. 기대 조각을
+`"it is private in"` 으로 좁히자 퇴행 변이가 4건 RED(D-6F4W-13). **같은 라운드의 MEDIUM 도 같은 계열**이다 — 우회 3
+의 부재 단언이 이름 셋의 금지 목록이라 `String.join` 복제가 통과했고, 상수 풀 **허용 목록**(⊆)으로 바꾸자 템플릿·
+`String.join`·`String.format`·multifile facade 변이가 전부 RED(D-6F4W-14). **둘 다 리뷰는 못 잡고 변이 실측만 잡았다**
+(M6 에서 세 slice 연속).
+
+**폐쇄가 닫은 것은 생성 경로이지 내용의 출처가 아니다(D-6F4W-15).** `assemble*` 의 인자가 `String?` 이라 요건 텍스트를
+넣으면 컴파일된다 — 6F-4 r2 시나리오가 철자만 바꿔 재현된다. 위협 모델이 「원천 값의 정직성」을 경계 밖에 두었고 오늘
+production 호출자는 어댑터 하나(`Notice` 타입 입력)라 이 slice 는 게이트를 세우지 않고 **문면을 고쳤다**(「실릴 길이 타입으로
+없다」류 전칭 삭제). 「어댑터만 부른다」는 오늘 **실측이지 구조가 아니다** — **`OPEN-6F4W-ASSEMBLE-CALLER`**(호출자 집합
+== {`NoticeWatchSubjectPortKt`}, app ArchUnit 층 집합 등식)를 신설해 **`OPEN-6F-ASSEMBLY` 의 전제 조건**으로 걸었다. 배선이
+호출자를 더하기 전에 닫혀야 한다. `of` 가 `internal` 인 것도 Kotlin 한계가 아니라 설계 선택(`NoticeTitle` 선례)으로 정정했다.
+
+**신설 OPEN**: `OPEN-6F4-TITLE-INGEST`(수집 절반) · `OPEN-6F4W-UNAVAILABLE-PRODUCER` · `OPEN-6F4W-ASSEMBLE-CALLER`.
+`OPEN-6F-ASSEMBLY` 재확인 항목 ①~④(privacy-gate U-1·R-1)를 scope.md OPEN 표에 등재했다.
+
+**장부 사실**: 수정 라운드 커밋 6개에 `Co-Authored-By` trailer 가 없다(evidence 의 SHA 앵커 보존을 위해 되쓰지 않음).
+검토 레인은 장비 리부팅으로 한 번 유실돼 같은 지시문으로 재발사했다(판정 SHA 불변). evidence 크기 여유가 16줄(825 ≤ 841)
+— 다음 slice 는 착수 시 evidence 예산을 먼저 잡는다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
@@ -434,7 +460,8 @@ main/test × 모듈로 갈라 보고하고, **`strategy` 밖 main 코드에 생�
 1. **6F-7** — `NotificationRequestPort` → outbox. **차단 없음**(outbox 기반은 V6·`JdbcOutboxPort` 로 존재).
    발송 채널은 `OPEN-STR-12` 로 그 뒤다 — 이 slice 는 **요청을 낳는 자리까지**다.
 2. **6F-4-w** — `WatchSubjectPort`. **차단 없음**(6F-4 의 `notice_title` 이 `main` 에 있다).
-   `OPEN-6F4-TITLE-WIRING` 을 닫는다.
+   `OPEN-6F4-TITLE-WIRING` 의 포트 절반을 닫는다(수집 절반은 `OPEN-6F4-TITLE-INGEST`). **PR #43 — 종결 문단 참조.**
+   4번(조립)의 전제에 **`OPEN-6F4W-ASSEMBLE-CALLER`** 가 더해진다.
 3. **6A-3 + 6F-3**(합침) — 평가 endpoint + `CapacityPort`. 여기서 **`MlAnalysisPort` 처분**(실 gRPC gateway
    배선 vs 자리지킴 유지)을 운영자에게 올린다 — 4B-6b 가 6A 로 넘긴 결정이고 **실 외부 호출 축**이다.
 4. **조립**(`OPEN-6F-ASSEMBLY`) — 포트 아홉을 app 에 꽂는다. 1~3 이 전제다.
