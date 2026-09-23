@@ -50,7 +50,9 @@ class OutboxNotificationRequestPort(
         return try {
             outbox.register(envelope)
             NotificationRequestOutcome.Requested
-        } catch (@Suppress("SwallowedException") failure: SQLException) {
+        } catch (
+            @Suppress("SwallowedException") failure: SQLException,
+        ) {
             // scope.md 우회 3 — outbox 쓰기 실패를 조용히 삼키지 않는다. `Failed`가 그
             // 축이고, 좁은 예외 타입만 잡는다(선례 `JdbcCompetitionSampleSource`).
             NotificationRequestOutcome.Failed
@@ -100,5 +102,7 @@ private fun PredictionEvidence.toOutboxPayload(): NotificationEvidencePayload =
             )
         }
 
-        is PredictionEvidence.NotPredicted -> NotificationEvidencePayload.NotPredicted(reason = reason.toString())
+        is PredictionEvidence.NotPredicted -> {
+            NotificationEvidencePayload.NotPredicted(reason = reason.toString())
+        }
     }

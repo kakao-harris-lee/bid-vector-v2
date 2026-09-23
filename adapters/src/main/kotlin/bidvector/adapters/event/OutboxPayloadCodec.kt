@@ -130,7 +130,7 @@ internal object OutboxPayloadCodec {
 
         fun evidenceFieldsOf(evidence: NotificationEvidencePayload): List<String> =
             when (evidence) {
-                is NotificationEvidencePayload.Diagnosed ->
+                is NotificationEvidencePayload.Diagnosed -> {
                     listOf(
                         EVIDENCE_KIND_DIAGNOSED,
                         evidence.trainingRowCount.toString(),
@@ -148,11 +148,13 @@ internal object OutboxPayloadCodec {
                         "",
                         excludedSamplesField(evidence.excludedSamples),
                     )
+                }
 
-                is NotificationEvidencePayload.NotPredicted ->
+                is NotificationEvidencePayload.NotPredicted -> {
                     listOf(EVIDENCE_KIND_NOT_PREDICTED) +
                         List(EVIDENCE_BLANK_SLOTS_FOR_NOT_PREDICTED) { "" } +
                         evidence.reason
+                }
             }
 
         val fields = listOf(payload.noticeId, encodeReasons(payload.bidNowReasons)) + evidenceFieldsOf(payload.evidence)
@@ -180,7 +182,7 @@ internal object OutboxPayloadCodec {
 
         fun decodeEvidence(evidenceFields: List<String>): NotificationEvidencePayload =
             when (val kind = evidenceFields[0]) {
-                EVIDENCE_KIND_DIAGNOSED ->
+                EVIDENCE_KIND_DIAGNOSED -> {
                     NotificationEvidencePayload.Diagnosed(
                         trainingRowCount = evidenceFields[1].toInt(),
                         segmentSupport = evidenceFields[2],
@@ -196,11 +198,15 @@ internal object OutboxPayloadCodec {
                         releaseKind = evidenceFields[12],
                         excludedSamples = decodeExcludedSamples(evidenceFields[EVIDENCE_TRAILING_SLOT_INDEX]),
                     )
+                }
 
-                EVIDENCE_KIND_NOT_PREDICTED ->
+                EVIDENCE_KIND_NOT_PREDICTED -> {
                     NotificationEvidencePayload.NotPredicted(reason = evidenceFields[EVIDENCE_TRAILING_SLOT_INDEX])
+                }
 
-                else -> error("알 수 없는 NotificationRequested evidenceKind 다: $kind")
+                else -> {
+                    error("알 수 없는 NotificationRequested evidenceKind 다: $kind")
+                }
             }
 
         val fields = splitEscapedFor(payload, FIELD_SEPARATOR)

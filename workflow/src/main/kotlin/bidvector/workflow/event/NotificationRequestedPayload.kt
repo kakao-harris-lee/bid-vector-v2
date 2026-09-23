@@ -49,7 +49,10 @@ sealed interface NotificationEvidencePayload {
         val excludedSamples: Map<String, Int>,
     ) : NotificationEvidencePayload
 
-    /** `PredictionEvidence.NotPredicted`의 투영 — [reason]은 `MlUnavailableReason`의 `toString()`(전부 `data object`라 클래스명과 같다). */
+    /**
+     * `PredictionEvidence.NotPredicted`의 투영 — [reason]은 `MlUnavailableReason`의
+     * `toString()`(전부 `data object`라 클래스명과 같다).
+     */
     data class NotPredicted(
         val reason: String,
     ) : NotificationEvidencePayload

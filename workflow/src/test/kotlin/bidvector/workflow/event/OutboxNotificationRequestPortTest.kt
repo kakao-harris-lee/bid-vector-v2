@@ -33,7 +33,10 @@ private val NOW: Instant = Instant.parse("2026-09-23T00:00:00Z")
 
 private fun noticeId(number: String = "N1") = NoticeId(NoticeNumber(number), NoticeRound("000"))
 
-/** `VerdictLadder.judge`(public, `decision` 모듈 소유)로 진짜 `Verdict.BidNow`를 얻는다 — `internal` 생성자를 직접 못 지으므로(scope.md 우회 1). */
+/**
+ * `VerdictLadder.judge`(public, `decision` 모듈 소유)로 진짜 `Verdict.BidNow`를 얻는다 —
+ * `internal` 생성자를 직접 못 지으므로(scope.md 우회 1).
+ */
 private fun bidNowVerdict(): Verdict.BidNow {
     val policy =
         Resolution.Resolved(
@@ -120,7 +123,8 @@ class OutboxNotificationRequestPortTest {
     @Test
     fun `outbox 등록에 성공하면 Requested 를 낸다`() {
         val outbox = NotificationInMemoryOutboxPort()
-        val sink = OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
+        val sink =
+            OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
         val notification =
             NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
 
@@ -133,7 +137,8 @@ class OutboxNotificationRequestPortTest {
     @Test
     fun `outbox 쓰기가 SQLException 으로 실패하면 Failed 를 낸다 — 조용히 삼키지 않는다`() {
         val outbox = NotificationInMemoryOutboxPort(failRegister = true)
-        val sink = OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
+        val sink =
+            OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
         val notification =
             NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
 
@@ -146,7 +151,8 @@ class OutboxNotificationRequestPortTest {
     @Test
     fun `봉투는 요청의 correlationId 를 그대로 나른다 — trace 유지`() {
         val outbox = NotificationInMemoryOutboxPort()
-        val sink = OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
+        val sink =
+            OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
         val notification =
             NotificationRequest(noticeId(), CorrelationId("corr-trace"), bidNowVerdict(), diagnosedEvidence())
 
@@ -159,7 +165,8 @@ class OutboxNotificationRequestPortTest {
     @Test
     fun `aggregateVersion 은 0 이다 — 실측 결과 낙관적 잠금·순서 어디에도 안 쓰인다(D-6F7-4)`() {
         val outbox = NotificationInMemoryOutboxPort()
-        val sink = OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
+        val sink =
+            OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
         val notification =
             NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
 
@@ -171,7 +178,8 @@ class OutboxNotificationRequestPortTest {
     @Test
     fun `idempotencyKey 는 noticeId 로 고정된다 — 권고적, 멱등을 주장하지 않는다(D-6F7-3)`() {
         val outbox = NotificationInMemoryOutboxPort()
-        val sink = OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
+        val sink =
+            OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
         val first = NotificationRequest(noticeId("N9"), CorrelationId("corr-a"), bidNowVerdict(), diagnosedEvidence())
         val second = NotificationRequest(noticeId("N9"), CorrelationId("corr-b"), bidNowVerdict(), diagnosedEvidence())
 
@@ -187,7 +195,8 @@ class OutboxNotificationRequestPortTest {
     @Test
     fun `payload 는 noticeId 와 bidNowReason 스냅샷을 나른다 — 복원 가능(D-6F7-2, 우회 6)`() {
         val outbox = NotificationInMemoryOutboxPort()
-        val sink = OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
+        val sink =
+            OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
         val verdict = bidNowVerdict()
         val notification = NotificationRequest(noticeId("N42"), CorrelationId("corr-1"), verdict, diagnosedEvidence())
 
@@ -201,7 +210,8 @@ class OutboxNotificationRequestPortTest {
     @Test
     fun `payload 는 Diagnosed evidence 의 진단·release·표본제외를 전부 나른다(D-6F7-2)`() {
         val outbox = NotificationInMemoryOutboxPort()
-        val sink = OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
+        val sink =
+            OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
         val notification =
             NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), diagnosedEvidence())
 
@@ -227,7 +237,8 @@ class OutboxNotificationRequestPortTest {
     @Test
     fun `payload 는 NotPredicted evidence 의 사유를 나른다(D-6F7-2)`() {
         val outbox = NotificationInMemoryOutboxPort()
-        val sink = OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
+        val sink =
+            OutboxNotificationRequestPort(outbox, NotificationSequentialEventIdFactory(), NotificationFixedClock(NOW))
         val evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.CircuitOpen)
         val notification = NotificationRequest(noticeId(), CorrelationId("corr-1"), bidNowVerdict(), evidence)
 
