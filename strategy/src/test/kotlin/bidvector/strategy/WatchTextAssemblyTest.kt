@@ -2,9 +2,21 @@ package bidvector.strategy
 
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.ReasonCode
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import io.kotest.property.Arb
+import io.kotest.property.arbitrary.of
+import io.kotest.property.checkAll
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
+
+/**
+ * D-6F4W-12 — 조립 함수 조각 하나의 경계 표본(전부 blank·일부 blank·전부 비blank·빈 문자열·
+ * 공백 낀 비blank). 전건 문자열 열거가 아니라 이 다섯 경계만으로 `isNotBlank` 술어가 실제로
+ * 거르는 경계를 덮는다.
+ */
+private val TEXT_FRAGMENT_ARB: Arb<String?> = Arb.of(null, "", "   ", "x", " x ", "x x")
 
 private fun noBudgetRules(
     focusRegionTerms: List<String> = emptyList(),
@@ -134,5 +146,33 @@ class WatchTextAssemblyTest {
         noBudgetRules(requiredKeywordTerms = listOf("기술용역")).evaluate(subject) shouldBe
             WatchVerdict.Rejected(setOf(WatchRuleId.RequiredKeyword))
         noBudgetRules(focusRegionTerms = listOf("해양수산부")).evaluate(subject).shouldBeInstanceOf<WatchVerdict.Passed>()
+    }
+
+    /**
+     * D-6F4W-12 — 「출력은 `""` 이거나 비공백 문자를 포함한다」는 D-6F4W-2(부재 → `Found`
+     * (빈 텍스트))가 기대는 불변식이다. `joinNonBlankParts`의 `isNotBlank` 술어 한 글자가
+     * `isNotEmpty`로 바뀌면 조용히 깨진다(부재가 `""`와 공백 문자열 두 모양으로 갈려
+     * 하류의 `isEmpty()`가 후자를 놓친다) — 이 test 가 그 술어를 잠근다.
+     */
+    @Test
+    fun `D-6F4W-12 조립 결과는 완전히 비거나 비공백 문자를 포함한다 — 경계 조합 property`() {
+        runBlocking {
+            checkAll(TEXT_FRAGMENT_ARB, TEXT_FRAGMENT_ARB, TEXT_FRAGMENT_ARB, TEXT_FRAGMENT_ARB) {
+                title,
+                label,
+                demandAgencyName,
+                noticeAgencyName,
+                ->
+                val keyword = assembleKeywordScopeText(title, label)
+                val full = assembleFullScopeText(title, label, demandAgencyName, noticeAgencyName)
+
+                withClue("keywordText=\"${keyword.value}\"") {
+                    (keyword.value.isEmpty() || keyword.value.isNotBlank()) shouldBe true
+                }
+                withClue("fullText=\"${full.value}\"") {
+                    (full.value.isEmpty() || full.value.isNotBlank()) shouldBe true
+                }
+            }
+        }
     }
 }
