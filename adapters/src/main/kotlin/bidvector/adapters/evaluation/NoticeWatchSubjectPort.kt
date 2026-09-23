@@ -22,7 +22,8 @@ import bidvector.workflow.evaluation.WatchSubjectPort
  * 그 선택 자체를 없앤다.
  */
 class NoticeWatchSubjectPort : WatchSubjectPort {
-    override fun subjectFor(notice: Notice): WatchSubjectOutcome = WatchSubjectOutcome.Found(noticeToWatchSubject(notice))
+    override fun subjectFor(notice: Notice): WatchSubjectOutcome =
+        WatchSubjectOutcome.Found(noticeToWatchSubject(notice))
 }
 
 /**

@@ -162,7 +162,12 @@ private fun testNotice(
                 },
             baseAmount =
                 baseAmountWon?.let { won ->
-                    ResolvedBaseAmount.Direct.of(won, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.Published(id.round))
+                    ResolvedBaseAmount.Direct.of(
+                        won,
+                        Currency.KRW,
+                        VatTreatment.INCLUSIVE,
+                        Provenance.Published(id.round),
+                    )
                 },
             estimatedAmount = null,
             allocatedBudget = null,
