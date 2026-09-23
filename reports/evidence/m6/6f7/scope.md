@@ -6,10 +6,13 @@ slice: 6f7-notification-request-outbox
 base_sha: 86093972   # main (6A-1 병합 뒤 + 배선 순서 문서)
 head_sha: 리뷰 요청 시점의 `git rev-parse HEAD`(값을 박지 않는다)
 in_scope:
-  - workflow/src/main/kotlin/bidvector/workflow/event/**        # 알림 payload 타입 + sink (봉투 생성이 workflow 에 internal 로 닫혀 있다, D-6F7-1)
+  - workflow/src/main/kotlin/bidvector/workflow/event/**        # 알림 **payload 타입**(봉투 생성이 workflow 에 internal, D-6F7-1)
+  - workflow/src/main/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPort.kt  # **sink** — D-6F7-7 로 event → evaluation 이동(패키지 순환 해소). **착수 판이 이 줄을 빠뜨려 게이트가 눈이 멀었다**(계약 갱신 (3) HIGH-1)
   - adapters/src/main/kotlin/bidvector/adapters/event/OutboxPayloadCodec.kt  # payload 분기 추가만
-  - workflow/src/test/kotlin/bidvector/workflow/event/**        # sink·payload 왕복·우회 게이트
-  - adapters/src/test/kotlin/bidvector/adapters/event/**        # codec 왕복
+  - workflow/src/test/kotlin/bidvector/workflow/event/**        # payload 왕복·축어 잠금
+  - workflow/src/test/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPortTest.kt  # **sink test** — 같은 이유로 이동
+  - adapters/src/test/kotlin/bidvector/adapters/event/**        # codec 왕복·폐쇄 컴파일 probe
+  - adapters/src/test/resources/compile-fixtures/negative-7-notification-request-ctor.kt.txt  # 우회 1 폐쇄 fixture
   - config/quality/gate-tests.properties                        # 신설 게이트 test 등재(추가만) — 공유 파일
   - reports/evidence/m6/6f7/**
   - milestone-6.md                                              # 6F-7 착수·결과 문단(팀장 커밋)
@@ -161,6 +164,35 @@ workflow.event` 등). **한 번 닫은 자리가 다시 열리면 붉는다.**
 돌지 않은 채** 「전 gate green」으로 보였다. **안 돌린 게이트는 아무것도 막지 못할 뿐 아니라 다른 게이트의
 실패를 가린다.** 래퍼를 고치자마자 순환이 드러났다 — **게이트를 먼저 고치고 간 판단이 값을 했다.**
 
+## 계약 갱신 (3) — 검토 레인 셋의 결과 (2026-09-23, 팀장)
+
+`privacy-gate` **통과**(차단 0 · 권고 1 · 확인 불가 1) · `code-reviewer` **머지 가능**(HIGH 0 · MEDIUM 1 ·
+LOW 2) · `verifier` **`not-ready` — HIGH 2**. 재작업 **1/5**.
+
+**코드·게이트·acceptance 는 전부 초록이다**(verifier 가 버릴 clone 에서 `check` 211 task 실제 실행 exit 0 —
+동결 worktree 에서는 `:app:test` 가 UP-TO-DATE 라 **아키텍처 게이트가 안 돌았다는 것까지 잡아** 다시 돌렸다).
+**막는 둘은 계약 문서이고 둘 다 팀장이 쓴 것이다.**
+
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| **D-6F7-8**(HIGH-1 — **`in_scope` 가 산출물의 62% 를 안 덮었다**) | `in_scope:` YAML 에 **sink main · sink test · compile fixture** 를 넣는다(이 갱신에서 **실제로** 고쳤다) | **D-6F7-7 이 sink 를 옮겼는데 `in_scope` 는 착수 때 그대로였다.** 그리고 **게이트가 실제로 눈이 먼다** — clean-tree 게이트의 정의가 이 목록이다. verifier 실측: clone 에서 sink 에 한 줄 심으니 **계약의 glob 은 출력 없음**, rollback 의 8경로는 `M` 으로 잡았다. **구현 레인은 실질적으로 옳은 8경로로 돌렸다** — 틀린 것은 그것을 「in_scope」라 부른 **팀장의 표기**다. **6A-1 의 D-6A1-26 과 글자 그대로 같은 실수의 두 번째**다: 위치를 옮기는 결정을 쓰면서 **그 결정이 목록에 미치는 영향을 같이 쓰지 않았다** |
+| **D-6F7-9**(HIGH-2 — **OPEN 의 차단 사유가 거짓이고 전제도 틀렸다**) | `OPEN-6F7-REASON-CODE-STABILITY` 를 **전면 재작성**한다. ⓐ 「경계 게이트가 막는다」는 **거짓** — `EventBoundaryTest.sourceRoot` 는 `workflow/event` 뿐이고 **D-6F7-7 이 sink 를 `workflow.evaluation` 으로 옮긴 순간 덮개 밖**이다(이웃 `EvidenceLines.kt` 는 이미 `BidNowReason` 을 import 해 소진 `when` 을 돈다) ⓑ 「`internal` 생성자라 재구성 불가」는 **비약** — `internal constructor` 는 **생성**을 막지 **타입 매칭·읽기**를 막지 않고 하위 타입은 전부 public 이다 ⓒ **전제도 틀렸다** — 「안정적 code 속성」으로 바꾸면 `toString()` 이 함께 나르는 **임계·확률 수치를 잃는다.** 남는 진짜 위험은 **「합성 문자열의 형식이 조용히 바뀐다」** 하나이고, 그건 **이 slice 의 축어 잠금이 이미 소리 나게** 했다 | **verifier 변이 실측**: sink 에 `when { is BidNowReason.X -> "CODE" }` 를 심고 `:workflow:compileKotlin` + `EventBoundaryTest` + `ArchitectureGateTest` → **전부 exit 0. 도메인 변경이 불필요하다.** **`toString()` 선택 자체는 지적이 아니다** — 그것이 code 단독보다 정보가 많고 **D-6F7-2(복원 가능성)와 정합한다.** 이것은 **6A-1 이 다섯 번 겪은 「보장을 지지 않는데 졌다고 적힘」의 거울상**이다 — **못 한다고 적었는데 사실은 할 수 있다.** 받는 레인이 **불필요한 전제를 깔게 된다** |
+| **D-6F7-10**(MEDIUM-1 — D-6F7-7 의 부수 효과를 적는다) | **D-6F7-7 이 sink 를 `EventBoundaryTest` 덮개 밖으로 내보냈다**는 사실을 계약에 적는다. HIGH-2 가 **거기서 나왔다** | 갱신 (1)·(2) 어디에도 그 부수 효과가 없었다. **위치를 옮기면 그 위치의 게이트 덮개도 바뀐다** — 순환은 풀었지만 **무엇을 덮개 밖으로 내보냈는지**를 같이 적지 않았다 |
+| **D-6F7-11**(MEDIUM-2 — 트랜잭션 경계, **조립 slice 로**) | `SQLException` → `Failed` 가 선례 `OutboxEventSink`(**전파 → 롤백**)와 갈린다. **지금은 결함이 아니다**(배선 전). 배선 뒤 `inTransaction` 안에서 호출부가 `Failed` 를 무시하면 **도메인 write 만 커밋되고 outbox 행이 없다.** 알려진 제한에 등재하고 **`OPEN-6F-ASSEMBLY` 가 받는다** | 고전적 dual-write 문제다. 위협 모델 (c)(실패를 삼키지 않는다)는 충족하나 **「누가 그 `Failed` 를 어떻게 다루는가」는 조립의 몫**이다 |
+| **D-6F7-12**(codec 구분자 — **고친다**) | `excludedSamples` Map 직렬화가 **구분자 둘(`;`·`=`)을 쓰면서 키에서 하나만 보호**한다. **`=` 도 이스케이프**하고, 파일 KDoc 의 「각 layer 가 자기 구분자만 보호하면 중첩이 안전하다」를 **이 layer 에 맞게 정정**하며, **왕복 test 에 `=` 를 담은 키**를 넣는다 | `code-reviewer` **MEDIUM** · `verifier` **LOW-1** 이 같은 사실을 봤다(등급만 갈렸다 — 오늘 도달 불가라서). **등재보다 수정이 맞다**: ① 이스케이프 한 줄이다 ② **KDoc 이 이 layer 에서 거짓인 주장을 한다** ③ **특수문자 왕복 test 가 정작 그 키에는 특수문자를 안 넣어 틈을 가린다** — 「덮는 것처럼 보이는데 안 덮는 test」는 이 저장소가 반복해 겪은 형태다 |
+
+**장부층(같은 라운드에)** — `privacy-gate` 권고: **「`NotificationRequested` outbox 행도 6B-3(승인된 보존
+기간 없음) 대상」** 한 줄을 알려진 제한에 · `code-reviewer` LOW: `emptyList()` ↔ `listOf("")` 왕복 구분
+불가(도달 불가, 코덱 계층 일반 성질 — **등재만**) · `OPEN-6F7-REASON-CODE-STABILITY` 를 **소스 KDoc 에도**
+문자열로 남겨 추적성 확보.
+
+**조립 slice 로 넘기는 것 둘** — `privacy-gate` 확인 불가: **하위 소비자의 `Failed` 로깅**(아직 배선 전이라
+확인 불가) · **D-6F7-11 의 트랜잭션 경계**.
+
+**verifier 가 확인하고 넘어간 것** — negative fixture 7 이 **우연히 붉은 게 아님**(술어가 부분문자열이라
+의심했는데 구현 레인의 우회 1 변이가 `OK` 를 낸 것이 다른 원인 부재를 증명) · 순환 재발 변이 · gate-tests
+**양방향** 등재 · payload 값 획득 축 · `data class` `toString()` 누출 축 — 전부 정상.
+
 ## 하네스 레인 변경 (상시 절)
 
 - (착수 시점) 없음.
@@ -178,7 +210,7 @@ workflow.event` 등). **한 번 닫은 자리가 다시 열리면 붉는다.**
 | --- | --- |
 | `OPEN-STR-12` | 변경 없음 — 발송 채널·렌더링은 그 뒤 |
 | `OPEN-6F-ASSEMBLY` | 변경 없음 — 이 slice 는 포트 구현을 낼 뿐 꽂지 않는다 |
-| `OPEN-6F7-REASON-CODE-STABILITY`(신설) | `BidNowReason`·`MlUnavailableReason`(`bidvector.decision`)이 **직렬화 가능한 안정적 code 속성을 갖지 않아** outbox 에 실리는 값이 **Kotlin 합성 `toString()`** 이다. 지금 못 고치는 이유: 경계 게이트가 main 소스에서 `bidvector.decision` 참조를 막고, 두 하위 타입이 `internal` 생성자다. **이 slice 의 축어 잠금은 「소리 나게」 할 뿐 형식 안정성을 주지 않는다** — 이미 영속된 옛 행을 고치지도 않는다. 받는 쪽 **도메인 레인** |
+| `OPEN-6F7-REASON-CODE-STABILITY`(신설, **D-6F7-9 로 전면 재작성**) | **남는 위험은 하나다** — outbox 에 영속되는 값이 **Kotlin 합성 `toString()`** 이라 **형식이 조용히 바뀔 수 있다**. **이 slice 의 축어 잠금 + 소진 `when` 이 그것을 「소리 나게」 했다**(형식이 바뀌면 그 커밋에서 RED). 다만 **이미 영속된 옛 행을 고치거나 마이그레이션하지 않는다.** **「안정적 code 속성으로 바꾼다」는 해법이 아니다** — `toString()` 이 함께 나르는 **임계·확률 수치를 잃기 때문**이고, 그 정보는 D-6F7-2(판정 복원 가능성)가 요구한 것이다. **착수 판이 적은 차단 사유 둘은 거짓이었다**(경계 게이트는 sink 를 덮지 않고, `internal` 생성자는 읽기를 막지 않는다 — verifier 변이 실측). 받는 레인이 **그 거짓 전제를 깔지 않도록** 여기 적는다 |
 | **4C-1 의 outbox `idempotency_key` UNIQUE 부재** | 이 slice 가 **수령만** 한다(D-6F7-3·6) — 고치지 않고 알려진 제한에 등재 |
 
 ## 리뷰 레인
