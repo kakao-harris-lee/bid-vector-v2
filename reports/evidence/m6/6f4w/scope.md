@@ -212,7 +212,7 @@ keywordText 에 실을 길은 여전히 없다」는 **사실과 다르다**(pri
   구조가 된다.
 - code-reviewer MEDIUM(「구조적으로 못 닫는다」 과장)도 같은 자리의 문면이다: `of` 를 `private` 으로 두면 **현재
   형태(top-level `assemble*`)에서는 컴파일되지 않는다**(verifier 실측)가 참이고, `procurement.NoticeTitle` 처럼
-  `assemble*` 를 companion 멤버로 옮기면 `internal of` 자체가 사라진다 — 호출부 13파일 갱신 비용 대신 택한 **설계
+  `assemble*` 를 companion 멤버로 옮기면 `internal of` 자체가 사라진다 — 호출부 7파일(import 기준) 갱신 비용 대신 택한 **설계
   선택**이지 Kotlin 의 한계가 아니다. 그렇게 적는다. `of` 는 `assemble*` 와 시그니처·본문이 같아 새 구멍이 아니다.
 
 **D-6F4W-16 — 장부층·low 일괄(한 커밋), 승인 전.**

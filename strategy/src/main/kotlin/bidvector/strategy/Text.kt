@@ -36,7 +36,7 @@ data class KeywordScopeText private constructor(
          * 형태([assembleKeywordScopeText])를 유지하는 한 그 함수가 이 companion 멤버에
          * 접근하려면 최소 `internal`이어야 한다(class-private은 같은 파일의 top-level
          * 함수도 보지 못한다). `procurement.NoticeTitle.of`처럼 이 팩토리 자체를
-         * companion 멤버로 두고 호출부(현재 13개 파일)를 그쪽으로 옮기면 이 `internal`
+         * companion 멤버로 두고 호출부(import 기준 7개 .kt 파일)를 그쪽으로 옮기면 이 `internal`
          * 잔여 표면은 사라진다 — 그 비용 대신 기존 top-level 호출 관례를 유지하기로 한
          * 선택이다(code-reviewer r1 MEDIUM).
          */
@@ -95,7 +95,7 @@ private fun keywordParts(
  * 부재 조각은 결합에서 빠진다(빈 문자열을 끼워 넣지 않는다) — 둘 다 없으면 `""`(D-6F4-4b,
  * 「값이 없으면 없는 것이다」, 예외로 흐르지 않는다).
  *
- * **요건·기관명은 이 함수의 인자 자체가 없다** — 이 시그니처를 통해서는 부를 방법이 없다
+ * **요건·기관명을 인자로 따로 받지 않는다** — 인자 이름 기준이고, 내용의 출처는 호출부 책임이다(아래)
  * (D-6F4-3b: 요건은 면허제한 오퍼레이션 응답이라 업무 키워드가 아니다. D-6F4-3: 기관명은
  * legacy 오탐의 차단 대상, [assembleFullScopeText]에만 더한다). **M6/6F-4-w(D-6F4W-7)부터
  * [KeywordScopeText]의 생성자가 `private`이라 이 시그니처를 우회하는 생성 경로(직접

@@ -27,8 +27,8 @@ job `check`의 관련 step 셋(주석·설명 제외, 실행 명령만):
 - 핵심 결과: Kotlin `check`+`qualityBaseline` 선행 단계는 `BUILD SUCCESSFUL`. **S-1(Python
   ml-engine `uv sync`)이 PyPI(`pypi.org`) 접속 시도에서 network timeout**으로 실패 —
   이 slice 는 Kotlin 파일만 만지고(`ml-engine/**`는 `in_scope`·변경분 어디에도 없다) 이
-  실패는 로컬 실행 환경의 PyPI 접근 제약이지 이 slice 의 산출물과 무관하다. **알려진
-  제한**에 등재.
+  실패는 그 장비(구현 레인 원래 장비)의 PyPI 접근 제약이지 이 slice 의 산출물과 무관하다.
+  → 아래 06:13Z 재실행이 이 장비에서 exit 0 — 알려진 제한 해제(verifier r1 L-6).
 
 ## 1단계 — 포트 매퍼 (TDD RED→GREEN, 부분 재실행)
 
@@ -136,7 +136,7 @@ worktree 자체는 변이를 받지 않았다)
 - 핵심 결과: `BUILD SUCCESSFUL`.
 
 ### 2026-09-23T05:53Z
-- cmd: `sed -n '27p' strategy/src/test/kotlin/bidvector/strategy/WatchTextAssemblyTest.kt | od -c`
+- cmd: `grep 'Arb.of(null' strategy/src/test/kotlin/bidvector/strategy/WatchTextAssemblyTest.kt | od -c`
 - exit: 0
 - 핵심 결과: 탭·U+3000(UTF-8 `343 200 200`)·U+00A0(UTF-8 `302 240`) 셋 다 바이트 일치.
 

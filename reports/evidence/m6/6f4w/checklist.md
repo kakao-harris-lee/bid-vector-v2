@@ -10,10 +10,10 @@ Kotlin source 표면(공개 API) 순증가 0, `noticeToWatchSubject` 는 `privat
 |---|---|---|---|
 | `NoticeWatchSubjectPort`(`adapters.evaluation`) | class, `WatchSubjectPort` 구현 | public | 아니오 — `subjectFor(notice)`는 `notice`의 title·businessCategory·agency 값만 읽어 `noticeToWatchSubject`에 위임한다. 자기 필드·상태 없음(순수 위임). |
 | `NoticeWatchSubjectPort.subjectFor` | fun | public(override) | 아니오 — 반환은 항상 `noticeToWatchSubject(notice)`를 `Found`로 감싼 값. 이 함수 자체에 텍스트 조립 로직이 없다(상수 풀 허용 목록 `EvaluationAdapterDependencyTest`가 실측, D-6F4W-14 수정). |
-| `noticeToWatchSubject`(`adapters.evaluation`) | fun | **private**(code-reviewer LOW) | 예, 그러나 경계 안 — `Notice`의 값만 읽어 `strategy.assembleKeywordScopeText`/`assembleFullScopeText`를 그대로 호출한다(상수 풀 허용 목록으로 실측). Kotlin 소스 레벨에서는 `NoticeWatchSubjectPort.kt` 밖에서 이름으로 참조할 수 없다. |
+| `noticeToWatchSubject`(`adapters.evaluation`) | fun | **private**(code-reviewer LOW) | 예, 그러나 경계 안 — `Notice`의 값만 읽어 `strategy.assembleKeywordScopeText`/`assembleFullScopeText`를 그대로 호출한다(상수 풀 허용 목록으로 실측). Kotlin 소스 레벨에서는 `NoticeWatchSubjectPort.kt` 밖에서 이름으로 참조할 수 없다. 허용된 getter 끼리의 **인자 치환**은 허용 목록이 구조상 못 잡고 `NoticeWatchSubjectPortTest` 거동 test 가 잡는다(verifier r2 m5 — 분담). |
 | `access$noticeToWatchSubject`(`adapters.evaluation.NoticeWatchSubjectPortKt`, 합성) | fun(compiler-generated) | **public**(bytecode, `javap -p` 실측) | 예(서명 동일), 그러나 Kotlin source 로는 어떤 호출자도 이 이름을 쓸 수 없다 — Kotlin 이 같은 파일의 다른 class(`NoticeWatchSubjectPort`)가 `private` top-level 함수를 부르도록 자동으로 내는 접근자다. raw JVM 호출(리플렉션 등)로만 닿고, 닿아도 `noticeToWatchSubject`와 서명·로직이 완전히 같아 새 능력이 없다 — `Notice`를 안 거치는 임의 문자열 주입 경로가 아니다. `EvaluationAdapterDependencyTest`의 허용 목록에 등재(D-6F4W-16). |
-| `KeywordScopeText.Companion.of`(`strategy`) | fun | **internal**(설계 선택 — Text.kt KDoc) | 예, 그러나 시그니처가 `assembleKeywordScopeText`와 동일(noticeTitle, businessCategoryLabel) — 원문 raw string 을 받는 별도 경로가 아니다. 모듈 밖에서 호출 불가(컴파일 fixture 4 가 실측). |
-| `FullScopeText.Companion.of`(`strategy`) | fun | **internal**(위와 같은 이유) | 예, `KeywordScopeText.of`와 같은 이유(fixture 6 실측). |
+| `KeywordScopeText.Companion.of`(`strategy`) | fun | **internal**(설계 선택 — Text.kt KDoc) | 예, 그러나 시그니처가 `assembleKeywordScopeText`와 동일(noticeTitle, businessCategoryLabel) — 원문 raw string 을 받는 별도 경로가 아니다. 모듈 밖에서 호출 불가 — 근거는 `internal` 가시성 자체다(`of` 를 부르는 fixture 는 없다, verifier L-2/LR2-1). |
+| `FullScopeText.Companion.of`(`strategy`) | fun | **internal**(위와 같은 이유) | 예, `KeywordScopeText.of`와 같은 이유(근거도 같다 — `internal` 가시성). |
 | `KeywordScopeText`/`FullScopeText` 주 생성자 | constructor | **private**(신설 폐쇄) | 「경계로 처리」 — 이 slice 이전에는 `public`이라 임의 문자열로 값을 만들 수 있었다(verifier r2 MEDIUM-3 실측 우회). 이제 클래스 본문(companion) 밖에서 호출 불가 — negative fixture 4·6 실측. |
 | `KeywordScopeText`/`FullScopeText.copy()` | fun(auto-gen) | **private**(`@ConsistentCopyVisibility`) | 「경계로 처리」 — 생성자와 같은 가시성으로 닫혀 기존 값을 갈아끼울 수 없다 — negative fixture 5·7 실측. |
 | `ConcatenationMachineryFixture`(`adapters.evaluation`, test-only) | class(메서드 2 — `concatenate`·`concatenateViaJoin`) | internal | 아니오 — production 표면이 아니다. `EvaluationAdapterDependencyTest`의 허용 목록 술어가 실제로 위반(문자열 템플릿 **및** `String.join`, D-6F4W-14)을 잡는지 증명하는 양성 대조 전용(주석에 명시). |
@@ -95,10 +95,10 @@ fixture 4~7(직접 생성·`copy()`)과 겹치지 않는다.
 - `KeywordScopeText.of`/`FullScopeText.of`가 `internal`인 이유는 **Kotlin 의 한계가
   아니라 설계 선택이다.** 같은 저장소의 `procurement.NoticeTitle.of`가 top-level 래퍼 없이
   `private constructor` + `public companion factory`로 완전히 닫은 선례다.
-  `assembleKeywordScopeText`가 top-level 함수로 남아 있는 한(현재 13개 파일이
+  `assembleKeywordScopeText`가 top-level 함수로 남아 있는 한(현재 import 기준 7개 .kt 파일이 — `grep -rlE 'import bidvector\.strategy\.assemble(Keyword|Full)ScopeText' --include=*.kt | wc -l` —
   `import ...assembleKeywordScopeText`로 부른다) 그 함수가 `of`에 접근하려면 최소
   `internal`이어야 하지만, `NoticeTitle`처럼 `assemble*` 자체를 companion 멤버로 옮기고
-  호출부를 갱신하면 이 `internal` 잔여 표면은 사라진다 — 호출부 13파일 갱신 비용 대신
+  호출부를 갱신하면 이 `internal` 잔여 표면은 사라진다 — 호출부 7파일 갱신 비용 대신
   택한 설계 선택이다. `of`는 `assemble*`와 시그니처·본문이 같아 raw 임의 문자열 주입의
   새 경로는 아니다.
 - **`noticeToWatchSubject`를 `private`으로 좁히면(D-6F4W-16) Kotlin 이 bytecode 레벨의
@@ -108,7 +108,7 @@ fixture 4~7(직접 생성·`copy()`)과 겹치지 않는다.
 - **privacy-gate R-1** — `KeywordScopeText`/`FullScopeText`/`WatchSubject`는 여전히
   `data class`라 합성 `toString()`이 공고명·공종·기관명 원문을 그대로 낸다. 오늘 그 값을
   문자열에 보간하는 production 경로는 없다(어댑터가 Spring 빈으로 등록되지 않음, D-6F4W-6).
-  `OPEN-6F-ASSEMBLE` 재확인 항목 ④(scope.md OPEN 표).
+  `OPEN-6F-ASSEMBLY` 재확인 항목 ④(scope.md OPEN 표).
 - `./tools/one-command-check.sh`가 이 장비에서 exit 0(Kotlin 전건 + Python S-1~S-11 전부
   통과, commands.md). S-1(Python `ml-engine` 설치)의 구 실패는 구현 레인 원래 장비의
   네트워크 제약(PyPI 접속 timeout)이었다(L-6).
