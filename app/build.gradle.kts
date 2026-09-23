@@ -29,6 +29,11 @@ dependencies {
     // 다룬다는 사실 자체가 이 선언을 요구한다).
     implementation(project(":strategy"))
     implementation(project(":shared-kernel"))
+    // M6/6A-3+6F-3 D-6A3-8 — `EvaluationWiring`이 `LICENSE_QUALIFICATION_POLICY`·
+    // `LicenseQualificationPolicyData`(qualification)를 `PersistenceWiring`의 전략 정책
+    // 해소와 같은 형태로 직접 참조한다. `adapters`가 이 모듈을 `implementation`(비전이)으로만
+    // 물어 app의 main compile classpath에 원래 없었다 — 위 `:strategy` 추가(6A-1)와 같은 이유.
+    implementation(project(":qualification"))
 
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.starter)
@@ -75,8 +80,9 @@ dependencies {
     // 지운다(`adapters/build.gradle.kts`의 같은 관례 — "testImplementation은 implementation을
     // 상속하므로 중복 금지").
     // M1/1C — license-* corpus 실행자가 qualification 공개 API(`LicenseEligibility.judge` 등)를
-    // 직접 부른다. shared-kernel과 달리 qualification은 main에서 쓰지 않아 test 전용으로 남는다.
-    testImplementation(project(":qualification"))
+    // 직접 부른다. M6/6A-3+6F-3부터는 위 `implementation(project(":qualification"))`이 이미
+    // test classpath에 전이돼 별도 testImplementation 선언이 중복이라 지운다(`:strategy`와
+    // 같은 관례, 6A-1).
     // M1/1D — base-amount-provenance·floor-shortfall·floor-threshold corpus 실행자가
     // decision 공개 API(`ProvenanceRules.judge`·`measureFloorShortfall` 등)를 직접 부른다.
     testImplementation(project(":decision"))
