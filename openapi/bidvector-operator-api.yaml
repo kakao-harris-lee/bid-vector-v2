@@ -35,6 +35,47 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/evaluation-dry-runs:
+    post:
+      operationId: evaluateDryRun
+      summary: 평가 dry-run(D-6A3-1·6 — 외부 effect 없음, outbox 미접촉)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluationDryRunRequest"
+      responses:
+        "200":
+          description: 판정 분포(결과별 공고 ID 배열 + 건수)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationDryRunResponse"
+        "400":
+          description: currentActiveBids 가 음수(D-6A3-5)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: 자격증명 없음 또는 틀림(D-6A1-6)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: 전략에 여력 상한 미설정(D-6A3-4) 또는 후보 스캔이 상한 초과(D-6A3-7)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /{unmatched}:
     get:
       operationId: unmatchedPath
@@ -132,6 +173,56 @@ components:
         maxActiveBids:
           type: integer
           nullable: true
+    EvaluationDryRunRequest:
+      type: object
+      required:
+        - currentActiveBids
+      properties:
+        currentActiveBids:
+          type: integer
+    # D-6A3-6 — 평탄하다. 결과별 공고 ID 배열 + 건수만 싣는다(후보별 사유 상세는
+    # OPEN-6A3-EVALUATION-DETAIL). 공고명·기관명 원문은 없다(privacy).
+    EvaluationDryRunResponse:
+      type: object
+      required:
+        - strategyRevision
+        - candidateCount
+        - currentActiveBids
+        - maxActiveBids
+        - bidNowNoticeIds
+        - reviewNoticeIds
+        - skipNoticeIds
+        - notReachedNoticeIds
+        - wouldNotifyNoticeIds
+      properties:
+        strategyRevision:
+          type: integer
+        candidateCount:
+          type: integer
+        currentActiveBids:
+          type: integer
+        maxActiveBids:
+          type: integer
+        bidNowNoticeIds:
+          type: array
+          items:
+            type: string
+        reviewNoticeIds:
+          type: array
+          items:
+            type: string
+        skipNoticeIds:
+          type: array
+          items:
+            type: string
+        notReachedNoticeIds:
+          type: array
+          items:
+            type: string
+        wouldNotifyNoticeIds:
+          type: array
+          items:
+            type: string
     ErrorBody:
       type: object
       required:

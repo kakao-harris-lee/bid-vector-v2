@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.evaluation.InvalidEvaluationRequestException
 import bidvector.adapters.evaluation.PinnedStrategyRepository
 import bidvector.adapters.evaluation.RecordingNotificationRequestPort
 import bidvector.adapters.evaluation.RequestCapacityPort
@@ -53,6 +54,12 @@ class EvaluationDryRunFactory(
     private val clock: Clock,
 ) {
     fun forRequest(currentActiveBids: Int): EvaluationDryRunRun {
+        // 요청 형태(400) 를 먼저 거부한다 — 저장소 상태(409) 보다 앞선다(입력 검증 우선
+        // 원칙). RequestCapacityPort 생성자도 같은 조건을 다시 검사한다(심층 방어,
+        // StrategyRow.toExactStrategyWon 과 같은 관례) — 이 자리에서 먼저 걸러 순서를 고정한다.
+        if (currentActiveBids < 0) {
+            throw InvalidEvaluationRequestException("currentActiveBids는 음수일 수 없다: $currentActiveBids")
+        }
         val strategy = strategyRepository.load()
         val maxActiveBids = strategy.maxActiveBids?.value ?: throw MaxActiveBidsNotConfiguredException()
         val capacity = RequestCapacityPort(currentActiveBids, maxActiveBids)

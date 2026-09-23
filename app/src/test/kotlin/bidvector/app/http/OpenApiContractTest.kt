@@ -287,6 +287,37 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         response.body?.containsKey("minBudgetWon") shouldBe true
         response.body?.get("minBudgetWon") shouldBe null
     }
+
+    // D-6A3-11 — 평가 dry-run endpoint(계약 갱신 없음, 이 slice가 처음 연다)도 같은 대조를 받는다.
+
+    private fun postDryRun(body: Map<String, Any?>): ResponseEntity<Map<String, Any?>> {
+        @Suppress("UNCHECKED_CAST")
+        return restTemplate.exchange(
+            url("/api/evaluation-dry-runs"),
+            HttpMethod.POST,
+            HttpEntity(body, authorizedHeaders()),
+            Map::class.java,
+        ) as ResponseEntity<Map<String, Any?>>
+    }
+
+    @Test
+    fun `평가 dry-run 409 응답의 최상위 키 집합이 계약과 완전히 일치한다`() {
+        // freshStrategy()는 maxActiveBids 를 설정하지 않는다 — fail-closed 409.
+        val response = postDryRun(mapOf("currentActiveBids" to 0))
+
+        response.statusCode.value() shouldBe 409
+        (response.body?.keys ?: emptySet()) shouldBe propertyKeys("ErrorBody")
+        response.body?.get("code") shouldBe ErrorCode.MAX_ACTIVE_BIDS_NOT_CONFIGURED
+    }
+
+    @Test
+    fun `평가 dry-run 400 응답의 최상위 키 집합이 계약과 완전히 일치한다`() {
+        val response = postDryRun(mapOf("currentActiveBids" to -1))
+
+        response.statusCode.value() shouldBe 400
+        (response.body?.keys ?: emptySet()) shouldBe propertyKeys("ErrorBody")
+        response.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
+    }
 }
 
 /**

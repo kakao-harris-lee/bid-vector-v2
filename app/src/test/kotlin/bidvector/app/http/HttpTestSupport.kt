@@ -1,5 +1,9 @@
 package bidvector.app.http
 
+import bidvector.adapters.ml.UnavailableMlAnalysis
+import bidvector.app.wiring.EvaluationDryRunFactory
+import bidvector.procurement.Notice
+import bidvector.qualification.LicenseVerdict
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.STRATEGY_POLICY
@@ -8,7 +12,12 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
+import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
+import bidvector.workflow.evaluation.LicenseGatePort
+import bidvector.workflow.evaluation.MlAnalysisPort
+import bidvector.workflow.evaluation.WatchSubjectOutcome
+import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
@@ -101,6 +110,24 @@ class TestStrategyRepository(
     }
 }
 
+/**
+ * M6/6A-3+6F-3 — `EvaluationDryRunController`(같은 패키지 main)가 `EvaluationDryRunFactory`
+ * 를 요구해 `HttpTestApplication` 기반 test(auth·OpenAPI 계약 등, 후보 거동을 보지 않는
+ * test)가 빈 후보 목록으로 최소 배선을 한다. 후보가 비어 있어 [watchSubjects]·[licenseGate]
+ * 는 절대 안 불린다 — `error()`로 그 사실 자체를 잠근다(우연히 불리면 test가 곧바로 실패).
+ */
+class EmptyCandidateSource : CandidateSourcePort {
+    override fun openCandidates(): List<Notice> = emptyList()
+}
+
+private class UnreachableWatchSubjectPort : WatchSubjectPort {
+    override fun subjectFor(notice: Notice): WatchSubjectOutcome = error("빈 후보 목록에서는 불릴 수 없다")
+}
+
+private class UnreachableLicenseGatePort : LicenseGatePort {
+    override fun verdictFor(notice: Notice): LicenseVerdict = error("빈 후보 목록에서는 불릴 수 없다")
+}
+
 /** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */
 class RecordingAuditSink {
     val records: MutableList<ApiAuditRecord> = Collections.synchronizedList(mutableListOf())
@@ -136,6 +163,28 @@ open class HttpTestApplication {
 
     @Bean
     open fun auditSink(): RecordingAuditSink = RecordingAuditSink()
+
+    /**
+     * `EvaluationDryRunController`(같은 패키지 main)가 요구하는 최소 배선 — 후보가
+     * 비어 있어 [watchSubjects]·[licenseGate]는 절대 안 불린다(auth·OpenAPI 계약
+     * test 는 후보 거동을 보지 않는다). 실 후보·판정 거동은 production 조립 E2E
+     * (`ProductionAssemblyAuthAuditTest` 계열)가 잰다.
+     */
+    @Bean
+    open fun evaluationDryRunFactory(
+        strategyRepository: TestStrategyRepository,
+        clock: Clock,
+        correlationIdFactory: CorrelationIdFactory,
+    ): EvaluationDryRunFactory =
+        EvaluationDryRunFactory(
+            strategyRepository = strategyRepository,
+            candidateSource = EmptyCandidateSource(),
+            watchSubjects = UnreachableWatchSubjectPort(),
+            licenseGate = UnreachableLicenseGatePort(),
+            mlAnalysis = UnavailableMlAnalysis(),
+            correlationIds = correlationIdFactory,
+            clock = clock,
+        )
 
     @Bean
     open fun operatorCredentialFilterRegistration(): FilterRegistrationBean<OperatorCredentialFilter> =

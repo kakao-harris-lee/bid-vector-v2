@@ -34,6 +34,12 @@ dependencies {
     // 해소와 같은 형태로 직접 참조한다. `adapters`가 이 모듈을 `implementation`(비전이)으로만
     // 물어 app의 main compile classpath에 원래 없었다 — 위 `:strategy` 추가(6A-1)와 같은 이유.
     implementation(project(":qualification"))
+    // M6/6A-3+6F-3 D-6A3-6 — `EvaluationDryRunController`가 `CandidateEvaluation`의
+    // 판정(`Verdict`, decision)과 공고 식별자(`NoticeId`, procurement)를 응답 배열로
+    // 직접 가른다 — 위 셋(:strategy·:shared-kernel·:qualification)과 같은 이유로
+    // app의 main compile classpath에 없었다.
+    implementation(project(":decision"))
+    implementation(project(":procurement"))
 
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.starter)
@@ -48,6 +54,14 @@ dependencies {
     // 한다). D-6A1-18 — HikariCP는 들이지 않는다(`OPEN-6A1-CONNECTION-POOL`).
     implementation(libs.flyway.database.postgresql)
     implementation(libs.postgresql.driver)
+    // M6/6A-3+6F-3 D-6A3-8 — `EvaluateCandidatesUseCase.evaluate()`는 `suspend`(M4/4B-3
+    // ADR 0010 D-2, 실 ML 취소 전파 대비)다. 이 slice가 처음으로 그 포트를 동기 Spring MVC
+    // 컨트롤러에서 부른다(D-6A3-8 「컨트롤러는 use case만 부른다」) — `runBlocking`으로 그
+    // 경계 하나만 다리 놓는다. `workflow` main은 이 좌표를 `testImplementation`으로만 물어
+    // (컴파일 클래스패스 실측: `:app:dependencies --configuration compileClasspath`에 없음)
+    // app이 직접 선언해야 한다 — 런타임 클래스패스에는 이미 전이돼 있었지만(Boot 생태계
+    // 다른 의존이 끌어옴) 컴파일 시점에는 없었다.
+    implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(libs.testcontainers.postgresql)
@@ -85,14 +99,16 @@ dependencies {
     // 같은 관례, 6A-1).
     // M1/1D — base-amount-provenance·floor-shortfall·floor-threshold corpus 실행자가
     // decision 공개 API(`ProvenanceRules.judge`·`measureFloorShortfall` 등)를 직접 부른다.
-    testImplementation(project(":decision"))
+    // M6/6A-3+6F-3부터는 위 `implementation(project(":decision"))`이 이미 test classpath에
+    // 전이돼 별도 testImplementation 선언이 중복이라 지운다(`:qualification`과 같은 관례).
     // M1/1E — strategy-watch·strategy-validation corpus 실행자가 strategy 공개 API
     // (`WatchRules.evaluate`·`validate` 등)를 직접 부른다. M6/6A-1부터는 위
     // `implementation(project(":strategy"))`이 이미 전이돼 별도 선언이 중복이라 지운다.
     // M3/3A — koneps-collection corpus 실행자가 procurement 공개 API(`canonicalize`·
     // `resolveAmount`·`decideDetailFetch`·`transition`·`mayOverwrite`·`parseSourceZonedInstant`
-    // 등)를 직접 부른다. 27 case 전건 authoritative 승격(운영자 승인 2026-09-07) 뒤 배선한다.
-    testImplementation(project(":procurement"))
+    // 등)를 직접 부른다. M6/6A-3+6F-3부터는 위 `implementation(project(":procurement"))`이
+    // 이미 전이돼 별도 선언이 중복이라 지운다(27 case 전건 authoritative 승격은 여전히
+    // 운영자 승인 2026-09-07 기준).
     // manifest.yaml(YAML) 을 읽기 위한 snakeyaml — 카탈로그 좌표는 이미 Boot BOM 관리 하에
     // transitively 해석되던 것을 명시로 올린 것뿐이다(`gradle/libs.versions.toml` 주석 참고).
     testImplementation(libs.snakeyaml)
