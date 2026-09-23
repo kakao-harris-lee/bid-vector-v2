@@ -1,0 +1,5 @@
+import bidvector.strategy.assembleFullScopeText
+
+fun positiveFullScopeTextViaAssembly() {
+    assembleFullScopeText("아무 텍스트", null, null, null)
+}

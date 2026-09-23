@@ -1,8 +1,8 @@
 import bidvector.sharedkernel.Fact
-import bidvector.strategy.FullScopeText
 import bidvector.strategy.WatchSubject
+import bidvector.strategy.assembleFullScopeText
 
 fun negativeKeywordScopeCrossText() {
-    val full = FullScopeText("전체 텍스트")
+    val full = assembleFullScopeText("전체 텍스트", null, null, null)
     WatchSubject(emptySet(), full, full, Fact.Absent(bidvector.sharedkernel.ReasonCode.EMPTY_INPUT))
 }

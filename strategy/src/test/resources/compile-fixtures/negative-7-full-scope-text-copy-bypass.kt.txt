@@ -1,0 +1,6 @@
+import bidvector.strategy.assembleFullScopeText
+
+fun negativeFullScopeTextCopyBypass() {
+    val text = assembleFullScopeText("아무 텍스트", null, null, null)
+    text.copy(value = "다른 텍스트")
+}

@@ -23,7 +23,17 @@ import java.nio.file.Files
  * 넣으면 basis 교차 대입이라 컴파일되지 않는다.
  * fixture 2 — `WatchSubject.keywordText`는 `KeywordScopeText`만 받는다(STR-02, D-5).
  * `FullScopeText` 값을 그 자리에 넣으면 컴파일되지 않는다(위협 모델 (d) — 선택을
- * 명시하는 서명까지만 강제한다, 값의 정직성은 어댑터 책임).
+ * 명시하는 서명까지만 강제한다, 값의 정직성은 어댑터 책임). **D-6F4W-7 이관** — 두
+ * 조각(`FullScopeText`·`KeywordScopeText`)의 원문 구성을 리터럴 생성자 대신
+ * `assembleFullScopeText`/`assembleKeywordScopeText`로 바꿨다 — 생성자 폐쇄 뒤에도 이
+ * fixture 는 여전히 **타입 교차 대입 거부**(fixture 2 고유 명제)만 재고, 생성 경계
+ * 폐쇄는 fixture 4~7 이 별도로 잰다(D-6F4W-11 조건 3 — 부호를 기계적으로 뒤집지 않는다).
+ * fixture 4 — `KeywordScopeText`는 모듈 밖에서 직접 생성할 수 없다(D-6F4W-7, private
+ * constructor). `assembleKeywordScopeText` 경유만 컴파일된다.
+ * fixture 5 — `KeywordScopeText.copy()`는 모듈 밖에서 부를 수 없다(`@ConsistentCopyVisibility`
+ * — 생성자와 같은 가시성으로 닫힌다, 우회 2).
+ * fixture 6 — `FullScopeText`는 모듈 밖에서 직접 생성할 수 없다(fixture 4 와 같은 형태).
+ * fixture 7 — `FullScopeText.copy()`는 모듈 밖에서 부를 수 없다(fixture 5 와 같은 형태).
  */
 class CompileFailureHarnessTest {
     @Test
@@ -70,6 +80,66 @@ class CompileFailureHarnessTest {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "3-score-of-outside-module-typo",
             realDiagnosticFragment = "cannot access",
+        )
+    }
+
+    /** D-6F4W-7 우회 1 — `KeywordScopeText`의 유일한 생성 경로는 `assembleKeywordScopeText`다. */
+    @Test
+    fun `4 KeywordScopeText 직접 생성은 모듈 밖에서 컴파일되지 않고 assemble 경유는 컴파일된다`() {
+        assertNegativeFails("4-keyword-scope-text-direct-construction", "it is private in")
+        assertPositiveCompiles("4-keyword-scope-text-via-assembly")
+    }
+
+    @Test
+    fun `4-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "4-keyword-scope-text-direct-construction-typo",
+            realDiagnosticFragment = "it is private in",
+        )
+    }
+
+    /** D-6F4W-7 우회 2 — `@ConsistentCopyVisibility` 가 `copy()` 도 생성자와 같은 가시성으로 닫는다. */
+    @Test
+    fun `5 KeywordScopeText copy 는 모듈 밖에서 컴파일되지 않는다`() {
+        assertNegativeFails("5-keyword-scope-text-copy-bypass", "it is private in")
+        assertPositiveCompiles("4-keyword-scope-text-via-assembly")
+    }
+
+    @Test
+    fun `5-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "5-keyword-scope-text-copy-bypass-typo",
+            realDiagnosticFragment = "it is private in",
+        )
+    }
+
+    /** D-6F4W-7 우회 1 — `FullScopeText`의 유일한 생성 경로는 `assembleFullScopeText`다(fixture 4 와 같은 형태). */
+    @Test
+    fun `6 FullScopeText 직접 생성은 모듈 밖에서 컴파일되지 않고 assemble 경유는 컴파일된다`() {
+        assertNegativeFails("6-full-scope-text-direct-construction", "it is private in")
+        assertPositiveCompiles("6-full-scope-text-via-assembly")
+    }
+
+    @Test
+    fun `6-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "6-full-scope-text-direct-construction-typo",
+            realDiagnosticFragment = "it is private in",
+        )
+    }
+
+    /** D-6F4W-7 우회 2 — `FullScopeText.copy()` 도 모듈 밖에서 부를 수 없다(fixture 5 와 같은 형태). */
+    @Test
+    fun `7 FullScopeText copy 는 모듈 밖에서 컴파일되지 않는다`() {
+        assertNegativeFails("7-full-scope-text-copy-bypass", "it is private in")
+        assertPositiveCompiles("6-full-scope-text-via-assembly")
+    }
+
+    @Test
+    fun `7-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
+        assertMutantDoesNotMatchRealFragment(
+            mutantFixtureName = "7-full-scope-text-copy-bypass-typo",
+            realDiagnosticFragment = "it is private in",
         )
     }
 }

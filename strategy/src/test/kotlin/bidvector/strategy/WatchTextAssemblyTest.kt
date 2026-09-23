@@ -2,9 +2,29 @@ package bidvector.strategy
 
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.ReasonCode
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import io.kotest.property.Arb
+import io.kotest.property.arbitrary.of
+import io.kotest.property.checkAll
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
+
+/**
+ * D-6F4W-12 — 조립 함수 조각 하나의 경계 표본(전부 blank·일부 blank·전부 비blank·빈 문자열·
+ * 공백 낀 비blank). 전건 문자열 열거가 아니라 이 경계들만으로 `isNotBlank` 술어가 실제로
+ * 거르는 경계를 덮는다.
+ *
+ * **verifier r1 LOW-1** — ASCII 공백(`" "`)만 있으면 `filter(String::isNotBlank)`가
+ * `filter { it.trim(' ').isNotEmpty() }`로 바뀌어도 이 property test 가 못 잡는다(그
+ * 변이는 ASCII 공백만 blank 로 본다). 탭(`\t`)·전각 공백(`　`, 한국어 공고명에서
+ * 현실적)·줄바꿈없는 공백(` `)을 더해 그 변이를 닫는다 — Kotlin `Char.isWhitespace`가
+ * 셋 다 Java `Character.isWhitespace ∪ isSpaceChar`로 blank 로 보므로 원래 술어와는
+ * 여전히 일치한다.
+ */
+private val TEXT_FRAGMENT_ARB: Arb<String?> =
+    Arb.of(null, "", "   ", "x", " x ", "x x", "\t", "　", " ")
 
 private fun noBudgetRules(
     focusRegionTerms: List<String> = emptyList(),
@@ -31,33 +51,35 @@ private fun subjectOf(
  * 밖이다). 그래서 이 test는 함수 자체의 조립 규칙과, `WatchRules.evaluate`를 거친 행동까지
  * 잠근다 — legacy가 주석으로만 막던 오탐을 이 조립 함수는 시그니처로 막는다는 것이 요점이다.
  *
- * **이 배제는 조립 함수 시그니처까지만 참이다(D-6F4-3c, 2026-09-19 정정)** — `KeywordScopeText`/
- * `FullScopeText`는 여전히 공개 생성자를 가진 `data class`라 결과 타입을 직접 만들면 이 함수를
- * 완전히 우회한다(`Text.kt`의 `KeywordScopeText` KDoc 참고). 「V2는 구조로 막는다」로 읽지 않는다.
+ * **이 배제는 M6/6F-4-w(D-6F4W-7)부터 생성자 자체로 막힌다** — `KeywordScopeText`/`FullScopeText`는
+ * `private constructor` + `@ConsistentCopyVisibility` 로 닫혀 이 두 조립 함수(와 그 companion
+ * factory)만 값을 낼 수 있다. 그 전(D-6F4-3c, 2026-09-19)에는 결과 타입의 공개 생성자로 이
+ * 배제를 우회할 수 있었다는 것이 이 폐쇄의 동기다(verifier r2 MEDIUM-3 — 요건 텍스트로
+ * `KeywordScopeText`를 직접 만들어 필수 키워드를 만족시키는 test 가 초록이었다).
  */
 class WatchTextAssemblyTest {
     @Test
     fun `키워드 대상은 공고명과 공종을 공백으로 이어 붙인다`() {
         val text = assembleKeywordScopeText(noticeTitle = "정보시스템 유지보수 용역", businessCategoryLabel = "기술용역")
-        text shouldBe KeywordScopeText("정보시스템 유지보수 용역 기술용역")
+        text.value shouldBe "정보시스템 유지보수 용역 기술용역"
     }
 
     @Test
     fun `공고명만 있으면 키워드 대상은 그 값만 싣는다`() {
-        assembleKeywordScopeText(noticeTitle = "도로 보수 공사", businessCategoryLabel = null) shouldBe
-            KeywordScopeText("도로 보수 공사")
+        assembleKeywordScopeText(noticeTitle = "도로 보수 공사", businessCategoryLabel = null).value shouldBe
+            "도로 보수 공사"
     }
 
     @Test
     fun `공종만 있으면 키워드 대상은 그 값만 싣는다`() {
-        assembleKeywordScopeText(noticeTitle = null, businessCategoryLabel = "공사") shouldBe
-            KeywordScopeText("공사")
+        assembleKeywordScopeText(noticeTitle = null, businessCategoryLabel = "공사").value shouldBe
+            "공사"
     }
 
     /** D-6F4-4b — 값이 없으면 없는 것이다. 빈 문자열을 지어내지 않고 `""`으로 닫는다. */
     @Test
     fun `공고명과 공종이 둘 다 없으면 키워드 대상은 빈 문자열이다`() {
-        assembleKeywordScopeText(noticeTitle = null, businessCategoryLabel = null) shouldBe KeywordScopeText("")
+        assembleKeywordScopeText(noticeTitle = null, businessCategoryLabel = null).value shouldBe ""
     }
 
     @Test
@@ -69,13 +91,13 @@ class WatchTextAssemblyTest {
                 demandAgencyName = "해양수산부",
                 noticeAgencyName = "국가정보자원관리원",
             )
-        text shouldBe FullScopeText("정보시스템 유지보수 용역 기술용역 해양수산부 국가정보자원관리원")
+        text.value shouldBe "정보시스템 유지보수 용역 기술용역 해양수산부 국가정보자원관리원"
     }
 
     /** D-6F4-4b — 네 조각이 전부 없으면 지역 대상도 빈 문자열이다. */
     @Test
     fun `네 조각이 전부 없으면 지역 대상도 빈 문자열이다`() {
-        assembleFullScopeText(null, null, null, null) shouldBe FullScopeText("")
+        assembleFullScopeText(null, null, null, null).value shouldBe ""
     }
 
     /**
@@ -132,5 +154,33 @@ class WatchTextAssemblyTest {
         noBudgetRules(requiredKeywordTerms = listOf("기술용역")).evaluate(subject) shouldBe
             WatchVerdict.Rejected(setOf(WatchRuleId.RequiredKeyword))
         noBudgetRules(focusRegionTerms = listOf("해양수산부")).evaluate(subject).shouldBeInstanceOf<WatchVerdict.Passed>()
+    }
+
+    /**
+     * D-6F4W-12 — 「출력은 `""` 이거나 비공백 문자를 포함한다」는 D-6F4W-2(부재 → `Found`
+     * (빈 텍스트))가 기대는 불변식이다. `joinNonBlankParts`의 `isNotBlank` 술어 한 글자가
+     * `isNotEmpty`로 바뀌면 조용히 깨진다(부재가 `""`와 공백 문자열 두 모양으로 갈려
+     * 하류의 `isEmpty()`가 후자를 놓친다) — 이 test 가 그 술어를 잠근다.
+     */
+    @Test
+    fun `D-6F4W-12 조립 결과는 완전히 비거나 비공백 문자를 포함한다 — 경계 조합 property`() {
+        runBlocking {
+            checkAll(TEXT_FRAGMENT_ARB, TEXT_FRAGMENT_ARB, TEXT_FRAGMENT_ARB, TEXT_FRAGMENT_ARB) {
+                title,
+                label,
+                demandAgencyName,
+                noticeAgencyName,
+                ->
+                val keyword = assembleKeywordScopeText(title, label)
+                val full = assembleFullScopeText(title, label, demandAgencyName, noticeAgencyName)
+
+                withClue("keywordText=\"${keyword.value}\"") {
+                    (keyword.value.isEmpty() || keyword.value.isNotBlank()) shouldBe true
+                }
+                withClue("fullText=\"${full.value}\"") {
+                    (full.value.isEmpty() || full.value.isNotBlank()) shouldBe true
+                }
+            }
+        }
     }
 }

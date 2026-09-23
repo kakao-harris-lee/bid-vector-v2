@@ -1,6 +1,6 @@
 package bidvector.workflow.evaluation
 
-import bidvector.strategy.FullScopeText
+import bidvector.strategy.assembleFullScopeText
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -8,11 +8,15 @@ import org.junit.jupiter.api.Test
  * 정책 키워드 매칭(4B-5 D-4B5-5 인계, legacy `opportunity_analysis/scoring.py`
  * `_estimate_execution_complexity_score` — `sum(1 for keyword in KEYWORDS if keyword in
  * text)`) — 소문자 부분 문자열, 같은 키워드 중복 출현은 1 회.
+ *
+ * **D-6F4W-7/8 이관** — `FullScopeText(literal)` 을 `assembleFullScopeText(literal, null,
+ * null, null)` 로 재구성한다(ⓐ). 단일 비공백 조각은 구분자 없이 그대로 나오므로 literal 은
+ * 전부 값 그대로 보존된다.
  */
 class KeywordHitsCounterTest {
     @Test
     fun `일치 0건이면 count 0`() {
-        val hits = KeywordHitsCounter.count(FullScopeText("아무 관련 없는 전문입니다"), TEST_POLICY)
+        val hits = KeywordHitsCounter.count(assembleFullScopeText("아무 관련 없는 전문입니다", null, null, null), TEST_POLICY)
 
         hits.count shouldBe 0
     }
@@ -21,7 +25,7 @@ class KeywordHitsCounterTest {
     fun `대소문자 무관 — 영문 키워드는 소문자 매칭`() {
         val policy = TEST_POLICY.copy(keywords = listOf("cloud"))
 
-        val hits = KeywordHitsCounter.count(FullScopeText("CLOUD 인프라 구축"), policy)
+        val hits = KeywordHitsCounter.count(assembleFullScopeText("CLOUD 인프라 구축", null, null, null), policy)
 
         hits.count shouldBe 1
     }
@@ -30,7 +34,7 @@ class KeywordHitsCounterTest {
     fun `같은 키워드가 여러 번 나와도 1 회만 센다`() {
         val policy = TEST_POLICY.copy(keywords = listOf("보안"))
 
-        val hits = KeywordHitsCounter.count(FullScopeText("보안 보안 보안 시스템"), policy)
+        val hits = KeywordHitsCounter.count(assembleFullScopeText("보안 보안 보안 시스템", null, null, null), policy)
 
         hits.count shouldBe 1
     }
@@ -38,11 +42,14 @@ class KeywordHitsCounterTest {
     @Test
     fun `정책 키워드 14 전부가 텍스트에 있으면 count 14`() {
         val fullText =
-            FullScopeText(
+            assembleFullScopeText(
                 OPPORTUNITY_POLICY.entries
                     .single()
                     .second.keywords
                     .joinToString(" "),
+                null,
+                null,
+                null,
             )
         val policy = OPPORTUNITY_POLICY.entries.single().second
 
@@ -55,7 +62,7 @@ class KeywordHitsCounterTest {
     fun `일부만 일치하면 일치한 수만 센다`() {
         val policy = TEST_POLICY.copy(keywords = listOf("보안", "클라우드"))
 
-        val hits = KeywordHitsCounter.count(FullScopeText("클라우드 기반 서비스"), policy)
+        val hits = KeywordHitsCounter.count(assembleFullScopeText("클라우드 기반 서비스", null, null, null), policy)
 
         hits.count shouldBe 1
     }
@@ -64,7 +71,7 @@ class KeywordHitsCounterTest {
     fun `verifier F-3 — 단어 내부에 나타나도 매치된다(단어 경계를 보지 않는다)`() {
         val policy = TEST_POLICY.copy(keywords = listOf("보안"))
 
-        val hits = KeywordHitsCounter.count(FullScopeText("정보안내 시스템"), policy)
+        val hits = KeywordHitsCounter.count(assembleFullScopeText("정보안내 시스템", null, null, null), policy)
 
         hits.count shouldBe 1
     }
@@ -73,7 +80,7 @@ class KeywordHitsCounterTest {
     fun `verifier F-3 — 글자 사이에 공백이 끼면 매치되지 않는다`() {
         val policy = TEST_POLICY.copy(keywords = listOf("보안"))
 
-        val hits = KeywordHitsCounter.count(FullScopeText("보 안 시스템"), policy)
+        val hits = KeywordHitsCounter.count(assembleFullScopeText("보 안 시스템", null, null, null), policy)
 
         hits.count shouldBe 0
     }

@@ -353,6 +353,77 @@ codec 의 허용 루트만 보고 위치를 정했고 **그 위치가 만드는 
 호출부가 `Failed` 를 무시하면 도메인 write 만 커밋되고 outbox 행이 없다**(D-6F7-11) · **하위 소비자의 `Failed`
 로깅**은 배선 전이라 확인 불가(privacy-gate).
 
+**6F-7 종결 2026-09-23** — PR **#42** 머지(`02164e44`). 판정 넷을 PR 코멘트로 남겼다(verifier 2라운드 ·
+`code-reviewer` · `privacy-gate` · 조치). 좁은 재검증이 **`ready-for-review`**, CI 세 job 전부 통과
+(`check` 5m48s · `container` · `ml-engine`). **CI 가 verifier 의 「확인 불가」 하나를 닫았다** — `pypi.org`
+도달 불가로 로컬에서 못 돌린 Python step 이 러너에서 돌았다. **두 번째 하네스 교훈**: `check` 가 exit 0
+이어도 **해당 모듈의 test task 가 `FROM-CACHE`** 일 수 있다(이번엔 `:workflow:test`, 산출물 test 가 거기
+있었다). 앞 라운드의 「`:app:test` 가 `UP-TO-DATE`」는 **재현되지 않았다** — 교훈은 특정 모듈이 아니라
+**acceptance 를 캐시 우회로 한 번 재야 한다** 쪽이다.
+
+**6F-4-w 착수 2026-09-23** — base `02164e44`(6F-7 머지 뒤 `main`), 레인 worktree `bid-vector-v2-m6f4w`·
+브랜치 `m6-6f4w/2026-09-23`. 정본 `reports/evidence/m6/6f4w/scope.md`(D-6F4W-1~7). **배선 순서의 2번**,
+`WatchSubjectPort` 의 첫 production 구현이다.
+
+**착수 조사가 크기를 확정했다 — 마이그레이션도 DB 재조회도 없다.** 전용 「관심대상」 표는 없지만 조립에
+필요한 열이 **전부 `notice` 에 있고**(`notice_title` V14 · `business_category_label` V1 ·
+`demand_agency_name`/`notice_agency_name` V7 · `base_amount_*` V1) 그 열을 읽는 어댑터도 이미 있다 —
+`CandidateSourcePort` 가 내주는 `Notice` 에 다 실려 온다. 이 slice 는 **`Notice` → `WatchSubject` 순수 매퍼**다.
+
+**`OPEN-6F4-TITLE-WIRING` 을 절반만 닫는다(D-6F4W-1).** 그 OPEN 은 **축이 다른 둘**을 한 이름으로 묶고
+있었다 — ⓐ 포트 구현(도메인 조립) ⓑ KONEPS 원시 키 → canonical `notice_title` 배선(수집). ⓐ 만 이 slice 고,
+ⓑ 는 **`OPEN-6F4-TITLE-INGEST`** 로 신설해 **D-6F4-6 제약**(공고명 키를 어댑터에 하드코딩하지 않는다)과 함께
+수집 레인에 넘긴다. 다음 두 단계를 막는 것은 ⓐ 뿐이고 ⓑ 는 **배선이 아니라 값**에만 닿는다.
+
+**승인 문서에 없던 도메인 규칙 하나를 정했다(D-6F4W-2·3).** 「감시 텍스트가 비었을 때 `Found("")` 인가
+`Unavailable` 인가」가 어디에도 없었다. **부재는 `Found`, 실패가 `Unavailable`** 로 정한다 — 반대로 정하면
+`halt(ScoreNotProvided)` → `WatchSubjectUnavailable` 경로를 타는데, `notice_title` 실 데이터가 **0건**이라
+그 선택은 **전건 탈락**이다. 순수 매퍼는 I/O 가 없어 **실패할 수 없으므로**, 매퍼를 `WatchSubject` 를 내는
+**전(total) 함수**로 두고 포트가 `Found` 로 감싼다 — 「이 어댑터가 `Unavailable` 을 낸다」가 **test 로 막을
+것이 아니라 타입으로 없는 것**이 된다. 대가는 `OPEN-6F4W-UNAVAILABLE-PRODUCER` 로 등재한다(그 variant 의
+production 생산자가 0이라 변이 실측이 그 경로를 못 잡는다).
+
+**부재 기초금액의 사유 코드는 `EMPTY_INPUT`(D-6F4W-4).** `ReasonCode` 여덟을 전수 검토했고 나머지는 전부
+**값이 있을 때의 실패**다. test fixture 가 쓰는 `POLICY_NOT_APPLICABLE` 은 뜻이 다르다 — **fixture 는 승인
+문서가 아니다.** shared-kernel enum 에 값을 새로 만들지 않는다(모든 소진 `when` 에 파급한다).
+
+**6F-4 가 넘긴 숙제를 받는다(D-6F4W-7)** — `KeywordScopeText`·`FullScopeText` 의 공개 생성자 우회는
+verifier r2 가 **실측한 구멍**이다. `NoticeTitle` 과 같은 기전(`@ConsistentCopyVisibility` + private 생성자
++ 팩토리)으로 닫고 **negative 컴파일 probe** 로 확인한다 — `internal` 은 모듈 범위라 같은 모듈 test 에서
+그대로 열린다. 생성 지점이 `strategy/src/main` 밖 **54곳**이라 **분기점을 걸었다**: 구현 레인이 먼저
+main/test × 모듈로 갈라 보고하고, **`strategy` 밖 main 코드에 생성 지점이 있으면 멈춘다** — 부풀리지 않고
+별도 slice 로 가른다.
+
+**계약에 명문으로 박은 것** — `in_scope` 가 넓어지면 **계약 갱신 절로 명시하고 rollback 을 재산출**한다.
+6A-1(D-6A1-26)·6F-7(HIGH-1)에서 **두 번 연속** 「파일이 움직였는데 `in_scope` 를 안 고쳐 clean-tree 게이트가
+눈이 멀었다」가 났다. **세 번째를 만들지 않는다.**
+
+**6F-4-w 종결 2026-09-23** — PR **#43**(head `f9624326`, 계약 갱신 절 넷·D-6F4W-1~16). 판정 넷 + 조치를 PR 코멘트로
+남겼다(verifier r1 `not-ready` → r2 `ready-for-review` · `code-reviewer` 머지 가능 · `privacy-gate` 위반 0 · 조치).
+재작업 **1/5**. CI 세 job 전부 통과(`check` 4m57s · `container` 2m16s · `ml-engine` 49s). Codex 는 대상 아님.
+
+**r1 HIGH 는 게이트 술어의 결함이었다 — 「있는지만 보는」의 변형.** 컴파일 probe 의 기대 조각 `"cannot access"`
+가 `private` 과 `internal` 을 구별하지 못해, 생성자를 `internal` 로 퇴행시켜도 `check` 전체가 초록이었다 —
+D-6F4W-7 이 「`internal` 로 때우지 않는다」를 명시했는데 그 probe 가 바로 그 퇴행을 통과시켰다. 기대 조각을
+`"it is private in"` 으로 좁히자 퇴행 변이가 4건 RED(D-6F4W-13). **같은 라운드의 MEDIUM 도 같은 계열**이다 — 우회 3
+의 부재 단언이 이름 셋의 금지 목록이라 `String.join` 복제가 통과했고, 상수 풀 **허용 목록**(⊆)으로 바꾸자 템플릿·
+`String.join`·`String.format`·multifile facade 변이가 전부 RED(D-6F4W-14). **둘 다 리뷰는 못 잡고 변이 실측만 잡았다**
+(M6 에서 세 slice 연속).
+
+**폐쇄가 닫은 것은 생성 경로이지 내용의 출처가 아니다(D-6F4W-15).** `assemble*` 의 인자가 `String?` 이라 요건 텍스트를
+넣으면 컴파일된다 — 6F-4 r2 시나리오가 철자만 바꿔 재현된다. 위협 모델이 「원천 값의 정직성」을 경계 밖에 두었고 오늘
+production 호출자는 어댑터 하나(`Notice` 타입 입력)라 이 slice 는 게이트를 세우지 않고 **문면을 고쳤다**(「실릴 길이 타입으로
+없다」류 전칭 삭제). 「어댑터만 부른다」는 오늘 **실측이지 구조가 아니다** — **`OPEN-6F4W-ASSEMBLE-CALLER`**(호출자 집합
+== {`NoticeWatchSubjectPortKt`}, app ArchUnit 층 집합 등식)를 신설해 **`OPEN-6F-ASSEMBLY` 의 전제 조건**으로 걸었다. 배선이
+호출자를 더하기 전에 닫혀야 한다. `of` 가 `internal` 인 것도 Kotlin 한계가 아니라 설계 선택(`NoticeTitle` 선례)으로 정정했다.
+
+**신설 OPEN**: `OPEN-6F4-TITLE-INGEST`(수집 절반) · `OPEN-6F4W-UNAVAILABLE-PRODUCER` · `OPEN-6F4W-ASSEMBLE-CALLER`.
+`OPEN-6F-ASSEMBLY` 재확인 항목 ①~④(privacy-gate U-1·R-1)를 scope.md OPEN 표에 등재했다.
+
+**장부 사실**: 수정 라운드 커밋 6개에 `Co-Authored-By` trailer 가 없다(evidence 의 SHA 앵커 보존을 위해 되쓰지 않음).
+검토 레인은 장비 리부팅으로 한 번 유실돼 같은 지시문으로 재발사했다(판정 SHA 불변). evidence 크기 여유가 16줄(825 ≤ 841)
+— 다음 slice 는 착수 시 evidence 예산을 먼저 잡는다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
@@ -389,7 +460,8 @@ codec 의 허용 루트만 보고 위치를 정했고 **그 위치가 만드는 
 1. **6F-7** — `NotificationRequestPort` → outbox. **차단 없음**(outbox 기반은 V6·`JdbcOutboxPort` 로 존재).
    발송 채널은 `OPEN-STR-12` 로 그 뒤다 — 이 slice 는 **요청을 낳는 자리까지**다.
 2. **6F-4-w** — `WatchSubjectPort`. **차단 없음**(6F-4 의 `notice_title` 이 `main` 에 있다).
-   `OPEN-6F4-TITLE-WIRING` 을 닫는다.
+   `OPEN-6F4-TITLE-WIRING` 의 포트 절반을 닫는다(수집 절반은 `OPEN-6F4-TITLE-INGEST`). **PR #43 — 종결 문단 참조.**
+   4번(조립)의 전제에 **`OPEN-6F4W-ASSEMBLE-CALLER`** 가 더해진다.
 3. **6A-3 + 6F-3**(합침) — 평가 endpoint + `CapacityPort`. 여기서 **`MlAnalysisPort` 처분**(실 gRPC gateway
    배선 vs 자리지킴 유지)을 운영자에게 올린다 — 4B-6b 가 6A 로 넘긴 결정이고 **실 외부 호출 축**이다.
 4. **조립**(`OPEN-6F-ASSEMBLY`) — 포트 아홉을 app 에 꽂는다. 1~3 이 전제다.

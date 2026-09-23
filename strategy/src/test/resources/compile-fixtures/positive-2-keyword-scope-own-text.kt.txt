@@ -1,10 +1,10 @@
 import bidvector.sharedkernel.Fact
-import bidvector.strategy.FullScopeText
-import bidvector.strategy.KeywordScopeText
 import bidvector.strategy.WatchSubject
+import bidvector.strategy.assembleFullScopeText
+import bidvector.strategy.assembleKeywordScopeText
 
 fun positiveKeywordScopeOwnText() {
-    val keyword = KeywordScopeText("키워드 텍스트")
-    val full = FullScopeText("전체 텍스트")
+    val keyword = assembleKeywordScopeText("키워드 텍스트", null)
+    val full = assembleFullScopeText("전체 텍스트", null, null, null)
     WatchSubject(emptySet(), keyword, full, Fact.Absent(bidvector.sharedkernel.ReasonCode.EMPTY_INPUT))
 }

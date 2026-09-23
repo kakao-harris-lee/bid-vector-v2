@@ -13,8 +13,6 @@ import bidvector.sharedkernel.VatTreatment
 import bidvector.strategy.BudgetBound
 import bidvector.strategy.BudgetBoundInclusivity
 import bidvector.strategy.CategoryCode
-import bidvector.strategy.FullScopeText
-import bidvector.strategy.KeywordScopeText
 import bidvector.strategy.ScoreRange
 import bidvector.strategy.StrategyDraft
 import bidvector.strategy.StrategyPolicyData
@@ -26,6 +24,8 @@ import bidvector.strategy.WatchRules
 import bidvector.strategy.WatchSubject
 import bidvector.strategy.WatchUndeterminableReason
 import bidvector.strategy.WatchVerdict
+import bidvector.strategy.assembleFullScopeText
+import bidvector.strategy.assembleKeywordScopeText
 import bidvector.strategy.evaluate
 import bidvector.strategy.isConfigured
 import bidvector.strategy.validate
@@ -117,11 +117,17 @@ private fun watchRulesFrom(node: JsonNode): WatchRules =
         budget = budgetBoundFrom(node.path("budget")),
     )
 
+/**
+ * D-6F4W-7/8 이관 — corpus 의 `keywordText`/`fullText` 는 단일 조각(`noticeTitle`)으로
+ * `assembleKeywordScopeText`/`assembleFullScopeText` 에 넘겨 재구성한다(ⓐ). corpus 8건
+ * (`fixtures/input/strategy-watch-00{1..8}.json`)을 전수 확인 — 값은 전부 `""` 또는 비공백
+ * 텍스트라, 단일 비공백 조각이 구분자 없이 그대로 나오는 성질로 값이 정확히 보존된다.
+ */
 private fun watchSubjectFrom(node: JsonNode): WatchSubject =
     WatchSubject(
         categories = stringListFrom(node.path("categories")).map(::CategoryCode).toSet(),
-        keywordText = KeywordScopeText(node.path("keywordText").asString()),
-        fullText = FullScopeText(node.path("fullText").asString()),
+        keywordText = assembleKeywordScopeText(node.path("keywordText").asString(), null),
+        fullText = assembleFullScopeText(node.path("fullText").asString(), null, null, null),
         baseAmount = factBaseAmountFrom(node.path("baseAmount")),
     )
 
@@ -304,7 +310,13 @@ private fun moneyBasis003Executor(input: JsonNode): Map<String, Any?> {
     val noticeAmount = baseAmountFrom(input.atDollarPath("$.noticeAmount"))
     val bound = budgetBoundForField(operatorFilterNode.path("field").asString(), operatorAmount)
     val rules = WatchRules(emptySet(), emptyList(), emptyList(), emptyList(), emptyList(), bound)
-    val subject = WatchSubject(emptySet(), KeywordScopeText(""), FullScopeText(""), Fact.Known(noticeAmount))
+    val subject =
+        WatchSubject(
+            emptySet(),
+            assembleKeywordScopeText(null, null),
+            assembleFullScopeText(null, null, null, null),
+            Fact.Known(noticeAmount),
+        )
     val paths = stringListFrom(input.atDollarPath("$.evaluatedVia"))
     val perPath =
         paths.associateWith { _ ->

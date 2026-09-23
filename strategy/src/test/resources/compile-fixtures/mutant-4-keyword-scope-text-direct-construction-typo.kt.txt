@@ -1,0 +1,5 @@
+import bidvector.strategy.KeywordScopeTextTypo
+
+fun negativeKeywordScopeTextDirectConstructionTypo() {
+    KeywordScopeTextTypo("아무 텍스트")
+}

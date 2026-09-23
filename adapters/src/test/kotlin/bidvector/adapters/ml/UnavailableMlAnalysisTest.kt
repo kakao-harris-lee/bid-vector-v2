@@ -19,8 +19,6 @@ import bidvector.sharedkernel.ReasonCode
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.BudgetBoundInclusivity
 import bidvector.strategy.CategoryCode
-import bidvector.strategy.FullScopeText
-import bidvector.strategy.KeywordScopeText
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.ScoreRange
 import bidvector.strategy.StrategyDraft
@@ -28,6 +26,8 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.WatchSubject
+import bidvector.strategy.assembleFullScopeText
+import bidvector.strategy.assembleKeywordScopeText
 import bidvector.strategy.validate
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
@@ -104,8 +104,8 @@ private fun testNotice(): Notice {
 private val MATCHING_SUBJECT =
     WatchSubject(
         categories = setOf(CategoryCode(FOCUS_CATEGORY)),
-        keywordText = KeywordScopeText(""),
-        fullText = FullScopeText(""),
+        keywordText = assembleKeywordScopeText(null, null),
+        fullText = assembleFullScopeText(null, null, null, null),
         baseAmount = Fact.Absent(ReasonCode.POLICY_NOT_APPLICABLE),
     )
 

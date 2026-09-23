@@ -1,0 +1,5 @@
+import bidvector.strategy.FullScopeTextTypo
+
+fun negativeFullScopeTextDirectConstructionTypo() {
+    FullScopeTextTypo("아무 텍스트")
+}
