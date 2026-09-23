@@ -51,6 +51,14 @@ import java.sql.SQLException
  * `outbox` 표는 `idempotency_key`에 UNIQUE가 없다(4C-1의 기존 한계, 이 slice가 고치는
  * 계약이 아니다). 같은 notice가 여러 evaluate run에서 반복 `BidNow`를 받으면 매번 새
  * outbox 행이 생긴다 — 이 클래스는 그것을 막지 않는다.
+ *
+ * **`SQLException`을 `Failed`로 매핑한다(scope.md 우회 3) — 이것이 `OutboxEventSink`(선례,
+ * `workflow.event`)와 갈린다(D-6F7-11).** `OutboxEventSink.publish`는 전파(→ 호출자
+ * 트랜잭션 롤백)를 택했는데 이 클래스는 삼키지 않되 **값으로 반환**한다. 지금은 결함이
+ * 아니다 — 이 port는 아직 배선되지 않았다(`OPEN-6F-ASSEMBLY`). **배선 뒤** 호출부가
+ * `inTransaction` 안에서 `request()`를 부르고 반환값 `Failed`를 무시하면, 도메인 write는
+ * 커밋되고 outbox 행은 없는 상태가 남는다(dual-write 문제) — 그 처리는 조립 slice
+ * (`OPEN-6F-ASSEMBLY`)의 몫이다.
  */
 class OutboxNotificationRequestPort(
     private val outbox: OutboxPort,
@@ -96,7 +104,22 @@ private fun idempotencyKeyFor(notification: NotificationRequest): IdempotencyKey
 /**
  * `NotificationRequest` → [NotificationRequestedPayload] 투영(D-6F7-2). `bidNowReasons`는
  * 각 `BidNowReason` 요소의 `toString()`이다 — 그 타입을 이름으로 참조하지 않고(클래스 KDoc)
- * 값은 그대로 보존한다.
+ * 값은 그대로 보존한다. `evidence.toOutboxPayload()`의 `NotPredicted.reason`도 같은 방식
+ * (`MlUnavailableReason.toString()`)이다.
+ *
+ * **`OPEN-6F7-REASON-CODE-STABILITY`(D-6F7-9로 전면 재작성, scope.md) — 남는 위험은
+ * 하나다.** `bidvector.decision`의 `BidNowReason`·`MlUnavailableReason`이 outbox에
+ * 영속되는 값을 Kotlin 합성 `toString()`으로만 낸다 — 그 형식이 조용히 바뀔 수 있다.
+ * `OutboxNotificationRequestPortTest`의 축어 잠금(각 case의 `toString()` 출력을 literal로
+ * 단언)과 소진 `when`(else 없음)이 그것을 「소리 나게」 한다(형식이 바뀌면 그 커밋에서
+ * RED) — 다만 **이미 영속된 옛 outbox 행을 고치거나 마이그레이션하지 않는다.**
+ * 「안정적 `code` 속성으로 바꾼다」는 해법이 아니다 — `toString()`이 함께 나르는 임계·
+ * 확률 수치를 잃기 때문이고, 그 정보는 D-6F7-2(판정 복원 가능성)가 요구한 것이다.
+ * **착수 판이 적은 차단 사유 둘은 거짓으로 판명됐다** — 경계 게이트(`EventBoundaryTest`)는
+ * `workflow.event`의 main 소스만 보고 이 sink(`workflow.evaluation`)를 덮지 않으며,
+ * `BidNowReason` 하위 타입의 `internal` 생성자는 **읽기**를 막지 않는다(verifier 변이
+ * 실측). 옛 사유를 여기 옮기지 않는다 — 진짜 종점은 `bidvector.decision`에 안정적
+ * `code: String` 속성을 추가하는 별도 slice다.
  */
 private fun NotificationRequest.toOutboxPayload(): NotificationRequestedPayload =
     NotificationRequestedPayload(
