@@ -1,7 +1,12 @@
 # M6/6F-7 — commands.md
 
-실측 HEAD(마지막 산출물 커밋): `e7e7a764`(D-6F7-7 — sink 를 `workflow.evaluation`
-으로 이동한 뒤의 최종 상태)
+실측 HEAD(마지막 산출물 커밋): `6f5ae4f8`(sink KDoc — OPEN-6F7-REASON-CODE-STABILITY
+재작성분 이관, D-6F7-11 명시. 그 뒤 커밋은 evidence·milestone 문서다).
+
+**마지막 HEAD 의 게이트 결과 정본은 evidence 가 아니라 verifier 와 PR 조치
+코멘트다**(evidence-pack 규율, 2026-09-16) — evidence 편집 커밋마다 그 HEAD 의
+post-state 를 적으려면 커밋이 하나 더 필요하고 그 커밋이 다시 같은 줄을
+요구하는 자기급식 루프가 되기 때문이다.
 
 ## acceptance_commands (scope.md) — `contractGate` 환경 결함 해소 뒤 전건 재실측
 

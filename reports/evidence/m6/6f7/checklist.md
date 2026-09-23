@@ -104,32 +104,29 @@ override**해 "이름은 그대로인데 직렬화 형식만 조용히 바뀌는
 
 둘 다 원복 확인 후 clone 삭제.
 
-**처분 ② — 진짜 종점은 도메인, OPEN 신설 요청(문면 초안)**
+**처분 ② — D-6F7-9 로 전면 재작성됨(정본: `scope.md` OPEN 절·D-6F7-9,
+`milestone-6.md` 6F-7 문단, sink KDoc `OutboxNotificationRequestPort.kt`)**
 
-```
-OPEN-6F7-REASON-CODE-STABILITY
+`OPEN-6F7-REASON-CODE-STABILITY` — 남는 위험은 하나다: outbox 에 영속되는 값이
+**Kotlin 합성 `toString()`** 이라 형식이 조용히 바뀔 수 있다. 이 slice 의 축어
+잠금(처분 ①) + 소진 `when` 이 그것을 **「소리 나게」** 했다(형식이 바뀌면 그
+커밋에서 RED) — 다만 **이미 영속된 옛 outbox 행을 고치거나 마이그레이션하지
+않는다.**
 
-무엇: BidNowReason·MlUnavailableReason(bidvector.decision)이 payload 직렬화
-가능한 안정적 code 속성(예: val code: String)을 갖지 않는다 — outbox에 실리는
-값이 Kotlin 합성 toString()이다.
+**「안정적 `code` 속성으로 바꾼다」는 해법이 아니다** — `toString()` 이 함께
+나르는 **임계·확률 수치를 잃기 때문**이고, 그 정보는 D-6F7-2(판정 복원
+가능성)가 요구한 것이다.
 
-왜 지금 못 하는가: (a) workflow.event 의 EventBoundaryTest(D-6F7-5 의 같은
-게이트)가 bidvector.decision 을 main 소스에서 이름으로 참조하는 것을 막는다
-(b) BidNowReason 의 두 하위 타입은 internal 생성자라 workflow 도 재구성 못
-한다 — sink 는 값을 toString()으로만 투영할 수 있다. 둘 다 도메인 타입 변경
-없이는 못 푼다.
+**착수 판이 적은 차단 사유 둘은 거짓이었다(verifier 변이 실측, D-6F7-9)**:
+경계 게이트(`EventBoundaryTest.sourceRoot`)는 `workflow/event` 만 보고
+D-6F7-7 로 옮겨진 이 sink(`workflow.evaluation`)를 덮지 않는다. `BidNowReason`
+하위 타입의 `internal` 생성자는 **생성**을 막지 **읽기**를 막지 않는다 —
+sink 에 `when { is BidNowReason.X -> "CODE" }` 를 심어도 `:workflow:compileKotlin`
+· `EventBoundaryTest` · `ArchitectureGateTest` 전부 exit 0 이었다(도메인 변경
+불필요, verifier 실측). 받는 레인은 이 둘을 차단 사유로 깔지 않는다.
 
-①이 무엇을 대신하는가: OutboxNotificationRequestPortTest 가 BidNowReason
-두 case·MlUnavailableReason 열한 case 의 toString() 출력을 literal 로 축어
-단언하고, 소진 when(else 없음)으로 새 case 추가 시 컴파일이 깨지게 한다.
-**이것은 "형식이 안정적이다"를 만들지 않는다** — 누군가 decision 모듈에서
-toString() 을 override 하면(변이 실측으로 재현) 그 커밋에서 이 test 가
-RED 로 잡지만, 이미 영속된 옛 outbox 행의 형식을 고치거나 마이그레이션하지
-않는다. 이 test 는 **회귀를 소리 나게 할 뿐 형식을 안정시키지 않는다.**
-
-누가 닫는가: decision 모듈에 code: String 속성을 추가하는 slice(도메인
-변경, M6/6F-7 밖) — 그 뒤 이 payload 도 code 기반으로 재작성해야 한다.
-```
+누가 닫는가: 이미 영속된 옛 outbox 행의 형식 마이그레이션이 필요해지는
+시점의 **도메인 레인**(M6/6F-7 밖).
 
 ## 알려진 제한
 
@@ -182,7 +179,7 @@ RED 로 잡지만, 이미 영속된 옛 outbox 행의 형식을 고치거나 마
 
 ## 리뷰 요청 조건 점검
 
-- [x] 구현 diff 커밋, base/head 고정 — `git status --porcelain -- <in_scope 8경로>`
+- [x] 구현 diff 커밋, base/head 고정 — `git status --porcelain -- <in_scope 10 glob>`
   결과 없음(clean). 양성 대조: `config/quality/gate-tests.properties`에 한 줄을
   일부러 지웠다 되돌려 porcelain이 `M`을 잡는 것을 확인 후 원복.
 - [x] acceptance_commands 셋 — `commands.md`. `check`·`qualityBaseline`
