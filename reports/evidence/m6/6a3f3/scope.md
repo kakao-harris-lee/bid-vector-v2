@@ -166,6 +166,22 @@ DB 스키마를 **정확 열거**로 잠근다 — 컬럼 집합 `shouldContainE
 미선언 파일을 「선례가 있다」로 자체 판단했다. 결과는 옳으나 절차는 「멈추고 보고」였어야 한다. 되쓰지 않는다(이력
 보존), 게이트(app 의존 방향 ArchUnit)가 이 의존을 승인된 방향으로 보는지 verifier 표적에 넣는다.
 
+## 계약 갱신 (4) — 구현 중 드러난 미선언 변경 둘의 흡수 (2026-09-23, 팀장)
+
+**D-6A3-16 — 사후 흡수 둘.** 구현 레인이 스스로 공개했다(절차 시정). 둘 다 선례·기계적 필연이 있어 **인정**하고
+in_scope 에 넣는다. 절차 사실(계약 갱신 전 커밋)은 D-6A3-15 와 같이 기록으로 남긴다.
+1. `app/build.gradle.kts` 에 `:decision`·`:procurement`·`kotlinx-coroutines-core` — 컨트롤러가 `Verdict`·`NoticeId` 를 직접
+   참조하고, `evaluate()` 가 suspend 라 동기 MVC 경계에 `runBlocking` 이 필요하다(coroutines 는 런타임 전이로만 있었다 —
+   컴파일 classpath 부재 실측). D-6A3-15 의 「한 줄」을 넘으므로 여기서 넓힌다. **verifier 표적**: app 이 `decision`·
+   `procurement` 를 main 의존으로 갖는 것이 ArchUnit 의존 방향 정책과 맞는가 · 컨트롤러의 `runBlocking` 이 요청 스레드에서
+   취소 전파를 끊지 않는가.
+2. `app/src/test/kotlin/bidvector/archfixture/violating/evaluation/**` — D-6A3-9 게이트의 양성 대조 fixture. 기존
+   `ArchitectureGateCatchesViolationsTest` 의 `archfixture.violating.*` 관례를 따른다.
+
+**변이 5 가 게이트 사각을 찾았다** — OpenAPI 에서 필드 하나를 빼는 변이가 초기에는 초록이었다(새 endpoint 의 200 응답
+키 집합 대조가 없었다). 구현 레인이 대조를 더해 RED 로 닫았다(`4c2d041e`). 「있는지만 보는 게이트」 계열 — checklist 에
+사실로 적는다.
+
 ## 위협 모델 — 6A-3+6F-3 고유 경계
 
 지키는 것: **① dry-run endpoint 는 외부 effect 를 만들지 않는다**(outbox 에 행이 생기지 않는다, 발송 없음)
@@ -228,7 +244,8 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/http/**                                             # 컨트롤러·DTO·ErrorMapping 행
   - app/src/main/kotlin/bidvector/app/wiring/**                                           # EvaluationWiring·Factory
   - app/src/main/kotlin/bidvector/app/BidVectorApplication.kt                             # 필요 시(속성 바인딩)
-  - app/build.gradle.kts                                                                 # D-6A3-15 — :qualification 의존 한 줄
+  - app/build.gradle.kts                                                                 # D-6A3-15·16 — :qualification·:decision·:procurement·coroutines
+  - app/src/test/kotlin/bidvector/archfixture/violating/evaluation/**                  # D-6A3-16 — D-6A3-9 양성 대조 fixture
   - app/src/main/resources/**                                                             # 설정 속성 선언이 있으면
   - app/src/test/kotlin/bidvector/app/**                                                  # http·wiring·architecture(D-6A3-9)·conformance(draft 필드)
   - openapi/bidvector-operator-api.yaml                                                   # D-6A3-11
