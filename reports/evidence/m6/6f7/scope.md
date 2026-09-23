@@ -125,6 +125,42 @@ workflow.embedding → workflow.event → workflow.evaluation → workflow.embed
 homebrew 설치라 `/opt/homebrew` 에 없었다). **`:contractGate` 단독 실행 BUILD SUCCESSFUL 을 팀장이 실측했다.**
 이제 전건이 온전히 돌고, 그래서 위 순환이 드러났다.
 
+## 계약 갱신 (2) — 순환 해소와 acceptance 정정 (2026-09-23, 팀장)
+
+D-6F7-7 이 적용됐다. sink 는 `workflow.evaluation`, payload 는 `workflow.event` 에 있고 **전건
+`./gradlew --no-daemon check` 이 exit 0**(아키텍처 게이트 포함)임을 팀장이 실측했다.
+
+**구현 레인이 독립으로 같은 순환을 찾아 같은 수정에 도달했다** — 재실측을 시작하자 `ArchitectureGateTest` 가
+**처음으로 실행돼** 순환 다섯 건을 냈고, 진단이 팀장이 `scope.md` 에 적어 둔 것과 같았으며 처방도 같았다.
+**두 레인의 수렴이라 D-6F7-7 이 단단하다.**
+
+**그리고 구현 레인이 순환 그림을 팀장보다 정확히 봤다.** 팀장은 게이트 출력에서 사슬 하나
+(`embedding → event → evaluation → embedding`)만 읽었는데, 실제로는 sink 가 `NotificationRequest`·
+`PredictionEvidence`(`workflow.evaluation`)와 그 `diagnostics`·`release`(**`workflow.prediction`**)까지
+직접 참조해 **반대 방향 간선이 둘**이었고, 기존 간선 셋(`evaluation→event`·`evaluation→prediction`·
+`prediction→event`)과 합쳐 순환이 닫혔다. **처방은 같지만 그림은 그쪽이 맞다.**
+
+**순환 재발 변이 실측** — 버릴 clone 에서 sink 를 `workflow.event` 로 되돌리니(패키지 선언·import 원복,
+`numstat` 확인) `ArchitectureGateTest` 가 **같은 순환으로 RED**(`workflow.event → workflow.prediction →
+workflow.event` 등). **한 번 닫은 자리가 다시 열리면 붉는다.**
+
+### acceptance — 정정과 남은 하나
+
+- **`./gradlew --no-daemon check` exit 0**(아키텍처 게이트 포함) · **`qualityBaseline` exit 0** — 팀장 실측.
+- **`contractGate` 환경 결함은 해소됐다.** 팀장이 `~/.internal-bin/git` 의 `exec` 경로를 `/usr/local/bin/git`
+  으로 고쳤다(이 머신의 git 은 **Intel homebrew**(`/usr/local/Cellar`) 설치라 `/opt/homebrew` 에 없었다).
+  **앞선 라운드의 「환경 결함이라 확인하지 않았다」는 이제 「해소 뒤 전건 통과」다.**
+- **`./tools/one-command-check.sh` 는 Kotlin 두 step 을 exit 0 로 끝까지 돌고 Python 첫 step(`uv sync`)에서
+  exit 1** — `pypi.org` 도달 불가(**프록시를 거쳐도 목적지에 못 닿는다**). **git 래퍼 문제와는 다른 종류**로,
+  로컬 설정이 아니라 **프록시 바깥의 실제 도달성** 문제다. **이 slice 는 `ml-engine`·Python 을 전혀 만지지
+  않는다.** **우회하지 않는다** — Python 축은 **CI 에서 확인**한다(6A-1 이 같은 자리에서 같은 방식으로 닫았다).
+
+### 이번 라운드가 남긴 것 — 「안 돌린 게이트」의 두 번째 날
+
+`contractGate` 가 먼저 죽어 빌드가 `:app:test` 에 **도달하지 못했고**, 그래서 아키텍처 게이트가 **한 번도
+돌지 않은 채** 「전 gate green」으로 보였다. **안 돌린 게이트는 아무것도 막지 못할 뿐 아니라 다른 게이트의
+실패를 가린다.** 래퍼를 고치자마자 순환이 드러났다 — **게이트를 먼저 고치고 간 판단이 값을 했다.**
+
 ## 하네스 레인 변경 (상시 절)
 
 - (착수 시점) 없음.
