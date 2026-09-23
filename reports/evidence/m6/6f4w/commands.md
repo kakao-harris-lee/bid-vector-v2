@@ -85,3 +85,93 @@ job `check`의 관련 step 셋(주석·설명 제외, 실행 명령만):
 - exit: 0
 - 핵심 결과: `50 actionable tasks: 50 executed`(캐시·up-to-date 0 — 전부 실제 실행 확인).
   test 실행 수: strategy 68·adapters 661·workflow 314·app 162, **failures 전부 0**.
+
+## 게이트 술어 변경 변이(버릴 clone `<scratchpad>/r1-mut`, `git worktree add --detach` — 동결
+worktree 자체는 변이를 받지 않았다)
+
+### 2026-09-23T05:15Z
+- cmd: (이 worktree, 무변이) `javap -p -v`로 `NoticeWatchSubjectPort`·`NoticeWatchSubjectPortKt`
+  두 class 의 `Methodref`/`InterfaceMethodref` 상수 풀 추출
+- exit: 0
+- 핵심 결과: 25건 — `ALLOWED_METHOD_REFERENCES`의 근거.
+
+### 2026-09-23T05:20Z
+- cmd: `Text.kt` 두 `private constructor` → `internal constructor`(numstat `2\t2`) 뒤
+  `./gradlew --no-daemon :strategy:test --tests "bidvector.strategy.CompileFailureHarnessTest"`
+  (수정 전 harness 조각으로)
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL` — 수정 전 harness 는 이 변이를 못 잡는다.
+
+### 2026-09-23T05:24Z
+- cmd: 같은 변이 위에 harness 기대 조각을 `"it is private in"`으로 좁힌 뒤 같은 test 재실행
+- exit: 1
+- 핵심 결과: 14 tests, 4 failed(4·5·6·7).
+
+### 2026-09-23T05:26Z
+- cmd: 변이 원복 후 같은 test 재실행
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`.
+
+### 2026-09-23T05:35Z
+- cmd: 어댑터 `keywordText` 줄을
+  `assembleKeywordScopeText(java.lang.String.join(" ", listOfNotNull(noticeTitle, businessCategoryLabel)), null)`
+  로 치환(numstat `1\t1`) 후 `./gradlew --no-daemon :adapters:test --tests 'bidvector.adapters.evaluation.*'`
+- exit: 1
+- 핵심 결과: 30 tests, 1 failed(허용 목록 subset test, `String.join`·`listOfNotNull` 2건 검출).
+
+### 2026-09-23T05:38Z
+- cmd: 변이 원복 후 같은 test 재실행
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`.
+
+### 2026-09-23T05:50Z
+- cmd: `Text.kt`의 `filter(String::isNotBlank)` → `filter { it.trim(' ').isNotEmpty() }`
+  (numstat `1\t1`) 후 `./gradlew --no-daemon :strategy:test --tests "bidvector.strategy.WatchTextAssemblyTest"`
+- exit: 1
+- 핵심 결과: 10 tests, 1 failed(U+3000 단독 조각 반례).
+
+### 2026-09-23T05:52Z
+- cmd: 변이 원복 후 같은 test 재실행
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`.
+
+### 2026-09-23T05:53Z
+- cmd: `sed -n '27p' strategy/src/test/kotlin/bidvector/strategy/WatchTextAssemblyTest.kt | od -c`
+- exit: 0
+- 핵심 결과: 탭·U+3000(UTF-8 `343 200 200`)·U+00A0(UTF-8 `302 240`) 셋 다 바이트 일치.
+
+## 스타일 게이트
+
+### 2026-09-23T05:58Z (버릴 clone, HEAD `547d6886`)
+- cmd: `./gradlew --no-daemon check --rerun-tasks`
+- exit: 1
+- 핵심 결과: `:adapters:detekt FAILED`(`MaxLineLength` 5건).
+
+### 2026-09-23T06:02Z (이 worktree, HEAD `bc9d98b4`)
+- cmd: `./gradlew --no-daemon :adapters:detekt :adapters:ktlintCheck`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`.
+
+## acceptance 재실행 (버릴 clone, HEAD `bc9d98b4`)
+
+### 2026-09-23T06:05Z
+- cmd: `./gradlew --no-daemon check --rerun-tasks`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL in 3m 56s`, `337 actionable tasks: 337 executed`(캐시 0).
+  test-results XML 집계: strategy 69·adapters 661(skip 4)·workflow 314·app 162, 실패 0.
+
+### 2026-09-23T06:12Z
+- cmd: `./gradlew --no-daemon qualityBaseline`
+- exit: 0
+- 핵심 결과: `BUILD SUCCESSFUL`.
+
+### 2026-09-23T06:13Z
+- cmd: `./tools/one-command-check.sh`
+- exit: 0
+- 핵심 결과: `one-command-check: 완료 — Kotlin 전건 + Python 전건 통과`.
+
+## 비밀값 스캔(이 라운드 변경 파일 한정)
+
+### 2026-09-23T06:20Z
+- cmd: `grep -rniE -f config/quality/leak-patterns.txt <이 라운드 변경 코드 파일 6개(개별 인자)>`
+- exit: 1(매치 없음)
