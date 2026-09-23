@@ -113,6 +113,34 @@ D-6A1-38 게이트를 **넓히지 않는다**(세 라운드로 닫힌 게이트�
 **D-6A3-11 — OpenAPI 는 수작성 단일 출처(D-6A1-8) 그대로.** 새 path·요청 스키마·응답 스키마·409/400 응답을 손으로
 적고 `OpenApiContractTest` 가 대조한다. `info.version` 을 `6a3f3` 로 올린다.
 
+## 계약 갱신 (1) — 0단계 측정의 결정 둘 (2026-09-23, 팀장)
+
+**D-6A3-12 — `StrategyDraftSnapshot`(workflow)에 `maxActiveBids` 를 더한다. `in_scope` 를 한 파일군 넓힌다.**
+0단계 실측: `StrategyDraft(` 호출 39건이 전부 named-arg 라 도메인 필드 추가는 컴파일 파괴 0건이지만, 6B-1 세션 영속의
+port 형 스냅샷 `StrategyDraftSnapshot`(`workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionSnapshot.kt`)은
+`out_of_scope: workflow/src/main/**` 안이라 구현 레인이 멈췄다(옳다). 구현 레인의 완화 논거 「6A-2 가 없어 그 필드를 채울
+명령이 없다 → 관측 가능한 손실 0」은 **반대 방향을 놓친다**: 상한이 **있는** 전략에서 시작한 세션이 `JdbcEditSessionRepository`
+로 영속·복원된 뒤 확정되면 스냅샷이 안 나른 `maxActiveBids` 가 **`null` 로 저장돼 상한이 조용히 지워진다** — endpoint 는
+없어도 그 경로는 production 코드에 이미 있다(6B-1 왕복 안정성 계약의 새 필드 구멍). **값이 조용히 사라지는 경로를
+만들지 않는다.**
+- 넓히는 경로: `workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionSnapshot.kt` + 스냅샷↔도메인 draft 변환이
+  사는 같은 패키지 파일(있으면, 구현 레인이 실측해 이름을 checklist 에 적는다). **조건**: nullable 필드 하나의 additive
+  변경만 — 포트 시그니처·use case·`EditSession` 상태기계 무변경. 편집 **명령**(field kind)은 더하지 않는다
+  (`OPEN-6A3-MAX-ACTIVE-BIDS-EDIT`, 6A-2).
+- 잠그는 test 둘: ① 세션 스냅샷 codec 왕복 등식(필드 누락 시 RED) ② **상한 있는 전략 → 세션 시작 → 영속·복원 → 확정 →
+  저장된 전략의 `maxActiveBids` 가 보존된다**(workflow 또는 adapters test 중 그 경로가 이미 있는 자리에 케이스 추가).
+- rollback 목록·`in_scope` 를 재산출한다(세 번째 「in_scope 눈멂」 금지).
+
+**D-6A3-13 — acceptance 의 `container` job 서술 정정.** 착수 계약이 「container job(앱 이미지 빌드)」로 적었으나 실제
+CI `container` job 은 **ml-serving 이미지 + compose + `RealServerIntegrationTest`** 이고 app 전용 Dockerfile 은 저장소에
+없다(`docker/ml-serving.Dockerfile` 뿐 — 앱 이미지는 6A-2 소관). acceptance 는 CI 원문 그대로이므로 실행 대상은 바뀌지
+않는다 — 문면만 정정하고, 「이 slice 의 배선 변경이 부팅에 닿는다」는 확인은 `ProductionAssemblyAuthAuditTest` 계열
+(production 조립 실제 부팅, `check` job 안)이 진다.
+
+**0단계 결정 채택**: 요청당 한 번 읽기는 **(a) 요청 스코프 데코레이터** `PinnedStrategyRepository(loaded, delegate)`
+(`load` 는 적재값, `save` 위임) — use case 시그니처 무변경. `RequestCapacityPort(currentActiveBids: Int, maxActiveBids: Int)`.
+설정은 `@ConfigurationProperties`(기본값 없음, `PersistenceProperties` 형) — `app/src/main/resources` 신설 없음.
+
 ## 위협 모델 — 6A-3+6F-3 고유 경계
 
 지키는 것: **① dry-run endpoint 는 외부 effect 를 만들지 않는다**(outbox 에 행이 생기지 않는다, 발송 없음)
@@ -179,10 +207,12 @@ in_scope:
   - config/quality/gate-tests.properties                                                  # 신설 게이트 등재(추가만) — 공유 파일
   - config/quality/architecture-policy.properties                                         # D-6A3-9 허용 집합 키(추가만) — 공유 파일
   - fixtures/**                                                                           # 전략 편집 corpus 에 필드가 필요할 때만, 근거 기록
+  - workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionSnapshot.kt   # D-6A3-12 — nullable 필드 하나 additive
+  - workflow/src/test/kotlin/bidvector/workflow/strategy/**                        # D-6A3-12 test ②
   - reports/evidence/m6/6a3f3/**
   - milestone-6.md                                                                        # 착수·종결 문단(팀장) — 공유 파일
 out_of_scope:
-  - workflow/src/main/**                          # use case·포트 무변경 — 바뀌어야 하면 멈추고 보고
+  - workflow/src/main/**                          # use case·포트 무변경 — 예외는 아래 한 파일군(D-6A3-12)
   - adapters/src/main/kotlin/bidvector/adapters/ml/**   # UnavailableMlAnalysis 그대로 (결정 1)
   - ml-engine/**
   - 세션 편집 endpoint                            # 6A-2
@@ -194,7 +224,7 @@ out_of_scope:
 ## acceptance
 
 CI 워크플로 job 명령 그대로(`.github/workflows/ci.yml`) — 구현 레인이 착수 시 원문을 대조해 `commands.md` 에 옮긴다.
-Kotlin `check` job 전체 + `container` job(앱 이미지 빌드 — 배선 변경이 부팅에 닿는다) + `one-command-check.sh`.
+Kotlin `check` job 전체 + `container` job(ml-serving 이미지·compose·`RealServerIntegrationTest` — D-6A3-13 정정) + `one-command-check.sh`.
 - **버릴 clone 에서**, **캐시 우회 한 번**(`--rerun-tasks`).
 - Testcontainers E2E(production 조립 부팅): ① 빈 DB → `POST` 200, 네 배열 빈, `candidateCount` 0 ② 상한 없는 전략 →
   409 ③ 음수 현재값 → 400 ④ 인증 없음 → 401 ⑤ **표본 공고 1건 이상 적재 → 판정 분포가 결정적**(`UnavailableMlAnalysis`
