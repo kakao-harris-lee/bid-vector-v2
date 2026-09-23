@@ -29,15 +29,11 @@ dependencies {
     // 다룬다는 사실 자체가 이 선언을 요구한다).
     implementation(project(":strategy"))
     implementation(project(":shared-kernel"))
-    // M6/6A-3+6F-3 D-6A3-8 — `EvaluationWiring`이 `LICENSE_QUALIFICATION_POLICY`·
-    // `LicenseQualificationPolicyData`(qualification)를 `PersistenceWiring`의 전략 정책
-    // 해소와 같은 형태로 직접 참조한다. `adapters`가 이 모듈을 `implementation`(비전이)으로만
-    // 물어 app의 main compile classpath에 원래 없었다 — 위 `:strategy` 추가(6A-1)와 같은 이유.
+    // M6/6A-3+6F-3 D-6A3-8 — EvaluationWiring이 LICENSE_QUALIFICATION_POLICY(qualification)를
+    // PersistenceWiring의 전략 정책 해소와 같은 형태로 직접 참조 — 위 :strategy와 같은 이유.
     implementation(project(":qualification"))
-    // M6/6A-3+6F-3 D-6A3-6 — `EvaluationDryRunController`가 `CandidateEvaluation`의
-    // 판정(`Verdict`, decision)과 공고 식별자(`NoticeId`, procurement)를 응답 배열로
-    // 직접 가른다 — 위 셋(:strategy·:shared-kernel·:qualification)과 같은 이유로
-    // app의 main compile classpath에 없었다.
+    // M6/6A-3+6F-3 D-6A3-6 — EvaluationDryRunController가 Verdict(decision)·NoticeId
+    // (procurement)를 응답 조립에 직접 참조 — 같은 이유(compile classpath 원래 없었음).
     implementation(project(":decision"))
     implementation(project(":procurement"))
 
@@ -54,13 +50,9 @@ dependencies {
     // 한다). D-6A1-18 — HikariCP는 들이지 않는다(`OPEN-6A1-CONNECTION-POOL`).
     implementation(libs.flyway.database.postgresql)
     implementation(libs.postgresql.driver)
-    // M6/6A-3+6F-3 D-6A3-8 — `EvaluateCandidatesUseCase.evaluate()`는 `suspend`(M4/4B-3
-    // ADR 0010 D-2, 실 ML 취소 전파 대비)다. 이 slice가 처음으로 그 포트를 동기 Spring MVC
-    // 컨트롤러에서 부른다(D-6A3-8 「컨트롤러는 use case만 부른다」) — `runBlocking`으로 그
-    // 경계 하나만 다리 놓는다. `workflow` main은 이 좌표를 `testImplementation`으로만 물어
-    // (컴파일 클래스패스 실측: `:app:dependencies --configuration compileClasspath`에 없음)
-    // app이 직접 선언해야 한다 — 런타임 클래스패스에는 이미 전이돼 있었지만(Boot 생태계
-    // 다른 의존이 끌어옴) 컴파일 시점에는 없었다.
+    // M6/6A-3+6F-3 D-6A3-8 — evaluate()가 suspend(M4/4B-3 ADR 0010 D-2)라 동기 MVC 경계에
+    // runBlocking 하나만 다리 놓는다. workflow main은 testImplementation으로만 물어(컴파일
+    // classpath 실측 부재) app이 직접 선언 — 런타임엔 이미 전이 존재(Boot 생태계 다른 의존).
     implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(platform(libs.spring.boot.bom))

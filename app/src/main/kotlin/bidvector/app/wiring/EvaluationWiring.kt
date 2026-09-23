@@ -52,7 +52,8 @@ open class EvaluationWiring {
     open fun watchSubjectPort(): WatchSubjectPort = NoticeWatchSubjectPort()
 
     @Bean
-    open fun operatorProfilePort(dataSource: DataSource): OperatorProfilePort = JdbcOperatorProfileRepository(dataSource)
+    open fun operatorProfilePort(dataSource: DataSource): OperatorProfilePort =
+        JdbcOperatorProfileRepository(dataSource)
 
     @Bean
     open fun licenseGatePort(
