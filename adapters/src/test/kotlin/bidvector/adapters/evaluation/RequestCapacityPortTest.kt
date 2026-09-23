@@ -26,8 +26,8 @@ class RequestCapacityPortTest {
     }
 
     @Test
-    fun `currentActiveBids 가 음수면 생성자가 거부한다`() {
-        shouldThrow<IllegalArgumentException> {
+    fun `currentActiveBids 가 음수면 InvalidEvaluationRequestException 을 던진다 — ErrorMapping 이 이 타입만 400 으로 매핑한다`() {
+        shouldThrow<InvalidEvaluationRequestException> {
             RequestCapacityPort(currentActiveBids = -1, maxActiveBids = 10)
         }
     }

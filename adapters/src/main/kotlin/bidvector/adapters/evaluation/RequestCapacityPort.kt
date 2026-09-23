@@ -16,8 +16,20 @@ class RequestCapacityPort(
     private val maxActiveBids: Int,
 ) : CapacityPort {
     init {
-        require(currentActiveBids >= 0) { "currentActiveBids는 음수일 수 없다: $currentActiveBids" }
+        if (currentActiveBids < 0) {
+            throw InvalidEvaluationRequestException("currentActiveBids는 음수일 수 없다: $currentActiveBids")
+        }
     }
 
     override fun snapshot(): CapacitySnapshot = CapacitySnapshot(currentActiveBids, maxActiveBids)
 }
+
+/**
+ * dry-run 요청 본문 거부(D-6A3-5, D-6A3-11 400 INVALID_REQUEST) — `IllegalArgumentException`의
+ * 구체 하위형이다: `app.http.ErrorMapping`이 **이 타입만** 400으로 매핑한다(바이트코드가 다른
+ * `IllegalArgumentException` 출처를 조용히 같은 상태 코드로 흡수하지 않는다, D-6A1-7과 같은
+ * 정밀도).
+ */
+class InvalidEvaluationRequestException(
+    message: String,
+) : IllegalArgumentException(message)
