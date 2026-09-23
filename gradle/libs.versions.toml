@@ -75,6 +75,23 @@ archunit-junit6 = { module = "com.tngtech.archunit:archunit-junit6", version.ref
 # 측정 대상이기 때문이다(ADR 0004 §6 의 미확인 항목). 해석된 버전은 compatibilitySmoke 가 낸다.
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
+# M6/6A-1 D-6A1-16 — HTTP 골격의 유일한 신규 production 좌표(scope.md in_scope
+# 「spring-boot-starter-web 좌표 추가만」). `compatibilitySmoke.expectedModules`에도
+# 같은 좌표를 등재해야 해석·컴파일·로드가 실제로 재진다(app/build.gradle.kts).
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+# M6/6A-1 — MockMvc 없이 실 임베디드 서버(webEnvironment=RANDOM_PORT)로 D-6A1-21의 디스패치
+# 실측을 재는 test 전용 좌표(scope.md 문면 밖 최소 추가, evidence에 사유 등재). `@SpringBootTest`
+# 자신은 이 모듈에 있다. 버전은 Boot BOM 이 관리한다(위 starter-web 과 같은 축).
+spring-boot-test = { module = "org.springframework.boot:spring-boot-test" }
+# Boot 4.1 모듈 재편(실측, 2026-09-19) — `TestRestTemplate`이 `spring-boot-test`에서
+# 이 좌표(`org.springframework.boot.resttestclient.TestRestTemplate`)로 옮겼다. 위
+# `spring-boot-test` 하나로는 부족해 실측 후 추가한다.
+spring-boot-resttestclient = { module = "org.springframework.boot:spring-boot-resttestclient" }
+# `spring-boot-resttestclient`의 선언된 의존 그래프에 `RestTemplateBuilder`
+# (`org.springframework.boot.restclient.RestTemplateBuilder`)가 없어 `TestRestTemplate()`의
+# 기본 생성자가 `NoClassDefFoundError`로 죽는 것을 실측했다(2026-09-19) — 그 타입이 사는
+# 이 좌표를 직접 더한다(전이 그래프의 공백을 메우는 명시 선언).
+spring-boot-restclient = { module = "org.springframework.boot:spring-boot-restclient" }
 flyway-core = { module = "org.flywaydb:flyway-core" }
 # M3/3D — PostgreSQL 전용 Flyway 파서/DB 지원 모듈(ADR 0004 D-1). Flyway 10+ 는 엔진별 지원을
 # 별도 모듈로 분리했다 — `flyway-core` 만으로는 `jdbc:postgresql:` URL 을 인식하지 못한다.

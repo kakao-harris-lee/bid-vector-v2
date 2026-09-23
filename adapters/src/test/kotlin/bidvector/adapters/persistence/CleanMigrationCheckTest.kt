@@ -69,6 +69,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // IS NOT NULL) + (kind='PARSED' OR group_no IS NULL) + license_names 비어있지
             // 않음 = 6.
             "notice_requirement_row" to 6,
+            // M6/6A-1 — 신규(추가만, D-6A1-7). V15__api_audit.sql: status_code 범위 1 +
+            // duration_ms>=0 1 = 2.
+            "api_request_audit" to 2,
         )
 
     @Test
@@ -189,6 +192,21 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
                 "CHECK (((license_names IS NULL) OR (cardinality(license_names) > 0)))",
             )
         queryCheckBodiesForTable("notice_requirement_row").toSet() shouldBe expectedCheckBodies
+    }
+
+    /**
+     * D-6A1-31 — 위 개수 축(`api_request_audit` to 2)만으로는 제자리 `OR TRUE` 항진명제화를
+     * 못 잡는다(D-6F5-21과 같은 결함 클래스). `notice_requirement_row` 선례와 같은 관례로
+     * CHECK 본문 **집합**을 `shouldBe`로 고정한다.
+     */
+    @Test
+    fun `축8 부가 — api_request_audit CHECK 본문 집합이 정확히 고정된다(D-6A1-31)`() {
+        val expectedCheckBodies =
+            setOf(
+                "CHECK (((status_code >= 100) AND (status_code <= 599)))",
+                "CHECK ((duration_ms >= 0))",
+            )
+        queryCheckBodiesForTable("api_request_audit").toSet() shouldBe expectedCheckBodies
     }
 
     private fun queryConstraintDef(constraintName: String): String =

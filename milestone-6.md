@@ -45,6 +45,31 @@ ADR 0008 §1.3 이 「UI 에는 승인된 사용자 가치도 acceptance scenari
 
 기존 FastAPI path/schema와의 호환은 제품 요구로 승인된 항목에만 적용한다.
 
+**6A 분할·6A-1 착수 2026-09-17** — base `c4d09cc`(PR #31, 6C), 레인 worktree `bid-vector-v2-m6a`·브랜치
+`m6-6a/2026-09-17`. 정본 `reports/evidence/m6/6a1/scope.md`(D-6A1-1~8). **운영자 결정 다섯**이 입력이다 —
+2026-09-16 ① 소비자는 **API 전용**(화면은 기존 시스템, `OPEN-ADR-09` 닫힘) ② 인바운드 인증은 **단일 운영자
+토큰 + 전 요청 audit**; 2026-09-17 ③ 웹 스택 **Spring Boot Web**(`app` 은 이미 Boot 플러그인·starter 를 갖고
+있고 `group.forbidden` 은 domain 모듈만 겨눈다) ④ 6A 는 **기존 use case 만 노출**(검색·투찰가 요청 use case
+신설은 별 slice) ⑤ audit 은 **전용 표 신설**.
+
+**착수 조사가 범위를 바꿨다.** 노출 후보 use case 가 받는 **포트의 production 구현을 세어 보니 ML 축
+하나뿐이었다** — 후보 공급·감시 대상·면허 게이트·여력·알림 요청·correlation id·전략 저장이 전부 test fake 다
+(실측). 「기존 use case 를 노출한다」가 지금 상태로는 성립하지 않고, 노출하려면 **어댑터 여섯**을 먼저 써야
+한다. M3 가 수집을, M4 가 판정을 세웠으나 **그 둘을 잇는 어댑터가 없다.** 그래서 6A 를 셋으로 가른다(D-6A1-1):
+**6A-1** HTTP 골격·단일 운영자 토큰·요청 audit 표·전략 조회(배선이 가능한 유일한 축, `main()` 과 `bootJar`
+활성 포함 — 6C 가 인계한 앱 이미지의 전제) · **6A-2** 세션 편집 명령 endpoint + 앱 이미지(`EditSessionRepository`
+실 구현이 6B-1 소관이라 그 병합 뒤) · **6A-3** 후보평가·알림 축(`OPEN-6A-EVALUATION-ADAPTERS` — 어댑터 여섯의
+slice 계획을 별도로 받는다).
+
+**6A-1 의 경계**: endpoint 는 **읽기 하나**뿐이다(D-6A1-4) — 후보평가 use case 는 호출마다 알림 요청을 낳으므로
+승인 문면 없는 외부 effect 를 HTTP 로 열지 않고, 실행 경로는 6A-2 에서 **dry-run 강제**로 시작한다. 토큰은
+환경변수 주입·기본값 없음이고 값을 로그·응답·audit 에 싣지 않으며 실패 사유를 나누지 않는다(D-6A1-6). audit 은
+**추가 전용**이고 요청 본문·토큰을 담지 않는다 — 보존·파기는 6B-3 이고 승인된 기간이 없다(D-6A1-7). OpenAPI 는
+**수작성 단일 출처**이고 test 가 구현과 대조한다(생성 도구 도입 안 함 — 자동 생성하면 단일 출처가 구현이 되어
+계약이 사라진다, D-6A1-8). **병행 레인**: 6B-1 이 `V8` 을 쓰므로 이 slice 는 `V9` 를 쓰고, 병합 순서가 바뀌면
+번호를 다시 붙인다. 리뷰 레인은 `migration-reviewer`·`privacy-gate`·`contract-keeper` 셋이 추가로 붙는다
+(전역 규약 §3 세 줄 전부 해당).
+
 ### Slice 6B — persistence와 migration completeness
 
 - clean PostgreSQL에서 Flyway 전체 재현
@@ -190,7 +215,7 @@ raw 원문에만 있다 · 「활성 투찰」 정의가 저장소·discovery �
   `bidNtceDtlUrl`·`ntceSpecDocUrl1` **뒤에** 있다 → **`OPEN-6F4-NOTICE-BODY-SOURCE`**.
 - **수집→canonical 배선은 6F-4 가 하지 않는다 → `OPEN-6F4-TITLE-WIRING`.** 공고명 표본이 **0건**이라
   (input fixture 119 중 이 키를 가진 것 1개, 그 값도 「공고번호 없는 행」이라는 합성 test 문자열) 배선을 잠그는
-  test 의 기대값을 authoritative 하게 세울 수 없고, 실행 진입점도 아직 없다(6A-1). 그 slice 의 계약이 함께
+  test 의 기대값을 authoritative 하게 세울 수 없고, 실행 진입점도 아직 없다(**6A-3** — 「(6A-1)」은 6A 가 셋으로 갈리기 전 참조다. 6A-1 은 D-6A1-4 로 **읽기 endpoint 하나**에 못박혀 실행 경로를 열지 않는다; 2026-09-19 6A-1 구현 레인 판단, 팀장 확인). 그 slice 의 계약이 함께
   받을 것 둘: **실 DB 가 생긴 뒤 이 열을 되돌리려면 파일 삭제가 아니라 새 V 파일의 `DROP COLUMN`** ·
   **감시 텍스트 두 타입의 생성 경계 폐쇄**(현재 공개 생성자라 조립 함수를 우회할 수 있고, 생성 지점이 54곳이라
   6F-4 범위를 넘는다).
@@ -390,6 +415,15 @@ main 의 생성 지점은 커널 둘뿐이고 밖은 전부 읽기만이라 깨�
 바이트코드 상수 풀로 바꾸면 `adapters` 모듈 안에 그 코드가 앉을 자리가 없어진다 — 그 파일은 이 slice 의
 in_scope 밖이고 **6F-4 가 그 패키지를 편집 중**이라 여기서 건드리지 않는다(받는 쪽 **하네스 레인**).
 **`OPEN-VERDICT-CONSTRUCTION-VISIBILITY`**: 위 종점 — 받는 쪽 **도메인 레인**.
+**6A-1 이 신설해 인계하는 OPEN 넷**(2026-09-23) — **`OPEN-6A1-CONNECTION-POOL`**: 커넥션 풀 없이
+(`PGSimpleDataSource`) 배선했다, **이 상태로 운영에 나갈 수 없다**(6C/6E) · **`OPEN-6A1-CREDENTIAL-RAW-
+REINTRODUCTION`**: 자격증명 타입이 **컴파일 시점 접근**은 막으나 **런타임 리플렉션**(단일 파일 4줄)과
+**허용 목록 simple name 재사용**(별칭 import)은 열려 있다 — 뿌리가 구조적이다(환경변수 원문은 어딘가에
+`String` 으로 있어야 한다), 받는 쪽 **6A-2** · **`OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`**: 명시
+`@ComponentScan` 이 Boot 기본 `excludeFilters` 둘을 가린다(오늘 거동 영향 0, **6A-2**) ·
+**`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`**: `jarContentGate` 가 배포물 `bootJar` 를 안 보고 `jar` 만
+보며 **빈 아카이브를 통과**시킨다(두 verifier 레인 실측, **하네스 레인**).
+
 **`OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`**: `CleanMigrationCheckTest` 의 COL-06·H-3 단언 셋이
 `any { contains }` **존재 단언**이라 CHECK 본문을 제자리에서 항진명제로 약화해도 통과한다(6F-5-a 가
 자기 표에서 실측한 뒤 같은 형태를 남의 표에서 확인했다 — 범위를 넓히지 않고 넘긴다. 받는 쪽
