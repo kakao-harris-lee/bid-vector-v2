@@ -173,6 +173,73 @@ port KDoc 이 `Unavailable` 을 「원문 텍스트 **조립 실패**」로 정�
   `git diff --numstat` 으로 먼저 보고 잰다. RED 가 안 되면 그 test 는 잠그는 것이 아니다.
 - 신설 게이트이므로 **`gate-tests.properties` 등재**한다.
 
+## 계약 갱신 (4) — 검토 라운드 1 판정과 팀장 결정 (2026-09-23, 팀장)
+
+판정 SHA `1f34858d` 에서 검토 레인 셋이 판정했다 — verifier **not-ready**(HIGH 1 · MEDIUM 2 · LOW 1 · 장부 5),
+code-reviewer(sonnet) **머지 가능**(MEDIUM 1 · LOW 1), privacy-gate **위반 0**(권고 2 · 확인 불가 1). 재작업
+**1/5**. 리포트는 레인 worktree `_workspace/m6-6f4w/1{0,1,2}_*.md`(gitignore) — 판정은 PR 코멘트로 옮긴다.
+
+**D-6F4W-13 — 컴파일 probe 의 기대 조각은 가시성을 구별해야 한다(HIGH-1).** `CompileFailureHarnessTest` 의
+negative 4~7 이 단언하는 조각 `"cannot access"` 는 `private` 과 `internal` 을 구별하지 못한다 — verifier 가
+`Text.kt` 의 두 생성자를 `internal` 로 퇴행시켜도 `check` 전체가 초록임을 실측했다. D-6F4W-7 이 「`internal`
+로 때우지 않는다」를 명시했는데 그 probe 가 바로 그 퇴행을 통과시킨다. **기대 조각을 `"it is private in"` 으로
+좁힌다**(negative·mutant 4~7 모두). negative-3(`Score.of`, 계약이 `internal`)은 그대로 둔다. 게이트 술어
+변경이므로 severity 와 무관하게 **표적 재검증** 대상 — `internal` 퇴행 변이가 RED 인 것을 evidence 에 명령으로 남긴다.
+
+**D-6F4W-14 — 우회 3 의 부재 단언은 열거가 아니라 허용 목록이다(MEDIUM-2).** `EvaluationAdapterDependencyTest`
+의 「이어붙이기 기계 부재」가 이름 셋(`StringBuilder`·`makeConcatWithConstants`·`joinToString`)의 금지 목록이라
+`java.lang.String.join` 으로 조립을 복제한 변이가 부재 단언·커널 참조 단언·거동 test 8건을 전부 통과했다(오늘은
+값이 같아서 거동 test 도 못 잡는다). **어댑터 두 class(`NoticeWatchSubjectPort`·`NoticeWatchSubjectPortKt`)의
+상수 풀 `Methodref`/`InterfaceMethodref` 집합이 허용 목록의 부분집합**이도록 바꾼다 — 허용은 `assemble*` 둘 ·
+`Notice`/값 객체 getter · `WatchSubject.<init>` · `Fact.*` · `CategoryCode.<init>` · `setOf`/`orEmpty`류 stdlib ·
+`Intrinsics` 형태로, **손 목록이되 새 이름은 무엇이든 RED** 가 된다. 양성 대조는 기존 `ConcatenationMachineryFixture`
+에 `String.join` 변형을 더해 허용 목록이 그것을 잡음을 보인다. 게이트 술어 변경 — 표적 재검증 대상(m4b 변이 RED).
+
+**D-6F4W-15 — MEDIUM-1 처분: 호출자 한정 게이트는 이 slice 가 세우지 않는다. 문면을 고치고 OPEN 으로 넘긴다.**
+verifier 실측: `assemble*` 의 인자가 `String?` 이라 `assembleKeywordScopeText(<요건 텍스트>, null)` 이 그대로
+컴파일되고 필수 키워드를 거짓 만족시킨다 — 6F-4 r2 시나리오가 **철자만 바꿔 재현**된다. 그래서 `Text.kt` KDoc 의
+「요건·기관명이 이 값에 실릴 길이 타입으로 없다」·「그 배제는 이 함수 하나로 닫힌다」와 checklist 의 「요건·기관명을
+keywordText 에 실을 길은 여전히 없다」는 **사실과 다르다**(privacy-gate R-2 도 같은 지적). 폐쇄가 실제로 닫은 것은
+**직접 생성 · `copy()` · 출력 정규화(D-6F4W-12)** 이고, 닫지 못한 것은 **내용의 출처** — 그것은 위협 모델이 처음부터
+경계 밖에 둔 축(「원천 값이 맞는가」)이며 어댑터의 책임이다. 문면을 그렇게 고친다.
+- **게이트를 지금 세우지 않는 이유**: 오늘 production 호출자는 `NoticeWatchSubjectPortKt` 하나이고(`grep` 실측 —
+  **구조가 아니라 실측이다**, 그 사실을 알려진 제한에 그대로 적는다), 새 호출자는 `OPEN-6F-ASSEMBLY` 배선에서만
+  생긴다. 게이트의 자리는 app 의 ArchUnit 층(`ArchitectureRules`, 전 모듈 production 클래스를 본다)인데 그러면
+  in_scope 를 **네 번째**로 넓히고 `app/**` 를 열어야 한다 — 이미 게이트 술어 둘을 바꾸는 라운드에 얹지 않는다.
+- **`OPEN-6F4W-ASSEMBLE-CALLER` 신설** — 「`assembleKeywordScopeText`·`assembleFullScopeText` 를 부르는 production
+  클래스 집합 == {`bidvector.adapters.evaluation.NoticeWatchSubjectPortKt`}」를 ArchUnit 규칙(집합 등식)으로 잠근다.
+  **`OPEN-6F-ASSEMBLY` 의 전제 조건**이다 — 배선이 호출자를 더하기 전에 닫혀야 「어댑터만 부른다」가 희망이 아니라
+  구조가 된다.
+- code-reviewer MEDIUM(「구조적으로 못 닫는다」 과장)도 같은 자리의 문면이다: `of` 를 `private` 으로 두면 **현재
+  형태(top-level `assemble*`)에서는 컴파일되지 않는다**(verifier 실측)가 참이고, `procurement.NoticeTitle` 처럼
+  `assemble*` 를 companion 멤버로 옮기면 `internal of` 자체가 사라진다 — 호출부 13파일 갱신 비용 대신 택한 **설계
+  선택**이지 Kotlin 의 한계가 아니다. 그렇게 적는다. `of` 는 `assemble*` 와 시그니처·본문이 같아 새 구멍이 아니다.
+
+**D-6F4W-16 — 장부층·low 일괄(한 커밋), 승인 전.**
+- verifier LOW-1: D-6F4W-12 의 Arb 가 ASCII 공백뿐이라 `trim(' ')` 변이가 산다 — `"\t"`·`"\u3000"`(전각, 한국어
+  공고명에서 현실적)·`"\u00A0"` 을 더한다.
+- code-reviewer LOW: `noticeToWatchSubject` 는 유일한 호출자가 같은 파일이므로 `private` 으로 좁힌다(top-level
+  `private` 은 파일 범위). (2b) 표의 가시성 행을 갱신한다.
+- verifier L-2: (2b) 표의 `of` 행 — 「모듈 밖 호출 불가」의 근거는 fixture 4 가 아니라 `internal` 가시성 자체다
+  (`of` 를 부르는 fixture 는 없다). 귀속을 고친다.
+- L-3: rollback.md 의 A/M 개수 표제(현재 A 16 · M 16)를 재산출값으로. 실측 HEAD 는 이 라운드의 마지막 산출물
+  커밋으로 옮기고 임시 clone ①~⑥ 을 다시 돈다.
+- L-4: D-6F4W-11 조건 3 의 답을 셋 각각으로 적는다(verifier ③ 의 답을 그대로 옮겨도 된다 — `positive-2` 의
+  「own text」는 「자기 모듈」이 아니라 「자기 타입 자리」다). `WatchRulesTest` 표 행과 헬퍼 KDoc 의 ⓐ/ⓑ 를 맞춘다.
+- L-5: `out_of_scope` 의 `app/**` 는 `app/src/main/**` 다(이 갱신에서 팀장이 고쳤다).
+- L-6: `one-command-check.sh` 는 이 장비에서 **exit 0**(verifier 실측, `uv` 있음). 구현 레인이 같은 장비에서
+  재실행해 commands.md 를 갱신하고 checklist 의 「S-1 알려진 제한」을 「구현 레인 원래 장비의 네트워크 제약이었다」로
+  고친다.
+- privacy-gate R-1: 두 타입과 `WatchSubject` 의 합성 `toString()` 이 공고명·공종·기관명 원문을 낸다(오늘 그 값을
+  문자열에 싣는 main 경로 없음) — 알려진 제한 한 줄 + `OPEN-6F-ASSEMBLY` 재확인 항목.
+- privacy-gate U-1: 배선 전이라 확인 불가한 셋(평가 use case 의 예외·에러 응답에 subject 적재 · 임베딩 gRPC 실패
+  시 요청 텍스트 로깅 · ml-engine 의 요청 텍스트 보관)을 `OPEN-6F-ASSEMBLY` 재확인 항목으로 아래 표에 등재한다.
+- verifier 참고 R-1(`strategy` 에 gate-tests 등재 게이트가 없다)은 기존 구조라 이 slice 의 finding 이 아니다 —
+  checklist 「확인하지 않은 것」에 사실로만 적는다.
+
+**이 라운드의 보고 항목** — (2b) 표 갱신(새 public 표면이 생겼는가 — 예상 0, `private` 축소만) · 수정 라운드가
+만든 새 파일 ↔ in_scope 대조 · 게이트 술어 변경 둘의 변이 RED 명령.
+
 ## 위협 모델 — 6F-4-w 고유 경계
 
 이 slice 가 지키려는 것: **감시 판정의 입력 텍스트는 승인된 조립 함수만 만든다.** 조립을 우회해 만든
@@ -220,7 +287,7 @@ in_scope:
   - milestone-6.md                                              # 착수·종결 문단(팀장 커밋) — 공유 파일
 out_of_scope:
   - adapters/src/main/resources/db/migration/**                 # 마이그레이션 신설 없음 (착수 조사)
-  - app/**                                                      # Spring 등록 안 함 (D-6F4W-6)
+  - app/src/main/**                                             # Spring 등록 안 함 (D-6F4W-6) — 계약 갱신 (4) L-5 정정
   - 수집→canonical 매퍼                                          # OPEN-6F4-TITLE-INGEST (D-6F4W-1)
 ```
 
@@ -263,7 +330,8 @@ CI 워크플로 job 의 명령 그대로(`.github/workflows/ci.yml` — 구현 �
 | `OPEN-6F4-TITLE-WIRING` | **수령·절반 닫음** | ⓐ 포트 구현 = 이 slice. ⓑ 수집 배선 = 신설로 가름 |
 | `OPEN-6F4-TITLE-INGEST` | **신설** | KONEPS 원시 키 → canonical `notice_title`. **D-6F4-6 제약을 안고 간다** |
 | 6F-4 제한 5 (D-6F4-3c) | **수령** | 두 타입 생성 경계 폐쇄 — D-6F4W-7 |
-| `OPEN-6F-ASSEMBLY` | **넘김** | 포트를 app 에 꽂기(4번 단계). 이 slice 는 받지 않는다 |
+| `OPEN-6F-ASSEMBLY` | **넘김** | 포트를 app 에 꽂기(4번 단계). 이 slice 는 받지 않는다. **재확인 항목(계약 갱신 (4))**: ① 평가 use case 호출부가 예외·에러 응답에 `WatchSubject`/`Notice` 를 싣는가 ② 임베딩 gRPC 실패 시 요청 텍스트가 로그에 남는가 ③ ml-engine 이 운영에서 요청 텍스트를 보관하는가 ④ 두 타입·`WatchSubject` 합성 `toString()` 이 진단 출력에 실리는 경로가 생기는가 |
+| `OPEN-6F4W-ASSEMBLE-CALLER` | **신설** | `assemble*` production 호출자 집합 == {`NoticeWatchSubjectPortKt`} 를 app ArchUnit 층에서 집합 등식으로 잠근다(D-6F4W-15). **`OPEN-6F-ASSEMBLY` 의 전제** |
 | `OPEN-6F4W-UNAVAILABLE-PRODUCER` | **신설** | D-6F4W-3 의 대가 — `Unavailable` 의 production 생산자가 없다 |
 
 ## 확인하지 않은 것 (착수 시점)
