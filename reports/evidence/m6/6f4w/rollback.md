@@ -104,17 +104,19 @@ git diff "$BASE"..HEAD -- milestone-6.md | git apply -R
 
 ## 임시 clone 실측 ①~⑥
 
-**실측 HEAD: `13f29522c486636f7fc3d10f71594f0f9f71a2e3`**
+**실측 HEAD: `cb1eb311`**(장부 커밋 — verifier r2 LR2-2 가 되돌림 대상 `Text.kt` KDoc 을 움직여 재실측. 앞 실측
+HEAD `13f29522` 와 트리·집계가 같다)
 
 ```bash
-git clone . /tmp/6f4w-rollback-probe-r1
-cd /tmp/6f4w-rollback-probe-r1
-git checkout m6-6f4w/2026-09-23   # HEAD 는 13f29522 — 이 SHA 와 일치 확인 후 진행
+git worktree add --detach <scratch>/rb-cb1eb311 cb1eb311   # 버릴 detached worktree, cp -r 아님
+cd <scratch>/rb-cb1eb311
 BASE=$(git merge-base HEAD origin/main)   # = 02164e44...
 <위 1)~3) 절차 실행>
 ```
 
-실제로 위 clone 을 만들어 절차를 끝까지 실행했다(2026-09-23, scratchpad `rollback-probe`).
+실제로 위 worktree 를 만들어 절차를 끝까지 실행했다(2026-09-23, 팀장 지시로 runner 레인이 재생하고 팀장이 트리
+해시를 재확인). ④⑤⑥ 은 **트리 동일성으로 갈음**한다 — 되돌린 트리의 `git write-tree` 가 base 트리 `b6e0c692…`
+와 같고, 그 트리는 `13f29522` 실측에서 ④⑤⑥ 을 직접 돌린 트리와 같은 트리다(아래 ④⑤⑥ 행은 그 실측값).
 
 | # | 확인 | 결과 |
 |---|---|---|
@@ -130,5 +132,5 @@ BASE=$(git merge-base HEAD origin/main)   # = 02164e44...
 
 `git diff --name-only <실측 HEAD>..<판정 SHA> -- <rollback.md 가 되돌리는 경로 전부(위 A·M
 32개, `rollback.md` 자신 포함)>` 가 **`rollback.md` 자신 한 줄만**이면 유효(문서 자기 커밋 — 실측
- HEAD(`13f29522`) 뒤에는 이 문서와 장부 커밋만 온다). 다른 경로가 한 줄이라도 나오면 미검증
+ HEAD(`cb1eb311`) 뒤에는 이 문서 커밋만 온다). 다른 경로가 한 줄이라도 나오면 미검증
  — verifier 가 재실행 시점(판정 SHA)에서 다시 확인한다(r2 실측: 자기 한 줄).
