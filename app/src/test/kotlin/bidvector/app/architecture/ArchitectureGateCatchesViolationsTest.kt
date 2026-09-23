@@ -266,17 +266,33 @@ class ArchitectureGateCatchesViolationsTest {
     }
 
     /**
-     * D-6A3-17(c) — [RoguePortBypassReferencer]는 예외 목록에 없는 채로 workflow port
-     * (`CandidateSourcePort`)를 직접 참조한다(verifier M5 재현 — 컨트롤러 우회 helper).
+     * D-6A3-25(verifier r2 N6 재현) — [bidvector.archfixture.violating.app.http.
+     * RogueConcreteAdapterCaller]는 구체 구현 타입을 직접 호출해 포트 메서드에 닿는다.
+     * 호출 지점의 owner 가 인터페이스가 아니라 구체 클래스라 이름 등식으로는 못 잡던 형태다.
      */
     @Test
-    fun `app http 가 예외 없이 workflow port 를 직접 참조하면 잡는다`() {
+    fun `구체 어댑터를 경유한 포트 호출도 잡는다`() {
         rules
-            .httpPackageMustNotBypassPorts(
-                httpRoot = "$fixtureRoot.app.http",
-                forbiddenPorts = policy.httpForbiddenPorts.toSet(),
-                allowedReferences = policy.httpAllowedPortReferences.toSet(),
-            ).mustReport("RoguePortBypassReferencer", "CandidateSourcePort")
+            .appPortCallsMustBeAllowedPairs(
+                appRoot = "$fixtureRoot.app",
+                ports = policy.portCallPorts.toSet(),
+                allowedPairs = policy.portCallAllowedPairs.toSet(),
+            ).mustReport("RogueConcreteAdapterCaller", "CandidateSourcePort")
+    }
+
+    /**
+     * D-6A3-25(verifier r2 N5 재현) — [bidvector.archfixture.violating.app.wiring.
+     * RogueWiringPortCaller]는 `app.wiring` 에 놓인 헬퍼가 포트 인터페이스를 직접 호출한다.
+     * 이전 규칙은 `app.http` 패키지 하나만 봤지만 새 규칙은 app production 전체를 본다.
+     */
+    @Test
+    fun `app wiring 헬퍼의 직접 호출도 잡는다`() {
+        rules
+            .appPortCallsMustBeAllowedPairs(
+                appRoot = "$fixtureRoot.app",
+                ports = policy.portCallPorts.toSet(),
+                allowedPairs = policy.portCallAllowedPairs.toSet(),
+            ).mustReport("RogueWiringPortCaller", "CandidateSourcePort")
     }
 
     /**

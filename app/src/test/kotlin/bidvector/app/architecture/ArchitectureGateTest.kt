@@ -112,14 +112,14 @@ class ArchitectureGateTest {
             ).checkAll()
     }
 
-    /** D-6A3-17(c) — HIGH-4 시정. app.http 전체가 명시 예외 없이 workflow port 를 직접 참조하지 않는다. */
+    /** D-6A3-25 — 검토 라운드 2 HIGH 시정. app production 전체가 평가·전략 포트를 허용된 (호출자, 포트.메서드) 쌍으로만 호출한다. */
     @Test
-    fun `app http 는 명시 예외 없이 workflow port 를 직접 참조하지 않는다`() {
+    fun `app production 은 허용된 호출자 포트 메서드 쌍으로만 평가 전략 포트를 부른다`() {
         rules
-            .httpPackageMustNotBypassPorts(
-                httpRoot = "${policy.packageRoot}.app.http",
-                forbiddenPorts = policy.httpForbiddenPorts.toSet(),
-                allowedReferences = policy.httpAllowedPortReferences.toSet(),
+            .appPortCallsMustBeAllowedPairs(
+                appRoot = "${policy.packageRoot}.app",
+                ports = policy.portCallPorts.toSet(),
+                allowedPairs = policy.portCallAllowedPairs.toSet(),
             ).checkAll()
     }
 

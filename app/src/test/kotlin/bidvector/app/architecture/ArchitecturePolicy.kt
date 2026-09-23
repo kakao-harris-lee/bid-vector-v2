@@ -46,15 +46,15 @@ class ArchitecturePolicy private constructor(
     /** D-6A3-17(b) — app production 전체가 참조해도 되는 `adapters.ml` 타입 허용 목록. */
     val mlAllowedTypes: List<String> get() = list("app.ml.allowed-types")
 
-    /** D-6A3-17(c) — `app.http` 가 우회하면 안 되는 workflow port 타입 전수(평가 port 여덟 + StrategyRepository). */
-    val httpForbiddenPorts: List<String> get() = list("app.http.forbidden-workflow-ports")
+    /** D-6A3-25 — 평가·전략 포트 아홉(evaluation 여덟 + StrategyRepository) 호출 판정 대상 집합. */
+    val portCallPorts: List<String> get() = list("app.port-call.ports")
 
-    /** D-6A3-17(c) — (참조자, port) 쌍의 명시 예외 — `"From->To"` 형태. */
-    val httpAllowedPortReferences: List<Pair<String, String>>
+    /** D-6A3-25 — (호출자, 포트.메서드) 쌍의 허용 목록 — `"Caller->Port.method"` 형태. */
+    val portCallAllowedPairs: List<Pair<String, String>>
         get() =
-            list("app.http.allowed-port-references").map { entry ->
+            list("app.port-call.allowed-pairs").map { entry ->
                 val parts = entry.split("->").map(String::trim)
-                check(parts.size == 2) { "app.http.allowed-port-references 항목이 'From->To' 형태가 아니다: $entry" }
+                check(parts.size == 2) { "app.port-call.allowed-pairs 항목이 'Caller->Port.method' 형태가 아니다: $entry" }
                 parts[0] to parts[1]
             }
 
