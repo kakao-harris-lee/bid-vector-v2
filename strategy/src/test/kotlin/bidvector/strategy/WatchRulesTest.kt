@@ -23,6 +23,14 @@ private fun baseAmount(
     provenance: Provenance = Provenance.OperatorDeclared,
 ): BaseAmount = BaseAmount(won, Currency.KRW, vat, provenance)
 
+/**
+ * D-6F4W-7/8 이관 — `keywordText`·`fullText` 는 `assembleKeywordScopeText`/
+ * `assembleFullScopeText` 에 단일 조각(`noticeTitle`)으로 넘겨 재구성한다(ⓐ, 도달 경로
+ * 증명). 단일 비공백 조각은 구분자 없이 그대로 나오므로 이 파일의 기존 literal 은 전부
+ * 값 그대로 보존된다 — D-6F4W-9 실측(assemble 은 공백뿐인 비지 않은 문자열을 못 낸다)에
+ * 따라 property test 가 생성하는 공백류 문자열은 `""` 로 접힌다(도달 불가능한 상태를
+ * 도달 가능한 가장 가까운 값으로 좁힌 것, ⓑ).
+ */
 private fun subject(
     categories: Set<String> = emptySet(),
     keywordText: String = "",
@@ -31,8 +39,8 @@ private fun subject(
 ): WatchSubject =
     WatchSubject(
         categories = categories.map(::CategoryCode).toSet(),
-        keywordText = KeywordScopeText(keywordText),
-        fullText = FullScopeText(fullText),
+        keywordText = assembleKeywordScopeText(keywordText, null),
+        fullText = assembleFullScopeText(fullText, null, null, null),
         baseAmount = baseAmount,
     )
 
