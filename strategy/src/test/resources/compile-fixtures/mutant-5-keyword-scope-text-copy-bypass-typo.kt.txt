@@ -1,0 +1,6 @@
+import bidvector.strategy.assembleKeywordScopeText
+
+fun negativeKeywordScopeTextCopyBypassTypo() {
+    val text = assembleKeywordScopeText("아무 텍스트", null)
+    text.copyTypo(value = "다른 텍스트")
+}
