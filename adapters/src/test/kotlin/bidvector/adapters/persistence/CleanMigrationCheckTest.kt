@@ -56,8 +56,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // + Codex 심판 HIGH 수정(won 범위 CHECK 둘, min·max 각 하나) = 15.
             // operator_strategy_revision: revision(PK 인라인) 1 + score 넷 + candidate_limit 1
             // + 예산 페어 여섯 = 12(id 가 없다) + 같은 won 범위 CHECK 둘 = 14.
-            "operator_strategy" to 15,
-            "operator_strategy_revision" to 14,
+            // M6/6A-3+6F-3 — 여력 상한 CHECK 하나씩 추가(D-6A3-4·D-6A3-14, V16, 추가만).
+            "operator_strategy" to 16,
+            "operator_strategy_revision" to 15,
             // M6/6F-6 — 신설(추가만, D-6F6-3). V12__operator_profile.sql: id 싱글턴 1 +
             // licenses_declared↔license_names 짝 1 = 2.
             "operator_profile" to 2,

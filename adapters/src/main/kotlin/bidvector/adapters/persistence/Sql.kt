@@ -314,7 +314,8 @@ internal object Sql {
         required_keyword_terms, exclude_keyword_terms,
         min_budget_won, min_budget_currency, min_budget_vat, min_budget_provenance, min_budget_provenance_detail,
         max_budget_won, max_budget_currency, max_budget_vat, max_budget_provenance, max_budget_provenance_detail,
-        minimum_match_score, minimum_probability_score, bid_now_threshold, review_threshold, candidate_limit
+        minimum_match_score, minimum_probability_score, bid_now_threshold, review_threshold, candidate_limit,
+        max_active_bids
         """
 
     const val SELECT_STRATEGY = "SELECT revision, $STRATEGY_COLUMNS FROM operator_strategy WHERE id = 1"
@@ -323,7 +324,7 @@ internal object Sql {
         """
         INSERT INTO operator_strategy (id, revision, $STRATEGY_COLUMNS)
         VALUES (
-            1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
         ON CONFLICT (id) DO UPDATE SET
             revision = EXCLUDED.revision,
@@ -347,6 +348,7 @@ internal object Sql {
             bid_now_threshold = EXCLUDED.bid_now_threshold,
             review_threshold = EXCLUDED.review_threshold,
             candidate_limit = EXCLUDED.candidate_limit,
+            max_active_bids = EXCLUDED.max_active_bids,
             updated_at = now()
         """
 
@@ -357,7 +359,7 @@ internal object Sql {
         """
         INSERT INTO operator_strategy_revision (revision, $STRATEGY_COLUMNS)
         VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
         """
 
