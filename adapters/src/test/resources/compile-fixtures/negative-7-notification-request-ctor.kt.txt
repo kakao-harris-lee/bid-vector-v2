@@ -1,0 +1,45 @@
+import bidvector.decision.LadderInput
+import bidvector.decision.UnitScore
+import bidvector.decision.Verdict
+import bidvector.decision.VerdictLadder
+import bidvector.decision.VerdictLadderPolicyData
+import bidvector.procurement.NoticeId
+import bidvector.procurement.NoticeNumber
+import bidvector.sharedkernel.EffectiveFrom
+import bidvector.sharedkernel.NoticeRound
+import bidvector.sharedkernel.PolicyVersion
+import bidvector.sharedkernel.Resolution
+import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.evaluation.NotificationRequest
+import bidvector.workflow.evaluation.PredictionEvidence
+import bidvector.decision.MlUnavailableReason
+import java.math.BigDecimal
+
+fun probe() {
+    val policy =
+        Resolution.Resolved(
+            VerdictLadderPolicyData(
+                capacityHoldPriorityThreshold = BigDecimal("0.1"),
+                bidNowThreshold = BigDecimal("0.5"),
+                reviewThreshold = BigDecimal("0.3"),
+                forceBidProbabilityThreshold = BigDecimal("0.9"),
+                forceBidMatchedThreshold = BigDecimal("0.9"),
+            ),
+            PolicyVersion(EffectiveFrom.Initial, "probe"),
+        )
+    val input =
+        LadderInput(
+            priorityScore = UnitScore(BigDecimal("0.9")),
+            probabilityScore = null,
+            matchedScore = null,
+            currentActiveBids = 0,
+            maxActiveBids = 10,
+        )
+    val verdict = VerdictLadder.judge(input, policy) as Verdict.BidNow
+    NotificationRequest(
+        noticeId = NoticeId(NoticeNumber("n"), NoticeRound("000")),
+        correlationId = CorrelationId("c"),
+        verdict = verdict,
+        evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
+    )
+}

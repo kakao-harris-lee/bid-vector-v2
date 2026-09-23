@@ -4,36 +4,58 @@ import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyRevision
+import bidvector.workflow.event.NotificationEvidencePayload
+import bidvector.workflow.event.NotificationRequestedPayload
 import java.time.LocalDate
 
 /**
  * outbox `payload_type`/`payload` 직렬화(scope.md ①, 설계 검토 (1) 「payload 직렬화의 타입
- * 판별」) — 오늘 payload는 [StrategyEvent.StrategyUpdated] 하나뿐이다. **등록·복원 둘 다
- * 알 수 없는 타입은 예외로 거부한다**(fail-closed) — 「모르면 건너뛴다」(legacy 조사가
- * 찾아낸 열셋과 같은 형태, `_workspace/m4-4b1`)를 쓰지 않는다.
+ * 판별」) — payload는 [StrategyEvent.StrategyUpdated]와 [NotificationRequestedPayload]
+ * 둘(D-6F7-1·D-6F7-5). **등록·복원 둘 다 알 수 없는 타입은 예외로 거부한다**(fail-closed)
+ * — 「모르면 건너뛴다」(legacy 조사가 찾아낸 열셋과 같은 형태, `_workspace/m4-4b1`)를
+ * 쓰지 않는다.
  *
- * 값이 단순(정수 하나·날짜 하나·짧은 문자열 하나)이라 Jackson 등 JSON 라이브러리를
- * 새로 끌어오지 않는다(측정된 필요 없음, §7) — 이스케이프를 인식하는 구분자 하나(`|`)로
- * 충분하다.
+ * 값이 단순(정수·날짜·짧은 문자열, 목록·map도 원시 원소뿐)이라 Jackson 등 JSON
+ * 라이브러리를 새로 끌어오지 않는다(측정된 필요 없음, §7) — 이스케이프를 인식하는
+ * 구분자로 충분하다. [NotificationRequestedPayload]가 목록·map을 나르므로 구분자를
+ * 계층별로 하나씩 쓴다([FIELD_SEPARATOR] 최상위, [LIST_SEPARATOR] 목록,
+ * [MAP_ENTRY_SEPARATOR] map 항목) — 각 계층은 [escapeFor]/[splitEscapedFor]로 독립적으로
+ * 이스케이프되므로(자신의 구분자와 [ESCAPE]만 보호) 중첩이 안전하다(바깥 계층이 안쪽이
+ * 이미 이스케이프한 [ESCAPE] 문자를 다시 보호한다 — CSV-in-CSV와 같은 원리).
  */
 internal object OutboxPayloadCodec {
     const val STRATEGY_UPDATED_TYPE = "StrategyUpdated"
+    const val NOTIFICATION_REQUESTED_TYPE = "NotificationRequested"
 
     private const val FIELD_SEPARATOR = '|'
+    private const val LIST_SEPARATOR = ','
+    private const val MAP_ENTRY_SEPARATOR = ';'
+    private const val MAP_KV_SEPARATOR = '='
     private const val ESCAPE = '\\'
 
     /** [encodeStrategyUpdated]가 내는 필드 수(revision·effectiveFrom·source) — [decodeStrategyUpdated]의 형식 검증 상수. */
     private const val STRATEGY_UPDATED_FIELD_COUNT = 3
 
+    /**
+     * [encodeNotificationRequested]가 내는 최상위 필드 수 — noticeId·bidNowReasons·
+     * evidenceKind·(Diagnosed 열둘 | NotPredicted 하나, 안 쓰는 자리는 빈 문자열)·
+     * excludedSamples. [decodeNotificationRequested]의 형식 검증 상수.
+     */
+    private const val NOTIFICATION_REQUESTED_FIELD_COUNT = 17
+    private const val EVIDENCE_KIND_DIAGNOSED = "DIAGNOSED"
+    private const val EVIDENCE_KIND_NOT_PREDICTED = "NOT_PREDICTED"
+
     fun payloadTypeOf(payload: Any?): String =
         when (payload) {
             is StrategyEvent.StrategyUpdated -> STRATEGY_UPDATED_TYPE
+            is NotificationRequestedPayload -> NOTIFICATION_REQUESTED_TYPE
             else -> unknownPayloadType(payload)
         }
 
     fun encode(payload: Any?): String =
         when (payload) {
             is StrategyEvent.StrategyUpdated -> encodeStrategyUpdated(payload)
+            is NotificationRequestedPayload -> encodeNotificationRequested(payload)
             else -> unknownPayloadType(payload)
         }
 
@@ -43,6 +65,7 @@ internal object OutboxPayloadCodec {
     ): Any =
         when (payloadType) {
             STRATEGY_UPDATED_TYPE -> decodeStrategyUpdated(payload)
+            NOTIFICATION_REQUESTED_TYPE -> decodeNotificationRequested(payload)
             else -> error("알 수 없는 outbox payload_type 이다: $payloadType")
         }
 
@@ -73,13 +96,127 @@ internal object OutboxPayloadCodec {
         return StrategyEvent.StrategyUpdated(revision, PolicyVersion(effectiveFrom, fields[2]))
     }
 
-    private fun escape(value: String): String =
-        value
-            .replace(ESCAPE.toString(), "$ESCAPE$ESCAPE")
-            .replace(FIELD_SEPARATOR.toString(), "$ESCAPE$FIELD_SEPARATOR")
+    private fun encodeNotificationRequested(payload: NotificationRequestedPayload): String {
+        val evidenceFields = evidenceFieldsOf(payload.evidence)
+        val fields =
+            listOf(
+                payload.noticeId,
+                payload.bidNowReasons.joinToString(LIST_SEPARATOR.toString()) { escapeFor(it, LIST_SEPARATOR) },
+            ) + evidenceFields
+        return fields.joinToString(FIELD_SEPARATOR.toString(), transform = ::escape)
+    }
+
+    /**
+     * evidenceKind + Diagnosed 12칸 + NotPredicted 1칸 + excludedSamples 1칸(총 15칸,
+     * noticeId·bidNowReasons와 합쳐 [NOTIFICATION_REQUESTED_FIELD_COUNT]) — 안 쓰는 갈래는
+     * 빈 문자열이다(§3.1 「reason 코드 + 구조화 payload」 — 두 갈래를 한 행에 펴는 관례상
+     * 선택이지 값의 혼동은 아니다. `evidenceKind`가 갈래를 소진적으로 가른다).
+     */
+    private fun evidenceFieldsOf(evidence: NotificationEvidencePayload): List<String> =
+        when (evidence) {
+            is NotificationEvidencePayload.Diagnosed ->
+                listOf(
+                    EVIDENCE_KIND_DIAGNOSED,
+                    evidence.trainingRowCount.toString(),
+                    evidence.segmentSupport,
+                    evidence.shrinkageWeight,
+                    evidence.excludedObservations.toString(),
+                    evidence.agencySampleCount.toString(),
+                    evidence.agencySampleBelowThreshold.toString(),
+                    evidence.releaseId,
+                    evidence.artifactChecksum,
+                    evidence.featureSchemaVersion,
+                    evidence.codeVersion,
+                    evidence.datasetId,
+                    evidence.releaseKind,
+                    "",
+                    excludedSamplesField(evidence.excludedSamples),
+                )
+
+            is NotificationEvidencePayload.NotPredicted ->
+                listOf(EVIDENCE_KIND_NOT_PREDICTED) + List(13) { "" } + evidence.reason
+        }
+
+    private fun excludedSamplesField(excludedSamples: Map<String, Int>): String =
+        excludedSamples.entries
+            .sortedBy { (reason, _) -> reason }
+            .joinToString(MAP_ENTRY_SEPARATOR.toString()) { (reason, count) ->
+                "${escapeFor(reason, MAP_ENTRY_SEPARATOR)}$MAP_KV_SEPARATOR$count"
+            }
+
+    private fun decodeNotificationRequested(payload: String): NotificationRequestedPayload {
+        val fields = splitEscaped(payload)
+        check(fields.size == NOTIFICATION_REQUESTED_FIELD_COUNT) {
+            "NotificationRequested payload 형식이 아니다(필드 ${NOTIFICATION_REQUESTED_FIELD_COUNT}개 기대, " +
+                "실제 ${fields.size}개): $payload"
+        }
+        val noticeId = fields[0]
+        val bidNowReasons =
+            if (fields[1].isEmpty()) {
+                emptyList()
+            } else {
+                splitEscapedFor(fields[1], LIST_SEPARATOR)
+            }
+        val evidence = decodeEvidence(fields.subList(2, NOTIFICATION_REQUESTED_FIELD_COUNT))
+        return NotificationRequestedPayload(noticeId, bidNowReasons, evidence)
+    }
+
+    private fun decodeEvidence(evidenceFields: List<String>): NotificationEvidencePayload =
+        when (val kind = evidenceFields[0]) {
+            EVIDENCE_KIND_DIAGNOSED ->
+                NotificationEvidencePayload.Diagnosed(
+                    trainingRowCount = evidenceFields[1].toInt(),
+                    segmentSupport = evidenceFields[2],
+                    shrinkageWeight = evidenceFields[3],
+                    excludedObservations = evidenceFields[4].toInt(),
+                    agencySampleCount = evidenceFields[5].toInt(),
+                    agencySampleBelowThreshold = evidenceFields[6].toBooleanStrict(),
+                    releaseId = evidenceFields[7],
+                    artifactChecksum = evidenceFields[8],
+                    featureSchemaVersion = evidenceFields[9],
+                    codeVersion = evidenceFields[10],
+                    datasetId = evidenceFields[11],
+                    releaseKind = evidenceFields[12],
+                    excludedSamples = decodeExcludedSamples(evidenceFields[14]),
+                )
+
+            EVIDENCE_KIND_NOT_PREDICTED -> NotificationEvidencePayload.NotPredicted(reason = evidenceFields[14])
+
+            else -> error("알 수 없는 NotificationRequested evidenceKind 다: $kind")
+        }
+
+    private fun decodeExcludedSamples(field: String): Map<String, Int> =
+        if (field.isEmpty()) {
+            emptyMap()
+        } else {
+            // entry 분리는 splitEscapedFor 로 한다 — 키가 MAP_ENTRY_SEPARATOR 를 이스케이프해
+            // 실었을 수 있어(encodeFor 대칭) 순진한 String.split 은 그 이스케이프를 못 본다.
+            splitEscapedFor(field, MAP_ENTRY_SEPARATOR).associate { entry ->
+                val kv = splitEscapedFor(entry, MAP_KV_SEPARATOR)
+                check(kv.size == 2) { "excludedSamples 항목 형식이 아니다: $entry" }
+                kv[0] to kv[1].toInt()
+            }
+        }
+
+    private fun escape(value: String): String = escapeFor(value, FIELD_SEPARATOR)
 
     /** [escape]의 역함수 — 이스케이프를 인식하며 [FIELD_SEPARATOR]로 나눈다. */
-    private fun splitEscaped(payload: String): List<String> {
+    private fun splitEscaped(payload: String): List<String> = splitEscapedFor(payload, FIELD_SEPARATOR)
+
+    /** [delimiter] 계층 하나를 보호한다 — [ESCAPE] 자신을 먼저 보호해야 중첩이 안전하다(클래스 KDoc). */
+    private fun escapeFor(
+        value: String,
+        delimiter: Char,
+    ): String =
+        value
+            .replace(ESCAPE.toString(), "$ESCAPE$ESCAPE")
+            .replace(delimiter.toString(), "$ESCAPE$delimiter")
+
+    /** [escapeFor]의 역함수 — 이스케이프를 인식하며 [delimiter]로 나눈다. */
+    private fun splitEscapedFor(
+        payload: String,
+        delimiter: Char,
+    ): List<String> {
         val fields = mutableListOf(StringBuilder())
         var index = 0
         while (index < payload.length) {
@@ -90,7 +227,7 @@ internal object OutboxPayloadCodec {
                     index += 2
                 }
 
-                char == FIELD_SEPARATOR -> {
+                char == delimiter -> {
                     fields += StringBuilder()
                     index += 1
                 }
