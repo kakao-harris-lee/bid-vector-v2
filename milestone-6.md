@@ -415,6 +415,15 @@ main 의 생성 지점은 커널 둘뿐이고 밖은 전부 읽기만이라 깨�
 바이트코드 상수 풀로 바꾸면 `adapters` 모듈 안에 그 코드가 앉을 자리가 없어진다 — 그 파일은 이 slice 의
 in_scope 밖이고 **6F-4 가 그 패키지를 편집 중**이라 여기서 건드리지 않는다(받는 쪽 **하네스 레인**).
 **`OPEN-VERDICT-CONSTRUCTION-VISIBILITY`**: 위 종점 — 받는 쪽 **도메인 레인**.
+**6A-1 이 신설해 인계하는 OPEN 넷**(2026-09-23) — **`OPEN-6A1-CONNECTION-POOL`**: 커넥션 풀 없이
+(`PGSimpleDataSource`) 배선했다, **이 상태로 운영에 나갈 수 없다**(6C/6E) · **`OPEN-6A1-CREDENTIAL-RAW-
+REINTRODUCTION`**: 자격증명 타입이 **컴파일 시점 접근**은 막으나 **런타임 리플렉션**(단일 파일 4줄)과
+**허용 목록 simple name 재사용**(별칭 import)은 열려 있다 — 뿌리가 구조적이다(환경변수 원문은 어딘가에
+`String` 으로 있어야 한다), 받는 쪽 **6A-2** · **`OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`**: 명시
+`@ComponentScan` 이 Boot 기본 `excludeFilters` 둘을 가린다(오늘 거동 영향 0, **6A-2**) ·
+**`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`**: `jarContentGate` 가 배포물 `bootJar` 를 안 보고 `jar` 만
+보며 **빈 아카이브를 통과**시킨다(두 verifier 레인 실측, **하네스 레인**).
+
 **`OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`**: `CleanMigrationCheckTest` 의 COL-06·H-3 단언 셋이
 `any { contains }` **존재 단언**이라 CHECK 본문을 제자리에서 항진명제로 약화해도 통과한다(6F-5-a 가
 자기 표에서 실측한 뒤 같은 형태를 남의 표에서 확인했다 — 범위를 넓히지 않고 넘긴다. 받는 쪽
