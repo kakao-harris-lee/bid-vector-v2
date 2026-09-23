@@ -2,8 +2,11 @@
 
 ## (2b) 값 획득 축 — 새 public 표면 전수 (구현 레인 실측)
 
-scope.md가 예상한 행 + 구현 중 실제로 늘어난 행을 함께 적는다(수정 라운드 없이 1회 실측,
-전부 이 slice가 처음 냄).
+scope.md가 예상한 행 + 구현 중 실제로 늘어난 행을 함께 적는다. 착수 라운드 1회 실측
+(아래 표) 뒤로 수정 라운드 둘(검토 라운드 1·2)이 있었으나 새 production public 표면을
+더하지 않았다 — 검토 라운드 2/D-6A3-25는 기존 ArchUnit 규칙 하나(`httpPackageMustNotBypassPorts`)
+를 구조가 다른 새 규칙(`appPortCallsMustBeAllowedPairs`)으로 **대체**했을 뿐이라 아래 표의
+「게이트」 행에 새 행을 더해 반영한다(신설이 아니라 교체).
 
 | 이름 | 위치 | 처분 | 실측 근거 |
 |---|---|---|---|
@@ -14,7 +17,8 @@ scope.md가 예상한 행 + 구현 중 실제로 늘어난 행을 함께 적는�
 | `MaxActiveBids` | strategy | 닫는다 | `validate()` 경유만(`OperatorStrategy internal constructor`), `init { require(value > 0) }`. |
 | `EvaluationWiring` 빈 메서드 | app.wiring | 경계로 처리(부분 실측) | `open fun`이라 구조적으로 test가 직접 부를 수 있다(컴파일 확인) — 그러나 이번 slice의 test는 그 경로를 **직접 호출하지 않고** Spring 컨테이너 경유(E2E, `EvaluationDryRunE2ETest`)로만 구동했다. 직접-호출 test는 없음 — 알려진 제한에 등재. |
 | ArchUnit 규칙(`assembleCallersMustBeAllowedSet`)·정책 키(`app.allowed.assemble-callers`) | app.architecture / config | 게이트 | `ArchitectureGateTest`(production 0건) + `ArchitectureGateCatchesViolationsTest`(fixture 1건 실제로 잡힘). |
-| **(예상 밖 추가 1) `PinnedStrategyRepository`** | adapters.evaluation | 닫는다 | `load()`는 고정값만 반환(delegate.load() 재호출 안 함, `PinnedStrategyRepositoryTest`), `save()`는 위임 — 새 계산 없음. |
+| **(검토 라운드 2) ArchUnit 규칙(`appPortCallsMustBeAllowedPairs`)·정책 키(`app.port-call.ports`·`app.port-call.allowed-pairs`)** | app.architecture / config | 게이트 | D-6A3-25 — `httpPackageMustNotBypassPorts`(D-6A3-17(c))를 대체한다. `ArchitectureGateTest`(production 0건) + `ArchitectureGateCatchesViolationsTest`(fixture 2건 실제로 잡힘 — 구체 어댑터·app.wiring 헬퍼). |
+| **(예상 밖 추가 1) `PinnedStrategyRepository`** | adapters.evaluation | 닫는다 | `load()`는 고정값만 반환(delegate.load() 재호출 안 함, `PinnedStrategyRepositoryTest`), `save()`는 `error()`(`Nothing`) — **위임하지 않는다**(D-6A3-18, 검토 라운드 1 verifier H-1/H-2 시정. 이전 판이 "위임"이라 적은 것은 낡은 서술이었다). |
 | **(예상 밖 추가 2) `EvaluationDryRunRun`** | app.wiring | 닫는다 | `useCase`·`notifications`·`strategy` 세 필드를 옮기는 값 객체, 메서드 없음. |
 | **(예상 밖 추가 3) `MaxActiveBidsNotConfiguredException`·`InvalidEvaluationRequestException`** | app.wiring / adapters.evaluation | 닫는다 | 둘 다 고정 메시지 예외(D-6A3-4·D-6A3-5 fail-closed 신호), 페이로드 없음. |
 | **(예상 밖 추가 4) `EvaluationProperties`** | app.wiring | 닫는다 | `candidateCap: Int` 하나, `@ConfigurationProperties` 바인딩만(기본값 없음 — 미설정 시 기동 실패). |
@@ -54,38 +58,31 @@ scope.md가 예상한 행 + 구현 중 실제로 늘어난 행을 함께 적는�
 6. **변이 5가 실측한 게이트 사각**(팀장 계약 갱신 (4)에 이미 등재) — 새 endpoint의 200 응답에 대한 키 집합
    대조가 처음에는 없어 OpenAPI 필드 하나를 빼는 변이가 초록이었다. `4c2d041e`에서 추가해 닫았다 — 「있는지만
    보는 게이트」류의 재발.
-7. **evidence 크기(수정 라운드 1 재실측, verifier L-3 시정 — 「이 문서 하단 크기 확인 절」 부재 자체를
-   고친다)** — 산출물 diff(이 slice, evidence·milestone-6.md 제외) `git diff --stat febad567..HEAD` =
-   3154줄 추가·49줄 삭제(파일 55개: A 25·M 30). evidence 네 파일(scope.md 387 + checklist.md 129 +
-   commands.md 101 + rollback.md 84, `wc -l` 실측, milestone-6.md 제외) 합계 701줄 — 산출물(3154줄
+7. **evidence 크기(검토 라운드 2 재실측, verifier L-3·LR2-2 시정 — 「이 문서 하단 크기 확인 절」 부재
+   자체를 고친다)** — 산출물 diff(이 slice, evidence·milestone-6.md 제외) `git diff --stat febad567..18fdd72e`
+   = 3237줄 추가·49줄 삭제(파일 56개: A 26·M 30). evidence 네 파일(scope.md 420 + checklist.md 128 +
+   commands.md 120 + rollback.md 117, `wc -l` 실측, milestone-6.md 제외) 합계 785줄 — 산출물(3237줄
    추가분)보다 작다(크기 게이트 통과).
 8. **`PinnedStrategyRepository.save()`가 `Nothing`을 반환하는 것 자체는 실행으로 잴 수 없다**(D-6A3-18,
    PinnedStrategyRepositoryTest KDoc에도 같은 근거) — `AppliedStrategy`의 생성자가 `workflow` 모듈
    `internal`이라 `adapters`(그리고 `app`도 마찬가지 — internal은 모듈 경계다) 밖에서는 그 값을 지을
    방법이 없다. 반환 타입 `Nothing`(정상 반환 경로가 없는 시그니처) 자체가 컴파일 층의 증거다 — 실행
    test는 이 gate 밖(`NoticeIdTest`의 `NoticeRound` 폐쇄와 같은 관례).
-9. **in_scope 밖 파일 5개(수정 라운드 1, 발견 즉시 보고)** — D-6A3-17(a)·(c)의 양성 대조 fixture 다섯
-   (`app/src/test/kotlin/bidvector/archfixture/violating/app/RogueNotificationPortImplementor.kt`·
-   `RogueOutboxNotificationReferencer.kt`·`RogueOutboxPortReferencer.kt`·`RogueMlGatewayReferencer.kt`·
-   `app/src/test/kotlin/bidvector/archfixture/violating/app/http/RoguePortBypassReferencer.kt`)는
-   scope.md의 `app/src/test/kotlin/bidvector/archfixture/violating/evaluation/**`(D-6A3-16이 편입한
-   경로, `evaluation` 서브패키지 고정)와 다른 서브패키지(`app`·`app.http`)에 있어 그 glob에 안 걸린다.
-   `app/src/test/kotlin/bidvector/app/**`도 `bidvector.archfixture.*`가 아니라 `bidvector.app.*`만 매치해
-   역시 안 걸린다. 팀장 지시("양성 대조 fixture는 `archfixture/violating/**` 관례를 따른다")와 기존
-   D-6A3-9 fixture(`archfixture/violating/evaluation/RogueAssembleKernelCaller.kt`)의 **같은 관례를
-   다른 서브패키지로 확장**한 것이지만, scope.md `in_scope:` 블록의 리터럴 glob은 `evaluation` 하나만
-   적는다 — **사후 흡수가 필요하다**(D-6A3-15·16과 같은 절차: 결과는 옳으나 절차는 「멈추고 보고」였어야
-   한다). test 전용·production classpath 미도달(빌드 산출물로 실측)이라 위험은 낮지만, scope.md
-   `in_scope:`를 `app/src/test/kotlin/bidvector/archfixture/violating/**`(하위 전부)로 넓히거나
-   `.../app/**`·`.../app/http/**` 두 줄을 추가하는 계약 갱신이 필요하다 — 오케스트레이터 보고 사항.
+9. **(해소, 검토 라운드 1 → 계약 갱신 (6) D-6A3-24로 닫힘)** in_scope 밖 fixture 다섯이 있었다 —
+   팀장이 `app/src/test/kotlin/bidvector/archfixture/violating/**`(하위 전부)로 in_scope 를 넓혀
+   해소했다. 아래 「새 파일 ↔ in_scope 대조」가 현재 불일치 0임을 싣는다.
 
 ## 새 파일 ↔ in_scope 대조
 
-`git diff --name-status febad567..HEAD`(evidence·milestone-6.md 제외) 신규 파일(`A`) 25개·변경 파일(`M`) 30개
-전부 in_scope glob과 대조했다(수작업, 자기 검사 하네스 아님). **M 30개는 전부 매치.** **A 25개 중 20개
-매치, 5개 불일치** — 위 알려진 제한 9의 fixture 다섯이다. 계약 갱신 (1)~(4)가 편입한 네 항목(D-6A3-12
-workflow 파일군, D-6A3-14 CleanMigration 두 파일, D-6A3-15 app/build.gradle.kts, D-6A3-16 archfixture
-경로)은 갱신된 in_scope에 전부 등재돼 있다.
+`git diff --name-status febad567..HEAD`(evidence·milestone-6.md 제외) 신규 파일(`A`) 26개·변경 파일(`M`) 30개
+전부 in_scope glob과 대조했다(수작업, 자기 검사 하네스 아님 — verifier r2 도 독립 정규식 glob 매처로 같은
+결론을 냈다). **M 30개·A 26개 전부 매치, 불일치 0.** 계약 갱신 (1)~(7)이 편입한 항목(D-6A3-12 workflow
+파일군, D-6A3-14 CleanMigration 두 파일, D-6A3-15 app/build.gradle.kts, D-6A3-16·24 archfixture 경로
+전부)은 갱신된 in_scope에 전부 등재돼 있다. **이 라운드(검토 라운드 2, D-6A3-25)가 새로 낸 파일 둘**
+(`app/src/test/kotlin/bidvector/archfixture/violating/app/http/RogueConcreteAdapterCaller.kt`·
+`.../app/wiring/RogueWiringPortCaller.kt`)도 D-6A3-24 가 이미 넓힌 `archfixture/violating/**` 글롭
+안이라 추가 계약 갱신 없이 매치한다(D-6A3-17(c) 양성 fixture였던 `RoguePortBypassReferencer.kt` 는
+같은 커밋에서 삭제 — 대체 관계).
 
 ## D-6A3-14 — V16 전/후 CleanMigration 두 test 의 RED→GREEN(verifier L-4 시정)
 

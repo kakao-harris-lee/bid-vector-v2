@@ -1,56 +1,88 @@
 # M6/6A-3+6F-3 rollback
 
-`실측 HEAD: 0dd74d19`(검토 라운드 1 수정의 마지막 산출물 커밋 — 이후 커밋은 evidence 전용)
+`실측 HEAD: 18fdd72e`(검토 라운드 2 수정의 마지막 산출물 커밋 — 이후 커밋은 evidence 전용)
 
 ## 되돌리는 것
 
 `base = febad567`(`git merge-base HEAD origin/main`, 라운드마다 재산출). 목록은 기계 산출:
 
 ```
-git diff --name-status febad567..0dd74d19 -- . ':!reports/evidence' ':!milestone-6.md'
+git diff --name-status febad567..18fdd72e -- . ':!reports/evidence' ':!milestone-6.md'
 ```
 
-신규(A) 25 · 변경(M) 30 = 55개.
+신규(A) 26 · 변경(M) 30 = 56개.
 
-**`milestone-6.md` 사실 정정(verifier r1 L-2 시정)** — 이전 판은 「`git log febad567..535a48ce
-milestone-6.md` 0건」이라고 적었으나 거짓이었다. `git log --oneline febad567..0dd74d19 --
-milestone-6.md`는 `39076f6c`(팀장, "docs(m6): 6A-3+6F-3 착수 문단 등재") 1건을 낸다 — 이 slice
-범위 안에서 `milestone-6.md`가 실제로 바뀌었다는 사실 자체는 있다. 그래도 되돌리지 않는다 —
-그 이유는 "커밋이 없어서"가 아니라 **팀장 레인 전용 문단(착수·계약 갱신)이라 이 slice의 되돌림
-대상 정의(scope.md `in_scope`)에 `milestone-6.md`가 없기 때문**이다. 이 slice의 어떤 커밋도
-그 파일을 만들거나 고치지 않았다(`git log --author` 대조로 39076f6c가 팀장 저작임을 확인) —
-「이 slice가 그 파일을 안 건드렸다」와 「그 파일이 범위 안에서 안 바뀌었다」는 다른 문장이고,
-전자만 참이다.
+## `milestone-6.md` — 공유 파일, 커밋 해시 hunk 격리(verifier r2 LR2-1 시정)
 
-## 공유 파일 — hunk 격리가 필요 없음을 재실측으로 확인
+**이전 판의 두 논거를 정정한다.** ① 「`milestone-6.md`가 scope.md `in_scope`에 없어서 안
+건드렸다」는 사실과 다르다 — `in_scope` 블록에 `milestone-6.md # 착수·종결 문단(팀장) — 공유
+파일`이 **있다**. ② 「`git log --author` 대조로 `39076f6c`가 팀장 저작임을 확인했다」도
+성립하지 않는다 — `febad567..18fdd72e` 범위의 모든 커밋이 같은 author(`kakao-harris-lee`)라
+author로는 레인을 가를 수 없다.
 
-`config/quality/gate-tests.properties`·`config/quality/architecture-policy.properties` 둘 다
-`git log --oneline febad567..0dd74d19 -- <파일>`로 **이 slice(`m6-6a3f3` 브랜치)의 커밋만**
-만졌음을 재확인했다(다른 레인과 겹치는 줄 없음 — 매 라운드 다시 실측, 검토 라운드 1의 신규
-커밋 다섯도 전부 `m6-6a3f3` 저작). 그래서 이 두 파일도 다른 M 파일과 같은
-`git restore --source=<base>`로 복원한다 — 커밋 해시별 hunk 격리가 필요한 경우(같은 파일을
-다른 slice가 같은 range 안에서 동시에 만진 경우)가 아니다.
+실제 근거는 **레인**(팀장의 착수·계약 갱신·종결 문단 vs 구현 레인의 산출물 커밋)이지 저자가
+아니다. `git log --oneline febad567..18fdd72e -- milestone-6.md`는 `39076f6c`(팀장, "docs(m6):
+6A-3+6F-3 착수 문단 등재") 1건만 낸다 — 구현 레인(kotlin-implementer)의 어떤 커밋도 이 파일을
+만들거나 고치지 않았다(위 rollback 목록의 기계 산출 `git diff --name-status`에도 이 파일이
+없다 — 목록 자체가 그 사실의 증거다). 이 slice의 종결 문단(팀장이 나중에 커밋)이 더해지면
+그 커밋 해시도 여기 추가한다.
 
-## 명령
+**만약 이 파일을 되돌려야 하면** range 전체를 `git restore`로 덮지 않는다(병합 뒤에는 다른
+레인의 커밋이 같은 range 안에 섞일 수 있어 「이 range 안에서는 이 slice만 만졌다」는 가정이
+깨진다, 라운드 1 L-2 지적). 대신 **그 커밋 하나만** 커밋 해시로 hunk 격리한다:
 
 ```
-git restore --source=febad567 --staged --worktree -- <위 55개 경로, 개별 인자>
+git diff 39076f6c~1..39076f6c -- milestone-6.md | git apply -R
 ```
 
-(경로 목록은 `git diff --name-status`가 매 라운드 다시 낸다 — 손으로 옮기지 않는다.)
+(이 slice의 rollback 목록에는 애초에 `milestone-6.md`가 없으므로 정상 절차에서는 이 명령이
+필요 없다 — 팀장이 착수 문단을 되돌릴 때만 쓰는 절차로 여기 적어 둔다.)
+
+## 공유 파일(`gate-tests.properties`·`architecture-policy.properties`) — 커밋 해시 hunk 격리
+
+**이전 판이 쓰던 「이 range 안에서는 이 slice만 만졌다」는 논거를 더 쓰지 않는다**(verifier
+r2 LR2-1 — 그 논거는 병합 전에만 성립한다, D-6A3-23 「규율대로」·라운드 1 L-2 지적). 대신
+**이 slice가 실제로 그 파일을 만진 커밋 각각**을 열거하고, 되돌릴 때는 그 커밋들을 **최신
+것부터 역순으로** 하나씩 hunk 격리한다(`git diff <sha>~1..<sha> -- <파일> | git apply -R`) —
+이렇게 하면 병합 뒤 다른 레인의 커밋이 같은 파일의 같은 range 안에 끼어 있어도 이 slice가
+낸 hunk만 정확히 걷어낸다(대상이 커밋 해시로 고정되므로 range 가정에 기대지 않는다).
+
+`config/quality/gate-tests.properties`를 만진 이 slice의 커밋(최신→과거):
+`0dd74d19`·`e3666929`·`b1982763`·`1c52a182`·`4213026e`·`aecfce53`·`691f5630`·`5d899951`·
+`98a18086`.
+
+`config/quality/architecture-policy.properties`를 만진 이 slice의 커밋(최신→과거):
+`86a48b7e`·`b1982763`·`4213026e`.
+
+(목록은 `git log --oneline febad567..18fdd72e -- <파일>` 기계 산출 — 라운드마다 재산출한다.
+일반 in_scope 파일과 달리 이 두 파일은 공유 자원이라 `git restore --source=<base>`로 되돌리지
+않는다 — 다른 레인이 병합 후 같은 파일에 낸 hunk를 함께 지울 위험이 있다.)
+
+## 명령(공유 파일 둘·`milestone-6.md` 제외 — 나머지 54개)
+
+```
+git restore --source=febad567 --staged --worktree -- <위 56개에서 공유 파일 둘을 뺀 54개 경로, 개별 인자>
+```
+
+(경로 목록은 `git diff --name-status`가 매 라운드 다시 낸다 — 손으로 옮기지 않는다. 공유 파일
+둘은 위 커밋 해시 hunk 격리로, `milestone-6.md`는 이 slice의 rollback 대상이 아니다.)
 
 ## 임시 clone 실측(①~⑥, 버릴 worktree, 캐시 우회 `check`는 별도 clone)
+
+실측은 편의상 공유 파일 둘을 포함한 전체 56개 경로에 `git restore --source=<base>`를 적용해
+빌드·test·게이트가 되돌린 상태에서도 서는지 확인했다(공유 파일의 실제 되돌림 **절차**는 위
+커밋 해시 hunk 격리이지만, 두 절차의 최종 파일 내용은 같다 — `febad567` 시점 값으로 수렴).
 
 | 축 | 결과 |
 |---|---|
 | ① `git restore` exit | 0 |
-| ② D/M 수 | D 25 · M 30 (파일 목록과 일치) |
-| ③ `git diff febad567 -- <55경로>` | 0줄(완전 일치) — `milestone-6.md`는 `0dd74d19`와도 0줄(무변경 확인, 위 사실 정정과 별개로 이 slice 커밋이 그 파일을 안 만졌다는 것의 재확인) |
-| ④ 모듈별 compile(`:strategy`·`:workflow`·`:adapters`·`:app`의 `compileKotlin`+`compileTestKotlin`) | BUILD SUCCESSFUL |
-| ⑤ `:strategy:test :workflow:test :adapters:test :app:test` | BUILD SUCCESSFUL |
-| ⑥ 되돌린 트리에서 `./gradlew --no-daemon check`(전건, 이 slice가 닿은 게이트 전부 포함) | BUILD SUCCESSFUL |
+| ② D/M 수 | D 26 · M 30 (파일 목록과 일치) |
+| ③ `git diff febad567 -- <56경로>` | 0줄(완전 일치) |
+| ④ 모듈별 compile(`:strategy`·`:workflow`·`:adapters`·`:app`의 `compileKotlin`+`compileTestKotlin`) | BUILD SUCCESSFUL(1m16s) |
+| ⑤ `:strategy:test :workflow:test :adapters:test :app:test` | BUILD SUCCESSFUL(2m10s) |
+| ⑥ 되돌린 트리에서 `./gradlew --no-daemon check`(전건, 이 slice가 닿은 게이트 전부 포함) | BUILD SUCCESSFUL(1m12s, 346 tasks) |
 
-①~⑥ 전부 같은 worktree(`git worktree add --detach <scratch> 0dd74d19` 뒤 위 restore 적용)에서
+①~⑥ 전부 같은 worktree(`git worktree add --detach <scratch> 18fdd72e` 뒤 위 restore 적용)에서
 순서대로 실측했다 — 초록 갈음은 「HEAD 초록」이 아니라 이 트리 동일성(③)과 빌드 가능성(④⑤⑥)
 둘 다로 선다.
 
@@ -75,10 +107,11 @@ git restore --source=febad567 --staged --worktree -- <위 55개 경로, 개별 �
 ## 그 사이 되돌림 대상이 움직였는가 (실측 HEAD ↔ 판정 SHA)
 
 ```
-git diff --name-only 0dd74d19..<판정 SHA> -- <위 55개 경로>
+git diff --name-only 18fdd72e..<판정 SHA> -- <위 56개 경로>
 ```
 
-이 slice의 남은 커밋은 evidence 파일(`reports/evidence/m6/6a3f3/**`)만 만진다 — 위 55개 경로는
-그 안에 없으므로 이 명령은 빈 출력이어야 유효하다. 최종 판정 SHA에서 이 명령을 실행해 빈 출력을
-확인하는 것이 verifier의 몫이다(이 문서는 실측 HEAD 시점의 절차 정본이고, 마지막 확인은 그 뒤
-커밋이 없다는 사실 하나로 성립한다 — evidence 전용 커밋은 정의상 이 diff에 나타나지 않는다).
+이 slice의 남은 커밋(장부 일괄)은 evidence 파일(`reports/evidence/m6/6a3f3/**`)만 만진다 —
+위 56개 경로는 그 안에 없으므로 이 명령은 빈 출력이어야 유효하다. 최종 판정 SHA에서 이 명령을
+실행해 빈 출력을 확인하는 것이 verifier의 몫이다(이 문서는 실측 HEAD 시점의 절차 정본이고,
+마지막 확인은 그 뒤 커밋이 없다는 사실 하나로 성립한다 — evidence 전용 커밋은 정의상 이
+diff에 나타나지 않는다).
