@@ -162,6 +162,41 @@ class ArchitectureRules(
                 .because("모듈 경계가 이미 계층을 표현한다 — 모듈 안에 기술 계층을 또 만들지 않는다")
         }
 
+    /**
+     * M6/6A-3+6F-3 D-6A3-9 — `bidvector.strategy.TextKt.assemble*`(감시 텍스트 조립 커널)를
+     * 부르는 production 클래스 집합은 [ArchitecturePolicy.allowedAssembleCallers] 뿐이다
+     * (부재 쪽 — 존재 쪽은 `EvaluationAdapterDependencyTest`, adapters 모듈이 잠근다).
+     * `noClasses().that(허용 밖)` 형태라 새 어댑터가 같은 텍스트를 다시 이어붙이면(우회
+     * — assemble* 를 안 거치고 직접 조립) 그 클래스가 허용 목록에 없는 한 이 규칙이 곧바로
+     * 걸린다.
+     */
+    fun assembleCallersMustBeAllowedSet(allowedCallers: List<String>): List<ArchRule> {
+        val allowed = allowedCallers.toSet()
+        return listOf(
+            noClasses()
+                .that(isNotAllowedAssembleCaller(allowed))
+                .should(callAssembleKernel())
+                .because("D-6A3-9 — assemble* 호출자 집합은 architecture-policy.properties 의 허용 목록과 같다"),
+        )
+    }
+
+    private fun isNotAllowedAssembleCaller(allowed: Set<String>): DescribedPredicate<JavaClass> =
+        object : DescribedPredicate<JavaClass>("허용된 assemble* 호출자가 아니다 (${allowed.size}종)") {
+            override fun test(target: JavaClass): Boolean = target.fullName !in allowed
+        }
+
+    private fun callAssembleKernel(): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("bidvector.strategy.TextKt.assemble* 를 호출한다") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.accessesFromSelf
+                    .filter { access -> access.declaringKeys().any { it.startsWith(ASSEMBLE_KERNEL_PREFIX) } }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, it.description)) }
+            }
+        }
+
     private fun packagesOf(
         root: String,
         modules: List<String>,
@@ -174,5 +209,8 @@ class ArchitectureRules(
         const val APPLICATION = "application"
         const val ADAPTERS = "adapters"
         const val APP = "app"
+
+        /** D-6A3-9 — `declaringKeys()`가 내는 `"owner#member"` 형태의 접두사. */
+        const val ASSEMBLE_KERNEL_PREFIX = "bidvector.strategy.TextKt#assemble"
     }
 }

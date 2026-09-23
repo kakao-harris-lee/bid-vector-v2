@@ -28,6 +28,9 @@ class ArchitecturePolicy private constructor(
     val allowedClasses: List<String> get() = allowedApiClasses + allowedRuntimeClasses
     val forbiddenPackageSegments: List<String> get() = list("package.segment.forbidden")
 
+    /** M6/6A-3+6F-3 D-6A3-9 — `assemble*`(bidvector.strategy.TextKt) 호출 허용 목록. */
+    val allowedAssembleCallers: List<String> get() = list("app.allowed.assemble-callers")
+
     /**
      * T-D. **손 열거가 아니라 도출된 후보의 분류**다 — `memberEffectGate` 가 허용 클래스에서
      * 효과 표면에 닿는 멤버를 내고, `member-effects.properties` 가 그 후보를 하나씩

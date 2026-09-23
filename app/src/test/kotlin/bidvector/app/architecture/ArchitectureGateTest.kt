@@ -79,5 +79,15 @@ class ArchitectureGateTest {
         rules.packageNamesMustNotBeTechnicalLayers(policy.packageRoot).checkAll()
     }
 
+    /**
+     * D-6A3-9 — assemble* 호출자 집합이 허용 목록과 같다(부재 쪽). [production]이 9 모듈
+     * 전체를 이미 담고 있어(이 파일 클래스 문서 「조합 지점」) 별도 cross-module 스캔이
+     * 필요 없다.
+     */
+    @Test
+    fun `assemble 커널 호출자는 architecture-policy 허용 목록 밖에 없다`() {
+        rules.assembleCallersMustBeAllowedSet(policy.allowedAssembleCallers).checkAll()
+    }
+
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }
 }

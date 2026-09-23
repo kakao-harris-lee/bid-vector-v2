@@ -194,6 +194,16 @@ class ArchitectureGateCatchesViolationsTest {
     }
 
     /**
+     * D-6A3-9 — [RogueAssembleKernelCaller]는 허용 목록(`NoticeWatchSubjectPortKt`) 밖에서
+     * `assembleKeywordScopeText`를 직접 부른다. 이 규칙은 root 치환이 아니라 절대 FQN
+     * 허용 목록이라 `production` 대신 이미 [fixtureRoot] 아래인 이 fixture 를 그대로 쓴다.
+     */
+    @Test
+    fun `assemble 커널을 허용 목록 밖에서 부르면 잡는다`() {
+        rules.assembleCallersMustBeAllowedSet(policy.allowedAssembleCallers) mustReport "RogueAssembleKernelCaller"
+    }
+
+    /**
      * **이름만 보지 않는다.** 위반 상세에 fixture 이름이 있기만 하면 통과하게 두면, 그 클래스가
      * **다른 이유로** 잡혀도 단언이 초록이 된다 — 실제로 컴파일러 삽입 `@NotNull` 이 그 masking 을
      * 만들어, 금지를 정책에서 걷어도 음성 단언이 죽지 않았다. 그래서 **어느 대상 때문에** 잡혔는지를
