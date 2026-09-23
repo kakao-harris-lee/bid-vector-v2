@@ -86,7 +86,7 @@ class CompileFailureHarnessTest {
     /** D-6F4W-7 우회 1 — `KeywordScopeText`의 유일한 생성 경로는 `assembleKeywordScopeText`다. */
     @Test
     fun `4 KeywordScopeText 직접 생성은 모듈 밖에서 컴파일되지 않고 assemble 경유는 컴파일된다`() {
-        assertNegativeFails("4-keyword-scope-text-direct-construction", "cannot access")
+        assertNegativeFails("4-keyword-scope-text-direct-construction", "it is private in")
         assertPositiveCompiles("4-keyword-scope-text-via-assembly")
     }
 
@@ -94,14 +94,14 @@ class CompileFailureHarnessTest {
     fun `4-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "4-keyword-scope-text-direct-construction-typo",
-            realDiagnosticFragment = "cannot access",
+            realDiagnosticFragment = "it is private in",
         )
     }
 
     /** D-6F4W-7 우회 2 — `@ConsistentCopyVisibility` 가 `copy()` 도 생성자와 같은 가시성으로 닫는다. */
     @Test
     fun `5 KeywordScopeText copy 는 모듈 밖에서 컴파일되지 않는다`() {
-        assertNegativeFails("5-keyword-scope-text-copy-bypass", "cannot access")
+        assertNegativeFails("5-keyword-scope-text-copy-bypass", "it is private in")
         assertPositiveCompiles("4-keyword-scope-text-via-assembly")
     }
 
@@ -109,14 +109,14 @@ class CompileFailureHarnessTest {
     fun `5-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "5-keyword-scope-text-copy-bypass-typo",
-            realDiagnosticFragment = "cannot access",
+            realDiagnosticFragment = "it is private in",
         )
     }
 
     /** D-6F4W-7 우회 1 — `FullScopeText`의 유일한 생성 경로는 `assembleFullScopeText`다(fixture 4 와 같은 형태). */
     @Test
     fun `6 FullScopeText 직접 생성은 모듈 밖에서 컴파일되지 않고 assemble 경유는 컴파일된다`() {
-        assertNegativeFails("6-full-scope-text-direct-construction", "cannot access")
+        assertNegativeFails("6-full-scope-text-direct-construction", "it is private in")
         assertPositiveCompiles("6-full-scope-text-via-assembly")
     }
 
@@ -124,14 +124,14 @@ class CompileFailureHarnessTest {
     fun `6-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "6-full-scope-text-direct-construction-typo",
-            realDiagnosticFragment = "cannot access",
+            realDiagnosticFragment = "it is private in",
         )
     }
 
     /** D-6F4W-7 우회 2 — `FullScopeText.copy()` 도 모듈 밖에서 부를 수 없다(fixture 5 와 같은 형태). */
     @Test
     fun `7 FullScopeText copy 는 모듈 밖에서 컴파일되지 않는다`() {
-        assertNegativeFails("7-full-scope-text-copy-bypass", "cannot access")
+        assertNegativeFails("7-full-scope-text-copy-bypass", "it is private in")
         assertPositiveCompiles("6-full-scope-text-via-assembly")
     }
 
@@ -139,7 +139,7 @@ class CompileFailureHarnessTest {
     fun `7-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
         assertMutantDoesNotMatchRealFragment(
             mutantFixtureName = "7-full-scope-text-copy-bypass-typo",
-            realDiagnosticFragment = "cannot access",
+            realDiagnosticFragment = "it is private in",
         )
     }
 }
