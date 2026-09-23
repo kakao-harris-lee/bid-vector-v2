@@ -53,7 +53,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/EvaluationDryRunResponse"
         "400":
-          description: currentActiveBids 가 음수(D-6A3-5)
+          description: >-
+            currentActiveBids 가 유효한 JSON 정수(0..2147483647)가 아니다(D-6A3-5·D-6A3-19) —
+            음수, 누락, null, 문자열·소수(조용한 강제 변환 없음), 범위 초과, 본문이 JSON
+            object 가 아님, 비JSON, 빈 본문을 모두 포함한다
           content:
             application/json:
               schema:
@@ -180,6 +183,8 @@ components:
       properties:
         currentActiveBids:
           type: integer
+          format: int32
+          minimum: 0
     # D-6A3-6 — 평탄하다. 결과별 공고 ID 배열 + 건수만 싣는다(후보별 사유 상세는
     # OPEN-6A3-EVALUATION-DETAIL). 공고명·기관명 원문은 없다(privacy).
     EvaluationDryRunResponse:

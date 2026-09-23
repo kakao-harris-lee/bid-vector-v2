@@ -7,14 +7,19 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import java.time.LocalDate
 
@@ -48,6 +53,18 @@ class EvaluationDryRunControllerTest : HttpIntegrationTestBase() {
             url("/api/evaluation-dry-runs"),
             HttpMethod.POST,
             HttpEntity(body, authorizedHeaders()),
+            Map::class.java,
+        ) as ResponseEntity<Map<String, Any?>>
+    }
+
+    /** D-6A3-19 — 원시 문자열 본문(비JSON·빈 본문 포함)을 그대로 보낸다. `Content-Type` 은 고정. */
+    private fun postRaw(rawBody: String): ResponseEntity<Map<String, Any?>> {
+        val headers = authorizedHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+        @Suppress("UNCHECKED_CAST")
+        return restTemplate.exchange(
+            url("/api/evaluation-dry-runs"),
+            HttpMethod.POST,
+            HttpEntity(rawBody, headers),
             Map::class.java,
         ) as ResponseEntity<Map<String, Any?>>
     }
@@ -95,5 +112,55 @@ class EvaluationDryRunControllerTest : HttpIntegrationTestBase() {
         response.body?.get("skipNoticeIds") shouldBe emptyList<String>()
         response.body?.get("notReachedNoticeIds") shouldBe emptyList<String>()
         response.body?.get("wouldNotifyNoticeIds") shouldBe emptyList<String>()
+    }
+
+    @Test
+    fun `currentActiveBids 0 은 유효한 JSON 정수다 — 200`() {
+        strategyRepository.strategy = strategyWithCap(maxActiveBids = 10)
+
+        val response = post(mapOf("currentActiveBids" to 0))
+
+        response.statusCode.value() shouldBe 200
+        response.body?.get("currentActiveBids") shouldBe 0
+    }
+
+    /**
+     * D-6A3-19(검토 라운드 1 contract-keeper V1 · verifier MEDIUM) — 요청 본문 입력 표.
+     * 조용한 강제 변환(`"3"`→3, `1.7`→1)도, 파싱 실패의 500 낙하(비JSON·빈 본문)도 없다 —
+     * 전부 400 `INVALID_REQUEST`(예외 메시지 미포함)로 통일된다. `maxActiveBids` 미설정
+     * 전략(`freshStrategy()`)에서도 이 판정이 먼저다(형식 검증이 `factory.forRequest()`
+     * 진입보다 앞선다 — `parseCurrentActiveBids`가 컨트롤러에서 저장소 호출 전에 돈다).
+     */
+    @ParameterizedTest(name = "{1} — {0}")
+    @MethodSource("invalidRequestBodies")
+    fun `요청 본문 형식 오류는 전부 400 INVALID_REQUEST 다`(
+        rawBody: String,
+        description: String,
+    ) {
+        withClue(description) {
+            val response = postRaw(rawBody)
+
+            response.statusCode.value() shouldBe 400
+            response.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
+            // D-6A1-7 불변식 — 예외 메시지(원시 파싱 오류 문구 등)를 응답에 싣지 않는다.
+            // 고정 문구 둘(파싱 실패/값 검증 실패) 중 하나여야 한다.
+            val fixedMessages = setOf("요청 값이 유효하지 않다", "요청 본문을 읽을 수 없다")
+            (response.body?.get("message") in fixedMessages) shouldBe true
+        }
+    }
+
+    companion object {
+        @JvmStatic
+        fun invalidRequestBodies(): List<Arguments> =
+            listOf(
+                Arguments.of("{}", "누락"),
+                Arguments.of("""{"currentActiveBids": null}""", "null"),
+                Arguments.of("""{"currentActiveBids": "3"}""", "문자열"),
+                Arguments.of("""{"currentActiveBids": 1.7}""", "소수"),
+                Arguments.of("""{"currentActiveBids": 2147483648}""", "Int 범위 초과"),
+                Arguments.of("""["currentActiveBids"]""", "object 아님"),
+                Arguments.of("not valid json {", "비JSON"),
+                Arguments.of("", "빈 본문"),
+            )
     }
 }

@@ -7,6 +7,7 @@ import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
@@ -82,6 +83,14 @@ object ErrorMapping {
                 ErrorBody(ErrorCode.INVALID_REQUEST, "요청 값이 유효하지 않다", correlationId)
             }
 
+            // M6/6A-3+6F-3 D-6A3-19(검토 라운드 1 contract-keeper V1 · verifier MEDIUM) —
+            // 비JSON·빈 본문은 EvaluationDryRunController의 parseCurrentActiveBids 에
+            // 닿기 전에 Jackson 자체가 여기서 던진다(HttpMessageNotReadableException).
+            // 같은 코드(INVALID_REQUEST)로 옮긴다 — 예외 메시지는 싣지 않는다(D-6A1-7 불변식).
+            is HttpMessageNotReadableException -> {
+                ErrorBody(ErrorCode.INVALID_REQUEST, "요청 본문을 읽을 수 없다", correlationId)
+            }
+
             else -> {
                 ErrorBody(ErrorCode.INTERNAL_ERROR, "요청을 처리하는 중 오류가 발생했다", correlationId)
             }
@@ -139,6 +148,13 @@ class GlobalErrorHandler {
     @ExceptionHandler(InvalidEvaluationRequestException::class)
     fun invalidEvaluationRequest(
         exception: InvalidEvaluationRequestException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
+
+    /** D-6A3-19 — 요청 본문 역직렬화 실패(비JSON·빈 본문)도 400 `INVALID_REQUEST` 다. */
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun httpMessageNotReadable(
+        exception: HttpMessageNotReadableException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
 
