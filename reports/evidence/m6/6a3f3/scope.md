@@ -141,6 +141,21 @@ CI `container` job 은 **ml-serving 이미지 + compose + `RealServerIntegration
 (`load` 는 적재값, `save` 위임) — use case 시그니처 무변경. `RequestCapacityPort(currentActiveBids: Int, maxActiveBids: Int)`.
 설정은 `@ConfigurationProperties`(기본값 없음, `PersistenceProperties` 형) — `app/src/main/resources` 신설 없음.
 
+## 계약 갱신 (2) — V16 이 부딪히는 스키마 열거 게이트 둘 (2026-09-23, 팀장)
+
+**D-6A3-14 — `CleanMigrationColumnTest`·`CleanMigrationCheckTest` 를 in_scope 에 넣는다(추가만).** 구현 레인 실측:
+`adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigration{Column,Check,Privilege,Test}.kt`(D-3D-6 여덟 축)가
+DB 스키마를 **정확 열거**로 잠근다 — 컬럼 집합 `shouldContainExactlyInAnyOrder`, 표별 CHECK **개수**(`operator_strategy` 15 ·
+`operator_strategy_revision` 14). V16 이 두 표에 열 하나 + CHECK 하나를 더하면 이 둘이 자동으로 RED 다(게이트가 제 일을
+하는 것이다). 6F-1 은 표 자체를 신설해 같은 파일이 함께 in_scope 였고, 이번은 기존 표에 열만 더해 다른 패키지의 기존
+게이트에 부딪힌다. `CleanMigrationPrivilegeTest`·`CleanMigrationTest`(GRANT·PK)는 영향 없음(구현 레인 확인).
+- 조건: **추가만** — `max_active_bids` 관련 줄(컬럼 이름 둘, CHECK 개수 15→16 · 14→15)만 더하고 기존 항목을 지우거나 바꾸지
+  않는다. 6F-1 의 「추가만」 관례.
+- 이 게이트가 정확 열거라는 사실 자체가 V16 의 회귀 방지다 — 열 이름 오타·CHECK 누락은 여기서 잡힌다. checklist 에 「V16
+  전/후 이 두 test 의 RED→GREEN」을 실측으로 적는다.
+- rollback 목록·in_scope 재산출(누적 3회 확장: D-6A3-12·14 — 이 slice 는 기존 축 셋(전략·세션·스키마 게이트)에 걸치는
+  additive 변경이라 확장이 예견된 형태다. 그래도 매번 계약에 적는다).
+
 ## 위협 모델 — 6A-3+6F-3 고유 경계
 
 지키는 것: **① dry-run endpoint 는 외부 effect 를 만들지 않는다**(outbox 에 행이 생기지 않는다, 발송 없음)
@@ -196,6 +211,8 @@ in_scope:
   - strategy/src/test/kotlin/bidvector/strategy/**
   - adapters/src/main/kotlin/bidvector/adapters/strategy/**                               # StrategyRow·Sql·EditSessionRow·JdbcStrategyRepository
   - adapters/src/test/kotlin/bidvector/adapters/strategy/**
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt   # D-6A3-14 — 추가만
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt    # D-6A3-14 — 추가만
   - adapters/src/main/kotlin/bidvector/adapters/evaluation/**                             # RequestCapacityPort·RecordingNotificationRequestPort
   - adapters/src/test/kotlin/bidvector/adapters/evaluation/**
   - app/src/main/kotlin/bidvector/app/http/**                                             # 컨트롤러·DTO·ErrorMapping 행
