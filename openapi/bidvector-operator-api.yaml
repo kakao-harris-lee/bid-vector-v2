@@ -1,11 +1,12 @@
 openapi: 3.0.3
 info:
   title: bid-vector operator API
-  version: "6a1"
+  version: "6a3f3"
   description: >-
-    M6/6A-1 — 단일 운영자 소비자 전용(운영자 결정 2026-09-16 ①). 이 문서가 단일 출처다
-    (D-6A1-8, 수작성) — `OpenApiContractTest`가 구현과 대조한다. 이 slice가 여는 endpoint는
-    전략 조회 하나뿐이다(D-6A1-4, 읽기 전용 — 실행·명령 경로 없음).
+    단일 운영자 소비자 전용(운영자 결정 2026-09-16 ①). 이 문서가 단일 출처다(D-6A1-8,
+    수작성) — `OpenApiContractTest`가 구현과 대조한다. M6/6A-1이 전략 조회(읽기 전용)를,
+    M6/6A-3+6F-3(D-6A3-11)이 평가 dry-run endpoint를 연다 — 둘 다 커밋을 만들지 않는다
+    (실행·명령 경로 없음).
 servers:
   - url: /
 security:
@@ -126,6 +127,9 @@ components:
           type: number
           nullable: true
         candidateLimit:
+          type: integer
+          nullable: true
+        maxActiveBids:
           type: integer
           nullable: true
     ErrorBody:
