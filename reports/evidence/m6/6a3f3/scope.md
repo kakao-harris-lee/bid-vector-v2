@@ -182,6 +182,70 @@ in_scope 에 넣는다. 절차 사실(계약 갱신 전 커밋)은 D-6A3-15 와 
 키 집합 대조가 없었다). 구현 레인이 대조를 더해 RED 로 닫았다(`4c2d041e`). 「있는지만 보는 게이트」 계열 — checklist 에
 사실로 적는다.
 
+## 계약 갱신 (5) — 검토 라운드 1 판정과 팀장 결정 (2026-09-23, 팀장)
+
+판정 SHA `ff69cdd2` 에서 검토 레인 다섯이 판정했다 — verifier **not-ready**(HIGH 4 · MEDIUM 4 · 장부 7) · code-reviewer
+(sonnet) 머지 가능(MEDIUM 1 · LOW 2) · migration-reviewer 위반 2 · 권고 2 · privacy-gate 위반 0 · 권고 2 · contract-keeper
+위반 3 · 권고 6. 재작업 **1/5**. 리포트는 `_workspace/m6-6a3f3/1{0..4}_*.md`(gitignore) — 판정은 PR 코멘트로 옮긴다.
+**코드의 오늘 거동은 옳다** — 결함은 전부 **게이트·test 가 계약이 닫았다고 적은 우회를 못 잡는 것**이다(이름 목록·패키지
+하나·접두 술어). 6F-4-w r1 과 같은 계열이고, 이 저장소의 네 번째 반복이다.
+
+**D-6A3-17 — 게이트 셋을 「app production 전체 × 계약 파일의 허용 집합」 ArchUnit 규칙으로 바꾼다(HIGH-1·3·4).**
+이름 목록·패키지·파일명 접두를 늘리지 않는다. 허용 집합은 전부 `config/quality/architecture-policy.properties` 키.
+- (a) **알림 포트(HIGH-1)**: app production 의 **모든 클래스**에 대해 ① `NotificationRequestPort` 를 구현하는 클래스 집합 == ∅
+  ② 참조하는 `NotificationRequestPort` 구현 타입 집합 ⊆ {`RecordingNotificationRequestPort`} ③ outbox 쓰기 타입
+  (`OutboxNotificationRequestPort`·outbox port/sink 류 — 구현 레인이 전수해 키에 적는다) 참조 == ∅. verifier M1(app 에 outbox
+  INSERT 구현을 신설해 꽂기)이 RED 여야 한다. `RecordingNotificationRequestPort` 자신은 6F-4-w 의 **상수 풀 허용 목록** 방식으로
+  (현 `EvaluationAdapterDependencyTest` 가 persistence·`java.sql` 을 못 막는 사각 — 우회 2).
+- (b) **ML(HIGH-3)**: app production 전체가 참조하는 `bidvector.adapters.ml` 타입 집합 ⊆ {`UnavailableMlAnalysis`}. 계약 D-6A3-2
+  문면(「배선이」)을 「app 전체」로 넓힌다 — 루트 패키지에도 `@Bean` 이 있다(verifier M4).
+- (c) **컨트롤러 우회(HIGH-4)**: `app.http` 패키지의 **모든 클래스**(이름 무관)가 참조하는 workflow 타입 집합에 port 인터페이스가
+  없다 — port 집합은 policy 키(평가 port 아홉 + `StrategyRepository`). verifier M5(helper 클래스)가 RED.
+- **거동 test(HIGH-1 의 두 번째 다리, code-reviewer MEDIUM · verifier M3 동시 해소)**: **`BidNow` 를 내는 ML fake 를 실
+  `EvaluationDryRunFactory` 에 넣고** Testcontainers 로 돌려 ① `wouldNotifyNoticeIds` 비어 있지 않음 ∧ == `bidNowNoticeIds`
+  ② outbox 행 수 전후 등식. fake 주입은 test 전용 Spring 구성으로 — production 배선에 주입 자리를 새로 열지 않는다(열어야
+  하면 멈추고 보고, (2b) 대상).
+
+**D-6A3-18 — 전략 한 번 읽기 계수 test 를 `evaluate()` 까지 돌린다(HIGH-2).** `forRequest()` 뒤 `evaluate()` 를 끝까지 돌리고
+**실 저장소(delegate)의 `load` 호출이 요청 전체에서 1회**임을 센다. verifier M2(use case 에 delegate 를 넘기는 변이)가 RED.
+`PinnedStrategyRepository.save` 는 dry-run 에서 부를 이유가 없으므로 **`error()`**(verifier LOW) — 위임하지 않는다.
+
+**D-6A3-19 — 요청 본문은 엄격하다. 형식 오류는 400(contract-keeper V1 · verifier MEDIUM · code-reviewer LOW · privacy 관찰).**
+`currentActiveBids` 는 **JSON 정수이고 `0..Int.MAX_VALUE`** 여야 한다 — 누락·null·문자열(`"3"`)·소수(`1.7`)·범위 초과·비JSON·
+빈 본문은 전부 **400 `INVALID_REQUEST`**(예외 메시지 미포함). 조용한 절삭·강제 변환을 두지 않는다. `ErrorMapping` 에
+역직렬화 실패 행을 더한다(매핑표는 여전히 하나). 입력 표 test(케이스 여덟 이상). OpenAPI 요청 스키마에 `minimum: 0`·
+400 description 정정.
+
+**D-6A3-20 — 계약 문서를 소비자가 분기할 수 있게(contract-keeper V2·V3 · verifier MEDIUM).**
+- `ErrorBody.code` 에 `enum`(전 코드) + 응답별 description 에 해당 code 부분집합. `ErrorCode` 상수 집합 == 문서 enum 양방향 test.
+- HTTP 층 `409 CANDIDATE_CAP_EXCEEDED` test(verifier M8 — 매핑 행을 지우면 RED).
+- `OpenApiContractTest` 가 path → **상태 코드 선언 집합** 과 **요청 스키마 키 집합**까지 대조(verifier: 409·401 선언을 지워도,
+  요청 스키마에 필드를 더해도 초록이던 사각). 기존 `/api/strategy` 가 같은 사각을 가진 것은 같은 test 가 함께 덮는다.
+- 이 path 의 401·500 도 `ErrorBody` 키 등식. E2E 의 공허한 단언(`as?…?.shouldBeEmpty()`·`.orEmpty()` 등식)을 고친다.
+
+**D-6A3-21 — V16 쓰기 경로를 잠근다(migration-reviewer 위반 1 · 권고 둘).** 두 번 저장(7 → 3) 뒤 `load()` == 3 · 개정 이력 표에서
+두 값을 다시 읽는다(UPSERT `DO UPDATE SET` 줄을 지우는 변이 RED) · DB 에 `max_active_bids = 0` 직접 INSERT 가 CHECK 로
+거부된다(CHECK 를 `>= 0` 으로 느슨하게 한 변이 RED).
+
+**D-6A3-22 — privacy R-1: 원문 텍스트 부재를 거동으로 잰다.** 제목·기관명이 있는 표본 공고로 dry-run 을 돌리고 **원시 응답
+본문 문자열에 그 원문이 없다**(부재 단언)를 E2E 에 둔다.
+
+**D-6A3-23 — 장부층·계약 문면(승인 전 일괄, 같은 라운드).**
+- in_scope 흡수: `adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt`(V16 SQL 열 목록 — 기계적 필연) ·
+  `workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionRestore.kt`(D-6A3-12 가 「같은 패키지 변환 파일이 있으면」으로
+  예견한 그 파일). checklist 의 in_scope 대조를 **A 와 M 둘 다**로.
+- rollback.md: `milestone-6.md` 커밋 목록 사실 정정(`39076f6c`) · 공유 파일 hunk 격리 절차를 규율대로 · **V16 두 갈래**를
+  migration-reviewer 처방대로(적용 DB 갈래는 V16 을 restore 목록에서 빼고 새 V 로 `DROP COLUMN`, 파일 삭제를 적용 DB 에 쓰면
+  Flyway 검증이 깨진다는 사실).
+- 크기 수치 정정(실측 산출물 +/− 1982 · evidence 는 scope.md 포함 총합으로 적는다) · D-6A3-14 V16 전/후 RED→GREEN 기록 ·
+  commands.md 의 1·2차 RED 절 삭제(라운드 이력 금지 — 최종 명령·exit 만) · `runBlocking` 제한 서술을 실측대로(스레드
+  interrupt 는 전파된다, 전파되지 않는 것은 클라이언트 연결 종료, 오늘 무해한 이유는 어떤 포트도 실제로 suspend 하지 않아서).
+- privacy R-2(합성 `toString()`)는 `OPEN-6F-ASSEMBLY` 재확인 ④ 를 **로거를 처음 들이는 slice 또는 `OPEN-ML-ANALYSIS-WIRING`** 로
+  옮겨 적는다. contract-keeper 의 `OPEN-6A3-EVALUATION-DETAIL` 권고(유지, 필요 시 「깊이 정확히 1」 방식)를 OPEN 표에 적는다.
+
+**이 라운드의 보고 항목**: (2b) 표 갱신(새 public 표면 — test 전용 Spring 구성이 production 에 새지 않는지) · 새 파일 ↔ in_scope
+대조(A·M) · 게이트 술어 변경 셋의 변이 RED 명령(verifier M1·M2·M4·M5·M3·M8 + migration 두 변이).
+
 ## 위협 모델 — 6A-3+6F-3 고유 경계
 
 지키는 것: **① dry-run endpoint 는 외부 effect 를 만들지 않는다**(outbox 에 행이 생기지 않는다, 발송 없음)
@@ -239,6 +303,8 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/strategy/**
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt   # D-6A3-14 — 추가만
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt    # D-6A3-14 — 추가만
+  - adapters/src/main/kotlin/bidvector/adapters/persistence/Sql.kt                         # D-6A3-23 — V16 SQL 열 목록
+  - workflow/src/main/kotlin/bidvector/workflow/strategy/EditSessionRestore.kt            # D-6A3-23 — D-6A3-12 가 예견한 변환 파일
   - adapters/src/main/kotlin/bidvector/adapters/evaluation/**                             # RequestCapacityPort·RecordingNotificationRequestPort
   - adapters/src/test/kotlin/bidvector/adapters/evaluation/**
   - app/src/main/kotlin/bidvector/app/http/**                                             # 컨트롤러·DTO·ErrorMapping 행
