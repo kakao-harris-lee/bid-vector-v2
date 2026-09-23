@@ -189,10 +189,12 @@ class EvaluationAdapterDependencyTest {
  */
 private val ALLOWED_METHOD_REFERENCES =
     setOf(
-        "bidvector/adapters/evaluation/NoticeWatchSubjectPortKt.noticeToWatchSubject:(Lbidvector/procurement/Notice;)Lbidvector/strategy/WatchSubject;",
+        "bidvector/adapters/evaluation/NoticeWatchSubjectPortKt.noticeToWatchSubject:" +
+            "(Lbidvector/procurement/Notice;)Lbidvector/strategy/WatchSubject;",
         // noticeToWatchSubject 를 private 으로 좁히면(D-6F4W-16, code-reviewer LOW) Kotlin 이
         // 같은 파일의 다른 class(NoticeWatchSubjectPort)가 부를 수 있도록 합성 접근자를 낸다.
-        "bidvector/adapters/evaluation/NoticeWatchSubjectPortKt.access\$noticeToWatchSubject:(Lbidvector/procurement/Notice;)Lbidvector/strategy/WatchSubject;",
+        "bidvector/adapters/evaluation/NoticeWatchSubjectPortKt.access\$noticeToWatchSubject:" +
+            "(Lbidvector/procurement/Notice;)Lbidvector/strategy/WatchSubject;",
         "bidvector/procurement/Agency.getName:()Lbidvector/procurement/AgencyName;",
         "bidvector/procurement/AgencyName.getValue:()Ljava/lang/String;",
         "bidvector/procurement/BusinessCategory.getCode:()Lbidvector/procurement/CategoryCode;",
@@ -209,9 +211,14 @@ private val ALLOWED_METHOD_REFERENCES =
         "bidvector/sharedkernel/Fact\$Absent.\"<init>\":(Lbidvector/sharedkernel/ReasonCode;)V",
         "bidvector/sharedkernel/Fact\$Known.\"<init>\":(Ljava/lang/Object;)V",
         "bidvector/strategy/CategoryCode.\"<init>\":(Ljava/lang/String;)V",
-        "bidvector/strategy/TextKt.assembleFullScopeText:(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lbidvector/strategy/FullScopeText;",
-        "bidvector/strategy/TextKt.assembleKeywordScopeText:(Ljava/lang/String;Ljava/lang/String;)Lbidvector/strategy/KeywordScopeText;",
-        "bidvector/strategy/WatchSubject.\"<init>\":(Ljava/util/Set;Lbidvector/strategy/KeywordScopeText;Lbidvector/strategy/FullScopeText;Lbidvector/sharedkernel/Fact;)V",
+        "bidvector/strategy/TextKt.assembleFullScopeText:" +
+            "(Ljava/lang/String;Ljava/lang/String;" +
+            "Ljava/lang/String;Ljava/lang/String;)Lbidvector/strategy/FullScopeText;",
+        "bidvector/strategy/TextKt.assembleKeywordScopeText:" +
+            "(Ljava/lang/String;Ljava/lang/String;)Lbidvector/strategy/KeywordScopeText;",
+        "bidvector/strategy/WatchSubject.\"<init>\":" +
+            "(Ljava/util/Set;Lbidvector/strategy/KeywordScopeText;" +
+            "Lbidvector/strategy/FullScopeText;Lbidvector/sharedkernel/Fact;)V",
         "bidvector/workflow/evaluation/WatchSubjectOutcome\$Found.\"<init>\":(Lbidvector/strategy/WatchSubject;)V",
         "java/lang/Object.\"<init>\":()V",
         "kotlin/collections/SetsKt.emptySet:()Ljava/util/Set;",
