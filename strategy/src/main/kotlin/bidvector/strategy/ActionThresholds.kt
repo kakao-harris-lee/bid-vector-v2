@@ -32,3 +32,17 @@ data class CandidateLimit(
         require(value > 0) { "CandidateLimit은 양수여야 한다: $value" }
     }
 }
+
+/**
+ * 활성 투찰 여력 상한(M6/6A-3+6F-3, D-6A3-4) — 양의 정수. [CandidateLimit](후보 상한, 스캔·
+ * 분석 축)과 다른 축이다 — 이 값은 `CapacityPort`(용량 게이트)가 소비하는 「현재 진행 중인
+ * 투찰이 몇 건까지 허용되는가」다. 미설정(`null`)과 값 0은 다른 상태다(D-15 관례) — 미설정은
+ * fail-closed 로 소비된다(app 조립 축, 이 값 자신은 그 정책을 모른다).
+ */
+data class MaxActiveBids(
+    val value: Int,
+) {
+    init {
+        require(value > 0) { "MaxActiveBids는 양수여야 한다: $value" }
+    }
+}

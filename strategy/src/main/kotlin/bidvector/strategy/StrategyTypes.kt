@@ -20,6 +20,8 @@ data class OperatorStrategy internal constructor(
     val actionThresholds: ActionThresholds,
     val candidateLimit: CandidateLimit?,
     val revision: StrategyRevision,
+    /** 활성 투찰 여력 상한(M6/6A-3+6F-3, D-6A3-4) — 미설정은 `null`(지어내지 않는다). */
+    val maxActiveBids: MaxActiveBids? = null,
 )
 
 /**

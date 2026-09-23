@@ -39,6 +39,8 @@ data class StrategyDraft(
     val bidNowThreshold: BigDecimal? = null,
     val reviewThreshold: BigDecimal? = null,
     val candidateLimit: Int? = null,
+    /** 활성 투찰 여력 상한(M6/6A-3+6F-3, D-6A3-4) — 미설정은 `null`. */
+    val maxActiveBids: Int? = null,
 )
 
 /** 전략 값 불변식 위반(⑤) — 구조화 코드, 문장이 아니다(`v2-지침서.md` §4.2). */
@@ -52,6 +54,9 @@ sealed interface StrategyViolation {
     ) : StrategyViolation
 
     data object CandidateLimitNotPositive : StrategyViolation
+
+    /** D-6A3-4 — 여력 상한은 양수여야 한다. [CandidateLimitNotPositive]와 같은 형태(다른 필드). */
+    data object MaxActiveBidsNotPositive : StrategyViolation
 
     data class BlankTerm(
         val field: WatchRuleId,
@@ -202,6 +207,20 @@ private fun buildCandidateLimit(
         }
     }
 
+/** D-6A3-4 — [buildCandidateLimit]과 같은 형태(다른 위반 코드·다른 값 타입). */
+private fun buildMaxActiveBids(
+    draft: StrategyDraft,
+    violations: MutableList<StrategyViolation>,
+): MaxActiveBids? =
+    draft.maxActiveBids?.let { raw ->
+        if (raw <= 0) {
+            violations += StrategyViolation.MaxActiveBidsNotPositive
+            null
+        } else {
+            MaxActiveBids(raw)
+        }
+    }
+
 /**
  * 전략 값 validation의 유일한 진입점(D-10, ⑤) — 위반을 전부 모아 낸다(첫 위반에서
  * 멈추지 않는다 — 편집 화면이 한 번에 보여야 한다). [OperatorStrategy]는 이 함수를
@@ -217,9 +236,10 @@ fun validate(
     val watchRules = buildWatchRules(draft, policy.value, violations)
     val actionThresholds = buildActionThresholds(draft, policy.value, violations)
     val candidateLimit = buildCandidateLimit(draft, violations)
+    val maxActiveBids = buildMaxActiveBids(draft, violations)
 
     if (violations.isNotEmpty()) return StrategyValidation.Invalid(violations, policy.version)
 
-    val strategy = OperatorStrategy(watchRules, actionThresholds, candidateLimit, revision)
+    val strategy = OperatorStrategy(watchRules, actionThresholds, candidateLimit, revision, maxActiveBids)
     return StrategyValidation.Valid(strategy, policy.version)
 }
