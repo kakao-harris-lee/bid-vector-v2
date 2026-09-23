@@ -246,6 +246,15 @@ in_scope 에 넣는다. 절차 사실(계약 갱신 전 커밋)은 D-6A3-15 와 
 **이 라운드의 보고 항목**: (2b) 표 갱신(새 public 표면 — test 전용 Spring 구성이 production 에 새지 않는지) · 새 파일 ↔ in_scope
 대조(A·M) · 게이트 술어 변경 셋의 변이 RED 명령(verifier M1·M2·M4·M5·M3·M8 + migration 두 변이).
 
+## 계약 갱신 (6) — 수정 라운드 1 의 fixture 경로 흡수 (2026-09-23, 팀장)
+
+**D-6A3-24 — `app/src/test/kotlin/bidvector/archfixture/violating/**` 전체를 in_scope 로 넓힌다.** D-6A3-17 게이트 셋의 양성 대조
+fixture 다섯(`archfixture/violating/app/**`·`.../app/http/**`)이 D-6A3-16 이 편입한 `.../evaluation/**` 밖에 생겼다. 전부 test 전용이고
+production classpath 에 닿지 않는다(구현 레인 빌드 산출물 실측). 게이트가 app 전체를 보게 바뀌었으므로 fixture 도 여러 서브패키지에
+놓이는 것이 형태상 필연이다 — 서브패키지마다 계약을 고치지 않도록 상위 글롭으로 넓힌다. **절차 사실**: 커밋 뒤 보고(네 번째
+사후 흡수). 이 slice 의 in_scope 확장은 이것으로 여섯 번째이며, 전부 「기존 축에 걸친 additive 변경」 형태였다 — 다음 배선 slice 는
+착수 계약에서 **게이트·fixture·스키마 게이트·build 파일**을 처음부터 in_scope 에 넣는다(milestone 종결 문단의 교훈으로 적는다).
+
 ## 위협 모델 — 6A-3+6F-3 고유 경계
 
 지키는 것: **① dry-run endpoint 는 외부 effect 를 만들지 않는다**(outbox 에 행이 생기지 않는다, 발송 없음)
@@ -311,7 +320,7 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/wiring/**                                           # EvaluationWiring·Factory
   - app/src/main/kotlin/bidvector/app/BidVectorApplication.kt                             # 필요 시(속성 바인딩)
   - app/build.gradle.kts                                                                 # D-6A3-15·16 — :qualification·:decision·:procurement·coroutines
-  - app/src/test/kotlin/bidvector/archfixture/violating/evaluation/**                  # D-6A3-16 — D-6A3-9 양성 대조 fixture
+  - app/src/test/kotlin/bidvector/archfixture/violating/**                             # D-6A3-16·24 — 게이트 양성 대조 fixture 전체
   - app/src/main/resources/**                                                             # 설정 속성 선언이 있으면
   - app/src/test/kotlin/bidvector/app/**                                                  # http·wiring·architecture(D-6A3-9)·conformance(draft 필드)
   - openapi/bidvector-operator-api.yaml                                                   # D-6A3-11
