@@ -3,6 +3,7 @@ package bidvector.adapters.evaluation
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import java.io.File
 
@@ -106,6 +107,84 @@ class EvaluationAdapterDependencyTest {
 
         javapOutput(classFile) shouldContain "biddableStatuses"
     }
+
+    /**
+     * D-6F4W-3 참조 단언 — [JdbcCandidateSource]의 `biddableStatuses` 참조 단언과 같은
+     * 형태. `NoticeWatchSubjectPort`가 텍스트를 직접 조립하지 않고 `strategy` 커널
+     * (`assembleKeywordScopeText`·`assembleFullScopeText`)을 실제로 부르는지, 소스 문법이
+     * 아니라 컴파일된 상수 풀로 잰다.
+     */
+    @Test
+    fun `NoticeWatchSubjectPort 의 컴파일된 클래스는 조립 커널을 참조한다`() {
+        val classFile = File("build/classes/kotlin/main/bidvector/adapters/evaluation/NoticeWatchSubjectPortKt.class")
+        check(classFile.isFile) {
+            "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
+        }
+
+        val output = javapOutput(classFile)
+        output shouldContain "assembleKeywordScopeText"
+        output shouldContain "assembleFullScopeText"
+    }
+
+    /**
+     * D-6F4W-7 우회 3 — **상수 풀 부재 단언**(CLAUDE.md 「존재 단언은 못 막는다」). 바로 위
+     * 참조 단언은 「커널을 부르는가」만 잰다 — 어댑터가 커널을 부르면서 **동시에** 자기
+     * 이어붙이기(문자열 템플릿·`StringBuilder`·`joinToString`)를 옆에 또 두는 우회는
+     * 잡지 못한다. 이 test는 그 기계 자체가 상수 풀에 없음을 잰다. 술어가 실제로 그
+     * 기계를 잡는지는 [문자열_템플릿으로_직접_이어붙이는_표본은_이_술어에_걸린다] 양성
+     * 대조가 증명한다.
+     */
+    @Test
+    fun `NoticeWatchSubjectPort 의 컴파일된 클래스는 문자열 이어붙이기 기계를 직접 갖지 않는다`() {
+        val classFiles =
+            listOf(
+                File("build/classes/kotlin/main/bidvector/adapters/evaluation/NoticeWatchSubjectPort.class"),
+                File("build/classes/kotlin/main/bidvector/adapters/evaluation/NoticeWatchSubjectPortKt.class"),
+            )
+        classFiles.forEach { classFile ->
+            check(classFile.isFile) {
+                "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
+            }
+        }
+
+        val output = classFiles.joinToString(separator = "\n", transform = ::javapOutput)
+
+        CONCATENATION_MACHINERY_MARKERS.forEach { marker -> output shouldNotContain marker }
+    }
+
+    /** 양성 대조 — 문자열 템플릿으로 직접 이어붙이는 표본([ConcatenationMachineryFixture])은 이 술어에 걸린다. */
+    @Test
+    fun `문자열 템플릿으로 직접 이어붙이는 표본은 이 술어에 걸린다 — 양성 대조`() {
+        val classFile =
+            File("build/classes/kotlin/test/bidvector/adapters/evaluation/ConcatenationMachineryFixture.class")
+        check(classFile.isFile) {
+            "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileTestKotlin 선행 필요"
+        }
+
+        val output = javapOutput(classFile)
+
+        CONCATENATION_MACHINERY_MARKERS.any { marker -> output.contains(marker) } shouldBe true
+    }
+}
+
+/**
+ * D-6F4W-7 우회 3 부재 단언이 찾는 문자열 이어붙이기 기계의 이름들 — Kotlin 문자열 템플릿이
+ * JVM 21 대상에서 실제로 내리는 두 형태(`invokedynamic makeConcatWithConstants`·명시적
+ * `StringBuilder`)와 `joinToString`(직접 조립 재현)을 모두 덮는다.
+ */
+private val CONCATENATION_MACHINERY_MARKERS =
+    listOf("StringBuilder", "makeConcatWithConstants", "joinToString")
+
+/**
+ * [EvaluationAdapterDependencyTest]의 양성 대조 전용 표본 — production 코드가 아니다.
+ * `NoticeWatchSubjectPort`처럼 커널을 부르지 않고 문자열 템플릿으로 직접 이어붙이면
+ * `CONCATENATION_MACHINERY_MARKERS`가 실제로 잡히는지를 증명한다.
+ */
+internal class ConcatenationMachineryFixture {
+    fun concatenate(
+        a: String?,
+        b: String?,
+    ): String = "$a $b"
 }
 
 /**
