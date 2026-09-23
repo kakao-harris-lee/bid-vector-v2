@@ -23,6 +23,7 @@ import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
@@ -70,6 +71,15 @@ private class UnreachableClock : Clock {
     override fun now(): Instant = error("forRequest() 는 이 port 를 부르지 않는다")
 }
 
+/**
+ * D-6A3-18 — HIGH-2(verifier) 시정. `evaluate()`까지 돌리되 후보가 0건이라 watch·license·
+ * ml·correlationId 넷에는 닿지 않는다(그 넷은 여전히 [UnreachablePort]/[UnreachableCorrelationIdFactory]
+ * 로 잠근다) — `load` 1회 계수만 재는 최소 표본.
+ */
+private class EmptyCandidateSource : CandidateSourcePort {
+    override fun openCandidates(): List<Notice> = emptyList()
+}
+
 private fun strategyWithCap(maxActiveBids: Int?): bidvector.strategy.OperatorStrategy {
     val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
     val draft = StrategyDraft(focusCategories = listOf("CAT-1"), maxActiveBids = maxActiveBids)
@@ -79,11 +89,14 @@ private fun strategyWithCap(maxActiveBids: Int?): bidvector.strategy.OperatorStr
     }
 }
 
-private fun factoryWith(repository: StrategyRepository): EvaluationDryRunFactory {
+private fun factoryWith(
+    repository: StrategyRepository,
+    candidateSource: CandidateSourcePort = UnreachablePort(),
+): EvaluationDryRunFactory {
     val unreachable = UnreachablePort()
     return EvaluationDryRunFactory(
         strategyRepository = repository,
-        candidateSource = unreachable,
+        candidateSource = candidateSource,
         watchSubjects = unreachable,
         licenseGate = unreachable,
         mlAnalysis = unreachable,
@@ -97,6 +110,12 @@ private fun factoryWith(repository: StrategyRepository): EvaluationDryRunFactory
  * 실제로 구동하지 않고(위 `UnreachablePort` 넷이 호출되면 스스로 실패한다) 직접 잰다.
  * `EvaluationDryRunControllerTest`·`EvaluationDryRunE2ETest`는 HTTP 층 전체를 거쳐 같은
  * 분기를 간접으로 재확인한다 — 이 test는 그 판정이 어디서 나는지(팩토리 자신)를 좁혀 잠근다.
+ *
+ * **D-6A3-18(검토 라운드 1 HIGH-2) — `forRequest 는 전략을 정확히 한 번 읽는다`는 절반만
+ * 잰다.** `forRequest()`만 부르고 `evaluate()`는 구동하지 않아, use case가 저장소를 따로
+ * 부르는 경로(예: factory가 use case에 pinned 가 아니라 delegate 를 그대로 넘기는 변이)는
+ * 이 test에 보이지 않았다(verifier M2). 아래 `forRequest 뒤 evaluate 까지 돌려도` test가
+ * `evaluate()`까지 실제로 돌려 그 사각을 닫는다.
  */
 class EvaluationDryRunFactoryTest {
     @Test
@@ -104,6 +123,24 @@ class EvaluationDryRunFactoryTest {
         val repository = CountingStrategyRepository(strategyWithCap(10))
 
         factoryWith(repository).forRequest(3)
+
+        repository.loadCount shouldBe 1
+    }
+
+    /**
+     * D-6A3-18 — HIGH-2 시정. `forRequest(n).useCase.evaluate()`까지 돌려 실 저장소
+     * (delegate)의 `load` 호출이 **요청 전체**에서 1회임을 센다. 후보가 0건이어도 `load`는
+     * `evaluate()` 진입에서 불리므로(`EvaluateCandidatesUseCase.evaluate` 첫 줄) 이 단언은
+     * 성립한다. `factory`의 `strategies = pinnedStrategies`를 `strategies = strategyRepository`
+     * (delegate 그대로)로 바꾸는 변이(verifier M2)는 `evaluate()`가 `strategies.load()`를
+     * 다시 불러 `loadCount`가 2가 되므로 이 test가 RED가 된다.
+     */
+    @Test
+    fun `forRequest 뒤 evaluate 까지 돌려도 delegate 의 load 는 요청 전체에서 1회다`() {
+        val repository = CountingStrategyRepository(strategyWithCap(10))
+
+        val run = factoryWith(repository, EmptyCandidateSource()).forRequest(3)
+        runBlocking { run.useCase.evaluate() }
 
         repository.loadCount shouldBe 1
     }

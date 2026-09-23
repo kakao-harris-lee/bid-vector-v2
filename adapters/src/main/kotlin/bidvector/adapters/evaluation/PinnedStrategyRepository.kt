@@ -13,14 +13,17 @@ import bidvector.workflow.strategy.StrategyRepository
  * 소비)과 사다리 판정이 같은 개정을 본다(4B-1 형태 ⑧ 「두 시점에 다르게 세어진다」의
  * 재발 방지).
  *
- * `save()`는 dry-run 경로에서 불리지 않지만 인터페이스 계약을 지키려 실 저장소로 위임한다
- * — 이 클래스 자신이 쓰기를 흡수하지 않는다.
+ * **`save()`는 `error()`다(D-6A3-18, 검토 라운드 1 verifier LOW 시정).** dry-run use case는
+ * 오늘 `save`를 부르지 않는다(위협 모델 ① effect 0) — 실 저장소로 위임하면 이 객체가
+ * 쓰기 경로를 계속 쥐고 있는 셈이라 dry-run 의 「effect 0」 취지와 어긋난다. 위임할 실
+ * 저장소 참조([delegate])도 더 이상 필요 없어 생성자에서 뺐다 — `load()`가 이미 [loaded]
+ * 만으로 완결된다.
  */
 class PinnedStrategyRepository(
     private val loaded: OperatorStrategy,
-    private val delegate: StrategyRepository,
 ) : StrategyRepository {
     override fun load(): OperatorStrategy = loaded
 
-    override fun save(applied: AppliedStrategy) = delegate.save(applied)
+    override fun save(applied: AppliedStrategy): Nothing =
+        error("PinnedStrategyRepository는 dry-run 전용이다 — save()를 부르지 않는다(effect 0)")
 }

@@ -63,7 +63,7 @@ class EvaluationDryRunFactory(
         val maxActiveBids = strategy.maxActiveBids?.value ?: throw MaxActiveBidsNotConfiguredException()
         val capacity = RequestCapacityPort(currentActiveBids, maxActiveBids)
         val notifications = RecordingNotificationRequestPort()
-        val pinnedStrategies = PinnedStrategyRepository(strategy, strategyRepository)
+        val pinnedStrategies = PinnedStrategyRepository(strategy)
         val useCase =
             EvaluateCandidatesUseCase(
                 strategies = pinnedStrategies,
