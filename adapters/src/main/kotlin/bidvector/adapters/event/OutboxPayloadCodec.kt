@@ -18,10 +18,16 @@ import java.time.LocalDate
  * 값이 단순(정수·날짜·짧은 문자열, 목록·map도 원시 원소뿐)이라 Jackson 등 JSON
  * 라이브러리를 새로 끌어오지 않는다(측정된 필요 없음, §7) — 이스케이프를 인식하는
  * 구분자로 충분하다. `NotificationRequestedPayload`가 목록·map을 나르므로 구분자를
- * 계층별로 하나씩 쓴다(`FIELD_SEPARATOR` 최상위, `LIST_SEPARATOR` 목록,
- * `MAP_ENTRY_SEPARATOR` map 항목) — 각 계층은 `escapeFor`/`splitEscapedFor`로 독립적으로
- * 이스케이프되므로(자신의 구분자와 `ESCAPE`만 보호) 중첩이 안전하다(바깥 계층이 안쪽이
- * 이미 이스케이프한 `ESCAPE` 문자를 다시 보호한다 — CSV-in-CSV와 같은 원리).
+ * 계층별로 쓴다(`FIELD_SEPARATOR` 최상위, `LIST_SEPARATOR` 목록, map 은 `MAP_ENTRY_SEPARATOR`
+ * 항목·`MAP_KV_SEPARATOR` 키/값 **둘**). **주의 — "각 계층이 자신의 구분자만 보호하면
+ * 중첩이 안전하다"는 계층이 하나씩 고르게 겹칠 때만 맞다.** map 처럼 한 계층 안에 구분자가
+ * 둘(항목·키값)이면 안쪽 계층(키를 `MAP_KV_SEPARATOR`로 먼저 보호)을 만든 **결과
+ * 전체**를 바깥 계층(`MAP_ENTRY_SEPARATOR`)으로 다시 감싸야 한다 — 키 하나만 보호하고
+ * 바깥 구분자로 이어 붙이면(join) 바깥쪽이 안쪽 이스케이프를 감싸지 않아 깨진다
+ * (D-6F7-12 실측: decode 의 첫 `splitEscapedFor`는 이스케이프 종류를 가리지 않고
+ * 전부 해제하므로, 감싸이지 않은 안쪽 보호는 그 자리에서 사라진다). 감싸인 계층은
+ * 바깥 계층이 안쪽이 이미 이스케이프한 `ESCAPE` 문자를 다시 보호해 중첩이 안전하다
+ * (CSV-in-CSV와 같은 원리) — `excludedSamplesField`가 이 감싸기를 명시적으로 한다.
  *
  * 직렬화 상수·하위 조립 함수는 이 object의 멤버가 아니라 **파일 스코프 private
  * top-level**이다(D-6F7 수정) — object 멤버로 두면 detekt `TooManyFunctions`(상한 11)와
@@ -137,11 +143,20 @@ private fun encodeReasons(reasons: List<String>): String =
 private fun excludedSamplesField(excludedSamples: Map<String, Int>): String =
     // toSortedMap 은 자연 순서 비교자를 쓴다 — sortedBy 람다가 낳는 합성 클래스
     // (jarContentGate가 거부하는 stdlib SourceFile 유출)를 만들지 않는다.
+    //
+    // D-6F7-12 — 키는 MAP_KV_SEPARATOR('=')와 MAP_ENTRY_SEPARATOR(';') 둘 다 담을 수
+    // 있다. decode 가 먼저 ';'로 전체를 나누고(splitEscapedFor) 그 다음 각 항목을
+    // '='로 나누므로, 두 구분자를 같은 단계에서 나란히 이스케이프하면 안 된다(첫
+    // splitEscapedFor 가 이스케이프 종류를 안 가리고 전부 해제해 두 번째 '=' 보호가
+    // 사라진다 — 실측). 안쪽 계층(키를 '='만 보호)으로 먼저 감싸고, 그 결과 전체를
+    // 바깥 계층('; '보호)으로 한 번 더 감싼다 — FIELD_SEPARATOR/LIST_SEPARATOR 가
+    // 이미 쓰는 것과 같은 중첩(파일 KDoc).
     excludedSamples
         .toSortedMap()
         .entries
         .joinToString(MAP_ENTRY_SEPARATOR.toString()) { (reason, count) ->
-            "${escapeFor(reason, MAP_ENTRY_SEPARATOR)}$MAP_KV_SEPARATOR$count"
+            val entry = "${escapeFor(reason, MAP_KV_SEPARATOR)}$MAP_KV_SEPARATOR$count"
+            escapeFor(entry, MAP_ENTRY_SEPARATOR)
         }
 
 /**

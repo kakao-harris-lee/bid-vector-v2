@@ -168,6 +168,38 @@ class OutboxPayloadCodecTest {
     }
 
     @Test
+    fun `excludedSamples 키에 구분자 문자가 있어도 왕복된다 — D-6F7-12 이스케이프 실측`() {
+        val payload =
+            NotificationRequestedPayload(
+                noticeId = "N5-000",
+                bidNowReasons = emptyList(),
+                evidence =
+                    NotificationEvidencePayload.Diagnosed(
+                        trainingRowCount = 5,
+                        segmentSupport = "Direct",
+                        shrinkageWeight = "0.1",
+                        excludedObservations = 1,
+                        agencySampleCount = 2,
+                        agencySampleBelowThreshold = false,
+                        releaseId = "rel-5",
+                        artifactChecksum = "sha256:key-escape",
+                        featureSchemaVersion = "v5",
+                        codeVersion = "code-5",
+                        datasetId = "ds-5",
+                        releaseKind = "Artifact",
+                        // 키가 MAP_KV_SEPARATOR('=')와 MAP_ENTRY_SEPARATOR(';') 둘 다 담는다 —
+                        // decode 의 `check(kv.size == 2)`가 '='만 이스케이프하지 않으면 터진다.
+                        excludedSamples = mapOf("A=B;C" to 4, "PLAIN" to 1),
+                    ),
+            )
+
+        val encoded = OutboxPayloadCodec.encode(payload)
+        val decoded = OutboxPayloadCodec.decode(OutboxPayloadCodec.payloadTypeOf(payload), encoded)
+
+        decoded shouldBe payload
+    }
+
+    @Test
     fun `StrategyUpdated 왕복은 NotificationRequested 신설 뒤에도 무변화다 — 회귀 없음`() {
         val event = StrategyEvent.StrategyUpdated(StrategyRevision(9), PolicyVersion(EffectiveFrom.Initial, "test"))
 
