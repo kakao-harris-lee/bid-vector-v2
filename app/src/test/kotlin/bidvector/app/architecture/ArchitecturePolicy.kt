@@ -31,6 +31,33 @@ class ArchitecturePolicy private constructor(
     /** M6/6A-3+6F-3 D-6A3-9 — `assemble*`(bidvector.strategy.TextKt) 호출 허용 목록. */
     val allowedAssembleCallers: List<String> get() = list("app.allowed.assemble-callers")
 
+    /** D-6A3-17(a) — `NotificationRequestPort` 포트 타입 FQCN. */
+    val notificationPortType: String get() = value("app.notification.port-type")
+
+    /** D-6A3-17(a)② — app 이 참조해도 되는 `NotificationRequestPort` 구현 타입 허용 목록. */
+    val notificationPortAllowedImpls: List<String> get() = list("app.notification.allowed-impls")
+
+    /** D-6A3-17(a)③ — app 이 참조하면 안 되는 outbox 쓰기 타입 전수(구현 레인이 전수). */
+    val outboxForbiddenTypes: List<String> get() = list("app.forbidden.outbox-types")
+
+    /** D-6A3-17(b) — `adapters.ml` 패키지. */
+    val mlPackage: String get() = value("app.ml.package")
+
+    /** D-6A3-17(b) — app production 전체가 참조해도 되는 `adapters.ml` 타입 허용 목록. */
+    val mlAllowedTypes: List<String> get() = list("app.ml.allowed-types")
+
+    /** D-6A3-17(c) — `app.http` 가 우회하면 안 되는 workflow port 타입 전수(평가 port 여덟 + StrategyRepository). */
+    val httpForbiddenPorts: List<String> get() = list("app.http.forbidden-workflow-ports")
+
+    /** D-6A3-17(c) — (참조자, port) 쌍의 명시 예외 — `"From->To"` 형태. */
+    val httpAllowedPortReferences: List<Pair<String, String>>
+        get() =
+            list("app.http.allowed-port-references").map { entry ->
+                val parts = entry.split("->").map(String::trim)
+                check(parts.size == 2) { "app.http.allowed-port-references 항목이 'From->To' 형태가 아니다: $entry" }
+                parts[0] to parts[1]
+            }
+
     /**
      * T-D. **손 열거가 아니라 도출된 후보의 분류**다 — `memberEffectGate` 가 허용 클래스에서
      * 효과 표면에 닿는 멤버를 내고, `member-effects.properties` 가 그 후보를 하나씩

@@ -197,6 +197,171 @@ class ArchitectureRules(
             }
         }
 
+    /**
+     * M6/6A-3+6F-3 D-6A3-17(a) — HIGH-1 시정(검토 라운드 1). 이름 목록(`KNOWN_
+     * NOTIFICATION_REQUEST_PORT_IMPLS`)이 아니라 **구조**로 닫는다. ① [appRoot] 안의
+     * 클래스가 [portTypeName] 을 스스로 구현하지 않는다(집합==∅ — app 안에 숨겨 심는
+     * 우회를 막는다, verifier M1). ② [appRoot] 가 참조하는 포트 구현 타입 집합(classpath
+     * 전체에서 `isAssignableTo` 로 도출)은 [allowedImpls] 의 부분집합이다(다른 모듈에
+     * 새 구현이 생겨 그것을 배선해도 걸린다). ③ [forbiddenOutboxTypes](outbox 쓰기 타입
+     * 전수) 참조 집합은 ∅ 다(포트를 거치지 않고 직접 쓰는 우회를 막는다).
+     */
+    fun notificationPortMustBeStructurallyClosed(
+        appRoot: String,
+        portTypeName: String,
+        allowedImpls: Set<String>,
+        forbiddenOutboxTypes: Set<String>,
+    ): List<ArchRule> =
+        listOf(
+            noClasses()
+                .that()
+                .resideInAPackage("$appRoot..")
+                .should(beAssignableToType(portTypeName))
+                .because("D-6A3-17(a)① — app 이 NotificationRequestPort 구현체를 스스로 정의하지 않는다"),
+            noClasses()
+                .that()
+                .resideInAPackage("$appRoot..")
+                .should(referenceDisallowedImplementation(portTypeName, allowedImpls))
+                .because("D-6A3-17(a)② — app 이 참조하는 NotificationRequestPort 구현 타입 집합은 허용 목록의 부분집합이다"),
+            noClasses()
+                .that()
+                .resideInAPackage("$appRoot..")
+                .should(referenceAnyOf(forbiddenOutboxTypes, "outbox 쓰기 타입"))
+                .because("D-6A3-17(a)③ — app 은 outbox 쓰기 타입을 참조하지 않는다(dry-run effect 0)"),
+        )
+
+    /**
+     * D-6A3-17(b) — HIGH-3 시정. `app.wiring` 만이 아니라 [appRoot] 전체(루트 패키지 포함
+     * — `@Bean` 을 아무 패키지에나 둘 수 있다, verifier M4)가 `adapters.ml`([mlPackage])
+     * 에서 참조하는 클래스 집합은 [allowedTypes] 의 부분집합이다.
+     */
+    fun appMustOnlyReferenceMlTypes(
+        appRoot: String,
+        mlPackage: String,
+        allowedTypes: Set<String>,
+    ): List<ArchRule> =
+        listOf(
+            noClasses()
+                .that()
+                .resideInAPackage("$appRoot..")
+                .should(referenceDisallowedInPackage(mlPackage, allowedTypes))
+                .because("D-6A3-17(b) — app production 이 참조하는 adapters.ml 타입 집합은 허용 목록의 부분집합이다"),
+        )
+
+    /**
+     * D-6A3-17(c) — HIGH-4 시정. [httpRoot] 전체(이름·접두 무관 — verifier M5 helper 클래스)가
+     * 참조하는 workflow port 타입 집합은 [forbiddenPorts] 밖이어야 한다 — 단 [allowedReferences]
+     * 에 적힌 (참조자, 포트) 쌍은 예외다(기존에 정당하게 포트를 직접 쓰는 읽기 전용 endpoint —
+     * `StrategyReadController` → `StrategyRepository`, `RequestAuditFilter` →
+     * `CorrelationIdFactory`). 새 컨트롤러·헬퍼가 use case 를 건너뛰면 그 쌍이 예외 목록에
+     * 없는 한 곧바로 걸린다(우회 5).
+     */
+    fun httpPackageMustNotBypassPorts(
+        httpRoot: String,
+        forbiddenPorts: Set<String>,
+        allowedReferences: Set<Pair<String, String>>,
+    ): List<ArchRule> =
+        listOf(
+            noClasses()
+                .that()
+                .resideInAPackage("$httpRoot..")
+                .should(referenceForbiddenPort(forbiddenPorts, allowedReferences))
+                .because("D-6A3-17(c) — app.http 는 use case 를 우회해 port 를 직접 참조하지 않는다(명시 예외 제외)"),
+        )
+
+    private fun beAssignableToType(typeName: String): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("$typeName 에 assignable 하다(그 타입 자신은 제외)") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                if (item.fullName != typeName && item.isAssignableTo(typeName)) {
+                    events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} implements/extends $typeName"))
+                }
+            }
+        }
+
+    private fun referenceDisallowedImplementation(
+        portTypeName: String,
+        allowed: Set<String>,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("허용 목록 밖의 $portTypeName 구현체를 참조한다 (허용 ${allowed.size} 종)") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.directDependenciesFromSelf
+                    .map { it.targetClass }
+                    .filter { target -> target.fullName != portTypeName && target.isAssignableTo(portTypeName) }
+                    .filter { target -> target.fullName !in allowed }
+                    .distinct()
+                    .forEach { target ->
+                        events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${target.fullName}"))
+                    }
+            }
+        }
+
+    private fun referenceAnyOf(
+        forbidden: Set<String>,
+        label: String,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("$label 을 참조한다 (${forbidden.size} 종)") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.directDependenciesFromSelf
+                    .map { it.targetClass }
+                    .filter { it.fullName in forbidden }
+                    .distinct()
+                    .forEach { target ->
+                        events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${target.fullName}"))
+                    }
+            }
+        }
+
+    private fun referenceDisallowedInPackage(
+        packagePrefix: String,
+        allowed: Set<String>,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("$packagePrefix 안의 허용 목록 밖 타입을 참조한다 (허용 ${allowed.size} 종)") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.directDependenciesFromSelf
+                    .map { it.targetClass }
+                    .filter { it.packageName == packagePrefix || it.packageName.startsWith("$packagePrefix.") }
+                    .filter { it.fullName !in allowed }
+                    .distinct()
+                    .forEach { target ->
+                        events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${target.fullName}"))
+                    }
+            }
+        }
+
+    private fun referenceForbiddenPort(
+        forbidden: Set<String>,
+        allowedReferences: Set<Pair<String, String>>,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>(
+            "허용되지 않은 workflow port 타입을 참조한다 (${forbidden.size} 종, 예외 ${allowedReferences.size} 건)",
+        ) {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.directDependenciesFromSelf
+                    .map { it.targetClass }
+                    .filter { it.fullName in forbidden }
+                    .filter { target -> (item.fullName to target.fullName) !in allowedReferences }
+                    .distinct()
+                    .forEach { target ->
+                        events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${target.fullName}"))
+                    }
+            }
+        }
+
     private fun packagesOf(
         root: String,
         modules: List<String>,

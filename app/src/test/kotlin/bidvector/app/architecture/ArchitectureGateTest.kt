@@ -89,5 +89,39 @@ class ArchitectureGateTest {
         rules.assembleCallersMustBeAllowedSet(policy.allowedAssembleCallers).checkAll()
     }
 
+    /** D-6A3-17(a) — HIGH-1 시정. app 이 다루는 NotificationRequestPort 구현체 집합이 구조로 닫힌다. */
+    @Test
+    fun `app 이 다루는 NotificationRequestPort 구현은 허용 목록의 부분집합이고 outbox 쓰기 타입을 참조하지 않는다`() {
+        rules
+            .notificationPortMustBeStructurallyClosed(
+                appRoot = "${policy.packageRoot}.app",
+                portTypeName = policy.notificationPortType,
+                allowedImpls = policy.notificationPortAllowedImpls.toSet(),
+                forbiddenOutboxTypes = policy.outboxForbiddenTypes.toSet(),
+            ).checkAll()
+    }
+
+    /** D-6A3-17(b) — HIGH-3 시정. app production 전체가 참조하는 adapters.ml 타입 집합이 구조로 닫힌다. */
+    @Test
+    fun `app production 이 참조하는 adapters ml 타입은 허용 목록의 부분집합이다`() {
+        rules
+            .appMustOnlyReferenceMlTypes(
+                appRoot = "${policy.packageRoot}.app",
+                mlPackage = policy.mlPackage,
+                allowedTypes = policy.mlAllowedTypes.toSet(),
+            ).checkAll()
+    }
+
+    /** D-6A3-17(c) — HIGH-4 시정. app.http 전체가 명시 예외 없이 workflow port 를 직접 참조하지 않는다. */
+    @Test
+    fun `app http 는 명시 예외 없이 workflow port 를 직접 참조하지 않는다`() {
+        rules
+            .httpPackageMustNotBypassPorts(
+                httpRoot = "${policy.packageRoot}.app.http",
+                forbiddenPorts = policy.httpForbiddenPorts.toSet(),
+                allowedReferences = policy.httpAllowedPortReferences.toSet(),
+            ).checkAll()
+    }
+
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }
 }
