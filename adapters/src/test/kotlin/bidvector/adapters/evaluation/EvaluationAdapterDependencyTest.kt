@@ -17,6 +17,11 @@ import java.io.File
  * 산다(`PersistenceAdapterDependencyTest`·`StrategyAdapterDependencyTest`의 allow-list를
  * 넓히지 않는다 — 이 test는 그 test들과 별개다). `bidvector.adapters.evaluation` 자신은
  * 이 패키지의 클래스끼리 서로 참조할 수 있어야 하므로 포함한다.
+ *
+ * **`bidvector.strategy`(M6/6F-4-w, D-6F4W-3 신설)** — [NoticeWatchSubjectPort]가
+ * `assembleKeywordScopeText`·`assembleFullScopeText`(순수 커널)를 불러 감시 텍스트를
+ * 조립한다(우회 3 — 어댑터가 이어붙이기를 복제하지 않고 커널을 부른다). `WatchSubject`·
+ * `CategoryCode`(strategy 쪽) 타입도 이 축에서 함께 참조된다.
  */
 private val ALLOWED_ROOTS =
     setOf(
@@ -25,6 +30,7 @@ private val ALLOWED_ROOTS =
         "bidvector.workflow.strategy",
         "bidvector.procurement",
         "bidvector.sharedkernel",
+        "bidvector.strategy",
         "bidvector.adapters.persistence",
         "bidvector.adapters.evaluation",
     )
@@ -65,7 +71,6 @@ class EvaluationAdapterDependencyTest {
     fun `허용 밖 domain 모듈을 심은 표본은 이 술어에 걸린다 — 양성 대조`() {
         isDisallowed("bidvector.decision") shouldBe true
         isDisallowed("bidvector.qualification") shouldBe true
-        isDisallowed("bidvector.strategy") shouldBe true
         isDisallowed("bidvector.workflow.ml") shouldBe true
         isDisallowed("bidvector.adapters.ml") shouldBe true
     }
@@ -77,6 +82,7 @@ class EvaluationAdapterDependencyTest {
         isDisallowed("bidvector.workflow.strategy") shouldBe false
         isDisallowed("bidvector.procurement") shouldBe false
         isDisallowed("bidvector.sharedkernel") shouldBe false
+        isDisallowed("bidvector.strategy") shouldBe false
         isDisallowed("bidvector.adapters.persistence") shouldBe false
         isDisallowed("bidvector.adapters.evaluation") shouldBe false
     }
