@@ -64,6 +64,73 @@ toString이 새는" 형태가 아니라 애초에 새어나갈 필드가 없는 
 이 test는 여전히 걸린다. **향후 slice가 evidence 필드를 확장하면(예: 원문 텍스트·
 연락처 등) 이 축을 재실측해야 한다** — 알려진 제한으로 아래에 등재.
 
+## BidNowReason·MlUnavailableReason `toString()` 축어 잠금(팀장 지적, 2라운드)
+
+**팀장 실측 — `bidNowReasons = verdict.reasons.map { it.toString() }`·
+`NotificationEvidencePayload.NotPredicted(reason = reason.toString())`가
+영속 데이터인데 그 문자열을 고정하는 test가 없었다.** `MlUnavailableReason`의
+이름을 바꿔도 payload 형식이 조용히 바뀌고 아무것도 안 붉는 자리였다 — 우회
+판단(경계 test가 `bidvector.decision`을 막고 `internal` 생성자라 재구성도
+불가능) 자체는 옳았지만 "없어야 할 것을 못 막는" 자리가 남아 있었다.
+
+**경계 test는 main 소스만 본다(실측)** — `EventBoundaryTest`의 `sourceRoot`는
+`File("src/main/kotlin/bidvector/workflow/event")`다(소스 코드 확인). test
+소스 디렉터리는 그 술어의 스캔 대상이 아니다 — `OutboxNotificationRequestPortTest`
+가 `bidvector.decision.BidNowReason`·`MlUnavailableReason`·`VerdictLadder`를
+이미 자유롭게 import하고 있고(우회 1 test부터), 그 test class 가 `check`를
+통과한다는 사실 자체가 실측이다.
+
+**처분 ① — 소리 나게 만들었다.** `OutboxNotificationRequestPortTest`에
+`expectedBidNowReasonToString`·`expectedMlUnavailableReasonToString` 두
+잠금 함수를 뒀다 — 둘 다 **`else` 없는 소진 `when`**(`BidNowReason`·
+`MlUnavailableReason`의 각 하위 타입을 전부 나열)이라 새 case가 추가되면
+이 test 파일부터 컴파일이 깨진다. `BidNowReason` 두 case(`VerdictLadder.judge`로
+정직하게 얻은 진짜 값), `MlUnavailableReason` 열한 case(전부 `data object`) 를
+literal 문자열로 축어 단언한다. sink test(payload 관련)도 production 호출을
+그대로 베끼지 않고 이 잠금 함수와 대조하도록 고쳤다(`verdict.reasons.map(::expectedBidNowReasonToString)`
+— production 코드의 `.map{it.toString()}`을 그대로 복사하면 assertion이
+자기참조가 돼 형식이 바뀌어도 항상 통과한다).
+
+**변이 실측(버릴 clone, `git clone --no-hardlinks`, numstat 확인)** — 이름을
+바꾸는 것은 `decision` 모듈 전역에 ripple 이 커서(생성 지점·`EvidenceLines.kt`
+등 여러 파일이 같이 깨짐, 격리된 실측이 안 됨) 대신 **`toString()`을 명시적으로
+override**해 "이름은 그대로인데 직렬화 형식만 조용히 바뀌는" 더 현실적인
+시나리오로 심었다:
+
+| 대상 | 변이 | numstat | RED |
+| --- | --- | --- | --- |
+| `MlUnavailableReason.TransportFailed` | `override fun toString() = "TRANSPORT_FAILED_V2"` 추가 | `2 1` | `MlUnavailableReason 전 case` test 1건 FAILED(`expected:<TransportFailed> but was:<TRANSPORT_FAILED_V2>`) |
+| `BidNowReason.ForceBidOverride` | 같은 형태로 `"FORCE_BID_OVERRIDE_V2"` override 추가 | `3 1` | 2건 FAILED — `payload 는 ForceBidOverride 사유도 나른다` · `BidNowReason 두 case 의 직렬화가 축어로 고정된다` |
+
+둘 다 원복 확인 후 clone 삭제.
+
+**처분 ② — 진짜 종점은 도메인, OPEN 신설 요청(문면 초안)**
+
+```
+OPEN-6F7-REASON-CODE-STABILITY
+
+무엇: BidNowReason·MlUnavailableReason(bidvector.decision)이 payload 직렬화
+가능한 안정적 code 속성(예: val code: String)을 갖지 않는다 — outbox에 실리는
+값이 Kotlin 합성 toString()이다.
+
+왜 지금 못 하는가: (a) workflow.event 의 EventBoundaryTest(D-6F7-5 의 같은
+게이트)가 bidvector.decision 을 main 소스에서 이름으로 참조하는 것을 막는다
+(b) BidNowReason 의 두 하위 타입은 internal 생성자라 workflow 도 재구성 못
+한다 — sink 는 값을 toString()으로만 투영할 수 있다. 둘 다 도메인 타입 변경
+없이는 못 푼다.
+
+①이 무엇을 대신하는가: OutboxNotificationRequestPortTest 가 BidNowReason
+두 case·MlUnavailableReason 열한 case 의 toString() 출력을 literal 로 축어
+단언하고, 소진 when(else 없음)으로 새 case 추가 시 컴파일이 깨지게 한다.
+**이것은 "형식이 안정적이다"를 만들지 않는다** — 누군가 decision 모듈에서
+toString() 을 override 하면(변이 실측으로 재현) 그 커밋에서 이 test 가
+RED 로 잡지만, 이미 영속된 옛 outbox 행의 형식을 고치거나 마이그레이션하지
+않는다. 이 test 는 **회귀를 소리 나게 할 뿐 형식을 안정시키지 않는다.**
+
+누가 닫는가: decision 모듈에 code: String 속성을 추가하는 slice(도메인
+변경, M6/6F-7 밖) — 그 뒤 이 payload 도 code 기반으로 재작성해야 한다.
+```
+
 ## 알려진 제한
 
 - **`OPEN-STR-12`**(발송 채널·렌더링) — 무변경, 이 slice 밖.
