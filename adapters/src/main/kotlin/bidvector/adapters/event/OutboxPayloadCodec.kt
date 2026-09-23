@@ -153,7 +153,7 @@ private fun excludedSamplesField(excludedSamples: Map<String, Int>): String =
  */
 private fun evidenceFieldsOf(evidence: NotificationEvidencePayload): List<String> =
     when (evidence) {
-        is NotificationEvidencePayload.Diagnosed ->
+        is NotificationEvidencePayload.Diagnosed -> {
             listOf(
                 EVIDENCE_KIND_DIAGNOSED,
                 evidence.trainingRowCount.toString(),
@@ -171,11 +171,13 @@ private fun evidenceFieldsOf(evidence: NotificationEvidencePayload): List<String
                 "",
                 excludedSamplesField(evidence.excludedSamples),
             )
+        }
 
-        is NotificationEvidencePayload.NotPredicted ->
+        is NotificationEvidencePayload.NotPredicted -> {
             listOf(EVIDENCE_KIND_NOT_PREDICTED) +
                 List(EVIDENCE_BLANK_SLOTS_FOR_NOT_PREDICTED) { "" } +
                 evidence.reason
+        }
     }
 
 private fun decodeExcludedSamples(field: String): Map<String, Int> =
@@ -193,7 +195,7 @@ private fun decodeExcludedSamples(field: String): Map<String, Int> =
 
 private fun decodeEvidence(evidenceFields: List<String>): NotificationEvidencePayload =
     when (val kind = evidenceFields[0]) {
-        EVIDENCE_KIND_DIAGNOSED ->
+        EVIDENCE_KIND_DIAGNOSED -> {
             NotificationEvidencePayload.Diagnosed(
                 trainingRowCount = evidenceFields[1].toInt(),
                 segmentSupport = evidenceFields[2],
@@ -209,11 +211,15 @@ private fun decodeEvidence(evidenceFields: List<String>): NotificationEvidencePa
                 releaseKind = evidenceFields[12],
                 excludedSamples = decodeExcludedSamples(evidenceFields[EVIDENCE_TRAILING_SLOT_INDEX]),
             )
+        }
 
-        EVIDENCE_KIND_NOT_PREDICTED ->
+        EVIDENCE_KIND_NOT_PREDICTED -> {
             NotificationEvidencePayload.NotPredicted(reason = evidenceFields[EVIDENCE_TRAILING_SLOT_INDEX])
+        }
 
-        else -> error("알 수 없는 NotificationRequested evidenceKind 다: $kind")
+        else -> {
+            error("알 수 없는 NotificationRequested evidenceKind 다: $kind")
+        }
     }
 
 /** [delimiter] 계층 하나를 보호한다 — [ESCAPE] 자신을 먼저 보호해야 중첩이 안전하다(파일 KDoc). */
