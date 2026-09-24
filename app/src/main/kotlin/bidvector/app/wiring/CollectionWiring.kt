@@ -13,6 +13,7 @@ import bidvector.app.collection.CollectionRunner
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.collection.KonepsCredentialProperties
 import bidvector.app.collection.KonepsEndpointProperties
+import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
@@ -94,8 +95,8 @@ open class CollectionWiring {
             properties.categories.map { category ->
                 val name = requireNotNull(CollectionSourceName.of(category)) { "업종 이름 형식이 유효하지 않다" }
                 val operation = endpoint.operations[category] ?: error("오퍼레이션이 등재되지 않은 업종이다: ${name.value}")
-                val operationUri = URI.create("$baseUri/$operation")
-                CollectionSource(name, sourceFor(httpClient, operationUri, serviceKey, httpPolicy))
+                val operationUri = URI.create("$baseUri/${operation.path}")
+                CollectionSource(name, sourceFor(httpClient, operationUri, operation.division, serviceKey, httpPolicy))
             }
         return CollectionSources(sources)
     }
@@ -137,6 +138,7 @@ open class CollectionWiring {
     private fun sourceFor(
         httpClient: HttpClient,
         baseUri: URI,
+        division: BusinessDivision,
         serviceKey: ServiceKey,
         httpPolicy: KonepsHttpPolicyData,
     ): KonepsOpenApiNoticeSource =
@@ -146,6 +148,7 @@ open class CollectionWiring {
             serviceKey = serviceKey,
             httpPolicy = httpPolicy,
             collectionPolicyProvider = ::collectionPolicyAt,
+            businessDivision = division,
         )
 }
 

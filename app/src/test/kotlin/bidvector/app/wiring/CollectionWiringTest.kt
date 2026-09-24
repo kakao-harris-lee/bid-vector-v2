@@ -2,6 +2,8 @@ package bidvector.app.wiring
 
 import bidvector.app.collection.CollectionRunner
 import bidvector.app.collection.KonepsCredentialProperties
+import bidvector.app.collection.KonepsEndpointProperties
+import bidvector.procurement.BusinessDivision
 import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.strategy.Clock
 import io.kotest.assertions.withClue
@@ -220,7 +222,8 @@ class CollectionWiringTest {
     fun `기본 오퍼레이션 표는 환경 속성으로 덮어쓸 수 있다 — 표에 새 업종을 더하면 그 업종이 선다`() {
         withBoot(
             *validProperties(categories = "goods"),
-            "bidvector.koneps.operations.goods=getBidPblancListInfoThng",
+            "bidvector.koneps.operations.goods.path=getBidPblancListInfoThng",
+            "bidvector.koneps.operations.goods.division=goods",
         ) { booted ->
             booted.failure shouldBe null
             booted.context
@@ -228,6 +231,34 @@ class CollectionWiringTest {
                 .all
                 .map { it.name.value } shouldContainExactly
                 listOf("goods")
+        }
+    }
+
+    @Test
+    fun `기본 오퍼레이션 표는 업종 한 행이 경로와 업무 대분류를 함께 나른다(D-6F9-1) — 공사는 공사 용역은 용역`() {
+        withBoot(*validProperties()) { booted ->
+            booted.failure shouldBe null
+            booted.context
+                .getBean(KonepsEndpointProperties::class.java)
+                .operations
+                .mapValues { it.value.division } shouldBe
+                mapOf("construction" to BusinessDivision.CONSTRUCTION, "service" to BusinessDivision.SERVICE)
+        }
+    }
+
+    @Test
+    fun `업종 행에 대분류가 없거나 어휘 밖이면 기동 실패다 — 경로만 바꿔 대분류가 표류하는 길이 없다`() {
+        listOf(
+            arrayOf("bidvector.koneps.operations.goods.path=getBidPblancListInfoThng"),
+            arrayOf(
+                "bidvector.koneps.operations.goods.path=getBidPblancListInfoThng",
+                "bidvector.koneps.operations.goods.division=basket",
+            ),
+        ).forEach { rowProperties ->
+            withBoot(*validProperties(categories = "goods"), *rowProperties) { booted ->
+                booted.failure shouldNotBe null
+                failureText(booted.failure) shouldNotContain secretKey
+            }
         }
     }
 }

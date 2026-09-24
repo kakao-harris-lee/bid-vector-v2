@@ -1,5 +1,6 @@
 package bidvector.app.collection
 
+import bidvector.procurement.BusinessDivision
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.LocalDate
 
@@ -22,17 +23,28 @@ data class CollectionProperties(
 private const val DEFAULT_KONEPS_BASE_URL = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService"
 
 /**
- * 업종 → 공고 목록 오퍼레이션 기본 매핑표(D-6F8-3) — 코드 리터럴이 아니라 설정 데이터다. 환경변수·속성으로
- * 덮어쓸 수 있다(mock server test 가 [baseUrl] 을 갈아 끼우는 자리이기도 하다). 표에 없는 업종 이름은 기동
- * 실패다.
+ * 업종 하나가 부르는 공고 목록 오퍼레이션 — **경로와 업무 대분류를 한 행에 묶는다**(D-6F9-1, M6/6F-9). 응답에 대분류 필드가
+ * 없어 「어느 오퍼레이션으로 받았는가」가 곧 대분류이므로, 경로만 바꾸고 대분류를 안 바꾸는 표류를 표 한 행이 막는다.
+ * [division] 은 필수다(누락·어휘 밖은 바인딩 실패 = 기동 실패). 배선은 이 값을 어댑터 생성 인자로 넘길 뿐이고 어댑터가
+ * URL 을 파싱하지 않는다.
+ */
+data class KonepsOperationProperties(
+    val path: String,
+    val division: BusinessDivision,
+)
+
+/**
+ * 업종 → 공고 목록 오퍼레이션 기본 매핑표(D-6F8-3) — 코드 리터럴이 아니라 설정 데이터다. 환경변수·속성으로 덮어쓸 수 있다
+ * (mock server test 가 [baseUrl] 을 갈아 끼우는 자리이기도 하다). 표에 없는 업종 이름은 기동 실패다. 기본 표는 공사·용역 둘이다 —
+ * 물품·외자 오퍼레이션 경로는 이 slice 가 검증하지 않아 짓지 않는다(`OPEN-6F9-GOODS-FOREIGN-COLLECTION`).
  */
 @ConfigurationProperties(prefix = "bidvector.koneps")
 data class KonepsEndpointProperties(
     val baseUrl: String = DEFAULT_KONEPS_BASE_URL,
-    val operations: Map<String, String> =
+    val operations: Map<String, KonepsOperationProperties> =
         mapOf(
-            "construction" to "getBidPblancListInfoCnstwk",
-            "service" to "getBidPblancListInfoServc",
+            "construction" to KonepsOperationProperties("getBidPblancListInfoCnstwk", BusinessDivision.CONSTRUCTION),
+            "service" to KonepsOperationProperties("getBidPblancListInfoServc", BusinessDivision.SERVICE),
         ),
 )
 
