@@ -113,6 +113,35 @@ class CollectNoticesUseCaseTest {
     }
 
     @Test
+    fun `차수 형식이 어긋난 항목은 IDENTIFIER 탈락으로 세고 원문은 저장하며 다음 항목을 계속 처리한다 — 실행이 죽지 않는다`() {
+        val fixture = CollectionFixture()
+        val malformed =
+            listOf("1", "01", "00A", " 000").mapIndexed { index, round ->
+                observation("BAD-ROUND-$index", extra = mapOf("bidNtceOrd" to round))
+            }
+        val ok1 = observation("OK-1")
+        val ok2 = observation("OK-2")
+        val items = listOf(ok1) + malformed + listOf(ok2)
+        val source = ScriptedSource { _, _ -> batchOf(items) }
+
+        val report =
+            fixture.useCase.collect(rangeOf("2026-09-01", "2026-09-01"), listOf(CollectionSource(construction, source)))
+
+        val accounting = report.slots.single().accounting
+        accounting.received shouldBe 6
+        accounting.normalized shouldBe 2
+        accounting.dropped shouldBe 4
+        accounting.dropReasons shouldBe
+            mapOf(CollectionDropReason.CollectionParseFailure(ParseFailureKind.IDENTIFIER) to 4)
+        accounting.received shouldBe accounting.normalized + accounting.duplicate + accounting.dropped
+        fixture.raw.appended shouldContainExactly items
+        fixture.notices.persisted.map { it.first.id.number.value } shouldContainExactly listOf("OK-1", "OK-2")
+        fixture.runs.recorded
+            .single()
+            .first shouldBe accounting
+    }
+
+    @Test
     fun `저장 결과가 Inserted·Updated 면 정규화, Unchanged 는 중복, Rejected 는 중복이면서 거부 건수로도 센다`() {
         val outcomes =
             mapOf(
@@ -202,18 +231,12 @@ class CollectNoticesUseCaseTest {
 
     @Test
     fun `쿼터가 아닌 모든 절단 원인은 실행을 멈추지 않는다 — 원인마다 다음 슬롯을 부른다`() {
-        val nonQuota =
-            listOf(
-                TruncationCause.RepeatedPage,
-                TruncationCause.Timeout,
-                TruncationCause.TransportFailure,
-                TruncationCause.ServerError,
-                TruncationCause.NotRetryable,
-                TruncationCause.InputError,
-                TruncationCause.Unclassified,
-                TruncationCause.StructureFailure,
-                TruncationCause.SelfThrottled,
-            )
+        // 원인 목록은 sealed 계층에서 도출한다(손으로 적지 않는다) — 새 원인이 생기면 이 test 가 그 원인도 잰다.
+        val allCauses =
+            requireNotNull(TruncationCause::class.java.permittedSubclasses) { "TruncationCause 는 sealed 여야 한다" }
+                .map { it.getField("INSTANCE").get(null) as TruncationCause }
+        val nonQuota = allCauses.filterNot { it == TruncationCause.QuotaExhausted || it == TruncationCause.MaxPages }
+        nonQuota.size shouldBe allCauses.size - 2
         nonQuota.forEach { cause ->
             val source =
                 ScriptedSource { _, _ ->

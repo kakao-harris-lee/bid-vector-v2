@@ -33,7 +33,16 @@ enum class AmountAxis {
     ESTIMATED,
 }
 
-private fun parseWonInteger(raw: String): Long? = raw.replace(",", "").trim().toLongOrNull()
+/**
+ * 원 단위 정수 — 음수는 `Money` 타입이 표현하지 못하므로(`requireNonNegative`) 숫자가 아닌 원문과 같은 NUMERIC
+ * 파싱 실패다(D-6F8-7). 이 자리에서 접지 않으면 `BaseAmount`·`EstimatedAmount` 생성이 던진다.
+ */
+private fun parseWonInteger(raw: String): Long? =
+    raw
+        .replace(",", "")
+        .trim()
+        .toLongOrNull()
+        ?.takeIf { it >= 0L }
 
 private fun provenanceFor(
     contract: KonepsFieldContract,

@@ -69,16 +69,42 @@ private fun currencyFor(unit: FieldUnit): Currency =
         else -> error("금액 축 계약의 unit은 WON이어야 한다: $unit")
     }
 
+/** 식별자를 세우는 단계의 결과 — 원문 값 유래 실패는 예외가 아니라 탈락 사유다(D-6F8-7). */
+private sealed interface IdentityOutcome {
+    data class Resolved(
+        val id: NoticeId,
+    ) : IdentityOutcome
+
+    data class Unresolvable(
+        val reason: CollectionDropReason,
+    ) : IdentityOutcome
+}
+
+/**
+ * 공백뿐인 번호·차수는 없는 것으로 본다(어댑터 `mapRawItem` 과 같은 판단). 비어 있지 않은데 차수가 형식
+ * (`NoticeRound`: 제로패딩 세 자리)을 어기면 [ParseFailureKind.IDENTIFIER] 탈락이다 — 형식 규칙의 정본은
+ * `NoticeRound` 이고 여기서 다시 쓰지 않는다. 그 값 객체는 위반을 `IllegalArgumentException` 으로만 알리므로
+ * 이 자리에서 결과로 접는다. 번호는 공백만 아니면 `NoticeNumber.of` 가 던지지 않는다.
+ */
 private fun resolvedNoticeId(
     observation: RawNoticeObservation,
     registry: KonepsFieldContractRegistry,
-): NoticeId? {
-    val numberRaw = registry.valueIn(observation, FieldConcept.NOTICE_NUMBER)
-    val roundRaw = registry.valueIn(observation, FieldConcept.NOTICE_ROUND)
-    return if (numberRaw != null && roundRaw != null) {
-        NoticeId(NoticeNumber.of(numberRaw), NoticeRound.of(roundRaw))
+): IdentityOutcome {
+    val numberRaw = registry.valueIn(observation, FieldConcept.NOTICE_NUMBER)?.takeUnless(String::isBlank)
+    val roundRaw = registry.valueIn(observation, FieldConcept.NOTICE_ROUND)?.takeUnless(String::isBlank)
+    if (numberRaw == null || roundRaw == null) {
+        return IdentityOutcome.Unresolvable(CollectionDropReason.CollectionMissingNoticeNumber)
+    }
+    val round =
+        try {
+            NoticeRound.of(roundRaw)
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    return if (round == null) {
+        IdentityOutcome.Unresolvable(CollectionDropReason.CollectionParseFailure(ParseFailureKind.IDENTIFIER))
     } else {
-        null
+        IdentityOutcome.Resolved(NoticeId(NoticeNumber.of(numberRaw), round))
     }
 }
 
@@ -121,6 +147,7 @@ private fun businessCategoryFrom(
         .contractsFor(FieldConcept.BUSINESS_CATEGORY_CODE)
         .firstOrNull()
         ?.let(observation::valueOf)
+        ?.takeIf(String::isNotBlank)
         ?.let { code ->
             val label =
                 registry.contractsFor(FieldConcept.BUSINESS_CATEGORY_LABEL).firstOrNull()?.let(observation::valueOf)
@@ -151,7 +178,11 @@ private fun allocatedBudgetFrom(
                 ?.let { won -> AllocatedBudget(won, currencyFor(contract.unit), Provenance.Published(noticeRound)) }
         }
 
-/** 게시 낙찰하한율(F-5) — 원문 percent → canonical fraction 은 계약 `scale` 지시로만 연다(ADR 0002 D-4). */
+/**
+ * 게시 낙찰하한율(F-5) — 원문 percent → canonical fraction 은 계약 `scale` 지시로만 연다(ADR 0002 D-4).
+ * 음수(`Rate` 불변식)나 표현할 수 없는 지수(`BigDecimal.divide` 의 `ArithmeticException`)는 수치가 아닌 원문과 같이
+ * 필드 부재로 접는다 — 항목을 살리고 던지지 않는다(D-6F8-7).
+ */
 private fun floorRateFrom(
     observation: RawNoticeObservation,
     registry: KonepsFieldContractRegistry,
@@ -163,7 +194,15 @@ private fun floorRateFrom(
         ?.takeIf { it.scale == FieldScale.PERCENT }
         ?.let(observation::valueOf)
         ?.toBigDecimalOrNull()
-        ?.let { numeric -> FloorRate(Rate.ofPercent(numeric), FloorRateOrigin.NoticeValue(noticeRound)) }
+        ?.let { numeric ->
+            try {
+                FloorRate(Rate.ofPercent(numeric), FloorRateOrigin.NoticeValue(noticeRound))
+            } catch (_: IllegalArgumentException) {
+                null
+            } catch (_: ArithmeticException) {
+                null
+            }
+        }
 
 /**
  * [InstantResolutionOutcome.Resolved]는 값으로, [InstantResolutionOutcome.Absent]는 `null`로
@@ -230,17 +269,16 @@ private fun normalizedCommand(
 
 /**
  * 원문 raw 관측 ↔ canonical command 변환(②) — 유일한 변환 지점. 원문은 [NoticeCollected.raw]
- * 로 보존된다(감사). 공고번호·차수 중 하나라도 없으면 이 항목은 탈락한다(④·⑦).
+ * 로 보존된다(감사). 공고번호·차수 중 하나라도 없거나 차수가 형식을 어기면 이 항목은 탈락한다(④·⑦, D-6F8-7).
+ * **원문 값이 무엇이든 던지지 않는다** — 값 유래 실패는 탈락 사유이거나 필드 부재다(`CanonicalizeNeverThrowsTest`).
  */
 fun canonicalize(
     observation: RawNoticeObservation,
     policy: KonepsCollectionPolicyData,
 ): CanonicalizationOutcome {
-    val noticeId = resolvedNoticeId(observation, policy.fieldContracts)
     val unknownFieldCount = policy.fieldContracts.unknownKeysIn(observation).size
-    return if (noticeId == null) {
-        CanonicalizationOutcome.Dropped(CollectionDropReason.CollectionMissingNoticeNumber, unknownFieldCount)
-    } else {
-        normalizedCommand(observation, policy, noticeId, unknownFieldCount)
+    return when (val identity = resolvedNoticeId(observation, policy.fieldContracts)) {
+        is IdentityOutcome.Unresolvable -> CanonicalizationOutcome.Dropped(identity.reason, unknownFieldCount)
+        is IdentityOutcome.Resolved -> normalizedCommand(observation, policy, identity.id, unknownFieldCount)
     }
 }
