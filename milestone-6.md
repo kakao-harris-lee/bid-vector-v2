@@ -443,6 +443,28 @@ INT 한 열 — `migration-reviewer` + `verifier`).
 결과별 공고 ID 배열 + 건수로 답하고, 후보별 사유 상세는 `OPEN-6A3-EVALUATION-DETAIL`(contract-keeper 결정 뒤).
 `wouldNotifyNoticeIds == bidNowNoticeIds` 불변식이 사다리와 알림 경로가 같은 판정을 본다는 것을 잠근다.
 
+**6A-3+6F-3 종결 2026-09-24** — PR **#44**(head `be58cec5` + 이 문단, 계약 갱신 절 여덟·D-6A3-1~26). 판정 일곱 + 조치를 PR
+코멘트로 남겼다(verifier 3라운드 · `code-reviewer` · `migration-reviewer` · `privacy-gate` · `contract-keeper`, 뒤 넷은 전용 정의 부재로
+범용 에이전트 대행). 재작업 **3/5**. CI 세 job 전부 통과(`check` 7m48s · `container` · `ml-engine`). **`EvaluateCandidatesUseCase` 가
+처음으로 production 조립에서 돈다** — 배선 4단계의 3·4번이 닫혔다(`OPEN-6F-ASSEMBLY`·`OPEN-6F4W-ASSEMBLE-CALLER`·
+`OPEN-6F2-CANDIDATE-BOUND` 닫힘).
+
+**세 라운드 전부 「코드는 옳고 게이트가 못 잰다」였다.** r1 은 게이트 셋이 이름 목록·패키지 하나·파일명 접두에 걸려 계약이 닫았다고 적은
+우회(outbox 구현 주입·루트 패키지 실 ML 참조·헬퍼 경유 포트 호출)가 초록이었다. r2 는 팀장이 쓴 처방 문면(「port 인터페이스 × `app.http`」)
+자체가 두 축의 좁힘이라 한 걸음씩 옮긴 변이가 초록이었다 — **(호출자, 포트.메서드) 호출 쌍 허용 목록, 호출 대상은 구현 타입 전부**로 닫자
+r3 가 스무 가지 우회를 두드려 전부 RED 였다. r3 의 BLOCKER 는 장부 커밋이 evidence 에 스캔 어휘를 축어로 적은 것 하나였다. **변이 실측
+없이는 셋 다 초록으로 머지됐을 것이다** — 6F-4-w 에 이어 같은 교훈이다.
+
+**배선 slice 의 교훈 — in_scope 를 여섯 번 넓혔다.** 산출물 경로만 적은 착수 계약이 세션 스냅샷(workflow)·스키마 정확 열거 게이트·
+`app/build.gradle.kts`·게이트 fixture 경로에 차례로 부딪혔고, 넷은 커밋 뒤 흡수였다. 전부 「기존 축에 걸친 additive 변경」이라 예견
+가능했다. **다음 배선 slice 는 착수 계약에 게이트·fixture·스키마 열거 게이트·build 파일을 처음부터 넣는다.**
+
+**넘긴 것**: `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST`(신설, r3 MEDIUM — 포트 메서드를 **호출하지 않는** 지름길 셋: 어댑터 추가 메서드 ·
+생성자에서 읽는 어댑터 · `app.http` raw SQL. 오늘 그 경로를 여는 production 코드 없음. `app.http` 의존 허용 목록 + 포트 집합 도출을
+**6A-2** 가 받는다) · `OPEN-ML-ANALYSIS-WIRING` · `OPEN-6A3-EVALUATION-COMMIT`(outbox 커밋 경로 — 6F-7 인계 둘) ·
+`OPEN-6A3-EVALUATION-DETAIL` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT`(6A-2). 컨트롤러 `runBlocking` 은 클라이언트 연결 종료를 전파하지 않는다
+— 오늘은 어떤 포트도 suspend 하지 않아 무해, 실 ML 배선에서 재검토.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
@@ -483,7 +505,8 @@ INT 한 열 — `migration-reviewer` + `verifier`).
    4번(조립)의 전제에 **`OPEN-6F4W-ASSEMBLE-CALLER`** 가 더해진다.
 3. **6A-3 + 6F-3**(합침) — 평가 endpoint + `CapacityPort`. 여기서 **`MlAnalysisPort` 처분**(실 gRPC gateway
    배선 vs 자리지킴 유지)을 운영자에게 올린다 — 4B-6b 가 6A 로 넘긴 결정이고 **실 외부 호출 축**이다.
-4. **조립**(`OPEN-6F-ASSEMBLY`) — 포트 아홉을 app 에 꽂는다. 1~3 이 전제다.
+4. **조립**(`OPEN-6F-ASSEMBLY`) — 포트 아홉을 app 에 꽂는다. 1~3 이 전제다. **3·4번은 한 slice 로 닫혔다 — PR #44, 6A-3+6F-3 종결
+   문단 참조**(ML 자리지킴 · dry-run 전용).
 
 ### 배선 밖 잔여
 
