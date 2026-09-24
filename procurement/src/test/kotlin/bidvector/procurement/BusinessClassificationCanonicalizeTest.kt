@@ -102,7 +102,7 @@ class BusinessClassificationCanonicalizeTest {
 
     @Test
     fun `새 칸 셋은 빈 값·공백뿐인 값에서 null 이고 항목은 탈락하지 않는다`() {
-        listOf("", " ", "\t", " ", "　", " \n ").forEach { blank ->
+        listOf("", " ", "\t", "\u00A0", "\u3000", " \n ").forEach { blank ->
             val command =
                 collected(
                     mapOf(

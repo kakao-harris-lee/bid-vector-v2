@@ -52,7 +52,7 @@ class BusinessDivisionTest {
 
     @Test
     fun `빈 값과 공백류만 있는 용역구분·주공종은 예외 없이 null 이다`() {
-        listOf("", " ", "\t", "\n", " ", "　").forEach { blank ->
+        listOf("", " ", "\t", "\n", "\u00A0", "\u3000").forEach { blank ->
             withClue("'${blank.replace("\n", "\\n")}'") {
                 ServiceDivision.of(blank) shouldBe null
                 MainConstructionType.of(blank) shouldBe null
