@@ -491,8 +491,8 @@ val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
                         // 19, offset 없음). koneps-collection-026 이 이 배선을 고정한다.
                         dateTimePatterns = listOf(DateTimePatternId.KONEPS_SPACE_DELIMITED_19),
                         // policy-values.md §1.5 authoritative(조달청 OpenAPI 참고자료,
-                        // koneps-collection-016 이 이 배선을 고정한다) — 문서 표기 순서 그대로.
-                        businessCategoryDocumentedLabels = DocumentedVocabulary(listOf("물품", "용역", "공사", "외자")),
+                        // koneps-collection-016 이 이 배선을 고정한다) — 문서 표기 순서 그대로, [BusinessDivision] 파생.
+                        businessCategoryDocumentedLabels = DocumentedVocabulary(BusinessDivision.entries.map { it.label }),
                     ),
             ),
     )
