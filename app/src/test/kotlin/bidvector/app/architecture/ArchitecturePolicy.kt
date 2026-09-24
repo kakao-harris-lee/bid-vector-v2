@@ -58,6 +58,41 @@ class ArchitecturePolicy private constructor(
                 parts[0] to parts[1]
             }
 
+    /** M6/6F-8 (b) — 수집 use case 패키지와 그것이 참조해도 되는 procurement 최상위 타입. */
+    val collectionPackage: String get() = value("workflow.collection.package")
+    val collectionAllowedProcurementTypes: List<String> get() = list("workflow.collection.allowed-procurement-types")
+
+    /** M6/6F-8 (b) — 멤버 접근이 금지되는 통과 전용 타입, 결과 타입 필드로 금지되는 타입. */
+    val collectionPassThroughTypes: List<String> get() = list("workflow.collection.pass-through-types")
+    val collectionForbiddenFieldTypes: List<String> get() = list("workflow.collection.forbidden-field-types")
+
+    /** M6/6F-8 (c) — 공고명 키 리터럴을 상수 풀에 가져도 되는 클래스. */
+    val titleKeyAllowedClasses: List<String> get() = list("collection.title-key.allowed-classes")
+
+    /** M6/6F-8 (d)·(e)·(f) — 타입 → 그 타입을 참조해도 되는 app 클래스 집합. */
+    val runnerTypes: List<String> get() = list("app.runner.types")
+    val runnerAllowedReferencers: List<String> get() = list("app.runner.allowed-referencers")
+    val serviceKeyType: String get() = value("app.secret.service-key-type")
+    val serviceKeyReaders: List<String> get() = list("app.secret.service-key-readers")
+    val loggingTypes: List<String> get() = list("app.logging.types")
+    val loggingAllowedUsers: List<String> get() = list("app.logging.allowed-users")
+
+    /** M6/6F-8 D-6F8-6 (g) — 원문 값 획득 봉쇄의 모듈 root·접근 타입과 참조자·멤버 접근자 허용 집합. */
+    val rawAccessRoots: List<String> get() = list("collection.raw-access.roots")
+    val rawAccessTypes: List<String> get() = list("collection.raw-access.types")
+    val rawAccessAllowedReferencers: List<String> get() = list("collection.raw-access.allowed-referencers")
+    val rawAccessAllowedMemberAccessors: List<String> get() = list("collection.raw-access.allowed-member-accessors")
+
+    /** M6/6F-8 D-6F8-13 (i) — 리플렉션 봉쇄: 금지 패키지·허용 참조자 집합과 `Class` 의 허용 멤버(이름 조회). root 는 (g) 와 같다. */
+    val reflectionPackages: List<String> get() = list("collection.reflection.packages")
+    val reflectionAllowedReferencers: List<String> get() = list("collection.reflection.allowed-referencers")
+    val reflectionClassType: String get() = value("collection.reflection.class-type")
+    val reflectionClassAllowedMembers: List<String> get() = list("collection.reflection.class-allowed-members")
+
+    /** M6/6F-8 D-6F8-6 (h) — 수집 use case 타입과 그것을 참조해도 되는 production 클래스 집합. */
+    val collectionUseCaseType: String get() = value("collection.usecase.type")
+    val collectionUseCaseReferencers: List<String> get() = list("collection.usecase.allowed-referencers")
+
     /**
      * T-D. **손 열거가 아니라 도출된 후보의 분류**다 — `memberEffectGate` 가 허용 클래스에서
      * 효과 표면에 닿는 멤버를 내고, `member-effects.properties` 가 그 후보를 하나씩

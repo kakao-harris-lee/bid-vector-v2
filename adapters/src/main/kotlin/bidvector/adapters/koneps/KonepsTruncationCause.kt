@@ -24,7 +24,7 @@ internal fun isQuotaSignal(step: KonepsRawStep): Boolean =
 internal fun describeTransport(outcome: KonepsTransportOutcome): String =
     when (outcome) {
         KonepsTransportOutcome.TimedOut -> "timeout"
-        is KonepsTransportOutcome.TransportFailed -> outcome.message
+        is KonepsTransportOutcome.TransportFailed -> outcome.exceptionType
         is KonepsTransportOutcome.Received -> "HTTP ${outcome.status}"
     }
 

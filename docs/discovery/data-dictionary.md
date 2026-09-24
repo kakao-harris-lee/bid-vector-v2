@@ -1569,6 +1569,17 @@ Python 정본은 `ml_engine.features.normalize.normalize_feature_key`(요청 축
 | **등재하지 않는 것** | 같은 응답의 담당자 이름·전화·이메일(`ntceInsttOfcl*`·`dminsttOfcl*`) — 개인정보, P-10 과 같은 축 |
 | **실측** | D-3H-8 채움률 프로브(read-only 1회, 2026-09-17, 공사 목록 100건): 코드·이름 넷 100/100, 수요=공고 91/100, 코드 길이 {7}, 영문자 포함 29/100 → 코드 키 확정. 엔진 교차 실측(D-3H2-4): Kotlin 요청 바이트로 `segment_support = DIRECT`·`agency_sample_count = 8`·`shrinkage_weight = 0.4` 첫 관측 — ML-04 ② 가 필드→계약→저장→도메인→요청·표본→엔진→`PredictionEvidence`(4D-4)까지 이어진다 |
 
+#### 6.3.3 공고명 fact — 계약이 키를 나르고 canonical 이 값을 갖는다(M6/6F-4 D-6F4-1~9 · M6/6F-8 D-6F8-2, 2026-09-24)
+
+| 자리 | 정의 |
+| --- | --- |
+| **원천** | 입찰공고정보서비스 응답 항목 `bidNtceNm`(입찰공고명, 공고 목록 오퍼레이션). **필드 계약 행 하나**(`FieldConcept.NOTICE_TITLE` · `OPAQUE_TEXT` · 옵션 · `presentIn = NOTICE_LIST`)가 그 원시 키를 나른다 — 어댑터·use case·러너에는 키 문자열이 없다(D-6F4-6, 상수 풀 게이트가 잠근다). legacy 의 둘째 키 `ntceNm` 은 어느 문서에도 없어(`policy-values.md` §1.7.6) 등재하지 않는다 |
+| **도메인** | `Notice.title: NoticeTitle?`(`NoticeCollected.title` 슬롯, 기본값 `null`). `NoticeTitle.of(raw)` = **trim 만**(정규화·별칭 없음, 표기 흔들림 보존), trim 뒤 빈 값이면 `null` — 「없음」은 센티넬이 아니라 타입으로 닫는다(D-6F4-8) |
+| **조립** | `canonicalize` 가 `NOTICE_TITLE` 계약(`contractsFor(NOTICE_TITLE)`)이 가리키는 키에서만 읽는다. 계약이 없는 정책은 원문에 그 키가 있어도 공고명을 낳지 않는다 |
+| **저장** | `notice.notice_title`(V14, nullable TEXT, 공백뿐인 값은 CHECK 가 거부). 재수집 값이 비어 있으면 기존 값을 지우지 않는다(존재 가드, 기존 쓰기 규율) |
+| **소비** | 감시 키워드 매칭 텍스트 = 공고명 + 공종(`business_category_label`), 지역 매칭 텍스트 = 위 + 기관명 둘(D-6F4-3). 본문(`description`)은 V2 에 존재하지 않는다(`OPEN-6F4-NOTICE-BODY-SOURCE`) |
+| **등재하지 않는 것** | 공고 본문·첨부 — 목록 응답에 없고 상세 URL 뒤에 있다 |
+
 ### 6.4 성숙도 — 계산과 판정의 분리 (`OPEN-ML-01` 잔여 확인)
 
 운영자 결정이 **0C에 확인을 위임했다** — *"SET-06 acceptance가 「성숙도 계산」과 「성숙도

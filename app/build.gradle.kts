@@ -66,6 +66,14 @@ dependencies {
     testImplementation(libs.spring.boot.restclient)
 }
 
+// M6/6F-8 — 실측: 배포물(`bootJar`)이 kotlin-reflect 없이 나가면 `@ConfigurationProperties` 의 Kotlin 생성자 바인딩이
+// `NoClassDefFoundError: kotlin/reflect/jvm/ReflectJvmMapping` 으로 죽어 **앱이 부팅하지 못한다**. 그동안 아무 test 도 이를
+// 못 잡은 이유는 test 런타임 classpath 에는 kotlin-reflect 가 이미 있어서다(production 과 test 의 classpath 가 다르다) —
+// `BootJarRuntimeClasspathTest` 가 배포물 자체를 열어 잠근다. 함수 50줄 한도 때문에 위 `dependencies {}` 밖 별도 블록이다.
+dependencies {
+    implementation(libs.kotlin.reflect)
+}
+
 // M6/6A-1 — sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties, `adapters
 // /build.gradle.kts` 주석과 같은 이유). 위 `dependencies {}` 가 이 slice의 추가로 그 상한에
 // 닿아, 관련 없는 나머지 배선(corpus 소비 test 전용 project 의존)을 별도 블록으로 나눈다
@@ -108,6 +116,16 @@ dependencies {
 
 // 아키텍처 게이트는 조합 지점에서 돈다 — app 의 test runtime classpath 에 아홉 모듈이 모두 있다.
 tasks.test {
+    // M6/6F-8 — `BootJarRuntimeClasspathTest` 가 배포물(`app.jar`)을 연다.
+    dependsOn(tasks.named("bootJar"))
+    systemProperty(
+        "bidvector.bootjar",
+        layout.buildDirectory
+            .file("libs/app.jar")
+            .get()
+            .asFile.absolutePath,
+    )
+
     val architecturePolicy = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
     inputs.file(architecturePolicy).withPropertyName("architecturePolicy")
     systemProperty("bidvector.architecture.policy", architecturePolicy.asFile.absolutePath)

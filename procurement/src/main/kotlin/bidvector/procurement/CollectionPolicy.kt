@@ -228,6 +228,16 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             VatTreatment.UNKNOWN,
             FieldProvenanceTemplate.NOT_APPLICABLE,
         ),
+        // M6/6F-8 D-6F8-2(운영자 지시 2026-09-24) — 공고명. 공고 목록 응답 항목(입찰공고명, 옵션으로 다룬다).
+        FieldContractRow(
+            RawKey("bidNtceNm"),
+            FieldConcept.NOTICE_TITLE,
+            null,
+            FieldScale.OPAQUE_TEXT,
+            FieldNullability.OPTIONAL,
+            VatTreatment.UNKNOWN,
+            FieldProvenanceTemplate.NOT_APPLICABLE,
+        ),
         // D-3A-8·§5.5 — 시공능력평가금액목록. 형식(`^` 구분, `[...]` 레코드)만 authoritative
         // (policy-values.md §1.5) — 단위·과세는 미확정(OPEN-QUAL-10)이라 수집 형태만 연다.
         FieldContractRow(
