@@ -247,6 +247,12 @@ out_of_scope:
 | `OPEN-6F4-NOTICE-BODY-SOURCE` | 변경 없음 | 본문은 상세 URL 뒤 |
 | `OPEN-6F8-COLLECTION-SCHEDULE` | **신설** | 운영 스케줄링(주기·리스·동시 실행 방지) — 이 slice 는 일회성 러너만 |
 | `OPEN-6F8-OPENING-COLLECTION` | **신설** | 개찰 결과·예비가격·면허 요건 수집 배선(포트는 있다) |
+| `OPEN-6F8-RAW-PII-RETENTION` | **신설 → 6B-3** | 원문 행 전부에 KONEPS 담당자 키가 영속된다(실수집 실측). 원문은 관측마다 추가 전용이라 재실행마다 늘어난다 |
+| `OPEN-6F8-QUOTA-XML-ENVELOPE` | **신설** | XML 오류 봉투의 한도 초과가 `StructureFailure` 로 분류돼 멈추지 않는다(실수집 3회 동안 미발생) |
+| `OPEN-6F8-COLLECTION-RUN-CATEGORY` | **신설** | `collection_run` 에 업종 열이 없다 — 업종별 회계는 러너 로그·결과 타입에만 |
+| `OPEN-6F8-NON-THROWING-FACTORIES` | **신설** | shared-kernel 비예외 팩토리 — `canonicalize` 의 좁은 try/catch 를 없앤다 |
+| `OPEN-6F8-NUL-CHARACTER` | **신설** | 값에 NUL 이 있으면 원문 저장이 `22P05` 로 실패하고 원문을 잃는다(실수집 3회 동안 0회) |
+| `OPEN-6F8-BUSINESS-CATEGORY-SOURCE` | **신설 → 운영자 결정** | 업무구분: 운영 계약에 코드 행이 없고 목록 응답에 그 키도 없다 — 오늘 업무구분은 항상 없음, 「관심 업종」 규칙이 어떤 공고와도 맞지 않는다. 선택지 ① 공공조달분류 번호·이름 키 채택(용역에만 채워짐) ② 다른 오퍼레이션 ③ 대기 |
 
 ## 리뷰 레인
 
