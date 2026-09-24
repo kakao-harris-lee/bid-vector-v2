@@ -1,6 +1,7 @@
 package bidvector.app.wiring
 
 import bidvector.app.collection.CollectionRunner
+import bidvector.app.collection.KonepsCredentialProperties
 import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.strategy.Clock
 import io.kotest.assertions.withClue
@@ -134,6 +135,11 @@ class CollectionWiringTest {
             withClue(failureText(booted.failure)) { booted.failure shouldBe null }
             booted.context.getBeansOfType(ApplicationRunner::class.java).size shouldBe 1
         }
+    }
+
+    @Test
+    fun `서비스 키 설정 객체의 문자열 표현은 원문을 내지 않는다 — data class 로 바뀌면 잡힌다`() {
+        KonepsCredentialProperties(secretKey).toString() shouldNotContain secretKey
     }
 
     @Test

@@ -108,7 +108,7 @@ class CollectionRunnerE2ETest {
         }
 
         /** 러너 한 번 — 부팅이 곧 실행이다(`ApplicationRunner`). 반환은 그 실행이 기록한 종료 코드들. */
-        private fun runOnce(): List<Int> {
+        private fun runOnce(extraProperties: Map<String, String> = emptyMap()): List<Int> {
             val context: ConfigurableApplicationContext =
                 SpringApplicationBuilder(BidVectorApplication::class.java)
                     .properties(
@@ -127,7 +127,7 @@ class CollectionRunnerE2ETest {
                                 "bidvector.collection.categories" to "construction,service",
                                 "bidvector.koneps.service-key" to SERVICE_KEY,
                                 "bidvector.koneps.base-url" to mock.baseUrl,
-                            ),
+                            ) + extraProperties,
                     ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachLogCapture() })
                     .run()
             return try {
@@ -237,7 +237,8 @@ class CollectionRunnerE2ETest {
         val noticesBefore = count("SELECT COUNT(*) FROM notice")
         logs.list.clear()
 
-        val exitCodes = runOnce()
+        // 실수집 권장 형태 — 웹 서버 없이(`web-application-type=none`) 러너만 돈다. 포트를 열지 않는다.
+        val exitCodes = runOnce(mapOf("spring.main.web-application-type" to "none"))
 
         exitCodes shouldContainExactly listOf(0)
         count("SELECT COUNT(*) FROM notice") shouldBe noticesBefore
