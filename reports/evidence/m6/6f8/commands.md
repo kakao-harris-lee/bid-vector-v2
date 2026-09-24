@@ -1,10 +1,9 @@
 # M6/6F-8 commands
 
-명령과 종료 코드만 남긴다(출력 전문 없음 — 감사자는 명령을 다시 돌린다). 실측은 전부 **버릴 worktree**(`git worktree add --detach`)에서 했고 산출물 HEAD 는
-`66589eda`(이 slice 의 마지막 산출물 커밋), `base` 는 `git merge-base HEAD origin/main`(= `74616367`, PR #44 머지 커밋). **마지막 evidence HEAD 의 `check` 결과 정본은
-verifier 와 완료 보고다**(evidence 가 자기 마지막 커밋의 post-state 를 담을 수 없다).
+명령과 종료 코드만 남긴다(출력 전문 없음 — 감사자는 명령을 다시 돌린다). 실측은 전부 **버릴 worktree**(`git worktree add --detach`)에서 했고 `base` 는 `git merge-base HEAD origin/main`(= `74616367`,
+PR #44 머지 커밋). 산출물 실측 HEAD 는 `rollback.md` 첫머리와 아래 각 표가 적는다. **마지막 evidence HEAD 의 `check` 결과 정본은 verifier 와 완료 보고다**(evidence 가 자기 마지막 커밋의 post-state 를 담을 수 없다).
 
-## acceptance — CI job 명령 그대로 (2026-09-24, 캐시 우회)
+## acceptance — CI job 명령 그대로 (캐시 우회, 버릴 worktree)
 
 | 명령 | exit | 핵심 결과 |
 |---|---|---|
@@ -12,10 +11,57 @@ verifier 와 완료 보고다**(evidence 가 자기 마지막 커밋의 post-sta
 | `./gradlew --no-daemon qualityBaseline` | 0 | BUILD SUCCESSFUL |
 | `./tools/one-command-check.sh` | 0 | 「Kotlin 전건 + Python 전건 통과」 |
 
+실측 트리 = 산출물 `45904275` + 이 evidence 파일들(트리 동일성 — 파일 셋을 그대로 얹은 버릴 worktree)이다. evidence 편집 커밋마다 그 HEAD 에서 `check` 를 다시 돌리고(누출 스캔 어휘 재귀 방지), 마지막 HEAD 의 결과 정본은 verifier 와 완료 보고다.
+
 실패 이력(검증이 작동했다는 증거): 같은 acceptance 를 산출물 커밋 `c5c13fde` 에서 돌렸을 때 `check` exit 1 — `:app:sizeGate` 함수 50줄 한도(첫 `dependencies {}` 람다 52줄).
 별도 블록으로 옮긴 `66589eda` 에서 위 셋 exit 0.
 
-## 변이 실측 — 아홉 (scope.md acceptance 의 여섯 + 공고명 둘 + 배포물 하나)
+## 변이 실측 (나) — 검토 뒤 수정분 (각 변이는 적용 전 `git diff --numstat` 로 확인, 실행 뒤 `git reset --hard` 로 원복, 버릴 worktree)
+
+**수정 전 초록 재현** — 수정 전 트리(`ea67a8c5`)에서 아래 변이는 전부 통과했다(게이트·test 의 사각):
+
+| 변이 | 적용(+/−) | 명령 | exit |
+|---|---|---|---|
+| M1 use case 가 이웃 패키지 `workflow.collectionx` 의 헬퍼(`RawNoticeObservation` 확장, 계약 경유 `valueOf`)를 부름 | +2/−0 · 새 파일 +8 | `:app:test --tests bidvector.app.architecture.* :workflow:test` | 0 |
+| M4a 배선이 `System.err.println` 으로 URL 인코딩된 키를 출력 | +1/−0 | `:app:test --tests *CollectionRunnerE2ETest* --tests bidvector.app.architecture.*` | 0 |
+| M5 러너의 「오늘」 기준을 `OPENING_DATE_ZONE`(KST) 에서 UTC 로 | +1/−1 | `:app:test --tests *CollectionWiringTest* --tests *CollectionRunnerE2ETest*` | 0 |
+
+**수정 후 RED**(산출물 `d6d8d0a0` — I2·G4·G5 는 `45904275`, 그 사이는 `CanonicalizeNeverThrowsTest` 적대적 값 표 네 줄뿐):
+
+| 변이 | 적용(+/−) | 명령 | exit | RED 된 test |
+|---|---|---|---|---|
+| M1 (위와 같음) | +2/−0 · 새 파일 +8 | `:app:test --tests bidvector.app.architecture.* :workflow:test` | 1 | `CollectionArchitectureGateTest` 「원문 키 접근 타입 참조와 통과 전용 멤버 접근은 … 모듈 전체」 · 「허용 참조자·접근자 집합은 관측 집합과 같다」 |
+| M4a (위와 같음) | +1/−0 | `:app:test --tests *CollectionRunnerE2ETest* --tests bidvector.app.architecture.*` | 1 | E2E 「로그에는 서비스 키도 … 표준 출력·표준 오류 전부에 키가 없다」 · 「… 멱등」 |
+| M5 (위와 같음) | +1/−1 | `:app:test --tests *CollectionWiringTest* --tests *CollectionRunnerE2ETest*` | 1 | `CollectionWiringTest` 「오늘은 KST 달력일이다 …」 |
+| I1 차수 형식 위반을 접지 않고 던짐(try/catch 제거) | +1/−6 | `:procurement:test --tests *CanonicalizeNeverThrowsTest*` | 1 | 「차수가 비어 있지 않지만 세 자리 숫자가 아니면 IDENTIFIER 탈락이다」 · 계약 전수 × 값 표 |
+| I1 (위와 같음) | +1/−6 | `:workflow:test --tests *CollectNoticesUseCaseTest*` | 1 | 「차수 형식이 어긋난 항목은 IDENTIFIER 탈락으로 세고 … 다음 항목을 계속 처리한다」 |
+| I1 (위와 같음) | +1/−6 | `:app:test --tests *CollectionRunnerE2ETest*` | 1 | `initializationError`(첫 실행이 던져 컨텍스트가 죽음 — 러너 exit 0 단언 이전) |
+| I2 음수 금액을 파싱 단계에서 접지 않음 | +0/−1 | `:procurement:test --tests *CanonicalizeNeverThrowsTest*` | 1 | 「금액이 음수면 NUMERIC 탈락이다」 · 전수 표 |
+| I3 낙찰하한율 접기(try/catch) 제거 | +1/−9 | 위와 같음 | 1 | 「낙찰하한율이 음수이거나 표현할 수 없으면 필드 부재다」 · 전수 표 |
+| I4 공백 업무구분 코드 접기 제거 | +0/−1 | 위와 같음 | 1 | 「업무구분 코드가 공백뿐이면 업무구분 부재다」 · 전수 표 |
+| I5 공백 공고번호를 없는 것으로 보지 않음 | +1/−1 | 위와 같음 | 1 | 「공백뿐인 공고번호·차수는 번호 없음 탈락이다」 · 전수 표 |
+| G2 러너·배선 밖 app 클래스가 수집 use case 를 참조 | 새 파일 +7 | `:app:test --tests *CollectionArchitectureGateTest*` | 1 | 「수집 use case 를 참조하는 production 클래스는 허용 집합뿐이다」 |
+| G3 app 이웃 클래스가 `RawNoticeObservation.sourceText` 를 꺼냄 | 새 파일 +5 | 위와 같음 | 1 | 「원문 키 접근 타입 참조와 통과 전용 멤버 접근은 … 모듈 전체」 · 「허용 … 관측 집합과 같다」 |
+| G5 workflow 이웃 패키지가 `resolveAmount` 를 직접 부름 | 새 파일 +14 | 위와 같음 | 1 | 같은 두 test(원문 해석 함수의 파일 클래스 참조) |
+| R3 전송 실패 사유에 예외 메시지를 다시 실음 | +1/−1 | `:adapters:test --tests *KonepsServiceKeyLeakTest*` | 1 | 「전송 실패의 사유는 예외 클래스 이름뿐이다」 |
+| WDUP 중복 업종 검사 제거 | +0/−3 | `:app:test --tests *CollectionWiringTest*` | 1 | 「같은 업종을 두 번 적으면 조립 시점에 기동 실패다」 |
+| WURL 기본 URL 검사 제거 | +0/−1 | 위와 같음 | 1 | 「KONEPS 기본 URL 이 평문 http 로 외부 호스트를 가리키면 기동 실패다」 |
+
+**초록인 변이 둘(한계의 실측 — checklist 알려진 제한 23·(2b) 표)**:
+
+| 변이 | 적용(+/−) | 명령 | exit | 뜻 |
+|---|---|---|---|---|
+| M2b 공고명 키를 `buildString` 으로 조립 + 리소스 파일에 적음 | 새 파일 +5 · +1 | `:app:test --tests *CollectionArchitectureGateTest*` | 0 | 상수 풀 리터럴 게이트는 **보조** 잠금이다 — 런타임 조립·리소스 파일은 못 본다(주 잠금은 M1 이 RED 인 모듈 전체 규칙) |
+| G4 workflow 이웃 패키지가 `canonicalize` 를 두 번째로 부름 | 새 파일 +11 | `:app:test --tests bidvector.app.architecture.*` | 0 | 같은 함수의 재호출이라 「변환 지점 하나」는 유지 — 경계로 처리(app 쪽은 기존 호출 쌍 규칙이 막는다) |
+
+**D-6F8-7 전수 스윕의 RED 실측** — 수정 전(`Canonicalize.kt`·`AmountResolutionOutcome.kt` 무수정) 트리에서 새 test 만 얹어 `:procurement:test --tests *CanonicalizeNeverThrowsTest*`: exit 1, 10 test 중 6 실패,
+전수 표가 던진 자리는 공고번호(공백) · 차수(형식 위반 다수) · 금액 키 넷의 음수 · 낙찰하한율(음수·극단 지수) · 업무구분 코드(공백) — checklist 5b.
+
+**`canonicalize` 경로의 `!!`·`checkNotNull`·`requireNotNull`·`.getValue(`·`.single(`·`error(`**:
+`grep -nE '!!|checkNotNull|requireNotNull|\.getValue\(|\.single\(|\berror\(' procurement/src/main/kotlin/bidvector/procurement/{Canonicalize,AmountResolutionOutcome,DateTimeInterpretation,NoticeId,BusinessCategory,Agency,NoticeTitle,ResolvedBaseAmount}.kt shared-kernel/src/main/kotlin/bidvector/sharedkernel/{NoticeRound,Rate}.kt`
+(주석 줄 제외) → `error(` 둘뿐(통화·출처, checklist 5b 9·10번 — 정책 구성 오류).
+
+## 변이 실측 (가) — 아홉 (scope.md acceptance 의 여섯 + 공고명 둘 + 배포물 하나, 산출물 HEAD `66589eda` 에서 실측)
 
 버릴 worktree 에서 변이를 적용하고 `git diff --no-index --numstat` 로 **적용을 확인한 뒤** RED 명령을 돌렸다(변이마다 원본 복원). 전부 RED, 사유는 표의 test.
 
@@ -61,6 +107,7 @@ Telegram id·사업자 정보는 패턴 스캔으로 못 잡아 육안 확인: e
 | 명령 | 결과 |
 |---|---|
 | `grep -rnE "data-dictionary(\.md)?:[0-9]+" -o --include=*.md --include=*.kt --include=*.properties --include=*.yaml --include=*.py .`(작업 노트 제외) | 인용 좌표 셋(그 문서의 삽입 지점보다 **위쪽** 줄) — 밀리지 않는다. 삽입 줄 번호와 인용 줄 번호를 함께 확인했다 |
+| `grep -rnE "policy-values[^ ]{0,12}:[0-9]+" --include=*.md --include=*.kt --include=*.properties --include=*.yaml .`(승인 문서 `policy-values.md` 에 줄을 넣은 뒤) | 0건 — 밀릴 좌표 없음 |
 
 ## 하네스 레인 변경
 
@@ -75,4 +122,4 @@ clean-tree 실측: 빈 출력(0줄) → 양성 대조로 in_scope 파일 하나�
 
 ## rollback 실측
 
-`rollback.md` 참조(①~⑥, `실측 HEAD: 66589eda`).
+`rollback.md` 참조(①~⑥ — 실측 HEAD 는 그 문서 첫머리가 적는다).
