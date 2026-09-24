@@ -54,6 +54,11 @@ dependencies {
     // runBlocking 하나만 다리 놓는다. workflow main은 testImplementation으로만 물어(컴파일
     // classpath 실측 부재) app이 직접 선언 — 런타임엔 이미 전이 존재(Boot 생태계 다른 의존).
     implementation(libs.kotlinx.coroutines.core)
+    // M6/6F-8 — 실측: 배포물(`bootJar`)이 kotlin-reflect 없이 나가면 `@ConfigurationProperties` 의 Kotlin 생성자
+    // 바인딩이 `NoClassDefFoundError: kotlin/reflect/jvm/ReflectJvmMapping` 으로 죽어 **앱이 부팅하지 못한다**.
+    // 그동안 아무 test 도 이를 못 잡은 이유는 test 런타임 classpath 에는 kotlin-reflect 가 이미 있어서다
+    // (production 과 test 의 classpath 가 다르다) — `BootJarRuntimeClasspathTest` 가 배포물 자체를 열어 잠근다.
+    implementation(libs.kotlin.reflect)
 
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(libs.testcontainers.postgresql)
@@ -108,6 +113,16 @@ dependencies {
 
 // 아키텍처 게이트는 조합 지점에서 돈다 — app 의 test runtime classpath 에 아홉 모듈이 모두 있다.
 tasks.test {
+    // M6/6F-8 — `BootJarRuntimeClasspathTest` 가 배포물(`app.jar`)을 연다.
+    dependsOn(tasks.named("bootJar"))
+    systemProperty(
+        "bidvector.bootjar",
+        layout.buildDirectory
+            .file("libs/app.jar")
+            .get()
+            .asFile.absolutePath,
+    )
+
     val architecturePolicy = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
     inputs.file(architecturePolicy).withPropertyName("architecturePolicy")
     systemProperty("bidvector.architecture.policy", architecturePolicy.asFile.absolutePath)
