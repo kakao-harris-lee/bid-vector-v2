@@ -4,8 +4,10 @@ import bidvector.procurement.Agency
 import bidvector.procurement.AgencyCode
 import bidvector.procurement.AgencyName
 import bidvector.procurement.BusinessCategory
+import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CategoryCode
 import bidvector.procurement.CategoryLabel
+import bidvector.procurement.MainConstructionType
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeEvent
@@ -17,6 +19,7 @@ import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.ResolvedBaseAmount
 import bidvector.procurement.ResolvedEstimatedAmount
+import bidvector.procurement.ServiceDivision
 import bidvector.procurement.SourceEndpoint
 import bidvector.sharedkernel.AllocatedBudget
 import bidvector.sharedkernel.BaseAmount
@@ -61,6 +64,13 @@ private fun businessCategoryOf(row: NoticeRow): BusinessCategory? {
     val code = row.businessCategoryCode ?: return null
     return BusinessCategory(CategoryCode.of(code), row.businessCategoryLabel?.let(::CategoryLabel))
 }
+
+/**
+ * D-6F9-3 — 저장된 대분류 라벨을 복원한다. 어휘 밖 값은 손상이다(DB CHECK 가 막는 값) — `NoticeStatus.valueOf`·
+ * `Currency.valueOf` 와 같은 관례로 조용히 `null` 로 접지 않고 실패한다(대분류가 사라진 채 「없음」으로 읽히는 것보다 낫다).
+ */
+private fun businessDivisionOf(label: String): BusinessDivision =
+    BusinessDivision.fromLabel(label) ?: error("business_division 이 문서 열거 어휘 밖이다: '$label'")
 
 /**
  * D-3H-3 — 복원 경로도 [AgencyCode.of]·[AgencyName.of]로 정규화·trim 한다(위
@@ -112,6 +122,9 @@ internal fun NoticeId.reconstructNotice(row: NoticeRow): Notice {
             demandAgency = agencyOf(row.demandAgencyCode, row.demandAgencyName),
             noticeAgency = agencyOf(row.noticeAgencyCode, row.noticeAgencyName),
             title = row.title?.let(NoticeTitle::of),
+            businessDivision = row.businessDivision?.let(::businessDivisionOf),
+            serviceDivision = row.serviceDivision?.let(ServiceDivision::of),
+            mainConstructionType = row.mainConstructionType?.let(MainConstructionType::of),
         )
     return applyStatusPath(Notice.collected(command), NoticeStatus.valueOf(row.status))
 }

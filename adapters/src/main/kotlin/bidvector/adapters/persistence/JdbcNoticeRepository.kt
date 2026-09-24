@@ -142,6 +142,9 @@ class JdbcNoticeRepository(
         statement.setString(index++, row.noticeAgencyCode)
         statement.setString(index++, row.noticeAgencyName)
         statement.setString(index++, row.title)
+        statement.setString(index++, row.businessDivision)
+        statement.setString(index++, row.serviceDivision)
+        statement.setString(index++, row.mainConstructionType)
         index = bindDeadline(statement, index, row)
         statement.setString(index++, observationKey.value)
         if (!includeStatusAndId) {

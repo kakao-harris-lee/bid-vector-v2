@@ -37,6 +37,10 @@ internal data class NoticeRow(
     val noticeAgencyName: String?,
     // M6/6F-4 D-6F4-9 — 공고명. provenance 컬럼 없음(business_category_*·agency_* 와 같은 축).
     val title: String?,
+    // M6/6F-9 D-6F9-3 — 업무구분 새 칸 셋(V17). 대분류는 문서 열거 라벨 그대로 저장한다. provenance 컬럼 없음(같은 축).
+    val businessDivision: String?,
+    val serviceDivision: String?,
+    val mainConstructionType: String?,
     val deadlineAt: Instant?,
     val revision: Long,
 )
@@ -68,6 +72,9 @@ internal fun ResultSet.toNoticeRow(): NoticeRow =
         noticeAgencyCode = getString("notice_agency_code"),
         noticeAgencyName = getString("notice_agency_name"),
         title = getString("notice_title"),
+        businessDivision = getString("business_division"),
+        serviceDivision = getString("service_division"),
+        mainConstructionType = getString("main_construction_type"),
         deadlineAt = getTimestamp("deadline_at")?.toInstant(),
         revision = getLong("revision"),
     )
@@ -103,6 +110,9 @@ internal fun NoticeCollected.toNoticeRow(): NoticeRow =
         noticeAgencyCode = noticeAgency?.code?.value,
         noticeAgencyName = noticeAgency?.name?.value,
         title = title?.value,
+        businessDivision = businessDivision?.label,
+        serviceDivision = serviceDivision?.value,
+        mainConstructionType = mainConstructionType?.value,
         deadlineAt = deadlineAt,
         revision = 1L,
     )

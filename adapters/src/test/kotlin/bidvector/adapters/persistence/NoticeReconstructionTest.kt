@@ -1,9 +1,13 @@
 package bidvector.adapters.persistence
 
+import bidvector.procurement.BusinessDivision
+import bidvector.procurement.MainConstructionType
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.NoticeStatus
+import bidvector.procurement.ServiceDivision
 import bidvector.sharedkernel.NoticeRound
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -51,6 +55,9 @@ class NoticeReconstructionTest {
             noticeAgencyCode = null,
             noticeAgencyName = null,
             title = null,
+            businessDivision = null,
+            serviceDivision = null,
+            mainConstructionType = null,
             deadlineAt = null,
             revision = 1L,
         )
@@ -60,6 +67,29 @@ class NoticeReconstructionTest {
         for (status in NoticeStatus.entries) {
             val notice = id.reconstructNotice(minimalRow(status))
             notice.status shouldBe status
+        }
+    }
+
+    /** D-6F9-3 — 업무구분 새 칸 셋의 복원. 대분류는 문서 열거 라벨 넷 전부가 왕복하고, 나머지 둘은 저장된 이름 그대로다. */
+    @Test
+    fun `업무구분 새 칸 셋은 저장 표현에서 그대로 복원된다 — 대분류 넷 전부`() {
+        BusinessDivision.entries.forEach { division ->
+            val notice = id.reconstructNotice(minimalRow(NoticeStatus.Open).copy(businessDivision = division.label))
+            notice.businessDivision shouldBe division
+        }
+        val notice =
+            id.reconstructNotice(
+                minimalRow(NoticeStatus.Open).copy(serviceDivision = "기술용역", mainConstructionType = "전기공사업"),
+            )
+        notice.serviceDivision shouldBe ServiceDivision.of("기술용역")
+        notice.mainConstructionType shouldBe MainConstructionType.of("전기공사업")
+        id.reconstructNotice(minimalRow(NoticeStatus.Open)).businessDivision shouldBe null
+    }
+
+    @Test
+    fun `어휘 밖 대분류 라벨은 손상이라 조용히 null 로 접지 않고 실패한다 — DB CHECK 가 이 값을 막는다`() {
+        shouldThrow<IllegalStateException> {
+            id.reconstructNotice(minimalRow(NoticeStatus.Open).copy(businessDivision = "basket"))
         }
     }
 }

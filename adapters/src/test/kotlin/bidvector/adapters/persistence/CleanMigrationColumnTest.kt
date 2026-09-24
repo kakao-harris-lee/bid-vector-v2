@@ -79,6 +79,10 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notice", "notice_agency_name", "text", true),
             // M6/6F-4 D-6F4-1·9 — 감시 키워드 매칭 입력(공고명).
             ColumnSpec("notice", "notice_title", "text", true),
+            // M6/6F-9 D-6F9-3 — 업무구분 새 칸 셋(추가만, V17). 전부 nullable·DEFAULT 없음(기존 행 보존, 재수집이 채운다).
+            ColumnSpec("notice", "business_division", "text", true),
+            ColumnSpec("notice", "service_division", "text", true),
+            ColumnSpec("notice", "main_construction_type", "text", true),
             ColumnSpec("notice", "deadline_at", "timestamp with time zone", true),
             ColumnSpec("notice", "revision", "bigint", false, true),
             ColumnSpec("notice", "observation_key", "text", false),
