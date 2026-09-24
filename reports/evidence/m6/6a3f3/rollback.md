@@ -25,14 +25,15 @@ author로는 레인을 가를 수 없다.
 아니다. `git log --oneline febad567..18fdd72e -- milestone-6.md`는 `39076f6c`(팀장, "docs(m6):
 6A-3+6F-3 착수 문단 등재") 1건만 낸다 — 구현 레인(kotlin-implementer)의 어떤 커밋도 이 파일을
 만들거나 고치지 않았다(위 rollback 목록의 기계 산출 `git diff --name-status`에도 이 파일이
-없다 — 목록 자체가 그 사실의 증거다). 이 slice의 종결 문단(팀장이 나중에 커밋)이 더해지면
-그 커밋 해시도 여기 추가한다.
+없다 — 목록 자체가 그 사실의 증거다). 종결 문단 `a6d75a32`(팀장, "docs(m6): 6A-3+6F-3 종결 문단 등재")가
+더해졌다 — 되돌릴 때는 종결 → 착수 순서로 두 커밋을 각각 hunk 격리한다.
 
 **만약 이 파일을 되돌려야 하면** range 전체를 `git restore`로 덮지 않는다(병합 뒤에는 다른
 레인의 커밋이 같은 range 안에 섞일 수 있어 「이 range 안에서는 이 slice만 만졌다」는 가정이
 깨진다, 라운드 1 L-2 지적). 대신 **그 커밋 하나만** 커밋 해시로 hunk 격리한다:
 
 ```
+git diff a6d75a32~1..a6d75a32 -- milestone-6.md | git apply -R
 git diff 39076f6c~1..39076f6c -- milestone-6.md | git apply -R
 ```
 
