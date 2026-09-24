@@ -45,6 +45,32 @@ class CollectionArchitectureGateCatchesViolationsTest {
         useCaseRules().mustReport("RogueCarrierResult", "ObservationKey")
     }
 
+    private fun moduleRules() =
+        rules.moduleMustNotReadRawFields(
+            roots = listOf("$fixtureRoot.workflow", "$fixtureRoot.app"),
+            rawAccessTypes = policy.rawAccessTypes.toSet(),
+            allowedReferencers = policy.rawAccessAllowedReferencers.toSet(),
+            passThroughTypes = policy.collectionPassThroughTypes.toSet(),
+            allowedMemberAccessors = policy.rawAccessAllowedMemberAccessors.toSet(),
+        )
+
+    @Test
+    fun `use case 패키지 밖 이웃 workflow 패키지의 헬퍼가 원문 필드를 읽어도 잡는다 — 한 걸음 옮긴 변이`() {
+        moduleRules().mustReport("RogueNeighborTitlePeek", "FieldConcept")
+        moduleRules().mustReport("RogueNeighborTitlePeek", "RawNoticeObservation.valueOf")
+    }
+
+    @Test
+    fun `app 의 이웃 클래스가 원문 관측의 항목 원문 텍스트를 꺼내도 잡는다`() {
+        moduleRules().mustReport("RogueRawFieldPeek", "RawNoticeObservation.getSourceText")
+    }
+
+    @Test
+    fun `러너와 배선 밖에서 수집 use case 를 참조하면 잡는다 — 컨트롤러·리스너로 수집을 여는 길`() {
+        typeRule(setOf(policy.collectionUseCaseType), policy.collectionUseCaseReferencers.toSet(), "use case")
+            .mustReport("RogueUseCaseCaller", "CollectNoticesUseCase")
+    }
+
     @Test
     fun `공고명 원시 키를 상수 풀에 가진 허용 밖 클래스를 잡는다`() {
         rules

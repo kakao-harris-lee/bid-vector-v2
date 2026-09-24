@@ -56,6 +56,55 @@ class CollectionArchitectureGateTest {
     }
 
     @Test
+    fun `원문 값 획득 봉쇄의 모듈 root 가 실제로 production 에 있다 — 규칙이 공허하지 않다`() {
+        policy.rawAccessRoots.forEach { root ->
+            production.filter { it.packageName == root || it.packageName.startsWith("$root.") }.shouldNotBeEmpty()
+        }
+    }
+
+    @Test
+    fun `원문 키 접근 타입 참조와 통과 전용 멤버 접근은 workflow·app production 전체에서 허용 집합 밖에 없다`() {
+        rules
+            .moduleMustNotReadRawFields(
+                roots = policy.rawAccessRoots,
+                rawAccessTypes = policy.rawAccessTypes.toSet(),
+                allowedReferencers = policy.rawAccessAllowedReferencers.toSet(),
+                passThroughTypes = policy.collectionPassThroughTypes.toSet(),
+                allowedMemberAccessors = policy.rawAccessAllowedMemberAccessors.toSet(),
+            ).checkAll()
+    }
+
+    @Test
+    fun `원문 값 획득 봉쇄의 허용 참조자·접근자 집합은 관측 집합과 같다 — 낡은 허용 항목이 게이트를 느슨하게 두지 않는다`() {
+        rules.observedReferencers(
+            production,
+            policy.rawAccessRoots,
+            policy.rawAccessTypes.toSet(),
+        ) shouldBe policy.rawAccessAllowedReferencers.toSet()
+        rules.observedMemberAccessors(
+            production,
+            policy.rawAccessRoots,
+            policy.collectionPassThroughTypes.toSet(),
+        ) shouldBe policy.rawAccessAllowedMemberAccessors.toSet()
+    }
+
+    @Test
+    fun `수집 use case 를 참조하는 production 클래스는 허용 집합뿐이다 — HTTP 나 이벤트 리스너로 열리는 길이 없다`() {
+        rules
+            .appTypesMustBeReferencedOnlyBy(
+                policy.packageRoot,
+                setOf(policy.collectionUseCaseType),
+                policy.collectionUseCaseReferencers.toSet(),
+                "D-6F8-6 우회 5 — 수집 use case 참조 집합은 러너와 배선이다",
+            ).checkAll()
+        rules.observedReferencers(
+            production,
+            listOf(policy.packageRoot),
+            setOf(policy.collectionUseCaseType),
+        ) shouldBe policy.collectionUseCaseReferencers.toSet()
+    }
+
+    @Test
     fun `공고명 원시 키 리터럴은 계약 데이터를 실은 정책 클래스 밖 production 상수 풀에 없다`() {
         rules
             .titleKeyLiteralMustStayInAllowedClasses(noticeTitleRawKey(), policy.titleKeyAllowedClasses.toSet())

@@ -2,6 +2,7 @@ package bidvector.app.architecture
 
 import com.tngtech.archunit.core.domain.JavaAccess
 import com.tngtech.archunit.core.domain.JavaClass
+import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.lang.ArchCondition
 import com.tngtech.archunit.lang.ArchRule
 import com.tngtech.archunit.lang.ConditionEvents
@@ -52,7 +53,7 @@ class CollectionArchitectureRules {
      * 남아 게이트가 조용히 느슨해지는 것(허용됐지만 아무도 안 쓰는 타입)을 「허용 집합 == 관측 집합」 단언으로 막는다.
      */
     fun observedProcurementTypes(
-        classes: com.tngtech.archunit.core.domain.JavaClasses,
+        classes: JavaClasses,
         collectionPackage: String,
         procurementPackage: String,
     ): Set<String> =
@@ -63,6 +64,73 @@ class CollectionArchitectureRules {
             .filter { it.packageName == procurementPackage || it.packageName.startsWith("$procurementPackage.") }
             .map { it.fullName }
             .toSet()
+
+    /**
+     * D-6F8-6 — 원문 값 획득의 **모듈 전체** 봉쇄. [roots] 아래 production **전체**(수집 패키지 밖 이웃 패키지·app
+     * 포함)가 입력이다 — 이름·패키지 하나를 지키는 규칙은 한 걸음(헬퍼를 이웃 패키지로) 옮기면 열린다.
+     * ① [rawAccessTypes](계약·레지스트리·원문 키·값·존재 판별·개념 토큰)를 참조하는 클래스는 [allowedReferencers] 의
+     * 부분집합, ② [passThroughTypes] 의 멤버에 접근하는 클래스는 [allowedMemberAccessors] 의 부분집합이다.
+     * 원문 값을 얻는 길은 `RawNoticeObservation` 의 멤버이므로 둘이 닫히면 procurement·adapters 밖에는 길이 없다.
+     */
+    fun moduleMustNotReadRawFields(
+        roots: List<String>,
+        rawAccessTypes: Set<String>,
+        allowedReferencers: Set<String>,
+        passThroughTypes: Set<String>,
+        allowedMemberAccessors: Set<String>,
+    ): List<ArchRule> {
+        val rootPackages = roots.map { "$it.." }.toTypedArray()
+        return listOf(
+            noClasses()
+                .that()
+                .resideInAnyPackage(*rootPackages)
+                .and(isOutside(allowedReferencers))
+                .should(referenceAnyOf(rawAccessTypes))
+                .because("D-6F8-6 우회 1 — 원문 키 접근 타입 참조 집합은 허용 집합의 부분집합이다(모듈 전체)"),
+            noClasses()
+                .that()
+                .resideInAnyPackage(*rootPackages)
+                .and(isOutside(allowedMemberAccessors))
+                .should(touchMembersOf(passThroughTypes))
+                .because("D-6F8-6 우회 1 — 통과 전용 타입의 멤버 접근 집합은 허용 집합의 부분집합이다(모듈 전체)"),
+        )
+    }
+
+    /** [roots] 아래 클래스 가운데 [types] 를 참조하는 것의 최상위 클래스 이름 집합 — 허용 집합과 같아야 한다. */
+    fun observedReferencers(
+        classes: JavaClasses,
+        roots: List<String>,
+        types: Set<String>,
+    ): Set<String> =
+        classes
+            .filter { inRoots(it, roots) }
+            .filter { origin -> referencedTypesOf(origin).any { it in types && it != origin.topLevel().fullName } }
+            .map { it.topLevel().fullName }
+            .toSet()
+
+    /** [roots] 아래 클래스 가운데 [types] 의 멤버에 접근하는 것의 최상위 클래스 이름 집합 — 허용 집합과 같아야 한다. */
+    fun observedMemberAccessors(
+        classes: JavaClasses,
+        roots: List<String>,
+        types: Set<String>,
+    ): Set<String> =
+        classes
+            .filter { inRoots(it, roots) }
+            .filter { origin -> origin.accessesFromSelf.any { it.targetOwner.topLevel().fullName in types } }
+            .map { it.topLevel().fullName }
+            .toSet()
+
+    private fun inRoots(
+        item: JavaClass,
+        roots: List<String>,
+    ): Boolean = roots.any { item.packageName == it || item.packageName.startsWith("$it.") }
+
+    private fun referencedTypesOf(origin: JavaClass): List<String> =
+        origin.directDependenciesFromSelf.map {
+            it.targetClass.baseComponentType
+                .topLevel()
+                .fullName
+        }
 
     /**
      * 우회 2 — [key](공고명 원시 키, 값은 필드 계약이 정한다)를 상수 풀에 가진 production 클래스 집합은
@@ -101,7 +169,7 @@ class CollectionArchitectureRules {
 
     private fun isOutside(allowed: Set<String>) =
         object : com.tngtech.archunit.base.DescribedPredicate<JavaClass>("허용 집합 밖 클래스 (${allowed.size}종)") {
-            override fun test(target: JavaClass): Boolean = target.fullName !in allowed
+            override fun test(target: JavaClass): Boolean = target.topLevel().fullName !in allowed
         }
 
     private fun referenceProcurementTypesOutside(
@@ -178,8 +246,8 @@ class CollectionArchitectureRules {
                 events: ConditionEvents,
             ) {
                 item.directDependenciesFromSelf
-                    .map { it.targetClass.baseComponentType }
-                    .filter { it.fullName in types && it.fullName != item.fullName }
+                    .map { it.targetClass.baseComponentType.topLevel() }
+                    .filter { it.fullName in types && it.fullName != item.topLevel().fullName }
                     .distinct()
                     .forEach { events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${it.fullName}")) }
             }
