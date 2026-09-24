@@ -69,6 +69,53 @@
    **공고명으로 실제 매칭되는 후보가 있는지**(공고명 배선의 거동 확인).
 5. 멱등: 같은 범위를 한 번 더 돌리면 새 `notice` 행 0, `duplicate` 가 1차 정규화 수와 같다.
 
+## 계약 갱신 (1) — 검토 라운드 1 판정과 팀장 결정 (2026-09-24, 팀장)
+
+판정 SHA `4ba88f46` — verifier **not-ready**(HIGH 1 · MEDIUM 5 · LOW 2) · code-reviewer **머지 불가**(HIGH 1 · MEDIUM 2 · LOW 9) ·
+privacy-gate 위반 0 · 권고 5 · 확인 불가 4. 재작업 **1/5**. 리포트 `_workspace/m6-6f8/1{0,1,2}_*.md`(gitignore) — 판정은 PR 코멘트로.
+
+**D-6F8-6 — 정규화 우회 게이트를 모듈 전체로 넓힌다(verifier F-1 HIGH).** 규칙이 `bidvector.workflow.collection..` 한 패키지만 봐서
+원시 키 읽기를 이웃 패키지 헬퍼로 옮긴 변이(M1)가 전체 `check` 초록이었다. **`workflow..`·`app..` production 전체**에서 원문 키 접근
+타입 참조·통과 전용 멤버 접근을 금지하고 허용 집합은 정책 파일(`architecture-policy.properties`) 키로. 오늘 그것을 쓰는 곳은 use case
+하나뿐이라 production 은 깨지지 않는다. 이웃 패키지 음성 fixture + M1 재적용 RED. 게이트 술어 변경 — 표적 재검증.
+
+**D-6F8-7 — 식별자 형식 위반은 탈락이다(code-reviewer HIGH).** `bidNtceOrd` 가 비어 있지 않지만 세 자리 숫자가 아니면(`"1"`·`"01"`·
+`"00A"`·앞뒤 공백) `canonicalize` → `NoticeRound.of` 의 `require` 가 던져 **러너까지 올라가 수집 전체가 죽는다** — 탈락 사유 없이,
+그 슬롯 회계 없이, 재실행해도 같은 자리에서. `ParseFailureKind.IDENTIFIER` 는 정의만 있고 main 에서 한 번도 방출되지 않았다(설계
+의도와 거동의 갈림). **변환 지점 `canonicalize` 안에서** `NoticeRound.of`(와 같은 형식 검사를 하는 번호 쪽이 있으면 그것도) 실패를
+`Dropped(CollectionParseFailure(IDENTIFIER))` 로 접는다 — use case 는 손대지 않는다. 회귀 잠금 세 계층: `CanonicalizeTest`(비정형
+차수 넷 → `Dropped(IDENTIFIER)`) · `CollectNoticesUseCaseTest`(섞인 배치에서 등식·사유·원문 저장·다음 항목 계속) · E2E(비정형 항목
+하나 → `SUM(dropped)` 반영, exit 0). **같은 계열 전수**: `canonicalize` 경로에서 입력값으로 `require`/`check`/`!!`/파싱 예외가 날 수 있는
+자리를 구현 레인이 전수해 표로 내고, 전부 탈락 사유로 접거나 도달 불가 근거를 적는다(실데이터를 처음 붙이는 slice 다).
+
+**D-6F8-1 문면 정정(verifier F-6 · 구현 레인 0단계 4번).** 「원문 저장 + 영속 한 트랜잭션」 → **「원문을 먼저 커밋하고, canonical 영속은
+항목 단위 트랜잭션」**. `JdbcNoticeRepository` 는 `TransactionBoundary` 참여자가 아니고, 묶으면 `Rejected` 경로의 rollback 이 원문
+append 까지 되돌린다 — 기존 `RawObservationStore` 계약 ⑤(「원문은 이후 실패와 무관하게 남는다」)와 같고 위협 ① 에 더 강하다.
+
+**D-6F8-8 — MEDIUM·LOW 는 같은 라운드에 일괄(승인 전).**
+- verifier F-3 · privacy R5: E2E 에 **표준 출력·표준 오류 캡처**를 더하고 예외는 **cause 체인 전체**에서 키 부재를 단언(M4a `System.err` 변이 RED).
+- verifier F-5: 「오늘 = KST」 경계 test — KST 와 UTC 날짜가 갈리는 시각을 고정한 clock 으로(M5 UTC 변이 RED).
+- verifier F-4: checklist 문면 — 공고명 키 리터럴 게이트는 **보조** 잠금이고 주 잠금은 D-6F8-6 규칙이다.
+- verifier F-7(a) `NoticeTitleCanonicalizeTest` 를 `gate-tests.properties` 에 등재 · (b) 멱등 등식을 「재실행 `normalized = 0`, 재실행
+  `duplicate = 1차 normalized + 1차 duplicate`」로 정정(D-6F8-5 5번도 같은 등식으로 읽는다).
+- privacy R3: `TransportFailed.message`·`Failed.detail` 채널을 예외 클래스 이름만 담도록 접는다(선례 `HttpAttachmentDocumentSource`).
+- code-reviewer MEDIUM 2 · LOW 9: 리포트 `11_code_review.md` 전문을 읽고 전부 처분(수정 또는 근거 있는 등재)한다.
+- `reports/evidence/m3/3a/policy-values.md` §1.3 공고명 행 + P-15 등재를 **in_scope 에 넣는다**(P-14 선례 — 정본 문서). 구현 레인이 쓴다.
+
+**D-6F8-9 — 실수집 전 조건과 OPEN (privacy R1·R2 · verifier F-2).**
+- 실행 명령(팀장, D-6F8-5): 키는 **원문형** 변수를 서브셸에서 파일로부터 읽어 **그 프로세스 환경에만** 넘긴다 — 명령 문자열·argv·셸
+  history·에이전트 transcript 에 값이 나타나지 않는다. `export`·`set -x`·`echo`·`-D`·`--args` 금지, `jdk.*` DEBUG 금지.
+- **`OPEN-6F8-RAW-PII-RETENTION` 신설 → 6B-3**: `raw_observation.payload` 가 항목 원문을 그대로 저장하므로 KONEPS 담당자 이름·전화·
+  이메일 키(`ntceInsttOfcl*`·`dminsttOfcl*`)가 **영속된다**. 이 실수집이 6B-3 대상 표를 늘린다. 개발 DB 는 확인 뒤 `docker rm -f -v`
+  로 폐기할 수 있음을 D-6F8-5 에 명시하고, evidence 에는 담당자 키가 있는 행 **수만** 싣는다.
+- **`OPEN-6F8-QUOTA-XML-ENVELOPE` 신설**(verifier F-2, 기존 어댑터 분류): data.go.kr 게이트웨이의 XML 오류 봉투로 한도 초과가 오면
+  `StructureFailure` 로 분류돼 멈추지 않고 남은 슬롯마다 한 번씩 부른다(최대 조회일 × 업종 호출). 실수집에서 슬롯 원인이 연달아
+  `StructureFailure` 로 찍히면 팀장이 러너를 중단한다.
+- **`OPEN-6F8-COLLECTION-RUN-CATEGORY` 신설**(구현 레인 제안): `collection_run` 에 업종 열이 없다 — 업종별 회계는 러너 로그·결과 타입에만.
+- 저장 `Rejected` 는 회계상 `duplicate` 로 접힌다(사유 어휘가 `Accounting.kt` 에 없다) — 알려진 제한, 건수는 `WriteTally.rejected` 와
+  `rejected_write`.
+- privacy R4(로거·키 읽기 게이트 사각, 현재 사용 0) — 알려진 제한 등재.
+
 ## 위협 모델 — 6F-8 고유 경계
 
 지키는 것: **① 수집은 원문을 잃지 않고 조용히 버리지 않는다**(수신 = 정규화 + 중복 + 탈락, 사유별) **② 정규화 지점은 하나다**
@@ -122,6 +169,7 @@ in_scope:
   - docs/discovery/**                                                   # 필드 계약 정본 표(구현 레인이 파일 실측)
   - fixtures/**                                                         # 공고명 필드가 corpus 기대값에 닿으면 — 근거 기록
   - expected/**
+  - reports/evidence/m3/3a/policy-values.md                              # D-6F8-8 — §1.3 공고명 행 + P-15(P-14 선례)
   - reports/evidence/m6/6f8/**
   - milestone-6.md                                                      # 착수·종결 문단(팀장) — 공유 파일
 out_of_scope:
