@@ -40,6 +40,16 @@ data class NoticeCollected(
      * 계약에서 채운다(D-6F8-2, M6/6F-8).
      */
     val title: NoticeTitle? = null,
+    /**
+     * 업무 대분류(D-6F9-1, M6/6F-9) — 응답 필드가 아니라 관측이 나르는 **수집 오퍼레이션 값**을 그대로 옮긴다
+     * ([RawNoticeObservation.sourceDivision]). 응답의 `bsnsDivNm` 은 소비하지 않는다(P-7 — 축을 접지 않는다).
+     * 기본값 `null`(위 슬롯들과 같은 이유).
+     */
+    val businessDivision: BusinessDivision? = null,
+    /** 용역구분(D-6F9-2, `SERVICE_DIVISION` 계약) — [businessCategory]의 라벨 칸에 섞지 않는 자기 칸. */
+    val serviceDivision: ServiceDivision? = null,
+    /** 주공종(D-6F9-2, `MAIN_CONSTRUCTION_TYPE` 계약) — 이름만이다. [businessCategory]의 코드를 낳지 않는다. */
+    val mainConstructionType: MainConstructionType? = null,
 )
 
 /** 추정가격도 기초금액과 같은 형태 규율(파생이 원본을 덮지 않는다)을 받는다 — `Published`만 직접값이다. */
@@ -138,26 +148,6 @@ private fun estimatedAmountAsResolved(outcome: AmountResolutionOutcome): Resolve
     )
 }
 
-/** 업무구분(⑤ D-3A-5, COL-08) — 코드·라벨 두 값. 매핑 없는 라벨·공백뿐인 라벨은 `null`(임의 라벨 금지). */
-private fun businessCategoryFrom(
-    observation: RawNoticeObservation,
-    registry: KonepsFieldContractRegistry,
-): BusinessCategory? =
-    registry
-        .contractsFor(FieldConcept.BUSINESS_CATEGORY_CODE)
-        .firstOrNull()
-        ?.let(observation::valueOf)
-        ?.takeIf(String::isNotBlank)
-        ?.let { code ->
-            val label =
-                registry
-                    .contractsFor(FieldConcept.BUSINESS_CATEGORY_LABEL)
-                    .firstOrNull()
-                    ?.let(observation::valueOf)
-                    ?.takeIf(String::isNotBlank)
-            BusinessCategory(CategoryCode.of(code), label?.let(::CategoryLabel))
-        }
-
 /**
  * 배정예산(F-5) — `FilledFromBudgetKey` 폴백과는 **다른 자리**다. 자기 개념(`ALLOCATED_BUDGET`)
  * 필드에 값이 있으면 그 자체로 게시값이라 `Provenance.Published`를 받는다(폴백에 쓰였는지
@@ -236,6 +226,34 @@ private fun instantOrNull(outcome: InstantResolutionOutcome): Instant? =
         InstantResolutionOutcome.ParseFailed -> null
     }
 
+/**
+ * 금액·일시 해석 중 하나라도 계약 위반이면 항목 전체가 탈락한다(④·⑦) — 먼저 걸린 사유 하나. 없으면 `null`(정규화 진행).
+ * 해석 결과 네 개 전부에서 [AmountResolutionOutcome.Rejected]·[InstantResolutionOutcome.ParseFailed] 가 아닌 것만 통과한다.
+ */
+private fun dropReasonOf(
+    baseAmount: AmountResolutionOutcome,
+    estimated: AmountResolutionOutcome,
+    deadline: InstantResolutionOutcome,
+    opening: InstantResolutionOutcome,
+): CollectionDropReason? =
+    when {
+        baseAmount is AmountResolutionOutcome.Rejected -> {
+            baseAmount.reason
+        }
+
+        estimated is AmountResolutionOutcome.Rejected -> {
+            estimated.reason
+        }
+
+        deadline is InstantResolutionOutcome.ParseFailed || opening is InstantResolutionOutcome.ParseFailed -> {
+            CollectionDropReason.CollectionParseFailure(ParseFailureKind.DATE_TIME)
+        }
+
+        else -> {
+            null
+        }
+    }
+
 /** 식별자가 선 뒤의 나머지 canonicalize — 금액 해석·일시 해석 중 하나라도 계약 위반이면 항목 전체가 탈락한다(④·⑦). */
 private fun normalizedCommand(
     observation: RawNoticeObservation,
@@ -247,44 +265,29 @@ private fun normalizedCommand(
     val estimatedResolution = resolveAmount(observation, noticeId.round, AmountAxis.ESTIMATED, policy)
     val deadlineResolution = instantResolutionOf(observation, policy, FieldConcept.DEADLINE_AT)
     val openingResolution = instantResolutionOf(observation, policy, FieldConcept.OPENING_SCHEDULED_AT)
-    val dateTimeParseFailure = CollectionDropReason.CollectionParseFailure(ParseFailureKind.DATE_TIME)
-    return when {
-        baseAmountResolution is AmountResolutionOutcome.Rejected -> {
-            CanonicalizationOutcome.Dropped(baseAmountResolution.reason, unknownFieldCount)
-        }
-
-        estimatedResolution is AmountResolutionOutcome.Rejected -> {
-            CanonicalizationOutcome.Dropped(estimatedResolution.reason, unknownFieldCount)
-        }
-
-        deadlineResolution is InstantResolutionOutcome.ParseFailed -> {
-            CanonicalizationOutcome.Dropped(dateTimeParseFailure, unknownFieldCount)
-        }
-
-        openingResolution is InstantResolutionOutcome.ParseFailed -> {
-            CanonicalizationOutcome.Dropped(dateTimeParseFailure, unknownFieldCount)
-        }
-
-        else -> {
-            CanonicalizationOutcome.Normalized(
-                NoticeCollected(
-                    id = noticeId,
-                    businessCategory = businessCategoryFrom(observation, policy.fieldContracts),
-                    baseAmount = baseAmountAsResolved(baseAmountResolution),
-                    estimatedAmount = estimatedAmountAsResolved(estimatedResolution),
-                    allocatedBudget = allocatedBudgetFrom(observation, policy.fieldContracts, noticeId.round),
-                    floorRate = floorRateFrom(observation, policy.fieldContracts, noticeId.round),
-                    deadlineAt = instantOrNull(deadlineResolution),
-                    openingScheduledAt = instantOrNull(openingResolution),
-                    raw = observation,
-                    demandAgency = demandAgencyFrom(observation, policy.fieldContracts),
-                    noticeAgency = noticeAgencyFrom(observation, policy.fieldContracts),
-                    title = policy.fieldContracts.valueIn(observation, FieldConcept.NOTICE_TITLE)?.let(NoticeTitle::of),
-                ),
-                unknownFieldCount,
-            )
-        }
-    }
+    val dropReason = dropReasonOf(baseAmountResolution, estimatedResolution, deadlineResolution, openingResolution)
+    if (dropReason != null) return CanonicalizationOutcome.Dropped(dropReason, unknownFieldCount)
+    val contracts = policy.fieldContracts
+    return CanonicalizationOutcome.Normalized(
+        NoticeCollected(
+            id = noticeId,
+            businessCategory = businessCategoryFrom(observation, contracts),
+            baseAmount = baseAmountAsResolved(baseAmountResolution),
+            estimatedAmount = estimatedAmountAsResolved(estimatedResolution),
+            allocatedBudget = allocatedBudgetFrom(observation, contracts, noticeId.round),
+            floorRate = floorRateFrom(observation, contracts, noticeId.round),
+            deadlineAt = instantOrNull(deadlineResolution),
+            openingScheduledAt = instantOrNull(openingResolution),
+            raw = observation,
+            demandAgency = demandAgencyFrom(observation, contracts),
+            noticeAgency = noticeAgencyFrom(observation, contracts),
+            title = contracts.valueIn(observation, FieldConcept.NOTICE_TITLE)?.let(NoticeTitle::of),
+            businessDivision = observation.sourceDivision,
+            serviceDivision = serviceDivisionFrom(observation, contracts),
+            mainConstructionType = mainConstructionTypeFrom(observation, contracts),
+        ),
+        unknownFieldCount,
+    )
 }
 
 /**

@@ -58,6 +58,37 @@ class RawObservationTest {
         a shouldBe b
     }
 
+    // D-6F9-1 — 대분류는 응답 필드가 아니라 수집 오퍼레이션이 정한다. 관측이 구조로 나른다(URL 을 파싱하지 않는다).
+    @Test
+    fun `관측은 수집 오퍼레이션의 대분류를 나른다 — 기본은 null 이고 두 생성 경로 모두 실을 수 있다`() {
+        val fields = mapOf(RawKey("k") to "v")
+
+        RawNoticeObservation.of(fields, SourceEndpoint.NOTICE_LIST, NOW).sourceDivision shouldBe null
+        RawNoticeObservation
+            .of(fields, SourceEndpoint.NOTICE_LIST, NOW, sourceDivision = BusinessDivision.SERVICE)
+            .sourceDivision shouldBe BusinessDivision.SERVICE
+        RawNoticeObservation
+            .ofRawValues(
+                mapOf(RawKey("k") to RawValue.ExplicitNull),
+                SourceEndpoint.NOTICE_LIST,
+                NOW,
+                sourceDivision = BusinessDivision.CONSTRUCTION,
+            ).sourceDivision shouldBe BusinessDivision.CONSTRUCTION
+    }
+
+    @Test
+    fun `대분류가 다른 관측은 같은 원문이어도 동등하지 않다`() {
+        val fields = mapOf(RawKey("k") to "v")
+
+        fun observationOf(division: BusinessDivision?) =
+            RawNoticeObservation.of(fields, SourceEndpoint.NOTICE_LIST, NOW, sourceDivision = division)
+
+        (observationOf(BusinessDivision.SERVICE) == observationOf(BusinessDivision.CONSTRUCTION)) shouldBe false
+        (observationOf(BusinessDivision.SERVICE) == observationOf(null)) shouldBe false
+        observationOf(BusinessDivision.SERVICE) shouldBe observationOf(BusinessDivision.SERVICE)
+        observationOf(BusinessDivision.SERVICE).hashCode() shouldBe observationOf(BusinessDivision.SERVICE).hashCode()
+    }
+
     @Test
     fun `RawKey 는 빈 문자열을 거부한다`() {
         shouldThrow<IllegalArgumentException> { RawKey("") }

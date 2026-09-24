@@ -44,7 +44,6 @@ data class MainConstructionType private constructor(
     val value: String,
 ) {
     companion object {
-        fun of(raw: String): MainConstructionType? =
-            raw.trim().takeIf(String::isNotEmpty)?.let(::MainConstructionType)
+        fun of(raw: String): MainConstructionType? = raw.trim().takeIf(String::isNotEmpty)?.let(::MainConstructionType)
     }
 }

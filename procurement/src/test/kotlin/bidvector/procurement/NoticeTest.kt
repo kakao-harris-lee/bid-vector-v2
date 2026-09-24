@@ -41,6 +41,36 @@ class NoticeTest {
     }
 
     @Test
+    fun `collected 는 업무구분 새 칸 셋을 명령 그대로 싣는다 — 이후 전이도 잃지 않는다`() {
+        val command =
+            COMMAND.copy(
+                businessDivision = BusinessDivision.SERVICE,
+                serviceDivision = ServiceDivision.of("기술용역"),
+                mainConstructionType = MainConstructionType.of("전기공사업"),
+            )
+
+        val notice = Notice.collected(command)
+
+        notice.businessDivision shouldBe BusinessDivision.SERVICE
+        notice.serviceDivision shouldBe ServiceDivision.of("기술용역")
+        notice.mainConstructionType shouldBe MainConstructionType.of("전기공사업")
+        val closed =
+            notice.applyEvent(NoticeEvent.DeadlineReached).shouldBeInstanceOf<NoticeTransitionOutcome.Applied>()
+        closed.notice.businessDivision shouldBe BusinessDivision.SERVICE
+        closed.notice.serviceDivision shouldBe ServiceDivision.of("기술용역")
+        closed.notice.mainConstructionType shouldBe MainConstructionType.of("전기공사업")
+    }
+
+    @Test
+    fun `업무구분 새 칸 셋의 기본값은 null 이다 — 기존 호출부는 수정 없이 컴파일된다`() {
+        val notice = Notice.collected(COMMAND)
+
+        notice.businessDivision shouldBe null
+        notice.serviceDivision shouldBe null
+        notice.mainConstructionType shouldBe null
+    }
+
+    @Test
     fun `applyEvent 는 표 안의 전이를 적용한 새 Notice 를 낸다`() {
         val notice = Notice.collected(COMMAND)
 

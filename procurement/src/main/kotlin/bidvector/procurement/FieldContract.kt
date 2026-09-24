@@ -158,6 +158,22 @@ enum class FieldConcept {
      * 박지 않는다).
      */
     NOTICE_TITLE,
+
+    // M6/6F-9 D-6F9-2 — 업무구분 세부 분류 넷. 대분류는 필드가 아니라 수집 오퍼레이션이 정한다(D-6F9-1,
+    // `RawNoticeObservation.sourceDivision`). 서로 다른 축이라 [BUSINESS_CATEGORY_CODE]·[BUSINESS_CATEGORY_LABEL]
+    // (코드+라벨 축, `bsnsDivNm` 행)에 섞지 않는다(P-7 · `OPEN-COL-03`).
+
+    /** 공공조달분류 세분류 번호(`pubPrcrmntClsfcNo`, 용역) — 제로패딩 보존 식별자, `BusinessCategory.code` 로 흐른다. */
+    PUBLIC_PROCUREMENT_CLASS_CODE,
+
+    /** 공공조달분류 세분류명(`pubPrcrmntClsfcNm`, 용역) — [PUBLIC_PROCUREMENT_CLASS_CODE]와 같은 쌍의 라벨. */
+    PUBLIC_PROCUREMENT_CLASS_NAME,
+
+    /** 용역구분명(`srvceDivNm`, 용역 — 일반용역·기술용역 …) — 자기 칸 `service_division`. */
+    SERVICE_DIVISION,
+
+    /** 주공종명(`mainCnsttyNm`, 공사 — 전기공사업·건축공사업 …) — 코드가 응답에 없어 이름만이다. */
+    MAIN_CONSTRUCTION_TYPE,
 }
 
 /**

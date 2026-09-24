@@ -91,6 +91,13 @@ class RawNoticeObservation private constructor(
      * 원문이 없는 관측(3B 밖 호출부, 기존 fixture)은 `null`.
      */
     val sourceText: String? = null,
+    /**
+     * 이 관측을 낸 **수집 오퍼레이션의 업무 대분류**(D-6F9-1, M6/6F-9) — 공사 목록·용역 목록을 따로 부르므로 응답에
+     * 필드가 없고 어느 오퍼레이션이었는가가 곧 대분류다. 어댑터가 구조로 싣는다(URL 문자열을 파싱하지 않는다) —
+     * 오퍼레이션이 대분류를 정하지 않는 관측(개찰 축·재구성 자리표시자)은 `null`. 응답의 `bsnsDivNm` 과 접지
+     * 않는다(P-7): 이 값은 계약 열람 규칙([valueOf]·[presenceOf])과 무관한 관측의 출처 정보다.
+     */
+    val sourceDivision: BusinessDivision? = null,
 ) {
     val keys: Set<RawKey> get() = fields.keys
 
@@ -114,12 +121,14 @@ class RawNoticeObservation private constructor(
             fields == other.fields &&
             sourceEndpoint == other.sourceEndpoint &&
             observedAt == other.observedAt &&
-            sourceText == other.sourceText
+            sourceText == other.sourceText &&
+            sourceDivision == other.sourceDivision
 
-    override fun hashCode(): Int = Objects.hash(fields, sourceEndpoint, observedAt, sourceText)
+    override fun hashCode(): Int = Objects.hash(fields, sourceEndpoint, observedAt, sourceText, sourceDivision)
 
     override fun toString(): String =
-        "RawNoticeObservation(keys=${fields.keys}, sourceEndpoint=$sourceEndpoint, observedAt=$observedAt)"
+        "RawNoticeObservation(keys=${fields.keys}, sourceEndpoint=$sourceEndpoint, observedAt=$observedAt, " +
+            "sourceDivision=$sourceDivision)"
 
     companion object {
         /** 문자열 값만 있는 관측(대다수 호출부) — 명시 `null`을 나를 수 없다, [ofRawValues] 참고. */
@@ -128,12 +137,14 @@ class RawNoticeObservation private constructor(
             sourceEndpoint: SourceEndpoint,
             observedAt: Instant,
             sourceText: String? = null,
+            sourceDivision: BusinessDivision? = null,
         ): RawNoticeObservation =
             RawNoticeObservation(
                 fields.mapValues { (_, text) -> RawValue.Present(text) },
                 sourceEndpoint,
                 observedAt,
                 sourceText,
+                sourceDivision,
             )
 
         /** 명시 `null`을 나를 수 있는 관측 — 부재(사유)를 구분해야 하는 호출부(예: [presenceOf] 소비자)용. */
@@ -142,6 +153,8 @@ class RawNoticeObservation private constructor(
             sourceEndpoint: SourceEndpoint,
             observedAt: Instant,
             sourceText: String? = null,
-        ): RawNoticeObservation = RawNoticeObservation(fields.toMap(), sourceEndpoint, observedAt, sourceText)
+            sourceDivision: BusinessDivision? = null,
+        ): RawNoticeObservation =
+            RawNoticeObservation(fields.toMap(), sourceEndpoint, observedAt, sourceText, sourceDivision)
     }
 }

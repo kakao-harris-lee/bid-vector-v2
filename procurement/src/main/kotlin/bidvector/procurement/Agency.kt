@@ -65,7 +65,7 @@ data class Agency(
 }
 
 /**
- * 발주기관 조립(D-3H-3, M3/3H-1) — `businessCategoryFrom`(`Canonicalize.kt`)과 같은 관례로
+ * 발주기관 조립(D-3H-3, M3/3H-1) — `businessCategoryFrom`(`BusinessClassification.kt`)과 같은 관례로
  * `registry.contractsFor(concept)` 경유만 읽는다(scope.md 우회 (1)). [codeConcept]·
  * [nameConcept]는 호출부가 역할별로 고정해 넘긴다 — 이 함수 자신은 "수요"·"공고" 어느
  * 쪽인지 모른다(그래서 폴백이 구조적으로 불가능하다, 우회 (3)). 코드·이름이 둘 다 없으면
