@@ -1,6 +1,6 @@
 # M6/6F-8 rollback
 
-`실측 HEAD: 45904275`(이 slice 의 마지막 산출물 커밋 — 이후 커밋은 evidence 전용). 앞 실측을 옮기지 않는다.
+`실측 HEAD: b10ba803`(이 slice 의 마지막 산출물 커밋 — 이후 커밋은 evidence 전용). 앞 실측을 옮기지 않는다.
 
 ## 비활성화 (코드를 되돌리지 않고 즉시)
 
@@ -20,7 +20,7 @@
 git diff --name-status <base>..<실측 HEAD> -- . ':!reports/evidence' ':!milestone-6.md' ':!config/quality/gate-tests.properties' ':!config/quality/architecture-policy.properties' ':!docs/discovery/data-dictionary.md'
 ```
 
-신규(A) 34 · 변경(M) 11 = 45개. **산출물이 바뀔 때마다 이 명령을 다시 돌려 목록을 재산출한다**(목록이 낡는 것이 이 결함의 실제 원인이다).
+신규(A) 37 · 변경(M) 11 = 48개. **산출물이 바뀔 때마다 이 명령을 다시 돌려 목록을 재산출한다**(목록이 낡는 것이 이 결함의 실제 원인이다).
 
 ```
 git restore --source=<base> --staged --worktree -- <위 목록의 경로, 개별 인자>
@@ -39,8 +39,8 @@ git diff <sha>~1..<sha> -- <파일> | git apply -R
 
 | 파일 | 이 slice 의 커밋(최신 → 과거) |
 |---|---|
-| `config/quality/gate-tests.properties` | `84c72c12` · `c5c13fde` · `09e13abc` · `7becb41a` · `defcc09d` · `4504483a` |
-| `config/quality/architecture-policy.properties` | `e6ccd2e2` · `09e13abc` |
+| `config/quality/gate-tests.properties` | `1b5b704c` · `9d63f922` · `84c72c12` · `c5c13fde` · `09e13abc` · `7becb41a` · `defcc09d` · `4504483a` |
+| `config/quality/architecture-policy.properties` | `1b5b704c` · `e6ccd2e2` · `09e13abc` |
 | `docs/discovery/data-dictionary.md` | `0bbc395b` |
 | `reports/evidence/m3/3a/policy-values.md` | `d6d8d0a0` |
 
@@ -50,13 +50,13 @@ git diff <sha>~1..<sha> -- <파일> | git apply -R
 `milestone-6.md` 는 이 rollback 의 restore 대상이 아니다 — 착수 문단 `a4a73e9e` 는 팀장 레인이 쓴 것이고 되돌려야 하면 팀장이 같은 방식으로 격리한다:
 `git diff a4a73e9e~1..a4a73e9e -- milestone-6.md | git apply -R`(종결 문단이 더해지면 그 커밋을 먼저).
 
-## 임시 worktree 실측 (①~⑥, 버릴 worktree — `git worktree add --detach <scratch> 45904275`)
+## 임시 worktree 실측 (①~⑥, 버릴 worktree — `git worktree add --detach <scratch> b10ba803` 뒤 이 evidence 파일 셋을 그대로 얹음)
 
 | 축 | 결과 |
 |---|---|
-| ① `git restore` exit / hunk 격리 exit | 0 / 열 번 전부 0 |
-| ② D/M 수 | D 34 · M 11 (위 목록과 일치) + 공유 파일 넷 hunk 되돌림(충돌 0) — 작업 트리 변경은 D 34 · M 15 |
-| ③ 되돌린 경로 전체(목록 45 + 공유 넷)의 `git diff <base>` | 0줄(완전 일치) |
+| ① `git restore` exit / hunk 격리 exit | 0 / 열세 번 전부 0 |
+| ② D/M 수 | D 37 · M 11 (위 목록과 일치) + 공유 파일 넷 hunk 되돌림(충돌 0) — 작업 트리 변경은 D 37 · M 15(그 밖에 얹은 evidence 파일 셋이 `git status` 에 M 으로 더 보인다 — 되돌리지 않는 것) |
+| ③ 되돌린 경로 전체(목록 48 + 공유 넷)의 `git diff <base>` | 0줄(완전 일치) |
 | ④ 모듈별 compile(`:procurement`·`:workflow`·`:adapters`·`:app` 의 `compileKotlin`+`compileTestKotlin`) | exit 0 |
 | ⑤ `:procurement:test :workflow:test :adapters:test :app:test` | exit 0 |
 | ⑥ 되돌린 트리에서 `./gradlew --no-daemon check`(전건 — 이 slice 가 닿은 게이트 전부 포함) | exit 0 |
@@ -69,7 +69,7 @@ git diff <sha>~1..<sha> -- <파일> | git apply -R
 ## 그 사이 되돌림 대상이 움직였는가 (실측 HEAD ↔ 판정 SHA)
 
 ```
-git diff --name-only 45904275..<판정 SHA> -- <위 목록 45개 경로> config/quality/gate-tests.properties config/quality/architecture-policy.properties docs/discovery/data-dictionary.md reports/evidence/m3/3a/policy-values.md
+git diff --name-only b10ba803..<판정 SHA> -- <위 목록 48개 경로> config/quality/gate-tests.properties config/quality/architecture-policy.properties docs/discovery/data-dictionary.md reports/evidence/m3/3a/policy-values.md
 ```
 
 이후 커밋이 evidence 파일만 만지면 빈 출력이어야 유효하다. 한 줄이라도 나오면 실측은 낡았고 그 절은 통과가 아니라 미검증이다.

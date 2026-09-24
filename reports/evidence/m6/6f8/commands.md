@@ -11,10 +11,11 @@ PR #44 머지 커밋). 산출물 실측 HEAD 는 `rollback.md` 첫머리와 아�
 | `./gradlew --no-daemon qualityBaseline` | 0 | BUILD SUCCESSFUL |
 | `./tools/one-command-check.sh` | 0 | 「Kotlin 전건 + Python 전건 통과」 |
 
-실측 트리 = 산출물 `45904275` + 이 evidence 파일들(트리 동일성 — 파일 셋을 그대로 얹은 버릴 worktree)이다. evidence 편집 커밋마다 그 HEAD 에서 `check` 를 다시 돌리고(누출 스캔 어휘 재귀 방지), 마지막 HEAD 의 결과 정본은 verifier 와 완료 보고다.
+실측 트리 = 산출물 `b10ba803`(수정 라운드 2 — D-6F8-11·13 반영, 이 slice 의 마지막 산출물 커밋) + 이 evidence 파일들(트리 동일성 — 파일 셋을 그대로 얹은 버릴 worktree)이다. `check --rerun-tasks` 는 348 task 전부 실행(348 executed). evidence 편집 커밋마다 그 HEAD 에서 `check` 를 다시 돌리고(누출 스캔 어휘 재귀 방지), 마지막 HEAD 의 결과 정본은 verifier 와 완료 보고다.
 
 실패 이력(검증이 작동했다는 증거): 같은 acceptance 를 산출물 커밋 `c5c13fde` 에서 돌렸을 때 `check` exit 1 — `:app:sizeGate` 함수 50줄 한도(첫 `dependencies {}` 람다 52줄).
 별도 블록으로 옮긴 `66589eda` 에서 위 셋 exit 0.
+수정 라운드 2: `:procurement:ktlintCheck` 가 산출물 `9d63f922` 의 새 test 파일에서 exit 1(서식 — 줄 길이·개행) → 서식 커밋 `b10ba803` 에서 exit 0.
 
 ## 변이 실측 (나) — 검토 뒤 수정분 (각 변이는 적용 전 `git diff --numstat` 로 확인, 실행 뒤 `git reset --hard` 로 원복, 버릴 worktree)
 
@@ -60,6 +61,25 @@ PR #44 머지 커밋). 산출물 실측 HEAD 는 `rollback.md` 첫머리와 아�
 **`canonicalize` 경로의 `!!`·`checkNotNull`·`requireNotNull`·`.getValue(`·`.single(`·`error(`**:
 `grep -nE '!!|checkNotNull|requireNotNull|\.getValue\(|\.single\(|\berror\(' procurement/src/main/kotlin/bidvector/procurement/{Canonicalize,AmountResolutionOutcome,DateTimeInterpretation,NoticeId,BusinessCategory,Agency,NoticeTitle,ResolvedBaseAmount}.kt shared-kernel/src/main/kotlin/bidvector/sharedkernel/{NoticeRound,Rate}.kt`
 (주석 줄 제외) → `error(` 둘뿐(통화·출처, checklist 5b 9·10번 — 정책 구성 오류).
+
+## 변이 실측 (다) — 수정 라운드 2: 빈 값 규칙(D-6F8-11)·반사 표면 봉쇄(D-6F8-13 F2-2) (산출물 `1b5b704c` 에서 실측, 버릴 worktree — 적용 전 `git diff --numstat` 확인, 실행 뒤 `git reset --hard`)
+
+**RED 먼저** — 수정 전 트리에서 새 test 만 얹어 돌렸다: `:procurement:test --tests *CanonicalizeBlankValuesTest*` exit 1(7 test 중 5 실패, 「계약 전수 × 공백 값」 표 offender 55 = 필드 열한 개 × 공백 값 다섯 —
+운영 정책 여섯(금액 후보 넷·일시 둘) + test 정책 다섯) · `:workflow:test --tests *CollectNoticesUseCaseTest*` exit 1(16 중 1 실패) · 반사 봉쇄는 production 에 대해 RED(`:app:test --tests bidvector.app.architecture.CollectionArchitecture*`
+exit 1, 28 중 2 실패 — 러너 파일 클래스가 `kotlin.reflect.KClass` 를 참조).
+
+| 변이 | 적용(+/−) | 명령 | exit | RED 된 test |
+|---|---|---|---|---|
+| B1 빈 일시 수정 되돌림(`instantResolutionOf` 를 `instantFrom` 직접 호출로) | +2/−2 | `:procurement:test --tests *CanonicalizeBlankValuesTest*` | 1 | 7 중 3 — 「빈 마감·개찰 일시는 그 필드만 null」 · 「계약 전수 × 공백 값」 · 「실수집이 낸 형태」 |
+| B1 (위와 같음) | +2/−2 | `:workflow:test --tests *CollectNoticesUseCaseTest*` | 1 | 「빈 문자열인 옵션 일시·금액 항목은 탈락이 아니라 정규화된다」 |
+| B1 (위와 같음) | +2/−2 | `:app:test --tests *CollectionRunnerE2ETest*` | 1 | 5 중 3 — 「첫 실행 …」 · 「빈 문자열인 옵션 항목은 탈락하지 않고 마감이 null 인 공고로 저장된다」 · 「형식이 어긋난 차수 항목 …」(DATE_TIME 계수 어긋남) |
+| B2 빈 금액 후보 건너뜀 제거 | +1/−1 | `:procurement:test --tests *CanonicalizeBlankValuesTest*` | 1 | 7 중 2 — 「공백뿐인 금액 후보는 건너뛴다」 · 「계약 전수 × 공백 값」 |
+| B3 빈 업무구분 라벨 부재 처리 제거 | +0/−1 | 위와 같음 | 1 | 7 중 1 — 「업무구분 라벨이 공백뿐이면 라벨만 없다」 |
+| F2 리플렉션 우회(이웃 `workflow.collectionx` 가 원문 타입을 이름 붙이지 않고 `getMethod`·`invoke` 로 항목 원문을 꺼내고 use case 가 그 결과로 항목을 거른다) — **수정 전**(`9d63f922`) | +1/−0 · 새 파일 +3 | `:workflow:test :app:test --tests bidvector.app.architecture.*` | **0** | (없음 — 게이트의 사각, 전체 `check` 초록이라던 verifier r2 F2-2 의 재현) |
+| F2 (위와 같음) — **수정 후**(`1b5b704c`) | +1/−0 · 새 파일 +3 | 위와 같음 | 1 | 75 중 2 — 「workflow·app production 은 리플렉션 API 를 참조하지 않고 Class 는 이름 조회만 한다」(`ItemTextKt -> java.lang.reflect.Method`) · 「허용 참조자·허용 Class 멤버는 관측 집합과 같다」 |
+
+B1~B3 는 수정한 세 자리를 **하나씩** 되돌려 각각 그 자리의 test 가 RED 임을 잰 것이다(같은 수정이 다른 계층의 test 를 함께 RED 로 만드는 것도 표에 있다 — 세 계층 잠금). 반사 표면 규칙의 양성 대조는 규칙 자체를 fixture 루트에 적용하는
+`CollectionArchitectureGateCatchesViolationsTest`(네 길이 잡히고 이름 조회만 하는 `CleanNameLookup` 은 안 잡힘)가 갖는다 — 이 표의 F2 는 그 게이트가 production 에서 실제로 물리는 것을 재는 별개 실측이다.
 
 ## 변이 실측 (가) — 아홉 (scope.md acceptance 의 여섯 + 공고명 둘 + 배포물 하나, 산출물 HEAD `66589eda` 에서 실측)
 
@@ -108,6 +128,7 @@ Telegram id·사업자 정보는 패턴 스캔으로 못 잡아 육안 확인: e
 |---|---|
 | `grep -rnE "data-dictionary(\.md)?:[0-9]+" -o --include=*.md --include=*.kt --include=*.properties --include=*.yaml --include=*.py .`(작업 노트 제외) | 인용 좌표 셋(그 문서의 삽입 지점보다 **위쪽** 줄) — 밀리지 않는다. 삽입 줄 번호와 인용 줄 번호를 함께 확인했다 |
 | `grep -rnE "policy-values[^ ]{0,12}:[0-9]+" --include=*.md --include=*.kt --include=*.properties --include=*.yaml .`(승인 문서 `policy-values.md` 에 줄을 넣은 뒤) | 0건 — 밀릴 좌표 없음 |
+| 수정 라운드 2 가 편집한 파일 — `grep -rnE "<stem>(\.[a-z]+)?:[0-9]+" --include=*.md --include=*.kt --include=*.properties --include=*.yaml --include=*.py .`(작업 노트 제외), stem = `architecture-policy`·`gate-tests`·`Canonicalize`·`AmountResolutionOutcome`·`CollectionRunner`·`CollectionArchitectureRules`·`ArchitecturePolicy`·`CollectionArchitectureGateTest`·`CanonicalizeBlankValuesTest` | 전부 0건 — 밀릴 좌표 없음. 이 slice 의 evidence 를 가리키는 `m6/6f8/…:줄` 인용도 0건 |
 
 ## 하네스 레인 변경
 
