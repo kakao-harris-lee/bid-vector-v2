@@ -39,6 +39,11 @@ internal class MockKonepsServer private constructor(
     private val counter = AtomicInteger(0)
 
     val requestCount: Int get() = counter.get()
+
+    /** 가장 최근 요청의 원시 질의 문자열(D-6F8-4 — 키가 실제로 요청에 실렸는지 재는 근거). */
+    @Volatile
+    var lastRequestQuery: String? = null
+        private set
     val baseUri: URI get() = URI.create("http://127.0.0.1:${server.address.port}/getBidPblancListInfoServc")
 
     override fun close() {
@@ -47,6 +52,7 @@ internal class MockKonepsServer private constructor(
     }
 
     private fun respond(exchange: HttpExchange) {
+        lastRequestQuery = exchange.requestURI.rawQuery
         val index = counter.getAndIncrement()
         val response = script.getOrElse(index) { script.last() }
         when (response) {
