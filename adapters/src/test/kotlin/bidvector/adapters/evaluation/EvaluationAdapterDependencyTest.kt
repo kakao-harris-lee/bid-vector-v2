@@ -173,6 +173,78 @@ class EvaluationAdapterDependencyTest {
 
         disallowed.shouldNotBeEmpty()
     }
+
+    /**
+     * M6/6A-3+6F-3 D-6A3-17(a) — HIGH-1(verifier r1) 우회 2 시정. [EvaluationAdapterDependencyTest]
+     * 의 `ALLOWED_ROOTS`(패키지 단위 허용)는 `bidvector.adapters.persistence`를 이미 허용하므로
+     * (다른 클래스 — `JdbcCandidateSource` 등 — 가 정당하게 그 패키지를 쓴다) `RecordingNotification
+     * RequestPort` 를 DataSource 를 받아 영속하도록 바꿔도 그 패키지 단위 게이트는 초록으로
+     * 남는다. 이 test 는 `NoticeWatchSubjectPort` 와 같은 **상수 풀 허용 목록**(금지 목록이
+     * 아니라 허용 목록 — 이름이 무엇이든 목록 밖은 RED)으로 그 클래스 하나를 별도로 좁혀 잠근다
+     * — `persistence`·`java.sql`·`javax.sql` 이 이 목록 어디에도 없어 그 경로로의 회귀는 이름과
+     * 무관하게 걸린다.
+     */
+    @Test
+    fun `RecordingNotificationRequestPort 의 컴파일된 클래스가 참조하는 메서드는 허용 목록의 부분집합이다`() {
+        val classFile =
+            File("build/classes/kotlin/main/bidvector/adapters/evaluation/RecordingNotificationRequestPort.class")
+        check(classFile.isFile) {
+            "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
+        }
+
+        val disallowed = methodReferences(classFile) - ALLOWED_RECORDING_METHOD_REFERENCES
+
+        disallowed shouldBe emptySet()
+    }
+
+    /**
+     * 양성 대조 — [PersistingNotificationPortFixture]는 `RecordingNotificationRequestPort`가
+     * 하면 안 되는 것(`DataSource`를 받아 SQL을 실행)을 흉내 낸다. `java.sql`·`javax.sql`
+     * 참조가 [ALLOWED_RECORDING_METHOD_REFERENCES] 밖이라 허용 목록 술어가 실제로 걸린다.
+     */
+    @Test
+    fun `RecordingNotificationRequestPort 가 영속하도록 바뀐 표본은 이 술어에 걸린다 — 양성 대조`() {
+        val classFile =
+            File("build/classes/kotlin/test/bidvector/adapters/evaluation/PersistingNotificationPortFixture.class")
+        check(classFile.isFile) {
+            "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileTestKotlin 선행 필요"
+        }
+
+        val disallowed = methodReferences(classFile) - ALLOWED_RECORDING_METHOD_REFERENCES
+
+        disallowed.shouldNotBeEmpty()
+    }
+}
+
+/**
+ * D-6A3-17(a) — [EvaluationAdapterDependencyTest]의 `RecordingNotificationRequestPort` 전용
+ * 허용 목록. `RecordingNotificationRequestPort.class`를 `javap -p -v`로 실측해 손으로 옮겼다
+ * (2026-09-23, commands.md에 원 출력 대조 기록) — `mutableListOf<NotificationRequest>()`의
+ * `ArrayList` 생성자·`Collection.add`(`recorded += notification`)·`CollectionsKt.toList`
+ * (`requested()`)·`Intrinsics.checkNotNullParameter`(null 체크)·`Object.<init>` 뿐이다.
+ * persistence·`java.sql`·`javax.sql` 이름은 어디에도 없다.
+ */
+private val ALLOWED_RECORDING_METHOD_REFERENCES =
+    setOf(
+        "java/lang/Object.\"<init>\":()V",
+        "java/util/ArrayList.\"<init>\":()V",
+        "kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V",
+        "java/util/Collection.add:(Ljava/lang/Object;)Z",
+        "kotlin/collections/CollectionsKt.toList:(Ljava/lang/Iterable;)Ljava/util/List;",
+    )
+
+/**
+ * [EvaluationAdapterDependencyTest]의 `RecordingNotificationRequestPort` 허용 목록 전용 양성
+ * 대조 표본 — `DataSource`를 받아 SQL을 실행하는 형태를 흉내 낸다. production 코드가 아니다.
+ */
+internal class PersistingNotificationPortFixture(
+    private val dataSource: javax.sql.DataSource,
+) {
+    fun leak() {
+        dataSource.connection.use { connection ->
+            connection.prepareStatement("SELECT 1").use { it.execute() }
+        }
+    }
 }
 
 /**

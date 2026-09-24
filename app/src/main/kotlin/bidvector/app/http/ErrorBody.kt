@@ -1,9 +1,13 @@
 package bidvector.app.http
 
+import bidvector.adapters.evaluation.CandidateCapExceededException
+import bidvector.adapters.evaluation.InvalidEvaluationRequestException
 import bidvector.adapters.strategy.InvalidStoredStrategyException
+import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
@@ -36,6 +40,11 @@ object ErrorCode {
     const val NOT_FOUND = "NOT_FOUND"
     const val INVALID_STORED_STRATEGY = "INVALID_STORED_STRATEGY"
     const val INTERNAL_ERROR = "INTERNAL_ERROR"
+
+    // M6/6A-3+6F-3 D-6A3-4·D-6A3-7·D-6A3-5 — 평가 dry-run endpoint 셋(전부 409/400).
+    const val MAX_ACTIVE_BIDS_NOT_CONFIGURED = "MAX_ACTIVE_BIDS_NOT_CONFIGURED"
+    const val CANDIDATE_CAP_EXCEEDED = "CANDIDATE_CAP_EXCEEDED"
+    const val INVALID_REQUEST = "INVALID_REQUEST"
 }
 
 /**
@@ -60,6 +69,26 @@ object ErrorMapping {
 
             is InvalidStoredStrategyException -> {
                 ErrorBody(ErrorCode.INVALID_STORED_STRATEGY, "저장된 전략이 유효하지 않다", correlationId)
+            }
+
+            is MaxActiveBidsNotConfiguredException -> {
+                ErrorBody(ErrorCode.MAX_ACTIVE_BIDS_NOT_CONFIGURED, "전략에 여력 상한이 설정되지 않았다", correlationId)
+            }
+
+            is CandidateCapExceededException -> {
+                ErrorBody(ErrorCode.CANDIDATE_CAP_EXCEEDED, "후보 스캔이 상한을 초과했다", correlationId)
+            }
+
+            is InvalidEvaluationRequestException -> {
+                ErrorBody(ErrorCode.INVALID_REQUEST, "요청 값이 유효하지 않다", correlationId)
+            }
+
+            // M6/6A-3+6F-3 D-6A3-19(검토 라운드 1 contract-keeper V1 · verifier MEDIUM) —
+            // 비JSON·빈 본문은 EvaluationDryRunController의 parseCurrentActiveBids 에
+            // 닿기 전에 Jackson 자체가 여기서 던진다(HttpMessageNotReadableException).
+            // 같은 코드(INVALID_REQUEST)로 옮긴다 — 예외 메시지는 싣지 않는다(D-6A1-7 불변식).
+            is HttpMessageNotReadableException -> {
+                ErrorBody(ErrorCode.INVALID_REQUEST, "요청 본문을 읽을 수 없다", correlationId)
             }
 
             else -> {
@@ -103,6 +132,31 @@ class GlobalErrorHandler {
         exception: InvalidStoredStrategyException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.INTERNAL_SERVER_ERROR, exception, request)
+
+    @ExceptionHandler(MaxActiveBidsNotConfiguredException::class)
+    fun maxActiveBidsNotConfigured(
+        exception: MaxActiveBidsNotConfiguredException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.CONFLICT, exception, request)
+
+    @ExceptionHandler(CandidateCapExceededException::class)
+    fun candidateCapExceeded(
+        exception: CandidateCapExceededException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.CONFLICT, exception, request)
+
+    @ExceptionHandler(InvalidEvaluationRequestException::class)
+    fun invalidEvaluationRequest(
+        exception: InvalidEvaluationRequestException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
+
+    /** D-6A3-19 — 요청 본문 역직렬화 실패(비JSON·빈 본문)도 400 `INVALID_REQUEST` 다. */
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun httpMessageNotReadable(
+        exception: HttpMessageNotReadableException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
 
     @ExceptionHandler(Throwable::class)
     fun fallback(

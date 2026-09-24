@@ -47,6 +47,8 @@ data class StrategyReadResponse(
     val bidNowThreshold: BigDecimal?,
     val reviewThreshold: BigDecimal?,
     val candidateLimit: Int?,
+    /** 활성 투찰 여력 상한(M6/6A-3+6F-3, D-6A3-4) — 미설정은 `null`(지어내지 않는다). */
+    val maxActiveBids: Int?,
 ) {
     companion object {
         fun from(strategy: OperatorStrategy): StrategyReadResponse {
@@ -88,6 +90,7 @@ data class StrategyReadResponse(
                         ?.score
                         ?.value,
                 candidateLimit = strategy.candidateLimit?.value,
+                maxActiveBids = strategy.maxActiveBids?.value,
             )
         }
     }

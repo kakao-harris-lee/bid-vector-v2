@@ -3,6 +3,7 @@ package bidvector.app.architecture
 import com.tngtech.archunit.base.DescribedPredicate
 import com.tngtech.archunit.core.domain.JavaAccess
 import com.tngtech.archunit.core.domain.JavaClass
+import com.tngtech.archunit.core.domain.JavaMethodCall
 import com.tngtech.archunit.lang.ArchCondition
 import com.tngtech.archunit.lang.ArchRule
 import com.tngtech.archunit.lang.ConditionEvents
@@ -162,6 +163,243 @@ class ArchitectureRules(
                 .because("모듈 경계가 이미 계층을 표현한다 — 모듈 안에 기술 계층을 또 만들지 않는다")
         }
 
+    /**
+     * M6/6A-3+6F-3 D-6A3-9 — `bidvector.strategy.TextKt.assemble*`(감시 텍스트 조립 커널)를
+     * 부르는 production 클래스 집합은 [ArchitecturePolicy.allowedAssembleCallers] 뿐이다
+     * (부재 쪽 — 존재 쪽은 `EvaluationAdapterDependencyTest`, adapters 모듈이 잠근다).
+     * `noClasses().that(허용 밖)` 형태라 새 어댑터가 같은 텍스트를 다시 이어붙이면(우회
+     * — assemble* 를 안 거치고 직접 조립) 그 클래스가 허용 목록에 없는 한 이 규칙이 곧바로
+     * 걸린다.
+     */
+    fun assembleCallersMustBeAllowedSet(allowedCallers: List<String>): List<ArchRule> {
+        val allowed = allowedCallers.toSet()
+        return listOf(
+            noClasses()
+                .that(isNotAllowedAssembleCaller(allowed))
+                .should(callAssembleKernel())
+                .because("D-6A3-9 — assemble* 호출자 집합은 architecture-policy.properties 의 허용 목록과 같다"),
+        )
+    }
+
+    private fun isNotAllowedAssembleCaller(allowed: Set<String>): DescribedPredicate<JavaClass> =
+        object : DescribedPredicate<JavaClass>("허용된 assemble* 호출자가 아니다 (${allowed.size}종)") {
+            override fun test(target: JavaClass): Boolean = target.fullName !in allowed
+        }
+
+    private fun callAssembleKernel(): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("bidvector.strategy.TextKt.assemble* 를 호출한다") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.accessesFromSelf
+                    .filter { access -> access.declaringKeys().any { it.startsWith(ASSEMBLE_KERNEL_PREFIX) } }
+                    .forEach { events.add(SimpleConditionEvent.satisfied(item, it.description)) }
+            }
+        }
+
+    /**
+     * M6/6A-3+6F-3 D-6A3-17(a) — HIGH-1 시정(검토 라운드 1). 이름 목록(`KNOWN_
+     * NOTIFICATION_REQUEST_PORT_IMPLS`)이 아니라 **구조**로 닫는다. ① [appRoot] 안의
+     * 클래스가 [portTypeName] 을 스스로 구현하지 않는다(집합==∅ — app 안에 숨겨 심는
+     * 우회를 막는다, verifier M1). ② [appRoot] 가 참조하는 포트 구현 타입 집합(classpath
+     * 전체에서 `isAssignableTo` 로 도출)은 [allowedImpls] 의 부분집합이다(다른 모듈에
+     * 새 구현이 생겨 그것을 배선해도 걸린다). ③ [forbiddenOutboxTypes](outbox 쓰기 타입
+     * 전수) 참조 집합은 ∅ 다(포트를 거치지 않고 직접 쓰는 우회를 막는다).
+     *
+     * **①은 명명 구현만 본다(verifier r2 R2-M1).** [portTypeName]이 가리키는
+     * `NotificationRequestPort`는 `fun interface`라 그 SAM 람다 구현은 바이트코드에
+     * 별도 구현 **클래스**를 만들지 않는다(invokedynamic) — ①의 「구현체 집합==∅」
+     * 판정은 이 형태에 닿지 않는다. 그 형태의 폐쇄는 이 구조 규칙이 아니라
+     * `EvaluationDryRunBidNowE2ETest`(거동 다리)가 진다 — `app.wiring`에 outbox
+     * INSERT를 실행하는 람다 tee를 꽂는 변이(N1)가 `architecture.*`는 초록인 채
+     * 그 E2E에서 RED임을 실측으로 확인했다.
+     */
+    fun notificationPortMustBeStructurallyClosed(
+        appRoot: String,
+        portTypeName: String,
+        allowedImpls: Set<String>,
+        forbiddenOutboxTypes: Set<String>,
+    ): List<ArchRule> =
+        listOf(
+            noClasses()
+                .that()
+                .resideInAPackage("$appRoot..")
+                .should(beAssignableToType(portTypeName))
+                .because("D-6A3-17(a)① — app 이 NotificationRequestPort 구현체를 스스로 정의하지 않는다"),
+            noClasses()
+                .that()
+                .resideInAPackage("$appRoot..")
+                .should(referenceDisallowedImplementation(portTypeName, allowedImpls))
+                .because("D-6A3-17(a)② — app 이 참조하는 NotificationRequestPort 구현 타입 집합은 허용 목록의 부분집합이다"),
+            noClasses()
+                .that()
+                .resideInAPackage("$appRoot..")
+                .should(referenceAnyOf(forbiddenOutboxTypes, "outbox 쓰기 타입"))
+                .because("D-6A3-17(a)③ — app 은 outbox 쓰기 타입을 참조하지 않는다(dry-run effect 0)"),
+        )
+
+    /**
+     * D-6A3-17(b) — HIGH-3 시정. `app.wiring` 만이 아니라 [appRoot] 전체(루트 패키지 포함
+     * — `@Bean` 을 아무 패키지에나 둘 수 있다, verifier M4)가 `adapters.ml`([mlPackage])
+     * 에서 참조하는 클래스 집합은 [allowedTypes] 의 부분집합이다.
+     */
+    fun appMustOnlyReferenceMlTypes(
+        appRoot: String,
+        mlPackage: String,
+        allowedTypes: Set<String>,
+    ): List<ArchRule> =
+        listOf(
+            noClasses()
+                .that()
+                .resideInAPackage("$appRoot..")
+                .should(referenceDisallowedInPackage(mlPackage, allowedTypes))
+                .because("D-6A3-17(b) — app production 이 참조하는 adapters.ml 타입 집합은 허용 목록의 부분집합이다"),
+        )
+
+    /**
+     * D-6A3-25 — 검토 라운드 2 HIGH 시정(우회 5). 이전 (c)(인터페이스 이름 등식 × `app.http`
+     * 패키지 하나)는 호출 지점 owner 가 구체 타입이면(verifier N6) 또는 헬퍼가 `app.http`
+     * 밖에 있으면(verifier N5) 보지 못했다 — 두 축을 각각 한 걸음씩 옮긴 변이가 둘 다
+     * 초록이었다. 이 규칙은 [appRoot] 전체(패키지 무관)에서 [ports] 의 메서드를 **호출**하는
+     * 모든 접근을 owner 의 `isAssignableTo`(구현 타입 전부 포함 — classpath 계층 해석,
+     * 이름 목록이 아니다)로 판정하고, (호출자, 포트.메서드) 쌍이 [allowedPairs] 의 부분집합인지
+     * 본다. 포트를 만들어 생성자로 **넘기기만** 하는 조립 코드(`EvaluationWiring`)는 메서드
+     * 호출이 아니라 걸리지 않는다 — 오직 실제로 포트 메서드를 부르는 지점만 판정한다.
+     */
+    fun appPortCallsMustBeAllowedPairs(
+        appRoot: String,
+        ports: Set<String>,
+        allowedPairs: Set<Pair<String, String>>,
+    ): List<ArchRule> =
+        listOf(
+            noClasses()
+                .that()
+                .resideInAPackage("$appRoot..")
+                .should(callDisallowedPortMethod(ports, allowedPairs))
+                .because(
+                    "D-6A3-25 — app production 전체에서 평가·전략 포트 메서드를 호출하는 " +
+                        "(호출자, 포트.메서드) 쌍은 허용 쌍의 부분집합이다",
+                ),
+        )
+
+    private fun beAssignableToType(typeName: String): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("$typeName 에 assignable 하다(그 타입 자신은 제외)") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                if (item.fullName != typeName && item.isAssignableTo(typeName)) {
+                    events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} implements/extends $typeName"))
+                }
+            }
+        }
+
+    private fun referenceDisallowedImplementation(
+        portTypeName: String,
+        allowed: Set<String>,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("허용 목록 밖의 $portTypeName 구현체를 참조한다 (허용 ${allowed.size} 종)") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.directDependenciesFromSelf
+                    .map { it.targetClass }
+                    .filter { target -> target.fullName != portTypeName && target.isAssignableTo(portTypeName) }
+                    .filter { target -> target.fullName !in allowed }
+                    .distinct()
+                    .forEach { target ->
+                        events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${target.fullName}"))
+                    }
+            }
+        }
+
+    private fun referenceAnyOf(
+        forbidden: Set<String>,
+        label: String,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("$label 을 참조한다 (${forbidden.size} 종)") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.directDependenciesFromSelf
+                    .map { it.targetClass }
+                    .filter { it.fullName in forbidden }
+                    .distinct()
+                    .forEach { target ->
+                        events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${target.fullName}"))
+                    }
+            }
+        }
+
+    private fun referenceDisallowedInPackage(
+        packagePrefix: String,
+        allowed: Set<String>,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>("$packagePrefix 안의 허용 목록 밖 타입을 참조한다 (허용 ${allowed.size} 종)") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.directDependenciesFromSelf
+                    .map { it.targetClass }
+                    .filter { it.packageName == packagePrefix || it.packageName.startsWith("$packagePrefix.") }
+                    .filter { it.fullName !in allowed }
+                    .distinct()
+                    .forEach { target ->
+                        events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> ${target.fullName}"))
+                    }
+            }
+        }
+
+    private fun callDisallowedPortMethod(
+        ports: Set<String>,
+        allowedPairs: Set<Pair<String, String>>,
+    ): ArchCondition<JavaClass> =
+        object : ArchCondition<JavaClass>(
+            "허용되지 않은 (호출자, 포트.메서드) 쌍으로 평가·전략 포트 메서드를 호출한다 " +
+                "(포트 ${ports.size} 종, 허용 ${allowedPairs.size} 쌍)",
+        ) {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.accessesFromSelf
+                    .flatMap { access -> access.matchedPortCalls(ports) }
+                    .filter { portMethod -> (item.fullName to portMethod) !in allowedPairs }
+                    .distinct()
+                    .forEach { portMethod ->
+                        events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} -> $portMethod"))
+                    }
+            }
+        }
+
+    /**
+     * **메서드 호출만 본다 — 생성자 호출은 제외한다.** [access] 가 [JavaMethodCall] 이 아니면
+     * (조립 코드가 어댑터를 **생성**만 하고 넘기는 `JavaConstructorCall`) 빈 목록이다. 처음
+     * 구현은 owner 의 `isAssignableTo` 만 봤는데, `EvaluationWiring` 이 `JdbcCandidateSource(...)`
+     * 를 **짓기만** 해도 그 생성자 호출의 owner(`JdbcCandidateSource`)가 `CandidateSourcePort`
+     * 에 assignable 이라 오탐이 났다(실측). 같은 이유로 `RecordingNotificationRequestPort.
+     * requested()`(포트에 없는 어댑터 전용 메서드)도 owner 만 보면 오탐이었다 — 그래서 **포트가
+     * 실제로 그 이름의 메서드를 선언하는지**까지 함께 본다. owner 자신과 그 상위(클래스·
+     * 인터페이스) 후보 가운데 [ports] 에 속하면서 [access] 의 메서드 이름을 **직접 선언**하는
+     * 포트만 판정 키("포트FQCN.메서드명")를 낸다 — owner 가 구체 구현 타입이어도(예:
+     * `JdbcCandidateSource.openCandidates()`) 그 타입이 포트의 그 메서드를 구현하는 한
+     * 걸린다(verifier N6).
+     */
+    private fun JavaAccess<*>.matchedPortCalls(ports: Set<String>): List<String> {
+        if (this !is JavaMethodCall) return emptyList()
+        val owner = targetOwner
+        val declaringCandidates = listOf(owner) + owner.allRawSuperclasses + owner.allRawInterfaces
+        return declaringCandidates
+            .filter { candidate -> candidate.fullName in ports }
+            .filter { portClass -> portClass.methods.any { method -> method.name == target.name } }
+            .map { portClass -> "${portClass.fullName}.${target.name}" }
+            .distinct()
+    }
+
     private fun packagesOf(
         root: String,
         modules: List<String>,
@@ -174,5 +412,8 @@ class ArchitectureRules(
         const val APPLICATION = "application"
         const val ADAPTERS = "adapters"
         const val APP = "app"
+
+        /** D-6A3-9 — `declaringKeys()`가 내는 `"owner#member"` 형태의 접두사. */
+        const val ASSEMBLE_KERNEL_PREFIX = "bidvector.strategy.TextKt#assemble"
     }
 }

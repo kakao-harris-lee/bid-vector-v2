@@ -42,6 +42,7 @@ internal data class StrategyRow(
     val bidNowThreshold: BigDecimal?,
     val reviewThreshold: BigDecimal?,
     val candidateLimit: Int?,
+    val maxActiveBids: Int?,
     val revision: Int,
 )
 
@@ -67,6 +68,7 @@ internal fun ResultSet.toStrategyRow(): StrategyRow =
         bidNowThreshold = getBigDecimal("bid_now_threshold"),
         reviewThreshold = getBigDecimal("review_threshold"),
         candidateLimit = getInt("candidate_limit").takeUnless { wasNull() },
+        maxActiveBids = getInt("max_active_bids").takeUnless { wasNull() },
         revision = getInt("revision"),
     )
 
@@ -105,6 +107,7 @@ internal fun StrategyRow.toDraft(): StrategyDraft {
         bidNowThreshold = bidNowThreshold,
         reviewThreshold = reviewThreshold,
         candidateLimit = candidateLimit,
+        maxActiveBids = maxActiveBids,
     )
 }
 
@@ -184,6 +187,7 @@ internal fun OperatorStrategy.toRow(): StrategyRow {
         bidNowThreshold = actionThresholds.bidNowThreshold?.score?.value,
         reviewThreshold = actionThresholds.reviewThreshold?.score?.value,
         candidateLimit = candidateLimit?.value,
+        maxActiveBids = maxActiveBids?.value,
         revision = revision.value,
     )
 }
@@ -222,5 +226,6 @@ internal fun PreparedStatement.bindStrategyRow(
     setBigDecimal(index++, row.bidNowThreshold)
     setBigDecimal(index++, row.reviewThreshold)
     setNullableInt(index++, row.candidateLimit)
+    setNullableInt(index++, row.maxActiveBids)
     return index
 }

@@ -277,6 +277,8 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             "bid_now_threshold" to "numeric",
             "review_threshold" to "numeric",
             "candidate_limit" to "integer",
+            // M6/6A-3+6F-3 D-6A3-4·D-6A3-14 — 활성 투찰 여력 상한(추가만, V16).
+            "max_active_bids" to "integer",
         )
 
     private fun operatorStrategySharedColumns(table: String): List<ColumnSpec> =

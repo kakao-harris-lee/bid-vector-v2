@@ -140,6 +140,7 @@ internal object EditSessionRow {
             draft.bidNowThreshold?.let { put("bidNowThreshold", it) }
             draft.reviewThreshold?.let { put("reviewThreshold", it) }
             draft.candidateLimit?.let { put("candidateLimit", it) }
+            draft.maxActiveBids?.let { put("maxActiveBids", it) }
         }
 
     private fun readDraft(node: JsonNode): StrategyDraftSnapshot =
@@ -156,6 +157,7 @@ internal object EditSessionRow {
             bidNowThreshold = node.get("bidNowThreshold")?.let { BigDecimal(it.asText()) },
             reviewThreshold = node.get("reviewThreshold")?.let { BigDecimal(it.asText()) },
             candidateLimit = node.get("candidateLimit")?.let { it.requireIntValue("candidateLimit") },
+            maxActiveBids = node.get("maxActiveBids")?.let { it.requireIntValue("maxActiveBids") },
         )
 
     private fun readCommand(node: JsonNode): EditCommandSnapshot =

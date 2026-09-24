@@ -178,6 +178,7 @@ private fun draftFrom(node: JsonNode): StrategyDraft {
         bidNowThreshold = optionalDecimal(node, "bidNowThreshold"),
         reviewThreshold = optionalDecimal(node, "reviewThreshold"),
         candidateLimit = optionalInt(node, "candidateLimit"),
+        maxActiveBids = optionalInt(node, "maxActiveBids"),
     )
 }
 
@@ -258,6 +259,7 @@ private fun strategyViolationName(violation: StrategyViolation): String =
         StrategyViolation.MinBudgetAboveMaxBudget -> "MinBudgetAboveMaxBudget"
         is StrategyViolation.ScoreOutOfRange -> "ScoreOutOfRange"
         StrategyViolation.CandidateLimitNotPositive -> "CandidateLimitNotPositive"
+        StrategyViolation.MaxActiveBidsNotPositive -> "MaxActiveBidsNotPositive"
         is StrategyViolation.BlankTerm -> "BlankTerm"
         is StrategyViolation.BudgetLimitNotComparable -> "BudgetLimitNotComparable"
     }

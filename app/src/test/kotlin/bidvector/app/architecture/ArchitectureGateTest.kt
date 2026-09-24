@@ -79,5 +79,49 @@ class ArchitectureGateTest {
         rules.packageNamesMustNotBeTechnicalLayers(policy.packageRoot).checkAll()
     }
 
+    /**
+     * D-6A3-9 — assemble* 호출자 집합이 허용 목록과 같다(부재 쪽). [production]이 9 모듈
+     * 전체를 이미 담고 있어(이 파일 클래스 문서 「조합 지점」) 별도 cross-module 스캔이
+     * 필요 없다.
+     */
+    @Test
+    fun `assemble 커널 호출자는 architecture-policy 허용 목록 밖에 없다`() {
+        rules.assembleCallersMustBeAllowedSet(policy.allowedAssembleCallers).checkAll()
+    }
+
+    /** D-6A3-17(a) — HIGH-1 시정. app 이 다루는 NotificationRequestPort 구현체 집합이 구조로 닫힌다. */
+    @Test
+    fun `app 이 다루는 NotificationRequestPort 구현은 허용 목록의 부분집합이고 outbox 쓰기 타입을 참조하지 않는다`() {
+        rules
+            .notificationPortMustBeStructurallyClosed(
+                appRoot = "${policy.packageRoot}.app",
+                portTypeName = policy.notificationPortType,
+                allowedImpls = policy.notificationPortAllowedImpls.toSet(),
+                forbiddenOutboxTypes = policy.outboxForbiddenTypes.toSet(),
+            ).checkAll()
+    }
+
+    /** D-6A3-17(b) — HIGH-3 시정. app production 전체가 참조하는 adapters.ml 타입 집합이 구조로 닫힌다. */
+    @Test
+    fun `app production 이 참조하는 adapters ml 타입은 허용 목록의 부분집합이다`() {
+        rules
+            .appMustOnlyReferenceMlTypes(
+                appRoot = "${policy.packageRoot}.app",
+                mlPackage = policy.mlPackage,
+                allowedTypes = policy.mlAllowedTypes.toSet(),
+            ).checkAll()
+    }
+
+    /** D-6A3-25 — 검토 라운드 2 HIGH 시정. app production 전체가 평가·전략 포트를 허용된 (호출자, 포트.메서드) 쌍으로만 호출한다. */
+    @Test
+    fun `app production 은 허용된 호출자 포트 메서드 쌍으로만 평가 전략 포트를 부른다`() {
+        rules
+            .appPortCallsMustBeAllowedPairs(
+                appRoot = "${policy.packageRoot}.app",
+                ports = policy.portCallPorts.toSet(),
+                allowedPairs = policy.portCallAllowedPairs.toSet(),
+            ).checkAll()
+    }
+
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }
 }

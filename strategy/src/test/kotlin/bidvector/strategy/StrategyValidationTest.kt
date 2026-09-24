@@ -130,6 +130,38 @@ class StrategyValidationTest {
     }
 
     @Test
+    fun `D-6A3-4 여력 상한이 양수면 MaxActiveBids 로 실린다`() {
+        val result = validate(StrategyDraft(maxActiveBids = 3), REV, policyOf())
+
+        result.shouldBeInstanceOf<StrategyValidation.Valid>()
+        result.strategy.maxActiveBids shouldBe MaxActiveBids(3)
+    }
+
+    @Test
+    fun `D-6A3-4 여력 상한을 지정하지 않으면 null 이다 — 지어내지 않는다`() {
+        val result = validate(StrategyDraft(), REV, policyOf())
+
+        result.shouldBeInstanceOf<StrategyValidation.Valid>()
+        result.strategy.maxActiveBids shouldBe null
+    }
+
+    @Test
+    fun `D-6A3-4 여력 상한이 0 이하면 MaxActiveBidsNotPositive 다`() {
+        val result = validate(StrategyDraft(maxActiveBids = 0), REV, policyOf())
+
+        result.shouldBeInstanceOf<StrategyValidation.Invalid>()
+        result.violations shouldBe listOf(StrategyViolation.MaxActiveBidsNotPositive)
+    }
+
+    @Test
+    fun `D-6A3-4 여력 상한이 음수면 MaxActiveBidsNotPositive 다`() {
+        val result = validate(StrategyDraft(maxActiveBids = -1), REV, policyOf())
+
+        result.shouldBeInstanceOf<StrategyValidation.Invalid>()
+        result.violations shouldBe listOf(StrategyViolation.MaxActiveBidsNotPositive)
+    }
+
+    @Test
     fun `빈 문자열 키워드는 BlankTerm 위반이다`() {
         val result = validate(StrategyDraft(requiredKeywordTerms = listOf("유지보수", "  ")), REV, policyOf())
 

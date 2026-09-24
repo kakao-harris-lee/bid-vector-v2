@@ -194,6 +194,108 @@ class ArchitectureGateCatchesViolationsTest {
     }
 
     /**
+     * D-6A3-9 — [RogueAssembleKernelCaller]는 허용 목록(`NoticeWatchSubjectPortKt`) 밖에서
+     * `assembleKeywordScopeText`를 직접 부른다. 이 규칙은 root 치환이 아니라 절대 FQN
+     * 허용 목록이라 `production` 대신 이미 [fixtureRoot] 아래인 이 fixture 를 그대로 쓴다.
+     */
+    @Test
+    fun `assemble 커널을 허용 목록 밖에서 부르면 잡는다`() {
+        rules.assembleCallersMustBeAllowedSet(policy.allowedAssembleCallers) mustReport "RogueAssembleKernelCaller"
+    }
+
+    /**
+     * D-6A3-17(a)① — [RogueNotificationPortImplementor]는 `bidvector.archfixture.violating.app`
+     * 안에서 `NotificationRequestPort`를 스스로 구현한다(verifier M1 재현 — app 이 새 구현을
+     * 숨겨 심는 우회). fixture 루트를 `appRoot`에 그대로 넣어 production 을 지키는 같은
+     * 규칙 값이 실제로 잡는지 확인한다.
+     */
+    @Test
+    fun `app 이 NotificationRequestPort 를 스스로 구현하면 잡는다`() {
+        rules
+            .notificationPortMustBeStructurallyClosed(
+                appRoot = "$fixtureRoot.app",
+                portTypeName = policy.notificationPortType,
+                allowedImpls = policy.notificationPortAllowedImpls.toSet(),
+                forbiddenOutboxTypes = policy.outboxForbiddenTypes.toSet(),
+            ).mustReport("RogueNotificationPortImplementor", "NotificationRequestPort")
+    }
+
+    /**
+     * D-6A3-17(a)② — [RogueOutboxNotificationReferencer]는 허용 목록 밖의 `NotificationRequestPort`
+     * 구현체(`OutboxNotificationRequestPort`, 실 production 클래스)를 참조한다.
+     */
+    @Test
+    fun `app 이 허용 목록 밖의 NotificationRequestPort 구현체를 참조하면 잡는다`() {
+        rules
+            .notificationPortMustBeStructurallyClosed(
+                appRoot = "$fixtureRoot.app",
+                portTypeName = policy.notificationPortType,
+                allowedImpls = policy.notificationPortAllowedImpls.toSet(),
+                forbiddenOutboxTypes = policy.outboxForbiddenTypes.toSet(),
+            ).mustReport("RogueOutboxNotificationReferencer", "OutboxNotificationRequestPort")
+    }
+
+    /**
+     * D-6A3-17(a)③ — [RogueOutboxPortReferencer]는 포트를 거치지 않고 outbox 쓰기 타입
+     * (`OutboxPort`)을 직접 참조한다.
+     */
+    @Test
+    fun `app 이 outbox 쓰기 타입을 직접 참조하면 잡는다`() {
+        rules
+            .notificationPortMustBeStructurallyClosed(
+                appRoot = "$fixtureRoot.app",
+                portTypeName = policy.notificationPortType,
+                allowedImpls = policy.notificationPortAllowedImpls.toSet(),
+                forbiddenOutboxTypes = policy.outboxForbiddenTypes.toSet(),
+            ).mustReport("RogueOutboxPortReferencer", "OutboxPort")
+    }
+
+    /**
+     * D-6A3-17(b) — [RogueMlGatewayReferencer]는 허용 목록 밖의 `adapters.ml` 타입
+     * (`GrpcBidPredictionGateway`)을 참조한다(verifier M4 재현 — 루트 패키지에 실 gateway 를
+     * 끌어오는 우회).
+     */
+    @Test
+    fun `app 이 허용 목록 밖의 adapters ml 타입을 참조하면 잡는다`() {
+        rules
+            .appMustOnlyReferenceMlTypes(
+                appRoot = "$fixtureRoot.app",
+                mlPackage = policy.mlPackage,
+                allowedTypes = policy.mlAllowedTypes.toSet(),
+            ).mustReport("RogueMlGatewayReferencer", "GrpcBidPredictionGateway")
+    }
+
+    /**
+     * D-6A3-25(verifier r2 N6 재현) — [bidvector.archfixture.violating.app.http.
+     * RogueConcreteAdapterCaller]는 구체 구현 타입을 직접 호출해 포트 메서드에 닿는다.
+     * 호출 지점의 owner 가 인터페이스가 아니라 구체 클래스라 이름 등식으로는 못 잡던 형태다.
+     */
+    @Test
+    fun `구체 어댑터를 경유한 포트 호출도 잡는다`() {
+        rules
+            .appPortCallsMustBeAllowedPairs(
+                appRoot = "$fixtureRoot.app",
+                ports = policy.portCallPorts.toSet(),
+                allowedPairs = policy.portCallAllowedPairs.toSet(),
+            ).mustReport("RogueConcreteAdapterCaller", "CandidateSourcePort")
+    }
+
+    /**
+     * D-6A3-25(verifier r2 N5 재현) — [bidvector.archfixture.violating.app.wiring.
+     * RogueWiringPortCaller]는 `app.wiring` 에 놓인 헬퍼가 포트 인터페이스를 직접 호출한다.
+     * 이전 규칙은 `app.http` 패키지 하나만 봤지만 새 규칙은 app production 전체를 본다.
+     */
+    @Test
+    fun `app wiring 헬퍼의 직접 호출도 잡는다`() {
+        rules
+            .appPortCallsMustBeAllowedPairs(
+                appRoot = "$fixtureRoot.app",
+                ports = policy.portCallPorts.toSet(),
+                allowedPairs = policy.portCallAllowedPairs.toSet(),
+            ).mustReport("RogueWiringPortCaller", "CandidateSourcePort")
+    }
+
+    /**
      * **이름만 보지 않는다.** 위반 상세에 fixture 이름이 있기만 하면 통과하게 두면, 그 클래스가
      * **다른 이유로** 잡혀도 단언이 초록이 된다 — 실제로 컴파일러 삽입 `@NotNull` 이 그 masking 을
      * 만들어, 금지를 정책에서 걷어도 음성 단언이 죽지 않았다. 그래서 **어느 대상 때문에** 잡혔는지를

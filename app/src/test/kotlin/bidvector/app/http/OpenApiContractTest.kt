@@ -11,8 +11,6 @@ import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.ResponseEntity
-import org.yaml.snakeyaml.Yaml
-import java.io.File
 
 /**
  * 우회 (6) 폐쇄 — D-6A1-8(수작성 단일 출처) · D-6A1-20(대조 깊이). 경로 이름만 보지 않고
@@ -50,6 +48,11 @@ import java.io.File
  *
  * 새 라이브러리(swagger-parser 등)를 들이지 않는다 — 계약이 얕아 SnakeYAML(이미 app의
  * test 의존)로 raw Map 순회만으로 충분하다(preflight 조사·재사용 우선).
+ *
+ * **D-6A3-20 — 평가 dry-run endpoint(`/api/evaluation-dry-runs`) 전용 대조는
+ * `OpenApiDryRunContractTest`로 분리했다**(sizeGate, v2-지침서 §5 파일당 500줄 —
+ * `PredictionContractTest`→`PredictionAdditiveContractTest` 선례와 같은 관심사 경계).
+ * YAML 로딩·스키마 조회 헬퍼는 `OpenApiSpecSupport.kt`를 공유한다.
  */
 @Suppress("UNCHECKED_CAST")
 @SpringBootTest(
@@ -67,20 +70,7 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
         strategyRepository.loadFailure = null
     }
 
-    private val spec: Map<String, Any?> by lazy {
-        val specProperty =
-            requireNotNull(System.getProperty("bidvector.openapi.spec")) {
-                "bidvector.openapi.spec 시스템 프로퍼티가 없다"
-            }
-        val specFile = File(specProperty)
-        Yaml().load<Map<String, Any?>>(specFile.readText())
-    }
-
-    private fun schema(name: String): Map<String, Any?> =
-        ((spec["components"] as Map<String, Any?>)["schemas"] as Map<String, Any?>)[name] as Map<String, Any?>
-
-    private fun propertyKeys(schemaName: String): Set<String> =
-        (schema(schemaName)["properties"] as Map<String, Any?>).keys
+    private val spec: Map<String, Any?> by lazy { loadOpenApiSpec() }
 
     /**
      * 문서 전체(D-6A1-44)에서 속성을 정의하는 스키마를 전부 찾아 [isFlatPropertyDefinition]이
@@ -92,14 +82,6 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
             properties
                 .filterNot { (_, definition) -> isFlatPropertyDefinition(definition as Map<String, Any?>) }
                 .map { (propertyName, _) -> "$location.properties.$propertyName" }
-        }
-
-    /** D-6A1-30 — 값 자체가 object이거나(Map), 배열 어느 깊이에서든 object를 담으면 평탄하지 않다. */
-    private fun containsNestedObject(value: Any?): Boolean =
-        when (value) {
-            is Map<*, *> -> true
-            is List<*> -> value.any(::containsNestedObject)
-            else -> false
         }
 
     private fun authorizedHeaders(): HttpHeaders =
@@ -219,7 +201,7 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
             ) as ResponseEntity<Map<String, Any?>>
 
         response.statusCode.value() shouldBe 200
-        (response.body?.keys ?: emptySet()) shouldBe propertyKeys("StrategyReadResponse")
+        (response.body?.keys ?: emptySet()) shouldBe spec.propertyKeys("StrategyReadResponse")
         // D-6A1-20 ⓑ — 문서(위 test)뿐 아니라 **실제 응답값**도 평탄한지 잰다(배열 축 포함).
         response.body?.values?.none(::containsNestedObject) shouldBe true
     }
@@ -230,7 +212,7 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
             restTemplate.getForEntity(url("/api/strategy"), Map::class.java) as ResponseEntity<Map<String, Any?>>
 
         response.statusCode.value() shouldBe 401
-        (response.body?.keys ?: emptySet()) shouldBe propertyKeys("ErrorBody")
+        (response.body?.keys ?: emptySet()) shouldBe spec.propertyKeys("ErrorBody")
     }
 
     @Test
@@ -244,7 +226,7 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
             ) as ResponseEntity<Map<String, Any?>>
 
         response.statusCode.value() shouldBe 404
-        (response.body?.keys ?: emptySet()) shouldBe propertyKeys("ErrorBody")
+        (response.body?.keys ?: emptySet()) shouldBe spec.propertyKeys("ErrorBody")
     }
 
     /**
@@ -268,7 +250,7 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
             ) as ResponseEntity<Map<String, Any?>>
 
         response.statusCode.value() shouldBe 500
-        (response.body?.keys ?: emptySet()) shouldBe propertyKeys("ErrorBody")
+        (response.body?.keys ?: emptySet()) shouldBe spec.propertyKeys("ErrorBody")
         response.body?.get("code") shouldBe ErrorCode.INVALID_STORED_STRATEGY
     }
 

@@ -77,6 +77,11 @@ class ProductionAssemblyAuthAuditTest {
                                 "bidvector.persistence.username" to postgres.username,
                                 "bidvector.persistence.credential" to postgres.password,
                                 "operator.credential.value" to TEST_CREDENTIAL_VALUE,
+                                // M6/6A-3+6F-3 D-6A3-7 — `EvaluationWiring`이 이 값 없이는 기동하지
+                                // 않는다(기본값 없음, fail-fast). 이 test는 평가 endpoint를 부르지
+                                // 않지만 production 조립 전체가 뜨려면 모든 `@ConfigurationProperties`가
+                                // 바인딩돼야 한다.
+                                "bidvector.evaluation.candidate-cap" to "1000",
                             ),
                     ).run()
             port = (context as ServletWebServerApplicationContext).webServer?.port ?: error("web server가 뜨지 않았다")

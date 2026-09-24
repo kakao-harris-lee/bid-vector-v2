@@ -1,11 +1,12 @@
 openapi: 3.0.3
 info:
   title: bid-vector operator API
-  version: "6a1"
+  version: "6a3f3"
   description: >-
-    M6/6A-1 — 단일 운영자 소비자 전용(운영자 결정 2026-09-16 ①). 이 문서가 단일 출처다
-    (D-6A1-8, 수작성) — `OpenApiContractTest`가 구현과 대조한다. 이 slice가 여는 endpoint는
-    전략 조회 하나뿐이다(D-6A1-4, 읽기 전용 — 실행·명령 경로 없음).
+    단일 운영자 소비자 전용(운영자 결정 2026-09-16 ①). 이 문서가 단일 출처다(D-6A1-8,
+    수작성) — `OpenApiContractTest`가 구현과 대조한다. M6/6A-1이 전략 조회(읽기 전용)를,
+    M6/6A-3+6F-3(D-6A3-11)이 평가 dry-run endpoint를 연다 — 둘 다 커밋을 만들지 않는다
+    (실행·명령 경로 없음).
 servers:
   - url: /
 security:
@@ -23,13 +24,65 @@ paths:
               schema:
                 $ref: "#/components/schemas/StrategyReadResponse"
         "401":
-          description: 자격증명 없음 또는 틀림 — 사유를 구분하지 않는다(D-6A1-6)
+          description: >-
+            자격증명 없음 또는 틀림 — 사유를 구분하지 않는다(D-6A1-6).
+            code: UNAUTHENTICATED
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "500":
-          description: 내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17, fail-closed)
+          description: >-
+            내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17,
+            fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/evaluation-dry-runs:
+    post:
+      operationId: evaluateDryRun
+      summary: 평가 dry-run(D-6A3-1·6 — 외부 effect 없음, outbox 미접촉)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluationDryRunRequest"
+      responses:
+        "200":
+          description: 판정 분포(결과별 공고 ID 배열 + 건수)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationDryRunResponse"
+        "400":
+          description: >-
+            currentActiveBids 가 유효한 JSON 정수(0..2147483647)가 아니다(D-6A3-5·D-6A3-19) —
+            음수, 누락, null, 문자열·소수(조용한 강제 변환 없음), 범위 초과, 본문이 JSON
+            object 가 아님, 비JSON, 빈 본문을 모두 포함한다. code: INVALID_REQUEST
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "자격증명 없음 또는 틀림(D-6A1-6). code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: >-
+            전략에 여력 상한 미설정(D-6A3-4, code: MAX_ACTIVE_BIDS_NOT_CONFIGURED) 또는
+            후보 스캔이 상한 초과(D-6A3-7, code: CANDIDATE_CAP_EXCEEDED)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: >-
+            내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17,
+            fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR
           content:
             application/json:
               schema:
@@ -40,7 +93,7 @@ paths:
       summary: 미매핑 경로 — 계약 문서화 목적(D-6A1-21, 실제로는 어떤 controller도 이 경로를 다루지 않는다)
       responses:
         "404":
-          description: 등록된 endpoint가 없음
+          description: "등록된 endpoint가 없음. code: NOT_FOUND"
           content:
             application/json:
               schema:
@@ -128,6 +181,66 @@ components:
         candidateLimit:
           type: integer
           nullable: true
+        maxActiveBids:
+          type: integer
+          nullable: true
+    EvaluationDryRunRequest:
+      type: object
+      required:
+        - currentActiveBids
+      properties:
+        currentActiveBids:
+          type: integer
+          format: int32
+          minimum: 0
+    # D-6A3-6 — 평탄하다. 결과별 공고 ID 배열 + 건수만 싣는다(후보별 사유 상세는
+    # OPEN-6A3-EVALUATION-DETAIL). 공고명·기관명 원문은 없다(privacy).
+    EvaluationDryRunResponse:
+      type: object
+      required:
+        - strategyRevision
+        - candidateCount
+        - currentActiveBids
+        - maxActiveBids
+        - bidNowNoticeIds
+        - reviewNoticeIds
+        - skipNoticeIds
+        - notReachedNoticeIds
+        - wouldNotifyNoticeIds
+      properties:
+        strategyRevision:
+          type: integer
+        candidateCount:
+          type: integer
+        currentActiveBids:
+          type: integer
+        maxActiveBids:
+          type: integer
+        bidNowNoticeIds:
+          type: array
+          items:
+            type: string
+        reviewNoticeIds:
+          type: array
+          items:
+            type: string
+        skipNoticeIds:
+          type: array
+          items:
+            type: string
+        notReachedNoticeIds:
+          type: array
+          items:
+            type: string
+        wouldNotifyNoticeIds:
+          type: array
+          items:
+            type: string
+    # D-6A3-20(검토 라운드 1 contract-keeper V2) — code 는 ErrorMapping.forThrowable 이 낼 수
+    # 있는 전 코드의 열거다. `OpenApiContractTest`가 app.http.ErrorCode 의 상수 집합과 이
+    # 목록을 양방향(부분집합 아니라 등식)으로 대조한다 — 한쪽에만 코드를 더하면 RED.
+    # `type: string` + `enum` 은 D-6A1-38 평탄 술어의 NON_FLAT_KEYS 밖이라 게이트는 그대로
+    # 초록이다.
     ErrorBody:
       type: object
       required:
@@ -137,6 +250,14 @@ components:
       properties:
         code:
           type: string
+          enum:
+            - UNAUTHENTICATED
+            - NOT_FOUND
+            - INVALID_STORED_STRATEGY
+            - INTERNAL_ERROR
+            - MAX_ACTIVE_BIDS_NOT_CONFIGURED
+            - CANDIDATE_CAP_EXCEEDED
+            - INVALID_REQUEST
         message:
           type: string
         correlationId:

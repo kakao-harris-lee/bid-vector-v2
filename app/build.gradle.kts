@@ -29,6 +29,13 @@ dependencies {
     // 다룬다는 사실 자체가 이 선언을 요구한다).
     implementation(project(":strategy"))
     implementation(project(":shared-kernel"))
+    // M6/6A-3+6F-3 D-6A3-8 — EvaluationWiring이 LICENSE_QUALIFICATION_POLICY(qualification)를
+    // PersistenceWiring의 전략 정책 해소와 같은 형태로 직접 참조 — 위 :strategy와 같은 이유.
+    implementation(project(":qualification"))
+    // M6/6A-3+6F-3 D-6A3-6 — EvaluationDryRunController가 Verdict(decision)·NoticeId
+    // (procurement)를 응답 조립에 직접 참조 — 같은 이유(compile classpath 원래 없었음).
+    implementation(project(":decision"))
+    implementation(project(":procurement"))
 
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.starter)
@@ -43,6 +50,10 @@ dependencies {
     // 한다). D-6A1-18 — HikariCP는 들이지 않는다(`OPEN-6A1-CONNECTION-POOL`).
     implementation(libs.flyway.database.postgresql)
     implementation(libs.postgresql.driver)
+    // M6/6A-3+6F-3 D-6A3-8 — evaluate()가 suspend(M4/4B-3 ADR 0010 D-2)라 동기 MVC 경계에
+    // runBlocking 하나만 다리 놓는다. workflow main은 testImplementation으로만 물어(컴파일
+    // classpath 실측 부재) app이 직접 선언 — 런타임엔 이미 전이 존재(Boot 생태계 다른 의존).
+    implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(libs.testcontainers.postgresql)
@@ -75,18 +86,21 @@ dependencies {
     // 지운다(`adapters/build.gradle.kts`의 같은 관례 — "testImplementation은 implementation을
     // 상속하므로 중복 금지").
     // M1/1C — license-* corpus 실행자가 qualification 공개 API(`LicenseEligibility.judge` 등)를
-    // 직접 부른다. shared-kernel과 달리 qualification은 main에서 쓰지 않아 test 전용으로 남는다.
-    testImplementation(project(":qualification"))
+    // 직접 부른다. M6/6A-3+6F-3부터는 위 `implementation(project(":qualification"))`이 이미
+    // test classpath에 전이돼 별도 testImplementation 선언이 중복이라 지운다(`:strategy`와
+    // 같은 관례, 6A-1).
     // M1/1D — base-amount-provenance·floor-shortfall·floor-threshold corpus 실행자가
     // decision 공개 API(`ProvenanceRules.judge`·`measureFloorShortfall` 등)를 직접 부른다.
-    testImplementation(project(":decision"))
+    // M6/6A-3+6F-3부터는 위 `implementation(project(":decision"))`이 이미 test classpath에
+    // 전이돼 별도 testImplementation 선언이 중복이라 지운다(`:qualification`과 같은 관례).
     // M1/1E — strategy-watch·strategy-validation corpus 실행자가 strategy 공개 API
     // (`WatchRules.evaluate`·`validate` 등)를 직접 부른다. M6/6A-1부터는 위
     // `implementation(project(":strategy"))`이 이미 전이돼 별도 선언이 중복이라 지운다.
     // M3/3A — koneps-collection corpus 실행자가 procurement 공개 API(`canonicalize`·
     // `resolveAmount`·`decideDetailFetch`·`transition`·`mayOverwrite`·`parseSourceZonedInstant`
-    // 등)를 직접 부른다. 27 case 전건 authoritative 승격(운영자 승인 2026-09-07) 뒤 배선한다.
-    testImplementation(project(":procurement"))
+    // 등)를 직접 부른다. M6/6A-3+6F-3부터는 위 `implementation(project(":procurement"))`이
+    // 이미 전이돼 별도 선언이 중복이라 지운다(27 case 전건 authoritative 승격은 여전히
+    // 운영자 승인 2026-09-07 기준).
     // manifest.yaml(YAML) 을 읽기 위한 snakeyaml — 카탈로그 좌표는 이미 Boot BOM 관리 하에
     // transitively 해석되던 것을 명시로 올린 것뿐이다(`gradle/libs.versions.toml` 주석 참고).
     testImplementation(libs.snakeyaml)

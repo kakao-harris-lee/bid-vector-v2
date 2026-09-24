@@ -4,6 +4,7 @@ import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.BudgetBoundInclusivity
+import bidvector.strategy.MaxActiveBids
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.ScoreRange
 import bidvector.strategy.StrategyDraft
@@ -121,6 +122,23 @@ class EditSessionTransitionTableTest {
         outcome.session.state shouldBe EditSessionState.Applied(StrategyRevision(2))
         outcome.event.revision shouldBe StrategyRevision(2)
         outcome.applied.strategy.revision shouldBe StrategyRevision(2)
+    }
+
+    @Test
+    fun `D-6A3-12 상한 있는 전략 — 세션 영속·복원 뒤 확정해도 maxActiveBids 가 보존된다`() {
+        // 계약 갱신 (1) D-6A3-12 — 이 draft 는 「기존 상한을 그대로 실은 draft」를 흉내낸다
+        // (6A-2 편집 UI 는 아직 없지만, 상한이 있는 전략에서 시작한 세션의 draft 는 그
+        // 값을 실은 채로 저장소에 왕복돼야 한다). 스냅샷 codec 이 그 필드를 빠뜨리면
+        // `restoreEditSession` 뒤 draft.maxActiveBids 가 null 이 되어 재검증이 상한을
+        // 조용히 지운다 — 이 test 는 영속·복원(스냅샷 왕복)을 실제로 거친 뒤 확정한다.
+        val draftWithCap = StrategyDraft(bidNowThreshold = BigDecimal("0.7"), maxActiveBids = 5)
+        val session = sessionAt(EditSessionState.WaitingForConfirmation(FIELD, draftWithCap))
+        val restored = restoreEditSession(session.toSnapshot())
+
+        val outcome = apply(restored, confirm(seenRevision = StrategyRevision(1)), NOW, currentStrategy(1), policyOf())
+
+        outcome.shouldBeInstanceOf<TransitionOutcome.Applied>()
+        outcome.applied.strategy.maxActiveBids shouldBe MaxActiveBids(5)
     }
 
     @Test
