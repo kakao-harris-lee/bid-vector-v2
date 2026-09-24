@@ -127,7 +127,8 @@ class CanonicalizeBlankValuesTest {
 
             normalizedOf(mapOf("presmptPrce" to blank)).estimatedAmount shouldBe null
         }
-        normalizedOf(mapOf("bssamt" to " 1,000 ")).baseAmount
+        normalizedOf(mapOf("bssamt" to " 1,000 "))
+            .baseAmount
             .shouldBeInstanceOf<ResolvedBaseAmount.Direct>()
             .amount.provenance
             .shouldBeInstanceOf<Provenance.Published>()
@@ -136,7 +137,8 @@ class CanonicalizeBlankValuesTest {
     @Test
     fun `업무구분 라벨이 공백뿐이면 라벨만 없다 — 코드는 산다`() {
         BLANK_VALUES.forEach { blank ->
-            val category = normalizedOf(mapOf("bsnsDivCd" to "0411", "bsnsDivNm" to blank), TEST_POLICY).businessCategory
+            val fields = mapOf("bsnsDivCd" to "0411", "bsnsDivNm" to blank)
+            val category = normalizedOf(fields, TEST_POLICY).businessCategory
 
             category?.code shouldBe CategoryCode.of("0411")
             category?.label shouldBe null
@@ -153,7 +155,8 @@ class CanonicalizeBlankValuesTest {
         }
     }
 
-    private fun String.escaped(): String = map { if (it.isWhitespace()) "\\u%04x".format(it.code) else "$it" }.joinToString("")
+    private fun String.escaped(): String =
+        map { if (it.isWhitespace()) "\\u%04x".format(it.code) else "$it" }.joinToString("")
 
     private companion object {
         val BLANK_VALUES = listOf("", " ", "\t", "\u3000", " \n ")
