@@ -19,8 +19,12 @@ internal sealed interface KonepsTransportOutcome {
 
     data object TimedOut : KonepsTransportOutcome
 
+    /**
+     * 예외 **클래스 이름만** 싣는다 — JDK 전송 예외의 메시지에는 요청 URI(서비스 키가 쿼리에 실린다)가 실릴 수
+     * 있어 메시지를 결과 채널로 내보내지 않는다(D-6F8-4, `HttpAttachmentDocumentSource` 와 같은 접기).
+     */
     data class TransportFailed(
-        val message: String,
+        val exceptionType: String,
     ) : KonepsTransportOutcome
 }
 
@@ -51,10 +55,10 @@ internal fun sendKonepsRequest(
         timedOut: TimeoutException,
     ) {
         // `TimedOut`은 의도적으로 detail 이 없다 — `future.get(timeout)` 자신의 시한 초과는
-        // 원인이 「이 함수가 스스로 정한 시한」 하나뿐이라 예외 메시지가 그 이상의 진단
+        // 원인이 「이 함수가 스스로 정한 시한」 하나뿐이라 예외 종류가 그 이상의 진단
         // 정보를 주지 않는다(HttpTimeoutException 계열과 달리 서버·네트워크 원인 구분이
-        // 없다) — ExecutionException·InterruptedException 분기는 원인이 다양해 message 를
-        // 보존한다.
+        // 없다) — ExecutionException·InterruptedException 분기는 원인이 다양해 예외
+        // 클래스 이름을 보존한다.
         future.cancel(true)
         KonepsTransportOutcome.TimedOut
     } catch (failed: ExecutionException) {
@@ -62,7 +66,7 @@ internal fun sendKonepsRequest(
     } catch (interrupted: InterruptedException) {
         Thread.currentThread().interrupt()
         future.cancel(true)
-        KonepsTransportOutcome.TransportFailed("호출이 중단됐다: ${interrupted.message}")
+        KonepsTransportOutcome.TransportFailed(interrupted.javaClass.simpleName)
     }
 }
 
@@ -71,6 +75,6 @@ private fun toOutcome(failed: ExecutionException): KonepsTransportOutcome {
     return if (cause is HttpTimeoutException) {
         KonepsTransportOutcome.TimedOut
     } else {
-        KonepsTransportOutcome.TransportFailed(cause?.message ?: failed.message ?: "전송 실패")
+        KonepsTransportOutcome.TransportFailed((cause ?: failed).javaClass.simpleName)
     }
 }

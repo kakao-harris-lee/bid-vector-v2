@@ -3,6 +3,7 @@ package bidvector.adapters.koneps
 import bidvector.procurement.CollectionReferenceDate
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
@@ -116,6 +117,32 @@ class KonepsServiceKeyLeakTest {
 
         outcome.toString() shouldNotContain rawKey
         outcome.toString() shouldNotContain encodedKey
+    }
+
+    @Test
+    fun `전송 실패의 사유는 예외 클래스 이름뿐이다 — 예외 메시지가 결과로 나가는 채널이 없다`() {
+        val closedBase = MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, "{}"))).use { it.baseUri }
+        val uri = URI.create("$closedBase?serviceKey=$encodedKey&pageNo=1")
+
+        val outcome = sendKonepsRequest(HttpClient.newHttpClient(), uri, Duration.ofMillis(200))
+
+        outcome shouldBe KonepsTransportOutcome.TransportFailed(exceptionType = "ConnectException")
+        describeTransport(outcome) shouldBe "ConnectException"
+    }
+
+    @Test
+    fun `깨진 본문의 구조 실패 사유에는 응답 본문 조각이 실리지 않는다 — 서버가 요청 URL 을 되돌려도`() {
+        val outcome =
+            parseKonepsEnvelope(
+                echoBody("not-json"),
+                resolvedCollectionPolicy(referenceDate),
+                testKonepsHttpPolicy().maxJsonDepth,
+            )
+
+        val reason = outcome.shouldBeInstanceOf<KonepsEnvelopeOutcome.StructureFailure>().reason
+        reason shouldNotContain "serviceKey"
+        reason shouldNotContain "not-json"
+        leaks(reason) shouldBe false
     }
 
     @Test

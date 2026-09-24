@@ -51,7 +51,10 @@ internal fun parseKonepsEnvelope(
     runCatching { KonepsJsonParser.parse(body, maxJsonDepth) }
         .fold(
             onSuccess = { root -> classifyRoot(root, policy) },
-            onFailure = { failure -> KonepsEnvelopeOutcome.StructureFailure("JSON 파싱 실패: ${failure.message}") },
+            // 예외 메시지에는 응답 본문 조각이 실릴 수 있다(서버가 요청 URL 을 되돌리면 서비스 키까지) — 종류만 싣는다.
+            onFailure = { failure ->
+                KonepsEnvelopeOutcome.StructureFailure("JSON 파싱 실패: ${failure.javaClass.simpleName}")
+            },
         )
 
 private fun classifyRoot(
