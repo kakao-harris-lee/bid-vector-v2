@@ -83,6 +83,12 @@ class ArchitecturePolicy private constructor(
     val rawAccessAllowedReferencers: List<String> get() = list("collection.raw-access.allowed-referencers")
     val rawAccessAllowedMemberAccessors: List<String> get() = list("collection.raw-access.allowed-member-accessors")
 
+    /** M6/6F-8 D-6F8-13 (i) — 리플렉션 봉쇄: 금지 패키지·허용 참조자 집합과 `Class` 의 허용 멤버(이름 조회). root 는 (g) 와 같다. */
+    val reflectionPackages: List<String> get() = list("collection.reflection.packages")
+    val reflectionAllowedReferencers: List<String> get() = list("collection.reflection.allowed-referencers")
+    val reflectionClassType: String get() = value("collection.reflection.class-type")
+    val reflectionClassAllowedMembers: List<String> get() = list("collection.reflection.class-allowed-members")
+
     /** M6/6F-8 D-6F8-6 (h) — 수집 use case 타입과 그것을 참조해도 되는 production 클래스 집합. */
     val collectionUseCaseType: String get() = value("collection.usecase.type")
     val collectionUseCaseReferencers: List<String> get() = list("collection.usecase.allowed-referencers")

@@ -89,6 +89,32 @@ class CollectionArchitectureGateTest {
     }
 
     @Test
+    fun `workflow·app production 은 리플렉션 API 를 참조하지 않고 Class 는 이름 조회만 한다`() {
+        rules
+            .moduleMustNotUseReflection(
+                roots = policy.rawAccessRoots,
+                reflectionPackages = policy.reflectionPackages.toSet(),
+                allowedReferencers = policy.reflectionAllowedReferencers.toSet(),
+                classType = policy.reflectionClassType,
+                allowedClassMembers = policy.reflectionClassAllowedMembers.toSet(),
+            ).checkAll()
+    }
+
+    @Test
+    fun `리플렉션 봉쇄의 허용 참조자·허용 Class 멤버는 관측 집합과 같다 — 규칙이 공허하지 않고 낡은 항목이 없다`() {
+        rules.observedReflectionReferencers(
+            production,
+            policy.rawAccessRoots,
+            policy.reflectionPackages.toSet(),
+        ) shouldBe policy.reflectionAllowedReferencers.toSet()
+        rules.observedClassMembers(
+            production,
+            policy.rawAccessRoots,
+            policy.reflectionClassType,
+        ) shouldBe policy.reflectionClassAllowedMembers.toSet()
+    }
+
+    @Test
     fun `수집 use case 를 참조하는 production 클래스는 허용 집합뿐이다 — HTTP 나 이벤트 리스너로 열리는 길이 없다`() {
         rules
             .appTypesMustBeReferencedOnlyBy(

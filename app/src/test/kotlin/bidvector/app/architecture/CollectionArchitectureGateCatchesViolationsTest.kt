@@ -3,6 +3,7 @@ package bidvector.app.architecture
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.lang.ArchRule
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -65,6 +66,33 @@ class CollectionArchitectureGateCatchesViolationsTest {
         moduleRules().mustReport("RogueRawFieldPeek", "RawNoticeObservation.getSourceText")
     }
 
+    private fun reflectionRules() =
+        rules.moduleMustNotUseReflection(
+            roots = listOf("$fixtureRoot.workflow", "$fixtureRoot.app"),
+            reflectionPackages = policy.reflectionPackages.toSet(),
+            allowedReferencers = policy.reflectionAllowedReferencers.toSet(),
+            classType = policy.reflectionClassType,
+            allowedClassMembers = policy.reflectionClassAllowedMembers.toSet(),
+        )
+
+    @Test
+    fun `원문 타입을 이름 붙이지 않고 리플렉션으로 값을 꺼내도 잡는다 — getMethod 와 invoke`() {
+        reflectionRules().mustReport("RogueReflectionPeek", "java.lang.reflect.Method")
+        reflectionRules().mustReport("RogueReflectionPeek", "java.lang.Class.getMethod")
+    }
+
+    @Test
+    fun `이름으로 클래스를 불러오거나 메서드 핸들·코틀린 반사를 쓰는 길도 잡는다`() {
+        reflectionRules().mustReport("RogueReflectionPeek", "java.lang.Class.forName")
+        reflectionRules().mustReport("RogueReflectionPeek", "java.lang.invoke.MethodHandles")
+        reflectionRules().mustReport("RogueReflectionPeek", "kotlin.reflect.KClass")
+    }
+
+    @Test
+    fun `Class 의 이름 조회는 잡지 않는다 — 규칙이 반사가 아닌 사용까지 막는 과잉이 아니다`() {
+        reflectionRules().mustNotReport("CleanNameLookup")
+    }
+
     @Test
     fun `러너와 배선 밖에서 수집 use case 를 참조하면 잡는다 — 컨트롤러·리스너로 수집을 여는 길`() {
         typeRule(setOf(policy.collectionUseCaseType), policy.collectionUseCaseReferencers.toSet(), "use case")
@@ -116,6 +144,17 @@ class CollectionArchitectureGateCatchesViolationsTest {
         allowed: Set<String>,
         label: String,
     ) = rules.appTypesMustBeReferencedOnlyBy("$fixtureRoot.app", types, allowed, "음성 대조 — $label")
+
+    private fun List<ArchRule>.mustNotReport(mentioned: String) {
+        val details =
+            flatMap { rule ->
+                rule
+                    .allowEmptyShould(true)
+                    .evaluate(violating)
+                    .failureReport.details
+            }
+        details.filter { it.contains(mentioned) }.shouldBeEmpty()
+    }
 
     private fun List<ArchRule>.mustReport(
         mentioned: String,

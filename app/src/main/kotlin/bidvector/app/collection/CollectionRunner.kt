@@ -30,8 +30,8 @@ class CollectionRunFailedException(
 /** 예외에서 로그에 실어도 되는 원인 코드만 뽑는다 — 클래스 이름, SQL 예외는 SQLSTATE 5자리만 더한다(메시지 없음). */
 private fun causeCodeOf(failure: Exception): String =
     when (failure) {
-        is SQLException -> "${failure::class.qualifiedName}:sqlState=${failure.sqlState}"
-        else -> failure::class.qualifiedName ?: "unknown"
+        is SQLException -> "${failure.javaClass.name}:sqlState=${failure.sqlState}"
+        else -> failure.javaClass.name
     }
 
 /**
