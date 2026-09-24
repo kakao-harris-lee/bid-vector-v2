@@ -116,7 +116,7 @@ private fun contractViolationOrNull(contract: KonepsFieldContract): ContractViol
     }
 
 /**
- * 후보 하나를 평가한다 — `null`은 「이 후보는 건너뛴다」(계약 없음·값 없음·0·미상, §5.2),
+ * 후보 하나를 평가한다 — `null`은 「이 후보는 건너뛴다」(계약 없음·값 없음·공백뿐인 값·0·미상, §5.2),
  * 그 외에는 이 항목의 최종 결과([resolveAmount]가 순서를 멈춘다). `scale`·`basis` 어긋남은
  * 둘 다 계약 위반이다(F-3 — legacy `KEY_BASIS`가 넷을 한 basis 로 접은 것을 되돌린다).
  */
@@ -127,7 +127,7 @@ private fun evaluateCandidate(
     rawKey: RawKey,
 ): AmountResolutionOutcome? {
     val contract = policy.fieldContracts.contractFor(rawKey)
-    val raw = contract?.let { observation.valueOf(it) }
+    val raw = contract?.let { observation.valueOf(it) }?.takeUnless(String::isBlank)
     if (contract == null || raw == null) return null
     val violation = contractViolationOrNull(contract)
     return if (violation != null) {

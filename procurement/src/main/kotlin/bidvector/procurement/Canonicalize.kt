@@ -138,7 +138,7 @@ private fun estimatedAmountAsResolved(outcome: AmountResolutionOutcome): Resolve
     )
 }
 
-/** 업무구분(⑤ D-3A-5, COL-08) — 코드·라벨 두 값. 매핑 없는 라벨은 `null`(임의 라벨 금지). */
+/** 업무구분(⑤ D-3A-5, COL-08) — 코드·라벨 두 값. 매핑 없는 라벨·공백뿐인 라벨은 `null`(임의 라벨 금지). */
 private fun businessCategoryFrom(
     observation: RawNoticeObservation,
     registry: KonepsFieldContractRegistry,
@@ -150,7 +150,11 @@ private fun businessCategoryFrom(
         ?.takeIf(String::isNotBlank)
         ?.let { code ->
             val label =
-                registry.contractsFor(FieldConcept.BUSINESS_CATEGORY_LABEL).firstOrNull()?.let(observation::valueOf)
+                registry
+                    .contractsFor(FieldConcept.BUSINESS_CATEGORY_LABEL)
+                    .firstOrNull()
+                    ?.let(observation::valueOf)
+                    ?.takeIf(String::isNotBlank)
             BusinessCategory(CategoryCode.of(code), label?.let(::CategoryLabel))
         }
 
@@ -205,6 +209,22 @@ private fun floorRateFrom(
         }
 
 /**
+ * 계약 값이 없거나 공백뿐이면 부재다(D-6F8-11) — KONEPS 는 옵션 일시를 키 부재·`null` 이 아니라 **빈 문자열**로 낼 때가
+ * 많다(실수집 실측). 값이 있는데 정책의 어느 패턴으로도 해석되지 않을 때만 [instantFrom] 이
+ * [InstantResolutionOutcome.ParseFailed] 를 낸다.
+ */
+private fun instantResolutionOf(
+    observation: RawNoticeObservation,
+    policy: KonepsCollectionPolicyData,
+    concept: FieldConcept,
+): InstantResolutionOutcome =
+    if (policy.fieldContracts.valueIn(observation, concept).isNullOrBlank()) {
+        InstantResolutionOutcome.Absent
+    } else {
+        instantFrom(observation, policy, concept)
+    }
+
+/**
  * [InstantResolutionOutcome.Resolved]는 값으로, [InstantResolutionOutcome.Absent]는 `null`로
  * 접는다 — [InstantResolutionOutcome.ParseFailed]는 이 함수가 다루지 않는다(호출부가 먼저
  * 걸러야 한다, `normalizedCommand`의 `when` 참고).
@@ -225,8 +245,8 @@ private fun normalizedCommand(
 ): CanonicalizationOutcome {
     val baseAmountResolution = resolveAmount(observation, noticeId.round, AmountAxis.BASE, policy)
     val estimatedResolution = resolveAmount(observation, noticeId.round, AmountAxis.ESTIMATED, policy)
-    val deadlineResolution = instantFrom(observation, policy, FieldConcept.DEADLINE_AT)
-    val openingResolution = instantFrom(observation, policy, FieldConcept.OPENING_SCHEDULED_AT)
+    val deadlineResolution = instantResolutionOf(observation, policy, FieldConcept.DEADLINE_AT)
+    val openingResolution = instantResolutionOf(observation, policy, FieldConcept.OPENING_SCHEDULED_AT)
     val dateTimeParseFailure = CollectionDropReason.CollectionParseFailure(ParseFailureKind.DATE_TIME)
     return when {
         baseAmountResolution is AmountResolutionOutcome.Rejected -> {

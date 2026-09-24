@@ -46,6 +46,8 @@ class CollectionRunnerE2ETest {
         private const val SERVICE_KEY = "E2E-SENTINEL+KEY/value="
         private const val SLOTS = 6
         private const val NORMAL_PER_SLOT = 3
+        private const val BLANK_PER_SLOT = 1
+        private const val NOTICES_PER_SLOT = NORMAL_PER_SLOT + BLANK_PER_SLOT
         private const val BAD_DATE_ITEM_NUMBER = "BAD-DATE-1"
         private const val BAD_ROUND_ITEM_NUMBER = "BAD-ROUND-1"
 
@@ -87,6 +89,10 @@ class CollectionRunnerE2ETest {
                 "bidClseDt" to closing,
             )
             val normal = (1..NORMAL_PER_SLOT).map { item("E2E-$category-$day-$it") }
+            // D-6F8-11 — KONEPS 는 옵션 일시·금액을 빈 문자열로 내기도 한다(실수집 실측). 합성 표본이며 정규화되고 마감은 null 이다.
+            val blankOptionals =
+                item("E2E-$category-$day-BLANK", closing = "") +
+                    mapOf("opengDt" to "", "bssamt" to "", "presmptPrce" to "", "chgDt" to "", "tpEvalApplClseDt" to "")
             val missingNumber = mapOf("bidNtceNm" to "번호 없는 공고명")
             val duplicate = normal.first()
             val firstConstructionDay = category == "Cnstwk" && day == firstDay.toString().replace("-", "")
@@ -107,7 +113,7 @@ class CollectionRunnerE2ETest {
                 } else {
                     emptyList()
                 }
-            return normal + missingNumber + duplicate + badDate + badRound
+            return normal + listOf(blankOptionals) + missingNumber + duplicate + badDate + badRound
         }
 
         /** 러너 한 번의 관측 — 종료 코드, 로거 이벤트 전부, 표준 출력·표준 오류 전부. */
@@ -213,6 +219,8 @@ class CollectionRunnerE2ETest {
                 count("SELECT COUNT(*) FROM notice WHERE notice_number = '$BAD_DATE_ITEM_NUMBER'"),
             val badRoundNotices: Int =
                 count("SELECT COUNT(*) FROM notice WHERE notice_number = '$BAD_ROUND_ITEM_NUMBER'"),
+            val blankOptionalNotices: Int =
+                count("SELECT COUNT(*) FROM notice WHERE notice_number LIKE 'E2E-%-BLANK' AND deadline_at IS NULL"),
         )
 
         private lateinit var firstRun: RunResult
@@ -261,18 +269,26 @@ class CollectionRunnerE2ETest {
         firstRun.exitCodes shouldContainExactly listOf(0)
         val db = firstRunDb
         db.collectionRuns shouldBe SLOTS
-        db.notices shouldBe SLOTS * NORMAL_PER_SLOT
+        db.notices shouldBe SLOTS * NOTICES_PER_SLOT
         db.untitledNotices shouldBe 0
         db.foreignTitleNotices shouldBe 0
         // 정상 항목 + 정규화에서 탈락한 둘(일시 오류·차수 형식 오류) — 번호 없는 항목은 어댑터 단계 탈락이라 원문이 없다.
-        db.rawObservations shouldBe SLOTS * NORMAL_PER_SLOT + 2
-        db.received shouldBe SLOTS * (NORMAL_PER_SLOT + 2) + 2
-        db.normalized shouldBe SLOTS * NORMAL_PER_SLOT
+        db.rawObservations shouldBe SLOTS * NOTICES_PER_SLOT + 2
+        db.received shouldBe SLOTS * (NOTICES_PER_SLOT + 2) + 2
+        db.normalized shouldBe SLOTS * NOTICES_PER_SLOT
         db.duplicate shouldBe SLOTS
         db.dropped shouldBe SLOTS + 2
         db.truncatedRuns shouldBe 0
         db.badDateNotices shouldBe 0
         db.badRoundNotices shouldBe 0
+    }
+
+    @Test
+    fun `빈 문자열인 옵션 일시·금액 항목은 탈락하지 않고 마감이 null 인 공고로 저장된다 — 슬롯마다 하나`() {
+        firstRunDb.blankOptionalNotices shouldBe SLOTS * BLANK_PER_SLOT
+        // 빈 일시를 「해석 실패」로 세지 않는다 — DATE_TIME 탈락은 형식이 어긋난 표본 하나뿐이다.
+        slotLines(firstRun).count { "CollectionParseFailure(kind=DATE_TIME)" in it } shouldBe 1
+        slotLines(firstRun).count { "CollectionParseFailure(kind=NUMERIC)" in it } shouldBe 0
     }
 
     @Test

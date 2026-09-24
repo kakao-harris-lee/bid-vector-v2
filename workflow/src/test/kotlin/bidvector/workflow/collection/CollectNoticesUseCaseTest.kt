@@ -142,6 +142,35 @@ class CollectNoticesUseCaseTest {
     }
 
     @Test
+    fun `빈 문자열인 옵션 일시·금액 항목은 탈락이 아니라 정규화된다 — 마감 null 로 영속되고 원문도 저장된다`() {
+        val fixture = CollectionFixture()
+        val blankOptionals =
+            observation(
+                "BLANK-OPTIONAL",
+                extra = mapOf("bidClseDt" to "", "opengDt" to " ", "bssamt" to "", "presmptPrce" to ""),
+            )
+        val badDate = observation("BAD-DATE", extra = mapOf("bidClseDt" to "not-a-date"))
+        val source = ScriptedSource { _, _ -> batchOf(listOf(blankOptionals, badDate)) }
+
+        val report =
+            fixture.useCase.collect(rangeOf("2026-09-01", "2026-09-01"), listOf(CollectionSource(construction, source)))
+
+        val accounting = report.slots.single().accounting
+        accounting.normalized shouldBe 1
+        accounting.dropped shouldBe 1
+        accounting.dropReasons shouldBe
+            mapOf(CollectionDropReason.CollectionParseFailure(ParseFailureKind.DATE_TIME) to 1)
+        accounting.received shouldBe accounting.normalized + accounting.duplicate + accounting.dropped
+        fixture.raw.appended shouldContainExactly listOf(blankOptionals, badDate)
+        val (command, _) = fixture.notices.persisted.single()
+        command.id.number.value shouldBe "BLANK-OPTIONAL"
+        command.deadlineAt shouldBe null
+        command.openingScheduledAt shouldBe null
+        command.baseAmount shouldBe null
+        command.estimatedAmount shouldBe null
+    }
+
+    @Test
     fun `저장 결과가 Inserted·Updated 면 정규화, Unchanged 는 중복, Rejected 는 중복이면서 거부 건수로도 센다`() {
         val outcomes =
             mapOf(
