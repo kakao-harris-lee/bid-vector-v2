@@ -69,7 +69,9 @@ Telegram id·사업자 정보는 패턴 스캔으로 못 잡아 육안 확인: e
 ## clean-tree 게이트
 
 `git status --porcelain -- <scope.md in_scope 경로, 개별 인자>` — 마지막 evidence 커밋 뒤 빈 출력 + 양성 대조 1회(in_scope 파일 끝에 줄을 덧붙여 잡히는지 확인 후, 사본으로 **비파괴 복원**, `checkout --` 미사용):
-아래 「clean-tree 실측」 줄이 그 결과다.
+
+
+clean-tree 실측: 빈 출력(0줄) → 양성 대조로 in_scope 파일 하나에 줄을 덧붙이자 1줄(` M …`) → 사본으로 복원 뒤 다시 0줄.
 
 ## rollback 실측
 
