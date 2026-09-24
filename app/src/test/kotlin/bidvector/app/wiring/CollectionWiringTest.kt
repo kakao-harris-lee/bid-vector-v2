@@ -37,13 +37,14 @@ class CollectionWiringTest {
 
     private fun boot(
         vararg properties: String,
+        now: Instant = fixedNow,
         customizeEnvironment: (ConfigurableEnvironment) -> Unit = {},
     ): Booted {
         val context = AnnotationConfigApplicationContext()
         TestPropertyValues.of(*properties).applyTo(context)
         customizeEnvironment(context.environment)
         context.register(CollectionWiring::class.java)
-        context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
+        context.registerBean(Clock::class.java, Supplier { Clock { now } })
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
         val failure = runCatching { context.refresh() }.exceptionOrNull()
         return Booted(context, failure)
@@ -51,10 +52,11 @@ class CollectionWiringTest {
 
     private fun <T> withBoot(
         vararg properties: String,
+        now: Instant = fixedNow,
         customizeEnvironment: (ConfigurableEnvironment) -> Unit = {},
         block: (Booted) -> T,
     ): T {
-        val booted = boot(*properties, customizeEnvironment = customizeEnvironment)
+        val booted = boot(*properties, now = now, customizeEnvironment = customizeEnvironment)
         return try {
             block(booted)
         } finally {
@@ -167,6 +169,41 @@ class CollectionWiringTest {
     @Test
     fun `상한 정확히(31일)는 뜬다 — 경계`() {
         withBoot(*validProperties(from = "2026-08-24")) { it.failure shouldBe null }
+    }
+
+    @Test
+    fun `오늘은 KST 달력일이다 — UTC 날짜와 갈리는 시각에도 KST 자정이 지나면 to=오늘 이 서고 그 전엔 미래다`() {
+        val kstMidnight = Instant.parse("2026-09-24T15:00:00Z")
+        val properties = validProperties(from = "2026-08-26", to = "2026-09-25")
+
+        withBoot(*properties, now = kstMidnight) { it.failure shouldBe null }
+        withBoot(*properties, now = kstMidnight.minusSeconds(1)) { it.failure shouldNotBe null }
+    }
+
+    @Test
+    fun `같은 업종을 두 번 적으면 조립 시점에 기동 실패다 — 실행 도중에 죽지 않는다`() {
+        withBoot(*validProperties(categories = "construction,construction")) { booted ->
+            booted.failure shouldNotBe null
+            failureText(booted.failure) shouldNotContain secretKey
+        }
+    }
+
+    @Test
+    fun `KONEPS 기본 URL 이 평문 http 로 외부 호스트를 가리키면 기동 실패다 — 서비스 키가 평문으로 나가지 않는다`() {
+        listOf("http://apis.data.go.kr/1230000", "ftp://apis.data.go.kr/x", "apis.data.go.kr/x").forEach { baseUrl ->
+            withBoot(*validProperties(), "bidvector.koneps.base-url=$baseUrl") { booted ->
+                booted.failure shouldNotBe null
+                failureText(booted.failure) shouldNotContain secretKey
+            }
+        }
+    }
+
+    @Test
+    fun `KONEPS 기본 URL 은 https 이거나 loopback 호스트(mock 서버)면 선다`() {
+        listOf("https://apis.data.go.kr/1230000", "http://127.0.0.1:8080/x", "http://localhost:9/x", "http://[::1]:9/x")
+            .forEach { baseUrl ->
+                withBoot(*validProperties(), "bidvector.koneps.base-url=$baseUrl") { it.failure shouldBe null }
+            }
     }
 
     @Test

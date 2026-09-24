@@ -50,9 +50,9 @@ class CollectionSources(
  * 배포는 KONEPS 키 없이 그대로 뜬다. 켜졌을 때의 설정 오류(범위 상한·미래·미지 업종·키 부재)는 전부
  * **기동 실패**다(조용히 자르거나 기본값으로 메우지 않는다).
  *
- * 이 클래스는 조립만 한다: 도메인 값을 만들지 않고 정규화·저장 포트를 직접 부르지 않는다(use case 가
- * 유일한 호출자다 — 구조 게이트). 서비스 키 원문은 [collectionSources] 한 곳에서 [ServiceKey] 로 감싼 뒤
- * 다시 다루지 않는다.
+ * 이 클래스는 조립만 한다: 설정 값의 형식을 검사하려고 [CollectionRange]·[CollectionSourceName] 을 만들 뿐
+ * 수집 포트와 정규화 함수를 직접 부르지 않는다(use case 가 유일한 호출자다 — 구조 게이트). 서비스 키 원문은
+ * [collectionSources] 한 곳에서 [ServiceKey] 로 감싼 뒤 다시 다루지 않는다.
  */
 @Configuration
 @ConditionalOnProperty(prefix = "bidvector.collection", name = ["mode"], havingValue = "once")
@@ -83,6 +83,10 @@ open class CollectionWiring {
         range: CollectionRange,
     ): CollectionSources {
         require(properties.categories.isNotEmpty()) { "bidvector.collection.categories 가 비어 있다" }
+        require(properties.categories.toSet().size == properties.categories.size) {
+            "bidvector.collection.categories 에 같은 업종이 두 번 있다"
+        }
+        val baseUri = endpointBaseUri(endpoint)
         val serviceKey = ServiceKey.of(credential.serviceKey)
         val httpPolicy = resolved(KONEPS_HTTP_POLICY.resolve(range.to), "KONEPS 전송 정책")
         val httpClient = HttpClient.newBuilder().connectTimeout(httpPolicy.requestTimeout).build()
@@ -90,8 +94,8 @@ open class CollectionWiring {
             properties.categories.map { category ->
                 val name = requireNotNull(CollectionSourceName.of(category)) { "업종 이름 형식이 유효하지 않다" }
                 val operation = endpoint.operations[category] ?: error("오퍼레이션이 등재되지 않은 업종이다: ${name.value}")
-                val baseUri = URI.create("${endpoint.baseUrl.trimEnd('/')}/$operation")
-                CollectionSource(name, sourceFor(httpClient, baseUri, serviceKey, httpPolicy))
+                val operationUri = URI.create("$baseUri/$operation")
+                CollectionSource(name, sourceFor(httpClient, operationUri, serviceKey, httpPolicy))
             }
         return CollectionSources(sources)
     }
@@ -143,6 +147,20 @@ open class CollectionWiring {
             httpPolicy = httpPolicy,
             collectionPolicyProvider = ::collectionPolicyAt,
         )
+}
+
+private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "[::1]")
+
+/**
+ * 서비스 키는 요청 URI 의 쿼리로 실려 나간다 — 평문 http 로 외부 호스트를 부르면 키가 그대로 노출된다. https 이거나
+ * 로컬 mock 서버(loopback)일 때만 받는다(설정 실수는 기동 실패, D-6F8-4).
+ */
+private fun endpointBaseUri(endpoint: KonepsEndpointProperties): String {
+    val uri = URI.create(endpoint.baseUrl.trimEnd('/'))
+    val secure = uri.scheme.equals("https", ignoreCase = true)
+    val loopback = uri.scheme.equals("http", ignoreCase = true) && uri.host in LOOPBACK_HOSTS
+    require(secure || loopback) { "bidvector.koneps.base-url 은 https 이거나 loopback 호스트여야 한다" }
+    return uri.toString()
 }
 
 /** 정책 해소 실패는 기동(또는 첫 조회) 실패다 — 값을 지어내지 않는다(`PersistenceWiring` 의 정책 해소와 같은 형태). */
