@@ -251,8 +251,9 @@ internal class PersistingNotificationPortFixture(
  * D-6F4W-14 — [EvaluationAdapterDependencyTest]의 허용 목록 술어가 쓰는 참조 집합.
  * `NoticeWatchSubjectPort`·`NoticeWatchSubjectPortKt` 두 class 를 `javap -p -v`로 실측해
  * 손으로 옮겼다(2026-09-23, commands.md 에 원 출력 대조 기록). `assemble*` 커널 둘·
- * `Notice`/값 객체 getter·`WatchSubject`/`Fact`/`CategoryCode` 생성자·`kotlin.collections.
- * SetsKt`(`.orEmpty()`가 컴파일되어 내리는 stdlib)·`Intrinsics`(null 체크)·`Object.<init>`·
+ * `assembleWatchCategories` 커널(M6/6F-9 — 관심 업종 집합도 어댑터가 짓지 않고 커널을 부른다, 이전에 있던 `SetsKt`
+ * `setOf`·`emptySet` 과 strategy `CategoryCode` 생성자는 이 허용 집합에서 **빠졌다** — 조여졌다)·`Notice`/값 객체
+ * getter·`WatchSubject`/`Fact` 생성자·`Intrinsics`(null 체크)·`Object.<init>`·
  * `noticeToWatchSubject`가 `private`이라 Kotlin이 내는 `access$` 합성 접근자(D-6F4W-16)
  * 뿐이다 — 이어붙이기 기계(`StringBuilder`·`makeConcatWithConstants`·`String.join`·
  * `joinToString`류)는 어떤 이름도 여기 없다. **새 이름이 어댑터에 나타나면 이 집합의
@@ -271,30 +272,35 @@ private val ALLOWED_METHOD_REFERENCES =
         "bidvector/procurement/AgencyName.getValue:()Ljava/lang/String;",
         "bidvector/procurement/BusinessCategory.getCode:()Lbidvector/procurement/CategoryCode;",
         "bidvector/procurement/BusinessCategory.getLabel:()Lbidvector/procurement/CategoryLabel;",
+        "bidvector/procurement/BusinessDivision.getLabel:()Ljava/lang/String;",
         "bidvector/procurement/CategoryCode.getValue:()Ljava/lang/String;",
         "bidvector/procurement/CategoryLabel.getValue:()Ljava/lang/String;",
+        "bidvector/procurement/MainConstructionType.getValue:()Ljava/lang/String;",
         "bidvector/procurement/Notice.getBaseAmount:()Lbidvector/procurement/ResolvedBaseAmount;",
         "bidvector/procurement/Notice.getBusinessCategory:()Lbidvector/procurement/BusinessCategory;",
+        "bidvector/procurement/Notice.getBusinessDivision:()Lbidvector/procurement/BusinessDivision;",
         "bidvector/procurement/Notice.getDemandAgency:()Lbidvector/procurement/Agency;",
+        "bidvector/procurement/Notice.getMainConstructionType:()Lbidvector/procurement/MainConstructionType;",
         "bidvector/procurement/Notice.getNoticeAgency:()Lbidvector/procurement/Agency;",
+        "bidvector/procurement/Notice.getServiceDivision:()Lbidvector/procurement/ServiceDivision;",
         "bidvector/procurement/Notice.getTitle:()Lbidvector/procurement/NoticeTitle;",
         "bidvector/procurement/NoticeTitle.getValue:()Ljava/lang/String;",
         "bidvector/procurement/ResolvedBaseAmount.getAmount:()Lbidvector/sharedkernel/BaseAmount;",
+        "bidvector/procurement/ServiceDivision.getValue:()Ljava/lang/String;",
         "bidvector/sharedkernel/Fact\$Absent.\"<init>\":(Lbidvector/sharedkernel/ReasonCode;)V",
         "bidvector/sharedkernel/Fact\$Known.\"<init>\":(Ljava/lang/Object;)V",
-        "bidvector/strategy/CategoryCode.\"<init>\":(Ljava/lang/String;)V",
         "bidvector/strategy/TextKt.assembleFullScopeText:" +
             "(Ljava/lang/String;Ljava/lang/String;" +
             "Ljava/lang/String;Ljava/lang/String;)Lbidvector/strategy/FullScopeText;",
         "bidvector/strategy/TextKt.assembleKeywordScopeText:" +
             "(Ljava/lang/String;Ljava/lang/String;)Lbidvector/strategy/KeywordScopeText;",
+        "bidvector/strategy/WatchCategoriesKt.assembleWatchCategories:" +
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/util/Set;",
         "bidvector/strategy/WatchSubject.\"<init>\":" +
             "(Ljava/util/Set;Lbidvector/strategy/KeywordScopeText;" +
             "Lbidvector/strategy/FullScopeText;Lbidvector/sharedkernel/Fact;)V",
         "bidvector/workflow/evaluation/WatchSubjectOutcome\$Found.\"<init>\":(Lbidvector/strategy/WatchSubject;)V",
         "java/lang/Object.\"<init>\":()V",
-        "kotlin/collections/SetsKt.emptySet:()Ljava/util/Set;",
-        "kotlin/collections/SetsKt.setOf:(Ljava/lang/Object;)Ljava/util/Set;",
         "kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V",
     )
 
