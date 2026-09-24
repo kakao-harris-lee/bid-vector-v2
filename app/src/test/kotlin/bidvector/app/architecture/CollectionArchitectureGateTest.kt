@@ -183,6 +183,25 @@ class CollectionArchitectureGateTest {
     }
 
     @Test
+    fun `문자열에서 대분류를 만드는 호출은 허용 쌍뿐이다 — URL·오퍼레이션 이름·응답 문자열에서 대분류를 짓는 길이 없다`() {
+        rules
+            .divisionParseCallsMustBeAllowedPairs(
+                policy.divisionParseType,
+                policy.divisionParseMembers.toSet(),
+                policy.divisionParseAllowedPairs.toSet(),
+            ).checkAll()
+    }
+
+    @Test
+    fun `대분류 변환 허용 쌍은 관측과 같다 — 규칙이 공허하지 않고 낡은 항목이 없다`() {
+        rules.observedDivisionParseCalls(
+            production,
+            policy.divisionParseType,
+            policy.divisionParseMembers.toSet(),
+        ) shouldBe policy.divisionParseAllowedPairs.toSet()
+    }
+
+    @Test
     fun `프로세스를 자동 시작하는 러너 타입은 수집 러너만 참조한다`() {
         rules
             .appTypesMustBeReferencedOnlyBy(

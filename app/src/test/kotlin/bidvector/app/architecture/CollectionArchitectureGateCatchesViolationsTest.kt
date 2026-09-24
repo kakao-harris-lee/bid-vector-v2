@@ -124,6 +124,16 @@ class CollectionArchitectureGateCatchesViolationsTest {
     }
 
     @Test
+    fun `URL 경로에서 대분류를 짓는 허용 밖 호출을 잡는다`() {
+        rules
+            .divisionParseCallsMustBeAllowedPairs(
+                policy.divisionParseType,
+                policy.divisionParseMembers.toSet(),
+                policy.divisionParseAllowedPairs.toSet(),
+            ).mustReport("RogueDivisionFromString", "fromLabel")
+    }
+
+    @Test
     fun `app 안의 두 번째 러너를 잡는다`() {
         typeRule(policy.runnerTypes.toSet(), policy.runnerAllowedReferencers.toSet(), "러너")
             .mustReport("RogueCollectionRunner", "ApplicationRunner")

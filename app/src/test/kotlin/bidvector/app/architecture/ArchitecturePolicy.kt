@@ -69,6 +69,19 @@ class ArchitecturePolicy private constructor(
     /** M6/6F-8 (c) — 공고명 키 리터럴을 상수 풀에 가져도 되는 클래스. */
     val titleKeyAllowedClasses: List<String> get() = list("collection.title-key.allowed-classes")
 
+    /** M6/6F-9 D-6F9-1 — 문자열에서 대분류를 만드는 표면: 대상 타입·멤버와 허용 (호출자->멤버) 쌍. */
+    val divisionParseType: String get() = value("collection.division-parse.type")
+    val divisionParseMembers: List<String> get() = list("collection.division-parse.members")
+    val divisionParseAllowedPairs: List<Pair<String, String>>
+        get() =
+            list("collection.division-parse.allowed-pairs").map { entry ->
+                val parts = entry.split("->").map(String::trim)
+                check(
+                    parts.size == 2,
+                ) { "collection.division-parse.allowed-pairs 항목이 'Caller->member' 형태가 아니다: $entry" }
+                parts[0] to parts[1]
+            }
+
     /** M6/6F-9 D-6F9-2 — 업무구분 세부 분류 키 리터럴 게이트: 대상 개념 집합과 그 키를 상수 풀에 가져도 되는 클래스. */
     val classificationKeyConcepts: List<String> get() = list("collection.classification-key.concepts")
     val classificationKeyAllowedClasses: List<String> get() = list("collection.classification-key.allowed-classes")
