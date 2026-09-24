@@ -241,6 +241,32 @@ class CollectionArchitectureRules {
         )
 
     /**
+     * M6/6F-9 D-6F9-2 우회 4 — 업무구분 세부 분류 **원시 키 리터럴들**([keys], 값은 그 개념들의 필드 계약이 정한다)을 상수 풀에 가진
+     * production 클래스 집합은 키마다 [allowedClasses] 의 부분집합이다. 공고명 키 게이트([titleKeyLiteralMustStayInAllowedClasses])와
+     * 같은 형태의 집합 규칙 — 키마다 규칙을 따로 내서 위반 상세가 어느 키 때문인지 가른다.
+     */
+    fun classificationKeyLiteralsMustStayInAllowedClasses(
+        keys: Set<String>,
+        allowedClasses: Set<String>,
+    ): List<ArchRule> =
+        keys.sorted().map { key ->
+            noClasses()
+                .that(isOutside(allowedClasses))
+                .should(containLiteralInClassFile(key))
+                .because("D-6F9-2 우회 4 — 업무구분 세부 분류 원시 키 리터럴은 계약 데이터를 실은 파일 클래스 밖에 없다")
+        }
+
+    /** [keys] 중 하나라도 상수 풀에 가진 production 클래스(최상위 이름) 집합 — 허용 집합과 **같아야** 한다(낡은 항목 금지). */
+    fun classesContainingAnyLiteral(
+        production: JavaClasses,
+        keys: Set<String>,
+    ): Set<String> =
+        production
+            .filter { item -> keys.any { constantPoolContains(item, it) } }
+            .map { it.topLevel().fullName }
+            .toSet()
+
+    /**
      * 우회 4·5 — [types] 를 참조하는 [appRoot] 안의 클래스 집합은 [allowedReferencers] 의 부분집합이다(타입 자신은
      * 제외). 러너·서비스 키 설정·로거처럼 「쓰는 자리가 하나여야 하는」 타입에 쓴다.
      */
@@ -317,15 +343,22 @@ class CollectionArchitectureRules {
             }
         }
 
+    private fun constantPoolContains(
+        item: JavaClass,
+        literal: String,
+    ): Boolean {
+        val uri = item.source.orElse(null)?.uri ?: return false
+        val bytes = uri.toURL().openStream().use { it.readBytes() }
+        return String(bytes, StandardCharsets.ISO_8859_1).contains(literal)
+    }
+
     private fun containLiteralInClassFile(literal: String): ArchCondition<JavaClass> =
         object : ArchCondition<JavaClass>("클래스 파일 상수 풀에 리터럴 '$literal' 을 가진다") {
             override fun check(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                val uri = item.source.orElse(null)?.uri ?: return
-                val bytes = uri.toURL().openStream().use { it.readBytes() }
-                if (String(bytes, StandardCharsets.ISO_8859_1).contains(literal)) {
+                if (constantPoolContains(item, literal)) {
                     events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} 상수 풀에 '$literal'"))
                 }
             }

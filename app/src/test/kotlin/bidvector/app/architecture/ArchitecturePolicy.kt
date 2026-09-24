@@ -69,6 +69,10 @@ class ArchitecturePolicy private constructor(
     /** M6/6F-8 (c) — 공고명 키 리터럴을 상수 풀에 가져도 되는 클래스. */
     val titleKeyAllowedClasses: List<String> get() = list("collection.title-key.allowed-classes")
 
+    /** M6/6F-9 D-6F9-2 — 업무구분 세부 분류 키 리터럴 게이트: 대상 개념 집합과 그 키를 상수 풀에 가져도 되는 클래스. */
+    val classificationKeyConcepts: List<String> get() = list("collection.classification-key.concepts")
+    val classificationKeyAllowedClasses: List<String> get() = list("collection.classification-key.allowed-classes")
+
     /** M6/6F-8 (d)·(e)·(f) — 타입 → 그 타입을 참조해도 되는 app 클래스 집합. */
     val runnerTypes: List<String> get() = list("app.runner.types")
     val runnerAllowedReferencers: List<String> get() = list("app.runner.allowed-referencers")

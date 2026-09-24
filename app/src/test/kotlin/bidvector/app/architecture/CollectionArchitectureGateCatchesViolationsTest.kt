@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.lang.ArchRule
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 
@@ -106,6 +107,20 @@ class CollectionArchitectureGateCatchesViolationsTest {
                 CollectionArchitectureGateTest.noticeTitleRawKey(),
                 policy.titleKeyAllowedClasses.toSet(),
             ).mustReport("RogueTitleKeyLiteral", CollectionArchitectureGateTest.noticeTitleRawKey())
+    }
+
+    @Test
+    fun `업무구분 세부 분류 원시 키를 상수 풀에 가진 허용 밖 클래스를 잡는다 — 키마다`() {
+        val keys = CollectionArchitectureGateTest.classificationRawKeys(policy.classificationKeyConcepts)
+
+        keys.size shouldBe policy.classificationKeyConcepts.size
+        keys.forEach { key ->
+            rules
+                .classificationKeyLiteralsMustStayInAllowedClasses(
+                    setOf(key),
+                    policy.classificationKeyAllowedClasses.toSet(),
+                ).mustReport("RogueClassificationKeyLiteral", key)
+        }
     }
 
     @Test
