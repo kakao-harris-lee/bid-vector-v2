@@ -7,7 +7,9 @@ import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.filter.Filter
 import ch.qos.logback.core.read.ListAppender
+import ch.qos.logback.core.spi.FilterReply
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
@@ -24,6 +26,8 @@ import org.springframework.context.ApplicationListener
 import org.springframework.context.ConfigurableApplicationContext
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.LocalDate
 import javax.sql.DataSource
 
@@ -52,7 +56,27 @@ class CollectionRunnerE2ETest {
 
         private val today: LocalDate = LocalDate.now(OPENING_DATE_ZONE)
         private val firstDay: LocalDate = today.minusDays(2)
-        private val logs = ListAppender<ILoggingEvent>()
+
+        /**
+         * 같은 JVM 의 mock KONEPS(`com.sun.net.httpserver`)는 **서버 쪽**에서 받은 요청줄을 DEBUG 로 남긴다 —
+         * 시험 대상(우리 프로세스의 클라이언트·러너)의 로그가 아니므로 캡처에서 뺀다. 그 밖의 모든 로거는 잡는다.
+         */
+        private val logs =
+            ListAppender<ILoggingEvent>().apply {
+                addFilter(
+                    object : Filter<ILoggingEvent>() {
+                        override fun decide(event: ILoggingEvent): FilterReply =
+                            if (event.loggerName.startsWith(
+                                    "com.sun.net.httpserver",
+                                )
+                            ) {
+                                FilterReply.DENY
+                            } else {
+                                FilterReply.NEUTRAL
+                            }
+                    },
+                )
+            }
         private lateinit var mock: MockKonepsHttp
 
         private fun itemsFor(
@@ -199,9 +223,12 @@ class CollectionRunnerE2ETest {
             Regex("[가-힣]").containsMatchIn(line) shouldBe false
         }
         val everything = logs.list.joinToString("\n") { it.formattedMessage + (it.throwableProxy?.message.orEmpty()) }
+        val encodedKey = URLEncoder.encode(SERVICE_KEY, StandardCharsets.UTF_8)
         everything shouldNotContain SERVICE_KEY
-        mock.queries.all { it.contains("serviceKey=") } shouldBe true
-        mock.queries.any { it.contains(SERVICE_KEY) } shouldBe false
+        everything shouldNotContain encodedKey
+        // 표본이 실제로 키를 요청에 실어 보냈다(URL 인코딩 형태) — 부재 단언이 공허하지 않다.
+        mock.queries.isNotEmpty() shouldBe true
+        mock.queries.all { it.contains("serviceKey=$encodedKey") } shouldBe true
     }
 
     @Test
