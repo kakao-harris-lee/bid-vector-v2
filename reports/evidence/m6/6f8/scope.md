@@ -116,6 +116,17 @@ append 까지 되돌린다 — 기존 `RawObservationStore` 계약 ⑤(「원문
   `rejected_write`.
 - privacy R4(로거·키 읽기 게이트 사각, 현재 사용 0) — 알려진 제한 등재.
 
+## 계약 갱신 (2) — D-6F8-7 전수가 찾은 파일 하나 (2026-09-24, 팀장)
+
+**D-6F8-10 — `procurement/.../AmountResolutionOutcome.kt` 를 in_scope 에 넣는다.** D-6F8-7 전수 스윕(RED 실측)이 `canonicalize` 경로에서
+던지는 계열 넷을 찾았다: ① 차수 형식 위반·공백 번호 ② **음수 금액**(운영 정책 `rangeBands` 가 빈 표라 `-1` 이 그대로 도달해 금액 타입의
+음수 금지 `require` 가 던짐) ③ 낙찰하한율 음수·극단 지수(`Rate` require · `BigDecimal.divide` `ArithmeticException`) ④ 업무구분 코드
+공백(운영 정책엔 그 계약이 없어 test 정책에서만 도달). ①③④ 는 `Canonicalize.kt` 안에서 접힌다. ② 는 금액 파싱 함수가 사는 이 파일에서
+「음수 → 숫자 파싱 실패」 한 줄로 접는 것이 맞다 — `Canonicalize.kt` 에서 우회하면 sizeGate 를 넘고 접는 자리가 둘로 갈린다. 후보 순서
+중단 규칙은 그대로. **착수 in_scope 가 procurement main 을 파일 넷으로 좁혀 적은 것이 사각이었다**(전수는 예견할 수 있었다).
+- `OPEN-6F8-NON-THROWING-FACTORIES` 신설(구현 레인 제안): shared-kernel 에 비예외 팩토리(`NoticeRound.parse`·`Rate.ofPercent` 결과형)가
+  있으면 `canonicalize` 의 좁은 try/catch 가 사라진다 — shared-kernel 은 공유 커널이라 이 slice 에서 넓히지 않는다.
+
 ## 위협 모델 — 6F-8 고유 경계
 
 지키는 것: **① 수집은 원문을 잃지 않고 조용히 버리지 않는다**(수신 = 정규화 + 중복 + 탈락, 사유별) **② 정규화 지점은 하나다**
@@ -151,6 +162,7 @@ in_scope:
   - procurement/src/main/kotlin/bidvector/procurement/FieldContract.kt  # NOTICE_TITLE
   - procurement/src/main/kotlin/bidvector/procurement/CollectionPolicy.kt  # bidNtceNm 계약 행
   - procurement/src/main/kotlin/bidvector/procurement/Canonicalize.kt   # title 슬롯 채움
+  - procurement/src/main/kotlin/bidvector/procurement/AmountResolutionOutcome.kt  # D-6F8-10 — 음수 금액 → 파싱 실패
   - procurement/src/main/kotlin/bidvector/procurement/KonepsPresentInSets.kt  # presentIn 집합이 필드를 열거하면
   - procurement/src/test/kotlin/bidvector/procurement/**
   - adapters/src/main/kotlin/bidvector/adapters/koneps/**               # 키 가림·업종 배선에 필요할 때만
