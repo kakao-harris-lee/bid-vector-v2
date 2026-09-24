@@ -151,6 +151,13 @@ enum class FieldConcept {
 
     /** 공고기관명(`ntceInsttNm`, D-3H-1, 문서 필수) — 표시·감사용. */
     NOTICE_AGENCY_NAME,
+
+    /**
+     * 공고명(`bidNtceNm`, M6/6F-8 D-6F8-2 — `OPEN-6F4-TITLE-INGEST` 닫음) — 감시 키워드 매칭 입력의
+     * 조각이다(D-6F4-3). 원문 키는 이 개념의 계약 행이 나른다(D-6F4-6 — 어댑터·use case 에 키를
+     * 박지 않는다).
+     */
+    NOTICE_TITLE,
 }
 
 /**
@@ -369,6 +376,16 @@ data class KonepsFieldContractRegistry internal constructor(
     fun contractFor(rawKey: RawKey): KonepsFieldContract? = byRawName[rawKey]
 
     fun contractsFor(concept: FieldConcept): List<KonepsFieldContract> = contracts.filter { it.concept == concept }
+
+    /**
+     * 개념의 첫 계약이 가리키는 키에서 원문 값을 읽는다 — 계약이 없거나 값이 없으면 `null`. procurement 안의
+     * 조립 함수들이 「계약 경유로만 읽는다」는 같은 세 줄을 한 자리에서 공유한다(`internal` — 다른 모듈에는
+     * 새 값 획득 표면이 없다, [RawNoticeObservation.valueOf] 가 계약을 요구하는 구조 그대로).
+     */
+    internal fun valueIn(
+        observation: RawNoticeObservation,
+        concept: FieldConcept,
+    ): String? = contractsFor(concept).firstOrNull()?.let(observation::valueOf)
 
     /** 관측이 가진 키 중 이 레지스트리에 없는 키 — 미지 필드(COL-07 acceptance). */
     fun unknownKeysIn(observation: RawNoticeObservation): Set<RawKey> = observation.keys - byRawName.keys

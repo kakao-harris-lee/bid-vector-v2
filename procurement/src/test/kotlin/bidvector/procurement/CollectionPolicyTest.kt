@@ -21,8 +21,8 @@ private val RESOLVED_POLICY: KonepsCollectionPolicyData =
     }
 
 // sizeGate(함수 50줄)는 본문 있는 선언만 잰다 — 「값을 담을 뿐인 프로퍼티 초기화식」은 그
-// 축이 아니다(CleanMigrationColumnTest.kt 관례와 같은 예외, size-policy.properties). 마흔
-// 개 rawName 리터럴 목록을 함수 본문 밖으로 뽑은 이유가 그것이다(M3/3H-1 발주기관 넷
+// 축이 아니다(CleanMigrationColumnTest.kt 관례와 같은 예외, size-policy.properties). 채택
+// rawName 리터럴 목록을 함수 본문 밖으로 뽑은 이유가 그것이다(M3/3H-1 발주기관 넷
 // 추가 뒤 함수 본문이 50줄 한도를 넘겨서).
 private val EXPECTED_ADOPTED_FIELD_RAW_NAMES: Set<String> =
     setOf(
@@ -36,6 +36,8 @@ private val EXPECTED_ADOPTED_FIELD_RAW_NAMES: Set<String> =
         "bidClseDt",
         "opengDt",
         "bsnsDivNm",
+        // M6/6F-8 D-6F8-2 — 공고명(공고 목록 응답 항목, 운영자 지시 2026-09-24).
+        "bidNtceNm",
         // M3/3H-1 D-3H-1 — 발주기관 넷(참고자료 응답 항목 표, P-14). 담당자 키는
         // 등재하지 않는다(scope.md 우회 (4)).
         "dminsttCd",
@@ -83,7 +85,7 @@ private val EXPECTED_ADOPTED_FIELD_RAW_NAMES: Set<String> =
  */
 class CollectionPolicyTest {
     @Test
-    fun `필드 계약은 승인된 채택분 마흔 개만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
+    fun `필드 계약은 승인된 채택분만 등재한다 — 미확정 칸은 인스턴스화하지 않는다`() {
         RESOLVED_POLICY.fieldContracts.contracts
             .map { it.rawName.name }
             .toSet() shouldBe EXPECTED_ADOPTED_FIELD_RAW_NAMES

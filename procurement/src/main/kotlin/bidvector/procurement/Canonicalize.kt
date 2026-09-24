@@ -36,8 +36,8 @@ data class NoticeCollected(
     val noticeAgency: Agency? = null,
     /**
      * 공고명(D-6F4-9, M6/6F-4) — 기본값 `null`(위 발주기관 둘과 같은 이유, 이 slice 밖
-     * 호출부는 수정 없이 그대로 컴파일된다). 수집→canonical 배선은 이 slice 밖이다
-     * (`OPEN-6F4-TITLE-WIRING`, D-6F4-4b) — 이 슬롯은 그 배선이 붙을 자리다.
+     * 호출부는 수정 없이 그대로 컴파일된다). 값은 `canonicalize` 가 `NOTICE_TITLE` 필드
+     * 계약에서 채운다(D-6F8-2, M6/6F-8).
      */
     val title: NoticeTitle? = null,
 )
@@ -69,18 +69,12 @@ private fun currencyFor(unit: FieldUnit): Currency =
         else -> error("금액 축 계약의 unit은 WON이어야 한다: $unit")
     }
 
-private fun identifierValue(
-    observation: RawNoticeObservation,
-    registry: KonepsFieldContractRegistry,
-    concept: FieldConcept,
-): String? = registry.contractsFor(concept).firstOrNull()?.let(observation::valueOf)
-
 private fun resolvedNoticeId(
     observation: RawNoticeObservation,
     registry: KonepsFieldContractRegistry,
 ): NoticeId? {
-    val numberRaw = identifierValue(observation, registry, FieldConcept.NOTICE_NUMBER)
-    val roundRaw = identifierValue(observation, registry, FieldConcept.NOTICE_ROUND)
+    val numberRaw = registry.valueIn(observation, FieldConcept.NOTICE_NUMBER)
+    val roundRaw = registry.valueIn(observation, FieldConcept.NOTICE_ROUND)
     return if (numberRaw != null && roundRaw != null) {
         NoticeId(NoticeNumber.of(numberRaw), NoticeRound.of(roundRaw))
     } else {
@@ -226,6 +220,7 @@ private fun normalizedCommand(
                     raw = observation,
                     demandAgency = demandAgencyFrom(observation, policy.fieldContracts),
                     noticeAgency = noticeAgencyFrom(observation, policy.fieldContracts),
+                    title = policy.fieldContracts.valueIn(observation, FieldConcept.NOTICE_TITLE)?.let(NoticeTitle::of),
                 ),
                 unknownFieldCount,
             )
