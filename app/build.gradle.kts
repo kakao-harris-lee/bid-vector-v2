@@ -54,11 +54,6 @@ dependencies {
     // runBlocking 하나만 다리 놓는다. workflow main은 testImplementation으로만 물어(컴파일
     // classpath 실측 부재) app이 직접 선언 — 런타임엔 이미 전이 존재(Boot 생태계 다른 의존).
     implementation(libs.kotlinx.coroutines.core)
-    // M6/6F-8 — 실측: 배포물(`bootJar`)이 kotlin-reflect 없이 나가면 `@ConfigurationProperties` 의 Kotlin 생성자
-    // 바인딩이 `NoClassDefFoundError: kotlin/reflect/jvm/ReflectJvmMapping` 으로 죽어 **앱이 부팅하지 못한다**.
-    // 그동안 아무 test 도 이를 못 잡은 이유는 test 런타임 classpath 에는 kotlin-reflect 가 이미 있어서다
-    // (production 과 test 의 classpath 가 다르다) — `BootJarRuntimeClasspathTest` 가 배포물 자체를 열어 잠근다.
-    implementation(libs.kotlin.reflect)
 
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(libs.testcontainers.postgresql)
@@ -69,6 +64,14 @@ dependencies {
     testImplementation(libs.spring.boot.test)
     testImplementation(libs.spring.boot.resttestclient)
     testImplementation(libs.spring.boot.restclient)
+}
+
+// M6/6F-8 — 실측: 배포물(`bootJar`)이 kotlin-reflect 없이 나가면 `@ConfigurationProperties` 의 Kotlin 생성자 바인딩이
+// `NoClassDefFoundError: kotlin/reflect/jvm/ReflectJvmMapping` 으로 죽어 **앱이 부팅하지 못한다**. 그동안 아무 test 도 이를
+// 못 잡은 이유는 test 런타임 classpath 에는 kotlin-reflect 가 이미 있어서다(production 과 test 의 classpath 가 다르다) —
+// `BootJarRuntimeClasspathTest` 가 배포물 자체를 열어 잠근다. 함수 50줄 한도 때문에 위 `dependencies {}` 밖 별도 블록이다.
+dependencies {
+    implementation(libs.kotlin.reflect)
 }
 
 // M6/6A-1 — sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties, `adapters
