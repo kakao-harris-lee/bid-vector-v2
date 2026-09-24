@@ -1,0 +1,107 @@
+package bidvector.app.architecture
+
+import com.tngtech.archunit.core.domain.JavaClasses
+import com.tngtech.archunit.core.importer.ClassFileImporter
+import com.tngtech.archunit.lang.ArchRule
+import io.kotest.matchers.collections.shouldNotBeEmpty
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
+
+/**
+ * M6/6F-8 수집 배선 게이트의 **음성** 쪽 — production 을 지키는 **같은 규칙 값**에 fixture 루트를 넣어 심은
+ * 위반을 잡는지 잰다(`ArchitectureGateCatchesViolationsTest` 와 같은 형태). 위반 상세에서 심은 클래스 이름과
+ * **어느 대상 때문에** 잡혔는지를 함께 확인한다 — 다른 이유로 잡혀도 통과하는 masking 을 막는다.
+ */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class CollectionArchitectureGateCatchesViolationsTest {
+    private val policy = ArchitecturePolicy.load()
+    private val rules = CollectionArchitectureRules()
+    private val fixtureRoot = "${policy.packageRoot}.archfixture.violating"
+    private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
+
+    private fun useCaseRules() =
+        rules.collectionMustNotReadRawFields(
+            collectionPackage = "$fixtureRoot.workflow.collection",
+            procurementPackage = "${policy.packageRoot}.procurement",
+            allowedTypes = policy.collectionAllowedProcurementTypes.toSet(),
+            passThroughTypes = policy.collectionPassThroughTypes.toSet(),
+            forbiddenFieldTypes = policy.collectionForbiddenFieldTypes.toSet(),
+        )
+
+    @Test
+    fun `use case 자리에서 필드 계약 타입을 이름 붙이면 잡는다`() {
+        useCaseRules().mustReport("RogueRawKeyReader", "KonepsFieldContractRegistry")
+        useCaseRules().mustReport("RogueRawKeyReader", "FieldConcept")
+    }
+
+    @Test
+    fun `use case 자리에서 통과 전용 원문의 멤버를 부르면 잡는다`() {
+        useCaseRules().mustReport("RogueRawKeyReader", "RawNoticeObservation.valueOf")
+    }
+
+    @Test
+    fun `결과 타입이 원문이나 관측 키를 필드로 나르면 잡는다`() {
+        useCaseRules().mustReport("RogueCarrierResult", "RawNoticeObservation")
+        useCaseRules().mustReport("RogueCarrierResult", "ObservationKey")
+    }
+
+    @Test
+    fun `공고명 원시 키를 상수 풀에 가진 허용 밖 클래스를 잡는다`() {
+        rules
+            .titleKeyLiteralMustStayInAllowedClasses(
+                CollectionArchitectureGateTest.noticeTitleRawKey(),
+                policy.titleKeyAllowedClasses.toSet(),
+            ).mustReport("RogueTitleKeyLiteral", CollectionArchitectureGateTest.noticeTitleRawKey())
+    }
+
+    @Test
+    fun `app 안의 두 번째 러너를 잡는다`() {
+        typeRule(policy.runnerTypes.toSet(), policy.runnerAllowedReferencers.toSet(), "러너")
+            .mustReport("RogueCollectionRunner", "ApplicationRunner")
+    }
+
+    @Test
+    fun `서비스 키 원문 설정을 배선 밖에서 읽으면 잡는다`() {
+        typeRule(setOf(policy.serviceKeyType), policy.serviceKeyReaders.toSet(), "키")
+            .mustReport("RogueServiceKeyReader", "KonepsCredentialProperties")
+    }
+
+    @Test
+    fun `수집 로그 출구 밖의 로거 사용을 잡는다`() {
+        typeRule(policy.loggingTypes.toSet(), policy.loggingAllowedUsers.toSet(), "로거")
+            .mustReport("RogueLoggerUser", "LoggerFactory")
+    }
+
+    @Test
+    fun `app 헬퍼가 원문 저장 포트나 정규화 함수를 직접 부르면 잡는다`() {
+        val portCalls =
+            ArchitectureRules(policy).appPortCallsMustBeAllowedPairs(
+                appRoot = "$fixtureRoot.app",
+                ports = policy.portCallPorts.toSet(),
+                allowedPairs = policy.portCallAllowedPairs.toSet(),
+            )
+
+        portCalls.mustReport("RogueCollectionPortCaller", "RawObservationStore.append")
+        portCalls.mustReport("RogueCollectionPortCaller", "CanonicalizeKt.canonicalize")
+    }
+
+    private fun typeRule(
+        types: Set<String>,
+        allowed: Set<String>,
+        label: String,
+    ) = rules.appTypesMustBeReferencedOnlyBy("$fixtureRoot.app", types, allowed, "음성 대조 — $label")
+
+    private fun List<ArchRule>.mustReport(
+        mentioned: String,
+        target: String,
+    ) {
+        val details =
+            flatMap { rule ->
+                rule
+                    .allowEmptyShould(true)
+                    .evaluate(violating)
+                    .failureReport.details
+            }
+        details.filter { it.contains(mentioned) && it.contains(target) }.shouldNotBeEmpty()
+    }
+}
