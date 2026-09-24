@@ -48,7 +48,8 @@ git diff <sha>~1..<sha> -- <파일> | git apply -R
 같은 자리에 끼어든 뒤인데, 그때는 충돌 블록에서 **이 slice 의 줄(`M6/6F-8` 주석 블록과 그 아래 등재 항목)만 지우고** 나머지를 남긴다.
 
 `milestone-6.md` 는 이 rollback 의 restore 대상이 아니다 — 착수 문단 `a4a73e9e` 는 팀장 레인이 쓴 것이고 되돌려야 하면 팀장이 같은 방식으로 격리한다:
-`git diff a4a73e9e~1..a4a73e9e -- milestone-6.md | git apply -R`(종결 문단이 더해지면 그 커밋을 먼저).
+종결 문단 `5b824126` 을 먼저, 착수 문단 `a4a73e9e` 를 다음으로 — `git diff 5b824126~1..5b824126 -- milestone-6.md | git apply -R` 뒤
+`git diff a4a73e9e~1..a4a73e9e -- milestone-6.md | git apply -R`(팀장이 버릴 worktree 에서 두 단계 exit 0 · base 와 diff 0줄 실측).
 
 ## 임시 worktree 실측 (①~⑥, 버릴 worktree — `git worktree add --detach <scratch> b10ba803` 뒤 이 evidence 파일 셋을 그대로 얹음)
 
