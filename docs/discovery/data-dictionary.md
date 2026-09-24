@@ -1577,8 +1577,25 @@ Python 정본은 `ml_engine.features.normalize.normalize_feature_key`(요청 축
 | **도메인** | `Notice.title: NoticeTitle?`(`NoticeCollected.title` 슬롯, 기본값 `null`). `NoticeTitle.of(raw)` = **trim 만**(정규화·별칭 없음, 표기 흔들림 보존), trim 뒤 빈 값이면 `null` — 「없음」은 센티넬이 아니라 타입으로 닫는다(D-6F4-8) |
 | **조립** | `canonicalize` 가 `NOTICE_TITLE` 계약(`contractsFor(NOTICE_TITLE)`)이 가리키는 키에서만 읽는다. 계약이 없는 정책은 원문에 그 키가 있어도 공고명을 낳지 않는다 |
 | **저장** | `notice.notice_title`(V14, nullable TEXT, 공백뿐인 값은 CHECK 가 거부). 재수집 값이 비어 있으면 기존 값을 지우지 않는다(존재 가드, 기존 쓰기 규율) |
-| **소비** | 감시 키워드 매칭 텍스트 = 공고명 + 공종(`business_category_label`), 지역 매칭 텍스트 = 위 + 기관명 둘(D-6F4-3). 본문(`description`)은 V2 에 존재하지 않는다(`OPEN-6F4-NOTICE-BODY-SOURCE`) |
+| **소비** | 감시 키워드 매칭 텍스트 = 공고명 + 공종(세부 이름 — 용역: `business_category_label`, 공사: 주공종명, §6.3.4), 지역 매칭 텍스트 = 위 + 기관명 둘(D-6F4-3). 본문(`description`)은 V2 에 존재하지 않는다(`OPEN-6F4-NOTICE-BODY-SOURCE`) |
 | **등재하지 않는 것** | 공고 본문·첨부 — 목록 응답에 없고 상세 URL 뒤에 있다 |
+
+#### 6.3.4 업무구분 네 칸 — 대분류는 오퍼레이션, 세부 분류는 응답 필드(M6/6F-9 P-16 · D-6F9-1~4, 2026-09-24)
+
+6F-8 실수집이 드러낸 공백 — 응답에 업무구분 라벨 키(`bsnsDivNm`)가 **없어** 업무구분이 공고 0건에 채워졌다 — 을 닫는다. **P-7·COL-08·`OPEN-COL-03` 을 지킨다: 업무구분 축을 한 자리에 접지 않는다.** 새 축은 새 칸에 두고 기존 칸에 섞지 않는다.
+
+| 자리 | 정의 |
+| --- | --- |
+| **대분류** | `BusinessDivision` = P-7 문서 열거 어휘 넷(물품·용역·공사·외자, 문서 표기 순서). **원천은 응답 필드가 아니라 수집 오퍼레이션**이다 — 공사 목록·용역 목록을 따로 부르므로 어느 오퍼레이션으로 받았는가가 곧 대분류다. 매핑은 **수집 소스 설정**(`bidvector.koneps.operations` 업종 한 행 = 경로 + 대분류)이 데이터로 나르고, 어댑터가 관측(`RawNoticeObservation.sourceDivision`)에 **구조로** 싣는다(URL 문자열을 파싱하지 않는다). `canonicalize` 가 그 값을 `NoticeCollected.businessDivision` 으로 옮긴다. **응답에 `bsnsDivNm` 이 실려 와도 대분류를 바꾸지 않는다**(불일치는 탈락도 덮어쓰기도 없음 — 원문·`payload_fields` 에 남고 대조는 SQL 로 한다). 개찰·상세 오퍼레이션 관측은 대분류를 정하지 않는다(`null`) |
+| **용역구분** | `ServiceDivision` ← `srvceDivNm`(일반용역·기술용역·일반용역(리스) …) — 원문 trim만, 빈 값은 `null`. **업무구분 라벨 칸(`business_category_label`)에 섞지 않는다**(우회 2) |
+| **공공조달분류** | `pubPrcrmntClsfcNo`(세분류 번호, `IDENTIFIER` — 제로패딩 보존) → **기존** `BusinessCategory.code`(`CategoryCode.of`, §6.3.1 한 규칙), `pubPrcrmntClsfcNm`(세분류명) → `BusinessCategory.label`(원문 trim). **코드와 라벨은 같은 원천 쌍에서만 읽는다**(레거시 코드+라벨 쌍이 있으면 그 쌍이 이기고, 코드가 비면 다음 쌍으로 — 다른 쌍의 라벨을 빌리지 않는다). 코드가 비어 있으면 라벨이 있어도 `BusinessCategory` 를 만들지 않는다. 대·중분류명(`…LrgClsfcNm`·`…MidClsfcNm`)은 싣지 않는다(후속) |
+| **주공종** | `MainConstructionType` ← `mainCnsttyNm`(전기공사업·건축공사업 …, 공사) — 원문 trim만, 빈 값은 `null`. **응답에 코드가 없으므로 코드를 지어내지 않는다** — 주공종은 `BusinessCategory.code` 로 흐르지 않는다(공사 공고의 `business_category_code` 는 주공종만 있을 때 `null`, 우회 3). 채움 약 33% — 나머지는 **`OPEN-6F9-CONSTRUCTION-TYPE-SOURCE`**(면허제한 오퍼레이션의 허용업종) |
+| **필드 계약** | 네 행 — `PUBLIC_PROCUREMENT_CLASS_CODE`(`IDENTIFIER`)·`PUBLIC_PROCUREMENT_CLASS_NAME`·`SERVICE_DIVISION`·`MAIN_CONSTRUCTION_TYPE`(`OPAQUE_TEXT`), 전부 옵션·`presentIn = NOTICE_LIST`. 키 문자열은 이 계약 행(`KonepsClassificationFieldContracts.kt`)에만 있다(상수 풀 게이트가 개념 집합으로 잠근다). 기존 `bsnsDivNm` 행(`BUSINESS_CATEGORY_LABEL`, 문서 필수)은 그대로다 — 이 오퍼레이션 응답에는 늘 부재이지만 다른 오퍼레이션에서 올 수 있다(P-7) |
+| **저장** | `notice.business_division`(V17, CHECK = 어휘 넷)·`service_division`·`main_construction_type`(공백류 CHECK — V14 와 같은 클래스), 전부 nullable·DEFAULT 없음. 기존 행은 `NULL` 로 보존되고 재수집이 채운다(기존 존재 가드, 그 갱신은 `updated`) |
+| **소비** | 감시 「관심 업종」 집합 `WatchSubject.categories` = {대분류, 용역구분, 공공조달분류 코드, 주공종} 중 **비어 있지 않은 것만**(`assembleWatchCategories`, trim — 운영자가 무엇을 적어도 규칙이 trim·대소문자를 접어 맞춘다). 키워드·지역 매칭 텍스트의 「공종」 조각 = 세부 이름(용역: 공공조달분류명, 공사: 주공종명; 용역구분은 이 조각이 아니다). 전략 조회 응답·OpenAPI 는 바뀌지 않는다 |
+| **ML 경로 파급** | `business_category_code` 는 ML 경로의 입력이다(요청 `category_code` fact · 표본 조회 축 `WHERE business_category_code = ?` · 표본의 `categoryCode`). 공공조달분류 번호가 용역 공고에 채워지면 그 입력이 처음으로 생긴다(이전에는 늘 `null` → 표본 조회를 건너뛰고 `UNKNOWN`). 분류 번호(세분류)가 학습 코드 공간과 다를 수 있다 — 공사 공고는 `null` 그대로. 이 slice 는 ML 쪽을 바꾸지 않았다 |
+| **등재하지 않는 것** | 면허제한·허용업종 수집, 물품·외자 오퍼레이션 수집(대분류 어휘는 넷 다 받는다 — `OPEN-6F9-GOODS-FOREIGN-COLLECTION`), 업무구분 코드 전체 체계(`OPEN-COL-03`) |
+| **실측** | 6F-8 실수집 원문 22,639건(값이 아니라 채움률·분포): `bsnsDivNm` 0% · `srvceDivNm`(용역) 100% · 공공조달분류 번호·명(용역) 거의 100% · `mainCnsttyNm`(공사) 약 33% |
 
 ### 6.4 성숙도 — 계산과 판정의 분리 (`OPEN-ML-01` 잔여 확인)
 

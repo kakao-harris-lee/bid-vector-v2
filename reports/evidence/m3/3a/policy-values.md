@@ -796,6 +796,10 @@ legacy `html_parsing` 이 **개찰결과 그리드의 업무코드**를 라벨�
 **전체 코드 체계는 미확정이다** — `OPEN-COL-03` 이 활성이다. 위 넷은 legacy 가 **관찰한** 값이고
 전수가 아니다. 매핑에 없는 코드에 임의 라벨을 붙이지 않는다(COL-08 · `koneps-collection-007`).
 
+**M6/6F-9(P-16)가 네 번째 자리를 더한다 — 접지 않고 새 칸에 둔다.** 응답이 싣는 세부 분류(용역구분 `srvceDivNm`·공공조달분류
+`pubPrcrmntClsfcNo`/`Nm`·주공종 `mainCnsttyNm`)와, 응답이 아니라 **수집 오퍼레이션**이 정하는 대분류(위 §1.5 열거 어휘 넷)다.
+위 세 축(문서 열거 · legacy 코드→라벨 · 낙찰정보 `bsnsDivCd`)과 통합하지 않으며 `OPEN-COL-03` 은 그대로 열려 있다.
+
 ---
 
 ## 6. 승인 결과 — 2026-09-07
@@ -835,6 +839,7 @@ legacy `html_parsing` 이 **개찰결과 그리드의 업무코드**를 라벨�
 | **P-12** | §1.9 의 오퍼레이션 계약 — `inqryDiv` 의 자리와 걷는 축 | 문면 `authoritative` · 축 선택은 정책 | **(a) 오퍼레이션 → (조회 축 값, 필수 항목, 기간 조건) 표를 정책 데이터로** 두고 URI 빌더는 해석만 한다(전역 상수 금지 — 같은 값이 군마다 다른 축을 뜻한다). **걷는 축 초기값은 개찰일시**(낙찰 목록 `3` · 개찰결과 목록 `3` · 검색군 `2`) — 기준일의 뜻이 `CollectionReferenceDate`(KST 캘린더 일자)와 맞는다. legacy 의 주석-문서 어긋남은 `insufficient-evidence` 로 등재하고 판정하지 않는다. base URI·tps·항목크기 문면은 초기값으로 채택 |
 | **P-14** (2026-09-16, M3/3H-1) | §1.3 의 **발주기관 키 넷**(`ntceInsttCd`·`ntceInsttNm`·`dminsttCd`·`dminsttNm`)을 P-1 격의 승인 항목으로 등재 + 엔진 키 `agency_id` 의 원천 | `authoritative`(문서 출처) · 키 선택은 정책 | **(a) 채택 「추천대로」.** 넷을 필드 계약 초기값으로(항목크기 7/400/7/400, 필수는 `ntceInsttNm` 만 — 문서 항목구분). **엔진 키 = 수요기관코드**(`dminsttCd`) 의 정규화값(§6.3.1 strip+소문자화, `CategoryCode.of` 와 같은 함수), **역할 간 폴백 없음**(공고기관 값으로 대체 금지 — legacy 의 개찰수요>수요>공고 폴백이 누수였다), 이름 둘은 표시·감사용 저장, 별칭·계층 사전 없음. 담당자 키(`ntceInsttOfclNm`·`…TelNo`·`…EmailAdrs`·`dminsttOfcl…`)는 **등재하지 않는다**(개인정보, P-10 과 같은 축). 코드 채움률은 문서(옵션)로 알 수 없어 read-only 실호출 1회로 재는 것을 함께 승인(3H-2 착수 전). 정본 `reports/evidence/m3/3h/scope.md` D-3H-1·2·7·8 |
 | **P-15** (2026-09-24, M6/6F-8) | §1.3 의 **공고명 키 하나**(`bidNtceNm`)를 P-1 격의 승인 항목으로 등재 — 감시 키워드 매칭 텍스트의 조각이 되는 `Notice.title` 의 원천(6F-4 `OPEN-6F4-TITLE-INGEST`) | `authoritative`(문서 출처) · 키 선택은 정책 | **(a) 채택 — 운영자 지시 2026-09-24**(「관련한 배선 진행하고, 수집은 최근 한달 이내의 데이터만 수집해서 기능 완료 확인」, 정본 `reports/evidence/m6/6f8/scope.md` 운영자 결정·D-6F8-2). 한 행을 필드 계약 초기값으로 — 개념 `NOTICE_TITLE`, scale `OPAQUE_TEXT`, 공고 목록 오퍼레이션(`presentIn = NOTICE_LIST`), **문서는 필수(`1`)이지만 계약은 옵션**(부재 = `null`, 센티넬 금지). 원문은 **trim 만** 하고 정규화·별칭이 없다(표기 흔들림을 보존, 기관명 둘과 같은 관례). 키 문자열은 이 계약 행 한 곳에만 있고 어댑터·use case·러너에는 없다(상수 풀 게이트). 둘째 키 `ntceNm`(legacy)은 §1.7.6 대로 어느 문서에도 없어 **등재하지 않는다** — 실수집 원문에서 확인한 뒤 후속. 정본 `docs/discovery/data-dictionary.md` §6.3.3 |
+| **P-16** (2026-09-24, M6/6F-9) | **업무구분 세부 분류 키 넷**(`pubPrcrmntClsfcNo`·`pubPrcrmntClsfcNm`·`srvceDivNm`·`mainCnsttyNm`)을 P-1 격의 필드 계약 초기값으로 등재 + **업무 대분류의 원천 = 수집 오퍼레이션**(응답 필드가 아니다) | `observed`(6F-8 실수집 원문 22,639건에서 존재·채움률 실측 — 조달청 참고자료 표와는 대조하지 않았다: 항목크기·필수 여부 미확인, 그래서 계약은 전부 옵션) · 대분류 원천 선택은 정책 | **(a) 채택 — 운영자 지시 2026-09-24**(「업무구분은 … 입찰에 필요한 정보일테니 수집 해야 맞을것 같아」, 정본 `reports/evidence/m6/6f9/scope.md` 운영자 지시·D-6F9-1~5). **P-7·COL-08·`OPEN-COL-03` 을 지킨다 — 축을 한 자리에 접지 않는다**(새 축은 새 칸). 대분류 = P-7 문서 열거 어휘 넷, 원천 = 어느 오퍼레이션으로 받았는가(수집 소스 설정 표 한 행 = 경로 + 대분류, 어댑터가 관측에 구조로 실음 — URL 파싱 없음), 응답 `bsnsDivNm` 은 소비하지 않는다. 용역: `srvceDivNm` → 새 칸 `service_division`, `pubPrcrmntClsfcNo`·`Nm` → 기존 `BusinessCategory`(코드 = 분류번호 정규화, 라벨 = 분류명). 공사: `mainCnsttyNm` → 새 칸 `main_construction_type`, **코드를 지어내지 않는다**(이름만). 빈 값은 부재(`null`, D-6F8-11). 감시 「관심 업종」 집합 = 네 값 중 비어 있지 않은 것. 공사 주공종 빈 값 67% 는 `OPEN-6F9-CONSTRUCTION-TYPE-SOURCE`. 정본 `docs/discovery/data-dictionary.md` §6.3.4 |
 
 **같은 승인에서 slice 범위 결정 하나** — `getOpengResultListInfoOpengCompt`(개찰완료) 는 **이번 3B-2
 밖**이다(D-3B2-9 (a)). `COL-03` 문면의 **추첨번호**(`drwtNo1`·`drwtNo2`)와 투찰 축(`bidprcAmt`·`bidprcrt`)을
