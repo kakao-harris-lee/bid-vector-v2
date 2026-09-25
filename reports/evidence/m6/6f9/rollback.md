@@ -1,6 +1,6 @@
 # M6/6F-9 rollback
 
-`실측 HEAD: c12eb889`(이 slice 의 마지막 산출물 커밋 — 이후 커밋은 evidence 전용). 앞 실측을 옮기지 않는다.
+`실측 HEAD: bfbdef1d`(이 slice 의 마지막 산출물 커밋 — 이후 커밋은 evidence 전용). 앞 실측을 옮기지 않는다 — 아래 ①~⑥ 과 목록·hunk 표는 이 HEAD 에서 다시 산출·실행한 값이다.
 
 ## 비활성화 (코드를 되돌리지 않고 즉시)
 
@@ -12,6 +12,10 @@
 
 1. **미적용 DB**: `V17__notice_business_division.sql` 을 지운다 — 아래 restore 목록에 신규(A)로 들어 있어 코드 되돌림이 함께 처리한다.
 2. **적용된 DB**(개발 DB 등): 파일 삭제로 되돌리지 않는다(Flyway 이력·체크섬). 새 마이그레이션(다음 V 번호)으로:
+   **적용된 DB 에서는 V17 파일을 restore 목록에서 빼고**(그 경로만 개별 인자에서 제외한다 — 기계 산출 목록은 그것을 신규(A)로 담으므로
+   `git restore` 가 파일을 지운다) **아래 `DROP COLUMN` 을 담은 V18 을 코드 되돌림과 같은 배포에 함께 낸다**(migration-reviewer r1 L-1).
+   `PersistenceWiring.migrate` 의 Flyway 는 기본 검증이라, 이력에 V17 이 있는 DB 에서 로컬 V17 이 사라지면 부팅이 실패한다
+   (「applied migration not resolved locally」). 순서를 나누면 V17 을 아는 바이너리가 열 없는 DB 를 보거나 그 반대가 된다.
 
 ```sql
 ALTER TABLE notice DROP COLUMN business_division, DROP COLUMN service_division, DROP COLUMN main_construction_type;
@@ -46,20 +50,21 @@ git diff <sha>~1..<sha> -- <파일> | git apply -R
 
 | 파일 | 이 slice 의 커밋(최신 → 과거) |
 |---|---|
-| `config/quality/gate-tests.properties` | `c3c241a7` · `a479a133` · `d40fcffc` · `72909a52` · `ed990046` · `74c78c6d` |
-| `config/quality/architecture-policy.properties` | `c12eb889` · `9290a3de` |
+| `config/quality/gate-tests.properties` | `ea2c2984` · `c3c241a7` · `a479a133` · `d40fcffc` · `72909a52` · `ed990046` · `74c78c6d` |
+| `config/quality/architecture-policy.properties` | `181c42c0` · `c12eb889` · `9290a3de` |
 | `docs/discovery/data-dictionary.md` | `0ca9a861` |
 | `reports/evidence/m3/3a/policy-values.md` | `0ca9a861` |
 
-이 slice 의 커밋만 역순으로 걷으면 각 `apply -R` 이 exit 0·conflict 0 이었다(`commands.md` ②). **다른 slice 의 줄이 같은 자리에 끼어든 뒤**에는 충돌 블록이 나오고 `--3way` 도 자동 해소하지 못할 수 있다 —
+이 slice 의 커밋만 역순으로 걷으면 각 `apply -R` 이 exit 0·conflict 0 이었다(`commands.md` ②, 열두 번). `architecture-policy.properties` 는 r1 이 앞 커밋의 줄을 **교체**했으므로 역순이 특히 중요하다 —
+최신(`181c42c0`)을 먼저 되돌려 옛 키를 되살린 뒤 그것을 더한 커밋을 되돌린다. **다른 slice 의 줄이 같은 자리에 끼어든 뒤**에는 충돌 블록이 나오고 `--3way` 도 자동 해소하지 못할 수 있다 —
 수동 절차: 충돌 블록에서 **이 slice 의 줄만** 지운다 —
-`gate-tests.properties`: `M6/6F-9 —` 주석 블록들과 등재 항목 다섯(`BusinessDivisionTest`·`BusinessClassificationCanonicalizeTest`·`KonepsSourceDivisionTest`·`NoticeBusinessClassificationPersistenceTest`·`WatchCategoriesAssemblyTest`) ·
-`architecture-policy.properties`: `(c')`·`(c'')` 블록과 `collection.classification-key.*`·`collection.division-parse.*` 키 · `data-dictionary.md`: §6.3.4 절 전체 + §6.3.3 「소비」 행의 「세부 이름 … §6.3.4」 문구를 원문(「공종(`business_category_label`)」)으로 ·
+`gate-tests.properties`: `M6/6F-9 —` 주석 블록들과 등재 항목 일곱(`BusinessDivisionTest`·`BusinessClassificationCanonicalizeTest`·`KonepsSourceDivisionTest`·`NoticeBusinessClassificationPersistenceTest`·`WatchCategoriesAssemblyTest`·`RequestCategoryCodeWireTest`·`OpportunitySampleSupplyDivisionTest`) ·
+`architecture-policy.properties`: `(c')`·`(c'')` 블록과 `collection.classification-key.*`·`collection.division-value.*` 키 · `data-dictionary.md`: §6.3.4 절 전체 + §6.3.3 「소비」 행의 「세부 이름 … §6.3.4」 문구를 원문(「공종(`business_category_label`)」)으로 ·
 `policy-values.md`: P-16 행 하나 + §5 의 「M6/6F-9(P-16)가 네 번째 자리를 더한다」 문단. 지운 뒤 「내 줄 사라짐」(위 식별어 grep 0)과 「남의 줄 남음」을 둘 다 확인한다.
 
 `milestone-6.md` 는 이 rollback 의 restore 대상이 아니다 — 착수 문단은 팀장 레인이 쓴 것이고 되돌려야 하면 팀장이 같은 방식으로 격리한다.
 
 ## 확인 — 임시 clone 실측 (`commands.md` 표)
 
-① restore exit 0(삭제 12 · 변경 36) → ② 공유 파일 hunk 격리 전부 exit 0·conflict 0 → ③ 목록·공유 파일 넷 `git diff <base>` 빈 출력 → ④ `compileKotlin compileTestKotlin` exit 0 → ⑤ `test` exit 0 → ⑥ `check` exit 0
+① restore exit 0(목록 60 — 삭제 18 · 변경 42) → ② 공유 파일 hunk 격리 열두 번 전부 exit 0·conflict 0 → ③ 목록·공유 파일 넷 `git diff <base>` 빈 출력이고 트리 전체에서 base 와 다른 것은 `milestone-6.md` 와 이 slice 의 evidence 뿐 → ④ `compileKotlin compileTestKotlin` exit 0 → ⑤ `test` exit 0 → ⑥ `check` exit 0
 (**게이트 초록** — 되돌린 트리에서도 이 slice 의 evidence 가 남아 `leakPatternGate` 를 돌리지만 매치 0). 되돌리지 않기로 한 것: 이 slice 의 evidence 디렉터리(`reports/evidence/m6/6f9/**`)와 `milestone-6.md`.

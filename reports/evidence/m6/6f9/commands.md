@@ -11,7 +11,7 @@
 | `./gradlew --no-daemon qualityBaseline` | 0 | BUILD SUCCESSFUL |
 | `./tools/one-command-check.sh` | 0 | Kotlin·Python 두 job 초록(pytest 958 passed + 1 passed) |
 
-실측은 `c12eb889`(merge-base `f6ebc047`)의 버릴 worktree 에서 2026-09-25 에 했다 — 2026-09-24 WSL 정지로 앞 실측 기록이 사라져 다시 돌렸다(아래 되돌림 실측도 같다).
+실측은 `bfbdef1d`(r1 의 마지막 산출물 커밋, merge-base `f6ebc047`)의 버릴 worktree 에서 2026-09-25 에 했다 — 아래 되돌림 실측도 같은 worktree 다. 세 명령은 앞 라운드에서도 같은 exit 0 였다(앞 실측을 옮기지 않고 이 HEAD 에서 다시 돌린 값이다).
 
 ## RED 실측 — 구현 전에 실패를 본 새 test
 
@@ -19,6 +19,8 @@
 |---|---|
 | `BusinessDivisionTest` · `WatchCategoriesAssemblyTest` | 구현 전 컴파일 실패(`Unresolved reference`) — 타입·커널이 없다 |
 | `NoticeWatchSubjectPortTest` 새 셋 | 구현 전 행동 수준 FAILED 3(집합·공사 텍스트 조각) → 포트가 커널을 부른 뒤 초록 |
+| **r1** 대분류 값 획득 축 게이트 | 위반 표본 셋만 심고 **바꾸기 전 게이트**(멤버 열거 술어)로 음성 단언을 돌렸다: `:app:test --tests *CollectionArchitectureGateCatchesViolationsTest` exit 1 — enum 상수(MV1)·`Enum.valueOf`(MV4) 표기를 잡지 못한다(FAILED 2). 새 술어 셋으로 바꾼 뒤 초록 |
+| **r1** `RequestCategoryCodeWireTest`·`OpportunitySampleSupplyDivisionTest` | 구현(잠금) 전에는 class 자체가 없었다 — 잠금 세기는 아래 변이 MLW 가 잰다(잠금 제거 = 초록 확인은 무의미하므로 운반 단계 변이로 잰다) |
 
 나머지 새 test 는 구현과 같은 커밋에서 처음 초록으로 돌았다 — 그 잠금은 아래 변이가 잰다(수정 전 초록 → 적용 후 RED).
 
@@ -38,12 +40,17 @@
 | M4c 바인딩 순서에서 `service_division` 과 `main_construction_type` 을 뒤바꿈(보조) | +1/−1 | 위와 같음 | 1 | 여섯(삽입·갱신 둘·존재 가드·공사·복원) |
 | M5 감시 집합에 빈 값 — 커널이 빈·공백 값을 걸러내지 않음 | +1/−1 | `:strategy:test --tests *WatchCategoriesAssemblyTest` | 1 | 「빈 값이 섞여도 …」 · 「빈 값과 공백류만 … 경계 표본 전수」 |
 | M6 키 리터럴을 어댑터에 삽입 | +2/−0 | `:app:test --tests *CollectionArchitectureGateTest` | 1 | 「원시 키 리터럴은 계약 행을 실은 파일 클래스 밖 … 없다」 · 「허용 클래스는 관측과 같다」 |
+| **MV1**(r1) 배선이 경로에서 enum 상수로 대분류를 지음(설정 값 무시) | +10/−1 | `:app:test --tests *CollectionArchitectureGateTest` | 1 | 셋(위반 규칙 · 타입 멤버 쌍 == 관측 · 값 획득 쌍 == 관측) |
+| **MV2**(r1) 타입 companion 에 파생 멤버를 더하고 배선이 그것을 부름 | +3/−0 · +10/−1 | 위와 같음 | 1 | 같은 셋 — 멤버 이름을 열거하지 않으므로 새 이름도 쌍이 된다 |
+| **MV4**(r1) `java.lang.Enum.valueOf(BusinessDivision::class.java, …)` | +10/−1 | 위와 같음 | 1 | 셋(위반 규칙 · 타입 멤버 쌍 · **클래스 객체 참조자 == 허용**) |
+| **MLW**(r1) `RequestMapping` 의 업종 코드 fact 를 늘 결측으로 | +1/−1 | `:adapters:test --tests *RequestCategoryCodeWireTest` · `:app:test --tests *CollectionArchitectureGateTest` | 1 | 「(가) 용역 공고의 공공조달분류 번호가 … 그대로 실린다」(앞 판에서는 이 변이가 초록이었다 — verifier r1 F-2) |
 
 ## 정적 확인
 
 | 확인 | 명령 | 결과 |
 |---|---|---|
-| in_scope 대조(A·M) | `git diff --name-status <base>..HEAD` 각 경로를 `scope.md` in_scope 항목 glob 에 대조(일회용 스크립트) | 밖 **0** |
+| in_scope 대조(A·M) | `git diff --name-status <base>..HEAD` 각 경로를 `scope.md` in_scope 항목 glob 에 대조(일회용 스크립트) | 밖 **0**. r1 이 더한 신규 여섯도 대조했다(게이트 규칙 파일 하나·표본 셋·`adapters/.../ml` test 하나·`workflow/.../evaluation` test 하나 — 앞 둘은 기존 glob, `ml` test 는 r1 계약 갱신이 더한 항목) |
+| r1 게이트 술어 교체 흔적 | `grep -rn 'division-parse' --include=*.kt --include=*.properties .` | 0 — 낡은 정책 키 이름이 코드·정책 파일에 남지 않았다(evidence 문서는 교체 사실 자체를 적으므로 대상 밖) |
 | 관심 업종 커널의 production 호출자 | `grep -rn "assembleWatchCategories(" --include=*.kt adapters/src/main workflow/src/main app/src/main` | 포트 한 곳 |
 | 설정 행 생성자 | `grep -rn "KonepsOperationProperties(" --include=*.kt app/src/main` | 기본 표 두 행뿐(나머지는 바인더) |
 | raw 행을 읽어 정규화를 재생하는 코드 | `grep -rn "FROM raw_observation" --include=*.kt adapters/src/main` | 0 |
@@ -56,9 +63,9 @@
 
 | 단계 | 명령 | exit·결과 |
 |---|---|---|
-| ① restore | `git restore --source=<base> --staged --worktree -- <목록>` | 0 · 삭제 12 · 변경 36 |
-| ② 공유 파일 hunk 격리 | `git diff <sha>~1..<sha> -- <파일> \| git apply -R`(최신 → 과거) | 열 번 전부 0, conflict 0 |
-| ③ 트리 동일성 | `git diff <base> -- <목록>` · 공유 파일 넷 | 둘 다 빈 출력(`milestone-6.md` 는 팀장 레인 문단이라 restore 대상 아님) |
+| ① restore | `git restore --source=<base> --staged --worktree -- <목록 60개>` | 0 · 삭제 18 · 변경 42 |
+| ② 공유 파일 hunk 격리 | `git diff <sha>~1..<sha> -- <파일> \| git apply -R`(최신 → 과거) | 열두 번 전부 0, conflict 0 |
+| ③ 트리 동일성 | `git diff <base> -- <목록>` · 공유 파일 넷 · `git diff --name-only <base>` 전체 | 앞 둘 빈 출력, 전체에서 남는 것은 `milestone-6.md` 와 이 slice 의 evidence 뿐이다(둘 다 restore 대상 아님) |
 | ④ compile | `./gradlew --no-daemon compileKotlin compileTestKotlin` | 0 |
 | ⑤ test | `./gradlew --no-daemon test` | 0 |
 | ⑥ 게이트 | `./gradlew --no-daemon check` | 0 |
