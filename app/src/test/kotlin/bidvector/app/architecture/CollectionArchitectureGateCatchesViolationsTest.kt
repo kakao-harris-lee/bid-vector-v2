@@ -163,12 +163,20 @@ class CollectionArchitectureGateCatchesViolationsTest {
         divisionClassObject().mustReport("RogueDivisionFromEnumBridge", "BusinessDivision")
     }
 
-    /** 규칙이 과잉이 아니다 — 대분류를 만들지 않는 fixture 는 세 축 어디에도 안 걸린다. */
+    /**
+     * 규칙이 과잉이 아니다 — 대조 둘. `CleanNameLookup` 은 대분류를 **아예 언급하지 않는** 클래스다(약한 대조:
+     * 규칙이 대분류를 언급하는 모든 클래스를 신고하도록 잘못 써도 초록이다). `CleanDivisionCarrier` 는 대분류를
+     * **가지고 있지만 만들지 않는** 클래스라 과잉 경계 위에 있다 — 축 ②의 자기 소유 읽기 제외 분기를 지우면 이
+     * 단언이 RED 가 된다(code-review r2 LOW, 측정). 운반 슬롯 getter 를 **부르는 쪽**이 축 ②에 드는 것은 의도이고
+     * (정책 주석), 나르기만 하는 쪽이 드는 것은 과잉이다.
+     */
     @Test
-    fun `대분류를 만들지 않는 fixture 는 대분류 축 셋에 걸리지 않는다`() {
-        divisionTypeAccess().mustNotReport("CleanNameLookup")
-        divisionAcquisition().mustNotReport("CleanNameLookup")
-        divisionClassObject().mustNotReport("CleanNameLookup")
+    fun `대분류를 만들지 않는 fixture 는 대분류 축 셋에 걸리지 않는다 — 언급조차 없는 것과 나르기만 하는 것`() {
+        listOf("CleanNameLookup", "CleanDivisionCarrier").forEach { clean ->
+            divisionTypeAccess().mustNotReport(clean)
+            divisionAcquisition().mustNotReport(clean)
+            divisionClassObject().mustNotReport(clean)
+        }
     }
 
     private fun divisionTypeAccess() = divisionRules.typeAccessRules(policy.divisionTypeAccessPairs.toSet())
