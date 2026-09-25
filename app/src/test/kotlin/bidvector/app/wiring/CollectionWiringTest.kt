@@ -3,7 +3,9 @@ package bidvector.app.wiring
 import bidvector.app.collection.CollectionRunner
 import bidvector.app.collection.KonepsCredentialProperties
 import bidvector.app.collection.KonepsEndpointProperties
+import bidvector.app.collection.MockKonepsHttp
 import bidvector.procurement.BusinessDivision
+import bidvector.procurement.CollectionReferenceDate
 import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.strategy.Clock
 import io.kotest.assertions.withClue
@@ -20,6 +22,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.SystemEnvironmentPropertySource
 import java.time.Instant
+import java.time.LocalDate
 import java.util.function.Supplier
 import javax.sql.DataSource
 
@@ -246,13 +249,58 @@ class CollectionWiringTest {
         }
     }
 
+    /**
+     * D-6F9-1(verifier r1 F-1 요구) — 설정 표 한 행의 **대분류가 이긴다**. 경로와 대분류를 고의로 어긋나게 주고(공사
+     * 경로 + 용역 대분류, 그리고 그 반대) 배선이 조립한 소스가 실제로 낸 관측의 대분류를 본다. 게이트는 「경로에서
+     * 대분류를 짓는 코드가 없다」를 구조로 잠그고 이 test 는 그 값이 관측까지 가는 것을 **행동으로** 잠근다 —
+     * 기본 표는 경로와 대분류가 일치해서 어느 쪽에서 얻어도 답이 같아 이 축을 재지 못한다(mock loopback, 실호출 0).
+     */
     @Test
-    fun `업종 행에 대분류가 없거나 어휘 밖이면 기동 실패다 — 경로만 바꿔 대분류가 표류하는 길이 없다`() {
+    fun `설정 행의 경로와 대분류가 어긋나면 설정한 대분류가 이긴다 — 경로에서 짓지 않는다`() {
+        listOf(
+            "getBidPblancListInfoCnstwk" to BusinessDivision.SERVICE,
+            "getBidPblancListInfoServc" to BusinessDivision.CONSTRUCTION,
+        ).forEach { (path, division) ->
+            MockKonepsHttp { _, _ -> listOf(mapOf("bidNtceNo" to "SYN-6F9-W-1", "bidNtceOrd" to "000")) }.use { mock ->
+                withBoot(
+                    *validProperties(categories = "mismatch"),
+                    "bidvector.koneps.base-url=${mock.baseUrl}",
+                    "bidvector.koneps.operations.mismatch.path=$path",
+                    "bidvector.koneps.operations.mismatch.division=${division.name}",
+                ) { booted ->
+                    withClue(failureText(booted.failure)) { booted.failure shouldBe null }
+                    val port =
+                        booted.context
+                            .getBean(CollectionSources::class.java)
+                            .all
+                            .single()
+                            .port
+                    val batch = port.fetchNotices(CollectionReferenceDate(LocalDate.of(2026, 9, 24)), null)
+
+                    withClue("$path -> $division") {
+                        batch.items.map { it.sourceDivision }.toSet() shouldBe setOf(division)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `업종 행의 대분류 누락·어휘 밖과 빈 경로는 기동 실패다 — 표류도 빈 값도 HTTP 시점까지 미루지 않는다`() {
         listOf(
             arrayOf("bidvector.koneps.operations.goods.path=getBidPblancListInfoThng"),
             arrayOf(
                 "bidvector.koneps.operations.goods.path=getBidPblancListInfoThng",
                 "bidvector.koneps.operations.goods.division=basket",
+            ),
+            // code-review r1 L9 — 빈·공백 경로는 `URI.create("$baseUri/")` 가 되어 HTTP 시점에 죽었다.
+            arrayOf(
+                "bidvector.koneps.operations.goods.path=",
+                "bidvector.koneps.operations.goods.division=goods",
+            ),
+            arrayOf(
+                "bidvector.koneps.operations.goods.path=   ",
+                "bidvector.koneps.operations.goods.division=goods",
             ),
         ).forEach { rowProperties ->
             withBoot(*validProperties(categories = "goods"), *rowProperties) { booted ->
