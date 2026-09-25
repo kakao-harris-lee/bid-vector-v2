@@ -87,6 +87,9 @@
   잠근다: (가) 용역 공고의 분류번호가 ML 요청 fact 에 **실린다**(wire), (나) 공사 공고는 null 을 유지한다. 알려진 제한에 등재한다.
   분류번호 공간이 legacy 학습 코드 공간과 같은지는 **`OPEN-6F9-ML-CATEGORY-CODE-SPACE`** 로 넘긴다(`OPEN-ML-ANALYSIS-WIRING` 과 함께 판단).
   verifier 는 현 평가 경로(dry-run)가 ML 을 실제로 부르는지 한 줄로 확인한다.
+  **r1 계약 갱신(2026-09-25, 팀장)**: 첫 구현이 (가)·(나) test 를 두지 않았다(verifier F-2 · code-reviewer HIGH). 잠금 test 자리로
+  `adapters/src/test/kotlin/bidvector/adapters/ml/**` 를 in_scope 에 더한다 — ML main 코드는 여전히 밖이다(바꾸지 않고 잠근다).
+  같은 라운드에서 기회 분석 표본 질의 발동(용역 코드 존재 → 표본 조회 실행, 공사 null → 생략)도 행동 test 로 잠근다(자리는 기존 in_scope).
 
 ## 위협 모델 — 6F-9 고유 경계
 
@@ -125,6 +128,7 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/wiring/**
   - app/src/test/kotlin/bidvector/app/**
   - app/src/test/kotlin/bidvector/archfixture/violating/**
+  - adapters/src/test/kotlin/bidvector/adapters/ml/**                   # D-6F9-6 잠금 test 자리(수정 라운드 r1 추가 — main 은 밖 그대로)
   - config/quality/gate-tests.properties                                # 공유 — 추가만
   - config/quality/architecture-policy.properties                       # 공유 — 추가만
   - config/quality/member-effects*.properties
