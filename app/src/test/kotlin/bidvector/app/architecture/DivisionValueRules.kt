@@ -25,13 +25,22 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
  * ② [acquisitionRules] — **반환 타입이 그 타입인 호출**과 **그 타입 필드 읽기**. 타입 자신을 거치지 않고 값을 얻는
  *    길(운반 슬롯의 getter, 허용 클래스 안에 새로 생긴 파생 함수)이 이 축에 남는다. 자기 소유 멤버 읽기는 획득이
  *    아니므로 제외한다(호출자 == 소유자) — 그 값은 생성 인자로 받은 것이고, 넘긴 자리가 이 축에 이미 있다.
- * ③ [classObjectRules] — 타입의 **클래스 객체 참조**(`BusinessDivision::class.java`). `Enum.valueOf(Class, String)`·
- *    `Class.getEnumConstants` 는 호출 소유자가 `java.lang.Enum`·`java.lang.Class` 라 ①②에 걸리지 않는다. 그 길의
- *    유일한 입구가 클래스 객체이므로 입구를 닫는다(문자열로 클래스를 얻는 `Class.forName` 은 6F-8 리플렉션 게이트).
+ * ③ [classObjectRules] — 타입의 **클래스 리터럴 참조**(`BusinessDivision::class.java`). `Enum.valueOf(Class, String)`·
+ *    `Class.getEnumConstants` 는 호출 소유자가 `java.lang.Enum`·`java.lang.Class` 라 ①②에 걸리지 않는다. 리터럴이
+ *    그 길의 입구이므로 입구를 닫는다.
  *
  * 세 축 모두 허용 집합이 관측 집합과 **같아야** 한다(`CollectionArchitectureGateTest` — 낡은 허용 항목이 게이트를
  * 조용히 느슨하게 두지 않는다). 운반 슬롯의 getter 까지 축 ②에 드는 것은 의도다 — 대분류 값이 닿는 자리를 늘리는
- * 변경은 정책 파일 한 줄을 명시적으로 더하게 된다.
+ * 변경은 정책 파일 한 줄을 명시적으로 더하게 된다. 나르기만 하는 자리(생성 인자를 자기 필드에 두고 자기 필드만 읽는
+ * 클래스)는 축 ② 밖이고, 그 경계는 `CollectionArchitectureGateCatchesViolationsTest` 의 `CleanDivisionCarrier` 가 잠근다.
+ *
+ * **닫지 못하는 범위**(verifier r2 R2-1 — 주장을 사실로 좁힌다). 축 ②는 디스크립터의 반환·필드 **타입**만 보므로
+ * 제네릭이 **소멸된** 자리에서 얻은 값은 세 축 어디에도 남지 않는다: 대분류를 담은 컨테이너의 원소 읽기(`Map.get` 의
+ * 반환은 `Object`), `Class.getEnumConstants`(`Object[]`), 역직렬화기의 타입 토큰(뒤따르는 `as` 는 CHECKCAST 이고
+ * access 가 아니다). 축 ③은 클래스 **리터럴**만 보므로 인스턴스의 `javaClass`(`Object.getClass`)나 문자열의
+ * `Class.forName` 으로 얻은 `Class` 도 밖이다. 6F-8 리플렉션·`Class` 멤버 게이트가 그 길을 덮는 root 는
+ * `collection.raw-access.roots`(= `bidvector.workflow`·`bidvector.app`)뿐이라 `procurement`·`adapters` 에는 그 보완이
+ * 없다 — 구조로 닫는 방향은 `OPEN-6F9-DIVISION-REFLECTION`(evidence 알려진 제한 7).
  */
 internal class DivisionValueRules(
     private val type: String,
