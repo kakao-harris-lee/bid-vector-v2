@@ -168,6 +168,7 @@ in_scope 경로 한정 restore(`<base>` = merge-base), 목록 기계 산출. 공
 | `OPEN-6F9-CONSTRUCTION-TYPE-SOURCE` | **신설** | 공사 주공종 67% 공백 — 면허제한 오퍼레이션 허용업종으로(`OPEN-6F8-OPENING-COLLECTION` 과 함께) |
 | `OPEN-6F9-GOODS-FOREIGN-COLLECTION` | **신설** | 물품·외자 오퍼레이션 수집(대분류 매핑은 이 slice 가 넷 다 받는다) |
 | `OPEN-6F9-ML-CATEGORY-CODE-SPACE` | **신설** | 용역 공고의 업종 코드가 공공조달분류 번호가 된다 — legacy 학습 코드 공간과의 일치 여부(D-6F9-6) |
+| `OPEN-6F9-DIVISION-REFLECTION` | **신설** | 대분류 값 획득 축 셋이 **제네릭 소멸·리플렉션**으로 얻은 값을 보지 못한다(verifier r2 R2-1 실측 — r2 는 술어를 넓히지 않고 주장을 좁혔다). 방향: 6F-8 리플렉션·`Class` 멤버 게이트의 root(`collection.raw-access.roots`)를 `procurement`·`adapters` 로 넓히고, 필요하면 `BusinessDivision` 에 대한 **의존 축**(제네릭 인자를 포함하는 `directDependenciesFromSelf`)을 한 겹 더한다. 비용·과잉 위험(운반 슬롯 전수가 새 목록이 된다)을 함께 판단한다 — checklist 알려진 제한 7 |
 
 ## 리뷰 레인
 

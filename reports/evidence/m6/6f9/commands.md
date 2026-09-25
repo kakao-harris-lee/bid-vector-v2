@@ -11,7 +11,7 @@
 | `./gradlew --no-daemon qualityBaseline` | 0 | BUILD SUCCESSFUL |
 | `./tools/one-command-check.sh` | 0 | Kotlin·Python 두 job 초록(pytest 958 passed + 1 passed) |
 
-실측은 `bfbdef1d`(r1 의 마지막 산출물 커밋, merge-base `f6ebc047`)의 버릴 worktree 에서 2026-09-25 에 했다 — 아래 되돌림 실측도 같은 worktree 다. 세 명령은 앞 라운드에서도 같은 exit 0 였다(앞 실측을 옮기지 않고 이 HEAD 에서 다시 돌린 값이다).
+실측은 **r2 의 마지막 산출물 커밋**(merge-base `f6ebc047`)의 버릴 worktree 에서 2026-09-25 에 했다 — 되돌림 실측은 같은 커밋의 임시 clone 이다. 세 명령은 앞 라운드에서도 같은 exit 0 였다(앞 실측을 옮기지 않고 이 HEAD 에서 다시 돌린 값이다).
 
 ## RED 실측 — 구현 전에 실패를 본 새 test
 
@@ -21,6 +21,7 @@
 | `NoticeWatchSubjectPortTest` 새 셋 | 구현 전 행동 수준 FAILED 3(집합·공사 텍스트 조각) → 포트가 커널을 부른 뒤 초록 |
 | **r1** 대분류 값 획득 축 게이트 | 위반 표본 셋만 심고 **바꾸기 전 게이트**(멤버 열거 술어)로 음성 단언을 돌렸다: `:app:test --tests *CollectionArchitectureGateCatchesViolationsTest` exit 1 — enum 상수(MV1)·`Enum.valueOf`(MV4) 표기를 잡지 못한다(FAILED 2). 새 술어 셋으로 바꾼 뒤 초록 |
 | **r1** `RequestCategoryCodeWireTest`·`OpportunitySampleSupplyDivisionTest` | 구현(잠금) 전에는 class 자체가 없었다 — 잠금 세기는 아래 변이 MLW 가 잰다(잠금 제거 = 초록 확인은 무의미하므로 운반 단계 변이로 잰다) |
+| **r2** 복원 손상 정책 잠금 · 게이트 과잉 대조 | 둘 다 **이미 맞는 코드·술어**를 잠그는 test 라 「구현 전 RED」가 없다 — 세기는 아래 변이 MR1(값 지어내기)·MC1(자기 소유 읽기 제외 분기 제거)이 잰다 |
 
 나머지 새 test 는 구현과 같은 커밋에서 처음 초록으로 돌았다 — 그 잠금은 아래 변이가 잰다(수정 전 초록 → 적용 후 RED).
 
@@ -44,12 +45,15 @@
 | **MV2**(r1) 타입 companion 에 파생 멤버를 더하고 배선이 그것을 부름 | +3/−0 · +10/−1 | 위와 같음 | 1 | 같은 셋 — 멤버 이름을 열거하지 않으므로 새 이름도 쌍이 된다 |
 | **MV4**(r1) `java.lang.Enum.valueOf(BusinessDivision::class.java, …)` | +10/−1 | 위와 같음 | 1 | 셋(위반 규칙 · 타입 멤버 쌍 · **클래스 객체 참조자 == 허용**) |
 | **MLW**(r1) `RequestMapping` 의 업종 코드 fact 를 늘 결측으로 | +1/−1 | `:adapters:test --tests *RequestCategoryCodeWireTest` · `:app:test --tests *CollectionArchitectureGateTest` | 1 | 「(가) 용역 공고의 공공조달분류 번호가 … 그대로 실린다」(앞 판에서는 이 변이가 초록이었다 — verifier r1 F-2) |
+| **MR1**(r2) 복원 손상 정책 — 세부 분류 이름 두 열에서 큰 소리 실패 대신 **값을 지어냄**(`?: error(…)` → `?: of("x")!!`) | +1/−1 | `:adapters:test --tests *NoticeReconstructionTest` | 1 | 「공백뿐인 세부 분류 이름 두 열도 … 실패한다」(앞 판에서는 이 변이가 초록이었다 — verifier r2 R2-L2) |
+| **MC1**(r2) 대분류 축 ②에서 **자기 소유 읽기 제외** 분기를 지움(과잉 방향 변이) | +0/−1 | `:app:test --tests *CollectionArchitectureGateCatchesViolationsTest` | 1 | 「대분류를 만들지 않는 fixture 는 … 나르기만 하는 것」 — 위반 상세는 새 fixture 의 자기 필드 읽기 한 줄뿐이고 `CleanNameLookup` 은 초록이다(옛 대조가 이 분기에 공허했다는 근거) |
 
 ## 정적 확인
 
 | 확인 | 명령 | 결과 |
 |---|---|---|
-| in_scope 대조(A·M) | `git diff --name-status <base>..HEAD` 각 경로를 `scope.md` in_scope 항목 glob 에 대조(일회용 스크립트) | 밖 **0**. r1 이 더한 신규 여섯도 대조했다(게이트 규칙 파일 하나·표본 셋·`adapters/.../ml` test 하나·`workflow/.../evaluation` test 하나 — 앞 둘은 기존 glob, `ml` test 는 r1 계약 갱신이 더한 항목) |
+| in_scope 대조(A·M) | `git diff --name-status <base>..HEAD` 각 경로를 `scope.md` in_scope 항목 glob 에 대조(일회용 스크립트) | 밖 **0**. r1 이 더한 신규 여섯도 대조했다(게이트 규칙 파일 하나·표본 셋·`adapters/.../ml` test 하나·`workflow/.../evaluation` test 하나 — 앞 둘은 기존 glob, `ml` test 는 r1 계약 갱신이 더한 항목). r2 가 더한 신규는 **하나**(게이트 과잉 대조 fixture)이고 기존 glob `app/src/test/kotlin/bidvector/archfixture/violating/**` 안이다 — 계약 갱신 불필요 |
+| 쓰이지 않는 import 를 막는 게이트가 있는가 | r1 의 파일 내용(import 둘 있는 상태)으로 `./gradlew --no-daemon --rerun-tasks :workflow:ktlintTestSourceSetCheck` | **exit 0 — 막는 게이트가 없다.** 태스크는 실행됐다(UP-TO-DATE 아님). `ktlint_official` + ktlint 1.8.0 표준 규칙 집합에 `no-unused-imports` 가 있고 비활성 설정도 baseline 도 없는데 이 표기를 신고하지 않는다. 그래서 acceptance 는 앞 라운드에서도 붉지 않았고(348/348 exit 0, verifier r2 와 같은 값) `commands.md` 의 앞 exit 값과 모순이 없다 — r2 의 삭제는 **정리**이지 빌드 고침이 아니다. import 순서를 어기면 같은 태스크가 exit 1 이므로(대조 1회) 태스크가 이 파일을 실제로 본다는 것은 확인됐다 |
 | r1 게이트 술어 교체 흔적 | `grep -rn 'division-parse' --include=*.kt --include=*.properties .` | 0 — 낡은 정책 키 이름이 코드·정책 파일에 남지 않았다(evidence 문서는 교체 사실 자체를 적으므로 대상 밖) |
 | 관심 업종 커널의 production 호출자 | `grep -rn "assembleWatchCategories(" --include=*.kt adapters/src/main workflow/src/main app/src/main` | 포트 한 곳 |
 | 설정 행 생성자 | `grep -rn "KonepsOperationProperties(" --include=*.kt app/src/main` | 기본 표 두 행뿐(나머지는 바인더) |
@@ -63,8 +67,8 @@
 
 | 단계 | 명령 | exit·결과 |
 |---|---|---|
-| ① restore | `git restore --source=<base> --staged --worktree -- <목록 60개>` | 0 · 삭제 18 · 변경 42 |
-| ② 공유 파일 hunk 격리 | `git diff <sha>~1..<sha> -- <파일> \| git apply -R`(최신 → 과거) | 열두 번 전부 0, conflict 0 |
+| ① restore | `git restore --source=<base> --staged --worktree -- <목록 61개, 개별 인자>` | 0 · 삭제 19 · 변경 42 |
+| ② 공유 파일 hunk 격리 | `git diff <sha>~1..<sha> -- <파일> \| git apply -R`(최신 → 과거) | 열세 번 전부 0, conflict 0 |
 | ③ 트리 동일성 | `git diff <base> -- <목록>` · 공유 파일 넷 · `git diff --name-only <base>` 전체 | 앞 둘 빈 출력, 전체에서 남는 것은 `milestone-6.md` 와 이 slice 의 evidence 뿐이다(둘 다 restore 대상 아님) |
 | ④ compile | `./gradlew --no-daemon compileKotlin compileTestKotlin` | 0 |
 | ⑤ test | `./gradlew --no-daemon test` | 0 |
