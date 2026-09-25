@@ -133,17 +133,22 @@ SELECT COUNT(*) FROM notice WHERE service_division = '기술용역' AND status I
 SELECT COUNT(*) FROM notice WHERE service_division IS NOT NULL AND main_construction_type IS NOT NULL;
 --    (b) 넓은 대리 측정: 원문 행에는 오퍼레이션 정보가 없다(제한 2) — 오퍼레이션마다 자기에게만 있는 키의 **빈 값 아닌 값**으로 가른다.
 --        키 **존재**로 가르면 안 된다(r2 에 정정): 원문 행은 빈 값도 「있는 키」로 담으므로(§5 빈 값 처리 표) 키 존재는 채움률이 아니고,
---        다른 오퍼레이션 응답이 그 키를 빈 값으로 실으면 곧바로 거짓 양성이 된다. 값으로 갈라도 주공종 채움률 때문에 여전히 **과소 계수**다
---        (0 이 배타의 증명은 아니고, 0 이 아니면 확실한 겹침이다).
-SELECT COUNT(*) FROM (
-  SELECT payload_fields->>'bidNtceNo' AS no, payload_fields->>'bidNtceOrd' AS ord
-  FROM raw_observation WHERE source_endpoint = 'NOTICE_LIST'
-  GROUP BY 1, 2
-  HAVING bool_or(NULLIF(btrim(payload_fields->>'srvceDivNm'), '') IS NOT NULL)
-     AND bool_or(NULLIF(btrim(payload_fields->>'mainCnsttyNm'), '') IS NOT NULL)
-) overlapping;
+--        다른 오퍼레이션 응답이 그 키를 빈 값으로 실으면 곧바로 거짓 양성이 된다. 값으로 갈라도 주공종 채움률 때문에 여전히 **과소 계수**다.
+--        빈 값 판정은 `btrim` 이 아니라 V17 CHECK 와 같은 공백류 클래스다(`btrim` 은 보통 공백만 걷어 NBSP 뿐인 값을 「찼다」로 센다 — verifier r3 L1).
+--        두 키는 **서로 다른 원문 행**에서 와야 센다 — 한 응답이 두 키를 함께 실은 경우(혼입)는 (b) 에서 빠지고 (c) 가 센다.
+--    (c) 혼입 대리 측정: 한 원문 행이 두 키를 **함께** 빈 값 아니게 실은 수.
+WITH r AS (
+  SELECT payload_fields->>'bidNtceNo' AS no, payload_fields->>'bidNtceOrd' AS ord,
+         coalesce(payload_fields->>'srvceDivNm', '')   ~ '[^\u0009-\u000D\u001C-\u001F    -     　]' AS srv,
+         coalesce(payload_fields->>'mainCnsttyNm', '') ~ '[^\u0009-\u000D\u001C-\u001F    -     　]' AS main
+  FROM raw_observation WHERE source_endpoint = 'NOTICE_LIST')
+SELECT
+  (SELECT COUNT(*) FROM (SELECT 1 FROM r GROUP BY no, ord
+     HAVING bool_or(srv AND NOT main) AND bool_or(main AND NOT srv)) g) AS overlap_b,
+  (SELECT COUNT(*) FROM r WHERE srv AND main) AS mixed_row_c;
 ```
 
-⑨ 판독: (a) 가 0 이 아니면 ⑤ 의 `construction_leak`·`service_leak` 은 **축 섞임이 아니라 오퍼레이션 겹침**일 수 있다 — 두 판독을 함께 본다.
-(a) > 0 인데 (b) = 0 이면 겹침보다 **한 응답이 두 키를 함께 실은 혼입**을 먼저 의심한다(⑥ 으로 그 응답을 가른다). (a) = 0 이어도 (b) > 0 이면 겹침이 있고 한쪽 칸이 비어 (a) 가 놓친 것이다.
+⑨ 판독(r3 정정): (a) 가 0 이 아니면 ⑤ 의 `construction_leak`·`service_leak` 은 **축 섞임이 아니라 오퍼레이션 겹침**일 수 있다 — 두 판독을 함께 본다.
+(b) > 0 이면 같은 공고번호·차수가 서로 다른 응답 행에서 두 오퍼레이션 전용 키를 따로 실었다 — 겹침의 강한 정황이다(원문 행에 오퍼레이션 정보가 없어 증명은 아니다). (b) = 0 은 배타의 증명이 아니다(과소 계수).
+(c) > 0 이면 한 응답이 두 키를 함께 실은 혼입이다 — (a) 는 겹침 없이도 이것으로 양수가 될 수 있다. (a) > 0 을 겹침으로 읽는 것은 (b) > 0 일 때뿐이다.
 겹침이 실제로 있으면 그 행의 최종 저장 상태는 (a) 가 세는 「두 칸이 다 찬」 모양이다 — 그 상태 자체는 `NoticeBusinessClassificationPersistenceTest` 의 겹침 test 가 잠근다.
