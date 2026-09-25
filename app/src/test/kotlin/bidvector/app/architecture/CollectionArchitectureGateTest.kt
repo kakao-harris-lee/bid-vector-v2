@@ -23,6 +23,7 @@ import java.time.LocalDate
 class CollectionArchitectureGateTest {
     private val policy = ArchitecturePolicy.load()
     private val rules = CollectionArchitectureRules()
+    private val divisionRules = DivisionValueRules(policy.divisionValueType)
     private val appRoot = "${policy.packageRoot}.app"
     private val production: JavaClasses =
         ClassFileImporter()
@@ -183,22 +184,25 @@ class CollectionArchitectureGateTest {
     }
 
     @Test
-    fun `문자열에서 대분류를 만드는 호출은 허용 쌍뿐이다 — URL·오퍼레이션 이름·응답 문자열에서 대분류를 짓는 길이 없다`() {
-        rules
-            .divisionParseCallsMustBeAllowedPairs(
-                policy.divisionParseType,
-                policy.divisionParseMembers.toSet(),
-                policy.divisionParseAllowedPairs.toSet(),
-            ).checkAll()
+    fun `대분류 값을 얻는 자리는 허용 쌍뿐이다 — 타입 멤버 접근·값 획득·클래스 객체 세 축`() {
+        divisionRules.typeAccessRules(policy.divisionTypeAccessPairs.toSet()).checkAll()
+        divisionRules.acquisitionRules(policy.divisionAcquisitionPairs.toSet()).checkAll()
+        divisionRules.classObjectRules(policy.divisionClassObjectReferencers.toSet()).checkAll()
     }
 
     @Test
-    fun `대분류 변환 허용 쌍은 관측과 같다 — 규칙이 공허하지 않고 낡은 항목이 없다`() {
-        rules.observedDivisionParseCalls(
-            production,
-            policy.divisionParseType,
-            policy.divisionParseMembers.toSet(),
-        ) shouldBe policy.divisionParseAllowedPairs.toSet()
+    fun `대분류 타입 멤버 접근 허용 쌍은 관측과 같다 — 멤버 목록이 없으므로 새 멤버도 쌍을 바꾼다`() {
+        divisionRules.observedTypeAccesses(production) shouldBe policy.divisionTypeAccessPairs.toSet()
+    }
+
+    @Test
+    fun `대분류 값 획득 허용 쌍은 관측과 같다 — 반환 타입이 대분류인 호출과 대분류 필드 읽기 전수`() {
+        divisionRules.observedAcquisitions(production) shouldBe policy.divisionAcquisitionPairs.toSet()
+    }
+
+    @Test
+    fun `대분류 클래스 객체를 참조하는 production 클래스는 허용 집합과 같다 — Enum valueOf 입구가 비어 있다`() {
+        divisionRules.observedClassObjectReferences(production) shouldBe policy.divisionClassObjectReferencers.toSet()
     }
 
     @Test

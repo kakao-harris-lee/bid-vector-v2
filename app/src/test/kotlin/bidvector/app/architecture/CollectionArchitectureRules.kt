@@ -256,55 +256,6 @@ class CollectionArchitectureRules {
                 .because("D-6F9-2 우회 4 — 업무구분 세부 분류 원시 키 리터럴은 계약 데이터를 실은 파일 클래스 밖에 없다")
         }
 
-    /**
-     * D-6F9-1 우회 1 — 문자열에서 업무 대분류를 **만드는** 표면([members]: 라벨 복원·`valueOf`·`values`·`entries`)의 호출자 쌍은
-     * [allowedPairs] 의 부분집합이다. 관측이 대분류를 구조로 나르므로(어댑터 생성 인자 → 관측 → `canonicalize`) URL 경로·오퍼레이션
-     * 이름·응답 문자열에서 대분류를 짓는 길이 production 에 없다 — 허용은 저장 라벨 복원(영속)과 정책 어휘 파생뿐이다. 문자열
-     * grep 이 아니라 **컴파일된 호출 그래프**를 본다(import 없이 전체 한정 이름으로 부르거나 별칭을 써도 같은 메서드 호출이다).
-     */
-    fun divisionParseCallsMustBeAllowedPairs(
-        type: String,
-        members: Set<String>,
-        allowedPairs: Set<Pair<String, String>>,
-    ): List<ArchRule> =
-        listOf(
-            noClasses()
-                .should(callDivisionParseOutside(type, members, allowedPairs))
-                .because("D-6F9-1 우회 1 — 문자열에서 대분류를 만드는 호출자 쌍은 허용 쌍의 부분집합이다"),
-        )
-
-    /** 실제로 관측된 (호출자 최상위 클래스, 멤버) 쌍 — 허용 집합과 **같아야** 한다(낡은 항목 금지). */
-    fun observedDivisionParseCalls(
-        production: JavaClasses,
-        type: String,
-        members: Set<String>,
-    ): Set<Pair<String, String>> =
-        production
-            .filter { it.topLevel().fullName != type }
-            .flatMap { item ->
-                item.methodCallsFromSelf
-                    .filter { it.targetOwner.topLevel().fullName == type && it.name in members }
-                    .map { item.topLevel().fullName to it.name }
-            }.toSet()
-
-    private fun callDivisionParseOutside(
-        type: String,
-        members: Set<String>,
-        allowedPairs: Set<Pair<String, String>>,
-    ): ArchCondition<JavaClass> =
-        object : ArchCondition<JavaClass>("$type 의 문자열 변환 멤버를 허용 밖 호출자가 부른다 (허용 ${allowedPairs.size}쌍)") {
-            override fun check(
-                item: JavaClass,
-                events: ConditionEvents,
-            ) {
-                if (item.topLevel().fullName == type) return
-                item.methodCallsFromSelf
-                    .filter { it.targetOwner.topLevel().fullName == type && it.name in members }
-                    .filter { (item.topLevel().fullName to it.name) !in allowedPairs }
-                    .forEach { events.add(SimpleConditionEvent.satisfied(item, it.describe())) }
-            }
-        }
-
     /** [keys] 중 하나라도 상수 풀에 가진 production 클래스(최상위 이름) 집합 — 허용 집합과 **같아야** 한다(낡은 항목 금지). */
     fun classesContainingAnyLiteral(
         production: JavaClasses,
@@ -392,6 +343,13 @@ class CollectionArchitectureRules {
             }
         }
 
+    /**
+     * 클래스 파일 바이트를 ISO-8859-1 로 읽어 [literal] 을 **부분 문자열**로 찾는다(상수 풀 항목 단위 파싱이 아니다,
+     * code-review r1 L8). 그래서 어떤 계약 키가 허용 클래스에 있는 다른 키의 부분 문자열이면 그 개념이 허위로
+     * 「허용 클래스에 있다」로 판정되어 개념 집합을 무관한 개념까지 넓혀야 초록이 된다 — 오늘 등재된 키들은 서로
+     * 부분 문자열이 아니라 잠재적 한계다(6F-8 에서 물려받은 술어). 반대 방향(위반을 놓치는 쪽)은 생기지 않는다:
+     * 리터럴이 상수 풀에 있으면 바이트열에도 반드시 있다. 항목 단위 일치가 필요해지면 `CONSTANT_Utf8` 파싱으로 좁힌다.
+     */
     private fun constantPoolContains(
         item: JavaClass,
         literal: String,

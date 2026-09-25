@@ -51,12 +51,7 @@ class ArchitecturePolicy private constructor(
 
     /** D-6A3-25 — (호출자, 포트.메서드) 쌍의 허용 목록 — `"Caller->Port.method"` 형태. */
     val portCallAllowedPairs: List<Pair<String, String>>
-        get() =
-            list("app.port-call.allowed-pairs").map { entry ->
-                val parts = entry.split("->").map(String::trim)
-                check(parts.size == 2) { "app.port-call.allowed-pairs 항목이 'Caller->Port.method' 형태가 아니다: $entry" }
-                parts[0] to parts[1]
-            }
+        get() = pairs("app.port-call.allowed-pairs")
 
     /** M6/6F-8 (b) — 수집 use case 패키지와 그것이 참조해도 되는 procurement 최상위 타입. */
     val collectionPackage: String get() = value("workflow.collection.package")
@@ -69,18 +64,20 @@ class ArchitecturePolicy private constructor(
     /** M6/6F-8 (c) — 공고명 키 리터럴을 상수 풀에 가져도 되는 클래스. */
     val titleKeyAllowedClasses: List<String> get() = list("collection.title-key.allowed-classes")
 
-    /** M6/6F-9 D-6F9-1 — 문자열에서 대분류를 만드는 표면: 대상 타입·멤버와 허용 (호출자->멤버) 쌍. */
-    val divisionParseType: String get() = value("collection.division-parse.type")
-    val divisionParseMembers: List<String> get() = list("collection.division-parse.members")
-    val divisionParseAllowedPairs: List<Pair<String, String>>
-        get() =
-            list("collection.division-parse.allowed-pairs").map { entry ->
-                val parts = entry.split("->").map(String::trim)
-                check(
-                    parts.size == 2,
-                ) { "collection.division-parse.allowed-pairs 항목이 'Caller->member' 형태가 아니다: $entry" }
-                parts[0] to parts[1]
-            }
+    /**
+     * M6/6F-9 D-6F9-1(verifier r1 F-1 뒤 개정) — 대분류 값 획득 축 셋: 대상 타입 · 타입 멤버 접근 쌍 ·
+     * 값 획득 쌍(`Caller->Owner#member`) · 클래스 객체 참조자. 멤버 이름 목록은 없다(정책 파일 주석 `(c'')`).
+     */
+    val divisionValueType: String get() = value("collection.division-value.type")
+
+    val divisionTypeAccessPairs: List<Pair<String, String>>
+        get() = pairs("collection.division-value.type-access-pairs")
+
+    val divisionAcquisitionPairs: List<Pair<String, String>>
+        get() = pairs("collection.division-value.acquisition-pairs")
+
+    val divisionClassObjectReferencers: List<String>
+        get() = list("collection.division-value.class-object-referencers")
 
     /** M6/6F-9 D-6F9-2 — 업무구분 세부 분류 키 리터럴 게이트: 대상 개념 집합과 그 키를 상수 풀에 가져도 되는 클래스. */
     val classificationKeyConcepts: List<String> get() = list("collection.classification-key.concepts")
@@ -129,6 +126,14 @@ class ArchitecturePolicy private constructor(
     private fun packageSegments(key: String): List<String> = list(key).map { it.replace("-", "") }
 
     private fun list(key: String): List<String> = value(key).split(',').map(String::trim).filter(String::isNotEmpty)
+
+    /** `"왼쪽->오른쪽"` 항목 목록 — 화살표가 없거나 둘 이상이면 정책 파일의 오타다(조용히 넘기지 않는다). */
+    private fun pairs(key: String): List<Pair<String, String>> =
+        list(key).map { entry ->
+            val parts = entry.split("->").map(String::trim)
+            check(parts.size == 2) { "$key 항목이 '왼쪽->오른쪽' 형태가 아니다: $entry" }
+            parts[0] to parts[1]
+        }
 
     companion object {
         private const val LOCATION_PROPERTY = "bidvector.architecture.policy"

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.TestInstance
 class CollectionArchitectureGateCatchesViolationsTest {
     private val policy = ArchitecturePolicy.load()
     private val rules = CollectionArchitectureRules()
+    private val divisionRules = DivisionValueRules(policy.divisionValueType)
     private val fixtureRoot = "${policy.packageRoot}.archfixture.violating"
     private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
 
@@ -125,13 +126,56 @@ class CollectionArchitectureGateCatchesViolationsTest {
 
     @Test
     fun `URL 경로에서 대분류를 짓는 허용 밖 호출을 잡는다`() {
-        rules
-            .divisionParseCallsMustBeAllowedPairs(
-                policy.divisionParseType,
-                policy.divisionParseMembers.toSet(),
-                policy.divisionParseAllowedPairs.toSet(),
-            ).mustReport("RogueDivisionFromString", "fromLabel")
+        divisionAcquisition().mustReport("RogueDivisionFromString", "BusinessDivision#fromLabel")
+        divisionTypeAccess().mustReport("RogueDivisionFromString", "fromLabel")
     }
+
+    /**
+     * verifier r1 F-1 재현 MV1 — 변환 **함수를 부르지 않고** enum 상수를 읽어 경로에서 값을 짓는다. 이전 판(멤버
+     * 이름 목록)에서 전체 `check` 가 초록이던 표기다.
+     */
+    @Test
+    fun `enum 상수를 읽어 경로에서 대분류를 짓는 허용 밖 클래스를 잡는다 — 멤버 호출이 하나도 없어도`() {
+        divisionTypeAccess().mustReport("RogueDivisionFromEnumConstant", "CONSTRUCTION")
+        divisionAcquisition().mustReport("RogueDivisionFromEnumConstant", "BusinessDivision#SERVICE")
+    }
+
+    /**
+     * verifier r1 F-1 재현 MV2 — 타입 자신에 생긴 **새 파생 멤버**를 부른다. production 타입에 멤버를 심을 수 없어
+     * 대상 타입만 같은 모양의 fixture enum 으로 바꾸고 규칙 값은 그대로다(허용 집합 비움) — 이전 판은 멤버 이름을
+     * 열거했기 때문에 이 표기가 조용했다. 새 판은 멤버 목록이 없어 어떤 이름이든 쌍으로 관측된다.
+     */
+    @Test
+    fun `타입에 새로 생긴 파생 멤버를 부르는 자리를 잡는다 — 멤버 이름 목록이 없다`() {
+        val fixtureEnum = DivisionValueRules("$fixtureRoot.collection.RogueDivisionLikeEnum")
+
+        fixtureEnum
+            .typeAccessRules(emptySet())
+            .mustReport("RogueDivisionFromCompanionDerivation", "ofOperationPath")
+        fixtureEnum
+            .acquisitionRules(emptySet())
+            .mustReport("RogueDivisionFromCompanionDerivation", "RogueDivisionLikeEnum#ofOperationPath")
+    }
+
+    /** verifier r1 F-1 재현 MV4 — `java.lang.Enum.valueOf(Class, String)`. 타입 이름이 남는 자리는 클래스 객체뿐이다. */
+    @Test
+    fun `Enum valueOf 로 대분류를 만드는 허용 밖 클래스를 잡는다 — 호출 소유자에 타입 이름이 없어도`() {
+        divisionClassObject().mustReport("RogueDivisionFromEnumBridge", "BusinessDivision")
+    }
+
+    /** 규칙이 과잉이 아니다 — 대분류를 만들지 않는 fixture 는 세 축 어디에도 안 걸린다. */
+    @Test
+    fun `대분류를 만들지 않는 fixture 는 대분류 축 셋에 걸리지 않는다`() {
+        divisionTypeAccess().mustNotReport("CleanNameLookup")
+        divisionAcquisition().mustNotReport("CleanNameLookup")
+        divisionClassObject().mustNotReport("CleanNameLookup")
+    }
+
+    private fun divisionTypeAccess() = divisionRules.typeAccessRules(policy.divisionTypeAccessPairs.toSet())
+
+    private fun divisionAcquisition() = divisionRules.acquisitionRules(policy.divisionAcquisitionPairs.toSet())
+
+    private fun divisionClassObject() = divisionRules.classObjectRules(policy.divisionClassObjectReferencers.toSet())
 
     @Test
     fun `app 안의 두 번째 러너를 잡는다`() {
