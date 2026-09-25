@@ -72,6 +72,7 @@ class RawObservationTest {
                 mapOf(RawKey("k") to RawValue.ExplicitNull),
                 SourceEndpoint.NOTICE_LIST,
                 NOW,
+                sourceText = null,
                 sourceDivision = BusinessDivision.CONSTRUCTION,
             ).sourceDivision shouldBe BusinessDivision.CONSTRUCTION
     }
@@ -103,6 +104,8 @@ class RawObservationTest {
                 mapOf(RawKey("presmptPrce") to RawValue.ExplicitNull),
                 SourceEndpoint.NOTICE_LIST,
                 NOW,
+                sourceText = null,
+                sourceDivision = null,
             )
 
         observation.presenceOf(contract("presmptPrce")) shouldBe FieldPresence.ExplicitNull
@@ -117,6 +120,8 @@ class RawObservationTest {
                 mapOf(RawKey("presmptPrce") to RawValue.Present("900000000")),
                 SourceEndpoint.NOTICE_LIST,
                 NOW,
+                sourceText = null,
+                sourceDivision = null,
             )
 
         observation.presenceOf(contract("presmptPrce")) shouldBe FieldPresence.Present("900000000")
@@ -129,6 +134,8 @@ class RawObservationTest {
                 mapOf(RawKey("presmptPrce") to RawValue.ExplicitNull),
                 SourceEndpoint.NOTICE_LIST,
                 NOW,
+                sourceText = null,
+                sourceDivision = null,
             )
 
         observation.keys shouldBe setOf(RawKey("presmptPrce"))

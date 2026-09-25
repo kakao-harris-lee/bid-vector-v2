@@ -131,7 +131,12 @@ class RawNoticeObservation private constructor(
             "sourceDivision=$sourceDivision)"
 
     companion object {
-        /** 문자열 값만 있는 관측(대다수 호출부) — 명시 `null`을 나를 수 없다, [ofRawValues] 참고. */
+        /**
+         * 문자열 값만 있는 관측(대다수 호출부) — 명시 `null`을 나를 수 없다, [ofRawValues] 참고.
+         * [sourceDivision] 에 기본값이 있는 것은 이 경로의 production 호출부가 **재구성 자리표시자**
+         * 하나뿐이기 때문이다(영속 복원 — 정본은 `notice` 열이라 관측 쪽 값이 없다). 공고 목록 관측을
+         * 만드는 경로는 `mapRawItem` 하나이고 거기서는 기본값 없이 필수다.
+         */
         fun of(
             fields: Map<RawKey, String>,
             sourceEndpoint: SourceEndpoint,
@@ -147,13 +152,19 @@ class RawNoticeObservation private constructor(
                 sourceDivision,
             )
 
-        /** 명시 `null`을 나를 수 있는 관측 — 부재(사유)를 구분해야 하는 호출부(예: [presenceOf] 소비자)용. */
+        /**
+         * 명시 `null`을 나를 수 있는 관측 — 부재(사유)를 구분해야 하는 호출부(예: [presenceOf] 소비자)용.
+         * [sourceDivision] 은 **기본값이 없다**(code-review r1 L5): 이 경로는 `mapRawItem`(공고 축)과
+         * masking 경로(개찰 축)가 함께 쓰는 자리라, 새 공고 목록 계열 소스가 이 경로를 쓰면서 대분류를
+         * 잊으면 조용히 `null`이 되는 층이 남는다. 이제 잊으면 컴파일이 깨진다 — 개찰 축처럼 오퍼레이션이
+         * 대분류를 정하지 않는 자리는 `null`을 **명시**한다.
+         */
         fun ofRawValues(
             fields: Map<RawKey, RawValue>,
             sourceEndpoint: SourceEndpoint,
             observedAt: Instant,
-            sourceText: String? = null,
-            sourceDivision: BusinessDivision? = null,
+            sourceText: String?,
+            sourceDivision: BusinessDivision?,
         ): RawNoticeObservation =
             RawNoticeObservation(fields.toMap(), sourceEndpoint, observedAt, sourceText, sourceDivision)
     }

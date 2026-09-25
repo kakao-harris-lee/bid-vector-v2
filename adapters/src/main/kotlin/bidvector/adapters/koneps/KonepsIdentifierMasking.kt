@@ -163,7 +163,17 @@ internal fun mapMaskedOpeningItem(
     if (numberRaw.isNullOrBlank() || roundRaw.isNullOrBlank()) {
         return RawItemOutcome.Dropped(CollectionDropReason.CollectionMissingNoticeNumber)
     }
-    val observation = RawNoticeObservation.ofRawValues(masked.fields, sourceEndpoint, observedAt, masked.sourceText)
+    // code-review r1 L5 — 개찰 축은 오퍼레이션이 업무 대분류를 정하지 않는다(공고 목록과 달리 한 오퍼레이션이
+    // 업종을 가리지 않는다). 기본값이 아니라 **명시** 값이다: 이 경로를 쓰는 새 공고 목록 계열 소스가 대분류를
+    // 잊으면 컴파일이 깨진다(`RawNoticeObservation.ofRawValues` 의 필수 인자).
+    val observation =
+        RawNoticeObservation.ofRawValues(
+            masked.fields,
+            sourceEndpoint,
+            observedAt,
+            masked.sourceText,
+            sourceDivision = null,
+        )
     val identity = identityOf(numberRaw, roundRaw, rowDiscriminatorOf(masked.fields, rowIdentifierRawKeys))
     // verifier r1 F-3·F-8 수정 — unknownFieldCount 는 이름 그대로 계약 밖 키 수만(F-3),
     // masking 실패는 별도 축(F-8, maskingFailureCount)으로 낸다. 이전 판은 이 둘을 하나로

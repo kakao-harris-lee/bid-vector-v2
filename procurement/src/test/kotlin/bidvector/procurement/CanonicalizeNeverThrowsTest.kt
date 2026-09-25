@@ -131,6 +131,8 @@ class CanonicalizeNeverThrowsTest {
                             fields + (contract.rawName to RawValue.ExplicitNull),
                             SourceEndpoint.NOTICE_LIST,
                             Instant.EPOCH,
+                            sourceText = null,
+                            sourceDivision = null,
                         )
                     runCatching {
                         canonicalize(observation, policy)

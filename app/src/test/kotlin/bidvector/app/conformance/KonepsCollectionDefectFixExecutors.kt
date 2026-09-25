@@ -66,7 +66,13 @@ private fun rawValuesFrom(payload: JsonNode): Map<RawKey, RawValue> =
 private fun estimatedPriceAbsenceCase(input: JsonNode): Map<String, Any?> {
     val payload = input.path("payload")
     val observation =
-        RawNoticeObservation.ofRawValues(rawValuesFrom(payload), SourceEndpoint.NOTICE_LIST, Instant.EPOCH)
+        RawNoticeObservation.ofRawValues(
+            rawValuesFrom(payload),
+            SourceEndpoint.NOTICE_LIST,
+            Instant.EPOCH,
+            sourceText = null,
+            sourceDivision = null,
+        )
     val contract = REAL_POLICY.fieldContracts.contractFor(RawKey("presmptPrce"))!!
     val reason =
         when (observation.presenceOf(contract)) {

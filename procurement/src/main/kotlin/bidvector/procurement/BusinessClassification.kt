@@ -21,6 +21,9 @@ private val CATEGORY_SOURCES: List<CategorySource> =
         CategorySource(FieldConcept.PUBLIC_PROCUREMENT_CLASS_CODE, FieldConcept.PUBLIC_PROCUREMENT_CLASS_NAME),
     )
 
+/** 「공백뿐이면 없다」 규칙 하나 — 코드·라벨 두 자리가 같은 관용구를 쓴다(code-review r1 L6). */
+private fun String?.presentTrimmed(): String? = this?.takeIf(String::isNotBlank)?.trim()
+
 private fun categoryFrom(
     source: CategorySource,
     observation: RawNoticeObservation,
@@ -28,13 +31,17 @@ private fun categoryFrom(
 ): BusinessCategory? =
     registry
         .valueIn(observation, source.code)
-        ?.takeIf(String::isNotBlank)
+        .presentTrimmed()
         ?.let { code ->
-            val label = registry.valueIn(observation, source.label)?.trim()?.takeIf(String::isNotEmpty)
+            val label = registry.valueIn(observation, source.label).presentTrimmed()
             BusinessCategory(CategoryCode.of(code), label?.let(::CategoryLabel))
         }
 
-/** 업무구분(⑤ D-3A-5, COL-08) — 코드·라벨 두 값. 라벨은 원문 trim(다른 이름 칸과 같은 관례), 공백뿐이면 `null`(임의 라벨 금지). */
+/**
+ * 업무구분(⑤ D-3A-5, COL-08) — 코드·라벨 두 값. 라벨은 원문 trim(다른 이름 칸과 같은 관례), 공백뿐이면 `null`(임의 라벨 금지).
+ * **M6/6F-9 부터 라벨을 trim 한다**(code-review r1 L6 — 기존 `business_category_label` 칸의 거동 변경): 6F-9 전까지 이 자리는
+ * 공백뿐인 값만 떨어뜨리고 양끝 공백은 그대로 저장했다. 코드 쪽 trim 은 [CategoryCode.of] 정규화 안에 있었고 라벨만 예외였다.
+ */
 internal fun businessCategoryFrom(
     observation: RawNoticeObservation,
     registry: KonepsFieldContractRegistry,

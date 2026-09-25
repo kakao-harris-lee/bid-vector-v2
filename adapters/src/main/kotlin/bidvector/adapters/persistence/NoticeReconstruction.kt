@@ -73,6 +73,19 @@ private fun businessDivisionOf(label: String): BusinessDivision =
     BusinessDivision.fromLabel(label) ?: error("business_division 이 문서 열거 어휘 밖이다: '$label'")
 
 /**
+ * D-6F9-3(code-review r1 L7) — 세부 분류 이름 두 열(`service_division`·`main_construction_type`)의 손상 정책을
+ * [businessDivisionOf] 와 **같게** 맞춘다. 세 열 다 감시 「관심 업종」 집합의 입력이고, V17 이 공백 CHECK 를 건 이유가
+ * 「빈 값이 조용히 성립하면 아무것과도 안 맞는다」(D-6F4-8)다. CHECK 가 1차 잠금이라 정상 DB 에서는 도달 불가이고,
+ * 도달했다면 CHECK 없이 만든 열이라는 뜻이라 조용히 `null` 로 접지 않는다. (열 자체가 `NULL` 인 것은 손상이 아니다 —
+ * 재수집 전 행이라 호출부가 `?.let` 으로 가른다.)
+ */
+private fun <T : Any> restoredName(
+    column: String,
+    stored: String,
+    of: (String) -> T?,
+): T = of(stored) ?: error("$column 이 공백뿐이다(V17 CHECK 가 막는 값)")
+
+/**
  * D-3H-3 — 복원 경로도 [AgencyCode.of]·[AgencyName.of]로 정규화·trim 한다(위
  * [businessCategoryOf]와 같은 관례). 저장 시점에 이미 정규화·trim 된 문자열만 오므로(D-3H-4
  * KDoc) 여기서는 값을 다시 뒤틀지 않는다 — 코드·이름이 둘 다 없으면 fact 없음(`null`).
@@ -123,8 +136,9 @@ internal fun NoticeId.reconstructNotice(row: NoticeRow): Notice {
             noticeAgency = agencyOf(row.noticeAgencyCode, row.noticeAgencyName),
             title = row.title?.let(NoticeTitle::of),
             businessDivision = row.businessDivision?.let(::businessDivisionOf),
-            serviceDivision = row.serviceDivision?.let(ServiceDivision::of),
-            mainConstructionType = row.mainConstructionType?.let(MainConstructionType::of),
+            serviceDivision = row.serviceDivision?.let { restoredName("service_division", it, ServiceDivision::of) },
+            mainConstructionType =
+                row.mainConstructionType?.let { restoredName("main_construction_type", it, MainConstructionType::of) },
         )
     return applyStatusPath(Notice.collected(command), NoticeStatus.valueOf(row.status))
 }
