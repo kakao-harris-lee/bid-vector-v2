@@ -181,24 +181,32 @@ class NoticeBusinessClassificationPersistenceTest : PersistenceTestSupport() {
     /**
      * code-review r1 MEDIUM-2 — 같은 공고가 **두 오퍼레이션**에 모두 나오면 대분류는 last-writer-wins 다. 공고 목록
      * 관측의 대분류는 절대 `null` 이 아니므로(오퍼레이션이 정한다) 존재 가드가 「유입이 항상 이긴다」로 작동한다.
-     * 이 test 는 그 전제를 **측정한다**: 두 순서가 서로 다른 값을 남기고(순서 독립이 아니다) 두 번째 저장이 매번
-     * `Updated` 다(그 행은 `Unchanged` 로 수렴하지 않는다). 병합 의미는 이 slice 가 바꾸지 않는다 — 알려진 제한으로
-     * 등재하고, 실제로 겹치는 공고가 있는지는 D-6F9-5 의 SQL 이 잰다.
+     * 이 test 는 그 전제를 **측정한다**: 두 순서가 서로 다른 값을 남기고(순서 독립이 아니다), 교대를 한 번 더 돌린
+     * 세 번째 저장도 `Updated` 라 그 행은 `Unchanged` 로 **수렴하지 않는다**(code-review r2 LOW — 두 번만 재던 이전
+     * 판은 「매번」을 재지 못했다). 겹친 행이 용역 전용 칸과 공사 전용 칸을 **둘 다** 채운 상태도 함께 잰다 —
+     * checklist §7 SQL ⑨(a) 가 겹침 탐지에 쓰는 바로 그 상태다. 병합 의미는 이 slice 가 바꾸지 않는다 — 알려진
+     * 제한으로 등재하고, 실제로 겹치는 공고가 있는지는 D-6F9-5 의 SQL 이 잰다.
      */
     @Test
     fun `두 오퍼레이션이 같은 공고를 내면 대분류는 나중 관측이 이긴다 — 슬롯 순서에 의존한다`() {
-        val construction = commandOf(idOf("CROSSOP-A"), BusinessDivision.CONSTRUCTION, main = electricalWork)
-        val service = commandOf(idOf("CROSSOP-B"), BusinessDivision.SERVICE, service = technicalService)
+        val serviceLast = idOf("CROSSOP-A")
+        val constructionLast = idOf("CROSSOP-B")
 
-        persist(commandOf(construction.id, BusinessDivision.CONSTRUCTION, main = electricalWork))
-        persist(commandOf(construction.id, BusinessDivision.SERVICE, service = technicalService))
+        persist(commandOf(serviceLast, BusinessDivision.CONSTRUCTION, main = electricalWork))
+        persist(commandOf(serviceLast, BusinessDivision.SERVICE, service = technicalService))
             .shouldBeInstanceOf<PersistOutcome.Updated>()
-        persist(commandOf(service.id, BusinessDivision.SERVICE, service = technicalService))
-        persist(commandOf(service.id, BusinessDivision.CONSTRUCTION, main = electricalWork))
+        persist(commandOf(constructionLast, BusinessDivision.SERVICE, service = technicalService))
+        persist(commandOf(constructionLast, BusinessDivision.CONSTRUCTION, main = electricalWork))
             .shouldBeInstanceOf<PersistOutcome.Updated>()
 
-        columnsOf(construction.id)["business_division"] shouldBe "용역"
-        columnsOf(service.id)["business_division"] shouldBe "공사"
+        columnsOf(serviceLast)["business_division"] shouldBe "용역"
+        columnsOf(constructionLast)["business_division"] shouldBe "공사"
+        columnsOf(serviceLast).filterKeys { it in setOf("service_division", "main_construction_type") } shouldBe
+            mapOf("service_division" to "기술용역", "main_construction_type" to "전기공사업")
+
+        persist(commandOf(serviceLast, BusinessDivision.CONSTRUCTION, main = electricalWork))
+            .shouldBeInstanceOf<PersistOutcome.Updated>()
+        columnsOf(serviceLast)["business_division"] shouldBe "공사"
     }
 
     @Test
