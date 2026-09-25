@@ -91,6 +91,13 @@ private fun mergeAllocatedBudget(
  * provenance 축이 없는 열의 **존재 가드**(V1 migration KDoc · D-3H-3) — 유입 값이 있으면 쓰고 없으면 기존을 지킨다.
  * 열마다 규칙을 따로 쓰면 새 열 하나가 가드를 빠뜨려도 초록이다(`OPEN-3H-MERGE-GUARD-TESTS`) — 같은 규칙을 두 함수(분류 축·서술 축)와
  * [mergeNoticeRow] 의 낙찰하한율·마감이 받는다. 금액 셋은 권위 계층이라 여기 없다. 분류 축 = 업무구분 코드·라벨 + M6/6F-9 새 칸 셋.
+ *
+ * **한계(code-review r1 MEDIUM-2)** — 대분류(`businessDivision`)는 공고 목록 관측에서 절대 `null` 이 아니다(오퍼레이션이
+ * 정한다). 그래서 이 축에 대해 존재 가드는 사실상 「유입이 항상 이긴다」다: 같은 공고번호·차수가 두 오퍼레이션에 모두
+ * 나오면 저장값이 **슬롯 순서**로 정해지고 그 행은 매 실행 `Updated` 로 뒤집힌다(순서 독립·멱등이 아니다).
+ * 충돌을 세는 자리도 없다 — D-6F9-1 R1 은 응답 라벨 불일치만 다루고 오퍼레이션 대 오퍼레이션은 다루지 않는다. 오늘은
+ * 공고번호가 오퍼레이션 간 배타라는 **전제**에 의존한다(실측은 D-6F9-5 의 SQL). 이 slice 는 병합 의미를 바꾸지 않는다 —
+ * 거동은 `NoticeBusinessClassificationPersistenceTest` 가 측정으로 잠갔고 제한은 `checklist.md` 에 등재했다.
  */
 private fun NoticeRow.keepingClassificationWhereAbsentIn(incoming: NoticeRow): NoticeRow =
     copy(
