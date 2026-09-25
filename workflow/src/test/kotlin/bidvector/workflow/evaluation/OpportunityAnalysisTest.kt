@@ -4,7 +4,6 @@ import bidvector.decision.MlUnavailableReason
 import bidvector.decision.VerdictLadder
 import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.derive.DERIVATION_POLICY
-import bidvector.procurement.Notice
 import bidvector.qualification.OperatorLicenses
 import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.EffectiveFrom
@@ -15,7 +14,6 @@ import bidvector.sharedkernel.Rate
 import bidvector.workflow.embedding.EmbeddingOutcome
 import bidvector.workflow.embedding.EmbeddingUnavailableReason
 import bidvector.workflow.embedding.TextKind
-import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.prediction.BidPredictionOutcome
 import bidvector.workflow.prediction.UnmeasurableReason
 import io.kotest.matchers.shouldBe
