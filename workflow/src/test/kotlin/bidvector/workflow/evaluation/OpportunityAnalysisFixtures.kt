@@ -26,6 +26,8 @@ import bidvector.workflow.embedding.EmbedTextPort
 import bidvector.workflow.embedding.EmbedTextRequest
 import bidvector.workflow.embedding.EmbeddingOutcome
 import bidvector.workflow.embedding.EmbeddingVector
+import bidvector.workflow.embedding.TextKind
+import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.prediction.BidPredictionOutcome
 import bidvector.workflow.prediction.BidPredictionPort
 import bidvector.workflow.prediction.BidPredictionRequest
@@ -38,6 +40,7 @@ import bidvector.workflow.prediction.PriceFitness
 import bidvector.workflow.prediction.SegmentSupport
 import bidvector.workflow.prediction.Uncertainty
 import bidvector.workflow.prediction.Weight
+import kotlinx.coroutines.runBlocking
 import java.math.BigDecimal
 import java.time.Instant
 import kotlin.math.sqrt
@@ -109,6 +112,40 @@ internal fun predicted(
         release = release,
         diagnostics = diagnostics,
     )
+
+/**
+ * 두 test 파일(`OpportunityAnalysisTest`·`OpportunitySampleSupplyDivisionTest`)이 함께 쓰는 조립·실행 헬퍼 —
+ * 6F-9 r1 에서 fixture 로 올렸다(파일 500줄 한도로 test 가 갈려도 조립은 한 정의만 둔다).
+ */
+internal fun matchingEmbed(): FakeEmbedTextPort =
+    FakeEmbedTextPort { request ->
+        when (request.kind) {
+            TextKind.NOTICE -> embedded(vector = normalizedEmbeddingVector(1.0f, 0.0f))
+            TextKind.OPERATOR_PROFILE -> embedded(vector = normalizedEmbeddingVector(1.0f, 0.0f))
+        }
+    }
+
+internal fun analysis(
+    embed: FakeEmbedTextPort = matchingEmbed(),
+    prediction: FakeBidPredictionPort = FakeBidPredictionPort { predicted() },
+    profile: ConfigurableProfilePort = ConfigurableProfilePort(testProfile()),
+    workload: FakeWorkloadPort = FakeWorkloadPort(),
+    watchSubjects: FakeWatchSubjectPort = FakeWatchSubjectPort(),
+    capacity: FakeCapacityPort = FakeCapacityPort(CapacitySnapshot(currentActiveBids = 2, maxActiveBids = 10)),
+    samples: FakeCompetitionSamplePort = FakeCompetitionSamplePort(),
+    clock: FixedClock = FixedClock(),
+): OpportunityAnalysis =
+    OpportunityAnalysis(embed, prediction, profile, workload, watchSubjects, capacity, samples, clock)
+
+internal fun analyzeNotice(
+    instance: OpportunityAnalysis,
+    notice: Notice = testNoticeWithMoney(),
+): MlAnalysisOutcome = runBlocking { instance.analyze(notice, CorrelationId("corr-1")) }
+
+internal fun MlAnalysisOutcome.shouldBeAnalyzed(): MlAnalysisOutcome.Analyzed {
+    check(this is MlAnalysisOutcome.Analyzed) { "Analyzed 가 아니다: $this" }
+    return this
+}
 
 internal class FakeEmbedTextPort(
     val outcomeFor: (EmbedTextRequest) -> EmbeddingOutcome,
