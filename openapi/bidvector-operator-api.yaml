@@ -1,12 +1,18 @@
 openapi: 3.0.3
 info:
   title: bid-vector operator API
-  version: "6a3f3"
+  version: "6a2b"
   description: >-
     단일 운영자 소비자 전용(운영자 결정 2026-09-16 ①). 이 문서가 단일 출처다(D-6A1-8,
     수작성) — `OpenApiContractTest`가 구현과 대조한다. M6/6A-1이 전략 조회(읽기 전용)를,
     M6/6A-3+6F-3(D-6A3-11)이 평가 dry-run endpoint를 연다 — 둘 다 커밋을 만들지 않는다
-    (실행·명령 경로 없음).
+    (실행·명령 경로 없음). M6/6A-2b(D-6A2b-1)가 편집 세션 endpoint 여섯을 열어 전략을
+    **쓰는** 길을 낸다 — 모든 쓰기는 편집 세션을 지나고 한 트랜잭션에서 커밋된다.
+
+    405(지원하지 않는 메서드)는 어느 operation 아래에도 적지 않는다 — 그것은 operation 의
+    응답이 아니라 「그 경로에 그 메서드가 없다」는 사실이고, OpenAPI 에 그 자리가 없다.
+    구현은 매핑된 모든 경로에서 미선언 메서드에 405 `ErrorBody` 를 낸다(D-6A2b-7,
+    `HttpSurfaceFormatGateTest` 가 등록된 매핑 전수로 잰다).
 servers:
   - url: /
 security:
@@ -79,10 +85,346 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: >-
+            요청 본문이 application/json 이 아니다(M6/6A-2b D-6A2b-7).
+            code: UNSUPPORTED_MEDIA_TYPE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "500":
           description: >-
             내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17,
             fail-closed). code: INVALID_STORED_STRATEGY | INTERNAL_ERROR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/strategy/edit-sessions:
+    post:
+      operationId: beginEditSession
+      summary: 편집 세션 시작(D-6A2b-1) — 세션 id 는 서버가 만든다
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditSessionBeginRequest"
+      responses:
+        "201":
+          description: 새 세션(state=WAITING_FOR_VALUE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditSessionResponse"
+        "400":
+          description: "본문 형식 오류·알 수 없는 field 토큰. code: INVALID_REQUEST"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "자격증명 없음 또는 틀림(D-6A1-6). code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: >-
+            같은 세션 id 에 이미 비종단 세션이 있다. code: SESSION_ALREADY_ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: >-
+            내부 오류(저장된 전략이 유효하지 않음 포함) 또는 감사 기록 실패(D-6A1-17).
+            code: INVALID_STORED_STRATEGY | INTERNAL_ERROR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/strategy/edit-sessions/{sessionId}:
+    get:
+      operationId: readEditSession
+      summary: 편집 세션 조회 — 접근 시점에 만료를 먼저 접는다(D-6A2b-11)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 세션 상태
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditSessionResponse"
+        "401":
+          description: "자격증명 없음 또는 틀림. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: "그 id 의 세션이 없다. code: SESSION_NOT_FOUND"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류. code: INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/strategy/edit-sessions/{sessionId}/value:
+    post:
+      operationId: provideEditSessionValue
+      summary: 값 제출(D-6A2b-2) — 현재 전략에서 그 필드 하나만 바꾼 초안을 만든다
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditSessionValueRequest"
+      responses:
+        "200":
+          description: 세션 상태(값이 유효하면 WAITING_FOR_CONFIRMATION)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditSessionResponse"
+        "400":
+          description: >-
+            본문 형식 오류(code: INVALID_REQUEST) 또는 전략 값 불변식 위반
+            (code: STRATEGY_VALUE_INVALID — 어느 불변식인지는 싣지 않는다,
+            OPEN-6A2B-VIOLATION-DETAIL)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "자격증명 없음 또는 틀림. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: "그 id 의 세션이 없다. code: SESSION_NOT_FOUND"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: >-
+            세션이 이 명령을 받을 수 없다. code: SESSION_EXPIRED | IDEMPOTENCY_CONFLICT |
+            ACTOR_MISMATCH | SYSTEM_ACTOR_NOT_PERMITTED | STALE_REVISION |
+            INVALID_TRANSITION | SESSION_ALREADY_ACTIVE | EDIT_SESSION_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류. code: INVALID_STORED_STRATEGY | INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/strategy/edit-sessions/{sessionId}/confirm:
+    post:
+      operationId: confirmEditSession
+      summary: 확인 — seenRevision 이 지금 전략과 다르면 거부한다(우회 3)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditSessionConfirmRequest"
+      responses:
+        "200":
+          description: 세션 상태(적용되면 APPLIED · strategyRevision 이 1 오른다)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditSessionResponse"
+        "400":
+          description: "본문 형식 오류. code: INVALID_REQUEST"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "자격증명 없음 또는 틀림. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: "그 id 의 세션이 없다. code: SESSION_NOT_FOUND"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: >-
+            세션이 이 명령을 받을 수 없다(사유 코드는 value 와 같은 목록).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류. code: INVALID_STORED_STRATEGY | INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/strategy/edit-sessions/{sessionId}/edit:
+    post:
+      operationId: requestEditSessionEdit
+      summary: 확인 화면에서 (같거나 다른) 필드로 되돌아간다
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditSessionEditRequest"
+      responses:
+        "200":
+          description: 세션 상태(WAITING_FOR_VALUE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditSessionResponse"
+        "400":
+          description: "본문 형식 오류·알 수 없는 field 토큰. code: INVALID_REQUEST"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "자격증명 없음 또는 틀림. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: "그 id 의 세션이 없다. code: SESSION_NOT_FOUND"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: "세션이 이 명령을 받을 수 없다(사유 코드는 value 와 같은 목록)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류. code: INVALID_STORED_STRATEGY | INTERNAL_ERROR"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/strategy/edit-sessions/{sessionId}/cancel:
+    post:
+      operationId: cancelEditSession
+      summary: 취소 — 종단 상태다(재개는 새 세션, D-4A-4)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditSessionCancelRequest"
+      responses:
+        "200":
+          description: 세션 상태(CANCELLED)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditSessionResponse"
+        "400":
+          description: "본문 형식 오류. code: INVALID_REQUEST"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: "자격증명 없음 또는 틀림. code: UNAUTHENTICATED"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: "그 id 의 세션이 없다. code: SESSION_NOT_FOUND"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: "세션이 이 명령을 받을 수 없다(사유 코드는 value 와 같은 목록)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: "요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "500":
+          description: "내부 오류. code: INVALID_STORED_STRATEGY | INTERNAL_ERROR"
           content:
             application/json:
               schema:
@@ -241,6 +583,158 @@ components:
     # 목록을 양방향(부분집합 아니라 등식)으로 대조한다 — 한쪽에만 코드를 더하면 RED.
     # `type: string` + `enum` 은 D-6A1-38 평탄 술어의 NON_FLAT_KEYS 밖이라 게이트는 그대로
     # 초록이다.
+    # M6/6A-2b D-6A2b-1 — 편집 요청·응답 다섯. 전부 평탄하다(D-6A1-20 ⓑ). `field` 의 enum 은
+    # 구현의 필드 어휘 전수와 **집합 등식**으로 대조된다(`OpenApiEditSessionContractTest`) —
+    # 새 필드를 코드에만 더하거나 문서에만 더하면 RED 다.
+    EditSessionBeginRequest:
+      type: object
+      required:
+        - field
+      properties:
+        field:
+          type: string
+          enum:
+            - FOCUS_CATEGORY
+            - FOCUS_REGION
+            - EXCLUDE_REGION
+            - REQUIRED_KEYWORD
+            - EXCLUDE_KEYWORD
+            - MIN_BUDGET
+            - MAX_BUDGET
+            - MINIMUM_MATCH_SCORE
+            - MINIMUM_PROBABILITY_SCORE
+            - BID_NOW_THRESHOLD
+            - REVIEW_THRESHOLD
+            - CANDIDATE_LIMIT
+            - MAX_ACTIVE_BIDS
+    # 값 칸 넷 가운데 `field` 가 이름하는 하나만 싣는다 — 다른 칸이 함께 오면 400 이다
+    # (조용히 무시하지 않는다). 칸 배정: 업종·지역·키워드 다섯 → terms, 예산 둘 → amountWon,
+    # 임계 넷 → number, 후보 상한·여력 상한 → count.
+    EditSessionValueRequest:
+      type: object
+      required:
+        - commandId
+        - field
+      properties:
+        commandId:
+          type: string
+        field:
+          type: string
+          enum:
+            - FOCUS_CATEGORY
+            - FOCUS_REGION
+            - EXCLUDE_REGION
+            - REQUIRED_KEYWORD
+            - EXCLUDE_KEYWORD
+            - MIN_BUDGET
+            - MAX_BUDGET
+            - MINIMUM_MATCH_SCORE
+            - MINIMUM_PROBABILITY_SCORE
+            - BID_NOW_THRESHOLD
+            - REVIEW_THRESHOLD
+            - CANDIDATE_LIMIT
+            - MAX_ACTIVE_BIDS
+        terms:
+          type: array
+          items:
+            type: string
+        amountWon:
+          type: integer
+          format: int64
+          minimum: 0
+        number:
+          type: number
+        count:
+          type: integer
+          format: int32
+    EditSessionConfirmRequest:
+      type: object
+      required:
+        - commandId
+        - seenRevision
+      properties:
+        commandId:
+          type: string
+        seenRevision:
+          type: integer
+          format: int32
+          minimum: 0
+    EditSessionEditRequest:
+      type: object
+      required:
+        - commandId
+        - field
+      properties:
+        commandId:
+          type: string
+        field:
+          type: string
+          enum:
+            - FOCUS_CATEGORY
+            - FOCUS_REGION
+            - EXCLUDE_REGION
+            - REQUIRED_KEYWORD
+            - EXCLUDE_KEYWORD
+            - MIN_BUDGET
+            - MAX_BUDGET
+            - MINIMUM_MATCH_SCORE
+            - MINIMUM_PROBABILITY_SCORE
+            - BID_NOW_THRESHOLD
+            - REVIEW_THRESHOLD
+            - CANDIDATE_LIMIT
+            - MAX_ACTIVE_BIDS
+    EditSessionCancelRequest:
+      type: object
+      required:
+        - commandId
+      properties:
+        commandId:
+          type: string
+    # 초안(draft) 전체는 싣지 않는다 — 확인 중인 값은 방금 보낸 값이고 현재 전략은
+    # `GET /api/strategy` 가 낸다.
+    EditSessionResponse:
+      type: object
+      required:
+        - sessionId
+        - state
+        - sessionVersion
+        - expiresAt
+      properties:
+        sessionId:
+          type: string
+        state:
+          type: string
+          enum:
+            - WAITING_FOR_VALUE
+            - WAITING_FOR_CONFIRMATION
+            - APPLIED
+            - CANCELLED
+            - EXPIRED
+        field:
+          type: string
+          nullable: true
+          enum:
+            - FOCUS_CATEGORY
+            - FOCUS_REGION
+            - EXCLUDE_REGION
+            - REQUIRED_KEYWORD
+            - EXCLUDE_KEYWORD
+            - MIN_BUDGET
+            - MAX_BUDGET
+            - MINIMUM_MATCH_SCORE
+            - MINIMUM_PROBABILITY_SCORE
+            - BID_NOW_THRESHOLD
+            - REVIEW_THRESHOLD
+            - CANDIDATE_LIMIT
+            - MAX_ACTIVE_BIDS
+        sessionVersion:
+          type: integer
+        expiresAt:
+          type: string
+          format: date-time
+        strategyRevision:
+          type: integer
+          nullable: true
     ErrorBody:
       type: object
       required:
@@ -258,6 +752,18 @@ components:
             - MAX_ACTIVE_BIDS_NOT_CONFIGURED
             - CANDIDATE_CAP_EXCEEDED
             - INVALID_REQUEST
+            - SESSION_NOT_FOUND
+            - SESSION_EXPIRED
+            - IDEMPOTENCY_CONFLICT
+            - ACTOR_MISMATCH
+            - SYSTEM_ACTOR_NOT_PERMITTED
+            - STALE_REVISION
+            - INVALID_TRANSITION
+            - SESSION_ALREADY_ACTIVE
+            - EDIT_SESSION_CONFLICT
+            - STRATEGY_VALUE_INVALID
+            - METHOD_NOT_ALLOWED
+            - UNSUPPORTED_MEDIA_TYPE
         message:
           type: string
         correlationId:
