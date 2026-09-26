@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.HttpMediaTypeNotAcceptableException
 import org.springframework.web.HttpMediaTypeNotSupportedException
 import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -73,6 +74,7 @@ object ErrorCode {
     const val STRATEGY_VALUE_INVALID = "STRATEGY_VALUE_INVALID"
     const val METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     const val UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
+    const val NOT_ACCEPTABLE = "NOT_ACCEPTABLE"
 }
 
 /**
@@ -144,9 +146,16 @@ object ErrorMapping {
     private fun editPathCode(throwable: Throwable): Pair<String, String>? =
         when (throwable) {
             is InvalidEditRequestException -> ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
+
             is EditSessionConflictException -> ErrorCode.EDIT_SESSION_CONFLICT to "편집 세션이 동시에 바뀌었다"
+
             is HttpRequestMethodNotSupportedException -> ErrorCode.METHOD_NOT_ALLOWED to "이 경로가 지원하지 않는 메서드다"
+
             is HttpMediaTypeNotSupportedException -> ErrorCode.UNSUPPORTED_MEDIA_TYPE to "지원하지 않는 미디어 타입이다"
+
+            // D-6A2b-21 — 이 앱은 JSON 하나만 낸다. 협상 실패도 기본 분기(500)로 보내지 않는다.
+            is HttpMediaTypeNotAcceptableException -> ErrorCode.NOT_ACCEPTABLE to "요청한 미디어 타입으로 응답할 수 없다"
+
             else -> null
         }
 }
@@ -225,6 +234,12 @@ class GlobalErrorHandler {
         exception.supportedHttpMethods?.let { builder.allow(*it.toTypedArray()) }
         return builder.body(ErrorMapping.forThrowable(exception, correlationId))
     }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException::class)
+    fun mediaTypeNotAcceptable(
+        exception: HttpMediaTypeNotAcceptableException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.NOT_ACCEPTABLE, exception, request)
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
     fun mediaTypeNotSupported(

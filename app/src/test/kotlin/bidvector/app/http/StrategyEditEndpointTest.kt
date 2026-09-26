@@ -273,6 +273,32 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
         get("/api/strategy").body?.get("focusCategories") shouldBe listOf("1234", "5678")
     }
 
+    /**
+     * 값 칸 넷이 각각 **그 칸을 읽는 필드**에서 실제로 통과하는지 — 파서(칸 선택)와 초안
+     * 패치(값 소비)가 같은 표를 말하는지 HTTP 로 한 번 태운다. 필드 전수의 짝 맞춤은
+     * `EditableFieldVocabularyGateTest` 가 값 층에서 따로 잠근다.
+     */
+    @Test
+    fun `값 칸 넷이 각각 그 칸을 읽는 필드에서 200 이다`() {
+        val probes =
+            listOf(
+                "FOCUS_CATEGORY" to """"terms":["1234"]""",
+                "MIN_BUDGET" to """"amountWon":1000""",
+                "BID_NOW_THRESHOLD" to """"number":0.9""",
+                "CANDIDATE_LIMIT" to """"count":5""",
+            )
+
+        val statuses =
+            probes.map { (field, slot) ->
+                val sessionId = beginSession(field)
+                post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"v-$field","field":"$field",$slot}""")
+                    .statusCode
+                    .value()
+            }
+
+        statuses shouldBe listOf(200, 200, 200, 200)
+    }
+
     @Test
     fun `편집 경로도 자격증명 없이는 401 이다 — 필터 무편집으로 덮인다`() {
         val anonymous =

@@ -49,8 +49,11 @@ data class EditSessionResponse(
  * 상태의 wire 어휘(전수 `when`) — 저장 어휘(`EditSessionSnapshot` 의 `stateKindName`)는
  * `workflow` 안에서 `private` 이라 재사용할 수 없다. 같은 낱말을 쓰되 출처가 다르다
  * (`StrategyReadController.provenanceLabel` 과 같은 갈래의 알려진 중복 — 모듈 경계가 막았다).
+ *
+ * `internal` 인 이유는 test 편의가 아니라 **계약 등식**이다(C-5a) — 문서의 `state` enum 과
+ * 이 표가 같은 어휘를 말하는지 잴 자리가 필요하고, 그 비교는 이 함수 자신이 유일한 출처다.
  */
-private fun EditSessionState.token(): String =
+internal fun EditSessionState.token(): String =
     when (this) {
         is EditSessionState.WaitingForValue -> "WAITING_FOR_VALUE"
         is EditSessionState.WaitingForConfirmation -> "WAITING_FOR_CONFIRMATION"

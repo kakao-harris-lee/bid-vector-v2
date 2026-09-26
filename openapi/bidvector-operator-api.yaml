@@ -105,6 +105,11 @@ paths:
     post:
       operationId: beginEditSession
       summary: 편집 세션 시작(D-6A2b-1) — 세션 id 는 서버가 만든다
+      description: >-
+        409 `SESSION_ALREADY_ACTIVE` 는 선언하지 않는다(C-3) — 세션 id 를 서버가 UUID 로
+        만들므로 「같은 id 에 이미 비종단 세션」 가드에 HTTP 로 닿을 길이 없다. 그 코드는
+        use case 의 전수 `when` 을 총(total)으로 유지하려고 남아 있을 뿐이고, 도달 불가는
+        알려진 제한으로 등재돼 있다. 버려진 세션의 처분은 `OPEN-6A2B-ABANDONED-SESSIONS`.
       requestBody:
         required: true
         content:
@@ -126,13 +131,6 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "401":
           description: "자격증명 없음 또는 틀림(D-6A1-6). code: UNAUTHENTICATED"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorBody"
-        "409":
-          description: >-
-            같은 세션 id 에 이미 비종단 세션이 있다. code: SESSION_ALREADY_ACTIVE
           content:
             application/json:
               schema:
@@ -174,8 +172,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "400":
+          description: >-
+            경로 변수가 비어 있다(`%20` 등 — 디코딩 뒤 공백). code: INVALID_REQUEST
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "404":
           description: "그 id 의 세션이 없다. code: SESSION_NOT_FOUND"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: >-
+            조회가 접는 만료 fold 의 영속이 동시 전진과 부딪쳤다(C-2).
+            code: EDIT_SESSION_CONFLICT
           content:
             application/json:
               schema:
@@ -713,7 +726,10 @@ components:
         field:
           type: string
           nullable: true
+          # C-4 — 종단 상태에서 실제로 `null` 이 나간다. 엄격한 검증기가 그 값을 거부하지
+          # 않도록 어휘에 함께 싣는다(대조 test 는 `null` 을 뺀 집합으로 등식을 잰다).
           enum:
+            - null
             - FOCUS_CATEGORY
             - FOCUS_REGION
             - EXCLUDE_REGION
@@ -767,6 +783,7 @@ components:
             - STRATEGY_VALUE_INVALID
             - METHOD_NOT_ALLOWED
             - UNSUPPORTED_MEDIA_TYPE
+            - NOT_ACCEPTABLE
         message:
           type: string
         correlationId:

@@ -2,6 +2,7 @@ package bidvector.app.architecture
 
 import bidvector.app.http.EDITABLE_FIELDS
 import bidvector.app.http.EDITABLE_FIELD_TOKENS
+import bidvector.app.http.EDIT_SESSION_STATE_SAMPLES
 import bidvector.app.wiring.EditValue
 import bidvector.app.wiring.EditValueSlot
 import bidvector.app.wiring.valueSlot
@@ -9,6 +10,7 @@ import bidvector.app.wiring.withFieldValue
 import bidvector.strategy.StrategyDraft
 import bidvector.strategy.ThresholdField
 import bidvector.strategy.WatchRuleId
+import bidvector.workflow.strategy.EditSessionState
 import bidvector.workflow.strategy.EditableField
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClasses
@@ -60,6 +62,17 @@ class EditableFieldVocabularyGateTest {
             .filterIsInstance<EditableField.Threshold>()
             .map { it.field::class.java.name }
             .toSet() shouldBe subclassNames(ThresholdField::class.java)
+    }
+
+    /**
+     * C-5a — 상태 어휘의 정의역도 같은 축이다. 문서 enum 과의 등식은
+     * `OpenApiEditSessionContractTest` 가 재고, **그 등식이 전수를 대상으로 하는지**는
+     * 여기서 잠근다 — 대표값 목록이 하위 타입 하나를 빠뜨리면 문서 등식은 조용히 통과한다.
+     */
+    @Test
+    fun `상태 대표값이 EditSessionState 하위 타입 전부와 같다 — 집합 등식`() {
+        EDIT_SESSION_STATE_SAMPLES.map { it::class.java.name }.toSet() shouldBe
+            subclassNames(EditSessionState::class.java)
     }
 
     @Test
