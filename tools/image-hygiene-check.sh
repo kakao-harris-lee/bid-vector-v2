@@ -39,11 +39,16 @@ fi
 # `[ 가 "integer expression expected"로 비-0 을 내면 조건이 거짓으로 읽혀 위반이 조용히
 # 삼켜졌다 — `base.image.layers=`를 비우면 요약에 `false`를 찍으면서도 exit 0 이었다).
 # 이제는 값 모양도 검증한다: CRLF 절삭 → 빈 값 거부 → kind 별 모양(수치/목록/텍스트).
+#
+# code-review r1 LOW — 키 대조를 **리터럴**로 한다. `grep -c "^${key}="` 는 키를 BRE 로 읽어
+# `size.cap.bytes` 가 `sizeXcapYbytes=` 에도 맞았다(현 정책 파일에서 오답은 안 났지만, 이
+# 함수가 존재하는 이유인 **중복 키 탐지**가 느슨해진다). `awk` 의 `index($0, k) == 1` 은 정규식이
+# 아니라 문자열 접두 비교다 — 이스케이프 목록을 손으로 관리하지 않는다.
 _policy_value() {
   local key="$1"
   local kind="${2:-text}" # text | numeric | list
   local matches
-  matches="$(grep -c "^${key}=" "$POLICY_FILE" || true)"
+  matches="$(awk -v k="${key}=" 'index($0, k) == 1 { n++ } END { print n+0 }' "$POLICY_FILE")"
   if [ "$matches" -eq 0 ]; then
     echo "정책 키 ${key} 를 ${POLICY_FILE} 에서 읽지 못했다" >&2
     exit 2
@@ -53,7 +58,7 @@ _policy_value() {
     exit 2
   fi
   local raw
-  raw="$(sed -n "s/^${key}=//p" "$POLICY_FILE" | tr -d '\r')"
+  raw="$(awk -v k="${key}=" 'index($0, k) == 1 { print substr($0, length(k) + 1) }' "$POLICY_FILE" | tr -d '\r')"
   if [ -z "$raw" ]; then
     echo "정책 키 ${key} 의 값이 비어 있다(정책 오류 — 값 없는 키는 정책 오류다)" >&2
     exit 2
@@ -76,11 +81,23 @@ _policy_value() {
       # R3-1(D-6C-10 이후, verifier r3 HIGH, 표적 재검증) — 공백만(또는 탭)인 원소는
       # `[ -z ]`를 통과하는 "의미상 빈" 값이었다 — 그 원소로 `import`를 시도하면
       # SyntaxError 가 나 게이트가 "위반 없음"으로 잘못 읽었다. 절삭 뒤에도 빈 원소는 거부.
+      #
+      # **R4-1(code-review r1 MEDIUM, 같은 계열의 네 번째 판) — 앞/뒤 공백이 붙은 원소도
+      # 거부한다.** `forbidden.executables=javac, jshell, jar`(긴 목록을 사람이 쓰는 가장
+      # 자연스러운 형태)는 R3-1 을 통과했고, 그 뒤 두 판정 축이 모두 「부재」로 읽었다:
+      # `--entrypoint " jshell"` 은 컨테이너 생성이 실패해 `if` 가 거짓이 되고,
+      # `command -v " jshell"` 도 없다고 답한다. 즉 **첫 원소만 실제로 판정하고 나머지를
+      # 조용히 끈다.** 절삭해서 쓰는 쪽보다 정책을 고치라고 끊는 쪽을 고른다 — 정책 파일은
+      # 사람이 편집하는 자리이고, 조용히 받아 주면 다음 편집에서 같은 형태가 또 온다.
       local item trimmed
       for item in "${items[@]}"; do
         trimmed="$(printf '%s' "$item" | tr -d '[:space:]')"
         if [ -z "$trimmed" ]; then
           echo "정책 키 ${key} 에 빈(또는 공백만인) 원소가 있다: '${raw}'" >&2
+          exit 2
+        fi
+        if [ "$item" != "$trimmed" ]; then
+          echo "정책 키 ${key} 의 원소에 공백이 섞여 있다 — 공백 없는 형태로 고친다(공백 하나가 그 원소의 판정을 조용히 끈다)" >&2
           exit 2
         fi
       done
@@ -122,6 +139,7 @@ RUNTIME_KIND="$(_policy_value runtime.kind text)"
 # `_policy_value` 가 정책 오류로 끊는다(분기 소진: 모르는 kind 는 아래 `*)` 가 잡는다).
 FORBIDDEN_PACKAGES=""
 FORBIDDEN_EXECUTABLES=""
+REQUIRED_EXECUTABLES=""
 FORBIDDEN_DEPENDENCY_COORDINATES=""
 DEPENDENCY_LAYER_PATH=""
 DEPENDENCY_LAYER_MIN_ENTRIES=""
@@ -143,6 +161,11 @@ case "$RUNTIME_KIND" in
     ;;
   jvm-app)
     FORBIDDEN_EXECUTABLES="$(_policy_value forbidden.executables list)"
+    # code-review r1 Open Question 2 — compose healthcheck 이 이미지 안 `curl` 에 기댄다. 그
+    # 전제는 주석과 실측 기록에만 있었고, 베이스 다이제스트를 올렸을 때 사라지면 증상은
+    # 「app 이 healthy 로 수렴하지 않음」(타임아웃)이라 원인이 보이지 않는다. **이름 있는 축**으로
+    # 만든다 — 부재면 게이트가 그 자리에서, 그 이름으로 실패한다.
+    REQUIRED_EXECUTABLES="$(_policy_value required.executables list)"
     FORBIDDEN_DEPENDENCY_COORDINATES="$(_policy_value forbidden.dependency.coordinates list)"
     DEPENDENCY_LAYER_PATH="$(_policy_value dependency.layer.path text)"
     DEPENDENCY_LAYER_MIN_ENTRIES="$(_policy_value dependency.layer.min-entries numeric)"
@@ -341,6 +364,18 @@ case "$RUNTIME_KIND" in
       fi
     done
 
+    # ①' **필수** 실행 파일 존재(code-review r1 Open Question 2). 금지 축과 같은 PATH 조회를
+    # 쓰므로 셸이 없으면 판정 불가다 — 위에서 이미 `fail` 로 끊었고, 여기서는 그 경우 축을
+    # 건너뛰지 않고 「판정 불가」 사유를 한 번 더 남긴다(조용한 통과를 만들지 않는다).
+    IFS=',' read -r -a required_array <<< "$REQUIRED_EXECUTABLES"
+    for tool in "${required_array[@]}"; do
+      if [ "$shell_probe_available" != true ]; then
+        fail "필수 실행 파일 '${tool}' 의 존재를 판정할 수 없다(이미지에 셸이 없다)"
+      elif ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
+        fail "필수 실행 파일 '${tool}' 이 이 이미지의 PATH 에 없다 — compose healthcheck 가 이것으로 준비 상태를 묻는다"
+      fi
+    done
+
     # ② 풀린 의존 layer 에 test 전용 좌표 0(D-6A2a-7 ②). **주 잠금은 Gradle 구조**(`bootJar`
     # 는 `runtimeClasspath` 만 담는다)이고 이 검사는 그것이 이미지까지 이어졌는지 재는 보조다.
     DEP_LAYER_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint ls "$IMAGE_REF" -1 "$DEPENDENCY_LAYER_PATH" 2>/dev/null || true)"
@@ -358,7 +393,7 @@ case "$RUNTIME_KIND" in
         fi
       done
     fi
-    FORBIDDEN_SUMMARY="금지-실행파일-검사=${#executable_array[@]}건 의존layer=${DEPENDENCY_LAYER_PATH} 항목수=${DEP_LAYER_ENTRIES}(하한 ${DEPENDENCY_LAYER_MIN_ENTRIES}) 금지좌표-검사=${#coordinate_array[@]}건"
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${#executable_array[@]}건 필수-실행파일-검사=${#required_array[@]}건 의존layer=${DEPENDENCY_LAYER_PATH} 항목수=${DEP_LAYER_ENTRIES}(하한 ${DEPENDENCY_LAYER_MIN_ENTRIES}) 금지좌표-검사=${#coordinate_array[@]}건"
     ;;
   *)
     echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2
