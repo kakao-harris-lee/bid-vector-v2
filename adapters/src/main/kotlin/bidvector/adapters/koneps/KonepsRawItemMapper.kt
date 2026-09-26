@@ -1,5 +1,6 @@
 package bidvector.adapters.koneps
 
+import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionDropReason
 import bidvector.procurement.FieldConcept
 import bidvector.procurement.KonepsCollectionPolicyData
@@ -156,6 +157,9 @@ internal fun mapRawItem(
     // lmtGrpNo·lmtSno)은 KonepsOperationDescriptor.rowIdentifierRawKeys 를 그대로 넘긴다.
     // 기본값을 두지 않는다 — 새 호출부가 이 값을 잊으면 컴파일이 깨진다.
     rowIdentifierRawKeys: List<String>,
+    // D-6F9-1 — 이 오퍼레이션이 정하는 업무 대분류. 상세·개찰 오퍼레이션은 대분류를 정하지 않아 `null` 을 **명시**한다
+    // (기본값 없음 — 같은 규율). 응답 필드에서 추측하지 않는다.
+    sourceDivision: BusinessDivision?,
 ): RawItemOutcome {
     val rawFields = item.fields
     // L-4(verifier r1) — blank 키는 [RawKey]가 거부해 걸러야 하나, 걸러진 사실 자체가
@@ -174,7 +178,14 @@ internal fun mapRawItem(
     }
     // F-7 3B 몫(운영자 결정 2026-09-08 (a)) — item.sourceText 는 파서가 잡은 원문 substring
     // 그대로다(재직렬화 없음, KonepsJson.kt). RawNoticeObservation 은 저장 전용으로만 나른다.
-    val observation = RawNoticeObservation.ofRawValues(fields, sourceEndpoint, observedAt, item.sourceText)
+    val observation =
+        RawNoticeObservation.ofRawValues(
+            fields,
+            sourceEndpoint,
+            observedAt,
+            item.sourceText,
+            sourceDivision,
+        )
     val unknownFieldCount = policy.fieldContracts.unknownKeysIn(observation).size + blankKeyCount
     val identity = identityOf(numberRaw, roundRaw, rowDiscriminatorOf(fields, rowIdentifierRawKeys))
     return RawItemOutcome.Mapped(observation, identity, unknownFieldCount)

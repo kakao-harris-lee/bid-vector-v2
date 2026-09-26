@@ -2,6 +2,8 @@ package bidvector.adapters.evaluation
 
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.procurement.BusinessDivision
+import bidvector.procurement.MainConstructionType
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
@@ -9,6 +11,7 @@ import bidvector.procurement.NoticeStatus
 import bidvector.procurement.PersistOutcome
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
+import bidvector.procurement.ServiceDivision
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.isBiddable
 import bidvector.sharedkernel.NoticeRound
@@ -35,6 +38,7 @@ class JdbcCandidateSourceTest : PersistenceTestSupport() {
         deadline: Instant?,
         status: NoticeStatus = NoticeStatus.Open,
         round: String = "000",
+        classification: Triple<BusinessDivision?, ServiceDivision?, MainConstructionType?> = Triple(null, null, null),
     ): NoticeId {
         val id = NoticeId(NoticeNumber.of(number), NoticeRound.of(round))
         val observation =
@@ -55,6 +59,9 @@ class JdbcCandidateSourceTest : PersistenceTestSupport() {
                 deadlineAt = deadline,
                 openingScheduledAt = null,
                 raw = observation,
+                businessDivision = classification.first,
+                serviceDivision = classification.second,
+                mainConstructionType = classification.third,
             )
         JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
         if (status != NoticeStatus.Open) setStatus(id, status)
@@ -213,5 +220,27 @@ class JdbcCandidateSourceTest : PersistenceTestSupport() {
 
         restored.status shouldBe NoticeStatus.Open
         restored.deadlineAt shouldBe deadline
+    }
+
+    /** D-6F9-3 — 후보 다건 스캔도 업무구분 새 칸 셋을 저장한 그대로 복원한다(감시 집합의 입력이 이 경로로 온다). */
+    @Test
+    fun `후보로 복원된 Notice 는 업무구분 새 칸 셋을 저장한 그대로 낸다`() {
+        val id =
+            insertNotice(
+                "CLASSIFY-001",
+                Instant.parse("2026-10-01T09:00:00Z"),
+                classification =
+                    Triple(
+                        BusinessDivision.SERVICE,
+                        ServiceDivision.of("기술용역"),
+                        MainConstructionType.of("전기공사업"),
+                    ),
+            )
+
+        val restored = source().openCandidates().single { it.id == id }
+
+        restored.businessDivision shouldBe BusinessDivision.SERVICE
+        restored.serviceDivision shouldBe ServiceDivision.of("기술용역")
+        restored.mainConstructionType shouldBe MainConstructionType.of("전기공사업")
     }
 }

@@ -51,6 +51,7 @@ class KonepsLicenseLimitDocumentSource(
                 SourceEndpoint.LICENSE_LIMIT_DETAIL,
                 observedAt,
                 KonepsOperationPolicy.LICENSE_LIMIT_DETAIL.rowIdentifierRawKeys,
+                sourceDivision = null,
             )
         }
 }

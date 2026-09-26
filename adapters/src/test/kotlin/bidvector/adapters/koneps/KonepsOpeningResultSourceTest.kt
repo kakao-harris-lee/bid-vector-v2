@@ -97,6 +97,8 @@ class KonepsOpeningResultSourceTest {
 
             batch.items.size shouldBe 1
             batch.items.single().sourceEndpoint shouldBe SourceEndpoint.OPENING_AWARD_LIST
+            // D-6F9-1 — 개찰 축 오퍼레이션은 업무 대분류를 정하지 않는다(응답에서 추측하지 않는다).
+            batch.items.single().sourceDivision shouldBe null
         }
     }
 

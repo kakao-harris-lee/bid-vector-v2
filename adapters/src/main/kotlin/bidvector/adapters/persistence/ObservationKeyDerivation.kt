@@ -15,6 +15,14 @@ import java.security.MessageDigest
  * 유도되는 재료가 같은 문자열이라 「같은 payload인데 다른 키」·「다른 payload인데 같은 키」
  * 가 (해시 충돌을 제외하면) 구조적으로 생기지 않는다.
  *
+ * **재료의 범위(M6/6F-9, code-review r1 L4)** — 위 불변식은 `raw_observation` 에 저장되는
+ * 축에 대한 것이다. `RawNoticeObservation.sourceDivision`(수집 오퍼레이션의 업무 대분류)은
+ * 관측 **동등성**에는 들지만 이 재료에도, `raw_observation` 열에도 없다 — 원문 행은 대분류를
+ * 저장하지 않고 정본은 `notice.business_division` 이다(`checklist.md` 알려진 제한 2). 그래서
+ * 대분류만 다른 두 관측은 동등하지 않은데 같은 키를 낼 수 있다. 오늘은 무해하다(슬롯마다
+ * `observedAt`이 다르고 공고번호가 payload에 있다). 재료에 넣는 선택은 기존 raw 행의 키를
+ * 전부 바꾸므로 하지 않는다.
+ *
  * SHA-256(256비트)은 `Object.hashCode()`류(32비트, `"Aa"`·`"BB"`가 `String.hashCode()`에서
  * 충돌하는 실물이 F-2였다)와 달리 실무에서 우연 충돌을 기대할 수 없는 자리수다.
  */

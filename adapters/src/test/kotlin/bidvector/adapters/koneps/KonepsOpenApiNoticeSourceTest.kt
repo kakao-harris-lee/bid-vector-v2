@@ -1,5 +1,6 @@
 package bidvector.adapters.koneps
 
+import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionDropReason
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.FieldConcept
@@ -29,6 +30,7 @@ private fun newSource(
         serviceKey = ServiceKey.of("test-service-key"),
         httpPolicy = policy,
         collectionPolicyProvider = ::resolvedCollectionPolicy,
+        businessDivision = BusinessDivision.SERVICE,
         clock = FIXED_CLOCK,
     )
 

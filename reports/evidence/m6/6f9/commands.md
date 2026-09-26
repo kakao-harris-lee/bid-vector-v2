@@ -1,0 +1,108 @@
+# M6/6F-9 commands
+
+명령과 종료 코드만 남긴다(출력 전문 없음 — 감사자는 명령을 다시 돌린다). 실측은 전부 **버릴 worktree·임시 clone**에서 했고 `base` 는 `git merge-base HEAD origin/main`(= `f6ebc047`, PR #45 머지 커밋)이다.
+산출물 실측 HEAD 는 `rollback.md` 첫머리가 적는다. **마지막 evidence HEAD 의 `check` 결과 정본은 verifier 와 완료 보고다**(evidence 가 자기 마지막 커밋의 post-state 를 담을 수 없다).
+
+## acceptance — CI job 명령 그대로 (캐시 우회, 버릴 worktree)
+
+| 명령 | exit | 핵심 결과 |
+|---|---|---|
+| `./gradlew --no-daemon check --rerun-tasks` | 0 | BUILD SUCCESSFUL · 348 태스크 전부 실행(캐시 0) |
+| `./gradlew --no-daemon qualityBaseline` | 0 | BUILD SUCCESSFUL |
+| `./tools/one-command-check.sh` | 0 | Kotlin·Python 두 job 초록(pytest 958 passed + 1 passed) |
+
+실측은 **r2 의 마지막 산출물 커밋**(merge-base `f6ebc047`)의 버릴 worktree 에서 2026-09-25 에 했다 — 되돌림 실측은 같은 커밋의 임시 clone 이다. 세 명령은 앞 라운드에서도 같은 exit 0 였다(앞 실측을 옮기지 않고 이 HEAD 에서 다시 돌린 값이다).
+
+## RED 실측 — 구현 전에 실패를 본 새 test
+
+| test | 실측 |
+|---|---|
+| `BusinessDivisionTest` · `WatchCategoriesAssemblyTest` | 구현 전 컴파일 실패(`Unresolved reference`) — 타입·커널이 없다 |
+| `NoticeWatchSubjectPortTest` 새 셋 | 구현 전 행동 수준 FAILED 3(집합·공사 텍스트 조각) → 포트가 커널을 부른 뒤 초록 |
+| **r1** 대분류 값 획득 축 게이트 | 위반 표본 셋만 심고 **바꾸기 전 게이트**(멤버 열거 술어)로 음성 단언을 돌렸다: `:app:test --tests *CollectionArchitectureGateCatchesViolationsTest` exit 1 — enum 상수(MV1)·`Enum.valueOf`(MV4) 표기를 잡지 못한다(FAILED 2). 새 술어 셋으로 바꾼 뒤 초록 |
+| **r1** `RequestCategoryCodeWireTest`·`OpportunitySampleSupplyDivisionTest` | 구현(잠금) 전에는 class 자체가 없었다 — 잠금 세기는 아래 변이 MLW 가 잰다(잠금 제거 = 초록 확인은 무의미하므로 운반 단계 변이로 잰다) |
+| **r2** 복원 손상 정책 잠금 · 게이트 과잉 대조 | 둘 다 **이미 맞는 코드·술어**를 잠그는 test 라 「구현 전 RED」가 없다 — 세기는 아래 변이 MR1(값 지어내기)·MC1(자기 소유 읽기 제외 분기 제거)이 잰다 |
+
+나머지 새 test 는 구현과 같은 커밋에서 처음 초록으로 돌았다 — 그 잠금은 아래 변이가 잰다(수정 전 초록 → 적용 후 RED).
+
+## 변이 실측 — 각 변이는 적용 전 `git diff --numstat` 로 확인, 실행 뒤 `git checkout -- .` 로 원복, 버릴 worktree
+
+**수정 전(변이 적용 전 트리) 아래 test 는 전부 초록**이었다(같은 명령, exit 0).
+
+| 변이 | 적용(+/−) | 명령 | exit | RED 된 test |
+|---|---|---|---|---|
+| M1a 대분류 매핑 제거 — `canonicalize` 가 관측의 대분류를 옮기지 않음 | +1/−1 | `:procurement:test --tests *BusinessClassificationCanonicalizeTest` | 1 | 용역 항목 · 「대분류는 수집 오퍼레이션 값만 쓴다」 · 공사 항목 |
+| M1b 대분류 매핑 제거 — 어댑터가 관측에 싣지 않음 | +1/−1 | `:adapters:test --tests *KonepsSourceDivisionTest` | 1 | 셋 전부(넷 모두 · URL 경로 · 응답 라벨) |
+| M1c 대분류를 URL 경로 문자열로 지음(생성 인자를 폴백으로 남긴 채) | +1/−1 | `:app:test --tests *CollectionArchitectureGateTest` · `:adapters:test --tests *KonepsSourceDivisionTest` | 1 | 게이트 둘(「문자열에서 대분류를 만드는 호출은 허용 쌍뿐이다」 · 「허용 쌍은 관측과 같다」). **행동 test 는 초록** — 폴백이 값을 지켜 못 잡는다; 이 변이를 잡는 것은 호출 그래프 게이트뿐 |
+| M2 용역구분을 업무구분 라벨 칸에 섞음 | +1/−1 | `:procurement:test --tests *BusinessClassificationCanonicalizeTest` | 1 | 용역 항목 · 라벨 = 분류명뿐 · 같은 원천 쌍 · 계약 키 재지정 |
+| M3 주공종을 코드 칸에(코드를 지어냄) | +1/−0 | 위와 같음 | 1 | 「공사 항목 — 주공종은 이름만 싣고 코드를 지어내지 않는다」 |
+| M4a V17 쓰기 누락 — `UPDATE_NOTICE` 의 `SET` 과 바인딩에서 `main_construction_type` 을 함께 뺌 | +1/−1 · +1/−1 | `:adapters:test --tests *NoticeBusinessClassificationPersistenceTest` | 1 | 「갱신 — … 열마다 따로」 · 「갱신 — 값이 바뀌면 새 값이 이긴다」 |
+| M4b 병합 존재 가드에서 `service_division` 을 뺌 | +1/−1 | 위와 같음 | 1 | 같은 두 test |
+| M4c 바인딩 순서에서 `service_division` 과 `main_construction_type` 을 뒤바꿈(보조) | +1/−1 | 위와 같음 | 1 | 여섯(삽입·갱신 둘·존재 가드·공사·복원) |
+| M5 감시 집합에 빈 값 — 커널이 빈·공백 값을 걸러내지 않음 | +1/−1 | `:strategy:test --tests *WatchCategoriesAssemblyTest` | 1 | 「빈 값이 섞여도 …」 · 「빈 값과 공백류만 … 경계 표본 전수」 |
+| M6 키 리터럴을 어댑터에 삽입 | +2/−0 | `:app:test --tests *CollectionArchitectureGateTest` | 1 | 「원시 키 리터럴은 계약 행을 실은 파일 클래스 밖 … 없다」 · 「허용 클래스는 관측과 같다」 |
+| **MV1**(r1) 배선이 경로에서 enum 상수로 대분류를 지음(설정 값 무시) | +10/−1 | `:app:test --tests *CollectionArchitectureGateTest` | 1 | 셋(위반 규칙 · 타입 멤버 쌍 == 관측 · 값 획득 쌍 == 관측) |
+| **MV2**(r1) 타입 companion 에 파생 멤버를 더하고 배선이 그것을 부름 | +3/−0 · +10/−1 | 위와 같음 | 1 | 같은 셋 — 멤버 이름을 열거하지 않으므로 새 이름도 쌍이 된다 |
+| **MV4**(r1) `java.lang.Enum.valueOf(BusinessDivision::class.java, …)` | +10/−1 | 위와 같음 | 1 | 셋(위반 규칙 · 타입 멤버 쌍 · **클래스 객체 참조자 == 허용**) |
+| **MLW**(r1) `RequestMapping` 의 업종 코드 fact 를 늘 결측으로 | +1/−1 | `:adapters:test --tests *RequestCategoryCodeWireTest` · `:app:test --tests *CollectionArchitectureGateTest` | 1 | 「(가) 용역 공고의 공공조달분류 번호가 … 그대로 실린다」(앞 판에서는 이 변이가 초록이었다 — verifier r1 F-2) |
+| **MR1**(r2) 복원 손상 정책 — 세부 분류 이름 두 열에서 큰 소리 실패 대신 **값을 지어냄**(`?: error(…)` → `?: of("x")!!`) | +1/−1 | `:adapters:test --tests *NoticeReconstructionTest` | 1 | 「공백뿐인 세부 분류 이름 두 열도 … 실패한다」(앞 판에서는 이 변이가 초록이었다 — verifier r2 R2-L2) |
+| **MC1**(r2) 대분류 축 ②에서 **자기 소유 읽기 제외** 분기를 지움(과잉 방향 변이) | +0/−1 | `:app:test --tests *CollectionArchitectureGateCatchesViolationsTest` | 1 | 「대분류를 만들지 않는 fixture 는 … 나르기만 하는 것」 — 위반 상세는 새 fixture 의 자기 필드 읽기 한 줄뿐이고 `CleanNameLookup` 은 초록이다(옛 대조가 이 분기에 공허했다는 근거) |
+
+## 정적 확인
+
+| 확인 | 명령 | 결과 |
+|---|---|---|
+| in_scope 대조(A·M) | `git diff --name-status <base>..HEAD` 각 경로를 `scope.md` in_scope 항목 glob 에 대조(일회용 스크립트) | 밖 **0**. r1 이 더한 신규 여섯도 대조했다(게이트 규칙 파일 하나·표본 셋·`adapters/.../ml` test 하나·`workflow/.../evaluation` test 하나 — 앞 둘은 기존 glob, `ml` test 는 r1 계약 갱신이 더한 항목). r2 가 더한 신규는 **하나**(게이트 과잉 대조 fixture)이고 기존 glob `app/src/test/kotlin/bidvector/archfixture/violating/**` 안이다 — 계약 갱신 불필요 |
+| 쓰이지 않는 import 를 막는 게이트가 있는가 | r1 의 파일 내용(import 둘 있는 상태)으로 `./gradlew --no-daemon --rerun-tasks :workflow:ktlintTestSourceSetCheck` | **exit 0 — 막는 게이트가 없다.** 태스크는 실행됐다(UP-TO-DATE 아님). `ktlint_official` + ktlint 1.8.0 표준 규칙 집합에 `no-unused-imports` 가 있고 비활성 설정도 baseline 도 없는데 이 표기를 신고하지 않는다. 그래서 acceptance 는 앞 라운드에서도 붉지 않았고(348/348 exit 0, verifier r2 와 같은 값) `commands.md` 의 앞 exit 값과 모순이 없다 — r2 의 삭제는 **정리**이지 빌드 고침이 아니다. import 순서를 어기면 같은 태스크가 exit 1 이므로(대조 1회) 태스크가 이 파일을 실제로 본다는 것은 확인됐다 |
+| r1 게이트 술어 교체 흔적 | `grep -rn 'division-parse' --include=*.kt --include=*.properties .` | 0 — 낡은 정책 키 이름이 코드·정책 파일에 남지 않았다(evidence 문서는 교체 사실 자체를 적으므로 대상 밖) |
+| 관심 업종 커널의 production 호출자 | `grep -rn "assembleWatchCategories(" --include=*.kt adapters/src/main workflow/src/main app/src/main` | 포트 한 곳 |
+| 설정 행 생성자 | `grep -rn "KonepsOperationProperties(" --include=*.kt app/src/main` | 기본 표 두 행뿐(나머지는 바인더) |
+| raw 행을 읽어 정규화를 재생하는 코드 | `grep -rn "FROM raw_observation" --include=*.kt adapters/src/main` | 0 |
+| 역방향 `file:line`(편집한 승인 문서) | `grep -rn 'data-dictionary\.md:[0-9]' --include=*.md --include=*.kt --include=*.properties .` · `grep -n '^#### 6.3.4' docs/discovery/data-dictionary.md` | 인용 최대 행 < 삽입 지점 — 밀린 인용 0. `policy-values.md` 의 `file:line` 인용 0 |
+| 하네스 레인 | `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` | 빈 출력(`scope.md` 「하네스 레인 변경」 = 없음 유효) |
+| 비밀값 스캔 | `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m6/6f9/` · 같은 패턴을 `git diff <base>..HEAD -U0` 의 추가 줄에 | evidence exit 1(매치 없음). 추가 줄 매치 1건 = 기존 관례의 test 상수(`shouldNotContain` 대상 변수)이고 비밀값 아님. 육안: 키·개인정보·공고 원문 없음 |
+| clean-tree | `git status --porcelain -- <in_scope 개별 인자>` | 빈 출력 + 양성 대조 1회(줄 하나 덧붙여 1건 잡힘 확인 → `head -n` 절삭으로 복원, `checkout --` 미사용) |
+
+## 되돌림 실측 — 임시 clone (`rollback.md` ①~⑥)
+
+| 단계 | 명령 | exit·결과 |
+|---|---|---|
+| ① restore | `git restore --source=<base> --staged --worktree -- <목록 61개, 개별 인자>` | 0 · 삭제 19 · 변경 42 |
+| ② 공유 파일 hunk 격리 | `git diff <sha>~1..<sha> -- <파일> \| git apply -R`(최신 → 과거) | 열세 번 전부 0, conflict 0 |
+| ③ 트리 동일성 | `git diff <base> -- <목록>` · 공유 파일 넷 · `git diff --name-only <base>` 전체 | 앞 둘 빈 출력, 전체에서 남는 것은 `milestone-6.md` 와 이 slice 의 evidence 뿐이다(둘 다 restore 대상 아님) |
+| ④ compile | `./gradlew --no-daemon compileKotlin compileTestKotlin` | 0 |
+| ⑤ test | `./gradlew --no-daemon test` | 0 |
+| ⑥ 게이트 | `./gradlew --no-daemon check` | 0 |
+| 적용된 DB 갈래 | 임시 Postgres 에 V1~V17 적용 → `ALTER TABLE notice DROP COLUMN` 셋 | 0 · 열 3 → 0 · `notice` CHECK 16 → 13 |
+
+## 실수집 (D-6F9-5, 팀장 실행 2026-09-26 — 건수만, 원문·키 없음)
+
+jar `df540992`(SHA-256 앞자리 `be421fd288c4`)를 버릴 worktree 에서 `bootJar` 로 만들었다. 대상은 개발 DB `bid-vector-v2-dev`(V16 → 기동 시 V17 적용)이고,
+키·DB 자격은 서브셸 환경에만 넘겼다(6F-8 checklist 6항 형태). 범위는 6F-8 과 같다: 2026-08-25~2026-09-24, 공사·용역, 슬롯 62.
+
+| 확인 | 결과 |
+|---|---|
+| 실행 | exit 0 · 슬롯 62 완료 · 절단 0 · 멈춤 없음 · StructureFailure·쿼터·NUL 표지 0 · 로그의 키 흔적(64자 16진) 0 |
+| 회계 | 수신 22,640 = 정규화 22,640 + 중복 0 + 탈락 0 |
+| D-6F9-3 거동 | `updated` 22,639(기존 전부) · `unchanged` 0 · `inserted` 1 — 원천 수신이 6F-8 의 22,639 에서 1 늘었다(그 사이 같은 범위에 공고 추가) |
+| §7 ② 대분류 | 용역 12,780 · 공사 9,860 · NULL 0 |
+| §7 ③ 용역 | 용역구분 12,780/12,780 · 분류번호 12,775 · 분류명 12,775 |
+| §7 ④ 공사 | 주공종 3,242/9,860 (32.9%) |
+| §7 ⑤ 축 섞임 | 0 · 0 · 0 |
+| §7 ⑥ `bsnsDivNm` | 존재 0 · 불일치 0 |
+| §7 ⑦ 빈 문자열 행 | 0 |
+| §7 ⑨ 겹침 | (a) 0 · (b) 0 · (c) 0 |
+
+**평가 dry-run**(같은 jar, 루프백, 후보 상한 20,000, 수집 꺼짐, `currentActiveBids` 0). 운영자 API 에 전략 쓰기 경로가 없어(`GET /api/strategy` 만 있다 —
+`OPEN-6F9-STRATEGY-WRITE-ENDPOINT`) 팀장이 개발 DB 전략 행에 측정용 값을 직접 쓰고 측정 뒤 되돌렸다. `revision` 은 올리지 않아 두 측정 모두 1 이다.
+
+| 전략 | HTTP | 후보 | 감시 통과(= 후보 − notReached) | SQL 기대 | 판정 |
+|---|---|---|---|---|---|
+| 관심 업종 `{기술용역}` · 키워드 없음 | 200 | 4,916 | 712 (review 712) | 712(측정 전후 같음) | **일치 · ID 집합 동일** |
+| 키워드 `{도로}` · 관심 업종 없음(6F-8 행 그대로) | 200 | 4,916 | 186 (review 186) | 186(공고명 + 세부 이름) — 공고명만이면 163(= 6F-8 값) | **일치** |
+
+두 실행 모두 아래가 성립했다.
+- 버킷 넷의 합 = 후보, 서로소, `wouldNotify == bidNow`(0, ML 자리지킴).
+- 무인증 호출은 401.
+- `outbox` 0(외부 효과 없음), 로그의 키 흔적 0.
+- 부수 관측: 매핑된 경로에 지원하지 않는 메서드로 요청하면 500(`OPEN-API-WRONG-METHOD-500`).

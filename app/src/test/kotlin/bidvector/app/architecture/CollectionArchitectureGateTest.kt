@@ -7,6 +7,7 @@ import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.ArchRule
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -22,6 +23,7 @@ import java.time.LocalDate
 class CollectionArchitectureGateTest {
     private val policy = ArchitecturePolicy.load()
     private val rules = CollectionArchitectureRules()
+    private val divisionRules = DivisionValueRules(policy.divisionValueType)
     private val appRoot = "${policy.packageRoot}.app"
     private val production: JavaClasses =
         ClassFileImporter()
@@ -148,6 +150,62 @@ class CollectionArchitectureGateTest {
     }
 
     @Test
+    fun `업무구분 세부 분류 원시 키 리터럴은 계약 행을 실은 파일 클래스 밖 production 상수 풀에 없다`() {
+        rules
+            .classificationKeyLiteralsMustStayInAllowedClasses(
+                classificationRawKeys(policy.classificationKeyConcepts),
+                policy.classificationKeyAllowedClasses.toSet(),
+            ).checkAll()
+    }
+
+    @Test
+    fun `세부 분류 키 게이트의 허용 클래스는 관측과 같다 — 개념마다 키가 실제로 그 클래스에 있고 낡은 항목이 없다`() {
+        val keys = classificationRawKeys(policy.classificationKeyConcepts)
+
+        keys.forEach { key ->
+            withClue("키 $key") {
+                rules.classesContainingAnyLiteral(production, setOf(key)) shouldBe
+                    policy.classificationKeyAllowedClasses.toSet()
+            }
+        }
+    }
+
+    @Test
+    fun `허용 클래스가 상수 풀에 가진 운영 계약 키의 개념은 전부 개념 집합에 든다 — 새 계약 행이 게이트 밖에 남지 않는다`() {
+        val allowed = policy.classificationKeyAllowedClasses.toSet()
+        val conceptsInAllowedClasses =
+            operationalFieldContracts()
+                .filter { contract ->
+                    rules.classesContainingAnyLiteral(production, setOf(contract.rawName.name)).any { it in allowed }
+                }.map { it.concept.name }
+                .toSet()
+
+        conceptsInAllowedClasses shouldBe policy.classificationKeyConcepts.toSet()
+    }
+
+    @Test
+    fun `대분류 값을 얻는 자리는 허용 쌍뿐이다 — 타입 멤버 접근·값 획득·클래스 객체 세 축`() {
+        divisionRules.typeAccessRules(policy.divisionTypeAccessPairs.toSet()).checkAll()
+        divisionRules.acquisitionRules(policy.divisionAcquisitionPairs.toSet()).checkAll()
+        divisionRules.classObjectRules(policy.divisionClassObjectReferencers.toSet()).checkAll()
+    }
+
+    @Test
+    fun `대분류 타입 멤버 접근 허용 쌍은 관측과 같다 — 멤버 목록이 없으므로 새 멤버도 쌍을 바꾼다`() {
+        divisionRules.observedTypeAccesses(production) shouldBe policy.divisionTypeAccessPairs.toSet()
+    }
+
+    @Test
+    fun `대분류 값 획득 허용 쌍은 관측과 같다 — 반환 타입이 대분류인 호출과 대분류 필드 읽기 전수`() {
+        divisionRules.observedAcquisitions(production) shouldBe policy.divisionAcquisitionPairs.toSet()
+    }
+
+    @Test
+    fun `대분류 클래스 객체를 참조하는 production 클래스는 허용 집합과 같다 — Enum valueOf 입구가 비어 있다`() {
+        divisionRules.observedClassObjectReferences(production) shouldBe policy.divisionClassObjectReferencers.toSet()
+    }
+
+    @Test
     fun `프로세스를 자동 시작하는 러너 타입은 수집 러너만 참조한다`() {
         rules
             .appTypesMustBeReferencedOnlyBy(
@@ -183,6 +241,17 @@ class CollectionArchitectureGateTest {
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }
 
     companion object {
+        /** 개념 이름(정책 파일)에서 운영 정책 계약의 원시 키 집합을 읽는다 — 키 문자열은 코드에 박지 않는다. */
+        fun classificationRawKeys(conceptNames: List<String>): Set<String> {
+            val concepts = conceptNames.map(FieldConcept::valueOf)
+            return operationalFieldContracts().filter { it.concept in concepts }.map { it.rawName.name }.toSet()
+        }
+
+        fun operationalFieldContracts() =
+            (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 9, 24)) as Resolution.Resolved)
+                .value
+                .fieldContracts.contracts
+
         /** 공고명 원시 키 — 코드에 박지 않고 운영 정책의 `NOTICE_TITLE` 계약에서 읽는다. */
         fun noticeTitleRawKey(): String {
             val policy = (KONEPS_COLLECTION_POLICY.resolve(LocalDate.of(2026, 9, 24)) as Resolution.Resolved).value

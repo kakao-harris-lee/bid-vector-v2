@@ -241,6 +241,32 @@ class CollectionArchitectureRules {
         )
 
     /**
+     * M6/6F-9 D-6F9-2 우회 4 — 업무구분 세부 분류 **원시 키 리터럴들**([keys], 값은 그 개념들의 필드 계약이 정한다)을 상수 풀에 가진
+     * production 클래스 집합은 키마다 [allowedClasses] 의 부분집합이다. 공고명 키 게이트([titleKeyLiteralMustStayInAllowedClasses])와
+     * 같은 형태의 집합 규칙 — 키마다 규칙을 따로 내서 위반 상세가 어느 키 때문인지 가른다.
+     */
+    fun classificationKeyLiteralsMustStayInAllowedClasses(
+        keys: Set<String>,
+        allowedClasses: Set<String>,
+    ): List<ArchRule> =
+        keys.sorted().map { key ->
+            noClasses()
+                .that(isOutside(allowedClasses))
+                .should(containLiteralInClassFile(key))
+                .because("D-6F9-2 우회 4 — 업무구분 세부 분류 원시 키 리터럴은 계약 데이터를 실은 파일 클래스 밖에 없다")
+        }
+
+    /** [keys] 중 하나라도 상수 풀에 가진 production 클래스(최상위 이름) 집합 — 허용 집합과 **같아야** 한다(낡은 항목 금지). */
+    fun classesContainingAnyLiteral(
+        production: JavaClasses,
+        keys: Set<String>,
+    ): Set<String> =
+        production
+            .filter { item -> keys.any { constantPoolContains(item, it) } }
+            .map { it.topLevel().fullName }
+            .toSet()
+
+    /**
      * 우회 4·5 — [types] 를 참조하는 [appRoot] 안의 클래스 집합은 [allowedReferencers] 의 부분집합이다(타입 자신은
      * 제외). 러너·서비스 키 설정·로거처럼 「쓰는 자리가 하나여야 하는」 타입에 쓴다.
      */
@@ -317,15 +343,29 @@ class CollectionArchitectureRules {
             }
         }
 
+    /**
+     * 클래스 파일 바이트를 ISO-8859-1 로 읽어 [literal] 을 **부분 문자열**로 찾는다(상수 풀 항목 단위 파싱이 아니다,
+     * code-review r1 L8). 그래서 어떤 계약 키가 허용 클래스에 있는 다른 키의 부분 문자열이면 그 개념이 허위로
+     * 「허용 클래스에 있다」로 판정되어 개념 집합을 무관한 개념까지 넓혀야 초록이 된다 — 오늘 등재된 키들은 서로
+     * 부분 문자열이 아니라 잠재적 한계다(6F-8 에서 물려받은 술어). 반대 방향(위반을 놓치는 쪽)은 생기지 않는다:
+     * 리터럴이 상수 풀에 있으면 바이트열에도 반드시 있다. 항목 단위 일치가 필요해지면 `CONSTANT_Utf8` 파싱으로 좁힌다.
+     */
+    private fun constantPoolContains(
+        item: JavaClass,
+        literal: String,
+    ): Boolean {
+        val uri = item.source.orElse(null)?.uri ?: return false
+        val bytes = uri.toURL().openStream().use { it.readBytes() }
+        return String(bytes, StandardCharsets.ISO_8859_1).contains(literal)
+    }
+
     private fun containLiteralInClassFile(literal: String): ArchCondition<JavaClass> =
         object : ArchCondition<JavaClass>("클래스 파일 상수 풀에 리터럴 '$literal' 을 가진다") {
             override fun check(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                val uri = item.source.orElse(null)?.uri ?: return
-                val bytes = uri.toURL().openStream().use { it.readBytes() }
-                if (String(bytes, StandardCharsets.ISO_8859_1).contains(literal)) {
+                if (constantPoolContains(item, literal)) {
                     events.add(SimpleConditionEvent.satisfied(item, "${item.fullName} 상수 풀에 '$literal'"))
                 }
             }

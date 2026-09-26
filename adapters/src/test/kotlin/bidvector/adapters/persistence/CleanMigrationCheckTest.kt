@@ -36,7 +36,8 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "collection_run" to 13,
             // M6/6F-4 D-6F4-1·8 — 신규(추가만). `notice_title`이 감시 키워드 매칭 입력이라
             // (기관 열 넷과 달리) 빈 문자열이 조용히 성립하지 않도록 CHECK 하나를 더 얹는다.
-            "notice" to 13,
+            // M6/6F-9 D-6F9-3 — 업무구분 새 칸 셋(V17, 추가만): 대분류 어휘 1 + 용역구분·주공종 공백류 2 → 16.
+            "notice" to 16,
             "notice_audit" to 1,
             "opening_result" to 24,
             "provenance_authority" to 1,
@@ -145,6 +146,25 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "CHECK (((notice_title IS NULL) OR (notice_title ~ '[^\\u0009-\\u000D\\u001C-\\u001F\\u0020\\u00A0" +
                 "\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]'::text)))"
         body shouldBe expected
+    }
+
+    /**
+     * M6/6F-9 D-6F9-3 — V17 의 CHECK 셋을 개수가 아니라 **본문**으로 고정한다(위 `notice_title` 선례, `OPEN-CHECK-BODY-
+     * PRESENCE-ASSERTIONS`). 대분류는 P-7 문서 열거 어휘 넷을 문서 순서 그대로, 용역구분·주공종은 `notice_title` 과 **같은**
+     * 공백류 문자 클래스다 — 이 열들도 감시 매칭 입력이라 빈 문자열이 조용히 성립하지 않게 한다(D-6F4-8·D-6F8-11).
+     */
+    @Test
+    fun `축8 부가 — 업무구분 새 칸 셋의 CHECK 본문이 정확히 고정된다(D-6F9-3)`() {
+        queryConstraintDef("notice_business_division_check") shouldBe
+            "CHECK (((business_division IS NULL) OR (business_division = ANY (ARRAY['물품'::text, '용역'::text, " +
+            "'공사'::text, '외자'::text]))))"
+        val nonBlankClass =
+            "'[^\\u0009-\\u000D\\u001C-\\u001F\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F" +
+                "\\u205F\\u3000]'::text)))"
+        queryConstraintDef("notice_service_division_check") shouldBe
+            "CHECK (((service_division IS NULL) OR (service_division ~ $nonBlankClass"
+        queryConstraintDef("notice_main_construction_type_check") shouldBe
+            "CHECK (((main_construction_type IS NULL) OR (main_construction_type ~ $nonBlankClass"
     }
 
     /**

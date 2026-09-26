@@ -1,9 +1,15 @@
 package bidvector.app.collection
 
+import bidvector.adapters.evaluation.NoticeWatchSubjectPort
+import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.RecordingCollectionTermination
+import bidvector.procurement.NoticeId
+import bidvector.procurement.NoticeNumber
+import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
+import bidvector.workflow.evaluation.WatchSubjectOutcome
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
@@ -50,6 +56,10 @@ class CollectionRunnerE2ETest {
         private const val NOTICES_PER_SLOT = NORMAL_PER_SLOT + BLANK_PER_SLOT
         private const val BAD_DATE_ITEM_NUMBER = "BAD-DATE-1"
         private const val BAD_ROUND_ITEM_NUMBER = "BAD-ROUND-1"
+        private const val DAYS = 3
+        private const val SERVICE_CLASS_CODE = "81111500"
+        private const val SERVICE_CLASS_NAME = "정보시스템 개발 서비스"
+        private const val CONSTRUCTION_TYPE = "전기공사업"
 
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
@@ -72,6 +82,20 @@ class CollectionRunnerE2ETest {
         private val logs = ListAppender<ILoggingEvent>()
         private lateinit var mock: MockKonepsHttp
 
+        private fun itemOf(
+            category: String,
+            number: String,
+            closing: String = "2026-12-31 10:00:00",
+            classification: Map<String, String> = emptyMap(),
+        ) = mapOf(
+            "bidNtceNo" to number,
+            "bidNtceOrd" to "000",
+            "bidNtceNm" to "공고명 $category $number",
+            // 실 응답에는 이 키가 없다(6F-8 실측) — 있어도 대분류는 오퍼레이션이 정한다(D-6F9-1): 용역 응답에도 「공사」를 싣는다.
+            "bsnsDivNm" to "공사",
+            "bidClseDt" to closing,
+        ) + classification
+
         private fun itemsFor(
             operation: String,
             day: String,
@@ -81,17 +105,18 @@ class CollectionRunnerE2ETest {
             fun item(
                 number: String,
                 closing: String = "2026-12-31 10:00:00",
-            ) = mapOf(
-                "bidNtceNo" to number,
-                "bidNtceOrd" to "000",
-                "bidNtceNm" to "공고명 $category $number",
-                "bsnsDivNm" to "공사",
-                "bidClseDt" to closing,
-            )
-            val normal = (1..NORMAL_PER_SLOT).map { item("E2E-$category-$day-$it") }
+                classification: Map<String, String> = emptyMap(),
+            ) = itemOf(category, number, closing, classification)
+            val normal =
+                (1..NORMAL_PER_SLOT).map {
+                    item(
+                        "E2E-$category-$day-$it",
+                        classification = classificationFor(category, it),
+                    )
+                }
             // D-6F8-11 — KONEPS 는 옵션 일시·금액을 빈 문자열로 내기도 한다(실수집 실측). 합성 표본이며 정규화되고 마감은 null 이다.
             val blankOptionals =
-                item("E2E-$category-$day-BLANK", closing = "") +
+                item("E2E-$category-$day-BLANK", closing = "", classification = blankClassificationFor(category)) +
                     mapOf("opengDt" to "", "bssamt" to "", "presmptPrce" to "", "chgDt" to "", "tpEvalApplClseDt" to "")
             val missingNumber = mapOf("bidNtceNm" to "번호 없는 공고명")
             val duplicate = normal.first()
@@ -115,6 +140,39 @@ class CollectionRunnerE2ETest {
                 }
             return normal + listOf(blankOptionals) + missingNumber + duplicate + badDate + badRound
         }
+
+        /**
+         * D-6F9-2 — 오퍼레이션마다 응답이 싣는 세부 분류 키가 다르다(6F-8 실측): 용역은 용역구분·공공조달분류 번호·명, 공사는 주공종이고
+         * 주공종은 일부 항목만 채워진다(전기공사업 · 빈 문자열 · 키 없음이 한 슬롯에 섞인다).
+         */
+        private fun classificationFor(
+            category: String,
+            index: Int,
+        ): Map<String, String> =
+            when (category) {
+                "Servc" -> {
+                    mapOf(
+                        "srvceDivNm" to if (index == 1) "일반용역" else "기술용역",
+                        "pubPrcrmntClsfcNo" to SERVICE_CLASS_CODE,
+                        "pubPrcrmntClsfcNm" to SERVICE_CLASS_NAME,
+                    )
+                }
+
+                else -> {
+                    when (index) {
+                        1 -> mapOf("mainCnsttyNm" to CONSTRUCTION_TYPE)
+                        2 -> mapOf("mainCnsttyNm" to "")
+                        else -> emptyMap()
+                    }
+                }
+            }
+
+        /** 빈 문자열로 오는 옵션 값(D-6F8-11) — 새 세부 분류 키도 빈 값은 없는 값이다. */
+        private fun blankClassificationFor(category: String): Map<String, String> =
+            when (category) {
+                "Servc" -> mapOf("srvceDivNm" to "", "pubPrcrmntClsfcNo" to " ", "pubPrcrmntClsfcNm" to "  ")
+                else -> mapOf("mainCnsttyNm" to "   ")
+            }
 
         /** 러너 한 번의 관측 — 종료 코드, 로거 이벤트 전부, 표준 출력·표준 오류 전부. */
         private class RunResult(
@@ -289,6 +347,92 @@ class CollectionRunnerE2ETest {
         // 빈 일시를 「해석 실패」로 세지 않는다 — DATE_TIME 탈락은 형식이 어긋난 표본 하나뿐이다.
         slotLines(firstRun).count { "CollectionParseFailure(kind=DATE_TIME)" in it } shouldBe 1
         slotLines(firstRun).count { "CollectionParseFailure(kind=NUMERIC)" in it } shouldBe 0
+    }
+
+    /**
+     * D-6F9-1·2 — 대분류는 오퍼레이션이, 세부 분류는 응답 필드가 정하고 각자 자기 열에 간다. 공사 응답의 주공종은 코드 없이 이름만이라
+     * 공사 공고의 업무구분 코드·라벨 열은 비고, 용역구분은 업무구분 라벨 열과 접히지 않으며, 빈 문자열은 부재(`NULL`)다.
+     * (공고번호는 저장 시 대문자로 정규화되므로 표본 접두도 대문자다.)
+     */
+    private fun assertClassificationColumns() {
+        fun notices(where: String) = count("SELECT COUNT(*) FROM notice WHERE $where")
+        val construction = "notice_number LIKE 'E2E-CNSTWK-%'"
+        val service = "notice_number LIKE 'E2E-SERVC-%'"
+
+        notices("business_division IS NULL") shouldBe 0
+        notices("$construction AND business_division = '공사'") shouldBe DAYS * NOTICES_PER_SLOT
+        // 응답이 용역 오퍼레이션에도 `bsnsDivNm=공사` 를 실었지만 용역 공고의 대분류는 용역이다(오퍼레이션이 이긴다).
+        notices("$service AND business_division = '용역'") shouldBe DAYS * NOTICES_PER_SLOT
+
+        notices("$service AND service_division IN ('일반용역', '기술용역')") shouldBe DAYS * NORMAL_PER_SLOT
+        notices("$service AND service_division = '일반용역'") shouldBe DAYS
+        val classified =
+            "business_category_code = '$SERVICE_CLASS_CODE' AND business_category_label = '$SERVICE_CLASS_NAME'"
+        notices("$service AND $classified") shouldBe DAYS * NORMAL_PER_SLOT
+        notices("$service AND main_construction_type IS NOT NULL") shouldBe 0
+
+        notices("$construction AND main_construction_type = '$CONSTRUCTION_TYPE'") shouldBe DAYS
+        notices("$construction AND main_construction_type IS NOT NULL") shouldBe DAYS
+        notices(
+            "$construction AND (business_category_code IS NOT NULL OR business_category_label IS NOT NULL)",
+        ) shouldBe
+            0
+        notices("$construction AND service_division IS NOT NULL") shouldBe 0
+
+        notices("service_division IN (business_category_label, business_category_code)") shouldBe 0
+        notices("service_division = '' OR main_construction_type = '' OR business_category_code = ''") shouldBe 0
+    }
+
+    @Test
+    fun `첫 실행 — 업무구분 새 칸 셋이 오퍼레이션·응답 필드에서 각자 자기 열에 채워진다 — 주공종은 코드를 낳지 않는다`() {
+        firstRun.exitCodes shouldContainExactly listOf(0)
+
+        assertClassificationColumns()
+    }
+
+    @Test
+    fun `감시 관심 업종 집합은 저장된 네 칸에서 조립된다 — 빈 값은 원소가 아니다`() {
+        val day = firstDay.toString().replace("-", "")
+        val repository = JdbcNoticeRepository(dataSource)
+
+        fun categoriesOf(number: String): Set<String> {
+            val notice = requireNotNull(repository.find(NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))))
+            val outcome = NoticeWatchSubjectPort().subjectFor(notice) as WatchSubjectOutcome.Found
+            return outcome.subject.categories
+                .map { it.value }
+                .toSet()
+        }
+
+        categoriesOf("E2E-Servc-$day-2") shouldBe setOf("용역", "기술용역", SERVICE_CLASS_CODE)
+        categoriesOf("E2E-Cnstwk-$day-1") shouldBe setOf("공사", CONSTRUCTION_TYPE)
+        categoriesOf("E2E-Cnstwk-$day-3") shouldBe setOf("공사")
+        categoriesOf("E2E-Servc-$day-BLANK") shouldBe setOf("용역")
+    }
+
+    @Test
+    fun `새 열이 없던 시절의 기존 행을 같은 범위 재수집이 채운다 — 슬롯마다 updated 이고 새 공고는 0 이다`() {
+        val noticesBefore = count("SELECT COUNT(*) FROM notice")
+        dataSource.connection.use { connection ->
+            connection.createStatement().use {
+                it.executeUpdate(
+                    "UPDATE notice SET business_division = NULL, service_division = NULL, " +
+                        "main_construction_type = NULL, business_category_code = NULL, business_category_label = NULL",
+                )
+            }
+        }
+        count("SELECT COUNT(*) FROM notice WHERE business_division IS NOT NULL") shouldBe 0
+
+        val rerun = runOnce(mapOf("spring.main.web-application-type" to "none"))
+
+        rerun.exitCodes shouldContainExactly listOf(0)
+        count("SELECT COUNT(*) FROM notice") shouldBe noticesBefore
+        slotLines(rerun).size shouldBe SLOTS
+        slotLines(rerun).forEach { line ->
+            slotField(line, "inserted") shouldBe 0
+            slotField(line, "updated") shouldBe NOTICES_PER_SLOT
+            slotField(line, "unchanged") shouldBe 0
+        }
+        assertClassificationColumns()
     }
 
     @Test

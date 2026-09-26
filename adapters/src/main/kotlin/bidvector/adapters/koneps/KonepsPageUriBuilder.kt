@@ -1,5 +1,6 @@
 package bidvector.adapters.koneps
 
+import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionAccounting
 import bidvector.procurement.CollectionDropReason
 import bidvector.procurement.KonepsCollectionPolicyData
@@ -25,7 +26,7 @@ internal fun interface KonepsPageUriBuilder {
  * [mapMaskedOpeningItem] allow-list 치환)을 꽂아 넣게 한다.
  *
  * **기본값이 없다(verifier r1 F-4 수정)** — 이전 판은 [walkKonepsNoticePages]의 `itemMapper`
- * 매개변수가 [defaultKonepsItemMapper](원문 보존 mapper)로 기본값이 있어, 개찰 축 walker 가
+ * 매개변수가 원문 보존 mapper 로 기본값이 있어, 개찰 축 walker 가
  * 이 인자를 잊으면 **누출이 조용한 폴백**이 됐다(설계 검토 게이트 ①이 막으려던 것과 반대
  * 방향 — 실수의 기본 결과가 누출). 세 호출부([KonepsOpenApiNoticeSource.fetchNotices]·
  * [KonepsOpeningResultSource.fetchOpeningResults]·[fetchSingleKonepsNotice])가 모두 명시한다.
@@ -39,13 +40,23 @@ internal fun interface KonepsItemMapper {
 }
 
 /**
- * 기존 3B 동작(공고 목록, 계약 여부와 무관하게 전 필드 보존) — 낙찰 목록군 오퍼레이션(한 행=한
- * 공고)의 행 식별자는 공고번호·차수뿐이라 `rowIdentifierRawKeys`는 `emptyList()`다. F-4 로 이
- * 값의 기본값 지위는 없어졌다 — [KonepsOpenApiNoticeSource.fetchNotices]가 명시적으로 참조한다.
+ * 공고 목록 항목 mapper(계약 여부와 무관하게 전 필드 보존) — 낙찰 목록군 오퍼레이션(한 행=한 공고)의 행 식별자는
+ * 공고번호·차수뿐이라 `rowIdentifierRawKeys`는 `emptyList()`다. F-4 로 암묵 기본값 지위는 없어졌다 —
+ * [KonepsOpenApiNoticeSource.fetchNotices]가 자기 오퍼레이션의 대분류와 함께 명시적으로 만든다.
+ *
+ * **[sourceDivision]은 필수 인자다(D-6F9-1)** — 업종별 인스턴스가 어느 오퍼레이션인지 알고, 이 mapper 는 그 값을 관측에
+ * 구조로 싣는다(URL·오퍼레이션 이름을 파싱하지 않는다). 잊으면 컴파일이 깨진다.
  */
-internal val defaultKonepsItemMapper: KonepsItemMapper =
+internal fun noticeListItemMapper(sourceDivision: BusinessDivision): KonepsItemMapper =
     KonepsItemMapper { item, policy, observedAt ->
-        mapRawItem(item, policy, SourceEndpoint.NOTICE_LIST, observedAt, rowIdentifierRawKeys = emptyList())
+        mapRawItem(
+            item,
+            policy,
+            SourceEndpoint.NOTICE_LIST,
+            observedAt,
+            rowIdentifierRawKeys = emptyList(),
+            sourceDivision = sourceDivision,
+        )
     }
 
 private const val START_PAGE = 1
@@ -360,7 +371,7 @@ internal fun walkKonepsNoticePages(
     clock: Clock,
     cursor: PageCursor?,
     // 3B-2 — 축마다 다른 항목 매핑을 꽂는다. **기본값 없음(verifier r1 F-4)** — 공고 축
-    // 호출부([KonepsOpenApiNoticeSource.fetchNotices])도 [defaultKonepsItemMapper]를 명시한다.
+    // 호출부([KonepsOpenApiNoticeSource.fetchNotices])도 [noticeListItemMapper]를 명시한다.
     itemMapper: KonepsItemMapper,
 ): SourceBatch<RawNoticeObservation> {
     val startPage = startPageOf(cursor) ?: return invalidCursorBatch()

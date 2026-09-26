@@ -6,12 +6,13 @@ import bidvector.sharedkernel.ReasonCode
 import bidvector.strategy.WatchSubject
 import bidvector.strategy.assembleFullScopeText
 import bidvector.strategy.assembleKeywordScopeText
+import bidvector.strategy.assembleWatchCategories
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 
 /**
  * [WatchSubjectPort]의 첫 production 구현(D-6F4W-2~5). `Notice`(3A canonical fact)가 이미 나르는
- * 열(title·businessCategory·agency 둘·baseAmount)만 읽는다 — DB 재조회·마이그레이션 없음
+ * 열(title·businessCategory·업무구분 새 칸 셋·agency 둘·baseAmount)만 읽는다 — DB 재조회·마이그레이션 없음
  * (D-6F4W-1 은 이 slice 를 ⓐ 포트 구현으로만 가른다, 값의 수집 정확성은
  * `OPEN-6F4-TITLE-INGEST`).
  *
@@ -38,17 +39,22 @@ class NoticeWatchSubjectPort : WatchSubjectPort {
  */
 private fun noticeToWatchSubject(notice: Notice): WatchSubject {
     val noticeTitle = notice.title?.value
-    val businessCategoryLabel = notice.businessCategory?.label?.value
+    // 「공종」 조각 = 세부 이름(D-6F9-4): 용역은 공공조달분류명, 공사는 주공종명. 두 원천은 상호배타다(용역 응답은 분류 라벨을,
+    // 공사 응답은 주공종을 싣는다) — 용역구분(`기술용역` 등)은 이 조각이 아니라 관심 업종 집합의 원소다.
+    val detailName = notice.businessCategory?.label?.value ?: notice.mainConstructionType?.value
     return WatchSubject(
         categories =
-            notice.businessCategory
-                ?.let { category -> setOf(bidvector.strategy.CategoryCode(category.code.value)) }
-                .orEmpty(),
-        keywordText = assembleKeywordScopeText(noticeTitle, businessCategoryLabel),
+            assembleWatchCategories(
+                businessDivision = notice.businessDivision?.label,
+                serviceDivision = notice.serviceDivision?.value,
+                classificationCode = notice.businessCategory?.code?.value,
+                mainConstructionType = notice.mainConstructionType?.value,
+            ),
+        keywordText = assembleKeywordScopeText(noticeTitle, detailName),
         fullText =
             assembleFullScopeText(
                 noticeTitle,
-                businessCategoryLabel,
+                detailName,
                 notice.demandAgency?.name?.value,
                 notice.noticeAgency?.name?.value,
             ),

@@ -38,6 +38,11 @@ private val EXPECTED_ADOPTED_FIELD_RAW_NAMES: Set<String> =
         "bsnsDivNm",
         // M6/6F-8 D-6F8-2 — 공고명(공고 목록 응답 항목, 운영자 지시 2026-09-24).
         "bidNtceNm",
+        // M6/6F-9 D-6F9-2 — 업무구분 세부 분류 넷(6F-8 실수집이 응답에서 실측한 키: 용역 앞 셋, 공사 마지막).
+        "pubPrcrmntClsfcNo",
+        "pubPrcrmntClsfcNm",
+        "srvceDivNm",
+        "mainCnsttyNm",
         // M3/3H-1 D-3H-1 — 발주기관 넷(참고자료 응답 항목 표, P-14). 담당자 키는
         // 등재하지 않는다(scope.md 우회 (4)).
         "dminsttCd",

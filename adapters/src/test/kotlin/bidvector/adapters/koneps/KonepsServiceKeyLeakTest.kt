@@ -1,5 +1,6 @@
 package bidvector.adapters.koneps
 
+import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionReferenceDate
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
@@ -62,6 +63,7 @@ class KonepsServiceKeyLeakTest {
                     serviceKey = ServiceKey.of(rawKey),
                     httpPolicy = testKonepsHttpPolicy(maxAttempts = 2, requestTimeout = Duration.ofMillis(100)),
                     collectionPolicyProvider = ::resolvedCollectionPolicy,
+                    businessDivision = BusinessDivision.SERVICE,
                     clock = fixedClock,
                 )
             val batch = source.fetchNotices(referenceDate, null)

@@ -432,7 +432,8 @@ private val KONEPS_OPENING_FIELD_ROWS: List<FieldContractRow> =
 private val KONEPS_OPERATIONAL_FIELD_CONTRACTS: List<KonepsFieldContract> =
     (KONEPS_OPERATIONAL_FIELD_ROWS + KONEPS_OPENING_FIELD_ROWS + KONEPS_OPENING_COMPLETE_ROWS).map { it.toContract() }
 private val KONEPS_ALL_FIELD_CONTRACTS: List<KonepsFieldContract> =
-    KONEPS_OPERATIONAL_FIELD_CONTRACTS + KONEPS_AGENCY_FIELD_ROWS.map { it.toContract() }
+    KONEPS_OPERATIONAL_FIELD_CONTRACTS +
+        (KONEPS_AGENCY_FIELD_ROWS + KONEPS_CLASSIFICATION_FIELD_ROWS).map { it.toContract() }
 
 /**
  * `resultCode` → 범주(D-M3-4, `OPEN-COL-02`) — 운영자 승인 2026-09-07(P-4 ②③)의 범주
@@ -491,8 +492,9 @@ val KONEPS_COLLECTION_POLICY: EffectiveDatedPolicy<KonepsCollectionPolicyData> =
                         // 19, offset 없음). koneps-collection-026 이 이 배선을 고정한다.
                         dateTimePatterns = listOf(DateTimePatternId.KONEPS_SPACE_DELIMITED_19),
                         // policy-values.md §1.5 authoritative(조달청 OpenAPI 참고자료,
-                        // koneps-collection-016 이 이 배선을 고정한다) — 문서 표기 순서 그대로.
-                        businessCategoryDocumentedLabels = DocumentedVocabulary(listOf("물품", "용역", "공사", "외자")),
+                        // koneps-collection-016 이 이 배선을 고정한다) — 문서 표기 순서 그대로, [BusinessDivision] 파생.
+                        businessCategoryDocumentedLabels =
+                            DocumentedVocabulary(BusinessDivision.entries.map { it.label }),
                     ),
             ),
     )

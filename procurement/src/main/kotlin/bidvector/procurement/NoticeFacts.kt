@@ -21,6 +21,16 @@ data class Notice internal constructor(
     val id: NoticeId,
     val status: NoticeStatus,
     val businessCategory: BusinessCategory?,
+    /**
+     * 업무 대분류(D-6F9-1, M6/6F-9) — 수집 오퍼레이션이 정한다. 이 아래 [serviceDivision]·[mainConstructionType]·위
+     * [businessCategory](코드+라벨 축)와 각자 자기 칸이다(P-7 · `OPEN-COL-03` — 접지 않는다). 기본값 `null`
+     * ([title] 과 같은 이유 — 이 slice 밖 호출부는 수정 없이 컴파일된다).
+     */
+    val businessDivision: BusinessDivision? = null,
+    /** 용역구분(D-6F9-2) — [businessCategory]의 라벨과 다른 축. */
+    val serviceDivision: ServiceDivision? = null,
+    /** 주공종(D-6F9-2) — 이름만이다. [businessCategory]의 코드가 아니다. */
+    val mainConstructionType: MainConstructionType? = null,
     val baseAmount: ResolvedBaseAmount?,
     val estimatedAmount: ResolvedEstimatedAmount?,
     val allocatedBudget: AllocatedBudget?,
@@ -50,6 +60,9 @@ data class Notice internal constructor(
                 id = command.id,
                 status = NoticeStatus.Open,
                 businessCategory = command.businessCategory,
+                businessDivision = command.businessDivision,
+                serviceDivision = command.serviceDivision,
+                mainConstructionType = command.mainConstructionType,
                 baseAmount = command.baseAmount,
                 estimatedAmount = command.estimatedAmount,
                 allocatedBudget = command.allocatedBudget,

@@ -4,7 +4,6 @@ import bidvector.decision.MlUnavailableReason
 import bidvector.decision.VerdictLadder
 import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.derive.DERIVATION_POLICY
-import bidvector.procurement.Notice
 import bidvector.qualification.OperatorLicenses
 import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.EffectiveFrom
@@ -15,7 +14,6 @@ import bidvector.sharedkernel.Rate
 import bidvector.workflow.embedding.EmbeddingOutcome
 import bidvector.workflow.embedding.EmbeddingUnavailableReason
 import bidvector.workflow.embedding.TextKind
-import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.prediction.BidPredictionOutcome
 import bidvector.workflow.prediction.UnmeasurableReason
 import io.kotest.matchers.shouldBe
@@ -30,36 +28,6 @@ import java.time.Duration
  * fitness/floorRate 이상 시 점수 성분 drop, 예산·호출 순서·무상태·use case 통합.
  */
 class OpportunityAnalysisTest {
-    private fun matchingEmbed(): FakeEmbedTextPort =
-        FakeEmbedTextPort { request ->
-            when (request.kind) {
-                TextKind.NOTICE -> embedded(vector = normalizedEmbeddingVector(1.0f, 0.0f))
-                TextKind.OPERATOR_PROFILE -> embedded(vector = normalizedEmbeddingVector(1.0f, 0.0f))
-            }
-        }
-
-    private fun analysis(
-        embed: FakeEmbedTextPort = matchingEmbed(),
-        prediction: FakeBidPredictionPort = FakeBidPredictionPort { predicted() },
-        profile: ConfigurableProfilePort = ConfigurableProfilePort(testProfile()),
-        workload: FakeWorkloadPort = FakeWorkloadPort(),
-        watchSubjects: FakeWatchSubjectPort = FakeWatchSubjectPort(),
-        capacity: FakeCapacityPort = FakeCapacityPort(CapacitySnapshot(currentActiveBids = 2, maxActiveBids = 10)),
-        samples: FakeCompetitionSamplePort = FakeCompetitionSamplePort(),
-        clock: FixedClock = FixedClock(),
-    ): OpportunityAnalysis =
-        OpportunityAnalysis(embed, prediction, profile, workload, watchSubjects, capacity, samples, clock)
-
-    private fun analyzeNotice(
-        instance: OpportunityAnalysis,
-        notice: Notice = testNoticeWithMoney(),
-    ): MlAnalysisOutcome = runBlocking { instance.analyze(notice, CorrelationId("corr-1")) }
-
-    private fun MlAnalysisOutcome.shouldBeAnalyzed(): MlAnalysisOutcome.Analyzed {
-        check(this is MlAnalysisOutcome.Analyzed) { "Analyzed 가 아니다: $this" }
-        return this
-    }
-
     @Test
     fun `정상 — Analyzed, probability null, matched = SemanticMatch 값`() {
         val analyzed = analyzeNotice(analysis()).shouldBeAnalyzed()

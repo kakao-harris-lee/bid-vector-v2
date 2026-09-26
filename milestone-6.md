@@ -492,6 +492,37 @@ r3 가 스무 가지 우회를 두드려 전부 RED 였다. r3 의 BLOCKER 는 �
 `OPEN-6F8-NON-THROWING-FACTORIES` · `OPEN-6F8-COLLECTION-SCHEDULE` · `OPEN-6F8-OPENING-COLLECTION`. 마감이 비어 있는 공고(1,765)는
 후보 조건상 평가에 오르지 않는다. 개발 DB 컨테이너 `bid-vector-v2-dev` 는 로컬에 남아 있다(폐기는 사용자 결정).
 
+**6F-9 착수 2026-09-24** — base `f6ebc047`(6F-8 머지 뒤 `main`), 레인 worktree `bid-vector-v2-m6-6f9`·브랜치 `m6-6f9/2026-09-24`.
+정본 `reports/evidence/m6/6f9/scope.md`(D-6F9-1~5). 사용자: 「업무구분은 … 입찰에 필요한 정보일테니 수집 해야 맞을것 같아」.
+**6F-8 실수집이 드러낸 공백의 원인은 「보던 자리」였다** — 대분류(물품·용역·공사·외자)는 오퍼레이션 자체라 응답에 필드가 없고, 세부
+분류는 다른 키로 있다(용역구분 100% · 공공조달분류 거의 100% · 공사 주공종 약 33%). 대분류는 **수집 오퍼레이션**에서, 세부는 **각자의
+칸**에 — P-7·COL-08 의 「업무구분 축을 한 자리에 접지 않는다」를 지킨다. V17 열 셋, 감시 「관심 업종」 집합이 네 값을 모두 본다.
+공사 주공종의 빈 값은 면허제한 수집과 함께(`OPEN-6F9-CONSTRUCTION-TYPE-SOURCE`).
+
+**6F-9 종결 2026-09-26** — PR **#46**(계약 갱신 r1: D-6F9-6 잠금 test 자리). 판정 일곱과 조치를 PR 코멘트로 남겼다. 레인은 verifier 3라운드
+(r1 not-ready → r2·r3 ready-for-review), `code-reviewer`(sonnet) 2라운드, `migration-reviewer`(범용 에이전트 대행, approve)다. 재작업 **2/5**.
+2026-09-24 WSL 정지로 앞 세션의 acceptance·rollback 실측 기록이 사라져 **처음부터 다시 쟀다**. **업무구분 네 칸이 실데이터로 찬다** —
+6F-8 과 같은 범위(2026-08-25~09-24, 공사 + 용역, 슬롯 62)를 V17 위에서 재수집했다. 결과는 기존 22,639건 전부 `updated`, 대분류 채움 100%
+(용역 12,780 · 공사 9,860), 용역구분 100%, 분류번호 99.96%, 주공종 32.9%다. 축 섞임·빈 문자열·오퍼레이션 겹침은 0 이고 로그의 키 흔적도 0 이다.
+새 공고 1건(`inserted=1`)은 그 사이 원천 수신이 22,639 → 22,640 으로 늘어난 몫이다. 평가 dry-run 에서 두 축 모두 **집합 수준으로 정확**하다.
+「관심 업종 = 기술용역」은 감시 통과 712 == SQL 712(ID 집합 동일)이고, 키워드 「도로」는 186 == SQL 186 이다 — 6F-8 의 163 에서 늘어난
+23 이 세부 이름이 키워드 범위에 들어간 몫이다. 이 dry-run 의 전략은 **팀장이 개발 DB 행에 직접 썼다가 되돌렸다**. 운영자 API 에 전략
+쓰기 경로가 없기 때문이다(아래 OPEN).
+
+**게이트는 「이름을 열거하면 이름 밖이 열린다」를 한 번 더 보였다.** 첫 대분류 게이트는 문자열 → 대분류 멤버 넷을 이름으로 봤다. 그래서
+배선의 `when (path)` → `BusinessDivision.CONSTRUCTION`(D-6F9-1 이 금지한 URL 파싱 그 자체), enum 안 새 함수, `java.lang.Enum.valueOf` 가 전건
+`check` 를 통과했다. 세 축(멤버 접근 · 값 획득 · 클래스 객체)으로 바꾸자 관용 표기는 전부 잡혔다. 다만 **타입 소거·리플렉션**(컨테이너 원소,
+`getEnumConstants`, 역직렬화 타입 토큰)은 여전히 못 본다. 이번 라운드는 게이트를 넓히지 않고 **주장을 좁혀** 알려진 제한으로 적었다.
+계약이 요구한 ML 파급 잠금 test 가 첫 구현에 없던 것은 verifier 와 code-reviewer 가 각자 잡았다.
+
+**넘긴 것**: **`OPEN-6F9-DIVISION-REFLECTION`**(리플렉션 루트를 `procurement`·`adapters` 로 넓히거나 `BusinessDivision` 의존 축 추가) ·
+**`OPEN-6F9-STRATEGY-WRITE-ENDPOINT`**(관심 업종을 운영자가 설정할 경로가 없다 — `EditStrategyWorkflow` 의 호출자는 test 뿐이다, 받는 쪽
+**6A-2**) · `OPEN-6F9-ML-CATEGORY-CODE-SPACE`(용역 분류번호가 ML 입력이 된다, `OPEN-ML-ANALYSIS-WIRING` 과 함께) ·
+`OPEN-6F9-CONSTRUCTION-TYPE-SOURCE` · `OPEN-6F9-GOODS-FOREIGN-COLLECTION` · **`OPEN-KTLINT-UNUSED-IMPORTS-SILENT`**(ktlint 1.8.0
+`ktlint_official` 의 `no-unused-imports` 가 켜져 있는데도 쓰지 않는 import 두 줄을 보고하지 않았다 — 구현 레인이 해당 태스크 단독 재실행으로
+exit 0 을 실측했다. 이 저장소에는 쓰지 않는 import 를 잡는 게이트가 없다. 받는 쪽 **하네스 레인**, 운영자 등재 결정 2026-09-26) ·
+`OPEN-API-WRONG-METHOD-500`(매핑된 경로에 지원하지 않는 메서드로 요청하면 405 가 아니라 500 — 상태 코드만 관측한 단서, **6A-2**).
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
