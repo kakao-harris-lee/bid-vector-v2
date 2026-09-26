@@ -19,7 +19,7 @@ import tools.jackson.databind.JsonNode
  *
  * **컨트롤러는 조립된 실행기만 받는다**(D-6A2b-8) — 저장소·outbox·`ConnectionSource` 를
  * 이 층에서 볼 수 없다(ArchUnit 의존 게이트가 구조로 강제한다). 요청 → command 변환과
- * 결과 → 상태 코드 변환만 한다: 변환표는 각각 `StrategyEditRequests.kt`·
+ * 결과 → 상태 코드 변환만 한다(알려진 키 밖의 본문 키는 400 — D-6A2b-25): 변환표는 각각 `StrategyEditRequests.kt`·
  * `StrategyEditResponses.kt` 한 자리씩이고 전수 `when` 이라 새 사유·새 필드가 생기면
  * 컴파일이 누락을 잡는다.
  *
@@ -35,7 +35,8 @@ class StrategyEditController(
     fun begin(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
-    ): ResponseEntity<Any> = executor.begin(body.requireObject().field()).toResponse(request)
+    ): ResponseEntity<Any> =
+        executor.begin(body.requireObject().requireKnownKeys(setOf("field")).field()).toResponse(request)
 
     @GetMapping("/{sessionId}")
     fun view(
@@ -65,7 +66,7 @@ class StrategyEditController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val payload = body.requireObject()
+        val payload = body.requireObject().requireKnownKeys(setOf("commandId", "seenRevision"))
         return executor.confirm(sessionIdOf(sessionId), payload.commandId(), payload.seenRevision()).toResponse(request)
     }
 
@@ -75,7 +76,7 @@ class StrategyEditController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val payload = body.requireObject()
+        val payload = body.requireObject().requireKnownKeys(setOf("commandId", "field"))
         return executor.requestEdit(sessionIdOf(sessionId), payload.commandId(), payload.field()).toResponse(request)
     }
 
@@ -85,7 +86,7 @@ class StrategyEditController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val payload = body.requireObject()
+        val payload = body.requireObject().requireKnownKeys(setOf("commandId"))
         return executor.cancel(sessionIdOf(sessionId), payload.commandId()).toResponse(request)
     }
 }

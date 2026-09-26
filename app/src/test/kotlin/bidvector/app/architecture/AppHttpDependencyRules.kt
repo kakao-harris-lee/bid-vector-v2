@@ -147,6 +147,10 @@ class AppHttpDependencyRules(
         }
     }
 
+    /**
+     * 허용 판정 — **순서가 곧 규칙**이다. 능력 포트와 금지 접두를 먼저 파고(허용 접두 안에
+     * 있어도 예외 없이), 그 다음에 허용 목록을 본다.
+     */
     private fun isAllowed(
         target: JavaClass,
         allowedPackages: List<String>,
@@ -154,19 +158,21 @@ class AppHttpDependencyRules(
         deniedPackages: List<String>,
         capabilityPorts: Set<String>,
         adaptersRoot: String,
-    ): Boolean {
-        if (target.fullName in capabilityPorts) return false
-        if (target.packageName.isUnder(deniedPackages)) return false
-        // 중첩 타입(sealed 의 하위 등)은 **최상위 이름**으로 판정한다 — 허용 목록에 하위 타입을
-        // 하나씩 적으면 그것이 곧 열거로 되돌아가는 길이다.
-        if (target.topLevel().fullName in allowedClasses) return true
-        if (target.packageName.isUnder(listOf(adaptersRoot)) &&
-            target.isAssignableTo(Throwable::class.java)
-        ) {
-            return true
+    ): Boolean =
+        when {
+            target.fullName in capabilityPorts -> false
+
+            target.packageName.isUnder(deniedPackages) -> false
+
+            // 중첩 타입(sealed 의 하위 등)은 **최상위 이름**으로 판정한다 — 허용 목록에 하위
+            // 타입을 하나씩 적으면 그것이 곧 열거로 되돌아가는 길이다.
+            target.topLevel().fullName in allowedClasses -> true
+
+            // 오류 매핑표가 옮기는 어댑터 예외 — 값일 뿐 포트를 건네지 않는다(계층 해석).
+            target.packageName.isUnder(listOf(adaptersRoot)) -> target.isAssignableTo(Throwable::class.java)
+
+            else -> target.packageName.isUnder(allowedPackages)
         }
-        return target.packageName.isUnder(allowedPackages)
-    }
 
     private fun String.isUnder(roots: List<String>): Boolean = roots.any { this == it || startsWith("$it.") }
 

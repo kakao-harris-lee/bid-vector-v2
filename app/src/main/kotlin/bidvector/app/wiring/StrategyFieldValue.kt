@@ -123,12 +123,13 @@ private fun operatorDeclared(won: Long): BaseAmount =
     BaseAmount(won, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.OperatorDeclared)
 
 private fun EditValue.terms(): List<String> =
-    (this as? EditValue.Terms)?.values ?: error("이 필드는 terms 칸을 읽는다 — 실제 값: $this")
+    (this as? EditValue.Terms)?.values ?: error("이 필드는 terms 칸을 읽는데 다른 칸의 값을 받았다(칸 배정표와 패치표가 어긋났다)")
 
 private fun EditValue.amountWon(): Long =
-    (this as? EditValue.AmountWon)?.won ?: error("이 필드는 amountWon 칸을 읽는다 — 실제 값: $this")
+    (this as? EditValue.AmountWon)?.won ?: error("이 필드는 amountWon 칸을 읽는데 다른 칸의 값을 받았다(칸 배정표와 패치표가 어긋났다)")
 
 private fun EditValue.number(): BigDecimal =
-    (this as? EditValue.Number)?.value ?: error("이 필드는 number 칸을 읽는다 — 실제 값: $this")
+    (this as? EditValue.Number)?.value ?: error("이 필드는 number 칸을 읽는데 다른 칸의 값을 받았다(칸 배정표와 패치표가 어긋났다)")
 
-private fun EditValue.count(): Int = (this as? EditValue.Count)?.value ?: error("이 필드는 count 칸을 읽는다 — 실제 값: $this")
+private fun EditValue.count(): Int =
+    (this as? EditValue.Count)?.value ?: error("이 필드는 count 칸을 읽는데 다른 칸의 값을 받았다(칸 배정표와 패치표가 어긋났다)")

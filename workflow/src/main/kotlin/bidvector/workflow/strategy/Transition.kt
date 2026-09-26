@@ -60,55 +60,6 @@ internal fun expireIfDue(
     }
 }
 
-/** 판정 순서 ①(설계 검토 (4) 2) — 이미 `Expired`인 세션, 또는 방금 만료로 접힌 세션. */
-private fun expiryRejection(
-    session: EditSession,
-    command: EditCommand,
-): TransitionOutcome.Rejected? =
-    if (session.state is EditSessionState.Expired) {
-        TransitionOutcome.Rejected(session, command, RejectionReason.SessionExpired)
-    } else {
-        null
-    }
-
-/** 판정 순서 ②(우회 (5)) — 직전 command 재전달은 효과 0, 다른 내용이면 conflict. */
-private fun duplicateOutcome(
-    session: EditSession,
-    command: EditCommand,
-): TransitionOutcome? {
-    val last = session.lastCommand
-    return when {
-        last == null || last.commandId != command.commandId -> null
-        last == command -> TransitionOutcome.Accepted(session)
-        else -> TransitionOutcome.Rejected(session, command, RejectionReason.IdempotencyConflict)
-    }
-}
-
-/** 판정 순서 ③ — `System` actor 는 전이표 자체가 없고, 다른 operator 는 소유권 위반. */
-private fun actorRejection(
-    session: EditSession,
-    command: EditCommand,
-): TransitionOutcome.Rejected? {
-    val actor = command.actor
-    return when {
-        actor !is Actor.Operator -> {
-            TransitionOutcome.Rejected(
-                session,
-                command,
-                RejectionReason.SystemActorNotPermitted,
-            )
-        }
-
-        actor != session.actor -> {
-            TransitionOutcome.Rejected(session, command, RejectionReason.ActorMismatch)
-        }
-
-        else -> {
-            null
-        }
-    }
-}
-
 /**
  * 편집 세션의 유일한 전이 문(scope.md ①, 우회 (1)) — 판정 순서(설계 검토 (4) 2):
  * ① 만료 → ② 직전 command 재전달 → ③ actor → ④ 전이표. [current]·[policy]는 매 호출마다
@@ -142,7 +93,15 @@ private fun dispatch(
     val state = session.state
     return when {
         state is EditSessionState.WaitingForValue && command is EditCommand.ProvideValue -> {
-            onProvideValue(session, state, command, current, policy)
+            // M6/6A-2b D-6A2b-25(code-review r1 L-1) — **세션이 기다리는 필드만 받는다.**
+            // 이전에는 command 의 필드를 그대로 받아, `begin` 이 연 필드가 아무것도 약속하지
+            // 않고 `RequestEdit` 의 존재 이유도 흐려졌다(필드를 바꾸려면 그 command 를 쓴다).
+            // corpus 다섯 전건이 세션 필드와 같은 필드를 보내므로 이 조임에 걸리는 case 는 없다(실측).
+            if (command.field == state.field) {
+                onProvideValue(session, state, command, current, policy)
+            } else {
+                TransitionOutcome.Rejected(session, command, RejectionReason.InvalidTransition)
+            }
         }
 
         state is EditSessionState.WaitingForConfirmation && command is EditCommand.Confirm -> {
@@ -183,8 +142,9 @@ private fun onProvideValue(
     when (validate(command.draft, current.revision, policy)) {
         is StrategyValidation.Valid -> {
             // D-6A2b-18 — draft 를 뜬 기준 revision 을 함께 남긴다. `RequestEdit` 뒤 새 value 는
-            // 이 자리를 다시 지나므로 새 기준을 잡는다.
-            val next = EditSessionState.WaitingForConfirmation(command.field, command.draft, current.revision)
+            // 이 자리를 다시 지나므로 새 기준을 잡는다. 필드는 **세션이 기다리던 것**이다
+            // (dispatch 가 command 와 같은지 이미 확인했다 — 두 값이 갈릴 자리가 없다).
+            val next = EditSessionState.WaitingForConfirmation(state.field, command.draft, current.revision)
             accept(session, next, command)
         }
 
@@ -192,22 +152,6 @@ private fun onProvideValue(
             accept(session, EditSessionState.WaitingForValue(state.field), command)
         }
     }
-
-/**
- * 신선도는 **두 축**이다(M6/6A-2b D-6A2b-18) — 둘 다 통과해야 적용한다.
- * ① 클라이언트가 본 revision(`seenRevision`)이 지금 값과 같은가 ② 세션이 든 draft 를 **뜬**
- * 시점([EditSessionState.WaitingForConfirmation.baseRevision])이 지금 값과 같은가.
- *
- * ①만으로는 부족했다(verifier r1 F-2 실측): 확인 직전에 조회하면 ①은 늘 참이 되고, 그 사이
- * 다른 세션이 적용한 변경은 낡은 스냅숏에 **덮여 사라졌다**. ②는 「이 draft 가 만들어진 뒤
- * 전략이 움직였는가」를 직접 묻는다. 기준이 없는(= 이 필드 이전에 저장된) 세션은 `null` 이라
- * 항상 stale 로 떨어진다 — 지어내지 않고 거부한다.
- */
-private fun isStale(
-    state: EditSessionState.WaitingForConfirmation,
-    command: EditCommand.Confirm,
-    current: OperatorStrategy,
-): Boolean = command.seenRevision != current.revision || state.baseRevision != current.revision
 
 /**
  * `Confirmed`(설계 검토 (4) 3) — (a) 신선하지 않으면 거부([isStale]). (b) 재검증이 `Invalid`면

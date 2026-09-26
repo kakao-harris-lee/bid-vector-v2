@@ -47,7 +47,16 @@ class StrategyEditExecutor(
             workflow.begin(EditSessionId(sessionIds()), OPERATOR.id, field)
         }
 
-    /** 조회 — 접근 시점 만료 fold 를 적용한 세션(D-6A2b-11, 주기 sweep 없음). */
+    /**
+     * 조회 — 접근 시점 만료 fold 를 적용한 세션(D-6A2b-11, 주기 sweep 없음).
+     *
+     * **그 fold 는 「접근하는 세션」에만 닿는다**(D-6A2b-24, code-review r1 MEDIUM-1 정정).
+     * 세션 id 를 서버가 만들므로 운영자가 열어 두고 떠난 세션에는 다시 접근할 주체가 없고,
+     * 그 행은 비종단 상태로 남는다 — 이 slice 는 그것을 치우지 않는다
+     * (`OPEN-6A2B-ABANDONED-SESSIONS`, 받는 쪽은 6B-3 보존·파기). 남아도 해가 없다:
+     * 만료된 세션의 command 는 fold 를 지나 거부되고, 낡은 기준 revision 은 D-6A2b-18 이
+     * 다시 막는다.
+     */
     fun view(sessionId: EditSessionId): EditSession? = transaction.inTransaction { it.view(sessionId) }
 
     /**

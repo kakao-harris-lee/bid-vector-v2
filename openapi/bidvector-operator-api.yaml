@@ -623,6 +623,11 @@ components:
     # 값 칸 넷 가운데 `field` 가 이름하는 하나만 싣는다 — 다른 칸이 함께 오면 400 이다
     # (조용히 무시하지 않는다). 칸 배정: 업종·지역·키워드 다섯 → terms, 예산 둘 → amountWon,
     # 임계 넷 → number, 후보 상한·여력 상한 → count.
+    # L-3 — 「`field` 가 이름하는 칸 **하나**가 필수」는 이 스키마 형태로 표현할 수 없다
+    # (`oneOf` 는 평탄 게이트에 걸린다). 구현은 엄격하게 강제한다: 그 칸이 없으면 400 이고,
+    # 다른 칸이 함께 오거나 알려진 키 밖이 오면 역시 400 이다. 칸 배정은 위 `field` enum 순서와
+    # 같다 — 업종·지역·키워드 다섯은 `terms`, 예산 둘은 `amountWon`, 임계 넷은 `number`,
+    # 후보 상한·여력 상한은 `count`.
     EditSessionValueRequest:
       type: object
       required:

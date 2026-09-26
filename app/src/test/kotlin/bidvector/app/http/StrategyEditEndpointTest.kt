@@ -87,11 +87,14 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
 
     @Test
     fun `begin 은 201 과 서버가 만든 세션 id 를 낸다 — 요청은 id 를 고르지 못한다(우회 4)`() {
-        val first = post(EDIT_SESSIONS, """{"field":"CANDIDATE_LIMIT","sessionId":"chosen-by-client"}""")
+        // D-6A2b-25(L-5) 뒤로 id 를 실으려는 시도는 **조용히 무시되지 않고 거부된다**.
+        val chosen = post(EDIT_SESSIONS, """{"field":"CANDIDATE_LIMIT","sessionId":"chosen-by-client"}""")
+        val first = post(EDIT_SESSIONS, """{"field":"CANDIDATE_LIMIT"}""")
         val second = post(EDIT_SESSIONS, """{"field":"CANDIDATE_LIMIT"}""")
 
+        chosen.statusCode.value() shouldBe 400
+        chosen.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
         first.statusCode.value() shouldBe 201
-        first.body?.get("sessionId") shouldNotBe "chosen-by-client"
         first.body?.get("state") shouldBe "WAITING_FOR_VALUE"
         first.body?.get("field") shouldBe "CANDIDATE_LIMIT"
         // 요청 본문이 id 를 나르지 못하므로 두 요청이 같은 세션을 겨냥할 수 없다.
@@ -199,15 +202,67 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
     }
 
     @Test
-    fun `행위자는 상수다 — 요청이 actor 를 실어도 System 이 되지 않는다 (우회 8)`() {
+    fun `행위자는 상수다 — 요청이 actor 를 실을 자리 자체가 없다 (우회 8)`() {
         val sessionId = beginSession()
-        post(
-            "$EDIT_SESSIONS/$sessionId/value",
-            """{"commandId":"c1","field":"CANDIDATE_LIMIT","count":7,"actor":"System"}""",
-        )
-        post("$EDIT_SESSIONS/$sessionId/confirm", """{"commandId":"c2","seenRevision":1}""")
 
+        // 행위자를 실으려는 시도는 알려진 키 밖이라 거부된다(D-6A2b-25) — 무시가 아니라 400 이다.
+        val withActor =
+            post(
+                "$EDIT_SESSIONS/$sessionId/value",
+                """{"commandId":"c1","field":"CANDIDATE_LIMIT","count":7,"actor":"System"}""",
+            )
+        withActor.statusCode.value() shouldBe 400
+        withActor.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
+
+        // 정상 경로가 내는 행위자는 상수 Operator 다 — 요청이 고를 수 있는 값이 아니다.
+        post("$EDIT_SESSIONS/$sessionId/value", limitValue("c1", 7))
+        confirmFirstRevision(sessionId)
         transaction.events.actors.map { it::class.simpleName } shouldBe listOf("Operator")
+    }
+
+    /**
+     * D-6A2b-25(L-1) — 세션이 기다리는 필드가 아닌 값 제출은 409 다. `begin` 응답의 `field`
+     * 가 실제로 무언가를 약속하고, 필드를 바꾸려면 `POST /{id}/edit` 를 쓴다.
+     */
+    @Test
+    fun `세션이 기다리지 않는 필드의 값 제출은 409 INVALID_TRANSITION 이다`() {
+        val sessionId = beginSession("CANDIDATE_LIMIT")
+
+        val other =
+            post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"c1","field":"MAX_ACTIVE_BIDS","count":4}""")
+
+        other.statusCode.value() shouldBe 409
+        other.body?.get("code") shouldBe ErrorCode.INVALID_TRANSITION
+        get("$EDIT_SESSIONS/$sessionId").body?.get("field") shouldBe "CANDIDATE_LIMIT"
+    }
+
+    /** D-6A2b-25(L-5) — 오탈자·군더더기 키도 성공으로 보이지 않는다. */
+    @Test
+    fun `알려진 키 밖의 본문 키는 400 이다`() {
+        val sessionId = beginSession()
+
+        val typo = post("$EDIT_SESSIONS/$sessionId/cancel", """{"commandID":"c1"}""")
+        val extra = post("$EDIT_SESSIONS/$sessionId/cancel", """{"commandId":"c1","note":"왜"}""")
+
+        typo.statusCode.value() shouldBe 400
+        extra.statusCode.value() shouldBe 400
+        extra.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
+    }
+
+    /** D-6A2b-25(L-6) — 무한히 큰 십진 표기는 받지 않는다. */
+    @Test
+    fun `척도·유효숫자 상한을 넘는 십진수는 400 이다`() {
+        val sessionId = beginSession("BID_NOW_THRESHOLD")
+        val longScale = "0." + "1".repeat(40)
+
+        val response =
+            post(
+                "$EDIT_SESSIONS/$sessionId/value",
+                """{"commandId":"c1","field":"BID_NOW_THRESHOLD","number":$longScale}""",
+            )
+
+        response.statusCode.value() shouldBe 400
+        response.body?.get("code") shouldBe ErrorCode.INVALID_REQUEST
     }
 
     @Test
