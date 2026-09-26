@@ -40,8 +40,14 @@ LABEL org.bidvector.baseimage="eclipse-temurin:21-jre-noble@sha256:7edbe8532195c
 
 # non-root — 위생 게이트가 `Config.User` 와 **실 ENTRYPOINT 로 띄운 컨테이너의 모든 프로세스
 # uid** 를 정책 하한과 대조한다(ml-serving 과 같은 고정 UID/GID·시스템 계정 범위).
+#
+# HOME 은 `/nonexistent`(Debian 이 시스템 계정에 쓰는 관례)다 — 아래 `--chown` 부재로 `/application`
+# 은 root 소유·이 사용자에게 읽기 전용이 됐고, 그것을 HOME 으로 가리키면 「쓸 수 없는 HOME」이
+# 된다(code-review r2 LOW-5). 지금 스택에서 `$HOME` 에 쓰는 것은 없지만(임시 파일은
+# `java.io.tmpdir`), `java.util.prefs` 같은 축이 깨어나면 증상이 이 줄에서 멀다. WORKDIR 이
+# 작업 자리를 따로 가리키므로 `/application` 을 HOME 으로 둘 이유가 없다.
 RUN groupadd --system --gid 10001 bidvector \
-    && useradd --system --uid 10001 --gid bidvector --home-dir /application --shell /usr/sbin/nologin bidvector
+    && useradd --system --uid 10001 --gid bidvector --home-dir /nonexistent --shell /usr/sbin/nologin bidvector
 
 WORKDIR /application
 
