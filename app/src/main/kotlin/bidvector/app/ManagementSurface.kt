@@ -13,7 +13,6 @@ import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
 import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.MapPropertySource
-import org.springframework.core.env.PropertySource
 
 /**
  * 관리 표면(D-6A2a-4) — health 를 **API 포트가 아닌 별도 관리 포트**에 내고, 그 포트에 health
@@ -151,11 +150,11 @@ private val CONSTANT_PROPERTY_SOURCE_NAMES: Set<String> =
         "server.ports",
     )
 
-/** 클래스 이름을 얻을 수 없는 소스(익명 클래스)의 분류. */
-private const val UNCLASSIFIED_SOURCE = "other"
+/** 상수 이름이 아닌 소스 전부의 **분류**. 한 낱말이고 입력에서 오는 조각이 없다. */
+private const val OTHER_SOURCE_CATEGORY = "other"
 
 /**
- * 소스를 **문면에 실을 수 있는 형태**로 바꾼다 — 상수 이름이면 그대로, 아니면 분류다.
+ * 소스 이름을 **문면에 실을 수 있는 형태**로 바꾼다 — 상수 이름이면 그대로, 아니면 분류다.
  *
  * 왜 이름을 그대로 실을 수 없는가(privacy-gate r3 L-6, 바이트코드 실독): 설정 데이터 소스의 이름은
  * Boot 이 `Config resource '<resource>' via location '<location>'` 으로 짓고, 그 두 조각에 운영자가
@@ -164,17 +163,14 @@ private const val UNCLASSIFIED_SOURCE = "other"
  * 않는 이유는 그것이 문자열 술어라 다른 운반 형태에 열려 있기 때문이다 — 분류는 **이름을 아예
  * 싣지 않으므로** 형태와 무관하다.
  *
- * 분류로 쓰는 것은 소스 **클래스**의 단순 이름이다. 클래스 이름은 Boot·Spring·우리 코드가 정하고
- * 입력이 정하지 않으므로 값이 실릴 자리가 없고, 그러면서 「설정 데이터에서 왔다」
- * (`OriginTrackedMapPropertySource`)·「설정 트리에서 왔다」(`ConfigTreePropertySource`)처럼 운영에
- * 필요한 만큼은 말한다.
+ * 분류를 더 쪼개지 않는다(예: 「설정 데이터에서 왔다」). 소스 클래스의 이름을 쓰는 형태는
+ * `bidvector.app` 의 리플렉션 봉쇄 규칙(D-6F8-13 F2-2 — `Class` 접근은 이름 조회로 한정)이
+ * 막는다(2026-09-26 실측: 전건 `check` 의 architecture test 가 `getSimpleName` 을 잡았다). 클래스를
+ * 열거하는 형태도 고르지 않았다 — 표지의 일은 **값을 싣지 않는 것**이고, 오늘 이 앱이 실제로
+ * 쓰는 채널은 전부 상수 이름 쪽에 있다(설정 데이터·설정 트리 채널은 쓰지 않는다).
  */
-private fun sourceLabel(source: PropertySource<*>): String =
-    if (source.name in CONSTANT_PROPERTY_SOURCE_NAMES) {
-        source.name
-    } else {
-        source.javaClass.simpleName.ifBlank { UNCLASSIFIED_SOURCE }
-    }
+private fun sourceLabel(sourceName: String): String =
+    if (sourceName in CONSTANT_PROPERTY_SOURCE_NAMES) sourceName else OTHER_SOURCE_CATEGORY
 
 /**
  * 같은 판정을 **키와 그 키를 실은 소스 표지의 짝**으로 돌려준다 — 거부 문면이 「어디서 온 값인가」를
@@ -197,7 +193,7 @@ private fun governedKeysOutsideLock(environment: ConfigurableEnvironment): List<
                 .mapNotNull { it as? IterableConfigurationPropertySource }
                 .flatMap { it.asSequence() }
                 .filter(::isGovernedByLock)
-                .map { sourceLabel(source) to it.toString() }
+                .map { sourceLabel(source.name) to it.toString() }
         }.distinct()
         .sortedWith(compareBy({ it.second }, { it.first }))
         .toList()

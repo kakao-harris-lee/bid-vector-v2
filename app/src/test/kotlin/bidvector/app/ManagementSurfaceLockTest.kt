@@ -221,7 +221,10 @@ class ManagementSurfaceLockTest {
      * 거부 문면의 **소스 이름**도 값 축이다(privacy-gate r3 L-6 · code-review r3 LOW-2).
      * `spring.config.import` 가 URL 을 받으면 그 URL 의 userinfo 가 소스 이름에 그대로 남는다 —
      * 이름을 문면에 그대로 실으면 자격이 기동 실패 로그로 나간다. 그래서 상수 이름이 아닌 소스는
-     * **분류**(소스 클래스의 단순 이름)로만 실린다.
+     * **분류 한 낱말**로만 실린다.
+     *
+     * 표지 값 하나만 보지 않는다 — location 원문의 다른 조각(호스트)도 함께 요구한다. 가리는
+     * 절삭이었다면 userinfo 는 사라지고 호스트는 남았을 것이다.
      */
     @Test
     fun `상수 이름이 아닌 소스는 문면에 분류로만 실린다`() {
@@ -230,9 +233,10 @@ class ManagementSurfaceLockTest {
         val thrown = shouldThrow<IllegalStateException> { lockManagementSurface(environment) }
 
         thrown.message!! shouldContain SIBLING_KEY
-        thrown.message!! shouldContain "MapPropertySource"
+        thrown.message!! shouldContain "(소스 other)"
         thrown.message!! shouldNotContain SOURCE_NAME_MARKER
         thrown.message!! shouldNotContain "cfg.internal"
+        thrown.message!! shouldNotContain "Config resource"
     }
 
     /**
