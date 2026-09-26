@@ -1,6 +1,7 @@
 package bidvector.app
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -74,6 +75,28 @@ class ManagementSurfaceLockTest {
                 "management.endpoints.web.exposure.include",
                 "spring.jmx.enabled",
             )
+    }
+
+    /**
+     * 판정 데이터 둘도 리터럴로 못박고, **둘을 잇는다** — 잠금이 새 이름공간의 키를 얻는 날
+     * 접두사 집합을 함께 늘리지 않으면 여기가 붉어진다(그러지 않으면 그 키만 조용히 잠금 밖
+     * 형제에게 열린다: 이번 라운드가 고친 결함의 형태 그대로다).
+     */
+    @Test
+    fun `거부 대상 이름공간과 배치 자유 키는 리터럴이고 잠금 키 전부를 덮는다`() {
+        MANAGEMENT_SURFACE_GOVERNED_PREFIXES.sorted() shouldContainExactly listOf("management", "spring.jmx")
+        MANAGEMENT_SURFACE_DEPLOYMENT_KEYS.sorted() shouldContainExactly listOf("management.server.port")
+
+        MANAGEMENT_SURFACE_LOCK.keys
+            .filterNot { key ->
+                MANAGEMENT_SURFACE_GOVERNED_PREFIXES.any { key == it || key.startsWith("$it.") }
+            }.shouldBeEmpty()
+    }
+
+    /** 판정 함수 자신도 직접 잰다 — 적대 없는 환경에서 위반 0 이어야 거부 단언이 공허하지 않다. */
+    @Test
+    fun `출하 기본값만 있는 환경에는 잠금 밖 관리 표면 키가 없다`() {
+        managementSurfaceKeysOutsideLock(environmentWithShippedDefaults()).shouldBeEmpty()
     }
 
     @Test
