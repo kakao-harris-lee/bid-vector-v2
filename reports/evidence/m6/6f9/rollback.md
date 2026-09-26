@@ -63,6 +63,8 @@ git diff <sha>~1..<sha> -- <파일> | git apply -R
 `policy-values.md`: P-16 행 하나 + §5 의 「M6/6F-9(P-16)가 네 번째 자리를 더한다」 문단. 지운 뒤 「내 줄 사라짐」(위 식별어 grep 0)과 「남의 줄 남음」을 둘 다 확인한다.
 
 `milestone-6.md` 는 이 rollback 의 restore 대상이 아니다 — 착수 문단은 팀장 레인이 쓴 것이고 되돌려야 하면 팀장이 같은 방식으로 격리한다.
+이 slice 의 문단은 **두 커밋**이다(최신 → 과거): `80b4ef01`(종결 문단) · `518f2dc1`(착수 문단). 되돌리는 명령은 `git diff <sha>~1..<sha> -- milestone-6.md | git apply -R` 을 이 순서로 두 번이다.
+확인: `grep -c '6F-9 종결\|6F-9 착수' milestone-6.md` = 0(내 줄이 사라졌다) · `grep -c '6F-8 종결' milestone-6.md` = 1(남의 줄이 남았다).
 
 ## 확인 — 임시 clone 실측 (`commands.md` 표)
 
