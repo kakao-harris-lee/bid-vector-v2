@@ -19,6 +19,13 @@ post-state 를 담을 수 없다).
   대괄호 색인 · `spring.jmx` · 적대 부팅 두 채널 · `SPRING_APPLICATION_JSON` 부팅)와 자격 `toString`.
   **양성 대조와 포트 판정은 전부 통과** — 실패가 「아무 것이나 거부/실패」가 아니라 그 축에서만 났다
 
+- cmd: `:app:test`(관리 표면 셋 + 늦은 소스 신규 test, 늦은 재검사 구현 전)
+- exit: 1
+- 핵심 결과: 25 test 중 **6 실패** — 판정 데이터 리터럴 둘 · 운반 이름공간 두 채널 · 대괄호 map 원소 ·
+  관리 주소 양성 대조 · **refresh 를 지나는 거부**. 양성 대조와 기존 거부 단언은 전부 초록이라
+  실패가 그 축에서만 났다. 같은 실행에서 「재검사 시점 readiness 는 503, 기동 완료 뒤 200」은
+  이미 초록이다 — Boot 의 발행 순서를 재는 단언이라 구현 전에도 참이고, 그래서 **양성 대조**로 쓴다
+
 ## 구현 뒤 표적 test
 
 - cmd: `./gradlew --no-daemon :app:test --tests 'bidvector.app.ManagementSurfaceLockTest' --tests 'bidvector.app.management.ManagementHealthSurfaceTest'`
@@ -56,6 +63,19 @@ post-state 를 담을 수 없다).
 - exit: 0
 - 핵심 결과: 문면에 **키 이름만** 실린다(심은 표지 값이 문면에 없음을 단언). 관리 포트 값 하나만
   환경이 정하고, 그 자유의 상한은 `ManagementPortType` 분리 판정이다
+
+## `spring.web.error` 확대 실측 (D-6A2a-17 ①, privacy-gate r2 L-4)
+
+- cmd: 출하 조립을 `spring.web.error.include-exception=true`·`include-message=always`·
+  `include-stacktrace=always`·`include-binding-errors=always` 로 띄우고 관리 포트 `/error` 와 비 GET 을 조회
+  (일회용 test, 판정 뒤 제거)
+- exit: 0(관측)
+- 핵심 결과: 관리 포트 `GET /error` 본문 키가 **셋에서 넷으로** 늘었다(`message` 가 붙고 값은
+  일반 문면이다). 비 GET 500 본문은 우리 오류 처리기의 모양이라 바뀌지 않았다. 관리 child 의 오류
+  endpoint 가 이 이름공간의 바인딩을 읽어 예외 클래스·스택 포함까지 정한다는 것은 바이트코드로
+  확인했다 — 그래서 **거부 이름공간에 넣는다**(환경이 관리 포트 응답을 넓히는 경로를 남기지 않는다).
+  verifier r2 가 같은 축을 `server.error.*` 로 쟀는데 Boot 4 는 그 자리를 `spring.web.error` 로
+  옮겼다(그래서 그 측정은 「새는 것 없음」이 나왔다)
 
 ## 이미지 · 위생 게이트
 
@@ -114,6 +134,12 @@ post-state 를 담을 수 없다).
 - exit: 1
 - 핵심 결과: 「필수 실행 파일 'curl' 이 이 이미지의 PATH 에 없다」 위반 1. 파생 이미지는 측정 뒤 삭제
 
+- cmd: 허용 문자 집합으로 바꾼 뒤 세 정책 사본으로 재측정(NBSP 원소 · 쉼표 뒤 공백 · 무수정)
+- exit: 2 · 2 · 0
+- 핵심 결과: **NBSP 가 섞인 원소도 거부된다**(앞 판은 통과시켰다 — 공백 종류 열거의 사각). 쉼표 뒤
+  공백도 그대로 거부. 무수정 정책은 게이트 전건 통과(exit 0)이므로 「아무 것이나 거부」가 아니다.
+  이 판정은 docker 를 타기 전에 끊는다
+
 ## compose · 스모크
 
 - cmd: `docker compose -f docker/compose.yaml config` (환경 변수 없이)
@@ -154,11 +180,22 @@ post-state 를 담을 수 없다).
 - 핵심 결과: 컨테이너·네트워크·볼륨 정리(이 호스트의 다른 프로젝트 컨테이너는 건드리지 않았다 —
   전용 project 이름으로 띄웠다)
 
+- cmd: CI 스모크 S-22c 를 **고치기 전 이미지**에 걸기(음성 대조)
+- exit: 1
+- 핵심 결과: 컨테이너는 비-0 으로 끝나지만(DB 부재) 스모크가 「거부 사유가 아니다」로 실패한다 —
+  **종료 코드만 보는 스모크는 아무것도 재지 않는다**는 사실의 실측이다
+
+- cmd: 같은 스모크를 고친 이미지에 걸기(양성)
+- exit: 0
+- 핵심 결과: 컨테이너 exit 1 + 문면이 결정 ID 와 운반 이름공간 키를 말한다. verifier r2 가 출하
+  이미지에서 쓴 환경변수 **그 한 줄**이 기동을 거부시킨다
+
 ## 변이 ①~⑦
 
-계약이 요구한 일곱 축이다. ①~④ 는 **현재 test 집합에서 다시 쟀다**(r1 이 test 를 값 축에서 거부
-축으로 바꿨으므로 앞 라운드 수치를 옮기지 않았다). 표적은 관리 표면 test 셋이고 기준선은
-**27 test 전건 통과**다.
+계약이 요구한 일곱 축이다. ①~④ 는 r1 이 test 를 값 축에서 거부 축으로 바꾼 **뒤** 다시 쟀다(앞
+라운드 수치를 옮기지 않았다). 표적은 그 시점의 관리 표면 test 셋이고 기준선은 **27 test 전건 통과**
+였다 — r2 가 test 를 더해 지금 기준선은 35 이므로, 아래 수치의 분모는 **그 측정 시점의 집합**이다.
+r2 가 바꾼 술어의 재측정은 아래 「변이 — 늦은 재검사」 절에 있다.
 
 | 변이 | 명령 | numstat | exit | 핵심 결과 |
 |---|---|---|---|---|
@@ -182,9 +219,9 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 
 ## 변이 — 접두사 거부·배선·자격 축 (D-6A2a-10~13)
 
-표적은 `ManagementSurfaceLockTest`·`ManagementSurfaceBootRefusalTest`(자격 축은
-`PersistencePropertiesTest`). 각 행은 적용 직후 `git diff --numstat` 으로 변이가 실제로 적용됐음을
-확인한 뒤의 결과이고, 측정 뒤 사본 복원 + `git diff --quiet` 로 복원을 확인했다.
+표적은 잠금 순수 환경 test·적대 부팅 test(자격 축은 자격 `toString` test)이고, 분모 20 은 **r1
+시점의 집합**이다. 각 행은 적용 직후 `git diff --numstat` 으로 변이가 실제로 적용됐음을 확인한 뒤의
+결과이고, 측정 뒤 사본 복원 + `git diff --quiet` 로 복원을 확인했다.
 
 | 변이 | numstat | exit | 핵심 결과 |
 |---|---|---|---|
@@ -195,6 +232,23 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 | `PersistenceProperties` 를 `data class` 로 되돌림 | 1/1 | 1 | 자격 `toString` 단언 FAILED |
 | `curl` 을 지운 파생 이미지 | 이미지 빌드 | 1 | 위생 게이트 위반 1(필수 실행 파일 부재) |
 | 정책 목록 원소에 공백 | 1/1 | 2 | 정책 오류로 끊는다 |
+
+## 변이 — 늦은 재검사 (D-6A2a-14)
+
+표적은 관리 표면 test 넷 + 출하 조립 부팅 test 둘이고 기준선은 **35 test 전건 통과**다. 각 행은 적용
+직후 `git diff --numstat` 으로 변이가 실제로 적용됐음을 확인하고, 측정 뒤 복원과 빈 `git status` 를
+확인한 뒤의 결과다.
+
+| 변이 | numstat | exit | 핵심 결과 |
+|---|---|---|---|
+| 조립에서 **늦은 재검사 listener 를 떼어냄** | 0/1 | 1 | 35 중 **1 FAILED** — refresh 를 지나는 거부 test 하나만 붉다. 다른 test 집합은 이 축을 못 본다(그래서 이 test 를 게이트 감시 집합에 등재했다) |
+| 재검사를 **readiness 발행 뒤로 이동**(같은 event 대신 준비 상태 변경 event 를 듣게) | 4/4 | 1 | 35 중 **3 FAILED** — 「재검사는 readiness 가 트래픽을 받기 전에 돈다」 + 출하 조립을 끝까지 띄우는 부팅 test 둘. 셋 다 재검사 자신의 문면(「검사 자리가 readiness 발행보다 뒤로 옮겨졌다」)으로 실패한다 — 자리 이동을 **구조로** 잡는다. 적대 test 하나는 이 변이에서도 초록이므로, 그것만으로는 자리 이동을 볼 수 없다 |
+| 조기 거부 `check` 삭제(현재 술어에서 재측정) | 0/1 | 1 | 35 중 **9 FAILED** — 순수 환경 5 + 부팅 축 4. 늦은 재검사는 refresh 전에 끝나는 test 를 구할 수 없다(그래서 두 자리가 서로를 대신하지 않는다) |
+| 운반 이름공간(`server.servlet.context-parameters`)을 거부 집합에서 제거 | 1/1 | 1 | 35 중 **4 FAILED** — 리터럴 집합 단언 + 두 채널 + 대괄호 map 원소. **refresh 를 지나는 거부 test 는 초록이다** — 보조 잠금이 사라져도 주 잠금이 그 위협을 닫는다는 실측이고, 보조가 보조임을 이 행이 보여 준다 |
+
+- cmd: 변이 없는 기준선 — `:app:test`(위 표적)
+- exit: 0
+- 핵심 결과: **35 test 전건 통과**
 
 ## `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT` 실측
 
@@ -235,12 +289,13 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 
 ## acceptance
 
-`check` job 명령 그대로를 **버릴 worktree**에서 마지막 산출물 커밋(`035311d4`)에 대해 한 번씩.
+`check` job 명령 그대로를 **버릴 worktree**에서 마지막 산출물 커밋(`8e385cea`)에 대해 한 번씩.
 
 - cmd: `./gradlew --no-daemon check --rerun-tasks`
 - exit: 0
-- 핵심 결과: BUILD SUCCESSFUL(컴파일·ktlint·detekt·sizeGate·domainDependencyGate·architecture test·
-  compatibilitySmoke·contractGate·leakPatternGate·gateExecutionGate 등 전건 실행)
+- 핵심 결과: BUILD SUCCESSFUL, 339 task 전건 실행(컴파일·ktlint·detekt·sizeGate·typeShapeGate·
+  jarContentGate·domainDependencyGate·architecture test·compatibilitySmoke·contractGate·
+  누출 패턴 게이트·gateExecutionGate 등)
 
 - cmd: `./gradlew --no-daemon qualityBaseline`
 - exit: 0
@@ -250,23 +305,34 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 - exit: 0
 - 핵심 결과: Kotlin 전건 + Python 전건 통과
 
-**전건 `check` 가 표적 test 로는 보이지 않는 것을 두 번 잡았다.** ① actuator 좌표가 test 전용 조립에
+**r2 에서도 전건 `check` 가 표적 test 로는 보이지 않는 것을 두 번 잡았다.** ① `jarContentGate` —
+판정 시퀀스의 `filterIsInstance` 가 reified inline 이라 stdlib 의 람다 클래스가 이 모듈 아카이브에
+복사되고, 게이트는 아카이브의 모든 클래스가 **게이트를 통과한 소스**에서 나왔음을 요구한다
+(`mapNotNull { it as? … }` 로 바꿨다 — 거동 동일). ② `typeShapeGate` — 늦은 재검사 listener 가
+인터페이스 둘을 구현해 인터페이스 수 래칫(상한 1)을 넘었다(`@Order` 로 우선순위를 주고 supertype 을
+하나로 줄였다 — `AnnotationAwareOrderComparator` 가 둘을 같게 읽는다). **표적 test 로는 둘 다
+초록이었다.**
+
+r1 에서 전건 `check` 가 잡은 것 둘. ① actuator 좌표가 test 전용 조립에
 `RequestMappingHandlerMapping` 빈을 둘로 만들어 `OperatorAuthenticationTest` 4 test 를
 `NoUniqueBeanDefinitionException` 으로 깨뜨렸다(시정은 그 조립에서 관리 서버를 끄는 별 커밋,
 `checklist.md` 「actuator 좌표가 만든 부수 효과」). ② 새 코드의 ktlint 위반 둘(체인 줄바꿈 · super
 type 줄바꿈). 둘 다 표적 test 만으로는 초록이었다 — 이것이 부분 게이트를 금지하는 이유의 실측이다.
 
 **`container` job — ci.yml 의 step 을 그 파일에서 뽑아 같은 순서로 한 번**(버릴 worktree
-`035311d4`). 러너 전용 step 셋(checkout·setup-java·setup-gradle)만 건너뛰고, `$GITHUB_ENV`
-전파는 CI 러너의 동작을 흉내 냈다(자격 값은 메모리 안에서만 흐르고 파일에 남기지 않았다).
+`8e385cea`). 러너 전용 step 셋(checkout·setup-java·setup-gradle)만 건너뛰고, 값 생성 step 둘은
+같은 명령(`openssl rand`)으로 **실행 셸의 메모리에만** 뒀다(`$GITHUB_ENV` 가 없는 자리다 — 파일을
+만들지 않는다). 컨테이너·compose project 는 전용 접두사를 썼다.
 
-- cmd: `container` job 의 실행 step 열하나 전부
+- cmd: `container` job 의 실행 step 열둘 전부(r2 가 거부 스모크 하나를 더했다)
 - exit: **전건 0**
-- 핵심 결과: DB·운영자 자격 값 생성(마스크 뒤) → ml-serving 이미지 → 앱 배포물 → 앱 이미지 →
-  위생 둘 통과(앱: uid 10001 · 금지 실행 파일 9 · **필수 실행 파일 1** · 의존 97/50 · 금지 좌표 13 ·
-  339.4MB) → 세 서비스 healthy → 스모크 통과(집계·`/error`·구성 요소 경로 포함) → S-24 통과 →
+- 핵심 결과: 자격 값 생성 → ml-serving 이미지 → 앱 배포물 → 앱 이미지 → 위생 둘 통과(앱: uid 10001 ·
+  금지 실행 파일 9 · 필수 실행 파일 1 · 의존 97/50 · 금지 좌표 13 · 339.4MB / ml-serving 336.1MB) →
+  **거부 스모크 통과**(출하 이미지가 verifier 의 환경변수 한 줄을 거부, 사유까지 확인) → 세 서비스
+  healthy → 스모크 통과(집계·`/error`·구성 요소 경로 포함, 고친 전송 오류 helper 로) → S-24 통과 →
   볼륨까지 정리. 정리 뒤 이 slice 가 만든 컨테이너·네트워크·볼륨 0, 이 호스트의 다른 프로젝트
-  컨테이너는 무접촉(전용 project 이름으로 띄웠다)
+  컨테이너는 무접촉. 실행 로그에 40·48자 hex **단독 토큰 0**(64자 단독 토큰 열은 이미지 다이제스트)이고
+  임시 파일은 판정 뒤 파기했다
 
 기준은 CI job 이 정본이고 PR CI 의 `container` 초록이 필요조건이다.
 
