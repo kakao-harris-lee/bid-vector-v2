@@ -13,6 +13,7 @@ import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
 import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.MapPropertySource
+import org.springframework.core.env.PropertySource
 
 /**
  * 관리 표면(D-6A2a-4) — health 를 **API 포트가 아닌 별도 관리 포트**에 내고, 그 포트에 health
@@ -127,9 +128,59 @@ fun managementSurfaceKeysOutsideLock(environment: ConfigurableEnvironment): List
     governedKeysOutsideLock(environment).map { it.second }.distinct()
 
 /**
- * 같은 판정을 **키와 그 키를 실은 소스 이름의 짝**으로 돌려준다 — 거부 문면이 「어디서 온 값인가」를
- * 말할 수 있게 한다(소스 이름은 값이 아니다). 운영 배치가 거부를 만났을 때 가장 먼저 필요한 정보가
- * 그것이다: 같은 키가 환경변수·명령행·서블릿 init-param 어디로든 들어올 수 있다.
+ * 문면에 **이름을 그대로 실을 수 있는** 소스 — Boot·Spring 이 **상수로** 정하는 이름들이다.
+ * `ManagementSurfaceLockTest` 가 이 열을 그 상수들과 대조한다(`server.ports` 만 리터럴이다 —
+ * `ServerPortInfoApplicationContextInitializer` 의 그 이름이 `private` 상수다).
+ *
+ * **이 열거는 공개하는 쪽이라 fail-closed 다**(privacy-gate r3 L-6, code-review r3 LOW-2 의
+ * 「열거가 돌아온다」 우려에 대한 답): 이름이 이 열에 없으면 문면은 **분류**로 내려간다. 즉 빠뜨린
+ * 이름은 문면의 유용성만 떨어뜨리고 표면을 열지 않는다. 거부 **판정**의 모집단은 여전히 환경의
+ * 소스 전부이고 이 열과 무관하다.
+ */
+private val CONSTANT_PROPERTY_SOURCE_NAMES: Set<String> =
+    setOf(
+        "systemEnvironment",
+        "systemProperties",
+        "commandLineArgs",
+        "spring.application.json",
+        "servletContextInitParams",
+        "servletConfigInitParams",
+        "jndiProperties",
+        "random",
+        "defaultProperties",
+        "server.ports",
+    )
+
+/** 클래스 이름을 얻을 수 없는 소스(익명 클래스)의 분류. */
+private const val UNCLASSIFIED_SOURCE = "other"
+
+/**
+ * 소스를 **문면에 실을 수 있는 형태**로 바꾼다 — 상수 이름이면 그대로, 아니면 분류다.
+ *
+ * 왜 이름을 그대로 실을 수 없는가(privacy-gate r3 L-6, 바이트코드 실독): 설정 데이터 소스의 이름은
+ * Boot 이 `Config resource '<resource>' via location '<location>'` 으로 짓고, 그 두 조각에 운영자가
+ * 준 location 원문이 들어간다. `spring.config.import` 가 URL 이면 그 URL 의 userinfo 와 쿼리
+ * 토큰이 이름 안에 남아 **자격이 기동 실패 로그로** 나간다. 가리는 절삭(`://…@` 치환)을 쓰지
+ * 않는 이유는 그것이 문자열 술어라 다른 운반 형태에 열려 있기 때문이다 — 분류는 **이름을 아예
+ * 싣지 않으므로** 형태와 무관하다.
+ *
+ * 분류로 쓰는 것은 소스 **클래스**의 단순 이름이다. 클래스 이름은 Boot·Spring·우리 코드가 정하고
+ * 입력이 정하지 않으므로 값이 실릴 자리가 없고, 그러면서 「설정 데이터에서 왔다」
+ * (`OriginTrackedMapPropertySource`)·「설정 트리에서 왔다」(`ConfigTreePropertySource`)처럼 운영에
+ * 필요한 만큼은 말한다.
+ */
+private fun sourceLabel(source: PropertySource<*>): String =
+    if (source.name in CONSTANT_PROPERTY_SOURCE_NAMES) {
+        source.name
+    } else {
+        source.javaClass.simpleName.ifBlank { UNCLASSIFIED_SOURCE }
+    }
+
+/**
+ * 같은 판정을 **키와 그 키를 실은 소스 표지의 짝**으로 돌려준다 — 거부 문면이 「어디서 온 값인가」를
+ * 말할 수 있게 한다. 운영 배치가 거부를 만났을 때 가장 먼저 필요한 정보가 그것이다: 같은 키가
+ * 환경변수·명령행·서블릿 init-param 어디로든 들어올 수 있다. 표지는 [sourceLabel] 이 정한다 —
+ * **소스 이름 자체는 값을 실을 수 있어서**(r3 정정) 상수 이름만 그대로 나간다.
  */
 private fun governedKeysOutsideLock(environment: ConfigurableEnvironment): List<Pair<String, String>> =
     environment.propertySources
@@ -146,7 +197,7 @@ private fun governedKeysOutsideLock(environment: ConfigurableEnvironment): List<
                 .mapNotNull { it as? IterableConfigurationPropertySource }
                 .flatMap { it.asSequence() }
                 .filter(::isGovernedByLock)
-                .map { source.name to it.toString() }
+                .map { sourceLabel(source) to it.toString() }
         }.distinct()
         .sortedWith(compareBy({ it.second }, { it.first }))
         .toList()
@@ -155,10 +206,10 @@ private fun refusalMessage(
     decision: String,
     environment: ConfigurableEnvironment,
 ): String {
-    val offending = governedKeysOutsideLock(environment).map { (source, key) -> "$key(소스 $source)" }
+    val offending = governedKeysOutsideLock(environment).map { (label, key) -> "$key(소스 $label)" }
     return "관리 표면 키를 환경이 정하려 한다($decision): ${offending.joinToString(", ")} — " +
         "배치가 정하는 것은 ${MANAGEMENT_SURFACE_DEPLOYMENT_KEYS.joinToString(", ")} 둘이다" +
-        "(값은 이 문면에 싣지 않는다)"
+        "(속성 값도, 소스 이름이 담을 수 있는 설정 위치 문자열도 이 문면에 싣지 않는다)"
 }
 
 /**
@@ -174,8 +225,9 @@ private fun refusalMessage(
  *
  * ② 는 ① 과 **같은 모양**의 fail-closed 판정이다(D-6A2a-10). 값을 조용히 덮어쓰지 않고 거부하는
  * 쪽을 고른 근거: 덮어쓰면 배치는 자기 설정이 왜 먹지 않는지 모르고, 같은 잠금이 **새 키에 대해
- * 아무 말도 하지 않는** 형태가 다시 생긴다. 거부 메시지에는 **키 이름만** 싣는다 — 값에는 자격이
- * 실려 올 수 있고(예: 오타로 들어온 자격 키), 기동 실패 문면은 운영 로그로 간다.
+ * 아무 말도 하지 않는** 형태가 다시 생긴다. 거부 메시지에는 **키 이름과 소스 표지**만 싣는다 —
+ * 값에는 자격이 실려 올 수 있고(예: 오타로 들어온 자격 키), 소스 **이름**에도 실려 올 수 있다
+ * ([sourceLabel] 이 그 자리를 닫는다). 기동 실패 문면은 운영 로그로 간다.
  *
  * 이 검사는 **빠른 실패**다 — 모집단이 「초기화자 시점에 열거 가능한 소스」로 한정되므로 이것만으로
  * 표면이 닫히지 않는다(D-6A2a-14 가 같은 술어를 refresh 뒤에 한 번 더 돈다).
