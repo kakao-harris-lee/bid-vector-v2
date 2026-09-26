@@ -3,19 +3,23 @@
 # 텍스트나 손으로 적는 라벨이 아니라 **만든 이미지의 실행·빌드 산출물**에 건다(하네스
 # 「게이트 술어는 구조로」, verifier r1 F-1·F-2·r2 R2-3·R2-4): 능력이 차단된 채 실 ENTRYPOINT
 # 로 띄운 컨테이너의 모든 프로세스 사용자·정책 다이제스트에서 파생한 이미지의 실제 layer
-# 체인·금지 패키지 다섯 각각 실제 import·이미지 자신의 태그·크기 상한.
+# 체인·이미지 자신의 태그·크기 상한, 그리고 kind 별 「금지」 판정(ml-serving: 금지 패키지 각각
+# 실제 import / 앱: 컴파일 도구 각각 실제 실행 + 풀린 의존 layer 의 test 전용 좌표).
 #
-# 사용법: tools/image-hygiene-check.sh <image-ref>
+# **M6/6A-2a D-6A2a-7 — 정책 파일을 인자로 받는다.** 앱 이미지가 생기면서 「금지」 판정이 하나가
+# 아니게 됐다(ml-serving 은 Python `import`, 앱은 JVM 구조). 기본값을 두지 않는다 — 어느 정책으로
+# 판정했는지가 명령에 보여야 한다(기본값은 "어느 정책이 돌았는가"를 감춘다).
+#
+# 사용법: tools/image-hygiene-check.sh <image-ref> <policy-file>
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
-  echo "사용법: $0 <image-ref>" >&2
+if [ "$#" -ne 2 ]; then
+  echo "사용법: $0 <image-ref> <policy-file>" >&2
   exit 2
 fi
 
 IMAGE_REF="$1"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-POLICY_FILE="$REPO_ROOT/config/quality/image-hygiene-policy.properties"
+POLICY_FILE="$2"
 
 if [ ! -f "$POLICY_FILE" ]; then
   echo "정책 파일이 없다: $POLICY_FILE" >&2
@@ -108,11 +112,63 @@ _check_at_most() {
   fi
 }
 
-FORBIDDEN_PACKAGES="$(_policy_value forbidden.packages list)"
 SIZE_CAP_BYTES="$(_policy_value size.cap.bytes numeric)"
 NONROOT_UID_MIN="$(_policy_value nonroot.uid.min numeric)"
 BASE_IMAGE_REPO="$(_policy_value base.image.repo text)"
 BASE_IMAGE_DIGEST="$(_policy_value base.image.digest text)"
+RUNTIME_KIND="$(_policy_value runtime.kind text)"
+
+# kind 별 값은 그 kind 에서만 읽는다 — 다른 kind 의 정책 파일에 없는 키를 요구하면
+# `_policy_value` 가 정책 오류로 끊는다(분기 소진: 모르는 kind 는 아래 `*)` 가 잡는다).
+FORBIDDEN_PACKAGES=""
+FORBIDDEN_EXECUTABLES=""
+FORBIDDEN_DEPENDENCY_COORDINATES=""
+DEPENDENCY_LAYER_PATH=""
+DEPENDENCY_LAYER_MIN_ENTRIES=""
+PROBE_ENV=()
+case "$RUNTIME_KIND" in
+  python-serving)
+    FORBIDDEN_PACKAGES="$(_policy_value forbidden.packages list)"
+    # D-6C-7 — 서버는 환경 7개가 전부 있어야 뜬다(기본값 없음). 이미지에 이미 구운 정책
+    # 파일 경로를 그대로 준다 — 위생 게이트 전용 부팅값이지 업무 정책 값이 아니다.
+    PROBE_ENV=(
+      -e ML_ENGINE_BIND=0.0.0.0:50051
+      -e ML_ENGINE_INFERENCE_POLICY=/app/policy/inference-v1.yaml
+      -e ML_ENGINE_TRAINING_POLICY=/app/policy/training-v1.yaml
+      -e ML_ENGINE_EVALUATION_POLICY=/app/policy/evaluation-v1.yaml
+      -e ML_ENGINE_SERVING_POLICY=/app/policy/serving-v1.yaml
+      -e ML_ENGINE_ARTIFACT_OUT_DIR=/app/artifacts
+      -e ML_ENGINE_CODE_VERSION=hygiene-check
+    )
+    ;;
+  jvm-app)
+    FORBIDDEN_EXECUTABLES="$(_policy_value forbidden.executables list)"
+    FORBIDDEN_DEPENDENCY_COORDINATES="$(_policy_value forbidden.dependency.coordinates list)"
+    DEPENDENCY_LAYER_PATH="$(_policy_value dependency.layer.path text)"
+    DEPENDENCY_LAYER_MIN_ENTRIES="$(_policy_value dependency.layer.min-entries numeric)"
+    # 앱도 설정이 전부 있어야 뜬다(기본값 없음 — 관리 포트 하나만 조립 근이 기본값을 갖는다).
+    # 위생 게이트 전용 부팅값이지 업무 정책 값이 아니다(위 ml-serving 과 같은 근거).
+    #
+    # JDBC 주소는 **RFC 5737 TEST-NET-1**(192.0.2.0/24, 문서·예시 전용으로 예약돼 어디로도
+    # 라우팅되지 않는다)이다. 실 DB 를 켜지 않으면서 프로세스를 살려 둬야 하기 때문이다 —
+    # 이름 해석 실패나 연결 거부는 즉시 기동 실패로 끝나 **(1) 의 프로세스 표집 창이 사라진다.**
+    # 여기로 보낸 SYN 은 응답이 없어 드라이버의 연결 타임아웃(기본 10초)까지 막히고, 그
+    # 사이 pid 1 은 살아 있다(2026-09-26 실측: t=10s 에도 `State.Running=true`, uid 10001).
+    PROBE_ENV=(
+      -e SERVER_PORT=8080
+      -e MANAGEMENT_SERVER_PORT=8081
+      -e BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:postgresql://192.0.2.1:5432/hygiene-check
+      -e BIDVECTOR_PERSISTENCE_USERNAME=hygiene-check
+      -e BIDVECTOR_PERSISTENCE_CREDENTIAL=hygiene-check
+      -e OPERATOR_CREDENTIAL_VALUE=hygiene-check-placeholder-not-an-operator-value
+      -e BIDVECTOR_EVALUATION_CANDIDATECAP=1
+    )
+    ;;
+  *)
+    echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(정책 오류 — 스크립트의 갈래와 정책이 어긋났다)" >&2
+    exit 2
+    ;;
+esac
 
 failures=0
 fail() {
@@ -152,17 +208,11 @@ cleanup_hygiene_container() {
 }
 trap cleanup_hygiene_container EXIT
 
-# D-6C-7 — 서버는 환경 7개가 전부 있어야 뜬다(기본값 없음). 이미지에 이미 구운 정책
-# 파일 경로를 그대로 준다 — 위생 게이트 전용 부팅값이지 업무 정책 값이 아니다.
+# 부팅값은 위 `case` 가 kind 별로 채운 `PROBE_ENV` 다(정책 파일이 아니라 게이트 내부 값 —
+# 업무 정책 값이 아니다). 능력 차단(`no-new-privileges`)은 kind 와 무관하게 늘 건다.
 docker run -d --name "$HYGIENE_CONTAINER" \
   --security-opt no-new-privileges \
-  -e ML_ENGINE_BIND=0.0.0.0:50051 \
-  -e ML_ENGINE_INFERENCE_POLICY=/app/policy/inference-v1.yaml \
-  -e ML_ENGINE_TRAINING_POLICY=/app/policy/training-v1.yaml \
-  -e ML_ENGINE_EVALUATION_POLICY=/app/policy/evaluation-v1.yaml \
-  -e ML_ENGINE_SERVING_POLICY=/app/policy/serving-v1.yaml \
-  -e ML_ENGINE_ARTIFACT_OUT_DIR=/app/artifacts \
-  -e ML_ENGINE_CODE_VERSION=hygiene-check \
+  "${PROBE_ENV[@]}" \
   "$IMAGE_REF" >/dev/null
 
 sleep 1
@@ -253,13 +303,55 @@ else
   fi
 fi
 
-# (3) 금지 패키지 다섯 — 이름 대조가 아니라 **실제 import 시도**(우회 (2), 5A S-1b 형태).
-IFS=',' read -r -a forbidden_array <<< "$FORBIDDEN_PACKAGES"
-for pkg in "${forbidden_array[@]}"; do
-  if docker run --rm --security-opt no-new-privileges --entrypoint python "$IMAGE_REF" -c "import ${pkg}" >/dev/null 2>&1; then
-    fail "금지 패키지 '${pkg}' 가 이 이미지에서 import 된다"
-  fi
-done
+# (3) 「금지」 판정 — 이름 대조가 아니라 **실행·산출물**에 건다. kind 로 갈라지는 유일한 절이다.
+# 요약 줄에 실을 한 줄은 `FORBIDDEN_SUMMARY` 가 든다(검사 범위가 요약에 그대로 드러나게 한다).
+FORBIDDEN_SUMMARY=""
+case "$RUNTIME_KIND" in
+  python-serving)
+    # 금지 패키지 다섯 — **실제 import 시도**(우회 (2), 5A S-1b 형태).
+    IFS=',' read -r -a forbidden_array <<< "$FORBIDDEN_PACKAGES"
+    for pkg in "${forbidden_array[@]}"; do
+      if docker run --rm --security-opt no-new-privileges --entrypoint python "$IMAGE_REF" -c "import ${pkg}" >/dev/null 2>&1; then
+        fail "금지 패키지 '${pkg}' 가 이 이미지에서 import 된다"
+      fi
+    done
+    FORBIDDEN_SUMMARY="금지-import-검사=${#forbidden_array[@]}건"
+    ;;
+  jvm-app)
+    # ① 컴파일·개발 도구 부재(D-6A2a-7 ①) — **실제 실행 시도**다. `--entrypoint <tool>` 로
+    # 덮어쓰는 것은 여기서 정당하다: 재는 대상이 "그 도구가 이 이미지에서 실행되는가"이고
+    # 프로세스 사용자가 아니다(사용자 축은 위 (1) 이 실 ENTRYPOINT 로 이미 쟀다).
+    IFS=',' read -r -a executable_array <<< "$FORBIDDEN_EXECUTABLES"
+    for tool in "${executable_array[@]}"; do
+      if docker run --rm --security-opt no-new-privileges --entrypoint "$tool" "$IMAGE_REF" --version >/dev/null 2>&1; then
+        fail "금지 실행 파일 '${tool}' 이 이 이미지에서 실행된다 — JRE 가 아니라 JDK 베이스일 수 있다"
+      fi
+    done
+
+    # ② 풀린 의존 layer 에 test 전용 좌표 0(D-6A2a-7 ②). **주 잠금은 Gradle 구조**(`bootJar`
+    # 는 `runtimeClasspath` 만 담는다)이고 이 검사는 그것이 이미지까지 이어졌는지 재는 보조다.
+    DEP_LAYER_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint ls "$IMAGE_REF" -1 "$DEPENDENCY_LAYER_PATH" 2>/dev/null || true)"
+    DEP_LAYER_ENTRIES="$(printf '%s\n' "$DEP_LAYER_LISTING" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    IFS=',' read -r -a coordinate_array <<< "$FORBIDDEN_DEPENDENCY_COORDINATES"
+    # **양성 대조가 먼저다** — 목록이 비거나 경로가 틀리면 아래 루프의 "위반 0" 은 공허하게
+    # 참이다(6C 의 세 라운드가 같은 계열을 세 번 냈다: 게이트가 틀린 답을 내는 게 아니라
+    # **아무 일도 하지 않게** 됐다). 그래서 목록이 실재함을 수치로 먼저 요구한다.
+    if ! [[ "$DEP_LAYER_ENTRIES" =~ ^[0-9]+$ ]] || [ "$DEP_LAYER_ENTRIES" -lt "$DEPENDENCY_LAYER_MIN_ENTRIES" ]; then
+      fail "의존 layer(${DEPENDENCY_LAYER_PATH})의 항목 수(${DEP_LAYER_ENTRIES})가 정책 하한(${DEPENDENCY_LAYER_MIN_ENTRIES}) 미만이다 — 경로가 틀렸거나 layer 가 풀리지 않았다(판정 불가)"
+    else
+      for coord in "${coordinate_array[@]}"; do
+        if printf '%s\n' "$DEP_LAYER_LISTING" | grep -qiF -- "$coord"; then
+          fail "test 전용 좌표 '${coord}' 가 의존 layer(${DEPENDENCY_LAYER_PATH})에 있다"
+        fi
+      done
+    fi
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${#executable_array[@]}건 의존layer=${DEPENDENCY_LAYER_PATH} 항목수=${DEP_LAYER_ENTRIES}(하한 ${DEPENDENCY_LAYER_MIN_ENTRIES}) 금지좌표-검사=${#coordinate_array[@]}건"
+    ;;
+  *)
+    echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2
+    exit 2
+    ;;
+esac
 
 # (4) 크기 상한 — `docker image inspect .Size`(단일 플랫폼 이미지 실 크기, `docker save`
 # 바이트 수와 일치함을 실측 확인함, commands.md 「크기 지표 선택 근거」)를 잰다. `docker
@@ -270,6 +362,8 @@ IMAGE_SIZE_BYTES="$(docker image inspect "$IMAGE_REF" --format '{{.Size}}')"
 _check_at_most "이미지 크기" "$IMAGE_SIZE_BYTES" "$SIZE_CAP_BYTES"
 
 echo "-- 실측 요약 --"
+echo "정책=${POLICY_FILE} runtime.kind=${RUNTIME_KIND}"
+echo "${FORBIDDEN_SUMMARY}"
 echo "Config.User=${CONFIG_USER} 실프로세스-uid전체=[${RUNTIME_UIDS_SUMMARY}] base-label(보조)=${BASE_LABEL}"
 echo "base-layer-접두-일치=${base_layer_prefix_ok}"
 echo "size_bytes=${IMAGE_SIZE_BYTES} cap_bytes=${SIZE_CAP_BYTES}"
