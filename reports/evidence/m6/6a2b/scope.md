@@ -96,6 +96,9 @@ outbox·SQL 로 가는 지름길이 없다 ③ 불변식을 어긴 값은 영속
 | 요청마다 트랜잭션 안에서 use case 를 조립하는 실행기(`app.wiring`) | **이것이 포트를 쥔다.** 공개 메서드는 command 를 받아 결과를 돌려주는 것뿐이어야 하고, 저장소·`ConnectionSource`·`TransactionBoundary` 를 밖에 내지 않는다 | **경계로 처리** — 실측 대상: 실행기에서 포트를 꺼낼 공개 경로가 0 임을 `javap` 로 잰다 |
 | 새 컨트롤러·DTO | HTTP 요청을 command 로 바꾼다. 포트 참조 없음(D-6A2b-8) | 닫는다 |
 | 읽기 조회기(기존 `StrategyReadController` 이전) | 현재 전략을 읽는다(원래 GET 이 하던 일) | 닫는다(동치) |
+| `TransactionBoundary`(app 컨텍스트 빈, D-6A2b-19 ④ — r1 추가) | 이 빈을 주입받은 app 코드는 트랜잭션 안에서 임의 SQL 을 실행할 수 있다(`jdbcClient`·`jdbcTemplate` 빈과 같은 권한 — 새 권한 아님) | **경계로 처리** — HTTP 로 닿지 않는 app 내부 코드는 빌드 저자 경계 밖. 닿는 길(컨트롤러·`app.http` 의 참조)은 허용 목록 ⊆ 가 막는다. 실측: 변이 MU1·MU2(컨트롤러 참조)·MU2b RED |
+| `StrategyEditTransaction`(app 컨텍스트 빈 — r1 추가) | 편집 use case 를 트랜잭션 안에서 실행한다. 모든 쓰기는 여전히 `EditStrategyWorkflow` 를 지난다 | **경계로 처리** — 허용 목록에 정확한 클래스로 올린 실행기만 컨트롤러가 받는다. 실측: 같은 변이 셋 |
+| JVM 공개 최상위 함수 둘(`TransitionGuardsKt`·`JsonValueReadersKt`, Kotlin `internal` — r1 크기 분할로 생김) | 판정 순서 술어는 이미 공개 생성자를 가진 결과 타입만 내고 `EditSession`(internal constructor)을 인자로 요구한다. JSON 읽기는 `JsonNode` 만 읽는다 | 닫는다(새 권한 없음) — 알려진 제한 ⑦ |
 
 ### (3) 과잉·미달
 
