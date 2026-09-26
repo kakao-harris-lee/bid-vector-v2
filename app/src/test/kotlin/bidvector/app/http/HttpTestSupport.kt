@@ -1,7 +1,10 @@
 package bidvector.app.http
 
 import bidvector.adapters.ml.UnavailableMlAnalysis
+import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.app.wiring.EvaluationDryRunFactory
+import bidvector.app.wiring.StrategyEditExecutor
+import bidvector.app.wiring.StrategyQuery
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
 import bidvector.sharedkernel.Resolution
@@ -10,6 +13,7 @@ import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyDraft
 import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
+import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
 import bidvector.workflow.evaluation.CandidateSourcePort
@@ -19,9 +23,19 @@ import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
+import bidvector.workflow.strategy.EDIT_SESSION_POLICY
+import bidvector.workflow.strategy.EditSession
+import bidvector.workflow.strategy.EditSessionId
+import bidvector.workflow.strategy.EditSessionPolicyData
+import bidvector.workflow.strategy.EditSessionRepository
+import bidvector.workflow.strategy.EditSessionSnapshot
+import bidvector.workflow.strategy.EditStrategyWorkflow
+import bidvector.workflow.strategy.EventSink
 import bidvector.workflow.strategy.StrategyRepository
+import bidvector.workflow.strategy.toSnapshot
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -164,6 +178,53 @@ class RecordingAuditSink {
     }
 }
 
+
+/**
+ * M6/6A-2b — 실 DB 없이 편집 endpoint 를 도는 트랜잭션 경계 이중체. **use case 는 실물**
+ * 이다(상태 기계·멱등·만료 판정을 test 사본으로 다시 짓지 않는다) — 바뀌는 것은 커넥션
+ * 경계뿐이라, 이 이중체 위에서 재는 것은 「HTTP 층이 결과를 어떤 상태 코드로 옮기는가」다.
+ * 원자성 자체(전략+outbox+세션 한 커밋)는 이 자리가 아니라 실 DB test 가 잰다.
+ */
+class InMemoryStrategyEditTransaction(
+    private val strategies: StrategyRepository,
+    private val clock: Clock,
+) : StrategyEditTransaction {
+    val sessions: InMemoryEditSessionRepository = InMemoryEditSessionRepository()
+    val events: RecordingStrategyEventSink = RecordingStrategyEventSink()
+
+    override fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T {
+        val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
+        val sessionPolicy =
+            (EDIT_SESSION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<EditSessionPolicyData>).value
+        return action(EditStrategyWorkflow(sessions, strategies, clock, events, policy, sessionPolicy))
+    }
+}
+
+/** `EditSession` 은 `internal constructor` 라 저장은 값 그대로, 반환은 원시 스냅숏으로 한다(D-6B1-7). */
+class InMemoryEditSessionRepository : EditSessionRepository {
+    private val stored = mutableMapOf<EditSessionId, EditSession>()
+
+    override fun load(id: EditSessionId): EditSessionSnapshot? = stored[id]?.toSnapshot()
+
+    override fun save(session: EditSession) {
+        stored[session.id] = session
+    }
+}
+
+class RecordingStrategyEventSink : EventSink {
+    val published: MutableList<StrategyEvent> = Collections.synchronizedList(mutableListOf())
+
+    override fun publish(
+        event: StrategyEvent,
+        actor: Actor,
+    ) {
+        published += event
+        actors += actor
+    }
+
+    val actors: MutableList<Actor> = Collections.synchronizedList(mutableListOf())
+}
+
 /**
  * 실 DB 없이 HTTP 층만 올리는 test 전용 조립 — `PersistenceWiring`(다른 패키지
  * `bidvector.app.wiring`)을 스캔 범위 밖에 둔다(`@SpringBootApplication`의 기본 컴포넌트
@@ -175,6 +236,24 @@ class RecordingAuditSink {
 open class HttpTestApplication {
     @Bean
     open fun strategyRepository(): TestStrategyRepository = TestStrategyRepository()
+
+    /** M6/6A-2b D-6A2b-8 — `StrategyReadController` 는 포트가 아니라 이 조회기를 받는다. */
+    @Bean
+    open fun strategyQuery(strategyRepository: TestStrategyRepository): StrategyQuery =
+        StrategyQuery(strategyRepository)
+
+    @Bean
+    open fun strategyEditTransaction(
+        strategyRepository: TestStrategyRepository,
+        clock: FixedClock,
+    ): InMemoryStrategyEditTransaction = InMemoryStrategyEditTransaction(strategyRepository, clock)
+
+    @Bean
+    open fun strategyEditExecutor(strategyEditTransaction: InMemoryStrategyEditTransaction): StrategyEditExecutor =
+        StrategyEditExecutor(
+            strategyEditTransaction,
+            STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>,
+        )
 
     @Bean
     open fun testClock(): FixedClock = FixedClock(Instant.parse("2026-09-19T00:00:00Z"))

@@ -3,23 +3,28 @@ package bidvector.app.http
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.export
 import bidvector.strategy.CategoryCode
+import bidvector.app.wiring.StrategyQuery
 import bidvector.strategy.OperatorStrategy
-import bidvector.workflow.strategy.StrategyRepository
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 import java.math.BigDecimal
 
 /**
- * 전략 조회(D-6A1-4 — 이 slice의 **유일한** endpoint, 읽기 전용). [StrategyRepository]가
- * 이미 낸 [OperatorStrategy]를 [StrategyReadResponse]로 그대로 옮긴다 — 새 계산값을
- * 만들지 않는다((2b) 「닫는다」).
+ * 전략 조회(D-6A1-4 — 6A-1 의 유일한 endpoint, 읽기 전용). [StrategyQuery]가 이미 낸
+ * [OperatorStrategy]를 [StrategyReadResponse]로 그대로 옮긴다 — 새 계산값을 만들지
+ * 않는다((2b) 「닫는다」).
+ *
+ * **M6/6A-2b D-6A2b-8 — 포트가 아니라 조회기를 받는다.** 이전 판은
+ * `StrategyRepository`(전략 저장 포트)를 직접 받았다: 읽기만 부르더라도 `save` 가 같은
+ * 객체에 있어, `app.http` 가 「저장할 수 있는 것」을 쥔 채 있었다. 조회기는 읽기 하나뿐이라
+ * 그 자리가 사라진다(하는 일은 같다 — (2b) 「닫는다(동치)」).
  */
 @RestController
 class StrategyReadController(
-    private val strategyRepository: StrategyRepository,
+    private val strategies: StrategyQuery,
 ) {
     @GetMapping("/api/strategy")
-    fun read(): StrategyReadResponse = StrategyReadResponse.from(strategyRepository.load())
+    fun read(): StrategyReadResponse = StrategyReadResponse.from(strategies.current())
 }
 
 /**

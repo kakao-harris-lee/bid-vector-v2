@@ -4,10 +4,13 @@ import bidvector.adapters.evaluation.CandidateCapExceededException
 import bidvector.adapters.evaluation.InvalidEvaluationRequestException
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
+import bidvector.workflow.strategy.EditSessionConflictException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.HttpMediaTypeNotSupportedException
+import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
@@ -21,7 +24,7 @@ import org.springframework.web.servlet.NoHandlerFoundException
 const val CORRELATION_ID_ATTRIBUTE = "bidvector.http.correlationId"
 const val AUDIT_SUBJECT_ATTRIBUTE = "bidvector.http.subject"
 
-private fun HttpServletRequest.correlationIdOrUnknown(): String =
+internal fun HttpServletRequest.correlationIdOrUnknown(): String =
     getAttribute(CORRELATION_ID_ATTRIBUTE) as? String ?: "unknown"
 
 /**
@@ -45,6 +48,22 @@ object ErrorCode {
     const val MAX_ACTIVE_BIDS_NOT_CONFIGURED = "MAX_ACTIVE_BIDS_NOT_CONFIGURED"
     const val CANDIDATE_CAP_EXCEEDED = "CANDIDATE_CAP_EXCEEDED"
     const val INVALID_REQUEST = "INVALID_REQUEST"
+
+    // M6/6A-2b D-6A2b-6·7 — 편집 endpoint 여섯. 거부 사유 일곱은 전부 409 이고 코드가
+    // 사유를 가른다(상태 코드가 아니라 본문이 구분한다). 나머지 넷은 세션 부재(404)·
+    // 낙관적 동시성 충돌(409)·값 불변식 위반(400)·메서드/미디어 타입 불일치(405/415)다.
+    const val SESSION_NOT_FOUND = "SESSION_NOT_FOUND"
+    const val SESSION_EXPIRED = "SESSION_EXPIRED"
+    const val IDEMPOTENCY_CONFLICT = "IDEMPOTENCY_CONFLICT"
+    const val ACTOR_MISMATCH = "ACTOR_MISMATCH"
+    const val SYSTEM_ACTOR_NOT_PERMITTED = "SYSTEM_ACTOR_NOT_PERMITTED"
+    const val STALE_REVISION = "STALE_REVISION"
+    const val INVALID_TRANSITION = "INVALID_TRANSITION"
+    const val SESSION_ALREADY_ACTIVE = "SESSION_ALREADY_ACTIVE"
+    const val EDIT_SESSION_CONFLICT = "EDIT_SESSION_CONFLICT"
+    const val STRATEGY_VALUE_INVALID = "STRATEGY_VALUE_INVALID"
+    const val METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
+    const val UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
 }
 
 /**
@@ -89,6 +108,24 @@ object ErrorMapping {
             // 같은 코드(INVALID_REQUEST)로 옮긴다 — 예외 메시지는 싣지 않는다(D-6A1-7 불변식).
             is HttpMessageNotReadableException -> {
                 ErrorBody(ErrorCode.INVALID_REQUEST, "요청 본문을 읽을 수 없다", correlationId)
+            }
+
+            // M6/6A-2b D-6A2b-7 — 편집 endpoint 가 이 앱의 첫 쓰기 표면이다. 형식 오류가
+            // 기본 분기(500)로 떨어지면 그것이 스택 노출의 문이 된다.
+            is InvalidEditRequestException -> {
+                ErrorBody(ErrorCode.INVALID_REQUEST, "요청 값이 유효하지 않다", correlationId)
+            }
+
+            is EditSessionConflictException -> {
+                ErrorBody(ErrorCode.EDIT_SESSION_CONFLICT, "편집 세션이 동시에 바뀌었다", correlationId)
+            }
+
+            is HttpRequestMethodNotSupportedException -> {
+                ErrorBody(ErrorCode.METHOD_NOT_ALLOWED, "이 경로가 지원하지 않는 메서드다", correlationId)
+            }
+
+            is HttpMediaTypeNotSupportedException -> {
+                ErrorBody(ErrorCode.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 미디어 타입이다", correlationId)
             }
 
             else -> {
@@ -157,6 +194,40 @@ class GlobalErrorHandler {
         exception: HttpMessageNotReadableException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
+
+    /** D-6A2b-7 — 형식·상태 오류 넷. 전부 [ErrorMapping] 의 같은 표를 지난다. */
+    @ExceptionHandler(InvalidEditRequestException::class)
+    fun invalidEditRequest(
+        exception: InvalidEditRequestException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
+
+    @ExceptionHandler(EditSessionConflictException::class)
+    fun editSessionConflict(
+        exception: EditSessionConflictException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.CONFLICT, exception, request)
+
+    /**
+     * 405 는 `Allow` 헤더를 함께 낸다(RFC 9110 §15.5.6 — 필수) — 값은 Spring 이 그 경로의
+     * 매핑에서 도출한 집합 그대로다(손으로 적지 않는다).
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException::class)
+    fun methodNotSupported(
+        exception: HttpRequestMethodNotSupportedException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> {
+        val correlationId = request.correlationIdOrUnknown()
+        val builder = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+        exception.supportedHttpMethods?.let { builder.allow(*it.toTypedArray()) }
+        return builder.body(ErrorMapping.forThrowable(exception, correlationId))
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
+    fun mediaTypeNotSupported(
+        exception: HttpMediaTypeNotSupportedException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.UNSUPPORTED_MEDIA_TYPE, exception, request)
 
     @ExceptionHandler(Throwable::class)
     fun fallback(

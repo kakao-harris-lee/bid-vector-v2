@@ -235,6 +235,8 @@ private fun editableFieldName(field: EditableField): String =
         is EditableField.Threshold -> thresholdFieldName(field.field)
         is EditableField.Watch -> watchRuleIdName(field.id)
         EditableField.CandidateLimit -> "CandidateLimit"
+        // M6/6A-2b — corpus 에 이 필드를 쓰는 case 는 없다(어휘 추가만 반영한다).
+        EditableField.MaxActiveBids -> "MaxActiveBids"
     }
 
 private fun editSessionStateName(state: EditSessionState): String =
