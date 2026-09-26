@@ -141,7 +141,10 @@ private fun governedKeysOutsideLock(environment: ConfigurableEnvironment): List<
             ConfigurationPropertySources
                 .from(source)
                 .asSequence()
-                .filterIsInstance<IterableConfigurationPropertySource>()
+                // `filterIsInstance` 를 쓰지 않는다 — reified inline 이라 stdlib(`_Sequences.kt`) 의
+                // 람다 클래스가 이 모듈 아카이브에 복사되고, `jarContentGate` 가 「게이트를 통과한
+                // 소스가 아니다」로 끊는다(2026-09-26 실측). `as?` 는 이 파일의 람다다.
+                .mapNotNull { it as? IterableConfigurationPropertySource }
                 .flatMap { it.asSequence() }
                 .filter(::isGovernedByLock)
                 .map { source.name to it.toString() }
