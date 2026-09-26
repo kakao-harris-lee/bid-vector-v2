@@ -5,32 +5,22 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.SmartInitializingSingleton
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.web.server.context.WebServerApplicationContext
 import org.springframework.boot.web.server.servlet.context.ServletWebServerInitializedEvent
 import org.springframework.boot.web.servlet.ServletContextInitializer
+import org.springframework.context.ApplicationContextInitializer
 import org.springframework.context.ApplicationListener
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
+import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.context.event.ContextRefreshedEvent
 import org.springframework.core.Ordered
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** 잠금이 **이름 대지 않은** 형제 키 — 이것이 열리면 readiness 가 구성 요소 세부를 낸다. */
 private const val LATE_SOURCE_SIBLING_KEY = "management.endpoint.health.group.readiness.show-details"
-
-/**
- * 「refresh 를 지났다」의 표지. `SmartInitializingSingleton` 은 singleton 전부가 만들어진 뒤
- * (`finishBeanFactoryInitialization` 끝)에 불린다 — 이 값이 참이면 거부는 초기화자가 아니라 그
- * **뒤**에서 났다. 표지가 없으면 「기동이 실패했다」가 조기 거부로도 참이 된다.
- */
-private val PAST_REFRESH = AtomicBoolean(false)
 
 /**
  * D-6A2a-14 — **refresh 를 지나는** 부팅으로 늦은 재검사를 잰다.
@@ -46,8 +36,14 @@ private val PAST_REFRESH = AtomicBoolean(false)
  * 초록**이 된다(공허한 단언). 대신 init-param 을 **서블릿 컨텍스트에 직접** 심는다 — 채널이
  * 무엇이든 「늦게 채워지는 소스가 형제 키를 운반한다」는 형태 그대로다.
  *
- * DB 가 필요한 이유: 거부가 걸리는 자리가 `finishRefresh` 라 그 전에 singleton 전부(DataSource·
- * Flyway migrate)가 이미 만들어진다. [PAST_REFRESH] 표지가 그 사실을 단언으로 만든다.
+ * **적대 조각을 `@Configuration` 으로 두지 않는다**(2026-09-26 실측 — D-6A1-27 과 같은 함정):
+ * 출하 조립의 컴포넌트 스캔 기준은 `bidvector.app` 과 그 하위 전부이고 test 소스도 그 범위 안이라,
+ * `@Configuration` 을 붙이면 이 조각이 **다른 모든 production 조립 부팅에 끼어들어** 그 부팅들을
+ * 전부 거부시켰다. 그래서 초기화자가 bean 을 **손으로 등재**한다(스테레오타입 annotation 0).
+ *
+ * DB 가 필요한 이유: 거부가 걸리는 자리는 부모의 `finishRefresh` 라 그 전에 singleton 전부
+ * (DataSource·Flyway migrate)가 이미 만들어진다. 「관리 child context 의 refresh 를 보았다」가
+ * 그 사실의 표지다 — child 는 부모 `finishRefresh` 의 `SmartLifecycle` 단계에서 서기 때문이다.
  */
 class ManagementSurfaceLateSourceRefusalTest {
     companion object {
@@ -69,23 +65,18 @@ class ManagementSurfaceLateSourceRefusalTest {
     }
 
     /**
-     * 적대 init-param 을 심는 조립 조각 — 이 bean 은 `createWebServer()` 안에서 불리므로
-     * `initPropertySources()` 가 소스를 실체로 바꿀 때 이 키가 그 안에 있다.
+     * 적대 init-param 을 심는 bean 을 손으로 등재한다 — 이 bean 은 `createWebServer()` 안에서
+     * 불리므로 `initPropertySources()` 가 소스를 실체로 바꿀 때 이 키가 그 안에 있다.
+     * `registerSingleton` 으로 등재해도 `getBeanNamesForType` 이 수동 singleton 을 포함하므로
+     * Boot 의 `ServletContextInitializer` 수집에 잡힌다.
      */
-    @Configuration(proxyBeanMethods = false)
-    open class HostileLateSource {
-        @Bean
-        open fun hostileInitParameter(): ServletContextInitializer =
-            ServletContextInitializer { it.setInitParameter(LATE_SOURCE_SIBLING_KEY, "always") }
-
-        @Bean
-        open fun pastRefreshMarker(): SmartInitializingSingleton = SmartInitializingSingleton { PAST_REFRESH.set(true) }
-    }
-
-    @BeforeEach
-    fun resetMarker() {
-        PAST_REFRESH.set(false)
-    }
+    private fun hostileLateSource(): ApplicationContextInitializer<ConfigurableApplicationContext> =
+        ApplicationContextInitializer { context ->
+            context.beanFactory.registerSingleton(
+                "hostileLateInitParameter",
+                ServletContextInitializer { it.setInitParameter(LATE_SOURCE_SIBLING_KEY, "always") },
+            )
+        }
 
     private fun builder(): SpringApplicationBuilder =
         productionApplication()
@@ -103,11 +94,23 @@ class ManagementSurfaceLateSourceRefusalTest {
 
     @Test
     fun `늦은 소스가 운반하는 잠금 밖 형제 키는 refresh 를 지나 기동을 거부한다`() {
-        val thrown = shouldThrow<IllegalStateException> { builder().sources(HostileLateSource::class.java).run() }
+        var managementContextRefreshed = false
+        val observeChildRefresh =
+            ApplicationListener<ContextRefreshedEvent> { event ->
+                if (WebServerApplicationContext.hasServerNamespace(event.applicationContext, "management")) {
+                    managementContextRefreshed = true
+                }
+            }
+
+        val thrown =
+            shouldThrow<IllegalStateException> {
+                builder().initializers(hostileLateSource()).listeners(observeChildRefresh).run()
+            }
 
         thrown.message!! shouldContain "D-6A2a-14"
         thrown.message!! shouldContain LATE_SOURCE_SIBLING_KEY
-        PAST_REFRESH.get() shouldBe true
+        // 「refresh 를 지났다」의 표지 — 없으면 「기동이 실패했다」가 조기 거부로도 참이 된다.
+        managementContextRefreshed shouldBe true
     }
 
     /**
@@ -117,7 +120,7 @@ class ManagementSurfaceLateSourceRefusalTest {
      *
      * 세 가지를 함께 잰다. ① 재검사 시점의 readiness 응답 코드(양성 대조: 끝난 뒤에는 200 이므로
      * 「경로가 없어서 200 이 아니었다」가 아니다) ② 같은 자리에 등록한 listener 가 **관리 child
-     * context 의 refresh 도 받는다**(Spring 이 child event 를 parent 로도 발행한다) — 늦은 재검사가
+     * context 의 refresh 도 받는다**(Spring 이 child event 를 부모에게도 발행한다) — 늦은 재검사가
      * 부모와 자식 **둘 다**를 판정 대상으로 본다는 배선 사실이다 ③ 정상 환경은 거부되지 않는다.
      */
     @Test

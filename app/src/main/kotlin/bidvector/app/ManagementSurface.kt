@@ -1,11 +1,17 @@
 package bidvector.app
 
 import org.springframework.boot.actuate.autoconfigure.web.server.ManagementPortType
+import org.springframework.boot.availability.ApplicationAvailability
+import org.springframework.boot.availability.ReadinessState
 import org.springframework.boot.context.properties.source.ConfigurationPropertyName
 import org.springframework.boot.context.properties.source.ConfigurationPropertySources
 import org.springframework.boot.context.properties.source.IterableConfigurationPropertySource
+import org.springframework.context.ApplicationContext
 import org.springframework.context.ApplicationContextInitializer
+import org.springframework.context.ApplicationListener
 import org.springframework.context.ConfigurableApplicationContext
+import org.springframework.context.event.ContextRefreshedEvent
+import org.springframework.core.Ordered
 import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.MapPropertySource
 
@@ -58,15 +64,22 @@ val MANAGEMENT_SURFACE_LOCK: Map<String, String> =
     )
 
 /**
- * 배치가 **정할 수 있는** 관리 표면 키(D-6A2a-4 의 유일한 자유). 그 자유의 상한은
- * [lockManagementSurface] 의 포트 분리 판정이 가둔다.
+ * 배치가 **정할 수 있는** 관리 표면 키(D-6A2a-4·15). 그 자유의 상한은 [lockManagementSurface] 의
+ * 포트 분리 판정이 가둔다.
+ *
+ * `management.server.address` 가 둘째 키인 근거(D-6A2a-15, code-review r2 MEDIUM-1): 계약은 관리
+ * 포트의 **네트워크 노출 통제를 배치 환경에 넘겼는데**(`OPEN-6A2A-MGMT-PORT-EXPOSURE`), 그 통제의
+ * 가장 싼 형태가 이 키다. 이 키는 표면을 **좁히기만** 한다 — Boot 기본값이 「전 인터페이스」라
+ * 넓힐 방향이 없고, 포트 분리 판정은 그대로 선다. 그래서 계약 (2b) 「환경이 넓히지 못한다」를
+ * 어기지 않는다.
  */
-val MANAGEMENT_SURFACE_DEPLOYMENT_KEYS: Set<String> = setOf("management.server.port")
+val MANAGEMENT_SURFACE_DEPLOYMENT_KEYS: Set<String> =
+    setOf("management.server.port", "management.server.address")
 
 /**
- * **거부 대상 이름공간**(D-6A2a-10). [MANAGEMENT_SURFACE_LOCK] 이 이름 댄 키가 걸린 접두사
- * 전부이며, `ManagementSurfaceLockTest` 가 두 집합의 리터럴과 그 포함 관계를 함께 단언한다 —
- * 잠금에 새 이름공간의 키를 더하면 여기도 함께 늘리지 않는 한 붉어진다.
+ * **거부 대상 이름공간**(D-6A2a-10·14·17 ①). `ManagementSurfaceLockTest` 가 이 집합의 리터럴과
+ * [MANAGEMENT_SURFACE_LOCK] 키 전부를 덮는다는 포함 관계를 함께 단언한다 — 잠금에 새 이름공간의
+ * 키를 더하면 여기도 함께 늘리지 않는 한 붉어진다.
  *
  * 왜 키 열거가 아니라 접두사인가(r1 실측): 잠금이 **이름으로** 고정한 키는 우선순위상 빈틈이
  * 없었다. 그러나 `management.endpoint.health.*` 는 열린 이름공간이고, 같은 출력에 닿는 **형제
@@ -74,8 +87,19 @@ val MANAGEMENT_SURFACE_DEPLOYMENT_KEYS: Set<String> = setOf("management.server.p
  * 이름, `status.http-mapping`, `probes.add-additional-paths`, `validate-group-membership`.
  * 환경변수 한두 줄이 그 키들로 우회 2·3·7 을 다시 열었다. 키를 더 적는 쪽으로 고치면 **다음
  * Boot 판이 새 키를 더할 때 같은 결함이 돌아온다** — 접두사는 그때도 닫혀 있다.
+ *
+ * 관리 이름공간 밖의 두 항목은 **같은 표면에 닿는 인접 이름공간**이고, 앱은 둘 다 쓰지 않는다.
+ * - `server.servlet.context-parameters` (r2 **보조 잠금**, verifier r2 F-1r): 이 이름공간의 값은
+ *   refresh 중에 서블릿 컨텍스트 init-param 으로 옮겨져 **환경변수보다 높은 우선순위**로 환경에
+ *   들어온다. 주 잠금은 [refuseManagementSurfaceKeysAfterRefresh] 이고 이 항목은 가장 짧은 경로를
+ *   가장 이른 자리에서 끊는다.
+ * - `spring.web.error` (r2, privacy-gate r2 L-4 실측): 관리 child context 의 `ManagementErrorEndpoint`
+ *   가 이 이름공간을 읽어 `/error` 본문의 예외·메시지·스택 포함 여부를 정한다(`management.` 밖이라
+ *   r1 판정이 보지 못했다). 2026-09-26 실측 — `include-message=always` 하나로 관리 포트 `/error`
+ *   본문 키가 셋에서 넷으로 늘었다(`message`).
  */
-val MANAGEMENT_SURFACE_GOVERNED_PREFIXES: Set<String> = setOf("management", "spring.jmx")
+val MANAGEMENT_SURFACE_GOVERNED_PREFIXES: Set<String> =
+    setOf("management", "spring.jmx", "server.servlet.context-parameters", "spring.web.error")
 
 private val GOVERNED_PREFIX_NAMES: List<ConfigurationPropertyName> =
     MANAGEMENT_SURFACE_GOVERNED_PREFIXES.map(ConfigurationPropertyName::of)
@@ -95,27 +119,44 @@ private fun isGovernedByLock(name: ConfigurationPropertyName): Boolean =
  * 다르지만 같은 속성에 바인딩된다** — 원시 문자열 접두사 비교는 그 가운데 하나만 막는다.
  * 이름공간 판정은 [ConfigurationPropertyName.isAncestorOf] 가 하므로 `.` 를 글자로 세지 않는다.
  *
- * 열거할 수 없는 소스(서블릿 컨텍스트 stub 등)는 이 시점에 볼 것이 없다 — 그 축을 막는 것은
- * 잠금을 **맨 앞**에 심는다는 사실이고, `ManagementSurfaceLockTest` 가 그 형태를 잠근다.
+ * 열거할 수 없는 소스는 **이 호출 시점에** 볼 것이 없다. 그 사실이 「닫혔다」는 뜻은 아니다
+ * (code-review r2 LOW-2 의 문면 정정): 그런 소스가 뒤에 실체로 채워지면서 잠금이 이름 대지 않은
+ * 형제 키를 들고 오면 `addFirst` 는 아무것도 하지 않는다. 그 축을 닫는 것은 **같은 술어를 모든
+ * 소스가 선 뒤에 한 번 더 도는 것**이다([refuseManagementSurfaceKeysAfterRefresh], D-6A2a-14).
  */
-fun managementSurfaceKeysOutsideLock(environment: ConfigurableEnvironment): List<String> {
-    val offending = sortedSetOf<String>()
+fun managementSurfaceKeysOutsideLock(environment: ConfigurableEnvironment): List<String> =
+    governedKeysOutsideLock(environment).map { it.second }.distinct()
+
+/**
+ * 같은 판정을 **키와 그 키를 실은 소스 이름의 짝**으로 돌려준다 — 거부 문면이 「어디서 온 값인가」를
+ * 말할 수 있게 한다(소스 이름은 값이 아니다). 운영 배치가 거부를 만났을 때 가장 먼저 필요한 정보가
+ * 그것이다: 같은 키가 환경변수·명령행·서블릿 init-param 어디로든 들어올 수 있다.
+ */
+private fun governedKeysOutsideLock(environment: ConfigurableEnvironment): List<Pair<String, String>> =
     environment.propertySources
         .asSequence()
         .filterNot { it.name == MANAGEMENT_SURFACE_LOCK_SOURCE }
         .filterNot { ConfigurationPropertySources.isAttachedConfigurationPropertySource(it) }
-        .forEach { source ->
-            ConfigurationPropertySources.from(source).forEach { adapted ->
-                if (adapted is IterableConfigurationPropertySource) {
-                    adapted
-                        .stream()
-                        .toList()
-                        .filter(::isGovernedByLock)
-                        .forEach { offending += it.toString() }
-                }
-            }
-        }
-    return offending.toList()
+        .flatMap { source ->
+            ConfigurationPropertySources
+                .from(source)
+                .asSequence()
+                .filterIsInstance<IterableConfigurationPropertySource>()
+                .flatMap { it.asSequence() }
+                .filter(::isGovernedByLock)
+                .map { source.name to it.toString() }
+        }.distinct()
+        .sortedWith(compareBy({ it.second }, { it.first }))
+        .toList()
+
+private fun refusalMessage(
+    decision: String,
+    environment: ConfigurableEnvironment,
+): String {
+    val offending = governedKeysOutsideLock(environment).map { (source, key) -> "$key(소스 $source)" }
+    return "관리 표면 키를 환경이 정하려 한다($decision): ${offending.joinToString(", ")} — " +
+        "배치가 정하는 것은 ${MANAGEMENT_SURFACE_DEPLOYMENT_KEYS.joinToString(", ")} 둘이다" +
+        "(값은 이 문면에 싣지 않는다)"
 }
 
 /**
@@ -133,6 +174,9 @@ fun managementSurfaceKeysOutsideLock(environment: ConfigurableEnvironment): List
  * 쪽을 고른 근거: 덮어쓰면 배치는 자기 설정이 왜 먹지 않는지 모르고, 같은 잠금이 **새 키에 대해
  * 아무 말도 하지 않는** 형태가 다시 생긴다. 거부 메시지에는 **키 이름만** 싣는다 — 값에는 자격이
  * 실려 올 수 있고(예: 오타로 들어온 자격 키), 기동 실패 문면은 운영 로그로 간다.
+ *
+ * 이 검사는 **빠른 실패**다 — 모집단이 「초기화자 시점에 열거 가능한 소스」로 한정되므로 이것만으로
+ * 표면이 닫히지 않는다(D-6A2a-14 가 같은 술어를 refresh 뒤에 한 번 더 돈다).
  */
 fun lockManagementSurface(environment: ConfigurableEnvironment) {
     val portType = ManagementPortType.get(environment)
@@ -141,14 +185,44 @@ fun lockManagementSurface(environment: ConfigurableEnvironment) {
             "management.server.port 가 비어 있거나 server.port 와 같거나 음수다(D-6A2a-4)"
     }
     val outsideLock = managementSurfaceKeysOutsideLock(environment)
-    check(outsideLock.isEmpty()) {
-        "관리 표면 키를 환경이 정하려 한다(D-6A2a-10): ${outsideLock.joinToString(", ")} — " +
-            "배치가 정하는 것은 ${MANAGEMENT_SURFACE_DEPLOYMENT_KEYS.joinToString(", ")} 하나다" +
-            "(값은 이 문면에 싣지 않는다)"
-    }
+    check(outsideLock.isEmpty()) { refusalMessage("D-6A2a-10", environment) }
     environment.propertySources.addFirst(
         MapPropertySource(MANAGEMENT_SURFACE_LOCK_SOURCE, MANAGEMENT_SURFACE_LOCK),
     )
+}
+
+/**
+ * **모든 소스가 선 뒤** 같은 술어를 한 번 더 돈다(D-6A2a-14). [lockManagementSurface] 의 모집단은
+ * 초기화자가 도는 그 순간 **열거 가능한** 소스뿐이다. 서블릿 컨텍스트 init-param 소스는 그 시점에
+ * 비열거 stub 이고 `createWebServer()` 끝의 `initPropertySources()` 가 실체로 바꾼다 — 그 안의 키는
+ * 환경변수보다 높은 우선순위로 들어오고, 잠금이 **이름 대지 않은** 형제 키라면 `addFirst` 는
+ * 아무것도 하지 않는다(verifier r2 F-1r 이 출하 이미지에서 환경변수 두 줄로 r1 결함 셋을 전부
+ * 재현했다). 채널을 하나씩 막으면 다음 늦은 소스가 같은 자리를 연다 — **시점**을 고친다.
+ *
+ * 부모 환경과 관리 child 환경은 서로 다른 소스 집합을 갖는다(child 는 자기 `StandardEnvironment`
+ * 를 세우고 부모 소스를 **이름이 겹치지 않는 것만** 뒤에 붙인다 — 즉 부모의 실체화된 init-param
+ * 소스는 child 에 없다). 그래서 둘 다 판정한다.
+ *
+ * 준비 상태 축도 함께 잠근다: 이 검사가 도는 시점에 readiness 가 이미
+ * [ReadinessState.ACCEPTING_TRAFFIC] 이면 **그 사실 자체로 기동을 거부한다.** 검사를 늦은 자리로
+ * 옮기는 변경이 조용히 통과하지 못하게 하는 구조적 방어다(트래픽을 받은 뒤의 거부는 늦다).
+ */
+fun refuseManagementSurfaceKeysAfterRefresh(context: ApplicationContext) {
+    val readiness =
+        generateSequence(context) { it.parent }
+            .last()
+            .getBean(ApplicationAvailability::class.java)
+            .readinessState
+    check(readiness != ReadinessState.ACCEPTING_TRAFFIC) {
+        "관리 표면 재검사가 트래픽 수락 뒤에 돌았다(D-6A2a-14) — 검사 자리가 readiness 발행보다 " +
+            "뒤로 옮겨졌다(context=${context.id})"
+    }
+    val environment = context.environment
+    check(environment is ConfigurableEnvironment) {
+        "관리 표면 재검사가 환경을 읽을 수 없다(D-6A2a-14) — context=${context.id}"
+    }
+    val outsideLock = managementSurfaceKeysOutsideLock(environment)
+    check(outsideLock.isEmpty()) { refusalMessage("D-6A2a-14", environment) }
 }
 
 /**
@@ -159,5 +233,36 @@ fun lockManagementSurface(environment: ConfigurableEnvironment) {
 class ManagementSurfaceLock : ApplicationContextInitializer<ConfigurableApplicationContext> {
     override fun initialize(applicationContext: ConfigurableApplicationContext) {
         lockManagementSurface(applicationContext.environment)
+    }
+}
+
+/**
+ * [refuseManagementSurfaceKeysAfterRefresh] 를 조립에 얹는 자리. `ContextRefreshedEvent` 를 고른
+ * 근거는 셋이다(Boot 4.1.1 바이트코드 실독 + 실측).
+ *
+ * ① **모든 소스가 서 있다.** 이 event 는 `finishRefresh()` 끝에서 발행되고, 서블릿 컨텍스트
+ * init-param 소스를 실체로 바꾸는 `initPropertySources()` 는 그보다 앞인 `onRefresh()` 안이다.
+ *
+ * ② **부모와 관리 child 둘 다 온다.** Spring 은 child context 의 event 를 부모에게도 발행하므로
+ * 조립에 listener 하나만 얹으면 두 환경을 모두 판정한다. 관리 child 의 refresh 는 부모의
+ * `finishRefresh` 안(`SmartLifecycle` 단계 `Integer.MAX_VALUE - 1536`)에서 끝나므로 **부모 event
+ * 보다 먼저** 온다.
+ *
+ * ③ **트래픽을 받기 전이다.** Boot 은 `ReadinessState.ACCEPTING_TRAFFIC` 을 `ApplicationReadyEvent`
+ * **뒤**에 발행한다(`EventPublishingRunListener.ready`) — 이 event 보다 두 단계 뒤다. 그 전의
+ * readiness 프로브는 `REFUSING_TRAFFIC` → `OUT_OF_SERVICE` → 503 이고, 실측으로 잰다
+ * (`ManagementSurfaceLateSourceRefusalTest`: 재검사 시점 503, 기동 완료 뒤 200).
+ *
+ * 여기서 던진 예외는 `refresh()` 안에서 `SpringApplication.run` 의 catch 로 올라가 context 를 닫고
+ * 그대로 다시 던져진다 — 즉 **프로세스가 뜨지 않는다**. 우선순위를 최상위로 두는 이유는 같은
+ * event 의 다른 listener 가 위반 상태에서 먼저 도는 것을 막기 위해서다.
+ */
+class ManagementSurfaceLateCheck :
+    ApplicationListener<ContextRefreshedEvent>,
+    Ordered {
+    override fun getOrder(): Int = Ordered.HIGHEST_PRECEDENCE
+
+    override fun onApplicationEvent(event: ContextRefreshedEvent) {
+        refuseManagementSurfaceKeysAfterRefresh(event.applicationContext)
     }
 }
