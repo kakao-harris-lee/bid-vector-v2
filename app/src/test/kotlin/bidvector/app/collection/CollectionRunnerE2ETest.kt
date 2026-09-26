@@ -4,6 +4,7 @@ import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
+import bidvector.app.wiring.CollectionTerminationTestConfiguration
 import bidvector.app.wiring.RecordingCollectionTermination
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
@@ -209,25 +210,31 @@ class CollectionRunnerE2ETest {
 
         private fun bootAndRun(extraProperties: Map<String, String>): List<Int> {
             val context: ConfigurableApplicationContext =
-                SpringApplicationBuilder(BidVectorApplication::class.java)
-                    .properties(
-                        PRODUCTION_DISPATCH_PROPERTIES +
-                            mapOf(
-                                "server.port" to "0",
-                                "spring.profiles.active" to "collection-e2e",
-                                "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
-                                "bidvector.persistence.username" to postgres.username,
-                                "bidvector.persistence.credential" to postgres.password,
-                                "operator.credential.value" to TEST_CREDENTIAL_VALUE,
-                                "bidvector.evaluation.candidate-cap" to "1000",
-                                "bidvector.collection.mode" to "once",
-                                "bidvector.collection.from" to firstDay.toString(),
-                                "bidvector.collection.to" to today.toString(),
-                                "bidvector.collection.categories" to "construction,service",
-                                "bidvector.koneps.service-key" to SERVICE_KEY,
-                                "bidvector.koneps.base-url" to mock.baseUrl,
-                            ) + extraProperties,
-                    ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachLogCapture() })
+                // M6/6A-2b D-6A2b-9 — 출하 조립이 Boot 기본 `TypeExcludeFilter` 를 되살리면서
+                // `@TestConfiguration`(=`@TestComponent`)이 더는 컴포넌트 스캔에 잡히지 않는다.
+                // 그것이 그 필터의 존재 이유다 — test 전용 빈이 출하 조립의 스캔에 섞이면 안 된다.
+                // 이 test 는 그 빈을 **명시 source** 로 준다(profile 잠금은 그대로).
+                SpringApplicationBuilder(
+                    BidVectorApplication::class.java,
+                    CollectionTerminationTestConfiguration::class.java,
+                ).properties(
+                    PRODUCTION_DISPATCH_PROPERTIES +
+                        mapOf(
+                            "server.port" to "0",
+                            "spring.profiles.active" to "collection-e2e",
+                            "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            "bidvector.persistence.username" to postgres.username,
+                            "bidvector.persistence.credential" to postgres.password,
+                            "operator.credential.value" to TEST_CREDENTIAL_VALUE,
+                            "bidvector.evaluation.candidate-cap" to "1000",
+                            "bidvector.collection.mode" to "once",
+                            "bidvector.collection.from" to firstDay.toString(),
+                            "bidvector.collection.to" to today.toString(),
+                            "bidvector.collection.categories" to "construction,service",
+                            "bidvector.koneps.service-key" to SERVICE_KEY,
+                            "bidvector.koneps.base-url" to mock.baseUrl,
+                        ) + extraProperties,
+                ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachLogCapture() })
                     .run()
             return try {
                 context.getBean(RecordingCollectionTermination::class.java).exitCodes.toList()

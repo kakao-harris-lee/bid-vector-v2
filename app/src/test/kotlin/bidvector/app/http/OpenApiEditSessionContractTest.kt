@@ -136,7 +136,9 @@ class OpenApiEditSessionContractTest : HttpIntegrationTestBase() {
         // 필수 키를 하나씩 뺀 본문이 실제로 400 인지 — 문서의 `required` 가 장식이 아님을 잰다.
         post(EDIT_SESSIONS, """{}""").statusCode.value() shouldBe 400
         val sessionId = post(EDIT_SESSIONS, """{"field":"CANDIDATE_LIMIT"}""").body?.get("sessionId") as String
-        post("$EDIT_SESSIONS/$sessionId/value", """{"field":"CANDIDATE_LIMIT","count":7}""").statusCode.value() shouldBe 400
+        post("$EDIT_SESSIONS/$sessionId/value", """{"field":"CANDIDATE_LIMIT","count":7}""")
+            .statusCode
+            .value() shouldBe 400
         post("$EDIT_SESSIONS/$sessionId/confirm", """{"commandId":"c9"}""").statusCode.value() shouldBe 400
         post("$EDIT_SESSIONS/$sessionId/cancel", """{}""").statusCode.value() shouldBe 400
     }

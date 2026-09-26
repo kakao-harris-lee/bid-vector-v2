@@ -42,13 +42,14 @@ class AppHttpDependencyRules(
 
     /** 무인자 메서드로 `java.time` 값만 내는 포트 — 권한이 아니라 주변 값이다. */
     fun ambientPorts(classes: JavaClasses): Set<String> =
-        derivedUseCasePorts(classes).filter { name ->
-            val port = classes.get(name)
-            port.methods.isNotEmpty() &&
-                port.methods.all { method ->
-                    method.rawParameterTypes.isEmpty() && method.rawReturnType.packageName.startsWith(TIME_PACKAGE)
-                }
-        }.toSet()
+        derivedUseCasePorts(classes)
+            .filter { name ->
+                val port = classes.get(name)
+                port.methods.isNotEmpty() &&
+                    port.methods.all { method ->
+                        method.rawParameterTypes.isEmpty() && method.rawReturnType.packageName.startsWith(TIME_PACKAGE)
+                    }
+            }.toSet()
 
     fun capabilityPorts(classes: JavaClasses): Set<String> = derivedUseCasePorts(classes) - ambientPorts(classes)
 

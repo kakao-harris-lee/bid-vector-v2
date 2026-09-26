@@ -40,7 +40,10 @@ class OperatorAuthenticationTest : HttpIntegrationTestBase() {
             handlerMapping.handlerMethods.keys
                 .mapNotNull { it.pathPatternsCondition }
                 .flatMap { it.patterns }
-                .map { it.patternString }
+                // M6/6A-2b — 경로 변수를 가진 매핑이 생겼다(`/{sessionId}`). 패턴 문자열을 그대로
+                // URL 로 쓰면 RestTemplate 이 그것을 **템플릿**으로 보고 확장에 실패한다 — 고정
+                // 값으로 치환해 구체 경로를 만든다(어느 세션도 가리키지 않는다: 인증 경계만 잰다).
+                .map { it.patternString.replace(PATH_VARIABLE_PATTERN, "auth-probe") }
                 .toSet()
 
         // 술어가 공허하게 참인 회귀를 막는다 — 최소 우리 endpoint 하나는 있어야 한다.

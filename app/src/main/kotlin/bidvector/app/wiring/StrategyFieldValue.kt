@@ -58,6 +58,7 @@ fun EditableField.valueSlot(): EditValueSlot =
 private fun WatchRuleId.valueSlot(): EditValueSlot =
     when (this) {
         WatchRuleId.MinBudget, WatchRuleId.MaxBudget -> EditValueSlot.AMOUNT_WON
+
         WatchRuleId.FocusCategory,
         WatchRuleId.FocusRegion,
         WatchRuleId.ExcludeRegion,
@@ -130,5 +131,4 @@ private fun EditValue.amountWon(): Long =
 private fun EditValue.number(): BigDecimal =
     (this as? EditValue.Number)?.value ?: error("이 필드는 number 칸을 읽는다 — 실제 값: $this")
 
-private fun EditValue.count(): Int =
-    (this as? EditValue.Count)?.value ?: error("이 필드는 count 칸을 읽는다 — 실제 값: $this")
+private fun EditValue.count(): Int = (this as? EditValue.Count)?.value ?: error("이 필드는 count 칸을 읽는다 — 실제 값: $this")

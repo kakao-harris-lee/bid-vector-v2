@@ -99,16 +99,32 @@ class AppHttpDependencyGateTest {
         rules.rules("$fixtureRoot.app.http", capabilityPorts(), policy.appHttpAdaptersRoot)
 
     private fun fixtureDetails(): List<String> =
-        fixtureRules().flatMap { it.allowEmptyShould(true).evaluate(violating).failureReport.details }
+        fixtureRules().flatMap {
+            it
+                .allowEmptyShould(true)
+                .evaluate(violating)
+                .failureReport.details
+        }
 
     private fun productionDetails(): List<String> =
         rules
             .rules(policy.appHttpPackage, capabilityPorts(), policy.appHttpAdaptersRoot)
-            .flatMap { it.allowEmptyShould(true).evaluate(production).failureReport.details }
+            .flatMap {
+                it
+                    .allowEmptyShould(true)
+                    .evaluate(production)
+                    .failureReport.details
+            }
 
     /** 이름만 보지 않는다 — **어느 대상 때문에** 잡혔는지까지 확인한다(기존 음성 test 관례). */
     private infix fun List<ArchRule>.mustReport(expected: Pair<String, String>) {
-        val details = flatMap { it.allowEmptyShould(true).evaluate(violating).failureReport.details }
+        val details =
+            flatMap {
+                it
+                    .allowEmptyShould(true)
+                    .evaluate(violating)
+                    .failureReport.details
+            }
         details.filter { it.contains(expected.first) && it.contains(expected.second) }.shouldNotBeEmpty()
     }
 }

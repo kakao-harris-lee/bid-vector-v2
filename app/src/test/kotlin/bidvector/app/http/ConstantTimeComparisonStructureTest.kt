@@ -69,7 +69,7 @@ class ConstantTimeComparisonStructureTest {
 
     /** 양성 대조 — 허용 목록의 각 항목은 근거 문장을 갖고 임의로 늘지 않는다. */
     @Test
-    fun `허용 목록은 정해진 여섯뿐이고 각각 근거 문장을 갖는다`() {
+    fun `허용 목록은 정해진 아홉뿐이고 각각 근거 문장을 갖는다`() {
         ALLOWED_INTRINSICS_AREEQUAL.keys shouldBe
             setOf(
                 "ApiAuditRecord",
@@ -78,6 +78,9 @@ class ConstantTimeComparisonStructureTest {
                 "StrategyReadControllerKt",
                 "EvaluationDryRunResponse",
                 "ResultBuckets",
+                "EditSessionResponse",
+                "EditFieldTokensKt",
+                "EditSessionResponseKt",
             )
         ALLOWED_INTRINSICS_AREEQUAL.values.all { it.isNotBlank() } shouldBe true
     }
@@ -104,6 +107,12 @@ private val ALLOWED_INTRINSICS_AREEQUAL: Map<String, String> =
             "평가 dry-run 응답 값 객체(data class) 자동 생성 equals — 판정 결과 공고 ID 배열·건수뿐, 자격증명 값 없음",
         "ResultBuckets" to
             "CandidateEvaluation 분류 중간값(data class, private) 자동 생성 equals — 공고 ID 배열 넷뿐, 자격증명 값 없음",
+        "EditSessionResponse" to
+            "편집 세션 응답 값 객체(data class) 자동 생성 equals — 세션 id·상태·필드·버전·만료 시각뿐, 자격증명 값 없음",
+        "EditFieldTokensKt" to
+            "필드 토큰 표의 sealed 싱글턴 when 소진과 토큰→필드 Map 조회(javap 확인: 자격증명 좌표 0)",
+        "EditSessionResponseKt" to
+            "상태·거부 사유 sealed 싱글턴 when 소진(javap 확인: 자격증명 좌표 0) — 값 비교가 아니라 객체 동일성",
     )
 
 private const val MESSAGE_DIGEST_IS_EQUAL = "java/security/MessageDigest.isEqual"

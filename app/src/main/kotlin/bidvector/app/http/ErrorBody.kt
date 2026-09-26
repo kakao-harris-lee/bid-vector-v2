@@ -16,6 +16,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
 
 /**
+ * 편집 요청의 형식 오류(M6/6A-2b D-6A2b-7) — 400 `INVALID_REQUEST`. 메시지는 응답에 실리지
+ * 않는다(아래 [ErrorMapping] 이 고정 문구로만 옮긴다) — 진단용이다. 던지는 자리는
+ * `StrategyEditRequests.kt` 의 파싱 함수들이고, 오류 어휘는 이 파일 하나가 갖는다.
+ */
+class InvalidEditRequestException(
+    message: String,
+) : RuntimeException(message)
+
+/**
  * 요청 attribute 키 — [RequestAuditFilter]가 요청마다 한 번 발급한 correlation id·
  * [OperatorCredentialFilter]가 판정한 subject 라벨을 필터 체인과 [GlobalErrorHandler]가
  * 공유하는 유일한 통로다(전역 상태가 아니라 요청 스코프 attribute — DI 대상이 아닌 값을
@@ -76,61 +85,69 @@ object ErrorMapping {
     fun unauthenticated(correlationId: String): ErrorBody =
         ErrorBody(ErrorCode.UNAUTHENTICATED, "인증에 실패했다", correlationId)
 
-    /** [chain.doFilter]를 완전히 벗어난 예외의 최후 방어선([RequestAuditFilter])에서도 쓴다. */
+    /**
+     * [chain.doFilter]를 완전히 벗어난 예외의 최후 방어선([RequestAuditFilter])에서도 쓴다.
+     *
+     * **표는 하나다 — 아래 두 `when` 은 크기 게이트(함수 50줄) 때문에 기계적으로 나눈
+     * 같은 표의 앞뒤다**(M6/6A-2b). 갈래를 더할 자리가 둘이 됐지만 **기본값은 여전히 여기
+     * 한 곳**이고, 어느 갈래도 `throwable.message` 를 응답에 싣지 않는다 — 두 함수의
+     * 반환 타입이 (코드, 고정 문구) 쌍이라 예외 값이 본문에 닿을 통로 자체가 없다.
+     */
     fun forThrowable(
         throwable: Throwable,
         correlationId: String,
-    ): ErrorBody =
+    ): ErrorBody {
+        val (code, message) =
+            readPathCode(throwable)
+                ?: editPathCode(throwable)
+                ?: (ErrorCode.INTERNAL_ERROR to "요청을 처리하는 중 오류가 발생했다")
+        return ErrorBody(code, message, correlationId)
+    }
+
+    /** 6A-1·6A-3 이 낸 갈래(조회·dry-run). */
+    private fun readPathCode(throwable: Throwable): Pair<String, String>? =
         when (throwable) {
             is NoHandlerFoundException -> {
-                ErrorBody(ErrorCode.NOT_FOUND, "요청한 경로가 없다", correlationId)
+                ErrorCode.NOT_FOUND to "요청한 경로가 없다"
             }
 
             is InvalidStoredStrategyException -> {
-                ErrorBody(ErrorCode.INVALID_STORED_STRATEGY, "저장된 전략이 유효하지 않다", correlationId)
+                ErrorCode.INVALID_STORED_STRATEGY to "저장된 전략이 유효하지 않다"
             }
 
             is MaxActiveBidsNotConfiguredException -> {
-                ErrorBody(ErrorCode.MAX_ACTIVE_BIDS_NOT_CONFIGURED, "전략에 여력 상한이 설정되지 않았다", correlationId)
+                ErrorCode.MAX_ACTIVE_BIDS_NOT_CONFIGURED to "전략에 여력 상한이 설정되지 않았다"
             }
 
             is CandidateCapExceededException -> {
-                ErrorBody(ErrorCode.CANDIDATE_CAP_EXCEEDED, "후보 스캔이 상한을 초과했다", correlationId)
+                ErrorCode.CANDIDATE_CAP_EXCEEDED to "후보 스캔이 상한을 초과했다"
             }
 
             is InvalidEvaluationRequestException -> {
-                ErrorBody(ErrorCode.INVALID_REQUEST, "요청 값이 유효하지 않다", correlationId)
+                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
             }
 
-            // M6/6A-3+6F-3 D-6A3-19(검토 라운드 1 contract-keeper V1 · verifier MEDIUM) —
-            // 비JSON·빈 본문은 EvaluationDryRunController의 parseCurrentActiveBids 에
-            // 닿기 전에 Jackson 자체가 여기서 던진다(HttpMessageNotReadableException).
-            // 같은 코드(INVALID_REQUEST)로 옮긴다 — 예외 메시지는 싣지 않는다(D-6A1-7 불변식).
+            // D-6A3-19 — 비JSON·빈 본문은 컨트롤러의 명시 검증에 닿기 전에 Jackson 이 던진다.
             is HttpMessageNotReadableException -> {
-                ErrorBody(ErrorCode.INVALID_REQUEST, "요청 본문을 읽을 수 없다", correlationId)
-            }
-
-            // M6/6A-2b D-6A2b-7 — 편집 endpoint 가 이 앱의 첫 쓰기 표면이다. 형식 오류가
-            // 기본 분기(500)로 떨어지면 그것이 스택 노출의 문이 된다.
-            is InvalidEditRequestException -> {
-                ErrorBody(ErrorCode.INVALID_REQUEST, "요청 값이 유효하지 않다", correlationId)
-            }
-
-            is EditSessionConflictException -> {
-                ErrorBody(ErrorCode.EDIT_SESSION_CONFLICT, "편집 세션이 동시에 바뀌었다", correlationId)
-            }
-
-            is HttpRequestMethodNotSupportedException -> {
-                ErrorBody(ErrorCode.METHOD_NOT_ALLOWED, "이 경로가 지원하지 않는 메서드다", correlationId)
-            }
-
-            is HttpMediaTypeNotSupportedException -> {
-                ErrorBody(ErrorCode.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 미디어 타입이다", correlationId)
+                ErrorCode.INVALID_REQUEST to "요청 본문을 읽을 수 없다"
             }
 
             else -> {
-                ErrorBody(ErrorCode.INTERNAL_ERROR, "요청을 처리하는 중 오류가 발생했다", correlationId)
+                null
             }
+        }
+
+    /**
+     * M6/6A-2b 가 낸 갈래(편집 쓰기) — 이 slice 가 본문을 받는 첫 쓰기 표면을 열었다.
+     * 형식·상태 오류가 기본 분기(500)로 떨어지면 그것이 스택 노출의 문이 된다(D-6A2b-7).
+     */
+    private fun editPathCode(throwable: Throwable): Pair<String, String>? =
+        when (throwable) {
+            is InvalidEditRequestException -> ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
+            is EditSessionConflictException -> ErrorCode.EDIT_SESSION_CONFLICT to "편집 세션이 동시에 바뀌었다"
+            is HttpRequestMethodNotSupportedException -> ErrorCode.METHOD_NOT_ALLOWED to "이 경로가 지원하지 않는 메서드다"
+            is HttpMediaTypeNotSupportedException -> ErrorCode.UNSUPPORTED_MEDIA_TYPE to "지원하지 않는 미디어 타입이다"
+            else -> null
         }
 }
 
@@ -170,48 +187,34 @@ class GlobalErrorHandler {
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.INTERNAL_SERVER_ERROR, exception, request)
 
-    @ExceptionHandler(MaxActiveBidsNotConfiguredException::class)
-    fun maxActiveBidsNotConfigured(
-        exception: MaxActiveBidsNotConfiguredException,
-        request: HttpServletRequest,
-    ): ResponseEntity<ErrorBody> = respond(HttpStatus.CONFLICT, exception, request)
-
-    @ExceptionHandler(CandidateCapExceededException::class)
-    fun candidateCapExceeded(
-        exception: CandidateCapExceededException,
-        request: HttpServletRequest,
-    ): ResponseEntity<ErrorBody> = respond(HttpStatus.CONFLICT, exception, request)
-
-    @ExceptionHandler(InvalidEvaluationRequestException::class)
-    fun invalidEvaluationRequest(
-        exception: InvalidEvaluationRequestException,
-        request: HttpServletRequest,
-    ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
-
-    /** D-6A3-19 — 요청 본문 역직렬화 실패(비JSON·빈 본문)도 400 `INVALID_REQUEST` 다. */
-    @ExceptionHandler(HttpMessageNotReadableException::class)
-    fun httpMessageNotReadable(
-        exception: HttpMessageNotReadableException,
-        request: HttpServletRequest,
-    ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
-
-    /** D-6A2b-7 — 형식·상태 오류 넷. 전부 [ErrorMapping] 의 같은 표를 지난다. */
-    @ExceptionHandler(InvalidEditRequestException::class)
-    fun invalidEditRequest(
-        exception: InvalidEditRequestException,
-        request: HttpServletRequest,
-    ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
-
-    @ExceptionHandler(EditSessionConflictException::class)
-    fun editSessionConflict(
-        exception: EditSessionConflictException,
+    /**
+     * 409 계열 — 저장소 상태가 요청과 맞지 않는다. 셋 다 같은 표([ErrorMapping])를 지나
+     * 서로 다른 코드를 낸다(상태 코드가 아니라 본문의 코드가 사유를 가른다, D-6A2b-6).
+     */
+    @ExceptionHandler(
+        MaxActiveBidsNotConfiguredException::class,
+        CandidateCapExceededException::class,
+        EditSessionConflictException::class,
+    )
+    fun conflict(
+        exception: Throwable,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.CONFLICT, exception, request)
 
     /**
-     * 405 는 `Allow` 헤더를 함께 낸다(RFC 9110 §15.5.6 — 필수) — 값은 Spring 이 그 경로의
-     * 매핑에서 도출한 집합 그대로다(손으로 적지 않는다).
+     * 400 계열 — 요청 형식·값이 유효하지 않다(D-6A3-19·D-6A2b-7). 예외 메시지는 어느
+     * 갈래에서도 응답에 실리지 않는다.
      */
+    @ExceptionHandler(
+        InvalidEvaluationRequestException::class,
+        HttpMessageNotReadableException::class,
+        InvalidEditRequestException::class,
+    )
+    fun badRequest(
+        exception: Throwable,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
+
     @ExceptionHandler(HttpRequestMethodNotSupportedException::class)
     fun methodNotSupported(
         exception: HttpRequestMethodNotSupportedException,

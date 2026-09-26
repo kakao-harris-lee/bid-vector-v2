@@ -1,9 +1,9 @@
 package bidvector.app.http
 
+import bidvector.app.wiring.StrategyQuery
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.export
 import bidvector.strategy.CategoryCode
-import bidvector.app.wiring.StrategyQuery
 import bidvector.strategy.OperatorStrategy
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController

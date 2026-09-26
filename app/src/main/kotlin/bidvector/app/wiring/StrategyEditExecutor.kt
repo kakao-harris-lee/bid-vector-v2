@@ -69,7 +69,10 @@ class StrategyEditExecutor(
             val current: OperatorStrategy = workflow.currentStrategy()
             val draft = current.toDraft().withFieldValue(field, value)
             when (val validation = validate(draft, current.revision, strategyPolicy)) {
-                is StrategyValidation.Invalid -> ProvideValueOutcome.Invalid(validation.violations)
+                is StrategyValidation.Invalid -> {
+                    ProvideValueOutcome.Invalid(validation.violations)
+                }
+
                 is StrategyValidation.Valid -> {
                     val command = EditCommand.ProvideValue(commandId, sessionId, OPERATOR, field, draft)
                     ProvideValueOutcome.Processed(workflow.provideValue(command))

@@ -38,7 +38,11 @@ class EditableFieldVocabularyGateTest {
             .importPackages("bidvector")
 
     private fun subclassNames(type: Class<*>): Set<String> =
-        production.get(type).subclasses.map(JavaClass::getName).toSet()
+        production
+            .get(type)
+            .subclasses
+            .map(JavaClass::getName)
+            .toSet()
 
     @Test
     fun `HTTP 표의 필드 갈래가 EditableField 하위 타입 전부와 같다 — 집합 등식`() {

@@ -68,6 +68,17 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
             Map::class.java,
         ) as ResponseEntity<Map<String, Any?>>
 
+    private fun limitValue(
+        commandId: String,
+        count: Int,
+    ): String = """{"commandId":"$commandId","field":"CANDIDATE_LIMIT","count":$count}"""
+
+    private fun confirmFirstRevision(sessionId: String) {
+        post("$EDIT_SESSIONS/$sessionId/confirm", """{"commandId":"c2","seenRevision":1}""")
+            .statusCode
+            .value() shouldBe 200
+    }
+
     private fun beginSession(field: String = "CANDIDATE_LIMIT"): String {
         val response = post(EDIT_SESSIONS, """{"field":"$field"}""")
         response.statusCode.value() shouldBe 201
@@ -91,7 +102,7 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
     fun `value → confirm 이 전략 revision 을 올리고 세션이 APPLIED 로 끝난다`() {
         val sessionId = beginSession()
 
-        val provided = post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"c1","field":"CANDIDATE_LIMIT","count":7}""")
+        val provided = post("$EDIT_SESSIONS/$sessionId/value", limitValue("c1", 7))
         provided.statusCode.value() shouldBe 200
         provided.body?.get("state") shouldBe "WAITING_FOR_CONFIRMATION"
 
@@ -107,7 +118,7 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
         val sessionId = beginSession()
         post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"c1","field":"CANDIDATE_LIMIT","count":7}""")
 
-        val replay = post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"c1","field":"CANDIDATE_LIMIT","count":9}""")
+        val replay = post("$EDIT_SESSIONS/$sessionId/value", limitValue("c1", 9))
 
         replay.statusCode.value() shouldBe 409
         replay.body?.get("code") shouldBe ErrorCode.IDEMPOTENCY_CONFLICT
@@ -145,7 +156,8 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
         post("$EDIT_SESSIONS/$bidNow/confirm", """{"commandId":"b2","seenRevision":1}""")
 
         val review = beginSession("REVIEW_THRESHOLD")
-        val inverted = post("$EDIT_SESSIONS/$review/value", """{"commandId":"r1","field":"REVIEW_THRESHOLD","number":0.9}""")
+        val invertedBody = """{"commandId":"r1","field":"REVIEW_THRESHOLD","number":0.9}"""
+        val inverted = post("$EDIT_SESSIONS/$review/value", invertedBody)
 
         inverted.statusCode.value() shouldBe 400
         inverted.body?.get("code") shouldBe ErrorCode.STRATEGY_VALUE_INVALID
@@ -220,7 +232,8 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
     fun `강제 변환 없이 거부한다 — 문자열 정수·소수 count·알 수 없는 필드 토큰`() {
         val sessionId = beginSession()
 
-        val quoted = post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"c1","field":"CANDIDATE_LIMIT","count":"7"}""")
+        val quoted =
+            post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"c1","field":"CANDIDATE_LIMIT","count":"7"}""")
         val fractional =
             post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"c1","field":"CANDIDATE_LIMIT","count":1.7}""")
         val unknownField = post(EDIT_SESSIONS, """{"field":"NO_SUCH_FIELD"}""")
@@ -238,7 +251,7 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
         val provided =
             post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"c1","field":"MIN_BUDGET","amountWon":1000000}""")
         provided.statusCode.value() shouldBe 200
-        post("$EDIT_SESSIONS/$sessionId/confirm", """{"commandId":"c2","seenRevision":1}""").statusCode.value() shouldBe 200
+        confirmFirstRevision(sessionId)
 
         val strategy = get("/api/strategy").body
         strategy?.get("minBudgetWon") shouldBe 1000000
@@ -255,7 +268,7 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
             "$EDIT_SESSIONS/$sessionId/value",
             """{"commandId":"c1","field":"FOCUS_CATEGORY","terms":["1234","5678"]}""",
         ).statusCode.value() shouldBe 200
-        post("$EDIT_SESSIONS/$sessionId/confirm", """{"commandId":"c2","seenRevision":1}""").statusCode.value() shouldBe 200
+        confirmFirstRevision(sessionId)
 
         get("/api/strategy").body?.get("focusCategories") shouldBe listOf("1234", "5678")
     }
@@ -266,7 +279,10 @@ class StrategyEditEndpointTest : HttpIntegrationTestBase() {
             restTemplate.exchange(
                 url(EDIT_SESSIONS),
                 HttpMethod.POST,
-                HttpEntity("""{"field":"CANDIDATE_LIMIT"}""", HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }),
+                HttpEntity(
+                    """{"field":"CANDIDATE_LIMIT"}""",
+                    HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON },
+                ),
                 Map::class.java,
             ) as ResponseEntity<Map<String, Any?>>
 

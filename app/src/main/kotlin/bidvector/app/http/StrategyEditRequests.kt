@@ -9,14 +9,6 @@ import bidvector.workflow.strategy.EditableField
 import tools.jackson.databind.JsonNode
 
 /**
- * 요청 본문 형식 오류(M6/6A-2b D-6A2b-7) — 400 `INVALID_REQUEST`. 메시지는 응답에 실리지
- * 않는다(`ErrorMapping` 이 고정 문구로만 옮긴다) — 진단용이다.
- */
-class InvalidEditRequestException(
-    message: String,
-) : RuntimeException(message)
-
-/**
  * 요청 본문의 **명시** 형식 검증(D-6A3-19 와 같은 규율) — Jackson 의 기본 강제 변환
  * (`"3"` → 3, `1.7` → 1)이 값을 조용히 지어내지 못하게 원시 트리로 받아 여기서 판정한다.
  * 이 파일이 편집 endpoint 의 유일한 파싱 자리다 — 컨트롤러는 타입이 확정된 값만 받는다.

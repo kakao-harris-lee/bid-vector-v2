@@ -105,7 +105,8 @@ class StrategyEditProductionE2ETest {
         json: String,
         withCredential: Boolean = true,
     ): ResponseEntity<Map<String, Any?>> {
-        val requestHeaders = if (withCredential) headers() else HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+        val requestHeaders =
+            if (withCredential) headers() else HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
         return restTemplate.exchange(
             url(path),
             HttpMethod.POST,

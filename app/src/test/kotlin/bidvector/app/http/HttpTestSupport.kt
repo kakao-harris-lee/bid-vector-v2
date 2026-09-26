@@ -11,9 +11,9 @@ import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyDraft
+import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
-import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
 import bidvector.workflow.evaluation.CandidateSourcePort
@@ -46,6 +46,12 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * 매핑 패턴의 경로 변수(`{sessionId}` 등)를 구체 값으로 바꿀 때 쓰는 정규식 — 기계 전수
+ * test 들이 공유한다(M6/6A-2b, 같은 값을 파일마다 베끼지 않는다).
+ */
+val PATH_VARIABLE_PATTERN: Regex = Regex("\\{[^/}]+}")
 
 /** 실 자격증명과 다른, test 고정값 — 운영 값과 헷갈리지 않게 문구를 담는다(비밀값이 아니다). */
 const val TEST_CREDENTIAL = "http-layer-test-fixture-credential"
@@ -181,7 +187,6 @@ class RecordingAuditSink {
         records += record
     }
 }
-
 
 /**
  * M6/6A-2b — 실 DB 없이 편집 endpoint 를 도는 트랜잭션 경계 이중체. **use case 는 실물**

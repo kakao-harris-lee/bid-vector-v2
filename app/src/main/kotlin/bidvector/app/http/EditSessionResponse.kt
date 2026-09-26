@@ -123,7 +123,9 @@ internal fun ProvideValueOutcome.toResponse(request: HttpServletRequest): Respon
                 )
         }
 
-        is ProvideValueOutcome.Processed -> result.toResponse(request)
+        is ProvideValueOutcome.Processed -> {
+            result.toResponse(request)
+        }
     }
 
 internal fun sessionNotFound(request: HttpServletRequest): ResponseEntity<Any> =

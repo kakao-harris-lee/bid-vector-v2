@@ -4,6 +4,7 @@ import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
+import bidvector.app.wiring.BidNowFakeMlAnalysisTestConfiguration
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeId
@@ -71,19 +72,24 @@ class EvaluationDryRunBidNowE2ETest {
         @BeforeAll
         fun boot() {
             context =
-                SpringApplicationBuilder(BidVectorApplication::class.java)
-                    .properties(
-                        PRODUCTION_DISPATCH_PROPERTIES +
-                            mapOf(
-                                "server.port" to "0",
-                                "spring.profiles.active" to "evaluation-bidnow-fake",
-                                "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
-                                "bidvector.persistence.username" to postgres.username,
-                                "bidvector.persistence.credential" to postgres.password,
-                                "operator.credential.value" to TEST_CREDENTIAL_VALUE,
-                                "bidvector.evaluation.candidate-cap" to CANDIDATE_CAP.toString(),
-                            ),
-                    ).run()
+                // M6/6A-2b D-6A2b-9 — `@TestConfiguration` 은 되살린 `TypeExcludeFilter` 가
+                // 컴포넌트 스캔에서 걷어낸다(그 필터의 존재 이유다). 명시 source 로 준다 —
+                // profile 잠금(`evaluation-bidnow-fake`)은 그대로라 다른 test 에는 등록되지 않는다.
+                SpringApplicationBuilder(
+                    BidVectorApplication::class.java,
+                    BidNowFakeMlAnalysisTestConfiguration::class.java,
+                ).properties(
+                    PRODUCTION_DISPATCH_PROPERTIES +
+                        mapOf(
+                            "server.port" to "0",
+                            "spring.profiles.active" to "evaluation-bidnow-fake",
+                            "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            "bidvector.persistence.username" to postgres.username,
+                            "bidvector.persistence.credential" to postgres.password,
+                            "operator.credential.value" to TEST_CREDENTIAL_VALUE,
+                            "bidvector.evaluation.candidate-cap" to CANDIDATE_CAP.toString(),
+                        ),
+                ).run()
             port = (context as ServletWebServerApplicationContext).webServer?.port ?: error("web server가 뜨지 않았다")
         }
 

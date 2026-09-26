@@ -2,18 +2,19 @@ package bidvector.adapters.strategy
 
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.adapters.persistence.TransactionBoundary
+import bidvector.sharedkernel.EffectiveFrom
+import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.BudgetBoundInclusivity
 import bidvector.strategy.ScoreRange
 import bidvector.strategy.StrategyDraft
 import bidvector.strategy.StrategyPolicyData
-import bidvector.sharedkernel.EffectiveFrom
-import bidvector.sharedkernel.PolicyVersion
+import bidvector.strategy.StrategyRevision
+import bidvector.workflow.strategy.Actor
+import bidvector.workflow.strategy.BeginOutcome
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.CommandId
 import bidvector.workflow.strategy.CommandResult
-import bidvector.workflow.strategy.Actor
-import bidvector.workflow.strategy.BeginOutcome
 import bidvector.workflow.strategy.EditCommand
 import bidvector.workflow.strategy.EditSessionId
 import bidvector.workflow.strategy.EditSessionPolicyData
@@ -105,7 +106,10 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
             ${'$'}${'$'} LANGUAGE plpgsql
             """.trimIndent(),
         )
-        execute("CREATE TRIGGER reject_outbox BEFORE INSERT ON outbox FOR EACH ROW EXECUTE FUNCTION reject_outbox_insert()")
+        execute(
+            "CREATE TRIGGER reject_outbox BEFORE INSERT ON outbox " +
+                "FOR EACH ROW EXECUTE FUNCTION reject_outbox_insert()",
+        )
     }
 
     private fun unblockOutboxInserts() = execute("DROP TRIGGER IF EXISTS reject_outbox ON outbox")
@@ -140,7 +144,7 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
         try {
             shouldThrow<SQLException> {
                 transaction.inTransaction { workflow ->
-                    workflow.confirm(EditCommand.Confirm(CommandId("confirm-1"), SESSION, ACTOR, bidvector.strategy.StrategyRevision(0)))
+                    workflow.confirm(confirmCommand())
                 }
             }
         } finally {
@@ -159,7 +163,7 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
 
         val confirmed =
             transaction.inTransaction { workflow ->
-                workflow.confirm(EditCommand.Confirm(CommandId("confirm-1"), SESSION, ACTOR, bidvector.strategy.StrategyRevision(0)))
+                workflow.confirm(confirmCommand())
             }
 
         (confirmed as CommandResult.Processed).outcome.shouldBeApplied()
@@ -168,6 +172,9 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
         countRows("SELECT count(*) FROM outbox WHERE idempotency_key = 'strategy-updated-1'") shouldBe 1L
     }
 }
+
+private fun confirmCommand(): EditCommand.Confirm =
+    EditCommand.Confirm(CommandId("confirm-1"), SESSION, ACTOR, StrategyRevision(0))
 
 private fun BeginOutcome.shouldBeStarted() {
     check(this is BeginOutcome.Started) { "세션이 열리지 않았다: $this" }
