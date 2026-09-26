@@ -63,6 +63,11 @@ class ArchitecturePolicy private constructor(
     val appHttpUseCasePorts: List<String> get() = list("app.http.use-case-ports")
     val appHttpAdaptersRoot: String get() = value("app.http.adapters-root")
 
+    /** D-6A2b-19 ② — 허용 목록(패키지 접두 · 정확한 클래스)과 그 안에서 다시 파는 금지 접두. */
+    val appHttpAllowedPackages: List<String> get() = list("app.http.allowed-packages")
+    val appHttpAllowedClasses: List<String> get() = list("app.http.allowed-classes")
+    val appHttpDeniedPackages: List<String> get() = list("app.http.denied-packages")
+
     /** D-6A2b-10 — 운영자 자격증명 타입과 그것을 참조해도 되는 클래스 집합(집합 등식). */
     val operatorCredentialTypes: List<String> get() = list("app.secret.operator-credential-types")
     val operatorCredentialReferencers: List<String> get() = list("app.secret.operator-credential-referencers")

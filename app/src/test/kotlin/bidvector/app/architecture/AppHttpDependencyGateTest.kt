@@ -30,6 +30,8 @@ class AppHttpDependencyGateTest {
     private val fixtureRoot = "${policy.packageRoot}.archfixture.violating"
     private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
 
+    private val appRoot = "${policy.packageRoot}.app"
+
     private fun capabilityPorts(): Set<String> = rules.capabilityPorts(production)
 
     @Test
@@ -49,25 +51,61 @@ class AppHttpDependencyGateTest {
     }
 
     @Test
-    fun `production 의 app http 는 능력 포트·어댑터 구현·원시 SQL 을 참조하지 않는다`() {
-        rules
-            .rules(policy.appHttpPackage, capabilityPorts(), policy.appHttpAdaptersRoot)
-            .forEach { rule -> rule.check(production) }
+    fun `production 의 HTTP 로 닿는 층은 허용 목록 밖을 참조하지 않는다`() {
+        rules.rules(appRoot, capabilityPorts()).forEach { rule -> rule.check(production) }
+    }
+
+    /**
+     * D-6A2b-19 ① — 대상이 패키지 이름이 아니라 **구조**다. 게이트가 실제로 보고 있는 집합을
+     * 단언한다: production 에서는 오늘 HTTP 층 전부가 그 집합이고(밖에 핸들러가 없다),
+     * 핸들러가 다른 패키지에 생기면 자동으로 들어온다 — 그 자동 편입을 fixture 로 실측한다.
+     * 모집단이 조용히 줄면(술어가 패키지 하나로 되돌아가면) 이 단언이 먼저 붉어진다.
+     */
+    @Test
+    fun `게이트가 보는 대상 집합은 HTTP 층과 핸들러 전부다`() {
+        val observed = rules.targets(production, appRoot)
+
+        // 계약 파일의 HTTP 층 좌표와 규칙이 세는 좌표가 같은지 — 어긋나면 게이트가 다른 곳을 본다.
+        policy.appHttpPackage shouldBe "$appRoot.http"
+        observed.shouldNotBeEmpty()
+        observed.filterNot { it.startsWith(policy.appHttpPackage + ".") } shouldBe emptyList()
+        rules.targets(violating, fixtureRoot + ".app").any { it.contains("RogueAdminBumpController") } shouldBe true
     }
 
     @Test
-    fun `app http 가 저장 포트를 쥐면 잡는다`() {
+    fun `HTTP 층이 저장 포트를 쥐면 잡는다`() {
         fixtureRules() mustReport ("RogueHttpPortHolder" to "StrategyRepository")
     }
 
     @Test
-    fun `app http 가 어댑터 구현을 참조하면 잡는다`() {
+    fun `HTTP 층이 어댑터 구현을 참조하면 잡는다`() {
         fixtureRules() mustReport ("RogueHttpAdapterUser" to "SystemClock")
     }
 
     @Test
-    fun `app http 의 원시 SQL 을 잡는다`() {
+    fun `HTTP 층의 원시 SQL 을 잡는다`() {
         fixtureRules() mustReport ("RogueHttpSqlUser" to "java.sql")
+    }
+
+    /** verifier r1 MU1 재현 — HTTP 층이 자동 구성 JDBC 클라이언트를 쥐는 형태. */
+    @Test
+    fun `HTTP 층의 JDBC 클라이언트 지름길을 잡는다 — MU1`() {
+        fixtureRules() mustReport ("RogueHttpJdbcShortcut" to "JdbcClient")
+    }
+
+    /** verifier r1 MU2b 재현 — HTTP 층 **밖** 패키지의 진짜 컨트롤러. 이전 판은 보지 못했다. */
+    @Test
+    fun `다른 패키지의 컨트롤러가 JDBC 로 전략을 바꾸면 잡는다 — MU2b`() {
+        fixtureRules() mustReport ("RogueAdminBumpController" to "JdbcClient")
+    }
+
+    /**
+     * verifier r1 MU2 재현(계약 ④ 의 형태) — 경계 빈을 쥔 헬퍼 자체는 경계 밖이지만,
+     * **컨트롤러가 그것을 참조하는 순간** 허용 목록 밖이라 걸린다.
+     */
+    @Test
+    fun `컨트롤러가 경계 빈을 쥔 헬퍼를 참조하면 잡는다 — MU2`() {
+        fixtureRules() mustReport ("RogueAdminBoundaryController" to "RogueAdminSqlHelper")
     }
 
     /**
@@ -95,8 +133,7 @@ class AppHttpDependencyGateTest {
         ) shouldBe policy.operatorCredentialReferencers.toSet()
     }
 
-    private fun fixtureRules(): List<ArchRule> =
-        rules.rules("$fixtureRoot.app.http", capabilityPorts(), policy.appHttpAdaptersRoot)
+    private fun fixtureRules(): List<ArchRule> = rules.rules(fixtureRoot + ".app", capabilityPorts())
 
     private fun fixtureDetails(): List<String> =
         fixtureRules().flatMap {
@@ -108,7 +145,7 @@ class AppHttpDependencyGateTest {
 
     private fun productionDetails(): List<String> =
         rules
-            .rules(policy.appHttpPackage, capabilityPorts(), policy.appHttpAdaptersRoot)
+            .rules(appRoot, capabilityPorts())
             .flatMap {
                 it
                     .allowEmptyShould(true)
