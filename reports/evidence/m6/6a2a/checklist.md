@@ -228,7 +228,10 @@ test·게이트 보강뿐이다.
     배선 표지와 음성 대조(정상 환경은 거부되지 않는다)뿐이다 — 「부모·child **둘 다**」라는 계약
     문면을 잠그려면 child 서블릿 컨텍스트에만 init-param 을 심는 test 가 필요하다. ② **listener
     우선순위(`@Order`)**: 제거 변이가 초록이다. 이 slice 에는 같은 event 로 위반 상태에 먼저 반응하는
-    listener 가 없어 거동 차이를 만들 자리가 없다.
+    listener 가 없어 거동 차이를 만들 자리가 없다. ③ **`ApplicationStartedEvent` 자리**(verifier r4 L-4, 팀장 등재): 재검사를
+    `ApplicationStartedEvent` 로 옮기는 변이는 표적 test 전건 초록이다. 그 자리는 readiness 수락과 수집 러너보다 앞이라 계약
+    (「readiness 가 수락을 알리기 전」)은 지켜진다. 다만 적대적 부팅 test·기록기 KDoc 의 「refresh 밖으로의 어떤 이동도 잡는다」는
+    한 칸 넓다 — 잡는 것은 readiness 수락·`ApplicationReadyEvent` 로의 이동이다.
 20. **거부 문면은 상수 이름이 아닌 소스를 낱말 하나(`other`)로 말한다**(r3). 운영자가 「어느 채널로
     들어왔는가」를 문면에서 바로 읽을 수 있는 것은 그 소스가 Boot·Spring 의 상수 이름을 갖는 경우다
     (환경변수·시스템 속성·명령행·`SPRING_APPLICATION_JSON`·서블릿 init-param 둘·JNDI·`random`·
