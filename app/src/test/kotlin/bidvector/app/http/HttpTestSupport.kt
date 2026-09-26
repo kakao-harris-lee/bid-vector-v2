@@ -54,6 +54,21 @@ const val PROP_THROW_EXCEPTION_IF_NO_HANDLER_FOUND = "spring.mvc.throw-exception
 const val PROP_NO_STATIC_RESOURCE_MAPPINGS = "spring.web.resources.add-mappings=false"
 
 /**
+ * **M6/6A-2a — 이 test 전용 조립에는 관리 서버가 없다.** `-1` 은 Boot 의 `ManagementPortType
+ * .DISABLED` 로, actuator 의 web endpoint 배선 자체가 올라오지 않는다.
+ *
+ * 왜 필요한가(실측, 2026-09-26): actuator 좌표가 들어오자 이 조립에 `RequestMappingHandlerMapping`
+ * **빈이 둘**(우리 것 + actuator 의 controller endpoint 매핑)이 되어 `OperatorAuthenticationTest`
+ * 의 타입 주입이 `NoUniqueBeanDefinitionException` 으로 깨졌다. 이름으로 한정하는 대신 조립에서
+ * 빼는 쪽을 고른다 — 이 test 들이 재는 것은 **API 포트의 필터 체인**이고, 그 조립에 actuator 가
+ * 있으면 「등록된 모든 endpoint」 기계 전수의 모집단이 우리 것이 아닌 경로로 오염된다.
+ *
+ * 출하 조립의 actuator 표면은 `ManagementHealthSurfaceTest`(별도 관리 포트)와 CI 스모크가 잰다 —
+ * 그쪽은 포트가 갈려 actuator 매핑이 child context 에 살고 이 애매성이 애초에 없다.
+ */
+const val PROP_NO_MANAGEMENT_SERVER = "management.server.port=-1"
+
+/**
  * `TestRestTemplate`을 **직접 만든다** — Boot 4.1의 `@AutoConfigureTestRestTemplate`
  * 자동 배선이 `@ConditionalOnMissingBean`의 타입 추론에서 예외를 던지는 것을 실측했다
  * (`org.springframework.boot.resttestclient.autoconfigure.TestRestTemplateTestAutoConfiguration

@@ -148,8 +148,31 @@ val PRODUCTION_DISPATCH_PROPERTIES: Map<String, String> =
         "spring.web.resources.add-mappings" to "false",
     )
 
-fun main(args: Array<String>) {
+/**
+ * 관리 포트 기본값(D-6A2a-4) — 이 값 하나만 **환경이 덮을 수 있다**(배치가 포트를 고른다).
+ * 기본값을 두는 이유는 기존 `java -jar` 경로가 새 환경변수 없이 그대로 뜨게 하는 것이고,
+ * 그 값이 API 포트 기본값(8080)과 달라야 [lockManagementSurface] 의 분리 판정이 선다.
+ * 나머지 관리 표면 값은 [MANAGEMENT_SURFACE_LOCK] 이 환경보다 높은 자리에서 못박는다.
+ */
+val PRODUCTION_MANAGEMENT_PROPERTIES: Map<String, String> =
+    mapOf("management.server.port" to "8081")
+
+/**
+ * 출하 조립의 **유일한** 조립 호출(D-6A1-27 의 교훈 — test 가 자기 사본으로 조립하면
+ * production 배선을 지워도 초록이다). `main()` 과 production boot test 가 이 하나를 공유하므로,
+ * 여기서 [ManagementSurfaceLock]·[ManagementSurfaceLateCheck] 나 두 property 묶음을 지우면 두
+ * 자리가 함께 무너진다.
+ *
+ * 관리 표면 잠금이 **두 자리**인 근거(D-6A2a-14): 초기화자는 그 시점에 열거 가능한 소스만 보고,
+ * 서블릿 컨텍스트 init-param 처럼 refresh 중에 실체로 채워지는 소스는 그 모집단 밖이다. 같은
+ * 술어를 refresh 뒤에 한 번 더 도는 listener 가 주 잠금이고 초기화자는 빠른 실패다.
+ */
+fun productionApplication(): SpringApplicationBuilder =
     SpringApplicationBuilder(BidVectorApplication::class.java)
-        .properties(PRODUCTION_DISPATCH_PROPERTIES)
-        .run(*args)
+        .properties(PRODUCTION_DISPATCH_PROPERTIES + PRODUCTION_MANAGEMENT_PROPERTIES)
+        .initializers(ManagementSurfaceLock())
+        .listeners(ManagementSurfaceLateCheck())
+
+fun main(args: Array<String>) {
+    productionApplication().run(*args)
 }

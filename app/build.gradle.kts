@@ -72,6 +72,9 @@ dependencies {
 // `BootJarRuntimeClasspathTest` 가 배포물 자체를 열어 잠근다. 함수 50줄 한도 때문에 위 `dependencies {}` 밖 별도 블록이다.
 dependencies {
     implementation(libs.kotlin.reflect)
+    // M6/6A-2a D-6A2a-4 — health 를 별도 관리 포트에 내는 production 좌표 둘(카탈로그 주석에 사유).
+    implementation(libs.spring.boot.starter.actuator)
+    implementation(libs.spring.boot.jdbc)
 }
 
 // M6/6A-1 — sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties, `adapters
@@ -181,6 +184,9 @@ val compatibilitySmoke =
                 "org.springframework.boot:spring-boot-starter",
                 // M6/6A-1 D-6A1-16 — 등재하지 않으면 이 의존의 해석·컴파일·로드를 아무도 재지 않는다.
                 "org.springframework.boot:spring-boot-starter-web",
+                // M6/6A-2a D-6A2a-4 — 같은 이유. 관리 포트 health 축의 두 좌표.
+                "org.springframework.boot:spring-boot-starter-actuator",
+                "org.springframework.boot:spring-boot-jdbc",
                 "com.github.kagkarlsson:db-scheduler",
                 "io.github.resilience4j:resilience4j-retry",
                 "io.micrometer:micrometer-core",

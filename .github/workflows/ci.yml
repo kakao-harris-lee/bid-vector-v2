@@ -194,6 +194,15 @@ jobs:
       # D-6C-9 — 파일에 리터럴 값을 남기지 않는다).
       BIDVECTOR_PG_USER: bidvector_ci
       BIDVECTOR_PG_DB: bidvector_ci
+      # M6/6A-2a D-6A2a-5·8 — compose 의 `app` 서비스는 값을 하나도 갖지 않고 전부 `${VAR:?}`
+      # 참조다. 자격이 아닌 값(포트·후보 상한·compose 네트워크 안의 DB 주소)만 여기 둔다 —
+      # 자격 값은 다음 두 step 이 실행 시점에 만들어 `$GITHUB_ENV` 에 채운다(D-6C-9, 저장소
+      # 파일에 리터럴을 남기지 않는다). API 포트는 루프백에만 publish 되고 관리 포트는 publish
+      # 되지 않으므로, 관리 포트 검사는 컨테이너 안에서 묻는다(아래 스모크).
+      BIDVECTOR_APP_PORT: 18080
+      BIDVECTOR_APP_MANAGEMENT_PORT: 18081
+      BIDVECTOR_APP_JDBC_URL: jdbc:postgresql://postgres:5432/bidvector_ci
+      BIDVECTOR_APP_CANDIDATE_CAP: 1000
     steps:
       - uses: actions/checkout@v5
 
@@ -204,8 +213,28 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      # M6/6A-2a r1(code-review LOW) — `::add-mask::` 를 먼저 붙인다. argv 축은 아래 주석대로
+      # 닫혀 있지만, 더 실질적인 축은 **공개 워크플로 로그**다: 스모크의 `fail()` 이 앱 로그를
+      # 찍고 Boot 의 바인딩 실패 보고는 속성 값을 문면에 낼 수 있다. 마스크는 그 경로를 값이
+      # 어디서 새든 덮는다.
       - name: DB 접속 값 생성(이 job 전용 일회성, 파일에 리터럴로 두지 않는다)
-        run: echo "BIDVECTOR_PG_PASSWORD=$(openssl rand -hex 20)" >> "$GITHUB_ENV"
+        run: |
+          value="$(openssl rand -hex 20)"
+          echo "::add-mask::$value"
+          echo "BIDVECTOR_PG_PASSWORD=$value" >> "$GITHUB_ENV"
+
+      # M6/6A-2a — 운영자 자격 값도 같은 형태로 이 job 안에서 만든다(D-6C-9 선례). 저장소
+      # 파일에는 리터럴이 없다. 이 값은 두 곳에 닿아야 한다: ① `app` 컨테이너 —
+      # compose 의 `${...}` 참조가 job 환경에서 읽으므로 argv 를 지나지 않는다 ② 스모크의
+      # `curl` — **`-H "…$VALUE"` 를 쓰지 않는다.** 그 형태는 값을 curl 의 argv 에 실어 같은
+      # 러너의 다른 프로세스가 `/proc/<pid>/cmdline` 으로 읽을 수 있다(2026-09-26 실측: `-H`
+      # 형태는 프로세스 표에서 26회 관측, `printf | curl --config -` 형태는 0회 — `printf` 는
+      # 셸 내장이라 별 프로세스를 만들지 않고 값은 파이프로만 흐른다).
+      - name: 운영자 자격 값 생성(이 job 전용 일회성, 파일에 리터럴로 두지 않는다)
+        run: |
+          value="$(openssl rand -hex 24)"
+          echo "::add-mask::$value"
+          echo "BIDVECTOR_APP_OPERATOR_CREDENTIAL=$value" >> "$GITHUB_ENV"
 
       # R2-2(D-6C-10 ④) — S-20 은 `check` job 으로 옮겼다(그 전제인 buf·전체 이력을
       # 이미 갖춘 자리, 위 참고). 이 job 은 컨테이너 축(S-21~S-25)만 진다 — python/uv
@@ -213,23 +242,212 @@ jobs:
       - name: 이미지 빌드 (S-21)
         run: docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .
 
-      - name: 이미지 위생 게이트 — non-root·고정 태그·금지 패키지 0·크기 상한 (S-22)
-        run: ./tools/image-hygiene-check.sh bidvector/ml-serving:local
+      # M6/6A-2a D-6A2a-2 — 이미지는 **밖에서 만든 `bootJar`** 를 담는다(이미지 안에서 Gradle 을
+      # 돌리지 않는다). 이 step 이 없으면 다음 step 의 `COPY` 가 그 경로를 이름으로 대며 실패한다.
+      - name: 앱 배포물 빌드 (S-21a)
+        run: ./gradlew --no-daemon :app:bootJar
 
-      - name: 로컬 환경 기동 — ml-serving+postgres 가 healthy 로 수렴 (S-23)
+      - name: 앱 이미지 빌드 (S-21b)
+        run: docker build -f docker/app.Dockerfile -t bidvector/app:local .
+
+      # M6/6A-2a D-6A2a-7 — 정책 파일을 **인자로** 받는다(기본값 없음 — 어느 정책으로 판정했는지가
+      # 명령에 보인다). 두 이미지의 「금지」 판정이 서로 다르다: ml-serving 은 Python `import`,
+      # 앱은 JVM 구조(컴파일 도구 실행 불가 + 풀린 의존 layer 의 test 전용 좌표 0).
+      - name: 이미지 위생 게이트 — ml-serving (S-22a)
+        run: ./tools/image-hygiene-check.sh bidvector/ml-serving:local config/quality/image-hygiene-policy.properties
+
+      - name: 이미지 위생 게이트 — 앱 (S-22b)
+        run: ./tools/image-hygiene-check.sh bidvector/app:local config/quality/image-hygiene-policy-app.properties
+
+      # M6/6A-2a r2 D-6A2a-14 — verifier r2 F-1r 이 **출하 이미지에서** 쓴 환경변수 그대로를 컨테이너
+      # 축에 고정한다. 그 한 줄이 r1 결함 셋을 전부 다시 열었으므로, 「뜬 이미지가 그것을 거부한다」를
+      # test 가 아니라 이미지에서 잰다. DB·compose 없이 `docker run` 한 번이라 값이 싸다.
+      #
+      # 거부 **사유**까지 요구한다 — 이 환경에는 DB 가 없어 기동은 어차피 실패하므로, 종료 코드만
+      # 보면 스모크가 아무것도 재지 않는 것과 같다(관리 표면 판정이 사라져도 초록이 된다).
+      #
+      # r3(code-review r3 LOW-1) — 사유를 **D-6A2a-10 하나로** 좁혔다. 이 환경변수의 정규형은
+      # `server.servlet.context-parameters` 이름공간이고 그것은 거부 접두사이므로 **초기화자의 조기
+      # 검사가 먼저 끊는다** — 이 step 이 재는 것은 「운반 이름공간을 조기에 거부한다」이고, 늦은
+      # 재검사(D-6A2a-14)는 여기서 도달하지 못한다. 둘 다 받는 형태는 어느 잠금이 섰는지를 문면에서
+      # 지운다. 늦은 재검사를 재는 것은 `ManagementSurfaceLateSourceRefusalTest` 이고, 오늘 이미지
+      # 밖에서 그 자리에 닿을 채널은 없다(설정 데이터·명령행·JSON 은 모두 초기화자보다 앞에 서고
+      # 실행 가능 jar 에는 `web.xml` 도 JNDI 도 없다) — 그 재검사는 **미래의 늦은 소스**에 대한
+      # 방어다.
+      - name: 앱 이미지 거부 스모크 — 운반 이름공간을 조기에 거부한다 (S-22c)
+        run: |
+          set -euo pipefail
+          name="m6a2a-late-source-refusal"
+          docker rm -f "$name" >/dev/null 2>&1 || true
+          out="$(docker run --rm --name "$name" --security-opt no-new-privileges \
+            -e SERVER_PORT=8080 \
+            -e MANAGEMENT_SERVER_PORT=8081 \
+            -e BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:postgresql://192.0.2.1:5432/refusal-smoke \
+            -e BIDVECTOR_PERSISTENCE_USERNAME=refusal-smoke \
+            -e BIDVECTOR_PERSISTENCE_CREDENTIAL=refusal-smoke \
+            -e OPERATOR_CREDENTIAL_VALUE=refusal-smoke-placeholder-not-an-operator-value \
+            -e BIDVECTOR_EVALUATION_CANDIDATECAP=1 \
+            -e SERVER_SERVLET_CONTEXTPARAMETERS_MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_SHOWDETAILS=always \
+            bidvector/app:local 2>&1)" && rc=0 || rc=$?
+          # r3(code-review r3 LOW-6) — 실패 분기에서 컨테이너 출력을 **버리지 않는다.** 이 step 이
+          # 붉어지는 경우가 곧 「무엇이 나왔는지 알아야 하는」 경우다. 다만 전문을 찍지 않는다 —
+          # 값이 실릴 축이 오늘 없다는 것은 이 step 자신이 보증하지만(입력 여덟이 전부 리터럴
+          # 일회성 값이고 생성 자격은 이 컨테이너로 전달되지 않는다), 뒤 편집이 실 값을 붙이는
+          # 날 그 전문이 로그로 간다. **고정 표지 줄만** 낸다.
+          _markers() {
+            local lines
+            lines="$(printf '%s\n' "$out" \
+              | grep -aE 'D-6A2a-|APPLICATION FAILED TO START|Application run failed' | tail -n 5)" || lines=""
+            if [ -n "$lines" ]; then
+              printf '%s\n' "$lines" >&2
+            else
+              echo "(값 없는 표지 줄이 없다 — 컨테이너 출력 ${#out} 자)" >&2
+            fi
+          }
+          if [ "$rc" -eq 0 ]; then
+            echo "적대 환경변수를 줬는데 컨테이너가 0 으로 끝났다 — 관리 표면 거부가 서지 않았다" >&2
+            _markers
+            exit 1
+          fi
+          case "$out" in
+            *D-6A2a-10*) ;;
+            *) echo "컨테이너가 비-0(${rc})으로 끝났지만 조기 거부(D-6A2a-10) 사유가 아니다" >&2; _markers; exit 1 ;;
+          esac
+          case "$out" in
+            *server.servlet.contextparameters*) ;;
+            *) echo "거부 문면이 운반 이름공간 키를 말하지 않는다" >&2; _markers; exit 1 ;;
+          esac
+          echo "== 거부 스모크 통과(exit=${rc}) =="
+
+      - name: 로컬 환경 기동 — app+ml-serving+postgres 가 healthy 로 수렴 (S-23)
         run: |
           docker compose -f docker/compose.yaml up -d
-          for i in $(seq 1 20); do
+          for i in $(seq 1 30); do
             ps_out="$(docker compose -f docker/compose.yaml ps --format '{{.Service}}: {{.Status}}')"
             echo "$ps_out"
-            if echo "$ps_out" | grep -q "ml-serving:.*healthy" && echo "$ps_out" | grep -q "postgres:.*healthy"; then
+            if echo "$ps_out" | grep -q "app:.*healthy" \
+              && echo "$ps_out" | grep -q "ml-serving:.*healthy" \
+              && echo "$ps_out" | grep -q "postgres:.*healthy"; then
               exit 0
             fi
             sleep 3
           done
-          echo "ml-serving/postgres 가 제한 시간 안에 healthy 로 수렴하지 않았다" >&2
+          echo "app/ml-serving/postgres 가 제한 시간 안에 healthy 로 수렴하지 않았다" >&2
           docker compose -f docker/compose.yaml logs
           exit 1
+
+      # M6/6A-2a D-6A2a-8 — 「이미지가 뜬다」가 아니라 **「뜬 이미지가 인증 경계를 지키며 준비
+      # 상태를 알린다」** 를 잰다. 관리 포트는 host 에 publish 되지 않으므로 컨테이너 안에서
+      # 묻고, API 포트는 루프백에서 묻는다. 자격 값은 argv 를 지나지 않는다(위 생성 step 주석).
+      - name: 컨테이너 스모크 — 준비 상태·인증 경계·health 격리·수집 꺼짐 (S-23b)
+        run: |
+          set -euo pipefail
+          COMPOSE="docker compose -f docker/compose.yaml"
+          API="http://127.0.0.1:${BIDVECTOR_APP_PORT}"
+          MGMT="http://127.0.0.1:${BIDVECTOR_APP_MANAGEMENT_PORT}"
+          fail() { echo "스모크 실패: $1" >&2; $COMPOSE logs app >&2 || true; exit 1; }
+          # R2-8 계열 — 도구 부재를 스모크 실패로 오인하지 않는다(`ubuntu-latest` 선탑재지만
+          # 워크플로가 설치를 선언하지 않는다). 위생 게이트도 같은 자리에서 같은 이유로 끊는다.
+          command -v jq >/dev/null 2>&1 || { echo "jq 가 필요하다 — 본문 키 집합 판정에 쓴다" >&2; exit 2; }
+          # M6/6A-2a r1(code-review LOW) — 전송 오류를 **`fail()` 로 옮긴다.** `set -euo pipefail`
+          # 아래서는 curl 의 비-0(예: exit 7 연결 거부)이 대입 자체를 실패시켜 step 이 즉사하고,
+          # `fail()` 이 붙이는 앱 로그를 잃는다. 실패는 정직한 사유로 나와야 한다.
+          # M6/6A-2a r2(code-review LOW-4) — `|| echo` 는 **덧붙이는** 형태였다. 전송 실패(exit 7)
+          # 에서도 curl 은 `-w '%{http_code}'` 를 처리해 `000` 을 stdout 에 쓰므로 잡히는 값이
+          # `000transport-error` 가 됐다(판정은 `fail()` 로 떨어지지만 문면이 정직하지 않다).
+          # 대입은 실패해도 일어나므로 `||` 로 **덮어쓴다** — `_api_authorized_code` 와 같은 형태다.
+          _anon_code() {
+            local out
+            out="$(curl -sS -o /dev/null -w '%{http_code}' "$1")" || out="transport-error"
+            printf '%s' "$out"
+          }
+          _mgmt() {
+            local out
+            # r3(code-review r3 LOW-7) — `$'…'` 가 같은 값을 서브셸 없이 준다(명령 치환은 뒤따르는
+            # 개행만 지우므로 앞 형태의 거동도 같았다). 형태가 위 두 helper 와 한 번 더 같아진다.
+            out="$($COMPOSE exec -T app curl -sS -w '\n%{http_code}' "$MGMT$1")" || out=$'\ntransport-error'
+            printf '%s' "$out"
+          }
+          _mgmt_code() { printf '%s' "$(_mgmt "$1")" | tail -n1; }
+          _api_authorized_code() {
+            local out
+            out="$(printf 'header = "X-Operator-Credential: %s"\n' "$BIDVECTOR_APP_OPERATOR_CREDENTIAL" \
+              | curl --config - -sS -o /dev/null -w '%{http_code}' "$API$1")" || out="transport-error"
+            printf '%s' "$out"
+          }
+          _mgmt_body_keys() { printf '%s' "$1" | jq -r 'keys | sort | join(",")' || echo parse-error; }
+
+          echo "-- 관리 포트 프로브 둘: 200 · 본문 키 하나(status) --"
+          for path in /actuator/health/liveness /actuator/health/readiness; do
+            out="$(_mgmt "$path")"
+            code="$(printf '%s' "$out" | tail -n1)"
+            body="$(printf '%s' "$out" | sed '$d')"
+            [ "$code" = "200" ] || fail "$path 가 200 이 아니다: $code"
+            keys="$(_mgmt_body_keys "$body")"
+            [ "$keys" = "status" ] || fail "$path 본문 키가 status 하나가 아니다: [$keys]"
+            [ "$(printf '%s' "$body" | jq -r '.status')" = "UP" ] || fail "$path 가 UP 이 아니다"
+          done
+
+          # M6/6A-2a D-6A2a-12 — **집계 경로도 잰다.** Boot 4.1.1 은 `show-details=never` 아래에서도
+          # `groups` 칸을 낸다(그룹이 있으면 항상 실린다 — 세부 설정과 무관하다). 값은 우리가 지은
+          # 그룹 이름 둘이고 구성 요소 이름·주소·예외·버전은 없다. 스모크가 프로브만 재면 이 칸이
+          # 환경으로 늘어나도(예: 새 그룹 이름) 컨테이너 축에서는 조용하다.
+          echo "-- 관리 포트 집계 health: 200 · 키는 status·groups · 그룹 이름 둘 --"
+          out="$(_mgmt /actuator/health)"
+          code="$(printf '%s' "$out" | tail -n1)"
+          body="$(printf '%s' "$out" | sed '$d')"
+          [ "$code" = "200" ] || fail "집계 /actuator/health 가 200 이 아니다: $code"
+          keys="$(_mgmt_body_keys "$body")"
+          [ "$keys" = "groups,status" ] || fail "집계 health 본문 키가 groups,status 가 아니다: [$keys]"
+          groups="$(printf '%s' "$body" | jq -r '.groups | sort | join(",")')"
+          [ "$groups" = "liveness,readiness" ] || fail "집계 health 그룹 이름이 liveness,readiness 가 아니다: [$groups]"
+          [ "$(printf '%s' "$body" | jq -r '.status')" = "UP" ] || fail "집계 health 가 UP 이 아니다"
+
+          echo "-- API 포트 무인증 401 · 인증 GET /api/strategy 200 --"
+          code="$(_anon_code "$API/api/strategy")"
+          [ "$code" = "401" ] || fail "무인증 /api/strategy 가 401 이 아니다: $code"
+          code="$(_api_authorized_code /api/strategy)"
+          [ "$code" = "200" ] || fail "인증 /api/strategy 가 200 이 아니다: $code"
+
+          echo "-- API 포트의 actuator: 401 또는 404(200 이면 실패) --"
+          for path in /actuator /actuator/health /actuator/health/readiness /actuator/env; do
+            anon="$(_anon_code "$API$path")"
+            auth="$(_api_authorized_code "$path")"
+            case "$anon" in 401|404) ;; *) fail "무인증 $path 가 401·404 가 아니다: $anon" ;; esac
+            case "$auth" in 401|404) ;; *) fail "인증 $path 가 401·404 가 아니다: $auth — actuator 가 API 포트에 있다" ;; esac
+          done
+
+          # `/actuator/health/db` 는 구성 요소 경로다(privacy-gate r1 L-1) — `show-components=never`
+          # 아래에서는 404 이고, 그 설정이 열리는 순간 **가장 먼저 세부를 내는 경로**다.
+          echo "-- 관리 포트의 health 외 경로 404 --"
+          for path in /actuator /actuator/env /actuator/configprops /actuator/beans \
+            /actuator/heapdump /actuator/shutdown /actuator/loggers /actuator/metrics \
+            /actuator/threaddump /actuator/mappings /actuator/info /actuator/health/db; do
+            code="$(_mgmt_code "$path")"
+            [ "$code" = "404" ] || fail "관리 포트 $path 가 404 가 아니다: $code"
+          done
+
+          # D-6A2a-13 ② — 관리 포트의 **actuator 밖 표면**을 실측 그대로 잠근다. `/error` 는 404 가
+          # 아니다(Boot 의 오류 처리 경로가 관리 child context 에도 붙는다). 새는 값은 없고 — 우리
+          # 예외가 아니라 「디스패치된 오류 없음」 상태다 — 칸이 늘면 이 단언이 붉어진다.
+          echo "-- 관리 포트 /error: 200 · 키 셋 고정 --"
+          out="$(_mgmt /error)"
+          code="$(printf '%s' "$out" | tail -n1)"
+          [ "$code" = "200" ] || fail "관리 포트 /error 가 200 이 아니다: $code"
+          keys="$(_mgmt_body_keys "$(printf '%s' "$out" | sed '$d')")"
+          [ "$keys" = "error,status,timestamp" ] || fail "관리 포트 /error 본문 키가 실측 모양과 다르다: [$keys]"
+
+          echo "-- 앱 로그에 수집 시작 줄 0 (우회 6) --"
+          # `$COMPOSE logs app | grep -q …` 를 쓰지 않는다(code-review r1 MEDIUM): `grep -q` 는 **첫
+          # 일치에서 즉시 나가** 파이프를 닫고, `pipefail` 아래 파이프라인 상태는 마지막 비-0 이므로
+          # **일치했을 때에도** `if` 가 거짓이 될 수 있었다 — 위반을 **숨기는 방향**의 비결정성이다.
+          # 로그를 변수로 먼저 받고 판정은 셸 패턴으로 한다(파이프가 없으므로 SIGPIPE 도 없다).
+          app_logs="$($COMPOSE logs app 2>&1)" || fail "app 로그를 읽지 못했다"
+          case "$app_logs" in
+            *'collection start'*) fail "앱 로그에 수집 시작 줄이 있다 — compose 기동이 수집을 켰다" ;;
+          esac
+
+          echo "== 스모크 통과 =="
 
       - name: 실 Kotlin gateway ↔ 컨테이너의 실 Python 서버 (S-24, OPEN-5E2-CROSSLANG-REAL-SERVER)
         # `RealServerIntegrationTest`는 Testcontainers 로 (S-21) 이미지의 **자기 전용**

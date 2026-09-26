@@ -3,19 +3,23 @@
 # 텍스트나 손으로 적는 라벨이 아니라 **만든 이미지의 실행·빌드 산출물**에 건다(하네스
 # 「게이트 술어는 구조로」, verifier r1 F-1·F-2·r2 R2-3·R2-4): 능력이 차단된 채 실 ENTRYPOINT
 # 로 띄운 컨테이너의 모든 프로세스 사용자·정책 다이제스트에서 파생한 이미지의 실제 layer
-# 체인·금지 패키지 다섯 각각 실제 import·이미지 자신의 태그·크기 상한.
+# 체인·이미지 자신의 태그·크기 상한, 그리고 kind 별 「금지」 판정(ml-serving: 금지 패키지 각각
+# 실제 import / 앱: 컴파일 도구 각각 실제 실행 + 풀린 의존 layer 의 test 전용 좌표).
 #
-# 사용법: tools/image-hygiene-check.sh <image-ref>
+# **M6/6A-2a D-6A2a-7 — 정책 파일을 인자로 받는다.** 앱 이미지가 생기면서 「금지」 판정이 하나가
+# 아니게 됐다(ml-serving 은 Python `import`, 앱은 JVM 구조). 기본값을 두지 않는다 — 어느 정책으로
+# 판정했는지가 명령에 보여야 한다(기본값은 "어느 정책이 돌았는가"를 감춘다).
+#
+# 사용법: tools/image-hygiene-check.sh <image-ref> <policy-file>
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
-  echo "사용법: $0 <image-ref>" >&2
+if [ "$#" -ne 2 ]; then
+  echo "사용법: $0 <image-ref> <policy-file>" >&2
   exit 2
 fi
 
 IMAGE_REF="$1"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-POLICY_FILE="$REPO_ROOT/config/quality/image-hygiene-policy.properties"
+POLICY_FILE="$2"
 
 if [ ! -f "$POLICY_FILE" ]; then
   echo "정책 파일이 없다: $POLICY_FILE" >&2
@@ -35,11 +39,16 @@ fi
 # `[ 가 "integer expression expected"로 비-0 을 내면 조건이 거짓으로 읽혀 위반이 조용히
 # 삼켜졌다 — `base.image.layers=`를 비우면 요약에 `false`를 찍으면서도 exit 0 이었다).
 # 이제는 값 모양도 검증한다: CRLF 절삭 → 빈 값 거부 → kind 별 모양(수치/목록/텍스트).
+#
+# code-review r1 LOW — 키 대조를 **리터럴**로 한다. `grep -c "^${key}="` 는 키를 BRE 로 읽어
+# `size.cap.bytes` 가 `sizeXcapYbytes=` 에도 맞았다(현 정책 파일에서 오답은 안 났지만, 이
+# 함수가 존재하는 이유인 **중복 키 탐지**가 느슨해진다). `awk` 의 `index($0, k) == 1` 은 정규식이
+# 아니라 문자열 접두 비교다 — 이스케이프 목록을 손으로 관리하지 않는다.
 _policy_value() {
   local key="$1"
   local kind="${2:-text}" # text | numeric | list
   local matches
-  matches="$(grep -c "^${key}=" "$POLICY_FILE" || true)"
+  matches="$(awk -v k="${key}=" 'index($0, k) == 1 { n++ } END { print n+0 }' "$POLICY_FILE")"
   if [ "$matches" -eq 0 ]; then
     echo "정책 키 ${key} 를 ${POLICY_FILE} 에서 읽지 못했다" >&2
     exit 2
@@ -49,7 +58,7 @@ _policy_value() {
     exit 2
   fi
   local raw
-  raw="$(sed -n "s/^${key}=//p" "$POLICY_FILE" | tr -d '\r')"
+  raw="$(awk -v k="${key}=" 'index($0, k) == 1 { print substr($0, length(k) + 1) }' "$POLICY_FILE" | tr -d '\r')"
   if [ -z "$raw" ]; then
     echo "정책 키 ${key} 의 값이 비어 있다(정책 오류 — 값 없는 키는 정책 오류다)" >&2
     exit 2
@@ -69,16 +78,26 @@ _policy_value() {
         echo "정책 키 ${key} 는 최소 1개 원소가 있어야 한다: '${raw}'" >&2
         exit 2
       fi
-      # R3-1(D-6C-10 이후, verifier r3 HIGH, 표적 재검증) — 공백만(또는 탭)인 원소는
-      # `[ -z ]`를 통과하는 "의미상 빈" 값이었다 — 그 원소로 `import`를 시도하면
-      # SyntaxError 가 나 게이트가 "위반 없음"으로 잘못 읽었다. 절삭 뒤에도 빈 원소는 거부.
-      local item trimmed
+      # **R5-1(code-review r2 LOW-3, 같은 계열의 다섯 번째 판) — 공백 「종류」 열거를 멈추고
+      # 허용 문자 집합으로 뒤집는다.** 이 축이 막는 결함은 늘 같다: 원소에 뭔가 섞이면 두 판정
+      # 축이 모두 「부재」로 읽어(`--entrypoint $' jshell'` 은 컨테이너 생성 실패로 `if` 가
+      # 거짓이 되고 `command -v` 도 없다고 답한다) **첫 원소만 판정하고 나머지를 조용히 끈다.**
+      # 앞선 네 판은 지우거나 거부할 문자를 열거했고(R3-1 공백·탭 → R4-1 앞뒤 공백), 그 목록은
+      # `tr -d '[:space:]'` 가 모르는 유니코드 공백(NBSP U+00A0 등)에 열려 있었다. 이제는
+      # **무엇이 허용인지**만 적는다 — 열거가 아니라 구성이고, 새 문자가 생겨도 닫혀 있다.
+      #
+      # 허용 집합의 근거: 현 정책 값 전부(`javac`·`jshell`·`curl`·`opentest4j`·`byte-buddy`·
+      # `sqlalchemy` …)가 영숫자와 `. _ + -` 뿐이다. 이 집합으로 좁히면 공백·유니코드 공백·
+      # 따옴표·와일드카드·쉼표가 한 술어로 함께 닫힌다. 값이 이 집합을 벗어나야 할 날에는
+      # 정책이 아니라 **이 줄**을 고친다(그 편집이 diff 에 보인다).
+      local item
       for item in "${items[@]}"; do
-        trimmed="$(printf '%s' "$item" | tr -d '[:space:]')"
-        if [ -z "$trimmed" ]; then
-          echo "정책 키 ${key} 에 빈(또는 공백만인) 원소가 있다: '${raw}'" >&2
-          exit 2
-        fi
+        case "$item" in
+          '' | *[!A-Za-z0-9._+-]*)
+            echo "정책 키 ${key} 의 원소가 허용 문자([A-Za-z0-9._+-])만으로 돼 있지 않다 — 그 원소의 판정이 조용히 꺼진다: '${raw}'" >&2
+            exit 2
+            ;;
+        esac
       done
       ;;
     text) ;;
@@ -108,11 +127,69 @@ _check_at_most() {
   fi
 }
 
-FORBIDDEN_PACKAGES="$(_policy_value forbidden.packages list)"
 SIZE_CAP_BYTES="$(_policy_value size.cap.bytes numeric)"
 NONROOT_UID_MIN="$(_policy_value nonroot.uid.min numeric)"
 BASE_IMAGE_REPO="$(_policy_value base.image.repo text)"
 BASE_IMAGE_DIGEST="$(_policy_value base.image.digest text)"
+RUNTIME_KIND="$(_policy_value runtime.kind text)"
+
+# kind 별 값은 그 kind 에서만 읽는다 — 다른 kind 의 정책 파일에 없는 키를 요구하면
+# `_policy_value` 가 정책 오류로 끊는다(분기 소진: 모르는 kind 는 아래 `*)` 가 잡는다).
+FORBIDDEN_PACKAGES=""
+FORBIDDEN_EXECUTABLES=""
+REQUIRED_EXECUTABLES=""
+FORBIDDEN_DEPENDENCY_COORDINATES=""
+DEPENDENCY_LAYER_PATH=""
+DEPENDENCY_LAYER_MIN_ENTRIES=""
+PROBE_ENV=()
+case "$RUNTIME_KIND" in
+  python-serving)
+    FORBIDDEN_PACKAGES="$(_policy_value forbidden.packages list)"
+    # D-6C-7 — 서버는 환경 7개가 전부 있어야 뜬다(기본값 없음). 이미지에 이미 구운 정책
+    # 파일 경로를 그대로 준다 — 위생 게이트 전용 부팅값이지 업무 정책 값이 아니다.
+    PROBE_ENV=(
+      -e ML_ENGINE_BIND=0.0.0.0:50051
+      -e ML_ENGINE_INFERENCE_POLICY=/app/policy/inference-v1.yaml
+      -e ML_ENGINE_TRAINING_POLICY=/app/policy/training-v1.yaml
+      -e ML_ENGINE_EVALUATION_POLICY=/app/policy/evaluation-v1.yaml
+      -e ML_ENGINE_SERVING_POLICY=/app/policy/serving-v1.yaml
+      -e ML_ENGINE_ARTIFACT_OUT_DIR=/app/artifacts
+      -e ML_ENGINE_CODE_VERSION=hygiene-check
+    )
+    ;;
+  jvm-app)
+    FORBIDDEN_EXECUTABLES="$(_policy_value forbidden.executables list)"
+    # code-review r1 Open Question 2 — compose healthcheck 이 이미지 안 `curl` 에 기댄다. 그
+    # 전제는 주석과 실측 기록에만 있었고, 베이스 다이제스트를 올렸을 때 사라지면 증상은
+    # 「app 이 healthy 로 수렴하지 않음」(타임아웃)이라 원인이 보이지 않는다. **이름 있는 축**으로
+    # 만든다 — 부재면 게이트가 그 자리에서, 그 이름으로 실패한다.
+    REQUIRED_EXECUTABLES="$(_policy_value required.executables list)"
+    FORBIDDEN_DEPENDENCY_COORDINATES="$(_policy_value forbidden.dependency.coordinates list)"
+    DEPENDENCY_LAYER_PATH="$(_policy_value dependency.layer.path text)"
+    DEPENDENCY_LAYER_MIN_ENTRIES="$(_policy_value dependency.layer.min-entries numeric)"
+    # 앱도 설정이 전부 있어야 뜬다(기본값 없음 — 관리 포트 하나만 조립 근이 기본값을 갖는다).
+    # 위생 게이트 전용 부팅값이지 업무 정책 값이 아니다(위 ml-serving 과 같은 근거).
+    #
+    # JDBC 주소는 **RFC 5737 TEST-NET-1**(192.0.2.0/24, 문서·예시 전용으로 예약돼 어디로도
+    # 라우팅되지 않는다)이다. 실 DB 를 켜지 않으면서 프로세스를 살려 둬야 하기 때문이다 —
+    # 이름 해석 실패나 연결 거부는 즉시 기동 실패로 끝나 **(1) 의 프로세스 표집 창이 사라진다.**
+    # 여기로 보낸 SYN 은 응답이 없어 드라이버의 연결 타임아웃(기본 10초)까지 막히고, 그
+    # 사이 pid 1 은 살아 있다(2026-09-26 실측: t=10s 에도 `State.Running=true`, uid 10001).
+    PROBE_ENV=(
+      -e SERVER_PORT=8080
+      -e MANAGEMENT_SERVER_PORT=8081
+      -e BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:postgresql://192.0.2.1:5432/hygiene-check
+      -e BIDVECTOR_PERSISTENCE_USERNAME=hygiene-check
+      -e BIDVECTOR_PERSISTENCE_CREDENTIAL=hygiene-check
+      -e OPERATOR_CREDENTIAL_VALUE=hygiene-check-placeholder-not-an-operator-value
+      -e BIDVECTOR_EVALUATION_CANDIDATECAP=1
+    )
+    ;;
+  *)
+    echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(정책 오류 — 스크립트의 갈래와 정책이 어긋났다)" >&2
+    exit 2
+    ;;
+esac
 
 failures=0
 fail() {
@@ -152,17 +229,11 @@ cleanup_hygiene_container() {
 }
 trap cleanup_hygiene_container EXIT
 
-# D-6C-7 — 서버는 환경 7개가 전부 있어야 뜬다(기본값 없음). 이미지에 이미 구운 정책
-# 파일 경로를 그대로 준다 — 위생 게이트 전용 부팅값이지 업무 정책 값이 아니다.
+# 부팅값은 위 `case` 가 kind 별로 채운 `PROBE_ENV` 다(정책 파일이 아니라 게이트 내부 값 —
+# 업무 정책 값이 아니다). 능력 차단(`no-new-privileges`)은 kind 와 무관하게 늘 건다.
 docker run -d --name "$HYGIENE_CONTAINER" \
   --security-opt no-new-privileges \
-  -e ML_ENGINE_BIND=0.0.0.0:50051 \
-  -e ML_ENGINE_INFERENCE_POLICY=/app/policy/inference-v1.yaml \
-  -e ML_ENGINE_TRAINING_POLICY=/app/policy/training-v1.yaml \
-  -e ML_ENGINE_EVALUATION_POLICY=/app/policy/evaluation-v1.yaml \
-  -e ML_ENGINE_SERVING_POLICY=/app/policy/serving-v1.yaml \
-  -e ML_ENGINE_ARTIFACT_OUT_DIR=/app/artifacts \
-  -e ML_ENGINE_CODE_VERSION=hygiene-check \
+  "${PROBE_ENV[@]}" \
   "$IMAGE_REF" >/dev/null
 
 sleep 1
@@ -253,13 +324,80 @@ else
   fi
 fi
 
-# (3) 금지 패키지 다섯 — 이름 대조가 아니라 **실제 import 시도**(우회 (2), 5A S-1b 형태).
-IFS=',' read -r -a forbidden_array <<< "$FORBIDDEN_PACKAGES"
-for pkg in "${forbidden_array[@]}"; do
-  if docker run --rm --security-opt no-new-privileges --entrypoint python "$IMAGE_REF" -c "import ${pkg}" >/dev/null 2>&1; then
-    fail "금지 패키지 '${pkg}' 가 이 이미지에서 import 된다"
-  fi
-done
+# (3) 「금지」 판정 — 이름 대조가 아니라 **실행·산출물**에 건다. kind 로 갈라지는 유일한 절이다.
+# 요약 줄에 실을 한 줄은 `FORBIDDEN_SUMMARY` 가 든다(검사 범위가 요약에 그대로 드러나게 한다).
+FORBIDDEN_SUMMARY=""
+case "$RUNTIME_KIND" in
+  python-serving)
+    # 금지 패키지 다섯 — **실제 import 시도**(우회 (2), 5A S-1b 형태).
+    IFS=',' read -r -a forbidden_array <<< "$FORBIDDEN_PACKAGES"
+    for pkg in "${forbidden_array[@]}"; do
+      if docker run --rm --security-opt no-new-privileges --entrypoint python "$IMAGE_REF" -c "import ${pkg}" >/dev/null 2>&1; then
+        fail "금지 패키지 '${pkg}' 가 이 이미지에서 import 된다"
+      fi
+    done
+    FORBIDDEN_SUMMARY="금지-import-검사=${#forbidden_array[@]}건"
+    ;;
+  jvm-app)
+    # ① 컴파일·개발 도구 부재(D-6A2a-7 ①). `--entrypoint <tool>` 로 덮어쓰는 것은 여기서
+    # 정당하다: 재는 대상이 "그 도구가 이 이미지에 있는가"이고 프로세스 사용자가 아니다
+    # (사용자 축은 위 (1) 이 실 ENTRYPOINT 로 이미 쟀다).
+    #
+    # **축이 둘이다.** 2026-09-26 변이 ⑦ 실측: `--version` 실행 시도 하나로는 **`serialver`
+    # 를 놓쳤다** — JDK 베이스에 그 파일이 있는데도 `--version` 을 거부해(exit 1) 게이트가
+    # "부재"로 읽었다. 그래서 PATH 조회 축을 더한다. 그 축은 셸이 필요하므로 **셸 존재를 먼저
+    # 확인하고, 없으면 판정 불가로 실패**한다(조용한 통과를 만들지 않는다 — 6C 의 교훈).
+    IFS=',' read -r -a executable_array <<< "$FORBIDDEN_EXECUTABLES"
+    shell_probe_available=true
+    if ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'exit 0' >/dev/null 2>&1; then
+      shell_probe_available=false
+      fail "이미지에 셸이 없어 금지 실행 파일의 PATH 조회 축을 판정할 수 없다 — 실행 시도 축만으로는 --version 을 거부하는 도구를 놓친다(변이 ⑦ 실측)"
+    fi
+    for tool in "${executable_array[@]}"; do
+      if docker run --rm --security-opt no-new-privileges --entrypoint "$tool" "$IMAGE_REF" --version >/dev/null 2>&1; then
+        fail "금지 실행 파일 '${tool}' 이 이 이미지에서 실행된다 — JRE 가 아니라 JDK 베이스일 수 있다"
+      elif [ "$shell_probe_available" = true ] \
+        && docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
+        fail "금지 실행 파일 '${tool}' 이 이 이미지의 PATH 에 있다(실행은 --version 을 거부했다) — JRE 가 아니라 JDK 베이스일 수 있다"
+      fi
+    done
+
+    # ①' **필수** 실행 파일 존재(code-review r1 Open Question 2). 금지 축과 같은 PATH 조회를
+    # 쓰므로 셸이 없으면 판정 불가다 — 위에서 이미 `fail` 로 끊었고, 여기서는 그 경우 축을
+    # 건너뛰지 않고 「판정 불가」 사유를 한 번 더 남긴다(조용한 통과를 만들지 않는다).
+    IFS=',' read -r -a required_array <<< "$REQUIRED_EXECUTABLES"
+    for tool in "${required_array[@]}"; do
+      if [ "$shell_probe_available" != true ]; then
+        fail "필수 실행 파일 '${tool}' 의 존재를 판정할 수 없다(이미지에 셸이 없다)"
+      elif ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
+        fail "필수 실행 파일 '${tool}' 이 이 이미지의 PATH 에 없다 — compose healthcheck 가 이것으로 준비 상태를 묻는다"
+      fi
+    done
+
+    # ② 풀린 의존 layer 에 test 전용 좌표 0(D-6A2a-7 ②). **주 잠금은 Gradle 구조**(`bootJar`
+    # 는 `runtimeClasspath` 만 담는다)이고 이 검사는 그것이 이미지까지 이어졌는지 재는 보조다.
+    DEP_LAYER_LISTING="$(docker run --rm --security-opt no-new-privileges --entrypoint ls "$IMAGE_REF" -1 "$DEPENDENCY_LAYER_PATH" 2>/dev/null || true)"
+    DEP_LAYER_ENTRIES="$(printf '%s\n' "$DEP_LAYER_LISTING" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')"
+    IFS=',' read -r -a coordinate_array <<< "$FORBIDDEN_DEPENDENCY_COORDINATES"
+    # **양성 대조가 먼저다** — 목록이 비거나 경로가 틀리면 아래 루프의 "위반 0" 은 공허하게
+    # 참이다(6C 의 세 라운드가 같은 계열을 세 번 냈다: 게이트가 틀린 답을 내는 게 아니라
+    # **아무 일도 하지 않게** 됐다). 그래서 목록이 실재함을 수치로 먼저 요구한다.
+    if ! [[ "$DEP_LAYER_ENTRIES" =~ ^[0-9]+$ ]] || [ "$DEP_LAYER_ENTRIES" -lt "$DEPENDENCY_LAYER_MIN_ENTRIES" ]; then
+      fail "의존 layer(${DEPENDENCY_LAYER_PATH})의 항목 수(${DEP_LAYER_ENTRIES})가 정책 하한(${DEPENDENCY_LAYER_MIN_ENTRIES}) 미만이다 — 경로가 틀렸거나 layer 가 풀리지 않았다(판정 불가)"
+    else
+      for coord in "${coordinate_array[@]}"; do
+        if printf '%s\n' "$DEP_LAYER_LISTING" | grep -qiF -- "$coord"; then
+          fail "test 전용 좌표 '${coord}' 가 의존 layer(${DEPENDENCY_LAYER_PATH})에 있다"
+        fi
+      done
+    fi
+    FORBIDDEN_SUMMARY="금지-실행파일-검사=${#executable_array[@]}건 필수-실행파일-검사=${#required_array[@]}건 의존layer=${DEPENDENCY_LAYER_PATH} 항목수=${DEP_LAYER_ENTRIES}(하한 ${DEPENDENCY_LAYER_MIN_ENTRIES}) 금지좌표-검사=${#coordinate_array[@]}건"
+    ;;
+  *)
+    echo "알 수 없는 runtime.kind '${RUNTIME_KIND}'(스크립트 결함 — 위 분기와 여기가 어긋났다)" >&2
+    exit 2
+    ;;
+esac
 
 # (4) 크기 상한 — `docker image inspect .Size`(단일 플랫폼 이미지 실 크기, `docker save`
 # 바이트 수와 일치함을 실측 확인함, commands.md 「크기 지표 선택 근거」)를 잰다. `docker
@@ -270,6 +408,8 @@ IMAGE_SIZE_BYTES="$(docker image inspect "$IMAGE_REF" --format '{{.Size}}')"
 _check_at_most "이미지 크기" "$IMAGE_SIZE_BYTES" "$SIZE_CAP_BYTES"
 
 echo "-- 실측 요약 --"
+echo "정책=${POLICY_FILE} runtime.kind=${RUNTIME_KIND}"
+echo "${FORBIDDEN_SUMMARY}"
 echo "Config.User=${CONFIG_USER} 실프로세스-uid전체=[${RUNTIME_UIDS_SUMMARY}] base-label(보조)=${BASE_LABEL}"
 echo "base-layer-접두-일치=${base_layer_prefix_ok}"
 echo "size_bytes=${IMAGE_SIZE_BYTES} cap_bytes=${SIZE_CAP_BYTES}"
