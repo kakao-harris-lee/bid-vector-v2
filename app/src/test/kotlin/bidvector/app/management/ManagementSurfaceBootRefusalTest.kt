@@ -42,7 +42,8 @@ class ManagementSurfaceBootRefusalTest {
      */
     private class HostileSystemEnvironment(
         private val entries: Map<String, String>,
-    ) : ApplicationListener<ApplicationEnvironmentPreparedEvent>, Ordered {
+    ) : ApplicationListener<ApplicationEnvironmentPreparedEvent>,
+        Ordered {
         override fun getOrder(): Int = Ordered.HIGHEST_PRECEDENCE
 
         override fun onApplicationEvent(event: ApplicationEnvironmentPreparedEvent) {
