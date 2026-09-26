@@ -213,8 +213,15 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      # M6/6A-2a r1(code-review LOW) — `::add-mask::` 를 먼저 붙인다. argv 축은 아래 주석대로
+      # 닫혀 있지만, 더 실질적인 축은 **공개 워크플로 로그**다: 스모크의 `fail()` 이 앱 로그를
+      # 찍고 Boot 의 바인딩 실패 보고는 속성 값을 문면에 낼 수 있다. 마스크는 그 경로를 값이
+      # 어디서 새든 덮는다.
       - name: DB 접속 값 생성(이 job 전용 일회성, 파일에 리터럴로 두지 않는다)
-        run: echo "BIDVECTOR_PG_PASSWORD=$(openssl rand -hex 20)" >> "$GITHUB_ENV"
+        run: |
+          value="$(openssl rand -hex 20)"
+          echo "::add-mask::$value"
+          echo "BIDVECTOR_PG_PASSWORD=$value" >> "$GITHUB_ENV"
 
       # M6/6A-2a — 운영자 자격 값도 같은 형태로 이 job 안에서 만든다(D-6C-9 선례). 저장소
       # 파일에는 리터럴이 없다. 이 값은 두 곳에 닿아야 한다: ① `app` 컨테이너 —
@@ -224,7 +231,10 @@ jobs:
       # 형태는 프로세스 표에서 26회 관측, `printf | curl --config -` 형태는 0회 — `printf` 는
       # 셸 내장이라 별 프로세스를 만들지 않고 값은 파이프로만 흐른다).
       - name: 운영자 자격 값 생성(이 job 전용 일회성, 파일에 리터럴로 두지 않는다)
-        run: echo "BIDVECTOR_APP_OPERATOR_CREDENTIAL=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+        run: |
+          value="$(openssl rand -hex 24)"
+          echo "::add-mask::$value"
+          echo "BIDVECTOR_APP_OPERATOR_CREDENTIAL=$value" >> "$GITHUB_ENV"
 
       # R2-2(D-6C-10 ④) — S-20 은 `check` job 으로 옮겼다(그 전제인 buf·전체 이력을
       # 이미 갖춘 자리, 위 참고). 이 job 은 컨테이너 축(S-21~S-25)만 진다 — python/uv
@@ -279,11 +289,19 @@ jobs:
           # R2-8 계열 — 도구 부재를 스모크 실패로 오인하지 않는다(`ubuntu-latest` 선탑재지만
           # 워크플로가 설치를 선언하지 않는다). 위생 게이트도 같은 자리에서 같은 이유로 끊는다.
           command -v jq >/dev/null 2>&1 || { echo "jq 가 필요하다 — 본문 키 집합 판정에 쓴다" >&2; exit 2; }
-          _mgmt() { $COMPOSE exec -T app curl -sS -w '\n%{http_code}' "$MGMT$1"; }
+          # M6/6A-2a r1(code-review LOW) — 전송 오류를 **`fail()` 로 옮긴다.** `set -euo pipefail`
+          # 아래서는 curl 의 비-0(예: exit 7 연결 거부)이 대입 자체를 실패시켜 step 이 즉사하고,
+          # `fail()` 이 붙이는 앱 로그를 잃는다. 실패는 정직한 사유로 나와야 한다.
+          _anon_code() { curl -sS -o /dev/null -w '%{http_code}' "$1" || echo transport-error; }
+          _mgmt() { $COMPOSE exec -T app curl -sS -w '\n%{http_code}' "$MGMT$1" || printf '\ntransport-error'; }
+          _mgmt_code() { printf '%s' "$(_mgmt "$1")" | tail -n1; }
           _api_authorized_code() {
-            printf 'header = "X-Operator-Credential: %s"\n' "$BIDVECTOR_APP_OPERATOR_CREDENTIAL" \
-              | curl --config - -sS -o /dev/null -w '%{http_code}' "$API$1"
+            local out
+            out="$(printf 'header = "X-Operator-Credential: %s"\n' "$BIDVECTOR_APP_OPERATOR_CREDENTIAL" \
+              | curl --config - -sS -o /dev/null -w '%{http_code}' "$API$1")" || out="transport-error"
+            printf '%s' "$out"
           }
+          _mgmt_body_keys() { printf '%s' "$1" | jq -r 'keys | sort | join(",")' || echo parse-error; }
 
           echo "-- 관리 포트 프로브 둘: 200 · 본문 키 하나(status) --"
           for path in /actuator/health/liveness /actuator/health/readiness; do
@@ -291,37 +309,69 @@ jobs:
             code="$(printf '%s' "$out" | tail -n1)"
             body="$(printf '%s' "$out" | sed '$d')"
             [ "$code" = "200" ] || fail "$path 가 200 이 아니다: $code"
-            keys="$(printf '%s' "$body" | jq -r 'keys | join(",")')"
+            keys="$(_mgmt_body_keys "$body")"
             [ "$keys" = "status" ] || fail "$path 본문 키가 status 하나가 아니다: [$keys]"
             [ "$(printf '%s' "$body" | jq -r '.status')" = "UP" ] || fail "$path 가 UP 이 아니다"
           done
 
+          # M6/6A-2a D-6A2a-12 — **집계 경로도 잰다.** Boot 4.1.1 은 `show-details=never` 아래에서도
+          # `groups` 칸을 낸다(그룹이 있으면 항상 실린다 — 세부 설정과 무관하다). 값은 우리가 지은
+          # 그룹 이름 둘이고 구성 요소 이름·주소·예외·버전은 없다. 스모크가 프로브만 재면 이 칸이
+          # 환경으로 늘어나도(예: 새 그룹 이름) 컨테이너 축에서는 조용하다.
+          echo "-- 관리 포트 집계 health: 200 · 키는 status·groups · 그룹 이름 둘 --"
+          out="$(_mgmt /actuator/health)"
+          code="$(printf '%s' "$out" | tail -n1)"
+          body="$(printf '%s' "$out" | sed '$d')"
+          [ "$code" = "200" ] || fail "집계 /actuator/health 가 200 이 아니다: $code"
+          keys="$(_mgmt_body_keys "$body")"
+          [ "$keys" = "groups,status" ] || fail "집계 health 본문 키가 groups,status 가 아니다: [$keys]"
+          groups="$(printf '%s' "$body" | jq -r '.groups | sort | join(",")')"
+          [ "$groups" = "liveness,readiness" ] || fail "집계 health 그룹 이름이 liveness,readiness 가 아니다: [$groups]"
+          [ "$(printf '%s' "$body" | jq -r '.status')" = "UP" ] || fail "집계 health 가 UP 이 아니다"
+
           echo "-- API 포트 무인증 401 · 인증 GET /api/strategy 200 --"
-          code="$(curl -sS -o /dev/null -w '%{http_code}' "$API/api/strategy")"
+          code="$(_anon_code "$API/api/strategy")"
           [ "$code" = "401" ] || fail "무인증 /api/strategy 가 401 이 아니다: $code"
           code="$(_api_authorized_code /api/strategy)"
           [ "$code" = "200" ] || fail "인증 /api/strategy 가 200 이 아니다: $code"
 
           echo "-- API 포트의 actuator: 401 또는 404(200 이면 실패) --"
           for path in /actuator /actuator/health /actuator/health/readiness /actuator/env; do
-            anon="$(curl -sS -o /dev/null -w '%{http_code}' "$API$path")"
+            anon="$(_anon_code "$API$path")"
             auth="$(_api_authorized_code "$path")"
             case "$anon" in 401|404) ;; *) fail "무인증 $path 가 401·404 가 아니다: $anon" ;; esac
             case "$auth" in 401|404) ;; *) fail "인증 $path 가 401·404 가 아니다: $auth — actuator 가 API 포트에 있다" ;; esac
           done
 
+          # `/actuator/health/db` 는 구성 요소 경로다(privacy-gate r1 L-1) — `show-components=never`
+          # 아래에서는 404 이고, 그 설정이 열리는 순간 **가장 먼저 세부를 내는 경로**다.
           echo "-- 관리 포트의 health 외 경로 404 --"
           for path in /actuator /actuator/env /actuator/configprops /actuator/beans \
             /actuator/heapdump /actuator/shutdown /actuator/loggers /actuator/metrics \
-            /actuator/threaddump /actuator/mappings /actuator/info; do
-            code="$(printf '%s' "$(_mgmt "$path")" | tail -n1)"
+            /actuator/threaddump /actuator/mappings /actuator/info /actuator/health/db; do
+            code="$(_mgmt_code "$path")"
             [ "$code" = "404" ] || fail "관리 포트 $path 가 404 가 아니다: $code"
           done
 
+          # D-6A2a-13 ② — 관리 포트의 **actuator 밖 표면**을 실측 그대로 잠근다. `/error` 는 404 가
+          # 아니다(Boot 의 오류 처리 경로가 관리 child context 에도 붙는다). 새는 값은 없고 — 우리
+          # 예외가 아니라 「디스패치된 오류 없음」 상태다 — 칸이 늘면 이 단언이 붉어진다.
+          echo "-- 관리 포트 /error: 200 · 키 셋 고정 --"
+          out="$(_mgmt /error)"
+          code="$(printf '%s' "$out" | tail -n1)"
+          [ "$code" = "200" ] || fail "관리 포트 /error 가 200 이 아니다: $code"
+          keys="$(_mgmt_body_keys "$(printf '%s' "$out" | sed '$d')")"
+          [ "$keys" = "error,status,timestamp" ] || fail "관리 포트 /error 본문 키가 실측 모양과 다르다: [$keys]"
+
           echo "-- 앱 로그에 수집 시작 줄 0 (우회 6) --"
-          if $COMPOSE logs app 2>&1 | grep -q 'collection start'; then
-            fail "앱 로그에 수집 시작 줄이 있다 — compose 기동이 수집을 켰다"
-          fi
+          # `$COMPOSE logs app | grep -q …` 를 쓰지 않는다(code-review r1 MEDIUM): `grep -q` 는 **첫
+          # 일치에서 즉시 나가** 파이프를 닫고, `pipefail` 아래 파이프라인 상태는 마지막 비-0 이므로
+          # **일치했을 때에도** `if` 가 거짓이 될 수 있었다 — 위반을 **숨기는 방향**의 비결정성이다.
+          # 로그를 변수로 먼저 받고 판정은 셸 패턴으로 한다(파이프가 없으므로 SIGPIPE 도 없다).
+          app_logs="$($COMPOSE logs app 2>&1)" || fail "app 로그를 읽지 못했다"
+          case "$app_logs" in
+            *'collection start'*) fail "앱 로그에 수집 시작 줄이 있다 — compose 기동이 수집을 켰다" ;;
+          esac
 
           echo "== 스모크 통과 =="
 
