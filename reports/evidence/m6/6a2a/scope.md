@@ -54,6 +54,20 @@
 | **D-6A2a-8** | CI `container` job 을 넓힌다: `bootJar` → 앱 이미지 빌드 → 두 이미지 위생 → compose 세 서비스 healthy 수렴 → **스모크**: 관리 포트 liveness·readiness 200 · API 포트 무인증 401 · 인증 `GET /api/strategy` 200 · API 포트의 `/actuator/**` 가 401 또는 404(actuator 가 API 포트에 없다) · 관리 포트의 health 외 경로 404 → 정리. 자격 값은 job 안에서 생성하고 파일에 남기지 않는다(D-6C-9 선례) | 「이미지가 뜬다」가 아니라 「뜬 이미지가 인증 경계를 지키며 준비 상태를 알린다」를 재야 한다. 스모크가 평가 dry-run 을 부르지 않는 이유: 전략 행이 비어 있는 새 DB 라 의미 있는 값이 없고, audit 쓰기만 늘린다 |
 | **D-6A2a-9** | 로컬 한 명령: `tools/one-command-check.sh` 는 **바꾸지 않는다**(Docker 없는 환경의 상시 붉음을 피한다 — D-6C-4 와 같은 근거). 컨테이너 축의 로컬 재현 명령은 `commands.md` 에 적고, CI `container` job 이 정본이다 | 부분 게이트 금지 규율과 충돌하지 않는다 — 줄일 수 있는 단위는 job 이고, 이 slice 의 acceptance 는 `check` job 과 `container` job 둘 다다 |
 
+## 계약 갱신 r1 (2026-09-26, 팀장 — verifier F-1·F-2 · code-reviewer HIGH · privacy-gate M-1 수령)
+
+세 레인이 같은 결함을 따로 실측했다. 잠금(`MANAGEMENT_SURFACE_LOCK`)이 **이름으로 고정한 키**는 우선순위상 빈틈이 없다. 그러나 `management.*` 에는
+같은 출력에 닿는 **다른 키**가 있다. 그룹별 `show-details`·`show-components`·`include`/`exclude`, 새 그룹, `status.http-mapping`,
+`probes.add-additional-paths`, `validate-group-membership` 이 그 예다. 환경변수 한두 줄이 이 키들로 우회 2·3·7 을 다시 연다. 잠금 test 는 잠금 자기 목록만 돌아 이것을 볼 수 없었다.
+**열거 결함**이다 — 키를 더하면 다음 Boot 판에서 같은 결함이 돌아온다.
+
+| ID | 결정 |
+|---|---|
+| **D-6A2a-10** | **관리 표면은 접두사 거부로 닫는다(구성).** 기동 시 잠금 밖의 어느 속성 소스에든 `management.` 접두사 키가 있으면 기동을 거부한다. 허용 목록은 **`management.server.port` 하나**다(D-6A2a-4 의 유일한 자유). 새 Boot 키도 접두사에 걸리므로 목록을 늘리지 않아도 닫힌다. 거부 메시지에는 키 이름만 싣고 값은 싣지 않는다. 관련 접두사(`spring.jmx.*` 등)를 같은 방식으로 볼지는 구현 레인이 실측해 정한다 — 잠금이 고정한 키가 걸린 접두사는 전부 대상이다. **게이트 술어 변경이므로 verifier 표적 재검증.** |
+| **D-6A2a-11** | 잠금 test 는 **잠금 밖에서 부팅**해 잰다. 적대적 명령행 인자·환경변수로 production 조립을 부팅해 기동 거부를 단언하고(그룹 세부 · 새 그룹 · 상태 매핑 · 추가 경로 · readiness exclude), 잠금 **배선 형태**(우선순위 최상위)도 잠근다. 잠금 키 집합은 리터럴로 단언한다(자기 목록 순회 금지). |
+| **D-6A2a-12** | (2b) 표의 관리 포트 행 정정: 프로브 두 경로(`/liveness`·`/readiness`)는 상태 한 단어다. **집계 `/actuator/health` 는 상태 + 우리 그룹 이름(`groups`)** 을 낸다(Boot 4.1.1 형태, 값은 고정 그룹 이름뿐 — 구성 요소·주소·예외·버전 없음). 형태를 실측으로 고정하고, 키가 하나라도 늘면 RED. 스모크도 집계 경로를 잰다. |
+| **D-6A2a-13** | 이 라운드에서 함께 처분할 것은 셋이다. ① `PersistenceProperties` 가 `data class` 라 바인딩 실패 분석기·로그가 자격 값을 문자열화할 수 있다(privacy-gate L-2) → `OperatorCredentialProperties`(6A-1 r4)와 같은 형태로 고친다(in_scope `app/**`). ② 관리 포트 `/error` 200·비 GET 500 은 스모크·test 로 형태를 잰다 — 500 은 `OPEN-API-WRONG-METHOD-500` 에 관리 포트 관측으로 덧붙인다. ③ 이름 기반 보조 판정(이름 바꾼 test jar · PATH 밖 `javac`)은 알려진 제한으로 둔다(계약 (1) 이 이미 보조로 선언했다, verifier F-6). |
+
 ## 위협 모델 — 6A-2a 고유 경계 (Phase 2.5 (0), 팀장)
 
 **지키는 것**: ① 이미지에 비밀값이 들어가지 않는다(레이어·환경변수 기본값·빌드 인자 어디에도 — 값은 기동 시 환경에서만 온다)
