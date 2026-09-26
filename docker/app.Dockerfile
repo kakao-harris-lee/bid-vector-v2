@@ -46,10 +46,16 @@ RUN groupadd --system --gid 10001 bidvector \
 WORKDIR /application
 
 # layer 넷을 각자 COPY 한다 — 변한 layer 만 다시 밀린다. 순서는 「덜 바뀌는 것부터」다.
-COPY --from=builder --chown=10001:10001 /builder/extracted/dependencies/ ./
-COPY --from=builder --chown=10001:10001 /builder/extracted/spring-boot-loader/ ./
-COPY --from=builder --chown=10001:10001 /builder/extracted/snapshot-dependencies/ ./
-COPY --from=builder --chown=10001:10001 /builder/extracted/application/ ./
+#
+# **`--chown` 을 쓰지 않는다**(code-review r1 LOW). 런타임 사용자에게 소유권을 주면 침해된 앱
+# 프로세스가 `application.jar` 과 `lib/` 의 jar 를 **재기동 뒤에도 남는 형태로** 고칠 수 있다.
+# 이 앱은 `/application` 에 쓸 이유가 없다(읽기만 한다 — 임시 파일은 `java.io.tmpdir` 로 간다).
+# root 소유·전체 읽기가 기본 mode 이고, `USER bidvector` 는 그것으로 충분히 읽는다. Boot 공식
+# Dockerfile 형태도 `--chown` 을 쓰지 않는다.
+COPY --from=builder /builder/extracted/dependencies/ ./
+COPY --from=builder /builder/extracted/spring-boot-loader/ ./
+COPY --from=builder /builder/extracted/snapshot-dependencies/ ./
+COPY --from=builder /builder/extracted/application/ ./
 
 USER bidvector
 
@@ -63,6 +69,12 @@ USER bidvector
 # 늘고(매직 넘버·중복 금지), 기본값 없이 `${MANAGEMENT_SERVER_PORT}` 만 쓰면 bare
 # `docker run` 이 멀쩡한 앱을 unhealthy 로 신고한다. 그래서 healthcheck 는 그 변수를 이미
 # 들고 있는 `docker/compose.yaml` 한 자리에만 둔다(ml-serving 도 같은 자리다).
-EXPOSE 8080 8081
+#
+# **`EXPOSE` 도 두지 않는다**(code-review r1 LOW). 바로 위 단락이 HEALTHCHECK 을 뺀 이유로
+# 「Dockerfile 에 두 번째 기본값을 구우면 드리프트 표면이 하나 늘고(매직 넘버·중복 금지)」를
+# 들었는데, `EXPOSE 8080 8081` 이 바로 그 두 번째 기본값이었다 — CI 는 18080/18081 을 쓰므로
+# 그 메타데이터는 이미 틀렸다. 문서 전용이라 깨지는 것은 없고, 잃는 것도 없다: 포트 publish 는
+# `docker/compose.yaml` 이 명시한다. 덧붙여 `EXPOSE` 는 `docker run -P` 가 관리 포트까지
+# publish 하게 만들었다(`OPEN-6A2A-MGMT-PORT-EXPOSURE` 의 한 갈래) — 그 갈래도 함께 닫힌다.
 
 ENTRYPOINT ["java", "-jar", "application.jar"]
