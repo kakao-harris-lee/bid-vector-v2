@@ -259,6 +259,41 @@ jobs:
       - name: 이미지 위생 게이트 — 앱 (S-22b)
         run: ./tools/image-hygiene-check.sh bidvector/app:local config/quality/image-hygiene-policy-app.properties
 
+      # M6/6A-2a r2 D-6A2a-14 — verifier r2 F-1r 이 **출하 이미지에서** 쓴 환경변수 그대로를 컨테이너
+      # 축에 고정한다. 그 한 줄이 r1 결함 셋을 전부 다시 열었으므로, 「뜬 이미지가 그것을 거부한다」를
+      # test 가 아니라 이미지에서 잰다. DB·compose 없이 `docker run` 한 번이라 값이 싸다.
+      #
+      # 거부 **사유**까지 요구한다 — 이 환경에는 DB 가 없어 기동은 어차피 실패하므로, 종료 코드만
+      # 보면 스모크가 아무것도 재지 않는 것과 같다(관리 표면 판정이 사라져도 초록이 된다).
+      - name: 앱 이미지 거부 스모크 — 늦은 소스로 관리 표면을 넓히면 기동을 거부한다 (S-22c)
+        run: |
+          set -euo pipefail
+          name="m6a2a-late-source-refusal"
+          docker rm -f "$name" >/dev/null 2>&1 || true
+          out="$(docker run --rm --name "$name" --security-opt no-new-privileges \
+            -e SERVER_PORT=8080 \
+            -e MANAGEMENT_SERVER_PORT=8081 \
+            -e BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:postgresql://192.0.2.1:5432/refusal-smoke \
+            -e BIDVECTOR_PERSISTENCE_USERNAME=refusal-smoke \
+            -e BIDVECTOR_PERSISTENCE_CREDENTIAL=refusal-smoke \
+            -e OPERATOR_CREDENTIAL_VALUE=refusal-smoke-placeholder-not-an-operator-value \
+            -e BIDVECTOR_EVALUATION_CANDIDATECAP=1 \
+            -e SERVER_SERVLET_CONTEXTPARAMETERS_MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_SHOWDETAILS=always \
+            bidvector/app:local 2>&1)" && rc=0 || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            echo "적대 환경변수를 줬는데 컨테이너가 0 으로 끝났다 — 관리 표면 거부가 서지 않았다" >&2
+            exit 1
+          fi
+          case "$out" in
+            *D-6A2a-1[04]*) ;;
+            *) echo "컨테이너가 비-0(${rc})으로 끝났지만 관리 표면 거부 사유가 아니다" >&2; exit 1 ;;
+          esac
+          case "$out" in
+            *server.servlet.contextparameters*) ;;
+            *) echo "거부 문면이 운반 이름공간 키를 말하지 않는다" >&2; exit 1 ;;
+          esac
+          echo "== 거부 스모크 통과(exit=${rc}) =="
+
       - name: 로컬 환경 기동 — app+ml-serving+postgres 가 healthy 로 수렴 (S-23)
         run: |
           docker compose -f docker/compose.yaml up -d
@@ -292,8 +327,20 @@ jobs:
           # M6/6A-2a r1(code-review LOW) — 전송 오류를 **`fail()` 로 옮긴다.** `set -euo pipefail`
           # 아래서는 curl 의 비-0(예: exit 7 연결 거부)이 대입 자체를 실패시켜 step 이 즉사하고,
           # `fail()` 이 붙이는 앱 로그를 잃는다. 실패는 정직한 사유로 나와야 한다.
-          _anon_code() { curl -sS -o /dev/null -w '%{http_code}' "$1" || echo transport-error; }
-          _mgmt() { $COMPOSE exec -T app curl -sS -w '\n%{http_code}' "$MGMT$1" || printf '\ntransport-error'; }
+          # M6/6A-2a r2(code-review LOW-4) — `|| echo` 는 **덧붙이는** 형태였다. 전송 실패(exit 7)
+          # 에서도 curl 은 `-w '%{http_code}'` 를 처리해 `000` 을 stdout 에 쓰므로 잡히는 값이
+          # `000transport-error` 가 됐다(판정은 `fail()` 로 떨어지지만 문면이 정직하지 않다).
+          # 대입은 실패해도 일어나므로 `||` 로 **덮어쓴다** — `_api_authorized_code` 와 같은 형태다.
+          _anon_code() {
+            local out
+            out="$(curl -sS -o /dev/null -w '%{http_code}' "$1")" || out="transport-error"
+            printf '%s' "$out"
+          }
+          _mgmt() {
+            local out
+            out="$($COMPOSE exec -T app curl -sS -w '\n%{http_code}' "$MGMT$1")" || out="$(printf '\ntransport-error')"
+            printf '%s' "$out"
+          }
           _mgmt_code() { printf '%s' "$(_mgmt "$1")" | tail -n1; }
           _api_authorized_code() {
             local out
