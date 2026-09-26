@@ -735,6 +735,9 @@ components:
         strategyRevision:
           type: integer
           nullable: true
+        baseRevision:
+          type: integer
+          nullable: true
     ErrorBody:
       type: object
       required:

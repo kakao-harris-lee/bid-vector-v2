@@ -179,6 +179,55 @@ class StrategyEditProductionE2ETest {
         count("SELECT count(*) FROM operator_strategy") shouldBe 0L
     }
 
+    /**
+     * D-6A2b-18 회귀 — verifier r1 F-2 · code-review r1 HIGH-1 의 재현을 **출하 조립 + 실 DB**
+     * 로 잠근다. 세션 둘이 같은 revision 에서 각자 전체 draft 를 뜨고, 뒤 세션은 확인 직전에
+     * 조회한 **최신** revision 을 보낸다 — 그래도 기준이 낡았으므로 409 다.
+     */
+    @Test
+    fun `동시 세션에서 낡은 draft 의 확인은 409 이고 앞 세션의 값이 보존된다`() {
+        val sessionA = post(EDIT_SESSIONS, """{"field":"CANDIDATE_LIMIT"}""").body?.get("sessionId") as String
+        val sessionB = post(EDIT_SESSIONS, """{"field":"MAX_ACTIVE_BIDS"}""").body?.get("sessionId") as String
+        val providedA =
+            post("$EDIT_SESSIONS/$sessionA/value", """{"commandId":"a1","field":"CANDIDATE_LIMIT","count":13}""")
+        post("$EDIT_SESSIONS/$sessionB/value", """{"commandId":"b1","field":"MAX_ACTIVE_BIDS","count":4}""")
+        providedA.body?.get("baseRevision") shouldBe 0
+
+        post("$EDIT_SESSIONS/$sessionA/confirm", """{"commandId":"a2","seenRevision":0}""")
+            .statusCode
+            .value() shouldBe 200
+        val observed = get("/api/strategy").body?.get("revision") as Int
+        val stale = post("$EDIT_SESSIONS/$sessionB/confirm", """{"commandId":"b2","seenRevision":$observed}""")
+
+        stale.statusCode.value() shouldBe 409
+        stale.body?.get("code") shouldBe ErrorCode.STALE_REVISION
+        val strategy = get("/api/strategy").body
+        strategy?.get("candidateLimit") shouldBe 13
+        strategy?.get("maxActiveBids") shouldBe null
+        strategy?.get("revision") shouldBe observed
+        count("SELECT count(*) FROM outbox") shouldBe 1L
+    }
+
+    /**
+     * D-6A2b-25(F-4) — 우회 ⑦ 「영속 0」을 **실 DB** 로 잰다. 이전에는 in-memory 이중체
+     * 위에서만 재서, 저장 층이 실제로 조용히 쓰지 않는지는 확인되지 않았다.
+     */
+    @Test
+    fun `불변식을 어긴 값은 400 이고 전략·세션·outbox 어디에도 남지 않는다`() {
+        val sessionId = post(EDIT_SESSIONS, """{"field":"CANDIDATE_LIMIT"}""").body?.get("sessionId") as String
+
+        val rejected =
+            post("$EDIT_SESSIONS/$sessionId/value", """{"commandId":"v1","field":"CANDIDATE_LIMIT","count":-3}""")
+
+        rejected.statusCode.value() shouldBe 400
+        rejected.body?.get("code") shouldBe ErrorCode.STRATEGY_VALUE_INVALID
+        count("SELECT count(*) FROM operator_strategy") shouldBe 0L
+        count("SELECT count(*) FROM operator_strategy_revision") shouldBe 0L
+        count("SELECT count(*) FROM outbox") shouldBe 0L
+        queryFirst("SELECT session_version FROM edit_session") { it.getInt(1) } shouldBe 0
+        queryFirst("SELECT state FROM edit_session") { it.getString(1) } shouldBe "WAITING_FOR_VALUE"
+    }
+
     /** D-6A2b-9 — 되살린 스캔 제외 필터 둘이 우리 빈을 걷어내지 않았다(빈 집합 실측). */
     @Test
     fun `출하 조립에 편집 실행기 빈이 있다`() {

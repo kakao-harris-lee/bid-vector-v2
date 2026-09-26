@@ -30,6 +30,8 @@ data class EditSessionSnapshot(
     val stateField: EditableFieldSnapshot?,
     val stateDraft: StrategyDraftSnapshot?,
     val stateRevision: Int?,
+    /** D-6A2b-18 — `WaitingForConfirmation` 의 기준 revision. 이 필드 이전 행은 `null` 이다(fail-closed). */
+    val stateBaseRevision: Int?,
     val stateCancelReasonKind: String?,
     val stateCancelReasonNote: String?,
     val lastCommand: EditCommandSnapshot?,
@@ -107,6 +109,7 @@ fun EditSession.toSnapshot(): EditSessionSnapshot =
         stateField = state.toFieldSnapshot(),
         stateDraft = state.toDraftSnapshot(),
         stateRevision = (state as? EditSessionState.Applied)?.revision?.value,
+        stateBaseRevision = (state as? EditSessionState.WaitingForConfirmation)?.baseRevision?.value,
         stateCancelReasonKind = (state as? EditSessionState.Cancelled)?.reason?.kindName(),
         stateCancelReasonNote = ((state as? EditSessionState.Cancelled)?.reason as? CancellationReason.Other)?.note,
         lastCommand = lastCommand?.toSnapshot(),

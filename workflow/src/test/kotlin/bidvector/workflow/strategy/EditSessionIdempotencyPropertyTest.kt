@@ -106,7 +106,10 @@ class EditSessionIdempotencyPropertyTest {
     @Test
     fun `④ Applied 로 이미 종단된 세션에 같은 Confirm 재전달은 효과 0 이다 — 두 번째 적용이 없다`() {
         val draft = StrategyDraft(bidNowThreshold = BigDecimal("0.7"))
-        val session = freshSession().copy(state = EditSessionState.WaitingForConfirmation(FIELD, draft))
+        val session =
+            freshSession().copy(
+                state = EditSessionState.WaitingForConfirmation(FIELD, draft, StrategyRevision(1)),
+            )
         val confirmCommand = EditCommand.Confirm(CommandId("confirm-1"), session.id, OPERATOR, StrategyRevision(1))
 
         val first = apply(session, confirmCommand, NOW, currentStrategy(1), policyOf())

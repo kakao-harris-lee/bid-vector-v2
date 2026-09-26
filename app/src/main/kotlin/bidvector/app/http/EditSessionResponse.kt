@@ -23,6 +23,12 @@ data class EditSessionResponse(
     val sessionVersion: Int,
     val expiresAt: String,
     val strategyRevision: Int?,
+    /**
+     * D-6A2b-18 — 확인 대기 중인 draft 를 뜬 시점의 전략 revision. 클라이언트가 확인 전에
+     * 「내 초안이 아직 최신 위에 서 있는가」를 볼 수 있는 유일한 값이다(그 대조 자체는
+     * 서버가 한다 — 이 값은 보고이지 신뢰 입력이 아니다). 확인 대기가 아니면 `null`.
+     */
+    val baseRevision: Int?,
 ) {
     companion object {
         fun from(session: EditSession): EditSessionResponse =
@@ -33,6 +39,8 @@ data class EditSessionResponse(
                 sessionVersion = session.sessionVersion,
                 expiresAt = session.expiresAt.toString(),
                 strategyRevision = (session.state as? EditSessionState.Applied)?.revision?.value,
+                baseRevision =
+                    (session.state as? EditSessionState.WaitingForConfirmation)?.baseRevision?.value,
             )
     }
 }

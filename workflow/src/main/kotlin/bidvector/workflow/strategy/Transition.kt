@@ -182,7 +182,10 @@ private fun onProvideValue(
 ): TransitionOutcome =
     when (validate(command.draft, current.revision, policy)) {
         is StrategyValidation.Valid -> {
-            accept(session, EditSessionState.WaitingForConfirmation(command.field, command.draft), command)
+            // D-6A2b-18 — draft 를 뜬 기준 revision 을 함께 남긴다. `RequestEdit` 뒤 새 value 는
+            // 이 자리를 다시 지나므로 새 기준을 잡는다.
+            val next = EditSessionState.WaitingForConfirmation(command.field, command.draft, current.revision)
+            accept(session, next, command)
         }
 
         is StrategyValidation.Invalid -> {
@@ -191,7 +194,23 @@ private fun onProvideValue(
     }
 
 /**
- * `Confirmed`(설계 검토 (4) 3) — (a) stale `seenRevision` 은 거부. (b) 재검증이 `Invalid`면
+ * 신선도는 **두 축**이다(M6/6A-2b D-6A2b-18) — 둘 다 통과해야 적용한다.
+ * ① 클라이언트가 본 revision(`seenRevision`)이 지금 값과 같은가 ② 세션이 든 draft 를 **뜬**
+ * 시점([EditSessionState.WaitingForConfirmation.baseRevision])이 지금 값과 같은가.
+ *
+ * ①만으로는 부족했다(verifier r1 F-2 실측): 확인 직전에 조회하면 ①은 늘 참이 되고, 그 사이
+ * 다른 세션이 적용한 변경은 낡은 스냅숏에 **덮여 사라졌다**. ②는 「이 draft 가 만들어진 뒤
+ * 전략이 움직였는가」를 직접 묻는다. 기준이 없는(= 이 필드 이전에 저장된) 세션은 `null` 이라
+ * 항상 stale 로 떨어진다 — 지어내지 않고 거부한다.
+ */
+private fun isStale(
+    state: EditSessionState.WaitingForConfirmation,
+    command: EditCommand.Confirm,
+    current: OperatorStrategy,
+): Boolean = command.seenRevision != current.revision || state.baseRevision != current.revision
+
+/**
+ * `Confirmed`(설계 검토 (4) 3) — (a) 신선하지 않으면 거부([isStale]). (b) 재검증이 `Invalid`면
  * `WaitingForValue`로 되돌아가는 accepted 전이(거부가 아니다). (c) `Valid`면 `Applied`.
  */
 private fun onConfirm(
@@ -201,7 +220,7 @@ private fun onConfirm(
     current: OperatorStrategy,
     policy: Resolution.Resolved<StrategyPolicyData>,
 ): TransitionOutcome {
-    if (command.seenRevision != current.revision) {
+    if (isStale(state, command, current)) {
         return TransitionOutcome.Rejected(session, command, RejectionReason.StaleRevision)
     }
     val nextRevision = StrategyRevision(current.revision.value + 1)

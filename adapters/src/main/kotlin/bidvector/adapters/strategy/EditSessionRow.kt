@@ -56,6 +56,7 @@ internal object EditSessionRow {
         snapshot.stateField?.let { node.set<JsonNode>("field", fieldNode(it)) }
         snapshot.stateDraft?.let { node.set<JsonNode>("draft", draftNode(it)) }
         snapshot.stateRevision?.let { node.put("revision", it) }
+        snapshot.stateBaseRevision?.let { node.put("baseRevision", it) }
         snapshot.stateCancelReasonKind?.let { node.put("cancelReasonKind", it) }
         snapshot.stateCancelReasonNote?.let { node.put("cancelReasonNote", it) }
         return mapper.writeValueAsString(node)
@@ -93,6 +94,8 @@ internal object EditSessionRow {
             stateField = payload?.get("field")?.let(::readField),
             stateDraft = payload?.get("draft")?.let(::readDraft),
             stateRevision = payload?.get("revision")?.let { it.requireIntValue("revision") },
+            // D-6A2b-18 — 키가 없는 낡은 행은 `null` 이고, workflow 의 대조가 fail-closed 로 거부한다.
+            stateBaseRevision = payload?.get("baseRevision")?.let { it.requireIntValue("baseRevision") },
             stateCancelReasonKind = payload?.get("cancelReasonKind")?.asText(),
             stateCancelReasonNote = payload?.get("cancelReasonNote")?.asText(),
             lastCommand = lastCommand?.let(mapper::readTree)?.let(::readCommand),

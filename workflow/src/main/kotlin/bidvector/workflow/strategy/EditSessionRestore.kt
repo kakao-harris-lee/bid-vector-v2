@@ -39,6 +39,8 @@ private fun restoreState(snapshot: EditSessionSnapshot): EditSessionState =
                 restoreStrategyDraft(
                     requireNotNull(snapshot.stateDraft) { "WaitingForConfirmation 은 stateDraft 가 필요하다" },
                 ),
+                // D-6A2b-18 — 없으면 `null` 그대로 둔다(지어내지 않는다). confirm 이 fail-closed 로 거부한다.
+                snapshot.stateBaseRevision?.let(::StrategyRevision),
             )
         }
 
