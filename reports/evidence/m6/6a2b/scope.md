@@ -133,9 +133,26 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 `milestone-6.md` 는 공유 파일이라 커밋 해시 hunk 격리. 실측은 임시 clone 에서 ①~⑥(evidence-pack 규격), `실측 HEAD` 를 `rollback.md` 에 적는다.
 비활성화 경로: 새 endpoint 는 조립이 없으면 뜨지 않는다 — 실행기 빈 등록을 빼면 쓰기 경로 전체가 사라지고 읽기·dry-run 은 남는다.
 
+## 계약 갱신 r0 (2026-09-27, 팀장 — 구현 레인 보고 수령, 검증 전)
+
+| ID | 결정 |
+|---|---|
+| **D-6A2b-14** | **D-6A2b-9 의 전제 「영향 0」(6A-2a 실측)은 거짓이었다.** 되살린 `TypeExcludeFilter` 가 `@TestConfiguration` 을 스캔에서 걷어내자 E2E 둘이 test 전용 빈(기록형 종료·fake ML)을 잃었다. 그러자 production 종료 경로가 test JVM 을 조용히 끝냈고, `gateExecutionGate`(실행 여부를 보는 게이트)가 잡았다. **처분 유지**: 필터를 되돌리지 않는다 — 그 누출이 필터의 존재 이유다. 두 test 가 빈을 명시 source 로 받게 고친다. 6A-2a 의 「영향 0」 실측이 왜 이것을 못 봤는지는 verifier 표적으로 준다 |
+| **D-6A2b-15** | 관리 포트 비 GET 은 **405 로 함께 닫혔다**(D-6A2b-7 의 조건부 절 충족). API 포트용 `@RestControllerAdvice` 가 관리 자식 컨텍스트에도 선다. 관리 표면 잠금(D-6A2a-10·14)은 넓히지 않았다고 구현 레인이 보고했다 — **verifier 표적**: 그 advice 가 관리 포트에서 405 말고 다른 표면(본문·경로)을 여는지 |
+| **D-6A2b-16** | 의존 게이트(D-6A2b-8)가 **기존 코드**를 잡았다: dry-run 응답 조립이 어댑터 포트 구현을 컨트롤러에 내주고 있었다. 값만 내도록 좁혔다(in_scope `app/**`) |
+| **D-6A2b-17** | 신설 OPEN 둘을 수용한다: `OPEN-6A2B-VIOLATION-DETAIL`(값 위반 사유가 응답에 없다) · `OPEN-6A2B-CONCURRENT-SESSION-ADVANCE`(HTTP 층 동시 전진 실측 없음). `SessionAlreadyActive` 가 HTTP 로 도달 불가인 것(서버 생성 id 의 귀결)은 알려진 제한이다 — 동시에 열린 세션 여럿은 `StaleRevision` 이 잡는다 |
+
 ## 하네스 레인 변경 (상시 절)
 
-(리뷰 요청 시점마다 갱신)
+구현 레인 checklist 「하네스 레인 변경」 절을 옮긴다(2026-09-27, 판정 SHA 고정 시점).
+
+- `config/quality/architecture-policy.properties` — 포트 호출 쌍 하나가 컨트롤러에서 조회기로 이동, 판정 대상 포트 둘(편집 세션 저장·이벤트 sink) 추가, 새 키 넷(의존 게이트)·둘(자격증명 참조자).
+- `.github/workflows/ci.yml` — `container` job 스모크에 쓰기 왕복 절과 405 단언. 다른 job 무편집.
+- `adapters/src/test/.../StrategyAdapterDependencyTest.kt` — 허용 루트 둘(이벤트 축). 조립을 어댑터 층에 두기 위해서다.
+- `ConstantTimeComparisonStructureTest` 허용 목록 셋(근거 문장 포함).
+- `ManagementHealthSurfaceTest` 비 GET 기대 500 → 405(D-6A2b-15).
+- 기계 전수 test 둘(`OperatorAuthenticationTest`·`ProductionAssemblyAuthAuditTest`)이 경로 변수를 구체 값으로 치환한다 — 경로 변수 매핑이 처음 생겼다.
+- 팀장 문서 커밋: `3750e6a6`(`milestone-6.md` 결정 ④ 개정 — 이 slice 범위 밖 문단).
 
 ## OPEN — 수령·신설
 
@@ -147,6 +164,7 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | `OPEN-API-WRONG-METHOD-500` | **닫는다**(API 포트) · 관리 포트는 D-6A2b-7 조건부 | D-6A2b-7 |
 | `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT` | **닫는다** | D-6A2b-9 |
 | `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` | 수령·재측정·**유지**(→ 6E) | D-6A2b-10 |
+| `OPEN-6A2B-VIOLATION-DETAIL` · `OPEN-6A2B-CONCURRENT-SESSION-ADVANCE` | **신설** | D-6A2b-17 |
 
 ## 리뷰 레인
 
