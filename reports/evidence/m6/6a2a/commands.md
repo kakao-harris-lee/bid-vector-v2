@@ -13,6 +13,12 @@ post-state 를 담을 수 없다).
 - exit: 1
 - 핵심 결과: 새 test 둘이 `lockManagementSurface`·`productionApplication`·actuator 좌표 부재로 컴파일 불가
 
+- cmd: `./gradlew --no-daemon :app:test --tests '…ManagementSurfaceLockTest' --tests '…ManagementSurfaceBootRefusalTest' --tests '…PersistencePropertiesTest'` (접두사 거부 구현 전)
+- exit: 1
+- 핵심 결과: 19 test 중 **9 실패** — 거부 단언 전부(환경변수 그룹 세부 · 명령행 · 평탄화 JSON ·
+  대괄호 색인 · `spring.jmx` · 적대 부팅 두 채널 · `SPRING_APPLICATION_JSON` 부팅)와 자격 `toString`.
+  **양성 대조와 포트 판정은 전부 통과** — 실패가 「아무 것이나 거부/실패」가 아니라 그 축에서만 났다
+
 ## 구현 뒤 표적 test
 
 - cmd: `./gradlew --no-daemon :app:test --tests 'bidvector.app.ManagementSurfaceLockTest' --tests 'bidvector.app.management.ManagementHealthSurfaceTest'`
@@ -25,13 +31,31 @@ post-state 를 담을 수 없다).
 - exit: 0
 - 핵심 결과: 기존 production 조립 test 가 `productionApplication()` 공유 형태에서 그대로 초록
 
-## 관리 표면 값 획득 축 실측 (계약 (2b) 요구)
+## 관리 표면 값 획득 축 실측 (계약 (2b) 요구 · D-6A2a-10)
 
-- cmd: `ManagementSurfaceLockTest` 의 「잠금 전」 단언 — 환경변수·명령행 source 를 세운 뒤 잠금 적용 전 값 조회
+- cmd: `ManagementSurfaceLockTest` 의 「잠금 전」 단언 — 환경변수·명령행 source 를 세운 뒤 값 조회
 - exit: 0
 - 핵심 결과: **잠금 전에는 환경변수·명령행이 노출·세부를 넓힌다**(계약이 가정한
-  `defaultProperties` 자리는 가장 낮은 우선순위다). `addFirst` 잠금 뒤에는 둘 다 못 이긴다 —
-  잠금 전/후를 같은 test 가 함께 단언해 공허한 참을 막는다
+  `defaultProperties` 자리는 가장 낮은 우선순위다). `addFirst` 잠금은 자기가 **이름 댄 키**에
+  대해서는 둘 다 못 이기게 한다 — 그러나 그것으로는 부족했다(아래)
+
+- cmd: 잠금 밖 형제 키 실측(r1 세 레인) — 그룹 단위 `show-details`/`show-components` · 새 그룹
+  `include` · `status.http-mapping.down` · `probes.add-additional-paths` · `group.readiness.exclude` ·
+  `validate-group-membership`
+- exit: (관측)
+- 핵심 결과: **여섯 축 모두 환경 한두 줄로 열렸다** — 세부·구성 요소 이름·드라이버 예외 문면이
+  인증 없는 관리 포트에 실리고, readiness 의 참/거짓이 뒤집힌다. 열거 잠금의 사각이다
+
+- cmd: 접두사 거부 뒤 같은 축 — `:app:test`(표적 셋)
+- exit: 0
+- 핵심 결과: 20 test 전건 통과. 여섯 축이 **기동 거부**로 닫힌다(출하 조립을 실제로 부팅한
+  단언 포함). 양성 대조 둘(`management.server.port` 를 환경변수·명령행으로 주면 통과)도 초록 —
+  거부가 무차별이 아니다
+
+- cmd: 거부 문면의 값 부재 단언
+- exit: 0
+- 핵심 결과: 문면에 **키 이름만** 실린다(심은 표지 값이 문면에 없음을 단언). 관리 포트 값 하나만
+  환경이 정하고, 그 자유의 상한은 `ManagementPortType` 분리 판정이다
 
 ## 이미지 · 위생 게이트
 
@@ -47,7 +71,13 @@ post-state 를 담을 수 없다).
 - cmd: `./tools/image-hygiene-check.sh bidvector/app:local config/quality/image-hygiene-policy-app.properties`
 - exit: 0
 - 핵심 결과: 실프로세스 uid 10001 · 베이스 layer 접두 일치 · 금지 실행 파일 9 전건 부재 ·
-  의존 layer 97 항목(하한 50) 중 금지 좌표 13 전건 0 · 339.4MB ≤ 450MB
+  **필수 실행 파일 1 존재** · 의존 layer 97 항목(하한 50) 중 금지 좌표 13 전건 0 · 339.4MB ≤ 450MB
+
+- cmd: layer 소유권·쓰기 가능성 실측(`--chown` 제거 뒤) — 이미지 안에서 `id -u`·`ls -ld`·쓰기 시도
+- exit: 0
+- 핵심 결과: 프로세스 uid 10001 · `/application` 과 배포물이 **root 소유·전체 읽기** ·
+  앱 사용자의 쓰기 시도가 거부된다 · `Config.ExposedPorts` 는 **null**(`EXPOSE` 제거 확인) ·
+  컨테이너는 그대로 healthy 로 수렴한다(아래 `container` job)
 
 - cmd: `./tools/image-hygiene-check.sh bidvector/ml-serving:local config/quality/image-hygiene-policy.properties`
 - exit: 0
@@ -63,6 +93,26 @@ post-state 를 담을 수 없다).
 - exit: 0
 - 핵심 결과: TEST-NET-1 주소로 DB 를 가리키면 pid 1 이 t=10s 에도 살아 있고 uid 10001 ·
   `no-new-privileges` 아래 정상 기동 — (1) 의 프로세스 표집 창이 확보된다
+
+## 위생 정책 값 모양 검증 (code-review r1 MEDIUM·LOW)
+
+- cmd: 목록 원소에 공백을 섞은 정책 파일로 게이트 실행(변이 적용을 `git diff --numstat` 으로 확인)
+- exit: 2
+- 핵심 결과: 「원소에 공백이 섞여 있다」로 **그 자리에서 끊는다**. 고치기 전에는 첫 원소만 판정하고
+  나머지 여덟을 조용히 껐다(두 판정 축이 모두 「부재」로 읽는다 — 컨테이너 생성 실패와 PATH 부재)
+
+- cmd: 키 대조가 리터럴인지 — 정책 파일에 `sizeXcapYbytes=1` 한 줄을 더해 게이트 실행
+- exit: 1
+- 핵심 결과: **중복 키로 읽지 않는다**(「중복 키」 메시지 0건). 고치기 전에는 키를 정규식으로 읽어
+  `.` 가 와일드카드였다. 남은 exit 1 은 그 측정에서 이미지가 없었던 것뿐이다
+
+- cmd: 같은 파일에 **실제** 중복 `size.cap.bytes=1` 을 더해 게이트 실행
+- exit: 2
+- 핵심 결과: 중복 키로 정확히 끊는다 — 리터럴 대조가 진짜 중복을 놓치지 않는다(양성 대조)
+
+- cmd: 필수 실행 파일 축 변이 — 파생 이미지에서 `curl` 을 지우고 앱 게이트 실행
+- exit: 1
+- 핵심 결과: 「필수 실행 파일 'curl' 이 이 이미지의 PATH 에 없다」 위반 1. 파생 이미지는 측정 뒤 삭제
 
 ## compose · 스모크
 
@@ -81,9 +131,17 @@ post-state 를 담을 수 없다).
 
 - cmd: CI `container` job 의 스모크 블록을 로컬에서 그대로 실행
 - exit: 0
-- 핵심 결과: 프로브 둘 200·키 하나(`status`,UP) · 무인증 401 · 인증 `/api/strategy` 200 ·
-  API 포트 actuator 네 경로가 무인증·인증 둘 다 401/404 · 관리 포트 health 외 열한 경로 404 ·
-  앱 로그에 수집 시작 줄 0
+- 핵심 결과: 프로브 둘 200·키 하나(`status`,UP) · **집계 `/actuator/health` 200·키 둘
+  (`groups`,`status`)·그룹 이름 둘** · 무인증 401 · 인증 `/api/strategy` 200 · API 포트 actuator
+  네 경로가 무인증·인증 둘 다 401/404 · 관리 포트 health 외 **열두** 경로 404(구성 요소 경로 포함) ·
+  **관리 포트 `/error` 200·키 셋 고정** · 앱 로그에 수집 시작 줄 0
+
+- cmd: 수집 판정 술어의 양성·음성 대조 — 2MB 로그(첫 줄에 일치)와 일치 없는 로그를 옛 형태
+  (`printf | grep -q`, `pipefail`)와 새 형태(`case`)에 각각 넣는다
+- exit: 0
+- 핵심 결과: **옛 형태는 일치를 놓쳤다**(대형 로그에서 MISSED — `grep -q` 가 첫 일치에서 나가
+  파이프를 닫고 `pipefail` 이 파이프라인을 비-0 으로 만든다). 새 형태는 CAUGHT/MISSED 를 정확히
+  가른다. 술어가 공허하지 않음과 고침이 실제로 그 축을 닫음을 같은 측정이 함께 든다
 
 - cmd: 자격 값 argv 노출 양성·음성 대조(요청 300회를 돌리며 프로세스 표와 `/proc/*/cmdline` 전수 조회)
 - exit: 0
@@ -116,6 +174,22 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 - cmd: 변이 없는 기준선 — `:app:test`(표적 둘)
 - exit: 0
 - 핵심 결과: 12 test 전건 통과(변이 RED 가 의미를 갖는 전제)
+
+## 변이 — 접두사 거부·배선·자격 축 (D-6A2a-10~13)
+
+표적은 `ManagementSurfaceLockTest`·`ManagementSurfaceBootRefusalTest`(자격 축은
+`PersistencePropertiesTest`). 각 행은 적용 직후 `git diff --numstat` 으로 변이가 실제로 적용됐음을
+확인한 뒤의 결과이고, 측정 뒤 사본 복원 + `git diff --quiet` 로 복원을 확인했다.
+
+| 변이 | numstat | exit | 핵심 결과 |
+|---|---|---|---|
+| 접두사 거부 `check` 블록 삭제 | 0/6 | 1 | 20 중 **8 FAILED** — 거부 단언 전부(순수 환경 5 + 부팅 3). 양성 대조·포트 판정은 초록 |
+| 허용 목록을 `management` 이름공간 전체로 넓힘(집합 + 판정 둘) | 2/2 | 1 | 20 중 **8 FAILED** — 리터럴 집합 단언이 먼저 붉고, 거부 단언 일곱이 함께 붉다 |
+| 잠금 심기를 `addFirst` → `addLast` | 1/1 | 1 | 20 중 **1 FAILED** — 「잠금 뒤에 실체가 채워지는 source 보다 잠금이 우선한다」. 접두사 거부가 그 시점의 소스만 보므로 **순서를 잠그는 단언이 따로 필요하다**는 것이 이 측정이다 |
+| 조립에서 초기화자를 떼고 잠금을 `.properties(...)` 최저 우선순위로 | 3/2 | 1 | 20 중 **3 FAILED** — 부팅 단언 셋만 붉다. 순수 환경 test 는 배선을 보지 않으므로 초록이다(r1 이 잡은 사각 그 자체) |
+| `PersistenceProperties` 를 `data class` 로 되돌림 | 1/1 | 1 | 자격 `toString` 단언 FAILED |
+| `curl` 을 지운 파생 이미지 | 이미지 빌드 | 1 | 위생 게이트 위반 1(필수 실행 파일 부재) |
+| 정책 목록 원소에 공백 | 1/1 | 2 | 정책 오류로 끊는다 |
 
 ## `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT` 실측
 
@@ -156,29 +230,12 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 
 ## acceptance
 
-`check` job 명령 그대로를 **버릴 worktree**에서 한 번씩. 두 번 돌렸다 — 첫 회차(`c4e09b94`)가
-붉었고, 그것이 이 slice 의 유일한 회귀를 잡았다.
-
-**첫 회차(`c4e09b94`)**
-
-- cmd: `./gradlew --no-daemon check --rerun-tasks`
-- exit: 1
-- 핵심 결과: `OperatorAuthenticationTest` 4 test FAILED — actuator 좌표가 test 전용 조립에
-  `RequestMappingHandlerMapping` 빈을 둘로 만들어 타입 주입이 `NoUniqueBeanDefinitionException`
-  으로 깨졌다. **표적 test 만 돌렸을 때는 보이지 않았다.** 시정은 별 커밋(`checklist.md` 의
-  「actuator 좌표가 만든 부수 효과」 절)
-
-- cmd: `./tools/one-command-check.sh`
-- exit: 1
-- 핵심 결과: 같은 원인(첫 명령이 `check` 다)
-
-**둘째 회차(`4facff09` — 마지막 산출물 커밋)**
+`check` job 명령 그대로를 **버릴 worktree**에서 마지막 산출물 커밋(`035311d4`)에 대해 한 번씩.
 
 - cmd: `./gradlew --no-daemon check --rerun-tasks`
 - exit: 0
-- 핵심 결과: BUILD SUCCESSFUL, 348 task 전건 실행(컴파일·ktlint·detekt·sizeGate·
-  domainDependencyGate·architecture test·compatibilitySmoke·contractGate·leakPatternGate·
-  gateExecutionGate 등)
+- 핵심 결과: BUILD SUCCESSFUL(컴파일·ktlint·detekt·sizeGate·domainDependencyGate·architecture test·
+  compatibilitySmoke·contractGate·leakPatternGate·gateExecutionGate 등 전건 실행)
 
 - cmd: `./gradlew --no-daemon qualityBaseline`
 - exit: 0
@@ -188,16 +245,23 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 - exit: 0
 - 핵심 결과: Kotlin 전건 + Python 전건 통과
 
+**전건 `check` 가 표적 test 로는 보이지 않는 것을 두 번 잡았다.** ① actuator 좌표가 test 전용 조립에
+`RequestMappingHandlerMapping` 빈을 둘로 만들어 `OperatorAuthenticationTest` 4 test 를
+`NoUniqueBeanDefinitionException` 으로 깨뜨렸다(시정은 그 조립에서 관리 서버를 끄는 별 커밋,
+`checklist.md` 「actuator 좌표가 만든 부수 효과」). ② 새 코드의 ktlint 위반 둘(체인 줄바꿈 · super
+type 줄바꿈). 둘 다 표적 test 만으로는 초록이었다 — 이것이 부분 게이트를 금지하는 이유의 실측이다.
+
 **`container` job — ci.yml 의 step 을 그 파일에서 뽑아 같은 순서로 한 번**(버릴 worktree
-`4facff09`). 러너 전용 step 셋(checkout·setup-java·setup-gradle)만 건너뛰고, `$GITHUB_ENV`
-전파는 CI 러너의 동작을 흉내 냈다.
+`035311d4`). 러너 전용 step 셋(checkout·setup-java·setup-gradle)만 건너뛰고, `$GITHUB_ENV`
+전파는 CI 러너의 동작을 흉내 냈다(자격 값은 메모리 안에서만 흐르고 파일에 남기지 않았다).
 
 - cmd: `container` job 의 실행 step 열하나 전부
-- exit: 전건 0 (`CONTAINER_JOB_FAILED=0`)
-- 핵심 결과: DB·운영자 자격 값 생성 → ml-serving 이미지(새로 빌드) → 앱 배포물 → 앱 이미지 →
-  위생 둘 통과 → 세 서비스 healthy → 스모크 통과 → 기존 S-24(실 Python 서버 통합) 통과 →
-  볼륨까지 정리. 정리 뒤 이 slice 가 만든 컨테이너 0, 이 호스트의 다른 프로젝트 컨테이너
-  36개는 무접촉
+- exit: **전건 0**
+- 핵심 결과: DB·운영자 자격 값 생성(마스크 뒤) → ml-serving 이미지 → 앱 배포물 → 앱 이미지 →
+  위생 둘 통과(앱: uid 10001 · 금지 실행 파일 9 · **필수 실행 파일 1** · 의존 97/50 · 금지 좌표 13 ·
+  339.4MB) → 세 서비스 healthy → 스모크 통과(집계·`/error`·구성 요소 경로 포함) → S-24 통과 →
+  볼륨까지 정리. 정리 뒤 이 slice 가 만든 컨테이너·네트워크·볼륨 0, 이 호스트의 다른 프로젝트
+  컨테이너는 무접촉(전용 project 이름으로 띄웠다)
 
 기준은 CI job 이 정본이고 PR CI 의 `container` 초록이 필요조건이다.
 
