@@ -77,7 +77,7 @@ verifier 가 출하 이미지에 환경변수 두 줄로 r1 결함 셋을 전부
 
 | ID | 결정 |
 |---|---|
-| **D-6A2a-14** | **같은 판정을 「모든 소스가 선 뒤」에 한 번 더 돈다.** 부모 컨텍스트와 관리 자식 컨텍스트 둘 다에서, refresh 완료 뒤·readiness 가 `ACCEPTING_TRAFFIC` 이 되기 **전에** 검사한다. 위반이면 기동을 실패시킨다(트래픽을 한 번도 받지 않는다). 판정 대상은 이제 **환경의 모든 소스**다(잠금 제외) — 늦은 소스도 포함한다. 조기 검사(D-6A2a-10)는 빠른 실패로 남긴다. **보조로** `server.servlet.context-parameters` 를 거부 접두사에 더한다 — 앱이 쓰지 않고 이 채널의 가장 짧은 경로다. 보조일 뿐이고 주 잠금은 늦은 재검사다. **게이트 술어 변경 → verifier 표적 재검증.** |
+| **D-6A2a-14** | **같은 판정을 「모든 소스가 선 뒤」에 한 번 더 돈다.** 부모 컨텍스트와 관리 자식 컨텍스트 둘 다에서, refresh 완료 뒤·readiness 가 `ACCEPTING_TRAFFIC` 이 되기 **전에** 검사한다. 위반이면 기동을 실패시킨다(트래픽을 한 번도 받지 않는다). 판정 대상은 이제 **환경의 모든 소스**다(잠금 제외) — 늦은 소스도 포함한다. **r3 문면 정정 두 곳**(privacy-gate r3 L-5·verifier r3 L-3·code-review r3 LOW-4, 계약 내용 변경 아님): ① 「트래픽을 한 번도 받지 않는다」는 **readiness 의미**다 — connector 는 이 검사보다 먼저 bind 되므로 정확히는 「readiness 가 수락을 알리기 전에 거부한다」이고, 그 밀리초 창과 조기 거부가 그것을 막고 있다는 사실은 `checklist.md` 제한 18 이 든다. ② 「환경의 모든 소스」는 **refresh 완료 시점에 서 있는** 모든 소스다 — 그 뒤에 서는 소스는 `server.ports`(`local.*`, 거부 대상 밖) 하나다. 조기 검사(D-6A2a-10)는 빠른 실패로 남긴다. **보조로** `server.servlet.context-parameters` 를 거부 접두사에 더한다 — 앱이 쓰지 않고 이 채널의 가장 짧은 경로다. 보조일 뿐이고 주 잠금은 늦은 재검사다. **게이트 술어 변경 → verifier 표적 재검증.** |
 | **D-6A2a-15** | 허용 목록에 **`management.server.address`** 를 더한다. 이 키는 바인드 범위를 **좁히기만** 한다(Boot 기본값은 전 인터페이스). 포트 분리 검사(`ManagementPortType`)는 그대로 선다. 배치 환경이 관리 포트 노출을 진다(`OPEN-6A2A-MGMT-PORT-EXPOSURE`)는 계약과도 맞다. |
 | **D-6A2a-16** | 기동 거부의 운영상 결과를 **알려진 제한 + 6E runbook 입력**으로 적는다. ① 환경에 포트·주소 말고 다른 `MANAGEMENT_*`·`SPRING_JMX_*` 가 있으면 기동을 거부한다. ② k8s 에서 이름이 `management` 인 Service 가 있으면 service link 변수(`MANAGEMENT_SERVICE_HOST` 등)가 자동 주입돼 기동을 거부한다 — 처방은 배치 쪽(`enableServiceLinks: false` 또는 Service 이름)이다. 코드를 좁히지 않는다(좁히면 열거로 돌아간다). |
 | **D-6A2a-17** | 동반 처분. ① `spring.web.error.include-*`(관리 포트 `/error` 본문 확대, privacy-gate L-4) — health 를 넓히지 않지만 같은 늦은 재검사의 거부 접두사 대상인지 구현 레인이 실측해 정한다(`/error` 가 예외·스택을 내면 대상). ② 위생 게이트 목록 원소 판정을 **허용 문자 클래스**로 바꾼다(NBSP 가 공백 종류 열거를 빠져나간 네 번째 라운드 — 열거를 멈춘다). ③ 그 밖의 code-reviewer r2 LOW 는 일괄 처리. |
@@ -205,6 +205,7 @@ out_of_scope:
 | `OPEN-6C-POLICY-GATE-STRUCTURAL` | 재평가 · 유지 | D-6C-11 착수 조건(배포 경로) 미충족 — 이 slice 는 레지스트리·배포를 만들지 않는다 |
 | `OPEN-6A2A-DISTROLESS` | **신설** | 셸·패키지 관리자 없는 런타임 베이스. 헬스체크 명령·디버깅 경로를 함께 바꾸므로 따로 판단 |
 | `OPEN-6A2A-MGMT-PORT-EXPOSURE` | **신설** | 관리 포트 네트워크 노출 통제는 배치 환경이 진다(6E 운영 runbook) |
+| `OPEN-6A2A-PRE-CONNECTOR-CHECK` | **신설**(r3 후보) | 늦은 재검사를 **connector 시작 전**으로 옮겨 `checklist.md` 제한 18 의 밀리초 창 자체를 없앤다(후보 자리: 부모의 `SmartInitializingSingleton` — `onRefresh` 뒤·lifecycle 전. child 는 자기 lifecycle 전 자리가 따로 필요하다). **이 라운드에서 하지 않는다**(팀장 지시) — 지금 그 창에 닿는 경로는 조기 거부가 막고 있고, 자리 이동은 게이트 술어 변경이라 표적 재검증 대상이다 |
 | 6A-2b 로 넘김(무변경) | — | `OPEN-6F9-STRATEGY-WRITE-ENDPOINT` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` · `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` · `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` · `OPEN-API-WRONG-METHOD-500` |
 
 ## 리뷰 레인

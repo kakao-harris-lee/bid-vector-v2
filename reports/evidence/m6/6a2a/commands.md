@@ -242,13 +242,44 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 | 변이 | numstat | exit | 핵심 결과 |
 |---|---|---|---|
 | 조립에서 **늦은 재검사 listener 를 떼어냄** | 0/1 | 1 | 35 중 **1 FAILED** — refresh 를 지나는 거부 test 하나만 붉다. 다른 test 집합은 이 축을 못 본다(그래서 이 test 를 게이트 감시 집합에 등재했다) |
-| 재검사를 **readiness 발행 뒤로 이동**(같은 event 대신 준비 상태 변경 event 를 듣게) | 4/4 | 1 | 35 중 **3 FAILED** — 「재검사는 readiness 가 트래픽을 받기 전에 돈다」 + 출하 조립을 끝까지 띄우는 부팅 test 둘. 셋 다 재검사 자신의 문면(「검사 자리가 readiness 발행보다 뒤로 옮겨졌다」)으로 실패한다 — 자리 이동을 **구조로** 잡는다. 적대 test 하나는 이 변이에서도 초록이므로, 그것만으로는 자리 이동을 볼 수 없다 |
+| 재검사를 **readiness 발행 뒤로 이동**(같은 event 대신 준비 상태 변경 event 를 듣게) | 4/4 | 1 | 35 중 **3 FAILED** — 셋 다 재검사 자신의 readiness 가드 문면으로 실패했다. **이 행의 「구조로 잡는다」는 과잉 주장이었다**(verifier r3 M-1 이 같은 계열의 다른 형태가 살아남음을 실측했다). r3 가 가드를 빼고 test 로 바꿨다 — 아래 「변이 — 자리 이동(r3)」 절이 그 재측정이다 |
 | 조기 거부 `check` 삭제(현재 술어에서 재측정) | 0/1 | 1 | 35 중 **9 FAILED** — 순수 환경 5 + 부팅 축 4. 늦은 재검사는 refresh 전에 끝나는 test 를 구할 수 없다(그래서 두 자리가 서로를 대신하지 않는다) |
 | 운반 이름공간(`server.servlet.context-parameters`)을 거부 집합에서 제거 | 1/1 | 1 | 35 중 **4 FAILED** — 리터럴 집합 단언 + 두 채널 + 대괄호 map 원소. **refresh 를 지나는 거부 test 는 초록이다** — 보조 잠금이 사라져도 주 잠금이 그 위협을 닫는다는 실측이고, 보조가 보조임을 이 행이 보여 준다 |
 
 - cmd: 변이 없는 기준선 — `:app:test`(위 표적)
 - exit: 0
 - 핵심 결과: **35 test 전건 통과**
+
+## 변이 — 자리 이동(r3, verifier r3 M-1)
+
+표적은 같고 기준선은 **37 test 전건 통과**다(r3 가 둘 더했다). 두 변이 모두 **마지막 산출물
+커밋에서** 다시 쟀고, 각 행은 적용 직후 `git diff --numstat` 으로 변이가 실제로 적용됐음을 확인한
+뒤의 결과다. 측정 뒤 복원과 빈 `git status` 를 확인했다.
+
+| 변이 | numstat | exit | 핵심 결과 |
+|---|---|---|---|
+| C 재검사를 `AvailabilityChangeEvent`(수락)로 이동 | 7/3 | 1 | 37 중 **1 FAILED** — 적대 부팅의 기록기 목록이 비지 않는다(원소 둘, 첫째가 `ApplicationStartedEvent`). r2 판에서는 이 형태가 **살아남았다** |
+| D 재검사를 `ApplicationReadyEvent` 로 이동 | 3/2 | 1 | 37 중 **1 FAILED** — 기록기 목록 원소 **하나**, `ApplicationStartedEvent` 뿐 |
+
+**D 의 원소가 하나인 것이 설계 근거의 실측이다.** 옮긴 재검사는 최상위 우선순위로 같은 event 를
+먼저 받아 던지고, multicast 가 그 자리에서 끊겨 기록기는 `ApplicationReadyEvent` 도
+`AvailabilityChangeEvent`(수락)도 **보지 못한다**. 즉 그 둘만 보는 기록기였다면 D 는 초록이었을
+것이다 — 셋 가운데 `ApplicationStartedEvent` 가 순서에 기대지 않고 잡는다.
+
+readiness 가드 변이(r2 의 G)는 **없어졌다** — r3 가 그 가드를 뺐다(발동할 수 없는 코드였다).
+
+## 변이 — 거부 문면의 소스 표지 (r3, privacy-gate r3 L-6)
+
+- cmd: `:app:test --tests '…ManagementSurfaceLockTest'` (표지 구현 전)
+- exit: 1
+- 핵심 결과: 18 중 **1 FAILED** — 소스 이름에 심은 표지가 문면에 그대로 실린다. 같은 실행에서
+  상수 이름 축은 **이미 초록**이다(문면이 소스를 말한다는 양성 대조)
+
+- cmd: 같은 명령(표지 구현 뒤)
+- exit: 0
+- 핵심 결과: 18 전건 통과. 상수 이름 열은 Boot·Spring 상수와 대조해 열 개를 각각 부팅 없이 잰다.
+  상수 밖 소스는 낱말 하나(`other`)로 내려가고, 문면에서 표지 값·호스트 조각·소스 이름 접두가
+  모두 사라짐을 함께 단언한다(가리는 절삭이었다면 뒤 둘은 남는다)
 
 ## `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT` 실측
 
@@ -289,7 +320,7 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 
 ## acceptance
 
-`check` job 명령 그대로를 **버릴 worktree**에서 마지막 산출물 커밋(`8e385cea`)에 대해 한 번씩.
+`check` job 명령 그대로를 **버릴 worktree**에서 마지막 산출물 커밋(r3: `71d2b620`)에 대해 한 번씩.
 
 - cmd: `./gradlew --no-daemon check --rerun-tasks`
 - exit: 0
@@ -304,6 +335,12 @@ PATH 조회 축을 더하고(셸 부재는 판정 불가로 실패) 다시 재 1
 - cmd: `./tools/one-command-check.sh`
 - exit: 0
 - 핵심 결과: Kotlin 전건 + Python 전건 통과
+
+**r3 에서도 전건 `check` 가 표적 test 로는 보이지 않는 것을 두 번 잡았다.** ① `ktlint` 의
+`when` 분기 형태 위반 다섯(표적 test 는 초록이었다). ② **architecture test 의 리플렉션 봉쇄
+규칙** — 소스 표지를 소스 클래스의 단순 이름으로 만들려 한 첫 판이 `bidvector.app` 의 「`Class`
+접근은 이름 조회로 한정」(D-6F8-13 F2-2)에 걸렸다. 그 규칙을 넓히지 않고 표지를 낱말 하나로
+바꿨다 — 게이트가 설계 선택을 **좁힌** 사례이고, 6F-8 이 세운 규칙이 이 slice 를 실제로 잡았다.
 
 **r2 에서도 전건 `check` 가 표적 test 로는 보이지 않는 것을 두 번 잡았다.** ① `jarContentGate` —
 판정 시퀀스의 `filterIsInstance` 가 reified inline 이라 stdlib 의 람다 클래스가 이 모듈 아카이브에
@@ -320,15 +357,17 @@ r1 에서 전건 `check` 가 잡은 것 둘. ① actuator 좌표가 test 전용 
 type 줄바꿈). 둘 다 표적 test 만으로는 초록이었다 — 이것이 부분 게이트를 금지하는 이유의 실측이다.
 
 **`container` job — ci.yml 의 step 을 그 파일에서 뽑아 같은 순서로 한 번**(버릴 worktree
-`8e385cea`). 러너 전용 step 셋(checkout·setup-java·setup-gradle)만 건너뛰고, 값 생성 step 둘은
+`71d2b620`). 러너 전용 step 셋(checkout·setup-java·setup-gradle)만 건너뛰고, 값 생성 step 둘은
 같은 명령(`openssl rand`)으로 **실행 셸의 메모리에만** 뒀다(`$GITHUB_ENV` 가 없는 자리다 — 파일을
-만들지 않는다). 컨테이너·compose project 는 전용 접두사를 썼다.
+만들지 않는다). 컨테이너·compose project 는 전용 접두사를 썼다. 실행 로그에 40·48자 hex 단독
+토큰은 0 이고 로그·임시 파일은 판정 뒤 파기했다.
 
 - cmd: `container` job 의 실행 step 열둘 전부(r2 가 거부 스모크 하나를 더했다)
 - exit: **전건 0**
 - 핵심 결과: 자격 값 생성 → ml-serving 이미지 → 앱 배포물 → 앱 이미지 → 위생 둘 통과(앱: uid 10001 ·
   금지 실행 파일 9 · 필수 실행 파일 1 · 의존 97/50 · 금지 좌표 13 · 339.4MB / ml-serving 336.1MB) →
-  **거부 스모크 통과**(출하 이미지가 verifier 의 환경변수 한 줄을 거부, 사유까지 확인) → 세 서비스
+  **거부 스모크 통과**(출하 이미지가 verifier 의 환경변수 한 줄을 `D-6A2a-10` 사유로 거부 — r3 가
+  사유를 그 하나로 좁혔다: 이 입력의 정규형은 조기 거부에 먼저 걸린다) → 세 서비스
   healthy → 스모크 통과(집계·`/error`·구성 요소 경로 포함, 고친 전송 오류 helper 로) → S-24 통과 →
   볼륨까지 정리. 정리 뒤 이 slice 가 만든 컨테이너·네트워크·볼륨 0, 이 호스트의 다른 프로젝트
   컨테이너는 무접촉. 실행 로그에 40·48자 hex **단독 토큰 0**(64자 단독 토큰 열은 이미지 다이제스트)이고

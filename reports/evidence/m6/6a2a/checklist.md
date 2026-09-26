@@ -28,10 +28,10 @@
 | `object`/companion 주입 자리 | 새로 만들지 않는다 | 새 `object`·`companion object` 0 — 잠금은 top-level `val`·함수와 `ApplicationContextInitializer` 하나다 |
 | **(r1 신설) 공개 Kotlin 표면 셋** — 거부 대상 이름공간 집합 · 배치 자유 키 집합 · 잠금 밖 키 조회 함수 | 같은 모듈의 test 가 읽는다. 런타임에 값을 **바꿀 수는 없다**(top-level `val`, 재대입 불가) | 경계로 처리 — 조회 함수는 **키 이름만** 돌려주고 값을 담지 않는다(거부 문면도 같다). 세 이름의 리터럴과 포함 관계를 test 가 단언하므로 조용한 확장이 없다 |
 | **(r1 신설) 위생 정책 키 `required.executables`** | 정책 파일 편집자가 필수 도구 목록을 정한다 | 경계로 처리 — 정책 파일은 저장소 안이고 값 모양 검증을 받는다(빈 값·공백 섞인 원소·중복 키는 정책 오류로 끊는다). 부재 판정은 이미지 안 PATH 조회이고, 셸이 없으면 **판정 불가로 실패**한다 |
-| **(r2 신설) 늦은 재검사 공개 표면 둘** — refresh 뒤 판정 함수 · 그것을 얹는 listener | 조립 근과 같은 모듈의 test 가 읽는다. 런타임에 끌 수 없다(스위치를 만들지 않았다) | 경계로 처리 — 함수는 `ApplicationContext` 하나를 받고 **아무 값도 돌려주지 않는다**(위반이면 던진다). 판정 대상은 환경의 모든 소스(잠금 제외)이고, 문면에는 키 이름과 **그 키를 실은 소스 이름**만 실린다(소스 이름은 값이 아니다). listener 의 우선순위는 `@Order` 로 준다(인터페이스 수 래칫) |
+| **(r2 신설) 늦은 재검사 공개 표면 둘** — refresh 뒤 판정 함수 · 그것을 얹는 listener | 조립 근과 같은 모듈의 test 가 읽는다. 런타임에 끌 수 없다(스위치를 만들지 않았다) | 경계로 처리 — 함수는 `ApplicationContext` 하나를 받고 **아무 값도 돌려주지 않는다**(위반이면 던진다). 판정 대상은 **refresh 완료 시점에 서 있는** 모든 소스(잠금 제외)다(r3 정정 — 그 뒤에 서는 소스는 `local.` 이름공간뿐인 `server.ports` 하나이고 거부 대상 밖이다). 문면에는 키 이름과 **소스 표지**만 실린다 — **소스 이름은 값을 실을 수 있어서**(r3 정정, privacy-gate r3 L-6: 설정 데이터 소스 이름은 운영자가 준 location 원문을 담고 URL 이면 userinfo 가 그 안에 남는다) 상수 이름만 그대로 나가고 그 밖은 낱말 하나(`other`)다. listener 의 우선순위는 `@Order` 로 준다(인터페이스 수 래칫) |
 | **(r2 확대) 배치 자유 키 집합** — 하나 → 둘(`management.server.address` 추가) | 배치가 관리 리스너의 **바인드 범위를 좁힐** 수 있다 | 경계로 처리 — 이 키는 넓힐 방향이 없다(Boot 기본값이 전 인터페이스). 포트 분리 판정은 그대로 서고, 리터럴 집합 단언 + 부팅 양성 대조가 둘을 고정한다 |
 | **(r2 확대) 거부 이름공간 집합** — 둘 → 넷(`server.servlet.context-parameters` · `spring.web.error`) | 없음(거부만 늘린다) | 닫는다 — 앱이 둘 다 쓰지 않는다. 늘린 결과는 **기동 거부의 확대**이고 그 운영상 결과를 알려진 제한 15·16 이 적는다 |
-| **(r2 신설) CI 컨테이너 축의 거부 스모크(S-22c)** | 없음(게이트다) | 출하 이미지에서 verifier 의 환경변수 한 줄을 거부시키고 **사유까지** 요구한다 — 종료 코드만 보면 DB 부재로도 참이 된다(음성 대조 실측) |
+| **(r2 신설) CI 컨테이너 축의 거부 스모크(S-22c)** | 없음(게이트다) | 출하 이미지에서 verifier 의 환경변수 한 줄을 거부시키고 **사유까지** 요구한다 — 종료 코드만 보면 DB 부재로도 참이 된다(음성 대조 실측). **r3 정정**: 이 입력이 재는 것은 **조기 거부(D-6A2a-10)** 다(정규형이 운반 이름공간이라 초기화자가 먼저 끊는다). 사유를 그 하나로 좁혔고 step 이름도 바꿨다 — 늦은 재검사를 재는 것은 `ManagementSurfaceLateSourceRefusalTest` 뿐이다 |
 | **(r1 축소) `PersistenceProperties` 의 `data class` 합성 멤버** | — | `equals`/`hashCode`/`copy`/구조 분해/`toString(원문)` 이 **사라졌다**. 표면이 줄었고 호출 자리 전수 확인으로 쓰는 곳이 없음을 확인했다 |
 
 ## 계약이 남긴 자리 — 구현 레인의 결정
@@ -107,7 +107,7 @@ Mapping` 이고 actuator endpoint 는 애초에 그 매핑에 없다(별 매핑�
 
 | finding | 처분 | 무엇이 막는가 |
 |---|---|---|
-| verifier F-1r (high) · privacy-gate M-2 (medium) — 늦게 채워지는 소스가 접두사 거부를 우회한다 | **고쳤다(시점)** — 같은 술어를 refresh 뒤 **부모·관리 child 둘**에서 다시 돈다(D-6A2a-14). 채널 열거를 쓰지 않았다 | `ManagementSurfaceLateSourceRefusalTest` 가 서블릿 컨텍스트에 init-param 을 **직접** 심어 refresh 를 지나는 거부를 단언한다(「관리 child 의 refresh 를 보았다」가 refresh 통과의 표지 — child 는 부모 `finishRefresh` 의 lifecycle 단계에서 선다). 보조로 운반 이름공간을 조기 거부. 변이: 재검사 배선 제거 → 1 FAILED · 재검사를 readiness 뒤로 이동 → 3 FAILED · 운반 이름공간 제거 → 4 FAILED. 컨테이너 축: CI 스모크 S-22c |
+| verifier F-1r (high) · privacy-gate M-2 (medium) — 늦게 채워지는 소스가 접두사 거부를 우회한다 | **고쳤다(시점)** — 같은 술어를 refresh 뒤 **부모·관리 child 둘**에서 다시 돈다(D-6A2a-14). 채널 열거를 쓰지 않았다 | `ManagementSurfaceLateSourceRefusalTest` 가 서블릿 컨텍스트에 init-param 을 **직접** 심어 refresh 를 지나는 거부를 단언한다(「관리 child 의 refresh 를 보았다」가 refresh 통과의 표지 — child 는 부모 `finishRefresh` 의 lifecycle 단계에서 선다). 보조로 운반 이름공간을 조기 거부. 변이: 재검사 배선 제거 → 1 FAILED · 운반 이름공간 제거 → 4 FAILED · **자리 이동 둘 → 각각 1 FAILED**(r3 의 기록기 단언이 잠근다 — r2 의 「3 FAILED」는 발동할 수 없는 가드가 낸 것이어서 같은 계열의 다른 형태가 살아남았다). **컨테이너 축(S-22c)은 이 축을 재지 않는다**(r3 정정, code-review r3 LOW-1) — 그 입력은 조기 거부에 먼저 걸리고, 오늘 이미지 밖에서 늦은 재검사에 닿을 채널은 없다. 늦은 재검사를 재는 것은 저 test 뿐이고(게이트 감시 집합 등재) 방어 대상은 **미래의 늦은 소스**다 |
 | verifier L-1 · code-review MEDIUM-1 — 노출 통제의 가장 싼 손잡이를 잠금이 함께 거부한다 | **고쳤다**(D-6A2a-15) — `management.server.address` 를 배치 자유 키로 | 이 키는 표면을 좁히기만 한다(Boot 기본값이 전 인터페이스). 리터럴 집합 단언 + 부팅 양성 대조(주소만 더한 환경은 잠금을 통과한다). 포트 분리 판정은 그대로 |
 | code-review MEDIUM-2 — 접두사 거부가 Spring 속성이 아닌 환경변수(k8s service link)도 잡는다 | **등재**(D-6A2a-16) — 코드를 좁히지 않는다 | 알려진 제한 15·16 과 아래 「6E runbook 입력」. 바인딩 가능한 Boot 키만 열거하는 쪽으로 좁히면 이 라운드가 고친 열거 결함이 돌아온다 |
 | privacy-gate L-4 — `spring.web.error.include-*` 가 관리 포트 `/error` 본문을 넓힌다 | **실측하고 고쳤다**(D-6A2a-17 ①) — `spring.web.error` 를 거부 이름공간에 | 실측: `include-message=always` 하나로 관리 포트 `/error` 본문 키가 셋에서 넷으로 늘었다(`message`). 그 이름공간이 예외 클래스·스택 포함까지 정한다(관리 child 의 오류 endpoint 가 `spring.web` 바인딩을 읽는다 — 바이트코드 실독). 두 채널 부팅 거부 test |
@@ -118,6 +118,26 @@ Mapping` 이고 actuator endpoint 는 애초에 그 매핑에 없다(별 매핑�
 | code-review LOW-5 — HOME 이 root 소유·읽기 전용 자리를 가리킨다 | **고쳤다** | `--home-dir /nonexistent`. 이미지의 `getent passwd` 실측 + 위생 게이트 전건 통과 |
 | code-review LOW-6 — 불필요한 `stream().toList()` · 두 겹 가변 누적 | **고쳤다** | 시퀀스 한 줄기. 단 `filterIsInstance` 는 쓰지 않는다 — reified inline 이라 stdlib 람다 클래스가 이 모듈 아카이브에 복사되고 `jarContentGate` 가 「게이트를 통과한 소스가 아니다」로 끊는다(전건 `check` 가 잡았다) |
 | verifier L-2 — 공유 scratchpad 의 잔여 자격 파일 | 저장소 밖 위생(팀장이 삭제) | 이 라운드의 로컬 `container` 재현은 값을 **파일에 두지 않는다** — 값 생성 step 둘을 같은 명령으로 실행 셸의 메모리에만 두고(`$GITHUB_ENV` 가 없는 자리), 실행 로그에 40·48자 hex 단독 토큰이 0 임을 확인한 뒤 임시 파일을 파기했다 |
+
+## r3 판정 → 처분
+
+세 레인 finding 전부의 처분이다(verifier `ready-for-review` M-1·L-1~3 · privacy-gate `pass`
+L-5·L-6 · code-review `APPROVE` LOW-1~7). 승인 전 일괄 배치라 계약 갱신은 없다 — 아래 문면 정정과
+test·게이트 보강뿐이다.
+
+| finding | 처분 | 무엇이 막는가 |
+|---|---|---|
+| verifier M-1 — 재검사 **자리**를 옮겨도 전 test 초록(「자리 이동을 구조로 잡는다」가 성립하지 않았다) | **고쳤다(test)** — 적대 부팅이 `ApplicationStartedEvent`·`ApplicationReadyEvent`·`AvailabilityChangeEvent`(수락)를 **한 번도 내지 않았음**을 기록기로 단언한다 | 변이 C(수락 event 로 이동)·D(ready event 로 이동)가 각각 **1 FAILED**(`commands.md` 「변이 — 자리 이동(r3)」). 셋을 함께 보는 이유도 실측이다 — D 에서는 옮긴 재검사가 같은 event 에서 먼저 던져 multicast 를 끊으므로 뒤 둘은 관측되지 않는다 |
+| verifier L-2 — readiness 가드와 `@Order` 를 어떤 test 도 잠그지 않는다 | **가드를 뺐다** | 가드는 발동할 수 없었다(같은 event 를 받는 가용성 bean 이 이 listener **뒤에** 상태를 기록한다). 죽은 코드가 구조적 방어로 읽히는 것을 없애고, 같은 성질을 위 기록기 단언이 실제로 잠근다. `@Order` 는 그대로 두고 잠기지 않는다는 사실을 제한 19 에 적는다 |
+| privacy-gate L-6 · code-review LOW-2 — 거부 문면의 **소스 이름**이 값을 실을 수 있다 | **고쳤다(구성) + 문면 정정** — 상수 이름만 그대로, 그 밖은 낱말 하나(`other`) | RED→GREEN 실측(`commands.md` 「변이 — 거부 문면의 소스 표지」). 상수 이름 열은 test 가 Boot·Spring 상수와 대조한다. 이 열거는 **공개하는 쪽**이라 fail-closed 다 — 빠뜨린 이름은 문면 품질만 떨어뜨리고 표면을 열지 않는다. 클래스 이름 형태는 리플렉션 봉쇄 규칙이 막았다(`commands.md` acceptance 절) |
+| privacy-gate L-5 · verifier L-3 — 「트래픽을 한 번도 받지 않는다」가 사실이 아니다 | **문면 정정 + 등재** | 제한 18. KDoc ③ 과 test 이름을 「readiness 가 수락을 알리기 전」으로 좁혔다. 재검사 시점의 503 자체가 connector 가 이미 bind 됐다는 증거다. 조기 거부가 **실질 방어의 일부**임을 같은 제한에 적는다. `SmartInitializingSingleton` 이동은 이 라운드에서 하지 않고 OPEN 후보로 남긴다(`scope.md` OPEN 표) |
+| code-review LOW-1 — S-22c 가 받을 수 있는 둘 가운데 하나만 도달 가능하고 처분표가 이 스모크를 늦은 재검사의 잠금으로 적는다 | **고쳤다(좁힘) + 재귀속** | `case` 를 `D-6A2a-10` 하나로 좁히고 step 이름을 재는 것에 맞췄다. (2b) 표의 S-22c 행과 위 r2 F-1r 행이 이제 조기 거부 쪽을 가리킨다. **오늘 이미지 밖에서 늦은 재검사에 닿을 채널은 없다**(설정 데이터·명령행·JSON 은 초기화자보다 앞에 서고 배포물에 `web.xml`·JNDI 가 없다) — 그 재검사는 미래의 늦은 소스에 대한 방어다 |
+| code-review LOW-3 — child 축의 거부는 `IllegalStateException` 이 아니다 | **KDoc 한 줄** | 부모 축은 그대로 올라오고 child 축은 `DefaultLifecycleProcessor` 가 `ApplicationContextException` 으로 감싼다 — child 축 test 에서 `shouldThrow<IllegalStateException>` 은 공허해진다 |
+| code-review LOW-4 — 「판정 대상은 환경의 **모든** 소스」가 한 칸 넓다 | **문면 정정** | 「refresh 완료 시점에 서 있는 모든 소스」로 좁혔다(KDoc · `scope.md` D-6A2a-14 · 위 (2b) 행 · 제한 9). 그 뒤에 서는 유일한 소스가 `server.ports`(`local.*`, 거부 대상 밖)라는 사실을 함께 적는다 |
+| code-review LOW-5 — readiness 가드가 기동 뒤의 정상 refresh 도 거부한다 | **원인을 없앴다** | 가드 제거로 이 축이 사라졌다(제한 9 의 전제에 매달 필요가 없어졌다). 두 번째 refresh 가 생기면 늦은 재검사는 같은 술어를 한 번 더 도는 것이 전부다 |
+| code-review LOW-6 — S-22c 가 실패할 때 컨테이너 로그를 버린다 | **고쳤다** | 세 실패 분기가 **고정 표지 줄만** 낸다(`D-6A2a-`·Boot 의 기동 실패 표지). 전문을 찍지 않는 이유는 뒤 편집이 실 값을 붙이는 날이다 |
+| code-review LOW-7 — `_mgmt` 의 군더더기 서브셸 · 「좌표」 키의 문면 | **고쳤다** | `$'…'` 형태(위 두 helper 와 같아진다) · 정책 주석에 「값은 좌표 전문이 아니라 이름 조각이고 `:` 는 허용 문자 밖」 |
+| verifier L-1 — 관리 child 축은 배선으로만 덮인다(부모만 판정하는 변이가 살아남는다) | **등재** | 제한 19. 환경만으로 도달 가능한 child 전용 적대 소스를 verifier 가 **구성하지 못했다**(그 입구는 조기 거부가 막는다) — 그래서 지금 표면을 여는 편차는 아니다. child 서블릿 컨텍스트에만 init-param 을 심는 test 는 이 라운드 범위 밖이다 |
 
 ## 알려진 제한
 
@@ -152,10 +172,13 @@ Mapping` 이고 actuator endpoint 는 애초에 그 매핑에 없다(별 매핑�
    이미지에서 재현). `addFirst` 가 지키는 것은 잠금이 **이름 댄 키**뿐이다 — 「닫혔다」가 아니라 「그
    키에 대해서는 순서가 이긴다」가 정확한 문장이고, `ManagementSurfaceLockTest` 가 그 형태와 그 한계를
    각각 잰다(`addLast` 로 바꾸면 붉다 · 형제 키는 증인 test 가 실측한다). 늦은 재검사(D-6A2a-14)가
-   같은 술어를 **부모와 관리 child 환경 둘**에서 다시 돌아 그 축을 닫고, 거부는 readiness 가 트래픽을
-   받기 전에 난다(실측: 재검사 시점 503, 기동 완료 뒤 200). 남는 제한은 **그 자리 뒤에 값을 바꾸는
+   같은 술어를 **부모와 관리 child 환경 둘**에서 다시 돌아 그 축을 닫고, 거부는 readiness 가
+   **수락을 알리기 전**에 난다(r3 정정 — 제한 18; 실측: 재검사 시점 503, 기동 완료 뒤 200). 재검사의
+   모집단은 **refresh 완료 시점에 서 있는** 모든 소스다(r3 정정 — 그 뒤에 서는 소스는 `local.`
+   이름공간뿐인 `server.ports` 하나이고 거부 대상 밖이다). 남는 제한은 **그 자리 뒤에 값을 바꾸는
    경로**인데 이 조립에는 없다 — `@ConfigurationProperties` 재바인딩 경로(refresh scope · config
-   client)를 쓰지 않는다.
+   client)를 쓰지 않는다. 그 경로가 생기면 재검사는 같은 술어를 한 번 더 도는 것이 전부다(r3 가
+   readiness 가드를 뺐으므로 정상 refresh 를 기동 실패로 바꾸는 축은 없다).
 10. **이름 기반 보조 판정 둘은 그대로 우회된다**(D-6A2a-13 ③, verifier r1 F-6). 이름을 바꾼 test jar 를
    의존 layer 에 넣거나 PATH 밖 절대 경로에 컴파일러를 두면 위생 게이트의 ②·① 축이 「부재」로 읽는다.
    계약 (1) 이 이 둘을 처음부터 **보조·열거**로 선언했고 주 잠금은 각각 「`bootJar` 는 `runtimeClasspath`
@@ -189,6 +212,29 @@ Mapping` 이고 actuator endpoint 는 애초에 그 매핑에 없다(별 매핑�
 17. **관리 포트 값에 숫자가 아닌 값을 주면 Boot·Spring 의 변환 실패 문면에 그 값이 실린다**(privacy-gate
     r2 Info). 포트·주소 둘은 타입 있는 키이고, 변환 실패 보고는 값을 절삭해 문면에 낸다 — 이 slice 가
     만든 거동이 아니라 타입 있는 모든 키에서 같다. 자격 값을 이 키에 잘못 넣는 경우가 그 노출 경로다.
+18. **늦은 재검사는 관리 포트 connector 가 이미 bind 된 뒤에 돈다**(r3 — privacy-gate r3 L-5 ·
+    verifier r3 L-3). 계약 D-6A2a-14 의 「트래픽을 한 번도 받지 않는다」는 **readiness 의미**로 읽는다:
+    거부는 readiness 가 `ACCEPTING_TRAFFIC` 을 알리기 전에 나고, 그 전의 프로브는 503 이다. 그러나
+    `finishRefresh` 의 lifecycle 단계가 이 event 보다 앞이라 관리 포트는 재검사보다 **먼저 열린다** —
+    이 slice 의 test 자신이 재검사 시점에 관리 포트로 요청을 보내 503 을 받는 것이 그 증거다. 그
+    밀리초 창에서 부모의 늦은 소스가 그룹 형제 키를 실었다면 `/actuator/health/readiness` 의 503
+    본문에 구성 요소 이름 수준의 세부가 실릴 수 있다(창이 닫히면 프로세스가 죽는다). **지금 그 창에
+    닿는 유일한 경로는 조기 거부가 막고 있다** — 그러므로 계약이 「보조」로 이름 붙인 조기 거부
+    (D-6A2a-10, 운반 이름공간 포함)는 이 축에서 **실질 방어의 일부**다. 창 자체를 없애는 형태
+    (connector 시작 전 판정)는 `OPEN-6A2A-PRE-CONNECTOR-CHECK` 로 남겼다.
+19. **잠기지 않는 형태 둘을 사실로 적는다**(r3 — verifier r3 L-1·L-2). ① **관리 child 축**: 부모만
+    판정하는 변이는 표적 test 전건 초록이다. 환경만으로 도달 가능한 child 전용 적대 소스는 verifier 가
+    **구성하지 못했고**(그 입구인 서블릿 컨텍스트 이름공간은 조기 거부가 막는다) child 축 보증은
+    배선 표지와 음성 대조(정상 환경은 거부되지 않는다)뿐이다 — 「부모·child **둘 다**」라는 계약
+    문면을 잠그려면 child 서블릿 컨텍스트에만 init-param 을 심는 test 가 필요하다. ② **listener
+    우선순위(`@Order`)**: 제거 변이가 초록이다. 이 slice 에는 같은 event 로 위반 상태에 먼저 반응하는
+    listener 가 없어 거동 차이를 만들 자리가 없다.
+20. **거부 문면은 상수 이름이 아닌 소스를 낱말 하나(`other`)로 말한다**(r3). 운영자가 「어느 채널로
+    들어왔는가」를 문면에서 바로 읽을 수 있는 것은 그 소스가 Boot·Spring 의 상수 이름을 갖는 경우다
+    (환경변수·시스템 속성·명령행·`SPRING_APPLICATION_JSON`·서블릿 init-param 둘·JNDI·`random`·
+    기본값·`server.ports` — 오늘 이 앱이 실제로 쓰는 채널 전부가 여기 있다). 설정 데이터·설정 트리
+    채널은 앱이 쓰지 않고, 그 이름에는 운영자가 정한 위치 문자열이 들어가므로 **일부러 싣지 않는다**.
+    소스 클래스로 분류를 쪼개는 형태는 `bidvector.app` 의 리플렉션 봉쇄 규칙이 막는다(D-6F8-13 F2-2).
 
 ## 6E runbook 입력 (D-6A2a-16 — 배치 쪽 처방)
 
@@ -203,8 +249,12 @@ Mapping` 이고 actuator endpoint 는 애초에 그 매핑에 없다(별 매핑�
 3. 관리 포트의 **네트워크 노출 통제는 배치가 진다**(`OPEN-6A2A-MGMT-PORT-EXPOSURE`). 앱 쪽 수단은
    `MANAGEMENT_SERVER_ADDRESS` 로 바인드 범위를 좁히는 것 하나이고, 그 밖은 NetworkPolicy·방화벽이다.
    compose 는 관리 포트를 host 에 publish 하지 않는다.
-4. 기동이 거부되면 **문면이 키 이름과 소스 이름을 말한다** — 같은 키가 환경변수·명령행·서블릿
-   init-param 어디로 들어왔는지가 그 줄에 있다. 값은 문면에 실리지 않는다.
+4. 기동이 거부되면 **문면이 키 이름과 소스 표지를 말한다** — 같은 키가 환경변수·명령행·서블릿
+   init-param 어디로 들어왔는지가 그 줄에 있다(Boot 상수 이름을 갖는 소스는 그 이름으로, 그 밖은
+   `other` 로 — 제한 20). 속성 값도, 소스 이름이 담을 수 있는 설정 위치 문자열도 실리지 않는다.
+5. **설정 위치 경로·URL 에 비밀값을 담지 않는다.** `spring.config.location`·`additional-location`·
+   `import` 의 문자열은 Boot 의 실패 문면 여럿에 실린다(이 slice 의 거부 문면은 싣지 않지만 Boot
+   자신의 설정 데이터 실패 보고는 싣는다). URL 형태의 import 라면 userinfo·쿼리 토큰을 쓰지 않는다.
 
 ## 신규 파일 ↔ in_scope 대조
 
@@ -220,6 +270,11 @@ Mapping` 이고 actuator endpoint 는 애초에 그 매핑에 없다(별 매핑�
 | `app/src/test/kotlin/bidvector/app/wiring/PersistencePropertiesTest.kt`(r1) | `app/src/test/kotlin/bidvector/app/**` | 안 |
 | `app/src/test/kotlin/bidvector/app/management/ManagementSurfaceLateSourceRefusalTest.kt`(r2) | `app/src/test/kotlin/bidvector/app/**` | 안 — 게이트 감시 집합(`config/quality/gate-tests.properties`)에도 등재했다 |
 | `reports/evidence/m6/6a2a/{checklist,commands,rollback}.md` | `reports/evidence/m6/6a2a/**` | 안 |
+
+**r3 은 신규 파일을 만들지 않았다** — 만진 경로 다섯(`ci.yml` · `ManagementSurface.kt` ·
+`ManagementSurfaceLockTest.kt` · `ManagementSurfaceLateSourceRefusalTest.kt` ·
+`image-hygiene-policy-app.properties`)이 전부 위 표와 in_scope 안에 이미 있다(`git diff
+--name-status` 로 대조했다 — 신규 0).
 
 **in_scope 밖으로 나가지 않았다** — 계약이 예비로 열어 둔 `build-logic/**` 은 **건드리지 않았다**
 (좌표 목록은 `app/build.gradle.kts` 의 `compatibilitySmoke.expectedModules` 에만 더했다).

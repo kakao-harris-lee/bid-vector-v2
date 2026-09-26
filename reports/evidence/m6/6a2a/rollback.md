@@ -1,6 +1,6 @@
 # M6/6A-2a — 되돌림
 
-실측 HEAD: `8e385cea` (이 slice 의 **마지막 산출물 커밋**)
+실측 HEAD: `71d2b620` (이 slice 의 **마지막 산출물 커밋**)
 
 base: `4dc17214`(착수 실측, `git merge-base HEAD origin/main`). 아래 목록은 손으로 쓰지 않고
 `git diff --name-status <base>..HEAD` 에서 기계적으로 냈다. **라운드마다 파일이 늘면 이 절차를
@@ -15,7 +15,9 @@ base: `4dc17214`(착수 실측, `git merge-base HEAD origin/main`). 아래 목�
 `tools/image-hygiene-check.sh`·`app/build.gradle.kts`)도 이 range 에서는 이 slice 만 만졌다.
 **수정 라운드가 만든 새 파일 셋**(적대 부팅 test · 자격 `toString` test · 늦은 소스 거부 test)도 같은
 확인을 받았고 `in_scope` 안이다(`checklist.md` 신규 파일 대조표). 라운드마다 이 확인을 다시 돌린다 —
-r2 는 신설 하나가 늘어 **A 9 · M 16** 이 됐다(r1 은 A 8 · M 16).
+r2 는 신설 하나가 늘어 **A 9 · M 16** 이 됐고(r1 은 A 8 · M 16), **r3 는 신규 파일이 0 이라 같은
+A 9 · M 16 이다**(r3 가 만진 다섯 경로 전부가 이미 목록 안이다). 이 수치는 r3 의 마지막 산출물
+커밋에서 `git diff --name-status <base>..HEAD` 를 다시 돌려 냈다.
 팀장 레인 커밋은 `milestone-6.md`(착수 문단)와 `reports/evidence/m6/6a2a/scope.md`(착수 계약)
 둘이고 **둘 다 되돌리지 않는다**(아래 절).
 
@@ -95,8 +97,9 @@ git status --porcelain -- CLAUDE.md .claude/     # 빈 출력(하네스 경로 �
 
 ## 실측 (임시 worktree)
 
-실측 HEAD `8e385cea` 에서 만든 버릴 worktree 에서 ①~⑥ 을 끝까지 실행했다(앞 라운드 실측을 옮기지
-않았다 — 되돌림 대상이 신설 하나 늘었고 수정 쪽 파일 넷이 이 라운드에 다시 움직였다).
+실측 HEAD `71d2b620` 에서 만든 버릴 worktree 에서 ①~⑥ 을 끝까지 다시 실행했다(앞 라운드 실측을
+옮기지 않았다 — 되돌림 대상 가운데 넷이 r3 에서 다시 움직였다: `ci.yml` · 관리 표면 조립 근 ·
+잠금 test · 늦은 소스 test. 목록 자체는 바뀌지 않았다).
 
 | 단계 | 명령 | exit | 핵심 결과 |
 |---|---|---|---|
@@ -105,9 +108,9 @@ git status --porcelain -- CLAUDE.md .claude/     # 빈 출력(하네스 경로 �
 | ③ | 위 `git diff`/`git status` 셋 | 0 | **내 줄 사라짐** — 되돌린 경로의 base 대비 diff 0바이트, 즉 되돌린 트리가 base 트리와 **같다**(갈음 기준은 「HEAD 초록」이 아니라 이 트리 동일성이다) · **남의 줄 남음** — `milestone-6.md` 의 base 대비 diff 2018바이트(팀장 문단 보존) · 하네스 경로 무편집(빈 출력) |
 | ④ | `:app:compileKotlin :app:compileTestKotlin` | 0 | 되돌린 트리가 컴파일된다 |
 | ⑤ | `:app:test` | 0 | 되돌린 트리의 test 초록 |
-| ⑥ | `check` | 0 | **게이트 전건 초록**(433 task 줄) — `gateExecutionGate` 가 되돌린 감시 집합과 되돌린 test 집합의 짝을 받아들이고, 되돌리지 않은 evidence 디렉터리도 누출 패턴 게이트를 붉히지 않는다 |
+| ⑥ | `check` | 0 | **게이트 전건 초록**(348 actionable task) — `gateExecutionGate` 가 되돌린 감시 집합과 되돌린 test 집합의 짝을 받아들이고, 되돌리지 않은 evidence 디렉터리도 누출 패턴 게이트를 붉히지 않는다 |
 
-**verifier 가 대조할 술어**: `git diff --name-only 8e385cea..<판정 SHA> -- <위 ①②의 경로들>` 이
+**verifier 가 대조할 술어**: `git diff --name-only 71d2b620..<판정 SHA> -- <위 ①②의 경로들>` 이
 빈 출력이면 이 실측이 유효하다(「실측 HEAD == 판정 SHA」가 아니다 — evidence 커밋은 언제나 뒤에 온다).
 이 slice 의 뒤 커밋은 `reports/evidence/m6/6a2a/**` 만 만지고 그 경로는 되돌림 대상이 아니므로
 (위 「되돌리지 않는 것」) 빈 출력이어야 한다.
