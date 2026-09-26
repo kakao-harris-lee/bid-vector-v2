@@ -1,8 +1,6 @@
 package bidvector.app
 
 import org.springframework.boot.actuate.autoconfigure.web.server.ManagementPortType
-import org.springframework.boot.availability.ApplicationAvailability
-import org.springframework.boot.availability.ReadinessState
 import org.springframework.boot.context.properties.source.ConfigurationPropertyName
 import org.springframework.boot.context.properties.source.ConfigurationPropertySources
 import org.springframework.boot.context.properties.source.IterableConfigurationPropertySource
@@ -196,7 +194,15 @@ fun lockManagementSurface(environment: ConfigurableEnvironment) {
 }
 
 /**
- * **모든 소스가 선 뒤** 같은 술어를 한 번 더 돈다(D-6A2a-14). [lockManagementSurface] 의 모집단은
+ * **refresh 완료 시점에 서 있는 모든 소스**를 대상으로 같은 술어를 한 번 더 돈다(D-6A2a-14).
+ *
+ * 「모든 소스」가 아니라 이렇게 적는다(r3 정정 — code-review r3 LOW-4): `finishRefresh()` 는
+ * `ContextRefreshedEvent` 를 발행한 **뒤에** web server 를 띄우고, 그 event 에서
+ * `ServerPortInfoApplicationContextInitializer` 가 소스 하나(`server.ports`)를 더한다. 그 소스의
+ * 키는 `local.` 이름공간뿐이라 거부 대상 밖이고 관리 표면을 넓힐 수 없다 — 그래서 위험은 0 이지만,
+ * 「모든 소스」라고 적으면 뒤 slice 가 그 문장을 근거로 쓴다.
+ *
+ * [lockManagementSurface] 의 모집단은
  * 초기화자가 도는 그 순간 **열거 가능한** 소스뿐이다. 서블릿 컨텍스트 init-param 소스는 그 시점에
  * 비열거 stub 이고 `createWebServer()` 끝의 `initPropertySources()` 가 실체로 바꾼다 — 그 안의 키는
  * 환경변수보다 높은 우선순위로 들어오고, 잠금이 **이름 대지 않은** 형제 키라면 `addFirst` 는
@@ -207,20 +213,17 @@ fun lockManagementSurface(environment: ConfigurableEnvironment) {
  * 를 세우고 부모 소스를 **이름이 겹치지 않는 것만** 뒤에 붙인다 — 즉 부모의 실체화된 init-param
  * 소스는 child 에 없다). 그래서 둘 다 판정한다.
  *
- * 준비 상태 축도 함께 잠근다: 이 검사가 도는 시점에 readiness 가 이미
- * [ReadinessState.ACCEPTING_TRAFFIC] 이면 **그 사실 자체로 기동을 거부한다.** 검사를 늦은 자리로
- * 옮기는 변경이 조용히 통과하지 못하게 하는 구조적 방어다(트래픽을 받은 뒤의 거부는 늦다).
+ * **여기에 readiness 가드를 두지 않는다**(r3 — verifier r3 M-1·L-2, code-review r3 LOW-5).
+ * r2 는 「이 검사가 도는 시점에 readiness 가 이미 수락 상태면 그 사실로 기동을 거부한다」는
+ * 가드를 두어 자리 이동을 막으려 했다. 실측은 그것이 **발동할 수 없음**을 보였다 — 가드가 읽는
+ * 상태는 같은 event 를 받는 가용성 bean 이 **이 listener 뒤에** 기록하므로, 재검사를 수락 시점으로
+ * 옮긴 변이에서도 가드는 여전히 수락 전 상태를 본다. 죽은 코드가 구조적 방어로 읽히면 다음
+ * 라운드가 그것을 근거로 쓴다. 게다가 기동 뒤의 두 번째 refresh(refresh scope·config client)가
+ * 생기면 그 가드는 **정상 refresh 를 기동 실패로** 바꾼다. 자리를 잠그는 것은 이제 test 다 —
+ * 적대 부팅에서 `ApplicationStartedEvent`·`ApplicationReadyEvent`·`AvailabilityChangeEvent`
+ * (수락) 관측이 0 임을 단언한다(`ManagementSurfaceLateSourceRefusalTest`).
  */
 fun refuseManagementSurfaceKeysAfterRefresh(context: ApplicationContext) {
-    val readiness =
-        generateSequence(context) { it.parent }
-            .last()
-            .getBean(ApplicationAvailability::class.java)
-            .readinessState
-    check(readiness != ReadinessState.ACCEPTING_TRAFFIC) {
-        "관리 표면 재검사가 트래픽 수락 뒤에 돌았다(D-6A2a-14) — 검사 자리가 readiness 발행보다 " +
-            "뒤로 옮겨졌다(context=${context.id})"
-    }
     val environment = context.environment
     check(environment is ConfigurableEnvironment) {
         "관리 표면 재검사가 환경을 읽을 수 없다(D-6A2a-14) — context=${context.id}"
@@ -252,16 +255,26 @@ class ManagementSurfaceLock : ApplicationContextInitializer<ConfigurableApplicat
  * `finishRefresh` 안(`SmartLifecycle` 단계 `Integer.MAX_VALUE - 1536`)에서 끝나므로 **부모 event
  * 보다 먼저** 온다.
  *
- * ③ **트래픽을 받기 전이다.** Boot 은 `ReadinessState.ACCEPTING_TRAFFIC` 을 `ApplicationReadyEvent`
- * **뒤**에 발행한다(`EventPublishingRunListener.ready`) — 이 event 보다 두 단계 뒤다. 그 전의
- * readiness 프로브는 `REFUSING_TRAFFIC` → `OUT_OF_SERVICE` → 503 이고, 실측으로 잰다
- * (`ManagementSurfaceLateSourceRefusalTest`: 재검사 시점 503, 기동 완료 뒤 200).
+ * ③ **readiness 가 수락을 알리기 전이다** — 「트래픽을 한 번도 받지 않는다」가 아니다(r3 정정 —
+ * privacy-gate r3 L-5 · verifier r3 L-3). Boot 은 `ReadinessState.ACCEPTING_TRAFFIC` 을
+ * `ApplicationReadyEvent` **뒤**에 발행한다(`EventPublishingRunListener.ready`) — 이 event 보다 두
+ * 단계 뒤다. 그 전의 readiness 프로브는 `REFUSING_TRAFFIC` → `OUT_OF_SERVICE` → 503 이고, 실측으로
+ * 잰다(`ManagementSurfaceLateSourceRefusalTest`: 재검사 시점 503, 기동 완료 뒤 200). 그 503 이
+ * 곧 **connector 가 이미 bind 되어 있다**는 증거이기도 하다 — `onRefresh()` 의 lifecycle 단계가 이
+ * event 보다 앞이라 관리 포트는 이 검사보다 먼저 열린다. 그 창(밀리초)에 관한 알려진 제한과,
+ * 지금 그 창에 닿는 유일한 경로를 조기 거부가 막고 있다는 사실은 `checklist.md` 제한 18 이 든다.
  *
  * 여기서 던진 예외는 `refresh()` 안에서 `SpringApplication.run` 의 catch 로 올라가 context 를 닫고
- * 그대로 다시 던져진다 — 즉 **프로세스가 뜨지 않는다**. 우선순위를 최상위로 두는 이유는 같은
- * event 의 다른 listener 가 위반 상태에서 먼저 도는 것을 막기 위해서다. 그 우선순위를 `Ordered`
- * 구현이 아니라 `@Order` 로 주는 이유는 `typeShapeGate` 의 인터페이스 수 래칫이다(구현 인터페이스
- * 상한 1) — `AnnotationAwareOrderComparator` 가 둘을 같게 읽으므로 거동은 같다.
+ * 그대로 다시 던져진다 — 즉 **프로세스가 뜨지 않는다**. 부모 축에서는 `IllegalStateException` 이
+ * 그대로 올라오지만 **관리 child 축은 형이 다르다**(code-review r3 LOW-3, 바이트코드 실독):
+ * child 의 refresh 는 `ChildManagementContextInitializer.start()` 안에서 끝나고 그 `Throwable` 을
+ * `DefaultLifecycleProcessor` 가 `ApplicationContextException` 으로 감싼다. 그래서 child 축을 재는
+ * test 를 쓸 때 `shouldThrow<IllegalStateException>` 은 공허해진다.
+ *
+ * 우선순위를 최상위로 두는 이유는 같은 event 의 다른 listener 가 위반 상태에서 먼저 도는 것을 막기
+ * 위해서다. 그 우선순위를 `Ordered` 구현이 아니라 `@Order` 로 주는 이유는 `typeShapeGate` 의
+ * 인터페이스 수 래칫이다(구현 인터페이스 상한 1) — `AnnotationAwareOrderComparator` 가 둘을 같게
+ * 읽으므로 거동은 같다.
  */
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class ManagementSurfaceLateCheck : ApplicationListener<ContextRefreshedEvent> {
