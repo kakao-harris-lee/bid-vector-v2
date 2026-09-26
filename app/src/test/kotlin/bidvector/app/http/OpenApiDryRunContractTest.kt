@@ -37,7 +37,11 @@ import java.time.LocalDate
 @SpringBootTest(
     classes = [HttpTestApplication::class],
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = [PROP_THROW_EXCEPTION_IF_NO_HANDLER_FOUND, PROP_NO_STATIC_RESOURCE_MAPPINGS],
+    properties = [
+        PROP_THROW_EXCEPTION_IF_NO_HANDLER_FOUND,
+        PROP_NO_STATIC_RESOURCE_MAPPINGS,
+        PROP_NO_MANAGEMENT_SERVER,
+    ],
 )
 class OpenApiDryRunContractTest : HttpIntegrationTestBase() {
     @Autowired
