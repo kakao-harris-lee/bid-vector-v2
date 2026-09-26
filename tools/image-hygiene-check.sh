@@ -318,13 +318,26 @@ case "$RUNTIME_KIND" in
     FORBIDDEN_SUMMARY="금지-import-검사=${#forbidden_array[@]}건"
     ;;
   jvm-app)
-    # ① 컴파일·개발 도구 부재(D-6A2a-7 ①) — **실제 실행 시도**다. `--entrypoint <tool>` 로
-    # 덮어쓰는 것은 여기서 정당하다: 재는 대상이 "그 도구가 이 이미지에서 실행되는가"이고
-    # 프로세스 사용자가 아니다(사용자 축은 위 (1) 이 실 ENTRYPOINT 로 이미 쟀다).
+    # ① 컴파일·개발 도구 부재(D-6A2a-7 ①). `--entrypoint <tool>` 로 덮어쓰는 것은 여기서
+    # 정당하다: 재는 대상이 "그 도구가 이 이미지에 있는가"이고 프로세스 사용자가 아니다
+    # (사용자 축은 위 (1) 이 실 ENTRYPOINT 로 이미 쟀다).
+    #
+    # **축이 둘이다.** 2026-09-26 변이 ⑦ 실측: `--version` 실행 시도 하나로는 **`serialver`
+    # 를 놓쳤다** — JDK 베이스에 그 파일이 있는데도 `--version` 을 거부해(exit 1) 게이트가
+    # "부재"로 읽었다. 그래서 PATH 조회 축을 더한다. 그 축은 셸이 필요하므로 **셸 존재를 먼저
+    # 확인하고, 없으면 판정 불가로 실패**한다(조용한 통과를 만들지 않는다 — 6C 의 교훈).
     IFS=',' read -r -a executable_array <<< "$FORBIDDEN_EXECUTABLES"
+    shell_probe_available=true
+    if ! docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'exit 0' >/dev/null 2>&1; then
+      shell_probe_available=false
+      fail "이미지에 셸이 없어 금지 실행 파일의 PATH 조회 축을 판정할 수 없다 — 실행 시도 축만으로는 --version 을 거부하는 도구를 놓친다(변이 ⑦ 실측)"
+    fi
     for tool in "${executable_array[@]}"; do
       if docker run --rm --security-opt no-new-privileges --entrypoint "$tool" "$IMAGE_REF" --version >/dev/null 2>&1; then
         fail "금지 실행 파일 '${tool}' 이 이 이미지에서 실행된다 — JRE 가 아니라 JDK 베이스일 수 있다"
+      elif [ "$shell_probe_available" = true ] \
+        && docker run --rm --security-opt no-new-privileges --entrypoint sh "$IMAGE_REF" -c 'command -v "$1"' sh "$tool" >/dev/null 2>&1; then
+        fail "금지 실행 파일 '${tool}' 이 이 이미지의 PATH 에 있다(실행은 --version 을 거부했다) — JRE 가 아니라 JDK 베이스일 수 있다"
       fi
     done
 
