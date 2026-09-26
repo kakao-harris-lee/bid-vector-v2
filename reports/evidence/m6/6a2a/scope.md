@@ -68,6 +68,20 @@
 | **D-6A2a-12** | (2b) 표의 관리 포트 행 정정: 프로브 두 경로(`/liveness`·`/readiness`)는 상태 한 단어다. **집계 `/actuator/health` 는 상태 + 우리 그룹 이름(`groups`)** 을 낸다(Boot 4.1.1 형태, 값은 고정 그룹 이름뿐 — 구성 요소·주소·예외·버전 없음). 형태를 실측으로 고정하고, 키가 하나라도 늘면 RED. 스모크도 집계 경로를 잰다. |
 | **D-6A2a-13** | 이 라운드에서 함께 처분할 것은 셋이다. ① `PersistenceProperties` 가 `data class` 라 바인딩 실패 분석기·로그가 자격 값을 문자열화할 수 있다(privacy-gate L-2) → `OperatorCredentialProperties`(6A-1 r4)와 같은 형태로 고친다(in_scope `app/**`). ② 관리 포트 `/error` 200·비 GET 500 은 스모크·test 로 형태를 잰다 — 500 은 `OPEN-API-WRONG-METHOD-500` 에 관리 포트 관측으로 덧붙인다. ③ 이름 기반 보조 판정(이름 바꾼 test jar · PATH 밖 `javac`)은 알려진 제한으로 둔다(계약 (1) 이 이미 보조로 선언했다, verifier F-6). |
 
+## 계약 갱신 r2 (2026-09-26, 팀장 — verifier r2 F-1r · privacy-gate r2 M-2·L-4 · code-reviewer r2 MEDIUM 둘 수령)
+
+접두사 거부(D-6A2a-10)는 **초기화 시점에 존재하는 소스**만 본다. `server.servlet.context-parameters.*` 는 refresh 중에 servlet context 소스를
+채우고, 그 소스는 환경변수보다 우선한다. 검사 시점의 정규 이름이 `server.` 라 거부되지 않고, 잠금의 `addFirst` 는 이름을 가진 10 키만 이긴다.
+verifier 가 출하 이미지에 환경변수 두 줄로 r1 결함 셋을 전부 재현했다(기동 성공 · health 세부 · DB 정지에도 readiness 200 · API 포트 `/livez`).
+**시점 결함**이다 — 채널 하나(context-parameters)를 막으면 다음 늦은 소스가 같은 자리를 연다.
+
+| ID | 결정 |
+|---|---|
+| **D-6A2a-14** | **같은 판정을 「모든 소스가 선 뒤」에 한 번 더 돈다.** 부모 컨텍스트와 관리 자식 컨텍스트 둘 다에서, refresh 완료 뒤·readiness 가 `ACCEPTING_TRAFFIC` 이 되기 **전에** 검사한다. 위반이면 기동을 실패시킨다(트래픽을 한 번도 받지 않는다). 판정 대상은 이제 **환경의 모든 소스**다(잠금 제외) — 늦은 소스도 포함한다. 조기 검사(D-6A2a-10)는 빠른 실패로 남긴다. **보조로** `server.servlet.context-parameters` 를 거부 접두사에 더한다 — 앱이 쓰지 않고 이 채널의 가장 짧은 경로다. 보조일 뿐이고 주 잠금은 늦은 재검사다. **게이트 술어 변경 → verifier 표적 재검증.** |
+| **D-6A2a-15** | 허용 목록에 **`management.server.address`** 를 더한다. 이 키는 바인드 범위를 **좁히기만** 한다(Boot 기본값은 전 인터페이스). 포트 분리 검사(`ManagementPortType`)는 그대로 선다. 배치 환경이 관리 포트 노출을 진다(`OPEN-6A2A-MGMT-PORT-EXPOSURE`)는 계약과도 맞다. |
+| **D-6A2a-16** | 기동 거부의 운영상 결과를 **알려진 제한 + 6E runbook 입력**으로 적는다. ① 환경에 포트·주소 말고 다른 `MANAGEMENT_*`·`SPRING_JMX_*` 가 있으면 기동을 거부한다. ② k8s 에서 이름이 `management` 인 Service 가 있으면 service link 변수(`MANAGEMENT_SERVICE_HOST` 등)가 자동 주입돼 기동을 거부한다 — 처방은 배치 쪽(`enableServiceLinks: false` 또는 Service 이름)이다. 코드를 좁히지 않는다(좁히면 열거로 돌아간다). |
+| **D-6A2a-17** | 동반 처분. ① `spring.web.error.include-*`(관리 포트 `/error` 본문 확대, privacy-gate L-4) — health 를 넓히지 않지만 같은 늦은 재검사의 거부 접두사 대상인지 구현 레인이 실측해 정한다(`/error` 가 예외·스택을 내면 대상). ② 위생 게이트 목록 원소 판정을 **허용 문자 클래스**로 바꾼다(NBSP 가 공백 종류 열거를 빠져나간 네 번째 라운드 — 열거를 멈춘다). ③ 그 밖의 code-reviewer r2 LOW 는 일괄 처리. |
+
 ## 위협 모델 — 6A-2a 고유 경계 (Phase 2.5 (0), 팀장)
 
 **지키는 것**: ① 이미지에 비밀값이 들어가지 않는다(레이어·환경변수 기본값·빌드 인자 어디에도 — 값은 기동 시 환경에서만 온다)
