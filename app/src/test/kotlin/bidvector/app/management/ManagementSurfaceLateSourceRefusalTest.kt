@@ -44,10 +44,17 @@ private class PostRefreshEventRecorder : ApplicationListener<ApplicationEvent> {
 
     override fun onApplicationEvent(event: ApplicationEvent) {
         when {
-            event is ApplicationStartedEvent -> observed += "ApplicationStartedEvent"
-            event is ApplicationReadyEvent -> observed += "ApplicationReadyEvent"
-            event is AvailabilityChangeEvent<*> && event.state == ReadinessState.ACCEPTING_TRAFFIC ->
+            event is ApplicationStartedEvent -> {
+                observed += "ApplicationStartedEvent"
+            }
+
+            event is ApplicationReadyEvent -> {
+                observed += "ApplicationReadyEvent"
+            }
+
+            event is AvailabilityChangeEvent<*> && event.state == ReadinessState.ACCEPTING_TRAFFIC -> {
                 observed += "AvailabilityChangeEvent(ACCEPTING_TRAFFIC)"
+            }
         }
     }
 }
