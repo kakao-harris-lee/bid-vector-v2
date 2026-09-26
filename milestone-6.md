@@ -557,6 +557,19 @@ ML 은 자리지킴 그대로이고, compose 기동은 수집을 켜지 않는�
 - 6A-2b 로(무변경): `OPEN-6F9-STRATEGY-WRITE-ENDPOINT` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` · `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` · `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(실측 영향 0) · `OPEN-API-WRONG-METHOD-500`(관리 포트 비 GET 500 관측 추가)
 - 관측: `ml-serving:local` 336MB / 상한 400MB.
 
+**운영자 결정 2026-09-26(6A-2a 머지 뒤 잔여 점검)** — 결정 대기로 남아 있던 넷을 정했다.
+① 다음 slice = **6A-2b, Codex 없음**(verifier + code-reviewer sonnet) ② **6B-3 보존 기간 90일**(공고·평가 이력·audit — 6F-6·6F-5-a·6A-1 이 넘긴
+`OPEN-…-RETENTION` 의 입력) ③ **6B-4 큐 상한 초과 시 가장 오래된 대기 job 부터 폐기**(최신성 우선) ④ **6F-5-b 실 LLM 요건 추출 승인 +
+`OPEN-ML-ANALYSIS-WIRING` 실 gRPC 배선 승인** — 조건: 「LLM 추출과 ML gRPC 를 비교할 수 있도록 적절한 패턴을 쓴다」. 비교 구조(같은 입력을 두 경로에
+흘려 같은 형태로 기록하고 판정에는 한쪽만 쓰는 shadow 형태 등)는 해당 slice 계약에서 설계한다. 이 결정들은 실 외부 호출의 **범위**를 승인한 것이고,
+각 slice 의 실행(호출 횟수·비용 상한)은 그 계약에서 다시 확인한다.
+
+**6A-2b 착수 2026-09-26** — base `6f0b21f0`(PR #47 머지 뒤 `main`), 레인 worktree `bid-vector-v2-m6-6a2b`·브랜치 `m6-6a2b/2026-09-26`. 정본
+`reports/evidence/m6/6a2b/scope.md`(D-6A2b-1~13). 세션 편집 endpoint 여섯을 `EditStrategyWorkflow` 위에 세운다 — 모든 전략 쓰기가 편집 세션을 지나고,
+적용은 전략·outbox·세션을 **한 트랜잭션**으로 커밋한다(4A 잔여 창 폐쇄). 인증·audit 필터 무편집, 외부 effect 0, 마이그레이션 없음을 목표로 한다.
+받는 OPEN 여섯 중 다섯을 닫고(`OPEN-6F9-STRATEGY-WRITE-ENDPOINT` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` · `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` ·
+`OPEN-API-WRONG-METHOD-500` · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`), `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` 은 재측정 후 6E 로 넘긴다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
