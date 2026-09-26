@@ -142,6 +142,23 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | **D-6A2b-16** | 의존 게이트(D-6A2b-8)가 **기존 코드**를 잡았다: dry-run 응답 조립이 어댑터 포트 구현을 컨트롤러에 내주고 있었다. 값만 내도록 좁혔다(in_scope `app/**`) |
 | **D-6A2b-17** | 신설 OPEN 둘을 수용한다: `OPEN-6A2B-VIOLATION-DETAIL`(값 위반 사유가 응답에 없다) · `OPEN-6A2B-CONCURRENT-SESSION-ADVANCE`(HTTP 층 동시 전진 실측 없음). `SessionAlreadyActive` 가 HTTP 로 도달 불가인 것(서버 생성 id 의 귀결)은 알려진 제한이다 — 동시에 열린 세션 여럿은 `StaleRevision` 이 잡는다 |
 
+## 계약 갱신 r1 (2026-09-27, 팀장 — verifier r1 not-ready F-1·F-2 · code-reviewer r1 HIGH-1·MEDIUM 다섯 · contract C-1~5 · privacy INFO-P1 수령)
+
+재작업 **1/5**. 차단 결함은 둘이다. 둘 다 계약 문면(D-6A2b-8 「허용 목록 ⊆」, 알려진 제한 ① 「조용히 덮이지 않는다」)과 산출물이 어긋난 자리다.
+
+| ID | 결정 |
+|---|---|
+| **D-6A2b-18** | **(F-2·HIGH-1) draft 의 기준 revision 을 세션에 담는다.** `WaitingForConfirmation` 에 `baseRevision`(draft 를 만든 시점의 전략 revision)을 더하고, `onConfirm` 은 `state.baseRevision != current.revision` 이면 `StaleRevision` 으로 거부한다(`seenRevision` 대조는 유지 — 둘 다 통과해야 적용). `RequestEdit` 뒤 새 value 는 새 기준을 잡는다. 스냅숏 codec 이 왕복하고, **`baseRevision` 이 없는 저장 행은 confirm 에서 fail-closed(`StaleRevision`)** 로 읽는다 — 마이그레이션 0 유지. 응답에 `baseRevision` 을 낸다. 회귀 test 는 교차 세션 시나리오 그대로(두 세션 value → A confirm → 최신 GET 의 revision 으로 B confirm → **409**, A 의 값 보존)를 use case 단위와 **실 DB E2E** 둘 다로. 알려진 제한 ①·D-6A2b-17 의 문면을 고친다. M4 커널(`Transition.kt`) 변경이다 — 기존 conformance fixture 가 이 거동과 충돌하면 멈추고 보고 |
+| **D-6A2b-19** | **(F-1) 의존 게이트를 계약 문면대로 다시 세운다.** ① **대상은 패키지 이름이 아니라 구조**: `bidvector.app` 아래 `@Controller`·`@RestController`·`@ControllerAdvice` 가 붙은 모든 클래스 + `app.http` 패키지 전체(합집합). ② **술어는 허용 목록 ⊆**: 의존 집합 ⊆ {workflow use case·결과·command 타입, 도메인 값 타입, `app.http` DTO·예외, 명시된 실행기·조회기 타입(`app.wiring` 의 정확한 클래스 집합, 계약 파일에서 읽음), Spring web, Kotlin·Java 표준(단 `java.sql`·`javax.sql` 제외)}. 금지 열거로 두지 않는다. ③ 모집단은 production 스캔 기준(`bidvector.app`)이다 — `HttpTestApplication`(스캔 `app.http`)을 쓰는 OpenAPI 대조·형식 게이트도 같은 모집단으로 옮긴다. ④ **컨텍스트 빈 경계**: `jdbcClient`·`jdbcTemplate`·`transactionBoundary`·`strategyEditTransaction` 은 app 컨텍스트에서 주입 가능하다. 위협 모델상 **HTTP 로 닿지 않는** app 내부 코드의 SQL 은 경계 밖(빌드 저자 경계와 같은 층)이고, 닿는 길은 ①②가 막는다 — (2b) 표에 두 행(`TransactionBoundary`·`StrategyEditTransaction`)을 「경계로 처리」로 더하고, 실측: verifier 변이 MU1·MU2(컨트롤러가 참조할 때)·MU2b 가 전부 RED. **게이트 술어 변경 → verifier 표적 재검증** |
+| **D-6A2b-20** | **(F-3·MEDIUM-3) 형식 게이트 항진식 제거.** 수집 집합은 실제로 탐침한 매핑만 담고, 선언 메서드가 없는 매핑·건너뛴 매핑은 **이유와 함께 별도 집합**으로 단언한다(집합 등식: 탐침 ∪ 명시 제외 == 전체 매핑). 변이 MU4(경로 변수 매핑 제외)가 RED. **(C-5b)** 「OpenAPI 문서 경로·메서드 집합 == production 등록 매핑 집합」 등식을 같은 수집기로 세운다. **(C-5a)** `state` enum 문서 ↔ 구현 등식. 게이트 술어 변경 → 표적 재검증 |
+| **D-6A2b-21** | **(MEDIUM-2) `Accept` 협상 실패 → 406 `ErrorBody`.** 매핑표에 더하고 형식 게이트에 `Accept` 축을 더한다. 관리 포트의 actuator 미디어 타입 요청이 여전히 200 인지(잠금 무변경) 함께 잰다 |
+| **D-6A2b-22** | **(MEDIUM-4) `toDraft()` 전수성 게이트.** `StrategyDraft` 생성자 매개변수 **전부**에 기본값이 아닌 값을 넣은 전략의 `validate → toDraft` 왕복이 동일함을 단언하고, 매개변수 이름 집합을 리플렉션으로 수집해 test 가 다룬 집합과 등식으로 잠근다(필드가 늘면 RED) |
+| **D-6A2b-23** | **(MEDIUM-5) 전략 정책은 조립에서 한 번 해소**해 같은 인스턴스를 실행기·트랜잭션이 공유한다(빈 하나) |
+| **D-6A2b-24** | **(MEDIUM-1) 버려진 세션은 이 slice 에서 치우지 않는다.** D-6A2b-11 의 근거 문면(「`begin` 이 만료를 먼저 접는다」)은 서버 생성 id 아래에서 성립하지 않는다 — 문면을 정정하고 **`OPEN-6A2B-ABANDONED-SESSIONS`** 신설(받는 쪽 6B-3 — 운영자 결정 보존 90일의 파기 대상에 `edit_session` 비종단 행을 넣는다). **(C-3)** 도달 불가한 begin 409 `SESSION_ALREADY_ACTIVE` 를 OpenAPI 에서 뺀다 |
+| **D-6A2b-25** | 문서·자잘한 것 일괄: **(C-1·C-2)** 세션 조회 GET 에 400·409 선언 · **(C-4)** nullable enum 에 `null` 포함 · **(INFO-P1·LOW)** `StrategyFieldValue` 방어 메시지에서 제출 값 제거 · 알 수 없는 본문 키 400 · 십진수 척도·지수 상한 · **(F-4)** 실 DB E2E 에 무효 값 → 영속 0 · **(LOW)** `onProvideValue` 가 세션 필드와 다른 command 필드를 받는 거동은 **측정 후 처분**(M4 fixture 가 허용을 요구하면 알려진 제한, 아니면 `InvalidTransition`) · **(F-5)** `TRACE` 405 본문은 알려진 제한(base 동일) · 마이그레이션 순서의 빈 생성 부수효과 의존은 알려진 제한 |
+
+**수정 라운드 보고 필수 항목**: 새 public 표면이 생겼는가·밖에 무엇을 허락하는가 · 새 파일 ↔ in_scope 대조 · rollback 재산출·재실측(마지막 산출물 커밋에서).
+
 ## 하네스 레인 변경 (상시 절)
 
 구현 레인 checklist 「하네스 레인 변경」 절을 옮긴다(2026-09-27, 판정 SHA 고정 시점).
@@ -165,6 +182,7 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT` | **닫는다** | D-6A2b-9 |
 | `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` | 수령·재측정·**유지**(→ 6E) | D-6A2b-10 |
 | `OPEN-6A2B-VIOLATION-DETAIL` · `OPEN-6A2B-CONCURRENT-SESSION-ADVANCE` | **신설** | D-6A2b-17 |
+| `OPEN-6A2B-ABANDONED-SESSIONS` | **신설**(→ 6B-3) | D-6A2b-24 |
 
 ## 리뷰 레인
 
