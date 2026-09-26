@@ -114,13 +114,34 @@ class ManagementHealthSurfaceTest {
 
     @Test
     @Order(1)
-    fun `관리 포트의 health·liveness·readiness 는 상태 한 단어만 낸다`() {
-        listOf("/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness").forEach { path ->
+    fun `관리 포트의 프로브 둘은 상태 한 단어만 낸다`() {
+        listOf("/actuator/health/liveness", "/actuator/health/readiness").forEach { path ->
             val response = bodyOf(management(path))
             response.statusCode.value() shouldBe 200
             response.body?.keys?.toList() shouldContainExactly listOf("status")
             response.body?.get("status") shouldBe "UP"
         }
+    }
+
+    /**
+     * **실측(Boot 4.1.1, 2026-09-26)** — 집계 `GET /actuator/health` 는 `show-details=never`·
+     * `show-components=never` 아래에서도 `groups` 칸을 낸다(`SystemHealth.getGroups()` 가
+     * `@JsonInclude(NON_EMPTY)` 라 그룹이 있으면 항상 실린다 — 세부 설정과 무관하다).
+     * 그 값은 **우리가 지은 그룹 이름 둘**이고 구성 요소 이름·DB 주소·예외 메시지·버전은 없다
+     * (위협 모델 ⑤ 가 막는 것은 그 넷이다). 그래서 이 축은 「키 하나」가 아니라 **실측한 모양
+     * 그대로 못박는다** — `components`·`details` 같은 칸이 하나라도 늘면 이 단언이 붉어진다.
+     */
+    @Test
+    @Order(1)
+    fun `집계 health 는 상태와 그룹 이름 둘만 낸다`() {
+        val response = bodyOf(management("/actuator/health"))
+        response.statusCode.value() shouldBe 200
+        response.body?.keys?.sorted() shouldContainExactly listOf("groups", "status")
+        response.body?.get("status") shouldBe "UP"
+
+        @Suppress("UNCHECKED_CAST")
+        val groups = response.body?.get("groups") as Collection<String>
+        groups.sorted() shouldContainExactly listOf("liveness", "readiness")
     }
 
     @Test

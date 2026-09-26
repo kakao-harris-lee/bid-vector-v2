@@ -82,6 +82,16 @@ spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-start
 # M6/6A-1 — MockMvc 없이 실 임베디드 서버(webEnvironment=RANDOM_PORT)로 D-6A1-21의 디스패치
 # 실측을 재는 test 전용 좌표(scope.md 문면 밖 최소 추가, evidence에 사유 등재). `@SpringBootTest`
 # 자신은 이 모듈에 있다. 버전은 Boot BOM 이 관리한다(위 starter-web 과 같은 축).
+# M6/6A-2a D-6A2a-4 — health 를 별도 관리 포트에 내는 production 좌표 둘. 버전은 Boot BOM 이
+# 관리한다(위 starter-web 과 같은 축). `compatibilitySmoke.expectedModules` 에도 같은 좌표를
+# 등재해야 해석·컴파일·로드가 실제로 재진다(app/build.gradle.kts).
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+# readiness 그룹의 `db` 기여자(`DataSourceHealthContributorAutoConfiguration`)가 사는 자리 —
+# 실측(2026-09-26): actuator starter 의 의존 그래프에 없어 app 이 직접 선언해야 한다. **starter 가
+# 아니라 이 모듈**을 쓴다 — `spring-boot-starter-jdbc` 는 HikariCP 를 끌고 오고 D-6A1-18 이 그것을
+# 들이지 않기로 했다(`OPEN-6A1-CONNECTION-POOL`). 이 모듈의 선언 의존은 spring-jdbc·boot-sql·
+# boot-transaction 셋뿐이고 커넥션 풀이 없다(POM 실측).
+spring-boot-jdbc = { module = "org.springframework.boot:spring-boot-jdbc" }
 spring-boot-test = { module = "org.springframework.boot:spring-boot-test" }
 # Boot 4.1 모듈 재편(실측, 2026-09-19) — `TestRestTemplate`이 `spring-boot-test`에서
 # 이 좌표(`org.springframework.boot.resttestclient.TestRestTemplate`)로 옮겼다. 위

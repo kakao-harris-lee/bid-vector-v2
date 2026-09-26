@@ -1,7 +1,6 @@
 package bidvector.app.http
 
-import bidvector.app.BidVectorApplication
-import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
+import bidvector.app.productionApplication
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -9,7 +8,6 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
 import org.springframework.context.ConfigurableApplicationContext
@@ -20,20 +18,21 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
+import java.net.ServerSocket
 import javax.sql.DataSource
 
 /**
  * D-6A1-27 시정(verifier r1 HIGH — F-1) — 그동안 http test 넷(`OperatorAuthenticationTest`·
  * `RequestAuditFilterTest`·`OpenApiContractTest`·`ConstantTimeComparisonStructureTest`)이
  * 전부 [HttpTestApplication](test 전용 조립)을 띄워 필터 등록을 **다시 선언**했다.
- * [BidVectorApplication]을 부팅하는 test가 **0**이라 production 자격증명 필터 bean을
+ * `BidVectorApplication`을 부팅하는 test가 **0**이라 production 자격증명 필터 bean을
  * 삭제(9줄)해도 `./gradlew check`가 BUILD SUCCESSFUL이었다(verifier 실측).
  *
- * 이 test는 **`main()`과 같은 조립 호출**(`SpringApplicationBuilder(BidVectorApplication
- * ::class.java)`, 같은 [PRODUCTION_DISPATCH_PROPERTIES] 참조)로 production 조립 그 자체를
+ * 이 test는 **`main()`과 같은 조립 호출**([bidvector.app.productionApplication] — M6/6A-2a 부터
+ * `main()`과 이 test 가 공유하는 유일한 조립 함수)로 production 조립 그 자체를
  * 부팅해 위협 모델 (a)·(c)를 잰다. 닫힘 판정(D-6A1-27 문면 그대로) — **production 필터
  * bean을 삭제했을 때 전건 `check`가 RED**인가. 더해 ⓐ production `urlPatterns`를 아무
- * 것도 안 맞는 패턴으로 좁히면 RED(첫 test) ⓑ [PRODUCTION_DISPATCH_PROPERTIES]를 비우면
+ * 것도 안 맞는 패턴으로 좁히면 RED(첫 test) ⓑ `PRODUCTION_DISPATCH_PROPERTIES`를 비우면
  * RED(둘째 test — 미매핑 경로가 컨테이너 ERROR 재디스패치로 새는 형태가 실제로 달라진다).
  *
  * `adapters` 모듈의 `PersistenceTestSupport`를 재사용하지 않는다 — `app`은 `adapters`의
@@ -68,21 +67,22 @@ class ProductionAssemblyAuthAuditTest {
         @BeforeAll
         fun boot() {
             context =
-                SpringApplicationBuilder(BidVectorApplication::class.java)
+                productionApplication()
                     .properties(
-                        PRODUCTION_DISPATCH_PROPERTIES +
-                            mapOf(
-                                "server.port" to "0",
-                                "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
-                                "bidvector.persistence.username" to postgres.username,
-                                "bidvector.persistence.credential" to postgres.password,
-                                "operator.credential.value" to TEST_CREDENTIAL_VALUE,
-                                // M6/6A-3+6F-3 D-6A3-7 — `EvaluationWiring`이 이 값 없이는 기동하지
-                                // 않는다(기본값 없음, fail-fast). 이 test는 평가 endpoint를 부르지
-                                // 않지만 production 조립 전체가 뜨려면 모든 `@ConfigurationProperties`가
-                                // 바인딩돼야 한다.
-                                "bidvector.evaluation.candidate-cap" to "1000",
-                            ),
+                        mapOf(
+                            "server.port" to "0",
+                            // M6/6A-2a — 관리 포트 기본값(8081)을 test 가 점유하지 않는다(병렬 fork 충돌).
+                            "management.server.port" to ServerSocket(0).use { it.localPort }.toString(),
+                            "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            "bidvector.persistence.username" to postgres.username,
+                            "bidvector.persistence.credential" to postgres.password,
+                            "operator.credential.value" to TEST_CREDENTIAL_VALUE,
+                            // M6/6A-3+6F-3 D-6A3-7 — `EvaluationWiring`이 이 값 없이는 기동하지
+                            // 않는다(기본값 없음, fail-fast). 이 test는 평가 endpoint를 부르지
+                            // 않지만 production 조립 전체가 뜨려면 모든 `@ConfigurationProperties`가
+                            // 바인딩돼야 한다.
+                            "bidvector.evaluation.candidate-cap" to "1000",
+                        ),
                     ).run()
             port = (context as ServletWebServerApplicationContext).webServer?.port ?: error("web server가 뜨지 않았다")
         }
