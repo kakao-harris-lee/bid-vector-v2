@@ -65,9 +65,19 @@ open class PersistenceWiring {
  * DataSource 설정 키(D-6A1-19) — `…password`를 쓰지 않는다(`leak-patterns.txt` 자기참조,
  * 팀장 실측). 값은 환경변수 주입, 기본값 없음 — Spring의 relaxed binding이 누락 시
  * `BindException`으로 기동을 fail-fast 시킨다(직접 null 검사를 재구현하지 않는다).
+ *
+ * **D-6A2a-13 ①(privacy-gate r1 L-2) — `data class`가 아니다.** 컴파일러가 합성하는
+ * `toString()`은 [credential] 원문을 그대로 낸다. Boot의 바인딩 실패 분석기는 실패한 속성의
+ * 값을 문면에 내고, 기동 실패 문면은 CI job 로그로도 운영 배치의 **영구 로그**로도 간다 —
+ * 지금 이 타입에 형식 검증이 없어 그 경로가 닫혀 있을 뿐이고, 뒤 slice 가 검증을 붙이는
+ * 순간 열린다. [bidvector.app.OperatorCredentialProperties](6A-1 r4)와 같은 근거이며 같은
+ * 처방이다: 재정의하지 않은 `Any.toString()`(클래스명@해시코드)을 쓴다.
+ *
+ * `equals`/`hashCode`/`copy`/구조 분해도 함께 사라진다 — 이 타입은 [PersistenceWiring.dataSource]
+ * 가 한 번 읽고 버리므로 어느 것도 쓰이지 않는다(호출 자리 전수 확인).
  */
 @ConfigurationProperties(prefix = "bidvector.persistence")
-data class PersistenceProperties(
+class PersistenceProperties(
     val jdbcUrl: String,
     val username: String,
     val credential: String,
