@@ -59,3 +59,32 @@ internal class DataSourceConnectionSource(
 ) : ConnectionSource {
     override fun <T> withConnection(block: (Connection) -> T): T = dataSource.connection.use(block)
 }
+
+/**
+ * M6/6A-2b D-6A2b-3 — **호출 하나가 곧 트랜잭션 하나**인 구현. `DataSource`만 쥔 옛
+ * 생성자(`JdbcStrategyRepository(dataSource, …)`·`JdbcEditSessionRepository(dataSource)`)가
+ * 이것에 위임한다: 그 두 어댑터의 write 는 원래 스스로 `autoCommit=false` → 여러 문 →
+ * `commit()` 을 했는데, 커넥션 관리를 [ConnectionSource] 로 옮기면서 그 원자성이 갈 곳이
+ * 없어졌다. [DataSourceConnectionSource](매 호출 autoCommit 기본값 그대로)로 위임하면
+ * 한 write 안의 두 문이 따로 커밋돼 **없던 창**이 생긴다 — 이 구현이 옛 거동을 그대로
+ * 보존한다.
+ *
+ * [TransactionBoundary] 와는 경계의 **주인**이 다르다: 이쪽은 어댑터 호출 하나가 주인이고,
+ * 저쪽은 호출부의 `inTransaction { … }` 블록이 주인이라 여러 어댑터의 write 가 한 커밋에
+ * 든다(전략 저장 + outbox 등록 + 세션 전진). 같은 어댑터 클래스가 어느 쪽 주인 아래서도
+ * 서는 것이 이 slice 가 옛 호출부를 고치지 않고 원자 경로를 여는 방법이다.
+ *
+ * `internal` 이라 이 모듈 밖에서는 만들 수 없다 — `sealed` 가 주는 교차 모듈 폐쇄
+ * (위 KDoc)는 그대로다.
+ */
+internal class OwnTransactionConnectionSource(
+    private val dataSource: javax.sql.DataSource,
+) : ConnectionSource {
+    override fun <T> withConnection(block: (Connection) -> T): T =
+        dataSource.connection.use { connection ->
+            connection.autoCommit = false
+            val result = block(connection)
+            connection.commit()
+            result
+        }
+}

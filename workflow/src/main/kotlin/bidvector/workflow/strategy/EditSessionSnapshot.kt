@@ -142,6 +142,7 @@ private fun EditableField.toSnapshot(): EditableFieldSnapshot =
         is EditableField.Watch -> EditableFieldSnapshot("WATCH", id.name())
         is EditableField.Threshold -> EditableFieldSnapshot("THRESHOLD", field.name())
         EditableField.CandidateLimit -> EditableFieldSnapshot("CANDIDATE_LIMIT", null)
+        EditableField.MaxActiveBids -> EditableFieldSnapshot("MAX_ACTIVE_BIDS", null)
     }
 
 private fun WatchRuleId.name(): String =

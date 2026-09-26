@@ -101,6 +101,10 @@ private fun restoreEditableField(snapshot: EditableFieldSnapshot): EditableField
             EditableField.CandidateLimit
         }
 
+        "MAX_ACTIVE_BIDS" -> {
+            EditableField.MaxActiveBids
+        }
+
         else -> {
             error("알 수 없는 EditableField kind: ${snapshot.kind}")
         }

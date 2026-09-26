@@ -1,6 +1,7 @@
 package bidvector.workflow.strategy
 
 import bidvector.sharedkernel.Resolution
+import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyPolicyData
 
 /**
@@ -93,6 +94,15 @@ class EditStrategyWorkflow(
         return BeginOutcome.Started(session)
     }
 
+    /**
+     * 지금 저장된 전략(M6/6A-2b D-6A2b-2) — 필드 하나짜리 편집을 **전체** draft 로 조립하는
+     * 어댑터가 나머지 필드를 지어내지 않으려면 이 값이 필요하고, 그 읽기는 뒤따르는
+     * command 와 **같은 트랜잭션** 안에서 일어나야 한다(D-6A2b-3). 그래서 어댑터가 포트를
+     * 직접 쥐는 대신(우회 (1)) 이 use case 를 통해 읽는다 — 새 권한이 아니다: 같은 값이
+     * 이미 `GET /api/strategy` 로 나간다.
+     */
+    fun currentStrategy(): OperatorStrategy = strategies.load()
+
     fun provideValue(command: EditCommand.ProvideValue): CommandResult = process(command)
 
     fun confirm(command: EditCommand.Confirm): CommandResult = process(command)
@@ -102,11 +112,20 @@ class EditStrategyWorkflow(
     fun cancel(command: EditCommand.Cancel): CommandResult = process(command)
 
     /** 주기 sweep 배선은 이 slice 밖(트리거는 4B/후속) — 순수 만료 판정만 여기서 노출한다. */
-    fun expire(sessionId: EditSessionId): EditSessionState? {
+    fun expire(sessionId: EditSessionId): EditSessionState? = view(sessionId)?.state
+
+    /**
+     * 조회(M6/6A-2b D-6A2b-1) — 세션 전체를 돌려준다. `expire` 와 **같은 동작**이다:
+     * 접근 시점에 만료를 먼저 접고(D-6A2b-11 — 주기 sweep 을 두지 않는 대신 접근이 접는다)
+     * 접혔으면 그 사실을 영속한다. `expire` 가 상태만 돌려줘 HTTP 응답이 요구하는 버전·
+     * 만료 시각·대기 필드를 나르지 못해 이 자리가 생겼다 — 같은 절차를 다시 쓰지 않는다
+     * (`expire` 가 이 함수에 위임한다).
+     */
+    fun view(sessionId: EditSessionId): EditSession? {
         val session = sessions.load(sessionId)?.let(::restoreEditSession) ?: return null
         val expired = expireIfDue(session, clock.now())
         if (expired !== session) sessions.save(expired)
-        return expired.state
+        return expired
     }
 
     /**

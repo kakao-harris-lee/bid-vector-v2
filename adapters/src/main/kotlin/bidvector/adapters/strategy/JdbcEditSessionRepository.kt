@@ -1,5 +1,7 @@
 package bidvector.adapters.strategy
 
+import bidvector.adapters.persistence.ConnectionSource
+import bidvector.adapters.persistence.OwnTransactionConnectionSource
 import bidvector.adapters.persistence.Sql
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.EditSession
@@ -26,20 +28,32 @@ import javax.sql.DataSource
  * [EditSessionConflictException]으로 크게 실패한다(D-6B1-4, 조용한 덮어쓰기 금지).
  */
 class JdbcEditSessionRepository(
-    private val dataSource: DataSource,
+    private val connections: ConnectionSource,
 ) : EditSessionRepository {
+    /**
+     * M6/6A-2b D-6A2b-3 — 옛 형태(이 어댑터가 커넥션과 커밋을 스스로 쥔다)를 그대로 남긴다.
+     * 편집 경로는 [ConnectionSource] 를 받는 위 생성자로 서서 **호출부의** 트랜잭션에
+     * 참여한다(전략 저장·outbox 등록과 같은 커밋 — 4A 잔여 창 폐쇄).
+     */
+    constructor(dataSource: DataSource) : this(OwnTransactionConnectionSource(dataSource))
+
     override fun load(id: EditSessionId): EditSessionSnapshot? =
-        dataSource.connection.use { connection ->
+        connections.withConnection { connection ->
             connection.prepareStatement(Sql.SELECT_EDIT_SESSION).use { statement ->
                 statement.setString(1, id.value)
                 statement.executeQuery().use { rs -> if (rs.next()) rs.toSnapshot(id) else null }
             }
         }
 
+    /**
+     * 0행(낙관적 동시성 전제조건 불일치)은 [EditSessionConflictException] 으로 크게
+     * 실패한다 — 트랜잭션의 주인이 그 예외를 보고 롤백한다(편집 경로에서는 전략 저장·
+     * outbox 등록까지 함께 되돌아간다, 우회 (9)).
+     */
     override fun save(session: EditSession) {
         val snapshot = session.toSnapshot()
         val affected =
-            dataSource.connection.use { connection ->
+            connections.withConnection { connection ->
                 connection.prepareStatement(Sql.UPSERT_EDIT_SESSION).use { statement ->
                     bindEditSession(statement, snapshot)
                     statement.executeQuery().use { rs -> if (rs.next()) 1 else 0 }
