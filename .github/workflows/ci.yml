@@ -265,7 +265,16 @@ jobs:
       #
       # 거부 **사유**까지 요구한다 — 이 환경에는 DB 가 없어 기동은 어차피 실패하므로, 종료 코드만
       # 보면 스모크가 아무것도 재지 않는 것과 같다(관리 표면 판정이 사라져도 초록이 된다).
-      - name: 앱 이미지 거부 스모크 — 늦은 소스로 관리 표면을 넓히면 기동을 거부한다 (S-22c)
+      #
+      # r3(code-review r3 LOW-1) — 사유를 **D-6A2a-10 하나로** 좁혔다. 이 환경변수의 정규형은
+      # `server.servlet.context-parameters` 이름공간이고 그것은 거부 접두사이므로 **초기화자의 조기
+      # 검사가 먼저 끊는다** — 이 step 이 재는 것은 「운반 이름공간을 조기에 거부한다」이고, 늦은
+      # 재검사(D-6A2a-14)는 여기서 도달하지 못한다. 둘 다 받는 형태는 어느 잠금이 섰는지를 문면에서
+      # 지운다. 늦은 재검사를 재는 것은 `ManagementSurfaceLateSourceRefusalTest` 이고, 오늘 이미지
+      # 밖에서 그 자리에 닿을 채널은 없다(설정 데이터·명령행·JSON 은 모두 초기화자보다 앞에 서고
+      # 실행 가능 jar 에는 `web.xml` 도 JNDI 도 없다) — 그 재검사는 **미래의 늦은 소스**에 대한
+      # 방어다.
+      - name: 앱 이미지 거부 스모크 — 운반 이름공간을 조기에 거부한다 (S-22c)
         run: |
           set -euo pipefail
           name="m6a2a-late-source-refusal"
@@ -280,17 +289,33 @@ jobs:
             -e BIDVECTOR_EVALUATION_CANDIDATECAP=1 \
             -e SERVER_SERVLET_CONTEXTPARAMETERS_MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_SHOWDETAILS=always \
             bidvector/app:local 2>&1)" && rc=0 || rc=$?
+          # r3(code-review r3 LOW-6) — 실패 분기에서 컨테이너 출력을 **버리지 않는다.** 이 step 이
+          # 붉어지는 경우가 곧 「무엇이 나왔는지 알아야 하는」 경우다. 다만 전문을 찍지 않는다 —
+          # 값이 실릴 축이 오늘 없다는 것은 이 step 자신이 보증하지만(입력 여덟이 전부 리터럴
+          # 일회성 값이고 생성 자격은 이 컨테이너로 전달되지 않는다), 뒤 편집이 실 값을 붙이는
+          # 날 그 전문이 로그로 간다. **고정 표지 줄만** 낸다.
+          _markers() {
+            local lines
+            lines="$(printf '%s\n' "$out" \
+              | grep -aE 'D-6A2a-|APPLICATION FAILED TO START|Application run failed' | tail -n 5)" || lines=""
+            if [ -n "$lines" ]; then
+              printf '%s\n' "$lines" >&2
+            else
+              echo "(값 없는 표지 줄이 없다 — 컨테이너 출력 ${#out} 자)" >&2
+            fi
+          }
           if [ "$rc" -eq 0 ]; then
             echo "적대 환경변수를 줬는데 컨테이너가 0 으로 끝났다 — 관리 표면 거부가 서지 않았다" >&2
+            _markers
             exit 1
           fi
           case "$out" in
-            *D-6A2a-1[04]*) ;;
-            *) echo "컨테이너가 비-0(${rc})으로 끝났지만 관리 표면 거부 사유가 아니다" >&2; exit 1 ;;
+            *D-6A2a-10*) ;;
+            *) echo "컨테이너가 비-0(${rc})으로 끝났지만 조기 거부(D-6A2a-10) 사유가 아니다" >&2; _markers; exit 1 ;;
           esac
           case "$out" in
             *server.servlet.contextparameters*) ;;
-            *) echo "거부 문면이 운반 이름공간 키를 말하지 않는다" >&2; exit 1 ;;
+            *) echo "거부 문면이 운반 이름공간 키를 말하지 않는다" >&2; _markers; exit 1 ;;
           esac
           echo "== 거부 스모크 통과(exit=${rc}) =="
 
@@ -338,7 +363,9 @@ jobs:
           }
           _mgmt() {
             local out
-            out="$($COMPOSE exec -T app curl -sS -w '\n%{http_code}' "$MGMT$1")" || out="$(printf '\ntransport-error')"
+            # r3(code-review r3 LOW-7) — `$'…'` 가 같은 값을 서브셸 없이 준다(명령 치환은 뒤따르는
+            # 개행만 지우므로 앞 형태의 거동도 같았다). 형태가 위 두 helper 와 한 번 더 같아진다.
+            out="$($COMPOSE exec -T app curl -sS -w '\n%{http_code}' "$MGMT$1")" || out=$'\ntransport-error'
             printf '%s' "$out"
           }
           _mgmt_code() { printf '%s' "$(_mgmt "$1")" | tail -n1; }
