@@ -533,6 +533,30 @@ endpoint** 로 가른다. endpoint 는 인증·쓰기 경로라 따로 판정받
 
 ML 은 자리지킴 그대로이고, compose 기동은 수집을 켜지 않는다. Codex 는 없다(인증 필터 편집 금지가 계약이다).
 
+**6A-2a 종결 2026-09-26** — PR **#47**(계약 갱신 둘: D-6A2a-10~17). 판정 열 건과 조치를 PR 코멘트로 남겼다. 레인별 판정 흐름:
+
+| 레인 | 판정 |
+|---|---|
+| verifier | 4라운드: not-ready ×2 → ready-for-review ×2 |
+| `code-reviewer`(sonnet) | 3라운드: → APPROVE |
+| `privacy-gate`(범용 대행) | 3라운드: → pass |
+
+재작업 **3/5**. CI 세 job 은 전부 통과했다(`check` 9m7s · `container` 3m48s · `ml-engine`). 앱이 처음으로 이미지로 뜬다 — 두 이미지 모두 위생 게이트를 통과하고 세 서비스가 healthy 로 수렴한다. 스모크가 뜬 컨테이너에서 인증 경계와 health 격리를 잰다. 인증·audit 필터 두 파일은 diff 0 이다.
+
+**세 라운드의 차단 결함은 한 계열이었다 — 「환경이 관리 표면을 넓힐 수 있다」.** 매 라운드 닫은 방법과 그다음 드러난 구멍은 이렇다.
+- r1 은 잠금이 **이름으로 열거한** 10 키만 막았다. 그룹별 세부·새 그룹·상태 매핑이 환경변수 한 줄로 열렸다.
+- 그래서 **접두사 거부**(구성)로 바꿨다. 그러자 r2 에서 **시점**이 드러났다 — 거부는 기동 초기에 선 소스만 봤고, refresh 중에 채워지는 servlet context 파라미터 소스가 출하 이미지에서 r1 결함 셋을 전부 다시 열었다.
+- **모든 소스가 선 뒤의 재검사**로 닫았다. r3 는 「readiness 전」이 test 로 잠겨 있지 않음을 보였고(검사를 뒤로 옮겨도 초록), 기록기 test 로 잠갔다.
+
+**열거를 구성으로 바꾸면 다음 결함은 시점에서 온다** — 게이트 술어는 「무엇을」과 「언제」를 둘 다 닫아야 한다.
+
+**넘긴 것**:
+- 신설 `OPEN-6A2A-DISTROLESS` · `OPEN-6A2A-MGMT-PORT-EXPOSURE`(관리 포트 노출은 배치 환경이 진다)
+- 신설 `OPEN-6A2A-PRE-CONNECTOR-CHECK` — 포트가 재검사보다 먼저 열린다. 지금 그 창에 닿는 경로는 조기 거부가 막는다.
+- **기동 거부 운영 결과는 6E runbook 입력이다**: 포트·주소 말고 다른 `MANAGEMENT_*`·`SPRING_JMX_*` 는 기동을 거부한다. k8s `management` Service 의 service link 변수도 거부 대상이다.
+- 6A-2b 로(무변경): `OPEN-6F9-STRATEGY-WRITE-ENDPOINT` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` · `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` · `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(실측 영향 0) · `OPEN-API-WRONG-METHOD-500`(관리 포트 비 GET 500 관측 추가)
+- 관측: `ml-serving:local` 336MB / 상한 400MB.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
