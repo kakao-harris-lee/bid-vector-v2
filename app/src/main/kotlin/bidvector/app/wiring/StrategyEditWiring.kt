@@ -4,7 +4,6 @@ import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.adapters.strategy.JdbcStrategyEditTransaction
 import bidvector.adapters.strategy.StrategyEditTransaction
 import bidvector.sharedkernel.Resolution
-import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyPolicyData
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.EDIT_SESSION_POLICY
@@ -39,17 +38,20 @@ open class StrategyEditWiring {
     open fun strategyEditTransaction(
         transactionBoundary: TransactionBoundary,
         clock: Clock,
+        resolvedStrategyPolicy: Resolution.Resolved<StrategyPolicyData>,
     ): StrategyEditTransaction =
         JdbcStrategyEditTransaction(
             transactions = transactionBoundary,
-            strategyPolicy = resolvedStrategyPolicy(),
+            strategyPolicy = resolvedStrategyPolicy,
             sessionPolicy = resolvedSessionPolicy(),
             clock = clock,
         )
 
     @Bean
-    open fun strategyEditExecutor(strategyEditTransaction: StrategyEditTransaction): StrategyEditExecutor =
-        StrategyEditExecutor(strategyEditTransaction, resolvedStrategyPolicy())
+    open fun strategyEditExecutor(
+        strategyEditTransaction: StrategyEditTransaction,
+        resolvedStrategyPolicy: Resolution.Resolved<StrategyPolicyData>,
+    ): StrategyEditExecutor = StrategyEditExecutor(strategyEditTransaction, resolvedStrategyPolicy)
 
     /** D-6A2b-8 — `app.http` 가 전략 포트를 직접 받지 않게 하는 읽기 전용 조회기. */
     @Bean
@@ -57,15 +59,9 @@ open class StrategyEditWiring {
 }
 
 /**
- * 정책 해소는 `PersistenceWiring.strategyRepository` 와 **같은 형태**다(그 자리의 KDoc
- * D-6F1-6) — 어댑터가 정책 파일의 독자가 되지 않게 조립이 해소해 넘긴다. 해소 실패는
- * 기동 실패다(전략을 지어내지 않는다).
+ * 세션 정책은 이 배선의 유일한 소비자라 여기서 해소한다 — 전략 정책과 달리 다른 배선이
+ * 쓰지 않는다(D-6A2b-23 이 하나로 모은 것은 **두 곳이 따로 읽던** 전략 정책이다).
  */
-private fun resolvedStrategyPolicy(): Resolution.Resolved<StrategyPolicyData> {
-    val resolution = STRATEGY_POLICY.resolve(LocalDate.now())
-    return resolution as? Resolution.Resolved<StrategyPolicyData> ?: error("전략 정책이 해소되지 않았다: $resolution")
-}
-
 private fun resolvedSessionPolicy(): EditSessionPolicyData {
     val resolution = EDIT_SESSION_POLICY.resolve(LocalDate.now())
     return (resolution as? Resolution.Resolved<EditSessionPolicyData>)?.value

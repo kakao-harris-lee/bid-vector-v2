@@ -37,18 +37,31 @@ open class PersistenceWiring {
         }
 
     /**
-     * 기동 시 1회 migrate 후 [JdbcStrategyRepository]를 만든다 — 정책은 항상 해소된다
-     * (`STRATEGY_POLICY`가 `EffectiveFrom.Initial` 항목 하나뿐이라 어떤 기준일도 적용된다,
-     * preflight 조사 확인). 해소되지 않으면 지어내지 않고 기동을 실패시킨다.
+     * **M6/6A-2b D-6A2b-23(code-review r1 MEDIUM-5) — 해소는 조립에서 한 번이다.** 이전에는
+     * 이 자리와 편집 배선이 각자 `resolve(LocalDate.now())` 를 불러, 같은 기동 안에서 서로
+     * 다른 정책 인스턴스(그리고 자정을 넘기면 다른 값)를 쥘 여지가 있었다. 정책 파일의
+     * 독자를 하나로 둔다 — 해소되지 않으면 지어내지 않고 기동을 실패시킨다.
      */
     @Bean
-    open fun strategyRepository(dataSource: DataSource): StrategyRepository {
-        migrate(dataSource)
+    open fun resolvedStrategyPolicy(): Resolution.Resolved<StrategyPolicyData> {
         val resolution = STRATEGY_POLICY.resolve(LocalDate.now())
-        val resolved =
-            resolution as? Resolution.Resolved<StrategyPolicyData>
-                ?: error("전략 정책이 해소되지 않았다: $resolution")
-        return JdbcStrategyRepository(dataSource, resolved)
+        return resolution as? Resolution.Resolved<StrategyPolicyData>
+            ?: error("전략 정책이 해소되지 않았다: $resolution")
+    }
+
+    /**
+     * 기동 시 1회 migrate 후 [JdbcStrategyRepository]를 만든다. **migration 이 이 빈 생성의
+     * 부수효과라는 것은 알려진 제한**이다(code-review r1 L-8) — 같은 컨텍스트의 싱글턴 생성
+     * 순서에 기대고 있고, 선언된 의존이 아니다. 오늘은 `DataSource` 를 쓰는 다른 빈이 전부
+     * 기동 시 생성돼 문제가 없다.
+     */
+    @Bean
+    open fun strategyRepository(
+        dataSource: DataSource,
+        resolvedStrategyPolicy: Resolution.Resolved<StrategyPolicyData>,
+    ): StrategyRepository {
+        migrate(dataSource)
+        return JdbcStrategyRepository(dataSource, resolvedStrategyPolicy)
     }
 
     private fun migrate(dataSource: DataSource) {
