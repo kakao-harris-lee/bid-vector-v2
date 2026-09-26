@@ -12,6 +12,7 @@ import org.springframework.context.ApplicationListener
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.context.event.ContextRefreshedEvent
 import org.springframework.core.Ordered
+import org.springframework.core.annotation.Order
 import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.MapPropertySource
 
@@ -258,13 +259,12 @@ class ManagementSurfaceLock : ApplicationContextInitializer<ConfigurableApplicat
  *
  * 여기서 던진 예외는 `refresh()` 안에서 `SpringApplication.run` 의 catch 로 올라가 context 를 닫고
  * 그대로 다시 던져진다 — 즉 **프로세스가 뜨지 않는다**. 우선순위를 최상위로 두는 이유는 같은
- * event 의 다른 listener 가 위반 상태에서 먼저 도는 것을 막기 위해서다.
+ * event 의 다른 listener 가 위반 상태에서 먼저 도는 것을 막기 위해서다. 그 우선순위를 `Ordered`
+ * 구현이 아니라 `@Order` 로 주는 이유는 `typeShapeGate` 의 인터페이스 수 래칫이다(구현 인터페이스
+ * 상한 1) — `AnnotationAwareOrderComparator` 가 둘을 같게 읽으므로 거동은 같다.
  */
-class ManagementSurfaceLateCheck :
-    ApplicationListener<ContextRefreshedEvent>,
-    Ordered {
-    override fun getOrder(): Int = Ordered.HIGHEST_PRECEDENCE
-
+@Order(Ordered.HIGHEST_PRECEDENCE)
+class ManagementSurfaceLateCheck : ApplicationListener<ContextRefreshedEvent> {
     override fun onApplicationEvent(event: ContextRefreshedEvent) {
         refuseManagementSurfaceKeysAfterRefresh(event.applicationContext)
     }
