@@ -18,7 +18,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
-import java.net.ServerSocket
 import javax.sql.DataSource
 
 /**
@@ -72,7 +71,10 @@ class ProductionAssemblyAuthAuditTest {
                         mapOf(
                             "server.port" to "0",
                             // M6/6A-2a — 관리 포트 기본값(8081)을 test 가 점유하지 않는다(병렬 fork 충돌).
-                            "management.server.port" to ServerSocket(0).use { it.localPort }.toString(),
+                            // `0` 은 커널이 고르게 한다 — 미리 고른 번호를 닫고 다시 bind 하는
+                            // 사이의 틈(TOCTOU)을 만들지 않는다(code-review r1 LOW). 이 test 는
+                            // 관리 포트를 부르지 않으므로 실제 번호를 읽을 필요가 없다.
+                            "management.server.port" to "0",
                             "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
                             "bidvector.persistence.username" to postgres.username,
                             "bidvector.persistence.credential" to postgres.password,

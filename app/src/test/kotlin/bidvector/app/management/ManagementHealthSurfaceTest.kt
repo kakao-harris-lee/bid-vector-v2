@@ -5,6 +5,7 @@ import bidvector.app.productionApplication
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.MethodOrderer
@@ -13,7 +14,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestMethodOrder
 import org.springframework.boot.actuate.endpoint.web.WebEndpointsSupplier
 import org.springframework.boot.resttestclient.TestRestTemplate
-import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
+import org.springframework.boot.web.server.context.WebServerApplicationContext
 import org.springframework.boot.web.server.servlet.context.ServletWebServerInitializedEvent
 import org.springframework.context.ApplicationListener
 import org.springframework.context.ConfigurableApplicationContext
@@ -23,7 +24,6 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.ResponseEntity
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
-import java.net.ServerSocket
 
 /**
  * D-6A2a-4 — **출하 조립을 실제로 띄워** 관리 표면을 잰다. 여기서 재는 것은 넷이다:
@@ -44,9 +44,6 @@ class ManagementHealthSurfaceTest {
         private const val POSTGRES_IMAGE = "postgres:16.4"
         private const val TEST_CREDENTIAL_VALUE = "management-surface-test-fixture-credential"
 
-        /** 관리 포트 기본값(8081)을 test 가 점유하지 않는다 — 병렬 test fork 끼리 충돌한다. */
-        private val managementPort: Int = ServerSocket(0).use { it.localPort }
-
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
                 .withDatabaseName("bidvector_management_surface_test")
@@ -56,6 +53,7 @@ class ManagementHealthSurfaceTest {
 
         private lateinit var context: ConfigurableApplicationContext
         private var apiPort: Int = 0
+        private var managementPort: Int = 0
 
         /**
          * 관리 child context 를 잡는다 — Spring 은 child 의 event 를 parent 로도 발행하므로
@@ -63,13 +61,27 @@ class ManagementHealthSurfaceTest {
          */
         private var managementContext: ConfigurableApplicationContext? = null
 
+        /**
+         * **포트를 미리 고르지 않는다**(code-review r1 LOW). `ServerSocket(0)` 으로 번호를 얻어
+         * 닫은 뒤 Boot 가 bind 하기까지는 틈이 있어, 병렬 fork 나 이 호스트의 다른 프로세스가
+         * 그 번호를 가져가면 `Address already in use` 로 붉는다. 둘 다 `0` 으로 주고 실제
+         * 번호는 **이미 뜬 서버의 event** 에서 읽는다. 판별은 번호 비교가 아니라 Boot 자신의
+         * 서버 이름공간(`management`)이다.
+         *
+         * `management.server.port` 를 **명령행 인자**로 주는 것은 양성 대조다(D-6A2a-10) —
+         * 배치가 정할 수 있는 유일한 관리 표면 키가 가장 높은 우선순위 자리에서 주어져도
+         * 출하 조립이 끝까지 뜬다는 사실을 이 test 전체가 전제로 깐다.
+         */
         @JvmStatic
         @BeforeAll
         fun boot() {
             val capture =
                 ApplicationListener<ServletWebServerInitializedEvent> { event ->
-                    if (event.webServer.port == managementPort) {
+                    if (WebServerApplicationContext.hasServerNamespace(event.applicationContext, "management")) {
                         managementContext = event.applicationContext
+                        managementPort = event.webServer.port
+                    } else {
+                        apiPort = event.webServer.port
                     }
                 }
             context =
@@ -78,17 +90,15 @@ class ManagementHealthSurfaceTest {
                     .properties(
                         mapOf(
                             "server.port" to "0",
-                            "management.server.port" to managementPort.toString(),
                             "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
                             "bidvector.persistence.username" to postgres.username,
                             "bidvector.persistence.credential" to postgres.password,
                             "operator.credential.value" to TEST_CREDENTIAL_VALUE,
                             "bidvector.evaluation.candidate-cap" to "1000",
                         ),
-                    ).run()
-            apiPort =
-                (context as ServletWebServerApplicationContext).webServer?.port
-                    ?: error("API web server 가 뜨지 않았다")
+                    ).run("--management.server.port=0")
+            require(apiPort > 0) { "API web server 가 뜨지 않았다" }
+            require(managementPort > 0) { "관리 web server 가 뜨지 않았다 — 포트가 분리되지 않았을 수 있다" }
         }
 
         @JvmStatic
@@ -167,8 +177,54 @@ class ManagementHealthSurfaceTest {
             "/actuator/heapdump",
             "/actuator/mappings",
             "/actuator/shutdown",
+            // privacy-gate r1 L-1 — 구성 요소 경로다. `show-components=never` 아래에서는 404 이고,
+            // 그 설정이 열리는 순간 **가장 먼저 세부를 내는 경로**다. 그래서 탐침에 넣는다.
+            "/actuator/health/db",
         ).forEach { path ->
             restTemplate.getForEntity(management(path), String::class.java).statusCode.value() shouldBe 404
+        }
+    }
+
+    /**
+     * D-6A2a-13 ② — 관리 포트의 **actuator 밖 표면**을 실측으로 못박는다(verifier r1 F-4 ·
+     * privacy-gate r1 L-1). 계약 (2b) 는 「관리 포트의 그 밖의 경로: 없어야 한다」였는데
+     * `/error` 는 404 가 아니다 — Boot 의 오류 처리 경로가 관리 child context 에도 붙는다.
+     *
+     * 고치지 않고 **모양을 잠그는** 쪽을 고른 근거: 이 응답에 새는 값이 없다(우리가 만든 예외가
+     * 아니라 「디스패치된 오류 없음」 상태라 구성 요소 이름·DB 주소·예외 메시지·스택이 없다).
+     * 대신 칸이 하나라도 늘면(예: `message`·`trace`·`exception`) 이 단언이 붉어진다.
+     */
+    @Test
+    @Order(2)
+    fun `관리 포트의 error 경로는 값을 싣지 않는 고정 모양이다`() {
+        val response = bodyOf(management("/error"))
+
+        response.statusCode.value() shouldBe 200
+        response.body?.keys?.sorted() shouldContainExactly listOf("error", "status", "timestamp")
+        response.body?.get("error") shouldBe "None"
+    }
+
+    /**
+     * D-6A2a-13 ② — 관리 포트의 **비 GET** 관측. `OPEN-API-WRONG-METHOD-500`(API 포트에서 이미
+     * 넘긴 OPEN)과 같은 계열이며, 본문이 일반 메시지뿐임을 여기서 잰다(응답에 우리 쪽 정보가
+     * 실리면 이 단언이 붉어진다).
+     */
+    @Test
+    @Order(2)
+    fun `관리 포트의 비 GET 요청은 일반 오류 본문만 낸다`() {
+        listOf(HttpMethod.POST, HttpMethod.DELETE).forEach { method ->
+            val response =
+                restTemplate.exchange(
+                    management("/actuator/health"),
+                    method,
+                    HttpEntity<Void>(HttpHeaders()),
+                    String::class.java,
+                )
+            response.statusCode.value() shouldBe 500
+            val body = response.body ?: ""
+            listOf("postgres", "jdbc", "Exception", "readinessState", "diskSpace").forEach { leak ->
+                body shouldNotContain leak
+            }
         }
     }
 

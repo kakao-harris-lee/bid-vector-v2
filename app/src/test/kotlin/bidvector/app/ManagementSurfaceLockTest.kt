@@ -1,27 +1,34 @@
 package bidvector.app
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import org.springframework.boot.actuate.autoconfigure.web.server.ManagementPortType
 import org.springframework.core.env.MapPropertySource
+import org.springframework.core.env.PropertySource
 import org.springframework.core.env.SimpleCommandLinePropertySource
 import org.springframework.core.env.StandardEnvironment
 import org.springframework.core.env.SystemEnvironmentPropertySource
 
 /**
- * D-6A2a-4 (2b) 「새 설정 키(`management.*`)」 — 관리 표면 값은 조립 근이 고정하고 **환경이
- * 넓히지 못해야** 한다. 넓힐 수 있으면 우회 2(관리 포트에서 `env`·`configprops`·`heapdump`로
- * 비밀값을 읽는다)가 다시 열린다.
+ * D-6A2a-10 「관리 표면은 **접두사 거부**로 닫는다(구성)」 — 잠금 밖의 어느 속성 소스에든
+ * `management.` 이름공간 키가 있으면 기동을 거부한다. 허용은 `management.server.port` 하나다.
  *
- * **실측 전제(구현 레인, 2026-09-26)** — `SpringApplicationBuilder.properties(...)`는
- * `SpringApplication.setDefaultProperties`로 들어가고 그 property source 는 **가장 낮은**
- * 우선순위다. 그래서 [PRODUCTION_DISPATCH_PROPERTIES] 형태만으로는 환경변수 한 줄이 노출을
- * 넓힌다. [lockManagementSurface]는 잠금 값을 `addFirst`로 **가장 높은** 자리에 심어 그 축을
- * 닫는다 — 이 test 가 재는 것이 그 순서다.
+ * **왜 이 판을 쓰는가(r1 세 레인이 같은 결함을 따로 실측했다).** 직전 판은 잠금이 **이름으로
+ * 고정한 키**의 우선순위만 쟀다. 그 축은 실제로 빈틈이 없었으나, `management.*` 에는 **같은
+ * 출력에 닿는 다른 키**가 있다 — 그룹별 `show-details`·`show-components`·`include`/`exclude`,
+ * 새 그룹 이름, `status.http-mapping`, `probes.add-additional-paths`,
+ * `validate-group-membership`. 환경변수 한두 줄이 그 키들로 우회 2·3·7 을 다시 열었고, 직전
+ * 판의 단언은 **모집단이 잠금 자신**(`MANAGEMENT_SURFACE_LOCK.forEach`)이라 열거 밖 키를
+ * 구조적으로 잴 수 없었다. 그래서 여기서는 ① 잠금 키 집합을 **리터럴**로 못박고(키를 지우면
+ * 곧바로 붉다) ② 판정은 열거가 아니라 **이름공간 접두사**로 하고 ③ 값 축이 아니라 **기동
+ * 거부**를 단언한다. 새 Boot 판이 새 `management.*` 키를 더해도 접두사에 걸린다.
  *
- * 명령행 인자까지 함께 재는 이유: `commandLineArgs`는 표준 우선순위에서 환경변수보다 **위**다.
- * 명령행을 이기면 환경변수는 자동으로 닫힌다(더 강한 축 하나로 두 축을 덮는다).
+ * 실행 단언(출하 조립을 실제로 부팅해 거부를 재는 축)은 [bidvector.app.management] 의
+ * `ManagementSurfaceBootRefusalTest` 가 든다 — 이 파일은 순수 환경 판정이다.
  */
 class ManagementSurfaceLockTest {
     private fun environmentWithSystemEnvironment(entries: Map<String, String>): StandardEnvironment =
@@ -46,50 +53,136 @@ class ManagementSurfaceLockTest {
             )
         }
 
+    /**
+     * 잠금이 고정하는 키 집합을 **손으로 적는다**(code-review r1 MEDIUM). 직전 판의 주 단언은
+     * `MANAGEMENT_SURFACE_LOCK` 을 순회했다 — 키를 **지우면** 루프가 짧아질 뿐 붉지 않았고,
+     * 지운 순간 그 키의 환경 축이 다시 열렸다(Boot 기본값이 같은 거동을 내는 다섯 키는 값
+     * 단언으로도 잡히지 않는다). 이제 집합이 바뀌면 여기가 먼저 붉다.
+     */
     @Test
-    fun `환경변수로 관리 표면을 넓히려 해도 잠금 값이 이긴다`() {
+    fun `잠금이 고정하는 키 집합은 리터럴이다`() {
+        MANAGEMENT_SURFACE_LOCK.keys.sorted() shouldContainExactly
+            listOf(
+                "management.endpoint.health.group.liveness.include",
+                "management.endpoint.health.group.readiness.include",
+                "management.endpoint.health.probes.enabled",
+                "management.endpoint.health.show-components",
+                "management.endpoint.health.show-details",
+                "management.endpoints.web.base-path",
+                "management.endpoints.web.discovery.enabled",
+                "management.endpoints.web.exposure.exclude",
+                "management.endpoints.web.exposure.include",
+                "spring.jmx.enabled",
+            )
+    }
+
+    @Test
+    fun `환경변수가 그룹 단위 세부를 정하려 하면 기동을 거부하고 값은 싣지 않는다`() {
         val environment =
             environmentWithSystemEnvironment(
                 mapOf(
                     "MANAGEMENT_SERVER_PORT" to "19081",
-                    "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE" to "health,env,configprops,heapdump",
-                    "MANAGEMENT_ENDPOINTS_WEB_DISCOVERY_ENABLED" to "true",
-                    "MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS" to "always",
-                    "MANAGEMENT_ENDPOINT_HEALTH_SHOW_COMPONENTS" to "always",
-                    "MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE" to "readinessState",
-                    "SPRING_JMX_ENABLED" to "true",
+                    "MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_SHOWDETAILS" to "VALUE-MUST-NOT-APPEAR",
                 ),
             )
 
-        // 잠금 전에는 환경변수가 이긴다 — 이 단언이 없으면 아래 단언이 공허하게 참일 수 있다.
-        environment.getProperty("management.endpoints.web.exposure.include") shouldBe
-            "health,env,configprops,heapdump"
+        val thrown = shouldThrow<IllegalStateException> { lockManagementSurface(environment) }
 
-        lockManagementSurface(environment)
-
-        MANAGEMENT_SURFACE_LOCK.forEach { (key, locked) ->
-            environment.getProperty(key) shouldBe locked
-        }
+        thrown.message!! shouldContain "management.endpoint.health.group.readiness"
+        thrown.message!! shouldNotContain "VALUE-MUST-NOT-APPEAR"
     }
 
     @Test
-    fun `명령행 인자로도 관리 표면을 넓힐 수 없다`() {
+    fun `명령행 인자가 관리 표면 키를 정하려 하면 기동을 거부한다`() {
         val environment =
             environmentWithSystemEnvironment(mapOf("MANAGEMENT_SERVER_PORT" to "19082")).apply {
                 propertySources.addFirst(
                     SimpleCommandLinePropertySource(
-                        "--management.endpoints.web.exposure.include=health,env",
-                        "--management.endpoint.health.show-details=always",
+                        "--management.endpoint.health.group.x.include=*",
+                        "--management.endpoint.health.status.http-mapping.down=200",
                     ),
                 )
             }
 
-        environment.getProperty("management.endpoints.web.exposure.include") shouldBe "health,env"
+        val thrown = shouldThrow<IllegalStateException> { lockManagementSurface(environment) }
 
-        lockManagementSurface(environment)
+        thrown.message!! shouldContain "management.endpoint.health.group.x.include"
+        thrown.message!! shouldContain "management.endpoint.health.status.http-mapping.down"
+    }
 
-        environment.getProperty("management.endpoints.web.exposure.include") shouldBe "health"
-        environment.getProperty("management.endpoint.health.show-details") shouldBe "never"
+    /**
+     * `SPRING_APPLICATION_JSON` 은 Boot 의 환경 후처리기가 **평탄화한 map source** 로 심는다
+     * (초기화자보다 먼저 돈다). 그 source 의 키는 점 표기이므로 같은 접두사 판정에 걸려야 한다.
+     */
+    @Test
+    fun `평탄화된 JSON source 의 관리 표면 키도 거부된다`() {
+        val environment =
+            environmentWithSystemEnvironment(mapOf("MANAGEMENT_SERVER_PORT" to "19084")).apply {
+                propertySources.addFirst(
+                    MapPropertySource(
+                        "spring.application.json",
+                        mapOf("management.endpoint.health.probes.add-additional-paths" to "true"),
+                    ),
+                )
+            }
+
+        val thrown = shouldThrow<IllegalStateException> { lockManagementSurface(environment) }
+
+        thrown.message!! shouldContain "management.endpoint.health.probes.add-additional-paths"
+    }
+
+    /**
+     * 목록 값의 **색인·대괄호 형태** — relaxed binding 이 `include[0]` 을 같은 속성의 원소로
+     * 읽으므로, 이름 비교 하나로 닫으면 이 형태가 남는다. 정규형 이름으로 판정한다.
+     */
+    @Test
+    fun `대괄호 색인 형태의 관리 표면 키도 거부된다`() {
+        val environment =
+            environmentWithSystemEnvironment(mapOf("MANAGEMENT_SERVER_PORT" to "19085")).apply {
+                propertySources.addFirst(
+                    MapPropertySource(
+                        "hostile-indexed",
+                        mapOf("management.endpoints.web.exposure.include[0]" to "env"),
+                    ),
+                )
+            }
+
+        shouldThrow<IllegalStateException> { lockManagementSurface(environment) }
+    }
+
+    /**
+     * `spring.jmx` 도 잠금이 고정하는 이름공간이다 — JMX 는 관리 포트와 무관한 **두 번째
+     * 표면**이므로 같은 방식으로 닫는다(잠금이 이름 댄 키가 걸린 접두사는 전부 대상이다).
+     */
+    @Test
+    fun `spring jmx 이름공간의 키도 거부된다`() {
+        val environment =
+            environmentWithSystemEnvironment(
+                mapOf("MANAGEMENT_SERVER_PORT" to "19086", "SPRING_JMX_ENABLED" to "true"),
+            )
+
+        val thrown = shouldThrow<IllegalStateException> { lockManagementSurface(environment) }
+
+        thrown.message!! shouldContain "spring.jmx.enabled"
+    }
+
+    /**
+     * **양성 대조** — 배치가 정할 수 있는 유일한 키는 거부되지 않는다. 이 단언이 없으면 위
+     * 거부 단언들이 「아무 것이나 거부한다」로도 참이 된다.
+     */
+    @Test
+    fun `관리 포트 값은 환경변수로도 명령행으로도 정할 수 있다`() {
+        val fromEnvironment = environmentWithSystemEnvironment(mapOf("MANAGEMENT_SERVER_PORT" to "19087"))
+        lockManagementSurface(fromEnvironment)
+        fromEnvironment.getProperty("management.server.port") shouldBe "19087"
+
+        val fromCommandLine =
+            environmentWithSystemEnvironment(emptyMap()).apply {
+                propertySources.addFirst(SimpleCommandLinePropertySource("--management.server.port=19088"))
+            }
+        lockManagementSurface(fromCommandLine)
+        fromCommandLine.getProperty("management.server.port") shouldBe "19088"
+        fromCommandLine.getProperty("management.endpoints.web.exposure.include") shouldBe "health"
     }
 
     @Test
@@ -128,8 +221,8 @@ class ManagementSurfaceLockTest {
     }
 
     /**
-     * 잠금이 두 번 걸려도 property source 가 쌓이지 않는다 — `main()`과 boot test 가 같은
-     * 초기화자를 공유하므로 재적용이 조용히 중복되는 형태를 막는다.
+     * 잠금이 두 번 걸려도 property source 가 쌓이지 않고, **자기 자신을 위반으로 읽지도
+     * 않는다**(잠금 source 는 판정 모집단에서 이름으로 빠진다).
      */
     @Test
     fun `잠금을 두 번 걸어도 property source 는 하나다`() {
@@ -139,5 +232,29 @@ class ManagementSurfaceLockTest {
         lockManagementSurface(environment)
 
         environment.propertySources.count { it.name == MANAGEMENT_SURFACE_LOCK_SOURCE } shouldBe 1
+    }
+
+    /**
+     * **배선 형태(`addFirst`)를 잠근다.** 접두사 거부는 초기화자가 도는 **그 시점에 있는**
+     * source 만 본다. 서블릿 컨텍스트 init-param 처럼 그 시점에는 stub(빈 것)이고 뒤에
+     * 실체로 교체되는 source 는 판정 모집단 밖이다 — 그 축을 막는 것은 잠금이 **맨 앞**에
+     * 심긴다는 사실 하나다. `addFirst` 를 `addLast` 로 바꾸면 이 단언이 붉어진다.
+     */
+    @Test
+    fun `잠금 뒤에 실체가 채워지는 source 보다 잠금이 우선한다`() {
+        val stubName = "servletContextInitParams"
+        val environment =
+            environmentWithShippedDefaults().apply {
+                propertySources.addFirst(PropertySource.StubPropertySource(stubName))
+            }
+
+        lockManagementSurface(environment)
+
+        environment.propertySources.replace(
+            stubName,
+            MapPropertySource(stubName, mapOf("management.endpoint.health.show-details" to "always")),
+        )
+
+        environment.getProperty("management.endpoint.health.show-details") shouldBe "never"
     }
 }
