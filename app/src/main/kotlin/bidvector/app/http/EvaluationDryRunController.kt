@@ -85,7 +85,7 @@ data class EvaluationDryRunResponse(
     val reviewNoticeIds: List<String>,
     val skipNoticeIds: List<String>,
     val notReachedNoticeIds: List<String>,
-    /** [RecordingNotificationRequestPort]가 모은 요청의 공고 ID — 불변식: 이 집합 == [bidNowNoticeIds] 집합. */
+    /** dry-run 이 모은 알림 요청의 공고 ID — 불변식: 이 집합 == [bidNowNoticeIds] 집합. */
     val wouldNotifyNoticeIds: List<String>,
 ) {
     companion object {
@@ -107,7 +107,7 @@ data class EvaluationDryRunResponse(
                 reviewNoticeIds = buckets.review,
                 skipNoticeIds = buckets.skip,
                 notReachedNoticeIds = buckets.notReached,
-                wouldNotifyNoticeIds = run.notifications.requested().map { it.noticeId.label() },
+                wouldNotifyNoticeIds = run.wouldNotifyNoticeIds().map { it.label() },
             )
         }
     }

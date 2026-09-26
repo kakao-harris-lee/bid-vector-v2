@@ -4,6 +4,7 @@ import bidvector.adapters.evaluation.InvalidEvaluationRequestException
 import bidvector.adapters.evaluation.PinnedStrategyRepository
 import bidvector.adapters.evaluation.RecordingNotificationRequestPort
 import bidvector.adapters.evaluation.RequestCapacityPort
+import bidvector.procurement.NoticeId
 import bidvector.strategy.OperatorStrategy
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
@@ -22,9 +23,17 @@ import bidvector.workflow.strategy.StrategyRepository
  */
 class EvaluationDryRunRun(
     val useCase: EvaluateCandidatesUseCase,
-    val notifications: RecordingNotificationRequestPort,
+    private val notifications: RecordingNotificationRequestPort,
     val strategy: OperatorStrategy,
-)
+) {
+    /**
+     * **M6/6A-2b D-6A2b-8 — 어댑터가 아니라 값을 낸다.** 이전 판은 [notifications](어댑터
+     * 구현)를 `val` 로 내줘 컨트롤러가 그 타입을 이름으로 알아야 했다 — `app.http` 의존
+     * 게이트가 그 참조를 잡았다(실측). 컨트롤러가 필요한 것은 「알림이 갈 뻔한 공고」
+     * 목록뿐이라 그 값만 낸다.
+     */
+    fun wouldNotifyNoticeIds(): List<NoticeId> = notifications.requested().map { it.noticeId }
+}
 
 /**
  * 전략에 여력 상한이 설정되지 않았다(D-6A3-4 fail-closed) — `app.http.ErrorMapping`이 이

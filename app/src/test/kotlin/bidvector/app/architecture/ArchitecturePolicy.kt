@@ -53,6 +53,20 @@ class ArchitecturePolicy private constructor(
     val portCallAllowedPairs: List<Pair<String, String>>
         get() = pairs("app.port-call.allowed-pairs")
 
+    /**
+     * M6/6A-2b D-6A2b-8 — `app.http` 의존 게이트. 포트 집합은 이 파일이 아니라 use case
+     * 생성자에서 **도출**한다 — [appHttpUseCasePorts] 는 그 도출 결과와 대조할 **관측 등식**
+     * 이다(포트가 늘거나 줄면 RED 가 되어 분류를 다시 보게 한다).
+     */
+    val appHttpPackage: String get() = value("app.http.package")
+    val appHttpUseCaseType: String get() = value("app.http.use-case-type")
+    val appHttpUseCasePorts: List<String> get() = list("app.http.use-case-ports")
+    val appHttpAdaptersRoot: String get() = value("app.http.adapters-root")
+
+    /** D-6A2b-10 — 운영자 자격증명 타입과 그것을 참조해도 되는 클래스 집합(집합 등식). */
+    val operatorCredentialTypes: List<String> get() = list("app.secret.operator-credential-types")
+    val operatorCredentialReferencers: List<String> get() = list("app.secret.operator-credential-referencers")
+
     /** M6/6F-8 (b) — 수집 use case 패키지와 그것이 참조해도 되는 procurement 최상위 타입. */
     val collectionPackage: String get() = value("workflow.collection.package")
     val collectionAllowedProcurementTypes: List<String> get() = list("workflow.collection.allowed-procurement-types")

@@ -126,7 +126,11 @@ class SequentialCorrelationIdFactory : CorrelationIdFactory {
     override fun newId(): CorrelationId = CorrelationId("test-corr-${counter.incrementAndGet()}")
 }
 
-/** `load()`를 제어할 수 있는 fake — `save()`는 이 slice가 쓰지 않는다(읽기 하나, D-6A1-4). */
+/**
+ * `load()`를 제어할 수 있는 fake. **M6/6A-2b — `save()`가 실제로 저장한다**(6A-1 에서는
+ * 쓰기 경로가 없어 `error()`였다): 편집 endpoint test 가 「confirm 뒤 `GET /api/strategy`
+ * 가 새 값을 낸다」를 같은 저장소에서 확인한다.
+ */
 class TestStrategyRepository(
     @Volatile var strategy: OperatorStrategy = freshStrategy(),
 ) : StrategyRepository {
@@ -135,7 +139,7 @@ class TestStrategyRepository(
     override fun load(): OperatorStrategy = loadFailure?.let { throw it() } ?: strategy
 
     override fun save(applied: AppliedStrategy) {
-        error("이 slice의 test double은 save()를 쓰지 않는다 — 읽기 하나(D-6A1-4)")
+        strategy = applied.strategy
     }
 }
 
@@ -192,6 +196,13 @@ class InMemoryStrategyEditTransaction(
     val sessions: InMemoryEditSessionRepository = InMemoryEditSessionRepository()
     val events: RecordingStrategyEventSink = RecordingStrategyEventSink()
 
+    /** Spring 컨텍스트가 test 사이에 재사용되므로 세션·발행 이력을 매 test 전에 비운다. */
+    fun reset() {
+        sessions.clear()
+        events.published.clear()
+        events.actors.clear()
+    }
+
     override fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T {
         val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
         val sessionPolicy =
@@ -209,6 +220,8 @@ class InMemoryEditSessionRepository : EditSessionRepository {
     override fun save(session: EditSession) {
         stored[session.id] = session
     }
+
+    fun clear() = stored.clear()
 }
 
 class RecordingStrategyEventSink : EventSink {
