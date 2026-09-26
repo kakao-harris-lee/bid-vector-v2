@@ -8,11 +8,32 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import org.springframework.boot.actuate.autoconfigure.web.server.ManagementPortType
+import org.springframework.boot.env.DefaultPropertiesPropertySource
+import org.springframework.boot.env.RandomValuePropertySource
+import org.springframework.boot.support.SpringApplicationJsonEnvironmentPostProcessor
+import org.springframework.core.env.CommandLinePropertySource
 import org.springframework.core.env.MapPropertySource
 import org.springframework.core.env.PropertySource
 import org.springframework.core.env.SimpleCommandLinePropertySource
 import org.springframework.core.env.StandardEnvironment
 import org.springframework.core.env.SystemEnvironmentPropertySource
+import org.springframework.web.context.support.StandardServletEnvironment
+
+/** 잠금이 이름 대지 않은 형제 키 — 거부 문면 축의 적대 입력으로 쓴다. */
+private const val SIBLING_KEY = "management.endpoint.health.group.readiness.show-details"
+
+/** 소스 **이름** 안에 값이 실려 오는 형태의 표지 — 문면에 이것이 나오면 안 된다. */
+private const val SOURCE_NAME_MARKER = "VALUE-MUST-NOT-APPEAR"
+
+/**
+ * `spring.config.import` 가 URL 을 받으면 Boot 의 `StandardConfigDataLoader` 가 소스 이름을
+ * `Config resource '<resource>' via location '<location>'` 으로 짓고, 그 두 조각에 **원문 URL 이
+ * 그대로** 남는다(privacy-gate r3 L-6, 바이트코드 실독). userinfo 가 든 URL 이면 자격이 소스
+ * 이름을 타고 기동 실패 로그로 나간다. 표지를 보간으로 넣어 이 파일에 실 자격 형태를 적지 않는다.
+ */
+private val CONFIG_IMPORT_SOURCE_NAME =
+    "Config resource 'URL [https://operator:$SOURCE_NAME_MARKER@cfg.internal/app.properties]' " +
+        "via location 'https://operator:$SOURCE_NAME_MARKER@cfg.internal/app.properties'"
 
 /**
  * D-6A2a-10 「관리 표면은 **접두사 거부**로 닫는다(구성)」 — 잠금 밖의 어느 속성 소스에든
@@ -197,6 +218,73 @@ class ManagementSurfaceLockTest {
     }
 
     /**
+     * 거부 문면의 **소스 이름**도 값 축이다(privacy-gate r3 L-6 · code-review r3 LOW-2).
+     * `spring.config.import` 가 URL 을 받으면 그 URL 의 userinfo 가 소스 이름에 그대로 남는다 —
+     * 이름을 문면에 그대로 실으면 자격이 기동 실패 로그로 나간다. 그래서 상수 이름이 아닌 소스는
+     * **분류**(소스 클래스의 단순 이름)로만 실린다.
+     */
+    @Test
+    fun `상수 이름이 아닌 소스는 문면에 분류로만 실린다`() {
+        val environment = environmentWithNamedSource(CONFIG_IMPORT_SOURCE_NAME)
+
+        val thrown = shouldThrow<IllegalStateException> { lockManagementSurface(environment) }
+
+        thrown.message!! shouldContain SIBLING_KEY
+        thrown.message!! shouldContain "MapPropertySource"
+        thrown.message!! shouldNotContain SOURCE_NAME_MARKER
+        thrown.message!! shouldNotContain "cfg.internal"
+    }
+
+    /**
+     * **양성 대조와 근거를 함께** — 문면에 이름을 그대로 싣는 소스는 Boot·Spring 이 **상수로**
+     * 정하는 것들이다. 이름을 손으로 적은 목록이 그 상수와 어긋나면 그 소스는 분류로 내려간다
+     * (문면 품질만 떨어지고 표면은 열리지 않는다 — 이 열거는 **공개하는 쪽**이라 fail-closed 다).
+     * 목록을 상수에 묶어 두면 판 올림에서 이름이 바뀌어도 여기가 먼저 붉다.
+     *
+     * `server.ports` 만 리터럴이다 — `ServerPortInfoApplicationContextInitializer` 의 그 이름이
+     * `private` 상수라 참조할 수 없다(javap 실독).
+     */
+    @Test
+    fun `문면에 이름을 그대로 싣는 소스는 Boot·Spring 상수와 같다`() {
+        val constantSourceNames =
+            listOf(
+                StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                StandardEnvironment.SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME,
+                CommandLinePropertySource.COMMAND_LINE_PROPERTY_SOURCE_NAME,
+                SpringApplicationJsonEnvironmentPostProcessor.SPRING_APPLICATION_JSON_PROPERTY,
+                StandardServletEnvironment.SERVLET_CONTEXT_PROPERTY_SOURCE_NAME,
+                StandardServletEnvironment.SERVLET_CONFIG_PROPERTY_SOURCE_NAME,
+                StandardServletEnvironment.JNDI_PROPERTY_SOURCE_NAME,
+                RandomValuePropertySource.RANDOM_PROPERTY_SOURCE_NAME,
+                DefaultPropertiesPropertySource.NAME,
+                "server.ports",
+            )
+
+        constantSourceNames.forEach { sourceName ->
+            val thrown =
+                shouldThrow<IllegalStateException> {
+                    lockManagementSurface(environmentWithNamedSource(sourceName))
+                }
+
+            thrown.message!! shouldContain "(소스 $sourceName)"
+        }
+    }
+
+    /**
+     * 적대 키를 **이름을 지정한 소스**에 싣는다. 관리 포트는 별 이름의 소스에 둔다 —
+     * `addFirst` 는 같은 이름의 소스를 먼저 치우므로(`MutablePropertySources` 의 계약), 포트를
+     * `systemEnvironment` 에 두면 그 이름을 쓰는 측정에서 포트가 함께 사라져 판정이 포트 축에서
+     * 먼저 끊긴다(측정이 아무것도 재지 못한다).
+     */
+    private fun environmentWithNamedSource(sourceName: String): StandardEnvironment =
+        StandardEnvironment().apply {
+            propertySources.addLast(
+                MapPropertySource("deployment-choice", mapOf("management.server.port" to "19090")),
+            )
+            propertySources.addFirst(MapPropertySource(sourceName, mapOf(SIBLING_KEY to "always")))
+        }
+
+    /**
      * **양성 대조** — 배치가 정할 수 있는 유일한 키는 거부되지 않는다. 이 단언이 없으면 위
      * 거부 단언들이 「아무 것이나 거부한다」로도 참이 된다.
      */
@@ -292,12 +380,11 @@ class ManagementSurfaceLockTest {
      */
     @Test
     fun `늦게 실체가 채워지는 source 의 잠금 밖 형제 키는 판정에 걸린다`() {
-        val siblingKey = "management.endpoint.health.group.readiness.show-details"
-        val environment = environmentWithLateSource(mapOf(siblingKey to "always"))
+        val environment = environmentWithLateSource(mapOf(SIBLING_KEY to "always"))
 
         // 잠금은 이 키를 이기지 못한다 — 이름 대지 않은 형제다.
-        environment.getProperty(siblingKey) shouldBe "always"
-        managementSurfaceKeysOutsideLock(environment) shouldContainExactly listOf(siblingKey)
+        environment.getProperty(SIBLING_KEY) shouldBe "always"
+        managementSurfaceKeysOutsideLock(environment) shouldContainExactly listOf(SIBLING_KEY)
     }
 
     /**
