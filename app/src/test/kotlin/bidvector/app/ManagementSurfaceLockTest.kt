@@ -84,8 +84,15 @@ class ManagementSurfaceLockTest {
      */
     @Test
     fun `거부 대상 이름공간과 배치 자유 키는 리터럴이고 잠금 키 전부를 덮는다`() {
-        MANAGEMENT_SURFACE_GOVERNED_PREFIXES.sorted() shouldContainExactly listOf("management", "spring.jmx")
-        MANAGEMENT_SURFACE_DEPLOYMENT_KEYS.sorted() shouldContainExactly listOf("management.server.port")
+        MANAGEMENT_SURFACE_GOVERNED_PREFIXES.sorted() shouldContainExactly
+            listOf(
+                "management",
+                "server.servlet.context-parameters",
+                "spring.jmx",
+                "spring.web.error",
+            )
+        MANAGEMENT_SURFACE_DEPLOYMENT_KEYS.sorted() shouldContainExactly
+            listOf("management.server.address", "management.server.port")
 
         MANAGEMENT_SURFACE_LOCK.keys
             .filterNot { key ->
@@ -258,13 +265,48 @@ class ManagementSurfaceLockTest {
     }
 
     /**
-     * **배선 형태(`addFirst`)를 잠근다.** 접두사 거부는 초기화자가 도는 **그 시점에 있는**
-     * source 만 본다. 서블릿 컨텍스트 init-param 처럼 그 시점에는 stub(빈 것)이고 뒤에
-     * 실체로 교체되는 source 는 판정 모집단 밖이다 — 그 축을 막는 것은 잠금이 **맨 앞**에
-     * 심긴다는 사실 하나다. `addFirst` 를 `addLast` 로 바꾸면 이 단언이 붉어진다.
+     * **배선 형태(`addFirst`)를 잠근다.** `addFirst` 가 지키는 것은 **잠금이 이름 댄 키**다 —
+     * 뒤에 실체로 채워지는 source 가 그 키를 들고 와도 잠금이 이긴다. `addFirst` 를 `addLast`
+     * 로 바꾸면 이 단언이 붉어진다.
+     *
+     * **이 단언이 지키지 못하는 것**(code-review r2 LOW-2 · verifier r2 F-1r): 잠금이 이름
+     * 대지 **않은** 형제 키다. `addFirst` 는 그 키에 대해 아무 것도 하지 않는다. 아래 test 가
+     * 그 사실을 실측으로 적고, 그 축을 닫는 것은 [refuseManagementSurfaceKeysAfterRefresh]
+     * (D-6A2a-14)의 **늦은 재검사**다 — 「닫혔다」와 「이 배포물에서는 도달 불가다」는 다른
+     * 주장이므로 구별해 적는다.
      */
     @Test
     fun `잠금 뒤에 실체가 채워지는 source 보다 잠금이 우선한다`() {
+        val environment = environmentWithLateSource(mapOf("management.endpoint.health.show-details" to "always"))
+
+        environment.getProperty("management.endpoint.health.show-details") shouldBe "never"
+    }
+
+    /**
+     * D-6A2a-14 — **늦은 source 가 운반하는 잠금 밖 형제 키**. verifier r2 가 출하 이미지에서
+     * 환경변수 두 줄로 이 축을 재현했다(`server.servlet.context-parameters.*` 가 refresh 중에
+     * 실체로 바뀌면서 그 안의 `management.endpoint.health.group.…` 키가 환경변수보다 높은
+     * 우선순위로 들어온다). 그래서 **같은 술어를 모든 source 가 선 뒤에 한 번 더** 돌린다.
+     * 여기서는 그 술어(판정 함수)가 형제 키를 실제로 잡는다는 사실만 잰다 — 부팅 축은
+     * [bidvector.app.management] 의 `ManagementSurfaceLateSourceRefusalTest` 가 든다.
+     */
+    @Test
+    fun `늦게 실체가 채워지는 source 의 잠금 밖 형제 키는 판정에 걸린다`() {
+        val siblingKey = "management.endpoint.health.group.readiness.show-details"
+        val environment = environmentWithLateSource(mapOf(siblingKey to "always"))
+
+        // 잠금은 이 키를 이기지 못한다 — 이름 대지 않은 형제다.
+        environment.getProperty(siblingKey) shouldBe "always"
+        managementSurfaceKeysOutsideLock(environment) shouldContainExactly listOf(siblingKey)
+    }
+
+    /**
+     * 초기화자 시점에는 stub(비열거)이고 [lockManagementSurface] 뒤에 실체로 교체되는 source 를
+     * 세운다 — 서블릿 컨텍스트 init-param 이 실제로 그리는 순서다(`initPropertySources()` 가
+     * `createWebServer()` 끝에서 stub 을 열거 가능한 source 로 바꾼다). 교체 **전**에 판정이
+     * 비어 있음을 함께 요구한다 — 그러지 않으면 아래 단언들이 「원래 걸려 있었다」로도 참이 된다.
+     */
+    private fun environmentWithLateSource(entries: Map<String, Any>): StandardEnvironment {
         val stubName = "servletContextInitParams"
         val environment =
             environmentWithShippedDefaults().apply {
@@ -272,12 +314,9 @@ class ManagementSurfaceLockTest {
             }
 
         lockManagementSurface(environment)
+        managementSurfaceKeysOutsideLock(environment).shouldBeEmpty()
 
-        environment.propertySources.replace(
-            stubName,
-            MapPropertySource(stubName, mapOf("management.endpoint.health.show-details" to "always")),
-        )
-
-        environment.getProperty("management.endpoint.health.show-details") shouldBe "never"
+        environment.propertySources.replace(stubName, MapPropertySource(stubName, entries))
+        return environment
     }
 }
