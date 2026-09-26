@@ -107,7 +107,11 @@ fun managementSurfaceKeysOutsideLock(environment: ConfigurableEnvironment): List
         .forEach { source ->
             ConfigurationPropertySources.from(source).forEach { adapted ->
                 if (adapted is IterableConfigurationPropertySource) {
-                    adapted.stream().toList().filter(::isGovernedByLock).forEach { offending += it.toString() }
+                    adapted
+                        .stream()
+                        .toList()
+                        .filter(::isGovernedByLock)
+                        .forEach { offending += it.toString() }
                 }
             }
         }
