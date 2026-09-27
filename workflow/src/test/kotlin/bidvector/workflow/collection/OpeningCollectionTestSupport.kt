@@ -130,7 +130,7 @@ internal class FakeSampleListLedger : SampleListLedger {
 }
 
 internal class OpeningFixture(
-    targetPerStratum: Int,
+    sampleSize: Int,
     private val budget: CollectionCallBudget = CollectionCallBudget(perDay = 20_000, total = 80_000),
     private val alreadySpent: bidvector.procurement.CallSpend =
         bidvector.procurement.CallSpend(total = 0, today = 0),
@@ -152,7 +152,7 @@ internal class OpeningFixture(
         CollectOpeningResultsUseCase(
             rawObservations = raw,
             runs = runs,
-            sampler = StratifiedSampler(SamplingSeed("6g-test-seed"), targetPerStratum),
+            sampler = StratifiedSampler(SamplingSeed("6g-test-seed"), SampleSize(sampleSize)),
             policyFor = { COLLECTION_POLICY },
             gates = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48),
             collectedAxes = collectedAxes,

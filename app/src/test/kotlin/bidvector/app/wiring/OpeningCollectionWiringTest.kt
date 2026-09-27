@@ -69,7 +69,7 @@ class OpeningCollectionWiringTest {
             "bidvector.opening-collection.to=2026-09-22",
             "bidvector.opening-collection.categories=construction,service",
             "bidvector.opening-collection.sampling-seed=6g-wiring-seed",
-            "bidvector.opening-collection.target-per-stratum=2",
+            "bidvector.opening-collection.sample-size=2",
             "bidvector.opening-collection.calls-per-day=100",
             "bidvector.opening-collection.calls-total=1000",
             "bidvector.opening-collection.budget-since=2026-01-01T00:00:00Z",
@@ -153,7 +153,7 @@ class OpeningCollectionWiringTest {
     @Test
     fun `표본 정책이 없으면 기동하지 않는다 — seed 와 층당 목표 둘 다`() {
         bootWithout("bidvector.opening-collection.sampling-seed").failure shouldNotBe null
-        bootWithout("bidvector.opening-collection.target-per-stratum").failure shouldNotBe null
+        bootWithout("bidvector.opening-collection.sample-size").failure shouldNotBe null
     }
 
     @Test

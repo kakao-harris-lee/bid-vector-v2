@@ -71,7 +71,8 @@ class SnapshotExtractionE2ETest {
                     "bidvector.opening-collection.to" to NOTICE_DAY.toString(),
                     "bidvector.opening-collection.categories" to "construction,service",
                     "bidvector.opening-collection.sampling-seed" to "6g-extract-seed",
-                    "bidvector.opening-collection.target-per-stratum" to "5",
+                    // 층 둘(공사·용역, 같은 주) — 비례 배분으로 층마다 다섯이다.
+                    "bidvector.opening-collection.sample-size" to "10",
                     "bidvector.opening-collection.calls-per-day" to "10000",
                     "bidvector.opening-collection.calls-total" to "10000",
                     "bidvector.opening-collection.budget-since" to Instant.now().toString(),

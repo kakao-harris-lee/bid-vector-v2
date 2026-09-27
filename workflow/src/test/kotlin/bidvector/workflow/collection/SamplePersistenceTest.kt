@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test
 class SamplePersistenceTest {
     @Test
     fun `창이 넓어져도 표본은 첫 실행이 확정한 그대로다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-02", count = 5)
         val first = fixture.run()
 
@@ -34,7 +34,7 @@ class SamplePersistenceTest {
 
     @Test
     fun `확정 표본인데 이번 표본틀에서 안 보이면 부르지 않고 센다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-02", count = 5)
         val first = fixture.run()
         val calledOnce = fixture.construction.reservePriceCalls.size
@@ -50,7 +50,7 @@ class SamplePersistenceTest {
 
     @Test
     fun `확정된 목록이 있으면 계획도 그것을 보여준다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-03-02", count = 5)
         val confirmed = fixture.run().sample.selected
 
@@ -62,7 +62,7 @@ class SamplePersistenceTest {
 
     @Test
     fun `계획은 표본을 확정하지 않는다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-03-02", count = 5)
 
         fixture.plan()
@@ -73,7 +73,7 @@ class SamplePersistenceTest {
 
     @Test
     fun `확정된 목록은 층을 함께 싣는다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 4)
         fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-02", count = 5)
         fixture.listRows(BusinessDivision.SERVICE, "2026-03-02", count = 5)
         val report = fixture.run()

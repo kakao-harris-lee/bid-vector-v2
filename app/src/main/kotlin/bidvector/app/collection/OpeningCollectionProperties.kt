@@ -18,7 +18,12 @@ data class OpeningCollectionProperties(
     val to: LocalDate,
     val categories: List<String>,
     val samplingSeed: String,
-    val targetPerStratum: Int,
+    /**
+     * 표본 **전체** 크기(D-6G-20·42 M-6) — 층마다 같은 수가 아니라 층 크기에 비례해 나뉜다.
+     * 층당 고정 수로 두면 층 크기가 다를 때 작은 층이 과대표집돼, 층화가 막으려던 편향을
+     * 층화가 만든다. 크기 결정식(상한·최소 필요 표본)은 정책이 정하고 배선은 그 값을 받는다.
+     */
+    val sampleSize: Int,
     val callsPerDay: Int,
     val callsTotal: Int,
     /**

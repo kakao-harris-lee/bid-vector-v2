@@ -27,9 +27,9 @@ internal fun openingFinishLine(
     exitCode: CollectionExitCode,
 ): String =
     "opening-collection finished frame=${report.frameSize} sampled=${report.sample.selected.size} " +
-        "strata=${report.sample.strata.size} shortStrata=${report.sample.strata.values.count { it.short }} " +
-        "detailCalls=${report.detailCalls} sampleListSha256=${report.sample.sampleListSha256} " +
-        "halted=${report.halted != null} exit=${exitCode.value}"
+        "requested=${report.sample.requested} short=${report.sample.short} " +
+        "strata=${report.sample.strata.size} sampleUnseen=${report.sampleUnseen} " +
+        "detailCalls=${report.detailCalls} halted=${report.halted != null} exit=${exitCode.value}"
 
 /** 멈춤은 미완이다 — 예산이든 쿼터든 표본 전체를 받지 못했다. */
 internal fun openingExitCodeOf(report: OpeningCollectionReport): CollectionExitCode =

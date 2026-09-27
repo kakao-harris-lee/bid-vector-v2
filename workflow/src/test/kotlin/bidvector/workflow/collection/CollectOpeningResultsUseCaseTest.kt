@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test
 class CollectOpeningResultsUseCaseTest {
     @Test
     fun `표본에 뽑힌 공고만 상세를 부른다 — 표본틀 전체를 부르지 않는다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 10)
 
         val report = fixture.run()
@@ -35,7 +35,7 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `기초금액 조회는 모든 업무에서 부른다 — 예가 범위율이 그 오퍼레이션에서만 온다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 4)
         fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-06-03", count = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 2)
 
@@ -47,7 +47,7 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `A값은 공사에서만 부른다 — 용역·물품은 그 오퍼레이션을 부르지 않는다`() {
-        val fixture = OpeningFixture(targetPerStratum = 3)
+        val fixture = OpeningFixture(sampleSize = 6)
         fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-06-03", count = 3)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
 
@@ -59,9 +59,9 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `표본은 결과를 보기 전에 확정된다 — 상세를 한 번도 부르지 않아도 같은 표본이 나온다`() {
-        val planOnly = OpeningFixture(targetPerStratum = 2)
+        val planOnly = OpeningFixture(sampleSize = 2)
         planOnly.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 8)
-        val full = OpeningFixture(targetPerStratum = 2)
+        val full = OpeningFixture(sampleSize = 2)
         full.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 8)
 
         val planned = planOnly.plan()
@@ -72,7 +72,7 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `층은 공고일 슬롯이 정한다 — 같은 업무의 다른 주가 각자 목표만큼 뽑힌다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 4)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-10", count = 5)
 
@@ -84,7 +84,7 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `일 호출 상한에 닿으면 멈춘다 — 남은 표본은 부르지 않는다`() {
-        val fixture = OpeningFixture(targetPerStratum = 10, budget = CollectionCallBudget(perDay = 6, total = 100))
+        val fixture = OpeningFixture(sampleSize = 10, budget = CollectionCallBudget(perDay = 6, total = 100))
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 10)
 
         val report = fixture.run()
@@ -104,7 +104,7 @@ class CollectOpeningResultsUseCaseTest {
     fun `이미 받은 축은 다시 부르지 않는다 — 이어 돌기`() {
         val fixture =
             OpeningFixture(
-                targetPerStratum = 2,
+                sampleSize = 2,
                 collectedAxes =
                     FakeCollectedAxisStore(setOf(bidvector.procurement.SourceEndpoint.RESERVE_PRICE_DETAIL)),
             )
@@ -125,7 +125,7 @@ class CollectOpeningResultsUseCaseTest {
     fun `이미 받은 몫이 예산에 실려 있으면 남은 몫만 쓴다 — 실행 사이에 이어진다`() {
         val fixture =
             OpeningFixture(
-                targetPerStratum = 10,
+                sampleSize = 10,
                 budget = CollectionCallBudget(perDay = 10, total = 10),
                 alreadySpent = bidvector.procurement.CallSpend(total = 8, today = 8),
             )
@@ -140,7 +140,7 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `쿼터 소진은 표본틀 단계에서도 실행을 멈춘다 — 표본을 뽑지 않는다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
         fixture.service.listTruncation = TruncationCause.QuotaExhausted
 
@@ -154,7 +154,7 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `첫 페이지 throttle — 한 장도 못 받은 슬롯이 실행을 죽이지 않는다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 4)
         // rate limiter 가 첫 페이지에서 허가를 거부한 모양 — 페이지를 한 장도 못 받았다.
         fixture.service.listPagesFetched = 0
@@ -169,7 +169,7 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `K6 — 상세 단계의 쿼터 소진도 실행을 멈춘다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
         fixture.service.detailTruncation = TruncationCause.QuotaExhausted
 
@@ -184,7 +184,7 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `쿼터가 아닌 절단은 그 슬롯만 접고 표본틀을 이어 만든다`() {
-        val fixture = OpeningFixture(targetPerStratum = 2)
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
         fixture.service.listTruncation = TruncationCause.Timeout
 
@@ -196,7 +196,7 @@ class CollectOpeningResultsUseCaseTest {
 
     @Test
     fun `원문은 부른 응답마다 남는다 — 목록·상세 어느 축이든 관측이 저장된다`() {
-        val fixture = OpeningFixture(targetPerStratum = 1)
+        val fixture = OpeningFixture(sampleSize = 1)
         fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-06-03", count = 4)
 
         fixture.run()

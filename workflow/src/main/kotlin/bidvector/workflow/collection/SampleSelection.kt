@@ -95,7 +95,12 @@ data class SampleOutcome(
     val strata: Map<SampleStratum, StratumOutcome>,
     /** 뽑힌 키가 어느 층에서 왔는가 — 표본 목록 파일이 층을 함께 싣기 위해 필요하다(D-6G-39). */
     val strataByKey: Map<NoticeKeyHash, SampleStratum> = emptyMap(),
+    /** 정책이 정한 전체 목표 — 뽑힌 수가 여기 못 미치면 후보가 모자랐다는 뜻이다(D-6G-20). */
+    val requested: Int = 0,
 ) {
+    /** 후보가 목표에 모자랐다 — 모자란 층을 다른 층에서 채우지 않으므로 전체가 그만큼 작다. */
+    val short: Boolean get() = requested > 0 && selected.size < requested
+
     val sampleListSha256: String = sha256Hex(selected.map { it.value }.sorted().joinToString("\n"))
 }
 
@@ -109,29 +114,87 @@ data class SampleOutcome(
  */
 class StratifiedSampler(
     private val seed: SamplingSeed,
-    private val targetPerStratum: Int,
+    private val sampleSize: SampleSize,
 ) {
-    init {
-        require(targetPerStratum > 0) { "층당 목표 표본 수는 양수여야 한다: $targetPerStratum" }
-    }
-
     fun select(candidates: List<SampleCandidate>): SampleOutcome {
         val byStratum = candidates.distinctBy { it.key }.groupBy { it.stratum }
+        val allocation = proportionalAllocation(byStratum.mapValues { it.value.size }, sampleSize.total)
         val selected = mutableListOf<NoticeKeyHash>()
         val outcomes = mutableMapOf<SampleStratum, StratumOutcome>()
         val strataByKey = mutableMapOf<NoticeKeyHash, SampleStratum>()
         for ((stratum, pool) in byStratum) {
+            val target = allocation.getValue(stratum)
             val tickets = pool.map { DrawTicket(drawOrderOf(it.key), it.key) }.sortedWith(DRAW_ORDER)
-            val taken = tickets.take(targetPerStratum).map { it.key }
+            val taken = tickets.take(target).map { it.key }
             selected += taken
             taken.forEach { strataByKey[it] = stratum }
-            outcomes[stratum] = StratumOutcome(targetPerStratum, pool.size, taken.size)
+            outcomes[stratum] = StratumOutcome(target, pool.size, taken.size)
         }
-        return SampleOutcome(selected.sortedWith(NOTICE_KEY_ORDER), outcomes, strataByKey)
+        return SampleOutcome(selected.sortedWith(NOTICE_KEY_ORDER), outcomes, strataByKey, sampleSize.total)
     }
 
     private fun drawOrderOf(key: NoticeKeyHash): String = sha256Hex("${seed.value}|${key.value}")
 }
+
+/**
+ * 표본 **전체** 크기(D-6G-20) — 층마다 같은 수를 뽑으면 층 크기가 다를 때 층화 표본이 아니라
+ * 균등 추출이다. 작은 층이 과대표집되고 큰 층이 과소표집된다. 크기 결정식(상한·최소 필요 표본)은
+ * 정책이 정하고 여기는 그 값을 받는다.
+ */
+data class SampleSize(
+    val total: Int,
+) {
+    init {
+        require(total > 0) { "표본 크기는 양수여야 한다: $total" }
+    }
+}
+
+/**
+ * 층 크기에 비례해 전체를 나눈다 — **최대 잔여법**(Hare quota). 단순 반올림은 합이 목표와 어긋나
+ * 표본이 상한을 넘거나 모자란다. 잔여 배분 순서는 나머지가 큰 층부터이고, 같으면 층 이름 순서로
+ * 깬다 — 후보를 **주는 순서**가 배분을 바꾸면 수집 순서가 표본의 입력이 된다.
+ *
+ * 후보가 목표보다 적으면 전수다(있는 것보다 많이 뽑을 수는 없다).
+ */
+internal fun proportionalAllocation(
+    pools: Map<SampleStratum, Int>,
+    total: Int,
+): Map<SampleStratum, Int> {
+    val population = pools.values.sum()
+    if (population <= total) return pools
+    val allocation = pools.mapValues { (_, size) -> (total.toLong() * size / population).toInt() }.toMutableMap()
+    var remaining = total - allocation.values.sum()
+    for (stratum in pools.keys.sortedWith(remainderOrder(pools, total, population))) {
+        if (remaining == 0) break
+        if (allocation.getValue(stratum) < pools.getValue(stratum)) {
+            allocation[stratum] = allocation.getValue(stratum) + 1
+            remaining--
+        }
+    }
+    return allocation
+}
+
+/** 나머지(= `total * n - population * floor`)가 큰 층 먼저, 같으면 층 이름 순서로. */
+private fun remainderOrder(
+    pools: Map<SampleStratum, Int>,
+    total: Int,
+    population: Int,
+): Comparator<SampleStratum> {
+    val remainderOf = { stratum: SampleStratum ->
+        val size = pools.getValue(stratum).toLong()
+        total.toLong() * size - population.toLong() * (total.toLong() * size / population)
+    }
+    return Comparator { left, right ->
+        val byRemainder = remainderOf(right).compareTo(remainderOf(left))
+        if (byRemainder != 0) byRemainder else STRATUM_ORDER.compare(left, right)
+    }
+}
+
+private val STRATUM_ORDER =
+    Comparator<SampleStratum> { left, right ->
+        val byDivision = left.division.name.compareTo(right.division.name)
+        if (byDivision != 0) byDivision else left.noticeWeek.compareTo(right.noticeWeek)
+    }
 
 /** 뽑기 순서와 그 키 — 순서를 미리 계산해 두면 비교마다 해시를 다시 돌리지 않는다. */
 private class DrawTicket(

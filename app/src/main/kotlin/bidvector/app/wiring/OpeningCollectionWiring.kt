@@ -34,6 +34,7 @@ import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangeOutcome
 import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.collection.OpeningCollectionSource
+import bidvector.workflow.collection.SampleSize
 import bidvector.workflow.collection.SamplingSeed
 import bidvector.workflow.collection.StratifiedSampler
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
@@ -126,7 +127,7 @@ open class OpeningCollectionWiring {
 
     @Bean
     open fun openingSampler(properties: OpeningCollectionProperties): StratifiedSampler =
-        StratifiedSampler(SamplingSeed(properties.samplingSeed), properties.targetPerStratum)
+        StratifiedSampler(SamplingSeed(properties.samplingSeed), SampleSize(properties.sampleSize))
 
     @Bean
     open fun openingCollectionSources(

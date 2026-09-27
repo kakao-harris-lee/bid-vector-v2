@@ -32,7 +32,7 @@ private fun noticeOf(
     // D-6G-19 provenance 분리 — 마감 뒤 공개된 기초금액은 투찰 시점에 없던 값이다.
     val knownAtBidTime = disclosedAt != null && canonical.bidCloseAt != null && disclosedAt < canonical.bidCloseAt
     return SnapshotNotice(
-        noticeKeyHash = NoticeKeyHash.of(key.number, key.round).value,
+        noticeKeyHash = NoticeKeyHash.of(key.number, key.round.value).value,
         category = canonical.division,
         // **개찰일로 대체하지 않는다**(D-6G-28) — 그렇게 접으면 제외 ⑬ 이 개찰일로 돌아
         // 시행일 전에 공고되고 후에 개찰된 공고가 승인된다.
@@ -54,7 +54,7 @@ private fun noticeOf(
         hasAwardMethodApplicationStandard =
             noticeListRow?.textOf(FieldConcept.AWARD_METHOD_APPLICATION_STANDARD) != null,
         hasApplicationBasisContent = noticeListRow?.textOf(FieldConcept.APPLICATION_BASIS_CONTENT) != null,
-        noticeOrdinal = key.round.toIntOrNull() ?: 0,
+        noticeOrdinal = key.round.value.toInt(),
         procurementClassCode = noticeListRow?.textOf(FieldConcept.PUBLIC_PROCUREMENT_CLASS_CODE),
         demandAgencyCode = noticeListRow?.textOf(FieldConcept.DEMAND_AGENCY_CODE),
         pureConstructionCost = baseAmountRow?.amountOf(FieldConcept.PURE_CONSTRUCTION_COST),

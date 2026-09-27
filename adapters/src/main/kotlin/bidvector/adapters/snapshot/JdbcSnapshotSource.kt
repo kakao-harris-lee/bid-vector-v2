@@ -4,6 +4,7 @@ import bidvector.procurement.FieldConcept
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.SourceEndpoint
+import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.collection.SampleList
 import java.math.BigDecimal
@@ -46,7 +47,7 @@ class JdbcSnapshotSource(
         var withoutNotice = 0
         var outsideSample = 0
         for ((key, axes) in observations) {
-            val hash = NoticeKeyHash.of(key.number, key.round)
+            val hash = NoticeKeyHash.of(key.number, key.round.value)
             // 상세가 하나도 없는 표본은 세지 않고 지나간다 — 아래의 **차집합**이 센다. 여기서 세면
             // 관측이 아예 없는 표본(원문이 한 줄도 안 온 공고)을 놓친다.
             if (hash !in sample.keys) {
@@ -91,7 +92,7 @@ class JdbcSnapshotSource(
         // canonical 이라, 그대로 비교하면 같은 공고가 두 키로 갈린다(목록 축 행과 상세 축 행이
         // 서로 다른 키에 앉아 목록 축이 사라졌다 — 실측).
         val number = rows.getString("notice_number")?.let { NoticeNumber.of(it).value }
-        val round = rows.getString("notice_round")
+        val round = rows.getString("notice_round")?.let(::roundOrNull)
         val endpoint = runCatching { SourceEndpoint.valueOf(rows.getString("source_endpoint")) }.getOrNull()
         return if (number == null || round == null || endpoint == null) null else NoticeKey(number, round) to endpoint
     }
@@ -106,12 +107,16 @@ class JdbcSnapshotSource(
     private fun collectNotices(rows: ResultSet): Map<NoticeKey, CanonicalNotice> {
         val out = linkedMapOf<NoticeKey, CanonicalNotice>()
         while (rows.next()) {
-            val key = NoticeKey(rows.getString("notice_number"), rows.getString("notice_round"))
-            canonicalNoticeOf(rows)?.let { out[key] = it }
+            val round = roundOrNull(rows.getString("notice_round"))
+            val key = round?.let { NoticeKey(rows.getString("notice_number"), it) }
+            if (key != null) canonicalNoticeOf(rows)?.let { out[key] = it }
         }
         return out
     }
 }
+
+/** 제로패딩 세 자리가 아니면 **기본값을 쓰지 않는다** — 차수를 모르는 행은 키를 갖지 못한다. */
+private fun roundOrNull(raw: String?): NoticeRound? = raw?.let { runCatching { NoticeRound.of(it) }.getOrNull() }
 
 internal const val RESERVE_PRICE_SLOTS = 15
 
@@ -139,7 +144,12 @@ private val DETAIL_ENDPOINTS =
         SourceEndpoint.BID_PRICE_FORMULA_A,
     )
 
+/**
+ * 공고 키 — **차수는 파싱된 값**이다(D-6G-42 M-9). 문자열로 들고 뒤에서 `toIntOrNull() ?: 0` 하면
+ * 파싱 실패가 **첫 차수(`000` = 0)** 로 둔갑해 제외 ③(재입찰·정정)을 통과한다. 파싱을 키 만드는
+ * 자리로 올려, 차수가 서지 않는 행은 키를 갖지 못하게 한다.
+ */
 internal data class NoticeKey(
     val number: String,
-    val round: String,
+    val round: NoticeRound,
 )

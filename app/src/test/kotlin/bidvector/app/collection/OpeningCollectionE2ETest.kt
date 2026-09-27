@@ -50,6 +50,9 @@ class OpeningCollectionE2ETest {
         private const val NOTICES_PER_SLOT = 4
         private const val TARGET_PER_STRATUM = 2
 
+        /** 층 = 업무 × 공고 주 — 이 E2E 는 하루치 두 업무라 층이 둘이다. */
+        private const val DIVISIONS = 2
+
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
                 .withDatabaseName("bidvector_opening_e2e_test")
@@ -100,7 +103,7 @@ class OpeningCollectionE2ETest {
                         "bidvector.opening-collection.to" to today.toString(),
                         "bidvector.opening-collection.categories" to "construction,service",
                         "bidvector.opening-collection.sampling-seed" to "6g-e2e-seed",
-                        "bidvector.opening-collection.target-per-stratum" to TARGET_PER_STRATUM.toString(),
+                        "bidvector.opening-collection.sample-size" to (TARGET_PER_STRATUM * DIVISIONS).toString(),
                         "bidvector.opening-collection.calls-per-day" to "1000",
                         "bidvector.opening-collection.calls-total" to "1000",
                         // **test 마다 다른 예산 시작 시점.** 원장이 영속이라(D-6G-29 ①) 앞 test 가
@@ -204,7 +207,7 @@ class OpeningCollectionE2ETest {
         bootAndRun(emptyMap())
 
         val lines = Files.readString(sampleListFile).trimEnd('\n').lines()
-        lines shouldHaveSize TARGET_PER_STRATUM * 2
+        lines shouldHaveSize TARGET_PER_STRATUM * DIVISIONS
         val hashes = lines.map { it.substringBefore('\t') }
         hashes shouldContainExactly hashes.sorted()
         lines.map { it.split('\t')[1] }.toSet() shouldBe setOf("CONSTRUCTION", "SERVICE")

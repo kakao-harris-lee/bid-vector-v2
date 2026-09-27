@@ -40,9 +40,10 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
     private fun observe(
         number: String,
         endpoint: SourceEndpoint,
+        round: String = "000",
     ) = appendRawObservation(
         RawNoticeObservation.of(
-            mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to "000"),
+            mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to round),
             endpoint,
             OBSERVED_AT,
         ),
@@ -109,6 +110,22 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         val accounted =
             extraction.rows.size + extraction.sampledWithoutDetail + extraction.skippedWithoutNotice
         accounted shouldBe sample.keys.size
+    }
+
+    /**
+     * D-6G-42 M-9 — 차수가 서지 않는 행은 **기본값을 받지 않는다.** `toIntOrNull() ?: 0` 이면 파싱
+     * 실패가 첫 차수(`000` = 0)로 둔갑해 제외 ③(재입찰·정정)을 그대로 통과한다 — 몇 차 공고인지
+     * 모르는 공고가 「첫 공고」로 실험에 든다.
+     */
+    @Test
+    fun `차수가 제로패딩 세 자리가 아니면 행이 되지 않는다`() {
+        observe("20260617001-00", SourceEndpoint.OPENING_COMPLETE, round = "1")
+
+        val extraction = extract(sampleOf("20260617001-00"))
+
+        extraction.rows.shouldBeEmpty()
+        // 표본의 키 해시는 canonical 차수로 만들어졌으므로 이 행은 애초에 그 키가 아니다.
+        extraction.sampledWithoutDetail shouldBe 1
     }
 
     /** 관측 창 밖의 원문은 보지 않는다 — 창은 `observed_at` 으로 자른다. */
