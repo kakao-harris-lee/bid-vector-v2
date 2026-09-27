@@ -102,7 +102,7 @@ outbox·SQL 로 가는 지름길이 없다 ③ 불변식을 어긴 값은 영속
 | `EditCommand.ProvideValue.baseRevision`(r2, D-6A2b-28) | `EditCommand` 는 원래 public 이라 밖에서 기준 값을 실어 만들 수 있다. 지어낸 값은 value 시점 대조가 `StaleRevision` 으로 막고, 남는 것은 현재와 같은 값을 싣는 것뿐(정상 사용과 구별 불가) | 닫는다(새 권한 없음) — 알려진 제한 ⑥ |
 | 406 핸들러 `ResponseEntity<Void>`(r2, D-6A2b-29) | 본문 없는 406. 정보 노출 없음 | 닫는다 |
 | `EditCommand.ProvideValue.baseRevision` 이 **nullable**(r3) | `null` 로 만든 command 가 value 시점 기준 대조를 **건너뛰는가**가 물음이다. HTTP 실행기는 늘 값을 싣는다. 다른 채널(또는 test·conformance)이 `null` 을 실으면 confirm 시점 `baseRevision` 대조(D-6A2b-18)가 여전히 막는지 | **경계로 처리 — verifier r4 표적**: `null` 기준 command 로 교차 세션 되돌림이 재현되는가 |
-| `StrategyReader`(workflow, r4 — `load` 하나, `StrategyRepository` 가 확장) | 현재 전략을 읽는다. 구현해도 쓰기 경로는 생기지 않는다(`save` 는 `StrategyRepository` 에 남고 인자 `AppliedStrategy` 는 `internal constructor`) | 닫는다(새 권한 없음) |
+| `StrategyReader`(workflow, r4 — `load` 하나, `StrategyRepository` 가 확장) | 현재 전략을 읽는다. 구현해도 쓰기 경로는 생기지 않는다(`save` 는 `StrategyRepository` 에 남고 인자 `AppliedStrategy` 는 `internal constructor`). **r5 정정(N-r5-5)**: 이 타입은 능력 포트가 아니라 제한 층 허용 접두 안이었다 — 도입 직후 컨트롤러가 조회기를 건너뛰고 전략을 직접 읽는 길이 열려 있었다 | 닫는다 — `app.http.denied-types` 가 제한 층의 **직접 참조**를 판다(조회기 경유만). 포트 호출 게이트의 쌍 오른쪽도 이 타입으로 옮겼다(N-r5-4) |
 | 읽기 포트 → 쓰기 포트 **다운캐스트**(r4 자체 탐침 P2) | `checkcast` 는 ArchUnit 직접 의존에 잡히지 않는다(OQ-1 과 같은 성질). 쓰기를 시도하면 인자 타입이 ② 층 목록 밖이라 RED 이고 `AppliedStrategy` 를 만들 길이 없다 | **경계로 처리** — 막는 것은 능력 축이 아니라 타입 목록 + `internal constructor`. 알려진 제한 ⑰ · verifier r5 표적 |
 
 ### (3) 과잉·미달
