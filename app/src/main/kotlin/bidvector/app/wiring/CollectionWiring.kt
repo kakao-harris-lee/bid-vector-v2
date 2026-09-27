@@ -67,14 +67,7 @@ open class CollectionWiring {
     open fun collectionRange(
         properties: CollectionProperties,
         clock: Clock,
-    ): CollectionRange {
-        val today = LocalDate.ofInstant(clock.now(), OPENING_DATE_ZONE)
-        val policy = resolved(COLLECTION_RANGE_POLICY.resolve(today), "수집 범위 정책")
-        return when (val outcome = CollectionRange.of(properties.from, properties.to, today, policy)) {
-            is CollectionRangeOutcome.Valid -> outcome.range
-            is CollectionRangeOutcome.Rejected -> error("수집 범위가 유효하지 않다: ${outcome.reason}")
-        }
-    }
+    ): CollectionRange = resolveCollectionRange(properties.from, properties.to, clock, "수집 범위")
 
     @Bean
     open fun collectionSources(
@@ -87,16 +80,14 @@ open class CollectionWiring {
         require(properties.categories.toSet().size == properties.categories.size) {
             "bidvector.collection.categories 에 같은 업종이 두 번 있다"
         }
-        val baseUri = endpointBaseUri(endpoint)
-        val serviceKey = ServiceKey.of(credential.serviceKey)
-        val httpPolicy = resolved(KONEPS_HTTP_POLICY.resolve(range.to), "KONEPS 전송 정책")
-        val httpClient = HttpClient.newBuilder().connectTimeout(httpPolicy.requestTimeout).build()
+        val baseUri = requireSafeKonepsBaseUri(endpoint.baseUrl)
+        val transport = konepsTransportFor(credential, range.to)
         val sources =
             properties.categories.map { category ->
                 val name = requireNotNull(CollectionSourceName.of(category)) { "업종 이름 형식이 유효하지 않다" }
                 val operation = endpoint.operations[category] ?: error("오퍼레이션이 등재되지 않은 업종이다: ${name.value}")
                 val operationUri = URI.create("$baseUri/${operation.path}")
-                CollectionSource(name, sourceFor(httpClient, operationUri, operation.division, serviceKey, httpPolicy))
+                CollectionSource(name, sourceFor(transport, operationUri, operation.division))
             }
         return CollectionSources(sources)
     }
@@ -136,41 +127,16 @@ open class CollectionWiring {
     }
 
     private fun sourceFor(
-        httpClient: HttpClient,
+        transport: KonepsTransport,
         baseUri: URI,
         division: BusinessDivision,
-        serviceKey: ServiceKey,
-        httpPolicy: KonepsHttpPolicyData,
     ): KonepsOpenApiNoticeSource =
         KonepsOpenApiNoticeSource(
-            httpClient = httpClient,
+            httpClient = transport.httpClient,
             baseUri = baseUri,
-            serviceKey = serviceKey,
-            httpPolicy = httpPolicy,
+            serviceKey = transport.serviceKey,
+            httpPolicy = transport.httpPolicy,
             collectionPolicyProvider = ::collectionPolicyAt,
             businessDivision = division,
         )
 }
-
-private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "[::1]")
-
-/**
- * 서비스 키는 요청 URI 의 쿼리로 실려 나간다 — 평문 http 로 외부 호스트를 부르면 키가 그대로 노출된다. https 이거나
- * 로컬 mock 서버(loopback)일 때만 받는다(설정 실수는 기동 실패, D-6F8-4).
- */
-private fun endpointBaseUri(endpoint: KonepsEndpointProperties): String {
-    val uri = URI.create(endpoint.baseUrl.trimEnd('/'))
-    val secure = uri.scheme.equals("https", ignoreCase = true)
-    val loopback = uri.scheme.equals("http", ignoreCase = true) && uri.host in LOOPBACK_HOSTS
-    require(secure || loopback) { "bidvector.koneps.base-url 은 https 이거나 loopback 호스트여야 한다" }
-    return uri.toString()
-}
-
-/** 정책 해소 실패는 기동(또는 첫 조회) 실패다 — 값을 지어내지 않는다(`PersistenceWiring` 의 정책 해소와 같은 형태). */
-private fun <T> resolved(
-    resolution: Resolution<T>,
-    label: String,
-): T = (resolution as? Resolution.Resolved<T>)?.value ?: error("$label 이 해소되지 않았다: $resolution")
-
-private fun collectionPolicyAt(referenceDate: CollectionReferenceDate): KonepsCollectionPolicyData =
-    resolved(KONEPS_COLLECTION_POLICY.resolve(referenceDate.date), "KONEPS 수집 정책")

@@ -1,0 +1,178 @@
+package bidvector.app.collection
+
+import bidvector.app.BidVectorApplication
+import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
+import bidvector.app.wiring.CollectionTerminationTestConfiguration
+import bidvector.app.wiring.RecordingCollectionTermination
+import bidvector.workflow.evaluation.OPENING_DATE_ZONE
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
+import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.ints.shouldBeGreaterThan
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
+import org.springframework.boot.builder.SpringApplicationBuilder
+import org.springframework.boot.context.event.ApplicationPreparedEvent
+import org.springframework.context.ApplicationListener
+import org.testcontainers.postgresql.PostgreSQLContainer
+import org.testcontainers.utility.DockerImageName
+import java.sql.ResultSet
+import java.time.LocalDate
+import javax.sql.DataSource
+
+/**
+ * M6/6G D-6G-1·11·19·20 E2E — **출하 조립**을 `bidvector.opening-collection.mode=once` 로 부팅해
+ * mock KONEPS → 표본틀 → 표본 → 상세 넷 → 원문 적재까지 끝에서 끝으로 잰다(실 KONEPS 호출 없음).
+ *
+ * 잠그는 것: ① 표본에 뽑힌 공고만 상세를 부른다 ② 공사는 A값까지 넷, 용역은 셋 ③ 호출 상한에 닿으면
+ * 멈추고 종료 코드가 미완이다 ④ 원문이 `raw_observation` 에 남는다 ⑤ 로그에 서비스 키도 상호도 없다.
+ */
+class OpeningCollectionE2ETest {
+    companion object {
+        private const val POSTGRES_IMAGE = "postgres:16.4"
+        private const val TEST_CREDENTIAL_VALUE = "opening-e2e-test-fixture-credential"
+        private const val SERVICE_KEY = "OPENING-E2E-SENTINEL+KEY/value="
+        private const val BIDDER_NAME = "SYN-투찰업체-이름"
+        private const val NOTICES_PER_SLOT = 4
+        private const val TARGET_PER_STRATUM = 2
+
+        private val postgres: PostgreSQLContainer =
+            PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
+                .withDatabaseName("bidvector_opening_e2e_test")
+                .withUsername("bidvector_admin")
+                .withPassword("bidvector_test_only")
+                .also { it.start() }
+
+        private val dataSource: DataSource =
+            org.postgresql.ds.PGSimpleDataSource().apply {
+                setUrl(postgres.jdbcUrl)
+                user = postgres.username
+                password = postgres.password
+            }
+
+        private val today: LocalDate = LocalDate.now(OPENING_DATE_ZONE)
+        private val logs = ListAppender<ILoggingEvent>()
+
+        @AfterAll
+        @JvmStatic
+        fun stop() {
+            postgres.stop()
+        }
+    }
+
+    private fun bootAndRun(extra: Map<String, String>): Pair<List<Int>, MockOpeningKonepsHttp> {
+        logs.list.clear()
+        val mock = MockOpeningKonepsHttp(noticesPerSlot = NOTICES_PER_SLOT, bidderName = BIDDER_NAME)
+        val context =
+            SpringApplicationBuilder(
+                BidVectorApplication::class.java,
+                CollectionTerminationTestConfiguration::class.java,
+            ).properties(
+                PRODUCTION_DISPATCH_PROPERTIES +
+                    mapOf(
+                        "server.port" to "0",
+                        "spring.profiles.active" to "collection-e2e",
+                        "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                        "bidvector.persistence.username" to postgres.username,
+                        "bidvector.persistence.credential" to postgres.password,
+                        "operator.credential.value" to TEST_CREDENTIAL_VALUE,
+                        "bidvector.evaluation.candidate-cap" to "1000",
+                        "bidvector.opening-collection.mode" to "once",
+                        "bidvector.opening-collection.from" to today.toString(),
+                        "bidvector.opening-collection.to" to today.toString(),
+                        "bidvector.opening-collection.categories" to "construction,service",
+                        "bidvector.opening-collection.sampling-seed" to "6g-e2e-seed",
+                        "bidvector.opening-collection.target-per-stratum" to TARGET_PER_STRATUM.toString(),
+                        "bidvector.opening-collection.calls-per-day" to "1000",
+                        "bidvector.opening-collection.calls-total" to "1000",
+                        "bidvector.koneps.service-key" to SERVICE_KEY,
+                        "bidvector.koneps.base-url" to mock.baseUrl,
+                        "bidvector.koneps.opening.scsbid-base-url" to mock.baseUrl,
+                    ) + extra,
+            ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachLogCapture() })
+                .run()
+        return try {
+            context.getBean(RecordingCollectionTermination::class.java).exitCodes.toList() to mock
+        } finally {
+            context.close()
+            mock.close()
+        }
+    }
+
+    private fun attachLogCapture() {
+        val root = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
+        root.level = Level.DEBUG
+        (LoggerFactory.getLogger("com.sun.net.httpserver") as Logger).level = Level.WARN
+        if (!logs.isStarted) logs.start()
+        if (!root.isAttached(logs)) root.addAppender(logs)
+    }
+
+    private fun <T> query(
+        sql: String,
+        read: (ResultSet) -> T,
+    ): T =
+        dataSource.connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery(sql).use { rows ->
+                    rows.next()
+                    read(rows)
+                }
+            }
+        }
+
+    @Test
+    fun `표본에 뽑힌 공고만 상세를 부르고 공사는 A값까지 넷을 부른다`() {
+        val (exitCodes, mock) = bootAndRun(emptyMap())
+
+        exitCodes shouldContainExactly listOf(0)
+        // 업무 둘 × 공고일 하나 = 목록 슬롯 둘. 층마다 목표 2 씩 = 표본 넷(표본틀 여덟 가운데).
+        mock.listCalls.size shouldBe 2
+        mock.reservePriceNotices.size shouldBe TARGET_PER_STRATUM * 2
+        mock.openingCompleteNotices.size shouldBe TARGET_PER_STRATUM * 2
+        mock.baseAmountNotices.size shouldBe TARGET_PER_STRATUM * 2
+        // A값은 공사 층에서만 — 용역 표본에는 안 나간다.
+        mock.formulaANotices.size shouldBe TARGET_PER_STRATUM
+        // 공고번호는 canonical 화에서 대문자로 선다 — 요청에 실려 나가는 것은 그 canonical 값이다.
+        mock.formulaANotices.forEach { it shouldContain "CNSTWK" }
+        // 표본틀 전체(8)를 부르지 않았다.
+        mock.reservePriceNotices.size shouldBe 4
+    }
+
+    @Test
+    fun `원문이 적재되고 어느 로그에도 서비스 키와 상호가 없다`() {
+        bootAndRun(emptyMap())
+
+        val rawRows = query("SELECT count(*) FROM raw_observation") { it.getInt(1) }
+        rawRows shouldBeGreaterThan 0
+        val captured = logs.list.joinToString("\n") { it.formattedMessage }
+        captured shouldNotContain SERVICE_KEY
+        captured shouldNotContain "ServiceKey"
+        // 상호는 raw 관측까지는 오지만 **로그에는 없다**(러너의 줄이 계수와 열거값뿐이다).
+        captured shouldNotContain BIDDER_NAME
+        captured shouldContain "opening-collection finished"
+    }
+
+    @Test
+    fun `호출 상한에 닿으면 멈추고 종료 코드가 미완이다`() {
+        val (exitCodes, mock) =
+            bootAndRun(
+                mapOf(
+                    // 일 상한만 낮춘다 — 총 상한을 같이 낮추면 TOTAL 이 먼저 물어 어느 한도인지가 바뀐다.
+                    "bidvector.opening-collection.calls-per-day" to "4",
+                    "bidvector.opening-collection.calls-total" to "1000",
+                ),
+            )
+
+        exitCodes shouldContainExactly listOf(CollectionExitCode.INCOMPLETE.value)
+        // 목록 둘 + 상세 둘까지만 나가고 멈춘다.
+        (mock.listCalls.size + mock.detailCallCount()) shouldBe 4
+        val captured = logs.list.joinToString("\n") { it.formattedMessage }
+        captured shouldContain "opening-collection halted budgetLimit=DAILY"
+    }
+}

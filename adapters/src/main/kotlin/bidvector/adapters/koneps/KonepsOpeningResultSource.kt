@@ -189,3 +189,30 @@ class KonepsOpeningResultSource(
             )
         }
 }
+
+/**
+ * 6G 표본틀 소스 한 벌(M6/6G D-6G-11·19) — 호출부는 **경로만** 준다. `inqryDiv` 축과 행 식별자 같은
+ * wire 계약은 이 모듈 안에 남는다(`KonepsOperationPolicy` 는 `internal` 이다) — 배선이 조회 축을 고르면
+ * 조용히 다른 축을 걷는 경로가 생긴다.
+ *
+ * baseUri 가 **넷**인 이유는 서비스가 둘이기 때문이다: 목록·예비가격 상세·개찰완료는 낙찰정보서비스,
+ * 입찰가격산식 A·기초금액 조회는 입찰공고정보서비스다.
+ */
+fun konepsOpeningResultSourceByNoticeDate(
+    listBaseUri: URI,
+    reserveDetailBaseUri: URI,
+    openingCompleteBaseUri: URI,
+    bidPriceFormulaABaseUri: URI,
+    baseAmountBaseUri: URI,
+    config: KonepsSourceConfig,
+): OpeningResultSourcePort =
+    KonepsOpeningResultSource(
+        listBaseUri = listBaseUri,
+        listOperation = KonepsOperationPolicy.OPENING_RESULT_LIST_BY_NOTICE_DATE,
+        listSourceEndpoint = SourceEndpoint.OPENING_RESULT_LIST,
+        reserveDetailBaseUri = reserveDetailBaseUri,
+        openingCompleteBaseUri = openingCompleteBaseUri,
+        bidPriceFormulaABaseUri = bidPriceFormulaABaseUri,
+        baseAmountBaseUri = baseAmountBaseUri,
+        config = config,
+    )

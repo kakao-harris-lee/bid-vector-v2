@@ -62,6 +62,21 @@ internal object KonepsOperationPolicy {
             rowIdentifierRawKeys = emptyList(),
         )
 
+    /**
+     * 개찰결과 목록(5~8)을 **공고일 축**으로 걷는다(M6/6G D-6G-11) — 그 군의 `inqryDiv` 표에서 `2` 가
+     * 공고일시다(§1.9.2). 6G 표본틀이 이 축을 쓰는 이유는 응답에 **공고일 항목이 없기** 때문이다:
+     * 개찰일 축으로 걸으면 슬롯의 조회일이 개찰일이라 층(업무 × **공고 주**)을 세울 수가 없다.
+     * 공고일로 걸으면 슬롯의 조회일이 곧 그 행의 공고일이다.
+     */
+    val OPENING_RESULT_LIST_BY_NOTICE_DATE =
+        KonepsOperationDescriptor(
+            inquiryDivValue = "2",
+            requiresPeriodWindow = true,
+            requiresNoticeNumber = false,
+            requiresNoticeRound = false,
+            rowIdentifierRawKeys = emptyList(),
+        )
+
     /** 개찰결과 목록(5~8) — `inqryDiv=3`(개찰일시), 기간창 필수(§1.9.2 표). 한 행=한 공고. */
     val OPENING_RESULT_LIST =
         KonepsOperationDescriptor(
