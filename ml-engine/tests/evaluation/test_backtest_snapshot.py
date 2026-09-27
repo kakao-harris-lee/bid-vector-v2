@@ -515,3 +515,54 @@ def test_notice_observed_count_keeps_samples_that_lost_only_their_detail() -> No
     assert loaded.sample_size == 3
     # 행 1 + 상세 없음 1 = 2. 공고 없음 1 만 빠진다.
     assert loaded.notice_observed_count == 2
+
+
+def test_reader_cannot_distinguish_a_post_hoc_shrink_of_the_sample_list() -> None:
+    """**판독의 경계를 명시한다** — 세 파일만 보는 판독은 「결과를 본 뒤 줄인 표본」과
+    「원래 작았던 표본」을 구별하지 못한다. 생산 레인이 실측해 보고한 자리다.
+
+    추출이 행이 된 표본만 목록에 남기고 `sample_size` 를 행 수로, 두 계수를 0 으로
+    적고 해시를 그 파일로 다시 계산하면 v4 의 대조 넷이 **전부 참**이 된다 —
+    ⑴ 해시가 그 파일의 것이고 ⑵ 행이 목록 안이고 ⑵' 키 수가 선언과 같고 ⑶ 항등식이
+    닫힌다. 원리상 그렇고, 어떤 술어를 더해도 이 판독 자리에서는 닫히지 않는다:
+    줄어든 파일 셋은 작은 표본의 파일 셋과 **바이트로 구별되지 않는다**.
+
+    이것을 막는 것은 판독이 아니라 (a) 수집 시점에 확정된 파일 그 자체의 보존
+    (D-6G-45 의 실행 상태 디렉터리 — 이미 있으면 덮어쓰지 않는다)과 (b) 생산 쪽
+    왕복 test 다. 생산 레인 실측: 같은 축소가 저쪽 E2E 에서는 **2 failed** 다.
+
+    이 test 가 통과하는 것이 정상이다. 있는 이유는 **이 경계가 닫혀 있다고 잘못
+    읽히지 않게** 하기 위해서다 — 누군가 판독에 술어를 더해 「이제 막힌다」고 적으면
+    이 자리에서 먼저 마주친다."""
+    rows = rows_bytes([row_payload("n-1")])
+
+    honest_listing = sample_list_bytes(rows, extra_keys=("f" * 64, "e" * 64))
+    honest = load_snapshot(
+        manifest_bytes(
+            rows,
+            sample_list=honest_listing,
+            sampled_without_detail=1,
+            sampled_without_notice=1,
+        ),
+        rows,
+        honest_listing,
+    )
+
+    shrunk_listing = sample_list_bytes(rows)
+    shrunk = load_snapshot(
+        manifest_bytes(
+            rows,
+            sample_list=shrunk_listing,
+            sample_size=1,
+            sampled_without_detail=0,
+            sampled_without_notice=0,
+        ),
+        rows,
+        shrunk_listing,
+    )
+
+    assert isinstance(honest, LoadedSnapshot), honest
+    assert isinstance(shrunk, LoadedSnapshot), shrunk
+    # 판독이 가르지 못한다는 사실 자체 — 행은 같고 선언만 다르다.
+    assert honest.rows == shrunk.rows
+    assert (honest.sample_size, shrunk.sample_size) == (3, 1)
