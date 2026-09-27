@@ -39,12 +39,11 @@ import java.util.UUID
 class StrategyEditExecutor(
     private val transaction: StrategyEditTransaction,
     private val strategyPolicy: Resolution.Resolved<StrategyPolicyData>,
-    private val sessionIds: () -> String = { UUID.randomUUID().toString() },
 ) {
     /** 세션 id 는 **서버가** 만든다(D-6A2b-1, 우회 (4)) — 요청이 고르면 남의 세션을 겨냥할 자리가 생긴다. */
     fun begin(field: EditableField): BeginOutcome =
         transaction.inTransaction { workflow ->
-            workflow.begin(EditSessionId(sessionIds()), OPERATOR.id, field)
+            workflow.begin(EditSessionId(UUID.randomUUID().toString()), OPERATOR.id, field)
         }
 
     /**
