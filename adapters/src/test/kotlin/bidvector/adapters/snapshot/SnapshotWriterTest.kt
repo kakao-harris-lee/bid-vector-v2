@@ -196,6 +196,26 @@ class SnapshotWriterTest {
         rendered shouldNotContain "시설공사"
     }
 
+    /**
+     * Python 판독은 이 둘을 **non-null `bool`** 로 읽는다 — `null` 이 나오면 값 결측 갈래가 아니라
+     * **구조 갈래**로 가서 스냅숏 전체가 거부된다. 타입이 `Boolean`(nullable 아님)이라 오늘은 불가능
+     * 하지만, 그 성질이 리팩터링을 넘어 살아 있는지를 재는 것이 이 test 다.
+     */
+    @Test
+    fun `자유텍스트 존재 여부 두 칸은 언제나 true 또는 false 다 — null 이 나오지 않는다`() {
+        val present = rowOf("aa").let { it.copy(notice = notice("aa", "조달청 기준")) }
+        val absent = rowOf("bb")
+
+        val rendered = SnapshotWriter.renderRows(listOf(present, absent))
+
+        rendered shouldContain "\"has_award_method_application_standard\":true"
+        rendered shouldContain "\"has_award_method_application_standard\":false"
+        rendered shouldNotContain "\"has_award_method_application_standard\":null"
+        rendered shouldNotContain "\"has_application_basis_content\":null"
+        // 두 칸이 **모든** 행에 있다(빠지면 미지 키가 아니라 결측 키로 거부된다).
+        rendered.trimEnd('\n').lines().forEach { it shouldContain "has_application_basis_content" }
+    }
+
     @Test
     fun `공고일·개찰일이 없으면 null 로 나간다 — 대체값을 지어내지 않는다`() {
         val blank =
