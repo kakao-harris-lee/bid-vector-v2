@@ -26,8 +26,8 @@ def notice_payload(
     label: str = "n-1",
     *,
     category: str = "SERVICE",
-    noticed_on: str = "2026-06-01",
-    bid_close_at: str = "2026-06-10T10:00:00+09:00",
+    noticed_on: str | None = "2026-06-01",
+    bid_close_at: str | None = "2026-06-10T10:00:00+09:00",
     base_amount: Any = _BASE_AMOUNT,
     floor_rate: float | None = _FLOOR_RATE,
     a_value: dict[str, Any] | None = None,
@@ -35,12 +35,11 @@ def notice_payload(
     successful_bid_method_name: str = "적격심사제-추정가격 2억원 미만인 용역",
     prearranged_price_decision_method: str = "복수예가",
     notice_ordinal: int = 1,
-    progress_division: str | None = None,
     procurement_class_code: str | None = None,
     demand_agency_code: str | None = "A0001",
     bid_price_formula_a_applicable: bool | None = None,
-    award_method_application_standard: str | None = "표준",
-    application_basis_content: str | None = None,
+    has_award_method_application_standard: bool = True,
+    has_application_basis_content: bool = False,
     base_amount_disclosed_at: str | None = "2026-06-05T09:00:00+09:00",
     reserve_range_begin_rate: float | None = -0.02,
     reserve_range_end_rate: float | None = 0.02,
@@ -61,13 +60,14 @@ def notice_payload(
         "successful_bid_method_name": successful_bid_method_name,
         "prearranged_price_decision_method": prearranged_price_decision_method,
         "notice_ordinal": notice_ordinal,
-        "progress_division": progress_division,
         "procurement_class_code": procurement_class_code,
         "demand_agency_code": demand_agency_code,
         "bid_price_formula_a_applicable": bid_price_formula_a_applicable,
         "pure_construction_cost": pure_construction_cost,
-        "award_method_application_standard": award_method_application_standard,
-        "application_basis_content": application_basis_content,
+        "has_award_method_application_standard": (
+            has_award_method_application_standard
+        ),
+        "has_application_basis_content": has_application_basis_content,
     }
 
 
@@ -80,8 +80,10 @@ def reserve_prices(base_amount: float = _BASE_AMOUNT) -> list[float]:
 
 def outcome_payload(
     *,
-    opened_on: str = "2026-06-15",
+    opened_on: str | None = "2026-06-15",
+    progress_division: str | None = None,
     planned_price: float | None = None,
+    planned_price_null: bool = False,
     prices: list[float] | None = None,
     prices_null: bool = False,
     opening_base_amount_null: bool = False,
@@ -103,7 +105,8 @@ def outcome_payload(
     )
     return {
         "opened_on": opened_on,
-        "planned_price": int(planned_price),
+        "planned_price": None if planned_price_null else int(planned_price),
+        "progress_division": progress_division,
         "opening_base_amount": (
             None
             if opening_base_amount_null
@@ -168,7 +171,7 @@ def manifest_bytes(
     period_end: str = "2026-08-31",
     rows_sha256: str | None = None,
     sample_list_sha256: str | None = None,
-    schema_version: str = "snapshot-v2",
+    schema_version: str = "snapshot-v3",
 ) -> bytes:
     payload = {
         "schema_version": schema_version,

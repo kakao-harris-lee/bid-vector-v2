@@ -96,19 +96,13 @@ def plan_backtest_windows(
     """창 전부를 만들고, 표본 하한·이력 부재로 빠지는 창을 사유와 함께 기록한다.
     **모든 창이 결과에 남는다** — 고른 창만 공시하면 창 쇼핑과 구별되지 않는다."""
     embargo = timedelta(days=policy.windows.embargo_days)
-    windows = _calendar_windows(
-        [item.row.outcome.opened_on for item in admitted], policy
-    )
+    windows = _calendar_windows([item.opened_on for item in admitted], policy)
     selected: list[WindowAssignment] = []
     excluded: list[WindowExclusion] = []
     for window in windows:
-        notices = tuple(
-            item for item in admitted if window.contains(item.row.outcome.opened_on)
-        )
+        notices = tuple(item for item in admitted if window.contains(item.opened_on))
         history = tuple(
-            item
-            for item in admitted
-            if item.row.outcome.opened_on < window.start - embargo
+            item for item in admitted if item.opened_on < window.start - embargo
         )
         if len(notices) < policy.verdict.min_window_rows:
             excluded.append(

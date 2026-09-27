@@ -59,6 +59,20 @@ class ExclusionReason(StrEnum):
     """(P-1.5) 투찰금액이 없는 행이 섞이면 「적격 투찰자 중 최저」가 최저라는 보장이
     없다 — 빠진 행이 더 낮았을 수 있어 would-have-won 이 부푼다. 통째로 뺀다."""
 
+    NOTICE_DATE_ABSENT = "NOTICE_DATE_ABSENT"
+    """v3 — 공고일이 없다. **개찰일로 대체하지 않는다**: v2 는 그렇게 접혀 시행일 경계
+    제외(⑬)가 개찰일 기준으로 돌았고, 하한율이 바뀐 앞뒤가 섞였다(verifier r1 H-1)."""
+
+    BID_CLOSE_AT_ABSENT = "BID_CLOSE_AT_ABSENT"
+    """v3 — 입찰 마감이 없다. A·기초금액의 공개 시점 절단이 서지 않는다."""
+
+    OPENING_DATE_ABSENT = "OPENING_DATE_ABSENT"
+    """v3 — 개찰일이 없다. 창 자르기와 누출 절단의 기준이라 대체값(EPOCH 등)을
+    지어내면 그 행이 엉뚱한 사유로 계수된다(code-review r1 M-5)."""
+
+    PLANNED_PRICE_ABSENT = "PLANNED_PRICE_ABSENT"
+    """v3 — 예정가격이 없다(단수 예가·예비가격 상세 미수신). 하한가가 서지 않는다."""
+
     NO_ELIGIBLE_BIDDER = "NO_ELIGIBLE_BIDDER"
     TIED_LOWEST = "TIED_LOWEST"
 

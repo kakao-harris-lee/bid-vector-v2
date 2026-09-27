@@ -85,11 +85,11 @@ def test_snapshot_checksum_is_the_sha256_of_the_rows_bytes() -> None:
         ({"row_count": 99}, SnapshotRejectionReason.ROW_COUNT_MISMATCH),
         ({"rows_sha256": "a" * 64}, SnapshotRejectionReason.CHECKSUM_MISMATCH),
         (
-            {"schema_version": "snapshot-v1"},
+            {"schema_version": "snapshot-v2"},
             SnapshotRejectionReason.UNSUPPORTED_SCHEMA_VERSION,
         ),
         (
-            {"schema_version": "snapshot-v3"},
+            {"schema_version": "snapshot-v4"},
             SnapshotRejectionReason.UNSUPPORTED_SCHEMA_VERSION,
         ),
     ],

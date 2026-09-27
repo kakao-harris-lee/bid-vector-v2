@@ -323,7 +323,7 @@ def prior_notices(
     경계는 엄격한 `<` 다 — 같은 날 개찰분의 결과는 투찰 시점에 알 수 없다. 경쟁 표본도
     참가자 수 표본도 전부 이 함수를 거치므로, 절단을 고치려면 여기 한 줄을 고쳐야 하고
     그 편집은 diff 에 드러난다."""
-    return tuple(item for item in history if item.row.outcome.opened_on < before)
+    return tuple(item for item in history if item.opened_on < before)
 
 
 def build_competitor_pool(
@@ -332,7 +332,7 @@ def build_competitor_pool(
     """지난 공고의 투찰 한 건마다 한 원소. 절단은 `prior_notices` 가 진다."""
     return tuple(
         CompetitorObservation(
-            opened_on=item.row.outcome.opened_on,
+            opened_on=item.opened_on,
             bid_rate=amount / item.base_amount,
             participant_count=item.participant_count,
             base_amount=item.base_amount,
@@ -350,7 +350,7 @@ def build_strategy_input(
 ) -> StrategyInput:
     """전략 입력 조립 — 개찰 결과 두 반쪽이 만나는 **유일한 자리**이고, 여기서 쓰는
     개찰 값은 대상 공고의 `opened_on`(절단 기준) 하나뿐이다."""
-    prior = prior_notices(history, before=target.row.outcome.opened_on)
+    prior = prior_notices(history, before=target.opened_on)
     return StrategyInput(
         notice=target.row.notice,
         floor_rate=target.floor_rate,
@@ -358,7 +358,7 @@ def build_strategy_input(
         base_amount=target.base_amount,
         reserve_range_begin_rate=target.reserve_range_begin_rate,
         reserve_range_end_rate=target.reserve_range_end_rate,
-        competitors=build_competitor_pool(prior, before=target.row.outcome.opened_on),
+        competitors=build_competitor_pool(prior, before=target.opened_on),
         history_participant_counts=tuple(item.participant_count for item in prior),
         seed=seed,
     )

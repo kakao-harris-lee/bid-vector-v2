@@ -28,9 +28,11 @@ from ml_engine.evaluation.backtest.jsonrow import (
     SnapshotRejectionReason,
     decode_json,
     row_date,
+    row_flag,
     row_integer,
     row_mapping,
     row_number,
+    row_optional_date,
     row_optional_flag,
     row_optional_integer,
     row_optional_number,
@@ -42,7 +44,7 @@ from ml_engine.evaluation.backtest.jsonrow import (
 )
 from ml_engine.registry.artifact import JsonValue
 
-SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v2"
+SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v3"
 
 
 class BusinessCategory(StrEnum):
@@ -93,8 +95,8 @@ class NoticeObservation:
 
     notice_key_hash: str
     category: BusinessCategory
-    noticed_on: date
-    bid_close_at: datetime
+    noticed_on: date | None
+    bid_close_at: datetime | None
     base_amount: float | None
     base_amount_disclosed_at: datetime | None
     floor_rate: float | None
@@ -105,13 +107,15 @@ class NoticeObservation:
     successful_bid_method_name: str | None
     prearranged_price_decision_method: str | None
     notice_ordinal: int
-    progress_division: str | None
     procurement_class_code: str | None
     demand_agency_code: str | None
     bid_price_formula_a_applicable: bool | None
     pure_construction_cost: float | None
-    award_method_application_standard: str | None
-    application_basis_content: str | None
+    has_award_method_application_standard: bool
+    has_application_basis_content: bool
+    """자유텍스트 두 칸의 **존재 여부만**(v3, D-6G-33). 원문은 무엇이 실릴지 모르는
+    자유텍스트라 담당자명이 들어올 수 있는 유일한 비통제 경로였다(privacy r1) — 스냅숏이
+    원문을 나르지 않으므로 그 경로가 사라진다. D-6G-22 채움률은 이 불리언으로 낸다."""
 
 
 @dataclass(frozen=True)
@@ -132,8 +136,12 @@ class OpeningOutcome:
     """개찰로 드러나는 것 — 채점만 읽는다. `opening_base_amount` 는 개찰결과 출처의
     기초금액이고 `NoticeObservation.base_amount` 와 **다른 칸**이다(스키마 §3.4)."""
 
-    opened_on: date
-    planned_price: float
+    opened_on: date | None
+    planned_price: float | None
+    progress_division: str | None
+    """진행구분 — **개찰로 드러나는 값**이라 이쪽이다(v3, verifier r1 M-5). v2 는 투찰
+    시점 타입에 있었고, 그러면 「타입으로 닫았다」가 이 칸에서 깨진다."""
+
     opening_base_amount: float | None
     reserve_prices: tuple[float, ...] | None
     drawn_serial_numbers: tuple[int, ...] | None
@@ -177,19 +185,19 @@ _NOTICE_KEYS: Final[frozenset[str]] = frozenset(
         "successful_bid_method_name",
         "prearranged_price_decision_method",
         "notice_ordinal",
-        "progress_division",
         "procurement_class_code",
         "demand_agency_code",
         "bid_price_formula_a_applicable",
         "pure_construction_cost",
-        "award_method_application_standard",
-        "application_basis_content",
+        "has_award_method_application_standard",
+        "has_application_basis_content",
     }
 )
 _OUTCOME_KEYS: Final[frozenset[str]] = frozenset(
     {
         "opened_on",
         "planned_price",
+        "progress_division",
         "opening_base_amount",
         "reserve_prices",
         "drawn_serial_numbers",
@@ -277,8 +285,8 @@ def _parse_notice(payload: JsonValue) -> NoticeObservation:
     return NoticeObservation(
         notice_key_hash=row_text(fields, "notice_key_hash"),
         category=_category(fields),
-        noticed_on=row_date(fields, "noticed_on"),
-        bid_close_at=row_timestamp(fields, "bid_close_at"),
+        noticed_on=row_optional_date(fields, "noticed_on"),
+        bid_close_at=row_optional_timestamp(fields, "bid_close_at"),
         base_amount=row_optional_number(fields, "base_amount"),
         base_amount_disclosed_at=row_optional_timestamp(
             fields, "base_amount_disclosed_at"
@@ -299,27 +307,25 @@ def _parse_notice(payload: JsonValue) -> NoticeObservation:
             fields, "prearranged_price_decision_method"
         ),
         notice_ordinal=row_integer(fields, "notice_ordinal"),
-        progress_division=row_optional_text(fields, "progress_division"),
         procurement_class_code=row_optional_text(fields, "procurement_class_code"),
         demand_agency_code=row_optional_text(fields, "demand_agency_code"),
         bid_price_formula_a_applicable=row_optional_flag(
             fields, "bid_price_formula_a_applicable"
         ),
         pure_construction_cost=row_optional_number(fields, "pure_construction_cost"),
-        award_method_application_standard=row_optional_text(
-            fields, "award_method_application_standard"
+        has_award_method_application_standard=row_flag(
+            fields, "has_award_method_application_standard"
         ),
-        application_basis_content=row_optional_text(
-            fields, "application_basis_content"
-        ),
+        has_application_basis_content=row_flag(fields, "has_application_basis_content"),
     )
 
 
 def _parse_outcome(payload: JsonValue) -> OpeningOutcome:
     fields = row_mapping(payload, "outcome", _OUTCOME_KEYS)
     return OpeningOutcome(
-        opened_on=row_date(fields, "opened_on"),
-        planned_price=row_number(fields, "planned_price"),
+        opened_on=row_optional_date(fields, "opened_on"),
+        planned_price=row_optional_number(fields, "planned_price"),
+        progress_division=row_optional_text(fields, "progress_division"),
         opening_base_amount=row_optional_number(fields, "opening_base_amount"),
         reserve_prices=_numbers(fields, "reserve_prices"),
         drawn_serial_numbers=_integers(fields, "drawn_serial_numbers"),

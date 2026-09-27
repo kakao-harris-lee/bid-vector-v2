@@ -28,6 +28,7 @@ from ml_engine.evaluation.backtest.exclusions import (
     UndecidableAxis,
     admit_rows,
     exclusion_counts,
+    fill_rates,
     resolve_a_value,
     standard_market_price_scope,
 )
@@ -43,6 +44,7 @@ from ml_engine.evaluation.backtest.policy import (
 from ml_engine.evaluation.backtest.snapshot import (
     BusinessCategory,
     LoadedSnapshot,
+    SnapshotRejected,
     load_snapshot,
 )
 
@@ -58,6 +60,11 @@ def _snapshot(payloads: list[dict[str, Any]]) -> LoadedSnapshot:
     loaded = load_snapshot(manifest_bytes(rows), rows)
     assert isinstance(loaded, LoadedSnapshot), loaded
     return loaded
+
+
+def _load(payloads: list[dict[str, Any]], **manifest_kwargs: Any) -> object:
+    rows = rows_bytes(payloads)
+    return load_snapshot(manifest_bytes(rows, **manifest_kwargs), rows)
 
 
 def _reason(payload: dict[str, Any]) -> ExclusionReason | None:
@@ -210,7 +217,7 @@ def test_construction_without_pure_cost_is_excluded() -> None:
             {"notice_reserve_range_end_rate": None},
             ExclusionReason.RESERVE_PRICE_RANGE_ABSENT,
         ),
-        ({"notice_progress_division": "유찰"}, ExclusionReason.REBID_OR_AMENDED),
+        ({"outcome_progress_division": "유찰"}, ExclusionReason.REBID_OR_AMENDED),
         (
             {
                 "notice_successful_bid_method_name": (
@@ -312,8 +319,8 @@ def test_exclusion_counts_report_every_reason_including_zero() -> None:
         _snapshot(
             [
                 row_payload("n-1"),
-                row_payload("n-2", notice_progress_division="유찰"),
-                row_payload("n-3", notice_progress_division="재입찰"),
+                row_payload("n-2", outcome_progress_division="유찰"),
+                row_payload("n-3", outcome_progress_division="재입찰"),
             ]
         ).rows,
         _policy(),
@@ -342,6 +349,84 @@ def _a_value(applicable: bool | None) -> dict[str, Any]:
         "open_at": "2026-06-05T09:00:00+09:00",
         "standard_market_price_applicable": applicable,
     }
+
+
+@pytest.mark.parametrize(
+    ("mutation", "reason"),
+    [
+        ({"notice_noticed_on": None}, ExclusionReason.NOTICE_DATE_ABSENT),
+        ({"notice_bid_close_at": None}, ExclusionReason.BID_CLOSE_AT_ABSENT),
+        ({"outcome_opened_on": None}, ExclusionReason.OPENING_DATE_ABSENT),
+        ({"outcome_planned_price_null": True}, ExclusionReason.PLANNED_PRICE_ABSENT),
+    ],
+)
+def test_v3_value_absence_is_a_row_level_exclusion(
+    mutation: dict[str, Any], reason: ExclusionReason
+) -> None:
+    """D-6G-28 — `| null` 로 선언된 칸의 결측은 **그 행만** 사유로 내린다. v2 는 이
+    넷을 필수로 읽어 한 행의 `null` 이 스냅숏 전체를 거부했고, 그 공고를 제외 규칙이
+    처리할 기회조차 오지 않았다(verifier r1 H-1)."""
+    assert _reason(row_payload("n-1", **mutation)) is reason
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"notice_noticed_on": None},
+        {"notice_bid_close_at": None},
+        {"outcome_opened_on": None},
+        {"outcome_planned_price_null": True},
+    ],
+)
+def test_one_missing_value_does_not_take_the_other_rows_down(
+    mutation: dict[str, Any],
+) -> None:
+    """행 단위라는 것의 뜻 — **나머지 행은 그대로 산다**."""
+    result = admit_rows(
+        _snapshot(
+            [
+                row_payload("bad", **mutation),
+                row_payload("good-1"),
+                row_payload("good-2"),
+            ]
+        ).rows,
+        _policy(),
+    )
+    assert len(result.admitted) == 2
+    assert len(result.excluded) == 1
+
+
+def test_structural_failures_still_reject_the_whole_snapshot() -> None:
+    """값 결측과 **구조 실패**는 다르다(D-6G-28). 미지 키·버전 불일치·행 checksum
+    불일치·닫힌 셋 밖의 업무는 두 레인이 어긋났다는 신호이지 데이터의 성질이 아니라,
+    그대로 **전체 거부**다. 이 대비가 무너지면 스키마 표류가 조용히 흐른다."""
+    good = row_payload("n-1")
+    with_unknown_key = row_payload("n-2")
+    with_unknown_key["notice"]["corp_name"] = "가상건설"
+    assert isinstance(_load([good, with_unknown_key]), SnapshotRejected)
+    assert isinstance(
+        _load([good, row_payload("n-3", notice_category="FOREIGN")]), SnapshotRejected
+    )
+    assert isinstance(_load([good], schema_version="snapshot-v2"), SnapshotRejected)
+    assert isinstance(_load([good], rows_sha256="c" * 64), SnapshotRejected)
+
+
+def test_free_text_columns_are_carried_as_presence_flags_only() -> None:
+    """D-6G-33·privacy r1 — 자유텍스트 원문이 스냅숏에 오지 않는다(담당자명이 실릴 수
+    있던 유일한 비통제 경로였다). 채움률은 존재 여부 불리언으로 낸다."""
+    snapshot = _snapshot(
+        [
+            row_payload("a", notice_has_award_method_application_standard=True),
+            row_payload("b", notice_has_award_method_application_standard=False),
+        ]
+    )
+    notice = snapshot.rows[0].notice
+    assert not {"award_method_application_standard", "application_basis_content"} & set(
+        vars(notice)
+    )
+    rates = dict(fill_rates(snapshot.rows))
+    assert rates["award_method_application_standard"] == 0.5
+    assert rates["application_basis_content"] == 0.0
 
 
 def test_standard_market_price_scope_counts_over_notices_that_have_an_a_value() -> None:

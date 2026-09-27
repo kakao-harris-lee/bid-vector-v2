@@ -84,17 +84,17 @@ def _row(label: str, opened: date, rng: Random) -> dict[str, Any]:
             "successful_bid_method_name": "적격심사제-추정가격 2억원 미만인 용역",
             "prearranged_price_decision_method": "복수예가",
             "notice_ordinal": 1,
-            "progress_division": "일반",
             "procurement_class_code": "0600",
             "demand_agency_code": "A0001",
             "bid_price_formula_a_applicable": None,
             "pure_construction_cost": None,
-            "award_method_application_standard": "적격심사 세부기준",
-            "application_basis_content": None,
+            "has_award_method_application_standard": True,
+            "has_application_basis_content": False,
         },
         "outcome": {
             "opened_on": opened.isoformat(),
             "planned_price": int(planned),
+            "progress_division": "일반",
             "opening_base_amount": int(_BASE_AMOUNT),
             "reserve_prices": [int(price) for price in prices],
             "drawn_serial_numbers": drawn,
@@ -125,7 +125,7 @@ def build_files() -> tuple[bytes, bytes]:
         + "\n"
     ).encode("utf-8")
     manifest = {
-        "schema_version": "snapshot-v2",
+        "schema_version": "snapshot-v3",
         "snapshot_id": "m6-6g-synthetic-v1",
         "row_count": len(rows),
         "period_start": _BLOCK_STARTS[0].isoformat(),

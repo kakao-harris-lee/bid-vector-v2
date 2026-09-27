@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import date, datetime
 
 from ml_engine.evaluation.backtest.floor import floor_price, is_eligible
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
@@ -60,6 +61,14 @@ class AdmittedNotice:
     a_value_total: float
     base_amount: float
     opening_base_amount: float
+    noticed_on: date
+    bid_close_at: datetime
+    opened_on: date
+    planned_price: float
+    """v3 에서 `| null` 이 된 네 칸의 **해소된** 값(D-6G-28). 값이 없는 행은 그 사유로
+    제외돼 승인되지 않으므로, 여기서는 `None` 을 다룰 필요가 없다 — 하류(창·전략·채점)가
+    `row.outcome.*` 대신 이 속성을 읽으면 nullable 이 번지지 않는다."""
+
     reserve_range_begin_rate: float
     reserve_range_end_rate: float
     actual_floor_price: float
@@ -82,7 +91,7 @@ class AdmittedNotice:
         """실현 사정률(예정가격 ÷ 기초금액) — P-4 적합도의 관측값. 분모는 **개찰결과
         출처**의 기초금액이다(예비가격이 그 축에서 뽑힌다). **개찰 결과**라 전략에
         넘어가지 않는다."""
-        return self.row.outcome.planned_price / self.opening_base_amount
+        return self.planned_price / self.opening_base_amount
 
     @property
     def base_amount_matches(self) -> bool:
@@ -106,6 +115,10 @@ class _Resolved:
     a_value_total: float
     base_amount: float
     opening_base_amount: float
+    noticed_on: date
+    bid_close_at: datetime
+    opened_on: date
+    planned_price: float
     begin_rate: float
     end_rate: float
     amounts: tuple[float, ...]
@@ -119,6 +132,10 @@ def _resolve(row: SnapshotRow) -> _Resolved | None:
     opening_base = row.outcome.opening_base_amount
     begin = row.notice.reserve_range_begin_rate
     end = row.notice.reserve_range_end_rate
+    noticed_on = row.notice.noticed_on
+    bid_close_at = row.notice.bid_close_at
+    opened_on = row.outcome.opened_on
+    planned_price = row.outcome.planned_price
     amounts = tuple(
         bidder.amount for bidder in row.outcome.bidder_rows if bidder.amount is not None
     )
@@ -126,7 +143,23 @@ def _resolve(row: SnapshotRow) -> _Resolved | None:
         return None
     if base is None or opening_base is None:
         return None
-    return _Resolved(rate, a_total, base, opening_base, begin, end, amounts)
+    if noticed_on is None or bid_close_at is None or opened_on is None:
+        return None
+    if planned_price is None:
+        return None
+    return _Resolved(
+        rate,
+        a_total,
+        base,
+        opening_base,
+        noticed_on,
+        bid_close_at,
+        opened_on,
+        planned_price,
+        begin,
+        end,
+        amounts,
+    )
 
 
 def _admit(
@@ -141,11 +174,13 @@ def _admit(
     if resolved is None:  # 규칙 표가 이미 걸렀다 — 도달하지 않는 안전망.
         return ExclusionReason.FLOOR_RATE_ABSENT_OR_OUT_OF_BAND
     actual_floor = floor_price(
-        planned_price=row.outcome.planned_price,
+        planned_price=resolved.planned_price,
         floor_rate=resolved.floor_rate,
         a_value_total=resolved.a_value_total,
     )
-    pure_floor = pure_cost_floor(row, policy, resolved.opening_base_amount)
+    pure_floor = pure_cost_floor(
+        row, policy, resolved.opening_base_amount, resolved.planned_price
+    )
     floors = (actual_floor,) if pure_floor is None else (actual_floor, pure_floor)
     eligible = [amount for amount in resolved.amounts if is_eligible(amount, floors)]
     if not eligible:
@@ -159,6 +194,10 @@ def _admit(
         a_value_total=resolved.a_value_total,
         base_amount=resolved.base_amount,
         opening_base_amount=resolved.opening_base_amount,
+        noticed_on=resolved.noticed_on,
+        bid_close_at=resolved.bid_close_at,
+        opened_on=resolved.opened_on,
+        planned_price=resolved.planned_price,
         reserve_range_begin_rate=resolved.begin_rate,
         reserve_range_end_rate=resolved.end_rate,
         actual_floor_price=actual_floor,
@@ -258,6 +297,16 @@ def bid_method_fill_rate(rows: Sequence[SnapshotRow]) -> float:
     return _fill_rate(rows, lambda row: row.notice.successful_bid_method_name)
 
 
+def _true_rate(
+    rows: Sequence[SnapshotRow], reader: Callable[[SnapshotRow], bool]
+) -> float:
+    """존재 여부 불리언의 참 비율 — v3 에서 자유텍스트 두 칸이 원문 대신 이 형태로
+    온다(D-6G-33). 원문을 나르지 않으므로 담당자명이 실릴 경로가 사라진다."""
+    if not rows:
+        return 0.0
+    return sum(1 for row in rows if reader(row)) / len(rows)
+
+
 def fill_rates(rows: Sequence[SnapshotRow]) -> tuple[tuple[str, float], ...]:
     """D-6G-22 가 공시를 요구하는 칸들의 채움률. 문서 XML 예제에서 빈 값이 관측된
     칸들이라(스키마 §6) 실수집 뒤 이 수치가 판정의 해석을 바꾼다."""
@@ -265,11 +314,13 @@ def fill_rates(rows: Sequence[SnapshotRow]) -> tuple[tuple[str, float], ...]:
         ("successful_bid_method_name", bid_method_fill_rate(rows)),
         (
             "award_method_application_standard",
-            _fill_rate(rows, lambda row: row.notice.award_method_application_standard),
+            _true_rate(
+                rows, lambda row: row.notice.has_award_method_application_standard
+            ),
         ),
         (
             "application_basis_content",
-            _fill_rate(rows, lambda row: row.notice.application_basis_content),
+            _true_rate(rows, lambda row: row.notice.has_application_basis_content),
         ),
         (
             "pure_construction_cost",

@@ -60,6 +60,23 @@ def effective_date_for(
     return policy.effective.goods
 
 
+def _is_notice_date_absent(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> bool:
+    return row.notice.noticed_on is None
+
+
+def _is_bid_close_at_absent(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> bool:
+    return row.notice.bid_close_at is None
+
+
+def _is_opening_date_absent(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> bool:
+    return row.outcome.opened_on is None
+
+
+def _is_planned_price_absent(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> bool:
+    price = row.outcome.planned_price
+    return price is None or price <= 0.0
+
+
 def resolve_a_value(notice: NoticeObservation) -> float | None:
     """A 합산액 해소(D-6G-12). 여기가 업무 축을 보는 유일한 자리다.
 
@@ -75,6 +92,8 @@ def resolve_a_value(notice: NoticeObservation) -> float | None:
     빼지 않는다."""
     if notice.category is not BusinessCategory.CONSTRUCTION:
         return 0.0
+    if notice.bid_close_at is None:
+        return None
     applicable = notice.bid_price_formula_a_applicable
     if applicable is None:
         return None
@@ -130,12 +149,17 @@ def _is_not_qualification(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> 
 
 
 def _is_before_effective(row: SnapshotRow, policy: StrategyBacktestPolicy) -> bool:
-    return row.notice.noticed_on < effective_date_for(row.notice.category, policy)
+    """공고일이 없으면 여기서 판정하지 않는다 — `NOTICE_DATE_ABSENT` 가 먼저 걸렀고,
+    **개찰일로 대체하지 않는다**(v2 가 그렇게 접혀 이 규칙이 개찰일 기준으로 돌았다)."""
+    noticed_on = row.notice.noticed_on
+    if noticed_on is None:
+        return False
+    return noticed_on < effective_date_for(row.notice.category, policy)
 
 
 def _is_rebid(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> bool:
     return row.notice.notice_ordinal != _FIRST_NOTICE_ORDINAL or _has_marker(
-        row.notice.progress_division, _REBID_MARKERS
+        row.outcome.progress_division, _REBID_MARKERS
     )
 
 
@@ -214,6 +238,9 @@ _RULES: Final[tuple[tuple[ExclusionReason, _Predicate], ...]] = (
     (ExclusionReason.SME_COMPETITION_SCREENING, _is_sme_competition),
     (ExclusionReason.SHIP_MANUFACTURING, _is_ship_manufacturing),
     (ExclusionReason.NOT_QUALIFICATION_SCREENING, _is_not_qualification),
+    # 값 결측은 **그 값을 쓰는 규칙보다 먼저** 온다 — 공고일이 없으면 시행일 경계를
+    # 판정할 수 없고, 마감이 없으면 A 의 공개 시점 절단이 서지 않는다(v3, D-6G-28).
+    (ExclusionReason.NOTICE_DATE_ABSENT, _is_notice_date_absent),
     (ExclusionReason.FLOOR_RATE_EFFECTIVE_DATE_BOUNDARY, _is_before_effective),
     (ExclusionReason.REBID_OR_AMENDED, _is_rebid),
     (ExclusionReason.SINGLE_PREARRANGED_PRICE, _is_single_prearranged),
@@ -221,7 +248,10 @@ _RULES: Final[tuple[tuple[ExclusionReason, _Predicate], ...]] = (
     (ExclusionReason.BASE_AMOUNT_ABSENT_OR_LATE, _is_base_amount_unusable),
     (ExclusionReason.OPENING_BASE_AMOUNT_ABSENT, _is_opening_base_amount_absent),
     (ExclusionReason.RESERVE_PRICE_RANGE_ABSENT, _is_reserve_range_absent),
+    (ExclusionReason.OPENING_DATE_ABSENT, _is_opening_date_absent),
+    (ExclusionReason.PLANNED_PRICE_ABSENT, _is_planned_price_absent),
     (ExclusionReason.RESERVE_DRAW_INCOMPLETE, _is_reserve_draw_incomplete),
+    (ExclusionReason.BID_CLOSE_AT_ABSENT, _is_bid_close_at_absent),
     (ExclusionReason.A_VALUE_ABSENT_OR_LATE, _is_a_value_unusable),
     (ExclusionReason.PURE_CONSTRUCTION_COST_ABSENT, _is_pure_cost_absent),
     (ExclusionReason.BIDDER_AMOUNT_ABSENT, _is_bidder_amount_absent),
@@ -244,7 +274,10 @@ def structural_reason(
 
 
 def pure_cost_floor(
-    row: SnapshotRow, policy: StrategyBacktestPolicy, opening_base_amount: float
+    row: SnapshotRow,
+    policy: StrategyBacktestPolicy,
+    opening_base_amount: float,
+    planned_price: float,
 ) -> float | None:
     """환산 분모는 **개찰결과 출처** 기초금액이다 — 순공사원가가 그 축의 값이다."""
     cost = row.notice.pure_construction_cost
@@ -253,6 +286,6 @@ def pure_cost_floor(
     return pure_construction_floor(
         pure_construction_cost=cost,
         base_amount=opening_base_amount,
-        planned_price=row.outcome.planned_price,
+        planned_price=planned_price,
         ratio=policy.floor.pure_construction_cost_ratio,
     )

@@ -115,6 +115,10 @@ def row_optional_flag(payload: dict[str, JsonValue], key: str) -> bool | None:
     return value
 
 
+def row_optional_date(payload: dict[str, JsonValue], key: str) -> date | None:
+    return None if row_value(payload, key) is None else row_date(payload, key)
+
+
 def row_optional_timestamp(payload: dict[str, JsonValue], key: str) -> datetime | None:
     return None if row_value(payload, key) is None else row_timestamp(payload, key)
 

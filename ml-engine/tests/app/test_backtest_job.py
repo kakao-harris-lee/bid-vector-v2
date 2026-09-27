@@ -191,6 +191,9 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
     # 숨기지 않고 공시한다(D-6G-22).
     assert fill["bid_price_formula_a_applicable"] == 0.0
     assert fill["pure_construction_cost"] == 0.0
+    # v3 — 자유텍스트 두 칸은 존재 여부 불리언이다(원문을 싣지 않는다).
+    assert fill["award_method_application_standard"] == 1.0
+    assert fill["application_basis_content"] == 0.0
     assert payload["base_amount_mismatch_count"] == 0
     # fixture 에 A 값 공고가 없다 — 분모 0 을 숨기지 않고 싣는다(D-6G-17·23).
     scope = payload["standard_market_price_scope"]
@@ -248,7 +251,7 @@ def test_exclusion_counts_report_every_reason(tmp_path: Path) -> None:
     payload = _main_variant(
         _run(_snapshot_dir(tmp_path), _derived_policy(tmp_path)).verdict_bytes
     )
-    assert len(payload["exclusions"]) == 20
+    assert len(payload["exclusions"]) == 24
     assert all(isinstance(value, int) for value in payload["exclusions"].values())
     # ⑪⑫ 는 한 번도 발화하지 않는다 — 0 이 「가르지 못했다」·「들어오지 않았다」임을
     # `undecidable` 이 따로 말한다(D-6G-21).
