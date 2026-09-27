@@ -17,13 +17,13 @@ from datetime import date
 from typing import Final
 
 from ml_engine.evaluation.backtest.floor import pure_construction_floor
-from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
-from ml_engine.evaluation.backtest.reasons import ExclusionReason
-from ml_engine.evaluation.backtest.snapshot import (
+from ml_engine.evaluation.backtest.observations import (
     BusinessCategory,
     NoticeObservation,
     SnapshotRow,
 )
+from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
+from ml_engine.evaluation.backtest.reasons import ExclusionReason
 
 # 낙찰방법명 어휘 — 조달청 OpenAPI 참고자료의 `sucsfbidMthdNm` 샘플 문면에서 왔다
 # (선행 조사 02 §2 축어 인용). **순서가 있다**: 아래 셋을 먼저 보고 나서 적격심사를

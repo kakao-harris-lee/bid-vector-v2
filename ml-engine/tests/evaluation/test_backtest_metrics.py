@@ -38,11 +38,16 @@ from ml_engine.evaluation.backtest.metrics import (
     score_strategy,
     scored_notice_keys,
 )
+from ml_engine.evaluation.backtest.observations import (
+    LoadedSnapshot,
+)
 from ml_engine.evaluation.backtest.policy import (
     StrategyBacktestPolicy,
     load_strategy_backtest_policy,
 )
-from ml_engine.evaluation.backtest.snapshot import LoadedSnapshot, load_snapshot
+from ml_engine.evaluation.backtest.snapshot import (
+    load_snapshot,
+)
 from ml_engine.evaluation.backtest.strategies import (
     Abstained,
     AbstentionReason,

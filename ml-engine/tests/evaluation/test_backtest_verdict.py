@@ -39,13 +39,18 @@ from _backtest_support import (
 from ml_engine.evaluation.backtest.exclusions import admit_rows
 from ml_engine.evaluation.backtest.mcnemar import DiscordantCounts, one_sided_p_value
 from ml_engine.evaluation.backtest.metrics import NoticeScore, StrategyScores
+from ml_engine.evaluation.backtest.observations import (
+    LoadedSnapshot,
+)
 from ml_engine.evaluation.backtest.policy import (
     StrategyBacktestPolicy,
     load_strategy_backtest_policy,
 )
 from ml_engine.evaluation.backtest.records import BacktestRequest, SampleVariant
 from ml_engine.evaluation.backtest.run import _samples_match, _seed_sign_consistent
-from ml_engine.evaluation.backtest.snapshot import LoadedSnapshot, load_snapshot
+from ml_engine.evaluation.backtest.snapshot import (
+    load_snapshot,
+)
 from ml_engine.evaluation.backtest.strategies import UniformBandStrategy
 from ml_engine.evaluation.backtest.verdict import (
     StrategyFailed,

@@ -16,9 +16,11 @@ from typing import Final
 
 from ml_engine.evaluation.backtest.exclusions import StandardMarketPriceScope
 from ml_engine.evaluation.backtest.fit import FitResult
+from ml_engine.evaluation.backtest.observations import (
+    LoadedSnapshot,
+)
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
 from ml_engine.evaluation.backtest.reasons import ExclusionReason, UndecidableAxis
-from ml_engine.evaluation.backtest.snapshot import LoadedSnapshot
 from ml_engine.evaluation.backtest.strategies import StrategyLike
 from ml_engine.evaluation.backtest.verdict import StrategyVerdict
 from ml_engine.evaluation.backtest.windows import WindowExclusion
@@ -108,6 +110,10 @@ class SamplingRecord:
     """표본 크기 결정식의 입력과 결과(D-6G-20) — 판정 JSON 이 그대로 싣는다."""
 
     sample_size: int
+    notice_observed_count: int
+    """`has_*` 채움률의 분모(M-8) — 표본에서 공고 canonical 이 없던 것만 뺀 수.
+    채움률이 하한인 이유가 이 수와 행 수의 차이이므로 함께 공시한다."""
+
     list_call_count: int
     detail_calls: int
     total_calls: int

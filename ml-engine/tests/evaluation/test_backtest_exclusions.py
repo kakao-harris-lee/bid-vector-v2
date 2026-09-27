@@ -38,14 +38,16 @@ from ml_engine.evaluation.backtest.floor import (
     is_eligible,
     pure_construction_floor,
 )
+from ml_engine.evaluation.backtest.observations import (
+    BusinessCategory,
+    LoadedSnapshot,
+    SnapshotRejected,
+)
 from ml_engine.evaluation.backtest.policy import (
     StrategyBacktestPolicy,
     load_strategy_backtest_policy,
 )
 from ml_engine.evaluation.backtest.snapshot import (
-    BusinessCategory,
-    LoadedSnapshot,
-    SnapshotRejected,
     load_snapshot,
 )
 
@@ -495,9 +497,34 @@ def test_free_text_columns_are_carried_as_presence_flags_only() -> None:
     assert not {"award_method_application_standard", "application_basis_content"} & set(
         vars(notice)
     )
-    rates = dict(fill_rates(snapshot.rows))
+    rates = dict(fill_rates(snapshot.rows, notice_observed_count=len(snapshot.rows)))
     assert rates["award_method_application_standard"] == 0.5
     assert rates["application_basis_content"] == 0.0
+
+
+def test_presence_fill_rate_denominator_is_every_sample_with_a_notice_observation() -> (
+    None
+):
+    """M-8 — `has_*` 채움률의 분모는 **목록 관측이 있는 표본** 전부다(행이 되지 못한
+    것 포함). `sampled_without_notice` 만 분모에서 뺀다.
+
+    이 칸들은 공고 축에서 온다. 상세(개찰 결과)를 못 받아 행이 되지 못한 표본도
+    공고 관측은 있었으므로 분모에 남는다 — 행만 세면 「상세를 받은 공고만」의 비율이
+    되어 실제 채움률보다 높게 나온다. 공고 canonical 자체가 없던 표본은 관측될 수
+    없었으므로 뺀다.
+
+    **이 값은 하한이다.** 분자는 행에서만 셀 수 있어(상세 없는 표본의 `has_*` 는
+    스냅숏에 오지 않는다) 그 표본들이 0 으로 들어간다. 분모를 함께 공시해
+    (`sampling.notice_observed_count`) 읽는 쪽이 그 사실을 볼 수 있게 한다."""
+    snapshot = _snapshot(
+        [
+            row_payload("a", notice_has_award_method_application_standard=True),
+            row_payload("b", notice_has_award_method_application_standard=False),
+        ]
+    )
+    # 표본 다섯 = 행 둘 + 상세 없음 둘 + 공고 없음 하나.
+    rates = dict(fill_rates(snapshot.rows, notice_observed_count=4))
+    assert rates["award_method_application_standard"] == 0.25
 
 
 def test_standard_market_price_scope_counts_over_notices_that_have_an_a_value() -> None:

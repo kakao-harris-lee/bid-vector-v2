@@ -24,11 +24,13 @@ from _backtest_support import (
     sample_list_bytes,
 )
 
-from ml_engine.evaluation.backtest.sample_list import parse_sample_list
-from ml_engine.evaluation.backtest.snapshot import (
+from ml_engine.evaluation.backtest.observations import (
     BusinessCategory,
     LoadedSnapshot,
     SnapshotRejected,
+)
+from ml_engine.evaluation.backtest.sample_list import parse_sample_list
+from ml_engine.evaluation.backtest.snapshot import (
     SnapshotRejectionReason,
     load_snapshot,
 )
@@ -426,7 +428,8 @@ def test_parse_sample_list_keeps_the_file_order() -> None:
             + "\tSERVICES\t2026-W08\n"
         ).encode()
     )
-    assert keys == ("a" * 64, "b" * 64)
+    assert keys.keys == ("a" * 64, "b" * 64)
+    assert keys.divisions == ("CONSTRUCTION", "SERVICES")
 
 
 def test_rejection_detail_never_repeats_a_notice_key_hash() -> None:
@@ -453,3 +456,62 @@ def test_loader_accepts_bytes_not_paths() -> None:
         ),
         SnapshotRejected,
     )
+
+
+def test_sample_list_divisions_come_from_the_file_not_a_code_constant() -> None:
+    """M-6 — 최소 표본 결정식의 **업무 수**는 코드 상수(`len(BusinessCategory)`)가
+    아니라 `sample-list.tsv` 의 distinct `business_division` 집합 크기다.
+
+    두 레인이 다 읽는 단일 출처이기 때문이다 — Kotlin 의 수집 대상 업무 설정이 그
+    파일에 반영되고, 설정이 둘이면 셋으로 센 최소치는 영영 닿지 않는 문턱이 된다.
+    스키마 §2.1 이 이 칸을 **행의 `category` 와 다른 축**(Kotlin `BusinessDivision`
+    어휘)이라고 못 박았으므로 닫힌 셋으로 검사하지 않는다 — 세기만 한다."""
+    rows = rows_bytes([row_payload("n-1"), row_payload("n-2"), row_payload("n-3")])
+    listing = sample_list_bytes(rows, divisions=("CONSTRUCTION", "SERVICE"))
+    loaded = load_snapshot(manifest_bytes(rows, sample_list=listing), rows, listing)
+    assert isinstance(loaded, LoadedSnapshot), loaded
+    assert loaded.sample_divisions == ("CONSTRUCTION", "SERVICE")
+
+
+def test_sample_list_divisions_are_sorted_and_deduplicated() -> None:
+    """공시·재현 때문에 순서가 고정돼야 한다. 세는 것은 **distinct** 집합이다."""
+    rows = rows_bytes([row_payload(f"n-{index}") for index in range(4)])
+    listing = sample_list_bytes(rows, divisions=("SERVICE", "CONSTRUCTION"))
+    loaded = load_snapshot(manifest_bytes(rows, sample_list=listing), rows, listing)
+    assert isinstance(loaded, LoadedSnapshot), loaded
+    assert loaded.sample_divisions == ("CONSTRUCTION", "SERVICE")
+
+
+@pytest.mark.parametrize("blank", ["", "  "])
+def test_blank_sample_list_columns_are_rejected(blank: str) -> None:
+    """빈 업무 축은 세기의 분모를 조용히 바꾼다 — 형태 실패로 거부한다."""
+    key = "a" * 64
+    raw = f"{key}\t{blank}\t2026-W25\n".encode()
+    rows = rows_bytes([row_payload("n-1")])
+    rejected = load_snapshot(manifest_bytes(rows, sample_list=raw), rows, raw)
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.SAMPLE_LIST_MALFORMED
+
+
+def test_notice_observed_count_keeps_samples_that_lost_only_their_detail() -> None:
+    """M-8 — `has_*` 채움률의 분모. 표본에서 **공고 canonical 이 없던 것만** 뺀다.
+
+    상세를 못 받아 행이 되지 못한 표본은 공고 축이 관측됐으므로 분모에 남는다.
+    둘을 같이 빼면 「상세를 받은 공고만」의 비율이 되어 채움률이 실제보다 높게 나오고,
+    둘 다 남기면 관측될 수 없었던 표본까지 분모에 들어간다."""
+    rows = rows_bytes([row_payload("n-1")])
+    listing = sample_list_bytes(rows, extra_keys=("f" * 64, "e" * 64))
+    loaded = load_snapshot(
+        manifest_bytes(
+            rows,
+            sample_list=listing,
+            sampled_without_detail=1,
+            sampled_without_notice=1,
+        ),
+        rows,
+        listing,
+    )
+    assert isinstance(loaded, LoadedSnapshot), loaded
+    assert loaded.sample_size == 3
+    # 행 1 + 상세 없음 1 = 2. 공고 없음 1 만 빠진다.
+    assert loaded.notice_observed_count == 2

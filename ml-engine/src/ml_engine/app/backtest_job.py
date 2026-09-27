@@ -25,6 +25,9 @@ from ml_engine.app.backtest_distribution import (
     S2_STRATEGY_NAMES,
     distribution_strategies,
 )
+from ml_engine.evaluation.backtest.observations import (
+    LoadedSnapshot,
+)
 from ml_engine.evaluation.backtest.policy import (
     StrategyBacktestPolicy,
     load_strategy_backtest_policy,
@@ -33,7 +36,9 @@ from ml_engine.evaluation.backtest.policy import (
 from ml_engine.evaluation.backtest.records import BacktestRequest, SampleVariant
 from ml_engine.evaluation.backtest.report import canonical_multi_verdict_bytes
 from ml_engine.evaluation.backtest.run import run_strategy_backtest
-from ml_engine.evaluation.backtest.snapshot import LoadedSnapshot, load_snapshot
+from ml_engine.evaluation.backtest.snapshot import (
+    load_snapshot,
+)
 from ml_engine.evaluation.backtest.strategies import (
     InstitutionalMonteCarloStrategy,
     RuleAnchorStrategy,

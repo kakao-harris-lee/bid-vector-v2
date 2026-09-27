@@ -29,6 +29,9 @@ import pytest
 
 from ml_engine.adapters.snapshot_files import SnapshotFiles, read_snapshot_files
 from ml_engine.evaluation.backtest.exclusions import admit_rows, exclusion_counts
+from ml_engine.evaluation.backtest.observations import (
+    LoadedSnapshot,
+)
 from ml_engine.evaluation.backtest.policy import (
     StrategyBacktestPolicy,
     load_strategy_backtest_policy,
@@ -36,7 +39,6 @@ from ml_engine.evaluation.backtest.policy import (
 from ml_engine.evaluation.backtest.reasons import ExclusionReason
 from ml_engine.evaluation.backtest.sample_list import parse_sample_list
 from ml_engine.evaluation.backtest.snapshot import (
-    LoadedSnapshot,
     load_snapshot,
     opening_date_range,
 )
@@ -195,7 +197,7 @@ def test_golden_sample_list_is_a_real_file_bound_to_its_rows() -> None:
         == hashlib.sha256(files.sample_list_bytes).hexdigest()
     )
 
-    sampled = set(parse_sample_list(files.sample_list_bytes))
+    sampled = set(parse_sample_list(files.sample_list_bytes).keys)
     assert sampled, "표본 목록이 비어 있다"
     assert {row.notice.notice_key_hash for row in snapshot.rows} <= sampled
 
@@ -204,6 +206,28 @@ def test_golden_sample_list_is_a_real_file_bound_to_its_rows() -> None:
         + snapshot.sampled_without_detail
         + snapshot.sampled_without_notice
     )
+
+
+def test_golden_actually_exercises_the_missing_sample_paths() -> None:
+    """**왕복이 헛돌지 않는다는 확인**(D-6G-42). golden 이 「표본 == 행」이면 v4 가 연
+    세 자리 중 둘이 생산 바이트에서 한 번도 실행되지 않는다 — 진부분집합 경로와 두
+    결측 계수다. 그 상태는 초록으로 보이므로 **이 test 가 없으면 보이지 않는다.**
+
+    실측으로 드러난 자리다: golden 이 10/10/0/0 이던 동안, ⑵ 를 계약의 `⊆` 에서 v3 의
+    `==` 로 되돌리는 변이(L9)가 단위 test 는 붉혔지만 golden 여덟은 **그대로 초록**
+    이었다. 지금 golden 은 12/10/1/1 이라 같은 변이가 왕복에서도 붉어진다.
+
+    그러므로 이 단언은 golden 의 성질이 아니라 **왕복의 검출력**에 대한 것이다."""
+    snapshot = _golden_snapshot()
+    sampled = set(parse_sample_list(_golden_files().sample_list_bytes).keys)
+    row_keys = {row.notice.notice_key_hash for row in snapshot.rows}
+    assert row_keys < sampled, (
+        "golden 의 행이 표본 목록과 같다 — 진부분집합 경로가 왕복에서 헛돈다"
+    )
+    assert snapshot.sampled_without_detail > 0, "상세 결측 표본이 없다"
+    assert snapshot.sampled_without_notice > 0, "공고 결측 표본이 없다"
+    # 분모가 행 수와 **다른** 판이어야 M-8 의 분모 선택이 왕복에서 의미를 갖는다.
+    assert snapshot.notice_observed_count != len(snapshot.rows)
 
 
 def test_golden_manifest_declares_the_supported_schema_version() -> None:

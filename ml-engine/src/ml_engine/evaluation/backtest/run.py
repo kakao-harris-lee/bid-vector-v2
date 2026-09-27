@@ -34,6 +34,9 @@ from ml_engine.evaluation.backtest.metrics import (
     score_strategy,
     scored_notice_keys,
 )
+from ml_engine.evaluation.backtest.observations import (
+    LoadedSnapshot,
+)
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
 from ml_engine.evaluation.backtest.reasons import ExclusionReason
 from ml_engine.evaluation.backtest.records import (
@@ -49,7 +52,6 @@ from ml_engine.evaluation.backtest.records import (
     VariantRecord,
     WindowRecord,
 )
-from ml_engine.evaluation.backtest.snapshot import BusinessCategory, LoadedSnapshot
 from ml_engine.evaluation.backtest.strategies import (
     StrategyLike,
     StrategyOutcome,
@@ -227,7 +229,12 @@ def _sampling_record(request: BacktestRequest) -> SamplingRecord:
 
     이 값들은 공시로 끝나지 않는다: 예산 초과도 최소 미달도 **판정 대신 멈춤**이다
     (verifier r1 M-3 — 앞 판의 `min_required_sample` 은 어디서도 멈춤을 만들지 않는
-    죽은 값이었다)."""
+    죽은 값이었다).
+
+    업무 수는 **표본 목록 파일이 말한다**(M-6). `len(BusinessCategory)` 로 세면 이
+    레인의 코드 상수가 문턱을 정하게 되고, Kotlin 의 수집 대상 업무 설정과 갈리면
+    영영 닿지 않는(또는 너무 낮은) 문턱이 된다 — 두 레인이 다 읽는 파일이 단일
+    출처다."""
     budget = request.policy.sampling
     rows = request.snapshot.rows
     size = len(rows)
@@ -238,10 +245,11 @@ def _sampling_record(request: BacktestRequest) -> SamplingRecord:
     minimum = budget.minimum_required_sample(
         rows_per_window=request.policy.verdict.min_window_rows,
         window_count=request.policy.verdict.min_window_count,
-        category_count=len(BusinessCategory),
+        category_count=len(request.snapshot.sample_divisions),
     )
     return SamplingRecord(
         sample_size=size,
+        notice_observed_count=request.snapshot.notice_observed_count,
         list_call_count=budget.list_call_count,
         detail_calls=detail_calls,
         total_calls=total,
@@ -422,7 +430,10 @@ def _assemble_verdict(
         fit=fit,
         exclusions=counts,
         undecidable=admission.undecidable,
-        fill_rates=fill_rates(request.snapshot.rows),
+        fill_rates=fill_rates(
+            request.snapshot.rows,
+            notice_observed_count=request.snapshot.notice_observed_count,
+        ),
         standard_market_price_scope=standard_market_price_scope(request.snapshot.rows),
         base_amount_mismatch_count=sum(
             1 for item in admission.admitted if not item.base_amount_matches

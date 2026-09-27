@@ -148,13 +148,26 @@ def rows_bytes(payloads: list[dict[str, Any]]) -> bytes:
 
 
 def sample_list_bytes(
-    rows: bytes, *, extra_keys: tuple[str, ...] = (), division: str = "SERVICES"
+    rows: bytes,
+    *,
+    extra_keys: tuple[str, ...] = (),
+    division: str = "SERVICES",
+    divisions: tuple[str, ...] = (),
 ) -> bytes:
     """`sample-list.tsv` 바이트(v4, 스키마 §2.1) — 헤더 없는 TSV, 해시 오름차순,
     끝 줄 개행 포함. `extra_keys` 로 **행이 없는 표본**(상세를 못 받았거나 공고
-    canonical 이 없는 공고)을 넣어 진부분집합 상태를 만든다."""
+    canonical 이 없는 공고)을 넣어 진부분집합 상태를 만든다.
+
+    `divisions` 를 주면 키 순서대로 **돌려 가며** 붙인다 — 업무 축이 여럿인 목록을
+    만들어 최소 표본 결정식이 그 수를 어디서 세는지 가른다."""
     keys = sorted({*_row_keys(rows), *extra_keys})
-    lines = [f"{key}\t{division}\t2026-W25" for key in keys]
+    if divisions:
+        lines = [
+            f"{key}\t{divisions[index % len(divisions)]}\t2026-W25"
+            for index, key in enumerate(keys)
+        ]
+    else:
+        lines = [f"{key}\t{division}\t2026-W25" for key in keys]
     return ("\n".join(lines) + "\n").encode("utf-8") if lines else b""
 
 

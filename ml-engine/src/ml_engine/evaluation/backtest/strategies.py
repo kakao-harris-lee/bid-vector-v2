@@ -34,8 +34,11 @@ import numpy as np
 from ml_engine.evaluation.backtest.exclusions import AdmittedNotice
 from ml_engine.evaluation.backtest.floor import floor_price, rate_from_basis_points
 from ml_engine.evaluation.backtest.institution import sample_assessment_ratios
+from ml_engine.evaluation.backtest.observations import (
+    BusinessCategory,
+    NoticeObservation,
+)
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
-from ml_engine.evaluation.backtest.snapshot import BusinessCategory, NoticeObservation
 
 _HALF = 2.0
 

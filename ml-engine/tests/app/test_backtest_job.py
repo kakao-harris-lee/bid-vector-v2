@@ -186,6 +186,19 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
     assert sampling["meets_minimum"] is True
     # 공고당 호출은 업무별이다 — fixture 는 전부 용역(3)이라 상세 호출이 행 수의 3배다.
     assert sampling["detail_calls"] == sampling["sample_size"] * 3
+    # M-6 — 최소 표본의 **업무 수**는 `sample-list.tsv` 의 distinct `business_division`
+    # 집합 크기다. 이 fixture 의 목록은 업무 축이 하나(`SERVICES`)뿐이라 1 로 센다.
+    # `len(BusinessCategory)`(=3)로 세던 옛 판이면 이 값이 세 배로 나온다 — 그 차이가
+    # 이 단언이 잠그는 것이다. 정책 값에서 파생해 적는다(리터럴 문턱을 쓰지 않는다).
+    policy = load_strategy_backtest_policy(_derived_policy(tmp_path))
+    assert isinstance(policy, StrategyBacktestPolicy), policy
+    assert sampling[
+        "minimum_required_sample"
+    ] == policy.sampling.minimum_required_sample(
+        rows_per_window=policy.verdict.min_window_rows,
+        window_count=policy.verdict.min_window_count,
+        category_count=1,
+    )
     fill = payload["fill_rates"]
     assert fill["successful_bid_method_name"] == 1.0
     assert fill["reserve_range_end_rate"] == 1.0

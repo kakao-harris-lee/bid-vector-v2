@@ -26,11 +26,16 @@ from _backtest_support import (
 )
 
 from ml_engine.evaluation.backtest.exclusions import AdmittedNotice, admit_rows
+from ml_engine.evaluation.backtest.observations import (
+    LoadedSnapshot,
+)
 from ml_engine.evaluation.backtest.policy import (
     StrategyBacktestPolicy,
     load_strategy_backtest_policy,
 )
-from ml_engine.evaluation.backtest.snapshot import LoadedSnapshot, load_snapshot
+from ml_engine.evaluation.backtest.snapshot import (
+    load_snapshot,
+)
 from ml_engine.evaluation.backtest.strategies import (
     Abstained,
     AbstentionReason,
