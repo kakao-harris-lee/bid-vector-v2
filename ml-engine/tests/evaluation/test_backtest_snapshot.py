@@ -396,11 +396,11 @@ def test_declared_sample_size_must_match_the_file_it_points_at() -> None:
 @pytest.mark.parametrize(
     "listing",
     [
-        b"deadbeef\tSERVICES\t2026-W25\n",
-        (("a" * 64) + "\tSERVICES\n"),
-        (("b" * 64) + "\tSERVICES\t2026-W25"),
-        (("c" * 64) + "\tSERVICES\t2026-W25\n" + ("a" * 64) + "\tSERVICES\t2026-W25\n"),
-        (("A" * 64) + "\tSERVICES\t2026-W25\n"),
+        b"deadbeef\tSERVICE\t2026-W25\n",
+        (("a" * 64) + "\tSERVICE\n"),
+        (("b" * 64) + "\tSERVICE\t2026-W25"),
+        (("c" * 64) + "\tSERVICE\t2026-W25\n" + ("a" * 64) + "\tSERVICE\t2026-W25\n"),
+        (("A" * 64) + "\tSERVICE\t2026-W25\n"),
     ],
 )
 def test_malformed_sample_list_is_rejected(listing: bytes | str) -> None:
@@ -425,11 +425,11 @@ def test_parse_sample_list_keeps_the_file_order() -> None:
             ("a" * 64)
             + "\tCONSTRUCTION\t2026-W07\n"
             + ("b" * 64)
-            + "\tSERVICES\t2026-W08\n"
+            + "\tSERVICE\t2026-W08\n"
         ).encode()
     )
     assert keys.keys == ("a" * 64, "b" * 64)
-    assert keys.divisions == ("CONSTRUCTION", "SERVICES")
+    assert keys.divisions == ("CONSTRUCTION", "SERVICE")
 
 
 def test_rejection_detail_never_repeats_a_notice_key_hash() -> None:
@@ -566,3 +566,68 @@ def test_reader_cannot_distinguish_a_post_hoc_shrink_of_the_sample_list() -> Non
     # 판독이 가르지 못한다는 사실 자체 — 행은 같고 선언만 다르다.
     assert honest.rows == shrunk.rows
     assert (honest.sample_size, shrunk.sample_size) == (3, 1)
+
+
+@pytest.mark.parametrize(
+    "division", ["SERVICES", "service", "CONSTRUCTION_SERVICE", "기타"]
+)
+def test_business_division_outside_the_closed_vocabulary_is_rejected(
+    division: str,
+) -> None:
+    """D-6G-53 — 업무 구분은 스키마 §2.1 의 닫힌 셋이다. 밖이면 **스냅숏 전체 거부**.
+
+    세기만 하던 앞 판에는 조용한 실패가 있었다: distinct 수가 최소 표본 문턱을
+    정하는데(업무 하나당 1,739건), 서로 다른 두 업무가 같은 문자열로 **합쳐지는**
+    오타면 distinct 수가 줄어 문턱이 **내려가고**, 설계가 요구한 것보다 적은
+    데이터로 실험이 그대로 진행된다."""
+    rows = rows_bytes([row_payload("n-1"), row_payload("n-2")])
+    listing = sample_list_bytes(rows, divisions=(division,))
+    rejected = load_snapshot(manifest_bytes(rows, sample_list=listing), rows, listing)
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.UNKNOWN_BUSINESS_DIVISION
+
+
+def test_every_vocabulary_member_is_accepted() -> None:
+    """양성 대조 — 닫힌 셋을 좁히면 출하 어휘가 거부된다."""
+    rows = rows_bytes([row_payload(f"n-{index}") for index in range(4)])
+    listing = sample_list_bytes(
+        rows, divisions=("CONSTRUCTION", "SERVICE", "GOODS", "FOREIGN")
+    )
+    loaded = load_snapshot(manifest_bytes(rows, sample_list=listing), rows, listing)
+    assert isinstance(loaded, LoadedSnapshot), loaded
+    assert loaded.sample_divisions == ("CONSTRUCTION", "FOREIGN", "GOODS", "SERVICE")
+
+
+def test_notice_key_hash_must_be_hex_characters() -> None:
+    """cr r3 L-6 — 길이 64 + 소문자만 보던 앞 판은 `z` 64자를 받았다. Kotlin
+    `NoticeKeyHash.ofHex` 는 `[0-9a-f]{64}` 다 — 두 레인의 판독 강도가 달랐다."""
+    raw = ("z" * 64 + "\tSERVICE\t2026-W25\n").encode()
+    rows = rows_bytes([row_payload("n-1")])
+    rejected = load_snapshot(manifest_bytes(rows, sample_list=raw), rows, raw)
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.SAMPLE_LIST_MALFORMED
+
+
+def test_broken_utf8_names_the_file_that_broke() -> None:
+    """cr r3 L-7 — 앞 판은 `UnicodeDecodeError` 를 바깥에서 한꺼번에 받아 **언제나**
+    `SAMPLE_LIST_MALFORMED` 로 접었다. 깨진 `rows.jsonl` 이 「표본 목록이 형태를
+    어겼다」로 보고되면 사유가 뿌리를 가리키지 못한다."""
+    rows = rows_bytes([row_payload("n-1")])
+    listing = sample_list_bytes(rows)
+
+    # manifest 는 **온전한** 행에서 만들고 해시만 깨진 바이트에 맞춘다 — 헬퍼가 깨진
+    # 바이트를 읽지 않게. 판독이 보는 것은 세 블롭이고, 여기서 재는 것은 사유다.
+    broken_rows = b"\xff\xfe" + rows
+    manifest = manifest_bytes(
+        rows, sample_list=listing, rows_sha256=hashlib.sha256(broken_rows).hexdigest()
+    )
+    rejected = load_snapshot(manifest, broken_rows, listing)
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.MALFORMED_JSON
+
+    broken_listing = b"\xff\xfe" + listing
+    rejected = load_snapshot(
+        manifest_bytes(rows, sample_list=broken_listing), rows, broken_listing
+    )
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.SAMPLE_LIST_MALFORMED

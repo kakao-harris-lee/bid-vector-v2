@@ -375,9 +375,7 @@ def load_snapshot(
             sampled_without_notice=manifest.sampled_without_notice,
         )
         return _assemble(manifest, rows, listing)
-    except (RowReadError, UnicodeDecodeError) as rejected:
-        if isinstance(rejected, UnicodeDecodeError):
-            return SnapshotRejected(
-                SnapshotRejectionReason.SAMPLE_LIST_MALFORMED, "UTF-8 아님"
-            )
+    except RowReadError as rejected:
+        # `UnicodeDecodeError` 를 여기서 받지 않는다 — 파일마다 자기 판독기가 사유를
+        # 붙인다(cr r3 L-7). 여기서 한꺼번에 접으면 어느 파일이 깨졌는지 잃는다.
         return SnapshotRejected(rejected.reason, rejected.detail)

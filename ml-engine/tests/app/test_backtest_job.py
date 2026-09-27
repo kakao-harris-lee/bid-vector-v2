@@ -147,7 +147,7 @@ def test_lower_bound_marker_comes_from_the_data_not_a_constant(
     assert fill_block["unmeasured_sample_count"] == 0
     assert fill_block["is_lower_bound"] is False
     # 빠진 표본이 없으니 분모가 행 수와 같아진다 — 그래서 모든 행에 있는 칸이 1.0 이다.
-    assert fill_block["denominator"] == payload["sampling"]["sample_size"]
+    assert fill_block["denominator"] == payload["sampling"]["row_count"]
     assert fill_block["values"]["successful_bid_method_name"] == 1.0
 
 
@@ -237,7 +237,7 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
     assert sampling["within_budget"] is True
     assert sampling["meets_minimum"] is True
     # 공고당 호출은 업무별이다 — fixture 는 전부 용역(3)이라 상세 호출이 행 수의 3배다.
-    assert sampling["detail_calls"] == sampling["sample_size"] * 3
+    assert sampling["detail_calls"] == sampling["row_count"] * 3
     # M-6 — 최소 표본의 **업무 수**는 `sample-list.tsv` 의 distinct `business_division`
     # 집합 크기다. 이 fixture 의 목록은 업무 축이 하나(`SERVICES`)뿐이라 1 로 센다.
     # `len(BusinessCategory)`(=3)로 세던 옛 판이면 이 값이 세 배로 나온다 — 그 차이가
@@ -251,6 +251,15 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
         window_count=policy.verdict.min_window_count,
         category_count=1,
     )
+    # D-6G-53 — 최소 표본 문턱이 업무 구분의 distinct 수로 정해지므로, 판정문이 그
+    # 근거를 싣는다. 값이 보이지 않으면 문턱이 왜 그 값인지 알 수 없다.
+    assert snapshot["sample_divisions"] == ["SERVICE"]
+    # cr r3 L-8 — 같은 문서 안에서 같은 이름이 다른 것을 가리키면 안 된다.
+    # `snapshot.sample_size` 는 표본 파일의 키 수(122), `sampling.row_count` 는 행
+    # 수(120)다. **두 수가 실제로 다르다**는 것이 이름을 가른 이유다.
+    assert "sample_size" not in sampling
+    assert sampling["row_count"] != snapshot["sample_size"]
+
     # D-6G-46 — 여섯이 분모 하나를 공유하고, 그 분모와 하한 표지를 값 옆에 싣는다.
     # fixture 는 표본 둘이 행이 되지 못한 판이라 **세 수가 다 다르다**: 표본 122 ·
     # 분모 121 · 행 120. 분모를 다른 수로 적으면 아래 단언들이 갈린다.
@@ -260,14 +269,14 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
         fill_block["denominator"]
         == snapshot["sample_size"] - snapshot["sampled_without_notice"]
     )
-    assert fill_block["denominator"] != sampling["sample_size"]
+    assert fill_block["denominator"] != sampling["row_count"]
     assert fill_block["denominator"] != snapshot["sample_size"]
     # 상세를 못 받은 표본이 있으므로 이 수치들은 **엄격한 하한**이다.
     assert fill_block["unmeasured_sample_count"] == snapshot["sampled_without_detail"]
     assert fill_block["is_lower_bound"] is True
     fill = fill_block["values"]
     # 모든 행에 있는 칸이라도 1.0 이 아니다 — 분모에 재지 못한 표본이 하나 있다.
-    everywhere = sampling["sample_size"] / fill_block["denominator"]
+    everywhere = sampling["row_count"] / fill_block["denominator"]
     assert everywhere < 1.0
     assert fill["successful_bid_method_name"] == everywhere
     assert fill["reserve_range_end_rate"] == everywhere

@@ -80,6 +80,7 @@ def _snapshot_record(snapshot: LoadedSnapshot) -> SnapshotRecord:
         sample_size=snapshot.sample_size,
         sampled_without_detail=snapshot.sampled_without_detail,
         sampled_without_notice=snapshot.sampled_without_notice,
+        sample_divisions=snapshot.sample_divisions,
         period_start=snapshot.period_start,
         period_end=snapshot.period_end,
     )
@@ -248,7 +249,7 @@ def _sampling_record(request: BacktestRequest) -> SamplingRecord:
         category_count=len(request.snapshot.sample_divisions),
     )
     return SamplingRecord(
-        sample_size=size,
+        row_count=size,
         notice_observed_count=request.snapshot.notice_observed_count,
         list_call_count=budget.list_call_count,
         detail_calls=detail_calls,
@@ -279,7 +280,7 @@ def _sampling_stop(
         return _stopped(
             request,
             StopReason.SAMPLE_SIZE_BELOW_MINIMUM,
-            f"{sampling.sample_size} < {sampling.minimum_required_sample}",
+            f"{sampling.row_count} < {sampling.minimum_required_sample}",
             None,
             counts,
         )

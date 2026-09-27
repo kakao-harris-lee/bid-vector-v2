@@ -41,6 +41,7 @@ def _snapshot(record: SnapshotRecord) -> dict[str, JsonValue]:
         "rows_sha256": record.rows_sha256,
         "sample_list_sha256": record.sample_list_sha256,
         "sample_size": record.sample_size,
+        "sample_divisions": list(record.sample_divisions),
         "sampled_without_detail": record.sampled_without_detail,
         "sampled_without_notice": record.sampled_without_notice,
         "period_start": record.period_start.isoformat(),
@@ -98,7 +99,7 @@ def _strategy(verdict: StrategyVerdict) -> dict[str, JsonValue]:
 
 def _sampling(record: SamplingRecord) -> dict[str, JsonValue]:
     return {
-        "sample_size": record.sample_size,
+        "row_count": record.row_count,
         "notice_observed_count": record.notice_observed_count,
         "list_call_count": record.list_call_count,
         "detail_calls": record.detail_calls,

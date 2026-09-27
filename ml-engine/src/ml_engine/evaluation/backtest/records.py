@@ -92,6 +92,10 @@ class SnapshotRecord:
     sample_size: int
     sampled_without_detail: int
     sampled_without_notice: int
+    sample_divisions: tuple[str, ...]
+    """표본틀에 들어간 업무 구분들(D-6G-53). 최소 표본 문턱이 이 **수**로 정해지므로
+    판정문이 그 근거를 싣는다 — 값이 보이지 않으면 문턱이 왜 그 값인지 알 수 없다."""
+
     period_start: date
     period_end: date
 
@@ -109,7 +113,11 @@ class WindowRecord:
 class SamplingRecord:
     """표본 크기 결정식의 입력과 결과(D-6G-20) — 판정 JSON 이 그대로 싣는다."""
 
-    sample_size: int
+    row_count: int
+    """이 스냅숏에서 **행이 된** 공고 수(cr r3 L-8). 앞 판은 `sample_size` 라 불렀는데
+    판정 JSON 안에 `snapshot.sample_size`(표본 파일의 키 수)가 따로 있어 **같은 이름이
+    다른 것**을 가리켰다."""
+
     notice_observed_count: int
     """`has_*` 채움률의 분모(M-8) — 표본에서 공고 canonical 이 없던 것만 뺀 수.
     채움률이 하한인 이유가 이 수와 행 수의 차이이므로 함께 공시한다."""

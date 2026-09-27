@@ -8,6 +8,7 @@ manifest 타입을 알지 않는다 — 대조에 필요한 값만 인자로 받
 from __future__ import annotations
 
 import hashlib
+import string
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
@@ -26,6 +27,21 @@ _SAMPLE_LIST_COLUMNS: Final[tuple[str, ...]] = (
 )
 # 해시 길이는 해시 함수가 정한다 — 상수로 적으면 둘이 갈릴 수 있다.
 _NOTICE_KEY_HEX_LENGTH: Final[int] = len(hashlib.sha256(b"").hexdigest())
+_NOTICE_KEY_ALPHABET: Final[frozenset[str]] = frozenset(string.hexdigits.lower())
+"""소문자 hex 문자 집합(cr r3 L-6). 길이와 대소문자만 보던 앞 판은 `zzzz...` 64자를
+받았다 — Kotlin `NoticeKeyHash.ofHex` 는 `[0-9a-f]{64}` 라 두 레인의 판독 강도가
+달랐다. 오늘은 manifest 해시 대조가 가려 주지만, 가려 준다는 것과 검사한다는 것은
+다르다."""
+
+_BUSINESS_DIVISIONS: Final[frozenset[str]] = frozenset(
+    {"CONSTRUCTION", "SERVICE", "GOODS", "FOREIGN"}
+)
+"""스키마 §2.1 의 업무 구분 어휘(Kotlin `BusinessDivision`). **닫힌 셋이다**(D-6G-53).
+
+세기만 하던 앞 판에는 조용한 실패가 있었다: 이 값의 distinct 수가 최소 표본 문턱을
+정하는데(업무 하나당 1,739건), 서로 다른 두 업무가 **같은 문자열로 합쳐지는 오타**면
+distinct 수가 줄고 문턱이 **내려간다** — 설계가 요구한 것보다 적은 데이터로 실험이
+그대로 진행된다. 어휘 밖 값을 거부하면 그 방향이 닫힌다."""
 
 
 @dataclass(frozen=True)
@@ -48,13 +64,22 @@ def parse_sample_list(sample_list_bytes: bytes) -> SampleList:
     형태는 헤더 없는 TSV 다 — `notice_key_hash <TAB> business_division <TAB>
     notice_week`, **해시 오름차순**, 줄마다 `\n`(끝 줄 포함).
 
-    `business_division` 은 **행의 `category` 와 다른 축**이다(스키마 §2.1 — Kotlin
-    `BusinessDivision` 어휘). 그래서 닫힌 셋으로 검사하지 않는다. 다만 **빈 값은
-    거부한다** — 세기의 분모를 조용히 바꾸기 때문이다. `notice_week` 도 같다.
+    `business_division` 은 **행의 `category` 와 다른 축**이지만 어휘는 같다(스키마
+    §2.1 — Kotlin `BusinessDivision`). **닫힌 셋 밖이면 스냅숏 전체를 거부한다**
+    (D-6G-53) — 이 값의 distinct 수가 최소 표본 문턱을 정하므로, 합쳐지는 오타가
+    문턱을 조용히 낮춘다. `notice_week` 은 어휘가 없으므로 빈 값만 거부한다.
 
     정렬을 여기서 고쳐 주지 않는다. 파일이 표본의 정본이고 그 바이트의 sha256 이
     대조 대상이므로, 순서가 어긋난 파일은 **다른 파일**이다."""
-    text = sample_list_bytes.decode("utf-8", errors="strict")
+    # 자기 파일의 디코드 실패는 **자기가** 사유를 붙인다(cr r3 L-7). 바깥에서
+    # `UnicodeDecodeError` 를 한꺼번에 받으면 깨진 `rows.jsonl` 이 「표본 목록이 형태를
+    # 어겼다」로 보고된다 — 어느 파일이 깨졌는지 사유가 가리키지 못한다.
+    try:
+        text = sample_list_bytes.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise RowReadError(
+            SnapshotRejectionReason.SAMPLE_LIST_MALFORMED, "sample-list: UTF-8 아님"
+        ) from exc
     if text and not text.endswith("\n"):
         raise RowReadError(
             SnapshotRejectionReason.SAMPLE_LIST_MALFORMED, "끝 줄 개행이 없다"
@@ -62,23 +87,7 @@ def parse_sample_list(sample_list_bytes: bytes) -> SampleList:
     keys: list[str] = []
     divisions: set[str] = set()
     for line in text.splitlines():
-        columns = line.split("\t")
-        if len(columns) != len(_SAMPLE_LIST_COLUMNS):
-            raise RowReadError(
-                SnapshotRejectionReason.SAMPLE_LIST_MALFORMED,
-                f"칸 수가 {len(_SAMPLE_LIST_COLUMNS)} 이 아니다: {len(columns)}",
-            )
-        key, division, week = columns
-        if len(key) != _NOTICE_KEY_HEX_LENGTH or key != key.lower():
-            raise RowReadError(
-                SnapshotRejectionReason.SAMPLE_LIST_MALFORMED,
-                "notice_key_hash 가 소문자 hex 64자가 아니다",
-            )
-        if not division.strip() or not week.strip():
-            raise RowReadError(
-                SnapshotRejectionReason.SAMPLE_LIST_MALFORMED,
-                "층 칸이 비었다(업무 축 또는 주)",
-            )
+        key, division = _parse_line(line)
         keys.append(key)
         divisions.add(division)
     if keys != sorted(keys):
@@ -86,6 +95,33 @@ def parse_sample_list(sample_list_bytes: bytes) -> SampleList:
             SnapshotRejectionReason.SAMPLE_LIST_MALFORMED, "해시 오름차순이 아니다"
         )
     return SampleList(keys=tuple(keys), divisions=tuple(sorted(divisions)))
+
+
+def _parse_line(line: str) -> tuple[str, str]:
+    """한 줄 -> (키, 업무 구분). 형태 위반은 여기서 사유를 붙인다."""
+    columns = line.split("\t")
+    if len(columns) != len(_SAMPLE_LIST_COLUMNS):
+        raise RowReadError(
+            SnapshotRejectionReason.SAMPLE_LIST_MALFORMED,
+            f"칸 수가 {len(_SAMPLE_LIST_COLUMNS)} 이 아니다: {len(columns)}",
+        )
+    key, division, week = columns
+    if len(key) != _NOTICE_KEY_HEX_LENGTH or not _NOTICE_KEY_ALPHABET.issuperset(key):
+        raise RowReadError(
+            SnapshotRejectionReason.SAMPLE_LIST_MALFORMED,
+            "notice_key_hash 가 소문자 hex 64자가 아니다",
+        )
+    if not division.strip() or not week.strip():
+        raise RowReadError(
+            SnapshotRejectionReason.SAMPLE_LIST_MALFORMED,
+            "층 칸이 비었다(업무 축 또는 주)",
+        )
+    if division not in _BUSINESS_DIVISIONS:
+        raise RowReadError(
+            SnapshotRejectionReason.UNKNOWN_BUSINESS_DIVISION,
+            "업무 구분이 닫힌 셋 밖이다",
+        )
+    return key, division
 
 
 def check_sample_list(

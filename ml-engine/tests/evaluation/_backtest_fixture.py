@@ -138,7 +138,7 @@ def build_files() -> tuple[bytes, bytes, bytes]:
     extra = (_MISSING_DETAIL_KEY, _MISSING_NOTICE_KEY)
     listing = (
         "\n".join(
-            f"{key}\tSERVICES\t2026-W25"
+            f"{key}\tSERVICE\t2026-W25"
             for key in sorted(
                 [row["notice"]["notice_key_hash"] for row in rows] + list(extra)
             )

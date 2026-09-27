@@ -151,7 +151,7 @@ def sample_list_bytes(
     rows: bytes,
     *,
     extra_keys: tuple[str, ...] = (),
-    division: str = "SERVICES",
+    division: str = "SERVICE",
     divisions: tuple[str, ...] = (),
 ) -> bytes:
     """`sample-list.tsv` 바이트(v4, 스키마 §2.1) — 헤더 없는 TSV, 해시 오름차순,
