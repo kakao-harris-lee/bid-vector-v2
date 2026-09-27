@@ -99,6 +99,8 @@ outbox·SQL 로 가는 지름길이 없다 ③ 불변식을 어긴 값은 영속
 | `TransactionBoundary`(app 컨텍스트 빈, D-6A2b-19 ④ — r1 추가) | 이 빈을 주입받은 app 코드는 트랜잭션 안에서 임의 SQL 을 실행할 수 있다(`jdbcClient`·`jdbcTemplate` 빈과 같은 권한 — 새 권한 아님) | **경계로 처리** — HTTP 로 닿지 않는 app 내부 코드는 빌드 저자 경계 밖. 닿는 길(컨트롤러·`app.http` 의 참조)은 허용 목록 ⊆ 가 막는다. 실측: 변이 MU1·MU2(컨트롤러 참조)·MU2b RED |
 | `StrategyEditTransaction`(app 컨텍스트 빈 — r1 추가) | 편집 use case 를 트랜잭션 안에서 실행한다. 모든 쓰기는 여전히 `EditStrategyWorkflow` 를 지난다 | **경계로 처리** — 허용 목록에 정확한 클래스로 올린 실행기만 컨트롤러가 받는다. 실측: 같은 변이 셋 |
 | JVM 공개 최상위 함수 둘(`TransitionGuardsKt`·`JsonValueReadersKt`, Kotlin `internal` — r1 크기 분할로 생김) | 판정 순서 술어는 이미 공개 생성자를 가진 결과 타입만 내고 `EditSession`(internal constructor)을 인자로 요구한다. JSON 읽기는 `JsonNode` 만 읽는다 | 닫는다(새 권한 없음) — 알려진 제한 ⑦ |
+| `EditCommand.ProvideValue.baseRevision`(r2, D-6A2b-28) | `EditCommand` 는 원래 public 이라 밖에서 기준 값을 실어 만들 수 있다. 지어낸 값은 value 시점 대조가 `StaleRevision` 으로 막고, 남는 것은 현재와 같은 값을 싣는 것뿐(정상 사용과 구별 불가) | 닫는다(새 권한 없음) — 알려진 제한 ⑥ |
+| 406 핸들러 `ResponseEntity<Void>`(r2, D-6A2b-29) | 본문 없는 406. 정보 노출 없음 | 닫는다 |
 
 ### (3) 과잉·미달
 
@@ -174,6 +176,12 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | **D-6A2b-29** | **(F-r2-4·M-r2-1) 406 은 본문 없음을 계약으로 받는다.** 클라이언트가 JSON 을 받을 수 없다고 말한 요청에 JSON 본문을 내는 것이 오히려 협상 위반이다. D-6A2b-6·7 의 「전부 `ErrorBody`」에 **406 예외 한 줄**을 적고, OpenAPI 의 `NOT_ACCEPTABLE` 코드는 도달 불가라 뺀다(C-3 과 같은 기준 — 도달 불가를 약속하지 않는다). 추적은 audit 행으로 한다(실측 1 증가) |
 | **D-6A2b-30** | **(F-r2-2·H-r2-1) 이 slice 의 게이트 test 전부를 `gateExecutionGate` 에 등재**한다(r1·r2 에서 생긴 것 전부 — 대조: `@Disabled` 를 달면 RED) |
 | **D-6A2b-31** | 일괄: **(F-r2-5·M-r2-2)** 관리 포트 미디어 타입 축 test(actuator v3·json·`*/*` → 200, xml → 406, 노출 집합 불변) · **(M-r2-4)** `editValue` 칸 배정 진단 순서 되살림 · **(L-r2-1)** OpenAPI 머리말의 삭제된 test 이름 · **(L-r2-3)** 사라진 알려진 제한 복원 · **(L-r2-5)** rollback.md 의 이동 술어를 「되돌림 대상 중 evidence 를 뺀 산출물 경로」로 정정 · **(L-r2-6)** 허용 접두 안의 포트 인터페이스는 알려진 제한. **(M-r2-3) 은 verifier 가 반증했다**(Spring 7 에서 `@Component @RequestMapping` 단독은 handler 로 등록되지 않는다) — 조치 없음 |
+
+### 계약 갱신 r2-b (2026-09-27, 팀장 — 수정 라운드 2 보고 수령, 검증 전)
+
+| ID | 결정 |
+|---|---|
+| **D-6A2b-32** | **면제를 한 덩어리로 두지 않는다 — 세 층으로 가른다.** ① **부팅·배선**(`BidVectorApplication`·`*Wiring` 등): 전면 면제(어댑터 구체 클래스·JDBC 에 의존해도 된다 — 조립이 일이다). ② **요청 스코프 조립과 그 결과**(`StrategyEditExecutor`·`StrategyQuery`·`EvaluationDryRunFactory`·`EvaluationDryRunRun` 등, **컨트롤러가 허용 목록으로 받는 것**): 면제가 아니라 **별도 허용 목록 ⊆** — workflow use case·포트 **인터페이스**·도메인 값·트랜잭션 경계 타입은 되지만, `java.sql`·`javax.sql`·Spring JDBC(`JdbcClient`·`JdbcTemplate` 등)·`adapters.**` 의 구체 클래스는 안 된다. 이유: 이 층은 컨트롤러에서 닿으므로 여기에 SQL 메서드를 더하면 HTTP 지름길이 된다(6A-3 R3-M1 ⓑ 「어댑터 추가 메서드」와 같은 형태). ③ **수집 레인**(`CollectionRunner` 등): 면제하되 **컨트롤러·② 층이 참조하면 RED**(HTTP 로 닿지 않음을 의존 방향으로 잠근다) — (27) 표면 실측과 함께. 세 층의 목록은 계약 파일에 층별 키로 정확한 이름. 변이: ② 층 클래스에 `JdbcClient` UPDATE 메서드 추가 → RED, 컨트롤러가 ③ 층 참조 → RED. 게이트 술어 변경 → 표적 재검증 |
 
 ## 하네스 레인 변경 (상시 절)
 
