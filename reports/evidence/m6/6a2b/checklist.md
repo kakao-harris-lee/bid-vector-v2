@@ -1,6 +1,6 @@
 # M6/6A-2b — 결정별 판정과 남는 것
 
-정본은 `scope.md`(D-6A2b-1~38, 위협 모델, 우회 아홉, (2b) 표). 여기는 **그 각 줄이 무엇으로 닫혔는지**와
+정본은 `scope.md`(D-6A2b-1~47, 위협 모델, 우회 아홉, (2b) 표). 여기는 **그 각 줄이 무엇으로 닫혔는지**와
 **닫히지 않은 것**을 적는다. 명령·종료 코드·변이 결과는 `commands.md`.
 
 ## 결정별 판정
@@ -34,6 +34,53 @@
 | D-6A2b-36 어댑터 호출 삼중쌍 | (호출자, 인터페이스, 메서드) 목록으로만. 6A-3 의 호출 쌍 규칙 형태를 재사용했다 | 변이 A5 가 RED |
 | D-6A2b-37 어댑터 예외 | 정확 목록 셋 + `Throwable` 이 준 멤버만 | 변이 A4 가 RED |
 | D-6A2b-38 지적 일괄 | MEDIUM 여섯·LOW 여섯. 커널 둘(기준 값 선택화·재전달 지문), 표면 실측 둘(매핑 빈 집합·composite 위임 근거), 음성 대조 하나, 진단 하나, 등재 완전성 meta-gate 하나, 정렬·번호 | 없음 |
+| D-6A2b-41 능력 전달 | ① 읽기 자리는 `save` 없는 읽기 port 를 받는다 ② ② 층의 workflow 허용을 정확 타입 목록으로(패키지 둘 제거) + 쓰기 능력 포트를 **서명·구현으로 쥐는 것** 금지 ③ 능력 포트를 받는 use case 의 조립은 등재된 (호출자, 타입) 쌍에서만, 편집 use case 는 **쌍이 없다** | ② 층이 use case 를 **쥐는 것**은 허용된다(알려진 제한 ⑯) · 다운캐스트는 게이트에 보이지 않는다(⑰) |
+| D-6A2b-42 예외 정확 목록 | `isAllowed`·`tier2Allows` 의 어댑터 갈래가 `fullName in 목록` 으로 바뀌었다 | — |
+| D-6A2b-43 fail-closed | `disallowedAdapterCall` 의 「그 밖」 갈래 제거. 오늘 도는 ② 층 호출 **둘**을 등재 | — |
+| D-6A2b-44 서술자 | 쌍 좌표가 넷(`호출자\|선언 타입\|메서드\|서술자`) | — |
+| D-6A2b-45 규칙별 음성 fixture | 규칙에 이름표(`AppRuleId` 일곱)를 붙여 **규칙별로** 판정. 규칙 하나를 공집합으로 바꾸면 그 규칙의 줄이 RED(일곱 전부 실측) | — |
+| D-6A2b-46 게이트 신뢰도 | 형제 접두 하나 추가 · meta-gate 를 전수·양방향으로 · `gate-tests.properties` 를 선언된 입력으로 · OQ-1 KDoc · OQ-2 실측(404) | meta-gate 를 **JUnit 태그가 아니라 전수**로 세웠다(아래 대조표) |
+| D-6A2b-47 문면·LOW | KDoc 넷 · ①-b 순서의 귀결을 전이표 행으로 · 「값 제출만 거부」 단언 · N-r4-9~14 · L-r4-1~3 | — |
+
+## 계약 문면 ↔ 구현 심볼 대조 (D-6A2b-34~47)
+
+r4 의 차단 셋은 전부 「계약은 그렇게 말하는데 코드는 다르다」였다. 문장마다 그것을 지는 심볼을 적는다.
+
+| 계약 문장 | 구현 심볼 | 이 문장을 잰 것 |
+|---|---|---|
+| 34 ① 층은 HTTP 확장 API 접두에 의존 못한다 | `dependOnHttpExtensionApi` + `tier1.forbidden-http-packages`(여덟) | 변이 A1·A2 |
+| 34 예외는 **정확한 타입 목록** | `tier1.http-api-types`(하나) | — |
+| 34 클래스 애너테이션도 의존 | `item.annotations` (+ 필드·생성자·메서드) | 변이 A6 |
+| 35 ② 층 정확 app 클래스 | `tier2.allowed-app-classes`(다섯) | 변이 A3 |
+| 36 어댑터 인터페이스 호출은 쌍으로만 | `callAdapterMemberOutsideContract` | 변이 A5 |
+| 37 예외는 **정확 목록 소속** | `isAllowed`·`tier2Allows` 의 `fullName in appAdapterExceptionTypes` | 변이 A4(타입 축) |
+| 37 `Throwable` 이 준 멤버만 | `throwableMemberViolation` | fixture `RogueExceptionOwnMember` |
+| 41 ① 읽기 자리는 `save` 없는 port | `StrategyReader` · `StrategyRepository : StrategyReader` | 변이 F-r4-1 |
+| 41 ② 정확 타입 목록 | `tier2.allowed-workflow-types`(스물넷) | 탐침 P2 |
+| 41 ② 능력 포트는 구조 도출(손 목록 금지) | `capabilityPorts = derivedUseCasePorts − ambientPorts` | 집합 등식 test |
+| 41 ② 쓰기 능력 포트를 쥐지 못한다 | `holdCapabilityPort`(필드·생성자·메서드 서명·구현) | 변이 F-r4-1 |
+| 41 ③ 편집 use case 조립은 어댑터 경계 한 곳 | `callUseCaseConstructorOutsideContract`, 편집 use case 쌍 **0** | 변이 F-r4-1 · 탐침 P1 |
+| 41 ③ dry-run 은 한 호출자 고정 | `workflow.use-case-construction-pairs`(하나) | 변이 F-r4-1(b) |
+| 42 | 위 37 첫 행과 같은 자리 | 변이 A4 |
+| 43 fail-closed, 등재 쌍 둘 | `disallowedAdapterCall` 에 「그 밖」 갈래 없음 · `adapter.member-call-pairs`(둘) | 오늘 도는 호출 둘이 등재됨 |
+| 44 서술자 | `MemberSignature` · `callPairKey` | 오버로드 변이 |
+| 45 규칙마다 fixture · 공집합 대조 | `AppRuleId`(일곱) · `RuleNegativeSamples` · 규칙별 비공허성 test | 공집합 일곱 전부 RED |
+| 46 형제 접두 | `boot.webmvc` 추가 · `isUnder` 는 `.` 경계 | — |
+| 46 meta-gate 를 구조로 | **전수·양방향**(`workflow` 관례) | 아래 이탈 하나 |
+| 46 선언된 입력 | `app/build.gradle.kts` `inputs.file(gateTests)` | 재실행 실측 |
+| 46 OQ-1 | `dependOnHttpExtensionApi` KDoc | verifier r4 실측 인용 |
+| 46 OQ-2 | 실측(새 게이트 없음) | 404·404·404 |
+| 47 | KDoc 넷 · 전이표 행 · 「값 제출만 거부」 단언 · N-r4-9~14 · L-r4-1~3 | — |
+
+**이탈 둘(판정 필요).**
+
+1. **46 의 「JUnit 태그 등」을 태그가 아니라 전수로 세웠다.** 저장소에 `@Tag` 선례가 **0 건**이라
+   (실측) 「기존 모듈 관례」는 `WorkflowGateRegistrationTest` 의 **패키지 전수·양방향**이다. 태그는
+   붙이는 것을 잊는 실패가 등재를 잊는 실패와 같은 모양이라 같은 병을 다시 앓는다.
+2. **34 의 접두 열거가 `scope.md` 와 계약 파일에서 다르다.** scope 는 여섯을 적고 계약 파일은
+   여덟이다(`boot.servlet`·`boot.webmvc`). D-6A2b-46 이 「목록은 계약 파일이 정본이고 scope 는
+   개수를 적지 않는다」로 처분했으므로 **scope.md 문면 정정은 팀장 소관**이다 — 구현 레인은
+   계약 파일만 고쳤다.
 
 ## 우회 아홉 — 무엇이 막는가
 
@@ -98,9 +145,11 @@ test 전용 빈이 출하 조립의 스캔에 섞이는 것이 바로 그 필터
 ⑦ **여러 `RouterFunction` 을 구분하지 못한다.** 표면 실측은 그 종류를 표기 하나로 센다. 오늘 이 앱에
 `RouterFunction` 빈은 0 이라 **등장 자체가 신호**지만, 하나가 계약에 오르면 둘째는 조용할 수 있다.
 
-⑧ **허용 접두 안의 포트 인터페이스.** 능력 포트 도출은 편집 use case 하나만 보므로, `workflow.evaluation`
-같은 허용 접두 안에 새 포트가 생기면 HTTP 층이 쥐어도 걸리지 않는다(오늘 그 패키지의 포트 빈은 읽기
-전용이고 `procurement` 의 저장 포트는 web 컨텍스트에 없다).
+⑧ **허용 목록 안의 읽기 포트 하나가 컨트롤러에 닿는다.** 능력 포트 도출은 편집 use case 하나만
+보므로 그 생성자에 없는 포트는 능력으로 분류되지 않는다. verifier r4 L-r4-3 이 실측한 자리 —
+컨트롤러가 기본 인자로 `OperatorProfilePort`(읽기 전용, 호출 쌍 목록에도 없다)를 주입받아 `current()`
+를 부르면 전건 초록이다. 「새 포트가 생기면」이 아니라 **오늘 이미 닿는다**. 읽기 전용이라는 서술은
+참이고, 쓰기 능력 축은 D-6A2b-41 이 따로 막는다.
 
 ⑨ **Kotlin `internal` 은 JVM 경계가 아니다.** 크기 분할이 만든 최상위 함수 열(판정 술어 넷·JSON 읽기
 여섯)은 바이트코드에서 public 이다. 새 권한은 아니다(`commands.md` 의 `javap` 절) — 커널의 `apply`·
@@ -132,6 +181,17 @@ composite 가 **어떤 조건으로 어느 위임에 보내는지**는 풀지 �
 있어야 한다(둘 다 없다). 닫으려면 locator 금지(v2-지침서 §5)를 기존 리플렉션 게이트에 얹는 편이
 맞고, 그 게이트는 다른 slice 의 자리라 여기서 넓히지 않았다(`OPEN-6A2B-LOCATOR-BAN`).
 
+⑯ **② 층은 편집 use case 를 **쥘 수** 있다(조립만 막는다).** `EditStrategyWorkflow` 는 ② 층 허용
+타입 목록에 있다 — 실행기가 어댑터 경계의 `inTransaction` 이 넘겨주는 인스턴스를 받아야 하기
+때문이다. 조립 자리가 한 곳뿐이라 그 인스턴스는 트랜잭션 안에서만 존재하지만, 「쥐는 것」 자체를
+막지는 않는다.
+
+⑰ **다운캐스트는 게이트에 보이지 않는다**(자체 탐침 P2, `commands.md`). ② 층이 받은 `StrategyReader`
+를 `StrategyRepository` 로 내려꽂는 `checkcast` 는 ArchUnit 의 직접 의존이 아니다(OQ-1 과 같은
+성질). 오늘 그 능력은 **무익하다** — `save` 의 인자 `AppliedStrategy` 를 app 이 만들 수 없고, 그
+타입을 서명에 쓰는 순간 ② 층 타입 목록이 RED 다(실측). 닫는 것은 능력 축이 아니라 **정확 타입
+목록 + `internal constructor`** 이고, 그 셋 중 하나가 느슨해지면 이 통로가 열린다.
+
 ## OPEN 처분
 
 | OPEN | 처분 |
@@ -152,7 +212,9 @@ composite 가 **어떤 조건으로 어느 위임에 보내는지**는 풀지 �
 HTTP 표면 실측 키 여섯(`architecture-policy.properties`), 게이트 test 등재 아홉(`gate-tests.properties`),
 `ManagementHealthSurfaceTest` 의 미디어 타입 축, 삭제 하나(`HttpSurfaceFormatGateTest` — 모집단이 좁은
 중복 게이트), 그리고 등재 완전성 meta-gate 신설 하나(`AppGateRegistrationTest` — `workflow`·`adapters`
-에는 있고 `app` 에만 없던 자리다).
+에는 있고 `app` 에만 없던 자리다. 대상은 `app` test **전수·양방향**이라 등재 목록이 25 에서 37 로 늘었다).
+라운드 4 가 더한 것: 의존 게이트의 새 축 둘(능력 보유·use case 조립)과 그 계약 키 셋, 규칙별 음성
+fixture 파일 둘, 관리 포트 진입점 축 키 하나, `:app:test` 의 선언된 입력 하나(`gate-tests.properties`).
 
 ## 비활성화 경로
 
