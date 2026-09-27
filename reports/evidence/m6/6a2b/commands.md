@@ -9,7 +9,7 @@
 
 ## acceptance — `check` job
 
-- cmd: `./gradlew --no-daemon check`
+- cmd: `./gradlew --no-daemon clean` → `./gradlew --no-daemon check --no-build-cache`
 - exit: 0
 - 핵심 결과: 9 모듈 전건. `app` test **전수 37** 이 `gateExecutionGate` 에 등재돼 **실행
   자체**가 확인된다(통과 수가 아니다 — 그중 하나에 `@Disabled` 를 달면 RED 임을 실측했다)
@@ -97,7 +97,7 @@
 | **오버로드** 등재된 쌍과 같은 이름의 `inTransaction(String)` 호출 | 쌍 좌표의 서술자 | RED 1 |
 | **F-r4-1(a)** ② 층이 쓰기 저장소를 쥐고 메모리 포트로 편집 use case 를 조립 | ② 층 타입 목록 · 능력 보유 · use case 조립 | RED 3축 5건 |
 | **F-r4-1(b)** 등재된 호출자(`EvaluationDryRunFactory`)가 **다른** use case 를 조립 | use case 조립 쌍 | RED 3축 7건 |
-| 규칙 하나를 항상 공집합으로(일곱 각각) | 규칙별 비공허성 | **일곱 전부** 그 규칙의 줄이 RED |
+| 규칙 하나를 항상 공집합으로(**여덟** 각각) | 규칙별 비공허성 | **여덟 전부** 그 규칙의 줄이 RED — r4 에 일곱, 여덟째(주입 표면)는 종결 일괄에서 실측 |
 | **F-r5-1** ① 층 `@Bean` 의 `() -> Int` SQL 클로저를 컨트롤러가 생성자로 받는다 | 주입 표면 | RED 3(규칙 · 목록 등식 · 운반 타입 검증) |
 | **변형 ①** 같은 클로저를 `java.util.function.Supplier<Int>` 로 | 주입 표면 | RED |
 | **변형 ②** `Runnable` 로 | 주입 표면 | RED |

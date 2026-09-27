@@ -1,6 +1,6 @@
 # M6/6A-2b — 결정별 판정과 남는 것
 
-정본은 `scope.md`(D-6A2b-1~50, 위협 모델, 우회 아홉, (2b) 표). 여기는 **그 각 줄이 무엇으로 닫혔는지**와
+정본은 `scope.md`(D-6A2b-1~54, 위협 모델, 우회 아홉, (2b) 표). 여기는 **그 각 줄이 무엇으로 닫혔는지**와
 **닫히지 않은 것**을 적는다. 명령·종료 코드·변이 결과는 `commands.md`.
 
 ## 결정별 판정
@@ -38,7 +38,7 @@
 | D-6A2b-42 예외 정확 목록 | `isAllowed`·`tier2Allows` 의 어댑터 갈래가 `fullName in 목록` 으로 바뀌었다 | — |
 | D-6A2b-43 fail-closed | `disallowedAdapterCall` 의 「그 밖」 갈래 제거. 오늘 도는 ② 층 호출 **둘**을 등재 | — |
 | D-6A2b-44 서술자 | 쌍 좌표가 넷(`호출자\|선언 타입\|메서드\|서술자`) | — |
-| D-6A2b-45 규칙별 음성 fixture | 규칙에 이름표(`AppRuleId` 일곱)를 붙여 **규칙별로** 판정. 규칙 하나를 공집합으로 바꾸면 그 규칙의 줄이 RED(일곱 전부 실측) | — |
+| D-6A2b-45 규칙별 음성 fixture | 규칙에 이름표(`AppRuleId`)를 붙여 **규칙별로** 판정. 규칙 하나를 공집합으로 바꾸면 그 규칙의 줄이 RED — r4 에 일곱, r5 가 여덟째(주입 표면)를 더했고 **여덟 전부 실측** | — |
 | D-6A2b-46 게이트 신뢰도 | 형제 접두 하나 추가 · meta-gate 를 전수·양방향으로 · `gate-tests.properties` 를 선언된 입력으로 · OQ-1 KDoc · OQ-2 실측(404) | meta-gate 를 **JUnit 태그가 아니라 전수**로 세웠다(아래 대조표) |
 | D-6A2b-47 문면·LOW | KDoc 넷 · ①-b 순서의 귀결을 전이표 행으로 · 「값 제출만 거부」 단언 · N-r4-9~14 · L-r4-1~3 | — |
 | D-6A2b-49 주입 표면 | 제한 층·② 층이 **받을 수 있는** 타입의 정확 목록. 생성자 매개변수와 주입 애너테이션이 붙은 필드·세터를 모아 제네릭 인자·함수 타입 인자까지 전개한다. **범용 운반 타입은 목록에 못 오른다**(구조 판정) · 목록 == 오늘 주입 표면(등식) · 참조 허용 접두는 적용하지 않는다 | 예외 **하나** — 무편집으로 묶인 audit 필터의 함수 타입(아래 이탈 절) · 목록은 **타입**이고 구현은 ① 층이 고른다(알려진 제한 ⑱) |
@@ -58,7 +58,7 @@ r4 의 차단 셋은 전부 「계약은 그렇게 말하는데 코드는 다르
 | 37 예외는 **정확 목록 소속** | `isAllowed`·`tier2Allows` 의 `fullName in appAdapterExceptionTypes` | 변이 A4(타입 축) |
 | 37 `Throwable` 이 준 멤버만 | `throwableMemberViolation` | fixture `RogueExceptionOwnMember` |
 | 41 ① 읽기 자리는 `save` 없는 port | `StrategyReader` · `StrategyRepository : StrategyReader` | 변이 F-r4-1 |
-| 41 ② 정확 타입 목록 | `tier2.allowed-workflow-types`(스물넷) | 탐침 P2 |
+| 41 ② 정확 타입 목록 | `tier2.allowed-workflow-types`(**스물**) | 탐침 P2 · r5 의 목록 등식이 능력 포트 하나와 죽은 항목 셋을 걷어냈다 |
 | 41 ② 능력 포트는 구조 도출(손 목록 금지) | `capabilityPorts = derivedUseCasePorts − ambientPorts` | 집합 등식 test |
 | 41 ② 쓰기 능력 포트를 쥐지 못한다 | `holdCapabilityPort`(필드·생성자·메서드 서명·구현) | 변이 F-r4-1 |
 | 41 ③ 편집 use case 조립은 어댑터 경계 한 곳 | `callUseCaseConstructorOutsideContract`, 편집 use case 쌍 **0** | 변이 F-r4-1 · 탐침 P1 |
@@ -66,7 +66,7 @@ r4 의 차단 셋은 전부 「계약은 그렇게 말하는데 코드는 다르
 | 42 | 위 37 첫 행과 같은 자리 | 변이 A4 |
 | 43 fail-closed, 등재 쌍 둘 | `disallowedAdapterCall` 에 「그 밖」 갈래 없음 · `adapter.member-call-pairs`(둘) | 오늘 도는 호출 둘이 등재됨 |
 | 44 서술자 | `MemberSignature` · `callPairKey` | 오버로드 변이 |
-| 45 규칙마다 fixture · 공집합 대조 | `AppRuleId`(일곱) · `RuleNegativeSamples` · 규칙별 비공허성 test | 공집합 일곱 전부 RED |
+| 45 규칙마다 fixture · 공집합 대조 | `AppRuleId`(**여덟**) · `RuleNegativeSamples` · 규칙별 비공허성 test | 공집합 **여덟 전부** RED |
 | 46 형제 접두 | `boot.webmvc` 추가 · `isUnder` 는 `.` 경계 | — |
 | 46 meta-gate 를 구조로 | 전수·양방향(D-6A2b-48 수용) + **발견을 컴파일된 test 클래스로**(D-6A2b-50) | 세 형태 RED — r4 의 이탈 ①은 닫혔다 |
 | 46 선언된 입력 | `app/build.gradle.kts` `inputs.file(gateTests)` | 재실행 실측 |
@@ -85,13 +85,20 @@ r4 의 차단 셋은 전부 「계약은 그렇게 말하는데 코드는 다르
 | 50 제한 층 `StrategyReader` 직접 참조 금지 | `app.http.denied-types` + `isAllowed` 갈래 | — |
 | 50 meta-gate 발견 = 컴파일된 test 클래스 전수 | `AppGateRegistrationTest.discoverAppTestClasses` | 세 형태 RED |
 
-**이탈 하나(판정 필요) — r5.**
+**이탈 둘(판정 필요) — r5·r6.**
 
 3. **주입 운반 타입 금지에 예외가 하나 있다.** 6A-1 이 남긴 audit 필터가 `(ApiAuditRecord) -> Unit`
    을 생성자로 받는다. 그 파일은 이 slice 의 계약이 **무편집(diff 0)** 으로 묶어 두어 서명을 바꿀 수
    없으므로 계약 파일에 **(클래스, 타입) 쌍** 하나로 등재하고, 그 쌍이 오늘 실재하는 주입점임을
    단언한다(죽은 항목 금지). **남는 위험**: ① 층이 그 한 자리에 다른 몸통의 함수 값을 넘기면 같은
    통로가 열린다 — 알려진 제한 ⑱ 과 같은 뿌리다.
+
+4. **② 층 목록에 use case 타입 둘이 남아 있다**(L-r6-2). D-6A2b-41 ② 문면은 「목록에 쓰기 능력
+   포트와 **use case 생성자**를 넣지 않는다」인데 `EditStrategyWorkflow`·`EvaluateCandidatesUseCase`
+   가 목록에 있다. 뺄 수 없다 — 실행기는 어댑터 경계가 넘겨주는 use case 인스턴스를 **받아야** 하고
+   (알려진 제한 ⑯), dry-run 팩토리는 등재된 한 쌍으로 그것을 **조립해야** 한다. 실효는 다른 두 규칙이
+   진다(`TIER2_CAPABILITY`·`USE_CASE_CONSTRUCTION`). r5 까지 이 사실은 ⑯ 과 41 ③ 문면에 흩어져
+   있었고 이탈 절에는 없었다 — 여기 등재한다.
 
 **앞 라운드 이탈 둘 — 처분됨(D-6A2b-48).** ① meta-gate 를 JUnit 태그가 아니라 전수로 세운 것
 (저장소에 `@Tag` 선례가 0 건이었다), ② `scope.md` 의 접두 열거가 계약 파일과 달랐던 것. 전자는
@@ -220,6 +227,13 @@ verifier r5 F-r5-1) — 그 자리는 D-6A2b-49 의 주입 표면이 닫았다. 
 ① 층의 JDBC **멤버 호출** 금지이거나 도메인 SAM 구현의 어댑터 층 고정이고, 둘 다 이 slice 의
 계약 밖이라 넓히지 않았다.
 
+⑲ **주입 표면 전개가 배열·`vararg` 를 푸는 대신 버린다**(code-review r6 N-r6-1). `Array<() -> Int>`
+나 `vararg` 한 겹이면 F-r5-1 이 되살아난다 — 같은 파일의 형제 술어(능력 보유 판정)는 `baseComponentType`
+으로 옳게 푼다. **오늘 재현 가능하고 D-6A2b-33 경계 안쪽이다.** 사전 등록 r6 규칙에 따라 이 라운드에
+고치지 않고(게이트 술어를 넓히는 변경) **`OPEN-6A2B-INJECTION-HARDENING` 의 첫 항목**으로 넘긴다 —
+고침은 한 줄이다. 이 slice 가 머지하는 것은 편집 endpoint·원자성·동시성이고, 의존·주입 게이트는 지금
+상태 그대로(엄격한 방향, 초록) 남는다(D-6A2b-53).
+
 ## OPEN 처분
 
 | OPEN | 처분 |
@@ -233,6 +247,8 @@ verifier r5 F-r5-1) — 그 자리는 D-6A2b-49 의 주입 표면이 닫았다. 
 | `OPEN-6A2B-ABANDONED-SESSIONS` | 신설(→ 6B-3) — 버려진 비종단 세션 행의 파기 |
 | `OPEN-6A2B-DRYRUN-ASSEMBLY-IN-APP` | 신설 — dry-run 의 요청 스코프 조립을 어댑터 층으로(편집 경로와 같은 형태). in_scope 밖이라 이 slice 에서 하지 않는다 |
 | `OPEN-6A2B-LOCATOR-BAN` | 신설(알려진 제한 ⑮) — locator 금지를 기존 리플렉션 게이트에 얹는다. 그 게이트는 다른 slice 의 자리다 |
+| `OPEN-6A2B-INJECTION-HARDENING` | **신설(D-6A2b-53, 게이트 분리 종결)** — 남은 주입 경로 하드닝. 첫 항목 **N-r6-1**(주입 전개가 배열·`vararg` 를 푸는 대신 버린다 — 같은 파일의 형제 술어는 옳게 푼다, 고침은 한 줄, 오늘 재현 가능·경계 안) · N-r6-3(meta-gate 발견 술어가 `@Test` 하나) · N-r6-4(상속 SAM·추상 클래스 운반 타입, 예외 목록 크기 래칫) · N-r6-6(프레임워크 콜백 세터가 표면 밖) · L-r6-1(수신 클래스 소유 SAM) · N-r6-13(`denied-types` 갈래의 음성 fixture) · N-r6-8(test 쪽 「최상위」가 문자열) |
+| `OPEN-6A2B-COMPOSITION-ROOT-HARDENING` | **M-r6-1 추가**(D-6A2b-53) — ① 층이 다른 클래스의 정적 가변 필드에 값을 쓴다. 가변 정적 필드 금지 또는 ① 층의 타 클래스 정적 필드 쓰기 금지 |
 
 ## 하네스 레인 변경(이 slice 가 만진 게이트·CI)
 
@@ -246,6 +262,10 @@ fixture 파일 둘, 관리 포트 진입점 축 키 하나, `:app:test` 의 선�
 라운드 5 가 더한 것: **주입 표면 축**(규칙 하나 + 계약 키 넷 + 음성 fixture 하나), 제한 층 거부 타입
 키 하나, 포트 호출 게이트의 포트 하나와 쌍 둘의 오른쪽 정정, 등재 meta-gate 의 발견 술어 교체와
 `:app:test` 의 system property 하나, `②` 층 목록에서 넷 제거(능력 포트 하나 + 죽은 항목 셋).
+종결 일괄이 되돌린 것: `app.port-call.ports` 에서 **조용히 빠졌던 포트 둘**(`CapacityPort`·
+`NotificationRequestPort`)을 되돌렸다 — 다른 slice 의 감시 목록이고 「오늘 호출 0」은 죽은 항목이
+아니라 래칫이다(N-r6-2). 같은 일괄이 `memberEffects`·`openApiSpec` 의 입력 path sensitivity 를
+기본값에서 RELATIVE 로 바꿨다(helper 가 늘 붙인다 — 절대 경로가 이미 입력이라 순효과 0, N-r6-11).
 
 ## 비활성화 경로
 
