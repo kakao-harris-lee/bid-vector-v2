@@ -4,6 +4,7 @@ import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.ArchRule
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -50,9 +51,15 @@ class AppHttpDependencyGateTest {
         capabilityPorts() shouldBe policy.appHttpUseCasePorts.toSet() - "bidvector.workflow.strategy.Clock"
     }
 
+    /**
+     * 규칙 다섯을 **한 번에** 평가한다(verifier r3 L-r3-1) — `forEach { check }` 로 돌면 첫 규칙이
+     * RED 일 때 뒤 규칙의 위반이 가려져, 한 변이가 몇 개의 잠금을 지났는지 알 수 없다.
+     */
     @Test
-    fun `production 의 HTTP 로 닿는 층은 허용 목록 밖을 참조하지 않는다`() {
-        rules.rules(appRoot, capabilityPorts()).forEach { rule -> rule.check(production) }
+    fun `production 의 app 층들이 각자의 허용 목록 밖을 참조하지 않는다`() {
+        val violations = productionDetails()
+
+        withClue(violations.joinToString("\n")) { violations shouldBe emptyList() }
     }
 
     /**
@@ -83,18 +90,34 @@ class AppHttpDependencyGateTest {
         val exempt = policy.appAssemblyExemptClasses.toSet()
         val allTopLevel = rules.appTopLevelClasses(production, appRoot)
 
-        rules.targets(production, appRoot) shouldBe (allTopLevel - exempt)
-        // 면제가 실재하는 클래스만 가리키는지 — 낡은 이름이 목록에 남아 조용히 넓어지지 않게.
+        // 「대상 == 전체 − 면제」는 구현이 그대로 하는 일이라 항진식이다(M-r3-2) — 빼고, 실제로
+        // 일하는 둘만 남긴다. ① 면제가 **실재하는** 클래스만 가리키는가(낡은 이름이 남아 조용히
+        // 넓어지지 않게) ② 면제의 크기가 고정인가(새 이름이 눈에 띄지 않게 늘지 않게).
         exempt - allTopLevel shouldBe emptySet()
+        exempt.size shouldBe EXPECTED_EXEMPT_COUNT
         // `app.http` 는 어느 면제 갈래에도 없다 — 면제는 「어댑터를 쥐어도 되는 자리」다.
         exempt.filter { it.startsWith(policy.appHttpPackage + ".") } shouldBe emptyList()
     }
 
-    /** 핸들러 애너테이션을 단 클래스는 어느 패키지에 있어도 대상이다(위반 fixture 로 실측). */
+    /** 면제가 없는 루트에서는 모든 클래스가 제한 층이다 — 위반 fixture 로 실측한다. */
     @Test
-    fun `HTTP 층 밖의 핸들러도 대상 집합에 든다`() {
-        rules.targets(violating, fixtureRoot + ".app").any { it.contains("RogueAdminBumpController") } shouldBe true
+    fun `면제가 없는 루트에서는 핸들러도 조립도 전부 제한 층이다`() {
+        rules.targets(violating, fixtureRoot + ".app", emptyLayers()).any {
+            it.contains("RogueAdminBumpController")
+        } shouldBe true
         policy.appHttpPackage shouldBe "$appRoot.http"
+    }
+
+    /** M-r3-3 — ② 층 규칙의 **영구 음성 대조**. 층 배정만 바꾸고 규칙 값은 production 과 같다. */
+    @Test
+    fun `요청 스코프 층이 JDBC 를 쥐면 잡는다`() {
+        tierFixtureRules() mustReport ("RogueTier2JdbcHolder" to "JdbcClient")
+    }
+
+    /** M-r3-3 — ③ 층 규칙의 영구 음성 대조. */
+    @Test
+    fun `제한 층이 수집 레인을 참조하면 잡는다`() {
+        tierFixtureRules() mustReport ("RogueCollectionReferencer" to "RogueCollectionLane")
     }
 
     @Test
@@ -158,7 +181,21 @@ class AppHttpDependencyGateTest {
         ) shouldBe policy.operatorCredentialReferencers.toSet()
     }
 
-    private fun fixtureRules(): List<ArchRule> = rules.rules(fixtureRoot + ".app", capabilityPorts())
+    private fun fixtureRules(): List<ArchRule> = rules.rules(fixtureRoot + ".app", capabilityPorts(), emptyLayers())
+
+    /** fixture 루트의 층 배정 — 같은 규칙 값에 배정만 얹는다. */
+    private fun tierFixtureRules(): List<ArchRule> =
+        rules.rules(
+            fixtureRoot + ".app",
+            capabilityPorts(),
+            LayerAssignment(
+                bootstrap = emptySet(),
+                requestScoped = setOf("$fixtureRoot.app.tiers.RogueTier2JdbcHolder"),
+                collection = setOf("$fixtureRoot.app.tiers.RogueCollectionLane"),
+            ),
+        )
+
+    private fun emptyLayers(): LayerAssignment = LayerAssignment(emptySet(), emptySet(), emptySet())
 
     private fun fixtureDetails(): List<String> =
         fixtureRules().flatMap {
@@ -190,3 +227,9 @@ class AppHttpDependencyGateTest {
         details.filter { it.contains(expected.first) && it.contains(expected.second) }.shouldNotBeEmpty()
     }
 }
+
+/**
+ * 면제 목록의 크기 — 새 이름이 눈에 띄지 않게 늘지 않도록 못박는다(M-r3-2). 늘려야 하면 이
+ * 숫자를 함께 고치게 되고, 그 커밋이 사유를 남긴다.
+ */
+private const val EXPECTED_EXEMPT_COUNT = 19

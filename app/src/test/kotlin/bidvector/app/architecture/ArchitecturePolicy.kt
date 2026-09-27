@@ -82,13 +82,27 @@ class ArchitecturePolicy private constructor(
 
     /** D-6A2b-32 ② — 요청 스코프 층의 별도 허용 목록과 그 안에서 다시 파는 접두. */
     val appTier2AllowedPackages: List<String> get() = list("app.assembly.tier2.allowed-packages")
-    val appTier2AllowedClasses: List<String> get() = list("app.assembly.tier2.allowed-classes")
+    val appTier2AllowedClasses: List<String>
+        get() = list("app.assembly.tier2.allowed-classes") + list("app.assembly.tier2.allowed-app-classes")
     val appTier2DeniedPackages: List<String> get() = list("app.assembly.tier2.denied-packages")
+
+    /** D-6A2b-34 — ① 층이 의존할 수 없는 HTTP 확장 API 접두와, 오늘 실제로 쓰는 예외 클래스. */
+    val appBootstrapForbiddenPackages: List<String> get() = list("app.assembly.tier1.forbidden-http-packages")
+    val appBootstrapHttpApiTypes: List<String> get() = list("app.assembly.tier1.http-api-types")
+
+    /** D-6A2b-36 — 어댑터 인터페이스 메서드 호출의 허용 쌍(`호출자|인터페이스|메서드`). */
+    val appAdapterInterfaceCallTriples: List<String> get() = list("app.adapter.interface-call-triples")
+
+    /** D-6A2b-37 — 제한·요청 스코프 층이 참조할 수 있는 어댑터 예외 타입(정확한 이름). */
+    val appAdapterExceptionTypes: List<String> get() = list("app.adapter.exception-types")
 
     /** D-6A2b-27 — 출하 조립에서 거둔 HTTP 표면의 기대 집합(API 포트·관리 포트 각각). */
     val apiSurfaceHandlers: List<String> get() = list("app.surface.api.handlers")
     val apiSurfaceFilters: List<String> get() = list("app.surface.api.filters")
     val apiSurfaceServlets: List<String> get() = list("app.surface.api.servlets")
+
+    /** M-r3-4 — API 포트의 method mapping 빈 집합(`빈 이름:타입`) — 진입점 축의 목록이다. */
+    val apiSurfaceMethodMappingBeans: List<String> get() = list("app.surface.api.method-mapping-beans")
     val managementSurfaceHandlers: List<String> get() = list("app.surface.management.handlers")
     val managementSurfaceFilters: List<String> get() = list("app.surface.management.filters")
     val managementSurfaceServlets: List<String> get() = list("app.surface.management.servlets")
