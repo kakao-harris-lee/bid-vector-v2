@@ -32,7 +32,7 @@ class SnapshotExtractionE2ETest {
         private const val POSTGRES_IMAGE = "postgres:16.4"
         private const val TEST_CREDENTIAL_VALUE = "snapshot-e2e-test-fixture-credential"
         private const val BIDDER_NAME = "SYN-상호-드러나면안됨"
-        private const val NOTICES_PER_SLOT = 2
+        private const val NOTICES_PER_SLOT = 5
         private val NOTICE_DAY: LocalDate = LocalDate.of(2026, 6, 3)
 
         private val postgres: PostgreSQLContainer =
@@ -71,7 +71,7 @@ class SnapshotExtractionE2ETest {
                     "bidvector.opening-collection.to" to NOTICE_DAY.toString(),
                     "bidvector.opening-collection.categories" to "construction,service",
                     "bidvector.opening-collection.sampling-seed" to "6g-extract-seed",
-                    "bidvector.opening-collection.target-per-stratum" to "2",
+                    "bidvector.opening-collection.target-per-stratum" to "5",
                     "bidvector.opening-collection.calls-per-day" to "10000",
                     "bidvector.opening-collection.calls-total" to "10000",
                     "bidvector.opening-collection.budget-since" to Instant.now().toString(),
@@ -157,7 +157,7 @@ class SnapshotExtractionE2ETest {
     fun `추첨번호가 실제로 찬다 — 상수 null 이 아니다`() {
         val rows = extractedRows()
 
-        rows shouldContain "\"drawn_serial_numbers\":[3,7]"
+        rows shouldContain "\"drawn_serial_numbers\":[3,7,11,14]"
         rows shouldNotContain "\"drawn_serial_numbers\":null"
     }
 

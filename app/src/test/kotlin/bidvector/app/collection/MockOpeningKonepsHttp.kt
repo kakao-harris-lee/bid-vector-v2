@@ -78,7 +78,9 @@ internal class MockOpeningKonepsHttp(
 
             operation.endsWith("OpengCompt") -> {
                 openingCompleteNotices += noticeNumber.orEmpty()
-                listOf(bidderRow(noticeNumber.orEmpty()))
+                // **투찰자 둘.** 추첨번호는 투찰 행마다 둘(`drwtNo1`·`drwtNo2`)이라 한 명만 두면
+                // 네 개가 모이지 않아 제외 ⑤ 가 전 행을 걷어낸다 — 실제 개찰에도 투찰자는 여럿이다.
+                BIDDERS.map { bidder -> bidderRow(noticeNumber.orEmpty(), bidder) }
             }
 
             operation.endsWith("BsisAmount") -> {
@@ -91,12 +93,8 @@ internal class MockOpeningKonepsHttp(
                 listOf(formulaARow(noticeNumber.orEmpty()))
             }
 
-            // 공고 목록(다른 서비스·다른 오퍼레이션) — canonical `notice` 를 세우는 갈래가 부른다.
-            // **같은 공고번호**를 낸다: 추출이 두 출처를 잇기 때문에 번호가 갈리면 아무것도 안 엮인다.
             operation.startsWith("getBidPblancListInfo") && !operation.endsWith("BsisAmount") -> {
-                noticeListCalls += operation
-                val suffix = operation.removePrefix("getBidPblancListInfo")
-                (1..noticesPerSlot).map { index -> noticeListRow(suffix, index) }
+                noticeListItems(operation)
             }
 
             else -> {
@@ -114,7 +112,22 @@ internal class MockOpeningKonepsHttp(
             }
         }
 
-    /** 공고 목록 행 — 대분류·하한율·마감·낙찰방법·**공고일**이 여기서만 온다. */
+    /**
+     * 공고 목록(다른 서비스·다른 오퍼레이션) — canonical `notice` 를 세우는 갈래가 부른다.
+     * **같은 공고번호**를 낸다: 추출이 두 출처를 잇기 때문에 번호가 갈리면 아무것도 안 엮인다.
+     */
+    private fun noticeListItems(operation: String): List<Map<String, String>> {
+        noticeListCalls += operation
+        val suffix = operation.removePrefix("getBidPblancListInfo")
+        return (1..noticesPerSlot).map { index -> noticeListRow(suffix, index) }
+    }
+
+    /**
+     * 공고 목록 행 — 대분류·하한율·마감·낙찰방법·**공고일**이 여기서만 온다.
+     *
+     * 표본에 **값 결측 행을 일부러 섞는다**(D-6G-37): golden 이 v3 의 행 단위 제외를 실제로 밟아야
+     * 「한 행의 null 이 전체를 거부하지 않는다」가 바이트로 확인된다. 결측은 칸마다 하나씩이다.
+     */
     private fun noticeListRow(
         suffix: String,
         index: Int,
@@ -129,9 +142,14 @@ internal class MockOpeningKonepsHttp(
         "pubPrcrmntClsfcNo" to "81112200",
         "dminsttCd" to "6110000",
         // 공고일은 개찰일보다 **이르다** — 둘이 같으면 제외 ⑬ 의 결함이 드러나지 않는다.
-        "bidNtceDt" to "2026-06-03 09:00:00",
-        "bidClseDt" to "2026-06-16 10:00:00",
-    )
+    ) + omittableNoticeFields(index)
+
+    /** 결측 표본 — `NO_NOTICE_DATE` 는 공고일을, `NO_BID_CLOSE` 는 마감을 뺀다. */
+    private fun omittableNoticeFields(index: Int): Map<String, String> =
+        buildMap {
+            if (index != NO_NOTICE_DATE) put("bidNtceDt", "2026-06-03 09:00:00")
+            if (index != NO_BID_CLOSE) put("bidClseDt", "2026-06-16 10:00:00")
+        }
 
     private fun noticeNumber(
         suffix: String,
@@ -151,26 +169,40 @@ internal class MockOpeningKonepsHttp(
         "bsisPlnprc" to (1_240_000_000L + sequence * 1_000_000L).toString(),
         "drwtYn" to if (sequence in DRAWN_SEQUENCES) "Y" else "N",
         "bssamt" to "1239999999",
-        "plnprc" to "1250000000",
-        // 개찰일 — 추출이 이 축에서 읽는다(canonical 이 아니라 원문에서).
-        "rlOpengDt" to "2026-06-17 11:00:00",
-    )
+    ) + omittableOpeningFields(indexOf(noticeNumber))
+
+    /**
+     * 결측 표본(D-6G-37) — `NO_PLANNED_PRICE` 는 예정가격을, `NO_OPENING_DATE` 는 개찰일을 뺀다.
+     * golden 이 v3 의 **행 단위** 제외를 실제로 밟아야 「한 행의 null 이 전체를 거부하지 않는다」가
+     * 바이트로 확인된다.
+     */
+    private fun omittableOpeningFields(index: Int): Map<String, String> =
+        buildMap {
+            if (index != NO_PLANNED_PRICE) put("plnprc", "1250000000")
+            // 개찰일 — 추출이 이 축에서 읽는다(canonical 이 아니라 원문에서).
+            if (index != NO_OPENING_DATE) put("rlOpengDt", "2026-06-17 11:00:00")
+        }
+
+    /** 공고번호 끝 네 자리가 표본 안의 순번이다 — 어느 칸을 뺄지 그 값으로 고른다. */
+    private fun indexOf(noticeNumber: String): Int = noticeNumber.takeLast(4).toIntOrNull() ?: 0
 
     /** 실 응답 그대로 개인정보 키 둘을 함께 싣는다 — 경계가 떨어뜨리는지 이 자리에서 잰다. */
-    private fun bidderRow(noticeNumber: String) =
-        mapOf(
-            "bidNtceNo" to noticeNumber,
-            "bidNtceOrd" to "000",
-            "opengRank" to "1",
-            "prcbdrNm" to bidderName,
-            "prcbdrBizno" to "1234567890",
-            "prcbdrCeoNm" to "SYN-대표자",
-            "bidprcAmt" to "1100000000",
-            "bidprcrt" to "88.000",
-            // 추첨번호 — v2 는 추출이 이 축을 안 읽어 실 추출이면 전 행이 제외 ⑤ 에 걸렸다(H-1).
-            "drwtNo1" to "3",
-            "drwtNo2" to "7",
-        )
+    private fun bidderRow(
+        noticeNumber: String,
+        bidder: SyntheticBidder,
+    ) = mapOf(
+        "bidNtceNo" to noticeNumber,
+        "bidNtceOrd" to "000",
+        "opengRank" to bidder.rank.toString(),
+        "prcbdrNm" to "$bidderName-${bidder.rank}",
+        "prcbdrBizno" to "1234567890",
+        "prcbdrCeoNm" to "SYN-대표자",
+        "bidprcAmt" to bidder.amount,
+        "bidprcrt" to "88.000",
+        // 추첨번호 — v2 는 추출이 이 축을 안 읽어 실 추출이면 전 행이 제외 ⑤ 에 걸렸다(H-1).
+        "drwtNo1" to bidder.firstDraw,
+        "drwtNo2" to bidder.secondDraw,
+    )
 
     private fun baseAmountRow(noticeNumber: String) =
         mapOf(
@@ -181,6 +213,8 @@ internal class MockOpeningKonepsHttp(
             "rsrvtnPrceRngBgnRate" to "-3",
             "rsrvtnPrceRngEndRate" to "+3",
             "bidPrceCalclAYn" to "Y",
+            // 순공사원가 — 공사 전용이고 제외 ⑨ 의 입력이다(없으면 공사가 전량 빠진다).
+            "bssAmtPurcnstcst" to "900000000",
         )
 
     private fun formulaARow(noticeNumber: String) =
@@ -191,7 +225,7 @@ internal class MockOpeningKonepsHttp(
             "qltyMngcstAObjYn" to "Y",
             "smkpAmtYn" to "N",
             "ntceNticeDt" to "2026-06-03 09:39:16",
-            "bidPrceCalclAOpenDt" to "2026-06-16 16:10:19",
+            "bidPrceCalclAOpenDt" to "2026-06-11 09:00:00",
         )
 
     private fun paramOf(
@@ -226,3 +260,22 @@ private const val NONCE_LENGTH = 8
 private const val RESERVE_PRICE_ROWS = 15
 
 private val DRAWN_SEQUENCES = setOf(3, 7, 11, 14)
+
+/** 합성 투찰자 — 금액이 서로 달라 동가 1위(제외 ⑮)가 생기지 않는다. */
+internal class SyntheticBidder(
+    val rank: Int,
+    val amount: String,
+    val firstDraw: String,
+    val secondDraw: String,
+)
+
+private val BIDDERS =
+    listOf(
+        SyntheticBidder(rank = 1, amount = "1100000000", firstDraw = "3", secondDraw = "7"),
+        SyntheticBidder(rank = 2, amount = "1150000000", firstDraw = "11", secondDraw = "14"),
+    )
+
+private const val NO_NOTICE_DATE = 2
+private const val NO_BID_CLOSE = 3
+private const val NO_OPENING_DATE = 4
+private const val NO_PLANNED_PRICE = 5
