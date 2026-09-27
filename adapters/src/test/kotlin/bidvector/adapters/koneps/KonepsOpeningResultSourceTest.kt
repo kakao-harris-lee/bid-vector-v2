@@ -14,7 +14,6 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -39,7 +38,7 @@ private fun newSource(
         baseAmountBaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
-                httpClient = HttpClient.newHttpClient(),
+                gate = testCallGate(),
                 serviceKey = ServiceKey.of("test-service-key"),
                 httpPolicy = policy,
                 collectionPolicyProvider = ::resolvedCollectionPolicy,
@@ -63,7 +62,7 @@ private fun newResultListSource(
         baseAmountBaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
-                httpClient = HttpClient.newHttpClient(),
+                gate = testCallGate(),
                 serviceKey = ServiceKey.of("test-service-key"),
                 httpPolicy = policy,
                 collectionPolicyProvider = ::resolvedCollectionPolicy,
@@ -75,6 +74,7 @@ private fun fetchEvidence(): DetailFetchDecision.Fetch {
     val decision =
         decideDetailFetch(
             NOTICE_ID,
+            "adapter-test-key-hash",
             alreadyHeld = false,
             openingObservedAt = null,
             lastCheckedAt = null,

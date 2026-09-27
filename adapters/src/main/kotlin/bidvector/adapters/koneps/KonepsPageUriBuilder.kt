@@ -9,7 +9,7 @@ import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
-import bidvector.workflow.collection.attemptOutcomeOf
+import bidvector.procurement.attemptOutcomeOf
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
 import java.time.Clock

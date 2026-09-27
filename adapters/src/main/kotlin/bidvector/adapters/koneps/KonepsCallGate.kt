@@ -1,18 +1,17 @@
 package bidvector.adapters.koneps
 
+import bidvector.procurement.AttemptKind
+import bidvector.procurement.AttemptLedger
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BudgetLimit
+import bidvector.procurement.BudgetOutcome
+import bidvector.procurement.CallBudgetLedger
+import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.SourceEndpoint
-import bidvector.workflow.collection.AttemptKind
-import bidvector.workflow.collection.AttemptLedger
-import bidvector.workflow.collection.AttemptOutcome
-import bidvector.workflow.collection.BudgetOutcome
-import bidvector.workflow.collection.CallBudgetLedger
-import bidvector.workflow.collection.CollectionAttempt
-import bidvector.workflow.collection.NoticeKeyHash
-import bidvector.workflow.strategy.Clock
 import java.net.URI
 import java.net.http.HttpClient
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -22,7 +21,7 @@ import java.time.ZoneId
  */
 internal data class KonepsCallContext(
     val axis: SourceEndpoint,
-    val noticeKey: NoticeKeyHash? = null,
+    val noticeKey: String? = null,
 )
 
 /** 관문의 답 — 보냈거나, 상한이 막았거나. 막힌 것은 오류가 아니라 **정상적인 답**이다. */
@@ -51,7 +50,8 @@ class KonepsCallGate(
     private val httpClient: HttpClient,
     private val budget: CallBudgetLedger,
     private val attempts: AttemptLedger,
-    private val clock: Clock,
+    /** 시각의 출처 — 함수 하나다. 시계 타입을 받으면 어느 모듈의 시계인지가 경계 문제가 된다. */
+    private val now: () -> Instant,
     private val zone: ZoneId,
 ) {
     internal fun send(
@@ -59,7 +59,7 @@ class KonepsCallGate(
         uri: URI,
         timeout: Duration,
     ): KonepsGateOutcome {
-        val today = LocalDate.ofInstant(clock.now(), zone)
+        val today = LocalDate.ofInstant(now(), zone)
         return when (val permit = budget.consume(today, 1)) {
             is BudgetOutcome.Exhausted -> KonepsGateOutcome.Denied(permit.limit)
             BudgetOutcome.Allowed -> KonepsGateOutcome.Sent(sendAndRecord(context, uri, timeout))
@@ -80,7 +80,7 @@ class KonepsCallGate(
                 noticeKey = context.noticeKey,
                 axis = context.axis,
                 outcome = outcome,
-                at = clock.now(),
+                at = now(),
                 httpAttempts = 0,
                 kind = AttemptKind.AXIS,
             ),
@@ -98,7 +98,7 @@ class KonepsCallGate(
                 noticeKey = context.noticeKey,
                 axis = context.axis,
                 outcome = transportOutcomeOf(transport),
-                at = clock.now(),
+                at = now(),
                 httpAttempts = 1,
                 kind = AttemptKind.HTTP,
             ),

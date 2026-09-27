@@ -6,7 +6,6 @@ import bidvector.procurement.NoticeId
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
-import bidvector.workflow.collection.NoticeKeyHash
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
 import java.net.URI
@@ -49,6 +48,8 @@ internal fun fetchSingleKonepsNotice(
     operation: KonepsOperationDescriptor,
     noticeId: NoticeId,
     axis: SourceEndpoint,
+    /** 공고 키 해시 — **호출부가 준다.** 어댑터가 다시 계산하면 해시 규칙이 두 자리가 된다. */
+    noticeKeyHash: String,
     itemMapper: KonepsItemMapper,
 ): SourceBatch<RawNoticeObservation> {
     val referenceDate = CollectionReferenceDate(LocalDate.now(config.clock))
@@ -64,8 +65,7 @@ internal fun fetchSingleKonepsNotice(
                 noticeId = noticeId,
             )
         }
-    val callContext =
-        KonepsCallContext(axis, NoticeKeyHash.of(noticeId.number.value, noticeId.round.value))
+    val callContext = KonepsCallContext(axis, noticeKeyHash)
     return walkKonepsNoticePages(
         config.gate,
         callContext,

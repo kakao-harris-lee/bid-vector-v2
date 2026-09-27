@@ -1,5 +1,6 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.BudgetLimit
 import bidvector.procurement.CollectionDropReason
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeTitle
@@ -263,9 +264,19 @@ class CollectNoticesUseCaseTest {
         // 원인 목록은 sealed 계층에서 도출한다(손으로 적지 않는다) — 새 원인이 생기면 이 test 가 그 원인도 잰다.
         val allCauses =
             requireNotNull(TruncationCause::class.java.permittedSubclasses) { "TruncationCause 는 sealed 여야 한다" }
-                .map { it.getField("INSTANCE").get(null) as TruncationCause }
-        val nonQuota = allCauses.filterNot { it == TruncationCause.QuotaExhausted || it == TruncationCause.MaxPages }
-        nonQuota.size shouldBe allCauses.size - 2
+                .map { subclass ->
+                    // 값을 싣는 사유(`BudgetExhausted`)는 `INSTANCE` 가 없다 — 한 인스턴스를 짓는다.
+                    runCatching { subclass.getField("INSTANCE").get(null) as TruncationCause }
+                        .getOrElse { TruncationCause.BudgetExhausted(BudgetLimit.TOTAL) }
+                }
+        // 쿼터·상한은 실행을 멈추고 MaxPages 는 같은 슬롯을 이어 간다 — 셋을 뺀 나머지를 잰다.
+        val nonHalting =
+            allCauses.filterNot {
+                it == TruncationCause.QuotaExhausted || it == TruncationCause.MaxPages ||
+                    it is TruncationCause.BudgetExhausted
+            }
+        val nonQuota = nonHalting
+        nonQuota.size shouldBe allCauses.size - 3
         nonQuota.forEach { cause ->
             val source =
                 ScriptedSource { _, _ ->

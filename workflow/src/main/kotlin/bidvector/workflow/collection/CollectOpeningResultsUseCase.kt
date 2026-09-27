@@ -1,7 +1,9 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.AttemptLedger
 import bidvector.procurement.BudgetLimit
 import bidvector.procurement.BusinessDivision
+import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.CollectedAxisStore
 import bidvector.procurement.CollectionAccounting
 import bidvector.procurement.CollectionReferenceDate
@@ -18,6 +20,7 @@ import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
 import bidvector.procurement.decideDetailFetch
+import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import java.time.LocalDate
@@ -281,7 +284,7 @@ class CollectOpeningResultsUseCase(
         // 실행마다 한 번 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다.
         val attempted = attempts.read().settledAxes()
         ids.forEach { id ->
-            val tried = attempted[NoticeKeyHash.of(id.number.value, id.round.value)].orEmpty()
+            val tried = attempted[NoticeKeyHash.of(id.number.value, id.round.value).value].orEmpty()
             DetailAxis.entries.filter { it.endpoint in tried }.forEach { axis ->
                 out.getOrPut(id) { mutableSetOf() }.add(axis)
             }
@@ -293,6 +296,7 @@ class CollectOpeningResultsUseCase(
     private fun fetchEvidence(id: NoticeId): DetailFetchDecision.Fetch =
         decideDetailFetch(
             noticeId = id,
+            noticeKeyHash = NoticeKeyHash.of(id.number.value, id.round.value).value,
             alreadyHeld = false,
             openingObservedAt = null,
             lastCheckedAt = null,

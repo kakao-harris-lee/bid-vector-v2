@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
 
+private const val TEST_KEY_HASH = "test-key-hash"
+
 private val NOTICE_ID = NoticeId(NoticeNumber.of("20260101001"), NoticeRound.of("000"))
 private val GATES = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48)
 private val OPENED_AT = Instant.parse("2026-09-01T00:00:00Z")
@@ -18,6 +20,7 @@ class DetailFetchTest {
         val decision =
             decideDetailFetch(
                 NOTICE_ID,
+                TEST_KEY_HASH,
                 alreadyHeld = true,
                 openingObservedAt = null,
                 lastCheckedAt = null,
@@ -32,7 +35,7 @@ class DetailFetchTest {
     fun `age-gate 미만 경과는 AgeGateNotPassed 로 건너뛴다`() {
         val now = OPENED_AT.plus(Duration.ofHours(23))
 
-        val decision = decideDetailFetch(NOTICE_ID, false, OPENED_AT, null, now, GATES)
+        val decision = decideDetailFetch(NOTICE_ID, TEST_KEY_HASH, false, OPENED_AT, null, now, GATES)
 
         decision.shouldBeInstanceOf<DetailFetchDecision.Skip>()
         decision.reason.shouldBeInstanceOf<DetailFetchSkipReason.AgeGateNotPassed>()
@@ -42,9 +45,9 @@ class DetailFetchTest {
     fun `age-gate 를 넘긴 뒤 정확히 Fetch 다`() {
         val now = OPENED_AT.plus(Duration.ofHours(24))
 
-        val decision = decideDetailFetch(NOTICE_ID, false, OPENED_AT, null, now, GATES)
+        val decision = decideDetailFetch(NOTICE_ID, TEST_KEY_HASH, false, OPENED_AT, null, now, GATES)
 
-        decision shouldBe DetailFetchDecision.Fetch(NOTICE_ID)
+        decision shouldBe DetailFetchDecision.Fetch(NOTICE_ID, TEST_KEY_HASH)
     }
 
     @Test
@@ -52,7 +55,7 @@ class DetailFetchTest {
         val lastChecked = OPENED_AT.plus(Duration.ofHours(30))
         val now = lastChecked.plus(Duration.ofHours(10))
 
-        val decision = decideDetailFetch(NOTICE_ID, false, OPENED_AT, lastChecked, now, GATES)
+        val decision = decideDetailFetch(NOTICE_ID, TEST_KEY_HASH, false, OPENED_AT, lastChecked, now, GATES)
 
         decision.shouldBeInstanceOf<DetailFetchDecision.Skip>()
         decision.reason.shouldBeInstanceOf<DetailFetchSkipReason.RecheckGateNotPassed>()
@@ -63,16 +66,16 @@ class DetailFetchTest {
         val lastChecked = OPENED_AT.plus(Duration.ofHours(30))
         val now = lastChecked.plus(Duration.ofHours(48))
 
-        val decision = decideDetailFetch(NOTICE_ID, false, OPENED_AT, lastChecked, now, GATES)
+        val decision = decideDetailFetch(NOTICE_ID, TEST_KEY_HASH, false, OPENED_AT, lastChecked, now, GATES)
 
-        decision shouldBe DetailFetchDecision.Fetch(NOTICE_ID)
+        decision shouldBe DetailFetchDecision.Fetch(NOTICE_ID, TEST_KEY_HASH)
     }
 
     @Test
     fun `Fetch 는 internal 생성자다 — 이 술어 밖에서 조립할 수 없다(우회 8, 컴파일 시점 확인은 procurement 모듈 밖 test 몫)`() {
-        val decision = decideDetailFetch(NOTICE_ID, false, null, null, OPENED_AT, GATES)
+        val decision = decideDetailFetch(NOTICE_ID, TEST_KEY_HASH, false, null, null, OPENED_AT, GATES)
 
-        decision shouldBe DetailFetchDecision.Fetch(NOTICE_ID)
+        decision shouldBe DetailFetchDecision.Fetch(NOTICE_ID, TEST_KEY_HASH)
     }
 
     @Test

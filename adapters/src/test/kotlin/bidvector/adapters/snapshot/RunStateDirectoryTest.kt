@@ -1,9 +1,10 @@
 package bidvector.adapters.snapshot
 
+import bidvector.procurement.AttemptKind
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BusinessDivision
+import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.SourceEndpoint
-import bidvector.workflow.collection.AttemptOutcome
-import bidvector.workflow.collection.CollectionAttempt
 import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.collection.SampleOutcome
 import bidvector.workflow.collection.SampleStratum
@@ -84,9 +85,10 @@ class FileAttemptLedgerTest {
 
     private fun attemptOf(
         outcome: AttemptOutcome,
-        key: NoticeKeyHash? = KEY,
+        key: String? = KEY.value,
         httpAttempts: Int = 1,
-    ) = CollectionAttempt(key, SourceEndpoint.RESERVE_PRICE_DETAIL, outcome, AT, httpAttempts)
+        kind: AttemptKind = AttemptKind.HTTP,
+    ) = CollectionAttempt(key, SourceEndpoint.RESERVE_PRICE_DETAIL, outcome, AT, httpAttempts, kind)
 
     @Test
     fun `원장이 없으면 빈 이력이다 — 첫 실행이다`() {
@@ -99,17 +101,18 @@ class FileAttemptLedgerTest {
         val written =
             listOf(
                 attemptOf(AttemptOutcome.Succeeded, httpAttempts = 3),
-                attemptOf(AttemptOutcome.Empty),
-                attemptOf(AttemptOutcome.Failed("Timeout")),
+                attemptOf(AttemptOutcome.Failed("TIMEOUT")),
                 attemptOf(AttemptOutcome.Succeeded, key = null, httpAttempts = 2),
+                attemptOf(AttemptOutcome.Empty, httpAttempts = 0, kind = AttemptKind.AXIS),
             )
 
         written.forEach(ledger::append)
 
         val history = ledger.read()
         history.size shouldBe written.size
-        history.attemptedAxes().getValue(KEY) shouldContainExactly listOf(SourceEndpoint.RESERVE_PRICE_DETAIL)
-        history.spend(Instant.parse("2026-09-20T00:00:00Z"), AT).total shouldBe 7
+        // 축 결말 줄만 이어 돌기에 든다. HTTP 줄은 상한만 센다(둘이 한 파일에 있어도 섞이지 않는다).
+        history.settledAxes().getValue(KEY.value) shouldContainExactly listOf(SourceEndpoint.RESERVE_PRICE_DETAIL)
+        history.spend(Instant.parse("2026-09-20T00:00:00Z"), AT).total shouldBe 6
     }
 
     /** 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고, 그것은 상한이 없는 것보다 나쁘다. */

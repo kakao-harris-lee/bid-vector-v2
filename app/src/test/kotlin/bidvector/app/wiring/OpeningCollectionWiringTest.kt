@@ -2,10 +2,10 @@ package bidvector.app.wiring
 
 import bidvector.app.collection.OpeningCollectionRunner
 import bidvector.app.collection.SnapshotExtractionRunner
+import bidvector.procurement.CallBudgetLedger
 import bidvector.procurement.CollectedAxisStore
 import bidvector.procurement.NoticeId
 import bidvector.procurement.SourceEndpoint
-import bidvector.workflow.collection.CallBudgetLedger
 import bidvector.workflow.collection.StratifiedSampler
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -81,7 +81,7 @@ class OpeningCollectionWiringTest {
             file,
             lines.joinToString("") { (at, attempts) ->
                 """{"at":"$at","axis":"OPENING_RESULT_LIST","notice_key_hash":null,""" +
-                    """"outcome":"SUCCEEDED","http_attempts":$attempts}""" + "\n"
+                    """"outcome":"SUCCEEDED","http_attempts":$attempts,"kind":"HTTP"}""" + "\n"
             },
         )
     }

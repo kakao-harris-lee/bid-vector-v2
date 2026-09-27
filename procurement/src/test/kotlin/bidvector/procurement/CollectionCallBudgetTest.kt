@@ -1,6 +1,5 @@
-package bidvector.workflow.collection
+package bidvector.procurement
 
-import bidvector.procurement.CallSpend
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test

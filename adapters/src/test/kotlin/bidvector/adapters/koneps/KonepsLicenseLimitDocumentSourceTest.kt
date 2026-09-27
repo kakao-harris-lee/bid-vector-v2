@@ -11,7 +11,6 @@ import bidvector.sharedkernel.NoticeRound
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -27,7 +26,7 @@ private fun newSource(
         baseUri = server.baseUri,
         config =
             KonepsSourceConfig(
-                httpClient = HttpClient.newHttpClient(),
+                gate = testCallGate(),
                 serviceKey = ServiceKey.of("test-service-key"),
                 httpPolicy = policy,
                 collectionPolicyProvider = ::resolvedCollectionPolicy,

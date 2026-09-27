@@ -4,11 +4,12 @@ import bidvector.adapters.koneps.KonepsJsonParser
 import bidvector.adapters.koneps.asIntOrNull
 import bidvector.adapters.koneps.asObject
 import bidvector.adapters.koneps.asStringOrNull
+import bidvector.procurement.AttemptHistory
+import bidvector.procurement.AttemptKind
+import bidvector.procurement.AttemptLedger
+import bidvector.procurement.AttemptOutcome
+import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.SourceEndpoint
-import bidvector.workflow.collection.AttemptHistory
-import bidvector.workflow.collection.AttemptLedger
-import bidvector.workflow.collection.AttemptOutcome
-import bidvector.workflow.collection.CollectionAttempt
 import bidvector.workflow.collection.NoticeKeyHash
 import java.nio.file.Files
 import java.nio.file.Path
@@ -111,9 +112,10 @@ class FileAttemptLedger(
                 listOf(
                     "at" to SnapshotJson.Text(attempt.at.toString()),
                     "axis" to SnapshotJson.Text(attempt.axis.name),
-                    "notice_key_hash" to (attempt.noticeKey?.let { SnapshotJson.Text(it.value) } ?: SnapshotJson.Null),
+                    "notice_key_hash" to (attempt.noticeKey?.let { SnapshotJson.Text(it) } ?: SnapshotJson.Null),
                     "outcome" to SnapshotJson.Text(labelOf(attempt.outcome)),
                     "http_attempts" to SnapshotJson.Number(attempt.httpAttempts.toString()),
+                    "kind" to SnapshotJson.Text(attempt.kind.name),
                 ),
             ).render() + "\n"
 
@@ -127,11 +129,16 @@ class FileAttemptLedger(
                 "시도 원장의 축 어휘가 아니다"
             }
         return CollectionAttempt(
-            noticeKey = fields["notice_key_hash"]?.asStringOrNull()?.let(NoticeKeyHash::ofHex),
+            // 형태 검사는 값 타입이 진다 — 원장에는 이미 지어진 hex 가 실린다.
+            noticeKey = fields["notice_key_hash"]?.asStringOrNull()?.let { NoticeKeyHash.ofHex(it).value },
             axis = axis,
             outcome = outcomeOf(requireNotNull(fields["outcome"].asStringOrNull()) { "시도 원장에 결말이 없다" }),
             at = Instant.parse(requireNotNull(fields["at"].asStringOrNull()) { "시도 원장에 시각이 없다" }),
             httpAttempts = requireNotNull(fields["http_attempts"].asIntOrNull()) { "시도 원장에 시도 수가 없다" },
+            kind =
+                requireNotNull(AttemptKind.entries.firstOrNull { it.name == fields["kind"].asStringOrNull() }) {
+                    "시도 원장의 줄 갈래 어휘가 아니다"
+                },
         )
     }
 }

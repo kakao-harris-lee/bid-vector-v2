@@ -8,7 +8,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -38,7 +37,7 @@ private fun gatewayErrorXml(
 
 private fun gatewaySource(server: MockKonepsServer): KonepsOpenApiNoticeSource =
     KonepsOpenApiNoticeSource(
-        httpClient = HttpClient.newHttpClient(),
+        gate = testCallGate(),
         baseUri = server.baseUri,
         serviceKey = ServiceKey.of("test-service-key"),
         httpPolicy = testKonepsHttpPolicy(maxAttempts = 3),

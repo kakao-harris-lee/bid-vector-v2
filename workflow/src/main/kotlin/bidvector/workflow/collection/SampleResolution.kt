@@ -1,5 +1,7 @@
 package bidvector.workflow.collection
 
+import bidvector.workflow.collection.NoticeKeyHash
+
 /**
  * 「이번 실행의 표본은 무엇인가」 하나만 답한다(D-6G-39) — 뽑기([StratifiedSampler])와 확정 원장
  * ([SampleListLedger]) 사이의 자리다. 수집 use case 는 표본을 **묻기만** 하고, 다시 뽑을지 말지를

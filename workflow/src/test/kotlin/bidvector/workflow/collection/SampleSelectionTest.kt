@@ -1,6 +1,7 @@
 package bidvector.workflow.collection
 
 import bidvector.procurement.BusinessDivision
+import bidvector.workflow.collection.NoticeKeyHash
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe

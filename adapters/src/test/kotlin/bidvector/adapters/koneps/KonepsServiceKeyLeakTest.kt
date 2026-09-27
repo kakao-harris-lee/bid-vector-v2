@@ -58,7 +58,7 @@ class KonepsServiceKeyLeakTest {
         try {
             val source =
                 KonepsOpenApiNoticeSource(
-                    httpClient = HttpClient.newHttpClient(),
+                    gate = testCallGate(),
                     baseUri = baseUri,
                     serviceKey = ServiceKey.of(rawKey),
                     httpPolicy = testKonepsHttpPolicy(maxAttempts = 2, requestTimeout = Duration.ofMillis(100)),

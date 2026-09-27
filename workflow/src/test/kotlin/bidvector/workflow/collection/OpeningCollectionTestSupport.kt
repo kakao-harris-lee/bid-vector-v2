@@ -1,6 +1,10 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.AttemptHistory
+import bidvector.procurement.AttemptLedger
 import bidvector.procurement.BusinessDivision
+import bidvector.procurement.COLLECTION_BUDGET_ZONE
+import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.DetailFetchDecision
 import bidvector.procurement.DetailFetchGates
@@ -12,6 +16,7 @@ import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
+import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.strategy.Clock
 import java.time.LocalDate
 
@@ -144,9 +149,6 @@ internal class FakeSampleListLedger : SampleListLedger {
 
 internal class OpeningFixture(
     sampleSize: Int,
-    private val budget: CollectionCallBudget = CollectionCallBudget(perDay = 20_000, total = 80_000),
-    private val alreadySpent: bidvector.procurement.CallSpend =
-        bidvector.procurement.CallSpend(total = 0, today = 0),
     collectedAxes: bidvector.procurement.CollectedAxisStore = FakeCollectedAxisStore(),
     attemptSeed: List<CollectionAttempt> = emptyList(),
 ) {
@@ -200,8 +202,7 @@ internal class OpeningFixture(
         portFor(division).listScript.remove(LocalDate.parse(noticeDate))
     }
 
-    fun run(): OpeningCollectionReport =
-        useCase.collect(range(), sources, CallBudgetLedger(budget, COLLECTION_BUDGET_DAY, alreadySpent))
+    fun run(): OpeningCollectionReport = useCase.collect(range(), sources)
 
     fun plan(): SampleOutcome = useCase.plan(range(), sources).sample
 

@@ -6,17 +6,17 @@ import bidvector.adapters.koneps.KonepsHttpPolicyData
 import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.KonepsCredentialProperties
+import bidvector.procurement.COLLECTION_BUDGET_ZONE
+import bidvector.procurement.CallBudgetLedger
+import bidvector.procurement.CollectionCallBudget
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
+import bidvector.procurement.dayStartOf
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.collection.COLLECTION_BUDGET_ZONE
 import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
-import bidvector.workflow.collection.CallBudgetLedger
-import bidvector.workflow.collection.CollectionCallBudget
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangeOutcome
-import bidvector.workflow.collection.dayStartOf
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import java.net.URI
@@ -101,7 +101,7 @@ internal fun konepsTransportFor(
                 httpClient = HttpClient.newBuilder().connectTimeout(httpPolicy.requestTimeout).build(),
                 budget = budget,
                 attempts = runState.attempts,
-                clock = clock,
+                now = clock::now,
                 zone = COLLECTION_BUDGET_ZONE,
             ),
     )

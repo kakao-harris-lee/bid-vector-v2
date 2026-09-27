@@ -5,7 +5,6 @@ import bidvector.procurement.CollectionReferenceDate
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -19,7 +18,7 @@ private fun sourceOf(
     division: BusinessDivision,
 ): KonepsOpenApiNoticeSource =
     KonepsOpenApiNoticeSource(
-        httpClient = HttpClient.newHttpClient(),
+        gate = testCallGate(),
         baseUri = server.baseUri,
         serviceKey = ServiceKey.of("test-service-key"),
         httpPolicy = testKonepsHttpPolicy(),

@@ -1,5 +1,7 @@
 package bidvector.workflow.collection
 
+import bidvector.workflow.collection.NoticeKeyHash
+
 /**
  * 확정된 표본(D-6G-39) — 키 집합과 층. **이 집합 밖은 표본이 아니다**가 수집·추출 양쪽의 기준이다.
  */

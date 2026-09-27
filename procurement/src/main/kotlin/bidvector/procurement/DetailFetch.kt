@@ -25,6 +25,12 @@ sealed interface DetailFetchDecision {
     @ConsistentCopyVisibility
     data class Fetch internal constructor(
         val noticeId: NoticeId,
+        /**
+         * 공고 키 해시 hex — **호출부가 이미 지은 값**이다. 어댑터가 호출 원장에 줄을 쓸 때
+         * 필요하고, 도메인은 sha256 을 계산하지 않는다(architecture 게이트). 해시를 짓는 자리는
+         * workflow 하나이므로 규칙이 두 벌이 되지 않는다.
+         */
+        val noticeKeyHash: String,
     ) : DetailFetchDecision
 
     data class Skip(
@@ -51,6 +57,7 @@ data class DetailFetchGates(
  */
 fun decideDetailFetch(
     noticeId: NoticeId,
+    noticeKeyHash: String,
     alreadyHeld: Boolean,
     openingObservedAt: Instant?,
     lastCheckedAt: Instant?,
@@ -73,7 +80,7 @@ fun decideDetailFetch(
         }
 
         else -> {
-            DetailFetchDecision.Fetch(noticeId)
+            DetailFetchDecision.Fetch(noticeId, noticeKeyHash)
         }
     }
 }

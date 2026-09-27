@@ -10,7 +10,6 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -25,7 +24,7 @@ private fun newSource(
     policy: KonepsHttpPolicyData,
 ): KonepsOpenApiNoticeSource =
     KonepsOpenApiNoticeSource(
-        httpClient = HttpClient.newHttpClient(),
+        gate = testCallGate(),
         baseUri = server.baseUri,
         serviceKey = ServiceKey.of("test-service-key"),
         httpPolicy = policy,

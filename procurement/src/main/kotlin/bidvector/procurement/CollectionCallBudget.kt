@@ -1,7 +1,5 @@
-package bidvector.workflow.collection
+package bidvector.procurement
 
-import bidvector.procurement.BudgetLimit
-import bidvector.procurement.CallSpend
 import java.time.LocalDate
 
 /**
@@ -10,7 +8,7 @@ import java.time.LocalDate
  * 그 회귀는 **시계가 정오 근처면 두 구역의 날짜가 같아 test 가 못 잡는다** — 그래서 이 값을 쓰는
  * test 는 시계를 KST 자정 근처에 둔다.
  */
-val COLLECTION_BUDGET_ZONE: java.time.ZoneId = bidvector.workflow.evaluation.OPENING_DATE_ZONE
+val COLLECTION_BUDGET_ZONE: java.time.ZoneId = java.time.ZoneId.of("Asia/Seoul")
 
 /** 한 걸음의 예산 판정 — 값이다(예외가 아니다). */
 sealed interface BudgetOutcome {

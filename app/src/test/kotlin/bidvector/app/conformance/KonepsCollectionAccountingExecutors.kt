@@ -155,6 +155,7 @@ private fun case024(input: JsonNode): Map<String, Any?> {
     val decision =
         decideDetailFetch(
             noticeId,
+            noticeKeyHash = CONFORMANCE_KEY_HASH,
             alreadyHeld = notice.path("reservePricesHeld").asBoolean(),
             openingObservedAt = Instant.parse(notice.path("openedAt").asString()),
             lastCheckedAt = null,
@@ -180,7 +181,7 @@ private fun case025(input: JsonNode): Map<String, Any?> {
     val sweepResults =
         input.path("sweeps").values().map { sweep ->
             val now = Instant.parse(sweep.path("now").asString())
-            val decision = decideDetailFetch(noticeId, false, openedAt, lastCheckedAt, now, gates)
+            val decision = decideDetailFetch(noticeId, CONFORMANCE_KEY_HASH, false, openedAt, lastCheckedAt, now, gates)
             val isFetch = decision is DetailFetchDecision.Fetch
             if (isFetch) {
                 totalFetch++
@@ -244,3 +245,6 @@ internal val KONEPS_COLLECTION_ACCOUNTING_EXECUTORS: Map<String, (JsonNode) -> M
         "koneps-collection-025" to ::case025,
         "koneps-collection-027" to ::case027,
     )
+
+/** 적합성 실행기는 조회 가치 술어만 잰다 — 원장 키는 이 축의 관심사가 아니다. */
+private const val CONFORMANCE_KEY_HASH = "conformance-key-hash"

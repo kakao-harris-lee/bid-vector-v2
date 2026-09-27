@@ -93,7 +93,10 @@ class OpeningCollectionE2ETest {
         Files.readString(runStateDir.resolve("attempts.jsonl")).trimEnd('\n').lines()
 
     private fun attemptSum(): Int =
-        attemptLines().sumOf { line -> line.substringAfter("\"http_attempts\":").trimEnd('}').toInt() }
+        attemptLines().sumOf { line ->
+            val match = Regex("\"http_attempts\":(\\d+)").find(line)
+            match?.groupValues?.get(1)?.toInt() ?: 0
+        }
 
     /** test 마다 새 실행 상태 — 앞 test 의 공고번호(nonce 가 다르다)와 시도를 물려받지 않는다. */
     private lateinit var runStateDir: Path
@@ -261,12 +264,16 @@ class OpeningCollectionE2ETest {
      */
     @Test
     fun `재시도로 나간 호출도 시도 원장에 실린다`() {
-        bootAndRun(emptyMap(), nonce = "RETRY", throttleOnce = setOf("getOpengResultListInfoCnstwk"))
+        val (_, mock) =
+            bootAndRun(emptyMap(), nonce = "RETRY", throttleOnce = setOf("getOpengResultListInfoCnstwk"))
 
-        val lines = Files.readString(runStateDir.resolve("attempts.jsonl")).trimEnd('\n').lines()
-        val listLines = lines.filter { it.contains("\"axis\":\"OPENING_RESULT_LIST\"") }
-        // 목록 슬롯 하나가 429 를 한 번 물었다 — 그 줄의 시도 수는 받은 페이지 수보다 크다.
-        listLines.any { it.contains("\"http_attempts\":2") } shouldBe true
+        val listAttempts =
+            attemptLines().count {
+                it.contains("\"axis\":\"OPENING_RESULT_LIST\"") && it.contains("\"kind\":\"HTTP\"")
+            }
+        // mock 은 429 로 끊은 요청을 `listCalls` 에 세지 않는다 — 원장에는 그것까지 한 줄로 남는다.
+        // 나간 호출을 세는 자리와 받은 페이지를 세는 자리가 **다르다**는 것이 이 값의 뜻이다.
+        listAttempts shouldBe mock.listCalls.size + 1
     }
 
     /**
@@ -323,7 +330,7 @@ class OpeningCollectionE2ETest {
     }
 
     @Test
-    fun `호출 상한에 닿으면 멈추고 종료 코드가 미완이며 반만 받은 공고가 없다`() {
+    fun `호출 상한에 닿으면 멈추고 종료 코드가 미완이며 남은 축은 다음 실행이 받는다`() {
         val (exitCodes, mock) =
             bootAndRun(
                 mapOf(
@@ -331,6 +338,7 @@ class OpeningCollectionE2ETest {
                     "bidvector.opening-collection.calls-per-day" to "6",
                     "bidvector.opening-collection.calls-total" to "1000",
                 ),
+                nonce = "HALFWAY",
             )
 
         exitCodes shouldContainExactly listOf(CollectionExitCode.INCOMPLETE.value)
@@ -340,14 +348,19 @@ class OpeningCollectionE2ETest {
         // 정해지고 mock 의 번호에 실행마다 다른 표식이 들어가, 먼저 뽑히는 층(공사 4축·용역 3축)이
         // 실행마다 달라진다. 계약은 「넘겨 쓰지 않는다」이지 「정확히 6 이다」가 아니다.
         (mock.listCalls.size + mock.detailCallCount()) shouldBeLessThanOrEqual 6
-        // **반만 받은 공고가 없다**(D-6G-29 ④) — 상세를 하나라도 받은 공고는 자기 축 전부를 받았다.
-        val touched =
-            (mock.reservePriceNotices + mock.openingCompleteNotices + mock.baseAmountNotices).toSet()
+
+        // **반쪽 공고가 영구히 남지 않는다**(D-6G-29 ④의 취지). 관문이 호출 하나씩 세므로 상한
+        // 경계가 공고 한가운데에 떨어질 수 있다 — 옛 걸음 단위 예산은 그 자리를 공고 단위로
+        // 막았지만, 그 대가로 재시도가 상한 밖에 있었다. 지금은 거부된 축이 **끝나지 않은 축**으로
+        // 남아(D-6G-49) 다음 실행이 그것부터 받는다. 잰다: 상한을 풀고 같은 실행 상태로 다시 돌면
+        // 받다 만 공고의 남은 축이 채워진다.
+        val touched = (mock.reservePriceNotices + mock.openingCompleteNotices + mock.baseAmountNotices).toSet()
+        // 같은 nonce·같은 실행 상태로 다시 돈다 — 번호가 같아야 「그 공고의 남은 축」을 잴 수 있다.
+        val (_, second) = bootAndRun(emptyMap(), nonce = "HALFWAY", reuseRunState = true)
         touched.forEach { notice ->
-            mock.reservePriceNotices shouldContain notice
-            mock.openingCompleteNotices shouldContain notice
-            mock.baseAmountNotices shouldContain notice
-            if (notice.contains("CNSTWK")) mock.formulaANotices shouldContain notice
+            (mock.reservePriceNotices + second.reservePriceNotices) shouldContain notice
+            (mock.openingCompleteNotices + second.openingCompleteNotices) shouldContain notice
+            (mock.baseAmountNotices + second.baseAmountNotices) shouldContain notice
         }
     }
 }

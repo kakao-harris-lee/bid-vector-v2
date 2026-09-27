@@ -72,6 +72,11 @@ class SnapshotExtractionE2ETest {
                     "bidvector.collection.from" to NOTICE_DAY.toString(),
                     "bidvector.collection.to" to NOTICE_DAY.toString(),
                     "bidvector.collection.categories" to "construction,service",
+                    // D-6G-47 H-1 — 공고 목록 갈래도 같은 실행 상태·같은 상한 아래다.
+                    "bidvector.collection.calls-per-day" to "10000",
+                    "bidvector.collection.calls-total" to "10000",
+                    "bidvector.collection.budget-since" to "2026-01-01T00:00:00Z",
+                    "bidvector.collection.run-state-dir" to RUN_STATE.toString(),
                 ),
             )
             bootOnce(

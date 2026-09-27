@@ -1,5 +1,6 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.BudgetLimit
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.TruncationCause
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -83,41 +84,35 @@ class CollectOpeningResultsUseCaseTest {
     }
 
     /**
-     * D-6G-42 M-4 — 상한은 **목록 갈래에서도** 문다. 상세만 막으면, 표본틀을 세우는 목록 호출이
-     * 상한 밖에서 계속 나가 승인 범위를 넘는다(표본을 뽑기도 전에).
+     * 상한 판정은 **관문**이 한다(D-6G-47) — 이 use case 는 그 거부를 절단 사유로 받아 멈추고
+     * 어느 한도였는지 보고한다. 상한을 실제로 세는 거동은 관문 test 와 E2E 가 잰다(여기서 다시
+     * 세면 셈의 출처가 둘이 된다).
      */
     @Test
-    fun `목록 갈래도 상한에서 멈춘다 — 다음 슬롯을 부르지 않는다`() {
-        val fixture = OpeningFixture(sampleSize = 2, budget = CollectionCallBudget(perDay = 1, total = 1))
+    fun `목록 갈래가 상한에 걸리면 표본을 뽑지 않고 멈춘다`() {
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
-        fixture.listRows(BusinessDivision.SERVICE, "2026-06-04", count = 3)
+        fixture.service.listTruncation = TruncationCause.BudgetExhausted(BudgetLimit.TOTAL)
 
         val report = fixture.run()
 
-        // TOTAL 이 먼저 문다 — `consume` 이 총 상한을 일 상한보다 앞서 본다.
         report.halted?.budgetLimit shouldBe BudgetLimit.TOTAL
-        // 상한이 하나였으니 목록 호출도 딱 하나 나갔다 — 남은 슬롯·남은 업무는 부르지 않는다.
-        (fixture.construction.listCalls.size + fixture.service.listCalls.size) shouldBe 1
         // 표본틀이 반만 선 채로 상세를 부르지 않는다 — 반쪽 표본틀에서 뽑으면 층이 비뚤어진다.
         report.detailCalls shouldBe 0
+        report.sample.selected.shouldBeEmpty()
     }
 
     @Test
-    fun `일 호출 상한에 닿으면 멈춘다 — 남은 표본은 부르지 않는다`() {
-        val fixture = OpeningFixture(sampleSize = 10, budget = CollectionCallBudget(perDay = 6, total = 100))
+    fun `상세 단계가 상한에 걸리면 멈추고 어느 한도였는지 싣는다`() {
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 10)
+        fixture.service.detailTruncation = TruncationCause.BudgetExhausted(BudgetLimit.DAILY)
 
         val report = fixture.run()
 
         report.halted shouldNotBe null
         report.halted!!.budgetLimit shouldBe BudgetLimit.DAILY
-        // 목록 슬롯 둘 = 2. 용역 공고는 상세 축이 셋이고 **통째로** 허가된다(D-6G-29 ④):
-        // 첫 공고가 3 을 받아 5, 둘째가 3 을 더 요구하면 8 > 6 이라 **한 호출도 나가지 않고** 멈춘다.
-        // 예산 경계에 걸려 반만 받은 공고가 생기지 않는다 — 그런 공고는 결측이 랜덤이 아니다.
-        fixture.service.reservePriceCalls.size shouldBe 1
-        fixture.service.openingCompleteCalls.size shouldBe 1
-        fixture.service.baseAmountCalls.size shouldBe 1
-        report.detailCalls shouldBe 3
+        report.detailCalls shouldBe 1
     }
 
     @Test
@@ -139,23 +134,6 @@ class CollectOpeningResultsUseCaseTest {
         fixture.service.baseAmountCalls.size shouldBe 2
         // 건너뛴 축은 예산에서도 빠진다 — 걸음당 호출이 셋이 아니라 둘이다.
         report.detailCalls shouldBe 4
-    }
-
-    @Test
-    fun `이미 받은 몫이 예산에 실려 있으면 남은 몫만 쓴다 — 실행 사이에 이어진다`() {
-        val fixture =
-            OpeningFixture(
-                sampleSize = 10,
-                budget = CollectionCallBudget(perDay = 10, total = 10),
-                alreadySpent = bidvector.procurement.CallSpend(total = 8, today = 8),
-            )
-        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
-
-        val report = fixture.run()
-
-        // 남은 몫 2 — 목록 슬롯 둘을 쓰고 나면 상세는 한 걸음도 못 뗀다.
-        report.halted shouldNotBe null
-        report.detailCalls shouldBe 0
     }
 
     @Test
@@ -204,15 +182,15 @@ class CollectOpeningResultsUseCaseTest {
         report.detailCalls shouldBe 1
     }
 
-    /** 마지막 축에서 물면 그 공고는 반쪽이 아니다 — 남은 축이 없다. */
+    /** 상한 거부는 첫 축에서 온다 — 그 공고는 축 하나도 적재되지 않아 반쪽이 아니다. */
     @Test
-    fun `K6 — 예산이 먼저 물면 그 공고는 손도 대지 않은 것이다`() {
-        val fixture = OpeningFixture(sampleSize = 2, budget = CollectionCallBudget(perDay = 3, total = 3))
+    fun `K6 — 상한이 물면 그 공고는 반쪽이 아니다`() {
+        val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
+        fixture.service.detailTruncation = TruncationCause.BudgetExhausted(BudgetLimit.TOTAL)
 
-        val report = fixture.run()
+        val halt = requireNotNull(fixture.run().halted)
 
-        val halt = requireNotNull(report.halted)
         halt.budgetLimit shouldBe BudgetLimit.TOTAL
         halt.partialNotice shouldBe false
         halt.notAttempted shouldBe 2

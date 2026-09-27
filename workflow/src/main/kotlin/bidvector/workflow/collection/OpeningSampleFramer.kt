@@ -1,5 +1,6 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
 import bidvector.procurement.CollectionRunStore
@@ -10,6 +11,7 @@ import bidvector.procurement.RawObservationStore
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
 import bidvector.procurement.noticeIdIn
+import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.strategy.Clock
 import java.time.LocalDate
 
@@ -126,8 +128,13 @@ internal class OpeningSampleFramer(
         val cause = batch.accounting.truncationCause
         val next = batch.next?.takeIf { cause == TruncationCause.MaxPages && it != cursor }
         return when {
+            // 상한 거부는 **예산 멈춤**으로 올린다 — 어느 한도였는지가 다음 걸음을 정한다.
+            cause is TruncationCause.BudgetExhausted -> PageWalk.Stop(OpeningCollectionHalt(cause.limit, null, 0))
+
             cause == TruncationCause.QuotaExhausted -> PageWalk.Stop(OpeningCollectionHalt(null, cause, 0))
+
             next != null -> PageWalk.Next(next)
+
             else -> PageWalk.Stop(null)
         }
     }

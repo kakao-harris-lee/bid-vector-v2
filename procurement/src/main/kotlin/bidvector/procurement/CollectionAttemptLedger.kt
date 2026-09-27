@@ -1,9 +1,5 @@
-package bidvector.workflow.collection
+package bidvector.procurement
 
-import bidvector.procurement.CallSpend
-import bidvector.procurement.CollectionAccounting
-import bidvector.procurement.SourceEndpoint
-import bidvector.procurement.TruncationCause
 import java.time.Instant
 import java.time.LocalDate
 
@@ -16,8 +12,13 @@ import java.time.LocalDate
  * 물어야 답이 나온다.
  */
 data class CollectionAttempt(
-    /** 목록 축은 공고 단위가 아니다 — 슬롯 하나가 여러 공고를 낸다. 그 경우 `null`. */
-    val noticeKey: NoticeKeyHash?,
+    /**
+     * 공고 키 해시의 **hex 문자열** — 목록 축은 공고 단위가 아니라 `null` 이다(슬롯 하나가 여러
+     * 공고를 낸다). 값 타입이 아니라 문자열인 이유: 그 타입을 만드는 일은 sha256 계산이고 도메인
+     * 모듈은 `java.security` 를 보지 않는다(architecture 게이트). 해시를 **짓는** 자리는 workflow
+     * 하나이고, 도메인은 이미 지어진 값을 나르기만 한다.
+     */
+    val noticeKey: String?,
     val axis: SourceEndpoint,
     val outcome: AttemptOutcome,
     val at: Instant,
@@ -92,7 +93,7 @@ class AttemptHistory(
      * 무작위가 아니게 된다 — 느린 응답·과부하 시간대에 몰린 공고만 빠지고, 그 행은 값 결측 제외로
      * 계수되어 사유 귀속까지 틀린다.
      */
-    fun settledAxes(): Map<NoticeKeyHash, Set<SourceEndpoint>> =
+    fun settledAxes(): Map<String, Set<SourceEndpoint>> =
         attempts
             .filter { it.kind == AttemptKind.AXIS && it.outcome.isSettled }
             .mapNotNull { attempt -> attempt.noticeKey?.let { it to attempt.axis } }
@@ -143,7 +144,7 @@ fun truncationCodeOf(cause: TruncationCause): String =
 fun attemptOutcomeOf(accounting: CollectionAccounting): AttemptOutcome =
     when {
         accounting.truncationCause != null -> {
-            AttemptOutcome.Failed(truncationCodeOf(accounting.truncationCause!!))
+            AttemptOutcome.Failed(truncationCodeOf(accounting.truncationCause))
         }
 
         accounting.received == 0 -> {
