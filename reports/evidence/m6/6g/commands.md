@@ -202,7 +202,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
 | S-3 | `uv run mypy --strict src/ml_engine` | 소스 94개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1142 passed · 4 skipped**(skip 은 golden 미도착, 아래 이탈) |
+| S-5 | `uv run python -m pytest tests -q` | **1155 passed**(skip 0 — golden 이 와서 왕복 test 여덟이 실제로 돈다) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -245,6 +245,11 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | D-6G-28 값 결측은 행 단위 | `reasons` 의 새 사유 넷 · `AdmittedNotice` 의 해소된 네 칸 | 한 행이 빠져도 **나머지는 산다** |
 | D-6G-28 구조 실패는 전체 거부 | `jsonrow.row_mapping` · `_assemble` | 미지 키·버전·checksum·닫힌 셋 밖 업무 넷을 한 test 로 |
 | D-6G-33 자유텍스트 | `NoticeObservation.has_*` 두 칸 | 원문 이름이 타입에 **없음**을 전수 대조 |
+| D-6G-35 첫 공고 차수 | `exclusion.first_notice_ordinal`(정책) | 값이 `0` 이고 `1` 이면 제외 ③ 이 발화 |
+| D-6G-36 결정방법 부재 | `rules._is_single_prearranged` · `UndecidableAxis.PREARRANGED_PRICE_METHOD` | 부재 통과 · 단일예가 제외 · 부재+예비가격 없으면 ⑤ 가 잡음 |
+| D-6G-32 manifest 기간 | `snapshot.opening_date_range` · `_check_period` | manifest 기간이 행의 개찰일 범위와 **일치**해야 한다 |
+| D-6G-27 golden 자리 단일성 | `test_no_golden_lives_outside_the_declared_path` | 선언 자리 밖 golden 이 있으면 RED |
+| 제외 사유의 귀속 | `_RULES` 순서(마감 -> 기초금액) | 마감 결측이 기초금액 사유로 계수되지 않는다 |
 | D-6G-20 표본 크기 결정식 | `records.SamplingRecord` · `policy.SamplingBudget` | 예산 초과 시 멈춤 |
 | D-6G-21 판정 불가와 민감도 둘 | `UndecidableAxis` · `SampleVariant` | 판 셋의 순서 · `estimate_available` |
 | D-6G-22 낙찰방법 채움률 | `exclusions.bid_method_fill_rate` | 판정 JSON 에 실림 |
@@ -281,6 +286,27 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | **W1** | 공고일이 없으면 개찰일로 대체(v2 회귀) | **1 failed** |
 | **W2** | 값 결측을 다시 전체 거부로(필수 판독) | **2 failed** |
 | **W3** | 구조 실패를 행 단위로 접음(미지 키 무시) | **6 failed** |
+| **P1** | manifest 기간 대조 제거 | **3 failed** |
+| **P2** | 기간을 일치에서 **포함 관계**로 약화 | **3 failed** |
+| **P3** | 선언된 자리 밖에 golden 을 심는다 | **1 failed** |
+
+누계 **열아홉**(M1~M13 · V3·V5·V7·V8·V9 · G1·G2 · W1~W3 · P1~P3). 전부 RED 이고 복원 뒤 초록이다.
+
+## 레인 간 왕복 golden — 실제로 결함을 잡았다 (D-6G-27)
+
+생산 쪽(Kotlin `SnapshotWriter` 출하 추출 경로)이 낸 바이트를 소비 쪽 판독·제외에 통과시킨다.
+**현황**: 10행 · 승인 2 · 제외 8 = 값 결측 사유 넷이 각각 2건, 모두 제 이름으로. golden test 여덟 통과.
+
+왕복이 **소비 쪽 fixture 로는 영영 못 잡는 결함**을 하나 잡았다. 마감(`bid_close_at`)이 빠진 행이
+`BASE_AMOUNT_ABSENT_OR_LATE` 로 계수되고 있었다 — 생산 쪽이 `base_amount_disclosed_at < bid_close_at`
+인 행만 기초금액을 싣기 때문에 마감이 빠지면 **기초금액도 함께 `null`** 이 되고, 내 규칙 표가
+기초금액을 먼저 봐서 뿌리가 아닌 쪽에 사유를 붙였다. 내 규칙과 생산 쪽 규칙이 **함께** 만든
+결함이라 한쪽 레인의 fixture 안에서는 나타나지 않는다. `BID_CLOSE_AT_ABSENT` 를 앞으로 옮겨 고쳤고
+test 가 두 갈래를 가른다(마감이 없어 기초금액이 따라 빈 행 ↔ 마감은 있고 기초금액만 없는 행).
+
+golden 이 수렴하기까지 승인 0건의 원인 넷을 단계별로 실측해 생산 레인에 전달했다(추첨번호 4개 ·
+A 공개를 마감 앞으로 · 공사 순공사원가 · 투찰자 복수). 추첨번호 4 요구는 **내리지 않았다** —
+예정가격이 예비가격 15개 중 **무작위 4개의 평균**이라 4가 아니면 그 평균이 성립하지 않는다.
 
 V3·V5·V7·V8·V9 는 verifier r1 이 **초록**으로 실측한 다섯이고, G1 은 같은 보고의 게이트
 변이다. 일곱 전부 이제 붉어진다(복원 뒤 272 passed).
@@ -298,12 +324,16 @@ provenance 분리가 잠기지 않았다. 두 값을 **다르게** 둔 공고를
 지자체 판정 불가 · 선박 분류 코드 미확정 · 예가 범위율/순공사원가 출처 대기 · A 합산의 표준시장단가금액
 제외 · 하한가 경계 1원 규칙 미확정 · S1 공사 한정 · S3(GBM) 부재 · 게시 하한율 밴드 미검증.
 
+## 혼입 (사실 선언)
+
+내 커밋 `de6f21d9` 에 **생산 레인의 golden 두 파일**(`m6-6g-golden/manifest.json`·`rows.jsonl`)이 함께
+실렸다. `git add ml-engine/tests/` 로 경로를 넓게 잡았는데 그 순간 상대 레인의 E2E 가 그 디렉터리를
+재생성한 상태였다. **이력을 되쓰지 않고 사실로 적는다**(하네스 규율). 그 뒤 생산 레인의 커밋이 정본을
+덮었으므로 내용은 그쪽 것이 맞고, 장부상 출처만 내 커밋에 붙었다. 이 디렉터리는 상대 레인의 test 실행에
+따라 **나타났다 사라진다** — 앞으로 파일 단위로만 스테이징한다.
+
 ## 이탈
 
-- **D-6G-27 왕복 golden 이 아직 서지 않았다.** 소비 쪽 test 는 섰지만 생산 쪽 golden 이
-  아직 커밋되지 않아 **네 test 가 건너뛴다**(`pytest -rs` 가 사유와 기대 경로를 찍는다).
-  초록으로 위장하지 않았고, golden 이 오면 경로 상수 하나로 선다. **verifier H-1 의
-  세 결함(추첨번호·공고일·필수 칸)은 이 잠금이 서기 전까지 재지 못한다.**
 - **`smkpAmt` 배제의 「크기」는 여전히 못 잰다(계수는 낸다).** D-6G-23 의 술어 칸이 `snapshot-v2` 로
   들어와 **영향 범위**(참 공고 수·판정 불가 수·분모)는 공시한다. 하지만 「A 가 얼마나 달라지는가」는
   `smkpAmt` 의 **금액**이 스냅숏에 없어 모른다 — `limitations` 의
