@@ -21,21 +21,24 @@ from _backtest_support import (
     notice_key_hash,
     row_payload,
     rows_bytes,
+    sample_list_bytes,
 )
 
+from ml_engine.evaluation.backtest.sample_list import parse_sample_list
 from ml_engine.evaluation.backtest.snapshot import (
     BusinessCategory,
     LoadedSnapshot,
     SnapshotRejected,
     SnapshotRejectionReason,
     load_snapshot,
-    sample_list_checksum,
 )
 
 
 def _load(payloads: list[dict[str, Any]], **manifest_kwargs: Any) -> object:
     rows = rows_bytes(payloads)
-    return load_snapshot(manifest_bytes(rows, **manifest_kwargs), rows)
+    return load_snapshot(
+        manifest_bytes(rows, **manifest_kwargs), rows, sample_list_bytes(rows)
+    )
 
 
 def _loaded(payloads: list[dict[str, Any]]) -> LoadedSnapshot:
@@ -74,7 +77,7 @@ def test_notice_half_carries_no_opening_result_attribute() -> None:
 
 def test_snapshot_checksum_is_the_sha256_of_the_rows_bytes() -> None:
     rows = rows_bytes([row_payload("n-1")])
-    loaded = load_snapshot(manifest_bytes(rows), rows)
+    loaded = load_snapshot(manifest_bytes(rows), rows, sample_list_bytes(rows))
     assert isinstance(loaded, LoadedSnapshot)
     assert loaded.rows_sha256 == hashlib.sha256(rows).hexdigest()
 
@@ -85,11 +88,11 @@ def test_snapshot_checksum_is_the_sha256_of_the_rows_bytes() -> None:
         ({"row_count": 99}, SnapshotRejectionReason.ROW_COUNT_MISMATCH),
         ({"rows_sha256": "a" * 64}, SnapshotRejectionReason.CHECKSUM_MISMATCH),
         (
-            {"schema_version": "snapshot-v2"},
+            {"schema_version": "snapshot-v3"},
             SnapshotRejectionReason.UNSUPPORTED_SCHEMA_VERSION,
         ),
         (
-            {"schema_version": "snapshot-v4"},
+            {"schema_version": "snapshot-v5"},
             SnapshotRejectionReason.UNSUPPORTED_SCHEMA_VERSION,
         ),
     ],
@@ -162,14 +165,14 @@ def test_non_finite_number_is_rejected() -> None:
     rows = rows_bytes([row_payload("n-1")]).replace(
         b'"floor_rate": 0.87745', b'"floor_rate": NaN'
     )
-    rejected = load_snapshot(manifest_bytes(rows), rows)
+    rejected = load_snapshot(manifest_bytes(rows), rows, sample_list_bytes(rows))
     assert isinstance(rejected, SnapshotRejected)
     assert rejected.reason is SnapshotRejectionReason.INVALID_VALUE
 
 
 def test_malformed_json_line_is_rejected() -> None:
     rows = rows_bytes([row_payload("n-1")])[:-10]
-    rejected = load_snapshot(manifest_bytes(rows), rows)
+    rejected = load_snapshot(manifest_bytes(rows), rows, sample_list_bytes(rows))
     assert isinstance(rejected, SnapshotRejected)
     assert rejected.reason is SnapshotRejectionReason.MALFORMED_JSON
 
@@ -182,7 +185,7 @@ def test_duplicate_notice_key_hash_is_rejected() -> None:
 
 def test_malformed_manifest_is_rejected() -> None:
     rows = rows_bytes([row_payload("n-1")])
-    rejected = load_snapshot(b"{not json", rows)
+    rejected = load_snapshot(b"{not json", rows, sample_list_bytes(rows))
     assert isinstance(rejected, SnapshotRejected)
     assert rejected.reason is SnapshotRejectionReason.MALFORMED_JSON
 
@@ -198,7 +201,7 @@ def test_rows_are_sorted_by_notice_key_hash_for_reproducibility() -> None:
 
 
 def test_empty_snapshot_is_rejected() -> None:
-    rejected = load_snapshot(manifest_bytes(b""), b"")
+    rejected = load_snapshot(manifest_bytes(b""), b"", b"")
     assert isinstance(rejected, SnapshotRejected)
     assert rejected.reason is SnapshotRejectionReason.EMPTY
 
@@ -259,9 +262,12 @@ def test_manifest_period_is_carried_for_the_verdict_record() -> None:
     # 않고 행에서 재계산해 대조하므로, 이 값은 fixture 의 개찰일과 같아야 한다.
     assert snapshot.period_start == snapshot.rows[0].outcome.opened_on
     assert snapshot.period_end == snapshot.rows[0].outcome.opened_on
-    assert snapshot.sample_list_sha256 == sample_list_checksum(
-        [row.notice.notice_key_hash for row in snapshot.rows]
+    rows = rows_bytes([row_payload("n-1")])
+    assert (
+        snapshot.sample_list_sha256
+        == hashlib.sha256(sample_list_bytes(rows)).hexdigest()
     )
+    assert snapshot.sample_size == len(snapshot.rows)
 
 
 @pytest.mark.parametrize(
@@ -279,19 +285,148 @@ def test_manifest_period_must_match_the_rows(
     묶이는 자리가 없으면 아무 기간이나 적을 수 있다(표본 목록 해시와 같은 계열).
     생산 계약이 「기간 = 행들의 개찰일 범위」이므로 **일치**를 요구한다."""
     rows = rows_bytes([row_payload("n-1"), row_payload("n-2")])
-    rejected = load_snapshot(manifest_bytes(rows, **manifest_kwargs), rows)
+    rejected = load_snapshot(
+        manifest_bytes(rows, **manifest_kwargs), rows, sample_list_bytes(rows)
+    )
     assert isinstance(rejected, SnapshotRejected)
     assert rejected.reason is SnapshotRejectionReason.PERIOD_MISMATCH
 
 
-def test_sample_list_checksum_is_recomputed_from_the_rows() -> None:
-    """manifest 의 표본 목록 해시를 **그대로 옮겨 싣지 않는다**(verifier r1 M-4).
-    행에서 다시 계산해 대조하므로, 다른 표본을 뽑아 놓고 그럴듯한 해시를 적는 길이
-    닫힌다(우회 ⑦)."""
+def test_sample_list_hash_is_the_file_bytes_not_a_row_recompute() -> None:
+    """v4(D-6G-39) — `sample_list_sha256` 은 **`sample-list.tsv` 바이트**의 해시다.
+    v3 까지는 행에서 역산한 값이라 판독이 같은 식으로 다시 계산해 맞췄고, 그 대조는
+    정의상 언제나 참이었다(순환). 이제 파일이 정본이라 **실패할 수 있다**."""
     rows = rows_bytes([row_payload("n-1"), row_payload("n-2")])
-    rejected = load_snapshot(manifest_bytes(rows, sample_list_sha256="b" * 64), rows)
+    listing = sample_list_bytes(rows)
+    rejected = load_snapshot(
+        manifest_bytes(rows, sample_list_sha256="b" * 64), rows, listing
+    )
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.CHECKSUM_MISMATCH
+
+
+def test_rows_outside_the_sample_list_are_rejected() -> None:
+    """⑵ 모든 행의 키가 파일의 키 집합 **안**이어야 한다(우회 ⑦) — 표본 밖 공고를
+    끼워 넣으면 거부다."""
+    sampled = rows_bytes([row_payload("n-1")])
+    listing = sample_list_bytes(sampled)
+    rows = rows_bytes([row_payload("n-1"), row_payload("intruder")])
+    rejected = load_snapshot(
+        manifest_bytes(rows, sample_list=listing, sample_size=1), rows, listing
+    )
     assert isinstance(rejected, SnapshotRejected)
     assert rejected.reason is SnapshotRejectionReason.SAMPLE_LIST_MISMATCH
+
+
+def test_rows_may_be_a_strict_subset_of_the_sample_list() -> None:
+    """행이 표본의 **진부분집합인 것은 정상**이다 — 상세를 못 받았거나 공고 canonical
+    이 없는 표본이 있다. 그 차이는 manifest 의 두 계수로 설명된다."""
+    rows = rows_bytes([row_payload("n-1")])
+    listing = sample_list_bytes(rows, extra_keys=("f" * 64, "e" * 64))
+    loaded = load_snapshot(
+        manifest_bytes(
+            rows,
+            sample_list=listing,
+            sampled_without_detail=1,
+            sampled_without_notice=1,
+        ),
+        rows,
+        listing,
+    )
+    assert isinstance(loaded, LoadedSnapshot), loaded
+    assert loaded.sample_size == 3
+    assert loaded.sampled_without_detail == 1
+    assert loaded.sampled_without_notice == 1
+
+
+def test_sample_accounting_identity_must_close() -> None:
+    """⑶ `sample_size == row_count + 상세없음 + 공고없음`. 표본 하나하나가 행이
+    되었거나 되지 못한 사유로 계수된다 — 깨지면 구조 실패다.
+
+    **앞 대조와 겹치지 않게 세운 판이다.** `sample_size` 를 파일의 키 수와 **맞춰**
+    둔다(2 == 2) — 그래야 「파일 키 수 != sample_size」 대조가 먼저 걸리지 않고, 남는
+    것이 항등식뿐이다. 이 자리를 맞추기 전에는 항등식을 통째로 지워도 test 가 초록
+    이었다(변이 실측에서 살아남았다)."""
+    rows = rows_bytes([row_payload("n-1")])
+    listing = sample_list_bytes(rows, extra_keys=("f" * 64,))
+    rejected = load_snapshot(
+        manifest_bytes(
+            rows,
+            sample_list=listing,
+            sample_size=2,
+            sampled_without_detail=0,
+            sampled_without_notice=0,
+        ),
+        rows,
+        listing,
+    )
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.SAMPLE_COUNT_MISMATCH
+
+
+def test_declared_sample_size_must_match_the_file_it_points_at() -> None:
+    """⑵ `sample_size` 는 **표본 목록 파일의 키 수**와 같아야 한다.
+
+    항등식만으로는 못 막는 우회가 있다: 표본을 600건 뽑아 놓고 **남은 행만큼으로
+    선언을 줄이면**(`sample_size = 행 수`, 결측 계수 0) 항등식은 깨끗하게 닫힌다.
+    그러면 「결과를 보기 전에 표본이 확정됐다」가 사후 선택으로 무너지는데도 통과한다.
+    파일이 표본의 정본이므로, 선언은 **파일**과 맞아야 한다.
+
+    항등식 test 와 일부러 반대 판이다 — 저쪽은 파일 수에 선언을 맞추고 항등식을
+    깨고, 이쪽은 항등식을 닫고 파일 수를 어긋내 대조 둘이 각각 서는지를 가른다."""
+    rows = rows_bytes([row_payload("n-1")])
+    listing = sample_list_bytes(rows, extra_keys=("f" * 64, "e" * 64))
+    rejected = load_snapshot(
+        manifest_bytes(
+            rows,
+            sample_list=listing,
+            sample_size=1,
+            sampled_without_detail=0,
+            sampled_without_notice=0,
+        ),
+        rows,
+        listing,
+    )
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.SAMPLE_COUNT_MISMATCH
+
+
+@pytest.mark.parametrize(
+    "listing",
+    [
+        b"deadbeef\tSERVICES\t2026-W25\n",
+        (("a" * 64) + "\tSERVICES\n"),
+        (("b" * 64) + "\tSERVICES\t2026-W25"),
+        (("c" * 64) + "\tSERVICES\t2026-W25\n" + ("a" * 64) + "\tSERVICES\t2026-W25\n"),
+        (("A" * 64) + "\tSERVICES\t2026-W25\n"),
+    ],
+)
+def test_malformed_sample_list_is_rejected(listing: bytes | str) -> None:
+    """짧은 해시 · 칸 수 · 끝 개행 · 오름차순 · 대문자 hex — 형태가 다르면 두 레인이
+    다른 파일을 본다는 뜻이라 거부한다. 정렬을 대신 고쳐 주지 않는다(파일이 정본이고
+    그 바이트가 해시 대상이다).
+
+    사유는 **정확히 하나**를 요구한다. 두 사유의 합집합으로 느슨하게 적었더니 정렬
+    검사를 통째로 지워도 초록이었다 — 형태 검사가 빠진 자리를 계수 대조가 받아
+    「어쨌든 거부됐다」로 덮었기 때문이다(변이 실측에서 살아남았다). 형태 위반은
+    형태 사유로 서야 한다."""
+    raw = listing if isinstance(listing, bytes) else listing.encode("utf-8")
+    rows = rows_bytes([row_payload("n-1")])
+    rejected = load_snapshot(manifest_bytes(rows, sample_list=raw), rows, raw)
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.SAMPLE_LIST_MALFORMED
+
+
+def test_parse_sample_list_keeps_the_file_order() -> None:
+    keys = parse_sample_list(
+        (
+            ("a" * 64)
+            + "\tCONSTRUCTION\t2026-W07\n"
+            + ("b" * 64)
+            + "\tSERVICES\t2026-W08\n"
+        ).encode()
+    )
+    assert keys == ("a" * 64, "b" * 64)
 
 
 def test_rejection_detail_never_repeats_a_notice_key_hash() -> None:
@@ -306,8 +441,15 @@ def test_rejection_detail_never_repeats_a_notice_key_hash() -> None:
 def test_loader_accepts_bytes_not_paths() -> None:
     """파일 읽기는 `ml_engine.adapters` 의 몫 — 이 커널은 바이트만 본다(층 경계)."""
     rows = rows_bytes([row_payload("n-1")])
-    assert isinstance(load_snapshot(manifest_bytes(rows), rows), LoadedSnapshot)
     assert isinstance(
-        load_snapshot(json.dumps({"schema_version": "snapshot-v1"}).encode(), rows),
+        load_snapshot(manifest_bytes(rows), rows, sample_list_bytes(rows)),
+        LoadedSnapshot,
+    )
+    assert isinstance(
+        load_snapshot(
+            json.dumps({"schema_version": "snapshot-v4"}).encode(),
+            rows,
+            sample_list_bytes(rows),
+        ),
         SnapshotRejected,
     )

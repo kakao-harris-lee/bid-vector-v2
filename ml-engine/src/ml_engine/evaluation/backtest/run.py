@@ -75,6 +75,9 @@ def _snapshot_record(snapshot: LoadedSnapshot) -> SnapshotRecord:
         snapshot_id=snapshot.snapshot_id,
         rows_sha256=snapshot.rows_sha256,
         sample_list_sha256=snapshot.sample_list_sha256,
+        sample_size=snapshot.sample_size,
+        sampled_without_detail=snapshot.sampled_without_detail,
+        sampled_without_notice=snapshot.sampled_without_notice,
         period_start=snapshot.period_start,
         period_end=snapshot.period_end,
     )

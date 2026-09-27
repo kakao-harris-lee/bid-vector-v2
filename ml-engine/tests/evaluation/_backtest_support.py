@@ -147,8 +147,18 @@ def rows_bytes(payloads: list[dict[str, Any]]) -> bytes:
     ).encode("utf-8")
 
 
-def _sample_list_of(rows: bytes) -> str:
-    """행에서 계산한 표본 목록 해시(스키마 §5) — 판독기가 같은 식으로 재계산해 대조한다."""
+def sample_list_bytes(
+    rows: bytes, *, extra_keys: tuple[str, ...] = (), division: str = "SERVICES"
+) -> bytes:
+    """`sample-list.tsv` 바이트(v4, 스키마 §2.1) — 헤더 없는 TSV, 해시 오름차순,
+    끝 줄 개행 포함. `extra_keys` 로 **행이 없는 표본**(상세를 못 받았거나 공고
+    canonical 이 없는 공고)을 넣어 진부분집합 상태를 만든다."""
+    keys = sorted({*_row_keys(rows), *extra_keys})
+    lines = [f"{key}\t{division}\t2026-W25" for key in keys]
+    return ("\n".join(lines) + "\n").encode("utf-8") if lines else b""
+
+
+def _row_keys(rows: bytes) -> list[str]:
     keys: list[str] = []
     for line in rows.decode("utf-8", errors="replace").splitlines():
         if not line.strip():
@@ -159,7 +169,7 @@ def _sample_list_of(rows: bytes) -> str:
             # 일부러 깨뜨린 입력을 쓰는 test 가 있다 — 그 줄은 건너뛴다. 그런 입력은
             # 판독기가 표본 목록 대조보다 먼저 `MALFORMED_JSON` 으로 거부한다.
             continue
-    return hashlib.sha256("\n".join(sorted(keys)).encode("utf-8")).hexdigest()
+    return keys
 
 
 def _opening_range(rows: bytes) -> tuple[str, str]:
@@ -188,7 +198,11 @@ def manifest_bytes(
     period_end: str | None = None,
     rows_sha256: str | None = None,
     sample_list_sha256: str | None = None,
-    schema_version: str = "snapshot-v3",
+    sample_list: bytes | None = None,
+    sample_size: int | None = None,
+    sampled_without_detail: int = 0,
+    sampled_without_notice: int = 0,
+    schema_version: str = "snapshot-v4",
 ) -> bytes:
     payload = {
         "schema_version": schema_version,
@@ -206,8 +220,19 @@ def manifest_bytes(
             hashlib.sha256(rows).hexdigest() if rows_sha256 is None else rows_sha256
         ),
         "sample_list_sha256": (
-            _sample_list_of(rows) if sample_list_sha256 is None else sample_list_sha256
+            hashlib.sha256(
+                sample_list_bytes(rows) if sample_list is None else sample_list
+            ).hexdigest()
+            if sample_list_sha256 is None
+            else sample_list_sha256
         ),
+        "sample_size": (
+            len(_row_keys(rows)) + sampled_without_detail + sampled_without_notice
+            if sample_size is None
+            else sample_size
+        ),
+        "sampled_without_detail": sampled_without_detail,
+        "sampled_without_notice": sampled_without_notice,
     }
     return json.dumps(payload, sort_keys=True).encode("utf-8")
 
@@ -218,5 +243,6 @@ def write_snapshot_dir(
     directory.mkdir(parents=True, exist_ok=True)
     rows = rows_bytes(payloads)
     (directory / "rows.jsonl").write_bytes(rows)
+    (directory / "sample-list.tsv").write_bytes(sample_list_bytes(rows))
     (directory / "manifest.json").write_bytes(manifest_bytes(rows, **manifest_kwargs))
     return directory

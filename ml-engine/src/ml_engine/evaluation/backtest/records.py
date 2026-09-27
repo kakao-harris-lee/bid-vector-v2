@@ -87,6 +87,9 @@ class SnapshotRecord:
     snapshot_id: str
     rows_sha256: str
     sample_list_sha256: str
+    sample_size: int
+    sampled_without_detail: int
+    sampled_without_notice: int
     period_start: date
     period_end: date
 

@@ -42,9 +42,10 @@ from ml_engine.evaluation.backtest.jsonrow import (
     row_timestamp,
     row_value,
 )
+from ml_engine.evaluation.backtest.sample_list import check_sample_list
 from ml_engine.registry.artifact import JsonValue
 
-SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v3"
+SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v4"
 
 
 class BusinessCategory(StrEnum):
@@ -165,6 +166,13 @@ class LoadedSnapshot:
     period_end: date
     rows_sha256: str
     sample_list_sha256: str
+    sample_size: int
+    sampled_without_detail: int
+    sampled_without_notice: int
+    """표본인데 행이 되지 못한 공고 수(v4, D-6G-39). 「상세 축 관측이 없다」와 「공고
+    목록 canonical 이 없다」를 가른다 — 판정 JSON 이 둘을 따로 싣는다. 행이 표본의
+    **진부분집합인 것은 정상**이고, 그 차이가 이 두 수로 설명되어야 한다."""
+
     rows: tuple[SnapshotRow, ...]
 
 
@@ -218,6 +226,9 @@ _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
         "period_end",
         "rows_sha256",
         "sample_list_sha256",
+        "sample_size",
+        "sampled_without_detail",
+        "sampled_without_notice",
     }
 )
 
@@ -342,6 +353,9 @@ class _Manifest:
     period_end: date
     rows_sha256: str
     sample_list_sha256: str
+    sample_size: int
+    sampled_without_detail: int
+    sampled_without_notice: int
 
 
 def _parse_manifest(manifest_bytes: bytes) -> _Manifest:
@@ -359,6 +373,9 @@ def _parse_manifest(manifest_bytes: bytes) -> _Manifest:
         period_end=row_date(fields, "period_end"),
         rows_sha256=row_text(fields, "rows_sha256"),
         sample_list_sha256=row_text(fields, "sample_list_sha256"),
+        sample_size=row_integer(fields, "sample_size"),
+        sampled_without_detail=row_integer(fields, "sampled_without_detail"),
+        sampled_without_notice=row_integer(fields, "sampled_without_notice"),
     )
 
 
@@ -384,18 +401,6 @@ def _parse_rows(rows_bytes: bytes) -> tuple[SnapshotRow, ...]:
             )
         )
     return tuple(sorted(rows, key=lambda row: row.notice.notice_key_hash))
-
-
-def sample_list_checksum(notice_key_hashes: Sequence[str]) -> str:
-    """스키마 §5 정의 그대로 — 뽑힌 `notice_key_hash` 를 **오름차순 정렬**해 `\n` 으로
-    이은 문자열(끝 개행 없음)의 sha256 hex.
-
-    이 값을 manifest 가 싣는 값과 대조하는 것이 우회 ⑦(표본 쇼핑)의 잠금이다
-    (verifier r1 M-4). 앞 판은 manifest 의 해시를 **그대로 판정 JSON 에 옮겨 실었고**,
-    그 해시가 추출된 행 집합과 묶이는 자리가 없었다 — seed 를 바꿔 여러 번 수집하고
-    합집합을 추출해도 그럴듯한 해시가 실린다. 행에서 다시 계산해야 술어가 선다."""
-    joined = "\n".join(sorted(notice_key_hashes))
-    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
 def opening_date_range(rows: Sequence[SnapshotRow]) -> tuple[date, date] | None:
@@ -443,11 +448,6 @@ def _assemble(manifest: _Manifest, rows: tuple[SnapshotRow, ...]) -> LoadedSnaps
             SnapshotRejectionReason.DUPLICATE_NOTICE,
             f"중복 공고 {len(keys) - len(set(keys))}건",
         )
-    if sample_list_checksum(keys) != manifest.sample_list_sha256:
-        raise RowReadError(
-            SnapshotRejectionReason.SAMPLE_LIST_MISMATCH,
-            "표본 목록 sha256 이 행 집합과 맞지 않는다",
-        )
     _check_period(manifest, rows)
     return LoadedSnapshot(
         snapshot_id=manifest.snapshot_id,
@@ -455,16 +455,19 @@ def _assemble(manifest: _Manifest, rows: tuple[SnapshotRow, ...]) -> LoadedSnaps
         period_end=manifest.period_end,
         rows_sha256=manifest.rows_sha256,
         sample_list_sha256=manifest.sample_list_sha256,
+        sample_size=manifest.sample_size,
+        sampled_without_detail=manifest.sampled_without_detail,
+        sampled_without_notice=manifest.sampled_without_notice,
         rows=rows,
     )
 
 
 def load_snapshot(
-    manifest_bytes: bytes, rows_bytes: bytes
+    manifest_bytes: bytes, rows_bytes: bytes, sample_list_bytes: bytes
 ) -> LoadedSnapshot | SnapshotRejected:
-    """스냅숏 바이트 둘을 판독한다. 실패는 전부 `SnapshotRejected` — 예외로 새지
-    않는다. 순서: manifest 형식 → schema version → rows checksum → 행 판독 → row 수
-    → 빈 스냅숏 → 중복 공고."""
+    """스냅숏 바이트 **셋**을 판독한다(v4 — 표본 목록이 파일이 됐다). 실패는 전부
+    `SnapshotRejected` — 예외로 새지 않는다. 순서: manifest 형식 → schema version →
+    rows checksum → 행 판독 → row 수 → 빈 스냅숏 → 중복 공고 → 기간 → 표본 대조 셋."""
     try:
         manifest = _parse_manifest(manifest_bytes)
         actual = hashlib.sha256(rows_bytes).hexdigest()
@@ -472,6 +475,20 @@ def load_snapshot(
             raise RowReadError(
                 SnapshotRejectionReason.CHECKSUM_MISMATCH, "rows.jsonl sha256 불일치"
             )
-        return _assemble(manifest, _parse_rows(rows_bytes))
-    except RowReadError as rejected:
+        rows = _parse_rows(rows_bytes)
+        loaded = _assemble(manifest, rows)
+        check_sample_list(
+            sample_list_bytes,
+            declared_sha256=manifest.sample_list_sha256,
+            sample_size=manifest.sample_size,
+            row_keys=[row.notice.notice_key_hash for row in rows],
+            sampled_without_detail=manifest.sampled_without_detail,
+            sampled_without_notice=manifest.sampled_without_notice,
+        )
+        return loaded
+    except (RowReadError, UnicodeDecodeError) as rejected:
+        if isinstance(rejected, UnicodeDecodeError):
+            return SnapshotRejected(
+                SnapshotRejectionReason.SAMPLE_LIST_MALFORMED, "UTF-8 아님"
+            )
         return SnapshotRejected(rejected.reason, rejected.detail)

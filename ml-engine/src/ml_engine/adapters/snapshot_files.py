@@ -3,7 +3,7 @@
 `ml_engine.evaluation.backtest.snapshot.load_snapshot` 이 한다.
 
 `file://` 경로만 지원한다(네트워크 0). 스냅숏은 디렉터리 하나(`manifest.json` +
-`rows.jsonl`)이고, **저장소 밖**에 둔다(`~/.local/bid-vector-snapshots/<id>/`,
+`rows.jsonl` + `sample-list.tsv`, v4)이고, **저장소 밖**에 둔다(`~/.local/bid-vector-snapshots/<id>/`,
 data-extract §7 · ADR 0010 D-8) — 그래서 이 함수가 받는 경로는 저장소 안이 아니다.
 """
 
@@ -19,6 +19,9 @@ from urllib.parse import urlparse
 class SnapshotFiles:
     manifest_bytes: bytes
     rows_bytes: bytes
+    sample_list_bytes: bytes
+    """v4(D-6G-39) — 표본 목록이 **파일**이 됐다. 판독이 이 바이트의 sha256 을
+    manifest 와 대조하므로 다시 렌더링하지 않고 바이트 그대로 나른다."""
 
 
 class SnapshotUnreadableReason(StrEnum):
@@ -55,9 +58,12 @@ def read_snapshot_files(uri: str) -> SnapshotFiles | SnapshotUnreadable:
         )
     manifest_path = directory / "manifest.json"
     rows_path = directory / "rows.jsonl"
-    for path in (manifest_path, rows_path):
+    sample_list_path = directory / "sample-list.tsv"
+    for path in (manifest_path, rows_path, sample_list_path):
         if not path.is_file():
             return SnapshotUnreadable(SnapshotUnreadableReason.NOT_FOUND, str(path))
     return SnapshotFiles(
-        manifest_bytes=manifest_path.read_bytes(), rows_bytes=rows_path.read_bytes()
+        manifest_bytes=manifest_path.read_bytes(),
+        rows_bytes=rows_path.read_bytes(),
+        sample_list_bytes=sample_list_path.read_bytes(),
     )

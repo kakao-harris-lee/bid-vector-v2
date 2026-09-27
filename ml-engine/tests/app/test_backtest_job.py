@@ -85,7 +85,7 @@ def _derived_policy(tmp_path: Path, extra: dict[str, str] | None = None) -> Path
 
 
 def _snapshot_dir(tmp_path: Path, *, reverse: bool = False) -> str:
-    manifest_bytes, rows_bytes = build_files()
+    manifest_bytes, rows_bytes, sample_list = build_files()
     directory = tmp_path / "snapshot"
     directory.mkdir(parents=True, exist_ok=True)
     if reverse:
@@ -96,6 +96,7 @@ def _snapshot_dir(tmp_path: Path, *, reverse: bool = False) -> str:
         manifest_bytes = json.dumps(manifest, sort_keys=True).encode("utf-8")
     (directory / "manifest.json").write_bytes(manifest_bytes)
     (directory / "rows.jsonl").write_bytes(rows_bytes)
+    (directory / "sample-list.tsv").write_bytes(sample_list)
     return directory.as_uri()
 
 
@@ -119,9 +120,10 @@ def _run(snapshot_uri: str, policy_path: Path) -> JobCompleted:
 def test_committed_fixture_matches_its_generator() -> None:
     """커밋된 fixture 가 생성기와 갈리지 않는다 — 갈리면 재현 test 가 무엇을 재는지
     알 수 없다."""
-    manifest_bytes, rows_bytes = build_files()
+    manifest_bytes, rows_bytes, sample_list = build_files()
     assert (fixture_dir() / "manifest.json").read_bytes() == manifest_bytes
     assert (fixture_dir() / "rows.jsonl").read_bytes() == rows_bytes
+    assert (fixture_dir() / "sample-list.tsv").read_bytes() == sample_list
 
 
 def test_same_snapshot_and_policy_yield_byte_identical_verdict(
@@ -261,8 +263,8 @@ def test_exclusion_counts_report_every_reason(tmp_path: Path) -> None:
 
 def test_verdict_carries_no_notice_identifier(tmp_path: Path) -> None:
     """판정 JSON 에 공고 식별자가 없다(D-6G-9) — fixture 의 키 해시를 직접 찾는다."""
-    manifest_bytes, rows_bytes = build_files()
-    del manifest_bytes
+    manifest_bytes, rows_bytes, sample_list = build_files()
+    del manifest_bytes, sample_list
     first_key = json.loads(rows_bytes.decode("utf-8").splitlines()[0])["notice"][
         "notice_key_hash"
     ]

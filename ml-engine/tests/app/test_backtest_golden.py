@@ -21,6 +21,7 @@ golden 바이트를 `load_snapshot` 과 전 과정에 통과시킨다. 생산 �
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -33,11 +34,11 @@ from ml_engine.evaluation.backtest.policy import (
     load_strategy_backtest_policy,
 )
 from ml_engine.evaluation.backtest.reasons import ExclusionReason
+from ml_engine.evaluation.backtest.sample_list import parse_sample_list
 from ml_engine.evaluation.backtest.snapshot import (
     LoadedSnapshot,
     load_snapshot,
     opening_date_range,
-    sample_list_checksum,
 )
 
 _TESTS_ROOT = Path(__file__).resolve().parents[1]
@@ -53,7 +54,8 @@ def _policy() -> StrategyBacktestPolicy:
 
 
 GOLDEN_SNAPSHOT_DIR = _TESTS_ROOT / "evaluation" / "fixtures" / "m6-6g-golden"
-"""생산 쪽이 낸 golden 스냅숏 디렉터리(`manifest.json` + `rows.jsonl`).
+"""생산 쪽이 낸 golden 스냅숏 디렉터리(v4 는 **파일 셋**이다 — `manifest.json` ·
+`rows.jsonl` · `sample-list.tsv`).
 
 **경로는 두 레인이 같이 아는 한 자리여야 한다** — 여기서만 선언하고, 바뀌면 이 상수
 하나를 고친다. 자리 선택의 근거 둘(팀장 지시 2026-09-27):
@@ -65,7 +67,7 @@ GOLDEN_SNAPSHOT_DIR = _TESTS_ROOT / "evaluation" / "fixtures" / "m6-6g-golden"
   둔다."""
 
 _ABSENT = (
-    "golden 이 아직 없다 — Kotlin 레인이 `SnapshotWriter` 출하 경로로 커밋하면 선다"
+    "golden 이 선언된 자리에 없다 — 레인 간 왕복이 서지 않았다"
     f" (기대 경로: {GOLDEN_SNAPSHOT_DIR})"
 )
 
@@ -95,15 +97,19 @@ def _discover_golden_dirs() -> list[Path]:
 
 def _golden_files() -> SnapshotFiles:
     if not GOLDEN_SNAPSHOT_DIR.is_dir():
-        pytest.skip(_ABSENT)
+        pytest.fail(_ABSENT)
     files = read_snapshot_files(GOLDEN_SNAPSHOT_DIR.as_uri())
-    assert isinstance(files, SnapshotFiles), files
+    assert isinstance(files, SnapshotFiles), (
+        f"golden 의 파일 셋이 v4 를 채우지 못했다(셋: manifest·rows·sample-list): {files}"
+    )
     return files
 
 
 def _golden_snapshot() -> LoadedSnapshot:
     files = _golden_files()
-    loaded = load_snapshot(files.manifest_bytes, files.rows_bytes)
+    loaded = load_snapshot(
+        files.manifest_bytes, files.rows_bytes, files.sample_list_bytes
+    )
     assert isinstance(loaded, LoadedSnapshot), (
         f"생산 쪽 golden 이 판독을 통과하지 못했다 — 레인 간 스키마가 갈렸다: {loaded}"
     )
@@ -147,7 +153,7 @@ def test_golden_snapshot_carries_the_fields_the_exclusion_rules_need() -> None:
 
 
 def test_golden_exercises_the_row_level_exclusion_path() -> None:
-    """golden 이 **값 결측 행을 일부러 담는다**(팀장 지시) — 그 행들이 v3 의 행 단위
+    """golden 이 **값 결측 행을 일부러 담는다**(팀장 지시) — 그 행들이 v3 부터의 행 단위
     제외로 내려가고 **나머지 행은 산다**는 것을 생산 바이트에서 확인한다.
 
     이 단언이 v2 라면 성립하지 않는다: 그때는 한 행의 `null` 이 스냅숏 전체를 거부해
@@ -171,11 +177,32 @@ def test_golden_exercises_the_row_level_exclusion_path() -> None:
     assert all(counts[reason] >= 1 for reason in absence)
 
 
-def test_golden_manifest_sample_list_matches_its_rows() -> None:
-    """생산 쪽이 적은 표본 목록 해시가 **그 파일의 행**과 묶여 있는지(우회 ⑦)."""
+def test_golden_sample_list_is_a_real_file_bound_to_its_rows() -> None:
+    """v4 의 표본 목록 대조 셋이 **생산 바이트에서** 실제로 서는지.
+
+    v3 에서 이 자리는 원형이었다 — 판독기가 행에서 재계산한 값을 manifest 와 맞춰
+    봤으니, 생산 쪽이 같은 식으로 적기만 하면 무조건 통과했다(D-6G-39). v4 는
+    표본 목록이 **파일**이라 셋 다 실제 대조다:
+
+    1. manifest 해시 == 그 **파일 바이트**의 해시
+    2. 행의 키 ⊆ 표본 목록(진부분집합이 정상 — 상세가 없어 빠진 표본이 있다)
+    3. 닫힌 항등식 `sample_size == 행 수 + 상세 결측 + 공고 결측`
+    """
+    files = _golden_files()
     snapshot = _golden_snapshot()
-    assert snapshot.sample_list_sha256 == sample_list_checksum(
-        [row.notice.notice_key_hash for row in snapshot.rows]
+    assert (
+        snapshot.sample_list_sha256
+        == hashlib.sha256(files.sample_list_bytes).hexdigest()
+    )
+
+    sampled = set(parse_sample_list(files.sample_list_bytes))
+    assert sampled, "표본 목록이 비어 있다"
+    assert {row.notice.notice_key_hash for row in snapshot.rows} <= sampled
+
+    assert snapshot.sample_size == (
+        len(snapshot.rows)
+        + snapshot.sampled_without_detail
+        + snapshot.sampled_without_notice
     )
 
 
@@ -183,7 +210,9 @@ def test_golden_manifest_declares_the_supported_schema_version() -> None:
     """버전이 갈리면 판독이 전체를 거부한다 — 그 거부가 이 test 에서 먼저 보이게."""
     files = _golden_files()
     manifest = json.loads(files.manifest_bytes)
-    loaded = load_snapshot(files.manifest_bytes, files.rows_bytes)
+    loaded = load_snapshot(
+        files.manifest_bytes, files.rows_bytes, files.sample_list_bytes
+    )
     assert isinstance(loaded, LoadedSnapshot), (
         f"golden 의 schema_version={manifest.get('schema_version')!r} 을 판독기가 "
         "지원하지 않는다 — 두 레인이 같이 움직여야 한다"

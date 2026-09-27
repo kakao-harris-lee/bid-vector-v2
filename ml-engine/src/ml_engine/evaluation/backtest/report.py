@@ -40,6 +40,9 @@ def _snapshot(record: SnapshotRecord) -> dict[str, JsonValue]:
         "snapshot_id": record.snapshot_id,
         "rows_sha256": record.rows_sha256,
         "sample_list_sha256": record.sample_list_sha256,
+        "sample_size": record.sample_size,
+        "sampled_without_detail": record.sampled_without_detail,
+        "sampled_without_notice": record.sampled_without_notice,
         "period_start": record.period_start.isoformat(),
         "period_end": record.period_end.isoformat(),
     }

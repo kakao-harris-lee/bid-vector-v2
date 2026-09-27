@@ -19,6 +19,7 @@ from _backtest_support import (
     manifest_bytes,
     row_payload,
     rows_bytes,
+    sample_list_bytes,
 )
 
 from ml_engine.evaluation.backtest.exclusions import AdmittedNotice, admit_rows
@@ -57,7 +58,7 @@ def _policy() -> StrategyBacktestPolicy:
 
 def _admitted(payload: dict[str, Any]) -> AdmittedNotice:
     rows = rows_bytes([payload])
-    snapshot = load_snapshot(manifest_bytes(rows), rows)
+    snapshot = load_snapshot(manifest_bytes(rows), rows, sample_list_bytes(rows))
     assert isinstance(snapshot, LoadedSnapshot), snapshot
     result = admit_rows(snapshot.rows, _policy())
     assert result.admitted, result.excluded

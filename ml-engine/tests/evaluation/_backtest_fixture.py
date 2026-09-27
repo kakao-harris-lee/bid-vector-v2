@@ -118,14 +118,23 @@ def build_rows() -> list[dict[str, Any]]:
     return rows
 
 
-def build_files() -> tuple[bytes, bytes]:
+def build_files() -> tuple[bytes, bytes, bytes]:
     rows = build_rows()
     rows_bytes = (
         "\n".join(json.dumps(row, sort_keys=True, ensure_ascii=False) for row in rows)
         + "\n"
     ).encode("utf-8")
+    # v4 — 표본 목록이 파일이다. 합성 fixture 는 「표본 == 행」인 판이라 결측 계수가
+    # 둘 다 0 이다(진부분집합 상태는 판독 test 가 따로 잰다).
+    listing = (
+        "\n".join(
+            f"{key}\tSERVICES\t2026-W25"
+            for key in sorted(row["notice"]["notice_key_hash"] for row in rows)
+        )
+        + "\n"
+    ).encode("utf-8")
     manifest = {
-        "schema_version": "snapshot-v3",
+        "schema_version": "snapshot-v4",
         "snapshot_id": "m6-6g-synthetic-v1",
         "row_count": len(rows),
         # 기간은 **행들의 개찰일 범위**다 — 판독기가 재계산해 대조하므로 블록 경계를
@@ -133,25 +142,26 @@ def build_files() -> tuple[bytes, bytes]:
         "period_start": min(row["outcome"]["opened_on"] for row in rows),
         "period_end": max(row["outcome"]["opened_on"] for row in rows),
         "rows_sha256": hashlib.sha256(rows_bytes).hexdigest(),
-        # 스키마 §5 정의대로 **행에서** 계산한다 — 판독기가 같은 식으로 재계산해
-        # 대조하므로 지어낸 값을 쓰면 fixture 가 거부된다(verifier r1 M-4).
-        "sample_list_sha256": hashlib.sha256(
-            "\n".join(sorted(row["notice"]["notice_key_hash"] for row in rows)).encode(
-                "utf-8"
-            )
-        ).hexdigest(),
+        # v4 — 표본 목록 **파일 바이트**의 해시다(행에서 재계산한 값이 아니다).
+        # v3 의 재계산 대조는 원형이라 성립하지 않았다 — D-6G-39.
+        "sample_list_sha256": hashlib.sha256(listing).hexdigest(),
+        "sample_size": len(rows),
+        "sampled_without_detail": 0,
+        "sampled_without_notice": 0,
     }
     return (
         json.dumps(manifest, sort_keys=True, ensure_ascii=False).encode("utf-8"),
         rows_bytes,
+        listing,
     )
 
 
 def write_fixture(directory: Path) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
-    manifest_bytes, rows_bytes = build_files()
+    manifest_bytes, rows_bytes, sample_list = build_files()
     (directory / "manifest.json").write_bytes(manifest_bytes)
     (directory / "rows.jsonl").write_bytes(rows_bytes)
+    (directory / "sample-list.tsv").write_bytes(sample_list)
     return directory
 
 

@@ -19,6 +19,7 @@ from _backtest_support import (
     manifest_bytes,
     row_payload,
     rows_bytes,
+    sample_list_bytes,
 )
 
 from ml_engine.evaluation.backtest.exclusions import (
@@ -57,14 +58,16 @@ def _policy() -> StrategyBacktestPolicy:
 
 def _snapshot(payloads: list[dict[str, Any]]) -> LoadedSnapshot:
     rows = rows_bytes(payloads)
-    loaded = load_snapshot(manifest_bytes(rows), rows)
+    loaded = load_snapshot(manifest_bytes(rows), rows, sample_list_bytes(rows))
     assert isinstance(loaded, LoadedSnapshot), loaded
     return loaded
 
 
 def _load(payloads: list[dict[str, Any]], **manifest_kwargs: Any) -> object:
     rows = rows_bytes(payloads)
-    return load_snapshot(manifest_bytes(rows, **manifest_kwargs), rows)
+    return load_snapshot(
+        manifest_bytes(rows, **manifest_kwargs), rows, sample_list_bytes(rows)
+    )
 
 
 def _reason(payload: dict[str, Any]) -> ExclusionReason | None:
