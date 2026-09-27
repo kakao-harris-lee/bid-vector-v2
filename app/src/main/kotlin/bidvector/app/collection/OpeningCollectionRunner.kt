@@ -36,7 +36,11 @@ class OpeningCollectionRunner(
             }
 
             is RunLease.Acquired -> {
-                held.use { collectUnderLease() }
+                try {
+                    collectUnderLease()
+                } finally {
+                    held.release()
+                }
             }
         }
     }

@@ -209,7 +209,7 @@ class OpeningCollectionWiringTest {
 
 /**
  * M6/6G D-6G-2 — 추출 배선도 같은 성질이다: `mode=once` 일 때만 올라오고, 출력 경로·기간·표본 목록
- * 해시가 없으면 기동하지 않는다. **KONEPS 서비스 키를 요구하지 않는다**(DB 만 읽는다).
+ * 파일이 없으면 기동하지 않는다. **KONEPS 서비스 키를 요구하지 않는다**(DB 만 읽는다).
  */
 class SnapshotExtractionWiringTest {
     private val approved =
@@ -219,7 +219,7 @@ class SnapshotExtractionWiringTest {
             "bidvector.snapshot-extract.to=2026-06-30",
             "bidvector.snapshot-extract.output-dir=/tmp/bidvector-snapshot-wiring-test",
             "bidvector.snapshot-extract.snapshot-id=wiring-test",
-            "bidvector.snapshot-extract.sample-list-sha256=feedface",
+            "bidvector.snapshot-extract.sample-list-file=$WIRING_SAMPLE_LIST",
         )
 
     private fun boot(vararg properties: String): Pair<AnnotationConfigApplicationContext, Throwable?> {
@@ -254,13 +254,31 @@ class SnapshotExtractionWiringTest {
         failure shouldNotBe null
     }
 
+    /**
+     * 해시를 설정으로 받지 않는다(D-6G-39) — 받으면 실행자가 적어 넣은 문자열이 「결과를 보기 전에
+     * 확정됐다」의 증거 행세를 한다. 수집이 확정한 **파일**을 가리키게 하고 해시는 그 바이트에서 낸다.
+     */
     @Test
-    fun `표본 목록 해시가 없으면 기동하지 않는다 — 결과에서 역산한 값을 싣지 않는다`() {
+    fun `표본 목록 파일이 없으면 기동하지 않는다 — 해시를 설정으로 받지 않는다`() {
         val (_, failure) =
             boot(
                 *approved
-                    .filterNot { it.startsWith("bidvector.snapshot-extract.sample-list-sha256=") }
+                    .filterNot { it.startsWith("bidvector.snapshot-extract.sample-list-file=") }
                     .toTypedArray(),
+            )
+
+        failure shouldNotBe null
+    }
+
+    /** 표본 목록도 저장소 밖이다(D-6G-43) — 실험 입력은 커밋되지 않는다. */
+    @Test
+    fun `표본 목록 파일이 저장소 안이면 기동하지 않는다`() {
+        val (_, failure) =
+            boot(
+                *approved
+                    .filterNot { it.startsWith("bidvector.snapshot-extract.sample-list-file=") }
+                    .toTypedArray(),
+                "bidvector.snapshot-extract.sample-list-file=reports/evidence/sample-list.tsv",
             )
 
         failure shouldNotBe null

@@ -16,23 +16,29 @@ class JdbcCollectionRunLeaseTest : PersistenceTestSupport() {
 
     @Test
     fun `잠금을 든 실행이 있으면 두 번째는 Busy 다`() {
-        lease().acquire().shouldBeInstanceOf<RunLease.Acquired>().use {
+        val held = lease().acquire().shouldBeInstanceOf<RunLease.Acquired>()
+        try {
             lease().acquire() shouldBe RunLease.Busy
+        } finally {
+            held.release()
         }
     }
 
     /** 세션을 놓으면 잠금이 풀린다 — 죽은 실행이 잠금을 들고 남아 다음 실행을 영원히 막지 않는다. */
     @Test
     fun `놓으면 다음 실행이 다시 든다`() {
-        lease().acquire().shouldBeInstanceOf<RunLease.Acquired>().close()
+        lease().acquire().shouldBeInstanceOf<RunLease.Acquired>().release()
 
-        lease().acquire().shouldBeInstanceOf<RunLease.Acquired>().close()
+        lease().acquire().shouldBeInstanceOf<RunLease.Acquired>().release()
     }
 
     @Test
     fun `다른 키는 서로 막지 않는다`() {
-        lease().acquire().shouldBeInstanceOf<RunLease.Acquired>().use {
-            lease(OTHER_KEY).acquire().shouldBeInstanceOf<RunLease.Acquired>().close()
+        val held = lease().acquire().shouldBeInstanceOf<RunLease.Acquired>()
+        try {
+            lease(OTHER_KEY).acquire().shouldBeInstanceOf<RunLease.Acquired>().release()
+        } finally {
+            held.release()
         }
     }
 }

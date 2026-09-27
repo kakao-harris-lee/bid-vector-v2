@@ -48,10 +48,9 @@ interface CollectionRunLease {
 sealed interface RunLease {
     class Acquired(
         private val connection: Connection,
-    ) : RunLease,
-        AutoCloseable {
+    ) : RunLease {
         /** 세션을 놓으면 잠금도 풀린다 — 따로 unlock 을 부르지 않는다. */
-        override fun close() = connection.close()
+        fun release() = connection.close()
     }
 
     data object Busy : RunLease
