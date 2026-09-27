@@ -331,6 +331,11 @@ paths:
     post:
       operationId: requestEditSessionEdit
       summary: 확인 화면에서 (같거나 다른) 필드로 되돌아간다
+      description: >-
+        **확인 대기(WAITING_FOR_CONFIRMATION) 에서만 유효하다**(L-r2-4). 값 대기 상태에서
+        필드를 바꿀 길은 없다 — `POST /{sessionId}/value` 는 세션이 기다리는 필드만 받고
+        (D-6A2b-25), 되돌아가기는 확인 대기에서만 전이표에 있다. 잘못 연 세션은 취소하고
+        다시 연다. 그 밖의 상태에서는 409 `INVALID_TRANSITION` 이다.
       parameters:
         - name: sessionId
           in: path
