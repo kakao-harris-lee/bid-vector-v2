@@ -101,8 +101,6 @@ internal class AppDependencyConditions(
             else -> target.packageName.isUnder(allowedPackages)
         }
 
-    internal fun String.isUnder(roots: List<String>): Boolean = roots.any { this == it || startsWith("$it.") }
-
     /**
      * ② 층의 허용 목록 ⊆ — 패키지 접두와 **정확한 클래스 이름**이다. 그 안에서도 원시 SQL·
      * Spring JDBC 는 다시 파고, `adapters` 는 **인터페이스만** 통과한다(구체 클래스는 이름을

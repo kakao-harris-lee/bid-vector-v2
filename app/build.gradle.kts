@@ -121,7 +121,12 @@ dependencies {
 /**
  * 계약 파일은 **선언된 입력이자 test 가 읽는 좌표**다 — 둘이 갈리면 그 파일만 바뀐 변경에서
  * task 가 UP-TO-DATE 로 건너뛰어 거짓 초록이 난다(M4/4B-6b F-2 · M6/6A-2b N-r4-7·N-r5-11).
- * 한 자리에서 둘을 함께 선언해 갈릴 수 없게 한다.
+ * 한 자리에서 둘을 함께 선언해 **build script 안에서는** 갈릴 수 없게 한다. 프로퍼티 **이름
+ * 문자열**은 읽는 test 쪽에 사본이 남는다(N-r6-11) — 갈리면 값이 비어 test 가 즉시 실패하는
+ * 방향이라 위험은 없다.
+ *
+ * 이 helper 는 path sensitivity 를 늘 RELATIVE 로 붙인다. `memberEffects`·`openApiSpec` 은 그
+ * 전까지 기본값이었고, 절대 경로가 이미 system property 로 입력에 실려 있어 순효과는 0 이다.
  */
 fun Project.settingsFile(path: String): java.io.File = layout.settingsDirectory.file(path).asFile
 
