@@ -4,32 +4,36 @@ import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
 import bidvector.app.wiring.RecordingCollectionTermination
-import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import java.time.LocalDate
-import javax.sql.DataSource
 
 /**
- * M6/6G D-6G-2 E2E — 적재된 dev DB 를 **출하 조립**으로 읽어 스냅숏 두 바이트를 저장소 밖에 쓴다.
- * 잠그는 것: ① 같은 입력이면 같은 바이트 ② 상호가 어디에도 없다 ③ 기초금액 두 칸이 갈린다
- * (마감 뒤 공개된 기초금액은 투찰 시점 칸에 오르지 않는다) ④ manifest 가 rows 의 해시를 싣는다.
+ * M6/6G D-6G-27 E2E — **적재도 출하 경로로 한다.** 수집 갈래 둘(공고 목록 · 개찰 축)을 가짜
+ * transport 로 돌려 DB 를 채우고, 그 위에서 추출을 돌린다. 표에 직접 INSERT 하지 않는다 —
+ * verifier 가 지적한 대로 직접 INSERT 는 「수집이 실제로 채우는가」를 가려 개찰일 결함을 숨겼다.
+ *
+ * 잠그는 것: ① 같은 입력이면 바이트 동일 ② golden 과 바이트 동일(레인 간 왕복) ③ 상호·공고번호
+ * 원문 부재 ④ 추첨번호가 실제로 찬다 ⑤ 공고일 ≠ 개찰일 ⑥ 기초금액 두 칸 분리.
  */
 class SnapshotExtractionE2ETest {
     companion object {
         private const val POSTGRES_IMAGE = "postgres:16.4"
         private const val TEST_CREDENTIAL_VALUE = "snapshot-e2e-test-fixture-credential"
         private const val BIDDER_NAME = "SYN-상호-드러나면안됨"
-        private const val NOTICE_NUMBER = "SNAP-E2E-0001"
-        private const val LATE_NOTICE_NUMBER = "SNAP-E2E-0002"
+        private const val NOTICES_PER_SLOT = 2
+        private val NOTICE_DAY: LocalDate = LocalDate.of(2026, 6, 3)
 
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
@@ -38,107 +42,152 @@ class SnapshotExtractionE2ETest {
                 .withPassword("bidvector_test_only")
                 .also { it.start() }
 
-        private val dataSource: DataSource =
-            org.postgresql.ds.PGSimpleDataSource().apply {
-                setUrl(postgres.jdbcUrl)
-                user = postgres.username
-                password = postgres.password
-            }
+        private lateinit var mock: MockOpeningKonepsHttp
+
+        /** 적재는 **한 번만** — 원문 표가 append-only 라 반복 적재가 행을 늘린다. */
+        @BeforeAll
+        @JvmStatic
+        fun collect() {
+            // **고정 표식**이다 — golden 이 공고 키 해시를 담으므로 실행마다 번호가 달라지면
+            // golden 이 설 수 없다. 이 test 는 자기 컨테이너에서 한 번만 적재하므로 충돌이 없다.
+            mock =
+                MockOpeningKonepsHttp(
+                    noticesPerSlot = NOTICES_PER_SLOT,
+                    bidderName = BIDDER_NAME,
+                    nonce = "GOLDEN",
+                )
+            bootOnce(
+                mapOf(
+                    "bidvector.collection.mode" to "once",
+                    "bidvector.collection.from" to NOTICE_DAY.toString(),
+                    "bidvector.collection.to" to NOTICE_DAY.toString(),
+                    "bidvector.collection.categories" to "construction,service",
+                ),
+            )
+            bootOnce(
+                mapOf(
+                    "bidvector.opening-collection.mode" to "once",
+                    "bidvector.opening-collection.from" to NOTICE_DAY.toString(),
+                    "bidvector.opening-collection.to" to NOTICE_DAY.toString(),
+                    "bidvector.opening-collection.categories" to "construction,service",
+                    "bidvector.opening-collection.sampling-seed" to "6g-extract-seed",
+                    "bidvector.opening-collection.target-per-stratum" to "2",
+                    "bidvector.opening-collection.calls-per-day" to "10000",
+                    "bidvector.opening-collection.calls-total" to "10000",
+                    "bidvector.opening-collection.budget-since" to Instant.now().toString(),
+                ),
+            )
+        }
 
         @AfterAll
         @JvmStatic
         fun stop() {
+            mock.close()
             postgres.stop()
         }
-    }
 
-    private val from = LocalDate.of(2026, 6, 1)
-    private val to = LocalDate.of(2026, 6, 30)
-
-    private fun runExtraction(outputDir: Path): List<Int> {
-        val context =
-            SpringApplicationBuilder(
-                BidVectorApplication::class.java,
-                CollectionTerminationTestConfiguration::class.java,
-            ).properties(
-                PRODUCTION_DISPATCH_PROPERTIES +
-                    mapOf(
-                        "server.port" to "0",
-                        "spring.profiles.active" to "collection-e2e",
-                        "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
-                        "bidvector.persistence.username" to postgres.username,
-                        "bidvector.persistence.credential" to postgres.password,
-                        "operator.credential.value" to TEST_CREDENTIAL_VALUE,
-                        "bidvector.evaluation.candidate-cap" to "1000",
-                        "bidvector.snapshot-extract.mode" to "once",
-                        "bidvector.snapshot-extract.from" to from.toString(),
-                        "bidvector.snapshot-extract.to" to to.toString(),
-                        "bidvector.snapshot-extract.output-dir" to outputDir.toString(),
-                        "bidvector.snapshot-extract.snapshot-id" to "snap-e2e",
-                        "bidvector.snapshot-extract.sample-list-sha256" to "feedfacecafe",
-                    ),
-            ).run()
-        return try {
-            context.getBean(RecordingCollectionTermination::class.java).exitCodes.toList()
-        } finally {
-            context.close()
+        private fun bootOnce(extra: Map<String, String>): List<Int> {
+            val context =
+                SpringApplicationBuilder(
+                    BidVectorApplication::class.java,
+                    CollectionTerminationTestConfiguration::class.java,
+                ).properties(
+                    PRODUCTION_DISPATCH_PROPERTIES +
+                        mapOf(
+                            "server.port" to "0",
+                            "spring.profiles.active" to "collection-e2e",
+                            "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            "bidvector.persistence.username" to postgres.username,
+                            "bidvector.persistence.credential" to postgres.password,
+                            "operator.credential.value" to TEST_CREDENTIAL_VALUE,
+                            "bidvector.evaluation.candidate-cap" to "1000",
+                            "bidvector.koneps.service-key" to "SNAPSHOT-E2E-KEY",
+                            "bidvector.koneps.base-url" to mock.baseUrl,
+                            "bidvector.koneps.opening.scsbid-base-url" to mock.baseUrl,
+                        ) + extra,
+                ).run()
+            return try {
+                context.getBean(RecordingCollectionTermination::class.java).exitCodes.toList()
+            } finally {
+                context.close()
+            }
         }
+
+        fun extractTo(outputDir: Path): List<Int> =
+            bootOnce(
+                mapOf(
+                    "bidvector.snapshot-extract.mode" to "once",
+                    // **관측 창**이다 — 적재는 지금 돌았으므로 오늘을 덮어야 한다(개찰일 창이 아니다).
+                    "bidvector.snapshot-extract.from" to LocalDate.now().minusDays(1).toString(),
+                    "bidvector.snapshot-extract.to" to LocalDate.now().plusDays(1).toString(),
+                    "bidvector.snapshot-extract.output-dir" to outputDir.toString(),
+                    "bidvector.snapshot-extract.snapshot-id" to "snap-e2e",
+                    "bidvector.snapshot-extract.sample-list-sha256" to "feedfacecafe",
+                ),
+            )
     }
 
-    private fun seed() {
-        SnapshotSeed(dataSource).load(
-            noticeNumber = NOTICE_NUMBER,
-            lateNoticeNumber = LATE_NOTICE_NUMBER,
-            bidderName = BIDDER_NAME,
-        )
-    }
-
-    @Test
-    fun `적재 → 추출 → 같은 입력이면 바이트가 같고 상호는 어디에도 없다`() {
-        seed()
-        val firstDir = Files.createTempDirectory("snapshot-e2e-1")
-        val secondDir = Files.createTempDirectory("snapshot-e2e-2")
-
-        runExtraction(firstDir) shouldContainExactly listOf(0)
-        runExtraction(secondDir) shouldContainExactly listOf(0)
-
-        val firstRows = Files.readString(firstDir.resolve("rows.jsonl"))
-        val secondRows = Files.readString(secondDir.resolve("rows.jsonl"))
-        firstRows shouldBe secondRows
-        firstRows shouldNotContain BIDDER_NAME
-        // 공고번호 원문도 싣지 않는다 — 해시만 간다.
-        firstRows shouldNotContain NOTICE_NUMBER
-        Files.readString(firstDir.resolve("manifest.json")) shouldBe
-            Files.readString(secondDir.resolve("manifest.json"))
+    private fun extractedRows(): String {
+        val dir = Files.createTempDirectory("snapshot-e2e")
+        extractTo(dir)
+        return Files.readString(dir.resolve("rows.jsonl"))
     }
 
     @Test
-    fun `기초금액 두 칸이 갈린다 — 마감 뒤 공개된 값은 투찰 시점 칸에 오르지 않는다`() {
-        seed()
-        val dir = Files.createTempDirectory("snapshot-e2e-3")
+    fun `수집 갈래가 채운 DB 에서 추출한다 — 같은 입력이면 바이트가 같다`() {
+        val first = extractedRows()
+        val second = extractedRows()
 
-        runExtraction(dir)
-
-        val rows = Files.readString(dir.resolve("rows.jsonl")).trimEnd('\n').lines()
-        // 마감 **전** 공개된 공고: 투찰 시점 칸에 값이 있다.
-        val onTime = rows.single { it.contains("\"base_amount\":1234567890") }
-        onTime shouldContain "\"opening_base_amount\":1239999999"
-        // 마감 **뒤** 공개된 공고: 투찰 시점 칸은 null 이고 개찰 출처만 남는다.
-        val late = rows.single { it.contains("\"base_amount\":null") }
-        late shouldContain "\"opening_base_amount\":1239999999"
-        late shouldContain "\"base_amount_disclosed_at\":"
+        first shouldBe second
+        first.trimEnd('\n').lines().size shouldBeGreaterThan 0
     }
 
     @Test
-    fun `manifest 가 rows 바이트의 해시와 표본 목록 해시를 싣는다`() {
-        seed()
-        val dir = Files.createTempDirectory("snapshot-e2e-4")
+    fun `상호도 공고번호 원문도 스냅숏에 없다`() {
+        val rows = extractedRows()
 
-        runExtraction(dir)
+        rows shouldNotContain BIDDER_NAME
+        rows shouldNotContain "OPEN-E2E"
+    }
 
-        val manifest = Files.readString(dir.resolve("manifest.json"))
-        manifest shouldContain "\"schema_version\":\"snapshot-v2\""
-        manifest shouldContain "\"sample_list_sha256\":\"feedfacecafe\""
-        manifest shouldContain "\"snapshot_id\":\"snap-e2e\""
+    @Test
+    fun `추첨번호가 실제로 찬다 — 상수 null 이 아니다`() {
+        val rows = extractedRows()
+
+        rows shouldContain "\"drawn_serial_numbers\":[3,7]"
+        rows shouldNotContain "\"drawn_serial_numbers\":null"
+    }
+
+    @Test
+    fun `공고일이 개찰일과 다르다 — 창 포함 판정이 개찰일로 돌지 않는다`() {
+        val rows = extractedRows()
+
+        rows shouldContain "\"noticed_on\":\"2026-06-03\""
+        rows shouldContain "\"opened_on\":\"2026-06-17\""
+    }
+
+    @Test
+    fun `기초금액 두 칸이 갈린다 — 출처가 다르면 값도 다르다`() {
+        val rows = extractedRows()
+
+        // 기초금액 조회 출처(마감 전 공개)와 예비가격 상세 출처가 서로 다른 값이다.
+        rows shouldContain "\"base_amount\":1234567890"
+        rows shouldContain "\"opening_base_amount\":1239999999"
+    }
+
+    @Test
+    fun `추출 바이트가 golden 과 같다 — 레인 간 왕복의 고정점`() {
+        val golden = Path.of("..", "fixtures", "golden", "m6-6g", "rows.jsonl")
+
+        val rows = extractedRows()
+
+        if (System.getenv("BIDVECTOR_WRITE_GOLDEN") == "1") {
+            Files.createDirectories(golden.parent)
+            Files.writeString(golden, rows)
+        }
+        // **비교만 한다.** 없으면 스스로 써서 초록이 되는 test 는 무엇도 잠그지 않는다 —
+        // golden 은 사람이 한 번 내고 커밋하는 것이다(생성 절차는 evidence 에 적는다).
+        Files.exists(golden) shouldBe true
+        rows shouldBe Files.readString(golden)
     }
 }

@@ -29,10 +29,9 @@ private fun notice(
         successfulBidMethodCode = "낙030001",
         successfulBidMethodName = "적격심사제",
         prearrangedPriceDecisionMethod = "복수예가",
-        awardMethodApplicationStandard = awardStandard,
-        applicationBasisContent = null,
+        hasAwardMethodApplicationStandard = awardStandard != null,
+        hasApplicationBasisContent = false,
         noticeOrdinal = 0,
-        progressDivision = "개찰완료",
         procurementClassCode = "81112200",
         demandAgencyCode = "6110000",
         pureConstructionCost = null,
@@ -41,6 +40,7 @@ private fun notice(
 private fun outcome(bidders: List<Pair<Int?, BigDecimal?>>): SnapshotOutcome =
     SnapshotOutcome(
         openedOn = LocalDate.of(2026, 6, 17),
+        progressDivision = "개찰완료",
         plannedPrice = BigDecimal("1250000000"),
         openingBaseAmount = BigDecimal("1239999999"),
         reservePrices = null,
@@ -77,10 +77,13 @@ class SnapshotWriterTest {
     }
 
     @Test
-    fun `자유텍스트의 따옴표·개행·제어문자가 이스케이프된다 — 한 줄이 깨지지 않는다`() {
+    fun `문자열 칸의 따옴표·개행·제어문자가 이스케이프된다 — 한 줄이 깨지지 않는다`() {
         val nasty = "조달청 \"시설공사\" 기준\n두 줄\t탭\\역슬래시\u0001제어"
 
-        val rendered = SnapshotWriter.renderRows(listOf(rowOf("aa").let { it.copy(notice = notice("aa", nasty)) }))
+        val rendered =
+            SnapshotWriter.renderRows(
+                listOf(rowOf("aa").let { it.copy(notice = it.notice.copy(successfulBidMethodName = nasty)) }),
+            )
 
         rendered.trimEnd('\n').lines().size shouldBe 1
         rendered shouldContain "\\\"시설공사\\\""
@@ -178,9 +181,44 @@ class SnapshotWriterTest {
                 sampleListSha256 = "feedface",
             )
 
-        manifest shouldContain "\"schema_version\":\"snapshot-v2\""
+        manifest shouldContain "\"schema_version\":\"snapshot-v3\""
         manifest shouldContain "\"rows_sha256\":\"${sha256Hex(rows)}\""
         manifest shouldContain "\"sample_list_sha256\":\"feedface\""
+    }
+
+    @Test
+    fun `자유텍스트는 원문이 아니라 존재 여부만 실린다 — 무엇이 실릴지 모르는 칸이다`() {
+        val nasty = "조달청 \"시설공사\" 기준"
+
+        val rendered = SnapshotWriter.renderRows(listOf(rowOf("aa").let { it.copy(notice = notice("aa", nasty)) }))
+
+        rendered shouldContain "\"has_award_method_application_standard\":true"
+        rendered shouldNotContain "시설공사"
+    }
+
+    @Test
+    fun `공고일·개찰일이 없으면 null 로 나간다 — 대체값을 지어내지 않는다`() {
+        val blank =
+            rowOf("aa").let {
+                it.copy(
+                    notice = it.notice.copy(noticedOn = null),
+                    outcome = it.outcome.copy(openedOn = null, plannedPrice = null),
+                )
+            }
+
+        val rendered = SnapshotWriter.renderRows(listOf(blank))
+
+        rendered shouldContain "\"noticed_on\":null"
+        rendered shouldContain "\"opened_on\":null"
+        rendered shouldContain "\"planned_price\":null"
+    }
+
+    @Test
+    fun `진행구분은 개찰 쪽에 실린다 — 투찰 시점 타입에 개찰 출처 칸이 없다`() {
+        val rendered = SnapshotWriter.renderRows(listOf(rowOf("aa")))
+
+        rendered.substringAfter("\"outcome\"") shouldContain "\"progress_division\":\"개찰완료\""
+        rendered.substringBefore("\"outcome\"") shouldNotContain "progress_division"
     }
 
     @Test

@@ -90,6 +90,10 @@ internal fun jsonCount(value: Int?): SnapshotJson =
 
 internal fun jsonDate(value: LocalDate): SnapshotJson = SnapshotJson.Text(value.toString())
 
+/** 날짜 결측은 **행 단위 제외**의 입력이다(v3) — 대체값을 지어내지 않는다. */
+internal fun jsonDateOrNull(value: LocalDate?): SnapshotJson =
+    value?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null
+
 internal fun jsonInstant(value: Instant?): SnapshotJson =
     value?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null
 

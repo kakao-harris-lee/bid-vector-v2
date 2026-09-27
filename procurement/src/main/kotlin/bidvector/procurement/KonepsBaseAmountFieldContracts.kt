@@ -80,6 +80,19 @@ internal val KONEPS_AWARD_METHOD_TEXT_ROWS: List<FieldContractRow> =
             FieldScale.OPAQUE_TEXT,
         ),
         optionalFieldRow("aplBssCntnts", FieldConcept.APPLICATION_BASIS_CONTENT, FieldScale.OPAQUE_TEXT),
+        // M6/6G D-6G-28 — **공고일을 목록 축에서도 읽는다.** A값 오퍼레이션(op 24)은 공사 전용이라
+        // 그 축에서만 읽으면 용역·물품의 공고일이 빈다. `bidNtceDt`(입찰공고일시)는 공고 목록 응답의
+        // 항목이고 예규 적용례(「시행일 이후 최초 **입찰공고분**」)가 가리키는 바로 그 축이다.
+        FieldContractRow(
+            rawName = RawKey("bidNtceDt"),
+            concept = FieldConcept.NOTICE_POSTED_AT,
+            basis = null,
+            scale = FieldScale.DATETIME_NO_ZONE,
+            nullability = FieldNullability.OPTIONAL,
+            vatTreatment = VatTreatment.UNKNOWN,
+            provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+            sourceZone = SourceZoneRuleId.ASSUME_KST,
+        ),
     )
 
 /** `bssamt` 가 세 축(공고 목록·예비가격 상세·기초금액 조회)에 실려 오는 자리 — 행은 하나고 presentIn 만 넓다. */

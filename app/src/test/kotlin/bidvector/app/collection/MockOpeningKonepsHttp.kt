@@ -31,6 +31,7 @@ internal class MockOpeningKonepsHttp(
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
 
     val listCalls = CopyOnWriteArrayList<String>()
+    val noticeListCalls = CopyOnWriteArrayList<String>()
     val reservePriceNotices = CopyOnWriteArrayList<String>()
     val openingCompleteNotices = CopyOnWriteArrayList<String>()
     val baseAmountNotices = CopyOnWriteArrayList<String>()
@@ -88,27 +89,65 @@ internal class MockOpeningKonepsHttp(
                 listOf(formulaARow(noticeNumber.orEmpty()))
             }
 
+            // 공고 목록(다른 서비스·다른 오퍼레이션) — canonical `notice` 를 세우는 갈래가 부른다.
+            // **같은 공고번호**를 낸다: 추출이 두 출처를 잇기 때문에 번호가 갈리면 아무것도 안 엮인다.
+            operation.startsWith("getBidPblancListInfo") && !operation.endsWith("BsisAmount") -> {
+                noticeListCalls += operation
+                val suffix = operation.removePrefix("getBidPblancListInfo")
+                (1..noticesPerSlot).map { index -> noticeListRow(suffix, index) }
+            }
+
             else -> {
                 listCalls += operation
                 val suffix = operation.removePrefix("getOpengResultListInfo")
                 (1..noticesPerSlot)
                     .map { index ->
                         mapOf(
-                            "bidNtceNo" to "OPEN-E2E-$nonce-$suffix-%04d".format(index),
+                            "bidNtceNo" to noticeNumber(suffix, index),
                             "bidNtceOrd" to "000",
                             "prtcptCnum" to "7",
+                            "progrsDivCdNm" to "개찰완료",
                         )
                     }.also { require(query.contains("inqryDiv=2")) { "표본틀은 공고일 축으로 걸어야 한다" } }
             }
         }
+
+    /** 공고 목록 행 — 대분류·하한율·마감·낙찰방법·**공고일**이 여기서만 온다. */
+    private fun noticeListRow(
+        suffix: String,
+        index: Int,
+    ) = mapOf(
+        "bidNtceNo" to noticeNumber(openingSuffixFor(suffix), index),
+        "bidNtceOrd" to "000",
+        "bidNtceNm" to "합성 공고 $index",
+        "sucsfbidLwltRate" to "87.745",
+        "sucsfbidMthdCd" to "낙030001",
+        "sucsfbidMthdNm" to "적격심사제",
+        "sucsfbidMthdAppStd" to "조달청 기준",
+        "pubPrcrmntClsfcNo" to "81112200",
+        "dminsttCd" to "6110000",
+        // 공고일은 개찰일보다 **이르다** — 둘이 같으면 제외 ⑬ 의 결함이 드러나지 않는다.
+        "bidNtceDt" to "2026-06-03 09:00:00",
+        "bidClseDt" to "2026-06-16 10:00:00",
+    )
+
+    private fun noticeNumber(
+        suffix: String,
+        index: Int,
+    ): String = "OPEN-E2E-$nonce-$suffix-%04d".format(index)
+
+    /** 공고 목록 오퍼레이션 접미(`Cnstwk`)와 개찰결과 목록 접미가 같은 업무를 가리킨다. */
+    private fun openingSuffixFor(noticeListSuffix: String): String = noticeListSuffix
 
     private fun reservePriceRow(noticeNumber: String) =
         mapOf(
             "bidNtceNo" to noticeNumber,
             "bidNtceOrd" to "000",
             "compnoRsrvtnPrceSno" to "01",
-            "bssamt" to "1234567890",
+            "bssamt" to "1239999999",
             "plnprc" to "1250000000",
+            // 개찰일 — 추출이 이 축에서 읽는다(canonical 이 아니라 원문에서).
+            "rlOpengDt" to "2026-06-17 11:00:00",
         )
 
     /** 실 응답 그대로 개인정보 키 둘을 함께 싣는다 — 경계가 떨어뜨리는지 이 자리에서 잰다. */
@@ -122,6 +161,9 @@ internal class MockOpeningKonepsHttp(
             "prcbdrCeoNm" to "SYN-대표자",
             "bidprcAmt" to "1100000000",
             "bidprcrt" to "88.000",
+            // 추첨번호 — v2 는 추출이 이 축을 안 읽어 실 추출이면 전 행이 제외 ⑤ 에 걸렸다(H-1).
+            "drwtNo1" to "3",
+            "drwtNo2" to "7",
         )
 
     private fun baseAmountRow(noticeNumber: String) =

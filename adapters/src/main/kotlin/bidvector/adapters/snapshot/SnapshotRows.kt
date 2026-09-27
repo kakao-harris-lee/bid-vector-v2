@@ -14,7 +14,7 @@ import java.time.LocalDate
 data class SnapshotNotice(
     val noticeKeyHash: String,
     val category: String,
-    val noticedOn: LocalDate,
+    val noticedOn: LocalDate?,
     val bidCloseAt: Instant?,
     val baseAmount: BigDecimal?,
     val baseAmountDisclosedAt: Instant?,
@@ -29,10 +29,10 @@ data class SnapshotNotice(
     val successfulBidMethodCode: String?,
     val successfulBidMethodName: String?,
     val prearrangedPriceDecisionMethod: String?,
-    val awardMethodApplicationStandard: String?,
-    val applicationBasisContent: String?,
+    /** 자유텍스트 원문을 싣지 않는다 — 존재 여부만(D-6G-33). 무엇이 실릴지 모르는 칸이다. */
+    val hasAwardMethodApplicationStandard: Boolean,
+    val hasApplicationBasisContent: Boolean,
     val noticeOrdinal: Int,
-    val progressDivision: String?,
     val procurementClassCode: String?,
     val demandAgencyCode: String?,
     val pureConstructionCost: BigDecimal?,
@@ -47,7 +47,9 @@ data class SnapshotBidderRow(
 
 /** 개찰로 드러나는 절반 — 채점만 읽는다. */
 data class SnapshotOutcome(
-    val openedOn: LocalDate,
+    val openedOn: LocalDate?,
+    /** 진행구분 — **개찰로 드러나는 값**이라 투찰 시점 타입이 아니라 여기다(v3). */
+    val progressDivision: String?,
     val plannedPrice: BigDecimal?,
     val openingBaseAmount: BigDecimal?,
     val reservePrices: List<BigDecimal>?,

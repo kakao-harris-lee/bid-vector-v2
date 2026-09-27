@@ -33,9 +33,19 @@ internal class RawRow(
 
     fun amountOf(concept: FieldConcept): BigDecimal? = textOf(concept)?.let { parseAmount(it) }
 
+    /**
+     * 한 개념을 **여러 raw 키**가 나르는 축의 값 전부(추첨번호 `drwtNo1`·`drwtNo2`). [textOf] 는 첫
+     * 값만 내므로 이 축에는 쓸 수 없다 — 둘째 추첨번호가 조용히 사라진다.
+     */
+    fun allTextOf(concept: FieldConcept): List<String> =
+        policy.fieldContracts
+            .contractsFor(concept)
+            .mapNotNull { contract -> fields[contract.rawName.name]?.takeIf { it.isNotBlank() } }
+
     /** 원문 단위 %(부호가 문자열 안에 있다: `-3`/`+3`) → fraction. 선행 `+` 를 허용한다(P-5 §3.2). */
     fun rateOf(concept: FieldConcept): BigDecimal? =
         textOf(concept)
+            ?.trim()
             ?.removePrefix("+")
             ?.let { runCatching { BigDecimal(it) }.getOrNull() }
             ?.divide(BigDecimal(PERCENT_DIVISOR))
@@ -50,6 +60,9 @@ internal class RawRow(
             else -> null
         }
 
+    /** 일시 원문의 **날짜 부분**(KST 해석) — 개찰일·공고일처럼 날짜만 쓰는 축. */
+    fun localDateOf(concept: FieldConcept): LocalDate? = instantOf(concept)?.atZone(SOURCE_ZONE)?.toLocalDate()
+
     fun instantOf(concept: FieldConcept): Instant? =
         textOf(concept)?.let { raw ->
             runCatching { LocalDateTime.parse(raw.trim().replace(' ', 'T')).atZone(SOURCE_ZONE).toInstant() }
@@ -59,41 +72,24 @@ internal class RawRow(
 
 private fun parseAmount(raw: String): BigDecimal? = runCatching { BigDecimal(raw.trim().replace(",", "")) }.getOrNull()
 
-/** canonical `notice` 한 행 — 개찰 축 응답에 **없는** 축(대분류·하한율·마감·낙찰방법)이 여기서 온다. */
+/**
+ * canonical `notice` 한 행 — 개찰 축 응답에 **없는** 축(대분류·하한율·마감)만 여기서 온다.
+ * 낙찰방법·분류·수요기관·공고일은 `notice` 표에 칸이 없어 **공고 목록 원문 관측**에서 읽는다
+ * (같은 조회가 이미 가져오므로 조인이 필요 없다 — LATERAL 을 없앴다).
+ */
 internal class CanonicalNotice(
-    /** 스냅숏의 닫힌 셋 값(`SERVICE` …) — DB 는 **문서 라벨**(`용역`)을 담으므로 어휘 변환이 필요하다. */
     val division: String,
-    val noticedOn: LocalDate?,
-    val openedOn: LocalDate,
     val bidCloseAt: Instant?,
     val floorRate: BigDecimal?,
-    val awardMethodCode: String?,
-    val awardMethodName: String?,
-    val awardMethodStandard: String?,
-    val applicationBasis: String?,
-    val procurementClassCode: String?,
-    val demandAgencyCode: String?,
 )
 
 /** 어휘 밖 라벨은 `null` — 대분류를 지어내지 않는다(그 공고는 행이 만들어지지 않는다). */
-internal fun canonicalNoticeOf(
-    rows: ResultSet,
-    policy: KonepsCollectionPolicyData,
-): CanonicalNotice? {
+internal fun canonicalNoticeOf(rows: ResultSet): CanonicalNotice? {
     val division = BusinessDivision.fromLabel(rows.getString("business_division").orEmpty()) ?: return null
-    val listRow = RawRow(parseFields(rows.getString("notice_list_fields")), policy)
     return CanonicalNotice(
         division = division.name,
-        noticedOn = rows.getObject("noticed_on", LocalDate::class.java),
-        openedOn = rows.getObject("opened_on", LocalDate::class.java) ?: LocalDate.EPOCH,
         bidCloseAt = rows.getTimestamp("deadline_at")?.toInstant(),
         floorRate = rows.getBigDecimal("floor_rate_fraction"),
-        awardMethodCode = listRow.textOf(FieldConcept.AWARD_METHOD_CODE),
-        awardMethodName = listRow.textOf(FieldConcept.AWARD_METHOD_NAME),
-        awardMethodStandard = listRow.textOf(FieldConcept.AWARD_METHOD_APPLICATION_STANDARD),
-        applicationBasis = listRow.textOf(FieldConcept.APPLICATION_BASIS_CONTENT),
-        procurementClassCode = listRow.textOf(FieldConcept.PUBLIC_PROCUREMENT_CLASS_CODE),
-        demandAgencyCode = listRow.textOf(FieldConcept.DEMAND_AGENCY_CODE),
     )
 }
 
@@ -131,24 +127,8 @@ internal const val NOTICE_SQL =
            n.notice_round,
            n.business_division,
            n.deadline_at,
-           n.floor_rate_fraction,
-           NULL::date  AS noticed_on,
-           o.opened_on AS opened_on,
-           r.payload_fields::text AS notice_list_fields
+           n.floor_rate_fraction
       FROM notice n
-      LEFT JOIN LATERAL (
-            SELECT payload_fields
-              FROM raw_observation
-             WHERE source_endpoint = 'NOTICE_LIST'
-               AND payload_fields ->> 'bidNtceNo' = n.notice_number
-               AND payload_fields ->> 'bidNtceOrd' = n.notice_round
-             ORDER BY observed_at DESC
-             LIMIT 1) r ON TRUE
-      LEFT JOIN LATERAL (
-            SELECT (actual_opening_at AT TIME ZONE 'Asia/Seoul')::date AS opened_on
-              FROM opening_result
-             WHERE notice_number = n.notice_number
-               AND notice_round = n.notice_round) o ON TRUE
      WHERE n.business_division IS NOT NULL
     """
 

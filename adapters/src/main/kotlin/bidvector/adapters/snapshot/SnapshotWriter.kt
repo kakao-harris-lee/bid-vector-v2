@@ -6,10 +6,11 @@ import java.time.Instant
 import java.time.LocalDate
 
 /**
- * `snapshot-v2`(D-6G-23) — A 묶음에 표준시장단가 적용 여부를 더하며 올렸다. 소비 쪽 판독은 **버전이
+ * `snapshot-v3`(D-6G-28) — 값 결측을 **행 단위 제외**로 내리고 출처 셋(공고일·개찰일·추첨번호)을
+ * 바로잡으며 올렸다. 소비 쪽 판독은 **버전이
  * 다르면 스냅숏 전체를 거부한다**(의도된 동작이다 — 두 레인이 같이 움직여야 한다는 신호).
  */
-const val SNAPSHOT_SCHEMA_VERSION: String = "snapshot-v2"
+const val SNAPSHOT_SCHEMA_VERSION: String = "snapshot-v3"
 
 private const val HEX_MASK = 0xff
 
@@ -84,7 +85,7 @@ private fun noticeJson(notice: SnapshotNotice): SnapshotJson =
         listOf(
             "notice_key_hash" to SnapshotJson.Text(notice.noticeKeyHash),
             "category" to SnapshotJson.Text(notice.category),
-            "noticed_on" to jsonDate(notice.noticedOn),
+            "noticed_on" to jsonDateOrNull(notice.noticedOn),
             "bid_close_at" to jsonInstant(notice.bidCloseAt),
             "base_amount" to jsonAmount(notice.baseAmount),
             "base_amount_disclosed_at" to jsonInstant(notice.baseAmountDisclosedAt),
@@ -96,10 +97,9 @@ private fun noticeJson(notice: SnapshotNotice): SnapshotJson =
             "successful_bid_method_code" to jsonText(notice.successfulBidMethodCode),
             "successful_bid_method_name" to jsonText(notice.successfulBidMethodName),
             "prearranged_price_decision_method" to jsonText(notice.prearrangedPriceDecisionMethod),
-            "award_method_application_standard" to jsonText(notice.awardMethodApplicationStandard),
-            "application_basis_content" to jsonText(notice.applicationBasisContent),
+            "has_award_method_application_standard" to SnapshotJson.Bool(notice.hasAwardMethodApplicationStandard),
+            "has_application_basis_content" to SnapshotJson.Bool(notice.hasApplicationBasisContent),
             "notice_ordinal" to SnapshotJson.Number(notice.noticeOrdinal.toString()),
-            "progress_division" to jsonText(notice.progressDivision),
             "procurement_class_code" to jsonText(notice.procurementClassCode),
             "demand_agency_code" to jsonText(notice.demandAgencyCode),
             "pure_construction_cost" to jsonAmount(notice.pureConstructionCost),
@@ -127,7 +127,8 @@ private fun aValue(notice: SnapshotNotice): SnapshotJson =
 private fun outcomeJson(outcome: SnapshotOutcome): SnapshotJson =
     SnapshotJson.Obj(
         listOf(
-            "opened_on" to jsonDate(outcome.openedOn),
+            "opened_on" to jsonDateOrNull(outcome.openedOn),
+            "progress_division" to jsonText(outcome.progressDivision),
             "planned_price" to jsonAmount(outcome.plannedPrice),
             "opening_base_amount" to jsonAmount(outcome.openingBaseAmount),
             "reserve_prices" to outcome.reservePrices.jsonArrayOrNull { list -> list.map(::jsonAmount) },

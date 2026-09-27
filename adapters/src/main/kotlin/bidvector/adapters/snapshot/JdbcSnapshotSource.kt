@@ -2,6 +2,7 @@ package bidvector.adapters.snapshot
 
 import bidvector.procurement.FieldConcept
 import bidvector.procurement.KonepsCollectionPolicyData
+import bidvector.procurement.NoticeNumber
 import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.NoticeKeyHash
 import java.math.BigDecimal
@@ -35,109 +36,21 @@ class JdbcSnapshotSource(
         val notices = readNotices()
         val rows = mutableListOf<SnapshotRow>()
         var skipped = 0
+        var frameOnly = 0
         for ((key, axes) in observations) {
             val canonical = notices[key]
-            if (canonical == null) {
-                skipped++
-            } else {
-                rows += assemble(key, axes, canonical)
+            when {
+                // **표본만 싣는다**(D-6G-28). 상세 축은 표본에 뽑힌 공고에만 나가므로(수집 갈래의
+                // 구조), 상세 관측의 존재가 곧 「표본이었다」이다 — 표본 목록을 따로 나르지 않고도
+                // 정확하다. 표본틀에만 있던 공고(목록 축만 있는 행)는 싣지 않는다.
+                axes.keys.none { it in DETAIL_ENDPOINTS } -> frameOnly++
+
+                canonical == null -> skipped++
+
+                else -> rows += assembleSnapshotRow(key, axes, canonical)
             }
         }
-        return SnapshotExtraction(rows, skipped)
-    }
-
-    private fun assemble(
-        key: NoticeKey,
-        axes: Map<SourceEndpoint, List<RawRow>>,
-        canonical: CanonicalNotice,
-    ): SnapshotRow =
-        SnapshotRow(
-            notice = noticeOf(key, axes, canonical),
-            outcome = outcomeOf(axes, canonical),
-        )
-
-    private fun noticeOf(
-        key: NoticeKey,
-        axes: Map<SourceEndpoint, List<RawRow>>,
-        canonical: CanonicalNotice,
-    ): SnapshotNotice {
-        val baseAmountRow = axes[SourceEndpoint.BASE_AMOUNT_DETAIL]?.firstOrNull()
-        val formulaARow = axes[SourceEndpoint.BID_PRICE_FORMULA_A]?.firstOrNull()
-        val listRow = axes[SourceEndpoint.OPENING_RESULT_LIST]?.firstOrNull()
-        val disclosedAt = baseAmountRow?.instantOf(FieldConcept.BASE_AMOUNT_DISCLOSED_AT)
-        // D-6G-19 provenance 분리 — 마감 뒤 공개된 기초금액은 투찰 시점에 없던 값이다.
-        val knownAtBidTime = disclosedAt != null && canonical.bidCloseAt != null && disclosedAt < canonical.bidCloseAt
-        return SnapshotNotice(
-            noticeKeyHash = NoticeKeyHash.of(key.number, key.round).value,
-            category = canonical.division,
-            noticedOn = canonical.noticedOn ?: canonical.openedOn,
-            bidCloseAt = canonical.bidCloseAt,
-            baseAmount = baseAmountRow?.takeIf { knownAtBidTime }?.amountOf(FieldConcept.BASE_AMOUNT),
-            baseAmountDisclosedAt = disclosedAt,
-            floorRate = canonical.floorRate,
-            reserveRangeBeginRate = baseAmountRow?.rateOf(FieldConcept.RESERVE_PRICE_RANGE_BEGIN_RATE),
-            reserveRangeEndRate = baseAmountRow?.rateOf(FieldConcept.RESERVE_PRICE_RANGE_END_RATE),
-            aValueTotal = formulaARow?.let(::aValueTotalOf),
-            aValueOpenAt = formulaARow?.instantOf(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT),
-            standardMarketPriceApplicable =
-                formulaARow?.predicateOf(FieldConcept.A_STANDARD_MARKET_UNIT_PRICE_APPLICABLE),
-            bidPriceFormulaAApplicable = baseAmountRow?.predicateOf(FieldConcept.BID_PRICE_FORMULA_A_APPLICABLE),
-            successfulBidMethodCode = canonical.awardMethodCode,
-            successfulBidMethodName = canonical.awardMethodName,
-            prearrangedPriceDecisionMethod = formulaARow?.textOf(FieldConcept.PLANNED_PRICE_DECISION_METHOD),
-            awardMethodApplicationStandard = canonical.awardMethodStandard,
-            applicationBasisContent = canonical.applicationBasis,
-            noticeOrdinal = key.round.toIntOrNull() ?: 0,
-            progressDivision = listRow?.textOf(FieldConcept.PROGRESS_DIVISION),
-            procurementClassCode = canonical.procurementClassCode,
-            demandAgencyCode = canonical.demandAgencyCode,
-            pureConstructionCost = baseAmountRow?.amountOf(FieldConcept.PURE_CONSTRUCTION_COST),
-        )
-    }
-
-    private fun outcomeOf(
-        axes: Map<SourceEndpoint, List<RawRow>>,
-        canonical: CanonicalNotice,
-    ): SnapshotOutcome {
-        val reserveRows = axes[SourceEndpoint.RESERVE_PRICE_DETAIL].orEmpty()
-        val listRow = axes[SourceEndpoint.OPENING_RESULT_LIST]?.firstOrNull()
-        val bidders =
-            axes[SourceEndpoint.OPENING_COMPLETE].orEmpty().map { row ->
-                row.countOf(FieldConcept.OPENING_RANK) to row.amountOf(FieldConcept.BID_AMOUNT)
-            }
-        return SnapshotOutcome(
-            openedOn = canonical.openedOn,
-            plannedPrice = reserveRows.firstNotNullOfOrNull { it.amountOf(FieldConcept.RESERVE_PRICE) },
-            openingBaseAmount = reserveRows.firstNotNullOfOrNull { it.amountOf(FieldConcept.BASE_AMOUNT) },
-            reservePrices = reservePricesOf(reserveRows),
-            drawnSerialNumbers = null,
-            participantCount = listRow?.countOf(FieldConcept.PARTICIPANT_COUNT),
-            bidderRows = orderedBidderRows(bidders),
-        )
-    }
-
-    /** 15행이 온전할 때만 배열을 싣는다 — 부분 배열은 위치가 순번이라는 규약을 깬다(스키마 §3.2). */
-    private fun reservePricesOf(rows: List<RawRow>): List<BigDecimal>? {
-        val bySequence =
-            rows
-                .mapNotNull { row ->
-                    val sequence = row.textOf(FieldConcept.RESERVE_PRICE_SEQUENCE)?.toIntOrNull()
-                    val amount = row.amountOf(FieldConcept.RESERVE_PRICE_PRELIMINARY)
-                    if (sequence == null || amount == null) null else sequence to amount
-                }.toMap()
-        val complete = (1..RESERVE_PRICE_SLOTS).all { it in bySequence }
-        return if (complete) (1..RESERVE_PRICE_SLOTS).map { bySequence.getValue(it) } else null
-    }
-
-    /** A 합산액 — **술어가 참인 항목만** 더한다. 표준시장단가금액은 근거 예규 미확보로 제외한다(§3.3). */
-    private fun aValueTotalOf(row: RawRow): BigDecimal? {
-        val always = A_ALWAYS_SUMMED.mapNotNull(row::amountOf)
-        val quality =
-            row
-                .amountOf(FieldConcept.A_QUALITY_MANAGEMENT_COST)
-                ?.takeIf { row.predicateOf(FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE) == true }
-        val parts = always + listOfNotNull(quality)
-        return if (parts.isEmpty()) null else parts.reduce(BigDecimal::add)
+        return SnapshotExtraction(rows, skipped, frameOnly)
     }
 
     private fun readObservations(
@@ -167,7 +80,10 @@ class JdbcSnapshotSource(
 
     /** 식별자나 엔드포인트 어휘가 서지 않는 행은 조용히 지나간다 — 지어내지 않는다. */
     private fun keyAndEndpointOf(rows: ResultSet): Pair<NoticeKey, SourceEndpoint>? {
-        val number = rows.getString("notice_number")
+        // **canonical 형태로 키를 맞춘다.** 원문 payload 는 수집 때 온 그대로이고 `notice` 표는
+        // canonical 이라, 그대로 비교하면 같은 공고가 두 키로 갈린다(목록 축 행과 상세 축 행이
+        // 서로 다른 키에 앉아 목록 축이 사라졌다 — 실측).
+        val number = rows.getString("notice_number")?.let { NoticeNumber.of(it).value }
         val round = rows.getString("notice_round")
         val endpoint = runCatching { SourceEndpoint.valueOf(rows.getString("source_endpoint")) }.getOrNull()
         return if (number == null || round == null || endpoint == null) null else NoticeKey(number, round) to endpoint
@@ -184,7 +100,7 @@ class JdbcSnapshotSource(
         val out = linkedMapOf<NoticeKey, CanonicalNotice>()
         while (rows.next()) {
             val key = NoticeKey(rows.getString("notice_number"), rows.getString("notice_round"))
-            canonicalNoticeOf(rows, policy)?.let { out[key] = it }
+            canonicalNoticeOf(rows)?.let { out[key] = it }
         }
         return out
     }
@@ -192,21 +108,24 @@ class JdbcSnapshotSource(
 
 internal const val RESERVE_PRICE_SLOTS = 15
 
-private val A_ALWAYS_SUMMED =
-    listOf(
-        FieldConcept.A_NATIONAL_PENSION_PREMIUM,
-        FieldConcept.A_HEALTH_INSURANCE_PREMIUM,
-        FieldConcept.A_LONG_TERM_CARE_INSURANCE_PREMIUM,
-        FieldConcept.A_RETIREMENT_MUTUAL_AID_CONTRIBUTION,
-        FieldConcept.A_INDUSTRIAL_SAFETY_HEALTH_COST,
-        FieldConcept.A_SAFETY_MANAGEMENT_COST,
-    )
-
-/** 추출 결과 — 행과, 공고 목록 관측이 없어 만들지 못한 공고 수(지어내지 않은 계수). */
+/**
+ * 추출 결과 — 행과 두 계수. [skippedWithoutNotice] 는 공고 목록 canonical 이 없어 대분류를 몰라
+ * 만들지 못한 공고, [frameOnlyNotices] 는 표본틀에만 있던(상세를 부르지 않은) 공고다. 둘 다
+ * 지어내지 않은 것의 계수다.
+ */
 data class SnapshotExtraction(
     val rows: List<SnapshotRow>,
     val skippedWithoutNotice: Int,
+    val frameOnlyNotices: Int,
 )
+
+private val DETAIL_ENDPOINTS =
+    setOf(
+        SourceEndpoint.RESERVE_PRICE_DETAIL,
+        SourceEndpoint.OPENING_COMPLETE,
+        SourceEndpoint.BASE_AMOUNT_DETAIL,
+        SourceEndpoint.BID_PRICE_FORMULA_A,
+    )
 
 internal data class NoticeKey(
     val number: String,

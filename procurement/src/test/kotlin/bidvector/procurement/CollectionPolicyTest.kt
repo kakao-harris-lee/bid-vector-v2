@@ -113,6 +113,9 @@ private val EXPECTED_ADOPTED_FIELD_RAW_NAMES: Set<String> =
         // M6/6G D-6G-22 — 새 호출 비용 0(공고 목록 응답에 이미 온다).
         "sucsfbidMthdAppStd",
         "aplBssCntnts",
+        // M6/6G D-6G-28 — 공고일을 목록 축에서도 읽는다(A 오퍼레이션은 공사 전용이라 그것만으로는
+        // 용역·물품의 공고일이 빈다).
+        "bidNtceDt",
     )
 
 /**

@@ -165,12 +165,14 @@ class KonepsBidPriceFormulaASourceTest {
             val registry = contractRegistry()
             val observation = batch.items.single()
 
-            val posted = registry.contractsFor(FieldConcept.NOTICE_POSTED_AT).single()
+            // M6/6G D-6G-28 — 공고일은 **두 축**이 나른다: A 오퍼레이션(`ntceNticeDt`)과 공고 목록
+            // (`bidNtceDt`). A 축은 공사 전용이라 그것만 읽으면 용역·물품의 공고일이 빈다.
+            val posted = registry.contractsFor(FieldConcept.NOTICE_POSTED_AT)
             val disclosed = registry.contractsFor(FieldConcept.BID_PRICE_FORMULA_A_DISCLOSED_AT).single()
 
-            posted.rawName shouldBe RawKey("ntceNticeDt")
+            posted.map { it.rawName } shouldBe listOf(RawKey("ntceNticeDt"), RawKey("bidNtceDt"))
             disclosed.rawName shouldBe RawKey("bidPrceCalclAOpenDt")
-            observation.valueOf(posted) shouldBe "2026-06-03 09:39:16"
+            observation.valueOf(posted.first()) shouldBe "2026-06-03 09:39:16"
             observation.valueOf(disclosed) shouldBe "2026-06-16 16:10:19"
         }
     }
