@@ -183,6 +183,23 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 |---|---|
 | **D-6A2b-32** | **면제를 한 덩어리로 두지 않는다 — 세 층으로 가른다.** ① **부팅·배선**(`BidVectorApplication`·`*Wiring` 등): 전면 면제(어댑터 구체 클래스·JDBC 에 의존해도 된다 — 조립이 일이다). ② **요청 스코프 조립과 그 결과**(`StrategyEditExecutor`·`StrategyQuery`·`EvaluationDryRunFactory`·`EvaluationDryRunRun` 등, **컨트롤러가 허용 목록으로 받는 것**): 면제가 아니라 **별도 허용 목록 ⊆** — workflow use case·포트 **인터페이스**·도메인 값·트랜잭션 경계 타입은 되지만, `java.sql`·`javax.sql`·Spring JDBC(`JdbcClient`·`JdbcTemplate` 등)·`adapters.**` 의 구체 클래스는 안 된다. 이유: 이 층은 컨트롤러에서 닿으므로 여기에 SQL 메서드를 더하면 HTTP 지름길이 된다(6A-3 R3-M1 ⓑ 「어댑터 추가 메서드」와 같은 형태). ③ **수집 레인**(`CollectionRunner` 등): 면제하되 **컨트롤러·② 층이 참조하면 RED**(HTTP 로 닿지 않음을 의존 방향으로 잠근다) — (27) 표면 실측과 함께. 세 층의 목록은 계약 파일에 층별 키로 정확한 이름. 변이: ② 층 클래스에 `JdbcClient` UPDATE 메서드 추가 → RED, 컨트롤러가 ③ 층 참조 → RED. 게이트 술어 변경 → 표적 재검증 |
 
+## 계약 갱신 r3 (2026-09-27, 팀장 — verifier r3 not-ready F-r3-1(변이 여섯) · code-reviewer r3 M-r3-1~6 수령 · **운영자 결정 (A) 구조 재건**)
+
+재작업 **3/5**. 세 라운드가 같은 계열로 뚫렸다 — r1 금지 열거, r2 대상 종류 열거, r3 면제 층·허용 통로. **진단: 위협 모델 경계가 흐렸다.** 「우회 ≥5」를 경계 없이 물으면 면제 층이 있는 한 우회 집합이 무한이다(1A 교훈과 같은 뿌리). 운영자는 (A) 를 골랐다 — 경계를 다시 긋고, 남는 자리를 **의존 방향**으로 닫는다.
+
+**위협 모델 개정(D-6A2b-33).** 「지키는 것」 ② 「HTTP 층에서 저장소·outbox·SQL 로 가는 지름길이 없다」의 주체를 한정한다: **평범한 코드 작성·리팩터링으로 생길 수 있는 지름길**(컨트롤러·요청 스코프 조립이 SQL·어댑터 구체 클래스를 잡는 것, 어댑터 인터페이스에 메서드를 더해 부르는 것, 배선 헬퍼를 부르는 것)을 막는다. **경계 밖**: 부팅·배선 층 코드를 **일부러 비틀어** 서블릿 컨테이너·Spring MVC 확장점에 SQL 을 심는 저자 — 그 저자는 인증 필터 자체를 꺼 버릴 수도 있고, 빌드 스크립트를 임의로 고치는 저자(1A·6C 경계)와 같은 층이다. 다만 그런 확장이 **배선 층에 들어오는 것 자체**는 아래 D-6A2b-34 가 의존 방향으로 드러낸다(경계 밖이라도 조용히 들어오지는 못한다).
+
+| ID | 결정 |
+|---|---|
+| **D-6A2b-33** | 위 위협 모델 개정. 6F-5-a r3 의 severity 선(평범한 리팩터링 HIGH / 관용을 벗어난 형태 MEDIUM)을 이 게이트의 판정 기준으로 명시한다 |
+| **D-6A2b-34** | **(A1·A2·A6) 배선 층은 HTTP 확장 API 에 의존하지 못한다.** ① 층(부팅·배선) 클래스는 `org.springframework.web.**`·`org.springframework.boot.web.**`·`org.springframework.boot.tomcat.**`·`jakarta.servlet.**`·`org.apache.catalina.**`·`org.apache.tomcat.**` 에 의존할 수 없다. 예외는 계약 파일의 **정확한 클래스 목록**(필터 등록·관리 표면 잠금처럼 오늘 실제로 그 API 를 쓰는 곳 — 구현 레인이 실측해 최소로)이고, 예외 클래스가 만드는 등록은 (27) 표면 실측이 이미 잰다. 같은 규칙이 ① 층의 **클래스 애너테이션**(`@ControllerAdvice`·`@Controller` 류)도 막는다(애너테이션 의존도 의존이다). 변이 A1(WebMvcConfigurer→interceptor)·A2(Tomcat valve)·A6(①층 `@ControllerAdvice`)이 RED. **보조**: (27) 에 interceptor·advice 집합을 더하는 것은 하지 않는다(종류 열거로 돌아간다) |
+| **D-6A2b-35** | **(A3) ② 층 허용은 정확한 클래스 목록.** `tier2.allowed-packages` 의 `bidvector.app.wiring` 통째 허용을 없애고, ② 층이 참조할 수 있는 app 클래스를 계약 파일에 정확한 이름으로 적는다 |
+| **D-6A2b-36** | **(A5) 어댑터 인터페이스는 허용된 메서드 호출 쌍으로만.** ② 층·제한 층이 `adapters.**` 인터페이스의 메서드를 호출하는 것은 계약 파일의 **(호출자 클래스, 인터페이스, 메서드) 쌍 목록**(6A-3 호출 쌍 규칙과 같은 형태 — 재사용)에 있을 때만 허용한다. 인터페이스에 메서드를 더하고 부르면 목록에 없어 RED |
+| **D-6A2b-37** | **(A4) Throwable 통로는 정확한 예외 목록.** 제한 층·② 층이 참조할 수 있는 `adapters.**` 예외 타입을 계약 파일에 정확한 이름으로 적고, 그 타입의 **인스턴스 메서드 호출**은 `Throwable` 에서 상속한 것만 허용한다(자기 메서드 호출 → RED) |
+| **D-6A2b-38** | code-reviewer r3 처분(같은 라운드): **M-r3-1** 게이트 KDoc·test 이름을 실제 술어로 정정 · **M-r3-2** 항진식 단언 제거(실제로 일하는 `exempt − allTopLevel == ∅` 만 남기고 「대상이 조용히 줄면 RED」는 면제 목록 크기 고정 단언으로 대신) · **M-r3-3** ② 층·③ 층 규칙의 **영구 음성 fixture**(`rules()` 가 층 목록을 루트별로 받게 연다) · **M-r3-4** 표면 실측에 method mapping 빈 수 == 1 · `RouterFunction` 부재 단언 · **M-r3-5** `commandBaseRevision` 없는 행은 조회·취소가 되고 confirm 만 fail-closed(상태 쪽과 같은 모양) + 회귀 test · **M-r3-6** 멱등 재전달 판별에서 서버 파생 `baseRevision` 을 빼고, 기준이 달라진 재전달은 `STALE_REVISION` 으로 · LOW 여섯 + verifier L-r3-1~3 일괄. **M-r3-3·4·D-6A2b-34~37 은 게이트 술어 변경 → 표적 재검증** |
+
+**변이 실측 의무(구현 레인)**: verifier r3 의 A1~A6 을 production 소스에 심어 A3·A4·A5·A1·A2·A6 각각이 **어느 규칙으로** RED 인지 표로. A2 는 D-6A2b-34 로 RED 여야 한다(경계 밖이지만 의존 방향이 드러낸다).
+
 ## 하네스 레인 변경 (상시 절)
 
 구현 레인 checklist 「하네스 레인 변경」 절을 옮긴다(2026-09-27, 판정 SHA 고정 시점).
