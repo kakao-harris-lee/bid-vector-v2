@@ -83,7 +83,7 @@ def _row(label: str, opened: date, rng: Random) -> dict[str, Any]:
             "successful_bid_method_code": "낙030001",
             "successful_bid_method_name": "적격심사제-추정가격 2억원 미만인 용역",
             "prearranged_price_decision_method": "복수예가",
-            "notice_ordinal": 1,
+            "notice_ordinal": 0,
             "procurement_class_code": "0600",
             "demand_agency_code": "A0001",
             "bid_price_formula_a_applicable": None,

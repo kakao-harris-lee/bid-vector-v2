@@ -426,11 +426,13 @@ def test_first_notice_ordinal_comes_from_policy_not_code() -> None:
     """D-6G-35 — 첫 차수가 `000` 인지 `001` 인지는 **관측이 정하는 사실**이다. 정책
     값을 바꾸면 제외 ③ 의 판정이 따라 바뀐다(코드 상수였다면 그러지 않는다)."""
     policy = _policy()
-    assert policy.exclusion.first_notice_ordinal == 1
-    assert _reason(row_payload("n-1", notice_notice_ordinal=0)) is (
+    # 값은 `000` 이다(스키마 §3.6 의 근거 표 — XML 예제 전수가 `000` 이고 `001` 을 든
+    # 유일한 자리는 표본 공고가 2차였던 것이다).
+    assert policy.exclusion.first_notice_ordinal == 0
+    assert _reason(row_payload("n-1", notice_notice_ordinal=1)) is (
         ExclusionReason.REBID_OR_AMENDED
     )
-    assert _reason(row_payload("n-2", notice_notice_ordinal=1)) is None
+    assert _reason(row_payload("n-2", notice_notice_ordinal=0)) is None
 
 
 def test_structural_failures_still_reject_the_whole_snapshot() -> None:

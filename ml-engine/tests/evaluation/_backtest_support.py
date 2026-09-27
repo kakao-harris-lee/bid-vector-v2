@@ -34,7 +34,7 @@ def notice_payload(
     successful_bid_method_code: str = "낙030001",
     successful_bid_method_name: str = "적격심사제-추정가격 2억원 미만인 용역",
     prearranged_price_decision_method: str = "복수예가",
-    notice_ordinal: int = 1,
+    notice_ordinal: int = 0,
     procurement_class_code: str | None = None,
     demand_agency_code: str | None = "A0001",
     bid_price_formula_a_applicable: bool | None = None,
