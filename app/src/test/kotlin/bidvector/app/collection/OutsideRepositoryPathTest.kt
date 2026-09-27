@@ -31,35 +31,36 @@ class OutsideRepositoryPathTest {
         val root = repositoryWithMarker("dir")
         val deep = Files.createDirectories(root.resolve("reports/evidence/m6/6g"))
 
-        repositoryRoot(from = deep) shouldBe root.toRealPath()
-        repositoryRoot(from = root) shouldBe root.toRealPath()
+        repositoryRoot(deep) shouldBe root.toRealPath()
+        repositoryRoot(root) shouldBe root.toRealPath()
     }
 
     @Test
     fun `linked worktree 의 git 은 파일이다 — 그것도 루트다`() {
         val root = repositoryWithMarker("file")
 
-        repositoryRoot(from = root.resolve("reports")) shouldBe root.toRealPath()
+        repositoryRoot(root.resolve("reports")) shouldBe root.toRealPath()
     }
 
+    /**
+     * D-6G-51 — 루트를 **대상 경로에서** 찾는다. 이 test 는 `root` 인자를 주지 않는다: 기본 갈래가
+     * 실제로 그 경로에서 루트를 찾는지 재는 것이 요점이고, 인자를 주면 기본 갈래를 지나지 않는다.
+     */
     @Test
-    fun `하위 디렉터리에서 돌아도 저장소 안은 거부된다`() {
+    fun `저장소 안은 거부된다 — 실행 위치와 무관하게`() {
         val root = repositoryWithMarker("dir")
-        val deep = root.resolve("reports/evidence")
 
-        // cwd 를 기준으로 삼았다면 이 경로는 deep 의 밖이라 통과했을 것이다.
-        shouldThrow<IllegalArgumentException> {
-            requireOutsideRepository(root.resolve("fixtures/golden"), root = repositoryRoot(from = deep))
-        }
+        shouldThrow<IllegalArgumentException> { requireOutsideRepository(root.resolve("fixtures/golden")) }
+        // 아직 없는 하위 경로도 같다 — 존재하는 조상까지 올라가 표식을 만난다.
+        shouldThrow<IllegalArgumentException> { requireOutsideRepository(root.resolve("a/b/c/d")) }
     }
 
     @Test
     fun `저장소 밖은 통과한다 — 아직 없는 경로도`() {
-        val root = repositoryWithMarker("dir")
+        repositoryWithMarker("dir")
         val outside = temp.resolve("snapshots/2026-09-28/rows")
 
-        requireOutsideRepository(outside, root = repositoryRoot(from = root)) shouldBe
-            temp.toRealPath().resolve("snapshots/2026-09-28/rows")
+        requireOutsideRepository(outside) shouldBe temp.toRealPath().resolve("snapshots/2026-09-28/rows")
     }
 
     /** 이름만 대조하면 밖을 가리키는 이름이 안을 가리켜도 통과한다. */
@@ -69,9 +70,7 @@ class OutsideRepositoryPathTest {
         val link = temp.resolve("looks-outside")
         Files.createSymbolicLink(link, root.resolve("reports"))
 
-        shouldThrow<IllegalArgumentException> {
-            requireOutsideRepository(link.resolve("snapshot"), root = repositoryRoot(from = root))
-        }
+        shouldThrow<IllegalArgumentException> { requireOutsideRepository(link.resolve("snapshot")) }
     }
 
     /** 계약(D-6G-43)이 적은 표식 — `.git` 이 없는 배치에서도 경계가 선다. */
@@ -79,11 +78,16 @@ class OutsideRepositoryPathTest {
     fun `settings gradle kts 도 루트 표식이다`() {
         val root = repositoryWithMarker("gradle")
 
-        repositoryRoot(from = root.resolve("reports/evidence")) shouldBe root.toRealPath()
+        repositoryRoot(root.resolve("reports/evidence")) shouldBe root.toRealPath()
     }
 
+    /**
+     * 대상이 어느 저장소에도 속하지 않으면 경계가 없다 — 그때만 통과다. 앞 판은 **cwd** 가 저장소
+     * 밖이면 경계가 사라져 저장소 안을 가리키는 경로까지 통과했다(vr M-6). 이제 그 구멍이 없다.
+     */
     @Test
-    fun `저장소가 아닌 곳에서는 경계가 없다`() {
-        repositoryRoot(from = temp.resolve("nowhere")) shouldBe null
+    fun `어느 저장소에도 속하지 않는 경로는 경계가 없다`() {
+        repositoryRoot(temp.resolve("nowhere")) shouldBe null
+        requireOutsideRepository(temp.resolve("nowhere")) shouldBe temp.toRealPath().resolve("nowhere")
     }
 }

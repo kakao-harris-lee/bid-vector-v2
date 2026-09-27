@@ -74,8 +74,10 @@ class JdbcSnapshotSource(
             connection.autoCommit = false
             connection.prepareStatement(OBSERVATION_SQL).use { statement ->
                 statement.fetchSize = OBSERVATION_FETCH_SIZE
-                statement.setObject(1, from)
-                statement.setObject(2, to.plusDays(1))
+                var index = 1
+                statement.setString(index++, SourceEndpoint.NOTICE_LIST.name)
+                statement.setObject(index++, from)
+                statement.setObject(index, to.plusDays(1))
                 statement.executeQuery().use { rows -> groupObservations(rows, sample) }
             }
         }

@@ -99,6 +99,11 @@ internal fun canonicalNoticeOf(rows: ResultSet): CanonicalNotice? {
  *
  * 존재 판정에 JSONB `?` 연산자를 **쓰지 않는다** — JDBC 가 그것을 바인드 자리로 읽어 「매개 변수 3 에
  * 값이 없다」로 떨어진다(실측). `->> … IS NOT NULL` 이 같은 일을 하면서 그 충돌이 없다.
+ *
+ * **공고 목록 축은 관측 창에서 뺀다**(D-6G-54, vr M-4). 창이 자르는 것은 「어느 개찰 관측을 실을까」
+ * 이고, 목록 축은 그 행을 **설명하는** 값(공고일·낙찰방법·분류)을 나르는 곁 자료다. 목록 적재가
+ * 창보다 앞서는 것은 정상인데(공고는 개찰보다 먼저다) 그것까지 자르면 전 행이 `NOTICE_DATE_ABSENT`
+ * 가 된다. 축 어휘는 바인드로 넘긴다 — SQL 에 열거 이름을 박지 않는다.
  */
 internal const val OBSERVATION_SQL =
     """
@@ -107,7 +112,7 @@ internal const val OBSERVATION_SQL =
            payload_fields ->> 'bidNtceOrd' AS notice_round,
            payload_fields::text AS payload_fields
       FROM raw_observation
-     WHERE observed_at >= ?::date AND observed_at < ?::date
+     WHERE (source_endpoint = ? OR (observed_at >= ?::date AND observed_at < ?::date))
        AND payload_fields ->> 'bidNtceNo' IS NOT NULL
      ORDER BY inserted_at
     """

@@ -1,12 +1,17 @@
 package bidvector.adapters.snapshot
 
+import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
+import bidvector.procurement.NoticeCollected
+import bidvector.procurement.NoticeId
+import bidvector.procurement.NoticeNumber
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
+import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.collection.SampleList
@@ -156,5 +161,62 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
 
         extraction.sampledWithoutDetail shouldBe 1
         extraction.skippedWithoutNotice shouldBe 0
+    }
+
+    /**
+     * D-6G-54(vr M-4) — **공고 목록 축은 창이 자르지 않는다.** 공고는 개찰보다 먼저 적재되므로
+     * 추출 창이 목록 적재 시각을 덮지 않는 것이 정상인데, 그것까지 자르면 그 행의 공고일·낙찰방법·
+     * 분류가 전부 사라진다(전 행 `NOTICE_DATE_ABSENT`). canonical 결합에도 시각 조건이 없다 —
+     * 있으면 같은 구멍이 `notice` 표 쪽에 생긴다.
+     *
+     * 계수로는 이 회귀가 드러나지 않는다(어느 쪽이든 사유는 같다) — **행의 값**으로 잰다.
+     */
+    @Test
+    fun `창 밖의 공고 목록 관측이 행의 공고일을 채운다`() {
+        val number = "20260617001-00"
+        // 목록 축은 창보다 **한 달 앞서** 적재됐다. 공고일·낙찰방법이 이 행에만 있다.
+        val listObservation =
+            RawNoticeObservation.of(
+                mapOf(
+                    RawKey("bidNtceNo") to number,
+                    RawKey("bidNtceOrd") to "000",
+                    RawKey("bidNtceDt") to "2026-05-17 09:00:00",
+                    RawKey("sucsfbidMthdCd") to "낙030001",
+                ),
+                SourceEndpoint.NOTICE_LIST,
+                Instant.parse("2026-05-17T02:00:00Z"),
+            )
+        persistCanonical(number, listObservation)
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+
+        val row = extract(sampleOf(number)).rows.single()
+
+        row.notice.noticedOn shouldBe LocalDate.of(2026, 5, 17)
+        row.notice.successfulBidMethodCode shouldBe "낙030001"
+    }
+
+    /** canonical 공고를 **출하 경로**(repository)로 세운다 — test 전용 SQL 사본을 두지 않는다. */
+    private fun persistCanonical(
+        number: String,
+        observation: RawNoticeObservation,
+    ) {
+        val id = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
+        JdbcNoticeRepository(dataSource()).persist(
+            NoticeCollected(
+                id = id,
+                businessCategory = null,
+                baseAmount = null,
+                estimatedAmount = null,
+                allocatedBudget = null,
+                floorRate = null,
+                deadlineAt = null,
+                openingScheduledAt = null,
+                raw = observation,
+                businessDivision = BusinessDivision.SERVICE,
+                serviceDivision = null,
+                mainConstructionType = null,
+            ),
+            appendRawObservation(observation),
+        )
     }
 }
