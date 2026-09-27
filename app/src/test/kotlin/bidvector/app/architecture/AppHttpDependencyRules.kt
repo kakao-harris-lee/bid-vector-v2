@@ -12,16 +12,6 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 /** 시각 같은 **주변 값**만 주는 포트를 가르는 구조 술어가 보는 반환 타입 패키지. */
 private const val TIME_PACKAGE = "java.time"
 
-/** 평가 루트 아래 HTTP 층의 패키지 세그먼트 — production 에서는 `bidvector.app.http` 다. */
-private const val HTTP_LAYER_SEGMENT = "http"
-
-/** 핸들러를 표시하는 Spring 애너테이션 — 메타 애너테이션까지 본다(`@RestController` → `@Controller`). */
-private val HANDLER_ANNOTATIONS =
-    listOf(
-        "org.springframework.stereotype.Controller",
-        "org.springframework.web.bind.annotation.ControllerAdvice",
-    )
-
 /**
  * M6/6A-2b D-6A2b-8·19 — HTTP 로 닿는 층이 **무엇을 쥘 수 있는가**를 의존 층에서 닫는다.
  *
@@ -73,14 +63,27 @@ class AppHttpDependencyRules(
 
     fun capabilityPorts(classes: JavaClasses): Set<String> = derivedUseCasePorts(classes) - ambientPorts(classes)
 
-    /** 판정 대상 전수 — 게이트가 **무엇을 보고 있는지**를 test 가 직접 단언할 수 있게 낸다. */
+    /**
+     * 판정 대상 전수(**최상위 이름**) — 게이트가 무엇을 보고 있는지를 test 가 직접 단언할 수
+     * 있게 낸다. 중첩·컴패니언은 소유자로 접힌다(판정 자체가 그렇게 한다).
+     */
     fun targets(
         classes: JavaClasses,
         appRoot: String,
     ): Set<String> =
         classes
             .filter { isTarget(it, appRoot) }
-            .map(JavaClass::getName)
+            .map { it.topLevel().fullName }
+            .toSet()
+
+    /** 대상 집합 등식의 다른 한쪽 — `appRoot` 아래 최상위 클래스 전수. */
+    fun appTopLevelClasses(
+        classes: JavaClasses,
+        appRoot: String,
+    ): Set<String> =
+        classes
+            .filter { it.packageName == appRoot || it.packageName.startsWith("$appRoot.") }
+            .map { it.topLevel().fullName }
             .toSet()
 
     fun rules(
@@ -99,20 +102,35 @@ class AppHttpDependencyRules(
             override fun test(input: JavaClass): Boolean = isTarget(input, appRoot)
         }
 
+    /**
+     * **대상은 `bidvector.app` 전체다**(D-6A2b-26, verifier r2 F-r2-1 시정). r1 은 대상을
+     * 「핸들러 애너테이션 ∪ HTTP 층」으로 **열거**했고, 그 목록 밖의 진입점 셋
+     * (`RouterFunction` 빈 · 빈 이름 URL 매핑 · 인증보다 앞선 필터)이 SQL 을 실행하며 전건
+     * 초록이었다. 종류를 하나 더 세는 처방은 같은 병을 다시 앓는다.
+     *
+     * 지금은 **기본이 제한**이고, 면제는 계약 파일에 **정확한 클래스 이름**으로 적은 조립
+     * 클래스뿐이다(접두·패턴을 쓰지 않는다 — 패키지 하나를 열면 그 안의 새 클래스가 조용히
+     * 면제된다). 면제된 조립 클래스가 `@Bean` 으로 진입점을 만드는 길은 이 규칙이 아니라
+     * 출하 조립의 표면 실측(D-6A2b-27)이 잡는다.
+     *
+     * 중첩·익명·컴패니언은 **최상위 소유자**로 판정한다 — 조립 클래스 안쪽에 숨겨도 면제가
+     * 따라가지만, 그 경우 역시 표면 실측이 진입점을 본다.
+     */
     private fun isTarget(
         item: JavaClass,
         appRoot: String,
     ): Boolean {
         val top = item.topLevel()
-        if (!(top.packageName == appRoot || top.packageName.startsWith("$appRoot."))) return false
-        // HTTP 층은 **평가 루트 기준**으로 센다 — 같은 규칙 값을 위반 fixture 루트에 그대로
-        // 적용해 음성 대조를 세우기 위해서다(규칙을 fixture 전용으로 새로 만들면 그 단언은
-        // production 게이트에 대해 아무것도 말하지 않는다). 계약 파일의
-        // `app.http.package` 와 어긋나지 않는지는 게이트 test 가 따로 단언한다.
-        val httpPackage = "$appRoot.$HTTP_LAYER_SEGMENT"
-        val inHttpLayer = top.packageName == httpPackage || top.packageName.startsWith("$httpPackage.")
-        return inHttpLayer || HANDLER_ANNOTATIONS.any(top::isMetaAnnotatedWith)
+        val inApp = top.packageName == appRoot || top.packageName.startsWith("$appRoot.")
+        return inApp && top.fullName !in exemptAssemblyClasses(appRoot)
     }
+
+    /**
+     * 면제 목록은 계약 파일이 갖는다. 평가 루트가 production 이 아니면(위반 fixture) 면제는
+     * 없다 — fixture 에 조립 클래스를 두지 않으므로 같은 규칙 값이 그대로 선다.
+     */
+    private fun exemptAssemblyClasses(appRoot: String): Set<String> =
+        if (appRoot == "${policy.packageRoot}.app") policy.appAssemblyExemptClasses.toSet() else emptySet()
 
     private fun onlyDependOnAllowed(capabilityPorts: Set<String>): ArchCondition<JavaClass> {
         val allowedPackages = policy.appHttpAllowedPackages
@@ -130,6 +148,8 @@ class AppHttpDependencyRules(
                 item.directDependenciesFromSelf
                     .map { it.targetClass.baseComponentType }
                     .filterNot { it.isPrimitive || it.isArray }
+                    // 자기 자신(중첩·컴패니언 포함)은 의존이 아니다 — 최상위 소유자로 가린다.
+                    .filterNot { it.topLevel().fullName == item.topLevel().fullName }
                     .filterNot { target ->
                         isAllowed(
                             target,

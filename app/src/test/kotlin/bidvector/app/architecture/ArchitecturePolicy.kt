@@ -68,6 +68,17 @@ class ArchitecturePolicy private constructor(
     val appHttpAllowedClasses: List<String> get() = list("app.http.allowed-classes")
     val appHttpDeniedPackages: List<String> get() = list("app.http.denied-packages")
 
+    /** D-6A2b-26 — 의존 허용 목록에서 면제되는 **조립 클래스**의 정확한 이름(접두·패턴 금지). */
+    val appAssemblyExemptClasses: List<String> get() = list("app.assembly.exempt-classes")
+
+    /** D-6A2b-27 — 출하 조립에서 거둔 HTTP 표면의 기대 집합(API 포트·관리 포트 각각). */
+    val apiSurfaceHandlers: List<String> get() = list("app.surface.api.handlers")
+    val apiSurfaceFilters: List<String> get() = list("app.surface.api.filters")
+    val apiSurfaceServlets: List<String> get() = list("app.surface.api.servlets")
+    val managementSurfaceHandlers: List<String> get() = list("app.surface.management.handlers")
+    val managementSurfaceFilters: List<String> get() = list("app.surface.management.filters")
+    val managementSurfaceServlets: List<String> get() = list("app.surface.management.servlets")
+
     /** D-6A2b-10 — 운영자 자격증명 타입과 그것을 참조해도 되는 클래스 집합(집합 등식). */
     val operatorCredentialTypes: List<String> get() = list("app.secret.operator-credential-types")
     val operatorCredentialReferencers: List<String> get() = list("app.secret.operator-credential-referencers")

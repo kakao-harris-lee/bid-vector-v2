@@ -56,20 +56,28 @@ class AppHttpDependencyGateTest {
     }
 
     /**
-     * D-6A2b-19 ① — 대상이 패키지 이름이 아니라 **구조**다. 게이트가 실제로 보고 있는 집합을
-     * 단언한다: production 에서는 오늘 HTTP 층 전부가 그 집합이고(밖에 핸들러가 없다),
-     * 핸들러가 다른 패키지에 생기면 자동으로 들어온다 — 그 자동 편입을 fixture 로 실측한다.
-     * 모집단이 조용히 줄면(술어가 패키지 하나로 되돌아가면) 이 단언이 먼저 붉어진다.
+     * D-6A2b-26 — 대상은 **`bidvector.app` 전체**이고 면제는 계약 파일의 **정확한 이름**뿐이다
+     * (verifier r2 F-r2-1 시정 — r1 은 대상을 「핸들러 종류」로 열거했고 그 목록 밖의 진입점
+     * 셋이 SQL 을 실행했다). 게이트가 보고 있는 집합을 직접 단언한다: app 의 모든 최상위
+     * 클래스에서 면제 목록을 뺀 것과 **같다**. 대상이 조용히 줄면 이 단언이 먼저 붉어진다.
      */
     @Test
-    fun `게이트가 보는 대상 집합은 HTTP 층과 핸들러 전부다`() {
-        val observed = rules.targets(production, appRoot)
+    fun `게이트가 보는 대상 집합은 app 전체에서 면제 목록을 뺀 것과 같다`() {
+        val exempt = policy.appAssemblyExemptClasses.toSet()
+        val allTopLevel = rules.appTopLevelClasses(production, appRoot)
 
-        // 계약 파일의 HTTP 층 좌표와 규칙이 세는 좌표가 같은지 — 어긋나면 게이트가 다른 곳을 본다.
-        policy.appHttpPackage shouldBe "$appRoot.http"
-        observed.shouldNotBeEmpty()
-        observed.filterNot { it.startsWith(policy.appHttpPackage + ".") } shouldBe emptyList()
+        rules.targets(production, appRoot) shouldBe (allTopLevel - exempt)
+        // 면제가 실재하는 클래스만 가리키는지 — 낡은 이름이 목록에 남아 조용히 넓어지지 않게.
+        exempt - allTopLevel shouldBe emptySet()
+        // `app.http` 는 어느 면제 갈래에도 없다 — 면제는 「어댑터를 쥐어도 되는 자리」다.
+        exempt.filter { it.startsWith(policy.appHttpPackage + ".") } shouldBe emptyList()
+    }
+
+    /** 핸들러 애너테이션을 단 클래스는 어느 패키지에 있어도 대상이다(위반 fixture 로 실측). */
+    @Test
+    fun `HTTP 층 밖의 핸들러도 대상 집합에 든다`() {
         rules.targets(violating, fixtureRoot + ".app").any { it.contains("RogueAdminBumpController") } shouldBe true
+        policy.appHttpPackage shouldBe "$appRoot.http"
     }
 
     @Test
