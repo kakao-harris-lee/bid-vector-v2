@@ -114,6 +114,19 @@ internal class FakeCollectedAxisStore(
     ): Set<bidvector.procurement.NoticeId> = if (endpoint in completedAxes) noticeIds.toSet() else emptySet()
 }
 
+/** 메모리 시도 원장 — 파일 어댑터와 같은 규칙이다: 덧붙이기만 하고 읽기는 값이다. */
+internal class FakeAttemptLedger(
+    seed: List<CollectionAttempt> = emptyList(),
+) : AttemptLedger {
+    val appended = seed.toMutableList()
+
+    override fun append(attempt: CollectionAttempt) {
+        appended += attempt
+    }
+
+    override fun read(): AttemptHistory = AttemptHistory(appended.toList())
+}
+
 /** 메모리 원장 — 파일 어댑터와 같은 규칙이다: 한 번 확정하면 덮어쓰지 않는다. */
 internal class FakeSampleListLedger : SampleListLedger {
     var confirmCount: Int = 0
@@ -135,8 +148,10 @@ internal class OpeningFixture(
     private val alreadySpent: bidvector.procurement.CallSpend =
         bidvector.procurement.CallSpend(total = 0, today = 0),
     collectedAxes: bidvector.procurement.CollectedAxisStore = FakeCollectedAxisStore(),
+    attemptSeed: List<CollectionAttempt> = emptyList(),
 ) {
     val sampleList = FakeSampleListLedger()
+    val attempts = FakeAttemptLedger(attemptSeed)
     val raw = RecordingRawStore()
     val runs = RecordingRunStore()
     val construction = ScriptedOpeningPort(BusinessDivision.CONSTRUCTION)
@@ -157,6 +172,7 @@ internal class OpeningFixture(
             gates = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48),
             collectedAxes = collectedAxes,
             sampleList = sampleList,
+            attempts = attempts,
             clock = Clock { COLLECTION_NOW },
         )
 

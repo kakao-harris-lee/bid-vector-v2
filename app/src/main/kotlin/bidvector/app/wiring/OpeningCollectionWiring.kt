@@ -5,11 +5,10 @@ import bidvector.adapters.koneps.KonepsSourceConfig
 import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.koneps.konepsOpeningResultSourceByNoticeDate
 import bidvector.adapters.persistence.JdbcCollectedAxisStore
-import bidvector.adapters.persistence.JdbcCollectionCallLedgerStore
 import bidvector.adapters.persistence.JdbcCollectionRunLease
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcRawObservationStore
-import bidvector.adapters.snapshot.FileSampleListLedger
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.collection.KonepsCredentialProperties
@@ -20,7 +19,6 @@ import bidvector.app.collection.OpeningCollectionProperties
 import bidvector.app.collection.OpeningCollectionRunner
 import bidvector.app.collection.requireOutsideRepository
 import bidvector.procurement.CollectedAxisStore
-import bidvector.procurement.CollectionCallLedgerStore
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
@@ -37,6 +35,7 @@ import bidvector.workflow.collection.OpeningCollectionSource
 import bidvector.workflow.collection.SampleSize
 import bidvector.workflow.collection.SamplingSeed
 import bidvector.workflow.collection.StratifiedSampler
+import bidvector.workflow.collection.dayStartOf
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import org.slf4j.LoggerFactory
@@ -85,31 +84,31 @@ open class OpeningCollectionWiring {
     ): CollectionRange = resolveCollectionRange(properties.from, properties.to, clock, "공고일 범위")
 
     /**
-     * 두 저장소는 `@ConditionalOnMissingBean` 이다 — 배선 조건 test 가 DB 없이 기동 조건만 재도록
-     * 대체 빈을 먼저 등록할 수 있게 한다. 출하에서는 이 자리를 덮는 빈이 없어 JDBC 구현이 선다.
+     * `@ConditionalOnMissingBean` 이다 — 배선 조건 test 가 DB 없이 기동 조건만 재도록 대체 빈을 먼저
+     * 등록할 수 있게 한다. 출하에서 이 자리를 덮는 빈이 없다는 것은 **선언이 아니라 실측**이다
+     * (실 DB 로 뜬 출하 조립에서 빈 타입을 잰다, D-6G-44).
      */
-    @Bean
-    @ConditionalOnMissingBean
-    open fun collectionCallLedgerStore(dataSource: DataSource): CollectionCallLedgerStore =
-        JdbcCollectionCallLedgerStore(dataSource)
-
     @Bean
     @ConditionalOnMissingBean
     open fun collectedAxisStore(dataSource: DataSource): CollectedAxisStore = JdbcCollectedAxisStore(dataSource)
 
     /**
-     * A-1 승인 상한 — 두 값 모두 설정이 준다. 원장은 **영속에서 seed** 한다(D-6G-29 ①): 승인된 총
-     * 상한은 3~4일에 걸친 여러 실행을 덮으므로, 매 기동마다 0 에서 시작하면 그 상한이 실제로는
-     * 아무것도 막지 못한다.
+     * A-1 승인 상한 — 두 값 모두 설정이 준다. 원장은 **시도 원장에서 seed** 한다(D-6G-45): 승인된
+     * 총 상한은 3~4일에 걸친 여러 실행을 덮으므로 매 기동 0 에서 시작하면 그 상한이 아무것도 막지
+     * 못하고, 받은 페이지만 세면 재시도·5xx·429·타임아웃이 상한 밖에서 나간다. 하루의 경계는
+     * **KST 자정**이다(UTC 자정이 아니다 — 그 사이 아홉 시간의 호출이 오늘치에서 빠진다).
      */
     @Bean
     open fun openingCallBudget(
         properties: OpeningCollectionProperties,
-        ledger: CollectionCallLedgerStore,
+        runState: RunStateDirectory,
         clock: Clock,
     ): CallBudgetLedger {
         val today = LocalDate.ofInstant(clock.now(), OPENING_DATE_ZONE)
-        val spent = ledger.spentSince(properties.budgetSince, today.atStartOfDay(OPENING_DATE_ZONE).toInstant())
+        val spent =
+            runState.attempts
+                .read()
+                .spend(properties.budgetSince, dayStartOf(today, OPENING_DATE_ZONE))
         return CallBudgetLedger(
             CollectionCallBudget(properties.callsPerDay, properties.callsTotal),
             today,
@@ -118,12 +117,12 @@ open class OpeningCollectionWiring {
     }
 
     /**
-     * 표본 목록 파일(D-6G-39) — 첫 실행이 확정하고 이후 실행은 읽기만 한다. 저장소 밖 강제는 기동
-     * 시점이다(경로가 안이면 빈 생성이 실패해 프로세스가 서지 않는다).
+     * 실행 상태 디렉터리(D-6G-39·45) — 확정 표본과 시도 원장이 여기 있다. 저장소 밖 강제도, 디렉터리
+     * 부재 거부도 **기동 시점**이다(조건이 깨지면 빈이 서지 않아 프로세스가 뜨지 않는다).
      */
     @Bean
-    open fun openingSampleListLedger(properties: OpeningCollectionProperties): FileSampleListLedger =
-        FileSampleListLedger(requireOutsideRepository(Path.of(properties.sampleListFile)))
+    open fun openingRunState(properties: OpeningCollectionProperties): RunStateDirectory =
+        RunStateDirectory(requireOutsideRepository(Path.of(properties.runStateDir)))
 
     @Bean
     open fun openingSampler(properties: OpeningCollectionProperties): StratifiedSampler =
@@ -172,7 +171,7 @@ open class OpeningCollectionWiring {
         range: CollectionRange,
         sampler: StratifiedSampler,
         collectedAxes: CollectedAxisStore,
-        sampleList: FileSampleListLedger,
+        runState: RunStateDirectory,
         clock: Clock,
     ): CollectOpeningResultsUseCase {
         val policy = collectionPolicyAt(CollectionReferenceDate(range.to))
@@ -183,7 +182,8 @@ open class OpeningCollectionWiring {
             policyFor = ::collectionPolicyAt,
             gates = policy.detailFetchGates,
             collectedAxes = collectedAxes,
-            sampleList = sampleList,
+            sampleList = runState.sampleList,
+            attempts = runState.attempts,
             clock = clock,
         )
     }

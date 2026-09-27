@@ -27,7 +27,13 @@ internal class MockOpeningKonepsHttp(
      * 사라진다 — 그 건너뜀 자체는 옳은 동작이라 번호를 갈라 둔다.
      */
     private val nonce: String = newNonce(),
+    /**
+     * 이 오퍼레이션들의 **첫 호출**만 HTTP 429 로 돌려준다 — 속도 한도는 재시도 대상이라
+     * (`isRetryableStep`) 한 번 더 나간다. 「받은 페이지 1, 나간 호출 2」를 만드는 자리다(D-6G-45).
+     */
+    private val throttleOnce: Set<String> = emptySet(),
 ) : AutoCloseable {
+    private val throttled = CopyOnWriteArrayList<String>()
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
 
     val listCalls = CopyOnWriteArrayList<String>()
@@ -55,6 +61,11 @@ internal class MockOpeningKonepsHttp(
     private fun respond(exchange: HttpExchange) {
         val query = exchange.requestURI.rawQuery.orEmpty()
         val operation = exchange.requestURI.path.substringAfterLast('/')
+        if (operation in throttleOnce && throttled.addIfAbsent(operation)) {
+            exchange.sendResponseHeaders(HTTP_TOO_MANY_REQUESTS, -1)
+            exchange.close()
+            return
+        }
         val noticeNumber = paramOf(query, "bidNtceNo")
         val items = itemsFor(operation, query, noticeNumber)
         val bytes = envelope(items).toByteArray(StandardCharsets.UTF_8)
@@ -68,13 +79,11 @@ internal class MockOpeningKonepsHttp(
         query: String,
         noticeNumber: String?,
     ): List<Map<String, String>> =
-        // 상세를 **받지 못하는 표본**(D-6G-42) — 응답이 빈 항목이라 원문이 한 줄도 적재되지 않는다.
-        // 표본인데 행이 되지 못하는 두 사유 가운데 하나를 실제 수집 경로로 만든다.
-        if (noticeNumber != null && isDetailOperation(operation) && isDetailless(noticeNumber)) {
-            emptyList()
-        } else {
-            itemsOf(operation, query, noticeNumber)
-        }
+        // 상세를 **받지 못하는 표본**(D-6G-42) — 호출은 실제로 나가고(그래서 여기서도 센다)
+        // 응답만 빈 항목이다. 원문이 한 줄도 적재되지 않아 표본인데 행이 되지 못한다.
+        itemsOf(operation, query, noticeNumber).takeUnless {
+            noticeNumber != null && isDetailOperation(operation) && isDetailless(noticeNumber)
+        } ?: emptyList()
 
     private fun itemsOf(
         operation: String,
@@ -289,6 +298,8 @@ private fun newNonce(): String =
         .uppercase()
 
 private const val NONCE_LENGTH = 8
+
+private const val HTTP_TOO_MANY_REQUESTS = 429
 
 private const val RESERVE_PRICE_ROWS = 15
 

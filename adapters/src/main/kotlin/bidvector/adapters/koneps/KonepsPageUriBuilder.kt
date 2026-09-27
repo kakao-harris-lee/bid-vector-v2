@@ -202,6 +202,7 @@ private class KonepsPageWalkAccumulator {
             truncationCause = truncationCause,
             quotaExceeded = counters.quotaExceeded,
             backoffSkipped = counters.backoffSkipped,
+            httpAttempts = counters.httpAttempts,
             maskingFailures = maskingFailures,
             rowIdentifierIndeterminate = rowIdentifierIndeterminate,
         )

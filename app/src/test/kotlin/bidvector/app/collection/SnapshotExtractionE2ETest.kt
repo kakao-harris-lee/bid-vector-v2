@@ -86,7 +86,7 @@ class SnapshotExtractionE2ETest {
                     "bidvector.opening-collection.calls-per-day" to "10000",
                     "bidvector.opening-collection.calls-total" to "10000",
                     "bidvector.opening-collection.budget-since" to Instant.now().toString(),
-                    "bidvector.opening-collection.sample-list-file" to SAMPLE_LIST_FILE.toString(),
+                    "bidvector.opening-collection.run-state-dir" to RUN_STATE.toString(),
                 ),
             )
         }
@@ -125,8 +125,8 @@ class SnapshotExtractionE2ETest {
             }
         }
 
-        /** 수집이 확정한 표본 목록 파일 — 추출도 **같은 파일**을 읽는다(D-6G-39). */
-        val SAMPLE_LIST_FILE: Path = Files.createTempDirectory("6g-sample-list").resolve("sample-list.tsv")
+        /** 수집이 남긴 실행 상태 — 추출도 **같은 디렉터리**를 읽는다(D-6G-39·45). */
+        val RUN_STATE: Path = Files.createTempDirectory("6g-run-state")
 
         fun extractTo(outputDir: Path): List<Int> =
             bootOnce(
@@ -137,7 +137,7 @@ class SnapshotExtractionE2ETest {
                     "bidvector.snapshot-extract.to" to LocalDate.now().plusDays(1).toString(),
                     "bidvector.snapshot-extract.output-dir" to outputDir.toString(),
                     "bidvector.snapshot-extract.snapshot-id" to "snap-e2e",
-                    "bidvector.snapshot-extract.sample-list-file" to SAMPLE_LIST_FILE.toString(),
+                    "bidvector.snapshot-extract.run-state-dir" to RUN_STATE.toString(),
                 ),
             )
     }

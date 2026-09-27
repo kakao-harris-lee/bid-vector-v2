@@ -46,6 +46,7 @@ private sealed interface PageWalk {
 internal class OpeningSampleFramer(
     private val rawObservations: RawObservationStore,
     private val runs: CollectionRunStore,
+    private val attempts: AttemptLedger,
     private val policyFor: (CollectionReferenceDate) -> KonepsCollectionPolicyData,
     private val clock: Clock,
 ) {
@@ -82,9 +83,20 @@ internal class OpeningSampleFramer(
         while (walk is PageWalk.Next) {
             walk = framePage(referenceDate, source, budget, into, tally, walk.cursor)
         }
+        val accounting = tally.toSourceAccounting()
         runs.record(
-            tally.toSourceAccounting(),
+            accounting,
             CollectionRunMeta(referenceDate, SourceEndpoint.OPENING_RESULT_LIST, startedAt, clock.now()),
+        )
+        // 목록 축은 공고 단위가 아니다 — 슬롯 하나가 여러 공고를 낸다. 공고 키 없이 적는다(D-6G-45).
+        attempts.append(
+            CollectionAttempt(
+                noticeKey = null,
+                axis = SourceEndpoint.OPENING_RESULT_LIST,
+                outcome = attemptOutcomeOf(accounting),
+                at = clock.now(),
+                httpAttempts = accounting.httpAttempts,
+            ),
         )
         return (walk as PageWalk.Stop).halt
     }

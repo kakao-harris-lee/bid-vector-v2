@@ -1,7 +1,7 @@
 package bidvector.app.wiring
 
-import bidvector.adapters.snapshot.FileSampleListLedger
 import bidvector.adapters.snapshot.JdbcSnapshotSource
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.collection.SnapshotExtractionProperties
@@ -32,22 +32,22 @@ open class SnapshotExtractionWiring {
         properties: SnapshotExtractionProperties,
     ): JdbcSnapshotSource = JdbcSnapshotSource(dataSource, collectionPolicyAt(CollectionReferenceDate(properties.to)))
 
-    /** 수집이 확정한 목록을 **읽기만** 한다 — 추출은 표본을 만들지 않는다(D-6G-39). */
+    /** 수집이 남긴 실행 상태를 **읽기만** 한다 — 추출은 표본을 만들지 않는다(D-6G-39). */
     @Bean
-    open fun snapshotSampleListLedger(properties: SnapshotExtractionProperties): FileSampleListLedger =
-        FileSampleListLedger(requireOutsideRepository(Path.of(properties.sampleListFile)))
+    open fun snapshotRunState(properties: SnapshotExtractionProperties): RunStateDirectory =
+        RunStateDirectory(requireOutsideRepository(Path.of(properties.runStateDir)))
 
     @Bean
     open fun snapshotExtractionRunner(
         source: JdbcSnapshotSource,
-        sampleList: FileSampleListLedger,
+        runState: RunStateDirectory,
         properties: SnapshotExtractionProperties,
         termination: CollectionTermination,
     ): SnapshotExtractionRunner {
         val logger = LoggerFactory.getLogger(SnapshotExtractionRunner::class.java)
         return SnapshotExtractionRunner(
             source,
-            sampleList,
+            runState,
             properties,
             CollectionLog { logger.info(it) },
             termination,

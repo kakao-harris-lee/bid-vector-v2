@@ -1,14 +1,12 @@
 package bidvector.app.collection
 
 import bidvector.adapters.persistence.JdbcCollectedAxisStore
-import bidvector.adapters.persistence.JdbcCollectionCallLedgerStore
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
 import bidvector.app.wiring.OPENING_COLLECTION_LOCK_KEY
 import bidvector.app.wiring.RecordingCollectionTermination
 import bidvector.procurement.CollectedAxisStore
-import bidvector.procurement.CollectionCallLedgerStore
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
@@ -52,7 +50,12 @@ class OpeningCollectionE2ETest {
         private const val TEST_CREDENTIAL_VALUE = "opening-e2e-test-fixture-credential"
         private const val SERVICE_KEY = "OPENING-E2E-SENTINEL+KEY/value="
         private const val BIDDER_NAME = "SYN-투찰업체-이름"
-        private const val NOTICES_PER_SLOT = 4
+
+        /**
+         * 업무마다 여섯 — 마지막 하나는 상세 응답이 비어 원문이 한 줄도 남지 않는다. 시도 원장이
+         * 없으면 그 축이 매 실행 다시 불린다(D-6G-45).
+         */
+        private const val NOTICES_PER_SLOT = 6
         private const val TARGET_PER_STRATUM = 2
 
         /** 층 = 업무 × 공고 주 — 이 E2E 는 하루치 두 업무라 층이 둘이다. */
@@ -82,47 +85,41 @@ class OpeningCollectionE2ETest {
         }
     }
 
-    /** test 마다 새 표본 목록 파일 — 앞 test 의 공고번호(nonce 가 다르다)를 표본으로 물려받지 않는다. */
-    private lateinit var sampleListFile: Path
+    /** 전수 표본 — 상세가 비는 마지막 순번까지 표본에 들어야 그 축의 이어 돌기를 잴 수 있다. */
+    private fun censusSample(): Map<String, String> =
+        mapOf("bidvector.opening-collection.sample-size" to (NOTICES_PER_SLOT * DIVISIONS).toString())
+
+    private fun attemptLines(): List<String> =
+        Files.readString(runStateDir.resolve("attempts.jsonl")).trimEnd('\n').lines()
+
+    private fun attemptSum(): Int =
+        attemptLines().sumOf { line -> line.substringAfter("\"http_attempts\":").trimEnd('}').toInt() }
+
+    /** test 마다 새 실행 상태 — 앞 test 의 공고번호(nonce 가 다르다)와 시도를 물려받지 않는다. */
+    private lateinit var runStateDir: Path
 
     private fun bootAndRun(
         extra: Map<String, String>,
+        nonce: String? = null,
+        throttleOnce: Set<String> = emptySet(),
+        reuseRunState: Boolean = false,
         inspect: (org.springframework.context.ApplicationContext) -> Unit = {},
     ): Pair<List<Int>, MockOpeningKonepsHttp> {
         logs.list.clear()
-        sampleListFile = Files.createTempDirectory("6g-e2e-sample").resolve("sample-list.tsv")
-        val mock = MockOpeningKonepsHttp(noticesPerSlot = NOTICES_PER_SLOT, bidderName = BIDDER_NAME)
+        if (!reuseRunState) runStateDir = Files.createTempDirectory("6g-e2e-run-state")
+        val mock =
+            MockOpeningKonepsHttp(
+                noticesPerSlot = NOTICES_PER_SLOT,
+                bidderName = BIDDER_NAME,
+                nonce = nonce ?: newE2ENonce(),
+                throttleOnce = throttleOnce,
+            )
         val context =
             SpringApplicationBuilder(
                 BidVectorApplication::class.java,
                 CollectionTerminationTestConfiguration::class.java,
             ).properties(
-                PRODUCTION_DISPATCH_PROPERTIES +
-                    mapOf(
-                        "server.port" to "0",
-                        "spring.profiles.active" to "collection-e2e",
-                        "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
-                        "bidvector.persistence.username" to postgres.username,
-                        "bidvector.persistence.credential" to postgres.password,
-                        "operator.credential.value" to TEST_CREDENTIAL_VALUE,
-                        "bidvector.evaluation.candidate-cap" to "1000",
-                        "bidvector.opening-collection.mode" to "once",
-                        "bidvector.opening-collection.from" to today.toString(),
-                        "bidvector.opening-collection.to" to today.toString(),
-                        "bidvector.opening-collection.categories" to "construction,service",
-                        "bidvector.opening-collection.sampling-seed" to "6g-e2e-seed",
-                        "bidvector.opening-collection.sample-size" to (TARGET_PER_STRATUM * DIVISIONS).toString(),
-                        "bidvector.opening-collection.calls-per-day" to "1000",
-                        "bidvector.opening-collection.calls-total" to "1000",
-                        // **test 마다 다른 예산 시작 시점.** 원장이 영속이라(D-6G-29 ①) 앞 test 가
-                        // 남긴 collection_run 행이 다음 test 의 상한을 갉아먹는다 — 그것이 영속이
-                        // 실제로 동작한다는 증거이기도 하다.
-                        "bidvector.opening-collection.budget-since" to Instant.now().toString(),
-                        "bidvector.opening-collection.sample-list-file" to sampleListFile.toString(),
-                        "bidvector.koneps.service-key" to SERVICE_KEY,
-                        "bidvector.koneps.base-url" to mock.baseUrl,
-                        "bidvector.koneps.opening.scsbid-base-url" to mock.baseUrl,
-                    ) + extra,
+                PRODUCTION_DISPATCH_PROPERTIES + baseProperties(mock) + extra,
             ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachLogCapture() })
                 .run()
         return try {
@@ -133,6 +130,34 @@ class OpeningCollectionE2ETest {
             mock.close()
         }
     }
+
+    /** 기동 속성의 바탕 — test 가 `extra` 로 덮어쓴다. */
+    private fun baseProperties(mock: MockOpeningKonepsHttp): Map<String, String> =
+        mapOf(
+            "server.port" to "0",
+            "spring.profiles.active" to "collection-e2e",
+            "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+            "bidvector.persistence.username" to postgres.username,
+            "bidvector.persistence.credential" to postgres.password,
+            "operator.credential.value" to TEST_CREDENTIAL_VALUE,
+            "bidvector.evaluation.candidate-cap" to "1000",
+            "bidvector.opening-collection.mode" to "once",
+            "bidvector.opening-collection.from" to today.toString(),
+            "bidvector.opening-collection.to" to today.toString(),
+            "bidvector.opening-collection.categories" to "construction,service",
+            "bidvector.opening-collection.sampling-seed" to "6g-e2e-seed",
+            "bidvector.opening-collection.sample-size" to (TARGET_PER_STRATUM * DIVISIONS).toString(),
+            "bidvector.opening-collection.calls-per-day" to "1000",
+            "bidvector.opening-collection.calls-total" to "1000",
+            // **test 마다 다른 예산 시작 시점.** 원장이 영속이라(D-6G-29 ①) 앞 test 가
+            // 남긴 collection_run 행이 다음 test 의 상한을 갉아먹는다 — 그것이 영속이
+            // 실제로 동작한다는 증거이기도 하다.
+            "bidvector.opening-collection.budget-since" to Instant.now().toString(),
+            "bidvector.opening-collection.run-state-dir" to runStateDir.toString(),
+            "bidvector.koneps.service-key" to SERVICE_KEY,
+            "bidvector.koneps.base-url" to mock.baseUrl,
+            "bidvector.koneps.opening.scsbid-base-url" to mock.baseUrl,
+        )
 
     private fun attachLogCapture() {
         val root = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
@@ -189,18 +214,75 @@ class OpeningCollectionE2ETest {
 
     /**
      * `@ConditionalOnMissingBean` 은 배선 조건 test 가 DB 없이 기동 조건을 재게 하려고 연 자리다.
-     * 그 자리가 **출하에서도** 열려 있으면 승인 상한을 세는 원장과 이어 돌기 저장소가 조용히 다른
-     * 빈으로 갈릴 수 있다 — 메모리 대역이 서면 상한은 매 기동 0 에서 시작하고 이어 돌기는 아무것도
-     * 기억하지 못한다. 실 DB 로 뜬 **출하 조립**에서 실제 타입을 잰다(D-6G-44).
+     * 그 자리가 **출하에서도** 열려 있으면 이어 돌기 저장소가 조용히 다른 빈으로 갈릴 수 있다 —
+     * 메모리 대역이 서면 아무것도 기억하지 못한다. 실 DB 로 뜬 **출하 조립**에서 실제 타입을
+     * 잰다(D-6G-44).
      */
     @Test
-    fun `출하 조립의 원장과 이어 돌기는 JDBC 구현이다`() {
+    fun `출하 조립의 이어 돌기 저장소는 JDBC 구현이다`() {
         bootAndRun(emptyMap()) { context ->
-            context
-                .getBean(CollectionCallLedgerStore::class.java)
-                .shouldBeInstanceOf<JdbcCollectionCallLedgerStore>()
             context.getBean(CollectedAxisStore::class.java).shouldBeInstanceOf<JdbcCollectedAxisStore>()
         }
+    }
+
+    /**
+     * D-6G-45 — 상한은 **시도 원장에서 이어진다.** 매 기동 0 에서 시작하면 승인 총 상한이 3~4일에
+     * 걸친 여러 실행을 덮지 못한다. 첫 실행이 쓴 만큼을 총 상한으로 걸고 **같은 실행 상태**로 다시
+     * 기동해, 두 번째가 한 호출도 내지 않는지 본다.
+     */
+    @Test
+    fun `두 번 기동하면 시도 원장의 합이 상한에 누적된다`() {
+        // **예산 시작 시점을 두 기동에 같게 못 박는다** — 기본값(`now()`)이면 두 번째 기동의
+        // 시작 시점이 첫 기동의 시도보다 뒤라 그 시도들이 계상에서 빠진다.
+        val since = mapOf("bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z")
+        bootAndRun(censusSample() + since, nonce = "ACCUM")
+        val spent = attemptSum()
+
+        val (exitCodes, second) =
+            bootAndRun(
+                censusSample() + since +
+                    mapOf(
+                        "bidvector.opening-collection.calls-per-day" to spent.toString(),
+                        "bidvector.opening-collection.calls-total" to spent.toString(),
+                    ),
+                nonce = "ACCUM",
+                reuseRunState = true,
+            )
+
+        spent shouldBeGreaterThan 0
+        exitCodes shouldContainExactly listOf(CollectionExitCode.INCOMPLETE.value)
+        second.listCalls.shouldBeEmpty()
+        second.detailCallCount() shouldBe 0
+    }
+
+    /**
+     * D-6G-45 — 원장이 세는 것은 **나간 호출**이다. 429 는 재시도 대상이라(`isRetryableStep`) 한 번
+     * 더 나가는데, 받은 페이지만 세면 그 호출이 승인 상한 밖에 남는다.
+     */
+    @Test
+    fun `재시도로 나간 호출도 시도 원장에 실린다`() {
+        bootAndRun(emptyMap(), nonce = "RETRY", throttleOnce = setOf("getOpengResultListInfoCnstwk"))
+
+        val lines = Files.readString(runStateDir.resolve("attempts.jsonl")).trimEnd('\n').lines()
+        val listLines = lines.filter { it.contains("\"axis\":\"OPENING_RESULT_LIST\"") }
+        // 목록 슬롯 하나가 429 를 한 번 물었다 — 그 줄의 시도 수는 받은 페이지 수보다 크다.
+        listLines.any { it.contains("\"http_attempts\":2") } shouldBe true
+    }
+
+    /**
+     * D-6G-45 — **빈 응답도 시도다.** 원문 행의 존재로만 이어 돌기를 판정하면 항목이 하나도 오지
+     * 않은 축은 다음 실행이 영원히 다시 부른다 — 그 공고만큼 상한이 매 실행 새로 탄다.
+     */
+    @Test
+    fun `빈 응답을 받은 축은 다음 기동에서 다시 부르지 않는다`() {
+        bootAndRun(censusSample(), nonce = "EMPTY")
+        val firstDetailCalls = attemptLines().count { it.contains("\"outcome\":\"EMPTY\"") }
+
+        val (_, second) = bootAndRun(censusSample(), nonce = "EMPTY", reuseRunState = true)
+
+        // 첫 실행에 빈 응답이 있었고(공사 마지막 순번), 두 번째는 그 축을 한 번도 부르지 않는다.
+        firstDetailCalls shouldBeGreaterThan 0
+        second.detailCallCount() shouldBe 0
     }
 
     /**
@@ -231,7 +313,7 @@ class OpeningCollectionE2ETest {
     fun `표본 목록이 저장소 밖 파일로 확정된다 — 층마다 목표만큼`() {
         bootAndRun(emptyMap())
 
-        val lines = Files.readString(sampleListFile).trimEnd('\n').lines()
+        val lines = Files.readString(runStateDir.resolve("sample-list.tsv")).trimEnd('\n').lines()
         lines shouldHaveSize TARGET_PER_STRATUM * DIVISIONS
         val hashes = lines.map { it.substringBefore('\t') }
         hashes shouldContainExactly hashes.sorted()
@@ -269,3 +351,12 @@ class OpeningCollectionE2ETest {
         }
     }
 }
+
+private fun newE2ENonce(): String =
+    java.util.UUID
+        .randomUUID()
+        .toString()
+        .take(NONCE_CHARS)
+        .uppercase()
+
+private const val NONCE_CHARS = 8

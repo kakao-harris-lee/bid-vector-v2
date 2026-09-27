@@ -33,6 +33,7 @@ internal class SourceAccountingTally {
     private var backoffSkipped = 0
     private var maskingFailures = 0
     private var rowIdentifierIndeterminate = 0
+    private var httpAttempts = 0
 
     fun absorb(source: CollectionAccounting) {
         received += source.received
@@ -47,6 +48,8 @@ internal class SourceAccountingTally {
         backoffSkipped += source.backoffSkipped
         maskingFailures += source.maskingFailures
         rowIdentifierIndeterminate += source.rowIdentifierIndeterminate
+        // **나간 호출**은 페이지 합이 아니다(D-6G-45) — 재시도가 여기서 떨어지면 상한 밖으로 샌다.
+        httpAttempts += source.httpAttempts
         truncationCause = source.truncationCause
     }
 
@@ -81,5 +84,6 @@ internal class SourceAccountingTally {
             backoffSkipped = backoffSkipped,
             maskingFailures = maskingFailures,
             rowIdentifierIndeterminate = rowIdentifierIndeterminate,
+            httpAttempts = httpAttempts,
         )
 }

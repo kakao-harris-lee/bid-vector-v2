@@ -87,12 +87,12 @@ class FileSampleListLedgerTest {
 
     @Test
     fun `해시는 파일 바이트의 것이다`() {
-        val ledger = ledgerAt("nested/deeper/sample-list.tsv")
+        val ledger = ledgerAt()
         ledger.confirm(outcomeOf("A-1" to CONSTRUCTION_W07, "A-2" to SERVICE_W08))
 
         val read = requireNotNull(ledger.read())
 
-        read.sha256 shouldBe sha256Hex(Files.readString(directory.resolve("nested/deeper/sample-list.tsv")))
+        read.sha256 shouldBe sha256Hex(Files.readString(directory.resolve("sample-list.tsv")))
         read.size shouldBe 2
         // 행에서 역산한 값과 **다르다** — v3 의 순환 대조가 되살아나지 않는다는 뜻이다.
         read.sha256 shouldNotBe SampleOutcome(read.list.keys.toList(), emptyMap()).sampleListSha256

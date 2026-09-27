@@ -2,9 +2,7 @@ package bidvector.app.wiring
 
 import bidvector.app.collection.OpeningCollectionRunner
 import bidvector.app.collection.SnapshotExtractionRunner
-import bidvector.procurement.CallSpend
 import bidvector.procurement.CollectedAxisStore
-import bidvector.procurement.CollectionCallLedgerStore
 import bidvector.procurement.NoticeId
 import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.CallBudgetLedger
@@ -29,26 +27,6 @@ import javax.sql.DataSource
  * 켜졌을 때 **승인 값이 하나라도 없으면 기동하지 않는다**: 호출 상한·표본 seed·층당 목표에 기본값을
  * 두지 않았다는 것이 실제로 기동을 막는지를 여기서 잰다(기본값 부재는 선언이 아니라 거동이어야 한다).
  */
-private object StubLedgerStore : CollectionCallLedgerStore {
-    // 무엇을 물었는지 기록한다 — 배선이 상한을 0 에서 시작하거나 하루 경계를 UTC 로 잡으면 승인
-    // 상한이 조용히 무력해진다: 매 기동 0 이면 총 상한이 아무것도 막지 못하고, UTC 자정이면 KST
-    // 자정과 그 사이 아홉 시간의 호출이 오늘치에서 빠진다.
-    var lastSince: java.time.Instant? = null
-    var lastDayStart: java.time.Instant? = null
-
-    override fun spentSince(
-        since: java.time.Instant,
-        dayStart: java.time.Instant,
-    ): CallSpend {
-        lastSince = since
-        lastDayStart = dayStart
-        return CallSpend(total = SEEDED_TOTAL, today = SEEDED_TODAY)
-    }
-}
-
-private const val SEEDED_TOTAL = 40
-private const val SEEDED_TODAY = 7
-
 private object StubAxisStore : CollectedAxisStore {
     override fun alreadyCollected(
         endpoint: SourceEndpoint,
@@ -56,8 +34,8 @@ private object StubAxisStore : CollectedAxisStore {
     ): Set<NoticeId> = emptySet()
 }
 
-/** 저장소 밖 — 배선은 경로를 검사할 뿐 파일을 만들지 않는다(표본 확정은 수집이 한다). */
-private val WIRING_SAMPLE_LIST: Path = Files.createTempDirectory("6g-wiring-sample").resolve("sample-list.tsv")
+/** 저장소 밖 — 배선은 디렉터리가 **있는지**만 본다(표본 확정과 시도 기록은 수집이 한다). */
+private val WIRING_RUN_STATE: Path = Files.createTempDirectory("6g-wiring-run-state")
 
 class OpeningCollectionWiringTest {
     private val fixedNow = Instant.parse("2026-09-24T03:00:00Z")
@@ -73,7 +51,7 @@ class OpeningCollectionWiringTest {
             "bidvector.opening-collection.calls-per-day=100",
             "bidvector.opening-collection.calls-total=1000",
             "bidvector.opening-collection.budget-since=2026-01-01T00:00:00Z",
-            "bidvector.opening-collection.sample-list-file=$WIRING_SAMPLE_LIST",
+            "bidvector.opening-collection.run-state-dir=$WIRING_RUN_STATE",
             "bidvector.koneps.service-key=WIRING-TEST-KEY",
         )
 
@@ -86,7 +64,6 @@ class OpeningCollectionWiringTest {
         val context = AnnotationConfigApplicationContext()
         TestPropertyValues.of(*properties).applyTo(context)
         // DB 없이 기동 **조건**만 잰다 — 저장소 둘을 대체 빈으로 먼저 세운다(출하에서는 JDBC 구현).
-        context.registerBean(CollectionCallLedgerStore::class.java, Supplier { StubLedgerStore })
         context.registerBean(CollectedAxisStore::class.java, Supplier { StubAxisStore })
         context.register(OpeningCollectionWiring::class.java)
         context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
@@ -96,6 +73,18 @@ class OpeningCollectionWiringTest {
     }
 
     private fun bootWithout(key: String): Booted = boot(*approved.filterNot { it.startsWith("$key=") }.toTypedArray())
+
+    /** 시도 원장을 미리 깐다 — 앞 실행이 남긴 상태를 재현한다. */
+    private fun seedAttempts(vararg lines: Pair<String, Int>) {
+        val file = WIRING_RUN_STATE.resolve("attempts.jsonl")
+        Files.writeString(
+            file,
+            lines.joinToString("") { (at, attempts) ->
+                """{"at":"$at","axis":"OPENING_RESULT_LIST","notice_key_hash":null,""" +
+                    """"outcome":"SUCCEEDED","http_attempts":$attempts}""" + "\n"
+            },
+        )
+    }
 
     /** 승인 설정에서 한 항목만 바꿔 넣는다 — 하나만 넘기면 나머지가 없어 조건 자체가 서지 않는다. */
     private fun bootWith(property: String): Booted =
@@ -127,21 +116,25 @@ class OpeningCollectionWiringTest {
     }
 
     /**
-     * 상한은 **영속에서 seed** 된다(D-6G-29 ①). 승인된 총 상한은 3~4일에 걸친 여러 실행을 덮으므로
-     * 매 기동 0 에서 시작하면 그 상한이 실제로는 아무것도 막지 못한다.
+     * 상한은 **시도 원장에서 seed** 된다(D-6G-45). 매 기동 0 에서 시작하면 승인 총 상한이 3~4일에
+     * 걸친 여러 실행을 덮지 못하고, 하루 경계를 UTC 로 잡으면 KST 자정과 그 사이 아홉 시간의 호출이
+     * 오늘치에서 빠진다. 둘 다 조용한 실패라 **원장 파일을 미리 깔고** 잰다.
+     *
+     * 고정 시계는 `2026-09-24T03:00Z` = KST 12:00 → 그날 KST 자정은 전날 `15:00Z` 다. 두 줄을 그
+     * 경계 양쪽에 두어 오늘치가 한 줄만 세는지 본다.
      */
     @Test
-    fun `호출 상한은 원장이 읽은 값에서 시작한다 — 0 이 아니다`() {
-        val booted = boot(*approved)
+    fun `호출 상한은 시도 원장의 HTTP 시도 합에서 시작한다 — KST 경계로`() {
+        seedAttempts(
+            "2026-09-23T16:00:00Z" to 6,
+            "2026-09-23T14:00:00Z" to 1,
+        )
 
-        use(booted) { context ->
+        use(boot(*approved)) { context ->
             val ledger = context.getBean(CallBudgetLedger::class.java)
-            ledger.spentTotal shouldBe SEEDED_TOTAL
-            ledger.spentToday shouldBe SEEDED_TODAY
+            ledger.spentTotal shouldBe 7
+            ledger.spentToday shouldBe 6
         }
-        StubLedgerStore.lastSince shouldBe Instant.parse("2026-01-01T00:00:00Z")
-        // 고정 시계는 2026-09-24T03:00Z = KST 12:00 → 그날 KST 자정은 전날 15:00Z 다.
-        StubLedgerStore.lastDayStart shouldBe Instant.parse("2026-09-23T15:00:00Z")
     }
 
     @Test
@@ -162,13 +155,13 @@ class OpeningCollectionWiringTest {
     }
 
     /**
-     * 표본 목록 자리를 지어내지 않는다(D-6G-39) — 기본 경로를 두면 다른 수집의 표본을 조용히
-     * 이어받는다. 저장소 **안**을 가리키면 기동이 실패한다(D-6G-43): 표본 목록은 커밋되지 않는다.
+     * 실행 상태 자리를 지어내지 않는다(D-6G-39·45) — 기본 경로를 두면 다른 수집의 표본과 시도를
+     * 조용히 이어받는다. 저장소 **안**을 가리키면 기동이 실패한다(D-6G-43).
      */
     @Test
-    fun `표본 목록 파일이 없거나 저장소 안이면 기동하지 않는다`() {
-        bootWithout("bidvector.opening-collection.sample-list-file").failure shouldNotBe null
-        bootWith("bidvector.opening-collection.sample-list-file=reports/evidence/sample-list.tsv")
+    fun `실행 상태 디렉터리가 없거나 저장소 안이면 기동하지 않는다`() {
+        bootWithout("bidvector.opening-collection.run-state-dir").failure shouldNotBe null
+        bootWith("bidvector.opening-collection.run-state-dir=reports/evidence")
             .failure shouldNotBe null
     }
 
@@ -219,7 +212,7 @@ class SnapshotExtractionWiringTest {
             "bidvector.snapshot-extract.to=2026-06-30",
             "bidvector.snapshot-extract.output-dir=/tmp/bidvector-snapshot-wiring-test",
             "bidvector.snapshot-extract.snapshot-id=wiring-test",
-            "bidvector.snapshot-extract.sample-list-file=$WIRING_SAMPLE_LIST",
+            "bidvector.snapshot-extract.run-state-dir=$WIRING_RUN_STATE",
         )
 
     private fun boot(vararg properties: String): Pair<AnnotationConfigApplicationContext, Throwable?> {
@@ -256,29 +249,29 @@ class SnapshotExtractionWiringTest {
 
     /**
      * 해시를 설정으로 받지 않는다(D-6G-39) — 받으면 실행자가 적어 넣은 문자열이 「결과를 보기 전에
-     * 확정됐다」의 증거 행세를 한다. 수집이 확정한 **파일**을 가리키게 하고 해시는 그 바이트에서 낸다.
+     * 확정됐다」의 증거 행세를 한다. 수집의 **실행 상태**를 가리키게 하고 해시는 그 바이트에서 낸다.
      */
     @Test
-    fun `표본 목록 파일이 없으면 기동하지 않는다 — 해시를 설정으로 받지 않는다`() {
+    fun `실행 상태 디렉터리가 없으면 기동하지 않는다 — 해시를 설정으로 받지 않는다`() {
         val (_, failure) =
             boot(
                 *approved
-                    .filterNot { it.startsWith("bidvector.snapshot-extract.sample-list-file=") }
+                    .filterNot { it.startsWith("bidvector.snapshot-extract.run-state-dir=") }
                     .toTypedArray(),
             )
 
         failure shouldNotBe null
     }
 
-    /** 표본 목록도 저장소 밖이다(D-6G-43) — 실험 입력은 커밋되지 않는다. */
+    /** 실행 상태도 저장소 밖이다(D-6G-43) — 실험 입력은 커밋되지 않는다. */
     @Test
-    fun `표본 목록 파일이 저장소 안이면 기동하지 않는다`() {
+    fun `실행 상태 디렉터리가 저장소 안이면 기동하지 않는다`() {
         val (_, failure) =
             boot(
                 *approved
-                    .filterNot { it.startsWith("bidvector.snapshot-extract.sample-list-file=") }
+                    .filterNot { it.startsWith("bidvector.snapshot-extract.run-state-dir=") }
                     .toTypedArray(),
-                "bidvector.snapshot-extract.sample-list-file=reports/evidence/sample-list.tsv",
+                "bidvector.snapshot-extract.run-state-dir=reports/evidence",
             )
 
         failure shouldNotBe null

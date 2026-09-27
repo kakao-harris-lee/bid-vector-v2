@@ -55,50 +55,12 @@ private fun observation(
 private fun noticeId(number: String): NoticeId = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
 
 /**
- * D-6G-40 — 상한과 이어 돌기가 **출하 경로에서** 서는지. 둘 다 영속을 읽는 자리이고, 조용히 0 을
- * 내면 승인 상한이 아무것도 막지 못하고(매 기동 0 에서 시작) 이어 돌기가 표본 전체를 다시 부른다.
- * fake 로는 그 조용함이 드러나지 않아 실 Postgres 로 잰다.
+ * D-6G-40 — 이어 돌기가 **출하 경로에서** 서는지. 조용히 빈 집합을 내면 표본 전체를 다시 불러
+ * 승인 상한을 그만큼 태운다. fake 로는 그 조용함이 드러나지 않아 실 Postgres 로 잰다.
+ *
+ * 상한 seed 는 이 자리에 없다 — `collection_run` 이 아니라 **시도 원장 파일**이 센다(D-6G-45).
  */
 class OpeningCollectionLedgerTest : PersistenceTestSupport() {
-    private fun ledger() = JdbcCollectionCallLedgerStore(dataSource())
-
-    private fun runs() = JdbcCollectionRunStore(dataSource())
-
-    @Test
-    fun `쓴 호출 수는 collection_run 의 pages_fetched 합이다`() {
-        runs().record(accounting(pages = 3), runMeta(Instant.parse("2026-09-24T01:00:00Z")))
-        runs().record(accounting(pages = 4), runMeta(Instant.parse("2026-09-24T02:00:00Z")))
-
-        val spend = ledger().spentSince(SINCE, DAY_START)
-
-        spend.total shouldBe 7
-        spend.today shouldBe 7
-    }
-
-    /** 승인 시작 전의 수집(다른 slice 의 실수집)은 이 예산에 계상하지 않는다. */
-    @Test
-    fun `since 이전 실행은 총계에 들어가지 않는다`() {
-        runs().record(accounting(pages = 5), runMeta(Instant.parse("2026-09-19T23:00:00Z")))
-        runs().record(accounting(pages = 2), runMeta(Instant.parse("2026-09-24T01:00:00Z")))
-
-        ledger().spentSince(SINCE, DAY_START).total shouldBe 2
-    }
-
-    /**
-     * 하루의 경계는 **호출부가 주는 `dayStart`** 다. KST 자정(= 전날 15:00Z)과 UTC 자정 사이에 난
-     * 실행이 오늘치에 드는지가 그 경계의 전부다 — UTC 로 세면 이 행이 빠진다.
-     */
-    @Test
-    fun `오늘치는 dayStart 이후만 센다 — KST 자정과 UTC 자정 사이도 오늘이다`() {
-        runs().record(accounting(pages = 6), runMeta(Instant.parse("2026-09-23T16:00:00Z")))
-        runs().record(accounting(pages = 1), runMeta(Instant.parse("2026-09-23T14:00:00Z")))
-
-        val spend = ledger().spentSince(SINCE, DAY_START)
-
-        spend.total shouldBe 7
-        spend.today shouldBe 6
-    }
-
     @Test
     fun `이어 돌기는 이미 받은 축의 공고를 돌려준다`() {
         val id = noticeId("20260924001-00")

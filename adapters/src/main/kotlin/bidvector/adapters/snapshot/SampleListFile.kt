@@ -79,12 +79,13 @@ class ConfirmedSampleList(
  */
 class FileSampleListLedger(
     private val file: Path,
+    /** 확정 바이트를 실행 상태에 못 박는다(D-6G-45) — 바깥에서 목록을 바꿔치우면 드러난다. */
+    private val onConfirmed: (String) -> Unit = {},
 ) : SampleListLedger {
     override fun confirmed(): SampleList? = read()?.list
 
     override fun confirm(sample: SampleOutcome): SampleList {
         val text = SampleListFile.render(sample)
-        file.parent?.let { Files.createDirectories(it) }
         val won =
             try {
                 Files.writeString(file, text, StandardOpenOption.CREATE_NEW)
@@ -93,7 +94,9 @@ class FileSampleListLedger(
                 // 경쟁에서 졌다 — 제어 흐름이 아니라 원자적 생성의 결과 판독이다.
                 false
             }
-        return if (won) SampleListFile.parse(text) else requireNotNull(confirmed()) { "표본 목록 파일을 읽지 못했다" }
+        if (!won) return requireNotNull(confirmed()) { "표본 목록 파일을 읽지 못했다" }
+        onConfirmed(text)
+        return SampleListFile.parse(text)
     }
 
     /** 확정된 파일의 바이트까지 — 추출이 manifest 해시와 곁파일 복사에 쓴다. */

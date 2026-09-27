@@ -128,6 +128,12 @@ data class CollectionAccounting(
     val backoffSkipped: Int = 0,
     val maskingFailures: Int = 0,
     val rowIdentifierIndeterminate: Int = 0,
+    /**
+     * **나간 HTTP 호출 수**(D-6G-45) — 재시도·5xx·429·타임아웃 포함. [pagesFetched] 는 **받은**
+     * 페이지라 둘이 다르다: 세 번 시도해 한 장을 받았으면 페이지 1, 시도 3 이다. 승인 호출 상한이
+     * 세야 하는 것은 시도 쪽이고, 성공 페이지만 세면 재시도가 상한 밖에서 나간다.
+     */
+    val httpAttempts: Int = 0,
 ) {
     init {
         require(received >= 0 && normalized >= 0 && duplicate >= 0 && dropped >= 0) {

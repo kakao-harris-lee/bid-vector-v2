@@ -47,6 +47,18 @@ internal class KonepsAttemptCounters {
     var backoffSkipped: Int = 0
         private set
 
+    /**
+     * **실제로 나간 HTTP 호출 수**(D-6G-45) — 재시도·5xx·429·타임아웃을 전부 포함한다. 받은
+     * 페이지 수(`pagesFetched`)와 다르다: 한 페이지를 세 번 시도해 받았으면 페이지는 1, 시도는 3
+     * 이다. 승인 호출 상한이 세야 하는 것은 **시도** 쪽이다 — 거절당한 호출도 쿼터를 쓴다.
+     */
+    var httpAttempts: Int = 0
+        private set
+
+    fun recordHttpAttempt() {
+        httpAttempts++
+    }
+
     fun recordQuotaSignal() {
         quotaExceeded++
     }
@@ -174,6 +186,7 @@ internal fun fetchPageResilient(
     counters: KonepsAttemptCounters,
 ): KonepsCallOutcome {
     val supplier = {
+        counters.recordHttpAttempt()
         val step = rawStep(httpClient, uri, httpPolicy, collectionPolicy)
         if (isQuotaSignal(step)) counters.recordQuotaSignal()
         step

@@ -1,8 +1,8 @@
 package bidvector.app.collection
 
 import bidvector.adapters.snapshot.ConfirmedSampleList
-import bidvector.adapters.snapshot.FileSampleListLedger
 import bidvector.adapters.snapshot.JdbcSnapshotSource
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.adapters.snapshot.SnapshotCounts
 import bidvector.adapters.snapshot.SnapshotExtraction
 import bidvector.adapters.snapshot.SnapshotWriter
@@ -30,10 +30,10 @@ data class SnapshotExtractionProperties(
     val outputDir: String,
     val snapshotId: String,
     /**
-     * 수집 갈래가 확정한 표본 목록 파일(D-6G-39) — 저장소 밖. 해시를 설정으로 받지 않는다: 받으면
+     * 수집 갈래의 실행 상태 디렉터리(D-6G-39·45) — 저장소 밖. 해시를 설정으로 받지 않는다: 받으면
      * 실행자가 적어 넣은 문자열이 「결과를 보기 전에 확정됐다」의 증거 행세를 한다. 파일에서 읽는다.
      */
-    val sampleListFile: String,
+    val runStateDir: String,
 )
 
 /**
@@ -43,7 +43,7 @@ data class SnapshotExtractionProperties(
 @Suppress("TooGenericExceptionCaught")
 class SnapshotExtractionRunner(
     private val source: JdbcSnapshotSource,
-    private val sampleList: FileSampleListLedger,
+    private val runState: RunStateDirectory,
     private val properties: SnapshotExtractionProperties,
     private val log: CollectionLog,
     private val termination: CollectionTermination,
@@ -62,7 +62,7 @@ class SnapshotExtractionRunner(
 
     @Suppress("TooGenericExceptionCaught")
     private fun extract() {
-        val sample = requireNotNull(sampleList.read()) { "확정된 표본 목록 파일이 없다 — 수집이 먼저다" }
+        val sample = requireNotNull(runState.confirmedSampleList()) { "확정된 표본 목록이 없다 — 수집이 먼저다" }
         val extraction = source.extract(properties.from, properties.to, sample.list)
         val rows = SnapshotWriter.renderRows(extraction.rows)
         val period = openingPeriod(extraction, properties.from..properties.to)

@@ -2,6 +2,7 @@ package bidvector.workflow.collection
 
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectedAxisStore
+import bidvector.procurement.CollectionAccounting
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
 import bidvector.procurement.CollectionRunStore
@@ -92,6 +93,42 @@ private fun detailAxesFor(division: BusinessDivision): List<DetailAxis> =
         }
     }
 
+/**
+ * 절단 사유의 **원장 어휘** — `::class.simpleName` 을 쓰지 않는다. 리플렉션이라 모듈 경계 게이트가
+ * 막기도 하지만, 더 나쁜 것은 클래스 이름이 영속 파일의 값이 되는 것이다: 타입 이름을 바꾸면 앞
+ * 실행이 남긴 원장을 읽지 못한다. 소진 `when` 이라 새 사유를 더하면 컴파일이 여기를 가리킨다.
+ */
+private fun codeOf(cause: TruncationCause): String =
+    when (cause) {
+        TruncationCause.MaxPages -> "MAX_PAGES"
+        TruncationCause.RepeatedPage -> "REPEATED_PAGE"
+        TruncationCause.QuotaExhausted -> "QUOTA_EXHAUSTED"
+        TruncationCause.Timeout -> "TIMEOUT"
+        TruncationCause.TransportFailure -> "TRANSPORT_FAILURE"
+        TruncationCause.ServerError -> "SERVER_ERROR"
+        TruncationCause.NotRetryable -> "NOT_RETRYABLE"
+        TruncationCause.InputError -> "INPUT_ERROR"
+        TruncationCause.Unclassified -> "UNCLASSIFIED"
+        TruncationCause.StructureFailure -> "STRUCTURE_FAILURE"
+        TruncationCause.SelfThrottled -> "SELF_THROTTLED"
+    }
+
+/** 시도의 결말 — 절단은 오류, 항목 0 은 빈 응답, 그 밖은 성공. 빈 응답은 오류가 아니다. */
+internal fun attemptOutcomeOf(accounting: CollectionAccounting): AttemptOutcome =
+    when {
+        accounting.truncationCause != null -> {
+            AttemptOutcome.Failed(codeOf(accounting.truncationCause!!))
+        }
+
+        accounting.received == 0 -> {
+            AttemptOutcome.Empty
+        }
+
+        else -> {
+            AttemptOutcome.Succeeded
+        }
+    }
+
 private enum class DetailAxis(
     val endpoint: SourceEndpoint,
 ) {
@@ -138,9 +175,10 @@ class CollectOpeningResultsUseCase(
     private val gates: DetailFetchGates,
     private val collectedAxes: CollectedAxisStore,
     sampleList: SampleListLedger,
+    private val attempts: AttemptLedger,
     private val clock: Clock,
 ) {
-    private val framer = OpeningSampleFramer(rawObservations, runs, policyFor, clock)
+    private val framer = OpeningSampleFramer(rawObservations, runs, attempts, policyFor, clock)
     private val samples = SampleResolution(sampler, sampleList)
 
     /**
@@ -249,6 +287,7 @@ class CollectOpeningResultsUseCase(
             calls++
             batch.items.forEach(rawObservations::append)
             recordDetailRun(batch, axes[index])
+            recordAttempt(picked, axes[index], batch)
             if (batch.accounting.truncationCause == TruncationCause.QuotaExhausted) {
                 halt =
                     OpeningCollectionHalt(
@@ -276,11 +315,43 @@ class CollectOpeningResultsUseCase(
         )
     }
 
-    /** 이미 받은 (공고, 축) — 이어 돌기의 입력(D-6G-29 ③). */
+    /**
+     * 시도한 축을 적는다(D-6G-45) — **빈 응답도 시도다.** 원문 행의 존재로만 판정하면 항목이 하나도
+     * 오지 않은 축은 다음 실행이 영원히 다시 부른다. 나간 HTTP 수도 여기 실려 다음 실행의 상한
+     * seed 가 재시도까지 본다.
+     */
+    private fun recordAttempt(
+        picked: Candidate,
+        axis: DetailAxis,
+        batch: SourceBatch<RawNoticeObservation>,
+    ) {
+        attempts.append(
+            CollectionAttempt(
+                noticeKey = picked.candidate.key,
+                axis = axis.endpoint,
+                outcome = attemptOutcomeOf(batch.accounting),
+                at = clock.now(),
+                httpAttempts = batch.accounting.httpAttempts,
+            ),
+        )
+    }
+
+    /**
+     * 이어 돌기의 입력(D-6G-29 ③ · D-6G-45) — **시도 원장 ∪ 원문 관측**이다. 원문만 보면 빈 응답이
+     * 영원히 다시 불리고, 시도 원장만 보면 원장 없이 적재된 앞 실행의 원문을 못 본다.
+     */
     private fun alreadyCollectedAxes(ids: List<NoticeId>): Map<NoticeId, Set<DetailAxis>> {
         val out = mutableMapOf<NoticeId, MutableSet<DetailAxis>>()
         DetailAxis.entries.forEach { axis ->
             collectedAxes.alreadyCollected(axis.endpoint, ids).forEach { id ->
+                out.getOrPut(id) { mutableSetOf() }.add(axis)
+            }
+        }
+        // 실행마다 한 번 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다.
+        val attempted = attempts.read().attemptedAxes()
+        ids.forEach { id ->
+            val tried = attempted[NoticeKeyHash.of(id.number.value, id.round.value)].orEmpty()
+            DetailAxis.entries.filter { it.endpoint in tried }.forEach { axis ->
                 out.getOrPut(id) { mutableSetOf() }.add(axis)
             }
         }
