@@ -35,6 +35,7 @@ private fun newSource(
         listSourceEndpoint = SourceEndpoint.OPENING_AWARD_LIST,
         reserveDetailBaseUri = server.baseUri,
         openingCompleteBaseUri = server.baseUri,
+        bidPriceFormulaABaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
                 httpClient = HttpClient.newHttpClient(),
@@ -57,6 +58,7 @@ private fun newResultListSource(
         listSourceEndpoint = SourceEndpoint.OPENING_RESULT_LIST,
         reserveDetailBaseUri = server.baseUri,
         openingCompleteBaseUri = server.baseUri,
+        bidPriceFormulaABaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
                 httpClient = HttpClient.newHttpClient(),

@@ -121,6 +121,25 @@ internal object KonepsOperationPolicy {
             requiresNoticeRound = true,
             rowIdentifierRawKeys = listOf("prcbdrNm"),
         )
+
+    /**
+     * 입찰가격산식 A 정보(**입찰공고정보서비스** op 24, M6/6G D-6G-12) — 이 군의 `inqryDiv` 는
+     * **1 = 공고게시일시 · 2 = 입찰공고번호**다(문서 문면). 단건 조회로 쓰므로 `2` 이고
+     * `bidNtceNo` 가 필수다. 다른 군의 `2` 와 값이 같은 것은 우연이다 — 군마다 축이 다르다는
+     * 것이 이 서술자가 있는 이유다.
+     *
+     * `bidNtceOrd` 는 문서가 **요청** 항목으로 적지 않는다 — 보내지 않는다(옵션이라는 근거가
+     * 없는 파라미터를 지어내지 않는다). 대신 **응답**이 차수를 싣고(`bidNtceOrd` 필수 항목),
+     * 한 공고번호에 차수가 여럿이면 그 키가 행을 가른다.
+     */
+    val BID_PRICE_FORMULA_A =
+        KonepsOperationDescriptor(
+            inquiryDivValue = "2",
+            requiresPeriodWindow = false,
+            requiresNoticeNumber = true,
+            requiresNoticeRound = false,
+            rowIdentifierRawKeys = listOf("bidNtceOrd"),
+        )
 }
 
 /**

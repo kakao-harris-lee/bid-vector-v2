@@ -20,4 +20,6 @@ internal val NOTICE_IDENTIFIER_PRESENT_IN: Set<SourceEndpoint> =
         SourceEndpoint.RESERVE_PRICE_DETAIL,
         SourceEndpoint.LICENSE_LIMIT_DETAIL,
         SourceEndpoint.OPENING_COMPLETE,
+        // M6/6G D-6G-12 — 입찰가격산식 A 정보도 「어느 공고의 행인가」를 필수 항목으로 싣는다.
+        SourceEndpoint.BID_PRICE_FORMULA_A,
     )

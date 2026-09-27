@@ -64,6 +64,15 @@ interface OpeningResultSourcePort {
      * canonical 승격은 이 port 의 몫이 아니다).
      */
     fun fetchOpeningCompleteResults(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
+
+    /**
+     * M6/6G D-6G-12 — 입찰가격산식 A 정보(`getBidPblancListBidPrceCalclAInfo`) 단건 조회.
+     * 위 둘과 같은 성질(공고당 1콜 · 증거 값 요구)이라 새 결정 타입을 만들지 않는다. A 합산
+     * 항목·적용 여부 술어·공개일시는 raw 관측까지만 간다 — canonical 자리는 이 slice 가 열지
+     * 않는다(D-6G-1 「새 표·마이그레이션 없음」). **낙찰정보서비스가 아니라 입찰공고정보
+     * 서비스**의 오퍼레이션이라 baseUri 가 다른 서비스를 가리킨다.
+     */
+    fun fetchBidPriceFormulaA(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
 }
 
 /**

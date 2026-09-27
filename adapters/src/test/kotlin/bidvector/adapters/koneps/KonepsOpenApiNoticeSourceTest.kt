@@ -212,6 +212,37 @@ class KonepsOpenApiNoticeSourceTest {
     }
 
     /**
+     * M6/6G D-6G-12 — 낙찰방법 둘은 **이미 오던 응답**에 있었고 계약이 없어 떨어지고 있었다.
+     * 계약 행 추가가 실제로 wire 에 닿는지(관측까지 살아남는지)를 잰다 — 계약 표만 보는
+     * test 는 「그 값이 실제로 오는가」를 재지 못한다.
+     */
+    @Test
+    fun `D-6G-12 — 낙찰방법 코드·명이 관측까지 살아남고 미지 필드로 세지 않는다`() {
+        val items =
+            listOf(
+                mapOf(
+                    "bidNtceNo" to "SYN-6G-0002",
+                    "bidNtceOrd" to "000",
+                    "sucsfbidLwltRate" to "87.745",
+                    "sucsfbidMthdCd" to "낙030001",
+                    "sucsfbidMthdNm" to "적격심사제-추정가격 2억원 미만인 용역",
+                ),
+            )
+        val body = KonepsEnvelopeFixtures.success(items, totalCount = 1, pageNo = 1, numOfRows = 100)
+        MockKonepsServer.start(listOf(MockKonepsResponse.Reply(200, body))).use { server ->
+            val batch = newSource(server, testKonepsHttpPolicy()).fetchNotices(REFERENCE_DATE, null)
+
+            val observation = batch.items.single()
+            val code = fieldContractFor(FieldConcept.AWARD_METHOD_CODE)
+            val name = fieldContractFor(FieldConcept.AWARD_METHOD_NAME)
+            observation.valueOf(code) shouldBe "낙030001"
+            observation.valueOf(name) shouldBe "적격심사제-추정가격 2억원 미만인 용역"
+            // 제로패딩·한글 접두가 보존된다(IDENTIFIER 축 — 수치로 접지 않는다).
+            batch.accounting.unknownFields shouldBe 0
+        }
+    }
+
+    /**
      * M6/6G D-6G-11 이 이 자리의 판정을 바꿨다 — `resultCode 22` 는 **일 트래픽 한도**라
      * 백오프로 회복되지 않는다. 재시도는 거부될 호출을 더 낼 뿐이고, 회복되는 축은 HTTP 429
      * (속도 한도, legacy 실측 「~2분 안에 회복, 원인은 동시성」)이다. 두 축이 다르다는 것은

@@ -47,6 +47,7 @@ class KonepsOpeningResultSource(
     private val listSourceEndpoint: SourceEndpoint,
     private val reserveDetailBaseUri: URI,
     private val openingCompleteBaseUri: URI,
+    private val bidPriceFormulaABaseUri: URI,
     private val config: KonepsSourceConfig,
 ) : OpeningResultSourcePort {
     private val retryName = "koneps-opening-${listSourceEndpoint.name.lowercase()}"
@@ -137,6 +138,30 @@ class KonepsOpeningResultSource(
                 SourceEndpoint.OPENING_COMPLETE,
                 observedAt,
                 KonepsOperationPolicy.OPENING_COMPLETE.rowIdentifierRawKeys,
+            )
+        }
+
+    /**
+     * 입찰가격산식 A 정보(M6/6G D-6G-12) — 공사 하한가 산식의 A 를 나른다.
+     * [bidPriceFormulaABaseUri] 는 위 셋과 **다른 서비스**(입찰공고정보서비스)의 엔드포인트라
+     * baseUri 가 넷이 된다. 항목 매핑은 같은 masking 경로를 지난다 — 이 응답에는 사업자·개인
+     * 식별자 키가 없지만 계약 미등재 키를 떨어뜨리는 반전은 그대로 선다.
+     */
+    override fun fetchBidPriceFormulaA(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation> =
+        fetchSingleKonepsNotice(
+            config,
+            retry,
+            rateLimiter,
+            bidPriceFormulaABaseUri,
+            KonepsOperationPolicy.BID_PRICE_FORMULA_A,
+            evidence.noticeId,
+        ) { item, itemPolicy, observedAt ->
+            mapMaskedOpeningItem(
+                item,
+                itemPolicy,
+                SourceEndpoint.BID_PRICE_FORMULA_A,
+                observedAt,
+                KonepsOperationPolicy.BID_PRICE_FORMULA_A.rowIdentifierRawKeys,
             )
         }
 }

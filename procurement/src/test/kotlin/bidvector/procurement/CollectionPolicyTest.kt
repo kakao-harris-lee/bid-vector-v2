@@ -82,6 +82,25 @@ private val EXPECTED_ADOPTED_FIELD_RAW_NAMES: Set<String> =
         "drwtNo1",
         "drwtNo2",
         "bidprcDt",
+        // M6/6G D-6G-12 — 낙찰방법 둘. 공고 목록 응답에 이미 오던 키이고 계약이 없어
+        // 떨어지고 있었다(제외 조건 ①⑦⑩의 1차 입력).
+        "sucsfbidMthdCd",
+        "sucsfbidMthdNm",
+        // M6/6G D-6G-12 — 입찰가격산식 A 정보(op 24) 13행. A 합산 항목 일곱 + 표준시장단가
+        // 금액 + 적용 여부 술어 둘 + 일시 둘 + 예정가격결정방법명.
+        "npnInsrprm",
+        "mrfnHealthInsrprm",
+        "odsnLngtrmrcprInsrprm",
+        "rtrfundNon",
+        "sftyMngcst",
+        "sftyChckMngcst",
+        "qltyMngcst",
+        "smkpAmt",
+        "qltyMngcstAObjYn",
+        "smkpAmtYn",
+        "ntceNticeDt",
+        "bidPrceCalclAOpenDt",
+        "prearngPrceDcsnMthdNm",
     )
 
 /**
@@ -131,7 +150,7 @@ class CollectionPolicyTest {
     }
 
     @Test
-    fun `bidNtceNo·bidNtceOrd 는 개찰 축 세 엔드포인트 + license-limit + 개찰완료에도 실린다 — F-6·G-4·P-13`() {
+    fun `bidNtceNo·bidNtceOrd 는 식별자는 공고 축 밖 여섯 엔드포인트에도 실린다 — F-6·G-4·P-13·D-6G-12`() {
         val allEndpoints =
             setOf(
                 SourceEndpoint.NOTICE_LIST,
@@ -141,6 +160,9 @@ class CollectionPolicyTest {
                 SourceEndpoint.LICENSE_LIMIT_DETAIL,
                 // M3/3F P-13 (a) 승인.
                 SourceEndpoint.OPENING_COMPLETE,
+                // M6/6G D-6G-12 — 입찰가격산식 A 정보. 좁히면 이 축의 allow-list 반전이
+                // 식별자부터 떨어뜨려 전 항목이 「공고번호 없음」으로 오분류된다.
+                SourceEndpoint.BID_PRICE_FORMULA_A,
             )
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceNo"))!!.presentIn shouldBe allEndpoints
         RESOLVED_POLICY.fieldContracts.contractFor(RawKey("bidNtceOrd"))!!.presentIn shouldBe allEndpoints

@@ -57,6 +57,7 @@ private fun newOpeningCompleteSource(
         listSourceEndpoint = SourceEndpoint.OPENING_AWARD_LIST,
         reserveDetailBaseUri = server.baseUri,
         openingCompleteBaseUri = server.baseUri,
+        bidPriceFormulaABaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
                 httpClient = HttpClient.newHttpClient(),

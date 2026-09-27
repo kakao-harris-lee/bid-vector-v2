@@ -174,6 +174,72 @@ enum class FieldConcept {
 
     /** 주공종명(`mainCnsttyNm`, 공사 — 전기공사업·건축공사업 …) — 코드가 응답에 없어 이름만이다. */
     MAIN_CONSTRUCTION_TYPE,
+
+    // M6/6G D-6G-12 — 낙찰방법 축. 제외 조건 ①⑦⑩(D-6G-13)의 1차 입력인데 계약에 자리가
+    // 없었다(응답은 이미 받고 있고 읽지 않을 뿐이었다). 코드와 이름은 다른 축이다.
+
+    /** 낙찰방법코드(`sucsfbidMthdCd`, 한글 1 + 숫자 6) — `int` 변환 금지(IDENTIFIER 축). */
+    AWARD_METHOD_CODE,
+
+    /** 낙찰방법명(`sucsfbidMthdNm`) — 「적격심사제…」·「협상에의한계약」 등 원문 라벨. */
+    AWARD_METHOD_NAME,
+
+    /** 예정가격결정방법명(`prearngPrceDcsnMthdNm`, 「복수예가」 등) — 제외 조건 ④(단일 예정가격)의 입력. */
+    PLANNED_PRICE_DECISION_METHOD,
+
+    /** 공고게시일시(`ntceNticeDt`) — D-6G-14 의 **공고일** 기준(예규 적용례 「시행일 이후 최초 입찰공고분」). */
+    NOTICE_POSTED_AT,
+
+    // M6/6G D-6G-12 — 입찰가격산식 A 의 합산 항목 일곱. **개념 하나로 접지 않는다**:
+    // [KonepsFieldContractRegistry.valueIn] 이 개념의 첫 계약만 읽으므로 서로 다른 일곱 금액이
+    // 한 개념을 공유하면 그중 하나가 조용히 나머지를 가린다(`drwtNo1`·`drwtNo2` 가 개념을
+    // 공유하는 것은 둘이 **같은 축의 두 슬롯**이기 때문이고 여기는 다른 축 일곱이다).
+
+    /** 국민연금보험료(`npnInsrprm`). */
+    A_NATIONAL_PENSION_PREMIUM,
+
+    /** 국민건강보험료(`mrfnHealthInsrprm`). */
+    A_HEALTH_INSURANCE_PREMIUM,
+
+    /** 노인장기요양보험료(`odsnLngtrmrcprInsrprm`). */
+    A_LONG_TERM_CARE_INSURANCE_PREMIUM,
+
+    /** 퇴직공제부금비(`rtrfundNon`). */
+    A_RETIREMENT_MUTUAL_AID_CONTRIBUTION,
+
+    /** 산업안전보건관리비(`sftyMngcst`). */
+    A_INDUSTRIAL_SAFETY_HEALTH_COST,
+
+    /** 안전관리비(`sftyChckMngcst`). */
+    A_SAFETY_MANAGEMENT_COST,
+
+    /** 품질관리비(`qltyMngcst`) — [A_QUALITY_MANAGEMENT_COST_APPLICABLE] 이 참일 때만 A 에 합산된다. */
+    A_QUALITY_MANAGEMENT_COST,
+
+    /**
+     * 품질관리비A적용대상여부(`qltyMngcstAObjYn`) — **값이 아니라 술어**다. 이 술어를 무시하고
+     * 합산하면 A 를 과대평가해 하한가를 높게 잡는다. 원문(`Y`/`N`)을 그대로 나른다 — 참·거짓
+     * 해석은 읽는 쪽이 한다(어휘를 지어내지 않는다).
+     */
+    A_QUALITY_MANAGEMENT_COST_APPLICABLE,
+
+    /**
+     * 표준시장단가금액(`smkpAmt`) — 예규 원문의 A 일곱 항목 열거에 **없다**. 응답이 적용 여부
+     * 술어를 함께 주므로 별도 규율로 합산되는 경로가 있다는 뜻이지만 그 근거 예규 문면은 아직
+     * 확보되지 않았다 — 관측값으로만 나른다(합산 판단은 이 계약의 몫이 아니다).
+     */
+    A_STANDARD_MARKET_UNIT_PRICE_AMOUNT,
+
+    /** 표준시장단가금액A적용대상여부(`smkpAmtYn`) — [A_QUALITY_MANAGEMENT_COST_APPLICABLE] 과 같은 술어 축. */
+    A_STANDARD_MARKET_UNIT_PRICE_APPLICABLE,
+
+    /**
+     * 입찰가격산식A공개일시(`bidPrceCalclAOpenDt`) — 공고게시와 **다른 시각**이다(문서 샘플은
+     * 27일 차이). 전략이 A 를 **입력**으로 쓰려면 이 시각이 투찰 마감 이전이어야 한다
+     * (D-6G-13 ⑥ — 투찰 시점에 알 수 없는 값을 입력으로 쓰면 누출이다). 실제 하한가 **채점**은
+     * 사후 값을 써도 된다(채점은 정의상 개찰 결과로 한다).
+     */
+    BID_PRICE_FORMULA_A_DISCLOSED_AT,
 }
 
 /**

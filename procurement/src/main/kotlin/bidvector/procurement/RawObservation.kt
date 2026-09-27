@@ -37,6 +37,14 @@ enum class SourceEndpoint {
     OPENING_RESULT_LIST,
     RESERVE_PRICE_DETAIL,
     OPENING_COMPLETE,
+
+    /**
+     * 입찰가격산식 A 정보(M6/6G D-6G-12 — 입찰공고정보서비스 op 24
+     * `getBidPblancListBidPrceCalclAInfo`) — 공사 하한가 산식 `(예정가격 − A) × r + A` 의 A
+     * 합산 항목과 그 적용 여부 술어·공개일시를 나른다. 예비가격 상세·개찰완료와 다른
+     * 오퍼레이션이라 다섯째 군으로 선다(기존 군에 접으면 `presentIn`이 그 구별을 잃는다).
+     */
+    BID_PRICE_FORMULA_A,
 }
 
 /**
