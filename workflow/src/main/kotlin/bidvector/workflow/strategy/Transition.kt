@@ -138,13 +138,30 @@ private fun onProvideValue(
     command: EditCommand.ProvideValue,
     current: OperatorStrategy,
     policy: Resolution.Resolved<StrategyPolicyData>,
+): TransitionOutcome {
+    // D-6A2b-28 — draft 를 뜬 읽기와 지금 읽은 값이 다르면 그 draft 는 이미 낡았다.
+    // 여기서 거부해야 낡은 스냅숏이 세션에 들어가지 않는다(확인 시점에 잡으면 늦다 —
+    // 기준이 「다시 읽은 값」이 되어 불일치 자체가 사라진다, verifier r2 F-r2-3).
+    if (command.baseRevision != current.revision) {
+        return TransitionOutcome.Rejected(session, command, RejectionReason.StaleRevision)
+    }
+    return provideValueOutcome(session, state, command, current, policy)
+}
+
+private fun provideValueOutcome(
+    session: EditSession,
+    state: EditSessionState.WaitingForValue,
+    command: EditCommand.ProvideValue,
+    current: OperatorStrategy,
+    policy: Resolution.Resolved<StrategyPolicyData>,
 ): TransitionOutcome =
     when (validate(command.draft, current.revision, policy)) {
         is StrategyValidation.Valid -> {
-            // D-6A2b-18 — draft 를 뜬 기준 revision 을 함께 남긴다. `RequestEdit` 뒤 새 value 는
-            // 이 자리를 다시 지나므로 새 기준을 잡는다. 필드는 **세션이 기다리던 것**이다
-            // (dispatch 가 command 와 같은지 이미 확인했다 — 두 값이 갈릴 자리가 없다).
-            val next = EditSessionState.WaitingForConfirmation(state.field, command.draft, current.revision)
+            // D-6A2b-18·28 — 기준은 **command 가 싣고 온 값**이다(어댑터가 draft 를 뜬 그
+            // 읽기의 revision). 위에서 지금 읽은 값과 같은지 이미 확인했으므로 둘은 같다 —
+            // command 값을 쓰는 것이 「어느 읽기에서 왔는가」를 문면에 남긴다. 필드는 세션이
+            // 기다리던 것이다(dispatch 가 command 와 같은지 이미 확인했다).
+            val next = EditSessionState.WaitingForConfirmation(state.field, command.draft, command.baseRevision)
             accept(session, next, command)
         }
 

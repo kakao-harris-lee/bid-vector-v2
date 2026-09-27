@@ -180,6 +180,11 @@ private fun restoreCommand(
                 operator,
                 restoreRequiredField(snapshot.field),
                 restoreStrategyDraft(requireNotNull(snapshot.draft) { "PROVIDE_VALUE 는 draft 가 필요하다" }),
+                // D-6A2b-28 — 없으면 지어내지 않고 거부한다. 이 값이 없는 행은 기준을 모르는
+                // command 이고, 그것을 0 이나 현재값으로 채우면 낡은 draft 가 통과할 수 있다.
+                StrategyRevision(
+                    requireNotNull(snapshot.baseRevision) { "PROVIDE_VALUE 는 baseRevision 이 필요하다" },
+                ),
             )
         }
 

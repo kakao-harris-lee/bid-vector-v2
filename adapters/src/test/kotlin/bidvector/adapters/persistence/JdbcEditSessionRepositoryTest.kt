@@ -53,7 +53,16 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
 
         val draft = StrategyDraft(bidNowThreshold = BigDecimal("0.7"), candidateLimit = 5)
         val provided =
-            flow.provideValue(EditCommand.ProvideValue(CommandId("cmd-1"), id, Actor.Operator(OPERATOR), FIELD, draft))
+            flow.provideValue(
+                EditCommand.ProvideValue(
+                    CommandId("cmd-1"),
+                    id,
+                    Actor.Operator(OPERATOR),
+                    FIELD,
+                    draft,
+                    StrategyRevision(1),
+                ),
+            )
         check(provided is CommandResult.Processed)
 
         sessions.load(id) shouldBe provided.outcome.session.toSnapshot()
@@ -73,6 +82,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                StrategyRevision(1),
             ),
         )
         val confirmed =
@@ -121,6 +131,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
                     Actor.Operator(OPERATOR),
                     FIELD,
                     StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                    StrategyRevision(1),
                 ),
             )
         check(provided is CommandResult.Processed)
@@ -165,6 +176,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                StrategyRevision(1),
             ),
         )
         flow.confirm(EditCommand.Confirm(CommandId("cmd-2"), id, Actor.Operator(OPERATOR), StrategyRevision(1)))
@@ -439,6 +451,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.70")),
+                StrategyRevision(1),
             )
         val first = flow.provideValue(command)
         check(first is CommandResult.Processed)

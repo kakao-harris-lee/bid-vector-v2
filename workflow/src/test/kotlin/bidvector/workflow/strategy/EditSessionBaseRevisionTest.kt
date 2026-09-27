@@ -109,9 +109,17 @@ class EditSessionBaseRevisionTest {
         commandId: String,
         field: EditableField,
         draft: StrategyDraft,
+        baseRevision: StrategyRevision? = null,
     ): CommandResult =
         workflow.provideValue(
-            EditCommand.ProvideValue(CommandId(commandId), session, Actor.Operator(OPERATOR), field, draft),
+            EditCommand.ProvideValue(
+                CommandId(commandId),
+                session,
+                Actor.Operator(OPERATOR),
+                field,
+                draft,
+                baseRevision ?: strategies.load().revision,
+            ),
         )
 
     private fun confirm(

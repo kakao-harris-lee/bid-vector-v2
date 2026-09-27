@@ -51,7 +51,8 @@ private fun freshSession(expiresAt: Instant = NOW.plus(Duration.ofMinutes(15))):
 private fun provideValue(
     id: String = "cmd-1",
     actor: Actor = OPERATOR,
-): EditCommand.ProvideValue = EditCommand.ProvideValue(CommandId(id), EditSessionId("s-1"), actor, FIELD, VALID_DRAFT)
+): EditCommand.ProvideValue =
+    EditCommand.ProvideValue(CommandId(id), EditSessionId("s-1"), actor, FIELD, VALID_DRAFT, StrategyRevision(1))
 
 /** scope.md ③ — actor/operator scope 와 timeout(④). 판정 순서(설계 검토 (4) 2) ①③을 잰다. */
 class EditSessionActorAndTimeoutTest {

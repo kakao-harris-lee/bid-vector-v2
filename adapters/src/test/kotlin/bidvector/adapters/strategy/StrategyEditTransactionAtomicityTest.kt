@@ -126,6 +126,8 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
                         ACTOR,
                         EditableField.CandidateLimit,
                         StrategyDraft(candidateLimit = 9),
+                        // 전략 표가 비어 있으므로 현재 revision 은 0 이다(D-6F1-4).
+                        StrategyRevision(0),
                     ),
                 )
             }

@@ -70,6 +70,7 @@ internal object EditSessionRow {
         command.field?.let { node.set<JsonNode>("field", fieldNode(it)) }
         command.draft?.let { node.set<JsonNode>("draft", draftNode(it)) }
         command.seenRevision?.let { node.put("seenRevision", it) }
+        command.baseRevision?.let { node.put("commandBaseRevision", it) }
         command.cancelReasonKind?.let { node.put("cancelReasonKind", it) }
         command.cancelReasonNote?.let { node.put("cancelReasonNote", it) }
         return mapper.writeValueAsString(node)
@@ -170,6 +171,7 @@ internal object EditSessionRow {
             field = node.get("field")?.let(::readField),
             draft = node.get("draft")?.let(::readDraft),
             seenRevision = node.get("seenRevision")?.let { it.requireIntValue("seenRevision") },
+            baseRevision = node.get("commandBaseRevision")?.let { it.requireIntValue("commandBaseRevision") },
             cancelReasonKind = node.get("cancelReasonKind")?.asText(),
             cancelReasonNote = node.get("cancelReasonNote")?.asText(),
         )

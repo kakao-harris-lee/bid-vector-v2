@@ -62,7 +62,17 @@ private fun provideValue(
     actor: Actor = OPERATOR,
     field: EditableField = FIELD,
     draft: StrategyDraft = VALID_DRAFT,
-): EditCommand.ProvideValue = EditCommand.ProvideValue(CommandId(id), EditSessionId("s-1"), actor, field, draft)
+    // D-6A2b-28 — 기준은 이 파일의 `currentStrategy()` 기본 revision 과 같다.
+    baseRevision: StrategyRevision = StrategyRevision(1),
+): EditCommand.ProvideValue =
+    EditCommand.ProvideValue(
+        CommandId(id),
+        EditSessionId("s-1"),
+        actor,
+        field,
+        draft,
+        baseRevision,
+    )
 
 private fun confirm(
     id: String = "cmd-2",

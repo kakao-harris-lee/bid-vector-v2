@@ -83,7 +83,11 @@ class StrategyEditExecutor(
                 }
 
                 is StrategyValidation.Valid -> {
-                    val command = EditCommand.ProvideValue(commandId, sessionId, OPERATOR, field, draft)
+                    // D-6A2b-28 — 기준은 **이 draft 를 만든 읽기**의 revision 이다. 커널이
+                    // 다시 읽은 값을 쓰면 두 읽기 사이의 커밋이 기준을 새 값으로 밀어
+                    // 낡은 draft 가 통과한다(verifier r2 F-r2-3).
+                    val command =
+                        EditCommand.ProvideValue(commandId, sessionId, OPERATOR, field, draft, current.revision)
                     ProvideValueOutcome.Processed(workflow.provideValue(command))
                 }
             }

@@ -90,6 +90,8 @@ data class EditCommandSnapshot(
     val field: EditableFieldSnapshot?,
     val draft: StrategyDraftSnapshot?,
     val seenRevision: Int?,
+    /** D-6A2b-28 — `ProvideValue` 가 실어 온 기준 revision(draft 를 뜬 읽기의 값). */
+    val baseRevision: Int?,
     val cancelReasonKind: String?,
     val cancelReasonNote: String?,
 )
@@ -205,23 +207,25 @@ private fun EditCommand.toSnapshot(): EditCommandSnapshot =
                 field.toSnapshot(),
                 draft.toSnapshot(),
                 null,
+                baseRevision.value,
                 null,
                 null,
             )
         }
 
         is EditCommand.Confirm -> {
-            EditCommandSnapshot(commandId.value, "CONFIRM", null, null, seenRevision.value, null, null)
+            EditCommandSnapshot(commandId.value, "CONFIRM", null, null, seenRevision.value, null, null, null)
         }
 
         is EditCommand.RequestEdit -> {
-            EditCommandSnapshot(commandId.value, "REQUEST_EDIT", field.toSnapshot(), null, null, null, null)
+            EditCommandSnapshot(commandId.value, "REQUEST_EDIT", field.toSnapshot(), null, null, null, null, null)
         }
 
         is EditCommand.Cancel -> {
             EditCommandSnapshot(
                 commandId.value,
                 "CANCEL",
+                null,
                 null,
                 null,
                 null,

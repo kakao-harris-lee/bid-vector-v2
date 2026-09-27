@@ -317,7 +317,16 @@ private fun runStrategyEdit(case: StrategyEditCase): EditSessionState {
     val begun = provideWorkflow.begin(sessionId, OPERATOR.id, case.field)
     check(begun is BeginOutcome.Started) { "corpus 배선 오류 — begin() 이 거부됐다: $begun" }
 
-    val provideCommand = EditCommand.ProvideValue(CommandId("cmd-1"), sessionId, OPERATOR, case.field, case.draft)
+    // D-6A2b-28 — corpus 는 value 와 confirm 사이에 전략이 움직이지 않으므로 기준은 현재 revision 이다.
+    val provideCommand =
+        EditCommand.ProvideValue(
+            CommandId("cmd-1"),
+            sessionId,
+            OPERATOR,
+            case.field,
+            case.draft,
+            case.current.revision,
+        )
     val provided = provideWorkflow.provideValue(provideCommand)
     check(provided is CommandResult.Processed) { "corpus 배선 오류 — provideValue() 가 세션을 못 찾았다" }
     if (!case.doConfirm) return provided.outcome.session.state

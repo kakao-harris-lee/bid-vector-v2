@@ -69,6 +69,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                StrategyRevision(1),
             )
         val first = flow.provideValue(command)
         check(first is CommandResult.Processed)
@@ -94,6 +95,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                StrategyRevision(1),
             ),
         )
         val confirmCommand = EditCommand.Confirm(CommandId("cmd-2"), id, Actor.Operator(OPERATOR), StrategyRevision(1))
@@ -121,6 +123,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                StrategyRevision(1),
             ),
         )
         flow.confirm(EditCommand.Confirm(CommandId("cmd-2"), id, Actor.Operator(OPERATOR), StrategyRevision(1)))
@@ -182,6 +185,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
                     Actor.Operator(OPERATOR),
                     FIELD,
                     StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                    StrategyRevision(1),
                 ),
             )
 

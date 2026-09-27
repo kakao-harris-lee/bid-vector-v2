@@ -126,6 +126,9 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
                     Actor.Operator(OPERATOR),
                     EditableField.CandidateLimit,
                     draft,
+                    // D-6A2b-28 — 이 helper 는 「지금 값을 보고 바꾼다」를 흉내낸다. 기준은
+                    // 확인에 쓰는 revision 과 같다(두 읽기 사이에 아무도 끼지 않는 경로다).
+                    seenRevision,
                 ),
             )
         check(provided is CommandResult.Processed && provided.outcome is TransitionOutcome.Accepted) {

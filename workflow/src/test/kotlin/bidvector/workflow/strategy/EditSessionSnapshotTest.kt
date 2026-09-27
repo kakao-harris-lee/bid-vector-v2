@@ -145,7 +145,14 @@ class EditSessionSnapshotTest {
     fun `lastCommand(ProvideValue)이 있는 세션을 왕복한다`() {
         val draft = StrategyDraft(candidateLimit = 3)
         val command =
-            EditCommand.ProvideValue(CommandId("cmd-1"), id, operator, EditableField.CandidateLimit, draft)
+            EditCommand.ProvideValue(
+                CommandId("cmd-1"),
+                id,
+                operator,
+                EditableField.CandidateLimit,
+                draft,
+                StrategyRevision(7),
+            )
         val original =
             session(
                 EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft, StrategyRevision(7)),
