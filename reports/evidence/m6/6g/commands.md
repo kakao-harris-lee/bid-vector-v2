@@ -200,9 +200,9 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 |---|---|---|
 | S-1 | `uv sync --frozen --all-extras` | 성공 |
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
-| S-3 | `uv run mypy --strict src/ml_engine` | 소스 94개, 오류 0 |
+| S-3 | `uv run mypy --strict src/ml_engine` | 소스 95개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1158 passed**(skip 0 — golden 부재는 이제 skip 이 아니라 fail 이다) |
+| S-5 | `uv run python -m pytest tests -q` | **1168 passed**(skip 0 — golden 부재는 skip 이 아니라 fail 이다) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -236,11 +236,16 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | D-6G-22 채움률 여섯 칸 | `exclusions.fill_rates` | 판정 JSON 이 0.0 도 숨기지 않고 싣는다 |
 | D-6G-23 `snapshot-v2` 술어 칸 | `AValue.standard_market_price_applicable` | v1·v3 둘 다 거부 · `null` 수용 · 미지 키 거부 |
 | D-6G-17 배제의 영향 범위 | `exclusions.standard_market_price_scope` | 참·판정 불가·분모 셋을 따로 |
-| D-6G-27 레인 간 왕복 golden | `tests/app/test_backtest_golden.py` | **아직 건너뜀**(golden 미도착) — 이탈 절 |
+| D-6G-27 레인 간 왕복 golden | `tests/app/test_backtest_golden.py` | 생산 v4 바이트가 판독·제외를 통과(여덟) |
 | D-6G-31 창 단위 UNDERPOWERED | `verdict.evaluable_window_count` · `_not_evaluable` | 판정 가능 창 과반 미만이면 전체 NotEvaluable |
 | D-6G-32 주/보조 유의수준 | `VerdictThresholds.alpha_for` · `run._is_primary` | 보정 전후 **사이**의 p 로 주는 실패·보조는 통과 |
 | D-6G-32 표본 결정식 멈춤 | `run._sampling_stop` · `SamplingBudget.minimum_required_sample` | 예산 초과·최소 미달 각각 멈춤 |
-| D-6G-32 표본 목록 해시 | `snapshot.sample_list_checksum` | manifest 값과 **행에서 재계산**한 값 대조 |
+| D-6G-39 표본 목록은 파일이다 | `sample_list.parse_sample_list` · `adapters.SnapshotFiles.sample_list_bytes` | 파일 셋이 셋 · 형태 다섯(칸·hex·정렬·개행·짧은 해시) |
+| D-6G-39 ⑴ 해시는 **파일 바이트**의 것 | `sample_list.check_sample_list` | manifest 값과 그 파일의 sha256 대조 |
+| D-6G-39 ⑵ 행 ⊆ 표본 목록 | 같은 함수의 `stray` | 목록 밖 행은 거부 · **진부분집합은 정상** |
+| D-6G-39 ⑵ 선언 == 파일의 키 수 | 같은 함수의 `len(sampled)` 대조 | 선언을 남은 행만큼 줄이는 사후 선택이 잡힌다 |
+| D-6G-39 ⑶ 닫힌 항등식 | 같은 함수의 `accounted` | `sample_size == 행 + 상세없음 + 공고없음` |
+| D-6G-44 golden 부재는 실패 | `test_backtest_golden._golden_files` | golden 을 치우면 RED(치환 실측) |
 | D-6G-33 리터럴 게이트 | `test_evaluation_no_stray_numeric_literals` | 문자열에 숨긴 수·조립 근 둘 |
 | D-6G-28 값 결측은 행 단위 | `reasons` 의 새 사유 넷 · `AdmittedNotice` 의 해소된 네 칸 | 한 행이 빠져도 **나머지는 산다** |
 | D-6G-28 구조 실패는 전체 거부 | `jsonrow.row_mapping` · `_assemble` | 미지 키·버전·checksum·닫힌 셋 밖 업무 넷을 한 test 로 |
@@ -296,9 +301,27 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | **G5** | 임계를 문자열 연결 `"0." + "05"` 로 | **2 failed** |
 | **G6** | 조립 근에 문자열 수 | **2 failed** |
 | **N6** | 과반 술어를 `<=` 에서 `<` 로(정확히 절반 경계) | **1 failed** |
+| **L1** | 표본 목록 **파일 바이트** 해시 대조 제거 | **1 failed** |
+| **L2** | 목록 밖 행 탐지를 빈 목록으로 무력화 | **1 failed** |
+| **L3** | 닫힌 항등식 제거 | **처음엔 살아남았다** — 아래 |
+| **L4** | 「파일 키 수 == 선언」 대조 제거 | **처음엔 살아남았다** — 아래 |
+| **L5** | TSV 칸 수 검사 제거 | **1 failed** |
+| **L6** | TSV 오름차순 검사 제거 | **처음엔 살아남았다** — 아래 |
+| **L7** | TSV 끝 줄 개행 검사 제거 | **1 failed** |
+| **L8** | TSV 소문자 hex 64자 검사 제거 | **2 failed** |
+| **A1** | golden 을 선언된 자리에서 치운다(현행 fail) | **8 failed**, 부재 메시지로 |
+| **A2** | 같은 상태에서 부재 처리를 skip 으로 되돌림 | **6건이 조용히 skip** — 잠금이 서는 자리 |
 
-누계 **스물일곱**(M1~M13 · V3·V5·V7·V8·V9 · G1~G6 · W1~W3 · P1~P3 · R1·R2 · N6).
-전부 RED 이고 복원 뒤 초록이다.
+누계 **서른일곱**(M1~M13 · V3·V5·V7·V8·V9 · G1~G6 · W1~W3 · P1~P3 · R1·R2 · N6 · L1~L8 · A1·A2).
+L·A 를 뺀 전부가 RED 이고 복원 뒤 초록이다. A2 는 **초록이 되는 것이 측정값**이다 — 부재를
+skip 으로 접으면 소비 test 여섯이 조용히 통과한다는 것을 보이는 대조군이다.
+
+**L3·L4·L6 이 드러낸 것**: 셋 다 처음엔 살아남았고 원인은 구현이 아니라 **test 가 느슨해서**였다.
+⑶ 항등식 test 는 표본 크기를 기본값으로 둬서 실은 ⑵ 의 키 수 대조에 걸리고 있었고(항등식을 통째로
+지워도 초록), 형태 위반 test 는 사유를 두 개의 합집합으로 받아 형태 검사가 빠진 자리를 계수 대조가
+덮었다. 항등식 test 는 선언을 파일 키 수에 **맞춰** 두고 항등식만 깨지게, 키 수 test 는 반대로
+항등식을 닫고 키 수만 어긋나게 판을 갈랐다. 형태 test 는 사유를 **정확히 하나**로 좁혔다.
+재측정에서 여덟 전부 RED(생존 0).
 
 ## 레인 간 왕복 golden — 실제로 결함을 잡았다 (D-6G-27)
 
@@ -325,6 +348,15 @@ provenance 분리가 잠기지 않았다. 두 값을 **다르게** 둔 공고를
 
 숫자 리터럴 게이트의 하위 패키지 보강도 같은 방식으로 실측했다 — 판정 임계를 리터럴로 바꾸니
 리터럴 산포와 출하 임계 누출 둘이 붉어지고, 복원하니 초록이었다.
+
+## 알려진 제한 — 왕복이 덮지 않는 자리
+
+**golden 이 표본 결측 경로를 지나가지 않는다.** 지금 golden 은 `sample_size` 10 · 행 10 · 목록 10 ·
+`sampled_without_detail` 0 · `sampled_without_notice` 0 이라 「표본 == 행」이다. v4 가 연 세 자리 중
+**진부분집합 경로와 두 결측 계수**가 왕복에서 헛돈다 — 생산 쪽이 상세 못 받은 표본을 목록에서 빼거나
+결측 계수를 상수 0 으로 적어도 golden 은 초록이다(지난 라운드 추첨번호 상수 `null` 과 같은 갈래).
+소비 쪽 단위 test 는 셋을 각각 잠그고 변이로 RED 를 봤지만(L2·L3·L4) 그것은 이 레인의 fixture 다.
+생산 레인에 「상세 없는 표본 하나 · 공고 canonical 없는 표본 하나」를 golden 에 넣어 달라고 전달했다.
 
 ## 알려진 제한 (판정 JSON 이 매번 싣는다)
 
@@ -359,13 +391,18 @@ S4 는 채점이 쓰는 두 실격선 중 하나를 보지 못한 채 투찰률�
 호출을 붙이고 변이 둘(R1·R2)로 잠갔다. **대조표에 이행이라 적고 실제가 다르면 그것이 결함이다** —
 이 줄을 남겨 둔다.
 
+**같은 갈래가 하나 더 있었다.** D-6G-44 의 「golden 부재는 skip 이 아니라 fail」을 앞 라운드에
+**docstring 에만** 적고 코드는 `pytest.skip` 으로 두었다. golden 이 자리에 있었으므로 그 갈래는
+실행되지 않았고 초록이 유지됐다 — 문면과 코드가 갈린 것을 아무것도 잡지 못했다. 이번에 `pytest.fail`
+로 바꾸고 A1·A2 로 양쪽을 실측했다. **문면이 이행을 주장하면 그 주장을 test 가 받쳐야 한다.**
+
 ## 이탈
 
-- **D-6G-39 의 표본 목록 대조는 이번 라운드에 손대지 않았다.** 계약이 「형식은 스키마 문서가 정하면
-  따른다」이고 그 문서가 아직 옛 정의(`sample_list_sha256` = 뽑힌 키 해시의 정렬 결합)를 담고 있다.
-  **지금 판독은 「행 집합 == 표본 목록」을 요구하는데 D-6G-39 는 「행 집합 ⊆ 표본 목록」이다** — 표본인데
-  상세를 못 받은 공고가 하나라도 있으면 지금 술어가 스냅숏 전체를 거부한다. 실수집 전에 반드시 바꿔야
-  하고, 스키마 문서가 서면 바로 맞춘다(팀장·생산 레인에 보고).
+- **D-6G-39 는 닫혔다(앞 라운드의 이탈 해소).** 스키마 문서가 v4 로 서면서 표본 목록이 파일
+  (`sample-list.tsv`)이 됐고, 판독이 요구하던 「행 집합 == 표본 목록」을 계약대로 **⊆** 로 바꿨다.
+  v3 까지의 `sample_list_sha256` 대조는 판독기가 행에서 역산한 값을 manifest 와 맞추는 **순환**
+  이어서 「결과를 보기 전에 표본이 확정됐다」를 아무것도 검사하지 못했다 — 지금은 파일 바이트가
+  대조 대상이라 실패할 수 있다. 항등식·키 수·형태까지 넷을 변이로 실측했다(L1~L8).
 - **`smkpAmt` 배제의 「크기」는 여전히 못 잰다(계수는 낸다).** D-6G-23 의 술어 칸이 `snapshot-v2` 로
   들어와 **영향 범위**(참 공고 수·판정 불가 수·분모)는 공시한다. 하지만 「A 가 얼마나 달라지는가」는
   `smkpAmt` 의 **금액**이 스냅숏에 없어 모른다 — `limitations` 의
