@@ -207,6 +207,7 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` | 수령·재측정·**유지**(→ 6E) | D-6A2b-10 |
 | `OPEN-6A2B-VIOLATION-DETAIL` · `OPEN-6A2B-CONCURRENT-SESSION-ADVANCE` | **신설** | D-6A2b-17 |
 | `OPEN-6A2B-ABANDONED-SESSIONS` | **신설**(→ 6B-3) | D-6A2b-24 |
+| `OPEN-6A2B-DRYRUN-ASSEMBLY-IN-APP` | **신설** — 팀장 수용(2026-09-27): dry-run 조립이 어댑터 구체 클래스 셋(기록형·고정 전략·요청 여력 — DB 쓰기 없음)을 app 에서 직접 만든다. 세 이름을 계약 파일에 정확히 고정(다른 구체 클래스 → RED). 편집 경로처럼 어댑터 층으로 옮기는 일은 `adapters/**/evaluation/**` 가 in_scope 밖이라 후속 slice | D-6A2b-32 |
 
 ## 리뷰 레인
 
