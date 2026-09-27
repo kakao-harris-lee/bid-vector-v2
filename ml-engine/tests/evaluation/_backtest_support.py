@@ -13,6 +13,10 @@ from typing import Any
 _BASE_AMOUNT = 1_000_000_000.0
 _FLOOR_RATE = 0.87745
 
+SHIPPED_BACKTEST_POLICY_PATH = (
+    Path(__file__).resolve().parents[2] / "policy" / "strategy-backtest-v1.yaml"
+)
+
 
 def notice_key_hash(label: str) -> str:
     return hashlib.sha256(label.encode("utf-8")).hexdigest()
@@ -67,6 +71,7 @@ def outcome_payload(
     opened_on: str = "2026-06-15",
     planned_price: float | None = None,
     prices: list[float] | None = None,
+    prices_null: bool = False,
     drawn: list[int] | None = None,
     participant_count: int = 12,
     bidder_amounts: list[float] | None = None,
@@ -85,7 +90,7 @@ def outcome_payload(
     return {
         "opened_on": opened_on,
         "planned_price": planned_price,
-        "reserve_prices": values,
+        "reserve_prices": None if prices_null else values,
         "drawn_serial_numbers": drawn_numbers,
         "participant_count": participant_count,
         "bidder_rows": [

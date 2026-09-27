@@ -18,6 +18,7 @@ import hashlib
 import json
 import math
 from dataclasses import asdict, dataclass
+from datetime import date
 from pathlib import Path
 from typing import Final
 
@@ -28,6 +29,7 @@ from ml_engine.evaluation.policy import (
     int_tuple,
     require_int,
     require_number,
+    require_str,
 )
 from ml_engine.registry.policy import PolicyError, PolicyScalar
 from ml_engine.registry.policy import load_policy as _load_raw_policy
@@ -43,6 +45,7 @@ _NUMBER_KEYS: Final[tuple[str, ...]] = (
     "verdict.target_power",
     "floor.rate_band_low",
     "floor.rate_band_high",
+    "floor.pure_construction_cost_ratio",
     "strategy.s1_offset_bp",
     "strategy.s4_grid_span_bp",
     "fit.alpha",
@@ -61,10 +64,16 @@ _INT_KEYS: Final[tuple[str, ...]] = (
     "strategy.s4_min_competitor_samples",
     "fit.min_sample_count",
 )
+_TEXT_KEYS: Final[tuple[str, ...]] = (
+    "effective.construction",
+    "effective.service",
+    "effective.goods",
+)
 _SEED_PREFIX: Final[str] = "stability_seeds"
 _KNOWN_KEYS: Final[frozenset[str]] = (
     frozenset(_NUMBER_KEYS)
     | frozenset(_INT_KEYS)
+    | frozenset(_TEXT_KEYS)
     | frozenset(f"{_SEED_PREFIX}.{index}" for index in range(_MAX_INDEXED_LIST_LENGTH))
 )
 
@@ -166,14 +175,18 @@ class InstitutionConstants:
 
 @dataclass(frozen=True)
 class FloorRateBand:
-    """낙찰하한율 개연 밴드(D-6G-13 ②) — 밖의 값은 제외 사유가 된다."""
+    """낙찰하한율 개연 밴드(D-6G-13 ②)와 공사 순공사원가 배제 비율(P-3 §4.3)."""
 
     rate_band_low: float
     rate_band_high: float
+    pure_construction_cost_ratio: float
 
     def __post_init__(self) -> None:
         _require_finite_unit_open(self.rate_band_low, "floor.rate_band_low")
         _require_finite_unit_open(self.rate_band_high, "floor.rate_band_high")
+        _require_finite_unit_open(
+            self.pure_construction_cost_ratio, "floor.pure_construction_cost_ratio"
+        )
         if self.rate_band_low >= self.rate_band_high:
             raise ValueError(
                 "floor.rate_band_low 는 rate_band_high 보다 작아야 합니다: "
@@ -182,6 +195,15 @@ class FloorRateBand:
 
     def contains(self, rate: float) -> bool:
         return self.rate_band_low <= rate <= self.rate_band_high
+
+
+@dataclass(frozen=True)
+class EffectiveDates:
+    """2026 낙찰하한율 개정 시행일(업무별). 포함 여부는 **공고일** 기준이다(D-6G-14)."""
+
+    construction: date
+    service: date
+    goods: date
 
 
 @dataclass(frozen=True)
@@ -244,6 +266,7 @@ class StrategyBacktestPolicy:
     windows: WindowRules
     institution: InstitutionConstants
     floor: FloorRateBand
+    effective: EffectiveDates
     strategies: StrategyConstants
     fit: FitThresholds
     stability_seeds: tuple[int, ...]
@@ -271,26 +294,59 @@ def _integers(values: dict[str, PolicyScalar]) -> dict[str, int] | None:
     return {key: value for key, value in parsed.items() if value is not None}
 
 
+def _dates(values: dict[str, PolicyScalar]) -> dict[str, date] | None:
+    """시행일은 ISO 날짜 문자열로만 온다 — 형식이 아니면 `None`(fail-closed)."""
+    parsed: dict[str, date] = {}
+    for key in _TEXT_KEYS:
+        raw = require_str(values, key)
+        if raw is None:
+            return None
+        try:
+            parsed[key] = date.fromisoformat(raw)
+        except ValueError:
+            return None
+    return parsed
+
+
+def _build_verdict(
+    numbers: dict[str, float], integers: dict[str, int]
+) -> VerdictThresholds:
+    return VerdictThresholds(
+        min_relative_improvement=numbers["verdict.min_relative_improvement"],
+        alpha=numbers["verdict.alpha"],
+        primary_hypothesis_count=integers["verdict.primary_hypothesis_count"],
+        ineligibility_noninferiority_margin=numbers[
+            "verdict.ineligibility_noninferiority_margin"
+        ],
+        target_power=numbers["verdict.target_power"],
+        min_window_count=integers["verdict.min_window_count"],
+        min_window_rows=integers["verdict.min_window_rows"],
+    )
+
+
+def _build_strategies(
+    numbers: dict[str, float], integers: dict[str, int]
+) -> StrategyConstants:
+    return StrategyConstants(
+        s1_offset_bp=numbers["strategy.s1_offset_bp"],
+        s4_iteration_count=integers["strategy.s4_iteration_count"],
+        s4_grid_size=integers["strategy.s4_grid_size"],
+        s4_grid_span_bp=numbers["strategy.s4_grid_span_bp"],
+        s4_min_competitor_samples=integers["strategy.s4_min_competitor_samples"],
+    )
+
+
 def _assemble(
     version: str,
     numbers: dict[str, float],
     integers: dict[str, int],
+    dates: dict[str, date],
     seeds: tuple[int, ...],
 ) -> StrategyBacktestPolicy:
     """값 불변식은 각 dataclass 의 `__post_init__` 이 진다 — 여기서는 조립만."""
     return StrategyBacktestPolicy(
         version=version,
-        verdict=VerdictThresholds(
-            min_relative_improvement=numbers["verdict.min_relative_improvement"],
-            alpha=numbers["verdict.alpha"],
-            primary_hypothesis_count=integers["verdict.primary_hypothesis_count"],
-            ineligibility_noninferiority_margin=numbers[
-                "verdict.ineligibility_noninferiority_margin"
-            ],
-            target_power=numbers["verdict.target_power"],
-            min_window_count=integers["verdict.min_window_count"],
-            min_window_rows=integers["verdict.min_window_rows"],
-        ),
+        verdict=_build_verdict(numbers, integers),
         windows=WindowRules(
             days=integers["window.days"],
             embargo_days=integers["window.embargo_days"],
@@ -302,14 +358,14 @@ def _assemble(
         floor=FloorRateBand(
             rate_band_low=numbers["floor.rate_band_low"],
             rate_band_high=numbers["floor.rate_band_high"],
+            pure_construction_cost_ratio=numbers["floor.pure_construction_cost_ratio"],
         ),
-        strategies=StrategyConstants(
-            s1_offset_bp=numbers["strategy.s1_offset_bp"],
-            s4_iteration_count=integers["strategy.s4_iteration_count"],
-            s4_grid_size=integers["strategy.s4_grid_size"],
-            s4_grid_span_bp=numbers["strategy.s4_grid_span_bp"],
-            s4_min_competitor_samples=integers["strategy.s4_min_competitor_samples"],
+        effective=EffectiveDates(
+            construction=dates["effective.construction"],
+            service=dates["effective.service"],
+            goods=dates["effective.goods"],
         ),
+        strategies=_build_strategies(numbers, integers),
         fit=FitThresholds(
             alpha=numbers["fit.alpha"],
             min_sample_count=integers["fit.min_sample_count"],
@@ -335,13 +391,14 @@ def load_strategy_backtest_policy(
 
     numbers = _numbers(raw.values)
     integers = _integers(raw.values)
+    dates = _dates(raw.values)
     seeds = int_tuple(collect_indexed_list(raw.values, _SEED_PREFIX))
-    if numbers is None or integers is None or seeds is None:
+    if numbers is None or integers is None or dates is None or seeds is None:
         return PolicyRejected(
             PolicyRejectionReason.INVALID_VALUE, f"malformed values: {raw.values!r}"
         )
     try:
-        return _assemble(raw.version, numbers, integers, seeds)
+        return _assemble(raw.version, numbers, integers, dates, seeds)
     except ValueError as exc:
         return PolicyRejected(PolicyRejectionReason.INVALID_VALUE, str(exc))
 
@@ -351,6 +408,10 @@ def strategy_backtest_policy_checksum(policy: StrategyBacktestPolicy) -> str:
     규칙(키 정렬·구분자 `(",", ":")`·`allow_nan=False`). 판정 JSON 이 이 값을 싣고,
     실행 전 승인 커밋 SHA 와 대조된다(우회 ② 「사후 튜닝」)."""
     payload = json.dumps(
-        asdict(policy), sort_keys=True, separators=(",", ":"), allow_nan=False
+        asdict(policy),
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+        default=str,
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
