@@ -58,7 +58,11 @@ class EditSessionSnapshotTest {
             )
         val original =
             session(
-                EditSessionState.WaitingForConfirmation(EditableField.Threshold(ThresholdField.BidNowThreshold), draft),
+                EditSessionState.WaitingForConfirmation(
+                    EditableField.Threshold(ThresholdField.BidNowThreshold),
+                    draft,
+                    StrategyRevision(7),
+                ),
             )
 
         restoreEditSession(original.toSnapshot()) shouldBe original
@@ -71,17 +75,39 @@ class EditSessionSnapshotTest {
         val draft = StrategyDraft(candidateLimit = 10, maxActiveBids = 5)
         val original =
             session(
-                EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft),
+                EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft, StrategyRevision(7)),
             )
 
         restoreEditSession(original.toSnapshot()) shouldBe original
+    }
+
+    /**
+     * D-6A2b-18 — 기준 revision 이 **없는** 저장 행(이 필드 이전에 쓰인 행)은 지어내지 않고
+     * `null` 그대로 복원된다. 그 값이 confirm 에서 fail-closed 로 떨어지는 것은
+     * `EditSessionBaseRevisionTest` 가 잰다.
+     */
+    @Test
+    fun `기준 revision 이 없는 스냅숏은 null 로 복원된다 — 지어내지 않는다`() {
+        val draft = StrategyDraft(bidNowThreshold = java.math.BigDecimal("0.5"))
+        val stored =
+            session(EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft, StrategyRevision(7)))
+                .toSnapshot()
+                .copy(stateBaseRevision = null)
+
+        val restored = restoreEditSession(stored).state
+
+        restored shouldBe EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft, null)
     }
 
     @Test
     fun `WaitingForConfirmation 예산 한계가 없는 draft 도 왕복한다`() {
         val original =
             session(
-                EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, StrategyDraft()),
+                EditSessionState.WaitingForConfirmation(
+                    EditableField.CandidateLimit,
+                    StrategyDraft(),
+                    StrategyRevision(7),
+                ),
             )
 
         restoreEditSession(original.toSnapshot()) shouldBe original
@@ -119,9 +145,19 @@ class EditSessionSnapshotTest {
     fun `lastCommand(ProvideValue)이 있는 세션을 왕복한다`() {
         val draft = StrategyDraft(candidateLimit = 3)
         val command =
-            EditCommand.ProvideValue(CommandId("cmd-1"), id, operator, EditableField.CandidateLimit, draft)
+            EditCommand.ProvideValue(
+                CommandId("cmd-1"),
+                id,
+                operator,
+                EditableField.CandidateLimit,
+                draft,
+                StrategyRevision(7),
+            )
         val original =
-            session(EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft), lastCommand = command)
+            session(
+                EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft, StrategyRevision(7)),
+                lastCommand = command,
+            )
 
         restoreEditSession(original.toSnapshot()) shouldBe original
     }
@@ -241,7 +277,7 @@ class EditSessionSnapshotTest {
                 minBudget = BaseAmount(1L, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.OperatorDeclared),
             )
         val bogus =
-            session(EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft))
+            session(EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft, StrategyRevision(7)))
                 .toSnapshot()
                 .let { snapshot ->
                     snapshot.copy(
@@ -262,7 +298,7 @@ class EditSessionSnapshotTest {
                 minBudget = BaseAmount(1L, Currency.KRW, VatTreatment.INCLUSIVE, Provenance.OperatorDeclared),
             )
         val bogus =
-            session(EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft))
+            session(EditSessionState.WaitingForConfirmation(EditableField.CandidateLimit, draft, StrategyRevision(7)))
                 .toSnapshot()
                 .let { snapshot ->
                     snapshot.copy(

@@ -66,6 +66,7 @@ class EditSessionIdempotencyPropertyTest {
                         OPERATOR,
                         FIELD,
                         StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                        StrategyRevision(1),
                     )
 
                 val first = apply(session, command, NOW, currentStrategy(), policyOf())
@@ -90,6 +91,7 @@ class EditSessionIdempotencyPropertyTest {
                         OPERATOR,
                         FIELD,
                         StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                        StrategyRevision(1),
                     )
                 val conflicting = original.copy(draft = StrategyDraft(bidNowThreshold = BigDecimal("0.8")))
 
@@ -106,7 +108,10 @@ class EditSessionIdempotencyPropertyTest {
     @Test
     fun `④ Applied 로 이미 종단된 세션에 같은 Confirm 재전달은 효과 0 이다 — 두 번째 적용이 없다`() {
         val draft = StrategyDraft(bidNowThreshold = BigDecimal("0.7"))
-        val session = freshSession().copy(state = EditSessionState.WaitingForConfirmation(FIELD, draft))
+        val session =
+            freshSession().copy(
+                state = EditSessionState.WaitingForConfirmation(FIELD, draft, StrategyRevision(1)),
+            )
         val confirmCommand = EditCommand.Confirm(CommandId("confirm-1"), session.id, OPERATOR, StrategyRevision(1))
 
         val first = apply(session, confirmCommand, NOW, currentStrategy(1), policyOf())
@@ -126,7 +131,15 @@ class EditSessionIdempotencyPropertyTest {
         // 일치)가 먼저 걸려 Accepted 로 조용히 통과한다.
         val session = freshSession()
         val draft = StrategyDraft(bidNowThreshold = BigDecimal("0.7"))
-        val command = EditCommand.ProvideValue(CommandId("cmd-1"), session.id, OPERATOR, FIELD, draft)
+        val command =
+            EditCommand.ProvideValue(
+                CommandId("cmd-1"),
+                session.id,
+                OPERATOR,
+                FIELD,
+                draft,
+                StrategyRevision(1),
+            )
 
         val accepted = apply(session, command, NOW, currentStrategy(), policyOf())
         accepted.shouldBeInstanceOf<TransitionOutcome.Accepted>()
@@ -143,7 +156,15 @@ class EditSessionIdempotencyPropertyTest {
     fun `④ 만료 뒤 같은 command 를 재전달해도 정직하게 SessionExpired 를 낸다 — 첫 결과와 같은 값이 아니다`() {
         val session = freshSession().copy(expiresAt = NOW.minusSeconds(1))
         val draft = StrategyDraft(bidNowThreshold = BigDecimal("0.7"))
-        val command = EditCommand.ProvideValue(CommandId("cmd-1"), session.id, OPERATOR, FIELD, draft)
+        val command =
+            EditCommand.ProvideValue(
+                CommandId("cmd-1"),
+                session.id,
+                OPERATOR,
+                FIELD,
+                draft,
+                StrategyRevision(1),
+            )
 
         val first = apply(session, command, NOW, currentStrategy(), policyOf())
         val replay = apply(first.session, command, NOW, currentStrategy(), policyOf())

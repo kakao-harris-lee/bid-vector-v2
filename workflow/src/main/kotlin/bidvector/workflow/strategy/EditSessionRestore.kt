@@ -39,6 +39,8 @@ private fun restoreState(snapshot: EditSessionSnapshot): EditSessionState =
                 restoreStrategyDraft(
                     requireNotNull(snapshot.stateDraft) { "WaitingForConfirmation 은 stateDraft 가 필요하다" },
                 ),
+                // D-6A2b-18 — 없으면 `null` 그대로 둔다(지어내지 않는다). confirm 이 fail-closed 로 거부한다.
+                snapshot.stateBaseRevision?.let(::StrategyRevision),
             )
         }
 
@@ -99,6 +101,10 @@ private fun restoreEditableField(snapshot: EditableFieldSnapshot): EditableField
 
         "CANDIDATE_LIMIT" -> {
             EditableField.CandidateLimit
+        }
+
+        "MAX_ACTIVE_BIDS" -> {
+            EditableField.MaxActiveBids
         }
 
         else -> {
@@ -174,6 +180,10 @@ private fun restoreCommand(
                 operator,
                 restoreRequiredField(snapshot.field),
                 restoreStrategyDraft(requireNotNull(snapshot.draft) { "PROVIDE_VALUE 는 draft 가 필요하다" }),
+                // D-6A2b-38(M-r3-5) — 없으면 `null` 그대로다(상태 쪽과 같은 모양). 던지면 그 행이
+                // 든 세션은 **조회·취소까지** 500 이 되어 치울 수 없는 행이 된다. 값 제출만
+                // fail-closed 로 거부된다(`null != current.revision`).
+                snapshot.baseRevision?.let(::StrategyRevision),
             )
         }
 

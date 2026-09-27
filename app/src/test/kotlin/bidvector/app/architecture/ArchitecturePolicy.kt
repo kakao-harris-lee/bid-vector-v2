@@ -53,6 +53,82 @@ class ArchitecturePolicy private constructor(
     val portCallAllowedPairs: List<Pair<String, String>>
         get() = pairs("app.port-call.allowed-pairs")
 
+    /**
+     * M6/6A-2b D-6A2b-8 — `app.http` 의존 게이트. 포트 집합은 이 파일이 아니라 use case
+     * 생성자에서 **도출**한다 — [appHttpUseCasePorts] 는 그 도출 결과와 대조할 **관측 등식**
+     * 이다(포트가 늘거나 줄면 RED 가 되어 분류를 다시 보게 한다).
+     */
+    val appHttpPackage: String get() = value("app.http.package")
+    val appHttpUseCaseType: String get() = value("app.http.use-case-type")
+    val appHttpUseCasePorts: List<String> get() = list("app.http.use-case-ports")
+    val appHttpAdaptersRoot: String get() = value("app.http.adapters-root")
+
+    /** D-6A2b-19 ② — 허용 목록(패키지 접두 · 정확한 클래스)과 그 안에서 다시 파는 금지 접두. */
+    val appHttpAllowedPackages: List<String> get() = list("app.http.allowed-packages")
+    val appHttpAllowedClasses: List<String> get() = list("app.http.allowed-classes")
+    val appHttpDeniedPackages: List<String> get() = list("app.http.denied-packages")
+
+    /**
+     * D-6A2b-26·32 — 면제의 **세 층**. 한 덩어리로 두면 ② 층에 SQL 메서드 하나를 더하는 것만으로
+     * 컨트롤러 → HTTP 지름길이 열린다. 목록은 전부 **정확한 클래스 이름**이다(접두·패턴 금지).
+     */
+    val appAssemblyTier1Classes: List<String> get() = list("app.assembly.tier1-bootstrap-classes")
+    val appAssemblyTier2Classes: List<String> get() = list("app.assembly.tier2-request-scoped-classes")
+    val appAssemblyTier3Classes: List<String> get() = list("app.assembly.tier3-collection-classes")
+
+    /** 면제 전체 — 대상 집합 등식의 다른 한쪽(세 층의 합). */
+    val appAssemblyExemptClasses: List<String>
+        get() = appAssemblyTier1Classes + appAssemblyTier2Classes + appAssemblyTier3Classes
+
+    /** D-6A2b-32 ② — 요청 스코프 층의 별도 허용 목록과 그 안에서 다시 파는 접두. */
+    val appTier2AllowedPackages: List<String> get() = list("app.assembly.tier2.allowed-packages")
+    val appTier2AllowedClasses: List<String>
+        get() = list("app.assembly.tier2.allowed-classes") + list("app.assembly.tier2.allowed-app-classes")
+    val appTier2DeniedPackages: List<String> get() = list("app.assembly.tier2.denied-packages")
+
+    /** D-6A2b-41 ② — ② 층이 참조해도 되는 `workflow` 타입(정확한 이름). 패키지 통째가 아니다. */
+    val appTier2AllowedWorkflowTypes: List<String> get() = list("app.assembly.tier2.allowed-workflow-types")
+
+    /** D-6A2b-41 — 능력 포트 도출의 뿌리가 있는 모듈 루트와, use case 조립이 허용된 (호출자, 타입) 쌍. */
+    val appWorkflowRoot: String get() = value("app.workflow-root")
+    val appUseCaseConstructionPairs: List<String> get() = list("app.workflow.use-case-construction-pairs")
+
+    /** D-6A2b-49 — 주입 표면(제한·② 층)이 받을 수 있는 정확 타입, 주입점 애너테이션, 도메인 port 뿌리. */
+    val appInjectionAllowedTypes: List<String> get() = list("app.injection.allowed-types")
+    val appInjectionAnnotations: List<String> get() = list("app.injection.annotations")
+    val appDomainPortRoots: List<String> get() = list("app.injection.domain-port-roots")
+    val appInjectionCarrierExemptions: List<String> get() = list("app.injection.carrier-exemptions")
+
+    /** N-r5-5 — 제한 층이 허용 접두 안이라도 직접 받지 못하는 타입. */
+    val appHttpDeniedTypes: List<String> get() = list("app.http.denied-types")
+
+    /** D-6A2b-34 — ① 층이 의존할 수 없는 HTTP 확장 API 접두와, 오늘 실제로 쓰는 예외 클래스. */
+    val appBootstrapForbiddenPackages: List<String> get() = list("app.assembly.tier1.forbidden-http-packages")
+    val appBootstrapHttpApiTypes: List<String> get() = list("app.assembly.tier1.http-api-types")
+
+    /** D-6A2b-36·43·44 — 어댑터 멤버 호출의 허용 쌍(`호출자|선언 타입|메서드|서술자`). */
+    val appAdapterMemberCallPairs: List<String> get() = list("app.adapter.member-call-pairs")
+
+    /** D-6A2b-37 — 제한·요청 스코프 층이 참조할 수 있는 어댑터 예외 타입(정확한 이름). */
+    val appAdapterExceptionTypes: List<String> get() = list("app.adapter.exception-types")
+
+    /** D-6A2b-27 — 출하 조립에서 거둔 HTTP 표면의 기대 집합(API 포트·관리 포트 각각). */
+    val apiSurfaceHandlers: List<String> get() = list("app.surface.api.handlers")
+    val apiSurfaceFilters: List<String> get() = list("app.surface.api.filters")
+    val apiSurfaceServlets: List<String> get() = list("app.surface.api.servlets")
+
+    /** M-r3-4 — API 포트의 method mapping 빈 집합(`빈 이름:타입`) — 진입점 축의 목록이다. */
+    val apiSurfaceMethodMappingBeans: List<String> get() = list("app.surface.api.method-mapping-beans")
+    val managementSurfaceMethodMappingBeans: List<String>
+        get() = list("app.surface.management.method-mapping-beans")
+    val managementSurfaceHandlers: List<String> get() = list("app.surface.management.handlers")
+    val managementSurfaceFilters: List<String> get() = list("app.surface.management.filters")
+    val managementSurfaceServlets: List<String> get() = list("app.surface.management.servlets")
+
+    /** D-6A2b-10 — 운영자 자격증명 타입과 그것을 참조해도 되는 클래스 집합(집합 등식). */
+    val operatorCredentialTypes: List<String> get() = list("app.secret.operator-credential-types")
+    val operatorCredentialReferencers: List<String> get() = list("app.secret.operator-credential-referencers")
+
     /** M6/6F-8 (b) — 수집 use case 패키지와 그것이 참조해도 되는 procurement 최상위 타입. */
     val collectionPackage: String get() = value("workflow.collection.package")
     val collectionAllowedProcurementTypes: List<String> get() = list("workflow.collection.allowed-procurement-types")

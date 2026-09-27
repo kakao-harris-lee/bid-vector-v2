@@ -199,7 +199,9 @@ class OpenApiDryRunContractTest : HttpIntegrationTestBase() {
         spec.responseStatusCodes(
             "/api/evaluation-dry-runs",
             "post",
-        ) shouldBe setOf("200", "400", "401", "409", "500")
+            // M6/6A-2b D-6A2b-7 — 미지원 미디어 타입이 500 에서 415 로 바뀌면서 이 operation 의
+            // 응답 집합에도 415 가 들어왔다(이전에는 선언할 수 없는 상태였다).
+        ) shouldBe setOf("200", "400", "401", "409", "415", "500")
         spec.responseStatusCodes("/{unmatched}", "get") shouldBe setOf("404")
     }
 

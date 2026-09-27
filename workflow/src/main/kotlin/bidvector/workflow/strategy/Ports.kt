@@ -33,10 +33,24 @@ fun interface Clock {
  * port 밖에서 자체 persistence 경로를 새로 만드는 것」은 이 slice 의 위협 모델 경계 밖이고
  * 3D/4C 의 write 게이트 소관이다.
  */
-interface StrategyRepository {
-    fun load(): OperatorStrategy
-
+interface StrategyRepository : StrategyReader {
     fun save(applied: AppliedStrategy)
+}
+
+/**
+ * 전략 **읽기** port(D-6A2b-41) — `save` 가 없다.
+ *
+ * verifier r4 F-r4-1: 읽기만 하는 요청 스코프 조립이 쓰기 가능한 [StrategyRepository] 를 쥐고
+ * 있었고, 그것 하나로 메모리 세션 저장소·no-op sink 를 붙여 편집 use case 를 **스스로 조립**하면
+ * HTTP GET 한 번에 전략이 바뀌면서 outbox·세션 행은 0 이었다. 능력은 **호출 지점**이 아니라
+ * **전달**에서 샌다 — 읽기 자리에 쓰기 능력을 주지 않는 것이 그 축을 닫는 구조다.
+ *
+ * 밖에 허락하는 것은 「현재 전략을 읽는다」뿐이다. 쓰기는 [StrategyRepository.save] 이고 그
+ * 인자 [AppliedStrategy] 는 `internal constructor` 라 이 모듈 밖에서 만들 수 없다 — 이 port 를
+ * 구현해도 쓰기 경로는 생기지 않는다.
+ */
+interface StrategyReader {
+    fun load(): OperatorStrategy
 }
 
 /**

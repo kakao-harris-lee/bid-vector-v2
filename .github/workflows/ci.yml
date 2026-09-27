@@ -409,6 +409,58 @@ jobs:
           code="$(_api_authorized_code /api/strategy)"
           [ "$code" = "200" ] || fail "인증 /api/strategy 가 200 이 아니다: $code"
 
+          # M6/6A-2b D-6A2b-13 — 「뜬 이미지에서 쓰기가 인증 경계 아래에서 끝까지 간다」를 잰다.
+          # 자격 값은 argv 를 지나지 않는다(위 생성 step 주석과 같은 형태) — 본문은 비밀이
+          # 아니지만 `--config` 의 `data = "@파일"` 로 넘겨 인용 규칙을 단순하게 둔다.
+          echo "-- API 포트 쓰기 왕복: begin → value → confirm → GET 반영 --"
+          bodies="$(mktemp -d)"
+          _api_get() {
+            local out
+            out="$(printf 'header = "X-Operator-Credential: %s"\n' "$BIDVECTOR_APP_OPERATOR_CREDENTIAL" \
+              | curl --config - -sS -w '\n%{http_code}' "$API$1")" || out=$'\ntransport-error'
+            printf '%s' "$out"
+          }
+          _api_post() {
+            local out
+            out="$(printf 'header = "X-Operator-Credential: %s"\nheader = "Content-Type: application/json"\nrequest = "POST"\ndata = "@%s"\n' \
+              "$BIDVECTOR_APP_OPERATOR_CREDENTIAL" "$2" \
+              | curl --config - -sS -w '\n%{http_code}' "$API$1")" || out=$'\ntransport-error'
+            printf '%s' "$out"
+          }
+          _code() { printf '%s' "$1" | tail -n1; }
+          _body() { printf '%s' "$1" | sed '$d'; }
+
+          before="$(_api_get /api/strategy)"
+          [ "$(_code "$before")" = "200" ] || fail "쓰기 전 GET /api/strategy 가 200 이 아니다"
+          revision="$(_body "$before" | jq -r '.revision')"
+
+          printf '{"field":"CANDIDATE_LIMIT"}' > "$bodies/begin.json"
+          begun="$(_api_post /api/strategy/edit-sessions "$bodies/begin.json")"
+          [ "$(_code "$begun")" = "201" ] || fail "begin 이 201 이 아니다: $(_code "$begun")"
+          session="$(_body "$begun" | jq -r '.sessionId')"
+          [ -n "$session" ] && [ "$session" != "null" ] || fail "begin 응답에 sessionId 가 없다"
+
+          printf '{"commandId":"smoke-v1","field":"CANDIDATE_LIMIT","count":13}' > "$bodies/value.json"
+          provided="$(_api_post "/api/strategy/edit-sessions/$session/value" "$bodies/value.json")"
+          [ "$(_code "$provided")" = "200" ] || fail "value 가 200 이 아니다: $(_code "$provided")"
+
+          printf '{"commandId":"smoke-c1","seenRevision":%s}' "$revision" > "$bodies/confirm.json"
+          confirmed="$(_api_post "/api/strategy/edit-sessions/$session/confirm" "$bodies/confirm.json")"
+          [ "$(_code "$confirmed")" = "200" ] || fail "confirm 이 200 이 아니다: $(_code "$confirmed")"
+          [ "$(_body "$confirmed" | jq -r '.state')" = "APPLIED" ] || fail "confirm 뒤 state 가 APPLIED 가 아니다"
+
+          after="$(_api_get /api/strategy)"
+          [ "$(_body "$after" | jq -r '.candidateLimit')" = "13" ] || fail "쓰기 값이 조회에 반영되지 않았다"
+          [ "$(_body "$after" | jq -r '.revision')" = "$((revision + 1))" ] || fail "revision 이 1 오르지 않았다"
+
+          echo "-- 무인증 쓰기 401 · 미선언 메서드 405 --"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+            --data '{"field":"CANDIDATE_LIMIT"}' "$API/api/strategy/edit-sessions")" || code="transport-error"
+          [ "$code" = "401" ] || fail "무인증 쓰기가 401 이 아니다: $code"
+          code="$(_code "$(_api_get /api/strategy/edit-sessions)")"
+          [ "$code" = "405" ] || fail "미선언 메서드가 405 가 아니다: $code"
+          rm -rf "$bodies"
+
           echo "-- API 포트의 actuator: 401 또는 404(200 이면 실패) --"
           for path in /actuator /actuator/health /actuator/health/readiness /actuator/env; do
             anon="$(_anon_code "$API$path")"

@@ -4,13 +4,26 @@ import bidvector.adapters.evaluation.CandidateCapExceededException
 import bidvector.adapters.evaluation.InvalidEvaluationRequestException
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
+import bidvector.workflow.strategy.EditSessionConflictException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.HttpMediaTypeNotAcceptableException
+import org.springframework.web.HttpMediaTypeNotSupportedException
+import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
+
+/**
+ * 편집 요청의 형식 오류(M6/6A-2b D-6A2b-7) — 400 `INVALID_REQUEST`. 메시지는 응답에 실리지
+ * 않는다(아래 [ErrorMapping] 이 고정 문구로만 옮긴다) — 진단용이다. 던지는 자리는
+ * `StrategyEditRequests.kt` 의 파싱 함수들이고, 오류 어휘는 이 파일 하나가 갖는다.
+ */
+class InvalidEditRequestException(
+    message: String,
+) : RuntimeException(message)
 
 /**
  * 요청 attribute 키 — [RequestAuditFilter]가 요청마다 한 번 발급한 correlation id·
@@ -21,7 +34,7 @@ import org.springframework.web.servlet.NoHandlerFoundException
 const val CORRELATION_ID_ATTRIBUTE = "bidvector.http.correlationId"
 const val AUDIT_SUBJECT_ATTRIBUTE = "bidvector.http.subject"
 
-private fun HttpServletRequest.correlationIdOrUnknown(): String =
+internal fun HttpServletRequest.correlationIdOrUnknown(): String =
     getAttribute(CORRELATION_ID_ATTRIBUTE) as? String ?: "unknown"
 
 /**
@@ -45,6 +58,22 @@ object ErrorCode {
     const val MAX_ACTIVE_BIDS_NOT_CONFIGURED = "MAX_ACTIVE_BIDS_NOT_CONFIGURED"
     const val CANDIDATE_CAP_EXCEEDED = "CANDIDATE_CAP_EXCEEDED"
     const val INVALID_REQUEST = "INVALID_REQUEST"
+
+    // M6/6A-2b D-6A2b-6·7 — 편집 endpoint 여섯. 거부 사유 일곱은 전부 409 이고 코드가
+    // 사유를 가른다(상태 코드가 아니라 본문이 구분한다). 나머지 넷은 세션 부재(404)·
+    // 낙관적 동시성 충돌(409)·값 불변식 위반(400)·메서드/미디어 타입 불일치(405/415)다.
+    const val SESSION_NOT_FOUND = "SESSION_NOT_FOUND"
+    const val SESSION_EXPIRED = "SESSION_EXPIRED"
+    const val IDEMPOTENCY_CONFLICT = "IDEMPOTENCY_CONFLICT"
+    const val ACTOR_MISMATCH = "ACTOR_MISMATCH"
+    const val SYSTEM_ACTOR_NOT_PERMITTED = "SYSTEM_ACTOR_NOT_PERMITTED"
+    const val STALE_REVISION = "STALE_REVISION"
+    const val INVALID_TRANSITION = "INVALID_TRANSITION"
+    const val SESSION_ALREADY_ACTIVE = "SESSION_ALREADY_ACTIVE"
+    const val EDIT_SESSION_CONFLICT = "EDIT_SESSION_CONFLICT"
+    const val STRATEGY_VALUE_INVALID = "STRATEGY_VALUE_INVALID"
+    const val METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
+    const val UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
 }
 
 /**
@@ -57,43 +86,69 @@ object ErrorMapping {
     fun unauthenticated(correlationId: String): ErrorBody =
         ErrorBody(ErrorCode.UNAUTHENTICATED, "인증에 실패했다", correlationId)
 
-    /** [chain.doFilter]를 완전히 벗어난 예외의 최후 방어선([RequestAuditFilter])에서도 쓴다. */
+    /**
+     * [chain.doFilter]를 완전히 벗어난 예외의 최후 방어선([RequestAuditFilter])에서도 쓴다.
+     *
+     * **표는 하나다 — 아래 두 `when` 은 크기 게이트(함수 50줄) 때문에 기계적으로 나눈
+     * 같은 표의 앞뒤다**(M6/6A-2b). 갈래를 더할 자리가 둘이 됐지만 **기본값은 여전히 여기
+     * 한 곳**이고, 어느 갈래도 `throwable.message` 를 응답에 싣지 않는다 — 두 함수의
+     * 반환 타입이 (코드, 고정 문구) 쌍이라 예외 값이 본문에 닿을 통로 자체가 없다.
+     */
     fun forThrowable(
         throwable: Throwable,
         correlationId: String,
-    ): ErrorBody =
+    ): ErrorBody {
+        val (code, message) =
+            readPathCode(throwable)
+                ?: editPathCode(throwable)
+                ?: (ErrorCode.INTERNAL_ERROR to "요청을 처리하는 중 오류가 발생했다")
+        return ErrorBody(code, message, correlationId)
+    }
+
+    /** 6A-1·6A-3 이 낸 갈래(조회·dry-run). */
+    private fun readPathCode(throwable: Throwable): Pair<String, String>? =
         when (throwable) {
             is NoHandlerFoundException -> {
-                ErrorBody(ErrorCode.NOT_FOUND, "요청한 경로가 없다", correlationId)
+                ErrorCode.NOT_FOUND to "요청한 경로가 없다"
             }
 
             is InvalidStoredStrategyException -> {
-                ErrorBody(ErrorCode.INVALID_STORED_STRATEGY, "저장된 전략이 유효하지 않다", correlationId)
+                ErrorCode.INVALID_STORED_STRATEGY to "저장된 전략이 유효하지 않다"
             }
 
             is MaxActiveBidsNotConfiguredException -> {
-                ErrorBody(ErrorCode.MAX_ACTIVE_BIDS_NOT_CONFIGURED, "전략에 여력 상한이 설정되지 않았다", correlationId)
+                ErrorCode.MAX_ACTIVE_BIDS_NOT_CONFIGURED to "전략에 여력 상한이 설정되지 않았다"
             }
 
             is CandidateCapExceededException -> {
-                ErrorBody(ErrorCode.CANDIDATE_CAP_EXCEEDED, "후보 스캔이 상한을 초과했다", correlationId)
+                ErrorCode.CANDIDATE_CAP_EXCEEDED to "후보 스캔이 상한을 초과했다"
             }
 
             is InvalidEvaluationRequestException -> {
-                ErrorBody(ErrorCode.INVALID_REQUEST, "요청 값이 유효하지 않다", correlationId)
+                ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
             }
 
-            // M6/6A-3+6F-3 D-6A3-19(검토 라운드 1 contract-keeper V1 · verifier MEDIUM) —
-            // 비JSON·빈 본문은 EvaluationDryRunController의 parseCurrentActiveBids 에
-            // 닿기 전에 Jackson 자체가 여기서 던진다(HttpMessageNotReadableException).
-            // 같은 코드(INVALID_REQUEST)로 옮긴다 — 예외 메시지는 싣지 않는다(D-6A1-7 불변식).
+            // D-6A3-19 — 비JSON·빈 본문은 컨트롤러의 명시 검증에 닿기 전에 Jackson 이 던진다.
             is HttpMessageNotReadableException -> {
-                ErrorBody(ErrorCode.INVALID_REQUEST, "요청 본문을 읽을 수 없다", correlationId)
+                ErrorCode.INVALID_REQUEST to "요청 본문을 읽을 수 없다"
             }
 
             else -> {
-                ErrorBody(ErrorCode.INTERNAL_ERROR, "요청을 처리하는 중 오류가 발생했다", correlationId)
+                null
             }
+        }
+
+    /**
+     * M6/6A-2b 가 낸 갈래(편집 쓰기) — 이 slice 가 본문을 받는 첫 쓰기 표면을 열었다.
+     * 형식·상태 오류가 기본 분기(500)로 떨어지면 그것이 스택 노출의 문이 된다(D-6A2b-7).
+     */
+    private fun editPathCode(throwable: Throwable): Pair<String, String>? =
+        when (throwable) {
+            is InvalidEditRequestException -> ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
+            is EditSessionConflictException -> ErrorCode.EDIT_SESSION_CONFLICT to "편집 세션이 동시에 바뀌었다"
+            is HttpRequestMethodNotSupportedException -> ErrorCode.METHOD_NOT_ALLOWED to "이 경로가 지원하지 않는 메서드다"
+            is HttpMediaTypeNotSupportedException -> ErrorCode.UNSUPPORTED_MEDIA_TYPE to "지원하지 않는 미디어 타입이다"
+            else -> null
         }
 }
 
@@ -115,7 +170,8 @@ private fun escapeJson(value: String): String = value.replace("\\", "\\\\").repl
 /**
  * DispatcherServlet 안에서 일어나는 모든 예외의 유일한 처리기(우회 (3)·(6)) — 도메인
  * 실패도, `NoHandlerFoundException`(D-6A1-21, `spring.mvc.throw-exception-if-no-handler-found`)
- * 도, 그 밖 매핑표에 없는 어떤 [Throwable]도 여기 한 곳을 지난다. [correlationId]는
+ * 도, 그 밖 매핑표에 없는 어떤 [Throwable]도 여기 한 곳을 지난다. **예외 하나** — 406 은
+ * 본문이 없다(아래 [mediaTypeNotAcceptable]). [correlationId]는
  * [RequestAuditFilter]가 요청 시작 시 발급해 request attribute에 심어 둔 값을 그대로
  * 읽는다(발급 지점 하나, 재발급하지 않는다).
  */
@@ -133,30 +189,59 @@ class GlobalErrorHandler {
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.INTERNAL_SERVER_ERROR, exception, request)
 
-    @ExceptionHandler(MaxActiveBidsNotConfiguredException::class)
-    fun maxActiveBidsNotConfigured(
-        exception: MaxActiveBidsNotConfiguredException,
+    /**
+     * 409 계열 — 저장소 상태가 요청과 맞지 않는다. 셋 다 같은 표([ErrorMapping])를 지나
+     * 서로 다른 코드를 낸다(상태 코드가 아니라 본문의 코드가 사유를 가른다, D-6A2b-6).
+     */
+    @ExceptionHandler(
+        MaxActiveBidsNotConfiguredException::class,
+        CandidateCapExceededException::class,
+        EditSessionConflictException::class,
+    )
+    fun conflict(
+        exception: Throwable,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.CONFLICT, exception, request)
 
-    @ExceptionHandler(CandidateCapExceededException::class)
-    fun candidateCapExceeded(
-        exception: CandidateCapExceededException,
-        request: HttpServletRequest,
-    ): ResponseEntity<ErrorBody> = respond(HttpStatus.CONFLICT, exception, request)
-
-    @ExceptionHandler(InvalidEvaluationRequestException::class)
-    fun invalidEvaluationRequest(
-        exception: InvalidEvaluationRequestException,
-        request: HttpServletRequest,
-    ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
-
-    /** D-6A3-19 — 요청 본문 역직렬화 실패(비JSON·빈 본문)도 400 `INVALID_REQUEST` 다. */
-    @ExceptionHandler(HttpMessageNotReadableException::class)
-    fun httpMessageNotReadable(
-        exception: HttpMessageNotReadableException,
+    /**
+     * 400 계열 — 요청 형식·값이 유효하지 않다(D-6A3-19·D-6A2b-7). 예외 메시지는 어느
+     * 갈래에서도 응답에 실리지 않는다.
+     */
+    @ExceptionHandler(
+        InvalidEvaluationRequestException::class,
+        HttpMessageNotReadableException::class,
+        InvalidEditRequestException::class,
+    )
+    fun badRequest(
+        exception: Throwable,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorBody> = respond(HttpStatus.BAD_REQUEST, exception, request)
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException::class)
+    fun methodNotSupported(
+        exception: HttpRequestMethodNotSupportedException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> {
+        val correlationId = request.correlationIdOrUnknown()
+        val builder = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+        exception.supportedHttpMethods?.let { builder.allow(*it.toTypedArray()) }
+        return builder.body(ErrorMapping.forThrowable(exception, correlationId))
+    }
+
+    /**
+     * **406 만 본문이 없다**(D-6A2b-29, verifier r2 F-r2-4 실측). 클라이언트가 「JSON 은 받지
+     * 않겠다」고 말한 요청에 JSON 오류 본문을 내는 것이 오히려 협상 위반이고, 실제로 Spring 도
+     * 그 본문을 쓸 수 없다(`content-length: 0` 실측). 「모든 오류는 `ErrorBody`」의 유일한
+     * 예외이며, 추적은 audit 행이 진다(406 도 행이 1 는다 — 실측).
+     */
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException::class)
+    fun mediaTypeNotAcceptable(): ResponseEntity<Void> = ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build()
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
+    fun mediaTypeNotSupported(
+        exception: HttpMediaTypeNotSupportedException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorBody> = respond(HttpStatus.UNSUPPORTED_MEDIA_TYPE, exception, request)
 
     @ExceptionHandler(Throwable::class)
     fun fallback(

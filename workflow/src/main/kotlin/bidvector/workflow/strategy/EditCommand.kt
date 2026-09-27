@@ -34,6 +34,26 @@ sealed interface EditCommand {
         override val actor: Actor,
         val field: EditableField,
         val draft: StrategyDraft,
+        /**
+         * **M6/6A-2b D-6A2b-28** — [draft] 를 뜬 전략의 revision. 어댑터가 draft 를 만든
+         * **바로 그 읽기**의 값이고, 요청에서 받지 않는다(서버 값이다).
+         *
+         * 커널이 다시 읽은 값을 기준으로 삼으면 두 읽기 사이에 다른 커밋이 끼는 창이 남는다
+         * (verifier r2 F-r2-3 실측 — 한 트랜잭션 안 두 SELECT 가 READ COMMITTED 에서 서로
+         * 다른 스냅숏을 본다). 그 창에서 기준은 새 revision 이 되고 draft 는 낡은 값이라,
+         * 확인이 통과하며 앞 세션의 변경이 사라졌다. 기준을 **draft 와 같은 읽기**에서
+         * 실어 보내면 그 불일치가 value 시점에 드러난다.
+         *
+         * `null` 은 **이 필드가 생기기 전에 저장된 `lastCommand` 행**이다(상태 쪽
+         * [EditSessionState.WaitingForConfirmation.baseRevision] 과 같은 모양·같은 낱말).
+         * 복원이 던지지 않으므로 그 세션도 조회·취소가 되고, 값 제출만 fail-closed 로 거부된다
+         * (`null != current.revision` 이 항상 참이다).
+         *
+         * **재전달 판별에는 들어가지 않는다**(D-6A2b-38 M-r3-6) — 서버가 매번 새로 읽어 싣는
+         * 값이라, 같은 본문을 다시 보내도 이 값이 달라 「다른 본문」으로 오판됐다. 기준이
+         * 달라진 재전달의 올바른 사유는 `StaleRevision` 이고 그 판정이 재전달 판별보다 앞선다.
+         */
+        val baseRevision: StrategyRevision?,
     ) : EditCommand
 
     /** `Confirmed` — [seenRevision]은 확인 시점에 클라이언트가 본 전략 revision(우회 (2)). */

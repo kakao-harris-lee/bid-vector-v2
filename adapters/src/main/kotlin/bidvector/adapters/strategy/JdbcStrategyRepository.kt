@@ -1,5 +1,7 @@
 package bidvector.adapters.strategy
 
+import bidvector.adapters.persistence.ConnectionSource
+import bidvector.adapters.persistence.OwnTransactionConnectionSource
 import bidvector.adapters.persistence.Sql
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
@@ -39,9 +41,18 @@ import javax.sql.DataSource
  * (`StrategyAdapterDependencyTest`가 그 경계를 잰다).
  */
 class JdbcStrategyRepository(
-    private val dataSource: DataSource,
+    private val connections: ConnectionSource,
     private val policy: Resolution.Resolved<StrategyPolicyData>,
 ) : StrategyRepository {
+    /**
+     * M6/6A-2b D-6A2b-3 — 옛 형태(이 어댑터가 커넥션과 커밋을 스스로 쥔다)를 그대로 남긴다.
+     * [OwnTransactionConnectionSource] 가 「호출 하나 = 트랜잭션 하나」를 지므로 [save] 의
+     * 두 문이 여전히 한 커밋에 든다. 편집 경로는 이 생성자가 아니라 [ConnectionSource] 를
+     * 받는 위 생성자로 서서 **호출부의** 트랜잭션(전략+outbox+세션)에 참여한다.
+     */
+    constructor(dataSource: DataSource, policy: Resolution.Resolved<StrategyPolicyData>) :
+        this(OwnTransactionConnectionSource(dataSource), policy)
+
     /**
      * **D-6F1-4 — 전략 없음(첫 기동)은 실패가 아니라 빈 전략이다.** 행이 없으면
      * `StrategyDraft()`(전부 기본값)와 `StrategyRevision(0)`을 그대로 [validate]에
@@ -53,7 +64,7 @@ class JdbcStrategyRepository(
      * 번역되어 그 사유(위반 목록)를 그대로 담아 전파된다.
      */
     override fun load(): OperatorStrategy {
-        val row = dataSource.connection.use { it.querySingletonStrategyRow() }
+        val row = connections.withConnection { it.querySingletonStrategyRow() }
         val draft = row?.toDraft() ?: StrategyDraft()
         val revision = StrategyRevision(row?.revision ?: 0)
         return when (val result = validate(draft, revision, policy)) {
@@ -66,13 +77,17 @@ class JdbcStrategyRepository(
      * 현재 값(싱글턴 upsert)과 개정 이력(append-only insert)을 한 트랜잭션에서 함께
      * 쓴다 — [OperatorStrategy]의 필드를 [StrategyRow]로 그대로 옮긴다(우회 (6), 자기
      * 값을 지어 쓰지 않는다). [JdbcNoticeRepository.persist]와 같은 관례로 `catch`를
-     * 두지 않는다 — `connection.use { }`가 커밋되지 않은 트랜잭션을 닫으며 롤백한다
-     * (business control flow에 exception을 쓰지 않는다, v2-지침서.md §5).
+     * 두지 않는다 — 실패는 그대로 전파되고 롤백은 커넥션의 주인이 진다.
+     *
+     * **M6/6A-2b D-6A2b-3 — 커밋 주체는 이 클래스가 아니라 [connections] 다.** 편집
+     * 경로에서는 [bidvector.adapters.persistence.TransactionBoundary] 가 주인이라 이
+     * 두 문이 outbox 등록·세션 전진과 **같은 커밋**에 든다(4A 잔여 창 폐쇄). 옛
+     * `DataSource` 생성자에서는 [OwnTransactionConnectionSource] 가 주인이라 거동이
+     * 이전과 같다.
      */
     override fun save(applied: AppliedStrategy) {
         val row = applied.strategy.toRow()
-        dataSource.connection.use { connection ->
-            connection.autoCommit = false
+        connections.withConnection { connection ->
             connection.prepareStatement(Sql.UPSERT_STRATEGY).use { statement ->
                 statement.bindStrategyRow(1, row)
                 statement.executeUpdate()
@@ -81,7 +96,6 @@ class JdbcStrategyRepository(
                 statement.bindStrategyRow(1, row)
                 statement.executeUpdate()
             }
-            connection.commit()
         }
     }
 

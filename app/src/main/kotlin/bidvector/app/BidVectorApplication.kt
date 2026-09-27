@@ -10,8 +10,10 @@ import bidvector.app.http.OperatorCredentialFilter
 import bidvector.app.http.RequestAuditFilter
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.strategy.Clock
+import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.builder.SpringApplicationBuilder
+import org.springframework.boot.context.TypeExcludeFilter
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.web.servlet.FilterRegistrationBean
@@ -52,6 +54,15 @@ import javax.sql.DataSource
 @SpringBootApplication
 @ComponentScan(
     excludeFilters = [
+        // M6/6A-2b D-6A2b-9 — Boot 기본 `@ComponentScan` 이 늘 거는 필터 둘을 되살린다
+        // (`OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`). 명시 `@ComponentScan` 을 쓰면 `@SpringBootApplication`
+        // 의 메타 애너테이션이 아니라 **이 선언**이 이긴다 — 6A-1 이 중첩 조립을 빼려고 이 애너테이션을
+        // 붙이면서 그 둘이 함께 사라졌다. 6A-2a 가 영향 0 을 실측했지만 「오늘 영향이 없다」는 것과
+        // 「없어도 된다」는 다르다: 두 필터가 없으면 test 슬라이스 표지(`TypeExcludeFilter`)와
+        // 자동 구성 등록 클래스(`AutoConfigurationExcludeFilter`)가 스캔에 섞일 수 있고, 새 컨트롤러·
+        // 조립기가 스캔에 들어오는 이 slice 가 그 자리를 닫기에 가장 싸다.
+        ComponentScan.Filter(type = FilterType.CUSTOM, classes = [TypeExcludeFilter::class]),
+        ComponentScan.Filter(type = FilterType.CUSTOM, classes = [AutoConfigurationExcludeFilter::class]),
         ComponentScan.Filter(type = FilterType.ANNOTATION, classes = [SpringBootApplication::class]),
     ],
 )

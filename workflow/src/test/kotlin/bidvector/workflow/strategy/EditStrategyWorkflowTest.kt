@@ -168,6 +168,7 @@ class EditStrategyWorkflowTest {
                     Actor.Operator(OPERATOR),
                     FIELD,
                     StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                    StrategyRevision(1),
                 ),
             )
         provided.shouldBeInstanceOf<CommandResult.Processed>()
@@ -204,6 +205,7 @@ class EditStrategyWorkflowTest {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                StrategyRevision(1),
             ),
         )
 
@@ -223,6 +225,7 @@ class EditStrategyWorkflowTest {
                     Actor.Operator(OPERATOR),
                     FIELD,
                     StrategyDraft(),
+                    StrategyRevision(1),
                 ),
             )
 
@@ -260,6 +263,7 @@ class EditStrategyWorkflowTest {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                StrategyRevision(1),
             ),
         )
 
@@ -315,6 +319,7 @@ class EditStrategyWorkflowTest {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                StrategyRevision(1),
             ),
         )
         val confirmCommand =
@@ -364,6 +369,7 @@ class EditStrategyWorkflowTest {
                 Actor.Operator(OPERATOR),
                 FIELD,
                 StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                StrategyRevision(1),
             ),
         )
         val confirmCommand =
@@ -421,6 +427,7 @@ class EditStrategyWorkflowTest {
                     Actor.Operator(OPERATOR),
                     FIELD,
                     StrategyDraft(bidNowThreshold = BigDecimal("0.7")),
+                    StrategyRevision(1),
                 ),
             )
 

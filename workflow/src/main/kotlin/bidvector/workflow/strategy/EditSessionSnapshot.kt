@@ -30,6 +30,8 @@ data class EditSessionSnapshot(
     val stateField: EditableFieldSnapshot?,
     val stateDraft: StrategyDraftSnapshot?,
     val stateRevision: Int?,
+    /** D-6A2b-18 — `WaitingForConfirmation` 의 기준 revision. 이 필드 이전 행은 `null` 이다(fail-closed). */
+    val stateBaseRevision: Int?,
     val stateCancelReasonKind: String?,
     val stateCancelReasonNote: String?,
     val lastCommand: EditCommandSnapshot?,
@@ -88,6 +90,8 @@ data class EditCommandSnapshot(
     val field: EditableFieldSnapshot?,
     val draft: StrategyDraftSnapshot?,
     val seenRevision: Int?,
+    /** D-6A2b-28 — `ProvideValue` 가 실어 온 기준 revision(draft 를 뜬 읽기의 값). */
+    val baseRevision: Int?,
     val cancelReasonKind: String?,
     val cancelReasonNote: String?,
 )
@@ -107,6 +111,7 @@ fun EditSession.toSnapshot(): EditSessionSnapshot =
         stateField = state.toFieldSnapshot(),
         stateDraft = state.toDraftSnapshot(),
         stateRevision = (state as? EditSessionState.Applied)?.revision?.value,
+        stateBaseRevision = (state as? EditSessionState.WaitingForConfirmation)?.baseRevision?.value,
         stateCancelReasonKind = (state as? EditSessionState.Cancelled)?.reason?.kindName(),
         stateCancelReasonNote = ((state as? EditSessionState.Cancelled)?.reason as? CancellationReason.Other)?.note,
         lastCommand = lastCommand?.toSnapshot(),
@@ -142,6 +147,7 @@ private fun EditableField.toSnapshot(): EditableFieldSnapshot =
         is EditableField.Watch -> EditableFieldSnapshot("WATCH", id.name())
         is EditableField.Threshold -> EditableFieldSnapshot("THRESHOLD", field.name())
         EditableField.CandidateLimit -> EditableFieldSnapshot("CANDIDATE_LIMIT", null)
+        EditableField.MaxActiveBids -> EditableFieldSnapshot("MAX_ACTIVE_BIDS", null)
     }
 
 private fun WatchRuleId.name(): String =
@@ -201,23 +207,25 @@ private fun EditCommand.toSnapshot(): EditCommandSnapshot =
                 field.toSnapshot(),
                 draft.toSnapshot(),
                 null,
+                baseRevision?.value,
                 null,
                 null,
             )
         }
 
         is EditCommand.Confirm -> {
-            EditCommandSnapshot(commandId.value, "CONFIRM", null, null, seenRevision.value, null, null)
+            EditCommandSnapshot(commandId.value, "CONFIRM", null, null, seenRevision.value, null, null, null)
         }
 
         is EditCommand.RequestEdit -> {
-            EditCommandSnapshot(commandId.value, "REQUEST_EDIT", field.toSnapshot(), null, null, null, null)
+            EditCommandSnapshot(commandId.value, "REQUEST_EDIT", field.toSnapshot(), null, null, null, null, null)
         }
 
         is EditCommand.Cancel -> {
             EditCommandSnapshot(
                 commandId.value,
                 "CANCEL",
+                null,
                 null,
                 null,
                 null,

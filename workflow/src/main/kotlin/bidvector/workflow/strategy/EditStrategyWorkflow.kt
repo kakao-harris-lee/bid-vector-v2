@@ -1,6 +1,7 @@
 package bidvector.workflow.strategy
 
 import bidvector.sharedkernel.Resolution
+import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyPolicyData
 
 /**
@@ -93,6 +94,15 @@ class EditStrategyWorkflow(
         return BeginOutcome.Started(session)
     }
 
+    /**
+     * 지금 저장된 전략(M6/6A-2b D-6A2b-2) — 필드 하나짜리 편집을 **전체** draft 로 조립하는
+     * 어댑터가 나머지 필드를 지어내지 않으려면 이 값이 필요하고, 그 읽기는 뒤따르는
+     * command 와 **같은 트랜잭션** 안에서 일어나야 한다(D-6A2b-3). 그래서 어댑터가 포트를
+     * 직접 쥐는 대신(우회 (1)) 이 use case 를 통해 읽는다 — 새 권한이 아니다: 같은 값이
+     * 이미 `GET /api/strategy` 로 나간다.
+     */
+    fun currentStrategy(): OperatorStrategy = strategies.load()
+
     fun provideValue(command: EditCommand.ProvideValue): CommandResult = process(command)
 
     fun confirm(command: EditCommand.Confirm): CommandResult = process(command)
@@ -102,11 +112,21 @@ class EditStrategyWorkflow(
     fun cancel(command: EditCommand.Cancel): CommandResult = process(command)
 
     /** 주기 sweep 배선은 이 slice 밖(트리거는 4B/후속) — 순수 만료 판정만 여기서 노출한다. */
-    fun expire(sessionId: EditSessionId): EditSessionState? {
+    fun expire(sessionId: EditSessionId): EditSessionState? = view(sessionId)?.state
+
+    /**
+     * 조회(M6/6A-2b D-6A2b-1) — 세션 전체를 돌려준다. `expire` 와 **같은 동작**이다:
+     * 접근 시점에 만료를 먼저 접고(D-6A2b-11 — 주기 sweep 을 두지 않는 대신 접근이 접는다.
+     * 다시 접근하지 않는 세션은 접히지 않은 채 남는다 — `OPEN-6A2B-ABANDONED-SESSIONS`)
+     * 접혔으면 그 사실을 영속한다. `expire` 가 상태만 돌려줘 HTTP 응답이 요구하는 버전·
+     * 만료 시각·대기 필드를 나르지 못해 이 자리가 생겼다 — 같은 절차를 다시 쓰지 않는다
+     * (`expire` 가 이 함수에 위임한다).
+     */
+    fun view(sessionId: EditSessionId): EditSession? {
         val session = sessions.load(sessionId)?.let(::restoreEditSession) ?: return null
         val expired = expireIfDue(session, clock.now())
         if (expired !== session) sessions.save(expired)
-        return expired.state
+        return expired
     }
 
     /**
@@ -116,8 +136,11 @@ class EditStrategyWorkflow(
      * revision 이 오르지 않고 발행도 없이 **편집이 영구 소실**됐다. 이 순서라면 전략 저장
      * 실패 시 세션이 전진하지 않아 재전달이 정상 재시도가 되고, 발행 실패(전략 저장은
      * 성공한 뒤)는 다음 재전달의 `seenRevision` 대조가 잡아 `StaleRevision` 거부로 정직하게
-     * 드러난다(이중 적용이 아니다). 남는 잔여 창(발행 실패 뒤 세션 미전진)은 알려진
-     * 제한 — 원자적 저장+발행+세션전진은 4C 트랜잭션 outbox 소관.
+     * 드러난다(이중 적용이 아니다). 이 순서가 다루는 것은 **저장·발행·세션전진이 서로 다른
+     * 트랜잭션일 때**의 잔여 창이다 — production 경로에서는 그 셋이 한 트랜잭션 안에 있다
+     * (`StrategyEditTransaction` 이 요청마다 경계를 열고 이 use case 를 조립한다, D-6A2b-3).
+     * 순서 자체는 심층 방어로 남긴다: 경계 없이 이 use case 를 직접 조립하는 호출자에게는
+     * 여전히 이 순서가 유일한 방어다.
      *
      * **verifier r3 HIGH-3 수정(D-6B1-10)** — `outcome.session`이 [session]과 **같은
      * 인스턴스**(버전이 안 오른 `Rejected` 전부·중복 재전달의 `Accepted`)면 저장하지

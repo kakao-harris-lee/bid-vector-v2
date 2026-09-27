@@ -557,6 +557,45 @@ ML 은 자리지킴 그대로이고, compose 기동은 수집을 켜지 않는�
 - 6A-2b 로(무변경): `OPEN-6F9-STRATEGY-WRITE-ENDPOINT` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` · `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` · `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(실측 영향 0) · `OPEN-API-WRONG-METHOD-500`(관리 포트 비 GET 500 관측 추가)
 - 관측: `ml-serving:local` 336MB / 상한 400MB.
 
+**운영자 결정 2026-09-26(6A-2a 머지 뒤 잔여 점검)** — 결정 대기로 남아 있던 넷을 정했다.
+① 다음 slice = **6A-2b, Codex 없음**(verifier + code-reviewer sonnet) ② **6B-3 보존 기간 90일**(공고·평가 이력·audit — 6F-6·6F-5-a·6A-1 이 넘긴
+`OPEN-…-RETENTION` 의 입력) ③ **6B-4 큐 상한 초과 시 가장 오래된 대기 job 부터 폐기**(최신성 우선) ④ **6F-5-b 실 LLM 요건 추출 승인 +
+`OPEN-ML-ANALYSIS-WIRING` 실 gRPC 배선 승인** — 조건: 「LLM 추출과 ML gRPC 를 비교할 수 있도록 적절한 패턴을 쓴다」. 비교 구조(같은 입력을 두 경로에
+흘려 같은 형태로 기록하고 판정에는 한쪽만 쓰는 shadow 형태 등)는 해당 slice 계약에서 설계한다. 이 결정들은 실 외부 호출의 **범위**를 승인한 것이고,
+각 slice 의 실행(호출 횟수·비용 상한)은 그 계약에서 다시 확인한다.
+
+**결정 ④ 개정 2026-09-27(운영자)** — **`OPEN-ML-ANALYSIS-WIRING` 실 gRPC 배선은 보류한다. 먼저 가격 경로 백테스트 slice 를 둔다.** 근거는 팀장 리서치다.
+① 사정률은 제도상 난수다 — 15구간 균등 난수 + 번호 무작위 배열, 4개 평균의 표준편차 약 0.51%p(±2%)·0.77%p(±3%). 공개된 딥러닝 예측 RMSE(0.758%)는
+「항상 100%」 기준선과 같거나 나쁘다. ② legacy 실측: LSTM 은 「학습할 신호가 없다」로 은퇴했고, LightGBM 이 그룹 평균을 이긴 흔적(잔차 sd −8.3%)은
+겹치지 않는 창에서 판정할 수 없었다. **균등 난수 기준선 비교는 한 번도 없었다.** ③ 남는 이득은 사정률 예측이 아니라 **경쟁자 밀집 회피**다(몬테카를로 추정
+1/N 대비 1.3배, 경쟁자가 몰리면 수 배). 백테스트는 2026-09-07 사전 등록 결정 실험 D-ML-2(`docs/discovery/ml-value-and-data-locality.md` §4)를 V2 개찰 데이터로 실행한다 —
+S0 밴드 내 균등 난수 · S1 규칙 앵커 · **S2 V2 분포 엔진**(V2 가 서빙하는 것은 GBM 이 아니라 분포 엔진이다 — 5D-2 D-5D2-1 (b); 이 문단 초판의 「기존 ML 대 이론 분포」 구분은 틀렸다, 2026-09-27 팀장 정정) · S3 GBM(데이터 없음, N/A) · S4 제도 분포 + 경쟁자 분포 몬테카를로. 정본은 **6G** 계약(`reports/evidence/m6/6g/scope.md`). 경쟁자 분포에 쓸 **개찰 순위 전체**(참가자별 투찰금액)를 KONEPS 에서 얻을 수 있는지가 선행 조사다 — legacy 는 낙찰자만 가졌다.
+**6F-5-b 실 LLM 요건 추출 승인은 그대로다**(가격과 무관한 축 — LLM 은 V2·legacy 어디서도 가격 예측에 쓰이지 않는다).
+
+**6A-2b 착수 2026-09-26** — base `6f0b21f0`(PR #47 머지 뒤 `main`), 레인 worktree `bid-vector-v2-m6-6a2b`·브랜치 `m6-6a2b/2026-09-26`. 정본
+`reports/evidence/m6/6a2b/scope.md`(D-6A2b-1~13). 세션 편집 endpoint 여섯을 `EditStrategyWorkflow` 위에 세운다 — 모든 전략 쓰기가 편집 세션을 지나고,
+적용은 전략·outbox·세션을 **한 트랜잭션**으로 커밋한다(4A 잔여 창 폐쇄). 인증·audit 필터 무편집, 외부 effect 0, 마이그레이션 없음을 목표로 한다.
+받는 OPEN 여섯 중 다섯을 닫고(`OPEN-6F9-STRATEGY-WRITE-ENDPOINT` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` · `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` ·
+`OPEN-API-WRONG-METHOD-500` · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`), `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` 은 재측정 후 6E 로 넘긴다.
+
+**6A-2b 종결 2026-09-27** — PR **#48**(계약 갱신 여섯 라운드: D-6A2b-14~54). 판정은 PR 코멘트 여섯에 있다. 재작업 **5/5 + 운영자 승인 초과 1** —
+verifier 는 r1~r5 not-ready, **r6 ready-for-review**, code-reviewer 는 r6 까지 REQUEST_CHANGES. **r6 사전 규칙**(경계 안 HIGH 하나면 게이트 분리 종결)이
+code-reviewer 의 N-r6-1(주입 표면 전개가 배열·`vararg` 를 버린다 — 한 줄)로 발동해, 수정 라운드 없이 **게이트 분리 종결**했다. 산출물(endpoint 여섯 · 한 트랜잭션
+원자성 · 교차 세션 기준 revision · 오류 매핑 · OpenAPI · 관리 포트 405)은 초판부터 서 있었고, 여섯 라운드는 전부 **HTTP 층 의존 게이트** 하나에 들었다.
+
+**게이트 여섯 라운드의 계열** — r1 금지 열거 → r2 대상 종류 열거(RouterFunction·Filter) → r3 면제 층·허용 통로(Tomcat valve·interceptor) → **운영자 결정
+(A) 구조 재건**(위협 모델 경계 개정 + 의존 방향) → r4 능력 전달(②층이 쥔 쓰기 포트로 use case 자체 조립) → r5 주입 값(①층 SQL 클로저를 DI 로) → **축 전환**
+(「무엇을 이름으로 아는가」→「무엇을 받을 수 있는가」, 주입 표면은 유한하다) → r6 배열 한 겹. **교훈**: ① 게이트가 막으려는 주체를 먼저 한정하라 — 조립 근을 믿지
+않으면 in-tree 게이트는 서지 않는다(D-6A2b-51, 1A 빌드 저자 경계와 같은 뿌리) ② 「아는 것」을 좁히는 게이트는 「받는 것」으로 새는 능력을 못 본다 ③ 계약 문장 ↔
+구현 심볼 대조표에 「이행」이라 적고 실제로 다른 것이 r4·r5 차단의 절반이었다 — 대조는 저자 아닌 레인이 독립으로 한다.
+
+**넘긴 것**: 신설 `OPEN-6A2B-INJECTION-HARDENING`(첫 항목 N-r6-1 · meta-gate 발견 · 상속 SAM · 콜백 세터) · `OPEN-6A2B-COMPOSITION-ROOT-HARDENING`(①층 SQL
+몸통 선택 R1·R8 · 정적 슬롯 M-r6-1) · `OPEN-6A2B-LOCATOR-BAN`(→ 리플렉션 봉쇄 레인) · `OPEN-6A2B-ABANDONED-SESSIONS`(→ 6B-3, 보존 90일) ·
+`OPEN-6A2B-DRYRUN-ASSEMBLY-IN-APP` · `OPEN-6A2B-VIOLATION-DETAIL` · `OPEN-6A2B-CONCURRENT-SESSION-ADVANCE` · `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`(→ 6E).
+닫은 것: `OPEN-6F9-STRATEGY-WRITE-ENDPOINT` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` · `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` · `OPEN-API-WRONG-METHOD-500`(관리 포트
+포함) · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(전제 「영향 0」은 거짓이었다 — test classpath 에서 `@TestConfiguration` 을 걷어냈다). rollback 의 공유 파일 절차는
+이 종결 문단도 같은 문단 단위 삭제로 지운다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서

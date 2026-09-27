@@ -30,9 +30,24 @@ sealed interface EditSessionState {
         val field: EditableField,
     ) : EditSessionState
 
+    /**
+     * 확인 대기 — [draft] 는 전략 **전체**의 스냅숏이고, [baseRevision] 은 그 스냅숏을 뜬
+     * 시점의 전략 revision 이다(M6/6A-2b D-6A2b-18).
+     *
+     * **왜 기준을 함께 담는가(verifier r1 F-2 · code-review r1 HIGH-1).** `Confirm` 의
+     * `seenRevision` 은 「클라이언트가 확인 직전에 본 revision」이라 지금 저장된 값과 같기
+     * 쉽다 — 그 대조만으로는 **draft 가 언제 떠졌는지**를 묻지 못한다. 서버 생성 id 아래서는
+     * 세션이 여럿 열리므로(알려진 제한 ①), 앞 세션이 적용한 뒤 뒤 세션이 낡은 스냅숏을
+     * 확인하면 앞의 변경이 **409 없이** 사라졌다(실측). 이 값이 그 물음의 자리다.
+     *
+     * `null` 은 **이 필드가 생기기 전에 저장된 행**이다 — [bidvector.workflow.strategy.apply]
+     * 의 대조가 `null != current.revision` 으로 항상 참이 되어 fail-closed 로 거부된다
+     * (마이그레이션을 만들지 않고 낡은 행을 안전한 쪽으로 읽는다, D-6A2b-18).
+     */
     data class WaitingForConfirmation(
         val field: EditableField,
         val draft: StrategyDraft,
+        val baseRevision: StrategyRevision?,
     ) : EditSessionState
 
     data class Applied(

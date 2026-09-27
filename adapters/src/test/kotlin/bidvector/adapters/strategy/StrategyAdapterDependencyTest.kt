@@ -16,6 +16,13 @@ import java.io.File
  * 넓히지 않는다 — 이 test는 그 test와 별개다, D-6B1-9 근거). `bidvector.adapters.strategy`
  * 자신은 이 패키지의 클래스끼리(예: `JdbcEditSessionRepository` → `EditSessionRow`) 서로
  * 참조할 수 있어야 하므로 포함한다.
+ *
+ * **M6/6A-2b D-6A2b-3 — 이벤트 축 둘을 더한다.** `JdbcStrategyEditTransaction` 이 편집
+ * 트랜잭션 안에서 outbox sink 를 조립하려면 `OutboxEventSink`(workflow.event)·
+ * `JdbcOutboxPort`(adapters.event) 를 이름으로 불러야 한다. 그 조립이 `app` 이 아니라
+ * 이 패키지에 사는 이유가 그것이다 — `app` production 은 outbox 쓰기 타입을 참조하지
+ * 못하고(D-6A3-17(a)③), 그 게이트를 넓히는 것보다 이 패키지의 허용 루트를 둘 넓히는
+ * 편이 좁다(`app` 은 아홉 모듈 전체를 배선하는 층이고 이 패키지는 전략·세션 저장 한 축이다).
  */
 private val ALLOWED_ROOTS =
     setOf(
@@ -24,6 +31,8 @@ private val ALLOWED_ROOTS =
         "bidvector.sharedkernel",
         "bidvector.adapters.persistence",
         "bidvector.adapters.strategy",
+        "bidvector.workflow.event",
+        "bidvector.adapters.event",
     )
 
 private fun isDisallowed(importedPackage: String): Boolean =
@@ -76,7 +85,7 @@ class StrategyAdapterDependencyTest {
         isDisallowed("bidvector.procurement") shouldBe true
         isDisallowed("bidvector.decision") shouldBe true
         isDisallowed("bidvector.qualification") shouldBe true
-        isDisallowed("bidvector.workflow.event") shouldBe true
+        isDisallowed("bidvector.workflow.evaluation") shouldBe true
         isDisallowed("bidvector.adapters.ml") shouldBe true
     }
 
@@ -87,6 +96,9 @@ class StrategyAdapterDependencyTest {
         isDisallowed("bidvector.sharedkernel") shouldBe false
         isDisallowed("bidvector.adapters.persistence") shouldBe false
         isDisallowed("bidvector.adapters.strategy") shouldBe false
+        // M6/6A-2b D-6A2b-3 — 편집 트랜잭션 조립이 부르는 outbox 축 둘.
+        isDisallowed("bidvector.workflow.event") shouldBe false
+        isDisallowed("bidvector.adapters.event") shouldBe false
     }
 }
 

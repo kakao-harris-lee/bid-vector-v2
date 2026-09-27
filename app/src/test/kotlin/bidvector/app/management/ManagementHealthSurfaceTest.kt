@@ -205,13 +205,16 @@ class ManagementHealthSurfaceTest {
     }
 
     /**
-     * D-6A2a-13 ② — 관리 포트의 **비 GET** 관측. `OPEN-API-WRONG-METHOD-500`(API 포트에서 이미
-     * 넘긴 OPEN)과 같은 계열이며, 본문이 일반 메시지뿐임을 여기서 잰다(응답에 우리 쪽 정보가
-     * 실리면 이 단언이 붉어진다).
+     * D-6A2a-13 ② + **M6/6A-2b D-6A2b-7 — 이 자리도 닫혔다.** 6A-2a 는 관리 포트의 비 GET 을
+     * 500 으로 관측하고 `OPEN-API-WRONG-METHOD-500` 의 관리 포트 몫을 조건부로 남겼다. 이
+     * slice 가 API 포트를 닫으려고 더한 `HttpRequestMethodNotSupportedException` 핸들러는
+     * `@RestControllerAdvice` 라 **관리 child context 에도 함께 등록된다** — 관리 표면 잠금
+     * (D-6A2a-10·14)을 **넓히지 않고** 405 가 됐다(새 endpoint·새 빈 없음, 기존 조언 하나가
+     * 두 컨텍스트에 서는 것뿐이다). 본문이 일반 메시지뿐이라는 원래 단언은 그대로다.
      */
     @Test
     @Order(2)
-    fun `관리 포트의 비 GET 요청은 일반 오류 본문만 낸다`() {
+    fun `관리 포트의 비 GET 요청은 405 이고 일반 오류 본문만 낸다`() {
         listOf(HttpMethod.POST, HttpMethod.DELETE).forEach { method ->
             val response =
                 restTemplate.exchange(
@@ -220,13 +223,61 @@ class ManagementHealthSurfaceTest {
                     HttpEntity<Void>(HttpHeaders()),
                     String::class.java,
                 )
-            response.statusCode.value() shouldBe 500
+            response.statusCode.value() shouldBe 405
             val body = response.body ?: ""
             listOf("postgres", "jdbc", "Exception", "readinessState", "diskSpace").forEach { leak ->
                 body shouldNotContain leak
             }
         }
     }
+
+    /**
+     * D-6A2b-21 둘째 절 · D-6A2b-31(verifier r2 F-r2-5) — **관리 포트의 미디어 타입 축**.
+     * API 포트에 406 을 들이면서 관리 포트가 함께 흔들리지 않았는지 잰다: actuator 타입·json·
+     * 「아무 타입이나」는 그대로 200 이고, 받아들일 수 없는 타입은 406 이며 **본문이 없다**.
+     * 노출 집합은 불변이다 — 200 을 내는 경로가 health 둘뿐인 것을 같은 표에서 확인한다.
+     */
+    @Test
+    @Order(3)
+    fun `관리 포트의 미디어 타입 협상은 health 둘만 200 이고 나머지는 406 이거나 404 다`() {
+        val acceptable =
+            listOf(
+                "application/vnd.spring-boot.actuator.v3+json",
+                "application/json",
+                "*/*",
+            )
+        val healthPaths = listOf("/actuator/health", "/actuator/health/liveness")
+
+        val statuses =
+            acceptable.flatMap { accept ->
+                healthPaths.map { path -> accept to probeStatus(path, accept) }
+            }
+        statuses.map { it.second }.toSet() shouldBe setOf(200)
+
+        val refused = probe("/actuator/health", "application/xml")
+        refused.statusCode.value() shouldBe 406
+        (refused.body ?: "") shouldBe ""
+
+        // 노출 집합 불변 — health 밖은 어떤 Accept 로도 200 이 되지 않는다.
+        listOf("/actuator", "/actuator/env", "/actuator/metrics").forEach { path ->
+            acceptable.forEach { accept -> probeStatus(path, accept) shouldNotBe 200 }
+        }
+    }
+
+    private fun probe(
+        path: String,
+        accept: String,
+    ) = restTemplate.exchange(
+        management(path),
+        HttpMethod.GET,
+        HttpEntity<Void>(HttpHeaders().apply { set("Accept", accept) }),
+        String::class.java,
+    )
+
+    private fun probeStatus(
+        path: String,
+        accept: String,
+    ): Int = probe(path, accept).statusCode.value()
 
     @Test
     @Order(3)

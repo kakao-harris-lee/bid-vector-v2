@@ -62,7 +62,17 @@ private fun provideValue(
     actor: Actor = OPERATOR,
     field: EditableField = FIELD,
     draft: StrategyDraft = VALID_DRAFT,
-): EditCommand.ProvideValue = EditCommand.ProvideValue(CommandId(id), EditSessionId("s-1"), actor, field, draft)
+    // D-6A2b-28 — 기준은 이 파일의 `currentStrategy()` 기본 revision 과 같다.
+    baseRevision: StrategyRevision = StrategyRevision(1),
+): EditCommand.ProvideValue =
+    EditCommand.ProvideValue(
+        CommandId(id),
+        EditSessionId("s-1"),
+        actor,
+        field,
+        draft,
+        baseRevision,
+    )
 
 private fun confirm(
     id: String = "cmd-2",
@@ -102,6 +112,32 @@ class EditSessionTransitionTableTest {
         outcome.session.sessionVersion shouldBe 1
     }
 
+    /**
+     * code-review r4 N-r4-8 — 기준 대조(판정 순서 ①-b)는 actor·전이표보다 **앞선다**. 그래서
+     * 기준이 어긋난 `ProvideValue` 는 다른 축의 사유로 거부되지 않는다. HTTP 로는 도달하지
+     * 않지만(행위자가 상수이고 기준을 서버가 같은 트랜잭션에서 싣는다) 커널의 거동이므로
+     * 행으로 덮는다 — 순서를 되돌리면 이 test 가 RED 다.
+     */
+    @Test
+    fun `①-b 기준 대조는 actor·전이표보다 앞선다 — 사유가 StaleRevision 이다`() {
+        val stale = StrategyRevision(99)
+        val rows =
+            listOf(
+                sessionAt(EditSessionState.WaitingForValue(FIELD)) to
+                    provideValue(actor = Actor.Operator(OperatorId("other-operator")), baseRevision = stale),
+                sessionAt(EditSessionState.WaitingForValue(FIELD)) to
+                    provideValue(actor = Actor.System("sweep"), baseRevision = stale),
+                sessionAt(waitingForConfirmation(VALID_DRAFT)) to provideValue(baseRevision = stale),
+            )
+
+        rows.forEach { (session, command) ->
+            val outcome = apply(session, command, NOW, currentStrategy(), policyOf())
+
+            outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
+            outcome.reason shouldBe RejectionReason.StaleRevision
+        }
+    }
+
     @Test
     fun `② WaitingForValue 에 무효한 ValueProvided 는 같은 field 로 accepted 전이한다 — 상태를 바꾸지 않는다`() {
         val session = sessionAt(EditSessionState.WaitingForValue(FIELD))
@@ -114,7 +150,7 @@ class EditSessionTransitionTableTest {
 
     @Test
     fun `① WaitingForConfirmation 에 유효한 Confirmed 는 Applied 전이하고 이벤트를 낸다`() {
-        val session = sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT))
+        val session = sessionAt(waitingForConfirmation(VALID_DRAFT))
 
         val outcome = apply(session, confirm(seenRevision = StrategyRevision(1)), NOW, currentStrategy(1), policyOf())
 
@@ -132,7 +168,7 @@ class EditSessionTransitionTableTest {
         // `restoreEditSession` 뒤 draft.maxActiveBids 가 null 이 되어 재검증이 상한을
         // 조용히 지운다 — 이 test 는 영속·복원(스냅샷 왕복)을 실제로 거친 뒤 확정한다.
         val draftWithCap = StrategyDraft(bidNowThreshold = BigDecimal("0.7"), maxActiveBids = 5)
-        val session = sessionAt(EditSessionState.WaitingForConfirmation(FIELD, draftWithCap))
+        val session = sessionAt(waitingForConfirmation(draftWithCap))
         val restored = restoreEditSession(session.toSnapshot())
 
         val outcome = apply(restored, confirm(seenRevision = StrategyRevision(1)), NOW, currentStrategy(1), policyOf())
@@ -143,19 +179,19 @@ class EditSessionTransitionTableTest {
 
     @Test
     fun `③(a) Confirmed 의 seenRevision 이 현재와 다르면 StaleRevision 으로 거부된다`() {
-        val session = sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT))
+        val session = sessionAt(waitingForConfirmation(VALID_DRAFT, base = 2))
 
         val outcome = apply(session, confirm(seenRevision = StrategyRevision(1)), NOW, currentStrategy(2), policyOf())
 
         outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
         outcome.reason shouldBe RejectionReason.StaleRevision
-        outcome.session.state shouldBe EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT)
+        outcome.session.state shouldBe waitingForConfirmation(VALID_DRAFT, base = 2)
     }
 
     @Test
     fun `③(b) apply 시점 재검증이 Invalid 면 거부가 아니라 WaitingForValue 로 되돌아간다`() {
         val staleValidDraft = StrategyDraft(bidNowThreshold = BigDecimal("0.5"), reviewThreshold = BigDecimal("0.6"))
-        val session = sessionAt(EditSessionState.WaitingForConfirmation(FIELD, staleValidDraft))
+        val session = sessionAt(waitingForConfirmation(staleValidDraft))
 
         val outcome = apply(session, confirm(seenRevision = StrategyRevision(1)), NOW, currentStrategy(1), policyOf())
 
@@ -165,7 +201,7 @@ class EditSessionTransitionTableTest {
 
     @Test
     fun `① WaitingForConfirmation 에 RequestEdit 는 지정한 field 로 WaitingForValue 전이한다`() {
-        val session = sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT))
+        val session = sessionAt(waitingForConfirmation(VALID_DRAFT))
         val otherField = EditableField.Watch(WatchRuleId.FocusCategory)
 
         val outcome = apply(session, requestEdit(field = otherField), NOW, currentStrategy(), policyOf())
@@ -177,7 +213,7 @@ class EditSessionTransitionTableTest {
     @Test
     fun `① 비종단 상태에서 Cancel 은 Cancelled 로 전이한다`() {
         val waiting = sessionAt(EditSessionState.WaitingForValue(FIELD))
-        val confirming = sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT))
+        val confirming = sessionAt(waitingForConfirmation(VALID_DRAFT))
 
         val outcomeWaiting = apply(waiting, cancel(), NOW, currentStrategy(), policyOf())
         val outcomeConfirming = apply(confirming, cancel(), NOW, currentStrategy(), policyOf())
@@ -189,7 +225,7 @@ class EditSessionTransitionTableTest {
     @Test
     fun `④ 표 밖의 (state, command) 쌍은 InvalidTransition 으로 거부되고 상태를 바꾸지 않는다`() {
         val waitingForValue = sessionAt(EditSessionState.WaitingForValue(FIELD))
-        val waitingForConfirmation = sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT))
+        val waitingForConfirmation = sessionAt(waitingForConfirmation(VALID_DRAFT))
         val applied = sessionAt(EditSessionState.Applied(StrategyRevision(2)))
         val cancelled = sessionAt(EditSessionState.Cancelled(CancellationReason.OperatorRequested))
 
@@ -257,6 +293,7 @@ private data class SaveDiscriminatorCase(
  * ([newInstanceCases], 실제로 `+1`인지를 잰다 — 그게 이 test 의 값이다). 함수당 50줄
  * 한도로 둘로 나눴을 뿐 하나의 case 집합이다.
  */
+
 private fun saveDiscriminatorInvariantCases(): List<SaveDiscriminatorCase> =
     sameInstanceCases() + duplicateCommandCases() + newInstanceCases()
 
@@ -283,7 +320,7 @@ private fun sameInstanceCases(): List<SaveDiscriminatorCase> =
         ),
         SaveDiscriminatorCase(
             "seenRevision 불일치 — 판정 순서 ④ StaleRevision, 같은 인스턴스",
-            sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT), sessionVersion = 1),
+            sessionAt(waitingForConfirmation(VALID_DRAFT), sessionVersion = 1),
             confirm(seenRevision = StrategyRevision(99)),
         ),
         SaveDiscriminatorCase(
@@ -338,7 +375,7 @@ private fun newInstanceCases(): List<SaveDiscriminatorCase> =
         ),
         SaveDiscriminatorCase(
             "RequestEdit — Accepted, 새 인스턴스",
-            sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT), sessionVersion = 1),
+            sessionAt(waitingForConfirmation(VALID_DRAFT), sessionVersion = 1),
             requestEdit(),
         ),
         SaveDiscriminatorCase(
@@ -348,7 +385,18 @@ private fun newInstanceCases(): List<SaveDiscriminatorCase> =
         ),
         SaveDiscriminatorCase(
             "유효한 Confirmed — Applied, 새 인스턴스",
-            sessionAt(EditSessionState.WaitingForConfirmation(FIELD, VALID_DRAFT), sessionVersion = 1),
+            sessionAt(waitingForConfirmation(VALID_DRAFT), sessionVersion = 1),
             confirm(seenRevision = StrategyRevision(1)),
         ),
     )
+
+/**
+ * D-6A2b-18 — 확인 대기 상태는 이제 **draft 를 뜬 기준 revision** 을 함께 담는다. 이 파일의
+ * `currentStrategy()` 기본 revision 이 1 이라 기본값도 1 이다. 「`seenRevision` 축만 stale」을
+ * 재는 test 는 기준을 현재 revision 에 맞춰 넘겨, 두 축이 함께 흐려지지 않게 한다.
+ */
+private fun waitingForConfirmation(
+    draft: StrategyDraft,
+    base: Int = 1,
+): EditSessionState.WaitingForConfirmation =
+    EditSessionState.WaitingForConfirmation(FIELD, draft, StrategyRevision(base))
