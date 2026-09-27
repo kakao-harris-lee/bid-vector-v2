@@ -11,8 +11,8 @@
 
 - cmd: `./gradlew --no-daemon check`
 - exit: 0
-- 핵심 결과: 9 모듈 전건. `:app:test` 의 게이트 test class 가 전부 실행된다(`gateExecutionGate` 가
-  통과 수가 아니라 **실행 자체**를 확인한다)
+- 핵심 결과: 9 모듈 전건. 이 slice 의 게이트·거동 test 아홉이 `gateExecutionGate` 에 등재돼 **실행
+  자체**가 확인된다(통과 수가 아니다 — 그중 하나에 `@Disabled` 를 달면 RED 임을 실측했다)
 
 - cmd: `./gradlew --no-daemon qualityBaseline`
 - exit: 0
@@ -53,9 +53,12 @@
 |---|---|---|
 | `:workflow:test --tests '…EditSessionBaseRevisionTest'` | 0 | 4 — 기준 revision 기록·교차 세션 거부·되돌아가 재확인·낡은 행 fail-closed |
 | `:app:test --tests '…StrategyEditProductionE2ETest'` | 0 | 6 — 출하 조립 왕복 · **교차 세션 409 와 앞 값 보존** · 무효 값의 영속 0 · audit==actor · 무자격 401 |
-| `:app:test --tests '…AppHttpDependencyGateTest'` | 0 | 12 — 도출 포트 집합 등식 · 대상 집합 · production 양성 · 위반 표본 여섯(MU1·MU2·MU2b 포함) |
+| `:app:test --tests '…AppHttpDependencyGateTest'` | 0 | 13 — 도출 포트 집합 등식 · **대상 집합(app 전체 − 면제)** · 면제가 실재 클래스만 가리키는지 · production 양성 · 위반 표본 여섯 |
+| `:app:test --tests '…HttpSurfaceCensusTest'` | 0 | 6 — 두 서블릿 컨텍스트 · API·관리 각각의 handler·Filter·Servlet 집합 등식 · 문서 등식 모집단 완전성 |
 | `:app:test --tests '…ProductionHttpSurfaceTest'` | 0 | 7 — 매핑 전수 405/415/400/406 · 두드림∪제외 등식 · 문서↔매핑 집합 등식 · 응답 키 집합 |
-| `:app:test --tests '…StrategyEditEndpointTest'` | 0 | 20 — 결과→상태 코드 표, 우회 ②③④⑦⑧, 알 수 없는 키·십진 상한·세션 필드 강제 |
+| `:app:test --tests '…StrategyEditExecutorRaceTest'` | 0 | 2 — 읽기 사이 끼어듦 거부와 끼어듦 없을 때의 양성 대조 |
+| `:app:test --tests '…StrategyEditEndpointTest'` | 0 | 21 — 결과→상태 코드 표, 우회 ②③④⑦⑧, 알 수 없는 키·십진 상한·세션 필드 강제 |
+| `:app:test --tests '…ManagementHealthSurfaceTest'` | 0 | 관리 포트 미디어 타입 축(200/406/노출 집합 불변) 포함 |
 | `:strategy:test --tests '…StrategyExportTest'` | 0 | 2 — 왕복 등식과 정의역 등식 |
 | `:adapters:test --tests '…StrategyEditTransactionAtomicityTest'` | 0 | 2 — 장애 주입(전략·세션 불변, outbox 0행)과 정상 커밋 |
 
@@ -75,9 +78,18 @@
 | **MU2** 경계 빈을 쥔 헬퍼를 컨트롤러가 참조(production 소스) | 의존 게이트 | RED 2(의존 · 대상 집합) |
 | **MU2b** 다른 패키지의 진짜 컨트롤러 + JDBC(production 소스) | 의존 게이트 | RED 2(의존 · 대상 집합) |
 | **MU4** 수집에서 경로 변수 매핑 제외 | 표면 게이트 | RED 2(매핑 앵커 · 문서↔매핑 등식) |
+| **F-r2-1 ①** `@Bean RouterFunction` (production 소스) | 의존 게이트 · 표면 실측 | RED / RED |
+| **F-r2-1 ②** 빈 이름 URL 매핑 `HttpRequestHandler` | 의존 게이트 · 표면 실측 | RED / RED |
+| **F-r2-1 ③** 인증보다 앞선 `OncePerRequestFilter` | 의존 게이트 · 표면 실측 | RED / RED |
+| **면제 클래스의 `@Bean RouterFunction`** | 의존 게이트 **통과** · 표면 실측 RED | 두 축이 함께 필요한 이유의 실측 |
+| value 시점 기준 대조 제거 | 읽기 사이 끼어듦 회귀 | RED 1 |
+| 등재된 게이트 test 에 `@Disabled` | `gateExecutionGate` | RED(「건너뛰어졌다」) |
 
 MU1·MU2·MU2b 는 **위반 fixture 로도 영구 고정**했다(같은 규칙 값에 평가 루트만 바꿔 음성 대조).
 production 소스 변이는 측정 뒤 지웠고 `git status` 빈 출력으로 확인했다.
+
+이 라운드의 변이 셋은 `bidvector.app.rogue` 에 두었다가 측정 뒤 지웠고, 면제 클래스 변이는 되돌린 뒤
+`git diff --numstat` 빈 출력으로 확인했다.
 
 ## 새 public 표면 전수 (`javap`)
 
@@ -87,8 +99,12 @@ production 소스 변이는 측정 뒤 지웠고 `git status` 빈 출력으로 �
   판정 순서 술어 넷과 JSON 원시 읽기 여섯. 새 권한은 아니다 — 전자는 이미 공개 생성자를 가진 결과
   타입만 내고(`Applied`·`AppliedStrategy` 는 내지 못한다) 인자로 `EditSession`(internal constructor)을
   요구하며, 후자는 `JsonNode` 만 읽는다.
-- `EditSessionState.WaitingForConfirmation` 에 `baseRevision` 이 붙었다 — 값 하나가 늘었을 뿐 생성
-  경로는 그대로다(`apply` 밖에서 이 상태를 세션에 실을 길이 없다).
+- `EditSessionState.WaitingForConfirmation` 에 `baseRevision` 이, `EditCommand.ProvideValue` 에
+  `baseRevision` 이 붙었다 — 값 하나씩 늘었을 뿐 생성 경로는 그대로다. command 는 원래 public 타입이라
+  밖에서 만들 수 있었고, 그 값을 지어내면 value 시점 대조가 `StaleRevision` 으로 막는다(알려진 제한 ⑥).
+- 406 핸들러가 `ResponseEntity<Void>` 를 낸다 — 본문 없음이 계약이라 `ErrorBody` 를 만들지 않는다.
+- 커널의 `apply`·`beginSession`·`expireIfDue` 는 이 slice 이전부터 JVM public 이다(Kotlin `internal`) —
+  이번에 나뉜 판정 술어 넷도 같은 형태이고 새 권한을 주지 않는다.
 
 ## privacy·누출 축
 
