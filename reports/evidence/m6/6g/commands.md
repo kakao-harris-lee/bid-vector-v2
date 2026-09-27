@@ -252,9 +252,9 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 |---|---|---|
 | S-1 | `uv sync --frozen --all-extras` | 성공 |
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
-| S-3 | `uv run mypy --strict src/ml_engine` | 소스 95개, 오류 0 |
+| S-3 | `uv run mypy --strict src/ml_engine` | 소스 96개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1168 passed**(skip 0 — golden 부재는 skip 이 아니라 fail 이다) |
+| S-5 | `uv run python -m pytest tests -q` | **1175 passed**(skip 0 — golden 부재는 skip 이 아니라 fail 이다) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -298,6 +298,11 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | D-6G-39 ⑵ 선언 == 파일의 키 수 | 같은 함수의 `len(sampled)` 대조 | 선언을 남은 행만큼 줄이는 사후 선택이 잡힌다 |
 | D-6G-39 ⑶ 닫힌 항등식 | 같은 함수의 `accounted` | `sample_size == 행 + 상세없음 + 공고없음` |
 | D-6G-39 계수 공시 | `report.verdict_payload` | 판정 JSON 이 세 계수를 판 셋마다 싣는다(실측) |
+| M-6 업무 수는 파일이 말한다 | `SampleList.divisions` · `_sampling_record` | 목록의 distinct 집합 크기로 최소 표본이 정해진다 |
+| M-6 층 칸은 비면 안 된다 | `parse_sample_list` | 빈 업무 축·빈 주는 형태 실패 |
+| M-8 채움률 분모 | `LoadedSnapshot.notice_observed_count` | 공고 결측만 빼고 상세 결측은 남긴다 |
+| M-8 분모 공시 | `SamplingRecord.notice_observed_count` | 하한임을 읽는 쪽이 볼 수 있게 분모를 싣는다 |
+| D-6G-42 왕복 검출력 | `test_golden_actually_exercises_the_missing_sample_paths` | golden 이 진부분집합·결측 계수 둘을 실제로 지난다 |
 | D-6G-44 golden 부재는 실패 | `test_backtest_golden._golden_files` | golden 을 치우면 RED(치환 실측) |
 | D-6G-33 리터럴 게이트 | `test_evaluation_no_stray_numeric_literals` | 문자열에 숨긴 수·조립 근 둘 |
 | D-6G-28 값 결측은 행 단위 | `reasons` 의 새 사유 넷 · `AdmittedNotice` 의 해소된 네 칸 | 한 행이 빠져도 **나머지는 산다** |
@@ -365,8 +370,26 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | **L9** | ⑵ 를 `⊆` 에서 `==` 로 되돌림(v3 술어) | **2 failed** — 단, **golden 은 초록** |
 | **A1** | golden 을 선언된 자리에서 치운다(현행 fail) | **8 failed**, 부재 메시지로 |
 | **A2** | 같은 상태에서 부재 처리를 skip 으로 되돌림 | **6건이 조용히 skip** — 잠금이 서는 자리 |
+| **N1** | 업무 수를 다시 코드 상수 `len(BusinessCategory)` 로 | **1 failed** |
+| **N2** | 채움률 분모에서 상세 결측까지 뺌 | **1 failed** |
+| **N3** | 채움률 분모를 다시 행 수로 | **1 failed** |
+| **N4** | 업무 축을 distinct 아닌 줄 수로 | **2 failed** |
+| **N5** | 빈 층 칸을 받아들임 | **2 failed** |
+| **N6** | **입력 변이** — golden 을 10/10/0/0 으로 되돌림 | 검출력 단언 **넷 모두 RED** |
 
-누계 **서른여덟**(M1~M13 · V3·V5·V7·V8·V9 · G1~G6 · W1~W3 · P1~P3 · R1·R2 · N6 · L1~L9 · A1·A2).
+누계 **마흔넷**(M1~M13 · V3·V5·V7·V8·V9 · G1~G6 · W1~W3 · P1~P3 · R1·R2 · N1~N6 · L1~L9 · A1·A2).
+(앞 판의 과반 경계 변이는 W-계열로 읽는다 — N 은 M-6·M-8 라운드의 것이다.)
+
+**N1·N4 의 첫 판은 가짜였다.** N1 은 `BusinessCategory` 가 이제 docstring 에만 남아
+NameError 였고, N4 는 `list` 에 `.add` 를 불러 AttributeError 였다 — 둘 다 0.4 초 만에
+「RED」를 냈고 그대로 셌으면 **크래시를 잠금으로 기록**할 뻔했다. 변이 하네스에 import
+선검사를 넣어 문법·이름 오류를 변이와 가르고 다시 쟀다(N1 은 12.75 초, 실제 판정 실패).
+**변이는 계약이 말한 규칙으로 붉어져야 하고, 붉다는 사실만으로는 측정이 아니다.**
+
+**N6 은 코드가 아니라 입력을 변이시켰다.** `<` 를 `<=` 로 약화시키는 코드 변이는 지금
+golden 에서 초록인데, 그 단언은 **현재 데이터가 아니라 미래의 golden 회귀**를 막는
+것이기 때문이다. 그래서 버릴 사본에서 golden 을 10/10/0/0 으로 되돌려 쟀다(추적되는
+파일은 만지지 않았다 — 공유 산출물이다).
 L·A 를 뺀 전부가 RED 이고 복원 뒤 초록이다. A2 는 **초록이 되는 것이 측정값**이다 — 부재를
 skip 으로 접으면 소비 test 여섯이 조용히 통과한다는 것을 보이는 대조군이다.
 
@@ -405,16 +428,31 @@ provenance 분리가 잠기지 않았다. 두 값을 **다르게** 둔 공고를
 
 ## 알려진 제한 — 왕복이 덮지 않는 자리
 
-**golden 이 표본 결측 경로를 지나가지 않는다.** 지금 golden 은 `sample_size` 10 · 행 10 · 목록 10 ·
+**해소됐다(D-6G-42).** 생산 레인이 golden 을 12/10/1/1 로 재생성해 세 자리가 다 돈다. 아래는 그 전
+상태의 기록이며, 같은 구멍이 다시 열리지 않게 `test_golden_actually_exercises_the_missing_sample_paths`
+가 선다.
+
+앞 상태: golden 은 `sample_size` 10 · 행 10 · 목록 10 ·
 `sampled_without_detail` 0 · `sampled_without_notice` 0 이라 「표본 == 행」이다. v4 가 연 세 자리 중
 **진부분집합 경로와 두 결측 계수**가 왕복에서 헛돈다 — 생산 쪽이 상세 못 받은 표본을 목록에서 빼거나
 결측 계수를 상수 0 으로 적어도 golden 은 초록이다(지난 라운드 추첨번호 상수 `null` 과 같은 갈래).
 소비 쪽 단위 test 는 셋을 각각 잠그고 변이로 RED 를 봤지만(L2·L3·L4) 그것은 이 레인의 fixture 다.
-**L9 가 그 구멍을 수치로 보인다**: ⑵ 를 계약의 `⊆` 에서 v3 의 `==` 로 되돌리면 단위 test 둘이
-붉어지는데 **golden 여덟은 그대로 초록**이다. 즉 지금 판으로는 왕복이 이 술어의 회귀를 못 잡는다 —
-「표본인데 상세를 못 받은 공고가 하나라도 있으면 스냅숏 전체가 거부된다」는 실수집 정지 결함이
-생산 바이트를 지나가도 초록으로 통과한다는 뜻이다.
+**L9 가 그 구멍을 수치로 보였다**: 그 판에서 ⑵ 를 계약의 `⊆` 에서 v3 의 `==` 로 되돌리면 단위
+test 둘이 붉어지는데 **golden 여덟은 그대로 초록**이었다. 「표본인데 상세를 못 받은 공고가 하나라도
+있으면 스냅숏 전체가 거부된다」는 실수집 정지 결함이 생산 바이트를 지나가도 통과한다는 뜻이다.
+**지금은 같은 변이가 golden 에서도 RED 다**(여섯) — 그 차이가 12/10/1/1 이 만든 검출력이다.
 생산 레인에 「상세 없는 표본 하나 · 공고 canonical 없는 표본 하나」를 golden 에 넣어 달라고 전달했다.
+
+## 알려진 제한 — 채움률 분모가 둘로 갈린다 (M-8)
+
+`has_*` 두 칸은 **목록 관측이 있는 표본 수**를 분모로 쓰고, 나머지 넷(`successful_bid_method_name` ·
+`pure_construction_cost` · `bid_price_formula_a_applicable` · `reserve_range_end_rate`)은 **행 수**를
+쓴다. 계약(M-8)이 `has_*` 만 지목했기 때문이고, 계약 갱신 없이 넓히지 않았다. 나머지 넷도 공고 축에서
+오므로 같은 근거가 적용될 수 있다 — **여섯을 서로 비교하면 안 된다**는 사실이 지금 판정 JSON 문면에
+드러나지 않는다(분모는 `sampling.notice_observed_count` 로 실리지만 어느 칸이 그것을 쓰는지는 코드에만
+있다). 계약 판단이 필요한 자리다.
+
+`has_*` 채움률은 또한 **하한**이다 — 분자는 행에서만 셀 수 있어, 상세를 못 받은 표본이 0 으로 들어간다.
 
 ## 알려진 제한 (판정 JSON 이 매번 싣는다)
 
