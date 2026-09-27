@@ -118,7 +118,13 @@ class JdbcSnapshotSource(
         return if (number == null || round == null || endpoint == null) null else NoticeKey(number, round) to endpoint
     }
 
-    /** 표본으로 거른다 — 조건 없이 전건을 읽으면 `notice` 표 전체가 메모리에 온다(같은 지적). */
+    /**
+     * 표본으로 거른다 — 조건 없이 전건을 읽으면 `notice` 표 전체가 메모리에 온다(같은 지적).
+     *
+     * 여기 넘기는 번호는 **이미 canonical** 이고(`keyAndEndpointOf` 가 `NoticeNumber.of` 를 지났다)
+     * `notice.notice_number` 도 canonical 이라 대소문자 함정이 없다 — 이어 돌기 조회가 원문과
+     * canonical 을 맞대 조용히 빗나갔던 자리와 다르다(D-6G-40).
+     */
     private fun readNotices(keys: Set<NoticeKey>): Map<NoticeKey, CanonicalNotice> {
         if (keys.isEmpty()) return emptyMap()
         return dataSource.connection.use { connection ->
