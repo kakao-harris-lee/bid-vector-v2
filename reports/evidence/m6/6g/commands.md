@@ -11,7 +11,7 @@
 | `./gradlew --no-daemon qualityBaseline` | BUILD SUCCESSFUL(게이트가 아니라 측정) |
 | `./tools/one-command-check.sh` | 「Kotlin 전건 + Python 전건 통과」 |
 
-실측 HEAD: `918a8e98`(이 레인의 마지막 산출물 커밋).
+실측 HEAD: `f31ff35f`(이 레인의 마지막 산출물 커밋).
 
 ## 실 KONEPS 호출
 
@@ -47,9 +47,12 @@
 
 | 표면 | 자리 |
 |---|---|
-| `SourceEndpoint.BID_PRICE_FORMULA_A` | procurement — 다섯째 수집 축 |
-| `FieldConcept` 15 토큰(낙찰방법 2 · 예정가격결정방법 · 공고게시일시 · A 축 11) | procurement |
-| `OpeningResultSourcePort.fetchBidPriceFormulaA` | procurement — 포트 메서드 하나 |
+| `SourceEndpoint.BID_PRICE_FORMULA_A`·`BASE_AMOUNT_DETAIL` | procurement — 다섯째·여섯째 수집 축 |
+| `FieldConcept` 24 토큰(낙찰방법 2 · 예정가격결정방법 · 공고게시일시 · A 축 11 · 기초금액 조회 축 6 · D-6G-22 둘 · 물품 표기 하나) | procurement |
+| `OpeningResultSourcePort.fetchBidPriceFormulaA`·`fetchBaseAmount` | procurement — 포트 메서드 둘 |
+| `noticeIdIn` | procurement — 표본틀이 (공고번호,차수)만 얻는 자리(원문 키는 이 모듈 안에 남는다) |
+| `CollectOpeningResultsUseCase`·`OpeningCollectionSource`·`OpeningCollectionHalt`·`OpeningCollectionPlan`·`OpeningCollectionReport` | workflow/collection — 수집 갈래 |
+| `SnapshotWriter`·`SnapshotRow`·`SnapshotNotice`·`SnapshotOutcome`·`SnapshotBidderRow`·`orderedBidderRows`·`SNAPSHOT_SCHEMA_VERSION` | adapters/snapshot — 스냅숏 바이트 |
 | `NoticeKeyHash` · `SamplingSeed` · `SampleStratum` · `SampleCandidate` · `StratumOutcome` · `SampleOutcome` · `StratifiedSampler` | workflow/collection |
 | `CollectionCallBudget` · `CallBudgetLedger` · `BudgetOutcome` · `BudgetLimit` | workflow/collection |
 
@@ -69,7 +72,12 @@
 | D-6G-12 「A값 오퍼레이션 + 합산 여부 술어 + A 공개일시」 | `SourceEndpoint.BID_PRICE_FORMULA_A` 축 13행 | 관측 생존 · 요청 축 · allow-list 반전 · 두 일시 분리 |
 | D-6G-12 「예정가격 결정방법」 | `PLANNED_PRICE_DECISION_METHOD` | 계약 원장 test |
 | D-6G-13 제외 열다섯 | `snapshot-schema.md` §4 의 입력 대조표 | 판정은 Python 레인 모듈이, 입력은 이 레인이 |
-| D-6G-2 「스냅숏 · manifest」 | `snapshot-schema.md` | 레인 간 계약 문서(구현 전) |
+| D-6G-2 「스냅숏 · manifest」 | `SnapshotWriter` | 정렬·키 순서·이스케이프·순번·manifest 해시 여덟 test |
+| D-6G-1 「개찰결과 수집 갈래」 | `CollectOpeningResultsUseCase` | 표본만 상세 호출 · 표본 사전 확정 · 층 가름 둘 · 원문 적재 |
+| D-6G-19 「기초금액 조회 op 5·6·7」 | `SourceEndpoint.BASE_AMOUNT_DETAIL` 축 6행 + `BASE_AMOUNT_DETAIL` 서술자 | 모든 업무에서 부른다는 test |
+| D-6G-19 「provenance 분리」 | `SnapshotNotice.baseAmount` ↔ `SnapshotOutcome.openingBaseAmount` | 타입이 두 칸으로 가른다 |
+| D-6G-20 「공고당 호출 = 상세 셋(+공사 A값)」 | `detailAxesFor` | 공사 넷·그 밖 셋, 소진 `when` |
+| D-6G-22 「새 호출 비용 0 칸」 | `AWARD_METHOD_APPLICATION_STANDARD`·`APPLICATION_BASIS_CONTENT` | 계약 원장 test |
 
 ## 스키마 합의 (2026-09-27, 두 레인)
 
@@ -81,12 +89,11 @@
 
 ## 알려진 제한
 
-1. **기초금액조회 오퍼레이션을 부르지 못해 값 셋이 비어 있다** — 예가 범위율 둘
-   (`rsrvtnPrceRngBgnRate`·`EndRate`) · 순공사원가(`bssAmtPurcnstcst`) · `bidPrceCalclAYn`(A값 공고
-   여부). 셋 다 기초금액조회 3종에만 있고, 그 오퍼레이션의 **요청 계약**(`inqryDiv` 축과 필수 항목)이
-   선행 조사에 없어 지어내지 않았다. 신설 **`OPEN-6G-BASE-AMOUNT-OPERATION`**. 파급 셋: **S0 의 반폭 h**
-   (D-6G-12 — 상수 2%·3% 로 메우면 안 된다, 공고별 필드라는 것이 P-3 의 발견이다) · 제외 ⑨(순공사원가
-   98% — 「입력이 없으면 제외」가 전량에 걸린다) · 공사의 A값 공고 판정.
+1. **기초금액 조회 축의 채움률이 실측 전이다.** `OPEN-6G-BASE-AMOUNT-OPERATION` 은 D-6G-19 구현으로
+   닫혔다 — op 5·6·7 을 수집 축으로 열어 예가 범위율·순공사원가·A값 공고 여부가 모두 경로를 갖는다.
+   다만 값이 실제로 얼마나 차 있는지는 모른다: 문서 XML 예제에서 `bssAmtPurcnstcst` 가 빈 값이고
+   `sucsfbidMthdAppStd` 는 예제 여덟이 전부 빈 값이다. 제외 ⑨가 전량에 걸릴 수 있다 — 실수집 뒤
+   채움률을 판정문에 공시한다.
 2. **호출 예산은 걸음 단위 근사다.** 한 걸음(공고 하나의 상세 조회)이 여러 페이지를 걸으면 그 걸음의
    실제 호출 수는 걸은 뒤에 알려진다 — 초과분은 최대 한 걸음의 페이지 수다. 어댑터 안쪽에 예산을
    넣으면 정확해지지만 의존 방향이 뒤집힌다.
@@ -107,11 +114,14 @@
 
 | 몫 | 상태 |
 |---|---|
-| 수집 러너 갈래 배선(개찰결과 목록 → 표본 → 공고별 상세 셋) | **안 했다** — 순수 코어(표본·예산)만 섰다 |
-| 스냅숏 추출 명령(JSONL·manifest) | **안 했다** — 스키마 계약 문서만 섰다 |
+| 수집 갈래 **use case** | **했다** — 표본틀·표본·상세 넷, 예산·쿼터 멈춤, fake 포트 test 아홉 |
+| 수집 갈래 **Spring 배선**(`CollectionWiring` 에 이 갈래를 올리는 것) | **안 했다** — use case 까지다 |
+| 스냅숏 **바이트 생성**(JSONL·manifest) | **했다** — `SnapshotWriter`, test 여덟 |
+| 스냅숏 **DB 판독 어댑터와 CLI 명령** | **안 했다** — 바이트를 만드는 쪽까지다 |
 | 제외 사유 판정의 구현 | **이 레인 몫이 아니게 됐다** — 두 레인 합의로 판정은 Python 쪽 한 자리에서 하고, 이 레인은 입력 칸만 진다(스키마 §4). 판정 자리가 둘이면 어긋날 때 정본이 없다 |
 
-셋 다 이 레인이 만든 표본·예산·필드 계약을 입력으로 쓴다 — 넣을 자리는 열려 있고 채우지 않았다.
+남은 둘은 **배선**이다 — 도메인 판단은 서 있고, 그것을 Spring 빈과 SQL 에 꽂는 일이 남았다.
+실 KONEPS 호출과 DB write 가 필요한 지점이라 검증 뒤 운영자 승인 아래 여는 것이 맞다.
 
 ---
 
@@ -129,9 +139,9 @@
 |---|---|---|
 | S-1 | `uv sync --frozen --all-extras` | 성공 |
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
-| S-3 | `uv run mypy --strict src/ml_engine` | 소스 90개, 오류 0 |
+| S-3 | `uv run mypy --strict src/ml_engine` | 소스 93개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1109 passed**(6G 추가분 포함) |
+| S-5 | `uv run python -m pytest tests -q` | **1114 passed**(6G 추가분 포함) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -160,6 +170,9 @@
 | D-6G-12 업무별 하한가 | `floor.floor_price` + `exclusions.resolve_a_value` | A값 공고의 약 77 bp 차이 |
 | D-6G-13 제외와 계수 | `exclusions.admit_rows` · `exclusion_counts` | 사유별 발화 · 0건 공시 · 시그니처에 전략 없음 |
 | D-6G-16 없는 값을 메우지 않는다 | `RESERVE_PRICE_RANGE_ABSENT` · `AdmittedNotice` 의 비-`None` 필드 | 범위율 null 에서 제외 발화 |
+| D-6G-19 기초금액 provenance 분리 | `AdmittedNotice.base_amount` / `opening_base_amount` · `StrategyInput.base_amount` | 두 값을 **다르게** 둔 공고에서 전략이 투찰 시점 칸을 쓰는지 |
+| D-6G-19 A값 공고 판정 | `rules.resolve_a_value` 의 `bid_price_formula_a_applicable` 분기 | 술어 거짓 → A=0 승인 · 술어 없음 → 제외 |
+| D-6G-22 채움률 여섯 칸 | `exclusions.fill_rates` | 판정 JSON 이 0.0 도 숨기지 않고 싣는다 |
 | D-6G-20 표본 크기 결정식 | `records.SamplingRecord` · `policy.SamplingBudget` | 예산 초과 시 멈춤 |
 | D-6G-21 판정 불가와 민감도 둘 | `UndecidableAxis` · `SampleVariant` | 판 셋의 순서 · `estimate_available` |
 | D-6G-22 낙찰방법 채움률 | `exclusions.bid_method_fill_rate` | 판정 JSON 에 실림 |
@@ -179,6 +192,13 @@
 | M5 | 예가 범위율 null 을 제외하지 않음 | **2 failed** |
 | M6 | would-have-won 을 `<=` 로(동가를 승으로 셈) | **1 failed** |
 | M7 | 기권을 「적격·승」으로 셈(표본에서 사실상 제외) | **2 failed** |
+| M8 | 투찰 시점 기초금액이 비면 개찰 출처로 메움 | **1 failed** |
+| M9 | A 적용 여부 술어를 무시(항상 A값 공고로 취급) | **1 failed** |
+| M10 | 전략이 개찰 출처 기초금액을 씀 | **처음엔 살아남았다** — 아래 |
+
+**M10 이 드러낸 것**: 두 기초금액이 같은 fixture 에서는 어느 쪽을 써도 test 가 통과해
+provenance 분리가 잠기지 않았다. 두 값을 **다르게** 둔 공고를 만드는 test 를 더해 RED 로
+만들었다(재측정 **1 failed**, 복원 251 passed). 변이가 살아남은 것 자체가 산출물이다.
 
 숫자 리터럴 게이트의 하위 패키지 보강도 같은 방식으로 실측했다 — 판정 임계를 리터럴로 바꾸니
 리터럴 산포와 출하 임계 누출 둘이 붉어지고, 복원하니 초록이었다.
@@ -191,9 +211,9 @@
 
 ## 이탈
 
-- **`smkpAmt` 술어 계수를 낼 수 없다.** 계약 갱신 p2(D-6G-17)는 「술어 참 공고 수를 판정 JSON 에
-  공시」를 요구하는데, 합의된 스냅숏 스키마(§3.3)에는 그 술어도 계수도 실리는 칸이 **없다**.
-  칸 없이 세는 방법이 없으므로 공시하지 못하고, 그 사실을 알려진 제한으로 싣는다. 칸을 더하려면
-  `schema_version` 을 올려야 한다 — 두 레인·팀장에 보고했다.
+- **`smkpAmt` 술어 계수는 아직 낼 수 없다.** D-6G-23 이 칸을 더하기로 했고 Kotlin 레인이 채운다 —
+  그 칸은 `schema_version` 을 올리며 오므로, **오늘 판독기는 그 스냅숏을 `UNSUPPORTED_SCHEMA_VERSION`
+  으로 거부한다**(fail-closed 가 의도대로 동작하는 것이고, 두 레인이 같이 움직여야 한다는 신호다).
+  그때까지 `limitations` 에 `STANDARD_MARKET_PRICE_PREDICATE_NOT_IN_SNAPSHOT` 로 싣는다.
 - **파생 정책으로 재현 test 를 돈다**(위 §4 주석). 출하 임계로 돌리면 CI 가 수 분을 잡는다.
   판정식 축은 출하 값 그대로이고 그 목록을 test 가 단언한다.
