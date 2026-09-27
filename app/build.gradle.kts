@@ -118,6 +118,22 @@ dependencies {
     testImplementation(libs.snakeyaml)
 }
 
+/**
+ * 계약 파일은 **선언된 입력이자 test 가 읽는 좌표**다 — 둘이 갈리면 그 파일만 바뀐 변경에서
+ * task 가 UP-TO-DATE 로 건너뛰어 거짓 초록이 난다(M4/4B-6b F-2 · M6/6A-2b N-r4-7·N-r5-11).
+ * 한 자리에서 둘을 함께 선언해 갈릴 수 없게 한다.
+ */
+fun Project.settingsFile(path: String): java.io.File = layout.settingsDirectory.file(path).asFile
+
+fun Test.contractInput(
+    name: String,
+    systemProperty: String,
+    file: java.io.File,
+) {
+    inputs.file(file).withPropertyName(name).withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty(systemProperty, file.absolutePath)
+}
+
 // 아키텍처 게이트는 조합 지점에서 돈다 — app 의 test runtime classpath 에 아홉 모듈이 모두 있다.
 tasks.test {
     // M6/6F-8 — `BootJarRuntimeClasspathTest` 가 배포물(`app.jar`)을 연다.
@@ -130,21 +146,16 @@ tasks.test {
             .asFile.absolutePath,
     )
 
-    // M6/6A-2b D-6A2b-46(N-r4-7) — `AppGateRegistrationTest` 는 런타임에
-    // `config/quality/gate-tests.properties` 를 직접 읽는다. 그 파일을 선언된 입력으로 두지
-    // 않으면 **그 파일만 바뀐 변경**에서 task 가 UP-TO-DATE 로 건너뛰어 이전 결과가 그대로
-    // 통과로 남는다(거짓 초록) — 이 meta-gate 가 잡으려는 변경이 정확히 그 모양이다.
-    // `workflow/build.gradle.kts` 가 같은 이유로 같은 선언을 갖는다.
-    val gateTests = layout.settingsDirectory.file("config/quality/gate-tests.properties")
-    inputs.file(gateTests).withPropertyName("gateTests").withPathSensitivity(PathSensitivity.RELATIVE)
-
-    val architecturePolicy = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
-    inputs.file(architecturePolicy).withPropertyName("architecturePolicy")
-    systemProperty("bidvector.architecture.policy", architecturePolicy.asFile.absolutePath)
+    // `AppGateRegistrationTest` 가 읽는 등재 목록. 이 meta-gate 가 잡으려는 변경이 바로
+    // 「이 파일만 바뀐 변경」이라 입력 선언이 없으면 조용히 건너뛴다.
+    contractInput("gateTests", "bidvector.gate.tests", settingsFile("config/quality/gate-tests.properties"))
+    contractInput(
+        "architecturePolicy",
+        "bidvector.architecture.policy",
+        settingsFile("config/quality/architecture-policy.properties"),
+    )
     // T-D 의 정본은 도출된 후보의 **분류**다 — 같은 목록을 여기 두 벌로 두지 않는다.
-    val memberEffects = layout.settingsDirectory.file("config/quality/member-effects.properties")
-    inputs.file(memberEffects).withPropertyName("memberEffects")
-    systemProperty("bidvector.member.effects", memberEffects.asFile.absolutePath)
+    contractInput("memberEffects", "bidvector.member.effects", settingsFile("config/quality/member-effects.properties"))
 
     // M1/1B-c ④ — corpus 소비 테스트(`SharedKernelCorpusConformanceTest`)가 manifest 와
     // 그 아래 input/expected fixture 전체를 읽는다. `ArchitecturePolicy.kt` 와 같은
@@ -165,9 +176,7 @@ tasks.test {
     // M6/6A-1 — `OpenApiContractTest`가 D-6A1-8 단일 출처 YAML을 읽는다. 같은
     // `System.getProperty` 주입 관례(위 두 항목과 같은 이유 — 상대 경로를 test가 직접
     // 추측하지 않는다).
-    val openApiSpec = layout.settingsDirectory.file("openapi/bidvector-operator-api.yaml")
-    inputs.file(openApiSpec).withPropertyName("openApiSpec")
-    systemProperty("bidvector.openapi.spec", openApiSpec.asFile.absolutePath)
+    contractInput("openApiSpec", "bidvector.openapi.spec", settingsFile("openapi/bidvector-operator-api.yaml"))
 }
 
 // 해석만 재면 「호환」을 주장할 수 없다 — 그 버전의 API 로 컴파일되고 JVM 에서 로드되는지는
