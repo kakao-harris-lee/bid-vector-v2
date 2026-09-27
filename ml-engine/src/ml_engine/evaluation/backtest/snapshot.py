@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
@@ -379,6 +380,18 @@ def _parse_rows(rows_bytes: bytes) -> tuple[SnapshotRow, ...]:
     return tuple(sorted(rows, key=lambda row: row.notice.notice_key_hash))
 
 
+def sample_list_checksum(notice_key_hashes: Sequence[str]) -> str:
+    """스키마 §5 정의 그대로 — 뽑힌 `notice_key_hash` 를 **오름차순 정렬**해 `\n` 으로
+    이은 문자열(끝 개행 없음)의 sha256 hex.
+
+    이 값을 manifest 가 싣는 값과 대조하는 것이 우회 ⑦(표본 쇼핑)의 잠금이다
+    (verifier r1 M-4). 앞 판은 manifest 의 해시를 **그대로 판정 JSON 에 옮겨 실었고**,
+    그 해시가 추출된 행 집합과 묶이는 자리가 없었다 — seed 를 바꿔 여러 번 수집하고
+    합집합을 추출해도 그럴듯한 해시가 실린다. 행에서 다시 계산해야 술어가 선다."""
+    joined = "\n".join(sorted(notice_key_hashes))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
 def _assemble(manifest: _Manifest, rows: tuple[SnapshotRow, ...]) -> LoadedSnapshot:
     if len(rows) != manifest.row_count:
         raise RowReadError(
@@ -392,6 +405,11 @@ def _assemble(manifest: _Manifest, rows: tuple[SnapshotRow, ...]) -> LoadedSnaps
         raise RowReadError(
             SnapshotRejectionReason.DUPLICATE_NOTICE,
             f"중복 공고 {len(keys) - len(set(keys))}건",
+        )
+    if sample_list_checksum(keys) != manifest.sample_list_sha256:
+        raise RowReadError(
+            SnapshotRejectionReason.SAMPLE_LIST_MISMATCH,
+            "표본 목록 sha256 이 행 집합과 맞지 않는다",
         )
     return LoadedSnapshot(
         snapshot_id=manifest.snapshot_id,

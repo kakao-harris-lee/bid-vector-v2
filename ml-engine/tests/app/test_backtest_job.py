@@ -47,8 +47,22 @@ _SHIPPED_BACKTEST_POLICY = _POLICY_DIR / "strategy-backtest-v1.yaml"
 _INFERENCE_POLICY = _POLICY_DIR / "inference-v1.yaml"
 
 # 출하 파일에서 낮추는 값 — 전부 **표본 크기·계산량** 축이고 판정식 축이 아니다.
+# **D-6G-25 허용 목록**(verifier r1 L-6 로 적합도 편차가 추가됐다). 여기 있는 키만
+# 파생 정책이 건드릴 수 있고, 전부 **표본 크기·계산량 축**이다 — 판정식 축은 출하값
+# 그대로다. 아래 `test_derived_policy_touches_only_the_permitted_axes` 가 이 목록을
+# 단언하므로, 목록 밖 키를 완화하려면 test 를 먼저 고쳐야 하고 그 편집이 diff 에 남는다.
+_PERMITTED_RELAXATION_AXES = frozenset(
+    {
+        "verdict.min_window_rows",
+        "verdict.min_window_count",
+        "strategy.s4_iteration_count",
+        "strategy.s4_min_competitor_samples",
+        "fit.min_sample_count",
+        "fit.max_bin_ratio_deviation",
+    }
+)
 _TEST_OVERRIDES = {
-    "verdict.min_window_rows": "25",
+    "verdict.min_window_rows": "10",
     "verdict.min_window_count": "3",
     "strategy.s4_iteration_count": "100",
     "strategy.s4_min_competitor_samples": "30",
@@ -165,7 +179,11 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
     assert payload["seeds"] == [20260812, 1, 7, 42, 2026]
     assert payload["limitations"]
     assert payload["undecidable"]["LOCAL_GOVERNMENT"] > 0
-    assert payload["sampling"]["within_budget"] is True
+    sampling = payload["sampling"]
+    assert sampling["within_budget"] is True
+    assert sampling["meets_minimum"] is True
+    # 공고당 호출은 업무별이다 — fixture 는 전부 용역(3)이라 상세 호출이 행 수의 3배다.
+    assert sampling["detail_calls"] == sampling["sample_size"] * 3
     fill = payload["fill_rates"]
     assert fill["successful_bid_method_name"] == 1.0
     assert fill["reserve_range_end_rate"] == 1.0
@@ -312,10 +330,11 @@ def test_strategy_assembly_is_the_preregistered_five() -> None:
     assert "S3" not in {item.name for item in candidates}
 
 
-@pytest.mark.parametrize("key", sorted(_TEST_OVERRIDES))
-def test_derived_policy_only_relaxes_sample_size_axes(key: str) -> None:
-    """파생 정책이 손대는 키가 **표본 크기·계산량 축**뿐임을 목록으로 잠근다 — 판정식
-    축(Δ·유의수준·Bonferroni·비열등 한계·검정력)을 낮추는 길을 test 가 막는다."""
+def test_derived_policy_touches_only_the_permitted_axes() -> None:
+    """파생 정책이 손대는 키가 **D-6G-25 허용 목록과 정확히 같은지** 본다. 앞 판은
+    「판정식 축이 아니다」만 봤고, 그래서 적합도 편차 완화가 목록 밖인 채 살았다
+    (verifier r1 L-6). 이제 목록 자체를 단언한다."""
+    assert set(_TEST_OVERRIDES) == _PERMITTED_RELAXATION_AXES
     judgement_axes = {
         "verdict.min_relative_improvement",
         "verdict.alpha",
@@ -323,4 +342,11 @@ def test_derived_policy_only_relaxes_sample_size_axes(key: str) -> None:
         "verdict.ineligibility_noninferiority_margin",
         "verdict.target_power",
     }
-    assert key not in judgement_axes
+    assert not _PERMITTED_RELAXATION_AXES & judgement_axes
+
+
+def test_shipped_policy_is_untouched_by_the_derived_one(tmp_path: Path) -> None:
+    """파생은 임시 경로에만 쓴다 — 출하 파일은 바이트 무변경이다."""
+    before = _SHIPPED_BACKTEST_POLICY.read_bytes()
+    _derived_policy(tmp_path)
+    assert _SHIPPED_BACKTEST_POLICY.read_bytes() == before

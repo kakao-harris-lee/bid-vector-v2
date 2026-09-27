@@ -49,7 +49,7 @@ from ml_engine.evaluation.backtest.records import (
     VariantRecord,
     WindowRecord,
 )
-from ml_engine.evaluation.backtest.snapshot import LoadedSnapshot
+from ml_engine.evaluation.backtest.snapshot import BusinessCategory, LoadedSnapshot
 from ml_engine.evaluation.backtest.strategies import (
     StrategyLike,
     StrategyOutcome,
@@ -219,18 +219,60 @@ def _strategy_verdict(
 
 
 def _sampling_record(request: BacktestRequest) -> SamplingRecord:
-    """표본 크기 결정식(D-6G-20) — 수집 강제는 Kotlin 레인이 하고 여기서는 **공시**한다."""
+    """표본 크기 결정식(D-6G-20·32). 호출 수는 **업무별**로 세고(공사가 하나 더 부른다),
+    최소 필요 표본은 창 규칙에서 파생한다 — 정책에 숫자로 적지 않는다.
+
+    이 값들은 공시로 끝나지 않는다: 예산 초과도 최소 미달도 **판정 대신 멈춤**이다
+    (verifier r1 M-3 — 앞 판의 `min_required_sample` 은 어디서도 멈춤을 만들지 않는
+    죽은 값이었다)."""
     budget = request.policy.sampling
-    size = len(request.snapshot.rows)
+    rows = request.snapshot.rows
+    size = len(rows)
+    detail_calls = sum(
+        budget.calls_per_notice_for(str(row.notice.category)) for row in rows
+    )
+    total = budget.list_call_count + detail_calls
+    minimum = budget.minimum_required_sample(
+        rows_per_window=request.policy.verdict.min_window_rows,
+        window_count=request.policy.verdict.min_window_count,
+        category_count=len(BusinessCategory),
+    )
     return SamplingRecord(
         sample_size=size,
         list_call_count=budget.list_call_count,
-        calls_per_notice=budget.calls_per_notice,
-        total_calls=budget.total_calls_for(size),
+        detail_calls=detail_calls,
+        total_calls=total,
         max_total_calls=budget.max_total_calls,
-        min_required_sample=budget.min_required_sample,
-        within_budget=budget.within_budget(size),
+        minimum_required_sample=minimum,
+        within_budget=total <= budget.max_total_calls,
+        meets_minimum=size >= minimum,
     )
+
+
+def _sampling_stop(
+    request: BacktestRequest,
+    counts: tuple[tuple[ExclusionReason, int], ...],
+) -> BacktestStopped | None:
+    """표본 결정식이 만드는 멈춤 둘(D-6G-32) — 예산 초과와 최소 미달. 둘 다 **판정
+    대신 멈춤**이고, 죽은 enum 값으로 두지 않는다(verifier r1 M-3)."""
+    sampling = _sampling_record(request)
+    if not sampling.within_budget:
+        return _stopped(
+            request,
+            StopReason.SAMPLING_BUDGET_EXCEEDED,
+            f"{sampling.total_calls} > {sampling.max_total_calls}",
+            None,
+            counts,
+        )
+    if not sampling.meets_minimum:
+        return _stopped(
+            request,
+            StopReason.SAMPLE_SIZE_BELOW_MINIMUM,
+            f"{sampling.sample_size} < {sampling.minimum_required_sample}",
+            None,
+            counts,
+        )
+    return None
 
 
 def _variant_record(
@@ -319,17 +361,11 @@ def run_strategy_backtest(
 ) -> BacktestVerdict | BacktestStopped:
     """표본 예산 -> 제외 -> 판 표본 -> P-4 -> 창 -> seed 다섯 -> 판정. 실패는 전부
     `BacktestStopped` 다."""
-    sampling = _sampling_record(request)
     admission = admit_rows(request.snapshot.rows, request.policy)
     counts = exclusion_counts(admission.excluded)
-    if not sampling.within_budget:
-        return _stopped(
-            request,
-            StopReason.SAMPLING_BUDGET_EXCEEDED,
-            f"{sampling.total_calls} > {sampling.max_total_calls}",
-            None,
-            counts,
-        )
+    sampling_stop = _sampling_stop(request, counts)
+    if sampling_stop is not None:
+        return sampling_stop
     if not admission.admitted:
         return _stopped(
             request, StopReason.NO_ADMITTED_NOTICE, "승인 0건", None, counts

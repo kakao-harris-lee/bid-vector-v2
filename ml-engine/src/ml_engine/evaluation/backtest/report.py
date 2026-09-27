@@ -97,11 +97,12 @@ def _sampling(record: SamplingRecord) -> dict[str, JsonValue]:
     return {
         "sample_size": record.sample_size,
         "list_call_count": record.list_call_count,
-        "calls_per_notice": record.calls_per_notice,
+        "detail_calls": record.detail_calls,
         "total_calls": record.total_calls,
         "max_total_calls": record.max_total_calls,
-        "min_required_sample": record.min_required_sample,
+        "minimum_required_sample": record.minimum_required_sample,
         "within_budget": record.within_budget,
+        "meets_minimum": record.meets_minimum,
     }
 
 

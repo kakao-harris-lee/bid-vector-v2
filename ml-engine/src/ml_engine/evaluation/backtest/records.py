@@ -105,11 +105,12 @@ class SamplingRecord:
 
     sample_size: int
     list_call_count: int
-    calls_per_notice: int
+    detail_calls: int
     total_calls: int
     max_total_calls: int
-    min_required_sample: int
+    minimum_required_sample: int
     within_budget: bool
+    meets_minimum: bool
 
 
 @dataclass(frozen=True)

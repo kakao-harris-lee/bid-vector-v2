@@ -144,6 +144,21 @@ def rows_bytes(payloads: list[dict[str, Any]]) -> bytes:
     ).encode("utf-8")
 
 
+def _sample_list_of(rows: bytes) -> str:
+    """행에서 계산한 표본 목록 해시(스키마 §5) — 판독기가 같은 식으로 재계산해 대조한다."""
+    keys: list[str] = []
+    for line in rows.decode("utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            keys.append(json.loads(line)["notice"]["notice_key_hash"])
+        except (json.JSONDecodeError, KeyError, TypeError):
+            # 일부러 깨뜨린 입력을 쓰는 test 가 있다 — 그 줄은 건너뛴다. 그런 입력은
+            # 판독기가 표본 목록 대조보다 먼저 `MALFORMED_JSON` 으로 거부한다.
+            continue
+    return hashlib.sha256("\n".join(sorted(keys)).encode("utf-8")).hexdigest()
+
+
 def manifest_bytes(
     rows: bytes,
     *,
@@ -152,7 +167,7 @@ def manifest_bytes(
     period_start: str = "2026-06-01",
     period_end: str = "2026-08-31",
     rows_sha256: str | None = None,
-    sample_list_sha256: str = "0" * 64,
+    sample_list_sha256: str | None = None,
     schema_version: str = "snapshot-v2",
 ) -> bytes:
     payload = {
@@ -168,7 +183,9 @@ def manifest_bytes(
         "rows_sha256": (
             hashlib.sha256(rows).hexdigest() if rows_sha256 is None else rows_sha256
         ),
-        "sample_list_sha256": sample_list_sha256,
+        "sample_list_sha256": (
+            _sample_list_of(rows) if sample_list_sha256 is None else sample_list_sha256
+        ),
     }
     return json.dumps(payload, sort_keys=True).encode("utf-8")
 

@@ -131,8 +131,12 @@ def build_files() -> tuple[bytes, bytes]:
         "period_start": _BLOCK_STARTS[0].isoformat(),
         "period_end": (_BLOCK_STARTS[-1] + timedelta(days=6)).isoformat(),
         "rows_sha256": hashlib.sha256(rows_bytes).hexdigest(),
+        # 스키마 §5 정의대로 **행에서** 계산한다 — 판독기가 같은 식으로 재계산해
+        # 대조하므로 지어낸 값을 쓰면 fixture 가 거부된다(verifier r1 M-4).
         "sample_list_sha256": hashlib.sha256(
-            b"m6-6g-synthetic-sample-list"
+            "\n".join(sorted(row["notice"]["notice_key_hash"] for row in rows)).encode(
+                "utf-8"
+            )
         ).hexdigest(),
     }
     return (

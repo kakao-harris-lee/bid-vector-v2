@@ -80,10 +80,16 @@ strategy.s4_min_competitor_samples: 30
 # Kotlin 레인이 수집 쪽에서 강제하고, Python 은 판정 JSON 에 입력과 결과를 공시한다.
 # `max_total_calls` 는 A-1 승인 범위 안의 수치(일 20,000 x 4일)다.
 sampling.list_call_count: 600
-sampling.calls_per_notice: 3
+# 공고당 상세 호출 수는 **업무별**이다(verifier r1 M-3) — 공사는 A값 오퍼레이션이
+# 하나 더 붙어 넷이다. 하나로 뭉치면 공사를 과소 계상한다.
+sampling.calls_per_notice_construction: 4
+sampling.calls_per_notice_service: 3
+sampling.calls_per_notice_goods: 3
 sampling.max_total_calls: 80000
-# 최소 필요 표본 — 창당 하한 x 창 최소 수. 이보다 적으면 판정 대신 멈춘다.
-sampling.min_required_sample: 1449
+# 최소 필요 표본은 **파생값**이다: 창당 하한 x 창 최소 수 x 업무 셋 x (1 + 여유).
+# 숫자를 따로 적으면 창 규칙이 바뀔 때 조용히 어긋난다(앞 판의 1449 는 업무 축을
+# 빠뜨린 값이었다). 표본이 이 수에 못 미치면 **판정 대신 멈춘다**.
+sampling.headroom_ratio: 0.20
 
 # ── 지자체 민감도 (D-6G-21) ──────────────────────────────────────────────────
 # 주 판정은 지자체를 가르지 못한 채로 낸다(판정 불가로 계수). 보조 민감도 둘을 함께

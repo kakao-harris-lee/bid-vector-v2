@@ -29,6 +29,7 @@ from ml_engine.evaluation.backtest.snapshot import (
     SnapshotRejected,
     SnapshotRejectionReason,
     load_snapshot,
+    sample_list_checksum,
 )
 
 
@@ -256,7 +257,19 @@ def test_manifest_period_is_carried_for_the_verdict_record() -> None:
     snapshot = _loaded([row_payload("n-1")])
     assert snapshot.period_start.isoformat() == "2026-06-01"
     assert snapshot.period_end.isoformat() == "2026-08-31"
-    assert snapshot.sample_list_sha256 == "0" * 64
+    assert snapshot.sample_list_sha256 == sample_list_checksum(
+        [row.notice.notice_key_hash for row in snapshot.rows]
+    )
+
+
+def test_sample_list_checksum_is_recomputed_from_the_rows() -> None:
+    """manifest 의 표본 목록 해시를 **그대로 옮겨 싣지 않는다**(verifier r1 M-4).
+    행에서 다시 계산해 대조하므로, 다른 표본을 뽑아 놓고 그럴듯한 해시를 적는 길이
+    닫힌다(우회 ⑦)."""
+    rows = rows_bytes([row_payload("n-1"), row_payload("n-2")])
+    rejected = load_snapshot(manifest_bytes(rows, sample_list_sha256="b" * 64), rows)
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.SAMPLE_LIST_MISMATCH
 
 
 def test_rejection_detail_never_repeats_a_notice_key_hash() -> None:

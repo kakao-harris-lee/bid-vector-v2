@@ -16,12 +16,23 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 from typing import Final
 
+from ml_engine.evaluation.backtest.policy_values import (
+    EffectiveDates,
+    FitThresholds,
+    FloorRateBand,
+    InstitutionConstants,
+    SamplingBudget,
+    SensitivityRules,
+    StrategyBacktestPolicy,
+    StrategyConstants,
+    VerdictThresholds,
+    WindowRules,
+)
 from ml_engine.evaluation.policy import (
     PolicyRejected,
     PolicyRejectionReason,
@@ -35,6 +46,22 @@ from ml_engine.registry.policy import PolicyError, PolicyScalar
 from ml_engine.registry.policy import load_policy as _load_raw_policy
 
 SHIPPED_STRATEGY_BACKTEST_POLICY_VERSION: Final[str] = "strategy-backtest-v1"
+
+__all__ = [
+    "SHIPPED_STRATEGY_BACKTEST_POLICY_VERSION",
+    "EffectiveDates",
+    "FitThresholds",
+    "FloorRateBand",
+    "InstitutionConstants",
+    "SamplingBudget",
+    "SensitivityRules",
+    "StrategyBacktestPolicy",
+    "StrategyConstants",
+    "VerdictThresholds",
+    "WindowRules",
+    "load_strategy_backtest_policy",
+    "strategy_backtest_policy_checksum",
+]
 
 _MAX_INDEXED_LIST_LENGTH: Final[int] = 32
 
@@ -51,6 +78,7 @@ _NUMBER_KEYS: Final[tuple[str, ...]] = (
     "fit.alpha",
     "fit.max_bin_ratio_deviation",
     "sensitivity.wide_reserve_half_width",
+    "sampling.headroom_ratio",
 )
 _INT_KEYS: Final[tuple[str, ...]] = (
     "verdict.primary_hypothesis_count",
@@ -65,9 +93,10 @@ _INT_KEYS: Final[tuple[str, ...]] = (
     "strategy.s4_min_competitor_samples",
     "fit.min_sample_count",
     "sampling.list_call_count",
-    "sampling.calls_per_notice",
+    "sampling.calls_per_notice_construction",
+    "sampling.calls_per_notice_service",
+    "sampling.calls_per_notice_goods",
     "sampling.max_total_calls",
-    "sampling.min_required_sample",
 )
 _TEXT_KEYS: Final[tuple[str, ...]] = (
     "effective.construction",
@@ -81,258 +110,6 @@ _KNOWN_KEYS: Final[frozenset[str]] = (
     | frozenset(_TEXT_KEYS)
     | frozenset(f"{_SEED_PREFIX}.{index}" for index in range(_MAX_INDEXED_LIST_LENGTH))
 )
-
-
-def _require_finite_unit_open(value: float, name: str) -> None:
-    """(0, 1) 열린 구간 — 확률·유의수준·검정력이 사는 자리."""
-    if not math.isfinite(value) or not (0 < value < 1):
-        raise ValueError(f"{name} 은 (0, 1) 안의 유한값이어야 합니다: {value}")
-
-
-def _require_finite_positive(value: float, name: str) -> None:
-    if not math.isfinite(value) or value <= 0:
-        raise ValueError(f"{name} 은 양의 유한값이어야 합니다: {value}")
-
-
-def _require_finite_non_negative(value: float, name: str) -> None:
-    if not math.isfinite(value) or value < 0:
-        raise ValueError(f"{name} 은 음이 아닌 유한값이어야 합니다: {value}")
-
-
-@dataclass(frozen=True)
-class VerdictThresholds:
-    """판정식 임계 한 벌(A-3 승인값)."""
-
-    min_relative_improvement: float
-    alpha: float
-    primary_hypothesis_count: int
-    ineligibility_noninferiority_margin: float
-    target_power: float
-    min_window_count: int
-    min_window_rows: int
-
-    def __post_init__(self) -> None:
-        _require_finite_positive(
-            self.min_relative_improvement, "verdict.min_relative_improvement"
-        )
-        _require_finite_unit_open(self.alpha, "verdict.alpha")
-        _require_finite_unit_open(self.target_power, "verdict.target_power")
-        _require_finite_non_negative(
-            self.ineligibility_noninferiority_margin,
-            "verdict.ineligibility_noninferiority_margin",
-        )
-        if self.primary_hypothesis_count < 1:
-            raise ValueError(
-                "verdict.primary_hypothesis_count 는 1 이상이어야 합니다: "
-                f"{self.primary_hypothesis_count}"
-            )
-        if self.min_window_count < 1:
-            raise ValueError(
-                f"verdict.min_window_count 는 1 이상이어야 합니다: "
-                f"{self.min_window_count}"
-            )
-        if self.min_window_rows < 2:
-            raise ValueError(
-                "verdict.min_window_rows 는 2 이상이어야 합니다(쌍대 검정 하한): "
-                f"{self.min_window_rows}"
-            )
-
-    @property
-    def primary_alpha(self) -> float:
-        """Bonferroni 보정 뒤 **주 가설** 유의수준(우회 ⑥)."""
-        return self.alpha / self.primary_hypothesis_count
-
-    def alpha_for(self, *, primary: bool) -> float:
-        """가설 종류에 맞는 유의수준 — **보정을 고르는 것도 정책 객체의 몫**이다
-        (D-6G-32, code-review r1 M-2). D-6G-6 은 주 가설(S2 세 후보)만 Bonferroni
-        /3 이고 보조(S1·S4)는 보정 없는 유의수준으로 따로 공시한다. 판정 코드가 어느 쪽을 쓸지 직접
-        고르면 그 선택이 diff 에 드러나지 않는다.
-
-        **보조가 주보다 느슨하다** — 그 완화가 숨지 않게 판정 JSON 이 전략마다
-        `alpha_used` 를 싣는다."""
-        return self.primary_alpha if primary else self.alpha
-
-
-@dataclass(frozen=True)
-class WindowRules:
-    """창 규칙(D-6G-5·14) — 비중첩 주 단위 + embargo."""
-
-    days: int
-    embargo_days: int
-
-    def __post_init__(self) -> None:
-        if self.days < 1:
-            raise ValueError(f"window.days 는 1 이상이어야 합니다: {self.days}")
-        if self.embargo_days < 0:
-            raise ValueError(
-                f"window.embargo_days 는 음수일 수 없습니다: {self.embargo_days}"
-            )
-
-
-@dataclass(frozen=True)
-class InstitutionConstants:
-    """복수예비가격 제도 상수 — 15구간 균등 + 무작위 4개 평균."""
-
-    reserve_price_count: int
-    draw_count: int
-
-    def __post_init__(self) -> None:
-        if self.draw_count < 1:
-            raise ValueError(
-                f"institution.draw_count 는 1 이상이어야 합니다: {self.draw_count}"
-            )
-        if self.reserve_price_count <= self.draw_count:
-            raise ValueError(
-                "institution.reserve_price_count 는 draw_count 보다 커야 합니다: "
-                f"{self.reserve_price_count} <= {self.draw_count}"
-            )
-
-
-@dataclass(frozen=True)
-class FloorRateBand:
-    """낙찰하한율 개연 밴드(D-6G-13 ②)와 공사 순공사원가 배제 비율(P-3 §4.3)."""
-
-    rate_band_low: float
-    rate_band_high: float
-    pure_construction_cost_ratio: float
-
-    def __post_init__(self) -> None:
-        _require_finite_unit_open(self.rate_band_low, "floor.rate_band_low")
-        _require_finite_unit_open(self.rate_band_high, "floor.rate_band_high")
-        _require_finite_unit_open(
-            self.pure_construction_cost_ratio, "floor.pure_construction_cost_ratio"
-        )
-        if self.rate_band_low >= self.rate_band_high:
-            raise ValueError(
-                "floor.rate_band_low 는 rate_band_high 보다 작아야 합니다: "
-                f"{self.rate_band_low} >= {self.rate_band_high}"
-            )
-
-    def contains(self, rate: float) -> bool:
-        return self.rate_band_low <= rate <= self.rate_band_high
-
-
-@dataclass(frozen=True)
-class EffectiveDates:
-    """2026 낙찰하한율 개정 시행일(업무별). 포함 여부는 **공고일** 기준이다(D-6G-14)."""
-
-    construction: date
-    service: date
-    goods: date
-
-
-@dataclass(frozen=True)
-class StrategyConstants:
-    """전략 상수 — S1 offset 과 S4 몬테카를로 격자(사전 등록)."""
-
-    s1_offset_bp: float
-    s4_iteration_count: int
-    s4_grid_size: int
-    s4_grid_span_bp: float
-    s4_min_competitor_samples: int
-
-    def __post_init__(self) -> None:
-        if not math.isfinite(self.s1_offset_bp):
-            raise ValueError(
-                f"strategy.s1_offset_bp 는 유한값이어야 합니다: {self.s1_offset_bp}"
-            )
-        _require_finite_non_negative(self.s4_grid_span_bp, "strategy.s4_grid_span_bp")
-        if self.s4_iteration_count < 1:
-            raise ValueError(
-                "strategy.s4_iteration_count 는 1 이상이어야 합니다: "
-                f"{self.s4_iteration_count}"
-            )
-        if self.s4_grid_size < 2:
-            raise ValueError(
-                f"strategy.s4_grid_size 는 2 이상이어야 합니다: {self.s4_grid_size}"
-            )
-        if self.s4_min_competitor_samples < 1:
-            raise ValueError(
-                "strategy.s4_min_competitor_samples 는 1 이상이어야 합니다: "
-                f"{self.s4_min_competitor_samples}"
-            )
-
-
-@dataclass(frozen=True)
-class SamplingBudget:
-    """표본 크기 결정식(D-6G-20) — 호출 예산이 표본을 정한다."""
-
-    list_call_count: int
-    calls_per_notice: int
-    max_total_calls: int
-    min_required_sample: int
-
-    def __post_init__(self) -> None:
-        for name in (
-            "list_call_count",
-            "calls_per_notice",
-            "max_total_calls",
-            "min_required_sample",
-        ):
-            if getattr(self, name) < 1:
-                raise ValueError(f"sampling.{name} 는 1 이상이어야 합니다")
-
-    def total_calls_for(self, sample_size: int) -> int:
-        return self.list_call_count + self.calls_per_notice * sample_size
-
-    def within_budget(self, sample_size: int) -> bool:
-        return self.total_calls_for(sample_size) <= self.max_total_calls
-
-
-@dataclass(frozen=True)
-class SensitivityRules:
-    """지자체 민감도(D-6G-21) — 주 판정 옆에 함께 내는 보조 판 둘의 규칙."""
-
-    wide_reserve_half_width: float
-
-    def __post_init__(self) -> None:
-        _require_finite_positive(
-            self.wide_reserve_half_width, "sensitivity.wide_reserve_half_width"
-        )
-
-
-@dataclass(frozen=True)
-class FitThresholds:
-    """P-4 제도 분포 적합도 임계 — 맞지 않으면 판정 대신 멈춤."""
-
-    alpha: float
-    min_sample_count: int
-    max_bin_ratio_deviation: float
-
-    def __post_init__(self) -> None:
-        _require_finite_unit_open(self.alpha, "fit.alpha")
-        _require_finite_positive(
-            self.max_bin_ratio_deviation, "fit.max_bin_ratio_deviation"
-        )
-        if self.min_sample_count < 1:
-            raise ValueError(
-                f"fit.min_sample_count 는 1 이상이어야 합니다: {self.min_sample_count}"
-            )
-
-
-@dataclass(frozen=True)
-class StrategyBacktestPolicy:
-    """사전 등록 정책 한 벌. 기본값 없음 — 「안 넘겼다」와 「미공시」를 구별한다."""
-
-    version: str
-    verdict: VerdictThresholds
-    windows: WindowRules
-    institution: InstitutionConstants
-    floor: FloorRateBand
-    effective: EffectiveDates
-    strategies: StrategyConstants
-    fit: FitThresholds
-    sampling: SamplingBudget
-    sensitivity: SensitivityRules
-    stability_seeds: tuple[int, ...]
-
-    def __post_init__(self) -> None:
-        if not self.stability_seeds:
-            raise ValueError("stability_seeds 는 비어 있을 수 없습니다.")
-        if len(set(self.stability_seeds)) != len(self.stability_seeds):
-            raise ValueError(
-                f"stability_seeds 에 중복이 있습니다: {self.stability_seeds!r}"
-            )
 
 
 def _numbers(values: dict[str, PolicyScalar]) -> dict[str, float] | None:
@@ -428,9 +205,13 @@ def _assemble(
         ),
         sampling=SamplingBudget(
             list_call_count=integers["sampling.list_call_count"],
-            calls_per_notice=integers["sampling.calls_per_notice"],
+            calls_per_notice_construction=integers[
+                "sampling.calls_per_notice_construction"
+            ],
+            calls_per_notice_service=integers["sampling.calls_per_notice_service"],
+            calls_per_notice_goods=integers["sampling.calls_per_notice_goods"],
             max_total_calls=integers["sampling.max_total_calls"],
-            min_required_sample=integers["sampling.min_required_sample"],
+            headroom_ratio=numbers["sampling.headroom_ratio"],
         ),
         sensitivity=SensitivityRules(
             wide_reserve_half_width=numbers["sensitivity.wide_reserve_half_width"]
