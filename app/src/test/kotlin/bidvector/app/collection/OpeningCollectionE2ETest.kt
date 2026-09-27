@@ -3,12 +3,14 @@ package bidvector.app.collection
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
+import bidvector.app.wiring.OPENING_COLLECTION_LOCK_KEY
 import bidvector.app.wiring.RecordingCollectionTermination
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
@@ -171,6 +173,26 @@ class OpeningCollectionE2ETest {
         // 상호는 raw 관측까지는 오지만 **로그에는 없다**(러너의 줄이 계수와 열거값뿐이다).
         captured shouldNotContain BIDDER_NAME
         captured shouldContain "opening-collection finished"
+    }
+
+    /**
+     * D-6G-42 M-3 — 겹쳐 도는 두 실행은 같은 표본을 두 번 부르고 두 상한 회계가 서로의 호출을 보지
+     * 못한다. 잠금을 **밖에서 들고** 기동해, 출하 조립이 실제로 아무것도 부르지 않고 끝나는지 잰다.
+     */
+    @Test
+    fun `이미 도는 실행이 있으면 아무것도 부르지 않고 끝난다`() {
+        dataSource.connection.use { held ->
+            held.prepareStatement("SELECT pg_advisory_lock(?)").use { statement ->
+                statement.setLong(1, OPENING_COLLECTION_LOCK_KEY)
+                statement.executeQuery().use { it.next() }
+            }
+
+            val (exitCodes, mock) = bootAndRun(emptyMap())
+
+            exitCodes shouldContainExactly listOf(CollectionExitCode.ALREADY_RUNNING.value)
+            mock.listCalls.shouldBeEmpty()
+            logs.list.joinToString("\n") { it.formattedMessage } shouldContain "ALREADY_RUNNING"
+        }
     }
 
     /**

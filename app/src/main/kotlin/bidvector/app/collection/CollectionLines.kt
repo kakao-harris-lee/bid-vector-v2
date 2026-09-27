@@ -43,6 +43,9 @@ internal fun failureLine(causeCode: String): String = "collection failed cause=$
 
 private fun slotFields(slot: CollectionSlot): String = "date=${slot.referenceDate} source=${slot.source.value}"
 
+// 0~2 와 달리 detekt 의 기본 허용 숫자가 아니라 이름을 붙인다 — 값 자체에 뜻은 없다.
+private const val ALREADY_RUNNING_EXIT_CODE = 3
+
 /** 프로세스 종료 코드 — 0 은 전 슬롯이 끝까지 읽혔을 때만이다(절단·쿼터 멈춤은 실행이 끝나도 미완이다). */
 enum class CollectionExitCode(
     val value: Int,
@@ -50,6 +53,9 @@ enum class CollectionExitCode(
     COMPLETE(0),
     FAILED(1),
     INCOMPLETE(2),
+
+    /** 다른 실행이 이미 잠금을 들고 있다 — 아무것도 부르지 않았다(미완과 구별해야 한다). */
+    ALREADY_RUNNING(ALREADY_RUNNING_EXIT_CODE),
 }
 
 internal fun exitCodeOf(report: CollectionReport): CollectionExitCode =

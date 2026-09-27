@@ -6,6 +6,7 @@ import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.koneps.konepsOpeningResultSourceByNoticeDate
 import bidvector.adapters.persistence.JdbcCollectedAxisStore
 import bidvector.adapters.persistence.JdbcCollectionCallLedgerStore
+import bidvector.adapters.persistence.JdbcCollectionRunLease
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.adapters.snapshot.FileSampleListLedger
@@ -49,6 +50,8 @@ import java.net.http.HttpClient
 import java.nio.file.Path
 import java.time.LocalDate
 import javax.sql.DataSource
+
+internal const val OPENING_COLLECTION_LOCK_KEY = 6_020_260_927L
 
 /** 조립된 개찰 축 소스 목록 — `List` 빈은 Spring 컬렉션 주입과 섞이므로 한 겹 감싼다. */
 class OpeningCollectionSources(
@@ -184,12 +187,21 @@ open class OpeningCollectionWiring {
         )
     }
 
+    /**
+     * 실행 잠금의 키 — 이 갈래 하나를 가리키는 상수다(다른 수집 갈래와 겹치지 않는 임의의 값).
+     * advisory lock 은 키 공간이 전역이므로 값 자체에 뜻이 없어도 되지만 **고정**이어야 한다.
+     */
+    @Bean
+    open fun openingCollectionRunLease(dataSource: DataSource): JdbcCollectionRunLease =
+        JdbcCollectionRunLease(dataSource, OPENING_COLLECTION_LOCK_KEY)
+
     @Bean
     open fun openingCollectionRunner(
         useCase: CollectOpeningResultsUseCase,
         range: CollectionRange,
         sources: OpeningCollectionSources,
         budget: CallBudgetLedger,
+        lease: JdbcCollectionRunLease,
         termination: CollectionTermination,
     ): OpeningCollectionRunner {
         val logger = LoggerFactory.getLogger(OpeningCollectionRunner::class.java)
@@ -198,6 +210,7 @@ open class OpeningCollectionWiring {
             range,
             sources.all,
             budget,
+            lease,
             CollectionLog { logger.info(it) },
             termination,
         )
