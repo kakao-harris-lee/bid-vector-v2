@@ -19,12 +19,24 @@ import java.time.LocalDate
 internal class Framing(
     val candidates: List<Candidate>,
     val halt: OpeningCollectionHalt?,
+    /**
+     * 절단된 슬롯 수(D-6G-50) — 쿼터·상한이 아닌 절단은 멈춤을 내지 않고 조용히 접힌다. 그대로
+     * 표본을 확정하면 **반쪽 표본틀에서 뽑은 표본이 영구히 굳는다**(vr M-3): 실패한 슬롯의 공고는
+     * 다음 실행에 표본틀에 들어와도 표본은 이미 확정돼 있어 영영 뽑히지 않는다.
+     */
+    val truncatedSlots: Int = 0,
 )
 
 internal class Candidate(
     val id: NoticeId,
     val candidate: SampleCandidate,
     val source: OpeningCollectionSource,
+)
+
+/** 슬롯 하나의 끝 — 멈춤 사유와 「끝까지 읽었는가」. 둘은 다른 축이다(절단은 멈춤이 아니다). */
+private class SlotOutcome(
+    val halt: OpeningCollectionHalt?,
+    val truncated: Boolean,
 )
 
 private sealed interface PageWalk {
@@ -57,13 +69,15 @@ internal class OpeningSampleFramer(
     ): Framing {
         require(sources.map { it.name }.toSet().size == sources.size) { "업종 이름은 서로 달라야 한다" }
         val candidates = mutableListOf<Candidate>()
+        var truncated = 0
         for (noticeDate in range.dates) {
             for (source in sources) {
-                val halt = frameSlot(noticeDate, source, candidates)
-                if (halt != null) return Framing(candidates, halt)
+                val outcome = frameSlot(noticeDate, source, candidates)
+                if (outcome.halt != null) return Framing(candidates, outcome.halt, truncated)
+                if (outcome.truncated) truncated++
             }
         }
-        return Framing(candidates, halt = null)
+        return Framing(candidates, halt = null, truncatedSlots = truncated)
     }
 
     /**
@@ -74,7 +88,7 @@ internal class OpeningSampleFramer(
         noticeDate: LocalDate,
         source: OpeningCollectionSource,
         into: MutableList<Candidate>,
-    ): OpeningCollectionHalt? {
+    ): SlotOutcome {
         val referenceDate = CollectionReferenceDate(noticeDate)
         val startedAt = clock.now()
         val tally = SourceAccountingTally()
@@ -87,7 +101,7 @@ internal class OpeningSampleFramer(
             accounting,
             CollectionRunMeta(referenceDate, SourceEndpoint.OPENING_RESULT_LIST, startedAt, clock.now()),
         )
-        return (walk as PageWalk.Stop).halt
+        return SlotOutcome((walk as PageWalk.Stop).halt, accounting.truncationCause != null)
     }
 
     /** 페이지 한 장 — 다음 커서를 내거나 멈춘다(멈춤 사유가 없으면 슬롯이 정상으로 끝난 것이다). */

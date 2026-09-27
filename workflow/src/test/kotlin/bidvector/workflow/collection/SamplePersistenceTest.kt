@@ -1,6 +1,7 @@
 package bidvector.workflow.collection
 
 import bidvector.procurement.BusinessDivision
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
@@ -18,18 +19,50 @@ import org.junit.jupiter.api.Test
  */
 class SamplePersistenceTest {
     @Test
-    fun `창이 넓어져도 표본은 첫 실행이 확정한 그대로다`() {
+    fun `같은 창에서 후보가 늘어도 표본은 첫 실행이 확정한 그대로다`() {
         val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-02", count = 5)
         val first = fixture.run()
 
-        // 늦게 개찰된 공고가 다음 실행의 표본틀에 들어온다 — 같은 층(같은 주)이라 다시 뽑으면 섞인다.
-        fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-03", count = 5)
+        // 늦게 개찰된 공고가 **같은 날짜 슬롯에** 들어온다 — 다시 뽑으면 표본이 섞인다.
+        fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-02", count = 9)
         val second = fixture.run()
 
         second.sample.selected shouldContainExactly first.sample.selected
         second.frameSize shouldBeGreaterThan first.frameSize
         fixture.sampleList.confirmCount shouldBe 1
+    }
+
+    /**
+     * D-6G-50 — **빈 표본은 확정하지 않는다.** 슬롯이 전부 성공했는데 공고가 하나도 없는 것은
+     * 절단이 아니다(정상 응답, 항목 0). 그대로 굳히면 빈 파일이 이후 모든 실행을 막고, 그것을
+     * 푸는 길은 운영자가 파일을 지우는 것뿐이다.
+     */
+    @Test
+    fun `슬롯이 성공했어도 후보가 없으면 확정하지 않는다`() {
+        val fixture = OpeningFixture(sampleSize = 2)
+        fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-02", count = 0)
+
+        shouldThrow<IllegalArgumentException> { fixture.run() }
+
+        fixture.sampleList.confirmCount shouldBe 0
+        fixture.sampleList.confirmed() shouldBe null
+    }
+
+    /**
+     * D-6G-50 — **창을 바꾸면 거부한다.** 확정된 표본은 그때의 표본틀에서 뽑힌 것이라, 창이 달라진
+     * 뒤의 실행은 다른 모집단을 보고 있다: 넓히면 늘어난 공고가 영영 뽑히지 않고, 좁히면 표본의
+     * 일부가 표본틀 밖이 된다. 조용히 지나가면 그 표본이 무엇의 표본인지 말할 수 없게 된다.
+     */
+    @Test
+    fun `확정 뒤 창이 달라지면 거부한다`() {
+        val fixture = OpeningFixture(sampleSize = 2)
+        fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-02", count = 5)
+        fixture.run()
+
+        fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-03-03", count = 5)
+
+        shouldThrow<IllegalArgumentException> { fixture.run() }
     }
 
     @Test

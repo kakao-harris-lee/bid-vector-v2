@@ -2,7 +2,9 @@ package bidvector.adapters.snapshot
 
 import bidvector.procurement.BusinessDivision
 import bidvector.workflow.collection.NoticeKeyHash
+import bidvector.workflow.collection.SampleConfirmation
 import bidvector.workflow.collection.SampleOutcome
+import bidvector.workflow.collection.SampleScope
 import bidvector.workflow.collection.SampleStratum
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.LocalDate
 
 private fun keyOf(number: String): NoticeKeyHash = NoticeKeyHash.of(number, "000")
 
@@ -23,6 +26,14 @@ private fun outcomeOf(vararg entries: Pair<String, SampleStratum>): SampleOutcom
     )
 
 private val CONSTRUCTION_W07 = SampleStratum(BusinessDivision.CONSTRUCTION, "2026-W07")
+
+/** 확정 한 벌 — 범위는 이 test 의 관심사가 아니라 고정값이다(범위 대조는 그 자리 test 가 잰다). */
+private fun confirmationOf(vararg entries: Pair<String, SampleStratum>): SampleConfirmation =
+    SampleConfirmation(
+        outcomeOf(*entries),
+        SampleScope(LocalDate.of(2026, 2, 9), LocalDate.of(2026, 2, 20), setOf(BusinessDivision.SERVICE)),
+    )
+
 private val SERVICE_W08 = SampleStratum(BusinessDivision.SERVICE, "2026-W08")
 
 /** 표본 목록 파일(D-6G-39) — 형태와 **한 번만 확정된다**는 성질. */
@@ -77,9 +88,9 @@ class FileSampleListLedgerTest {
     @Test
     fun `한 번 확정하면 두 번째 뽑기는 파일을 이기지 못한다`() {
         val ledger = ledgerAt()
-        val first = ledger.confirm(outcomeOf("A-1" to CONSTRUCTION_W07))
+        val first = ledger.confirm(confirmationOf("A-1" to CONSTRUCTION_W07))
 
-        val second = ledger.confirm(outcomeOf("B-9" to SERVICE_W08))
+        val second = ledger.confirm(confirmationOf("B-9" to SERVICE_W08))
 
         second shouldBe first
         ledger.confirmed() shouldBe first
@@ -88,7 +99,7 @@ class FileSampleListLedgerTest {
     @Test
     fun `해시는 파일 바이트의 것이다`() {
         val ledger = ledgerAt()
-        ledger.confirm(outcomeOf("A-1" to CONSTRUCTION_W07, "A-2" to SERVICE_W08))
+        ledger.confirm(confirmationOf("A-1" to CONSTRUCTION_W07, "A-2" to SERVICE_W08))
 
         val read = requireNotNull(ledger.read())
 

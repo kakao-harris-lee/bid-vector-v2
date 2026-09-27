@@ -1,16 +1,26 @@
 package bidvector.adapters.snapshot
 
+import bidvector.adapters.koneps.JsonValue
+import bidvector.adapters.koneps.KonepsJsonParser
+import bidvector.adapters.koneps.asArray
+import bidvector.adapters.koneps.asIntOrNull
+import bidvector.adapters.koneps.asObject
+import bidvector.adapters.koneps.asStringOrNull
 import bidvector.procurement.BusinessDivision
 import bidvector.workflow.collection.NOTICE_KEY_ORDER
 import bidvector.workflow.collection.NoticeKeyHash
+import bidvector.workflow.collection.SampleConfirmation
 import bidvector.workflow.collection.SampleList
 import bidvector.workflow.collection.SampleListLedger
 import bidvector.workflow.collection.SampleOutcome
+import bidvector.workflow.collection.SampleScope
 import bidvector.workflow.collection.SampleStratum
+import bidvector.workflow.collection.StratumOutcome
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import java.time.LocalDate
 
 private const val COLUMN_SEPARATOR = '\t'
 private const val COLUMNS = 3
@@ -82,10 +92,12 @@ class FileSampleListLedger(
     /** 확정 바이트를 실행 상태에 못 박는다(D-6G-45) — 바깥에서 목록을 바꿔치우면 드러난다. */
     private val onConfirmed: (String) -> Unit = {},
 ) : SampleListLedger {
+    private val scopeFile: Path = file.resolveSibling(SAMPLE_SCOPE_NAME)
+
     override fun confirmed(): SampleList? = read()?.list
 
-    override fun confirm(sample: SampleOutcome): SampleList {
-        val text = SampleListFile.render(sample)
+    override fun confirm(confirmation: SampleConfirmation): SampleList {
+        val text = SampleListFile.render(confirmation.sample)
         val won =
             try {
                 Files.writeString(file, text, StandardOpenOption.CREATE_NEW)
@@ -95,14 +107,103 @@ class FileSampleListLedger(
                 false
             }
         if (!won) return requireNotNull(confirmed()) { "표본 목록 파일을 읽지 못했다" }
+        Files.writeString(scopeFile, SampleScopeFile.render(confirmation))
         onConfirmed(text)
-        return SampleListFile.parse(text)
+        return SampleListFile.parse(text).withFacts(SampleScopeFile.parse(Files.readString(scopeFile)))
     }
 
     /** 확정된 파일의 바이트까지 — 추출이 manifest 해시와 곁파일 복사에 쓴다. */
     fun read(): ConfirmedSampleList? {
         if (!Files.isRegularFile(file)) return null
         val text = Files.readString(file)
-        return ConfirmedSampleList(text, SampleListFile.parse(text))
+        // 목록이 있는데 범위가 없으면 거부한다(D-6G-50) — 범위 없는 목록은 대조가 조용히 꺼진다.
+        require(Files.isRegularFile(scopeFile)) { "확정 표본의 표본틀 범위 파일이 없다" }
+        val facts = SampleScopeFile.parse(Files.readString(scopeFile))
+        return ConfirmedSampleList(text, SampleListFile.parse(text).withFacts(facts))
     }
 }
+
+internal const val SAMPLE_SCOPE_NAME = "sample-scope.json"
+
+/**
+ * 확정 표본의 곁 사실(D-6G-50) — 표본틀 **범위**와 **층별 목표**. TSV 는 레인 간 계약이라 칸을 늘릴
+ * 수 없어(스키마 §2.1) 같은 디렉터리의 파일 하나로 뺀다. 이것이 없으면 범위 대조가 조용히 꺼지고
+ * 「모자란 층」 보고가 사라지므로, 목록이 있는데 이 파일이 없으면 판독이 거부한다.
+ */
+internal object SampleScopeFile {
+    fun render(confirmation: SampleConfirmation): String {
+        val scope = confirmation.scope
+        val strata =
+            confirmation.sample.strata.entries.map { (stratum, outcome) ->
+                SnapshotJson.Obj(
+                    listOf(
+                        "division" to SnapshotJson.Text(stratum.division.name),
+                        "week" to SnapshotJson.Text(stratum.noticeWeek),
+                        "target" to SnapshotJson.Number(outcome.target.toString()),
+                        "available" to SnapshotJson.Number(outcome.available.toString()),
+                        "taken" to SnapshotJson.Number(outcome.taken.toString()),
+                    ),
+                )
+            }
+        return SnapshotJson
+            .Obj(
+                listOf(
+                    "from" to SnapshotJson.Text(scope.from.toString()),
+                    "to" to SnapshotJson.Text(scope.to.toString()),
+                    "divisions" to SnapshotJson.Arr(scope.divisions.map { SnapshotJson.Text(it.name) }),
+                    "requested" to SnapshotJson.Number(confirmation.sample.requested.toString()),
+                    "strata" to SnapshotJson.Arr(strata),
+                ),
+            ).render() + "\n"
+    }
+
+    fun parse(text: String): SampleList {
+        val fields =
+            requireNotNull(KonepsJsonParser.parse(text, SCOPE_MAX_DEPTH).asObject()?.fields) {
+                "표본틀 범위 파일이 JSON 객체가 아니다"
+            }
+        val scope =
+            SampleScope(
+                from = LocalDate.parse(requireNotNull(fields["from"].asStringOrNull()) { "범위에 시작일이 없다" }),
+                to = LocalDate.parse(requireNotNull(fields["to"].asStringOrNull()) { "범위에 종료일이 없다" }),
+                divisions = divisionsOf(fields["divisions"]),
+            )
+        return SampleList(emptyMap(), strataOf(fields["strata"]), requestedOf(fields), scope)
+    }
+
+    private fun requestedOf(fields: Map<String, JsonValue>): Int =
+        requireNotNull(fields["requested"].asIntOrNull()) { "범위에 목표 표본 수가 없다" }
+
+    private fun divisionsOf(value: JsonValue?): Set<BusinessDivision> =
+        requireNotNull(value.asArray()) { "범위의 업무 집합이 배열이 아니다" }
+            .items
+            .map { item ->
+                val name = item.asStringOrNull()
+                requireNotNull(BusinessDivision.entries.firstOrNull { it.name == name }) { "범위의 업무 어휘가 아니다" }
+            }.toSet()
+
+    private fun strataOf(value: JsonValue?): Map<SampleStratum, StratumOutcome> =
+        requireNotNull(value.asArray()) { "범위의 층 목록이 배열이 아니다" }
+            .items
+            .associate { item ->
+                val row = requireNotNull(item.asObject()?.fields) { "층 항목이 객체가 아니다" }
+                val divisionName = row["division"].asStringOrNull()
+                val division =
+                    requireNotNull(BusinessDivision.entries.firstOrNull { it.name == divisionName }) {
+                        "층의 업무 어휘가 아니다"
+                    }
+                val stratum = SampleStratum(division, requireNotNull(row["week"].asStringOrNull()) { "층에 주가 없다" })
+                stratum to
+                    StratumOutcome(
+                        target = requireNotNull(row["target"].asIntOrNull()) { "층에 목표가 없다" },
+                        available = requireNotNull(row["available"].asIntOrNull()) { "층에 후보 수가 없다" },
+                        taken = requireNotNull(row["taken"].asIntOrNull()) { "층에 뽑힌 수가 없다" },
+                    )
+            }
+}
+
+private const val SCOPE_MAX_DEPTH = 6
+
+/** 목록(키·층)에 곁 사실(범위·목표·층별 결과)을 얹는다 — 둘은 같은 확정의 두 조각이다. */
+private fun SampleList.withFacts(facts: SampleList): SampleList =
+    copy(strata = facts.strata, requested = facts.requested, scope = facts.scope)

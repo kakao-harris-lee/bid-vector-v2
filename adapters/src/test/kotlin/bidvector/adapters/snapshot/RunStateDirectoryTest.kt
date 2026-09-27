@@ -6,8 +6,11 @@ import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.NoticeKeyHash
+import bidvector.workflow.collection.SampleConfirmation
 import bidvector.workflow.collection.SampleOutcome
+import bidvector.workflow.collection.SampleScope
 import bidvector.workflow.collection.SampleStratum
+import bidvector.workflow.collection.StratumOutcome
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -17,12 +20,17 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
+import java.time.LocalDate
 
 private val KEY = NoticeKeyHash.of("SYN-6G-0001", "000")
 private val STRATUM = SampleStratum(BusinessDivision.SERVICE, "2026-W23")
 private val AT: Instant = Instant.parse("2026-09-24T01:00:00Z")
 
-private fun sample() = SampleOutcome(listOf(KEY), emptyMap(), mapOf(KEY to STRATUM))
+private fun sample() =
+    SampleConfirmation(
+        SampleOutcome(listOf(KEY), mapOf(STRATUM to StratumOutcome(1, 1, 1)), mapOf(KEY to STRATUM), 1),
+        SampleScope(LocalDate.of(2026, 6, 3), LocalDate.of(2026, 6, 3), setOf(BusinessDivision.SERVICE)),
+    )
 
 private fun httpAttempt() =
     CollectionAttempt(KEY.value, SourceEndpoint.RESERVE_PRICE_DETAIL, AttemptOutcome.Succeeded, AT, 1)

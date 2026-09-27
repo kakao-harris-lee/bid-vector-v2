@@ -3,6 +3,7 @@ package bidvector.workflow.collection
 import bidvector.procurement.BudgetLimit
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.TruncationCause
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -158,11 +159,11 @@ class CollectOpeningResultsUseCaseTest {
         fixture.service.listPagesFetched = 0
         fixture.service.listTruncation = TruncationCause.SelfThrottled
 
-        val report = fixture.run()
+        // 한 장도 못 받은 슬롯은 **절단**이다 — 그 표본틀로 표본을 굳히지 않는다(D-6G-50).
+        // 빈 표본을 확정하는 것도 막힌다: 그 파일이 이후 모든 실행을 막는다.
+        shouldThrow<IllegalArgumentException> { fixture.run() }
 
-        // 던지지 않는다. 그 슬롯은 비었지만 실행은 이어지고, 쿼터가 아니므로 멈춤도 아니다.
-        report.halted shouldBe null
-        report.frameSize shouldBe 0
+        fixture.sampleList.confirmCount shouldBe 0
     }
 
     @Test
@@ -196,16 +197,20 @@ class CollectOpeningResultsUseCaseTest {
         halt.notAttempted shouldBe 2
     }
 
+    /**
+     * D-6G-50(vr M-3) — 쿼터가 아닌 절단은 멈춤을 내지 않지만 **표본을 확정해서도 안 된다.**
+     * 반쪽 표본틀에서 굳히면 실패한 슬롯의 공고는 다음 실행에 표본틀에 들어와도 영영 뽑히지
+     * 않는다. 확정하지 않고 거부하면 다음 실행이 표본틀부터 다시 세운다.
+     */
     @Test
-    fun `쿼터가 아닌 절단은 그 슬롯만 접고 표본틀을 이어 만든다`() {
+    fun `절단된 슬롯이 있으면 표본을 확정하지 않는다`() {
         val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
         fixture.service.listTruncation = TruncationCause.Timeout
 
-        val report = fixture.run()
+        shouldThrow<IllegalArgumentException> { fixture.run() }
 
-        report.halted shouldBe null
-        report.sample.selected.size shouldBe 2
+        fixture.sampleList.confirmCount shouldBe 0
     }
 
     @Test

@@ -174,9 +174,15 @@ class CollectOpeningResultsUseCase(
         if (framing.halt != null) {
             return OpeningCollectionReport(framing.candidates.size, EMPTY_SAMPLE, 0, 0, framing.halt)
         }
-        val framed = samples.resolve(framing.candidates)
+        val framed = samples.resolve(framing, scopeOf(range, sources))
         return fanOut(framing, framed.sample, framed.unseen)
     }
+
+    /** 이번 설정이 말하는 표본틀의 범위 — 확정 파일이 싣고, 이후 실행이 대조한다(D-6G-50). */
+    private fun scopeOf(
+        range: CollectionRange,
+        sources: List<OpeningCollectionSource>,
+    ): SampleScope = SampleScope(range.from, range.to, sources.map { it.division }.toSet())
 
     /** ③ 표본 공고마다 상세 — 멈추면 아직 손대지 않은 표본 수를 사유에 싣는다. */
     private fun fanOut(

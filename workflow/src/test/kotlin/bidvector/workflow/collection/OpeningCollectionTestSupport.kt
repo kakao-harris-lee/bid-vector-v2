@@ -140,10 +140,12 @@ internal class FakeSampleListLedger : SampleListLedger {
 
     override fun confirmed(): SampleList? = stored
 
-    override fun confirm(sample: SampleOutcome): SampleList {
+    override fun confirm(confirmation: SampleConfirmation): SampleList {
         stored?.let { return it }
         confirmCount++
-        return SampleList(sample.strataByKey).also { stored = it }
+        val sample = confirmation.sample
+        return SampleList(sample.strataByKey, sample.strata, sample.requested, confirmation.scope)
+            .also { stored = it }
     }
 }
 
