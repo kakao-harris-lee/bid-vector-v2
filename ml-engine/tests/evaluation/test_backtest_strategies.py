@@ -80,6 +80,7 @@ def _construction_target() -> AdmittedNotice:
             row_payload(
                 "c-1",
                 notice_category="CONSTRUCTION",
+                notice_bid_price_formula_a_applicable=True,
                 notice_noticed_on="2026-03-01",
                 notice_successful_bid_method_name="적격심사제-추정가격 100억원 미만 공사",
                 notice_a_value={
@@ -286,6 +287,30 @@ def test_competitor_pool_carries_no_identifier() -> None:
             "reserve_prices",
             "drawn_serial_numbers",
         }
+
+
+def test_strategy_uses_the_bid_time_base_amount_not_the_opening_one() -> None:
+    """D-6G-19 — 두 기초금액을 **다르게** 두고, 전략이 투찰 시점 칸을 쓰는지 본다.
+    둘이 같은 fixture 에서는 어느 쪽을 써도 test 가 통과해 provenance 분리가 잠기지
+    않는다(변이 실측에서 드러난 구멍)."""
+    admitted = _admitted(
+        [
+            row_payload(
+                "t-split",
+                outcome_opened_on="2026-06-15",
+                outcome_opening_base_amount=900_000_000,
+                outcome_bidder_amounts=[885_000_000.0, 890_000_000.0, 900_000_000.0],
+            )
+        ]
+    )[0]
+    assert admitted.base_amount != admitted.opening_base_amount
+    assert not admitted.base_amount_matches
+    request = build_strategy_input(admitted, (), seed=7)
+    assert request.base_amount == admitted.base_amount
+    outcome = UniformBandStrategy().bid(request, _policy())
+    assert isinstance(outcome, BidAmount)
+    rate = outcome.amount / admitted.base_amount
+    assert 0.87745 * 0.98 <= rate <= 0.87745 * 1.02
 
 
 def test_strategy_input_does_not_expose_the_admitted_notice() -> None:

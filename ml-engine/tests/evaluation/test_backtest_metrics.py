@@ -104,6 +104,7 @@ def test_construction_second_floor_makes_an_otherwise_eligible_bid_ineligible() 
         row_payload(
             "c-1",
             notice_category="CONSTRUCTION",
+            notice_bid_price_formula_a_applicable=True,
             notice_noticed_on="2026-03-01",
             notice_a_value={
                 "total": 60_000_000.0,

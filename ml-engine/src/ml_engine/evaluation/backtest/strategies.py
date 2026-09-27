@@ -65,6 +65,11 @@ class StrategyInput:
     notice: NoticeObservation
     floor_rate: float
     a_value_total: float
+    base_amount: float
+    """**투찰 시점** 기초금액(기초금액 조회 출처, 스키마 §3.4). 전략의 결정 변수는
+    `투찰금액 ÷ 이 값` 이다. 개찰결과 출처의 기초금액은 이 타입에 없다 — 투찰 시점에
+    몰랐던 값이기 때문이다."""
+
     reserve_range_begin_rate: float
     reserve_range_end_rate: float
     competitors: tuple[CompetitorObservation, ...]
@@ -141,8 +146,9 @@ def _round_up_won(amount: float) -> StrategyOutcome:
 
 
 def bid_from_rate(request: StrategyInput, rate: float) -> StrategyOutcome:
-    """투찰률(기초금액 기준) → 원 단위 올림 금액. 전략 셋이 공유하는 유일한 환산."""
-    return _round_up_won(request.notice.base_amount * rate)
+    """투찰률(기초금액 기준) → 원 단위 올림 금액. 전략 셋이 공유하는 유일한 환산.
+    분모는 **투찰 시점** 기초금액이다(D-6G-19) — 개찰결과 출처 값은 이 타입에 없다."""
+    return _round_up_won(request.base_amount * rate)
 
 
 def notice_rng(request: StrategyInput) -> np.random.Generator:
@@ -225,7 +231,7 @@ def _win_probabilities(
         reserve_price_count=policy.institution.reserve_price_count,
         draw_count=policy.institution.draw_count,
     )
-    base = request.notice.base_amount
+    base = request.base_amount
     floors = np.array(
         [
             floor_price(
@@ -275,9 +281,9 @@ def build_competitor_pool(
     return tuple(
         CompetitorObservation(
             opened_on=item.row.outcome.opened_on,
-            bid_rate=amount / item.row.notice.base_amount,
+            bid_rate=amount / item.base_amount,
             participant_count=item.participant_count,
-            base_amount=item.row.notice.base_amount,
+            base_amount=item.base_amount,
             category=item.row.notice.category,
             reserve_prices=item.row.outcome.reserve_prices,
             drawn_serial_numbers=item.row.outcome.drawn_serial_numbers,
@@ -297,6 +303,7 @@ def build_strategy_input(
         notice=target.row.notice,
         floor_rate=target.floor_rate,
         a_value_total=target.a_value_total,
+        base_amount=target.base_amount,
         reserve_range_begin_rate=target.reserve_range_begin_rate,
         reserve_range_end_rate=target.reserve_range_end_rate,
         competitors=build_competitor_pool(history, before=target.row.outcome.opened_on),

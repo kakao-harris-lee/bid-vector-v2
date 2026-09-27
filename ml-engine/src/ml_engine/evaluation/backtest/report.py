@@ -144,7 +144,8 @@ def verdict_payload(verdict: BacktestVerdict) -> dict[str, JsonValue]:
         "distribution_fit": _fit(verdict.fit),
         "exclusions": {str(reason): count for reason, count in verdict.exclusions},
         "undecidable": {str(axis): count for axis, count in verdict.undecidable},
-        "bid_method_fill_rate": verdict.bid_method_fill_rate,
+        "fill_rates": {name: value for name, value in verdict.fill_rates},
+        "base_amount_mismatch_count": verdict.base_amount_mismatch_count,
         "limitations": list(verdict.limitations),
         "selected_windows": [
             _window_record(record) for record in verdict.selected_windows

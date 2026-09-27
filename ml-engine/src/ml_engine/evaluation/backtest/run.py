@@ -23,10 +23,9 @@ from collections.abc import Sequence
 from ml_engine.evaluation.backtest.exclusions import (
     AdmissionResult,
     AdmittedNotice,
-    ExclusionReason,
     admit_rows,
-    bid_method_fill_rate,
     exclusion_counts,
+    fill_rates,
 )
 from ml_engine.evaluation.backtest.fit import FitResult, check_institutional_fit
 from ml_engine.evaluation.backtest.metrics import (
@@ -35,6 +34,7 @@ from ml_engine.evaluation.backtest.metrics import (
     scored_notice_keys,
 )
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
+from ml_engine.evaluation.backtest.reasons import ExclusionReason
 from ml_engine.evaluation.backtest.records import (
     ESTIMATED_LOCAL_AGENCY_PREFIXES,
     KNOWN_LIMITATIONS,
@@ -365,7 +365,10 @@ def _assemble_verdict(
         fit=fit,
         exclusions=counts,
         undecidable=admission.undecidable,
-        bid_method_fill_rate=bid_method_fill_rate(request.snapshot.rows),
+        fill_rates=fill_rates(request.snapshot.rows),
+        base_amount_mismatch_count=sum(
+            1 for item in admission.admitted if not item.base_amount_matches
+        ),
         limitations=KNOWN_LIMITATIONS,
         selected_windows=_window_records(plan),
         excluded_windows=plan.excluded,

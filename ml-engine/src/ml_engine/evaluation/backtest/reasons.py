@@ -1,0 +1,70 @@
+"""`ml_engine.evaluation.backtest.reasons` — 제외 사유와 판정 불가 축의 **어휘**.
+
+어휘를 따로 둔 이유는 순환을 막기 위해서다: 규칙 표(`rules`)와 승인 조립(`exclusions`)이
+둘 다 이 이름들을 쓰고, 한쪽이 다른 쪽을 import 하면 고리가 생긴다.
+
+**새 사유는 코드 분기가 아니라 이 enum 한 줄**이고, 계수는 0건도 공시한다 — 제외는
+침묵이 아니라 기록이다.
+"""
+
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+class ExclusionReason(StrEnum):
+    """제외 사유 어휘(D-6G-13 ①~⑮ + 스키마가 드러낸 입력 부재 셋)."""
+
+    LOCAL_GOVERNMENT = "LOCAL_GOVERNMENT"
+    """⑪ — **오늘 한 번도 발화하지 않는다.** 기관 코드에서 지자체를 가를 authoritative
+    대응이 없고(스키마 §4), 지어내면 DEC-03 을 코드가 조용히 재정의한다. 계수 0 은
+    「지자체가 없었다」가 아니라 「가르지 못했다」이며 `undecidable_counts` 가 공시한다."""
+
+    FOREIGN_CAPITAL = "FOREIGN_CAPITAL"
+    """⑫ — **구조적으로 0.** 수집 갈래가 외자 오퍼레이션을 부르지 않아 그 행이 들어오지
+    않는다(스키마 §4). 「걸러서 0」이 아니라 「들어오지 않아 0」이다."""
+
+    BID_METHOD_ABSENT = "BID_METHOD_ABSENT"
+    """낙찰방법이 부재해 ①⑦⑩ 을 판정할 수 없다 — 조용히 통과시키지 않는다(fail-closed)."""
+
+    SMALL_SUM_QUOTE = "SMALL_SUM_QUOTE"
+    SME_COMPETITION_SCREENING = "SME_COMPETITION_SCREENING"
+    SHIP_MANUFACTURING = "SHIP_MANUFACTURING"
+    NOT_QUALIFICATION_SCREENING = "NOT_QUALIFICATION_SCREENING"
+    FLOOR_RATE_EFFECTIVE_DATE_BOUNDARY = "FLOOR_RATE_EFFECTIVE_DATE_BOUNDARY"
+    REBID_OR_AMENDED = "REBID_OR_AMENDED"
+    SINGLE_PREARRANGED_PRICE = "SINGLE_PREARRANGED_PRICE"
+    FLOOR_RATE_ABSENT_OR_OUT_OF_BAND = "FLOOR_RATE_ABSENT_OR_OUT_OF_BAND"
+
+    BASE_AMOUNT_ABSENT_OR_LATE = "BASE_AMOUNT_ABSENT_OR_LATE"
+    """D-6G-19 — 전략의 결정 변수는 `투찰금액 ÷ 기초금액` 이고 그 기초금액은 **기초금액
+    조회 출처**여야 한다. 공개가 입찰 마감보다 늦으면 투찰 시점에 없던 값이라 스냅숏이
+    `null` 로 두고(스키마 §3.4), 여기서 제외된다. 개찰결과 출처의 기초금액으로 메우지
+    않는다 — 그게 이 칸을 둘로 가른 이유다."""
+
+    OPENING_BASE_AMOUNT_ABSENT = "OPENING_BASE_AMOUNT_ABSENT"
+    """채점 축의 기초금액(개찰결과 출처)이 없으면 사정률·순공사원가선을 낼 수 없다.
+    투찰 시점 칸으로 메우지 않는다(두 칸은 서로의 대용이 아니다)."""
+
+    RESERVE_PRICE_RANGE_ABSENT = "RESERVE_PRICE_RANGE_ABSENT"
+    """D-6G-16 — 예가 범위율이 없으면 S0 의 반폭 h 가 서지 않는다. **상수 2%·3% 로
+    메우지 않고**(그것이 공고별 필드라는 것이 P-3 의 발견이다) 예비가격 15개로 역산하지도
+    않는다(역산은 개찰 결과를 투찰 시점 입력으로 쓰는 누출이다)."""
+
+    RESERVE_DRAW_INCOMPLETE = "RESERVE_DRAW_INCOMPLETE"
+    A_VALUE_ABSENT_OR_LATE = "A_VALUE_ABSENT_OR_LATE"
+    PURE_CONSTRUCTION_COST_ABSENT = "PURE_CONSTRUCTION_COST_ABSENT"
+
+    BIDDER_AMOUNT_ABSENT = "BIDDER_AMOUNT_ABSENT"
+    """(P-1.5) 투찰금액이 없는 행이 섞이면 「적격 투찰자 중 최저」가 최저라는 보장이
+    없다 — 빠진 행이 더 낮았을 수 있어 would-have-won 이 부푼다. 통째로 뺀다."""
+
+    NO_ELIGIBLE_BIDDER = "NO_ELIGIBLE_BIDDER"
+    TIED_LOWEST = "TIED_LOWEST"
+
+
+class UndecidableAxis(StrEnum):
+    """제외 규칙이 **발화하지 못한** 축 — 「해당 없음」과 구별해 센다(D-6G-21)."""
+
+    LOCAL_GOVERNMENT = "LOCAL_GOVERNMENT"
+    SHIP_MANUFACTURING_CLASS = "SHIP_MANUFACTURING_CLASS"

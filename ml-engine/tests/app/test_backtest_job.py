@@ -153,7 +153,14 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
     assert payload["limitations"]
     assert payload["undecidable"]["LOCAL_GOVERNMENT"] > 0
     assert payload["sampling"]["within_budget"] is True
-    assert payload["bid_method_fill_rate"] == 1.0
+    fill = payload["fill_rates"]
+    assert fill["successful_bid_method_name"] == 1.0
+    assert fill["reserve_range_end_rate"] == 1.0
+    # 오늘 fixture 는 공사가 없어 A 적용 여부·순공사원가가 비어 있다 — 채움률 0 을
+    # 숨기지 않고 공시한다(D-6G-22).
+    assert fill["bid_price_formula_a_applicable"] == 0.0
+    assert fill["pure_construction_cost"] == 0.0
+    assert payload["base_amount_mismatch_count"] == 0
 
 
 def test_verdict_carries_the_policy_checksum_and_snapshot_coordinates(
@@ -202,7 +209,7 @@ def test_exclusion_counts_report_every_reason(tmp_path: Path) -> None:
     payload = _main_variant(
         _run(_snapshot_dir(tmp_path), _derived_policy(tmp_path)).verdict_bytes
     )
-    assert len(payload["exclusions"]) == 18
+    assert len(payload["exclusions"]) == 20
     assert all(isinstance(value, int) for value in payload["exclusions"].values())
     # ⑪⑫ 는 한 번도 발화하지 않는다 — 0 이 「가르지 못했다」·「들어오지 않았다」임을
     # `undecidable` 이 따로 말한다(D-6G-21).

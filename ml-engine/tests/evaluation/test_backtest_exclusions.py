@@ -109,6 +109,7 @@ def test_construction_a_value_opened_after_bid_close_is_unusable() -> None:
     late = row_payload(
         "n-1",
         notice_category="CONSTRUCTION",
+        notice_bid_price_formula_a_applicable=True,
         notice_bid_close_at="2026-06-10T10:00:00+09:00",
         notice_a_value={"total": 1.0, "open_at": "2026-06-11T10:00:00+09:00"},
         notice_pure_construction_cost=800_000_000.0,
@@ -121,16 +122,64 @@ def test_construction_without_a_value_is_excluded() -> None:
     payload = row_payload(
         "n-1",
         notice_category="CONSTRUCTION",
+        notice_bid_price_formula_a_applicable=True,
         notice_pure_construction_cost=800_000_000.0,
         notice_noticed_on="2026-06-01",
     )
     assert _reason(payload) is ExclusionReason.A_VALUE_ABSENT_OR_LATE
 
 
+def test_construction_that_is_not_an_a_value_notice_resolves_a_as_zero() -> None:
+    """`bidPrceCalclAYn` 이 거짓이면 A값 공고가 아니라 산식에 A 가 없다 — `a_value`
+    부재만 보고 제외하면 A 를 쓰지 않는 공사가 통째로 빠진다(D-6G-19 수집 뒤)."""
+    payload = row_payload(
+        "c-0",
+        notice_category="CONSTRUCTION",
+        notice_bid_price_formula_a_applicable=False,
+        notice_successful_bid_method_name="적격심사제-추정가격 100억원 미만 공사",
+        notice_noticed_on="2026-03-01",
+        notice_pure_construction_cost=700_000_000,
+    )
+    result = admit_rows(_snapshot([payload]).rows, _policy())
+    assert result.admitted, result.excluded
+    assert result.admitted[0].a_value_total == 0.0
+
+
+def test_construction_without_the_a_applicability_flag_is_excluded() -> None:
+    """판정 입력이 없으면 조용히 통과시키지 않는다(fail-closed)."""
+    payload = row_payload(
+        "c-0",
+        notice_category="CONSTRUCTION",
+        notice_successful_bid_method_name="적격심사제-추정가격 100억원 미만 공사",
+        notice_noticed_on="2026-03-01",
+        notice_pure_construction_cost=700_000_000,
+    )
+    assert _reason(payload) is ExclusionReason.A_VALUE_ABSENT_OR_LATE
+
+
+@pytest.mark.parametrize(
+    ("mutation", "reason"),
+    [
+        ({"notice_base_amount": None}, ExclusionReason.BASE_AMOUNT_ABSENT_OR_LATE),
+        (
+            {"outcome_opening_base_amount_null": True},
+            ExclusionReason.OPENING_BASE_AMOUNT_ABSENT,
+        ),
+    ],
+)
+def test_base_amount_provenance_split_is_fail_closed(
+    mutation: dict[str, Any], reason: ExclusionReason
+) -> None:
+    """D-6G-19 — 두 칸은 서로의 대용이 아니다. 한쪽이 비면 다른 쪽으로 메우지 않고
+    제외한다(투찰 시점 칸이 비었는데 개찰 칸으로 메우면 그게 곧 누출이다)."""
+    assert _reason(row_payload("n-1", **mutation)) is reason
+
+
 def test_construction_without_pure_cost_is_excluded() -> None:
     payload = row_payload(
         "n-1",
         notice_category="CONSTRUCTION",
+        notice_bid_price_formula_a_applicable=True,
         notice_a_value={"total": 1.0, "open_at": "2026-06-05T10:00:00+09:00"},
         notice_noticed_on="2026-06-01",
     )

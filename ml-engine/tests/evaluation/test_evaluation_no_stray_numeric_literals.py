@@ -68,8 +68,11 @@ _ALLOWED: frozenset[tuple[str, float]] = frozenset(
         # ── M6/6G `evaluation/backtest/**` ────────────────────────────────────
         # 아래 여섯은 전부 **구조적 불변식·산식 자체의 눈금**이고, 판정 임계는 하나도
         # 없다(임계는 policy/strategy-backtest-v1.yaml 에만 있다).
-        ("backtest/exclusions.py", 0.0),  # 공사가 아닌 업무의 A(산식에 A 가 없다)
-        ("backtest/exclusions.py", 1),  # 첫 공고 차수·동가 1건 초과 비교
+        ("backtest/exclusions.py", 0),  # 계수 초기값
+        ("backtest/exclusions.py", 0.0),  # 빈 표본의 채움률
+        ("backtest/exclusions.py", 1),  # 동가 1건 초과 비교
+        ("backtest/rules.py", 0.0),  # 공사가 아닌/A값 아닌 공고의 A · 금액 양수 검사
+        ("backtest/rules.py", 1),  # _FIRST_NOTICE_ORDINAL 선언
         ("backtest/floor.py", 1.0),  # 비율에서 1 을 빼 증감으로 바꾸는 자리
         ("backtest/floor.py", 10000.0),  # bp 의 정의(10^4) — 단위이지 임계가 아니다
         ("backtest/policy.py", 0),  # 양수·음이 아님 검사 경계

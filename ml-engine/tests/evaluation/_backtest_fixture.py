@@ -72,6 +72,10 @@ def _row(label: str, opened: date, rng: Random) -> dict[str, Any]:
             "noticed_on": noticed.isoformat(),
             "bid_close_at": f"{(opened - timedelta(days=1)).isoformat()}T10:00:00+09:00",
             "base_amount": int(_BASE_AMOUNT),
+            "base_amount_disclosed_at": (
+                f"{(opened - timedelta(days=_OPENING_LAG_DAYS - 2)).isoformat()}"
+                "T09:00:00+09:00"
+            ),
             "floor_rate": floor_rate,
             "reserve_range_begin_rate": -_HALF_WIDTH,
             "reserve_range_end_rate": _HALF_WIDTH,
@@ -83,11 +87,15 @@ def _row(label: str, opened: date, rng: Random) -> dict[str, Any]:
             "progress_division": "일반",
             "procurement_class_code": "0600",
             "demand_agency_code": "A0001",
+            "bid_price_formula_a_applicable": None,
             "pure_construction_cost": None,
+            "award_method_application_standard": "적격심사 세부기준",
+            "application_basis_content": None,
         },
         "outcome": {
             "opened_on": opened.isoformat(),
             "planned_price": int(planned),
+            "opening_base_amount": int(_BASE_AMOUNT),
             "reserve_prices": [int(price) for price in prices],
             "drawn_serial_numbers": drawn,
             "participant_count": _BIDDERS_PER_NOTICE,

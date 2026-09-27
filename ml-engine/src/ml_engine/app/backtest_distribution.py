@@ -80,9 +80,7 @@ def build_request(
     않는다** — `StrategyInput` 에 애초에 없다."""
     return prediction_pb2.CalculateOptimalBidRequest(
         features=features_pb2.FeatureInputs(
-            base_amount=features_pb2.BaseAmountFact(
-                value=_money(request.notice.base_amount)
-            ),
+            base_amount=features_pb2.BaseAmountFact(value=_money(request.base_amount)),
             category_code=features_pb2.CategoryCodeFact(
                 value=str(request.notice.category)
             ),

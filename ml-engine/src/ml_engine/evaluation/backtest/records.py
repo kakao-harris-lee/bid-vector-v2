@@ -14,9 +14,9 @@ from datetime import date
 from enum import StrEnum
 from typing import Final
 
-from ml_engine.evaluation.backtest.exclusions import ExclusionReason, UndecidableAxis
 from ml_engine.evaluation.backtest.fit import FitResult
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
+from ml_engine.evaluation.backtest.reasons import ExclusionReason, UndecidableAxis
 from ml_engine.evaluation.backtest.snapshot import LoadedSnapshot
 from ml_engine.evaluation.backtest.strategies import StrategyLike
 from ml_engine.evaluation.backtest.verdict import StrategyVerdict
@@ -55,9 +55,9 @@ KNOWN_LIMITATIONS: Final[tuple[str, ...]] = (
     "COUNTERFACTUAL_NOT_MEASURED",
     "LOCAL_GOVERNMENT_UNDECIDABLE",
     "SHIP_CLASS_CODE_UNRESOLVED",
-    "RESERVE_RANGE_SOURCE_PENDING",
-    "PURE_CONSTRUCTION_COST_SOURCE_PENDING",
+    "SNAPSHOT_FIELD_FILL_RATES_UNMEASURED",
     "A_VALUE_EXCLUDES_STANDARD_MARKET_PRICE",
+    "STANDARD_MARKET_PRICE_PREDICATE_NOT_IN_SNAPSHOT",
     "FLOOR_ROUNDING_RULE_UNRESOLVED",
     "S1_CONSTRUCTION_ONLY",
     "S3_GBM_NOT_AVAILABLE",
@@ -145,7 +145,11 @@ class BacktestVerdict:
     fit: FitResult
     exclusions: tuple[tuple[ExclusionReason, int], ...]
     undecidable: tuple[tuple[UndecidableAxis, int], ...]
-    bid_method_fill_rate: float
+    fill_rates: tuple[tuple[str, float], ...]
+    base_amount_mismatch_count: int
+    """두 출처의 기초금액이 다른 공고 수(D-6G-19). 값을 고치지 않고 계수만 공시한다 —
+    어느 쪽이 옳은지는 이 레인이 판정할 일이 아니다."""
+
     limitations: tuple[str, ...]
     selected_windows: tuple[WindowRecord, ...]
     excluded_windows: tuple[WindowExclusion, ...]

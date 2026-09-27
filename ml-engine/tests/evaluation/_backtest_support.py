@@ -38,6 +38,10 @@ def notice_payload(
     progress_division: str | None = None,
     procurement_class_code: str | None = None,
     demand_agency_code: str | None = "A0001",
+    bid_price_formula_a_applicable: bool | None = None,
+    award_method_application_standard: str | None = "표준",
+    application_basis_content: str | None = None,
+    base_amount_disclosed_at: str | None = "2026-06-05T09:00:00+09:00",
     reserve_range_begin_rate: float | None = -0.02,
     reserve_range_end_rate: float | None = 0.02,
     pure_construction_cost: int | None = None,
@@ -48,6 +52,7 @@ def notice_payload(
         "noticed_on": noticed_on,
         "bid_close_at": bid_close_at,
         "base_amount": base_amount,
+        "base_amount_disclosed_at": base_amount_disclosed_at,
         "floor_rate": floor_rate,
         "reserve_range_begin_rate": reserve_range_begin_rate,
         "reserve_range_end_rate": reserve_range_end_rate,
@@ -59,7 +64,10 @@ def notice_payload(
         "progress_division": progress_division,
         "procurement_class_code": procurement_class_code,
         "demand_agency_code": demand_agency_code,
+        "bid_price_formula_a_applicable": bid_price_formula_a_applicable,
         "pure_construction_cost": pure_construction_cost,
+        "award_method_application_standard": award_method_application_standard,
+        "application_basis_content": application_basis_content,
     }
 
 
@@ -76,6 +84,8 @@ def outcome_payload(
     planned_price: float | None = None,
     prices: list[float] | None = None,
     prices_null: bool = False,
+    opening_base_amount_null: bool = False,
+    opening_base_amount: int | None = None,
     drawn: list[int] | None = None,
     participant_count: int = 12,
     bidder_amounts: list[float] | None = None,
@@ -94,6 +104,13 @@ def outcome_payload(
     return {
         "opened_on": opened_on,
         "planned_price": int(planned_price),
+        "opening_base_amount": (
+            None
+            if opening_base_amount_null
+            else int(
+                _BASE_AMOUNT if opening_base_amount is None else opening_base_amount
+            )
+        ),
         "reserve_prices": None if prices_null else [int(value) for value in values],
         "drawn_serial_numbers": drawn_numbers,
         "participant_count": participant_count,

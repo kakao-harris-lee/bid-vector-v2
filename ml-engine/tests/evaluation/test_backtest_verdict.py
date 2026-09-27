@@ -172,9 +172,7 @@ def test_passing_requires_majority_windows_pooled_and_non_inferior_ineligibility
         strategy_name="S2b",
         windows=strong,
         pooled=pooled,
-        ineligibility_delta=(
-            policy.verdict.ineligibility_noninferiority_margin * 2.0
-        ),
+        ineligibility_delta=(policy.verdict.ineligibility_noninferiority_margin * 2.0),
         seed_sign_consistent=True,
         policy=policy,
     )

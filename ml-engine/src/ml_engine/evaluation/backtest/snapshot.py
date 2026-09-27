@@ -17,13 +17,28 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
-from math import isfinite
 from typing import Final
 
+from ml_engine.evaluation.backtest.jsonrow import (
+    RowReadError,
+    SnapshotRejectionReason,
+    decode_json,
+    row_date,
+    row_integer,
+    row_mapping,
+    row_number,
+    row_optional_flag,
+    row_optional_integer,
+    row_optional_number,
+    row_optional_text,
+    row_optional_timestamp,
+    row_text,
+    row_timestamp,
+    row_value,
+)
 from ml_engine.registry.artifact import JsonValue
 
 SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v1"
@@ -35,19 +50,6 @@ class BusinessCategory(StrEnum):
     CONSTRUCTION = "CONSTRUCTION"
     SERVICE = "SERVICE"
     GOODS = "GOODS"
-
-
-class SnapshotRejectionReason(StrEnum):
-    MALFORMED_JSON = "MALFORMED_JSON"
-    UNSUPPORTED_SCHEMA_VERSION = "UNSUPPORTED_SCHEMA_VERSION"
-    MISSING_FIELD = "MISSING_FIELD"
-    UNKNOWN_FIELD = "UNKNOWN_FIELD"
-    INVALID_VALUE = "INVALID_VALUE"
-    UNKNOWN_CATEGORY = "UNKNOWN_CATEGORY"
-    DUPLICATE_NOTICE = "DUPLICATE_NOTICE"
-    ROW_COUNT_MISMATCH = "ROW_COUNT_MISMATCH"
-    CHECKSUM_MISMATCH = "CHECKSUM_MISMATCH"
-    EMPTY = "EMPTY"
 
 
 @dataclass(frozen=True)
@@ -71,16 +73,22 @@ class AValue:
 class NoticeObservation:
     """투찰 시점에 알 수 있는 것만. 개찰 결과 이름은 여기 없다(누출 금지의 타입 경계).
 
-    **nullable 이 많다**(스키마 §3.1·§6) — `reserve_range_*` 와 `pure_construction_cost`
-    는 KONEPS 기초금액조회에만 있는데 그 오퍼레이션의 요청 계약이 미확정이라 당분간
-    항상 `null` 로 온다(`OPEN-6G-BASE-AMOUNT-OPERATION`). 낙찰방법 셋도 문서상 옵션이다.
-    **없는 값을 상수로 메우지 않는다** — 없으면 제외 사유가 되고 계수된다(D-6G-16)."""
+    **기초금액이 두 칸으로 갈린다**(스키마 §3.4, D-6G-19). 여기 `base_amount` 는 **기초금액
+    조회 출처**이고 `base_amount_disclosed_at < bid_close_at` 인 행만 값을 갖는다 — 공개가
+    마감보다 늦으면 투찰 시점에 없던 값이라 `null` 이다. 개찰결과 출처의 기초금액은
+    `OpeningOutcome.opening_base_amount` 로 따로 있고 **채점만** 쓴다. 한 칸에 접으면
+    전략이 투찰 시점에 몰랐던 값을 입력으로 쓰게 된다.
+
+    **없는 값을 상수로 메우지 않는다** — 없으면 제외 사유가 되고 계수된다(D-6G-16).
+    예가 범위율은 기초금액 조회에서 오고 원문이 percent 라 추출이 fraction 으로 넘긴다.
+    시작률이 종료율의 반대수라는 보장은 없다(비대칭 범위 지원)."""
 
     notice_key_hash: str
     category: BusinessCategory
     noticed_on: date
     bid_close_at: datetime
-    base_amount: float
+    base_amount: float | None
+    base_amount_disclosed_at: datetime | None
     floor_rate: float | None
     reserve_range_begin_rate: float | None
     reserve_range_end_rate: float | None
@@ -92,7 +100,10 @@ class NoticeObservation:
     progress_division: str | None
     procurement_class_code: str | None
     demand_agency_code: str | None
+    bid_price_formula_a_applicable: bool | None
     pure_construction_cost: float | None
+    award_method_application_standard: str | None
+    application_basis_content: str | None
 
 
 @dataclass(frozen=True)
@@ -110,10 +121,12 @@ class BidderRow:
 
 @dataclass(frozen=True)
 class OpeningOutcome:
-    """개찰로 드러나는 것 — 채점만 읽는다."""
+    """개찰로 드러나는 것 — 채점만 읽는다. `opening_base_amount` 는 개찰결과 출처의
+    기초금액이고 `NoticeObservation.base_amount` 와 **다른 칸**이다(스키마 §3.4)."""
 
     opened_on: date
     planned_price: float
+    opening_base_amount: float | None
     reserve_prices: tuple[float, ...] | None
     drawn_serial_numbers: tuple[int, ...] | None
     participant_count: int | None
@@ -147,6 +160,7 @@ _NOTICE_KEYS: Final[frozenset[str]] = frozenset(
         "noticed_on",
         "bid_close_at",
         "base_amount",
+        "base_amount_disclosed_at",
         "floor_rate",
         "reserve_range_begin_rate",
         "reserve_range_end_rate",
@@ -158,13 +172,17 @@ _NOTICE_KEYS: Final[frozenset[str]] = frozenset(
         "progress_division",
         "procurement_class_code",
         "demand_agency_code",
+        "bid_price_formula_a_applicable",
         "pure_construction_cost",
+        "award_method_application_standard",
+        "application_basis_content",
     }
 )
 _OUTCOME_KEYS: Final[frozenset[str]] = frozenset(
     {
         "opened_on",
         "planned_price",
+        "opening_base_amount",
         "reserve_prices",
         "drawn_serial_numbers",
         "participant_count",
@@ -186,207 +204,114 @@ _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
 )
 
 
-class _RowReadError(Exception):
-    """판독 실패를 호출 경계까지 나르는 내부 신호 — `load_snapshot` 이 결과 타입으로
-    바꾼다(예외가 public 표면으로 새지 않는다, v2-지침서.md §5)."""
-
-    def __init__(self, reason: SnapshotRejectionReason, detail: str) -> None:
-        super().__init__(detail)
-        self.reason = reason
-        self.detail = detail
-
-
-def _mapping(
-    value: JsonValue, name: str, allowed: frozenset[str]
-) -> dict[str, JsonValue]:
-    if not isinstance(value, dict):
-        raise _RowReadError(
-            SnapshotRejectionReason.INVALID_VALUE, f"{name}: 매핑이 아님"
-        )
-    unknown = sorted(set(value) - allowed)
-    if unknown:
-        raise _RowReadError(
-            SnapshotRejectionReason.UNKNOWN_FIELD, f"{name}: 미지 키 {unknown}"
-        )
-    return value
-
-
-def _present(payload: dict[str, JsonValue], key: str) -> JsonValue:
-    if key not in payload:
-        raise _RowReadError(SnapshotRejectionReason.MISSING_FIELD, key)
-    return payload[key]
-
-
-def _number(payload: dict[str, JsonValue], key: str) -> float:
-    value = _present(payload, key)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise _RowReadError(SnapshotRejectionReason.INVALID_VALUE, f"{key}: 수가 아님")
-    if not isfinite(value):
-        raise _RowReadError(SnapshotRejectionReason.INVALID_VALUE, f"{key}: 비유한값")
-    return float(value)
-
-
-def _optional_number(payload: dict[str, JsonValue], key: str) -> float | None:
-    return None if _present(payload, key) is None else _number(payload, key)
-
-
-def _integer(payload: dict[str, JsonValue], key: str) -> int:
-    value = _present(payload, key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise _RowReadError(
-            SnapshotRejectionReason.INVALID_VALUE, f"{key}: 정수가 아님"
-        )
-    return value
-
-
-def _text(payload: dict[str, JsonValue], key: str) -> str:
-    value = _present(payload, key)
-    if not isinstance(value, str):
-        raise _RowReadError(
-            SnapshotRejectionReason.INVALID_VALUE, f"{key}: 문자열 아님"
-        )
-    return value
-
-
-def _flag(payload: dict[str, JsonValue], key: str) -> bool:
-    value = _present(payload, key)
-    if not isinstance(value, bool):
-        raise _RowReadError(
-            SnapshotRejectionReason.INVALID_VALUE, f"{key}: 불리언 아님"
-        )
-    return value
-
-
-def _optional_integer(payload: dict[str, JsonValue], key: str) -> int | None:
-    return None if _present(payload, key) is None else _integer(payload, key)
-
-
-def _optional_text(payload: dict[str, JsonValue], key: str) -> str | None:
-    return None if _present(payload, key) is None else _text(payload, key)
-
-
-def _day(payload: dict[str, JsonValue], key: str) -> date:
-    try:
-        return date.fromisoformat(_text(payload, key))
-    except ValueError as exc:
-        raise _RowReadError(
-            SnapshotRejectionReason.INVALID_VALUE, f"{key}: 날짜 형식 아님"
-        ) from exc
-
-
-def _timestamp(payload: dict[str, JsonValue], key: str) -> datetime:
-    try:
-        return datetime.fromisoformat(_text(payload, key))
-    except ValueError as exc:
-        raise _RowReadError(
-            SnapshotRejectionReason.INVALID_VALUE, f"{key}: 시각 형식 아님"
-        ) from exc
-
-
 def _category(payload: dict[str, JsonValue]) -> BusinessCategory:
-    raw = _text(payload, "category")
+    raw = row_text(payload, "category")
     if raw not in tuple(BusinessCategory):
-        raise _RowReadError(
+        raise RowReadError(
             SnapshotRejectionReason.UNKNOWN_CATEGORY, "category: 닫힌 셋 밖의 값"
         )
     return BusinessCategory(raw)
 
 
 def _a_value(payload: dict[str, JsonValue]) -> AValue | None:
-    raw = _present(payload, "a_value")
+    raw = row_value(payload, "a_value")
     if raw is None:
         return None
-    fields = _mapping(raw, "a_value", _A_VALUE_KEYS)
-    return AValue(total=_number(fields, "total"), open_at=_timestamp(fields, "open_at"))
+    fields = row_mapping(raw, "a_value", _A_VALUE_KEYS)
+    return AValue(
+        total=row_number(fields, "total"), open_at=row_timestamp(fields, "open_at")
+    )
 
 
 def _numbers(payload: dict[str, JsonValue], key: str) -> tuple[float, ...] | None:
-    raw = _present(payload, key)
+    raw = row_value(payload, key)
     if raw is None:
         return None
     if not isinstance(raw, list):
-        raise _RowReadError(SnapshotRejectionReason.INVALID_VALUE, f"{key}: 배열 아님")
-    return tuple(_number({"item": item}, "item") for item in raw)
+        raise RowReadError(SnapshotRejectionReason.INVALID_VALUE, f"{key}: 배열 아님")
+    return tuple(row_number({"item": item}, "item") for item in raw)
 
 
 def _integers(payload: dict[str, JsonValue], key: str) -> tuple[int, ...] | None:
-    raw = _present(payload, key)
+    raw = row_value(payload, key)
     if raw is None:
         return None
     if not isinstance(raw, list):
-        raise _RowReadError(SnapshotRejectionReason.INVALID_VALUE, f"{key}: 배열 아님")
-    return tuple(_integer({"item": item}, "item") for item in raw)
+        raise RowReadError(SnapshotRejectionReason.INVALID_VALUE, f"{key}: 배열 아님")
+    return tuple(row_integer({"item": item}, "item") for item in raw)
 
 
 def _bidder_rows(payload: dict[str, JsonValue]) -> tuple[BidderRow, ...]:
-    raw = _present(payload, "bidder_rows")
+    raw = row_value(payload, "bidder_rows")
     if not isinstance(raw, list):
-        raise _RowReadError(
+        raise RowReadError(
             SnapshotRejectionReason.INVALID_VALUE, "bidder_rows: 배열 아님"
         )
-    rows = [_mapping(item, "bidder_rows[]", _BIDDER_KEYS) for item in raw]
+    rows = [row_mapping(item, "bidder_rows[]", _BIDDER_KEYS) for item in raw]
     return tuple(
         BidderRow(
-            ordinal=_integer(item, "ordinal"),
-            rank=_optional_integer(item, "rank"),
-            amount=_optional_number(item, "amount"),
+            ordinal=row_integer(item, "ordinal"),
+            rank=row_optional_integer(item, "rank"),
+            amount=row_optional_number(item, "amount"),
         )
         for item in rows
     )
 
 
 def _parse_notice(payload: JsonValue) -> NoticeObservation:
-    fields = _mapping(payload, "notice", _NOTICE_KEYS)
+    fields = row_mapping(payload, "notice", _NOTICE_KEYS)
     return NoticeObservation(
-        notice_key_hash=_text(fields, "notice_key_hash"),
+        notice_key_hash=row_text(fields, "notice_key_hash"),
         category=_category(fields),
-        noticed_on=_day(fields, "noticed_on"),
-        bid_close_at=_timestamp(fields, "bid_close_at"),
-        base_amount=_number(fields, "base_amount"),
-        floor_rate=_optional_number(fields, "floor_rate"),
-        reserve_range_begin_rate=_optional_number(fields, "reserve_range_begin_rate"),
-        reserve_range_end_rate=_optional_number(fields, "reserve_range_end_rate"),
+        noticed_on=row_date(fields, "noticed_on"),
+        bid_close_at=row_timestamp(fields, "bid_close_at"),
+        base_amount=row_optional_number(fields, "base_amount"),
+        base_amount_disclosed_at=row_optional_timestamp(
+            fields, "base_amount_disclosed_at"
+        ),
+        floor_rate=row_optional_number(fields, "floor_rate"),
+        reserve_range_begin_rate=row_optional_number(
+            fields, "reserve_range_begin_rate"
+        ),
+        reserve_range_end_rate=row_optional_number(fields, "reserve_range_end_rate"),
         a_value=_a_value(fields),
-        successful_bid_method_code=_optional_text(fields, "successful_bid_method_code"),
-        successful_bid_method_name=_optional_text(fields, "successful_bid_method_name"),
-        prearranged_price_decision_method=_optional_text(
+        successful_bid_method_code=row_optional_text(
+            fields, "successful_bid_method_code"
+        ),
+        successful_bid_method_name=row_optional_text(
+            fields, "successful_bid_method_name"
+        ),
+        prearranged_price_decision_method=row_optional_text(
             fields, "prearranged_price_decision_method"
         ),
-        notice_ordinal=_integer(fields, "notice_ordinal"),
-        progress_division=_optional_text(fields, "progress_division"),
-        procurement_class_code=_optional_text(fields, "procurement_class_code"),
-        demand_agency_code=_optional_text(fields, "demand_agency_code"),
-        pure_construction_cost=_optional_number(fields, "pure_construction_cost"),
+        notice_ordinal=row_integer(fields, "notice_ordinal"),
+        progress_division=row_optional_text(fields, "progress_division"),
+        procurement_class_code=row_optional_text(fields, "procurement_class_code"),
+        demand_agency_code=row_optional_text(fields, "demand_agency_code"),
+        bid_price_formula_a_applicable=row_optional_flag(
+            fields, "bid_price_formula_a_applicable"
+        ),
+        pure_construction_cost=row_optional_number(fields, "pure_construction_cost"),
+        award_method_application_standard=row_optional_text(
+            fields, "award_method_application_standard"
+        ),
+        application_basis_content=row_optional_text(
+            fields, "application_basis_content"
+        ),
     )
 
 
 def _parse_outcome(payload: JsonValue) -> OpeningOutcome:
-    fields = _mapping(payload, "outcome", _OUTCOME_KEYS)
+    fields = row_mapping(payload, "outcome", _OUTCOME_KEYS)
     return OpeningOutcome(
-        opened_on=_day(fields, "opened_on"),
-        planned_price=_number(fields, "planned_price"),
+        opened_on=row_date(fields, "opened_on"),
+        planned_price=row_number(fields, "planned_price"),
+        opening_base_amount=row_optional_number(fields, "opening_base_amount"),
         reserve_prices=_numbers(fields, "reserve_prices"),
         drawn_serial_numbers=_integers(fields, "drawn_serial_numbers"),
-        participant_count=_optional_integer(fields, "participant_count"),
+        participant_count=row_optional_integer(fields, "participant_count"),
         bidder_rows=_bidder_rows(fields),
     )
-
-
-def _reject_constant(literal: str) -> float:
-    """`NaN`/`Infinity` 는 JSON 이 아니다 — `json.loads` 기본값은 받아들이므로 막는다."""
-    raise _RowReadError(
-        SnapshotRejectionReason.INVALID_VALUE, f"비유한 상수: {literal}"
-    )
-
-
-def _decode(raw: bytes, name: str) -> JsonValue:
-    try:
-        decoded: JsonValue = json.loads(raw, parse_constant=_reject_constant)
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise _RowReadError(
-            SnapshotRejectionReason.MALFORMED_JSON, f"{name}: JSON 아님"
-        ) from exc
-    return decoded
 
 
 @dataclass(frozen=True)
@@ -400,18 +325,20 @@ class _Manifest:
 
 
 def _parse_manifest(manifest_bytes: bytes) -> _Manifest:
-    fields = _mapping(_decode(manifest_bytes, "manifest"), "manifest", _MANIFEST_KEYS)
-    if _text(fields, "schema_version") != SUPPORTED_SNAPSHOT_SCHEMA_VERSION:
-        raise _RowReadError(
+    fields = row_mapping(
+        decode_json(manifest_bytes, "manifest"), "manifest", _MANIFEST_KEYS
+    )
+    if row_text(fields, "schema_version") != SUPPORTED_SNAPSHOT_SCHEMA_VERSION:
+        raise RowReadError(
             SnapshotRejectionReason.UNSUPPORTED_SCHEMA_VERSION, "schema_version"
         )
     return _Manifest(
-        snapshot_id=_text(fields, "snapshot_id"),
-        row_count=_integer(fields, "row_count"),
-        period_start=_day(fields, "period_start"),
-        period_end=_day(fields, "period_end"),
-        rows_sha256=_text(fields, "rows_sha256"),
-        sample_list_sha256=_text(fields, "sample_list_sha256"),
+        snapshot_id=row_text(fields, "snapshot_id"),
+        row_count=row_integer(fields, "row_count"),
+        period_start=row_date(fields, "period_start"),
+        period_end=row_date(fields, "period_end"),
+        rows_sha256=row_text(fields, "rows_sha256"),
+        sample_list_sha256=row_text(fields, "sample_list_sha256"),
     )
 
 
@@ -420,11 +347,11 @@ def _parse_rows(rows_bytes: bytes) -> tuple[SnapshotRow, ...]:
     for line in rows_bytes.decode("utf-8", errors="replace").splitlines():
         if not line.strip():
             continue
-        fields = _mapping(_decode(line.encode("utf-8"), "row"), "row", _ROW_KEYS)
+        fields = row_mapping(decode_json(line.encode("utf-8"), "row"), "row", _ROW_KEYS)
         rows.append(
             SnapshotRow(
-                notice=_parse_notice(_present(fields, "notice")),
-                outcome=_parse_outcome(_present(fields, "outcome")),
+                notice=_parse_notice(row_value(fields, "notice")),
+                outcome=_parse_outcome(row_value(fields, "outcome")),
             )
         )
     return tuple(sorted(rows, key=lambda row: row.notice.notice_key_hash))
@@ -432,15 +359,15 @@ def _parse_rows(rows_bytes: bytes) -> tuple[SnapshotRow, ...]:
 
 def _assemble(manifest: _Manifest, rows: tuple[SnapshotRow, ...]) -> LoadedSnapshot:
     if len(rows) != manifest.row_count:
-        raise _RowReadError(
+        raise RowReadError(
             SnapshotRejectionReason.ROW_COUNT_MISMATCH,
             f"manifest {manifest.row_count} != rows {len(rows)}",
         )
     if not rows:
-        raise _RowReadError(SnapshotRejectionReason.EMPTY, "행이 없다")
+        raise RowReadError(SnapshotRejectionReason.EMPTY, "행이 없다")
     keys = [row.notice.notice_key_hash for row in rows]
     if len(set(keys)) != len(keys):
-        raise _RowReadError(
+        raise RowReadError(
             SnapshotRejectionReason.DUPLICATE_NOTICE,
             f"중복 공고 {len(keys) - len(set(keys))}건",
         )
@@ -464,9 +391,9 @@ def load_snapshot(
         manifest = _parse_manifest(manifest_bytes)
         actual = hashlib.sha256(rows_bytes).hexdigest()
         if actual != manifest.rows_sha256:
-            raise _RowReadError(
+            raise RowReadError(
                 SnapshotRejectionReason.CHECKSUM_MISMATCH, "rows.jsonl sha256 불일치"
             )
         return _assemble(manifest, _parse_rows(rows_bytes))
-    except _RowReadError as rejected:
+    except RowReadError as rejected:
         return SnapshotRejected(rejected.reason, rejected.detail)
