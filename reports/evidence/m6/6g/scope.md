@@ -119,6 +119,23 @@ E[R] = 1.0(no-op)이다. 조사 노트는 Python 레인이 `_workspace/m6-6g/` �
 | **D-6G-25** | 재현 test 의 파생 정책 수용 — 창 크기·몬테카를로 반복 수·적합도 표본 하한만 낮추고 판정식 축(Δ·유의수준·Bonferroni 분모·비열등 한계·검정력)은 출하값, 그 목록을 test 가 단언(완화 통로 아님) |
 | **D-6G-26** | 표본 뽑기(`|`)와 전략 내부 난수(`:`)의 seed 결합 구분자를 **다르게 둔다** — 같으면 두 난수원이 상관을 가져 seed 쇼핑의 새 표면이 된다 |
 
+## 계약 갱신 r1 (2026-09-27, 팀장 — verifier r1 not-ready H-1~4 · code-reviewer r1 H-1~6·M-1~11·L-1~6 · privacy r1 pass(LOW 2·INFO 3) 수령)
+
+재작업 **1/5**. 차단의 공통 뿌리는 **레인 간 왕복 부재**다 — Kotlin 이 쓴 바이트를 Python 이 한 번도 읽지 않았고, Python fixture 는 소비 쪽 생성기가 만들었다. 그래서 실데이터면 승인 0건인 결함 셋이 초록 CI 아래 살았다. 둘째 뿌리는 **호출 상한이 한 프로세스 안에서만 섰다**는 것이다.
+
+| ID | 결정 |
+|---|---|
+| **D-6G-27** | **(H-1·M-11 — 첫 항목) 레인 간 왕복 golden.** Kotlin `SnapshotWriter` 가 출하 추출 경로(E2E)로 낸 스냅숏 바이트를 저장소에 **golden** 으로 커밋하고(합성 입력, 비식별), Python test 가 그 golden 을 `load_snapshot`·전 과정에 통과시킨다. Kotlin 쪽은 golden 과 바이트 동일을 단언한다(스키마가 한쪽만 움직이면 둘 중 하나가 RED). **Kotlin E2E 는 수집 갈래가 채우지 않는 표에 직접 INSERT 하지 않는다** — 적재는 수집 갈래(가짜 transport)가 한다(verifier: `opening_result` 직접 INSERT 가 개찰일 결함을 가렸다) |
+| **D-6G-28** | **(H-1) 추출 칸 정정.** 추첨번호는 수집된 추첨 필드에서 · 개찰일은 수집 갈래가 실제로 채우는 출처(raw 관측)에서 — 없으면 지어내지 않고 제외 사유(`EPOCH` 등 대체값 금지, code-review M-5) · **공고일은 `NOTICE_POSTED_AT`**(목록 축 계약 포함) — 개찰일로 대체 금지 · 추출은 **표본 목록의 공고만**(표본 밖 raw 관측 제외) · 예가 범위율 파싱 `trim`(M-6). **(H-3·code-review) null 은 행 단위 제외로**: 스키마 v3 에서 선언된 제외 사유가 있는 값 결측(예정가격·마감일시 등)은 **그 행만** 사유 계수로 내리고, 구조 실패(미지 키·버전·checksum)는 전체 거부를 유지한다. 투찰 시점 타입에 개찰 출처 칸(`progress_division`) 금지 → outcome 쪽으로(verifier M-5) |
+| **D-6G-29** | **(H-2·code-review H-4~6·M-8) 호출 상한을 실행 사이에 강제한다.** ① 원장은 **영속**(기존 수집 회계 원장 또는 전용 표 — 마이그레이션이 필요하면 멈추고 보고, `migration-reviewer` 추가) ② 하루 경계는 **Asia/Seoul**(KONEPS 일 한도와 같은 축) ③ 상세 단계는 **이어 돌기**(이미 받은 공고·축은 다시 부르지 않는다) ④ 한 걸음(공고 하나의 상세 축 전부)은 **통째로 허가되거나 통째로 거부** ⑤ `settle` 음수 금지(`max(…, 0)`) — 재검증 표적은 **첫 페이지 throttle 경로**(Kotlin 레인 실측: rate limiter 거부는 운영 중 거의 확실히 밟는다) ⑥ **공고 목록 갈래의 호출도 같은 원장에 계상**(A-1 상한은 6G 의 모든 KONEPS 호출을 덮는다 — verifier H-3 의 우회) |
+| **D-6G-30** | **(H-3) 모드 단독 기동** — `f979e904`(종료 자리 공유) 수령, r2 표적. 추출은 같은 기간 공고 목록 canonical 이 있어야 선다(Kotlin 보고) — 실수집 계획은 공고 목록 → 개찰 축 순서이고 둘 다 D-6G-29 원장 아래다 |
+| **D-6G-31** | **(H-4) 판정식 잠금.** 변이 V3(McNemar `P(X≥k+1)`)·V5(seed 안정성)·V7(embargo·창 안 이력)·V8(합동 통과 조건)·V9(전략 간 표본 동일성)·K6(상세 단계 quota 멈춤 무시)가 **각각 RED** 인 test. `one_sided_p_value` 는 손 계산 값과 대조. **(verifier M-2) UNDERPOWERED 는 창 단위**(계약 문면) — 검정력 미달 창은 판정 불가, 판정 가능한 창이 과반 미만이면 전체 `NotEvaluable`(「Failed → 미배선」 귀결로 새지 않게) |
+| **D-6G-32** | 실험 정합(Python): **(cr M-1·verifier M-3) 표본 크기** — 결정식을 계약대로(층별 비례, 최소 필요 = 창당 483 × 창 3 × 업무 셋 + 여유, 공고당 호출은 업무별 — 공사 4) 정책에 두고 **미달이면 멈춤**(죽은 enum 금지) · **(cr M-2)** Bonferroni 는 주 가설(S2 셋)에만, 보조(S1·S4)는 α — 전략별 `alpha_used` 를 판정 JSON 에 공시 · **(cr M-3)** S4 경쟁자 수는 공고 단위 · **(cr M-4)** S4 시뮬레이션에 순공사원가선 · **(verifier M-1)** S2 엔진 캐시 키는 경쟁 표본 **내용 해시** · **(verifier M-4)** `sample_list_sha256` 은 행에서 재계산해 manifest 와 대조 · **(cr L-2)** S0·S4 난수 스트림 분리(배관 — 등록 위반 아님, 실행 전) · (cr L-1·L-3·L-4) |
+| **D-6G-33** | 게이트·문면·개인정보: **(verifier M-6·cr M-10)** 숫자 리터럴 게이트가 `float("…")`·`Decimal("…")` 문자열 숫자도 잡고, 뿌리에 `app/backtest_*.py` 둘 · **(cr L-6·privacy)** 자유텍스트 두 칸은 스냅숏에 **원문을 싣지 않고 존재 여부만**(채움률은 그것으로) · **(privacy LOW-1)** 추출 러너 예외 차단(형제 러너와 같은 형태) · **(privacy LOW-2)** job 실패 detail 의 절대 경로 제거 · **(privacy INFO-2)** 추출 출력 경로가 저장소 루트 아래면 거부 + test · (cr M-7·M-9) 주석·게이트 문면 정정 · **(cr L-5)** LATERAL `LIMIT 1` · **(Kotlin 자진)** commands.md 「끝에서 끝까지 선다」 문면 — 참이 되게 고치거나 한계로 · **(verifier L-6)** 재현 파생 정책의 적합도 편차 완화는 D-6G-25 허용 목록에 **명시 추가**(출하 정책 무변경, test 단언) |
+| **D-6G-34** | 장부: **(verifier L-1)** in_scope 에 `adapters/src/main/kotlin/bidvector/adapters/snapshot/**`·`app/src/main/kotlin/bidvector/app/wiring/**`(수집·추출 배선) 추가 — 이 갱신으로 이미 커밋된 편집도 범위 안 · **(L-2~4)** rollback 목록: Kotlin 술어에서 evidence 제외, `milestone-6.md` 를 공유 파일로 등재(착수 문단), Python 절의 복제 문단 제거 · **종결 전 두 레인 rollback 을 한 판으로 합친다**(팀장 요청 유지) |
+
+**레인 분담**: Kotlin — D-6G-27(writer golden 생산·E2E 적재 경로) · 28 · 29 · 30 · 31 의 K6 · 33 의 러너·출력 경로·LATERAL·문면 · 34. Python — 27(golden 소비 test) · 28 의 v3 판독(행 단위 제외) · 31 의 V3·V5·V7·V8·V9·창 단위 UNDERPOWERED · 32 · 33 의 리터럴 게이트·자유텍스트·절대 경로·파생 정책. **스키마 v3 은 Kotlin 이 문서 먼저 커밋 → Python 판독 → Kotlin writer 순**(v2 때와 같은 절차).
+
 ## 결정
 
 | ID | 결정 | 근거 |
@@ -173,6 +190,7 @@ E[R] = 1.0(no-op)이다. 조사 노트는 Python 레인이 `_workspace/m6-6g/` �
 ## in_scope (착수 시 확정 — 게이트·fixture·build 파일을 처음부터 넣는다)
 
 - `app/src/main/kotlin/bidvector/app/collection/**` · `app/src/main/kotlin/bidvector/app/wiring/CollectionWiring.kt` · `app/src/test/**`(수집 갈래)
+- **(계약 갱신 r1 D-6G-34)** `adapters/src/main/kotlin/bidvector/adapters/snapshot/**` · `app/src/main/kotlin/bidvector/app/wiring/**`(수집·추출 배선)
 - **(계약 갱신 p4, 2026-09-27 — 팀장 누락 정정)** `workflow/src/main/kotlin/bidvector/workflow/collection/**` · `workflow/src/test/kotlin/bidvector/workflow/collection/**`(수집 use case·호출 예산 원장 — 수집 조율의 기존 자리) · `procurement/src/main/kotlin/bidvector/procurement/**` · `procurement/src/test/**`(공고 식별·정규화). Kotlin 레인이 이미 `918a8e98` 에서 `workflow/.../collection/` 을 편집했다 — 착수 계약이 수집 조율 층을 빠뜨린 팀장 누락이고(6A-3 교훈 「배선 slice 는 착수 계약에 게이트·fixture·build 파일을 처음부터」의 재발), 그 커밋은 이 갱신으로 in_scope 안이 된다
 - `adapters/src/main/kotlin/bidvector/adapters/koneps/**` · `adapters/src/main/kotlin/bidvector/adapters/persistence/**` · `adapters/src/test/**`(필요 시)
 - `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/adapters/**` · `ml-engine/src/ml_engine/app/**`(job 진입점) · `ml-engine/tests/**` · `ml-engine/pyproject.toml`(import-linter 계약)
