@@ -11,7 +11,7 @@
 | `./gradlew --no-daemon qualityBaseline` | BUILD SUCCESSFUL(게이트가 아니라 측정) |
 | `./tools/one-command-check.sh` | 「Kotlin 전건 + Python 전건 통과」 |
 
-실측 HEAD: `7e4e6c48`(이 레인의 마지막 산출물 커밋 시점의 트리).
+실측 HEAD: `f979e904`(이 레인의 마지막 산출물 커밋 시점의 트리).
 
 ## 실 KONEPS 호출
 
@@ -82,6 +82,7 @@
 | D-6G-1 「수집 모드 한 갈래」 | `OpeningCollectionWiring`(`mode=once` 일 때만) | 출하 조립 E2E 셋 |
 | D-6G-11 「호출 상한은 설정값, 기본값 없음」 | `OpeningCollectionProperties` | 상한 도달 시 멈춤·종료 코드 미완 E2E |
 | D-6G-2 「저장소 밖 출력 · manifest」 | `SnapshotExtractionRunner`·`JdbcSnapshotSource` | Testcontainers E2E 셋(바이트 결정성·상호 부재·provenance 분리) |
+| D-6G-11 「기본값 없음」이 **거동**인가 | `OpeningCollectionWiringTest`·`SnapshotExtractionWiringTest` | 상한 둘·seed·층당 목표·키가 없으면 기동 실패 · 값 어긋남·미등재 업종·평문 http 도 실패 · mode 없으면 갈래가 안 뜬다 |
 
 ## 스키마 합의 (2026-09-27, 두 레인)
 
@@ -119,6 +120,7 @@
 | 변이 | 결과 |
 |---|---|
 | `opening_base_amount` 에 다른 값을 꽂는다(두 기초금액 뒤바뀜 부류) | **RED**(11 중 1 실패) — 잠긴다 |
+| 종료 자리를 공고 목록 배선 안에만 둔다(원래 코드) | **RED** — 개찰 축·추출 갈래를 혼자 켜면 기동 실패. E2E 는 test 설정의 `@Primary` 가 가려 못 봤고 **배선 test 가 잡았다** |
 | 예산의 「날」을 조회 대상 공고일로 센다 | **RED** — 공고일 슬롯마다 일 회계가 0 으로 되돌아 일 상한이 아무것도 막지 못한다. 이 변이는 **처음에 실제 코드였다**(test 가 잡았다) |
 
 이 자리는 **처음에 잠겨 있지 않았다.** fixture 의 두 기초금액이 같은 값이라 어느 쪽을 써도 출력이 같아

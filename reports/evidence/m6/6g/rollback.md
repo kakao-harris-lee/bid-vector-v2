@@ -1,11 +1,11 @@
 # M6/6G Kotlin 수집 레인 — rollback
 
-- base `678c6ed7` · **실측 HEAD `7e4e6c48`**(이 레인의 마지막 산출물 커밋 시점의 트리)
+- base `678c6ed7` · **실측 HEAD `f979e904`**(이 레인의 마지막 산출물 커밋 시점의 트리)
 - 되돌림은 range revert 가 아니라 **in_scope 경로 한정 복원**이다.
 
-## 되돌리는 경로 (기계 산출 — `git diff --name-status 678c6ed7..7e4e6c48`)
+## 되돌리는 경로 (기계 산출 — `git diff --name-status 678c6ed7..f979e904`)
 
-신규 **40** · 수정 **21**. 경로 목록은 아래 디렉터리 인자가 덮는다 — 파일 이름을 여기 옮겨 적지 않는다(라운드마다 낡는다).
+신규 **42** · 수정 **21**. 경로 목록은 아래 디렉터리 인자가 덮는다 — 파일 이름을 여기 옮겨 적지 않는다(라운드마다 낡는다).
 
 ## 절차
 
@@ -18,6 +18,7 @@ git restore --source=678c6ed7 --staged --worktree -- \
   app/src/main/kotlin/bidvector/app/collection \
   app/src/main/kotlin/bidvector/app/wiring \
   app/src/test/kotlin/bidvector/app/collection \
+  app/src/test/kotlin/bidvector/app/wiring \
   app/src/test/kotlin/bidvector/app/architecture \
   procurement/src/main/kotlin/bidvector/procurement \
   procurement/src/test/kotlin/bidvector/procurement \
@@ -52,12 +53,12 @@ adapters 쪽(koneps·snapshot)은 그 패키지에 등재 test 가 **없어** �
 
 ## 실측 (임시 clone, 저장소 밖)
 
-`7e4e6c48` 을 checkout 한 clone 에서 위 절차를 그대로 실행했다.
+`f979e904` 를 checkout 한 clone 에서 위 절차를 그대로 실행했다.
 
 | 축 | 결과 |
 |---|---|
 | ① 명령 exit | 0 |
-| ② D/M 수 | 삭제 **40** · 수정 **21** — 위 기계 산출과 **같다** |
+| ② D/M 수 | 삭제 **42** · 수정 **21** — 위 기계 산출과 **같다** |
 | ③ diff 빈 것 | `git diff 678c6ed7 -- <경로들>` **0 줄** — 되돌린 트리가 base 와 바이트 동일(갈음은 「HEAD 초록」이 아니라 이 트리 동일성이다) |
 | ④ 컴파일 | 통과(`check` 안) |
 | ⑤ test | 통과(`check` 안) |
@@ -65,14 +66,14 @@ adapters 쪽(koneps·snapshot)은 그 패키지에 등재 test 가 **없어** �
 
 ## 두 레인의 실측 HEAD 가 다르다
 
-이 절의 `7e4e6c48` 은 **이 레인의 경로 집합**(koneps·snapshot·procurement·workflow/collection·
+이 절의 `f979e904` 는 **이 레인의 경로 집합**(koneps·snapshot·procurement·workflow/collection·
 app/collection·app/wiring·config/quality)을 되돌려 잰 값이다. Python 레인은 자기 경로 집합(`ml-engine/**`)을 자기 HEAD 에서
 따로 잰다(아래 그 레인의 절). 두 집합은 겹치지 않으므로 한 값으로 합치지 않는다 — 합치면 어느 경로가
 어느 시점에 검증됐는지가 사라진다.
 
 ## 실측 HEAD 이후 되돌림 대상이 움직였는가
 
-`git diff --name-only 7e4e6c48..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
+`git diff --name-only f979e904..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
 evidence 커밋은 언제나 뒤에 오므로 「실측 HEAD == 판정 SHA」를 요구하지 않는다 — 보는 것은
 **그 사이에 되돌림 대상이 움직였는가**다. 이 레인의 evidence 커밋은 `reports/evidence/m6/6g/` 안에
 있고 그 경로는 위 목록에 **있다** — 그러므로 evidence 를 더 쓸 때마다 이 실측을 다시 돌려야 한다
