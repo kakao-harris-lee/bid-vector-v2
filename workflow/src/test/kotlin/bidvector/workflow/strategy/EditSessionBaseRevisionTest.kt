@@ -14,6 +14,7 @@ import bidvector.strategy.StrategyValidation
 import bidvector.strategy.toDraft
 import bidvector.strategy.validate
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
@@ -36,8 +37,10 @@ private fun policy(): Resolution.Resolved<StrategyPolicyData> =
         PolicyVersion(EffectiveFrom.Initial, "test-base-revision"),
     )
 
-private fun initialStrategy(): OperatorStrategy =
-    (validate(StrategyDraft(), StrategyRevision(1), policy()) as StrategyValidation.Valid).strategy
+private fun initialStrategy(): OperatorStrategy = strategyAt(1)
+
+private fun strategyAt(revision: Int): OperatorStrategy =
+    (validate(StrategyDraft(), StrategyRevision(revision), policy()) as StrategyValidation.Valid).strategy
 
 private class BaseRevisionClock : Clock {
     override fun now(): Instant = NOW
@@ -199,6 +202,69 @@ class EditSessionBaseRevisionTest {
         strategies.load().candidateLimit?.value shouldBe 13
         strategies.load().maxActiveBids?.value shouldBe 4
         strategies.load().revision shouldBe StrategyRevision(3)
+    }
+
+    /**
+     * D-6A2b-38(M-r3-6) — 같은 본문의 재전달은 **재전달**이다. 서버가 매번 새로 읽어 싣는
+     * 기준 revision 이 재전달 판별에 들어가 있으면 그것이 「다른 본문」으로 오판돼
+     * `IdempotencyConflict` 가 나왔다 — 운영자가 고칠 곳이 달라진다.
+     */
+    @Test
+    fun `기준이 달라진 같은 본문의 재전달은 StaleRevision 이다 — 멱등 충돌이 아니다`() {
+        workflow.begin(SESSION_A, OPERATOR, EditableField.CandidateLimit)
+        val draft = draftWith { copy(candidateLimit = 13) }
+        provideValue(SESSION_A, "a-value", EditableField.CandidateLimit, draft)
+        // 그 사이 다른 세션이 적용해 전략이 움직인다.
+        strategies.strategy = strategyAt(2)
+
+        val resent = provideValue(SESSION_A, "a-value", EditableField.CandidateLimit, draft)
+
+        val outcome = (resent as CommandResult.Processed).outcome
+        outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
+        outcome.reason shouldBe RejectionReason.StaleRevision
+    }
+
+    /** 기준이 같은 같은 본문의 재전달은 그대로 멱등이다 — 양성 대조. */
+    @Test
+    fun `기준이 같은 같은 본문의 재전달은 효과 없이 수용된다`() {
+        workflow.begin(SESSION_A, OPERATOR, EditableField.CandidateLimit)
+        val draft = draftWith { copy(candidateLimit = 13) }
+        val first = provideValue(SESSION_A, "a-value", EditableField.CandidateLimit, draft)
+
+        val resent = provideValue(SESSION_A, "a-value", EditableField.CandidateLimit, draft)
+
+        (first as CommandResult.Processed).outcome.shouldBeInstanceOf<TransitionOutcome.Accepted>()
+        (resent as CommandResult.Processed).outcome.shouldBeInstanceOf<TransitionOutcome.Accepted>()
+        resent.outcome.session.sessionVersion shouldBe first.outcome.session.sessionVersion
+    }
+
+    /**
+     * D-6A2b-38(M-r3-5) — `lastCommand` 의 기준이 없는 행은 **조회·취소가 된다.** 복원이
+     * 던지면 그 세션은 치울 수도 없는 행이 되고, 버려진 세션(`OPEN-6A2B-ABANDONED-SESSIONS`)과
+     * 겹치면 영영 남는다. 값 제출만 fail-closed 로 거부된다.
+     */
+    @Test
+    fun `command 의 기준이 없는 행도 조회·취소가 되고 값 제출만 거부된다`() {
+        workflow.begin(SESSION_A, OPERATOR, EditableField.CandidateLimit)
+        provideValue(SESSION_A, "a-value", EditableField.CandidateLimit, draftWith { copy(candidateLimit = 13) })
+        val stored = requireNotNull(sessions.load(SESSION_A))
+        sessions.put(stored.copy(lastCommand = requireNotNull(stored.lastCommand).copy(baseRevision = null)))
+
+        val viewed = workflow.view(SESSION_A)
+        val cancelled =
+            workflow.cancel(
+                EditCommand.Cancel(
+                    CommandId("a-cancel"),
+                    SESSION_A,
+                    Actor.Operator(OPERATOR),
+                    CancellationReason.OperatorRequested,
+                ),
+            )
+
+        viewed shouldNotBe null
+        (cancelled as CommandResult.Processed).outcome.shouldBeInstanceOf<TransitionOutcome.Accepted>()
+        cancelled.outcome.session.state
+            .shouldBeInstanceOf<EditSessionState.Cancelled>()
     }
 
     @Test

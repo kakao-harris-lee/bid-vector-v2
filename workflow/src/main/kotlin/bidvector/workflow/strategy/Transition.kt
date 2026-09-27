@@ -79,6 +79,7 @@ internal fun apply(
 ): TransitionOutcome {
     val checked = if (session.state is EditSessionState.Expired) session else expireIfDue(session, now)
     return expiryRejection(checked, command)
+        ?: provideValueStaleness(checked, command, current)
         ?: duplicateOutcome(checked, command)
         ?: actorRejection(checked, command)
         ?: dispatch(checked, command, current, policy)
@@ -139,12 +140,8 @@ private fun onProvideValue(
     current: OperatorStrategy,
     policy: Resolution.Resolved<StrategyPolicyData>,
 ): TransitionOutcome {
-    // D-6A2b-28 — draft 를 뜬 읽기와 지금 읽은 값이 다르면 그 draft 는 이미 낡았다.
-    // 여기서 거부해야 낡은 스냅숏이 세션에 들어가지 않는다(확인 시점에 잡으면 늦다 —
-    // 기준이 「다시 읽은 값」이 되어 불일치 자체가 사라진다, verifier r2 F-r2-3).
-    if (command.baseRevision != current.revision) {
-        return TransitionOutcome.Rejected(session, command, RejectionReason.StaleRevision)
-    }
+    // D-6A2b-28 의 기준 대조는 `apply` 의 판정 순서 ①-b(`provideValueStaleness`)로 올라갔다 —
+    // 재전달 판별보다 앞서야 같은 본문의 재전달이 조용히 중복 처리되지 않는다(M-r3-6).
     return provideValueOutcome(session, state, command, current, policy)
 }
 

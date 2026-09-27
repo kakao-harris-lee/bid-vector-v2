@@ -22,6 +22,30 @@ internal fun expiryRejection(
         null
     }
 
+/**
+ * 판정 순서 ①-b(D-6A2b-28·38) — `ProvideValue` 의 기준 대조는 **재전달 판별보다 앞선다.**
+ * 뒤에 두면 같은 본문의 재전달이 「기준이 달라졌다」는 이유로 중복 처리돼 조용히 통과한다.
+ */
+internal fun provideValueStaleness(
+    session: EditSession,
+    command: EditCommand,
+    current: OperatorStrategy,
+): TransitionOutcome.Rejected? =
+    if (command is EditCommand.ProvideValue && command.baseRevision != current.revision) {
+        TransitionOutcome.Rejected(session, command, RejectionReason.StaleRevision)
+    } else {
+        null
+    }
+
+/**
+ * 재전달 판별용 지문 — **서버가 파생한 값을 뺀다**(M-r3-6). `baseRevision` 은 실행기가 호출마다
+ * 새로 읽어 싣는 값이라, 그것을 비교에 넣으면 같은 본문의 재전달이 `IdempotencyConflict`
+ * (「같은 commandId 다른 본문」)로 나온다 — 클라이언트는 같은 본문을 보냈고, 운영자가 고칠 곳이
+ * 달라진다. 지문이 같고 서버 파생 값만 다르면 맞는 사유는 `StaleRevision` 이다.
+ */
+private fun EditCommand.idempotencyFingerprint(): EditCommand =
+    if (this is EditCommand.ProvideValue) copy(baseRevision = null) else this
+
 /** 판정 순서 ②(우회 (5)) — 직전 command 재전달은 효과 0, 다른 내용이면 conflict. */
 internal fun duplicateOutcome(
     session: EditSession,
@@ -29,9 +53,24 @@ internal fun duplicateOutcome(
 ): TransitionOutcome? {
     val last = session.lastCommand
     return when {
-        last == null || last.commandId != command.commandId -> null
-        last == command -> TransitionOutcome.Accepted(session)
-        else -> TransitionOutcome.Rejected(session, command, RejectionReason.IdempotencyConflict)
+        last == null || last.commandId != command.commandId -> {
+            null
+        }
+
+        // 같은 본문이고 서버 파생 값까지 같다 — 진짜 재전달이다(효과 0).
+        last == command -> {
+            TransitionOutcome.Accepted(session)
+        }
+
+        // 본문은 같은데 서버 파생 기준만 다르다 — 세션이 든 draft 가 이미 낡았다는 뜻이다.
+        // 조용히 수용하면 낡은 스냅숏이 확인 대기로 남는다(M-r3-6).
+        last.idempotencyFingerprint() == command.idempotencyFingerprint() -> {
+            TransitionOutcome.Rejected(session, command, RejectionReason.StaleRevision)
+        }
+
+        else -> {
+            TransitionOutcome.Rejected(session, command, RejectionReason.IdempotencyConflict)
+        }
     }
 }
 

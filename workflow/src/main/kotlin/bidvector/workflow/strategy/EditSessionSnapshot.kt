@@ -207,7 +207,7 @@ private fun EditCommand.toSnapshot(): EditCommandSnapshot =
                 field.toSnapshot(),
                 draft.toSnapshot(),
                 null,
-                baseRevision.value,
+                baseRevision?.value,
                 null,
                 null,
             )
