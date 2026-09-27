@@ -99,12 +99,16 @@ evaluation 등 다른 adapters 패키지에는 있다). 그래서 이 두 패키
 
 ## 되돌리는 경로 (기계 산출 — `git diff --name-status <base>..HEAD -- ml-engine`)
 
-추가 35 · 수정 2. 수정 둘만 적는다(추가는 되돌리면 사라진다):
+추가 39 · 수정 3. 수정 셋만 적는다(추가는 되돌리면 사라진다):
 
 - `ml-engine/src/ml_engine/evaluation/policy.py` — 5C-2 의 평탄 인덱스 판독기 여섯을 public 이름으로
   올린 것(재사용). 되돌리면 그 여섯이 다시 비공개가 되고 backtest 정책 로더가 사라지므로 정합하다.
 - `ml-engine/tests/evaluation/test_evaluation_no_stray_numeric_literals.py` — 숫자 리터럴 게이트의
-  하위 패키지 보강과 허용 목록. 되돌리면 게이트가 직계만 보던 상태로 돌아간다.
+  하위 패키지 보강, 문자열 숫자 술어, 조립 근 뿌리, 허용 목록. 되돌리면 게이트가 직계만 보고
+  문자열에 숨긴 수를 놓치던 상태로 돌아간다.
+- `ml-engine/src/ml_engine/evaluation/verdict.py` — 공유 사유 어휘에 `NO_BASELINE_WIN` 한 줄.
+  되돌리면 6G 판정이 그 사유를 낼 수 없고 5C-2 의 GBM 게이트는 영향이 없다(그 게이트는 이
+  사유를 내지 않는다).
 
 ## 절차
 
@@ -114,11 +118,13 @@ range revert 가 아니라 **in_scope 경로 한정 복원**이다:
 git restore --source=<base> --staged --worktree -- \
   ml-engine/src/ml_engine/evaluation/backtest \
   ml-engine/src/ml_engine/evaluation/policy.py \
+  ml-engine/src/ml_engine/evaluation/verdict.py \
   ml-engine/src/ml_engine/adapters \
   ml-engine/src/ml_engine/app/backtest_distribution.py \
   ml-engine/src/ml_engine/app/backtest_job.py \
   ml-engine/policy/strategy-backtest-v1.yaml \
-  ml-engine/tests/evaluation ml-engine/tests/app/test_backtest_job.py
+  ml-engine/tests/evaluation ml-engine/tests/app/test_backtest_job.py \
+  ml-engine/tests/app/test_backtest_golden.py
 ```
 
 `ml-engine/src/ml_engine/evaluation/backtest/` 와 `tests/evaluation/fixtures/backtest-snapshot/` 은
@@ -139,7 +145,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 
 ## 실측
 
-**실측 HEAD: `9bab1083`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
+**실측 HEAD: `d1307ec0`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
 
 임시 clone 에서 위 복원을 돌리고 ①~⑥ 을 쟀다. **Gradle 축(④⑤⑥ 중 Kotlin `check`)은 이 레인이
 돌리지 않는다**(호스트 무거운 빌드 1개 규율) — Python 축으로 같은 여섯을 쟀다.
@@ -147,7 +153,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 | 축 | 결과 |
 |---|---|
 | ① 명령 exit | 0 |
-| ② A/M 수 | 추가 35 · 수정 2 — 위 기계 산출과 같다 |
+| ② A/M 수 | 추가 39 · 수정 3 — 위 기계 산출과 같다 |
 | ③ diff 빈 것 | `git diff 678c6ed7 -- ml-engine` **0 줄** — 되돌린 트리가 base 와 바이트 동일 |
 | ④ 형 검사 | `uv run mypy --strict src/ml_engine` 통과(base 상태) |
 | ⑤ test | `uv run python -m pytest tests -q` 통과(base 상태, 6G 추가분 없음) |
@@ -157,7 +163,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 
 ## 실측 HEAD 이후 되돌림 대상이 움직였는가
 
-`git diff --name-only 9bab1083..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
+`git diff --name-only d1307ec0..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
 이 레인의 evidence 커밋은 `reports/evidence/m6/6g/` 안이고 그 경로는 위 목록에 **없다** — 그러므로
 evidence 를 더 써도 이 실측은 유효하다.
 

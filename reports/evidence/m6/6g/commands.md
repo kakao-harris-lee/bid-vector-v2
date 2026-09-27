@@ -170,9 +170,9 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 |---|---|---|
 | S-1 | `uv sync --frozen --all-extras` | 성공 |
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
-| S-3 | `uv run mypy --strict src/ml_engine` | 소스 93개, 오류 0 |
+| S-3 | `uv run mypy --strict src/ml_engine` | 소스 94개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1119 passed**(6G 추가분 포함) |
+| S-5 | `uv run python -m pytest tests -q` | **1132 passed · 4 skipped**(skip 은 golden 미도착, 아래 이탈) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -206,6 +206,12 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | D-6G-22 채움률 여섯 칸 | `exclusions.fill_rates` | 판정 JSON 이 0.0 도 숨기지 않고 싣는다 |
 | D-6G-23 `snapshot-v2` 술어 칸 | `AValue.standard_market_price_applicable` | v1·v3 둘 다 거부 · `null` 수용 · 미지 키 거부 |
 | D-6G-17 배제의 영향 범위 | `exclusions.standard_market_price_scope` | 참·판정 불가·분모 셋을 따로 |
+| D-6G-27 레인 간 왕복 golden | `tests/app/test_backtest_golden.py` | **아직 건너뜀**(golden 미도착) — 이탈 절 |
+| D-6G-31 창 단위 UNDERPOWERED | `verdict.evaluable_window_count` · `_not_evaluable` | 판정 가능 창 과반 미만이면 전체 NotEvaluable |
+| D-6G-32 주/보조 유의수준 | `VerdictThresholds.alpha_for` · `run._is_primary` | 보정 전후 **사이**의 p 로 주는 실패·보조는 통과 |
+| D-6G-32 표본 결정식 멈춤 | `run._sampling_stop` · `SamplingBudget.minimum_required_sample` | 예산 초과·최소 미달 각각 멈춤 |
+| D-6G-32 표본 목록 해시 | `snapshot.sample_list_checksum` | manifest 값과 **행에서 재계산**한 값 대조 |
+| D-6G-33 리터럴 게이트 | `test_evaluation_no_stray_numeric_literals` | 문자열에 숨긴 수·조립 근 둘 |
 | D-6G-20 표본 크기 결정식 | `records.SamplingRecord` · `policy.SamplingBudget` | 예산 초과 시 멈춤 |
 | D-6G-21 판정 불가와 민감도 둘 | `UndecidableAxis` · `SampleVariant` | 판 셋의 순서 · `estimate_available` |
 | D-6G-22 낙찰방법 채움률 | `exclusions.bid_method_fill_rate` | 판정 JSON 에 실림 |
@@ -232,6 +238,16 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | M11 | 술어를 무시하고 A 값 공고 전량을 셈 | **1 failed** |
 | M12 | 판정 불가를 참으로 접음 | **1 failed** |
 | M13 | `snapshot-v1` 을 조용히 받아들임 | **78 failed**(판독기 전역) |
+| **V3** | McNemar p 를 `P(X >= k+1)` 로 | **9 failed** — `comb`+`Fraction` 유리수 산술(구현과 다른 경로)로 낸 손 계산 값과 대조 |
+| **V5** | seed 안정성 판정 `return True` | **1 failed** |
+| **V7** | 창 이력 `< start - embargo` -> `< window.end` | **1 failed** |
+| **V8** | Passed 조건에서 `pooled.passed` 제거 | **1 failed** |
+| **V9** | 전략 간 표본 동일성 단언 `return True` | **1 failed** |
+| **G1** | 임계를 `float("0.05")` 문자열로 | **2 failed** |
+| **G2** | 조립 근(`app/backtest_job.py`)에 임계 리터럴 | **2 failed** |
+
+V3·V5·V7·V8·V9 는 verifier r1 이 **초록**으로 실측한 다섯이고, G1 은 같은 보고의 게이트
+변이다. 일곱 전부 이제 붉어진다(복원 뒤 272 passed).
 
 **M10 이 드러낸 것**: 두 기초금액이 같은 fixture 에서는 어느 쪽을 써도 test 가 통과해
 provenance 분리가 잠기지 않았다. 두 값을 **다르게** 둔 공고를 만드는 test 를 더해 RED 로
@@ -248,6 +264,13 @@ provenance 분리가 잠기지 않았다. 두 값을 **다르게** 둔 공고를
 
 ## 이탈
 
+- **D-6G-27 왕복 golden 이 아직 서지 않았다.** 소비 쪽 test 는 섰지만 생산 쪽 golden 이
+  아직 커밋되지 않아 **네 test 가 건너뛴다**(`pytest -rs` 가 사유와 기대 경로를 찍는다).
+  초록으로 위장하지 않았고, golden 이 오면 경로 상수 하나로 선다. **verifier H-1 의
+  세 결함(추첨번호·공고일·필수 칸)은 이 잠금이 서기 전까지 재지 못한다.**
+- **D-6G-28 의 v3 판독(행 단위 제외)은 아직 손대지 않았다.** 절차가 「Kotlin 이 v3 문서를
+  먼저 커밋 -> Python 판독 -> Kotlin writer」라 문서를 기다린다. 오늘 판독기는 `snapshot-v2`
+  이고 필수 칸의 `null` 은 여전히 **스냅숏 전체**를 거부한다.
 - **`smkpAmt` 배제의 「크기」는 여전히 못 잰다(계수는 낸다).** D-6G-23 의 술어 칸이 `snapshot-v2` 로
   들어와 **영향 범위**(참 공고 수·판정 불가 수·분모)는 공시한다. 하지만 「A 가 얼마나 달라지는가」는
   `smkpAmt` 의 **금액**이 스냅숏에 없어 모른다 — `limitations` 의
