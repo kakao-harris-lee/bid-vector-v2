@@ -161,13 +161,6 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 이 레인의 evidence 커밋은 `reports/evidence/m6/6g/` 안이고 그 경로는 위 목록에 **없다** — 그러므로
 evidence 를 더 써도 이 실측은 유효하다.
 
-## 알려진 제한
-
-`bidvector.adapters.koneps`·`bidvector.adapters.snapshot` 패키지에는 **등재 test 가 없다**(audit·event·
-evaluation 등 다른 adapters 패키지에는 있다). 그래서 이 두 패키지의 test 는 `gate-tests.properties` 에
-빠져 있어도 게이트가 잡지 못한다 — 이 slice 가 만든 셋은 등재했고, 기존 `KonepsOpeningCompleteSourceTest`
-가 미등재인 것을 그 과정에서 발견했다(이 slice 가 만든 것이 아니라 **기존 사각**이다). 후속 후보.
-
 ## 데이터
 
 이 레인은 DB 에 쓰지 않았고 실 KONEPS 호출도 실 데이터 실행도 하지 않았다 — 되돌릴 데이터가 없다.
