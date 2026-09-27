@@ -254,7 +254,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
 | S-3 | `uv run mypy --strict src/ml_engine` | 소스 96개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1176 passed**(skip 0 — golden 부재는 skip 이 아니라 fail 이다) |
+| S-5 | `uv run python -m pytest tests -q` | **1178 passed**(skip 0 — golden 부재는 skip 이 아니라 fail 이다) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -316,7 +316,9 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | 제외 사유의 귀속 | `_RULES` 순서(마감 -> 기초금액) | 마감 결측이 기초금액 사유로 계수되지 않는다 |
 | D-6G-20 표본 크기 결정식 | `records.SamplingRecord` · `policy.SamplingBudget` | 예산 초과 시 멈춤 |
 | D-6G-21 판정 불가와 민감도 둘 | `UndecidableAxis` · `SampleVariant` | 판 셋의 순서 · `estimate_available` |
-| D-6G-22 낙찰방법 채움률 | `exclusions.bid_method_fill_rate` | 판정 JSON 에 실림 |
+| D-6G-22 낙찰방법 채움률 | `fill_rates` 의 공고 축 표 | 판정 JSON 에 실림(전용 함수는 호출 0 이 되어 삭제) |
+| D-6G-46 분모 하나 | `fill_rates` 의 `notice_observed_count` | 여섯이 같은 분모로 반씩 줄어든다 |
+| D-6G-46 하한 표지 | `report.verdict_payload` 의 `is_lower_bound` | 결측 있는 판·없는 판 둘 다 실행 |
 | D-6G-9 보고에 식별자 없음 | `report.verdict_payload` | fixture 의 공고 키 해시가 판정 바이트에 없음 |
 | 재현(위협 모델 ③) | `app.backtest_job.run_backtest_job` | 두 번 돌려 바이트 동일 · 줄 순서 무관 · 정책 한 값으로 달라짐 |
 
@@ -377,8 +379,15 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | **N4** | 업무 축을 distinct 아닌 줄 수로 | **2 failed** |
 | **N5** | 빈 층 칸을 받아들임 | **2 failed** |
 | **N6** | **입력 변이** — golden 을 10/10/0/0 으로 되돌림 | 검출력 단언 **넷 모두 RED** |
+| **D1** | 공고 축 넷만 행 수 분모로(비대칭 복원) | **1 failed** |
+| **D2** | `has_*` 둘만 행 수 분모로 | **2 failed** |
+| **D3** | 하한 표지를 상수 **참**으로 | **1 failed** |
+| **D3b** | 하한 표지를 상수 **거짓**으로 | **1 failed** |
+| **D4** | 분모를 표본 수로(공고 결측을 빼지 않음) | **1 failed** |
+| **D5** | 분모를 행 수로 | **1 failed** |
 
-누계 **마흔넷**(M1~M13 · V3·V5·V7·V8·V9 · G1~G6 · W1~W3 · P1~P3 · R1·R2 · N1~N6 · L1~L9 · A1·A2).
+누계 **쉰**(M1~M13 · V3·V5·V7·V8·V9 · G1~G6 · W1~W3 · P1~P3 · R1·R2 · N1~N6 · L1~L9 · A1·A2 ·
+D1~D5·D3b).
 (앞 판의 과반 경계 변이는 W-계열로 읽는다 — N 은 M-6·M-8 라운드의 것이다.)
 
 **N1·N4 의 첫 판은 가짜였다.** N1 은 `BusinessCategory` 가 이제 docstring 에만 남아
@@ -386,6 +395,20 @@ NameError 였고, N4 는 `list` 에 `.add` 를 불러 AttributeError 였다 — 
 「RED」를 냈고 그대로 셌으면 **크래시를 잠금으로 기록**할 뻔했다. 변이 하네스에 import
 선검사를 넣어 문법·이름 오류를 변이와 가르고 다시 쟀다(N1 은 12.75 초, 실제 판정 실패).
 **변이는 계약이 말한 규칙으로 붉어져야 하고, 붉다는 사실만으로는 측정이 아니다.**
+
+**D4 의 첫 판도 가짜였다** — `SnapshotRecord.row_count` 가 없어 AttributeError 였다. import
+선검사는 모듈만 불러 보므로 **속성 오류는 걸러 내지 못한다**. 변이 시간(12.9 초 대 0.4 초)이 실제 실행과
+크래시를 가르는 표지였다.
+
+**D3 은 fixture 를 고치기 전에 초록이었다.** 그때 합성 fixture 가 「표본 == 행」이라 표지가 거짓이었고,
+상수 **참** 변이는 잡혔지만 fixture 를 122/121/120 으로 바꾸자 표지가 참이 되어 상수 참과 구별되지
+않았다. 반대쪽 판(표본이 하나도 빠지지 않은 스냅숏)을 도는 test 를 더해 양방향으로 잠갔다 —
+**한 판만으로는 표지가 데이터를 따라간다는 것을 못 보인다.**
+
+**합성 fixture 의 같은 함정을 이번에 고쳤다.** 표본 122 · 분모 121 · 행 120 이 다 다른 값이라야 판정
+JSON 이 분모를 어디서 가져오는지 test 가 가른다. 셋이 같던 앞 판에서는 분모를 무엇으로 적든 같은 수가
+나와 아무것도 잠기지 않았다 — 왕복 golden 이 10/10/0/0 이던 동안 겪은 것과 **같은 함정이 이 레인의
+fixture 에도 있었다.**
 
 **N6 은 코드가 아니라 입력을 변이시켰다.** `<` 를 `<=` 로 약화시키는 코드 변이는 지금
 golden 에서 초록인데, 그 단언은 **현재 데이터가 아니라 미래의 golden 회귀**를 막는
@@ -464,16 +487,14 @@ test 둘이 붉어지는데 **golden 여덟은 그대로 초록**이었다. 「�
 싣고 판독이 「확정 시각 < 최초 개찰일」을 요구하면 위조 비용은 오르지만 **닫히지는 않는다**(확정을
 늦게 돌리면 그만이다). 스키마 변경이므로 제안만 하고 구현하지 않았다.
 
-## 알려진 제한 — 채움률 분모가 둘로 갈린다 (M-8)
+## 채움률 — 여섯이 분모 하나를 쓴다 (D-6G-46, 앞 라운드 비대칭 해소)
 
-`has_*` 두 칸은 **목록 관측이 있는 표본 수**를 분모로 쓰고, 나머지 넷(`successful_bid_method_name` ·
-`pure_construction_cost` · `bid_price_formula_a_applicable` · `reserve_range_end_rate`)은 **행 수**를
-쓴다. 계약(M-8)이 `has_*` 만 지목했기 때문이고, 계약 갱신 없이 넓히지 않았다. 나머지 넷도 공고 축에서
-오므로 같은 근거가 적용될 수 있다 — **여섯을 서로 비교하면 안 된다**는 사실이 지금 판정 JSON 문면에
-드러나지 않는다(분모는 `sampling.notice_observed_count` 로 실리지만 어느 칸이 그것을 쓰는지는 코드에만
-있다). 계약 판단이 필요한 자리다.
+공고 축 여섯이 분모 하나(`sample_size - sampled_without_notice`)를 공유한다. 앞 판은 `has_*` 둘만
+표본 수를, 나머지 넷은 행 수를 써서 같은 표에 실린 여섯을 비교할 수 없었다 — 계약 갱신으로 닫았다.
 
-`has_*` 채움률은 또한 **하한**이다 — 분자는 행에서만 셀 수 있어, 상세를 못 받은 표본이 0 으로 들어간다.
+수치들은 **하한**이다(분자는 행에서만 센다). 판정 JSON 이 `fill_rates.denominator` ·
+`unmeasured_sample_count` · `is_lower_bound` 를 값 옆에 싣고, **표지는 상수가 아니라 그 수에서
+파생한다** — 두 방향 변이(상수 참 · 상수 거짓)가 각각 RED 다.
 
 ## 알려진 제한 (판정 JSON 이 매번 싣는다)
 
