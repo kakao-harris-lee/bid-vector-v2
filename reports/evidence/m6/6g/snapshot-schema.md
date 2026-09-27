@@ -3,9 +3,11 @@
 > **지위: 두 레인이 합의한 계약.** 2026-09-27 초판(Kotlin 레인)과 Python 레인의 독자 초안이 엇갈려, **Python 레인의
 > 구조를 채택**하고 Kotlin 레인이 생산 쪽 제약을 반영해 정정했다. 형태를 바꾸려면 `schema_version` 을 올리고 이
 > 문서를 먼저 고친다 — 한쪽만 바꾸지 않는다.
+> **v4(2026-09-28, D-6G-39)**: 표본 목록이 파일이 됐다 — 파일 하나(`sample-list.tsv`)·manifest 칸 셋
+> (`sample_size`·`sampled_without_detail`·`sampled_without_notice`)·`sample_list_sha256` 의 정의가 바뀐다.
 > 스냅숏 실물은 **저장소 밖**(`~/.local/bid-vector-snapshots/<snapshot_id>/`)에 둔다(data-extract §7 · ADR 0010 D-8).
 
-`schema_version`: **`snapshot-v3`** · 파일 둘: `manifest.json` · `rows.jsonl`
+`schema_version`: **`snapshot-v4`** · 파일 **셋**: `manifest.json` · `rows.jsonl` · `sample-list.tsv`
 
 ## 0. 왜 한 행이 두 반쪽인가
 
@@ -28,16 +30,52 @@
 ## 2. `manifest.json`
 
 ```json
-{ "schema_version": "snapshot-v3", "snapshot_id": "…", "row_count": 24000,
+{ "schema_version": "snapshot-v4", "snapshot_id": "…", "row_count": 23880,
   "period_start": "2026-02-06", "period_end": "2026-09-26",
-  "rows_sha256": "…", "sample_list_sha256": "…" }
+  "rows_sha256": "…", "sample_list_sha256": "…",
+  "sample_size": 24000, "sampled_without_detail": 96, "sampled_without_notice": 24 }
 ```
 
 | 칸 | 뜻 |
 |---|---|
 | `period_start`·`period_end` | **개찰일** 범위다(창을 자르는 축). 공고일은 행마다 `notice.noticed_on` 이 나른다 — 창 **포함** 판정은 그쪽이다(D-6G-14) |
 | `rows_sha256` | `rows.jsonl` **바이트**의 sha256 hex |
-| `sample_list_sha256` | §5. 결과를 보기 전에 표본이 확정됐다는 증거(우회 ⑦) |
+| `sample_list_sha256` | **`sample-list.tsv` 바이트**의 sha256 hex(§2.1) |
+| `sample_size` | `sample-list.tsv` 의 줄 수 = 확정된 표본 크기 |
+| `sampled_without_detail` | 표본인데 상세 축 관측이 하나도 없는 공고 수(부르지 못했거나 응답이 비었다) |
+| `sampled_without_notice` | 표본이고 상세는 있는데 **공고 목록 canonical 이 없어** 행을 만들지 못한 공고 수 |
+
+**닫힌 항등식:** `sample_size == row_count + sampled_without_detail + sampled_without_notice`.
+표본 하나하나가 행이 되었거나, 되지 못한 사유로 계수된다 — 어느 쪽도 아닌 공고는 없다. 판독은 이
+등식을 검사하고, 깨지면 **구조 실패**다(계수가 행을 설명하지 못한다는 뜻이므로 데이터의 성질이 아니다).
+
+## 2.1 `sample-list.tsv` — 표본은 결과를 보기 전에 파일로 확정된다 (v4, D-6G-39)
+
+v3 까지 `sample_list_sha256` 은 **스냅숏 행에서 역산**한 값이었다. 판독이 그 값을 행 집합으로 다시 계산해
+대조했으니 정의상 언제나 맞았다 — 「결과를 보기 전에 확정됐다」를 **아무것도 검사하지 못하는** 순환 대조였다.
+생산 쪽도 마찬가지로 실행마다 표본틀을 다시 걷고 다시 뽑았다. 수집이 3~4일에 걸치면 늦게 개찰된 공고가 창에
+들어와 **표본 자체가 달라진다**.
+
+v4 는 표본을 파일로 못 박는다. 수집 갈래의 **첫 표본틀 단계**가 `sample-list.tsv` 를 저장소 밖에 쓰고, 그
+뒤의 모든 수집 실행과 추출은 **그 파일만** 읽는다. 다시 뽑지 않는다. 파일이 이미 있으면 덮어쓰지 않는다.
+
+형태는 줄 단위 TSV 다 — `notice_key_hash <TAB> business_division <TAB> notice_week`, **해시 오름차순**,
+줄마다 `\n`(끝 줄 포함). 헤더가 없다.
+
+```
+0a1f…(64 hex)	CONSTRUCTION	2026-W07
+3c92…(64 hex)	SERVICES	2026-W08
+```
+
+| 칸 | 뜻 |
+|---|---|
+| `notice_key_hash` | §5 의 정의 그대로(소문자 hex 64자) |
+| `business_division` | 층의 업무 축 — Kotlin `BusinessDivision` 어휘. 행의 `category` 와는 다른 축이다 |
+| `notice_week` | 층의 시간 축 — 공고일의 ISO 주(`YYYY-Www`) |
+
+추출은 이 파일을 **바이트 그대로 복사**해 스냅숏 곁에 놓는다(해시 동일성이 목적이므로 다시 렌더링하지
+않는다). 판독의 대조는 셋이다 — ⑴ 파일 sha256 == `sample_list_sha256`, ⑵ 모든 행의 `notice_key_hash` 가
+파일의 키 집합 안(밖이면 `SAMPLE_LIST_MISMATCH`), ⑶ §2 의 닫힌 항등식.
 
 ## 3. `rows.jsonl`
 
@@ -204,8 +242,8 @@ authoritative 하게 확보하지 못했다 — 지어내면 DEC-03(운영자 �
   공고번호 자체가 공개값이다. 이 해시가 지우는 것은 비밀이 아니라 **조인 키**이며, 비식별의 대상은 공고가
   아니라 투찰자다.
 - **표본 뽑기 순서** = `sha256("<seed>|<notice_key_hash>")` 오름차순(구분자는 `|`). 층마다 앞에서 N 개.
-- **`sample_list_sha256`** = 뽑힌 `notice_key_hash` 를 **오름차순 정렬**해 `\n` 으로 이은 문자열(끝에 개행
-  없음)의 sha256 hex.
+- **`sample_list_sha256`** = `sample-list.tsv` **파일 바이트**의 sha256 hex(v4 — §2.1). v3 까지는 스냅숏
+  행에서 역산한 값이었고, 그 대조는 순환이라 아무것도 검사하지 못했다.
 
 셋 다 Kotlin 쪽에 이미 구현돼 있고 test 가 잠근다.
 
