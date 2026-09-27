@@ -23,6 +23,8 @@ data class SnapshotNotice(
     val reserveRangeEndRate: BigDecimal?,
     val aValueTotal: BigDecimal?,
     val aValueOpenAt: Instant?,
+    /** `smkpAmtYn` 의 술어(D-6G-23) — `Y`/`N` 밖의 값이나 부재는 `null`(판정 불가)이다. 지어내지 않는다. */
+    val standardMarketPriceApplicable: Boolean?,
     val bidPriceFormulaAApplicable: Boolean?,
     val successfulBidMethodCode: String?,
     val successfulBidMethodName: String?,

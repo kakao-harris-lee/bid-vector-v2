@@ -24,6 +24,7 @@ private fun notice(
         reserveRangeEndRate = BigDecimal("0.02"),
         aValueTotal = null,
         aValueOpenAt = null,
+        standardMarketPriceApplicable = null,
         bidPriceFormulaAApplicable = null,
         successfulBidMethodCode = "낙030001",
         successfulBidMethodName = "적격심사제",
@@ -41,7 +42,7 @@ private fun outcome(bidders: List<Pair<Int?, BigDecimal?>>): SnapshotOutcome =
     SnapshotOutcome(
         openedOn = LocalDate.of(2026, 6, 17),
         plannedPrice = BigDecimal("1250000000"),
-        openingBaseAmount = BigDecimal("1234567890"),
+        openingBaseAmount = BigDecimal("1239999999"),
         reservePrices = null,
         drawnSerialNumbers = listOf(3, 7, 11, 14),
         participantCount = bidders.size,
@@ -123,6 +124,47 @@ class SnapshotWriterTest {
     }
 
     @Test
+    fun `두 기초금액은 각자 자기 칸에 실린다 — 값이 다를 때만 드러나는 자리다`() {
+        val rendered = SnapshotWriter.renderRows(listOf(rowOf("aa")))
+
+        // 투찰 시점 칸과 개찰 출처 칸이 **서로의 대용이 아니다**(D-6G-19 provenance 분리).
+        // 둘을 같은 값으로 둔 fixture 에서는 뒤바뀜 변이가 살아남는다.
+        rendered shouldContain "\"base_amount\":1234567890"
+        rendered shouldContain "\"opening_base_amount\":1239999999"
+        rendered.substringBefore("\"outcome\"") shouldNotContain "1239999999"
+        rendered.substringAfter("\"outcome\"") shouldNotContain "1234567890"
+    }
+
+    @Test
+    fun `A 묶음은 합산액·공개일시·표준시장단가 술어 셋을 함께 싣는다 — D-6G-23`() {
+        val withA =
+            rowOf("aa").let {
+                it.copy(
+                    notice =
+                        it.notice.copy(
+                            aValueTotal = BigDecimal("98000000"),
+                            aValueOpenAt = Instant.parse("2026-06-15T00:00:00Z"),
+                            standardMarketPriceApplicable = true,
+                        ),
+                )
+            }
+
+        val rendered = SnapshotWriter.renderRows(listOf(withA))
+
+        rendered shouldContain
+            "\"a_value\":{\"total\":98000000,\"open_at\":\"2026-06-15T00:00:00Z\"," +
+            "\"standard_market_price_applicable\":true}"
+    }
+
+    @Test
+    fun `A 가 없으면 술어도 없다 — 배제의 계수 분모는 A 값을 가진 공고다`() {
+        val rendered = SnapshotWriter.renderRows(listOf(rowOf("aa")))
+
+        rendered shouldContain "\"a_value\":null"
+        rendered shouldNotContain "standard_market_price_applicable"
+    }
+
+    @Test
     fun `manifest 는 rows 바이트의 sha256 을 싣고 표본 목록 해시는 그대로 옮긴다`() {
         val rows = SnapshotWriter.renderRows(listOf(rowOf("aa")))
 
@@ -136,7 +178,7 @@ class SnapshotWriterTest {
                 sampleListSha256 = "feedface",
             )
 
-        manifest shouldContain "\"schema_version\":\"snapshot-v1\""
+        manifest shouldContain "\"schema_version\":\"snapshot-v2\""
         manifest shouldContain "\"rows_sha256\":\"${sha256Hex(rows)}\""
         manifest shouldContain "\"sample_list_sha256\":\"feedface\""
     }

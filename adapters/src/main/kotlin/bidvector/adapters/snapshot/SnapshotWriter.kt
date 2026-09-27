@@ -5,7 +5,11 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 
-const val SNAPSHOT_SCHEMA_VERSION: String = "snapshot-v1"
+/**
+ * `snapshot-v2`(D-6G-23) — A 묶음에 표준시장단가 적용 여부를 더하며 올렸다. 소비 쪽 판독은 **버전이
+ * 다르면 스냅숏 전체를 거부한다**(의도된 동작이다 — 두 레인이 같이 움직여야 한다는 신호).
+ */
+const val SNAPSHOT_SCHEMA_VERSION: String = "snapshot-v2"
 
 private const val HEX_MASK = 0xff
 
@@ -102,13 +106,20 @@ private fun noticeJson(notice: SnapshotNotice): SnapshotJson =
         ),
     )
 
-/** A 는 합산액과 **그 자신의 공개일시**가 한 묶음이다 — 둘을 떼면 누출 판정을 못 한다(D-6G-13 ⑥). */
+/**
+ * A 는 합산액과 **그 자신의 공개일시**가 한 묶음이다 — 둘을 떼면 누출 판정을 못 한다(D-6G-13 ⑥).
+ *
+ * 표준시장단가 적용 여부(D-6G-23)도 이 묶음 안이다. `a_value` 가 `null` 이면 이 술어도 없고 그것이
+ * 옳다 — 그 배제는 A 의 **합산액**에만 영향을 주므로 A 가 없는 공고는 영향 범위 밖이다(계수의 분모가
+ * 「A 값을 가진 공고」인 이유).
+ */
 private fun aValue(notice: SnapshotNotice): SnapshotJson =
     notice.aValueTotal?.let { total ->
         SnapshotJson.Obj(
             listOf(
                 "total" to jsonAmount(total),
                 "open_at" to jsonInstant(notice.aValueOpenAt),
+                "standard_market_price_applicable" to jsonBool(notice.standardMarketPriceApplicable),
             ),
         )
     } ?: SnapshotJson.Null
