@@ -267,6 +267,36 @@ class EditSessionBaseRevisionTest {
             .shouldBeInstanceOf<EditSessionState.Cancelled>()
     }
 
+    /**
+     * code-review r4 N-r4-10 · verifier r4 L-r4-2 — 앞 test 의 이름이 말하던 「값 제출만
+     * 거부된다」를 여기서 잰다. 기준을 `null` 로 **실어 들어오는** command 는 저장소 전체에서
+     * 이 test 에만 있다: `provideValueStaleness` 가 `null != current.revision`(항상 참)으로
+     * 먼저 거부하므로 재전달 판별·actor·전이표를 **전부 건너뛴다**(거부 방향으로).
+     */
+    @Test
+    fun `기준을 실지 않은 값 제출은 StaleRevision 으로 거부되고 상태가 남지 않는다`() {
+        workflow.begin(SESSION_B, OPERATOR, EditableField.CandidateLimit)
+
+        val result =
+            workflow.provideValue(
+                EditCommand.ProvideValue(
+                    CommandId("b-null-base"),
+                    SESSION_B,
+                    Actor.Operator(OPERATOR),
+                    EditableField.CandidateLimit,
+                    draftWith { copy(candidateLimit = 13) },
+                    baseRevision = null,
+                ),
+            )
+
+        val rejected = (result as CommandResult.Processed).outcome
+        rejected.shouldBeInstanceOf<TransitionOutcome.Rejected>()
+        rejected.reason shouldBe RejectionReason.StaleRevision
+        val stored = requireNotNull(sessions.load(SESSION_B))
+        stored.stateKind shouldBe "WAITING_FOR_VALUE"
+        stored.stateDraft shouldBe null
+    }
+
     @Test
     fun `기준 revision 이 없는 저장 행은 확인에서 fail-closed 로 거부된다`() {
         workflow.begin(SESSION_A, OPERATOR, EditableField.CandidateLimit)

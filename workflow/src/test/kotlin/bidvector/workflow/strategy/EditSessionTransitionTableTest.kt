@@ -112,6 +112,32 @@ class EditSessionTransitionTableTest {
         outcome.session.sessionVersion shouldBe 1
     }
 
+    /**
+     * code-review r4 N-r4-8 — 기준 대조(판정 순서 ①-b)는 actor·전이표보다 **앞선다**. 그래서
+     * 기준이 어긋난 `ProvideValue` 는 다른 축의 사유로 거부되지 않는다. HTTP 로는 도달하지
+     * 않지만(행위자가 상수이고 기준을 서버가 같은 트랜잭션에서 싣는다) 커널의 거동이므로
+     * 행으로 덮는다 — 순서를 되돌리면 이 test 가 RED 다.
+     */
+    @Test
+    fun `①-b 기준 대조는 actor·전이표보다 앞선다 — 사유가 StaleRevision 이다`() {
+        val stale = StrategyRevision(99)
+        val rows =
+            listOf(
+                sessionAt(EditSessionState.WaitingForValue(FIELD)) to
+                    provideValue(actor = Actor.Operator(OperatorId("other-operator")), baseRevision = stale),
+                sessionAt(EditSessionState.WaitingForValue(FIELD)) to
+                    provideValue(actor = Actor.System("sweep"), baseRevision = stale),
+                sessionAt(waitingForConfirmation(VALID_DRAFT)) to provideValue(baseRevision = stale),
+            )
+
+        rows.forEach { (session, command) ->
+            val outcome = apply(session, command, NOW, currentStrategy(), policyOf())
+
+            outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
+            outcome.reason shouldBe RejectionReason.StaleRevision
+        }
+    }
+
     @Test
     fun `② WaitingForValue 에 무효한 ValueProvided 는 같은 field 로 accepted 전이한다 — 상태를 바꾸지 않는다`() {
         val session = sessionAt(EditSessionState.WaitingForValue(FIELD))

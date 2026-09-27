@@ -62,8 +62,16 @@ internal fun expireIfDue(
 
 /**
  * 편집 세션의 유일한 전이 문(scope.md ①, 우회 (1)) — 판정 순서(설계 검토 (4) 2):
- * ① 만료 → ② 직전 command 재전달 → ③ actor → ④ 전이표. [current]·[policy]는 매 호출마다
- * 신선하게 주입된다(호출부가 fresh read 를 보장 — apply 시점 재검증의 메커니즘).
+ * ① 만료 → **①-b `ProvideValue` 기준 대조** → ② 직전 command 재전달 → ③ actor → ④ 전이표.
+ * [current]·[policy]는 매 호출마다 신선하게 주입된다(호출부가 fresh read 를 보장 — apply
+ * 시점 재검증의 메커니즘).
+ *
+ * **①-b 는 actor·전이표보다 앞선다**(code-review r4 N-r4-8). 재전달 판별보다 앞서야 한다는
+ * 것이 M-r3-6 의 요구였고, 그 자리는 actor 앞이기도 하다. 그래서 기준이 어긋난 `ProvideValue`
+ * 는 actor 가 달라도·세션이 값 대기 상태가 아니어도 `StaleRevision` 으로 거부된다 —
+ * `ActorMismatch`·`SystemActorNotPermitted`·`InvalidTransition` 이 아니다. HTTP 로는 도달하지
+ * 않는다(행위자가 상수이고 기준을 서버가 같은 트랜잭션에서 싣는다). 전이표 test 가 이
+ * 상호작용을 행으로 덮는다.
  *
  * `internal`이다(verifier H-3/M-4 수정) — `current`·`policy`를 호출부가 원하는 값으로 골라
  * 이 함수를 직접 부르면 `EditStrategyWorkflow`(port 로드·저장·발행을 함께 묶는 오케스트레이션)
@@ -99,7 +107,7 @@ private fun dispatch(
             // 않고 `RequestEdit` 의 존재 이유도 흐려졌다(필드를 바꾸려면 그 command 를 쓴다).
             // corpus 다섯 전건이 세션 필드와 같은 필드를 보내므로 이 조임에 걸리는 case 는 없다(실측).
             if (command.field == state.field) {
-                onProvideValue(session, state, command, current, policy)
+                provideValueOutcome(session, state, command, current, policy)
             } else {
                 TransitionOutcome.Rejected(session, command, RejectionReason.InvalidTransition)
             }
@@ -133,18 +141,6 @@ private fun accept(
     )
 
 /** `ValueProvided`(scope.md ①②) — invalid 는 상태를 바꾸지 않는다(같은 field 로 accepted). */
-private fun onProvideValue(
-    session: EditSession,
-    state: EditSessionState.WaitingForValue,
-    command: EditCommand.ProvideValue,
-    current: OperatorStrategy,
-    policy: Resolution.Resolved<StrategyPolicyData>,
-): TransitionOutcome {
-    // D-6A2b-28 의 기준 대조는 `apply` 의 판정 순서 ①-b(`provideValueStaleness`)로 올라갔다 —
-    // 재전달 판별보다 앞서야 같은 본문의 재전달이 조용히 중복 처리되지 않는다(M-r3-6).
-    return provideValueOutcome(session, state, command, current, policy)
-}
-
 private fun provideValueOutcome(
     session: EditSession,
     state: EditSessionState.WaitingForValue,
@@ -155,7 +151,7 @@ private fun provideValueOutcome(
     when (validate(command.draft, current.revision, policy)) {
         is StrategyValidation.Valid -> {
             // D-6A2b-18·28 — 기준은 **command 가 싣고 온 값**이다(어댑터가 draft 를 뜬 그
-            // 읽기의 revision). 위에서 지금 읽은 값과 같은지 이미 확인했으므로 둘은 같다 —
+            // 읽기의 revision). `apply` 의 판정 순서 ①-b 가 지금 읽은 값과 같은지 이미 확인했으므로 —
             // command 값을 쓰는 것이 「어느 읽기에서 왔는가」를 문면에 남긴다. 필드는 세션이
             // 기다리던 것이다(dispatch 가 command 와 같은지 이미 확인했다).
             val next = EditSessionState.WaitingForConfirmation(state.field, command.draft, command.baseRevision)

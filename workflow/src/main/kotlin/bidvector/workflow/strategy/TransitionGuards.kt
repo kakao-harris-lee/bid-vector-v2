@@ -3,8 +3,10 @@ package bidvector.workflow.strategy
 import bidvector.strategy.OperatorStrategy
 
 // ---------------------------------------------------------------------------
-// 판정 순서의 술어들(설계 검토 (4) 2) — ① 만료 → ② 직전 command 재전달 → ③ actor, 그리고
-// `Confirm` 전용 ④ 신선도. `Transition.kt` 의 `apply`/`dispatch` 가 이 순서대로 부른다.
+// 판정 순서의 술어들(설계 검토 (4) 2) — ① 만료 → ①-b `ProvideValue` 기준 대조 → ② 직전
+// command 재전달 → ③ actor, 그리고 `Confirm` 전용 ④ 신선도. `Transition.kt` 의
+// `apply`/`dispatch` 가 이 순서대로 부른다. ①-b 가 actor 보다 앞선 결과는 `apply` 의 KDoc 에
+// 적혀 있다(N-r4-8).
 //
 // `Transition.kt` 에서 갈라 나왔다(파일당 함수 한도 11) — 경계는 「거부할 이유가 있는가」와
 // 「전이를 실제로 만든다」다. `private` 이던 것이 `internal` 이 되지만 모듈 밖으로는 나가지
