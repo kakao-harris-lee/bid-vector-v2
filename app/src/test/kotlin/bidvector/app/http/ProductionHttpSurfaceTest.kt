@@ -215,9 +215,9 @@ class ProductionHttpSurfaceTest {
 
         statuses.keys.shouldNotBeEmpty()
         statuses.values.toSet() shouldBe setOf(406)
-        // **본문은 비어 있다(실측).** 클라이언트가 JSON 을 받지 않겠다고 했으므로 우리 `ErrorBody`
-        // 도 쓸 수 없다 — Spring 은 상태만 내고 끝낸다. 누출 축에서는 그것이 가장 안전한 결과이고,
-        // 그래서 여기서는 「우리 형태의 본문」이 아니라 **「어떤 본문도 없다」**를 잠근다.
+        // **본문 없음이 계약이다**(D-6A2b-29). 클라이언트가 JSON 을 받지 않겠다고 했으므로
+        // `ErrorBody` 를 쓰는 것이 오히려 협상 위반이다 — 「우리 형태의 본문」이 아니라
+        // **「어떤 본문도 없다」**를 잠근다.
         val raw =
             restTemplate.exchange(
                 url("/api/strategy"),

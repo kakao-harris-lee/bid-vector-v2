@@ -231,6 +231,54 @@ class ManagementHealthSurfaceTest {
         }
     }
 
+    /**
+     * D-6A2b-21 둘째 절 · D-6A2b-31(verifier r2 F-r2-5) — **관리 포트의 미디어 타입 축**.
+     * API 포트에 406 을 들이면서 관리 포트가 함께 흔들리지 않았는지 잰다: actuator 타입·json·
+     * 「아무 타입이나」는 그대로 200 이고, 받아들일 수 없는 타입은 406 이며 **본문이 없다**.
+     * 노출 집합은 불변이다 — 200 을 내는 경로가 health 둘뿐인 것을 같은 표에서 확인한다.
+     */
+    @Test
+    @Order(3)
+    fun `관리 포트의 미디어 타입 협상은 health 둘만 200 이고 나머지는 406 이거나 404 다`() {
+        val acceptable =
+            listOf(
+                "application/vnd.spring-boot.actuator.v3+json",
+                "application/json",
+                "*/*",
+            )
+        val healthPaths = listOf("/actuator/health", "/actuator/health/liveness")
+
+        val statuses =
+            acceptable.flatMap { accept ->
+                healthPaths.map { path -> accept to probeStatus(path, accept) }
+            }
+        statuses.map { it.second }.toSet() shouldBe setOf(200)
+
+        val refused = probe("/actuator/health", "application/xml")
+        refused.statusCode.value() shouldBe 406
+        (refused.body ?: "") shouldBe ""
+
+        // 노출 집합 불변 — health 밖은 어떤 Accept 로도 200 이 되지 않는다.
+        listOf("/actuator", "/actuator/env", "/actuator/metrics").forEach { path ->
+            acceptable.forEach { accept -> probeStatus(path, accept) shouldNotBe 200 }
+        }
+    }
+
+    private fun probe(
+        path: String,
+        accept: String,
+    ) = restTemplate.exchange(
+        management(path),
+        HttpMethod.GET,
+        HttpEntity<Void>(HttpHeaders().apply { set("Accept", accept) }),
+        String::class.java,
+    )
+
+    private fun probeStatus(
+        path: String,
+        accept: String,
+    ): Int = probe(path, accept).statusCode.value()
+
     @Test
     @Order(3)
     fun `API 포트에는 actuator 가 없다 — 자격증명을 줘도 404 다`() {

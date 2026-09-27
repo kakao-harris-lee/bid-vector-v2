@@ -74,7 +74,6 @@ object ErrorCode {
     const val STRATEGY_VALUE_INVALID = "STRATEGY_VALUE_INVALID"
     const val METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     const val UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
-    const val NOT_ACCEPTABLE = "NOT_ACCEPTABLE"
 }
 
 /**
@@ -146,16 +145,9 @@ object ErrorMapping {
     private fun editPathCode(throwable: Throwable): Pair<String, String>? =
         when (throwable) {
             is InvalidEditRequestException -> ErrorCode.INVALID_REQUEST to "요청 값이 유효하지 않다"
-
             is EditSessionConflictException -> ErrorCode.EDIT_SESSION_CONFLICT to "편집 세션이 동시에 바뀌었다"
-
             is HttpRequestMethodNotSupportedException -> ErrorCode.METHOD_NOT_ALLOWED to "이 경로가 지원하지 않는 메서드다"
-
             is HttpMediaTypeNotSupportedException -> ErrorCode.UNSUPPORTED_MEDIA_TYPE to "지원하지 않는 미디어 타입이다"
-
-            // D-6A2b-21 — 이 앱은 JSON 하나만 낸다. 협상 실패도 기본 분기(500)로 보내지 않는다.
-            is HttpMediaTypeNotAcceptableException -> ErrorCode.NOT_ACCEPTABLE to "요청한 미디어 타입으로 응답할 수 없다"
-
             else -> null
         }
 }
@@ -178,7 +170,8 @@ private fun escapeJson(value: String): String = value.replace("\\", "\\\\").repl
 /**
  * DispatcherServlet 안에서 일어나는 모든 예외의 유일한 처리기(우회 (3)·(6)) — 도메인
  * 실패도, `NoHandlerFoundException`(D-6A1-21, `spring.mvc.throw-exception-if-no-handler-found`)
- * 도, 그 밖 매핑표에 없는 어떤 [Throwable]도 여기 한 곳을 지난다. [correlationId]는
+ * 도, 그 밖 매핑표에 없는 어떤 [Throwable]도 여기 한 곳을 지난다. **예외 하나** — 406 은
+ * 본문이 없다(아래 [mediaTypeNotAcceptable]). [correlationId]는
  * [RequestAuditFilter]가 요청 시작 시 발급해 request attribute에 심어 둔 값을 그대로
  * 읽는다(발급 지점 하나, 재발급하지 않는다).
  */
@@ -235,11 +228,14 @@ class GlobalErrorHandler {
         return builder.body(ErrorMapping.forThrowable(exception, correlationId))
     }
 
+    /**
+     * **406 만 본문이 없다**(D-6A2b-29, verifier r2 F-r2-4 실측). 클라이언트가 「JSON 은 받지
+     * 않겠다」고 말한 요청에 JSON 오류 본문을 내는 것이 오히려 협상 위반이고, 실제로 Spring 도
+     * 그 본문을 쓸 수 없다(`content-length: 0` 실측). 「모든 오류는 `ErrorBody`」의 유일한
+     * 예외이며, 추적은 audit 행이 진다(406 도 행이 1 는다 — 실측).
+     */
     @ExceptionHandler(HttpMediaTypeNotAcceptableException::class)
-    fun mediaTypeNotAcceptable(
-        exception: HttpMediaTypeNotAcceptableException,
-        request: HttpServletRequest,
-    ): ResponseEntity<ErrorBody> = respond(HttpStatus.NOT_ACCEPTABLE, exception, request)
+    fun mediaTypeNotAcceptable(): ResponseEntity<Void> = ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build()
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
     fun mediaTypeNotSupported(

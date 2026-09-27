@@ -9,10 +9,13 @@ info:
     (실행·명령 경로 없음). M6/6A-2b(D-6A2b-1)가 편집 세션 endpoint 여섯을 열어 전략을
     **쓰는** 길을 낸다 — 모든 쓰기는 편집 세션을 지나고 한 트랜잭션에서 커밋된다.
 
-    405(지원하지 않는 메서드)는 어느 operation 아래에도 적지 않는다 — 그것은 operation 의
-    응답이 아니라 「그 경로에 그 메서드가 없다」는 사실이고, OpenAPI 에 그 자리가 없다.
-    구현은 매핑된 모든 경로에서 미선언 메서드에 405 `ErrorBody` 를 낸다(D-6A2b-7,
-    `HttpSurfaceFormatGateTest` 가 등록된 매핑 전수로 잰다).
+    **405 와 406 은 어느 operation 아래에도 적지 않는다.** 405 는 operation 의 응답이 아니라
+    「그 경로에 그 메서드가 없다」는 사실이라 적을 자리가 없다. 406 은 operation 의 응답이
+    맞지만 **본문이 없다**(D-6A2b-29) — 클라이언트가 JSON 을 받지 않겠다고 한 요청이라
+    `ErrorBody` 를 쓸 수 없고, 그래서 `ErrorBody.code` 어휘에도 그 코드를 두지 않는다.
+    구현은 매핑된 모든 경로에서 미선언 메서드에 405 `ErrorBody` 를, 받아들일 수 없는 `Accept`
+    에 본문 없는 406 을 낸다 — `ProductionHttpSurfaceTest` 가 출하 조립의 등록된 매핑 전수로
+    두 축을 함께 잰다.
 servers:
   - url: /
 security:
@@ -788,7 +791,6 @@ components:
             - STRATEGY_VALUE_INVALID
             - METHOD_NOT_ALLOWED
             - UNSUPPORTED_MEDIA_TYPE
-            - NOT_ACCEPTABLE
         message:
           type: string
         correlationId:

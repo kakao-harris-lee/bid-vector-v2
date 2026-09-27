@@ -45,10 +45,12 @@ internal fun JsonNode.seenRevision(): StrategyRevision = StrategyRevision(requir
  */
 internal fun JsonNode.editValue(field: EditableField): EditValue {
     val slot = field.valueSlot()
-    requireKnownKeys(setOf("commandId", "field", slot.jsonKey))
+    // M-r2-4 — **칸 배정 위반을 먼저 알린다.** 알려진 키 검사를 앞세우면 이 구체 진단이 죽은
+    // 분기가 되고, 운영자는 「알 수 없는 키」만 본다(둘 다 400 이지만 고칠 곳이 다르다).
     EditValueSlot.entries
         .filter { it != slot && has(it.jsonKey) }
         .forEach { throw InvalidEditRequestException("${field.token()} 는 ${it.jsonKey} 칸을 읽지 않는다") }
+    requireKnownKeys(setOf("commandId", "field", slot.jsonKey))
     return when (slot) {
         EditValueSlot.TERMS -> EditValue.Terms(requiredStringArray(slot.jsonKey))
         EditValueSlot.AMOUNT_WON -> EditValue.AmountWon(requiredLong(slot.jsonKey, minimum = 0))
