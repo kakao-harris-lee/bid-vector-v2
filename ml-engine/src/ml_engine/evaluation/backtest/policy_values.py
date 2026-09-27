@@ -144,6 +144,22 @@ class FloorRateBand:
 
 
 @dataclass(frozen=True)
+class ExclusionConstants:
+    """제외 규칙이 쓰는 관측 의존 상수(D-6G-35). 코드가 아니라 정책에 두는 이유는
+    **값의 근거가 관측**이기 때문이다 — 틀리면 제외 ③ 이 전량을 먹거나 정정 공고를
+    통과시킨다."""
+
+    first_notice_ordinal: int
+
+    def __post_init__(self) -> None:
+        if self.first_notice_ordinal < 0:
+            raise ValueError(
+                "exclusion.first_notice_ordinal 은 음수일 수 없습니다: "
+                f"{self.first_notice_ordinal}"
+            )
+
+
+@dataclass(frozen=True)
 class EffectiveDates:
     """2026 낙찰하한율 개정 시행일(업무별). 포함 여부는 **공고일** 기준이다(D-6G-14)."""
 
@@ -271,6 +287,7 @@ class StrategyBacktestPolicy:
     windows: WindowRules
     institution: InstitutionConstants
     floor: FloorRateBand
+    exclusion: ExclusionConstants
     effective: EffectiveDates
     strategies: StrategyConstants
     fit: FitThresholds

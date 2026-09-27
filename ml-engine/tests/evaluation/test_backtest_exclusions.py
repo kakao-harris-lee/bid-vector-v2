@@ -396,6 +396,43 @@ def test_one_missing_value_does_not_take_the_other_rows_down(
     assert len(result.excluded) == 1
 
 
+def test_absent_prearranged_method_is_left_to_the_reserve_draw_rule() -> None:
+    """D-6G-36 — 결정방법이 **없으면** ④ 로 제외하지 않는다. 그 칸은 A값 오퍼레이션에서만
+    와서 용역·물품은 늘 `null` 이고, fail-closed 면 주 표본이 통째로 사라진다(golden 첫
+    왕복 실측). 대신 ⑤ 가 복수예가 제도를 보증하고, 부재 건수를 따로 공시한다."""
+    absent = row_payload("n-1", notice_prearranged_price_decision_method=None)
+    assert _reason(absent) is None
+    result = admit_rows(_snapshot([absent]).rows, _policy())
+    assert dict(result.undecidable)[UndecidableAxis.PREARRANGED_PRICE_METHOD] == 1
+    # 방법명이 **있고** 복수예가가 아니면 여전히 제외다.
+    assert (
+        _reason(row_payload("n-2", notice_prearranged_price_decision_method="단일예가"))
+        is ExclusionReason.SINGLE_PREARRANGED_PRICE
+    )
+    # 부재인데 예비가격이 없으면 ⑤ 가 잡는다 — 보증이 실제로 선다.
+    assert (
+        _reason(
+            row_payload(
+                "n-3",
+                notice_prearranged_price_decision_method=None,
+                outcome_prices_null=True,
+            )
+        )
+        is ExclusionReason.RESERVE_DRAW_INCOMPLETE
+    )
+
+
+def test_first_notice_ordinal_comes_from_policy_not_code() -> None:
+    """D-6G-35 — 첫 차수가 `000` 인지 `001` 인지는 **관측이 정하는 사실**이다. 정책
+    값을 바꾸면 제외 ③ 의 판정이 따라 바뀐다(코드 상수였다면 그러지 않는다)."""
+    policy = _policy()
+    assert policy.exclusion.first_notice_ordinal == 1
+    assert _reason(row_payload("n-1", notice_notice_ordinal=0)) is (
+        ExclusionReason.REBID_OR_AMENDED
+    )
+    assert _reason(row_payload("n-2", notice_notice_ordinal=1)) is None
+
+
 def test_structural_failures_still_reject_the_whole_snapshot() -> None:
     """값 결측과 **구조 실패**는 다르다(D-6G-28). 미지 키·버전 불일치·행 checksum
     불일치·닫힌 셋 밖의 업무는 두 레인이 어긋났다는 신호이지 데이터의 성질이 아니라,

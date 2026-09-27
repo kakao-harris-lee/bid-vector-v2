@@ -42,7 +42,6 @@ _REBID_MARKERS: Final[frozenset[str]] = frozenset({"유찰", "재입찰", "정�
 # `UndecidableAxis.SHIP_MANUFACTURING_CLASS` 가 공시한다.
 _SHIP_MANUFACTURING_CLASS_CODES: Final[frozenset[str]] = frozenset()
 _MULTIPLE_PREARRANGED_PRICE_NAME: Final[str] = "복수예가"
-_FIRST_NOTICE_ORDINAL: Final[int] = 1
 
 
 def _has_marker(name: str | None, markers: frozenset[str]) -> bool:
@@ -157,17 +156,28 @@ def _is_before_effective(row: SnapshotRow, policy: StrategyBacktestPolicy) -> bo
     return noticed_on < effective_date_for(row.notice.category, policy)
 
 
-def _is_rebid(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> bool:
-    return row.notice.notice_ordinal != _FIRST_NOTICE_ORDINAL or _has_marker(
-        row.outcome.progress_division, _REBID_MARKERS
+def _is_rebid(row: SnapshotRow, policy: StrategyBacktestPolicy) -> bool:
+    """첫 차수 값은 **정책**에서 온다(D-6G-35) — `bidNtceOrd` 의 첫 값이 `000` 인지
+    `001` 인지는 관측이 정하는 사실이고 코드가 추측할 것이 아니다."""
+    return row.notice.notice_ordinal != policy.exclusion.first_notice_ordinal or (
+        _has_marker(row.outcome.progress_division, _REBID_MARKERS)
     )
 
 
 def _is_single_prearranged(row: SnapshotRow, _policy: StrategyBacktestPolicy) -> bool:
-    """④ — 결정방법이 부재하면 판정할 수 없으므로 제외 쪽으로 접는다(fail-closed)."""
-    return (
-        row.notice.prearranged_price_decision_method != _MULTIPLE_PREARRANGED_PRICE_NAME
-    )
+    """④ 단일 예정가격(D-6G-36). 방법명이 **있고** 복수예가가 아니면 제외하고,
+    **없으면 제외하지 않는다** — ⑤(예비가격 15개 + 추첨 정보)가 복수예가 제도를 대신
+    보증하기 때문이다.
+
+    fail-closed 로 두지 않는 이유는 그것이 더 안전해서가 아니라 **그 칸이 A값
+    오퍼레이션에서만 오기 때문**이다: 용역·물품은 늘 `null` 이라 fail-closed 면 주
+    표본이 통째로 사라진다(golden 첫 왕복에서 실측 — 4행 전부 이 사유로 빠졌다).
+    부재 건수는 `UndecidableAxis.PREARRANGED_PRICE_METHOD` 로 따로 공시한다 —
+    「복수예가로 확인했다」와 「⑤ 에 맡겼다」는 다른 사실이다."""
+    method = row.notice.prearranged_price_decision_method
+    if method is None:
+        return False
+    return method != _MULTIPLE_PREARRANGED_PRICE_NAME
 
 
 def _is_floor_rate_unusable(row: SnapshotRow, policy: StrategyBacktestPolicy) -> bool:

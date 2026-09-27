@@ -82,3 +82,6 @@ class UndecidableAxis(StrEnum):
 
     LOCAL_GOVERNMENT = "LOCAL_GOVERNMENT"
     SHIP_MANUFACTURING_CLASS = "SHIP_MANUFACTURING_CLASS"
+    PREARRANGED_PRICE_METHOD = "PREARRANGED_PRICE_METHOD"
+    """D-6G-36 — 예정가격 결정방법이 부재해 ④ 를 직접 판정하지 못하고 ⑤ 에 맡긴 공고
+    수. 「복수예가로 확인했다」와 「⑤ 가 보증한다」는 다른 사실이라 따로 센다."""

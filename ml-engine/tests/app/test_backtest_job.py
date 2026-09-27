@@ -252,6 +252,7 @@ def test_exclusion_counts_report_every_reason(tmp_path: Path) -> None:
         _run(_snapshot_dir(tmp_path), _derived_policy(tmp_path)).verdict_bytes
     )
     assert len(payload["exclusions"]) == 24
+    assert "FIRST_NOTICE_ORDINAL_UNVERIFIED" in payload["limitations"]
     assert all(isinstance(value, int) for value in payload["exclusions"].values())
     # ⑪⑫ 는 한 번도 발화하지 않는다 — 0 이 「가르지 못했다」·「들어오지 않았다」임을
     # `undecidable` 이 따로 말한다(D-6G-21).

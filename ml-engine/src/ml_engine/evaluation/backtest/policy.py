@@ -23,6 +23,7 @@ from typing import Final
 
 from ml_engine.evaluation.backtest.policy_values import (
     EffectiveDates,
+    ExclusionConstants,
     FitThresholds,
     FloorRateBand,
     InstitutionConstants,
@@ -50,6 +51,7 @@ SHIPPED_STRATEGY_BACKTEST_POLICY_VERSION: Final[str] = "strategy-backtest-v1"
 __all__ = [
     "SHIPPED_STRATEGY_BACKTEST_POLICY_VERSION",
     "EffectiveDates",
+    "ExclusionConstants",
     "FitThresholds",
     "FloorRateBand",
     "InstitutionConstants",
@@ -92,6 +94,7 @@ _INT_KEYS: Final[tuple[str, ...]] = (
     "strategy.s4_grid_size",
     "strategy.s4_min_competitor_samples",
     "fit.min_sample_count",
+    "exclusion.first_notice_ordinal",
     "sampling.list_call_count",
     "sampling.calls_per_notice_construction",
     "sampling.calls_per_notice_service",
@@ -168,6 +171,21 @@ def _build_strategies(
     )
 
 
+def _build_institution(integers: dict[str, int]) -> InstitutionConstants:
+    return InstitutionConstants(
+        reserve_price_count=integers["institution.reserve_price_count"],
+        draw_count=integers["institution.draw_count"],
+    )
+
+
+def _build_effective(dates: dict[str, date]) -> EffectiveDates:
+    return EffectiveDates(
+        construction=dates["effective.construction"],
+        service=dates["effective.service"],
+        goods=dates["effective.goods"],
+    )
+
+
 def _assemble(
     version: str,
     numbers: dict[str, float],
@@ -183,20 +201,16 @@ def _assemble(
             days=integers["window.days"],
             embargo_days=integers["window.embargo_days"],
         ),
-        institution=InstitutionConstants(
-            reserve_price_count=integers["institution.reserve_price_count"],
-            draw_count=integers["institution.draw_count"],
-        ),
+        institution=_build_institution(integers),
         floor=FloorRateBand(
             rate_band_low=numbers["floor.rate_band_low"],
             rate_band_high=numbers["floor.rate_band_high"],
             pure_construction_cost_ratio=numbers["floor.pure_construction_cost_ratio"],
         ),
-        effective=EffectiveDates(
-            construction=dates["effective.construction"],
-            service=dates["effective.service"],
-            goods=dates["effective.goods"],
+        exclusion=ExclusionConstants(
+            first_notice_ordinal=integers["exclusion.first_notice_ordinal"]
         ),
+        effective=_build_effective(dates),
         strategies=_build_strategies(numbers, integers),
         fit=FitThresholds(
             alpha=numbers["fit.alpha"],

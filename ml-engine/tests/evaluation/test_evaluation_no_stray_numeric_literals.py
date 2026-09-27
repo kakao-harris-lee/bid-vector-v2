@@ -124,7 +124,6 @@ _ALLOWED: frozenset[tuple[str, float]] = frozenset(
             "evaluation/backtest/rules.py",
             0.0,
         ),  # 공사가 아닌/A값 아닌 공고의 A · 금액 양수 검사
-        ("evaluation/backtest/rules.py", 1),  # _FIRST_NOTICE_ORDINAL 선언
         ("evaluation/backtest/floor.py", 1.0),  # 비율에서 1 을 빼 증감으로 바꾸는 자리
         (
             "evaluation/backtest/floor.py",

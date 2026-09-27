@@ -222,6 +222,14 @@ def undecidable_counts(
                 if item.row.notice.category is BusinessCategory.GOODS
             ),
         ),
+        (
+            UndecidableAxis.PREARRANGED_PRICE_METHOD,
+            sum(
+                1
+                for item in admitted
+                if item.row.notice.prearranged_price_decision_method is None
+            ),
+        ),
     )
 
 
