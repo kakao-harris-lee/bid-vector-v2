@@ -1,10 +1,10 @@
 # M6/6G — 가격 경로 결정 실험: 분포 엔진은 밴드 내 난수보다 나은가 (계약 초안, 2026-09-27)
 
-> **지위: 초안 — 착수 전.** 6A-2b 종결 뒤 착수한다. 「운영자 승인 필요」 다섯은 **2026-09-27 승인됐다**(추천안 그대로).
+> **지위: 착수 2026-09-27**(6A-2b 머지 뒤). 「운영자 승인 필요」 다섯은 **2026-09-27 승인됐다**(추천안 그대로).
 > 이 slice 는 **2026-09-07 사전 등록 결정 실험 D-ML-2** 를 V2 자체 데이터로 실행한다(`docs/discovery/ml-value-and-data-locality.md` §4 ·
 > `docs/discovery/bid-price-predictability-2026-09-27.md` §6 · `milestone-6.md` 「결정 ④ 개정 2026-09-27」).
 
-- base: 착수 시점 `git merge-base HEAD origin/main`. 초안 작성 기준 `439ccebd`.
+- base: `git merge-base HEAD origin/main`. **착수 실측 `678c6ed7`**(PR #48 6A-2b 머지). 초안 작성 기준은 `439ccebd` 였다.
 - worktree `bid-vector-v2-m6-6g`, 브랜치 `m6-6g/2026-09-27`.
 
 ## 왜 이 slice 인가

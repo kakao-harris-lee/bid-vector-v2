@@ -596,6 +596,13 @@ code-reviewer 의 N-r6-1(주입 표면 전개가 배열·`vararg` 를 버린다 
 포함) · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(전제 「영향 0」은 거짓이었다 — test classpath 에서 `@TestConfiguration` 을 걷어냈다). rollback 의 공유 파일 절차는
 이 종결 문단도 같은 문단 단위 삭제로 지운다.
 
+**6G 착수 2026-09-27 — 가격 경로 결정 실험** — base `678c6ed7`(PR #48 6A-2b 머지 뒤 `main`), 레인 worktree `bid-vector-v2-m6-6g`·브랜치
+`m6-6g/2026-09-27`. 정본 `reports/evidence/m6/6g/scope.md`(D-6G-1~14, 운영자 승인 A-1~A-5 · 운영계정 키). 2026-09-07 사전 등록 결정 실험 **D-ML-2** 를
+V2 자체 개찰 데이터로 실행한다 — S0 밴드 내 균등 난수 · S1 규칙 앵커 · S2 V2 분포 엔진(세 후보) · S3 GBM(N/A) · S4 제도 분포 + **실측** 경쟁자 분포(개찰완료
+오퍼레이션의 참가자 전 행) 몬테카를로. 산출물은 판정 하나: 분포 엔진을 운영 경로에 꽂을 것인가(`OPEN-ML-ANALYSIS-WIRING` 의 입력). 층화 무작위 24,000 공고 ·
+호출 상한 일 20,000 / 총 80,000 · 실수집 전 `OPEN-6F8-QUOTA-XML-ENVELOPE` 폐쇄 · 제외 15 · 공고일 기준 창. 리뷰 레인 verifier + code-reviewer(sonnet) +
+privacy-gate, Codex 없음.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
