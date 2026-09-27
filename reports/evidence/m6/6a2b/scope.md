@@ -162,6 +162,19 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 
 **수정 라운드 보고 필수 항목**: 새 public 표면이 생겼는가·밖에 무엇을 허락하는가 · 새 파일 ↔ in_scope 대조 · rollback 재산출·재실측(마지막 산출물 커밋에서).
 
+## 계약 갱신 r2 (2026-09-27, 팀장 — verifier r2 not-ready F-r2-1~5 · code-reviewer r2 H-r2-1·M-r2-1~4 수령)
+
+재작업 **2/5**. r1 의 차단 결함 둘(F-1 변이 셋 · F-2 교차 세션)은 실측으로 닫혔다. 새 차단 결함 F-r2-1 은 **r1 과 같은 계열**이다 — r1 은 금지를 열거했고, r1 수정은 **대상(핸들러 종류)을 열거**했다. `RouterFunction` 빈 · 빈 이름 URL 매핑 `HttpRequestHandler` · 인증 필터보다 앞선 `OncePerRequestFilter` 셋이 목록 밖에서 HTTP 로 SQL 을 실행했다(필터는 자격 없이 200). **대상을 한 종류 더 늘리는 처방은 받지 않는다.** 두 축을 함께 건다 — 하나는 「누가 무엇에 의존하는가」를 기본 제한으로, 하나는 「HTTP 로 무엇이 닿는가」를 출하 조립의 실측 목록으로.
+
+| ID | 결정 |
+|---|---|
+| **D-6A2b-26** | **(F-r2-1) D-6A2b-19 ① 을 대체한다 — 대상은 `bidvector.app` 전체, 면제는 조립 클래스의 정확한 목록.** 의존 허용 목록 ⊆ 는 `bidvector.app` 의 모든 클래스(중첩·익명·컴패니언 포함, 최상위 소유자로 판정)에 걸리고, 면제는 계약 파일(`config/quality/architecture-policy.properties`)에 **정확한 클래스 이름**으로 적은 조립 클래스뿐이다(`BidVectorApplication`·`*Wiring`·수집 조립 등 오늘 있는 것 — 접두·패턴 금지). 새 클래스는 기본으로 제한된다. **보완 — 면제된 조립 클래스가 진입점을 만드는 길**: 조립 클래스의 `@Bean` 메서드가 `RouterFunction`·`HandlerMapping`·`Filter`·`Servlet`·`HttpRequestHandler`·`Controller` 류를 반환하면 그것은 아래 D-6A2b-27 이 잡는다 |
+| **D-6A2b-27** | **(F-r2-1) HTTP 표면 실측 목록 — 출하 조립에서 거둔다.** production 조립 컨텍스트에서 ① 모든 `HandlerMapping` 빈(종류 불문)이 내는 handler 집합 ② 서블릿 컨테이너에 등록된 모든 `Filter`·`Servlet` 등록 집합을 거두어 **계약 파일의 기대 집합과 등식**으로 단언한다(API 포트·관리 포트 각각). 기대 집합에 없는 handler·filter·servlet 하나가 늘면 RED. 문서↔매핑 등식(D-6A2b-20)은 `RequestMappingHandlerMapping` 뿐 아니라 이 전체 handler 집합에서 프레임워크 기본 handler(명시 목록)를 뺀 것과 대조한다. **F-r2-1 의 세 변이가 (26)·(27) 각각에서 RED** 여야 한다. 게이트 술어 변경 → 표적 재검증 |
+| **D-6A2b-28** | **(F-r2-3) 기준 revision 은 draft 를 만든 바로 그 읽기에서 온다.** 실행기가 draft 를 만든 전략의 revision 을 `ProvideValue` command 에 실어 보내고(서버 값 — 요청에서 받지 않는다), 커널은 그 값을 `baseRevision` 으로 담는다(다시 읽은 값으로 심지 않는다). value 시점에 command 의 기준 ≠ 현재 revision 이면 `StaleRevision` 으로 거부한다. 회귀 test 는 verifier 의 TOCTOU 재현(두 읽기 사이에 다른 세션 적용 끼우기)을 그대로 |
+| **D-6A2b-29** | **(F-r2-4·M-r2-1) 406 은 본문 없음을 계약으로 받는다.** 클라이언트가 JSON 을 받을 수 없다고 말한 요청에 JSON 본문을 내는 것이 오히려 협상 위반이다. D-6A2b-6·7 의 「전부 `ErrorBody`」에 **406 예외 한 줄**을 적고, OpenAPI 의 `NOT_ACCEPTABLE` 코드는 도달 불가라 뺀다(C-3 과 같은 기준 — 도달 불가를 약속하지 않는다). 추적은 audit 행으로 한다(실측 1 증가) |
+| **D-6A2b-30** | **(F-r2-2·H-r2-1) 이 slice 의 게이트 test 전부를 `gateExecutionGate` 에 등재**한다(r1·r2 에서 생긴 것 전부 — 대조: `@Disabled` 를 달면 RED) |
+| **D-6A2b-31** | 일괄: **(F-r2-5·M-r2-2)** 관리 포트 미디어 타입 축 test(actuator v3·json·`*/*` → 200, xml → 406, 노출 집합 불변) · **(M-r2-4)** `editValue` 칸 배정 진단 순서 되살림 · **(L-r2-1)** OpenAPI 머리말의 삭제된 test 이름 · **(L-r2-3)** 사라진 알려진 제한 복원 · **(L-r2-5)** rollback.md 의 이동 술어를 「되돌림 대상 중 evidence 를 뺀 산출물 경로」로 정정 · **(L-r2-6)** 허용 접두 안의 포트 인터페이스는 알려진 제한. **(M-r2-3) 은 verifier 가 반증했다**(Spring 7 에서 `@Component @RequestMapping` 단독은 handler 로 등록되지 않는다) — 조치 없음 |
+
 ## 하네스 레인 변경 (상시 절)
 
 구현 레인 checklist 「하네스 레인 변경」 절을 옮긴다(2026-09-27, 판정 SHA 고정 시점).
