@@ -5,7 +5,7 @@
 > 문서를 먼저 고친다 — 한쪽만 바꾸지 않는다.
 > 스냅숏 실물은 **저장소 밖**(`~/.local/bid-vector-snapshots/<snapshot_id>/`)에 둔다(data-extract §7 · ADR 0010 D-8).
 
-`schema_version`: **`snapshot-v2`** · 파일 둘: `manifest.json` · `rows.jsonl`
+`schema_version`: **`snapshot-v3`** · 파일 둘: `manifest.json` · `rows.jsonl`
 
 ## 0. 왜 한 행이 두 반쪽인가
 
@@ -28,7 +28,7 @@
 ## 2. `manifest.json`
 
 ```json
-{ "schema_version": "snapshot-v2", "snapshot_id": "…", "row_count": 24000,
+{ "schema_version": "snapshot-v3", "snapshot_id": "…", "row_count": 24000,
   "period_start": "2026-02-06", "period_end": "2026-09-26",
   "rows_sha256": "…", "sample_list_sha256": "…" }
 ```
@@ -50,8 +50,8 @@
 |---|---|---|
 | `notice_key_hash` | string(64 hex) | §5 |
 | `category` | `CONSTRUCTION`\|`SERVICE`\|`GOODS` | 닫힌 셋. `FOREIGN` 은 **오지 않는다**(§4 ⑫) |
-| `noticed_on` | date | 공고일 — 창 포함 판정(D-6G-14) |
-| `bid_close_at` | datetime(offset) | **줄 수 있다**(`bidClseDt` — 이미 계약·canonical 칸에 있다). A 공개 시점 절단의 기준 |
+| `noticed_on` | date \| null | 공고일(`ntceNticeDt`) — 창 포함 판정(D-6G-14). **개찰일로 대체하지 않는다**(v2 는 그렇게 접혀 제외 ⑬ 이 개찰일로 돌았다). 없으면 `NOTICE_DATE_ABSENT` |
+| `bid_close_at` | datetime(offset) \| null | 입찰 마감(`bidClseDt`) — A·기초금액 공개 시점 절단의 기준. 없으면 `BID_CLOSE_AT_ABSENT` |
 | `base_amount` | int \| null | 기초금액. **기초금액 조회 오퍼레이션의 값만** 싣고, `base_amount_disclosed_at < bid_close_at` 인 행만이다(§3.4) |
 | `base_amount_disclosed_at` | datetime(offset) \| null | 기초금액공개일시(`bssamtOpenDt`) — 「그 값이 언제 공개되었나」 |
 | `floor_rate` | number \| **null** | fraction(percent ÷ 100) |
@@ -62,13 +62,12 @@
 | `successful_bid_method_name` | string \| null | `sucsfbidMthdNm` — 같음 |
 | `prearranged_price_decision_method` | string \| null | `prearngPrceDcsnMthdNm` — A 오퍼레이션에서만 오므로 그 호출이 없으면 부재 |
 | `notice_ordinal` | int | `bidNtceOrd` |
-| `progress_division` | string \| null | **추가**(§4 ③) — 유찰·재입찰 판정 입력 |
 | `procurement_class_code` | string \| null | **추가**(§4 ⑧) — 선박 제조 물품 판정 입력 |
 | `demand_agency_code` | string \| null | **원값**(해시 아님) — 기관 코드는 개인정보가 아니다(상호·사업자번호는 여전히 비수집). 지자체 판정의 *입력*이지 판정이 아니다(§4 ⑪) |
 | `bid_price_formula_a_applicable` | bool \| null | `bidPrceCalclAYn` — **공사에만 오는 필수 필드**. 「이 공고가 A값 공고인가」를 한 필드로 답한다. 공사가 아니면 null |
 | `pure_construction_cost` | int \| null | `bssAmtPurcnstcst`(공사 전용) — 제외 ⑨의 입력 |
-| `award_method_application_standard` | string \| null | `sucsfbidMthdAppStd`(D-6G-22) — 자유텍스트, 채움률 미상 |
-| `application_basis_content` | string \| null | `aplBssCntnts`(D-6G-22, 공사 전용) — 자유텍스트, 값 어휘 미상 |
+| `has_award_method_application_standard` | bool | `sucsfbidMthdAppStd` 의 **존재 여부만**(D-6G-33) — 원문은 자유텍스트라 무엇이 실릴지 모른다. 채움률은 이 불리언으로 낸다 |
+| `has_application_basis_content` | bool | `aplBssCntnts`(공사 전용)의 존재 여부만 — 같은 이유 |
 
 **뺀 칸 둘**: `is_local_government`·`is_foreign_capital`. 사유는 §4 ⑪⑫ — 앞은 **판정할 수 없고**, 뒤는 **구조적으로
 항상 거짓**이다. 지어낸 불리언을 싣지 않는다.
@@ -77,11 +76,12 @@
 
 | 칸 | 형 | 정정·주의 |
 |---|---|---|
-| `opened_on` | date | 개찰일 — 창 자르기·누출 절단 |
-| `planned_price` | int | 예정가격 |
+| `opened_on` | date \| null | 개찰일 — 창 자르기·누출 절단. **수집 갈래가 실제로 채우는 출처**(raw 관측)에서 온다. 없으면 `OPENING_DATE_ABSENT` — 대체값(EPOCH 등)을 지어내지 않는다 |
+| `progress_division` | string \| null | 진행구분 — **개찰로 드러나는 값**이라 `outcome` 쪽이다(v2 는 투찰 시점 타입에 있었다). 유찰·재입찰 판정(③) 입력 |
+| `planned_price` | int \| null | 예정가격. 없으면 `PLANNED_PRICE_ABSENT`(단수 예가·예비가격 상세 미수신 공고에서 난다) |
 | `opening_base_amount` | int \| null | **개찰결과 출처**의 기초금액. `notice.base_amount` 와 **다른 칸**이다(§3.4) |
 | `reserve_prices` | int[15] \| null | **위치 = 순번**이다. 15행이 모두 있고 순번이 1..15 로 빠짐없을 때만 배열을 싣고, 아니면 `null`(부분 배열을 싣지 않는다) |
-| `drawn_serial_numbers` | int[] \| null | 1-기반 순번. 개수가 4라는 보장은 하지 않는다 |
+| `drawn_serial_numbers` | int[] \| null | 1-기반 순번. **수집된 추첨 필드에서 온다**(v2 는 상수 `null` 이라 실 추출이면 전 행이 제외 ⑤ 에 걸렸다). 개수가 4라는 보장은 하지 않는다 |
 | `participant_count` | int \| null | 목록 축 관측이라 부재 가능 |
 | `bidder_rows` | 아래 | |
 
@@ -132,6 +132,22 @@
 > `smkpAmt` 의 **금액**을 스냅숏이 싣지 않기 때문이다. 크기까지 재려면 그 금액 칸이 필요하고, 그것은 또 한 번의
 > `schema_version` 인상이다(지금 판에서는 하지 않는다 — 계약이 요구한 것은 계수다).
 
+## 3.5 `null` 은 **행 단위** 제외다 — 스냅숏 전체 거부가 아니다 (v3, D-6G-28)
+
+v2 는 `planned_price`·`bid_close_at` 을 필수로 선언해 놓고 생산 쪽이 nullable 이었다. 한 행의 `null` 이
+판독을 `INVALID_VALUE` 로 떨어뜨려 **스냅숏 전체**가 거부됐고, 그 공고를 제외 규칙이 처리할 기회조차
+오지 않았다.
+
+v3 은 둘을 가른다.
+
+| 갈래 | 대상 | 처분 |
+|---|---|---|
+| **값 결측** | 위 표에서 `\| null` 로 선언된 칸 | **그 행만** 제외 사유로 내리고 계수한다. 나머지 행은 그대로 산다 |
+| **구조 실패** | 미지 키 · `schema_version` 불일치 · `rows_sha256` 불일치 · 닫힌 셋 밖의 `category` | **스냅숏 전체 거부**(그대로) — 두 레인이 어긋났다는 신호이지 데이터의 성질이 아니다 |
+
+값 결측이 부르는 사유 넷을 새로 둔다(나머지는 기존 어휘 그대로):
+`NOTICE_DATE_ABSENT` · `BID_CLOSE_AT_ABSENT` · `OPENING_DATE_ABSENT` · `PLANNED_PRICE_ABSENT`.
+
 ## 4. D-6G-13 제외 열다섯 — 판정은 Python 레인이, 입력은 Kotlin 레인이
 
 초판은 `exclusions` 배열을 스냅숏에 실었다. **철회한다**: Python 레인이 이미 입력에서 판정하는 모듈을 갖고 있고,
@@ -143,13 +159,14 @@
 |---|---|---|
 | ① 낙찰방법 · ⑦ 소액수의견적 · ⑩ 중소기업자간 경쟁물품 | `successful_bid_method_code`·`_name` | 준다 |
 | ② 하한율 부재·밴드 밖 | `floor_rate` | 준다 |
-| ③ 유찰·재입찰·정정 | `notice_ordinal` + **`progress_division`** | 칸을 더했다 |
+| ③ 유찰·재입찰·정정 | `notice_ordinal` + `outcome.progress_division` | 진행구분은 개찰로 드러나므로 outcome 쪽이다(v3) |
 | ④ 단일 예정가격 | `prearranged_price_decision_method` · `reserve_prices` | 준다 |
 | ⑤ 예비가격·추첨 결측 | `reserve_prices` · `drawn_serial_numbers` | 준다 |
 | ⑥ A 결측·공개 늦음 | `a_value` · `bid_close_at` | 준다 |
-| ⑧ 선박 제조 물품 | **`procurement_class_code`** | 칸을 더했다(대분류만으로는 못 가른다) |
+| ⑧ 선박 제조 물품 | `procurement_class_code` | 대분류만으로는 못 가른다 |
 | ⑨ 순공사원가 98% | `pure_construction_cost` | 준다(공사) — 문서 XML 예제가 빈 값이라 **채움률은 실측 전이다** |
 | ⑪ 지자체 발주 | `demand_agency_code` | **판정은 못 한다**(아래) |
+| D-6G-22 채움률 | `has_award_method_application_standard`·`has_application_basis_content` | 원문 없이 **존재 여부만**으로 낸다(v3) |
 | ⑫ 외자 | — | **구조적으로 0**: 수집 갈래가 외자 오퍼레이션을 부르지 않아 `FOREIGN` 행이 생기지 않는다. 계수는 0 으로 공시하되 「행을 걸러서 0」이 아니라 「들어오지 않아 0」이라고 적는다 |
 | ⑬ 시행일 경계 | `noticed_on` | 준다 |
 | ⑭ 적격 투찰자 없음 | 하한가 산식 | Python 레인이 붙인다 |
