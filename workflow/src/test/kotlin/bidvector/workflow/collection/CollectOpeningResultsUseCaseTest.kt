@@ -168,6 +168,21 @@ class CollectOpeningResultsUseCaseTest {
     }
 
     @Test
+    fun `K6 — 상세 단계의 쿼터 소진도 실행을 멈춘다`() {
+        val fixture = OpeningFixture(targetPerStratum = 2)
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
+        fixture.service.detailTruncation = TruncationCause.QuotaExhausted
+
+        val report = fixture.run()
+
+        // 첫 상세 호출이 쿼터를 물면 거기서 멈춘다 — 남은 표본을 계속 부르면 거부만 쌓인다.
+        val halt = requireNotNull(report.halted)
+        halt.truncationCause shouldBe TruncationCause.QuotaExhausted
+        halt.notAttempted shouldBe 2
+        report.detailCalls shouldBe 1
+    }
+
+    @Test
     fun `쿼터가 아닌 절단은 그 슬롯만 접고 표본틀을 이어 만든다`() {
         val fixture = OpeningFixture(targetPerStratum = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)

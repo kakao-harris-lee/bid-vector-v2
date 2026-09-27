@@ -29,6 +29,9 @@ internal class ScriptedOpeningPort(
     val openingCompleteCalls = mutableListOf<NoticeId>()
     val formulaACalls = mutableListOf<NoticeId>()
 
+    /** 이 축의 응답을 쿼터 소진으로 만든다 — 상세 단계의 멈춤을 재는 자리(K6). */
+    var detailTruncation: TruncationCause? = null
+
     override fun fetchOpeningResults(
         referenceDate: CollectionReferenceDate,
         cursor: PageCursor?,
@@ -76,7 +79,11 @@ internal class ScriptedOpeningPort(
         endpoint: SourceEndpoint,
     ): SourceBatch<RawNoticeObservation> {
         val item = observationOf(evidence.noticeId.number.value, endpoint)
-        return SourceBatch(listOf(item), sourceAccounting(normalized = 1), next = null)
+        return SourceBatch(
+            listOf(item),
+            sourceAccounting(normalized = 1, truncationCause = detailTruncation),
+            next = null,
+        )
     }
 }
 
