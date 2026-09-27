@@ -170,7 +170,7 @@ class PolicyRejected:
     detail: str
 
 
-def _collect_indexed_list(
+def collect_indexed_list(
     values: dict[str, PolicyScalar], prefix: str
 ) -> tuple[PolicyScalar, ...] | None:
     """`{prefix}.{N}` 형태의 키를 모아 인덱스 오름차순 tuple 로. 구멍·중복 인덱스는
@@ -194,26 +194,26 @@ def _collect_indexed_list(
     return tuple(entries[index] for index in sorted(entries))
 
 
-def _require_str(values: dict[str, PolicyScalar], key: str) -> str | None:
+def require_str(values: dict[str, PolicyScalar], key: str) -> str | None:
     value = values.get(key)
     return value if isinstance(value, str) and value else None
 
 
-def _require_int(values: dict[str, PolicyScalar], key: str) -> int | None:
+def require_int(values: dict[str, PolicyScalar], key: str) -> int | None:
     value = values.get(key)
     if isinstance(value, bool) or not isinstance(value, int):
         return None
     return value
 
 
-def _require_number(values: dict[str, PolicyScalar], key: str) -> float | None:
+def require_number(values: dict[str, PolicyScalar], key: str) -> float | None:
     value = values.get(key)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return float(value)
 
 
-def _int_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[int, ...] | None:
+def int_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[int, ...] | None:
     if raw is None:
         return None
     if any(isinstance(item, bool) or not isinstance(item, int) for item in raw):
@@ -221,7 +221,7 @@ def _int_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[int, ...] | None:
     return tuple(int(item) for item in raw)
 
 
-def _float_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[float, ...] | None:
+def float_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[float, ...] | None:
     if raw is None:
         return None
     if any(
@@ -231,7 +231,7 @@ def _float_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[float, ...] | No
     return tuple(float(item) for item in raw)
 
 
-def _str_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[str, ...] | None:
+def str_tuple(raw: tuple[PolicyScalar, ...] | None) -> tuple[str, ...] | None:
     if raw is None:
         return None
     if any(not isinstance(item, str) or not item for item in raw):
@@ -261,17 +261,17 @@ def _parse_fields(values: dict[str, PolicyScalar]) -> _ParsedFields | None:
     """평탄 인덱스 목록 조립 + 스칼라 형 검사 — 형이 맞지 않으면 `None`(설계 래칫
     함수 길이 한도로 `load_evaluation_policy`에서 분리, verifier r1 L-5 형식)."""
     fields = (
-        _require_number(values, "paired_t_threshold"),
-        _require_str(values, "gate_baseline"),
-        _require_str(values, "gate_model"),
-        _require_str(values, "gate_stratum"),
-        _require_number(values, "maturity_threshold"),
-        _require_int(values, "min_evaluation_rows"),
-        _require_int(values, "max_origins"),
-        _require_int(values, "agency_baseline_min_count"),
-        _int_tuple(_collect_indexed_list(values, "stability_seeds")),
-        _float_tuple(_collect_indexed_list(values, "amount_band_edges")),
-        _str_tuple(_collect_indexed_list(values, "segment_axes")),
+        require_number(values, "paired_t_threshold"),
+        require_str(values, "gate_baseline"),
+        require_str(values, "gate_model"),
+        require_str(values, "gate_stratum"),
+        require_number(values, "maturity_threshold"),
+        require_int(values, "min_evaluation_rows"),
+        require_int(values, "max_origins"),
+        require_int(values, "agency_baseline_min_count"),
+        int_tuple(collect_indexed_list(values, "stability_seeds")),
+        float_tuple(collect_indexed_list(values, "amount_band_edges")),
+        str_tuple(collect_indexed_list(values, "segment_axes")),
     )
     if any(field is None for field in fields):
         return None

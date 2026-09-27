@@ -1,0 +1,75 @@
+version: strategy-backtest-v1
+# M6/6G — 가격 경로 결정 실험(D-6G-6)의 사전 등록 정책. **실험 창을 보기 전에 고정된
+# 값**이고, 값을 바꾸면 새 version 이며 이전 판정과 구분된다(위협 모델 ②).
+#
+# effective date: 2026-09-27(착수일). 이 파일의 값은 `reports/evidence/m6/6g/scope.md`
+# 「운영자 승인 필요」 A-3 의 승인 문면에서 온다 — 축어 인용:
+#   "**A-3 판정 정책 값**: Δ(제안: 상대 +20%) · α(0.05 단측, 주 가설 Bonferroni /3) ·
+#    비열등 한계(실격률 +1%p) · 검정력 0.8 · 창 최소 3 · seed 5."
+#   "**2026-09-27 운영자: 「A-1~A-5 추천안대로 승인」.** 아래 다섯 항목이 제안값 그대로
+#    확정됐다."
+# 창당 표본 하한은 같은 문서 D-6G-5 의 "창당 n ≥ 483(ML-07 legacy 필요 표본 승계)".
+#
+# **코드 리터럴 금지**(ML-07 acceptance ③) — 이 값들은 `load_strategy_backtest_policy`
+# 로만 읽힌다. CLI·환경변수로 완화하는 통로는 없다(같은 acceptance ④, 로더는 `path`
+# 하나만 받는다). 값 갱신 절차: scope.md 승인 문면 → 이 파일 → test.
+
+# ── 판정식 (D-6G-6) ────────────────────────────────────────────────────────────
+# 주 지표는 would-have-won 비율의 S0 대비 차이(공고 단위 쌍대). 각 창에서 McNemar
+# 정확 검정(단측) + 상대 개선 >= Δ.
+verdict.min_relative_improvement: 0.20
+verdict.alpha: 0.05
+# 주 가설은 S2 의 세 후보(S2c·S2b·S2a) 대 S0 — Bonferroni 분모(우회 ⑥).
+verdict.primary_hypothesis_count: 3
+# 실격률 비열등 한계 +1%p — S0 보다 이만큼 넘게 나쁘면 Passed 가 아니다.
+verdict.ineligibility_noninferiority_margin: 0.01
+verdict.target_power: 0.80
+verdict.min_window_count: 3
+verdict.min_window_rows: 483
+
+# ── 창 (D-6G-5·D-6G-14) ───────────────────────────────────────────────────────
+# 비중첩 주 단위 창 + embargo 1주. 창은 개찰 주로 자르되 포함 여부는 공고일로 본다.
+window.days: 7
+window.embargo_days: 7
+
+# ── 제도 상수 (복수예비가격) ──────────────────────────────────────────────────
+# 예가 범위를 균등 폭 15구간으로 나눠 구간마다 하나씩 뽑고, 그 15개 중 무작위 4개의
+# 평균이 예정가격이다. 값은 `ml-engine/policy/inference-v1.yaml` 의
+# `reserve.expected_price_count`·`reserve.draw_count` 와 같다 — evaluation 층은
+# inference 를 import 할 수 없어(import-linter forbidden) 같은 제도 상수를 이 파일이
+# 따로 나른다. 두 파일이 갈리면 `test_policy.py` 의 대조 test 가 붉어진다.
+institution.reserve_price_count: 15
+institution.draw_count: 4
+
+# ── 낙찰하한율 개연 밴드 (D-6G-13 ②) ─────────────────────────────────────────
+# legacy 게이트 승계. 밴드 확정은 `OPEN-DEC-10` 소관이라 여기서 판정하지 않는다 —
+# 밴드 밖 값은 사유별 계수와 함께 제외된다.
+floor.rate_band_low: 0.30
+floor.rate_band_high: 0.995
+
+# ── 전략 상수 ────────────────────────────────────────────────────────────────
+# S1 규칙 앵커의 offset(bp). 값의 출처는 `reports/evidence/m6/6g/policy-values.md` —
+# 창을 보고 조정하지 않는다(우회 ②).
+strategy.s1_offset_bp: 0.0
+# S4 제도 분포 + 경쟁자 분포 몬테카를로. 난수는 판정 seed 에서만 오고 반복 수·격자는
+# 여기 고정한다(seed 쇼핑·격자 쇼핑 차단).
+strategy.s4_iteration_count: 4000
+strategy.s4_grid_size: 41
+strategy.s4_grid_span_bp: 400.0
+strategy.s4_min_competitor_samples: 30
+
+# ── P-4 제도 분포 적합도 ─────────────────────────────────────────────────────
+# 실험 앞에 돈다. 맞지 않으면 판정 대신 멈춤 결과를 낸다(scope.md 선행 조사 P-4).
+fit.alpha: 0.05
+fit.min_sample_count: 200
+fit.max_bin_ratio_deviation: 0.02
+
+# ── seed 안정성 (A-3 「seed 5」) ──────────────────────────────────────────────
+# S0 의 난수 seed 5개. 판정 부호가 하나라도 뒤집히면 NotEvaluable(SEED_UNSTABLE).
+# 값은 `ml-engine/policy/evaluation-v1.yaml` 의 `stability_seeds` 와 같은 다섯이다
+# (5C-2 가 고정한 값 — 6G 가 새 다섯을 지어내면 그 자체가 seed 쇼핑 표면이다).
+stability_seeds.0: 20260812
+stability_seeds.1: 1
+stability_seeds.2: 7
+stability_seeds.3: 42
+stability_seeds.4: 2026
