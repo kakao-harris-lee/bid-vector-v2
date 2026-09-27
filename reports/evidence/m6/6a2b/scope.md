@@ -258,6 +258,18 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | **D-6A2b-51** | **조립 근 신뢰 — D-6A2b-33 경계의 명시.** 주입 표면 목록(D-6A2b-49)이 닫는 것은 「HTTP 층이 **어떤 타입**을 받는가」이고, 그 타입 뒤에 **어떤 구현**을 꽂는지는 조립 근(① 층)이 정한다. 조립 근은 인증 필터를 꽂는 그 자리다 — 조립 근을 신뢰하지 않으면 어떤 in-tree 게이트도 서지 않는다(1A 빌드 저자 경계와 같은 뿌리). 그래서 구현 레인 자체 탐침 **R1**(① 층 `@Bean` 이 목록 안 도메인 SAM 몸통에 SQL)·**R8**(① 층이 어댑터 경계 구현을 갈아끼움)은 **경계 밖**이다. F-r5-1 과의 차이: F-r5-1 은 **범용 운반 타입**으로 능력을 몰래 넘겼다(받는 쪽 타입이 능력을 말하지 않는다) — D-6A2b-49 가 닫았다. R1·R8 은 **이름 있는 타입의 구현 선택**이다. **`OPEN-6A2B-COMPOSITION-ROOT-HARDENING`** 신설(① 층 JDBC 멤버 호출 금지 · 도메인 SAM 구현의 어댑터 층 고정 — 별 하드닝 slice). r6 검토는 ① 층 **몸통 선택** 형태를 HIGH 로 올리지 않는다(경계 밖, MEDIUM 이하로 등재) |
 | **D-6A2b-52** | 구현 레인 이탈 하나 수용: 주입 운반 타입 금지의 예외 **(RequestAuditFilter, `(ApiAuditRecord) -> Unit`)** 쌍 하나 — 그 파일은 이 slice 가 diff 0 으로 묶었다(D-6A2b-5). 쌍이 오늘 실재하는 주입점임을 단언(죽은 항목 금지). 남는 위험은 D-6A2b-51 과 같은 뿌리(조립 근의 몸통 선택) |
 
+## 종결 결정 r6 (2026-09-27, 팀장 — verifier r6 ready-for-review · code-reviewer r6 REQUEST_CHANGES(HIGH N-r6-1) 수령)
+
+**사전 등록 r6 규칙이 걸렸다.** verifier r6 은 경계 안쪽 HIGH 0 으로 ready-for-review 를 냈으나(배열 형태는 두드리지 않았다), code-reviewer r6 이
+경계 안쪽 HIGH 하나를 냈다 — **N-r6-1: 주입 표면 전개가 배열·`vararg` 를 풀지 않고 버린다**(`Array<() -> Int>`·`vararg` 한 겹으로 F-r5-1 이
+되살아난다, 같은 파일의 형제 술어는 옳게 푼다 — 고침은 한 줄). 두 판정은 모순이 아니다(다른 형태를 두드렸다). **규칙대로 수정 라운드를 돌리지 않고
+게이트를 분리해 종결한다.**
+
+| ID | 결정 |
+|---|---|
+| **D-6A2b-53** | **게이트 분리 종결.** 편집 endpoint 여섯 · 한 트랜잭션 원자성 · 교차 세션 기준 revision · 오류 매핑 · OpenAPI · 관리 포트 405 는 **머지한다**. 의존·주입 게이트는 **지금 상태 그대로** 남긴다(엄격한 방향, 초록). 남은 주입 경로 하드닝은 별 slice 로 넘긴다 — **`OPEN-6A2B-INJECTION-HARDENING`** 신설, 첫 항목 **N-r6-1**(오늘 재현 가능 · 경계 안 · 한 줄) · 이어 N-r6-3(meta-gate 가 `@Test` 하나만 발견) · N-r6-4(상속 SAM·추상 클래스 운반 타입, 예외 목록 크기 래칫) · N-r6-6(프레임워크 콜백 세터) · L-r6-1(수신 클래스 소유 SAM 한 곳 방어). `OPEN-6A2B-COMPOSITION-ROOT-HARDENING` 에는 verifier r6 **M-r6-1**(① 층이 다른 클래스의 정적 가변 필드에 값을 쓴다 — 가변 정적 필드 금지 또는 ① 층의 타 클래스 정적 필드 쓰기 금지)을 더한다 |
+| **D-6A2b-54** | **승인 전 일괄(수정 라운드 아님 — 장부·래칫 복원만)**: **(N-r6-2)** `app.port-call.ports` 에서 조용히 빠진 `CapacityPort`·`NotificationRequestPort` 를 되돌린다(감시 목록의 「오늘 호출 0」은 죽은 항목이 아니라 래칫) · **(N-r6-5)** 규칙 수 「일곱/다섯」 → 여덟 정정(KDoc·checklist·commands) + 여덟째 규칙 공집합 대조 실측 기록 · **(L-r6-2)** tier2 목록에 남은 use case 타입 둘을 이탈 절에 등재, 대조표 개수 정정 · N-r6-7~13 중 문면만인 것. **게이트 술어를 넓히는 변경은 하지 않는다**(N-r6-1 을 여기서 고치지 않는 이유 — 사전 규칙). 복원(N-r6-2)은 술어를 엄격한 쪽으로 되돌리는 것이라 표적 확인 한 번(verifier) |
+
 ## 하네스 레인 변경 (상시 절)
 
 구현 레인 checklist 「하네스 레인 변경」 절을 옮긴다(2026-09-27, 판정 SHA 고정 시점).
@@ -282,7 +294,8 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` | 수령·재측정·**유지**(→ 6E) | D-6A2b-10 |
 | `OPEN-6A2B-VIOLATION-DETAIL` · `OPEN-6A2B-CONCURRENT-SESSION-ADVANCE` | **신설** | D-6A2b-17 |
 | `OPEN-6A2B-ABANDONED-SESSIONS` | **신설**(→ 6B-3) | D-6A2b-24 |
-| `OPEN-6A2B-COMPOSITION-ROOT-HARDENING` | **신설**(→ 하드닝 slice) | D-6A2b-51 |
+| `OPEN-6A2B-COMPOSITION-ROOT-HARDENING` | **신설**(→ 하드닝 slice) — r6 M-r6-1 추가 | D-6A2b-51·53 |
+| `OPEN-6A2B-INJECTION-HARDENING` | **신설**(→ 하드닝 slice, 첫 항목 N-r6-1) | D-6A2b-53 |
 | `OPEN-6A2B-LOCATOR-BAN` | **신설**(→ 리플렉션 봉쇄 게이트 레인) | D-6A2b-39 |
 | `OPEN-6A2B-DRYRUN-ASSEMBLY-IN-APP` | **신설** — 팀장 수용(2026-09-27): dry-run 조립이 어댑터 구체 클래스 셋(기록형·고정 전략·요청 여력 — DB 쓰기 없음)을 app 에서 직접 만든다. 세 이름을 계약 파일에 정확히 고정(다른 구체 클래스 → RED). 편집 경로처럼 어댑터 층으로 옮기는 일은 `adapters/**/evaluation/**` 가 in_scope 밖이라 후속 slice | D-6A2b-32 |
 
