@@ -356,8 +356,17 @@ def _parse_manifest(manifest_bytes: bytes) -> _Manifest:
 
 
 def _parse_rows(rows_bytes: bytes) -> tuple[SnapshotRow, ...]:
+    """깨진 바이트를 **치환하지 않는다**(code-review r1 L-1) — 같은 모듈이 「미지 키를
+    조용히 무시하지 않고 거부한다」를 표방하면서 바이트는 조용히 바꾸면 일관되지 않다.
+    `UnicodeDecodeError` 는 `MALFORMED_JSON` 으로 접힌다."""
     rows: list[SnapshotRow] = []
-    for line in rows_bytes.decode("utf-8", errors="replace").splitlines():
+    try:
+        text = rows_bytes.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise RowReadError(
+            SnapshotRejectionReason.MALFORMED_JSON, "rows: UTF-8 아님"
+        ) from exc
+    for line in text.splitlines():
         if not line.strip():
             continue
         fields = row_mapping(decode_json(line.encode("utf-8"), "row"), "row", _ROW_KEYS)

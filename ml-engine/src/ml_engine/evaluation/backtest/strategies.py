@@ -27,7 +27,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import Protocol
+from typing import Final, Protocol
 
 import numpy as np
 
@@ -73,6 +73,11 @@ class StrategyInput:
     reserve_range_begin_rate: float
     reserve_range_end_rate: float
     competitors: tuple[CompetitorObservation, ...]
+    history_participant_counts: tuple[int, ...]
+    """지난 창 공고들의 투찰자 수 — **공고 하나당 한 원소**다(code-review r1 M-3).
+    `competitors` 는 투찰 한 건마다 한 원소라 참가자가 많은 공고가 더 많은 원소를 내고,
+    그 중앙값은 위로 끌린다(size-biased). 두 목록을 나눠 그 편향을 없앤다."""
+
     seed: int
 
     @property
@@ -92,11 +97,11 @@ class StrategyInput:
 
     @property
     def expected_participant_count(self) -> int:
-        """경쟁자 수 추정 — 지난 창 공고들의 참가자 수 중앙값. 대상 공고의
+        """경쟁자 수 추정 — 지난 창 **공고 단위** 투찰자 수의 중앙값. 대상 공고의
         `participant_count` 는 개찰 결과라 **쓰지 않는다**(누출 금지)."""
-        if not self.competitors:
+        if not self.history_participant_counts:
             return 0
-        counts = sorted(item.participant_count for item in self.competitors)
+        counts = sorted(self.history_participant_counts)
         return int(counts[len(counts) // 2])
 
 
@@ -151,14 +156,18 @@ def bid_from_rate(request: StrategyInput, rate: float) -> StrategyOutcome:
     return _round_up_won(request.base_amount * rate)
 
 
-def notice_rng(request: StrategyInput) -> np.random.Generator:
-    """`(판정 seed, 공고 키 해시)` 에서 결정적으로 나오는 난수원 — 공고 처리 순서가
-    바뀌어도 같은 표본이 나온다(재현성, 위협 모델 ③)."""
+def notice_rng(request: StrategyInput, *, stream: str) -> np.random.Generator:
+    """`(판정 seed, 공고 키 해시, 스트림 이름)` 에서 결정적으로 나오는 난수원 — 공고
+    처리 순서가 바뀌어도 같은 표본이 나온다(재현성, 위협 모델 ③).
+
+    **`stream` 이 전략마다 다르다**(code-review r1 L-2). 없으면 S0 의 첫 균등 난수와
+    S4 의 사정률 표본이 같은 상태에서 나와 두 전략이 독립이 아니고, seed 안정성 스윕도
+    둘을 함께 움직인다. 배관이지 사전 등록 값이 아니라 실행 전에 고친다."""
     # 구분자 `:` 는 **전략 내부 난수** 전용이다. 표본 뽑기 순서(Kotlin 레인,
     # 스키마 §5)는 `sha256("<seed>|<notice_key_hash>")` 로 구분자가 `|` 다 — 두
     # 용도가 다르고 서로를 재현하지 않으므로 일부러 다른 구분자를 쓴다(같은 문자열을
     # 쓰면 표본 선택과 전략 난수가 상관을 갖는다).
-    material = f"{request.seed}:{request.notice.notice_key_hash}".encode()
+    material = f"{request.seed}:{request.notice.notice_key_hash}:{stream}".encode()
     digest = hashlib.sha256(material).digest()
     return np.random.default_rng(int.from_bytes(digest, "big"))
 
@@ -178,7 +187,10 @@ class UniformBandStrategy:
         half_width = request.reserve_half_width
         low = request.floor_rate * (1.0 - half_width)
         high = request.floor_rate * (1.0 + half_width)
-        return bid_from_rate(request, float(notice_rng(request).uniform(low, high)))
+        return bid_from_rate(
+            request,
+            float(notice_rng(request, stream=self.name).uniform(low, high)),
+        )
 
 
 @dataclass(frozen=True)
@@ -214,6 +226,39 @@ def _candidate_rates(
     return np.linspace(low, low + span, policy.strategies.s4_grid_size)
 
 
+_S4_STREAM: Final[str] = "S4"
+
+
+def _simulated_floors(
+    request: StrategyInput,
+    policy: StrategyBacktestPolicy,
+    ratios: np.ndarray,
+) -> np.ndarray:
+    """시뮬레이션 안의 실격선 — 채점이 쓰는 것과 **같은 수**여야 한다(code-review
+    r1 M-4). 공사는 순공사원가선까지 둘이고, 그 선을 빼면 S4 가 채점에서 부적격이
+    되는 투찰률을 고른다(실격률이 계통적으로 나빠지고 승률은 과대평가된다).
+
+    입력은 전부 투찰 시점 값이라 누출이 아니다 — `pure_construction_floor` 가
+    `cost * (예정가격/기초금액) * ratio` 인데 그 비율이 곧 시뮬레이션의 사정률
+    표본이다(개찰 결과를 읽지 않는다)."""
+    base = request.base_amount
+    floors = np.array(
+        [
+            floor_price(
+                planned_price=ratio * base,
+                floor_rate=request.floor_rate,
+                a_value_total=request.a_value_total,
+            )
+            for ratio in ratios
+        ]
+    )
+    cost = request.notice.pure_construction_cost
+    if cost is None:
+        return floors
+    pure = cost * ratios * policy.floor.pure_construction_cost_ratio
+    return np.asarray(np.maximum(floors, pure), dtype=np.float64)
+
+
 def _win_probabilities(
     request: StrategyInput,
     policy: StrategyBacktestPolicy,
@@ -221,7 +266,7 @@ def _win_probabilities(
 ) -> np.ndarray:
     """후보 투찰률마다 승률 추정 — 제도 분포에서 사정률을 뽑고, 경쟁자 투찰률을 지난
     창 표본에서 복원추출해 「적격이고 최저」일 빈도를 센다."""
-    rng = notice_rng(request)
+    rng = notice_rng(request, stream=_S4_STREAM)
     iterations = policy.strategies.s4_iteration_count
     ratios = sample_assessment_ratios(
         rng,
@@ -270,14 +315,21 @@ class InstitutionalMonteCarloStrategy:
         return bid_from_rate(request, float(rates[int(np.argmax(probabilities))]))
 
 
+def prior_notices(
+    history: Sequence[AdmittedNotice], *, before: date
+) -> tuple[AdmittedNotice, ...]:
+    """**누출 절단의 유일한 자리**(D-6G-3). 대상 공고의 개찰일 이전 개찰분만 남긴다.
+
+    경계는 엄격한 `<` 다 — 같은 날 개찰분의 결과는 투찰 시점에 알 수 없다. 경쟁 표본도
+    참가자 수 표본도 전부 이 함수를 거치므로, 절단을 고치려면 여기 한 줄을 고쳐야 하고
+    그 편집은 diff 에 드러난다."""
+    return tuple(item for item in history if item.row.outcome.opened_on < before)
+
+
 def build_competitor_pool(
     history: Sequence[AdmittedNotice], *, before: date
 ) -> tuple[CompetitorObservation, ...]:
-    """대상 공고의 **개찰일 이전** 개찰분에서만 경쟁자 투찰률을 모은다(누출 금지 ①).
-
-    경계는 엄격한 `<` 다 — 같은 날 개찰분의 결과는 투찰 시점에 알 수 없다. 이 한 줄이
-    「경쟁 표본은 그 공고 개찰일 이전 데이터만」(D-6G-3)의 유일한 구현이고,
-    `test_backtest_strategies.py` 가 대상 공고 자신을 이력에 심어 RED 를 확인한다."""
+    """지난 공고의 투찰 한 건마다 한 원소. 절단은 `prior_notices` 가 진다."""
     return tuple(
         CompetitorObservation(
             opened_on=item.row.outcome.opened_on,
@@ -288,8 +340,7 @@ def build_competitor_pool(
             reserve_prices=item.row.outcome.reserve_prices,
             drawn_serial_numbers=item.row.outcome.drawn_serial_numbers,
         )
-        for item in history
-        if item.row.outcome.opened_on < before
+        for item in prior_notices(history, before=before)
         for amount in item.bid_amounts
     )
 
@@ -299,6 +350,7 @@ def build_strategy_input(
 ) -> StrategyInput:
     """전략 입력 조립 — 개찰 결과 두 반쪽이 만나는 **유일한 자리**이고, 여기서 쓰는
     개찰 값은 대상 공고의 `opened_on`(절단 기준) 하나뿐이다."""
+    prior = prior_notices(history, before=target.row.outcome.opened_on)
     return StrategyInput(
         notice=target.row.notice,
         floor_rate=target.floor_rate,
@@ -306,6 +358,7 @@ def build_strategy_input(
         base_amount=target.base_amount,
         reserve_range_begin_rate=target.reserve_range_begin_rate,
         reserve_range_end_rate=target.reserve_range_end_rate,
-        competitors=build_competitor_pool(history, before=target.row.outcome.opened_on),
+        competitors=build_competitor_pool(prior, before=target.row.outcome.opened_on),
+        history_participant_counts=tuple(item.participant_count for item in prior),
         seed=seed,
     )

@@ -18,6 +18,7 @@ gRPC 서버를 띄우지 않는다 — 오프라인 실험에 서버 경로는 �
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
 from ml_engine.contracts import common_pb2, features_pb2, prediction_pb2
@@ -36,8 +37,9 @@ from ml_engine.inference.results import CandidateLabel, Success
 
 _KRW = common_pb2.CURRENCY_KRW
 _BASE_AMOUNT_BASIS = common_pb2.BASIS_BASE_AMOUNT
-# 스냅숏의 기초금액은 공고 게시값이다(수집 어댑터가 `bssamt` 로 채운다) — provenance
-# 라벨도 그 사실 그대로다. 값을 지어내지 않는다.
+# 전략 입력의 기초금액은 **기초금액 조회 오퍼레이션**의 값이다(D-6G-19) — 개찰결과
+# 출처의 `bssamt` 는 `OpeningOutcome` 쪽에만 있고 이 어댑터에 닿지 않는다. provenance
+# 라벨은 그 사실 그대로이고 값을 지어내지 않는다(code-review r1 M-7).
 _PROVENANCE = common_pb2.AMOUNT_PROVENANCE_KIND_PUBLISHED
 _PROVENANCE_LABEL = common_pb2.BASE_AMOUNT_PROVENANCE_LABEL_CLEAN
 
@@ -96,23 +98,44 @@ def build_request(
     )
 
 
+def _request_digest(request: StrategyInput) -> str:
+    """엔진 결과를 정하는 입력 전부의 sha256 — 대상 공고 축과 **경쟁 표본의 내용**.
+    표본 수만 쓰면 길이가 같고 내용이 다른 표본에서 낡은 결과가 돌아온다."""
+    material = [
+        request.notice.notice_key_hash,
+        repr(request.base_amount),
+        repr(request.floor_rate),
+        repr(request.a_value_total),
+        str(request.notice.category),
+    ]
+    material.extend(
+        f"{item.opened_on.isoformat()}|{item.bid_rate!r}|{item.base_amount!r}"
+        f"|{item.category}|{item.reserve_prices!r}|{item.drawn_serial_numbers!r}"
+        for item in request.competitors
+    )
+    return hashlib.sha256("\n".join(material).encode("utf-8")).hexdigest()
+
+
 class DistributionEngine:
     """분포 엔진 호출을 후보 셋·seed 다섯이 **공유**하는 자리.
 
     엔진 결과는 (대상 공고, 경쟁 표본) 에만 달려 있다 — 후보 라벨도 판정 seed 도 입력이
     아니다. 라벨마다·seed 마다 다시 부르면 같은 계산을 열다섯 번 한다(재현 test 실측:
-    7분 -> 캐시 뒤 그 일부). 캐시 키는 공고 키 해시와 표본 수다: 창은 비중첩이고
-    (`run` 이 `window_overlaps` 로 실측해 단언한다) 한 공고는 한 창에만 들어가므로,
-    같은 공고에 두 가지 표본이 붙는 일이 없다.
+    7분 -> 캐시 뒤 그 일부).
+
+    **캐시 키는 표본의 내용 해시다**(verifier r1 M-1). 앞선 판은 `(공고 키, 표본 수)`
+    였는데, 판(variant) 셋이 같은 엔진을 공유하므로 **길이는 같고 내용만 다른** 표본이
+    실재한다(verifier 가 길이 684 인 두 표본으로 재현: 새 엔진 0.8596, 캐시 0.8862).
+    길이는 내용의 대리가 아니다.
 
     **순수 메모다** — 같은 입력이면 같은 결과이고, 캐시가 있든 없든 판정이 같다."""
 
     def __init__(self, inference_policy: InferencePolicy) -> None:
         self._policy = inference_policy
-        self._cache: dict[tuple[str, int], Success | None] = {}
+        self._cache: dict[str, Success | None] = {}
 
     def result_for(self, request: StrategyInput) -> Success | None:
-        key = (request.notice.notice_key_hash, len(request.competitors))
+        key = _request_digest(request)
         if key not in self._cache:
             self._cache[key] = self._evaluate(request)
         return self._cache[key]

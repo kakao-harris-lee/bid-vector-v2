@@ -139,8 +139,18 @@ class VerdictThresholds:
 
     @property
     def primary_alpha(self) -> float:
-        """Bonferroni 보정 뒤 주 가설 유의수준 — 판정이 쓰는 유일한 유의수준(우회 ⑥)."""
+        """Bonferroni 보정 뒤 **주 가설** 유의수준(우회 ⑥)."""
         return self.alpha / self.primary_hypothesis_count
+
+    def alpha_for(self, *, primary: bool) -> float:
+        """가설 종류에 맞는 유의수준 — **보정을 고르는 것도 정책 객체의 몫**이다
+        (D-6G-32, code-review r1 M-2). D-6G-6 은 주 가설(S2 세 후보)만 Bonferroni
+        /3 이고 보조(S1·S4)는 보정 없는 유의수준으로 따로 공시한다. 판정 코드가 어느 쪽을 쓸지 직접
+        고르면 그 선택이 diff 에 드러나지 않는다.
+
+        **보조가 주보다 느슨하다** — 그 완화가 숨지 않게 판정 JSON 이 전략마다
+        `alpha_used` 를 싣는다."""
+        return self.primary_alpha if primary else self.alpha
 
 
 @dataclass(frozen=True)

@@ -9,8 +9,14 @@ NotEvaluable(reason)` sealed 타입, 「못 이겼다」와 「못 쟀다」를 
 이진 지표(would-have-won)의 쌍대 비율과 McNemar 정확 검정으로 판정한다.
 
 판정식은 한 자리(`passes_window`)에만 있고 창 판정·합동 판정이 같은 함수를 쓴다
-(이중 구현 금지, 5C-2 verifier r1 H-2 와 같은 규율). Bonferroni 보정된 유의수준은
-정책 객체(`verdict.primary_alpha`)가 내므로 여기서 다시 나누지 않는다.
+(이중 구현 금지, 5C-2 verifier r1 H-2 와 같은 규율). 유의수준은 **정책 객체가**
+고른다(`VerdictThresholds.alpha_for`) — 주 가설은 Bonferroni /3, 보조는 보정 없음(D-6G-32).
+여기서 나누지도, 어느 쪽인지 고르지도 않는다.
+
+**UNDERPOWERED 는 창 단위다**(D-6G-31, verifier r1 M-2). 계약 문면이 「**창의** 불일치
+쌍 수가 모자람」이고, 창이 검정력 미달인데 `Failed` 로 접으면 D-6G-7 의 「미배선」
+갈래로 가 버린다 — 원래는 「수집 연장」 갈래다. 판정 가능한 창이 과반에 못 미치면
+전체가 `NotEvaluable` 이다.
 """
 
 from __future__ import annotations
@@ -49,6 +55,10 @@ class WindowOutcome:
     relative_gain: float
     discordant: DiscordantCounts
     p_value: float
+    alpha_used: float
+    """이 창에 실제로 쓴 유의수준 — 주 가설은 Bonferroni 보정값, 보조는 유의수준. 보조가
+    느슨한 것이 판정 JSON 문면에 보이게 싣는다(D-6G-32)."""
+
     required_discordant_pairs: int | None
     passed: bool
 
@@ -64,12 +74,17 @@ class WindowOutcome:
 
 
 def passes_window(
-    outcome_gain: float, p_value: float, policy: StrategyBacktestPolicy
+    outcome_gain: float,
+    p_value: float,
+    policy: StrategyBacktestPolicy,
+    *,
+    primary: bool,
 ) -> bool:
-    """판정식 그 자체 — 유일 정의. 창 판정도 합동 판정도 이 함수만 쓴다."""
+    """판정식 그 자체 — 유일 정의. 창 판정도 합동 판정도 이 함수만 쓴다. 유의수준은
+    정책이 고르고(`alpha_for`) 여기서는 그 값을 쓰기만 한다."""
     return (
         outcome_gain >= policy.verdict.min_relative_improvement
-        and p_value <= policy.verdict.primary_alpha
+        and p_value <= policy.verdict.alpha_for(primary=primary)
     )
 
 
@@ -79,12 +94,14 @@ def evaluate_window(
     baseline: StrategyScores,
     strategy: StrategyScores,
     policy: StrategyBacktestPolicy,
+    primary: bool,
 ) -> WindowOutcome:
     """창 하나의 결과 — 쌍은 공고 순서로 맞춘다(`score_strategy` 가 순서를 지킨다)."""
     counts = discordant_counts(strategy.wins, baseline.wins)
     p_value = one_sided_p_value(counts)
     gain = relative_gain(baseline.win_rate, strategy.win_rate)
     rows = len(baseline.scores)
+    alpha = policy.verdict.alpha_for(primary=primary)
     required = required_discordant_pairs(
         success_probability=alternative_success_probability(
             window_rows=rows,
@@ -92,7 +109,7 @@ def evaluate_window(
             relative_improvement=policy.verdict.min_relative_improvement,
             pairs=counts.total,
         ),
-        alpha=policy.verdict.primary_alpha,
+        alpha=alpha,
         target_power=policy.verdict.target_power,
     )
     return WindowOutcome(
@@ -103,14 +120,16 @@ def evaluate_window(
         relative_gain=gain,
         discordant=counts,
         p_value=p_value,
+        alpha_used=alpha,
         required_discordant_pairs=required,
-        passed=passes_window(gain, p_value, policy),
+        passed=passes_window(gain, p_value, policy, primary=primary),
     )
 
 
 @dataclass(frozen=True)
 class _Summary:
     strategy_name: str
+    primary: bool
     windows: tuple[WindowOutcome, ...]
     pooled: WindowOutcome
     ineligibility_delta: float
@@ -132,6 +151,7 @@ class StrategyNotEvaluable:
     """못 쟀다 — `Passed` 가 될 수 없다(타입, 불리언 쌍 아님)."""
 
     strategy_name: str
+    primary: bool
     reason: NotEvaluableReason
     windows: tuple[WindowOutcome, ...]
     pooled: WindowOutcome | None
@@ -146,47 +166,53 @@ def _majority_passed(windows: Sequence[WindowOutcome]) -> bool:
     return sum(1 for window in windows if window.passed) * 2 > len(windows)
 
 
+def evaluable_window_count(windows: Sequence[WindowOutcome]) -> int:
+    """검정력이 서는 창의 수 — 「잴 수 있었던 창」이다(D-6G-31)."""
+    return sum(1 for window in windows if not window.underpowered)
+
+
 def _not_evaluable(
     *,
     strategy_name: str,
+    primary: bool,
     windows: tuple[WindowOutcome, ...],
     pooled: WindowOutcome,
     seed_sign_consistent: bool,
     policy: StrategyBacktestPolicy,
 ) -> StrategyNotEvaluable | None:
-    """「못 쟀다」 셋 — 순서: 창 부족 -> seed 불안정 -> underpowered. 창이 모자라면
-    합동 결과 자체를 공시하지 않는다(`pooled=None`) — 잴 창이 없었다는 사실이 값보다
-    앞선다."""
+    """「못 쟀다」 넷 — 순서: 창 부족 -> seed 불안정 -> 기준선 무승 -> 창 단위
+    underpowered. 창이 모자라면 합동 결과 자체를 공시하지 않는다(`pooled=None`) —
+    잴 창이 없었다는 사실이 값보다 앞선다."""
+
+    def rejected(
+        reason: NotEvaluableReason, *, show_pooled: bool = True
+    ) -> StrategyNotEvaluable:
+        return StrategyNotEvaluable(
+            strategy_name,
+            primary,
+            reason,
+            windows,
+            pooled if show_pooled else None,
+            pooled.required_discordant_pairs,
+        )
+
     if len(windows) < policy.verdict.min_window_count:
-        return StrategyNotEvaluable(
-            strategy_name,
-            NotEvaluableReason.NO_EVALUABLE_WINDOW,
-            windows,
-            None,
-            pooled.required_discordant_pairs,
-        )
+        return rejected(NotEvaluableReason.NO_EVALUABLE_WINDOW, show_pooled=False)
     if not seed_sign_consistent:
-        return StrategyNotEvaluable(
-            strategy_name,
-            NotEvaluableReason.SEED_UNSTABLE,
-            windows,
-            pooled,
-            pooled.required_discordant_pairs,
-        )
-    if pooled.underpowered:
-        return StrategyNotEvaluable(
-            strategy_name,
-            NotEvaluableReason.UNDERPOWERED,
-            windows,
-            pooled,
-            pooled.required_discordant_pairs,
-        )
+        return rejected(NotEvaluableReason.SEED_UNSTABLE)
+    if pooled.baseline_win_rate <= 0.0:
+        # 기준선이 한 번도 이기지 못했다 — 상대 개선의 분모가 0 이라 개선률이 서지
+        # 않는다. `UNDERPOWERED` 로 접으면 다른 이름이 붙는다(code-review r1 L-3).
+        return rejected(NotEvaluableReason.NO_BASELINE_WIN)
+    if evaluable_window_count(windows) * 2 <= len(windows) or pooled.underpowered:
+        return rejected(NotEvaluableReason.UNDERPOWERED)
     return None
 
 
 def strategy_verdict(
     *,
     strategy_name: str,
+    primary: bool,
     windows: Sequence[WindowOutcome],
     pooled: WindowOutcome,
     ineligibility_delta: float,
@@ -200,6 +226,7 @@ def strategy_verdict(
     ordered = tuple(windows)
     unmeasured = _not_evaluable(
         strategy_name=strategy_name,
+        primary=primary,
         windows=ordered,
         pooled=pooled,
         seed_sign_consistent=seed_sign_consistent,
@@ -209,6 +236,7 @@ def strategy_verdict(
         return unmeasured
     summary = (
         strategy_name,
+        primary,
         ordered,
         pooled,
         ineligibility_delta,

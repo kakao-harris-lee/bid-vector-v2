@@ -139,6 +139,12 @@ def _samples_match(run: dict[str, tuple[StrategyScores, ...]]) -> bool:
     return len(signatures) == 1
 
 
+def _is_primary(request: BacktestRequest, name: str) -> bool:
+    """주 가설인가 — Bonferroni 보정이 걸리는 쪽이다(D-6G-6·32). 이 술어가 판정
+    경로에 닿지 않으면 주/보조 구분이 공시용 장식이 된다(code-review r1 M-2)."""
+    return name in request.primary_names
+
+
 def _seed_sign_consistent(
     request: BacktestRequest,
     plan: WindowPlan,
@@ -147,6 +153,7 @@ def _seed_sign_consistent(
 ) -> bool:
     """seed 다섯에서 합동 판정의 **부호와 통과 여부**가 일관한가(5C-2 개념 승계)."""
     del plan
+    primary = _is_primary(request, name)
     signs: set[bool] = set()
     verdicts: set[bool] = set()
     for run in runs:
@@ -155,10 +162,16 @@ def _seed_sign_consistent(
             baseline=_pooled_scores(run[request.baseline.name]),
             strategy=_pooled_scores(run[name]),
             policy=request.policy,
+            primary=primary,
         )
         signs.add(pooled.relative_gain > 0.0)
         verdicts.add(
-            passes_window(pooled.relative_gain, pooled.p_value, request.policy)
+            passes_window(
+                pooled.relative_gain,
+                pooled.p_value,
+                request.policy,
+                primary=primary,
+            )
         )
     return len(signs) <= 1 and len(verdicts) <= 1
 
@@ -169,15 +182,17 @@ def _strategy_verdict(
     name: str,
     runs: Sequence[dict[str, tuple[StrategyScores, ...]]],
 ) -> StrategyVerdict:
-    primary = runs[0]
-    baseline_windows = primary[request.baseline.name]
-    strategy_windows = primary[name]
+    first = runs[0]
+    is_primary = _is_primary(request, name)
+    baseline_windows = first[request.baseline.name]
+    strategy_windows = first[name]
     windows: tuple[WindowOutcome, ...] = tuple(
         evaluate_window(
             window_index=plan.selected[index].window.index,
             baseline=baseline_windows[index],
             strategy=strategy_windows[index],
             policy=request.policy,
+            primary=is_primary,
         )
         for index in range(len(plan.selected))
     )
@@ -188,9 +203,11 @@ def _strategy_verdict(
         baseline=baseline_pooled,
         strategy=strategy_pooled,
         policy=request.policy,
+        primary=is_primary,
     )
     return strategy_verdict(
         strategy_name=name,
+        primary=is_primary,
         windows=windows,
         pooled=pooled,
         ineligibility_delta=(

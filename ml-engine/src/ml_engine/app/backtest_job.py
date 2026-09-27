@@ -105,11 +105,13 @@ def _load_policies(
 def _load_snapshot(snapshot_uri: str) -> LoadedSnapshot | JobFailed:
     files = read_snapshot_files(snapshot_uri)
     if isinstance(files, SnapshotUnreadable):
-        return JobFailed(
-            JobFailureReason.SNAPSHOT_UNREADABLE, f"{files.reason}: {files.detail}"
-        )
+        # privacy r1 LOW-2 — `detail` 에 절대 경로가 실리면 실패 문면이 호스트의
+        # 디렉터리 구조를 나른다. 사유 어휘만 낸다(경로는 부르는 쪽이 이미 안다).
+        return JobFailed(JobFailureReason.SNAPSHOT_UNREADABLE, str(files.reason))
     snapshot = load_snapshot(files.manifest_bytes, files.rows_bytes)
     if not isinstance(snapshot, LoadedSnapshot):
+        # 판독 거부 사유의 `detail` 은 필드 이름만 나른다(식별자·경로 없음) —
+        # 그대로 실어도 안전하다.
         return JobFailed(
             JobFailureReason.SNAPSHOT_REJECTED,
             f"{snapshot.reason}: {snapshot.detail}",

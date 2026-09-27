@@ -66,6 +66,7 @@ def _window_outcome(outcome: WindowOutcome) -> dict[str, JsonValue]:
         "discordant_strategy_only": outcome.discordant.strategy_only,
         "discordant_baseline_only": outcome.discordant.baseline_only,
         "p_value": outcome.p_value,
+        "alpha_used": outcome.alpha_used,
         "required_discordant_pairs": outcome.required_discordant_pairs,
         "passed": outcome.passed,
         "underpowered": outcome.underpowered,
@@ -75,6 +76,7 @@ def _window_outcome(outcome: WindowOutcome) -> dict[str, JsonValue]:
 def _strategy(verdict: StrategyVerdict) -> dict[str, JsonValue]:
     payload: dict[str, JsonValue] = {
         "strategy": verdict.strategy_name,
+        "primary_hypothesis": verdict.primary,
         "outcome": type(verdict).__name__,
         "windows": [_window_outcome(window) for window in verdict.windows],
     }

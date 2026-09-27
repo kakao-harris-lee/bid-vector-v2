@@ -148,6 +148,19 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
         "S4",
     ]
     assert payload["primary_hypotheses"] == list(S2_STRATEGY_NAMES)
+    # D-6G-32 — Bonferroni 는 주 가설 셋만. 보조가 느슨한 쪽이라 그 완화가 전략마다
+    # `alpha_used` 로 문면에 보인다.
+    used = {
+        item["strategy"]: item["windows"][0]["alpha_used"]
+        for item in payload["strategies"]
+    }
+    assert used["S2b"] < used["S1"]
+    assert used["S2b"] == pytest.approx(0.05 / 3)
+    assert used["S1"] == pytest.approx(0.05)
+    assert used["S4"] == pytest.approx(0.05)
+    assert {
+        item["strategy"] for item in payload["strategies"] if item["primary_hypothesis"]
+    } == set(S2_STRATEGY_NAMES)
     assert len(payload["selected_windows"]) >= 3
     assert payload["seeds"] == [20260812, 1, 7, 42, 2026]
     assert payload["limitations"]

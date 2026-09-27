@@ -45,6 +45,12 @@ class NotEvaluableReason(StrEnum):
     NO_EVALUABLE_WINDOW = "NO_EVALUABLE_WINDOW"
     UNDERPOWERED = "UNDERPOWERED"
     SEED_UNSTABLE = "SEED_UNSTABLE"
+    NO_BASELINE_WIN = "NO_BASELINE_WIN"
+    """M6/6G(code-review r1 L-3) — 기준선이 한 번도 이기지 못한 창. 상대 개선의 분모가
+    0 이라 개선률이 정의되지 않는다. `improvement_ratio` 의 0 가드가 이것을 0.0 으로
+    접으면 `UNDERPOWERED` 라는 **다른 이름**이 붙는다 — 「검정력이 모자랐다」와 「잴
+    기준선이 없었다」는 다른 사실이다. 5C-2 의 GBM 게이트는 이 사유를 내지 않는다
+    (RMSE 기준선은 0 이 될 수 없다)."""
 
 
 @dataclass(frozen=True)
