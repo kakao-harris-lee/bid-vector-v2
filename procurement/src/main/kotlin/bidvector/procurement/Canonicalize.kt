@@ -80,7 +80,7 @@ private fun currencyFor(unit: FieldUnit): Currency =
     }
 
 /** 식별자를 세우는 단계의 결과 — 원문 값 유래 실패는 예외가 아니라 탈락 사유다(D-6F8-7). */
-private sealed interface IdentityOutcome {
+internal sealed interface IdentityOutcome {
     data class Resolved(
         val id: NoticeId,
     ) : IdentityOutcome
@@ -96,7 +96,7 @@ private sealed interface IdentityOutcome {
  * `NoticeRound` 이고 여기서 다시 쓰지 않는다. 그 값 객체는 위반을 `IllegalArgumentException` 으로만 알리므로
  * 이 자리에서 결과로 접는다. 번호는 공백만 아니면 `NoticeNumber.of` 가 던지지 않는다.
  */
-private fun resolvedNoticeId(
+internal fun resolvedNoticeId(
     observation: RawNoticeObservation,
     registry: KonepsFieldContractRegistry,
 ): IdentityOutcome {

@@ -140,6 +140,23 @@ internal object KonepsOperationPolicy {
             requiresNoticeRound = false,
             rowIdentifierRawKeys = listOf("bidNtceOrd"),
         )
+
+    /**
+     * 기초금액 조회(입찰공고정보서비스 op 5·6·7, M6/6G D-6G-19) — 이 군의 `inqryDiv` 는
+     * **1 = 입력일시 · 2 = 입찰공고번호**다(P-5 §2.1 — 목록 4종·op 24 와 **다른 축**이다). 단건
+     * 조회로 쓰므로 `2` 이고 `bidNtceNo` 가 필수다.
+     *
+     * `bidNtceOrd` 는 **요청 항목에 아예 없다**(응답에는 필수로 있다) — 보내지 않고, 응답의 차수 키가
+     * 행을 가른다(op 24 와 같은 형태). 업무 대분류는 **경로**가 정한다: 같은 서술자를 세 경로에 쓴다.
+     */
+    val BASE_AMOUNT_DETAIL =
+        KonepsOperationDescriptor(
+            inquiryDivValue = "2",
+            requiresPeriodWindow = false,
+            requiresNoticeNumber = true,
+            requiresNoticeRound = false,
+            rowIdentifierRawKeys = listOf("bidNtceOrd"),
+        )
 }
 
 /**

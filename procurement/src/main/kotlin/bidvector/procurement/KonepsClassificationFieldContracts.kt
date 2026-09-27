@@ -1,7 +1,5 @@
 package bidvector.procurement
 
-import bidvector.sharedkernel.VatTreatment
-
 /**
  * M6/6F-9 D-6F9-2 — 업무구분 세부 분류 넷 필드 계약 열(6F-8 실수집이 응답에서 실측한 키). `CollectionPolicy.kt` 에서
  * 분리한 파일이다(sizeGate 500줄 — `KonepsAgencyFieldContracts.kt` 와 같은 전례). **키 리터럴은 계약 데이터인
@@ -14,23 +12,8 @@ import bidvector.sharedkernel.VatTreatment
  */
 internal val KONEPS_CLASSIFICATION_FIELD_ROWS: List<FieldContractRow> =
     listOf(
-        classificationRow("pubPrcrmntClsfcNo", FieldConcept.PUBLIC_PROCUREMENT_CLASS_CODE, FieldScale.IDENTIFIER),
-        classificationRow("pubPrcrmntClsfcNm", FieldConcept.PUBLIC_PROCUREMENT_CLASS_NAME, FieldScale.OPAQUE_TEXT),
-        classificationRow("srvceDivNm", FieldConcept.SERVICE_DIVISION, FieldScale.OPAQUE_TEXT),
-        classificationRow("mainCnsttyNm", FieldConcept.MAIN_CONSTRUCTION_TYPE, FieldScale.OPAQUE_TEXT),
-    )
-
-private fun classificationRow(
-    rawName: String,
-    concept: FieldConcept,
-    scale: FieldScale,
-): FieldContractRow =
-    FieldContractRow(
-        rawName = RawKey(rawName),
-        concept = concept,
-        basis = null,
-        scale = scale,
-        nullability = FieldNullability.OPTIONAL,
-        vatTreatment = VatTreatment.UNKNOWN,
-        provenanceTemplate = FieldProvenanceTemplate.NOT_APPLICABLE,
+        optionalFieldRow("pubPrcrmntClsfcNo", FieldConcept.PUBLIC_PROCUREMENT_CLASS_CODE, FieldScale.IDENTIFIER),
+        optionalFieldRow("pubPrcrmntClsfcNm", FieldConcept.PUBLIC_PROCUREMENT_CLASS_NAME, FieldScale.OPAQUE_TEXT),
+        optionalFieldRow("srvceDivNm", FieldConcept.SERVICE_DIVISION, FieldScale.OPAQUE_TEXT),
+        optionalFieldRow("mainCnsttyNm", FieldConcept.MAIN_CONSTRUCTION_TYPE, FieldScale.OPAQUE_TEXT),
     )

@@ -48,6 +48,7 @@ class KonepsOpeningResultSource(
     private val reserveDetailBaseUri: URI,
     private val openingCompleteBaseUri: URI,
     private val bidPriceFormulaABaseUri: URI,
+    private val baseAmountBaseUri: URI,
     private val config: KonepsSourceConfig,
 ) : OpeningResultSourcePort {
     private val retryName = "koneps-opening-${listSourceEndpoint.name.lowercase()}"
@@ -162,6 +163,29 @@ class KonepsOpeningResultSource(
                 SourceEndpoint.BID_PRICE_FORMULA_A,
                 observedAt,
                 KonepsOperationPolicy.BID_PRICE_FORMULA_A.rowIdentifierRawKeys,
+            )
+        }
+
+    /**
+     * 기초금액 조회(M6/6G D-6G-19) — [baseAmountBaseUri] 는 **이 인스턴스의 업무 대분류**에 해당하는
+     * 경로다(물품·공사·용역이 각자 다른 오퍼레이션이다). 호출부가 업무를 고르지 않는다 — 인스턴스가
+     * 자기 경로를 들고 있으므로 잘못된 업무의 오퍼레이션을 부르는 조합이 생기지 않는다.
+     */
+    override fun fetchBaseAmount(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation> =
+        fetchSingleKonepsNotice(
+            config,
+            retry,
+            rateLimiter,
+            baseAmountBaseUri,
+            KonepsOperationPolicy.BASE_AMOUNT_DETAIL,
+            evidence.noticeId,
+        ) { item, itemPolicy, observedAt ->
+            mapMaskedOpeningItem(
+                item,
+                itemPolicy,
+                SourceEndpoint.BASE_AMOUNT_DETAIL,
+                observedAt,
+                KonepsOperationPolicy.BASE_AMOUNT_DETAIL.rowIdentifierRawKeys,
             )
         }
 }

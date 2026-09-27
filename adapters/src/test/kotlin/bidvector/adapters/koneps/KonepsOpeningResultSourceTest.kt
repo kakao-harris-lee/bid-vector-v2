@@ -36,6 +36,7 @@ private fun newSource(
         reserveDetailBaseUri = server.baseUri,
         openingCompleteBaseUri = server.baseUri,
         bidPriceFormulaABaseUri = server.baseUri,
+        baseAmountBaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
                 httpClient = HttpClient.newHttpClient(),
@@ -59,6 +60,7 @@ private fun newResultListSource(
         reserveDetailBaseUri = server.baseUri,
         openingCompleteBaseUri = server.baseUri,
         bidPriceFormulaABaseUri = server.baseUri,
+        baseAmountBaseUri = server.baseUri,
         config =
             KonepsSourceConfig(
                 httpClient = HttpClient.newHttpClient(),

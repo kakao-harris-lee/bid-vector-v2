@@ -52,6 +52,25 @@ class CallBudgetLedger(
     var spentTotal: Int = 0
         private set
 
+    /**
+     * **이미 나간** 호출을 사후 반영한다 — 거부하지 않는다(거부해도 호출은 되돌아오지 않는다). 한 걸음이
+     * 여러 페이지를 걸었을 때 그 나머지를 싣는 자리다: 페이지 수는 걷기 전에 알 수 없으므로 한 페이지만
+     * 미리 허가받고([consume]) 나머지를 여기서 정산한다. 다음 걸음의 허가 판정이 이 값을 보므로 초과분은
+     * **최대 한 걸음의 페이지 수**로 묶인다.
+     */
+    fun settle(
+        onDay: LocalDate,
+        calls: Int,
+    ) {
+        require(calls >= 0) { "정산 호출 수는 음수일 수 없다: $calls" }
+        if (onDay != day) {
+            day = onDay
+            spentToday = 0
+        }
+        spentToday += calls
+        spentTotal += calls
+    }
+
     fun consume(
         onDay: LocalDate,
         calls: Int,

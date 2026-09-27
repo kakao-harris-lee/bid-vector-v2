@@ -45,6 +45,14 @@ enum class SourceEndpoint {
      * 오퍼레이션이라 다섯째 군으로 선다(기존 군에 접으면 `presentIn`이 그 구별을 잃는다).
      */
     BID_PRICE_FORMULA_A,
+
+    /**
+     * 기초금액 조회(M6/6G D-6G-19 — 입찰공고정보서비스 op 5·6·7
+     * `getBidPblancListInfo{Thng,Cnstwk,Servc}BsisAmount`) — 예가 범위율·기초금액 공개일시와 공사
+     * 전용 칸(A값 공고 여부·순공사원가)을 나른다. 업무 대분류마다 **다른 오퍼레이션**이지만 응답 축은
+     * 하나라 엔드포인트 토큰도 하나다(어느 업무로 받았는가는 관측의 `sourceDivision` 이 나른다).
+     */
+    BASE_AMOUNT_DETAIL,
 }
 
 /**

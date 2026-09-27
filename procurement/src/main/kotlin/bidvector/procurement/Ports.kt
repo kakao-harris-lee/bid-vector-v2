@@ -73,6 +73,13 @@ interface OpeningResultSourcePort {
      * 서비스**의 오퍼레이션이라 baseUri 가 다른 서비스를 가리킨다.
      */
     fun fetchBidPriceFormulaA(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
+
+    /**
+     * M6/6G D-6G-19 — 기초금액 조회(`getBidPblancListInfo{Thng,Cnstwk,Servc}BsisAmount`) 단건 조회.
+     * **업무 대분류마다 다른 오퍼레이션**이라 구현 인스턴스가 자기 업무의 경로를 안다(호출부가 고르지
+     * 않는다). 예가 범위율·기초금액 공개일시와 공사 전용 칸을 나른다.
+     */
+    fun fetchBaseAmount(evidence: DetailFetchDecision.Fetch): SourceBatch<RawNoticeObservation>
 }
 
 /**

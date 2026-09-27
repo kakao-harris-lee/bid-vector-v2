@@ -160,7 +160,7 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
             FieldNullability.OPTIONAL,
             VatTreatment.UNKNOWN,
             FieldProvenanceTemplate.PUBLISHED,
-            presentIn = setOf(SourceEndpoint.NOTICE_LIST, SourceEndpoint.RESERVE_PRICE_DETAIL),
+            presentIn = BASE_AMOUNT_PRESENT_IN,
         ),
         FieldContractRow(
             RawKey("asignBdgtAmt"),
@@ -278,7 +278,7 @@ private val KONEPS_OPERATIONAL_FIELD_ROWS: List<FieldContractRow> =
 private val KONEPS_OPERATIONAL_FIELD_CONTRACTS: List<KonepsFieldContract> =
     (
         KONEPS_OPERATIONAL_FIELD_ROWS + KONEPS_OPENING_FIELD_ROWS + KONEPS_OPENING_COMPLETE_ROWS +
-            KONEPS_BID_PRICE_FORMULA_A_ROWS
+            KONEPS_BID_PRICE_FORMULA_A_ROWS + KONEPS_BASE_AMOUNT_ROWS + KONEPS_AWARD_METHOD_TEXT_ROWS
     ).map { it.toContract() }
 private val KONEPS_ALL_FIELD_CONTRACTS: List<KonepsFieldContract> =
     KONEPS_OPERATIONAL_FIELD_CONTRACTS +

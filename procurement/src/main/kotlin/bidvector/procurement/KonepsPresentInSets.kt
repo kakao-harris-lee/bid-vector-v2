@@ -22,4 +22,16 @@ internal val NOTICE_IDENTIFIER_PRESENT_IN: Set<SourceEndpoint> =
         SourceEndpoint.OPENING_COMPLETE,
         // M6/6G D-6G-12 — 입찰가격산식 A 정보도 「어느 공고의 행인가」를 필수 항목으로 싣는다.
         SourceEndpoint.BID_PRICE_FORMULA_A,
+        // M6/6G D-6G-19 — 기초금액 조회도 공고번호·차수를 응답 필수 항목으로 싣는다.
+        SourceEndpoint.BASE_AMOUNT_DETAIL,
     )
+
+/**
+ * A 합산 항목 가운데 **입찰가격산식 A 정보(op 24)와 기초금액 조회(op 5·6·7) 양쪽에 오는** 키의 presentIn
+ * (M6/6G D-6G-19, P-5 §3.1 전수표). 같은 raw 키를 두 행으로 등재할 수 없으므로(레지스트리가 중복을
+ * 거부한다) 한 행의 presentIn 을 넓힌다. 물품은 산업안전보건관리비의 **이름이 다르고**
+ * (`industSftyHelthMngcst`) 노인장기요양보험료·안전관리비가 **없다** — presentIn 은 엔드포인트 축이라
+ * 업무별 부재는 값의 부재로 나타난다.
+ */
+internal val A_ITEM_PRESENT_IN: Set<SourceEndpoint> =
+    setOf(SourceEndpoint.BID_PRICE_FORMULA_A, SourceEndpoint.BASE_AMOUNT_DETAIL)

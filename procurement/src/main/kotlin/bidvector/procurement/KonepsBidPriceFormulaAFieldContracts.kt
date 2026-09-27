@@ -16,19 +16,19 @@ import bidvector.sharedkernel.VatTreatment
  */
 internal val KONEPS_BID_PRICE_FORMULA_A_ROWS: List<FieldContractRow> =
     listOf(
-        aComponentRow("npnInsrprm", FieldConcept.A_NATIONAL_PENSION_PREMIUM),
-        aComponentRow("mrfnHealthInsrprm", FieldConcept.A_HEALTH_INSURANCE_PREMIUM),
-        aComponentRow("odsnLngtrmrcprInsrprm", FieldConcept.A_LONG_TERM_CARE_INSURANCE_PREMIUM),
-        aComponentRow("rtrfundNon", FieldConcept.A_RETIREMENT_MUTUAL_AID_CONTRIBUTION),
-        aComponentRow("sftyMngcst", FieldConcept.A_INDUSTRIAL_SAFETY_HEALTH_COST),
-        aComponentRow("sftyChckMngcst", FieldConcept.A_SAFETY_MANAGEMENT_COST),
-        aComponentRow("qltyMngcst", FieldConcept.A_QUALITY_MANAGEMENT_COST),
-        aComponentRow("smkpAmt", FieldConcept.A_STANDARD_MARKET_UNIT_PRICE_AMOUNT),
+        aSharedComponentRow("npnInsrprm", FieldConcept.A_NATIONAL_PENSION_PREMIUM),
+        aSharedComponentRow("mrfnHealthInsrprm", FieldConcept.A_HEALTH_INSURANCE_PREMIUM),
+        aSharedComponentRow("odsnLngtrmrcprInsrprm", FieldConcept.A_LONG_TERM_CARE_INSURANCE_PREMIUM),
+        aSharedComponentRow("rtrfundNon", FieldConcept.A_RETIREMENT_MUTUAL_AID_CONTRIBUTION),
+        aSharedComponentRow("sftyMngcst", FieldConcept.A_INDUSTRIAL_SAFETY_HEALTH_COST),
+        aSharedComponentRow("sftyChckMngcst", FieldConcept.A_SAFETY_MANAGEMENT_COST),
+        aSharedComponentRow("qltyMngcst", FieldConcept.A_QUALITY_MANAGEMENT_COST),
+        aSharedComponentRow("smkpAmt", FieldConcept.A_STANDARD_MARKET_UNIT_PRICE_AMOUNT),
         // 술어 둘 — 문서상 필수(1). 값이 `Y` 일 때만 해당 금액이 A 에 합산된다. `Y`/`N` 을
         // boolean 으로 접지 않는다: 문서가 두 값만 선언했다는 근거가 없어 세 번째 값이 오면
         // 조용히 `false` 가 되는 자리를 만들지 않는다(원문 그대로, 해석은 읽는 쪽이).
-        aPredicateRow("qltyMngcstAObjYn", FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE),
-        aPredicateRow("smkpAmtYn", FieldConcept.A_STANDARD_MARKET_UNIT_PRICE_APPLICABLE),
+        aSharedPredicateRow("qltyMngcstAObjYn", FieldConcept.A_QUALITY_MANAGEMENT_COST_APPLICABLE),
+        aSharedPredicateRow("smkpAmtYn", FieldConcept.A_STANDARD_MARKET_UNIT_PRICE_APPLICABLE),
         // 일시 둘 — 서로 다른 시각이다. 공고게시는 창 포함 판정(D-6G-14), A 공개는 누출
         // 판정(D-6G-13 ⑥)의 입력이라 한 축으로 접을 수 없다.
         aDateTimeRow("ntceNticeDt", FieldConcept.NOTICE_POSTED_AT),
@@ -44,6 +44,17 @@ internal val KONEPS_BID_PRICE_FORMULA_A_ROWS: List<FieldContractRow> =
             presentIn = setOf(SourceEndpoint.BID_PRICE_FORMULA_A),
         ),
     )
+
+/** op 24 와 기초금액 조회 **양쪽**에 오는 A 합산 항목(D-6G-19, P-5 §3.1) — 행은 하나, presentIn 만 넓다. */
+private fun aSharedComponentRow(
+    rawName: String,
+    concept: FieldConcept,
+): FieldContractRow = aComponentRow(rawName, concept).copy(presentIn = A_ITEM_PRESENT_IN)
+
+private fun aSharedPredicateRow(
+    rawName: String,
+    concept: FieldConcept,
+): FieldContractRow = aPredicateRow(rawName, concept).copy(presentIn = A_ITEM_PRESENT_IN)
 
 /**
  * A 합산 항목 금액 한 행 — 과세는 미확정이다(`OPEN-REG-05` 와 같은 결). basis 를 두지 않는다:
