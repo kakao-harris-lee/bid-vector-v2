@@ -1,4 +1,5 @@
 import bidvector.buildlogic.CompatibilitySmokeTask
+import org.gradle.api.tasks.PathSensitivity
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
@@ -128,6 +129,14 @@ tasks.test {
             .get()
             .asFile.absolutePath,
     )
+
+    // M6/6A-2b D-6A2b-46(N-r4-7) — `AppGateRegistrationTest` 는 런타임에
+    // `config/quality/gate-tests.properties` 를 직접 읽는다. 그 파일을 선언된 입력으로 두지
+    // 않으면 **그 파일만 바뀐 변경**에서 task 가 UP-TO-DATE 로 건너뛰어 이전 결과가 그대로
+    // 통과로 남는다(거짓 초록) — 이 meta-gate 가 잡으려는 변경이 정확히 그 모양이다.
+    // `workflow/build.gradle.kts` 가 같은 이유로 같은 선언을 갖는다.
+    val gateTests = layout.settingsDirectory.file("config/quality/gate-tests.properties")
+    inputs.file(gateTests).withPropertyName("gateTests").withPathSensitivity(PathSensitivity.RELATIVE)
 
     val architecturePolicy = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
     inputs.file(architecturePolicy).withPropertyName("architecturePolicy")

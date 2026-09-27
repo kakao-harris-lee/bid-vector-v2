@@ -127,8 +127,14 @@ class HttpSurfaceCensusTest {
             }.toSet()
 
     /** census 가 도는 모집단 — 한 컨텍스트에 **국소**인 `HandlerMapping` 빈이다. */
-    private fun mappingBeans(management: Boolean): Collection<HandlerMapping> =
-        contextOf(management).getBeansOfType(HandlerMapping::class.java).values
+    private fun mappingBeans(management: Boolean): Collection<HandlerMapping> = namedMappingBeans(management).values
+
+    /**
+     * 같은 모집단을 **빈 이름과 함께** 낸다(N-r4-14). 타입 이름만으로 견주면 제3의 조상
+     * 컨텍스트가 **이미 census 된 타입**의 다른 빈을 기여해도 포함 관계가 성립한다.
+     */
+    private fun namedMappingBeans(management: Boolean): Map<String, HandlerMapping> =
+        contextOf(management).getBeansOfType(HandlerMapping::class.java)
 
     private fun handlerName(handler: Any): String = if (handler is String) handler else handler::class.java.name
 
@@ -210,6 +216,23 @@ class HttpSurfaceCensusTest {
         handlers(management = true) shouldBe policy.managementSurfaceHandlers.toSet()
     }
 
+    /**
+     * N-r4-9 — 진입점 축을 관리 포트에도 세운다. handler 집합은 **클래스 이름**의 집합이라
+     * 같은 종류의 handler 를 내는 mapping 빈이 하나 더 생겨도 그대로다. 오늘은 D-6A2a 의
+     * 노출 잠금이 따로 서 있지만, 두 포트의 축이 같은 모양이어야 한 쪽만 조용해지지 않는다.
+     */
+    @Test
+    fun `관리 포트의 진입점 축도 계약과 같다 — method mapping 빈 · RouterFunction 없음`() {
+        contextOf(management = true)
+            .getBeansOfType(AbstractHandlerMethodMapping::class.java)
+            .map { (name, bean) -> "$name:${bean::class.java.name}" }
+            .sorted() shouldBe policy.managementSurfaceMethodMappingBeans.sorted()
+        contextOf(management = true)
+            .getBeansOfType(RouterFunctionMapping::class.java)
+            .values
+            .mapNotNull { it.routerFunction } shouldBe emptyList()
+    }
+
     @Test
     fun `관리 포트의 Filter·Servlet 등록 집합이 계약과 같다`() {
         filters(management = true) shouldBe policy.managementSurfaceFilters.toSet()
@@ -230,9 +253,10 @@ class HttpSurfaceCensusTest {
         val reachable =
             BeanFactoryUtils
                 .beansOfTypeIncludingAncestors(contextOf(management = true), HandlerMapping::class.java)
-                .values
-                .map { it::class.java.name }
-        val censused = (mappingBeans(management = true) + mappingBeans(management = false)).map { it::class.java.name }
+                .map { (name, bean) -> "$name:${bean::class.java.name}" }
+        val censused =
+            (namedMappingBeans(management = true) + namedMappingBeans(management = false))
+                .map { (name, bean) -> "$name:${bean::class.java.name}" }
 
         reachable.shouldNotBeEmpty()
         censused shouldContainAll reachable
