@@ -113,7 +113,10 @@ class SnapshotExtractionE2ETest {
             }
         }
 
-        fun extractTo(outputDir: Path): List<Int> =
+        fun extractTo(
+            outputDir: Path,
+            sampleListSha256: String = "feedfacecafe",
+        ): List<Int> =
             bootOnce(
                 mapOf(
                     "bidvector.snapshot-extract.mode" to "once",
@@ -122,7 +125,7 @@ class SnapshotExtractionE2ETest {
                     "bidvector.snapshot-extract.to" to LocalDate.now().plusDays(1).toString(),
                     "bidvector.snapshot-extract.output-dir" to outputDir.toString(),
                     "bidvector.snapshot-extract.snapshot-id" to "snap-e2e",
-                    "bidvector.snapshot-extract.sample-list-sha256" to "feedfacecafe",
+                    "bidvector.snapshot-extract.sample-list-sha256" to sampleListSha256,
                 ),
             )
     }
@@ -175,19 +178,44 @@ class SnapshotExtractionE2ETest {
         rows shouldContain "\"opening_base_amount\":1239999999"
     }
 
+    /**
+     * D-6G-37 — golden 은 **Python 레인의 fixture 자리**에 둔다(저장소 루트의 `fixtures` 는 data-extract 의 corpus
+     * 자리라 실험 fixture 를 섞지 않는다). manifest 의 `sample_list_sha256` 은 그 파일의 행 집합으로
+     * 계산한다 — golden 안에서 자기 완결이어야 Python 이 그 대조를 돌릴 수 있다.
+     */
     @Test
     fun `추출 바이트가 golden 과 같다 — 레인 간 왕복의 고정점`() {
-        val golden = Path.of("..", "fixtures", "golden", "m6-6g", "rows.jsonl")
+        val goldenDir = Path.of("..", "ml-engine", "tests", "evaluation", "fixtures", "m6-6g-golden")
+        val work = Files.createTempDirectory("snapshot-golden")
 
-        val rows = extractedRows()
+        extractTo(work)
+        val rows = Files.readString(work.resolve("rows.jsonl"))
+        val sampleList = sampleListSha256Of(rows)
+        extractTo(work, sampleList)
+        val manifest = Files.readString(work.resolve("manifest.json"))
 
         if (System.getenv("BIDVECTOR_WRITE_GOLDEN") == "1") {
-            Files.createDirectories(golden.parent)
-            Files.writeString(golden, rows)
+            Files.createDirectories(goldenDir)
+            Files.writeString(goldenDir.resolve("rows.jsonl"), rows)
+            Files.writeString(goldenDir.resolve("manifest.json"), manifest)
         }
-        // **비교만 한다.** 없으면 스스로 써서 초록이 되는 test 는 무엇도 잠그지 않는다 —
-        // golden 은 사람이 한 번 내고 커밋하는 것이다(생성 절차는 evidence 에 적는다).
-        Files.exists(golden) shouldBe true
-        rows shouldBe Files.readString(golden)
+        // **비교만 한다.** 없으면 스스로 써서 초록이 되는 test 는 무엇도 잠그지 않는다.
+        Files.exists(goldenDir.resolve("rows.jsonl")) shouldBe true
+        rows shouldBe Files.readString(goldenDir.resolve("rows.jsonl"))
+        manifest shouldBe Files.readString(goldenDir.resolve("manifest.json"))
+    }
+
+    /** 표본 목록 해시 — 행들의 `notice_key_hash` 를 오름차순 정렬해 개행으로 이은 문자열의 sha256. */
+    private fun sampleListSha256Of(rows: String): String {
+        val hashes =
+            rows
+                .trimEnd('\n')
+                .lines()
+                .map { it.substringAfter("\"notice_key_hash\":\"").substringBefore('"') }
+                .sorted()
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        return digest
+            .digest(hashes.joinToString("\n").toByteArray())
+            .joinToString("") { "%02x".format(it) }
     }
 }

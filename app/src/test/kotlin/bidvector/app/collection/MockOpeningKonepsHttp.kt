@@ -71,7 +71,9 @@ internal class MockOpeningKonepsHttp(
         when {
             operation.endsWith("PreparPcDetail") -> {
                 reservePriceNotices += noticeNumber.orEmpty()
-                listOf(reservePriceRow(noticeNumber.orEmpty()))
+                // **복수예가 15행 전부.** 하나만 주면 제외 ⑤(예비가격·추첨 결측)가 전 행을 걷어내
+                // golden 에 승인되는 행이 하나도 남지 않는다(D-6G-37).
+                (1..RESERVE_PRICE_ROWS).map { sequence -> reservePriceRow(noticeNumber.orEmpty(), sequence) }
             }
 
             operation.endsWith("OpengCompt") -> {
@@ -139,16 +141,20 @@ internal class MockOpeningKonepsHttp(
     /** 공고 목록 오퍼레이션 접미(`Cnstwk`)와 개찰결과 목록 접미가 같은 업무를 가리킨다. */
     private fun openingSuffixFor(noticeListSuffix: String): String = noticeListSuffix
 
-    private fun reservePriceRow(noticeNumber: String) =
-        mapOf(
-            "bidNtceNo" to noticeNumber,
-            "bidNtceOrd" to "000",
-            "compnoRsrvtnPrceSno" to "01",
-            "bssamt" to "1239999999",
-            "plnprc" to "1250000000",
-            // 개찰일 — 추출이 이 축에서 읽는다(canonical 이 아니라 원문에서).
-            "rlOpengDt" to "2026-06-17 11:00:00",
-        )
+    private fun reservePriceRow(
+        noticeNumber: String,
+        sequence: Int,
+    ) = mapOf(
+        "bidNtceNo" to noticeNumber,
+        "bidNtceOrd" to "000",
+        "compnoRsrvtnPrceSno" to "%02d".format(sequence),
+        "bsisPlnprc" to (1_240_000_000L + sequence * 1_000_000L).toString(),
+        "drwtYn" to if (sequence in DRAWN_SEQUENCES) "Y" else "N",
+        "bssamt" to "1239999999",
+        "plnprc" to "1250000000",
+        // 개찰일 — 추출이 이 축에서 읽는다(canonical 이 아니라 원문에서).
+        "rlOpengDt" to "2026-06-17 11:00:00",
+    )
 
     /** 실 응답 그대로 개인정보 키 둘을 함께 싣는다 — 경계가 떨어뜨리는지 이 자리에서 잰다. */
     private fun bidderRow(noticeNumber: String) =
@@ -216,3 +222,7 @@ private fun newNonce(): String =
         .uppercase()
 
 private const val NONCE_LENGTH = 8
+
+private const val RESERVE_PRICE_ROWS = 15
+
+private val DRAWN_SEQUENCES = setOf(3, 7, 11, 14)
