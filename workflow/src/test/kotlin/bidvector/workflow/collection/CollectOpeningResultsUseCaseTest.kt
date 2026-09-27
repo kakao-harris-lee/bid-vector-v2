@@ -82,6 +82,26 @@ class CollectOpeningResultsUseCaseTest {
         report.sample.selected.size shouldBe 4
     }
 
+    /**
+     * D-6G-42 M-4 — 상한은 **목록 갈래에서도** 문다. 상세만 막으면, 표본틀을 세우는 목록 호출이
+     * 상한 밖에서 계속 나가 승인 범위를 넘는다(표본을 뽑기도 전에).
+     */
+    @Test
+    fun `목록 갈래도 상한에서 멈춘다 — 다음 슬롯을 부르지 않는다`() {
+        val fixture = OpeningFixture(sampleSize = 2, budget = CollectionCallBudget(perDay = 1, total = 1))
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-04", count = 3)
+
+        val report = fixture.run()
+
+        // TOTAL 이 먼저 문다 — `consume` 이 총 상한을 일 상한보다 앞서 본다.
+        report.halted?.budgetLimit shouldBe BudgetLimit.TOTAL
+        // 상한이 하나였으니 목록 호출도 딱 하나 나갔다 — 남은 슬롯·남은 업무는 부르지 않는다.
+        (fixture.construction.listCalls.size + fixture.service.listCalls.size) shouldBe 1
+        // 표본틀이 반만 선 채로 상세를 부르지 않는다 — 반쪽 표본틀에서 뽑으면 층이 비뚤어진다.
+        report.detailCalls shouldBe 0
+    }
+
     @Test
     fun `일 호출 상한에 닿으면 멈춘다 — 남은 표본은 부르지 않는다`() {
         val fixture = OpeningFixture(sampleSize = 10, budget = CollectionCallBudget(perDay = 6, total = 100))
