@@ -83,15 +83,20 @@ def build_strategies(
 def _load_policies(
     backtest_policy_path: Path, inference_policy_path: Path
 ) -> tuple[StrategyBacktestPolicy, InferencePolicy] | JobFailed:
+    # privacy r1 LOW-2 의 같은 갈래(code-review r2) — 정책 로더의 거부 `detail` 에는
+    # **파일 경로가 들어 있다**(뿌리 로더가 메시지에 `path` 를 넣는다). 실패 문면이
+    # 호스트의 디렉터리 구조를 나르지 않게 사유 어휘만 낸다. 어느 파일인지는 부르는
+    # 쪽이 이미 안다(인자로 넘겼다).
     backtest_policy = load_strategy_backtest_policy(backtest_policy_path)
     if isinstance(backtest_policy, PolicyRejected):
         return JobFailed(
-            JobFailureReason.BACKTEST_POLICY_REJECTED, backtest_policy.detail
+            JobFailureReason.BACKTEST_POLICY_REJECTED, str(backtest_policy.reason)
         )
     inference_policy = load_inference_policy(inference_policy_path)
     if not isinstance(inference_policy, InferencePolicy):
         return JobFailed(
-            JobFailureReason.INFERENCE_POLICY_REJECTED, str(inference_policy)
+            JobFailureReason.INFERENCE_POLICY_REJECTED,
+            type(inference_policy).__name__,
         )
     if backtest_policy.verdict.primary_hypothesis_count != len(S2_STRATEGY_NAMES):
         return JobFailed(

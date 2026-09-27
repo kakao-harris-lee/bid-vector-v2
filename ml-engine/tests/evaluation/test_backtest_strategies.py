@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -37,6 +38,8 @@ from ml_engine.evaluation.backtest.strategies import (
     RuleAnchorStrategy,
     StrategyInput,
     UniformBandStrategy,
+    _candidate_rates,
+    _win_probabilities,
     build_competitor_pool,
     build_strategy_input,
 )
@@ -265,6 +268,66 @@ def test_s4_picks_a_grid_point_and_repeats_under_the_same_seed() -> None:
     rate = first.amount / target.row.notice.base_amount
     low = target.floor_rate * (1.0 - request.reserve_half_width)
     assert low <= rate <= low + policy.strategies.s4_grid_span_bp / 10_000.0 + 1e-9
+
+
+def _construction_admitted() -> AdmittedNotice:
+    """S4 가 두 실격선을 다 보는지 재려고 쓰는 공사 공고. A 값 공고가 아니라 A = 0 이고,
+    순공사원가선만 하한가 위로 올라간다."""
+    return _admitted(
+        [
+            row_payload(
+                "s4-c",
+                notice_category="CONSTRUCTION",
+                notice_bid_price_formula_a_applicable=False,
+                notice_successful_bid_method_name="적격심사제-추정가격 100억원 미만 공사",
+                notice_noticed_on="2026-03-01",
+                notice_pure_construction_cost=900_000_000,
+                outcome_opened_on="2026-06-15",
+                outcome_bidder_amounts=[940_000_000.0, 960_000_000.0, 980_000_000.0],
+            )
+        ]
+    )[0]
+
+
+def test_s4_simulation_respects_the_pure_construction_cost_floor() -> None:
+    """**code-review r2 H-2** — `_simulated_floors` 가 정의만 되고 **호출되지 않았다**.
+    그래서 S4 는 채점이 쓰는 두 실격선 중 하나(순공사원가선)를 보지 못한 채 투찰률을
+    골랐고, 대조표에는 이행으로 적혀 있었다.
+
+    **승률 곡선으로 잰다.** `bid` 의 argmax 하나만 보면 최적점이 우연히 같은 자리에
+    남아 변이를 놓친다(실측: 두 판 모두 같은 격자점을 골랐지만 그 점의 승률은 0.491 대
+    0.387 로 달랐다).
+
+    곡선이 **일률적으로 낮아지지는 않는다** — 순공사원가선은 나와 경쟁자에게 똑같이
+    걸려서, 높은 투찰률에서는 경쟁자를 더 많이 떨어뜨려 승률을 **올린다**(실측으로
+    확인했다). 잠금은 그래서 「낮아진다」가 아니라 **「낮은 쪽이 더 많이 죽는다」**다:
+    그 선 아래 투찰률은 어떤 사정률에서도 부적격이라 승률이 정확히 0 이 된다."""
+    policy = _policy()
+    history = _history(10)
+    admitted = _construction_admitted()
+    assert admitted.pure_cost_floor is not None
+    assert admitted.pure_cost_floor > admitted.actual_floor_price
+
+    guarded_input = build_strategy_input(admitted, history, seed=7)
+    # 한 변수만 다르게 — 순공사원가만 지운 같은 입력(그 공고는 제외 ⑨ 로 승인되지
+    # 않으므로 판독을 거쳐 만들 수 없다).
+    unguarded_input = replace(
+        guarded_input, notice=replace(guarded_input.notice, pure_construction_cost=None)
+    )
+    rates = _candidate_rates(guarded_input, policy)
+    guarded = _win_probabilities(guarded_input, policy, rates)
+    unguarded = _win_probabilities(unguarded_input, policy, rates)
+
+    assert (guarded != unguarded).any(), (
+        "순공사원가선이 승률을 한 자리도 바꾸지 않았다 — 시뮬레이션이 그 선을 빼고 "
+        "돈다(code-review r2 H-2)"
+    )
+    dead_with = int((guarded == 0.0).sum())
+    dead_without = int((unguarded == 0.0).sum())
+    assert dead_with > dead_without, (
+        "순공사원가선 아래 투찰률이 더 죽지 않았다 — 그 선이 내 적격 판정에 "
+        f"들어가지 않는다(승률 0 인 격자: {dead_with} vs {dead_without})"
+    )
 
 
 def test_strategy_names_are_the_preregistered_labels() -> None:

@@ -303,6 +303,37 @@ def test_underpowered_is_decided_per_window_not_only_pooled() -> None:
     assert outcome.reason is NotEvaluableReason.UNDERPOWERED
 
 
+def test_exactly_half_the_windows_evaluable_is_not_evaluable() -> None:
+    """**경계**(code-review r2 N6) — 「판정 가능한 창이 **과반 미만**이면 전체
+    NotEvaluable」에서 정확히 절반은 과반이 **아니다**. 창 넷 중 둘만 잴 수 있으면
+    못 잰 것이다. 술어가 `<=` 에서 `<` 로 밀리면 이 test 가 붉어진다."""
+    weak = [
+        _outcome(index=index, gain=0.5, p_value=0.9, pairs=3, required=500)
+        for index in range(2)
+    ]
+    strong = [_outcome(index=index + 2, gain=0.5, p_value=0.0) for index in range(2)]
+    windows = [*weak, *strong]
+    assert evaluable_window_count(windows) * 2 == len(windows)
+    outcome = _verdict(windows, _outcome(index=None, gain=0.5, p_value=0.0))
+    assert isinstance(outcome, StrategyNotEvaluable)
+    assert outcome.reason is NotEvaluableReason.UNDERPOWERED
+
+
+def test_one_more_than_half_the_windows_evaluable_reaches_the_judgement() -> None:
+    """경계의 반대편 — 다섯 중 셋이면 과반이라 판정으로 간다."""
+    windows = [
+        *(
+            _outcome(index=index, gain=0.5, p_value=0.9, pairs=3, required=500)
+            for index in range(2)
+        ),
+        *(_outcome(index=index + 2, gain=0.5, p_value=0.0) for index in range(3)),
+    ]
+    assert evaluable_window_count(windows) * 2 > len(windows)
+    assert isinstance(
+        _verdict(windows, _outcome(index=None, gain=0.5, p_value=0.0)), StrategyPassed
+    )
+
+
 def test_enough_evaluable_windows_reach_the_judgement() -> None:
     windows = [
         _outcome(index=0, gain=0.5, p_value=0.0),

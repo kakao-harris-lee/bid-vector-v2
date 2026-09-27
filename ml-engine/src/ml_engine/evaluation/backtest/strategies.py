@@ -277,16 +277,7 @@ def _win_probabilities(
         draw_count=policy.institution.draw_count,
     )
     base = request.base_amount
-    floors = np.array(
-        [
-            floor_price(
-                planned_price=ratio * base,
-                floor_rate=request.floor_rate,
-                a_value_total=request.a_value_total,
-            )
-            for ratio in ratios
-        ]
-    )
+    floors = _simulated_floors(request, policy, ratios)
     pool = np.array([item.bid_rate for item in request.competitors])
     rivals = max(request.expected_participant_count - 1, 0)
     draws = rng.choice(pool, size=(iterations, rivals)) * base

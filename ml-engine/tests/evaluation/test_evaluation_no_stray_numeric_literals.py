@@ -43,7 +43,38 @@ _APP_BACKTEST_SOURCES = ("backtest_job.py", "backtest_distribution.py")
 _EXCLUDED_FILES = frozenset({"__init__.py"})
 # 문자열 안에 수를 숨기는 두 생성자 — `float("0.05")` 가 AST 숫자 상수가 아니라서
 # 앞 판의 술어를 그대로 지나갔다(verifier r1 변이 G1).
-_STRING_NUMBER_CALLS = frozenset({"float", "Decimal"})
+# 문자열에 숨긴 수를 **이름 열거 없이** 잡는다(D-6G-43, verifier r2 M-c). 앞 판은
+# `float(...)`·`Decimal(...)` 두 이름만 봐서 별칭(`Decimal as D`)·`json.loads("0.05")`·
+# 연결(`"0." + "05"`)을 전부 지나갔다. 이제 **AST 의 모든 문자열 상수**를 수로 읽어
+# 보고, 읽히면 같은 자리에서 센다 — 호출 이름이 무엇이든, 아예 호출이 아니든 상관없다.
+# docstring 만 뺀다(설명 문장의 수는 값이 아니다).
+
+
+def _docstring_nodes(tree: ast.AST) -> set[int]:
+    """module·class·function 의 첫 문장 문자열 — 설명이지 값이 아니다."""
+    marked: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(
+            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
+            continue
+        body = node.body
+        if (
+            body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            marked.add(id(body[0].value))
+    return marked
+
+
+def _as_number(raw: str) -> float | None:
+    """문자열이 수로 읽히면 그 수, 아니면 `None`."""
+    try:
+        return float(raw)
+    except ValueError:
+        return None
 
 
 def _scanned_paths() -> list[Path]:
@@ -56,21 +87,6 @@ def _scanned_paths() -> list[Path]:
 
 def _key(path: Path) -> str:
     return path.relative_to(_ML_ENGINE_SRC).as_posix()
-
-
-def _string_number(node: ast.Call) -> float | None:
-    """`float("…")`·`Decimal("…")` 의 문자열 인자를 수로. 수로 읽히지 않으면 `None`."""
-    if not isinstance(node.func, ast.Name) or node.func.id not in _STRING_NUMBER_CALLS:
-        return None
-    if len(node.args) != 1 or not isinstance(node.args[0], ast.Constant):
-        return None
-    raw = node.args[0].value
-    if not isinstance(raw, str):
-        return None
-    try:
-        return float(raw)
-    except ValueError:
-        return None
 
 
 _ALLOWED: frozenset[tuple[str, float]] = frozenset(
@@ -218,19 +234,21 @@ _ALLOWED: frozenset[tuple[str, float]] = frozenset(
 
 
 def _numeric_literals(path: Path) -> list[tuple[int, float]]:
-    """AST 숫자 상수 **와** 문자열에 숨긴 수(`float("…")`·`Decimal("…")`)를 함께 센다.
-    문자열 형태를 빼면 게이트가 표기 하나로 열린다(verifier r1 M-6)."""
+    """AST 숫자 상수 **와** 수로 읽히는 모든 문자열 상수(docstring 제외)를 함께 센다.
+
+    문자열 축을 호출 이름으로 좁히면(`float`·`Decimal`) 별칭·다른 파서(`json.loads`)·
+    연결 형태가 전부 빠져나간다(verifier r2 M-c). 술어를 **값의 성질**(수로 읽히는가)로
+    옮겨서 이름 열거를 없앴다."""
     tree = ast.parse(path.read_text(encoding="utf-8"))
+    docstrings = _docstring_nodes(tree)
     literals: list[tuple[int, float]] = []
     for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Constant)
-            and type(node.value) in (int, float)
-            and not isinstance(node.value, bool)
-        ):
+        if not isinstance(node, ast.Constant):
+            continue
+        if type(node.value) in (int, float) and not isinstance(node.value, bool):
             literals.append((node.lineno, node.value))
-        elif isinstance(node, ast.Call):
-            hidden = _string_number(node)
+        elif isinstance(node.value, str) and id(node) not in docstrings:
+            hidden = _as_number(node.value)
             if hidden is not None:
                 literals.append((node.lineno, hidden))
     return literals
