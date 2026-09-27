@@ -143,6 +143,8 @@ _ALLOWED: frozenset[tuple[str, float]] = frozenset(
             "evaluation/backtest/policy_values.py",
             2,
         ),  # min_window_rows>=2(쌍대 검정 하한)·격자 하한
+        ("evaluation/backtest/snapshot.py", 0),  # 개찰일 범위 tuple 인덱스
+        ("evaluation/backtest/snapshot.py", 1),  # 같음
         ("evaluation/backtest/institution.py", 0),  # digitize 구간 인덱스 하한(clip)
         (
             "evaluation/backtest/institution.py",

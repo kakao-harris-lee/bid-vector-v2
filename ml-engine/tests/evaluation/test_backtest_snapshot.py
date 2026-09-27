@@ -255,11 +255,33 @@ def test_a_value_rejects_an_unknown_key() -> None:
 
 def test_manifest_period_is_carried_for_the_verdict_record() -> None:
     snapshot = _loaded([row_payload("n-1")])
-    assert snapshot.period_start.isoformat() == "2026-06-01"
-    assert snapshot.period_end.isoformat() == "2026-08-31"
+    # 기간은 **행들의 개찰일 범위**다(D-6G-32) — manifest 가 적은 값을 그대로 옮기지
+    # 않고 행에서 재계산해 대조하므로, 이 값은 fixture 의 개찰일과 같아야 한다.
+    assert snapshot.period_start == snapshot.rows[0].outcome.opened_on
+    assert snapshot.period_end == snapshot.rows[0].outcome.opened_on
     assert snapshot.sample_list_sha256 == sample_list_checksum(
         [row.notice.notice_key_hash for row in snapshot.rows]
     )
+
+
+@pytest.mark.parametrize(
+    "manifest_kwargs",
+    [
+        {"period_start": "2020-01-01"},
+        {"period_end": "2099-12-31"},
+        {"period_start": "2020-01-01", "period_end": "2099-12-31"},
+    ],
+)
+def test_manifest_period_must_match_the_rows(
+    manifest_kwargs: dict[str, Any],
+) -> None:
+    """D-6G-32 「manifest 가 사실을 말하는가」 — 기간은 생산 쪽이 적는 값이고 행과
+    묶이는 자리가 없으면 아무 기간이나 적을 수 있다(표본 목록 해시와 같은 계열).
+    생산 계약이 「기간 = 행들의 개찰일 범위」이므로 **일치**를 요구한다."""
+    rows = rows_bytes([row_payload("n-1"), row_payload("n-2")])
+    rejected = load_snapshot(manifest_bytes(rows, **manifest_kwargs), rows)
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.PERIOD_MISMATCH
 
 
 def test_sample_list_checksum_is_recomputed_from_the_rows() -> None:

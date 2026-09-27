@@ -398,6 +398,37 @@ def sample_list_checksum(notice_key_hashes: Sequence[str]) -> str:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
+def opening_date_range(rows: Sequence[SnapshotRow]) -> tuple[date, date] | None:
+    """행들의 **개찰일 범위**. v3 에서 개찰일이 `| null` 이라 값 있는 행만 본다 —
+    하나도 없으면 범위가 성립하지 않는다(`None`)."""
+    days = [row.outcome.opened_on for row in rows if row.outcome.opened_on is not None]
+    if not days:
+        return None
+    return min(days), max(days)
+
+
+def _check_period(manifest: _Manifest, rows: tuple[SnapshotRow, ...]) -> None:
+    """manifest 의 기간이 **그 파일의 행**과 맞는지(D-6G-32 「manifest 가 사실을
+    말하는가」). 표본 목록 해시 재계산(verifier r1 M-4)과 같은 계열이다 — manifest 는
+    생산 쪽이 적는 값이고, 행과 묶이는 자리가 없으면 아무 기간이나 적을 수 있다.
+
+    생산 쪽 계약은 「기간 = 행들의 개찰일 범위(추출 설정의 관측 창이 아니다)」이므로
+    **일치**를 요구한다(포함이 아니라). 어긋나면 두 레인이 다른 것을 보고 있다는
+    신호라 구조 실패로 전체를 거부한다."""
+    observed = opening_date_range(rows)
+    if observed is None:
+        raise RowReadError(
+            SnapshotRejectionReason.PERIOD_MISMATCH,
+            "개찰일이 있는 행이 없어 기간을 대조할 수 없다",
+        )
+    if (manifest.period_start, manifest.period_end) != observed:
+        raise RowReadError(
+            SnapshotRejectionReason.PERIOD_MISMATCH,
+            f"manifest {manifest.period_start}~{manifest.period_end} != "
+            f"행 {observed[0]}~{observed[1]}",
+        )
+
+
 def _assemble(manifest: _Manifest, rows: tuple[SnapshotRow, ...]) -> LoadedSnapshot:
     if len(rows) != manifest.row_count:
         raise RowReadError(
@@ -417,6 +448,7 @@ def _assemble(manifest: _Manifest, rows: tuple[SnapshotRow, ...]) -> LoadedSnaps
             SnapshotRejectionReason.SAMPLE_LIST_MISMATCH,
             "표본 목록 sha256 이 행 집합과 맞지 않는다",
         )
+    _check_period(manifest, rows)
     return LoadedSnapshot(
         snapshot_id=manifest.snapshot_id,
         period_start=manifest.period_start,

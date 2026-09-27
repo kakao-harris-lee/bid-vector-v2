@@ -356,7 +356,6 @@ def _a_value(applicable: bool | None) -> dict[str, Any]:
     [
         ({"notice_noticed_on": None}, ExclusionReason.NOTICE_DATE_ABSENT),
         ({"notice_bid_close_at": None}, ExclusionReason.BID_CLOSE_AT_ABSENT),
-        ({"outcome_opened_on": None}, ExclusionReason.OPENING_DATE_ABSENT),
         ({"outcome_planned_price_null": True}, ExclusionReason.PLANNED_PRICE_ABSENT),
     ],
 )
@@ -367,6 +366,22 @@ def test_v3_value_absence_is_a_row_level_exclusion(
     넷을 필수로 읽어 한 행의 `null` 이 스냅숏 전체를 거부했고, 그 공고를 제외 규칙이
     처리할 기회조차 오지 않았다(verifier r1 H-1)."""
     assert _reason(row_payload("n-1", **mutation)) is reason
+
+
+def test_missing_opening_date_is_a_row_level_exclusion() -> None:
+    """개찰일 결측도 행 단위다 — 다만 **동반 행이 필요하다**: 기간 대조(D-6G-32)가
+    「개찰일 있는 행이 하나도 없는 스냅숏」을 구조 실패로 보기 때문이다. 실제 스냅숏에서
+    전 행이 개찰일을 잃는 것은 데이터의 성질이 아니라 추출이 깨진 것이다."""
+    result = admit_rows(
+        _snapshot(
+            [row_payload("bad", outcome_opened_on=None), row_payload("good")]
+        ).rows,
+        _policy(),
+    )
+    assert len(result.admitted) == 1
+    assert [item.reason for item in result.excluded] == [
+        ExclusionReason.OPENING_DATE_ABSENT
+    ]
 
 
 @pytest.mark.parametrize(

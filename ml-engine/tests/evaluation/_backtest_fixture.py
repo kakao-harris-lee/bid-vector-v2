@@ -128,8 +128,10 @@ def build_files() -> tuple[bytes, bytes]:
         "schema_version": "snapshot-v3",
         "snapshot_id": "m6-6g-synthetic-v1",
         "row_count": len(rows),
-        "period_start": _BLOCK_STARTS[0].isoformat(),
-        "period_end": (_BLOCK_STARTS[-1] + timedelta(days=6)).isoformat(),
+        # 기간은 **행들의 개찰일 범위**다 — 판독기가 재계산해 대조하므로 블록 경계를
+        # 적으면 거부된다(D-6G-32).
+        "period_start": min(row["outcome"]["opened_on"] for row in rows),
+        "period_end": max(row["outcome"]["opened_on"] for row in rows),
         "rows_sha256": hashlib.sha256(rows_bytes).hexdigest(),
         # 스키마 §5 정의대로 **행에서** 계산한다 — 판독기가 같은 식으로 재계산해
         # 대조하므로 지어낸 값을 쓰면 fixture 가 거부된다(verifier r1 M-4).

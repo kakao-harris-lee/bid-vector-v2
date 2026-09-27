@@ -9,10 +9,12 @@ Python 이 한 번도 읽지 않았다.** Python fixture 는 소비 쪽 생성�
 golden 바이트를 `load_snapshot` 과 전 과정에 통과시킨다. 생산 반쪽(같은 바이트를 낸다는
 단언)은 Kotlin 레인에 있다 — 스키마가 한쪽만 움직이면 **둘 중 하나가 RED** 다.
 
-**지금은 골격이다.** golden 이 아직 커밋되지 않았다(Kotlin 레인 진행 중). 그때까지 이
-test 는 **건너뛰고 그 사실을 이유와 함께 남긴다** — 초록으로 위장하지 않는다. golden 이
-오면 경로 상수 하나만 맞추면 선다. 이 잠금이 아직 서지 않았다는 것은 evidence 「알려진
-제한」에도 적혀 있다.
+**부재를 성공으로 접지 않는다.** golden 이 선언된 자리에 없으면 건너뛰되(`-rs` 가 사유와
+기대 경로를 찍는다), **저장소 어딘가에 golden 이 있는데 선언된 자리가 비어 있으면
+붉어진다**(`test_no_golden_lives_outside_the_declared_path`). 두 레인이 서로 다른 자리를
+보는 상태가 조용히 초록으로 지나가는 것이 이 slice 가 고치려는 결함(왕복 부재) 바로 그
+모양이기 때문이다 — Kotlin 레인이 「없으면 쓰고 있으면 비교」로 짰다가 빈 파일로 초록을
+받은 것과 같은 갈래다.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ from ml_engine.evaluation.backtest.reasons import ExclusionReason
 from ml_engine.evaluation.backtest.snapshot import (
     LoadedSnapshot,
     load_snapshot,
+    opening_date_range,
     sample_list_checksum,
 )
 
@@ -63,6 +66,29 @@ _ABSENT = (
     "golden 이 아직 없다 — Kotlin 레인이 `SnapshotWriter` 출하 경로로 커밋하면 선다"
     f" (기대 경로: {GOLDEN_SNAPSHOT_DIR})"
 )
+
+
+_GOLDEN_DIR_MARKER = "golden"
+_SCAN_SKIP = frozenset({".git", ".venv", "node_modules", "__pycache__", "build"})
+
+
+def _discover_golden_dirs() -> list[Path]:
+    """저장소 안에서 **golden 처럼 보이는** 디렉터리 전수 — 경로의 어느 마디에든
+    `golden` 이 있고 `rows.jsonl` 을 가진 곳. 상대 레인이 상위 마디에 붙일 수 있어
+    마디 전체를 본다(`fixtures/golden/m6-6g/` 처럼 — 실제로 그랬다).
+
+    이름 술어인 것은 한계다(그렇게 부르지 않으면 못 찾는다). 그래도 「두 레인이 다른
+    자리를 본다」는 실제 상태를 잡기에는 충분하고, 합성 fixture(`backtest-snapshot`)와
+    섞이지 않는다."""
+    repo_root = _TESTS_ROOT.parents[1]
+    found: list[Path] = []
+    for path in repo_root.rglob("rows.jsonl"):
+        if _SCAN_SKIP & set(path.parts):
+            continue
+        relative = path.relative_to(repo_root)
+        if any(_GOLDEN_DIR_MARKER in part.lower() for part in relative.parts):
+            found.append(path.parent)
+    return sorted(found)
 
 
 def _golden_files() -> SnapshotFiles:
@@ -160,6 +186,30 @@ def test_golden_manifest_declares_the_supported_schema_version() -> None:
         f"golden 의 schema_version={manifest.get('schema_version')!r} 을 판독기가 "
         "지원하지 않는다 — 두 레인이 같이 움직여야 한다"
     )
+
+
+def test_no_golden_lives_outside_the_declared_path() -> None:
+    """**부재를 성공으로 접지 않는 잠금**(D-6G-32 「manifest 가 사실을 말하는가」와 같은
+    계열 — 이쪽은 「파일이 선언된 자리에 있는가」다). 선언된 자리가 비어 있는데 저장소
+    어딘가에 golden 이 있으면 두 레인이 다른 자리를 보고 있다는 뜻이고, 그 상태로 skip 이
+    초록을 내면 왕복이 서지 않은 채 섰다고 읽힌다 — 이 slice 가 고치려는 결함 그 모양이다.
+
+    golden 이 아무 데도 없으면(골격 단계) 통과한다 — 「아직 안 왔다」와 「다른 데 있다」는
+    다른 사실이다."""
+    stray = [path for path in _discover_golden_dirs() if path != GOLDEN_SNAPSHOT_DIR]
+    assert not stray, (
+        "선언된 자리 밖에 golden 이 있다 — 두 레인이 다른 자리를 본다. "
+        f"선언: {GOLDEN_SNAPSHOT_DIR} · 발견: {stray}"
+    )
+
+
+def test_golden_manifest_period_matches_its_rows() -> None:
+    """생산 쪽이 적은 기간이 **그 파일의 행**과 묶여 있는지(D-6G-32). 판독이 이미
+    거부하지만, golden 에서 그 잠금이 실제로 서는지는 여기서 본다."""
+    snapshot = _golden_snapshot()
+    observed = opening_date_range(snapshot.rows)
+    assert observed is not None
+    assert (snapshot.period_start, snapshot.period_end) == observed
 
 
 def test_golden_path_is_declared_in_exactly_one_place() -> None:

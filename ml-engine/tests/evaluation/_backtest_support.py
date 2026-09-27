@@ -162,13 +162,30 @@ def _sample_list_of(rows: bytes) -> str:
     return hashlib.sha256("\n".join(sorted(keys)).encode("utf-8")).hexdigest()
 
 
+def _opening_range(rows: bytes) -> tuple[str, str]:
+    """행에서 계산한 개찰일 범위 — 판독기가 같은 식으로 재계산해 대조한다."""
+    days: list[str] = []
+    for line in rows.decode("utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            day = json.loads(line)["outcome"]["opened_on"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            continue
+        if day:
+            days.append(day)
+    if not days:
+        return ("2026-06-01", "2026-06-01")
+    return (min(days), max(days))
+
+
 def manifest_bytes(
     rows: bytes,
     *,
     snapshot_id: str = "snapshot-test-1",
     row_count: int | None = None,
-    period_start: str = "2026-06-01",
-    period_end: str = "2026-08-31",
+    period_start: str | None = None,
+    period_end: str | None = None,
     rows_sha256: str | None = None,
     sample_list_sha256: str | None = None,
     schema_version: str = "snapshot-v3",
@@ -181,8 +198,10 @@ def manifest_bytes(
             if row_count is None
             else row_count
         ),
-        "period_start": period_start,
-        "period_end": period_end,
+        "period_start": (
+            _opening_range(rows)[0] if period_start is None else period_start
+        ),
+        "period_end": _opening_range(rows)[1] if period_end is None else period_end,
         "rows_sha256": (
             hashlib.sha256(rows).hexdigest() if rows_sha256 is None else rows_sha256
         ),
