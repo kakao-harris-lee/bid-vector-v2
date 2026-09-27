@@ -164,6 +164,7 @@ E[R] = 1.0(no-op)이다. 조사 노트는 Python 레인이 `_workspace/m6-6g/` �
 ## in_scope (착수 시 확정 — 게이트·fixture·build 파일을 처음부터 넣는다)
 
 - `app/src/main/kotlin/bidvector/app/collection/**` · `app/src/main/kotlin/bidvector/app/wiring/CollectionWiring.kt` · `app/src/test/**`(수집 갈래)
+- **(계약 갱신 p4, 2026-09-27 — 팀장 누락 정정)** `workflow/src/main/kotlin/bidvector/workflow/collection/**` · `workflow/src/test/kotlin/bidvector/workflow/collection/**`(수집 use case·호출 예산 원장 — 수집 조율의 기존 자리) · `procurement/src/main/kotlin/bidvector/procurement/**` · `procurement/src/test/**`(공고 식별·정규화). Kotlin 레인이 이미 `918a8e98` 에서 `workflow/.../collection/` 을 편집했다 — 착수 계약이 수집 조율 층을 빠뜨린 팀장 누락이고(6A-3 교훈 「배선 slice 는 착수 계약에 게이트·fixture·build 파일을 처음부터」의 재발), 그 커밋은 이 갱신으로 in_scope 안이 된다
 - `adapters/src/main/kotlin/bidvector/adapters/koneps/**` · `adapters/src/main/kotlin/bidvector/adapters/persistence/**` · `adapters/src/test/**`(필요 시)
 - `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/adapters/**` · `ml-engine/src/ml_engine/app/**`(job 진입점) · `ml-engine/tests/**` · `ml-engine/pyproject.toml`(import-linter 계약)
 - `policy/strategy-backtest-v1.yaml`(위치는 기존 정책 파일 관례를 따른다)
