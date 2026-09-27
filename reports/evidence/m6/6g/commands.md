@@ -254,7 +254,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
 | S-3 | `uv run mypy --strict src/ml_engine` | 소스 96개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1175 passed**(skip 0 — golden 부재는 skip 이 아니라 fail 이다) |
+| S-5 | `uv run python -m pytest tests -q` | **1176 passed**(skip 0 — golden 부재는 skip 이 아니라 fail 이다) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -303,6 +303,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | M-8 채움률 분모 | `LoadedSnapshot.notice_observed_count` | 공고 결측만 빼고 상세 결측은 남긴다 |
 | M-8 분모 공시 | `SamplingRecord.notice_observed_count` | 하한임을 읽는 쪽이 볼 수 있게 분모를 싣는다 |
 | D-6G-42 왕복 검출력 | `test_golden_actually_exercises_the_missing_sample_paths` | golden 이 진부분집합·결측 계수 둘을 실제로 지난다 |
+| 판독의 경계(사후 축소) | `test_reader_cannot_distinguish_a_post_hoc_shrink_of_the_sample_list` | 닫히지 **않음**을 명시 — 닫는 것은 확정 파일 보존과 생산 쪽 왕복 |
 | D-6G-44 golden 부재는 실패 | `test_backtest_golden._golden_files` | golden 을 치우면 RED(치환 실측) |
 | D-6G-33 리터럴 게이트 | `test_evaluation_no_stray_numeric_literals` | 문자열에 숨긴 수·조립 근 둘 |
 | D-6G-28 값 결측은 행 단위 | `reasons` 의 새 사유 넷 · `AdmittedNotice` 의 해소된 네 칸 | 한 행이 빠져도 **나머지는 산다** |
@@ -442,6 +443,26 @@ test 둘이 붉어지는데 **golden 여덟은 그대로 초록**이었다. 「�
 있으면 스냅숏 전체가 거부된다」는 실수집 정지 결함이 생산 바이트를 지나가도 통과한다는 뜻이다.
 **지금은 같은 변이가 golden 에서도 RED 다**(여섯) — 그 차이가 12/10/1/1 이 만든 검출력이다.
 생산 레인에 「상세 없는 표본 하나 · 공고 canonical 없는 표본 하나」를 golden 에 넣어 달라고 전달했다.
+
+## 알려진 제한 — 판독은 표본의 **사후 축소**를 잡지 못한다
+
+세 파일만 보는 판독은 「결과를 본 뒤 줄인 표본」과 「원래 작았던 표본」을 **구별하지 못한다**. 추출이
+행이 된 표본만 목록에 남기고 `sample_size` 를 행 수로, 두 계수를 0 으로 적고 해시를 그 파일로 다시
+계산하면 v4 의 대조 넷이 전부 참이 된다 — ⑴ 해시가 그 파일의 것이고 ⑵ 행이 목록 안이고 ⑵' 키 수가
+선언과 같고 ⑶ 항등식이 닫힌다.
+
+생산 레인이 실측해 보고했고 이 레인에서 버릴 사본으로 독립 재현했다: 축소된 파일 셋이 `LoadedSnapshot`
+으로 **통과한다**(rows=10). 판독에 술어를 더해도 닫히지 않는다 — 줄어든 파일 셋은 작은 표본의 파일
+셋과 바이트로 같기 때문이다.
+
+**잡는 것은 판독이 아니다**: ⒜ 수집 시점에 확정된 파일 그 자체의 보존(D-6G-45 의 실행 상태 디렉터리 —
+이미 있으면 덮어쓰지 않는다)과 ⒝ 생산 쪽 왕복 test 다(같은 축소가 저쪽 E2E 에서 2 failed).
+경계가 닫혀 있다고 잘못 읽히지 않게 `test_reader_cannot_distinguish_a_post_hoc_shrink_of_the_sample_list`
+가 이 사실을 실행 가능한 형태로 세워 둔다.
+
+**계약 판단이 필요한 자리**: manifest 가 표본틀 확정의 근거(실행 상태 디렉터리 식별자·확정 시각)를
+싣고 판독이 「확정 시각 < 최초 개찰일」을 요구하면 위조 비용은 오르지만 **닫히지는 않는다**(확정을
+늦게 돌리면 그만이다). 스키마 변경이므로 제안만 하고 구현하지 않았다.
 
 ## 알려진 제한 — 채움률 분모가 둘로 갈린다 (M-8)
 
