@@ -68,8 +68,22 @@ class ArchitecturePolicy private constructor(
     val appHttpAllowedClasses: List<String> get() = list("app.http.allowed-classes")
     val appHttpDeniedPackages: List<String> get() = list("app.http.denied-packages")
 
-    /** D-6A2b-26 — 의존 허용 목록에서 면제되는 **조립 클래스**의 정확한 이름(접두·패턴 금지). */
-    val appAssemblyExemptClasses: List<String> get() = list("app.assembly.exempt-classes")
+    /**
+     * D-6A2b-26·32 — 면제의 **세 층**. 한 덩어리로 두면 ② 층에 SQL 메서드 하나를 더하는 것만으로
+     * 컨트롤러 → HTTP 지름길이 열린다. 목록은 전부 **정확한 클래스 이름**이다(접두·패턴 금지).
+     */
+    val appAssemblyTier1Classes: List<String> get() = list("app.assembly.tier1-bootstrap-classes")
+    val appAssemblyTier2Classes: List<String> get() = list("app.assembly.tier2-request-scoped-classes")
+    val appAssemblyTier3Classes: List<String> get() = list("app.assembly.tier3-collection-classes")
+
+    /** 면제 전체 — 대상 집합 등식의 다른 한쪽(세 층의 합). */
+    val appAssemblyExemptClasses: List<String>
+        get() = appAssemblyTier1Classes + appAssemblyTier2Classes + appAssemblyTier3Classes
+
+    /** D-6A2b-32 ② — 요청 스코프 층의 별도 허용 목록과 그 안에서 다시 파는 접두. */
+    val appTier2AllowedPackages: List<String> get() = list("app.assembly.tier2.allowed-packages")
+    val appTier2AllowedClasses: List<String> get() = list("app.assembly.tier2.allowed-classes")
+    val appTier2DeniedPackages: List<String> get() = list("app.assembly.tier2.denied-packages")
 
     /** D-6A2b-27 — 출하 조립에서 거둔 HTTP 표면의 기대 집합(API 포트·관리 포트 각각). */
     val apiSurfaceHandlers: List<String> get() = list("app.surface.api.handlers")

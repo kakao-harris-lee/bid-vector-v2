@@ -9,6 +9,24 @@ import com.tngtech.archunit.lang.ConditionEvents
 import com.tngtech.archunit.lang.SimpleConditionEvent
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 
+/** D-6A2b-32 — 면제의 세 층과 그 밖(제한 층). 층마다 다른 규칙이 선다. */
+enum class AppLayer {
+    /** `bidvector.app` 밖 — 이 게이트의 대상이 아니다. */
+    OUTSIDE,
+
+    /** 기본값. 허용 목록 ⊆ 가 그대로 걸린다. */
+    RESTRICTED,
+
+    /** ① 부팅·배선 — 어댑터 구체 클래스·JDBC 에 의존해도 된다(조립이 일이다). */
+    BOOTSTRAP,
+
+    /** ② 요청 스코프 조립과 그 결과 — 컨트롤러가 받는다. 별도 허용 목록 ⊆. */
+    REQUEST_SCOPED,
+
+    /** ③ 수집 레인 — 자기 의존은 자유지만 컨트롤러·② 층이 참조하면 위반이다. */
+    COLLECTION,
+}
+
 /** 시각 같은 **주변 값**만 주는 포트를 가르는 구조 술어가 보는 반환 타입 패키지. */
 private const val TIME_PACKAGE = "java.time"
 
@@ -92,14 +110,28 @@ class AppHttpDependencyRules(
     ): List<ArchRule> =
         listOf(
             classes()
-                .that(handlerOrHttpLayer(appRoot))
+                .that(inLayer(appRoot, AppLayer.RESTRICTED))
                 .should(onlyDependOnAllowed(capabilityPorts))
-                .because("D-6A2b-19 — HTTP 로 닿는 층의 의존 집합은 허용 목록의 부분집합이다(열거가 아니라 구성)"),
+                .because("D-6A2b-26 — 제한 층의 의존 집합은 허용 목록의 부분집합이다(열거가 아니라 구성)"),
+            classes()
+                .that(inLayer(appRoot, AppLayer.REQUEST_SCOPED))
+                .should(onlyDependOnTier2Allowed())
+                .because(
+                    "D-6A2b-32 ② — 컨트롤러가 받는 요청 스코프 층은 면제가 아니라 별도 허용 목록 ⊆ 다. " +
+                        "여기에 SQL 이 들어오면 그것이 곧 HTTP 지름길이다",
+                ),
+            classes()
+                .that(inLayer(appRoot, AppLayer.RESTRICTED, AppLayer.REQUEST_SCOPED))
+                .should(dependOnCollectionLayer())
+                .because("D-6A2b-32 ③ — 수집 레인은 HTTP 로 닿지 않는다(의존 방향으로 잠근다)"),
         )
 
-    private fun handlerOrHttpLayer(appRoot: String): DescribedPredicate<JavaClass> =
-        object : DescribedPredicate<JavaClass>("$appRoot 아래의 핸들러이거나 HTTP 층인 클래스") {
-            override fun test(input: JavaClass): Boolean = isTarget(input, appRoot)
+    private fun inLayer(
+        appRoot: String,
+        vararg layers: AppLayer,
+    ): DescribedPredicate<JavaClass> =
+        object : DescribedPredicate<JavaClass>("$appRoot 아래 ${layers.joinToString()} 층의 클래스") {
+            override fun test(input: JavaClass): Boolean = layerOf(input, appRoot) in layers
         }
 
     /**
@@ -108,29 +140,35 @@ class AppHttpDependencyRules(
      * (`RouterFunction` 빈 · 빈 이름 URL 매핑 · 인증보다 앞선 필터)이 SQL 을 실행하며 전건
      * 초록이었다. 종류를 하나 더 세는 처방은 같은 병을 다시 앓는다.
      *
-     * 지금은 **기본이 제한**이고, 면제는 계약 파일에 **정확한 클래스 이름**으로 적은 조립
-     * 클래스뿐이다(접두·패턴을 쓰지 않는다 — 패키지 하나를 열면 그 안의 새 클래스가 조용히
-     * 면제된다). 면제된 조립 클래스가 `@Bean` 으로 진입점을 만드는 길은 이 규칙이 아니라
-     * 출하 조립의 표면 실측(D-6A2b-27)이 잡는다.
+     * **면제는 한 덩어리가 아니라 세 층이다**(D-6A2b-32). 한 덩어리로 두면 ② 층에 SQL 메서드
+     * 하나를 더하는 것만으로 컨트롤러 → HTTP 지름길이 열린다(6A-3 R3-M1 ⓑ 「어댑터 추가
+     * 메서드」와 같은 형태).
      *
-     * 중첩·익명·컴패니언은 **최상위 소유자**로 판정한다 — 조립 클래스 안쪽에 숨겨도 면제가
-     * 따라가지만, 그 경우 역시 표면 실측이 진입점을 본다.
+     * 중첩·익명·컴패니언은 **최상위 소유자**로 판정한다. 위반 fixture 루트에는 층이 없다 —
+     * 같은 규칙 값이 그대로 서게 평가 루트가 production 일 때만 층을 읽는다.
      */
+    private fun layerOf(
+        item: JavaClass,
+        appRoot: String,
+    ): AppLayer {
+        val top = item.topLevel().fullName
+        val topPackage = item.topLevel().packageName
+        return when {
+            !(topPackage == appRoot || topPackage.startsWith("$appRoot.")) -> AppLayer.OUTSIDE
+            appRoot != productionAppRoot() -> AppLayer.RESTRICTED
+            top in policy.appAssemblyTier1Classes -> AppLayer.BOOTSTRAP
+            top in policy.appAssemblyTier2Classes -> AppLayer.REQUEST_SCOPED
+            top in policy.appAssemblyTier3Classes -> AppLayer.COLLECTION
+            else -> AppLayer.RESTRICTED
+        }
+    }
+
+    private fun productionAppRoot(): String = "${policy.packageRoot}.app"
+
     private fun isTarget(
         item: JavaClass,
         appRoot: String,
-    ): Boolean {
-        val top = item.topLevel()
-        val inApp = top.packageName == appRoot || top.packageName.startsWith("$appRoot.")
-        return inApp && top.fullName !in exemptAssemblyClasses(appRoot)
-    }
-
-    /**
-     * 면제 목록은 계약 파일이 갖는다. 평가 루트가 production 이 아니면(위반 fixture) 면제는
-     * 없다 — fixture 에 조립 클래스를 두지 않으므로 같은 규칙 값이 그대로 선다.
-     */
-    private fun exemptAssemblyClasses(appRoot: String): Set<String> =
-        if (appRoot == "${policy.packageRoot}.app") policy.appAssemblyExemptClasses.toSet() else emptySet()
+    ): Boolean = layerOf(item, appRoot) == AppLayer.RESTRICTED
 
     private fun onlyDependOnAllowed(capabilityPorts: Set<String>): ArchCondition<JavaClass> {
         val allowedPackages = policy.appHttpAllowedPackages
@@ -195,6 +233,85 @@ class AppHttpDependencyRules(
         }
 
     private fun String.isUnder(roots: List<String>): Boolean = roots.any { this == it || startsWith("$it.") }
+
+    /**
+     * ② 층의 허용 목록 ⊆ — 패키지 접두와 **정확한 클래스 이름**이다. 그 안에서도 원시 SQL·
+     * Spring JDBC 는 다시 파고, `adapters` 는 **인터페이스만** 통과한다(구체 클래스는 이름을
+     * 적어야 한다). 이 층은 컨트롤러에서 닿으므로 「무엇을 쥘 수 있는가」가 곧 HTTP 표면이다.
+     */
+    private fun onlyDependOnTier2Allowed(): ArchCondition<JavaClass> {
+        val allowedPackages = policy.appTier2AllowedPackages
+        val allowedClasses = policy.appTier2AllowedClasses.toSet()
+        val deniedPackages = policy.appTier2DeniedPackages
+        val adaptersRoot = policy.appHttpAdaptersRoot
+        return object : ArchCondition<JavaClass>(
+            "요청 스코프 층의 허용 목록 밖을 참조한다 (패키지 ${allowedPackages.size} · 클래스 ${allowedClasses.size})",
+        ) {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.directDependenciesFromSelf
+                    .map { it.targetClass.baseComponentType }
+                    .filterNot { it.isPrimitive || it.isArray }
+                    .filterNot { it.topLevel().fullName == item.topLevel().fullName }
+                    .filterNot { target ->
+                        tier2Allows(target, allowedPackages, allowedClasses, deniedPackages, adaptersRoot)
+                    }.distinct()
+                    .forEach { target ->
+                        events.add(SimpleConditionEvent.violated(item, "${item.fullName} -> ${target.fullName}"))
+                    }
+            }
+        }
+    }
+
+    private fun tier2Allows(
+        target: JavaClass,
+        allowedPackages: List<String>,
+        allowedClasses: Set<String>,
+        deniedPackages: List<String>,
+        adaptersRoot: String,
+    ): Boolean =
+        when {
+            target.packageName.isUnder(deniedPackages) -> {
+                false
+            }
+
+            target.topLevel().fullName in allowedClasses -> {
+                true
+            }
+
+            // 어댑터는 **인터페이스만** — 구체 클래스를 쥐는 것은 구현을 쥐는 것이고 메서드가 늘 수 있다.
+            // 예외 타입 하나는 판다: 값일 뿐 포트를 건네지 않고, 제한 층의 같은 규칙에서 이미
+            // 같은 근거로 열려 있다(`isAssignableTo(Throwable)` — 이름이 아니라 계층 해석).
+            target.packageName.isUnder(listOf(adaptersRoot)) -> {
+                target.isInterface || target.isAssignableTo(Throwable::class.java)
+            }
+
+            else -> {
+                target.packageName.isUnder(allowedPackages)
+            }
+        }
+
+    /** ③ 층을 참조하면 그 자체가 위반이다 — 수집 레인은 HTTP 로 닿지 않아야 한다. */
+    private fun dependOnCollectionLayer(): ArchCondition<JavaClass> {
+        val collection = policy.appAssemblyTier3Classes.toSet()
+        return object : ArchCondition<JavaClass>("수집 레인(${collection.size} 종)을 참조한다") {
+            override fun check(
+                item: JavaClass,
+                events: ConditionEvents,
+            ) {
+                item.directDependenciesFromSelf
+                    .map {
+                        it.targetClass.baseComponentType
+                            .topLevel()
+                            .fullName
+                    }.filter { it in collection }
+                    .distinct()
+                    .forEach { events.add(SimpleConditionEvent.violated(item, "${item.fullName} -> $it")) }
+            }
+        }
+    }
 
     /** 중첩·동반 객체는 자신을 담은 최상위 클래스로 판정한다 — 컨트롤러 안쪽에 숨기는 형태를 함께 든다. */
     private fun JavaClass.topLevel(): JavaClass = enclosingClass.map { it.topLevel() }.orElse(this)

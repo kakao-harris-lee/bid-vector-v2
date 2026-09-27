@@ -56,6 +56,23 @@ class AppHttpDependencyGateTest {
     }
 
     /**
+     * D-6A2b-32 — 세 층이 **서로 겹치지 않고**, 합이 면제 전체이며, `app.http` 가 어느 층에도
+     * 없다. 한 클래스가 두 층에 들면 어느 규칙이 서는지가 목록의 순서에 달리게 된다.
+     */
+    @Test
+    fun `면제는 세 층으로 갈리고 서로 겹치지 않는다`() {
+        val tier1 = policy.appAssemblyTier1Classes
+        val tier2 = policy.appAssemblyTier2Classes
+        val tier3 = policy.appAssemblyTier3Classes
+
+        (tier1 + tier2 + tier3).size shouldBe (tier1 + tier2 + tier3).toSet().size
+        policy.appAssemblyExemptClasses.toSet() shouldBe (tier1 + tier2 + tier3).toSet()
+        (tier1 + tier2 + tier3).filter { it.startsWith(policy.appHttpPackage + ".") } shouldBe emptyList()
+        // ② 층은 컨트롤러가 받는 것이다 — HTTP 층의 허용 클래스 목록에 실제로 들어 있어야 한다.
+        tier2.filter { it !in policy.appHttpAllowedClasses } shouldBe emptyList()
+    }
+
+    /**
      * D-6A2b-26 — 대상은 **`bidvector.app` 전체**이고 면제는 계약 파일의 **정확한 이름**뿐이다
      * (verifier r2 F-r2-1 시정 — r1 은 대상을 「핸들러 종류」로 열거했고 그 목록 밖의 진입점
      * 셋이 SQL 을 실행했다). 게이트가 보고 있는 집합을 직접 단언한다: app 의 모든 최상위
