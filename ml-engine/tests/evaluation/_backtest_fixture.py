@@ -107,6 +107,12 @@ def _row(label: str, opened: date, rng: Random) -> dict[str, Any]:
     }
 
 
+# 행이 되지 못한 표본 둘 — 상세를 못 받은 것과 공고 canonical 이 없던 것.
+# 해시는 결정적으로 만든다(같은 seed 면 같은 바이트).
+_MISSING_DETAIL_KEY = hashlib.sha256(b"m6-6g-sampled-without-detail").hexdigest()
+_MISSING_NOTICE_KEY = hashlib.sha256(b"m6-6g-sampled-without-notice").hexdigest()
+
+
 def build_rows() -> list[dict[str, Any]]:
     """결정적 생성 — 같은 seed 면 같은 바이트. 커밋된 fixture 와 대조된다."""
     rng = Random(_FIXTURE_SEED)
@@ -124,12 +130,18 @@ def build_files() -> tuple[bytes, bytes, bytes]:
         "\n".join(json.dumps(row, sort_keys=True, ensure_ascii=False) for row in rows)
         + "\n"
     ).encode("utf-8")
-    # v4 — 표본 목록이 파일이다. 합성 fixture 는 「표본 == 행」인 판이라 결측 계수가
-    # 둘 다 0 이다(진부분집합 상태는 판독 test 가 따로 잰다).
+    # v4 — 표본 목록이 파일이다. **일부러 「표본 != 행」으로 둔다**: 표본 둘이 행이
+    # 되지 못한 판이라야 `sample_size`(행+2) · `notice_observed_count`(행+1) · 행 수가
+    # 셋 다 다른 값이 되고, 판정 JSON 이 분모를 어디서 가져오는지 test 가 가를 수
+    # 있다. 셋이 같은 판에서는 분모를 무엇으로 적든 같은 수가 나와 아무것도 잠기지
+    # 않는다 — 왕복 golden 이 10/10/0/0 이던 동안 겪은 것과 같은 함정이다.
+    extra = (_MISSING_DETAIL_KEY, _MISSING_NOTICE_KEY)
     listing = (
         "\n".join(
             f"{key}\tSERVICES\t2026-W25"
-            for key in sorted(row["notice"]["notice_key_hash"] for row in rows)
+            for key in sorted(
+                [row["notice"]["notice_key_hash"] for row in rows] + list(extra)
+            )
         )
         + "\n"
     ).encode("utf-8")
@@ -145,9 +157,9 @@ def build_files() -> tuple[bytes, bytes, bytes]:
         # v4 — 표본 목록 **파일 바이트**의 해시다(행에서 재계산한 값이 아니다).
         # v3 의 재계산 대조는 원형이라 성립하지 않았다 — D-6G-39.
         "sample_list_sha256": hashlib.sha256(listing).hexdigest(),
-        "sample_size": len(rows),
-        "sampled_without_detail": 0,
-        "sampled_without_notice": 0,
+        "sample_size": len(rows) + len(extra),
+        "sampled_without_detail": 1,
+        "sampled_without_notice": 1,
     }
     return (
         json.dumps(manifest, sort_keys=True, ensure_ascii=False).encode("utf-8"),

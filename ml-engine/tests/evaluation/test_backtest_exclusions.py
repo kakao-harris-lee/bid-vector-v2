@@ -527,6 +527,28 @@ def test_presence_fill_rate_denominator_is_every_sample_with_a_notice_observatio
     assert rates["award_method_application_standard"] == 0.25
 
 
+def test_every_notice_axis_fill_rate_shares_one_denominator() -> None:
+    """D-6G-46 — 공고 축 여섯이 **분모 하나**를 쓴다. 앞 판은 `has_*` 둘만 표본 수를
+    쓰고 나머지 넷은 행 수를 써서, 같은 표에 실린 여섯을 서로 비교할 수 없었다.
+
+    분모를 넷으로 두고 행 둘을 주면 **모든 칸이 행 수 기준 값의 절반**이어야 한다.
+    한 칸이라도 행 수를 분모로 쓰고 있으면 그 칸만 두 배로 남는다."""
+    payloads = [
+        row_payload("a", notice_has_award_method_application_standard=True),
+        row_payload("b", notice_has_award_method_application_standard=True),
+    ]
+    snapshot = _snapshot(payloads)
+    by_rows = dict(fill_rates(snapshot.rows, notice_observed_count=len(snapshot.rows)))
+    halved = dict(
+        fill_rates(snapshot.rows, notice_observed_count=len(snapshot.rows) * 2)
+    )
+    assert set(by_rows) == set(halved)
+    for name, value in by_rows.items():
+        assert halved[name] == value / 2, f"{name} 이 분모를 공유하지 않는다"
+    # 헛돌지 않는 확인 — 적어도 한 칸은 0 이 아니어야 비율 비교가 의미를 갖는다.
+    assert any(value > 0 for value in by_rows.values())
+
+
 def test_standard_market_price_scope_counts_over_notices_that_have_an_a_value() -> None:
     """D-6G-17·23 — 분모는 **A 값을 가진 공고**다. A 가 없는 공고는 합산액이 없어
     애초에 이 배제의 범위 밖이다(스키마 §3.3). 참·판정 불가를 따로 세는 이유는

@@ -100,6 +100,57 @@ def _snapshot_dir(tmp_path: Path, *, reverse: bool = False) -> str:
     return directory.as_uri()
 
 
+def _complete_snapshot_dir(tmp_path: Path) -> str:
+    """표본이 **하나도 빠지지 않은** 판 — 목록에서 행 없는 표본 둘을 빼고 계수를 0 으로
+    적는다. 기본 fixture 와 반대쪽 경우라서, 하한 표지가 상수가 아니라 데이터에서
+    나온다는 것을 가른다."""
+    manifest_bytes, rows_bytes, sample_list = build_files()
+    row_keys = {
+        json.loads(line)["notice"]["notice_key_hash"]
+        for line in rows_bytes.decode("utf-8").splitlines()
+        if line.strip()
+    }
+    kept = [
+        line
+        for line in sample_list.decode("utf-8").splitlines()
+        if line.split("\t")[0] in row_keys
+    ]
+    listing = ("\n".join(kept) + "\n").encode("utf-8")
+    manifest = json.loads(manifest_bytes)
+    manifest["sample_list_sha256"] = hashlib.sha256(listing).hexdigest()
+    manifest["sample_size"] = len(row_keys)
+    manifest["sampled_without_detail"] = 0
+    manifest["sampled_without_notice"] = 0
+    directory = tmp_path / "complete"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "manifest.json").write_bytes(
+        json.dumps(manifest, sort_keys=True).encode("utf-8")
+    )
+    (directory / "rows.jsonl").write_bytes(rows_bytes)
+    (directory / "sample-list.tsv").write_bytes(listing)
+    return directory.as_uri()
+
+
+def test_lower_bound_marker_comes_from_the_data_not_a_constant(
+    tmp_path: Path,
+) -> None:
+    """D-6G-46 의 하한 표지는 **상수가 아니다**. 표본이 하나도 빠지지 않은 판에서는
+    채움률이 실측이므로 표지가 거짓이어야 한다.
+
+    기본 fixture 는 반대쪽(상세 결측 하나)이라 그쪽만으로는 상수 `true` 와 구별되지
+    않는다 — 변이 실측에서 그 판이 실제로 살아남았다. 두 판을 다 돌려야 표지가
+    데이터를 따라간다는 것이 잠긴다."""
+    payload = _main_variant(
+        _run(_complete_snapshot_dir(tmp_path), _derived_policy(tmp_path)).verdict_bytes
+    )
+    fill_block = payload["fill_rates"]
+    assert fill_block["unmeasured_sample_count"] == 0
+    assert fill_block["is_lower_bound"] is False
+    # 빠진 표본이 없으니 분모가 행 수와 같아진다 — 그래서 모든 행에 있는 칸이 1.0 이다.
+    assert fill_block["denominator"] == payload["sampling"]["sample_size"]
+    assert fill_block["values"]["successful_bid_method_name"] == 1.0
+
+
 def _main_variant(payload_bytes: bytes) -> dict[str, Any]:
     """판 셋 중 주 판정(첫 원소). `SampleVariant` 선언 순서가 배열 순서다."""
     variants = json.loads(payload_bytes)["variants"]
@@ -182,6 +233,7 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
     assert payload["limitations"]
     assert payload["undecidable"]["LOCAL_GOVERNMENT"] > 0
     sampling = payload["sampling"]
+    snapshot = payload["snapshot"]
     assert sampling["within_budget"] is True
     assert sampling["meets_minimum"] is True
     # 공고당 호출은 업무별이다 — fixture 는 전부 용역(3)이라 상세 호출이 행 수의 3배다.
@@ -199,15 +251,32 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
         window_count=policy.verdict.min_window_count,
         category_count=1,
     )
-    fill = payload["fill_rates"]
-    assert fill["successful_bid_method_name"] == 1.0
-    assert fill["reserve_range_end_rate"] == 1.0
+    # D-6G-46 — 여섯이 분모 하나를 공유하고, 그 분모와 하한 표지를 값 옆에 싣는다.
+    # fixture 는 표본 둘이 행이 되지 못한 판이라 **세 수가 다 다르다**: 표본 122 ·
+    # 분모 121 · 행 120. 분모를 다른 수로 적으면 아래 단언들이 갈린다.
+    fill_block = payload["fill_rates"]
+    assert fill_block["denominator"] == sampling["notice_observed_count"]
+    assert (
+        fill_block["denominator"]
+        == snapshot["sample_size"] - snapshot["sampled_without_notice"]
+    )
+    assert fill_block["denominator"] != sampling["sample_size"]
+    assert fill_block["denominator"] != snapshot["sample_size"]
+    # 상세를 못 받은 표본이 있으므로 이 수치들은 **엄격한 하한**이다.
+    assert fill_block["unmeasured_sample_count"] == snapshot["sampled_without_detail"]
+    assert fill_block["is_lower_bound"] is True
+    fill = fill_block["values"]
+    # 모든 행에 있는 칸이라도 1.0 이 아니다 — 분모에 재지 못한 표본이 하나 있다.
+    everywhere = sampling["sample_size"] / fill_block["denominator"]
+    assert everywhere < 1.0
+    assert fill["successful_bid_method_name"] == everywhere
+    assert fill["reserve_range_end_rate"] == everywhere
     # 오늘 fixture 는 공사가 없어 A 적용 여부·순공사원가가 비어 있다 — 채움률 0 을
     # 숨기지 않고 공시한다(D-6G-22).
     assert fill["bid_price_formula_a_applicable"] == 0.0
     assert fill["pure_construction_cost"] == 0.0
     # v3 — 자유텍스트 두 칸은 존재 여부 불리언이다(원문을 싣지 않는다).
-    assert fill["award_method_application_standard"] == 1.0
+    assert fill["award_method_application_standard"] == everywhere
     assert fill["application_basis_content"] == 0.0
     assert payload["base_amount_mismatch_count"] == 0
     # fixture 에 A 값 공고가 없다 — 분모 0 을 숨기지 않고 싣는다(D-6G-17·23).

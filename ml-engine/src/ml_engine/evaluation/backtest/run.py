@@ -434,6 +434,7 @@ def _assemble_verdict(
             request.snapshot.rows,
             notice_observed_count=request.snapshot.notice_observed_count,
         ),
+        unmeasured_sample_count=request.snapshot.sampled_without_detail,
         standard_market_price_scope=standard_market_price_scope(request.snapshot.rows),
         base_amount_mismatch_count=sum(
             1 for item in admission.admitted if not item.base_amount_matches

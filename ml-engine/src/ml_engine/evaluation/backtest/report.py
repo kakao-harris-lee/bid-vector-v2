@@ -99,6 +99,7 @@ def _strategy(verdict: StrategyVerdict) -> dict[str, JsonValue]:
 def _sampling(record: SamplingRecord) -> dict[str, JsonValue]:
     return {
         "sample_size": record.sample_size,
+        "notice_observed_count": record.notice_observed_count,
         "list_call_count": record.list_call_count,
         "detail_calls": record.detail_calls,
         "total_calls": record.total_calls,
@@ -150,7 +151,15 @@ def verdict_payload(verdict: BacktestVerdict) -> dict[str, JsonValue]:
         "distribution_fit": _fit(verdict.fit),
         "exclusions": {str(reason): count for reason, count in verdict.exclusions},
         "undecidable": {str(axis): count for axis, count in verdict.undecidable},
-        "fill_rates": {name: value for name, value in verdict.fill_rates},
+        "fill_rates": {
+            # D-6G-46 — 여섯이 분모 하나를 공유한다. 분모와 하한 표지를 값 옆에 실어
+            # 읽는 쪽이 「무엇에 대한 비율인가」를 판정문만 보고 알 수 있게 한다.
+            "denominator": verdict.sampling.notice_observed_count,
+            "unmeasured_sample_count": verdict.unmeasured_sample_count,
+            # 계수는 음이 아니므로 `bool` 이 「0 보다 큰가」와 같다.
+            "is_lower_bound": bool(verdict.unmeasured_sample_count),
+            "values": {name: value for name, value in verdict.fill_rates},
+        },
         "standard_market_price_scope": {
             "a_value_present_count": (
                 verdict.standard_market_price_scope.a_value_present_count

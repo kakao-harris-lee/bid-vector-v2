@@ -158,6 +158,14 @@ class BacktestVerdict:
     exclusions: tuple[tuple[ExclusionReason, int], ...]
     undecidable: tuple[tuple[UndecidableAxis, int], ...]
     fill_rates: tuple[tuple[str, float], ...]
+    """공고 축 여섯의 채움률(D-6G-46). 분모는 `sampling.notice_observed_count` 하나를
+    공유하고, 분자는 행에서만 세므로 **하한**이다 — 판정 JSON 이 분모와 하한 표지를
+    값 옆에 함께 싣는다."""
+
+    unmeasured_sample_count: int
+    """분모에는 있는데 분자를 셀 수 없는 표본 수(= `sampled_without_detail`). 이 수가
+    0 보다 크면 위 여섯이 **엄격한 하한**이고, 0 이면 실측이다. 표지를 상수로 적지
+    않고 이 수에서 파생하는 이유다 — 항상 참인 표지는 아무것도 말하지 않는다."""
     standard_market_price_scope: StandardMarketPriceScope
     base_amount_mismatch_count: int
     """두 출처의 기초금액이 다른 공고 수(D-6G-19). 값을 고치지 않고 계수만 공시한다 —

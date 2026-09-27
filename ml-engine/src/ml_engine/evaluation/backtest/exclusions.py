@@ -295,17 +295,14 @@ def standard_market_price_scope(
 
 
 def _fill_rate(
-    rows: Sequence[SnapshotRow], reader: Callable[[SnapshotRow], object]
+    rows: Sequence[SnapshotRow],
+    reader: Callable[[SnapshotRow], object],
+    *,
+    denominator: int,
 ) -> float:
-    if not rows:
+    if denominator <= 0:
         return 0.0
-    return sum(1 for row in rows if reader(row) is not None) / len(rows)
-
-
-def bid_method_fill_rate(rows: Sequence[SnapshotRow]) -> float:
-    """낙찰방법 칸의 채움률(D-6G-22) — 판정문에 공시한다. 채움률이 낮으면 ①⑦⑩ 제외가
-    실제로는 「판정 못 함」이라는 뜻이다."""
-    return _fill_rate(rows, lambda row: row.notice.successful_bid_method_name)
+    return sum(1 for row in rows if reader(row) is not None) / denominator
 
 
 def _true_rate(
@@ -317,12 +314,7 @@ def _true_rate(
     """존재 여부 불리언의 참 비율 — v3 에서 자유텍스트 두 칸이 원문 대신 이 형태로
     온다(D-6G-33). 원문을 나르지 않으므로 담당자명이 실릴 경로가 사라진다.
 
-    분모는 행 수가 아니라 **목록 관측이 있는 표본 수**다(M-8). 상세를 못 받아 행이
-    되지 못한 표본도 공고 관측은 있었으므로 분모에 남는다 — 행만 세면 「상세를 받은
-    공고만」의 비율이 되어 실제보다 높게 나온다.
-
-    그 대가로 이 값은 **하한**이다: 분자는 행에서만 셀 수 있어 상세 없는 표본이 0 으로
-    들어간다. 분모를 판정 JSON 에 함께 싣는 이유다."""
+    분모는 `_fill_rate` 와 같다(D-6G-46) — 공고 축 여섯이 하나를 공유한다."""
     if denominator <= 0:
         return 0.0
     return sum(1 for row in rows if reader(row)) / denominator
@@ -334,39 +326,40 @@ def fill_rates(
     """D-6G-22 가 공시를 요구하는 칸들의 채움률. 문서 XML 예제에서 빈 값이 관측된
     칸들이라(스키마 §6) 실수집 뒤 이 수치가 판정의 해석을 바꾼다.
 
-    **분모가 둘로 갈린다.** `has_*` 두 칸은 목록 관측이 있는 표본 수를 분모로 쓰고
-    (M-8), 나머지 넷은 행 수를 쓴다. 계약이 `has_*` 만 지목했기 때문이며, 나머지
-    넷도 공고 축에서 오므로 같은 근거가 적용될 수 있다 — 계약 갱신 없이 넓히지
-    않는다(이 비대칭은 evidence 의 알려진 제한에 적었다). 두 분모가 다르므로 여섯을
-    **서로 비교하면 안 된다**."""
-    return (
-        ("successful_bid_method_name", bid_method_fill_rate(rows)),
+    **여섯이 분모 하나를 공유한다**(D-6G-46) — 공고 목록 관측이 있는 표본 수
+    (`sample_size - sampled_without_notice`). 여섯 다 공고 축에서 오므로 같은 근거가
+    적용된다. 분모가 같으니 **서로 비교할 수 있다**.
+
+    분자는 행에서만 셀 수 있어 상세를 못 받은 표본이 0 으로 들어간다 — 그래서 이
+    수치들은 **하한**이다. 판정 JSON 이 분모와 하한 표지를 함께 싣는다."""
+    present: tuple[tuple[str, Callable[[SnapshotRow], object]], ...] = (
+        (
+            "successful_bid_method_name",
+            lambda row: row.notice.successful_bid_method_name,
+        ),
+        ("pure_construction_cost", lambda row: row.notice.pure_construction_cost),
+        (
+            "bid_price_formula_a_applicable",
+            lambda row: row.notice.bid_price_formula_a_applicable,
+        ),
+        ("reserve_range_end_rate", lambda row: row.notice.reserve_range_end_rate),
+    )
+    flags: tuple[tuple[str, Callable[[SnapshotRow], bool]], ...] = (
         (
             "award_method_application_standard",
-            _true_rate(
-                rows,
-                lambda row: row.notice.has_award_method_application_standard,
-                denominator=notice_observed_count,
-            ),
+            lambda row: row.notice.has_award_method_application_standard,
         ),
         (
             "application_basis_content",
-            _true_rate(
-                rows,
-                lambda row: row.notice.has_application_basis_content,
-                denominator=notice_observed_count,
-            ),
-        ),
-        (
-            "pure_construction_cost",
-            _fill_rate(rows, lambda row: row.notice.pure_construction_cost),
-        ),
-        (
-            "bid_price_formula_a_applicable",
-            _fill_rate(rows, lambda row: row.notice.bid_price_formula_a_applicable),
-        ),
-        (
-            "reserve_range_end_rate",
-            _fill_rate(rows, lambda row: row.notice.reserve_range_end_rate),
+            lambda row: row.notice.has_application_basis_content,
         ),
     )
+    rates = [
+        (name, _fill_rate(rows, reader, denominator=notice_observed_count))
+        for name, reader in present
+    ]
+    rates += [
+        (name, _true_rate(rows, reader, denominator=notice_observed_count))
+        for name, reader in flags
+    ]
+    return tuple(rates)
