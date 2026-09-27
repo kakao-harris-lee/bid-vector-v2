@@ -128,6 +128,23 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         extraction.sampledWithoutDetail shouldBe 1
     }
 
+    /**
+     * 표본 밖 공고의 원문은 **펴지 않는다**(code-review r2 LOW) — 창 안 전건을 파싱해 메모리에
+     * 올리면 표본과 무관한 공고까지 통째로 적재된다. 결과는 계수로만 드러나므로, 표본 밖 키가
+     * 여럿일 때 **키 수**로 세는지(행 수가 아니라) 확인한다.
+     */
+    @Test
+    fun `표본 밖은 키 수로 센다 — 행 수가 아니다`() {
+        // 한 공고에 축 둘·행 여럿 — 행으로 세면 이 값이 1 이 아니다.
+        observe("20260617009-00", SourceEndpoint.OPENING_RESULT_LIST)
+        observe("20260617009-00", SourceEndpoint.OPENING_COMPLETE)
+        observe("20260617008-00", SourceEndpoint.OPENING_COMPLETE)
+
+        val extraction = extract(sampleOf("20260617001-00"))
+
+        extraction.observedOutsideSample shouldBe 2
+    }
+
     /** 관측 창 밖의 원문은 보지 않는다 — 창은 `observed_at` 으로 자른다. */
     @Test
     fun `창 밖 관측은 상세로 치지 않는다`() {

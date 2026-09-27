@@ -64,13 +64,13 @@ v4 는 표본을 파일로 못 박는다. 수집 갈래의 **첫 표본틀 단�
 
 ```
 0a1f…(64 hex)	CONSTRUCTION	2026-W07
-3c92…(64 hex)	SERVICES	2026-W08
+3c92…(64 hex)	SERVICE	2026-W08
 ```
 
 | 칸 | 뜻 |
 |---|---|
 | `notice_key_hash` | §5 의 정의 그대로(소문자 hex 64자) |
-| `business_division` | 층의 업무 축 — Kotlin `BusinessDivision` 어휘. 행의 `category` 와는 다른 축이다 |
+| `business_division` | 층의 업무 축 — Kotlin `BusinessDivision` 어휘(`CONSTRUCTION`·`SERVICE`·`GOODS`·`FOREIGN`). 행의 `category` 와는 **다른 축**이지만 어휘는 같다 — 예제가 갈려 있으면 다음 사람이 어느 쪽을 정본으로 읽을지 헷갈린다(D-6G-46) |
 | `notice_week` | 층의 시간 축 — 공고일의 ISO 주(`YYYY-Www`) |
 
 추출은 이 파일을 **바이트 그대로 복사**해 스냅숏 곁에 놓는다(해시 동일성이 목적이므로 다시 렌더링하지

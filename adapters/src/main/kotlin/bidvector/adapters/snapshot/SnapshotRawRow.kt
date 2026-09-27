@@ -130,6 +130,7 @@ internal const val NOTICE_SQL =
            n.floor_rate_fraction
       FROM notice n
      WHERE n.business_division IS NOT NULL
+       AND n.notice_number = ANY (?)
     """
 
 /**

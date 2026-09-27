@@ -40,50 +40,71 @@ class JdbcSnapshotSource(
         to: LocalDate,
         sample: SampleList,
     ): SnapshotExtraction {
-        val observations = readObservations(from, to)
-        val notices = readNotices()
+        val observed = readObservations(from, to, sample)
+        val notices = readNotices(observed.byKey.keys)
         val rows = mutableListOf<SnapshotRow>()
         val withDetail = mutableSetOf<NoticeKeyHash>()
         var withoutNotice = 0
-        var outsideSample = 0
-        for ((key, axes) in observations) {
-            val hash = NoticeKeyHash.of(key.number, key.round.value)
+        for ((key, axes) in observed.byKey) {
             // 상세가 하나도 없는 표본은 세지 않고 지나간다 — 아래의 **차집합**이 센다. 여기서 세면
             // 관측이 아예 없는 표본(원문이 한 줄도 안 온 공고)을 놓친다.
-            if (hash !in sample.keys) {
-                outsideSample++
-            } else if (axes.keys.any { it in DETAIL_ENDPOINTS }) {
-                withDetail += hash
+            if (axes.keys.any { it in DETAIL_ENDPOINTS }) {
+                withDetail += NoticeKeyHash.of(key.number, key.round.value)
                 val canonical = notices[key]
                 if (canonical == null) withoutNotice++ else rows += assembleSnapshotRow(key, axes, canonical)
             }
         }
-        return SnapshotExtraction(rows, withoutNotice, sample.keys.size - withDetail.size, outsideSample)
+        return SnapshotExtraction(
+            rows,
+            withoutNotice,
+            sample.keys.size - withDetail.size,
+            observed.outsideSample.size,
+        )
     }
 
     private fun readObservations(
         from: LocalDate,
         to: LocalDate,
-    ): Map<NoticeKey, Map<SourceEndpoint, List<RawRow>>> =
+        sample: SampleList,
+    ): ObservedRows =
         dataSource.connection.use { connection ->
+            // **커서로 흘린다.** Postgres 드라이버는 autoCommit 이 켜진 채로는 `fetchSize` 를 무시하고
+            // 결과 집합을 통째로 받는다 — 둘을 함께 두어야 창이 넓어져도 메모리가 늘지 않는다.
+            // 읽기만 하므로 커밋하지 않는다(커넥션이 닫히며 롤백된다).
+            connection.autoCommit = false
             connection.prepareStatement(OBSERVATION_SQL).use { statement ->
+                statement.fetchSize = OBSERVATION_FETCH_SIZE
                 statement.setObject(1, from)
                 statement.setObject(2, to.plusDays(1))
-                statement.executeQuery().use { rows -> groupObservations(rows) }
+                statement.executeQuery().use { rows -> groupObservations(rows, sample) }
             }
         }
 
-    private fun groupObservations(rows: ResultSet): Map<NoticeKey, Map<SourceEndpoint, List<RawRow>>> {
+    /**
+     * **표본 밖은 원문을 펴지 않는다**(code-review r2 LOW). 창 안의 모든 행을 파싱해 메모리에 올리면
+     * 표본과 무관한 공고까지 통째로 적재된다 — 창이 넓어질수록 선형으로 는다. 키는 결과 집합에서
+     * 바로 얻으므로, 표본 밖 행은 `payload_fields` 를 만지기 전에 버린다.
+     */
+    private fun groupObservations(
+        rows: ResultSet,
+        sample: SampleList,
+    ): ObservedRows {
         val byKey = linkedMapOf<NoticeKey, MutableMap<SourceEndpoint, MutableList<RawRow>>>()
+        val outside = mutableSetOf<NoticeKey>()
         while (rows.next()) {
+            // 식별자나 엔드포인트 어휘가 서지 않는 행은 `null` 로 와서 조용히 지나간다.
             keyAndEndpointOf(rows)?.let { (key, endpoint) ->
-                byKey
-                    .getOrPut(key) { linkedMapOf() }
-                    .getOrPut(endpoint) { mutableListOf() }
-                    .add(RawRow(parseFields(rows.getString("payload_fields")), policy))
+                if (NoticeKeyHash.of(key.number, key.round.value) in sample.keys) {
+                    byKey
+                        .getOrPut(key) { linkedMapOf() }
+                        .getOrPut(endpoint) { mutableListOf() }
+                        .add(RawRow(parseFields(rows.getString("payload_fields")), policy))
+                } else {
+                    outside += key
+                }
             }
         }
-        return byKey
+        return ObservedRows(byKey, outside)
     }
 
     /** 식별자나 엔드포인트 어휘가 서지 않는 행은 조용히 지나간다 — 지어내지 않는다. */
@@ -97,12 +118,16 @@ class JdbcSnapshotSource(
         return if (number == null || round == null || endpoint == null) null else NoticeKey(number, round) to endpoint
     }
 
-    private fun readNotices(): Map<NoticeKey, CanonicalNotice> =
-        dataSource.connection.use { connection ->
-            connection.createStatement().use { statement ->
-                statement.executeQuery(NOTICE_SQL).use(::collectNotices)
+    /** 표본으로 거른다 — 조건 없이 전건을 읽으면 `notice` 표 전체가 메모리에 온다(같은 지적). */
+    private fun readNotices(keys: Set<NoticeKey>): Map<NoticeKey, CanonicalNotice> {
+        if (keys.isEmpty()) return emptyMap()
+        return dataSource.connection.use { connection ->
+            connection.prepareStatement(NOTICE_SQL).use { statement ->
+                statement.setArray(1, connection.createArrayOf("text", keys.map { it.number }.toTypedArray()))
+                statement.executeQuery().use(::collectNotices)
             }
         }
+    }
 
     private fun collectNotices(rows: ResultSet): Map<NoticeKey, CanonicalNotice> {
         val out = linkedMapOf<NoticeKey, CanonicalNotice>()
@@ -117,6 +142,14 @@ class JdbcSnapshotSource(
 
 /** 제로패딩 세 자리가 아니면 **기본값을 쓰지 않는다** — 차수를 모르는 행은 키를 갖지 못한다. */
 private fun roundOrNull(raw: String?): NoticeRound? = raw?.let { runCatching { NoticeRound.of(it) }.getOrNull() }
+
+/** 창 안의 관측 — 표본 안은 편 채로, 표본 밖은 **키만** 센다. */
+private class ObservedRows(
+    val byKey: Map<NoticeKey, Map<SourceEndpoint, List<RawRow>>>,
+    val outsideSample: Set<NoticeKey>,
+)
+
+private const val OBSERVATION_FETCH_SIZE = 500
 
 internal const val RESERVE_PRICE_SLOTS = 15
 
