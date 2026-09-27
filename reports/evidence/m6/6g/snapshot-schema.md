@@ -1,176 +1,165 @@
-# M6/6G 실험 스냅숏 JSONL 스키마 (D-6G-2)
+# M6/6G 실험 스냅숏 스키마 (D-6G-2) — 레인 간 계약
 
-> **지위: 레인 간 계약.** Kotlin 레인이 이 형태로 쓰고 Python 레인이 이 형태로 읽는다(fixture 도 이 형태로 짓는다).
-> 형태를 바꾸려면 `schema_version` 을 올리고 이 문서를 먼저 고친다 — 한쪽만 바꾸지 않는다.
-> 스냅숏 실물은 **저장소 밖**(`~/.local/bid-vector-snapshots/<snapshot_id>/`)에 둔다(D-6G-2 · data-extract §7 · ADR 0010 D-8).
+> **지위: 두 레인이 합의한 계약.** 2026-09-27 초판(Kotlin 레인)과 Python 레인의 독자 초안이 엇갈려, **Python 레인의
+> 구조를 채택**하고 Kotlin 레인이 생산 쪽 제약을 반영해 정정했다. 형태를 바꾸려면 `schema_version` 을 올리고 이
+> 문서를 먼저 고친다 — 한쪽만 바꾸지 않는다.
+> 스냅숏 실물은 **저장소 밖**(`~/.local/bid-vector-snapshots/<snapshot_id>/`)에 둔다(data-extract §7 · ADR 0010 D-8).
 
-`schema_version`: `6g-snapshot-1`
+`schema_version`: `snapshot-v1` · 파일 둘: `manifest.json` · `rows.jsonl`
 
-## 0. 파일 구성
+## 0. 왜 한 행이 두 반쪽인가
 
-| 파일 | 내용 |
-|---|---|
-| `notices.jsonl` | 공고 하나 = 한 줄(UTF-8, 개행 구분, 줄 안에 개행 없음). 아래 §1 |
-| `manifest.json` | 한 객체. 행 수 · 기간 · sha256 · 표본 목록 sha256 · 표집 축. 아래 §3 |
+한 줄은 `notice`(투찰 시점에 알 수 있는 것)와 `outcome`(개찰로 드러나는 것)으로 갈린다. 전략에 넘어가는 것은
+`notice` 뿐이고 `outcome` 은 채점만 읽는다 — **누출 금지(위협 모델 ①)를 문서가 아니라 타입으로 닫는다.** 전략이
+예정가격을 보려면 dataclass 를 고쳐야 하고 그 편집은 diff 에 드러난다. 초판의 평평한 한 객체는 이 성질이 없었다.
 
-**정렬**: `notices.jsonl` 은 `notice_key_hash` **오름차순**으로 쓴다 — 같은 입력이면 바이트까지 같은 파일이 나온다
-(재현성 D-6G-2, acceptance 의 「바이트 동일」 재현 test 가 이것을 잰다). JSON 객체의 키 순서는 이 문서의 선언 순서로 고정한다.
+## 1. 수치 표현 — JSON 수치로 간다
 
-**수치의 표현**: 금액·비율은 **문자열**이다(JSON number 로 쓰지 않는다). 부동소수 왕복이 값을 바꾸는 자리를 만들지 않는다 —
-읽는 쪽이 `Decimal` 로 받는다. 개수·순번만 JSON 정수다.
+초판은 금액·비율을 **문자열**로 적었다(부동소수 왕복 회피). **철회한다**: 소비 쪽 산술이 `float`·numpy float64
+전 구간이라 문자열로 실어도 읽는 즉시 `float` 이 된다 — 바꾸지 않는 보장을 위해 양쪽에 churn 만 남는다.
 
-**`null` 의 뜻**: 「관측되지 않았다」이다. 「0」·「없음」과 구분된다 — 제외 판정은 `exclusions` 가 따로 나른다(§2).
+대신 **금액은 JSON 정수**로 쓴다(원 단위, 소수점 없음). 1e12 원까지 double 이 정확히 담으므로 왕복이 exact 하다.
+비율은 JSON 실수다.
 
-## 1. `notices.jsonl` 레코드
+> **경계 1원의 판정은 이 스키마가 결정하지 못한다.** 하한가 `(예정가격 − A) × r + A` 의 **절상·절하 규칙**이
+> 미확정이고(선행 조사가 문면을 확보하지 못했다), 그 미확정이 부동소수 오차(~1e-4 원)보다 **훨씬 크다**. 투찰금액이
+> 하한가와 1원 차이인 공고의 적격 판정은 그 규칙이 정해질 때까지 미정이다 — 판정문에 한계로 적는다.
 
-```json
-{
-  "notice_key_hash": "9f2c…",
-  "business_division": "CONSTRUCTION",
-  "notice_date": "2026-06-03",
-  "opening_date": "2026-06-17",
-  "opening_window": "2026-W25",
-  "base_amount_won": "1234567890",
-  "planned_price_won": "1250000000",
-  "floor_rate_fraction": "0.87745",
-  "floor_rate_origin": "PUBLISHED",
-  "award_method_code": "01",
-  "award_method_name": "적격심사",
-  "planned_price_method_name": "복수예가",
-  "reserve_price_range_begin_rate": "-0.02",
-  "reserve_price_range_end_rate": "0.02",
-  "total_reserve_price_candidate_count": 15,
-  "reserve_prices": [
-    { "sequence": "01", "amount_won": "1248000000", "is_drawn": true, "draw_count": 2 }
-  ],
-  "draw_numbers": [3, 7, 11, 14],
-  "draw_numbers_kind": "VERIFIED",
-  "construction_a_value_won": "98000000",
-  "construction_a_value_disclosed_at": "2026-06-16T00:00:00Z",
-  "construction_a_value_summed": true,
-  "participant_count": 42,
-  "bidders": [
-    { "ordinal": 1, "bid_amount_won": "1100000000", "bid_rate_percent": "88.000", "opening_rank": 1, "bid_at": "2026-06-17T00:50:00Z" }
-  ],
-  "exclusions": []
-}
-```
-
-### 1.1 칸의 뜻
-
-| 칸 | 형 | 뜻 · 출처 |
-|---|---|---|
-| `notice_key_hash` | string(64, 소문자 hex) | `sha256("<공고번호>/<차수>")`. **salt 없음** — 표본 선택 술어(D-6G-11)가 같은 해시를 다시 계산할 수 있어야 하고, 공고번호 자체는 공개값이다. **되돌릴 수 있다**(11자리 공간) — 이것은 비밀이 아니라 **조인 키 제거**다. 비식별의 대상은 공고가 아니라 투찰자다 |
-| `business_division` | enum | `GOODS` · `SERVICE` · `CONSTRUCTION` · `FOREIGN`. 값은 수집 오퍼레이션이 정한다(응답 필드 아님) |
-| `notice_date` | date | **공고일**. 창 포함 판정의 기준(D-6G-14 — 예규 적용례 「시행일 이후 최초 입찰공고분」) |
-| `opening_date` | date | 개찰일(실개찰일시의 KST 날짜). 창을 **자르는** 기준(D-6G-5) |
-| `opening_window` | string | 개찰 주 창 id, ISO 주(`YYYY-Www`). 비중첩 · 층의 한 축 |
-| `base_amount_won` | string\|null | 기초금액 |
-| `planned_price_won` | string\|null | 예정가격 |
-| `floor_rate_fraction` | string\|null | 낙찰하한율 **fraction**(percent 아님). 없으면 그 공고는 `exclusions` 에 ② |
-| `floor_rate_origin` | string\|null | 하한율 출처 어휘 |
-| `award_method_code` | string\|null | 낙찰방법코드(`sucsfbidMthdCd`) — 제로패딩 보존 |
-| `award_method_name` | string\|null | 낙찰방법명(`sucsfbidMthdNm`). 제외 ①의 입력 |
-| `planned_price_method_name` | string\|null | 예정가격 결정방법. 제외 ④의 입력 |
-| `reserve_price_range_begin_rate` | string\|null | 예가 범위 **시작**율 fraction(`rsrvtnPrceRngBgnRate`). S0 의 반폭 h 는 이 값과 아래 값에서 나온다 — 상수 2%·3% 를 코드에 박지 않는다 |
-| `reserve_price_range_end_rate` | string\|null | 예가 범위 **끝**율 fraction(`rsrvtnPrceRngEndRate`) |
-| `total_reserve_price_candidate_count` | int\|null | 총예가건수 |
-| `reserve_prices` | array | 복수예비가격 후보 행. §1.2 |
-| `draw_numbers` | array[int]\|null | 관측된 추첨번호(1-기반 인덱스). 투찰자 귀속 없음 |
-| `draw_numbers_kind` | enum\|null | `VERIFIED` · `OUT_OF_RANGE` · `RANGE_CHECK_UNAVAILABLE`. 「검사 못 했다」가 조용한 통과로 접히지 않는다 |
-| `construction_a_value_won` | string\|null | 공사 A값. 공사가 아니면 항상 `null` |
-| `construction_a_value_disclosed_at` | datetime(UTC, `Z`)\|null | A 공개일시. **입찰 마감 뒤면** 제외 ⑥(투찰 시점에 알 수 없는 값) |
-| `construction_a_value_summed` | bool\|null | 합산 여부 술어 |
-| `participant_count` | int\|null | 참가업체수(목록 축 관측) |
-| `bidders` | array | 투찰 행. §1.3 |
-| `exclusions` | array[enum] | 제외 사유. §2. **빈 배열이면 실험 대상** |
-
-### 1.2 `reserve_prices[]`
-
-| 칸 | 형 | 뜻 |
-|---|---|---|
-| `sequence` | string | 복수예가순번(`compnoRsrvtnPrceSno`) — 제로패딩 보존 |
-| `amount_won` | string\|null | 예비가격 |
-| `is_drawn` | bool\|null | 추첨 여부 |
-| `draw_count` | int\|null | 추첨 횟수 |
-
-`sequence` 오름차순(문자열 사전순)으로 쓴다.
-
-### 1.3 `bidders[]` — **상호를 싣지 않는다**
-
-| 칸 | 형 | 뜻 |
-|---|---|---|
-| `ordinal` | int | **공고 안 순번**, 1-기반. 투찰자의 유일한 식별이다 — 상호·사업자번호·대표자명은 싣지 않는다(D-6G-2 ⑤). 공고 사이에 같은 `ordinal` 이 같은 업체를 뜻하지 **않는다** |
-| `bid_amount_won` | string\|null | 투찰금액. 협상에 의한 계약에서는 부재한다(제외 ⑯의 입력) |
-| `bid_rate_percent` | string\|null | 투찰률 percent 원문 형(분자는 투찰금액) |
-| `opening_rank` | int\|null | 개찰순위 원문. **결측·중복이 흔하다** — 순위로 경쟁자 분포를 만들지 말고 `bid_amount_won` 으로 만든다 |
-| `bid_at` | datetime(UTC, `Z`)\|null | 투찰일시 |
-
-**`ordinal` 의 결정 규칙**(재현성): `bid_amount_won` **오름차순**, `null` 은 뒤로, 같은 금액은 원문 행 순서 — 그 뒤 1부터 매긴다.
-오름차순이라 `ordinal = 1` 은 **최저 투찰**이다(개찰순위 1위와 같은 행이라는 보장은 없다 — `opening_rank` 와 어긋나면
-그 자체가 관측 사실이다).
-
-사업자등록번호·대표자명은 **DB 에 들어오지 못한다**(어댑터 경계 허용 목록 반전이 계약 미등재 키를 관측 생성 전에 떨어뜨린다).
-상호는 raw 관측까지 오지만 이 추출이 그 열을 고르지 않는다.
-
-## 2. `exclusions` 어휘 (D-6G-13)
-
-수집·추출 단계에서 판정 가능한 것만 싣는다. **전략을 보기 전에** 정해지고, 전략 간 동일 집합이다.
-한 공고에 여러 사유가 붙을 수 있다(배열, 선언 순서로 정렬).
-
-| 값 | D-6G-13 | 판정 자리 |
-|---|---|---|
-| `AWARD_METHOD_NOT_QUALIFICATION_REVIEW` | ① | 추출(낙찰방법) |
-| `FLOOR_RATE_MISSING_OR_OUT_OF_BAND` | ② | 추출(하한율 · 밴드 `[0.30, 0.995]`) |
-| `REBID_OR_FAILED_ROUND` | ③ | 추출(진행구분 · 재입찰번호 · 차수) |
-| `SINGLE_PLANNED_PRICE` | ④ | 추출(예정가격 결정방법 · 총예가건수) |
-| `RESERVE_PRICE_INCOMPLETE` | ⑤ | 추출(예비가격 행 수 · 추첨 정보) |
-| `CONSTRUCTION_A_VALUE_MISSING_OR_LATE` | ⑥ | 추출(A값 부재 또는 공개일시 > 마감) |
-| `SMALL_SUM_NEGOTIATED` | ⑦ | 추출(낙찰방법) |
-| `SHIP_MANUFACTURING_GOODS` | ⑧ | 추출(업무 세부 분류) |
-| `PURE_CONSTRUCTION_COST_INPUT_MISSING` | ⑨ | 추출(순공사원가 입력 부재) |
-| `SME_COMPETITION_CAPABILITY_REVIEW` | ⑩ | 추출(낙찰방법) |
-| `LOCAL_GOVERNMENT_ORDER` | ⑪ | 추출(발주 기관 축) |
-| `FOREIGN_PROCUREMENT` | ⑫ | 수집(업무 대분류 `FOREIGN`) |
-| `FLOOR_RATE_EFFECTIVE_DATE_BOUNDARY` | ⑬ | 추출(공고일이 시행일 경계 구간) |
-| `NO_ELIGIBLE_BIDDER` | ⑭ | 실험(적격 투찰자 0) — **추출은 싣지 않는다** |
-| `TIED_TOP_BID` | ⑮ | 추출(최저 투찰금액이 둘 이상) |
-| `BID_AMOUNT_ABSENT` | (P-1.5) | 추출(협상계약 등 투찰금액 부재) |
-
-⑭ `NO_ELIGIBLE_BIDDER` 는 하한가 산식을 적용해야 나오므로 **실험 단계**가 붙인다 — 추출은 이 값을 쓰지 않는다.
-Python 레인은 자기가 붙인 ⑭ 를 계수에 더한다(같은 어휘를 쓰되 출처가 다르다는 것을 판정문에 적는다).
-
-## 3. `manifest.json`
+## 2. `manifest.json`
 
 ```json
-{
-  "schema_version": "6g-snapshot-1",
-  "snapshot_id": "2026-09-28T01-00-00Z",
-  "created_at": "2026-09-28T01:00:00Z",
-  "row_count": 24000,
-  "notice_date_range": { "from": "2026-01-30", "to": "2026-09-26" },
-  "opening_date_range": { "from": "2026-02-06", "to": "2026-09-26" },
-  "sample_list_sha256": "…",
-  "sampling": {
-    "policy_seed": "…",
-    "strata": ["business_division", "notice_week"],
-    "target_per_stratum": 500
-  },
-  "files": [
-    { "path": "notices.jsonl", "sha256": "…", "row_count": 24000 }
-  ],
-  "exclusion_counts": { "FLOOR_RATE_MISSING_OR_OUT_OF_BAND": 312 }
-}
+{ "schema_version": "snapshot-v1", "snapshot_id": "…", "row_count": 24000,
+  "period_start": "2026-02-06", "period_end": "2026-09-26",
+  "rows_sha256": "…", "sample_list_sha256": "…" }
 ```
 
 | 칸 | 뜻 |
 |---|---|
-| `sample_list_sha256` | 표본 목록(정렬된 `notice_key_hash` 를 개행으로 이은 텍스트)의 sha256. **결과를 보기 전에** 확정된 목록이라는 증거 — 판정 JSON 이 이 값을 싣는다(우회 ⑦ 표본 쇼핑) |
-| `files[].sha256` | 파일 바이트의 sha256. 같은 스냅숏이면 같은 판정이 나와야 한다는 요구의 고정점 |
-| `exclusion_counts` | 추출이 붙인 사유별 계수(⑭ 제외). 사유별 계수 공시(D-6G-2 ④) |
+| `period_start`·`period_end` | **개찰일** 범위다(창을 자르는 축). 공고일은 행마다 `notice.noticed_on` 이 나른다 — 창 **포함** 판정은 그쪽이다(D-6G-14) |
+| `rows_sha256` | `rows.jsonl` **바이트**의 sha256 hex |
+| `sample_list_sha256` | §5. 결과를 보기 전에 표본이 확정됐다는 증거(우회 ⑦) |
 
-## 4. Python 레인이 fixture 를 지을 때
+## 3. `rows.jsonl`
 
-- 합성 스냅숏(비식별)은 같은 파일 구성·같은 키 순서·같은 정렬로 짓는다 — 재현 test 가 「바이트 동일」을 잰다.
-- 실제 공고번호·상호를 쓰지 않는다. `notice_key_hash` 는 임의의 64자 hex 로 지어도 된다(형태만 맞으면 된다).
-- 금액·비율이 **문자열**이라는 것이 가장 자주 틀리는 자리다.
+공고 하나 = 한 줄. **`notice_key_hash` 오름차순**으로 쓴다(같은 입력이면 바이트까지 같은 파일 — 재현 test 의
+「바이트 동일」이 이것을 잰다). 키 순서는 아래 선언 순서로 고정한다.
+
+### 3.1 `notice` — 투찰 시점
+
+| 칸 | 형 | 정정·주의 |
+|---|---|---|
+| `notice_key_hash` | string(64 hex) | §5 |
+| `category` | `CONSTRUCTION`\|`SERVICE`\|`GOODS` | 닫힌 셋. `FOREIGN` 은 **오지 않는다**(§4 ⑫) |
+| `noticed_on` | date | 공고일 — 창 포함 판정(D-6G-14) |
+| `bid_close_at` | datetime(offset) | **줄 수 있다**(`bidClseDt` — 이미 계약·canonical 칸에 있다). A 공개 시점 절단의 기준 |
+| `base_amount` | int | 기초금액 |
+| `floor_rate` | number \| **null** | fraction(percent ÷ 100) |
+| `reserve_range_begin_rate` | number \| **null** | **당분간 항상 null**(§6 ①). 초안의 non-null 은 첫날 깨진다 |
+| `reserve_range_end_rate` | number \| **null** | 같음 |
+| `a_value` | `{total:int, open_at:datetime}` \| null | `total` 의 합산 규칙은 §3.3 |
+| `successful_bid_method_code` | string \| null | `sucsfbidMthdCd` — 문서상 옵션이라 부재 가능 |
+| `successful_bid_method_name` | string \| null | `sucsfbidMthdNm` — 같음 |
+| `prearranged_price_decision_method` | string \| null | `prearngPrceDcsnMthdNm` — A 오퍼레이션에서만 오므로 그 호출이 없으면 부재 |
+| `notice_ordinal` | int | `bidNtceOrd` |
+| `progress_division` | string \| null | **추가**(§4 ③) — 유찰·재입찰 판정 입력 |
+| `procurement_class_code` | string \| null | **추가**(§4 ⑧) — 선박 제조 물품 판정 입력 |
+| `demand_agency_code` | string \| null | **추가**(§4 ⑪) — 지자체 판정의 *입력*이지 판정이 아니다 |
+| `pure_construction_cost` | int \| **null** | **당분간 항상 null**(§6 ①) |
+
+**뺀 칸 둘**: `is_local_government`·`is_foreign_capital`. 사유는 §4 ⑪⑫ — 앞은 **판정할 수 없고**, 뒤는 **구조적으로
+항상 거짓**이다. 지어낸 불리언을 싣지 않는다.
+
+### 3.2 `outcome` — 개찰 시점
+
+| 칸 | 형 | 정정·주의 |
+|---|---|---|
+| `opened_on` | date | 개찰일 — 창 자르기·누출 절단 |
+| `planned_price` | int | 예정가격 |
+| `reserve_prices` | int[15] \| null | **위치 = 순번**이다. 15행이 모두 있고 순번이 1..15 로 빠짐없을 때만 배열을 싣고, 아니면 `null`(부분 배열을 싣지 않는다) |
+| `drawn_serial_numbers` | int[] \| null | 1-기반 순번. 개수가 4라는 보장은 하지 않는다 |
+| `participant_count` | int \| null | 목록 축 관측이라 부재 가능 |
+| `bidder_rows` | 아래 | |
+
+`bidder_rows[]`:
+
+| 칸 | 형 | 정정·주의 |
+|---|---|---|
+| `ordinal` | int | **추가.** `amount` 오름차순(null 뒤), 동값은 원문 행 순서 — 1부터. **항상 있다** |
+| `rank` | int \| **null** | `opengRank` 원문. **결측·중복이 흔하다**(실측: 표본 15건 중 전 행 유일은 4건뿐) — 초안의 non-null `int` 는 깨진다. 순위로 경쟁자 분포를 만들지 말고 `amount` 로 만들어라 |
+| `amount` | int \| **null** | 협상에 의한 계약에서는 **부재한다**(문서가 명시) |
+
+동가 1위(D-6G-13 ⑮)는 같은 `amount` 가 둘 이상인 것으로 센다 — 초안 그대로다.
+
+### 3.3 `a_value.total` 이 무엇을 더한 값인가
+
+**더한다**: 국민연금보험료 · 국민건강보험료 · 노인장기요양보험료 · 퇴직공제부금비 · 산업안전보건관리비 ·
+안전관리비 · 품질관리비(단 `qltyMngcstAObjYn` 이 참일 때만).
+
+**더하지 않는다**: 표준시장단가금액(`smkpAmt`). 예규 원문의 A 일곱 항목 열거에 없고, 응답이 적용 여부 술어를
+따로 주지만 **그 술어가 여는 근거 예규 문면을 확보하지 못했다**.
+
+> **이 배제의 방향을 오해하지 마라.** 하한가는 A 에 대해 **증가**한다(`∂/∂A = 1 − r > 0`). A 를 작게 잡으면
+> 하한가가 낮아져 **적격이 더 쉽게** 나온다 — 즉 이 배제는 보수적인 쪽이 **아니다**. `smkpAmtYn` 이 참인 공고의
+> 수를 따로 세어 판정문에 싣는다(영향 범위를 숨기지 않는다).
+
+## 4. D-6G-13 제외 열다섯 — 판정은 Python 레인이, 입력은 Kotlin 레인이
+
+초판은 `exclusions` 배열을 스냅숏에 실었다. **철회한다**: Python 레인이 이미 입력에서 판정하는 모듈을 갖고 있고,
+판정 자리가 둘이면 서로 어긋날 때 어느 쪽이 정본인지가 없다. 스냅숏은 **입력만** 싣고 판정은 한 자리에서 한다.
+계약이 요구하는 성질(전략을 보기 전 입력 단계 · 사유별 계수 · 전략 간 동일 집합)은 그 모듈이 전략보다 먼저,
+전략과 무관하게 도는 한 그대로 선다.
+
+| D-6G-13 | 입력 | 상태 |
+|---|---|---|
+| ① 낙찰방법 · ⑦ 소액수의견적 · ⑩ 중소기업자간 경쟁물품 | `successful_bid_method_code`·`_name` | 준다 |
+| ② 하한율 부재·밴드 밖 | `floor_rate` | 준다 |
+| ③ 유찰·재입찰·정정 | `notice_ordinal` + **`progress_division`** | 칸을 더했다 |
+| ④ 단일 예정가격 | `prearranged_price_decision_method` · `reserve_prices` | 준다 |
+| ⑤ 예비가격·추첨 결측 | `reserve_prices` · `drawn_serial_numbers` | 준다 |
+| ⑥ A 결측·공개 늦음 | `a_value` · `bid_close_at` | 준다 |
+| ⑧ 선박 제조 물품 | **`procurement_class_code`** | 칸을 더했다(대분류만으로는 못 가른다) |
+| ⑨ 순공사원가 98% | `pure_construction_cost` | **당분간 null**(§6 ①) — 「입력이 없으면 제외」가 전량에 걸린다 |
+| ⑪ 지자체 발주 | `demand_agency_code` | **판정은 못 한다**(아래) |
+| ⑫ 외자 | — | **구조적으로 0**: 수집 갈래가 외자 오퍼레이션을 부르지 않아 `FOREIGN` 행이 생기지 않는다. 계수는 0 으로 공시하되 「행을 걸러서 0」이 아니라 「들어오지 않아 0」이라고 적는다 |
+| ⑬ 시행일 경계 | `noticed_on` | 준다 |
+| ⑭ 적격 투찰자 없음 | 하한가 산식 | Python 레인이 붙인다 |
+| ⑮ 동가 1위 | `bidder_rows[].amount` | 준다 |
+| (P-1.5) 투찰금액 부재 | `bidder_rows[].amount` null | 준다 |
+
+**⑪ 지자체 판정이 없다.** 기관 코드에서 지자체를 가르려면 「행자부 코드 공간 ↔ 지자체」 대응이 필요한데 그 대응을
+authoritative 하게 확보하지 못했다 — 지어내면 DEC-03(운영자 확정 범위)을 코드가 조용히 재정의한다.
+`demand_agency_code` 를 그대로 싣고 판정은 **열어 둔다**. 신설 `OPEN-6G-LOCAL-GOVERNMENT-JUDGEMENT`.
+
+## 5. 해시 두 개의 정확한 정의
+
+재현하려면 바이트까지 같아야 하므로 축어로 적는다.
+
+- **`notice_key_hash`** = `sha256("<공고번호>/<차수>")` 의 소문자 hex 64자. 구분자는 `/`, salt 없음, 차수는
+  제로패딩 3자리 원문(`"001"`). salt 가 없는 이유: 표본 선택 술어가 같은 값을 다시 계산할 수 있어야 하고
+  공고번호 자체가 공개값이다. 이 해시가 지우는 것은 비밀이 아니라 **조인 키**이며, 비식별의 대상은 공고가
+  아니라 투찰자다.
+- **표본 뽑기 순서** = `sha256("<seed>|<notice_key_hash>")` 오름차순(구분자는 `|`). 층마다 앞에서 N 개.
+- **`sample_list_sha256`** = 뽑힌 `notice_key_hash` 를 **오름차순 정렬**해 `\n` 으로 이은 문자열(끝에 개행
+  없음)의 sha256 hex.
+
+셋 다 Kotlin 쪽에 이미 구현돼 있고 test 가 잠근다.
+
+## 6. 지금 줄 수 없는 것
+
+1. **`reserve_range_begin_rate`·`reserve_range_end_rate`·`pure_construction_cost` 셋 다 null 이다.** 셋 모두
+   KONEPS **기초금액조회**(공사 op 6 등)에만 있는데, 그 오퍼레이션의 **요청 계약**(`inqryDiv` 축과 필수 항목)이
+   선행 조사에 없어 지어내지 않았다. 신설 `OPEN-6G-BASE-AMOUNT-OPERATION`. 파급이 셋이다 — **S0 의 반폭 h**
+   (D-6G-12) · 제외 ⑨ · `bidPrceCalclAYn`(A값 공고 여부).
+   **h 를 상수 2%·3% 로 메우지 마라** — 그것이 공고별 필드라는 것이 P-3 의 발견이다.
+2. **⑪ 지자체 판정**(위).
+3. 추출 명령 자체가 아직 없다 — 이 문서는 계약이고 구현은 뒤따른다.
+
+## 7. 판독 규율 (Python 레인 초안 그대로 채택)
+
+미지 키는 조용히 무시하지 않고 **스냅숏 전체를 거부한다**(fail-closed). 상호·사업자번호·담당자가 실려 오는 경로를
+금지 목록 열거가 아니라 **허용 키 전수 대조**로 막는 자리다 — 키를 더하려면 양쪽을 같이 고쳐야 한다.
+`category` 는 닫힌 셋이고 그 밖의 값은 행 거부(조용한 fallback 없음). 거부 사유는 필드 이름만 나르고 공고
+식별자를 담지 않는다.
+
+투찰자에는 상호·사업자번호·대표자명이 **없다**. 사업자번호·대표자명은 어댑터 경계의 허용 목록 반전이 관측
+생성 **전에** 떨어뜨려 DB 에 들어오지도 못하고, 상호는 raw 관측까지 오지만 추출이 그 열을 고르지 않는다.
