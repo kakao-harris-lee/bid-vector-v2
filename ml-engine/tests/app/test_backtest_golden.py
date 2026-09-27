@@ -23,6 +23,12 @@ from pathlib import Path
 import pytest
 
 from ml_engine.adapters.snapshot_files import SnapshotFiles, read_snapshot_files
+from ml_engine.evaluation.backtest.exclusions import admit_rows, exclusion_counts
+from ml_engine.evaluation.backtest.policy import (
+    StrategyBacktestPolicy,
+    load_strategy_backtest_policy,
+)
+from ml_engine.evaluation.backtest.reasons import ExclusionReason
 from ml_engine.evaluation.backtest.snapshot import (
     LoadedSnapshot,
     load_snapshot,
@@ -30,6 +36,16 @@ from ml_engine.evaluation.backtest.snapshot import (
 )
 
 _TESTS_ROOT = Path(__file__).resolve().parents[1]
+_SHIPPED_BACKTEST_POLICY = (
+    _TESTS_ROOT.parents[0] / "policy" / "strategy-backtest-v1.yaml"
+)
+
+
+def _policy() -> StrategyBacktestPolicy:
+    loaded = load_strategy_backtest_policy(_SHIPPED_BACKTEST_POLICY)
+    assert isinstance(loaded, StrategyBacktestPolicy), loaded
+    return loaded
+
 
 GOLDEN_SNAPSHOT_DIR = _TESTS_ROOT / "evaluation" / "fixtures" / "m6-6g-golden"
 """생산 쪽이 낸 golden 스냅숏 디렉터리(`manifest.json` + `rows.jsonl`).
@@ -74,21 +90,57 @@ def test_golden_snapshot_is_readable_by_the_shipped_reader() -> None:
 
 
 def test_golden_snapshot_carries_the_fields_the_exclusion_rules_need() -> None:
-    """verifier r1 H-1 이 지목한 세 칸이 상수 `null` 이 아님을 **생산 바이트에서**
+    """verifier r1 H-1 이 지목한 세 칸이 **상수 `null` 이 아님**을 생산 바이트에서
     확인한다. 소비 쪽 fixture 로는 잴 수 없던 것이다.
 
-    - `drawn_serial_numbers` — 전 행이 `null` 이면 제외 ⑤ 가 전량에 걸린다
-    - `noticed_on` != `opened_on` — 같으면 D-6G-14 의 공고일 기준이 개찰일 기준이 된다
-    - `planned_price`·`bid_close_at` — 필수 칸이 비면 스냅숏 전체가 거부된다"""
-    snapshot = _golden_snapshot()
-    rows = snapshot.rows
+    golden 에는 값 결측 행이 각 칸 하나씩 **일부러** 들어 있으므로(팀장 지시), 단언은
+    「모든 행이 차 있다」가 아니라 **「채워진 행이 있다」**다 — 전자로 쓰면 의도된
+    결측 행이 test 를 붉히고, 그렇다고 `!= None` 비교로 느슨하게 쓰면 결측 행이
+    단언을 **거짓 통과**시킨다(`None != date` 는 참이다)."""
+    rows = _golden_snapshot().rows
     assert any(row.outcome.drawn_serial_numbers for row in rows), (
         "전 행의 추첨번호가 비어 있다 — 제외 ⑤ 가 전량에 걸린다(verifier H-1)"
     )
-    assert any(row.notice.noticed_on != row.outcome.opened_on for row in rows), (
+    both_dates = [
+        row
+        for row in rows
+        if row.notice.noticed_on is not None and row.outcome.opened_on is not None
+    ]
+    assert both_dates, "공고일과 개찰일이 함께 있는 행이 없다"
+    assert any(row.notice.noticed_on != row.outcome.opened_on for row in both_dates), (
         "공고일이 개찰일과 같다 — 시행일 경계 제외가 개찰일 기준으로 돈다(H-2)"
     )
-    assert all(row.outcome.planned_price > 0 for row in rows)
+    prices = [
+        row.outcome.planned_price
+        for row in rows
+        if row.outcome.planned_price is not None
+    ]
+    assert prices and all(price > 0 for price in prices)
+
+
+def test_golden_exercises_the_row_level_exclusion_path() -> None:
+    """golden 이 **값 결측 행을 일부러 담는다**(팀장 지시) — 그 행들이 v3 의 행 단위
+    제외로 내려가고 **나머지 행은 산다**는 것을 생산 바이트에서 확인한다.
+
+    이 단언이 v2 라면 성립하지 않는다: 그때는 한 행의 `null` 이 스냅숏 전체를 거부해
+    `load_snapshot` 단계에서 이미 멈춘다(verifier r1 H-1). 판독이 여기까지 왔다는 것
+    자체가 갈래가 갈렸다는 증거다."""
+    snapshot = _golden_snapshot()
+    policy = _policy()
+    result = admit_rows(snapshot.rows, policy)
+    assert result.admitted, "golden 에서 승인된 행이 하나도 없다"
+    reasons = {item.reason for item in result.excluded}
+    absence = {
+        ExclusionReason.NOTICE_DATE_ABSENT,
+        ExclusionReason.BID_CLOSE_AT_ABSENT,
+        ExclusionReason.OPENING_DATE_ABSENT,
+        ExclusionReason.PLANNED_PRICE_ABSENT,
+    }
+    assert absence <= reasons, (
+        f"값 결측 사유가 다 나오지 않았다 — 빠진 것: {sorted(absence - reasons)}"
+    )
+    counts = dict(exclusion_counts(result.excluded))
+    assert all(counts[reason] >= 1 for reason in absence)
 
 
 def test_golden_manifest_sample_list_matches_its_rows() -> None:
