@@ -11,6 +11,7 @@ import bidvector.workflow.collection.SampleStratum
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
@@ -22,6 +23,9 @@ private val STRATUM = SampleStratum(BusinessDivision.SERVICE, "2026-W23")
 private val AT: Instant = Instant.parse("2026-09-24T01:00:00Z")
 
 private fun sample() = SampleOutcome(listOf(KEY), emptyMap(), mapOf(KEY to STRATUM))
+
+private fun httpAttempt() =
+    CollectionAttempt(KEY.value, SourceEndpoint.RESERVE_PRICE_DETAIL, AttemptOutcome.Succeeded, AT, 1)
 
 /**
  * D-6G-45 — 실행 상태는 저장소 밖 디렉터리 하나다. 이 test 가 재는 것은 **거부**다: 디렉터리가
@@ -40,14 +44,77 @@ class RunStateDirectoryTest {
     }
 
     @Test
-    fun `첫 확정이 표본과 해시를 함께 남긴다`() {
+    fun `첫 확정이 무결성 장부 넷을 남긴다`() {
         val state = RunStateDirectory(root())
 
         state.sampleList.confirm(sample())
 
         val declared = Files.readString(root().resolve(STATE_NAME))
-        declared shouldBe
-            "{\"sample_list_sha256\":\"${sha256Hex(Files.readString(root().resolve(SAMPLE_LIST_NAME)))}\"}\n"
+        declared shouldContain "\"directory_id\""
+        val sampleDigest = sha256Hex(Files.readString(root().resolve(SAMPLE_LIST_NAME)))
+        declared shouldContain "\"sample_list_sha256\":\"$sampleDigest\""
+        declared shouldContain "\"attempts_sha256\""
+        declared shouldContain "\"attempt_lines\":0"
+    }
+
+    /** 원장을 지우면 상한이 0 에서 다시 시작한다 — 앞 판은 그것을 거부 없이 지나갔다(vr M-7). */
+    @Test
+    fun `시도 원장을 지우면 기동을 거부한다`() {
+        val state = RunStateDirectory(root())
+        state.sampleList.confirm(sample())
+        state.attempts.append(httpAttempt())
+        Files.delete(root().resolve(ATTEMPT_LEDGER_NAME))
+
+        shouldThrow<IllegalArgumentException> { RunStateDirectory(root()) }
+    }
+
+    @Test
+    fun `시도 원장을 자르면 기동을 거부한다`() {
+        val state = RunStateDirectory(root())
+        state.sampleList.confirm(sample())
+        state.attempts.append(httpAttempt())
+        state.attempts.append(httpAttempt())
+        val file = root().resolve(ATTEMPT_LEDGER_NAME)
+        Files.writeString(file, Files.readString(file).lines().first() + "\n")
+
+        shouldThrow<IllegalArgumentException> { RunStateDirectory(root()) }
+    }
+
+    /** 표본과 장부만 새 디렉터리로 옮기면 원장이 비어 장부와 어긋난다 — 「새로 시작」이 막힌다. */
+    @Test
+    fun `원장 없이 표본과 장부만 복사하면 거부한다`() {
+        val source = RunStateDirectory(root())
+        source.sampleList.confirm(sample())
+        source.attempts.append(httpAttempt())
+        val copy = Files.createDirectories(temp.resolve("copied"))
+        listOf(SAMPLE_LIST_NAME, STATE_NAME).forEach {
+            Files.copy(root().resolve(it), copy.resolve(it))
+        }
+
+        shouldThrow<IllegalArgumentException> { RunStateDirectory(copy) }
+    }
+
+    /** 파일이 있는데 장부만 지운 것도 거부다 — 무엇이 지워졌는지 알 수 없다. */
+    @Test
+    fun `장부만 지워도 거부한다`() {
+        val state = RunStateDirectory(root())
+        state.sampleList.confirm(sample())
+        Files.delete(root().resolve(STATE_NAME))
+
+        shouldThrow<IllegalArgumentException> { RunStateDirectory(root()) }
+    }
+
+    @Test
+    fun `줄을 쓸 때마다 장부가 따라온다`() {
+        val state = RunStateDirectory(root())
+        state.sampleList.confirm(sample())
+
+        state.attempts.append(httpAttempt())
+        state.attempts.append(httpAttempt())
+
+        Files.readString(root().resolve(STATE_NAME)) shouldContain "\"attempt_lines\":2"
+        // 같은 디렉터리로 다시 기동해도 넷이 맞는다.
+        RunStateDirectory(root()).attempts.read().size shouldBe 2
     }
 
     /** 바깥에서 목록을 바꿔치우면 「결과를 보기 전에 확정했다」가 거짓이 된다 — 안을 봐서는 모른다. */

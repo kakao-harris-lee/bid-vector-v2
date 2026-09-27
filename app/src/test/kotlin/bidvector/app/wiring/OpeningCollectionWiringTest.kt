@@ -1,9 +1,12 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.OpeningCollectionRunner
 import bidvector.app.collection.SnapshotExtractionRunner
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.CallBudgetLedger
 import bidvector.procurement.CollectedAxisStore
+import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.NoticeId
 import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.StratifiedSampler
@@ -34,8 +37,14 @@ private object StubAxisStore : CollectedAxisStore {
     ): Set<NoticeId> = emptySet()
 }
 
-/** 저장소 밖 — 배선은 디렉터리가 **있는지**만 본다(표본 확정과 시도 기록은 수집이 한다). */
-private val WIRING_RUN_STATE: Path = Files.createTempDirectory("6g-wiring-run-state")
+/**
+ * 저장소 밖 — 배선은 디렉터리가 **있는지**만 본다(표본 확정과 시도 기록은 수집이 한다).
+ * test 마다 새 자리를 준다: 무결성 장부가 파일 셋의 일관성을 요구하므로(D-6G-48) 한 자리를
+ * 여럿이 나눠 쓰면 앞 test 가 남긴 상태가 뒤 test 의 기동을 막는다.
+ */
+private fun newRunState(): Path = Files.createTempDirectory("6g-wiring-run-state")
+
+private val WIRING_RUN_STATE: Path = newRunState()
 
 class OpeningCollectionWiringTest {
     private val fixedNow = Instant.parse("2026-09-24T03:00:00Z")
@@ -74,16 +83,23 @@ class OpeningCollectionWiringTest {
 
     private fun bootWithout(key: String): Booted = boot(*approved.filterNot { it.startsWith("$key=") }.toTypedArray())
 
-    /** 시도 원장을 미리 깐다 — 앞 실행이 남긴 상태를 재현한다. */
+    /**
+     * 시도 원장을 미리 깐다 — 앞 실행이 남긴 상태를 재현한다. **출하 경로로 쓴다**: 손으로 줄만
+     * 쓰면 무결성 장부와 어긋나 기동이 거부되고(D-6G-48), 그 거부는 이 test 가 재려는 것이 아니다.
+     */
     private fun seedAttempts(vararg lines: Pair<String, Int>) {
-        val file = WIRING_RUN_STATE.resolve("attempts.jsonl")
-        Files.writeString(
-            file,
-            lines.joinToString("") { (at, attempts) ->
-                """{"at":"$at","axis":"OPENING_RESULT_LIST","notice_key_hash":null,""" +
-                    """"outcome":"SUCCEEDED","http_attempts":$attempts,"kind":"HTTP"}""" + "\n"
-            },
-        )
+        val ledger = RunStateDirectory(WIRING_RUN_STATE).attempts
+        lines.forEach { (at, attempts) ->
+            ledger.append(
+                CollectionAttempt(
+                    noticeKey = null,
+                    axis = SourceEndpoint.OPENING_RESULT_LIST,
+                    outcome = AttemptOutcome.Succeeded,
+                    at = Instant.parse(at),
+                    httpAttempts = attempts,
+                ),
+            )
+        }
     }
 
     /** 승인 설정에서 한 항목만 바꿔 넣는다 — 하나만 넘기면 나머지가 없어 조건 자체가 서지 않는다. */
@@ -204,6 +220,8 @@ class OpeningCollectionWiringTest {
  * M6/6G D-6G-2 — 추출 배선도 같은 성질이다: `mode=once` 일 때만 올라오고, 출력 경로·기간·표본 목록
  * 파일이 없으면 기동하지 않는다. **KONEPS 서비스 키를 요구하지 않는다**(DB 만 읽는다).
  */
+private val EXTRACT_RUN_STATE: Path = newRunState()
+
 class SnapshotExtractionWiringTest {
     private val approved =
         arrayOf(
@@ -212,7 +230,7 @@ class SnapshotExtractionWiringTest {
             "bidvector.snapshot-extract.to=2026-06-30",
             "bidvector.snapshot-extract.output-dir=/tmp/bidvector-snapshot-wiring-test",
             "bidvector.snapshot-extract.snapshot-id=wiring-test",
-            "bidvector.snapshot-extract.run-state-dir=$WIRING_RUN_STATE",
+            "bidvector.snapshot-extract.run-state-dir=$EXTRACT_RUN_STATE",
         )
 
     private fun boot(vararg properties: String): Pair<AnnotationConfigApplicationContext, Throwable?> {
