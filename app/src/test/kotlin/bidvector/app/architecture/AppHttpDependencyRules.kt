@@ -3,11 +3,7 @@ package bidvector.app.architecture
 import com.tngtech.archunit.base.DescribedPredicate
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClasses
-import com.tngtech.archunit.core.domain.JavaMethodCall
-import com.tngtech.archunit.lang.ArchCondition
 import com.tngtech.archunit.lang.ArchRule
-import com.tngtech.archunit.lang.ConditionEvents
-import com.tngtech.archunit.lang.SimpleConditionEvent
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 
 /** 층 배정 — production 은 계약 파일이, 위반 fixture 는 test 가 정한다(M-r3-3). */
@@ -42,6 +38,7 @@ enum class AppLayer {
  */
 enum class AppRuleId {
     RESTRICTED_ALLOWLIST,
+    INJECTION_SURFACE,
     TIER2_ALLOWLIST,
     COLLECTION_REFERENCE,
     ADAPTER_MEMBER_CALL,
@@ -59,9 +56,13 @@ private const val TIME_PACKAGE = "java.time"
  * 규칙은 일곱이고 모양이 서로 다르다([AppRuleId]). 「전부 허용 목록 ⊆」가 아니다 —
  * 그렇게 적었던 앞 판의 KDoc 은 실제 술어와 어긋났다(code-review r4 N-r4-5).
  *
+ * - [AppRuleId.INJECTION_SURFACE] — HTTP 로 닿는 층이 **무엇을 받을 수 있는가**의 정확 목록이다.
+ *   참조 축과 다른 축이다 — 허용 접두 안의 일반 타입(`() -> Int`)이 능력을 나른다.
  * - [AppRuleId.RESTRICTED_ALLOWLIST] · [AppRuleId.TIER2_ALLOWLIST] — **허용 목록 ⊆**(구성).
- *   허용은 패키지 접두와 정확한 타입 이름이고, 그 안에서도 ① 쓰기 능력 포트(use case
- *   생성자에서 도출) ② `java.sql`·`javax.sql` 은 다시 판다. 새 좌표는 기본이 거부다.
+ *   허용은 패키지 접두와 정확한 타입 이름이고, 두 층 모두 **쓰기 능력 포트**(use case 생성자에서
+ *   도출)를 먼저 판다. 다시 파는 접두는 층마다 다르다 — 제한 층은 `java.sql`·`javax.sql`,
+ *   ② 층은 거기에 `org.springframework.jdbc` 를 더한다. 제한 층은 읽기 port 도 직접 받지
+ *   못한다(`app.http.denied-types`). 새 좌표는 기본이 거부다.
  * - [AppRuleId.COLLECTION_REFERENCE] — 수집 레인에 대한 **참조 자체**가 위반이다(방향).
  * - [AppRuleId.ADAPTER_MEMBER_CALL] — 어댑터 **멤버 호출**은 등재된 (호출자, 선언 타입,
  *   메서드, 서술자) 쌍만이다(**fail-closed**). 어댑터 예외는 정확 목록 소속이어야 하고
@@ -102,7 +103,8 @@ class AppHttpDependencyRules(
                 val port = classes.get(name)
                 port.methods.isNotEmpty() &&
                     port.methods.all { method ->
-                        method.rawParameterTypes.isEmpty() && method.rawReturnType.packageName.startsWith(TIME_PACKAGE)
+                        method.rawParameterTypes.isEmpty() &&
+                            method.rawReturnType.packageName.isUnder(listOf(TIME_PACKAGE))
                     }
             }.toSet()
 
@@ -140,6 +142,35 @@ class AppHttpDependencyRules(
             .map { it.topLevel().fullName }
             .toSet()
 
+    /** ② 층이 오늘 실제로 참조하는 `workflow` 타입 전수 — 목록 등식의 다른 한쪽(N-r5-2). */
+    fun observedTier2WorkflowTypes(
+        classes: JavaClasses,
+        appRoot: String,
+        layers: LayerAssignment = productionLayers(),
+    ): Set<String> =
+        classes
+            .filter { layerOf(it, appRoot, layers) == AppLayer.REQUEST_SCOPED }
+            .flatMap { item ->
+                item.directDependenciesFromSelf
+                    .map { it.targetClass.baseComponentType.topLevel() }
+                    .filter { it.packageName.isUnder(listOf(policy.appWorkflowRoot)) }
+                    .map(JavaClass::getName)
+            }.toSet()
+
+    /** 주입 표면 규칙의 대상 — 제한 층과 ② 층이다(D-6A2b-49). */
+    fun injectionTargets(
+        classes: JavaClasses,
+        appRoot: String,
+        layers: LayerAssignment = productionLayers(),
+    ): List<JavaClass> =
+        classes.filter { layerOf(it, appRoot, layers) in setOf(AppLayer.RESTRICTED, AppLayer.REQUEST_SCOPED) }
+
+    /** 한 클래스가 **받을 수 있는** 타입 전개 — 조건 술어가 쓰는 것과 같은 도출이다. */
+    fun injectionTypes(item: JavaClass): Set<JavaClass> = conditions.injectionTypes(item)
+
+    /** 범용 능력 운반 타입인가 — 목록 검증이 쓰는 것과 같은 술어다. */
+    fun isCapabilityCarrier(type: JavaClass): Boolean = conditions.isCapabilityCarrier(type)
+
     /** 대상 집합 등식의 다른 한쪽 — `appRoot` 아래 최상위 클래스 전수. */
     fun appTopLevelClasses(
         classes: JavaClasses,
@@ -173,6 +204,14 @@ class AppHttpDependencyRules(
         layers: LayerAssignment,
     ): Map<AppRuleId, ArchRule> =
         mapOf(
+            AppRuleId.INJECTION_SURFACE to
+                classes()
+                    .that(inLayer(appRoot, layers, AppLayer.RESTRICTED, AppLayer.REQUEST_SCOPED))
+                    .should(conditions.injectOutsideContract(policy.appInjectionAllowedTypes.toSet()))
+                    .because(
+                        "D-6A2b-49 — HTTP 로 닿는 층이 **무엇을 받을 수 있는가**는 정확 목록이다. " +
+                            "참조 축이 아무리 좁아도 능력은 주입된 값으로 온다(verifier r5 F-r5-1)",
+                    ),
             AppRuleId.RESTRICTED_ALLOWLIST to
                 classes()
                     .that(inLayer(appRoot, layers, AppLayer.RESTRICTED))
@@ -181,7 +220,7 @@ class AppHttpDependencyRules(
             AppRuleId.TIER2_ALLOWLIST to
                 classes()
                     .that(inLayer(appRoot, layers, AppLayer.REQUEST_SCOPED))
-                    .should(conditions.onlyDependOnTier2Allowed())
+                    .should(conditions.onlyDependOnTier2Allowed(capabilityPorts))
                     .because(
                         "D-6A2b-32 ② — 컨트롤러가 받는 요청 스코프 층은 면제가 아니라 별도 허용 목록 ⊆ 다. " +
                             "여기에 SQL 이 들어오면 그것이 곧 HTTP 지름길이다",

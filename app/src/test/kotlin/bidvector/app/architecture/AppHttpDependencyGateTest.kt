@@ -194,6 +194,68 @@ class AppHttpDependencyGateTest {
     }
 
     /**
+     * D-6A2b-50(N-r5-1·N-r5-2·F-r5-3) — ② 층 workflow 허용 목록의 두 성질.
+     *
+     * ① **능력 포트를 담지 않는다.** 계약 문면이 요구한 「구조 분류로 도출」이 이 단언이다 —
+     * 다음 편집이 `EventSink` 를 목록에 넣는 순간 RED 다. 술어 쪽에도 같은 갈래가 서 있어
+     * (`tier2Allows` 첫 갈래) 목록이 유일한 방벽이 아니다.
+     * ② **오늘 실제 참조와 등식이다.** 죽은 항목이 남으면 「받아도 된다」가 사실이 아닌 채 남는다.
+     */
+    @Test
+    fun `② 층 workflow 목록은 능력 포트를 담지 않고 오늘의 참조와 같다 — 집합 등식`() {
+        val allowed = policy.appTier2AllowedWorkflowTypes.toSet()
+
+        (allowed intersect capabilityPorts()) shouldBe emptySet()
+        rules.observedTier2WorkflowTypes(production, appRoot) shouldBe allowed
+    }
+
+    /**
+     * D-6A2b-49 — 주입 목록은 **오늘 실제 주입 타입과 등식**이다(죽은 항목 금지). 목록이 관측보다
+     * 넓으면 「받아도 된다」가 사실이 아닌 채로 남고, 좁으면 게이트가 붉다.
+     */
+    @Test
+    fun `주입 허용 목록이 오늘의 주입 표면과 같다 — 집합 등식`() {
+        val exempted = policy.appInjectionCarrierExemptions.map { it.substringAfterLast('|') }.toSet()
+
+        observedInjectionTypes() shouldBe policy.appInjectionAllowedTypes.toSet() + exempted
+    }
+
+    /**
+     * D-6A2b-49 — **범용 능력 운반 타입은 목록에 오를 수 없다.** 무엇이든 담는 그릇이라 「이 타입을
+     * 받아도 된다」가 아무것도 제한하지 않는다(verifier r5 F-r5-1 이 그 그릇으로 SQL 을 날랐다).
+     * 예외는 계약 파일의 (클래스, 타입) 쌍뿐이고, 그 쌍도 **오늘 실재하는 주입점**이어야 한다.
+     */
+    @Test
+    fun `목록과 예외가 범용 운반 타입을 담지 않는다 — 목록 검증`() {
+        val carrierNames = observedCarrierInjections().map { it.substringAfterLast('|') }.toSet()
+
+        (carrierNames intersect policy.appInjectionAllowedTypes.toSet()) shouldBe emptySet()
+        policy.appInjectionCarrierExemptions.toSet() shouldBe observedCarrierInjections()
+    }
+
+    /** 오늘 대상 층이 실제로 받는 타입 전수(자기 자신 제외 — 규칙과 같은 모양). */
+    private fun observedInjectionTypes(): Set<String> =
+        rules
+            .injectionTargets(production, appRoot)
+            .flatMap { item ->
+                rules
+                    .injectionTypes(item)
+                    .filterNot { it.name.substringBefore('$') == item.name.substringBefore('$') }
+                    .map { it.name }
+            }.toSet()
+
+    /** 그 가운데 운반 타입인 것 — (클래스, 타입) 쌍으로 낸다. */
+    private fun observedCarrierInjections(): Set<String> =
+        rules
+            .injectionTargets(production, appRoot)
+            .flatMap { item ->
+                rules
+                    .injectionTypes(item)
+                    .filter { rules.isCapabilityCarrier(it) }
+                    .map { "${item.name.substringBefore('$')}|${it.name}" }
+            }.toSet()
+
+    /**
      * D-6A2b-45 — 규칙마다 **영구 음성 fixture** 가 하나씩 있고, **그 규칙이** 그것을 보고한다.
      *
      * verifier r4 F-r4-4: 규칙 넷을 항상 공집합이 되게 바꿔도 RED 는 한 건뿐이었다. production 이
@@ -206,6 +268,7 @@ class AppHttpDependencyGateTest {
         val expected =
             mapOf(
                 AppRuleId.RESTRICTED_ALLOWLIST to listOf("RogueAdminSqlHelper", "RogueUnlistedExceptionUser"),
+                AppRuleId.INJECTION_SURFACE to listOf("RogueInjectedClosure"),
                 AppRuleId.TIER2_ALLOWLIST to listOf("RogueTier2JdbcHolder"),
                 AppRuleId.COLLECTION_REFERENCE to listOf("RogueCollectionReferencer"),
                 AppRuleId.ADAPTER_MEMBER_CALL to listOf("RogueAdapterMemberCaller", "RogueExceptionOwnMember"),

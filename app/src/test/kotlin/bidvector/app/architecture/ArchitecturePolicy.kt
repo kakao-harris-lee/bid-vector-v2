@@ -93,6 +93,15 @@ class ArchitecturePolicy private constructor(
     val appWorkflowRoot: String get() = value("app.workflow-root")
     val appUseCaseConstructionPairs: List<String> get() = list("app.workflow.use-case-construction-pairs")
 
+    /** D-6A2b-49 — 주입 표면(제한·② 층)이 받을 수 있는 정확 타입, 주입점 애너테이션, 도메인 port 뿌리. */
+    val appInjectionAllowedTypes: List<String> get() = list("app.injection.allowed-types")
+    val appInjectionAnnotations: List<String> get() = list("app.injection.annotations")
+    val appDomainPortRoots: List<String> get() = list("app.injection.domain-port-roots")
+    val appInjectionCarrierExemptions: List<String> get() = list("app.injection.carrier-exemptions")
+
+    /** N-r5-5 — 제한 층이 허용 접두 안이라도 직접 받지 못하는 타입. */
+    val appHttpDeniedTypes: List<String> get() = list("app.http.denied-types")
+
     /** D-6A2b-34 — ① 층이 의존할 수 없는 HTTP 확장 API 접두와, 오늘 실제로 쓰는 예외 클래스. */
     val appBootstrapForbiddenPackages: List<String> get() = list("app.assembly.tier1.forbidden-http-packages")
     val appBootstrapHttpApiTypes: List<String> get() = list("app.assembly.tier1.http-api-types")

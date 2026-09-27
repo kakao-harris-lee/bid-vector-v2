@@ -61,3 +61,10 @@ class RogueExceptionOwnMember {
 class RogueUnlistedExceptionUser {
     fun reasonOf(e: UnlistedAdapterException): String = e.rejectionReason()
 }
+
+/** 주입 표면 규칙(D-6A2b-49) — 제한 층이 **함수 값**을 생성자로 받는다. 참조 축은 `kotlin` 접두라 조용하다. */
+class RogueInjectedClosure(
+    private val touch: () -> Int,
+) {
+    fun run(): Int = touch()
+}
