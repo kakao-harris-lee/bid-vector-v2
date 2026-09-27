@@ -1,11 +1,11 @@
 # M6/6G Kotlin 수집 레인 — rollback
 
-- base `678c6ed7` · **실측 HEAD `51528f2c`**(이 레인의 마지막 산출물 커밋 시점의 트리)
+- base `678c6ed7` · **실측 HEAD `8dc6d3aa`**(이 레인의 마지막 산출물 커밋 시점의 트리)
 - 되돌림은 range revert 가 아니라 **in_scope 경로 한정 복원**이다.
 
-## 되돌리는 경로 (기계 산출 — `git diff --name-status 678c6ed7..51528f2c`)
+## 되돌리는 경로 (기계 산출 — `git diff --name-status 678c6ed7..8dc6d3aa -- <아래 경로들>`)
 
-신규 **41** · 수정 **22**. 경로 목록은 아래 디렉터리 인자가 덮는다 — 파일 이름을 여기 옮겨 적지 않는다(라운드마다 낡는다).
+신규 **53** · 수정 **23**. 경로 목록은 아래 디렉터리 인자가 덮는다 — 파일 이름을 여기 옮겨 적지 않는다(라운드마다 낡는다).
 
 ## 절차
 
@@ -15,6 +15,7 @@ git restore --source=678c6ed7 --staged --worktree -- \
   adapters/src/main/kotlin/bidvector/adapters/persistence \
   adapters/src/main/kotlin/bidvector/adapters/snapshot \
   adapters/src/test/kotlin/bidvector/adapters/koneps \
+  adapters/src/test/kotlin/bidvector/adapters/persistence \
   adapters/src/test/kotlin/bidvector/adapters/snapshot \
   app/src/main/kotlin/bidvector/app/collection \
   app/src/main/kotlin/bidvector/app/wiring \
@@ -72,12 +73,12 @@ git diff <착수 문단 커밋>~1..<착수 문단 커밋> -- milestone-6.md | gi
 
 ## 실측 (임시 clone, 저장소 밖)
 
-`51528f2c` 를 checkout 한 clone 에서 위 절차를 그대로 실행했다.
+`8dc6d3aa` 를 checkout 한 clone 에서 위 절차를 그대로 실행했다.
 
 | 축 | 결과 |
 |---|---|
 | ① 명령 exit | 0 |
-| ② D/M 수 | 삭제 **41** · 수정 **22** — 위 기계 산출과 **같다** |
+| ② D/M 수 | 삭제 **53** · 수정 **23** — 위 기계 산출과 **같다** |
 | ③ diff 빈 것 | `git diff 678c6ed7 -- <경로들>` **0 줄** — 되돌린 트리가 base 와 바이트 동일(갈음은 「HEAD 초록」이 아니라 이 트리 동일성이다) |
 | ④ 컴파일 | 통과(`check` 안) |
 | ⑤ test | 통과(`check` 안) |
@@ -85,7 +86,7 @@ git diff <착수 문단 커밋>~1..<착수 문단 커밋> -- milestone-6.md | gi
 
 ## 두 레인의 실측 HEAD 가 다르다
 
-이 절의 `51528f2c` 는 **이 레인의 경로 집합**(koneps·snapshot·procurement·workflow/collection·
+이 절의 `8dc6d3aa` 는 **이 레인의 경로 집합**(koneps·snapshot·procurement·workflow/collection·
 app/collection·app/wiring·config/quality)을 되돌려 잰 값이다. Python 레인은 자기 경로 집합(`ml-engine/**`)을 자기 HEAD 에서
 따로 잰다(아래 그 레인의 절). 두 집합은 겹치지 않으므로 한 값으로 합치지 않는다 — 합치면 어느 경로가
 어느 시점에 검증됐는지가 사라진다.

@@ -10,8 +10,9 @@
 | `./gradlew --no-daemon check` | BUILD SUCCESSFUL — 컴파일 · ktlint · detekt · sizeGate · 의존 방향 · architecture test · 계약 게이트 전부 |
 | `./gradlew --no-daemon qualityBaseline` | BUILD SUCCESSFUL(게이트가 아니라 측정) |
 | `./tools/one-command-check.sh` | 「Kotlin 전건 + Python 전건 통과」 |
+| `container` job 전 단계(S-21 · S-21a · S-21b · S-22a · S-22b · S-22c · S-23 · S-23b · S-24 · S-25) | 전부 통과 — 이미지 둘 빌드 · 위생 게이트 둘 · 거부 스모크(D-6A2a-10 표지) · compose 셋 healthy 수렴 · 스모크 열 축 · 실 서버 교차 test |
 
-실측 HEAD: `51528f2c`(이 레인의 마지막 산출물 커밋 시점의 트리).
+실측 HEAD: `8dc6d3aa`(이 레인의 마지막 산출물 커밋 시점의 트리).
 
 ## 실 KONEPS 호출
 
@@ -82,14 +83,32 @@
 | D-6G-1 「수집 모드 한 갈래」 | `OpeningCollectionWiring`(`mode=once` 일 때만) | 출하 조립 E2E 셋 |
 | D-6G-11 「호출 상한은 설정값, 기본값 없음」 | `OpeningCollectionProperties` | 상한 도달 시 멈춤·종료 코드 미완 E2E |
 | D-6G-2 「저장소 밖 출력 · manifest」 | `SnapshotExtractionRunner`·`JdbcSnapshotSource` | Testcontainers E2E 셋(바이트 결정성·상호 부재·provenance 분리) |
-| D-6G-11 「기본값 없음」이 **거동**인가 | `OpeningCollectionWiringTest`·`SnapshotExtractionWiringTest` | 상한 둘·seed·층당 목표·키가 없으면 기동 실패 · 값 어긋남·미등재 업종·평문 http 도 실패 · mode 없으면 갈래가 안 뜬다 |
+| D-6G-11 「기본값 없음」이 **거동**인가 | `OpeningCollectionWiringTest`·`SnapshotExtractionWiringTest` | 상한 둘·seed·표본 크기·표본 목록 파일·키가 없으면 기동 실패 · 값 어긋남·미등재 업종·평문 http 도 실패 · mode 없으면 갈래가 안 뜬다 |
+| D-6G-38 「추첨번호 = 예비가격 상세 `drwtYn=Y` 행 순번」 | `drawnSerialNumbersOf`(`DRAW_FLAG`·`RESERVE_PRICE_SEQUENCE`) | mock 의 투찰자 선택을 뽑힌 넷과 다르게 두어 출처가 틀리면 golden 이 붉어진다 |
+| D-6G-39 「첫 표본틀이 목록 파일을 쓰고 이후는 그 파일만」 | `SampleListLedger`·`FileSampleListLedger`·`SampleResolution` | 창이 넓어져도 표본 불변 · 확정 횟수 1 · 계획은 확정하지 않는다 |
+| D-6G-39 「표본인데 상세 못 받은 공고는 사유 계수, 표본 밖은 추출 제외」 | `SnapshotExtraction` 계수 셋 | Testcontainers 로 사유 갈래 넷(상세 없음·관측 없음·표본 밖·canonical 없음) |
+| D-6G-39 「manifest `sample_list_sha256` = 그 파일 해시」 | `ConfirmedSampleList.sha256`·`SnapshotCounts` | 행에서 역산한 값과 **다르다**는 test · 항등식이 생성 시점 불변식 |
+| D-6G-40 「출하 경로 잠금」 | `OpeningCollectionLedgerTest`·`JdbcSnapshotSourceSampleTest` | 실 Postgres — KM1·KM2·KM4·KM7 변이가 각각 RED |
+| D-6G-42 M-3 「동시 실행 차단(마이그레이션 없이)」 | `JdbcCollectionRunLease`(advisory lock) | 두 번째는 Busy · 놓으면 다시 든다 · E2E 가 잠금을 밖에서 들고 기동 |
+| D-6G-42 M-4 「목록 갈래도 상한에서 멈춘다」 | `OpeningSampleFramer.framePage` 의 예산 질의 | 상한 1 이면 목록 호출도 하나만 나간다 |
+| D-6G-42 M-6 「표본은 층별 비례」 | `SampleSize`·`proportionalAllocation`(최대 잔여법) | 90:10 층에 18:2 · 합이 정확히 목표 · 잔여 배분도 후보 순서 무관 |
+| D-6G-42 M-9 「차수 파싱 실패는 기본값 없이」 | `NoticeKey.round: NoticeRound` | 타입이 막는다 — 차수가 서지 않는 행은 키를 갖지 못한다 |
+| D-6G-43 「저장소 루트 탐지(cwd 아님) + 거부·허용」 | `repositoryRoot`·`requireOutsideRepository` | 표식 둘(`settings.gradle.kts`·`.git`) · 심링크 추적 · 하위 디렉터리에서 돌아도 안은 거부 |
+| D-6G-44 「K6 `notAttempted` 오계수」 | `OpeningCollectionHalt.partialNotice` | 쿼터 멈춤은 반쪽 · 예산 멈춤은 손대지 않음, 두 test |
+| D-6G-44 「`@ConditionalOnMissingBean` 대체를 production 에서 닫는다」 | E2E 의 출하 조립 빈 타입 실측 | 실 DB 로 뜬 조립에서 JDBC 구현임을 잰다(단위 배선 test 로는 못 잰다 — 원장이 기동 시점에 접속한다) |
+| D-6G-44 「`BIDVECTOR_WRITE_GOLDEN` 는 CI 에서 거부」 | `writeGoldenRequested` | `CI` 가 있으면 무시가 아니라 **실패**(실측: `CI=true` 로 RED) |
 
-## 수정 라운드 1 이 바꾼 것 (요약)
+## 손으로 쓴 fixture 가 못 보는 것 — 무엇이 그 자리를 덮는가
 
-`OPEN-6G-BASE-AMOUNT-OPERATION` 뒤에 남아 있던 **실데이터면 승인 0건**인 결함 셋을 걷어냈다:
-추첨번호가 상수 `null` · 공고일이 개찰일로 접힘 · 값 결측 한 행이 스냅숏 전체를 거부. 셋 다 손으로 쓴
-fixture 아래에서 초록이었고, **레인 간 왕복 golden**(출하 추출 경로가 낸 바이트를 Python 이 읽는다)이
-그 구멍을 닫는다. 호출 상한은 실행 사이에 이어지도록 영속 원장에서 seed 한다.
+이 레인에서 실제로 잡힌 결함은 **전부 한 부류**다: 손으로 쓴 fixture 아래에서 초록인 코드. 추첨번호가
+상수 `null` 이었고, 공고일이 개찰일로 접혔고, 값 결측 한 행이 스냅숏 전체를 거부했고, 추첨번호의 출처가
+투찰자 선택이었고, 표본을 실행마다 다시 뽑았고, 이어 돌기 조회가 canonical 번호를 원문과 그대로 맞댔다.
+fixture 를 쓴 사람이 기대한 모양을 fixture 가 다시 말해 주는 한 이 부류는 초록이다.
+
+그 자리를 덮는 것이 셋이다. **레인 간 왕복 golden** — 출하 추출 경로가 낸 바이트를 Python 이 읽으므로,
+한 레인의 fixture 만으로는 보이지 않는 어긋남이 드러난다. **실 Postgres test**(D-6G-40) — 원장이 0 을
+내도, 이어 돌기가 빈 집합을 내도 fake 는 아무 말을 하지 않는다. **mock 의 값을 일부러 어긋나게 두기**
+(D-6G-38) — 두 출처의 값을 같게 맞춘 mock 은 출처가 틀려도 초록이다.
 
 ## 스키마 합의 (2026-09-27, 두 레인)
 
@@ -118,7 +137,17 @@ fixture 아래에서 초록이었고, **레인 간 왕복 golden**(출하 추출
    함께 주므로 별도 규율이 있다는 뜻이지만, 계약은 관측값과 술어를 나르기만 하고 합산 판단을 하지 않는다.
 5. **A 합산 항목의 `basis` 가 `null`이다.** A 는 기초금액·예정가격·낙찰금액 어느 축도 아니라 산식의
    항이고, 그 셀에 맞는 basis 어휘가 승인 표에 없다(미확정 칸은 인스턴스화하지 않는다).
-6. **`bidNtceOrd` 를 A 오퍼레이션의 행 식별자로 쓴다.** 문서가 요청 항목으로 적지 않아 보내지 않고,
+6. **이어 돌기 키가 「시도한 축」이 아니라 「원문 행의 존재」다.** 빈 응답을 받은 축은 raw 행이 없어
+   다음 실행이 다시 부른다 — 그 공고만큼 상한이 매 실행 새로 탄다. 「시도했다」를 적을 자리가 지금
+   없다: `raw_observation` 은 payload 가 있어야 하고 `collection_run` 에는 공고 칸이 없다. 마이그레이션
+   여부가 걸린 결정이라 운영자에게 올렸다(D-6G-42 M-2).
+7. **호출 원장이 성공 페이지만 센다.** 5xx·타임아웃 재시도는 실제로 나간 호출인데 `pages_fetched` 에
+   들지 않는다. 기존 칸의 합으로 근사하면 쿼터 신호를 본 호출이 이중 계수될 수 있어 쓰지 않았다 —
+   상한 회계를 어림으로 두면 상한이 아니다. 같은 결정에 묶여 올렸다(D-6G-42 M-a).
+8. **이어 돌기 조회가 축 하나를 전부 훑는다.** 정규화 규칙(COL-05)을 SQL 에 한 벌 더 쓰지 않으려고
+   원문을 읽어 도메인 규칙으로 접는다. 돌려받는 행 수는 `DISTINCT` 와 「이 네 상세 축에 쓰는 것은 이
+   갈래뿐이고 표본에만 나간다」로 표본 크기에 묶이지만, **스캔 범위**는 그 축의 전 행이다.
+9. **`bidNtceOrd` 를 A 오퍼레이션의 행 식별자로 쓴다.** 문서가 요청 항목으로 적지 않아 보내지 않고,
    응답의 차수 키가 행을 가른다. 한 공고번호·한 차수에 행이 둘 이상이면 뒤 행이 `duplicate` 로 접힌다
    — 그런 응답의 관측이 아직 없다.
 
@@ -132,6 +161,17 @@ fixture 아래에서 초록이었고, **레인 간 왕복 golden**(출하 추출
 | `opening_base_amount` 에 다른 값을 꽂는다(두 기초금액 뒤바뀜 부류) | **RED**(11 중 1 실패) — 잠긴다 |
 | 종료 자리를 공고 목록 배선 안에만 둔다(원래 코드) | **RED** — 개찰 축·추출 갈래를 혼자 켜면 기동 실패. E2E 는 test 설정의 `@Primary` 가 가려 못 봤고 **배선 test 가 잡았다** |
 | 예산의 「날」을 조회 대상 공고일로 센다 | **RED** — 공고일 슬롯마다 일 회계가 0 으로 되돌아 일 상한이 아무것도 막지 못한다. 이 변이는 **처음에 실제 코드였다**(test 가 잡았다) |
+| 추첨번호를 투찰자 선택에서 읽는다(D-6G-38 이전 코드) | **RED** 2건 |
+| 실행마다 표본을 다시 뽑는다(D-6G-39 이전 코드) | **RED** 2건 |
+| 원장 읽기가 0 을 낸다(KM1) | **RED** 4건 |
+| 이어 돌기 조회가 빈 집합을 낸다(KM2) | **RED** 3건 |
+| 배선이 상한을 0 에서 시작한다(KM3) | **RED** 2건 |
+| 하루 경계를 UTC 로 잡는다(KM4) | **RED** 2건 |
+| 표본틀만 있는 공고를 행으로 싣는다(KM7) | **RED** 2건 |
+| 목록 갈래의 예산 질의를 지운다(M-4) | **RED** 3건 |
+| 층마다 같은 수를 뽑는다(M-6 이전 코드) | **RED** 3건 |
+| 차수를 `toIntOrNull() ?: 0` 으로 되돌린다(M-9 이전 코드) | **RED** 2건 |
+| `CI=true` 에서 golden 갱신 플래그를 켠다 | **RED** — 무시가 아니라 실패한다 |
 
 이 자리는 **처음에 잠겨 있지 않았다.** fixture 의 두 기초금액이 같은 값이라 어느 쪽을 써도 출력이 같아
 뒤바뀜이 드러나지 않았다(Python 레인이 자기 쪽에서 같은 함정을 겪고 알려 왔다). 둘을 다르게 둔 test 를
