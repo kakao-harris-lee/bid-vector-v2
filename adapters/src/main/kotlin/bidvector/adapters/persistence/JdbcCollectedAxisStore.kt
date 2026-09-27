@@ -52,10 +52,6 @@ class JdbcCollectedAxisStore(
     }
 }
 
-/**
- * 두 창을 한 번에 센다 — 총계(`since` 이후)와 오늘치(`dayStart` 이후). `started_at` 을 축으로 쓴다:
- * 호출이 실제로 나간 시각이고, `reference_date`(조회 대상 날짜)와 다르다.
- */
 
 private const val COLLECTED_SQL =
     """

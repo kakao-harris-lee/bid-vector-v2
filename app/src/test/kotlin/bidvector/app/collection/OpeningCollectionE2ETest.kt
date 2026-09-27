@@ -1,6 +1,7 @@
 package bidvector.app.collection
 
 import bidvector.adapters.persistence.JdbcCollectedAxisStore
+import bidvector.adapters.persistence.RunLease
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
@@ -225,6 +226,8 @@ class OpeningCollectionE2ETest {
     fun `출하 조립의 이어 돌기 저장소는 JDBC 구현이다`() {
         bootAndRun(emptyMap()) { context ->
             context.getBean(CollectedAxisStore::class.java).shouldBeInstanceOf<JdbcCollectedAxisStore>()
+            // 잠금도 출하 조립에서 실제로 잡힌다 — 대역이 서면 동시 실행 차단이 사라진다.
+            context.getBean(RunLease::class.java).shouldBeInstanceOf<RunLease.Acquired>()
         }
     }
 

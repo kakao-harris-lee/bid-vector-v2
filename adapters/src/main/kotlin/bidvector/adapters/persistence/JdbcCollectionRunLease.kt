@@ -49,7 +49,12 @@ sealed interface RunLease {
     class Acquired(
         private val connection: Connection,
     ) : RunLease {
-        /** 세션을 놓으면 잠금도 풀린다 — 따로 unlock 을 부르지 않는다. */
+        /**
+         * 세션을 놓으면 잠금도 풀린다 — **`pg_advisory_unlock` 을 부르지 않는다.** 세션 범위
+         * advisory lock 은 커넥션이 닫히는 순간 서버가 놓는다(프로세스가 죽어도 마찬가지다).
+         * 명시 unlock 을 두면 그것이 실패하거나 건너뛰는 경로가 새로 생기고, 커넥션을 닫는
+         * 경로는 어차피 있어야 한다 — 놓는 길이 둘이면 하나는 반드시 덜 지난다.
+         */
         fun release() = connection.close()
     }
 

@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.RunLease
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.OpeningCollectionRunner
 import bidvector.app.collection.SnapshotExtractionRunner
@@ -74,6 +75,10 @@ class OpeningCollectionWiringTest {
         TestPropertyValues.of(*properties).applyTo(context)
         // DB 없이 기동 **조건**만 잰다 — 저장소 둘을 대체 빈으로 먼저 세운다(출하에서는 JDBC 구현).
         context.registerBean(CollectedAxisStore::class.java, Supplier { StubAxisStore })
+        // 잠금은 기동 시점에 DB 를 잡는다(vr L-5 — seed 보다 먼저여야 한다). 이 test 는 DB 없이
+        // 기동 **조건**만 재므로 대역을 먼저 세운다. 출하에서 이 자리를 덮는 빈이 없다는 것은
+        // 실 DB 로 뜬 조립이 잰다(E2E).
+        context.registerBean(RunLease::class.java, Supplier { RunLease.Busy })
         context.register(OpeningCollectionWiring::class.java)
         context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })

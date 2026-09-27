@@ -100,8 +100,9 @@ internal class MockOpeningKonepsHttp(
 
             operation.endsWith("OpengCompt") -> {
                 openingCompleteNotices += noticeNumber.orEmpty()
-                // **투찰자 둘.** 추첨번호는 투찰 행마다 둘(`drwtNo1`·`drwtNo2`)이라 한 명만 두면
-                // 네 개가 모이지 않아 제외 ⑤ 가 전 행을 걷어낸다 — 실제 개찰에도 투찰자는 여럿이다.
+                // **투찰자 셋.** 추첨번호의 출처는 예비가격 상세이고(D-6G-38) 이 행들의 선택은
+                // 그것과 일부러 어긋나 있다 — 추출이 틀린 출처에서 읽으면 golden 이 붉어진다.
+                // 셋을 두는 이유는 `prtcptCnum`(참가업체수)이 투찰 행 수와 같아야 하기 때문이다.
                 BIDDERS.map { bidder -> bidderRow(noticeNumber.orEmpty(), bidder) }
             }
 

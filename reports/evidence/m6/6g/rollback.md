@@ -65,7 +65,7 @@ adapters 쪽(koneps·snapshot·persistence)은 그 패키지에 등재 test 가 
 커밋의 hunk 격리다:
 
 ```
-git diff <착수 문단 커밋>~1..<착수 문단 커밋> -- milestone-6.md | git apply -R
+git diff 57869cc7~1..57869cc7 -- milestone-6.md | git apply -R
 ```
 
 `--3way` 가 자동 해소에 실패하면 수동으로 그 문단(6G 착수 줄과 그 아래 in_scope 요약)만 지운다.
@@ -88,8 +88,9 @@ git diff <착수 문단 커밋>~1..<착수 문단 커밋> -- milestone-6.md | gi
 
 이 절의 `d9e0e985` 는 **이 레인의 경로 집합**(koneps·snapshot·procurement·workflow/collection·
 app/collection·app/wiring·config/quality)을 되돌려 잰 값이다. Python 레인은 자기 경로 집합(`ml-engine/**`)을 자기 HEAD 에서
-따로 잰다(아래 그 레인의 절). 두 집합은 겹치지 않으므로 한 값으로 합치지 않는다 — 합치면 어느 경로가
-어느 시점에 검증됐는지가 사라진다.
+따로 잰다(아래 그 레인의 절). 두 집합은 **golden 디렉터리 하나에서 겹친다**(두 레인이 다 그것을 되돌린다) — 그래도 한 값으로
+합치지 않는다: 합치면 어느 경로가 어느 시점에 검증됐는지가 사라진다. 겹치는 그 하나는 두 목록이
+같은 결과를 내므로 무해하다.
 
 ## 실측 HEAD 이후 되돌림 대상이 움직였는가
 

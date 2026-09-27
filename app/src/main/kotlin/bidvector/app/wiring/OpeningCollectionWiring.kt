@@ -6,6 +6,7 @@ import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.koneps.konepsOpeningResultSourceByNoticeDate
 import bidvector.adapters.persistence.JdbcCollectedAxisStore
 import bidvector.adapters.persistence.JdbcCollectionRunLease
+import bidvector.adapters.persistence.RunLease
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.adapters.snapshot.RunStateDirectory
@@ -102,6 +103,10 @@ open class OpeningCollectionWiring {
     open fun openingCallBudget(
         properties: OpeningCollectionProperties,
         runState: RunStateDirectory,
+        // **잠금을 먼저 잡고 seed 한다**(vr L-5). 둘의 순서가 뒤집히면 창이 생긴다: 두 실행이
+        // 나란히 seed 한 뒤 하나가 끝나고 다른 하나가 잠금을 얻으면, 그 실행은 앞 실행의 호출을
+        // 보지 못한 낡은 값에서 시작한다. 인자로 받아 빈 순서를 강제한다(값은 쓰지 않는다).
+        @Suppress("UNUSED_PARAMETER") lease: RunLease,
         clock: Clock,
     ): CallBudgetLedger =
         seededBudget(runState, properties.callsPerDay, properties.callsTotal, properties.budgetSince, clock)
@@ -185,16 +190,21 @@ open class OpeningCollectionWiring {
      * 실행 잠금의 키 — 이 갈래 하나를 가리키는 상수다(다른 수집 갈래와 겹치지 않는 임의의 값).
      * advisory lock 은 키 공간이 전역이므로 값 자체에 뜻이 없어도 되지만 **고정**이어야 한다.
      */
+    /**
+     * 실행 잠금을 **기동 시점에** 잡는다 — 예산 seed 보다 먼저다(vr L-5). 얻지 못하면 값이
+     * [RunLease.Busy] 이고 러너가 아무것도 부르지 않고 끝낸다(오류가 아니라 정상적인 답이다).
+     */
     @Bean
-    open fun openingCollectionRunLease(dataSource: DataSource): JdbcCollectionRunLease =
-        JdbcCollectionRunLease(dataSource, OPENING_COLLECTION_LOCK_KEY)
+    @ConditionalOnMissingBean
+    open fun openingCollectionRunLease(dataSource: DataSource): RunLease =
+        JdbcCollectionRunLease(dataSource, OPENING_COLLECTION_LOCK_KEY).acquire()
 
     @Bean
     open fun openingCollectionRunner(
         useCase: CollectOpeningResultsUseCase,
         range: CollectionRange,
         sources: OpeningCollectionSources,
-        lease: JdbcCollectionRunLease,
+        lease: RunLease,
         termination: CollectionTermination,
     ): OpeningCollectionRunner {
         val logger = LoggerFactory.getLogger(OpeningCollectionRunner::class.java)
