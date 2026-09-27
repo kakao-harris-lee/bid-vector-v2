@@ -102,6 +102,8 @@ outbox·SQL 로 가는 지름길이 없다 ③ 불변식을 어긴 값은 영속
 | `EditCommand.ProvideValue.baseRevision`(r2, D-6A2b-28) | `EditCommand` 는 원래 public 이라 밖에서 기준 값을 실어 만들 수 있다. 지어낸 값은 value 시점 대조가 `StaleRevision` 으로 막고, 남는 것은 현재와 같은 값을 싣는 것뿐(정상 사용과 구별 불가) | 닫는다(새 권한 없음) — 알려진 제한 ⑥ |
 | 406 핸들러 `ResponseEntity<Void>`(r2, D-6A2b-29) | 본문 없는 406. 정보 노출 없음 | 닫는다 |
 | `EditCommand.ProvideValue.baseRevision` 이 **nullable**(r3) | `null` 로 만든 command 가 value 시점 기준 대조를 **건너뛰는가**가 물음이다. HTTP 실행기는 늘 값을 싣는다. 다른 채널(또는 test·conformance)이 `null` 을 실으면 confirm 시점 `baseRevision` 대조(D-6A2b-18)가 여전히 막는지 | **경계로 처리 — verifier r4 표적**: `null` 기준 command 로 교차 세션 되돌림이 재현되는가 |
+| `StrategyReader`(workflow, r4 — `load` 하나, `StrategyRepository` 가 확장) | 현재 전략을 읽는다. 구현해도 쓰기 경로는 생기지 않는다(`save` 는 `StrategyRepository` 에 남고 인자 `AppliedStrategy` 는 `internal constructor`) | 닫는다(새 권한 없음) |
+| 읽기 포트 → 쓰기 포트 **다운캐스트**(r4 자체 탐침 P2) | `checkcast` 는 ArchUnit 직접 의존에 잡히지 않는다(OQ-1 과 같은 성질). 쓰기를 시도하면 인자 타입이 ② 층 목록 밖이라 RED 이고 `AppliedStrategy` 를 만들 길이 없다 | **경계로 처리** — 막는 것은 능력 축이 아니라 타입 목록 + `internal constructor`. 알려진 제한 ⑰ · verifier r5 표적 |
 
 ### (3) 과잉·미달
 
@@ -193,7 +195,7 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | ID | 결정 |
 |---|---|
 | **D-6A2b-33** | 위 위협 모델 개정. 6F-5-a r3 의 severity 선(평범한 리팩터링 HIGH / 관용을 벗어난 형태 MEDIUM)을 이 게이트의 판정 기준으로 명시한다 |
-| **D-6A2b-34** | **(A1·A2·A6) 배선 층은 HTTP 확장 API 에 의존하지 못한다.** ① 층(부팅·배선) 클래스는 `org.springframework.web.**`·`org.springframework.boot.web.**`·`org.springframework.boot.tomcat.**`·`jakarta.servlet.**`·`org.apache.catalina.**`·`org.apache.tomcat.**` 에 의존할 수 없다. 예외는 계약 파일의 **정확한 클래스 목록**(필터 등록·관리 표면 잠금처럼 오늘 실제로 그 API 를 쓰는 곳 — 구현 레인이 실측해 최소로)이고, 예외 클래스가 만드는 등록은 (27) 표면 실측이 이미 잰다. 같은 규칙이 ① 층의 **클래스 애너테이션**(`@ControllerAdvice`·`@Controller` 류)도 막는다(애너테이션 의존도 의존이다). 변이 A1(WebMvcConfigurer→interceptor)·A2(Tomcat valve)·A6(①층 `@ControllerAdvice`)이 RED. **보조**: (27) 에 interceptor·advice 집합을 더하는 것은 하지 않는다(종류 열거로 돌아간다) |
+| **D-6A2b-34** | **(A1·A2·A6) 배선 층은 HTTP 확장 API 에 의존하지 못한다.** ① 층(부팅·배선) 클래스는 HTTP 확장 API(Spring web·Boot web/webmvc/servlet/tomcat·jakarta.servlet·catalina·tomcat 계열 — **정확한 접두 목록은 계약 파일 `config/quality/architecture-policy.properties` 가 정본**, r4-b 정정)에 의존할 수 없다. 예외는 계약 파일의 **정확한 클래스 목록**(필터 등록·관리 표면 잠금처럼 오늘 실제로 그 API 를 쓰는 곳 — 구현 레인이 실측해 최소로)이고, 예외 클래스가 만드는 등록은 (27) 표면 실측이 이미 잰다. 같은 규칙이 ① 층의 **클래스 애너테이션**(`@ControllerAdvice`·`@Controller` 류)도 막는다(애너테이션 의존도 의존이다). 변이 A1(WebMvcConfigurer→interceptor)·A2(Tomcat valve)·A6(①층 `@ControllerAdvice`)이 RED. **보조**: (27) 에 interceptor·advice 집합을 더하는 것은 하지 않는다(종류 열거로 돌아간다) |
 | **D-6A2b-35** | **(A3) ② 층 허용은 정확한 클래스 목록.** `tier2.allowed-packages` 의 `bidvector.app.wiring` 통째 허용을 없애고, ② 층이 참조할 수 있는 app 클래스를 계약 파일에 정확한 이름으로 적는다 |
 | **D-6A2b-36** | **(A5) 어댑터 인터페이스는 허용된 메서드 호출 쌍으로만.** ② 층·제한 층이 `adapters.**` 인터페이스의 메서드를 호출하는 것은 계약 파일의 **(호출자 클래스, 인터페이스, 메서드) 쌍 목록**(6A-3 호출 쌍 규칙과 같은 형태 — 재사용)에 있을 때만 허용한다. 인터페이스에 메서드를 더하고 부르면 목록에 없어 RED |
 | **D-6A2b-37** | **(A4) Throwable 통로는 정확한 예외 목록.** 제한 층·② 층이 참조할 수 있는 `adapters.**` 예외 타입을 계약 파일에 정확한 이름으로 적고, 그 타입의 **인스턴스 메서드 호출**은 `Throwable` 에서 상속한 것만 허용한다(자기 메서드 호출 → RED) |
@@ -226,6 +228,12 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | **D-6A2b-47** | 문면·LOW 일괄: **(N-r4-5)** KDoc 넷 정정(「열거가 아니라 구성」 서술은 실제 규칙 다섯의 모양대로) · **(N-r4-8)** 기준 대조를 actor·전이표 앞에 둔 순서는 **유지**(M-r3-6 요구) — HTTP 로 도달 불가한 상호작용을 알려진 제한 + 전이표 test 로 기록 · N-r4-9~14 · verifier L-r4-1~3 |
 
 **보고 필수(이번이 마지막 자동 라운드)**: 새 public 표면(읽기 포트 추가가 workflow 공개 표면을 넓힌다 — 밖에 무엇을 허락하는가) · 새 파일 ↔ in_scope · 규칙별 음성 fixture 표 · F-r4-1·A4·오버로드 변이 RED · **스스로 고안한 우회 셋 이상(D-6A2b-33 경계 안쪽)** · rollback 재산출·재실측.
+
+### 계약 갱신 r4-b (2026-09-27, 팀장 — 수정 라운드 4 보고 수령, 검증 전)
+
+| ID | 결정 |
+|---|---|
+| **D-6A2b-48** | 구현 레인 이탈 둘 처분. ① D-6A2b-46 의 게이트 등재 meta-gate 를 JUnit 태그가 아니라 **패키지 전수 + 양방향 등식**으로 세운 것을 **수용**(저장소에 `@Tag` 선례 0 — 기존 관례는 `WorkflowGateRegistrationTest` 의 전수 방식이고, 태그는 「붙이길 잊기」가 「등재를 잊기」와 같은 실패 모양이다). ② D-6A2b-34 의 접두 열거 문면을 계약 파일 정본 참조로 정정(위 D-6A2b-34 행) |
 
 ## 하네스 레인 변경 (상시 절)
 
