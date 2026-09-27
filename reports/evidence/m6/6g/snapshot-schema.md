@@ -52,10 +52,11 @@
 | `category` | `CONSTRUCTION`\|`SERVICE`\|`GOODS` | 닫힌 셋. `FOREIGN` 은 **오지 않는다**(§4 ⑫) |
 | `noticed_on` | date | 공고일 — 창 포함 판정(D-6G-14) |
 | `bid_close_at` | datetime(offset) | **줄 수 있다**(`bidClseDt` — 이미 계약·canonical 칸에 있다). A 공개 시점 절단의 기준 |
-| `base_amount` | int | 기초금액 |
+| `base_amount` | int \| null | 기초금액. **기초금액 조회 오퍼레이션의 값만** 싣고, `base_amount_disclosed_at < bid_close_at` 인 행만이다(§3.4) |
+| `base_amount_disclosed_at` | datetime(offset) \| null | 기초금액공개일시(`bssamtOpenDt`) — 「그 값이 언제 공개되었나」 |
 | `floor_rate` | number \| **null** | fraction(percent ÷ 100) |
-| `reserve_range_begin_rate` | number \| **null** | **당분간 항상 null**(§6 ①). 초안의 non-null 은 첫날 깨진다 |
-| `reserve_range_end_rate` | number \| **null** | 같음 |
+| `reserve_range_begin_rate` | number \| null | fraction. 원문은 **% 이고 부호가 문자열 안**에 있다(`-3`) — 추출이 선행 `+` 를 허용해 파싱하고 100 으로 나눈다 |
+| `reserve_range_end_rate` | number \| null | fraction(`+3` → `0.03`). **시작률의 반대수라는 보장이 없다** — 비대칭 범위를 지원하라 |
 | `a_value` | `{total:int, open_at:datetime}` \| null | `total` 의 합산 규칙은 §3.3 |
 | `successful_bid_method_code` | string \| null | `sucsfbidMthdCd` — 문서상 옵션이라 부재 가능 |
 | `successful_bid_method_name` | string \| null | `sucsfbidMthdNm` — 같음 |
@@ -63,8 +64,11 @@
 | `notice_ordinal` | int | `bidNtceOrd` |
 | `progress_division` | string \| null | **추가**(§4 ③) — 유찰·재입찰 판정 입력 |
 | `procurement_class_code` | string \| null | **추가**(§4 ⑧) — 선박 제조 물품 판정 입력 |
-| `demand_agency_code` | string \| null | **추가**(§4 ⑪) — 지자체 판정의 *입력*이지 판정이 아니다 |
-| `pure_construction_cost` | int \| **null** | **당분간 항상 null**(§6 ①) |
+| `demand_agency_code` | string \| null | **원값**(해시 아님) — 기관 코드는 개인정보가 아니다(상호·사업자번호는 여전히 비수집). 지자체 판정의 *입력*이지 판정이 아니다(§4 ⑪) |
+| `bid_price_formula_a_applicable` | bool \| null | `bidPrceCalclAYn` — **공사에만 오는 필수 필드**. 「이 공고가 A값 공고인가」를 한 필드로 답한다. 공사가 아니면 null |
+| `pure_construction_cost` | int \| null | `bssAmtPurcnstcst`(공사 전용) — 제외 ⑨의 입력 |
+| `award_method_application_standard` | string \| null | `sucsfbidMthdAppStd`(D-6G-22) — 자유텍스트, 채움률 미상 |
+| `application_basis_content` | string \| null | `aplBssCntnts`(D-6G-22, 공사 전용) — 자유텍스트, 값 어휘 미상 |
 
 **뺀 칸 둘**: `is_local_government`·`is_foreign_capital`. 사유는 §4 ⑪⑫ — 앞은 **판정할 수 없고**, 뒤는 **구조적으로
 항상 거짓**이다. 지어낸 불리언을 싣지 않는다.
@@ -75,6 +79,7 @@
 |---|---|---|
 | `opened_on` | date | 개찰일 — 창 자르기·누출 절단 |
 | `planned_price` | int | 예정가격 |
+| `opening_base_amount` | int \| null | **개찰결과 출처**의 기초금액. `notice.base_amount` 와 **다른 칸**이다(§3.4) |
 | `reserve_prices` | int[15] \| null | **위치 = 순번**이다. 15행이 모두 있고 순번이 1..15 로 빠짐없을 때만 배열을 싣고, 아니면 `null`(부분 배열을 싣지 않는다) |
 | `drawn_serial_numbers` | int[] \| null | 1-기반 순번. 개수가 4라는 보장은 하지 않는다 |
 | `participant_count` | int \| null | 목록 축 관측이라 부재 가능 |
@@ -89,6 +94,20 @@
 | `amount` | int \| **null** | 협상에 의한 계약에서는 **부재한다**(문서가 명시) |
 
 동가 1위(D-6G-13 ⑮)는 같은 `amount` 가 둘 이상인 것으로 센다 — 초안 그대로다.
+
+### 3.4 기초금액이 두 칸인 이유 — provenance 분리 (D-6G-19)
+
+기초금액은 두 곳에서 온다: **기초금액 조회**(공개일시를 함께 준다)와 **개찰결과**(개찰 뒤에 보이는 값).
+둘을 한 칸에 접으면 전략이 투찰 시점에 알 수 없었던 값을 입력으로 쓰게 된다.
+
+- `notice.base_amount` — 기초금액 조회의 값만. 그중에서도 **`bssamtOpenDt < 입찰 마감`** 인 행만이다.
+  공개가 마감보다 늦으면 그 값은 투찰 시점에 없던 값이라 **null 로 두고** 그 공고를 제외 사유로 센다.
+- `outcome.opening_base_amount` — 개찰결과 출처. 채점에만 쓴다.
+
+예가 범위율도 같은 규율을 따른다 — 기초금액 조회에서만 오고, 같은 공개일시 조건을 지난다.
+
+> **개찰 뒤 공개되는 예비가격 15개로 반폭 `h` 를 역산하지 마라.** 투찰 시점에 모르는 값이고,
+> 역산은 누출이다(팀장 지시 2026-09-27).
 
 ### 3.3 `a_value.total` 이 무엇을 더한 값인가
 
@@ -118,7 +137,7 @@
 | ⑤ 예비가격·추첨 결측 | `reserve_prices` · `drawn_serial_numbers` | 준다 |
 | ⑥ A 결측·공개 늦음 | `a_value` · `bid_close_at` | 준다 |
 | ⑧ 선박 제조 물품 | **`procurement_class_code`** | 칸을 더했다(대분류만으로는 못 가른다) |
-| ⑨ 순공사원가 98% | `pure_construction_cost` | **당분간 null**(§6 ①) — 「입력이 없으면 제외」가 전량에 걸린다 |
+| ⑨ 순공사원가 98% | `pure_construction_cost` | 준다(공사) — 문서 XML 예제가 빈 값이라 **채움률은 실측 전이다** |
 | ⑪ 지자체 발주 | `demand_agency_code` | **판정은 못 한다**(아래) |
 | ⑫ 외자 | — | **구조적으로 0**: 수집 갈래가 외자 오퍼레이션을 부르지 않아 `FOREIGN` 행이 생기지 않는다. 계수는 0 으로 공시하되 「행을 걸러서 0」이 아니라 「들어오지 않아 0」이라고 적는다 |
 | ⑬ 시행일 경계 | `noticed_on` | 준다 |
@@ -146,13 +165,13 @@ authoritative 하게 확보하지 못했다 — 지어내면 DEC-03(운영자 �
 
 ## 6. 지금 줄 수 없는 것
 
-1. **`reserve_range_begin_rate`·`reserve_range_end_rate`·`pure_construction_cost` 셋 다 null 이다.** 셋 모두
-   KONEPS **기초금액조회**(공사 op 6 등)에만 있는데, 그 오퍼레이션의 **요청 계약**(`inqryDiv` 축과 필수 항목)이
-   선행 조사에 없어 지어내지 않았다. 신설 `OPEN-6G-BASE-AMOUNT-OPERATION`. 파급이 셋이다 — **S0 의 반폭 h**
-   (D-6G-12) · 제외 ⑨ · `bidPrceCalclAYn`(A값 공고 여부).
-   **h 를 상수 2%·3% 로 메우지 마라** — 그것이 공고별 필드라는 것이 P-3 의 발견이다.
-2. **⑪ 지자체 판정**(위).
-3. 추출 명령 자체가 아직 없다 — 이 문서는 계약이고 구현은 뒤따른다.
+1. **⑪ 지자체 판정** — 선행 조사 P-5 로 **authoritative 필드가 없음이 확정**됐다. 기관 코드 원값을 싣고
+   판정은 열어 둔다(`OPEN-6G-LOCAL-GOVERNMENT-JUDGEMENT`). Python 레인의 민감도 분석이 이 칸을 쓴다.
+2. **추출 명령 자체가 아직 없다** — 이 문서는 계약이고 구현은 뒤따른다. 수집 갈래(Kotlin)는 섰다.
+
+`OPEN-6G-BASE-AMOUNT-OPERATION` 은 **닫혔다**(D-6G-19 구현) — 예가 범위율·순공사원가·A값 공고 여부가
+모두 수집 경로를 갖는다. 다만 **채움률은 실측 전**이다: 문서 XML 예제에서 `bssAmtPurcnstcst` 가 빈 값이고
+`sucsfbidMthdAppStd` 는 여덟 예제가 전부 빈 값이다 — 실수집 뒤 채움률을 판정문에 공시한다.
 
 ## 7. 판독 규율 (Python 레인 초안 그대로 채택)
 
