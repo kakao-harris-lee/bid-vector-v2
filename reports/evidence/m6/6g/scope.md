@@ -136,6 +136,14 @@ E[R] = 1.0(no-op)이다. 조사 노트는 Python 레인이 `_workspace/m6-6g/` �
 
 **레인 분담**: Kotlin — D-6G-27(writer golden 생산·E2E 적재 경로) · 28 · 29 · 30 · 31 의 K6 · 33 의 러너·출력 경로·LATERAL·문면 · 34. Python — 27(golden 소비 test) · 28 의 v3 판독(행 단위 제외) · 31 의 V3·V5·V7·V8·V9·창 단위 UNDERPOWERED · 32 · 33 의 리터럴 게이트·자유텍스트·절대 경로·파생 정책. **스키마 v3 은 Kotlin 이 문서 먼저 커밋 → Python 판독 → Kotlin writer 순**(v2 때와 같은 절차).
 
+## 계약 갱신 r1-b (2026-09-27, 팀장 — golden 첫 왕복: 형태 통과 · 승인 0건, 계약 문제 둘 수령)
+
+| ID | 결정 |
+|---|---|
+| **D-6G-35** | **첫 공고 차수 값은 관측으로 정한다.** 「재입찰·정정」 제외(③)의 기준인 첫 공고 차수(`bidNtceOrd`)가 `000` 인지 `001` 인지를 Kotlin 레인이 공식 참고자료 XML 예제·저장소의 실제 관측 흔적에서 확인하고 **정책 값**으로 둔다(근거를 evidence 에). 추측 금지 — 틀리면 전량이 ③ 으로 빠지거나 정정 공고가 섞인다 |
+| **D-6G-36** | **예정가격 결정방법이 null 인 공고.** 방법명이 **있고** 복수예가가 아니면 ④ 로 제외, **없으면** ⑤(예비가격 15개 + 추첨 정보)가 복수예가 제도를 대신 보증한다 — 그 칸은 A값 오퍼레이션에서만 와서 용역·물품은 늘 null 이고, fail-closed 로 두면 주 표본이 통째로 사라진다. ④ 의 「부재」 계수는 따로 공시한다 |
+| **D-6G-37** | **golden 자리 확정**: `ml-engine/tests/evaluation/fixtures/m6-6g-golden/`(manifest.json · rows.jsonl). Kotlin 이 먼저 커밋한 `fixtures/golden/m6-6g/` 는 옮긴다(`fixtures/**` 는 data-extract.md corpus 자리). golden 은 **승인되는 행이 있어야** 한다 — 결측 행(각 칸 하나)과 함께 전 제외를 통과하는 정상 행을 둔다. manifest 의 `sample_list_sha256` 은 그 파일의 행 집합으로 계산 |
+
 ## 결정
 
 | ID | 결정 | 근거 |
