@@ -101,6 +101,7 @@ outbox·SQL 로 가는 지름길이 없다 ③ 불변식을 어긴 값은 영속
 | JVM 공개 최상위 함수 둘(`TransitionGuardsKt`·`JsonValueReadersKt`, Kotlin `internal` — r1 크기 분할로 생김) | 판정 순서 술어는 이미 공개 생성자를 가진 결과 타입만 내고 `EditSession`(internal constructor)을 인자로 요구한다. JSON 읽기는 `JsonNode` 만 읽는다 | 닫는다(새 권한 없음) — 알려진 제한 ⑦ |
 | `EditCommand.ProvideValue.baseRevision`(r2, D-6A2b-28) | `EditCommand` 는 원래 public 이라 밖에서 기준 값을 실어 만들 수 있다. 지어낸 값은 value 시점 대조가 `StaleRevision` 으로 막고, 남는 것은 현재와 같은 값을 싣는 것뿐(정상 사용과 구별 불가) | 닫는다(새 권한 없음) — 알려진 제한 ⑥ |
 | 406 핸들러 `ResponseEntity<Void>`(r2, D-6A2b-29) | 본문 없는 406. 정보 노출 없음 | 닫는다 |
+| `EditCommand.ProvideValue.baseRevision` 이 **nullable**(r3) | `null` 로 만든 command 가 value 시점 기준 대조를 **건너뛰는가**가 물음이다. HTTP 실행기는 늘 값을 싣는다. 다른 채널(또는 test·conformance)이 `null` 을 실으면 confirm 시점 `baseRevision` 대조(D-6A2b-18)가 여전히 막는지 | **경계로 처리 — verifier r4 표적**: `null` 기준 command 로 교차 세션 되돌림이 재현되는가 |
 
 ### (3) 과잉·미달
 
@@ -200,6 +201,13 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 
 **변이 실측 의무(구현 레인)**: verifier r3 의 A1~A6 을 production 소스에 심어 A3·A4·A5·A1·A2·A6 각각이 **어느 규칙으로** RED 인지 표로. A2 는 D-6A2b-34 로 RED 여야 한다(경계 밖이지만 의존 방향이 드러낸다).
 
+### 계약 갱신 r3-b (2026-09-27, 팀장 — 수정 라운드 3 보고 수령, 검증 전)
+
+| ID | 결정 |
+|---|---|
+| **D-6A2b-39** | 구현 레인 자체 탐침 N3(요청 시점 `ServletContext.addServlet` — 컨테이너가 `IllegalStateException` 으로 막음, 붙어도 인증 필터가 `/*`)·N4(`ServiceLoader` 로 어댑터 타입을 적지 않고 능력 세탁 — 오늘 실행 불가)는 **D-6A2b-33 경계 밖**(평범한 리팩터링으로 생기지 않는 형태)으로 수용한다. **`OPEN-6A2B-LOCATOR-BAN`** 신설(locator·ServiceLoader 금지는 리플렉션 봉쇄 게이트(D-6F8-13)의 자리 — 그 레인으로). N2(허용 타입만으로 새 Filter 등록)는 의존 게이트를 통과하고 표면 실측(27)이 RED — 두 축이 함께 필요하다는 역방향 증명으로 checklist 에 둔다 |
+| **D-6A2b-40** | 이 라운드 커밋 넷의 trailer 가 앞 라운드와 다르다(세션 중 하네스 귀속 지시 변경). **이력을 되쓰지 않고** evidence 에 사실로 둔다 |
+
 ## 하네스 레인 변경 (상시 절)
 
 구현 레인 checklist 「하네스 레인 변경」 절을 옮긴다(2026-09-27, 판정 SHA 고정 시점).
@@ -224,6 +232,7 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` | 수령·재측정·**유지**(→ 6E) | D-6A2b-10 |
 | `OPEN-6A2B-VIOLATION-DETAIL` · `OPEN-6A2B-CONCURRENT-SESSION-ADVANCE` | **신설** | D-6A2b-17 |
 | `OPEN-6A2B-ABANDONED-SESSIONS` | **신설**(→ 6B-3) | D-6A2b-24 |
+| `OPEN-6A2B-LOCATOR-BAN` | **신설**(→ 리플렉션 봉쇄 게이트 레인) | D-6A2b-39 |
 | `OPEN-6A2B-DRYRUN-ASSEMBLY-IN-APP` | **신설** — 팀장 수용(2026-09-27): dry-run 조립이 어댑터 구체 클래스 셋(기록형·고정 전략·요청 여력 — DB 쓰기 없음)을 app 에서 직접 만든다. 세 이름을 계약 파일에 정확히 고정(다른 구체 클래스 → RED). 편집 경로처럼 어댑터 층으로 옮기는 일은 `adapters/**/evaluation/**` 가 in_scope 밖이라 후속 slice | D-6A2b-32 |
 
 ## 리뷰 레인
