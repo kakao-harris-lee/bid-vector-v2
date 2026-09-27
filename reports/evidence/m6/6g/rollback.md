@@ -55,9 +55,20 @@ git diff <그 커밋>~1..<그 커밋> -- config/quality/architecture-policy.prop
 집합 한 줄, 대분류 타입 멤버 접근 쌍 두 줄, 그 앞의 설명 문단)를 지운다. 확인은 **둘 다**다:
 「내 줄이 사라졌는가」와 「남의 줄이 남았는가」.
 
-`gate-tests.properties` 는 등재 여섯 줄(workflow 셋 · adapters 셋)이다 — workflow 쪽은
+`gate-tests.properties` 는 등재 줄들(workflow · adapters · app)이다 — workflow 쪽은
 `WorkflowGateRegistrationTest` 가 양방향 등재를 요구하므로 test 파일 삭제와 **짝으로만** 성립한다.
-adapters 쪽(koneps·snapshot)은 그 패키지에 등재 test 가 **없어** 짝 제약이 없다(아래 알려진 제한).
+adapters 쪽(koneps·snapshot·persistence)은 그 패키지에 등재 test 가 **없어** 짝 제약이 없다(아래 알려진 제한).
+
+`milestone-6.md` 는 위 복원 목록에 **없다** — 다른 slice 의 문단이 같은 파일에 있어 경로 복원이 남의
+줄까지 되돌린다. 이 레인이 그 파일에 더한 것은 착수 문단 하나(D-6G-34 등재)이고, 되돌림은 그것을 담은
+커밋의 hunk 격리다:
+
+```
+git diff <착수 문단 커밋>~1..<착수 문단 커밋> -- milestone-6.md | git apply -R
+```
+
+`--3way` 가 자동 해소에 실패하면 수동으로 그 문단(6G 착수 줄과 그 아래 in_scope 요약)만 지운다.
+확인은 **둘 다**다: 내 문단이 사라졌는가, 다른 slice 의 문단이 남았는가.
 
 ## 실측 (임시 clone, 저장소 밖)
 
@@ -81,11 +92,14 @@ app/collection·app/wiring·config/quality)을 되돌려 잰 값이다. Python �
 
 ## 실측 HEAD 이후 되돌림 대상이 움직였는가
 
-`git diff --name-only 51528f2c..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
+`git diff --name-only <실측 HEAD>..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
 evidence 커밋은 언제나 뒤에 오므로 「실측 HEAD == 판정 SHA」를 요구하지 않는다 — 보는 것은
-**그 사이에 되돌림 대상이 움직였는가**다. 이 레인의 evidence 커밋은 `reports/evidence/m6/6g/` 안에
-있고 그 경로는 위 목록에 **있다** — 그러므로 evidence 를 더 쓸 때마다 이 실측을 다시 돌려야 한다
-(다음 라운드에서 실측 HEAD 를 갱신한다).
+**그 사이에 되돌림 대상이 움직였는가**다.
+
+**앞 라운드 이 절은 「evidence 경로가 위 목록에 있다」고 적었다 — 거짓이었다.** 위 복원 목록에
+`reports/` 는 없고, 바로 앞 절이 그것을 뺀 이유를 적고 있다. 두 문장이 서로를 부정했다. 참인 쪽은
+**뺐다**이고, 그래서 evidence 를 더 쓰는 것만으로는 이 실측이 무효가 되지 않는다 — 산출물 경로가
+움직였을 때만 다시 돈다. 그 성질이 evidence 를 목록에서 뺀 이유 그 자체다.
 
 ## 알려진 제한
 
