@@ -238,6 +238,27 @@ class CollectionArchitectureGateTest {
             ).checkAll()
     }
 
+    /**
+     * D-6G-47 — **HTTP 클라이언트를 쥔 자리가 관문 하나**임을 잰다(만드는 배선 한 곳 포함).
+     *
+     * 관문이 상한을 세고 원장에 적는데, 다른 곳에서 클라이언트를 얻으면 그 호출은 어느 셈에도
+     * 들어가지 않는다. 「관문을 지나라」는 규율이 아니라 **의존 구조**여야 하고, 이 등식이 그
+     * 구조를 잰다 — 새 클라이언트 참조가 생기면 목록을 고치지 않고는 초록이 되지 않는다.
+     */
+    @Test
+    fun `HTTP 클라이언트를 쥔 자리는 관문과 그것을 만드는 배선뿐이다`() {
+        val roots = policy.httpClientRoots
+        val observed =
+            production
+                .filter { item -> roots.any { item.name.startsWith("$it.") } }
+                .filter { item ->
+                    item.directDependenciesFromSelf.any { it.targetClass.name == policy.httpClientType }
+                }.map { it.name }
+                .toSet()
+
+        observed shouldBe policy.httpClientHolders.toSet()
+    }
+
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }
 
     companion object {

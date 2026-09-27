@@ -4,6 +4,7 @@ import bidvector.procurement.AttemptHistory
 import bidvector.procurement.AttemptLedger
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.CallBudgetLedger
+import bidvector.procurement.CallSpend
 import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.CollectionCallBudget
 import java.net.http.HttpClient
@@ -33,13 +34,16 @@ internal fun testCallGate(
     total: Int = 10_000,
     ledger: AttemptLedger = RecordingAttemptLedger(),
     now: Instant = GATE_NOW,
+    startDay: LocalDate = LocalDate.ofInstant(now, COLLECTION_BUDGET_ZONE),
+    alreadySpent: CallSpend = CallSpend(total = 0, today = 0),
 ): KonepsCallGate =
     KonepsCallGate(
         httpClient = httpClient,
         budget =
             CallBudgetLedger(
                 CollectionCallBudget(perDay, total),
-                LocalDate.ofInstant(now, COLLECTION_BUDGET_ZONE),
+                startDay,
+                alreadySpent,
             ),
         attempts = ledger,
         now = { now },
