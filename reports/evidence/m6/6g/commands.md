@@ -172,7 +172,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
 | S-3 | `uv run mypy --strict src/ml_engine` | 소스 94개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1132 passed · 4 skipped**(skip 은 golden 미도착, 아래 이탈) |
+| S-5 | `uv run python -m pytest tests -q` | **1142 passed · 4 skipped**(skip 은 golden 미도착, 아래 이탈) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -212,6 +212,9 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | D-6G-32 표본 결정식 멈춤 | `run._sampling_stop` · `SamplingBudget.minimum_required_sample` | 예산 초과·최소 미달 각각 멈춤 |
 | D-6G-32 표본 목록 해시 | `snapshot.sample_list_checksum` | manifest 값과 **행에서 재계산**한 값 대조 |
 | D-6G-33 리터럴 게이트 | `test_evaluation_no_stray_numeric_literals` | 문자열에 숨긴 수·조립 근 둘 |
+| D-6G-28 값 결측은 행 단위 | `reasons` 의 새 사유 넷 · `AdmittedNotice` 의 해소된 네 칸 | 한 행이 빠져도 **나머지는 산다** |
+| D-6G-28 구조 실패는 전체 거부 | `jsonrow.row_mapping` · `_assemble` | 미지 키·버전·checksum·닫힌 셋 밖 업무 넷을 한 test 로 |
+| D-6G-33 자유텍스트 | `NoticeObservation.has_*` 두 칸 | 원문 이름이 타입에 **없음**을 전수 대조 |
 | D-6G-20 표본 크기 결정식 | `records.SamplingRecord` · `policy.SamplingBudget` | 예산 초과 시 멈춤 |
 | D-6G-21 판정 불가와 민감도 둘 | `UndecidableAxis` · `SampleVariant` | 판 셋의 순서 · `estimate_available` |
 | D-6G-22 낙찰방법 채움률 | `exclusions.bid_method_fill_rate` | 판정 JSON 에 실림 |
@@ -245,6 +248,9 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | **V9** | 전략 간 표본 동일성 단언 `return True` | **1 failed** |
 | **G1** | 임계를 `float("0.05")` 문자열로 | **2 failed** |
 | **G2** | 조립 근(`app/backtest_job.py`)에 임계 리터럴 | **2 failed** |
+| **W1** | 공고일이 없으면 개찰일로 대체(v2 회귀) | **1 failed** |
+| **W2** | 값 결측을 다시 전체 거부로(필수 판독) | **2 failed** |
+| **W3** | 구조 실패를 행 단위로 접음(미지 키 무시) | **6 failed** |
 
 V3·V5·V7·V8·V9 는 verifier r1 이 **초록**으로 실측한 다섯이고, G1 은 같은 보고의 게이트
 변이다. 일곱 전부 이제 붉어진다(복원 뒤 272 passed).
@@ -268,9 +274,6 @@ provenance 분리가 잠기지 않았다. 두 값을 **다르게** 둔 공고를
   아직 커밋되지 않아 **네 test 가 건너뛴다**(`pytest -rs` 가 사유와 기대 경로를 찍는다).
   초록으로 위장하지 않았고, golden 이 오면 경로 상수 하나로 선다. **verifier H-1 의
   세 결함(추첨번호·공고일·필수 칸)은 이 잠금이 서기 전까지 재지 못한다.**
-- **D-6G-28 의 v3 판독(행 단위 제외)은 아직 손대지 않았다.** 절차가 「Kotlin 이 v3 문서를
-  먼저 커밋 -> Python 판독 -> Kotlin writer」라 문서를 기다린다. 오늘 판독기는 `snapshot-v2`
-  이고 필수 칸의 `null` 은 여전히 **스냅숏 전체**를 거부한다.
 - **`smkpAmt` 배제의 「크기」는 여전히 못 잰다(계수는 낸다).** D-6G-23 의 술어 칸이 `snapshot-v2` 로
   들어와 **영향 범위**(참 공고 수·판정 불가 수·분모)는 공시한다. 하지만 「A 가 얼마나 달라지는가」는
   `smkpAmt` 의 **금액**이 스냅숏에 없어 모른다 — `limitations` 의
