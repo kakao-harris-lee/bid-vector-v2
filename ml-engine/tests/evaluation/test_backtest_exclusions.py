@@ -532,10 +532,22 @@ def test_every_notice_axis_fill_rate_shares_one_denominator() -> None:
     쓰고 나머지 넷은 행 수를 써서, 같은 표에 실린 여섯을 서로 비교할 수 없었다.
 
     분모를 넷으로 두고 행 둘을 주면 **모든 칸이 행 수 기준 값의 절반**이어야 한다.
-    한 칸이라도 행 수를 분모로 쓰고 있으면 그 칸만 두 배로 남는다."""
+    한 칸이라도 행 수를 분모로 쓰고 있으면 그 칸만 두 배로 남는다.
+
+    **여섯 칸이 전부 채워진 공고를 쓴다.** 비어 있는 칸은 비율이 0 이라 분모를 무엇으로
+    나눠도 0 이고, `0 == 0 / 2` 가 공허하게 참이 되어 그 칸의 분모 회귀가 지나간다 —
+    「넷 중 하나만 행 수 분모로」 변이에서 실제로 두 칸이 살아남았다. 그래서 값 비교
+    앞에 **모든 칸이 0 이 아님**을 먼저 요구한다."""
     payloads = [
-        row_payload("a", notice_has_award_method_application_standard=True),
-        row_payload("b", notice_has_award_method_application_standard=True),
+        row_payload(
+            label,
+            notice_category="CONSTRUCTION",
+            notice_has_award_method_application_standard=True,
+            notice_has_application_basis_content=True,
+            notice_bid_price_formula_a_applicable=True,
+            notice_pure_construction_cost=800_000_000,
+        )
+        for label in ("a", "b")
     ]
     snapshot = _snapshot(payloads)
     by_rows = dict(fill_rates(snapshot.rows, notice_observed_count=len(snapshot.rows)))
@@ -543,10 +555,10 @@ def test_every_notice_axis_fill_rate_shares_one_denominator() -> None:
         fill_rates(snapshot.rows, notice_observed_count=len(snapshot.rows) * 2)
     )
     assert set(by_rows) == set(halved)
+    empty = sorted(name for name, value in by_rows.items() if value == 0.0)
+    assert not empty, f"빈 칸이 있으면 그 칸의 분모 회귀가 지나간다: {empty}"
     for name, value in by_rows.items():
         assert halved[name] == value / 2, f"{name} 이 분모를 공유하지 않는다"
-    # 헛돌지 않는 확인 — 적어도 한 칸은 0 이 아니어야 비율 비교가 의미를 갖는다.
-    assert any(value > 0 for value in by_rows.values())
 
 
 def test_standard_market_price_scope_counts_over_notices_that_have_an_a_value() -> None:
