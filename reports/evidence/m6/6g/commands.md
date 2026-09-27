@@ -269,7 +269,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
 | S-3 | `uv run mypy --strict src/ml_engine` | 소스 96개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1178 passed**(skip 0 — golden 부재는 skip 이 아니라 fail 이다) |
+| S-5 | `uv run python -m pytest tests -q` | **1187 passed**(skip 0 — golden 부재는 skip 이 아니라 fail 이다) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -334,6 +334,16 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | D-6G-22 낙찰방법 채움률 | `fill_rates` 의 공고 축 표 | 판정 JSON 에 실림(전용 함수는 호출 0 이 되어 삭제) |
 | D-6G-46 분모 하나 | `fill_rates` 의 `notice_observed_count` | 여섯이 같은 분모로 반씩 줄어든다 |
 | D-6G-46 하한 표지 | `report.verdict_payload` 의 `is_lower_bound` | 결측 있는 판·없는 판 둘 다 실행 |
+| D-6G-52 수 파서 전부 | `_parsed_number` | `Fraction`·`fromhex`·`complex` 각각 RED |
+| D-6G-52 `bytes` 상수 | `_as_number` | `float(b"0.05")` RED |
+| D-6G-52 접히는 표현식 | `_folded` | `float("0.0166x"[:-1])` RED |
+| D-6G-52 뿌리는 import 그래프 | `_app_roots` | 백테스트를 import 하는 **새 app 파일** RED |
+| D-6G-53 업무 어휘 닫힌 셋 | `_BUSINESS_DIVISIONS` | 밖이면 스냅숏 전체 거부 · 어휘 넷 다 수용 |
+| D-6G-53 업무 구분 공시 | `report._snapshot` 의 `sample_divisions` | 공시 제거 변이 RED |
+| L-5 허용 목록 키 타입 보존 | `_ALLOWED` 의 `repr` 키 | 타입 보존 제거 변이 RED |
+| L-6 hex 문자 검사 | `_NOTICE_KEY_ALPHABET` | `z` 64자 거부 |
+| L-7 디코드 실패의 파일 귀속 | `parse_sample_list` 의 자기 `except` | 행·목록 각각 제 사유로 |
+| L-8 이름 분리 | `SamplingRecord.row_count` | `sampling` 에 `sample_size` 없음 · 두 수가 다름 |
 | D-6G-9 보고에 식별자 없음 | `report.verdict_payload` | fixture 의 공고 키 해시가 판정 바이트에 없음 |
 | 재현(위협 모델 ③) | `app.backtest_job.run_backtest_job` | 두 번 돌려 바이트 동일 · 줄 순서 무관 · 정책 한 값으로 달라짐 |
 
@@ -401,9 +411,29 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | **D4** | 분모를 표본 수로(공고 결측을 빼지 않음) | **1 failed** |
 | **D5** | 분모를 행 수로 | **1 failed** |
 | **D6** | **단일 칸** 여섯 각각만 행 수 분모로 | 여섯 다 **RED** — 둘은 처음에 살아남았다 |
+| **G5·G10** | 임계를 `bytes` 상수로(`float(b"0.05")`) | **RED** |
+| **G6** | `float(Fraction("1/60"))` | **RED** |
+| **G7** | `float.fromhex("0x1.1p-6")` | **RED** |
+| **G8** | `complex("0.0166j").imag` | **RED** |
+| **G9** | `float("0.0166x"[:-1])` — 상수 절단 | **RED**(처음엔 살아남았다 — 아래) |
+| **G11** | 백테스트를 import 하는 **새 `app/` 파일**에 임계 | **RED** |
+| **V1·V2** | 업무 어휘 검사 제거 · 어휘에 오타 값 추가 | **RED** |
+| **V3** | hex 문자 검사 제거 | **RED** |
+| **V4·V5** | 디코드 실패를 바깥으로 · 행 실패를 목록 사유로 | **RED** |
+| **V6·V7** | 업무 구분 공시 제거 · `row_count` 를 `sample_size` 로 되돌림 | **RED** |
+| **V8** | 허용 목록 키에서 타입 보존 제거 | **RED** |
 
-누계 **쉰여섯**(M1~M13 · V3·V5·V7·V8·V9 · G1~G6 · W1~W3 · P1~P3 · R1·R2 · N1~N6 · L1~L9 ·
-A1·A2 · D1~D5·D3b · D6 여섯).
+누계 **일흔넷**(앞 쉰여섯 · G5~G11 일곱 · V1~V8 여덟, r3 라운드 열여덟 중 셋은 앞 이름과 겹쳐 재번호).
+
+**G9 가 처음에 살아남았다.** `-1` 은 상수가 아니라 `UnaryOp(USub, Constant(1))` 이라 접히지 않았고,
+더 나쁜 것은 **접기 실패가 조용히 `None` 경계로 떨어져** `[:-1]` 이 「경계 없는 슬라이스」가 된 것이다 —
+전체 문자열이 나와 수로 읽히지 않으니 통과했다. 둘 다 고쳤다(단항 연산 접기 · 접지 못하면 포기).
+**게이트가 부분적으로 접으면 접지 못한 자리가 안전한 자리로 보인다.**
+
+**L-5 를 고치자 미등재 여섯이 드러났다.** 키에 타입을 넣으니 `0`/`0.0` 쌍 가운데 정수 쪽 여섯이
+허용 목록에 **없었다** — 주석 둘이 한 원소를 설명하고 있었다는 code-review 의 지적 그대로다.
+타입별로 등재했다. 그리고 그 등재를 잠그는 test 의 첫 판이 틀렸다: 중복을 `set(_ALLOWED_ENTRIES)`
+로 세려 했는데 **그 집합이 바로 접는 장본인**이다. `repr` 키로 세도록 고쳤다.
 
 **D6 이 D1 의 사각을 열었다.** 넷을 한꺼번에 되돌리는 D1 은 RED 였지만, **한 칸씩** 되돌리자
 `pure_construction_cost` 와 `bid_price_formula_a_applicable` 둘이 통과했다. 원인은 구현이 아니라

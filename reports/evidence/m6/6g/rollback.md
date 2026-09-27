@@ -169,7 +169,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 
 ## 실측
 
-**실측 HEAD: `a39997c8`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
+**실측 HEAD: `ab0f4138`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
 
 임시 clone 에서 위 복원을 돌리고 ①~⑥ 을 쟀다. **Gradle 축(④⑤⑥ 중 Kotlin `check`)은 이 레인이
 돌리지 않는다**(호스트 무거운 빌드 1개 규율) — Python 축으로 같은 여섯을 쟀다.
@@ -187,7 +187,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 
 ## 실측 HEAD 이후 되돌림 대상이 움직였는가
 
-`git diff --name-only a39997c8..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
+`git diff --name-only ab0f4138..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
 이 레인의 evidence 커밋은 `reports/evidence/m6/6g/` 안이고 그 경로는 위 목록에 **없다** — 그러므로
 evidence 를 더 써도 이 실측은 유효하다.
 
