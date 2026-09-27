@@ -17,8 +17,11 @@ class OutsideRepositoryPathTest {
 
     private fun repositoryWithMarker(marker: String): Path {
         val root = Files.createDirectories(temp.resolve("repo"))
-        val git = root.resolve(".git")
-        if (marker == "dir") Files.createDirectories(git) else Files.writeString(git, "gitdir: …\n")
+        when (marker) {
+            "dir" -> Files.createDirectories(root.resolve(".git"))
+            "gradle" -> Files.writeString(root.resolve("settings.gradle.kts"), "rootProject.name = \"x\"\n")
+            else -> Files.writeString(root.resolve(".git"), "gitdir: …\n")
+        }
         Files.createDirectories(root.resolve("reports/evidence"))
         return root
     }
@@ -69,6 +72,14 @@ class OutsideRepositoryPathTest {
         shouldThrow<IllegalArgumentException> {
             requireOutsideRepository(link.resolve("snapshot"), root = repositoryRoot(from = root))
         }
+    }
+
+    /** 계약(D-6G-43)이 적은 표식 — `.git` 이 없는 배치에서도 경계가 선다. */
+    @Test
+    fun `settings gradle kts 도 루트 표식이다`() {
+        val root = repositoryWithMarker("gradle")
+
+        repositoryRoot(from = root.resolve("reports/evidence")) shouldBe root.toRealPath()
     }
 
     @Test

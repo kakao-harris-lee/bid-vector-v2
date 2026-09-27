@@ -3,7 +3,12 @@ package bidvector.app.collection
 import java.nio.file.Files
 import java.nio.file.Path
 
-private const val GIT_MARKER = ".git"
+/**
+ * 저장소 루트의 표식 — **둘 다** 본다. 계약(D-6G-43)은 `settings.gradle.kts` 를 적었고, `.git` 은
+ * 그 빌드 파일이 없는 배치(소스 export, 다른 빌드 도구)에서도 경계를 세운다. 어느 하나라도 있는
+ * 첫 조상이 루트다 — 표식을 좁게 잡으면 경계가 사라져 저장소 안이 「밖」으로 통과한다.
+ */
+private val ROOT_MARKERS = listOf("settings.gradle.kts", ".git")
 
 /**
  * 실험 입력(스냅숏·표본 목록)은 **저장소 밖**이다(data-extract §7 · ADR 0010 D-8) — 커밋되지 않아야
@@ -25,13 +30,13 @@ fun requireOutsideRepository(
 }
 
 /**
- * `.git` 을 가진 첫 조상 — 디렉터리든 파일이든(linked worktree 의 `.git` 은 파일이다). 찾지 못하면
+ * 표식을 가진 첫 조상 — 디렉터리든 파일이든(linked worktree 의 `.git` 은 파일이다). 찾지 못하면
  * `null` 이고, 그때는 경계가 없다(저장소가 아닌 곳에서 돌고 있다).
  */
 internal fun repositoryRoot(from: Path = Path.of("")): Path? {
     var probe: Path? = realPathOf(from)
     while (probe != null) {
-        if (Files.exists(probe.resolve(GIT_MARKER))) return probe
+        if (ROOT_MARKERS.any { Files.exists(probe.resolve(it)) }) return probe
         probe = probe.parent
     }
     return null
