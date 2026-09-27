@@ -578,6 +578,24 @@ S0 밴드 내 균등 난수 · S1 규칙 앵커 · **S2 V2 분포 엔진**(V2 �
 받는 OPEN 여섯 중 다섯을 닫고(`OPEN-6F9-STRATEGY-WRITE-ENDPOINT` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` · `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` ·
 `OPEN-API-WRONG-METHOD-500` · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`), `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION` 은 재측정 후 6E 로 넘긴다.
 
+**6A-2b 종결 2026-09-27** — PR **#48**(계약 갱신 여섯 라운드: D-6A2b-14~54). 판정은 PR 코멘트 여섯에 있다. 재작업 **5/5 + 운영자 승인 초과 1** —
+verifier 는 r1~r5 not-ready, **r6 ready-for-review**, code-reviewer 는 r6 까지 REQUEST_CHANGES. **r6 사전 규칙**(경계 안 HIGH 하나면 게이트 분리 종결)이
+code-reviewer 의 N-r6-1(주입 표면 전개가 배열·`vararg` 를 버린다 — 한 줄)로 발동해, 수정 라운드 없이 **게이트 분리 종결**했다. 산출물(endpoint 여섯 · 한 트랜잭션
+원자성 · 교차 세션 기준 revision · 오류 매핑 · OpenAPI · 관리 포트 405)은 초판부터 서 있었고, 여섯 라운드는 전부 **HTTP 층 의존 게이트** 하나에 들었다.
+
+**게이트 여섯 라운드의 계열** — r1 금지 열거 → r2 대상 종류 열거(RouterFunction·Filter) → r3 면제 층·허용 통로(Tomcat valve·interceptor) → **운영자 결정
+(A) 구조 재건**(위협 모델 경계 개정 + 의존 방향) → r4 능력 전달(②층이 쥔 쓰기 포트로 use case 자체 조립) → r5 주입 값(①층 SQL 클로저를 DI 로) → **축 전환**
+(「무엇을 이름으로 아는가」→「무엇을 받을 수 있는가」, 주입 표면은 유한하다) → r6 배열 한 겹. **교훈**: ① 게이트가 막으려는 주체를 먼저 한정하라 — 조립 근을 믿지
+않으면 in-tree 게이트는 서지 않는다(D-6A2b-51, 1A 빌드 저자 경계와 같은 뿌리) ② 「아는 것」을 좁히는 게이트는 「받는 것」으로 새는 능력을 못 본다 ③ 계약 문장 ↔
+구현 심볼 대조표에 「이행」이라 적고 실제로 다른 것이 r4·r5 차단의 절반이었다 — 대조는 저자 아닌 레인이 독립으로 한다.
+
+**넘긴 것**: 신설 `OPEN-6A2B-INJECTION-HARDENING`(첫 항목 N-r6-1 · meta-gate 발견 · 상속 SAM · 콜백 세터) · `OPEN-6A2B-COMPOSITION-ROOT-HARDENING`(①층 SQL
+몸통 선택 R1·R8 · 정적 슬롯 M-r6-1) · `OPEN-6A2B-LOCATOR-BAN`(→ 리플렉션 봉쇄 레인) · `OPEN-6A2B-ABANDONED-SESSIONS`(→ 6B-3, 보존 90일) ·
+`OPEN-6A2B-DRYRUN-ASSEMBLY-IN-APP` · `OPEN-6A2B-VIOLATION-DETAIL` · `OPEN-6A2B-CONCURRENT-SESSION-ADVANCE` · `OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`(→ 6E).
+닫은 것: `OPEN-6F9-STRATEGY-WRITE-ENDPOINT` · `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` · `OPEN-6A3-APP-HTTP-DEPENDENCY-ALLOWLIST` · `OPEN-API-WRONG-METHOD-500`(관리 포트
+포함) · `OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`(전제 「영향 0」은 거짓이었다 — test classpath 에서 `@TestConfiguration` 을 걷어냈다). rollback 의 공유 파일 절차는
+이 종결 문단도 같은 문단 단위 삭제로 지운다.
+
 ## M6 잔여 해소와 배선 — 실측 지도와 순서 (2026-09-23, 팀장)
 
 운영자 지시 **「M6 잔여를 해소하고 미배선된 부분을 배선 작업 진행해」**. 착수 전에 `main`(`48043440`)에서
