@@ -19,7 +19,7 @@ import bidvector.workflow.strategy.EditSession
 import bidvector.workflow.strategy.EditSessionId
 import bidvector.workflow.strategy.EditableField
 import bidvector.workflow.strategy.OperatorId
-import bidvector.workflow.strategy.StrategyRepository
+import bidvector.workflow.strategy.StrategyReader
 import java.util.UUID
 
 /**
@@ -145,12 +145,14 @@ sealed interface ProvideValueOutcome {
 }
 
 /**
- * 읽기 전용 전략 조회기(D-6A2b-8) — `app.http` 가 포트([bidvector.workflow.strategy.StrategyRepository])
- * 를 직접 받지 않게 하는 자리다. 하는 일은 6A-1 의 `GET /api/strategy` 가 하던 일과 **같다**
- * ((2b) 「닫는다(동치)」) — 쓰기 메서드가 없다.
+ * 읽기 전용 전략 조회기(D-6A2b-8·41) — `app.http` 가 저장 port 를 직접 받지 않게 하는 자리다.
+ * 하는 일은 6A-1 의 `GET /api/strategy` 가 하던 일과 **같다**((2b) 「닫는다(동치)」).
+ *
+ * 받는 것은 [StrategyReader] 다 — 쓰기 가능한 port 를 쥐면 그것 하나로 편집 use case 를 스스로
+ * 조립할 수 있다(verifier r4 F-r4-1: 그 조립은 트랜잭션·outbox·세션을 전부 건너뛴다).
  */
 class StrategyQuery(
-    private val strategies: StrategyRepository,
+    private val strategies: StrategyReader,
 ) {
     fun current(): OperatorStrategy = strategies.load()
 }

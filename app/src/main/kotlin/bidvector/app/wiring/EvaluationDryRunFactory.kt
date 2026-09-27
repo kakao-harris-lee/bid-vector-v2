@@ -13,7 +13,7 @@ import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.strategy.Clock
-import bidvector.workflow.strategy.StrategyRepository
+import bidvector.workflow.strategy.StrategyReader
 
 /**
  * 요청 스코프 평가 실행 묶음(D-6A3-8) — `EvaluationDryRunController`가 이 안의 [useCase]만
@@ -53,7 +53,7 @@ class MaxActiveBidsNotConfiguredException : RuntimeException("전략에 여력 �
  * `strategies.load()` 호출은 이 캐시값을 돌려받을 뿐 저장소를 다시 두드리지 않는다.
  */
 class EvaluationDryRunFactory(
-    private val strategyRepository: StrategyRepository,
+    private val strategyRepository: StrategyReader,
     private val candidateSource: CandidateSourcePort,
     private val watchSubjects: WatchSubjectPort,
     private val licenseGate: LicenseGatePort,
