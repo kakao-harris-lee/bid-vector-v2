@@ -255,13 +255,17 @@ _RULES: Final[tuple[tuple[ExclusionReason, _Predicate], ...]] = (
     (ExclusionReason.REBID_OR_AMENDED, _is_rebid),
     (ExclusionReason.SINGLE_PREARRANGED_PRICE, _is_single_prearranged),
     (ExclusionReason.FLOOR_RATE_ABSENT_OR_OUT_OF_BAND, _is_floor_rate_unusable),
+    # 마감이 없으면 **기초금액도 없다** — 생산 쪽이 `base_amount_disclosed_at <
+    # bid_close_at` 인 행만 기초금액을 싣기 때문에, 마감이 빠지면 그 조건을 평가할 수
+    # 없어 기초금액이 함께 `null` 이 된다(golden 에서 실측). 뿌리인 마감을 먼저 세지
+    # 않으면 그 행이 「기초금액 문제」로 계수되어 사유가 사실과 어긋난다(위협 모델 ④).
+    (ExclusionReason.BID_CLOSE_AT_ABSENT, _is_bid_close_at_absent),
     (ExclusionReason.BASE_AMOUNT_ABSENT_OR_LATE, _is_base_amount_unusable),
     (ExclusionReason.OPENING_BASE_AMOUNT_ABSENT, _is_opening_base_amount_absent),
     (ExclusionReason.RESERVE_PRICE_RANGE_ABSENT, _is_reserve_range_absent),
     (ExclusionReason.OPENING_DATE_ABSENT, _is_opening_date_absent),
     (ExclusionReason.PLANNED_PRICE_ABSENT, _is_planned_price_absent),
     (ExclusionReason.RESERVE_DRAW_INCOMPLETE, _is_reserve_draw_incomplete),
-    (ExclusionReason.BID_CLOSE_AT_ABSENT, _is_bid_close_at_absent),
     (ExclusionReason.A_VALUE_ABSENT_OR_LATE, _is_a_value_unusable),
     (ExclusionReason.PURE_CONSTRUCTION_COST_ABSENT, _is_pure_cost_absent),
     (ExclusionReason.BIDDER_AMOUNT_ABSENT, _is_bidder_amount_absent),

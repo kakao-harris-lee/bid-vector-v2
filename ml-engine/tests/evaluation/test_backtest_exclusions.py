@@ -450,6 +450,20 @@ def test_first_notice_ordinal_comes_from_policy_not_code() -> None:
     assert _reason(row_payload("n-2", notice_notice_ordinal=0)) is None
 
 
+def test_absent_bid_close_is_attributed_to_itself_not_to_the_base_amount() -> None:
+    """**사유의 귀속**(위협 모델 ④). 생산 쪽은 `base_amount_disclosed_at < bid_close_at`
+    인 행만 기초금액을 싣는다 — 마감이 빠지면 그 조건을 평가할 수 없어 기초금액도 함께
+    `null` 이 된다(golden 에서 실측). 뿌리인 마감을 먼저 세지 않으면 그 행이 「기초금액
+    문제」로 계수되어 사유가 사실과 어긋난다."""
+    cascaded = row_payload("n-1", notice_bid_close_at=None, notice_base_amount=None)
+    assert _reason(cascaded) is ExclusionReason.BID_CLOSE_AT_ABSENT
+    # 마감은 있고 기초금액만 없으면 그때는 기초금액 사유다.
+    assert (
+        _reason(row_payload("n-2", notice_base_amount=None))
+        is ExclusionReason.BASE_AMOUNT_ABSENT_OR_LATE
+    )
+
+
 def test_structural_failures_still_reject_the_whole_snapshot() -> None:
     """값 결측과 **구조 실패**는 다르다(D-6G-28). 미지 키·버전 불일치·행 checksum
     불일치·닫힌 셋 밖의 업무는 두 레인이 어긋났다는 신호이지 데이터의 성질이 아니라,
