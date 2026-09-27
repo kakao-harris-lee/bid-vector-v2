@@ -36,6 +36,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Import
 import java.net.URI
 import java.net.http.HttpClient
 import java.time.LocalDate
@@ -55,6 +56,7 @@ class OpeningCollectionSources(
  * 서비스 키 원문은 [openingCollectionSources] 한 곳에서 [ServiceKey] 로 감싼 뒤 다시 다루지 않는다.
  */
 @Configuration
+@Import(CollectionTerminationWiring::class)
 @ConditionalOnProperty(prefix = "bidvector.opening-collection", name = ["mode"], havingValue = "once")
 @EnableConfigurationProperties(
     OpeningCollectionProperties::class,

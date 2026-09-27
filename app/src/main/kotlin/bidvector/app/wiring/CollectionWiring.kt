@@ -27,18 +27,15 @@ import bidvector.workflow.collection.CollectionSourceName
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import org.slf4j.LoggerFactory
-import org.springframework.boot.ExitCodeGenerator
-import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Import
 import java.net.URI
 import java.net.http.HttpClient
 import java.time.LocalDate
 import javax.sql.DataSource
-import kotlin.system.exitProcess
 
 /** 조립된 업종 소스 목록 — `List` 빈은 Spring 의 컬렉션 주입과 섞이므로 한 겹 감싼다. */
 class CollectionSources(
@@ -56,6 +53,7 @@ class CollectionSources(
  * [collectionSources] 한 곳에서 [ServiceKey] 로 감싼 뒤 다시 다루지 않는다.
  */
 @Configuration
+@Import(CollectionTerminationWiring::class)
 @ConditionalOnProperty(prefix = "bidvector.collection", name = ["mode"], havingValue = "once")
 @EnableConfigurationProperties(
     CollectionProperties::class,
@@ -108,12 +106,6 @@ open class CollectionWiring {
             clock = clock,
         )
     }
-
-    @Bean
-    open fun collectionTermination(context: ConfigurableApplicationContext): CollectionTermination =
-        CollectionTermination { exitCode ->
-            exitProcess(SpringApplication.exit(context, ExitCodeGenerator { exitCode }))
-        }
 
     @Bean
     open fun collectionRunner(

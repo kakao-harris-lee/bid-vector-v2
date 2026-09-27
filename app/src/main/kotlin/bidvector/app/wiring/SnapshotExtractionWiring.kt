@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Import
 import javax.sql.DataSource
 
 /**
@@ -18,6 +19,7 @@ import javax.sql.DataSource
  * DB 를 읽기만 하고 KONEPS 를 부르지 않는다(서비스 키 설정을 요구하지 않는다).
  */
 @Configuration
+@Import(CollectionTerminationWiring::class)
 @ConditionalOnProperty(prefix = "bidvector.snapshot-extract", name = ["mode"], havingValue = "once")
 @EnableConfigurationProperties(SnapshotExtractionProperties::class)
 open class SnapshotExtractionWiring {
