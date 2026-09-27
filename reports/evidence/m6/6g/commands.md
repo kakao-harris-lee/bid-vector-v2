@@ -112,3 +112,88 @@
 | 제외 사유 판정의 구현 | **이 레인 몫이 아니게 됐다** — 두 레인 합의로 판정은 Python 쪽 한 자리에서 하고, 이 레인은 입력 칸만 진다(스키마 §4). 판정 자리가 둘이면 어긋날 때 정본이 없다 |
 
 셋 다 이 레인이 만든 표본·예산·필드 계약을 입력으로 쓴다 — 넣을 자리는 열려 있고 채우지 않았다.
+
+---
+
+# Python 레인 (ml-engine) — acceptance 와 대조표
+
+> 이 절은 Python 레인(`ml-engine/**` 와 정책 파일)의 것이다. 위 절들은 Kotlin 레인이 쓴다.
+> **Gradle 은 이 레인에서 돌리지 않았다**(호스트 무거운 빌드 1개 규율 — Kotlin 레인 몫).
+
+## acceptance — CI `ml-engine` job 의 명령 그대로
+
+`.github/workflows/ci.yml` 의 `ml-engine` job 단계를 순서대로 돌렸다(작업 디렉터리 `ml-engine/`).
+결과는 핵심 한 줄만 적는다.
+
+| 단계 | 명령 | 결과 |
+|---|---|---|
+| S-1 | `uv sync --frozen --all-extras` | 성공 |
+| S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
+| S-3 | `uv run mypy --strict src/ml_engine` | 소스 90개, 오류 0 |
+| S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
+| S-5 | `uv run python -m pytest tests -q` | **1109 passed**(6G 추가분 포함) |
+| S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
+| S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
+
+`ml-engine` job 의 나머지 단계(S-1b serving extras 분리 · S-9 Python 버전 대조 · S-11 wheel 재수출)는
+이 레인이 건드린 축이 아니고 CI 가 같은 명령으로 돈다.
+
+**실험 실행 자체(실수집·스냅숏·판정)는 acceptance 가 아니라 산출물**이고, 이 레인은 **실 데이터를
+돌리지 않았다** — 코드·test·evidence 까지다.
+
+## 계약 문장 ↔ 심볼 대조표
+
+| 계약 | 심볼 | 잠그는 test |
+|---|---|---|
+| D-6G-2 불변 스냅숏 · 누출 금지 타입화 | `backtest.snapshot` 의 `NoticeObservation` / `OpeningOutcome` | 개찰 결과 이름이 `notice` 반쪽에 없음을 전수 대조 |
+| D-6G-3 S0 밴드 내 균등 난수 | `UniformBandStrategy` | 밴드 안·seed 결정성·공고별 차이 |
+| D-6G-3 경쟁 표본은 개찰일 이전만 | `build_competitor_pool(before=…)` | 대상 공고를 이력에 **심어** 확인 |
+| D-6G-15 S1 = 하한율 + offset, 공사 한정 | `RuleAnchorStrategy` | 산식 일치 · 용역에서 기권 |
+| D-6G-3 S2 는 출하 정책 그대로 | `app.backtest_distribution.DistributionEngine` | 조립이 사전 등록 다섯인지 |
+| D-6G-3 S4 제도 분포 + 경쟁자 분포 | `InstitutionalMonteCarloStrategy` | 표본 부족 시 기권 · 격자 안 · 결정성 |
+| D-6G-4 지표 셋 | `metrics.score_notice` | 실격선 전부 · bp 는 적격일 때만 · 최저 적격 대조 |
+| D-6G-10 would-have-won 은 전체 순위 대조 | 같은 함수의 `lowest_eligible_amount` 비교 | 경계 셋(−1·동가·+1) |
+| D-6G-5·14 창 | `windows.plan_backtest_windows` | 달력 블록 · embargo · 제외 사유 기록 |
+| D-6G-6 판정식·Bonferroni | `verdict.passes_window` · `VerdictThresholds.primary_alpha` | 보정 전후 **사이**의 p |
+| D-6G-6 3값 결과 | `StrategyPassed` / `StrategyFailed` / `StrategyNotEvaluable` | 판정 순서 넷 |
+| D-6G-6 McNemar 정확 검정 | `mcnemar.one_sided_p_value` | 손으로 센 이항 꼬리와 대조 |
+| D-6G-12 업무별 하한가 | `floor.floor_price` + `exclusions.resolve_a_value` | A값 공고의 약 77 bp 차이 |
+| D-6G-13 제외와 계수 | `exclusions.admit_rows` · `exclusion_counts` | 사유별 발화 · 0건 공시 · 시그니처에 전략 없음 |
+| D-6G-16 없는 값을 메우지 않는다 | `RESERVE_PRICE_RANGE_ABSENT` · `AdmittedNotice` 의 비-`None` 필드 | 범위율 null 에서 제외 발화 |
+| D-6G-20 표본 크기 결정식 | `records.SamplingRecord` · `policy.SamplingBudget` | 예산 초과 시 멈춤 |
+| D-6G-21 판정 불가와 민감도 둘 | `UndecidableAxis` · `SampleVariant` | 판 셋의 순서 · `estimate_available` |
+| D-6G-22 낙찰방법 채움률 | `exclusions.bid_method_fill_rate` | 판정 JSON 에 실림 |
+| D-6G-9 보고에 식별자 없음 | `report.verdict_payload` | fixture 의 공고 키 해시가 판정 바이트에 없음 |
+| 재현(위협 모델 ③) | `app.backtest_job.run_backtest_job` | 두 번 돌려 바이트 동일 · 줄 순서 무관 · 정책 한 값으로 달라짐 |
+
+## 변이 실측 (판정식·누출 가드·제외 동일성)
+
+`tests/evaluation` 만 돌려 붉어지는지 봤다(변이 심고 → 확인 → 복원). 복원 뒤 246 passed.
+
+| # | 변이 | 결과 |
+|---|---|---|
+| M1 | 누출 절단 `<` → `<=`(같은 날 개찰분이 표본에 섞임) | **2 failed** |
+| M2 | Bonferroni 제거(`primary_alpha` → `alpha`) | **1 failed** |
+| M3 | 하한가 산식에서 A 제거(`예정가격 × r`) | **1 failed** |
+| M4 | A 공개일시 절단 제거(마감 뒤 공개된 A 를 통과) | **1 failed** |
+| M5 | 예가 범위율 null 을 제외하지 않음 | **2 failed** |
+| M6 | would-have-won 을 `<=` 로(동가를 승으로 셈) | **1 failed** |
+| M7 | 기권을 「적격·승」으로 셈(표본에서 사실상 제외) | **2 failed** |
+
+숫자 리터럴 게이트의 하위 패키지 보강도 같은 방식으로 실측했다 — 판정 임계를 리터럴로 바꾸니
+리터럴 산포와 출하 임계 누출 둘이 붉어지고, 복원하니 초록이었다.
+
+## 알려진 제한 (판정 JSON 이 매번 싣는다)
+
+판정 JSON 의 `limitations` 배열이 코드로 고정돼 있어 판정문이 이것들을 숨길 수 없다: 반사실 미측정 ·
+지자체 판정 불가 · 선박 분류 코드 미확정 · 예가 범위율/순공사원가 출처 대기 · A 합산의 표준시장단가금액
+제외 · 하한가 경계 1원 규칙 미확정 · S1 공사 한정 · S3(GBM) 부재 · 게시 하한율 밴드 미검증.
+
+## 이탈
+
+- **`smkpAmt` 술어 계수를 낼 수 없다.** 계약 갱신 p2(D-6G-17)는 「술어 참 공고 수를 판정 JSON 에
+  공시」를 요구하는데, 합의된 스냅숏 스키마(§3.3)에는 그 술어도 계수도 실리는 칸이 **없다**.
+  칸 없이 세는 방법이 없으므로 공시하지 못하고, 그 사실을 알려진 제한으로 싣는다. 칸을 더하려면
+  `schema_version` 을 올려야 한다 — 두 레인·팀장에 보고했다.
+- **파생 정책으로 재현 test 를 돈다**(위 §4 주석). 출하 임계로 돌리면 CI 가 수 분을 잡는다.
+  판정식 축은 출하 값 그대로이고 그 목록을 test 가 단언한다.

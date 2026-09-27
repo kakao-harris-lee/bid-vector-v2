@@ -102,3 +102,79 @@ evidence 커밋은 언제나 뒤에 오므로 「실측 HEAD == 판정 SHA」를
 ## 데이터
 
 이 레인은 DB 에 쓰지 않았고 실 KONEPS 호출을 하지 않았다 — 되돌릴 데이터가 없다.
+
+---
+
+# Python 레인 (ml-engine) — rollback
+
+> 이 절은 Python 레인의 것이다. 위 절은 Kotlin 레인이 쓴다. 두 레인의 in_scope 경로는 겹치지 않는다
+> (`ml-engine/**` + `ml-engine/policy/**` ↔ `adapters/**`·`app/**`·`workflow/**`·`procurement/**`).
+
+## 되돌리는 경로 (기계 산출 — `git diff --name-status <base>..HEAD -- ml-engine`)
+
+추가 31 · 수정 2. 수정 둘만 적는다(추가는 되돌리면 사라진다):
+
+- `ml-engine/src/ml_engine/evaluation/policy.py` — 5C-2 의 평탄 인덱스 판독기 여섯을 public 이름으로
+  올린 것(재사용). 되돌리면 그 여섯이 다시 비공개가 되고 backtest 정책 로더가 사라지므로 정합하다.
+- `ml-engine/tests/evaluation/test_evaluation_no_stray_numeric_literals.py` — 숫자 리터럴 게이트의
+  하위 패키지 보강과 허용 목록. 되돌리면 게이트가 직계만 보던 상태로 돌아간다.
+
+## 절차
+
+range revert 가 아니라 **in_scope 경로 한정 복원**이다:
+
+```
+git restore --source=<base> --staged --worktree -- \
+  ml-engine/src/ml_engine/evaluation/backtest \
+  ml-engine/src/ml_engine/evaluation/policy.py \
+  ml-engine/src/ml_engine/adapters \
+  ml-engine/src/ml_engine/app/backtest_distribution.py \
+  ml-engine/src/ml_engine/app/backtest_job.py \
+  ml-engine/policy/strategy-backtest-v1.yaml \
+  ml-engine/tests/evaluation ml-engine/tests/app/test_backtest_job.py
+```
+
+`ml-engine/src/ml_engine/evaluation/backtest/` 와 `tests/evaluation/fixtures/backtest-snapshot/` 은
+이 slice 가 만든 디렉터리라 복원 뒤 비게 된다 — 빈 디렉터리는 git 이 추적하지 않으므로 별도 처리가
+필요 없다.
+
+## 공유 파일
+
+`reports/evidence/m6/6g/commands.md` 와 `rollback.md` 는 **두 레인이 함께 쓴다**. 되돌릴 때 range
+revert 를 쓰면 Kotlin 레인의 줄까지 사라진다 — 커밋 해시 단위로 hunk 를 격리한다:
+
+```
+git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/6g/commands.md | git apply -R
+```
+
+`--3way` 는 같은 파일 끝에 두 레인이 덧붙인 구조에서 자동 해소에 실패하므로 기대하지 않는다.
+확인은 **둘 다** 본다: 「내 줄이 사라졌는가」와 「남의 줄이 남았는가」.
+
+## 실측
+
+**실측 HEAD: `ed3d1c4a`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
+
+임시 clone 에서 위 복원을 돌리고 ①~⑥ 을 쟀다. **Gradle 축(④⑤⑥ 중 Kotlin `check`)은 이 레인이
+돌리지 않는다**(호스트 무거운 빌드 1개 규율) — Python 축으로 같은 여섯을 쟀다.
+
+| 축 | 결과 |
+|---|---|
+| ① 명령 exit | 0 |
+| ② A/M 수 | 추가 31 · 수정 2 — 위 기계 산출과 같다 |
+| ③ diff 빈 것 | `git diff 678c6ed7 -- ml-engine` **0 줄** — 되돌린 트리가 base 와 바이트 동일 |
+| ④ 형 검사 | `uv run mypy --strict src/ml_engine` 통과(base 상태) |
+| ⑤ test | `uv run python -m pytest tests -q` 통과(base 상태, 6G 추가분 없음) |
+| ⑥ 게이트 | `ruff` · `lint-imports` · `design_ratchet` 셋 다 통과(base 상태) |
+
+갈음은 「HEAD 초록」이 아니라 **트리 동일성**(③)이다.
+
+## 실측 HEAD 이후 되돌림 대상이 움직였는가
+
+`git diff --name-only ed3d1c4a..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
+이 레인의 evidence 커밋은 `reports/evidence/m6/6g/` 안이고 그 경로는 위 목록에 **없다** — 그러므로
+evidence 를 더 써도 이 실측은 유효하다.
+
+## 데이터
+
+이 레인은 DB 에 쓰지 않았고 실 KONEPS 호출도 실 데이터 실행도 하지 않았다 — 되돌릴 데이터가 없다.
+스냅숏 fixture 는 합성이고 저장소 안(`ml-engine/tests/evaluation/fixtures/`)에 있다.
