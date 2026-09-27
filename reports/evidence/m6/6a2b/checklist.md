@@ -100,11 +100,11 @@ r4 의 차단 셋은 전부 「계약은 그렇게 말하는데 코드는 다르
    진다(`TIER2_CAPABILITY`·`USE_CASE_CONSTRUCTION`). r5 까지 이 사실은 ⑯ 과 41 ③ 문면에 흩어져
    있었고 이탈 절에는 없었다 — 여기 등재한다.
 
-**앞 라운드 이탈 둘 — 처분됨(D-6A2b-48).** ① meta-gate 를 JUnit 태그가 아니라 전수로 세운 것
-(저장소에 `@Tag` 선례가 0 건이었다), ② `scope.md` 의 접두 열거가 계약 파일과 달랐던 것. 전자는
-이번 라운드에 발견 술어까지 구조로 바뀌었고, 후자는 「계약 파일이 정본」으로 정리됐다.
+**처분된 이탈 둘(D-6A2b-48).** ① meta-gate 를 JUnit 태그가 아니라 전수로 세운 것(저장소에 `@Tag`
+선례가 0 건이다), ② `scope.md` 의 접두 열거가 계약 파일과 달랐던 것. 전자는 발견 술어까지 구조로
+서 있고(컴파일된 test 클래스), 후자는 「계약 파일이 정본」으로 정리됐다.
 
-**r4 가 「이행」으로 적었으나 실제로 달랐던 것(F-r5-3·N-r5-1) — 이번 라운드에 닫혔다.** 41 ② 의
+**대조표가 「이행」이라 적었으나 실제로 달랐던 것(F-r5-3·N-r5-1) — 닫혔다.** 41 ② 의
 「목록에 쓰기 능력 포트를 넣지 않는다」를 대조표가 이행으로 적었는데 목록에 `StrategyRepository`
 가 있었다. 지금은 술어(`tier2Allows` 첫 갈래)와 목록(등식 단언) 양쪽에서 막는다. **대조표에
 「이행」으로 적고 실제로 다른 것은 그 자체가 결함**이라는 것이 이 항목의 교훈이다.
@@ -229,10 +229,37 @@ verifier r5 F-r5-1) — 그 자리는 D-6A2b-49 의 주입 표면이 닫았다. 
 
 ⑲ **주입 표면 전개가 배열·`vararg` 를 푸는 대신 버린다**(code-review r6 N-r6-1). `Array<() -> Int>`
 나 `vararg` 한 겹이면 F-r5-1 이 되살아난다 — 같은 파일의 형제 술어(능력 보유 판정)는 `baseComponentType`
-으로 옳게 푼다. **오늘 재현 가능하고 D-6A2b-33 경계 안쪽이다.** 사전 등록 r6 규칙에 따라 이 라운드에
+으로 옳게 푼다. **오늘 재현 가능하고 D-6A2b-33 경계 안쪽이다.** 사전 등록 r6 규칙에 따라 이 slice 에서
 고치지 않고(게이트 술어를 넓히는 변경) **`OPEN-6A2B-INJECTION-HARDENING` 의 첫 항목**으로 넘긴다 —
 고침은 한 줄이다. 이 slice 가 머지하는 것은 편집 endpoint·원자성·동시성이고, 의존·주입 게이트는 지금
 상태 그대로(엄격한 방향, 초록) 남는다(D-6A2b-53).
+
+⑳ **멱등 재전달 진단이 fail-closed 쪽으로 기운다**(PR #48 리뷰 K). 재전달 판별 지문이 서버 파생
+`baseRevision` 만 빼고 **draft 는 그대로 비교**한다. 같은 `commandId` 를 같은 본문으로 다시 보내도
+어댑터가 draft 객체를 새로 만들면 지문이 달라져 `STALE_REVISION` 이 아니라 `IDEMPOTENCY_CONFLICT`
+가 나온다 — 둘 다 409 이고 편집은 일어나지 않으므로 **안전한 방향**이지만 운영자가 고칠 곳을
+잘못 가리킨다. 오늘의 회귀 test 가 이것을 못 잡는 이유는 **같은 draft 객체를 재사용**하기 때문이다.
+`OPEN-6A2B-REVIEW-FOLLOWUPS`.
+
+㉑ **값 무효 400 이 404·409 를 가린다**(리뷰 D). 실행기가 `validate()` 로 **먼저** 400 을 내므로,
+없는 세션·상태 불일치에 무효한 값을 함께 보내면 404·409 대신 400 이 나온다. 입력 검증 우선
+원칙의 귀결이고 편집은 일어나지 않는다. `OPEN-6A2B-REVIEW-FOLLOWUPS`.
+
+㉒ **`requiredDecimal` 이 음수 척도를 막지 않는다**(리뷰 E). 유효숫자·척도 상한은 재지만 음수 척도
+(`1E+3` 류)는 형식 층에서 통과한다 — 하류 `validate()` 가 도메인 규칙으로 막아 영속은 0 이다.
+형식 층에서 먼저 끊는 편이 진단이 정확하다. `OPEN-6A2B-REVIEW-FOLLOWUPS`.
+
+㉓ **스캔 필터 게이트가 패턴 필터를 보지 못한다**(리뷰 G). `ComponentScanFilterTest` 는 애너테이션
+집합 등식을 재고, `FilterType.REGEX`·`ASPECTJ` 같은 패턴 필터가 새로 붙으면 그 자리는 조용하다.
+오늘 그런 필터는 0 이다. `OPEN-6A2B-REVIEW-FOLLOWUPS`.
+
+㉔ **요청 타입의 속성 집합이 대조되지 않는다**(리뷰 I). 알려진 키 밖의 본문 키는 400 이지만,
+`EditSession*Request` 의 **속성 집합 자체**가 OpenAPI 스키마와 등식으로 묶여 있지 않다 — 새 속성을
+더하면 문서와 갈릴 수 있다. `OPEN-6A2B-REVIEW-FOLLOWUPS`.
+
+㉕ **upsert 의 SET 열 목록이 잠겨 있지 않다**(리뷰 J). 전략 저장의 upsert 가 갱신하는 열 집합을
+게이트가 재지 않는다 — HTTP 로 새로 열린 필드가 그 목록에서 빠지면 조용히 저장되지 않는다.
+오늘은 왕복 test 가 값으로 덮는다. `OPEN-6A2B-REVIEW-FOLLOWUPS`.
 
 ## OPEN 처분
 
@@ -248,24 +275,34 @@ verifier r5 F-r5-1) — 그 자리는 D-6A2b-49 의 주입 표면이 닫았다. 
 | `OPEN-6A2B-DRYRUN-ASSEMBLY-IN-APP` | 신설 — dry-run 의 요청 스코프 조립을 어댑터 층으로(편집 경로와 같은 형태). in_scope 밖이라 이 slice 에서 하지 않는다 |
 | `OPEN-6A2B-LOCATOR-BAN` | 신설(알려진 제한 ⑮) — locator 금지를 기존 리플렉션 게이트에 얹는다. 그 게이트는 다른 slice 의 자리다 |
 | `OPEN-6A2B-INJECTION-HARDENING` | **신설(D-6A2b-53, 게이트 분리 종결)** — 남은 주입 경로 하드닝. 첫 항목 **N-r6-1**(주입 전개가 배열·`vararg` 를 푸는 대신 버린다 — 같은 파일의 형제 술어는 옳게 푼다, 고침은 한 줄, 오늘 재현 가능·경계 안) · N-r6-3(meta-gate 발견 술어가 `@Test` 하나) · N-r6-4(상속 SAM·추상 클래스 운반 타입, 예외 목록 크기 래칫) · N-r6-6(프레임워크 콜백 세터가 표면 밖) · L-r6-1(수신 클래스 소유 SAM) · N-r6-13(`denied-types` 갈래의 음성 fixture) · N-r6-8(test 쪽 「최상위」가 문자열) |
+| `OPEN-6A2B-REVIEW-FOLLOWUPS` | **신설** — PR #48 리뷰가 낸 후속 여섯(알려진 제한 ⑳~㉕): 멱등 진단이 draft 비교로 기운다 · 값 무효 400 이 404·409 를 가린다 · `requiredDecimal` 음수 척도 · 스캔 필터 게이트의 패턴 필터 사각 · 요청 타입 속성 집합 미대조 · upsert SET 열 미잠금. 전부 **안전한 방향**의 잔여이고 코드 변경 없이 등재만 한다 — `OPEN-6A2B-INJECTION-HARDENING` 과는 별개 목록이다 |
 | `OPEN-6A2B-COMPOSITION-ROOT-HARDENING` | **M-r6-1 추가**(D-6A2b-53) — ① 층이 다른 클래스의 정적 가변 필드에 값을 쓴다. 가변 정적 필드 금지 또는 ① 층의 타 클래스 정적 필드 쓰기 금지 |
 
 ## 하네스 레인 변경(이 slice 가 만진 게이트·CI)
 
-`scope.md` 「하네스 레인 변경」 절이 정본이다. 이 라운드가 더한 것: 의존 게이트의 대상·면제 키(세 층 + ② 층 허용 목록 셋)와
-HTTP 표면 실측 키 여섯(`architecture-policy.properties`), 게이트 test 등재 아홉(`gate-tests.properties`),
-`ManagementHealthSurfaceTest` 의 미디어 타입 축, 삭제 하나(`HttpSurfaceFormatGateTest` — 모집단이 좁은
-중복 게이트), 그리고 등재 완전성 meta-gate 신설 하나(`AppGateRegistrationTest` — `workflow`·`adapters`
-에는 있고 `app` 에만 없던 자리다. 대상은 `app` test **전수·양방향**이라 등재 목록이 25 에서 37 로 늘었다).
-라운드 4 가 더한 것: 의존 게이트의 새 축 둘(능력 보유·use case 조립)과 그 계약 키 셋, 규칙별 음성
-fixture 파일 둘, 관리 포트 진입점 축 키 하나, `:app:test` 의 선언된 입력 하나(`gate-tests.properties`).
-라운드 5 가 더한 것: **주입 표면 축**(규칙 하나 + 계약 키 넷 + 음성 fixture 하나), 제한 층 거부 타입
-키 하나, 포트 호출 게이트의 포트 하나와 쌍 둘의 오른쪽 정정, 등재 meta-gate 의 발견 술어 교체와
-`:app:test` 의 system property 하나, `②` 층 목록에서 넷 제거(능력 포트 하나 + 죽은 항목 셋).
-종결 일괄이 되돌린 것: `app.port-call.ports` 에서 **조용히 빠졌던 포트 둘**(`CapacityPort`·
-`NotificationRequestPort`)을 되돌렸다 — 다른 slice 의 감시 목록이고 「오늘 호출 0」은 죽은 항목이
-아니라 래칫이다(N-r6-2). 같은 일괄이 `memberEffects`·`openApiSpec` 의 입력 path sensitivity 를
-기본값에서 RELATIVE 로 바꿨다(helper 가 늘 붙인다 — 절대 경로가 이미 입력이라 순효과 0, N-r6-11).
+`scope.md` 「하네스 레인 변경」 절이 정본이다. 여기는 **현재 상태**를 적는다 — 어느 라운드가 무엇을
+더했는지는 `git log`(경로 한정)와 PR 코멘트가 갖는다. 목록 크기는 세지 않는다: 계약 파일과 등재
+목록이 정본이고, 그 값은 `git diff 6f0b21f0..HEAD -- config/quality/` 로 읽는다.
+
+**`config/quality/architecture-policy.properties`** — HTTP 층 의존 게이트가 여기서 산다. 지금 선 축은
+여덟이다(`AppRuleId`): 제한 층·② 층 허용 목록, 수집 레인 참조 금지, 어댑터 멤버 호출 쌍, ② 층 능력
+포트 보유 금지, use case 조립 쌍, ① 층 HTTP 확장 API 금지, **주입 표면 정확 목록**. 그 밖에 HTTP
+표면 실측 키(API·관리 포트의 handler·Filter·Servlet·method mapping 빈)와 운영자 자격증명 참조자
+집합이 같은 파일에 있다. 포트 호출 게이트(`app.port-call.*`)는 다른 slice 의 래칫이고 이 slice 는
+`StrategyReader` 를 더하고 쌍 둘의 오른쪽을 그 이름으로 옮겼다 — 「오늘 호출 0」인 포트도 감시
+대상이라 지우지 않는다(N-r6-2 가 그 원칙을 되돌린 자리다).
+
+**`config/quality/gate-tests.properties`** — `gate.tests.app` 의 뜻이 「게이트 목록」에서 **`app` test
+전수**로 바뀌었다. 등재 완전성 meta-gate(`AppGateRegistrationTest`)가 **컴파일된 test 클래스 집합과
+양방향 등식**으로 강제한다. `workflow`·`adapters` 에는 있고 `app` 에만 없던 자리였다.
+
+**`app/build.gradle.kts`** — 계약 파일 넷을 `contractInput` helper 로 선언한다(선언된 입력 + 읽는
+system property 를 한 자리에서). 그 부수효과로 `memberEffects`·`openApiSpec` 의 path sensitivity 가
+기본값에서 RELATIVE 로 바뀌었다 — 절대 경로가 이미 입력이라 순효과는 0 이다(N-r6-11).
+
+**test 쪽** — 규칙별 영구 음성 fixture(`archfixture/violating/app/rules`·`.../tiers`)와 목록 밖
+어댑터 예외 표본(`adapters/archfixture`). `ManagementHealthSurfaceTest` 에 미디어 타입 축이 섰고,
+모집단이 좁아 중복이던 게이트 하나(`HttpSurfaceFormatGateTest`)는 삭제했다.
 
 ## 비활성화 경로
 
