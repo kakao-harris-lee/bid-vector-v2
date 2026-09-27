@@ -110,6 +110,15 @@ E[R] = 1.0(no-op)이다. 조사 노트는 Python 레인이 `_workspace/m6-6g/` �
 
 **OPEN 갱신**: `OPEN-6G-BASE-AMOUNT-OPERATION` → D-6G-19 로 **닫는다**(수집 구현 시) · `OPEN-6G-LOCAL-GOVERNMENT-JUDGEMENT` → 판정 불가 계수 + 민감도로 수용, 판별 수단은 별 slice(운영자 결정 대기).
 
+## 계약 갱신 p5 (2026-09-27, 팀장 — Python 레인 완료 보고 수령)
+
+| ID | 결정 |
+|---|---|
+| **D-6G-23** | 스냅숏 스키마의 A값 묶음에 **표준시장단가 적용 여부**(bool, 기초금액조회 출처) 칸을 더하고 `schema_version` 을 올린다 — D-6G-17 의 공시가 그 칸 없이는 셀 수 없다(Python 레인 이탈 1). Kotlin 레인이 채운다 |
+| **D-6G-24** | 정책 파일 위치는 기존 관례대로 **`ml-engine/policy/strategy-backtest-v1.yaml`**(계약 문면 `policy/…` 정정) |
+| **D-6G-25** | 재현 test 의 파생 정책 수용 — 창 크기·몬테카를로 반복 수·적합도 표본 하한만 낮추고 판정식 축(Δ·유의수준·Bonferroni 분모·비열등 한계·검정력)은 출하값, 그 목록을 test 가 단언(완화 통로 아님) |
+| **D-6G-26** | 표본 뽑기(`|`)와 전략 내부 난수(`:`)의 seed 결합 구분자를 **다르게 둔다** — 같으면 두 난수원이 상관을 가져 seed 쇼핑의 새 표면이 된다 |
+
 ## 결정
 
 | ID | 결정 | 근거 |
@@ -167,7 +176,7 @@ E[R] = 1.0(no-op)이다. 조사 노트는 Python 레인이 `_workspace/m6-6g/` �
 - **(계약 갱신 p4, 2026-09-27 — 팀장 누락 정정)** `workflow/src/main/kotlin/bidvector/workflow/collection/**` · `workflow/src/test/kotlin/bidvector/workflow/collection/**`(수집 use case·호출 예산 원장 — 수집 조율의 기존 자리) · `procurement/src/main/kotlin/bidvector/procurement/**` · `procurement/src/test/**`(공고 식별·정규화). Kotlin 레인이 이미 `918a8e98` 에서 `workflow/.../collection/` 을 편집했다 — 착수 계약이 수집 조율 층을 빠뜨린 팀장 누락이고(6A-3 교훈 「배선 slice 는 착수 계약에 게이트·fixture·build 파일을 처음부터」의 재발), 그 커밋은 이 갱신으로 in_scope 안이 된다
 - `adapters/src/main/kotlin/bidvector/adapters/koneps/**` · `adapters/src/main/kotlin/bidvector/adapters/persistence/**` · `adapters/src/test/**`(필요 시)
 - `ml-engine/src/ml_engine/evaluation/**` · `ml-engine/src/ml_engine/adapters/**` · `ml-engine/src/ml_engine/app/**`(job 진입점) · `ml-engine/tests/**` · `ml-engine/pyproject.toml`(import-linter 계약)
-- `policy/strategy-backtest-v1.yaml`(위치는 기존 정책 파일 관례를 따른다)
+- `ml-engine/policy/strategy-backtest-v1.yaml`(D-6G-24)
 - `config/quality/**`(게이트 baseline·허용 목록이 바뀔 때)
 - `reports/evidence/m6/6g/**` · `milestone-6.md`(착수·종결 문단만)
 
