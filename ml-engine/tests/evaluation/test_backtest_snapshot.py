@@ -144,7 +144,7 @@ def test_missing_field_is_rejected() -> None:
         {"notice_noticed_on": "2026-13-01"},
         {"notice_bid_close_at": "not-a-timestamp"},
         {"notice_notice_ordinal": "1"},
-        {"notice_is_local_government": "false"},
+        {"notice_notice_ordinal": True},
     ],
 )
 def test_wrong_typed_field_is_rejected(mutation: dict[str, Any]) -> None:
@@ -155,7 +155,7 @@ def test_wrong_typed_field_is_rejected(mutation: dict[str, Any]) -> None:
 
 def test_non_finite_number_is_rejected() -> None:
     rows = rows_bytes([row_payload("n-1")]).replace(
-        b'"base_amount": 1000000000.0', b'"base_amount": NaN'
+        b'"floor_rate": 0.87745', b'"floor_rate": NaN'
     )
     rejected = load_snapshot(manifest_bytes(rows), rows)
     assert isinstance(rejected, SnapshotRejected)

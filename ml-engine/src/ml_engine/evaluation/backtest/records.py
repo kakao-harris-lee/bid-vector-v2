@@ -1,0 +1,155 @@
+"""`ml_engine.evaluation.backtest.records` — 판정 산출물의 **형태**(D-6G-9·20·21).
+조율자(`run`)에서 분리한 이유는 하나다: 산출물의 모양은 오래 남고 직렬화
+(`report`)·조립 근(`app`)이 함께 읽는데, 조율 절차와 한 파일에 있으면 그 파일이
+설계 래칫의 파일 크기 한도를 넘는다(실측).
+
+여기 있는 것은 전부 **공시 대상**이다 — 제외 계수, 판정 불가 축, 표본 크기 결정식의
+입력과 결과, 창 목록, 알려진 제한. 숨기면 안 되는 것을 타입으로 고정해 둔다.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+from enum import StrEnum
+from typing import Final
+
+from ml_engine.evaluation.backtest.exclusions import ExclusionReason, UndecidableAxis
+from ml_engine.evaluation.backtest.fit import FitResult
+from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
+from ml_engine.evaluation.backtest.snapshot import LoadedSnapshot
+from ml_engine.evaluation.backtest.strategies import StrategyLike
+from ml_engine.evaluation.backtest.verdict import StrategyVerdict
+from ml_engine.evaluation.backtest.windows import WindowExclusion
+
+
+class StopReason(StrEnum):
+    """판정을 내지 않고 멈춘 사유 — 「판정이 없다」와 「판정이 나빴다」를 구별한다."""
+
+    DISTRIBUTION_FIT_REJECTED = "DISTRIBUTION_FIT_REJECTED"
+    NO_ADMITTED_NOTICE = "NO_ADMITTED_NOTICE"
+    SAMPLE_SIZE_BELOW_MINIMUM = "SAMPLE_SIZE_BELOW_MINIMUM"
+    SAMPLING_BUDGET_EXCEEDED = "SAMPLING_BUDGET_EXCEEDED"
+    INSUFFICIENT_WINDOWS = "INSUFFICIENT_WINDOWS"
+    WINDOW_OVERLAP = "WINDOW_OVERLAP"
+    STRATEGY_SAMPLE_MISMATCH = "STRATEGY_SAMPLE_MISMATCH"
+
+
+class SampleVariant(StrEnum):
+    """표본 판 셋(D-6G-21). 주 판정은 지자체를 **가르지 못한 채로** 내고, 보조 민감도
+    둘을 함께 낸다 — 세 판의 판정 부호가 다르면 판정문에 그대로 적는다."""
+
+    MAIN = "MAIN"
+    EXCLUDE_WIDE_RESERVE_RANGE = "EXCLUDE_WIDE_RESERVE_RANGE"
+    EXCLUDE_ESTIMATED_LOCAL_GOVERNMENT = "EXCLUDE_ESTIMATED_LOCAL_GOVERNMENT"
+
+
+# 기관 코드에서 지자체를 **추정**하는 접두 목록 — **비어 있다.** authoritative 대응을
+# 확보하지 못했고(스키마 §4, `OPEN-6G-LOCAL-GOVERNMENT-JUDGEMENT`) 지어내면 DEC-03 을
+# 코드가 조용히 재정의한다. 비어 있는 동안 보조 판 (b) 는 주 판정과 같은 표본이고,
+# 판정 JSON 의 `estimate_available: false` 가 그 사실을 명시한다.
+ESTIMATED_LOCAL_AGENCY_PREFIXES: Final[frozenset[str]] = frozenset()
+
+# 알려진 제한 — 판정문이 숨기면 안 되는 것들. 코드로 고정해 판정 JSON 이 매번 싣는다.
+KNOWN_LIMITATIONS: Final[tuple[str, ...]] = (
+    "COUNTERFACTUAL_NOT_MEASURED",
+    "LOCAL_GOVERNMENT_UNDECIDABLE",
+    "SHIP_CLASS_CODE_UNRESOLVED",
+    "RESERVE_RANGE_SOURCE_PENDING",
+    "PURE_CONSTRUCTION_COST_SOURCE_PENDING",
+    "A_VALUE_EXCLUDES_STANDARD_MARKET_PRICE",
+    "FLOOR_ROUNDING_RULE_UNRESOLVED",
+    "S1_CONSTRUCTION_ONLY",
+    "S3_GBM_NOT_AVAILABLE",
+    "POSTED_FLOOR_RATE_BAND_UNVERIFIED",
+)
+
+
+@dataclass(frozen=True)
+class BacktestRequest:
+    """실험 한 번의 입력. `baseline` 이 S0 이고 `candidates` 가 나머지 전략이다."""
+
+    snapshot: LoadedSnapshot
+    baseline: StrategyLike
+    candidates: tuple[StrategyLike, ...]
+    primary_names: tuple[str, ...]
+    policy: StrategyBacktestPolicy
+    policy_checksum: str
+    variant: SampleVariant = SampleVariant.MAIN
+
+
+@dataclass(frozen=True)
+class SnapshotRecord:
+    """판정 JSON 이 싣는 입력 좌표 — 같은 값이면 같은 판정이 나와야 한다."""
+
+    snapshot_id: str
+    rows_sha256: str
+    sample_list_sha256: str
+    period_start: date
+    period_end: date
+
+
+@dataclass(frozen=True)
+class WindowRecord:
+    index: int
+    start: date
+    end: date
+    notice_count: int
+    history_count: int
+
+
+@dataclass(frozen=True)
+class SamplingRecord:
+    """표본 크기 결정식의 입력과 결과(D-6G-20) — 판정 JSON 이 그대로 싣는다."""
+
+    sample_size: int
+    list_call_count: int
+    calls_per_notice: int
+    total_calls: int
+    max_total_calls: int
+    min_required_sample: int
+    within_budget: bool
+
+
+@dataclass(frozen=True)
+class VariantRecord:
+    """이 판이 무엇을 뺐는가. `estimate_available` 이 거짓이면 「추정 규칙이 없어
+    아무것도 빼지 못했다」는 뜻이고, 그것을 0 건으로 적으면 판정문이 거짓말을 한다."""
+
+    variant: SampleVariant
+    notice_count: int
+    removed_count: int
+    estimate_available: bool
+
+
+@dataclass(frozen=True)
+class BacktestStopped:
+    reason: StopReason
+    detail: str
+    variant: SampleVariant
+    snapshot: SnapshotRecord
+    sampling: SamplingRecord
+    fit: FitResult | None
+    exclusions: tuple[tuple[ExclusionReason, int], ...]
+
+
+@dataclass(frozen=True)
+class BacktestVerdict:
+    """실험 한 번의 산출물 전부 — 판정 JSON 의 원본."""
+
+    policy_version: str
+    policy_checksum: str
+    variant: VariantRecord
+    snapshot: SnapshotRecord
+    sampling: SamplingRecord
+    fit: FitResult
+    exclusions: tuple[tuple[ExclusionReason, int], ...]
+    undecidable: tuple[tuple[UndecidableAxis, int], ...]
+    bid_method_fill_rate: float
+    limitations: tuple[str, ...]
+    selected_windows: tuple[WindowRecord, ...]
+    excluded_windows: tuple[WindowExclusion, ...]
+    scored_notice_count: int
+    seeds: tuple[int, ...]
+    primary_names: tuple[str, ...]
+    verdicts: tuple[StrategyVerdict, ...]

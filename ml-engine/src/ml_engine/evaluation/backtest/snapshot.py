@@ -69,7 +69,12 @@ class AValue:
 
 @dataclass(frozen=True)
 class NoticeObservation:
-    """투찰 시점에 알 수 있는 것만. 개찰 결과 이름은 여기 없다(누출 금지의 타입 경계)."""
+    """투찰 시점에 알 수 있는 것만. 개찰 결과 이름은 여기 없다(누출 금지의 타입 경계).
+
+    **nullable 이 많다**(스키마 §3.1·§6) — `reserve_range_*` 와 `pure_construction_cost`
+    는 KONEPS 기초금액조회에만 있는데 그 오퍼레이션의 요청 계약이 미확정이라 당분간
+    항상 `null` 로 온다(`OPEN-6G-BASE-AMOUNT-OPERATION`). 낙찰방법 셋도 문서상 옵션이다.
+    **없는 값을 상수로 메우지 않는다** — 없으면 제외 사유가 되고 계수된다(D-6G-16)."""
 
     notice_key_hash: str
     category: BusinessCategory
@@ -77,24 +82,30 @@ class NoticeObservation:
     bid_close_at: datetime
     base_amount: float
     floor_rate: float | None
-    reserve_range_begin_rate: float
-    reserve_range_end_rate: float
+    reserve_range_begin_rate: float | None
+    reserve_range_end_rate: float | None
     a_value: AValue | None
-    successful_bid_method_code: str
-    successful_bid_method_name: str
-    prearranged_price_decision_method: str
+    successful_bid_method_code: str | None
+    successful_bid_method_name: str | None
+    prearranged_price_decision_method: str | None
     notice_ordinal: int
-    is_local_government: bool
-    is_foreign_capital: bool
+    progress_division: str | None
+    procurement_class_code: str | None
+    demand_agency_code: str | None
     pure_construction_cost: float | None
 
 
 @dataclass(frozen=True)
 class BidderRow:
-    """투찰자 한 행 — 공고 안 순위와 금액뿐. 상호·사업자번호를 싣지 않는다(D-6G-10)."""
+    """투찰자 한 행 — 공고 안 순번과 금액뿐. 상호·사업자번호를 싣지 않는다(D-6G-10).
 
-    rank: int
-    amount: float
+    `rank`(원문 `opengRank`)는 **결측·중복이 흔하다**(스키마 §3.2 실측: 표본 15건 중
+    전 행 유일은 4건뿐) — 경쟁자 분포는 `rank` 가 아니라 `amount` 로 만든다. `ordinal`
+    은 금액 오름차순으로 추출이 붙인 순번이고 항상 있다."""
+
+    ordinal: int
+    rank: int | None
+    amount: float | None
 
 
 @dataclass(frozen=True)
@@ -105,7 +116,7 @@ class OpeningOutcome:
     planned_price: float
     reserve_prices: tuple[float, ...] | None
     drawn_serial_numbers: tuple[int, ...] | None
-    participant_count: int
+    participant_count: int | None
     bidder_rows: tuple[BidderRow, ...]
 
 
@@ -144,8 +155,9 @@ _NOTICE_KEYS: Final[frozenset[str]] = frozenset(
         "successful_bid_method_name",
         "prearranged_price_decision_method",
         "notice_ordinal",
-        "is_local_government",
-        "is_foreign_capital",
+        "progress_division",
+        "procurement_class_code",
+        "demand_agency_code",
         "pure_construction_cost",
     }
 )
@@ -159,7 +171,7 @@ _OUTCOME_KEYS: Final[frozenset[str]] = frozenset(
         "bidder_rows",
     }
 )
-_BIDDER_KEYS: Final[frozenset[str]] = frozenset({"rank", "amount"})
+_BIDDER_KEYS: Final[frozenset[str]] = frozenset({"ordinal", "rank", "amount"})
 _A_VALUE_KEYS: Final[frozenset[str]] = frozenset({"total", "open_at"})
 _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
     {
@@ -245,6 +257,14 @@ def _flag(payload: dict[str, JsonValue], key: str) -> bool:
     return value
 
 
+def _optional_integer(payload: dict[str, JsonValue], key: str) -> int | None:
+    return None if _present(payload, key) is None else _integer(payload, key)
+
+
+def _optional_text(payload: dict[str, JsonValue], key: str) -> str | None:
+    return None if _present(payload, key) is None else _text(payload, key)
+
+
 def _day(payload: dict[str, JsonValue], key: str) -> date:
     try:
         return date.fromisoformat(_text(payload, key))
@@ -306,7 +326,11 @@ def _bidder_rows(payload: dict[str, JsonValue]) -> tuple[BidderRow, ...]:
         )
     rows = [_mapping(item, "bidder_rows[]", _BIDDER_KEYS) for item in raw]
     return tuple(
-        BidderRow(rank=_integer(item, "rank"), amount=_number(item, "amount"))
+        BidderRow(
+            ordinal=_integer(item, "ordinal"),
+            rank=_optional_integer(item, "rank"),
+            amount=_optional_number(item, "amount"),
+        )
         for item in rows
     )
 
@@ -320,17 +344,18 @@ def _parse_notice(payload: JsonValue) -> NoticeObservation:
         bid_close_at=_timestamp(fields, "bid_close_at"),
         base_amount=_number(fields, "base_amount"),
         floor_rate=_optional_number(fields, "floor_rate"),
-        reserve_range_begin_rate=_number(fields, "reserve_range_begin_rate"),
-        reserve_range_end_rate=_number(fields, "reserve_range_end_rate"),
+        reserve_range_begin_rate=_optional_number(fields, "reserve_range_begin_rate"),
+        reserve_range_end_rate=_optional_number(fields, "reserve_range_end_rate"),
         a_value=_a_value(fields),
-        successful_bid_method_code=_text(fields, "successful_bid_method_code"),
-        successful_bid_method_name=_text(fields, "successful_bid_method_name"),
-        prearranged_price_decision_method=_text(
+        successful_bid_method_code=_optional_text(fields, "successful_bid_method_code"),
+        successful_bid_method_name=_optional_text(fields, "successful_bid_method_name"),
+        prearranged_price_decision_method=_optional_text(
             fields, "prearranged_price_decision_method"
         ),
         notice_ordinal=_integer(fields, "notice_ordinal"),
-        is_local_government=_flag(fields, "is_local_government"),
-        is_foreign_capital=_flag(fields, "is_foreign_capital"),
+        progress_division=_optional_text(fields, "progress_division"),
+        procurement_class_code=_optional_text(fields, "procurement_class_code"),
+        demand_agency_code=_optional_text(fields, "demand_agency_code"),
         pure_construction_cost=_optional_number(fields, "pure_construction_cost"),
     )
 
@@ -342,7 +367,7 @@ def _parse_outcome(payload: JsonValue) -> OpeningOutcome:
         planned_price=_number(fields, "planned_price"),
         reserve_prices=_numbers(fields, "reserve_prices"),
         drawn_serial_numbers=_integers(fields, "drawn_serial_numbers"),
-        participant_count=_integer(fields, "participant_count"),
+        participant_count=_optional_integer(fields, "participant_count"),
         bidder_rows=_bidder_rows(fields),
     )
 

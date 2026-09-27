@@ -35,18 +35,27 @@ from ml_engine.evaluation.backtest.exclusions import AdmittedNotice
 from ml_engine.evaluation.backtest.floor import floor_price, rate_from_basis_points
 from ml_engine.evaluation.backtest.institution import sample_assessment_ratios
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
-from ml_engine.evaluation.backtest.snapshot import NoticeObservation
+from ml_engine.evaluation.backtest.snapshot import BusinessCategory, NoticeObservation
 
 _HALF = 2.0
 
 
 @dataclass(frozen=True)
 class CompetitorObservation:
-    """지난 공고의 경쟁자 한 건 — 투찰률과 그 공고의 개찰일·참가자 수."""
+    """지난 공고의 경쟁자 한 건 — 투찰률과 그 공고의 맥락. **전부 대상 공고보다 앞선
+    개찰분에서만 온다.**
+
+    공고 식별자·상호는 없다(D-6G-10). 예비가격·추첨 번호가 함께 오는 이유는 S2(분포
+    엔진)가 표본마다 그 공고의 추첨 관측을 요구하기 때문이다 — 그 값들도 **지난** 공고의
+    것이라 누출이 아니다."""
 
     opened_on: date
     bid_rate: float
     participant_count: int
+    base_amount: float
+    category: BusinessCategory
+    reserve_prices: tuple[float, ...] | None
+    drawn_serial_numbers: tuple[int, ...] | None
 
 
 @dataclass(frozen=True)
@@ -56,6 +65,8 @@ class StrategyInput:
     notice: NoticeObservation
     floor_rate: float
     a_value_total: float
+    reserve_range_begin_rate: float
+    reserve_range_end_rate: float
     competitors: tuple[CompetitorObservation, ...]
     seed: int
 
@@ -64,20 +75,15 @@ class StrategyInput:
         """E[R] — 제도상 사정률의 기대값은 예가 범위의 중점이다(15구간 균등 + 무작위
         평균이라 편향이 없다). 비대칭 범위면 중점도 1 이 아니다."""
         return (
-            1.0
-            + (
-                self.notice.reserve_range_begin_rate
-                + self.notice.reserve_range_end_rate
-            )
-            / _HALF
+            1.0 + (self.reserve_range_begin_rate + self.reserve_range_end_rate) / _HALF
         )
 
     @property
     def reserve_half_width(self) -> float:
-        """예가 범위 반폭 — 상수가 아니라 그 공고의 필드에서 온다(조사 02 §4.4)."""
-        return (
-            self.notice.reserve_range_end_rate - self.notice.reserve_range_begin_rate
-        ) / _HALF
+        """예가 범위 반폭 — 상수가 아니라 그 공고의 필드에서 온다(조사 02 §4.4).
+        값이 없는 공고는 애초에 승인되지 않는다(제외 `RESERVE_PRICE_RANGE_ABSENT`,
+        D-6G-16) — 여기서 `None` 을 다룰 필요가 없다."""
+        return (self.reserve_range_end_rate - self.reserve_range_begin_rate) / _HALF
 
     @property
     def expected_participant_count(self) -> int:
@@ -97,6 +103,10 @@ class AbstentionReason(StrEnum):
     INSUFFICIENT_COMPETITOR_SAMPLES = "INSUFFICIENT_COMPETITOR_SAMPLES"
     ENGINE_UNMEASURABLE = "ENGINE_UNMEASURABLE"
     NON_FINITE_RESULT = "NON_FINITE_RESULT"
+    NOT_APPLICABLE_CATEGORY = "NOT_APPLICABLE_CATEGORY"
+    """전략의 정의가 그 업무에 서지 않는다 — S1 의 offset 이 **공사 전용**으로
+    측정된 값이라(D-6G-15) 용역·물품에서는 금액을 내지 않는다. 관측값으로 새 상수를
+    만들지 않는다."""
 
 
 @dataclass(frozen=True)
@@ -138,6 +148,10 @@ def bid_from_rate(request: StrategyInput, rate: float) -> StrategyOutcome:
 def notice_rng(request: StrategyInput) -> np.random.Generator:
     """`(판정 seed, 공고 키 해시)` 에서 결정적으로 나오는 난수원 — 공고 처리 순서가
     바뀌어도 같은 표본이 나온다(재현성, 위협 모델 ③)."""
+    # 구분자 `:` 는 **전략 내부 난수** 전용이다. 표본 뽑기 순서(Kotlin 레인,
+    # 스키마 §5)는 `sha256("<seed>|<notice_key_hash>")` 로 구분자가 `|` 다 — 두
+    # 용도가 다르고 서로를 재현하지 않으므로 일부러 다른 구분자를 쓴다(같은 문자열을
+    # 쓰면 표본 선택과 전략 난수가 상관을 갖는다).
     material = f"{request.seed}:{request.notice.notice_key_hash}".encode()
     digest = hashlib.sha256(material).digest()
     return np.random.default_rng(int.from_bytes(digest, "big"))
@@ -163,17 +177,24 @@ class UniformBandStrategy:
 
 @dataclass(frozen=True)
 class RuleAnchorStrategy:
-    """**S1** — 규칙 앵커. `r * E[R] + offset`. offset 은 정책 파일에서만 오고 창을
-    보고 조정하지 않는다(우회 ②)."""
+    """**S1** — 규칙 앵커(D-6G-15 확정). `하한율 + offset` 이고 `E[R]` 를 곱하지
+    않는다 — legacy 의 앵커가 `floor + 선언 offset` 이고 `x E[예정가]` 변형은 legacy 가
+    기각했다(`app/ai/construction_scenario.py::resolve_scenario_anchor_rates`).
+
+    **공사에서만 채점한다.** offset 은 legacy 가 공사 정착행에서 잰 백분위수(p50)라
+    용역·물품에 그 값을 옮길 근거가 없다 — 그 업무에서는 금액을 내지 않고 기권으로
+    공시한다(관측값으로 새 상수를 만들지 않는다). S1 은 보조 가설이다."""
 
     name: str = "S1"
 
     def bid(
         self, request: StrategyInput, policy: StrategyBacktestPolicy
     ) -> StrategyOutcome:
-        rate = request.floor_rate * request.expected_assessment_ratio
+        if request.notice.category is not BusinessCategory.CONSTRUCTION:
+            return Abstained(AbstentionReason.NOT_APPLICABLE_CATEGORY)
         return bid_from_rate(
-            request, rate + rate_from_basis_points(policy.strategies.s1_offset_bp)
+            request,
+            request.floor_rate + rate_from_basis_points(policy.strategies.s1_offset_bp),
         )
 
 
@@ -199,8 +220,8 @@ def _win_probabilities(
     ratios = sample_assessment_ratios(
         rng,
         count=iterations,
-        begin_rate=request.notice.reserve_range_begin_rate,
-        end_rate=request.notice.reserve_range_end_rate,
+        begin_rate=request.reserve_range_begin_rate,
+        end_rate=request.reserve_range_end_rate,
         reserve_price_count=policy.institution.reserve_price_count,
         draw_count=policy.institution.draw_count,
     )
@@ -254,12 +275,16 @@ def build_competitor_pool(
     return tuple(
         CompetitorObservation(
             opened_on=item.row.outcome.opened_on,
-            bid_rate=bidder.amount / item.row.notice.base_amount,
-            participant_count=item.row.outcome.participant_count,
+            bid_rate=amount / item.row.notice.base_amount,
+            participant_count=item.participant_count,
+            base_amount=item.row.notice.base_amount,
+            category=item.row.notice.category,
+            reserve_prices=item.row.outcome.reserve_prices,
+            drawn_serial_numbers=item.row.outcome.drawn_serial_numbers,
         )
         for item in history
         if item.row.outcome.opened_on < before
-        for bidder in item.row.outcome.bidder_rows
+        for amount in item.bid_amounts
     )
 
 
@@ -272,6 +297,8 @@ def build_strategy_input(
         notice=target.row.notice,
         floor_rate=target.floor_rate,
         a_value_total=target.a_value_total,
+        reserve_range_begin_rate=target.reserve_range_begin_rate,
+        reserve_range_end_rate=target.reserve_range_end_rate,
         competitors=build_competitor_pool(history, before=target.row.outcome.opened_on),
         seed=seed,
     )

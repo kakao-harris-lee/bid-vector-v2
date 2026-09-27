@@ -25,6 +25,7 @@ from ml_engine.evaluation.backtest.exclusions import (
     EXCLUSION_RULE_ORDER,
     AdmittedNotice,
     ExclusionReason,
+    UndecidableAxis,
     admit_rows,
     exclusion_counts,
     resolve_a_value,
@@ -139,8 +140,19 @@ def test_construction_without_pure_cost_is_excluded() -> None:
 @pytest.mark.parametrize(
     ("mutation", "reason"),
     [
-        ({"notice_is_local_government": True}, ExclusionReason.LOCAL_GOVERNMENT),
-        ({"notice_is_foreign_capital": True}, ExclusionReason.FOREIGN_CAPITAL),
+        (
+            {"notice_successful_bid_method_name": None},
+            ExclusionReason.BID_METHOD_ABSENT,
+        ),
+        (
+            {"notice_reserve_range_begin_rate": None},
+            ExclusionReason.RESERVE_PRICE_RANGE_ABSENT,
+        ),
+        (
+            {"notice_reserve_range_end_rate": None},
+            ExclusionReason.RESERVE_PRICE_RANGE_ABSENT,
+        ),
+        ({"notice_progress_division": "유찰"}, ExclusionReason.REBID_OR_AMENDED),
         (
             {
                 "notice_successful_bid_method_name": (
@@ -242,16 +254,23 @@ def test_exclusion_counts_report_every_reason_including_zero() -> None:
         _snapshot(
             [
                 row_payload("n-1"),
-                row_payload("n-2", notice_is_local_government=True),
-                row_payload("n-3", notice_is_local_government=True),
+                row_payload("n-2", notice_progress_division="유찰"),
+                row_payload("n-3", notice_progress_division="재입찰"),
             ]
         ).rows,
         _policy(),
     )
     counts = dict(exclusion_counts(result.excluded))
     assert len(counts) == len(ExclusionReason)
-    assert counts[ExclusionReason.LOCAL_GOVERNMENT] == 2
+    assert counts[ExclusionReason.REBID_OR_AMENDED] == 2
     assert counts[ExclusionReason.TIED_LOWEST] == 0
+    # ⑪⑫ 는 **한 번도 발화하지 않는다** — 0 은 「없었다」가 아니라 「가르지 못했다」·
+    # 「들어오지 않았다」이고, 그 사실은 `undecidable` 이 따로 공시한다(D-6G-21).
+    assert counts[ExclusionReason.LOCAL_GOVERNMENT] == 0
+    assert counts[ExclusionReason.FOREIGN_CAPITAL] == 0
+    assert dict(result.undecidable)[UndecidableAxis.LOCAL_GOVERNMENT] == len(
+        result.admitted
+    )
 
 
 def test_exclusion_rule_order_covers_every_reason_exactly_once() -> None:

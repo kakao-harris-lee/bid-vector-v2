@@ -50,6 +50,7 @@ _NUMBER_KEYS: Final[tuple[str, ...]] = (
     "strategy.s4_grid_span_bp",
     "fit.alpha",
     "fit.max_bin_ratio_deviation",
+    "sensitivity.wide_reserve_half_width",
 )
 _INT_KEYS: Final[tuple[str, ...]] = (
     "verdict.primary_hypothesis_count",
@@ -63,6 +64,10 @@ _INT_KEYS: Final[tuple[str, ...]] = (
     "strategy.s4_grid_size",
     "strategy.s4_min_competitor_samples",
     "fit.min_sample_count",
+    "sampling.list_call_count",
+    "sampling.calls_per_notice",
+    "sampling.max_total_calls",
+    "sampling.min_required_sample",
 )
 _TEXT_KEYS: Final[tuple[str, ...]] = (
     "effective.construction",
@@ -239,6 +244,44 @@ class StrategyConstants:
 
 
 @dataclass(frozen=True)
+class SamplingBudget:
+    """표본 크기 결정식(D-6G-20) — 호출 예산이 표본을 정한다."""
+
+    list_call_count: int
+    calls_per_notice: int
+    max_total_calls: int
+    min_required_sample: int
+
+    def __post_init__(self) -> None:
+        for name in (
+            "list_call_count",
+            "calls_per_notice",
+            "max_total_calls",
+            "min_required_sample",
+        ):
+            if getattr(self, name) < 1:
+                raise ValueError(f"sampling.{name} 는 1 이상이어야 합니다")
+
+    def total_calls_for(self, sample_size: int) -> int:
+        return self.list_call_count + self.calls_per_notice * sample_size
+
+    def within_budget(self, sample_size: int) -> bool:
+        return self.total_calls_for(sample_size) <= self.max_total_calls
+
+
+@dataclass(frozen=True)
+class SensitivityRules:
+    """지자체 민감도(D-6G-21) — 주 판정 옆에 함께 내는 보조 판 둘의 규칙."""
+
+    wide_reserve_half_width: float
+
+    def __post_init__(self) -> None:
+        _require_finite_positive(
+            self.wide_reserve_half_width, "sensitivity.wide_reserve_half_width"
+        )
+
+
+@dataclass(frozen=True)
 class FitThresholds:
     """P-4 제도 분포 적합도 임계 — 맞지 않으면 판정 대신 멈춤."""
 
@@ -269,6 +312,8 @@ class StrategyBacktestPolicy:
     effective: EffectiveDates
     strategies: StrategyConstants
     fit: FitThresholds
+    sampling: SamplingBudget
+    sensitivity: SensitivityRules
     stability_seeds: tuple[int, ...]
 
     def __post_init__(self) -> None:
@@ -370,6 +415,15 @@ def _assemble(
             alpha=numbers["fit.alpha"],
             min_sample_count=integers["fit.min_sample_count"],
             max_bin_ratio_deviation=numbers["fit.max_bin_ratio_deviation"],
+        ),
+        sampling=SamplingBudget(
+            list_call_count=integers["sampling.list_call_count"],
+            calls_per_notice=integers["sampling.calls_per_notice"],
+            max_total_calls=integers["sampling.max_total_calls"],
+            min_required_sample=integers["sampling.min_required_sample"],
+        ),
+        sensitivity=SensitivityRules(
+            wide_reserve_half_width=numbers["sensitivity.wide_reserve_half_width"]
         ),
         stability_seeds=seeds,
     )

@@ -87,6 +87,36 @@ _ALLOWED: frozenset[tuple[str, float]] = frozenset(
         ("backtest/strategies.py", 1.0),  # 비율 1 기준(밴드 상·하단, E[R] 중점)
         ("backtest/strategies.py", 2),  # 중앙값 인덱스 나눗셈
         ("backtest/strategies.py", 2.0),  # _HALF — 반폭·중점의 정의(구조 상수)
+        ("backtest/fit.py", 0.0),  # 확률·통계량의 하한 클램프
+        ("backtest/fit.py", 1),  # 급수 항 시작·구간 경계 슬라이스
+        ("backtest/fit.py", 1.0),  # 확률 상한 클램프·정규화 축 1 기준
+        ("backtest/fit.py", 2),  # 급수의 홀짝 부호 판정(k % 2)
+        ("backtest/fit.py", 2.0),  # Kolmogorov 급수의 계수 2 — 분포의 정의
+        ("backtest/fit.py", 64),  # _KOLMOGOROV_TERMS — 급수 절단(수치 상수)
+        ("backtest/fit.py", 200000),  # _REFERENCE_SAMPLE_COUNT — 기준 표본 분해능
+        ("backtest/mcnemar.py", 0),  # k<=0 꼬리 경계
+        ("backtest/mcnemar.py", 0.0),  # 검정력 하한(기각 불가)
+        ("backtest/mcnemar.py", 0.5),  # 귀무가설 성공 확률 — McNemar 의 정의 그 자체
+        ("backtest/mcnemar.py", 1),  # 팩토리얼 누적합 시작·탐색 시작
+        ("backtest/mcnemar.py", 1.0),  # 확률 상한·여확률(1-p)
+        ("backtest/mcnemar.py", 2.0),  # 승수 차이를 불일치 쌍 비율로 옮기는 반분
+        ("backtest/mcnemar.py", 200000),  # _MAX_SEARCH_PAIRS — 탐색 상한(구조 상수)
+        ("backtest/mcnemar.py", 64),  # _BACK_SCAN_PAIRS — 계단 역주행 폭(구조 상수)
+        ("backtest/run.py", 2.0),  # 반폭 = (end - begin) / 2 — 반폭의 정의
+        ("backtest/metrics.py", 0),  # 빈 표본 비율
+        ("backtest/metrics.py", 0.0),  # 빈 표본 비율 fallback
+        ("backtest/metrics.py", 0.25),  # 사분위 하 — 지표 정의
+        ("backtest/metrics.py", 0.5),  # 중앙값 — 지표 정의
+        ("backtest/metrics.py", 0.75),  # 사분위 상 — 지표 정의
+        ("backtest/metrics.py", 1),  # 계수 증가
+        ("backtest/metrics.py", 2),  # 사분위 tuple 인덱스
+        ("backtest/run.py", 0),  # 사분위/인덱스 시작
+        ("backtest/run.py", 0.0),  # 상대 개선 부호 비교
+        ("backtest/run.py", 1),  # 서명 집합 크기 비교
+        ("backtest/verdict.py", 0.0),  # 개선률 부호 경계(UNDERPOWERED)
+        ("backtest/verdict.py", 1),  # 창 통과 계수
+        ("backtest/verdict.py", 2),  # 과반 판정(계수 * 2 > 전체)
+        ("backtest/windows.py", 1),  # 창 인덱스 증가
     }
 )
 

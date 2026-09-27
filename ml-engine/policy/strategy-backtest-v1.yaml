@@ -61,11 +61,12 @@ effective.service: "2026-05-26"
 effective.goods: "2026-05-29"
 
 # ── 전략 상수 ────────────────────────────────────────────────────────────────
-# S1 규칙 앵커의 offset(bp) — A-4 「legacy 값 승계」. 출처 좌표와 승계 판단은
-# `reports/evidence/m6/6g/policy-values.md` §1. legacy 의 선언 데이터
-# `PREDICTION_CONSTRUCTION_SCENARIO_FLOOR_OFFSETS` 의 **추천(p50) = 0.0053** 를 bp 로
-# 옮긴 값이다(공격 p25 = 0.0016, 안전 p75 = 0.0148 — S1 은 공고당 금액 하나를 내므로
-# 가운데 값을 쓴다). 창을 보고 조정하지 않는다(우회 ②).
+# S1 규칙 앵커의 offset(bp) — D-6G-15 확정(A-4 「legacy 값 승계」). legacy 의 선언 데이터
+# `PREDICTION_CONSTRUCTION_SCENARIO_FLOOR_OFFSETS` 의 **추천(p50) = 0.0053** 을 bp 로
+# 옮긴 값이다(공격 p25 = 0.0016, 안전 p75 = 0.0148 — S1 은 공고당 금액 하나를 낸다).
+# 산식은 `하한율 + offset` 이고 E[R] 을 곱하지 않는다(legacy 가 그 변형을 기각했다).
+# 이 값은 legacy 가 **공사 정착행**에서 잰 것이라 S1 은 공사에서만 채점한다 —
+# 용역·물품은 기권으로 공시한다. 창을 보고 조정하지 않는다(우회 ②).
 strategy.s1_offset_bp: 53.0
 # S4 제도 분포 + 경쟁자 분포 몬테카를로. 난수는 판정 seed 에서만 오고 반복 수·격자는
 # 여기 고정한다(seed 쇼핑·격자 쇼핑 차단).
@@ -73,6 +74,24 @@ strategy.s4_iteration_count: 4000
 strategy.s4_grid_size: 41
 strategy.s4_grid_span_bp: 400.0
 strategy.s4_min_competitor_samples: 30
+
+# ── 표본 크기 결정식 (D-6G-20) ────────────────────────────────────────────────
+# 수집 호출 예산이 표본 크기를 정한다: 목록 호출 + 공고당 호출 x 표본 <= 상한.
+# Kotlin 레인이 수집 쪽에서 강제하고, Python 은 판정 JSON 에 입력과 결과를 공시한다.
+# `max_total_calls` 는 A-1 승인 범위 안의 수치(일 20,000 x 4일)다.
+sampling.list_call_count: 600
+sampling.calls_per_notice: 3
+sampling.max_total_calls: 80000
+# 최소 필요 표본 — 창당 하한 x 창 최소 수. 이보다 적으면 판정 대신 멈춘다.
+sampling.min_required_sample: 1449
+
+# ── 지자체 민감도 (D-6G-21) ──────────────────────────────────────────────────
+# 주 판정은 지자체를 가르지 못한 채로 낸다(판정 불가로 계수). 보조 민감도 둘을 함께
+# 낸다: (a) 예가 범위율이 넓은(지방 계열로 알려진 +-3%) 공고를 뺀 판 (b) 기관 코드
+# 접두로 지자체를 **추정**해 뺀 판. 접두 목록은 **비어 있다** — authoritative 대응을
+# 확보하지 못했고 지어내면 DEC-03 을 코드가 조용히 재정의한다. 비어 있는 동안 (b) 는
+# 주 판정과 같은 표본이고, 판정 JSON 이 「추정 불가」를 명시한다.
+sensitivity.wide_reserve_half_width: 0.025
 
 # ── P-4 제도 분포 적합도 ─────────────────────────────────────────────────────
 # 실험 앞에 돈다. 맞지 않으면 판정 대신 멈춤 결과를 낸다(scope.md 선행 조사 P-4).

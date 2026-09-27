@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-_BASE_AMOUNT = 1_000_000_000.0
+_BASE_AMOUNT = 1_000_000_000
 _FLOOR_RATE = 0.87745
 
 SHIPPED_BACKTEST_POLICY_PATH = (
@@ -28,16 +28,19 @@ def notice_payload(
     category: str = "SERVICE",
     noticed_on: str = "2026-06-01",
     bid_close_at: str = "2026-06-10T10:00:00+09:00",
-    base_amount: float = _BASE_AMOUNT,
+    base_amount: Any = _BASE_AMOUNT,
     floor_rate: float | None = _FLOOR_RATE,
     a_value: dict[str, Any] | None = None,
     successful_bid_method_code: str = "낙030001",
     successful_bid_method_name: str = "적격심사제-추정가격 2억원 미만인 용역",
     prearranged_price_decision_method: str = "복수예가",
     notice_ordinal: int = 1,
-    is_local_government: bool = False,
-    is_foreign_capital: bool = False,
-    pure_construction_cost: float | None = None,
+    progress_division: str | None = None,
+    procurement_class_code: str | None = None,
+    demand_agency_code: str | None = "A0001",
+    reserve_range_begin_rate: float | None = -0.02,
+    reserve_range_end_rate: float | None = 0.02,
+    pure_construction_cost: int | None = None,
 ) -> dict[str, Any]:
     return {
         "notice_key_hash": notice_key_hash(label),
@@ -46,15 +49,16 @@ def notice_payload(
         "bid_close_at": bid_close_at,
         "base_amount": base_amount,
         "floor_rate": floor_rate,
-        "reserve_range_begin_rate": -0.02,
-        "reserve_range_end_rate": 0.02,
+        "reserve_range_begin_rate": reserve_range_begin_rate,
+        "reserve_range_end_rate": reserve_range_end_rate,
         "a_value": a_value,
         "successful_bid_method_code": successful_bid_method_code,
         "successful_bid_method_name": successful_bid_method_name,
         "prearranged_price_decision_method": prearranged_price_decision_method,
         "notice_ordinal": notice_ordinal,
-        "is_local_government": is_local_government,
-        "is_foreign_capital": is_foreign_capital,
+        "progress_division": progress_division,
+        "procurement_class_code": procurement_class_code,
+        "demand_agency_code": demand_agency_code,
         "pure_construction_cost": pure_construction_cost,
     }
 
@@ -89,12 +93,12 @@ def outcome_payload(
     )
     return {
         "opened_on": opened_on,
-        "planned_price": planned_price,
-        "reserve_prices": None if prices_null else values,
+        "planned_price": int(planned_price),
+        "reserve_prices": None if prices_null else [int(value) for value in values],
         "drawn_serial_numbers": drawn_numbers,
         "participant_count": participant_count,
         "bidder_rows": [
-            {"rank": index + 1, "amount": amount}
+            {"ordinal": index + 1, "rank": index + 1, "amount": int(amount)}
             for index, amount in enumerate(sorted(amounts))
         ],
     }
