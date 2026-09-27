@@ -10,9 +10,9 @@
 | `./gradlew --no-daemon check` | BUILD SUCCESSFUL — 컴파일 · ktlint · detekt · sizeGate · 의존 방향 · architecture test · 계약 게이트 전부 |
 | `./gradlew --no-daemon qualityBaseline` | BUILD SUCCESSFUL(게이트가 아니라 측정) |
 | `./tools/one-command-check.sh` | 「Kotlin 전건 + Python 전건 통과」 |
-| `container` job 전 단계(S-21 · S-21a · S-21b · S-22a · S-22b · S-22c · S-23 · S-23b · S-24 · S-25) | 전부 통과 — 이미지 둘 빌드 · 위생 게이트 둘 · 거부 스모크(D-6A2a-10 표지) · compose 셋 healthy 수렴 · 스모크 열 축 · 실 서버 교차 test |
+| `container` job 전 단계(S-21 · S-21a · S-21b · S-22a · S-22b · S-22c · S-23 · S-23b · S-24 · S-25) | 전부 통과 — 이미지 둘 빌드 · 위생 게이트 둘 · 거부 스모크(D-6A2a-10 표지) · compose 셋 healthy 수렴 · 스모크 열 축 · 실 서버 교차 test. **실행 뒤 compose 를 내린다**(D-6G-55 — 띄워 둔 채로 두면 다음 사람이 그 job 을 못 돌린다) |
 
-실측 HEAD: `d9e0e985`(이 레인의 마지막 산출물 커밋 시점의 트리).
+실측 HEAD: `5832baea`(이 레인의 마지막 산출물 커밋 시점의 트리).
 
 ## 실 KONEPS 호출
 
@@ -101,6 +101,13 @@
 | D-6G-45 「시도 원장 — 저장소 밖, append-only」 | `AttemptLedger`·`FileAttemptLedger`·`RunStateDirectory` | 결말 셋 왕복 · 형태 위반 거부 · 디렉터리 부재·표본 변조 거부 |
 | D-6G-45 「이어 돌기 = 시도 원장 ∪ 원문 관측」 | `alreadyCollectedAxes` | 빈 응답 축이 다음 기동에서 다시 불리지 않는다(E2E) |
 | D-6G-45 「상한 seed = HTTP 시도 합(KST 일 경계)」 | `AttemptHistory.spend`·`openingCallBudget` | 두 번 기동하면 누적 · 재시도 호출도 실린다 · 원장 파일로 seed 실측 |
+| D-6G-47 「6G 의 모든 KONEPS 호출이 관문 하나를 지난다」 | `KonepsCallGate` · `collection.http-client.holders` 정확 집합 | 클라이언트를 쥔 자리 셋 등식(다른 클래스가 쥐면 RED) · 관문 계약 넷 |
+| D-6G-47 「상한의 하루는 KST」 | `COLLECTION_BUDGET_ZONE` | 시계를 **KST 자정 직후**에 두고 일 상한을 다 쓴 원장에서 시작(정오면 두 구역 날짜가 같아 못 잡는다) |
+| D-6G-48 「무결성 장부 넷」 | `RunStateDirectory` 의 `state.json` | 원장 삭제·절삭·부분 복사·장부 삭제 네 갈래 거부 |
+| D-6G-49 「재호출 금지 = 성공 ∪ 빈 응답」 | `AttemptHistory.settledAxes` · `AttemptOutcome.isSettled` | 실패·타임아웃은 다시 부른다는 test |
+| D-6G-50 「확정의 전제 셋」 | `SampleResolution.confirmFirst` · `sample-scope.json` | 절단 슬롯·빈 표본·범위 불일치 각각 거부 |
+| D-6G-51 「루트를 대상 경로에서」 | `requireOutsideRepository` | 기본 갈래를 지나는 test(인자를 주면 그 갈래를 지나지 않는다) |
+| D-6G-54 「canonical 결합에 시각 조건 없음」 | `OBSERVATION_SQL` 의 축 예외 | **행의 값**으로 잰다 — 계수로는 이 회귀가 드러나지 않는다 |
 | cr L r2 「전건 적재」 | `groupObservations`(표본 밖은 payload 를 펴기 전에 버린다) · `NOTICE_SQL` 의 `= ANY (?)` | 표본 밖 계수가 **키 수**라는 test(행 수로 세면 RED) |
 | D-6G-46 「업무 구분 예제 어휘」 | 스키마 §2.1 TSV 예제 | 생산 바이트(`SERVICE`)와 같은 어휘 — 판독은 이 칸을 세기만 하므로 문면 정정이다 |
 
@@ -187,6 +194,16 @@ fixture 를 쓴 사람이 기대한 모양을 fixture 가 다시 말해 주는 �
 | 실행 상태 디렉터리를 자동으로 만든다 | **RED** 2건 |
 | 표본 밖을 **행 수**로 센다(키 수가 아니라) | **RED** 3건 |
 | `NOTICE_SQL` 의 표본 필터를 지운다 | **RED** 3건 — 인자 없는 질의가 서지 않는다 |
+| 다른 클래스가 HTTP 클라이언트를 쥔다 | **RED** 2건 |
+| 관문이 호출 뒤 원장에 적지 않는다 | **RED** 3건 |
+| 관문의 하루를 UTC 로 센다 | **RED** 2건 |
+| 원장 해시·줄 수 검사를 뺀다 | **RED** 4건 |
+| 줄마다 장부를 갱신하지 않는다 | **RED** 4건 |
+| 절단 슬롯이 있어도 표본을 확정한다 | **RED** 2건 |
+| 빈 표본을 확정한다 | **RED** 2건 |
+| 확정 범위를 대조하지 않는다 | **RED** 2건 |
+| 루트를 cwd 에서 찾는다 | **RED** 3건 |
+| 창이 공고 목록 축까지 자른다 | **RED** 2건 |
 
 이 자리는 **처음에 잠겨 있지 않았다.** fixture 의 두 기초금액이 같은 값이라 어느 쪽을 써도 출력이 같아
 뒤바뀜이 드러나지 않았다(Python 레인이 자기 쪽에서 같은 함정을 겪고 알려 왔다). 둘을 다르게 둔 test 를
