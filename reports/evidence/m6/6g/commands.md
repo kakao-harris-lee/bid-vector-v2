@@ -150,7 +150,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
 | S-3 | `uv run mypy --strict src/ml_engine` | 소스 93개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1114 passed**(6G 추가분 포함) |
+| S-5 | `uv run python -m pytest tests -q` | **1119 passed**(6G 추가분 포함) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -182,6 +182,8 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | D-6G-19 기초금액 provenance 분리 | `AdmittedNotice.base_amount` / `opening_base_amount` · `StrategyInput.base_amount` | 두 값을 **다르게** 둔 공고에서 전략이 투찰 시점 칸을 쓰는지 |
 | D-6G-19 A값 공고 판정 | `rules.resolve_a_value` 의 `bid_price_formula_a_applicable` 분기 | 술어 거짓 → A=0 승인 · 술어 없음 → 제외 |
 | D-6G-22 채움률 여섯 칸 | `exclusions.fill_rates` | 판정 JSON 이 0.0 도 숨기지 않고 싣는다 |
+| D-6G-23 `snapshot-v2` 술어 칸 | `AValue.standard_market_price_applicable` | v1·v3 둘 다 거부 · `null` 수용 · 미지 키 거부 |
+| D-6G-17 배제의 영향 범위 | `exclusions.standard_market_price_scope` | 참·판정 불가·분모 셋을 따로 |
 | D-6G-20 표본 크기 결정식 | `records.SamplingRecord` · `policy.SamplingBudget` | 예산 초과 시 멈춤 |
 | D-6G-21 판정 불가와 민감도 둘 | `UndecidableAxis` · `SampleVariant` | 판 셋의 순서 · `estimate_available` |
 | D-6G-22 낙찰방법 채움률 | `exclusions.bid_method_fill_rate` | 판정 JSON 에 실림 |
@@ -205,6 +207,10 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | M9 | A 적용 여부 술어를 무시(항상 A값 공고로 취급) | **1 failed** |
 | M10 | 전략이 개찰 출처 기초금액을 씀 | **처음엔 살아남았다** — 아래 |
 
+| M11 | 술어를 무시하고 A 값 공고 전량을 셈 | **1 failed** |
+| M12 | 판정 불가를 참으로 접음 | **1 failed** |
+| M13 | `snapshot-v1` 을 조용히 받아들임 | **78 failed**(판독기 전역) |
+
 **M10 이 드러낸 것**: 두 기초금액이 같은 fixture 에서는 어느 쪽을 써도 test 가 통과해
 provenance 분리가 잠기지 않았다. 두 값을 **다르게** 둔 공고를 만드는 test 를 더해 RED 로
 만들었다(재측정 **1 failed**, 복원 251 passed). 변이가 살아남은 것 자체가 산출물이다.
@@ -220,9 +226,10 @@ provenance 분리가 잠기지 않았다. 두 값을 **다르게** 둔 공고를
 
 ## 이탈
 
-- **`smkpAmt` 술어 계수는 아직 낼 수 없다.** D-6G-23 이 칸을 더하기로 했고 Kotlin 레인이 채운다 —
-  그 칸은 `schema_version` 을 올리며 오므로, **오늘 판독기는 그 스냅숏을 `UNSUPPORTED_SCHEMA_VERSION`
-  으로 거부한다**(fail-closed 가 의도대로 동작하는 것이고, 두 레인이 같이 움직여야 한다는 신호다).
-  그때까지 `limitations` 에 `STANDARD_MARKET_PRICE_PREDICATE_NOT_IN_SNAPSHOT` 로 싣는다.
+- **`smkpAmt` 배제의 「크기」는 여전히 못 잰다(계수는 낸다).** D-6G-23 의 술어 칸이 `snapshot-v2` 로
+  들어와 **영향 범위**(참 공고 수·판정 불가 수·분모)는 공시한다. 하지만 「A 가 얼마나 달라지는가」는
+  `smkpAmt` 의 **금액**이 스냅숏에 없어 모른다 — `limitations` 의
+  `STANDARD_MARKET_PRICE_MAGNITUDE_UNMEASURED` 가 그 한계를 매번 싣는다. 금액 칸은 또 한 번의
+  `schema_version` 인상이라 이 판에서 하지 않았다(계약이 요구한 것은 계수다).
 - **파생 정책으로 재현 test 를 돈다**(위 §4 주석). 출하 임계로 돌리면 CI 가 수 분을 잡는다.
   판정식 축은 출하 값 그대로이고 그 목록을 test 가 단언한다.
