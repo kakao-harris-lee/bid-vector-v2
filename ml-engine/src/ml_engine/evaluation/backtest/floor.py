@@ -47,6 +47,14 @@ def is_eligible(amount: float, floors: tuple[float, ...]) -> bool:
     return all(amount >= threshold for threshold in floors)
 
 
+_BASIS_POINT_SCALE = 10_000.0
+
+
 def basis_points_above(amount: float, reference: float) -> float:
-    """기준 대비 bp — `(금액 ÷ 기준 - 1) * 10⁴`. 지표 ②(D-6G-4)의 유일 정의."""
-    return (amount / reference - 1.0) * 10_000.0
+    """기준 대비 bp — `(금액 ÷ 기준 - 1) * 10^4`. 지표 ②(D-6G-4)의 유일 정의."""
+    return (amount / reference - 1.0) * _BASIS_POINT_SCALE
+
+
+def rate_from_basis_points(basis_points: float) -> float:
+    """bp -> 비율. `basis_points_above` 의 역이고 같은 눈금을 쓴다(정의 단일 지점)."""
+    return basis_points / _BASIS_POINT_SCALE

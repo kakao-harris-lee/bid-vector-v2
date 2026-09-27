@@ -41,6 +41,7 @@ def _scanned_paths() -> list[Path]:
 def _key(path: Path) -> str:
     return path.relative_to(_EVALUATION_SRC).as_posix()
 
+
 _ALLOWED: frozenset[tuple[str, float]] = frozenset(
     {
         ("baselines.py", 0.0),  # group_mean_predictions 카운터 초기값(total, count)
@@ -78,6 +79,14 @@ _ALLOWED: frozenset[tuple[str, float]] = frozenset(
             "backtest/policy.py",
             32,
         ),  # _MAX_INDEXED_LIST_LENGTH — 평탄 인덱스 키 상한(정적 구조 상수)
+        ("backtest/institution.py", 0),  # digitize 구간 인덱스 하한(clip)
+        ("backtest/institution.py", 1),  # 구간 경계 슬라이스·bin_count-1 상한
+        ("backtest/institution.py", 1.0),  # 사정률 1 기준(예가 범위는 1 둘레의 비율)
+        ("backtest/strategies.py", 0),  # 표본 없음·경쟁자 0 비교
+        ("backtest/strategies.py", 1),  # 자신을 뺀 경쟁자 수(n-1)·중앙값 인덱스
+        ("backtest/strategies.py", 1.0),  # 비율 1 기준(밴드 상·하단, E[R] 중점)
+        ("backtest/strategies.py", 2),  # 중앙값 인덱스 나눗셈
+        ("backtest/strategies.py", 2.0),  # _HALF — 반폭·중점의 정의(구조 상수)
     }
 )
 

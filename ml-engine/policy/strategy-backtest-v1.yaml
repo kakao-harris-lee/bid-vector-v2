@@ -61,9 +61,12 @@ effective.service: "2026-05-26"
 effective.goods: "2026-05-29"
 
 # ── 전략 상수 ────────────────────────────────────────────────────────────────
-# S1 규칙 앵커의 offset(bp). 값의 출처는 `reports/evidence/m6/6g/policy-values.md` —
-# 창을 보고 조정하지 않는다(우회 ②).
-strategy.s1_offset_bp: 0.0
+# S1 규칙 앵커의 offset(bp) — A-4 「legacy 값 승계」. 출처 좌표와 승계 판단은
+# `reports/evidence/m6/6g/policy-values.md` §1. legacy 의 선언 데이터
+# `PREDICTION_CONSTRUCTION_SCENARIO_FLOOR_OFFSETS` 의 **추천(p50) = 0.0053** 를 bp 로
+# 옮긴 값이다(공격 p25 = 0.0016, 안전 p75 = 0.0148 — S1 은 공고당 금액 하나를 내므로
+# 가운데 값을 쓴다). 창을 보고 조정하지 않는다(우회 ②).
+strategy.s1_offset_bp: 53.0
 # S4 제도 분포 + 경쟁자 분포 몬테카를로. 난수는 판정 seed 에서만 오고 반복 수·격자는
 # 여기 고정한다(seed 쇼핑·격자 쇼핑 차단).
 strategy.s4_iteration_count: 4000
