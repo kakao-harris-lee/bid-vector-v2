@@ -5,7 +5,7 @@
 > 문서를 먼저 고친다 — 한쪽만 바꾸지 않는다.
 > 스냅숏 실물은 **저장소 밖**(`~/.local/bid-vector-snapshots/<snapshot_id>/`)에 둔다(data-extract §7 · ADR 0010 D-8).
 
-`schema_version`: `snapshot-v1` · 파일 둘: `manifest.json` · `rows.jsonl`
+`schema_version`: **`snapshot-v2`** · 파일 둘: `manifest.json` · `rows.jsonl`
 
 ## 0. 왜 한 행이 두 반쪽인가
 
@@ -28,7 +28,7 @@
 ## 2. `manifest.json`
 
 ```json
-{ "schema_version": "snapshot-v1", "snapshot_id": "…", "row_count": 24000,
+{ "schema_version": "snapshot-v2", "snapshot_id": "…", "row_count": 24000,
   "period_start": "2026-02-06", "period_end": "2026-09-26",
   "rows_sha256": "…", "sample_list_sha256": "…" }
 ```
@@ -57,7 +57,7 @@
 | `floor_rate` | number \| **null** | fraction(percent ÷ 100) |
 | `reserve_range_begin_rate` | number \| null | fraction. 원문은 **% 이고 부호가 문자열 안**에 있다(`-3`) — 추출이 선행 `+` 를 허용해 파싱하고 100 으로 나눈다 |
 | `reserve_range_end_rate` | number \| null | fraction(`+3` → `0.03`). **시작률의 반대수라는 보장이 없다** — 비대칭 범위를 지원하라 |
-| `a_value` | `{total:int, open_at:datetime}` \| null | `total` 의 합산 규칙은 §3.3 |
+| `a_value` | `{total:int, open_at:datetime, standard_market_price_applicable:bool\|null}` \| null | `total` 의 합산 규칙은 §3.3 |
 | `successful_bid_method_code` | string \| null | `sucsfbidMthdCd` — 문서상 옵션이라 부재 가능 |
 | `successful_bid_method_name` | string \| null | `sucsfbidMthdNm` — 같음 |
 | `prearranged_price_decision_method` | string \| null | `prearngPrceDcsnMthdNm` — A 오퍼레이션에서만 오므로 그 호출이 없으면 부재 |
@@ -118,8 +118,19 @@
 따로 주지만 **그 술어가 여는 근거 예규 문면을 확보하지 못했다**.
 
 > **이 배제의 방향을 오해하지 마라.** 하한가는 A 에 대해 **증가**한다(`∂/∂A = 1 − r > 0`). A 를 작게 잡으면
-> 하한가가 낮아져 **적격이 더 쉽게** 나온다 — 즉 이 배제는 보수적인 쪽이 **아니다**. `smkpAmtYn` 이 참인 공고의
-> 수를 따로 세어 판정문에 싣는다(영향 범위를 숨기지 않는다).
+> 하한가가 낮아져 **적격이 더 쉽게** 나온다 — 즉 이 배제는 보수적인 쪽이 **아니다**.
+
+**`a_value.standard_market_price_applicable`**(D-6G-23, `snapshot-v2` 에서 신설) — `smkpAmtYn` 의 원문 술어를
+불리언으로 나른다. 출처는 기초금액 조회(공사 op 6)이고, `Y`/`N` 밖의 값이나 부재는 `null`(판정 불가)이다.
+**이 칸이 있어야 배제의 영향 범위를 셀 수 있다** — 없으면 「몇 건이 이 배제에 걸리는가」를 판정문이 말하지
+못한다(D-6G-17 이 그 공시를 요구한다).
+
+`a_value` 가 `null` 인 공고에는 이 술어도 없다. 그것이 옳다 — 배제는 A 의 합산액에만 영향을 주므로, A 자체가
+없는 공고는 애초에 영향 범위 밖이다. 계수의 분모는 **A 값을 가진 공고**다.
+
+> **계수는 범위이지 크기가 아니다.** 「몇 건이 걸리는가」는 알 수 있지만 「A 가 얼마나 달라지는가」는 모른다 —
+> `smkpAmt` 의 **금액**을 스냅숏이 싣지 않기 때문이다. 크기까지 재려면 그 금액 칸이 필요하고, 그것은 또 한 번의
+> `schema_version` 인상이다(지금 판에서는 하지 않는다 — 계약이 요구한 것은 계수다).
 
 ## 4. D-6G-13 제외 열다섯 — 판정은 Python 레인이, 입력은 Kotlin 레인이
 
