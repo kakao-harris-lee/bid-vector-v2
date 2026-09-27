@@ -1,5 +1,6 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.CallSpend
 import java.time.LocalDate
 
 /** 어느 한도가 물었는가 — 「멈췄다」만으로는 다음 날 다시 돌려도 되는지를 알 수 없다. */
@@ -43,13 +44,15 @@ data class CollectionCallBudget(
 class CallBudgetLedger(
     private val budget: CollectionCallBudget,
     startDay: LocalDate,
+    /** 실행 **이전에** 이미 쓴 몫(D-6G-29 ① — 영속 원장에서 seed). 없으면 0 에서 시작한다. */
+    alreadySpent: CallSpend = CallSpend(total = 0, today = 0),
 ) {
     private var day: LocalDate = startDay
 
-    var spentToday: Int = 0
+    var spentToday: Int = alreadySpent.today
         private set
 
-    var spentTotal: Int = 0
+    var spentTotal: Int = alreadySpent.total
         private set
 
     /**
@@ -62,13 +65,16 @@ class CallBudgetLedger(
         onDay: LocalDate,
         calls: Int,
     ) {
-        require(calls >= 0) { "정산 호출 수는 음수일 수 없다: $calls" }
+        // **음수를 던지지 않고 0 으로 접는다.** 한 페이지도 못 받은 배치(첫 페이지에서 rate limiter 가
+        // 허가를 거부하면 난다 — 운영 중 거의 확실히 밟는다)가 `pagesFetched - 1 = -1` 로 들어오면,
+        // 던지는 순간 **이미 실 호출을 쓴 run 이 통째로 죽는다**(code-review H-4).
+        val settled = maxOf(calls, 0)
         if (onDay != day) {
             day = onDay
             spentToday = 0
         }
-        spentToday += calls
-        spentTotal += calls
+        spentToday += settled
+        spentTotal += settled
     }
 
     fun consume(

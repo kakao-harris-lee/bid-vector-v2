@@ -34,7 +34,8 @@ internal class ScriptedOpeningPort(
         cursor: PageCursor?,
     ): SourceBatch<RawNoticeObservation> {
         listCalls += referenceDate.date
-        val numbers = listScript[referenceDate.date].orEmpty()
+        // 한 장도 못 받은 배치에는 항목이 없다 — 페이지를 못 받았는데 행이 오는 모양은 실물에 없다.
+        val numbers = if (listPagesFetched == 0) emptyList() else listScript[referenceDate.date].orEmpty()
         val items = numbers.map { openingListObservation(it) }
         return SourceBatch(
             items,
@@ -92,9 +93,26 @@ private fun observationOf(
         COLLECTION_NOW,
     )
 
+/**
+ * 이어 돌기 입력 — [completedAxes] 에 든 축은 **표본 전부**가 이미 받은 것으로 본다. 공고를 골라
+ * 지정하지 않는 이유는 표본이 seed 로 정해져 test 가 어느 공고가 뽑힐지에 기대면 안 되기 때문이다
+ * (그리고 공고번호는 canonical 화에서 대문자가 된다 — 원문으로 맞추면 조용히 빗나간다).
+ */
+internal class FakeCollectedAxisStore(
+    private val completedAxes: Set<SourceEndpoint> = emptySet(),
+) : bidvector.procurement.CollectedAxisStore {
+    override fun alreadyCollected(
+        endpoint: SourceEndpoint,
+        noticeIds: Collection<bidvector.procurement.NoticeId>,
+    ): Set<bidvector.procurement.NoticeId> = if (endpoint in completedAxes) noticeIds.toSet() else emptySet()
+}
+
 internal class OpeningFixture(
     targetPerStratum: Int,
     private val budget: CollectionCallBudget = CollectionCallBudget(perDay = 20_000, total = 80_000),
+    private val alreadySpent: bidvector.procurement.CallSpend =
+        bidvector.procurement.CallSpend(total = 0, today = 0),
+    collectedAxes: bidvector.procurement.CollectedAxisStore = FakeCollectedAxisStore(),
 ) {
     val raw = RecordingRawStore()
     val runs = RecordingRunStore()
@@ -114,6 +132,7 @@ internal class OpeningFixture(
             sampler = StratifiedSampler(SamplingSeed("6g-test-seed"), targetPerStratum),
             policyFor = { COLLECTION_POLICY },
             gates = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48),
+            collectedAxes = collectedAxes,
             clock = Clock { COLLECTION_NOW },
         )
 
@@ -134,7 +153,7 @@ internal class OpeningFixture(
     }
 
     fun run(): OpeningCollectionReport =
-        useCase.collect(range(), sources, CallBudgetLedger(budget, COLLECTION_BUDGET_DAY))
+        useCase.collect(range(), sources, CallBudgetLedger(budget, COLLECTION_BUDGET_DAY, alreadySpent))
 
     fun plan(): SampleOutcome = useCase.plan(range(), sources).sample
 

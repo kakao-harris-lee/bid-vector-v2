@@ -4,6 +4,8 @@ import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
 import bidvector.adapters.koneps.KonepsSourceConfig
 import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.koneps.konepsOpeningResultSourceByNoticeDate
+import bidvector.adapters.persistence.JdbcCollectedAxisStore
+import bidvector.adapters.persistence.JdbcCollectionCallLedgerStore
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcRawObservationStore
 import bidvector.app.collection.CollectionLog
@@ -14,6 +16,8 @@ import bidvector.app.collection.KonepsOpeningEndpointProperties
 import bidvector.app.collection.KonepsOpeningOperationProperties
 import bidvector.app.collection.OpeningCollectionProperties
 import bidvector.app.collection.OpeningCollectionRunner
+import bidvector.procurement.CollectedAxisStore
+import bidvector.procurement.CollectionCallLedgerStore
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
@@ -32,6 +36,7 @@ import bidvector.workflow.collection.StratifiedSampler
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -72,16 +77,38 @@ open class OpeningCollectionWiring {
         clock: Clock,
     ): CollectionRange = resolveCollectionRange(properties.from, properties.to, clock, "공고일 범위")
 
-    /** A-1 승인 상한 — 두 값 모두 설정이 준다(`CollectionCallBudget` 이 0·역전을 기동 시점에 거부한다). */
+    /**
+     * 두 저장소는 `@ConditionalOnMissingBean` 이다 — 배선 조건 test 가 DB 없이 기동 조건만 재도록
+     * 대체 빈을 먼저 등록할 수 있게 한다. 출하에서는 이 자리를 덮는 빈이 없어 JDBC 구현이 선다.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    open fun collectionCallLedgerStore(dataSource: DataSource): CollectionCallLedgerStore =
+        JdbcCollectionCallLedgerStore(dataSource)
+
+    @Bean
+    @ConditionalOnMissingBean
+    open fun collectedAxisStore(dataSource: DataSource): CollectedAxisStore = JdbcCollectedAxisStore(dataSource)
+
+    /**
+     * A-1 승인 상한 — 두 값 모두 설정이 준다. 원장은 **영속에서 seed** 한다(D-6G-29 ①): 승인된 총
+     * 상한은 3~4일에 걸친 여러 실행을 덮으므로, 매 기동마다 0 에서 시작하면 그 상한이 실제로는
+     * 아무것도 막지 못한다.
+     */
     @Bean
     open fun openingCallBudget(
         properties: OpeningCollectionProperties,
+        ledger: CollectionCallLedgerStore,
         clock: Clock,
-    ): CallBudgetLedger =
-        CallBudgetLedger(
+    ): CallBudgetLedger {
+        val today = LocalDate.ofInstant(clock.now(), OPENING_DATE_ZONE)
+        val spent = ledger.spentSince(properties.budgetSince, today.atStartOfDay(OPENING_DATE_ZONE).toInstant())
+        return CallBudgetLedger(
             CollectionCallBudget(properties.callsPerDay, properties.callsTotal),
-            LocalDate.ofInstant(clock.now(), OPENING_DATE_ZONE),
+            today,
+            spent,
         )
+    }
 
     @Bean
     open fun openingSampler(properties: OpeningCollectionProperties): StratifiedSampler =
@@ -129,6 +156,7 @@ open class OpeningCollectionWiring {
         properties: OpeningCollectionProperties,
         range: CollectionRange,
         sampler: StratifiedSampler,
+        collectedAxes: CollectedAxisStore,
         clock: Clock,
     ): CollectOpeningResultsUseCase {
         val policy = collectionPolicyAt(CollectionReferenceDate(range.to))
@@ -138,6 +166,7 @@ open class OpeningCollectionWiring {
             sampler = sampler,
             policyFor = ::collectionPolicyAt,
             gates = policy.detailFetchGates,
+            collectedAxes = collectedAxes,
             clock = clock,
         )
     }

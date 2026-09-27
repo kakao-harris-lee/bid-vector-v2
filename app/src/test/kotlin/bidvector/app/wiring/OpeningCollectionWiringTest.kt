@@ -2,6 +2,11 @@ package bidvector.app.wiring
 
 import bidvector.app.collection.OpeningCollectionRunner
 import bidvector.app.collection.SnapshotExtractionRunner
+import bidvector.procurement.CallSpend
+import bidvector.procurement.CollectedAxisStore
+import bidvector.procurement.CollectionCallLedgerStore
+import bidvector.procurement.NoticeId
+import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.CallBudgetLedger
 import bidvector.workflow.collection.StratifiedSampler
 import bidvector.workflow.strategy.Clock
@@ -22,6 +27,20 @@ import javax.sql.DataSource
  * 켜졌을 때 **승인 값이 하나라도 없으면 기동하지 않는다**: 호출 상한·표본 seed·층당 목표에 기본값을
  * 두지 않았다는 것이 실제로 기동을 막는지를 여기서 잰다(기본값 부재는 선언이 아니라 거동이어야 한다).
  */
+private object StubLedgerStore : CollectionCallLedgerStore {
+    override fun spentSince(
+        since: java.time.Instant,
+        dayStart: java.time.Instant,
+    ): CallSpend = CallSpend(total = 0, today = 0)
+}
+
+private object StubAxisStore : CollectedAxisStore {
+    override fun alreadyCollected(
+        endpoint: SourceEndpoint,
+        noticeIds: Collection<NoticeId>,
+    ): Set<NoticeId> = emptySet()
+}
+
 class OpeningCollectionWiringTest {
     private val fixedNow = Instant.parse("2026-09-24T03:00:00Z")
 
@@ -35,6 +54,7 @@ class OpeningCollectionWiringTest {
             "bidvector.opening-collection.target-per-stratum=2",
             "bidvector.opening-collection.calls-per-day=100",
             "bidvector.opening-collection.calls-total=1000",
+            "bidvector.opening-collection.budget-since=2026-01-01T00:00:00Z",
             "bidvector.koneps.service-key=WIRING-TEST-KEY",
         )
 
@@ -46,6 +66,9 @@ class OpeningCollectionWiringTest {
     private fun boot(vararg properties: String): Booted {
         val context = AnnotationConfigApplicationContext()
         TestPropertyValues.of(*properties).applyTo(context)
+        // DB 없이 기동 **조건**만 잰다 — 저장소 둘을 대체 빈으로 먼저 세운다(출하에서는 JDBC 구현).
+        context.registerBean(CollectionCallLedgerStore::class.java, Supplier { StubLedgerStore })
+        context.registerBean(CollectedAxisStore::class.java, Supplier { StubAxisStore })
         context.register(OpeningCollectionWiring::class.java)
         context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
@@ -90,6 +113,11 @@ class OpeningCollectionWiringTest {
     fun `표본 정책이 없으면 기동하지 않는다 — seed 와 층당 목표 둘 다`() {
         bootWithout("bidvector.opening-collection.sampling-seed").failure shouldNotBe null
         bootWithout("bidvector.opening-collection.target-per-stratum").failure shouldNotBe null
+    }
+
+    @Test
+    fun `예산 시작 시점이 없으면 기동하지 않는다 — 어느 시점부터 상한을 세는지를 지어내지 않는다`() {
+        bootWithout("bidvector.opening-collection.budget-since").failure shouldNotBe null
     }
 
     @Test

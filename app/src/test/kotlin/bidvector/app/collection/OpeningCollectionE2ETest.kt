@@ -9,8 +9,10 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.ints.shouldBeGreaterThan
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -23,6 +25,7 @@ import org.springframework.context.ApplicationListener
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import java.sql.ResultSet
+import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
 
@@ -91,6 +94,10 @@ class OpeningCollectionE2ETest {
                         "bidvector.opening-collection.target-per-stratum" to TARGET_PER_STRATUM.toString(),
                         "bidvector.opening-collection.calls-per-day" to "1000",
                         "bidvector.opening-collection.calls-total" to "1000",
+                        // **test 마다 다른 예산 시작 시점.** 원장이 영속이라(D-6G-29 ①) 앞 test 가
+                        // 남긴 collection_run 행이 다음 test 의 상한을 갉아먹는다 — 그것이 영속이
+                        // 실제로 동작한다는 증거이기도 하다.
+                        "bidvector.opening-collection.budget-since" to Instant.now().toString(),
                         "bidvector.koneps.service-key" to SERVICE_KEY,
                         "bidvector.koneps.base-url" to mock.baseUrl,
                         "bidvector.koneps.opening.scsbid-base-url" to mock.baseUrl,
@@ -159,20 +166,31 @@ class OpeningCollectionE2ETest {
     }
 
     @Test
-    fun `호출 상한에 닿으면 멈추고 종료 코드가 미완이다`() {
+    fun `호출 상한에 닿으면 멈추고 종료 코드가 미완이며 반만 받은 공고가 없다`() {
         val (exitCodes, mock) =
             bootAndRun(
                 mapOf(
-                    // 일 상한만 낮춘다 — 총 상한을 같이 낮추면 TOTAL 이 먼저 물어 어느 한도인지가 바뀐다.
-                    "bidvector.opening-collection.calls-per-day" to "4",
+                    // 일 상한만 낮춘다 — 총 상한을 같이 낮추면 TOTAL 이 먼저 물어 사유가 바뀐다.
+                    "bidvector.opening-collection.calls-per-day" to "6",
                     "bidvector.opening-collection.calls-total" to "1000",
                 ),
             )
 
         exitCodes shouldContainExactly listOf(CollectionExitCode.INCOMPLETE.value)
-        // 목록 둘 + 상세 둘까지만 나가고 멈춘다.
-        (mock.listCalls.size + mock.detailCallCount()) shouldBe 4
         val captured = logs.list.joinToString("\n") { it.formattedMessage }
         captured shouldContain "opening-collection halted budgetLimit=DAILY"
+        // 상한을 넘겨 쓰지 않는다. **정확한 수를 고정하지 않는다** — 표본 순서가 공고 키 해시로
+        // 정해지고 mock 의 번호에 실행마다 다른 표식이 들어가, 먼저 뽑히는 층(공사 4축·용역 3축)이
+        // 실행마다 달라진다. 계약은 「넘겨 쓰지 않는다」이지 「정확히 6 이다」가 아니다.
+        (mock.listCalls.size + mock.detailCallCount()) shouldBeLessThanOrEqual 6
+        // **반만 받은 공고가 없다**(D-6G-29 ④) — 상세를 하나라도 받은 공고는 자기 축 전부를 받았다.
+        val touched =
+            (mock.reservePriceNotices + mock.openingCompleteNotices + mock.baseAmountNotices).toSet()
+        touched.forEach { notice ->
+            mock.reservePriceNotices shouldContain notice
+            mock.openingCompleteNotices shouldContain notice
+            mock.baseAmountNotices shouldContain notice
+            if (notice.contains("CNSTWK")) mock.formulaANotices shouldContain notice
+        }
     }
 }

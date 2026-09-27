@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 
@@ -20,6 +21,12 @@ import java.util.concurrent.Executors
 internal class MockOpeningKonepsHttp(
     private val noticesPerSlot: Int,
     private val bidderName: String,
+    /**
+     * 공고번호를 **이 mock 인스턴스마다 다르게** 만드는 표식. 같은 컨테이너를 쓰는 앞 test 가 같은
+     * 번호를 이미 적재하면 이어 돌기(D-6G-29 ③)가 전 축을 건너뛰어, 뒤 test 가 재려는 거동이
+     * 사라진다 — 그 건너뜀 자체는 옳은 동작이라 번호를 갈라 둔다.
+     */
+    private val nonce: String = newNonce(),
 ) : AutoCloseable {
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
 
@@ -87,7 +94,7 @@ internal class MockOpeningKonepsHttp(
                 (1..noticesPerSlot)
                     .map { index ->
                         mapOf(
-                            "bidNtceNo" to "OPEN-E2E-$suffix-%04d".format(index),
+                            "bidNtceNo" to "OPEN-E2E-$nonce-$suffix-%04d".format(index),
                             "bidNtceOrd" to "000",
                             "prtcptCnum" to "7",
                         )
@@ -158,3 +165,12 @@ internal class MockOpeningKonepsHttp(
     private fun objectJson(fields: Map<String, String>): String =
         fields.entries.joinToString(",", "{", "}") { (key, value) -> "\"$key\":\"$value\"" }
 }
+
+private fun newNonce(): String =
+    UUID
+        .randomUUID()
+        .toString()
+        .take(NONCE_LENGTH)
+        .uppercase()
+
+private const val NONCE_LENGTH = 8

@@ -1,5 +1,6 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.CallSpend
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
@@ -53,6 +54,34 @@ class CollectionCallBudgetTest {
         ledger.consume(DAY, 3).shouldBeInstanceOf<BudgetOutcome.Exhausted>()
 
         ledger.spentToday shouldBe 3
+    }
+
+    @Test
+    fun `첫 페이지 throttle 경로 — 한 장도 못 받은 배치의 정산이 실행을 죽이지 않는다`() {
+        val ledger = CallBudgetLedger(CollectionCallBudget(perDay = 10, total = 100), DAY)
+        ledger.consume(DAY, 1)
+
+        // rate limiter 가 첫 페이지에서 허가를 거부하면 `pagesFetched = 0` 인 배치가 온다 —
+        // 호출부는 `pagesFetched - 1` 을 정산하므로 `-1` 이 들어온다. 던지면 **이미 실 호출을 쓴
+        // run 이 통째로 죽는다**(code-review H-4). 0 으로 접는다.
+        ledger.settle(DAY, -1)
+
+        ledger.spentToday shouldBe 1
+        ledger.spentTotal shouldBe 1
+    }
+
+    @Test
+    fun `이미 쓴 몫으로 seed 되면 그 값에서 이어 센다 — 실행 사이에 상한이 이어진다`() {
+        val ledger =
+            CallBudgetLedger(
+                CollectionCallBudget(perDay = 10, total = 100),
+                DAY,
+                CallSpend(total = 40, today = 9),
+            )
+
+        ledger.spentTotal shouldBe 40
+        ledger.consume(DAY, 1).shouldBeInstanceOf<BudgetOutcome.Allowed>()
+        ledger.consume(DAY, 1).shouldBeInstanceOf<BudgetOutcome.Exhausted>()
     }
 
     @Test

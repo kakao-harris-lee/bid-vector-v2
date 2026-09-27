@@ -1,7 +1,9 @@
 package bidvector.workflow.collection
 
 import bidvector.procurement.BusinessDivision
+import bidvector.procurement.CollectedAxisStore
 import bidvector.procurement.CollectionReferenceDate
+import bidvector.procurement.CollectionRunMeta
 import bidvector.procurement.CollectionRunStore
 import bidvector.procurement.DetailFetchDecision
 import bidvector.procurement.DetailFetchGates
@@ -11,12 +13,13 @@ import bidvector.procurement.OpeningResultSourcePort
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.RawObservationStore
 import bidvector.procurement.SourceBatch
+import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
 import bidvector.procurement.decideDetailFetch
+import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZoneOffset
 
 /**
  * 6G 수집 갈래가 부르는 업무 하나 — 이름·대분류·포트. 대분류는 **포트가 아니라 여기**가 안다:
@@ -79,7 +82,14 @@ private fun detailAxesFor(division: BusinessDivision): List<DetailAxis> =
         }
     }
 
-private enum class DetailAxis { RESERVE_PRICE, OPENING_COMPLETE, BASE_AMOUNT, BID_PRICE_FORMULA_A }
+private enum class DetailAxis(
+    val endpoint: SourceEndpoint,
+) {
+    RESERVE_PRICE(SourceEndpoint.RESERVE_PRICE_DETAIL),
+    OPENING_COMPLETE(SourceEndpoint.OPENING_COMPLETE),
+    BASE_AMOUNT(SourceEndpoint.BASE_AMOUNT_DETAIL),
+    BID_PRICE_FORMULA_A(SourceEndpoint.BID_PRICE_FORMULA_A),
+}
 
 private fun DetailAxis.fetch(
     port: OpeningResultSourcePort,
@@ -112,10 +122,11 @@ private fun DetailAxis.fetch(
  */
 class CollectOpeningResultsUseCase(
     private val rawObservations: RawObservationStore,
-    runs: CollectionRunStore,
+    private val runs: CollectionRunStore,
     private val sampler: StratifiedSampler,
     policyFor: (CollectionReferenceDate) -> KonepsCollectionPolicyData,
     private val gates: DetailFetchGates,
+    private val collectedAxes: CollectedAxisStore,
     private val clock: Clock,
 ) {
     private val framer = OpeningSampleFramer(rawObservations, runs, policyFor, clock)
@@ -151,9 +162,11 @@ class CollectOpeningResultsUseCase(
         budget: CallBudgetLedger,
     ): OpeningCollectionReport {
         val byKey = framing.candidates.associateBy { it.candidate.key }
+        val done = alreadyCollectedAxes(sample.selected.map { byKey.getValue(it).id })
         var detailCalls = 0
         for ((index, key) in sample.selected.withIndex()) {
-            when (val step = fetchDetails(byKey.getValue(key), budget)) {
+            val picked = byKey.getValue(key)
+            when (val step = fetchDetails(picked, budget, done[picked.id].orEmpty())) {
                 is DetailStep.Done -> {
                     detailCalls += step.calls
                 }
@@ -167,41 +180,77 @@ class CollectOpeningResultsUseCase(
         return OpeningCollectionReport(framing.candidates.size, sample, detailCalls, halted = null)
     }
 
+    /**
+     * 한 공고의 상세 축 전부 — **통째로 허가되거나 통째로 거부된다**(D-6G-29 ④). 남은 몫만큼 반만
+     * 부르면 그 공고는 결측이 랜덤이 아니라 예산 경계에 걸려 생기고, 표본이 비뚤어진다.
+     *
+     * 이미 받은 축은 **예산에서도 빼고 부르지도 않는다**(③ 이어 돌기) — 멈췄다 다시 돌 때 같은 호출을
+     * 두 번 쓰지 않는다. 남은 축이 없으면 예산을 한 번도 묻지 않는다.
+     */
     private fun fetchDetails(
         picked: Candidate,
         budget: CallBudgetLedger,
+        alreadyDone: Set<DetailAxis>,
     ): DetailStep {
         val today = executionDay()
+        val remaining = detailAxesFor(picked.source.division).filterNot { it in alreadyDone }
+        val permit = if (remaining.isEmpty()) BudgetOutcome.Allowed else budget.consume(today, remaining.size)
+        return when (permit) {
+            BudgetOutcome.Allowed -> {
+                runAxes(picked, budget, remaining, today)
+            }
+
+            is BudgetOutcome.Exhausted -> {
+                DetailStep.Halted(OpeningCollectionHalt(permit.limit, null, notAttempted = 0), 0)
+            }
+        }
+    }
+
+    private fun runAxes(
+        picked: Candidate,
+        budget: CallBudgetLedger,
+        axes: List<DetailAxis>,
+        today: LocalDate,
+    ): DetailStep {
         var calls = 0
         var halt: OpeningCollectionHalt? = null
-        val axes = detailAxesFor(picked.source.division)
         var index = 0
         while (halt == null && index < axes.size) {
-            val outcome = fetchAxis(axes[index], picked, budget, today)
-            calls += outcome.calls
-            halt = outcome.halt
+            val batch = axes[index].fetch(picked.source.port, fetchEvidence(picked.id))
+            // 이미 한 장은 `consume` 이 셌다 — 나머지 페이지만 정산한다(음수는 `settle` 이 0 으로 접는다).
+            budget.settle(today, batch.accounting.pagesFetched - 1)
+            calls++
+            batch.items.forEach(rawObservations::append)
+            recordDetailRun(batch, axes[index])
+            if (batch.accounting.truncationCause == TruncationCause.QuotaExhausted) {
+                halt = OpeningCollectionHalt(null, TruncationCause.QuotaExhausted, notAttempted = 0)
+            }
             index++
         }
         return halt?.let { DetailStep.Halted(it, calls) } ?: DetailStep.Done(calls)
     }
 
-    /** 상세 축 하나 — 예산이 막으면 호출 0, 쿼터가 나면 호출 1 과 멈춤 사유를 함께 낸다. */
-    private fun fetchAxis(
+    /** 상세 호출도 회계 원장에 남긴다 — 그래야 다음 실행의 예산 seed 가 이 호출들을 본다(D-6G-29 ①). */
+    private fun recordDetailRun(
+        batch: SourceBatch<RawNoticeObservation>,
         axis: DetailAxis,
-        picked: Candidate,
-        budget: CallBudgetLedger,
-        today: LocalDate,
-    ): AxisOutcome {
-        val refused = refusal(budget, today)
-        if (refused != null) return AxisOutcome(calls = 0, halt = refused)
-        val batch = axis.fetch(picked.source.port, fetchEvidence(picked.id))
-        budget.settle(today, batch.accounting.pagesFetched - 1)
-        batch.items.forEach(rawObservations::append)
-        val quota =
-            batch.accounting.truncationCause
-                ?.takeIf { it == TruncationCause.QuotaExhausted }
-                ?.let { OpeningCollectionHalt(null, it, notAttempted = 0) }
-        return AxisOutcome(calls = 1, halt = quota)
+    ) {
+        val now = clock.now()
+        runs.record(
+            batch.accounting,
+            CollectionRunMeta(CollectionReferenceDate(executionDay()), axis.endpoint, now, now),
+        )
+    }
+
+    /** 이미 받은 (공고, 축) — 이어 돌기의 입력(D-6G-29 ③). */
+    private fun alreadyCollectedAxes(ids: List<NoticeId>): Map<NoticeId, Set<DetailAxis>> {
+        val out = mutableMapOf<NoticeId, MutableSet<DetailAxis>>()
+        DetailAxis.entries.forEach { axis ->
+            collectedAxes.alreadyCollected(axis.endpoint, ids).forEach { id ->
+                out.getOrPut(id) { mutableSetOf() }.add(axis)
+            }
+        }
+        return out
     }
 
     /** 조회 가치 술어를 거친 증거 — 6G 는 처음 받는 공고들이라 항상 `Fetch` 다(술어를 우회하지 않는다). */
@@ -222,11 +271,6 @@ class CollectOpeningResultsUseCase(
     private fun executionDay(): LocalDate = LocalDate.ofInstant(clock.now(), COLLECTION_BUDGET_ZONE)
 }
 
-private class AxisOutcome(
-    val calls: Int,
-    val halt: OpeningCollectionHalt?,
-)
-
 private sealed interface DetailStep {
     data class Done(
         val calls: Int,
@@ -240,7 +284,12 @@ private sealed interface DetailStep {
 
 private val EMPTY_SAMPLE = SampleOutcome(emptyList(), emptyMap())
 
-internal val COLLECTION_BUDGET_ZONE: ZoneId = ZoneOffset.UTC
+/**
+ * 예산이 세는 「하루」의 구역 — **Asia/Seoul** 이다. KONEPS 일 한도와 이 저장소의 다른 모든 날짜 축이
+ * 같은 구역이라, UTC 로 세면 일 회계가 09:00 KST 에 리셋돼 **같은 KONEPS 하루 안에서 승인 일 상한을
+ * 두 번** 받는다(code-review H-6).
+ */
+internal val COLLECTION_BUDGET_ZONE: ZoneId = OPENING_DATE_ZONE
 
 internal fun refusal(
     budget: CallBudgetLedger,

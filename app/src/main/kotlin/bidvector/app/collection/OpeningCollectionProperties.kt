@@ -21,6 +21,12 @@ data class OpeningCollectionProperties(
     val targetPerStratum: Int,
     val callsPerDay: Int,
     val callsTotal: Int,
+    /**
+     * 승인 호출 예산이 **시작된 시점**(D-6G-29 ①) — 이 시각 이후의 수집 회계만 A-1 상한에 계상한다.
+     * 기본값이 없다: 그 전의 실수집 이력(다른 slice)을 조용히 끌어오거나 빼먹지 않으려면 실행자가
+     * 매번 정해야 한다.
+     */
+    val budgetSince: java.time.Instant,
     /** 원문 저장 행의 출처 표식 — 빌드 식별자를 모르는 로컬 실행이 값을 지어내지 않고 「모름」을 적는다. */
     val releaseSha: String = "unversioned",
 )

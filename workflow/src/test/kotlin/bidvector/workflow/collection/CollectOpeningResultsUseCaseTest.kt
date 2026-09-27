@@ -91,12 +91,51 @@ class CollectOpeningResultsUseCaseTest {
 
         report.halted shouldNotBe null
         report.halted!!.budgetLimit shouldBe BudgetLimit.DAILY
-        // 목록 슬롯 둘(업무 둘 × 공고일 하나) = 2 + 용역 공고마다 셋(예비가격·개찰완료·기초금액) →
-        // 상한 6 은 첫 공고 셋(3·4·5)과 둘째의 예비가격(6)까지 허가하고 둘째의 개찰완료에서 끊긴다.
-        fixture.service.reservePriceCalls.size shouldBe 2
+        // 목록 슬롯 둘 = 2. 용역 공고는 상세 축이 셋이고 **통째로** 허가된다(D-6G-29 ④):
+        // 첫 공고가 3 을 받아 5, 둘째가 3 을 더 요구하면 8 > 6 이라 **한 호출도 나가지 않고** 멈춘다.
+        // 예산 경계에 걸려 반만 받은 공고가 생기지 않는다 — 그런 공고는 결측이 랜덤이 아니다.
+        fixture.service.reservePriceCalls.size shouldBe 1
         fixture.service.openingCompleteCalls.size shouldBe 1
         fixture.service.baseAmountCalls.size shouldBe 1
+        report.detailCalls shouldBe 3
+    }
+
+    @Test
+    fun `이미 받은 축은 다시 부르지 않는다 — 이어 돌기`() {
+        val fixture =
+            OpeningFixture(
+                targetPerStratum = 2,
+                collectedAxes =
+                    FakeCollectedAxisStore(setOf(bidvector.procurement.SourceEndpoint.RESERVE_PRICE_DETAIL)),
+            )
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 6)
+
+        val report = fixture.run()
+
+        // 예비가격 상세는 이미 받았으므로 **한 번도 부르지 않는다**. 나머지 축은 표본 수만큼 나간다.
+        report.halted shouldBe null
+        fixture.service.reservePriceCalls.shouldBeEmpty()
+        fixture.service.openingCompleteCalls.size shouldBe 2
+        fixture.service.baseAmountCalls.size shouldBe 2
+        // 건너뛴 축은 예산에서도 빠진다 — 걸음당 호출이 셋이 아니라 둘이다.
         report.detailCalls shouldBe 4
+    }
+
+    @Test
+    fun `이미 받은 몫이 예산에 실려 있으면 남은 몫만 쓴다 — 실행 사이에 이어진다`() {
+        val fixture =
+            OpeningFixture(
+                targetPerStratum = 10,
+                budget = CollectionCallBudget(perDay = 10, total = 10),
+                alreadySpent = bidvector.procurement.CallSpend(total = 8, today = 8),
+            )
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
+
+        val report = fixture.run()
+
+        // 남은 몫 2 — 목록 슬롯 둘을 쓰고 나면 상세는 한 걸음도 못 뗀다.
+        report.halted shouldNotBe null
+        report.detailCalls shouldBe 0
     }
 
     @Test
@@ -111,6 +150,21 @@ class CollectOpeningResultsUseCaseTest {
         report.halted!!.truncationCause shouldBe TruncationCause.QuotaExhausted
         report.sample.selected.shouldBeEmpty()
         fixture.service.reservePriceCalls.shouldBeEmpty()
+    }
+
+    @Test
+    fun `첫 페이지 throttle — 한 장도 못 받은 슬롯이 실행을 죽이지 않는다`() {
+        val fixture = OpeningFixture(targetPerStratum = 2)
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 4)
+        // rate limiter 가 첫 페이지에서 허가를 거부한 모양 — 페이지를 한 장도 못 받았다.
+        fixture.service.listPagesFetched = 0
+        fixture.service.listTruncation = TruncationCause.SelfThrottled
+
+        val report = fixture.run()
+
+        // 던지지 않는다. 그 슬롯은 비었지만 실행은 이어지고, 쿼터가 아니므로 멈춤도 아니다.
+        report.halted shouldBe null
+        report.frameSize shouldBe 0
     }
 
     @Test
