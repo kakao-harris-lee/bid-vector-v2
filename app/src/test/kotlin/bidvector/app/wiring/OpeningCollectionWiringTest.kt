@@ -30,11 +30,24 @@ import javax.sql.DataSource
  * 두지 않았다는 것이 실제로 기동을 막는지를 여기서 잰다(기본값 부재는 선언이 아니라 거동이어야 한다).
  */
 private object StubLedgerStore : CollectionCallLedgerStore {
+    // 무엇을 물었는지 기록한다 — 배선이 상한을 0 에서 시작하거나 하루 경계를 UTC 로 잡으면 승인
+    // 상한이 조용히 무력해진다: 매 기동 0 이면 총 상한이 아무것도 막지 못하고, UTC 자정이면 KST
+    // 자정과 그 사이 아홉 시간의 호출이 오늘치에서 빠진다.
+    var lastSince: java.time.Instant? = null
+    var lastDayStart: java.time.Instant? = null
+
     override fun spentSince(
         since: java.time.Instant,
         dayStart: java.time.Instant,
-    ): CallSpend = CallSpend(total = 0, today = 0)
+    ): CallSpend {
+        lastSince = since
+        lastDayStart = dayStart
+        return CallSpend(total = SEEDED_TOTAL, today = SEEDED_TODAY)
+    }
 }
+
+private const val SEEDED_TOTAL = 40
+private const val SEEDED_TODAY = 7
 
 private object StubAxisStore : CollectedAxisStore {
     override fun alreadyCollected(
@@ -111,6 +124,24 @@ class OpeningCollectionWiringTest {
             context.getBean(CallBudgetLedger::class.java) shouldNotBe null
             context.getBean(StratifiedSampler::class.java) shouldNotBe null
         }
+    }
+
+    /**
+     * 상한은 **영속에서 seed** 된다(D-6G-29 ①). 승인된 총 상한은 3~4일에 걸친 여러 실행을 덮으므로
+     * 매 기동 0 에서 시작하면 그 상한이 실제로는 아무것도 막지 못한다.
+     */
+    @Test
+    fun `호출 상한은 원장이 읽은 값에서 시작한다 — 0 이 아니다`() {
+        val booted = boot(*approved)
+
+        use(booted) { context ->
+            val ledger = context.getBean(CallBudgetLedger::class.java)
+            ledger.spentTotal shouldBe SEEDED_TOTAL
+            ledger.spentToday shouldBe SEEDED_TODAY
+        }
+        StubLedgerStore.lastSince shouldBe Instant.parse("2026-01-01T00:00:00Z")
+        // 고정 시계는 2026-09-24T03:00Z = KST 12:00 → 그날 KST 자정은 전날 15:00Z 다.
+        StubLedgerStore.lastDayStart shouldBe Instant.parse("2026-09-23T15:00:00Z")
     }
 
     @Test
