@@ -29,14 +29,19 @@ from ml_engine.evaluation.backtest.snapshot import (
     sample_list_checksum,
 )
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_TESTS_ROOT = Path(__file__).resolve().parents[1]
 
-GOLDEN_SNAPSHOT_DIR = _REPO_ROOT / "fixtures" / "m6-6g" / "golden-snapshot"
+GOLDEN_SNAPSHOT_DIR = _TESTS_ROOT / "evaluation" / "fixtures" / "m6-6g-golden"
 """생산 쪽이 낸 golden 스냅숏 디렉터리(`manifest.json` + `rows.jsonl`).
 
-**경로는 두 레인이 같이 아는 한 자리여야 한다** — 여기서만 선언하고, Kotlin 쪽이 다른
-곳에 커밋하면 이 상수를 고친다. `reports/evidence/` 밖에 두는 이유는 evidence 크기 게이트
-(evidence <= 산출물) 다: golden 은 산출물이지 장부가 아니다."""
+**경로는 두 레인이 같이 아는 한 자리여야 한다** — 여기서만 선언하고, 바뀌면 이 상수
+하나를 고친다. 자리 선택의 근거 둘(팀장 지시 2026-09-27):
+- `reports/evidence/` 가 아니다 — evidence 크기 게이트(evidence <= 산출물)에 걸린다.
+  golden 은 산출물이지 장부가 아니다.
+- 저장소 루트 `fixtures/` 도 아니다 — 그쪽은 `data-extract.md` 가 manifest·SHA·출처
+  규율로 관리하는 **검증 corpus** 자리다. 레인 간 왕복 golden 은 그 규율의 대상이
+  아니고 test 의 입력이므로, 합성 스냅숏 fixture 옆(`tests/evaluation/fixtures/`)에
+  둔다."""
 
 _ABSENT = (
     "golden 이 아직 없다 — Kotlin 레인이 `SnapshotWriter` 출하 경로로 커밋하면 선다"
@@ -107,7 +112,11 @@ def test_golden_manifest_declares_the_supported_schema_version() -> None:
 
 def test_golden_path_is_declared_in_exactly_one_place() -> None:
     """경로가 흩어지면 golden 이 온 뒤에도 한쪽이 옛 자리를 본다. 이 test 는 golden 이
-    없어도 돈다 — 골격이 살아 있다는 확인이다."""
-    assert GOLDEN_SNAPSHOT_DIR.name == "golden-snapshot"
-    assert GOLDEN_SNAPSHOT_DIR.parent.parent == _REPO_ROOT / "fixtures"
-    assert not GOLDEN_SNAPSHOT_DIR.is_relative_to(_REPO_ROOT / "reports")
+    없어도 돈다 — 골격이 살아 있다는 확인이다. 자리 선택의 근거 둘도 함께 잠근다:
+    evidence 안이 아니고(크기 게이트), 저장소 루트 `fixtures/` 안도 아니다(그쪽은
+    `data-extract.md` 의 검증 corpus 규율 자리다)."""
+    assert GOLDEN_SNAPSHOT_DIR.name == "m6-6g-golden"
+    assert GOLDEN_SNAPSHOT_DIR.parent == _TESTS_ROOT / "evaluation" / "fixtures"
+    repo_root = _TESTS_ROOT.parents[1]
+    assert not GOLDEN_SNAPSHOT_DIR.is_relative_to(repo_root / "reports")
+    assert not GOLDEN_SNAPSHOT_DIR.is_relative_to(repo_root / "fixtures")
