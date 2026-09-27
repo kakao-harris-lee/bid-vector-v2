@@ -198,8 +198,24 @@ class CollectOpeningResultsUseCaseTest {
         // 첫 상세 호출이 쿼터를 물면 거기서 멈춘다 — 남은 표본을 계속 부르면 거부만 쌓인다.
         val halt = requireNotNull(report.halted)
         halt.truncationCause shouldBe TruncationCause.QuotaExhausted
-        halt.notAttempted shouldBe 2
+        // **첫 공고는 반쪽이다**(축 셋 중 하나만 적재됐다) — 「손대지 않은」 수에 넣으면 거짓이다.
+        halt.partialNotice shouldBe true
+        halt.notAttempted shouldBe 1
         report.detailCalls shouldBe 1
+    }
+
+    /** 마지막 축에서 물면 그 공고는 반쪽이 아니다 — 남은 축이 없다. */
+    @Test
+    fun `K6 — 예산이 먼저 물면 그 공고는 손도 대지 않은 것이다`() {
+        val fixture = OpeningFixture(sampleSize = 2, budget = CollectionCallBudget(perDay = 3, total = 3))
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
+
+        val report = fixture.run()
+
+        val halt = requireNotNull(report.halted)
+        halt.budgetLimit shouldBe BudgetLimit.TOTAL
+        halt.partialNotice shouldBe false
+        halt.notAttempted shouldBe 2
     }
 
     @Test

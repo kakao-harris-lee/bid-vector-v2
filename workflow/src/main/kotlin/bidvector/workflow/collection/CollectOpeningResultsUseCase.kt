@@ -38,7 +38,15 @@ class OpeningCollectionSource(
 data class OpeningCollectionHalt(
     val budgetLimit: BudgetLimit?,
     val truncationCause: TruncationCause?,
+    /** **손도 대지 않은** 표본 수 — 반쯤 받은 공고는 여기 들지 않는다(D-6G-44 K6). */
     val notAttempted: Int,
+    /**
+     * 멈춘 그 공고를 **반쯤 받았는가.** 예산은 공고 단위로 통째로 허가하므로(D-6G-29 ④) 반쪽이
+     * 생기지 않지만, 쿼터 거절은 축 사이에서 온다 — 그때 그 공고는 축 일부만 적재된 채 남는다.
+     * 이 사실을 계수에 접으면 「손대지 않았다」가 거짓이 되고, 이어 돌기가 무엇을 다시 불러야
+     * 하는지도 흐려진다.
+     */
+    val partialNotice: Boolean = false,
 ) {
     init {
         require((budgetLimit == null) != (truncationCause == null)) {
@@ -183,7 +191,9 @@ class CollectOpeningResultsUseCase(
                 }
 
                 is DetailStep.Halted -> {
-                    val halt = step.halt.copy(notAttempted = sample.selected.size - index)
+                    // 멈춘 그 공고는 반쯤 받았으면 「손대지 않은」 수에서 뺀다(D-6G-44 K6).
+                    val untouched = sample.selected.size - index - if (step.halt.partialNotice) 1 else 0
+                    val halt = step.halt.copy(notAttempted = untouched)
                     return OpeningCollectionReport(
                         framing.candidates.size,
                         sample,
@@ -240,7 +250,14 @@ class CollectOpeningResultsUseCase(
             batch.items.forEach(rawObservations::append)
             recordDetailRun(batch, axes[index])
             if (batch.accounting.truncationCause == TruncationCause.QuotaExhausted) {
-                halt = OpeningCollectionHalt(null, TruncationCause.QuotaExhausted, notAttempted = 0)
+                halt =
+                    OpeningCollectionHalt(
+                        null,
+                        TruncationCause.QuotaExhausted,
+                        notAttempted = 0,
+                        // 마지막 축이 아니면 이 공고는 반쪽이다 — 남은 축이 적재되지 않았다.
+                        partialNotice = index < axes.size - 1,
+                    )
             }
             index++
         }

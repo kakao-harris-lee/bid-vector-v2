@@ -1,10 +1,14 @@
 package bidvector.app.collection
 
+import bidvector.adapters.persistence.JdbcCollectedAxisStore
+import bidvector.adapters.persistence.JdbcCollectionCallLedgerStore
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
 import bidvector.app.wiring.OPENING_COLLECTION_LOCK_KEY
 import bidvector.app.wiring.RecordingCollectionTermination
+import bidvector.procurement.CollectedAxisStore
+import bidvector.procurement.CollectionCallLedgerStore
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
@@ -19,6 +23,7 @@ import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
@@ -80,7 +85,10 @@ class OpeningCollectionE2ETest {
     /** test 마다 새 표본 목록 파일 — 앞 test 의 공고번호(nonce 가 다르다)를 표본으로 물려받지 않는다. */
     private lateinit var sampleListFile: Path
 
-    private fun bootAndRun(extra: Map<String, String>): Pair<List<Int>, MockOpeningKonepsHttp> {
+    private fun bootAndRun(
+        extra: Map<String, String>,
+        inspect: (org.springframework.context.ApplicationContext) -> Unit = {},
+    ): Pair<List<Int>, MockOpeningKonepsHttp> {
         logs.list.clear()
         sampleListFile = Files.createTempDirectory("6g-e2e-sample").resolve("sample-list.tsv")
         val mock = MockOpeningKonepsHttp(noticesPerSlot = NOTICES_PER_SLOT, bidderName = BIDDER_NAME)
@@ -118,6 +126,7 @@ class OpeningCollectionE2ETest {
             ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachLogCapture() })
                 .run()
         return try {
+            inspect(context)
             context.getBean(RecordingCollectionTermination::class.java).exitCodes.toList() to mock
         } finally {
             context.close()
@@ -176,6 +185,22 @@ class OpeningCollectionE2ETest {
         // 상호는 raw 관측까지는 오지만 **로그에는 없다**(러너의 줄이 계수와 열거값뿐이다).
         captured shouldNotContain BIDDER_NAME
         captured shouldContain "opening-collection finished"
+    }
+
+    /**
+     * `@ConditionalOnMissingBean` 은 배선 조건 test 가 DB 없이 기동 조건을 재게 하려고 연 자리다.
+     * 그 자리가 **출하에서도** 열려 있으면 승인 상한을 세는 원장과 이어 돌기 저장소가 조용히 다른
+     * 빈으로 갈릴 수 있다 — 메모리 대역이 서면 상한은 매 기동 0 에서 시작하고 이어 돌기는 아무것도
+     * 기억하지 못한다. 실 DB 로 뜬 **출하 조립**에서 실제 타입을 잰다(D-6G-44).
+     */
+    @Test
+    fun `출하 조립의 원장과 이어 돌기는 JDBC 구현이다`() {
+        bootAndRun(emptyMap()) { context ->
+            context
+                .getBean(CollectionCallLedgerStore::class.java)
+                .shouldBeInstanceOf<JdbcCollectionCallLedgerStore>()
+            context.getBean(CollectedAxisStore::class.java).shouldBeInstanceOf<JdbcCollectedAxisStore>()
+        }
     }
 
     /**

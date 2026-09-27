@@ -20,7 +20,8 @@ internal fun openingStartLine(
 
 internal fun openingHaltLine(halt: OpeningCollectionHalt): String =
     "opening-collection halted budgetLimit=${halt.budgetLimit ?: "none"} " +
-        "truncation=${halt.truncationCause ?: "none"} notAttempted=${halt.notAttempted}"
+        "truncation=${halt.truncationCause ?: "none"} notAttempted=${halt.notAttempted} " +
+        "partialNotice=${halt.partialNotice}"
 
 internal fun openingFinishLine(
     report: OpeningCollectionReport,

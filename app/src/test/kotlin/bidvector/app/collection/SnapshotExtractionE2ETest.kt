@@ -209,7 +209,7 @@ class SnapshotExtractionE2ETest {
         extractTo(work)
         val produced = SNAPSHOT_FILES.associateWith { Files.readString(work.resolve(it)) }
 
-        if (System.getenv("BIDVECTOR_WRITE_GOLDEN") == "1") {
+        if (writeGoldenRequested()) {
             Files.createDirectories(goldenDir)
             produced.forEach { (name, bytes) -> Files.writeString(goldenDir.resolve(name), bytes) }
         }
@@ -222,3 +222,16 @@ class SnapshotExtractionE2ETest {
 }
 
 private val SNAPSHOT_FILES = listOf("rows.jsonl", "manifest.json", "sample-list.tsv")
+
+/**
+ * golden 갱신은 **사람이 있는 실행에서만** 허용한다(D-6G-44). CI 에서 이 플래그가 켜지면 golden 이
+ * 그 실행의 산출물로 덮여 왕복 대조가 자기 자신과의 대조가 된다 — 초록이지만 아무것도 잠그지 않는다.
+ * 그래서 CI 에서는 **무시하지 않고 실패**한다: 조용히 무시하면 누가 왜 켰는지 아무도 모른 채 지나간다.
+ */
+private fun writeGoldenRequested(): Boolean {
+    val requested = System.getenv("BIDVECTOR_WRITE_GOLDEN") == "1"
+    require(!(requested && System.getenv("CI") != null)) {
+        "golden 갱신 플래그는 CI 에서 쓸 수 없다 — golden 은 사람이 보고 갱신한다"
+    }
+    return requested
+}
