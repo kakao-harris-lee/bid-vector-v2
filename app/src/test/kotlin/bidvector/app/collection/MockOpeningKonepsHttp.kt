@@ -105,7 +105,8 @@ internal class MockOpeningKonepsHttp(
                         mapOf(
                             "bidNtceNo" to noticeNumber(suffix, index),
                             "bidNtceOrd" to "000",
-                            "prtcptCnum" to "7",
+                            // 참가업체수는 **투찰 행 수와 같다** — 실물이 어긋나지 않는 자리다(D-6G-38).
+                            "prtcptCnum" to BIDDERS.size.toString(),
                             "progrsDivCdNm" to "개찰완료",
                         )
                     }.also { require(query.contains("inqryDiv=2")) { "표본틀은 공고일 축으로 걸어야 한다" } }
@@ -261,7 +262,6 @@ private const val RESERVE_PRICE_ROWS = 15
 
 private val DRAWN_SEQUENCES = setOf(3, 7, 11, 14)
 
-/** 합성 투찰자 — 금액이 서로 달라 동가 1위(제외 ⑮)가 생기지 않는다. */
 internal class SyntheticBidder(
     val rank: Int,
     val amount: String,
@@ -269,10 +269,18 @@ internal class SyntheticBidder(
     val secondDraw: String,
 )
 
+/**
+ * 합성 투찰자 셋(D-6G-38) — 금액이 서로 달라 동가 1위(제외 ⑮)가 생기지 않는다.
+ *
+ * **선택(`drwtNo1`·`drwtNo2`)을 뽑힌 넷([DRAWN_SEQUENCES])과 일부러 다르게 둔다.** r1 의 mock 은 둘을
+ * 같게 맞춰 두어, 추출이 **틀린 출처**(투찰자 선택)에서 읽고 있는데도 golden 이 초록이었다. 겹치지
+ * 않게 두면 출처가 틀린 순간 golden 이 붉어진다.
+ */
 private val BIDDERS =
     listOf(
-        SyntheticBidder(rank = 1, amount = "1100000000", firstDraw = "3", secondDraw = "7"),
-        SyntheticBidder(rank = 2, amount = "1150000000", firstDraw = "11", secondDraw = "14"),
+        SyntheticBidder(rank = 1, amount = "1100000000", firstDraw = "1", secondDraw = "2"),
+        SyntheticBidder(rank = 2, amount = "1150000000", firstDraw = "4", secondDraw = "5"),
+        SyntheticBidder(rank = 3, amount = "1200000000", firstDraw = "6", secondDraw = "8"),
     )
 
 private const val NO_NOTICE_DATE = 2

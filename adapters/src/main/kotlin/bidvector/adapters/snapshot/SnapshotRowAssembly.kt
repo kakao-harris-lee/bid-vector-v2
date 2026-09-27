@@ -75,22 +75,26 @@ private fun outcomeOf(axes: Map<SourceEndpoint, List<RawRow>>): SnapshotOutcome 
         plannedPrice = reserveRows.firstNotNullOfOrNull { it.amountOf(FieldConcept.RESERVE_PRICE) },
         openingBaseAmount = reserveRows.firstNotNullOfOrNull { it.amountOf(FieldConcept.BASE_AMOUNT) },
         reservePrices = reservePricesOf(reserveRows),
-        drawnSerialNumbers = drawnSerialNumbersOf(axes[SourceEndpoint.OPENING_COMPLETE].orEmpty()),
+        drawnSerialNumbers = drawnSerialNumbersOf(reserveRows),
         participantCount = listRow?.countOf(FieldConcept.PARTICIPANT_COUNT),
         bidderRows = orderedBidderRows(bidders),
     )
 }
 
 /**
- * 추첨번호(D-6G-28) — 개찰완료 투찰 행이 `drwtNo1`·`drwtNo2` 로 싣는다. v2 는 이 자리를 상수
- * `null` 로 두어, 실 추출이면 **전 행이 제외 ⑤ 에 걸려 승인 0건**이었다(code-review H-1).
+ * 추첨번호(D-6G-38) — **예비가격 상세에서 `drwtYn` 이 참인 행의 순번**이다. legacy 도 이렇게 읽는다.
+ *
+ * r1 은 개찰완료 투찰 행의 `drwtNo1`·`drwtNo2` 를 읽었는데 그것은 **투찰자가 고른 번호**이지 추첨된
+ * 번호가 아니다. 둘은 대개 다르고, 예정가격은 뽑힌 넷의 평균이라 선택을 쓰면 사정률이 통째로 틀린다.
+ * r1 의 golden 이 이 자리를 가린 것은 mock 이 투찰자 선택을 뽑힌 넷과 **같게** 맞춰 두었기 때문이다.
+ *
  * 값은 1-기반 순번이고 투찰자 귀속은 보존하지 않는다 — 실현 사정률에는 집합만 있으면 된다.
  */
-private fun drawnSerialNumbersOf(bidderRows: List<RawRow>): List<Int>? {
+private fun drawnSerialNumbersOf(reserveRows: List<RawRow>): List<Int>? {
     val numbers =
-        bidderRows
-            .flatMap { row -> row.allTextOf(FieldConcept.DRAW_NUMBER) }
-            .mapNotNull { it.trim().toIntOrNull() }
+        reserveRows
+            .filter { row -> row.predicateOf(FieldConcept.DRAW_FLAG) == true }
+            .mapNotNull { row -> row.textOf(FieldConcept.RESERVE_PRICE_SEQUENCE)?.trim()?.toIntOrNull() }
             .distinct()
             .sorted()
     return numbers.ifEmpty { null }
