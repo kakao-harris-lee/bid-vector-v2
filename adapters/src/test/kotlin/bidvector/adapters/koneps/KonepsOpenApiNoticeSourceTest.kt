@@ -211,25 +211,20 @@ class KonepsOpenApiNoticeSourceTest {
         }
     }
 
+    /**
+     * M6/6G D-6G-11 이 이 자리의 판정을 바꿨다 — `resultCode 22` 는 **일 트래픽 한도**라
+     * 백오프로 회복되지 않는다. 재시도는 거부될 호출을 더 낼 뿐이고, 회복되는 축은 HTTP 429
+     * (속도 한도, legacy 실측 「~2분 안에 회복, 원인은 동시성」)이다. 두 축이 다르다는 것은
+     * 위 429 test 가 함께 잰다.
+     */
     @Test
-    fun `resultCode 22 는 quota 초과로 재시도 대상이다`() {
-        val successBody =
-            KonepsEnvelopeFixtures.success(
-                listOf(mapOf("bidNtceNo" to "SYN-3B-0008", "bidNtceOrd" to "000")),
-                totalCount = 1,
-                pageNo = 1,
-                numOfRows = 100,
-            )
-        val script =
-            listOf(
-                MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("22", "서비스 요청 제한 횟수 초과")),
-                MockKonepsResponse.Reply(200, successBody),
-            )
+    fun `resultCode 22 는 일 한도라 재시도 없이 즉시 quota 소진이다`() {
+        val script = listOf(MockKonepsResponse.Reply(200, KonepsEnvelopeFixtures.failure("22", "서비스 요청 제한 횟수 초과")))
         MockKonepsServer.start(script).use { server ->
             val batch = newSource(server, testKonepsHttpPolicy(maxAttempts = 3)).fetchNotices(REFERENCE_DATE, null)
 
-            batch.items.size shouldBe 1
-            server.requestCount shouldBe 2
+            batch.accounting.truncationCause shouldBe TruncationCause.QuotaExhausted
+            server.requestCount shouldBe 1
             batch.accounting.quotaExceeded shouldBe 1
         }
     }

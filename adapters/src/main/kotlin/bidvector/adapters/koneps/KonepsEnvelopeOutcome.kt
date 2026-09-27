@@ -40,8 +40,9 @@ private const val SUCCESS_CODE = "00"
 private const val NO_DATA_CODE = "03"
 
 /**
- * 응답 원문(JSON 문자열)을 envelope outcome 으로 판정한다(③, D-3B-7). `policy`는 3A
- * `KONEPS_COLLECTION_POLICY`를 조회일 기준으로 resolve 한 값이다.
+ * 응답 원문을 envelope outcome 으로 판정한다(③, D-3B-7). `policy`는 3A
+ * `KONEPS_COLLECTION_POLICY`를 조회일 기준으로 resolve 한 값이다. JSON 이 먼저이고, JSON 이
+ * 아니면 게이트웨이 XML 오류 봉투로 한 번 더 읽는다([gatewayErrorOutcome]).
  */
 internal fun parseKonepsEnvelope(
     body: String,
@@ -53,9 +54,41 @@ internal fun parseKonepsEnvelope(
             onSuccess = { root -> classifyRoot(root, policy) },
             // 예외 메시지에는 응답 본문 조각이 실릴 수 있다(서버가 요청 URL 을 되돌리면 서비스 키까지) — 종류만 싣는다.
             onFailure = { failure ->
-                KonepsEnvelopeOutcome.StructureFailure("JSON 파싱 실패: ${failure.javaClass.simpleName}")
+                gatewayErrorOutcome(body, policy)
+                    ?: KonepsEnvelopeOutcome.StructureFailure("JSON 파싱 실패: ${failure.javaClass.simpleName}")
             },
         )
+
+/**
+ * JSON 이 아닌 본문을 게이트웨이 XML 오류 봉투로 읽는다(`OPEN-6F8-QUOTA-XML-ENVELOPE` 폐쇄,
+ * M6/6G D-6G-11) — 한도 초과가 `StructureFailure` 로 접히면 use case 가 그것을 「다음 슬롯」
+ * 사유로 읽어 남은 슬롯마다 거부된 호출을 한 번씩 더 낸다. 읽어 낸 코드는 **JSON 봉투와 같은
+ * 범주표**를 지난다 — 범주를 여기서 다시 정하지 않는다.
+ *
+ * XML 판독 자체의 실패는 값으로 접는다(`getOrNull`) — 예외 메시지에 본문 조각이 실릴 수 있어
+ * 결과 채널로 내보내지 않는다(JSON 경로와 같은 접기).
+ */
+private fun gatewayErrorOutcome(
+    body: String,
+    policy: KonepsCollectionPolicyData,
+): KonepsEnvelopeOutcome? =
+    runCatching { readGatewayErrorCode(body) }
+        .getOrNull()
+        ?.let { code -> gatewayOutcomeFor(code, policy) }
+
+/**
+ * 성공 코드는 이 경로에서 `null` 이다 — 본문을 파싱하지 못했으니 실을 항목이 없고, 항목을 못
+ * 읽은 것은 「없음」(NoData)이 아니라 「못 읽음」(구조 실패)이다.
+ */
+private fun gatewayOutcomeFor(
+    code: String,
+    policy: KonepsCollectionPolicyData,
+): KonepsEnvelopeOutcome? =
+    when (code) {
+        SUCCESS_CODE -> null
+        NO_DATA_CODE -> KonepsEnvelopeOutcome.NoData
+        else -> classifyKnownFailure(code, policy)
+    }
 
 private fun classifyRoot(
     root: JsonValue,

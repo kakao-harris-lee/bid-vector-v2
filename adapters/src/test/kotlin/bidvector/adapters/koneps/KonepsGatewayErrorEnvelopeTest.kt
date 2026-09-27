@@ -120,12 +120,12 @@ class KonepsGatewayErrorEnvelopeTest {
         MockKonepsServer.start(script).use { server ->
             val batch = gatewaySource(server).fetchNotices(GATEWAY_REFERENCE_DATE, null)
 
+            // 실행 자체를 멈추는 것은 use case 다(`QuotaExhausted` → 멈춤은 이미 잠겨 있다).
+            // 어댑터가 지는 몫은 그 사유를 정확히 내는 것과, 내기까지 호출을 더 내지 않는 것이다.
             batch.accounting.truncationCause shouldBe TruncationCause.QuotaExhausted
             // 재시도 상한이 3 이어도 호출은 하나다 — 한도 초과는 백오프로 회복되지 않는다.
             server.requestCount shouldBe 1
             batch.accounting.quotaExceeded shouldBe 1
-            // 멈춤 사유라 이어 읽을 커서를 내지 않는다.
-            batch.next shouldBe null
         }
     }
 

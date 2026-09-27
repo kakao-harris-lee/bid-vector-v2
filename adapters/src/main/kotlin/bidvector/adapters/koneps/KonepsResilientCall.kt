@@ -95,9 +95,12 @@ private fun isRetryableStep(step: KonepsRawStep): Boolean =
             }
         }
 
+        // M6/6G D-6G-11 — 봉투가 나르는 quota 초과는 **일 트래픽 한도**다. 백오프 몇 십 ms 로
+        // 회복되지 않으므로 재시도는 거부될 호출을 더 낼 뿐이다(한도가 풀리는 것은 날이 바뀔
+        // 때다). 속도 한도(HTTP 429)는 위 TransportStep 분기가 그대로 재시도한다 — legacy
+        // 실측이 「~2분 안에 회복, 원인은 동시성」으로 가른 그 축이고 두 축은 다른 것이다.
         is KonepsRawStep.EnvelopeStep -> {
-            val category = (step.outcome as? KonepsEnvelopeOutcome.Classified)?.category
-            category == ResultCodeCategory.RETRYABLE || category == ResultCodeCategory.QUOTA_EXCEEDED
+            (step.outcome as? KonepsEnvelopeOutcome.Classified)?.category == ResultCodeCategory.RETRYABLE
         }
     }
 
