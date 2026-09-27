@@ -11,7 +11,7 @@
 | `./gradlew --no-daemon qualityBaseline` | BUILD SUCCESSFUL(게이트가 아니라 측정) |
 | `./tools/one-command-check.sh` | 「Kotlin 전건 + Python 전건 통과」 |
 
-실측 HEAD: `74f240b8`(이 레인의 마지막 산출물 커밋 시점의 트리).
+실측 HEAD: `7e4e6c48`(이 레인의 마지막 산출물 커밋 시점의 트리).
 
 ## 실 KONEPS 호출
 
@@ -79,6 +79,9 @@
 | D-6G-19 「provenance 분리」 | `SnapshotNotice.baseAmount` ↔ `SnapshotOutcome.openingBaseAmount` | 타입이 두 칸으로 가른다 |
 | D-6G-20 「공고당 호출 = 상세 셋(+공사 A값)」 | `detailAxesFor` | 공사 넷·그 밖 셋, 소진 `when` |
 | D-6G-22 「새 호출 비용 0 칸」 | `AWARD_METHOD_APPLICATION_STANDARD`·`APPLICATION_BASIS_CONTENT` | 계약 원장 test |
+| D-6G-1 「수집 모드 한 갈래」 | `OpeningCollectionWiring`(`mode=once` 일 때만) | 출하 조립 E2E 셋 |
+| D-6G-11 「호출 상한은 설정값, 기본값 없음」 | `OpeningCollectionProperties` | 상한 도달 시 멈춤·종료 코드 미완 E2E |
+| D-6G-2 「저장소 밖 출력 · manifest」 | `SnapshotExtractionRunner`·`JdbcSnapshotSource` | Testcontainers E2E 셋(바이트 결정성·상호 부재·provenance 분리) |
 
 ## 스키마 합의 (2026-09-27, 두 레인)
 
@@ -116,6 +119,7 @@
 | 변이 | 결과 |
 |---|---|
 | `opening_base_amount` 에 다른 값을 꽂는다(두 기초금액 뒤바뀜 부류) | **RED**(11 중 1 실패) — 잠긴다 |
+| 예산의 「날」을 조회 대상 공고일로 센다 | **RED** — 공고일 슬롯마다 일 회계가 0 으로 되돌아 일 상한이 아무것도 막지 못한다. 이 변이는 **처음에 실제 코드였다**(test 가 잡았다) |
 
 이 자리는 **처음에 잠겨 있지 않았다.** fixture 의 두 기초금액이 같은 값이라 어느 쪽을 써도 출력이 같아
 뒤바뀜이 드러나지 않았다(Python 레인이 자기 쪽에서 같은 함정을 겪고 알려 왔다). 둘을 다르게 둔 test 를
@@ -134,14 +138,19 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 
 | 몫 | 상태 |
 |---|---|
-| 수집 갈래 **use case** | **했다** — 표본틀·표본·상세 넷, 예산·쿼터 멈춤, fake 포트 test 아홉 |
-| 수집 갈래 **Spring 배선**(`CollectionWiring` 에 이 갈래를 올리는 것) | **안 했다** — use case 까지다 |
-| 스냅숏 **바이트 생성**(JSONL·manifest) | **했다** — `SnapshotWriter`, test 여덟 |
-| 스냅숏 **DB 판독 어댑터와 CLI 명령** | **안 했다** — 바이트를 만드는 쪽까지다 |
+| 수집 갈래 use case | **했다** — 표본틀·표본·상세 넷, 예산·쿼터 멈춤 |
+| 수집 갈래 **Spring 배선 + 가짜 transport E2E** | **했다** — 출하 조립 부팅, 실 KONEPS 호출 0 |
+| 스냅숏 바이트 생성(JSONL·manifest) | **했다** — `SnapshotWriter` |
+| 스냅숏 **DB 판독 어댑터 + 추출 CLI + Testcontainers E2E** | **했다** — 읽기만 한다(DB write 0) |
+| **실수집·실추출 실행** | **안 했다** — 운영자 키·승인 아래 팀장이 연다 |
 | 제외 사유 판정의 구현 | **이 레인 몫이 아니게 됐다** — 두 레인 합의로 판정은 Python 쪽 한 자리에서 하고, 이 레인은 입력 칸만 진다(스키마 §4). 판정 자리가 둘이면 어긋날 때 정본이 없다 |
 
-남은 둘은 **배선**이다 — 도메인 판단은 서 있고, 그것을 Spring 빈과 SQL 에 꽂는 일이 남았다.
-실 KONEPS 호출과 DB write 가 필요한 지점이라 검증 뒤 운영자 승인 아래 여는 것이 맞다.
+코드는 끝에서 끝까지 선다. 남은 것은 **실행**뿐이고 그것은 실 KONEPS 호출과 dev DB write 가 필요한
+지점이라 검증 뒤 운영자 승인 아래 연다.
+
+**두 갈래가 다 돌아야 스냅숏이 선다** — 추출은 개찰 축 원문(raw_observation)과 canonical notice 를
+잇는다. 대분류·낙찰하한율·마감일시는 개찰 축 응답에 **없어서** 공고 목록 갈래가 세운 canonical 에서만
+온다. 공고 목록 관측이 없는 공고는 행이 만들어지지 않고 그 수가 계수된다(지어내지 않는다).
 
 ---
 
