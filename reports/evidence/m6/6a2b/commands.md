@@ -53,7 +53,7 @@
 |---|---|---|
 | `:workflow:test --tests '…EditSessionBaseRevisionTest'` | 0 | 4 — 기준 revision 기록·교차 세션 거부·되돌아가 재확인·낡은 행 fail-closed |
 | `:app:test --tests '…StrategyEditProductionE2ETest'` | 0 | 6 — 출하 조립 왕복 · **교차 세션 409 와 앞 값 보존** · 무효 값의 영속 0 · audit==actor · 무자격 401 |
-| `:app:test --tests '…AppHttpDependencyGateTest'` | 0 | 13 — 도출 포트 집합 등식 · **대상 집합(app 전체 − 면제)** · 면제가 실재 클래스만 가리키는지 · production 양성 · 위반 표본 여섯 |
+| `:app:test --tests '…AppHttpDependencyGateTest'` | 0 | 14 — **면제 세 층의 배타성과 합** · 도출 포트 집합 등식 · **대상 집합(app 전체 − 면제)** · 면제가 실재 클래스만 가리키는지 · production 양성 · 위반 표본 여섯 |
 | `:app:test --tests '…HttpSurfaceCensusTest'` | 0 | 6 — 두 서블릿 컨텍스트 · API·관리 각각의 handler·Filter·Servlet 집합 등식 · 문서 등식 모집단 완전성 |
 | `:app:test --tests '…ProductionHttpSurfaceTest'` | 0 | 7 — 매핑 전수 405/415/400/406 · 두드림∪제외 등식 · 문서↔매핑 집합 등식 · 응답 키 집합 |
 | `:app:test --tests '…StrategyEditExecutorRaceTest'` | 0 | 2 — 읽기 사이 끼어듦 거부와 끼어듦 없을 때의 양성 대조 |
@@ -82,6 +82,9 @@
 | **F-r2-1 ②** 빈 이름 URL 매핑 `HttpRequestHandler` | 의존 게이트 · 표면 실측 | RED / RED |
 | **F-r2-1 ③** 인증보다 앞선 `OncePerRequestFilter` | 의존 게이트 · 표면 실측 | RED / RED |
 | **면제 클래스의 `@Bean RouterFunction`** | 의존 게이트 **통과** · 표면 실측 RED | 두 축이 함께 필요한 이유의 실측 |
+| ② 층(조회기)에 `JdbcClient` UPDATE 메서드 추가 | 요청 스코프 층 허용 목록 | RED 1 |
+| 컨트롤러가 ③ 층(수집 러너)을 참조 | 제한 층 허용 목록 | RED 1 |
+| 위 + 허용 접두에 수집 레인을 열어 첫 규칙을 우회 | 수집 레인 의존 금지 | RED 1 — **두 잠금이 독립이다** |
 | value 시점 기준 대조 제거 | 읽기 사이 끼어듦 회귀 | RED 1 |
 | 등재된 게이트 test 에 `@Disabled` | `gateExecutionGate` | RED(「건너뛰어졌다」) |
 
