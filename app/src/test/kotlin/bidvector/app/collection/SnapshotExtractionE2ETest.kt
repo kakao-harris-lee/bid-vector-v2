@@ -33,6 +33,7 @@ class SnapshotExtractionE2ETest {
         private const val POSTGRES_IMAGE = "postgres:16.4"
         private const val TEST_CREDENTIAL_VALUE = "snapshot-e2e-test-fixture-credential"
         private const val BIDDER_NAME = "SYN-상호-드러나면안됨"
+
         /**
          * 업무마다 여섯 — 마지막 하나(`MISSING_SAMPLE_INDEX`)가 업무마다 다른 사유로 행이 되지
          * 못한다(공사는 상세 결측, 용역은 canonical 결측). 표본 12 · 행 10 · 결측 계수 각 1.
@@ -41,6 +42,7 @@ class SnapshotExtractionE2ETest {
 
         /** 층 = 업무 × 공고 주 — 이 E2E 는 하루치 두 업무라 층이 둘이다. */
         private const val DIVISIONS = 2
+
         private val NOTICE_DAY: LocalDate = LocalDate.of(2026, 6, 3)
 
         private val postgres: PostgreSQLContainer =
