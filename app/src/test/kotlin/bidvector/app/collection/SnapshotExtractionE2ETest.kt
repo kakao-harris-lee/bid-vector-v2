@@ -4,6 +4,7 @@ import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
 import bidvector.app.wiring.RecordingCollectionTermination
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -32,7 +33,14 @@ class SnapshotExtractionE2ETest {
         private const val POSTGRES_IMAGE = "postgres:16.4"
         private const val TEST_CREDENTIAL_VALUE = "snapshot-e2e-test-fixture-credential"
         private const val BIDDER_NAME = "SYN-상호-드러나면안됨"
-        private const val NOTICES_PER_SLOT = 5
+        /**
+         * 업무마다 여섯 — 마지막 하나(`MISSING_SAMPLE_INDEX`)가 업무마다 다른 사유로 행이 되지
+         * 못한다(공사는 상세 결측, 용역은 canonical 결측). 표본 12 · 행 10 · 결측 계수 각 1.
+         */
+        private const val NOTICES_PER_SLOT = 6
+
+        /** 층 = 업무 × 공고 주 — 이 E2E 는 하루치 두 업무라 층이 둘이다. */
+        private const val DIVISIONS = 2
         private val NOTICE_DAY: LocalDate = LocalDate.of(2026, 6, 3)
 
         private val postgres: PostgreSQLContainer =
@@ -71,8 +79,8 @@ class SnapshotExtractionE2ETest {
                     "bidvector.opening-collection.to" to NOTICE_DAY.toString(),
                     "bidvector.opening-collection.categories" to "construction,service",
                     "bidvector.opening-collection.sampling-seed" to "6g-extract-seed",
-                    // 층 둘(공사·용역, 같은 주) — 비례 배분으로 층마다 다섯이다.
-                    "bidvector.opening-collection.sample-size" to "10",
+                    // 층 둘(공사·용역, 같은 주) 전수 — 후보 12 를 다 뽑는다.
+                    "bidvector.opening-collection.sample-size" to "12",
                     "bidvector.opening-collection.calls-per-day" to "10000",
                     "bidvector.opening-collection.calls-total" to "10000",
                     "bidvector.opening-collection.budget-since" to Instant.now().toString(),
@@ -194,6 +202,33 @@ class SnapshotExtractionE2ETest {
         // 기초금액 조회 출처(마감 전 공개)와 예비가격 상세 출처가 서로 다른 값이다.
         rows shouldContain "\"base_amount\":1234567890"
         rows shouldContain "\"opening_base_amount\":1239999999"
+    }
+
+    /**
+     * 표본인데 행이 되지 못한 공고가 **실제로 있다**(D-6G-42). 둘 다 0 이면 생산 쪽이 이 칸을 상수로
+     * 적어도, 행 집합을 표본 목록과 같게 맞춰도 왕복이 아무것도 잡지 못한다 — 지난 라운드 추첨번호
+     * 상수 `null` 과 같은 갈래다. 두 사유를 수집 경로로 만들어(응답이 비거나 공고 목록이 내지 않아)
+     * 항등식이 **0 이 아닌 값으로** 닫히게 한다.
+     */
+    @Test
+    fun `표본은 행의 진부분집합이고 두 결측 사유가 각각 하나다`() {
+        val work = Files.createTempDirectory("snapshot-counts")
+        extractTo(work)
+
+        val manifest = Files.readString(work.resolve("manifest.json"))
+        val sampleLines = Files.readString(work.resolve("sample-list.tsv")).trimEnd('\n').lines()
+        val rows = Files.readString(work.resolve("rows.jsonl")).trimEnd('\n').lines()
+
+        sampleLines shouldHaveSize NOTICES_PER_SLOT * DIVISIONS
+        rows shouldHaveSize sampleLines.size - 2
+        manifest shouldContain "\"sample_size\":${sampleLines.size}"
+        manifest shouldContain "\"sampled_without_detail\":1"
+        manifest shouldContain "\"sampled_without_notice\":1"
+        // 행의 키는 표본의 **진부분집합**이다 — 목록에서 빼는 식으로 맞추면 이 단언이 붉어진다.
+        val sampleKeys = sampleLines.map { it.substringBefore('\t') }.toSet()
+        val rowKeys = rows.map { it.substringAfter("\"notice_key_hash\":\"").substringBefore('"') }.toSet()
+        sampleKeys.containsAll(rowKeys) shouldBe true
+        (sampleKeys - rowKeys) shouldHaveSize 2
     }
 
     /**

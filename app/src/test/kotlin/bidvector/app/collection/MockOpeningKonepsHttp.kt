@@ -68,6 +68,19 @@ internal class MockOpeningKonepsHttp(
         query: String,
         noticeNumber: String?,
     ): List<Map<String, String>> =
+        // 상세를 **받지 못하는 표본**(D-6G-42) — 응답이 빈 항목이라 원문이 한 줄도 적재되지 않는다.
+        // 표본인데 행이 되지 못하는 두 사유 가운데 하나를 실제 수집 경로로 만든다.
+        if (noticeNumber != null && isDetailOperation(operation) && isDetailless(noticeNumber)) {
+            emptyList()
+        } else {
+            itemsOf(operation, query, noticeNumber)
+        }
+
+    private fun itemsOf(
+        operation: String,
+        query: String,
+        noticeNumber: String?,
+    ): List<Map<String, String>> =
         when {
             operation.endsWith("PreparPcDetail") -> {
                 reservePriceNotices += noticeNumber.orEmpty()
@@ -120,8 +133,27 @@ internal class MockOpeningKonepsHttp(
     private fun noticeListItems(operation: String): List<Map<String, String>> {
         noticeListCalls += operation
         val suffix = operation.removePrefix("getBidPblancListInfo")
-        return (1..noticesPerSlot).map { index -> noticeListRow(suffix, index) }
+        // canonical 이 **없는 표본**(D-6G-42) — 개찰 축 목록은 이 공고를 내지만 공고 목록 갈래는
+        // 내지 않는다. 상세는 받지만 대분류를 몰라 행이 서지 않는 자리다.
+        return (1..noticesPerSlot)
+            .filterNot { index -> suffix == NO_CANONICAL_SUFFIX && index == MISSING_SAMPLE_INDEX }
+            .map { index -> noticeListRow(suffix, index) }
     }
+
+    /** 상세 축 넷 — 목록 축과 가른다(목록은 표본틀을 만든다). */
+    private fun isDetailOperation(operation: String): Boolean =
+        operation.endsWith("PreparPcDetail") ||
+            operation.endsWith("OpengCompt") ||
+            operation.endsWith("BsisAmount") ||
+            operation.endsWith("BidPrceCalclAInfo")
+
+    /**
+     * 상세 요청의 공고번호는 **canonical**(ASCII 대문자화)이라 원문 접미와 그대로 맞대면 빗나간다 —
+     * 이어 돌기 조회가 같은 이유로 조용히 빗나갔던 자리와 같은 함정이다(D-6G-40).
+     */
+    private fun isDetailless(noticeNumber: String): Boolean =
+        indexOf(noticeNumber) == MISSING_SAMPLE_INDEX &&
+            noticeNumber.uppercase().contains("-${DETAILLESS_SUFFIX.uppercase()}-")
 
     /**
      * 공고 목록 행 — 대분류·하한율·마감·낙찰방법·**공고일**이 여기서만 온다.
@@ -287,3 +319,13 @@ private const val NO_NOTICE_DATE = 2
 private const val NO_BID_CLOSE = 3
 private const val NO_OPENING_DATE = 4
 private const val NO_PLANNED_PRICE = 5
+
+/**
+ * 표본인데 행이 되지 못하는 두 자리(D-6G-42) — 마지막 순번 하나를 업무마다 다른 사유로 쓴다.
+ * 공사에서는 상세가 비고, 용역에서는 공고 목록 canonical 이 없다. 두 계수가 **각각 1** 이 되어야
+ * 왕복이 「진부분집합」과 「결측 계수」를 실제로 지나간다 — 둘 다 0 이면 생산 쪽이 그 칸을 상수로
+ * 적어도 golden 이 초록이다.
+ */
+private const val MISSING_SAMPLE_INDEX = 6
+private const val DETAILLESS_SUFFIX = "Cnstwk"
+private const val NO_CANONICAL_SUFFIX = "Servc"
