@@ -2,11 +2,13 @@ package bidvector.app.http
 
 import bidvector.app.architecture.ArchitecturePolicy
 import bidvector.app.productionApplication
+import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.BeanFactoryUtils
 import org.springframework.boot.web.server.context.WebServerApplicationContext
 import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
 import org.springframework.boot.web.server.servlet.context.ServletWebServerInitializedEvent
@@ -103,9 +105,7 @@ class HttpSurfaceCensusTest {
      * **모르는 형태는 표기 하나로 남겨** 등식이 깨지게 한다(열거가 아니라 fail-closed).
      */
     private fun handlers(management: Boolean): Set<String> =
-        contextOf(management)
-            .getBeansOfType(HandlerMapping::class.java)
-            .values
+        mappingBeans(management)
             .flatMap { mapping ->
                 when (mapping) {
                     is AbstractHandlerMethodMapping<*> -> {
@@ -126,13 +126,15 @@ class HttpSurfaceCensusTest {
                 }
             }.toSet()
 
+    /** census 가 도는 모집단 — 한 컨텍스트에 **국소**인 `HandlerMapping` 빈이다. */
+    private fun mappingBeans(management: Boolean): Collection<HandlerMapping> =
+        contextOf(management).getBeansOfType(HandlerMapping::class.java).values
+
     private fun handlerName(handler: Any): String = if (handler is String) handler else handler::class.java.name
 
     /** 어노테이션 매핑만 — 문서 등식이 실제로 읽는 모집단이다. */
     private fun annotationHandlers(management: Boolean): Set<String> =
-        contextOf(management)
-            .getBeansOfType(HandlerMapping::class.java)
-            .values
+        mappingBeans(management)
             .filterIsInstance<AbstractHandlerMethodMapping<*>>()
             .flatMap { mapping -> mapping.handlerMethods.values.map { it.beanType.name } }
             .toSet()
@@ -179,6 +181,24 @@ class HttpSurfaceCensusTest {
         handlers(management = false) shouldBe annotationHandlers(management = false)
     }
 
+    /**
+     * M-r3-4 — 진입점 동일성이 **클래스 이름**이라 세 자리에서 접힌다. 그 가운데 가장 좁은 갈래
+     * (두 번째 method mapping 빈이 **이미 계약에 있는 컨트롤러**를 새 경로에 거는 형태)는 위
+     * 두 등식이 보지 못한다. 그래서 「빈이 하나뿐」과 「`RouterFunction` 이 없음」을 직접 못박는다 —
+     * 둘 중 하나가 생기는 순간 **게이트 자체를 고쳐야** 열린다.
+     */
+    @Test
+    fun `API 포트의 진입점 축이 하나다 — method mapping 빈 하나 · RouterFunction 없음`() {
+        contextOf(management = false)
+            .getBeansOfType(AbstractHandlerMethodMapping::class.java)
+            .map { (name, bean) -> "$name:${bean::class.java.name}" }
+            .sorted() shouldBe policy.apiSurfaceMethodMappingBeans.sorted()
+        contextOf(management = false)
+            .getBeansOfType(RouterFunctionMapping::class.java)
+            .values
+            .mapNotNull { it.routerFunction } shouldBe emptyList()
+    }
+
     @Test
     fun `API 포트의 Filter·Servlet 등록 집합이 계약과 같다`() {
         filters(management = false) shouldBe policy.apiSurfaceFilters.toSet()
@@ -194,5 +214,27 @@ class HttpSurfaceCensusTest {
     fun `관리 포트의 Filter·Servlet 등록 집합이 계약과 같다`() {
         filters(management = true) shouldBe policy.managementSurfaceFilters.toSet()
         servlets(management = true) shouldBe policy.managementSurfaceServlets.toSet()
+    }
+
+    /**
+     * D-6A2b-38(L-r3-5·verifier L-r3-2) — 계약에 오른 `알 수 없는 종류: …CompositeHandlerMapping`
+     * 은 **풀지 않고 수용한 항목**이다. 수용의 근거는 그것이 스스로 handler 를 만들지 않고
+     * 자기 컨텍스트와 **조상**의 `HandlerMapping` 빈에게 넘기기만 한다는 것 — 즉 census 가
+     * 두 컨텍스트에서 이미 도는 빈들이다. 근거를 문장으로만 두지 않고 여기서 잠근다.
+     *
+     * census 는 컨텍스트마다 **국소** 빈만 돈다. 조상까지 포함해 닿는 집합이 그 합집합을
+     * 넘어서면(제3의 조상 컨텍스트가 끼면) 위임 대상 중 census 밖이 생긴 것이라 RED 다.
+     */
+    @Test
+    fun `관리 포트 composite 가 위임할 수 있는 mapping 빈은 census 가 이미 도는 빈이다`() {
+        val reachable =
+            BeanFactoryUtils
+                .beansOfTypeIncludingAncestors(contextOf(management = true), HandlerMapping::class.java)
+                .values
+                .map { it::class.java.name }
+        val censused = (mappingBeans(management = true) + mappingBeans(management = false)).map { it::class.java.name }
+
+        reachable.shouldNotBeEmpty()
+        censused shouldContainAll reachable
     }
 }
