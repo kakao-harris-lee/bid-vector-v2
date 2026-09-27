@@ -86,12 +86,19 @@ class ArchitecturePolicy private constructor(
         get() = list("app.assembly.tier2.allowed-classes") + list("app.assembly.tier2.allowed-app-classes")
     val appTier2DeniedPackages: List<String> get() = list("app.assembly.tier2.denied-packages")
 
+    /** D-6A2b-41 ② — ② 층이 참조해도 되는 `workflow` 타입(정확한 이름). 패키지 통째가 아니다. */
+    val appTier2AllowedWorkflowTypes: List<String> get() = list("app.assembly.tier2.allowed-workflow-types")
+
+    /** D-6A2b-41 — 능력 포트 도출의 뿌리가 있는 모듈 루트와, use case 조립이 허용된 (호출자, 타입) 쌍. */
+    val appWorkflowRoot: String get() = value("app.workflow-root")
+    val appUseCaseConstructionPairs: List<String> get() = list("app.workflow.use-case-construction-pairs")
+
     /** D-6A2b-34 — ① 층이 의존할 수 없는 HTTP 확장 API 접두와, 오늘 실제로 쓰는 예외 클래스. */
     val appBootstrapForbiddenPackages: List<String> get() = list("app.assembly.tier1.forbidden-http-packages")
     val appBootstrapHttpApiTypes: List<String> get() = list("app.assembly.tier1.http-api-types")
 
-    /** D-6A2b-36 — 어댑터 인터페이스 메서드 호출의 허용 쌍(`호출자|인터페이스|메서드`). */
-    val appAdapterInterfaceCallTriples: List<String> get() = list("app.adapter.interface-call-triples")
+    /** D-6A2b-36·43·44 — 어댑터 멤버 호출의 허용 쌍(`호출자|선언 타입|메서드|서술자`). */
+    val appAdapterMemberCallPairs: List<String> get() = list("app.adapter.member-call-pairs")
 
     /** D-6A2b-37 — 제한·요청 스코프 층이 참조할 수 있는 어댑터 예외 타입(정확한 이름). */
     val appAdapterExceptionTypes: List<String> get() = list("app.adapter.exception-types")
@@ -103,6 +110,8 @@ class ArchitecturePolicy private constructor(
 
     /** M-r3-4 — API 포트의 method mapping 빈 집합(`빈 이름:타입`) — 진입점 축의 목록이다. */
     val apiSurfaceMethodMappingBeans: List<String> get() = list("app.surface.api.method-mapping-beans")
+    val managementSurfaceMethodMappingBeans: List<String>
+        get() = list("app.surface.management.method-mapping-beans")
     val managementSurfaceHandlers: List<String> get() = list("app.surface.management.handlers")
     val managementSurfaceFilters: List<String> get() = list("app.surface.management.filters")
     val managementSurfaceServlets: List<String> get() = list("app.surface.management.servlets")

@@ -29,11 +29,14 @@ class AppHttpDependencyGateTest {
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TEST_FIXTURES)
             .importPackages(policy.packageRoot)
     private val fixtureRoot = "${policy.packageRoot}.archfixture.violating"
-    private val violating: JavaClasses = ClassFileImporter().importPackages(fixtureRoot)
+    private val violating: JavaClasses =
+        ClassFileImporter().importPackages(fixtureRoot, "${policy.packageRoot}.adapters.archfixture")
 
     private val appRoot = "${policy.packageRoot}.app"
 
     private fun capabilityPorts(): Set<String> = rules.capabilityPorts(production)
+
+    private fun useCaseAssemblyTypes(): Set<String> = rules.useCaseAssemblyTypes(production, capabilityPorts())
 
     @Test
     fun `use case 생성자에서 도출한 포트 집합이 계약과 같다 — 집합 등식`() {
@@ -157,15 +160,24 @@ class AppHttpDependencyGateTest {
     }
 
     /**
-     * 예외 통로의 **양성 대조** — 오류 매핑표가 참조하는 어댑터 예외 타입은 보고되지
-     * 않는다. 이 단언이 없으면 「어댑터는 전부 금지」로 좁혀도 음성 test 가 초록이라,
+     * 예외 통로의 **양성 대조** — 오류 매핑표가 참조하는 어댑터 예외 타입은 **타입 축**에서
+     * 보고되지 않는다. 이 단언이 없으면 「어댑터는 전부 금지」로 좁혀도 음성 test 가 초록이라,
      * 매핑표가 설 자리가 사라진 것을 아무도 모른다.
+     *
+     * 멤버 축은 별개다 — 같은 타입이라도 **자기 멤버**를 부르면 보고된다(D-6A2b-37, 음성
+     * fixture 가 그 자리를 잡는다). 그래서 타입 축의 두 규칙만 본다.
      */
     @Test
-    fun `어댑터 예외 타입 참조는 보고되지 않는다 — Throwable 통로`() {
-        val details = fixtureDetails() + productionDetails()
-        details.filter { it.contains("InvalidStoredStrategyException") }.toList() shouldBe emptyList()
-        details.filter { it.contains("CandidateCapExceededException") }.toList() shouldBe emptyList()
+    fun `어댑터 예외 타입 참조는 타입 축에서 보고되지 않는다 — 정확 목록 통로`() {
+        val typeAxis = listOf(AppRuleId.RESTRICTED_ALLOWLIST, AppRuleId.TIER2_ALLOWLIST)
+        val fixtures = fixtureRules()
+        val production = rules.rules(appRoot, capabilityPorts(), useCaseAssemblyTypes())
+        val details =
+            typeAxis.flatMap { fixtures.getValue(it).detailsOn(violating) } +
+                typeAxis.flatMap { production.getValue(it).detailsOn(this.production) }
+
+        details.filter { it.contains("InvalidStoredStrategyException") } shouldBe emptyList()
+        details.filter { it.contains("CandidateCapExceededException") } shouldBe emptyList()
     }
 
     /**
@@ -181,49 +193,81 @@ class AppHttpDependencyGateTest {
         ) shouldBe policy.operatorCredentialReferencers.toSet()
     }
 
-    private fun fixtureRules(): List<ArchRule> = rules.rules(fixtureRoot + ".app", capabilityPorts(), emptyLayers())
+    /**
+     * D-6A2b-45 — 규칙마다 **영구 음성 fixture** 가 하나씩 있고, **그 규칙이** 그것을 보고한다.
+     *
+     * verifier r4 F-r4-4: 규칙 넷을 항상 공집합이 되게 바꿔도 RED 는 한 건뿐이었다. production 이
+     * 오늘 그 규칙들을 어기지 않으니 **항진식이 되어도 조용하다**. 합쳐서 보면 다른 규칙의 위반이
+     * 그 자리를 메우므로, 판정은 **규칙별로** 한다 — 어느 규칙 하나를 공집합으로 바꾸면 그 규칙의
+     * 줄이 RED 다. 층 배정은 규칙마다 다르므로 규칙 값은 그대로 두고 배정만 얹는다.
+     */
+    @Test
+    fun `규칙마다 자기 음성 fixture 를 보고한다 — 규칙별 비공허성`() {
+        val expected =
+            mapOf(
+                AppRuleId.RESTRICTED_ALLOWLIST to listOf("RogueAdminSqlHelper", "RogueUnlistedExceptionUser"),
+                AppRuleId.TIER2_ALLOWLIST to listOf("RogueTier2JdbcHolder"),
+                AppRuleId.COLLECTION_REFERENCE to listOf("RogueCollectionReferencer"),
+                AppRuleId.ADAPTER_MEMBER_CALL to listOf("RogueAdapterMemberCaller", "RogueExceptionOwnMember"),
+                AppRuleId.TIER2_CAPABILITY to listOf("RogueTier2CapabilityHolder"),
+                AppRuleId.USE_CASE_CONSTRUCTION to listOf("RogueUseCaseAssembler"),
+                AppRuleId.TIER1_HTTP_API to listOf("RogueTier1HttpExtension"),
+            )
+        val byRule = tierFixtureRules()
 
-    /** fixture 루트의 층 배정 — 같은 규칙 값에 배정만 얹는다. */
-    private fun tierFixtureRules(): List<ArchRule> =
+        // 규칙이 늘면 fixture 도 함께 늘어야 한다 — 새 규칙이 음성 대조 없이 서지 못한다.
+        byRule.keys shouldBe AppRuleId.entries.toSet()
+        expected.keys shouldBe AppRuleId.entries.toSet()
+
+        val missing =
+            expected.flatMap { (id, markers) ->
+                val details = byRule.getValue(id).detailsOn(violating)
+                markers.filter { marker -> details.none { it.contains(marker) } }.map { "$id: $it" }
+            }
+        missing shouldBe emptyList()
+    }
+
+    private fun fixtureRules(): Map<AppRuleId, ArchRule> =
+        rules.rules(fixtureRoot + ".app", capabilityPorts(), useCaseAssemblyTypes(), emptyLayers())
+
+    /**
+     * fixture 루트의 층 배정 — 같은 규칙 값에 배정만 얹는다. 규칙마다 영구 음성 fixture 를
+     * 하나씩 두려면 그 fixture 가 서는 층도 함께 정해야 한다(D-6A2b-45).
+     */
+    private fun tierFixtureRules(): Map<AppRuleId, ArchRule> =
         rules.rules(
             fixtureRoot + ".app",
             capabilityPorts(),
+            useCaseAssemblyTypes(),
             LayerAssignment(
-                bootstrap = emptySet(),
-                requestScoped = setOf("$fixtureRoot.app.tiers.RogueTier2JdbcHolder"),
+                bootstrap = setOf("$fixtureRoot.app.rules.RogueTier1HttpExtension"),
+                requestScoped =
+                    setOf(
+                        "$fixtureRoot.app.tiers.RogueTier2JdbcHolder",
+                        "$fixtureRoot.app.rules.RogueTier2CapabilityHolder",
+                    ),
                 collection = setOf("$fixtureRoot.app.tiers.RogueCollectionLane"),
             ),
         )
 
     private fun emptyLayers(): LayerAssignment = LayerAssignment(emptySet(), emptySet(), emptySet())
 
-    private fun fixtureDetails(): List<String> =
-        fixtureRules().flatMap {
-            it
-                .allowEmptyShould(true)
-                .evaluate(violating)
-                .failureReport.details
-        }
+    private fun fixtureDetails(): List<String> = fixtureRules().values.flatMap { it.detailsOn(violating) }
 
     private fun productionDetails(): List<String> =
         rules
-            .rules(appRoot, capabilityPorts())
-            .flatMap {
-                it
-                    .allowEmptyShould(true)
-                    .evaluate(production)
-                    .failureReport.details
-            }
+            .rules(appRoot, capabilityPorts(), useCaseAssemblyTypes())
+            .values
+            .flatMap { it.detailsOn(production) }
+
+    private fun ArchRule.detailsOn(classes: JavaClasses): List<String> =
+        allowEmptyShould(true)
+            .evaluate(classes)
+            .failureReport.details
 
     /** 이름만 보지 않는다 — **어느 대상 때문에** 잡혔는지까지 확인한다(기존 음성 test 관례). */
-    private infix fun List<ArchRule>.mustReport(expected: Pair<String, String>) {
-        val details =
-            flatMap {
-                it
-                    .allowEmptyShould(true)
-                    .evaluate(violating)
-                    .failureReport.details
-            }
+    private infix fun Map<AppRuleId, ArchRule>.mustReport(expected: Pair<String, String>) {
+        val details = values.flatMap { it.detailsOn(violating) }
         details.filter { it.contains(expected.first) && it.contains(expected.second) }.shouldNotBeEmpty()
     }
 }
