@@ -208,6 +208,25 @@ in_scope 경로 한정 `git restore --source=<base> --staged --worktree -- <경�
 | **D-6A2b-39** | 구현 레인 자체 탐침 N3(요청 시점 `ServletContext.addServlet` — 컨테이너가 `IllegalStateException` 으로 막음, 붙어도 인증 필터가 `/*`)·N4(`ServiceLoader` 로 어댑터 타입을 적지 않고 능력 세탁 — 오늘 실행 불가)는 **D-6A2b-33 경계 밖**(평범한 리팩터링으로 생기지 않는 형태)으로 수용한다. **`OPEN-6A2B-LOCATOR-BAN`** 신설(locator·ServiceLoader 금지는 리플렉션 봉쇄 게이트(D-6F8-13)의 자리 — 그 레인으로). N2(허용 타입만으로 새 Filter 등록)는 의존 게이트를 통과하고 표면 실측(27)이 RED — 두 축이 함께 필요하다는 역방향 증명으로 checklist 에 둔다 |
 | **D-6A2b-40** | 이 라운드 커밋 넷의 trailer 가 앞 라운드와 다르다(세션 중 하네스 귀속 지시 변경). **이력을 되쓰지 않고** evidence 에 사실로 둔다 |
 
+## 계약 갱신 r4 (2026-09-27, 팀장 — verifier r4 not-ready F-r4-1~4 · code-reviewer r4 N-r4-1~14·OQ-1~3 수령)
+
+재작업 **4/5 — 다음 not-ready 는 상한이다.** 이번 라운드로 닫히지 않으면 라운드를 더 돌리지 않고 진단과 함께 운영자에게 올린다.
+차단은 두 갈래다. ① **새 축 — 능력 전달(F-r4-1)**: ② 층이 이미 쥔 `StrategyRepository`(쓰기 가능 포트)로 메모리 세션 저장소·no-op sink 를 붙여
+`EditStrategyWorkflow` 를 **스스로 조립**하면 GET 한 번에 전략이 바뀌고 outbox·세션이 0 이다. 오늘 dry-run 조립과 같은 모양이라 평범한 형태다(D-6A2b-33 HIGH).
+**D-6A2b-32 가 이 조립을 허용했다 — 계약의 결함이다.** ② **계약 미이행 셋(F-r4-2·N-r4-1·N-r4-2·N-r4-3)**: r3 계약 문면(D-6A2b-36·37)과 구현 술어가 다르다.
+
+| ID | 결정 |
+|---|---|
+| **D-6A2b-41** | **(F-r4-1) ② 층은 쓰기 능력을 쥐지 못한다.** ① 읽기 쪽(`StrategyQuery`·`EvaluationDryRunFactory` 의 전략 읽기)은 **`save` 가 없는 읽기 전용 포트**만 받는다 — workflow 에 읽기 포트(`load` 하나)를 두고 `StrategyRepository` 가 그것을 확장하게 하거나 동등한 구조로(이름은 구현 레인). ② ② 층의 workflow 허용을 `workflow.strategy` **패키지 통째에서 정확한 타입 목록**으로 좁히고, 그 목록에 쓰기 능력 포트(`StrategyRepository`·`EditSessionRepository`·`EventSink`·outbox 포트 등 — 게이트의 기존 **능력/주변 구조 분류**로 도출, 손 목록 금지)와 **use case 생성자**를 넣지 않는다. ③ 편집 use case 의 생성은 **어댑터 트랜잭션 경계 한 곳**뿐이다(D-6A2b-3 이 이미 그 자리). dry-run 의 `EvaluateCandidatesUseCase` 조립은 `OPEN-6A2B-DRYRUN-ASSEMBLY-IN-APP` 로 정확히 한 호출자(`EvaluationDryRunFactory`)에 고정 — 다른 ② 층 클래스가 use case 생성자를 부르면 RED. 변이: verifier F-r4-1 그대로 RED + 같은 조립을 `EvaluationDryRunFactory` 에서 편집 use case 로 시도 → RED |
+| **D-6A2b-42** | **(F-r4-2·N-r4-1) D-6A2b-37 첫 절 이행** — 어댑터 예외는 `isAssignableTo(Throwable)` 이 아니라 **정확 목록 소속**으로 판정(② 층은 여기에 정확 목록의 인터페이스만 추가). 목록 밖 어댑터 예외 참조 → RED. verifier r3 A4(새 예외 타입) RED |
+| **D-6A2b-43** | **(N-r4-3) 어댑터 멤버 호출 판정을 fail-closed 로.** `disallowedAdapterCall` 의 「그 밖」 갈래는 허용이 아니라 거부다 — ② 층·제한 층의 어댑터 멤버 호출은 **등재된 쌍만**(오늘 실제 호출 둘: 트랜잭션 실행 · 기록형 알림 조회). 구체 클래스 멤버도 대상 |
+| **D-6A2b-44** | **(F-r4-3·N-r4-2) 호출 쌍 좌표에 매개변수 타입.** (호출자, 선언 타입, 메서드 이름, **descriptor**) — 오버로드를 더하면 RED |
+| **D-6A2b-45** | **(F-r4-4) 규칙마다 영구 음성 fixture.** D-6A2b-34(① 층 HTTP API) · 36/43/44(호출 쌍) · 37/42(예외) · 41(능력 전달) 각각에 fixture 하나, ③ 층 fixture 는 제한 층 규칙과 **격리**(그 규칙을 끈 층 배정으로도 RED). 대조: 규칙 하나를 항상 공집합으로 바꾸면 **그 규칙의 fixture 가** RED |
+| **D-6A2b-46** | 게이트 신뢰도(같은 라운드): **(N-r4-4)** 금지 접두에 `org.springframework.boot.webmvc` 등 형제 패키지 — 접두 판정을 패키지 **경계**(`.` 경계 startsWith)로 유지하되 목록은 계약 파일이 정본이고 scope 는 개수를 적지 않는다 · **(N-r4-6)** 게이트 등재 meta-gate 의 대상을 파일명 문자열이 아니라 **구조**로(JUnit 태그 등 기존 모듈 관례를 따라 — 태그 집합 == 등재 목록 등식), 양성 대조 항진식 제거 · **(N-r4-7)** `gate-tests.properties` 를 `:app:test` 의 선언된 입력으로(workflow 선례) · **(OQ-1)** `checkcast`·`anewarray` 가 ArchUnit 직접 의존에 잡히지 않는다는 사실을 KDoc 에 적는다(verifier r4 실측: 게이트 초록) · **(OQ-2)** ① 층 `@Endpoint`/`@WriteOperation` 이 노출되지 않음을 관리 표면 잠금 test 로 **실측**(잠금이 막는다는 주장 확인, 새 게이트 아님) |
+| **D-6A2b-47** | 문면·LOW 일괄: **(N-r4-5)** KDoc 넷 정정(「열거가 아니라 구성」 서술은 실제 규칙 다섯의 모양대로) · **(N-r4-8)** 기준 대조를 actor·전이표 앞에 둔 순서는 **유지**(M-r3-6 요구) — HTTP 로 도달 불가한 상호작용을 알려진 제한 + 전이표 test 로 기록 · N-r4-9~14 · verifier L-r4-1~3 |
+
+**보고 필수(이번이 마지막 자동 라운드)**: 새 public 표면(읽기 포트 추가가 workflow 공개 표면을 넓힌다 — 밖에 무엇을 허락하는가) · 새 파일 ↔ in_scope · 규칙별 음성 fixture 표 · F-r4-1·A4·오버로드 변이 RED · **스스로 고안한 우회 셋 이상(D-6A2b-33 경계 안쪽)** · rollback 재산출·재실측.
+
 ## 하네스 레인 변경 (상시 절)
 
 구현 레인 checklist 「하네스 레인 변경」 절을 옮긴다(2026-09-27, 판정 SHA 고정 시점).
