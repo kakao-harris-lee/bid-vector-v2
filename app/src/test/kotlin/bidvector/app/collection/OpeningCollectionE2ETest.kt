@@ -11,6 +11,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
@@ -24,6 +25,8 @@ import org.springframework.boot.context.event.ApplicationPreparedEvent
 import org.springframework.context.ApplicationListener
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
+import java.nio.file.Files
+import java.nio.file.Path
 import java.sql.ResultSet
 import java.time.Instant
 import java.time.LocalDate
@@ -69,8 +72,12 @@ class OpeningCollectionE2ETest {
         }
     }
 
+    /** test 마다 새 표본 목록 파일 — 앞 test 의 공고번호(nonce 가 다르다)를 표본으로 물려받지 않는다. */
+    private lateinit var sampleListFile: Path
+
     private fun bootAndRun(extra: Map<String, String>): Pair<List<Int>, MockOpeningKonepsHttp> {
         logs.list.clear()
+        sampleListFile = Files.createTempDirectory("6g-e2e-sample").resolve("sample-list.tsv")
         val mock = MockOpeningKonepsHttp(noticesPerSlot = NOTICES_PER_SLOT, bidderName = BIDDER_NAME)
         val context =
             SpringApplicationBuilder(
@@ -98,6 +105,7 @@ class OpeningCollectionE2ETest {
                         // 남긴 collection_run 행이 다음 test 의 상한을 갉아먹는다 — 그것이 영속이
                         // 실제로 동작한다는 증거이기도 하다.
                         "bidvector.opening-collection.budget-since" to Instant.now().toString(),
+                        "bidvector.opening-collection.sample-list-file" to sampleListFile.toString(),
                         "bidvector.koneps.service-key" to SERVICE_KEY,
                         "bidvector.koneps.base-url" to mock.baseUrl,
                         "bidvector.koneps.opening.scsbid-base-url" to mock.baseUrl,
@@ -163,6 +171,23 @@ class OpeningCollectionE2ETest {
         // 상호는 raw 관측까지는 오지만 **로그에는 없다**(러너의 줄이 계수와 열거값뿐이다).
         captured shouldNotContain BIDDER_NAME
         captured shouldContain "opening-collection finished"
+    }
+
+    /**
+     * 출하 조립이 표본을 **파일로** 확정한다(D-6G-39) — 다음 실행이 다시 뽑지 못하게 하는 것은 이
+     * 파일이다. 파일이 없으면 「결과를 보기 전에 확정했다」는 실행 로그의 주장일 뿐이다.
+     */
+    @Test
+    fun `표본 목록이 저장소 밖 파일로 확정된다 — 층마다 목표만큼`() {
+        bootAndRun(emptyMap())
+
+        val lines = Files.readString(sampleListFile).trimEnd('\n').lines()
+        lines shouldHaveSize TARGET_PER_STRATUM * 2
+        val hashes = lines.map { it.substringBefore('\t') }
+        hashes shouldContainExactly hashes.sorted()
+        lines.map { it.split('\t')[1] }.toSet() shouldBe setOf("CONSTRUCTION", "SERVICE")
+        val captured = logs.list.joinToString("\n") { it.formattedMessage }
+        captured shouldContain "sampled=${lines.size} "
     }
 
     @Test

@@ -5,6 +5,7 @@ import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.NoticeKeyHash
+import bidvector.workflow.collection.SampleList
 import java.math.BigDecimal
 import java.sql.ResultSet
 import java.time.LocalDate
@@ -28,29 +29,35 @@ class JdbcSnapshotSource(
     private val dataSource: DataSource,
     private val policy: KonepsCollectionPolicyData,
 ) {
+    /**
+     * **표본은 [sample] 이 정한다**(D-6G-39). v3 까지는 「상세 관측이 있으면 표본이었다」로 역산했고,
+     * 그것은 수집이 도중에 무엇을 불렀는가에 기댄 정의였다 — 확정 목록과 어긋나도 드러나지 않았다.
+     * 이제 표본 밖은 세기만 하고, 표본인데 행이 되지 못한 공고는 **사유별로** 계수된다.
+     */
     fun extract(
         from: LocalDate,
         to: LocalDate,
+        sample: SampleList,
     ): SnapshotExtraction {
         val observations = readObservations(from, to)
         val notices = readNotices()
         val rows = mutableListOf<SnapshotRow>()
-        var skipped = 0
-        var frameOnly = 0
+        val withDetail = mutableSetOf<NoticeKeyHash>()
+        var withoutNotice = 0
+        var outsideSample = 0
         for ((key, axes) in observations) {
-            val canonical = notices[key]
-            when {
-                // **표본만 싣는다**(D-6G-28). 상세 축은 표본에 뽑힌 공고에만 나가므로(수집 갈래의
-                // 구조), 상세 관측의 존재가 곧 「표본이었다」이다 — 표본 목록을 따로 나르지 않고도
-                // 정확하다. 표본틀에만 있던 공고(목록 축만 있는 행)는 싣지 않는다.
-                axes.keys.none { it in DETAIL_ENDPOINTS } -> frameOnly++
-
-                canonical == null -> skipped++
-
-                else -> rows += assembleSnapshotRow(key, axes, canonical)
+            val hash = NoticeKeyHash.of(key.number, key.round)
+            // 상세가 하나도 없는 표본은 세지 않고 지나간다 — 아래의 **차집합**이 센다. 여기서 세면
+            // 관측이 아예 없는 표본(원문이 한 줄도 안 온 공고)을 놓친다.
+            if (hash !in sample.keys) {
+                outsideSample++
+            } else if (axes.keys.any { it in DETAIL_ENDPOINTS }) {
+                withDetail += hash
+                val canonical = notices[key]
+                if (canonical == null) withoutNotice++ else rows += assembleSnapshotRow(key, axes, canonical)
             }
         }
-        return SnapshotExtraction(rows, skipped, frameOnly)
+        return SnapshotExtraction(rows, withoutNotice, sample.keys.size - withDetail.size, outsideSample)
     }
 
     private fun readObservations(
@@ -109,14 +116,19 @@ class JdbcSnapshotSource(
 internal const val RESERVE_PRICE_SLOTS = 15
 
 /**
- * 추출 결과 — 행과 두 계수. [skippedWithoutNotice] 는 공고 목록 canonical 이 없어 대분류를 몰라
- * 만들지 못한 공고, [frameOnlyNotices] 는 표본틀에만 있던(상세를 부르지 않은) 공고다. 둘 다
- * 지어내지 않은 것의 계수다.
+ * 추출 결과 — 행과 계수 셋. **닫힌 항등식**(스키마 §2)이 성립한다:
+ * `표본 크기 == rows.size + sampledWithoutDetail + skippedWithoutNotice`. 표본 하나하나가 행이
+ * 되었거나 되지 못한 사유로 계수된다 — 어느 쪽도 아닌 공고는 없다.
+ *
+ * [observedOutsideSample] 은 항등식 밖이다. 표본이 아닌 공고의 관측 수이므로 정상 값이 크다(표본틀
+ * 전체가 여기 든다). 0 이 아닌 것이 문제가 아니라, 표본 쪽 계수가 전부 0 인데 이 값만 큰 것이
+ * 문제다 — 엉뚱한 표본 목록 파일을 가리켰다는 뜻이다.
  */
 data class SnapshotExtraction(
     val rows: List<SnapshotRow>,
     val skippedWithoutNotice: Int,
-    val frameOnlyNotices: Int,
+    val sampledWithoutDetail: Int,
+    val observedOutsideSample: Int,
 )
 
 private val DETAIL_ENDPOINTS =

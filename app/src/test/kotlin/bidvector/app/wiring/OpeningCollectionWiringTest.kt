@@ -18,6 +18,8 @@ import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
+import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
 import java.util.function.Supplier
 import javax.sql.DataSource
@@ -41,6 +43,9 @@ private object StubAxisStore : CollectedAxisStore {
     ): Set<NoticeId> = emptySet()
 }
 
+/** 저장소 밖 — 배선은 경로를 검사할 뿐 파일을 만들지 않는다(표본 확정은 수집이 한다). */
+private val WIRING_SAMPLE_LIST: Path = Files.createTempDirectory("6g-wiring-sample").resolve("sample-list.tsv")
+
 class OpeningCollectionWiringTest {
     private val fixedNow = Instant.parse("2026-09-24T03:00:00Z")
 
@@ -55,6 +60,7 @@ class OpeningCollectionWiringTest {
             "bidvector.opening-collection.calls-per-day=100",
             "bidvector.opening-collection.calls-total=1000",
             "bidvector.opening-collection.budget-since=2026-01-01T00:00:00Z",
+            "bidvector.opening-collection.sample-list-file=$WIRING_SAMPLE_LIST",
             "bidvector.koneps.service-key=WIRING-TEST-KEY",
         )
 
@@ -77,6 +83,10 @@ class OpeningCollectionWiringTest {
     }
 
     private fun bootWithout(key: String): Booted = boot(*approved.filterNot { it.startsWith("$key=") }.toTypedArray())
+
+    /** 승인 설정에서 한 항목만 바꿔 넣는다 — 하나만 넘기면 나머지가 없어 조건 자체가 서지 않는다. */
+    private fun bootWith(property: String): Booted =
+        boot(*approved.filterNot { it.startsWith(property.substringBefore('=') + "=") }.toTypedArray(), property)
 
     private fun <T> use(
         booted: Booted,
@@ -118,6 +128,17 @@ class OpeningCollectionWiringTest {
     @Test
     fun `예산 시작 시점이 없으면 기동하지 않는다 — 어느 시점부터 상한을 세는지를 지어내지 않는다`() {
         bootWithout("bidvector.opening-collection.budget-since").failure shouldNotBe null
+    }
+
+    /**
+     * 표본 목록 자리를 지어내지 않는다(D-6G-39) — 기본 경로를 두면 다른 수집의 표본을 조용히
+     * 이어받는다. 저장소 **안**을 가리키면 기동이 실패한다(D-6G-43): 표본 목록은 커밋되지 않는다.
+     */
+    @Test
+    fun `표본 목록 파일이 없거나 저장소 안이면 기동하지 않는다`() {
+        bootWithout("bidvector.opening-collection.sample-list-file").failure shouldNotBe null
+        bootWith("bidvector.opening-collection.sample-list-file=reports/evidence/sample-list.tsv")
+            .failure shouldNotBe null
     }
 
     @Test

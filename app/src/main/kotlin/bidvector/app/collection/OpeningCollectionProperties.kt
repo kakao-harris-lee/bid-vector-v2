@@ -27,6 +27,12 @@ data class OpeningCollectionProperties(
      * 매번 정해야 한다.
      */
     val budgetSince: java.time.Instant,
+    /**
+     * 표본 목록 파일(D-6G-39) — 저장소 **밖** 경로. 첫 실행이 여기에 표본을 확정하고, 이후 실행은
+     * 읽기만 한다. 기본값이 없다: 어디에 확정했는지를 실행자가 매번 대야 다른 수집의 표본을 조용히
+     * 이어받지 않는다.
+     */
+    val sampleListFile: String,
     /** 원문 저장 행의 출처 표식 — 빌드 식별자를 모르는 로컬 실행이 값을 지어내지 않고 「모름」을 적는다. */
     val releaseSha: String = "unversioned",
 )

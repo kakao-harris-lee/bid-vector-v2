@@ -75,6 +75,7 @@ class SnapshotExtractionE2ETest {
                     "bidvector.opening-collection.calls-per-day" to "10000",
                     "bidvector.opening-collection.calls-total" to "10000",
                     "bidvector.opening-collection.budget-since" to Instant.now().toString(),
+                    "bidvector.opening-collection.sample-list-file" to SAMPLE_LIST_FILE.toString(),
                 ),
             )
         }
@@ -113,10 +114,10 @@ class SnapshotExtractionE2ETest {
             }
         }
 
-        fun extractTo(
-            outputDir: Path,
-            sampleListSha256: String = "feedfacecafe",
-        ): List<Int> =
+        /** 수집이 확정한 표본 목록 파일 — 추출도 **같은 파일**을 읽는다(D-6G-39). */
+        val SAMPLE_LIST_FILE: Path = Files.createTempDirectory("6g-sample-list").resolve("sample-list.tsv")
+
+        fun extractTo(outputDir: Path): List<Int> =
             bootOnce(
                 mapOf(
                     "bidvector.snapshot-extract.mode" to "once",
@@ -125,7 +126,7 @@ class SnapshotExtractionE2ETest {
                     "bidvector.snapshot-extract.to" to LocalDate.now().plusDays(1).toString(),
                     "bidvector.snapshot-extract.output-dir" to outputDir.toString(),
                     "bidvector.snapshot-extract.snapshot-id" to "snap-e2e",
-                    "bidvector.snapshot-extract.sample-list-sha256" to sampleListSha256,
+                    "bidvector.snapshot-extract.sample-list-file" to SAMPLE_LIST_FILE.toString(),
                 ),
             )
     }
@@ -153,12 +154,28 @@ class SnapshotExtractionE2ETest {
         rows shouldNotContain "OPEN-E2E"
     }
 
+    /**
+     * D-6G-38 — 추첨번호는 **예비가격 상세의 `drwtYn=Y` 행 순번**이지 투찰자가 고른 번호가 아니다.
+     * mock 이 둘을 겹치지 않게 두므로(뽑힌 `3,7,11,14` ↔ 선택 `1,2,4,5,6,8`), 출처가 틀리면 이 단언이
+     * 곧바로 붉어진다. r1 은 둘을 같게 맞춰 둬서 틀린 출처가 초록으로 지나갔다.
+     */
     @Test
-    fun `추첨번호가 실제로 찬다 — 상수 null 이 아니다`() {
+    fun `추첨번호는 뽑힌 번호다 — 투찰자 선택이 아니다`() {
         val rows = extractedRows()
 
         rows shouldContain "\"drawn_serial_numbers\":[3,7,11,14]"
         rows shouldNotContain "\"drawn_serial_numbers\":null"
+        // 선택 합집합(1,2,4,5,6,8)이 그대로 실리는 모양이 아니다.
+        rows shouldNotContain "\"drawn_serial_numbers\":[1,2,4,5,6,8]"
+    }
+
+    @Test
+    fun `참가업체수가 투찰 행 수와 같다`() {
+        val rows = extractedRows()
+
+        rows.trimEnd('\n').lines().forEach { line ->
+            line shouldContain "\"participant_count\":3"
+        }
     }
 
     @Test
@@ -179,9 +196,9 @@ class SnapshotExtractionE2ETest {
     }
 
     /**
-     * D-6G-37 — golden 은 **Python 레인의 fixture 자리**에 둔다(저장소 루트의 `fixtures` 는 data-extract 의 corpus
-     * 자리라 실험 fixture 를 섞지 않는다). manifest 의 `sample_list_sha256` 은 그 파일의 행 집합으로
-     * 계산한다 — golden 안에서 자기 완결이어야 Python 이 그 대조를 돌릴 수 있다.
+     * D-6G-37 — golden 은 **Python 레인의 fixture 자리**에 둔다(저장소 루트의 `fixtures` 는
+     * data-extract 의 corpus 자리라 실험 fixture 를 섞지 않는다). v4 부터 파일이 셋이다: 표본 목록도
+     * golden 에 들어가야 판독이 `sample_list_sha256` 대조를 돌릴 수 있다.
      */
     @Test
     fun `추출 바이트가 golden 과 같다 — 레인 간 왕복의 고정점`() {
@@ -189,33 +206,18 @@ class SnapshotExtractionE2ETest {
         val work = Files.createTempDirectory("snapshot-golden")
 
         extractTo(work)
-        val rows = Files.readString(work.resolve("rows.jsonl"))
-        val sampleList = sampleListSha256Of(rows)
-        extractTo(work, sampleList)
-        val manifest = Files.readString(work.resolve("manifest.json"))
+        val produced = SNAPSHOT_FILES.associateWith { Files.readString(work.resolve(it)) }
 
         if (System.getenv("BIDVECTOR_WRITE_GOLDEN") == "1") {
             Files.createDirectories(goldenDir)
-            Files.writeString(goldenDir.resolve("rows.jsonl"), rows)
-            Files.writeString(goldenDir.resolve("manifest.json"), manifest)
+            produced.forEach { (name, bytes) -> Files.writeString(goldenDir.resolve(name), bytes) }
         }
         // **비교만 한다.** 없으면 스스로 써서 초록이 되는 test 는 무엇도 잠그지 않는다.
-        Files.exists(goldenDir.resolve("rows.jsonl")) shouldBe true
-        rows shouldBe Files.readString(goldenDir.resolve("rows.jsonl"))
-        manifest shouldBe Files.readString(goldenDir.resolve("manifest.json"))
-    }
-
-    /** 표본 목록 해시 — 행들의 `notice_key_hash` 를 오름차순 정렬해 개행으로 이은 문자열의 sha256. */
-    private fun sampleListSha256Of(rows: String): String {
-        val hashes =
-            rows
-                .trimEnd('\n')
-                .lines()
-                .map { it.substringAfter("\"notice_key_hash\":\"").substringBefore('"') }
-                .sorted()
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        return digest
-            .digest(hashes.joinToString("\n").toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        SNAPSHOT_FILES.forEach { name ->
+            Files.exists(goldenDir.resolve(name)) shouldBe true
+            produced.getValue(name) shouldBe Files.readString(goldenDir.resolve(name))
+        }
     }
 }
+
+private val SNAPSHOT_FILES = listOf("rows.jsonl", "manifest.json", "sample-list.tsv")

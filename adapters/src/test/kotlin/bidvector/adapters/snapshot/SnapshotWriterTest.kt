@@ -1,5 +1,6 @@
 package bidvector.adapters.snapshot
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -175,15 +176,35 @@ class SnapshotWriterTest {
             SnapshotWriter.renderManifest(
                 snapshotId = "2026-09-28T01-00-00Z",
                 rowsBytes = rows,
-                rowCount = 1,
-                periodStart = LocalDate.of(2026, 2, 6),
-                periodEnd = LocalDate.of(2026, 9, 26),
+                counts =
+                    SnapshotCounts(
+                        sampleSize = 4,
+                        rowCount = 1,
+                        sampledWithoutDetail = 2,
+                        sampledWithoutNotice = 1,
+                    ),
+                period = LocalDate.of(2026, 2, 6)..LocalDate.of(2026, 9, 26),
                 sampleListSha256 = "feedface",
             )
 
-        manifest shouldContain "\"schema_version\":\"snapshot-v3\""
+        manifest shouldContain "\"schema_version\":\"snapshot-v4\""
         manifest shouldContain "\"rows_sha256\":\"${sha256Hex(rows)}\""
+        // 표본 목록 해시는 **파일 바이트**의 해시다 — 이 함수는 행에서 역산하지 않고 그대로 옮긴다.
         manifest shouldContain "\"sample_list_sha256\":\"feedface\""
+        manifest shouldContain "\"sample_size\":4"
+        manifest shouldContain "\"sampled_without_detail\":2"
+        manifest shouldContain "\"sampled_without_notice\":1"
+    }
+
+    /**
+     * 계수가 행을 설명하지 못하는 manifest 는 **만들어지지 않는다**(스키마 §2 닫힌 항등식). 판독이
+     * 구조 실패로 거부하기 전에 생산이 멈춰야, 어느 계수가 틀렸는지 아는 자리에서 실패한다.
+     */
+    @Test
+    fun `표본 계수가 행을 설명하지 못하면 manifest 를 만들지 않는다`() {
+        shouldThrow<IllegalArgumentException> {
+            SnapshotCounts(sampleSize = 4, rowCount = 1, sampledWithoutDetail = 1, sampledWithoutNotice = 1)
+        }
     }
 
     @Test

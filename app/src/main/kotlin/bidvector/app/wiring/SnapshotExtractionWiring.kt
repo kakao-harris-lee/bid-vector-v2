@@ -1,10 +1,12 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.snapshot.FileSampleListLedger
 import bidvector.adapters.snapshot.JdbcSnapshotSource
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.collection.SnapshotExtractionProperties
 import bidvector.app.collection.SnapshotExtractionRunner
+import bidvector.app.collection.requireOutsideRepository
 import bidvector.procurement.CollectionReferenceDate
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -12,6 +14,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
+import java.nio.file.Path
 import javax.sql.DataSource
 
 /**
@@ -29,13 +32,25 @@ open class SnapshotExtractionWiring {
         properties: SnapshotExtractionProperties,
     ): JdbcSnapshotSource = JdbcSnapshotSource(dataSource, collectionPolicyAt(CollectionReferenceDate(properties.to)))
 
+    /** 수집이 확정한 목록을 **읽기만** 한다 — 추출은 표본을 만들지 않는다(D-6G-39). */
+    @Bean
+    open fun snapshotSampleListLedger(properties: SnapshotExtractionProperties): FileSampleListLedger =
+        FileSampleListLedger(requireOutsideRepository(Path.of(properties.sampleListFile)))
+
     @Bean
     open fun snapshotExtractionRunner(
         source: JdbcSnapshotSource,
+        sampleList: FileSampleListLedger,
         properties: SnapshotExtractionProperties,
         termination: CollectionTermination,
     ): SnapshotExtractionRunner {
         val logger = LoggerFactory.getLogger(SnapshotExtractionRunner::class.java)
-        return SnapshotExtractionRunner(source, properties, CollectionLog { logger.info(it) }, termination)
+        return SnapshotExtractionRunner(
+            source,
+            sampleList,
+            properties,
+            CollectionLog { logger.info(it) },
+            termination,
+        )
     }
 }

@@ -114,6 +114,21 @@ internal class FakeCollectedAxisStore(
     ): Set<bidvector.procurement.NoticeId> = if (endpoint in completedAxes) noticeIds.toSet() else emptySet()
 }
 
+/** 메모리 원장 — 파일 어댑터와 같은 규칙이다: 한 번 확정하면 덮어쓰지 않는다. */
+internal class FakeSampleListLedger : SampleListLedger {
+    var confirmCount: Int = 0
+        private set
+    private var stored: SampleList? = null
+
+    override fun confirmed(): SampleList? = stored
+
+    override fun confirm(sample: SampleOutcome): SampleList {
+        stored?.let { return it }
+        confirmCount++
+        return SampleList(sample.strataByKey).also { stored = it }
+    }
+}
+
 internal class OpeningFixture(
     targetPerStratum: Int,
     private val budget: CollectionCallBudget = CollectionCallBudget(perDay = 20_000, total = 80_000),
@@ -121,6 +136,7 @@ internal class OpeningFixture(
         bidvector.procurement.CallSpend(total = 0, today = 0),
     collectedAxes: bidvector.procurement.CollectedAxisStore = FakeCollectedAxisStore(),
 ) {
+    val sampleList = FakeSampleListLedger()
     val raw = RecordingRawStore()
     val runs = RecordingRunStore()
     val construction = ScriptedOpeningPort(BusinessDivision.CONSTRUCTION)
@@ -140,6 +156,7 @@ internal class OpeningFixture(
             policyFor = { COLLECTION_POLICY },
             gates = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48),
             collectedAxes = collectedAxes,
+            sampleList = sampleList,
             clock = Clock { COLLECTION_NOW },
         )
 
@@ -157,6 +174,14 @@ internal class OpeningFixture(
         port.listScript[day] = (1..count).map { "SYN-6G-$division-$noticeDate-%04d".format(it) }
         from = listOfNotNull(from, day).min()
         to = listOfNotNull(to, day).max()
+    }
+
+    /** 그 슬롯이 이번엔 아무것도 내지 않는다 — 목록 축 실패를 표본틀에 재현한다. */
+    fun dropListRows(
+        division: BusinessDivision,
+        noticeDate: String,
+    ) {
+        portFor(division).listScript.remove(LocalDate.parse(noticeDate))
     }
 
     fun run(): OpeningCollectionReport =

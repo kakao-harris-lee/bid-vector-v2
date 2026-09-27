@@ -8,6 +8,7 @@ import bidvector.adapters.persistence.JdbcCollectedAxisStore
 import bidvector.adapters.persistence.JdbcCollectionCallLedgerStore
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.snapshot.FileSampleListLedger
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.collection.KonepsCredentialProperties
@@ -16,6 +17,7 @@ import bidvector.app.collection.KonepsOpeningEndpointProperties
 import bidvector.app.collection.KonepsOpeningOperationProperties
 import bidvector.app.collection.OpeningCollectionProperties
 import bidvector.app.collection.OpeningCollectionRunner
+import bidvector.app.collection.requireOutsideRepository
 import bidvector.procurement.CollectedAxisStore
 import bidvector.procurement.CollectionCallLedgerStore
 import bidvector.procurement.CollectionReferenceDate
@@ -44,6 +46,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import java.net.URI
 import java.net.http.HttpClient
+import java.nio.file.Path
 import java.time.LocalDate
 import javax.sql.DataSource
 
@@ -110,6 +113,14 @@ open class OpeningCollectionWiring {
         )
     }
 
+    /**
+     * 표본 목록 파일(D-6G-39) — 첫 실행이 확정하고 이후 실행은 읽기만 한다. 저장소 밖 강제는 기동
+     * 시점이다(경로가 안이면 빈 생성이 실패해 프로세스가 서지 않는다).
+     */
+    @Bean
+    open fun openingSampleListLedger(properties: OpeningCollectionProperties): FileSampleListLedger =
+        FileSampleListLedger(requireOutsideRepository(Path.of(properties.sampleListFile)))
+
     @Bean
     open fun openingSampler(properties: OpeningCollectionProperties): StratifiedSampler =
         StratifiedSampler(SamplingSeed(properties.samplingSeed), properties.targetPerStratum)
@@ -157,6 +168,7 @@ open class OpeningCollectionWiring {
         range: CollectionRange,
         sampler: StratifiedSampler,
         collectedAxes: CollectedAxisStore,
+        sampleList: FileSampleListLedger,
         clock: Clock,
     ): CollectOpeningResultsUseCase {
         val policy = collectionPolicyAt(CollectionReferenceDate(range.to))
@@ -167,6 +179,7 @@ open class OpeningCollectionWiring {
             policyFor = ::collectionPolicyAt,
             gates = policy.detailFetchGates,
             collectedAxes = collectedAxes,
+            sampleList = sampleList,
             clock = clock,
         )
     }

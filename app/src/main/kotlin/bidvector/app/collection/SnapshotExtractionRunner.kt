@@ -1,6 +1,9 @@
 package bidvector.app.collection
 
+import bidvector.adapters.snapshot.ConfirmedSampleList
+import bidvector.adapters.snapshot.FileSampleListLedger
 import bidvector.adapters.snapshot.JdbcSnapshotSource
+import bidvector.adapters.snapshot.SnapshotCounts
 import bidvector.adapters.snapshot.SnapshotExtraction
 import bidvector.adapters.snapshot.SnapshotWriter
 import org.springframework.boot.ApplicationArguments
@@ -26,7 +29,11 @@ data class SnapshotExtractionProperties(
     val to: LocalDate,
     val outputDir: String,
     val snapshotId: String,
-    val sampleListSha256: String,
+    /**
+     * 수집 갈래가 확정한 표본 목록 파일(D-6G-39) — 저장소 밖. 해시를 설정으로 받지 않는다: 받으면
+     * 실행자가 적어 넣은 문자열이 「결과를 보기 전에 확정됐다」의 증거 행세를 한다. 파일에서 읽는다.
+     */
+    val sampleListFile: String,
 )
 
 /**
@@ -36,6 +43,7 @@ data class SnapshotExtractionProperties(
 @Suppress("TooGenericExceptionCaught")
 class SnapshotExtractionRunner(
     private val source: JdbcSnapshotSource,
+    private val sampleList: FileSampleListLedger,
     private val properties: SnapshotExtractionProperties,
     private val log: CollectionLog,
     private val termination: CollectionTermination,
@@ -54,29 +62,45 @@ class SnapshotExtractionRunner(
 
     @Suppress("TooGenericExceptionCaught")
     private fun extract() {
-        val extraction = source.extract(properties.from, properties.to)
+        val sample = requireNotNull(sampleList.read()) { "확정된 표본 목록 파일이 없다 — 수집이 먼저다" }
+        val extraction = source.extract(properties.from, properties.to, sample.list)
         val rows = SnapshotWriter.renderRows(extraction.rows)
-        val period = openingPeriod(extraction, properties.from to properties.to)
+        val period = openingPeriod(extraction, properties.from..properties.to)
         val manifest =
             SnapshotWriter.renderManifest(
                 snapshotId = properties.snapshotId,
                 rowsBytes = rows,
-                rowCount = extraction.rows.size,
-                periodStart = period.first,
-                periodEnd = period.second,
-                sampleListSha256 = properties.sampleListSha256,
+                counts = countsOf(sample, extraction),
+                period = period,
+                sampleListSha256 = sample.sha256,
             )
         val directory = Files.createDirectories(requireOutsideRepository(Path.of(properties.outputDir)))
         Files.writeString(directory.resolve("rows.jsonl"), rows)
         Files.writeString(directory.resolve("manifest.json"), manifest)
+        // 표본 목록은 **바이트 그대로** 곁에 둔다 — 판독이 manifest 해시를 실제 파일로 대조한다.
+        Files.writeString(directory.resolve("sample-list.tsv"), sample.text)
         log.write(
             "snapshot-extract finished rows=${extraction.rows.size} " +
+                "sampleSize=${sample.size} " +
+                "sampledWithoutDetail=${extraction.sampledWithoutDetail} " +
                 "skippedWithoutNotice=${extraction.skippedWithoutNotice} " +
-                "frameOnly=${extraction.frameOnlyNotices} bytes=${rows.length}",
+                "outsideSample=${extraction.observedOutsideSample} bytes=${rows.length}",
         )
         termination.terminate(CollectionExitCode.COMPLETE.value)
     }
 }
+
+/** 계수는 셋 다 **측정값**이다 — 항등식은 [SnapshotCounts] 가 생성 시점에 검사한다(스키마 §2). */
+private fun countsOf(
+    sample: ConfirmedSampleList,
+    extraction: SnapshotExtraction,
+): SnapshotCounts =
+    SnapshotCounts(
+        sampleSize = sample.size,
+        rowCount = extraction.rows.size,
+        sampledWithoutDetail = extraction.sampledWithoutDetail,
+        sampledWithoutNotice = extraction.skippedWithoutNotice,
+    )
 
 /**
  * manifest 의 기간 — 행들의 **개찰일** 범위다(스키마 §2 「창을 자르는 축」). 개찰일이 있는 행이
@@ -84,21 +108,8 @@ class SnapshotExtractionRunner(
  */
 private fun openingPeriod(
     extraction: SnapshotExtraction,
-    fallback: Pair<LocalDate, LocalDate>,
-): Pair<LocalDate, LocalDate> {
+    fallback: ClosedRange<LocalDate>,
+): ClosedRange<LocalDate> {
     val days = extraction.rows.mapNotNull { it.outcome.openedOn }
-    return if (days.isEmpty()) fallback else days.min() to days.max()
-}
-
-/**
- * 실험 입력은 **저장소 밖**이다(data-extract §7 · ADR 0010 D-8) — 커밋되지 않아야 한다. 출력 경로가
- * 저장소 루트 아래면 거부한다(privacy INFO-2). 「커밋하지 마라」를 규율이 아니라 기동 실패로 둔다.
- */
-private fun requireOutsideRepository(target: Path): Path {
-    val absolute = target.toAbsolutePath().normalize()
-    val repositoryRoot = Path.of("").toAbsolutePath().normalize()
-    require(!absolute.startsWith(repositoryRoot)) {
-        "스냅숏 출력 경로는 저장소 밖이어야 한다 — 실험 입력은 커밋되지 않는다"
-    }
-    return absolute
+    return if (days.isEmpty()) fallback else days.min()..days.max()
 }

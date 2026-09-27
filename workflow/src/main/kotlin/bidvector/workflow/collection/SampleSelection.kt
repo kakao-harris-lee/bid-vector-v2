@@ -27,6 +27,14 @@ data class NoticeKeyHash private constructor(
             noticeNumber: String,
             noticeRound: String,
         ): NoticeKeyHash = NoticeKeyHash(sha256Hex("$noticeNumber/$noticeRound"))
+
+        /** 이미 계산된 해시를 되읽는다(표본 목록 파일) — 형태만 검사하고 값을 지어내지 않는다. */
+        fun ofHex(raw: String): NoticeKeyHash {
+            require(HEX_SHAPE.matches(raw)) { "공고 키 해시 형태가 아니다" }
+            return NoticeKeyHash(raw)
+        }
+
+        private val HEX_SHAPE = Regex("[0-9a-f]{64}")
     }
 }
 
@@ -85,6 +93,8 @@ data class StratumOutcome(
 data class SampleOutcome(
     val selected: List<NoticeKeyHash>,
     val strata: Map<SampleStratum, StratumOutcome>,
+    /** 뽑힌 키가 어느 층에서 왔는가 — 표본 목록 파일이 층을 함께 싣기 위해 필요하다(D-6G-39). */
+    val strataByKey: Map<NoticeKeyHash, SampleStratum> = emptyMap(),
 ) {
     val sampleListSha256: String = sha256Hex(selected.map { it.value }.sorted().joinToString("\n"))
 }
@@ -109,13 +119,15 @@ class StratifiedSampler(
         val byStratum = candidates.distinctBy { it.key }.groupBy { it.stratum }
         val selected = mutableListOf<NoticeKeyHash>()
         val outcomes = mutableMapOf<SampleStratum, StratumOutcome>()
+        val strataByKey = mutableMapOf<NoticeKeyHash, SampleStratum>()
         for ((stratum, pool) in byStratum) {
             val tickets = pool.map { DrawTicket(drawOrderOf(it.key), it.key) }.sortedWith(DRAW_ORDER)
             val taken = tickets.take(targetPerStratum).map { it.key }
             selected += taken
+            taken.forEach { strataByKey[it] = stratum }
             outcomes[stratum] = StratumOutcome(targetPerStratum, pool.size, taken.size)
         }
-        return SampleOutcome(selected.sortedWith(KEY_ORDER), outcomes)
+        return SampleOutcome(selected.sortedWith(NOTICE_KEY_ORDER), outcomes, strataByKey)
     }
 
     private fun drawOrderOf(key: NoticeKeyHash): String = sha256Hex("${seed.value}|${key.value}")
@@ -130,4 +142,4 @@ private class DrawTicket(
 // 명시 Comparator 다 — `sortedBy` 는 stdlib 출처의 합성 비교자 클래스를 산출물에 남겨
 // jarContentGate(게이트를 통과한 소스만 아카이브에 든다)가 거부한다.
 private val DRAW_ORDER = Comparator<DrawTicket> { left, right -> left.order.compareTo(right.order) }
-private val KEY_ORDER = Comparator<NoticeKeyHash> { left, right -> left.value.compareTo(right.value) }
+val NOTICE_KEY_ORDER = Comparator<NoticeKeyHash> { left, right -> left.value.compareTo(right.value) }

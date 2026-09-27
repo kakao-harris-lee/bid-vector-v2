@@ -10,7 +10,7 @@ import java.time.LocalDate
  * 바로잡으며 올렸다. 소비 쪽 판독은 **버전이
  * 다르면 스냅숏 전체를 거부한다**(의도된 동작이다 — 두 레인이 같이 움직여야 한다는 신호).
  */
-const val SNAPSHOT_SCHEMA_VERSION: String = "snapshot-v3"
+const val SNAPSHOT_SCHEMA_VERSION: String = "snapshot-v4"
 
 private const val HEX_MASK = 0xff
 
@@ -41,15 +41,14 @@ object SnapshotWriter {
             .joinToString("") { row -> rowJson(row).render() + "\n" }
 
     /**
-     * `manifest.json`. [sampleListSha256] 은 **수집 전에** 확정된 표본 목록의 해시이고 이 함수가
-     * 다시 계산하지 않는다 — 결과에서 역산한 값을 싣지 않기 위해서다(우회 ⑦).
+     * `manifest.json`. [sampleListSha256] 은 **표본 목록 파일 바이트**의 해시이고 이 함수가 다시
+     * 계산하지 않는다 — 결과에서 역산한 값을 싣지 않기 위해서다(우회 ⑦, v4).
      */
     fun renderManifest(
         snapshotId: String,
         rowsBytes: String,
-        rowCount: Int,
-        periodStart: LocalDate,
-        periodEnd: LocalDate,
+        counts: SnapshotCounts,
+        period: ClosedRange<LocalDate>,
         sampleListSha256: String,
     ): String =
         SnapshotJson
@@ -57,13 +56,34 @@ object SnapshotWriter {
                 listOf(
                     "schema_version" to SnapshotJson.Text(SNAPSHOT_SCHEMA_VERSION),
                     "snapshot_id" to SnapshotJson.Text(snapshotId),
-                    "row_count" to SnapshotJson.Number(rowCount.toString()),
-                    "period_start" to SnapshotJson.Text(periodStart.toString()),
-                    "period_end" to SnapshotJson.Text(periodEnd.toString()),
+                    "row_count" to SnapshotJson.Number(counts.rowCount.toString()),
+                    "period_start" to SnapshotJson.Text(period.start.toString()),
+                    "period_end" to SnapshotJson.Text(period.endInclusive.toString()),
                     "rows_sha256" to SnapshotJson.Text(sha256Hex(rowsBytes)),
                     "sample_list_sha256" to SnapshotJson.Text(sampleListSha256),
+                    "sample_size" to SnapshotJson.Number(counts.sampleSize.toString()),
+                    "sampled_without_detail" to SnapshotJson.Number(counts.sampledWithoutDetail.toString()),
+                    "sampled_without_notice" to SnapshotJson.Number(counts.sampledWithoutNotice.toString()),
                 ),
             ).render()
+}
+
+/**
+ * manifest 의 계수 — **닫힌 항등식**(스키마 §2)을 생성 시점에 검사한다. 표본 하나하나가 행이
+ * 되었거나 되지 못한 사유로 계수된다. 항등식이 깨진 manifest 는 만들어지지 않는다(판독이 구조
+ * 실패로 거부하기 전에 생산이 멈춘다 — 그래야 어느 계수가 틀렸는지 아는 자리에서 실패한다).
+ */
+data class SnapshotCounts(
+    val sampleSize: Int,
+    val rowCount: Int,
+    val sampledWithoutDetail: Int,
+    val sampledWithoutNotice: Int,
+) {
+    init {
+        require(sampleSize == rowCount + sampledWithoutDetail + sampledWithoutNotice) {
+            "표본 계수가 행을 설명하지 못한다 — 표본 목록과 추출 결과가 어긋났다"
+        }
+    }
 }
 
 internal fun sha256Hex(text: String): String =

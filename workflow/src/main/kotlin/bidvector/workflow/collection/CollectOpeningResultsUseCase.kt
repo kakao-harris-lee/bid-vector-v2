@@ -58,6 +58,8 @@ data class OpeningCollectionReport(
     val frameSize: Int,
     val sample: SampleOutcome,
     val detailCalls: Int,
+    /** 확정 표본인데 이번 표본틀에서 보이지 않은 공고 수 — 표본을 바꾸지 않고 사실만 센다(D-6G-39). */
+    val sampleUnseen: Int,
     val halted: OpeningCollectionHalt?,
 )
 
@@ -123,42 +125,51 @@ private fun DetailAxis.fetch(
 class CollectOpeningResultsUseCase(
     private val rawObservations: RawObservationStore,
     private val runs: CollectionRunStore,
-    private val sampler: StratifiedSampler,
+    sampler: StratifiedSampler,
     policyFor: (CollectionReferenceDate) -> KonepsCollectionPolicyData,
     private val gates: DetailFetchGates,
     private val collectedAxes: CollectedAxisStore,
+    sampleList: SampleListLedger,
     private val clock: Clock,
 ) {
     private val framer = OpeningSampleFramer(rawObservations, runs, policyFor, clock)
+    private val samples = SampleResolution(sampler, sampleList)
 
-    /** ①② 만 — 상세를 부르지 않는다. 같은 입력이면 [collect] 와 같은 표본이 나온다. */
+    /**
+     * ①② 만 — 상세를 부르지 않는다. **표본을 확정하지도 않는다**: 시험 삼아 돌린 계획이 표본을
+     * 못 박으면 그 뒤의 수집이 계획의 창에 묶인다. 이미 확정돼 있으면 그것을 보여준다.
+     */
     fun plan(
         range: CollectionRange,
         sources: List<OpeningCollectionSource>,
     ): OpeningCollectionPlan {
         val framing = framer.frame(range, sources, budget = null)
-        return OpeningCollectionPlan(framing.candidates.size, sampleOf(framing), framing.halt)
+        return OpeningCollectionPlan(framing.candidates.size, samples.preview(framing.candidates), framing.halt)
     }
 
-    private fun sampleOf(framing: Framing): SampleOutcome = sampler.select(framing.candidates.map { it.candidate })
-
+    /**
+     * **다시 뽑지 않는다**(D-6G-39) — 첫 실행이 확정한 표본이 이후 모든 실행의 기준이다. 늦게 개찰된
+     * 공고가 창에 들어와도 표본은 그대로이고, 확정 표본인데 이번 표본틀에서 보이지 않은 공고는 부르지
+     * 않고 [OpeningCollectionReport.sampleUnseen] 로 센다.
+     */
     fun collect(
         range: CollectionRange,
         sources: List<OpeningCollectionSource>,
         budget: CallBudgetLedger,
     ): OpeningCollectionReport {
         val framing = framer.frame(range, sources, budget)
-        return if (framing.halt != null) {
-            OpeningCollectionReport(framing.candidates.size, EMPTY_SAMPLE, 0, framing.halt)
-        } else {
-            fanOut(framing, sampleOf(framing), budget)
+        if (framing.halt != null) {
+            return OpeningCollectionReport(framing.candidates.size, EMPTY_SAMPLE, 0, 0, framing.halt)
         }
+        val framed = samples.resolve(framing.candidates)
+        return fanOut(framing, framed.sample, framed.unseen, budget)
     }
 
     /** ③ 표본 공고마다 상세 — 멈추면 아직 손대지 않은 표본 수를 사유에 싣는다. */
     private fun fanOut(
         framing: Framing,
         sample: SampleOutcome,
+        sampleUnseen: Int,
         budget: CallBudgetLedger,
     ): OpeningCollectionReport {
         val byKey = framing.candidates.associateBy { it.candidate.key }
@@ -173,11 +184,17 @@ class CollectOpeningResultsUseCase(
 
                 is DetailStep.Halted -> {
                     val halt = step.halt.copy(notAttempted = sample.selected.size - index)
-                    return OpeningCollectionReport(framing.candidates.size, sample, detailCalls + step.calls, halt)
+                    return OpeningCollectionReport(
+                        framing.candidates.size,
+                        sample,
+                        detailCalls + step.calls,
+                        sampleUnseen,
+                        halt,
+                    )
                 }
             }
         }
-        return OpeningCollectionReport(framing.candidates.size, sample, detailCalls, halted = null)
+        return OpeningCollectionReport(framing.candidates.size, sample, detailCalls, sampleUnseen, halted = null)
     }
 
     /**
