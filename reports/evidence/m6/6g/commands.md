@@ -11,7 +11,7 @@
 | `./gradlew --no-daemon qualityBaseline` | BUILD SUCCESSFUL(게이트가 아니라 측정) |
 | `./tools/one-command-check.sh` | 「Kotlin 전건 + Python 전건 통과」 |
 
-실측 HEAD: `f31ff35f`(이 레인의 마지막 산출물 커밋).
+실측 HEAD: `74f240b8`(이 레인의 마지막 산출물 커밋 시점의 트리).
 
 ## 실 KONEPS 호출
 
@@ -52,7 +52,7 @@
 | `OpeningResultSourcePort.fetchBidPriceFormulaA`·`fetchBaseAmount` | procurement — 포트 메서드 둘 |
 | `noticeIdIn` | procurement — 표본틀이 (공고번호,차수)만 얻는 자리(원문 키는 이 모듈 안에 남는다) |
 | `CollectOpeningResultsUseCase`·`OpeningCollectionSource`·`OpeningCollectionHalt`·`OpeningCollectionPlan`·`OpeningCollectionReport` | workflow/collection — 수집 갈래 |
-| `SnapshotWriter`·`SnapshotRow`·`SnapshotNotice`·`SnapshotOutcome`·`SnapshotBidderRow`·`orderedBidderRows`·`SNAPSHOT_SCHEMA_VERSION` | adapters/snapshot — 스냅숏 바이트 |
+| `SnapshotWriter`·`SnapshotRow`·`SnapshotNotice`·`SnapshotOutcome`·`SnapshotBidderRow`·`orderedBidderRows`·`SNAPSHOT_SCHEMA_VERSION`(`snapshot-v2`) | adapters/snapshot — 스냅숏 바이트 |
 | `NoticeKeyHash` · `SamplingSeed` · `SampleStratum` · `SampleCandidate` · `StratumOutcome` · `SampleOutcome` · `StratifiedSampler` | workflow/collection |
 | `CollectionCallBudget` · `CallBudgetLedger` · `BudgetOutcome` · `BudgetLimit` | workflow/collection |
 
@@ -72,7 +72,8 @@
 | D-6G-12 「A값 오퍼레이션 + 합산 여부 술어 + A 공개일시」 | `SourceEndpoint.BID_PRICE_FORMULA_A` 축 13행 | 관측 생존 · 요청 축 · allow-list 반전 · 두 일시 분리 |
 | D-6G-12 「예정가격 결정방법」 | `PLANNED_PRICE_DECISION_METHOD` | 계약 원장 test |
 | D-6G-13 제외 열다섯 | `snapshot-schema.md` §4 의 입력 대조표 | 판정은 Python 레인 모듈이, 입력은 이 레인이 |
-| D-6G-2 「스냅숏 · manifest」 | `SnapshotWriter` | 정렬·키 순서·이스케이프·순번·manifest 해시 여덟 test |
+| D-6G-2 「스냅숏 · manifest」 | `SnapshotWriter` | 정렬·키 순서·이스케이프·순번·manifest 해시 · 기초금액 두 칸 분리 열한 test |
+| D-6G-23 「표준시장단가 적용 여부」 | `a_value.standard_market_price_applicable`(`snapshot-v2`) | A 묶음 셋 동반 · A 없으면 술어도 없음 |
 | D-6G-1 「개찰결과 수집 갈래」 | `CollectOpeningResultsUseCase` | 표본만 상세 호출 · 표본 사전 확정 · 층 가름 둘 · 원문 적재 |
 | D-6G-19 「기초금액 조회 op 5·6·7」 | `SourceEndpoint.BASE_AMOUNT_DETAIL` 축 6행 + `BASE_AMOUNT_DETAIL` 서술자 | 모든 업무에서 부른다는 test |
 | D-6G-19 「provenance 분리」 | `SnapshotNotice.baseAmount` ↔ `SnapshotOutcome.openingBaseAmount` | 타입이 두 칸으로 가른다 |
@@ -109,6 +110,16 @@
 6. **`bidNtceOrd` 를 A 오퍼레이션의 행 식별자로 쓴다.** 문서가 요청 항목으로 적지 않아 보내지 않고,
    응답의 차수 키가 행을 가른다. 한 공고번호·한 차수에 행이 둘 이상이면 뒤 행이 `duplicate` 로 접힌다
    — 그런 응답의 관측이 아직 없다.
+
+## 변이 실측 (이 레인)
+
+| 변이 | 결과 |
+|---|---|
+| `opening_base_amount` 에 다른 값을 꽂는다(두 기초금액 뒤바뀜 부류) | **RED**(11 중 1 실패) — 잠긴다 |
+
+이 자리는 **처음에 잠겨 있지 않았다.** fixture 의 두 기초금액이 같은 값이라 어느 쪽을 써도 출력이 같아
+뒤바뀜이 드러나지 않았다(Python 레인이 자기 쪽에서 같은 함정을 겪고 알려 왔다). 둘을 다르게 둔 test 를
+더해 잠갔다 — **두 칸을 가른 의미는 값이 다를 때만 드러난다**.
 
 ## 스테이징 혼입 (사실 선언)
 
