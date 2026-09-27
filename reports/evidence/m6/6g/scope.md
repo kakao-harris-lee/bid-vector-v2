@@ -144,6 +144,22 @@ E[R] = 1.0(no-op)이다. 조사 노트는 Python 레인이 `_workspace/m6-6g/` �
 | **D-6G-36** | **예정가격 결정방법이 null 인 공고.** 방법명이 **있고** 복수예가가 아니면 ④ 로 제외, **없으면** ⑤(예비가격 15개 + 추첨 정보)가 복수예가 제도를 대신 보증한다 — 그 칸은 A값 오퍼레이션에서만 와서 용역·물품은 늘 null 이고, fail-closed 로 두면 주 표본이 통째로 사라진다. ④ 의 「부재」 계수는 따로 공시한다 |
 | **D-6G-37** | **golden 자리 확정**: `ml-engine/tests/evaluation/fixtures/m6-6g-golden/`(manifest.json · rows.jsonl). Kotlin 이 먼저 커밋한 `fixtures/golden/m6-6g/` 는 옮긴다(`fixtures/**` 는 data-extract.md corpus 자리). golden 은 **승인되는 행이 있어야** 한다 — 결측 행(각 칸 하나)과 함께 전 제외를 통과하는 정상 행을 둔다. manifest 의 `sample_list_sha256` 은 그 파일의 행 집합으로 계산 |
 
+## 계약 갱신 r2 (2026-09-28, 팀장 — verifier r2 not-ready R2-H1~3 · code-reviewer r2 H-1·H-2·M-1~9·L 수령)
+
+재작업 **2/5**. r1 의 H-3·H-4 는 닫혔다. 새 차단은 셋 — 모두 「고쳐진 것처럼 보이는」 모양이다: 추첨번호가 **틀린 출처**에서 오고 golden 이 그것을 가렸다(투찰자 둘의 선택을 뽑힌 넷과 일부러 같게 맞췄다) · 표본이 **실행마다 다시 뽑힌다** · H-2 수정이 **출하 경로에서 잠기지 않았다**(use case 층만 test).
+
+| ID | 결정 |
+|---|---|
+| **D-6G-38** | **(R2-H1·cr H-1) 추첨번호 = 예비가격 상세의 `drwtYn=Y` 행 순번**(`DRAW_FLAG` — legacy 도 이렇게 읽는다). 투찰자 선택(`drwtNo1/2`)은 추첨번호가 아니다. **mock 을 실물처럼**: 투찰자 셋 이상, 선택은 뽑힌 넷과 **다르게**, `participant_count` 는 투찰 행 수와 일치. golden 이 이 자리를 잠그게 한다(뽑힌 번호 ≠ 선택 합집합인 행에서 승인) |
+| **D-6G-39** | **(R2-H2) 표본은 한 번 확정하고 영속한다.** 첫 표본틀 단계가 표본 목록(공고 키 해시 · 층)을 **저장소 밖 파일**(스냅숏과 같은 규율 — 출력 경로 인자, sha256 동반)로 쓰고, 이후 수집 실행과 추출은 **그 파일만** 읽는다(다시 뽑지 않는다). 늦게 개찰된 공고·일시 실패는 표본을 바꾸지 않고 계수된다(표본인데 상세를 못 받은 공고 = 사유 계수, 표본 밖 공고 = 추출 제외). 추출은 「상세 관측이 있으면 표본」이 아니라 **표본 파일의 집합**으로 거른다. manifest `sample_list_sha256` = 그 파일의 sha256, Python 은 행 집합 ⊆ 표본 목록과 계수를 대조 |
+| **D-6G-40** | **(R2-H3) 출하 경로 잠금** — JDBC 원장·이어 돌기 저장소를 **Testcontainers** 로 부르는 test. 변이 KM1(원장 읽기 0)·KM2(이어 돌기 조회 빈 집합)·KM3(배선 seed 0)·KM4(UTC 일 경계)·KM7(표본틀만 있는 공고 추출)이 각각 RED |
+| **D-6G-41** | **(cr H-2) S4 순공사원가선** — `_simulated_floors` 를 실제로 부르고 죽은 복제 컴프리헨션을 지운다. 변이(순공사원가선 제거)가 RED |
+| **D-6G-42** | 수집 정합(Kotlin): **(cr M-1)** 추출 관측 창이 공고 목록 관측을 덮지 않아도 행이 서게 — canonical 결합은 시각 조건 없이, 목록 관측 부재는 **따로 계수**(전량 `NOTICE_DATE_ABSENT` 로 숨지 않게) · **(cr M-2)** 이어 돌기 키는 「시도한 축」(빈 응답 포함)이지 raw 행 존재가 아니다 · **(cr M-3)** 동시 실행 차단(DB advisory lock 등 — 마이그레이션 없이) · **(cr M-4·verifier M-b)** 공고 목록 갈래도 상한에서 **멈춘다** · **(verifier M-a)** 원장은 성공 페이지가 아니라 **HTTP 시도 전부**(재시도·5xx·429·타임아웃 포함)를 센다 · **(cr M-6)** 표본은 계약대로 **층별 비례**, 수집 대상 업무 집합과 Python 최소 표본의 업무 수를 같은 출처로 · **(cr M-9)** 차수 파싱 실패는 기본값 없이 제외 사유 · **(cr M-8)** `has_*` 채움률 분모는 목록 관측이 있는 행 |
+| **D-6G-43** | 게이트·경로: **(verifier M-c·cr L)** 숫자 리터럴 게이트를 **이름 열거에서 구조로** — evaluation·backtest 조립 근의 AST 에서 **숫자로 해석되는 모든 문자열 상수**(docstring 제외)와 숫자 상수를 잡는다(`Decimal`·별칭·`json.loads`·연결 형태를 이름 없이 덮는다) · **(verifier M-d·cr M-7)** 「저장소 밖」 술어는 cwd 가 아니라 **저장소 루트를 찾아**(위로 올라가며 `settings.gradle.kts`) 판정 + 거부·허용 test |
+| **D-6G-44** | LOW·장부 일괄: 판정 가능 창 정확히 절반 경계 test · `JobFailed.detail` 의 정책 경로 절대 경로 제거 · `list_call_count` 를 실행 횟수 반영 · rollback.md Kotlin 절 모순 정리 + `milestone-6.md` 공유 파일 되돌림 절차 · **혼입 선언의 거짓 문장 정정**(golden 을 만진 마지막 커밋은 `de6f21d9`) · commands.md 「참이 되게 고쳤다」 문면 — R2-H1·H2 해소 뒤 다시 확인 · cr L(전건 메모리 적재·K6 `notAttempted` 오계수·golden 두 말·`BIDVECTOR_WRITE_GOLDEN` 는 CI 에서 거부·Python golden 부재 시 skip 이 아니라 fail·`KNOWN_LIMITATIONS` 에 문면 매칭 술어) · **`@ConditionalOnMissingBean` 으로 영속 원장이 대체될 수 있는 자리**를 production 에서 닫는다 |
+
+**레인 분담**: Kotlin — 38(출처·mock·golden) · 39(표본 파일 생산·수집·추출) · 40 · 42 · 43 의 경로 술어 · 44 의 Kotlin 몫. Python — 39(표본 목록 대조) · 41 · 43 의 리터럴 게이트 · 44 의 Python 몫(창 절반 경계·JobFailed·golden 부재 fail·KNOWN_LIMITATIONS). **golden 은 Kotlin 이 38·39 뒤 재생성 → Python 이 대조** 순서.
+
 ## 결정
 
 | ID | 결정 | 근거 |
