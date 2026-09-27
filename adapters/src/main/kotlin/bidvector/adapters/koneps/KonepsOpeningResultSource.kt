@@ -73,7 +73,8 @@ class KonepsOpeningResultSource(
                 )
             }
         return walkKonepsNoticePages(
-            config.httpClient,
+            config.gate,
+            KonepsCallContext(listSourceEndpoint),
             retry,
             rateLimiter,
             uriBuilder,
@@ -104,6 +105,7 @@ class KonepsOpeningResultSource(
             reserveDetailBaseUri,
             KonepsOperationPolicy.RESERVE_PRICE_DETAIL,
             evidence.noticeId,
+            SourceEndpoint.RESERVE_PRICE_DETAIL,
         ) { item, itemPolicy, observedAt ->
             // F-1(verifier r1) — 예비가격 상세는 한 공고에 복수예가 15행까지 온다
             // (compnoRsrvtnPrceSno 마다 반복, §1.7.1). 그 순번을 행 식별자에 더하지
@@ -132,6 +134,7 @@ class KonepsOpeningResultSource(
             openingCompleteBaseUri,
             KonepsOperationPolicy.OPENING_COMPLETE,
             evidence.noticeId,
+            SourceEndpoint.OPENING_COMPLETE,
         ) { item, itemPolicy, observedAt ->
             mapMaskedOpeningItem(
                 item,
@@ -156,6 +159,7 @@ class KonepsOpeningResultSource(
             bidPriceFormulaABaseUri,
             KonepsOperationPolicy.BID_PRICE_FORMULA_A,
             evidence.noticeId,
+            SourceEndpoint.BID_PRICE_FORMULA_A,
         ) { item, itemPolicy, observedAt ->
             mapMaskedOpeningItem(
                 item,
@@ -179,6 +183,7 @@ class KonepsOpeningResultSource(
             baseAmountBaseUri,
             KonepsOperationPolicy.BASE_AMOUNT_DETAIL,
             evidence.noticeId,
+            SourceEndpoint.BASE_AMOUNT_DETAIL,
         ) { item, itemPolicy, observedAt ->
             mapMaskedOpeningItem(
                 item,

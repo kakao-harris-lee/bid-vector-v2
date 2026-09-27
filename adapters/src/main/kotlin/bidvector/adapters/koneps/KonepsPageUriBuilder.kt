@@ -9,9 +9,9 @@ import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
+import bidvector.workflow.collection.attemptOutcomeOf
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.Instant
 
@@ -202,7 +202,6 @@ private class KonepsPageWalkAccumulator {
             truncationCause = truncationCause,
             quotaExceeded = counters.quotaExceeded,
             backoffSkipped = counters.backoffSkipped,
-            httpAttempts = counters.httpAttempts,
             maskingFailures = maskingFailures,
             rowIdentifierIndeterminate = rowIdentifierIndeterminate,
         )
@@ -216,9 +215,13 @@ private class KonepsPageWalkAccumulator {
  */
 private fun isResumable(cause: TruncationCause): Boolean =
     when (cause) {
+        // 상한은 날이 바뀌거나 승인이 늘면 풀린다 — 같은 자리에서 이어 돌 수 있다.
+        is TruncationCause.BudgetExhausted -> true
+
         TruncationCause.MaxPages,
         TruncationCause.RepeatedPage,
         TruncationCause.QuotaExhausted,
+
         TruncationCause.Timeout,
         TruncationCause.TransportFailure,
         TruncationCause.ServerError,
@@ -278,11 +281,17 @@ private fun applyOutcome(
             accumulator.markTruncated(TruncationCause.SelfThrottled, pageNo)
             WalkStep.STOP
         }
+
+        is KonepsCallOutcome.BudgetDenied -> {
+            accumulator.markTruncated(TruncationCause.BudgetExhausted(outcome.limit), pageNo)
+            WalkStep.STOP
+        }
     }
 
 /** page-walk 한 번을 이루는 고정 배선 — 매개변수 개수를 줄이려고 묶은 값 전달 객체(설계 판단, 로직 없음). */
 private class KonepsWalkContext(
-    val httpClient: HttpClient,
+    val gate: KonepsCallGate,
+    val callContext: KonepsCallContext,
     val retry: Retry,
     val rateLimiter: RateLimiter,
     val uriBuilder: KonepsPageUriBuilder,
@@ -302,7 +311,8 @@ private fun fetchNextPage(
     val uri = context.uriBuilder.uriFor(pageNo)
     val outcome =
         fetchPageResilient(
-            context.httpClient,
+            context.gate,
+            context.callContext,
             context.retry,
             context.rateLimiter,
             uri,
@@ -363,7 +373,8 @@ private fun startPageOf(cursor: PageCursor?): Int? {
  * checklist.md 「판단이 갈린 지점」).
  */
 internal fun walkKonepsNoticePages(
-    httpClient: HttpClient,
+    gate: KonepsCallGate,
+    callContext: KonepsCallContext,
     retry: Retry,
     rateLimiter: RateLimiter,
     uriBuilder: KonepsPageUriBuilder,
@@ -379,7 +390,8 @@ internal fun walkKonepsNoticePages(
     val counters = KonepsAttemptCounters()
     val context =
         KonepsWalkContext(
-            httpClient,
+            gate,
+            callContext,
             retry,
             rateLimiter,
             uriBuilder,
@@ -396,5 +408,9 @@ internal fun walkKonepsNoticePages(
         walking = nextWalkState(accumulator, context, pageNo)
         if (walking) pageNo++
     }
-    return SourceBatch(accumulator.items, accumulator.toAccounting(counters), next = accumulator.nextCursor())
+    val accounting = accumulator.toAccounting(counters)
+    // **축의 결말을 여기서 적는다**(D-6G-49) — 모든 소스 호출이 이 자리를 지나므로 기록이 빠질
+    // 수 없다. 항목이 0 이었는지는 봉투를 편 뒤에야 아는 사실이라 transport 관문이 답할 수 없다.
+    gate.settle(callContext, attemptOutcomeOf(accounting))
+    return SourceBatch(accumulator.items, accounting, next = accumulator.nextCursor())
 }

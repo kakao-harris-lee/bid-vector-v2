@@ -46,20 +46,18 @@ private sealed interface PageWalk {
 internal class OpeningSampleFramer(
     private val rawObservations: RawObservationStore,
     private val runs: CollectionRunStore,
-    private val attempts: AttemptLedger,
     private val policyFor: (CollectionReferenceDate) -> KonepsCollectionPolicyData,
     private val clock: Clock,
 ) {
     fun frame(
         range: CollectionRange,
         sources: List<OpeningCollectionSource>,
-        budget: CallBudgetLedger?,
     ): Framing {
         require(sources.map { it.name }.toSet().size == sources.size) { "업종 이름은 서로 달라야 한다" }
         val candidates = mutableListOf<Candidate>()
         for (noticeDate in range.dates) {
             for (source in sources) {
-                val halt = frameSlot(noticeDate, source, budget, candidates)
+                val halt = frameSlot(noticeDate, source, candidates)
                 if (halt != null) return Framing(candidates, halt)
             }
         }
@@ -73,7 +71,6 @@ internal class OpeningSampleFramer(
     private fun frameSlot(
         noticeDate: LocalDate,
         source: OpeningCollectionSource,
-        budget: CallBudgetLedger?,
         into: MutableList<Candidate>,
     ): OpeningCollectionHalt? {
         val referenceDate = CollectionReferenceDate(noticeDate)
@@ -81,22 +78,12 @@ internal class OpeningSampleFramer(
         val tally = SourceAccountingTally()
         var walk: PageWalk = PageWalk.Next(null)
         while (walk is PageWalk.Next) {
-            walk = framePage(referenceDate, source, budget, into, tally, walk.cursor)
+            walk = framePage(referenceDate, source, into, tally, walk.cursor)
         }
         val accounting = tally.toSourceAccounting()
         runs.record(
             accounting,
             CollectionRunMeta(referenceDate, SourceEndpoint.OPENING_RESULT_LIST, startedAt, clock.now()),
-        )
-        // 목록 축은 공고 단위가 아니다 — 슬롯 하나가 여러 공고를 낸다. 공고 키 없이 적는다(D-6G-45).
-        attempts.append(
-            CollectionAttempt(
-                noticeKey = null,
-                axis = SourceEndpoint.OPENING_RESULT_LIST,
-                outcome = attemptOutcomeOf(accounting),
-                at = clock.now(),
-                httpAttempts = accounting.httpAttempts,
-            ),
         )
         return (walk as PageWalk.Stop).halt
     }
@@ -105,26 +92,24 @@ internal class OpeningSampleFramer(
     private fun framePage(
         referenceDate: CollectionReferenceDate,
         source: OpeningCollectionSource,
-        budget: CallBudgetLedger?,
         into: MutableList<Candidate>,
         tally: SourceAccountingTally,
         cursor: PageCursor?,
     ): PageWalk {
-        val refused = budget?.let { refusal(it, executionDay()) }
-        return refused?.let { PageWalk.Stop(it) }
-            ?: readPage(referenceDate, source, budget, into, tally, cursor)
+        // 상한은 **관문이** 센다(D-6G-47) — 여기서 한 번 더 세면 같은 호출을 두 번 계상하고,
+        // 관문이 막지 못한 경로가 있다는 착각을 준다. 거부는 절단 사유로 올라온다.
+        return readPage(referenceDate, source, into, tally, cursor)
     }
 
     private fun readPage(
         referenceDate: CollectionReferenceDate,
         source: OpeningCollectionSource,
-        budget: CallBudgetLedger?,
         into: MutableList<Candidate>,
         tally: SourceAccountingTally,
         cursor: PageCursor?,
     ): PageWalk {
         val batch = source.port.fetchOpeningResults(referenceDate, cursor)
-        budget?.settle(executionDay(), batch.accounting.pagesFetched - 1)
+        // 사후 정산이 없다 — 관문이 호출 **전에** 한 번씩 세므로 페이지 수로 메울 나머지가 없다.
         tally.absorb(batch.accounting)
         val policy = policyFor(referenceDate)
         batch.items.forEach { observation ->

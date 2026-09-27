@@ -1,10 +1,16 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.BudgetLimit
 import bidvector.procurement.CallSpend
 import java.time.LocalDate
 
-/** 어느 한도가 물었는가 — 「멈췄다」만으로는 다음 날 다시 돌려도 되는지를 알 수 없다. */
-enum class BudgetLimit { DAILY, TOTAL }
+/**
+ * 상한의 「하루」가 도는 구역(D-6G-47) — **KST 다.** UTC 로 두면 KST 00~09 시 실행에서 원장이
+ * 세는 날과 소비가 세는 날이 갈리고, `spentToday` 가 0 으로 되돌아 seed 한 오늘치가 사라진다.
+ * 그 회귀는 **시계가 정오 근처면 두 구역의 날짜가 같아 test 가 못 잡는다** — 그래서 이 값을 쓰는
+ * test 는 시계를 KST 자정 근처에 둔다.
+ */
+val COLLECTION_BUDGET_ZONE: java.time.ZoneId = bidvector.workflow.evaluation.OPENING_DATE_ZONE
 
 /** 한 걸음의 예산 판정 — 값이다(예외가 아니다). */
 sealed interface BudgetOutcome {

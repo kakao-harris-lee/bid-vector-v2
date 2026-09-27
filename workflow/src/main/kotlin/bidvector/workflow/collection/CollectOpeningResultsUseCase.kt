@@ -1,5 +1,6 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.BudgetLimit
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectedAxisStore
 import bidvector.procurement.CollectionAccounting
@@ -93,42 +94,6 @@ private fun detailAxesFor(division: BusinessDivision): List<DetailAxis> =
         }
     }
 
-/**
- * 절단 사유의 **원장 어휘** — `::class.simpleName` 을 쓰지 않는다. 리플렉션이라 모듈 경계 게이트가
- * 막기도 하지만, 더 나쁜 것은 클래스 이름이 영속 파일의 값이 되는 것이다: 타입 이름을 바꾸면 앞
- * 실행이 남긴 원장을 읽지 못한다. 소진 `when` 이라 새 사유를 더하면 컴파일이 여기를 가리킨다.
- */
-private fun codeOf(cause: TruncationCause): String =
-    when (cause) {
-        TruncationCause.MaxPages -> "MAX_PAGES"
-        TruncationCause.RepeatedPage -> "REPEATED_PAGE"
-        TruncationCause.QuotaExhausted -> "QUOTA_EXHAUSTED"
-        TruncationCause.Timeout -> "TIMEOUT"
-        TruncationCause.TransportFailure -> "TRANSPORT_FAILURE"
-        TruncationCause.ServerError -> "SERVER_ERROR"
-        TruncationCause.NotRetryable -> "NOT_RETRYABLE"
-        TruncationCause.InputError -> "INPUT_ERROR"
-        TruncationCause.Unclassified -> "UNCLASSIFIED"
-        TruncationCause.StructureFailure -> "STRUCTURE_FAILURE"
-        TruncationCause.SelfThrottled -> "SELF_THROTTLED"
-    }
-
-/** 시도의 결말 — 절단은 오류, 항목 0 은 빈 응답, 그 밖은 성공. 빈 응답은 오류가 아니다. */
-internal fun attemptOutcomeOf(accounting: CollectionAccounting): AttemptOutcome =
-    when {
-        accounting.truncationCause != null -> {
-            AttemptOutcome.Failed(codeOf(accounting.truncationCause!!))
-        }
-
-        accounting.received == 0 -> {
-            AttemptOutcome.Empty
-        }
-
-        else -> {
-            AttemptOutcome.Succeeded
-        }
-    }
-
 private enum class DetailAxis(
     val endpoint: SourceEndpoint,
 ) {
@@ -178,7 +143,7 @@ class CollectOpeningResultsUseCase(
     private val attempts: AttemptLedger,
     private val clock: Clock,
 ) {
-    private val framer = OpeningSampleFramer(rawObservations, runs, attempts, policyFor, clock)
+    private val framer = OpeningSampleFramer(rawObservations, runs, policyFor, clock)
     private val samples = SampleResolution(sampler, sampleList)
 
     /**
@@ -189,7 +154,7 @@ class CollectOpeningResultsUseCase(
         range: CollectionRange,
         sources: List<OpeningCollectionSource>,
     ): OpeningCollectionPlan {
-        val framing = framer.frame(range, sources, budget = null)
+        val framing = framer.frame(range, sources)
         return OpeningCollectionPlan(framing.candidates.size, samples.preview(framing.candidates), framing.halt)
     }
 
@@ -201,14 +166,13 @@ class CollectOpeningResultsUseCase(
     fun collect(
         range: CollectionRange,
         sources: List<OpeningCollectionSource>,
-        budget: CallBudgetLedger,
     ): OpeningCollectionReport {
-        val framing = framer.frame(range, sources, budget)
+        val framing = framer.frame(range, sources)
         if (framing.halt != null) {
             return OpeningCollectionReport(framing.candidates.size, EMPTY_SAMPLE, 0, 0, framing.halt)
         }
         val framed = samples.resolve(framing.candidates)
-        return fanOut(framing, framed.sample, framed.unseen, budget)
+        return fanOut(framing, framed.sample, framed.unseen)
     }
 
     /** ③ 표본 공고마다 상세 — 멈추면 아직 손대지 않은 표본 수를 사유에 싣는다. */
@@ -216,14 +180,13 @@ class CollectOpeningResultsUseCase(
         framing: Framing,
         sample: SampleOutcome,
         sampleUnseen: Int,
-        budget: CallBudgetLedger,
     ): OpeningCollectionReport {
         val byKey = framing.candidates.associateBy { it.candidate.key }
         val done = alreadyCollectedAxes(sample.selected.map { byKey.getValue(it).id })
         var detailCalls = 0
         for ((index, key) in sample.selected.withIndex()) {
             val picked = byKey.getValue(key)
-            when (val step = fetchDetails(picked, budget, done[picked.id].orEmpty())) {
+            when (val step = fetchDetails(picked, done[picked.id].orEmpty())) {
                 is DetailStep.Done -> {
                     detailCalls += step.calls
                 }
@@ -254,41 +217,30 @@ class CollectOpeningResultsUseCase(
      */
     private fun fetchDetails(
         picked: Candidate,
-        budget: CallBudgetLedger,
         alreadyDone: Set<DetailAxis>,
     ): DetailStep {
-        val today = executionDay()
+        // 상한 판정은 **관문**이 한다(D-6G-47) — 여기서 걸음 단위로 미리 세면 셈의 출처가 둘이
+        // 되고, 걸음 단위 근사(받은 페이지)와 관문의 시도 수가 갈린다. 거부는 절단 사유로 온다.
         val remaining = detailAxesFor(picked.source.division).filterNot { it in alreadyDone }
-        val permit = if (remaining.isEmpty()) BudgetOutcome.Allowed else budget.consume(today, remaining.size)
-        return when (permit) {
-            BudgetOutcome.Allowed -> {
-                runAxes(picked, budget, remaining, today)
-            }
-
-            is BudgetOutcome.Exhausted -> {
-                DetailStep.Halted(OpeningCollectionHalt(permit.limit, null, notAttempted = 0), 0)
-            }
-        }
+        return runAxes(picked, remaining)
     }
 
     private fun runAxes(
         picked: Candidate,
-        budget: CallBudgetLedger,
         axes: List<DetailAxis>,
-        today: LocalDate,
     ): DetailStep {
         var calls = 0
         var halt: OpeningCollectionHalt? = null
         var index = 0
         while (halt == null && index < axes.size) {
             val batch = axes[index].fetch(picked.source.port, fetchEvidence(picked.id))
-            // 이미 한 장은 `consume` 이 셌다 — 나머지 페이지만 정산한다(음수는 `settle` 이 0 으로 접는다).
-            budget.settle(today, batch.accounting.pagesFetched - 1)
             calls++
             batch.items.forEach(rawObservations::append)
             recordDetailRun(batch, axes[index])
-            recordAttempt(picked, axes[index], batch)
-            if (batch.accounting.truncationCause == TruncationCause.QuotaExhausted) {
+            val cause = batch.accounting.truncationCause
+            if (cause is TruncationCause.BudgetExhausted) {
+                halt = OpeningCollectionHalt(cause.limit, null, notAttempted = 0)
+            } else if (cause == TruncationCause.QuotaExhausted) {
                 halt =
                     OpeningCollectionHalt(
                         null,
@@ -316,27 +268,6 @@ class CollectOpeningResultsUseCase(
     }
 
     /**
-     * 시도한 축을 적는다(D-6G-45) — **빈 응답도 시도다.** 원문 행의 존재로만 판정하면 항목이 하나도
-     * 오지 않은 축은 다음 실행이 영원히 다시 부른다. 나간 HTTP 수도 여기 실려 다음 실행의 상한
-     * seed 가 재시도까지 본다.
-     */
-    private fun recordAttempt(
-        picked: Candidate,
-        axis: DetailAxis,
-        batch: SourceBatch<RawNoticeObservation>,
-    ) {
-        attempts.append(
-            CollectionAttempt(
-                noticeKey = picked.candidate.key,
-                axis = axis.endpoint,
-                outcome = attemptOutcomeOf(batch.accounting),
-                at = clock.now(),
-                httpAttempts = batch.accounting.httpAttempts,
-            ),
-        )
-    }
-
-    /**
      * 이어 돌기의 입력(D-6G-29 ③ · D-6G-45) — **시도 원장 ∪ 원문 관측**이다. 원문만 보면 빈 응답이
      * 영원히 다시 불리고, 시도 원장만 보면 원장 없이 적재된 앞 실행의 원문을 못 본다.
      */
@@ -348,7 +279,7 @@ class CollectOpeningResultsUseCase(
             }
         }
         // 실행마다 한 번 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다.
-        val attempted = attempts.read().attemptedAxes()
+        val attempted = attempts.read().settledAxes()
         ids.forEach { id ->
             val tried = attempted[NoticeKeyHash.of(id.number.value, id.round.value)].orEmpty()
             DetailAxis.entries.filter { it.endpoint in tried }.forEach { axis ->
@@ -388,19 +319,3 @@ private sealed interface DetailStep {
 }
 
 private val EMPTY_SAMPLE = SampleOutcome(emptyList(), emptyMap())
-
-/**
- * 예산이 세는 「하루」의 구역 — **Asia/Seoul** 이다. KONEPS 일 한도와 이 저장소의 다른 모든 날짜 축이
- * 같은 구역이라, UTC 로 세면 일 회계가 09:00 KST 에 리셋돼 **같은 KONEPS 하루 안에서 승인 일 상한을
- * 두 번** 받는다(code-review H-6).
- */
-internal val COLLECTION_BUDGET_ZONE: ZoneId = OPENING_DATE_ZONE
-
-internal fun refusal(
-    budget: CallBudgetLedger,
-    onDay: LocalDate,
-): OpeningCollectionHalt? =
-    when (val outcome = budget.consume(onDay, 1)) {
-        BudgetOutcome.Allowed -> null
-        is BudgetOutcome.Exhausted -> OpeningCollectionHalt(outcome.limit, null, notAttempted = 0)
-    }

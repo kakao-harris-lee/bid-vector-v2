@@ -2,7 +2,6 @@ package bidvector.app.collection
 
 import bidvector.adapters.persistence.CollectionRunLease
 import bidvector.adapters.persistence.RunLease
-import bidvector.workflow.collection.CallBudgetLedger
 import bidvector.workflow.collection.CollectOpeningResultsUseCase
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.OpeningCollectionReport
@@ -19,7 +18,6 @@ class OpeningCollectionRunner(
     private val useCase: CollectOpeningResultsUseCase,
     private val range: CollectionRange,
     private val sources: List<OpeningCollectionSource>,
-    private val budget: CallBudgetLedger,
     private val lease: CollectionRunLease,
     private val log: CollectionLog,
     private val termination: CollectionTermination,
@@ -57,7 +55,7 @@ class OpeningCollectionRunner(
     @Suppress("TooGenericExceptionCaught")
     private fun collectOrFail(): OpeningCollectionReport =
         try {
-            useCase.collect(range, sources, budget)
+            useCase.collect(range, sources)
         } catch (failure: Exception) {
             val causeCode = openingCauseCodeOf(failure)
             log.write(failureLine(causeCode))

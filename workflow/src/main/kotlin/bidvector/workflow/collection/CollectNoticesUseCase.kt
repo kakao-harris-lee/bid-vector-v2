@@ -23,7 +23,10 @@ private fun TruncationCause.directive(): WalkDirective =
     when (this) {
         TruncationCause.MaxPages -> WalkDirective.RESUME_SAME_SLOT
 
+        // 쿼터든 승인 상한이든 더 부르면 거절만 쌓인다 — 실행을 멈춘다(D-6G-47).
         TruncationCause.QuotaExhausted -> WalkDirective.HALT_RUN
+
+        is TruncationCause.BudgetExhausted -> WalkDirective.HALT_RUN
 
         TruncationCause.RepeatedPage,
         TruncationCause.Timeout,

@@ -7,18 +7,21 @@ import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionProperties
 import bidvector.app.collection.CollectionRunner
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.collection.KonepsCredentialProperties
 import bidvector.app.collection.KonepsEndpointProperties
+import bidvector.app.collection.requireOutsideRepository
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
+import bidvector.workflow.collection.CallBudgetLedger
 import bidvector.workflow.collection.CollectNoticesUseCase
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangeOutcome
@@ -34,6 +37,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import java.net.URI
 import java.net.http.HttpClient
+import java.nio.file.Path
 import java.time.LocalDate
 import javax.sql.DataSource
 
@@ -73,13 +77,16 @@ open class CollectionWiring {
         endpoint: KonepsEndpointProperties,
         credential: KonepsCredentialProperties,
         range: CollectionRange,
+        runState: RunStateDirectory,
+        budget: CallBudgetLedger,
+        clock: Clock,
     ): CollectionSources {
         require(properties.categories.isNotEmpty()) { "bidvector.collection.categories 가 비어 있다" }
         require(properties.categories.toSet().size == properties.categories.size) {
             "bidvector.collection.categories 에 같은 업종이 두 번 있다"
         }
         val baseUri = requireSafeKonepsBaseUri(endpoint.baseUrl)
-        val transport = konepsTransportFor(credential, range.to)
+        val transport = konepsTransportFor(credential, range.to, runState, budget, clock)
         val sources =
             properties.categories.map { category ->
                 val name = requireNotNull(CollectionSourceName.of(category)) { "업종 이름 형식이 유효하지 않다" }
@@ -89,6 +96,19 @@ open class CollectionWiring {
             }
         return CollectionSources(sources)
     }
+
+    /** 개찰 갈래와 **같은 실행 상태**를 쓴다(D-6G-47) — 두 갈래의 호출이 한 원장에서 합쳐진다. */
+    @Bean
+    open fun collectionRunState(properties: CollectionProperties): RunStateDirectory =
+        RunStateDirectory(requireOutsideRepository(Path.of(properties.runStateDir)))
+
+    @Bean
+    open fun collectionCallBudget(
+        properties: CollectionProperties,
+        runState: RunStateDirectory,
+        clock: Clock,
+    ): CallBudgetLedger =
+        seededBudget(runState, properties.callsPerDay, properties.callsTotal, properties.budgetSince, clock)
 
     @Bean
     open fun collectNoticesUseCase(
@@ -124,7 +144,7 @@ open class CollectionWiring {
         division: BusinessDivision,
     ): KonepsOpenApiNoticeSource =
         KonepsOpenApiNoticeSource(
-            httpClient = transport.httpClient,
+            gate = transport.gate,
             baseUri = baseUri,
             serviceKey = transport.serviceKey,
             httpPolicy = transport.httpPolicy,

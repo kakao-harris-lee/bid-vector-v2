@@ -2,6 +2,12 @@ package bidvector.procurement
 
 import java.time.Instant
 
+/**
+ * 어느 한도가 물었는가 — 「멈췄다」만으로는 다음 날 다시 돌려도 되는지를 알 수 없다. 절단 사유가
+ * 이 값을 실으므로(`TruncationCause.BudgetExhausted`) 도메인 쪽에 둔다.
+ */
+enum class BudgetLimit { DAILY, TOTAL }
+
 /** 승인 호출 예산이 이미 쓴 몫 — 총계와 오늘치(D-6G-29 ①). */
 data class CallSpend(
     val total: Int,

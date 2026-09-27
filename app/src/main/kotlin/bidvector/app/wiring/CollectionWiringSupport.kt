@@ -1,16 +1,22 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
+import bidvector.adapters.koneps.KonepsCallGate
 import bidvector.adapters.koneps.KonepsHttpPolicyData
 import bidvector.adapters.koneps.ServiceKey
+import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.KonepsCredentialProperties
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.collection.COLLECTION_BUDGET_ZONE
 import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
+import bidvector.workflow.collection.CallBudgetLedger
+import bidvector.workflow.collection.CollectionCallBudget
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangeOutcome
+import bidvector.workflow.collection.dayStartOf
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import java.net.URI
@@ -63,23 +69,56 @@ internal fun resolveCollectionRange(
 }
 
 /**
- * KONEPS 호출 한 벌의 전송 자리 — 서비스 키·전송 정책·HTTP 클라이언트. **원문 키를 읽는 자리가 여기
- * 하나**이고(두 배선이 각자 읽던 것을 모았다) 감싼 뒤에는 [ServiceKey] 밖으로 다시 나오지 않는다.
+ * KONEPS 호출 한 벌의 전송 자리 — 서비스 키·전송 정책·**호출 관문**. 원문 키를 읽는 자리가 여기
+ * 하나이고(두 배선이 각자 읽던 것을 모았다) 감싼 뒤에는 [ServiceKey] 밖으로 다시 나오지 않는다.
+ *
+ * `HttpClient` 를 내보내지 않는다(D-6G-47) — 관문이 그것을 쥔 유일한 자리이고, 배선이 클라이언트를
+ * 손에 쥘 수 없으면 관문을 우회하는 경로도 만들 수 없다.
  */
 internal class KonepsTransport(
     val serviceKey: ServiceKey,
     val httpPolicy: KonepsHttpPolicyData,
-    val httpClient: HttpClient,
+    val gate: KonepsCallGate,
 )
 
+/**
+ * 두 수집 갈래가 **같은 형태로** 관문을 만든다(D-6G-47 H-1) — 공고 목록 갈래가 상한 밖에 있던 것이
+ * 세 라운드 열려 있던 구멍이라, 관문을 만드는 자리를 하나로 두어 한쪽만 빠뜨리는 모양을 없앤다.
+ */
 internal fun konepsTransportFor(
     credential: KonepsCredentialProperties,
     on: LocalDate,
+    runState: RunStateDirectory,
+    budget: CallBudgetLedger,
+    clock: Clock,
 ): KonepsTransport {
     val httpPolicy = resolvedOrFail(KONEPS_HTTP_POLICY.resolve(on), "KONEPS 전송 정책")
     return KonepsTransport(
         serviceKey = ServiceKey.of(credential.serviceKey),
         httpPolicy = httpPolicy,
-        httpClient = HttpClient.newBuilder().connectTimeout(httpPolicy.requestTimeout).build(),
+        gate =
+            KonepsCallGate(
+                httpClient = HttpClient.newBuilder().connectTimeout(httpPolicy.requestTimeout).build(),
+                budget = budget,
+                attempts = runState.attempts,
+                clock = clock,
+                zone = COLLECTION_BUDGET_ZONE,
+            ),
     )
+}
+
+/**
+ * 승인 상한 원장 — **시도 원장에서 seed** 한다(D-6G-45·47). 하루의 경계는 [COLLECTION_BUDGET_ZONE]
+ * (KST)이고, 소비도 관문이 같은 구역으로 센다(두 자리가 갈리면 KST 00~09 시에 오늘치가 사라진다).
+ */
+internal fun seededBudget(
+    runState: RunStateDirectory,
+    perDay: Int,
+    total: Int,
+    since: java.time.Instant,
+    clock: Clock,
+): CallBudgetLedger {
+    val today = LocalDate.ofInstant(clock.now(), COLLECTION_BUDGET_ZONE)
+    val spent = runState.attempts.read().spend(since, dayStartOf(today, COLLECTION_BUDGET_ZONE))
+    return CallBudgetLedger(CollectionCallBudget(perDay, total), today, spent)
 }

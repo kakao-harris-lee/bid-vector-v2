@@ -41,6 +41,7 @@ class KonepsLicenseLimitDocumentSource(
             baseUri,
             KonepsOperationPolicy.LICENSE_LIMIT_DETAIL,
             evidence.noticeId,
+            SourceEndpoint.LICENSE_LIMIT_DETAIL,
         ) { item, itemPolicy, observedAt ->
             // F-1(verifier r1) — license-limit 은 한 공고에 제한그룹번호·제한순번 축으로
             // 복수 행이 온다. 그 짝을 행 식별자에 더하지 않으면 첫 행만 남고 나머지가

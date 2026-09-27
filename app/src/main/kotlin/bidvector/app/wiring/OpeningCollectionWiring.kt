@@ -103,18 +103,8 @@ open class OpeningCollectionWiring {
         properties: OpeningCollectionProperties,
         runState: RunStateDirectory,
         clock: Clock,
-    ): CallBudgetLedger {
-        val today = LocalDate.ofInstant(clock.now(), OPENING_DATE_ZONE)
-        val spent =
-            runState.attempts
-                .read()
-                .spend(properties.budgetSince, dayStartOf(today, OPENING_DATE_ZONE))
-        return CallBudgetLedger(
-            CollectionCallBudget(properties.callsPerDay, properties.callsTotal),
-            today,
-            spent,
-        )
-    }
+    ): CallBudgetLedger =
+        seededBudget(runState, properties.callsPerDay, properties.callsTotal, properties.budgetSince, clock)
 
     /**
      * 실행 상태 디렉터리(D-6G-39·45) — 확정 표본과 시도 원장이 여기 있다. 저장소 밖 강제도, 디렉터리
@@ -135,6 +125,9 @@ open class OpeningCollectionWiring {
         opening: KonepsOpeningEndpointProperties,
         credential: KonepsCredentialProperties,
         range: CollectionRange,
+        runState: RunStateDirectory,
+        budget: CallBudgetLedger,
+        clock: Clock,
     ): OpeningCollectionSources {
         require(properties.categories.isNotEmpty()) { "bidvector.opening-collection.categories 가 비어 있다" }
         require(properties.categories.toSet().size == properties.categories.size) {
@@ -142,10 +135,10 @@ open class OpeningCollectionWiring {
         }
         val noticeBase = requireSafeKonepsBaseUri(endpoint.baseUrl)
         val scsbidBase = requireSafeKonepsBaseUri(opening.scsbidBaseUrl)
-        val transport = konepsTransportFor(credential, range.to)
+        val transport = konepsTransportFor(credential, range.to, runState, budget, clock)
         val config =
             KonepsSourceConfig(
-                httpClient = transport.httpClient,
+                gate = transport.gate,
                 serviceKey = transport.serviceKey,
                 httpPolicy = transport.httpPolicy,
                 collectionPolicyProvider = ::collectionPolicyAt,
@@ -201,7 +194,6 @@ open class OpeningCollectionWiring {
         useCase: CollectOpeningResultsUseCase,
         range: CollectionRange,
         sources: OpeningCollectionSources,
-        budget: CallBudgetLedger,
         lease: JdbcCollectionRunLease,
         termination: CollectionTermination,
     ): OpeningCollectionRunner {
@@ -210,7 +202,6 @@ open class OpeningCollectionWiring {
             useCase,
             range,
             sources.all,
-            budget,
             lease,
             CollectionLog { logger.info(it) },
             termination,

@@ -1,5 +1,6 @@
 package bidvector.adapters.koneps
 
+import bidvector.procurement.BudgetLimit
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.ResultCodeCategory
 import bidvector.procurement.TruncationCause
@@ -10,7 +11,6 @@ import io.github.resilience4j.ratelimiter.RequestNotPermitted
 import io.github.resilience4j.retry.Retry
 import io.github.resilience4j.retry.RetryConfig
 import java.net.URI
-import java.net.http.HttpClient
 
 private const val HTTP_TOO_MANY_REQUESTS = 429
 
@@ -32,6 +32,15 @@ internal sealed interface KonepsCallOutcome {
     data class Throttled(
         val detail: String,
     ) : KonepsCallOutcome
+
+    /**
+     * 승인 호출 상한이 막았다(D-6G-47) — 호출이 **나가지 않았다.** 쿼터(KONEPS 거절)와 다르고
+     * 자체 throttle(속도 보호)과도 다르다: 이것은 우리가 승인받은 범위를 다 썼다는 뜻이고,
+     * 다음 걸음을 정하는 답이 다르다(오늘은 멈추고 내일 이어 돈다).
+     */
+    data class BudgetDenied(
+        val limit: BudgetLimit,
+    ) : KonepsCallOutcome
 }
 
 /**
@@ -46,18 +55,6 @@ internal class KonepsAttemptCounters {
         private set
     var backoffSkipped: Int = 0
         private set
-
-    /**
-     * **실제로 나간 HTTP 호출 수**(D-6G-45) — 재시도·5xx·429·타임아웃을 전부 포함한다. 받은
-     * 페이지 수(`pagesFetched`)와 다르다: 한 페이지를 세 번 시도해 받았으면 페이지는 1, 시도는 3
-     * 이다. 승인 호출 상한이 세야 하는 것은 **시도** 쪽이다 — 거절당한 호출도 쿼터를 쓴다.
-     */
-    var httpAttempts: Int = 0
-        private set
-
-    fun recordHttpAttempt() {
-        httpAttempts++
-    }
 
     fun recordQuotaSignal() {
         quotaExceeded++
@@ -77,15 +74,29 @@ internal sealed interface KonepsRawStep {
     data class TransportStep(
         val outcome: KonepsTransportOutcome,
     ) : KonepsRawStep
+
+    /**
+     * 승인 상한이 막았다(D-6G-47) — **재시도 대상이 아니다.** 백오프를 태워도 상한은 돌아오지
+     * 않는다(날이 바뀌거나 승인이 늘어야 한다). KONEPS 가 거절한 것이 아니므로 쿼터와도 다르다.
+     */
+    data class BudgetStep(
+        val limit: BudgetLimit,
+    ) : KonepsRawStep
 }
 
 private fun rawStep(
-    httpClient: HttpClient,
+    gate: KonepsCallGate,
+    callContext: KonepsCallContext,
     uri: URI,
     httpPolicy: KonepsHttpPolicyData,
     collectionPolicy: KonepsCollectionPolicyData,
 ): KonepsRawStep {
-    val transport = sendKonepsRequest(httpClient, uri, httpPolicy.requestTimeout)
+    val sent =
+        when (val gated = gate.send(callContext, uri, httpPolicy.requestTimeout)) {
+            is KonepsGateOutcome.Denied -> return KonepsRawStep.BudgetStep(gated.limit)
+            is KonepsGateOutcome.Sent -> gated
+        }
+    val transport = sent.transport
     return when {
         transport is KonepsTransportOutcome.Received && transport.status != HTTP_TOO_MANY_REQUESTS -> {
             KonepsRawStep.EnvelopeStep(parseKonepsEnvelope(transport.body, collectionPolicy, httpPolicy.maxJsonDepth))
@@ -114,6 +125,10 @@ private fun isRetryableStep(step: KonepsRawStep): Boolean =
         is KonepsRawStep.EnvelopeStep -> {
             (step.outcome as? KonepsEnvelopeOutcome.Classified)?.category == ResultCodeCategory.RETRYABLE
         }
+
+        is KonepsRawStep.BudgetStep -> {
+            false
+        }
     }
 
 private fun foldFinal(step: KonepsRawStep): KonepsCallOutcome =
@@ -128,6 +143,10 @@ private fun foldFinal(step: KonepsRawStep): KonepsCallOutcome =
                 KonepsEnvelopeOutcome.NoData -> KonepsCallOutcome.NoData
                 else -> KonepsCallOutcome.Failed(causeFor(step), describeEnvelope(envelope))
             }
+        }
+
+        is KonepsRawStep.BudgetStep -> {
+            KonepsCallOutcome.BudgetDenied(step.limit)
         }
     }
 
@@ -177,7 +196,8 @@ internal fun buildKonepsRateLimiter(
  * 센다 — Resilience4j 가 내부에서 삼키는 중간 실패도 놓치지 않는다(H-3).
  */
 internal fun fetchPageResilient(
-    httpClient: HttpClient,
+    gate: KonepsCallGate,
+    callContext: KonepsCallContext,
     retry: Retry,
     rateLimiter: RateLimiter,
     uri: URI,
@@ -186,8 +206,7 @@ internal fun fetchPageResilient(
     counters: KonepsAttemptCounters,
 ): KonepsCallOutcome {
     val supplier = {
-        counters.recordHttpAttempt()
-        val step = rawStep(httpClient, uri, httpPolicy, collectionPolicy)
+        val step = rawStep(gate, callContext, uri, httpPolicy, collectionPolicy)
         if (isQuotaSignal(step)) counters.recordQuotaSignal()
         step
     }

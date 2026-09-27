@@ -5,10 +5,11 @@ import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NoticeId
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceBatch
+import bidvector.procurement.SourceEndpoint
+import bidvector.workflow.collection.NoticeKeyHash
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
 import java.net.URI
-import java.net.http.HttpClient
 import java.time.Clock
 import java.time.LocalDate
 
@@ -24,7 +25,7 @@ private const val DEFAULT_ROWS_PER_PAGE = 100
  * 한 줄도 고치지 않는다는 제약(scope.md in_scope 주석)에 걸린다.
  */
 data class KonepsSourceConfig(
-    val httpClient: HttpClient,
+    val gate: KonepsCallGate,
     val serviceKey: ServiceKey,
     val httpPolicy: KonepsHttpPolicyData,
     val collectionPolicyProvider: (referenceDate: CollectionReferenceDate) -> KonepsCollectionPolicyData,
@@ -47,6 +48,7 @@ internal fun fetchSingleKonepsNotice(
     baseUri: URI,
     operation: KonepsOperationDescriptor,
     noticeId: NoticeId,
+    axis: SourceEndpoint,
     itemMapper: KonepsItemMapper,
 ): SourceBatch<RawNoticeObservation> {
     val referenceDate = CollectionReferenceDate(LocalDate.now(config.clock))
@@ -62,8 +64,11 @@ internal fun fetchSingleKonepsNotice(
                 noticeId = noticeId,
             )
         }
+    val callContext =
+        KonepsCallContext(axis, NoticeKeyHash.of(noticeId.number.value, noticeId.round.value))
     return walkKonepsNoticePages(
-        config.httpClient,
+        config.gate,
+        callContext,
         retry,
         rateLimiter,
         uriBuilder,
