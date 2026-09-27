@@ -11,7 +11,7 @@
 
 - cmd: `./gradlew --no-daemon check`
 - exit: 0
-- 핵심 결과: 9 모듈 전건. 이 slice 의 게이트·거동 test 아홉이 `gateExecutionGate` 에 등재돼 **실행
+- 핵심 결과: 9 모듈 전건. 이 slice 의 게이트·거동 test 열이 `gateExecutionGate` 에 등재돼 **실행
   자체**가 확인된다(통과 수가 아니다 — 그중 하나에 `@Disabled` 를 달면 RED 임을 실측했다)
 
 - cmd: `./gradlew --no-daemon qualityBaseline`
@@ -87,12 +87,40 @@
 | 위 + 허용 접두에 수집 레인을 열어 첫 규칙을 우회 | 수집 레인 의존 금지 | RED 1 — **두 잠금이 독립이다** |
 | value 시점 기준 대조 제거 | 읽기 사이 끼어듦 회귀 | RED 1 |
 | 등재된 게이트 test 에 `@Disabled` | `gateExecutionGate` | RED(「건너뛰어졌다」) |
+| **A1** ① 층에 `@Bean WebMvcConfigurer` | ① 층 HTTP 확장 API 의존 금지 | RED 1 |
+| **A2** ① 층에 `@Bean WebServerFactoryCustomizer` + Tomcat valve | ① 층 HTTP 확장 API 의존 금지 | RED 1 |
+| **A6** ① 층 클래스에 `@ControllerAdvice` | ① 층 HTTP 확장 API 의존 금지 | RED 1 — 애너테이션도 의존으로 센다 |
+| **A3** ② 층이 ① 층 컴패니언을 참조 | ② 층 허용 app 클래스 목록 | RED 1 |
+| **A5** 어댑터 인터페이스에 메서드를 더해 ② 층이 호출 | 어댑터 호출 삼중쌍 | RED 1 |
+| **A4** 컨트롤러가 어댑터 예외의 자기 멤버를 호출 | 어댑터 예외 멤버 제한 | RED 1 |
+| 등재 목록에서 게이트 test 하나 제거 | 등재 완전성 meta-gate | RED 1(그 이름을 그대로 낸다) |
 
 MU1·MU2·MU2b 는 **위반 fixture 로도 영구 고정**했다(같은 규칙 값에 평가 루트만 바꿔 음성 대조).
 production 소스 변이는 측정 뒤 지웠고 `git status` 빈 출력으로 확인했다.
 
-이 라운드의 변이 셋은 `bidvector.app.rogue` 에 두었다가 측정 뒤 지웠고, 면제 클래스 변이는 되돌린 뒤
-`git diff --numstat` 빈 출력으로 확인했다.
+production 소스에 심은 변이는 측정 뒤 되돌리고 `git status --porcelain` · `git diff --numstat` 으로
+되돌림을 확인했다. ② 층·③ 층 규칙은 production 이 오늘 어기지 않아 양성만으로는 조용할 수 있어
+위반 fixture(`archfixture/violating/app/tiers`)로 **영구 음성 대조**를 남겼다.
+
+## 자체 우회 탐침 — 규칙을 세운 뒤 스스로 고안한 넷
+
+위 변이표는 남이 지목한 형태를 재현한 것이다. 규칙이 선 **뒤에** 직접 고안해 두드린 것은 아래 넷이고,
+셋째·넷째는 **막히지 않았다** — 무엇이 막았는지까지 적는다.
+
+| 탐침 | 형태 | 결과 |
+|---|---|---|
+| **N1** | 제한 층이 web 컨텍스트에서 **이름으로** 빈을 꺼내 리플렉션으로 SQL | RED 2 — 기존 리플렉션 봉쇄(`app`·`workflow` production 의 리플렉션 API 참조 금지)가 잡는다 |
+| **N2** | **허용된 능력 타입만** 쥔 새 `Filter` 를, ① 층이 유일하게 허용된 등록 타입으로 올린다 | 의존 게이트 **전건 통과** · 표면 실측 RED — 두 축이 필요한 이유의 **역방향** 실측 |
+| **N3** | 컨트롤러가 요청 시점에 `ServletContext.addServlet` 으로 서블릿을 새로 단다(능력은 캡처) | 게이트 **전건 통과**. 막은 것은 컨테이너다 — 초기화된 컨텍스트에 서블릿을 더하지 못한다(실측). 설령 붙어도 인증 필터가 `/*` 라 우회가 아니다 |
+| **N4** | `ServiceLoader<Runnable>` — 어댑터 타입을 한 번도 적지 않고 능력을 꺼낸다 | 게이트 **전건 통과**. 오늘 실행 불가(자원 파일과 구현이 둘 다 없다). 알려진 제한 ⑮ · `OPEN-6A2B-LOCATOR-BAN` |
+
+N2 의 값: 앞선 라운드는 「면제 클래스가 `@Bean` 으로 진입점을 만든다」로 표면 실측이 필요함을 보였고,
+N2 는 **반대로** 「모든 타입이 허용 목록 안이어도 새 진입점이 생긴다」를 보인다. 의존 축만으로는
+둘 다 조용하다.
+
+N3·N4 는 같은 뿌리다 — **일반 타입으로 능력을 세탁하면 의존 방향이 보이지 않는다**. 앞 세 라운드의
+병(대상 종류 열거)과는 다른 계열이라 종류를 더 세는 처방으로는 닫히지 않는다. 닫는 자리는 허용
+목록의 입도(패키지 → 타입)이거나 locator 금지이고, 후자가 이미 있는 게이트라 그쪽으로 넘겼다.
 
 ## 새 public 표면 전수 (`javap`)
 
@@ -103,8 +131,11 @@ production 소스 변이는 측정 뒤 지웠고 `git status` 빈 출력으로 �
   타입만 내고(`Applied`·`AppliedStrategy` 는 내지 못한다) 인자로 `EditSession`(internal constructor)을
   요구하며, 후자는 `JsonNode` 만 읽는다.
 - `EditSessionState.WaitingForConfirmation` 에 `baseRevision` 이, `EditCommand.ProvideValue` 에
-  `baseRevision` 이 붙었다 — 값 하나씩 늘었을 뿐 생성 경로는 그대로다. command 는 원래 public 타입이라
-  밖에서 만들 수 있었고, 그 값을 지어내면 value 시점 대조가 `StaleRevision` 으로 막는다(알려진 제한 ⑥).
+  `baseRevision` 이 붙었다 — 값 하나씩 늘었을 뿐 생성 경로는 그대로다. command 쪽은 **선택 값**이다
+  (필드 행이 아직 없는 최초 value 에는 기준이 없다). command 는 원래 public 타입이라 밖에서 만들 수
+  있었고, 그 값을 지어내면 value 시점 대조가 `StaleRevision` 으로 막는다(알려진 제한 ⑥).
+- 판정 술어가 하나 늘었다(`internal` 최상위, JVM 공개) — `EditSession`(internal constructor)과
+  `OperatorStrategy` 를 요구하고 `Rejected?` 만 낸다. 지문 함수는 `private` 이라 표면이 아니다.
 - 406 핸들러가 `ResponseEntity<Void>` 를 낸다 — 본문 없음이 계약이라 `ErrorBody` 를 만들지 않는다.
 - 커널의 `apply`·`beginSession`·`expireIfDue` 는 이 slice 이전부터 JVM public 이다(Kotlin `internal`) —
   이번에 나뉜 판정 술어 넷도 같은 형태이고 새 권한을 주지 않는다.
