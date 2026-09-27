@@ -161,6 +161,14 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
     assert fill["bid_price_formula_a_applicable"] == 0.0
     assert fill["pure_construction_cost"] == 0.0
     assert payload["base_amount_mismatch_count"] == 0
+    # fixture 에 A 값 공고가 없다 — 분모 0 을 숨기지 않고 싣는다(D-6G-17·23).
+    scope = payload["standard_market_price_scope"]
+    assert scope["a_value_present_count"] == 0
+    assert scope["applicable_count"] == 0
+    assert "STANDARD_MARKET_PRICE_MAGNITUDE_UNMEASURED" in payload["limitations"]
+    assert (
+        "STANDARD_MARKET_PRICE_PREDICATE_NOT_IN_SNAPSHOT" not in payload["limitations"]
+    )
 
 
 def test_verdict_carries_the_policy_checksum_and_snapshot_coordinates(

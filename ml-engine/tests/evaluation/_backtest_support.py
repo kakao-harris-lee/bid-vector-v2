@@ -153,7 +153,7 @@ def manifest_bytes(
     period_end: str = "2026-08-31",
     rows_sha256: str | None = None,
     sample_list_sha256: str = "0" * 64,
-    schema_version: str = "snapshot-v1",
+    schema_version: str = "snapshot-v2",
 ) -> bytes:
     payload = {
         "schema_version": schema_version,

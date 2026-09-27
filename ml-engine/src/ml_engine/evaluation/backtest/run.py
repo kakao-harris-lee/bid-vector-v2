@@ -26,6 +26,7 @@ from ml_engine.evaluation.backtest.exclusions import (
     admit_rows,
     exclusion_counts,
     fill_rates,
+    standard_market_price_scope,
 )
 from ml_engine.evaluation.backtest.fit import FitResult, check_institutional_fit
 from ml_engine.evaluation.backtest.metrics import (
@@ -366,6 +367,7 @@ def _assemble_verdict(
         exclusions=counts,
         undecidable=admission.undecidable,
         fill_rates=fill_rates(request.snapshot.rows),
+        standard_market_price_scope=standard_market_price_scope(request.snapshot.rows),
         base_amount_mismatch_count=sum(
             1 for item in admission.admitted if not item.base_amount_matches
         ),

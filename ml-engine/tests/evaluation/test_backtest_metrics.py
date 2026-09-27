@@ -107,8 +107,9 @@ def test_construction_second_floor_makes_an_otherwise_eligible_bid_ineligible() 
             notice_bid_price_formula_a_applicable=True,
             notice_noticed_on="2026-03-01",
             notice_a_value={
-                "total": 60_000_000.0,
+                "total": 60_000_000,
                 "open_at": "2026-06-05T09:00:00+09:00",
+                "standard_market_price_applicable": False,
             },
             notice_pure_construction_cost=930_000_000.0,
             outcome_bidder_amounts=[960_000_000.0, 980_000_000.0],

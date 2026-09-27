@@ -145,6 +145,15 @@ def verdict_payload(verdict: BacktestVerdict) -> dict[str, JsonValue]:
         "exclusions": {str(reason): count for reason, count in verdict.exclusions},
         "undecidable": {str(axis): count for axis, count in verdict.undecidable},
         "fill_rates": {name: value for name, value in verdict.fill_rates},
+        "standard_market_price_scope": {
+            "a_value_present_count": (
+                verdict.standard_market_price_scope.a_value_present_count
+            ),
+            "applicable_count": verdict.standard_market_price_scope.applicable_count,
+            "undecidable_count": (
+                verdict.standard_market_price_scope.undecidable_count
+            ),
+        },
         "base_amount_mismatch_count": verdict.base_amount_mismatch_count,
         "limitations": list(verdict.limitations),
         "selected_windows": [

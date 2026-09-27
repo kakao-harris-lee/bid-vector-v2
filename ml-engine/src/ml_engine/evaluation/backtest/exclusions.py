@@ -213,6 +213,37 @@ def exclusion_counts(
     return tuple((reason, tally[reason]) for reason in EXCLUSION_RULE_ORDER)
 
 
+@dataclass(frozen=True)
+class StandardMarketPriceScope:
+    """표준시장단가금액 배제의 **영향 범위**(D-6G-17·23). 분모는 **A 값을 가진 공고**다 —
+    A 가 없는 공고는 합산액이 없어 애초에 범위 밖이다(스키마 §3.3).
+
+    **계수는 범위이지 크기가 아니다.** 「몇 건이 걸리는가」는 나오지만 「A 가 얼마나
+    달라지는가」는 모른다 — `smkpAmt` 의 **금액**을 스냅숏이 싣지 않기 때문이다. 그
+    한계는 판정문의 알려진 제한으로 나간다."""
+
+    a_value_present_count: int
+    applicable_count: int
+    undecidable_count: int
+
+
+def standard_market_price_scope(
+    rows: Sequence[SnapshotRow],
+) -> StandardMarketPriceScope:
+    """술어가 참인 공고 수 · 판정 불가 수 · 분모를 함께 낸다. 셋을 같이 내는 이유는
+    「참이 적다」와 「판정하지 못했다」가 다르기 때문이다."""
+    present = [row.notice.a_value for row in rows if row.notice.a_value is not None]
+    return StandardMarketPriceScope(
+        a_value_present_count=len(present),
+        applicable_count=sum(
+            1 for item in present if item.standard_market_price_applicable is True
+        ),
+        undecidable_count=sum(
+            1 for item in present if item.standard_market_price_applicable is None
+        ),
+    )
+
+
 def _fill_rate(
     rows: Sequence[SnapshotRow], reader: Callable[[SnapshotRow], object]
 ) -> float:

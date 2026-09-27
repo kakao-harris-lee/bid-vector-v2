@@ -125,7 +125,7 @@ def build_files() -> tuple[bytes, bytes]:
         + "\n"
     ).encode("utf-8")
     manifest = {
-        "schema_version": "snapshot-v1",
+        "schema_version": "snapshot-v2",
         "snapshot_id": "m6-6g-synthetic-v1",
         "row_count": len(rows),
         "period_start": _BLOCK_STARTS[0].isoformat(),

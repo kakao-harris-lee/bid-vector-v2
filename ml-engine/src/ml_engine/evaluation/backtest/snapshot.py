@@ -41,7 +41,7 @@ from ml_engine.evaluation.backtest.jsonrow import (
 )
 from ml_engine.registry.artifact import JsonValue
 
-SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v1"
+SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v2"
 
 
 class BusinessCategory(StrEnum):
@@ -63,10 +63,17 @@ class SnapshotRejected:
 @dataclass(frozen=True)
 class AValue:
     """입찰가격산식 A — 합산액과 **그 자신의 공개일시**. 공개가 입찰 마감 뒤인 공고는
-    투찰 시점에 알 수 없는 값이라 제외된다(D-6G-12·D-6G-13 ⑥)."""
+    투찰 시점에 알 수 없는 값이라 제외된다(D-6G-12·D-6G-13 ⑥).
+
+    `standard_market_price_applicable`(`snapshot-v2`, D-6G-23)는 표준시장단가금액
+    (`smkpAmt`)의 적용 여부 술어다. **`total` 은 그 금액을 더하지 않는다**(스키마 §3.3 —
+    예규의 A 일곱 항목 열거에 없고 근거 문면을 확보하지 못했다). 이 술어가 있어야
+    그 배제의 **영향 범위**를 셀 수 있다 — 없으면 판정문이 「몇 건이 걸리는가」를 말하지
+    못한다. `Y`/`N` 밖의 값이나 부재는 `None`(판정 불가)."""
 
     total: float
     open_at: datetime
+    standard_market_price_applicable: bool | None
 
 
 @dataclass(frozen=True)
@@ -190,7 +197,9 @@ _OUTCOME_KEYS: Final[frozenset[str]] = frozenset(
     }
 )
 _BIDDER_KEYS: Final[frozenset[str]] = frozenset({"ordinal", "rank", "amount"})
-_A_VALUE_KEYS: Final[frozenset[str]] = frozenset({"total", "open_at"})
+_A_VALUE_KEYS: Final[frozenset[str]] = frozenset(
+    {"total", "open_at", "standard_market_price_applicable"}
+)
 _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
     {
         "schema_version",
@@ -219,7 +228,11 @@ def _a_value(payload: dict[str, JsonValue]) -> AValue | None:
         return None
     fields = row_mapping(raw, "a_value", _A_VALUE_KEYS)
     return AValue(
-        total=row_number(fields, "total"), open_at=row_timestamp(fields, "open_at")
+        total=row_number(fields, "total"),
+        open_at=row_timestamp(fields, "open_at"),
+        standard_market_price_applicable=row_optional_flag(
+            fields, "standard_market_price_applicable"
+        ),
     )
 
 

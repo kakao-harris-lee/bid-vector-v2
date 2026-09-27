@@ -14,6 +14,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Final
 
+from ml_engine.evaluation.backtest.exclusions import StandardMarketPriceScope
 from ml_engine.evaluation.backtest.fit import FitResult
 from ml_engine.evaluation.backtest.policy import StrategyBacktestPolicy
 from ml_engine.evaluation.backtest.reasons import ExclusionReason, UndecidableAxis
@@ -57,7 +58,7 @@ KNOWN_LIMITATIONS: Final[tuple[str, ...]] = (
     "SHIP_CLASS_CODE_UNRESOLVED",
     "SNAPSHOT_FIELD_FILL_RATES_UNMEASURED",
     "A_VALUE_EXCLUDES_STANDARD_MARKET_PRICE",
-    "STANDARD_MARKET_PRICE_PREDICATE_NOT_IN_SNAPSHOT",
+    "STANDARD_MARKET_PRICE_MAGNITUDE_UNMEASURED",
     "FLOOR_ROUNDING_RULE_UNRESOLVED",
     "S1_CONSTRUCTION_ONLY",
     "S3_GBM_NOT_AVAILABLE",
@@ -146,6 +147,7 @@ class BacktestVerdict:
     exclusions: tuple[tuple[ExclusionReason, int], ...]
     undecidable: tuple[tuple[UndecidableAxis, int], ...]
     fill_rates: tuple[tuple[str, float], ...]
+    standard_market_price_scope: StandardMarketPriceScope
     base_amount_mismatch_count: int
     """두 출처의 기초금액이 다른 공고 수(D-6G-19). 값을 고치지 않고 계수만 공시한다 —
     어느 쪽이 옳은지는 이 레인이 판정할 일이 아니다."""

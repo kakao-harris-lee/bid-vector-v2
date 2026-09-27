@@ -29,6 +29,7 @@ from ml_engine.evaluation.backtest.exclusions import (
     admit_rows,
     exclusion_counts,
     resolve_a_value,
+    standard_market_price_scope,
 )
 from ml_engine.evaluation.backtest.floor import (
     floor_price,
@@ -111,7 +112,11 @@ def test_construction_a_value_opened_after_bid_close_is_unusable() -> None:
         notice_category="CONSTRUCTION",
         notice_bid_price_formula_a_applicable=True,
         notice_bid_close_at="2026-06-10T10:00:00+09:00",
-        notice_a_value={"total": 1.0, "open_at": "2026-06-11T10:00:00+09:00"},
+        notice_a_value={
+            "total": 1,
+            "open_at": "2026-06-11T10:00:00+09:00",
+            "standard_market_price_applicable": False,
+        },
         notice_pure_construction_cost=800_000_000.0,
         notice_noticed_on="2026-06-01",
     )
@@ -180,7 +185,11 @@ def test_construction_without_pure_cost_is_excluded() -> None:
         "n-1",
         notice_category="CONSTRUCTION",
         notice_bid_price_formula_a_applicable=True,
-        notice_a_value={"total": 1.0, "open_at": "2026-06-05T10:00:00+09:00"},
+        notice_a_value={
+            "total": 1,
+            "open_at": "2026-06-05T10:00:00+09:00",
+            "standard_market_price_applicable": False,
+        },
         notice_noticed_on="2026-06-01",
     )
     assert _reason(payload) is ExclusionReason.PURE_CONSTRUCTION_COST_ABSENT
@@ -325,6 +334,48 @@ def test_exclusion_counts_report_every_reason_including_zero() -> None:
 def test_exclusion_rule_order_covers_every_reason_exactly_once() -> None:
     assert sorted(EXCLUSION_RULE_ORDER) == sorted(ExclusionReason)
     assert len(set(EXCLUSION_RULE_ORDER)) == len(EXCLUSION_RULE_ORDER)
+
+
+def _a_value(applicable: bool | None) -> dict[str, Any]:
+    return {
+        "total": 60_000_000,
+        "open_at": "2026-06-05T09:00:00+09:00",
+        "standard_market_price_applicable": applicable,
+    }
+
+
+def test_standard_market_price_scope_counts_over_notices_that_have_an_a_value() -> None:
+    """D-6G-17·23 — 분모는 **A 값을 가진 공고**다. A 가 없는 공고는 합산액이 없어
+    애초에 이 배제의 범위 밖이다(스키마 §3.3). 참·판정 불가를 따로 세는 이유는
+    「참이 적다」와 「판정하지 못했다」가 다르기 때문이다."""
+    rows = _snapshot(
+        [
+            row_payload(
+                "a-1", notice_category="CONSTRUCTION", notice_a_value=_a_value(True)
+            ),
+            row_payload(
+                "a-2", notice_category="CONSTRUCTION", notice_a_value=_a_value(True)
+            ),
+            row_payload(
+                "a-3", notice_category="CONSTRUCTION", notice_a_value=_a_value(False)
+            ),
+            row_payload(
+                "a-4", notice_category="CONSTRUCTION", notice_a_value=_a_value(None)
+            ),
+            row_payload("a-5"),  # A 없음 — 분모에 들어가지 않는다
+        ]
+    ).rows
+    scope = standard_market_price_scope(rows)
+    assert scope.a_value_present_count == 4
+    assert scope.applicable_count == 2
+    assert scope.undecidable_count == 1
+
+
+def test_standard_market_price_scope_is_zero_without_any_a_value() -> None:
+    scope = standard_market_price_scope(_snapshot([row_payload("n-1")]).rows)
+    assert scope.a_value_present_count == 0
+    assert scope.applicable_count == 0
+    assert scope.undecidable_count == 0
 
 
 def test_admission_signature_has_no_strategy_parameter() -> None:

@@ -84,7 +84,11 @@ def test_snapshot_checksum_is_the_sha256_of_the_rows_bytes() -> None:
         ({"row_count": 99}, SnapshotRejectionReason.ROW_COUNT_MISMATCH),
         ({"rows_sha256": "a" * 64}, SnapshotRejectionReason.CHECKSUM_MISMATCH),
         (
-            {"schema_version": "snapshot-v2"},
+            {"schema_version": "snapshot-v1"},
+            SnapshotRejectionReason.UNSUPPORTED_SCHEMA_VERSION,
+        ),
+        (
+            {"schema_version": "snapshot-v3"},
             SnapshotRejectionReason.UNSUPPORTED_SCHEMA_VERSION,
         ),
     ],
@@ -202,13 +206,50 @@ def test_a_value_is_parsed_with_its_own_open_timestamp() -> None:
     payload = row_payload(
         "n-1",
         notice_category="CONSTRUCTION",
-        notice_a_value={"total": 873_130_896.0, "open_at": "2026-06-05T16:10:19+09:00"},
+        notice_a_value={
+            "total": 873_130_896,
+            "open_at": "2026-06-05T16:10:19+09:00",
+            "standard_market_price_applicable": True,
+        },
     )
     snapshot = _loaded([payload])
     a_value = snapshot.rows[0].notice.a_value
     assert a_value is not None
     assert a_value.total == pytest.approx(873_130_896.0)
     assert a_value.open_at.isoformat() == "2026-06-05T16:10:19+09:00"
+    assert a_value.standard_market_price_applicable is True
+
+
+def test_a_value_standard_market_price_predicate_accepts_null() -> None:
+    """`Y`/`N` 밖의 값이나 부재는 `null`(판정 불가) — 추출이 지어내지 않는다."""
+    payload = row_payload(
+        "n-1",
+        notice_category="CONSTRUCTION",
+        notice_a_value={
+            "total": 1,
+            "open_at": "2026-06-05T09:00:00+09:00",
+            "standard_market_price_applicable": None,
+        },
+    )
+    a_value = _loaded([payload]).rows[0].notice.a_value
+    assert a_value is not None
+    assert a_value.standard_market_price_applicable is None
+
+
+def test_a_value_rejects_an_unknown_key() -> None:
+    payload = row_payload(
+        "n-1",
+        notice_category="CONSTRUCTION",
+        notice_a_value={
+            "total": 1,
+            "open_at": "2026-06-05T09:00:00+09:00",
+            "standard_market_price_applicable": None,
+            "standard_market_price_amount": 1,
+        },
+    )
+    rejected = _load([payload])
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.UNKNOWN_FIELD
 
 
 def test_manifest_period_is_carried_for_the_verdict_record() -> None:

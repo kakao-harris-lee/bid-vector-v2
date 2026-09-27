@@ -86,6 +86,7 @@ def _construction_target() -> AdmittedNotice:
                 notice_a_value={
                     "total": 60_000_000,
                     "open_at": "2026-06-05T09:00:00+09:00",
+                    "standard_market_price_applicable": False,
                 },
                 notice_pure_construction_cost=700_000_000,
                 outcome_opened_on="2026-06-15",
