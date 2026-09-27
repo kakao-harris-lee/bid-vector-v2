@@ -24,22 +24,6 @@ internal const val STATE_NAME = "state.json"
 private const val ATTEMPT_MAX_DEPTH = 4
 
 /**
- * 실험 실행 상태 디렉터리(D-6G-45) — 저장소 **밖**에 있고 파일 셋을 담는다.
- *
- * | 파일 | 무엇 |
- * |---|---|
- * | `sample-list.tsv` | 확정된 표본(D-6G-39) |
- * | `attempts.jsonl` | 시도 원장 — append-only |
- * | `state.json` | 표본 목록 바이트의 sha256 |
- *
- * **이 클래스는 디렉터리를 만들지 않는다.** 없으면 거부한다. 경로 오타 하나로 빈 디렉터리가 생기면
- * 승인 상한이 조용히 0 에서 시작하고 표본이 다시 뽑힌다 — 둘 다 실 호출이 나간 뒤에야 드러난다.
- * 디렉터리를 만드는 것은 운영자의 명시 행위여야 한다.
- *
- * 표본 목록이 있는데 `state.json` 이 없거나 해시가 어긋나면 **기동을 거부**한다. 바깥에서 목록을
- * 바꿔치우면 「결과를 보기 전에 확정했다」가 거짓이 되는데, 그것은 파일 안을 봐서는 알 수 없다.
- */
-/**
  * 실행 상태의 무결성 장부(D-6G-48) — 이 넷이 맞아야 기동한다.
  *
  * 앞 판은 표본 해시 하나였고, 그래서 **원장만 지우거나 잘라도** 거부 없이 상한이 0 에서 다시
@@ -83,7 +67,10 @@ class RunStateDirectory(
         verifyIntegrity()
     }
 
-    private var directoryId: String = readFacts()?.directoryId ?: java.util.UUID.randomUUID().toString()
+    private var directoryId: String =
+        readFacts()?.directoryId ?: java.util.UUID
+            .randomUUID()
+            .toString()
 
     val sampleList: FileSampleListLedger = FileSampleListLedger(sampleFile) { recordState() }
 
@@ -149,8 +136,7 @@ class RunStateDirectory(
 }
 
 /** 없는 파일은 빈 바이트로 본다 — 「아직 없다」와 「비었다」를 장부가 같게 다룬다. */
-private fun digestOf(file: Path): String =
-    sha256Hex(runCatching { Files.readString(file) }.getOrDefault(""))
+private fun digestOf(file: Path): String = sha256Hex(runCatching { Files.readString(file) }.getOrDefault(""))
 
 private fun lineCountOf(file: Path): Int =
     runCatching { Files.readString(file) }

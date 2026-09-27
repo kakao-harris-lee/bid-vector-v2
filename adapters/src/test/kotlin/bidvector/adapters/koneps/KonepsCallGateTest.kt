@@ -84,7 +84,11 @@ class KonepsCallGateTest {
 
         ledger.appended.single().kind shouldBe AttemptKind.AXIS
         ledger.read().spend(Instant.EPOCH, Instant.EPOCH).total shouldBe 0
-        ledger.read().settledAxes().keys.shouldBeEmpty()
+        ledger
+            .read()
+            .settledAxes()
+            .keys
+            .shouldBeEmpty()
     }
 }
 

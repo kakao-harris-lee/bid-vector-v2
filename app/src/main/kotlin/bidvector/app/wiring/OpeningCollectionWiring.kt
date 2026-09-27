@@ -6,9 +6,9 @@ import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.koneps.konepsOpeningResultSourceByNoticeDate
 import bidvector.adapters.persistence.JdbcCollectedAxisStore
 import bidvector.adapters.persistence.JdbcCollectionRunLease
-import bidvector.adapters.persistence.RunLease
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.persistence.RunLease
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -186,10 +186,6 @@ open class OpeningCollectionWiring {
         )
     }
 
-    /**
-     * 실행 잠금의 키 — 이 갈래 하나를 가리키는 상수다(다른 수집 갈래와 겹치지 않는 임의의 값).
-     * advisory lock 은 키 공간이 전역이므로 값 자체에 뜻이 없어도 되지만 **고정**이어야 한다.
-     */
     /**
      * 실행 잠금을 **기동 시점에** 잡는다 — 예산 seed 보다 먼저다(vr L-5). 얻지 못하면 값이
      * [RunLease.Busy] 이고 러너가 아무것도 부르지 않고 끝낸다(오류가 아니라 정상적인 답이다).

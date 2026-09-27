@@ -164,6 +164,7 @@ class ArchitecturePolicy private constructor(
     val runnerAllowedReferencers: List<String> get() = list("app.runner.allowed-referencers")
     val serviceKeyType: String get() = value("app.secret.service-key-type")
     val serviceKeyReaders: List<String> get() = list("app.secret.service-key-readers")
+
     /** M6/6G D-6G-47 — HTTP 클라이언트 타입과 그것을 쥐어도 되는 클래스 집합(관문과 그 조립). */
     val httpClientType: String get() = value("collection.http-client.type")
     val httpClientRoots: List<String> get() = list("collection.http-client.roots")

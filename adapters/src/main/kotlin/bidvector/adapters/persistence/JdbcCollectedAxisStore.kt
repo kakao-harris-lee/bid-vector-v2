@@ -52,7 +52,6 @@ class JdbcCollectedAxisStore(
     }
 }
 
-
 private const val COLLECTED_SQL =
     """
     SELECT DISTINCT payload_fields ->> 'bidNtceNo' AS notice_number,
