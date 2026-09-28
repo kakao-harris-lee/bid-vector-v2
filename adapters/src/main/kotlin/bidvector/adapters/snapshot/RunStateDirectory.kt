@@ -11,12 +11,15 @@ import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.NoticeKeyHash
+import bidvector.workflow.collection.hexOf
+import bidvector.workflow.collection.sha256Hex
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
 import java.time.Instant
 
 internal const val SAMPLE_LIST_NAME = "sample-list.tsv"
@@ -71,11 +74,16 @@ class RunStateDirectory(
      */
     val lock: RunStateLock = RunStateLock.tryAcquire(requireStateDirectory(root))
 
-    /** 첫 확정이 지은 표식 — 재동기가 [init] 안에서 장부를 다시 쓰므로 그 전에 값이 있어야 한다. */
-    private val directoryId: String =
-        readFacts()?.directoryId ?: java.util.UUID
-            .randomUUID()
-            .toString()
+    /**
+     * **이 자리의 표식**(cr r4 M-3) — 디렉터리의 절대 경로 해시다. 앞 판은 임의의 UUID 를 적고 아무
+     * 데서도 대조하지 않아 죽은 칸이었고, 「다른 디렉터리로의 복사가 모두 거부된다」는 참이 아니었다.
+     * 자리에 묶으면 파일 셋을 통째로 복사해 상한을 0 에서 다시 시작하는 길이 닫힌다(넷이 서로 맞아도
+     * 표식이 그 자리의 것이 아니다).
+     */
+    private val directoryId: String = sha256Hex(root.toAbsolutePath().normalize().toString())
+
+    /** 원장의 **누적** 해시와 줄 수 — append 마다 파일 전체를 다시 읽지 않는다(cr r4 M-6). */
+    private val ledger = LedgerDigest(attemptFile)
 
     init {
         if (lock is RunStateLock.Held) {
@@ -99,8 +107,16 @@ class RunStateDirectory(
      */
     val attempts: AttemptLedger =
         when (lock) {
-            is RunStateLock.Held -> FileAttemptLedger(attemptFile) { recordState() }
-            RunStateLock.Busy -> LockedOutAttemptLedger(FileAttemptLedger(attemptFile))
+            is RunStateLock.Held -> {
+                FileAttemptLedger(attemptFile) { line ->
+                    ledger.append(line)
+                    recordState()
+                }
+            }
+
+            RunStateLock.Busy -> {
+                LockedOutAttemptLedger(FileAttemptLedger(attemptFile) {})
+            }
         }
 
     /**
@@ -123,8 +139,8 @@ class RunStateDirectory(
                     "directory_id" to SnapshotJson.Text(directoryId),
                     "sample_list_sha256" to SnapshotJson.Text(digestOf(sampleFile)),
                     "sample_scope_sha256" to SnapshotJson.Text(digestOf(scopeFile)),
-                    "attempts_sha256" to SnapshotJson.Text(digestOf(attemptFile)),
-                    "attempt_lines" to SnapshotJson.Number(lineCountOf(attemptFile).toString()),
+                    "attempts_sha256" to SnapshotJson.Text(ledger.hex()),
+                    "attempt_lines" to SnapshotJson.Number(ledger.lines.toString()),
                 ),
             )
         val staged = root.resolve("$STATE_NAME.staged")
@@ -162,6 +178,9 @@ class RunStateDirectory(
             "실행 상태 장부가 없는데 파일이 있다 — 무엇이 지워졌는지 알 수 없다"
         }
         if (facts == null) return
+        require(facts.directoryId == directoryId) {
+            "실행 상태 장부가 다른 자리에서 왔다 — 디렉터리가 복사되었거나 옮겨졌다"
+        }
         require(facts.sampleListSha256 == digestOf(sampleFile)) {
             "표본 목록이 확정된 뒤에 바뀌었다 — 결과를 보기 전에 확정했다는 것이 더는 참이 아니다"
         }
@@ -233,6 +252,33 @@ private fun digestOf(file: Path): String = sha256Hex(runCatching { Files.readStr
 private val EMPTY_DIGEST: String = sha256Hex("")
 
 /**
+ * 원장의 누적 해시(cr r4 M-6) — append 마다 파일 전체를 다시 읽고 해시하면 호출 수의 제곱으로 는다.
+ * 승인 상한이 8만 호출이면 그 비용이 수집 자체를 넘어선다. 원장은 append-only 라 누적이 성립한다.
+ */
+private class LedgerDigest(
+    file: Path,
+) {
+    private val digest: MessageDigest = MessageDigest.getInstance("SHA-256")
+
+    var lines: Int = 0
+        private set
+
+    init {
+        val text = runCatching { Files.readString(file) }.getOrDefault("")
+        digest.update(text.toByteArray(Charsets.UTF_8))
+        lines = text.lineSequence().count { it.isNotBlank() }
+    }
+
+    fun append(line: String) {
+        digest.update(line.toByteArray(Charsets.UTF_8))
+        lines++
+    }
+
+    /** 복제해서 뽑는다 — `digest()` 는 상태를 되돌리므로 원본을 쓰면 다음 줄부터 해시가 갈린다. */
+    fun hex(): String = hexOf((digest.clone() as MessageDigest).digest())
+}
+
+/**
  * 잠금을 들지 않은 실행의 시도 원장 — 읽기는 되고 **쓰기는 거부**한다(D-6G-57). 두 실행이 나란히
  * 원장에 쓰면 무결성 장부가 서로의 줄에 어긋나고, 그보다 먼저 두 상한 회계가 서로의 호출을 못 본다.
  */
@@ -259,14 +305,19 @@ private fun linesOf(file: Path): List<String> =
  * 줄이 형태를 어기면 읽지 않는다 — 시도 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고, 그것은
  * 상한이 없는 것보다 나쁘다(있다고 믿게 된다).
  */
-class FileAttemptLedger(
+internal class FileAttemptLedger(
     private val file: Path,
-    /** 줄을 쓸 때마다 무결성 장부를 갱신한다(D-6G-48) — 기록과 장부가 갈리는 창을 남기지 않는다. */
-    private val onAppended: () -> Unit = {},
+    /**
+     * 줄을 쓸 때마다 무결성 장부를 갱신한다(D-6G-48) — 기록과 장부가 갈리는 창을 남기지 않는다.
+     * **기본값이 없다**(vr r4 L-10): 장부를 갱신하지 않는 append 는 그 디렉터리를 다음 기동에서
+     * 막아 버리고, 그것을 쉽게 만드는 기본값은 이 타입이 주는 편의가 아니라 함정이다.
+     */
+    private val onAppended: (String) -> Unit,
 ) : AttemptLedger {
     override fun append(attempt: CollectionAttempt) {
-        Files.writeString(file, lineOf(attempt), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
-        onAppended()
+        val line = lineOf(attempt)
+        Files.writeString(file, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+        onAppended(line)
     }
 
     override fun read(): AttemptHistory {

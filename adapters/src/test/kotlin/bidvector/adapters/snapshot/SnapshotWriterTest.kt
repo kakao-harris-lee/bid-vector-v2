@@ -1,5 +1,6 @@
 package bidvector.adapters.snapshot
 
+import bidvector.workflow.collection.sha256Hex
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain

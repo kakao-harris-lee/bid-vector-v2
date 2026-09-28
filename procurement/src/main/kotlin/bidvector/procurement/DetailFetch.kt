@@ -31,7 +31,13 @@ sealed interface DetailFetchDecision {
          * workflow 하나이므로 규칙이 두 벌이 되지 않는다.
          */
         val noticeKeyHash: String,
-    ) : DetailFetchDecision
+    ) : DetailFetchDecision {
+        init {
+            // 형태를 **값이 들어오는 자리**에서 닫는다 — 원장까지 흘러간 뒤에 잡으면 그 사이의
+            // 어댑터는 이미 그 문자열을 URI·로그에 실었을 수 있다.
+            require(NOTICE_KEY_HEX.matches(noticeKeyHash)) { NOTICE_KEY_HEX_MESSAGE }
+        }
+    }
 
     data class Skip(
         val reason: DetailFetchSkipReason,

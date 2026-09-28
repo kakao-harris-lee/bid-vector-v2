@@ -247,4 +247,4 @@ internal val KONEPS_COLLECTION_ACCOUNTING_EXECUTORS: Map<String, (JsonNode) -> M
     )
 
 /** 적합성 실행기는 조회 가치 술어만 잰다 — 원장 키는 이 축의 관심사가 아니다. */
-private const val CONFORMANCE_KEY_HASH = "conformance-key-hash"
+private const val CONFORMANCE_KEY_HASH = "9f08ac97bcdef6b843d07c82e36ef3d4b591c671800ab1239dd7c723b6ec63ff"

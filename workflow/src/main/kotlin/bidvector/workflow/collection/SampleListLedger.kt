@@ -27,7 +27,12 @@ data class SampleList(
     val strataByKey: Map<NoticeKeyHash, SampleStratum>,
     val strata: Map<SampleStratum, StratumOutcome> = emptyMap(),
     val requested: Int = 0,
-    val scope: SampleScope? = null,
+    /**
+     * 이 표본을 뽑은 **모집단의 범위**(D-6G-50) — `null` 일 수 없다(cr r4 M-7 ⑴). 없으면 통과하는
+     * 대조는 게이트가 아니다: 판독이 범위를 빠뜨리는 순간 「같은 모집단인가」 검사가 예외 없이,
+     * 조용히 사라진다. 타입이 그 자리를 없앤다.
+     */
+    val scope: SampleScope,
 ) {
     val keys: Set<NoticeKeyHash> get() = strataByKey.keys
 }

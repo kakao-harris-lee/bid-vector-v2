@@ -48,8 +48,12 @@ internal fun fetchSingleKonepsNotice(
     operation: KonepsOperationDescriptor,
     noticeId: NoticeId,
     axis: SourceEndpoint,
-    /** 공고 키 해시 — **호출부가 준다.** 어댑터가 다시 계산하면 해시 규칙이 두 자리가 된다. */
-    noticeKeyHash: String,
+    /**
+     * 공고 키 해시 — **호출부가 준다**(어댑터가 다시 계산하면 해시 규칙이 두 자리가 된다).
+     * 6G 표본 축이 아닌 호출은 `null` 이다: 빈 문자열은 「없다」가 아니라 **형태를 어긴 키**이고,
+     * 그런 줄이 원장에 들어가면 어떤 공고와도 맞지 않아 그 축이 영영 다시 불린다.
+     */
+    noticeKeyHash: String?,
     itemMapper: KonepsItemMapper,
 ): SourceBatch<RawNoticeObservation> {
     val referenceDate = CollectionReferenceDate(LocalDate.now(config.clock))

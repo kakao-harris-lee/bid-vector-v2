@@ -16,6 +16,7 @@ import bidvector.workflow.collection.SampleOutcome
 import bidvector.workflow.collection.SampleScope
 import bidvector.workflow.collection.SampleStratum
 import bidvector.workflow.collection.StratumOutcome
+import bidvector.workflow.collection.sha256Hex
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -48,7 +49,10 @@ object SampleListFile {
     }
 
     /** 줄이 형태를 어기면 **읽지 않는다** — 표본을 반쯤 읽는 것이 다시 뽑는 것보다 나쁘다. */
-    fun parse(text: String): SampleList {
+    fun parse(
+        text: String,
+        scope: SampleScope,
+    ): SampleList {
         val entries =
             text
                 .lineSequence()
@@ -63,7 +67,7 @@ object SampleListFile {
                     NoticeKeyHash.ofHex(parts[0]) to SampleStratum(division, parts[2])
                 }.toList()
         require(entries.isNotEmpty()) { "표본 목록이 비어 있다" }
-        return SampleList(entries.toMap())
+        return SampleList(entries.toMap(), scope = scope)
     }
 }
 
@@ -109,7 +113,8 @@ class FileSampleListLedger(
         if (!won) return requireNotNull(confirmed()) { "표본 목록 파일을 읽지 못했다" }
         Files.writeString(scopeFile, SampleScopeFile.render(confirmation))
         onConfirmed(text)
-        return SampleListFile.parse(text).withFacts(SampleScopeFile.parse(Files.readString(scopeFile)))
+        val facts = SampleScopeFile.parse(Files.readString(scopeFile))
+        return SampleListFile.parse(text, facts.scope).withFacts(facts)
     }
 
     /** 확정된 파일의 바이트까지 — 추출이 manifest 해시와 곁파일 복사에 쓴다. */
@@ -119,7 +124,7 @@ class FileSampleListLedger(
         // 목록이 있는데 범위가 없으면 거부한다(D-6G-50) — 범위 없는 목록은 대조가 조용히 꺼진다.
         require(Files.isRegularFile(scopeFile)) { "확정 표본의 표본틀 범위 파일이 없다" }
         val facts = SampleScopeFile.parse(Files.readString(scopeFile))
-        return ConfirmedSampleList(text, SampleListFile.parse(text).withFacts(facts))
+        return ConfirmedSampleList(text, SampleListFile.parse(text, facts.scope).withFacts(facts))
     }
 }
 
@@ -206,4 +211,4 @@ private const val SCOPE_MAX_DEPTH = 6
 
 /** 목록(키·층)에 곁 사실(범위·목표·층별 결과)을 얹는다 — 둘은 같은 확정의 두 조각이다. */
 private fun SampleList.withFacts(facts: SampleList): SampleList =
-    copy(strata = facts.strata, requested = facts.requested, scope = facts.scope)
+    copy(strata = facts.strata, requested = facts.requested)

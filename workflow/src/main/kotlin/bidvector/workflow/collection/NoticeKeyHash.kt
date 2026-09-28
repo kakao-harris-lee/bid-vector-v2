@@ -4,11 +4,18 @@ import java.security.MessageDigest
 
 private const val HEX_MASK = 0xff
 
+/**
+ * 바이트를 소문자 hex 로 — **해시 문자열의 형태를 짓는 자리는 하나다**(vr r4 L-13). 형태가 두 벌이면
+ * 한쪽만 고쳐도 아무 데서도 붉어지지 않고, 그 값들은 영속 파일과 레인 간 계약에 실린다.
+ */
+fun hexOf(bytes: ByteArray): String = bytes.joinToString("") { byte -> "%02x".format(byte.toInt() and HEX_MASK) }
+
 fun sha256Hex(text: String): String =
-    MessageDigest
-        .getInstance("SHA-256")
-        .digest(text.toByteArray(Charsets.UTF_8))
-        .joinToString("") { byte -> "%02x".format(byte.toInt() and HEX_MASK) }
+    hexOf(
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(text.toByteArray(Charsets.UTF_8)),
+    )
 
 /**
  * 공고 하나의 익명 키(D-6G-2) — `sha256("<공고번호>/<차수>")`. **salt 가 없다**: 표본 선택

@@ -36,7 +36,8 @@ private fun fetchEvidence(): DetailFetchDecision.Fetch {
     val decision =
         decideDetailFetch(
             NOTICE_ID,
-            "adapter-test-key-hash",
+            // 형태가 닫혀 있다(vr r4 L-6) — 아무 문자열이나 원장에 실리지 않는다.
+            "012ce64dd1d5954b3279e08a36dfe71621f2e3a128c998933866cb51fd4cbc4f",
             alreadyHeld = false,
             openingObservedAt = null,
             lastCheckedAt = null,

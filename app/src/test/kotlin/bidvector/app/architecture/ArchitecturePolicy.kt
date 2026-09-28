@@ -175,6 +175,11 @@ class ArchitecturePolicy private constructor(
     val transportBypassTypes: List<String> get() = list("collection.transport-bypass.types")
     val transportBypassHolders: List<String> get() = list("collection.transport-bypass.holders")
 
+    /** vr r4 L-12·L-13 — 공고 키 해시·hex 형태를 짓는 함수와 그것을 불러도 되는 클래스 집합. */
+    val keyHashRoots: List<String> get() = list("collection.key-hash.roots")
+    val keyHashType: String get() = value("collection.key-hash.type")
+    val keyHashHolders: List<String> get() = list("collection.key-hash.holders")
+
     val loggingTypes: List<String> get() = list("app.logging.types")
     val loggingAllowedUsers: List<String> get() = list("app.logging.allowed-users")
 

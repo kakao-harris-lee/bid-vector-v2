@@ -6,6 +6,7 @@ import bidvector.workflow.collection.SampleConfirmation
 import bidvector.workflow.collection.SampleOutcome
 import bidvector.workflow.collection.SampleScope
 import bidvector.workflow.collection.SampleStratum
+import bidvector.workflow.collection.sha256Hex
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -36,6 +37,10 @@ private fun confirmationOf(vararg entries: Pair<String, SampleStratum>): SampleC
 
 private val SERVICE_W08 = SampleStratum(BusinessDivision.SERVICE, "2026-W08")
 
+/** 판독은 범위를 곁 파일에서 받는다 — 목록 파일 자체에는 범위 칸이 없다(스키마 §2.1). */
+private val TEST_SCOPE =
+    SampleScope(LocalDate.of(2026, 2, 9), LocalDate.of(2026, 2, 22), setOf(BusinessDivision.CONSTRUCTION))
+
 /** 표본 목록 파일(D-6G-39) — 형태와 **한 번만 확정된다**는 성질. */
 class SampleListFileTest {
     @Test
@@ -55,7 +60,7 @@ class SampleListFileTest {
     fun `쓴 것을 그대로 읽는다 — 키와 층 둘 다`() {
         val sample = outcomeOf("A-1" to CONSTRUCTION_W07, "A-2" to SERVICE_W08)
 
-        val parsed = SampleListFile.parse(SampleListFile.render(sample))
+        val parsed = SampleListFile.parse(SampleListFile.render(sample), TEST_SCOPE)
 
         parsed.strataByKey shouldBe sample.strataByKey
     }
@@ -65,12 +70,17 @@ class SampleListFileTest {
     fun `형태를 어긴 줄은 읽지 않는다`() {
         val good = SampleListFile.render(outcomeOf("A-1" to CONSTRUCTION_W07))
 
-        shouldThrow<IllegalArgumentException> { SampleListFile.parse(good + "칸이\t둘뿐\n") }
-        shouldThrow<IllegalArgumentException> { SampleListFile.parse(good + "not-hex\tSERVICE\t2026-W08\n") }
+        shouldThrow<IllegalArgumentException> { SampleListFile.parse(good + "칸이\t둘뿐\n", TEST_SCOPE) }
         shouldThrow<IllegalArgumentException> {
-            SampleListFile.parse(good.replace("CONSTRUCTION", "건설"))
+            SampleListFile.parse(
+                good + "not-hex\tSERVICE\t2026-W08\n",
+                TEST_SCOPE,
+            )
         }
-        shouldThrow<IllegalArgumentException> { SampleListFile.parse("") }
+        shouldThrow<IllegalArgumentException> {
+            SampleListFile.parse(good.replace("CONSTRUCTION", "건설"), TEST_SCOPE)
+        }
+        shouldThrow<IllegalArgumentException> { SampleListFile.parse("", TEST_SCOPE) }
     }
 }
 

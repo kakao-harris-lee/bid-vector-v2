@@ -23,7 +23,23 @@ data class CollectionAttempt(
     val outcome: AttemptOutcome,
     val at: Instant,
     val kind: AttemptKind,
-)
+) {
+    init {
+        // 형태를 여기서 닫는다 — 원장은 영속 파일이고, 키가 아닌 문자열이 한 줄 들어가면 그 줄은
+        // 어떤 공고와도 맞지 않아 그 축이 영영 다시 불린다(조용히 상한만 태운다).
+        require(noticeKey == null || NOTICE_KEY_HEX.matches(noticeKey)) { NOTICE_KEY_HEX_MESSAGE }
+    }
+}
+
+/**
+ * 공고 키 해시의 형태(vr r4 L-6) — 이 형태를 도메인이 검사한다. 원장은 영속 파일이고, 키가 아닌
+ * 문자열이 한 줄 들어가면 그 줄은 어떤 공고와도 맞지 않아 그 축이 영영 다시 불린다(조용히 상한만
+ * 태운다). 해시를 **짓는** 것은 workflow 의 몫이고(도메인은 `java.security` 를 보지 않는다),
+ * 도메인은 나르는 값의 형태만 닫는다.
+ */
+internal val NOTICE_KEY_HEX = Regex("[0-9a-f]{64}")
+
+internal const val NOTICE_KEY_HEX_MESSAGE = "공고 키 해시는 소문자 hex 64 자다"
 
 /**
  * 원장의 두 줄 갈래 — **상한과 이어 돌기는 서로 다른 것을 묻는다.**

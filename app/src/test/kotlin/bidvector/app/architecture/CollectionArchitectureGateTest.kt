@@ -261,6 +261,16 @@ class CollectionArchitectureGateTest {
             policy.transportBypassHolders.toSet()
     }
 
+    /**
+     * vr r4 L-12·L-13 — 공고 키 해시를 **짓는 자리**를 정확 집합으로 잠근다. `sha256Hex` 는 public
+     * top-level 이라 `sha256Hex("$번호/$차수")` 를 다른 곳에서 써도 컴파일이 통과하고, 그러면 같은
+     * 값을 짓는 두 번째 정의가 생긴다 — 그 값은 영속 원장과 레인 간 계약(스냅숏 manifest)에 실린다.
+     */
+    @Test
+    fun `공고 키 해시를 짓는 자리는 등재된 집합뿐이다`() {
+        referencersOf(policy.keyHashRoots, setOf(policy.keyHashType)) shouldBe policy.keyHashHolders.toSet()
+    }
+
     /** root 아래 production 에서 [types] 중 하나라도 직접 참조하는 클래스 이름 집합. */
     private fun referencersOf(
         roots: List<String>,

@@ -7,7 +7,8 @@ import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
 
-private const val TEST_KEY_HASH = "test-key-hash"
+/** 형태가 닫혀 있다(vr r4 L-6) — 술어가 아무 문자열이나 `Fetch` 로 감싸지 않는다. */
+private const val TEST_KEY_HASH = "69319a9b03a9d88f35d363e669aff8ee6d36d64973c678594b5ab57b077bb7a6"
 
 private val NOTICE_ID = NoticeId(NoticeNumber.of("20260101001"), NoticeRound.of("000"))
 private val GATES = DetailFetchGates(ageGateHours = 24, recheckGateHours = 48)

@@ -15,6 +15,7 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.collection.SampleList
+import bidvector.workflow.collection.SampleScope
 import bidvector.workflow.collection.SampleStratum
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -36,6 +37,7 @@ private fun policy(): KonepsCollectionPolicyData =
 private fun sampleOf(vararg numbers: String): SampleList =
     SampleList(
         numbers.associate { NoticeKeyHash.of(it, "000") to SampleStratum(BusinessDivision.SERVICE, "2026-W25") },
+        scope = SampleScope(WINDOW_FROM, WINDOW_TO, setOf(BusinessDivision.SERVICE)),
     )
 
 /**

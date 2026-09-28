@@ -59,8 +59,8 @@ internal class SampleResolution(
         confirmed: SampleList,
         scope: SampleScope,
     ): SampleOutcome {
-        confirmed.scope?.let {
-            require(it == scope) { "확정된 표본의 표본틀 범위가 지금 설정과 다르다 — 같은 모집단이 아니다" }
+        require(confirmed.scope == scope) {
+            "확정된 표본의 표본틀 범위가 지금 설정과 다르다 — 같은 모집단이 아니다"
         }
         return narrow(candidates, confirmed)
     }

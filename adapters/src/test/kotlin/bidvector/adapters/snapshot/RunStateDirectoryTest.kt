@@ -11,6 +11,7 @@ import bidvector.workflow.collection.SampleOutcome
 import bidvector.workflow.collection.SampleScope
 import bidvector.workflow.collection.SampleStratum
 import bidvector.workflow.collection.StratumOutcome
+import bidvector.workflow.collection.sha256Hex
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -107,6 +108,23 @@ class RunStateDirectoryTest {
         Files.writeString(file, Files.readString(file).lines().first() + "\n")
 
         shouldThrow<IllegalArgumentException> { reopen() }
+    }
+
+    /**
+     * cr r4 M-3 — 파일 **셋을 통째로** 복사하면 넷이 서로 맞아 앞 판은 그대로 기동했다(상한이 0 에서
+     * 다시 시작한다). 장부의 표식이 그 **자리**에 묶이면 복사본은 자기 자리의 것이 아니다.
+     */
+    @Test
+    fun `디렉터리를 통째로 복사하면 거부한다`() {
+        val source = open()
+        source.sampleList.confirm(sample())
+        source.attempts.append(httpAttempt())
+        val copy = Files.createDirectories(temp.resolve("whole-copy"))
+        listOf(SAMPLE_LIST_NAME, SAMPLE_SCOPE_NAME, ATTEMPT_LEDGER_NAME, STATE_NAME).forEach {
+            Files.copy(root().resolve(it), copy.resolve(it))
+        }
+
+        shouldThrow<IllegalArgumentException> { open(copy) }
     }
 
     /** 표본과 장부만 새 디렉터리로 옮기면 원장이 비어 장부와 어긋난다 — 「새로 시작」이 막힌다. */
@@ -292,7 +310,7 @@ class FileAttemptLedgerTest {
     lateinit var temp: Path
 
     private fun ledger(): FileAttemptLedger =
-        FileAttemptLedger(Files.createDirectories(temp.resolve("run-state")).resolve(ATTEMPT_LEDGER_NAME))
+        FileAttemptLedger(Files.createDirectories(temp.resolve("run-state")).resolve(ATTEMPT_LEDGER_NAME)) {}
 
     private fun attemptOf(
         outcome: AttemptOutcome,

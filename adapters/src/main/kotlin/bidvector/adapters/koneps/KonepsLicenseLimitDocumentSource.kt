@@ -43,7 +43,7 @@ class KonepsLicenseLimitDocumentSource(
             evidence.noticeId,
             SourceEndpoint.LICENSE_LIMIT_DETAIL,
             // 자격 축 증거에는 공고 키 해시가 없다 — 6G 표본 축이 아니라 이어 돌기 대상이 아니다.
-            noticeKeyHash = "",
+            noticeKeyHash = null,
         ) { item, itemPolicy, observedAt ->
             // F-1(verifier r1) — license-limit 은 한 공고에 제한그룹번호·제한순번 축으로
             // 복수 행이 온다. 그 짝을 행 식별자에 더하지 않으면 첫 행만 남고 나머지가

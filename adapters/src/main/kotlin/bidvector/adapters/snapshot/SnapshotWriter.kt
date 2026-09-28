@@ -1,7 +1,7 @@
 package bidvector.adapters.snapshot
 
+import bidvector.workflow.collection.sha256Hex
 import java.math.BigDecimal
-import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 
@@ -11,8 +11,6 @@ import java.time.LocalDate
  * 다르면 스냅숏 전체를 거부한다**(의도된 동작이다 — 두 레인이 같이 움직여야 한다는 신호).
  */
 const val SNAPSHOT_SCHEMA_VERSION: String = "snapshot-v5"
-
-private const val HEX_MASK = 0xff
 
 /**
  * 명시 Comparator 다 — `sortedBy` 는 stdlib 출처의 합성 비교자 클래스를 산출물에 남겨 jarContentGate
@@ -91,12 +89,6 @@ data class SnapshotCounts(
         }
     }
 }
-
-internal fun sha256Hex(text: String): String =
-    MessageDigest
-        .getInstance("SHA-256")
-        .digest(text.toByteArray(Charsets.UTF_8))
-        .joinToString("") { byte -> "%02x".format(byte.toInt() and HEX_MASK) }
 
 private fun rowJson(row: SnapshotRow): SnapshotJson =
     SnapshotJson.Obj(
