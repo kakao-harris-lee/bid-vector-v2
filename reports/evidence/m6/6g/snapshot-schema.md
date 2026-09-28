@@ -3,8 +3,9 @@
 > **지위: 두 레인이 합의한 계약.** 2026-09-27 초판(Kotlin 레인)과 Python 레인의 독자 초안이 엇갈려, **Python 레인의
 > 구조를 채택**하고 Kotlin 레인이 생산 쪽 제약을 반영해 정정했다. 형태를 바꾸려면 `schema_version` 을 올리고 이
 > 문서를 먼저 고친다 — 한쪽만 바꾸지 않는다.
-> **v5(2026-09-28, D-6G-58)**: 축 완료를 **시도 원장이** 정한다 — 완료되지 않은 축이 있는 공고는
-> 행을 쓰지 않고 `incomplete_axis` 로 계수한다. manifest 칸 하나와 닫힌 항등식의 항 하나가 는다.
+> **v5(2026-09-28, D-6G-58·66)**: 축 완료를 **시도 원장이** 정한다 — 완료되지 않은 축이 있는 공고는
+> 행을 쓰지 않고 `incomplete_axis` 로 계수한다. manifest 칸 하나와 닫힌 항등식의 항 하나가 늘고,
+> 표본 업무 범위 칸(`sample_scope_divisions`)이 하나 더 는다.
 > **v4(2026-09-28, D-6G-39)**: 표본 목록이 파일이 됐다 — 파일 하나(`sample-list.tsv`)·manifest 칸 셋
 > (`sample_size`·`sampled_without_detail`·`sampled_without_notice`)·`sample_list_sha256` 의 정의가 바뀐다.
 > 스냅숏 실물은 **저장소 밖**(`~/.local/bid-vector-snapshots/<snapshot_id>/`)에 둔다(data-extract §7 · ADR 0010 D-8).
@@ -36,7 +37,7 @@
   "period_start": "2026-02-06", "period_end": "2026-09-26",
   "rows_sha256": "…", "sample_list_sha256": "…",
   "sample_size": 24000, "sampled_without_detail": 96, "sampled_without_notice": 24,
-  "incomplete_axis": 24 }
+  "incomplete_axis": 24, "sample_scope_divisions": ["CONSTRUCTION", "SERVICE"] }
 ```
 
 | 칸 | 뜻 |
@@ -48,6 +49,7 @@
 | `sampled_without_detail` | 표본인데 상세 축 관측이 하나도 없는 공고 수(부르지 못했거나 응답이 비었다) |
 | `sampled_without_notice` | 표본이고 상세는 있는데 **공고 목록 canonical 이 없어** 행을 만들지 못한 공고 수 |
 | `incomplete_axis` | 상세 축 가운데 **완료되지 않은 것이 있는** 공고 수(v5, D-6G-58) — 아래 |
+| `sample_scope_divisions` | **확정 범위가 말하는 업무 집합**(v5, D-6G-66) — §2.1 의 닫힌 어휘, 오름차순 정렬. 아래 |
 
 **`incomplete_axis` 가 왜 행이 아니라 계수인가.** 한 축이 페이지 중간에 끊기면 그 축의 원문은
 **일부만** 있다. 그 반쪽으로 행을 쓰면 값이 조용히 틀린다(예: 개찰완료 2쪽 중 1쪽만 받은 공고의
@@ -55,10 +57,30 @@
 걸리지 않는다. 완료는 **시도 원장**이 정한다(마지막 AXIS 결말이 성공이거나 빈 응답일 때만 완료),
 raw 행의 존재가 아니다. 다음 실행이 그 축을 다시 부르면 이 공고는 행이 된다.
 
+**`sample_scope_divisions` 가 왜 표본 행에서 오지 않는가.** 문턱(최소 표본 수)이 업무 수로 정해지는데,
+그 수를 **표본 행에서 센 distinct** 로 잡으면 한 업무가 통째로 빠졌을 때 distinct 가 줄고 문턱도 함께
+내려간다 — 결측이 문턱을 스스로 낮추는 모양이고, 그것은 조용하다. 이 칸은 확정 파일이 싣는 **설정된**
+범위이고(`sample-scope.json` 의 `divisions`), 표본 행의 업무 집합은 이 칸의 **부분집합**이어야 한다.
+비어 있는 업무는 그 자리에서 보이고 판정이 그 업무를 따로 공시한다.
+
 **닫힌 항등식:** `sample_size == row_count + sampled_without_detail + sampled_without_notice +
 incomplete_axis`.
 표본 하나하나가 행이 되었거나, 되지 못한 사유로 계수된다 — 어느 쪽도 아닌 공고는 없다. 판독은 이
 등식을 검사하고, 깨지면 **구조 실패**다(계수가 행을 설명하지 못한다는 뜻이므로 데이터의 성질이 아니다).
+
+## 2.2 해시의 용도 구분자 — 두 무작위가 같은 digest 를 쓰지 않는다 (v5, vr r4 L-14)
+
+표본 추첨(Kotlin `StratifiedSampler`)과 S0 밴드 내 난수(Python `strategies`)가 **같은 `seed|key` 형태**를
+쓰면, 두 seed 값이 우연히 같을 때 「어떤 공고가 뽑혔나」와 「S0 가 그 공고에 낸 값」이 같은 digest 에서
+나온다 — 두 무작위가 상관되고 판정이 그만큼 덜 독립이다. 해시 입력의 **맨 앞에 용도 구분자**를 붙여 두
+영역을 가른다.
+
+| 용도 | 해시 입력 | 쓰는 레인 |
+|---|---|---|
+| 표본 추첨 순서 | `sha256("sample-draw" + "\|" + seed + "\|" + 공고 키 해시)` | Kotlin |
+| S0 밴드 내 난수 | `sha256("s0-band" + "\|" + seed + "\|" + 공고 키 해시)` | Python |
+
+구분자 값을 바꾸면 표본과 S0 값이 둘 다 바뀐다 — 그것은 **새 실험**이고 정책 version 을 올린다.
 
 ## 2.1 `sample-list.tsv` — 표본은 결과를 보기 전에 파일로 확정된다 (v4, D-6G-39)
 

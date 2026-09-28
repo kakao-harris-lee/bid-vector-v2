@@ -187,6 +187,7 @@ class SnapshotWriterTest {
                     ),
                 period = LocalDate.of(2026, 2, 6)..LocalDate.of(2026, 9, 26),
                 sampleListSha256 = "feedface",
+                sampleScopeDivisions = setOf("SERVICE", "CONSTRUCTION"),
             )
 
         manifest shouldContain "\"schema_version\":\"snapshot-v5\""
@@ -197,6 +198,8 @@ class SnapshotWriterTest {
         manifest shouldContain "\"sampled_without_detail\":2"
         manifest shouldContain "\"sampled_without_notice\":1"
         manifest shouldContain "\"incomplete_axis\":0"
+        // D-6G-66 — 설정된 업무 집합이다(행에서 센 distinct 가 아니다). 순서는 정렬로 고정한다.
+        manifest shouldContain "\"sample_scope_divisions\":[\"CONSTRUCTION\",\"SERVICE\"]"
     }
 
     /**

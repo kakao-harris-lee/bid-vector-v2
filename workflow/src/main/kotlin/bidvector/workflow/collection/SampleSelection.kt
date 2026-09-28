@@ -6,6 +6,12 @@ import bidvector.workflow.collection.sha256Hex
 import java.time.LocalDate
 import java.time.temporal.IsoFields
 
+/**
+ * 표본 추첨의 **용도 구분자**(vr r4 L-14) — 스키마 §2.2 가 두 레인에 대해 정본이다. 값을 바꾸면
+ * 표본이 바뀌므로 그것은 새 실험이다.
+ */
+const val SAMPLE_DRAW_DOMAIN: String = "sample-draw"
+
 /** 표본 seed — 정책 파일이 나르는 값이고 코드 리터럴이 아니다(사후에 바꾸면 새 version 이다). */
 data class SamplingSeed(
     val value: String,
@@ -73,9 +79,14 @@ data class SampleOutcome(
 }
 
 /**
- * 층화 무작위 표본(D-6G-11) — 무작위성의 출처는 난수 발생기가 아니라 **`sha256(seed | 공고 키
- * 해시)`** 다. 그래서 같은 seed·같은 후보 집합이면 언제 돌려도 같은 표본이 나오고, 뽑는 값이
+ * 층화 무작위 표본(D-6G-11) — 무작위성의 출처는 난수 발생기가 아니라 **`sha256(용도 | seed | 공고
+ * 키 해시)`** 다. 그래서 같은 seed·같은 후보 집합이면 언제 돌려도 같은 표본이 나오고, 뽑는 값이
  * 수집 결과와 무관하다는 것이 계산 그 자체로 선다.
+ *
+ * **용도 구분자**(vr r4 L-14, 스키마 §2.2): 같은 `seed|key` 형태를 Python S0 의 밴드 내 난수도
+ * 쓴다. 두 seed 값이 같으면 「어떤 공고가 뽑혔나」와 「S0 가 그 공고에 낸 값」이 **같은 digest** 에서
+ * 나와 두 무작위가 상관된다 — 표본 선택과 전략 값이 붙으면 판정이 그만큼 덜 독립이다. 용도를 앞에
+ * 붙여 두 영역을 가른다.
  *
  * 난수 발생기를 쓰지 않는 이유: 상태가 있는 발생기는 후보를 **주는 순서**가 표본을 바꾼다 —
  * 수집 순서(응답이 온 순서)가 표본의 입력이 되면 「결과와 무관」이 깨진다.
@@ -101,7 +112,7 @@ class StratifiedSampler(
         return SampleOutcome(selected.sortedWith(NOTICE_KEY_ORDER), outcomes, strataByKey, sampleSize.total)
     }
 
-    private fun drawOrderOf(key: NoticeKeyHash): String = sha256Hex("${seed.value}|${key.value}")
+    private fun drawOrderOf(key: NoticeKeyHash): String = sha256Hex("$SAMPLE_DRAW_DOMAIN|${seed.value}|${key.value}")
 }
 
 /**

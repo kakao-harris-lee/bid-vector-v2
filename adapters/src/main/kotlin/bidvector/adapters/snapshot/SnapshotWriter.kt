@@ -48,6 +48,12 @@ object SnapshotWriter {
         counts: SnapshotCounts,
         period: ClosedRange<LocalDate>,
         sampleListSha256: String,
+        /**
+         * **확정 범위가 말하는 업무 집합**(D-6G-66) — 표본 행에서 세지 않는다. 한 업무가 표본에서
+         * 통째로 빠지면 행에서 센 distinct 는 줄고, 그 수에 기댄 최소 표본 문턱도 조용히 내려간다.
+         * 이 값은 `sample-scope.json` 이 말하는 **설정된** 범위다.
+         */
+        sampleScopeDivisions: Set<String>,
     ): String =
         SnapshotJson
             .Obj(
@@ -63,6 +69,8 @@ object SnapshotWriter {
                     "sampled_without_detail" to SnapshotJson.Number(counts.sampledWithoutDetail.toString()),
                     "sampled_without_notice" to SnapshotJson.Number(counts.sampledWithoutNotice.toString()),
                     "incomplete_axis" to SnapshotJson.Number(counts.incompleteAxis.toString()),
+                    "sample_scope_divisions" to
+                        SnapshotJson.Arr(sampleScopeDivisions.sorted().map { SnapshotJson.Text(it) }),
                 ),
             ).render()
 }

@@ -43,6 +43,9 @@ class SnapshotExtractionE2ETest {
         /** 층 = 업무 × 공고 주 — 이 E2E 는 하루치 두 업무라 층이 둘이다. */
         private const val DIVISIONS = 2
 
+        /** 개찰완료 축을 두 쪽으로 — 투찰 행 셋이 2 + 1 로 갈린다(미완 축을 짓는 자리). */
+        private const val OPENING_COMPLETE_PAGE_SIZE = 2
+
         private val NOTICE_DAY: LocalDate = LocalDate.of(2026, 6, 3)
 
         private val postgres: PostgreSQLContainer =
@@ -65,6 +68,12 @@ class SnapshotExtractionE2ETest {
                     noticesPerSlot = NOTICES_PER_SLOT,
                     bidderName = BIDDER_NAME,
                     nonce = "GOLDEN",
+                    // **완료되지 않은 축을 하나 남긴다**(D-6G-58 · 팀장 2026-09-28). 개찰완료를 두
+                    // 쪽으로 나누고 2쪽의 **첫 요청**만 5xx 로 끊는다 — 그 공고 하나가 `incomplete_axis`
+                    // 로 제외된다. 이 계수가 golden 에서 늘 0 이면 왕복이 그 항을 한 번도 검사하지
+                    // 않는다(r2 의 `sample == rows` 와 같은 갈래다).
+                    openingCompletePageSize = OPENING_COMPLETE_PAGE_SIZE,
+                    failOpeningCompleteSecondPageOnce = true,
                 )
             bootOnce(
                 mapOf(
@@ -227,15 +236,19 @@ class SnapshotExtractionE2ETest {
         val rows = Files.readString(work.resolve("rows.jsonl")).trimEnd('\n').lines()
 
         sampleLines shouldHaveSize NOTICES_PER_SLOT * DIVISIONS
-        rows shouldHaveSize sampleLines.size - 2
+        rows shouldHaveSize sampleLines.size - 3
         manifest shouldContain "\"sample_size\":${sampleLines.size}"
         manifest shouldContain "\"sampled_without_detail\":1"
         manifest shouldContain "\"sampled_without_notice\":1"
+        // **0 이 아닌 값으로** 닫힌다 — 늘 0 인 항은 왕복이 한 번도 검사하지 않는다(D-6G-58).
+        manifest shouldContain "\"incomplete_axis\":1"
+        // D-6G-66 — 업무 집합은 **확정 범위**가 말한다(행에서 센 distinct 가 아니다).
+        manifest shouldContain "\"sample_scope_divisions\":[\"CONSTRUCTION\",\"SERVICE\"]"
         // 행의 키는 표본의 **진부분집합**이다 — 목록에서 빼는 식으로 맞추면 이 단언이 붉어진다.
         val sampleKeys = sampleLines.map { it.substringBefore('\t') }.toSet()
         val rowKeys = rows.map { it.substringAfter("\"notice_key_hash\":\"").substringBefore('"') }.toSet()
         sampleKeys.containsAll(rowKeys) shouldBe true
-        (sampleKeys - rowKeys) shouldHaveSize 2
+        (sampleKeys - rowKeys) shouldHaveSize 3
     }
 
     /**

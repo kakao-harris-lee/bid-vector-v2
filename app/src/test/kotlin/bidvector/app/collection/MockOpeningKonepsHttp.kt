@@ -93,7 +93,9 @@ internal class MockOpeningKonepsHttp(
         }
         val noticeNumber = paramOf(query, "bidNtceNo")
         val all = itemsFor(operation, query, noticeNumber)
-        val bytes = envelope(pageOf(operation, all, page), all.size, page).toByteArray(StandardCharsets.UTF_8)
+        val bytes =
+            envelope(pageOf(operation, all, page), all.size, page, rowsPerPage(operation))
+                .toByteArray(StandardCharsets.UTF_8)
         exchange.responseHeaders.add("Content-Type", "application/json; charset=utf-8")
         exchange.sendResponseHeaders(200, bytes.size.toLong())
         exchange.responseBody.use { it.write(bytes) }
@@ -321,13 +323,17 @@ internal class MockOpeningKonepsHttp(
             all
         }
 
+    /** 쪽 크기는 **쪽으로 나눈 오퍼레이션에만** 적용한다 — 다른 축까지 줄이면 그 축도 쪼개진다. */
+    private fun rowsPerPage(operation: String): Int =
+        if (isPagedOpeningComplete(operation)) openingCompletePageSize else DEFAULT_PAGE_ROWS
+
     private fun envelope(
         items: List<Map<String, String>>,
         totalCount: Int,
         page: Int,
+        rows: Int,
     ): String {
         val itemsJson = items.joinToString(",", "[", "]") { fields -> objectJson(fields) }
-        val rows = if (openingCompletePageSize > 0) openingCompletePageSize else DEFAULT_PAGE_ROWS
         val body = "\"items\":$itemsJson,\"numOfRows\":$rows,\"pageNo\":$page,\"totalCount\":$totalCount"
         return """{"response":{"header":{"resultCode":"00","resultMsg":"NORMAL SERVICE."},"body":{$body}}}"""
     }

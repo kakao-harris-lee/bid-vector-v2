@@ -75,6 +75,10 @@ class SnapshotExtractionRunner(
                 counts = countsOf(sample, extraction),
                 period = period,
                 sampleListSha256 = sample.sha256,
+                sampleScopeDivisions =
+                    sample.list.scope.divisions
+                        .map { it.name }
+                        .toSet(),
             )
         val directory = Files.createDirectories(requireOutsideRepository(Path.of(properties.outputDir)))
         Files.writeString(directory.resolve("rows.jsonl"), rows)
