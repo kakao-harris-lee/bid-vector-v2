@@ -286,7 +286,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
 | S-3 | `uv run mypy --strict src/ml_engine` | 소스 96개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1184 passed · 7 failed**(skip 0). 붉은 일곱은 전부 `tests/app/test_backtest_golden.py` 이고 원인이 하나다 — golden manifest 의 새 칸 `incomplete_axis`. **D-6G-58 은 이 레인이 손대지 말라는 지시 아래 있다**(Kotlin SHA 대기). 그 SHA 가 오면 판독을 맞춘다 |
+| S-5 | `uv run python -m pytest tests -q` | **1194 passed**(skip 0). 앞 라운드의 붉은 일곱은 D-6G-58 판독을 v5 로 올려 닫혔다 |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
 | S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
 
@@ -366,6 +366,10 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | D-6G-63 **판정 자체**가 움직인다 | `test_named_judgement_values_move_the_decision_itself` | 판정 투영(결말·통과)만 본다 |
 | cr r4 L-5 유한 수·자릿수 | `_is_finite` · `_parsed_number` 의 자릿수 요구 | `j`·`abc`·`nan` 이 수가 아니다 |
 | cr r4 L-7 두 레인 어휘 결합 | `test_business_division_vocabulary_matches_the_schema_document` | 어휘 ↔ 스키마 §2.1 등식 |
+| D-6G-58 항이 넷인 항등식 | `sample_list._check_identity` | 축 미완 항을 빼면 RED |
+| D-6G-58 생산 귀속 닫힌 어휘 | `ProducerExclusionReason` | 어휘 ↔ 스키마 §6 등식 |
+| D-6G-58 계수 공시 | `report._snapshot` 의 `producer_exclusions` | 셋 다 0 이 아닌 판으로 잠금 |
+| D-6G-58 버전 경계 | `test_manifest_mismatch_is_rejected` | v4·v6 둘 다 거부 |
 | D-6G-9 보고에 식별자 없음 | `report.verdict_payload` | fixture 의 공고 키 해시가 판정 바이트에 없음 |
 | 재현(위협 모델 ③) | `app.backtest_job.run_backtest_job` | 두 번 돌려 바이트 동일 · 줄 순서 무관 · 정책 한 값으로 달라짐 |
 
@@ -447,8 +451,12 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | **V9·V10** | 업무 어휘를 문서와 어긋내기(빼기·더하기) | **RED** |
 | **N1·N4·N5·N6·N7** | 판정의 alpha 를 밀수 상수로(산술·struct·f-string·`literal_eval`·`eval`) | 민감도 **RED** |
 | **N2·N3** | 판정의 seed 를 코드에서 만듦(`len` · `int.from_bytes`) | 민감도 **RED** |
+| **W1** | 항등식에서 축 미완 항을 뺀다 | **RED** |
+| **W2·W3** | 생산 귀속 어휘를 문서 밖 이름으로 · 항목 제거 | **RED** |
+| **W4** | `snapshot-v5` 를 v4 로 되돌림 | **RED** |
+| **W5·W6** | 공시에서 항목 누락 · 계수를 상수 0 으로 | **RED** |
 
-누계 **여든셋**(앞 일흔넷 · V9·V10 둘 · N1~N7 일곱).
+누계 **여든아홉**(앞 여든셋 · W1~W6 여섯).
 
 **N1~N7 은 verifier r4 가 GREEN 으로 실측한 일곱**이다. 리터럴 게이트에 형태를 더하지 않고, 판정
 경로에 넣어 **민감도 test 가 RED 인지**로 잰다. 일곱 다 RED 이고, 그중 **다섯은 리터럴 게이트가
@@ -572,6 +580,11 @@ test 둘이 붉어지는데 **golden 여덟은 그대로 초록**이었다. 「�
 `_app_roots` 그래프는 `app/**` 안에서만 돈다(제3 패키지를 거친 import 는 뿌리가 안 된다) ·
 `float.fromhex("abc")` 처럼 자릿수 없는 문자열로 숨긴 수는 본다(cr r4 L-5 대가). 셋 다 **민감도 test 가
 받는다** — 숨긴 수가 쓰이는 순간 잡히므로 형태를 묻지 않는다.
+
+**왕복 golden 이 `incomplete_axis` 를 0 으로만 지나간다.** 지금 golden 은 manifest 만 v5 이고 그 항이
+0 이라, 생산 쪽이 그 계수를 상수 0 으로 적어도 왕복은 초록이다 — 10/10/0/0 이던 때와 같은 갈래다.
+합성 fixture 는 123/120/1/1/1 로 셋을 다 0 이 아니게 뒀고 변이 W1·W5·W6 로 RED 를 확인했지만 그것은
+이 레인의 fixture 다. 0 이 아닌 golden 이 오면 검출력 단언을 더한다(팀장이 생산 레인에 지시함).
 
 **`sample_divisions` 는 설정 범위가 아니라 표본 목록 파일에서 온다**(vr r4 L-8). 설정에 든 업무가
 표본 0 이면 그 업무가 파일에 없고 distinct 수가 줄어 **최소 표본 문턱이 내려간다**. 어휘 밖 값(합쳐지는
