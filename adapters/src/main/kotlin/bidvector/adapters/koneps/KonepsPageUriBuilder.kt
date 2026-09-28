@@ -241,7 +241,7 @@ private fun applySuccess(
     accumulator: KonepsPageWalkAccumulator,
     page: KonepsEnvelopeOutcome.Success,
     policy: KonepsCollectionPolicyData,
-    clock: Clock,
+    observedAt: Instant,
     pageNo: Int,
     itemMapper: KonepsItemMapper,
 ): WalkStep {
@@ -250,7 +250,7 @@ private fun applySuccess(
         accumulator.recordRepeatedPage(pageNo)
         return WalkStep.STOP
     }
-    accumulator.recordPage(page, signature, clock.instant(), policy, itemMapper)
+    accumulator.recordPage(page, signature, observedAt, policy, itemMapper)
     return if (accumulator.currentlyComplete() || page.items.isEmpty()) WalkStep.STOP else WalkStep.CONTINUE
 }
 
@@ -258,13 +258,13 @@ private fun applyOutcome(
     accumulator: KonepsPageWalkAccumulator,
     outcome: KonepsCallOutcome,
     policy: KonepsCollectionPolicyData,
-    clock: Clock,
+    observedAt: Instant,
     pageNo: Int,
     itemMapper: KonepsItemMapper,
 ): WalkStep =
     when (outcome) {
         is KonepsCallOutcome.Success -> {
-            applySuccess(accumulator, outcome.body, policy, clock, pageNo, itemMapper)
+            applySuccess(accumulator, outcome.body, policy, observedAt, pageNo, itemMapper)
         }
 
         KonepsCallOutcome.NoData -> {
@@ -298,6 +298,12 @@ private class KonepsWalkContext(
     val httpPolicy: KonepsHttpPolicyData,
     val collectionPolicy: KonepsCollectionPolicyData,
     val clock: Clock,
+    /**
+     * **한 걷기는 한 관측이다**(D-6G-58) — 쪽마다 시각을 새로 읽으면 같은 걷기의 쪽들이 서로 다른
+     * 관측 시각을 달고, 추출이 「마지막 걷기」를 골라낼 수 없다. 원문은 append-only 라 다시 걸어도
+     * 앞 쪽이 남고, 그 둘이 합쳐지면 참가자 수와 1위 투찰가가 조용히 틀린다.
+     */
+    val observedAt: Instant,
     val counters: KonepsAttemptCounters,
     val itemMapper: KonepsItemMapper,
 )
@@ -320,7 +326,8 @@ private fun fetchNextPage(
             context.collectionPolicy,
             context.counters,
         )
-    val step = applyOutcome(accumulator, outcome, context.collectionPolicy, context.clock, pageNo, context.itemMapper)
+    val step =
+        applyOutcome(accumulator, outcome, context.collectionPolicy, context.observedAt, pageNo, context.itemMapper)
     return step == WalkStep.CONTINUE
 }
 
@@ -398,6 +405,7 @@ internal fun walkKonepsNoticePages(
             httpPolicy,
             collectionPolicy,
             clock,
+            clock.instant(),
             counters,
             itemMapper,
         )

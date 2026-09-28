@@ -50,8 +50,9 @@ class KonepsCallGateTest {
         val denied = gate.send(LIST_CALL, UNREACHABLE, TIMEOUT)
 
         denied.shouldBeInstanceOf<KonepsGateOutcome.Denied>().limit shouldBe BudgetLimit.TOTAL
-        // 막힌 호출은 원장에 없다 — 나가지 않았으므로 「시도」가 아니다.
-        ledger.appended shouldHaveSizeOf 1
+        // 막힌 호출은 원장에 없다 — 나가지 않았으므로 「시도」가 아니다(나간 하나의 의도·결말 두 줄뿐).
+        ledger.appended shouldHaveSizeOf 2
+        ledger.read().spend(Instant.EPOCH, Instant.EPOCH).total shouldBe 1
     }
 
     /**

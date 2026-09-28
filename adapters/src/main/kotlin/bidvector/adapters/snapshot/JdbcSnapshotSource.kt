@@ -10,6 +10,7 @@ import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.collection.SampleList
 import java.math.BigDecimal
 import java.sql.ResultSet
+import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
 
@@ -118,15 +119,13 @@ class JdbcSnapshotSource(
         sample: SampleList,
     ): ObservedRows {
         val byKey = linkedMapOf<NoticeKey, MutableMap<SourceEndpoint, MutableList<RawRow>>>()
+        val walkOf = mutableMapOf<Pair<NoticeKey, SourceEndpoint>, Instant>()
         val outside = mutableSetOf<NoticeKey>()
         while (rows.next()) {
             // 식별자나 엔드포인트 어휘가 서지 않는 행은 `null` 로 와서 조용히 지나간다.
             keyAndEndpointOf(rows)?.let { (key, endpoint) ->
                 if (NoticeKeyHash.of(key.number, key.round.value) in sample.keys) {
-                    byKey
-                        .getOrPut(key) { linkedMapOf() }
-                        .getOrPut(endpoint) { mutableListOf() }
-                        .add(RawRow(parseFields(rows.getString("payload_fields")), policy))
+                    collectLatestWalk(byKey, walkOf, key, endpoint, rows)
                 } else {
                     outside += key
                 }
@@ -135,7 +134,30 @@ class JdbcSnapshotSource(
         return ObservedRows(byKey, outside)
     }
 
-    /** 식별자나 엔드포인트 어휘가 서지 않는 행은 조용히 지나간다 — 지어내지 않는다. */
+    /**
+     * **(공고, 축)마다 마지막 걷기의 행만 쓴다**(D-6G-58). 원문은 append-only 라(DB 트리거) 잘린
+     * 걷기의 쪽이 그대로 남고, 다시 걸어 받은 전 쪽과 **합쳐지면** 그 공고의 참가자 수와 1위
+     * 투찰가가 조용히 틀린다 — 행이 늘 뿐 오류가 없어 아무 데서도 붉어지지 않는다. 한 걷기의 모든
+     * 쪽은 같은 관측 시각을 달고 오므로(`KonepsWalkContext.observedAt`) 그 시각이 걷기의 이름이다.
+     */
+    private fun collectLatestWalk(
+        byKey: MutableMap<NoticeKey, MutableMap<SourceEndpoint, MutableList<RawRow>>>,
+        walkOf: MutableMap<Pair<NoticeKey, SourceEndpoint>, Instant>,
+        key: NoticeKey,
+        endpoint: SourceEndpoint,
+        rows: ResultSet,
+    ) {
+        val observedAt = rows.getTimestamp("observed_at").toInstant()
+        val latest = walkOf[key to endpoint]
+        if (latest != null && observedAt.isBefore(latest)) return
+        val slot = byKey.getOrPut(key) { linkedMapOf() }.getOrPut(endpoint) { mutableListOf() }
+        if (latest == null || observedAt.isAfter(latest)) {
+            walkOf[key to endpoint] = observedAt
+            slot.clear()
+        }
+        slot += RawRow(parseFields(rows.getString("payload_fields")), policy)
+    }
+
     private fun keyAndEndpointOf(rows: ResultSet): Pair<NoticeKey, SourceEndpoint>? {
         // **canonical 형태로 키를 맞춘다.** 원문 payload 는 수집 때 온 그대로이고 `notice` 표는
         // canonical 이라, 그대로 비교하면 같은 공고가 두 키로 갈린다(목록 축 행과 상세 축 행이

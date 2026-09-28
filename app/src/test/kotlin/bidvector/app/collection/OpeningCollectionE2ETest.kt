@@ -24,6 +24,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
@@ -77,6 +78,15 @@ class OpeningCollectionE2ETest {
         /** 오늘치 경계를 재는 자리의 일 상한 — 이만큼 써 둔 실행 상태로 KST 00:30 에 기동한다. */
         private const val DAILY_CAP = 4
 
+        /** 개찰완료 축을 두 쪽으로 나눈다 — 투찰 행 셋이 2 + 1 로 갈린다(D-6G-58). */
+        private const val OPENING_COMPLETE_PAGE_SIZE = 2
+
+        /** mock 이 공고마다 내는 투찰 행 수 — 전 참가자다. */
+        private const val BIDDERS_PER_NOTICE = 3
+
+        /** 미리 깔아 두는 시도의 시각 — 기동 시각보다 조금 앞이면 같은 KST 하루에 든다. */
+        private const val SEED_BACKDATE_SECONDS = 60L
+
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
                 .withDatabaseName("bidvector_opening_e2e_test")
@@ -105,9 +115,6 @@ class OpeningCollectionE2ETest {
     private fun censusSample(): Map<String, String> =
         mapOf("bidvector.opening-collection.sample-size" to (NOTICES_PER_SLOT * DIVISIONS).toString())
 
-    private fun attemptLines(): List<String> =
-        Files.readString(runStateDir.resolve("attempts.jsonl")).trimEnd('\n').lines()
-
     private fun pendingLines(): Int = attemptKindCount(runStateDir, "PENDING")
 
     private fun httpLines(): Int = attemptKindCount(runStateDir, "HTTP")
@@ -119,6 +126,8 @@ class OpeningCollectionE2ETest {
         extra: Map<String, String>,
         nonce: String? = null,
         throttleOnce: Set<String> = emptySet(),
+        openingCompletePageSize: Int = 0,
+        failOpeningCompleteSecondPageOnce: Boolean = false,
         reuseRunState: Boolean = false,
         now: Instant? = null,
         inspect: (org.springframework.context.ApplicationContext) -> Unit = {},
@@ -132,6 +141,8 @@ class OpeningCollectionE2ETest {
                 bidderName = BIDDER_NAME,
                 nonce = nonce ?: newE2ENonce(),
                 throttleOnce = throttleOnce,
+                openingCompletePageSize = openingCompletePageSize,
+                failOpeningCompleteSecondPageOnce = failOpeningCompleteSecondPageOnce,
             )
         val context =
             SpringApplicationBuilder(
@@ -249,6 +260,47 @@ class OpeningCollectionE2ETest {
     }
 
     /**
+     * **D-6G-58 — 한 쪽만 받고 끊긴 축은 완료가 아니다.** 앞 판은 이어 돌기를 **원문 행의 존재**로
+     * 판정해, 잘린 1쪽의 행이 남아 있으면 그 축을 영영 다시 부르지 않았다 — 그 공고는 참가자 일부만
+     * 실린 채 스냅숏에 들어간다(조용한 결측). 지금은 원장이 정하고, `SHORT_WALK` 은 미완이다.
+     */
+    @Test
+    fun `한 쪽만 받고 끊긴 축은 다음 기동이 다시 걷는다 — 최종 행 수가 전 참가자와 같다`() {
+        val nonce = "SHORTWALK"
+        val since = mapOf("bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z")
+
+        val (_, first) =
+            bootAndRun(
+                since,
+                nonce = nonce,
+                openingCompletePageSize = OPENING_COMPLETE_PAGE_SIZE,
+                failOpeningCompleteSecondPageOnce = true,
+            )
+        val calledFirst = first.openingCompleteNotices.toSet()
+
+        // 끊긴 축은 원장에 **미완**으로 적힌다 — 그 줄이 다음 기동의 입력이다.
+        attemptLinesOf(
+            runStateDir,
+        ).any { it.contains("\"axis\":\"OPENING_COMPLETE\"") && it.contains("FAILED:") } shouldBe
+            true
+
+        val (_, second) =
+            bootAndRun(
+                since,
+                nonce = nonce,
+                openingCompletePageSize = OPENING_COMPLETE_PAGE_SIZE,
+                reuseRunState = true,
+            )
+
+        // 끊긴 그 공고를 다시 부른다(끝난 축은 다시 부르지 않는다).
+        second.openingCompleteNotices.toSet().shouldNotBeEmpty()
+        // 원문은 append-only 라 잘린 1쪽의 행도 **남는다** — 그것을 지우는 것이 답이 아니다.
+        query(allOpeningRowsSql(nonce)) { it.getInt(1) } shouldBeGreaterThan calledFirst.size * BIDDERS_PER_NOTICE
+        // 추출이 쓰는 것은 (공고, 축)마다 **마지막 걷기**다 — 그 수가 전 참가자와 같다.
+        query(latestWalkOpeningRowsSql(nonce)) { it.getInt(1) } shouldBe calledFirst.size * BIDDERS_PER_NOTICE
+    }
+
+    /**
      * **D-6G-56 — 진실의 출처를 원장 밖에 둔다.** 네 라운드 동안 test 는 원장이 센 것을 **원장의
      * 합**으로 쟀고, 그래서 덜 센 것을 한 번도 보지 못했다. 여기서 기준은 **mock 서버가 실제로 받은
      * 요청 수**다 — 429 로 끊긴 것도, 재시도도, 상세·A값·기초금액도 전부 들어간다.
@@ -292,7 +344,7 @@ class OpeningCollectionE2ETest {
     fun `오늘치를 다 쓴 실행 상태로 KST 00시 30분에 기동하면 한 요청도 나가지 않는다`() {
         val bootAt = ZonedDateTime.of(today, LocalTime.of(0, 30), COLLECTION_BUDGET_ZONE).toInstant()
         runStateDir = Files.createTempDirectory("6g-e2e-run-state")
-        seedSpentToday(bootAt)
+        seedSpentCallsAt(runStateDir, bootAt.minusSeconds(SEED_BACKDATE_SECONDS), DAILY_CAP)
 
         val (exitCodes, mock) =
             bootAndRun(
@@ -307,23 +359,6 @@ class OpeningCollectionE2ETest {
 
         mock.requestCount() shouldBe 0
         exitCodes shouldContainExactly listOf(CollectionExitCode.INCOMPLETE.value)
-    }
-
-    /** 오늘치를 상한만큼 써 둔 실행 상태 — **출하 경로로** 적는다(손으로 쓰면 무결성 장부와 어긋난다). */
-    private fun seedSpentToday(bootAt: Instant) {
-        val runState = RunStateDirectory(runStateDir)
-        repeat(DAILY_CAP) {
-            runState.attempts.append(
-                CollectionAttempt(
-                    noticeKey = null,
-                    axis = SourceEndpoint.OPENING_RESULT_LIST,
-                    outcome = AttemptOutcome.Succeeded,
-                    at = bootAt.minusSeconds(60),
-                    kind = AttemptKind.PENDING,
-                ),
-            )
-        }
-        runState.close()
     }
 
     /**
@@ -366,7 +401,7 @@ class OpeningCollectionE2ETest {
             bootAndRun(emptyMap(), nonce = "RETRY", throttleOnce = setOf("getOpengResultListInfoCnstwk"))
 
         val listAttempts =
-            attemptLines().count {
+            attemptLinesOf(runStateDir).count {
                 it.contains("\"axis\":\"OPENING_RESULT_LIST\"") && it.contains("\"kind\":\"HTTP\"")
             }
         // mock 은 429 로 끊은 요청을 `listCalls` 에 세지 않는다 — 원장에는 그것까지 한 줄로 남는다.
@@ -381,7 +416,7 @@ class OpeningCollectionE2ETest {
     @Test
     fun `빈 응답을 받은 축은 다음 기동에서 다시 부르지 않는다`() {
         bootAndRun(censusSample(), nonce = "EMPTY")
-        val firstDetailCalls = attemptLines().count { it.contains("\"outcome\":\"EMPTY\"") }
+        val firstDetailCalls = attemptLinesOf(runStateDir).count { it.contains("\"outcome\":\"EMPTY\"") }
 
         val (_, second) = bootAndRun(censusSample(), nonce = "EMPTY", reuseRunState = true)
 
@@ -463,12 +498,3 @@ class OpeningCollectionE2ETest {
         }
     }
 }
-
-private fun newE2ENonce(): String =
-    java.util.UUID
-        .randomUUID()
-        .toString()
-        .take(NONCE_CHARS)
-        .uppercase()
-
-private const val NONCE_CHARS = 8

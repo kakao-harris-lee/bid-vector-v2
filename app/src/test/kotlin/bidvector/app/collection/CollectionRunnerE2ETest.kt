@@ -59,9 +59,6 @@ class CollectionRunnerE2ETest {
         private const val BAD_DATE_ITEM_NUMBER = "BAD-DATE-1"
         private const val BAD_ROUND_ITEM_NUMBER = "BAD-ROUND-1"
         private const val DAYS = 3
-        private const val SERVICE_CLASS_CODE = "81111500"
-        private const val SERVICE_CLASS_NAME = "정보시스템 개발 서비스"
-        private const val CONSTRUCTION_TYPE = "전기공사업"
 
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
@@ -142,39 +139,6 @@ class CollectionRunnerE2ETest {
                 }
             return normal + listOf(blankOptionals) + missingNumber + duplicate + badDate + badRound
         }
-
-        /**
-         * D-6F9-2 — 오퍼레이션마다 응답이 싣는 세부 분류 키가 다르다(6F-8 실측): 용역은 용역구분·공공조달분류 번호·명, 공사는 주공종이고
-         * 주공종은 일부 항목만 채워진다(전기공사업 · 빈 문자열 · 키 없음이 한 슬롯에 섞인다).
-         */
-        private fun classificationFor(
-            category: String,
-            index: Int,
-        ): Map<String, String> =
-            when (category) {
-                "Servc" -> {
-                    mapOf(
-                        "srvceDivNm" to if (index == 1) "일반용역" else "기술용역",
-                        "pubPrcrmntClsfcNo" to SERVICE_CLASS_CODE,
-                        "pubPrcrmntClsfcNm" to SERVICE_CLASS_NAME,
-                    )
-                }
-
-                else -> {
-                    when (index) {
-                        1 -> mapOf("mainCnsttyNm" to CONSTRUCTION_TYPE)
-                        2 -> mapOf("mainCnsttyNm" to "")
-                        else -> emptyMap()
-                    }
-                }
-            }
-
-        /** 빈 문자열로 오는 옵션 값(D-6F8-11) — 새 세부 분류 키도 빈 값은 없는 값이다. */
-        private fun blankClassificationFor(category: String): Map<String, String> =
-            when (category) {
-                "Servc" -> mapOf("srvceDivNm" to "", "pubPrcrmntClsfcNo" to " ", "pubPrcrmntClsfcNm" to "  ")
-                else -> mapOf("mainCnsttyNm" to "   ")
-            }
 
         /** 러너 한 번의 관측 — 종료 코드, 로거 이벤트 전부, 표준 출력·표준 오류 전부. */
         private class RunResult(

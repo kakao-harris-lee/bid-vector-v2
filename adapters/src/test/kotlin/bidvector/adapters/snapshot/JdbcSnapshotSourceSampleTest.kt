@@ -24,6 +24,9 @@ import java.time.Instant
 import java.time.LocalDate
 
 private val OBSERVED_AT: Instant = Instant.parse("2026-06-17T02:00:00Z")
+
+/** 다시 걷기는 다른 시각에 온다 — 그 시각이 걷기의 이름이다(D-6G-58). */
+private const val RE_WALK_GAP_SECONDS = 3600L
 private val WINDOW_FROM: LocalDate = LocalDate.of(2026, 6, 16)
 private val WINDOW_TO: LocalDate = LocalDate.of(2026, 6, 18)
 
@@ -47,11 +50,14 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         number: String,
         endpoint: SourceEndpoint,
         round: String = "000",
+        at: Instant = OBSERVED_AT,
+        marker: String? = null,
     ) = appendRawObservation(
         RawNoticeObservation.of(
-            mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to round),
+            mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to round) +
+                (marker?.let { mapOf(RawKey("prcbdrNm") to it) } ?: emptyMap()),
             endpoint,
-            OBSERVED_AT,
+            at,
         ),
     )
 
@@ -129,6 +135,27 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         extraction.incompleteAxis shouldBe 1
         extraction.skippedWithoutNotice shouldBe 0
         extraction.sampledWithoutDetail shouldBe 0
+    }
+
+    /**
+     * D-6G-58 — 원문은 append-only 다(DB 트리거가 DELETE 를 막는다). 그래서 **잘린 걷기의 쪽이
+     * 그대로 남고**, 다시 걸어 받은 전 쪽과 합쳐지면 그 공고의 투찰 행이 실제보다 많아진다 — 참가자
+     * 수와 1위 투찰가가 조용히 틀리고, 행이 늘 뿐이라 어느 제외 사유에도 걸리지 않는다. 추출은
+     * (공고, 축)마다 **마지막 걷기**의 행만 쓴다(한 걷기의 모든 쪽은 같은 관측 시각을 단다).
+     */
+    @Test
+    fun `다시 걸은 축은 마지막 걷기의 행만 쓴다 — 앞 걷기와 합쳐지지 않는다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        // 첫 걷기 — 2쪽 중 1쪽에서 끊겨 투찰 행 둘만 남았다.
+        repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "첫-걷기-$it") }
+        // 다시 걷기 — 전 쪽을 받아 투찰 행 셋.
+        val again = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = again, marker = "다시-걷기-$it") }
+
+        val row = extract(sampleOf(number)).rows.single()
+
+        row.outcome.bidderRows shouldHaveSize 3
     }
 
     /** 공사는 A값까지 넷이다 — 부르지 않는 축을 기다리면 공사 아닌 공고가 영영 행이 되지 않는다. */

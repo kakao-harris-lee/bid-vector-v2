@@ -110,7 +110,8 @@ internal const val OBSERVATION_SQL =
     SELECT source_endpoint,
            payload_fields ->> 'bidNtceNo' AS notice_number,
            payload_fields ->> 'bidNtceOrd' AS notice_round,
-           payload_fields::text AS payload_fields
+           payload_fields::text AS payload_fields,
+           observed_at
       FROM raw_observation
      WHERE (source_endpoint = ? OR (observed_at >= ?::date AND observed_at < ?::date))
        AND payload_fields ->> 'bidNtceNo' IS NOT NULL

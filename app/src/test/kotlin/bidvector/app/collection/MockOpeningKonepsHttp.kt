@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -33,7 +34,15 @@ internal class MockOpeningKonepsHttp(
      * (`isRetryableStep`) 한 번 더 나간다. 「받은 페이지 1, 나간 호출 2」를 만드는 자리다(D-6G-45).
      */
     private val throttleOnce: Set<String> = emptySet(),
+    /**
+     * 개찰완료 축을 **쪽으로 나눈다**(D-6G-58) — 0 이면 한 쪽에 전부 싣는다(기본). 잘린 걷기가
+     * 다음 실행에 다시 불리는지 재려면 한 축이 두 쪽이어야 한다.
+     */
+    private val openingCompletePageSize: Int = 0,
+    /** 개찰완료 **2쪽의 첫 요청만** 5xx — 1쪽만 받고 끊긴 축을 만든다. */
+    private val failOpeningCompleteSecondPageOnce: Boolean = false,
 ) : AutoCloseable {
+    private val secondPageFailurePending = AtomicBoolean(failOpeningCompleteSecondPageOnce)
     private val throttled = CopyOnWriteArrayList<String>()
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
 
@@ -76,9 +85,15 @@ internal class MockOpeningKonepsHttp(
             exchange.close()
             return
         }
+        val page = paramOf(query, "pageNo")?.toIntOrNull() ?: 1
+        if (isPagedOpeningComplete(operation) && page > 1 && secondPageFailurePending.compareAndSet(true, false)) {
+            exchange.sendResponseHeaders(HTTP_SERVER_ERROR, -1)
+            exchange.close()
+            return
+        }
         val noticeNumber = paramOf(query, "bidNtceNo")
-        val items = itemsFor(operation, query, noticeNumber)
-        val bytes = envelope(items).toByteArray(StandardCharsets.UTF_8)
+        val all = itemsFor(operation, query, noticeNumber)
+        val bytes = envelope(pageOf(operation, all, page), all.size, page).toByteArray(StandardCharsets.UTF_8)
         exchange.responseHeaders.add("Content-Type", "application/json; charset=utf-8")
         exchange.sendResponseHeaders(200, bytes.size.toLong())
         exchange.responseBody.use { it.write(bytes) }
@@ -291,9 +306,29 @@ internal class MockOpeningKonepsHttp(
             ?.substringAfter('=')
             ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8) }
 
-    private fun envelope(items: List<Map<String, String>>): String {
+    private fun isPagedOpeningComplete(operation: String): Boolean =
+        openingCompletePageSize > 0 && operation.endsWith("OpengCompt")
+
+    /** 쪽으로 나눈 축은 그 쪽의 몫만 낸다 — `totalCount` 는 언제나 전수다(짧은 걷기를 볼 수 있게). */
+    private fun pageOf(
+        operation: String,
+        all: List<Map<String, String>>,
+        page: Int,
+    ): List<Map<String, String>> =
+        if (isPagedOpeningComplete(operation)) {
+            all.drop((page - 1) * openingCompletePageSize).take(openingCompletePageSize)
+        } else {
+            all
+        }
+
+    private fun envelope(
+        items: List<Map<String, String>>,
+        totalCount: Int,
+        page: Int,
+    ): String {
         val itemsJson = items.joinToString(",", "[", "]") { fields -> objectJson(fields) }
-        val body = "\"items\":$itemsJson,\"numOfRows\":100,\"pageNo\":1,\"totalCount\":${items.size}"
+        val rows = if (openingCompletePageSize > 0) openingCompletePageSize else DEFAULT_PAGE_ROWS
+        val body = "\"items\":$itemsJson,\"numOfRows\":$rows,\"pageNo\":$page,\"totalCount\":$totalCount"
         return """{"response":{"header":{"resultCode":"00","resultMsg":"NORMAL SERVICE."},"body":{$body}}}"""
     }
 
@@ -313,6 +348,8 @@ private const val NONCE_LENGTH = 8
 private const val HTTP_TOO_MANY_REQUESTS = 429
 
 private const val RESERVE_PRICE_ROWS = 15
+private const val DEFAULT_PAGE_ROWS = 100
+private const val HTTP_SERVER_ERROR = 503
 
 private val DRAWN_SEQUENCES = setOf(3, 7, 11, 14)
 
