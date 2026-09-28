@@ -119,8 +119,11 @@ evaluation 등 다른 adapters 패키지에는 있다). 그래서 이 두 패키
 
 # Python 레인 (ml-engine) — rollback
 
-> 이 절은 Python 레인의 것이다. 위 절은 Kotlin 레인이 쓴다. 두 레인의 in_scope 경로는 겹치지 않는다
-> (`ml-engine/**` + `ml-engine/policy/**` ↔ `adapters/**`·`app/**`·`workflow/**`·`procurement/**`).
+> 이 절은 Python 레인의 것이다. 위 절은 Kotlin 레인이 쓴다. 두 레인의 in_scope 는 **한 자리에서 겹친다** —
+> 왕복 golden(`ml-engine/tests/evaluation/fixtures/m6-6g-golden/`)은 생산 레인이 쓰고 이 레인이 읽는 공동
+> 산출물이다(아래 「왕복 golden 은 두 레인의 공동 산출물이다」 절). 그 밖은 갈린다(`ml-engine/**` +
+> `ml-engine/policy/**` ↔ `adapters/**`·`app/**`·`workflow/**`·`procurement/**`). 앞 문면은 「겹치지
+> 않는다」고 적어 같은 문서의 아래 절과 모순이었다(vr r4 L-9).
 
 ## 되돌리는 경로 (기계 산출 — `git diff --name-status <base>..HEAD -- ml-engine`)
 
