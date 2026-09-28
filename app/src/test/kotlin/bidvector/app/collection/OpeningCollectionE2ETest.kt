@@ -6,8 +6,15 @@ import bidvector.adapters.snapshot.RunStateLock
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
+import bidvector.app.wiring.E2E_FIXED_NOW
+import bidvector.app.wiring.FixedClockTestConfiguration
 import bidvector.app.wiring.RecordingCollectionTermination
+import bidvector.procurement.AttemptKind
+import bidvector.procurement.AttemptOutcome
+import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.CollectedAxisStore
+import bidvector.procurement.CollectionAttempt
+import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
@@ -36,6 +43,8 @@ import java.nio.file.Path
 import java.sql.ResultSet
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZonedDateTime
 import javax.sql.DataSource
 
 /**
@@ -61,6 +70,12 @@ class OpeningCollectionE2ETest {
 
         /** 층 = 업무 × 공고 주 — 이 E2E 는 하루치 두 업무라 층이 둘이다. */
         private const val DIVISIONS = 2
+
+        /** 원장 합과 **다른 값** — 상한과 같으면 「상한만큼만 셌다」는 구현도 통과한다(D-6G-56). */
+        private const val CAP_UNRELATED_TO_LEDGER = 97
+
+        /** 오늘치 경계를 재는 자리의 일 상한 — 이만큼 써 둔 실행 상태로 KST 00:30 에 기동한다. */
+        private const val DAILY_CAP = 4
 
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
@@ -93,11 +108,9 @@ class OpeningCollectionE2ETest {
     private fun attemptLines(): List<String> =
         Files.readString(runStateDir.resolve("attempts.jsonl")).trimEnd('\n').lines()
 
-    private fun attemptSum(): Int =
-        attemptLines().sumOf { line ->
-            val match = Regex("\"http_attempts\":(\\d+)").find(line)
-            match?.groupValues?.get(1)?.toInt() ?: 0
-        }
+    private fun pendingLines(): Int = attemptKindCount(runStateDir, "PENDING")
+
+    private fun httpLines(): Int = attemptKindCount(runStateDir, "HTTP")
 
     /** test 마다 새 실행 상태 — 앞 test 의 공고번호(nonce 가 다르다)와 시도를 물려받지 않는다. */
     private lateinit var runStateDir: Path
@@ -107,9 +120,11 @@ class OpeningCollectionE2ETest {
         nonce: String? = null,
         throttleOnce: Set<String> = emptySet(),
         reuseRunState: Boolean = false,
+        now: Instant? = null,
         inspect: (org.springframework.context.ApplicationContext) -> Unit = {},
     ): Pair<List<Int>, MockOpeningKonepsHttp> {
         logs.list.clear()
+        E2E_FIXED_NOW.set(now)
         if (!reuseRunState) runStateDir = Files.createTempDirectory("6g-e2e-run-state")
         val mock =
             MockOpeningKonepsHttp(
@@ -122,6 +137,7 @@ class OpeningCollectionE2ETest {
             SpringApplicationBuilder(
                 BidVectorApplication::class.java,
                 CollectionTerminationTestConfiguration::class.java,
+                FixedClockTestConfiguration::class.java,
             ).properties(
                 PRODUCTION_DISPATCH_PROPERTIES + baseProperties(mock) + extra,
             ).listeners(ApplicationListener<ApplicationPreparedEvent> { attachLogCapture() })
@@ -132,6 +148,7 @@ class OpeningCollectionE2ETest {
         } finally {
             context.close()
             mock.close()
+            E2E_FIXED_NOW.set(null)
         }
     }
 
@@ -232,6 +249,84 @@ class OpeningCollectionE2ETest {
     }
 
     /**
+     * **D-6G-56 — 진실의 출처를 원장 밖에 둔다.** 네 라운드 동안 test 는 원장이 센 것을 **원장의
+     * 합**으로 쟀고, 그래서 덜 센 것을 한 번도 보지 못했다. 여기서 기준은 **mock 서버가 실제로 받은
+     * 요청 수**다 — 429 로 끊긴 것도, 재시도도, 상세·A값·기초금액도 전부 들어간다.
+     *
+     * 상한은 원장 합과 **다른 값**으로 둔다. 상한과 같으면 「상한만큼만 셌다」는 구현도 통과한다.
+     */
+    @Test
+    fun `출하 조립이 낸 요청 수가 원장의 HTTP 줄 수와 같다 — 두 번 기동해도`() {
+        val since = mapOf("bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z")
+        val cap =
+            mapOf(
+                "bidvector.opening-collection.calls-per-day" to CAP_UNRELATED_TO_LEDGER.toString(),
+                "bidvector.opening-collection.calls-total" to CAP_UNRELATED_TO_LEDGER.toString(),
+            )
+
+        val (_, first) =
+            bootAndRun(
+                censusSample() + since + cap,
+                nonce = "GROUND",
+                throttleOnce = setOf("getOpengResultListInfoCnstwk"),
+            )
+        val firstRequests = first.requestCount()
+
+        firstRequests shouldBeGreaterThan 0
+        firstRequests shouldBe httpLines()
+        // 의도 줄과 결말 줄은 한 벌이다 — 한쪽만 적히면 상한과 원장이 갈린다.
+        pendingLines() shouldBe httpLines()
+
+        val (_, second) = bootAndRun(censusSample() + since + cap, nonce = "GROUND", reuseRunState = true)
+
+        second.requestCount() shouldBe httpLines() - firstRequests
+        pendingLines() shouldBe httpLines()
+    }
+
+    /**
+     * D-6G-56 — 상한의 「오늘」은 **KST 하루**다. 오늘치를 다 쓴 실행 상태로 KST 00:30 에 기동하면
+     * 한 요청도 나가지 않아야 한다. 하루 경계를 UTC 로 잡으면 이 시각은 아직 「어제」라 오늘치가
+     * 0 으로 되살아나고, 그 아홉 시간 동안 일 상한이 아무것도 막지 못한다.
+     */
+    @Test
+    fun `오늘치를 다 쓴 실행 상태로 KST 00시 30분에 기동하면 한 요청도 나가지 않는다`() {
+        val bootAt = ZonedDateTime.of(today, LocalTime.of(0, 30), COLLECTION_BUDGET_ZONE).toInstant()
+        runStateDir = Files.createTempDirectory("6g-e2e-run-state")
+        seedSpentToday(bootAt)
+
+        val (exitCodes, mock) =
+            bootAndRun(
+                mapOf(
+                    "bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z",
+                    "bidvector.opening-collection.calls-per-day" to DAILY_CAP.toString(),
+                    "bidvector.opening-collection.calls-total" to "1000",
+                ),
+                reuseRunState = true,
+                now = bootAt,
+            )
+
+        mock.requestCount() shouldBe 0
+        exitCodes shouldContainExactly listOf(CollectionExitCode.INCOMPLETE.value)
+    }
+
+    /** 오늘치를 상한만큼 써 둔 실행 상태 — **출하 경로로** 적는다(손으로 쓰면 무결성 장부와 어긋난다). */
+    private fun seedSpentToday(bootAt: Instant) {
+        val runState = RunStateDirectory(runStateDir)
+        repeat(DAILY_CAP) {
+            runState.attempts.append(
+                CollectionAttempt(
+                    noticeKey = null,
+                    axis = SourceEndpoint.OPENING_RESULT_LIST,
+                    outcome = AttemptOutcome.Succeeded,
+                    at = bootAt.minusSeconds(60),
+                    kind = AttemptKind.PENDING,
+                ),
+            )
+        }
+        runState.close()
+    }
+
+    /**
      * D-6G-45 — 상한은 **시도 원장에서 이어진다.** 매 기동 0 에서 시작하면 승인 총 상한이 3~4일에
      * 걸친 여러 실행을 덮지 못한다. 첫 실행이 쓴 만큼을 총 상한으로 걸고 **같은 실행 상태**로 다시
      * 기동해, 두 번째가 한 호출도 내지 않는지 본다.
@@ -242,7 +337,7 @@ class OpeningCollectionE2ETest {
         // 시작 시점이 첫 기동의 시도보다 뒤라 그 시도들이 계상에서 빠진다.
         val since = mapOf("bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z")
         bootAndRun(censusSample() + since, nonce = "ACCUM")
-        val spent = attemptSum()
+        val spent = pendingLines()
 
         val (exitCodes, second) =
             bootAndRun(

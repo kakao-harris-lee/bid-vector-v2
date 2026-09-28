@@ -170,6 +170,11 @@ class ArchitecturePolicy private constructor(
     val httpClientRoots: List<String> get() = list("collection.http-client.roots")
     val httpClientHolders: List<String> get() = list("collection.http-client.holders")
 
+    /** M6/6G D-6G-62 — 관문을 우회하는 전송·반사 타입과 그것을 참조해도 되는 클래스 집합(비어 있다). */
+    val transportBypassRoots: List<String> get() = list("collection.transport-bypass.roots")
+    val transportBypassTypes: List<String> get() = list("collection.transport-bypass.types")
+    val transportBypassHolders: List<String> get() = list("collection.transport-bypass.holders")
+
     val loggingTypes: List<String> get() = list("app.logging.types")
     val loggingAllowedUsers: List<String> get() = list("app.logging.allowed-users")
 

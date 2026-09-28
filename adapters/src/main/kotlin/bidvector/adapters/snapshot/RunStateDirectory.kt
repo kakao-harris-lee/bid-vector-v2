@@ -71,17 +71,24 @@ class RunStateDirectory(
      */
     val lock: RunStateLock = RunStateLock.tryAcquire(requireStateDirectory(root))
 
-    init {
-        if (lock is RunStateLock.Held) {
-            rollBackInterruptedConfirmation()
-            verifyIntegrity()
-        }
-    }
-
-    private var directoryId: String =
+    /** 첫 확정이 지은 표식 — 재동기가 [init] 안에서 장부를 다시 쓰므로 그 전에 값이 있어야 한다. */
+    private val directoryId: String =
         readFacts()?.directoryId ?: java.util.UUID
             .randomUUID()
             .toString()
+
+    init {
+        if (lock is RunStateLock.Held) {
+            // 기동 거부로 끝나도 **잠금은 놓는다** — 들고 죽은 잠금은 다음 실행을 막는다.
+            runCatching {
+                rollBackInterruptedConfirmation()
+                verifyIntegrity()
+            }.onFailure {
+                lock.release()
+                throw it
+            }
+        }
+    }
 
     val sampleList: FileSampleListLedger = FileSampleListLedger(sampleFile) { recordState() }
 
@@ -133,13 +140,13 @@ class RunStateDirectory(
      * **확정 전으로 되돌린다**: 끝나지 않은 확정은 확정이 아니다. 잠금 안이라 그 목록을 보고 있는 다른
      * 실행이 없고, 결과를 보기 전에 확정한다는 성질도 그대로다(다시 뽑아 다시 확정한다).
      *
-     * 원장이 있는데 장부가 없는 모양은 확정 창이 아니다 — 그것은 「장부만 지웠다」이고 [verifyIntegrity]
-     * 가 거부한다(되돌리면 상한이 되감긴다).
+     * 장부가 **아예 없는** 모양은 확정 창이 아니다 — 그것은 「장부만 지웠다」이고 [verifyIntegrity] 가
+     * 거부한다(되돌리면 지워진 것이 무엇인지 모른 채 상한이 0 에서 시작한다). 확정은 목록 축 조회
+     * 뒤에 오므로 그 시점에는 장부가 이미 서 있다.
      */
     private fun rollBackInterruptedConfirmation() {
-        val facts = readFacts()
-        if (facts != null && facts.sampleListSha256 != EMPTY_DIGEST) return
-        if (facts == null && Files.isRegularFile(attemptFile)) return
+        val facts = readFacts() ?: return
+        if (facts.sampleListSha256 != EMPTY_DIGEST) return
         Files.deleteIfExists(sampleFile)
         Files.deleteIfExists(scopeFile)
     }

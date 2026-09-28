@@ -17,6 +17,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.spi.ThrowableProxyUtil
 import ch.qos.logback.core.read.ListAppender
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -331,6 +332,27 @@ class CollectionRunnerE2ETest {
     private fun assertNoServiceKey(run: RunResult) {
         run.everything shouldNotContain SERVICE_KEY
         run.everything shouldNotContain URLEncoder.encode(SERVICE_KEY, StandardCharsets.UTF_8)
+    }
+
+    /**
+     * **D-6G-56 — 공고 목록 갈래도 같은 관문 아래다.** 기준은 원장 자신의 합이 아니라 **mock 이
+     * 실제로 받은 요청 수**다. 한 test 클래스의 모든 기동이 같은 mock 과 같은 실행 상태를 쓰므로
+     * **증분**으로 잰다 — 두 번 기동해도 증분이 맞아야 한다.
+     */
+    @Test
+    fun `공고 목록 갈래가 낸 요청 수가 원장의 HTTP 줄 수와 같다 — 두 번 기동해도`() {
+        repeat(2) {
+            val requestsBefore = mock.requestCount()
+            val httpBefore = attemptKindCount(NOTICE_E2E_RUN_STATE, "HTTP")
+
+            runOnce()
+
+            val sent = mock.requestCount() - requestsBefore
+            sent shouldBeGreaterThan 0
+            sent shouldBe attemptKindCount(NOTICE_E2E_RUN_STATE, "HTTP") - httpBefore
+        }
+        // 의도 줄과 결말 줄은 한 벌이다 — 한쪽만 적히면 상한과 원장이 갈린다.
+        attemptKindCount(NOTICE_E2E_RUN_STATE, "PENDING") shouldBe attemptKindCount(NOTICE_E2E_RUN_STATE, "HTTP")
     }
 
     @Test

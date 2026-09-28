@@ -247,17 +247,30 @@ class CollectionArchitectureGateTest {
      */
     @Test
     fun `HTTP 클라이언트를 쥔 자리는 관문과 그것을 만드는 배선뿐이다`() {
-        val roots = policy.httpClientRoots
-        val observed =
-            production
-                .filter { item -> roots.any { item.name.startsWith("$it.") } }
-                .filter { item ->
-                    item.directDependenciesFromSelf.any { it.targetClass.name == policy.httpClientType }
-                }.map { it.name }
-                .toSet()
-
-        observed shouldBe policy.httpClientHolders.toSet()
+        referencersOf(policy.httpClientRoots, setOf(policy.httpClientType)) shouldBe policy.httpClientHolders.toSet()
     }
+
+    /**
+     * D-6G-62 — `java.net.http` 를 쓰지 않아도 URL·소켓으로 바이트를 가져올 수 있고, 그 호출은
+     * 상한에도 원장에도 들어가지 않는다. 이름을 문자열로 짓는 반사도 같은 구멍이라 함께 막는다.
+     * 허용 집합은 **비어 있다**: 6G 의 모든 바깥 호출은 관문의 `java.net.http` 를 지난다.
+     */
+    @Test
+    fun `관문을 우회하는 전송·반사 타입을 쥔 production 클래스가 없다`() {
+        referencersOf(policy.transportBypassRoots, policy.transportBypassTypes.toSet()) shouldBe
+            policy.transportBypassHolders.toSet()
+    }
+
+    /** root 아래 production 에서 [types] 중 하나라도 직접 참조하는 클래스 이름 집합. */
+    private fun referencersOf(
+        roots: List<String>,
+        types: Set<String>,
+    ): Set<String> =
+        production
+            .filter { item -> roots.any { item.name.startsWith("$it.") } }
+            .filter { item -> item.directDependenciesFromSelf.any { it.targetClass.name in types } }
+            .map { it.name }
+            .toSet()
 
     private fun List<ArchRule>.checkAll() = forEach { rule -> rule.check(production) }
 
