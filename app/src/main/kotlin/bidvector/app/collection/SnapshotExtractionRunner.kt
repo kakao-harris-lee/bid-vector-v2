@@ -63,7 +63,9 @@ class SnapshotExtractionRunner(
     @Suppress("TooGenericExceptionCaught")
     private fun extract() {
         val sample = requireNotNull(runState.confirmedSampleList()) { "확정된 표본 목록이 없다 — 수집이 먼저다" }
-        val extraction = source.extract(properties.from, properties.to, sample.list)
+        // 축 완료는 **시도 원장**이 정한다(D-6G-58) — raw 존재가 아니다.
+        val settled = runState.attempts.read().settledAxes()
+        val extraction = source.extract(properties.from, properties.to, sample.list, settled)
         val rows = SnapshotWriter.renderRows(extraction.rows)
         val period = openingPeriod(extraction, properties.from..properties.to)
         val manifest =
@@ -84,6 +86,7 @@ class SnapshotExtractionRunner(
                 "sampleSize=${sample.size} " +
                 "sampledWithoutDetail=${extraction.sampledWithoutDetail} " +
                 "skippedWithoutNotice=${extraction.skippedWithoutNotice} " +
+                "incompleteAxis=${extraction.incompleteAxis} " +
                 "outsideSample=${extraction.observedOutsideSample} bytes=${rows.length}",
         )
         termination.terminate(CollectionExitCode.COMPLETE.value)
@@ -100,6 +103,7 @@ private fun countsOf(
         rowCount = extraction.rows.size,
         sampledWithoutDetail = extraction.sampledWithoutDetail,
         sampledWithoutNotice = extraction.skippedWithoutNotice,
+        incompleteAxis = extraction.incompleteAxis,
     )
 
 /**

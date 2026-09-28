@@ -1,5 +1,6 @@
 package bidvector.adapters.snapshot
 
+import bidvector.procurement.BusinessDivision
 import bidvector.procurement.FieldConcept
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NoticeNumber
@@ -39,19 +40,30 @@ class JdbcSnapshotSource(
         from: LocalDate,
         to: LocalDate,
         sample: SampleList,
+        /**
+         * 축의 완료를 정하는 것은 **시도 원장**이다(D-6G-58) — raw 행의 존재가 아니다. 페이지
+         * 중간에 끊긴 축도 행은 남기 때문에, 존재로 판정하면 반쪽 원문으로 행을 쓰게 된다.
+         */
+        settledAxes: Map<String, Set<SourceEndpoint>>,
     ): SnapshotExtraction {
         val observed = readObservations(from, to, sample)
         val notices = readNotices(observed.byKey.keys)
         val rows = mutableListOf<SnapshotRow>()
-        val withDetail = mutableSetOf<NoticeKeyHash>()
+        val withDetail = mutableSetOf<String>()
         var withoutNotice = 0
+        var incomplete = 0
         for ((key, axes) in observed.byKey) {
             // 상세가 하나도 없는 표본은 세지 않고 지나간다 — 아래의 **차집합**이 센다. 여기서 세면
             // 관측이 아예 없는 표본(원문이 한 줄도 안 온 공고)을 놓친다.
             if (axes.keys.any { it in DETAIL_ENDPOINTS }) {
-                withDetail += NoticeKeyHash.of(key.number, key.round.value)
+                val hash = NoticeKeyHash.of(key.number, key.round.value).value
+                withDetail += hash
                 val canonical = notices[key]
-                if (canonical == null) withoutNotice++ else rows += assembleSnapshotRow(key, axes, canonical)
+                when {
+                    canonical == null -> withoutNotice++
+                    !complete(hash, canonical.division, settledAxes) -> incomplete++
+                    else -> rows += assembleSnapshotRow(key, axes, canonical)
+                }
             }
         }
         return SnapshotExtraction(
@@ -59,7 +71,21 @@ class JdbcSnapshotSource(
             withoutNotice,
             sample.keys.size - withDetail.size,
             observed.outsideSample.size,
+            incomplete,
         )
+    }
+
+    /**
+     * 그 공고가 **부를 축을 전부 끝냈는가**. 부를 축은 업무가 정한다(공사는 A값까지 넷) — 부르지
+     * 않는 축을 기다리면 공사 아닌 공고가 영영 행이 되지 않는다.
+     */
+    private fun complete(
+        noticeKeyHash: String,
+        division: String,
+        settledAxes: Map<String, Set<SourceEndpoint>>,
+    ): Boolean {
+        val settled = settledAxes[noticeKeyHash].orEmpty()
+        return expectedAxesFor(division).all { it in settled }
     }
 
     private fun readObservations(
@@ -175,7 +201,22 @@ data class SnapshotExtraction(
     val skippedWithoutNotice: Int,
     val sampledWithoutDetail: Int,
     val observedOutsideSample: Int,
+    /** 완료되지 않은 축이 있는 표본 수(D-6G-58) — 반쪽 원문으로 행을 쓰지 않는다. */
+    val incompleteAxis: Int,
 )
+
+/**
+ * 그 업무가 부르는 상세 축(D-6G-20) — 예비가격 상세·개찰완료·기초금액은 모든 업무, A값은 공사만.
+ * 수집 use case 의 `detailAxesFor` 와 **같은 규칙**이고, 그 규칙이 갈리면 추출이 영영 오지 않을
+ * 축을 기다리거나 덜 기다린다.
+ */
+internal fun expectedAxesFor(division: String): Set<SourceEndpoint> =
+    buildSet {
+        add(SourceEndpoint.RESERVE_PRICE_DETAIL)
+        add(SourceEndpoint.OPENING_COMPLETE)
+        add(SourceEndpoint.BASE_AMOUNT_DETAIL)
+        if (division == BusinessDivision.CONSTRUCTION.name) add(SourceEndpoint.BID_PRICE_FORMULA_A)
+    }
 
 private val DETAIL_ENDPOINTS =
     setOf(

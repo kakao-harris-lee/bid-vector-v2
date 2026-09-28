@@ -3,11 +3,13 @@
 > **지위: 두 레인이 합의한 계약.** 2026-09-27 초판(Kotlin 레인)과 Python 레인의 독자 초안이 엇갈려, **Python 레인의
 > 구조를 채택**하고 Kotlin 레인이 생산 쪽 제약을 반영해 정정했다. 형태를 바꾸려면 `schema_version` 을 올리고 이
 > 문서를 먼저 고친다 — 한쪽만 바꾸지 않는다.
+> **v5(2026-09-28, D-6G-58)**: 축 완료를 **시도 원장이** 정한다 — 완료되지 않은 축이 있는 공고는
+> 행을 쓰지 않고 `incomplete_axis` 로 계수한다. manifest 칸 하나와 닫힌 항등식의 항 하나가 는다.
 > **v4(2026-09-28, D-6G-39)**: 표본 목록이 파일이 됐다 — 파일 하나(`sample-list.tsv`)·manifest 칸 셋
 > (`sample_size`·`sampled_without_detail`·`sampled_without_notice`)·`sample_list_sha256` 의 정의가 바뀐다.
 > 스냅숏 실물은 **저장소 밖**(`~/.local/bid-vector-snapshots/<snapshot_id>/`)에 둔다(data-extract §7 · ADR 0010 D-8).
 
-`schema_version`: **`snapshot-v4`** · 파일 **셋**: `manifest.json` · `rows.jsonl` · `sample-list.tsv`
+`schema_version`: **`snapshot-v5`** · 파일 **셋**: `manifest.json` · `rows.jsonl` · `sample-list.tsv`
 
 ## 0. 왜 한 행이 두 반쪽인가
 
@@ -30,10 +32,11 @@
 ## 2. `manifest.json`
 
 ```json
-{ "schema_version": "snapshot-v4", "snapshot_id": "…", "row_count": 23880,
+{ "schema_version": "snapshot-v5", "snapshot_id": "…", "row_count": 23856,
   "period_start": "2026-02-06", "period_end": "2026-09-26",
   "rows_sha256": "…", "sample_list_sha256": "…",
-  "sample_size": 24000, "sampled_without_detail": 96, "sampled_without_notice": 24 }
+  "sample_size": 24000, "sampled_without_detail": 96, "sampled_without_notice": 24,
+  "incomplete_axis": 24 }
 ```
 
 | 칸 | 뜻 |
@@ -44,8 +47,16 @@
 | `sample_size` | `sample-list.tsv` 의 줄 수 = 확정된 표본 크기 |
 | `sampled_without_detail` | 표본인데 상세 축 관측이 하나도 없는 공고 수(부르지 못했거나 응답이 비었다) |
 | `sampled_without_notice` | 표본이고 상세는 있는데 **공고 목록 canonical 이 없어** 행을 만들지 못한 공고 수 |
+| `incomplete_axis` | 상세 축 가운데 **완료되지 않은 것이 있는** 공고 수(v5, D-6G-58) — 아래 |
 
-**닫힌 항등식:** `sample_size == row_count + sampled_without_detail + sampled_without_notice`.
+**`incomplete_axis` 가 왜 행이 아니라 계수인가.** 한 축이 페이지 중간에 끊기면 그 축의 원문은
+**일부만** 있다. 그 반쪽으로 행을 쓰면 값이 조용히 틀린다(예: 개찰완료 2쪽 중 1쪽만 받은 공고의
+투찰자 수가 실제보다 적다) — 그리고 그 행은 「값이 있는 정상 행」으로 보여 어느 제외 사유에도
+걸리지 않는다. 완료는 **시도 원장**이 정한다(마지막 AXIS 결말이 성공이거나 빈 응답일 때만 완료),
+raw 행의 존재가 아니다. 다음 실행이 그 축을 다시 부르면 이 공고는 행이 된다.
+
+**닫힌 항등식:** `sample_size == row_count + sampled_without_detail + sampled_without_notice +
+incomplete_axis`.
 표본 하나하나가 행이 되었거나, 되지 못한 사유로 계수된다 — 어느 쪽도 아닌 공고는 없다. 판독은 이
 등식을 검사하고, 깨지면 **구조 실패**다(계수가 행을 설명하지 못한다는 뜻이므로 데이터의 성질이 아니다).
 
@@ -185,6 +196,11 @@ v3 은 둘을 가른다.
 
 값 결측이 부르는 사유 넷을 새로 둔다(나머지는 기존 어휘 그대로):
 `NOTICE_DATE_ABSENT` · `BID_CLOSE_AT_ABSENT` · `OPENING_DATE_ABSENT` · `PLANNED_PRICE_ABSENT`.
+
+**생산 쪽이 귀속하는 제외 사유 셋**(행이 아예 오지 않으므로 판독은 계수로만 본다):
+`SAMPLED_WITHOUT_DETAIL` · `SAMPLED_WITHOUT_NOTICE` · **`INCOMPLETE_AXIS`**(v5). 셋 다 manifest 의
+같은 이름 칸이 수를 나르고, 닫힌 항등식이 그 수가 행을 설명함을 보증한다. 판정문은 이 어휘로
+결측을 귀속한다 — 이름이 닫혀 있어야 「왜 빠졌는지 모르는 공고」가 생기지 않는다.
 
 ## 3.6 첫 공고 차수는 `"000"` 이다 (D-6G-35)
 

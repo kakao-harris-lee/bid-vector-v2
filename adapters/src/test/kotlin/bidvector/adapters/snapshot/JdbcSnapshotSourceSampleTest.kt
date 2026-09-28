@@ -17,6 +17,7 @@ import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.collection.SampleList
 import bidvector.workflow.collection.SampleStratum
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -54,8 +55,14 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         ),
     )
 
-    private fun extract(sample: SampleList): SnapshotExtraction =
-        JdbcSnapshotSource(dataSource(), policy()).extract(WINDOW_FROM, WINDOW_TO, sample)
+    /** 기본은 **전 축 완료** — 이 test 들이 재는 것은 완료 판정이 아니라 그 앞의 문턱들이다. */
+    private fun extract(
+        sample: SampleList,
+        settled: Map<String, Set<SourceEndpoint>> = allAxesSettled(sample),
+    ): SnapshotExtraction = JdbcSnapshotSource(dataSource(), policy()).extract(WINDOW_FROM, WINDOW_TO, sample, settled)
+
+    private fun allAxesSettled(sample: SampleList): Map<String, Set<SourceEndpoint>> =
+        sample.keys.associate { it.value to expectedAxesFor(BusinessDivision.SERVICE.name) }
 
     /** 표본틀에만 있던 공고(목록 축만)는 행이 되지 않는다 — 상세를 부르지 않았으므로 결과가 없다. */
     @Test
@@ -100,6 +107,36 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         extraction.rows.shouldBeEmpty()
         extraction.skippedWithoutNotice shouldBe 1
         extraction.sampledWithoutDetail shouldBe 0
+    }
+
+    /**
+     * D-6G-58 — **완료되지 않은 축이 있으면 행을 쓰지 않는다.** 한 축이 페이지 중간에 끊기면 그
+     * 축의 원문은 일부만 있고, 그 반쪽으로 쓴 행은 값이 조용히 틀리면서(받은 쪽까지만 센 투찰자
+     * 수) 어느 제외 사유에도 걸리지 않는다. 완료는 시도 원장이 정한다 — raw 존재가 아니다.
+     */
+    @Test
+    fun `축 하나가 끝나지 않았으면 행이 아니라 계수다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        observe(number, SourceEndpoint.OPENING_COMPLETE)
+        val sample = sampleOf(number)
+
+        // 원문은 있지만 개찰완료 축이 원장에서 끝나지 않았다(예: 2쪽 중 1쪽에서 끊겼다).
+        val partial = expectedAxesFor(BusinessDivision.SERVICE.name) - SourceEndpoint.OPENING_COMPLETE
+        val extraction = extract(sample, mapOf(sample.keys.single().value to partial))
+
+        extraction.rows.shouldBeEmpty()
+        extraction.incompleteAxis shouldBe 1
+        extraction.skippedWithoutNotice shouldBe 0
+        extraction.sampledWithoutDetail shouldBe 0
+    }
+
+    /** 공사는 A값까지 넷이다 — 부르지 않는 축을 기다리면 공사 아닌 공고가 영영 행이 되지 않는다. */
+    @Test
+    fun `부를 축은 업무가 정한다`() {
+        expectedAxesFor(BusinessDivision.CONSTRUCTION.name) shouldHaveSize 4
+        expectedAxesFor(BusinessDivision.SERVICE.name) shouldHaveSize 3
+        expectedAxesFor(BusinessDivision.SERVICE.name).contains(SourceEndpoint.BID_PRICE_FORMULA_A) shouldBe false
     }
 
     /** 사유 셋의 합이 표본 크기를 덮는다(스키마 §2 닫힌 항등식) — 어느 쪽도 아닌 공고는 없다. */
@@ -157,7 +194,12 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
 
         val extraction =
             JdbcSnapshotSource(dataSource(), policy())
-                .extract(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 2), sampleOf("20260617001-00"))
+                .extract(
+                    LocalDate.of(2026, 7, 1),
+                    LocalDate.of(2026, 7, 2),
+                    sampleOf("20260617001-00"),
+                    allAxesSettled(sampleOf("20260617001-00")),
+                )
 
         extraction.sampledWithoutDetail shouldBe 1
         extraction.skippedWithoutNotice shouldBe 0
@@ -196,6 +238,13 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
     }
 
     /** canonical 공고를 **출하 경로**(repository)로 세운다 — test 전용 SQL 사본을 두지 않는다. */
+    private fun listObservation(number: String): RawNoticeObservation =
+        RawNoticeObservation.of(
+            mapOf(RawKey("bidNtceNo") to number, RawKey("bidNtceOrd") to "000"),
+            SourceEndpoint.NOTICE_LIST,
+            OBSERVED_AT,
+        )
+
     private fun persistCanonical(
         number: String,
         observation: RawNoticeObservation,

@@ -10,7 +10,7 @@ import java.time.LocalDate
  * 바로잡으며 올렸다. 소비 쪽 판독은 **버전이
  * 다르면 스냅숏 전체를 거부한다**(의도된 동작이다 — 두 레인이 같이 움직여야 한다는 신호).
  */
-const val SNAPSHOT_SCHEMA_VERSION: String = "snapshot-v4"
+const val SNAPSHOT_SCHEMA_VERSION: String = "snapshot-v5"
 
 private const val HEX_MASK = 0xff
 
@@ -64,6 +64,7 @@ object SnapshotWriter {
                     "sample_size" to SnapshotJson.Number(counts.sampleSize.toString()),
                     "sampled_without_detail" to SnapshotJson.Number(counts.sampledWithoutDetail.toString()),
                     "sampled_without_notice" to SnapshotJson.Number(counts.sampledWithoutNotice.toString()),
+                    "incomplete_axis" to SnapshotJson.Number(counts.incompleteAxis.toString()),
                 ),
             ).render()
 }
@@ -78,9 +79,14 @@ data class SnapshotCounts(
     val rowCount: Int,
     val sampledWithoutDetail: Int,
     val sampledWithoutNotice: Int,
+    /**
+     * 상세 축 가운데 **완료되지 않은 것이 있는** 공고 수(D-6G-58). 반쪽 축으로 행을 쓰면 값이
+     * 조용히 틀리고(받은 쪽까지만 센 투찰자 수), 그 행은 어느 제외 사유에도 걸리지 않는다.
+     */
+    val incompleteAxis: Int,
 ) {
     init {
-        require(sampleSize == rowCount + sampledWithoutDetail + sampledWithoutNotice) {
+        require(sampleSize == rowCount + sampledWithoutDetail + sampledWithoutNotice + incompleteAxis) {
             "표본 계수가 행을 설명하지 못한다 — 표본 목록과 추출 결과가 어긋났다"
         }
     }

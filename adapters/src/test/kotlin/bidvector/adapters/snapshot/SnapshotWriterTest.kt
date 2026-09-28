@@ -182,18 +182,20 @@ class SnapshotWriterTest {
                         rowCount = 1,
                         sampledWithoutDetail = 2,
                         sampledWithoutNotice = 1,
+                        incompleteAxis = 0,
                     ),
                 period = LocalDate.of(2026, 2, 6)..LocalDate.of(2026, 9, 26),
                 sampleListSha256 = "feedface",
             )
 
-        manifest shouldContain "\"schema_version\":\"snapshot-v4\""
+        manifest shouldContain "\"schema_version\":\"snapshot-v5\""
         manifest shouldContain "\"rows_sha256\":\"${sha256Hex(rows)}\""
         // 표본 목록 해시는 **파일 바이트**의 해시다 — 이 함수는 행에서 역산하지 않고 그대로 옮긴다.
         manifest shouldContain "\"sample_list_sha256\":\"feedface\""
         manifest shouldContain "\"sample_size\":4"
         manifest shouldContain "\"sampled_without_detail\":2"
         manifest shouldContain "\"sampled_without_notice\":1"
+        manifest shouldContain "\"incomplete_axis\":0"
     }
 
     /**
@@ -203,7 +205,13 @@ class SnapshotWriterTest {
     @Test
     fun `표본 계수가 행을 설명하지 못하면 manifest 를 만들지 않는다`() {
         shouldThrow<IllegalArgumentException> {
-            SnapshotCounts(sampleSize = 4, rowCount = 1, sampledWithoutDetail = 1, sampledWithoutNotice = 1)
+            SnapshotCounts(
+                sampleSize = 4,
+                rowCount = 1,
+                sampledWithoutDetail = 1,
+                sampledWithoutNotice = 1,
+                incompleteAxis = 0,
+            )
         }
     }
 
