@@ -111,6 +111,7 @@ def _row(label: str, opened: date, rng: Random) -> dict[str, Any]:
 # 해시는 결정적으로 만든다(같은 seed 면 같은 바이트).
 _MISSING_DETAIL_KEY = hashlib.sha256(b"m6-6g-sampled-without-detail").hexdigest()
 _MISSING_NOTICE_KEY = hashlib.sha256(b"m6-6g-sampled-without-notice").hexdigest()
+_INCOMPLETE_AXIS_KEY = hashlib.sha256(b"m6-6g-incomplete-axis").hexdigest()
 
 
 def build_rows() -> list[dict[str, Any]]:
@@ -135,7 +136,7 @@ def build_files() -> tuple[bytes, bytes, bytes]:
     # 셋 다 다른 값이 되고, 판정 JSON 이 분모를 어디서 가져오는지 test 가 가를 수
     # 있다. 셋이 같은 판에서는 분모를 무엇으로 적든 같은 수가 나와 아무것도 잠기지
     # 않는다 — 왕복 golden 이 10/10/0/0 이던 동안 겪은 것과 같은 함정이다.
-    extra = (_MISSING_DETAIL_KEY, _MISSING_NOTICE_KEY)
+    extra = (_MISSING_DETAIL_KEY, _MISSING_NOTICE_KEY, _INCOMPLETE_AXIS_KEY)
     listing = (
         "\n".join(
             f"{key}\tSERVICE\t2026-W25"
@@ -146,7 +147,7 @@ def build_files() -> tuple[bytes, bytes, bytes]:
         + "\n"
     ).encode("utf-8")
     manifest = {
-        "schema_version": "snapshot-v4",
+        "schema_version": "snapshot-v5",
         "snapshot_id": "m6-6g-synthetic-v1",
         "row_count": len(rows),
         # 기간은 **행들의 개찰일 범위**다 — 판독기가 재계산해 대조하므로 블록 경계를
@@ -160,6 +161,9 @@ def build_files() -> tuple[bytes, bytes, bytes]:
         "sample_size": len(rows) + len(extra),
         "sampled_without_detail": 1,
         "sampled_without_notice": 1,
+        # v5 — 축이 반쪽인 표본도 하나 둔다. 0 만 지나가는 fixture 는 그 항을 검사하지
+        # 않는다(왕복 golden 이 10/10/0/0 이던 때와 같은 함정).
+        "incomplete_axis": 1,
     }
     return (
         json.dumps(manifest, sort_keys=True, ensure_ascii=False).encode("utf-8"),

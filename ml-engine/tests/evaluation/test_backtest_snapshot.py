@@ -31,6 +31,7 @@ from ml_engine.evaluation.backtest.observations import (
     LoadedSnapshot,
     SnapshotRejected,
 )
+from ml_engine.evaluation.backtest.reasons import ProducerExclusionReason
 from ml_engine.evaluation.backtest.sample_list import (
     _BUSINESS_DIVISIONS,
     parse_sample_list,
@@ -96,12 +97,14 @@ def test_snapshot_checksum_is_the_sha256_of_the_rows_bytes() -> None:
     [
         ({"row_count": 99}, SnapshotRejectionReason.ROW_COUNT_MISMATCH),
         ({"rows_sha256": "a" * 64}, SnapshotRejectionReason.CHECKSUM_MISMATCH),
+        # 지원 버전의 **앞뒤 하나씩**. 버전이 오르면 이 둘을 같이 민다 — 한쪽만
+        # 밀면 「과거도 미래도 거부한다」가 반쪽만 남는다.
         (
-            {"schema_version": "snapshot-v3"},
+            {"schema_version": "snapshot-v4"},
             SnapshotRejectionReason.UNSUPPORTED_SCHEMA_VERSION,
         ),
         (
-            {"schema_version": "snapshot-v5"},
+            {"schema_version": "snapshot-v6"},
             SnapshotRejectionReason.UNSUPPORTED_SCHEMA_VERSION,
         ),
     ],
@@ -457,7 +460,7 @@ def test_loader_accepts_bytes_not_paths() -> None:
     )
     assert isinstance(
         load_snapshot(
-            json.dumps({"schema_version": "snapshot-v4"}).encode(),
+            json.dumps({"schema_version": "snapshot-v6"}).encode(),
             rows,
             sample_list_bytes(rows),
         ),
@@ -660,4 +663,61 @@ def test_business_division_vocabulary_matches_the_schema_document() -> None:
     assert documented == set(_BUSINESS_DIVISIONS), (
         f"스키마 문서의 어휘와 판독기의 닫힌 셋이 다르다 — 문서: {sorted(documented)} · "
         f"판독기: {sorted(_BUSINESS_DIVISIONS)}"
+    )
+
+
+def test_incomplete_axis_closes_the_identity_as_a_fourth_term() -> None:
+    """D-6G-58 — v5 의 항등식은 항이 **넷**이다: 행 · 상세 없음 · 공고 없음 · 축 미완.
+
+    축이 반쪽인 표본은 행으로 오지 않는다(반쪽 원문으로 행을 쓰면 값이 조용히 틀리고,
+    그 행은 「값이 있는 정상 행」으로 보여 어느 제외 사유에도 걸리지 않는다). 그래서
+    계수로 오고, 항등식이 그 수가 표본을 설명함을 보증한다."""
+    rows = rows_bytes([row_payload("n-1")])
+    listing = sample_list_bytes(rows, extra_keys=("f" * 64,))
+    loaded = load_snapshot(
+        manifest_bytes(rows, sample_list=listing, incomplete_axis=1),
+        rows,
+        listing,
+    )
+    assert isinstance(loaded, LoadedSnapshot), loaded
+    assert loaded.sample_size == 2
+    assert loaded.incomplete_axis == 1
+
+
+def test_identity_breaks_when_the_incomplete_axis_term_is_dropped() -> None:
+    """네 번째 항을 빼면 표본이 설명되지 않는다 — 구조 실패다.
+
+    `sample_size` 를 파일 키 수에 맞춰 둬서 「파일 키 수 != 선언」 대조가 먼저 걸리지
+    않게 한다(앞 항들과 같은 판 가르기)."""
+    rows = rows_bytes([row_payload("n-1")])
+    listing = sample_list_bytes(rows, extra_keys=("f" * 64,))
+    rejected = load_snapshot(
+        manifest_bytes(rows, sample_list=listing, sample_size=2, incomplete_axis=0),
+        rows,
+        listing,
+    )
+    assert isinstance(rejected, SnapshotRejected)
+    assert rejected.reason is SnapshotRejectionReason.SAMPLE_COUNT_MISMATCH
+
+
+def test_producer_exclusion_vocabulary_matches_the_schema_document() -> None:
+    """스키마 §6 의 **생산 귀속 사유 셋**과 판독기의 닫힌 어휘가 같다.
+
+    행이 오지 않는 표본들이라 판독은 계수로만 보지만, 이름이 닫혀 있어야 「왜 빠졌는지
+    모르는 공고」가 생기지 않는다. 업무 어휘와 같은 방식으로 두 레인이 같이 읽는
+    문서에 맞댄다(cr r4 L-7 과 같은 갈래)."""
+    schema = (
+        _REPO_ROOT / "reports" / "evidence" / "m6" / "6g" / "snapshot-schema.md"
+    ).read_text(encoding="utf-8")
+    marker = "생산 쪽이 귀속하는 제외 사유"
+    assert marker in schema, "스키마 문서에서 생산 귀속 사유 절을 찾지 못했다"
+    section = schema[schema.index(marker) : schema.index(marker) + 400]
+    documented = {
+        token.strip("`*")
+        for token in re.findall(r"`[A-Z_]+`", section)
+        if token.strip("`*").isupper()
+    }
+    assert documented == {str(reason) for reason in ProducerExclusionReason}, (
+        f"문서: {sorted(documented)} · 판독기: "
+        f"{sorted(str(reason) for reason in ProducerExclusionReason)}"
     )

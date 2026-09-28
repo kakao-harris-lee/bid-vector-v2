@@ -85,3 +85,16 @@ class UndecidableAxis(StrEnum):
     PREARRANGED_PRICE_METHOD = "PREARRANGED_PRICE_METHOD"
     """D-6G-36 — 예정가격 결정방법이 부재해 ④ 를 직접 판정하지 못하고 ⑤ 에 맡긴 공고
     수. 「복수예가로 확인했다」와 「⑤ 가 보증한다」는 다른 사실이라 따로 센다."""
+
+
+class ProducerExclusionReason(StrEnum):
+    """생산 쪽이 귀속하는 결측 사유(스키마 §6, v5 · D-6G-58).
+
+    **행이 아예 오지 않는 표본들**이다 — 판독은 행을 볼 수 없으므로 manifest 의 계수로만
+    본다. 그래도 어휘를 닫는 이유는 하나다: 이름이 닫혀 있어야 「왜 빠졌는지 모르는
+    공고」가 생기지 않는다. 판정문은 이 셋으로 결측을 귀속하고, 닫힌 항등식이 세 수의
+    합이 표본을 설명함을 보증한다."""
+
+    SAMPLED_WITHOUT_DETAIL = "SAMPLED_WITHOUT_DETAIL"
+    SAMPLED_WITHOUT_NOTICE = "SAMPLED_WITHOUT_NOTICE"
+    INCOMPLETE_AXIS = "INCOMPLETE_AXIS"

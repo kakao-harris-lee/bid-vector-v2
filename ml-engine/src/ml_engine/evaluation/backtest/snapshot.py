@@ -54,7 +54,7 @@ from ml_engine.evaluation.backtest.observations import (
 from ml_engine.evaluation.backtest.sample_list import SampleList, check_sample_list
 from ml_engine.registry.artifact import JsonValue
 
-SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v4"
+SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v5"
 
 
 _ROW_KEYS: Final[frozenset[str]] = frozenset({"notice", "outcome"})
@@ -110,6 +110,7 @@ _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
         "sample_size",
         "sampled_without_detail",
         "sampled_without_notice",
+        "incomplete_axis",
     }
 )
 
@@ -237,6 +238,7 @@ class _Manifest:
     sample_size: int
     sampled_without_detail: int
     sampled_without_notice: int
+    incomplete_axis: int
 
 
 def _parse_manifest(manifest_bytes: bytes) -> _Manifest:
@@ -257,6 +259,7 @@ def _parse_manifest(manifest_bytes: bytes) -> _Manifest:
         sample_size=row_integer(fields, "sample_size"),
         sampled_without_detail=row_integer(fields, "sampled_without_detail"),
         sampled_without_notice=row_integer(fields, "sampled_without_notice"),
+        incomplete_axis=row_integer(fields, "incomplete_axis"),
     )
 
 
@@ -346,6 +349,7 @@ def _assemble(
         sample_size=manifest.sample_size,
         sampled_without_detail=manifest.sampled_without_detail,
         sampled_without_notice=manifest.sampled_without_notice,
+        incomplete_axis=manifest.incomplete_axis,
         sample_divisions=listing.divisions,
         rows=rows,
     )
@@ -373,6 +377,7 @@ def load_snapshot(
             row_keys=[row.notice.notice_key_hash for row in rows],
             sampled_without_detail=manifest.sampled_without_detail,
             sampled_without_notice=manifest.sampled_without_notice,
+            incomplete_axis=manifest.incomplete_axis,
         )
         return _assemble(manifest, rows, listing)
     except RowReadError as rejected:

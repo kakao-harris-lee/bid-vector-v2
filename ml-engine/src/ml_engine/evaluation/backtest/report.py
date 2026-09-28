@@ -16,6 +16,7 @@ import json
 from collections.abc import Sequence
 
 from ml_engine.evaluation.backtest.fit import FitResult
+from ml_engine.evaluation.backtest.reasons import ProducerExclusionReason
 from ml_engine.evaluation.backtest.records import (
     BacktestStopped,
     BacktestVerdict,
@@ -42,8 +43,21 @@ def _snapshot(record: SnapshotRecord) -> dict[str, JsonValue]:
         "sample_list_sha256": record.sample_list_sha256,
         "sample_size": record.sample_size,
         "sample_divisions": list(record.sample_divisions),
+        # 생산 귀속 결측은 **닫힌 어휘로** 싣는다(스키마 §6, v5) — 행이 오지 않는
+        # 표본들이라 판독은 계수만 볼 수 있고, 이름이 닫혀 있어야 「왜 빠졌는지 모르는
+        # 공고」가 생기지 않는다.
+        "producer_exclusions": {
+            str(ProducerExclusionReason.SAMPLED_WITHOUT_DETAIL): (
+                record.sampled_without_detail
+            ),
+            str(ProducerExclusionReason.SAMPLED_WITHOUT_NOTICE): (
+                record.sampled_without_notice
+            ),
+            str(ProducerExclusionReason.INCOMPLETE_AXIS): record.incomplete_axis,
+        },
         "sampled_without_detail": record.sampled_without_detail,
         "sampled_without_notice": record.sampled_without_notice,
+        "incomplete_axis": record.incomplete_axis,
         "period_start": record.period_start.isoformat(),
         "period_end": record.period_end.isoformat(),
     }

@@ -132,6 +132,7 @@ def check_sample_list(
     row_keys: Sequence[str],
     sampled_without_detail: int,
     sampled_without_notice: int,
+    incomplete_axis: int,
 ) -> SampleList:
     """표본 대조 셋(스키마 §2.1). v3 까지는 manifest 의 해시를 **행에서 역산**해
     맞췄으니 정의상 언제나 맞는 순환 대조였다 — 「결과를 보기 전에 표본이 확정됐다」
@@ -141,7 +142,9 @@ def check_sample_list(
     ⑴ 파일 바이트의 sha256 == `sample_list_sha256`
     ⑵ 모든 행의 키가 파일의 키 집합 **안**(행이 표본의 진부분집합인 것은 정상이다 —
        상세를 못 받았거나 공고 canonical 이 없는 표본이 있다)
-    ⑶ 닫힌 항등식 — 표본 하나하나가 행이 되었거나 되지 못한 사유로 계수된다
+    ⑶ 닫힌 항등식(v5, D-6G-58) — 표본 하나하나가 행이 되었거나 **되지 못한 사유로**
+       계수된다. 항이 넷이다: 행 · 상세 없음 · 공고 없음 · 축 미완. 어느 쪽도 아닌
+       공고는 없다 — 깨지면 계수가 행을 설명하지 못한다는 뜻이라 구조 실패다
 
     통과하면 읽어 둔 목록을 돌려준다 — 업무 축은 스냅숏이 실어 나르고 최소 표본
     결정식이 그 수를 쓴다(M-6). 같은 파일을 두 번 파싱하지 않기 위해서다."""
@@ -162,11 +165,26 @@ def check_sample_list(
             SnapshotRejectionReason.SAMPLE_LIST_MISMATCH,
             f"표본 목록 밖의 행 {len(stray)}건",
         )
-    accounted = len(row_keys) + sampled_without_detail + sampled_without_notice
+    _check_identity(
+        sample_size,
+        row_count=len(row_keys),
+        missing=(sampled_without_detail, sampled_without_notice, incomplete_axis),
+    )
+    return listing
+
+
+def _check_identity(
+    sample_size: int, *, row_count: int, missing: tuple[int, ...]
+) -> None:
+    """닫힌 항등식 — 표본 하나하나가 행이 되었거나 **되지 못한 사유로** 계수된다.
+
+    결측 항을 낱개 인자가 아니라 묶음으로 받는 이유: v4 에서 v5 로 오며 항이 하나 늘었고
+    (`incomplete_axis`), 앞으로도 는다. 항을 인자로 열거하면 늘 때마다 시그니처가 바뀌고
+    **더하기를 빠뜨려도 조용히 통과**한다 — 묶음이면 합이 곧 계약이다."""
+    accounted = row_count + sum(missing)
     if accounted != sample_size:
         raise RowReadError(
             SnapshotRejectionReason.SAMPLE_COUNT_MISMATCH,
-            f"항등식이 깨졌다: {len(row_keys)} + {sampled_without_detail} + "
-            f"{sampled_without_notice} != {sample_size}",
+            f"항등식이 깨졌다: {row_count} + {'+'.join(str(n) for n in missing)}"
+            f" != {sample_size}",
         )
-    return listing

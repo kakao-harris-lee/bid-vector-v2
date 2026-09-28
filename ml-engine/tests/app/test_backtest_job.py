@@ -121,6 +121,7 @@ def _complete_snapshot_dir(tmp_path: Path) -> str:
     manifest["sample_size"] = len(row_keys)
     manifest["sampled_without_detail"] = 0
     manifest["sampled_without_notice"] = 0
+    manifest["incomplete_axis"] = 0
     directory = tmp_path / "complete"
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "manifest.json").write_bytes(
@@ -269,6 +270,16 @@ def test_verdict_reaches_the_judgement_stage_with_every_strategy(
         fill_block["denominator"]
         == snapshot["sample_size"] - snapshot["sampled_without_notice"]
     )
+    # D-6G-58 — 생산 귀속 결측은 **닫힌 어휘로** 실린다. 셋 다 0 이 아닌 판이라야
+    # 「이름이 닫혔다」가 헛돌지 않는다(0 만 지나가면 그 항을 검사하지 않는다).
+    producer = snapshot["producer_exclusions"]
+    assert set(producer) == {
+        "SAMPLED_WITHOUT_DETAIL",
+        "SAMPLED_WITHOUT_NOTICE",
+        "INCOMPLETE_AXIS",
+    }
+    assert all(count > 0 for count in producer.values())
+    assert snapshot["sample_size"] == sampling["row_count"] + sum(producer.values())
     assert fill_block["denominator"] != sampling["row_count"]
     assert fill_block["denominator"] != snapshot["sample_size"]
     # 상세를 못 받은 표본이 있으므로 이 수치들은 **엄격한 하한**이다.

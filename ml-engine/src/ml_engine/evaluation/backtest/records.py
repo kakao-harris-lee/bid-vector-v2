@@ -92,6 +92,7 @@ class SnapshotRecord:
     sample_size: int
     sampled_without_detail: int
     sampled_without_notice: int
+    incomplete_axis: int
     sample_divisions: tuple[str, ...]
     """표본틀에 들어간 업무 구분들(D-6G-53). 최소 표본 문턱이 이 **수**로 정해지므로
     판정문이 그 근거를 싣는다 — 값이 보이지 않으면 문턱이 왜 그 값인지 알 수 없다."""

@@ -215,7 +215,8 @@ def manifest_bytes(
     sample_size: int | None = None,
     sampled_without_detail: int = 0,
     sampled_without_notice: int = 0,
-    schema_version: str = "snapshot-v4",
+    incomplete_axis: int = 0,
+    schema_version: str = "snapshot-v5",
 ) -> bytes:
     payload = {
         "schema_version": schema_version,
@@ -240,12 +241,16 @@ def manifest_bytes(
             else sample_list_sha256
         ),
         "sample_size": (
-            len(_row_keys(rows)) + sampled_without_detail + sampled_without_notice
+            len(_row_keys(rows))
+            + sampled_without_detail
+            + sampled_without_notice
+            + incomplete_axis
             if sample_size is None
             else sample_size
         ),
         "sampled_without_detail": sampled_without_detail,
         "sampled_without_notice": sampled_without_notice,
+        "incomplete_axis": incomplete_axis,
     }
     return json.dumps(payload, sort_keys=True).encode("utf-8")
 
