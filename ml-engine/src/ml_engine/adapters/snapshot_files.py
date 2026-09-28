@@ -3,7 +3,7 @@
 `ml_engine.evaluation.backtest.snapshot.load_snapshot` 이 한다.
 
 `file://` 경로만 지원한다(네트워크 0). 스냅숏은 디렉터리 하나(`manifest.json` +
-`rows.jsonl` + `sample-list.tsv`, v4)이고, **저장소 밖**에 둔다(`~/.local/bid-vector-snapshots/<id>/`,
+`rows.jsonl` + `sample-list.tsv`, v5)이고, **저장소 밖**에 둔다(`~/.local/bid-vector-snapshots/<id>/`,
 data-extract §7 · ADR 0010 D-8) — 그래서 이 함수가 받는 경로는 저장소 안이 아니다.
 """
 
@@ -37,7 +37,8 @@ class SnapshotUnreadable:
 
 
 def read_snapshot_files(uri: str) -> SnapshotFiles | SnapshotUnreadable:
-    """`file:///<dir>` 의 `manifest.json`·`rows.jsonl` 을 읽는다. 다른 scheme 과
+    """`file:///<dir>` 의 `manifest.json`·`rows.jsonl`·`sample-list.tsv` **셋**을
+    읽는다(하나라도 없으면 `NOT_FOUND` 로 전체가 선다). 다른 scheme 과
     `file://<host>/…`(비표준, host 를 조용히 무시할 위험)은 fail-closed — 5C
     `read_dataset_files` 가 PR #13 리뷰에서 닫은 것과 같은 경계."""
     parsed = urlparse(uri)
