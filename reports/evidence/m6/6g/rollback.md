@@ -127,7 +127,7 @@ evaluation 등 다른 adapters 패키지에는 있다). 그래서 이 두 패키
 
 ## 되돌리는 경로 (기계 산출 — `git diff --name-status <base>..HEAD -- ml-engine`)
 
-추가 41 · 수정 4. 수정 넷만 적는다(추가는 되돌리면 사라진다):
+추가 42 · 수정 4. 수정 넷만 적는다(추가는 되돌리면 사라진다):
 
 - `ml-engine/src/ml_engine/evaluation/policy.py` — 5C-2 의 평탄 인덱스 판독기 여섯을 public 이름으로
   올린 것(재사용). 되돌리면 그 여섯이 다시 비공개가 되고 backtest 정책 로더가 사라지므로 정합하다.
@@ -153,7 +153,8 @@ git restore --source=<base> --staged --worktree -- \
   ml-engine/src/ml_engine/app/backtest_job.py \
   ml-engine/policy/strategy-backtest-v1.yaml \
   ml-engine/tests/evaluation ml-engine/tests/app/test_backtest_job.py \
-  ml-engine/tests/app/test_backtest_golden.py
+  ml-engine/tests/app/test_backtest_golden.py \
+  ml-engine/tests/app/test_backtest_policy_sensitivity.py
 ```
 
 `ml-engine/src/ml_engine/evaluation/backtest/` 와 `tests/evaluation/fixtures/backtest-snapshot/` 은
@@ -174,7 +175,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 
 ## 실측
 
-**실측 HEAD: `ab0f4138`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
+**실측 HEAD: `73570b2d`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
 
 임시 clone 에서 위 복원을 돌리고 ①~⑥ 을 쟀다. **Gradle 축(④⑤⑥ 중 Kotlin `check`)은 이 레인이
 돌리지 않는다**(호스트 무거운 빌드 1개 규율) — Python 축으로 같은 여섯을 쟀다.
@@ -182,7 +183,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 | 축 | 결과 |
 |---|---|
 | ① 명령 exit | 0 |
-| ② A/M 수 | 추가 41 · 수정 4 — 위 기계 산출과 같다 |
+| ② A/M 수 | 추가 42 · 수정 4 — 위 기계 산출과 같다 |
 | ③ diff 빈 것 | `git diff 678c6ed7 -- ml-engine` **0 줄** — 되돌린 트리가 base 와 바이트 동일 |
 | ④ 형 검사 | `uv run mypy --strict src/ml_engine` — 소스 72개, 오류 0(base 상태) |
 | ⑤ test | `uv run python -m pytest tests -q` — **958 passed**(base 상태, 6G 추가분 없음) |
@@ -192,7 +193,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 
 ## 실측 HEAD 이후 되돌림 대상이 움직였는가
 
-`git diff --name-only ab0f4138..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
+`git diff --name-only 73570b2d..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
 이 레인의 evidence 커밋은 `reports/evidence/m6/6g/` 안이고 그 경로는 위 목록에 **없다** — 그러므로
 evidence 를 더 써도 이 실측은 유효하다.
 
