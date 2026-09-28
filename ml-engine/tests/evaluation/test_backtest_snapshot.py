@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -29,11 +31,16 @@ from ml_engine.evaluation.backtest.observations import (
     LoadedSnapshot,
     SnapshotRejected,
 )
-from ml_engine.evaluation.backtest.sample_list import parse_sample_list
+from ml_engine.evaluation.backtest.sample_list import (
+    _BUSINESS_DIVISIONS,
+    parse_sample_list,
+)
 from ml_engine.evaluation.backtest.snapshot import (
     SnapshotRejectionReason,
     load_snapshot,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _load(payloads: list[dict[str, Any]], **manifest_kwargs: Any) -> object:
@@ -631,3 +638,26 @@ def test_broken_utf8_names_the_file_that_broke() -> None:
     )
     assert isinstance(rejected, SnapshotRejected)
     assert rejected.reason is SnapshotRejectionReason.SAMPLE_LIST_MALFORMED
+
+
+def test_business_division_vocabulary_matches_the_schema_document() -> None:
+    """cr r4 L-7 — `_BUSINESS_DIVISIONS` 는 Kotlin `BusinessDivision` 의 **손 복사본**
+    이다. 두 레인을 묶는 자리가 없으면 Kotlin 이 업무를 하나 늘릴 때 Python 이 스냅숏
+    전체를 거부하고, 진단은 「업무 구분이 닫힌 셋 밖이다」 한 줄뿐이다.
+
+    두 레인이 **같이 읽는 문서**(스키마 §2.1)를 정본으로 삼아 맞댄다 — 어휘가 문서에서
+    움직이면 이 test 가 먼저 붉어지고, 거기서 두 레인이 같이 움직인다."""
+    schema = (
+        _REPO_ROOT / "reports" / "evidence" / "m6" / "6g" / "snapshot-schema.md"
+    ).read_text(encoding="utf-8")
+    rows = [line for line in schema.splitlines() if "`business_division`" in line]
+    assert rows, "스키마 문서에서 업무 구분 행을 찾지 못했다"
+    documented = {
+        token.strip("`")
+        for token in re.findall(r"`[A-Z_]+`", rows[0])
+        if token.strip("`").isupper()
+    }
+    assert documented == set(_BUSINESS_DIVISIONS), (
+        f"스키마 문서의 어휘와 판독기의 닫힌 셋이 다르다 — 문서: {sorted(documented)} · "
+        f"판독기: {sorted(_BUSINESS_DIVISIONS)}"
+    )

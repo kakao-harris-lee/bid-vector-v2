@@ -34,6 +34,7 @@ M6/6G r1 보강 둘(D-6G-33 — verifier r1 M-6·G1 변이, code-review r1 M-10)
 from __future__ import annotations
 
 import ast
+import math
 from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
@@ -79,6 +80,20 @@ _PARSER_INT_BASES: Final[tuple[int, ...]] = (0, 10)
 받으므로 「진법 포함」은 이것으로 닫힌다."""
 
 
+def _is_finite(value: object) -> bool:
+    """유한 수인가. `nan`·`inf`·`snan` 은 **임계가 될 수 없으므로** 수로 세지 않는다
+    (cr r4 L-5). 좁히지 않으면 `"j"` 한 글자가 `complex("j")` 로 읽혀 리터럴이 되고,
+    게이트가 자기 docstring 에서 base 36 을 거부한 이유(「술어가 모든 것을 잡으면
+    아무것도 잡지 못한다」)를 스스로 어긴다."""
+    if isinstance(value, complex):
+        return math.isfinite(value.real) and math.isfinite(value.imag)
+    if isinstance(value, Decimal):
+        return value.is_finite()
+    if isinstance(value, Fraction):
+        return True
+    return isinstance(value, float) and math.isfinite(value)
+
+
 def _parsed_number(raw: str) -> object | None:
     """문자열이 **Python 수 파서 가운데 하나라도** 받으면 그 수, 아니면 `None`.
 
@@ -86,6 +101,13 @@ def _parsed_number(raw: str) -> object | None:
     `Fraction("1/60")` · `float.fromhex("0x1.1p-6")` · `complex("0.0166j")` 는
     `float()` 이 거부하지만 **전부 수로 읽힌다**. 파서 하나를 고르는 순간 나머지가
     문이 된다."""
+    if not any(character.isdigit() for character in raw):
+        # **숫자가 한 자도 없는 문자열은 수로 세지 않는다**(cr r4 L-5). 좁히지 않으면
+        # `complex("j")` 가 `1j` 이고 `float.fromhex("abc")` 가 2748.0 이라 알파벳
+        # 문자열이 죄다 리터럴이 된다 — 게이트가 base 36 을 거부한 이유와 같은 자리다.
+        # 대가는 문면에 둔다: `fromhex("abc")` 로 숨긴 수는 이 층이 못 본다. 그 자리는
+        # 정책 값 민감도 test 가 받는다.
+        return None
     for parse in (
         float,
         Decimal,
@@ -94,9 +116,11 @@ def _parsed_number(raw: str) -> object | None:
         float.fromhex,
     ):
         try:
-            return parse(raw)  # type: ignore[operator]
+            parsed = parse(raw)  # type: ignore[operator]
         except (ValueError, ArithmeticError, TypeError):
             continue
+        if _is_finite(parsed):
+            return parsed
     for base in _PARSER_INT_BASES:
         try:
             return int(raw, base)
@@ -127,8 +151,13 @@ def _folded(node: ast.expr) -> object | None:
     이것이 있어야 `float("0.0166x"[:-1])` 같은 자리가 닫힌다(verifier r3 M-5 의
     `G9`). 상수 자체는 수로 읽히지 않지만 **코드가 상수만으로 수를 만든다** — 접어
     보지 않으면 보이지 않는다. 파서 **이름**을 열거해 호출을 찾는 방식은 별칭
-    (`from builtins import float as f`) 하나로 열리므로 쓰지 않는다: 접는 쪽은
-    호출이 무엇이든 상관하지 않는다."""
+    (`from builtins import float as f`) 하나로 열리므로 쓰지 않는다.
+
+    **한계를 문면에 둔다**(cr r4 L-6): 접는 것은 **상수만으로 된 식**뿐이다. 이름·
+    호출이 하나라도 섞이면 포기하므로 `len("xxxxx")` 처럼 완전히 정적인데도 호출을
+    지나는 길은 보지 못한다. 이 층을 형태로 더 넓히지 않는 것이 D-6G-63 의 결정이고,
+    그 자리는 정책 값 민감도 test(`tests/app/test_backtest_policy_sensitivity.py`)가
+    받는다 — 숨긴 수가 **쓰이는 순간** 잡히므로 형태를 묻지 않는다."""
     if isinstance(node, ast.Constant):
         return node.value
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
@@ -209,7 +238,11 @@ def _app_roots() -> list[Path]:
     **파일명을 적지 않는다.** 앞 판은 6G 조립 근 두 개를 이름으로 열거했다 —
     `app/` 에 파일 하나를 더 만드는 것이 게이트를 우회하는 길이었다(cr r3 L-4).
     이제 import 그래프에서 도출하므로, 백테스트를 import 하는 파일은 **만들어지는
-    순간** 대상이 된다."""
+    순간** 대상이 된다.
+
+    **한계**(cr r4 L-6): 그래프는 `app/**` 안에서만 돈다. `app` 파일이 제3 패키지를
+    거쳐 백테스트를 import 하면 뿌리가 되지 않는다. 같은 이유로 이 층은 보조이고,
+    정본은 정책 값 민감도 test 다."""
     app_dir = _ML_ENGINE_SRC / "app"
     if not app_dir.is_dir():
         return []
