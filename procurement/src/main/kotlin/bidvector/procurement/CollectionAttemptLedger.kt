@@ -22,27 +22,30 @@ data class CollectionAttempt(
     val axis: SourceEndpoint,
     val outcome: AttemptOutcome,
     val at: Instant,
-    val httpAttempts: Int,
-    val kind: AttemptKind = AttemptKind.HTTP,
-) {
-    init {
-        require(httpAttempts >= 0) { "HTTP 시도 수는 음수일 수 없다: $httpAttempts" }
-        require(kind == AttemptKind.HTTP || httpAttempts == 0) {
-            "축 결말 줄은 호출이 아니다 — 상한에 계상되지 않는다"
-        }
-    }
-}
+    val kind: AttemptKind,
+)
 
 /**
  * 원장의 두 줄 갈래 — **상한과 이어 돌기는 서로 다른 것을 묻는다.**
  *
- * [HTTP] 는 실제로 나간 호출 하나다(재시도마다 한 줄). 상한이 세는 것은 이것뿐이다.
- * [AXIS] 는 한 축의 조회가 **끝난 방식**이다 — 항목이 0 이었는지(빈 응답)는 봉투를 편 뒤에야
- * 알 수 있어 transport 관문이 답할 수 없다. 이어 돌기가 보는 것은 이것뿐이고, 호출이 아니므로
- * `http_attempts` 는 0 이다(한 파일 안에서 두 셈이 섞이지 않는다).
+ * [PENDING] 은 **나가려는 호출 하나**다(재시도마다 한 줄). 상한이 세는 것은 이것뿐이고, **줄 수를
+ * 센다** — 한 줄이 「몇 회」를 들고 있으면 그 수를 0 으로 적는 길이 생기고 네 라운드 동안 실제로
+ * 그렇게 새어 나갔다. 한 줄 = 한 호출이면 덜 세려면 줄을 지워야 하고, 지운 줄은 무결성 장부가 본다.
+ * [HTTP] 는 그 호출의 **결말**이고 [AXIS] 는 한 축의 조회가 **끝난 방식**이다 — 항목이 0 이었는지는
+ * 봉투를 편 뒤에야 알 수 있어 transport 관문이 답할 수 없다. 이어 돌기가 보는 것은 [AXIS] 뿐이다.
  */
 enum class AttemptKind {
+    /**
+     * **나가려는** 호출 하나(D-6G-61) — 호출 **전에** 적는다. 호출 뒤에 적으면 그 사이에 죽었을 때
+     * 나간 호출이 원장에 없고, 다음 기동의 seed 가 그만큼 덜 세어 **상한이 되감긴다**. 선기록이면
+     * 최악이 「덜 쓴 것으로 세지 않고 더 쓴 것으로 센다」다 — 상한은 그 방향으로 틀려야 한다.
+     */
+    PENDING,
+
+    /** 나간 호출 하나의 결말 — 선기록한 [PENDING] 줄에 이어 붙는다. */
     HTTP,
+
+    /** 한 축의 조회가 끝난 방식 — 이어 돌기가 보는 줄이고 호출이 아니다. */
     AXIS,
 }
 
@@ -73,32 +76,41 @@ class AttemptHistory(
     private val attempts: List<CollectionAttempt>,
 ) {
     /**
-     * 승인 상한에 계상할 몫 — [since] 이후 전부와 [dayStart] 이후 오늘치. 오늘치는 총계의
-     * 부분집합이라 [dayStart] 가 [since] 보다 이르면 같은 창을 두 번 세지 않도록 좁힌다.
+     * 승인 상한에 계상할 몫 — [since] 이후 전부와 [dayStart] 이후 오늘치(총계의 부분집합이라
+     * 좁힌다). **의도 줄([AttemptKind.PENDING])의 개수**다(D-6G-61). 결말 줄까지 세면 한 호출이
+     * 두 번 계상되고, 죽어서 결말이 없는 의도 줄은 세는 것이 맞다 — 그 호출은 실제로 나갔을 수
+     * 있고 상한은 덜 세는 쪽이 아니라 더 세는 쪽으로 틀려야 한다.
      */
     fun spend(
         since: Instant,
         dayStart: Instant,
     ): CallSpend {
-        val counted = attempts.filter { !it.at.isBefore(since) }
-        val total = counted.sumOf { it.httpAttempts }
-        val today = counted.filter { !it.at.isBefore(dayStart) }.sumOf { it.httpAttempts }
-        return CallSpend(total = total, today = minOf(today, total))
+        val counted = attempts.filter { it.kind == AttemptKind.PENDING && !it.at.isBefore(since) }
+        val today = counted.count { !it.at.isBefore(dayStart) }
+        return CallSpend(total = counted.size, today = today)
     }
 
     /**
-     * **다시 부르지 않을** (공고, 축)(D-6G-49) — 끝난 방식이 성공이거나 빈 응답인 것만이다.
+     * (공고, 축)마다 **마지막** 결말이 끝난 것인가(D-6G-58) — 원장에 줄이 하나라도 있으면 **원장이
+     * 이긴다.** 원문 행의 존재는 원장 이전 실행의 흔적에만 쓴다: 잘린 걷기도 행을 남기므로, 행이
+     * 있다고 다 받은 것이 아니다(그 축은 영영 다시 불리지 않고 결측이 조용해진다).
      *
-     * 실패·타임아웃·5xx·쿼터 거절은 **다시 부른다.** 한 번 실패한 축을 영구히 포기하면 그 결측이
-     * 무작위가 아니게 된다 — 느린 응답·과부하 시간대에 몰린 공고만 빠지고, 그 행은 값 결측 제외로
-     * 계수되어 사유 귀속까지 틀린다.
+     * 값이 `false` 인 것(실패·타임아웃·5xx·쿼터 거절·짧은 걷기)은 **다시 부른다.** 한 번 실패한 축을
+     * 영구히 포기하면 그 결측이 무작위가 아니게 된다 — 느린 응답·과부하 시간대에 몰린 공고만 빠지고,
+     * 그 행은 값 결측 제외로 계수되어 사유 귀속까지 틀린다.
      */
-    fun settledAxes(): Map<String, Set<SourceEndpoint>> =
+    fun axisConclusions(): Map<String, Map<SourceEndpoint, Boolean>> =
         attempts
-            .filter { it.kind == AttemptKind.AXIS && it.outcome.isSettled }
-            .mapNotNull { attempt -> attempt.noticeKey?.let { it to attempt.axis } }
+            .filter { it.kind == AttemptKind.AXIS }
+            .mapNotNull { attempt -> attempt.noticeKey?.let { it to attempt } }
             .groupBy({ it.first }, { it.second })
-            .mapValues { (_, axes) -> axes.toSet() }
+            .mapValues { (_, lines) ->
+                lines.groupBy { it.axis }.mapValues { (_, byAxis) -> byAxis.last().outcome.isSettled }
+            }
+
+    /** **다시 부르지 않을** (공고, 축) — [axisConclusions] 중 끝난 것만. 추출이 완료 판정에 쓴다. */
+    fun settledAxes(): Map<String, Set<SourceEndpoint>> =
+        axisConclusions().mapValues { (_, byAxis) -> byAxis.filterValues { it }.keys }
 
     val size: Int get() = attempts.size
 }
@@ -140,11 +152,22 @@ fun truncationCodeOf(cause: TruncationCause): String =
         is TruncationCause.BudgetExhausted -> "BUDGET_EXHAUSTED_${cause.limit}"
     }
 
-/** 시도의 결말 — 절단은 오류, 항목 0 은 빈 응답, 그 밖은 성공. 빈 응답은 오류가 아니다. */
+/**
+ * 시도의 결말 — 절단은 오류, **짧은 걷기**도 오류, 항목 0 은 빈 응답, 그 밖은 성공.
+ *
+ * 짧은 걷기(D-6G-58 ⓒ): 원천이 총수를 말했는데 그만큼 받지 못한 채 끝났다. 빈 페이지나 `NoData` 로
+ * 「곱게」 멈춘 걷기는 절단 사유를 남기지 않아 앞 판에서 **성공으로** 적혔고, 그 축은 다시 불리지
+ * 않았다. 받은 것이 총수보다 적으면 그것이 어떤 모양으로 끝났든 아직 다 받은 것이 아니다.
+ * 빈 응답이 끝난 답인 것은 **원천 총수가 0 일 때뿐**이다.
+ */
 fun attemptOutcomeOf(accounting: CollectionAccounting): AttemptOutcome =
     when {
         accounting.truncationCause != null -> {
             AttemptOutcome.Failed(truncationCodeOf(accounting.truncationCause))
+        }
+
+        accounting.sourceTotal != null && accounting.received < accounting.sourceTotal -> {
+            AttemptOutcome.Failed(SHORT_WALK_CODE)
         }
 
         accounting.received == 0 -> {
@@ -155,3 +178,5 @@ fun attemptOutcomeOf(accounting: CollectionAccounting): AttemptOutcome =
             AttemptOutcome.Succeeded
         }
     }
+
+private const val SHORT_WALK_CODE = "SHORT_WALK"

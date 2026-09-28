@@ -408,9 +408,8 @@ internal fun walkKonepsNoticePages(
         walking = nextWalkState(accumulator, context, pageNo)
         if (walking) pageNo++
     }
-    val accounting = accumulator.toAccounting(counters)
-    // **축의 결말을 여기서 적는다**(D-6G-49) — 모든 소스 호출이 이 자리를 지나므로 기록이 빠질
-    // 수 없다. 항목이 0 이었는지는 봉투를 편 뒤에야 아는 사실이라 transport 관문이 답할 수 없다.
-    gate.settle(callContext, attemptOutcomeOf(accounting))
-    return SourceBatch(accumulator.items, accounting, next = accumulator.nextCursor())
+    // 축의 결말은 **여기서 적지 않는다**(D-6G-58 ⓑ) — 걷기가 끝난 것과 그 행이 적재된 것은 다르고,
+    // 적재 전에 「완료」를 적으면 그 사이에 죽은 실행의 축이 영영 다시 불리지 않는다. 적재하는
+    // 자리(use case)가 적는다.
+    return SourceBatch(accumulator.items, accumulator.toAccounting(counters), next = accumulator.nextCursor())
 }

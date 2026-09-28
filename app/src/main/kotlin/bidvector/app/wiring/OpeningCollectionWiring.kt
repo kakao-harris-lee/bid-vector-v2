@@ -5,10 +5,8 @@ import bidvector.adapters.koneps.KonepsSourceConfig
 import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.koneps.konepsOpeningResultSourceByNoticeDate
 import bidvector.adapters.persistence.JdbcCollectedAxisStore
-import bidvector.adapters.persistence.JdbcCollectionRunLease
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcRawObservationStore
-import bidvector.adapters.persistence.RunLease
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -51,8 +49,6 @@ import java.net.http.HttpClient
 import java.nio.file.Path
 import java.time.LocalDate
 import javax.sql.DataSource
-
-internal const val OPENING_COLLECTION_LOCK_KEY = 6_020_260_927L
 
 /** 조립된 개찰 축 소스 목록 — `List` 빈은 Spring 컬렉션 주입과 섞이므로 한 겹 감싼다. */
 class OpeningCollectionSources(
@@ -102,11 +98,11 @@ open class OpeningCollectionWiring {
     @Bean
     open fun openingCallBudget(
         properties: OpeningCollectionProperties,
+        // **잠금을 먼저 잡고 seed 한다**(vr L-5). 둘의 순서가 뒤집히면 창이 생긴다: 두 실행이 나란히
+        // seed 한 뒤 하나가 끝나고 다른 하나가 잠금을 얻으면, 그 실행은 앞 실행의 호출을 보지 못한 낡은
+        // 값에서 시작한다. 이제 순서는 **의존이 강제한다** — 디렉터리를 여는 것이 곧 잠그는 것이고,
+        // seed 는 그 디렉터리의 원장에서만 나온다(D-6G-57).
         runState: RunStateDirectory,
-        // **잠금을 먼저 잡고 seed 한다**(vr L-5). 둘의 순서가 뒤집히면 창이 생긴다: 두 실행이
-        // 나란히 seed 한 뒤 하나가 끝나고 다른 하나가 잠금을 얻으면, 그 실행은 앞 실행의 호출을
-        // 보지 못한 낡은 값에서 시작한다. 인자로 받아 빈 순서를 강제한다(값은 쓰지 않는다).
-        @Suppress("UNUSED_PARAMETER") lease: RunLease,
         clock: Clock,
     ): CallBudgetLedger =
         seededBudget(runState, properties.callsPerDay, properties.callsTotal, properties.budgetSince, clock)
@@ -186,21 +182,12 @@ open class OpeningCollectionWiring {
         )
     }
 
-    /**
-     * 실행 잠금을 **기동 시점에** 잡는다 — 예산 seed 보다 먼저다(vr L-5). 얻지 못하면 값이
-     * [RunLease.Busy] 이고 러너가 아무것도 부르지 않고 끝낸다(오류가 아니라 정상적인 답이다).
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    open fun openingCollectionRunLease(dataSource: DataSource): RunLease =
-        JdbcCollectionRunLease(dataSource, OPENING_COLLECTION_LOCK_KEY).acquire()
-
     @Bean
     open fun openingCollectionRunner(
         useCase: CollectOpeningResultsUseCase,
         range: CollectionRange,
         sources: OpeningCollectionSources,
-        lease: RunLease,
+        runState: RunStateDirectory,
         termination: CollectionTermination,
     ): OpeningCollectionRunner {
         val logger = LoggerFactory.getLogger(OpeningCollectionRunner::class.java)
@@ -208,7 +195,7 @@ open class OpeningCollectionWiring {
             useCase,
             range,
             sources.all,
-            lease,
+            runState.lock,
             CollectionLog { logger.info(it) },
             termination,
         )

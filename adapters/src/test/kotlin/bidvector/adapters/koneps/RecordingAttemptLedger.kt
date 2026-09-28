@@ -47,5 +47,4 @@ internal fun testCallGate(
             ),
         attempts = ledger,
         now = { now },
-        zone = COLLECTION_BUDGET_ZONE,
     )

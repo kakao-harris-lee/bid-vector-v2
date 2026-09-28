@@ -37,6 +37,11 @@ internal class ScriptedOpeningPort(
     /** 이 축의 응답을 쿼터 소진으로 만든다 — 상세 단계의 멈춤을 재는 자리(K6). */
     var detailTruncation: TruncationCause? = null
 
+    /** 몇 번째 상세 호출부터 절단인가(0-based) — 「앞 축은 받았고 이 축에서 막혔다」를 짓는다. */
+    var detailTruncationFromCall: Int = 0
+
+    private var detailCallCount = 0
+
     override fun fetchOpeningResults(
         referenceDate: CollectionReferenceDate,
         cursor: PageCursor?,
@@ -84,9 +89,11 @@ internal class ScriptedOpeningPort(
         endpoint: SourceEndpoint,
     ): SourceBatch<RawNoticeObservation> {
         val item = observationOf(evidence.noticeId.number.value, endpoint)
+        val truncation = detailTruncation.takeIf { detailCallCount >= detailTruncationFromCall }
+        detailCallCount++
         return SourceBatch(
             listOf(item),
-            sourceAccounting(normalized = 1, truncationCause = detailTruncation),
+            sourceAccounting(normalized = 1, truncationCause = truncation),
             next = null,
         )
     }

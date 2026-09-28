@@ -1,11 +1,11 @@
 package bidvector.app.collection
 
 import bidvector.adapters.persistence.JdbcCollectedAxisStore
-import bidvector.adapters.persistence.RunLease
+import bidvector.adapters.snapshot.RunStateDirectory
+import bidvector.adapters.snapshot.RunStateLock
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
-import bidvector.app.wiring.OPENING_COLLECTION_LOCK_KEY
 import bidvector.app.wiring.RecordingCollectionTermination
 import bidvector.procurement.CollectedAxisStore
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
@@ -227,7 +227,7 @@ class OpeningCollectionE2ETest {
         bootAndRun(emptyMap()) { context ->
             context.getBean(CollectedAxisStore::class.java).shouldBeInstanceOf<JdbcCollectedAxisStore>()
             // 잠금도 출하 조립에서 실제로 잡힌다 — 대역이 서면 동시 실행 차단이 사라진다.
-            context.getBean(RunLease::class.java).shouldBeInstanceOf<RunLease.Acquired>()
+            context.getBean(RunStateDirectory::class.java).lock.shouldBeInstanceOf<RunStateLock.Held>()
         }
     }
 
@@ -296,22 +296,23 @@ class OpeningCollectionE2ETest {
     }
 
     /**
-     * D-6G-42 M-3 — 겹쳐 도는 두 실행은 같은 표본을 두 번 부르고 두 상한 회계가 서로의 호출을 보지
-     * 못한다. 잠금을 **밖에서 들고** 기동해, 출하 조립이 실제로 아무것도 부르지 않고 끝나는지 잰다.
+     * D-6G-42 M-3 · D-6G-57 — 겹쳐 도는 두 실행은 같은 표본을 두 번 부르고 두 상한 회계가 서로의
+     * 호출을 보지 못한다. 잠금은 **실행 상태 디렉터리**에 걸린다(갈래별 DB advisory lock 은 범위가
+     * 달라 같은 것을 지키지 못했다 — vr r4 H-2). 잠금을 밖에서 들고 기동해, 출하 조립이 실제로
+     * 아무것도 부르지 않고 끝나는지 **mock 이 받은 요청 수**로 잰다.
      */
     @Test
     fun `이미 도는 실행이 있으면 아무것도 부르지 않고 끝난다`() {
-        dataSource.connection.use { held ->
-            held.prepareStatement("SELECT pg_advisory_lock(?)").use { statement ->
-                statement.setLong(1, OPENING_COLLECTION_LOCK_KEY)
-                statement.executeQuery().use { it.next() }
-            }
-
-            val (exitCodes, mock) = bootAndRun(emptyMap())
+        runStateDir = Files.createTempDirectory("6g-e2e-run-state")
+        val held = RunStateLock.tryAcquire(runStateDir)
+        try {
+            val (exitCodes, mock) = bootAndRun(emptyMap(), reuseRunState = true)
 
             exitCodes shouldContainExactly listOf(CollectionExitCode.ALREADY_RUNNING.value)
-            mock.listCalls.shouldBeEmpty()
+            mock.requestCount() shouldBe 0
             logs.list.joinToString("\n") { it.formattedMessage } shouldContain "ALREADY_RUNNING"
+        } finally {
+            held.release()
         }
     }
 

@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 개찰 축 KONEPS mock(M6/6G E2E) — loopback in-process(네트워크 0). 경로의 마지막 조각이 오퍼레이션
@@ -58,7 +59,16 @@ internal class MockOpeningKonepsHttp(
         server.stop(0)
     }
 
+    /**
+     * **이 서버가 실제로 받은 요청 수**(D-6G-56) — 429·5xx·본문을 끝까지 읽지 않은 것까지 전부다.
+     * 원장이 세는 것을 원장의 합으로 재면 덜 센 것을 볼 수 없다. 기준은 원장 **밖**에 있어야 한다.
+     */
+    fun requestCount(): Int = received.get()
+
+    private val received = AtomicInteger()
+
     private fun respond(exchange: HttpExchange) {
+        received.incrementAndGet()
         val query = exchange.requestURI.rawQuery.orEmpty()
         val operation = exchange.requestURI.path.substringAfterLast('/')
         if (operation in throttleOnce && throttled.addIfAbsent(operation)) {

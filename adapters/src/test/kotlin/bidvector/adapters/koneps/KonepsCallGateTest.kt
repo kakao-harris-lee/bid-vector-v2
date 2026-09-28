@@ -27,14 +27,18 @@ private val UNREACHABLE: URI = URI.create("http://127.0.0.1:1/mock/getOpengResul
  */
 class KonepsCallGateTest {
     @Test
-    fun `호출마다 한 줄이 남는다 — 재시도도 각자 한 줄이다`() {
+    fun `호출마다 의도 한 줄과 결말 한 줄 — 재시도도 각자 한 벌이다`() {
         val ledger = RecordingAttemptLedger()
         val gate = testCallGate(ledger = ledger)
 
         repeat(3) { gate.send(LIST_CALL, UNREACHABLE, TIMEOUT) }
 
-        ledger.appended shouldHaveSizeOf 3
-        ledger.appended.all { it.kind == AttemptKind.HTTP && it.httpAttempts == 1 } shouldBe true
+        ledger.appended shouldHaveSizeOf 6
+        // 의도 줄은 호출 **전에** 적힌다 — 그 사이에 죽어도 다음 기동의 상한이 되감기지 않는다.
+        ledger.appended.filterIndexed { index, _ -> index % 2 == 0 }.all { it.kind == AttemptKind.PENDING } shouldBe
+            true
+        ledger.appended.filterIndexed { index, _ -> index % 2 == 1 }.all { it.kind == AttemptKind.HTTP } shouldBe true
+        ledger.read().spend(Instant.EPOCH, Instant.EPOCH).total shouldBe 3
     }
 
     @Test
@@ -73,22 +77,6 @@ class KonepsCallGateTest {
             )
 
         gate.send(LIST_CALL, UNREACHABLE, TIMEOUT).shouldBeInstanceOf<KonepsGateOutcome.Sent>()
-    }
-
-    @Test
-    fun `축의 결말은 호출이 아니다 — 상한에 계상되지 않는다`() {
-        val ledger = RecordingAttemptLedger()
-        val gate = testCallGate(ledger = ledger)
-
-        gate.settle(LIST_CALL, bidvector.procurement.AttemptOutcome.Empty)
-
-        ledger.appended.single().kind shouldBe AttemptKind.AXIS
-        ledger.read().spend(Instant.EPOCH, Instant.EPOCH).total shouldBe 0
-        ledger
-            .read()
-            .settledAxes()
-            .keys
-            .shouldBeEmpty()
     }
 }
 

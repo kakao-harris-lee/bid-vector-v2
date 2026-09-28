@@ -5,6 +5,7 @@ import bidvector.procurement.AttemptLedger
 import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BudgetLimit
 import bidvector.procurement.BudgetOutcome
+import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.CallBudgetLedger
 import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.SourceEndpoint
@@ -13,7 +14,6 @@ import java.net.http.HttpClient
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 
 /**
  * 한 소스 호출이 무엇을 부르는지 — 원장 줄에 실린다. 목록 축은 공고 단위가 아니라 [noticeKey] 가
@@ -52,14 +52,13 @@ class KonepsCallGate(
     private val attempts: AttemptLedger,
     /** 시각의 출처 — 함수 하나다. 시계 타입을 받으면 어느 모듈의 시계인지가 경계 문제가 된다. */
     private val now: () -> Instant,
-    private val zone: ZoneId,
 ) {
     internal fun send(
         context: KonepsCallContext,
         uri: URI,
         timeout: Duration,
     ): KonepsGateOutcome {
-        val today = LocalDate.ofInstant(now(), zone)
+        val today = LocalDate.ofInstant(now(), COLLECTION_BUDGET_ZONE)
         return when (val permit = budget.consume(today, 1)) {
             is BudgetOutcome.Exhausted -> KonepsGateOutcome.Denied(permit.limit)
             BudgetOutcome.Allowed -> KonepsGateOutcome.Sent(sendAndRecord(context, uri, timeout))
@@ -67,44 +66,32 @@ class KonepsCallGate(
     }
 
     /**
-     * 축의 조회가 **끝난 방식**을 적는다 — 이어 돌기가 보는 줄이다(D-6G-49). 항목이 0 이었는지는
-     * 봉투를 편 뒤에야 알 수 있어 이 관문이 답할 수 없으므로, 소스 호출이 끝난 자리에서 부른다.
-     * 호출이 아니므로 상한에 계상되지 않는다.
+     * **선기록**(D-6G-61) — 호출 전에 의도를 적고 호출 뒤에 결말을 붙인다. 호출 뒤에만 적으면 그
+     * 사이에 죽었을 때 나간 호출이 원장에 없어 다음 기동의 상한이 되감긴다.
      */
-    internal fun settle(
-        context: KonepsCallContext,
-        outcome: AttemptOutcome,
-    ) {
-        attempts.append(
-            CollectionAttempt(
-                noticeKey = context.noticeKey,
-                axis = context.axis,
-                outcome = outcome,
-                at = now(),
-                httpAttempts = 0,
-                kind = AttemptKind.AXIS,
-            ),
-        )
-    }
-
     private fun sendAndRecord(
         context: KonepsCallContext,
         uri: URI,
         timeout: Duration,
     ): KonepsTransportOutcome {
+        attempts.append(lineOf(context, AttemptOutcome.Succeeded, AttemptKind.PENDING))
         val transport = sendKonepsRequest(httpClient, uri, timeout)
-        attempts.append(
-            CollectionAttempt(
-                noticeKey = context.noticeKey,
-                axis = context.axis,
-                outcome = transportOutcomeOf(transport),
-                at = now(),
-                httpAttempts = 1,
-                kind = AttemptKind.HTTP,
-            ),
-        )
+        attempts.append(lineOf(context, transportOutcomeOf(transport), AttemptKind.HTTP))
         return transport
     }
+
+    private fun lineOf(
+        context: KonepsCallContext,
+        outcome: AttemptOutcome,
+        kind: AttemptKind,
+    ): CollectionAttempt =
+        CollectionAttempt(
+            noticeKey = context.noticeKey,
+            axis = context.axis,
+            outcome = outcome,
+            at = now(),
+            kind = kind,
+        )
 }
 
 /**

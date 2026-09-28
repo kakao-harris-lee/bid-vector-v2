@@ -1,11 +1,14 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.AttemptKind
 import bidvector.procurement.AttemptLedger
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BudgetLimit
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.CollectedAxisStore
 import bidvector.procurement.CollectionAccounting
+import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
 import bidvector.procurement.CollectionRunStore
@@ -19,10 +22,12 @@ import bidvector.procurement.RawObservationStore
 import bidvector.procurement.SourceBatch
 import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
+import bidvector.procurement.attemptOutcomeOf
 import bidvector.procurement.decideDetailFetch
 import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -218,10 +223,13 @@ class CollectOpeningResultsUseCase(
     }
 
     /**
-     * 한 공고의 상세 축 전부 — **통째로 허가되거나 통째로 거부된다**(D-6G-29 ④). 남은 몫만큼 반만
-     * 부르면 그 공고는 결측이 랜덤이 아니라 예산 경계에 걸려 생기고, 표본이 비뚤어진다.
+     * 한 공고의 상세 축 전부 — **끝나지 않은 축은 다음 실행이 받는다**(D-6G-29 ④ 개정, D-6G-59).
+     * 앞 문면은 「공고는 통째로 허가·거부」였다: 반만 받은 공고를 남기지 않으려는 것이었지만, 상한이
+     * 어디서 끝나든 반쪽 공고는 생기고(마지막 공고의 마지막 축), 통째 거부는 그것을 **감추기만** 했다.
+     * 지금은 반쪽을 값으로 관측하고, 총 상한으로 끝내 못 받은 공고는 `incomplete_axis` 로 제외·계수한다
+     * — 비랜덤 결측을 막는 취지는 같고, 조용한 결측이 0 이 된다.
      *
-     * 이미 받은 축은 **예산에서도 빼고 부르지도 않는다**(③ 이어 돌기) — 멈췄다 다시 돌 때 같은 호출을
+     * 이미 끝난 축은 **예산에서도 빼고 부르지도 않는다**(③ 이어 돌기) — 멈췄다 다시 돌 때 같은 호출을
      * 두 번 쓰지 않는다. 남은 축이 없으면 예산을 한 번도 묻지 않는다.
      */
     private fun fetchDetails(
@@ -231,37 +239,32 @@ class CollectOpeningResultsUseCase(
         // 상한 판정은 **관문**이 한다(D-6G-47) — 여기서 걸음 단위로 미리 세면 셈의 출처가 둘이
         // 되고, 걸음 단위 근사(받은 페이지)와 관문의 시도 수가 갈린다. 거부는 절단 사유로 온다.
         val remaining = detailAxesFor(picked.source.division).filterNot { it in alreadyDone }
-        return runAxes(picked, remaining)
+        return runAxes(picked, remaining, settledBefore = alreadyDone.isNotEmpty())
     }
 
     private fun runAxes(
         picked: Candidate,
         axes: List<DetailAxis>,
+        settledBefore: Boolean,
     ): DetailStep {
         var calls = 0
-        var halt: OpeningCollectionHalt? = null
+        var settledAny = settledBefore
         var index = 0
-        while (halt == null && index < axes.size) {
-            val batch = axes[index].fetch(picked.source.port, fetchEvidence(picked.id))
+        while (index < axes.size) {
+            val axis = axes[index]
+            val batch = axis.fetch(picked.source.port, fetchEvidence(picked.id))
             calls++
             batch.items.forEach(rawObservations::append)
-            recordDetailRun(batch, axes[index])
-            val cause = batch.accounting.truncationCause
-            if (cause is TruncationCause.BudgetExhausted) {
-                halt = OpeningCollectionHalt(cause.limit, null, notAttempted = 0)
-            } else if (cause == TruncationCause.QuotaExhausted) {
-                halt =
-                    OpeningCollectionHalt(
-                        null,
-                        TruncationCause.QuotaExhausted,
-                        notAttempted = 0,
-                        // 마지막 축이 아니면 이 공고는 반쪽이다 — 남은 축이 적재되지 않았다.
-                        partialNotice = index < axes.size - 1,
-                    )
-            }
+            // **적재 뒤에** 축의 결말을 적는다(D-6G-58 ⓑ). 적재 전에 적으면 적재가 실패하거나 그
+            // 사이에 죽었을 때 다음 실행이 그 축을 「완료」로 읽고 영영 다시 부르지 않는다.
+            val outcome = attemptOutcomeOf(batch.accounting)
+            attempts.append(axisConclusion(picked, axis, outcome, clock.now()))
+            recordDetailRun(batch, axis)
+            if (outcome.isSettled) settledAny = true
+            haltOf(batch.accounting.truncationCause, settledAny)?.let { return DetailStep.Halted(it, calls) }
             index++
         }
-        return halt?.let { DetailStep.Halted(it, calls) } ?: DetailStep.Done(calls)
+        return DetailStep.Done(calls)
     }
 
     /** 상세 호출도 회계 원장에 남긴다 — 그래야 다음 실행의 예산 seed 가 이 호출들을 본다(D-6G-29 ①). */
@@ -277,8 +280,9 @@ class CollectOpeningResultsUseCase(
     }
 
     /**
-     * 이어 돌기의 입력(D-6G-29 ③ · D-6G-45) — **시도 원장 ∪ 원문 관측**이다. 원문만 보면 빈 응답이
-     * 영원히 다시 불리고, 시도 원장만 보면 원장 없이 적재된 앞 실행의 원문을 못 본다.
+     * 이어 돌기의 입력(D-6G-58) — (공고, 축)에 원장 줄이 하나라도 있으면 **원장이 이긴다.** 원문 행의
+     * 존재는 **원장 이전** 실행의 흔적에만 쓴다: 잘린 걷기도 행을 남기므로 「행이 있다 = 다 받았다」가
+     * 아니고, 그렇게 읽으면 그 축은 영영 다시 불리지 않아 결측이 조용해진다.
      */
     private fun alreadyCollectedAxes(ids: List<NoticeId>): Map<NoticeId, Set<DetailAxis>> {
         val out = mutableMapOf<NoticeId, MutableSet<DetailAxis>>()
@@ -288,11 +292,15 @@ class CollectOpeningResultsUseCase(
             }
         }
         // 실행마다 한 번 읽는다 — 한 프로세스가 두 번 돌면 앞 실행의 시도도 보여야 한다.
-        val attempted = attempts.read().settledAxes()
+        val conclusions = attempts.read().axisConclusions()
         ids.forEach { id ->
-            val tried = attempted[NoticeKeyHash.of(id.number.value, id.round.value).value].orEmpty()
-            DetailAxis.entries.filter { it.endpoint in tried }.forEach { axis ->
-                out.getOrPut(id) { mutableSetOf() }.add(axis)
+            val known = conclusions[NoticeKeyHash.of(id.number.value, id.round.value).value].orEmpty()
+            DetailAxis.entries.forEach { axis ->
+                when (known[axis.endpoint]) {
+                    true -> out.getOrPut(id) { mutableSetOf() }.add(axis)
+                    false -> out[id]?.remove(axis)
+                    null -> Unit
+                }
             }
         }
         return out
@@ -316,6 +324,44 @@ class CollectOpeningResultsUseCase(
      */
     private fun executionDay(): LocalDate = LocalDate.ofInstant(clock.now(), COLLECTION_BUDGET_ZONE)
 }
+
+/**
+ * 멈춤의 관측(D-6G-59) — `partialNotice` 는 추측이 아니라 **본 것**이다: 이 공고의 축 중 하나라도
+ * 끝났는가. 멈춘 축 자신은 끝나지 않았으므로 남은 축은 언제나 하나 이상이고, 앞 실행이 끝낸 축도
+ * 「하나라도 끝났다」에 든다. 예산 거부와 쿼터 거절이 같은 물음에 같은 답을 쓴다.
+ */
+private fun haltOf(
+    cause: TruncationCause?,
+    settledAny: Boolean,
+): OpeningCollectionHalt? =
+    when (cause) {
+        is TruncationCause.BudgetExhausted -> {
+            OpeningCollectionHalt(cause.limit, null, notAttempted = 0, partialNotice = settledAny)
+        }
+
+        TruncationCause.QuotaExhausted -> {
+            OpeningCollectionHalt(null, TruncationCause.QuotaExhausted, notAttempted = 0, partialNotice = settledAny)
+        }
+
+        else -> {
+            null
+        }
+    }
+
+/** 축의 결말 한 줄 — 이어 돌기가 보는 유일한 줄이다(D-6G-58). */
+private fun axisConclusion(
+    picked: Candidate,
+    axis: DetailAxis,
+    outcome: AttemptOutcome,
+    at: Instant,
+): CollectionAttempt =
+    CollectionAttempt(
+        noticeKey = NoticeKeyHash.of(picked.id.number.value, picked.id.round.value).value,
+        axis = axis.endpoint,
+        outcome = outcome,
+        at = at,
+        kind = AttemptKind.AXIS,
+    )
 
 private sealed interface DetailStep {
     data class Done(

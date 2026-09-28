@@ -33,7 +33,7 @@ private fun sample() =
     )
 
 private fun httpAttempt() =
-    CollectionAttempt(KEY.value, SourceEndpoint.RESERVE_PRICE_DETAIL, AttemptOutcome.Succeeded, AT, 1)
+    CollectionAttempt(KEY.value, SourceEndpoint.RESERVE_PRICE_DETAIL, AttemptOutcome.Succeeded, AT, AttemptKind.PENDING)
 
 /**
  * D-6G-45 — 실행 상태는 저장소 밖 디렉터리 하나다. 이 test 가 재는 것은 **거부**다: 디렉터리가
@@ -161,9 +161,8 @@ class FileAttemptLedgerTest {
     private fun attemptOf(
         outcome: AttemptOutcome,
         key: String? = KEY.value,
-        httpAttempts: Int = 1,
-        kind: AttemptKind = AttemptKind.HTTP,
-    ) = CollectionAttempt(key, SourceEndpoint.RESERVE_PRICE_DETAIL, outcome, AT, httpAttempts, kind)
+        kind: AttemptKind = AttemptKind.PENDING,
+    ) = CollectionAttempt(key, SourceEndpoint.RESERVE_PRICE_DETAIL, outcome, AT, kind)
 
     @Test
     fun `원장이 없으면 빈 이력이다 — 첫 실행이다`() {
@@ -175,10 +174,10 @@ class FileAttemptLedgerTest {
         val ledger = ledger()
         val written =
             listOf(
-                attemptOf(AttemptOutcome.Succeeded, httpAttempts = 3),
-                attemptOf(AttemptOutcome.Failed("TIMEOUT")),
-                attemptOf(AttemptOutcome.Succeeded, key = null, httpAttempts = 2),
-                attemptOf(AttemptOutcome.Empty, httpAttempts = 0, kind = AttemptKind.AXIS),
+                attemptOf(AttemptOutcome.Succeeded),
+                attemptOf(AttemptOutcome.Failed("TIMEOUT"), kind = AttemptKind.HTTP),
+                attemptOf(AttemptOutcome.Succeeded, key = null),
+                attemptOf(AttemptOutcome.Empty, kind = AttemptKind.AXIS),
             )
 
         written.forEach(ledger::append)
@@ -187,7 +186,7 @@ class FileAttemptLedgerTest {
         history.size shouldBe written.size
         // 축 결말 줄만 이어 돌기에 든다. HTTP 줄은 상한만 센다(둘이 한 파일에 있어도 섞이지 않는다).
         history.settledAxes().getValue(KEY.value) shouldContainExactly listOf(SourceEndpoint.RESERVE_PRICE_DETAIL)
-        history.spend(Instant.parse("2026-09-20T00:00:00Z"), AT).total shouldBe 6
+        history.spend(Instant.parse("2026-09-20T00:00:00Z"), AT).total shouldBe 2
     }
 
     /** 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고, 그것은 상한이 없는 것보다 나쁘다. */

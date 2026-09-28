@@ -1,7 +1,11 @@
 package bidvector.workflow.collection
 
+import bidvector.procurement.AttemptKind
+import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BudgetLimit
 import bidvector.procurement.BusinessDivision
+import bidvector.procurement.CollectionAttempt
+import bidvector.procurement.SourceEndpoint
 import bidvector.procurement.TruncationCause
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -166,8 +170,13 @@ class CollectOpeningResultsUseCaseTest {
         fixture.sampleList.confirmCount shouldBe 0
     }
 
+    /**
+     * D-6G-59 — `partialNotice` 는 **관측**이다: 이 공고의 축 중 하나라도 끝났는가. 앞 판은 「멈춘
+     * 축이 마지막이 아니면 반쪽」이라고 **추측**했고, 그래서 첫 축에서 막혀 아무것도 적재되지 않은
+     * 공고도 반쪽으로 세어 「손대지 않은」 수가 하나 모자랐다.
+     */
     @Test
-    fun `K6 — 상세 단계의 쿼터 소진도 실행을 멈춘다`() {
+    fun `K6 — 첫 축에서 쿼터를 물면 그 공고는 반쪽이 아니다`() {
         val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
         fixture.service.detailTruncation = TruncationCause.QuotaExhausted
@@ -177,15 +186,30 @@ class CollectOpeningResultsUseCaseTest {
         // 첫 상세 호출이 쿼터를 물면 거기서 멈춘다 — 남은 표본을 계속 부르면 거부만 쌓인다.
         val halt = requireNotNull(report.halted)
         halt.truncationCause shouldBe TruncationCause.QuotaExhausted
-        // **첫 공고는 반쪽이다**(축 셋 중 하나만 적재됐다) — 「손대지 않은」 수에 넣으면 거짓이다.
-        halt.partialNotice shouldBe true
-        halt.notAttempted shouldBe 1
+        halt.partialNotice shouldBe false
+        halt.notAttempted shouldBe 2
         report.detailCalls shouldBe 1
     }
 
-    /** 상한 거부는 첫 축에서 온다 — 그 공고는 축 하나도 적재되지 않아 반쪽이 아니다. */
+    /** 앞 축을 받고 둘째 축에서 막히면 그 공고는 실제로 반쪽이다 — 「손대지 않은」 수에서 뺀다. */
     @Test
-    fun `K6 — 상한이 물면 그 공고는 반쪽이 아니다`() {
+    fun `K6 — 둘째 축에서 쿼터를 물면 그 공고는 반쪽이다`() {
+        val fixture = OpeningFixture(sampleSize = 2)
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
+        fixture.service.detailTruncation = TruncationCause.QuotaExhausted
+        fixture.service.detailTruncationFromCall = 1
+
+        val report = fixture.run()
+
+        val halt = requireNotNull(report.halted)
+        halt.partialNotice shouldBe true
+        halt.notAttempted shouldBe 1
+        report.detailCalls shouldBe 2
+    }
+
+    /** 상한 거부가 첫 축에서 오면 그 공고는 축 하나도 적재되지 않아 반쪽이 아니다. */
+    @Test
+    fun `K6 — 상한이 첫 축에서 물면 그 공고는 반쪽이 아니다`() {
         val fixture = OpeningFixture(sampleSize = 2)
         fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
         fixture.service.detailTruncation = TruncationCause.BudgetExhausted(BudgetLimit.TOTAL)
@@ -195,6 +219,42 @@ class CollectOpeningResultsUseCaseTest {
         halt.budgetLimit shouldBe BudgetLimit.TOTAL
         halt.partialNotice shouldBe false
         halt.notAttempted shouldBe 2
+    }
+
+    /**
+     * D-6G-58 — 축의 결말은 원장이 정한다. 짧게 걸었거나 실패한 축은 **원문 행이 있어도** 다시
+     * 부른다. 앞 판은 raw 존재를 보고 완료로 읽어, 잘린 1쪽만 남은 축이 영영 다시 불리지 않았다.
+     */
+    @Test
+    fun `원문이 있어도 원장이 미완이라고 하면 다시 부른다`() {
+        val axis = SourceEndpoint.RESERVE_PRICE_DETAIL
+        val fixture =
+            OpeningFixture(
+                sampleSize = 1,
+                collectedAxes = FakeCollectedAxisStore(setOf(axis)),
+                attemptSeed = syntheticServiceKeys().map { shortWalkOn(it, axis) },
+            )
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+
+        fixture.run()
+
+        fixture.service.reservePriceCalls.size shouldBe 1
+    }
+
+    /** 반대 방향 — 원장이 「끝났다」고 하면 원문이 없어도 부르지 않는다(빈 응답이 영원히 불리지 않게). */
+    @Test
+    fun `원문이 없어도 원장이 끝났다고 하면 부르지 않는다`() {
+        val axis = SourceEndpoint.RESERVE_PRICE_DETAIL
+        val fixture =
+            OpeningFixture(
+                sampleSize = 1,
+                attemptSeed = syntheticServiceKeys().map { settledOn(it, axis) },
+            )
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 3)
+
+        fixture.run()
+
+        fixture.service.reservePriceCalls.shouldBeEmpty()
     }
 
     /**
@@ -224,3 +284,17 @@ class CollectOpeningResultsUseCaseTest {
         fixture.raw.appended.size shouldBe 8
     }
 }
+
+/** 합성 목록이 내는 공고 키 해시 — 이어 돌기 원장을 그 공고들에 대고 심는다. */
+private fun syntheticServiceKeys(): List<String> =
+    (1..3).map { NoticeKeyHash.of("SYN-6G-SERVICE-2026-06-03-%04d".format(it), "000").value }
+
+private fun shortWalkOn(
+    key: String,
+    axis: SourceEndpoint,
+) = CollectionAttempt(key, axis, AttemptOutcome.Failed("SHORT_WALK"), COLLECTION_NOW, AttemptKind.AXIS)
+
+private fun settledOn(
+    key: String,
+    axis: SourceEndpoint,
+) = CollectionAttempt(key, axis, AttemptOutcome.Succeeded, COLLECTION_NOW, AttemptKind.AXIS)

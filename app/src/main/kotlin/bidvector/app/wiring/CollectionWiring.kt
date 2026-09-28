@@ -132,10 +132,18 @@ open class CollectionWiring {
         useCase: CollectNoticesUseCase,
         range: CollectionRange,
         sources: CollectionSources,
+        runState: RunStateDirectory,
         termination: CollectionTermination,
     ): CollectionRunner {
         val logger = LoggerFactory.getLogger(CollectionRunner::class.java)
-        return CollectionRunner(useCase, range, sources.all, CollectionLog { logger.info(it) }, termination)
+        return CollectionRunner(
+            useCase,
+            range,
+            sources.all,
+            runState.lock,
+            CollectionLog { logger.info(it) },
+            termination,
+        )
     }
 
     private fun sourceFor(

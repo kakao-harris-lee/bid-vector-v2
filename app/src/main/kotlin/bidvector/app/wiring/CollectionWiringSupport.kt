@@ -102,7 +102,6 @@ internal fun konepsTransportFor(
                 budget = budget,
                 attempts = runState.attempts,
                 now = clock::now,
-                zone = COLLECTION_BUDGET_ZONE,
             ),
     )
 }

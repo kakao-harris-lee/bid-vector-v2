@@ -1,6 +1,6 @@
 package bidvector.app.collection
 
-import bidvector.adapters.persistence.RunLease
+import bidvector.adapters.snapshot.RunStateLock
 import bidvector.workflow.collection.CollectOpeningResultsUseCase
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.OpeningCollectionReport
@@ -17,32 +17,18 @@ class OpeningCollectionRunner(
     private val useCase: CollectOpeningResultsUseCase,
     private val range: CollectionRange,
     private val sources: List<OpeningCollectionSource>,
-    private val lease: RunLease,
+    private val lock: RunStateLock,
     private val log: CollectionLog,
     private val termination: CollectionTermination,
 ) : ApplicationRunner {
     /**
-     * **한 번에 한 실행만**(D-6G-42 M-3). 겹쳐 돌면 같은 표본을 두 번 부르고 두 상한 회계가 서로의
-     * 호출을 못 봐 승인 상한이 사실상 두 배가 된다 — 호출이 나간 뒤에 아는 사고다.
+     * **한 번에 한 실행만**(D-6G-42 M-3 · D-6G-57). 겹쳐 돌면 같은 표본을 두 번 부르고 두 상한 회계가
+     * 서로의 호출을 못 봐 승인 상한이 사실상 두 배가 된다 — 호출이 나간 뒤에 아는 사고다.
      */
-    override fun run(args: ApplicationArguments) {
-        when (val held = lease) {
-            is RunLease.Busy -> {
-                log.write("opening-collection skipped reason=ALREADY_RUNNING")
-                termination.terminate(CollectionExitCode.ALREADY_RUNNING.value)
-            }
+    override fun run(args: ApplicationArguments) =
+        underRunStateLock(lock, "opening-collection", log, termination) { collectUnderLock() }
 
-            is RunLease.Acquired -> {
-                try {
-                    collectUnderLease()
-                } finally {
-                    held.release()
-                }
-            }
-        }
-    }
-
-    private fun collectUnderLease() {
+    private fun collectUnderLock() {
         log.write(openingStartLine(range, sources))
         val report = collectOrFail()
         report.halted?.let { log.write(openingHaltLine(it)) }

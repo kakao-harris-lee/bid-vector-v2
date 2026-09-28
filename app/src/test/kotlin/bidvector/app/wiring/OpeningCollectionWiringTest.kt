@@ -1,9 +1,9 @@
 package bidvector.app.wiring
 
-import bidvector.adapters.persistence.RunLease
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.OpeningCollectionRunner
 import bidvector.app.collection.SnapshotExtractionRunner
+import bidvector.procurement.AttemptKind
 import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.CallBudgetLedger
 import bidvector.procurement.CollectedAxisStore
@@ -75,10 +75,6 @@ class OpeningCollectionWiringTest {
         TestPropertyValues.of(*properties).applyTo(context)
         // DB 없이 기동 **조건**만 잰다 — 저장소 둘을 대체 빈으로 먼저 세운다(출하에서는 JDBC 구현).
         context.registerBean(CollectedAxisStore::class.java, Supplier { StubAxisStore })
-        // 잠금은 기동 시점에 DB 를 잡는다(vr L-5 — seed 보다 먼저여야 한다). 이 test 는 DB 없이
-        // 기동 **조건**만 재므로 대역을 먼저 세운다. 출하에서 이 자리를 덮는 빈이 없다는 것은
-        // 실 DB 로 뜬 조립이 잰다(E2E).
-        context.registerBean(RunLease::class.java, Supplier { RunLease.Busy })
         context.register(OpeningCollectionWiring::class.java)
         context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
@@ -93,18 +89,22 @@ class OpeningCollectionWiringTest {
      * 쓰면 무결성 장부와 어긋나 기동이 거부되고(D-6G-48), 그 거부는 이 test 가 재려는 것이 아니다.
      */
     private fun seedAttempts(vararg lines: Pair<String, Int>) {
-        val ledger = RunStateDirectory(WIRING_RUN_STATE).attempts
-        lines.forEach { (at, attempts) ->
-            ledger.append(
-                CollectionAttempt(
-                    noticeKey = null,
-                    axis = SourceEndpoint.OPENING_RESULT_LIST,
-                    outcome = AttemptOutcome.Succeeded,
-                    at = Instant.parse(at),
-                    httpAttempts = attempts,
-                ),
-            )
+        val runState = RunStateDirectory(WIRING_RUN_STATE)
+        lines.forEach { (at, calls) ->
+            repeat(calls) {
+                runState.attempts.append(
+                    CollectionAttempt(
+                        noticeKey = null,
+                        axis = SourceEndpoint.OPENING_RESULT_LIST,
+                        outcome = AttemptOutcome.Succeeded,
+                        at = Instant.parse(at),
+                        kind = AttemptKind.PENDING,
+                    ),
+                )
+            }
         }
+        // 잠금을 놓는다 — 놓지 않으면 뒤이은 기동이 스스로를 「이미 도는 실행」으로 본다.
+        runState.close()
     }
 
     /** 승인 설정에서 한 항목만 바꿔 넣는다 — 하나만 넘기면 나머지가 없어 조건 자체가 서지 않는다. */
