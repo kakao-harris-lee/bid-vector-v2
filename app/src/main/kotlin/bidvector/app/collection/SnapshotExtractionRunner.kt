@@ -97,7 +97,7 @@ class SnapshotExtractionRunner(
     }
 }
 
-/** 계수는 셋 다 **측정값**이다 — 항등식은 [SnapshotCounts] 가 생성 시점에 검사한다(스키마 §2). */
+/** 계수 넷은 모두 **측정값**이다 — 항등식 자체는 구성상 참이라 [SnapshotCounts] 에서 표기로 선다. */
 private fun countsOf(
     sample: ConfirmedSampleList,
     extraction: SnapshotExtraction,

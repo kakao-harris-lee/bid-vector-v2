@@ -210,9 +210,13 @@ private const val OBSERVATION_FETCH_SIZE = 500
 internal const val RESERVE_PRICE_SLOTS = 15
 
 /**
- * 추출 결과 — 행과 계수 셋. **닫힌 항등식**(스키마 §2)이 성립한다:
- * `표본 크기 == rows.size + sampledWithoutDetail + skippedWithoutNotice`. 표본 하나하나가 행이
- * 되었거나 되지 못한 사유로 계수된다 — 어느 쪽도 아닌 공고는 없다.
+ * 추출 결과 — 행과 계수 넷. **닫힌 항등식**(스키마 §2)이 성립한다:
+ * `표본 크기 == rows.size + sampledWithoutDetail + skippedWithoutNotice + incompleteAxis`. 표본
+ * 하나하나가 행이 되었거나 되지 못한 사유로 계수된다 — 어느 쪽도 아닌 공고는 없다.
+ *
+ * 이 항등식은 여기서 **구성상 참**이다(`sampledWithoutDetail` 이 나머지 셋의 차집합으로 나온다) —
+ * 그래서 이 자리의 검사는 방어가 아니라 **표기**다. 실제로 깨질 수 있는 대조는 판독 쪽(표본 파일의
+ * 키 수 ↔ manifest 계수)이고, 여기서 잡히는 것은 계수 하나를 상수로 바꾸는 변이뿐이다.
  *
  * [observedOutsideSample] 은 항등식 밖이다. 표본이 아닌 공고의 관측 수이므로 정상 값이 크다(표본틀
  * 전체가 여기 든다). 0 이 아닌 것이 문제가 아니라, 표본 쪽 계수가 전부 0 인데 이 값만 큰 것이
