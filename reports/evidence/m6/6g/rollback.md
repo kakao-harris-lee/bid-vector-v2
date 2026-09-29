@@ -125,26 +125,37 @@ evaluation 등 다른 adapters 패키지에는 있다). 그래서 이 두 패키
 > `ml-engine/policy/**` ↔ `adapters/**`·`app/**`·`workflow/**`·`procurement/**`). 앞 문면은 「겹치지
 > 않는다」고 적어 같은 문서의 아래 절과 모순이었다(vr r4 L-9).
 
-## 되돌리는 경로 (기계 산출 — `git diff --name-status <base>..HEAD -- ml-engine`)
+## 되돌리는 경로 (기계 산출 — `git diff --name-status a8adf8f5..HEAD -- <아래 경로들>`)
 
-추가 **44** · 수정 4(r5 에서 test 파일 둘이 늘었다). 수정 넷만 적는다(추가는 되돌리면 사라진다):
+**복원 출처가 `a8adf8f5` 다**(D-6G-67 — r5 판정 전에 새 main 을 합쳤다). `678c6ed7` 로 되돌리면
+main 의 주석 이력 정리까지 함께 사라진다 — 이 slice 가 되돌릴 것은 **이 slice 가 더한 것**뿐이다.
+목록은 라운드마다 다시 뽑는다.
 
-- `ml-engine/src/ml_engine/evaluation/policy.py` — 5C-2 의 평탄 인덱스 판독기 여섯을 public 이름으로
-  올린 것(재사용). 되돌리면 그 여섯이 다시 비공개가 되고 backtest 정책 로더가 사라지므로 정합하다.
+추가 **44** · 수정 **4**. 수정 넷만 적는다(추가는 되돌리면 사라진다). 넷 중 **셋이 main 의 주석
+정리와 같은 파일**이므로, 복원이 무엇을 남기는지 함께 적는다:
+
+- `ml-engine/src/ml_engine/evaluation/policy.py` — 5C-2 의 평탄 인덱스 판독기 **일곱**을 public
+  이름으로 올린 것(`_collect_indexed_list`·`_require_str`·`_require_int`·`_require_number`·
+  `_int_tuple`·`_float_tuple`·`_str_tuple` → 밑줄 없는 이름). 앞 문면은 「여섯」이라 적었는데 실제는
+  일곱이다 — 기계로 세어 고친다. 되돌리면 일곱이 다시 비공개가 되고 backtest 정책 로더가 사라지므로
+  정합하다. **main 의 주석 정리 두 줄은 `a8adf8f5` 에 이미 있으므로 복원 뒤에도 남는다.**
 - `ml-engine/tests/evaluation/test_evaluation_no_stray_numeric_literals.py` — 숫자 리터럴 게이트의
   하위 패키지 보강, 문자열 숫자 술어, 조립 근 뿌리, 허용 목록. 되돌리면 게이트가 직계만 보고
-  문자열에 숨긴 수를 놓치던 상태로 돌아간다.
+  문자열에 숨긴 수를 놓치던 상태로 돌아간다. **main 의 docstring 정리 두 줄은 복원 뒤에도 남는다.**
+  r5 는 이 파일을 만지지 않았다(D-6G-63 「그대로 두고 확장하지 않는다」) — `79df92dd..HEAD` 의 차이는
+  main hunk 둘뿐이다.
 - `ml-engine/src/ml_engine/evaluation/verdict.py` — 공유 사유 어휘에 `NO_BASELINE_WIN` 한 줄.
   되돌리면 6G 판정이 그 사유를 낼 수 없고 5C-2 의 GBM 게이트는 영향이 없다(그 게이트는 이
-  사유를 내지 않는다).
-- `ml-engine/src/ml_engine/adapters/__init__.py` — 스냅숏 파일 판독기 재수출 네 줄.
+  사유를 내지 않는다). **main 의 주석 정리 다섯 줄은 복원 뒤에도 남는다.**
+- `ml-engine/src/ml_engine/adapters/__init__.py` — 스냅숏 파일 판독기 재수출 네 줄. main 이 만지지
+  않은 유일한 수정 파일이다.
 
 ## 절차
 
 range revert 가 아니라 **in_scope 경로 한정 복원**이다:
 
 ```
-git restore --source=<base> --staged --worktree -- \
+git restore --source=a8adf8f5 --staged --worktree -- \
   ml-engine/src/ml_engine/evaluation/backtest \
   ml-engine/src/ml_engine/evaluation/policy.py \
   ml-engine/src/ml_engine/evaluation/verdict.py \
@@ -185,7 +196,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 |---|---|
 | ① 명령 exit | 0 |
 | ② D/M 수 | 삭제 **44** · 수정 **4** — 위 기계 산출(A 44 · M 4)과 같다 |
-| ③ diff 빈 것 | `git diff <base> -- ml-engine` **0 줄** — 되돌린 트리가 base 와 바이트 동일. `fixtures/`·`evaluation/backtest/` 둘 다 남지 않았다 |
+| ③ diff 빈 것 | `git diff a8adf8f5 -- ml-engine` **0 줄** — 되돌린 트리가 base 와 바이트 동일. `fixtures/`·`evaluation/backtest/` 둘 다 남지 않았다 |
 | ④ 형 검사 | `uv run mypy --strict src/ml_engine` — 소스 72개, 오류 0(base 상태) |
 | ⑤ test | `uv run python -m pytest tests -q` — **958 passed**(base 상태, 6G 추가분 없음) |
 | ⑥ 게이트 | `ruff check` · `ruff format --check` · `lint-imports` · `design_ratchet` · `reuse_provenance_check` 다섯 다 통과(base 상태) |

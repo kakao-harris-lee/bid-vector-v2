@@ -326,6 +326,27 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 > 이 절은 Python 레인(`ml-engine/**` 와 정책 파일)의 것이다. 위 절들은 Kotlin 레인이 쓴다.
 > **Gradle 은 이 레인에서 돌리지 않았다**(호스트 무거운 빌드 1개 규율 — Kotlin 레인 몫).
 
+## 새 main 병합 뒤 재확인 (D-6G-67 — merge `41603713`, 출처 `a8adf8f5`)
+
+병합은 Kotlin 레인이 했고 `ml-engine` 쪽 자동 병합은 셋이다. **「충돌 없음」은 아무것도 보증하지
+않는다** — 자동 병합이 조용히 만드는 것은 충돌이 아니라 **되살아난 줄**이라서, 셋을 문자 단위로
+대조했다.
+
+| 확인 | 결과 |
+|---|---|
+| merge 가 `ml-engine` 에 만든 변경 == main 의 변경 | **같다** — 둘 다 111 파일 `+458 -468` |
+| 겹친 셋의 hunk 문면 대조(main 의 것 ↔ merge 가 적용한 것) | 세 파일 모두 **문자 단위 동일** |
+| main 이 지운 줄의 부활 | `policy.py` 2줄 · `verdict.py` 5줄 · 리터럴 게이트 2줄 — **부활 0** |
+| 이 slice 변경의 온전성 | `verdict.py` 의 `NO_BASELINE_WIN` 정의 1 + 소비 2(backtest 판정·test) · `policy.py` 의 공개 승격 **일곱** 전부 남음 |
+| 리터럴 게이트 비확장(D-6G-63) | `79df92dd..HEAD` 의 차이가 **main hunk 둘뿐** — r5 는 이 파일을 만지지 않았다 |
+
+부활 검사는 눈이 아니라 기계다: main 이 지운 줄을 `git diff`에서 뽑아 **한 줄씩 전체 일치**로 현재
+파일에서 찾았다(`grep -Fqx`). 부활이 있으면 그 줄을 그대로 출력하게 해 두었고, 출력은 없었다.
+
+**앞 문면 정정 하나**: rollback.md 가 `policy.py` 의 공개 승격을 「여섯」이라 적었는데 기계로 세면
+**일곱**이다(`_collect_indexed_list`·`_require_str`·`_require_int`·`_require_number`·`_int_tuple`·
+`_float_tuple`·`_str_tuple`). 세어 보지 않고 적은 수였다 — 고친다.
+
 ## acceptance — CI `ml-engine` job 의 명령 그대로
 
 `.github/workflows/ci.yml` 의 `ml-engine` job 단계를 순서대로 돌렸다(작업 디렉터리 `ml-engine/`).
