@@ -15,7 +15,8 @@ import java.math.BigDecimal
  *
  * **`featureSchemaVersion`은 위 넷과 다른 축이다** — 이 필드는
  * 「텍스트 합성 규약의 version」이라 `embedding.proto`가 뜻을 정하고 주인은
- * `OPEN-2E-TEXT-SYNTHESIS`(4B-6)다. 2E 승인 testdata(`contracts/testdata/embedding/embed_text_response_success.binpb`)와 provider
+ * `OPEN-2E-TEXT-SYNTHESIS`(4B-6)다. 2E 승인
+ * testdata(`contracts/testdata/embedding/embed_text_response_success.binpb`)와 provider
  * fixture servicer(`ml-engine/tests/test_embedding_contract.py`)가 이미
  * `"text-synthesis-v1"`을 정본으로 쓰므로 그 값을 그대로 채용한다 — 어긋나게 지어낸 값을
  * 실 provider에 붙이면 양방향 `UNSUPPORTED_SCHEMA`가 된다. 이 slice는 그 축의 **의미를
