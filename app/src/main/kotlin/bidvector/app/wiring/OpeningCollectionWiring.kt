@@ -45,7 +45,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import java.net.URI
-import java.net.http.HttpClient
 import java.nio.file.Path
 import java.time.LocalDate
 import javax.sql.DataSource

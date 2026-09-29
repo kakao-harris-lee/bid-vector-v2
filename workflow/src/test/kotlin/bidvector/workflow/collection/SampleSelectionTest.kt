@@ -159,6 +159,31 @@ class SampleSelectionTest {
         shuffled.strata shouldBe sampler.select(pool).strata
     }
 
+    /**
+     * **D-6G-74 (cr r5 L-4) — 용도 구분자를 스키마 문서에 묶는다.** `SAMPLE_DRAW_DOMAIN` 을 바꾸거나
+     * 재료에서 빼는 변이는 두 레인 어느 test 도 붉히지 않았다 — Python 쪽 단언은 문서의 값만 읽고,
+     * Kotlin 쪽에는 그 값이 **실제로 쓰인다**는 단언이 없었다. 그 값이 바뀌면 같은 seed 에서 다른
+     * 표본이 뽑힌다(사전 등록 값이다).
+     *
+     * 정본은 스키마 §2.2 의 재료식 `sha256("sample-draw" | seed | 공고 키 해시)` 이고, 여기서 그
+     * 재료를 손으로 지어 sampler 의 순서와 맞댄다.
+     */
+    @Test
+    fun `표본 추첨 순서는 스키마 §2·2 의 재료식 그대로다`() {
+        val seed = SamplingSeed("6g-purpose-seed")
+        val pool = candidates(4)
+        val keys = pool.map { it.key }
+
+        // 목표를 **둘**로 둔다 — 전수를 뽑으면 순서가 무엇이든 같은 집합이라 재료식이 드러나지 않는다.
+        val drawn = StratifiedSampler(seed, SampleSize(2)).select(pool).selected
+
+        // 문서 §2.2 의 재료식으로 지은 순서의 앞 둘 — 구분자를 빼거나 바꾸면 **다른 둘**이 뽑힌다.
+        // 뽑힌 뒤의 나열 순서는 계약이 아니므로 집합으로 맞댄다.
+        val expected =
+            keys.sortedBy { sha256Hex("sample-draw|${seed.value}|${it.value}") }.take(2)
+        drawn.toSet() shouldBe expected.toSet()
+    }
+
     @Test
     fun `표본 목록 sha256 은 뽑힌 해시의 정렬 목록에서만 나온다 — 후보 순서와 무관하다`() {
         val pool = candidates(30)

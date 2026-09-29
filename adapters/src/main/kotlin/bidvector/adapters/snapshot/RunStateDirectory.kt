@@ -26,6 +26,9 @@ internal const val SAMPLE_LIST_NAME = "sample-list.tsv"
 internal const val ATTEMPT_LEDGER_NAME = "attempts.jsonl"
 internal const val STATE_NAME = "state.json"
 
+/** 원자적 교체의 중간 이름 — 장부 집합 등식에서 빼는 **유일한** 이름이다(cr r5 L-2). */
+internal const val STAGED_STATE_NAME = "$STATE_NAME.staged"
+
 private const val ATTEMPT_MAX_DEPTH = 4
 
 /**
@@ -80,7 +83,9 @@ class RunStateDirectory(
      * 자리에 묶으면 파일 셋을 통째로 복사해 상한을 0 에서 다시 시작하는 길이 닫힌다(넷이 서로 맞아도
      * 표식이 그 자리의 것이 아니다).
      */
-    private val directoryId: String = sha256Hex(root.toAbsolutePath().normalize().toString())
+    // **실경로**로 짓는다(vr r5 L-5) — `toAbsolutePath().normalize()` 는 심링크를 풀지 않아
+    // 같은 디렉터리를 심링크로 가리킨 정직한 기동이 「다른 자리의 표식」으로 거부됐다.
+    private val directoryId: String = sha256Hex(realPathOf(root))
 
     /** 원장의 **누적** 해시와 줄 수 — append 마다 파일 전체를 다시 읽지 않는다(cr r4 M-6). */
     private val ledger = LedgerDigest(attemptFile)
@@ -144,7 +149,7 @@ class RunStateDirectory(
                     "attempt_lines" to SnapshotJson.Number(ledger.lines.toString()),
                 ),
             )
-        val staged = root.resolve("$STATE_NAME.staged")
+        val staged = root.resolve(STAGED_STATE_NAME)
         Files.writeString(staged, facts.render() + "\n")
         Files.move(staged, stateFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }
@@ -194,7 +199,9 @@ class RunStateDirectory(
             Files
                 .list(root)
                 .use { paths -> paths.map { it.fileName.toString() }.toList() }
-                .filterNot { it == STATE_NAME || it == RUN_LOCK_NAME || it.endsWith(".staged") }
+                // `*.staged` 를 통째로 빼면 `anything.staged` 가 장부 검사에 보이지 않는다
+                // (cr r5 L-2). 이 클래스가 쓰는 **한 이름**만 뺀다.
+                .filterNot { it == STATE_NAME || it == RUN_LOCK_NAME || it == STAGED_STATE_NAME }
                 .toSet()
         require(present == LEDGERED_FILES.filter { Files.isRegularFile(root.resolve(it)) }.toSet()) {
             "실행 상태 디렉터리에 장부가 모르는 파일이 있다 — 무엇이 정본인지 알 수 없다"
@@ -260,6 +267,10 @@ class RunStateDirectory(
         )
     }
 }
+
+/** 심링크를 푼 절대 경로 — 풀 수 없으면(경쟁 상태) 앞 규칙으로 물러선다. */
+private fun realPathOf(root: Path): String =
+    runCatching { root.toRealPath().toString() }.getOrElse { root.toAbsolutePath().normalize().toString() }
 
 private fun requireStateDirectory(root: Path): Path {
     require(Files.isDirectory(root)) {
@@ -375,7 +386,14 @@ internal class FileAttemptLedger(
                     "at" to SnapshotJson.Text(attempt.at.toString()),
                     "axis" to SnapshotJson.Text(attempt.axis.name),
                     "notice_key_hash" to (attempt.noticeKey?.let { SnapshotJson.Text(it) } ?: SnapshotJson.Null),
-                    "outcome" to SnapshotJson.Text(labelOf(attempt.outcome)),
+                    // 의도 줄에는 결말이 **없다**(cr r5 L-3). 앞 판은 `SUCCEEDED` 를 적었고,
+                    // `kind` 를 함께 보지 않는 판독자에게는 나가지도 않은 호출이 성공으로 보였다.
+                    "outcome" to
+                        if (attempt.kind == AttemptKind.PENDING) {
+                            SnapshotJson.Null
+                        } else {
+                            SnapshotJson.Text(labelOf(attempt.outcome))
+                        },
                     "kind" to SnapshotJson.Text(attempt.kind.name),
                     // 걷기 식별자(D-6G-68) — AXIS 줄만 갖는다. 없는 줄은 키 자체를 싣지 않는다.
                     "walk" to (attempt.walk?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null),
@@ -395,7 +413,8 @@ internal class FileAttemptLedger(
             // 형태 검사는 값 타입이 진다 — 원장에는 이미 지어진 hex 가 실린다.
             noticeKey = fields["notice_key_hash"]?.asStringOrNull()?.let { NoticeKeyHash.ofHex(it).value },
             axis = axis,
-            outcome = outcomeOf(requireNotNull(fields["outcome"].asStringOrNull()) { "시도 원장에 결말이 없다" }),
+            // 결말 없는 의도 줄은 값이 아니라 **자리표시**다 — 상한은 `kind` 로 센다.
+            outcome = fields["outcome"].asStringOrNull()?.let(::outcomeOf) ?: AttemptOutcome.Succeeded,
             at = Instant.parse(requireNotNull(fields["at"].asStringOrNull()) { "시도 원장에 시각이 없다" }),
             kind =
                 requireNotNull(AttemptKind.entries.firstOrNull { it.name == fields["kind"].asStringOrNull() }) {

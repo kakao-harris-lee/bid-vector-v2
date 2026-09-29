@@ -222,6 +222,27 @@ class CollectOpeningResultsUseCaseTest {
     }
 
     /**
+     * **D-6G-74 (vr r5 M-2) — 예산 멈춤의 반쪽도 잰다.** 쿼터 쪽에는 「둘째 축에서 물면 반쪽」이
+     * 있었고 예산 쪽에는 「첫 축에서 물면 반쪽이 아니다」만 있었다. 출하 코드는 두 사유에 같은
+     * 물음을 쓰지만(D-6G-59), 그 성질을 예산 갈래에서 잠그는 test 가 없어 갈래마다 다른 답을
+     * 쓰게 되어도 초록이었다.
+     */
+    @Test
+    fun `K6 — 상한이 둘째 축에서 물면 그 공고는 반쪽이다`() {
+        val fixture = OpeningFixture(sampleSize = 2)
+        fixture.listRows(BusinessDivision.SERVICE, "2026-06-03", count = 5)
+        fixture.service.detailTruncation = TruncationCause.BudgetExhausted(BudgetLimit.TOTAL)
+        fixture.service.detailTruncationFromCall = 1
+
+        val halt = requireNotNull(fixture.run().halted)
+
+        halt.budgetLimit shouldBe BudgetLimit.TOTAL
+        halt.partialNotice shouldBe true
+        // 반쯤 받은 그 공고는 「손대지 않은」 수에서 빠진다.
+        halt.notAttempted shouldBe 1
+    }
+
+    /**
      * D-6G-58 — 축의 결말은 원장이 정한다. 짧게 걸었거나 실패한 축은 **원문 행이 있어도** 다시
      * 부른다. 앞 판은 raw 존재를 보고 완료로 읽어, 잘린 1쪽만 남은 축이 영영 다시 불리지 않았다.
      */

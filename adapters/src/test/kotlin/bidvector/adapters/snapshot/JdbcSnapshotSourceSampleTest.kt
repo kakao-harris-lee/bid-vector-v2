@@ -194,8 +194,11 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
 
         val extraction = extract(sample)
 
+        // **항이 넷이다**(cr r5 L-5) — 앞 판은 `incompleteAxis` 를 빼고 셋만 더했고, 그 판의 값이
+        // 0 이라 성립했다. 계수를 축 미완으로 잘못 귀속하는 변이가 그 문턱을 그대로 지났다.
         val accounted =
-            extraction.rows.size + extraction.sampledWithoutDetail + extraction.skippedWithoutNotice
+            extraction.rows.size + extraction.sampledWithoutDetail +
+                extraction.skippedWithoutNotice + extraction.incompleteAxis
         accounted shouldBe sample.keys.size
     }
 
