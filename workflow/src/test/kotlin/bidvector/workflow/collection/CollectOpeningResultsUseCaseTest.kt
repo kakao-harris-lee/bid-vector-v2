@@ -273,6 +273,26 @@ class CollectOpeningResultsUseCaseTest {
         fixture.sampleList.confirmCount shouldBe 0
     }
 
+    /**
+     * **D-6G-58 ⓑ — 축의 결말은 그 축의 원문이 적재된 뒤에 적는다.** 적재 전에 적으면, 적재가
+     * 실패하거나 그 사이에 프로세스가 죽었을 때 다음 실행이 그 축을 「완료」로 읽고 영영 다시
+     * 부르지 않는다 — 그 공고는 그 축 없이 스냅숏에 들어가고 어느 제외 사유에도 걸리지 않는다.
+     *
+     * 공사 표본 하나의 둘째 축(개찰완료)에서 적재를 실패시킨다: 첫 축의 결말은 남고 둘째 축의
+     * 결말은 **없어야** 한다. 있으면 미완이 완료로 둔갑한 것이다.
+     */
+    @Test
+    fun `적재가 실패한 축은 원장에 결말이 남지 않는다`() {
+        val fixture = OpeningFixture(sampleSize = 1, rawFailsOn = SourceEndpoint.OPENING_COMPLETE)
+        fixture.listRows(BusinessDivision.CONSTRUCTION, "2026-06-03", count = 4)
+
+        shouldThrow<IllegalStateException> { fixture.run() }
+
+        fixture.attempts.appended
+            .filter { it.kind == AttemptKind.AXIS }
+            .map { it.axis } shouldContainExactly listOf(SourceEndpoint.RESERVE_PRICE_DETAIL)
+    }
+
     @Test
     fun `원문은 부른 응답마다 남는다 — 목록·상세 어느 축이든 관측이 저장된다`() {
         val fixture = OpeningFixture(sampleSize = 1)

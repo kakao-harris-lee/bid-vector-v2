@@ -160,10 +160,12 @@ internal class OpeningFixture(
     sampleSize: Int,
     collectedAxes: bidvector.procurement.CollectedAxisStore = FakeCollectedAxisStore(),
     attemptSeed: List<CollectionAttempt> = emptyList(),
+    /** 적재가 실패하는 축(D-6G-58 ⓑ) — 없으면 전 축이 적재된다. */
+    rawFailsOn: SourceEndpoint? = null,
 ) {
     val sampleList = FakeSampleListLedger()
     val attempts = FakeAttemptLedger(attemptSeed)
-    val raw = RecordingRawStore()
+    val raw = RecordingRawStore(rawFailsOn)
     val runs = RecordingRunStore()
     val construction = ScriptedOpeningPort(BusinessDivision.CONSTRUCTION)
     val service = ScriptedOpeningPort(BusinessDivision.SERVICE)
