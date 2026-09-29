@@ -115,6 +115,12 @@ data class AxisConclusion(
  */
 class AttemptHistory(
     private val attempts: List<CollectionAttempt>,
+    /**
+     * 형태가 서지 않아 읽지 못한 **끝 줄**의 수(D-6G-70) — 개행 없이 끝난 원장의 마지막 줄은
+     * 크래시 흔적이다(append 도중에 죽었다). 그 호출이 실제로 나갔는지는 알 수 없고, 상한은
+     * **덜 세는 쪽이 아니라 더 세는 쪽으로** 틀려야 하므로 호출 하나로 센다.
+     */
+    private val tornLines: Int = 0,
 ) {
     /**
      * 승인 상한에 계상할 몫 — **이 원장 전부**와 [dayStart] 이후 오늘치(총계의 부분집합이라 좁힌다).
@@ -130,7 +136,8 @@ class AttemptHistory(
     fun spend(dayStart: Instant): CallSpend {
         val counted = attempts.filter { it.kind == AttemptKind.PENDING }
         val today = counted.count { !it.at.isBefore(dayStart) }
-        return CallSpend(total = counted.size, today = today)
+        // 찢어진 끝 줄은 **오늘치에도** 넣는다 — 시각을 모르므로 상한이 줄지 않는 쪽을 고른다.
+        return CallSpend(total = counted.size + tornLines, today = today + tornLines)
     }
 
     /**

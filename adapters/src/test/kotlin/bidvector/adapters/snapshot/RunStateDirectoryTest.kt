@@ -301,6 +301,30 @@ class RunStateDirectoryTest {
         second.attempts.read().size shouldBe 1
         shouldThrow<IllegalStateException> { second.attempts.append(httpAttempt()) }
     }
+
+    /**
+     * **D-6G-70 (cr r5 M-1 probe C2) — 찢어진 끝 줄은 크래시 흔적이다.** append 도중에 죽으면 원장은
+     * 개행 없이 끝난다. 거부하면 그 실행 상태는 사람이 손대기 전까지 막히고, 그대로 두면 다음
+     * append 가 조각에 이어 붙어 두 시도가 한 줄이 된다. 기동은 **수락**하고, 그 조각은 나갔을 수
+     * 있으므로 **호출 하나로 센다** — 상한이 줄지 않는 쪽이다.
+     */
+    @Test
+    fun `찢어진 끝 줄은 기동을 막지 않고 호출 하나로 센다`() {
+        val directory = open()
+        directory.attempts.append(httpAttempt())
+        val spentBefore = directory.attempts.read().spend(AT).total
+        directory.close()
+        val file = root().resolve(ATTEMPT_LEDGER_NAME)
+        // 개행 없이 끝난 조각 — 마지막 append 가 절반만 디스크에 닿았다.
+        Files.writeString(file, Files.readString(file) + "{\"at\":\"2026-09-24T01:00:00Z\",\"axis\":\"RES")
+
+        val reopened = open()
+
+        reopened.attempts.read().spend(AT).total shouldBe spentBefore + 1
+        // 조각을 닫았으므로 다음 append 가 그 줄에 이어 붙지 않는다.
+        reopened.attempts.append(httpAttempt())
+        reopened.attempts.read().spend(AT).total shouldBe spentBefore + 2
+    }
 }
 
 private val OTHER_KEY = NoticeKeyHash.of("SYN-6G-9999", "000")
@@ -343,15 +367,21 @@ class FileAttemptLedgerTest {
         history.spend(AT).total shouldBe 2
     }
 
-    /** 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고, 그것은 상한이 없는 것보다 나쁘다. */
+    /**
+     * 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고, 그것은 상한이 없는 것보다 나쁘다. 관용은
+     * **끝 줄 하나**뿐이다(D-6G-70) — 그 앞의 줄이 형태를 어기면 여전히 멈춘다.
+     */
     @Test
-    fun `형태를 어긴 줄은 읽지 않는다`() {
+    fun `가운데의 형태를 어긴 줄은 읽지 않는다`() {
         val ledger = ledger()
         ledger.append(attemptOf(AttemptOutcome.Succeeded))
         val file = Files.createDirectories(temp.resolve("run-state")).resolve(ATTEMPT_LEDGER_NAME)
-
         Files.writeString(file, Files.readString(file) + "{\"axis\":\"RESERVE_PRICE_DETAIL\"}\n")
+
+        // 그 뒤에 성한 줄을 하나 더 붙이면 어긴 줄은 **끝 줄이 아니다**.
+        ledger.append(attemptOf(AttemptOutcome.Succeeded))
 
         shouldThrow<IllegalArgumentException> { ledger.read() }
     }
+
 }

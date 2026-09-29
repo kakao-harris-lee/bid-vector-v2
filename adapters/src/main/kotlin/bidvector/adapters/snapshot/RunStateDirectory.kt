@@ -90,6 +90,7 @@ class RunStateDirectory(
             // 기동 거부로 끝나도 **잠금은 놓는다** — 들고 죽은 잠금은 다음 실행을 막는다.
             runCatching {
                 rollBackInterruptedConfirmation()
+                healTornTail()
                 verifyIntegrity()
             }.onFailure {
                 lock.release()
@@ -221,6 +222,28 @@ class RunStateDirectory(
         if (lines.size > facts.attemptLines) recordState()
     }
 
+    /**
+     * **찢어진 끝 줄을 닫는다**(D-6G-70). append 도중에 죽으면 원장은 개행 없이 끝난다. 그대로 두면
+     * 다음 append 가 조각에 이어 붙어 **두 시도가 한 줄**이 되고, 그 줄은 영영 읽히지 않는다.
+     *
+     * 조각을 **버리지 않는다** — 그 호출은 실제로 나갔을 수 있다. 조각을 제 줄에서 떼어 `torn`
+     * 표식 줄로 감싼다: 형태가 선 JSON 이라 뒤에 줄이 더 붙어도 읽기가 멈추지 않고, 원문 조각은
+     * 사람이 볼 수 있게 남으며, 읽는 쪽이 그것을 **호출 하나**로 센다(상한이 줄지 않는 쪽).
+     * 축을 **지어내지 않는다** — 조각이 무엇이었는지 모르는 채로 시도 줄을 만들면 이어 돌기가
+     * 있지도 않은 축을 완료로 읽는다.
+     *
+     * 재동기보다 **먼저** 돈다 — 순서가 반대면 장부가 조각까지 포함한 해시를 굳히고, 그 뒤의
+     * 교체가 다음 기동에서 「앞부분이 다르다」로 읽힌다.
+     */
+    private fun healTornTail() {
+        if (!Files.isRegularFile(attemptFile)) return
+        val text = Files.readString(attemptFile)
+        if (text.isEmpty() || text.endsWith("\n")) return
+        val fragment = text.substringAfterLast('\n')
+        val healed = text.removeSuffix(fragment) + tornMarkerOf(fragment)
+        Files.writeString(attemptFile, healed, StandardOpenOption.TRUNCATE_EXISTING)
+    }
+
     private fun readFacts(): RunStateFacts? {
         val fields =
             runCatching { Files.readString(stateFile) }
@@ -292,6 +315,12 @@ private class LockedOutAttemptLedger(
 
 private fun lineCountOf(file: Path): Int = linesOf(file).size
 
+/** 잃어버린 호출의 표식(D-6G-70) — 조각을 원문 그대로 담되 형태가 선 JSON 한 줄로. */
+private fun tornMarkerOf(fragment: String): String =
+    SnapshotJson.Obj(listOf(TORN_KEY to SnapshotJson.Text(fragment))).render() + "\n"
+
+internal const val TORN_KEY = "torn"
+
 private fun linesOf(file: Path): List<String> =
     runCatching { Files.readString(file) }
         .getOrDefault("")
@@ -322,15 +351,22 @@ internal class FileAttemptLedger(
 
     override fun read(): AttemptHistory {
         if (!Files.isRegularFile(file)) return AttemptHistory(emptyList())
-        return AttemptHistory(
+        val lines =
             Files
                 .readString(file)
                 .lineSequence()
                 .filter { it.isNotBlank() }
-                .map(::parseLine)
-                .toList(),
-        )
+                .toList()
+        // `torn` 표식 줄은 시도가 아니라 **잃어버린 호출**이다(D-6G-70) — 세기만 한다. 그 밖의
+        // 줄이 형태를 어기면 여전히 멈춘다: 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고,
+        // 그것은 상한이 없는 것보다 나쁘다.
+        val (tornLines, attemptLines) = lines.partition(::isTornMarker)
+        return AttemptHistory(attemptLines.map(::parseLine), tornLines = tornLines.size)
     }
+
+    private fun isTornMarker(line: String): Boolean =
+        runCatching { KonepsJsonParser.parse(line, ATTEMPT_MAX_DEPTH).asObject()?.fields?.containsKey(TORN_KEY) }
+            .getOrNull() == true
 
     private fun lineOf(attempt: CollectionAttempt): String =
         SnapshotJson
