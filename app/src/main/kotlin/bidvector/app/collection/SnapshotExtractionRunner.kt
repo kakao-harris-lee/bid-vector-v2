@@ -38,7 +38,9 @@ data class SnapshotExtractionProperties(
 
 /**
  * 스냅숏 추출 러너(D-6G-2) — dev DB 를 읽어 `rows.jsonl`·`manifest.json` 두 바이트를 저장소 **밖**에
- * 쓴다. 읽기만 한다(DB write 없음). 로그에는 계수와 경로만 남긴다 — 공고 식별자도 상호도 싣지 않는다.
+ * 쓴다. **DB 는 읽기만** 한다(write 0). 실행 상태 디렉터리는 읽기 전용이 아니다(D-6G-71) — 잠금을
+ * 잡고, 원장이 장부보다 앞서 있으면(크래시 흔적) `state.json` 을 재동기한다. 로그에는 계수와 경로만
+ * 남긴다 — 공고 식별자도 상호도 싣지 않는다.
  */
 @Suppress("TooGenericExceptionCaught")
 class SnapshotExtractionRunner(
@@ -48,7 +50,16 @@ class SnapshotExtractionRunner(
     private val log: CollectionLog,
     private val termination: CollectionTermination,
 ) : ApplicationRunner {
-    override fun run(args: ApplicationArguments) {
+    /**
+     * **추출도 잠금 안에서만 돈다**(D-6G-71). 잠그지 않으면 두 가지가 함께 깨진다: 수집이 도는 중에
+     * 읽으면 표본·원장이 **검증되지 않은 채**로 오고(무결성 대조는 잠금을 든 자리에서만 돈다),
+     * 그 순간의 원장은 절반만 쓰인 걷기를 가리킬 수 있다. 잠금을 못 잡으면 추출을 **거부**한다 —
+     * 덜 읽은 스냅숏보다 없는 스냅숏이 낫다.
+     */
+    override fun run(args: ApplicationArguments) =
+        underRunStateLock(runState.lock, "snapshot-extract", log, termination) { extractOrFail() }
+
+    private fun extractOrFail() {
         try {
             extract()
         } catch (failure: Exception) {

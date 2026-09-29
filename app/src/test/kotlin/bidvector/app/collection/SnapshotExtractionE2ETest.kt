@@ -1,24 +1,26 @@
 package bidvector.app.collection
 
+import bidvector.adapters.snapshot.RunStateLock
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
 import bidvector.app.wiring.RecordingCollectionTermination
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import java.nio.file.Files
+import java.nio.file.Path
+import java.time.Instant
+import java.time.LocalDate
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
-import java.nio.file.Files
-import java.nio.file.Path
-import java.time.Instant
-import java.time.LocalDate
 
 /**
  * M6/6G D-6G-27 E2E — **적재도 출하 경로로 한다.** 수집 갈래 둘(공고 목록 · 개찰 축)을 가짜
@@ -158,6 +160,29 @@ class SnapshotExtractionE2ETest {
         val dir = Files.createTempDirectory("snapshot-e2e")
         extractTo(dir)
         return Files.readString(dir.resolve("rows.jsonl"))
+    }
+
+    /**
+     * **D-6G-71 (cr r5 M-2 · vr r5 L-1) — 추출은 잠금 안에서만 돈다.** 잠그지 않으면 수집이 도는
+     * 중에 읽게 되고, 그때 표본·원장은 **무결성 대조를 지나지 않은 채** 온다(그 검사는 잠금을 든
+     * 자리에서만 돈다). 그 순간의 원장은 절반만 쓰인 걷기를 가리킬 수도 있다 — 덜 읽은 스냅숏보다
+     * 없는 스냅숏이 낫다.
+     */
+    @Test
+    fun `수집이 도는 중이면 추출을 거부한다 — 바이트를 쓰지 않는다`() {
+        val held = RunStateLock.tryAcquire(RUN_STATE)
+        val dir = Files.createTempDirectory("snapshot-e2e-locked")
+
+        val exitCodes =
+            try {
+                extractTo(dir)
+            } finally {
+                held.release()
+            }
+
+        exitCodes shouldContainExactly listOf(CollectionExitCode.ALREADY_RUNNING.value)
+        Files.exists(dir.resolve("rows.jsonl")) shouldBe false
+        Files.exists(dir.resolve("manifest.json")) shouldBe false
     }
 
     @Test
