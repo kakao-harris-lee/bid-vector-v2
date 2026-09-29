@@ -127,7 +127,7 @@ evaluation 등 다른 adapters 패키지에는 있다). 그래서 이 두 패키
 
 ## 되돌리는 경로 (기계 산출 — `git diff --name-status <base>..HEAD -- ml-engine`)
 
-추가 42 · 수정 4. 수정 넷만 적는다(추가는 되돌리면 사라진다):
+추가 **44** · 수정 4(r5 에서 test 파일 둘이 늘었다). 수정 넷만 적는다(추가는 되돌리면 사라진다):
 
 - `ml-engine/src/ml_engine/evaluation/policy.py` — 5C-2 의 평탄 인덱스 판독기 여섯을 public 이름으로
   올린 것(재사용). 되돌리면 그 여섯이 다시 비공개가 되고 backtest 정책 로더가 사라지므로 정합하다.
@@ -163,8 +163,9 @@ git restore --source=<base> --staged --worktree -- \
 
 ## 공유 파일
 
-`reports/evidence/m6/6g/commands.md` 와 `rollback.md` 는 **두 레인이 함께 쓴다**. 되돌릴 때 range
-revert 를 쓰면 Kotlin 레인의 줄까지 사라진다 — 커밋 해시 단위로 hunk 를 격리한다:
+`reports/evidence/m6/6g/` 의 `commands.md` · `rollback.md` · **`snapshot-schema.md`**(r5 부터 —
+이 레인이 §2 에 범위 칸의 판독 규율과 업무 대표 어휘를 더했다) 는 **두 레인이 함께 쓴다**. 되돌릴 때
+range revert 를 쓰면 Kotlin 레인의 줄까지 사라진다 — 커밋 해시 단위로 hunk 를 격리한다:
 
 ```
 git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/6g/commands.md | git apply -R
