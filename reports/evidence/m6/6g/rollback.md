@@ -1,16 +1,18 @@
 # M6/6G Kotlin 수집 레인 — rollback
 
-- base `678c6ed7` · **실측 HEAD `ba3a8d42`**(이 레인의 마지막 산출물 커밋 시점의 트리)
+- **복원 출처 `a8adf8f5`**(D-6G-67 — r5 판정 전에 새 main 을 합쳤다, merge 커밋 `41603713`) ·
+  **실측 HEAD `41603713`**. 착수 base 는 `678c6ed7` 이었지만 그것으로 되돌리면 main 의 주석
+  이력 정리(550 파일)까지 함께 되돌아간다 — 이 slice 가 되돌릴 것은 이 slice 의 변경뿐이다.
 - 되돌림은 range revert 가 아니라 **in_scope 경로 한정 복원**이다.
 
-## 되돌리는 경로 (기계 산출 — `git diff --name-status 678c6ed7..ba3a8d42 -- <아래 경로들>`)
+## 되돌리는 경로 (기계 산출 — `git diff --name-status a8adf8f5..41603713 -- <아래 경로들>`)
 
 신규 **62** · 수정 **46**. 경로 목록은 아래 디렉터리 인자가 덮는다 — 파일 이름을 여기 옮겨 적지 않는다(라운드마다 낡는다).
 
 ## 절차
 
 ```
-git restore --source=678c6ed7 --staged --worktree -- \
+git restore --source=a8adf8f5 --staged --worktree -- \
   adapters/src/main/kotlin/bidvector/adapters/koneps \
   adapters/src/main/kotlin/bidvector/adapters/persistence \
   adapters/src/main/kotlin/bidvector/adapters/snapshot \
@@ -74,20 +76,20 @@ git diff 57869cc7~1..57869cc7 -- milestone-6.md | git apply -R
 
 ## 실측 (임시 clone, 저장소 밖)
 
-`ba3a8d42` 를 checkout 한 clone 에서 위 절차를 그대로 실행했다(저장소 밖 `--no-local` clone).
+`41603713`(merge 커밋) 을 checkout 한 clone 에서 위 절차를 그대로 실행했다(저장소 밖 `--no-local` clone).
 
 | 축 | 결과 |
 |---|---|
 | ① 명령 exit | 0 |
 | ② D/M 수 | 삭제 **62** · 수정 **46** — 위 기계 산출과 **같다** |
-| ③ diff 빈 것 | `git diff 678c6ed7 -- <경로들>` **0 줄** — 되돌린 트리가 base 와 바이트 동일(갈음은 「HEAD 초록」이 아니라 이 트리 동일성이다) |
+| ③ diff 빈 것 | `git diff a8adf8f5 -- <경로들>` **0 줄** — 되돌린 트리가 복원 출처와 바이트 동일(갈음은 「HEAD 초록」이 아니라 이 트리 동일성이다) |
 | ④ 컴파일 | 통과(`check` 안) |
 | ⑤ test | 통과(`check` 안) |
-| ⑥ 게이트 | 통과 — `./gradlew --no-daemon check` BUILD SUCCESSFUL(되돌린 트리에서 exit 0) |
+| ⑥ 게이트 | 통과 — `./gradlew --no-daemon check` BUILD SUCCESSFUL(되돌린 트리에서 exit 0). **첫 시도는 earlyoom 이 죽였다** — 다른 레인의 16GB python 과 겹쳐 가용 메모리가 1GB 로 떨어졌고 java 가 SIGTERM 을 받았다(결함이 아니라 호스트 사건, 재시도 3분 12초 초록) |
 
 ## 두 레인의 실측 HEAD 가 다르다
 
-이 절의 `ba3a8d42` 는 **이 레인의 경로 집합**(koneps·snapshot·procurement·workflow/collection·
+이 절의 `41603713` 은 **이 레인의 경로 집합**(koneps·snapshot·procurement·workflow/collection·
 app/collection·app/wiring·config/quality)을 되돌려 잰 값이다. Python 레인은 자기 경로 집합(`ml-engine/**`)을 자기 HEAD 에서
 따로 잰다(아래 그 레인의 절). 두 집합은 **golden 디렉터리 하나에서 겹친다**(두 레인이 다 그것을 되돌린다) — 그래도 한 값으로
 합치지 않는다: 합치면 어느 경로가 어느 시점에 검증됐는지가 사라진다. 겹치는 그 하나는 두 목록이

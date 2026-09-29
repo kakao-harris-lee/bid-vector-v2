@@ -1,6 +1,8 @@
 # M6/6G Kotlin 수집 레인 — 실행 명령과 결과
 
-- base `678c6ed7` · worktree `bid-vector-v2-m6-6g` · 브랜치 `m6-6g/2026-09-27`
+- 착수 base `678c6ed7` · **판정 기준은 합친 트리**(D-6G-67) — `origin/main` `a8adf8f5` 를 로컬
+  merge 한 `41603713` 이다(push 없음). 복원 출처도 `678c6ed7` 이 아니라 `a8adf8f5` 다.
+- worktree `bid-vector-v2-m6-6g` · 브랜치 `m6-6g/2026-09-27`
 - 이 문서는 **Kotlin 레인**의 기록이다(Python 실험 레인은 자기 기록을 갖는다).
 
 ## acceptance (CI job 명령 그대로)
@@ -17,7 +19,32 @@ compose 프로젝트 이름은 `docker` 이고 호스트에 떠 있는 셋(`bid-
 않는다. 포트도 겹치지 않는다(50051 · 루프백 18080; postgres 는 publish 하지 않는다) — 남의 프로젝트는
 멈추지도 지우지도 않았다.
 
-실측 HEAD: `ba3a8d42`(이 레인의 마지막 산출물 커밋 시점의 트리).
+실측 HEAD: `41603713`(merge 커밋 — acceptance 다섯과 rollback ①~⑥ 을 모두 이 트리에서 다시 쟀다).
+
+## main 합치기 (D-6G-67)
+
+main 이 `a8adf8f5` 로 움직였다(PR #49 — 소스 주석에서 이력 표기를 걷어낸 550 파일). r5 판정이 **합친
+트리**를 보게 로컬 merge 했다(push 없음). 충돌 셋의 해소 규칙은 「거동은 이 slice 것 · 주석 정리는
+main 것」이고, 그 가운데 **둘은 제자리 충돌이 아니었다**:
+
+| 충돌 | 모양 | 해소 |
+|---|---|---|
+| `KonepsOpenApiNoticeSource.kt` | 제자리 | main 의 정리된 두 줄 + 이 slice 의 D-6G-47 문장·`callContext` 줄 |
+| `CollectionPolicy.kt` | **옮긴 블록** — 이 slice 가 `KonepsOpeningAxisFieldContracts.kt` 로 옮겼고 main 은 옛 자리에서 주석을 정리했다 | slice 쪽(블록은 이 파일에 없다) + main 의 정리 **2줄을 옮긴 사본에 이식** |
+| `FieldContract.kt` | **옮긴 블록** — `FieldConcept` 가 `FieldConcept.kt` 로 갔다 | 같은 모양, 이식 **7줄** |
+
+옮긴 블록에서 「slice 쪽을 취한다」만 하면 main 의 정리가 **조용히** 사라진다(main 쪽을 취하면 재선언이라
+컴파일이 깨져 시끄럽다). 그래서 이식을 기계로 대조했다:
+
+| 대조 | 남은 차이 |
+|---|---|
+| `KonepsOpeningAxisFieldContracts.kt` ↔ `a8adf8f5:CollectionPolicy.kt` 의 블록 | 분할 사유 문단 · `private`→`internal` — 둘 다 이 slice 의 것 |
+| `FieldConcept.kt` ↔ `a8adf8f5:FieldContract.kt` 의 `FieldConcept` | 6G 토큰 추가뿐 |
+
+합친 트리 전수 대조 둘: `git diff a8adf8f5..HEAD` 가 다른 파일은 **정확히 이 slice 가 만진 159 개**이고
+그 밖은 0 이다 · 겹치는 33 파일에서 main 이 지운 주석 줄이 되살아난 것은 **0** 이다(눈이 아니라 스캔으로).
+같은 모양(옮긴 블록)이 다른 데 더 있는지는 이 slice 가 만든 main 소스 36 개를 훑어 확인했다 — 없다.
+구조로도 그렇다: 옮긴 블록을 main 이 만졌으면 delete-vs-modify 라 반드시 충돌한다.
 
 ## 실 KONEPS 호출
 
@@ -287,7 +314,7 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 | cr r4 L-4 `startPageOf` 앞 주석 | **주석이 사라졌다** | 「모든 소스 호출이 이 자리를 지난다」는 문장은 관문을 어댑터로 옮기며 없어졌다(D-6G-47). 잘못된 cursor 는 호출을 내지 않으므로 상한에도 원장에도 빚이 없다 |
 | cr r4 L-1 관문 우회 봉쇄 범위 | **이행**(D-6G-62) | 뿌리를 production 전체로, 술어를 `URL`·`Socket`·반사까지 넓혔다 |
 | cr r3 L-1 `notAttempted` 오계수(마지막 축) | **이행**(D-6G-59) | `partialNotice` 가 「이 공고의 축 중 하나라도 끝났는가」의 **관측**이 되어 마지막 축에서 물어도 반쪽으로 선다 |
-| 호스트 규율 「무거운 빌드 1개」 | **지켰다 · 한 조건은 완화했다**(사실 선언) | Gradle 은 호스트 전체에서 이 레인 하나만 돌았다(`GradleWrapperMain`·`GradleWorkerMain` 매 실행 전 확인). 다만 다른 프로젝트의 **경량 단위 pytest** 가 도는 동안 시작한 실행이 있다 — 가용 메모리 13GB(문턱 6GB)를 확인하고 진행했다 |
+| 호스트 규율 「무거운 빌드 1개」 | **한 번 어겼고 빌드가 죽었다**(사실 선언) | Gradle 은 매 실행 전 `pgrep` 으로 확인했고 호스트 전체에서 이 레인 하나만 돌았다. 그럼에도 **2026-09-30 00:24 earlyoom 이 이 레인의 java 를 죽였다** — 같은 시각 다른 레인의 python 이 RSS 16.4GB 였고 가용 메모리가 1GB 로 떨어졌다. 원인은 내 핸드오프 문면이다: 「내 다음 실행이 끝나면 창은 당신 것」이라고 보내 놓고 실행을 이어 갔다. 그 실패는 rollback ⑥ 이고 **결함이 아니라 호스트 사건**이다(재시도 3분 12초 초록). `pgrep` + 가용 메모리만으로는 부족하다 — 다른 레인의 RSS 상위와 swap 여유까지 보고, 핸드오프는 「끝나면」이 아니라 **끝난 뒤 명시적으로** 넘긴다 |
 
 ## 하지 않은 것 (이 레인의 몫 가운데)
 
