@@ -188,7 +188,8 @@ def test_golden_sample_list_is_a_real_file_bound_to_its_rows() -> None:
 
     1. manifest 해시 == 그 **파일 바이트**의 해시
     2. 행의 키 ⊆ 표본 목록(진부분집합이 정상 — 상세가 없어 빠진 표본이 있다)
-    3. 닫힌 항등식 `sample_size == 행 수 + 상세 결측 + 공고 결측`
+    3. 닫힌 항등식(v5, D-6G-58) `sample_size == 행 수 + 상세 결측 + 공고 결측 + 축 미완`
+       — 항이 **넷**이다. 셋으로 적으면 생산 바이트에서 바로 어긋난다
     """
     files = _golden_files()
     snapshot = _golden_snapshot()
@@ -205,6 +206,7 @@ def test_golden_sample_list_is_a_real_file_bound_to_its_rows() -> None:
         len(snapshot.rows)
         + snapshot.sampled_without_detail
         + snapshot.sampled_without_notice
+        + snapshot.incomplete_axis
     )
 
 
@@ -226,8 +228,29 @@ def test_golden_actually_exercises_the_missing_sample_paths() -> None:
     )
     assert snapshot.sampled_without_detail > 0, "상세 결측 표본이 없다"
     assert snapshot.sampled_without_notice > 0, "공고 결측 표본이 없다"
+    # v5 의 넷째 항(D-6G-58). 생산 쪽이 여기에 0 을 적으면 「축 미완」 자리가 왕복에서
+    # 한 번도 실행되지 않고, 항이 셋이던 v4 판과 구별되지 않는다 — 앞 판의 golden 이
+    # 정확히 그 상태였다(10/10/0/0 이라 L9 변이가 왕복에서 초록이었다).
+    assert snapshot.incomplete_axis > 0, (
+        "golden 의 축 미완 계수가 0 이다 — v5 의 넷째 항이 왕복에서 헛돈다"
+    )
     # 분모가 행 수와 **다른** 판이어야 M-8 의 분모 선택이 왕복에서 의미를 갖는다.
     assert snapshot.notice_observed_count != len(snapshot.rows)
+
+
+def test_golden_carries_the_sample_scope_the_threshold_is_built_from() -> None:
+    """D-6G-66 — 문턱의 출처가 **생산 바이트에 실제로 있다**.
+
+    이 칸이 manifest 에 없으면 판독이 스냅숏 전체를 거부하므로, 여기까지 온 것만으로
+    생산 쪽이 범위를 싣는다는 뜻이다. 그 위에 계약의 부분집합 관계를 확인한다 —
+    표본의 업무가 범위 밖이면 어느 쪽이 거짓인지 판정문이 말할 수 없다."""
+    snapshot = _golden_snapshot()
+    assert snapshot.sample_scope_divisions, "golden manifest 에 확정 범위가 비었다"
+    assert set(snapshot.sample_divisions) <= set(snapshot.sample_scope_divisions)
+    covered = dict(snapshot.division_row_counts)
+    assert set(covered) == set(snapshot.sample_scope_divisions), (
+        "업무 대표 공시가 범위 전체를 덮지 않는다 — 빠진 업무가 목록에서 사라진다"
+    )
 
 
 def test_golden_manifest_declares_the_supported_schema_version() -> None:
