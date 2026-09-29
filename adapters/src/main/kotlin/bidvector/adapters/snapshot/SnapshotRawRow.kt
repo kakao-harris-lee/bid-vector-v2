@@ -144,7 +144,8 @@ internal fun jsonbKeyOf(key: RawKey): String =
  * 그 값들을 SQL 이 `->>` 로 꺼내지 **않는다** — 그러면 raw 키 문자열이 이 파일에 박히고, 키를 아는 것은
  * 계약의 몫이라는 규율이 깨진다(6F-9 키 리터럴 게이트가 실제로 잡았다). 원문 객체를 통째로 가져와
  * [RawRow] 가 개념으로 읽는다. SQL 에 남는 raw 키는 **공고 식별자 둘**뿐이고, 그것은 조인 축이라
- * 달리 표현할 자리가 없다(알려진 제한).
+ * 달리 표현할 자리가 없다 — 다만 그 둘의 **이름은 이 파일이 짓지 않는다**(vr r4 L-11,
+ * [jsonbKeyOf] · [bidvector.procurement.NOTICE_NUMBER_RAW_KEY]).
  */
 internal const val NOTICE_SQL =
     """
