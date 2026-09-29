@@ -49,8 +49,13 @@ data class CollectionCallBudget(
 class CallBudgetLedger(
     private val budget: CollectionCallBudget,
     startDay: LocalDate,
-    /** 실행 **이전에** 이미 쓴 몫(D-6G-29 ① — 영속 원장에서 seed). 없으면 0 에서 시작한다. */
-    alreadySpent: CallSpend = CallSpend(total = 0, today = 0),
+    /**
+     * 실행 **이전에** 이미 쓴 몫(D-6G-29 ① — 영속 원장에서 seed). **기본값이 없다**(D-6G-72):
+     * 있던 동안 「seed 를 빼먹은 원장」이 어디서나 한 줄로 지어졌고, 그 배선은 승인 상한을 매 기동
+     * 0 에서 다시 시작한다. 0 에서 시작해야 하는 자리는 `CallSpend(0, 0)` 을 **명시**한다 — 빠뜨린
+     * 것과 뜻한 것이 코드에서 갈린다.
+     */
+    alreadySpent: CallSpend,
 ) {
     private var day: LocalDate = startDay
 

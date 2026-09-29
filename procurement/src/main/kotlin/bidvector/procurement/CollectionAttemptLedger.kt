@@ -117,16 +117,18 @@ class AttemptHistory(
     private val attempts: List<CollectionAttempt>,
 ) {
     /**
-     * 승인 상한에 계상할 몫 — [since] 이후 전부와 [dayStart] 이후 오늘치(총계의 부분집합이라
-     * 좁힌다). **의도 줄([AttemptKind.PENDING])의 개수**다(D-6G-61). 결말 줄까지 세면 한 호출이
-     * 두 번 계상되고, 죽어서 결말이 없는 의도 줄은 세는 것이 맞다 — 그 호출은 실제로 나갔을 수
-     * 있고 상한은 덜 세는 쪽이 아니라 더 세는 쪽으로 틀려야 한다.
+     * 승인 상한에 계상할 몫 — **이 원장 전부**와 [dayStart] 이후 오늘치(총계의 부분집합이라 좁힌다).
+     * **의도 줄([AttemptKind.PENDING])의 개수**다(D-6G-61). 결말 줄까지 세면 한 호출이 두 번
+     * 계상되고, 죽어서 결말이 없는 의도 줄은 세는 것이 맞다 — 그 호출은 실제로 나갔을 수 있고
+     * 상한은 덜 세는 쪽이 아니라 더 세는 쪽으로 틀려야 한다.
+     *
+     * **시작 시점 인자를 받지 않는다**(D-6G-69). 받던 시절에는 그 값이 기동마다 설정에서 왔고, 1 초
+     * 뒤로 옮기기만 하면 총계와 오늘치가 **둘 다 0 으로 되감겼다** — 승인 상한을 다 쓴 디렉터리에서
+     * 다시 상한만큼 나갈 수 있었다. 원장이 실행 상태 디렉터리 전용이 된 뒤로 그 값이 막는 것은 없고
+     * 되감는 길만 남았다. **범위는 디렉터리 자신이다.**
      */
-    fun spend(
-        since: Instant,
-        dayStart: Instant,
-    ): CallSpend {
-        val counted = attempts.filter { it.kind == AttemptKind.PENDING && !it.at.isBefore(since) }
+    fun spend(dayStart: Instant): CallSpend {
+        val counted = attempts.filter { it.kind == AttemptKind.PENDING }
         val today = counted.count { !it.at.isBefore(dayStart) }
         return CallSpend(total = counted.size, today = today)
     }

@@ -44,7 +44,7 @@ class KonepsCallGateTest {
         ledger.appended.filterIndexed { index, _ -> index % 2 == 0 }.all { it.kind == AttemptKind.PENDING } shouldBe
             true
         ledger.appended.filterIndexed { index, _ -> index % 2 == 1 }.all { it.kind == AttemptKind.HTTP } shouldBe true
-        ledger.read().spend(Instant.EPOCH, Instant.EPOCH).total shouldBe 3
+        ledger.read().spend(Instant.EPOCH).total shouldBe 3
     }
 
     @Test
@@ -58,7 +58,7 @@ class KonepsCallGateTest {
         denied.shouldBeInstanceOf<KonepsGateOutcome.Denied>().limit shouldBe BudgetLimit.TOTAL
         // 막힌 호출은 원장에 없다 — 나가지 않았으므로 「시도」가 아니다(나간 하나의 의도·결말 두 줄뿐).
         ledger.appended shouldHaveSizeOf 2
-        ledger.read().spend(Instant.EPOCH, Instant.EPOCH).total shouldBe 1
+        ledger.read().spend(Instant.EPOCH).total shouldBe 1
     }
 
     /**

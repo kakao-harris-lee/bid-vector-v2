@@ -247,7 +247,7 @@ class RunStateDirectoryTest {
         reopened.attempts.read().size shouldBe 2
         reopened.attempts
             .read()
-            .spend(Instant.EPOCH, Instant.EPOCH)
+            .spend(Instant.EPOCH)
             .total shouldBe 2
         Files.readString(root().resolve(STATE_NAME)) shouldContain "\"attempt_lines\":2"
     }
@@ -340,7 +340,7 @@ class FileAttemptLedgerTest {
         history.size shouldBe written.size
         // 축 결말 줄만 이어 돌기에 든다. HTTP 줄은 상한만 센다(둘이 한 파일에 있어도 섞이지 않는다).
         history.settledAxes().getValue(KEY.value) shouldContainExactly listOf(SourceEndpoint.RESERVE_PRICE_DETAIL)
-        history.spend(Instant.parse("2026-09-20T00:00:00Z"), AT).total shouldBe 2
+        history.spend(AT).total shouldBe 2
     }
 
     /** 원장을 반쯤 읽는 것은 상한을 반만 세는 것이고, 그것은 상한이 없는 것보다 나쁘다. */

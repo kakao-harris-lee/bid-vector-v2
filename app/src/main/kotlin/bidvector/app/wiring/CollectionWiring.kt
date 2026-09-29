@@ -108,7 +108,7 @@ open class CollectionWiring {
         runState: RunStateDirectory,
         clock: Clock,
     ): CallBudgetLedger =
-        seededBudget(runState, properties.callsPerDay, properties.callsTotal, properties.budgetSince, clock)
+        seededBudget(runState, properties.callsPerDay, properties.callsTotal, clock)
 
     @Bean
     open fun collectNoticesUseCase(

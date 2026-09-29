@@ -60,7 +60,6 @@ class OpeningCollectionWiringTest {
             "bidvector.opening-collection.sample-size=2",
             "bidvector.opening-collection.calls-per-day=100",
             "bidvector.opening-collection.calls-total=1000",
-            "bidvector.opening-collection.budget-since=2026-01-01T00:00:00Z",
             "bidvector.opening-collection.run-state-dir=$WIRING_RUN_STATE",
             "bidvector.koneps.service-key=WIRING-TEST-KEY",
         )
@@ -168,11 +167,6 @@ class OpeningCollectionWiringTest {
     fun `표본 정책이 없으면 기동하지 않는다 — seed 와 층당 목표 둘 다`() {
         bootWithout("bidvector.opening-collection.sampling-seed").failure shouldNotBe null
         bootWithout("bidvector.opening-collection.sample-size").failure shouldNotBe null
-    }
-
-    @Test
-    fun `예산 시작 시점이 없으면 기동하지 않는다 — 어느 시점부터 상한을 세는지를 지어내지 않는다`() {
-        bootWithout("bidvector.opening-collection.budget-since").failure shouldNotBe null
     }
 
     /**

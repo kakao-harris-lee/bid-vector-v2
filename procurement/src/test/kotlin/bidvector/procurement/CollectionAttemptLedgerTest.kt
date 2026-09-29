@@ -14,7 +14,6 @@ private fun settledHttp(at: String) =
     CollectionAttempt(null, AXIS, AttemptOutcome.Succeeded, Instant.parse(at), AttemptKind.HTTP)
 
 private val AXIS: SourceEndpoint = SourceEndpoint.RESERVE_PRICE_DETAIL
-private val SINCE: Instant = Instant.parse("2026-09-20T00:00:00Z")
 
 /** 나가려는 호출 한 줄 — 한 줄이 한 호출이다(D-6G-61 ①). */
 private fun attempt(
@@ -71,11 +70,17 @@ class CollectionAttemptLedgerTest {
                 ),
             )
 
-        history.spend(SINCE, Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 3
+        history.spend(Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 3
     }
 
+    /**
+     * **D-6G-69 (vr r5 M-1 probe P4) — 되감을 시작 시점이 없다.** 앞 판은 설정이 매 기동 주는
+     * `budget-since` 이후만 셌고, 그 값을 1 초 뒤로 옮기면 총계와 오늘치가 **둘 다 0 으로** 되감겨
+     * 승인 상한을 다 쓴 디렉터리에서 상한만큼 다시 나갈 수 있었다. 범위는 디렉터리 자신이다 —
+     * 오래된 줄도 센다.
+     */
     @Test
-    fun `승인 시작 이전 시도는 계상하지 않는다`() {
+    fun `원장의 모든 의도 줄을 계상한다 — 되감을 시작 시점이 없다`() {
         val history =
             AttemptHistory(
                 listOf(
@@ -85,7 +90,7 @@ class CollectionAttemptLedgerTest {
                 ),
             )
 
-        history.spend(SINCE, Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 2
+        history.spend(Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 3
     }
 
     /** KST 자정과 UTC 자정 사이 아홉 시간 — UTC 로 세면 이 시도가 오늘치에서 빠진다. */
@@ -100,7 +105,7 @@ class CollectionAttemptLedgerTest {
                 ),
             )
 
-        val spend = history.spend(SINCE, dayStartOf(java.time.LocalDate.of(2026, 9, 24), KST))
+        val spend = history.spend(dayStartOf(java.time.LocalDate.of(2026, 9, 24), KST))
 
         spend.total shouldBe 3
         spend.today shouldBe 2
@@ -157,7 +162,10 @@ class CollectionAttemptLedgerTest {
             )
 
         history.axisConclusions().getValue(key) shouldBe
-            mapOf(SourceEndpoint.OPENING_COMPLETE to true, SourceEndpoint.BASE_AMOUNT_DETAIL to false)
+            mapOf(
+                SourceEndpoint.OPENING_COMPLETE to AxisConclusion(settled = true, walk = null),
+                SourceEndpoint.BASE_AMOUNT_DETAIL to AxisConclusion(settled = false, walk = null),
+            )
     }
 
     /**
@@ -182,7 +190,7 @@ class CollectionAttemptLedgerTest {
             AttemptHistory(listOf(attempt("2026-09-24T01:00:00Z", key, SourceEndpoint.OPENING_COMPLETE)))
 
         history.settledAxes().keys.shouldBeEmpty()
-        history.spend(SINCE, Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 1
+        history.spend(Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 1
     }
 
     /** 목록 축은 공고 단위가 아니다 — 이어 돌기 대상이 아니지만 상한은 센다. */
@@ -199,6 +207,6 @@ class CollectionAttemptLedgerTest {
             )
 
         history.settledAxes().keys.shouldBeEmpty()
-        history.spend(SINCE, Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 4
+        history.spend(Instant.parse("2026-09-23T15:00:00Z")).total shouldBe 4
     }
 }

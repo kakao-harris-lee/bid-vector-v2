@@ -61,11 +61,10 @@ class OpeningBudgetE2ETest {
     @Test
     fun `한 쪽만 받고 끊긴 축은 다음 기동이 다시 걷는다 — 최종 행 수가 전 참가자와 같다`() {
         val nonce = "SHORTWALK"
-        val since = mapOf("bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z")
 
         val (_, first) =
             e2e.bootAndRun(
-                since,
+                emptyMap(),
                 nonce = nonce,
                 openingCompletePageSize = OPENING_COMPLETE_PAGE_SIZE,
                 failOpeningCompleteSecondPageOnce = true,
@@ -79,7 +78,7 @@ class OpeningBudgetE2ETest {
 
         val (_, second) =
             e2e.bootAndRun(
-                since,
+                emptyMap(),
                 nonce = nonce,
                 openingCompletePageSize = OPENING_COMPLETE_PAGE_SIZE,
                 reuseRunState = true,
@@ -101,10 +100,8 @@ class OpeningBudgetE2ETest {
     @Test
     fun `상한이 쪽 중간에서 끊어도 그 축은 미완이고 다음 기동이 다시 걷는다`() {
         val nonce = "CAPCUT"
-        val since = mapOf("bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z")
         val capped =
-            since +
-                mapOf(
+            mapOf(
                     "bidvector.opening-collection.calls-per-day" to CAP_CUTS_SECOND_PAGE.toString(),
                     "bidvector.opening-collection.calls-total" to CAP_CUTS_SECOND_PAGE.toString(),
                 )
@@ -122,7 +119,7 @@ class OpeningBudgetE2ETest {
 
         val (_, second) =
             e2e.bootAndRun(
-                since + mapOf("bidvector.opening-collection.calls-total" to "1000"),
+                mapOf("bidvector.opening-collection.calls-total" to "1000"),
                 nonce = nonce,
                 openingCompletePageSize = OPENING_COMPLETE_PAGE_SIZE,
                 reuseRunState = true,
@@ -144,7 +141,6 @@ class OpeningBudgetE2ETest {
      */
     @Test
     fun `출하 조립이 낸 요청 수가 원장의 HTTP 줄 수와 같다 — 두 번 기동해도`() {
-        val since = mapOf("bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z")
         val cap =
             mapOf(
                 "bidvector.opening-collection.calls-per-day" to CAP_UNRELATED_TO_LEDGER.toString(),
@@ -153,7 +149,7 @@ class OpeningBudgetE2ETest {
 
         val (_, first) =
             e2e.bootAndRun(
-                e2e.censusSample() + since + cap,
+                e2e.censusSample() + cap,
                 nonce = "GROUND",
                 throttleOnce = setOf("getOpengResultListInfoCnstwk"),
             )
@@ -164,7 +160,7 @@ class OpeningBudgetE2ETest {
         // 의도 줄과 결말 줄은 한 벌이다 — 한쪽만 적히면 상한과 원장이 갈린다.
         e2e.pendingLines() shouldBe e2e.httpLines()
 
-        val (_, second) = e2e.bootAndRun(e2e.censusSample() + since + cap, nonce = "GROUND", reuseRunState = true)
+        val (_, second) = e2e.bootAndRun(e2e.censusSample() + cap, nonce = "GROUND", reuseRunState = true)
 
         second.requestCount() shouldBe e2e.httpLines() - firstRequests
         e2e.pendingLines() shouldBe e2e.httpLines()
@@ -184,7 +180,6 @@ class OpeningBudgetE2ETest {
         val (exitCodes, mock) =
             e2e.bootAndRun(
                 mapOf(
-                    "bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z",
                     "bidvector.opening-collection.calls-per-day" to DAILY_CAP.toString(),
                     "bidvector.opening-collection.calls-total" to "1000",
                 ),
@@ -205,13 +200,12 @@ class OpeningBudgetE2ETest {
     fun `두 번 기동하면 시도 원장의 합이 상한에 누적된다`() {
         // **예산 시작 시점을 두 기동에 같게 못 박는다** — 기본값(`now()`)이면 두 번째 기동의
         // 시작 시점이 첫 기동의 시도보다 뒤라 그 시도들이 계상에서 빠진다.
-        val since = mapOf("bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z")
-        e2e.bootAndRun(e2e.censusSample() + since, nonce = "ACCUM")
+        e2e.bootAndRun(e2e.censusSample(), nonce = "ACCUM")
         val spent = e2e.pendingLines()
 
         val (exitCodes, second) =
             e2e.bootAndRun(
-                e2e.censusSample() + since +
+                e2e.censusSample() +
                     mapOf(
                         "bidvector.opening-collection.calls-per-day" to spent.toString(),
                         "bidvector.opening-collection.calls-total" to spent.toString(),

@@ -5,7 +5,10 @@ import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.wiring.CollectionTerminationTestConfiguration
+import bidvector.app.wiring.E2E_FIXED_NOW
+import bidvector.app.wiring.FixedClockTestConfiguration
 import bidvector.app.wiring.RecordingCollectionTermination
+import bidvector.procurement.COLLECTION_BUDGET_ZONE
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.sharedkernel.NoticeRound
@@ -21,6 +24,15 @@ import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZonedDateTime
+import javax.sql.DataSource
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -31,12 +43,6 @@ import org.springframework.context.ApplicationListener
 import org.springframework.context.ConfigurableApplicationContext
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
-import java.io.ByteArrayOutputStream
-import java.io.PrintStream
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-import java.time.LocalDate
-import javax.sql.DataSource
 
 /**
  * D-6F8-1~4 E2E — production 조립을 `mode=once` 로 부팅해 mock KONEPS → 원문 저장 → 정규화 → 영속 →
@@ -59,6 +65,12 @@ class CollectionRunnerE2ETest {
         private const val BAD_DATE_ITEM_NUMBER = "BAD-DATE-1"
         private const val BAD_ROUND_ITEM_NUMBER = "BAD-ROUND-1"
         private const val DAYS = 3
+
+        /** 오늘치 경계를 재는 자리의 일 상한 — 이만큼 써 둔 실행 상태로 KST 00:30 에 기동한다. */
+        private const val NOTICE_DAILY_CAP = 4
+
+        /** 미리 깔아 두는 시도의 시각 — 기동 시각보다 조금 앞이면 같은 KST 하루에 든다. */
+        private const val SEED_BACKDATE_SECONDS = 60L
 
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
@@ -182,6 +194,8 @@ class CollectionRunnerE2ETest {
                 SpringApplicationBuilder(
                     BidVectorApplication::class.java,
                     CollectionTerminationTestConfiguration::class.java,
+                    // 시계는 `E2E_FIXED_NOW` 가 비면 실 시계다 — 이 소스를 더해도 다른 test 는 그대로다.
+                    FixedClockTestConfiguration::class.java,
                 ).properties(
                     PRODUCTION_DISPATCH_PROPERTIES +
                         mapOf(
@@ -198,7 +212,6 @@ class CollectionRunnerE2ETest {
                             "bidvector.collection.categories" to "construction,service",
                             "bidvector.collection.calls-per-day" to "10000",
                             "bidvector.collection.calls-total" to "10000",
-                            "bidvector.collection.budget-since" to "2026-01-01T00:00:00Z",
                             "bidvector.collection.run-state-dir" to NOTICE_E2E_RUN_STATE.toString(),
                             "bidvector.koneps.service-key" to SERVICE_KEY,
                             "bidvector.koneps.base-url" to mock.baseUrl,
@@ -296,6 +309,39 @@ class CollectionRunnerE2ETest {
     private fun assertNoServiceKey(run: RunResult) {
         run.everything shouldNotContain SERVICE_KEY
         run.everything shouldNotContain URLEncoder.encode(SERVICE_KEY, StandardCharsets.UTF_8)
+    }
+
+    /**
+     * **D-6G-72 (vr r5 H-4) — 공고 목록 갈래의 상한 seed 를 잰다.** 개찰 갈래에는 같은 모양의
+     * test 가 있었고 이 갈래에는 없었다: 증분 등식(요청 수 == HTTP 줄 수)은 **seed 가 없어도**
+     * 성립하므로, 배선이 원장에서 seed 하지 않게 되어도 아무것도 붉어지지 않았다.
+     *
+     * 오늘치를 다 쓴 실행 상태로 KST 00:30 에 기동하면 **한 요청도 나가면 안 된다.** 하루 경계를
+     * UTC 로 잡거나 seed 를 빼먹으면 오늘치가 0 으로 되살아나 그만큼 더 나간다.
+     */
+    @Test
+    fun `오늘치를 다 쓴 실행 상태로 공고 목록 갈래를 KST 00시 30분에 기동하면 한 요청도 나가지 않는다`() {
+        val bootAt = ZonedDateTime.of(today, LocalTime.of(0, 30), COLLECTION_BUDGET_ZONE).toInstant()
+        val runStateDir = Files.createTempDirectory("6g-notice-budget-seeded")
+        seedSpentCallsAt(runStateDir, bootAt.minusSeconds(SEED_BACKDATE_SECONDS), NOTICE_DAILY_CAP)
+        val requestsBefore = mock.requestCount()
+
+        E2E_FIXED_NOW.set(bootAt)
+        val exitCodes =
+            try {
+                bootAndRun(
+                    mapOf(
+                        "bidvector.collection.run-state-dir" to runStateDir.toString(),
+                        "bidvector.collection.calls-per-day" to NOTICE_DAILY_CAP.toString(),
+                        "bidvector.collection.calls-total" to "10000",
+                    ),
+                )
+            } finally {
+                E2E_FIXED_NOW.set(null)
+            }
+
+        mock.requestCount() shouldBe requestsBefore
+        exitCodes shouldContainExactly listOf(CollectionExitCode.INCOMPLETE.value)
     }
 
     /**

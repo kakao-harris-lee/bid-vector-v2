@@ -114,10 +114,9 @@ internal fun seededBudget(
     runState: RunStateDirectory,
     perDay: Int,
     total: Int,
-    since: java.time.Instant,
     clock: Clock,
 ): CallBudgetLedger {
     val today = LocalDate.ofInstant(clock.now(), COLLECTION_BUDGET_ZONE)
-    val spent = runState.attempts.read().spend(since, dayStartOf(today, COLLECTION_BUDGET_ZONE))
+    val spent = runState.attempts.read().spend(dayStartOf(today, COLLECTION_BUDGET_ZONE))
     return CallBudgetLedger(CollectionCallBudget(perDay, total), today, spent)
 }

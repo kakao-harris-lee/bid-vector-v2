@@ -153,10 +153,6 @@ internal class OpeningCollectionE2EHarness {
             "bidvector.opening-collection.sample-size" to (TARGET_PER_STRATUM * DIVISIONS).toString(),
             "bidvector.opening-collection.calls-per-day" to "1000",
             "bidvector.opening-collection.calls-total" to "1000",
-            // **test 마다 다른 예산 시작 시점.** 원장이 영속이라(D-6G-29 ①) 앞 test 가
-            // 남긴 collection_run 행이 다음 test 의 상한을 갉아먹는다 — 그것이 영속이
-            // 실제로 동작한다는 증거이기도 하다.
-            "bidvector.opening-collection.budget-since" to Instant.now().toString(),
             "bidvector.opening-collection.run-state-dir" to runStateDir.toString(),
             "bidvector.koneps.service-key" to SERVICE_KEY,
             "bidvector.koneps.base-url" to mock.baseUrl,

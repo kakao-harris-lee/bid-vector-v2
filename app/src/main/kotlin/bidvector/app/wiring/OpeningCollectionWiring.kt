@@ -105,7 +105,7 @@ open class OpeningCollectionWiring {
         runState: RunStateDirectory,
         clock: Clock,
     ): CallBudgetLedger =
-        seededBudget(runState, properties.callsPerDay, properties.callsTotal, properties.budgetSince, clock)
+        seededBudget(runState, properties.callsPerDay, properties.callsTotal, clock)
 
     /**
      * 실행 상태 디렉터리(D-6G-39·45) — 확정 표본과 시도 원장이 여기 있다. 저장소 밖 강제도, 디렉터리

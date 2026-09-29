@@ -23,7 +23,6 @@ data class CollectionProperties(
      */
     val callsPerDay: Int,
     val callsTotal: Int,
-    val budgetSince: java.time.Instant,
     /** 실행 상태 디렉터리 — 개찰 갈래와 **같은 자리**여야 두 갈래의 호출이 한 원장에서 합쳐진다. */
     val runStateDir: String,
     val releaseSha: String = UNVERSIONED_RELEASE,

@@ -83,7 +83,6 @@ class CollectionWiringTest {
         // D-6G-47 H-1 — 이 갈래도 승인 상한 아래다. 기본값이 없으므로 켜려면 넷을 대야 한다.
         "bidvector.collection.calls-per-day=1000",
         "bidvector.collection.calls-total=1000",
-        "bidvector.collection.budget-since=2026-01-01T00:00:00Z",
         "bidvector.collection.run-state-dir=$NOTICE_RUN_STATE",
         "bidvector.koneps.service-key=$secretKey",
     )
