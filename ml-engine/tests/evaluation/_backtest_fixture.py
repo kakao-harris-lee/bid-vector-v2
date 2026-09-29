@@ -164,6 +164,9 @@ def build_files() -> tuple[bytes, bytes, bytes]:
         # v5 — 축이 반쪽인 표본도 하나 둔다. 0 만 지나가는 fixture 는 그 항을 검사하지
         # 않는다(왕복 golden 이 10/10/0/0 이던 때와 같은 함정).
         "incomplete_axis": 1,
+        # v5 — 확정 범위(D-6G-66). 이 fixture 는 층도 행도 용역 하나라 범위도 하나다.
+        # 문턱이 이 **수**로 정해지므로, 둘이 갈리는 판은 전용 test 가 따로 짓는다.
+        "sample_scope_divisions": ["SERVICE"],
     }
     return (
         json.dumps(manifest, sort_keys=True, ensure_ascii=False).encode("utf-8"),
