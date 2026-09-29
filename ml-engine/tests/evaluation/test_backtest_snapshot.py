@@ -33,7 +33,7 @@ from ml_engine.evaluation.backtest.observations import (
 )
 from ml_engine.evaluation.backtest.reasons import ProducerExclusionReason
 from ml_engine.evaluation.backtest.sample_list import (
-    _BUSINESS_DIVISIONS,
+    BUSINESS_DIVISIONS,
     parse_sample_list,
 )
 from ml_engine.evaluation.backtest.snapshot import (
@@ -644,7 +644,7 @@ def test_broken_utf8_names_the_file_that_broke() -> None:
 
 
 def test_business_division_vocabulary_matches_the_schema_document() -> None:
-    """cr r4 L-7 — `_BUSINESS_DIVISIONS` 는 Kotlin `BusinessDivision` 의 **손 복사본**
+    """cr r4 L-7 — `BUSINESS_DIVISIONS` 는 Kotlin `BusinessDivision` 의 **손 복사본**
     이다. 두 레인을 묶는 자리가 없으면 Kotlin 이 업무를 하나 늘릴 때 Python 이 스냅숏
     전체를 거부하고, 진단은 「업무 구분이 닫힌 셋 밖이다」 한 줄뿐이다.
 
@@ -660,9 +660,9 @@ def test_business_division_vocabulary_matches_the_schema_document() -> None:
         for token in re.findall(r"`[A-Z_]+`", rows[0])
         if token.strip("`").isupper()
     }
-    assert documented == set(_BUSINESS_DIVISIONS), (
+    assert documented == set(BUSINESS_DIVISIONS), (
         f"스키마 문서의 어휘와 판독기의 닫힌 셋이 다르다 — 문서: {sorted(documented)} · "
-        f"판독기: {sorted(_BUSINESS_DIVISIONS)}"
+        f"판독기: {sorted(BUSINESS_DIVISIONS)}"
     )
 
 

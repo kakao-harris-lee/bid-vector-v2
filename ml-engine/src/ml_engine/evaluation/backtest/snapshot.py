@@ -51,7 +51,11 @@ from ml_engine.evaluation.backtest.observations import (
     SnapshotRejected,
     SnapshotRow,
 )
-from ml_engine.evaluation.backtest.sample_list import SampleList, check_sample_list
+from ml_engine.evaluation.backtest.sample_list import (
+    BUSINESS_DIVISIONS,
+    SampleList,
+    check_sample_list,
+)
 from ml_engine.registry.artifact import JsonValue
 
 SUPPORTED_SNAPSHOT_SCHEMA_VERSION: Final[str] = "snapshot-v5"
@@ -111,6 +115,7 @@ _MANIFEST_KEYS: Final[frozenset[str]] = frozenset(
         "sampled_without_detail",
         "sampled_without_notice",
         "incomplete_axis",
+        "sample_scope_divisions",
     }
 )
 
@@ -239,6 +244,51 @@ class _Manifest:
     sampled_without_detail: int
     sampled_without_notice: int
     incomplete_axis: int
+    sample_scope_divisions: tuple[str, ...]
+
+
+def _scope_divisions(fields: dict[str, JsonValue]) -> tuple[str, ...]:
+    """`sample_scope_divisions`(v5, D-6G-66) — **확정 범위가 말하는** 업무 집합.
+
+    최소 표본 문턱이 이 수로 정해진다. 표본 행에서 센 distinct 로 잡으면 한 업무가
+    통째로 빠졌을 때 문턱이 함께 내려가고, 그 하락은 조용하다 — 결측이 자기 검사를
+    낮추는 모양이다. 그래서 문턱의 출처를 **생산 쪽이 선언한 범위**로 옮긴다.
+
+    어휘는 §2.1 의 닫힌 셋이고(D-6G-53), 문서가 오름차순 중복 없음을 규정하므로
+    그대로 요구한다 — 「같은 입력이면 같은 바이트」가 이 칸에서도 서야 한다."""
+    raw = row_value(fields, "sample_scope_divisions")
+    if not isinstance(raw, list):
+        raise RowReadError(
+            SnapshotRejectionReason.INVALID_VALUE, "sample_scope_divisions: 배열 아님"
+        )
+    values = tuple(row_text({"item": item}, "item") for item in raw)
+    if not values:
+        raise RowReadError(
+            SnapshotRejectionReason.INVALID_VALUE, "sample_scope_divisions: 비었다"
+        )
+    unknown = sorted(set(values) - BUSINESS_DIVISIONS)
+    if unknown:
+        raise RowReadError(
+            SnapshotRejectionReason.UNKNOWN_BUSINESS_DIVISION,
+            f"sample_scope_divisions: 닫힌 셋 밖 {unknown}",
+        )
+    if list(values) != sorted(set(values)):
+        raise RowReadError(
+            SnapshotRejectionReason.INVALID_VALUE,
+            "sample_scope_divisions: 오름차순 중복 없음이 아니다",
+        )
+    return values
+
+
+def _check_scope(scope: tuple[str, ...], listing: SampleList) -> None:
+    """표본의 업무 ⊆ 확정 범위(D-6G-66). 범위 밖 업무가 표본에 있으면 둘 중 하나는
+    거짓이다 — 문턱을 그 범위에서 정하는 이상 조용히 넘길 수 없다."""
+    stray = sorted(set(listing.divisions) - set(scope))
+    if stray:
+        raise RowReadError(
+            SnapshotRejectionReason.SAMPLE_SCOPE_MISMATCH,
+            f"확정 범위 밖의 표본 업무 {stray}",
+        )
 
 
 def _parse_manifest(manifest_bytes: bytes) -> _Manifest:
@@ -260,6 +310,7 @@ def _parse_manifest(manifest_bytes: bytes) -> _Manifest:
         sampled_without_detail=row_integer(fields, "sampled_without_detail"),
         sampled_without_notice=row_integer(fields, "sampled_without_notice"),
         incomplete_axis=row_integer(fields, "incomplete_axis"),
+        sample_scope_divisions=_scope_divisions(fields),
     )
 
 
@@ -351,6 +402,7 @@ def _assemble(
         sampled_without_notice=manifest.sampled_without_notice,
         incomplete_axis=manifest.incomplete_axis,
         sample_divisions=listing.divisions,
+        sample_scope_divisions=manifest.sample_scope_divisions,
         rows=rows,
     )
 
@@ -360,7 +412,8 @@ def load_snapshot(
 ) -> LoadedSnapshot | SnapshotRejected:
     """스냅숏 바이트 **셋**을 판독한다(v4 — 표본 목록이 파일이 됐다). 실패는 전부
     `SnapshotRejected` — 예외로 새지 않는다. 순서: manifest 형식 → schema version →
-    rows checksum → 행 판독 → row 수 → 빈 스냅숏 → 중복 공고 → 기간 → 표본 대조 셋."""
+    rows checksum → 행 판독 → row 수 → 빈 스냅숏 → 중복 공고 → 기간 → 표본 대조 셋 →
+    확정 범위 대조(v5, D-6G-66)."""
     try:
         manifest = _parse_manifest(manifest_bytes)
         actual = hashlib.sha256(rows_bytes).hexdigest()
@@ -379,6 +432,7 @@ def load_snapshot(
             sampled_without_notice=manifest.sampled_without_notice,
             incomplete_axis=manifest.incomplete_axis,
         )
+        _check_scope(manifest.sample_scope_divisions, listing)
         return _assemble(manifest, rows, listing)
     except RowReadError as rejected:
         # `UnicodeDecodeError` 를 여기서 받지 않는다 — 파일마다 자기 판독기가 사유를

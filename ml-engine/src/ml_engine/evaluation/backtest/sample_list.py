@@ -33,7 +33,7 @@ _NOTICE_KEY_ALPHABET: Final[frozenset[str]] = frozenset(string.hexdigits.lower()
 달랐다. 오늘은 manifest 해시 대조가 가려 주지만, 가려 준다는 것과 검사한다는 것은
 다르다."""
 
-_BUSINESS_DIVISIONS: Final[frozenset[str]] = frozenset(
+BUSINESS_DIVISIONS: Final[frozenset[str]] = frozenset(
     {"CONSTRUCTION", "SERVICE", "GOODS", "FOREIGN"}
 )
 """스키마 §2.1 의 업무 구분 어휘(Kotlin `BusinessDivision`). **닫힌 셋이다**(D-6G-53).
@@ -116,7 +116,7 @@ def _parse_line(line: str) -> tuple[str, str]:
             SnapshotRejectionReason.SAMPLE_LIST_MALFORMED,
             "층 칸이 비었다(업무 축 또는 주)",
         )
-    if division not in _BUSINESS_DIVISIONS:
+    if division not in BUSINESS_DIVISIONS:
         raise RowReadError(
             SnapshotRejectionReason.UNKNOWN_BUSINESS_DIVISION,
             "업무 구분이 닫힌 셋 밖이다",

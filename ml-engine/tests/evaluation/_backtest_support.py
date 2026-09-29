@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ml_engine.evaluation.backtest.sample_list import BUSINESS_DIVISIONS
+
 _BASE_AMOUNT = 1_000_000_000
 _FLOOR_RATE = 0.87745
 
@@ -216,8 +218,13 @@ def manifest_bytes(
     sampled_without_detail: int = 0,
     sampled_without_notice: int = 0,
     incomplete_axis: int = 0,
+    sample_scope_divisions: tuple[str, ...] | None = None,
     schema_version: str = "snapshot-v5",
 ) -> bytes:
+    """`sample_scope_divisions` 를 주지 않으면 **표본 목록에 나타난 업무**로 채운다 —
+    범위와 표본이 같은 판이 기본이고, 둘을 **다르게** 두는 것은 그것을 재는 test 의
+    몫이다(D-6G-66: 문턱이 어느 쪽에서 오는지는 둘이 다를 때만 갈린다)."""
+    listing = sample_list_bytes(rows) if sample_list is None else sample_list
     payload = {
         "schema_version": schema_version,
         "snapshot_id": snapshot_id,
@@ -234,9 +241,7 @@ def manifest_bytes(
             hashlib.sha256(rows).hexdigest() if rows_sha256 is None else rows_sha256
         ),
         "sample_list_sha256": (
-            hashlib.sha256(
-                sample_list_bytes(rows) if sample_list is None else sample_list
-            ).hexdigest()
+            hashlib.sha256(listing).hexdigest()
             if sample_list_sha256 is None
             else sample_list_sha256
         ),
@@ -251,8 +256,31 @@ def manifest_bytes(
         "sampled_without_detail": sampled_without_detail,
         "sampled_without_notice": sampled_without_notice,
         "incomplete_axis": incomplete_axis,
+        "sample_scope_divisions": (
+            sorted(_listing_divisions(listing))
+            if sample_scope_divisions is None
+            else list(sample_scope_divisions)
+        ),
     }
     return json.dumps(payload, sort_keys=True).encode("utf-8")
+
+
+def _listing_divisions(listing: bytes) -> set[str]:
+    """표본 목록에서 **어휘에 맞는** 업무만 모은다.
+
+    일부러 깨뜨린 목록(어휘 밖 값·칸 수 위반)을 쓰는 test 가 있다 — 그 값을 범위 칸에
+    옮겨 적으면 manifest 판독이 먼저 걸려 test 가 겨눈 자리를 못 본다. 기본값은 판이
+    서는 값이어야 한다."""
+    divisions = {
+        columns[1]
+        for columns in (
+            line.split("\t")
+            for line in listing.decode("utf-8", errors="replace").splitlines()
+        )
+        if len(columns) == len(("key", "division", "week"))
+        and columns[1] in BUSINESS_DIVISIONS
+    }
+    return divisions or {"SERVICE"}
 
 
 def write_snapshot_dir(

@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
@@ -150,8 +151,17 @@ class LoadedSnapshot:
     설명함을 보증한다."""
 
     sample_divisions: tuple[str, ...]
-    """표본틀에 들어간 업무 축들(오름차순 distinct). 최소 표본 결정식이 이 **수**를
-    쓴다(M-6) — 코드 상수가 아니라 두 레인이 다 읽는 파일이 출처다."""
+    """표본 목록 파일에 **실제로 나타난** 업무 축들(오름차순 distinct).
+
+    v5 부터 최소 표본 문턱은 이 값이 아니라 `sample_scope_divisions` 가 정한다
+    (D-6G-66) — 이 값은 「범위 안에서 무엇이 실제로 뽑혔나」의 공시다."""
+
+    sample_scope_divisions: tuple[str, ...]
+    """**확정 범위가 말하는** 업무 집합(v5, D-6G-66, manifest 출처).
+
+    문턱을 표본에서 세면 한 업무가 통째로 빠질 때 distinct 가 줄어 문턱이 함께
+    내려간다 — 결측이 자기 검사를 낮추는 모양이고 그 하락은 조용하다. 문턱은 이
+    칸에서만 오고, `sample_divisions` 는 이 칸의 부분집합이어야 한다(판독이 대조)."""
 
     rows: tuple[SnapshotRow, ...]
 
@@ -165,3 +175,15 @@ class LoadedSnapshot:
         v5 의 `incomplete_axis` 도 **분모에 남는다** — 축이 반쪽이라 행이 되지 못했을
         뿐 공고 축은 관측됐기 때문이다(그래서 `sampled_without_notice` 가 아니다)."""
         return self.sample_size - self.sampled_without_notice
+
+    @property
+    def division_row_counts(self) -> tuple[tuple[str, int], ...]:
+        """**확정 범위의** 업무마다 행이 몇 개 왔는가(v5, D-6G-66).
+
+        범위에서 세므로 행이 0 인 업무가 목록에서 사라지지 않는다 — 그 업무가 통째로
+        빠진 사실이 판정문에 남고, 문턱은 그대로다. 0 인 업무를 판정이 따로 공시한다."""
+        counted = Counter(str(row.notice.category) for row in self.rows)
+        return tuple(
+            (division, counted.get(division, 0))
+            for division in self.sample_scope_divisions
+        )

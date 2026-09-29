@@ -98,3 +98,17 @@ class ProducerExclusionReason(StrEnum):
     SAMPLED_WITHOUT_DETAIL = "SAMPLED_WITHOUT_DETAIL"
     SAMPLED_WITHOUT_NOTICE = "SAMPLED_WITHOUT_NOTICE"
     INCOMPLETE_AXIS = "INCOMPLETE_AXIS"
+
+
+class DivisionCoverage(StrEnum):
+    """확정 범위의 업무 하나가 표본에서 어떻게 대표됐는가(v5, D-6G-66).
+
+    `UNDERPOWERED` 는 **행이 하나도 오지 않았다**는 뜻이다. 그 업무가 목록에서
+    사라지는 대신 이 이름으로 남아야, 문턱이 왜 내려가지 않았는지가 판정문에서
+    읽힌다 — 빠진 업무를 조용히 지우면 결측이 스스로 검사를 낮춘다.
+
+    행이 있는데 적어서 검정력이 모자란 경우는 이 축이 아니라 **창 단위**
+    UNDERPOWERED 가 잰다(D-6G-31). 두 축은 다른 것을 센다."""
+
+    COVERED = "COVERED"
+    UNDERPOWERED = "UNDERPOWERED"

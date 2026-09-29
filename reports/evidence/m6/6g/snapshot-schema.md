@@ -63,6 +63,15 @@ raw 행의 존재가 아니다. 다음 실행이 그 축을 다시 부르면 이
 범위이고(`sample-scope.json` 의 `divisions`), 표본 행의 업무 집합은 이 칸의 **부분집합**이어야 한다.
 비어 있는 업무는 그 자리에서 보이고 판정이 그 업무를 따로 공시한다.
 
+값은 §2.1 의 닫힌 어휘이고 **오름차순·중복 없음**이다. 판독은 셋을 검사한다 — 어휘 밖이면
+`UNKNOWN_BUSINESS_DIVISION`, 정렬·중복이 어긋나면 `INVALID_VALUE`, 표본 목록의 업무가 이 칸 밖이면
+`SAMPLE_SCOPE_MISMATCH` 로 **스냅숏 전체를 거부**한다.
+
+**판정문의 업무 대표 어휘**(닫힌 셋): `COVERED` · `UNDERPOWERED`. 확정 범위의 업무 하나에 행이
+하나도 오지 않으면 `UNDERPOWERED` 다 — 문턱은 내려가지 않고, 그 업무가 판정 JSON 의
+`snapshot.division_coverage` 에 행 수 0 과 함께 남는다. 행이 있는데 적어서 검정력이 모자란 것은
+이 축이 아니라 **창 단위** UNDERPOWERED 가 잰다(D-6G-31) — 두 축은 다른 것을 센다.
+
 **닫힌 항등식:** `sample_size == row_count + sampled_without_detail + sampled_without_notice +
 incomplete_axis`.
 표본 하나하나가 행이 되었거나, 되지 못한 사유로 계수된다 — 어느 쪽도 아닌 공고는 없다. 판독은 이

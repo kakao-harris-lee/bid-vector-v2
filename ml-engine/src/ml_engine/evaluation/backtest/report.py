@@ -16,7 +16,10 @@ import json
 from collections.abc import Sequence
 
 from ml_engine.evaluation.backtest.fit import FitResult
-from ml_engine.evaluation.backtest.reasons import ProducerExclusionReason
+from ml_engine.evaluation.backtest.reasons import (
+    DivisionCoverage,
+    ProducerExclusionReason,
+)
 from ml_engine.evaluation.backtest.records import (
     BacktestStopped,
     BacktestVerdict,
@@ -43,6 +46,18 @@ def _snapshot(record: SnapshotRecord) -> dict[str, JsonValue]:
         "sample_list_sha256": record.sample_list_sha256,
         "sample_size": record.sample_size,
         "sample_divisions": list(record.sample_divisions),
+        # D-6G-66 — 문턱의 출처(확정 범위)와, 그 범위에서 **행이 오지 않은** 업무.
+        # 범위에서 세므로 빠진 업무가 목록에서 사라지지 않고 UNDERPOWERED 로 남는다.
+        "sample_scope_divisions": list(record.sample_scope_divisions),
+        "division_coverage": {
+            division: {
+                "row_count": count,
+                "status": str(
+                    DivisionCoverage.COVERED if count else DivisionCoverage.UNDERPOWERED
+                ),
+            }
+            for division, count in record.division_row_counts
+        },
         # 생산 귀속 결측은 **닫힌 어휘로** 싣는다(스키마 §6, v5) — 행이 오지 않는
         # 표본들이라 판독은 계수만 볼 수 있고, 이름이 닫혀 있어야 「왜 빠졌는지 모르는
         # 공고」가 생기지 않는다.

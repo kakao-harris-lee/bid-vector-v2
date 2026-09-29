@@ -94,8 +94,15 @@ class SnapshotRecord:
     sampled_without_notice: int
     incomplete_axis: int
     sample_divisions: tuple[str, ...]
-    """표본틀에 들어간 업무 구분들(D-6G-53). 최소 표본 문턱이 이 **수**로 정해지므로
+    """표본 목록에 **실제로 나타난** 업무 구분들(D-6G-53)."""
+
+    sample_scope_divisions: tuple[str, ...]
+    """**확정 범위**의 업무 구분들(D-6G-66). 최소 표본 문턱이 이 **수**로 정해지므로
     판정문이 그 근거를 싣는다 — 값이 보이지 않으면 문턱이 왜 그 값인지 알 수 없다."""
+
+    division_row_counts: tuple[tuple[str, int], ...]
+    """확정 범위의 업무마다 온 행 수. 0 인 업무는 판정문에서 UNDERPOWERED 로 공시된다
+    — 표본에서 사라지는 대신 이름이 남아야 문턱이 내려가지 않은 이유가 읽힌다."""
 
     period_start: date
     period_end: date

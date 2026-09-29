@@ -82,6 +82,8 @@ def _snapshot_record(snapshot: LoadedSnapshot) -> SnapshotRecord:
         sampled_without_notice=snapshot.sampled_without_notice,
         incomplete_axis=snapshot.incomplete_axis,
         sample_divisions=snapshot.sample_divisions,
+        sample_scope_divisions=snapshot.sample_scope_divisions,
+        division_row_counts=snapshot.division_row_counts,
         period_start=snapshot.period_start,
         period_end=snapshot.period_end,
     )
@@ -233,10 +235,11 @@ def _sampling_record(request: BacktestRequest) -> SamplingRecord:
     (verifier r1 M-3 — 앞 판의 `min_required_sample` 은 어디서도 멈춤을 만들지 않는
     죽은 값이었다).
 
-    업무 수는 **표본 목록 파일이 말한다**(M-6). `len(BusinessCategory)` 로 세면 이
-    레인의 코드 상수가 문턱을 정하게 되고, Kotlin 의 수집 대상 업무 설정과 갈리면
-    영영 닿지 않는(또는 너무 낮은) 문턱이 된다 — 두 레인이 다 읽는 파일이 단일
-    출처다."""
+    업무 수는 **확정 범위**(`sample_scope_divisions`, manifest)가 말한다(D-6G-66).
+    `len(BusinessCategory)` 로 세면 이 레인의 코드 상수가 문턱을 정하고, 표본 목록에
+    나타난 업무로 세면 한 업무가 통째로 빠질 때 문턱이 **함께 내려간다** — 결측이
+    자기 검사를 낮추는 자리라 범위 쪽을 출처로 둔다(빠진 업무는 판정문이
+    UNDERPOWERED 로 공시한다)."""
     budget = request.policy.sampling
     rows = request.snapshot.rows
     size = len(rows)
@@ -247,7 +250,7 @@ def _sampling_record(request: BacktestRequest) -> SamplingRecord:
     minimum = budget.minimum_required_sample(
         rows_per_window=request.policy.verdict.min_window_rows,
         window_count=request.policy.verdict.min_window_count,
-        category_count=len(request.snapshot.sample_divisions),
+        category_count=len(request.snapshot.sample_scope_divisions),
     )
     return SamplingRecord(
         row_count=size,
