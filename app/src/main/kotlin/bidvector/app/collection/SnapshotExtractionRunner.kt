@@ -63,9 +63,11 @@ class SnapshotExtractionRunner(
     @Suppress("TooGenericExceptionCaught")
     private fun extract() {
         val sample = requireNotNull(runState.confirmedSampleList()) { "확정된 표본 목록이 없다 — 수집이 먼저다" }
-        // 축 완료는 **시도 원장**이 정한다(D-6G-58) — raw 존재가 아니다.
-        val settled = runState.attempts.read().settledAxes()
-        val extraction = source.extract(properties.from, properties.to, sample.list, settled)
+        // 축 완료도, **어느 걷기의 행을 쓸지**도 시도 원장이 정한다(D-6G-58·68) — raw 존재도 그
+        // 행의 시각도 아니다. `properties.from..to` 는 이제 추출 범위가 아니라 manifest 기간이
+        // 되돌아갈 자리일 뿐이다(행에 개찰일이 하나도 없을 때).
+        val conclusions = runState.attempts.read().axisConclusions()
+        val extraction = source.extract(sample.list, conclusions)
         val rows = SnapshotWriter.renderRows(extraction.rows)
         val period = openingPeriod(extraction, properties.from..properties.to)
         val manifest =

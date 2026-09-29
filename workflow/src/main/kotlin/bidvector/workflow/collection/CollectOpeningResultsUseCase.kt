@@ -259,7 +259,7 @@ class CollectOpeningResultsUseCase(
             // **적재 뒤에** 축의 결말을 적는다(D-6G-58 ⓑ). 적재 전에 적으면 적재가 실패하거나 그
             // 사이에 죽었을 때 다음 실행이 그 축을 「완료」로 읽고 영영 다시 부르지 않는다.
             val outcome = attemptOutcomeOf(batch.accounting)
-            attempts.append(axisConclusion(picked, axis, outcome, clock.now()))
+            attempts.append(axisConclusion(picked, axis, outcome, clock.now(), walkOf(batch)))
             recordDetailRun(batch, axis)
             if (outcome.isSettled) settledAny = true
             haltOf(batch.accounting.truncationCause, settledAny)?.let { return DetailStep.Halted(it, calls) }
@@ -297,7 +297,7 @@ class CollectOpeningResultsUseCase(
         ids.forEach { id ->
             val known = conclusions[NoticeKeyHash.of(id.number.value, id.round.value).value].orEmpty()
             DetailAxis.entries.forEach { axis ->
-                when (known[axis.endpoint]) {
+                when (known[axis.endpoint]?.settled) {
                     true -> out.getOrPut(id) { mutableSetOf() }.add(axis)
                     false -> out[id]?.remove(axis)
                     null -> Unit
@@ -355,6 +355,7 @@ private fun axisConclusion(
     axis: DetailAxis,
     outcome: AttemptOutcome,
     at: Instant,
+    walk: Instant?,
 ): CollectionAttempt =
     CollectionAttempt(
         noticeKey = NoticeKeyHash.of(picked.id.number.value, picked.id.round.value).value,
@@ -362,7 +363,20 @@ private fun axisConclusion(
         outcome = outcome,
         at = at,
         kind = AttemptKind.AXIS,
+        walk = walk,
     )
+
+/**
+ * 이 걷기의 이름(D-6G-68) — 한 걷기의 모든 쪽이 같은 관측 시각을 달고 오므로 그 값이다. 행이 없으면
+ * `null`(빈 응답)이고, 그것이 추출에게 「이 축은 0 행」이라는 뜻이다. **원장이 걷기를 가리키므로**
+ * 추출이 원문 행의 시각으로 걷기를 짐작하지 않는다.
+ */
+private fun walkOf(batch: SourceBatch<RawNoticeObservation>): Instant? {
+    val observedAt = batch.items.firstOrNull()?.observedAt ?: return null
+    // 한 걷기가 두 시각을 달면 추출이 그 축의 행을 반만 쓴다 — 조용하므로 여기서 멈춘다.
+    require(batch.items.all { it.observedAt == observedAt }) { "한 걷기의 쪽들이 서로 다른 관측 시각을 달았다" }
+    return observedAt
+}
 
 private sealed interface DetailStep {
     data class Done(

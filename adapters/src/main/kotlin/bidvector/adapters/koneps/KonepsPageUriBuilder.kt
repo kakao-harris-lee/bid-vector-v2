@@ -14,6 +14,7 @@ import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.retry.Retry
 import java.time.Clock
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 /** [walkKonepsNoticePages] 한 스텝이 요구하는 페이지별 URI 조립 — 조회일·페이지 번호만 안다. */
 internal fun interface KonepsPageUriBuilder {
@@ -404,7 +405,10 @@ internal fun walkKonepsNoticePages(
             httpPolicy,
             collectionPolicy,
             clock,
-            clock.instant(),
+            // **걷기의 이름은 저장이 견디는 정밀도여야 한다**(D-6G-68). `observed_at` 은 TIMESTAMPTZ
+            // (마이크로초)이고 시계는 나노초를 준다 — 자르지 않으면 원장이 적은 걷기 식별자가
+            // 저장된 행의 시각과 영원히 다르고, 추출은 그 축의 행을 **하나도** 찾지 못한다(실측).
+            clock.instant().truncatedTo(ChronoUnit.MICROS),
             counters,
             itemMapper,
         )

@@ -341,6 +341,8 @@ internal class FileAttemptLedger(
                     "notice_key_hash" to (attempt.noticeKey?.let { SnapshotJson.Text(it) } ?: SnapshotJson.Null),
                     "outcome" to SnapshotJson.Text(labelOf(attempt.outcome)),
                     "kind" to SnapshotJson.Text(attempt.kind.name),
+                    // 걷기 식별자(D-6G-68) — AXIS 줄만 갖는다. 없는 줄은 키 자체를 싣지 않는다.
+                    "walk" to (attempt.walk?.let { SnapshotJson.Text(it.toString()) } ?: SnapshotJson.Null),
                 ),
             ).render() + "\n"
 
@@ -363,6 +365,8 @@ internal class FileAttemptLedger(
                 requireNotNull(AttemptKind.entries.firstOrNull { it.name == fields["kind"].asStringOrNull() }) {
                     "시도 원장의 줄 갈래 어휘가 아니다"
                 },
+            // 이 칸 이전에 쓰인 원장은 값이 없다 — 그 축은 걷기를 모르므로 추출이 미완으로 센다.
+            walk = fields["walk"]?.asStringOrNull()?.let(Instant::parse),
         )
     }
 }

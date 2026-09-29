@@ -108,10 +108,11 @@ internal fun canonicalNoticeOf(rows: ResultSet): CanonicalNotice? {
  * 존재 판정에 JSONB `?` 연산자를 **쓰지 않는다** — JDBC 가 그것을 바인드 자리로 읽어 「매개 변수 3 에
  * 값이 없다」로 떨어진다(실측). `->> … IS NOT NULL` 이 같은 일을 하면서 그 충돌이 없다.
  *
- * **공고 목록 축은 관측 창에서 뺀다**(D-6G-54, vr M-4). 창이 자르는 것은 「어느 개찰 관측을 실을까」
- * 이고, 목록 축은 그 행을 **설명하는** 값(공고일·낙찰방법·분류)을 나르는 곁 자료다. 목록 적재가
- * 창보다 앞서는 것은 정상인데(공고는 개찰보다 먼저다) 그것까지 자르면 전 행이 `NOTICE_DATE_ABSENT`
- * 가 된다. 축 어휘는 바인드로 넘긴다 — SQL 에 열거 이름을 박지 않는다.
+ * **관측 창을 걸지 않는다**(D-6G-68). 범위를 정하는 것은 표본 목록과 시도 원장이다 — 표본 밖은
+ * 아래에서 버려지고, 표본 안에서 어느 걷기를 쓸지는 원장의 AXIS 줄이 가리킨다. 창을 함께 걸면
+ * **원장에는 걸리지 않는 창**이 되어, 창 밖에서 다시 걸은 축의 행이 보이지 않고 그 앞의 잘린 걷기가
+ * 마지막으로 보인다(vr r5 H-1 probe W5). 앞 판이 목록 축만 창에서 뺀 이유(D-6G-54 — 목록 적재가
+ * 개찰보다 앞서는 것은 정상이다)는 상세 축에도 같은 힘으로 적용된다.
  *
  * 공고 식별자 둘의 **키 이름은 여기서 짓지 않는다**(vr r4 L-11) — [NOTICE_NUMBER_RAW_KEY]·
  * [NOTICE_ROUND_RAW_KEY] 가 필드 계약과 같은 정의를 준다. 리터럴로 적으면 계약이 바뀌어도 이 문은
@@ -125,8 +126,7 @@ internal val OBSERVATION_SQL =
            payload_fields::text AS payload_fields,
            observed_at
       FROM raw_observation
-     WHERE (source_endpoint = ? OR (observed_at >= ?::date AND observed_at < ?::date))
-       AND payload_fields ->> '${jsonbKeyOf(NOTICE_NUMBER_RAW_KEY)}' IS NOT NULL
+     WHERE payload_fields ->> '${jsonbKeyOf(NOTICE_NUMBER_RAW_KEY)}' IS NOT NULL
      ORDER BY inserted_at
     """
 

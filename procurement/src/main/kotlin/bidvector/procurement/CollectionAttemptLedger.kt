@@ -23,11 +23,24 @@ data class CollectionAttempt(
     val outcome: AttemptOutcome,
     val at: Instant,
     val kind: AttemptKind,
+    /**
+     * **이 결말이 가리키는 걷기**(D-6G-68) — 그 걷기의 관측 시각이고, 한 걷기의 모든 쪽이 같은 값을
+     * 단다. [AttemptKind.AXIS] 줄만 갖는다(호출 단위 줄은 걷기를 모른다). 빈 응답이면 `null` 이다 —
+     * 그 걷기는 행을 남기지 않았고, 그것이 곧 「이 축은 0 행」이라는 뜻이다.
+     *
+     * 이 칸이 없던 동안 추출은 「원문 행 중 가장 늦은 시각」으로 걷기를 **짐작**했다. 그러면 셋이
+     * 조용히 틀린다: 빈 응답으로 끝난 재걷기는 행을 남기지 않아 앞의 잘린 걷기가 마지막으로 보이고,
+     * 추출의 관측 창은 원장에 걸리지 않아 창 밖 재걷기가 보이지 않으며, 벽시계가 뒤로 가면 걷기의
+     * 순서가 뒤집힌다. 셋 다 정직한 운영자에게 일어나고(예비 추출·일시적 `NODATA`·시계 보정),
+     * 결과는 **잘린 투찰 행이 완료 행으로 실리는 것**이다 — 계수도 오류도 없이.
+     */
+    val walk: Instant? = null,
 ) {
     init {
         // 형태를 여기서 닫는다 — 원장은 영속 파일이고, 키가 아닌 문자열이 한 줄 들어가면 그 줄은
         // 어떤 공고와도 맞지 않아 그 축이 영영 다시 불린다(조용히 상한만 태운다).
         require(noticeKey == null || NOTICE_KEY_HEX.matches(noticeKey)) { NOTICE_KEY_HEX_MESSAGE }
+        require(walk == null || kind == AttemptKind.AXIS) { "걷기 식별자는 AXIS 줄만 갖는다" }
     }
 }
 
@@ -86,6 +99,18 @@ sealed interface AttemptOutcome {
 }
 
 /**
+ * (공고, 축)의 **마지막 AXIS 결말**(D-6G-68) — 끝났는가와, 그 결말이 **어느 걷기의 것인가**.
+ *
+ * 추출이 이 둘을 함께 읽어야 짐작이 사라진다. [settled] 만 있으면 「끝났다」는 알아도 **어느 행이
+ * 그 끝난 걷기의 것인지**는 모르고, 그 자리를 원문 행의 시각으로 메우는 순간 잘린 걷기가 완료 행이
+ * 된다. [walk] 가 `null` 인 settled 는 빈 응답이고 **0 행**이다.
+ */
+data class AxisConclusion(
+    val settled: Boolean,
+    val walk: Instant?,
+)
+
+/**
  * 읽어 온 시도 이력 — 두 물음에만 답한다. 파일 판독은 어댑터가 하고 이 타입은 값만 센다.
  */
 class AttemptHistory(
@@ -115,18 +140,20 @@ class AttemptHistory(
      * 영구히 포기하면 그 결측이 무작위가 아니게 된다 — 느린 응답·과부하 시간대에 몰린 공고만 빠지고,
      * 그 행은 값 결측 제외로 계수되어 사유 귀속까지 틀린다.
      */
-    fun axisConclusions(): Map<String, Map<SourceEndpoint, Boolean>> =
+    fun axisConclusions(): Map<String, Map<SourceEndpoint, AxisConclusion>> =
         attempts
             .filter { it.kind == AttemptKind.AXIS }
             .mapNotNull { attempt -> attempt.noticeKey?.let { it to attempt } }
             .groupBy({ it.first }, { it.second })
             .mapValues { (_, lines) ->
-                lines.groupBy { it.axis }.mapValues { (_, byAxis) -> byAxis.last().outcome.isSettled }
+                lines.groupBy { it.axis }.mapValues { (_, byAxis) ->
+                    byAxis.last().let { AxisConclusion(it.outcome.isSettled, it.walk) }
+                }
             }
 
-    /** **다시 부르지 않을** (공고, 축) — [axisConclusions] 중 끝난 것만. 추출이 완료 판정에 쓴다. */
+    /** **다시 부르지 않을** (공고, 축) — [axisConclusions] 중 끝난 것만. 이어 돌기가 쓴다. */
     fun settledAxes(): Map<String, Set<SourceEndpoint>> =
-        axisConclusions().mapValues { (_, byAxis) -> byAxis.filterValues { it }.keys }
+        axisConclusions().mapValues { (_, byAxis) -> byAxis.filterValues { it.settled }.keys }
 
     val size: Int get() = attempts.size
 }

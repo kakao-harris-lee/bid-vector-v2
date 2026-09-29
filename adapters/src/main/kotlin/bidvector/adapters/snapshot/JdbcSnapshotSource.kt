@@ -1,5 +1,6 @@
 package bidvector.adapters.snapshot
 
+import bidvector.procurement.AxisConclusion
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.FieldConcept
 import bidvector.procurement.KonepsCollectionPolicyData
@@ -11,7 +12,6 @@ import bidvector.workflow.collection.SampleList
 import java.math.BigDecimal
 import java.sql.ResultSet
 import java.time.Instant
-import java.time.LocalDate
 import javax.sql.DataSource
 
 /**
@@ -38,16 +38,16 @@ class JdbcSnapshotSource(
      * 이제 표본 밖은 세기만 하고, 표본인데 행이 되지 못한 공고는 **사유별로** 계수된다.
      */
     fun extract(
-        from: LocalDate,
-        to: LocalDate,
         sample: SampleList,
         /**
-         * 축의 완료를 정하는 것은 **시도 원장**이다(D-6G-58) — raw 행의 존재가 아니다. 페이지
-         * 중간에 끊긴 축도 행은 남기 때문에, 존재로 판정하면 반쪽 원문으로 행을 쓰게 된다.
+         * 축의 완료와 **어느 걷기의 행을 쓸지**를 정하는 것은 시도 원장이다(D-6G-58·68) — raw 행의
+         * 존재도, 그 행의 시각도 아니다. 페이지 중간에 끊긴 축도 행은 남기므로 존재로 판정하면 반쪽
+         * 원문으로 행을 쓰고, 행의 시각으로 걷기를 고르면 빈 응답 재걷기·창 밖 재걷기·시계 역행
+         * 셋에서 앞의 잘린 걷기가 마지막으로 보인다.
          */
-        settledAxes: Map<String, Set<SourceEndpoint>>,
+        axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
     ): SnapshotExtraction {
-        val observed = readObservations(from, to, sample)
+        val observed = readObservations(sample, axisConclusions)
         val notices = readNotices(observed.byKey.keys)
         val rows = mutableListOf<SnapshotRow>()
         val withDetail = mutableSetOf<String>()
@@ -62,7 +62,7 @@ class JdbcSnapshotSource(
                 val canonical = notices[key]
                 when {
                     canonical == null -> withoutNotice++
-                    !complete(hash, canonical.division, settledAxes) -> incomplete++
+                    !complete(hash, canonical.division, axisConclusions) -> incomplete++
                     else -> rows += assembleSnapshotRow(key, axes, canonical)
                 }
             }
@@ -83,29 +83,24 @@ class JdbcSnapshotSource(
     private fun complete(
         noticeKeyHash: String,
         division: String,
-        settledAxes: Map<String, Set<SourceEndpoint>>,
+        axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
     ): Boolean {
-        val settled = settledAxes[noticeKeyHash].orEmpty()
-        return expectedAxesFor(division).all { it in settled }
+        val known = axisConclusions[noticeKeyHash].orEmpty()
+        return expectedAxesFor(division).all { known[it]?.settled == true }
     }
 
     private fun readObservations(
-        from: LocalDate,
-        to: LocalDate,
         sample: SampleList,
+        axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
     ): ObservedRows =
         dataSource.connection.use { connection ->
             // **커서로 흘린다.** Postgres 드라이버는 autoCommit 이 켜진 채로는 `fetchSize` 를 무시하고
-            // 결과 집합을 통째로 받는다 — 둘을 함께 두어야 창이 넓어져도 메모리가 늘지 않는다.
+            // 결과 집합을 통째로 받는다 — 둘을 함께 두어야 표본이 커져도 메모리가 늘지 않는다.
             // 읽기만 하므로 커밋하지 않는다(커넥션이 닫히며 롤백된다).
             connection.autoCommit = false
             connection.prepareStatement(OBSERVATION_SQL).use { statement ->
                 statement.fetchSize = OBSERVATION_FETCH_SIZE
-                var index = 1
-                statement.setString(index++, SourceEndpoint.NOTICE_LIST.name)
-                statement.setObject(index++, from)
-                statement.setObject(index, to.plusDays(1))
-                statement.executeQuery().use { rows -> groupObservations(rows, sample) }
+                statement.executeQuery().use { rows -> groupObservations(rows, sample, axisConclusions) }
             }
         }
 
@@ -117,15 +112,16 @@ class JdbcSnapshotSource(
     private fun groupObservations(
         rows: ResultSet,
         sample: SampleList,
+        axisConclusions: Map<String, Map<SourceEndpoint, AxisConclusion>>,
     ): ObservedRows {
         val byKey = linkedMapOf<NoticeKey, MutableMap<SourceEndpoint, MutableList<RawRow>>>()
-        val walkOf = mutableMapOf<Pair<NoticeKey, SourceEndpoint>, Instant>()
         val outside = mutableSetOf<NoticeKey>()
         while (rows.next()) {
             // 식별자나 엔드포인트 어휘가 서지 않는 행은 `null` 로 와서 조용히 지나간다.
             keyAndEndpointOf(rows)?.let { (key, endpoint) ->
-                if (NoticeKeyHash.of(key.number, key.round.value) in sample.keys) {
-                    collectLatestWalk(byKey, walkOf, key, endpoint, rows)
+                val hash = NoticeKeyHash.of(key.number, key.round.value)
+                if (hash in sample.keys) {
+                    collectWalkRow(byKey, key, endpoint, rows, axisConclusions[hash.value]?.get(endpoint))
                 } else {
                     outside += key
                 }
@@ -135,27 +131,30 @@ class JdbcSnapshotSource(
     }
 
     /**
-     * **(공고, 축)마다 마지막 걷기의 행만 쓴다**(D-6G-58). 원문은 append-only 라(DB 트리거) 잘린
-     * 걷기의 쪽이 그대로 남고, 다시 걸어 받은 전 쪽과 **합쳐지면** 그 공고의 참가자 수와 1위
-     * 투찰가가 조용히 틀린다 — 행이 늘 뿐 오류가 없어 아무 데서도 붉어지지 않는다. 한 걷기의 모든
-     * 쪽은 같은 관측 시각을 달고 오므로(`KonepsWalkContext.observedAt`) 그 시각이 걷기의 이름이다.
+     * **(공고, 축)마다 원장이 가리키는 걷기의 행만 쓴다**(D-6G-68). 원문은 append-only 라(DB 트리거)
+     * 잘린 걷기의 쪽이 그대로 남고, 다시 걸어 받은 전 쪽과 **합쳐지면** 그 공고의 참가자 수와 1위
+     * 투찰가가 조용히 틀린다 — 행이 늘 뿐 오류가 없어 아무 데서도 붉어지지 않는다.
+     *
+     * 앞 판은 걷기를 **행의 시각**으로 골랐다(가장 늦은 `observed_at`). 그것은 세 자리에서 틀린다:
+     * 빈 응답 재걷기는 행이 없어 보이지 않고, 추출 창 밖 재걷기도 보이지 않으며, 시계가 뒤로 가면
+     * 순서가 뒤집힌다. 지금은 원장의 마지막 AXIS 줄이 걷기를 **가리킨다** — 짐작할 자리가 없다.
+     *
+     * 결말이 없는 축(원장 이전 원문)은 행을 모아만 둔다. 그 축은 완료로 서지 못해(D-6G-58) 그
+     * 공고가 `incomplete_axis` 로 빠지므로 어느 행도 조립에 닿지 않는다.
      */
-    private fun collectLatestWalk(
+    private fun collectWalkRow(
         byKey: MutableMap<NoticeKey, MutableMap<SourceEndpoint, MutableList<RawRow>>>,
-        walkOf: MutableMap<Pair<NoticeKey, SourceEndpoint>, Instant>,
         key: NoticeKey,
         endpoint: SourceEndpoint,
         rows: ResultSet,
+        conclusion: AxisConclusion?,
     ) {
+        // 빈 응답으로 끝난 축은 **0 행**이다 — 앞의 잘린 걷기가 남긴 쪽을 쓰지 않는다.
+        if (conclusion != null && conclusion.walk == null) return
         val observedAt = rows.getTimestamp("observed_at").toInstant()
-        val latest = walkOf[key to endpoint]
-        if (latest != null && observedAt.isBefore(latest)) return
-        val slot = byKey.getOrPut(key) { linkedMapOf() }.getOrPut(endpoint) { mutableListOf() }
-        if (latest == null || observedAt.isAfter(latest)) {
-            walkOf[key to endpoint] = observedAt
-            slot.clear()
-        }
-        slot += RawRow(parseFields(rows.getString("payload_fields")), policy)
+        if (conclusion != null && observedAt != conclusion.walk) return
+        byKey.getOrPut(key) { linkedMapOf() }.getOrPut(endpoint) { mutableListOf() } +=
+            RawRow(parseFields(rows.getString("payload_fields")), policy)
     }
 
     private fun keyAndEndpointOf(rows: ResultSet): Pair<NoticeKey, SourceEndpoint>? {

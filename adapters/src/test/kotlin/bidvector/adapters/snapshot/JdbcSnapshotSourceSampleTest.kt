@@ -2,6 +2,7 @@ package bidvector.adapters.snapshot
 
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.procurement.AxisConclusion
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
@@ -23,6 +24,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 private val OBSERVED_AT: Instant = Instant.parse("2026-06-17T02:00:00Z")
 
@@ -63,14 +65,21 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         ),
     )
 
-    /** 기본은 **전 축 완료** — 이 test 들이 재는 것은 완료 판정이 아니라 그 앞의 문턱들이다. */
+    /** 기본은 **전 축 완료 · 걷기는 [OBSERVED_AT]** — 이 test 들이 재는 것은 그 앞의 문턱들이다. */
     private fun extract(
         sample: SampleList,
-        settled: Map<String, Set<SourceEndpoint>> = allAxesSettled(sample),
-    ): SnapshotExtraction = JdbcSnapshotSource(dataSource(), policy()).extract(WINDOW_FROM, WINDOW_TO, sample, settled)
+        conclusions: Map<String, Map<SourceEndpoint, AxisConclusion>> = allAxesSettled(sample),
+    ): SnapshotExtraction = JdbcSnapshotSource(dataSource(), policy()).extract(sample, conclusions)
 
-    private fun allAxesSettled(sample: SampleList): Map<String, Set<SourceEndpoint>> =
-        sample.keys.associate { it.value to expectedAxesFor(BusinessDivision.SERVICE.name) }
+    /** 원장이 가리키는 걷기(D-6G-68) — [walk] 가 `null` 이면 빈 응답으로 끝난 축이다(0 행). */
+    private fun allAxesSettled(
+        sample: SampleList,
+        walk: Instant? = OBSERVED_AT,
+    ): Map<String, Map<SourceEndpoint, AxisConclusion>> =
+        sample.keys.associate { key ->
+            key.value to
+                expectedAxesFor(BusinessDivision.SERVICE.name).associateWith { AxisConclusion(true, walk) }
+        }
 
     /** 표본틀에만 있던 공고(목록 축만)는 행이 되지 않는다 — 상세를 부르지 않았으므로 결과가 없다. */
     @Test
@@ -129,9 +138,16 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         observe(number, SourceEndpoint.OPENING_COMPLETE)
         val sample = sampleOf(number)
 
-        // 원문은 있지만 개찰완료 축이 원장에서 끝나지 않았다(예: 2쪽 중 1쪽에서 끊겼다).
-        val partial = expectedAxesFor(BusinessDivision.SERVICE.name) - SourceEndpoint.OPENING_COMPLETE
-        val extraction = extract(sample, mapOf(sample.keys.single().value to partial))
+        // 원문은 있지만 개찰완료 축이 원장에서 끝나지 않았다(예: 2쪽 중 1쪽에서 끊겼다) —
+        // 그 축의 결말은 **미완**이고, 걷기를 가리켜도 그 행은 쓰이지 않는다.
+        val partial =
+            allAxesSettled(sample) +
+                (
+                    sample.keys.single().value to
+                        allAxesSettled(sample).getValue(sample.keys.single().value) +
+                        (SourceEndpoint.OPENING_COMPLETE to AxisConclusion(settled = false, walk = OBSERVED_AT))
+                )
+        val extraction = extract(sample, partial)
 
         extraction.rows.shouldBeEmpty()
         extraction.incompleteAxis shouldBe 1
@@ -155,7 +171,7 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         val again = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
         repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = again, marker = "다시-걷기-$it") }
 
-        val row = extract(sampleOf(number)).rows.single()
+        val row = extract(sampleOf(number), allAxesSettled(sampleOf(number), again)).rows.single()
 
         row.outcome.bidderRows shouldHaveSize 3
     }
@@ -216,22 +232,65 @@ class JdbcSnapshotSourceSampleTest : PersistenceTestSupport() {
         extraction.observedOutsideSample shouldBe 2
     }
 
-    /** 관측 창 밖의 원문은 보지 않는다 — 창은 `observed_at` 으로 자른다. */
+    /**
+     * **D-6G-68 (vr r5 H-1 probe W1) — 빈 응답으로 끝난 축은 0 행이다.** 다시 걸었더니 KONEPS 가
+     * `NODATA` 를 돌려주면 그 걷기는 행을 남기지 않는다. 앞 판은 걷기를 **행의 시각**으로 골랐으므로
+     * 그 재걷기가 아예 보이지 않았고, 그 앞의 **잘린 걷기**가 마지막으로 보여 투찰 둘짜리 행이
+     * 완성돼 실렸다 — 계수도 오류도 없이. 지금은 원장이 「빈 응답」을 가리키고, 그 축은 0 행이다.
+     */
     @Test
-    fun `창 밖 관측은 상세로 치지 않는다`() {
-        observe("20260617001-00", SourceEndpoint.OPENING_COMPLETE)
+    fun `빈 응답으로 끝난 축은 앞의 잘린 걷기를 쓰지 않는다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        // 첫 걷기는 2쪽 중 1쪽에서 끊겨 투찰 행 둘을 남겼다. 재걷기는 NODATA — 원문 0 행.
+        repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "끊긴-걷기-$it") }
 
-        val extraction =
-            JdbcSnapshotSource(dataSource(), policy())
-                .extract(
-                    LocalDate.of(2026, 7, 1),
-                    LocalDate.of(2026, 7, 2),
-                    sampleOf("20260617001-00"),
-                    allAxesSettled(sampleOf("20260617001-00")),
-                )
+        val extraction = extract(sampleOf(number), allAxesSettled(sampleOf(number), walk = null))
 
+        extraction.rows.shouldBeEmpty()
         extraction.sampledWithoutDetail shouldBe 1
-        extraction.skippedWithoutNotice shouldBe 0
+    }
+
+    /**
+     * **D-6G-68 (vr r5 H-1 probe W2) — 걷기의 순서를 벽시계가 정하지 않는다.** 실행 사이에 시계가
+     * 뒤로 가면(이 호스트는 WSL2, 시각 보정이 있다) 나중에 받은 **전 쪽 걷기**가 앞의 잘린 걷기보다
+     * 이른 시각을 단다. 「가장 늦은 `observed_at`」은 그때 잘린 걷기를 고른다. 원장이 가리키면
+     * 시각의 대소는 상관이 없다.
+     */
+    @Test
+    fun `시계가 뒤로 가도 원장이 가리킨 걷기를 쓴다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        // 끊긴 걷기가 **더 늦은** 시각을 달았다(시계가 앞서 있던 실행).
+        val skewed = OBSERVED_AT.plusSeconds(RE_WALK_GAP_SECONDS)
+        repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = skewed, marker = "끊긴-걷기-$it") }
+        // 다시 걸어 전 쪽을 받았지만 시각은 뒤로 간 시계의 것이다.
+        repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "전-쪽-$it") }
+
+        val row = extract(sampleOf(number), allAxesSettled(sampleOf(number), OBSERVED_AT)).rows.single()
+
+        row.outcome.bidderRows shouldHaveSize 3
+    }
+
+    /**
+     * **D-6G-68 (vr r5 H-1 probe W5) — 추출에 관측 창이 없다.** 앞 판은 `observed_at` 으로 창을
+     * 잘랐고, 그 창은 **원장에는 걸리지 않았다**: 창 밖에서 다시 걸은 축은 행이 보이지 않는데 원장은
+     * 「완료」라고 말해, 그 공고가 **앞의 잘린 걷기의 행으로** 완성돼 실렸다. 범위를 정하는 것은
+     * 표본 목록과 원장이다 — 창이 아니라.
+     */
+    @Test
+    fun `창 밖에서 다시 걸은 축의 행도 원장이 가리키면 쓴다`() {
+        val number = "20260617001-00"
+        persistCanonical(number, listObservation(number))
+        // 첫 걷기는 끊겨 투찰 행 둘, 다시 걷기는 **한 달 뒤**(옛 추출 창 밖)에 전 쪽 셋.
+        repeat(2) { observe(number, SourceEndpoint.OPENING_COMPLETE, marker = "첫-걷기-$it") }
+        val farLater = OBSERVED_AT.plus(30, ChronoUnit.DAYS)
+        repeat(3) { observe(number, SourceEndpoint.OPENING_COMPLETE, at = farLater, marker = "창-밖-$it") }
+
+        val extraction = extract(sampleOf(number), allAxesSettled(sampleOf(number), farLater))
+
+        extraction.sampledWithoutDetail shouldBe 0
+        extraction.rows.single().outcome.bidderRows shouldHaveSize 3
     }
 
     /**
