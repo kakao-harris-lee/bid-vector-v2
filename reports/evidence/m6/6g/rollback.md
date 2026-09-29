@@ -189,25 +189,30 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 
 ## 실측
 
-**실측 HEAD: `be4e852c`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
+**실측 HEAD: `41603713`**(merge 커밋 — 병합이 이 레인의 복원 경로 중 셋을 바꿨으므로, 그 뒤로 이
+경로들을 만진 커밋이 없다. 이 뒤의 이 레인 커밋은 evidence 뿐이고 그것은 복원 목록 밖이다).
+
+**앞 라운드의 실측(`be4e852c`, 병합 전)은 버린다** — 복원 출처가 `678c6ed7` 이었고 그 트리에는 main 의
+주석 정리가 없다. 병합 뒤 값을 옮겨 적지 않고 병합 트리에서 처음부터 다시 쟀다.
 
 임시 clone 에서 위 복원을 돌리고 ①~⑥ 을 쟀다. **Gradle 축(④⑤⑥ 중 Kotlin `check`)은 이 레인이
-돌리지 않는다**(호스트 무거운 빌드 1개 규율) — Python 축으로 같은 여섯을 쟀다.
+돌리지 않는다**(호스트 무거운 빌드 1개 규율) — Python 축으로 같은 여섯을 쟀다. 이번 실측은 **단독**
+이다(Gradle·pytest 0 · available 16.8GB · swap free 2.5GB 를 별도 호출로 확인하고 시작).
 
 | 축 | 결과 |
 |---|---|
 | ① 명령 exit | 0 |
 | ② D/M 수 | 삭제 **44** · 수정 **4** — 위 기계 산출(A 44 · M 4)과 같다 |
-| ③ diff 빈 것 | `git diff a8adf8f5 -- ml-engine` **0 줄** — 되돌린 트리가 base 와 바이트 동일. `fixtures/`·`evaluation/backtest/` 둘 다 남지 않았다 |
+| ③ diff 빈 것 | `git diff a8adf8f5 -- ml-engine` **0 줄** — 되돌린 트리가 새 base 와 바이트 동일. `fixtures/`·`evaluation/backtest/` 둘 다 남지 않았다. **main 의 주석 정리는 남는다**(복원 출처가 `a8adf8f5` 라서) |
 | ④ 형 검사 | `uv run mypy --strict src/ml_engine` — 소스 72개, 오류 0(base 상태) |
 | ⑤ test | `uv run python -m pytest tests -q` — **958 passed**(base 상태, 6G 추가분 없음) |
-| ⑥ 게이트 | `ruff check` · `ruff format --check` · `lint-imports` · `design_ratchet` · `reuse_provenance_check` 다섯 다 통과(base 상태) |
+| ⑥ 게이트 | `ruff check` · `ruff format --check`(178 파일) · `lint-imports`(계약 8) · `design_ratchet` · `reuse_provenance_check` 다섯 다 통과(base 상태) |
 
 갈음은 「HEAD 초록」이 아니라 **트리 동일성**(③)이다.
 
 ## 실측 HEAD 이후 되돌림 대상이 움직였는가
 
-`git diff --name-only be4e852c..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
+`git diff --name-only 41603713..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
 이 레인의 evidence 커밋은 `reports/evidence/m6/6g/` 안이고 그 경로는 위 목록에 **없다** — 그러므로
 evidence 를 더 써도 이 실측은 유효하다.
 
