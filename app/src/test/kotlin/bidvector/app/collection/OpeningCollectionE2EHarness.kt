@@ -8,19 +8,23 @@ import bidvector.app.wiring.FixedClockTestConfiguration
 import bidvector.app.wiring.RecordingCollectionTermination
 import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.classic.spi.ThrowableProxyUtil
 import ch.qos.logback.core.read.ListAppender
-import org.springframework.boot.builder.SpringApplicationBuilder
-import org.springframework.boot.context.event.ApplicationPreparedEvent
-import org.springframework.context.ApplicationContext
-import org.springframework.context.ApplicationListener
-import org.testcontainers.postgresql.PostgreSQLContainer
-import org.testcontainers.utility.DockerImageName
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.ResultSet
 import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
+import org.springframework.boot.builder.SpringApplicationBuilder
+import org.springframework.boot.context.event.ApplicationPreparedEvent
+import org.springframework.context.ApplicationContext
+import org.springframework.context.ApplicationListener
+import org.testcontainers.postgresql.PostgreSQLContainer
+import org.testcontainers.utility.DockerImageName
 
 /** 업무마다 여섯 — 마지막 하나는 상세 응답이 비어 원문이 한 줄도 남지 않는다(D-6G-42). */
 internal const val NOTICES_PER_SLOT = 6
@@ -89,6 +93,25 @@ internal class OpeningCollectionE2EHarness {
 
     fun capturedLog(): String = logs.list.joinToString("\n") { it.formattedMessage }
 
+    /**
+     * 부재 단언의 대상(D-6G-73) — 로거 메시지에 **예외 cause 체인 전체**와 **표준 출력·오류**를
+     * 더한다. 공고 목록 갈래는 처음부터 이 셋을 함께 봤고 이 갈래는 메시지만 봤다: 서비스 키가
+     * 새는 가장 흔한 길은 정상 로그가 아니라 **실패 경로의 스택 트레이스**다.
+     */
+    fun capturedEverything(): String =
+        logs.list.joinToString("\n") { event ->
+            event.formattedMessage + "\n" + event.throwableProxy?.let(ThrowableProxyUtil::asString).orEmpty()
+        } + "\n" + lastStdio
+
+    /** 실행 상태 디렉터리의 파일 전부 — 원장·표본·장부에 키가 적히지 않았는가. */
+    fun runStateText(): String =
+        Files
+            .list(runStateDir)
+            .use { paths -> paths.filter { Files.isRegularFile(it) }.toList() }
+            .joinToString("\n") { runCatching { Files.readString(it) }.getOrDefault("") }
+
+    private var lastStdio: String = ""
+
     fun <T> query(
         sql: String,
         read: (ResultSet) -> T,
@@ -105,6 +128,12 @@ internal class OpeningCollectionE2EHarness {
         inspect: (ApplicationContext) -> Unit = {},
     ): Pair<List<Int>, MockOpeningKonepsHttp> {
         logs.list.clear()
+        // 표준 출력·오류도 실행 동안 잡는다(D-6G-73) — Boot 의 실패 보고가 그 채널로 나간다.
+        val stdio = ByteArrayOutputStream()
+        val originalOut = System.out
+        val originalErr = System.err
+        System.setOut(PrintStream(stdio, true, StandardCharsets.UTF_8))
+        System.setErr(PrintStream(stdio, true, StandardCharsets.UTF_8))
         E2E_FIXED_NOW.set(now)
         if (!reuseRunState) freshRunStateDir()
         val mock =
@@ -132,6 +161,9 @@ internal class OpeningCollectionE2EHarness {
             context.close()
             mock.close()
             E2E_FIXED_NOW.set(null)
+            System.setOut(originalOut)
+            System.setErr(originalErr)
+            lastStdio = stdio.toString(StandardCharsets.UTF_8)
         }
     }
 

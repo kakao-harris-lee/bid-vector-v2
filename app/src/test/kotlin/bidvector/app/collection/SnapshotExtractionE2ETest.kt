@@ -200,6 +200,9 @@ class SnapshotExtractionE2ETest {
 
         rows shouldNotContain BIDDER_NAME
         rows shouldNotContain "OPEN-E2E"
+        // **대표자명도 없다**(privacy r2 INFO-4). mock 은 실 응답대로 상호와 함께 그것도 싣는다 —
+        // 어댑터 경계의 허용 목록이 상호만 떨어뜨리고 대표자명을 흘리면 이 줄이 붉어진다.
+        rows shouldNotContain MOCK_REPRESENTATIVE_NAME
     }
 
     /**

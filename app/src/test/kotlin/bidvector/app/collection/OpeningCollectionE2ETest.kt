@@ -10,6 +10,8 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 
@@ -58,13 +60,39 @@ class OpeningCollectionE2ETest {
 
         val rawRows = e2e.query("SELECT count(*) FROM raw_observation") { it.getInt(1) }
         rawRows shouldBeGreaterThan 0
-        val (serviceKey, bidderName) = e2e.sentinels
-        val captured = e2e.capturedLog()
-        captured shouldNotContain serviceKey
-        captured shouldNotContain "ServiceKey"
+        assertNoServiceKey(e2e.capturedEverything())
         // 상호는 raw 관측까지는 오지만 **로그에는 없다**(러너의 줄이 계수와 열거값뿐이다).
-        captured shouldNotContain bidderName
-        captured shouldContain "opening-collection finished"
+        e2e.capturedEverything() shouldNotContain e2e.sentinels.second
+        e2e.capturedLog() shouldContain "opening-collection finished"
+        // 실행 상태 파일(원장·표본·장부)에도 키가 없다 — 그 디렉터리는 저장소 밖에 오래 남는다.
+        assertNoServiceKey(e2e.runStateText())
+    }
+
+    /**
+     * **D-6G-73 (privacy r2 LOW-3) — 실패 경로에서도 키가 새지 않는다.** 키가 새는 가장 흔한 길은
+     * 정상 로그가 아니라 **실패 보고의 스택 트레이스**다(URI 를 통째로 싣는 예외 메시지). 닿을 수
+     * 없는 주소를 주어 전송이 실패하게 만들고, 로그·예외 cause 체인·표준 출력·표준 오류 어디에도
+     * 키가 원문으로도 **URL 인코딩 형태로도** 없는지 본다.
+     */
+    @Test
+    fun `전송이 실패해도 서비스 키가 어느 채널에도 없다`() {
+        // 닿을 수 없는 주소면 표본틀이 절단돼 실행 자체가 실패한다(D-6G-50) — 그것이 이 test 가
+        // 원하는 상태다. 실패를 삼키지 않고 **일어났음을 단언**한 뒤 채널을 훑는다.
+        val failure = runCatching {
+            e2e.bootAndRun(mapOf("bidvector.koneps.opening.scsbid-base-url" to "http://127.0.0.1:1/mock"))
+        }
+
+        failure.isFailure shouldBe true
+        assertNoServiceKey(e2e.capturedEverything())
+        assertNoServiceKey(e2e.runStateText())
+    }
+
+    /** 원문과 URL 인코딩 형태 둘 다 — 키는 쿼리 문자열에 실려 나가므로 인코딩된 채로 샌다. */
+    private fun assertNoServiceKey(text: String) {
+        val serviceKey = e2e.sentinels.first
+        text shouldNotContain serviceKey
+        text shouldNotContain URLEncoder.encode(serviceKey, StandardCharsets.UTF_8)
+        text shouldNotContain "ServiceKey"
     }
 
     /**

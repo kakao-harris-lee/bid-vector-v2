@@ -266,7 +266,7 @@ internal class MockOpeningKonepsHttp(
         "opengRank" to bidder.rank.toString(),
         "prcbdrNm" to "$bidderName-${bidder.rank}",
         "prcbdrBizno" to "1234567890",
-        "prcbdrCeoNm" to "SYN-대표자",
+        "prcbdrCeoNm" to MOCK_REPRESENTATIVE_NAME,
         "bidprcAmt" to bidder.amount,
         "bidprcrt" to "88.000",
         // 추첨번호 — v2 는 추출이 이 축을 안 읽어 실 추출이면 전 행이 제외 ⑤ 에 걸렸다(H-1).
@@ -350,6 +350,9 @@ private fun newNonce(): String =
         .uppercase()
 
 private const val NONCE_LENGTH = 8
+
+/** 실 응답이 상호와 함께 싣는 대표자명 — 스냅숏에 **없어야** 한다(privacy r2 INFO-4). */
+internal const val MOCK_REPRESENTATIVE_NAME = "SYN-대표자"
 
 private const val HTTP_TOO_MANY_REQUESTS = 429
 
