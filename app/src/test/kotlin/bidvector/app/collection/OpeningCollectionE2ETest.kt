@@ -84,6 +84,9 @@ class OpeningCollectionE2ETest {
         /** mock 이 공고마다 내는 투찰 행 수 — 전 참가자다. */
         private const val BIDDERS_PER_NOTICE = 3
 
+        /** 목록 둘 · 예비가격 하나 · 개찰완료 1쪽 — 여기까지가 넷이고 2쪽이 거부된다(D-6G-58). */
+        private const val CAP_CUTS_SECOND_PAGE = 4
+
         /** 미리 깔아 두는 시도의 시각 — 기동 시각보다 조금 앞이면 같은 KST 하루에 든다. */
         private const val SEED_BACKDATE_SECONDS = 60L
 
@@ -191,26 +194,12 @@ class OpeningCollectionE2ETest {
             "bidvector.koneps.opening.scsbid-base-url" to mock.baseUrl,
         )
 
-    private fun attachLogCapture() {
-        val root = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
-        root.level = Level.DEBUG
-        (LoggerFactory.getLogger("com.sun.net.httpserver") as Logger).level = Level.WARN
-        if (!logs.isStarted) logs.start()
-        if (!root.isAttached(logs)) root.addAppender(logs)
-    }
+    private fun attachLogCapture() = attachRootLogCapture(logs)
 
     private fun <T> query(
         sql: String,
         read: (ResultSet) -> T,
-    ): T =
-        dataSource.connection.use { connection ->
-            connection.createStatement().use { statement ->
-                statement.executeQuery(sql).use { rows ->
-                    rows.next()
-                    read(rows)
-                }
-            }
-        }
+    ): T = queryOne(dataSource, sql, read)
 
     @Test
     fun `표본에 뽑힌 공고만 상세를 부르고 공사는 A값까지 넷을 부른다`() {
@@ -298,6 +287,48 @@ class OpeningCollectionE2ETest {
         query(allOpeningRowsSql(nonce)) { it.getInt(1) } shouldBeGreaterThan calledFirst.size * BIDDERS_PER_NOTICE
         // 추출이 쓰는 것은 (공고, 축)마다 **마지막 걷기**다 — 그 수가 전 참가자와 같다.
         query(latestWalkOpeningRowsSql(nonce)) { it.getInt(1) } shouldBe calledFirst.size * BIDDERS_PER_NOTICE
+    }
+
+    /**
+     * D-6G-58 — 끊는 것이 5xx 가 아니라 **상한 거부**여도 같다. 쪽 단위로 결정적으로 짓는다:
+     * 목록 둘 → 표본 첫 공고의 예비가격 하나 → 개찰완료 1쪽까지가 넷이고, 상한을 넷으로 두면
+     * **2쪽이 거부된다**. 기준은 여기서도 mock 이 받은 요청 수다 — 정확히 상한만큼이어야 한다.
+     */
+    @Test
+    fun `상한이 쪽 중간에서 끊어도 그 축은 미완이고 다음 기동이 다시 걷는다`() {
+        val nonce = "CAPCUT"
+        val since = mapOf("bidvector.opening-collection.budget-since" to "2026-01-01T00:00:00Z")
+        val capped =
+            since +
+                mapOf(
+                    "bidvector.opening-collection.calls-per-day" to CAP_CUTS_SECOND_PAGE.toString(),
+                    "bidvector.opening-collection.calls-total" to CAP_CUTS_SECOND_PAGE.toString(),
+                )
+
+        val (_, first) = bootAndRun(capped, nonce = nonce, openingCompletePageSize = OPENING_COMPLETE_PAGE_SIZE)
+
+        first.requestCount() shouldBe CAP_CUTS_SECOND_PAGE
+        val cut = first.openingCompleteNotices.single()
+        // **1쪽까지만 적재됐다.** 이 값이 전 참가자와 같으면 상한이 쪽 **사이**에서 끊지 않은 것이라
+        // 이 test 가 재려던 자리가 사라진다 — 그때는 초록이 아니라 붉어야 한다.
+        query(allOpeningRowsForNoticeSql(cut)) { it.getInt(1) } shouldBe OPENING_COMPLETE_PAGE_SIZE
+        attemptLinesOf(runStateDir).any {
+            it.contains("\"axis\":\"OPENING_COMPLETE\"") && it.contains("BUDGET_EXHAUSTED")
+        } shouldBe true
+
+        val (_, second) =
+            bootAndRun(
+                since + mapOf("bidvector.opening-collection.calls-total" to "1000"),
+                nonce = nonce,
+                openingCompletePageSize = OPENING_COMPLETE_PAGE_SIZE,
+                reuseRunState = true,
+            )
+
+        second.openingCompleteNotices shouldContain cut
+        // 잘린 앞 걷기의 쪽은 원문에 **남고**(append-only), 추출이 쓰는 마지막 걷기만 전 참가자다.
+        query(allOpeningRowsForNoticeSql(cut)) { it.getInt(1) } shouldBe
+            OPENING_COMPLETE_PAGE_SIZE + BIDDERS_PER_NOTICE
+        query(latestWalkOpeningRowsForNoticeSql(cut)) { it.getInt(1) } shouldBe BIDDERS_PER_NOTICE
     }
 
     /**
