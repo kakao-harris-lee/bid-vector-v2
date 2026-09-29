@@ -18,12 +18,12 @@ import bidvector.sharedkernel.Resolution
 import tools.jackson.databind.JsonNode
 
 /*
- * M4/4B-1 — verdict case → executor(scope.md ⑧). `decision`은 도메인 모듈이라 이 파일이
+ * verdict case → executor(scope.md ⑧). `decision`은 도메인 모듈이라 이 파일이
  * `VerdictLadder.judge`·`FloorOverrideValidation.validate`(둘 다 public — 설계 검토 (2))를
  * 직접 부른다. `Verdict`·reason 하위 타입 생성자가 `internal`이라도 이 실행자는 그 값을
  * 조립하지 않는다 — [VerdictLadder.judge]가 낸 값을 **읽기만** 해서 projection 을 만든다.
  *
- * `verdict-001~004`는 수정 라운드 1(2026-09-09, 운영자 결정 (a))에서 `authoritative`로
+ * `verdict-001~004`는 `authoritative`로
  * 승격됐다 — M0 저작 시점(커널 이전)의 입력을 이 커널의 입력 계약(`$.input`/`$.policy`,
  * `$.override`/`$.band`)으로 재구성해 이 표에 넣었다(각 case가 단언하는 규칙은 불변,
  * manifest.yaml 의 `change_history` 참고). 열둘 전부 이제 이 표에 있다.
@@ -71,8 +71,8 @@ private fun mlUnavailableReasonName(reason: MlUnavailableReason): String =
     when (reason) {
         MlUnavailableReason.ScoreNotProvided -> "ScoreNotProvided"
 
-        // M4/4D-1(D-4D-6) 이 넓힌 값 아홉 — conformance harness projection 은 이름만 낸다,
-        // 이 커널 판단은 이 값들을 만들지 않는다(4D-1 gateway 만 짓는다).
+        // D-4D-6 이 넓힌 값 아홉 — conformance harness projection 은 이름만 낸다,
+        // 이 커널 판단은 이 값들을 만들지 않는다(gateway 만 짓는다).
         MlUnavailableReason.DeadlineExceeded -> "DeadlineExceeded"
 
         MlUnavailableReason.CircuitOpen -> "CircuitOpen"

@@ -38,13 +38,12 @@ import java.time.LocalDate
 import javax.sql.DataSource
 
 /**
- * D-6A3-17(a) 거동 test(검토 라운드 1 HIGH-1 둘째 다리, code-reviewer MEDIUM · verifier M3
- * 동시 해소) — `BidNow`를 내는 fake ML(`BidNowFakeMlAnalysisTestConfiguration`, `spring.
+ * D-6A3-17(a) 거동 test — `BidNow`를 내는 fake ML(`BidNowFakeMlAnalysisTestConfiguration`, `spring.
  * profiles.active=evaluation-bidnow-fake`)로 production 조립을 부팅해 `EvaluationDryRunE2ETest`
  * ⑤⑥⑦이 공집합 대 공집합으로만 확인하던 불변식을 **비어 있지 않은 값**으로 잰다:
  * ① `wouldNotifyNoticeIds` 가 비어 있지 않고 `bidNowNoticeIds` 와 같다(사다리·알림 요청 경로가
  * 같은 판정을 본다는 것을 실제 BidNow 로 확인) ② dry-run 전후 outbox 행 수가 같다(effect 0 이
- * BidNow 판정이 나온 뒤에도 유지된다 — verifier M3: `wouldNotifyNoticeIds`를 빈 목록으로
+ * BidNow 판정이 나온 뒤에도 유지된다 — `wouldNotifyNoticeIds`를 빈 목록으로
  * 바꾸는 변이가 이 test 에서만 RED).
  *
  * **profile 은 이 test 부팅에만 있다** — 다른 모든 test(`EvaluationDryRunE2ETest`·
@@ -72,7 +71,7 @@ class EvaluationDryRunBidNowE2ETest {
         @BeforeAll
         fun boot() {
             context =
-                // M6/6A-2b D-6A2b-9 — `@TestConfiguration` 은 되살린 `TypeExcludeFilter` 가
+                // D-6A2b-9 — `@TestConfiguration` 은 되살린 `TypeExcludeFilter` 가
                 // 컴포넌트 스캔에서 걷어낸다(그 필터의 존재 이유다). 명시 source 로 준다 —
                 // profile 잠금(`evaluation-bidnow-fake`)은 그대로라 다른 test 에는 등록되지 않는다.
                 SpringApplicationBuilder(

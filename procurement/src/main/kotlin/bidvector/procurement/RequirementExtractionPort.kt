@@ -40,7 +40,7 @@ data class ExtractionEvidenceSpan(
  * adapters 층의 일이다, ADR 0006 D-4·§4b). `init`이 재는 것은 이 타입 **자신의** 구조
  * 불변식(빈 이름 목록·공백 이름 금지)뿐이다.
  *
- * **알려진 이탈(verifier r1 F-3)** — 이 생성자는 `public`이라 스키마를 한 번도 통과하지
+ * **알려진 이탈** — 이 생성자는 `public`이라 스키마를 한 번도 통과하지
  * 않은 값으로도 (adapters 뿐 아니라 이 module 을 볼 수 있는 어디서든) 조립할 수 있다
  * (probe C, app test 에서 컴파일 성공 실측). 설계 검토 (1) 표 ④가 원래 그린 형태
  * (`internal` + `SchemaValidatedJson` 인자 요구)는 procurement(domain, 외부 라이브러리
@@ -103,7 +103,7 @@ sealed interface ExtractionOutcome {
 }
 
 /**
- * 문서 → 구조화 요건 추출 port(M3/3C ①, ADR 0005 D-10.1 「domain이 의존하는 port는
+ * 문서 → 구조화 요건 추출 port(ADR 0005 D-10.1 「domain이 의존하는 port는
  * domain 안에 선다」) — 구현은 adapters(`HttpLlmRequirementExtractor`)가 한다. 이 port
  * 를 감시 통과 여부와 무관하게 부르는 것은 domain 의 일이 아니다 — 그 게이트(D-3C-6)는
  * adapters 층에 선다(같은 도메인 모듈끼리 참조 불가, ADR 0006 D-4 — `strategy`

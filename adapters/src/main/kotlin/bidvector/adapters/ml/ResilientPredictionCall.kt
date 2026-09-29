@@ -44,7 +44,7 @@ internal sealed interface MlCallOutcome<out R> {
     data object BreakerOpen : MlCallOutcome<Nothing>
 
     /**
-     * verifier r2 G-4(medium) — 호출부 예산 부족은 서버 건강 신호가 아니다. `TransportFailed`
+     * 호출부 예산 부족은 서버 건강 신호가 아니다. `TransportFailed`
      * 와 분리된 별도 가지라 `callResilient`가 `circuitBreaker.onError`를 부르지 않는다.
      */
     data object BudgetExhausted : MlCallOutcome<Nothing>
@@ -66,15 +66,15 @@ private sealed interface BoundedRetryOutcome<out R> {
 /**
  * breaker + bounded retry **한 계층**(scope.md ③⑧, ADR 0005 D-11, ADR 0010 D-4·D-5) —
  * deadline은 호출부가 stub 에 이미 건 값을 쓴다(이 함수는 시간을 직접 재지 않는다 — 단,
- * `remainingBudget`으로 백오프가 예산을 넘는지는 잰다, verifier r1 F-1). 재시도는 transport
+ * `remainingBudget`으로 백오프가 예산을 넘는지는 잰다). 재시도는 transport
  * 예외(`isRetryableTransportStatus`)와 application failure([isRetryableFailure], D-4D2-4로
  * 호출부가 넘기는 술어 — 예측은 `resultCase == FAILURE && retryable`, 임베딩은
  * `EmbedTextResponse`의 같은 모양)를 **한 loop**(`callWithBoundedRetry`)에서 함께 보고,
  * 재시도 사이마다 `backoff`(정책 배열, attempt index 로 고른다)만큼 실제로 지연한다
  * (resilience4j `Retry`를 쓰지 않는다 — 재시도 계층이 둘이 되지 않는다). **예산 소진은
- * breaker 계수 밖이다**(verifier r2 G-4) — 서버로 나가는 호출을 한 번도 만들지 않은 채
+ * breaker 계수 밖이다** — 서버로 나가는 호출을 한 번도 만들지 않은 채
  * 예산이 끝나는 것은 서버 건강과 무관하므로 `circuitBreaker.onError`를 부르지 않는다.
- * permit 을 얻은 뒤의 결말은 `settlePermit` 하나로 좁힌다(verifier r3 H-1, 아래 참고 —
+ * permit 을 얻은 뒤의 결말은 `settlePermit` 하나로 좁힌다(아래 참고 —
  * **이 구조와 분기 조건은 D-4D2-4에서도 한 줄도 바뀌지 않았다**). gRPC 실패는
  * [StatusException]·[StatusRuntimeException] 둘 중 하나로만 온다 — 그 밖(coroutine 취소의
  * `CancellationException` 포함)은 여기서 잡지 않고 그대로 전파한다(`RetryRules.kt`와 같은
@@ -123,12 +123,12 @@ internal suspend fun <S : AbstractStub<S>, Req, Resp> callMlRpc(
 }
 
 /**
- * verifier r3 H-1(high) — permit 을 이미 얻은 뒤의 **모든** 경로를 이 함수 하나로 좁혀
- * `try`/`finally`로 결말을 구조로 강제한다. 이전 결함: `callResilient`가 permit 을 얻은
+ * permit 을 이미 얻은 뒤의 **모든** 경로를 이 함수 하나로 좁혀
+ * `try`/`finally`로 결말을 구조로 강제한다. 가지마다 따로 처리하면: `callResilient`가 permit 을 얻은
  * 뒤 `BudgetExhausted` 가지에서 `onSuccess`·`onError`·`releasePermission` 중 아무것도
- * 부르지 않고 그냥 반환했다 — CLOSED 에서는 무해했으나(permit 이 무제한) HALF_OPEN 은
+ * 부르지 않고 그냥 반환하기 쉽다 — CLOSED 에서는 무해하지만(permit 이 무제한) HALF_OPEN 은
  * `permittedNumberOfCallsInHalfOpenState`(기본 10)이 유한해, 예산 소진 호출이 그 permit 을
- * 계속 먹기만 하고 반납하지 않아 breaker 가 회복 불가능한 HALF_OPEN 에 영구히 갇혔다(실측:
+ * 계속 먹기만 하고 반납하지 않으면 breaker 가 회복 불가능한 HALF_OPEN 에 영구히 갇힌다(실측:
  * permit 수보다 많은 예산 소진 호출 뒤 넉넉한 예산 호출도 전부 `CircuitOpen`, 서버 호출 0).
  *
  * 처방은 「가지마다 `releasePermission()` 한 줄」이 아니다 — 그러면 다음에 새 가지가 늘 때
@@ -137,8 +137,8 @@ internal suspend fun <S : AbstractStub<S>, Req, Resp> callMlRpc(
  * `releasePermission`) 중 정확히 하나가 항상 불린다 — `settled` 플래그가 그 중 하나가 이미
  * 불렸음을 표시하고, `finally`는 그렇지 않은 경우에만 `releasePermission()`으로 닫는다.
  * `BudgetExhausted`는 서버를 향한 호출이 실패했다는 신호가 아니므로(백오프를 감당 못 해
- * 재시도를 포기한 것뿐) `releasePermission()`만 부른다 — `onError`가 아니다(verifier r2
- * G-4 의 의미를 그대로 지킨다, CLOSED 에서 예산 소진이 breaker 건강에 영향을 주면 안 된다).
+ * 재시도를 포기한 것뿐) `releasePermission()`만 부른다 — `onError`가 아니다(그 의미를
+ * 그대로 지킨다, CLOSED 에서 예산 소진이 breaker 건강에 영향을 주면 안 된다).
  */
 private suspend fun <R> settlePermit(
     circuitBreaker: CircuitBreaker,
@@ -210,13 +210,12 @@ private suspend fun <R> attemptOnce(
     }
 
 /**
- * verifier r1 F-1(high) — 재시도 전에 정책 `backoff`(attempt index 로 고른다, 마지막 index
+ * 재시도 전에 정책 `backoff`(attempt index 로 고른다, 마지막 index
  * 이후는 마지막 값을 반복)만큼 `delay`한다(ADR 0010 D-4 「RESOURCE_EXHAUSTED(백오프 필수)」,
  * 모든 재시도 가능 status 에 균일 적용). **남은 예산이 그 백오프조차 감당하지 못하면
  * 재시도하지 않는다** — `false`를 내어 `callWithBoundedRetry`가 예외 없이
- * `BoundedRetryOutcome.BudgetExhausted`로 접게 한다(verifier r2 G-4 — 이전엔 합성
- * `Status.DEADLINE_EXCEEDED`를 던져 breaker 가 그 실패를 서버 오류로 계수했다).
- * `delay`는 verifier r2 G-6 — sub-millisecond `backoff`가 `toMillis()`로 0 절삭되지 않게
+ * `BoundedRetryOutcome.BudgetExhausted`로 접게 한다.
+ * `delay`는 sub-millisecond `backoff`가 `toMillis()`로 0 절삭되지 않게
  * `kotlin.time.Duration` 오버로드(나노 보존)를 쓴다.
  */
 private suspend fun awaitBackoffOrSignalExhausted(

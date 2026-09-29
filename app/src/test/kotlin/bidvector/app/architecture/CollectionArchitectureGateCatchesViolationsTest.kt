@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 
 /**
- * M6/6F-8 수집 배선 게이트의 **음성** 쪽 — production 을 지키는 **같은 규칙 값**에 fixture 루트를 넣어 심은
+ * 수집 배선 게이트의 **음성** 쪽 — production 을 지키는 **같은 규칙 값**에 fixture 루트를 넣어 심은
  * 위반을 잡는지 잰다(`ArchitectureGateCatchesViolationsTest` 와 같은 형태). 위반 상세에서 심은 클래스 이름과
  * **어느 대상 때문에** 잡혔는지를 함께 확인한다 — 다른 이유로 잡혀도 통과하는 masking 을 막는다.
  */
@@ -131,8 +131,8 @@ class CollectionArchitectureGateCatchesViolationsTest {
     }
 
     /**
-     * verifier r1 F-1 재현 MV1 — 변환 **함수를 부르지 않고** enum 상수를 읽어 경로에서 값을 짓는다. 이전 판(멤버
-     * 이름 목록)에서 전체 `check` 가 초록이던 표기다.
+     * MV1 — 변환 **함수를 부르지 않고** enum 상수를 읽어 경로에서 값을 짓는다. 멤버 이름 목록만
+     * 보면 전체 `check` 가 초록이 되는 표기다.
      */
     @Test
     fun `enum 상수를 읽어 경로에서 대분류를 짓는 허용 밖 클래스를 잡는다 — 멤버 호출이 하나도 없어도`() {
@@ -141,9 +141,9 @@ class CollectionArchitectureGateCatchesViolationsTest {
     }
 
     /**
-     * verifier r1 F-1 재현 MV2 — 타입 자신에 생긴 **새 파생 멤버**를 부른다. production 타입에 멤버를 심을 수 없어
-     * 대상 타입만 같은 모양의 fixture enum 으로 바꾸고 규칙 값은 그대로다(허용 집합 비움) — 이전 판은 멤버 이름을
-     * 열거했기 때문에 이 표기가 조용했다. 새 판은 멤버 목록이 없어 어떤 이름이든 쌍으로 관측된다.
+     * MV2 — 타입 자신에 생긴 **새 파생 멤버**를 부른다. production 타입에 멤버를 심을 수 없어
+     * 대상 타입만 같은 모양의 fixture enum 으로 바꾸고 규칙 값은 그대로다(허용 집합 비움). 멤버
+     * 목록이 없어 어떤 이름이든 쌍으로 관측된다.
      */
     @Test
     fun `타입에 새로 생긴 파생 멤버를 부르는 자리를 잡는다 — 멤버 이름 목록이 없다`() {
@@ -157,7 +157,7 @@ class CollectionArchitectureGateCatchesViolationsTest {
             .mustReport("RogueDivisionFromCompanionDerivation", "RogueDivisionLikeEnum#ofOperationPath")
     }
 
-    /** verifier r1 F-1 재현 MV4 — `java.lang.Enum.valueOf(Class, String)`. 타입 이름이 남는 자리는 클래스 객체뿐이다. */
+    /** MV4 — `java.lang.Enum.valueOf(Class, String)`. 타입 이름이 남는 자리는 클래스 객체뿐이다. */
     @Test
     fun `Enum valueOf 로 대분류를 만드는 허용 밖 클래스를 잡는다 — 호출 소유자에 타입 이름이 없어도`() {
         divisionClassObject().mustReport("RogueDivisionFromEnumBridge", "BusinessDivision")
@@ -167,7 +167,7 @@ class CollectionArchitectureGateCatchesViolationsTest {
      * 규칙이 과잉이 아니다 — 대조 둘. `CleanNameLookup` 은 대분류를 **아예 언급하지 않는** 클래스다(약한 대조:
      * 규칙이 대분류를 언급하는 모든 클래스를 신고하도록 잘못 써도 초록이다). `CleanDivisionCarrier` 는 대분류를
      * **가지고 있지만 만들지 않는** 클래스라 과잉 경계 위에 있다 — 축 ②의 자기 소유 읽기 제외 분기를 지우면 이
-     * 단언이 RED 가 된다(code-review r2 LOW, 측정). 운반 슬롯 getter 를 **부르는 쪽**이 축 ②에 드는 것은 의도이고
+     * 단언이 RED 가 된다(측정). 운반 슬롯 getter 를 **부르는 쪽**이 축 ②에 드는 것은 의도이고
      * (정책 주석), 나르기만 하는 쪽이 드는 것은 과잉이다.
      */
     @Test

@@ -31,7 +31,7 @@ internal fun Target.surfaceReferences(): List<Pair<String, KtTypeReference?>> =
                 " 의 타입" to d.typeReference,
                 " 의 확장 수신자" to d.receiverTypeReference,
                 // `val rate get(): Double = …` 처럼 프로퍼티 자신이 아니라 getter 가 타입을
-                // 명시하는 자리(verifier r18 F-2) — 명시됐으면 타입 미명시가 아니라 이 축(금지
+                // 명시하는 자리 — 명시됐으면 타입 미명시가 아니라 이 축(금지
                 // 타입 단언)이 잡아야 한다.
                 " 의 접근자 반환 타입" to d.getter?.returnTypeReference,
             ) + d.typeParameterBounds()
@@ -59,9 +59,9 @@ internal fun Target.surfaceReferences(): List<Pair<String, KtTypeReference?>> =
     }
 
 /**
- * **Codex 14차 #2.** `T : Number` 형태(`extendsBound`)만 보고 `where T : Number` 형태
- * (`typeConstraints`)를 놓쳤다 — `class Numeric<T> where T : Number` 가 두 단언 모두를
- * 지났다. class·interface·function·(확장 프로퍼티의) property 전부 이 인터페이스를 구현하므로
+ * `T : Number` 형태(`extendsBound`)뿐 아니라 `where T : Number` 형태(`typeConstraints`)도
+ * 봐야 한다 — `class Numeric<T> where T : Number` 가 두 단언 모두를 쓸 수 있다.
+ * class·interface·function·(확장 프로퍼티의) property 전부 이 인터페이스를 구현하므로
  * 한 자리에서 잡는다.
  */
 private fun KtTypeParameterListOwner.typeParameterBounds(): List<Pair<String, KtTypeReference?>> =
@@ -86,9 +86,9 @@ private fun Target.functionUntypedReason(function: KtNamedFunction): String? =
         .takeIf { isInScope() && !function.hasBlockBody() && function.typeReference == null }
 
 /**
- * **verifier r18 F-2.** 초기화식·위임뿐 아니라 **접근자 본문만 있는 프로퍼티**도 타입 미명시다
- * (`val rate get() = 0.5`) — 이전 조건은 `hasInitializer() || hasDelegate()` 만 봐서 접근자
- * 전용 형태를 놓쳤다. 다만 **getter 가 스스로 반환 타입을 명시하면**(`get(): Double = …`)
+ * 초기화식·위임뿐 아니라 **접근자 본문만 있는 프로퍼티**도 타입 미명시다
+ * (`val rate get() = 0.5`) — `hasInitializer() || hasDelegate()` 만으로는 접근자
+ * 전용 형태를 놓친다. 다만 **getter 가 스스로 반환 타입을 명시하면**(`get(): Double = …`)
  * 타입 미명시가 아니다 — 그 타입은 `surfaceReferences` 가 별도 슬롯으로 잡아 금지 타입
  * 단언으로 넘긴다.
  */

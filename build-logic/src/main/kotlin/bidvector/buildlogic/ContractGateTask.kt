@@ -14,7 +14,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 /**
- * M2/2D — `.proto` 계약 drift·생성물 수동 편집·게이트 밖 소스를 잡는 게이트 하나
+ * `.proto` 계약 drift·생성물 수동 편집·게이트 밖 소스를 잡는 게이트 하나
  * (scope.md 「이 slice 가 하는 일」 ①②③). 판정 로직은 전부 `ContractGateChecks.kt`의 순수
  * 함수다 — 이 task 는 외부 프로세스(`buf`·`gradlew`·`git`)를 실행하고 그 결과를 넘기기만
  * 한다. **`Internal`로 표시한다** — 외부 프로세스·git 작업 트리 상태를 Gradle 입력
@@ -36,7 +36,7 @@ abstract class ContractGateTask : DefaultTask() {
     @get:Internal
     abstract val catalogGrpcKotlinVersion: Property<String>
 
-    // verifier r1 F-13 — 생성물의 Java/gRPC 절반을 만드는 플러그인 버전도 대조한다.
+    // 생성물의 Java/gRPC 절반을 만드는 플러그인 버전도 대조한다.
     @get:Internal
     abstract val catalogGrpcJavaVersion: Property<String>
 
@@ -134,7 +134,7 @@ abstract class ContractGateTask : DefaultTask() {
     }
 
     /**
-     * verifier r1 F-1(high) — 이 중첩 호출에 `--no-build-cache`가 없으면 격리 사본의
+     * 이 중첩 호출에 `--no-build-cache`가 없으면 격리 사본의
      * `ml-contract/gradle.properties`(`org.gradle.caching=true`)가 공유 build cache 를 켠
      * 채로 두 회차 모두 **같은 캐시 엔트리에서 복원**된다(`generateProto FROM-CACHE` 두 번,
      * 실측). 그러면 비교되는 두 해시 집합이 같은 복원본이라 결정성 검사가 구조적으로

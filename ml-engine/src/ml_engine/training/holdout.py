@@ -9,7 +9,7 @@
 창 하나의 실행 세부(분할·학습은 `_holdout_fit.py`, 채점·안정성 sweep 은
 `_holdout_window.py`)는 형제 파일 둘(비공개 내부 모듈)에 있다 — 설계 래칫
 `file_loc_soft_limit`(500줄) 준수를 위한 분리이고, `pyproject.toml`
-`[tool.design-ratchet]` allowlist 편집(팀장 소관, 「필요가 생기면 멈추고 보고」
+`[tool.design-ratchet]` allowlist 편집(「필요가 생기면 멈추고 보고」
 지시)을 피하는 대안이다. checklist.md 「계약과 어긋나 판단이 필요했던 자리」에 등재.
 """
 
@@ -56,7 +56,7 @@ class HoldoutRejectionReason(StrEnum):
     EMPTY_SIDE = "EMPTY_SIDE"
     INVALID_MATURITY_INPUT = "INVALID_MATURITY_INPUT"
     ACCOUNTING_MISMATCH = "ACCOUNTING_MISMATCH"
-    """verifier r2 H-2r — `_unaccounted_row_count`가 음수로 나오면(회계 결함,
+    """H-2r — `_unaccounted_row_count`가 음수로 나오면(회계 결함,
     도달해서는 안 되는 상태) `max(…, 0)`으로 접어 감추는 대신 실행 자체를 거부한다
     (결과 타입, raw 예외 아님)."""
 
@@ -69,14 +69,12 @@ class HoldoutRejected:
 
 @dataclass(frozen=True)
 class HoldoutCancelled:
-    """M5/5E-3 D-5E3-3 — `should_stop`이 창 처리 중 참이 되어 실행이 중단됐다(결과
+    """D-5E3-3 — `should_stop`이 창 처리 중 참이 되어 실행이 중단됐다(결과
     타입, 예외 아님). `completed_windows`는 중단 전에 **처리를 끝낸**(학습이
     실패해 건너뛴 창도 포함, 학습에 성공한 창만은 아니다) 창 수다 — 부분 보고서를
     조립하지 않는다(우회 후보 (4): 이 타입을 `PipelineFailed`로 매핑하면 FAILED 로
-    위장하는 것이므로 호출부는 `PipelineCancelled`로만 옮긴다). verifier r1 LOW-1 —
-    이전 문면은 「학습까지 끝난」이라 적어 실제 계수 대상(성공·실패 무관, 루프가
-    처리한 창)과 어긋났다. 현재 production 소비자는 없다(`app/pipeline.py`가 이
-    값을 버리고 `PipelineCancelled()`만 낸다)."""
+    위장하는 것이므로 호출부는 `PipelineCancelled`로만 옮긴다). 현재 production 소비자는
+    없다(`app/pipeline.py`가 이 값을 버리고 `PipelineCancelled()`만 낸다)."""
 
     completed_windows: int
 
@@ -112,7 +110,7 @@ class _WindowsOutcome:
     results: tuple[WindowResult, ...]
     excluded: tuple[WindowExclusion, ...]
     succeeded_windows: tuple[WeekMaturity, ...]
-    """verifier r2 H-2r — `results`(`WindowResult`)는 원 `WeekMaturity`를 담지
+    """H-2r — `results`(`WindowResult`)는 원 `WeekMaturity`를 담지
     않아 회계 계산에 못 쓴다. 성공한 창 자체를 `results`와 같은 순서로 별도 보관해,
     `_unaccounted_row_count`가 `plan_selected`(skip 뒤에도 그대로인 계획 통과분)
     대신 이 **서로소** 집합을 쓰게 한다."""
@@ -124,7 +122,7 @@ def _exclusion_from_skip(
     ordered_rows: tuple[TrainingRow, ...],
     gate_stratum: str,
 ) -> WindowExclusion:
-    """verifier r2 M-1r — `WindowSkip`의 구조화 필드(`build_split`이 이미 계산한
+    """M-1r — `WindowSkip`의 구조화 필드(`build_split`이 이미 계산한
     buildable 수·dropped 사유별 계수)를 `WindowExclusion`으로 옮긴다(`_evaluate_
     windows`를 50줄 안에 두려는 분리, design ratchet)."""
     return WindowExclusion(
@@ -218,15 +216,15 @@ def _unaccounted_row_count(
     """회계 불변식의 계측기 — 성공한 창 + 제외된 창(계획 단계·실행 단계 skip 전부,
     `excluded`가 이미 합쳐 담는다)의 합집합 밖 게이트 층 행 수(legacy
     `_unaccounted_row_count`와 같은 정의) **더하기** buildability 로 버려진 행
-    (verifier r1 H-1 회계식). 창 소속(구조적 멤버십)만으로 「회계됨」을 선언하지
+    (H-1 회계식). 창 소속(구조적 멤버십)만으로 「회계됨」을 선언하지
     않는다 — 창에 속했지만 채점되지 못한 행은 `WindowResult.dropped_rows`로 개별
     공시되는 동시에 이 합계에도 반영돼야, 「이 report 가 놓친 행」이라는 이 필드의
     원래 취지가 지켜진다.
 
-    verifier r2 H-2r — 이전 시그니처는 `plan_selected`(계획 통과분, **실행 단계에서
-    skip 된 창도 그대로 남아있음**)를 받아, 그 창이 `excluded`에도 다시 잡혀
-    이중 계수되고 결과가 음수가 되면 `max(…, 0)`이 조용히 0 으로 접었다.
-    `succeeded_windows`(성공한 창만, `excluded`와 서로소)로 바꿔 이중 계수 자체를
+    H-2r — `plan_selected`(계획 통과분, **실행 단계에서
+    skip 된 창도 그대로 남아있음**)를 받으면, 그 창이 `excluded`에도 다시 잡혀
+    이중 계수되고 결과가 음수가 될 때 `max(…, 0)`이 조용히 0 으로 접는다.
+    `succeeded_windows`(성공한 창만, `excluded`와 서로소)로 이중 계수 자체를
     없앤다 — 그래도 음수가 나오면 그것은 clamp 로 감출 값이 아니라
     `HoldoutRejected(ACCOUNTING_MISMATCH)`로 실행을 거부해야 할 신호다(clamp
     제거, 호출부가 부호를 검사한다)."""
@@ -246,7 +244,7 @@ def _unaccounted_or_reject(
     evaluation_policy: EvaluationPolicy,
     windows_outcome: _WindowsOutcome,
 ) -> int | HoldoutRejected:
-    """verifier r2 H-2r — `unaccounted_row_count`가 음수면(회계 결함, 서로소 집합
+    """H-2r — `unaccounted_row_count`가 음수면(회계 결함, 서로소 집합
     정정 뒤에도 도달해서는 안 되는 상태) `HoldoutRejected`를 낸다(`max(…, 0)`
     제거의 짝 — clamp 대신 결과 타입). `_assemble_report`를 50줄 안에 두려고
     분리한 헬퍼(design ratchet)."""
@@ -272,10 +270,8 @@ def _assemble_report(
     ordered_rows: tuple[TrainingRow, ...],
     windows_outcome: _WindowsOutcome,
 ) -> EvaluationReportV1 | HoldoutRejected:
-    """verifier r3 LOW L-2r — `holdout_overlaps` 는 `windows_outcome.
-    succeeded_windows`(서로소 집합)만 본다. 예전에는 `plan_selected`(계획
-    통과분, 실행 단계 skip 된 창도 그대로 남음)를 받아 H-2r 이 정정한 회계와
-    다른 창 집합을 겹침 측정에 썼다 — `plan_selected` 인자 자체를 없앴다."""
+    """L-2r — `holdout_overlaps` 는 `windows_outcome.
+    succeeded_windows`(서로소 집합)만 본다 — `plan_selected` 인자 자체를 없앴다."""
     unaccounted_or_reject = _unaccounted_or_reject(
         ordered_rows, evaluation_policy, windows_outcome
     )
@@ -332,7 +328,7 @@ def run_holdout(
     `EvaluationReportV1`을 조립한다. 임계·seed 목록·창 수를 낱개 인자로 받지 않는다 —
     전부 `evaluation_policy`/`spec`/`training_policy`에서만 온다.
 
-    M5/5E-3 D-5E3-3 — `should_stop`(기본: 항상 거짓, 기존 호출자·test 무변경)이
+    D-5E3-3 — `should_stop`(기본: 항상 거짓, 기존 호출자·test 무변경)이
     참이 되면 창 루프가 남은 창을 학습하지 않고 `HoldoutCancelled`를 낸다(창 단위
     취소 — 창 하나 안의 LightGBM 학습 자체를 중단하지는 않는다, 알려진 제한).
     `training.jobs`는 여기서 import 하지 않는다 — 취소 확인 함수는 호출부가

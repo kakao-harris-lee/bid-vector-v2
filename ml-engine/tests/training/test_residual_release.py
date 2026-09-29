@@ -1,5 +1,5 @@
 """RED — `ml_engine.training.residual`·`ml_engine.training.release`(scope ⑦⑨,
-D-5C-10). verifier r1 H-1 뒤 — `ReleaseInputs` 타입은 삭제됐다. `derive_release_id`는
+D-5C-10). H-1 뒤 — `ReleaseInputs` 타입은 삭제됐다. `derive_release_id`는
 다섯 값을 키워드 인자로 직접 받는다(값의 유효성은 각 값의 원 출처 타입이 강제 —
 이 모듈은 더 이상 검증하지 않는다)."""
 

@@ -9,7 +9,7 @@
 않는다). 이 모듈은 그 둘을 **분리된 사유**로 낸다(조용한 drop 금지, 위협 모델 (b))(D-5D-2
 「사유가 섞이면 구별 안 됨」과 같은 원칙).
 
-M5/5D-3(D-5D3-2) — 9번째 사유 `SEGMENT_REASON_NOT_ALLOWED` 신설. `observe_sample` 자신은
+D-5D3-2 — 9번째 사유 `SEGMENT_REASON_NOT_ALLOWED` 신설. `observe_sample` 자신은
 표본별 기관·공종 축(`agency_id`/`category_code`)을 읽지 않는다 — 그 축은
 `ml_engine.inference.distribution`이 5B `resolve_text_fact`(허용 결측 사유
 `{NOT_COLLECTED_YET, UNKNOWN}`로 좁힘 — 3H-2 D-3H2-3)로 직접 판독하고, 거부되면 이 사유를 실어 표본 전체를
@@ -17,26 +17,26 @@ M5/5D-3(D-5D3-2) — 9번째 사유 `SEGMENT_REASON_NOT_ALLOWED` 신설. `observ
 표본 거부 사유의 단일 어휘는 이 모듈, D-5D3-2). `Diagnostics.excluded_observations`가
 그 개수를 다른 8 사유와 함께 총계로 나른다.
 
-9 사유(`SampleRejectionReason`): `BASE_AMOUNT_INVALID`(4성분 검증 — verifier r2 N-4,
+9 사유(`SampleRejectionReason`): `BASE_AMOUNT_INVALID`(4성분 검증 — N-4,
 `Money` 다섯 필드 중 `vat_treatment`는 5B 도 판정하지 않는다 — 5B `features/facts.py`
 `_resolve_base_amount`와 같은 규칙 — `CompetitionSample.base_amount`는 oneof/Fact 래퍼가
 아닌 바로 `Money`라 그 함수를 그대로 재사용할 수 없어 규칙만 재현한다, 5B 파일은 편집하지
 않는다) · `NO_RESERVE_DRAW`(optional 미설정) · `PRICE_COUNT_MISMATCH`(!= `policy.
 reserve_expected_price_count`) · `RESERVE_PRICE_INVALID`(예비가 `Money` 하나라도 4성분
-규칙 위반 — verifier r1 F-2, `amount_won > 0`만 보던 구판의 `NonPositivePrice`를 대체·
+규칙 위반 — F-2, `amount_won > 0`만 보던 구판의 `NonPositivePrice`를 대체·
 포섭한다: `_validate_money_amount`(basis·currency·provenance·amount_won)를 `base_amount`와
 같은 규칙으로 재사용) · `RESERVE_DRAW_UNMEASURABLE`(K6 `draw_mean_moments`가 자체적으로
 `Unmeasurable`을 낼 때 — 표본 15개가 전부 동일값이면 모분산 0, legacy 에는 없던 경로다·
 golden M-3) · `CENTER_OUT_OF_BAND`(K6 결과 `mean` 이 `policy.assessment_plausible_*` 밖) ·
-`BID_RATE_UNPARSEABLE`(`Rate.fraction` 이 빈 문자열·비수치·비유한 — verifier r1 F-1,
+`BID_RATE_UNPARSEABLE`(`Rate.fraction` 이 빈 문자열·비수치·비유한 — F-1,
 `parse_rate` 관문 신설) · `BID_RATE_OUT_OF_BAND`(파싱된 `observed_bid_rate` 가 `policy.
 bid_ratio_plausible_*` 밖 — D-5D2-6 이 `bid_to_assessment_ratio` 환산을 이식하지 않기로
 하면서, legacy 가 그 비에 적용하던 개연 밴드를 이 모듈은 관측값 자체의 sanity 밴드로
 재사용한다).
 
-**verifier r1 F-1(high)** — 이전 판은 `Decimal(sample.observed_bid_rate.fraction)`을
-관문 없이 호출해 미설정(proto 기본값 `""`)·비수치 문자열에서 `decimal.InvalidOperation`
-이 `serve_bid_rates` 밖으로 새 표본 한 건이 요청 전체를 죽였다(위협 모델 (a) 위반 —
+**F-1(high)** — `Decimal(sample.observed_bid_rate.fraction)`을
+관문 없이 호출하면 미설정(proto 기본값 `""`)·비수치 문자열에서 `decimal.InvalidOperation`
+이 `serve_bid_rates` 밖으로 새 표본 한 건이 요청 전체를 죽인다(위협 모델 (a) 위반 —
 「실패는 전부 `Unmeasurable`」과 정면 충돌). `parse_rate`(신규, 저장소에서 wire `Rate`
 를 파싱하는 유일한 자리) 가 그 경계를 막는다 — `observed_bid_rate`뿐 아니라 있으면
 `award_rate`(optional)도 같은 관문을 거친다(현재 조립기가 `award_rate` 값을 소비하지
@@ -78,9 +78,9 @@ _PROVENANCE_LABELS: dict[int, AssessmentProvenance] = {
 
 
 class SampleRejectionReason(StrEnum):
-    """관문 아홉 — 설계 검토 (5) 구현 지시 3 「7 사유」에 verifier r1 F-1·F-2 가
+    """관문 아홉 — 설계 검토 (5) 구현 지시 3 「7 사유」에 F-1·F-2 가
     `BID_RATE_UNPARSEABLE` 신설 + `NON_POSITIVE_PRICE`→`RESERVE_PRICE_INVALID` 확장·
-    개명(포섭)을 더했고, M5/5D-3(D-5D3-2)이 `SEGMENT_REASON_NOT_ALLOWED`를 더했다.
+    개명(포섭)을 더했고, D-5D3-2 가 `SEGMENT_REASON_NOT_ALLOWED`를 더했다.
     wire 로 나가지 않는다(Python 결과 타입 전용, `Diagnostics.excluded_observations`가
     사유별이 아니라 총계만 나른다)."""
 
@@ -119,7 +119,7 @@ def _validate_money_amount(money: common_pb2.Money) -> float | None:
     reserve_prices`의 각 `Money`도 oneof/Fact 래퍼가 아닌 바로 `Money`라 그 함수를 직접
     재사용하지 못해 규칙만 재현한다(5B 파일 편집 금지, reuse.md 에 근거 기록). 이 모듈
     안에서는 두 호출부(`observe_sample`의 base_amount, `_resolve_reserve_draw`의 예비가
-    15개)가 이 함수 하나를 공유한다(verifier r1 F-2 — 중복 재구현 금지)."""
+    15개)가 이 함수 하나를 공유한다(F-2 — 중복 재구현 금지)."""
     if money.basis != common_pb2.BASIS_BASE_AMOUNT:
         return None
     if money.currency != common_pb2.CURRENCY_KRW:
@@ -132,12 +132,12 @@ def _validate_money_amount(money: common_pb2.Money) -> float | None:
 
 
 def parse_rate(fraction: str) -> Decimal | None:
-    """wire `Rate.fraction` 파싱 관문(verifier r1 F-1) — 빈 문자열·비수치·비유한
+    """wire `Rate.fraction` 파싱 관문(F-1) — 빈 문자열·비수치·비유한
     (`NaN`·`Infinity`)을 걸러 유한 `Decimal`만 반환한다. 업무적 타당성(밴드)은 호출부가
     별도로 본다 — 이 함수는 「파싱 가능한가」만 판정한다. 저장소에서 wire `Rate`를
     파싱하는 유일한 자리(5B 에 대응 함수 없음, grep 확인).
 
-    `Decimal()`의 관용(verifier r2 N-3) — 앞뒤 공백·개행, 자릿수 구분 `_`, 선행 `+`를
+    `Decimal()`의 관용(N-3) — 앞뒤 공백·개행, 자릿수 구분 `_`, 선행 `+`를
     허용해 값을 만든다(예: `"  1_000.5  "` → `Decimal("1000.5")`). 이 함수는 그 관용을
     막지 않는다 — 그렇게 파싱된 값이 업무적으로 말이 안 되면(사정률 축 밴드 밖) 호출부의
     `policy.bid_ratio_plausible_*` 밴드가 어차피 `BID_RATE_OUT_OF_BAND`로 거부한다
@@ -187,7 +187,7 @@ def _validated_reserve_price_amounts(
     reserve_prices: Iterable[common_pb2.Money],
 ) -> list[float] | SampleRejected:
     """예비가 15개 각각을 `_validate_money_amount`(base_amount 와 같은 4성분 규칙)로
-    검증한다 — verifier r1 F-2, `amount_won > 0`만 보던 구판을 대체한다."""
+    검증한다 — F-2, `amount_won > 0`만 보던 구판을 대체한다."""
     validated: list[float] = []
     for price in reserve_prices:
         amount = _validate_money_amount(price)
@@ -231,7 +231,7 @@ def _resolve_reserve_draw(
 def _resolve_observed_bid_rate(
     sample: features_pb2.CompetitionSample, policy: InferencePolicy
 ) -> float | SampleRejected:
-    """`observed_bid_rate` 파싱(verifier r1 F-1, `parse_rate`) → 밴드(D-5D2-6). `award_
+    """`observed_bid_rate` 파싱(F-1, `parse_rate`) → 밴드(D-5D2-6). `award_
     rate`(optional, 조립기가 소비하지 않는다)도 있으면 같은 파싱 관문만 거친다 — 계약
     밖 값을 조용히 접지 않는다는 원칙은 소비 여부와 무관하다."""
     rate = parse_rate(sample.observed_bid_rate.fraction)

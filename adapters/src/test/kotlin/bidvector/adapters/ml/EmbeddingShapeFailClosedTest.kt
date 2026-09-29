@@ -27,13 +27,13 @@ import contract.bidvector.ml.v1.EmbedTextRequest as ProtoEmbedTextRequest
 /**
  * 검증층을 통과하지 못한 `Embedding`은 예외가 아니라 `Unavailable`로 접힌다 —
  * `EmbeddingVector.init`은 마지막 안전판이지 게이트가 아니다(`isAcceptableEmbeddingShape`가
- * 게이트, 4D-1 `SuccessShapeFailClosedTest`와 동형 패턴). 이 파일이 증명하는 것 셋:
+ * 게이트, `SuccessShapeFailClosedTest`와 동형 패턴). 이 파일이 증명하는 것 셋:
  *
  * - values 개수가 dimension 과 다르면 `Unavailable(ContractViolation)`이다(우회 (1)).
  * - normalization 이 L2 가 아니거나 norm 이 1 을 epsilon 이상 벗어나면
  *   `Unavailable(ContractViolation)`이다(우회 (2)).
  * - release 다섯 성분 중 하나라도 공백이면 `Unavailable(ContractViolation)`이다(우회 (3)
- *   release 공백 축 — **(6)이 아니다, 리뷰 F-D 정정**: (6)은 이 slice가 열어 둔 값 타입
+ *   release 공백 축 — **(6)이 아니다**: (6)은 이 slice가 열어 둔 값 타입
  *   위조 축이다, 성분별 table-driven).
  */
 class EmbeddingShapeFailClosedTest {

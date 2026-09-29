@@ -34,12 +34,12 @@ private val PROBED_METHODS =
 private val FRAMEWORK_PATHS = setOf("/error")
 
 /**
- * `OPEN-API-WRONG-METHOD-500` 폐쇄 판정과 문서↔구현 표면 등식(M6/6A-2b D-6A2b-7·19·20·21).
+ * `OPEN-API-WRONG-METHOD-500` 폐쇄 판정과 문서↔구현 표면 등식(D-6A2b-7·19·20·21).
  *
- * **모집단이 출하 조립이다(verifier r1 F-1 ③).** 이전 판은 test 전용 조립
- * (`HttpTestApplication`, 스캔 루트가 HTTP 층 하나)에서 매핑을 거뒀다 — 다른 패키지의 진짜
- * 컨트롤러가 들어와도 보이지 않았고, 그래서 「등록된 모든 매핑」이라는 말이 실제보다 좁았다.
- * 여기서는 `main()` 과 같은 조립 함수로 뜬 컨텍스트에서 거둔다.
+ * **모집단이 출하 조립이다.** test 전용 조립(`HttpTestApplication`, 스캔 루트가 HTTP 층
+ * 하나)에서 매핑을 거두면 — 다른 패키지의 진짜 컨트롤러가 들어와도 보이지 않아 「등록된 모든
+ * 매핑」이라는 말이 실제보다 좁아진다. 여기서는 `main()` 과 같은 조립 함수로 뜬 컨텍스트에서
+ * 거둔다.
  *
  * **집합 등식이 항진식이 아니다(F-3).** 두드린 경로만 `probed` 에 넣고, 건너뛴 경로는 이유가
  * 붙은 [FRAMEWORK_PATHS] 에만 둔다 — `probed ∪ 건너뜀 == 전체 매핑`. 수집에서 한 갈래가

@@ -98,7 +98,7 @@ class BreakerTest {
     }
 
     /**
-     * verifier r3 H-1(high) — 예산 소진(`PredictionCallOutcome.BudgetExhausted`)이 permit 을
+     * 예산 소진(`PredictionCallOutcome.BudgetExhausted`)이 permit 을
      * 반납하지 않던 결함의 회귀 방지. CLOSED 에서는 permit 이 사실상 무제한이라 무해했지만,
      * OPEN→HALF_OPEN 전이 뒤에는 `permittedNumberOfCallsInHalfOpenState`(기본 10)가 유한해
      * 예산 소진 호출을 그 permit 수보다 많이 반복하면(여기선 15회) 수정 전 코드는 11번째

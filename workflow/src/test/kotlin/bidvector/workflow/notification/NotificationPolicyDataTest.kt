@@ -14,7 +14,7 @@ import java.time.LocalDate
  */
 class NotificationPolicyDataTest {
     /**
-     * verifier r1 M-2 시정 — 손으로 만든 map(아래 test들)만으로는 출하 값
+     * 손으로 만든 map(아래 test들)만으로는 출하 값
      * `NOTIFICATION_DELIVERY_POLICY`(`NotificationDeliveryPolicyData.kt`) 자신이 정의
      * 자리 외 어디서도 참조되지 않아, 그 값을 담은 파일의 JVM 클래스 초기화가 트리거되지
      * 않았다(초기화가 안 되면 `init`의 `require`도 안 돈다) — 출하 map에서 환경 하나를

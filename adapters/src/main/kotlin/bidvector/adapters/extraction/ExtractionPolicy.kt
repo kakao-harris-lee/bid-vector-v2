@@ -19,10 +19,10 @@ data class ExtractionPolicyData(
     val maxTokensPerCall: Int,
     /**
      * resilience4j `TimeLimiter`의 시한 — 이 값이 「timeout」의 정본이다(scope ⑤).
-     * [httpRequestTimeout]과 값을 공유하지 않는다(verifier r1 F-2) — 예전엔 둘이 같은
-     * 값을 써서 JDK `HttpClient`의 자체 시한과 `TimeLimiter`가 경합했다(같은 시각에
+     * [httpRequestTimeout]과 값을 공유하지 않는다 — 둘이 같은
+     * 값을 쓰면 JDK `HttpClient`의 자체 시한과 `TimeLimiter`가 경합한다(같은 시각에
      * 둘 다 만료 가능 → `Uncertain(Timeout)`과 `Uncertain(TransportFailed)`가 실행마다
-     * 갈렸다, `ExtractionFailOpenTest` flaky 실측 S-2·S-4). `httpRequestTimeout`이 이
+     * 갈린다, `ExtractionFailOpenTest` flaky 실측 S-2·S-4). `httpRequestTimeout`이 이
      * 값보다 항상 크므로(`init` 강제) `TimeLimiter`가 항상 먼저 끊어 분류가 결정론적이다.
      */
     val callTimeout: Duration,

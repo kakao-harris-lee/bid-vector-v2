@@ -282,9 +282,9 @@ def test_pipeline_with_real_lightgbm_trainer(tmp_path: Path) -> None:
     assert artifact_path.is_file()
 
 
-# ---- M-2(verifier r1) — 취소 경계 넷을 각각 독립적으로 확인한다. 셋 중 하나를
+# ---- M-2 — 취소 경계 넷을 각각 독립적으로 확인한다. 셋 중 하나를
 # 지워도(또는 넷 중 하나를 지워도) 정확히 그 경계에 대응하는 아래 test 가 붉어져야
-# 한다(이전에는 하나만 살아도 전체가 초록이었다 — 변이 생존 실측). ----
+# 한다(하나만 살아도 전체가 초록이면 변이 생존을 놓친다). ----
 
 
 class _CancelAfterNChecks:
@@ -473,7 +473,7 @@ def test_never_cancelled_reaches_all_four_stages_and_writes_files(
     assert len(list(out_dir.iterdir())) == 1
 
 
-# ---- M5/5E-3 D-5E3-4 — `HoldoutCancelled`(창 루프 도중 취소, D-5E3-3)를
+# ---- D-5E3-4 — `HoldoutCancelled`(창 루프 도중 취소, D-5E3-3)를
 # `PipelineCancelled`로만 옮긴다. 창 루프 내부 정밀도(학습 전 확인·완료 창 수)는
 # `tests/training/test_holdout.py`가 mutation 검증까지 마쳤다 — 여기서는 pipeline
 # 층의 배선(같은 `cancel_token.is_cancelled`가 `should_stop`으로 전달되는가)과

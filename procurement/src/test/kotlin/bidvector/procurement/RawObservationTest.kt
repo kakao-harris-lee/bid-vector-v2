@@ -95,8 +95,7 @@ class RawObservationTest {
         shouldThrow<IllegalArgumentException> { RawKey("") }
     }
 
-    // v2-defect(3A 잔여 일괄 verifier r3 전 수정, koneps-collection-003·004) — 명시 null 과
-    // 키 부재를 presenceOf 로 구분한다. valueOf 는 하위호환으로 둘 다 null 로 접는다.
+    // 명시 null 과 키 부재를 presenceOf 로 구분한다. valueOf 는 하위호환으로 둘 다 null 로 접는다.
     @Test
     fun `presenceOf 는 명시 null 과 키 부재를 구분한다`() {
         val observation =

@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
 /**
- * 단일 운영자 자격증명 필터(운영자 결정 2026-09-16 ②, D-6A1-6) — 값은 환경변수 주입,
+ * 단일 운영자 자격증명 필터(운영자 결정 ②, D-6A1-6) — 값은 환경변수 주입,
  * 기본값 없음(생성자가 빈 값을 거부한다 — 조립 시점에 이미 실패한다, `bidvector.persistence`
  * 관례와 같은 fail-fast). 실패는 401이고 사유를 나누지 않는다(없음/틀림을 구분하지 않는다
  * — 구분하면 자격증명 존재 자체를 흘린다).
@@ -21,19 +21,19 @@ import java.security.MessageDigest
  *
  * **우회 (4)(D-6A1-43) — 비교는 [OperatorCredential.matches] 하나뿐이고, 이 필터는 raw
  * `String`을 아예 다루지 않는다.** 「필터는 그 타입만 다룬다. 환경변수에서 읽는 자리에서
- * 곧바로 감싼다」(운영자 결정 2026-09-23) — 생성자가 [OperatorCredential]만 받는다. 이전
- * 판은 필터가 `String` 생성자 인자를 받아 **내부에서** 감쌌는데, 그러면 raw 문자열이
+ * 곧바로 감싼다」 — 생성자가 [OperatorCredential]만 받는다. 필터가 `String` 생성자
+ * 인자를 받아 **내부에서** 감싸면, raw 문자열이
  * 생성자 매개변수로 필터 class 안에 순간적으로 존재해 「그 값을 다시 꺼내 이웃 패키지의
- * 새 비교 함수로 넘긴다」는 형태의 재도입이 가능했다(verifier r3 MUT-A3 재현 — 이 슬라이스
+ * 새 비교 함수로 넘긴다」는 형태의 재도입이 가능하다(MUT-A3 재현 — 이 슬라이스
  * 착수 재검증에서 실측: `private val rawExpected: String = expectedCredential` 필드를
  * 새로 만들고 이웃 패키지 `==` 함수에 넘기니 전건 `check`가 초록이었다). **환경변수를 읽는
  * 조립 지점(`BidVectorApplication`·`HttpTestSupport`)에서 [OperatorCredential.of]로 즉시
  * 감싸면 필터 class 안에는 애초에 raw 문자열이 존재하지 않는다** — 재도입하려면 이 필터의
  * 생성자 시그니처와 조립 지점 둘 다 고쳐야 하고, 그것은 더 이상 「한 줄 이동」이 아니다.
- * 이전 판은 `MessageDigest.isEqual`을 직접 호출하는 규율을 `ConstantTimeComparisonStructureTest`
- * (게이트)로만 지켰는데, 그 게이트는 이 slice 안에서 세 번(파일 하나 → 이름 하나 →
- * 패키지+허용 목록) 넓혀졌고 세 번 다 위치·이름을 바꾸는 다음 라운드에 뚫렸다(verifier r3
- * MUT-A2~A4). **타입은 코드가 어디로 옮겨지든 따라온다** — 게이트는 회귀 그물로 남긴다.
+ * `MessageDigest.isEqual`을 직접 호출하는 규율을 `ConstantTimeComparisonStructureTest`
+ * (게이트)로만 지키면, 그 게이트는 파일 하나 → 이름 하나 →
+ * 패키지+허용 목록 순으로 넓어질 수 있고 위치·이름을 바꾸는 변이가 그때마다 뚫는다(MUT-A2~A4).
+ * **타입은 코드가 어디로 옮겨지든 따라온다** — 게이트는 회귀 그물로 남긴다.
  *
  * 이름에 스캔 어휘를 쓰지 않는다(D-6A1-9, D-6A1-19가 모든 설정 키로 일반화) — `Credential`.
  */

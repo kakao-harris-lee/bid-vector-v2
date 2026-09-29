@@ -3,7 +3,7 @@ package bidvector.procurement
 import bidvector.sharedkernel.VatTreatment
 
 /**
- * M3/3F P-13 (a) 승인(`policy-values.md` §1.11) — 개찰완료(투찰 행) 축 필드 계약 열.
+ * P-13 (a) 승인(`policy-values.md` §1.11) — 개찰완료(투찰 행) 축 필드 계약 열.
  * `CollectionPolicy.kt`에서 분리한 파일이다(sizeGate 500줄, v2-지침서 §5 — 3E
  * `CleanMigrationCheckTest.kt` 분리와 같은 전례). 평가점수 넷(`bidPrceEvlVal`·`techEvlVal`·
  * `techEvlNaturVal`·`totalEvlAmtVal`)·사업자등록번호(`prcbdrBizno`)·대표자명(`prcbdrCeoNm`)·

@@ -27,13 +27,13 @@ private const val SERVICE_CLASS_NAME = "정보시스템 개발 서비스"
 private const val CONSTRUCTION_TYPE_NAME = "전기공사업"
 
 /**
- * M6/6F-9 D-6F9-6 — 업무구분 수집이 ML 요청 wire 에 만드는 파급을 **이 slice 가 바꾸지 않고 잠근다**. 계약 문면이
+ * D-6F9-6 — 업무구분 수집이 ML 요청 wire 에 만드는 파급을 **이 slice 가 바꾸지 않고 잠근다**. 계약 문면이
  * 요구하는 두 가지다: (가) 용역 공고의 공공조달분류 번호가 요청 fact 에 **실린다** (나) 공사 공고는 결측을 유지한다.
  * `adapters/ml` main 코드는 건드리지 않는다 — 여기 있는 것은 잠금뿐이다.
  *
  * 값을 손으로 짓지 않고 **운영 필드 계약 → `canonicalize` → 공고 fact → wire** 를 한 줄로 잇는다(원시 키 문자열도
  * 계약에서 읽는다). 그래서 canonicalize 가 분류 번호를 코드 칸에 넣기를 멈춰도, 매핑 층이 그 값을 떨어뜨려도
- * 둘 다 이 test 가 RED 다. 기존 `RequestMappingTest` 는 업종 코드 축을 전혀 단언하지 않았다(verifier r1 F-2).
+ * 둘 다 이 test 가 RED 다. 기존 `RequestMappingTest` 는 업종 코드 축을 전혀 단언하지 않았다.
  */
 class RequestCategoryCodeWireTest {
     private val policy: KonepsCollectionPolicyData =

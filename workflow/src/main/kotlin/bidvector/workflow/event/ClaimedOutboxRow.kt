@@ -4,10 +4,10 @@ import bidvector.workflow.strategy.Actor
 import java.time.Instant
 
 /**
- * outbox 저장소가 [OutboxPort.claim]으로 돌려주는 **원시 행**(scope.md ③, verifier H-1
- * 시정) — 완성된 [EventEnvelope]가 아니다. 어댑터(persistence, 4C-2)는 DB 컬럼을 그대로
+ * outbox 저장소가 [OutboxPort.claim]으로 돌려주는 **원시 행**(scope.md ③) — 완성된
+ * [EventEnvelope]가 아니다. 어댑터(persistence, 4C-2)는 DB 컬럼을 그대로
  * 이 값에 옮겨 담기만 한다 — [EventEnvelope]를 다루지 않는다(그 생성자는 `workflow` 안에서만
- * 유효하다, `EventEnvelope.restore`도 이 시정으로 `internal`이다).
+ * 유효하다, `EventEnvelope.restore`도 `internal`이다).
  *
  * **이 타입의 생성자는 공개다** — 아무 모듈이나 이 값을 지어도 얻는 것이 없다.
  * `OutboxPort.register`는 [EventEnvelope]를 받고, 이 행에서 [EventEnvelope]로 가는

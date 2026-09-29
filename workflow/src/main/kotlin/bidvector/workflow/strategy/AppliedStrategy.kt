@@ -3,13 +3,13 @@ package bidvector.workflow.strategy
 import bidvector.strategy.OperatorStrategy
 
 /**
- * write 경로 우회 폐쇄용 통로(capability) 타입(우회 (3), verifier H-1/H-2 수정) —
- * M3/3B-2 `MaskedKonepsItem`(P-10 (a) allow-list 반전 + 통로 타입)과 같은 갈래다.
+ * write 경로 우회 폐쇄용 통로(capability) 타입(우회 (3)) —
+ * `MaskedKonepsItem`(P-10 (a) allow-list 반전 + 통로 타입)과 같은 갈래다.
  *
  * `bidvector.strategy.validate()`가 public 이고 `StrategyValidation.Valid.strategy`도
  * public 이라(1E D-10) [OperatorStrategy] 자체는 어느 모듈에서든 손에 넣을 수 있다 —
  * `internal constructor`만으로는 「값을 가진 자 = 저장을 실행할 권한을 가진 자」를
- * 가르지 못한다(verifier 실측: `app` test 가 `validate()` 결과를 그대로 `save()`에 넘겨
+ * 가르지 못한다(실측: `app` test 가 `validate()` 결과를 그대로 `save()`에 넘겨
  * `EditStrategyWorkflow`를 지나지 않고 컴파일됐다).
  *
  * 이 타입이 그 둘을 가른다 — 생성자가 `internal`이라 **`workflow` 모듈 밖에서는 만들 수

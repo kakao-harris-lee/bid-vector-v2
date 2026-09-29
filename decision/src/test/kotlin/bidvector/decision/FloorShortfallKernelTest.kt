@@ -32,7 +32,7 @@ private val TIGHT_INDETERMINATE_BAND = AssessmentBand(BigDecimal("0.999"), BigDe
 private fun rate(value: String): AssessmentRate = AssessmentRate.observed(Rate.ofFraction(BigDecimal(value)))
 
 /**
- * `measureFloorShortfall`은 `Derived<AssessmentRate>`를 요구한다(verifier r1 F-1) —
+ * `measureFloorShortfall`은 `Derived<AssessmentRate>`를 요구한다 —
  * `decision`은 `Derived`를 새로 만들 수 없으므로(shared-kernel `internal` 생성자) 실제
  * 파생 경로(`criticalAssessmentRate`)를 불러 정당한 값을 얻는다. `floor = 1`로 두면
  * 몫이 `value` 그대로 나온다.
@@ -66,7 +66,7 @@ private fun policyOf(
         TEST_VERSION,
     )
 
-/** M1/1D ④⑤⑥⑦⑧ — floor shortfall 커널 회귀. */
+/** floor shortfall 커널 회귀. */
 class FloorShortfallKernelTest {
     @Test
     fun `④ 경계 등가는 미달이 아니다 — strictly-greater`() {

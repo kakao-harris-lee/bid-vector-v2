@@ -24,12 +24,12 @@ import java.math.MathContext
 import java.nio.file.Path
 
 /**
- * M2/2E — `EmbeddingService` 계약 consumer test. Kotlin in-process fake servicer
+ * `EmbeddingService` 계약 consumer test. Kotlin in-process fake servicer
  * (`EmbeddingServiceCoroutineImplBase`) 위에서 `contracts/testdata/embedding/` 의
  * canonical 바이트(`buf convert`로 생성 — 재현 절차는 `reports/evidence/m2/2e/commands.md`)를
- * 답으로 낸다. 실 servicer(M5)·실 client(4D-2)는 이 slice 밖이다(scope.md 「만들지 않는 것」).
+ * 답으로 낸다. 실 servicer·실 client는 범위 밖이다(scope.md 「만들지 않는 것」).
  *
- * **거부 규칙은 이 test 안의 순수 함수다**(2B `PredictionContractTest`와 같은 관례) —
+ * **거부 규칙은 이 test 안의 순수 함수다**(`PredictionContractTest`와 같은 관례) —
  * `isAcceptableEmbedding`이 D-2E-1의 형태 불변식(차원 일치·L2 정규화)을 문서화·고정한다.
  * 실제 Kotlin validation 구현은 4D-2 몫이다.
  */
@@ -122,12 +122,11 @@ class EmbeddingContractTest {
 
     @Test
     fun `values 개수가 dimension 과 다르면 계약 불변식 위반이다(norm 은 1 로 유지)`() {
-        // verifier r1 F-2(high) — 이전 판은 `valuesList.drop(1)`로 원소를 "떼기만" 했다.
-        // 그러면 dimension(4)은 그대로인데 남은 3원소의 norm 도 0.866으로 같이 무너져
-        // **norm 항에서 먼저 걸리고 dimension 항은 확인력이 0**이었다(가드를 지워도
-        // 43개 test 전건이 그대로 통과 — 실측). 여기서는 `dimension` 필드는 testdata
-        // 원본 그대로(4) 두고 `values`만 L2 정규화된 **3원소**(1/√3 씩, norm=1)로 바꿔
-        // norm 항은 통과·dimension 항만 단독으로 걸리게 한다.
+        // 단순히 `valuesList.drop(1)`로 원소를 하나 떼면 dimension(4)은 그대로인데 남은
+        // 3원소의 norm 도 0.866으로 같이 무너져 **norm 항에서 먼저 걸리고 dimension 항은
+        // 확인력이 0**이 된다(가드를 지워도 43개 test 전건이 그대로 통과함을 실측으로 확인).
+        // 그래서 `dimension` 필드는 testdata 원본 그대로(4) 두고 `values`만 L2 정규화된
+        // **3원소**(1/√3 씩, norm=1)로 바꿔 norm 항은 통과·dimension 항만 단독으로 걸리게 한다.
         val normalizedThreeElements = List(3) { (1.0 / Math.sqrt(3.0)).toFloat() }
         val response = EmbedTextResponse.parseFrom(successBytes)
         val mutated =
@@ -165,9 +164,9 @@ class EmbeddingContractTest {
         isAcceptableEmbedding(mutated.success, normEpsilon) shouldBe false
     }
 
-    // ---- metadata.dimension 대조(설계 검토 (1), verifier r1 F-2 미구현 지적) ----
+    // ---- metadata.dimension 대조(설계 검토 (1)) ----
     // 「차원은 응답이 나르고 client 는 GetEmbeddingMetadata.dimension 과 대조(불일치 =
-    // 계약 위반)」(scope.md ②)의 실제 대응 test — 이전 판은 이 대조 자체가 없었다.
+    // 계약 위반)」(scope.md ②)의 실제 대응 test.
 
     @Test
     fun `testdata 의 EmbedText 응답 dimension 은 GetEmbeddingMetadata 의 dimension 과 같다`() {
@@ -235,9 +234,8 @@ class EmbeddingContractTest {
         isModelReleaseNonBlank(success.release) shouldBe true
     }
 
-    // verifier r1 F-3(medium) — 이전 판은 `datasetId` 하나만 변이했다. 4D-1
     // `SuccessShapeFailClosedTest`(main)의 같은 규칙은 다섯 성분을 **각각** 덮는다
-    // (§「ModelReleaseRef」 표) — 이 slice도 같은 커버리지로 맞춘다. 성분 하나의 절을
+    // (§「ModelReleaseRef」 표) — 이 test도 같은 커버리지로 맞춘다. 성분 하나의 절을
     // `isModelReleaseNonBlank`에서 지워도(`&&` 한 항 삭제) 다섯 case 중 그 성분 case만
     // 놓치지 않고 걸린다.
     private data class ReleaseBlankCase(
@@ -350,8 +348,8 @@ class EmbeddingContractTest {
                 datasetId.isNotBlank()
         }
 
-    // `embeddingDimensionMatchesMetadata`는 main 으로 승격됐다(PR #5 게이트 시정, D-2E ②
+    // `embeddingDimensionMatchesMetadata`는 main 으로 승격됐다(D-2E ②
     // 미구현 — `bidvector.adapters.ml.EmbeddingShapeValidation.kt`). `releaseSatisfiesSelector`
-    // 를 M2/2B `PredictionContractTest`에서 승격한 것과 같은 관례 — 사본을 남기지 않고
+    // 를 `PredictionContractTest`에서 승격한 것과 같은 관례 — 사본을 남기지 않고
     // import 해서 쓴다(위 import 문).
 }

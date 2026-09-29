@@ -1,4 +1,4 @@
-"""M2/2C — `TrainingJobService` provider 계약 test.
+"""`TrainingJobService` provider 계약 test.
 
 Python 쪽 fake servicer(생성 `TrainingJobServiceServicer`의 최소 구현, **실제 상태
 기계**를 갖는다 — job 저장소 dict, idempotency 키 대조)가 계약 규칙(전이표·idempotency·
@@ -394,7 +394,7 @@ def test_cancelled_and_running_testdata_have_no_artifact_evaluation_failure(trai
 
 
 def test_unspecified_or_undefined_state_job_violates_combination_invariant(training_pb2):
-    # verifier r1 F-1 — fail-closed 가지(UNSPECIFIED·정의 밖 정수)가 단언되지 않아
+    # F-1 — fail-closed 가지(UNSPECIFIED·정의 밖 정수)가 단언되지 않아
     # `_is_valid_job_combination` 말미 `return False`를 `return True`로 바꿔도 초록이었다.
     unspecified = training_pb2.TrainingJob()
     unspecified.job_id = "job-unspecified"

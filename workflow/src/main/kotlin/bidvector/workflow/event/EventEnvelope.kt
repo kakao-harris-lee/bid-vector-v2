@@ -32,12 +32,12 @@ data class EventEnvelope<out P> internal constructor(
         /**
          * 저장소 복원 전용(persistence 어댑터, 4C-2) — **신규 이벤트 생성에 쓰지 않는다.**
          *
-         * **`internal`이다(verifier H-1 시정) — 이전 판은 `public`이었다.** 「경계로
+         * **`internal`이다.** 「경계로
          * 처리」(설계 검토 (2) 셋째 행 — 저장소 구현자는 이미 자기 store에 임의 행을
          * 지어낼 수 있으므로 새 권한이 아니다)는 **persistence 어댑터에 대해서만** 참이고,
          * `public`은 그 권한을 **아무 모듈에나** 준다 — `actor=null`인 `StrategyUpdated`
          * 봉투를 `workflow` 밖에서 지어 `OutboxPort.register`(4C-1 자신의 port)에 넣는
-         * 위조가 컴파일됐다(verifier 실측, 4A r2 H-3과 같은 형태). 위임 대상 [newEnvelope]가
+         * 위조가 컴파일됐다(실측). 위임 대상 [newEnvelope]가
          * `internal`이라는 사실은 이 함수 **자신**이 `public`이면 아무 의미가 없다 — 이
          * 함수가 바로 그 「공개된 문」이었다.
          *

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M2/2D — breaking mutation 증명(S-3, scope.md 「이 slice 가 하는 일」 ①②).
+# breaking mutation 증명(S-3, scope.md 「이 slice 가 하는 일」 ①②).
 # 하네스 `test-discovery-guard` B-1~B-4 — 2D 알려진 제한 11~13(F-21·F-22·F-23) 을 닫는다.
 #
 # 승인된 `.proto`(정책 데이터의 `approved.tag`)를 **임시 디렉터리**에서 mutation 집합
@@ -14,7 +14,7 @@
 # 정책 키 부재/값 이상·buf 버전 불일치·git 태그 없음·컴파일 오류·판정 근거 부재·
 # `expected.tsv` 불완전/표류한 표 등 환경/스크립트 문제).
 #
-# **verifier r3 F-18·F-19 — "구멍을 하나씩 막지 않고 양성 단언 구조로"**. 판정에 필요한
+# **F-18·F-19 — "구멍을 하나씩 막지 않고 양성 단언 구조로"**. 판정에 필요한
 # 모든 값(정책 키 존재+비어있지 않음, `breaking.mutations.min`이 1 이상의 정수, buf 버전
 # 일치, `caught`이면 진짜 규칙 이름 하나 이상 확보)이 **전부 확인될 때만** 다음 단계로
 # 간다 — 하나라도 확인되지 않으면 exit 2. `policy_value`는 실패를 `exit`이 아니라
@@ -23,18 +23,18 @@
 # `breaking.mutations` 는 **키가 있는 한** 빈 값이 허용된 유일한 항목이다(우회 후보 (1) —
 # 빈 집합은 뒤의 최소 크기 단언이 잡아야 하는 정상 실패 경로).
 #
-# **verifier r2 F-14 로 정정된 사실** — `buf breaking`의 exit code 는 **위반과 컴파일
+# **F-14** — `buf breaking`의 exit code 는 **위반과 컴파일
 # 오류를 가르지 않는다**(실측: `.proto` 구문이 깨진 사본에도 exit 100 이 난다). exit 100
 # 은 "caught 후보"일 뿐이고 `--error-format=json`의 `"type"` 필드를 봐야 한다 — 컴파일
 # 오류는 전부 `breaking.compile-error.type`(정책 데이터) 값이고, 진짜 breaking 규칙은
 # `FIELD_NO_DELETE` 같은 규칙 이름이다.
 #
 # 결과는 `contracts/testdata/breaking/expected.tsv`(커밋된 **기대값** 표, mutation →
-# 기대 규칙 이름)와 대조한다(verifier r3 F-20) — 매 실행 덮어쓰지 않는다. 규칙 이름이
+# 기대 규칙 이름)와 대조한다(F-20) — 매 실행 덮어쓰지 않는다. 규칙 이름이
 # 다른 규칙으로 표류하면 exit 1. 표를 의도적으로 새로 세우거나 갱신할 때만
 # `./tools/breaking-mutations.sh --update`로 명시적으로 다시 쓴다.
 #
-# **verifier r4 F-21(하네스 B-1 로 닫힘)** — 표에 행이 없는 mutation 이 대조를 건너뛰고
+# **F-21(하네스 B-1 로 닫힘)** — 표에 행이 없는 mutation 이 대조를 건너뛰고
 # "규칙 이름이 비어 있지 않으면 caught" 로 돌아가던 관용을 없앴다. 루프 전에
 # `assert_expected_tsv_complete`가 `breaking.mutations`(+양성 대조) 목록과 표의 mutation
 # 열을 **양방향**으로 대조한다 — 표에 없는 mutation, 표에만 있고 목록에 없는 행(표류한 표)
@@ -76,7 +76,7 @@ EXPECTED_TSV="${EXPECTED_TSV:-$CONTRACTS_DIR/testdata/breaking/expected.tsv}"
 POSITIVE_CONTROL_LABEL="compatible-additions(positive-control)"
 
 # 값을 stdout 으로, 실패는 return 1 로 낸다 — `exit`을 여기서 쓰면 명령 치환의 서브셸만
-# 끝나고 부모 스크립트는 빈 값을 들고 계속 간다(verifier r3 F-18 의 근본 원인).
+# 끝나고 부모 스크립트는 빈 값을 들고 계속 간다(F-18 의 근본 원인).
 policy_value() {
     local key="$1"
     local line
@@ -111,7 +111,7 @@ require_positive_int() {
     fi
 }
 
-# verifier r1 F-9 — `sed -i ''`는 BSD sed(macOS) 전용 문법이다. GNU sed(Linux, 미래 CI)는
+# F-9 — `sed -i ''`는 BSD sed(macOS) 전용 문법이다. GNU sed(Linux, 미래 CI)는
 # 같은 자리에서 다음 인자를 in-place 접미사로 먹어 버린다. 임시 파일 경유로 두 구현
 # 모두에서 동작하게 한다.
 sed_inplace() {
@@ -149,7 +149,7 @@ finding_types() {
 # 컴파일 오류(정책 `breaking.compile-error.type`) 가 하나라도 섞여 있으면 위반이 아니라
 # mutation 적용이 구문을 깬 것이다 — genuine breaking 규칙과 구분한다.
 #
-# **verifier r1 F-8(info)** — 이 함수와 `first_rule_type` 은 호출자 스코프의 전역
+# **F-8(info)** — 이 함수와 `first_rule_type` 은 호출자 스코프의 전역
 # `COMPILE_ERROR_TYPE` 을 전제한다(`main` 이 `require_policy_value` 로 채운다). 그 전역
 # 없이(예: `source` 만 하고) 직접 부르면 `unbound variable` 로 죽는다 — `breaking-mutations-
 # selftest.sh` 는 호출 전 직접 설정하므로 이 전제를 충족한다.
@@ -165,7 +165,7 @@ has_compile_error() {
 
 # evidence 열용 — 첫 finding 의 규칙 이름(컴파일 오류가 아닌 경우의 대표값). `"type"`을
 # 하나도 못 뽑으면 빈 문자열을 낸다 — 그 경우를 "규칙을 못 얻었다"는 신호로 호출부가
-# 양성 검사한다(verifier r3 F-19).
+# 양성 검사한다(F-19).
 #
 # **F-23(하네스 B-3)** — `finding_types`의 같은 변수를 줄 단위 here-string(`<<<`)으로
 # 읽는다. here-string 은 파이프가 아니다(생산자 프로세스가 따로 없다) — SIGPIPE 표면이
@@ -182,7 +182,7 @@ first_rule_type() {
     return 0
 }
 
-# verifier r3 F-20 — 커밋된 `expected.tsv`에서 이 mutation 의 기대 규칙 이름을 읽는다.
+# F-20 — 커밋된 `expected.tsv`에서 이 mutation 의 기대 규칙 이름을 읽는다.
 # bash 3.2(macOS 기본)에는 연관 배열이 없어 매번 `awk`로 조회한다(mutation 수가 적어
 # 성능 문제 없음). **B-1 로 「행이 없으면 빈 문자열」의 소비처가 사라졌다** —
 # `assert_expected_tsv_complete`가 루프 전에 완전성을 이미 확인하므로, 이 함수가 빈
@@ -193,7 +193,7 @@ expected_rule_type_for() {
     awk -F'\t' -v m="$mutation" '$1==m {print $4}' "$EXPECTED_TSV" | head -1
 }
 
-# ---- verifier r4 F-21(하네스 B-1) — expected.tsv 완전성 양방향 단언 ----
+# ---- F-21(하네스 B-1) — expected.tsv 완전성 양방향 단언 ----
 # `breaking.mutations`(+양성 대조 라벨) 각각이 표에 행을 가져야 하고(없으면 표가
 # 불완전), 표의 각 행도 그 목록 안에 있어야 한다(표류한 표 — 목록에서 mutation 을
 # 뺐는데 표 행만 남는 경우). 둘 중 하나라도 어긋나면 return 2(도구 오류) — 호출부가
@@ -223,7 +223,7 @@ assert_expected_tsv_complete() {
 COMMON="proto/bidvector/ml/v1/common.proto"
 PREDICTION="proto/bidvector/ml/v1/prediction.proto"
 TRAINING="proto/bidvector/ml/v1/training.proto"
-# M2/2E — 신설 파일을 스윕에 넣는다(scope.md 「이 slice 가 하는 일」, 조사 §5). `buf
+# 신설 파일을 스윕에 넣는다(scope.md 「이 slice 가 하는 일」, 조사 §5). `buf
 # breaking`은 **승인 태그에 없는 파일**을 비교 기준으로 못 삼는다 — `embedding.proto`는
 # 승인 태그(`contracts/v1-approved-2026-09-07`) 시점에 존재하지 않았으므로, 그 파일 자체의
 # 필드·enum·rpc 삭제는 "원래 없던 것의 형태가 바뀜"이라 breaking으로 잡히지 않는다(11종이
@@ -388,7 +388,7 @@ main() {
         IFS=',' read -r -a MUTATIONS <<<"$MUTATIONS_RAW"
     fi
 
-    # verifier r3 F-19 — S-3 자신도 buf 버전을 정책과 대조한다.
+    # F-19 — S-3 자신도 buf 버전을 정책과 대조한다.
     BUF_VERSION_ACTUAL=$(buf --version | tr -d '[:space:]')
     if [[ "$BUF_VERSION_ACTUAL" != "$BUF_VERSION_POLICY" ]]; then
         echo "buf 버전이 정책과 다르다 — 실측 '$BUF_VERSION_ACTUAL', 정책 '$BUF_VERSION_POLICY'" >&2
@@ -400,7 +400,7 @@ main() {
         exit 2
     fi
 
-    # verifier r3 F-20 — 기대값 표가 없으면(최초 실행) 비교할 대상이 없다.
+    # F-20 — 기대값 표가 없으면(최초 실행) 비교할 대상이 없다.
     if [[ "$UPDATE_MODE" -eq 0 && ! -f "$EXPECTED_TSV" ]]; then
         echo "$EXPECTED_TSV 가 없다 — 최초 기준표는 '$0 --update' 로 만든다" >&2
         exit 2
@@ -436,7 +436,7 @@ main() {
 
         if [[ $code -eq 100 ]]; then
             rule_type=$(first_rule_type "$output")
-            # verifier r3 F-19 — 양성 단언: exit 100 이어도 컴파일 오류가 하나도 없고 진짜
+            # F-19 — 양성 단언: exit 100 이어도 컴파일 오류가 하나도 없고 진짜
             # 규칙 이름을 하나 이상 얻었을 때만 caught 다.
             if has_compile_error "$output" || [[ -z "$rule_type" ]]; then
                 echo "buf 도구 오류(exit=100 이지만 유효한 breaking 규칙을 확인하지 못했다) — mutation '$mutation'" >&2

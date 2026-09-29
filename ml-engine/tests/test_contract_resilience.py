@@ -1,4 +1,4 @@
-"""M2/2D — Python 쪽 계약 게이트 증명(④ unknown field·⑤ max payload 경계 쌍·⑧ aio 실측).
+"""Python 쪽 계약 게이트 증명(④ unknown field·⑤ max payload 경계 쌍·⑧ aio 실측).
 
 **`OPEN-2D-AIO-INPROCESS` 닫힘(실측, 2026-09-07)** — `grpcio-testing`(`grpc_testing` 패키지)은
 `grpc.aio` 를 지원하지 않는다(`grpc_testing.aio` 모듈이 없다, `dir(grpc_testing)`에 `channel`·
@@ -153,10 +153,10 @@ def _read_varint(data: bytes, index: int) -> tuple[int, int]:
 
 
 def _top_level_field_numbers(data: bytes) -> set[int]:
-    """verifier r1 F-7 — `UnknownFields()`는 이 환경의 `upb` 백엔드에서
+    """F-7 — `UnknownFields()`는 이 환경의 `upb` 백엔드에서
     `NotImplementedError`를 던진다(실측) — 대신 wire 를 직접 훑어 실제로 어떤 필드 번호가
-    실렸는지 관측한다(그룹 wire type 3/4 는 이 계약에 없으므로 지원하지 않는다). 이전 판의
-    "재직렬화 길이가 자기 자신과 같다"는 어떤 메시지에도 참인 항진명제였다 — 이 함수는
+    실렸는지 관측한다(그룹 wire type 3/4 는 이 계약에 없으므로 지원하지 않는다). "재직렬화
+    길이가 자기 자신과 같다"는 어떤 메시지에도 참인 항진명제라, 이 함수는
     실제 관측 가능한 성질(어떤 field number 가 wire 에 있는가)을 낸다."""
     numbers: set[int] = set()
     index = 0
@@ -238,11 +238,11 @@ def test_unknown_field_is_preserved_by_local_parse_reserialize(prediction_pb2) -
     """소켓 없이도 성립하는 성질 — protobuf-python 은 proto3 unknown field 를 파싱 시
     보존하고 재직렬화에 되싣는다(Kotlin `ContractUnknownFieldPreservationTest`와 대칭).
 
-    verifier r1 F-6 — 이전 판은 `prediction_pb2` fixture 를 인자로 받지 않고 생성 stub 을
-    함수 안에서 직접 import 했다. pytest 는 요청된 fixture 만 해석하므로, 이 test 를
-    단독 선택(`-k`)해 돌리면 `generated_stub_path`(sys.path 에 임시 생성물을 얹는 module
+    F-6 — `prediction_pb2` fixture 를 인자로 받지 않고 생성 stub 을
+    함수 안에서 직접 import 하면, pytest 는 요청된 fixture 만 해석하므로, 이 test 를
+    단독 선택(`-k`)해 돌릴 때 `generated_stub_path`(sys.path 에 임시 생성물을 얹는 module
     fixture)가 전혀 실행되지 않아 `ModuleNotFoundError: No module named 'bidvector'`로
-    죽었다(재현 확인). fixture 를 인자로 받으면 단독 실행도 정상화된다.
+    죽는다(재현 확인). fixture 를 인자로 받으면 단독 실행도 정상화된다.
     """
     original = _read("calculate_optimal_bid_request.binpb")
     with_unknown = _append_unknown_varint_field(original, field_number=999, value=42)

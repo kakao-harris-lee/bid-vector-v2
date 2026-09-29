@@ -103,7 +103,7 @@ class GrpcEmbeddingGatewayTest {
         }
     }
 
-    // ---- PR #5 게이트 시정(D-2E ② 미구현, contract-keeper 차단) — dimension 대조를 실
+    // ---- 게이트 시정(D-2E ② 미구현) — dimension 대조를 실
     // gateway 경로로 고정한다. 변이 — 처방 전 코드로 되돌리면(`promotedMetadata.dimension`
     // 대조를 지우면) 이 test 가 유일하게 잡는다: release 는 일치하지만 metadata 의
     // dimension 만 응답과 다른 fixture라 `releaseSatisfiesSelector`는 통과하고

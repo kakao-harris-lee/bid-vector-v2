@@ -2,7 +2,7 @@ plugins {
     id("bidvector.kotlin-conventions")
 }
 
-// M1/1C — qualification 은 domain 층이라 shared-kernel 하나만 참조할 수 있다(ADR 0006 D-4,
+// qualification 은 domain 층이라 shared-kernel 하나만 참조할 수 있다(ADR 0006 D-4,
 // architecture-policy.properties layer.domain.shareable). PolicyVersion·EffectiveDatedPolicy
 // 재사용(decision 23)에 필요하다.
 //

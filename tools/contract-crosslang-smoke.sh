@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M2/2D S-6 — 교차 언어 socket 스모크. Python fake servicer(2B·2C)를 localhost 에 실제
+# S-6 — 교차 언어 socket 스모크. Python fake servicer(2B·2C)를 localhost 에 실제
 # TCP 소켓으로 띄우고, Kotlin 생성 client(`CrossLangSmokeTest`)로 한 번씩 부른다 —
 # "요청만으로 Python 이 DB 조회 없이 계산 가능"의 형태 증명(D-2D-3 (a), 상시 게이트 아님).
 set -uo pipefail
@@ -52,7 +52,7 @@ fi
 
 echo "== Kotlin client 로 2B·2C 한 번씩 호출 =="
 cd "$REPO_ROOT"
-# verifier r1 F-2 — build cache 가 이 task 의 이전 실행 결과를 복원하면 소켓을 한 번도 열지
+# F-2 — build cache 가 이 task 의 이전 실행 결과를 복원하면 소켓을 한 번도 열지
 # 않고도 exit 0 이 난다(실측). `--rerun-tasks --no-build-cache` 로 매 실행이 실제 socket
 # 왕복이게 한다 — "로컬 실측 1회"의 증거가 이 실행 자체여야 한다(D-2D-3 (a)).
 ./gradlew --offline --rerun-tasks --no-build-cache :adapters:crossLangSmokeTest \

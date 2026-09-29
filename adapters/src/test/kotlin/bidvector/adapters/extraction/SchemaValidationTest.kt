@@ -23,7 +23,7 @@ class SchemaValidationTest {
     }
 
     /**
-     * verifier r1 F-4(a) — 위 test 의 fixture 는 위반이 둘(미등록 키 + `items` 빈 배열)이라
+     * 위 test 의 fixture 는 위반이 둘(미등록 키 + `items` 빈 배열)이라
      * `additionalProperties:false` 를 지워도 두 번째 위반 때문에 여전히 Invalid 다(변이
      * 실측). 이 test 의 fixture 는 미등록 키 **하나만** 위반이라 `additionalProperties`
      * 규칙이 실제로 죽으면(값을 `true` 로 바꾸면) 이 test 만 Valid 로 뒤집혀 죽는다.

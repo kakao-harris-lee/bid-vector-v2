@@ -54,7 +54,7 @@ fun interface LicenseGatePort {
  * 옮긴다 — 이 port가 접지 않는다). [SimilarityProjectionNotReady]는 점수 산출 **이전**
  * 단계의 일시적 부재라 다른 신호다(D-11).
  *
- * **[Unavailable](M4/4B-3 scope.md ①, ADR 0010 D-6 「미가용의 이름은 하나」)** — ML 호출
+ * **[Unavailable](scope.md ①, ADR 0010 D-6 「미가용의 이름은 하나」)** — ML 호출
  * 자체가 되지 않은 상태(transport·breaker·application 실패 등, 사유는
  * `bidvector.decision.MlUnavailableReason`). `Analyzed`는 무변경이다 — 「분석됐는데
  * priority가 없다」는 상태는 없다. 이 상태의 소비(`Review(MlUnavailable)`로 이르는 길)는
@@ -63,7 +63,7 @@ fun interface LicenseGatePort {
  */
 sealed interface MlAnalysisOutcome {
     /**
-     * `evidence`(M4/4D-4, D-4D4-2) — 필수 인자, 기본값 없음. 예측 근거가 판정을 거쳐
+     * `evidence`(D-4D4-2) — 필수 인자, 기본값 없음. 예측 근거가 판정을 거쳐
      * 알림까지 조용히 사라지는 것을 컴파일 거부로 막는다(scope.md 우회 (1)).
      */
     data class Analyzed(
@@ -83,13 +83,13 @@ sealed interface MlAnalysisOutcome {
 /**
  * ML 분석 port(scope.md ⑦) — 실 ML 호출·gRPC·deadline·breaker는 4D.
  *
- * **`correlationId`를 받는다(수정 라운드 1 M-2, 운영자 결정).** M4 완료 조건 「trace/
+ * **`correlationId`를 받는다.** M4 완료 조건 「trace/
  * correlation id가 수집→판정→**ML**→알림 요청까지 유지」가 이 port 계약에도 걸린다 —
  * 4D가 남의 port를 고쳐야 하는 상황을 만들지 않기 위해 지금 닫는다. 이 slice의 실
  * 구현(fake)은 그 값을 쓰지 않아도 되지만, 시그니처에 있어야 4D의 실 어댑터가 ML
  * 호출 로그·헤더에 그 값을 실을 수 있다.
  *
- * **`suspend`다(M4/4B-3 scope.md ④, ADR 0010 D-2).** coroutine 취소가 gRPC cancel로
+ * **`suspend`다(scope.md ④, ADR 0010 D-2).** coroutine 취소가 gRPC cancel로
  * 전파되려면 이 자리부터 suspend 여야 한다 — 동기 port + 어댑터 내부 `runBlocking`은
  * 그 전파를 끊는다(설계 검토 (1) 「동기 port 로 되돌아감」 우회의 차단).
  */
@@ -121,7 +121,7 @@ fun interface CapacityPort {
  * 이 값 자체가 「판정이 확정적으로 승격이었다」를 나른다. 생성자는 `internal` — 밖에서
  * 지으면 「판정 없이 알림을 요청했다」를 위조.
  *
- * **`evidence`(M4/4D-4, D-4D4-3)** — 필수 인자. 근거는 같은 `reach` 호출의 `outcome`
+ * **`evidence`(D-4D4-3)** — 필수 인자. 근거는 같은 `reach` 호출의 `outcome`
  * 에서만 온다(scope.md 우회 (3)) — 생성자가 `internal`이라 다른 호출·다른 공고의
  * 근거를 여기 실을 수 없다.
  */
@@ -146,7 +146,7 @@ fun interface NotificationRequestPort {
 }
 
 /**
- * 경쟁 표본 조회 축(M4/4B-7, D-4B7-3) — 같은 [CategoryCode]·과거 개찰 결과 창. `excludeNoticeId`
+ * 경쟁 표본 조회 축(D-4B7-3) — 같은 [CategoryCode]·과거 개찰 결과 창. `excludeNoticeId`
  * 는 대상 공고 자신을 표본에서 제외한다(설계 검토 우회 (1)). `asOf`는 미래 표본 누출을 막는
  * 기준 시각(호출부의 [bidvector.workflow.strategy.Clock]), `windowDays`·`limit`은
  * [OpportunityPolicyData]의 정책 슬롯에서 온다.
@@ -160,16 +160,16 @@ data class CompetitionSampleQuery(
 )
 
 /**
- * 표본 자격 판정이 후보를 제외한 사유(M4/4B-7, D-4B7-2) — 조용한 drop 대신 사유별로 센다.
+ * 표본 자격 판정이 후보를 제외한 사유(D-4B7-2) — 조용한 drop 대신 사유별로 센다.
  *
- * **`CANDIDATE_VANISHED`(verifier r1 F-3 뒤 신설)** — 「개찰 결과 존재」(D-4B7-2 ①)는
+ * **`CANDIDATE_VANISHED`** — 「개찰 결과 존재」(D-4B7-2 ①)는
  * 어댑터의 SQL 조인이 스캔 시점에는 보장하지만, 복원은 그 뒤 별도 단건 `find(id)`
  * 두 번(`JdbcCompetitionSampleSource.candidatePair`)이라 스캔과 복원 사이에 행이
  * 사라지면(원칙상 이 저장소에 삭제 경로는 없지만 「조인이 이미 보장한다」는 더 이상
  * 정확한 서술이 아니다) 후보가 계수 없이 증발할 수 있었다 — 이 사유가 그 자리를
  * 채운다(합계 불변식: `samples.size + excluded.values.sum() == 후보 수`).
  *
- * **`RESERVE_PRICE_SEQUENCE_INVALID`(verifier r1 F-4 뒤 신설)** — 엔진이 `selected_numbers`
+ * **`RESERVE_PRICE_SEQUENCE_INVALID`** — 엔진이 `selected_numbers`
  * 를 wire `reserve_prices` 리스트의 1-기반 인덱스로 소비하므로, 행 수가
  * `expectedReservePriceCount`와 같아도 `sequenceNumber` 집합이 정확히 `1..N`이 아니면
  * (예: `002`~`016`) 위치와 번호가 어긋난다 — 건수만 보는 `RESERVE_PRICE_COUNT_MISMATCH`와
@@ -199,7 +199,7 @@ sealed interface CompetitionSampleSupply {
 }
 
 /**
- * 경쟁 표본 조회 port(M4/4B-7, D-4B7-4) — 구현(어댑터)은 조인·창·상한만 진다(RO, 쓰기 0,
+ * 경쟁 표본 조회 port(D-4B7-4) — 구현(어댑터)은 조인·창·상한만 진다(RO, 쓰기 0,
  * 트랜잭션 없음). 자격·라벨·변환은 workflow 순수 함수(`SampleEligibility.kt`)가 진다 —
  * 판정을 SQL에 두지 않는다.
  */

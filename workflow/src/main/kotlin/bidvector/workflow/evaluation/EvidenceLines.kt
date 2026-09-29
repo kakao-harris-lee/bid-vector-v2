@@ -17,7 +17,7 @@ import bidvector.workflow.prediction.SegmentSupport
  * 1줄) ③ 표본 제외 요약(`excludedSamples`가 비어 있으면 생략).
  *
  * 숫자는 [java.math.BigDecimal.toPlainString]·[Int.toString]만 쓴다 — printf 계열 서식
- * 함수·locale 종속 API는 이 파일에 없다. **갱신 2(verifier r1 V-1)** — `ArchitectureGateTest`
+ * 함수·locale 종속 API는 이 파일에 없다. **갱신 2** — `ArchitectureGateTest`
  * 의 locale 누출 축은 `layer.domain` 모듈에만 걸리고 `workflow`는 `layer.application`이라
  * 대상 밖이다. 잠금은 `EvidenceLinesBoundaryTest`(소스 텍스트 경계 test, S-5
  * `NotificationBoundaryTest` 관례)가 진다 — 그 test 의 금지 어휘 목록은 여기 적지 않는다

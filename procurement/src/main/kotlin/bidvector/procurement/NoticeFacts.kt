@@ -14,7 +14,7 @@ import java.time.Instant
  * 공고 fact + 상태(D-3A-1 (a)) — canonical fact 셋(`Notice`·[OpeningResult]·[QualificationText])
  * 중 상태를 보유하는 유일한 자리(`NoticeId`로 묶인다). `status` 변경은 [applyEvent] 하나뿐이다 —
  * `@ConsistentCopyVisibility` + `internal constructor`(1E 관례)가 `copy(status = ...)`로 전이표를
- * 우회하는 경로를 닫는다(우회 (5), verifier r1 F-5가 「대상 부재」로 지적한 자리를 채운다).
+ * 우회하는 경로를 닫는다(우회 (5)).
  */
 @ConsistentCopyVisibility
 data class Notice internal constructor(
@@ -22,7 +22,7 @@ data class Notice internal constructor(
     val status: NoticeStatus,
     val businessCategory: BusinessCategory?,
     /**
-     * 업무 대분류(D-6F9-1, M6/6F-9) — 수집 오퍼레이션이 정한다. 이 아래 [serviceDivision]·[mainConstructionType]·위
+     * 업무 대분류(D-6F9-1) — 수집 오퍼레이션이 정한다. 이 아래 [serviceDivision]·[mainConstructionType]·위
      * [businessCategory](코드+라벨 축)와 각자 자기 칸이다(P-7 · `OPEN-COL-03` — 접지 않는다). 기본값 `null`
      * ([title] 과 같은 이유 — 이 slice 밖 호출부는 수정 없이 컴파일된다).
      */
@@ -36,12 +36,12 @@ data class Notice internal constructor(
     val allocatedBudget: AllocatedBudget?,
     val floorRate: FloorRate?,
     val deadlineAt: Instant?,
-    /** 수요기관(D-3H-3, M3/3H-1) — 역할별 자기 필드, 접지 않는다(scope.md 우회 (3)). */
+    /** 수요기관(D-3H-3) — 역할별 자기 필드, 접지 않는다(scope.md 우회 (3)). */
     val demandAgency: Agency? = null,
-    /** 공고기관(D-3H-3, M3/3H-1) — [demandAgency]와 다른 축. */
+    /** 공고기관(D-3H-3) — [demandAgency]와 다른 축. */
     val noticeAgency: Agency? = null,
     /**
-     * 공고명(D-6F4-9, M6/6F-4) — 기본값 `null`(D-3H-3 관례, 이 slice 밖 호출부는 수정 없이
+     * 공고명(D-6F4-9) — 기본값 `null`(D-3H-3 관례, 이 slice 밖 호출부는 수정 없이
      * 그대로 컴파일된다). 감시 키워드 매칭 입력 조각 하나([NoticeTitle] KDoc).
      */
     val title: NoticeTitle? = null,
@@ -97,7 +97,7 @@ data class OpeningResult(
     val derivedBaseAmount: ResolvedBaseAmount.DerivedFromOpeningAmount?,
     val observedAt: Instant,
     /**
-     * ③ fact 슬롯 확장(추가만, M3/3E, D-3E-4 (a) — 부모 fact + 자식 목록, 한 aggregate) 첫째
+     * ③ fact 슬롯 확장(추가만, D-3E-4 (a) — 부모 fact + 자식 목록, 한 aggregate) 첫째
      * 슬롯 — 3B-2가 실제로 수집하는 것만 준다(`policy-values.md` §1.7.1·§1.7.5). 추첨번호·
      * 투찰 축(3F)의 자리는 만들지 않는다. 최종낙찰금액(`sucsfbidAmt`) — `AwardAmount`(basis
      * AWARD)가 이미 있다.
@@ -110,7 +110,7 @@ data class OpeningResult(
     /** 진행구분(`progrsDivCdNm`, §1.7.5 — 유찰/개찰완료/재입찰 3값 열거, 문서 라벨 원문 그대로). */
     val progressDivision: String? = null,
     /**
-     * 예정가격(`plnprc`, basis YEGA) — **공고 층 슬롯**(팀리드 실측 정정 2026-09-08, §1.9.7).
+     * 예정가격(`plnprc`, basis YEGA) — **공고 층 슬롯**(§1.9.7).
      * 예비가격 상세 응답은 행마다 이 값을 반복해 싣지만 한 공고에 하나다 — 자식 행에 두면
      * 단수 예가(총예가건수 1, 순번 공백)일 때 자식 행이 0개가 되며 이 값도 함께 사라진다.
      */
@@ -128,14 +128,14 @@ data class OpeningResult(
     /** 복수예비가격 자식 행 목록(D-3E-2 (a)) — 순번 부재 행은 여기 오르지 않는다(D-3E-1b (a)). */
     val reservePrices: List<OpeningReservePriceRow> = emptyList(),
     /**
-     * M3/3F ① 개찰 1위 축(D-3F-4 (a)) — `getOpengResultListInfoOpengCompt`(개찰완료)만 준다.
+     * ① 개찰 1위 축(D-3F-4 (a)) — `getOpengResultListInfoOpengCompt`(개찰완료)만 준다.
      * D-3F-3 해소로 투찰자별 canonical 표를 만들지 않는다 — 순위 1 행을 특정할 수 있을 때만
      * [OpeningRankOneOutcome.Determined]이고, 부재·중복이면 이 축을 비우고 사유를 명시적으로
      * 나른다(투찰금액으로 순위를 재계산하지 않는다, scope.md 설계 검토 (2)).
      */
     val openingRankOne: OpeningRankOneOutcome = OpeningRankOneOutcome.NotObserved,
     /**
-     * M3/3F ② 관측된 추첨번호 집합(D-3F-4 (a), `drwtNo1`·`drwtNo2`) — 15행의 1-기반 인덱스
+     * ② 관측된 추첨번호 집합(D-3F-4 (a), `drwtNo1`·`drwtNo2`) — 15행의 1-기반 인덱스
      * (§1.9.4). 투찰자별 귀속은 보존하지 않는다(운영자 도메인 결정, D-3F-3) — 실현 사정률
      * 계산(M5)은 이 집합만으로 충분하다. 범위 검사는 [totalReservePriceCandidateCount]가
      * 있어야 성립하는데 이 오퍼레이션 응답에는 그 값이 없다(§1.9.7) — 그래서 「검사 불가」가
@@ -154,17 +154,17 @@ data class OpeningResult(
 }
 
 /**
- * 복수예비가격 후보 자식 행(D-3E-2 (a), M3/3E 신설, §1.9.7 실측 정정으로 「후보 층」만 남는다)
+ * 복수예비가격 후보 자식 행(D-3E-2 (a), §1.9.7 실측으로 「후보 층」만 남는다)
  * — `OpeningResult`가 목록으로 안는다. `sequenceNumber`(`compnoRsrvtnPrceSno`)가 부재·공백인
- * 행은 이 타입으로 만들어지지 않는다(D-3E-1b (a), 운영자 승인 2026-09-08 — 정체성 없는 행은
+ * 행은 이 타입으로 만들어지지 않는다(D-3E-1b (a), 운영자 승인 — 정체성 없는 행은
  * canonical 승격을 거절한다). 3B-2 `rowIdentifierIndeterminate` 회계가 그 승격 불가 건수를
  * 이미 센다(같은 부재 판정을 공유한다, `KonepsRawItemMapper.rowDiscriminatorOf`). **실측
- * (§1.9.7, 8건 23행, 2026-09-01~09-07 창)이 부재 조건을 좁혔다** — 순번 공백은 총예가건수가
+ * (§1.9.7)이 부재 조건을 좁혔다** — 순번 공백은 총예가건수가
  * 1(단수 예가)일 때만 관측됐고, 그 경우 행이 하나뿐이라 애초에 정체성 모호가 없다. 15행
  * 건(4건)은 순번이 전부 채워져 있었다 — COL-03이 요구하는 복수예비가격 축은 이 관측 범위에서
  * 온전하다. 표본이 작아 「항상 그렇다」로 승격하지 않는다.
  *
- * **`observedAt`(verifier r1 H-2 뒤 신설)** — D-3E-3 (a)가 확정한 「사라진 행을 지우지 않고
+ * **`observedAt`** — D-3E-3 (a)가 확정한 「사라진 행을 지우지 않고
  * 관측 시각으로 구분한다」의 읽기 경로 절반. 15→12 재수집처럼 이번 응답에 없던 행이 저장에
  * 남을 때, 그 행의 `observedAt`이 최신 관측(부모 `OpeningResult.observedAt`)보다 이르면
  * 「낡았다」고 소비자가 스스로 판정할 수 있다 — 낡음 자체를 저장 컬럼(파생 플래그)으로 만들지
@@ -216,7 +216,7 @@ data class ReservePriceCandidateAmount(
 }
 
 /**
- * 투찰금액(`bidprcAmt`) 관측값 전용 값 객체(M3/3F) — `bidvector.sharedkernel.BidAmount`
+ * 투찰금액(`bidprcAmt`) 관측값 전용 값 객체 — `bidvector.sharedkernel.BidAmount`
  * (Basis.BID)는 **기초금액×투찰율의 파생값**만 나르고 생성자가 `internal`이라 그 생성 경로가
  * `MoneyArithmetic.kt` 하나뿐이다(shared-kernel 「유일한 생성 경로는 반올림 함수」). 이 축은
  * KONEPS 가 준 **관측**이지 파생이 아니다 — 파생 전용 타입을 관측값으로 지어내는 것은
@@ -236,10 +236,10 @@ data class ObservedBidAmount(
 }
 
 /**
- * 개찰 1위 행(M3/3F, D-3F-4 (a)) — 상호(`prcbdrNm`, masked)·투찰금액·투찰율. 투찰금액·투찰율은
+ * 개찰 1위 행(D-3F-4 (a)) — 상호(`prcbdrNm`, masked)·투찰금액·투찰율. 투찰금액·투찰율은
  * 협상 계약에서 부재가 정상이다(§1.9.7 실측, 3/15).
  *
- * **평가점수 넷(D-3F-5 (a))은 이 슬롯에 없다** — P-13 (a) 승인(2026-09-09, `policy-values.md`
+ * **평가점수 넷(D-3F-5 (a))은 이 슬롯에 없다** — P-13 (a) 승인(`policy-values.md`
  * §1.11)이 그 넷을 계약 등재에서 **제외**했다(scale 이 3A `FieldScale` 어휘에 없고 문서가
  * 범위·소수 자리를 적지 않는다, 「어휘를 지어내지 않는다」). 계약이 없으면 allow-list
  * 반전(§5.3 규율 1)이 그 값을 masking 경계에서 자동으로 걷어낸다 — `raw_observation` 에도
@@ -257,7 +257,7 @@ data class OpeningRankOneBid(
 }
 
 /**
- * 개찰 1위 축의 결정 결과(M3/3F, D-3F-4 (a)) — [resolve]가 유일한 생성 경로는 아니지만
+ * 개찰 1위 축의 결정 결과(D-3F-4 (a)) — [resolve]가 유일한 생성 경로는 아니지만
  * (부모 fact 는 이 슬롯을 직접 받는다), **순위 1을 특정할 수 없으면 그 축을
  * 비우고 사유를 명시적으로 나른다**는 요구를 sealed type 으로 고정한다. `opengRank`가
  * 실측(§1.9.7)에서 전 행 채워지고 유일한 경우가 4/15뿐이라(결측·중복 흔함) [RankMissing]·
@@ -266,7 +266,7 @@ data class OpeningRankOneBid(
  */
 sealed interface OpeningRankOneOutcome {
     /**
-     * 이 축이 마지막으로 관측된 시각(verifier r1 F-2 뒤 신설, 3E `OpeningReservePriceRow
+     * 이 축이 마지막으로 관측된 시각(3E `OpeningReservePriceRow
      * .observedAt`과 같은 자리) — 부모 `OpeningResult.observedAt`(관측 전체의 시각)과 다르다.
      * `NotObserved`만 `null`이다(관측 자체가 없었다). 재수집이 이 축을 싣지 않으면(값이
      * `NotObserved`로 옴) 저장은 이 축을 옛 상태 그대로 보존하고, 그 옛 상태의 `observedAt`도
@@ -324,7 +324,7 @@ sealed interface OpeningRankOneOutcome {
 }
 
 /**
- * 추첨번호(`drwtNo1`·`drwtNo2`) 관측 결과(M3/3F, D-3F-4 (a)) — 15행의 1-기반 인덱스(§1.9.4).
+ * 추첨번호(`drwtNo1`·`drwtNo2`) 관측 결과(D-3F-4 (a)) — 15행의 1-기반 인덱스(§1.9.4).
  * 실현 사정률 계산(M5)은 이 슬라이스 밖이다 — 이 타입은 **범위 검사까지**만 진다. 범위 검사는
  * `OpeningResult.totalReservePriceCandidateCount`(3E 슬롯)를 요구하는데 이 오퍼레이션 응답에는
  * 그 값이 없다(§1.9.7 실측) — 그래서 **검사 불가**가 조용한 통과(`Verified`)가 아니라 그
@@ -332,7 +332,7 @@ sealed interface OpeningRankOneOutcome {
  */
 sealed interface DrawNumberObservation {
     /**
-     * 이 축이 마지막으로 관측된 시각(verifier r1 F-2 뒤 신설) — [OpeningRankOneOutcome
+     * 이 축이 마지막으로 관측된 시각 — [OpeningRankOneOutcome
      * .observedAt]과 같은 자리·같은 이유. `NotObserved`만 `null`이다.
      */
     val observedAt: Instant?
@@ -351,11 +351,11 @@ sealed interface DrawNumberObservation {
     /**
      * 범위 밖 번호가 섞여 있다 — 조용히 통과시키지 않는다.
      *
-     * **verifier r3 M-1 뒤** — `validRange.first`는 예비가격 15행의 **1-기반 인덱스**라는
+     * `validRange.first`는 예비가격 15행의 **1-기반 인덱스**라는
      * 도메인 진실(§1.11·legacy `distribution_extraction`)이라 항상 1이어야 한다. `of()`는
      * 이미 그렇게만 만들지만, 그 성질이 `of()`의 습관일 뿐 타입의 보장이 아니면 다른 생성
      * 경로(직접 생성자 호출·저장소 read)가 `5..15`처럼 하한이 어긋난 값을 조용히 만들거나
-     * 읽어 들일 수 있다 — 이 slice가 세 라운드 내내 막아 온 「값이 조용히 바뀐다」와 같은
+     * 읽어 들일 수 있다 — 「값이 조용히 바뀐다」류를 막는다는 것과 같은
      * 계열이다. `init`의 `require`로 하한 1을 타입 자체가 강제하게 한다.
      */
     data class OutOfRange(

@@ -29,7 +29,7 @@ private fun subsetsOf(items: List<Component>): List<Set<Component>> =
 
 /**
  * 독립 재구성 — `weightedScoreOf`를 부르지 않고 같은 산식(가중합 ÷ Present 가중치 합)을
- * 이 test 파일이 별도로 계산한다(verifier r1 T-1의 32 전수 방식과 같은 형태).
+ * 이 test 파일이 별도로 계산한다(32 전수 방식과 같은 형태).
  */
 private fun expectedWeightedScore(present: Set<Component>): BigDecimal {
     val weightSum = present.fold(BigDecimal.ZERO) { acc, c -> acc + TEST_PRIORITY_POLICY.weights.getValue(c) }
@@ -48,7 +48,7 @@ private fun clampToUnit(value: BigDecimal): BigDecimal =
     }
 
 /**
- * F-3(verifier r1 low) — 표본 하나(표본2)만으로는 Absent 조합의 **값**을 대조하지 못한다.
+ * 표본 하나(표본2)만으로는 Absent 조합의 **값**을 대조하지 못한다.
  * `match`를 상시 Present로 두고 나머지 넷의 **부분집합 16개 전부**를 순회해, 각 조합의
  * 재정규화 결과를 손계산(위 [expectedWeightedScore])과 대조한다 — penalty 셋은 상시
  * Present로 고정해 조합마다 상수([FIXED_TOTAL_PENALTY])로 뺀다.

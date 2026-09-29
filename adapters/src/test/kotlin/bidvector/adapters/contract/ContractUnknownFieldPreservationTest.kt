@@ -19,10 +19,10 @@ import java.io.ByteArrayOutputStream
 import java.nio.file.Path
 
 /**
- * M2/2D ④(a) — 정의 밖 필드 번호가 든 바이트를 **실제 in-process RPC 왕복**(client stub 의
+ * ④(a) — 정의 밖 필드 번호가 든 바이트를 **실제 in-process RPC 왕복**(client stub 의
  * serialize → wire → server 의 parse) 뒤에도 파싱 결과가 unknown field 를 보존하는지, 그리고
  * 그 unknown field 가 **응답(다른 메시지 타입)으로 되돌아오지 않는지** 증명한다. ④(b)(정의
- * 밖 enum 정수 거부)는 2A~2C 의 기존 test(`ContractRoundTripTest`·`PredictionContractTest`·
+ * 밖 enum 정수 거부)는 기존 test(`ContractRoundTripTest`·`PredictionContractTest`·
  * `TrainingContractTest`)가 이미 여러 필드에서 증명했으므로 여기서 되풀이하지 않는다.
  *
  * client 쪽이 `CalculateOptimalBidRequest.parseFrom(bytesWithUnknown)`로 만든 객체를

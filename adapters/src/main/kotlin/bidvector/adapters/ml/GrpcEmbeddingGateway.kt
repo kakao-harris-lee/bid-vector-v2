@@ -21,7 +21,7 @@ import bidvector.workflow.prediction.ModelReleaseSelector as DomainModelReleaseS
 private typealias EmbeddingStub = EmbeddingServiceGrpcKt.EmbeddingServiceCoroutineStub
 
 /**
- * M4/4D-2(scope.md ②~⑤) — `EmbedTextPort`의 gRPC 구현. `ManagedChannel`·정책·`Clock`을
+ * scope.md ②~⑤ — `EmbedTextPort`의 gRPC 구현. `ManagedChannel`·정책·`Clock`을
  * 생성자로 받는다(4D-1 `GrpcBidPredictionGateway`와 같은 DI 관례, 채널 생성 자체는 M6
  * 배선 소관). resilience 골격(breaker·bounded retry)은 `ResilientPredictionCall.kt`(D-4D2-4
  * 제네릭화)를 **재사용**한다 — 임베딩 고유는 매핑·구조 검증·release 대조뿐이다. 실패는
@@ -59,7 +59,7 @@ class GrpcEmbeddingGateway(
                 EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.CircuitOpen)
             }
 
-            // 4D-1 관례(verifier r2 G-4) — 예산 소진은 서버를 한 번도 못 불렀거나 재시도를
+            // 4D-1 관례 — 예산 소진은 서버를 한 번도 못 불렀거나 재시도를
             // 포기한 것이지 breaker 가 셀 transport 실패가 아니다.
             MlCallOutcome.BudgetExhausted -> {
                 EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.DeadlineExceeded)
@@ -105,13 +105,12 @@ class GrpcEmbeddingGateway(
         }
 
     /**
-     * release 대조는 여기서 마친다(**D-4D-4**, 4D-1 `handleSuccess`와 같은 자리 — 리뷰 F-D
-     * 정정: 이전엔 D-4D2-1(port 소유권 결정)로 잘못 인용했다) —
+     * release 대조는 여기서 마친다(**D-4D-4**, 4D-1 `handleSuccess`와 같은 자리) —
      * `latest_promoted`면 **같은 embed 호출 안에서** `GetEmbeddingMetadata`를 부른다. 대조에
      * 실패(불일치·조회 불가)하면 `Embedded`로 가지 않고 `ReleaseMismatch`다(제3 변환 금지,
      * ADR 0010 D-3).
      *
-     * **PR #5 게이트 시정(D-2E ② 미구현, contract-keeper 차단)** — `latest_promoted`
+     * **D-2E ② 강제** — `latest_promoted`
      * 경로에서 이미 불러온 metadata 의 `dimension`을 [embeddingDimensionMatchesMetadata]로
      * 대조한다(scope.md D-2E ② 「client 가 `EmbedText` 응답 `dimension`을
      * `GetEmbeddingMetadata.dimension`과 대조 — 불일치 = 계약 위반」). 불일치는 별도
@@ -119,7 +118,7 @@ class GrpcEmbeddingGateway(
      * 사실("이미 불러온 승격 metadata가 지금 온 응답과 어긋난다")의 다른 성분일 뿐이고,
      * 호출부(운영)가 이 둘을 다르게 다뤄야 할 근거가 없다(`EmbeddingUnavailableReason`
      * 소비처 전수 확인 — 현재 이 값을 분기하는 곳이 없다). `GetEmbeddingMetadata`를 이
-     * 대조 때문에 두 번째로 부르지 않는다(팀장 지시 — 추가 RPC 금지) — [fetchPromoted]가
+     * 대조 때문에 두 번째로 부르지 않는다(추가 RPC 금지) — [fetchPromoted]가
      * 반환하는 `EmbeddingMetadata`(release **와** dimension 을 함께 나른다, `ReleaseCheck.kt`)
      * 를 그대로 재사용한다. `exact_release` 요청은 metadata 를 아예 안 부르므로
      * (`promotedMetadata == null`) 이 검사가 구조적으로 적용되지 않는다 — 이는 selector
@@ -154,8 +153,8 @@ class GrpcEmbeddingGateway(
                 null
             }
         val promoted: ModelRelease? = promotedMetadata?.promoted
-        // detekt ReturnCount(≤2) — 조기 반환 셋을 단일 when 으로 접는다(PR #5 게이트 시정
-        // 리뷰에서 발견, 검사 순서·값 모두 그대로 — release 대조가 여전히 dimension 대조보다 먼저다).
+        // detekt ReturnCount(≤2) — 조기 반환 셋을 단일 when 으로 접는다(검사 순서·값 모두
+        // 그대로 — release 대조가 여전히 dimension 대조보다 먼저다).
         return when {
             !releaseSatisfiesSelector(selector.toProto(), success.release, promoted) -> {
                 EmbeddingOutcome.Unavailable(EmbeddingUnavailableReason.ReleaseMismatch)
@@ -171,7 +170,7 @@ class GrpcEmbeddingGateway(
         }
     }
 
-    /** 리뷰 F-E(medium) 처방 — 분류 로직은 `classifyTransportFailure`(`RetryRules.kt`, 예측과 공유), 도메인 사유 매핑만 여기서 한다. */
+    /** 분류 로직은 `classifyTransportFailure`(`RetryRules.kt`, 예측과 공유), 도메인 사유 매핑만 여기서 한다. */
     private fun mapEmbedTransportFailure(error: Throwable): EmbeddingOutcome.Unavailable =
         EmbeddingOutcome.Unavailable(
             when (classifyTransportFailure(error)) {
@@ -182,10 +181,10 @@ class GrpcEmbeddingGateway(
         )
 
     /**
-     * 4D-1 `resolvePolicy` r1 F-10(low) 관례와 같은 fail-fast 방어 — `EMBEDDING_CALL_POLICY`가
+     * 4D-1 `resolvePolicy` 관례와 같은 fail-fast 방어 — `EMBEDDING_CALL_POLICY`가
      * 어떤 기준일도 못 푸는 상태(시행일이 전부 미래)는 배선 자체의 설정 오류라 [error]로
      * 즉시 실패한다. `EMBEDDING_CALL_POLICY`가 `Initial` 하나만 갖는 한 `embed` 경로는 이
-     * 가지에 실질적으로 도달하지 않는다. 리뷰 F-E(medium) 처방 — 본문은
+     * 가지에 실질적으로 도달하지 않는다. 본문은
      * `resolveMlCallPolicy`(`MlCallPolicyData.kt`)로 옮겼다(예측과 17줄 중복이었다).
      */
     private fun resolvePolicy(): ResolvedMlCallPolicy = resolveMlCallPolicy(policy, clock, "EMBEDDING_CALL_POLICY")

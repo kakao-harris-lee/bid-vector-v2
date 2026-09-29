@@ -8,7 +8,7 @@ package bidvector.sharedkernel
  * 밖에서 만들 수 없다(형식 위반은 생성 실패이지 정규화 대상이 아니다).
  *
  * 3자리 제로패딩 형식은 KONEPS `bidNtceOrd` 관측 사실이라 값 객체 KDoc에 근거를 싣는다 —
- * 정책값이 아니다(매직넘버 금지 원칙과 다른 축, M3/3A 설계 검토 「구현 지침」).
+ * 정책값이 아니다(매직넘버 금지 원칙과 다른 축, 설계 검토 「구현 지침」).
  */
 data class NoticeRound(
     val value: String,

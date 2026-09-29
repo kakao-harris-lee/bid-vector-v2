@@ -23,7 +23,7 @@ import bidvector.workflow.strategy.StrategyReader
 import java.util.UUID
 
 /**
- * HTTP 가 부르는 유일한 편집 실행기(M6/6A-2b D-6A2b-3·8) — 컨트롤러는 이 클래스만 받는다.
+ * HTTP 가 부르는 유일한 편집 실행기(D-6A2b-3·8) — 컨트롤러는 이 클래스만 받는다.
  *
  * **(2b) 「경계로 처리」 — 포트를 밖에 내지 않는다.** 이 클래스가 쥔 것은
  * [StrategyEditTransaction] 하나이고, 그 계약의 유일한 메서드는 트랜잭션 **안에서만**
@@ -49,7 +49,7 @@ class StrategyEditExecutor(
     /**
      * 조회 — 접근 시점 만료 fold 를 적용한 세션(D-6A2b-11, 주기 sweep 없음).
      *
-     * **그 fold 는 「접근하는 세션」에만 닿는다**(D-6A2b-24, code-review r1 MEDIUM-1 정정).
+     * **그 fold 는 「접근하는 세션」에만 닿는다**(D-6A2b-24).
      * 세션 id 를 서버가 만들므로 운영자가 열어 두고 떠난 세션에는 다시 접근할 주체가 없고,
      * 그 행은 비종단 상태로 남는다 — 이 slice 는 그것을 치우지 않는다
      * (`OPEN-6A2B-ABANDONED-SESSIONS`, 받는 쪽은 6B-3 보존·파기). 남아도 해가 없다:
@@ -84,7 +84,7 @@ class StrategyEditExecutor(
                 is StrategyValidation.Valid -> {
                     // D-6A2b-28 — 기준은 **이 draft 를 만든 읽기**의 revision 이다. 커널이
                     // 다시 읽은 값을 쓰면 두 읽기 사이의 커밋이 기준을 새 값으로 밀어
-                    // 낡은 draft 가 통과한다(verifier r2 F-r2-3).
+                    // 낡은 draft 가 통과한다.
                     val command =
                         EditCommand.ProvideValue(commandId, sessionId, OPERATOR, field, draft, current.revision)
                     ProvideValueOutcome.Processed(workflow.provideValue(command))
@@ -148,7 +148,7 @@ sealed interface ProvideValueOutcome {
  * 하는 일은 6A-1 의 `GET /api/strategy` 가 하던 일과 **같다**((2b) 「닫는다(동치)」).
  *
  * 받는 것은 [StrategyReader] 다 — 쓰기 가능한 port 를 쥐면 그것 하나로 편집 use case 를 스스로
- * 조립할 수 있다(verifier r4 F-r4-1: 그 조립은 트랜잭션·outbox·세션을 전부 건너뛴다).
+ * 조립할 수 있다(그 조립은 트랜잭션·outbox·세션을 전부 건너뛴다).
  */
 class StrategyQuery(
     private val strategies: StrategyReader,

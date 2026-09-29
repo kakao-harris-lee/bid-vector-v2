@@ -90,7 +90,7 @@ class EvaluationPolicy:
         self._validate_collections()
 
     def _validate_scalars(self) -> None:
-        # verifier r1 M-1 — NaN/Infinity 비교는 부호 있는 범위 검사를 조용히
+        # M-1 — NaN/Infinity 비교는 부호 있는 범위 검사를 조용히
         # 통과한다(`nan <= 0`은 항상 거짓). 범위 검사보다 먼저 유한성을 강제한다.
         if not math.isfinite(self.paired_t_threshold):
             raise ValueError(
@@ -259,7 +259,7 @@ class _ParsedFields:
 
 def _parse_fields(values: dict[str, PolicyScalar]) -> _ParsedFields | None:
     """평탄 인덱스 목록 조립 + 스칼라 형 검사 — 형이 맞지 않으면 `None`(설계 래칫
-    함수 길이 한도로 `load_evaluation_policy`에서 분리, verifier r1 L-5 형식)."""
+    함수 길이 한도로 `load_evaluation_policy`에서 분리, L-5 형식)."""
     fields = (
         _require_number(values, "paired_t_threshold"),
         _require_str(values, "gate_baseline"),

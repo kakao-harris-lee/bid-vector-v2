@@ -50,7 +50,7 @@ private val PROVENANCE_POLICY: Resolution.Resolved<ProvenancePolicyData> =
 private val ELIGIBILITY_POLICY = SampleEligibilityPolicyData(expectedReservePriceCount = 15)
 
 /**
- * `judgeEligibility`(M4/4B-7, D-4B7-2) 규칙표 — 사유별 실격(②~⑦) + 정상 변환 전수 +
+ * `judgeEligibility`(D-4B7-2) 규칙표 — 사유별 실격(②~⑦) + 정상 변환 전수 +
  * `NotObserved` → 빈 집합 + `Published(round)` 회차 대조(우회 (18)). port를 읽지 않는 순수
  * 함수이므로 fake port 없이 값만으로 잰다.
  */
@@ -71,7 +71,7 @@ class SampleEligibilityTest {
         (1..15).map { n -> reserveRow(n.toString().padStart(3, '0'), 900_000_000L + n, hasPrice) }
 
     /**
-     * verifier r2 N-1 — `reserve_price_sequence`는 zero-pad 없는 원문 그대로 저장된다
+     * `reserve_price_sequence`는 zero-pad 없는 원문 그대로 저장된다
      * (`OpeningReservePriceRow.init`은 공백만 거부, `KonepsOpeningResultSourceTest`의
      * `sno.toString()`이 실제 수집 형태다) — 실 DB `ORDER BY reserve_price_sequence`(TEXT)는
      * 사전순이라 `"1","10","11",…,"15","2",…,"9"` 순으로 행을 돌려준다. `fifteenRows()`는
@@ -89,7 +89,7 @@ class SampleEligibilityTest {
         categoryCode: String? = "A01",
         baseAmountWon: Long? = 1_000_000_000L,
         estimatedAmountWon: Long? = null,
-        // M3/3H-2(D-3H2-1) — 표본 축 agencyId 조립(`sampleOf`) test 용. 기본값 null 은
+        // (D-3H2-1) — 표본 축 agencyId 조립(`sampleOf`) test 용. 기본값 null 은
         // 기존 fixture와 바이트 동일.
         demandAgency: Agency? = null,
         noticeAgency: Agency? = null,
@@ -179,19 +179,19 @@ class SampleEligibilityTest {
         val reserveDraw = requireNotNull(outcome.sample.reserveDraw)
         reserveDraw.reservePrices.size shouldBe 15
         reserveDraw.selectedNumbers shouldBe setOf(1, 5, 9, 14)
-        // verifier r1 F-7 — Money 4성분 전수(basis·currency·vat·provenance), amountWon 하나만이 아니다.
+        // Money 4성분 전수(basis·currency·vat·provenance), amountWon 하나만이 아니다.
         val firstPrice = reserveDraw.reservePrices.first()
         firstPrice.basis shouldBe Basis.BASE_AMOUNT
         firstPrice.currency shouldBe Currency.KRW
         firstPrice.vatTreatment shouldBe VatTreatment.UNKNOWN
-        // verifier r1 F-4 — 순번 "001"이 위치 0(=selected_numbers 의 번호 1)과 일치한다.
+        // 순번 "001"이 위치 0(=selected_numbers 의 번호 1)과 일치한다.
         firstPrice shouldBe reserveDraw.reservePrices[0]
         (firstPrice.export().won) shouldBe 900_000_001L
         // 우회 (18) — Published 의 회차는 표본 공고 자기 회차("001")다. 대상 공고 회차를 빌리지 않는다.
         firstPrice.provenance shouldBe Provenance.Published(NoticeRound.of("001"))
     }
 
-    // ---- M3/3H-2(D-3H2-1, scope.md 우회 (1)(4)) — 표본 축 agencyId 조립(`sampleOf`). ----
+    // ---- (D-3H2-1, scope.md 우회 (1)(4)) — 표본 축 agencyId 조립(`sampleOf`). ----
 
     @Test
     fun `수요기관 코드가 있으면 표본 agencyId 는 그 코드 값이다`() {
@@ -226,7 +226,7 @@ class SampleEligibilityTest {
     }
 
     /**
-     * verifier r2 N-1(HIGH) — `reservePriceAmounts`의 정렬(`RESERVE_PRICE_SEQUENCE_ORDER`)이
+     * `reservePriceAmounts`의 정렬(`RESERVE_PRICE_SEQUENCE_ORDER`)이
      * 실제로 측정되는 유일한 자리. 입력을 DB 사전순(`lexicographicOrderRows()`)으로 주고
      * 출력 `reserveDraw.reservePrices`가 **순번 1..15 순**(사전순이 아니라)인지 잰다 —
      * 정렬을 지우는 편집(`rows.sortedWith(...)` → `rows`)이 이 test에서만 붉어진다

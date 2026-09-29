@@ -156,7 +156,7 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
     }
 
     /**
-     * D-6F5-10(verifier r1 HIGH-2) — `Collected(빈 rows)`는 `DataAbsent`와 구분해 저장하려고
+     * D-6F5-10 — `Collected(빈 rows)`는 `DataAbsent`와 구분해 저장하려고
      * D-6F5-4가 표를 둘로 가른 바로 그 상태다. 커널의 `judgeCollected`는 `rows.isEmpty()`를
      * `absentJudgement(RequirementDataAbsent, ...)`로 접는다 — `Eligible`로 뒤집는 변이가
      * 이 케이스 부재 때문에 전건 `check`를 통과했었다(가장 비싼 방향의 오판).

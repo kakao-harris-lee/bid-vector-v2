@@ -78,7 +78,7 @@ class PolicyTest {
     }
 
     /**
-     * verifier r2 M-6 — `RoundingPolicy(scaleDigits, mode)` 가 정의역 검사 없이 아무 값이나
+     * `RoundingPolicy(scaleDigits, mode)` 가 정의역 검사 없이 아무 값이나
      * 받아, 음수 `scaleDigits` 가 예외도 사유 있는 실패도 아니라 **조용한 성공**으로 흘러
      * 백 원 단위 반올림 같은 값 오염을 만든다. `data-dictionary.md` §1.1 정의 ①이 금액 축
      * 자리수를 0(원 단위 정수)으로 닫았으므로 음수는 그 자체로 불법 값이다. 상한(축 밖

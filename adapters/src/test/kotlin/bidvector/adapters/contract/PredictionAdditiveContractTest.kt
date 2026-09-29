@@ -13,9 +13,9 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Path
 
 /**
- * M2/2F(scope.md ⑦, D-2F-1~4) — v1 additive 묶음(표본 축 fact 둘·`Diagnostics` 넷·
+ * (scope.md ⑦, D-2F-1~4) — v1 additive 묶음(표본 축 fact 둘·`Diagnostics` 넷·
  * `IntervalSource.POSTERIOR_PREDICTIVE`·`ModelRelease.release_kind`)의 계약 단언.
- * `PredictionContractTest.kt`(같은 패키지, M2/2B)에서 size ratchet(v2-지침서 §5, 파일당
+ * `PredictionContractTest.kt`(같은 패키지)에서 size ratchet(v2-지침서 §5, 파일당
  * 500줄)으로 갈라낸 파일이다 — testdata·헬퍼(`contractTestdataRoot`·`canonicalBytes`)는
  * `ContractTestdataSupport.kt`(같은 패키지)를 공유한다.
  */

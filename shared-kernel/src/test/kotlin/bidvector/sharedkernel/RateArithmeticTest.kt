@@ -7,7 +7,7 @@ import org.junit.jupiter.api.assertThrows
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-/** M1/1D D-1(a)+D-9 — shared-kernel 좁은 확장(3.1 커밋) 회귀. */
+/** D-1(a)+D-9 — shared-kernel 좁은 확장 회귀. */
 class RateArithmeticTest {
     private fun scalePolicy(digits: Int): Resolution.Resolved<RoundingPolicy> =
         Resolution.Resolved(RoundingPolicy(digits, RoundingMode.HALF_UP), PolicyVersion(EffectiveFrom.Initial, "test"))

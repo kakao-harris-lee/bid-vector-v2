@@ -7,15 +7,15 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * M2/2E verifier r1 F-1(high) 임시 대응 — `contracts/testdata/embedding/` 안의 JSON 원본을
+ * 임시 대응 — `contracts/testdata/embedding/` 안의 JSON 원본을
  * `buf convert`로 다시 canonical 바이트로 만들어 커밋된 `.binpb`와 대조한다.
  *
- * **왜 필요한가**(F-1(a) 장부 정정) — 신설 `embedding.proto`는 승인 태그
+ * **왜 필요한가** — 신설 `embedding.proto`는 승인 태그
  * `contracts/v1-approved-2026-09-07`에 없어 `buf breaking`이 이 파일 **내부**의 필드·enum
  * 값·필드 번호 변경을 못 본다(원래 없던 것의 형태 변경이라서, `contract-policy.properties`
  * D-2E 주석·`contracts/tools/breaking-mutations.sh` 머리 주석 참고 — 다음 승인 태그가
  * `embedding.proto`를 포함하기 전까지 이 사각은 구조적이다). 이 test는 **같은 JSON 텍스트가
- * 스키마 변경 뒤 다른 바이트를 낸다**는 사실을 이용한 임시 대응이다 — verifier r1이 실측:
+ * 스키마 변경 뒤 다른 바이트를 낸다**는 사실을 이용한 임시 대응이다 — 실측:
  * enum 값 하나를 지우면 같은 JSON이 `1a02 0102` 대신 `1a01 01`을 내(미지 enum 이름이
  * 조용히 탈락), 필드 삭제·필드 번호 재사용도 같은 방식으로 바이트가 갈린다.
  *

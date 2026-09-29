@@ -1,4 +1,4 @@
-"""RED — M5/5E-3 D-5E3-1. `ml_engine.registry.policy.load_policy` 는 `yaml.safe_load`가
+"""RED — D-5E3-1. `ml_engine.registry.policy.load_policy` 는 `yaml.safe_load`가
 던지는 `yaml.YAMLError`(문법이 깨진 YAML)를 `PolicyError`로 감싼다 — 네 소비 로더
 (training·evaluation·serving·inference)가 각자 사본으로 잡던 것을 뿌리 하나에서 잡는다
 (`OPEN-5E-YAML-LOADER-INFERENCE` = `OPEN-5C-YAML-ERROR-5D` 종결). 정상 경로 test 는

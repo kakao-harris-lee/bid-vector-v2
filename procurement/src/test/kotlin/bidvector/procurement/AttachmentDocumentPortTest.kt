@@ -25,7 +25,7 @@ private val CONTRACT =
     )
 
 /**
- * M3/3C ① — [AttachmentUrl]은 등재된 [KonepsFieldContract]가 없으면 만들 수 없다(위협
+ * [AttachmentUrl]은 등재된 [KonepsFieldContract]가 없으면 만들 수 없다(위협
  * 모델 우회 (7)). 실제 `ntceSpecDocUrl1` 계약 등재는 `OPEN-3C-ATTACHMENT-FIELD-CONTRACT`
  * (CollectionPolicy.kt 편집은 이 slice 의 in_scope 밖) — 이 test 는 계약의 **형태**(생성
  * 함수가 [RawNoticeObservation.valueOf]로만 값을 읽는다는 메커니즘)만 증명한다.

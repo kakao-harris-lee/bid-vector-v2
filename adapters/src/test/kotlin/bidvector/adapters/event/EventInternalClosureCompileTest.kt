@@ -11,21 +11,20 @@ import java.io.PrintStream
 import java.nio.file.Files
 
 /**
- * verifier r1 M-2 시정 — 4C-1 이 닫은 값 획득 축(설계 검토 (2) 우회 1, (2b) 마지막 행)이
- * `workflow` 밖에서 여전히 닫혀 있는지 상시 probe 로 증명한다(1B `CompileFailureHarnessTest`
+ * 닫힌 값 획득 축(설계 검토 (2) 우회 1, (2b) 마지막 행)이
+ * `workflow` 밖에서 여전히 닫혀 있는지 상시 probe 로 증명한다(`CompileFailureHarnessTest`
  * 관례 — `kotlin-compiler-embeddable`로 이 모듈의 test classpath 위에서 별도 컴파일 단위를
  * 돌린다). `adapters`가 이미 `workflow` 밖의 실제 소비 모듈이므로 별도 fixture 모듈을 짓지
  * 않는다 — 이 test worker의 classpath 자체가 「workflow 밖에서 컴파일」이다.
  *
- * 여섯 access point(verifier r1이 수동으로 확인한 넷 + **verifier r2 M-4 시정**으로
- * 더한 둘): [bidvector.workflow.event.EventEnvelope] 생성자·`transitionOutbox`·
+ * 여섯 access point: [bidvector.workflow.event.EventEnvelope] 생성자·`transitionOutbox`·
  * `OutboxTransition.ToDelivered` 생성자·`OutboxEntry.restore`(폐기 축)와
  * `newEnvelope`·`forStrategyUpdated`(**획득 축** — 둘 다 완성된 봉투를 돌려주는
- * `internal` 팩토리라, r1의 probe 넷만으로는 이 두 함수가 `internal`→`public`으로
+ * `internal` 팩토리라, 앞 네 probe만으로는 이 두 함수가 `internal`→`public`으로
  * 한 단어 바뀌어도 이 test가 초록이었다: `app`이 `forStrategyUpdated`를 통해 진짜
- * 봉투를 조립할 수 있었다, verifier r2 실측). 양성 대조는 하나를 공유한다 —
+ * 봉투를 조립할 수 있었다(실측)). 양성 대조는 하나를 공유한다 —
  * `ClaimedOutboxRow`(공개 생성자)가 정상 컴파일돼 harness 자체가 항상 실패만 내는
- * 고장이 아님을 확인한다(1B 관례의 sanity 목적과 같다).
+ * 고장이 아님을 확인한다(sanity 목적과 같다).
  */
 class EventInternalClosureCompileTest {
     @Test

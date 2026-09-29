@@ -17,7 +17,7 @@ import java.sql.Timestamp
 import javax.sql.DataSource
 
 /**
- * [EditSessionRepository] 실 구현(M4/4B 알려진 제한 ② 인계, D-6B1-7). `load`는 원시
+ * [EditSessionRepository] 실 구현(알려진 제한 ② 인계, D-6B1-7). `load`는 원시
  * [EditSessionSnapshot]만 반환한다 — `EditSession`은 만들지 않는다(D-6B1-6, 복원은
  * `workflow` 안 internal `restoreEditSession` 하나뿐). `save`는 이미 완성된
  * [EditSession]의 public 프로퍼티를 [EditSession.toSnapshot]으로 원시 값으로 내려
@@ -31,7 +31,7 @@ class JdbcEditSessionRepository(
     private val connections: ConnectionSource,
 ) : EditSessionRepository {
     /**
-     * M6/6A-2b D-6A2b-3 — 옛 형태(이 어댑터가 커넥션과 커밋을 스스로 쥔다)를 그대로 남긴다.
+     * D-6A2b-3 — 옛 형태(이 어댑터가 커넥션과 커밋을 스스로 쥔다)를 그대로 남긴다.
      * 편집 경로는 [ConnectionSource] 를 받는 위 생성자로 서서 **호출부의** 트랜잭션에
      * 참여한다(전략 저장·outbox 등록과 같은 커밋 — 4A 잔여 창 폐쇄).
      */

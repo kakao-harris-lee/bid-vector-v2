@@ -67,10 +67,10 @@ class OpeningQualificationRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * M-c(verifier r2) 재현 — [OpeningResult]의 `winningRate`·`derivedBaseAmount`는 둘 다
+     * M-c 재현 — [OpeningResult]의 `winningRate`·`derivedBaseAmount`는 둘 다
      * nullable이라 부분 관측(하나만 실린 더 늦은 관측)이 정상이다(설계 검토 ④ 「비었으면
-     * 지우지 않는다」). COALESCE 이전 판은 이 부분 관측이 오면 이미 있던
-     * `derivedBaseAmount`를 NULL로 지워 존재 가드가 항목 전체를 실패시켰다.
+     * 지우지 않는다」). COALESCE 없이 두면 이 부분 관측이 올 때 이미 있던
+     * `derivedBaseAmount`를 NULL로 지워 존재 가드가 항목 전체를 실패시킨다.
      */
     @Test
     fun `M-c 재현 — winningRate 만 실은 더 늦은 부분 관측은 derivedBaseAmount 를 지우지 않고 항목은 성공한다`() {

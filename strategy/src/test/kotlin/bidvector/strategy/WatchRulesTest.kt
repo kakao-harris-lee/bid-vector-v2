@@ -24,7 +24,7 @@ private fun baseAmount(
 ): BaseAmount = BaseAmount(won, Currency.KRW, vat, provenance)
 
 /**
- * D-6F4W-7/8 이관 — 이 함수에는 서로 다른 두 축이 있다(verifier r1 L-4, checklist.md
+ * D-6F4W-7/8 이관 — 이 함수에는 서로 다른 두 축이 있다(checklist.md
  * (2b) 표의 「2건 ⓐ」는 아래 첫째 축만 센다).
  *
  * **ⓐ — 기본값 리터럴 전환(2건, checklist.md 집계 대상).** `keywordText`·`fullText`
@@ -71,7 +71,7 @@ private fun rulesOf(
     )
 
 /**
- * M1/1E ①②③④ — 감시 predicate 커널. STR-01 acceptance 넷·STR-02 acceptance 넷을
+ * 감시 predicate 커널. STR-01 acceptance 넷·STR-02 acceptance 넷을
  * `reports/evidence/m1/1e/scope.md` D-3 승인(decision 30) 문면 그대로 옮긴다.
  */
 class WatchRulesTest {
@@ -162,7 +162,7 @@ class WatchRulesTest {
         verdict.shouldBeInstanceOf<WatchVerdict.Passed>()
     }
 
-    // --- F-2(verifier r1) — ASCII 대소문자 접기 잠금. D-5 문면 갈림(checklist "판단이 갈린
+    // --- F-2 — ASCII 대소문자 접기 잠금. D-5 문면 갈림(checklist "판단이 갈린
     // 지점" 1)은 남지만, 채택한 동작(legacy `.strip().lower()` 상당, ASCII만)을 example로
     // 고정한다 — 운영자 사후 확인 대상은 Phase 6가 별도로 올린다.
 
@@ -208,7 +208,7 @@ class WatchRulesTest {
         verdict shouldBe WatchVerdict.Passed(setOf(WatchRuleId.MinBudget))
     }
 
-    // --- F-3(verifier r1) — BudgetBoundInclusivity.Exclusive 분기 잠금. STRATEGY_POLICY 는
+    // --- F-3 — BudgetBoundInclusivity.Exclusive 분기 잠금. STRATEGY_POLICY 는
     // Inclusive 만 내지만(D-15) 타입 자체는 Exclusive 도 나른다(§1.4.3) — test 정책
     // 인스턴스로 그 갈래가 살아 있음을 example 로 고정한다.
 
@@ -391,7 +391,7 @@ class WatchRulesTest {
     }
 
     /**
-     * 변이 실측(구현 레인 mutation sweep) — 축 리스트 순서를 category 먼저로 바꾸면 이
+     * 변이 실측(mutation sweep) — 축 리스트 순서를 category 먼저로 바꾸면 이
      * test 만 실패한다(기존 「D-9 제외 규칙이 우선이다」 test 는 category 가 통과하는
      * 입력이라 한 축만 Failed 여서 순서 무관 — 이 test 가 그 사각을 메운다).
      */

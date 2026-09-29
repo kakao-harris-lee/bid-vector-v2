@@ -25,8 +25,8 @@ import contract.bidvector.ml.v1.Currency as ProtoCurrency
 import contract.bidvector.ml.v1.VatTreatment as ProtoVatTreatment
 
 /**
- * M4/4B-7(D-4B7-5) — `reserve_draw`(features.proto 7번 필드) 왕복. `mapRequest`가 조립하는
- * `CompetitionSample` 하나에 예비가격 15·번호 4를 싣고 wire 값을 직접 대조한다(2B-계열
+ * (D-4B7-5) — `reserve_draw`(features.proto 7번 필드) 왕복. `mapRequest`가 조립하는
+ * `CompetitionSample` 하나에 예비가격 15·번호 4를 싣고 wire 값을 직접 대조한다(
  * consumer test 관례 — `MlTestFixtures.testBidPredictionRequest`를 재사용).
  */
 class RequestMappingTest {
@@ -64,11 +64,11 @@ class RequestMappingTest {
             deadlinePolicyVersion = "deadline-test",
         )
 
-    // ---- M3/3H-2(D-3H2-2, scope.md 우회 (2)) — 표본 축 agencyId 결측 사유는 UNKNOWN. ----
+    // ---- (D-3H2-2, scope.md 우회 (2)) — 표본 축 agencyId 결측 사유는 UNKNOWN. ----
 
     /**
      * D-3H2-2 — 표본 축 `agency_id`가 `null`이면 `MISSING_REASON_UNKNOWN`이다.
-     * M2/2F 시절의 `NOT_COLLECTED_YET`은 더는 이 축에서 나오지 않는다(우회 (2)) — 대상
+     * `NOT_COLLECTED_YET`은 더는 이 축에서 나오지 않는다(우회 (2)) — 대상
      * 공고 축(`toAgencyIdFact`)과 사유가 같아졌다.
      */
     @Test
@@ -105,7 +105,7 @@ class RequestMappingTest {
     }
 
     /**
-     * verifier r1 F-7 — 예비가 `Money`의 basis·currency·provenance·vat 넷이 전부 왕복한다.
+     * 예비가 `Money`의 basis·currency·provenance·vat 넷이 전부 왕복한다.
      * 기존 test는 `amountWon`만 대조했다 — basis를 `YEGA`로, vat을 `INCLUSIVE`로 바꿔도
      * 전부 초록이었다(D-4B7-1 문면이 못 박은 `BASE_AMOUNT`·`UNKNOWN`을 무측정으로 방치).
      */
@@ -122,7 +122,7 @@ class RequestMappingTest {
     }
 
     /**
-     * verifier r2 N-1 관련 — `mapRequest`/`toProtoReserveDraw`는 받은 `List<BaseAmount>`
+     * `mapRequest`/`toProtoReserveDraw`는 받은 `List<BaseAmount>`
      * 순서를 그대로 옮긴다(재정렬하지 않는다). 순번 정렬 자체는 `SampleConversion.
      * reservePriceAmounts`(workflow, `SampleEligibilityTest`의 N-1 test) 소관 — 이 test는
      * 그 인접 위험(매핑 층이 이미 정렬된 리스트를 다시 섞지 않는가)을 잰다. 같은 픽스처
@@ -173,8 +173,8 @@ class RequestMappingTest {
      * `mapRequest`에 그대로 흘려 실제 `CalculateOptimalBidRequest.envelope.featureSchemaVersion`
      * 이 그 정책 값과 같은지 잰다. `testMlCallPolicy()`(다른 test 전부가 쓰는 좁은 값)를 쓰지
      * 않는 것이 핵심이다 — 그래야 `PredictionEnvelopeMapping.buildPredictionEnvelope`가 그
-     * 값을 조용히 다른 문자열로 바꿔도(verifier r1 변이 B) 이 test 가 잡는다. 저장소에 이
-     * 경로(정책 값 → 요청 proto)를 재는 test 가 이전까지 없었다(verifier r1 L-1).
+     * 값을 조용히 다른 문자열로 바꿔도(변이 B) 이 test 가 잡는다. 저장소에 이
+     * 경로(정책 값 → 요청 proto)를 재는 test 가 이전까지 없었다(L-1).
      */
     @Test
     fun `feature_schema_version 은 실 정책 ML_CALL_POLICY 값을 그대로 요청 envelope 에 싣는다`() {

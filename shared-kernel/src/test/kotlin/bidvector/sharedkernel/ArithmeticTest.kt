@@ -63,10 +63,7 @@ class ArithmeticTest {
     }
 
     /**
-     * Codex 1차 #3 — 이전 판은 `floor`(정수)에 `ε < 1원`을 더한 원시값만 생성해, 반올림
-     * 뒤 값이 항상 그 **정수** `floor` 이상으로만 떨어졌다(`DOWN`이 최악이어도 정수부
-     * `floor` 로 떨어지지 `floor` 미만으로는 못 간다) — 그래서 "예외 없음"이 곧 "하한
-     * 이상"으로 보였다. 실제 반례는 `floor` **자신이 소수**일 때다(`data-dictionary.md`
+     * 반례는 `floor` **자신이 소수**일 때다(`data-dictionary.md`
      * §1.1 정의 ②가 요구하는 하한은 원 단위로 딱 떨어진다는 보장이 없다 — 하한율×기초금액
      * 같은 계산에서 나온다). `floor=1000.4`·`scale=0`·`DOWN` 이면 결과가 `1000`인데 이는
      * `1000.4` **미만**이다.
@@ -74,7 +71,7 @@ class ArithmeticTest {
      * **처리 방식 판단(evidence)**: clamp(하한으로 올림) 대신 `Unmeasurable`(새
      * `ReasonCode.ROUNDED_BELOW_FLOOR`)을 택했다 — `capability-map.md` DEC-02 acceptance가
      * "최종 추천가가 어느 제약에 binding됐는지가 결과에 실린다"를 요구하는데, 그 binding
-     * 추적은 DEC-02 의 더 큰 산정 알고리즘(하한·상한·신뢰비율)의 몫이지 1B 의 순수 반올림
+     * 추적은 DEC-02 의 더 큰 산정 알고리즘(하한·상한·신뢰비율)의 몫이지 이 모듈의 순수 반올림
      * 함수가 가질 장치가 아니다. `roundedWith` 가 스스로 값을 하한으로 올려 버리면(clamp)
      * 그 값이 "왜 그 값인지"(원 계산값 그대로인지, clamp 로 올라간 값인지)를 잃어 DEC-02
      * 의 그 요구를 오히려 어길 위험이 있다 — 사유 있는 실패로 돌려주면 그 판단(clamp 할지,
@@ -117,8 +114,8 @@ class ArithmeticTest {
     }
 
     /**
-     * `P-2b` 정정(Codex 1차 #3) — 이전 판이 놓친 소수 하한 반례를 임의 mode 전역에서
-     * 낸다. 원시값을 하한과 **정확히 같게**(Codex 반례와 같은 가장 빡빡한 경계) 두고,
+     * `P-2b` — 소수 하한 반례를 임의 mode 전역에서
+     * 낸다. 원시값을 하한과 **정확히 같게**(가장 빡빡한 경계) 두고,
      * `setScale` 오라클로 기대값을 직접 계산해 비교한다 — mode 별 반올림 방향을 하드코딩
      * 하지 않는다. **하한 검사를 지우는 mutant가 이 test 를 실패시킨다** — `DOWN`·
      * `HALF_DOWN`류가 하한 바로 아래로 접힐 때마다 `Unmeasurable` 을 기대하므로, 검사가
@@ -190,8 +187,7 @@ class ArithmeticTest {
     @Test
     fun `M-3 원소가 하나뿐이어도 그 vatTreatment 가 Unknown 이면 합은 부재다`() {
         // seenVat 이 null 로 시작하므로 첫 원소는 이전 원소와 비교할 대상이 없다 — 그렇다고
-        // Unknown 이 전건을 그냥 통과해서는 안 된다(verifier r1 M-3). 이전에는 seenVat==null
-        // 분기가 current.vatTreatment 자체를 보지 않아 이 케이스가 Fact.Known 으로 샜다.
+        // Unknown 이 전건을 그냥 통과해서는 안 된다.
         sumOfBaseAmounts(
             listOf(Fact.Known(base(500L, vat = VatTreatment.UNKNOWN))),
         ) shouldBe Fact.Absent(ReasonCode.VAT_TREATMENT_MISMATCH)
@@ -227,7 +223,7 @@ class ArithmeticTest {
 
     @Test
     fun `M-1 임의 mode·유효 scale 에서 roundedWith 는 예외를 누출하지 않는다`() {
-        // scale 후보에서 -1 을 뺐다(verifier r2 M-6) — 음수 scaleDigits 는 이제
+        // 음수 scaleDigits 는
         // RoundingPolicy 생성 시점에 거부된다(PolicyTest 의 M-6 test 가 그 자리를 잰다).
         // 여기서 검증하는 것은 "유효한 정책이 어떤 원시값을 만나도 roundedWith 가 예외를
         // 던지지 않는다"이지 "정책 자체의 정의역"이 아니다 — 두 층을 섞지 않는다.
@@ -314,7 +310,7 @@ class ArithmeticTest {
     }
 
     /**
-     * decision 17(운영자 결정 2026-09-04, Codex M1/1B 1차 리뷰 #4) — B11(선택지 ②, "입력
+     * decision 17 — B11(선택지 ②, "입력
      * fact 의 안정적 참조를 값에 싣는다")은 그 참조가 가리킬 identity 가 없어 ①의 변형으로
      * 조정됐다. 파생값은 **계산에 쓴 정책 version 만** 싣는다 — 입력 fact 로의 되짚기는
      * 그 값을 낸 판정의 `DecisionProvenance`(§4.1, M2~ 판정 레이어)가 소유한다. 이 test 는

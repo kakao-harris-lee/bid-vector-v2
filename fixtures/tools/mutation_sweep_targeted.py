@@ -8,7 +8,7 @@
      변이체(`money-basis-006` 전체 · 과세 단독 · provenance 단독 · corpus 적격 단독) ·
      `floor-shortfall-001` 의 0% 렌더 · `verdict-004` 의 override 통과 등.
   2. **projection 피연산자의 대소문자 변형이 술어를 우회하는가** — B8 `findings[0]` 이
-     빠져나간 구조적 원인이 이 갈래의 부재였다(verifier r16 F-8). `CASE_VARIANTS` 가
+     빠져나간 구조적 원인이 이 갈래의 부재였다(F-8). `CASE_VARIANTS` 가
      projection 전건에서 기계로 생성한다.
 
 **표적 목록은 앞선 라운드의 기록이다.** 강등으로 계약 필드를 잃은 case 는 이제
@@ -24,7 +24,7 @@
     python3 fixtures/tools/mutation_sweep_targeted.py --crosscheck-pyyaml
     python3 fixtures/tools/mutation_sweep_targeted.py --manifest <경로>
 
-종료 코드(2026-09-06, 1B-c 이월 — verifier r1 *"exit code 로 강제되지 않는다"*):
+종료 코드(*"exit code 로 강제되지 않는다"*):
 
     0  정상 — `MUTANTS` + 표기 변형 가운데 `EXPECTED_PASSES` 밖의 통과 0
     1  위반 변이체 통과 ≥1 — 통과한 (case, 경로들, 이유) 를 stderr 에 한 줄씩 낸다
@@ -95,13 +95,13 @@ PENDING = [
 # `operand` 가 **리터럴 토큰이 아닌** 술어. 대소문자 변형의 대상이 아니다 —
 # `differs-from-path` 의 피연산자는 **경로**이고 `differs-from-case` 의 것은 **case id** 라,
 # `.upper()` 를 걸면 기대값에 없는 문자열을 심어 「표기 변형이 통과했다」로 오독한다
-# (운영자 결정 2026-09-05 decision 18 · 조사 §2 의 가드 요구). `is-present` 는 피연산자가
+# (decision 18 · 조사 §2 의 가드 요구). `is-present` 는 피연산자가
 # 아예 없다.
 NON_LITERAL_OPERAND = ("is-present", "differs-from-path", "differs-from-case")
 
 
 def notation_variants(cases):
-    """projection 이 건 값의 표기를 흔든다 — 대소문자 변형 적대 집합(verifier r16 F-8)."""
+    """projection 이 건 값의 표기를 흔든다 — 대소문자 변형 적대 집합(F-8)."""
     variants = []
     for cid, case in cases.items():
         for entry in case.get("verified_projections") or []:

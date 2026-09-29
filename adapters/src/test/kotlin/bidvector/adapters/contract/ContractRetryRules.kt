@@ -6,7 +6,7 @@ import bidvector.adapters.ml.isRetryableApplicationFailure as mlIsRetryableAppli
 import bidvector.adapters.ml.isRetryableTransportStatus as mlIsRetryableTransportStatus
 
 /*
- * M4/4D-1(D-4D-3) — 이 규칙의 실물은 `adapters/src/main/kotlin/bidvector/adapters/ml/
+ * (D-4D-3) — 이 규칙의 실물은 `adapters/src/main/kotlin/bidvector/adapters/ml/
  * RetryRules.kt`로 승격됐다(ADR 0010 D-4의 순수 판정 함수 — 실제 운영 재시도 정책의 정본은
  * `bidvector.adapters.ml.MlCallPolicyData`). 이 파일은 2A~2D 소비자 test
  * (`ContractDeadlineCancellationRetryTest` 등)가 같은 이름·시그니처로 계속 통과하도록

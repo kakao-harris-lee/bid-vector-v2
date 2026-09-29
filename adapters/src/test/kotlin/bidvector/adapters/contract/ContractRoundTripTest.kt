@@ -19,14 +19,14 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Path
 
 /**
- * M2/2A round-trip — `contracts/testdata/` 의 `.binpb` 표본(canonical, `buf convert`로 생성. 재현 절차는
+ * round-trip — `contracts/testdata/` 의 `.binpb` 표본(canonical, `buf convert`로 생성. 재현 절차는
  * `reports/evidence/m2/2a/commands.md`) 를 생성 Kotlin/Java 타입으로 파싱하고 deterministic
  * serialization 후 바이트가 원본과 같은지 잰다(`OPEN-2A-CANONICAL-FORM` — protobuf deterministic
  * serialization 을 canonical form 으로 확정하는 근거: proto3 필드가 전부 스칼라/oneof/enum 뿐이고
  * unknown field 가 없는 이 testdata 에서는 `CodedOutputStream.useDeterministicSerialization()`이
  * map 없는 단일 메시지의 필드를 선언 순서(오름차순 필드 번호)로 직렬화해 결정적이다).
  *
- * **거부 규칙은 이 test 안의 순수 함수다** — Kotlin 쪽 validation 구현은 M4 몫이라 main 에 두지
+ * **거부 규칙은 이 test 안의 순수 함수다** — Kotlin 쪽 validation 구현은 아직 main 에 두지
  * 않는다(scope.md 「구현 순서」 4). 여기서는 계약이 요구하는 거부 규칙을 test 가 문서화한다.
  */
 class ContractRoundTripTest {
@@ -227,10 +227,10 @@ class ContractRoundTripTest {
             .setVatTreatment(VatTreatment.VAT_TREATMENT_EXCLUSIVE)
             .setProvenance(AmountProvenanceKind.AMOUNT_PROVENANCE_KIND_PUBLISHED)
 
-    // ---- 계약이 요구하는 거부 규칙 — 순수 함수. Kotlin 쪽 실제 validation 구현은 M4 몫이고,
+    // ---- 계약이 요구하는 거부 규칙 — 순수 함수. Kotlin 쪽 실제 validation 구현은 아직 없고,
     // 여기서는 round-trip test 가 그 규칙을 문서화·고정한다(scope.md 「구현 순서」 4).
-    // `isNormalizedFraction`은 `ContractFractionRules.kt`(같은 패키지) 공유 함수다 — 2B의
-    // `PredictionContractTest`와 중복 정의하지 않는다(verifier r1 F-3). ----
+    // `isNormalizedFraction`은 `ContractFractionRules.kt`(같은 패키지) 공유 함수다 —
+    // `PredictionContractTest`와 중복 정의하지 않는다. ----
 
     private fun isAcceptableMoney(money: Money): Boolean =
         isKnown(money.currency, Currency.CURRENCY_UNSPECIFIED, Currency.UNRECOGNIZED) &&

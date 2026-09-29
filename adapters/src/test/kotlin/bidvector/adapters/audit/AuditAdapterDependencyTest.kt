@@ -11,8 +11,8 @@ import java.io.File
  * `java.sql`·`java.time`·`javax.sql`만 쓴다 — domain·workflow 타입을 하나도 참조하지 않는다
  * (D-6A1-7, audit 행이 도메인 값이 아니라 원시 값만 나른다). 그래서 허용 루트는 **자기
  * 패키지 하나**다 — 다른 형제(`evaluation`·`qualification`·`profile`)와 달리 이 패키지는
- * `adapters.persistence`조차 참조하지 않는다(SQL 문 자신을 `ApiAuditSql`이 직접 갖는다,
- * 팀장 지시 — 6F-4와 `Sql.kt`를 동시에 늘리지 않기 위해서였다).
+ * `adapters.persistence`조차 참조하지 않는다(SQL 문 자신을 `ApiAuditSql`이 직접 갖는다 —
+ * `Sql.kt`를 동시에 늘리지 않기 위해서다).
  */
 private val ALLOWED_ROOTS = setOf("bidvector.adapters.audit")
 

@@ -77,9 +77,9 @@ def parse_reuse_table(text: str) -> dict[str, tuple[str, str]]:
 
 
 def check(repo_root: Path, evidence_paths: list[Path]) -> list[str]:
-    """`{docstring 포인터} ↔ {evidence 기록}` 양방향 대조(verifier r1 F-3 — 이전 판은
-    docstring 이 있는 모듈만 대조해, evidence 행만 있고 docstring 포인터가 없는(또는 지워진)
-    이식본을 놓쳤다. 이제 두 집합의 합집합을 돈다). 위반 설명 목록(빈 목록 = 위반 0)."""
+    """`{docstring 포인터} ↔ {evidence 기록}` 양방향 대조(F-3 — docstring 이 있는
+    모듈만 대조하면, evidence 행만 있고 docstring 포인터가 없는(또는 지워진)
+    이식본을 놓친다 — 두 집합의 합집합을 돈다). 위반 설명 목록(빈 목록 = 위반 0)."""
     pointers = find_reuse_pointers(repo_root)
     evidence: dict[str, tuple[str, str]] = {}
     for evidence_path in evidence_paths:

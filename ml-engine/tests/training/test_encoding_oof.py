@@ -125,7 +125,7 @@ def test_out_of_fold_matrix_and_residuals_builds_for_enough_rows() -> None:
 
 
 def test_out_of_fold_encoding_differs_from_full_corpus_encoding_for_every_row() -> None:
-    """legacy OOF 불변식 이식(verifier r1 H-2) — 학습 행렬의 `agency_encoding` 열은 전 구간
+    """legacy OOF 불변식 이식(H-2) — 학습 행렬의 `agency_encoding` 열은 전 구간
     인코딩과 **모든 행**에서 달라야 한다. legacy 원본
     (`bid-vector/tests/test_award_rate_gbm_training.py::
     test_training_matrix_encoding_differs_from_the_self_including_encoding`)이 정확히
@@ -159,7 +159,7 @@ def test_out_of_fold_encoding_differs_from_full_corpus_encoding_for_every_row() 
 
 
 def test_all_rows_assertion_catches_partial_leak_that_not_allclose_misses() -> None:
-    """RED 먼저 재현(verifier r1 H-2) — 검증 레인이 재현한 반례(폴드 하나가 전 구간
+    """RED 먼저 재현(H-2) — 검증 레인이 재현한 반례(폴드 하나가 전 구간
     인코딩을 그대로 써서 30행 중 6행이 누수)를 합성 배열로 직접 만든다. `not np.allclose`
     단독은 이 반례를 통과시키지만(24행이 여전히 다르므로 전체 배열은 "가깝지 않다"),
     legacy 의 두 번째 단언(「모든 행이 달라야 한다」)은 이 반례를 정확히 잡아야 한다 —

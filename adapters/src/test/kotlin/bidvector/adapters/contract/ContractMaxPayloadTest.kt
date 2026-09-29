@@ -21,7 +21,7 @@ import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 /**
- * M2/2D ⑤ — `max_message_bytes`(정책 데이터, `contract-policy.properties`) 경계 쌍(D-2D-6).
+ * `max_message_bytes`(정책 데이터, `contract-policy.properties`) 경계 쌍(D-2D-6).
  * 선언값 바로 아래 표본은 양쪽(channel·server)에서 **수용**되고, 바로 위 표본은 **양쪽에서
  * `RESOURCE_EXHAUSTED`로 거부**된다는 두 단언을 같은 방식으로 만든 testdata 로 건다.
  *

@@ -7,13 +7,12 @@ plugins {
     alias(libs.plugins.spring.boot)
 }
 
-// M6/6A-1 D-6A1-4 — 이 slice가 처음으로 진입점(main())·controller를 만든다. bootJar를
-// 켠다(1A가 disabled로 남겨 둔 자리). **D-6A1-28 정정** — 평범한 jar는 끄지 않는다. 이전
-// 판은 「파일명 충돌」을 근거로 껐으나 실측과 다르다: Boot Gradle 플러그인은 둘 다 켜져
-// 있으면 plain jar에 `-plain` classifier를 자동으로 붙여(`app-plain.jar`) `bootJar`
+// D-6A1-4 — 이 slice가 처음으로 진입점(main())·controller를 만든다. bootJar를
+// 켠다(disabled로 남겨 둔 자리). **D-6A1-28** — 평범한 jar는 끄지 않는다: Boot Gradle
+// 플러그인은 둘 다 켜져 있으면 plain jar에 `-plain` classifier를 자동으로 붙여(`app-plain.jar`) `bootJar`
 // (`app.jar`)와 공존시킨다. `jar`를 끄면 `jarContentGate`(하드코딩된 `jar` task 산출물
 // 대조)가 빈 아카이브를 보게 되어 게이트가 아무것도 검증하지 않는 채로 초록이 된다
-// (verifier 실측 — entries 1→0). 배포물은 `bootJar`이지만 게이트는 `jar`만 본다는
+// (실측 — entries 1→0). 배포물은 `bootJar`이지만 게이트는 `jar`만 본다는
 // 사실은 바뀌지 않으므로(build-logic 하드코딩), `jar`를 켜 두는 것이 이 게이트가 실제로
 // 뭔가를 재게 하는 유일한 방법이다.
 tasks.named<BootJar>("bootJar") { enabled = true }
@@ -22,36 +21,36 @@ tasks.named<Jar>("jar") { enabled = true }
 dependencies {
     implementation(project(":adapters"))
     implementation(project(":workflow"))
-    // M6/6A-1 — `StrategyReadController`·`PersistenceWiring`이 `OperatorStrategy`·
+    // `StrategyReadController`·`PersistenceWiring`이 `OperatorStrategy`·
     // `STRATEGY_POLICY`(strategy)·`Provenance`·`Resolution`·`Money.export()`(shared-kernel)를
     // 직접 참조한다. `adapters`·`workflow`가 이 둘을 `implementation`(비전이)으로만 물어
-    // app의 main compile classpath에 원래 없었다(1B-c의 test 전용 배선과 같은 이유,
+    // app의 main compile classpath에 원래 없었다(test 전용 배선과 같은 이유,
     // 다만 이번은 main — 이 slice가 처음으로 controller/조립에서 도메인 타입을 직접
     // 다룬다는 사실 자체가 이 선언을 요구한다).
     implementation(project(":strategy"))
     implementation(project(":shared-kernel"))
-    // M6/6A-3+6F-3 D-6A3-8 — EvaluationWiring이 LICENSE_QUALIFICATION_POLICY(qualification)를
+    // D-6A3-8 — EvaluationWiring이 LICENSE_QUALIFICATION_POLICY(qualification)를
     // PersistenceWiring의 전략 정책 해소와 같은 형태로 직접 참조 — 위 :strategy와 같은 이유.
     implementation(project(":qualification"))
-    // M6/6A-3+6F-3 D-6A3-6 — EvaluationDryRunController가 Verdict(decision)·NoticeId
+    // D-6A3-6 — EvaluationDryRunController가 Verdict(decision)·NoticeId
     // (procurement)를 응답 조립에 직접 참조 — 같은 이유(compile classpath 원래 없었음).
     implementation(project(":decision"))
     implementation(project(":procurement"))
 
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.starter)
-    // M6/6A-1 — HTTP 골격의 유일한 신규 production 좌표(D-6A1-16, scope.md in_scope).
+    // HTTP 골격의 유일한 신규 production 좌표(D-6A1-16, scope.md in_scope).
     implementation(libs.spring.boot.starter.web)
     implementation(libs.db.scheduler)
     implementation(libs.resilience4j.retry)
     implementation(libs.micrometer.core)
     implementation(libs.flyway.core)
-    // M6/6A-1 — `PersistenceWiring`이 production DataSource·migration을 처음 배선한다
+    // `PersistenceWiring`이 production DataSource·migration을 처음 배선한다
     // (adapters의 관례와 같은 좌표, `implementation`은 전이되지 않아 app이 다시 선언해야
     // 한다). D-6A1-18 — HikariCP는 들이지 않는다(`OPEN-6A1-CONNECTION-POOL`).
     implementation(libs.flyway.database.postgresql)
     implementation(libs.postgresql.driver)
-    // M6/6A-3+6F-3 D-6A3-8 — evaluate()가 suspend(M4/4B-3 ADR 0010 D-2)라 동기 MVC 경계에
+    // D-6A3-8 — evaluate()가 suspend(ADR 0010 D-2)라 동기 MVC 경계에
     // runBlocking 하나만 다리 놓는다. workflow main은 testImplementation으로만 물어(컴파일
     // classpath 실측 부재) app이 직접 선언 — 런타임엔 이미 전이 존재(Boot 생태계 다른 의존).
     implementation(libs.kotlinx.coroutines.core)
@@ -59,7 +58,7 @@ dependencies {
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.archunit.junit6)
-    // M6/6A-1 — D-6A1-21 디스패치 실측(실 임베디드 서버, webEnvironment=RANDOM_PORT)에
+    // D-6A1-21 — 디스패치 실측(실 임베디드 서버, webEnvironment=RANDOM_PORT)에
     // 필요한 test 전용 신규 좌표(scope.md 문면 밖 최소 추가 — MockMvc 대신 이 둘만으로
     // `@SpringBootTest`+`TestRestTemplate`를 쓴다, evidence에 사유 등재).
     testImplementation(libs.spring.boot.test)
@@ -67,19 +66,19 @@ dependencies {
     testImplementation(libs.spring.boot.restclient)
 }
 
-// M6/6F-8 — 실측: 배포물(`bootJar`)이 kotlin-reflect 없이 나가면 `@ConfigurationProperties` 의 Kotlin 생성자 바인딩이
+// 실측: 배포물(`bootJar`)이 kotlin-reflect 없이 나가면 `@ConfigurationProperties` 의 Kotlin 생성자 바인딩이
 // `NoClassDefFoundError: kotlin/reflect/jvm/ReflectJvmMapping` 으로 죽어 **앱이 부팅하지 못한다**. 그동안 아무 test 도 이를
 // 못 잡은 이유는 test 런타임 classpath 에는 kotlin-reflect 가 이미 있어서다(production 과 test 의 classpath 가 다르다) —
 // `BootJarRuntimeClasspathTest` 가 배포물 자체를 열어 잠근다. 함수 50줄 한도 때문에 위 `dependencies {}` 밖 별도 블록이다.
 dependencies {
     implementation(libs.kotlin.reflect)
-    // M6/6A-2a D-6A2a-4 — health 를 별도 관리 포트에 내는 production 좌표 둘(카탈로그 주석에 사유).
+    // D-6A2a-4 — health 를 별도 관리 포트에 내는 production 좌표 둘(카탈로그 주석에 사유).
     implementation(libs.spring.boot.starter.actuator)
     implementation(libs.spring.boot.jdbc)
 }
 
-// M6/6A-1 — sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties, `adapters
-// /build.gradle.kts` 주석과 같은 이유). 위 `dependencies {}` 가 이 slice의 추가로 그 상한에
+// sizeGate 의 함수 50줄 축은 `.kts` 람다도 잰다(size-policy.properties, `adapters
+// /build.gradle.kts` 주석과 같은 이유). 위 `dependencies {}` 가 추가로 그 상한에
 // 닿아, 관련 없는 나머지 배선(corpus 소비 test 전용 project 의존)을 별도 블록으로 나눈다
 // — Gradle 은 같은 스크립트 안 `dependencies {}` 를 여러 번 받아 누적 적용한다(내용 변경
 // 없음, 크기 축 회피만).
@@ -91,28 +90,28 @@ dependencies {
     testImplementation(libs.grpc.api)
     testImplementation(libs.protobuf.java)
 
-    // M1/1B-c ④(decision 22, D5(d)) — corpus 소비 테스트(conformance runner). shared-kernel
+    // ④(decision 22, D5(d)) — corpus 소비 테스트(conformance runner). shared-kernel
     // 공개 API 만으로 값을 대조한다(testFixtures 는 하네스 게이트 셋을 깨 쓰지 않는다 —
-    // `scope.md` 「Phase 3 중 계약 정정」). M6/6A-1부터는 위 `implementation(project(":shared-
+    // `scope.md` 「Phase 3 중 계약 정정」). 위 `implementation(project(":shared-
     // kernel"))`이 이미 test classpath에 전이돼 별도 testImplementation 선언이 중복이라
     // 지운다(`adapters/build.gradle.kts`의 같은 관례 — "testImplementation은 implementation을
     // 상속하므로 중복 금지").
-    // M1/1C — license-* corpus 실행자가 qualification 공개 API(`LicenseEligibility.judge` 등)를
-    // 직접 부른다. M6/6A-3+6F-3부터는 위 `implementation(project(":qualification"))`이 이미
+    // license-* corpus 실행자가 qualification 공개 API(`LicenseEligibility.judge` 등)를
+    // 직접 부른다. 위 `implementation(project(":qualification"))`이 이미
     // test classpath에 전이돼 별도 testImplementation 선언이 중복이라 지운다(`:strategy`와
-    // 같은 관례, 6A-1).
-    // M1/1D — base-amount-provenance·floor-shortfall·floor-threshold corpus 실행자가
+    // 같은 관례).
+    // base-amount-provenance·floor-shortfall·floor-threshold corpus 실행자가
     // decision 공개 API(`ProvenanceRules.judge`·`measureFloorShortfall` 등)를 직접 부른다.
-    // M6/6A-3+6F-3부터는 위 `implementation(project(":decision"))`이 이미 test classpath에
+    // 위 `implementation(project(":decision"))`이 이미 test classpath에
     // 전이돼 별도 testImplementation 선언이 중복이라 지운다(`:qualification`과 같은 관례).
-    // M1/1E — strategy-watch·strategy-validation corpus 실행자가 strategy 공개 API
-    // (`WatchRules.evaluate`·`validate` 등)를 직접 부른다. M6/6A-1부터는 위
+    // strategy-watch·strategy-validation corpus 실행자가 strategy 공개 API
+    // (`WatchRules.evaluate`·`validate` 등)를 직접 부른다. 위
     // `implementation(project(":strategy"))`이 이미 전이돼 별도 선언이 중복이라 지운다.
-    // M3/3A — koneps-collection corpus 실행자가 procurement 공개 API(`canonicalize`·
+    // koneps-collection corpus 실행자가 procurement 공개 API(`canonicalize`·
     // `resolveAmount`·`decideDetailFetch`·`transition`·`mayOverwrite`·`parseSourceZonedInstant`
-    // 등)를 직접 부른다. M6/6A-3+6F-3부터는 위 `implementation(project(":procurement"))`이
-    // 이미 전이돼 별도 선언이 중복이라 지운다(27 case 전건 authoritative 승격은 여전히
-    // 운영자 승인 2026-09-07 기준).
+    // 등)를 직접 부른다. 위 `implementation(project(":procurement"))`이
+    // 이미 전이돼 별도 선언이 중복이라 지운다(27 case 전건 authoritative 승격은
+    // 별도 승인 사항이다).
     // manifest.yaml(YAML) 을 읽기 위한 snakeyaml — 카탈로그 좌표는 이미 Boot BOM 관리 하에
     // transitively 해석되던 것을 명시로 올린 것뿐이다(`gradle/libs.versions.toml` 주석 참고).
     testImplementation(libs.snakeyaml)
@@ -120,9 +119,9 @@ dependencies {
 
 /**
  * 계약 파일은 **선언된 입력이자 test 가 읽는 좌표**다 — 둘이 갈리면 그 파일만 바뀐 변경에서
- * task 가 UP-TO-DATE 로 건너뛰어 거짓 초록이 난다(M4/4B-6b F-2 · M6/6A-2b N-r4-7·N-r5-11).
+ * task 가 UP-TO-DATE 로 건너뛰어 거짓 초록이 난다.
  * 한 자리에서 둘을 함께 선언해 **build script 안에서는** 갈릴 수 없게 한다. 프로퍼티 **이름
- * 문자열**은 읽는 test 쪽에 사본이 남는다(N-r6-11) — 갈리면 값이 비어 test 가 즉시 실패하는
+ * 문자열**은 읽는 test 쪽에 사본이 남는다 — 갈리면 값이 비어 test 가 즉시 실패하는
  * 방향이라 위험은 없다.
  *
  * 이 helper 는 path sensitivity 를 늘 RELATIVE 로 붙인다. `memberEffects`·`openApiSpec` 은 그
@@ -141,7 +140,7 @@ fun Test.contractInput(
 
 // 아키텍처 게이트는 조합 지점에서 돈다 — app 의 test runtime classpath 에 아홉 모듈이 모두 있다.
 tasks.test {
-    // M6/6F-8 — `BootJarRuntimeClasspathTest` 가 배포물(`app.jar`)을 연다.
+    // `BootJarRuntimeClasspathTest` 가 배포물(`app.jar`)을 연다.
     dependsOn(tasks.named("bootJar"))
     systemProperty(
         "bidvector.bootjar",
@@ -162,7 +161,7 @@ tasks.test {
     // T-D 의 정본은 도출된 후보의 **분류**다 — 같은 목록을 여기 두 벌로 두지 않는다.
     contractInput("memberEffects", "bidvector.member.effects", settingsFile("config/quality/member-effects.properties"))
 
-    // M1/1B-c ④ — corpus 소비 테스트(`SharedKernelCorpusConformanceTest`)가 manifest 와
+    // corpus 소비 테스트(`SharedKernelCorpusConformanceTest`)가 manifest 와
     // 그 아래 input/expected fixture 전체를 읽는다. `ArchitecturePolicy.kt` 와 같은
     // `System.getProperty` 주입 관례(조사 §6)를 그대로 쓴다.
     val fixturesRoot = layout.settingsDirectory.dir("fixtures")
@@ -178,7 +177,7 @@ tasks.test {
     inputs.dir(sharedKernelCompileFixtures).withPropertyName("sharedKernelCompileFixtures")
     systemProperty("bidvector.sharedkernel.compile-fixtures", sharedKernelCompileFixtures.asFile.absolutePath)
 
-    // M6/6A-1 — `OpenApiContractTest`가 D-6A1-8 단일 출처 YAML을 읽는다. 같은
+    // `OpenApiContractTest`가 D-6A1-8 단일 출처 YAML을 읽는다. 같은
     // `System.getProperty` 주입 관례(위 두 항목과 같은 이유 — 상대 경로를 test가 직접
     // 추측하지 않는다).
     contractInput("openApiSpec", "bidvector.openapi.spec", settingsFile("openapi/bidvector-operator-api.yaml"))
@@ -205,9 +204,9 @@ val compatibilitySmoke =
         expectedModules =
             setOf(
                 "org.springframework.boot:spring-boot-starter",
-                // M6/6A-1 D-6A1-16 — 등재하지 않으면 이 의존의 해석·컴파일·로드를 아무도 재지 않는다.
+                // D-6A1-16 — 등재하지 않으면 이 의존의 해석·컴파일·로드를 아무도 재지 않는다.
                 "org.springframework.boot:spring-boot-starter-web",
-                // M6/6A-2a D-6A2a-4 — 같은 이유. 관리 포트 health 축의 두 좌표.
+                // D-6A2a-4 — 같은 이유. 관리 포트 health 축의 두 좌표.
                 "org.springframework.boot:spring-boot-starter-actuator",
                 "org.springframework.boot:spring-boot-jdbc",
                 "com.github.kagkarlsson:db-scheduler",

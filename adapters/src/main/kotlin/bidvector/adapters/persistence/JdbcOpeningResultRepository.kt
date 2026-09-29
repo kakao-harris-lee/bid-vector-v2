@@ -30,7 +30,7 @@ import javax.sql.DataSource
  * V1 migration KDoc). 한 SQL 문(`ON CONFLICT ... WHERE observed_at >= ...`)이 insert/update/
  * no-op을 다 낸다 — [toUpsertOutcome]가 어느 경로였는지 안다(PostgreSQL 관용구).
  *
- * **M3/3E ⑤⑥ — 부모+자식 한 항목 트랜잭션**(D-3E-2 (a), scope.md 「이 slice가 하는 일」⑤).
+ * **⑤⑥ — 부모+자식 한 항목 트랜잭션**(D-3E-2 (a), scope.md 「이 slice가 하는 일」⑤).
  * `persist`가 `opening_result`(부모) upsert 하나와 `reservePrices`(자식) upsert 반복을 같은
  * 연결(`autoCommit = false`, `commit()`은 둘 다 성공한 뒤)에서 묶는다 — 자식 쓰기가 실패하면
  * 예외가 `commit()` 전에 던져지고, `connection.use`가 커밋 없이 close하므로 JDBC 기본 동작이
@@ -105,7 +105,7 @@ private fun bindReservePriceRow(
     statement.setString(index++, row.baseReservePrice?.currency?.name)
     statement.setNullableBoolean(index++, row.isDrawn)
     statement.setNullableInt(index++, row.drawCount)
-    // verifier r1 H-2 — 행 자신의 observedAt을 싣는다(result.observedAt 대체 아님, 각
+    // 행 자신의 observedAt을 싣는다(result.observedAt 대체 아님, 각
     // 행이 자기 관측 시각을 스스로 나른다).
     statement.setTimestamp(index++, Timestamp.from(row.observedAt))
     statement.setString(index, observationKey.value)
@@ -171,7 +171,7 @@ private fun bindOpeningResult(
     statement.setString(index++, result.baseAmount?.let { ProvenanceCodec.detailOf(it.provenance) })
     statement.setNullableInt(index++, result.totalReservePriceCandidateCount)
     statement.setNullableTimestamp(index++, result.actualOpeningAt)
-    // M3/3F ①② — 10+2 컬럼 바인딩은 OpeningCompleteAxisCodec.kt 가 진다(detekt
+    // ①② — 10+2 컬럼 바인딩은 OpeningCompleteAxisCodec.kt 가 진다(detekt
     // TooManyFunctions·CPD 중복 회피 — bindOpeningResult 가 조립을 맡고 각 축의 바인딩
     // 자체는 그 축을 아는 codec object 에 둔다).
     index = OpeningRankOneKind.bind(statement, index, result.openingRankOne)
@@ -212,8 +212,8 @@ private fun ResultSet.toOpeningResult(id: NoticeId): OpeningResult {
         baseAmount = toOpeningBaseAmount(),
         totalReservePriceCandidateCount = getInt("total_reserve_price_candidate_count").takeUnless { wasNull() },
         actualOpeningAt = getTimestamp("actual_opening_at")?.toInstant(),
-        // M3/3F ①② — OpeningCompleteAxisCodec.kt 가 왕복을 진다(같은 회피 판단, bind 쪽 참고).
-        // verifier r2 N-1 뒤 — DrawNumbersKind.read 는 draw_numbers_valid_range_max 를 자신의
+        // ①② — OpeningCompleteAxisCodec.kt 가 왕복을 진다(같은 회피 판단, bind 쪽 참고).
+        // DrawNumbersKind.read 는 draw_numbers_valid_range_max 를 자신의
         // 축 컬럼에서 직접 읽는다(다른 축 값을 빌리지 않는다).
         openingRankOne = OpeningRankOneKind.read(this),
         drawNumbers = DrawNumbersKind.read(this),
@@ -228,7 +228,7 @@ private fun ResultSet.toDerivedBaseAmount(won: BigDecimal): ResolvedBaseAmount.D
 }
 
 /**
- * `won`+`currency`+provenance(kind+detail) 네 컬럼을 읽는 공통 형태(verifier r1 H-1 뒤 신설)
+ * `won`+`currency`+provenance(kind+detail) 네 컬럼을 읽는 공통 형태(신설)
  * — `AwardAmount`·`YegaAmount` 복원이 공유한다(중복 제거). **저장한 provenance를 그대로
  * 복원한다** — 상수를 씌우지 않는다(`notice` 표 관례, [ProvenanceCodec]).
  */

@@ -1,4 +1,4 @@
-"""M2/2E — `EmbeddingService` provider 계약 test.
+"""`EmbeddingService` provider 계약 test.
 
 Python 쪽 fake servicer(생성 `EmbeddingServiceServicer`의 최소 구현)가 요청 내용에 따라
 **실제로 판단한다** — 빈/공백 텍스트·상한 초과·`TEXT_KIND_UNSPECIFIED`는
@@ -269,9 +269,9 @@ def test_success_testdata_embedding_is_acceptable(embedding_pb2):
 
 
 def test_dimension_mismatch_violates_the_contract_invariant(embedding_pb2):
-    # verifier r1 F-2(high) — 이전 판은 `del values[0]`로 원소를 "떼기만" 했다. 그러면
+    # F-2(high) — `del values[0]`로 원소를 "떼기만" 하면
     # `dimension`(4)은 그대로인데 남은 3원소의 norm 도 함께 무너져(0.866) **norm 항에서
-    # 먼저 걸리고 dimension 항은 확인력이 0**이었다(가드를 지워도 전건 통과 — 실측). 여기서는
+    # 먼저 걸리고 dimension 항은 확인력이 0**이 된다(가드를 지워도 전건 통과 — 실측). 여기서는
     # `dimension` 필드는 testdata 원본 그대로(4) 두고 `values`만 L2 정규화된 **3원소**
     # (1/√3 씩, norm=1)로 바꿔 norm 항은 통과·dimension 항만 단독으로 걸리게 한다.
     response = embedding_pb2.EmbedTextResponse()
@@ -295,7 +295,7 @@ def test_dimension_mismatch_violates_the_contract_invariant(embedding_pb2):
 def test_embed_text_dimension_matches_metadata_dimension(embedding_pb2):
     # 설계 검토 (1)·scope.md ② — 「차원은 응답이 나르고 client 는
     # GetEmbeddingMetadata.dimension 과 대조(불일치 = 계약 위반)」의 실제 대응 test
-    # (verifier r1 F-2 미구현 지적 반영, 이전 판에는 이 대조가 없었다).
+    # (F-2 지적 반영).
     embed_response = embedding_pb2.EmbedTextResponse()
     embed_response.ParseFromString(_read("embed_text_response_success.binpb"))
     metadata_response = embedding_pb2.GetEmbeddingMetadataResponse()
@@ -367,7 +367,7 @@ def test_success_testdata_release_is_non_blank(embedding_pb2):
     ["release_id", "artifact_checksum", "feature_schema_version", "code_version", "dataset_id"],
 )
 def test_release_with_blank_component_violates_the_contract_invariant(embedding_pb2, component):
-    # verifier r1 F-3(medium) — 이전 판은 `dataset_id` 하나만 변이했다. 4D-1
+    # F-3(medium) — `dataset_id` 하나만 변이하면 부족하다. 4D-1
     # `SuccessShapeFailClosedTest`(Kotlin main)의 같은 규칙은 다섯 성분을 각각 덮는다 —
     # 이 slice도 같은 커버리지로 맞춘다(파라미터화, 성분당 1건).
     response = embedding_pb2.EmbedTextResponse()

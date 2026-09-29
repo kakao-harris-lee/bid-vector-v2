@@ -39,10 +39,10 @@ import bidvector.workflow.strategy.StrategyRepository
  * `evaluateOne`은 각 단계가 [CandidateEvaluation.NotReached]를 내면 그 자리에서 그치는
  * guard 함수 체인(`?:` 연쇄, 4A `apply`·4B-1 `VerdictLadder.judge` 관례)으로 구성된다.
  *
- * **주 생성자는 `internal`이다(수정 라운드 2 H-1 시정).** `judge` 위임(아래)을 받는
- * 자리가 처음엔 `private val`이었으나 **생성자 매개변수는 그래도 공개 시그니처라**
- * 다른 모듈이 `judge = ...`로 넘겨 사다리를 후보와 무관한 입력·정책으로 몰 수 있었다
- * (verifier r2 실측 — 정직한 배선은 `Skip`·알림 0건인데 주입 배선은 `BidNow`·알림
+ * **주 생성자는 `internal`이다.** `judge` 위임(아래)을 받는
+ * 자리가 `private val`이면 **생성자 매개변수는 그래도 공개 시그니처라**
+ * 다른 모듈이 `judge = ...`로 넘겨 사다리를 후보와 무관한 입력·정책으로 몰 수 있다
+ * (실측 — 정직한 배선은 `Skip`·알림 0건인데 주입 배선은 `BidNow`·알림
  * 2건을 냈다). `Verdict.BidNow`는 위조를 막아도(4B-1) **정당한 값을 사다리 밖에서
  * 얻는 경로**가 열려 있었다는 뜻이다 — 그 값이 [NotificationRequest]의 `internal`
  * 생성자를 정직하게 지나 「판정 없이 알림을 요청했다」가 다른 문으로 성립했다. 이제
@@ -69,8 +69,8 @@ class EvaluateCandidatesUseCase internal constructor(
      */
     private val analysisBudget: Int? = null,
     /**
-     * 사다리 호출 위임(결정 5, verifier r1 L-1) — **`internal` 주 생성자를 통해서만
-     * 닿는다**(수정 라운드 2 H-1). 실 배선(아래 public 보조 생성자)은 이 자리를 항상
+     * 사다리 호출 위임(결정 5) — **`internal` 주 생성자를 통해서만
+     * 닿는다.** 실 배선(아래 public 보조 생성자)은 이 자리를 항상
      * [VerdictLadder.judge] 그대로 채운다 — 바꿀 수 없다. test만(같은 `workflow`
      * 모듈) 이 생성자를 직접 불러 계수 래퍼로 바꿀 수 있다. `reach` 안 정확히 한
      * 자리에서만 불린다는 사실은 이 위임이 있든 없든 같다 — 이 자리는 **셀 수 있게**
@@ -78,7 +78,7 @@ class EvaluateCandidatesUseCase internal constructor(
      */
     private val judge: (LadderInput, Resolution.Resolved<VerdictLadderPolicyData>) -> Verdict,
 ) {
-    /** 실 배선(public) — `judge`는 항상 [VerdictLadder.judge]다(수정 라운드 2 H-1). */
+    /** 실 배선(public) — `judge`는 항상 [VerdictLadder.judge]다. */
     constructor(
         strategies: StrategyRepository,
         candidateSource: CandidateSourcePort,
@@ -107,7 +107,7 @@ class EvaluateCandidatesUseCase internal constructor(
     )
 
     /**
-     * `suspend`다(M4/4B-3 scope.md ④, ADR 0010 D-2) — [mlAnalysis].`analyze`가 suspend라
+     * `suspend`다(scope.md ④, ADR 0010 D-2) — [mlAnalysis].`analyze`가 suspend라
      * 이 자리부터 그래야 취소 전파가 끊기지 않는다. 후보 순회는 여전히 순차다(`mapIndexed`,
      * 병렬화는 이 slice 밖).
      */
@@ -230,13 +230,13 @@ class EvaluateCandidatesUseCase internal constructor(
     /**
      * [thresholdConfigurationDrop]이 이미 둘 다 non-null임을 확인한 뒤에만 불린다.
      *
-     * **`Unavailable` 가지(M4/4B-3 scope.md ③)** — `scoreThresholdDrop`을 거치지 않고
+     * **`Unavailable` 가지(scope.md ③)** — `scoreThresholdDrop`을 거치지 않고
      * `reach`로 직행한다(점수가 없으니 최소치 비교가 성립하지 않는다, 설계 검토 (3)).
      * `LadderInput`의 점수 셋은 전부 null, `mlUnavailableReason`에는 어댑터가 실은 사유를
      * 그대로 싣는다(설계 검토 (4) 우회 2 차단 — `ScoreNotProvided`로 접지 않는다).
      *
-     * **`Analyzed` 가지의 `ladderInputFor(...)`는 `?:`의 우변에 인라인된다(verifier r1
-     * L-1 시정).** Kotlin의 `?:`는 우변을 좌변이 `null`일 때만 평가한다 — `scoreThresholdDrop`
+     * **`Analyzed` 가지의 `ladderInputFor(...)`는 `?:`의 우변에 인라인된다.**
+     * Kotlin의 `?:`는 우변을 좌변이 `null`일 때만 평가한다 — `scoreThresholdDrop`
      * 이 드롭을 내면 `ladderInputFor`가 아예 불리지 않는다. base(4B-2)의 `reach` 안 조립과
      * 같은 시점을 회복한다 — 드롭될 후보에서 `LadderInput.init`의 용량 `require`가 먼저
      * 터지는 일이 없다(`CapacitySnapshot`은 자체 불변식이 없어, 드롭 전 조립은 실 음수
@@ -348,10 +348,10 @@ class EvaluateCandidatesUseCase internal constructor(
 
     /**
      * 판정은 정확히 이 한 자리에서만 돈다(결정 5) — 두 번째 호출 경로가 이 클래스에 없다.
-     * `ladderInput`은 호출자가 조립한다(M4/4B-3 — `Analyzed`·`Unavailable` 두 가지가
+     * `ladderInput`은 호출자가 조립한다 — `Analyzed`·`Unavailable` 두 가지가
      * 서로 다른 `LadderInput`을 낳으므로 이 함수는 그 차이를 모른다).
      *
-     * `evidence`(M4/4D-4, D-4D4-3) — 호출자가 건넨 값을 그대로 [NotificationRequest]에
+     * `evidence`(D-4D4-3) — 호출자가 건넨 값을 그대로 [NotificationRequest]에
      * 싣는다. 이 함수 자신이 `Analyzed`인지 `Unavailable`인지 모르므로 근거도 스스로
      * 짓지 않는다 — [analyzeAndJudge]의 두 가지가 이미 만든 값을 옮길 뿐이다.
      */
@@ -393,7 +393,7 @@ private fun notReached(
  * [WatchVerdict]가 통과가 아닌 갈래를 [CandidateEvaluation.NotReached]로 옮긴다
  * (`EvaluateCandidatesUseCase.watchGateDrop`에서 분리 — 클래스당 함수 11개 한도,
  * v2-지침서 §5, detekt `TooManyFunctions`). 인스턴스 상태가 필요 없어 top-level로 뺐다.
- * **운영자 결정 2026-09-10(수정 라운드 1 M-1) — `NoGate`는 이제 통과가 아니다.**
+ * **`NoGate`는 통과가 아니다.**
  * legacy는 이 상태에서 스캔 자체를 하지 않았다(`_has_configured_watch_rules`
  * 게이트) — 결과(후보 0)를 그대로 두고 탈락만 값으로 남긴다.
  */

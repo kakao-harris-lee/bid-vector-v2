@@ -11,15 +11,14 @@ import java.time.Duration
  * 자체를 못 만들게 하는 사유(`Absent(PredictionMissing)`)는 4B-6 이 [deriveExpectedMargin]
  * 을 부르지 않는 것으로 낸다 — 이 타입은 「이미 확보된 다섯」만 나른다.
  *
- * **`recommendedRate`·`floorRate`·`predictedRate` 는 `≤ 1` 이어야 한다**(verifier r1 F-1) —
+ * **`recommendedRate`·`floorRate`·`predictedRate` 는 `≤ 1` 이어야 한다** —
  * `Rate` 자신은 상한을 두지 않는다(shared-kernel `Rate` KDoc, ADR 0002 D-4 「밴드 상한을
  * 여기 두지 않는다」). 1 을 넘는 율이 이 타입을 통과하면 `floorHeadroomOf`(분모 `1 − floor`)
  * 가 부호를 두 번 뒤집어 legacy 보다 **낙관적인**(높은) 마진으로 새는 결함이 있었다
  * (실측: `rec=0.9, floor=1.2` → V2 `0.715` vs legacy `0.515`). 이 `init` 이 그 값을 「불가능한
  * 상태」로 닫는다.
  *
- * **판정층 짝은 축마다 다르다(verifier r2 G-1 정정 — r1 의 「상류에 있다」는 한 축에만
- * 맞았다)**:
+ * **판정층 짝은 축마다 다르다**:
  * - `recommendedRate`·`predictedRate` — 상류에 **이미 있는 관문**의 마지막 안전판이다.
  *   2B `D-2B-8`(*"`Rate.fraction` 이 `1` 초과면 계약 위반(`INVALID_REQUEST`)"*)이 계약을
  *   걸고, `bidvector.adapters.ml.ParsedSuccessFields.toRateOrNull()` 이 `> 1` 이면 `null`

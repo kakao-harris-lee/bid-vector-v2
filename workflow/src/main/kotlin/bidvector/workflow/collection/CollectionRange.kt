@@ -7,7 +7,7 @@ import java.time.temporal.ChronoUnit
 
 /**
  * 수집 범위 상한 정책(D-6F8-3) — `to - from` 이 이 일수를 넘는 범위는 기동 단계에서 거부한다.
- * 값은 운영자 지시(2026-09-24, 「최근 한 달」)의 안전 상한이고 도메인 규칙이 아니다.
+ * 값은 운영자 지시(「최근 한 달」)의 안전 상한이고 도메인 규칙이 아니다.
  * **생성자가 `internal` 이다** — 상한을 키운 정책 값을 다른 모듈(배선·test)이 지어 [CollectionRange.of]
  * 에 넘기는 경로가 없고, 운영 인스턴스는 [COLLECTION_RANGE_POLICY] 하나다.
  */

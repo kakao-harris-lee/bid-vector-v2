@@ -15,7 +15,7 @@ import java.math.BigDecimal
 import java.time.Instant
 
 /**
- * M3/3A 잔여 일괄 verifier r3 전 — team-lead 가 v2-defect 로 확정한 7 case(002·003·004·
+ * 3A 잔여 일괄 — v2-defect 로 확정한 7 case(002·003·004·
  * 016·018·023·026)를 production 수정 뒤 실제로 dispatch 한다. 여섯 결함(002 `RangeBand`·
  * 003/004 `RawValue`/`FieldPresence`·016 `DocumentedVocabulary`·018 `DELIMITED_LIST`·
  * 023 `NoticeNumber` 정규화 확장·026 `DateTimePatternId`)을 각각 procurement 에 실제로

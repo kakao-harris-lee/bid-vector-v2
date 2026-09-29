@@ -1,5 +1,5 @@
-"""`ml_engine.serving.prediction` — `BidPredictionServicer`(scope.md ①~④). M5/5E-2 —
-`CalculateOptimalBid`를 채운다(5E-1 D-5E-3 (a)의 "5E-2 가 채운다"를 이행). 검증 순서
+"""`ml_engine.serving.prediction` — `BidPredictionServicer`(scope.md ①~④).
+`CalculateOptimalBid`를 채운다(D-5E-3 (a)의 "5E-2 가 채운다"를 이행). 검증 순서
 (닫힌 어휘, scope.md ①)는 `_validate`가 소유한다 — servicer 는 그 결과만 본다:
 
   ⑴ envelope base(request_id·correlation_id 비공백)
@@ -89,13 +89,13 @@ def _validate(
     if objective_rejection is not None:
         return objective_rejection
 
-    # code-reviewer HIGH(R-H1) — 미준비 판정은 **gate 스냅샷**을 본다, `runtime` 유무가
-    # 아니라(D-5E2-10, scope 위협 모델 (f) 「⑸는 gate 실물」). 이전 판은 `runtime is
-    # None`만 봤는데, 조립 근이 inference 정책 성공만으로 `runtime`을 만들면서
+    # HIGH(R-H1) — 미준비 판정은 **gate 스냅샷**을 본다, `runtime` 유무가
+    # 아니라(D-5E2-10, scope 위협 모델 (f) 「⑸는 gate 실물」). `runtime is
+    # None`만 보면, 조립 근이 inference 정책 성공만으로 `runtime`을 만들 때
     # training/evaluation/serving 정책이 깨져 gate 가 NOT_READY(`GetModelMetadata`가
-    # `promoted` 미설정)여도 `CalculateOptimalBid`은 계산을 진행해 성공 응답을 냈다 —
+    # `promoted` 미설정)여도 `CalculateOptimalBid`은 계산을 진행해 성공 응답을 낸다 —
     # Kotlin `ReleaseCheck`(`latest_promoted`)가 `promoted`가 없어 그 정직한 응답을
-    # 폐기하는 반면 서버는 자신이 미준비임을 스스로 드러내지 않는 상태였다. 이제
+    # 폐기하는 반면 서버는 자신이 미준비임을 스스로 드러내지 않는다. 이제
     # `runtime`이 있어도 gate 가 READY 가 아니면 거부한다 — 두 조건의 동시 성립은
     # 조립 근(`app/server.py::_prediction_runtime`)이 gate 와 같은 기준으로 보장한다.
     if gate.snapshot().state is not Readiness.READY:

@@ -2,8 +2,7 @@ package bidvector.procurement
 
 /**
  * scale/basis/range 계약 위반의 축 — `ContractViolation(scale/basis/range)`(D-3A-6).
- * `RANGE`는 v2-defect 수정(3A 잔여 일괄 verifier r3 전, koneps-collection-002)이 더했다 —
- * [RangeBand]가 참조하는 `expectedRange`(§5.3 규율 2 단일 출처) 위반을 나른다.
+ * `RANGE`는 [RangeBand]가 참조하는 `expectedRange`(§5.3 규율 2 단일 출처) 위반을 나른다.
  */
 enum class ContractViolationAxis {
     SCALE,
@@ -41,8 +40,7 @@ sealed interface CollectionDropReason {
 }
 
 /**
- * 걷기가 `truncated` 로 끝난 실제 사유(M3/3B 좁은 확장, 운영자 결정 2026-09-07 verifier r1
- * H-3) — 3B 의 page-walk 가 백스톱·재시도 소진으로 종료될 때 「왜 빠졌는가」를 회계가
+ * 걷기가 `truncated` 로 끝난 실제 사유 — 3B 의 page-walk 가 백스톱·재시도 소진으로 종료될 때 「왜 빠졌는가」를 회계가
  * 구별하게 한다(COL-06 사용자 가치). 3B(어댑터)만 이 값을 만든다 — procurement 는 형태만
  * 소유한다.
  */
@@ -87,27 +85,23 @@ sealed interface TruncationCause {
  * `setdefault` 채움·뺄셈 역산(`cap_skipped_count`)은 채택하지 않는다 — 값은 전부 호출부가
  * 직접 센 수만 받는다.
  *
- * **`truncationCause`·`quotaExceeded`·`backoffSkipped`는 M3/3B 좁은 확장이다**(운영자 결정
- * 2026-09-07, verifier r1 H-3) — 기본값이 있어 기존 생성자 호출처(3A corpus 실행자·
- * `AccountingTest`)는 그대로 컴파일된다. `truncated`↔`truncationCause` 결합 불변식만
- * 새로 추가한다 — 다른 기존 불변식은 손대지 않는다.
+ * **`truncationCause`·`quotaExceeded`·`backoffSkipped`는 기본값이 있어** 기존 생성자 호출처
+ * (3A corpus 실행자·`AccountingTest`)는 그대로 컴파일된다. `truncated`↔`truncationCause` 결합
+ * 불변식만 새로 추가한다 — 다른 기존 불변식은 손대지 않는다.
  *
- * **`maskingFailures`는 M3/3B-2 좁은 확장이다**(운영자 결정 2026-09-08, verifier r1 F-3·F-8) —
- * 개찰 축이 `opengCorpInfo` 성분 배치 불일치로 값 전체를 폐기한 건수를 `unknownFields`와
- * **분리**해 낸다. 이전 판은 이 사유를 `unknownFields`(이름 그대로면 「계약 밖 키 수」)에
- * 얹어 그 축의 원래 의미(§5.3 규율 1의 미지 필드 리포트)를 비웠다 — 이번 확장은 그 자리를
- * 되돌리고(`unknownFields`는 다시 계약 밖 키만 센다) masking 실패를 별도 축으로 세운다.
+ * **`maskingFailures`** — 개찰 축이 `opengCorpInfo` 성분 배치 불일치로 값 전체를 폐기한 건수를
+ * `unknownFields`와 **분리**해 낸다: `unknownFields`는 계약 밖 키만 센다(§5.3 규율 1의
+ * 미지 필드 리포트), masking 실패는 별도 축으로 센다.
  * **`dropReasons`/`dropped` 항등식 밖에 둔다** — 필드 단위 실패는 항목 단위 drop 과 다른
  * 축이라(같은 항목 안의 일부 필드만 폐기되고 항목 자체는 살아남는다) 그 항등식에 강제로
  * 넣으면 「항목이 몇 개 왔는가」와 「항목 안에서 무엇이 빠졌는가」가 뒤섞인다. 기본값이
  * 있어 기존 호출처(3A corpus 실행자·`AccountingTest`·3B `mapRawItem` 경로)는 그대로
  * 컴파일된다.
  *
- * **`rowIdentifierIndeterminate`는 M3/3B-2 좁은 확장이다**(운영자 결정 2026-09-08, verifier r2
- * G-1) — 오퍼레이션이 행 식별자(예: 예비가격 상세의 `compnoRsrvtnPrceSno`)를 선언했는데 그
- * 값이 특정 항목에서 부재·공백이라 dedup 을 적용할 수 없었던 건수다. 그 문서 축이 **옵션**
- * 이라(§1.7.3) 부재는 정상 응답이고, 이전 판은 부재를 `""`로 접어 같은 공고의 여러 부재 행이
- * 서로 충돌해 F-1(복수예가 15행 소실)이 그대로 재현됐다(G-1). 그런 항목은 dedup 판정 없이
+ * **`rowIdentifierIndeterminate`** — 오퍼레이션이 행 식별자(예: 예비가격 상세의
+ * `compnoRsrvtnPrceSno`)를 선언했는데 그 값이 특정 항목에서 부재·공백이라 dedup 을 적용할 수
+ * 없었던 건수다. 그 문서 축이 **옵션**이라(§1.7.3) 부재는 정상 응답이다 — 부재를 `""`로
+ * 접으면 같은 공고의 여러 부재 행이 서로 충돌해 복수예가 15행 손실이 재현된다. 그런 항목은 dedup 판정 없이
  * 항상 살아남는다(`duplicate`로 세지 않는다, COL-03 이 15행 전부를 요구한다) — 이 축이 「dedup
  * 을 적용하지 못했다」는 사실 자체를 드러낸다. **`dropReasons`/`dropped` 항등식 밖**이다 —
  * dedup 불가는 항목 drop 이 아니라 항목은 살아남되 중복 판정만 못 한 것이라 다른 축이다.

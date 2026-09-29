@@ -40,13 +40,13 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 /*
- * M1/1D — base-amount-provenance·floor-threshold·floor-shortfall case → executor dispatch.
+ * base-amount-provenance·floor-threshold·floor-shortfall case → executor dispatch.
  * `CorpusExecutors.kt`(1B-c·1C)와 같은 관심사 분리(크기 한도 회피가 아니라 「fixture 를
  * 읽고 비교하는 법」과 「계약과 무엇을 대조하는가」를 나눈다) — `SharedKernelCorpusConformanceTest.kt`
  * 의 dispatch 표(`VALUE_EXECUTORS`)가 이 파일의 [PROVENANCE_FLOOR_EXECUTORS] 를 합친다.
  */
 
-// ---- provenance/floor value executor 보조 — M1/1D, decision 공개 API 호출 → projection ----
+// ---- provenance/floor value executor 보조 — decision 공개 API 호출 → projection ----
 
 /** legacy 술어 어휘(조사 §5.2 ②, kebab-case) ↔ `ProvenanceRuleId`. 결속은 이 runner 소유다(D-12). */
 private fun provenanceRuleIdFromToken(token: String): ProvenanceRuleId =
@@ -203,7 +203,7 @@ private fun floorRateFrom(input: JsonNode): FloorRate =
 
 /**
  * `floor-threshold` 축 전용 — `FloorShortfallPolicyData`가 없는 입력(ft-001·003)에서도
- * 임계을 낸다. `Derived<AssessmentRate>`를 그대로 돌려준다(verifier r1 F-1) — 벗겨서
+ * 임계을 낸다. `Derived<AssessmentRate>`를 그대로 돌려준다 — 벗겨서
  * bare rate 로 두지 않는다.
  */
 private fun criticalAssessmentRateFrom(input: JsonNode): Derived<AssessmentRate> {
@@ -247,7 +247,7 @@ private fun shortfallWithoutPolicy(
 }
 
 /**
- * `$.comparison` 문자열(verifier r1 F-4) — 정책 토큰에서 낸다. 001·003(정책 부재)은
+ * `$.comparison` 문자열 — 정책 토큰에서 낸다. 001·003(정책 부재)은
  * decision 28 초기값(strictly-greater)의 문면을 쓴다 — [shortfallWithoutPolicy]가 실제로는
  * 두 비교값이 같은 결과임을 이미 확인했으므로 어느 쪽 문구를 써도 값 자체는 어긋나지
  * 않는다. 이 필드는 계약 타입이 아니다(`does_not_carry` ①) — 사람이 읽는 설명일 뿐이다.
@@ -265,7 +265,7 @@ private fun comparisonStringFor(policyNode: JsonNode): String {
  * floor-threshold 실행자(②, D-4 — 표본 하나의 미달 술어). 입력이 정책을 실으면 그것을
  * 읽고(`policy.shortfallComparison`, ft-002), 없으면 정책 독립적 판정으로 대신한다
  * (ft-001·003, [shortfallWithoutPolicy]) — 어느 쪽도 runner 가 값을 지어내지 않는다.
- * `critical`은 `Derived<AssessmentRate>`다(verifier r1 F-1) — `isShortfall`(bare 값을
+ * `critical`은 `Derived<AssessmentRate>`다 — `isShortfall`(bare 값을
  * 받는 순수 술어)을 부를 때만 `.value`로 벗기고, 봉투에는 담지 않는다(floor-threshold
  * 축은 그 자체가 봉투를 만들지 않는다 — D-4 표본 단건 술어).
  */
@@ -396,7 +396,7 @@ private fun floorShortfallResultProjection(
 
 /**
  * floor-shortfall 실행자(⑤⑥, D-4 — 집계에서 판정). 임계는
- * `bidvector.decision.criticalAssessmentRateFor`로 낸다(verifier r1 F-3) — 이 경로가
+ * `bidvector.decision.criticalAssessmentRateFor`로 낸다 — 이 경로가
  * `FloorShortfallPolicyData.criticalRateScale`을 실제로 소비하는 유일한 자리다. 별도
  * `RoundingPolicy`를 runner 가 조립하지 않는다(F-1과 F-3을 한 호출로 함께 만족한다).
  */

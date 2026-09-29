@@ -45,14 +45,14 @@ internal class DelegatingGreeter(
 ) : Greeter by delegate
 
 /**
- * D-7(verifier r1 M-2) — build-logic 자신의 실제 형태(`abstract class X : DefaultTask()`)를
+ * D-7 — build-logic 자신의 실제 형태(`abstract class X : DefaultTask()`)를
  * 그대로 고정한다. `DefaultTask`는 이 fixture 컴파일 단위 밖(Gradle API)이라 import 집합에
  * 없다 — depth 는 0 이어야 한다.
  */
 internal abstract class FakeGradleTask : org.gradle.api.DefaultTask()
 
 /**
- * verifier r2 H-1 — **다른 모듈의 소유 타입**을 흉내낸다. `TypeShapeFixtureTest`가 일부러
+ * **다른 모듈의 소유 타입**을 흉내낸다. `TypeShapeFixtureTest`가 일부러
  * 이 클래스 자체를 `ClassFileImporter.importClasses`에 넣지 않는다 — 「이번 스캔 집합 밖이지만
  * 루트 패키지(`bidvector.`) 아래」인 사례를 만들기 위해서다(예: `shared-kernel`의 `open class`를
  * `workflow`가 상속하는 실제 형태). `CrossModuleDerived`는 스캔 집합에 있고 상위가

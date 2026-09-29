@@ -84,7 +84,7 @@ internal class AppDependencyConditions(
         when {
             target.fullName in capabilityPorts -> false
 
-            // N-r5-5 — 읽기 port 도 제한 층에서는 직접 받지 않는다(조회기 경유만).
+            // 읽기 port 도 제한 층에서는 직접 받지 않는다(조회기 경유만).
             target.fullName in policy.appHttpDeniedTypes -> false
 
             target.packageName.isUnder(deniedPackages) -> false
@@ -95,7 +95,7 @@ internal class AppDependencyConditions(
 
             // 오류 매핑표가 옮기는 어댑터 예외 — 값일 뿐 포트를 건네지 않는다. 판정은 **정확
             // 목록 소속**이다(D-6A2b-42): 계층 해석(`isAssignableTo(Throwable)`)은 목록 밖의
-            // 새 예외 타입을 그대로 통과시켰다(verifier r4 F-r4-2).
+            // 새 예외 타입을 그대로 통과시킨다.
             target.packageName.isUnder(listOf(adaptersRoot)) -> target.fullName in policy.appAdapterExceptionTypes
 
             else -> target.packageName.isUnder(allowedPackages)
@@ -148,8 +148,8 @@ internal class AppDependencyConditions(
         capabilityPorts: Set<String>,
     ): Boolean =
         when {
-            // 제한 층과 **같은 갈래**다(D-6A2b-50, N-r5-1) — 앞 판에는 이 갈래가 없어서 ② 층에서
-            // 능력 포트를 거부하는 술어가 손 목록뿐이었다.
+            // 제한 층과 **같은 갈래**다(D-6A2b-50) — 이 갈래가 없으면 ② 층에서
+            // 능력 포트를 거부하는 술어가 손 목록뿐이다.
             target.fullName in capabilityPorts -> {
                 false
             }
@@ -164,7 +164,7 @@ internal class AppDependencyConditions(
 
             // 어댑터는 **인터페이스만** — 구체 클래스를 쥐는 것은 구현을 쥐는 것이고 메서드가 늘 수 있다.
             // 예외는 **정확 목록 소속**이어야 한다(D-6A2b-42). `isAssignableTo(Throwable)` 은
-            // 목록 밖의 새 예외 타입을 그대로 통과시켰다(verifier r4 F-r4-2: A4 가 초록이었다).
+            // 목록 밖의 새 예외 타입을 그대로 통과시킨다(A4 가 초록이었다).
             target.packageName.isUnder(listOf(adaptersRoot)) -> {
                 target.isInterface || target.fullName in policy.appAdapterExceptionTypes
             }
@@ -175,7 +175,7 @@ internal class AppDependencyConditions(
         }
 
     /**
-     * 어댑터 **멤버 호출**의 두 축(D-6A2b-36·37, verifier r3 A4·A5).
+     * 어댑터 **멤버 호출**의 두 축(D-6A2b-36·37, A4·A5).
      *
      * 타입 층의 허용(인터페이스 O / 예외 O)은 「무엇을 쥘 수 있는가」만 말하고 「무엇을 부를 수
      * 있는가」는 말하지 않는다 — 인터페이스에 메서드를 하나 더하면(A5) 그 타입은 여전히
@@ -187,7 +187,7 @@ internal class AppDependencyConditions(
      * - 예외: `Throwable`(과 `Object`)이 **선언한** 멤버만. 자기 메서드는 이름을 적을 자리가 없다.
      *
      * 판정은 owner 의 상위 타입까지 훑는다 — 구체 구현을 거쳐 불러도 인터페이스가 그 이름의
-     * 메서드를 선언하면 걸린다(6A-3 D-6A3-25 의 `matchedPortCalls` 와 같은 형태).
+     * 메서드를 선언하면 걸린다(D-6A3-25 의 `matchedPortCalls` 와 같은 형태).
      */
     internal fun callAdapterMemberOutsideContract(): ArchCondition<JavaClass> {
         val callPairs = policy.appAdapterMemberCallPairs.toSet()
@@ -229,8 +229,6 @@ internal class AppDependencyConditions(
                     throwableMemberViolation(caller, declarer, signature)
                 } else {
                     // **fail-closed**(D-6A2b-43): 인터페이스든 구체 클래스든 등재된 쌍이어야 한다.
-                    // 「그 밖은 허용」이던 앞 판은 ② 층의 어댑터 구체 클래스 호출을 통째로 못 봤다
-                    // (code-review r4 N-r4-3: 오늘 도는 호출 하나가 이미 계약 밖이었다).
                     "$caller -> ${declarer.fullName}.$signature"
                         .takeIf { callPairKey(caller, declarer, signature) !in callPairs }
                 }
@@ -268,8 +266,8 @@ internal class AppDependencyConditions(
      * 자신이 구현한 인터페이스다.
      *
      * 타입 축(참조 허용 목록)과 다른 축이다. 참조는 값 전달에도 생기지만(dry-run use case
-     * 생성자의 서술자), **쥐는 것**은 그 능력을 임의 시점에 쓸 수 있다는 뜻이다. verifier r4
-     * F-r4-1 이 쓴 것이 정확히 그 자리다 — 읽기 조회기가 쓰기 저장소 빈을 필드로 들고 있었다.
+     * 생성자의 서술자), **쥐는 것**은 그 능력을 임의 시점에 쓸 수 있다는 뜻이다 — 읽기 조회기가
+     * 쓰기 저장소 빈을 필드로 들고 있는 자리가 정확히 그것이다.
      */
     internal fun holdCapabilityPort(capabilityPorts: Set<String>): ArchCondition<JavaClass> =
         object : ArchCondition<JavaClass>("쓰기 능력 포트(${capabilityPorts.size})를 서명·구현으로 쥐지 않아야 한다") {
@@ -277,8 +275,8 @@ internal class AppDependencyConditions(
                 item: JavaClass,
                 events: ConditionEvents,
             ) {
-                // 제네릭 인자까지 푼다(N-r5-3·L-r5-1) — `List<StrategyRepository>` 는 raw 가
-                // `java.util.List` 라 앞 판이 보지 못했고, 스프링의 컬렉션 주입은 평범한 형태다.
+                // 제네릭 인자까지 푼다 — `List<StrategyRepository>` 는 raw 가
+                // `java.util.List` 라 그대로 두면 보이지 않고, 스프링의 컬렉션 주입은 평범한 형태다.
                 val held =
                     (
                         item.fields.map { it.type } +
@@ -322,22 +320,22 @@ internal class AppDependencyConditions(
         }
 
     /**
-     * ① 층이 HTTP 확장 API 를 참조하면 위반이다(D-6A2b-34, verifier r3 A1·A2·A6).
+     * ① 층이 HTTP 확장 API 를 참조하면 위반이다(D-6A2b-34, A1·A2·A6).
      *
-     * 세 라운드가 **종류를 세다가** 뚫렸다 — handler·Filter·Servlet 을 거두자 interceptor·
-     * Tomcat valve·`@ControllerAdvice` 가 그 밖에 있었다. 확장점의 목록에는 끝이 없지만 그것들이
+     * **종류를 세는 접근은 뚫린다** — handler·Filter·Servlet 을 거둬도 interceptor·
+     * Tomcat valve·`@ControllerAdvice` 가 그 밖에 있다. 확장점의 목록에는 끝이 없지만 그것들이
      * **어느 API 에서 오는가**는 유한하다: Spring web·Boot web·Tomcat·서블릿 API. 배선 층이 그
      * API 에 의존하지 못하면 확장점을 만들 재료가 없다.
      *
      * **애너테이션도 의존이다** — 클래스·필드·생성자·메서드에 붙은 애너테이션 타입을 함께 본다.
      * ArchUnit 의 직접 의존은 애너테이션을 이미 담는다(`annotationDependenciesFromSelf`) —
-     * 여기서 다시 모으는 것은 **중복**이고, 규칙이 문서보다 넓은 쪽이라 해는 없다(N-r5-12).
+     * 여기서 다시 모으는 것은 **중복**이고, 규칙이 문서보다 넓은 쪽이라 해는 없다.
      *
      * 접두 목록은 **HTTP 확장점을 만드는 재료**를 겨냥한다. HTTP 거동을 바꾸는 재료 **전부**는
      * 아니다 — `org.springframework.http.converter` 같은 자리는 접두 밖이고, 새 진입점을 만들지
-     * 않아 표면 실측(D-6A2b-27)의 대상도 아니다(N-r5-13).
+     * 않아 표면 실측(D-6A2b-27)의 대상도 아니다.
      *
-     * **ArchUnit 이 「의존」이라 부르는 것은 상수 풀보다 좁다**(OQ-1, verifier r4 실측).
+     * **ArchUnit 이 「의존」이라 부르는 것은 상수 풀보다 좁다**(OQ-1).
      * `checkcast`·`anewarray` 만으로 등장하는 타입은 `directDependenciesFromSelf` 에 들어오지
      * 않는다 — 오늘 `BidVectorApplication` 의 `jakarta.servlet.Filter`·
      * `org.springframework.boot.web.servlet.ServletRegistrationBean` 이 그 자리이고 게이트는
@@ -393,12 +391,12 @@ internal class AppDependencyConditions(
     }
 
     /**
-     * **주입 표면**(D-6A2b-49, verifier r5 F-r5-1) — 이 클래스가 **무엇을 받을 수 있는가**.
+     * **주입 표면**(D-6A2b-49) — 이 클래스가 **무엇을 받을 수 있는가**.
      *
-     * 다섯 라운드가 「HTTP 층이 무엇을 **이름으로 아는가**」를 좁혔는데, 능력은 **주입된 값**으로도
+     * 「HTTP 층이 무엇을 **이름으로 아는가**」만 좁히면 놓친다 — 능력은 **주입된 값**으로도
      * 온다: ① 층 `@Bean` 이 SQL 을 실행하는 `() -> Int` 를 내고 컨트롤러가 그것을 생성자로 받으면
      * 컨트롤러는 ① 층 클래스 이름을 한 번도 적지 않는다. 참조 축의 허용 접두(`kotlin`·`java.util`)
-     * 안이라 전건 초록이었고, 실제로 HTTP GET 한 번에 전략이 바뀌었다.
+     * 안이면 초록이지만, 그 형태로 HTTP GET 한 번에 전략이 바뀔 수 있다.
      *
      * 주입 표면은 유한하다 — 생성자 매개변수와 **주입 애너테이션이 붙은** 필드·세터다. 애너테이션이
      * 없는 필드는 주입점이 아니다(초기화식이 값을 준다).

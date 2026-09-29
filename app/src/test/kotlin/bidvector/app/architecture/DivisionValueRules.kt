@@ -11,13 +11,13 @@ import com.tngtech.archunit.lang.SimpleConditionEvent
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 
 /**
- * M6/6F-9 D-6F9-1 우회 1 — 업무 대분류 **값 획득 축** 게이트. `CollectionArchitectureRules` 의 형태(패키지·타입을
+ * D-6F9-1 우회 1 — 업무 대분류 **값 획득 축** 게이트. `CollectionArchitectureRules` 의 형태(패키지·타입을
  * 값으로 받아 production 을 지키는 규칙을 fixture 루트에 그대로 적용, 허용 집합은 정책 파일)와 같고 500줄 한도로
  * 파일이 갈렸다.
  *
- * **verifier r1 F-1 뒤 개정.** 이전 판은 열거한 멤버 넷(`fromLabel`·`valueOf`·`values`·`getEntries`)의 **호출**만
- * 보았다 — enum 상수 읽기(`getstatic`), 목록에 없는 새 companion 멤버, `java.lang.Enum.valueOf(Class, String)`
- * 셋이 전부 전체 `check` 를 초록으로 통과했다(실측). 멤버 목록을 늘리는 것은 다음 표기에서 다시 열린다. 그래서
+ * **멤버 이름 목록으로 열거하는 접근은 부족하다.** 멤버 넷(`fromLabel`·`valueOf`·`values`·`getEntries`)의 **호출**만
+ * 보면 — enum 상수 읽기(`getstatic`), 목록에 없는 새 companion 멤버, `java.lang.Enum.valueOf(Class, String)`
+ * 셋이 전부 전체 `check` 를 초록으로 통과한다. 멤버 목록을 늘리는 것은 다음 표기에서 다시 열린다. 그래서
  * **값이 생기는 자리 전부**를 컴파일된 바이트코드에서 도출해 세 축으로 닫는다:
  *
  * ① [typeAccessRules] — 타입 자신의 **모든** 멤버 접근(상수 필드·companion·`valueOf`·`values`·`entries`·어떤 새
@@ -34,7 +34,7 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
  * 변경은 정책 파일 한 줄을 명시적으로 더하게 된다. 나르기만 하는 자리(생성 인자를 자기 필드에 두고 자기 필드만 읽는
  * 클래스)는 축 ② 밖이고, 그 경계는 `CollectionArchitectureGateCatchesViolationsTest` 의 `CleanDivisionCarrier` 가 잠근다.
  *
- * **닫지 못하는 범위**(verifier r2 R2-1 — 주장을 사실로 좁힌다). 축 ②는 디스크립터의 반환·필드 **타입**만 보므로
+ * **닫지 못하는 범위** — 주장을 사실로 좁힌다. 축 ②는 디스크립터의 반환·필드 **타입**만 보므로
  * 제네릭이 **소멸된** 자리에서 얻은 값은 세 축 어디에도 남지 않는다: 대분류를 담은 컨테이너의 원소 읽기(`Map.get` 의
  * 반환은 `Object`), `Class.getEnumConstants`(`Object[]`), 역직렬화기의 타입 토큰(뒤따르는 `as` 는 CHECKCAST 이고
  * access 가 아니다). 축 ③은 클래스 **리터럴**만 보므로 인스턴스의 `javaClass`(`Object.getClass`)나 문자열의

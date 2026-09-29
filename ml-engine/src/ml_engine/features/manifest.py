@@ -6,7 +6,7 @@ legacy에는 feature schema manifest·checksum이 없었다(조사 §c-5 「data
 형태를 feature manifest에 적용한다. **artifact/dataset manifest 실물은 5C 소관** — 이
 모듈은 `feature_manifest_checksum`으로 5C의 artifact manifest 안에 실릴 값 하나를 낸다.
 
-PR #10 리뷰 MEDIUM — `json.dumps`의 기본값은 `allow_nan=True`라 `NaN`/`Infinity`가
+MEDIUM — `json.dumps`의 기본값은 `allow_nan=True`라 `NaN`/`Infinity`가
 `global_mean`·`mean`에 들어오면 표준 JSON이 아닌 리터럴(`NaN`, `Infinity`)로 조용히
 직렬화된다. checksum 자체는 계산되지만 그 canonical JSON을 다른(표준 준수) 파서가 못
 읽어 D-5B-5의 「canonical JSON」 전제가 깨진다. `canonical_json`은 그런 값을 만나면
@@ -48,7 +48,7 @@ class FeatureManifest:
     """feature manifest 내용 — 전부 canonical_json 이 직렬화할 수 있는 원시 구조만 담는다
     (dict 키에 tuple을 쓰지 않는다, JSON 은 그런 키를 표현할 수 없다).
 
-    verifier r1 M-1 — `categories`·`denominator_sources`·`agency_means`·`category_means`는
+    M-1 — `categories`·`denominator_sources`·`agency_means`·`category_means`는
     생성 시점에 **키 기준으로 정렬**한다(`Vocabulary`와 같은 불변식). 정렬하지 않으면
     같은 내용을 다른 순서로 들고 온 두 manifest가 다른 checksum을 낸다 — 5C가 dict
     삽입 순서대로 이 필드를 채우면 같은 학습 결과가 실행마다 다른 checksum을 내게 된다.
@@ -95,7 +95,7 @@ class NonFiniteValue:
 
 @dataclass(frozen=True)
 class CanonicalizationRejected:
-    """PR #10 리뷰 MEDIUM — canonical JSON 은 표준 리터럴만 낸다, 예외 아님."""
+    """MEDIUM — canonical JSON 은 표준 리터럴만 낸다, 예외 아님."""
 
     reason: NonFiniteValue
 
@@ -122,7 +122,7 @@ def canonical_json(manifest: FeatureManifest) -> bytes | CanonicalizationRejecte
     """키 정렬·구분자 `(",", ":")`·float 는 `repr`(Python `json`의 기본 float 인코딩이
     이미 `float.__repr__`을 쓴다 — shortest round-trip repr, Python 3.12 결정적).
     `NaN`/`Infinity`가 섞이면 `allow_nan=False`로 fail-closed — 결과 타입으로,
-    예외로 새지 않는다(PR #10 리뷰 MEDIUM).
+    예외로 새지 않는다(MEDIUM).
 
     직렬화 대상 dict 를 별도 헬퍼 함수의 반환 타입으로 뽑지 않는다 — `dict[str, object]`가
     함수 시그니처에 나타나면 설계 래칫의 약한 경계 판정에 걸린다(로컬 변수는 대상이

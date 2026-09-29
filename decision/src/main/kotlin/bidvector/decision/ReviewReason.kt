@@ -3,8 +3,8 @@ package bidvector.decision
 import java.math.BigDecimal
 
 /**
- * ML 미가용 세부 사유(D-M4-6, ADR 0010 D-6) — 4B-1 은 사다리에 필요한 점수가 없다는
- * 사실 하나만 알았다. M4/4D-1 착수로 이 sealed 가 넓어진다(scope.md ④, D-4D-6 — 값은
+ * ML 미가용 세부 사유(D-M4-6, ADR 0010 D-6) — 사다리에 필요한 점수가 없다는 사실 하나만
+ * 알던 것을 이 sealed 가 넓힌다(scope.md ④, D-4D-6 — 값은
  * 전부 `data object`, payload 없음. transport status 코드·detail_code 같은 자유 문자열을
  * 싣지 않는다 — 진단은 어댑터 로그의 몫이다).
  *

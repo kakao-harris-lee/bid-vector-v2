@@ -13,9 +13,9 @@ import org.springframework.web.bind.annotation.RestController
 import tools.jackson.databind.JsonNode
 
 /**
- * 전략 편집 endpoint 여섯(M6/6A-2b D-6A2b-1) — 6A-1 이 연 읽기 경로의 쓰기 쪽이다.
+ * 전략 편집 endpoint 여섯(D-6A2b-1) — 기존 읽기 경로의 쓰기 쪽이다.
  * `EditStrategyWorkflow` 의 command 넷 + `begin` + 조회가 전부이고 새 동작을 만들지
- * 않는다(그 상태 기계·멱등·stale revision·만료는 M4 가 이미 판정했다, D-M4-1 채널 독립).
+ * 않는다(그 상태 기계·멱등·stale revision·만료는 이미 판정됐다, D-M4-1 채널 독립).
  *
  * **컨트롤러는 조립된 실행기만 받는다**(D-6A2b-8) — 저장소·outbox·`ConnectionSource` 를
  * 이 층에서 볼 수 없다(ArchUnit 의존 게이트가 구조로 강제한다). 요청 → command 변환과

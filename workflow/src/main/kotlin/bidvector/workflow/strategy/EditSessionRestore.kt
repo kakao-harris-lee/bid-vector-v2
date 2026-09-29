@@ -12,7 +12,7 @@ import bidvector.strategy.WatchRuleId
 // ---------------------------------------------------------------------------
 // 복원 — 원시 값([EditSessionSnapshot]) → EditSession(D-6B1-6·D-6B1-7). `internal`이라
 // `workflow` 밖에서 호출 자체가 컴파일되지 않는다. 미지·불량 값은 지어내지 않고
-// 거부한다(팀장 판정). 인코딩 쪽([EditSession.toSnapshot] 등)은 EditSessionSnapshot.kt —
+// 거부한다. 인코딩 쪽([EditSession.toSnapshot] 등)은 EditSessionSnapshot.kt —
 // 이 파일은 detekt TooManyFunctions(11) 축을 넘지 않도록 나눈 분할이다(sizeGate 500 관례,
 // CleanMigrationTest 계열과 같은 이유).
 // ---------------------------------------------------------------------------

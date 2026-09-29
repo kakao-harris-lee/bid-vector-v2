@@ -32,7 +32,7 @@ import java.time.Instant
  */
 internal object EditSessionRow {
     /**
-     * verifier r7 HIGH-5 수정 — 이 코덱 전용 인스턴스(`adapters` 전체에서 `ObjectMapper`를
+     * 이 코덱 전용 인스턴스(`adapters` 전체에서 `ObjectMapper`를
      * 쓰는 다른 자리는 `SchemaValidation.kt`가 자기 인스턴스를 따로 갖는다, 실측:
      * `grep -rn "ObjectMapper(" adapters/src/main/kotlin/` 2건, 공유 0). 인코더는 정확한
      * 십진 노드로 쓰지만, 기본 `ObjectMapper`는 `readTree`가 부동소수 토큰을
@@ -183,8 +183,8 @@ private fun stringListNode(values: List<String>): ArrayNode =
     JsonNodeFactory.instance.arrayNode().apply { values.forEach(::add) }
 
 /**
- * verifier r1 HIGH-2 수정 — 이전 판은 `node?.map { it.asText() } ?: emptyList()`라 리스트
- * 키가 **없거나 배열이 아니면 조용히 빈 리스트로 채웠다**(D-6B1-7 「지어내지 않는다」 위반).
+ * `node?.map { it.asText() } ?: emptyList()` 형태로 두면 리스트
+ * 키가 **없거나 배열이 아니어도 조용히 빈 리스트로 채운다**(D-6B1-7 「지어내지 않는다」 위반).
  * 인코더([bidvector.adapters.strategy.EditSessionRow.draftNode])는 다섯 리스트 필드를
  * 예외 없이 항상 배열로 쓰므로, 정상적으로 인코딩된 행이라면 이 키는 **항상 존재하고
  * 항상 배열**이다 — 그 전제가 깨지면(키 없음·배열 아님·원소가 문자열이 아님) 거부한다.
@@ -202,18 +202,17 @@ private fun requireStringArray(
 }
 
 /**
- * verifier r1 HIGH-2 수정 — 이전 판은 `JsonNode.asInt()`/`asLong()`을 그대로 썼는데, 그
+ * `JsonNode.asInt()`/`asLong()`을 그대로 쓰면, 그
  * 함수들은 숫자로 변환할 수 없는 값(문자열 `"not-a-number"` 등)에 **조용히 0 을 돌려준다**
  * (Jackson 관용). `StrategyRevision`은 0 을 허용하는 값이라 그 위조값이 그대로 통과해
- * workflow 가 "아무도 쓴 적 없는" revision 을 받았다. `canConvertToInt`/`canConvertToLong`
+ * workflow 가 "아무도 쓴 적 없는" revision 을 받을 수 있다. `canConvertToInt`/`canConvertToLong`
  * 으로 먼저 확인해 변환 불가능하면 거부한다.
  *
- * **Codex 1라운드 HIGH 수정 — `canConvertToInt`/`canConvertToLong`은 변환 "가능성"만 보고
- * 정수 "표기"인지는 안 본다.** Jackson 2.21.5(`:adapters` 실 컴파일 클래스패스 실측,
- * `2.18.3 -> 2.21.5` 카탈로그 상향)에서 `DoubleNode(1.2).canConvertToInt()`는 `true`이고
+ * **`canConvertToInt`/`canConvertToLong`은 변환 "가능성"만 보고
+ * 정수 "표기"인지는 안 본다.** Jackson 2.21.5(`:adapters` 실 컴파일 클래스패스 실측)에서
+ * `DoubleNode(1.2).canConvertToInt()`는 `true`이고
  * `asInt()`는 `1`을 돌려준다 — `1e2`도 `canConvertToInt()=true`·`asInt()=100`. 둘 다
- * 정수가 아닌데 통과해 **아무도 쓴 적 없는 값으로 절삭**된다(HIGH-2 가 남긴 반쪽 —
- * 그때는 변환 "불가능"만 막았고 변환은 되지만 표기가 정수가 아닌 경우는 열려 있었다).
+ * 정수가 아닌데 통과하면 **아무도 쓴 적 없는 값으로 절삭**된다.
  * `isIntegralNumber`(정수 표기 JSON 노드에서만 참 — `IntNode`·`LongNode`·`BigIntegerNode`
  * 등, `DoubleNode`·`FloatNode`는 값이 `2.0`처럼 정수여도 거짓)를 먼저 검사해 닫는다 —
  * 인코더([EditSessionRow.encodeStatePayload] 등)가 이 필드들에 항상 `Int`/`Long`을

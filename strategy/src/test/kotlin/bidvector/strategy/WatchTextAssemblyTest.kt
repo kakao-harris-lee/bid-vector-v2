@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test
  * 공백 낀 비blank). 전건 문자열 열거가 아니라 이 경계들만으로 `isNotBlank` 술어가 실제로
  * 거르는 경계를 덮는다.
  *
- * **verifier r1 LOW-1** — ASCII 공백(`" "`)만 있으면 `filter(String::isNotBlank)`가
+ * ASCII 공백(`" "`)만 있으면 `filter(String::isNotBlank)`가
  * `filter { it.trim(' ').isNotEmpty() }`로 바뀌어도 이 property test 가 못 잡는다(그
  * 변이는 ASCII 공백만 blank 로 본다). 탭(`\t`)·전각 공백(`　`, 한국어 공고명에서
  * 현실적)·줄바꿈없는 공백(` `)을 더해 그 변이를 닫는다 — Kotlin `Char.isWhitespace`가
@@ -45,16 +45,16 @@ private fun subjectOf(
 ): WatchSubject = WatchSubject(emptySet(), keyword, full, Fact.Absent(ReasonCode.EMPTY_INPUT))
 
 /**
- * M6/6F-4(D-6F4-3·3b) — 감시 텍스트 조립 순수 함수. `assembleKeywordScopeText`/
+ * D-6F4-3·3b — 감시 텍스트 조립 순수 함수. `assembleKeywordScopeText`/
  * `assembleFullScopeText`는 이 slice의 실질이고, 어댑터(M3)에서 이 함수를 실제로 부르는
  * 호출자는 아직 없다(`OPEN-6F4-TITLE-WIRING`, D-6F4-4b — 수집→canonical 배선이 이 slice
  * 밖이다). 그래서 이 test는 함수 자체의 조립 규칙과, `WatchRules.evaluate`를 거친 행동까지
  * 잠근다 — legacy가 주석으로만 막던 오탐을 이 조립 함수는 시그니처로 막는다는 것이 요점이다.
  *
- * **이 배제는 M6/6F-4-w(D-6F4W-7)부터 생성자 자체로 막힌다** — `KeywordScopeText`/`FullScopeText`는
+ * **이 배제는 D-6F4W-7부터 생성자 자체로 막힌다** — `KeywordScopeText`/`FullScopeText`는
  * `private constructor` + `@ConsistentCopyVisibility` 로 닫혀 이 두 조립 함수(와 그 companion
- * factory)만 값을 낼 수 있다. 그 전(D-6F4-3c, 2026-09-19)에는 결과 타입의 공개 생성자로 이
- * 배제를 우회할 수 있었다는 것이 이 폐쇄의 동기다(verifier r2 MEDIUM-3 — 요건 텍스트로
+ * factory)만 값을 낼 수 있다. 그 전(D-6F4-3c)에는 결과 타입의 공개 생성자로 이
+ * 배제를 우회할 수 있었다는 것이 이 폐쇄의 동기다(요건 텍스트로
  * `KeywordScopeText`를 직접 만들어 필수 키워드를 만족시키는 test 가 초록이었다).
  */
 class WatchTextAssemblyTest {

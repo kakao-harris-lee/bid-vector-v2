@@ -10,7 +10,7 @@ import java.util.Properties
  * `adapters/profile` 패키지의 **모든** `*Test` class 가 `gate.tests.adapters`
  * (`config/quality/gate-tests.properties`)에 등재돼 있는지, 소스 디렉터리 스캔과
  * properties 파싱을 직접 대조해 잰다. 등재가 빠지면 그 class가 아무리 회귀를 잘 막아도
- * 게이트 밖이라 삭제·비활성화돼도 `check`가 초록이다(6F-2 verifier r1 HIGH-2 선례 —
+ * 게이트 밖이라 삭제·비활성화돼도 `check`가 초록이다(선례 —
  * `EvaluationAdapterDependencyTest.kt`를 파일째 지워도 `check`가 BUILD SUCCESSFUL이었다).
  * 자기 자신(`ProfileGateRegistrationTest`)도 대상이다.
  */

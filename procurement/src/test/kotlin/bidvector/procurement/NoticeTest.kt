@@ -94,7 +94,7 @@ class NoticeTest {
     fun `같은 모듈 안에서는 copy(status=X) 가 열려 있다 — 경계는 모듈 밖뿐이다(우회 5, N-5 이름 정정)`() {
         val notice = Notice.collected(COMMAND)
 
-        // 이 test 이름이 이전 판(verifier r2 N-5)과 반대로 읽힌다 — 실제로 이 호출은
+        // 이 test 이름은 반대로 읽힐 수 있다 — 실제로 이 호출은
         // *성공*한다. `Notice`(internal constructor + @ConsistentCopyVisibility)가 닫는
         // 것은 **모듈 경계**이지 파일 경계가 아니다(위협 모델 (0) — 같은 모듈 안의 저자는
         // 방어 대상 밖이다, scope.md 「방어하지 않는 것」). 우회 (5)의 실제 폐쇄(다른 모듈,

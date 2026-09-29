@@ -60,7 +60,7 @@ def _feature_inputs(*, category: str, agency: str) -> features_pb2.FeatureInputs
 def _feature_inputs_missing_base_amount(
     *, category: str, agency: str
 ) -> features_pb2.FeatureInputs:
-    """PR #13 code-reviewer HIGH-1 재현 — `base_amount`가 wire `Missing`(구조적으로
+    """HIGH-1 재현 — `base_amount`가 wire `Missing`(구조적으로
     유효 — `admit_corpus`는 이것을 거부 사유로 보지 않는다). `build_row`(scope ⑤)만
     이 행을 `RowRejected(BASE_AMOUNT)`로 떨어뜨린다."""
     inputs = features_pb2.FeatureInputs()
@@ -268,12 +268,12 @@ def test_train_award_rate_gbm_insufficient_training_rows() -> None:
 def test_train_award_rate_gbm_insufficient_training_rows_after_encoding_dropout() -> (
     None
 ):
-    """code-reviewer PR #13 HIGH-1 — `admit_corpus` 직후 게이트만 있으면 이 사례를
+    """HIGH-1 — `admit_corpus` 직후 게이트만 있으면 이 사례를
     놓친다: 50행 전부 구조적으로 유효(admission 통과, `min_training_rows=50` 첫 게이트
     통과)하지만 44행이 `base_amount` wire Missing 이라 `build_row`에서 떨어져 실제
-    학습 행렬에는 6행만 남는다. 시정 전에는 `TrainedArtifact(training_row_count=6)`
-    가 성공 반환됐다(M5 완료 조건 「최소 표본이 성공으로 변환되지 않음」 위반) — 시정
-    후에는 재게이트가 이 행 수 부족을 잡는다."""
+    학습 행렬에는 6행만 남는다. 재게이트가 없으면 `TrainedArtifact(training_row_count=6)`
+    가 성공 반환된다(M5 완료 조건 「최소 표본이 성공으로 변환되지 않음」 위반) — 재게이트가
+    이 행 수 부족을 잡는다."""
     dataset = _dataset_with_missing_base_amount(present=6, missing=44)
     policy = TrainingPolicy(version="test-v1", min_training_rows=50)
     result = train_award_rate_gbm(
@@ -423,10 +423,10 @@ def test_write_artifact_sha256_matches_recomputed_hash() -> None:
 
 
 def test_write_artifact_feature_manifest_checksum_matches_independent_compute() -> None:
-    """verifier r3 H-1 ① — `payload["feature_manifest_checksum"]`이 5B
+    """H-1 ① — `payload["feature_manifest_checksum"]`이 5B
     `compute_checksum(trained.feature_manifest)`의 **독립 재계산**과 일치해야 한다.
-    이전에는 이 값을 재계산 대조하는 test 가 없어 `.hexdigest().upper()` 같은 변이가
-    452 test 전건을 조용히 통과했다(리포트 §「H-1」 변이 1b)."""
+    이 값을 재계산 대조하는 test 가 없으면 `.hexdigest().upper()` 같은 변이가
+    452 test 전건을 조용히 통과한다(리포트 §「H-1」 변이 1b)."""
     dataset = _dataset(40)
     policy = TrainingPolicy(version="test-v1", min_training_rows=5)
     trained = train_award_rate_gbm(
@@ -442,7 +442,7 @@ def test_write_artifact_feature_manifest_checksum_matches_independent_compute() 
 
 
 def test_write_artifact_training_spec_checksum_matches_independent_compute() -> None:
-    """verifier r3 H-1 ② — `payload["training_spec_checksum"]`이 `spec_checksum(spec)`
+    """H-1 ② — `payload["training_spec_checksum"]`이 `spec_checksum(spec)`
     의 독립 재계산과 일치해야 한다(변이 4, `.upper()`)."""
     dataset = _dataset(40)
     policy = TrainingPolicy(version="test-v1", min_training_rows=5)
@@ -458,7 +458,7 @@ def test_write_artifact_training_spec_checksum_matches_independent_compute() -> 
 
 
 def test_residual_std_hits_floor_when_predictions_match_labels_exactly() -> None:
-    """verifier r3 H-1 ③ — 예측이 라벨과 정확히 같아 OOF 잔차가 전부 0 인 코퍼스는
+    """H-1 ③ — 예측이 라벨과 정확히 같아 OOF 잔차가 전부 0 인 코퍼스는
     `spec.min_residual_std` 바닥에 걸린다. `residual.py` 단위 test(하한 자체)와 달리
     이것은 `train_award_rate_gbm`의 **배선**을 표적한다 — floor 인자가 어딘가에서
     빠지거나 무시되면(변이 6, `floor=float()`) 여기서 잡힌다."""
@@ -516,7 +516,7 @@ def test_write_artifact_rejects_feature_name_mismatch() -> None:
 
 
 def test_write_artifact_release_derives_entirely_from_trained() -> None:
-    """verifier r1 H-1 — 우회 (12) 폐쇄 확인. `write_artifact` 는 `trained` 하나만 받으므로
+    """H-1 — 우회 (12) 폐쇄 확인. `write_artifact` 는 `trained` 하나만 받으므로
     호출자가 다른 `dataset_id`/`code_version`/`seed`를 실을 경로가 없다(시그니처 차원의
     닫힘). `release_id`가 `trained` 자신의 다섯 값에서 재파생한 값과 같음도 확인한다."""
     import inspect

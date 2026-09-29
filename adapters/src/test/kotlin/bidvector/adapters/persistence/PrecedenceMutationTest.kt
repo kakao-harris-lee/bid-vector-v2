@@ -30,7 +30,7 @@ import java.time.Instant
  * 역할과 무관하게(단, superuser의 트리거 비활성화 같은 DDL 권한 우회는 경계 밖) 거부함을
  * 증명한다.
  *
- * **verifier r1 뒤 개정** — F-1(값만 바뀌고 provenance는 그대로인 write가 통과)·F-4(비권위→
+ * **개정** — F-1(값만 바뀌고 provenance는 그대로인 write가 통과)·F-4(비권위→
  * 비권위 write가 통과)를 닫는 트리거 개정(V2)에 맞춰 정확한 재현 test를 추가한다.
  */
 private val FIXED_INSTANT: Instant = Instant.parse("2026-09-07T00:00:00Z")
@@ -183,7 +183,7 @@ class PrecedenceMutationTest : PersistenceTestSupport() {
         currentBaseAmountProvenance() shouldBe beforeProvenance
     }
 
-    /** N-2(verifier r2) 재현 — 값·provenance 는 그대로 두고 동반 컬럼(과세 구분)만 바꾼다. */
+    /** N-2 재현 — 값·provenance 는 그대로 두고 동반 컬럼(과세 구분)만 바꾼다. */
     @Test
     fun `N-2 재현 — 값·provenance 는 그대로 두고 과세 구분(vat)만 바꾸는 직접 SQL 은 거부된다`() {
         seedAuthoritativeNotice()
@@ -209,7 +209,7 @@ class PrecedenceMutationTest : PersistenceTestSupport() {
         currentBaseAmountProvenance() shouldBe beforeProvenance
     }
 
-    /** N-2(verifier r2) 재현 — status는 provenance 축이 없지만 신선도 가드는 적용된다. */
+    /** N-2 재현 — status는 provenance 축이 없지만 신선도 가드는 적용된다. */
     @Test
     fun `N-2 재현 — status 를 직접 SQL 로 위조하면(observation_key 그대로) 거부된다`() {
         seedAuthoritativeNotice()
@@ -334,10 +334,8 @@ class PrecedenceMutationTest : PersistenceTestSupport() {
         currentBaseAmountWon() shouldBe before
     }
 
-    // r1이 지목한 이름 문제(verifier r2 N-7) — 원래 이름은 이 test가 F-1/N-1의 중심 방어를
-    // 보여주는 것처럼 읽혔지만, 실제로는 「빈 자리에 provenance 없이 금액만 채우는」 좁은
-    // CHECK 불변식 하나만 잰다(진짜 재현은 위 F-1/N-1 전용 test들이 덮는다) — 이름을 실물에
-    // 맞춘다.
+    // 「빈 자리에 provenance 없이 금액만 채우는」 좁은
+    // CHECK 불변식 하나만 잰다(진짜 재현은 위 F-1/N-1 전용 test들이 덮는다).
     @Test
     fun `CHECK 불변식 — 빈 자리에 provenance 없이 금액만 채우는 직접 SQL 은 거부된다`() {
         // base_amount가 아직 없는(둘 다 NULL) 행을 심는다 — 그래야 「금액만 채우고 provenance는

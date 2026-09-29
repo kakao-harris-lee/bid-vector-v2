@@ -4,7 +4,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
- * D-3H-3, M3/3H-1 — 발주기관 역할별 조립(② `canonicalize`). `CanonicalizeTest.kt`에서
+ * D-3H-3 — 발주기관 역할별 조립(② `canonicalize`). `CanonicalizeTest.kt`에서
  * 분리한 파일이다(sizeGate 500줄, v2-지침서 §5 — `KonepsOpeningCompleteFieldContracts.kt`
  * 분리와 같은 전례). `TEST_REGISTRY`·`TEST_POLICY`·`observationOf`는 `CanonicalizeTest.kt`
  * 소유(`internal`)를 그대로 재사용한다 — 두 번째 정본을 만들지 않는다.

@@ -174,10 +174,10 @@ def test_load_dataset_row_missing_required_field_is_unreadable(field: str) -> No
 def test_load_dataset_manifest_field_type_mismatch_is_unreadable(
     field: str, bad_value: object
 ) -> None:
-    """code-reviewer PR #13 MEDIUM-1 — `_parse_manifest`가 `raw[...]`를 그대로 읽고
+    """`_parse_manifest`가 `raw[...]`를 그대로 읽고
     `__post_init__`은 진위(falsy)만 보므로, `"feed_origin_only": "yes"`(문자열) 같은
-    타입 오류가 이전에는 거부되지 않고 `LoadedDataset.manifest.feed_origin_only`에
-    문자열이 그대로 실렸다. 이제는 필드마다 타입을 강제한다."""
+    타입 오류를 거부하지 않으면 `LoadedDataset.manifest.feed_origin_only`에
+    문자열이 그대로 실린다. 이제는 필드마다 타입을 강제한다."""
     rows_bytes = b""
     manifest = dict(_MANIFEST_DICT)
     manifest["row_count"] = 0

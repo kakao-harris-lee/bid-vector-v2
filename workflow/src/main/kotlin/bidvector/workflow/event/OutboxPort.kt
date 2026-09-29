@@ -11,10 +11,9 @@ package bidvector.workflow.event
  * [transitionOutbox](`internal`)만 낼 수 있으므로 전이표를 거치지 않은 임의 상태 점프는
  * 이 인터페이스가 public이어도 인자 자체를 만들 방법이 없어 막힌다.
  *
- * **`claim`은 [EventEnvelope]를 돌려주지 않는다(verifier H-1 시정).** 이전 판은
- * `List<OutboxEntry>`(완성된 봉투를 나름)를 돌려줬는데, `EventEnvelope.restore`가
- * `public`이라 **어느 모듈에서든** 임의 필드로 봉투를 지어 `register`에 넣는 위조가
- * 컴파일됐다(4A r2 H-3과 같은 형태 — 위조는 막았지만 재료 획득은 열려 있었다). `restore`를
+ * **`claim`은 [EventEnvelope]를 돌려주지 않는다.** `EventEnvelope.restore`가
+ * `public`이면 **어느 모듈에서든** 임의 필드로 봉투를 지어 `register`에 넣는 위조가
+ * 컴파일된다(위조는 막아도 재료 획득은 열려 있는 형태). `restore`를
  * `internal`로 내리면 그 자체로는 안전해지지만, 4C-2의 persistence 어댑터가 실제로 DB
  * 행을 봉투로 되살려야 하는 순간 그 함수를 다시 열어야 하고 같은 구멍이 되돌아온다.
  * **그래서 배치를 바꾼다**: `claim`은 [ClaimedOutboxRow](완성 전 원시 필드)만 돌려주고,

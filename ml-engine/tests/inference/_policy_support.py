@@ -1,9 +1,9 @@
-"""M5/5D-2 — 출하 정책 로드 test 지원(golden `_adapter.py`와 같은 관례, `tests/inference/`
+"""출하 정책 로드 test 지원(golden `_adapter.py`와 같은 관례, `tests/inference/`
 스코프 파일이라 5D 소유 모듈 편집 없이 추가한다).
 
-M5/5F-1(2026-09-16) — `assessment.agency_sample_threshold`가 이제 출하
-`inference-v1.yaml`에 잠정값 `10`으로 있다(`OPEN-5D2-POLICY-VALUES` 종결, 운영자
-결정 ③). 아래 `setdefault` 는 이 키가 이미 있을 때 아무것도 하지 않으므로 **이제
+`assessment.agency_sample_threshold`가 이제 출하
+`inference-v1.yaml`에 잠정값 `10`으로 있다(`OPEN-5D2-POLICY-VALUES` 종결, 결정 ③).
+아래 `setdefault` 는 이 키가 이미 있을 때 아무것도 하지 않으므로 **이제
 no-op** 다 — 출하 파일을 그대로 로드해도 이 helper 와 같은 값(threshold `10`)이
 나온다. 임시 사본 경로는 값이 아니라 "출하 YAML 파일 자체는 건드리지 않는다"는
 불변식을 지키려 남겨 둔다(다른 5D 모듈 test 가 이 helper 를 계속 쓸 수 있게).

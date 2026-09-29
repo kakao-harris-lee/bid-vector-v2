@@ -6,7 +6,7 @@ feature_schema_version·code_version·dataset_id)에서 **`artifact_checksum`을
 갖는다(D-5C-9 — 아티팩트 바이트 안에 자기 checksum 을 넣지 않는다. checksum 은
 `ArtifactBytes.sha256`이 낸다, `artifact_writer.py`).
 
-verifier r1 H-1 — 이 모듈은 더 이상 호출자가 넘기는 `ReleaseInputs` 를 받지 않는다.
+H-1 — 이 모듈은 더 이상 호출자가 넘기는 `ReleaseInputs` 를 받지 않는다.
 `derive_release_id`의 다섯 입력은 전부 `TrainedArtifact`(호출부는 `artifact_writer.py`)에서만
 읽힌다 — 계약 우회 후보 (12)(「`release.dataset_id` 를 요청과 다르게」)가 시그니처 차원에서
 성립하지 않는다."""

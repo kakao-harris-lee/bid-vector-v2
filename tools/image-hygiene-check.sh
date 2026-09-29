@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# M6/6C — 이미지 위생 게이트(scope.md ⑥, 설계 검토 (1), D-6C-9·D-6C-10). 술어는 Dockerfile
+# 이미지 위생 게이트(scope.md ⑥, 설계 검토 (1), D-6C-9·D-6C-10). 술어는 Dockerfile
 # 텍스트나 손으로 적는 라벨이 아니라 **만든 이미지의 실행·빌드 산출물**에 건다(하네스
-# 「게이트 술어는 구조로」, verifier r1 F-1·F-2·r2 R2-3·R2-4): 능력이 차단된 채 실 ENTRYPOINT
+# 「게이트 술어는 구조로」, F-1·F-2·R2-3·R2-4): 능력이 차단된 채 실 ENTRYPOINT
 # 로 띄운 컨테이너의 모든 프로세스 사용자·정책 다이제스트에서 파생한 이미지의 실제 layer
 # 체인·이미지 자신의 태그·크기 상한, 그리고 kind 별 「금지」 판정(ml-serving: 금지 패키지 각각
 # 실제 import / 앱: 컴파일 도구 각각 실제 실행 + 풀린 의존 layer 의 test 전용 좌표).
 #
-# **M6/6A-2a D-6A2a-7 — 정책 파일을 인자로 받는다.** 앱 이미지가 생기면서 「금지」 판정이 하나가
+# **D-6A2a-7 — 정책 파일을 인자로 받는다.** 앱 이미지가 생기면서 「금지」 판정이 하나가
 # 아니게 됐다(ml-serving 은 Python `import`, 앱은 JVM 구조). 기본값을 두지 않는다 — 어느 정책으로
 # 판정했는지가 명령에 보여야 한다(기본값은 "어느 정책이 돌았는가"를 감춘다).
 #
@@ -26,7 +26,7 @@ if [ ! -f "$POLICY_FILE" ]; then
   exit 2
 fi
 
-# R2-8(verifier r2 LOW) — 이 게이트는 `jq`로 `RootFS.Layers` JSON 을 판독한다. `ubuntu-latest`
+# R2-8(LOW) — 이 게이트는 `jq`로 `RootFS.Layers` JSON 을 판독한다. `ubuntu-latest`
 # 에 선탑재라 지금은 서지만 워크플로가 설치를 선언하지 않는다 — 없으면 (2) 절이 값 획득
 # 실패를 "베이스가 정책과 다르다"는 엉뚱한 사유로 보고할 뻔했다. 여기서 먼저, 분명하게 끊는다.
 if ! command -v jq >/dev/null 2>&1; then
@@ -34,13 +34,13 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 2
 fi
 
-# R2-1(D-6C-10 ①, verifier r2 HIGH, 표적 재검증) — 직전 판(F-3 시정)은 중복 키만 잡고
-# **값이 비어 있거나 CRLF 가 섞인 경우를 통과시켰다**(수치 비교가 `elif` 조건 안에 있어
+# R2-1(D-6C-10 ①, HIGH, 표적 재검증) — 값이 비어 있거나 CRLF 가 섞인 경우도 통과시켜서는
+# 안 된다(수치 비교가 `elif` 조건 안에 있어
 # `[ 가 "integer expression expected"로 비-0 을 내면 조건이 거짓으로 읽혀 위반이 조용히
-# 삼켜졌다 — `base.image.layers=`를 비우면 요약에 `false`를 찍으면서도 exit 0 이었다).
-# 이제는 값 모양도 검증한다: CRLF 절삭 → 빈 값 거부 → kind 별 모양(수치/목록/텍스트).
+# 삼켜진다 — `base.image.layers=`를 비우면 요약에 `false`를 찍으면서도 exit 0 이 될 수 있다).
+# 값 모양도 검증한다: CRLF 절삭 → 빈 값 거부 → kind 별 모양(수치/목록/텍스트).
 #
-# code-review r1 LOW — 키 대조를 **리터럴**로 한다. `grep -c "^${key}="` 는 키를 BRE 로 읽어
+# LOW — 키 대조를 **리터럴**로 한다. `grep -c "^${key}="` 는 키를 BRE 로 읽어
 # `size.cap.bytes` 가 `sizeXcapYbytes=` 에도 맞았다(현 정책 파일에서 오답은 안 났지만, 이
 # 함수가 존재하는 이유인 **중복 키 탐지**가 느슨해진다). `awk` 의 `index($0, k) == 1` 은 정규식이
 # 아니라 문자열 접두 비교다 — 이스케이프 목록을 손으로 관리하지 않는다.
@@ -78,12 +78,12 @@ _policy_value() {
         echo "정책 키 ${key} 는 최소 1개 원소가 있어야 한다: '${raw}'" >&2
         exit 2
       fi
-      # **R5-1(code-review r2 LOW-3, 같은 계열의 다섯 번째 판) — 공백 「종류」 열거를 멈추고
+      # **R5-1(LOW-3) — 공백 「종류」 열거를 멈추고
       # 허용 문자 집합으로 뒤집는다.** 이 축이 막는 결함은 늘 같다: 원소에 뭔가 섞이면 두 판정
       # 축이 모두 「부재」로 읽어(`--entrypoint $' jshell'` 은 컨테이너 생성 실패로 `if` 가
       # 거짓이 되고 `command -v` 도 없다고 답한다) **첫 원소만 판정하고 나머지를 조용히 끈다.**
-      # 앞선 네 판은 지우거나 거부할 문자를 열거했고(R3-1 공백·탭 → R4-1 앞뒤 공백), 그 목록은
-      # `tr -d '[:space:]'` 가 모르는 유니코드 공백(NBSP U+00A0 등)에 열려 있었다. 이제는
+      # 거부할 문자를 낱낱이 열거하는 접근(R3-1 공백·탭 → R4-1 앞뒤 공백)은
+      # `tr -d '[:space:]'` 가 모르는 유니코드 공백(NBSP U+00A0 등)에 열려 있다. 대신
       # **무엇이 허용인지**만 적는다 — 열거가 아니라 구성이고, 새 문자가 생겨도 닫혀 있다.
       #
       # 허용 집합의 근거: 현 정책 값 전부(`javac`·`jshell`·`curl`·`opentest4j`·`byte-buddy`·
@@ -159,7 +159,7 @@ case "$RUNTIME_KIND" in
     ;;
   jvm-app)
     FORBIDDEN_EXECUTABLES="$(_policy_value forbidden.executables list)"
-    # code-review r1 Open Question 2 — compose healthcheck 이 이미지 안 `curl` 에 기댄다. 그
+    # Open Question 2 — compose healthcheck 이 이미지 안 `curl` 에 기댄다. 그
     # 전제는 주석과 실측 기록에만 있었고, 베이스 다이제스트를 올렸을 때 사라지면 증상은
     # 「app 이 healthy 로 수렴하지 않음」(타임아웃)이라 원인이 보이지 않는다. **이름 있는 축**으로
     # 만든다 — 부재면 게이트가 그 자리에서, 그 이름으로 실패한다.
@@ -238,8 +238,8 @@ docker run -d --name "$HYGIENE_CONTAINER" \
 
 sleep 1
 
-# R3-6(verifier r3 LOW) — 요약 줄이 검사 범위를 그대로 드러내도록 **관측한 uid 전부**를
-# 모은다(이전 판은 첫 행만 담아, 판정은 전 행을 보면서도 요약은 그것을 못 보여줬다).
+# R3-6(LOW) — 요약 줄이 검사 범위를 그대로 드러내도록 **관측한 uid 전부**를
+# 모은다(요약이 첫 행만 담으면 판정은 전 행을 보면서도 그것을 보여주지 못한다).
 RUNTIME_UIDS_SUMMARY=""
 CONTAINER_RUNNING="$(docker inspect "$HYGIENE_CONTAINER" --format '{{.State.Running}}' 2>/dev/null || echo false)"
 if [ "$CONTAINER_RUNNING" != "true" ]; then
@@ -249,7 +249,7 @@ else
   if [ -z "$TOP_DATA_ROWS" ]; then
     fail "컨테이너 안에서 도는 프로세스를 하나도 찾지 못했다(그 사이 종료됐을 수 있다)"
   else
-    # R2-5(verifier r2 LOW) — 「행 수 ≠ 1」이 아니라 **행마다 uid** 를 본다. 정상 이미지가
+    # R2-5(LOW) — 「행 수 ≠ 1」이 아니라 **행마다 uid** 를 본다. 정상 이미지가
     # 프로세스 여러 개가 되는 날에도 root 자식이 조용히 통과하지 않는다.
     while IFS= read -r row; do
       row_uid="$(printf '%s\n' "$row" | awk '{print $2}')"
@@ -300,7 +300,7 @@ else
       [ -n "$layer_line" ] && actual_layers+=("$layer_line")
     done < <(docker image inspect "$IMAGE_REF" --format '{{json .RootFS.Layers}}' 2>/dev/null | jq -r '.[]' 2>/dev/null || true)
 
-    # R3-3(verifier r3 LOW) — 파생이 linux/amd64 로 고정돼 있다(OPEN-6C-MULTIARCH, 6E 전까지
+    # R3-3(LOW) — 파생이 linux/amd64 로 고정돼 있다(OPEN-6C-MULTIARCH, 6E 전까지
     # 대상 밖). 아래 실패 사유는 그래서 두 가지를 함께 언급한다 — FROM 이 실제로 다른
     # 이미지를 가리키거나, **이 이미지가 linux/amd64 가 아닌 플랫폼으로 빌드됐다.** 둘을
     # 구분하는 추가 판정은 넣지 않는다(하드코딩된 축 자체가 OPEN 이다) — 문면만 정확히 한다.
@@ -362,7 +362,7 @@ case "$RUNTIME_KIND" in
       fi
     done
 
-    # ①' **필수** 실행 파일 존재(code-review r1 Open Question 2). 금지 축과 같은 PATH 조회를
+    # ①' **필수** 실행 파일 존재(Open Question 2). 금지 축과 같은 PATH 조회를
     # 쓰므로 셸이 없으면 판정 불가다 — 위에서 이미 `fail` 로 끊었고, 여기서는 그 경우 축을
     # 건너뛰지 않고 「판정 불가」 사유를 한 번 더 남긴다(조용한 통과를 만들지 않는다).
     IFS=',' read -r -a required_array <<< "$REQUIRED_EXECUTABLES"

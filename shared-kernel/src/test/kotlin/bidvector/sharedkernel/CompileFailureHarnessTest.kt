@@ -15,8 +15,8 @@ import java.nio.file.Files
  * 컴파일 실패 하네스 — `ADR 0002` §6 ①이 요구하는 "상호 대입이 컴파일되지 않는다"를
  * 기계로 증명한다(설계 검토 §4.9). `kotlin-compiler-embeddable` 로 음성 fixture를 이 모듈의
  * 산출 classpath 위에서 **별도 컴파일 단위**로 돌려 실패와 기대 진단을 단언하고, 음성마다
- * 2~3 토큰(함수명·변수명·import)만 다른 양성 쌍둥이가 성공함을 함께 단언한다(verifier r1
- * L-3 정정 — 「한 토큰만」은 부정확했다) — exit code만 보면 오타도 통과시킨다
+ * 2~3 토큰(함수명·변수명·import)만 다른 양성 쌍둥이가 성공함을 함께 단언한다 —
+ * exit code만 보면 오타도 통과시킨다
  * (설계 검토 §4.9 하드 요구, 「공허한 통과」방지).
  *
  * fixture 여섯째(`VatTreatment` 다른 금액의 비교)는 여기 없다 — `Money`가 basis 축을
@@ -46,7 +46,7 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * verifier r1 M-2 — 식별자 부분 문자열(`"times"`)은 오타만 낸 변이(`timesTypo`)도
+     * 식별자 부분 문자열(`"times"`)은 오타만 낸 변이(`timesTypo`)도
      * 만족시킨다(그 진단문에 "times"가 부분 문자열로 들어 있다). "receiver type mismatch"는
      * 후보 시그니처가 있는데 receiver 타입이 안 맞아 나는 진단 **종류**라 오타(후보 자체가
      * 없음)의 "unresolved reference" 진단에는 나타나지 않는다 — 실측으로 확인한다.
@@ -72,7 +72,7 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * verifier r1 M-2 — `"amount"`는 오타 변이(`amountTypo`)의 진단문에도 부분 문자열로
+     * `"amount"`는 오타 변이(`amountTypo`)의 진단문에도 부분 문자열로
      * 들어 있다("unresolved reference 'amountTypo'"의 "amountTypo"가 "amount"를 포함).
      * "cannot access"는 선언이 실존하고 접근만 막힌 경우의 진단 종류라 오타(선언 자체가
      * 없음)의 "unresolved reference" 진단에는 나타나지 않는다 — 실측으로 확인한다.
@@ -92,8 +92,8 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * 규칙(verifier r1 M-2) — 모든 음성 fixture 는 변이 쌍둥이를 갖는다: 정당한 양성
-     * 경로에 오타만 넣은 코드가 그 진단 단편을 만족시키지 않아야 한다(verifier r2 L-7).
+     * 규칙: 모든 음성 fixture 는 변이 쌍둥이를 갖는다 — 정당한 양성
+     * 경로에 오타만 넣은 코드가 그 진단 단편을 만족시키지 않아야 한다.
      */
     @Test
     fun `6-M2 계약 위반 없는 오타 변이는 새 단언을 만족시키지 않는다`() {
@@ -118,7 +118,7 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * verifier r2 H-3 — `DerivationRecord`의 생성자만 닫고 그것을 나르는 [Derived]를 열어
+     * `DerivationRecord`의 생성자만 닫고 그것을 나르는 [Derived]를 열어
      * 두면 값과 계산 정책 version의 결속(decision 17)이 `copy(derivedFrom = …)`로 깨진다.
      * 읽기(`positive-8`)는 여전히 열려 있어야 한다 — 소비자는 값을 읽어야 한다.
      */
@@ -136,7 +136,7 @@ class CompileFailureHarnessTest {
         )
     }
 
-    /** verifier r2 H-3 — `Derived(a.value, b.derivedFrom)`로 값과 다른 계산의 기록을 갈아 끼워 위조한다. */
+    /** `Derived(a.value, b.derivedFrom)`로 값과 다른 계산의 기록을 갈아 끼워 위조한다. */
     @Test
     fun `9 Derived 는 값과 기록을 재조합해 위조할 수 없고 값을 읽을 수는 있다 (verifier r2 H-3)`() {
         assertNegativeFails("9-derived-recombine-forge", "cannot access")
@@ -152,7 +152,7 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * verifier r2 H-3 — `Derived`만 닫고 [Measurement.Measured]를 열어 두면 임의 타입 값을
+     * `Derived`만 닫고 [Measurement.Measured]를 열어 두면 임의 타입 값을
      * 진짜 `DerivationRecord`로 감싼 `Derived`를 다시 `Measurement.Measured`로 포장해
      * 모듈 밖에서 "판정"을 조립할 수 있다. `Unmeasurable` 형제는 `ReasonCode`만 나르므로
      * 위조 대상이 없어 계속 공개다(positive-10).
@@ -172,7 +172,7 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * verifier r4 H-1 — 제네릭 `fun <T : Money> compareKnownVat(left: T, right: T)` 는
+     * 제네릭 `fun <T : Money> compareKnownVat(left: T, right: T)` 는
      * Kotlin 이 `T` 를 두 인자의 최소 상위 타입(LUB)으로 추론해 basis 가 다른 두 `Money`
      * 값도 `T = Money` 로 컴파일시켰다(회귀 — `MoneyTest` 의 옛 test 가 같은 타입 쌍만
      * 불러 이 구멍을 놓쳤다). 타입별 오버로드 여섯으로 되돌린 지금은 이 fixture(basis
@@ -194,7 +194,7 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * M1/1B-c ④(decision 21, `scope.md` in_scope 승격 2026-09-05) — `rate-unit-003`·`004`
+     * (decision 21, `scope.md` in_scope 승격) — `rate-unit-003`·`004`
      * (compile-fixture 위임)의 실행자. `Rate` 의 생성자가 `internal` 이고 공개 경로는 단위를
      * 이름에 담은 `ofPercent`·`ofFraction` 둘뿐이라 단위 미선언 값으로 `Rate` 를 만들 함수
      * 서명 자체가 없다 — 그 부재를 여기서 실측한다. `SharedKernelCorpusConformanceTest`
@@ -216,7 +216,7 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * M1/1A-b ⑥(1B-c 알려진 제한) — `BaseAmount`는 `won`·`currency`·`vatTreatment`·
+     * (알려진 제한) — `BaseAmount`는 `won`·`currency`·`vatTreatment`·
      * `provenance` 넷을 다 받아야 하고 기본값이 없다(fixture 7은 `vatTreatment` 인자
      * 부재라는 다른 명제다 — 이 fixture는 개수 자체의 회귀를 고정한다). 기본값이 조용히
      * 생기면 인자 둘만으로 만들 수 있게 되므로, 그 회귀를 컴파일 실패로 잡는다.
@@ -254,8 +254,8 @@ private fun assertPositiveCompiles(fixtureName: String) {
 
 /**
  * 변이(오타만 넣고 계약 위반은 없는 fixture)가 여전히 컴파일에 실패하되(참조 자체가
- * 없으므로), 실 위반 fixture 를 식별하는 진단 단편은 **만족시키지 않음**을 확인한다
- * (verifier r1 M-2) — 단언이 종류를 보는지, 부분 문자열만 보는지를 가르는 실측이다.
+ * 없으므로), 실 위반 fixture 를 식별하는 진단 단편은 **만족시키지 않음**을 확인한다 —
+ * 단언이 종류를 보는지, 부분 문자열만 보는지를 가르는 실측이다.
  */
 private fun assertMutantDoesNotMatchRealFragment(
     mutantFixtureName: String,

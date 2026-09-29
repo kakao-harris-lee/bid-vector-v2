@@ -1,4 +1,4 @@
-"""M2/2B — `BidPredictionService` provider 계약 test.
+"""`BidPredictionService` provider 계약 test.
 
 Python 쪽 fake servicer(생성 `BidPredictionServiceServicer`의 최소 구현, 같은
 `contracts/testdata/prediction/*.binpb`를 답으로 낸다)가 계약 규칙(fail-closed·oneof·
@@ -177,7 +177,7 @@ def test_two_candidates_violates_the_contract_invariant(prediction_pb2):
     assert not _has_three_ordered_candidates(prediction_pb2, response.success)
 
 
-# ---- 후보 origin 은 항상 RECOMMENDED(scope.md ④, verifier r1 F-2) ----
+# ---- 후보 origin 은 항상 RECOMMENDED(scope.md ④, F-2) ----
 
 
 def test_success_testdata_candidates_are_all_recommended_origin(prediction_pb2, common_pb2):
@@ -209,7 +209,7 @@ def test_unmeasurable_reasons_differ(prediction_pb2, error_pb2):
     assert untrained.unmeasurable.reason != insufficient.unmeasurable.reason
 
 
-# ---- M2/2F additive: diagnostics 넷 보존(proto 레벨, 도메인 미소비) ----
+# ---- additive: diagnostics 넷 보존(proto 레벨, 도메인 미소비) ----
 
 
 def test_diagnostics_fields_are_preserved_after_parsing(prediction_pb2):
@@ -222,7 +222,7 @@ def test_diagnostics_fields_are_preserved_after_parsing(prediction_pb2):
     assert diagnostics.agency_sample_below_threshold is False
 
 
-# ---- M2/2F additive: IntervalSource.POSTERIOR_PREDICTIVE ----
+# ---- additive: IntervalSource.POSTERIOR_PREDICTIVE ----
 
 
 def test_posterior_predictive_testdata_has_that_interval_source(prediction_pb2):
@@ -231,7 +231,7 @@ def test_posterior_predictive_testdata_has_that_interval_source(prediction_pb2):
     assert response.success.uncertainty.interval_source == prediction_pb2.INTERVAL_SOURCE_POSTERIOR_PREDICTIVE
 
 
-# ---- M2/2F additive: DERIVED release ⇒ training_row_count == 0(D-2B-6, 설계 검토 (10)) ----
+# ---- additive: DERIVED release ⇒ training_row_count == 0(D-2B-6, 설계 검토 (10)) ----
 
 
 def test_derived_release_has_zero_training_row_count(prediction_pb2):
@@ -241,7 +241,7 @@ def test_derived_release_has_zero_training_row_count(prediction_pb2):
     assert response.success.diagnostics.training_row_count == 0
 
 
-# ---- M2/2F additive: 표본 축(agency_id/category_code) — 값 표본 1·missing 표본 1 ----
+# ---- additive: 표본 축(agency_id/category_code) — 값 표본 1·missing 표본 1 ----
 
 
 def test_competition_samples_carry_agency_id_and_category_code_facts(prediction_pb2, common_pb2):
@@ -260,7 +260,7 @@ def test_competition_samples_carry_agency_id_and_category_code_facts(prediction_
     assert samples[1].category_code.missing == common_pb2.MISSING_REASON_NOT_COLLECTED_YET
 
 
-# ---- M2/2F additive: release_kind — ARTIFACT/DERIVED 통과, UNSPECIFIED 거부, kind ↔
+# ---- additive: release_kind — ARTIFACT/DERIVED 통과, UNSPECIFIED 거부, kind ↔
 # release_id 접두 `distribution/` 불일치 거부(Kotlin `hasValidReleaseShape`와 대칭) ----
 
 
@@ -389,12 +389,12 @@ def test_success_testdata_candidate_fractions_are_all_valid(prediction_pb2):
 
 
 # ---- decimal string 정규형(Kotlin ContractFractionRules.isNormalizedFraction 과 대칭,
-# verifier r1 F-3) — Rate 셋 + decimal 넷 ----
+# F-3) — Rate 셋 + decimal 넷 ----
 
 
 def test_exponential_notation_is_rejected_for_bid_rate_and_weight():
-    # verifier r1 변이 T7 — `bid_rate="8.87E-1"`·`weight="5.2E-1"`가 값으로는 [0,1] 안이라
-    # 범위 검사만으로는 통과했었다. 정규형 검사를 선행 조건으로 걸어 막는다.
+    # 변이 T7 — `bid_rate="8.87E-1"`·`weight="5.2E-1"`가 값으로는 [0,1] 안이라
+    # 범위 검사만으로는 통과한다. 정규형 검사를 선행 조건으로 걸어 막는다.
     assert not _is_valid_bid_rate_fraction("8.87E-1")
     assert not _is_normalized_fraction("5.2E-1")
     assert not _is_normalized_fraction("8.87E-1")
@@ -425,15 +425,15 @@ def test_testdata_decimal_string_fields_are_all_normalized(prediction_pb2):
 
 
 def test_nan_fraction_is_rejected():
-    # Kotlin 대칭(verifier r1 F-6) — `Decimal("NaN")`은 생성은 되지만 뒤의 범위 비교가
-    # `InvalidOperation`을 던진다(수정 전 버그). `_is_normalized_fraction`이 그 앞에서
+    # Kotlin 대칭(F-6) — `Decimal("NaN")`은 생성은 되지만 뒤의 범위 비교가
+    # `InvalidOperation`을 던진다. `_is_normalized_fraction`이 그 앞에서
     # 명시적으로 걸러 예외 없이 `False`를 낸다.
     assert not _is_valid_bid_rate_fraction("NaN")
     assert not _is_normalized_fraction("NaN")
 
 
 def test_fraction_with_surrounding_whitespace_is_rejected():
-    # Kotlin 대칭(verifier r1 F-6) — `Decimal(" 0.5 ")`는 파싱되지만(Python이 공백을
+    # Kotlin 대칭(F-6) — `Decimal(" 0.5 ")`는 파싱되지만(Python이 공백을
     # 허용) `BigDecimal(" 0.5 ")`는 예외를 던진다(Java는 공백을 허용하지 않음). 정규형
     # 검사(재직렬화 문자열과의 완전 일치)가 공백을 실측하지 못한 차이로 잡는다.
     assert not _is_valid_bid_rate_fraction(" 0.5 ")
@@ -591,8 +591,8 @@ def _is_acceptable_candidate_label(prediction_pb2, value: int) -> bool:
 
 
 def _is_normalized_fraction(fraction: str) -> bool:
-    """Kotlin `ContractFractionRules.isNormalizedFraction`(2A가 세우고 2B가 재사용, scale
-    보존·지수 표기 거부)과 대칭인 Python 술어(verifier r1 F-3). `Decimal`은 Java의
+    """Kotlin `ContractFractionRules.isNormalizedFraction`(scale
+    보존·지수 표기 거부)과 대칭인 Python 술어(F-3). `Decimal`은 Java의
     `BigDecimal`과 달리 앞뒤 공백과 `NaN`/`Infinity`를 파싱하므로(F-6 비대칭의 원인),
     재직렬화한 문자열이 입력과 완전히 같은지 비교해 그 차이를 없앤다 — 공백이 섞이면
     재직렬화 결과에 공백이 없어 불일치, `NaN`은 `is_nan()`으로 명시 거부한다."""
@@ -619,7 +619,7 @@ def _is_acceptable_success(success) -> bool:
 
 
 def _success_release(prediction_pb2, testdata_name: str):
-    """M2/2F additive 헬퍼 — `Success.release`를 뽑는다(release_kind 계약 test 공용)."""
+    """additive 헬퍼 — `Success.release`를 뽑는다(release_kind 계약 test 공용)."""
     response = prediction_pb2.CalculateOptimalBidResponse()
     response.ParseFromString(_read(testdata_name))
     release = prediction_pb2.ModelRelease()

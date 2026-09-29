@@ -15,7 +15,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 // D-6A2b-45 — **규칙마다 하나씩** 두는 영구 음성 fixture.
 //
-// verifier r4 F-r4-4: 규칙 넷을 항상 공집합이 되게 바꿔도 `AppHttpDependencyGateTest` 의 RED 는
+// 규칙 넷을 항상 공집합이 되게 바꿔도 `AppHttpDependencyGateTest` 의 RED 는
 // 한 건뿐이었다. production 이 오늘 그 규칙들을 어기지 않으니 **항진식이 되어도 조용하다**.
 // 여기 표본은 규칙별로 평가되고(`AppRuleId`), 어느 규칙 하나를 공집합으로 바꾸면 그 규칙의
 // 단언이 RED 다.

@@ -7,13 +7,12 @@ import org.junit.jupiter.api.Test
 /**
  * scope.md ①, 설계 검토 (1) — 이 패키지가 여는 값 타입의 생성 불변식.
  *
- * **verifier F-2(medium) — 정정.** 이전 문면은 「위조 차단은 `internal constructor` +
- * 임시 clone 컴파일 거부 실측이 진다」고 적었으나 `EmbeddingVector`의 생성자는
+ * `EmbeddingVector`의 생성자는
  * **`internal`이 아니라 public**이다(어댑터 모듈이 값을 지어야 해서 `internal`을 쓸 수
  * 없다 — `EmbeddingVector` KDoc, (2b) 표). 그러므로 위조 차단이라는 게이트 자체가
  * **없다** — 이 test 는 `init`이 실제로 강제하는 **형태 하한**만 잰다: 빈 리스트 거부·
  * L2 정규화(norm 1±0.01) 밖 거부·비유한(NaN/Infinity) 값 거부(IEEE754 비교가 항상
- * `false`가 되어 정규화 검사에 걸린다, verifier F-1 확증). **정규화된 임의 방향 벡터는
+ * `false`가 되어 정규화 검사에 걸린다, 실측). **정규화된 임의 방향 벡터는
  * 통과한다** — 「위조 방어」로 셀 수 없다. 소비자가 배선되는 순간(4B-6) 타입만으로는
  * 진짜와 위조를 가를 수 없다는 사실은 `OPEN-4D2-VECTOR-FORGERY-AT-WIRING`으로 그
  * slice에 넘겼다(scope.md (2b) 표).

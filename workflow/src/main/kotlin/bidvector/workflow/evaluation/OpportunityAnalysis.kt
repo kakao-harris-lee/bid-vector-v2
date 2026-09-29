@@ -58,7 +58,7 @@ class OpportunityAnalysis internal constructor(
     private val workload: WorkloadPort,
     private val watchSubjects: WatchSubjectPort,
     private val capacity: CapacityPort,
-    // M4/4B-7(D-4B7-9) — 경쟁 표본 조회 port. 표본 조회는 예측 요청 조립의 일부다(predictionFacts).
+    // (D-4B7-9) — 경쟁 표본 조회 port. 표본 조회는 예측 요청 조립의 일부다(predictionFacts).
     private val samples: CompetitionSamplePort,
     private val clock: Clock,
     private val opportunityPolicyTable: EffectiveDatedPolicy<OpportunityPolicyData>,
@@ -120,7 +120,7 @@ class OpportunityAnalysis internal constructor(
         }
 
     /**
-     * M4/4B-8(D-4B8-5) — `SAMPLE_PROVENANCE_POLICY`도 이 자리에서 함께 resolve한다.
+     * (D-4B8-5) — `SAMPLE_PROVENANCE_POLICY`도 이 자리에서 함께 resolve한다.
      * `predictionRequestFor`(`PredictionFacts.kt`, port를 읽지 않는 파일)가 `Clock`을 직접
      * 읽지 않고도 대상 공고 라벨에 쓸 정책을 받도록 — 표본 라벨(`JdbcCompetitionSampleSource`)과
      * 대상 라벨이 같은 정책 singleton을 참조한다(대상·표본이 같은 version으로 판정).
@@ -154,7 +154,7 @@ class OpportunityAnalysis internal constructor(
 
     /**
      * scope.md ②(4) — notice 를 먼저 부르고, 그 응답이 이미 `Unavailable` 이면 profile 은
-     * 부르지 않는다(verifier r1 F-4 — 실패가 확정된 뒤 원격 호출·예산을 더 쓰지 않는다).
+     * 부르지 않는다 — 실패가 확정된 뒤 원격 호출·예산을 더 쓰지 않는다.
      */
     private suspend fun embedPairStep(
         texts: SynthesizedTexts,
@@ -242,7 +242,7 @@ class OpportunityAnalysis internal constructor(
     ): PredictionComponents {
         val resolvedBaseAmount = notice.baseAmount ?: return absentPair(MlUnavailableReason.ScoreNotProvided)
         // detekt ReturnCount(≤2) — 표본 공급 Unavailable 분기를 예측 호출 분기와 같은 when 안에
-        // 스마트캐스트로 접는다(M4/4B-7, 두 번째이자 마지막 return).
+        // 스마트캐스트로 접는다(두 번째이자 마지막 return).
         return when (val supply = competitionSampleSupplyFor(notice, policies)) {
             is CompetitionSampleSupply.Unavailable -> {
                 absentPairForUnavailableSupply(supply)
@@ -271,7 +271,7 @@ class OpportunityAnalysis internal constructor(
     }
 
     /**
-     * M4/4B-7(D-4B7-3·9) — 대상 공고에 공종이 없으면 조회 자체를 하지 않고 표본 0건으로
+     * (D-4B7-3·9) — 대상 공고에 공종이 없으면 조회 자체를 하지 않고 표본 0건으로
      * 접는다(값을 지어내지 않는다 — 조회 축[CompetitionSampleQuery.categoryCode]이 필수라
      * 지을 값이 없다). 공종이 있으면 port로 넘긴다 — 자격 판정은 port 구현(어댑터)이
      * `SampleEligibility`를 불러 진다(D-4B7-4).
@@ -321,7 +321,7 @@ private suspend fun <T, R> Step<T>.andThen(f: suspend (T) -> Step<R>): Step<R> =
 
 /**
  * 세 파일이 공유하는 정책 스냅샷(internal) — 매 `analyze` 호출마다 한 번만 resolve 한다.
- * `provenancePolicy`는 M4/4B-8(D-4B8-5) — 대상 공고 라벨(`predictionRequestFor`)이 표본
+ * `provenancePolicy`(D-4B8-5)는 대상 공고 라벨(`predictionRequestFor`)이 표본
  * 라벨(`sampleOf`)과 같은 `SAMPLE_PROVENANCE_POLICY` singleton·같은 version을 쓴다.
  */
 internal data class ResolvedPolicies(

@@ -127,7 +127,7 @@ class ResponseMappingTest {
         ).shouldBeInstanceOf<BidPredictionOutcome.Unavailable>()
     }
 
-    // ---- verifier r1 F-2(high) — release provenance 공백 유출 회귀 방지(probe P4) ----
+    // ---- release provenance 공백 유출 회귀 방지(probe P4) ----
 
     @Test
     fun `release 성분 셋(schema code_version dataset_id)이 공백이면 ContractViolation 이다(F-2 P4a)`() {
@@ -177,7 +177,7 @@ class ResponseMappingTest {
         outcome.reason shouldBe MlUnavailableReason.UnsupportedSchema
     }
 
-    // ---- M4/4D-3(scope.md D-4D3-2, 위협 모델 우회 (1)~(5)) — 진단 fail-closed ----
+    // ---- (scope.md D-4D3-2, 위협 모델 우회 (1)~(5)) — 진단 fail-closed ----
 
     @Test
     fun `shrinkage_weight fraction 이 범위 밖 형태면 ContractViolation 이다(우회 1)`() {

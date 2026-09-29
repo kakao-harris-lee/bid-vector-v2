@@ -114,7 +114,7 @@ class ExpectedMarginDerivationTest {
         score.value.compareTo(BigDecimal("0.5445")) shouldBe 0
     }
 
-    // ---- verifier r1 F-1 — Rate 상한(≤1) 생성 불변식 ----
+    // ---- Rate 상한(≤1) 생성 불변식 ----
 
     @Test
     fun `F-1 — recommendedRate 가 1 을 넘으면 생성 실패`() {
@@ -177,7 +177,7 @@ class ExpectedMarginDerivationTest {
                 capacity = UnitScore(BigDecimal.ZERO),
             )
         // floorHeadroom = clamp01((0.7-0.9)/(1-0.9)) = clamp01(-2) = 0 · alignment = 1.0(완전 정렬)
-        // score = .7*.35 + 0*.20 + 1.0*.20 + 0*.15 + 0*.10 = .245+.20 = .445(verifier r1 F-1 표와 일치)
+        // score = .7*.35 + 0*.20 + 1.0*.20 + 0*.15 + 0*.10 = .245+.20 = .445
         val score = deriveExpectedMargin(inputs, policy)
         score.value.compareTo(BigDecimal("0.445")) shouldBe 0
     }

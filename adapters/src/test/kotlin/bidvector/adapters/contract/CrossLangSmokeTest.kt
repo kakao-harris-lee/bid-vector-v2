@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Path
 
 /**
- * M2/2D S-6 — 교차 언어 socket 스모크(D-2D-3 (a), **상시 게이트가 아니다** — `tools/
+ * 교차 언어 socket 스모크(D-2D-3 (a), **상시 게이트가 아니다** — `tools/
  * contract-crosslang-smoke.sh`가 Python 서버를 띄운 뒤 이 test class 만 골라 돈다).
  * `adapters/build.gradle.kts`의 일반 `test` task 는 이 class 를 이름으로 **제외**한다 —
  * Python 서버가 없는 보통의 `check` 실행에서는 절대 돌지 않는다.

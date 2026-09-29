@@ -120,8 +120,8 @@ def test_missing_required_key_is_rejected(tmp_path: Path) -> None:
 
 
 def test_malformed_yaml_syntax_is_rejected_not_raised(tmp_path: Path) -> None:
-    """verifier r1 H-1 — 문법이 깨진 YAML(닫히지 않은 flow sequence)은 `yaml.YAMLError`
-    를 새지 않고 `PolicyRejected`여야 한다(세 번째 재발 — training/policy.py PR #13
+    """H-1 — 문법이 깨진 YAML(닫히지 않은 flow sequence)은 `yaml.YAMLError`
+    를 새지 않고 `PolicyRejected`여야 한다(세 번째 재발 — training/policy.py
     HIGH-2·evaluation/policy.py 가 이미 같은 구멍을 막았다)."""
     path = _write(tmp_path, "max_workers: [unclosed\n")
     result = load_serving_policy(path)

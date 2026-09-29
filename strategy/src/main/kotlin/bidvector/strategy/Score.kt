@@ -29,8 +29,8 @@ data class ScoreRange(
  * 무차원 점수 값(D-1 (a), 스카우트 §7.3) — `Rate`와 다른 축이다. `Rate`가 단위 크기 추측
  * 금지(`ADR 0002` D-4)로 상한을 두지 않는 것과 달리, 점수는 정의상 `[0,1]` 구조적 경계를
  * 갖는다(백분율·소수 표기의 단위 모호성이 없다 — ML이 내는 값은 항상 fraction이다).
- * 생성자는 `internal`이고 유일한 생성 경로는 [of]다 — `of`도 `internal`이라(verifier r1
- * F-1) 이 타입은 `strategy` 모듈 밖에서 만들 수 없다. `MatchScore`·`ProbabilityScore`·
+ * 생성자는 `internal`이고 유일한 생성 경로는 [of]다 — `of`도 `internal`이라 이 타입은
+ * `strategy` 모듈 밖에서 만들 수 없다. `MatchScore`·`ProbabilityScore`·
  * `PriorityScore`가 이미 만들어진 값을 옮겨 담는 것은 여전히 공개다(값 읽기는 막지 않는다).
  */
 @ConsistentCopyVisibility
@@ -52,7 +52,7 @@ data class Score internal constructor(
          * [StrategyViolation.ScoreOutOfRange]로 번역돼 밖으로 나간다 — 재사용한 `ReasonCode`
          * 값 자체는 호출부에 노출되지 않는다.
          *
-         * `internal`이다(verifier r1 F-1) — 「밖으로 새지 않는다」가 KDoc 관례가 아니라
+         * `internal`이다 — 「밖으로 새지 않는다」가 KDoc 관례가 아니라
          * 가시성이 되게 한다. 저장소 전체 유일 호출자는 `StrategyValidation.kt`의 `validate`뿐
          * (`grep -rn "Score\.of("` 1건). 모듈 밖 호출은 컴파일 자체가 막는다
          * ([bidvector.strategy.CompileFailureHarnessTest] fixture 3).
@@ -75,7 +75,7 @@ data class MatchScore(
 )
 
 /**
- * 가격 적합도(추정) 축(D-13) — **P(낙찰)이 아니다**(M4/4B-4 scope.md ⑤, ML-03·D-M2-8).
+ * 가격 적합도(추정) 축(D-13) — **P(낙찰)이 아니다**(scope.md ⑤, ML-03·D-M2-8).
  * 이름이 「확률」이라 낙찰 확률로 읽히기 쉽지만 2E 계약(`embedding.proto` 등)에 확률
  * 축이 없어 이 타입의 **현재 소비자가 없다**(조사 §7 7(c)) — `calibrated_win_rate` 결정
  * (`OPEN-ML-02`) 뒤에 그 축이 서면 이 타입이나 후속 타입이 맡는다.

@@ -29,7 +29,7 @@ import java.time.LocalDate
 import javax.sql.DataSource
 
 /**
- * [CompetitionSamplePort] JDBC 구현(M4/4B-7, D-4B7-3·4). **`adapters.persistence`가 아니라
+ * [CompetitionSamplePort] JDBC 구현(D-4B7-3·4). **`adapters.persistence`가 아니라
  * `adapters.ml` 패키지에 둔다** — `PersistenceAdapterDependencyTest`가 `persistence` 패키지의
  * domain import를 `procurement`·`shared-kernel`로 좁게 막는데(`bidvector.decision`·
  * `bidvector.workflow` 거부), 이 클래스는 `judgeEligibility`(`decision.ProvenancePolicyData`
@@ -76,7 +76,7 @@ class JdbcCompetitionSampleSource(
         }
 
     /**
-     * verifier r1 F-3 — `candidatePair`가 `null`이면(스캔과 복원 사이 행 소실, KDoc
+     * `candidatePair`가 `null`이면(스캔과 복원 사이 행 소실, KDoc
      * 참고) `continue`로 조용히 건너뛰지 않고 `CANDIDATE_VANISHED`로 계수한다. 합계
      * 불변식 `samples.size + excluded.values.sum() == ids.size`가 이 함수 밖에서 항상
      * 성립한다(`JdbcCompetitionSampleSourceTest` 실측).
@@ -116,7 +116,7 @@ class JdbcCompetitionSampleSource(
     /**
      * notice·opening 둘 다 있어야 판정 대상이다(둘 다 기존 repository `find` 재사용).
      * `null`은 스캔(SQL)과 이 복원 사이에 행이 사라졌다는 뜻이다 — `CANDIDATE_VANISHED`로
-     * 계수된다(verifier r1 F-3, `aggregate` KDoc).
+     * 계수된다(`aggregate` KDoc).
      */
     private fun candidatePair(id: NoticeId): Pair<Notice, OpeningResult>? =
         noticeRepository.find(id)?.let { notice ->
@@ -124,8 +124,8 @@ class JdbcCompetitionSampleSource(
         }
 
     /**
-     * `Initial` 한 entry뿐이라 항상 resolve되지만, `resolve(referenceDate)`를 쓴다(verifier
-     * r1 F-2) — `.single()`은 entry가 하나 더 붙는 순간(policy-values.md가 예고한 5C/5E
+     * `Initial` 한 entry뿐이라 항상 resolve되지만, `resolve(referenceDate)`를 쓴다
+     * — `.single()`은 entry가 하나 더 붙는 순간(policy-values.md가 예고한 5C/5E
      * 갱신) `IllegalArgumentException`을 던지고 `catch(SQLException)`가 못 잡는다.
      * `error()`는 배선 방어다.
      */
@@ -184,9 +184,9 @@ class JdbcCompetitionSampleSource(
     }
 
     private companion object {
-        // M4/4B-7(D-4B7-3·4) — 다건 스캔 SELECT 첫 사례. 공종 일치(정확 일치 — D-4B7-2 우회
-        // (16) 실측: `CategoryCode.init`이 공백/대소문자를 정규화·거부하지 않는다, 팀장
-        // 지시에 따라 조회 술어에 정규화를 두지 않고 팀장에게 보고) · 대상 공고 자신 제외 ·
+        // D-4B7-3·4 — 다건 스캔 SELECT 첫 사례. 공종 일치(정확 일치 — D-4B7-2 우회
+        // (16) 실측: `CategoryCode.init`이 공백/대소문자를 정규화·거부하지 않는다 — 조회
+        // 술어에도 정규화를 두지 않는다) · 대상 공고 자신 제외 ·
         // 개찰일 창(미래 표본 누출 방지, 우회 (1))은 **개찰일 결측 행을 걸러내지 않는다** —
         // 결측 행도 초과 집합으로 후보에 오르고, 실격은 workflow `SampleEligibility`
         // (OPENING_DATE_MISSING)가 진다(D-4B7-4, 설계 검토 (5)-4). 정렬은 최신 순(우회

@@ -1,6 +1,6 @@
-"""M5/5A 게이트 — 생성 stub 은 VCS 밖이어야 하고(D-5A-0 (b)), 패키지 트리 밖이라
-`ml_engine.contracts.<하위>` 라는 Python import 경로 자체가 없어야 한다(verifier r1 F-2 —
-트리 안에 있으면 grimp 그래프에 노드로 안 잡혀 forbidden 열거가 아무것도 못 걸렀다. 열거
+"""게이트 — 생성 stub 은 VCS 밖이어야 하고(D-5A-0 (b)), 패키지 트리 밖이라
+`ml_engine.contracts.<하위>` 라는 Python import 경로 자체가 없어야 한다(F-2 —
+트리 안에 있으면 grimp 그래프에 노드로 안 잡혀 forbidden 열거가 아무것도 못 거른다. 열거
 대신 경로를 없앴다 — 우회 (8))."""
 
 from __future__ import annotations

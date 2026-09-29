@@ -9,17 +9,17 @@ import org.junit.jupiter.api.Test
  * D-3D-6). `PersistenceTestSupport` companion object의 `init` 블록이 이미 clean 컨테이너에
  * 전건 migrate를 실행했다.
  *
- * **verifier r1 F-3 뒤 개정** — 원판은 테이블·트리거 **이름 집합**만 봤다. D-3D-6이 고정한
- * 여덟 축(테이블·컬럼·타입·NOT NULL·UNIQUE·FK·트리거·CHECK)을 전부 대조한다 — verifier가
+ * **개정** — 원판은 테이블·트리거 **이름 집합**만 봤다. D-3D-6이 고정한
+ * 여덟 축(테이블·컬럼·타입·NOT NULL·UNIQUE·FK·트리거·CHECK)을 전부 대조한다 —
  * 실측한 변이(COL-06 항등식 CHECK 삭제·`NUMERIC(20,0)`→`NUMERIC(20,4)`·`notice_round` 형식
  * CHECK 삭제)가 각각 이 test들 중 하나 이상을 FAIL시킨다(수치·정밀도·CHECK 개수·CHECK
  * 본문 부분 문자열까지 본다).
  *
  * 축 2·3·4(컬럼)는 `CleanMigrationColumnTest`로, 축 7(트리거)은 `CleanMigrationTriggerTest`로,
  * 축 8(CHECK)은 `CleanMigrationCheckTest`로, 축 9(유효 권한 행렬)는
- * `CleanMigrationPrivilegeTest`로 분리했다(sizeGate 500줄 — M3/3E에서 축7·8을,
- * M4/4C-2에서 축2·3·4를, M6/6F-5-a+6F-6 병합 뒤(두 slice가 각자 정당하게 늘린 합이
- * 501줄이 되어)에서 축9를 분리).
+ * `CleanMigrationPrivilegeTest`로 분리했다(sizeGate 500줄 — 먼저 축7·8을,
+ * 다음으로 축2·3·4를, 병합 뒤(두 slice가 각자 정당하게 늘린 합이
+ * 501줄이 되어) 축9를 분리).
  */
 class CleanMigrationTest : PersistenceTestSupport() {
     // =========================================================================
@@ -36,22 +36,22 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "qualification_text",
             "collection_run",
             "flyway_schema_history",
-            // M3/3E — 스키마 스냅샷 래칫 예외(운영자 승인 2026-09-08, scope.md), 추가만.
+            // 스키마 스냅샷 래칫 예외(scope.md), 추가만.
             "opening_reserve_price",
-            // M4/4C-2 — 스키마 스냅샷 래칫 예외(D-4C2-2, 추가만). V6__outbox_inbox.sql.
+            // 스키마 스냅샷 래칫 예외(D-4C2-2, 추가만). V6__outbox_inbox.sql.
             "outbox",
             "inbox",
-            // M6/6B-1 — 스키마 스냅샷 래칫 예외(D-6B1-8, 추가만). V8__edit_session.sql.
+            // 스키마 스냅샷 래칫 예외(D-6B1-8, 추가만). V8__edit_session.sql.
             "edit_session",
-            // M6/6F-1 — 스키마 스냅샷 래칫 예외(D-6F1-1, 추가만). V9__operator_strategy.sql.
+            // 스키마 스냅샷 래칫 예외(D-6F1-1, 추가만). V9__operator_strategy.sql.
             "operator_strategy",
             "operator_strategy_revision",
-            // M6/6F-6 — 스키마 스냅샷 래칫 예외(D-6F6-3, 추가만). V12__operator_profile.sql.
+            // 스키마 스냅샷 래칫 예외(D-6F6-3, 추가만). V12__operator_profile.sql.
             "operator_profile",
-            // M6/6F-5-a — 스키마 스냅샷 래칫 예외(D-6F5-4, 추가만). V13__notice_requirement.sql.
+            // 스키마 스냅샷 래칫 예외(D-6F5-4, 추가만). V13__notice_requirement.sql.
             "notice_requirement",
             "notice_requirement_row",
-            // M6/6A-1 — 스키마 스냅샷 래칫 예외(D-6A1-7, 추가만). V15__api_audit.sql.
+            // 스키마 스냅샷 래칫 예외(D-6A1-7, 추가만). V15__api_audit.sql.
             "api_request_audit",
         )
 
@@ -87,24 +87,24 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "opening_result" to setOf("notice_number", "notice_round"),
             "qualification_text" to setOf("notice_number", "notice_round"),
             "collection_run" to setOf("id"),
-            // M3/3E — 층 B 자식 표(추가만).
+            // 층 B 자식 표(추가만).
             "opening_reserve_price" to setOf("notice_number", "notice_round", "reserve_price_sequence"),
-            // M4/4C-2 — 애플리케이션이 발급하는 TEXT PK(추가만, D-4C2-2 — 시퀀스를 만들지
+            // 애플리케이션이 발급하는 TEXT PK(추가만, D-4C2-2 — 시퀀스를 만들지
             // 않는다, V6__outbox_inbox.sql).
             "outbox" to setOf("entry_id"),
             "inbox" to setOf("idempotency_key"),
-            // M6/6B-1 — 애플리케이션이 발급하는 TEXT PK(추가만, D-6B1-8). V8__edit_session.sql.
+            // 애플리케이션이 발급하는 TEXT PK(추가만, D-6B1-8). V8__edit_session.sql.
             "edit_session" to setOf("id"),
-            // M6/6F-1 — 싱글턴 고정 키(operator_strategy)·도메인 개정 번호(operator_strategy_revision).
+            // 싱글턴 고정 키(operator_strategy)·도메인 개정 번호(operator_strategy_revision).
             // 둘 다 시퀀스를 만들지 않는다(D-6F1-5, D-6F1-1 추가만).
             "operator_strategy" to setOf("id"),
             "operator_strategy_revision" to setOf("revision"),
-            // M6/6F-6 — 싱글턴 고정 키(D-6F6-3, 추가만). V12__operator_profile.sql.
+            // 싱글턴 고정 키(D-6F6-3, 추가만). V12__operator_profile.sql.
             "operator_profile" to setOf("id"),
-            // M6/6F-5-a — 헤더는 공고 복합키, 행은 그 위에 자연 키(serialNo)를 더한다(D-6F5-4).
+            // 헤더는 공고 복합키, 행은 그 위에 자연 키(serialNo)를 더한다(D-6F5-4).
             "notice_requirement" to setOf("notice_number", "notice_round"),
             "notice_requirement_row" to setOf("notice_number", "notice_round", "serial_no"),
-            // M6/6A-1 — 애플리케이션이 발급하지 않는다(GENERATED ALWAYS AS IDENTITY, D-6A1-7).
+            // 애플리케이션이 발급하지 않는다(GENERATED ALWAYS AS IDENTITY, D-6A1-7).
             "api_request_audit" to setOf("id"),
         )
 
@@ -146,7 +146,7 @@ class CleanMigrationTest : PersistenceTestSupport() {
             FkSpec("notice", "observation_key", "raw_observation", "observation_key"),
             FkSpec("opening_result", "observation_key", "raw_observation", "observation_key"),
             FkSpec("qualification_text", "observation_key", "raw_observation", "observation_key"),
-            // M3/3E — 층 B 자식 표(추가만).
+            // 층 B 자식 표(추가만).
             FkSpec("opening_reserve_price", "observation_key", "raw_observation", "observation_key"),
             // 복합(2컬럼) FK는 이 질의(constraint_name join만, 컬럼 순서 미보존)에서 cross
             // product 4행으로 관측된다(실측, PostgreSQL 알려진 특성 — 스키마 결함이 아니다).
@@ -154,7 +154,7 @@ class CleanMigrationTest : PersistenceTestSupport() {
             FkSpec("opening_reserve_price", "notice_number", "opening_result", "notice_round"),
             FkSpec("opening_reserve_price", "notice_round", "opening_result", "notice_number"),
             FkSpec("opening_reserve_price", "notice_round", "opening_result", "notice_round"),
-            // M6/6F-5-a — 행 표가 헤더 표를 참조한다(D-6F5-4, ON DELETE CASCADE).
+            // 행 표가 헤더 표를 참조한다(D-6F5-4, ON DELETE CASCADE).
             // 복합(2컬럼) FK라 같은 cross product 넷이 나온다(위 opening_reserve_price와 같은 이유).
             FkSpec("notice_requirement_row", "notice_number", "notice_requirement", "notice_number"),
             FkSpec("notice_requirement_row", "notice_number", "notice_requirement", "notice_round"),
@@ -194,7 +194,7 @@ class CleanMigrationTest : PersistenceTestSupport() {
     }
 
     // 축 7(트리거)은 `CleanMigrationTriggerTest`로, 축 8(CHECK)은 `CleanMigrationCheckTest`로
-    // 분리했다(sizeGate 500줄, M3/3E에서 재분리).
+    // 분리했다(sizeGate 500줄, 재분리).
 
     @Test
     fun `flyway validate 가 통과한다 — migration 이력과 파일이 어긋나지 않는다`() {

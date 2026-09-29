@@ -16,7 +16,7 @@ dependencies {
     testImplementation(libs.kotlin.compilerEmbeddable)
 }
 
-// kotest-property 시드 고정(verifier r1 L-6) — 이 모듈은 kotest 의 JUnit5 러너를 붙이지
+// kotest-property 시드 고정 — 이 모듈은 kotest 의 JUnit5 러너를 붙이지
 // 않으므로(순수 junit-jupiter + kotest-property, 위 dependencies 주석 참고)
 // `AbstractProjectConfig` 자동탐지가 적용되지 않는다. 시스템 property
 // `kotest.proptest.default.seed` 가 시드를 거는 유일한 전역 지점이다 — 미고정 시 property

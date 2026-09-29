@@ -1,4 +1,4 @@
-"""M5/5C-1 — 모듈 캐시 격리. 5A `tests/gates/test_serving_purity.py`는 `sys.modules`를
+"""모듈 캐시 격리. 5A `tests/gates/test_serving_purity.py`는 `sys.modules`를
 전역으로 관측해 `serving`이 금지 모듈을 끌어들이지 않았는지 확인한다(5A 소유 파일,
 편집하지 않는다). `pytest tests -q`로 전체 스위트를 한 프로세스에서 돌리면 이 디렉터리의
 test 가 남긴 `ml_engine.adapters` 캐시가 그 관측을 오염시킬 수 있다 — 이 test 가 끝날 때마다

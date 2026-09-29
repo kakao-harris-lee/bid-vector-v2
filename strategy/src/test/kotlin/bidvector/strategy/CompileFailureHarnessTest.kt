@@ -23,9 +23,9 @@ import java.nio.file.Files
  * 넣으면 basis 교차 대입이라 컴파일되지 않는다.
  * fixture 2 — `WatchSubject.keywordText`는 `KeywordScopeText`만 받는다(STR-02, D-5).
  * `FullScopeText` 값을 그 자리에 넣으면 컴파일되지 않는다(위협 모델 (d) — 선택을
- * 명시하는 서명까지만 강제한다, 값의 정직성은 어댑터 책임). **D-6F4W-7 이관** — 두
- * 조각(`FullScopeText`·`KeywordScopeText`)의 원문 구성을 리터럴 생성자 대신
- * `assembleFullScopeText`/`assembleKeywordScopeText`로 바꿨다 — 생성자 폐쇄 뒤에도 이
+ * 명시하는 서명까지만 강제한다, 값의 정직성은 어댑터 책임). 두
+ * 조각(`FullScopeText`·`KeywordScopeText`)의 원문 구성은 리터럴 생성자가 아니라
+ * `assembleFullScopeText`/`assembleKeywordScopeText`를 거친다(D-6F4W-7) — 생성자 폐쇄 뒤에도 이
  * fixture 는 여전히 **타입 교차 대입 거부**(fixture 2 고유 명제)만 재고, 생성 경계
  * 폐쇄는 fixture 4~7 이 별도로 잰다(D-6F4W-11 조건 3 — 부호를 기계적으로 뒤집지 않는다).
  * fixture 4 — `KeywordScopeText`는 모듈 밖에서 직접 생성할 수 없다(D-6F4W-7, private
@@ -65,7 +65,7 @@ class CompileFailureHarnessTest {
     }
 
     /**
-     * verifier r1 F-1 — `Score.of`는 `internal`이라 모듈 밖에서 못 부르고(`strategy` 저장소
+     * `Score.of`는 `internal`이라 모듈 밖에서 못 부르고(`strategy` 저장소
      * 전체 유일 호출자는 `StrategyValidation.kt`), 이미 만들어진 `Score`를 옮겨 담는
      * `MatchScore`의 값 읽기와 `ScoreRange`의 생성·`contains`는 여전히 공개다.
      */

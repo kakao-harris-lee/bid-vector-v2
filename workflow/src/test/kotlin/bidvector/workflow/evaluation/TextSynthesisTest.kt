@@ -68,7 +68,7 @@ class TextSynthesisTest {
      * 공백뿐인 비지 않은 문자열을 **낼 수 없다** — 조각이 없으면 `""`, 있으면 반드시 비공백
      * 문자를 포함한다. 그 상태는 production 도달 불가능이라 ⓑ로 처분한다 — 가장 가까운
      * 도달 가능한 값(완전히 빈 문자열)으로 대체한다. 「절단 뒤 공백만 남는」 축은 바로 아래
-     * `verifier F-1` test 가 이미 재고 있어 커버가 비지 않는다.
+     * test 가 이미 재고 있어 커버가 비지 않는다.
      */
     @Test
     fun `NOTICE 빈 subject 는 SynthesisOutcome Empty`() {

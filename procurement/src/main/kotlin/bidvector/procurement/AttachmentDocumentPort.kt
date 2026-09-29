@@ -5,7 +5,7 @@ import java.time.Instant
 import java.util.Objects
 
 /**
- * 공고 첨부문서 URL(M3/3C ①) — **3A 필드 계약 등재 키에서만** 만들어지는 값이다. 유일한
+ * 공고 첨부문서 URL — **3A 필드 계약 등재 키에서만** 만들어지는 값이다. 유일한
  * 생성 경로는 [from]이고, 그 서명이 [KonepsFieldContract]를 요구한다 — 그 타입의 생성자·
  * `of()` 팩토리가 이미 procurement 밖에서 `internal`로 닫혀 있으므로(`FieldContract.kt`
  * F-4/N-1), 이 함수를 호출하는 쪽(adapters)은 procurement 가 이미 발급한 계약 인스턴스를
@@ -90,7 +90,7 @@ sealed interface FetchOutcome {
 }
 
 /**
- * 첨부문서 취득 port(M3/3C ①) — **도메인 소유 인터페이스**(ADR 0005 D-10.1). 구현은
+ * 첨부문서 취득 port — **도메인 소유 인터페이스**(ADR 0005 D-10.1). 구현은
  * 3C 어댑터(`HttpAttachmentDocumentSource`)가 한다. 3A `DocumentSourcePort`
  * (`fetchQualificationText`)는 KONEPS 자격 원문 서브콜(3B-2)이라 이 port 와 다르다
  * (착수 시 정정 ①).

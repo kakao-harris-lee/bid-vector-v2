@@ -45,12 +45,12 @@ import java.time.Duration
 import java.time.Instant
 
 /*
- * M4/4A — `strategy-edit` case → executor(D-4A-1 (a)). 신설 fixture 다섯이 편집 상태
+ * `strategy-edit` case → executor(D-4A-1 (a)). 신설 fixture 다섯이 편집 상태
  * 기계(`bidvector.workflow.strategy`)를 실제 domain 계약과 대조한다.
  * `StrategyExecutors.kt`(1E strategy-watch/strategy-validation)와 같은 관심사 분리 —
  * 이 파일은 편집 세션 축만 갖고, 다른 파일의 private helper 를 참조하지 않는다(관례).
  *
- * **verifier H-3/M-4 수정 — `EditStrategyWorkflow` 경유.** `beginSession`·`apply`가
+ * **`EditStrategyWorkflow` 경유.** `beginSession`·`apply`가
  * `internal`로 내려가면서(우회 (3) 구조적 폐쇄) 이 파일이 커널을 직접 부르던 이전 형태가
  * 컴파일되지 않게 됐다. 지금은 이 파일 안의 fake port 넷(`FakeSessionRepository`·
  * `FakeStrategyRepository`·고정 `Clock`·`RecordingEventSink`)으로 `EditStrategyWorkflow`
@@ -81,10 +81,10 @@ private class FakeStrategyRepository(
 }
 
 /**
- * D-6B1-7(계약 갱신 (2), M6/6B-1) — `EditSessionRepository.load`가 원시 스냅숏을
+ * D-6B1-7(계약 갱신 (2)) — `EditSessionRepository.load`가 원시 스냅숏을
  * 반환하도록 좁게 바뀌면서 이 fake 도 함께 바뀐다(계약이 명시한 곳은 `workflow` test
- * fake이지만, port 시그니처 변경은 이 구현체에도 기계적으로 번진다 — M4/4C-1
- * `OutboxPort` 개정 때도 같은 파급이 있었다). 저장은 여전히 [EditSession]으로,
+ * fake이지만, port 시그니처 변경은 이 구현체에도 기계적으로 번진다 — `OutboxPort`
+ * 개정 때도 같은 파급이 있었다). 저장은 여전히 [EditSession]으로,
  * 반환 시점에만 [EditSession.toSnapshot]으로 내린다 — 단언·시나리오는 무편집.
  */
 private class FakeSessionRepository : EditSessionRepository {
@@ -97,7 +97,7 @@ private class FakeSessionRepository : EditSessionRepository {
     }
 }
 
-/** M4/4C-1 좁은 예외(`EventSink.publish(event, actor)`) 배선 — corpus 는 actor 를 투영하지 않는다(범위 밖). */
+/** 좁은 예외(`EventSink.publish(event, actor)`) 배선 — corpus 는 actor 를 투영하지 않는다(범위 밖). */
 private class RecordingEventSink : EventSink {
     val published = mutableListOf<StrategyEvent>()
 
@@ -238,7 +238,7 @@ private fun editableFieldName(field: EditableField): String =
 
         EditableField.CandidateLimit -> "CandidateLimit"
 
-        // M6/6A-2b — corpus 에 이 필드를 쓰는 case 는 없다(어휘 추가만 반영한다).
+        // corpus 에 이 필드를 쓰는 case 는 없다(어휘 추가만 반영한다).
         EditableField.MaxActiveBids -> "MaxActiveBids"
     }
 

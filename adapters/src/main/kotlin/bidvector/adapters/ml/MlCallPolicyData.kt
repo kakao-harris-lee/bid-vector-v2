@@ -44,10 +44,10 @@ data class MlCallPolicyData(
 }
 
 /**
- * 운영 정책 인스턴스(D-4D-7) — **사용자 승인 2026-09-10으로 확정됐다**(`policy-values.md`
- * §1~§3). 착수 시(2026-09-10)에는 구조 검증용 placeholder였으나(근거는 실측이 아니라 3C
+ * 운영 정책 인스턴스(D-4D-7) — **사용자 승인으로 확정됐다**(`policy-values.md`
+ * §1~§3). 착수 시에는 구조 검증용 placeholder였으나(근거는 실측이 아니라 3C
  * `EXTRACTION_POLICY`와 2D `retry.sample.max-attempts=3`의 보수적 상한, ADR 0010 D-1
- * 「보수적 상한 + 측정 의무」), slice 4D-1 종결 승인과 함께 이 값 자체가 승인됐다
+ * 「보수적 상한 + 측정 의무」), 이 값 자체가 승인됐다
  * (`OPEN-4D-POLICY-VALUES` 종결). 정본은 `reports/evidence/m4/4d/policy-values.md §1~§3`
  * — 값을 바꾸려면 그 문서를 먼저 갱신한다(정본이 코드가 아니라 문서다, 3A
  * `KONEPS_COLLECTION_POLICY`·4E `NOTIFICATION_DELIVERY_POLICY` 관례). **실측 갱신
@@ -68,7 +68,7 @@ val ML_CALL_POLICY: EffectiveDatedPolicy<MlCallPolicyData> =
 
 /**
  * 두 gateway(`GrpcBidPredictionGateway`·`GrpcEmbeddingGateway`)의 `resolvePolicy()`가
- * 공유하는 결과 운반체 — 리뷰 F-E(medium) 처방으로 `ResolvedMlCallPolicy`/
+ * 공유하는 결과 운반체 — `ResolvedMlCallPolicy`/
  * `ResolvedEmbeddingCallPolicy` 두 벌(형태 완전 동일, 이름만 다름)을 하나로 합쳤다.
  */
 internal data class ResolvedMlCallPolicy(
@@ -77,10 +77,10 @@ internal data class ResolvedMlCallPolicy(
 )
 
 /**
- * 리뷰 F-E(medium) 처방 — 두 gateway의 `resolvePolicy()`가 각자 갖던 17줄(정책 이름
+ * 두 gateway의 `resolvePolicy()`가 각자 갖던 17줄(정책 이름
  * 문자열만 다름)을 여기 하나로 합쳤다. `Resolution.NotApplicable` 가지의 `error(...)`는
- * scope.md ④ 「예외가 이 클래스 밖으로 새지 않는다」의 대상이 아니다(verifier r1
- * F-10(low) 관례 — 배선 설정 오류의 fail-fast 방어이지 ML 호출의 업무 실패가 아니다).
+ * scope.md ④ 「예외가 이 클래스 밖으로 새지 않는다」의 대상이 아니다(관례 — 배선 설정
+ * 오류의 fail-fast 방어이지 ML 호출의 업무 실패가 아니다).
  */
 internal fun resolveMlCallPolicy(
     policy: EffectiveDatedPolicy<MlCallPolicyData>,

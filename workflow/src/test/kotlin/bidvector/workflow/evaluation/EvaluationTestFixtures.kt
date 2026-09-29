@@ -62,8 +62,8 @@ internal fun strategyPolicy(): Resolution.Resolved<StrategyPolicyData> =
 
 /**
  * 감시 카테고리 하나 + 사다리 임계만 설정된 기본 전략 — 개별 test가 draft를 바꿔
- * 재구성한다. **감시 규칙을 반드시 하나 둔다**(수정 라운드 1 M-1 — `NoGate`가 이제
- * 통과가 아니므로, 다른 단계를 재는 test는 감시 게이트를 먼저 통과해야 한다).
+ * 재구성한다. **감시 규칙을 반드시 하나 둔다** — `NoGate`가
+ * 통과가 아니므로, 다른 단계를 재는 test는 감시 게이트를 먼저 통과해야 한다.
  * `MATCHING_SUBJECT`가 이 카테고리와 일치해 `Passed`를 낸다.
  */
 internal fun testStrategy(
@@ -239,7 +239,7 @@ internal class SequentialCorrelationIdFactory : CorrelationIdFactory {
 
 /**
  * 항상 확정 BidNow를 내는 ML 분석 — priority가 bidNowThreshold(0.7) 이상. `evidence`는
- * M4/4D-4(D-4D4-2) — 이 fixture는 예측 자체를 재지 않는 test가 쓰므로 `NotPredicted`
+ * (D-4D4-2) — 이 fixture는 예측 자체를 재지 않는 test가 쓰므로 `NotPredicted`
  * 고정값을 싣는다(예측 경로 test는 `OpportunityAnalysisFixtures.predicted()`를 쓴다).
  */
 internal fun bidNowAnalysis(): MlAnalysisOutcome =
@@ -250,14 +250,14 @@ internal fun bidNowAnalysis(): MlAnalysisOutcome =
         evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
     )
 
-/** M4/4B-3 scope.md ① — ML 미가용 값(기본 사유 `ScoreNotProvided`, 항상-미가용 배선 관례). */
+/** (scope.md ①) — ML 미가용 값(기본 사유 `ScoreNotProvided`, 항상-미가용 배선 관례). */
 internal fun unavailableAnalysis(
     reason: MlUnavailableReason = MlUnavailableReason.ScoreNotProvided,
 ): MlAnalysisOutcome = MlAnalysisOutcome.Unavailable(reason)
 
 /**
- * [EvaluateCandidatesUseCase]의 `judge` 위임을 감싸 호출 횟수를 센다(verifier r1 L-1
- * — `VerdictLadder`는 `object`라 fake로 대체할 수 없어 얇은 위임 뒤에서 센다).
+ * [EvaluateCandidatesUseCase]의 `judge` 위임을 감싸 호출 횟수를 센다
+ * — `VerdictLadder`는 `object`라 fake로 대체할 수 없어 얇은 위임 뒤에서 센다.
  */
 internal class CountingJudge {
     val callCountFor = mutableMapOf<NoticeId, AtomicInteger>()

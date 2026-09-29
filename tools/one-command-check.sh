@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M6/6C — 완료 조건 1(milestone-6.md 「새 checkout/clean database 에서 one-command
+# 완료 조건 1(milestone-6.md 「새 checkout/clean database 에서 one-command
 # build/test 가능」). Kotlin 전건 + Python 전건을 **한 명령**으로 순차 실행한다.
 #
 # 내부 명령은 `.github/workflows/ci.yml` 의 두 job(`check`·`ml-engine`)이 돌리는 명령
@@ -24,7 +24,7 @@ _step() {
 _step "Kotlin — ./gradlew --no-daemon check"
 ./gradlew --no-daemon check
 
-# F-6(D-6C-9, verifier r1 MEDIUM) — ci.yml 의 `check` job 은 이 step 도 돈다(OPEN-ADR-06
+# F-6(D-6C-9, MEDIUM) — ci.yml 의 `check` job 은 이 step 도 돈다(OPEN-ADR-06
 # 측정 입력). 머리 주석의 "CI 전용 step 만 뺀다"는 체크아웃·툴체인 설치·아티팩트 업로드
 # 셋을 가리키고 이 step 은 그 셋이 아니다 — 뺐던 것이 축어 불일치였다.
 _step "Kotlin — ./gradlew --no-daemon qualityBaseline"

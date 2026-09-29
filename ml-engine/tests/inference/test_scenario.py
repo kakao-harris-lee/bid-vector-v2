@@ -29,7 +29,7 @@ def policy() -> InferencePolicy:
 
 
 def test_candidates_have_fixed_order_and_labels(policy: InferencePolicy) -> None:
-    """M5/5F-1 계약 갱신 (2) — `center=0.9`(이전엔 `1.0`). `scenario.clamp_max` 가
+    """계약 갱신 (2) — `center=0.9`. `scenario.clamp_max` 가
     `1.0`으로 내려간 뒤(D-5F1-1) `center=1.0`은 `aggressive`를 상한에 접어 이
     test 의 엄격 부등식 전제(순서만 확인, clamp 자체는 아래 `test_clamp_band_
     applied`·`test_center_at_or_above_clamp_max_folds_base_and_aggressive_but_
@@ -58,9 +58,9 @@ def test_bid_rate_is_decimal_with_scale_preserved(policy: InferencePolicy) -> No
 @pytest.mark.legacy_parity
 def test_matches_legacy_scenario_bid_rates_formula(policy: InferencePolicy) -> None:
     """legacy `scenario_bid_rates` — `clamp(scale*(center + sign*z*std))`(회귀 관측,
-    판정 근거 아님 — S-8 관측 전용, verifier r1 L-4). `center=0.9`(M5/5F-1 계약
-    갱신 (2), 이전엔 `1.0` — clamp_max 1.0 하에서 `aggressive` 기대값(clamp 미고려
-    raw 산식)이 실제 clamp 된 값과 어긋났다). 이 test 의 관심은 clamp 미적용
+    판정 근거 아님 — S-8 관측 전용, L-4). `center=0.9`(계약
+    갱신 (2) — clamp_max 1.0 하에서 `aggressive` 기대값(clamp 미고려
+    raw 산식)이 실제 clamp 된 값과 어긋난다). 이 test 의 관심은 clamp 미적용
     구간에서의 산식 일치이므로 clamp 상한을 안 건드리는 값으로 옮긴다."""
     center, std, scale = 0.9, 0.03, 1.0
     z = float(policy.scenario_z)
@@ -89,7 +89,7 @@ def test_clamp_band_applied(policy: InferencePolicy) -> None:
 def test_center_at_or_above_clamp_max_folds_base_and_aggressive_but_keeps_three_candidates(
     policy: InferencePolicy, center: float
 ) -> None:
-    """D-5F1-5(M5/5F-1 계약 갱신 (2)) — `scenario.clamp_max` 를 `1.0`으로 내린 뒤
+    """D-5F1-5(계약 갱신 (2)) — `scenario.clamp_max` 를 `1.0`으로 내린 뒤
     `center >= clamp_max`인 입력(경계 `1.0`과 그 너머 `1.05` 둘 다)에서 `base`
     (sign 0)와 `aggressive`(sign +1, std>0)가 똑같이 상한으로 접혀 같은 값이 된다
     (`conservative`는 sign -1 이라 상한 밑에 남는다). 이것은 엔진 결함이 아니다 —
@@ -138,10 +138,10 @@ def test_zero_std_does_not_reject_but_produces_equal_candidates(
 
 
 def test_quantize_rounds_half_up_not_half_even(policy: InferencePolicy) -> None:
-    """D-5D-10(verifier r1 L-1) — `center=0.87465`(BASE 후보, sign=0 이라 std 무관)는
+    """D-5D-10(L-1) — `center=0.87465`(BASE 후보, sign=0 이라 std 무관)는
     `Decimal("0.87465")`(경계 변환 `Decimal(str(x))`가 만드는 정확한 십진 표현)에서
-    정확히 다섯째 자리 5 인 동점이다. `ROUND_HALF_UP`은 `0.8747`, 이전 판
-    `ROUND_HALF_EVEN`(banker's rounding)은 `0.8746`을 냈다 — D-5D-10 이 전자로 고정한다.
+    정확히 다섯째 자리 5 인 동점이다. `ROUND_HALF_UP`은 `0.8747`,
+    `ROUND_HALF_EVEN`(banker's rounding)이면 `0.8746`이 난다 — D-5D-10 이 전자로 고정한다.
     **의도된 갈림**: legacy `round(rate, 4)`(Python 내장, 이진 float 값 기준)는 이
     특정 값에서 별개 이유(0.87465 의 실제 이진 표현이 근소하게 0.87465 보다 크다)로
     `0.8747`을 내지만, 그 일치가 「같은 규칙이다」를 뜻하지 않는다 — legacy 출력은

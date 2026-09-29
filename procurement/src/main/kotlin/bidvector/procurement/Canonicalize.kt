@@ -27,21 +27,21 @@ data class NoticeCollected(
     val openingScheduledAt: Instant?,
     val raw: RawNoticeObservation,
     /**
-     * 수요기관(D-3H-3, M3/3H-1) — 기본값 `null`이라 이 slice 밖 호출부(workflow·ml 어댑터
+     * 수요기관(D-3H-3) — 기본값 `null`이라 이 slice 밖 호출부(workflow·ml 어댑터
      * test 등)는 수정 없이 그대로 컴파일된다(scope.md 우회 (6) — `agencyId = null` 두 자리
      * 불변).
      */
     val demandAgency: Agency? = null,
-    /** 공고기관(D-3H-3, M3/3H-1) — [demandAgency]와 다른 축, 기본값 `null`(위와 같은 이유). */
+    /** 공고기관(D-3H-3) — [demandAgency]와 다른 축, 기본값 `null`(위와 같은 이유). */
     val noticeAgency: Agency? = null,
     /**
-     * 공고명(D-6F4-9, M6/6F-4) — 기본값 `null`(위 발주기관 둘과 같은 이유, 이 slice 밖
+     * 공고명(D-6F4-9) — 기본값 `null`(위 발주기관 둘과 같은 이유, 이 slice 밖
      * 호출부는 수정 없이 그대로 컴파일된다). 값은 `canonicalize` 가 `NOTICE_TITLE` 필드
-     * 계약에서 채운다(D-6F8-2, M6/6F-8).
+     * 계약에서 채운다(D-6F8-2).
      */
     val title: NoticeTitle? = null,
     /**
-     * 업무 대분류(D-6F9-1, M6/6F-9) — 응답 필드가 아니라 관측이 나르는 **수집 오퍼레이션 값**을 그대로 옮긴다
+     * 업무 대분류(D-6F9-1) — 응답 필드가 아니라 관측이 나르는 **수집 오퍼레이션 값**을 그대로 옮긴다
      * ([RawNoticeObservation.sourceDivision]). 응답의 `bsnsDivNm` 은 소비하지 않는다(P-7 — 축을 접지 않는다).
      * 기본값 `null`(위 슬롯들과 같은 이유).
      */
@@ -118,7 +118,7 @@ private fun resolvedNoticeId(
     }
 }
 
-/** 통화·과세는 계약에서 읽는다(verifier r1 F-2) — 리터럴로 짓지 않는다. */
+/** 통화·과세는 계약에서 읽는다 — 리터럴로 짓지 않는다. */
 private fun baseAmountAsResolved(outcome: AmountResolutionOutcome): ResolvedBaseAmount? {
     if (outcome !is AmountResolutionOutcome.Resolved) return null
     val currency = currencyFor(outcome.unit)

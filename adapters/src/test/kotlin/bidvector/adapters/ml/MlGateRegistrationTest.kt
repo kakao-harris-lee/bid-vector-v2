@@ -6,12 +6,12 @@ import java.io.File
 import java.util.Properties
 
 /**
- * verifier r3 H-2(medium) — `gateExecutionGate`(build-logic)는 **등재된** test class 가
+ * `gateExecutionGate`(build-logic)는 **등재된** test class 가
  * 실제로 도는지 잰다(반대 방향은 못 잰다). 이 test 는 반대축이다 — `adapters/ml` 패키지의
  * **모든** `*Test` class 가 `gate.tests.adapters`(`config/quality/gate-tests.properties`)에
  * 등재돼 있는지, 소스 디렉터리 스캔과 properties 파싱을 직접 대조해 잰다. 등재가 빠지면
  * 그 class 가 아무리 회귀를 잘 막아도 게이트 밖이라 삭제·비활성화돼도 `check`가 초록이다
- * (r3 실측: 신설 class 의 `@Test` 여섯을 전부 `@Disabled` 로 만들어도 `gateExecutionGate`
+ * (실측: 신설 class 의 `@Test` 여섯을 전부 `@Disabled` 로 만들어도 `gateExecutionGate`
  * 가 초록이었다). 자기 자신(`MlGateRegistrationTest`)도 대상이라 이 test 스스로 등재
  * 여부를 보증한다 — evidence 자기검사가 아니라 산출물 게이트의 완전성 test 다.
  */

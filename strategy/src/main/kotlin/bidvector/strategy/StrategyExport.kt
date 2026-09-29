@@ -1,7 +1,7 @@
 package bidvector.strategy
 
 /**
- * 현재 전략을 다시 편집 가능한 원시 초안으로 내보낸다(M6/6A-2b D-6A2b-2) — 필드 하나만
+ * 현재 전략을 다시 편집 가능한 원시 초안으로 내보낸다(D-6A2b-2) — 필드 하나만
  * 바꾸는 편집(`EditCommand.ProvideValue`가 **전체** [StrategyDraft]를 요구한다)이 나머지
  * 필드를 지어내지 않고 현재 값 그대로 실어 보내려면 이 방향이 필요하다.
  *

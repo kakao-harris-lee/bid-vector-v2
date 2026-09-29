@@ -1,7 +1,7 @@
 package bidvector.adapters.persistence
 
 /**
- * SQL 문자열 상수 — mapper 함수와 분리한다(3D 설계 검토 「구현 지침」, sizeGate 500).
+ * SQL 문자열 상수 — mapper 함수와 분리한다(설계 검토 「구현 지침」, sizeGate 500).
  * `notice`는 DB constraint(V2)와 별개로 **Kotlin write 규칙이 같은 데이터
  * (`bidvector.procurement.mayOverwrite`)로 미리 거른다** — 여기 SQL은 그 결과값을 그대로
  * SET하는 평범한 UPDATE다. `opening_result`·`qualification_text`는 provenance 점유 가드가
@@ -10,8 +10,8 @@ package bidvector.adapters.persistence
  * 왕복 한 번에 안다(PostgreSQL 관용구: 이 문이 실제로 삽입한 행은 `xmax`가 0이다).
  *
  * `bidvector.adapters.event.EventSql`이 outbox·inbox SQL을 이 object 밖에 두는 것과 같은
- * 이유로, M6/6F-5-a의 자격 요건 SQL도 `bidvector.adapters.qualification.RequirementSql`에
- * 있다(M6/6F-5-a+6F-6 병합 뒤 두 slice가 각자 정당하게 더한 상수의 합이 타입 멤버 31개가
+ * 이유로, 6F-5-a의 자격 요건 SQL도 `bidvector.adapters.qualification.RequirementSql`에
+ * 있다(6F-5-a+6F-6 병합 뒤 두 slice가 각자 정당하게 더한 상수의 합이 타입 멤버 31개가
  * 되어(OPEN-ADR-06 (a), 30개 한도) 6F-5-a 몫을 떼어냈다 — 각자는 한도 안이었다).
  */
 internal object Sql {
@@ -41,7 +41,7 @@ internal object Sql {
     const val SELECT_NOTICE = "SELECT $NOTICE_COLUMNS FROM notice WHERE notice_number = ? AND notice_round = ?"
 
     /**
-     * 후보 다건 스캔(M6/6F-2, D-6F2-2~5) — 상태 집합은 `= ANY(?)`로 바인딩한다(호출부가
+     * 후보 다건 스캔(D-6F2-2~5) — 상태 집합은 `= ANY(?)`로 바인딩한다(호출부가
      * `bidvector.adapters.evaluation.biddableStatuses()`로 도메인 술어에서 기계 산출한
      * 값을 넘긴다 — 여기 상태 리터럴을 적지 않는다). `deadline_at > ?`는 반개구간(D-6F2-3,
      * `?`는 주입된 `Clock.now()` — DB `now()`를 쓰지 않는다). `LIMIT ?`는 호출부가
@@ -95,12 +95,12 @@ internal object Sql {
         VALUES (?, ?, ?, ?, ?::jsonb)
         """
 
-    // M3/3E ③ — §1.9.7 실측 정정으로 예정가격·기초금액·총예가건수·실개찰일시가 공고 층(부모)
+    // ③ — §1.9.7 실측 정정으로 예정가격·기초금액·총예가건수·실개찰일시가 공고 층(부모)
     // 컬럼으로 붙는다(층 C, 추가만). final_award_amount·planned_price는 AwardAmount·
-    // YegaAmount(vatTreatment 항상 UNKNOWN 고정)라 vat 컬럼이 없다. verifier r1 H-1 뒤
-    // (V5) — 세 금액 축에 provenance(kind+detail) 컬럼을 더해 notice 관례를 따른다(왕복
+    // YegaAmount(vatTreatment 항상 UNKNOWN 고정)라 vat 컬럼이 없다. (V5) — 세 금액 축에
+    // provenance(kind+detail) 컬럼을 더해 notice 관례를 따른다(왕복
     // 시 값을 지어내지 않는다).
-    // M3/3F — 개찰완료 축 부모 슬롯(층 C, 추가만). opening_rank_one_* 는 OpeningRankOneOutcome,
+    // 개찰완료 축 부모 슬롯(층 C, 추가만). opening_rank_one_* 는 OpeningRankOneOutcome,
     // draw_numbers_* 는 DrawNumberObservation 을 그대로 편다(D-3F-4 (a)).
     private const val OPENING_RESULT_COLUMNS =
         """
@@ -159,7 +159,7 @@ internal object Sql {
             ?, 1, ?
         )
         ON CONFLICT (notice_number, notice_round) DO UPDATE SET
-            -- M-c(verifier r2) — COALESCE로 NULL 유입이 기존 값을 지우지 않게 한다(설계
+            -- COALESCE로 NULL 유입이 기존 값을 지우지 않게 한다(설계
             -- 검토 ④ 「비었으면 지우지 않는다」). winningRate만 실은 더 늦은 관측이 오면
             -- derivedBaseAmount 세 컬럼은 EXCLUDED에서 전부 NULL인데, COALESCE 없이 그대로
             -- SET하면 기존 값을 지워 존재 가드가 항목을 통째로 실패시켰다(부분 관측이
@@ -204,7 +204,7 @@ internal object Sql {
             total_reserve_price_candidate_count = COALESCE(
                 EXCLUDED.total_reserve_price_candidate_count, opening_result.total_reserve_price_candidate_count),
             actual_opening_at = COALESCE(EXCLUDED.actual_opening_at, opening_result.actual_opening_at),
-            -- verifier r1 F-1 — 컬럼별 COALESCE 는 opening_rank_one 축(kind + 동반 값 다섯)의
+            -- 컬럼별 COALESCE 는 opening_rank_one 축(kind + 동반 값 다섯)의
             -- 짝을 깨뜨린다: kind 만 새 값으로 덮이고 동반 컬럼(예: bidderName)이 옛 값으로
             -- 남으면 V5 페어 CHECK 를 위반한다(RankMissing 인데 bidderName 이 이전 Determined
             -- 것으로 남는 경우 등). 그래서 **축 전체를 한 CASE 조건으로 갱신**한다 —
@@ -256,10 +256,10 @@ internal object Sql {
         RETURNING (xmax = 0) AS inserted, revision
         """
 
-    // M3/3E ⑤⑥ — 복수예비가격 후보 자식 표(층 B, D-3E-2 (a)). 「최신 관측 우선」이라
+    // ⑤⑥ — 복수예비가격 후보 자식 표(층 B, D-3E-2 (a)). 「최신 관측 우선」이라
     // opening_result와 같은 COALESCE 관례를 쓴다 — 부모 upsert가 자식을 조용히 덮지 않도록
     // 별도 문으로 갈랐다(한 항목 트랜잭션 안에서 반복 실행, JdbcOpeningResultRepository).
-    // verifier r1 H-2 뒤 — observed_at을 더 골라 D-3E-3 (a)의 「관측 시각으로 구분한다」가
+    // observed_at을 더 골라 D-3E-3 (a)의 「관측 시각으로 구분한다」가
     // 읽기 경로에도 서게 한다(15→12 재수집 뒤 낡은 행을 소비자가 판별할 수 있어야 한다).
     const val SELECT_OPENING_RESERVE_PRICES =
         """
@@ -307,7 +307,7 @@ internal object Sql {
         RETURNING (xmax = 0) AS inserted, revision
         """
 
-    // M6/6F-1 — 전략 영속(D-6F1-1). `operator_strategy`는 싱글턴(id=1, 리터럴), `revision`이
+    // 전략 영속(D-6F1-1). `operator_strategy`는 싱글턴(id=1, 리터럴), `revision`이
     // 두 표 모두 플레이스홀더 순서의 첫 자리다(`StrategyRow.bindStrategyRow`가 그 순서로
     // 채운다 — 표 둘이 한 바인더를 공유한다).
     private const val STRATEGY_COLUMNS =
@@ -365,7 +365,7 @@ internal object Sql {
         )
         """
 
-    // M6/6F-6 — 프로필 영속(D-6F6-1~3). 싱글턴(id=1, operator_strategy 와 같은 관례).
+    // 프로필 영속(D-6F6-1~3). 싱글턴(id=1, operator_strategy 와 같은 관례).
     // `licenses_declared`·`license_names`가 짝을 이뤄 세 상태(미설정=행 없음·NotDeclared·
     // Declared(빈 목록 포함))를 구분한다 — V12 CHECK 가 그 짝의 모순만 막고, 세 상태 자체의
     // 구분은 이 열 형태가 진다.
@@ -404,7 +404,7 @@ internal object Sql {
         FROM edit_session WHERE id = ?
         """
 
-    // M6/6B-1 D-6B1-3·D-6B1-4 — 낙관적 동시성의 유일한 write 경로(우회 (3)). WHERE 절이
+    // D-6B1-3·D-6B1-4 — 낙관적 동시성의 유일한 write 경로(우회 (3)). WHERE 절이
     // 전제조건 둘 중 하나를 요구한다: (a) **저장소의 현재 state 가 이미 종단(APPLIED·
     // CANCELLED·EXPIRED)이고 동시에 이번 쓰기가 새 episode(EXCLUDED.session_version = 0,
     // beginSession) 일 때만** 버전을 안 보고 갈아 끼운다 — 끝난 세션 위에 새로 여는 것은
@@ -414,17 +414,17 @@ internal object Sql {
     // ON CONFLICT 분기 전체가 no-op 이고 RETURNING 이 0행이다(Sql.kt KDoc 의
     // `toUpsertOutcome` 관용구와 같은 계열, 여기는 계수만 본다).
     //
-    // **verifier r1 HIGH-1 수정** — 이전 판은 (a) 를 `edit_session.state IN (...)` 만으로
-    // 열어 뒀다. 그러면 **저장소가 이미 종단**이기만 하면(과거의 정상 전이로 종단이 된
-    // 경우도 포함) **어떤 버전의 새 쓰기든** 통과했다 — 같은 비종단 세션을 버전 N 에서
+    // (a) 를 `edit_session.state IN (...)` 만으로 열면 **저장소가 이미 종단**이기만 하면
+    // (과거의 정상 전이로 종단이 된 경우도 포함) **어떤 버전의 새 쓰기든** 통과한다 —
+    // 같은 비종단 세션을 버전 N 에서
     // 읽은 두 writer 가 각각 종단 전이(APPLIED·CANCELLED)를 저장하면 **둘 다 성공**하고
-    // 뒤에 온 쪽이 앞의 결정을 조용히 덮었다(재현: `state=CANCELLED v=2` 위에
+    // 뒤에 온 쪽이 앞의 결정을 조용히 덮는다(재현: `state=CANCELLED v=2` 위에
     // `(APPLIED,v2)`→1행, 이어서 `(CANCELLED,v2)`→1행, 정상이면 두 번째는 0행이어야
     // 한다). `AND EXCLUDED.session_version = 0` 을 더해 "새 episode" 로 뜻을 좁힌다 —
     // 정당한 재시작(v0, 저장소가 종단)은 여전히 통과하고, 종단 위의 임의 버전 갈아치우기는
     // 이제 (b) 로 떨어져 버전이 안 맞으면 거부된다. **처음 값 EXCLUDED.session_version=0
     // 만으로 무조건 통과시키지도 않는다** — 그러면 같은 id 로 경합하는 두 begin() 이
-    // 서로 조용히 덮어써 우회 (3)이 다시 열린다(구현 레인 실측, 별도 회귀).
+    // 서로 조용히 덮어써 우회 (3)이 다시 열린다.
     const val UPSERT_EDIT_SESSION =
         """
         INSERT INTO edit_session (id, operator_id, state, state_payload, expires_at, session_version, last_command)

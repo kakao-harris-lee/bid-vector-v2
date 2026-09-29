@@ -214,7 +214,7 @@ def test_holdout_overlaps_zero_for_disjoint_windows() -> None:
 
 
 def test_holdout_overlaps_counts_duplicate_valued_rows_by_position_not_value() -> None:
-    """verifier r1 H-2 변이 #3 재현 — 인덱스가 아니라 값으로 세면 opened_at·stratum
+    """H-2 변이 #3 재현 — 인덱스가 아니라 값으로 세면 opened_at·stratum
     이 완전히 같은 두 행이 한 원소로 합쳐져 겹침이 실제보다 작게 잡힌다. `D-5C2-8`
     「값 동일성이 아니라 인덱스로」의 회귀 방지."""
     rows = [
@@ -230,7 +230,7 @@ def test_holdout_overlaps_counts_duplicate_valued_rows_by_position_not_value() -
 
 
 def test_week_maturity_contains_excludes_end_boundary() -> None:
-    """verifier r1 H-2 변이 #2 재현 — `< end`를 `<= end`로 바꾸면 인접한 두 창이
+    """H-2 변이 #2 재현 — `< end`를 `<= end`로 바꾸면 인접한 두 창이
     경계 행을 공유하게 된다(반개구간 위반, D-5C2-8)."""
     window = _week(1, opened=1, settled=1)  # [day1, day8)
     assert window.contains(_dt(7))  # 안쪽 경계 — 포함
@@ -238,7 +238,7 @@ def test_week_maturity_contains_excludes_end_boundary() -> None:
 
 
 def test_plan_evaluation_windows_uses_policy_min_evaluation_rows_not_literal() -> None:
-    """verifier r1 H-2 변이 #5 재현 — 기존 test 는 전부 `min_evaluation_rows=2`인
+    """H-2 변이 #5 재현 — 기존 test 는 전부 `min_evaluation_rows=2`인
     `_POLICY`를 썼기 때문에 하한을 리터럴 `2`로 바꿔도 잡히지 않았다. 정책 값이
     2 가 아닐 때도 그 값이 실제로 쓰이는지 확인한다."""
     stricter_policy = EvaluationPolicy(

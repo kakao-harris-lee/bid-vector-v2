@@ -20,7 +20,7 @@ sealed interface EditableField {
     data object CandidateLimit : EditableField
 
     /**
-     * M6/6A-2b D-6A2b-2 — `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` 를 닫는다. 값 타입
+     * D-6A2b-2 — `OPEN-6A3-MAX-ACTIVE-BIDS-EDIT` 를 닫는다. 값 타입
      * ([bidvector.strategy.MaxActiveBids])과 그 불변식
      * ([bidvector.strategy.StrategyViolation.MaxActiveBidsNotPositive])은 6A-3 이 이미 냈다 —
      * 이 자리는 「편집 세션이 이 필드를 기다린다」를 말할 어휘가 없던 공백만 메운다.

@@ -1,4 +1,4 @@
-"""ml_engine.training — 낙찰률 GBM 학습 커널(M5/5C-1). 공개 표면 재수출(scope.md ①~⑫가
+"""ml_engine.training — 낙찰률 GBM 학습 커널. 공개 표면 재수출(scope.md ①~⑫가
 전수) — 다른 패키지(serving·registry 등)는 이 최상위 이름만 보고 하위 모듈을 직접
 import하지 않는다."""
 

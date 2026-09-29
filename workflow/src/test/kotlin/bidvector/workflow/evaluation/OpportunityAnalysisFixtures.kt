@@ -80,7 +80,7 @@ internal fun embedded(
     release: ModelReleaseRef = TEST_RELEASE,
 ): EmbeddingOutcome.Embedded = EmbeddingOutcome.Embedded(vector, release)
 
-/** M4/4D-3(scope.md D-4D3-3) — `predictedFacts`는 이 값을 바꾸지 않는다(우회 (8) test 대상). */
+/** (scope.md D-4D3-3) — `predictedFacts`는 이 값을 바꾸지 않는다(우회 (8) test 대상). */
 internal val TEST_DIAGNOSTICS =
     PredictionDiagnostics(
         trainingRowCount = 100,
@@ -163,7 +163,7 @@ internal class FakeEmbedTextPort(
     }
 }
 
-/** M4/4B-7 — `CompetitionSamplePort` fake. 기본값은 표본 0건(빈 supply). */
+/** `CompetitionSamplePort` fake. 기본값은 표본 0건(빈 supply). */
 internal class FakeCompetitionSamplePort(
     val outcomeFor: (CompetitionSampleQuery) -> CompetitionSampleSupply = {
         CompetitionSampleSupply.Supplied(samples = emptyList(), excluded = emptyMap())
@@ -227,11 +227,11 @@ internal fun testNoticeWithMoney(
     won: Long = 1_000_000_000L,
     floorRate: FloorRate? = null,
     deadlineAt: Instant? = FUTURE_DEADLINE,
-    // M4/4B-7(D-4B7-9) — 경쟁 표본 조회 축(categoryCode) test 용. 기본값은 기존 fixture와 바이트 동일.
+    // (D-4B7-9) — 경쟁 표본 조회 축(categoryCode) test 용. 기본값은 기존 fixture와 바이트 동일.
     businessCategory: bidvector.procurement.BusinessCategory? = null,
-    // M4/4B-8(D-4B8-1) — SuspectRatio 판정용 추정가격 축. 기본값 null 은 기존 fixture와 바이트 동일.
+    // (D-4B8-1) — SuspectRatio 판정용 추정가격 축. 기본값 null 은 기존 fixture와 바이트 동일.
     estimatedAmountWon: Long? = null,
-    // M3/3H-2(D-3H2-1) — 요청 축 agencyId 조립 test 용. 기본값 null 은 기존 fixture와 바이트 동일.
+    // (D-3H2-1) — 요청 축 agencyId 조립 test 용. 기본값 null 은 기존 fixture와 바이트 동일.
     demandAgency: Agency? = null,
     noticeAgency: Agency? = null,
 ): Notice {
@@ -261,7 +261,7 @@ internal fun testNoticeWithMoney(
     )
 }
 
-/** M4/4B-8(D-4B8-1) — [testNoticeWithMoney]에서 갈라낸 추정가격 축 조립(sizeGate 50줄). */
+/** (D-4B8-1) — [testNoticeWithMoney]에서 갈라낸 추정가격 축 조립(sizeGate 50줄). */
 private fun resolvedEstimatedAmountOf(
     estimatedAmountWon: Long?,
     round: NoticeRound,

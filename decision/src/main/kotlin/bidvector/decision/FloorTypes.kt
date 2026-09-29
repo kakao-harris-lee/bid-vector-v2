@@ -92,7 +92,7 @@ data class ShortfallTally(
  * 하나로 닫는다(`internal constructor`, 위협 모델 (2)) — `frequency=0/0` 같은 임의 조립을
  * 막는다. `Unmeasurable`은 값 생성자가 공개다(사유 있는 실패는 어디서든 만들 수 있다).
  *
- * `criticalAssessmentRate`는 `Derived<AssessmentRate>`다(verifier r1 F-1) — 임계 사정률은
+ * `criticalAssessmentRate`는 `Derived<AssessmentRate>`다 — 임계 사정률은
  * 파생값이라 계산에 쓴 정책 version이 `DerivationRecord`에 실려야 한다(decision 17). 벗겨서
  * bare `AssessmentRate`로 두면 그 결속(어느 정책 version의 나눗셈인지)을 잃는다. `decision`
  * 모듈은 `Derived`를 새로 만들 수 없다(`internal` 생성자, shared-kernel 소유) — 이 필드는

@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test
  * review MEDIUM — [NoticeTitle]의 핵심 불변식(trim 후 빈/공백 문자열은 `null`, 그 밖의 원문은
  * trim만 하고 정규화하지 않는다)을 순수 함수 수준에서 직접 잠근다. 지금까지는
  * `NoticeFindRoundTripTest`의 DB 왕복 경유로만 간접 확인됐다 — 같은 계열의 선례
- * [AgencyTest]가 [AgencyName]에 두는 test와 같은 형태다. 공백류 표본은 verifier r2
- * MEDIUM-1이 DB CHECK 과 교차 실측한 것과 같은 집합이다.
+ * [AgencyTest]가 [AgencyName]에 두는 test와 같은 형태다. 공백류 표본은 DB CHECK 과
+ * 교차 확인한 것과 같은 집합이다.
  */
 class NoticeTitleTest {
     @Test

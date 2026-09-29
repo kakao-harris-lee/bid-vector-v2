@@ -11,7 +11,7 @@ import kotlin.math.sqrt
  * public 이면 `DomainApiTypeGateTask`가 주 생성자 자신의 가시성 표기를 보지 않고
  * **클래스 가시성으로** 판정한다(`PublicApiTypes.classOrObjectTargets` — 주 생성자
  * Target 은 `ownVisibilityOverride = PUBLIC` 고정, `internal`/`private constructor`
- * 로도 숨겨지지 않는다) — 그래서 좌표 타입 자체를 `List<BigDecimal>`로 바꿨다(scope.md
+ * 로도 숨겨지지 않는다) — 그래서 좌표 타입 자체는 `List<BigDecimal>`이다(scope.md
  * D-4B4-3 대안). 코사인 계산은 `Double`(1B 금액 규율과 축이 다르다 — 계약이 float 이고
  * 정밀도 요구가 없다)로 [doubles] 에서만 하고, 그 프로퍼티는 본문의 `internal` 선언이라
  * (주 생성자가 아니다) 실제 가시성 그대로 게이트 표면 밖이다.

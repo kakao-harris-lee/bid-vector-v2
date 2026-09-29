@@ -12,7 +12,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 /**
- * Codex 1차 #1 — `v2-지침서.md` §4.1 "provenance가 없거나 모르는 값은 추측하지 않고 거부
+ * `v2-지침서.md` §4.1 "provenance가 없거나 모르는 값은 추측하지 않고 거부
  * 또는 `Unmeasurable`로 반환한다"의 산술·파생 성공 경계(`times`→`roundedWith`·
  * `divideForRate`·`sumOfBaseAmounts`) 적용을 모은다. `ArithmeticTest.kt` 에서 크기 한도
  * (`v2-지침서.md` §5, 500줄)로 옮겼다 — 주제가 뚜렷이 갈린다(입력 provenance 전건)는
@@ -22,13 +22,13 @@ import java.math.RoundingMode
  */
 class UndeclaredProvenanceTest {
     /**
-     * Codex 1차 #1 — `v2-지침서.md` §4.1 "provenance가 없거나 모르는 값은 추측하지 않고
+     * `v2-지침서.md` §4.1 "provenance가 없거나 모르는 값은 추측하지 않고
      * 거부 또는 `Unmeasurable`로 반환한다"를 산술·파생 성공 경계(`times`→`roundedWith`,
      * `divideForRate`, `sumOfBaseAmounts`)에 건다. `Provenance.Undeclared`가 그 "모르는
      * 값"의 명시적 표현이다(`data-dictionary.md` §5.1 sealed 정의의 여섯째 variant).
      * `OPEN-DIC-06`(어댑터 write 경로가 `Undeclared`를 거부하는가)과는 다른 축이다 — 그
      * 결정은 **수집 시점** 수용 여부이고, 여기서 막는 것은 **이미 도메인에 들어온 값의
-     * 계산** 이다. 값이 같아도 provenance 가 다른 fact 를 구분 못 하는 문제(Codex #4)와도
+     * 계산** 이다. 값이 같아도 provenance 가 다른 fact 를 구분 못 하는 문제와도
      * 다른 축 — 여기는 "구분"이 아니라 "출처 모름을 계산에 쓰지 않는다"이다.
      */
     @Test
@@ -108,7 +108,7 @@ class UndeclaredProvenanceTest {
     /**
      * `BidAmount`·`BaseAmount` 축은 B9 의 vat 고정을 받지 않아(둘 다 `vatTreatment`가
      * 자유 파라미터다) "declared 면 성공, Undeclared 면 실패"를 같은 test 로 대조할 수
-     * 있는 유일한 파생 율 경로다 — 여기서 team-lead 가 요구한 property(임의 provenance
+     * 있는 유일한 파생 율 경로다 — 여기서 요구하는 property(임의 provenance
      * 조합에서 Undeclared 하나라도 있으면 실패)를 낸다. `BidAmount`는 `internal` 생성자지만
      * 이 test 가 같은 모듈(shared-kernel) 안이라 직접 생성할 수 있다(H-1 이 막는 것은
      * 모듈 밖 생성이다).

@@ -8,9 +8,9 @@ package bidvector.sharedkernel
  *
  * 이 상위 타입에 `Comparable`이나 이항 연산을 두지 않는다 — 두면 서로 다른 basis 금액이
  * `f(a: Money, b: Money)`로 다시 섞인다(설계 검토 §1a·§5 L-11, 「개념마다 타입 하나」의
- * 단일 실패점). **여섯 구현 타입도 각자의 공개 `Comparable<Self>`를 갖지 않는다**(Codex
- * 1차 #2 정정 — 이전 판은 `won`만 비교해 `VAT` `UNKNOWN`/`INCLUSIVE`도 정렬됐고 동일 금액은
- * `VAT`가 달라도 `compareTo`가 0이었다). 비교가 필요하면 `sameKnownVat` 전건을 건
+ * 단일 실패점). **여섯 구현 타입도 각자의 공개 `Comparable<Self>`를 갖지 않는다** — `won`만
+ * 비교하면 `VAT` `UNKNOWN`/`INCLUSIVE`도 정렬되고 동일 금액도 `VAT`가 다르면 `compareTo`가
+ * 0이어야 하는지가 불명확해진다. 비교가 필요하면 `sameKnownVat` 전건을 건
  * [compareKnownVat]가 유일한 경로다.
  */
 sealed interface Money {
@@ -48,11 +48,10 @@ fun Money.export(): AmountRecord = AmountRecord(amount, currency, basis, vatTrea
 
 /**
  * `sameKnownVat`·`hasDeclaredProvenance` 전건을 건 비교 경로 — 타입별 오버로드 여섯
- * (`BaseAmount`~`AwardAmount`)이다(verifier r4 H-1 회귀 수정). 이전 판(Codex 1차 #2)은
- * 제네릭 `fun <T : Money> compareKnownVat(left: T, right: T)` 하나였으나, Kotlin이 `T`를
- * 두 인자의 **최소 상위 타입(LUB)**으로 추론해 `compareKnownVat(baseAmount,
- * estimatedAmount)`가 `T = Money`로 컴파일됐다 — basis 교차 비교 차단이 구조적으로 뚫린
- * 회귀였다(설계 검토 §5 L-11이 세운 경계와 같은 축). 오버로드 각각이 정확히 그 타입 하나만
+ * (`BaseAmount`~`AwardAmount`)이다. 제네릭 `fun <T : Money> compareKnownVat(left: T, right: T)`
+ * 하나로 두면, Kotlin이 `T`를 두 인자의 **최소 상위 타입(LUB)**으로 추론해 `compareKnownVat(baseAmount,
+ * estimatedAmount)`가 `T = Money`로 컴파일된다 — basis 교차 비교 차단이 구조적으로 뚫리는
+ * 회귀다(설계 검토 §5 L-11이 세운 경계와 같은 축). 오버로드 각각이 정확히 그 타입 하나만
  * 받으므로 서로 다른 타입 인자로는 어떤 오버로드도 성립하지 않는다 — LUB 추론 자체가
  * 일어날 자리가 없다. 공통 로직은 [compareSameType] 하나에 위임해 중복을 두지 않는다.
  */
@@ -88,19 +87,18 @@ fun compareKnownVat(
 
 /**
  * `compareKnownVat` 여섯 오버로드가 공유하는 구현 — **검사 순서: provenance 먼저, VAT
- * 다음**(`sumOfBaseAmounts`의 `accumulate`와 같은 순서 원칙, verifier r4 M-1). 어느
+ * 다음**(`sumOfBaseAmounts`의 `accumulate`와 같은 순서 원칙). 어느
  * 한쪽이라도 `Provenance.Undeclared`면 VAT 일치 여부와 무관하게 `UNDECLARED_PROVENANCE`가
  * 먼저 나온다 — `hasDeclaredProvenance`의 "산술·파생·비교 성공 경계 전건의 유일한 자리"
- * 계약(`MoneyArithmetic.kt`)이 비교 경로에도 실제로 걸리게 한다(Codex 1차 #2가 신설한
- * 비교가 이 전건을 부르지 않아 출처를 모르는 두 값의 순서 비교가 성공으로 새던 결함의
- * 수정). `private`다 — 호출부가 항상 같은 타입 쌍으로 여섯 오버로드를 거쳐 들어오므로
- * 이 함수 자체가 `Money`/`Money` 시그니처를 공개할 필요가 없다(공개하면 H-1이 되돌리려는
+ * 계약(`MoneyArithmetic.kt`)이 비교 경로에도 실제로 걸리게 한다 — 그러지 않으면 출처를
+ * 모르는 두 값의 순서 비교가 성공으로 샌다. `private`다 — 호출부가 항상 같은 타입 쌍으로 여섯 오버로드를 거쳐 들어오므로
+ * 이 함수 자체가 `Money`/`Money` 시그니처를 공개할 필요가 없다(공개하면 되돌리려던
  * LUB 경로가 다시 열린다).
  *
  * `Measurement` 대신 `Fact`를 반환한다 — 비교는 정책 version 을 소비하지 않는다
  * (`sumOfBaseAmounts`가 이미 같은 이유로 `Fact`를 쓴다). `Measurement.Measured`가 요구하는
  * `policyVersion`/`sampleSize`는 비교에 자연스러운 입력이 없어 지어내는 값이 되므로(매직
- * 넘버 금지 원칙과 같은 성질), Codex 전달문의 "Unmeasurable" 표현 대신 `Fact.Absent`로
+ * 넘버 금지 원칙과 같은 성질), "Unmeasurable" 표현 대신 `Fact.Absent`로
  * 낸다 — 사유 어휘(`VAT_TREATMENT_MISMATCH`)는 그대로다.
  */
 private fun compareSameType(
@@ -139,7 +137,7 @@ data class BaseAmount(
     }
 }
 
-/** 추정가격(`presmptPrce`). 운영자 결정 2026-09-04(A1)로 승인 명세 이름을 채택했다. */
+/** 추정가격(`presmptPrce`). 승인 명세 이름을 채택했다(A1). */
 data class EstimatedAmount(
     internal val won: Long,
     override val currency: Currency,
@@ -156,8 +154,8 @@ data class EstimatedAmount(
 /**
  * 예정가(`planned_price`). 개념은 `legacy-behavior`(`data-dictionary.md` §1.2).
  *
- * `vatTreatment`는 생성자 파라미터가 아니라 `Unknown` 고정이다(운영자 결정 2026-09-04
- * B9) — `data-dictionary.md` §1.2의 `Unknown` 정의("정의상 현재 값 — 미결의 표현이지
+ * `vatTreatment`는 생성자 파라미터가 아니라 `Unknown` 고정이다(B9) —
+ * `data-dictionary.md` §1.2의 `Unknown` 정의("정의상 현재 값 — 미결의 표현이지
  * 답이 아니다")를 그대로 싣는다. `OPEN-DIC-04`(실제 과세 처리 값)는 이 선언으로 해소되지
  * 않는다 — 값이 정해지면 이 필드가 `INCLUSIVE`/`EXCLUSIVE`로 바뀌는 것이 해소다. 다른
  * 값을 넣을 생성 경로가 없으므로 `sameKnownVat` 전건이 이 타입을 낀 산술(예:
@@ -178,8 +176,8 @@ data class YegaAmount(
 
 /**
  * 투찰가. 기초금액에 투찰율을 곱해 얻는 파생값 — 유일한 생성 경로는 [MoneyArithmetic.kt]의
- * 반올림 함수다. 생성자를 `internal`로 닫아 이 보증을 컴파일 시점에 강제한다(verifier r1
- * H-1) — `Rate`가 이미 쓴 처방과 같다. `@ConsistentCopyVisibility`가 없으면 기본 공개
+ * 반올림 함수다. 생성자를 `internal`로 닫아 이 보증을 컴파일 시점에 강제한다 —
+ * `Rate`가 이미 쓴 처방과 같다. `@ConsistentCopyVisibility`가 없으면 기본 공개
  * `copy()`가 이 경계를 우회한다(Kotlin 2.4.10 `-Werror`가 그 경고를 실제로 낸다).
  */
 @ConsistentCopyVisibility
@@ -197,8 +195,8 @@ data class BidAmount internal constructor(
 }
 
 /**
- * 배정예산(`asignBdgtAmt`·`bdgtAmt`). 운영자 결정 2026-09-04(A3)로 1B 금액 타입 집합에
- * 포함됐다. `vatTreatment`는 `YegaAmount`와 같은 이유로 `Unknown` 고정이다(B9).
+ * 배정예산(`asignBdgtAmt`·`bdgtAmt`). 금액 타입 집합에 포함됐다(A3).
+ * `vatTreatment`는 `YegaAmount`와 같은 이유로 `Unknown` 고정이다(B9).
  */
 data class AllocatedBudget(
     internal val won: Long,
@@ -214,7 +212,7 @@ data class AllocatedBudget(
 }
 
 /**
- * 낙찰가. 운영자 결정 2026-09-04(A3)로 1B 금액 타입 집합에 포함됐다. `vatTreatment`는
+ * 낙찰가. 금액 타입 집합에 포함됐다(A3). `vatTreatment`는
  * `YegaAmount`와 같은 이유로 `Unknown` 고정이다(B9) — [awardRateAgainst]가 항상
  * `Unmeasurable`이 된다.
  */

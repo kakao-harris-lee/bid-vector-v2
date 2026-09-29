@@ -18,9 +18,8 @@ internal fun sameKnownVat(
 /**
  * `v2-지침서.md` §4.1 — "provenance가 없거나 모르는 값은 추측하지 않고 거부 또는
  * `Unmeasurable`로 반환한다." `Provenance.Undeclared`가 그 "모르는 값"의 명시적
- * 표현이다(Codex 1차 #1). 산술·파생·비교 성공 경계 전건의 유일한 자리다 — `Money.kt`의
- * `compareSameType`도 이 함수를 부른다(verifier r4 M-1 — Codex 1차 #2가 신설한 비교 경로가
- * 이 전건을 부르지 않아 출처를 모르는 두 값의 순서 비교가 성공으로 새던 결함의 수정).
+ * 표현이다. 산술·파생·비교 성공 경계 전건의 유일한 자리다 — `Money.kt`의
+ * `compareSameType`도 이 함수를 부른다.
  * `internal`로 열어 `Money.kt`(같은 모듈, 다른 파일)가 재사용한다 — 중복 선언하지 않는다.
  */
 internal fun hasDeclaredProvenance(provenance: Provenance): Boolean = provenance != Provenance.Undeclared
@@ -39,15 +38,15 @@ class UnroundedBidAmount internal constructor(
 ) {
     /**
      * `setScale` 자체가 던질 수 있다(`RoundingMode.UNNECESSARY`가 반올림을 요구하는 값을
-     * 받으면) — overflow와는 다른 실패라 별도 `ReasonCode`로 잡는다(verifier r1 M-1).
+     * 받으면) — overflow와는 다른 실패라 별도 `ReasonCode`로 잡는다.
      * overflow는 `Math.*Exact`와 동등한 성질로 잡는다 — `longValueExact()`가 범위·소수부를
      * 함께 잰다(A4). 반올림 결과가 음수면(이론상만 — `times()`의 두 입력이 모두 비음수라
      * 실제 경로에서는 나오지 않는다) `BidAmount.init`의 예외가 아니라 사유 있는 실패로 낸다.
      * 입력 `BaseAmount`의 `provenance`가 `Undeclared`면 다른 검사보다 먼저 막는다
-     * (`v2-지침서.md` §4.1, Codex 1차 #1) — "출처를 모른다"는 값 오염이 계산에 들어가지
+     * (`v2-지침서.md` §4.1) — "출처를 모른다"는 값 오염이 계산에 들어가지
      * 않는다.
      *
-     * `floor`(적용 하한, Codex 1차 #3) — 준다면 반올림 결과가 그 미만일 때
+     * `floor`(적용 하한) — 준다면 반올림 결과가 그 미만일 때
      * `ROUNDED_BELOW_FLOOR`로 막는다. 하한 자신이 소수일 수 있다(하한율×기초금액 같은
      * 계산에서 나온다) — `1000.4`를 `scale=0`·`DOWN`으로 내리면 `1000`이고 이는 `1000.4`
      * 미만이다(`data-dictionary.md` §1.1 정의 ②·`capability-map.md` DEC-02 무조건
@@ -68,8 +67,8 @@ class UnroundedBidAmount internal constructor(
 
     /**
      * `longValueExact()`가 던지는 이유는 둘이다 — ① 소수 자리가 남음(호출부가 자리수 0이
-     * 아닌 `scaleDigits`를 준 경우) ② 크기가 `Long` 범위를 벗어남. **정확한 사유를 낸다**
-     * (verifier r1 M-1) — 둘 다 `AMOUNT_OVERFLOW`로 뭉치면 소수 자리 문제가 overflow로
+     * 아닌 `scaleDigits`를 준 경우) ② 크기가 `Long` 범위를 벗어남. **정확한 사유를 낸다** —
+     * 둘 다 `AMOUNT_OVERFLOW`로 뭉치면 소수 자리 문제가 overflow로
      * 오라벨된다.
      */
     private fun extractWon(
@@ -133,7 +132,7 @@ operator fun BaseAmount.times(rate: BidRate): UnroundedBidAmount =
     )
 
 /**
- * provenance 검사를 vat·overflow 검사보다 먼저 한다(Codex 1차 #1) — 값을 어디서
+ * provenance 검사를 vat·overflow 검사보다 먼저 한다 — 값을 어디서
  * 얻었는지 모르면 그 값이 다른 값과 vat·0-나눗셈 조건을 만족하는지 자체가 의미 없다.
  * 그래서 여러 실패가 동시에 걸려도 `UNDECLARED_PROVENANCE`가 먼저 나온다.
  */
@@ -234,9 +233,9 @@ private fun combine(
 
 /**
  * `seenVat == null`(첫 원소)이라고 전건을 건너뛰면 안 된다 — 이전 원소가 없을 뿐, 이
- * 원소 자체의 `vatTreatment`가 `UNKNOWN`이면 그 자체로 실패다(verifier r1 M-3, 단일
- * `UNKNOWN` 원소가 `Known`으로 새던 결함). `provenance` 검사를 `vat` 검사보다 먼저
- * 한다(Codex 1차 #1과 같은 순서 원칙 — `divideForRate` 참고) — 출처를 모르는 값은
+ * 원소 자체의 `vatTreatment`가 `UNKNOWN`이면 그 자체로 실패다 — 단일
+ * `UNKNOWN` 원소가 `Known`으로 새면 안 된다. `provenance` 검사를 `vat` 검사보다 먼저
+ * 한다(`divideForRate`와 같은 순서 원칙) — 출처를 모르는 값은
  * vat 일관성을 따지기 전에 이미 계산에 못 쓴다.
  */
 private fun accumulate(
@@ -264,7 +263,7 @@ private fun accumulate(
  * `BaseAmount` 목록의 합산 규칙 넷 — 전부 `Known`이면 `Known(합)`(overflow는 `AMOUNT_OVERFLOW`),
  * 하나라도 `Absent`면 그 사유를 그대로 전파, `vatTreatment`가 갈리면 `VAT_TREATMENT_MISMATCH`,
  * **빈 목록은 `Absent(EMPTY_INPUT)`다 — `Known(0원)`이 아니다.** 이 넷째 규칙은 승인 문면이
- * 직접 말하지 않는 자리라 1B가 형태로 정한다(값 결정이 아니므로 `OPEN`이 아니다).
+ * 직접 말하지 않는 자리라 이 모듈이 형태로 정한다(값 결정이 아니므로 `OPEN`이 아니다).
  *
  * 원 단위 `Long`을 나르므로 공개하지 않는다 — `internal`.
  */

@@ -103,7 +103,7 @@ def test_segment_score_improvement_ratio_negative_means_model_worse() -> None:
 
 
 def test_regressed_segments_excludes_single_row_segments() -> None:
-    """verifier r1 M-2 재현 — 수정 전 test 는 베이스라인이 완벽(`baseline_rmse == 0`)
+    """M-2 재현 — 수정 전 test 는 베이스라인이 완벽(`baseline_rmse == 0`)
     이라 `improvement_ratio(0, x) == 0.0`(음수 아님) 자체로 회귀 목록이 비었다.
     `and score.row_count > 1`을 지워도 630 passed 였던 이유가 그것이다. 베이스라인을
     불완전하게 만들어 `improvement_ratio`가 **실제로 음수**인 1행 세그먼트가 그래도

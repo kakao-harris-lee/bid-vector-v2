@@ -43,7 +43,7 @@ private class PlannedSlot(
 )
 
 /**
- * 공고 목록 수집 use case(D-6F8-1, M6/6F-8) — 조회일 × 업종마다 커서가 끝날 때까지 페이지를 읽고, 항목마다
+ * 공고 목록 수집 use case(D-6F8-1) — 조회일 × 업종마다 커서가 끝날 때까지 페이지를 읽고, 항목마다
  * **원문 저장 → [canonicalize] → 영속**을 한 번씩 부르며, 슬롯마다 회계를 [CollectionRunStore] 에 남긴다.
  * 정규화는 [canonicalize] 하나뿐이다 — 이 클래스는 원문 필드를 직접 읽지 않는다(구조 게이트가 잠근다).
  *

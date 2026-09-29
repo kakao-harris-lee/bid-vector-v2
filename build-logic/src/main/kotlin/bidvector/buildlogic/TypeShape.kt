@@ -18,7 +18,7 @@ internal data class TypeShape(
  * (v2-지침서.md §5). 두 task 가 각자 계수식을 새로 쓰면 baseline 이 보고하는 최댓값과 게이트가
  * 실제로 잡는 임계가 어긋날 수 있다.
  *
- * **상속 깊이의 정의(D-7, 2026-09-05 정제 · verifier r2 H-1, 2026-09-06 확장) — 프로젝트가
+ * **상속 깊이의 정의(D-7) — 프로젝트가
  * 소유한 타입 안에서의 상위 체인 길이.** 「프로젝트가 소유한」= **이번 스캔이 찾은 타입**
  * (`ownedTypeNames`, 같은 배선이 컴파일한 산출물) **이거나 루트 패키지(`rootPackagePrefix`,
  * 예: `bidvector.`) 아래**다. 상위 클래스를 따라 올라가다 둘 다 아닌 클래스를 만나면 그 자리에서
@@ -26,7 +26,7 @@ internal data class TypeShape(
  * 우리가 늘리거나 줄일 수 없는 프레임워크 기저 깊이는 세지 않는다. ADR 0007 §1.3 의 대상은
  * **우리 코드의 합성 팽창**이지 프레임워크가 강제하는 최소 상속이 아니다.
  *
- * **왜 스캔 집합만으로는 부족한가(verifier r2 H-1)** — `ownedTypeNames`는 **한 배선(보통 한
+ * **왜 스캔 집합만으로는 부족한가** — `ownedTypeNames`는 **한 배선(보통 한
  * 모듈)이 스캔한 집합**이다. 상위 클래스가 **다른 모듈**(예: `shared-kernel`의 `open class A`를
  * `workflow`의 `class B : A()`가 상속)에 있으면 소유 코드인데도 그 스캔 밖이라 계수가 즉시
  * 멈춰 모듈 경계를 하나 넘을 때마다 깊이가 1씩 줄었다(실측: 2모듈짜리 상속 한 단계가 아예
@@ -35,10 +35,8 @@ internal data class TypeShape(
  * 접두 문자열은 하드코딩하지 않는다 — `architecture-policy.properties` 의 `package.root`
  * (ADR 0006 D-3)를 호출부가 읽어 넘긴다.
  *
- * verifier r1 M-2 실측 — build-logic 자신의 `abstract class X : DefaultTask()` 형태 17개가
- * 이전 정의(외부 포함)로는 depth 3(`DefaultTask`가 이미 2단 상속이라 항상 최소 3)이었는데,
- * 이 정의로는 `DefaultTask`가 소유 집합 밖(스캔 밖이자 `bidvector.` 도 아님)이라 즉시 멈춰
- * depth 0이다.
+ * 실측 — build-logic 자신의 `abstract class X : DefaultTask()` 형태 17개는 이 정의로
+ * depth 0이다 — `DefaultTask`가 소유 집합 밖(스캔 밖이자 `bidvector.` 도 아님)이라 즉시 멈춘다.
  */
 internal fun JavaClass.inheritanceDepth(
     ownedTypeNames: Set<String>,

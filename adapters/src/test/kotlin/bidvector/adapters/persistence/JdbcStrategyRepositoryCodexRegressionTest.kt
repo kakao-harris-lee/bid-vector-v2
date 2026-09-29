@@ -9,7 +9,7 @@ import java.sql.SQLException
 
 /**
  * [JdbcStrategyRepositoryTest]에서 분리(sizeGate, 파일 500줄 한도) — Codex 심판
- * request_changes(HIGH·MEDIUM, M6/6F-1 D-6F1-9·D-6F1-10) 회귀 중 **원시 SQL로 도메인
+ * request_changes(HIGH·MEDIUM, D-6F1-9·D-6F1-10) 회귀 중 **원시 SQL로 도메인
  * 경로(`validate()`)를 우회하는** 자리만 여기 모은다. `workflow`를 거치는 경계값 왕복
  * test(정상 케이스)는 원본 파일에 남아 있다 — 이 파일은 저장 계층 자체의 방어(V9 CHECK·
  * `getTextList`)만 겨눈다.
@@ -58,10 +58,10 @@ class JdbcStrategyRepositoryCodexRegressionTest : PersistenceTestSupport() {
     }
 
     /**
-     * verifier r4 MEDIUM-3 — [dropMinBudgetWonCheck]가 뗀 CHECK 를 매 test 뒤 되건다.
+     * [dropMinBudgetWonCheck]가 뗀 CHECK 를 매 test 뒤 되건다.
      * 컨테이너가 class 간 공유([PersistenceTestSupport]의 `@BeforeEach` TRUNCATE 는 DDL 을
      * 되돌리지 않는다)라, 여기서 빼먹으면 뒤따르는 test 가 그 CHECK 없이 실행돼 오염된다
-     * (verifier 가 실제로 겪은 함정). 멱등 — 이 test class 의 다른 test 는 CHECK 를 떼지
+     * (실제로 겪은 함정). 멱등 — 이 test class 의 다른 test 는 CHECK 를 떼지
      * 않으므로 그때는 조용히 아무 일도 하지 않는다.
      */
     @AfterEach
@@ -99,7 +99,7 @@ class JdbcStrategyRepositoryCodexRegressionTest : PersistenceTestSupport() {
         }
     }
 
-    // verifier r4 MEDIUM-3 — CHECK 를 우회해도 코드 층(longValueExact)이 단독으로 막는가.
+    // CHECK 를 우회해도 코드 층(longValueExact)이 단독으로 막는가.
     // D-6F1-9 의 「둘 다 있어야 닫힌다」에서 코드 층이 실제로 방어선인지 겨눈다(CHECK 가 있으면
     // 범위 밖 값이 코드 층까지 갈 길이 없어, 그 층만 도는 test 가 따로 필요하다).
     @Test

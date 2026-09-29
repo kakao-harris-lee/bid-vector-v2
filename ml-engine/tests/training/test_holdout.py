@@ -319,7 +319,7 @@ def test_run_holdout_evaluates_selected_window_and_produces_gate_outcome() -> No
 
 
 def test_stability_trials_headline_seed_first_even_when_not_first_in_policy() -> None:
-    """verifier r1 H-2 변이 #7 재현 — 기존 test 는 헤드라인 seed 가 정책 목록에서도
+    """H-2 변이 #7 재현 — 기존 test 는 헤드라인 seed 가 정책 목록에서도
     이미 첫 자리였다(20260812, 1). `stability_seed_order`가 `tuple(policy.
     stability_seeds)`로 퇴화해도 그 test 는 우연히 통과한다 — 헤드라인이 목록
     **끝**에 있는 정책으로 재조립이 실제로 일어나는지 확인한다."""
@@ -341,7 +341,7 @@ def test_stability_trials_headline_seed_first_even_when_not_first_in_policy() ->
 
 
 def test_run_stability_trial_passed_reflects_significance_not_rmse_alone() -> None:
-    """verifier r2 MEDIUM M-2r 재현 — 변이 ⑥(`_run_stability`의 `passed`에서
+    """MEDIUM M-2r 재현 — 변이 ⑥(`_run_stability`의 `passed`에서
     `paired_t_threshold` 조건 삭제)이 652 passed 로 통과했다. 기존
     `test_passes_gate_is_the_single_predicate_definition`은 `gate_outcome`의
     결과만 보고 안정성 sweep 의 **호출 지점**은 보지 않는다. 이 test 는
@@ -407,7 +407,7 @@ def test_run_stability_trial_passed_reflects_significance_not_rmse_alone() -> No
 
 
 def test_build_split_boundary_row_at_window_start_excluded_from_training() -> None:
-    """verifier r1 H-2 변이 #1 재현 — `_structural_rows`의 `opened_at < window.start`
+    """H-2 변이 #1 재현 — `_structural_rows`의 `opened_at < window.start`
     를 `<= window.start`로 바꾸면 경계 동시각 행이 학습측에도 새어 든다(D-5C2-8,
     누수는 크기가 아니라 비대칭). 경계 행은 평가측에만 있어야 한다."""
     window_start_day = 30
@@ -436,7 +436,7 @@ def test_build_split_boundary_row_at_window_start_excluded_from_training() -> No
 def _mixed_buildability_window_scenario(
     *, buildable_count: int, missing_count: int
 ) -> tuple[LoadedDataset, WeekMaturity]:
-    """verifier r1 H-1 재현 — 창 안 구조적 행(opened_at·stratum 만 봄)과 실제로
+    """H-1 재현 — 창 안 구조적 행(opened_at·stratum 만 봄)과 실제로
     채점 가능한(buildable) 행 수가 다르다. `missing_count`행은 `base_amount`가 wire
     `Missing`이라 `admit_corpus`는 통과하지만 `is_buildable`은 걸러낸다."""
     train_part = _many_rows(20, start_day=0)
@@ -474,10 +474,10 @@ def _mixed_buildability_window_scenario(
 def test_run_holdout_excludes_window_when_buildable_rows_below_min_evaluation_rows() -> (
     None
 ):
-    """verifier r1 H-1 / code-reviewer HIGH — `min_evaluation_rows` 하한은 구조적
+    """H-1 / HIGH — `min_evaluation_rows` 하한은 구조적
     행 수가 아니라 **실제로 채점되는(buildable) 행 수**에 재대조돼야 한다. 창 안
     120행 중 30행만 buildable, 정책 하한 100 → 창이 `INSUFFICIENT_EVALUATION_ROWS`
-    로 제외돼야 한다(수정 전에는 `Passed`+`Promotable`까지 통과했다)."""
+    로 제외돼야 한다(그렇지 않으면 `Passed`+`Promotable`까지 통과한다)."""
     dataset, window = _mixed_buildability_window_scenario(
         buildable_count=30, missing_count=90
     )
@@ -519,17 +519,17 @@ def _run_holdout_with_mixed_buildability_exclusion(
 
 
 def test_window_exclusion_reports_buildable_row_count_and_dropped_rows() -> None:
-    """verifier r2 MEDIUM M-1r 재현 — 제외된 창(`INSUFFICIENT_EVALUATION_ROWS`)의
+    """MEDIUM M-1r 재현 — 제외된 창(`INSUFFICIENT_EVALUATION_ROWS`)의
     문면은 `evaluation_row_count=120`(구조적 행 수)과 하한 100 을 나란히 실어
     **자기모순**(120 ≥ 100 인데 「행 부족」)이었다. `build_split`이 이미 계산한
     `buildable=30`·`dropped=[(base_amount, 90)]`(`WindowSkip.detail` 문자열에만
     있었다)를 `WindowExclusion`의 구조화 필드로 공시해 그 모순을 없앤다.
 
-    verifier r3 MEDIUM M-1r(잔존) — 수정 전 이 단언은 전부 dataclass 필드였고
-    `canonical_report_bytes`를 한 번도 지나지 않았다. `_window_exclusion_json`이
-    두 필드를 직렬화하지 않아, 서명·저장되는 형태(canonical JSON/checksum)에서는
-    공시가 사라지고 buildable 30 과 50 이 같은 checksum 을 냈다 — 이 test 를
-    canonical bytes 를 파싱해 그 값을 보도록 바꾸고, 별도 test 로 checksum 이
+    MEDIUM M-1r(잔존) — 이 단언이 전부 dataclass 필드에만 있으면
+    `canonical_report_bytes`를 한 번도 지나지 않는다. `_window_exclusion_json`이
+    두 필드를 직렬화하지 않으면, 서명·저장되는 형태(canonical JSON/checksum)에서는
+    공시가 사라지고 buildable 30 과 50 이 같은 checksum 을 낸다 — 이 test 는
+    canonical bytes 를 파싱해 그 값을 보고, 별도 test 로 checksum 이
     실제로 달라짐을 확인한다."""
     result = _run_holdout_with_mixed_buildability_exclusion(
         buildable_count=30, missing_count=90
@@ -555,7 +555,7 @@ def test_window_exclusion_reports_buildable_row_count_and_dropped_rows() -> None
     assert excluded_json["buildable_row_count"] == 30
     assert sum(item["row_count"] for item in excluded_json["dropped_rows"]) == 90
     assert excluded_json["evaluation_row_count"] == 120
-    # verifier r3 표적 정정 — _window_exclusion_json 이 실제로 키 둘을
+    # _window_exclusion_json 이 실제로 키 둘을
     # "추가"했는지(대체·누락 없이)를 정확한 키 수로 고정한다: window_start·
     # window_end·window_opened_count·window_settled_count·reason·
     # evaluation_row_count(기존 6) + buildable_row_count·dropped_rows(신규 2) = 8.
@@ -603,11 +603,11 @@ def _excluded_window_scenario_with_fixed_composition(
 
 
 def test_window_exclusion_checksum_differs_by_buildable_row_count() -> None:
-    """verifier r3 MEDIUM M-1r(잔존) 재현 — buildable 30(dropped 90)과 buildable
+    """MEDIUM M-1r(잔존) 재현 — buildable 30(dropped 90)과 buildable
     50(dropped 70)은 둘 다 하한 100 미달로 같은 사유(`INSUFFICIENT_EVALUATION_
     ROWS`)·같은 구조적 행 수(120)로 제외되지만, 실제로 버려진 행 수는 다르다.
     `_window_exclusion_json`이 그 필드를 직렬화하지 않으면 두 실행이 **같은
-    checksum**을 낸다(수정 전 재현값) — 서로 다른 실행이 같은 서명을 갖는 것은
+    checksum**을 낸다 — 서로 다른 실행이 같은 서명을 갖는 것은
     서명의 존재 이유(어떤 실행 결과인지 식별)를 무너뜨린다. 두 시나리오의 코퍼스
     구성(category·agency·label 분포, 총 행 수)은 인덱스 기반으로 고정해
     `buildable_row_count`/`dropped_rows` 외의 어떤 report 필드도 달라지지 않게
@@ -750,12 +750,12 @@ def test_unaccounted_row_count_adds_dropped_rows_not_just_window_membership() ->
 
 
 def test_unaccounted_row_count_does_not_double_count_execution_stage_skip() -> None:
-    """verifier r2 HIGH H-2r 재현 — 창이 **계획 단계**(구조적 행 수 120 ≥ 하한 100)는
+    """HIGH H-2r 재현 — 창이 **계획 단계**(구조적 행 수 120 ≥ 하한 100)는
     통과하고 **실행 단계**(H-A 의 buildable 재대조, 30 < 100)에서 skip 되면,
     `plan.selected`(계획 통과분, skip 뒤에도 그대로 남음)와
     `windows_outcome.excluded`(skip 이 추가한 같은 창)에 그 창이 **둘 다** 잡혀
-    이중 계수되고, `160 - 240 + 0 = -80`이 `max(…, 0)`에 걸려 0 이 된다(수정 전
-    재현값). 창 밖 40행이 실제로 남아있으므로 정답은 40 이다."""
+    이중 계수되고, `160 - 240 + 0 = -80`이 `max(…, 0)`에 걸려 0 이 된다.
+    창 밖 40행이 실제로 남아있으므로 정답은 40 이다."""
     outside = _many_rows(40, start_day=0)
     window_start_day = 100
     buildable = tuple(
@@ -805,7 +805,7 @@ def test_unaccounted_row_count_does_not_double_count_execution_stage_skip() -> N
 def test_unaccounted_or_reject_returns_accounting_mismatch_for_negative_result() -> (
     None
 ):
-    """verifier r2 H-2r — `max(…, 0)` clamp 를 지운 자리를 그냥 두면 회계 결함이
+    """H-2r — `max(…, 0)` clamp 를 지운 자리를 그냥 두면 회계 결함이
     조용히 음수로 새거나(치명적이진 않지만 report 필드가 거짓), clamp 를 되살리면
     변이 저항이 없어진다(§5 표 「max 복원 → test 붉음」). `_unaccounted_or_reject`
     를 직접 호출해(white-box, `build_split`/`WindowSkip`과 같은 관행) **서로소가
@@ -969,14 +969,14 @@ def test_run_holdout_window_with_training_rejected_is_excluded() -> None:
 def test_run_holdout_promotion_uses_latest_evaluable_window_not_latest_calendar_window() -> (
     None
 ):
-    """code-reviewer 「확인 불가」 처분(2026-09-16, 팀장 지시) — 시간상 가장 늦은
+    """시간상 가장 늦은
     선택 창이 제외되고(이 test 는 `INSUFFICIENT_EVALUATION_ROWS` 경로로 유도, H-A)
     더 이른 창만 성공했을 때, `_assemble_report`의 `latest = windows_outcome.results[-1]`
     은 **성숙·평가 가능했던 가장 최근 창**(=성공한 것 중 최신)을 승격 판정에 쓴다 —
     "달력상 가장 최근 창"이 아니다. 이것은 의도된 완화다: 계산이 아니라 결과가 있는
     창에서만 판정을 뽑는다(설계 검토 (1) 「창 실패는 창 제외로 흡수, report 는 여전히
     성공 반환」과 같은 원칙 — 실패한 최신 창이 존재한다고 승격 자체를 막지 않는다).
-    scope.md/설계 검토 문면에는 이 경계가 없었다(code-reviewer 지적) — 이 test 와
+    scope.md/설계 검토 문면에는 이 경계가 없었다 — 이 test 와
     checklist.md 「알려진 제한」 등재로 문면화한다."""
     train_part = _many_rows(20, start_day=0)
     window1_start = 40  # 더 이른 창 — buildable, 성공해야 한다.
@@ -1033,7 +1033,7 @@ def test_run_holdout_promotion_uses_latest_evaluable_window_not_latest_calendar_
         )
         == result.promotion
     )
-    # verifier r3 LOW L-2r 재현 — holdout_overlaps 가 plan_selected(skip 된 창도
+    # LOW L-2r 재현 — holdout_overlaps 가 plan_selected(skip 된 창도
     # 그대로 포함) 대신 succeeded_windows(서로소 집합)를 써야 회계(H-2r)와
     # 일관된다. window2 는 skip 됐으므로 겹침 측정 대상은 window1 하나뿐이고,
     # 창이 하나면 쌍이 없어 holdout_overlaps 자체가 빈 tuple 이어야 한다 —
@@ -1088,7 +1088,7 @@ def test_no_bare_threshold_seed_or_layer_parameter_on_run_holdout() -> None:
     assert forbidden.isdisjoint(signature.parameters)
 
 
-# ---- M5/5E-3 D-5E3-3 — `should_stop` 창 루프 취소 정밀도 ----
+# ---- D-5E3-3 — `should_stop` 창 루프 취소 정밀도 ----
 # `OPEN-5E-CANCEL-GRANULARITY` 종결: 창마다 학습 **전**에 확인하고, 멈추면
 # `HoldoutCancelled(completed_windows=…)`(결과 타입, 부분 보고서 조립 없음)를
 # 낸다.

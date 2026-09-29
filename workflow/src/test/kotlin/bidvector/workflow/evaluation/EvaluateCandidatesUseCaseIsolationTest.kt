@@ -89,10 +89,10 @@ class EvaluateCandidatesUseCaseIsolationTest {
         mlAnalysis.callCountFor.getValue(notice.id).get() shouldBe 1
     }
 
-    // 결정 5(사다리 호출 축, verifier r1 L-1) — `VerdictLadder.judge`는 공고당 정확히
+    // 결정 5(사다리 호출 축) — `VerdictLadder.judge`는 공고당 정확히
     // 한 번만 불린다. `judge`가 object라 fake로 못 세므로 얇은 위임(CountingJudge)
     // 뒤에서 센다 — ML 분석 호출 횟수(위 test)와는 **다른 축**이라 따로 재야 한다
-    // (verifier 실측: judge를 두 번 부르는 변이에 ML 분석 계수만으로는 전건 초록이었다).
+    // (실측: judge를 두 번 부르는 변이에 ML 분석 계수만으로는 전건 초록이다).
     @Test
     fun `사다리 호출은 공고당 정확히 한 번 돈다`() {
         val notice = testNotice()
@@ -177,7 +177,7 @@ class EvaluateCandidatesUseCaseIsolationTest {
         notifications.requested.shouldBeEmpty()
     }
 
-    // 결정 4(M4 완료 조건, 수정 라운드 1 M-2) — trace가 ML 구간도 넘는다: 판정에
+    // 결정 4(M4 완료 조건) — trace가 ML 구간도 넘는다: 판정에
     // 실린 correlationId와 MlAnalysisPort가 받은 correlationId가 같다.
     @Test
     fun `correlationId 는 ML 분석 port 에도 실린다`() {

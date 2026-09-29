@@ -7,9 +7,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * M2/2C verifier r1 F-3 — testdata 로더·canonicalization 공유 함수. `ContractRoundTripTest`
- * (2A)·`PredictionContractTest`(2B)·`TrainingContractTest`(2C) 세 파일에 복제돼 있던 블록을
- * 여기 하나로 모은다(CPD observed 72·80 토큰 중복, 2A `ContractFractionRules.kt`와 같은
+ * testdata 로더·canonicalization 공유 함수. `ContractRoundTripTest`·`PredictionContractTest`·
+ * `TrainingContractTest` 세 파일에 복제돼 있던 블록을
+ * 여기 하나로 모은다(CPD observed 72·80 토큰 중복, `ContractFractionRules.kt`와 같은
  * 관례). `canonicalBytes`는 `OPEN-2A-CANONICAL-FORM`(protobuf deterministic
  * serialization을 canonical form으로 삼는 근거)의 유일한 구현이다.
  */

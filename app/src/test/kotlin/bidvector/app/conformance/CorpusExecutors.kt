@@ -32,7 +32,7 @@ import tools.jackson.databind.JsonNode
 import java.time.LocalDate
 
 /*
- * M1/1B-c ④ · M1/1C — case id → executor dispatch 표와 1B·1C 계약 호출부.
+ * case id → executor dispatch 표와 1B·1C 계약 호출부.
  * `SharedKernelCorpusConformanceTest.kt` 가 fixture/JSON 인프라를 갖고, 이 파일은 「계약과
  * 무엇을 대조하는가」만 갖는다(크기 한도 회피가 아니라 관심사 분리 — 클래스 KDoc 참고).
  *
@@ -66,7 +66,7 @@ private fun assertRateFractionMatches(
 }
 
 /**
- * verifier r1 M-2 — 입력의 `$.rawRate.declaredUnit` 이 percent/fraction 갈래를 정한다.
+ * M-2 — 입력의 `$.rawRate.declaredUnit` 이 percent/fraction 갈래를 정한다.
  * case 별 하드코딩을 두면 `rate-unit-005`(*"선언이 개연성을 이긴다"*)의 실질을 기계가
  * 재지 못한다 — `declaredUnit` 을 바꿔도 결과가 그대로면 이 executor 가 놓친 것이다.
  */
@@ -101,7 +101,7 @@ private val UNASSERTED_NOTICE_REVISION = NoticeRound.of("000")
 /**
  * `provenance` 토큰 문자열 → 계약 값. 형제 노드(`siblingNode`)는 `Published` 의
  * `noticeRevision`·`FilledFromBudgetKey` 의 `key` 처럼 variant 별 부가 성분을 읽는 자리다.
- * `noticeRevision` 은 [NoticeRound] 다(M3/3A D-3A-0 (a)) — fixture 는 이미 제로패딩 문자열
+ * `noticeRevision` 은 [NoticeRound] 다(D-3A-0 (a)) — fixture 는 이미 제로패딩 문자열
  * (`"000"`)을 준다, `toInt` 접힘을 두지 않는다(R-QUAL-05).
  */
 private fun provenanceFromToken(
@@ -146,7 +146,7 @@ private fun provenanceFromToken(
     }
 
 /**
- * verifier r1 M-1 과 같은 원칙 — `provenance` 누락을 `Undeclared` 로 접지 않는다. 이 helper 를
+ * M-1 과 같은 원칙 — `provenance` 누락을 `Undeclared` 로 접지 않는다. 이 helper 를
  * 쓰는 money-basis-002·005 의 입력은 전부 명시 선언(`OperatorDeclared`·`Published`)이라
  * 이 요구가 실제로 실패를 내는 자리는 없다 — 관대한 fallback 을 남겨 두지 않는 것 자체가
  * 목적이다.
@@ -224,7 +224,7 @@ private val MONEY_BASIS_VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, A
             val right = moneyFrom(operands.path(1))
             factComparisonProjection(compareBaseAmounts(left, right), left, right)
         },
-        // verifier r1 M-1 — null → UNKNOWN/Undeclared 로 접는 fallback 을 없앤다. 그 접기가
+        // M-1 — null → UNKNOWN/Undeclared 로 접는 fallback 을 없앤다. 그 접기가
         // 있으면 「legacy 유래 행을 정의상 기본값으로 자동 태깅하지 않는다」의 실질을 계약이
         // 아니라 runner 상수가 지게 된다(재현: fallback 을 INCLUSIVE 로 바꿔도 그 case 만
         // FAILED, shared-kernel 무변경 — 계약이 아니라 runner 가 답을 정하고 있었다는 뜻).
@@ -258,15 +258,15 @@ private val MONEY_BASIS_VALUE_EXECUTORS: Map<String, (JsonNode) -> Map<String, A
         },
     )
 
-// ---- license value executor 보조 — M1/1C, qualification 공개 API 호출 → projection ----
+// ---- license value executor 보조 — qualification 공개 API 호출 → projection ----
 
 /**
  * OPEN-QUAL-07 — 내용이 비어 있는 정책을 실제로 resolve 해서 쓴다(지어낸 리터럴이 아니다).
- * `judge` 가 `Resolution.Resolved` 하나를 받으므로(verifier r1 F-5) 값과 version 이
+ * `judge` 가 `Resolution.Resolved` 하나를 받으므로 값과 version 이
  * 여기서부터 같은 객체로 나온다 — runner 가 값만 꺼내고 version 을 fixture 문자열로 따로
  * 만드는 경로 자체가 없어졌다.
  *
- * verifier r1 F-8 — `LocalDate.now()` 는 이 정책에 `Initial` 하나뿐인 지금은 항상 성립하지만
+ * `LocalDate.now()` 는 이 정책에 `Initial` 하나뿐인 지금은 항상 성립하지만
  * 미래 일자 항목이 생기면 test 가 벽시계에 의존하게 되고, `as Resolution.Resolved` 강제
  * 캐스트는 그때 `ClassCastException` 으로 죽는다. 고정 기준일 + 소진 `when` 으로 두 문제를
  * 함께 없앤다 — `NotApplicable` 이 나오면 (지금은 나올 수 없지만) 캐스트 실패 대신 이 자리를
@@ -289,10 +289,10 @@ private val LICENSE_RESOLVED_POLICY: Resolution.Resolved<LicenseQualificationPol
     }
 
 /**
- * verifier r1 F-7 — 물리 행 하나가 `lcnsLmtNm`(항상)과 `permsnIndstrytyList`(선택, 배열)를
- * 동시에 가질 수 있다(조사 §3 — 동반 필드, 별도 행 아님). 이전 판은 `sourceField` 를
- * `LcnsLmtNm` 으로 하드코딩해 `permsnIndstrytyList` 를 조용히 무시했다 — 지어내지 않기
- * 원칙(1B-c 관례) 위반이었다. 이제 실제로 읽어 두 번째 `RequirementRow.Parsed`(같은
+ * 물리 행 하나가 `lcnsLmtNm`(항상)과 `permsnIndstrytyList`(선택, 배열)를
+ * 동시에 가질 수 있다(조사 §3 — 동반 필드, 별도 행 아님). `sourceField` 를 `LcnsLmtNm` 으로
+ * 하드코딩하면 `permsnIndstrytyList` 를 조용히 무시하게 되어 지어내지 않기 원칙(1B-c 관례)을
+ * 어긴다. 그래서 실제로 읽어 두 번째 `RequirementRow.Parsed`(같은
  * `groupNo`, `sourceField=PermsnIndstrytyList`)를 만든다. 배열이 아니거나 빈 배열이면
  * 이 corpus 가 다루지 않는 형태이니 지어내지 않고 멈춘다.
  */
@@ -389,8 +389,8 @@ private fun foldedUngrouped(verdict: LicenseVerdict): Boolean =
     }
 
 /**
- * verifier r1 F-6 — `$.expiryEvaluated` 를 runner 리터럴 `false` 가 답하면 그 경로는 계약이
- * 내는 값을 재지 않는다(1B-c verifier r1 M-1 과 같은 갈래). `LicenseValidity` 를 소진
+ * `$.expiryEvaluated` 를 runner 리터럴 `false` 가 답하면 그 경로는 계약이
+ * 내는 값을 재지 않는다(1B-c M-1 과 같은 갈래). `LicenseValidity` 를 소진
  * `when` 으로 소비해서 낸다 — 지금은 `NotVerified` 단일 variant라 값이 같지만, `Verified`
  * variant 가 생기면 이 `when` 이 컴파일 에러로 먼저 깨져 리터럴이 조용히 낡는 것을 막는다.
  */

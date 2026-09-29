@@ -20,7 +20,7 @@ import bidvector.workflow.prediction.ModelReleaseSelector as DomainModelReleaseS
 private typealias PredictionStub = BidPredictionServiceGrpcKt.BidPredictionServiceCoroutineStub
 
 /**
- * M4/4D-1(scope.md ①~⑩) — `BidPredictionPort`의 gRPC 구현. `ManagedChannel`·정책·`Clock`을
+ * scope.md ①~⑩ — `BidPredictionPort`의 gRPC 구현. `ManagedChannel`·정책·`Clock`을
  * 생성자로 받는다(DI, 채널 생성 자체는 M6 배선 소관). 실패는 전부 [BidPredictionOutcome]
  * 안으로 접힌다 — 예외가 이 클래스 밖으로 새지 않는다(`CancellationException`은 예외 —
  * coroutine 취소는 그대로 전파한다, ADR 0010 D-2).
@@ -56,7 +56,7 @@ class GrpcBidPredictionGateway(
                 BidPredictionOutcome.Unavailable(MlUnavailableReason.CircuitOpen)
             }
 
-            // verifier r2 G-4 — 예산 소진은 서버를 한 번도 못 불렀거나 재시도를 포기한
+            // 예산 소진은 서버를 한 번도 못 불렀거나 재시도를 포기한
             // 것이지 breaker 가 셀 transport 실패가 아니다(ResilientPredictionCall.kt).
             MlCallOutcome.BudgetExhausted -> {
                 BidPredictionOutcome.Unavailable(MlUnavailableReason.DeadlineExceeded)
@@ -133,7 +133,7 @@ class GrpcBidPredictionGateway(
                             else -> null
                         }
                     },
-                    // PR #5 게이트 시정 — `fetchPromotedRelease`가 `fetchPromoted<S, Resp, T>`로
+                    // `fetchPromotedRelease`가 `fetchPromoted<S, Resp, T>`로
                     // 넓어졌다(ReleaseCheck.kt). 여기서는 T = ModelRelease 라 공백 거부 대상이
                     // 곧 반환값 자신이다.
                     releaseOf = { it },
@@ -147,7 +147,7 @@ class GrpcBidPredictionGateway(
         return mapSuccess(success, expectedFeatureSchemaVersion)
     }
 
-    /** 리뷰 F-E(medium) 처방 — 분류 로직은 `classifyTransportFailure`(`RetryRules.kt`, 임베딩과 공유), 도메인 사유 매핑만 여기서 한다. */
+    /** 분류 로직은 `classifyTransportFailure`(`RetryRules.kt`, 임베딩과 공유), 도메인 사유 매핑만 여기서 한다. */
     private fun mapTransportFailure(error: Throwable): BidPredictionOutcome.Unavailable =
         BidPredictionOutcome.Unavailable(
             when (classifyTransportFailure(error)) {
@@ -158,7 +158,7 @@ class GrpcBidPredictionGateway(
         )
 
     /**
-     * verifier r1 F-10(low) — `Resolution.NotApplicable` 가지의 `error(...)`는 scope.md ④
+     * `Resolution.NotApplicable` 가지의 `error(...)`는 scope.md ④
      * 「예외가 이 클래스 밖으로 새지 않는다」의 대상이 **아니다**. 그 규율은 ML 호출의
      * 업무 실패(transport·application·release 불일치 등)를 가리킨다 — 이 가지는 배선
      * 자체의 설정 오류(`ML_CALL_POLICY`에 [bidvector.sharedkernel.EffectiveFrom.Initial]
@@ -167,7 +167,7 @@ class GrpcBidPredictionGateway(
      * 이 가지에 실질적으로 도달하지 않는다 — 제거하지 않는 이유는 정책이 시행일 기반
      * 다중 entry 로 확장될 미래(`OPEN-M2-DEADLINE-VALUES` 실측 갱신)에 이 방어가 실제
      * 배선 결함(예: 시행일이 전부 미래인 정책 배포)을 조용히 통과시키지 않게 하려는 것.
-     * 리뷰 F-E(medium) 처방 — 본문은 `resolveMlCallPolicy`(`MlCallPolicyData.kt`)로
+     * 본문은 `resolveMlCallPolicy`(`MlCallPolicyData.kt`)로
      * 옮겼다(임베딩과 17줄 중복이었다, 정책 이름 문자열만 다름).
      */
     private fun resolvePolicy(): ResolvedMlCallPolicy = resolveMlCallPolicy(policy, clock, "ML_CALL_POLICY")
@@ -175,8 +175,7 @@ class GrpcBidPredictionGateway(
 
 /**
  * D-4D2-4 처방 2 — 응답 타입에 의존하는 재시도 판정 술어는 `ResilientPredictionCall.kt`가
- * 아니라 호출부가 갖는다(4D-1 에서 이 파일로 이동, 순수 위치 이동 — 판정 로직 자체는
- * 한 글자도 바뀌지 않았다). 임베딩 쪽 대응은 `GrpcEmbeddingGateway.kt`의
+ * 아니라 호출부가 갖는다. 임베딩 쪽 대응은 `GrpcEmbeddingGateway.kt`의
  * `isRetryableEmbedFailure`다.
  */
 private fun isRetryableFailureResponse(response: CalculateOptimalBidResponse): Boolean =

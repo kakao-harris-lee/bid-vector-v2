@@ -17,7 +17,7 @@ import java.sql.Connection
 import javax.sql.DataSource
 
 /**
- * [StrategyRepository]의 첫 production 구현(M6/6F-1, D-6F1-1~6). 저장소에 이 port의 실
+ * [StrategyRepository]의 첫 production 구현(D-6F1-1~6). 저장소에 이 port의 실
  * 구현이 없었다 — `EvaluateCandidatesUseCase.evaluate()`의 첫 줄이 `strategies.load()`라
  * 이 어댑터 없이는 어떤 후보도 판정에 들어가지 못한다.
  *
@@ -31,7 +31,7 @@ import javax.sql.DataSource
  * [Resolution.Resolved]다 — 이 클래스는 [bidvector.strategy.STRATEGY_POLICY]를 참조하지
  * 않는다(어댑터가 정책 파일의 두 번째 독자가 되지 않는다).
  *
- * **D-6F1-7(계약 갱신 (2), 6B-1 실측 인계) — 패키지는 `bidvector.adapters.strategy`다.**
+ * **D-6F1-7(계약 갱신 (2), 실측 인계) — 패키지는 `bidvector.adapters.strategy`다.**
  * `bidvector.adapters.persistence`에는 두지 않는다 — 그 패키지의
  * `PersistenceAdapterDependencyTest`가 `strategy`·`workflow` 참조를 금지하고(3D 원안),
  * 이 클래스는 [bidvector.workflow.strategy.StrategyRepository]와 [OperatorStrategy]를
@@ -45,7 +45,7 @@ class JdbcStrategyRepository(
     private val policy: Resolution.Resolved<StrategyPolicyData>,
 ) : StrategyRepository {
     /**
-     * M6/6A-2b D-6A2b-3 — 옛 형태(이 어댑터가 커넥션과 커밋을 스스로 쥔다)를 그대로 남긴다.
+     * D-6A2b-3 — 옛 형태(이 어댑터가 커넥션과 커밋을 스스로 쥔다)를 그대로 남긴다.
      * [OwnTransactionConnectionSource] 가 「호출 하나 = 트랜잭션 하나」를 지므로 [save] 의
      * 두 문이 여전히 한 커밋에 든다. 편집 경로는 이 생성자가 아니라 [ConnectionSource] 를
      * 받는 위 생성자로 서서 **호출부의** 트랜잭션(전략+outbox+세션)에 참여한다.
@@ -79,7 +79,7 @@ class JdbcStrategyRepository(
      * 값을 지어 쓰지 않는다). [JdbcNoticeRepository.persist]와 같은 관례로 `catch`를
      * 두지 않는다 — 실패는 그대로 전파되고 롤백은 커넥션의 주인이 진다.
      *
-     * **M6/6A-2b D-6A2b-3 — 커밋 주체는 이 클래스가 아니라 [connections] 다.** 편집
+     * **D-6A2b-3 — 커밋 주체는 이 클래스가 아니라 [connections] 다.** 편집
      * 경로에서는 [bidvector.adapters.persistence.TransactionBoundary] 가 주인이라 이
      * 두 문이 outbox 등록·세션 전진과 **같은 커밋**에 든다(4A 잔여 창 폐쇄). 옛
      * `DataSource` 생성자에서는 [OwnTransactionConnectionSource] 가 주인이라 거동이

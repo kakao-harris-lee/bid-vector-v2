@@ -3,7 +3,7 @@
 규칙표: 범주 OOV→NaN+OOV, 금액 결측→RowRejected, 분모 결측→RowRejected,
 agency Missing→NaN NaN, 미관측→category 평균 0.0(Observed), 관측→log1p(n)(Observed).
 NaN 위치 ≡ provenance 위치. `inspect.signature` 고정(시각 인자 없음). `Observed` 값은
-`FEATURE_SCHEMA_V2`가 선언한 열별 `range` 안에 있어야 한다(verifier r1 L-1).
+`FEATURE_SCHEMA_V2`가 선언한 열별 `range` 안에 있어야 한다(L-1).
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ def _feature_space(observations: list[AwardRateObservation] | None = None):
         assert isinstance(outcome, Built)
         encoding = outcome.encoding
     else:
-        # 관측 0 은 `NoObservations`(verifier r1 M-2) — 행 조립 test 는 여기서 그 가드를
+        # 관측 0 은 `NoObservations`(M-2) — 행 조립 test 는 여기서 그 가드를
         # 다시 재판정하지 않고, 빈 encoding 표를 직접 만들어 build_row 규칙만 확인한다.
         encoding = _EMPTY_ENCODING
     return AwardRateFeatureSpace(
@@ -61,7 +61,7 @@ def _feature_space(observations: list[AwardRateObservation] | None = None):
 
 
 def _assert_observed_values_within_schema_range(row: FeatureRow) -> None:
-    """verifier r1 L-1 — `Observed` 값은 `FEATURE_SCHEMA_V2`가 선언한 범위 안에 있어야 한다."""
+    """L-1 — `Observed` 값은 `FEATURE_SCHEMA_V2`가 선언한 범위 안에 있어야 한다."""
     for value, provenance, column in zip(
         row.values, row.provenance.columns, FEATURE_SCHEMA_V2.columns, strict=True
     ):

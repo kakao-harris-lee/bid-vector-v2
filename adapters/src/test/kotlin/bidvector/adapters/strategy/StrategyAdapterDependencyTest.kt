@@ -17,7 +17,7 @@ import java.io.File
  * 자신은 이 패키지의 클래스끼리(예: `JdbcEditSessionRepository` → `EditSessionRow`) 서로
  * 참조할 수 있어야 하므로 포함한다.
  *
- * **M6/6A-2b D-6A2b-3 — 이벤트 축 둘을 더한다.** `JdbcStrategyEditTransaction` 이 편집
+ * **D-6A2b-3 — 이벤트 축 둘을 더한다.** `JdbcStrategyEditTransaction` 이 편집
  * 트랜잭션 안에서 outbox sink 를 조립하려면 `OutboxEventSink`(workflow.event)·
  * `JdbcOutboxPort`(adapters.event) 를 이름으로 불러야 한다. 그 조립이 `app` 이 아니라
  * 이 패키지에 사는 이유가 그것이다 — `app` production 은 outbox 쓰기 타입을 참조하지
@@ -43,27 +43,26 @@ private fun isDisallowed(importedPackage: String): Boolean =
  * 바이트코드 내부 이름(`a/b/C`)과 이름 기반 클래스 로드가 남기는 점 표기 좌표
  * (`a.b.C`) 양쪽에서 `bidvector...` 부분을 뽑는다 — 상수 풀 전체를 훑는다.
  *
- * **verifier r3 MEDIUM-5 수정** — 이전 판(`bidvector/[A-Za-z0-9_/$]+`, 슬래시 형태만)은
+ * **수정** — 슬래시 형태만 잡는 정규식(`bidvector/[A-Za-z0-9_/$]+`)은
  * `Class.forName("bidvector.procurement...")`처럼 이름으로 클래스를 로드하면 상수 풀에
- * 남는 점 표기 Utf8 문자열을 놓쳤다(그 로드는 런타임 classpath 에 있어 실제로 성공한다).
+ * 남는 점 표기 Utf8 문자열을 놓친다(그 로드는 런타임 classpath 에 있어 실제로 성공한다).
  * 문자 클래스에 `.`을 더해 두 표기 모두 잡는다 — 허용 루트는 어차피 `isDisallowed`가
  * 거른다.
  */
 private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
 
 /**
- * S-3B 계열, MEDIUM-2 시정(verifier r1) — **소스 텍스트가 아니라 컴파일된 클래스의 상수
- * 풀(constant pool)을 `javap -p -v`로 훑는다.** 이전 판(`^import (bidvector\.…)` 정규식)은
+ * S-3B 계열, MEDIUM-2 시정 — **소스 텍스트가 아니라 컴파일된 클래스의 상수
+ * 풀(constant pool)을 `javap -p -v`로 훑는다.** 소스 텍스트 정규식(`^import (bidvector\.…)`)은
  * import 문 없이 전체 한정 좌표로 직접 참조하면(`bidvector.procurement.NoticeId(...)`처럼
- * import 없이 씀) 보지 못했고 전건 `check --rerun-tasks`가 BUILD SUCCESSFUL 이었다
- * (verifier MUT-E3). 상수 풀은 소스가 import 를 썼는지·들여쓰기가 어떤지와 무관하게
+ * import 없이 씀) 보지 못하고 전건 `check --rerun-tasks`가 BUILD SUCCESSFUL 이 된다
+ * (MUT-E3). 상수 풀은 소스가 import 를 썼는지·들여쓰기가 어떤지와 무관하게
  * **컴파일러가 실제로 만든 타입 참조**를 담으므로 그 우회가 구조적으로 닫힌다.
  *
  * `javap`(JDK 번들 도구)를 외부 프로세스로 부르는 것은 이 저장소에 새 패턴이지만, 여기
  * 말고는 옮길 자리가 없다 — Kotlin/JVM 에 「소스만 보고 컴파일된 참조를 판정」하는 표준
  * API 는 없고, ASM 등 바이트코드 라이브러리를 새로 끌어오는 것은 `javap` 하나 실행하는
- * 것보다 비용이 크다(팀장 지시 "비용이 그보다 크면 코딩하지 말고 멈추고 보고" — 이 저장소가
- * 이미 갖고 있는 JDK 도구로 되므로 비용이 작은 쪽을 골랐다).
+ * 것보다 비용이 크다(이 저장소가 이미 갖고 있는 JDK 도구로 되므로 비용이 작은 쪽을 골랐다).
  */
 class StrategyAdapterDependencyTest {
     @Test
@@ -96,7 +95,7 @@ class StrategyAdapterDependencyTest {
         isDisallowed("bidvector.sharedkernel") shouldBe false
         isDisallowed("bidvector.adapters.persistence") shouldBe false
         isDisallowed("bidvector.adapters.strategy") shouldBe false
-        // M6/6A-2b D-6A2b-3 — 편집 트랜잭션 조립이 부르는 outbox 축 둘.
+        // D-6A2b-3 — 편집 트랜잭션 조립이 부르는 outbox 축 둘.
         isDisallowed("bidvector.workflow.event") shouldBe false
         isDisallowed("bidvector.adapters.event") shouldBe false
     }

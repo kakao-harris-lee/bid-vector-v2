@@ -32,9 +32,9 @@ sealed interface EditSessionState {
 
     /**
      * 확인 대기 — [draft] 는 전략 **전체**의 스냅숏이고, [baseRevision] 은 그 스냅숏을 뜬
-     * 시점의 전략 revision 이다(M6/6A-2b D-6A2b-18).
+     * 시점의 전략 revision 이다(D-6A2b-18).
      *
-     * **왜 기준을 함께 담는가(verifier r1 F-2 · code-review r1 HIGH-1).** `Confirm` 의
+     * **왜 기준을 함께 담는가.** `Confirm` 의
      * `seenRevision` 은 「클라이언트가 확인 직전에 본 revision」이라 지금 저장된 값과 같기
      * 쉽다 — 그 대조만으로는 **draft 가 언제 떠졌는지**를 묻지 못한다. 서버 생성 id 아래서는
      * 세션이 여럿 열리므로(알려진 제한 ①), 앞 세션이 적용한 뒤 뒤 세션이 낡은 스냅숏을

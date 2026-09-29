@@ -189,7 +189,7 @@ def test_no_bare_threshold_parameter_on_public_entry_points() -> None:
 
 
 def test_trial_outcome_is_not_public() -> None:
-    """verifier r1 H-3 — `trial_outcome`은 안정성 없이 `Passed`(→ `Promotable`)를
+    """H-3 — `trial_outcome`은 안정성 없이 `Passed`(→ `Promotable`)를
     만들 수 있어 public 이면 위협 모델 (f)의 우회 표면이었다. 모듈 안에서는 여전히
     `_trial_outcome`으로 존재하지만(이 파일 자신의 판정식 검증용) evaluation
     패키지의 public 표면(`__all__`)에는 없다."""
@@ -200,7 +200,7 @@ def test_trial_outcome_is_not_public() -> None:
 
 
 def test_passes_gate_is_the_single_predicate_definition() -> None:
-    """verifier r1 H-2 — `gate_outcome`·`_trial_outcome`이 내는 판정이 `passes_gate`
+    """H-2 — `gate_outcome`·`_trial_outcome`이 내는 판정이 `passes_gate`
     하나로 설명된다(별도 판정식이 없다는 것을 값으로 확인)."""
     model, baseline, targets = _strong_win()
     from ml_engine.evaluation.scoring import paired_t, rmse_bias_std
@@ -223,7 +223,7 @@ def test_passes_gate_is_the_single_predicate_definition() -> None:
 
 
 def test_passes_gate_requires_both_rmse_and_statistic_conditions() -> None:
-    """verifier r1 H-2 변이 #6 재현 — 안정성 sweep 의 인라인 재구현이 `and
+    """H-2 변이 #6 재현 — 안정성 sweep 의 인라인 재구현이 `and
     statistic < -threshold` 조건을 빠뜨려도 `pytest tests -q`가 630 passed 였다.
     두 조건이 **각각** 필요함을 직접 확인한다(단일 조건만으로는 통과하지 않는다)."""
     # rmse 는 개선됐지만 통계량이 유의 수준(2.58)에 못 미친다 → 통과하면 안 된다.

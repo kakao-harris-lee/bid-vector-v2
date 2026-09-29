@@ -27,28 +27,16 @@ class DomainSourceReferenceFixtureTest {
         assertViolates(File(VIOLATING, "settlement/FullyQualifiedReferenceLeak.kt"), "java.net.HttpURLConnection")
     }
 
-    /**
-     * **Codex 14차 #1 회귀 고정.** 다른 함수의 동명 지역 변수(`val java = 1`)가 이 함수의
-     * 완전수식 참조를 지우지 못한다 — production 게이트 회귀 fixture.
-     */
     @Test
     fun `다른 함수의 동명 지역 변수가 완전수식 참조를 지우지 못한다`() {
         assertViolates(File(VIOLATING, "qualification/ShadowedRootLeak.kt"), "java.net.HttpURLConnection")
     }
 
-    /**
-     * **verifier r20 H-1 회귀 고정.** 같은 함수 안, 참조 **뒤쪽**의 동명 지역 변수(`val java = 1`)
-     * 도 그 앞선 참조를 지우지 못한다 — production 게이트 회귀 fixture.
-     */
     @Test
     fun `참조 뒤쪽의 동명 지역 변수가 앞선 완전수식 참조를 지우지 못한다`() {
         assertViolates(File(VIOLATING, "qualification/TrailingShadowLeak.kt"), "java.net.HttpURLConnection")
     }
 
-    /**
-     * **verifier r21 H-1' 회귀 고정.** 참조를 가리는 선언 자신의 초기화식 안(`val java =
-     * java.net.…`) 에 둔 완전수식 참조도 지워지지 않는다 — production 게이트 회귀 fixture.
-     */
     @Test
     fun `가리는 선언 자신의 초기화식 안 완전수식 참조도 지워지지 않는다`() {
         assertViolates(File(VIOLATING, "qualification/SelfInitShadowLeak.kt"), "java.net.HttpURLConnection")

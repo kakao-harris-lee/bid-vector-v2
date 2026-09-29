@@ -87,9 +87,9 @@ private fun <K> requireFullWeightMap(
 }
 
 /**
- * 운영 정책 인스턴스 — **사용자 승인 2026-09-10으로 확정됐다**(`OPEN-4B5-POLICY-VALUES` 종결).
- * 착수 시(2026-09-10)에는 구조 검증용 placeholder였으나(근거는 실측이 아니라 legacy 값
- * 그대로, ADR 0010 D-1 「보수적 상한 + 측정 의무」), slice 4B-5 종결 승인과 함께 이 값
+ * 운영 정책 인스턴스 — **사용자 승인으로 확정됐다**(`OPEN-4B5-POLICY-VALUES` 종결).
+ * 착수 시에는 구조 검증용 placeholder였으나(근거는 실측이 아니라 legacy 값
+ * 그대로, ADR 0010 D-1 「보수적 상한 + 측정 의무」), 종결 승인과 함께 이 값
  * 자체가 승인됐다 — 밴드 넷·가중치 둘·상수 다섯·`budgetCaptureRounding`(scale 6) 전부,
  * 「의도된 갈림」 셋(`Rate ≤ 1` 거부·`floor=1` legacy 이탈·2자리 반올림 미재현)을 포함한다.
  * 값은 legacy 산식 상수 그대로다(D-4B5-2 예외 외에는 4B-4 와 달리 확률 축을 빼는

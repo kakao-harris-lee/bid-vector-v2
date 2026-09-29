@@ -87,10 +87,10 @@ private val ALLOWED_ROOTS =
 
 /**
  * `foo.Baz`·`foo.bar.Baz` 형태 — 점으로 이어진 소문자(숫자·언더스코어 포함) 세그먼트
- * 하나 이상 다음에 대문자로 시작하는 식별자(4A `EditSessionImportBoundaryTest` verifier
- * L-7 수정판과 동일 정규식 — 단일 소문자 세그먼트 루트도 잡는다).
+ * 하나 이상 다음에 대문자로 시작하는 식별자(`EditSessionImportBoundaryTest`와
+ * 동일 정규식 — 단일 소문자 세그먼트 루트도 잡는다).
  *
- * **알려진 사각(4A와 동일)**: 대문자로 시작하는 단일 세그먼트 루트(`Telegram.Bot`)는 잡지
+ * **알려진 사각(다른 test와 동일)**: 대문자로 시작하는 단일 세그먼트 루트(`Telegram.Bot`)는 잡지
  * 못한다 — 강화하면 이 패키지 자신의 정당한 sealed 하위 타입 접근(`Verdict.BidNow`·
  * `WatchVerdict.Rejected` 등)까지 오탐한다. milestone-4.md 알려진 제한에 등재한다.
  */

@@ -6,7 +6,7 @@ import contract.bidvector.ml.v1.EmbedTextRequest as ProtoEmbedTextRequest
 import contract.bidvector.ml.v1.TextKind as ProtoTextKind
 
 /**
- * M4/4D-2(scope.md ①) — 도메인 [EmbedTextRequest] → `embedding.proto` 계약 DTO. 자유
+ * scope.md ① — 도메인 [EmbedTextRequest] → `embedding.proto` 계약 DTO. 자유
  * `String`은 만들지 않는다(요청 `text` 자체가 이미 도메인 값이다 — 4B-6 이 합성한다).
  * `PredictionEnvelope`를 재사용한다(D-4D2-1 — release 선택자·feature_schema_version·
  * deadline_policy_version 축은 예측 전용이 아니라 `PredictionEnvelope` 전체가 두 RPC 가

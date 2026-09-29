@@ -28,7 +28,7 @@ import javax.sql.DataSource
  * 이 클래스 자신은 도메인 값을 만들지 않는다 — 환경변수/설정을 읽어 어댑터·필터를
  * 생성자에 꽂을 뿐이다(v2-지침서 §5 「생성자 주입 DI, 전역 상태·service locator 금지」).
  *
- * **D-6A1-21 실측 전제 — 정정: 둘 다 필요한 것이 아니라 `add-mappings=false` 하나가
+ * **D-6A1-21 실측 전제 — 둘 다 필요한 것이 아니라 `add-mappings=false` 하나가
  * 지탱한다.** `spring.web.resources.add-mappings=false`가 없으면 미매핑 경로가 정적
  * 리소스 핸들러(`add-mappings` 기본값 true가 등록하는 전체 경로 매핑)에 먼저 걸려
  * `sendError()`로 컨테이너의 **별도 ERROR 재디스패치**를 유발한다 — 그 재디스패치는 이
@@ -36,7 +36,7 @@ import javax.sql.DataSource
  * 모두 우회한다(우회 (1)·(2)가 만나는 자리, D-6A1-21). `spring.mvc.throw-exception-if-
  * no-handler-found=true`는 정적 리소스 핸들러가 비활성화된 뒤 남는 미매핑 경로를
  * `NoHandlerFoundException`으로 만들어 [bidvector.app.http.GlobalErrorHandler]를
- * 지나게 한다 — **실측(팀장 지시): 이 값만 빼면 여전히 GREEN이다**(`add-mappings=false`
+ * 지나게 한다 — **실측: 이 값만 빼면 여전히 GREEN이다**(`add-mappings=false`
  * 하나로 이미 같은 REQUEST 디스패치 안에서 끝난다). 그래도 두 값을 함께 둔다 — 정적
  * 리소스 핸들러 재활성 같은 미래 변경에서 `NoHandlerFoundException`으로의 변환을 명시
  * 보장으로 남겨 두는 편이 암묵적 부작용에 기대는 것보다 낫다(비용은 설정 값 한 줄).
@@ -54,10 +54,10 @@ import javax.sql.DataSource
 @SpringBootApplication
 @ComponentScan(
     excludeFilters = [
-        // M6/6A-2b D-6A2b-9 — Boot 기본 `@ComponentScan` 이 늘 거는 필터 둘을 되살린다
+        // D-6A2b-9 — Boot 기본 `@ComponentScan` 이 늘 거는 필터 둘을 되살린다
         // (`OPEN-6A1-SCAN-FILTER-SIDE-EFFECT`). 명시 `@ComponentScan` 을 쓰면 `@SpringBootApplication`
-        // 의 메타 애너테이션이 아니라 **이 선언**이 이긴다 — 6A-1 이 중첩 조립을 빼려고 이 애너테이션을
-        // 붙이면서 그 둘이 함께 사라졌다. 6A-2a 가 영향 0 을 실측했지만 「오늘 영향이 없다」는 것과
+        // 의 메타 애너테이션이 아니라 **이 선언**이 이긴다 — 중첩 조립을 빼려고 이 애너테이션을
+        // 붙이면서 그 둘이 함께 사라졌다. 「오늘 영향이 없다」는 것과
         // 「없어도 된다」는 다르다: 두 필터가 없으면 test 슬라이스 표지(`TypeExcludeFilter`)와
         // 자동 구성 등록 클래스(`AutoConfigurationExcludeFilter`)가 스캔에 섞일 수 있고, 새 컨트롤러·
         // 조립기가 스캔에 들어오는 이 slice 가 그 자리를 닫기에 가장 싸다.
@@ -127,7 +127,7 @@ open class BidVectorApplication {
  * 단일 운영자 자격증명 설정 키(D-6A1-9, 「인증 관련」 이름 규율) — 값은 환경변수 주입,
  * 기본값 없음.
  *
- * **verifier r4 실측 — `data class`였을 때 `toString()`이 원문을 그대로 냈다.** Spring은
+ * **실측 — `data class`였을 때 `toString()`이 원문을 그대로 냈다.** Spring은
  * 기동 실패·바인딩 오류·actuator 환경 노출 등에서 `@ConfigurationProperties` 객체를
  * 문자열화해 로그·응답에 낼 수 있다 — 컴파일러가 합성하는 `data class`의 `toString()`이
  * 그 경로로 자격증명 원문을 흘린다(D-6A1-43의 (2b) 값 획득 축 전수에서 이 타입이 누락돼
@@ -145,11 +145,8 @@ class OperatorCredentialProperties(
  * D-6A1-21 — 위 클래스 문서의 실측 전제. 새 파일(application.yml)을 만들지 않는다
  * (scope.md in_scope 파일 목록 밖) — 조립 근이 프로그램적으로 못박는다.
  *
- * **D-6A1-27 시정 — `main()`과 production 조립 boot test(`ProductionAssemblyAuthAuditTest`)가
- * 같은 값을 참조한다.** 이전 판은 이 두 속성을 test 파일에 `const val`로 중복 선언하고
- * (`HttpTestSupport.PROP_*`) 「드리프트가 나면 test가 곧바로 실패한다」고 적었는데, 그
- * test는 `main()`을 부르지 않고 자기 사본을 그대로 써서 실측으로 거짓임이 드러났다
- * (verifier — 이 둘을 제거해도 기존 http test 넷은 exit 0). 이 값을 `main()`과 production
+ * **D-6A1-27 — `main()`과 production 조립 boot test(`ProductionAssemblyAuthAuditTest`)가
+ * 같은 값을 참조한다.** 이 값을 `main()`과 production
  * boot test가 **같은 참조**로 공유하면, 여기서 지우는 순간 두 자리 모두 같이 비어 실제
  * 런타임 동작(미매핑 경로의 디스패치 형태)이 갈라지고 그 test가 붉어진다.
  */
