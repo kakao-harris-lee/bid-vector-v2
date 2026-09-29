@@ -176,7 +176,7 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 
 ## 실측
 
-**실측 HEAD: `9356d086`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
+**실측 HEAD: `be4e852c`**(이 레인의 마지막 산출물 커밋 — evidence 커밋 앞).
 
 임시 clone 에서 위 복원을 돌리고 ①~⑥ 을 쟀다. **Gradle 축(④⑤⑥ 중 Kotlin `check`)은 이 레인이
 돌리지 않는다**(호스트 무거운 빌드 1개 규율) — Python 축으로 같은 여섯을 쟀다.
@@ -184,17 +184,17 @@ git diff <이 레인의 evidence 커밋>~1..<그 커밋> -- reports/evidence/m6/
 | 축 | 결과 |
 |---|---|
 | ① 명령 exit | 0 |
-| ② A/M 수 | 추가 42 · 수정 4 — 위 기계 산출과 같다 |
-| ③ diff 빈 것 | `git diff 678c6ed7 -- ml-engine` **0 줄** — 되돌린 트리가 base 와 바이트 동일 |
+| ② D/M 수 | 삭제 **44** · 수정 **4** — 위 기계 산출(A 44 · M 4)과 같다 |
+| ③ diff 빈 것 | `git diff <base> -- ml-engine` **0 줄** — 되돌린 트리가 base 와 바이트 동일. `fixtures/`·`evaluation/backtest/` 둘 다 남지 않았다 |
 | ④ 형 검사 | `uv run mypy --strict src/ml_engine` — 소스 72개, 오류 0(base 상태) |
 | ⑤ test | `uv run python -m pytest tests -q` — **958 passed**(base 상태, 6G 추가분 없음) |
-| ⑥ 게이트 | `ruff` · `lint-imports` · `design_ratchet` 셋 다 통과(base 상태) |
+| ⑥ 게이트 | `ruff check` · `ruff format --check` · `lint-imports` · `design_ratchet` · `reuse_provenance_check` 다섯 다 통과(base 상태) |
 
 갈음은 「HEAD 초록」이 아니라 **트리 동일성**(③)이다.
 
 ## 실측 HEAD 이후 되돌림 대상이 움직였는가
 
-`git diff --name-only 9356d086..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
+`git diff --name-only be4e852c..<판정 SHA> -- <위 경로들>` 이 빈 출력이어야 이 실측이 유효하다.
 이 레인의 evidence 커밋은 `reports/evidence/m6/6g/` 안이고 그 경로는 위 목록에 **없다** — 그러므로
 evidence 를 더 써도 이 실측은 유효하다.
 

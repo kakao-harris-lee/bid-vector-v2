@@ -328,16 +328,28 @@ evidence 커밋에 함께 실렸다 — 그 레인이 같은 경로를 스테이
 
 | 단계 | 명령 | 결과 |
 |---|---|---|
-| S-1 | `uv sync --frozen --all-extras` | 성공 |
-| S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 |
+| S-1 | `uv sync --frozen --all-extras` | exit 0 |
+| S-1b | serving extras 분리(금지 패키지 다섯 import 불가 확인 후 dev 복구) | exit 0 |
+| S-2 | `uv run ruff check .` / `uv run ruff format --check .` | 위반 0 / 215 파일 이미 정렬 |
 | S-3 | `uv run mypy --strict src/ml_engine` | 소스 96개, 오류 0 |
 | S-4 | `uv run lint-imports` | 계약 8 유지, 0 깨짐 |
-| S-5 | `uv run python -m pytest tests -q` | **1194 passed**(skip 0). 앞 라운드의 붉은 일곱은 D-6G-58 판독을 v5 로 올려 닫혔다 |
+| S-5 | `uv run python -m pytest tests -q` | **1209 passed**(실패 0 · skip 0) |
 | S-6 | `uv run python tools/design_ratchet.py --check` | 위반 0 |
-| S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 통과(6G 신규 모듈은 이식이 아니라 대상 밖) |
+| S-7 | `uv run python tools/reuse_provenance_check.py` + 양성 대조 | 위반 0 · 양성 대조 exit 비0(정상) |
+| S-9 | Python 버전 두 자리 대조 | exit 0 |
+| S-11 | `uv build --wheel` + `pytest tests/gates/test_wheel_reexport.py` | build exit 0 · 1 passed |
+| 누출 스캔 | `grep -rniE -f config/quality/leak-patterns.txt <evidence> <policy> <golden>` | **0건** |
 
-`ml-engine` job 의 나머지 단계(S-1b serving extras 분리 · S-9 Python 버전 대조 · S-11 wheel 재수출)는
-이 레인이 건드린 축이 아니고 CI 가 같은 명령으로 돈다.
+**S-5 는 한 번 붉었다(10 failed).** 원인은 합성 스냅숏 fixture 생성기가 test 지원 헬퍼와 **다른
+자리**에서 manifest 를 짓는데 한쪽만 고친 것이다 — 판독이 없는 키로 거부했고, fail-closed 가 제
+일을 한 결과다(조용히 지나가지 않았다). 생성기와 커밋된 fixture 를 함께 고친 뒤 실패 0 이다.
+**manifest 키를 늘리면 고칠 자리가 판독기 하나가 아니다** — 문서·판독기 등식 test 는 그 둘을
+묶지만 test 쪽 생성기는 묶지 않는다(아래 알려진 제한).
+
+**Gradle 과 겹쳐 돌았다(사실 선언).** 상대 레인의 Gradle 이 도는 동안 이 레인의 Python 실행을
+`nice -n 19` 로 돌렸다 — 우선순위를 양보하므로 그 빌드를 굶기지 않고, 매 실행 전 가용 메모리를
+확인했다(11~15GB, 문턱 6GB). 호스트 규율이 막는 것은 **무거운 빌드 둘**이고 이 레인은 Gradle 을
+돌리지 않는다. 그래도 완전한 직렬은 아니므로 사실로 적는다.
 
 **실험 실행 자체(실수집·스냅숏·판정)는 acceptance 가 아니라 산출물**이고, 이 레인은 **실 데이터를
 돌리지 않았다** — 코드·test·evidence 까지다.
@@ -699,6 +711,16 @@ test 둘이 붉어지는데 **golden 여덟은 그대로 초록**이었다. 「�
 **판정 JSON 의 바이트는 달라진다** — 같은 스냅숏·같은 정책이라도 S0 가 다른 금액을 내기 때문이다.
 재현(위협 모델 ③)이 요구하는 것은 「같은 입력·같은 코드면 같은 판정」이고, 코드가 바뀌었으므로 이전
 판정 바이트와 같을 이유가 없다. 실 데이터 판정은 아직 돌지 않았다.
+
+## 알려진 제한 — manifest 키를 늘리면 고칠 자리가 판독기 하나가 아니다
+
+문서 §2 의 키 집합과 판독기의 허용 키는 등식 test 가 묶는다. 묶지 **않는** 것은 test 쪽 manifest
+**생성기 둘**(지원 헬퍼와 합성 fixture 생성기)이다 — 한쪽만 고치면 그 생성기를 쓰는 test 가 붉어질
+뿐 어느 자리를 고쳐야 하는지 등식이 말해 주지 않는다. r5 에서 실제로 그렇게 열 건이 붉었다.
+
+닫지 않은 이유: 잡히기는 **확실히 잡힌다**(판독이 fail-closed 라 없는 키도 거부한다). 생성기를
+하나로 합치면 「깨뜨린 manifest 를 짓는」 test 들이 그 하나를 우회해야 해서, 지금 판독을 겨누는
+test 들이 오히려 헐거워진다. 비용이 이득보다 크다고 보고 등재만 한다.
 
 ## 알려진 제한 — 판독은 표본의 **사후 축소**를 잡지 못한다
 
